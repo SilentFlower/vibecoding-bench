@@ -15,6 +15,7 @@ function leaveEnvironments() {
   ui.timer = null;
   closeNativeKernelDialog(true);
   closeCpuResourceDialog(true);
+  closeContentCaptureDialog(true);
 }
 
 /**
@@ -84,9 +85,14 @@ function paintEnvironments() {
   if (document.activeElement !== select && select.innerHTML !== options) select.innerHTML = options;
   select.value = ui.status;
   const query = ui.query.trim().toLocaleLowerCase();
-  const rows = ui.rows.filter(row => (ui.status === 'all' || (row.state || 'unknown') === ui.status)
+  const parameters = new URLSearchParams(location.hash.split('?')[1] || '');
+  const gateway = parameters.get('gateway_account'), environment = parameters.get('environment');
+  const rows = ui.rows.filter(row => (!gateway || String(row.gateway_account_id) === gateway)
+    && (!environment || row.environment_id === environment)
+    && (ui.status === 'all' || (row.state || 'unknown') === ui.status)
     && `${row.name || ''} ${row.environment_id || ''}`.toLocaleLowerCase().includes(query));
-  $('#environment-result-count').textContent = `显示 ${rows.length} / ${ui.rows.length} 个环境`;
+  $('#environment-result-count').textContent = `显示 ${rows.length} / ${ui.rows.length} 个环境${gateway ? ` · 网关账号 ${gateway}` : ''}`;
+  $('#environment-clear-target').hidden = !gateway && !environment;
   list.innerHTML = rows.map(renderEnvironmentCard).join('') || `<p class="env-empty">${ui.rows.length ? '没有匹配的环境，请调整搜索或筛选。' : '暂无账号环境。'}</p>`;
   $$('details[data-env-details]', list).forEach(details => {
     details.open = ui.expanded.has(details.dataset.envDetails);
@@ -124,6 +130,7 @@ function renderEnvironmentCard(row) {
     ${ui.feedback.has(id) ? `<p class="env-notice" role="status">${escapeHTML(ui.feedback.get(id))}</p>` : ''}
     ${renderNativeKernel(row)}
     ${renderNativePreparation(row)}
+    <section class="env-window"><div><h4>请求内容采集</h4><p class="env-muted">${row.content_capture?.applied ? (row.content_capture.enabled ? '已开启' : '已关闭') : '实际配置待核对'} · 后续 debug 请求保存脱敏原文</p></div><button type="button" class="env-switch" role="switch" aria-label="${escapeHTML((row.name || '当前环境') + '请求内容采集')}" aria-checked="${row.content_capture?.enabled === true}" data-content-capture data-environment="${escapeHTML(id)}" data-env-focus="${escapeHTML(id + ':capture')}" ${pending || row.busy || KERNEL_BUSY_STATES.includes(row.native_kernel?.state) || row.native_kernel?.state === 'reconcile' || !['ready', 'stopped'].includes(row.state) || !row.content_capture?.supported || !row.content_capture?.applied ? 'disabled' : ''}><span></span></button></section>
     ${row.isolation_version === 2 ? `<section class="env-window"><div><h4>CPU 额度</h4><p class="env-muted">分别调整 CLI、API 发送器和网络的额度，保存后重建沿用。</p></div><button type="button" class="btn btn-sm" data-cpu-resources data-environment="${escapeHTML(id)}" data-env-focus="${escapeHTML(id + ':cpu')}" ${pending ? 'disabled' : ''}>调整额度</button></section>` : ''}
     <section class="env-window"><div><h4>当地运行窗口</h4>${row.run_window ? renderAccountRunWindow({id: row.account_id, run_window: row.run_window}) : '<p class="env-muted">运行窗口尚未提供</p>'}</div>${row.run_window && row.account_id != null ? `<button type="button" class="btn btn-sm" data-run-window-config="${escapeHTML(row.account_id)}" data-environment="${escapeHTML(id)}" data-env-focus="${escapeHTML(id + ':window')}">配置时段</button>` : ''}</section>
     <details class="env-details" data-env-details="${escapeHTML(id + ':technical')}"><summary>环境与物理详情</summary><div class="env-details-body"><dl><dt>环境 ID</dt><dd><code>${escapeHTML(id)}</code></dd><dt>主机名</dt><dd>${escapeHTML(fingerprint.hostname || '未提供')}</dd><dt>设备身份</dt><dd>${escapeHTML(row.identity_status || '待核对')}</dd><dt>语言区域</dt><dd>${escapeHTML(fingerprint.lang || '未提供')}</dd><dt>画像版本</dt><dd>${escapeHTML(fingerprint.profile_version ?? '未提供')}</dd></dl>${row.physical_features ? renderPhysicalFeatures(row) : '<p class="env-muted">物理实测尚未采集。</p>'}</div></details>
@@ -190,6 +197,7 @@ async function handleEnvironmentAction(button) {
   if (!id || ui.pending.has(id)) return;
   if (button.dataset.kernelAction) return openNativeKernelDialog(button);
   if (button.hasAttribute('data-cpu-resources')) return openCpuResourceDialog(button);
+  if (button.hasAttribute('data-content-capture')) return openContentCaptureDialog(button);
   if (button.dataset.runWindowConfig) {
     try { await openRunWindowConfig(button.dataset.runWindowConfig); }
     catch (error) {
@@ -452,6 +460,81 @@ async function submitCpuResources(event) {
   } finally {
     request.sending = false;
     if (state.cpuDialog === request) $$('[data-close]', modal).forEach(button => { button.disabled = false; });
+    if (request.generation === state.viewGeneration && currentTab() === 'environments') await renderEnvironments();
+  }
+}
+
+/** 打开采集切换窗口并冻结实际版本。@param {HTMLButtonElement} button 账号开关。@return {Promise<void>} 读取结束。 */
+async function openContentCaptureDialog(button) {
+  if (state.captureDialog) return;
+  const row = state.environmentUI.rows.find(item => item.environment_id === button.dataset.environment);
+  if (!row) return;
+  const request = {id: row.environment_id, generation: state.viewGeneration, focus: button.dataset.envFocus,
+    sending: false, settings: null};
+  state.captureDialog = request;
+  const modal = $('#content-capture-modal'), form = $('#content-capture-form');
+  $('#content-capture-description').textContent = `${row.name} · 正在读取实际采集配置`;
+  $('#content-capture-feedback').textContent = '';
+  $('button[type="submit"]', form).disabled = true;
+  form.onsubmit = submitContentCapture;
+  modal.onkeydown = event => {
+    if (event.key !== 'Tab') return;
+    const nodes = $$('button:not(:disabled)', modal).filter(node => node.getClientRects().length);
+    const index = nodes.indexOf(document.activeElement);
+    if (event.shiftKey && index <= 0) { event.preventDefault(); nodes.at(-1)?.focus(); }
+    else if (!event.shiftKey && index === nodes.length - 1) { event.preventDefault(); nodes[0]?.focus(); }
+  };
+  openModal('#content-capture-modal');
+  $('[data-close]', modal).focus();
+  try {
+    const settings = await API(`/environments/${encodeURIComponent(request.id)}/content-capture`);
+    if (state.captureDialog !== request) return;
+    request.settings = settings;
+    $('#content-capture-description').textContent = `${row.name} · ${settings.enabled ? '已开启 → 关闭' : '已关闭 → 开启'} · 环境代次 ${settings.generation}`;
+    $('button[type="submit"]', form).disabled = !settings.supported || !settings.applied;
+    if (!settings.supported || !settings.applied) $('#content-capture-feedback').textContent = '原生发送器配置待核对，请先处理环境维护状态。';
+  } catch (error) {
+    if (state.captureDialog === request) $('#content-capture-feedback').textContent = '读取失败：' + error.message;
+  }
+}
+
+/** 统一关闭采集窗口并作废旧回执。@param {boolean} force 离页强制关闭。@return {boolean} 是否关闭。 */
+function closeContentCaptureDialog(force = false) {
+  const request = state.captureDialog, modal = $('#content-capture-modal');
+  if (!modal || (request?.sending && !force)) return false;
+  state.captureDialog = null;
+  modal.classList.add('hidden'); modal.onkeydown = null;
+  $$('[data-close]', modal).forEach(button => { button.disabled = false; });
+  if (request && !force) {
+    ($$('[data-env-focus]').find(node => node.dataset.envFocus === request.focus && !node.disabled)
+      || $('#environment-refresh'))?.focus({preventScroll: true});
+  }
+  return true;
+}
+
+/** 提交一次冻结的采集切换，失败后要求重新读取。@param {SubmitEvent} event 表单事件。@return {Promise<void>} 应用及刷新结束。 */
+async function submitContentCapture(event) {
+  event.preventDefault();
+  const request = state.captureDialog;
+  if (!request?.settings || request.sending) return;
+  request.sending = true;
+  const modal = $('#content-capture-modal');
+  $$('button', modal).forEach(button => { button.disabled = true; });
+  $('#content-capture-feedback').textContent = '正在等待空闲门禁并核对发送器配置…';
+  try {
+    const result = await API(`/environments/${encodeURIComponent(request.id)}/content-capture`, {method: 'POST', body: JSON.stringify({
+      enabled: !request.settings.enabled, expected_generation: request.settings.generation,
+      expected_revision: request.settings.revision
+    })});
+    if (state.captureDialog !== request) return;
+    request.sending = false;
+    closeContentCaptureDialog();
+    state.environmentUI.feedback.set(request.id, `请求内容采集已${result.enabled ? '开启' : '关闭'}，对后续请求生效。`);
+  } catch (error) {
+    if (state.captureDialog === request) $('#content-capture-feedback').textContent = '切换失败：' + error.message + '。请关闭窗口并重新读取。';
+  } finally {
+    request.sending = false;
+    if (state.captureDialog === request) $$('[data-close]', modal).forEach(button => { button.disabled = false; });
     if (request.generation === state.viewGeneration && currentTab() === 'environments') await renderEnvironments();
   }
 }

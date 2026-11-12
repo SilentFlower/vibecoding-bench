@@ -168,3 +168,50 @@ const isValidLimit = computed(() => {
 | settings 控件发错 key | 保存成功但服务不生效 | 对照 `settings_store.rs` key |
 | 组件直接 fetch | 鉴权和错误处理不一致 | 统一走 `api.ts` |
 | 显示完整 token | 凭据泄露 | 默认脱敏，必要时用户主动复制 |
+
+
+## Scenario: 管理页面版本、导航与请求详情
+
+### 1. Scope / Trigger
+
+修改 `Dashboard.vue`、`Environments.vue`、`SystemUpdates.vue`、`RequestDiagnostics.vue` 及其共享展示工具时适用。
+
+### 2. Signatures
+
+- `formatLocalTime(value?: string | null): string` 按浏览者时区显示日期、秒与 IANA 时区，空值及非法值显示“未观测”。原始 UTC 值仍用于查询与追溯。
+- 顶层 `/environments` 为环境列表，`/tasks?tab=accounts|topics|tasks|runs|projects|warmup` 为原任务相关页面；默认任务 Tab 使用 `/tasks`。
+- iframe `/runtime/?view=environments|tasks#<tab>?account=...&environment=...&gateway_account=...` 只传受控视图及筛选参数。
+
+### 3. Contracts
+
+- 目标管理页面采用 vm2api 实际亮色参考：中性表面、绿色强调、系统中文字体和等宽数字。现有 token 保名换值，App 背景使用 token。环境页仅在 `environment-page` 作用域映射色板；任务页保留原 `vibebench-theme` 偏好。
+- 顶层环境页隐藏重复内层导航；任务页隐藏环境子 Tab。旧内部链接通过 `runtime:navigate` 消息同步顶层 URL。父页同时核对 `origin`、当前 iframe `contentWindow` 和 Tab 白名单；忽略其它来源。
+- iframe 按 source 设置 key，导航由顶层创建历史项；点击内部链接先阻止内部 hash 历史重复入栈。账号筛选以 replace 同步，刷新和前进后退均以 URL 为准。离页保留原轮询、SSE 和弹窗收口。
+- `gateway_account` 表示网关账号 ID，环境列表按公开 `gateway_account_id` 精确筛选。bench 账号 ID 与网关 ID 分开处理。提供“显示全部环境”清除直达筛选。
+- 请求列表紧凑显示时间、短 ID、账号、持久终态和实际总耗时；390px 保留时间、账号、结果及详情入口，其它列按宽度折叠。状态使用 outcome，空计时保持未知，实际零 token 显示 0。
+- 请求详情四页签为概览、请求链路、性能、原始数据。固定标题与页签、内部滚动，支持方向键、Esc 和焦点返回。响应头耗时、首次有效输出、本地准备分别显示；本地准备包含等待与 checkout。
+- 内容读取同时检查原生方式、发生时日志模式及 capture_status。disabled、info、failed、dropped 提供各自状态与指引；queued/saved/timeout 和旧状态按原合同按需读取。关闭及切换尝试使原读取代次失效，保留已有后台证据短轮询。
+- 账号内容采集开关位于环境卡片，请求详情直达对应网关账号；保存窗口冻结 generation/revision，冲突后重新读取。具体后端合同见账号运行时规范“账号请求内容采集开关”。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 旧记录缺时间、模式或性能 | 保持未观测或历史未知 |
+| disabled 或 info | 阶段文件读取为零，说明后续请求生效条件 |
+| missing / expired | 分别显示文件缺失或已清理、超过保留期 |
+| 切换尝试、关窗、离页 | 旧回执失效，关闭后焦点回到原按钮 |
+| 过期配置或忙碌维护 | 展示服务端冲突，停止重放写入 |
+
+### 5. Scenarios and Examples
+
+- 正常：debug 请求显示“当时采集已关闭”→直达账号环境→空闲切换→后续请求使用新配置。
+- 边界：上海与洛杉矶显示同一 UTC 时间的对应本地时间；历史零值与空值保持区别。
+- 错误用法：把 bench 账号 ID 直接当作网关 ID。正确处理：按公开绑定字段筛选。
+- 错误用法：仅凭 debug 提供采集读取按钮。正确处理：同时使用发生时采集状态。
+
+### 6. Tests Required
+
+- `cd cc2api/web && npm run build`；通过 Vue/TypeScript 和生产构建。
+- `python deploy/v3/verify_management_ui.py --output .deploy/management-ui/combined`：实际产物、合成 API、两个时区、390px、版本单展开、导航历史、采集开关及异步关闭。
+- 原 `verify_environment_ui.py` 继续覆盖内核、时段、焦点、乱序和物理实测；所有浏览器模型调用为零。

@@ -13,7 +13,7 @@ const API = (path, opts = {}) =>
     // 401:session 过期或未登录 → 全局弹登录框,中止当前调用
     if (r.status === 401 && !path.startsWith('/auth/')) {
       if (!RUNTIME_BASE) showAuthModal();
-      const error = new Error(RUNTIME_BASE ? '统一后台会话已过期，请重新进入环境与任务页面' : 'auth required');
+      const error = new Error(RUNTIME_BASE ? '统一后台会话已过期，请重新进入环境或任务页面' : 'auth required');
       error.status = 401;
       throw error;
     }
@@ -51,6 +51,7 @@ const state = {
   environmentUI: {rows: [], query: '', status: 'all', expanded: new Set(), pending: new Set(),
     feedback: new Map(), request: 0, timer: null, loaded: false},
   kernelDialog: null,
+  captureDialog: null,
 };
 
 // ===================== Pi 项目指挥 =====================
@@ -93,6 +94,7 @@ function renderProjects() {
       // 选择账号只更新地址，不重建组件；切空间继续使用正常浏览历史。
       history.replaceState(history.state, '', iterationUrl(mode, id ?? 0));
       updateLinks(id ?? 0);
+      syncRuntimeNavigation(location.hash, true);
     }});
 }
 
@@ -124,6 +126,35 @@ function currentTab() {
   return ROUTES[hash] ? hash : 'accounts';
 }
 
+/** 同源嵌入时同步受控导航参数至主后台。
+ * @param {string} hash 目标内部路由。
+ * @param {boolean} replace 是否替换当前筛选地址。
+ * @return {boolean} 是否交由主后台导航。
+ */
+function syncRuntimeNavigation(hash = location.hash, replace = false) {
+  const embedded = new URLSearchParams(location.search).get('view');
+  if (!RUNTIME_BASE || window.parent === window || !['environments', 'tasks'].includes(embedded)) return false;
+  const tab = hash.replace(/^#/, '').split('?')[0], query = new URLSearchParams(hash.split('?')[1] || '');
+  if (!Object.hasOwn(ROUTES, tab)) return false;
+  const target = new URL(tab === 'environments' ? '/environments' : '/tasks', location.origin);
+  if (!['environments', 'tasks'].includes(tab)) target.searchParams.set('tab', tab);
+  for (const key of ['account', 'environment', 'gateway_account']) {
+    if (query.has(key)) target.searchParams.set(key, query.get(key));
+  }
+  // 初次进入与父地址相同，避免 iframe 加载和顶层导航相互触发。
+  if (target.pathname + target.search === window.parent.location.pathname + window.parent.location.search) return false;
+  window.parent.postMessage({type: 'runtime:navigate', tab, replace,
+    account: query.get('account'), environment: query.get('environment'), gateway_account: query.get('gateway_account')}, location.origin);
+  return true;
+}
+
+// 由顶层路由创建唯一历史项，避免一次点击同时写入 iframe 和主页面历史。
+document.addEventListener('click', event => {
+  const link = event.target.closest('a[href^="#"]');
+  if (link && !event.defaultPrevented && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey
+      && event.button === 0 && syncRuntimeNavigation(link.getAttribute('href'))) event.preventDefault();
+});
+
 /** 切换视图并使旧页面、时段弹窗的异步回调失效。@return {void} */
 function navigate() {
   state.viewGeneration += 1;
@@ -132,6 +163,10 @@ function navigate() {
   closeProjectDialogs();
   window.ProjectsUI.unmount();
   const tab = currentTab();
+  const embedded = new URLSearchParams(location.search).get('view');
+  document.documentElement.classList.toggle('embedded-environments', !!RUNTIME_BASE && embedded === 'environments');
+  document.documentElement.classList.toggle('embedded-tasks', !!RUNTIME_BASE && embedded === 'tasks');
+  syncRuntimeNavigation();
   document.documentElement.classList.toggle('environment-page', tab === 'environments');
   $$('.tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === (tab === 'warmup' ? 'projects' : tab)));
   const view = $('#view');
@@ -2563,6 +2598,7 @@ function openModal(sel) { $(sel).classList.remove('hidden'); }
 function closeModal(sel) {
   if (sel === '#native-kernel-modal') return closeNativeKernelDialog();
   if (sel === '#cpu-resource-modal') return closeCpuResourceDialog();
+  if (sel === '#content-capture-modal') return closeContentCaptureDialog();
   if (sel === '#cli-settings-modal') state.cliSettings = null;
   if (sel === '#work-capture-modal') state.workCapture = null;
   if (sel === '#run-window-modal') {

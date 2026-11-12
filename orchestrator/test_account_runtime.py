@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
+from content_capture_settings import read_settings as read_content_capture, set_settings as set_content_capture
 
 from docker import APIClient
 
@@ -1746,6 +1747,46 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual(rebuilt['generation'], row['generation'] + 1)
         for container in old_roles:
             container.remove.assert_called_once()
+
+    def test_content_capture_uses_real_lifecycle_and_preserves_identity(self) -> None:
+        """真实维护链重建采集配置，身份与内核选择沿用。@return None。"""
+        self._isolated_docker()
+        self.client.images.get.return_value.attrs['Config']['Labels']['vibebench.native-runtime'] = '293-raw-1'
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
+            'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        lease = None
+
+        def gateway(method, path, body=None):
+            """模拟唯一账号的配置与维护租约，业务发送入口保持关闭。@return 合成回执。"""
+            nonlocal lease
+            if path.endswith('/config'):
+                return {'auth_type': 'oauth', 'status': 'active', 'proxy_url': self.runtime._proxy(account),
+                    'request_backend': 'native293', 'concurrency': 2}
+            self.assertTrue(path.endswith('/7/lease'))
+            if method == 'POST':
+                lease = None if body['operation'] == 'release' else {'owner': body['owner'], 'generation': 1}
+            return {'lease': lease, 'active': 0, 'waiting': 0}
+
+        self.gateway._request.side_effect = gateway
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
+                patch.object(self.runtime, '_sender_active', return_value=0), \
+                patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '1536m'}):
+            row, _ = self.runtime.ensure(account)
+            row['gateway_account_id'] = 7
+            original = json.loads(row['fingerprint_json'])
+            kernel = json.loads(self.runtime._sender_config(row).read_text())['native'].get('release')
+            for enabled in [True, False]:
+                before = read_content_capture(self.runtime, row)
+                result = set_content_capture(self.runtime, row, account, enabled, before['generation'], before['revision'])
+                self.assertEqual(result['enabled'], enabled)
+                self.assertTrue(result['applied'])
+                configuration = json.loads(self.runtime._sender_config(row).read_text())
+                self.assertEqual(configuration['native_capture_dir'], '/flows/api/cc-prepared' if enabled else None)
+                self.assertEqual(configuration['native'].get('release'), kernel)
+                current = json.loads(row['fingerprint_json'])
+                self.assertEqual({key: current[key] for key in original}, original)
+                self.assertEqual(self.runtime.environment_jobs(row['environment_id']), [])
+                self.assertIsNone(lease)
 
     def test_saved_role_cpu_policy_is_used_when_recreating_containers(self) -> None:
         """实际三角色创建沿私有CPU策略，重建代次保持原策略。@return None。"""

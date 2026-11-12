@@ -143,7 +143,7 @@ class Fixture:
                     status, payload = 503, {'detail': '合成读取故障'}
             elif api.endswith('/run-window'):
                 payload = self.rows[0]['run_window']
-            elif api in ('accounts', 'accounts/login-drafts', 'topics'):
+            elif api in ('accounts', 'accounts/login-drafts', 'topics', 'task-batches'):
                 payload = []
             elif api == 'auth/me':
                 payload = {'user': '合成验证', 'authenticated': True}
@@ -154,7 +154,7 @@ class Fixture:
             if path.startswith('/runtime/'):
                 filename = path.removeprefix('/runtime/') or 'index.html'
                 directory = ROOT / 'webui'
-            elif path in ('/', '/environments'):
+            elif path in ('/', '/environments', '/tasks', '/requests', '/updates'):
                 directory, filename = self.gateway, 'index.html'
             else:
                 directory, filename = self.gateway, path.lstrip('/')
@@ -183,7 +183,7 @@ async def run(output: Path, gateway: Path) -> dict:
             # 真实网关产物负责外层路由、导航及 iframe，认证接口只返回合成会话。
             await page.goto(BASE + '/environments')
             frame = page.frame_locator('iframe')
-            await frame.locator('[data-tab="environments"]').click()
+            await page.get_by_role('link', name='环境', exact=True).click()
             await expect(frame.locator('.env-card')).to_have_count(4)
             target = frame.locator('.env-card').filter(has=frame.get_by_role('heading', name='演示环境 A', exact=True))
             await expect(target).to_be_visible()
@@ -226,7 +226,7 @@ async def run(output: Path, gateway: Path) -> dict:
                     await frame.locator('html').evaluate('(node,theme)=>node.dataset.theme=theme', theme)
                     assert await page.evaluate('document.documentElement.scrollWidth<=innerWidth')
                     assert await frame.locator('html').evaluate('node=>node.scrollWidth<=innerWidth')
-                    assert await frame.locator('body').evaluate('node=>getComputedStyle(node).backgroundColor') == 'rgb(249, 246, 241)'
+                    assert (await frame.locator('body').evaluate('node=>getComputedStyle(node).backgroundColor')).startswith('oklch(0.995')
                     assert await target.evaluate('node=>getComputedStyle(node).backgroundColor') == 'rgb(255, 255, 255)'
                     await page.screenshot(path=str(output / f'environments-{width}-{theme}.png'), full_page=True)
             scenes.append('1280/720/390px，原明暗偏好下与主后台色板一致且无溢出')
@@ -407,7 +407,7 @@ async def run(output: Path, gateway: Path) -> dict:
             await expect(frame.locator('#environment-list')).to_have_count(0)
             assert await frame.locator('html').evaluate("()=>state.environmentUI.timer===null&&state.kernelDialog===null")
             fixture.operation_gate.set()
-            await frame.locator('[data-tab="environments"]').click()
+            await page.get_by_role('link', name='环境', exact=True).click()
             await expect(frame.locator('.env-card')).to_have_count(4)
             await expect(frame.locator('#native-kernel-modal')).to_be_hidden()
             assert len(fixture.writes) == previous
@@ -432,19 +432,21 @@ async def run(output: Path, gateway: Path) -> dict:
             scenes.append('手机长 ID/主机名/完整摘要展开及真正空列表')
 
             await frame.locator('html').evaluate("node=>node.dataset.theme='dark'")
+            await page.get_by_role('link', name='任务', exact=True).click()
             await frame.locator('[data-tab="topics"]').click()
             assert await frame.locator('html').evaluate("node=>!node.classList.contains('environment-page')&&node.dataset.theme==='dark'")
             assert await frame.locator('body').evaluate('node=>getComputedStyle(node).backgroundColor') != 'rgb(249, 246, 241)'
-            await frame.locator('[data-tab="environments"]').click()
+            await page.get_by_role('link', name='环境', exact=True).click()
             await expect(frame.locator('.env-card')).to_have_count(4)
             scenes.append('环境作用域退出后恢复原主题偏好和其他页样式')
             await page.get_by_role('link', name='请求记录', exact=True).click()
             await page.get_by_role('button', name='详情', exact=True).click()
+            await page.get_by_role('tab', name='性能', exact=True).click()
             runtime = page.locator('[data-native-runtime]')
             await expect(runtime).to_contain_text('命中热进程')
             await expect(runtime).to_contain_text('PID 27')
             await expect(runtime).to_contain_text('本地准备合计 185 ms')
-            await expect(page.get_by_text('原生进程复用与本地阶段：未观测', exact=True)).to_be_visible()
+            await expect(page.get_by_text('原生进程与本地阶段：未观测', exact=True)).to_be_visible()
             assert await page.locator('html').evaluate('node=>node.scrollWidth<=innerWidth')
             scenes.append('请求详情展示真实 PID/热命中/本地分段；历史记录保留未观测，手机无溢出')
             assert not errors, errors

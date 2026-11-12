@@ -1,20 +1,20 @@
 /* 环境路由独立使用主后台色板；移除作用域后其它页面继续使用原主题。 */
 :root.environment-page {
-  --bg: #f9f6f1;
+  --bg: oklch(0.995 0.001 258);
   --surface: #ffffff;
   --surface-2: #ffffff;
-  --surface-3: #f0ebe4;
-  --border: #e8e2d9;
-  --border-bright: #ded5c9;
-  --text: #29261e;
-  --text-dim: #5c5647;
-  --text-faint: #8c8475;
-  --text-muted: #8c8475;
-  --amber: #c4704f;
-  --amber-soft: #b5623f;
-  --amber-deep: #a65f43;
+  --surface-3: oklch(0.968 0.003 258);
+  --border: oklch(0.916 0.005 258);
+  --border-bright: oklch(0.84 0.009 258);
+  --text: oklch(0.21 0.008 258);
+  --text-dim: oklch(0.38 0.01 258);
+  --text-faint: oklch(0.5 0.014 258);
+  --text-muted: oklch(0.5 0.014 258);
+  --amber: oklch(0.52 0.115 157);
+  --amber-soft: oklch(0.46 0.105 157);
+  --amber-deep: oklch(0.42 0.10 157);
   --amber-glow: transparent;
-  --border-amber: #e8c5b5;
+  --border-amber: oklch(0.87 0.035 157);
   --success: #25834a;
   --failed: #b44637;
   --running: #25834a;
@@ -22,13 +22,13 @@
   --env-good-border: #d9efdf;
   --env-warning: #925e19;
   --env-warning-bg: #fff7e8;
-  --env-muted-bg: #f0ebe4;
-  --env-kernel-bg: #fcfaf7;
-  --env-kernel-border: #eee6dc;
-  --env-accent-bg: #f5e9e0;
-  --env-modal-overlay: #29261e80;
-  --env-shadow: 0 16px 48px #29261e24;
-  --env-font: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --env-muted-bg: oklch(0.968 0.003 258);
+  --env-kernel-bg: oklch(0.985 0.002 258);
+  --env-kernel-border: oklch(0.916 0.005 258);
+  --env-accent-bg: oklch(0.96 0.016 157);
+  --env-modal-overlay: #00000070;
+  --env-shadow: 0 16px 48px #00000024;
+  --env-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', 'Microsoft YaHei', sans-serif;
   background: var(--bg);
   color-scheme: light;
 }
@@ -235,3 +235,16 @@
 @media (prefers-reduced-motion: reduce) {
   .environment-page *, .environment-page *::before, .environment-page *::after { animation: none !important; transition: none !important; }
 }
+
+/* 嵌入环境已拥有顶部独立入口，内页只承载列表。 */
+.embedded-environments .topbar { display: none; }
+.embedded-tasks [data-tab="environments"] { display: none; }
+
+.environment-page .env-switch { width: 38px; height: 22px; flex-shrink: 0; padding: 2px; background: var(--border-bright); border: 0; border-radius: 12px !important; cursor: pointer; }
+.environment-page .env-switch span { display: block; width: 18px; height: 18px; border-radius: 50% !important; background: var(--surface); transition: transform 150ms; }
+.environment-page .env-switch[aria-checked="true"] { background: var(--amber); }
+.environment-page .env-switch[aria-checked="true"] span { transform: translateX(16px); }
+.environment-page .env-switch:disabled { opacity: .45; cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) { .environment-page .env-switch span { transition: none; } }
+
+.environment-page #environment-clear-target[hidden] { display: none !important; }

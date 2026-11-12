@@ -1405,3 +1405,50 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - test_account_runtime实际三角色创建沿保存额度；test_project_review_runtime旧布局按新CPU交接、原文件及RAM/PID保持、角色漂移拒绝。
 - test_system_update_cpu核维护前持久冻结、重建实际新角色恢复、归属冲突更新前拒绝；原更新器回归保持。
 - verify_native_diagnostics_cpu：轮询保留表单、冻结提交、冲突、晚回执、390像素及零真实模型调用。
+
+
+## Scenario: 账号请求内容采集开关
+
+### 1. Scope / Trigger
+
+修改 `content_capture_settings.py`、`/api/environments/{environment_id}/content-capture`、管理桥准入及环境卡片开关时适用。
+
+### 2. Signatures
+
+- GET 返回 `environment_id`、bench `account_id`、`generation:int`、`revision:string`、`enabled:bool`、`applied:bool`、`supported:bool`。
+- POST 精确接收 `enabled:StrictBool`、`expected_generation:StrictInt`、`expected_revision:StrictStr`，拒绝附加字段。
+- `read_settings(runtime,row)` 只读；`set_settings(runtime,row,account,enabled,expected_generation,expected_revision)` 在更新准入和账号锁内应用。
+
+### 3. Contracts
+
+- GET/POST 都通过实际 SQL 核对未删除账号与唯一网关绑定。row 的 `gateway_account_id` 为 SQL 投影；并发摘要包含该绑定、环境代次、状态、完整画像和 sender 文件摘要。
+- sender 配置沿原 root:1001、0640 合同读取，安全文件读取拒绝链接和越界。`applied` 核对实际 native 配置、采集目录、账号、环境及发送器代次；公开响应排除凭据。
+- `pending_upgrade(root, include_preparing=True)` 同时排除候选下载；该关键字参数默认False，原调用沿用既有判定。
+- POST 按 update admission → OAuth owner → profile → environment 锁顺序重读。原生未就绪、配置偏离、旧版本、活动工作、评审交接、内核维护及 API 活动均拒绝切换。
+- 使用唯一 `capture:<uuid>` 领取、claim 和释放网关排他维护租约。API 在维护租约持有期间保持关闭；到期保持关闭，原 owner 可释放。维护重建使用独立租约，CLI 作业登记会阻止画像准备。
+- 环境锁阻止其它本地工作进入，更新 admission 覆盖整个操作。重建复用原 ensure，保留 HOME、画像、资源策略及已保存内核。原停止环境在核对后恢复停止状态，过程模型调用为零。
+- 指纹 `native_capture_enabled` 与实际 `native_capture_dir` 一致后返回成功。失败恢复原指纹并重新准备；恢复失败或租约释放不确定时置 reconcile，使用原环境维护对账。私有 `runtime/content-capture-operation.json` 保存操作与恢复状态。
+- prepare 回执丢失时按唯一 owner 重读并释放本次租约。占用/旧版本返回 409；文件、Docker 或连接故障返回受控 503；明确恢复/对账错误保持可见。
+- 开关只影响后续请求，与 request_diagnostics_log_mode 独立。既有脱敏、7 天、50 份、100 MiB、2 MiB 预览及最终 TLS 证据合同沿用。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 重复或删除绑定 | 404，零写入 |
+| 布尔冒充代次、数字冒充开关、附加字段 | DTO 422 |
+| 旧代次/摘要、活动 CLI/API、配置偏离 | 409，保留原策略 |
+| 切换准备失败、恢复成功 | 409，说明原策略已恢复 |
+| 恢复或门禁释放失败 | reconcile，明确要求对账 |
+
+### 5. Scenarios and Examples
+
+- 正常：开启→核对实际 sender 目录→关闭，账号独立，身份和内核选择保持。
+- 边界：停止环境切换后保持停止；prepare 响应丢失后仅释放本次 owner。
+- 错误用法：把采集维护登记为 CLI 作业后调用 ensure，导致画像准备被自身作业阻止。正确处理：在原环境锁和更新准入内独立持有排他维护租约。
+
+### 6. Tests Required
+
+- `test_content_capture_settings` 覆盖 DTO/SQL、实际配置偏离、账号独立、忙碌/旧版本、内核下载中零租约/零重建、回执丢失、恢复及门禁失败。
+- `test_account_runtime.AccountRuntimeTests.test_content_capture_uses_real_lifecycle_and_preserves_identity` 走实际维护租约及配置重建路径；验证 sender 文件、代次、原身份和内核，作业集合与租约正常收口。
+- `test_saved_role_cpu_policy_is_used_when_recreating_containers` 验证三角色重建沿原 CPU 策略；浏览器回归核对冻结版本、独立开关及重复提交。

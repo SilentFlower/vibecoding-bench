@@ -236,7 +236,7 @@ P1 阶段做到的:
 
 ### 3. Contracts
 
-- `:root.environment-page` 固定主后台暖白、陶土强调色与正文层级；只有该作用域可覆盖旧直角 reset、扫描线、内层导航与弹窗。保留 `data-theme` 和 `vibebench-theme` 原值，离开环境路由移除作用域后恢复原页面主题。作用域选择器需与旧 `:root[data-theme=light]` 具有足够优先级。
+- `:root.environment-page` 使用主后台中性亮色、绿色强调色与正文层级；只有该作用域可覆盖旧直角 reset、扫描线、内层导航与弹窗。保留 `data-theme` 和 `vibebench-theme` 原值，离开环境路由移除作用域后恢复原页面主题。作用域选择器需与旧 `:root[data-theme=light]` 具有足够优先级。
 - `index.html` 按 `projects.js`、`environments.js`、`app.js` 装载。环境模块仅定义函数及常量，实际调用继续使用 `app.js` 的 API/state；资源修改同步静态版本参数。
 - `state.environmentUI` 保存服务器 rows、搜索、筛选、展开集合、操作中集合、只读请求序号及定时器。搜索筛选只派生当前 rows，不发送写请求；详情按环境 ID 和区块恢复。
 - 列表读取同时检查 `viewGeneration` 与请求序号，旧页面或旧请求结果不得覆盖新视图。工具栏与弹窗位于列表重绘区外，输入、光标和焦点不被进度刷新重置。

@@ -197,3 +197,47 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 - `verify_database_compatibility.py`：真实旧库→候选→原程序读写、重复迁移及快照恢复；结果绑定精确镜像及合同。默认环境独立入口必须工作。
 - `verify_system_update.py --migration-manifest <候选清单>`：真实旧底座接入、固定源码独立导入、双库半完成中断、恢复后启动中断、健康失败、账号部分角色恢复、显式回退及最近两组快照断言。
 - 页面真实浏览器覆盖迁移计划/阶段、未知状态、断线重连、390px 以及冻结 UUID/revision；合成环境真实模型请求计数为0。
+
+
+## Scenario: 平台语义版本展示与旧发行兼容
+
+### 1. Scope / Trigger
+
+修改正式发行元数据、前端版本展示和构建/发布输入时适用。
+
+### 2. Signatures
+
+- `deploy/v3/platform-release.json` 精确字段为 `schema_version:1`、`version:string`、`changes:string`。
+- `read_version(path)` 校验规范 `v<major>.<minor>.<patch>` 及说明；`signed_changes(metadata)` 生成受控首行 `平台版本：v1.0.0` 与正文。
+- `ensure_forward_version(current,previous)` 检查受信前后发行；前端使用 `VITE_PLATFORM_VERSION` 构建输入。
+
+### 3. Contracts
+
+- 新发行首版 v1.0.0；修复递增补丁，功能递增次版本。元数据为唯一维护源，build 将版本传入 frontend Docker 阶段，且将元数据纳入源快照摘要。
+- 发布端从同一元数据生成现有签名 changes，GitHub 标题使用可读版本。原 release/sequence/镜像/清单摘要及 v1/v2 字段集合保持原合同。
+- 发布前从原已签目录取得最新完整清单并核对大小、摘要及格式；旧目录按签发时刻验证，允许正式发布刷新过期通道。不同源码使用相同或更低语义版本拒绝；同源重跑允许相同版本。
+- 当前平台版本来自控制镜像中构建的前端；可用版本从已验签说明首行提取。独立构建缺输入时使用已有受信信息或历史构建语义。
+- 旧发行字节保持可追溯，缺元数据展示历史构建日期及技术详情；CLI 和内核按账号分别展示实际来源。
+- 更新列表默认突出当前与最新可用项，历史折叠，同一列表只保留一个详情展开。安装确认冻结真实 release、摘要、revision 及显示标题，轮询保持原参数。
+- 时间按浏览者时区显示，技术详情保留原始标识；UTC 存储及安装参数沿用。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 非规范版本、空说明、未知元数据字段 | 构建/发布拒绝 |
+| 不同源码复用版本、版本倒退 | 发布拒绝 |
+| 原清单大小或摘要不符 | 发布拒绝 |
+| 历史发行缺可读版本 | 日期及技术详情 |
+| 目录不新鲜或安装现场变化 | 原更新合同要求重新检查/确认 |
+
+### 5. Scenarios and Examples
+
+- 正常：v1.0.0 → 修复 v1.0.1 → 功能 v1.1.0；同一源码 Action 重跑保留原版本。
+- 边界：原系统仍使用严格 v1/v2 清单，版本信息沿受信 changes 兼容展示。
+- 错误用法：把 ci 编号直接改名后作为安装参数。正确处理：语义版本用于展示，安装使用原受信身份。
+
+### 6. Tests Required
+
+- `test_system_platform_version` 覆盖实际元数据、历史说明、递增和不同源码拒绝；`test_system_release` 验证原签名与字段合同。
+- Vue/TypeScript 生产构建和 `verify_management_ui.py` 覆盖当前/最新/历史、单展开、取消零写入及两个浏览器时区。

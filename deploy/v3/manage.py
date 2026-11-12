@@ -29,6 +29,7 @@ COMPOSE = Path(__file__).with_name("compose.yml")
 sys.path.insert(0, str(REPO / "orchestrator"))
 from resource_budget import account_limits, isolated_account_limits
 from native_sender import prewarm_account_id, stage_asset
+from platform_version import read_version
 from storage_assets import essential_exclusions
 from storage_backup import create_backup_data, verify_backup_data
 from storage_cleanup import apply_storage_plan, storage_plan
@@ -438,6 +439,7 @@ def build(release: str, manifest_path: Path) -> None:
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", release):
         raise ValueError("批次名不合法")
     parent = command("git", "rev-parse", "HEAD", capture=True).strip()
+    platform_version = read_version(REPO / 'deploy/v3/platform-release.json')['version']
     gateway = command("git", "-C", "cc2api", "rev-parse", "HEAD", capture=True).strip()
     dirty = bool(command("git", "status", "--porcelain", capture=True).strip())
     if manifest_path.exists():
@@ -449,7 +451,7 @@ def build(release: str, manifest_path: Path) -> None:
             "research/github-projects")
         for relative in folders:
             shutil.copytree(REPO / relative, snapshot / relative, ignore=source_snapshot_ignore)
-        for relative in ("cc2api/Cargo.toml", "cc2api/Cargo.lock", "topics.md"):
+        for relative in ("cc2api/Cargo.toml", "cc2api/Cargo.lock", "topics.md", "deploy/v3/platform-release.json"):
             (snapshot / relative).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(REPO / relative, snapshot / relative)
         native_runtime = stage_asset(snapshot / "native-runtime/ccrb-runtime")
@@ -469,7 +471,8 @@ def build(release: str, manifest_path: Path) -> None:
                 raise ValueError("批次镜像标签已经存在，禁止覆盖")
             command("docker", "build", "-f", str(snapshot / "images/v3/Dockerfile"), "--target", role,
                 "--build-arg", f"V3_RELEASE={release}", "--build-arg", f"V3_PARENT_REV={parent}",
-                "--build-arg", f"V3_GATEWAY_REV={gateway}", "-t", reference, str(snapshot))
+                "--build-arg", f"V3_GATEWAY_REV={gateway}", "--build-arg", f"VITE_PLATFORM_VERSION={platform_version}",
+                "-t", reference, str(snapshot))
             info = json.loads(command("docker", "image", "inspect", reference, capture=True))[0]
             images[role] = {"reference": reference, "digest": info["Id"],
                 "config_digest": _image_config_digest(reference),

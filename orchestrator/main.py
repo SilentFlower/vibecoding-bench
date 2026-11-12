@@ -53,6 +53,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
 from pydantic import BaseModel, ConfigDict, StrictBool, StrictFloat, StrictInt, StrictStr, ValidationError
 from cpu_resources import read_resources as read_cpu_resources, set_resources as set_cpu_resources
+from content_capture_settings import read_settings as read_content_capture, set_settings as set_content_capture
 from requests.exceptions import RequestException
 from sse_starlette.sse import EventSourceResponse
 from starlette.websockets import WebSocketState
@@ -12500,6 +12501,7 @@ def v3_environments() -> list[dict]:
             finally:
                 connection.close()
             row["run_window"] = _account_run_window(dict(account), public=True, zone=row["fingerprint"]["tz"]) if account else None
+            row['gateway_account_id'] = account['cc2api_account_id'] if account else None
         else:
             row["run_window"] = None
         row['native_preparation'] = account_runtime.native_preparation_summary(row, dict(account) if account else None, native_preparations, native_preparation_error)
@@ -12527,6 +12529,17 @@ def v3_environments() -> list[dict]:
         except (OSError, ValueError, TypeError):
             row["native_kernel"] = None
         row["platform_release"] = account_runtime.release_id
+        row['content_capture'] = None
+        if account and account['cc2api_account_id'] is not None:
+            guard = account_runtime.environment_lock(row['environment_id'])
+            if guard.acquire(blocking=False):
+                try:
+                    current, _ = _content_capture_account(row['environment_id'])
+                    row['content_capture'] = read_content_capture(account_runtime, current)
+                except (HTTPException, OSError, ValueError, RuntimeError):
+                    pass
+                finally:
+                    guard.release()
         try:
             row["runtime_release"] = role_release(account_runtime, row)
             row["runtime_release_error"] = None
@@ -12579,6 +12592,75 @@ def refresh_v3_physical_features(environment_id: str) -> dict:
     except (DockerException, RequestException, OSError):
         raise HTTPException(503, "容器暂时不可读取，已保留上次观察") from None
     return {"ok": True}
+
+
+class ContentCaptureOperation(BaseModel):
+    """管理员冻结的账号采集选择与环境版本。"""
+
+    model_config = ConfigDict(extra='forbid')
+    enabled: StrictBool
+    expected_generation: StrictInt
+    expected_revision: StrictStr
+
+
+def _content_capture_account(environment_id: str) -> tuple[dict, dict]:
+    connection = get_db()
+    try:
+        row = connection.execute('SELECT e.*, a.cc2api_account_id AS gateway_account_id FROM account_environments e JOIN accounts a ON a.id=e.account_id '
+            'WHERE e.environment_id=? AND a.deleted_at IS NULL AND a.cc2api_account_id IS NOT NULL '
+            'AND (SELECT COUNT(*) FROM accounts b WHERE b.cc2api_account_id=a.cc2api_account_id '
+            'AND b.deleted_at IS NULL)=1', (environment_id,)).fetchone()
+        account = connection.execute('SELECT * FROM accounts WHERE id=?', (row['account_id'],)).fetchone() if row else None
+    finally:
+        connection.close()
+    if row is None or account is None:
+        raise HTTPException(404, '账号没有唯一的 V3 环境绑定')
+    return dict(row), dict(account)
+
+
+@app.get('/api/environments/{environment_id}/content-capture')
+def v3_content_capture(environment_id: str) -> dict:
+    """只读采集开关及实际配置版本。
+
+    :param environment_id: 唯一环境标识。
+    :return: 后续请求的配置与当前生效状态。
+    """
+    if not account_runtime:
+        raise HTTPException(404)
+    try:
+        with account_runtime.environment_lock(environment_id):
+            row, _ = _content_capture_account(environment_id)
+            return read_content_capture(account_runtime, row)
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(409, str(error)) from None
+    except (DockerException, RequestException, OSError):
+        raise HTTPException(503, '采集配置暂时不可读取，请刷新核对') from None
+
+
+@app.post('/api/environments/{environment_id}/content-capture')
+def v3_set_content_capture(environment_id: str, body: ContentCaptureOperation) -> dict:
+    """按原账号锁顺序在空闲维护中应用采集选择。
+
+    :param environment_id: 唯一环境标识。
+    :param body: 目标选择及页面冻结版本。
+    :return: 实际配置；占用、过期及恢复状态分别说明。
+    """
+    if not account_runtime:
+        raise HTTPException(404)
+    _, original = _content_capture_account(environment_id)
+    try:
+        with UPDATE_GATE.admission('environment-content-capture'):
+            with _oauth_owner_lock(original['name']), _profile_lock(original['name']):
+                with account_runtime.environment_lock(environment_id):
+                    row, account = _content_capture_account(environment_id)
+                    if account['id'] != original['id'] or account['name'] != original['name']:
+                        raise ValueError('账号环境归属已变化，请重新读取')
+                    return set_content_capture(account_runtime, row, account, body.enabled,
+                        body.expected_generation, body.expected_revision)
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(409, str(error)) from None
+    except (DockerException, RequestException, OSError):
+        raise HTTPException(503, '采集切换尚未完成，请重新读取实际状态') from None
 
 
 class CpuResourceOperation(BaseModel):

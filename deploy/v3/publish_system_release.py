@@ -10,8 +10,9 @@ import tempfile
 from pathlib import Path
 
 from system_release import REPO, create_index, create_release, sign_file
+from platform_version import ensure_forward_version, read_version, signed_changes
 from datetime import datetime, timedelta, timezone
-from system_update_contract import INDEX_LIMIT, REPOSITORY, strict_json, verify_signed, utc_now, validate_index
+from system_update_contract import INDEX_LIMIT, MANIFEST_LIMIT, REPOSITORY, strict_json, verify_signed, utc_now, validate_index, validate_release
 
 
 def run(*arguments: str, data: bytes | None = None, environment: dict | None = None) -> bytes:
@@ -39,6 +40,7 @@ def publish(manifest: Path, bundle: Path, private_key: str, migration_evidence: 
     :return: 本次发布事实。
     """
     build = strict_json(manifest.read_bytes())
+    metadata = read_version(Path(__file__).with_name('platform-release.json'))
     expected = f'ci-{os.environ.get("GITHUB_RUN_ID", "")}-{os.environ.get("GITHUB_RUN_ATTEMPT", "")}'
     if (os.environ.get('GITHUB_ACTIONS') != 'true' or os.environ.get('GITHUB_REF') != 'refs/heads/v3'
             or os.environ.get('GITHUB_REPOSITORY', '').lower() != REPOSITORY.lower()
@@ -59,7 +61,7 @@ def publish(manifest: Path, bundle: Path, private_key: str, migration_evidence: 
         public = run('openssl', 'pkey', '-in', str(key), '-pubout', '-outform', 'DER')[-32:].hex()
         release = create_release(manifest, Path(__file__).with_name('system-update-policy.json'), root / 'release', key,
             [int(os.environ['GITHUB_RUN_NUMBER']), int(os.environ['GITHUB_RUN_ATTEMPT'])],
-            '平台联合更新。数据库迁移、快照恢复及旧版兼容已经隔离演练。', migration_evidence=migration_evidence)
+            signed_changes(metadata), migration_evidence=migration_evidence)
         channel = 'updates/v3-migrations' if release['schema_version'] == 2 else 'updates/v3'
         reference = run('git', 'ls-remote', 'origin', 'refs/heads/' + channel).decode().strip()
         previous, parent = None, None
@@ -83,13 +85,28 @@ def publish(manifest: Path, bundle: Path, private_key: str, migration_evidence: 
                 verify_signed(raw, run('git', 'show', legacy_parent + ':index.sig'), public, INDEX_LIMIT)
                 previous = root / 'previous.json'
                 previous.write_bytes(raw)
+        if previous:
+            # 沿原已签目录定位完整旧清单；版本属于说明展示，安装身份仍以原摘要为准。
+            previous_value = strict_json(previous.read_bytes(), INDEX_LIMIT)
+            # 发布需要更新过期通道；历史签名目录按其签发时刻校验原合同。
+            previous_index = validate_index(previous_value,
+                now=datetime.fromisoformat(previous_value['issued_at'].replace('Z', '+00:00')).timestamp())
+            latest = previous_index['releases'][0]
+            previous_folder = root / 'previous-release'
+            previous_folder.mkdir()
+            run('gh', 'release', 'download', latest['release'], '--repo', REPOSITORY,
+                '--pattern', 'system-release.json', '--dir', str(previous_folder))
+            previous_raw = (previous_folder / 'system-release.json').read_bytes()
+            if len(previous_raw) != latest['manifest']['size'] or hashlib.sha256(previous_raw).hexdigest() != latest['manifest']['sha256']:
+                raise ValueError('原平台版本清单摘要不符')
+            ensure_forward_version(release, validate_release(strict_json(previous_raw, MANIFEST_LIMIT)))
         index = root / 'index.json'
         create_index(root / 'release/system-release.json', previous, index, key)
         notes = root / 'notes.md'
-        notes.write_text(f'平台发行 {release["release"]}\n\n来源：{build["parent_revision"]}\n\n安装与回退兼容条件见 system-release.json。\n')
+        notes.write_text(f'{signed_changes(metadata)}\n\n发行：{release["release"]}\n来源：{build["parent_revision"]}\n\n安装与回退兼容条件见 system-release.json。\n')
         tag = release['release']
         run('gh', 'release', 'create', tag, '--repo', REPOSITORY, '--target', build['parent_revision'],
-            '--draft', '--title', tag, '--notes-file', str(notes))
+            '--draft', '--title', metadata['version'], '--notes-file', str(notes))
         run('gh', 'release', 'upload', tag, '--repo', REPOSITORY,
             str(root / 'release/system-release.json'), str(root / 'release/system-release.sig'),
             str(root / 'release/v3.json'), str(bundle))

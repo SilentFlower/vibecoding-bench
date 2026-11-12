@@ -165,9 +165,15 @@ def _load(root: Path) -> dict:
         return {}
 
 
-def pending_upgrade(root: Path) -> bool:
-    """查询固定环境有无待处理的内核操作。"""
-    return _load(root).get('state') in PENDING
+def pending_upgrade(root: Path, *, include_preparing: bool = False) -> bool:
+    """查询固定环境有无待处理的内核操作。
+
+    :param root: 当前账号私有目录。
+    :param include_preparing: 重建类维护同时排除候选下载，保护下载完成时的原代次上下文。
+    :return: 当前操作是否阻止调用方继续。
+    """
+    record = _load(root)
+    return record.get('state') in PENDING or (include_preparing and bool(record.get('preparing_release')))
 
 
 def applied_kernel(root: Path, account_id: int) -> dict:

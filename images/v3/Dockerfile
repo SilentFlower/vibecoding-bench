@@ -4,6 +4,8 @@ WORKDIR /source/cc2api/web
 COPY cc2api/web/package.json cc2api/web/package-lock.json ./
 RUN npm ci
 COPY cc2api/web/ ./
+ARG VITE_PLATFORM_VERSION
+ENV VITE_PLATFORM_VERSION=$VITE_PLATFORM_VERSION
 RUN npm run build
 WORKDIR /terminal
 RUN npm pack xterm@5.3.0 && npm pack xterm-addon-fit@0.8.0 \

@@ -12,7 +12,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
   <link rel="stylesheet" href="style.css?v=20261103-iteration-console" />
-  <link rel="stylesheet" href="environments.css?v=20261112-native-readiness" />
+  <link rel="stylesheet" href="environments.css?v=20261112-management-ui" />
   <script>
     // 防 FOUC: 在 CSS 应用前确定主题
     (function () {
@@ -80,6 +80,7 @@
         <label><span class="env-sr-only">搜索账号名称或环境 ID</span><input type="search" id="environment-search" placeholder="搜索账号名称、环境 ID…" /></label>
         <label><span class="env-sr-only">按环境状态筛选</span><select id="environment-status"><option value="all">全部状态</option></select></label>
         <span id="environment-result-count" class="env-muted" role="status"></span>
+        <a href="#environments" id="environment-clear-target" class="btn btn-sm" hidden>显示全部环境</a>
       </div>
       <div id="environment-list" class="env-list"><p class="env-empty" role="status">正在读取环境…</p></div>
     </section>
@@ -541,6 +542,19 @@
     </div>
   </div>
 
+  <div class="modal hidden" id="content-capture-modal" role="dialog" aria-modal="true" aria-labelledby="content-capture-title">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-titlebar"><span class="modal-titlebar-name" id="content-capture-title">请求内容采集</span><button type="button" class="modal-close" data-close="#content-capture-modal" aria-label="关闭采集配置">×</button></div>
+      <form id="content-capture-form" class="form">
+        <p id="content-capture-description"></p>
+        <p class="env-muted">在账号空闲时重新配置发送器，保留身份、资源和内核。开关仅影响后续请求。完整阶段原文同时需要请求记录的 debug 模式。</p>
+        <p class="env-muted">历史记录保留当时状态。每账号最多 50 份、100 MiB，正文最多 2 MiB，保留 7 天。</p>
+        <p id="content-capture-feedback" class="env-error" role="status" aria-live="polite"></p>
+        <div class="row-end"><button type="button" class="btn" data-close="#content-capture-modal">取消</button><button type="submit" class="btn btn-primary">确认切换</button></div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal hidden" id="cpu-resource-modal" role="dialog" aria-modal="true" aria-labelledby="cpu-resource-title">
     <div class="modal-card modal-card-sm">
       <div class="modal-titlebar"><span class="modal-titlebar-name" id="cpu-resource-title">调整 CPU 额度</span><button type="button" class="modal-close" data-close="#cpu-resource-modal" aria-label="关闭 CPU 配置">×</button></div>
@@ -906,7 +920,7 @@
   </div>
 
   <script src="projects.js?v=20261106-pi-auto-recovery"></script>
-  <script src="environments.js?v=20261112-native-kernel-all"></script>
-  <script src="app.js?v=20261112-cpu-resources"></script>
+  <script src="environments.js?v=20261112-content-capture"></script>
+  <script src="app.js?v=20261112-navigation"></script>
 </body>
 </html>
