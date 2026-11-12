@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-11-12T15:02:19.690485+00:00",
+  "scope": "项目两份远程配置去重后的同一宿主；仅docker ps -a只读核验",
+  "container_count": 15,
+  "legacy_references": [],
+  "protected_packages": [
+    "vibebench-v3-control",
+    "vibebench-v3-account",
+    "flower2api-control",
+    "flower2api-account"
+  ]
+}
