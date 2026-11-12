@@ -1,0 +1,206 @@
+{
+  "success": true,
+  "source_alive": true,
+  "instances": [
+    {
+      "index": 0,
+      "pid": 1110,
+      "namespace": 1103,
+      "worker_id": "4aa06374-2bfb-43a1-beff-7cb13dd1cabd",
+      "prepared_ms": 962.46,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3",
+      "tls_pid": 1110,
+      "tls_body_sha256": "2e4cf33dcdbc68d97b528340339a0bc113f449b871d49cd780c08b595549d4de",
+      "tls_headers_sha256": "e78dff75a069109b5ac41d9af8b3f8b51e4ec09f8754d8ee3d9a1e2a195f05cd",
+      "client_id": "645ac839-591a-47b9-9ec7-604105a02c3e",
+      "prepared_delta": {
+        "prepared_bytes": 29948,
+        "actual_bytes": 29948,
+        "changed_bytes": 3,
+        "first_offset": 2104
+      }
+    },
+    {
+      "index": 1,
+      "pid": 1131,
+      "namespace": 1124,
+      "worker_id": "63433a3b-86dc-4833-9f5b-54399b1b1704",
+      "prepared_ms": 548.29,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3",
+      "tls_pid": 1131,
+      "tls_body_sha256": "5ef91b1cc45ba74da45229d407f2161a7d5c6fdbfaa3eb632d1df320d22d7dae",
+      "tls_headers_sha256": "95a683efe2d2e536dd446a77d3dc0087ade82adf07d2b32bb798693f0cc8d0c9",
+      "client_id": "a282a935-5e97-428e-b4a2-a495d18425c7",
+      "prepared_delta": {
+        "prepared_bytes": 29933,
+        "actual_bytes": 29933,
+        "changed_bytes": 5,
+        "first_offset": 2103
+      }
+    },
+    {
+      "index": 2,
+      "pid": 1152,
+      "namespace": 1145,
+      "worker_id": "91f9790a-956e-45f5-9ad5-8280acf1eceb",
+      "prepared_ms": 560.14,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3",
+      "tls_pid": 1152,
+      "tls_body_sha256": "7e9a641b17d07bf839b75591d02d8b6c89c6d6b9c8016cc44dbc915280cfd737",
+      "tls_headers_sha256": "41111f54a6dc2322f07baba3056da70e9a7b0bf1c1828c632b21cebff86901a1",
+      "client_id": "440eded6-a351-4f69-83ee-fb2e9fe5bafe",
+      "prepared_delta": {
+        "prepared_bytes": 29948,
+        "actual_bytes": 29948,
+        "changed_bytes": 4,
+        "first_offset": 2105
+      }
+    },
+    {
+      "index": 3,
+      "pid": 1190,
+      "namespace": 1170,
+      "worker_id": "8653c693-b467-4588-b419-d2fe5c54754e",
+      "prepared_ms": 3699.44,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3",
+      "tls_pid": 1190,
+      "tls_body_sha256": "357c81eb0408d8614df01f48ab2e5bcf938564fe5893b0e1659e799ae410d2bb",
+      "tls_headers_sha256": "21ff7e24a9acbd2de918a61cb03000f438c5a0dadffab03b222d5a1d3f626ef7",
+      "client_id": "068af51a-d0ed-45d3-a0b7-4e13568271da",
+      "prepared_delta": {
+        "prepared_bytes": 29933,
+        "actual_bytes": 29933,
+        "changed_bytes": 5,
+        "first_offset": 2103
+      }
+    },
+    {
+      "index": 4,
+      "pid": 1183,
+      "namespace": 1172,
+      "worker_id": "af146201-0e0e-43a0-bd74-aca44392e36e",
+      "prepared_ms": 2334.87,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3",
+      "tls_pid": 1183,
+      "tls_body_sha256": "27bd377e6a57fef210bd804470b09fbbcc164cf2e66b1c64d61a1ffc2b94d7dc",
+      "tls_headers_sha256": "ff58df19982d45ff4c18606cb108d51cc4a61209d810968a3a4603128827731f",
+      "client_id": "b10ac478-dd63-4423-9aa5-73874402c8d7",
+      "prepared_delta": {
+        "prepared_bytes": 29948,
+        "actual_bytes": 29948,
+        "changed_bytes": 5,
+        "first_offset": 2104
+      }
+    },
+    {
+      "index": 5,
+      "pid": 1197,
+      "namespace": 1174,
+      "worker_id": "118d4000-9ea9-4e83-8c3e-98e745a1207d",
+      "prepared_ms": 3658.83,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3",
+      "tls_pid": 1197,
+      "tls_body_sha256": "7758c971f7dc52b9f8f75f8414ba399b5b894dae8b03cf470e9fb5d3b2d1f8f8",
+      "tls_headers_sha256": "ee16ab8e3a897f1a06468ffe8083a05e004691467b942cf0c598a38aa5ca87c9",
+      "client_id": "3989475c-1753-4991-a8a5-e05dd4239dad",
+      "prepared_delta": {
+        "prepared_bytes": 29933,
+        "actual_bytes": 29933,
+        "changed_bytes": 5,
+        "first_offset": 2103
+      }
+    },
+    {
+      "index": 6,
+      "pid": 1204,
+      "namespace": 1176,
+      "worker_id": "8d23ade5-14d4-4546-8b79-568e3a25e79c",
+      "prepared_ms": 3892.58,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3",
+      "tls_pid": 1204,
+      "tls_body_sha256": "f4a4be1c324e54f55ebe533859114f664a01debd65a279e76d8183f14c78d084",
+      "tls_headers_sha256": "c733bcf3fab31ceea7aa226ac2b625d68557a7d44e21ac9281a8f6e22c263bb8",
+      "client_id": "539eccee-c7d3-4e79-be64-053e0bdc5c00",
+      "prepared_delta": {
+        "prepared_bytes": 29948,
+        "actual_bytes": 29948,
+        "changed_bytes": 4,
+        "first_offset": 2104
+      }
+    }
+  ],
+  "faults": {
+    "invalid_identity_or_schema": 5,
+    "cancel_before_ack": true,
+    "cancel_after_ack": true,
+    "foreign_peer": true,
+    "corrupt_snapshot": true,
+    "expired_template": true
+  },
+  "receiver": {
+    "matched": 7,
+    "unique_sessions": 7,
+    "models": [
+      "claude-haiku-4-5",
+      "claude-sonnet-4-6"
+    ]
+  },
+  "cleanup": {
+    "active": 0,
+    "templates": 0,
+    "owners": 0,
+    "instances": 0,
+    "posts": 7
+  },
+  "controller_context": {
+    "CapEff": "00000000032c11eb",
+    "NoNewPrivs": "1",
+    "Seccomp": "0"
+  },
+  "criu_sha256": "e496fdc39d3d2189710146aff26b38ed8e4da945afd84e56675d9425650084bc",
+  "shutdown_warnings": false,
+  "restore_phases_ms": [
+    {
+      "layer": "criu_supervisor",
+      "criu_restore_ms": 522.869,
+      "entropy_verify_ms": 75.476
+    },
+    {
+      "layer": "criu_supervisor",
+      "criu_restore_ms": 114.445,
+      "entropy_verify_ms": 102.288
+    },
+    {
+      "layer": "criu_supervisor",
+      "criu_restore_ms": 165.016,
+      "entropy_verify_ms": 76.702
+    },
+    {
+      "layer": "criu_supervisor",
+      "criu_restore_ms": 168.349,
+      "entropy_verify_ms": 218.518
+    },
+    {
+      "layer": "criu_supervisor",
+      "criu_restore_ms": 2252.323,
+      "entropy_verify_ms": 413.064
+    },
+    {
+      "layer": "criu_supervisor",
+      "criu_restore_ms": 2442.013,
+      "entropy_verify_ms": 253.833
+    },
+    {
+      "layer": "criu_supervisor",
+      "criu_restore_ms": 3064.583,
+      "entropy_verify_ms": 250.107
+    }
+  ]
+}

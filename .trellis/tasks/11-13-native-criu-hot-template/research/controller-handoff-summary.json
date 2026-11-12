@@ -1,0 +1,77 @@
+{
+  "success": true,
+  "source_alive": true,
+  "instances": [
+    {
+      "index": 0,
+      "pid": 1106,
+      "namespace": 1099,
+      "worker_id": "63057c39-1795-44dc-a25d-228d7a2aa9a1",
+      "prepared_ms": 510.82,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3"
+    },
+    {
+      "index": 1,
+      "pid": 1124,
+      "namespace": 1117,
+      "worker_id": "08607a23-4493-4912-b89a-9f3e00c2913b",
+      "prepared_ms": 371.52,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3"
+    },
+    {
+      "index": 2,
+      "pid": 1142,
+      "namespace": 1135,
+      "worker_id": "0989f9e6-8004-469a-a863-22d3f3cd19bc",
+      "prepared_ms": 322.89,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3"
+    },
+    {
+      "index": 3,
+      "pid": 1177,
+      "namespace": 1157,
+      "worker_id": "52fb248a-f85f-4df3-a158-c5e67ccd0b4e",
+      "prepared_ms": 888.52,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3"
+    },
+    {
+      "index": 4,
+      "pid": 1175,
+      "namespace": 1159,
+      "worker_id": "daa5718c-9633-4e31-87fc-258e7b39be8c",
+      "prepared_ms": 977.66,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3"
+    },
+    {
+      "index": 5,
+      "pid": 1191,
+      "namespace": 1163,
+      "worker_id": "5026e40e-4750-4400-86fb-f832cbb762fc",
+      "prepared_ms": 877.17,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3"
+    },
+    {
+      "index": 6,
+      "pid": 1185,
+      "namespace": 1161,
+      "worker_id": "fccfb79b-be41-44cb-aa9f-a65e67564d35",
+      "prepared_ms": 960.61,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3"
+    }
+  ],
+  "cleanup": {
+    "active": 0,
+    "templates": 0,
+    "owners": 0,
+    "instances": 0,
+    "posts": 7
+  },
+  "tls_verified": false
+}

@@ -1,0 +1,175 @@
+{
+  "success": true,
+  "source_alive": true,
+  "instances": [
+    {
+      "index": 0,
+      "pid": 1111,
+      "namespace": 1104,
+      "worker_id": "5b6d4d5b-b6eb-4a1d-8164-6829cefbcd25",
+      "prepared_ms": 682.67,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3",
+      "tls_pid": 1111,
+      "tls_body_sha256": "cae9a95dcf8cc3f4a51f997c834869d0a7b15b4958814b5e92a266b8ed70bf73",
+      "tls_headers_sha256": "769cb46465df0e9a548ce97f92629ae226e801c5c24ca567e0239f5db362a067",
+      "client_id": "652ab52d-7fa7-4ae9-bc1f-818b2919f890",
+      "prepared_delta": {
+        "prepared_bytes": 29948,
+        "actual_bytes": 29948,
+        "changed_bytes": 4,
+        "first_offset": 2104
+      }
+    },
+    {
+      "index": 1,
+      "pid": 1132,
+      "namespace": 1125,
+      "worker_id": "66d90fbc-e925-4ce5-aed0-2bf060abec8c",
+      "prepared_ms": 492.53,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3",
+      "tls_pid": 1132,
+      "tls_body_sha256": "05a76c2e200125010c98bad79fe160d45145113c9a9d49fa65cfe03ac16c7d2f",
+      "tls_headers_sha256": "8f37acc389daae6c21dae4dc36fb0b96ea5f501a1f0fed4d164e44a1e391bd97",
+      "client_id": "c1aba552-3be0-44f8-b647-6d99c8b88476",
+      "prepared_delta": {
+        "prepared_bytes": 29933,
+        "actual_bytes": 29933,
+        "changed_bytes": 5,
+        "first_offset": 2103
+      }
+    },
+    {
+      "index": 2,
+      "pid": 1153,
+      "namespace": 1146,
+      "worker_id": "194ef6e7-f991-4886-80a6-4557e74bb0ec",
+      "prepared_ms": 519.47,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3",
+      "tls_pid": 1153,
+      "tls_body_sha256": "4abb6ff2011f5eb56038f2c8b17fe4b3ff64cbb85faadb40d24bd185e1d43766",
+      "tls_headers_sha256": "66c28a26b6731c1bc6d91d0ac415c7df90a4dbc52b8c87363f41b7545803358f",
+      "client_id": "f3ef18ac-7f7f-40c2-b2a6-96f85c7dba32",
+      "prepared_delta": {
+        "prepared_bytes": 29948,
+        "actual_bytes": 29948,
+        "changed_bytes": 5,
+        "first_offset": 2104
+      }
+    },
+    {
+      "index": 3,
+      "pid": 1199,
+      "namespace": 1177,
+      "worker_id": "10a5a153-00b4-4d33-b9a3-3dbfc14effb9",
+      "prepared_ms": 1218.05,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3",
+      "tls_pid": 1199,
+      "tls_body_sha256": "145d124bf93cb0c2498567b59e63bbb552ebef78ca4442be8d17c3d3d88d7de8",
+      "tls_headers_sha256": "1cb4c4e07b0d29ebf6cb1aeac7335829273748913a57aaf98dcd81ac632a87bd",
+      "client_id": "557c202c-556b-4fcf-836b-649fd2cce6b3",
+      "prepared_delta": {
+        "prepared_bytes": 29933,
+        "actual_bytes": 29933,
+        "changed_bytes": 3,
+        "first_offset": 2103
+      }
+    },
+    {
+      "index": 4,
+      "pid": 1205,
+      "namespace": 1175,
+      "worker_id": "f5ead532-655c-479b-be5f-ee1c54f4ec70",
+      "prepared_ms": 1344.2,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3",
+      "tls_pid": 1205,
+      "tls_body_sha256": "4d438d7ef166ce42407434122e1d29463710bc88158ccd7925b0738e818b1280",
+      "tls_headers_sha256": "e7f7ef4c67fc10b7bc03ed01f143bfb3add586ad78911c3b917646673212aadb",
+      "client_id": "cdc98e35-bfe1-40dd-a0ce-6c15e3168501",
+      "prepared_delta": {
+        "prepared_bytes": 29948,
+        "actual_bytes": 29948,
+        "changed_bytes": 4,
+        "first_offset": 2104
+      }
+    },
+    {
+      "index": 5,
+      "pid": 1184,
+      "namespace": 1171,
+      "worker_id": "99528574-4435-4541-a0fa-1d20ed4de9f0",
+      "prepared_ms": 1203.44,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3",
+      "tls_pid": 1184,
+      "tls_body_sha256": "a5cb84231ed6701616c95ad03a51fbc4eb34139418b1575cf71ded34675bd4d8",
+      "tls_headers_sha256": "999f200f731e13fdb7f9660567ec21f7a8df8da81db3183e54d752736a8e979f",
+      "client_id": "dcf1355e-8f83-4c94-b9e2-af8cfb5a79cc",
+      "prepared_delta": {
+        "prepared_bytes": 29933,
+        "actual_bytes": 29933,
+        "changed_bytes": 4,
+        "first_offset": 2103
+      }
+    },
+    {
+      "index": 6,
+      "pid": 1196,
+      "namespace": 1173,
+      "worker_id": "372aa0ce-bad0-4ce9-9090-555f46e2ddca",
+      "prepared_ms": 1319.16,
+      "success": true,
+      "instruction": "4883c4185b415c415d415e415f5dc3",
+      "tls_pid": 1196,
+      "tls_body_sha256": "1ee93285279a10290945d821b23763caebae60be08ac990d2db9c12c1f534009",
+      "tls_headers_sha256": "711b7d247c3fb1e975575dec9523b94a944264870e4e88354e7db8c1fc1968f1",
+      "client_id": "369ca014-23a2-45b1-b3db-d9cf0edf0a25",
+      "prepared_delta": {
+        "prepared_bytes": 29948,
+        "actual_bytes": 29948,
+        "changed_bytes": 4,
+        "first_offset": 2104
+      }
+    }
+  ],
+  "faults": {
+    "invalid_identity_or_schema": 5,
+    "cancel_before_ack": true,
+    "cancel_after_ack": true,
+    "foreign_peer": true,
+    "corrupt_snapshot": true,
+    "expired_template": true
+  },
+  "cleanup": {
+    "active": 0,
+    "templates": 0,
+    "owners": 0,
+    "instances": 0,
+    "posts": 7
+  },
+  "receiver": {
+    "matched": 7,
+    "unique_sessions": 7,
+    "models": [
+      "claude-haiku-4-5",
+      "claude-sonnet-4-6"
+    ]
+  },
+  "python_shutdown_warnings": false,
+  "reasons": [
+    "RESTORE_TEMPLATE_UNAVAILABLE",
+    "RESTORE_TEMPLATE_UNAVAILABLE",
+    "RESTORE_TEMPLATE_UNAVAILABLE",
+    "RESTORE_COMMAND_INVALID",
+    "RESTORE_COMMAND_INVALID",
+    "RESTORE_CONNECTION_CLOSED",
+    "RESTORE_CONNECTION_CLOSED",
+    "RESTORE_PEER_INVALID",
+    "RESTORE_TEMPLATE_CHANGED",
+    "RESTORE_TEMPLATE_UNAVAILABLE"
+  ]
+}

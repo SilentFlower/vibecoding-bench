@@ -1,0 +1,26 @@
+--- a/criu/mem.c
++++ b/criu/mem.c
+@@ -747,7 +747,9 @@
+ 	if (ret <= 0)
+ 		return ret;
+ 
+-	if (collect_special_file(ri->mm->exe_file_id) == NULL)
++	/* memfd 执行体使用 MEMFD 记录；仅为本地恢复兼容性研究。 */
++	if (find_file_desc_raw(FD_TYPES__MEMFD, ri->mm->exe_file_id) == NULL &&
++	    collect_special_file(ri->mm->exe_file_id) == NULL)
+ 		return -1;
+ 
+ 	pr_debug("Found %zd VMAs in image\n", ri->mm->n_vmas);
+--- a/criu/cr-restore.c
++++ b/criu/cr-restore.c
+@@ -2498,7 +2498,9 @@
+ 		args->mm_saved_auxv[i] = (auxv_t)mm->mm_saved_auxv[i];
+ 	}
+ 
+-	exe_fd = open_reg_by_id(mm->exe_file_id);
++	/* 复用内存映射对应的同一 memfd，保留执行体与映射的归属。 */
++	struct file_desc *exe_memfd = find_file_desc_raw(FD_TYPES__MEMFD, mm->exe_file_id);
++	exe_fd = exe_memfd ? memfd_open(exe_memfd, NULL, false) : open_reg_by_id(mm->exe_file_id);
+ 	if (exe_fd < 0)
+ 		goto out;
+ 

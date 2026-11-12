@@ -1,0 +1,194 @@
+{
+  "template_count": 1,
+  "template_id": "3e948590-6a20-46c3-b498-f59f43a65150",
+  "source_pid": 1058,
+  "image_sha256": "564019c9560e960e96875c9663975491534b27c789ea3d23e5c13309ff293c79",
+  "bootstrap_posts": 0,
+  "dump_returncode": 0,
+  "source_alive_at_end": true,
+  "rng_unique": {
+    "normal": 224,
+    "uncached": 224,
+    "bytes": 56,
+    "math": 224
+  },
+  "success": true,
+  "post_count": 7,
+  "instances": [
+    {
+      "index": 0,
+      "restore_ms": 673.48,
+      "binding_ms": 17.19,
+      "host_pid": 1108,
+      "namespace_pid": 1058,
+      "new_worker_id": "74f0b0cb-0549-47c4-a1bc-7a87d58fd16b",
+      "source_alive": true,
+      "success": true,
+      "response_matches": true,
+      "directory_isolated": true,
+      "entropy_receipt": {
+        "profile": "bun143-wipeonfork-v1",
+        "guard_bytes": 4,
+        "stopped_threads": 8
+      },
+      "status": [
+        "Uid:\t1001\t1001\t1001\t1001",
+        "NSpid:\t1108\t1058",
+        "CapEff:\t0000000000000000",
+        "NoNewPrivs:\t1",
+        "Seccomp:\t2"
+      ],
+      "seals": 15
+    },
+    {
+      "index": 1,
+      "restore_ms": 132.75,
+      "binding_ms": 14.69,
+      "host_pid": 1124,
+      "namespace_pid": 1058,
+      "new_worker_id": "c23dbbd1-fc9f-44f0-9ee9-1c2ff3928a9e",
+      "source_alive": true,
+      "success": true,
+      "response_matches": true,
+      "directory_isolated": true,
+      "entropy_receipt": {
+        "profile": "bun143-wipeonfork-v1",
+        "guard_bytes": 4,
+        "stopped_threads": 8
+      },
+      "status": [
+        "Uid:\t1001\t1001\t1001\t1001",
+        "NSpid:\t1124\t1058",
+        "CapEff:\t0000000000000000",
+        "NoNewPrivs:\t1",
+        "Seccomp:\t2"
+      ],
+      "seals": 15
+    },
+    {
+      "index": 2,
+      "restore_ms": 113.36,
+      "binding_ms": 19.3,
+      "host_pid": 1140,
+      "namespace_pid": 1058,
+      "new_worker_id": "89ea9187-2988-44b1-9896-27246e73995d",
+      "source_alive": true,
+      "success": true,
+      "response_matches": true,
+      "directory_isolated": true,
+      "entropy_receipt": {
+        "profile": "bun143-wipeonfork-v1",
+        "guard_bytes": 4,
+        "stopped_threads": 8
+      },
+      "status": [
+        "Uid:\t1001\t1001\t1001\t1001",
+        "NSpid:\t1140\t1058",
+        "CapEff:\t0000000000000000",
+        "NoNewPrivs:\t1",
+        "Seccomp:\t2"
+      ],
+      "seals": 15
+    },
+    {
+      "index": 3,
+      "restore_ms": 2204.93,
+      "binding_ms": 93.16,
+      "host_pid": 1166,
+      "namespace_pid": 1058,
+      "new_worker_id": "47698a05-6866-417a-94da-8f02876bec9c",
+      "source_alive": true,
+      "success": true,
+      "response_matches": true,
+      "directory_isolated": true,
+      "entropy_receipt": {
+        "profile": "bun143-wipeonfork-v1",
+        "guard_bytes": 4,
+        "stopped_threads": 8
+      },
+      "status": [
+        "Uid:\t1001\t1001\t1001\t1001",
+        "NSpid:\t1166\t1058",
+        "CapEff:\t0000000000000000",
+        "NoNewPrivs:\t1",
+        "Seccomp:\t2"
+      ],
+      "seals": 15
+    },
+    {
+      "index": 4,
+      "restore_ms": 2215.02,
+      "binding_ms": 27.23,
+      "host_pid": 1181,
+      "namespace_pid": 1058,
+      "new_worker_id": "3b6017e5-83fa-47fe-90d8-1babe276dce1",
+      "source_alive": true,
+      "success": true,
+      "response_matches": true,
+      "directory_isolated": true,
+      "entropy_receipt": {
+        "profile": "bun143-wipeonfork-v1",
+        "guard_bytes": 4,
+        "stopped_threads": 8
+      },
+      "status": [
+        "Uid:\t1001\t1001\t1001\t1001",
+        "NSpid:\t1181\t1058",
+        "CapEff:\t0000000000000000",
+        "NoNewPrivs:\t1",
+        "Seccomp:\t2"
+      ],
+      "seals": 15
+    },
+    {
+      "index": 5,
+      "restore_ms": 2189.74,
+      "binding_ms": 23.67,
+      "host_pid": 1176,
+      "namespace_pid": 1058,
+      "new_worker_id": "e559b7f4-510b-4df7-bc5d-14f2691a94d1",
+      "source_alive": true,
+      "success": true,
+      "response_matches": true,
+      "directory_isolated": true,
+      "entropy_receipt": {
+        "profile": "bun143-wipeonfork-v1",
+        "guard_bytes": 4,
+        "stopped_threads": 8
+      },
+      "status": [
+        "Uid:\t1001\t1001\t1001\t1001",
+        "NSpid:\t1176\t1058",
+        "CapEff:\t0000000000000000",
+        "NoNewPrivs:\t1",
+        "Seccomp:\t2"
+      ],
+      "seals": 15
+    },
+    {
+      "index": 6,
+      "restore_ms": 810.35,
+      "binding_ms": 442.06,
+      "host_pid": 1175,
+      "namespace_pid": 1058,
+      "new_worker_id": "0c98abc1-61e4-492f-ac93-78781aaa5e0b",
+      "source_alive": true,
+      "success": true,
+      "response_matches": true,
+      "directory_isolated": true,
+      "entropy_receipt": {
+        "profile": "bun143-wipeonfork-v1",
+        "guard_bytes": 4,
+        "stopped_threads": 8
+      },
+      "status": [
+        "Uid:\t1001\t1001\t1001\t1001",
+        "NSpid:\t1175\t1058",
+        "CapEff:\t0000000000000000",
+        "NoNewPrivs:\t1",
+        "Seccomp:\t2"
+      ],
+      "seals": 15
+    }
+  ]
+}

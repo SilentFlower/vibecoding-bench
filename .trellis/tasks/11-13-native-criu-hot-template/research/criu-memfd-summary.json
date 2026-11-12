@@ -1,0 +1,49 @@
+{
+  "source": "CRIU v4.2 加两处 memfd 执行体研究补丁",
+  "samples": 3,
+  "restore_ms": [
+    120.89,
+    168.62,
+    145.92
+  ],
+  "median_restore_ms": 145.92,
+  "cold_shared_image_ready_ms": [
+    1121.36,
+    1074.73,
+    1072.48
+  ],
+  "median_cold_shared_image_ready_ms": 1074.73,
+  "median_time_ratio": 7.37,
+  "all_success": true,
+  "upstream_posts_each": [
+    1,
+    1,
+    1
+  ],
+  "bootstrap_posts_each": [
+    0,
+    0,
+    0
+  ],
+  "restored_seals_each": [
+    15,
+    15,
+    15
+  ],
+  "restricted_restored_status": [
+    "Uid:\t1001\t1001\t1001\t1001",
+    "CapEff:\t0000000000000000",
+    "NoNewPrivs:\t1",
+    "Seccomp:\t2"
+  ],
+  "snapshot_bytes": [
+    210151853,
+    210213589,
+    210267387
+  ],
+  "restored_first_request_ms": [
+    139.16,
+    148.42,
+    141.14
+  ]
+}

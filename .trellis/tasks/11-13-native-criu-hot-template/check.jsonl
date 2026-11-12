@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/runtime/backend/runtime-contract.md", "reason": "固定原生来源、ready、身份和唯一发送合同"}
+{"file": ".trellis/spec/orchestrator/backend/account-runtime-v3.md", "reason": "账号代次、进程池隔离及内核切换合同"}
+{"file": ".trellis/spec/gateway/backend/service-architecture.md", "reason": "容量、取消、退出及准备时序"}
+{"file": ".trellis/tasks/11-13-native-criu-hot-template/research/current-boundaries.md", "reason": "恢复接入的实际类型和研究限制"}
+{"file": ".trellis/tasks/11-13-native-criu-hot-template/research/criu-memfd-feasibility.md", "reason": "封存memfd恢复实测与补丁来源"}
+{"file": ".trellis/tasks/11-13-native-criu-hot-template/research/verification/README.md", "reason": "隔离环境及合成验收复跑约束"}

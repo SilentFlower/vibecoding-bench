@@ -1,0 +1,22 @@
+{
+  "death": {
+    "controller_killed": true,
+    "namespace_exited": true,
+    "worker_exited": true,
+    "seed_alive": true,
+    "worker_pid": 1112,
+    "namespace_pid": 1105,
+    "posts": 0
+  },
+  "recovery": {
+    "before": {
+      "templates": 1,
+      "instances": 1
+    },
+    "after": {
+      "templates": 0,
+      "instances": 0
+    },
+    "entry_exit": 0
+  }
+}

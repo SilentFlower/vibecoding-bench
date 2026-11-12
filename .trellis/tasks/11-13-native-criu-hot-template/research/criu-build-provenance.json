@@ -1,0 +1,11 @@
+{
+  "source_tag": "v4.2",
+  "archive_sha256": "0c6e51af878e63df7391e6dffbbe5f0ced429bc9f1e5a603020bfd2503065c39",
+  "patch_sha256": "ef96d0ff663300a2a2d55c35b044edb82f6c875f8963af0bf93769f7d2e9860b",
+  "tested_binary": {
+    "source": "CRIU v4.2",
+    "sha256": "d5496f4294be3458f46f1bf110da1db9a8303b80ad96fbdb825a4afed8fd559f"
+  },
+  "raw_evidence_directory": "/tmp/flower2api-criu-research-9amnj8l_/memfd-followup",
+  "scope": "独立KVM、合成账号、回环HTTP、三轮各自快照"
+}
