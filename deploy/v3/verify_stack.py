@@ -14,6 +14,7 @@ import time
 import uuid
 from contextlib import ExitStack
 from pathlib import Path
+from source_layout import source_path
 
 import docker
 import requests
@@ -97,7 +98,7 @@ def main() -> None:
         data = root / "v3-data"
         fixture_library = root / 'project-fixture-library'
         if minimal_library:
-            sys.path.insert(0,str(REPO/'orchestrator'))
+            sys.path.insert(0,str(source_path(REPO, 'orchestrator')))
             from project_test_content import create_project_fixture
             create_project_fixture(fixture_library)
         legacy = root / "legacy-data"
@@ -156,12 +157,12 @@ def main() -> None:
             compose_text = compose_text.replace(volume_anchor,
                 volume_anchor+f'      - {fixture_library}:/test-project-library:ro\n')
         if args.source_overlay:
-            overlay = [(path, '/app/' + path.name) for path in sorted((REPO / 'orchestrator').glob('*.py'))]
-            overlay.extend((path, '/webui/' + path.name) for path in sorted((REPO / 'webui').iterdir())
+            overlay = [(path, '/app/' + path.name) for path in sorted((source_path(REPO, 'orchestrator')).glob('*.py'))]
+            overlay.extend((path, '/webui/' + path.name) for path in sorted((source_path(REPO, 'webui')).iterdir())
                 if path.is_file() and path.suffix in ('.js', '.html', '.css'))
             # 与正式 Dockerfile 一致使用镜像内 vendor；Chrome 演练禁止外部网络。
             index = root / 'index-overlay.html'
-            html = (REPO / 'webui/index.html').read_text()
+            html = (source_path(REPO, 'webui/index.html')).read_text()
             for remote, local in (('https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css', 'vendor/xterm.css'),
                     ('https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js', 'vendor/xterm.js'),
                     ('https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js', 'vendor/xterm-addon-fit.js')):

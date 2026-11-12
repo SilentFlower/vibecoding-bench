@@ -11,7 +11,7 @@ from pathlib import Path
 import docker
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0,str(ROOT/'orchestrator'))
+sys.path.insert(0,str(ROOT/'services/orchestrator'))
 from project_library import ProjectLibrary, materialize_snapshot, read_document, safe_relative, snapshot_tree
 from project_verifier import ProjectVerifier
 
@@ -83,7 +83,7 @@ def main() -> None:
     :return: None。
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root',type=Path,default=ROOT/'project_library')
+    parser.add_argument('--root',type=Path,default=ROOT/'resources/project-library')
     parser.add_argument('--catalog', default='catalog.json')
     parser.add_argument('--project',required=True)
     parser.add_argument('--task',required=True)

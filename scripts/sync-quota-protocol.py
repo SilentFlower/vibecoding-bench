@@ -5,6 +5,6 @@ from pathlib import Path
 
 if __name__ == "__main__":
     root = Path(__file__).resolve().parents[1]
-    source = root / "orchestrator" / "quota_protocol.py"
+    source = root / "services/orchestrator" / "quota_protocol.py"
     target = root / "images" / "sidecar" / "quota_protocol.py"
     target.write_bytes(source.read_bytes())

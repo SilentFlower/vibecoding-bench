@@ -48,7 +48,7 @@ def convert(project: Path, old: dict) -> tuple[dict | None, dict]:
     mapping = []
     audit = {'project_key': slug, 'status': 'ready' if groups else 'blocked',
         'source': old['source'], 'legacy_manifest_sha256': hashlib.sha256((project / 'project.json').read_bytes()).hexdigest(),
-        'research': [f'research/github-projects/{slug}.md', f'research/github-projects/{slug}-roadmap-20.md'],
+        'research': [f'resources/project-research/{slug}.md', f'resources/project-research/{slug}-roadmap-20.md'],
         'tasks': [], 'legacy_tasks': mapping}
     if not groups:
         audit['reason'] = '现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。'
@@ -126,7 +126,7 @@ def main() -> None:
     :return: None。
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root', type=Path, default=ROOT / 'project_library')
+    parser.add_argument('--root', type=Path, default=ROOT / 'resources/project-library')
     parser.add_argument('--activate', action='store_true', help='在双试点通过后切换当前内容目录')
     parser.add_argument('--validation-report', type=Path, help='与当前内容摘要一致的全部任务原生验收回执')
     args = parser.parse_args()
@@ -156,7 +156,7 @@ def main() -> None:
     if args.activate or args.validation_report:
         if not args.validation_report:
             raise ValueError('激活前必须提供当前全部任务的原生正反验证回执')
-        sys.path.insert(0, str(ROOT / 'orchestrator'))
+        sys.path.insert(0, str(ROOT / 'services/orchestrator'))
         from project_library import ProjectLibrary
         proof = document(args.validation_report)
         library = ProjectLibrary(args.root, catalog_name='catalog-development.json')

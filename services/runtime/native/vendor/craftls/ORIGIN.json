@@ -1,0 +1,397 @@
+{
+  "upstream": "https://github.com/3andne/craftls",
+  "referenceCommitRepository": "cc2api 本机参考树，不表示 craftls 上游提交号",
+  "referenceCommit": "47e75ef4a1e982e2693edab81d5387eedb6adf40",
+  "version": "rustls 0.22.4",
+  "scope": "保留生产库、构建文件和许可；省略上游测试数据、示例和基准。运行不依赖参考仓库。",
+  "files": [
+    {
+      "path": "LICENSE",
+      "sha256": "181434970b3e0d42e8fda9b0c151a9e2a0febd43beb1e5ee9c4dfb24d385c884"
+    },
+    {
+      "path": "LICENSE-APACHE",
+      "sha256": "7818d82472e021776bda1b41efff060b87d7312d9bfa09b6c8c44c04a2f72ee4"
+    },
+    {
+      "path": "LICENSE-ISC",
+      "sha256": "77cc3999395ebbefa026fc7921cb7c2bc211ea8a8b67ee55edc60b71ccfc25f8"
+    },
+    {
+      "path": "LICENSE-MIT",
+      "sha256": "9e4ff43743f270ba8710556c5c2b61264b070b32082e379678b09c6b333f14b6"
+    },
+    {
+      "path": "rustls/Cargo.toml",
+      "sha256": "eb4e2fa6f2fb844232e02246aee0f0b5bafab0d774c909cc7b9d18076358db71"
+    },
+    {
+      "path": "rustls/LICENSE-MIT",
+      "sha256": "9e4ff43743f270ba8710556c5c2b61264b070b32082e379678b09c6b333f14b6"
+    },
+    {
+      "path": "rustls/build.rs",
+      "sha256": "83af94fa10c4be7653b2b69e1a4656239ecf6fbdfc225341f10e1ec7121b383e"
+    },
+    {
+      "path": "rustls/src/bs_debug.rs",
+      "sha256": "47e7f8b684e939900080652493709f3ef3b017fbdac0c9094a665553262449d6"
+    },
+    {
+      "path": "rustls/src/builder.rs",
+      "sha256": "e84f9b2d5bdd7b9a0404642cdcef32577d3f584107e58fbf1de84814f0c8e986"
+    },
+    {
+      "path": "rustls/src/check.rs",
+      "sha256": "c6e04e377057b492e277b8aaa2f177f56d26365b52ce2b9b38b24007a53d2002"
+    },
+    {
+      "path": "rustls/src/client/builder.rs",
+      "sha256": "84e825565b78d9b2fab85b7dc213d1b499d06f90cdc8ef6f41b2a8142dbf4cbd"
+    },
+    {
+      "path": "rustls/src/client/client_conn.rs",
+      "sha256": "8fb022a8f2a28769e257aaf4b26301a13812dc5bce42de0696c5d89d72e200d2"
+    },
+    {
+      "path": "rustls/src/client/common.rs",
+      "sha256": "a8e342435e5273124685428f4b79fbf737fb7513fe2a3739dfabc19c292d0a6b"
+    },
+    {
+      "path": "rustls/src/client/handy.rs",
+      "sha256": "6fd3690410d06c4cb049e49f456f7feda55adf0ae8da10da8d3060fd4e22f4c2"
+    },
+    {
+      "path": "rustls/src/client/hs.rs",
+      "sha256": "cd771b9f0c27b2c089f8687ec816e55202a08be7ae6cd675252a42f3e6166916"
+    },
+    {
+      "path": "rustls/src/client/tls12.rs",
+      "sha256": "2e6cdfc9ae05540509e7c20a8e25cc2c34e1af511314aa3864506339741867a5"
+    },
+    {
+      "path": "rustls/src/client/tls13.rs",
+      "sha256": "37af814e04e13d05aea7347bfa52959768446055a941b38b146300014973468a"
+    },
+    {
+      "path": "rustls/src/common_state.rs",
+      "sha256": "940b6903b8fc0495f03d49cf86d68a1e5c2baae26ce14f347f4144b276702300"
+    },
+    {
+      "path": "rustls/src/compression.rs",
+      "sha256": "5fa1221ad1710cb195cef0a60a2694316b17230e7a62bbd0a793e69babd04965"
+    },
+    {
+      "path": "rustls/src/conn.rs",
+      "sha256": "a0cca94c4b009eafd49e5195e9c904703b4150f6e63f1bb94eb3a34105b2ecf0"
+    },
+    {
+      "path": "rustls/src/craft/fingerprints.rs",
+      "sha256": "10675be77d2dcdbe5d71e3fba0284127ea43bb959a94907ef19652ac4e68283a"
+    },
+    {
+      "path": "rustls/src/craft/mod.rs",
+      "sha256": "19337ee9886dcbac1c7713d53ca8efea0ce37769e4843c2b745b61d3ce396432"
+    },
+    {
+      "path": "rustls/src/crypto/aws_lc_rs/mod.rs",
+      "sha256": "4b7ec784a8967c99dfb887c55a1cce3afa96743f6cf3eb72a2f6525bfa08c813"
+    },
+    {
+      "path": "rustls/src/crypto/aws_lc_rs/tls12.rs",
+      "sha256": "d74489ee6921dfeb52379b0fc81b4ab27c47b6f0f784bca559e6680c302ebe32"
+    },
+    {
+      "path": "rustls/src/crypto/aws_lc_rs/tls13.rs",
+      "sha256": "90bac942f2ed370240c7fb06935e6ef0caf922ed9acc82ee1d34f7c50f4b3ee3"
+    },
+    {
+      "path": "rustls/src/crypto/cipher.rs",
+      "sha256": "bc8bc4af5af37840ca7d66c6d2b2a8d3c2d7a3c04f8419e2d5c60559aa686107"
+    },
+    {
+      "path": "rustls/src/crypto/hash.rs",
+      "sha256": "4a428d2ffe4a247da62760c108c872bf9b9ce922170c26cc367bb83ceb92ff5a"
+    },
+    {
+      "path": "rustls/src/crypto/hmac.rs",
+      "sha256": "0cc5a905b365ea0a9d9c5d9b825784409e2243807ef15a14d31d5239283c29e3"
+    },
+    {
+      "path": "rustls/src/crypto/hpke.rs",
+      "sha256": "859eb10ddc13c76dd5d1b7939ee9d916b620d6bfd10fa55712fa4a0c9b595f94"
+    },
+    {
+      "path": "rustls/src/crypto/mod.rs",
+      "sha256": "19b47219d7636630f7d57d54b1b2c73ea79789d9aeb32cd5af7481315bcdde06"
+    },
+    {
+      "path": "rustls/src/crypto/ring/hash.rs",
+      "sha256": "eeb1decbef5b83131945c6ff86810076f2f0912fc3eedad58e69722e06c10d62"
+    },
+    {
+      "path": "rustls/src/crypto/ring/hmac.rs",
+      "sha256": "9c15cce5db83c40e23e7937f9509379dfda6725fed8c65a5b5ce00fdeacada94"
+    },
+    {
+      "path": "rustls/src/crypto/ring/kx.rs",
+      "sha256": "f15d3212c7249b54961adcd77cab6769055bc9e8215973247eb1f4c0c8b124c3"
+    },
+    {
+      "path": "rustls/src/crypto/ring/mod.rs",
+      "sha256": "62e535ca8e58b448fdc86560838086b7368e36f5d2af80d863fa171bef7c1762"
+    },
+    {
+      "path": "rustls/src/crypto/ring/quic.rs",
+      "sha256": "309374cd696231546171566adc1709246fc2040eb972b6f3f8e82cf058b2b241"
+    },
+    {
+      "path": "rustls/src/crypto/ring/sign.rs",
+      "sha256": "62687fdad96388d2bb9b1e8a4b4be434276f5a3081dab39dd3cfcb86ad87eb77"
+    },
+    {
+      "path": "rustls/src/crypto/ring/ticketer.rs",
+      "sha256": "7d82bb0fe20226da6f79074e3c1a31cf669faa63319a1deebcb4575f13c80554"
+    },
+    {
+      "path": "rustls/src/crypto/ring/tls12.rs",
+      "sha256": "b79acf3f5d3aadece12b849d87c253c4a5e7b56e44f191f352d59bd26f063da1"
+    },
+    {
+      "path": "rustls/src/crypto/ring/tls13.rs",
+      "sha256": "33f5b0f3e2711ceffaa611481142cb15022b54165257e46aadbb9f2529cf4f29"
+    },
+    {
+      "path": "rustls/src/crypto/signer.rs",
+      "sha256": "8eeb222aa293a0e7b9ec522fe723cd8dabcb0cd5a92f8cba51f2c3f455ad30a0"
+    },
+    {
+      "path": "rustls/src/crypto/tls12.rs",
+      "sha256": "493d3e65ebfc6c376aa28bbd6ee56748f525b17e5c9c9c3e5b65c79ca287a4a4"
+    },
+    {
+      "path": "rustls/src/crypto/tls13.rs",
+      "sha256": "f0832ecc192777f629f1649f3f1198678591d66430045fce2c7ba1f1454bbb4d"
+    },
+    {
+      "path": "rustls/src/enums.rs",
+      "sha256": "9f767bb4f45eee9bb70d00fd25e8959feb35665552cc0dae1dea2563c4165cb1"
+    },
+    {
+      "path": "rustls/src/error.rs",
+      "sha256": "5292c870a718c82b65bde6f14f8bfa46d3e17c14f4a0891603c50d2be5e6d7d8"
+    },
+    {
+      "path": "rustls/src/hash_hs.rs",
+      "sha256": "6a3952f74944802a35f93d748cf5f3281a69c1f662610015a9775fb51f196669"
+    },
+    {
+      "path": "rustls/src/key_log.rs",
+      "sha256": "75c6a23db1733d9c981d9f2f556971a4aea84a7cf0db2bc3f40210f52761d7e3"
+    },
+    {
+      "path": "rustls/src/key_log_file.rs",
+      "sha256": "46930a7452745c9b660e8fbedadfcf82efa6351c4a5e266af0a9b5a95cc1b6dc"
+    },
+    {
+      "path": "rustls/src/lib.rs",
+      "sha256": "58fe15ecfd28bf06c6d23ee56b4ec4d9811967a929848aebc5dbbeee6039542f"
+    },
+    {
+      "path": "rustls/src/limited_cache.rs",
+      "sha256": "78e4ccbb39705a4dd1b34930b1d873c2c4e906bc54d7ca25f0f4c7396f665927"
+    },
+    {
+      "path": "rustls/src/manual/defaults.rs",
+      "sha256": "d4d44d094c8dee1e595988674c1f7e19c3d73ae51b8c7aa9921fd8a1a33ad015"
+    },
+    {
+      "path": "rustls/src/manual/features.rs",
+      "sha256": "5aef65271e980cef6ab3be21cd2bfcf18eb4fcb8e7bca1c46788d4fdbd951a22"
+    },
+    {
+      "path": "rustls/src/manual/howto.rs",
+      "sha256": "eb4e7704465a1e90d12c775773235f5933b65d1585b08a3232fb7675575d2c7c"
+    },
+    {
+      "path": "rustls/src/manual/implvulns.rs",
+      "sha256": "b42abb13ce142e83da012f7fa47759091c43216628abd46563de9910748efe5b"
+    },
+    {
+      "path": "rustls/src/manual/mod.rs",
+      "sha256": "8348373cb7d6f21da000ceeba4e39f79e2e81a3a8d01841847d8e54e3a7b6dba"
+    },
+    {
+      "path": "rustls/src/manual/tlsvulns.rs",
+      "sha256": "527156e1afb45d1a5b75a3a770cdc28b2cefd623dc60fbb1d9725d497817db3e"
+    },
+    {
+      "path": "rustls/src/msgs/alert.rs",
+      "sha256": "8271db3a7b135b87758f3bba93edaccae5b72de4d42b09ee54e56f25bd1cbd1b"
+    },
+    {
+      "path": "rustls/src/msgs/base.rs",
+      "sha256": "bfe40c3afa9b7e40ae1d1a0503f59421a4d35005ce58a2e8c3528b890744cbbf"
+    },
+    {
+      "path": "rustls/src/msgs/ccs.rs",
+      "sha256": "cf6828aace2102d53ed5e0eea56abb82aa1826c0b9705097c569cefff0a144ad"
+    },
+    {
+      "path": "rustls/src/msgs/codec.rs",
+      "sha256": "9606841cac0e8b903c56e203c529e06e3733fcc0260b68904c3deeb15b9d1f32"
+    },
+    {
+      "path": "rustls/src/msgs/deframer.rs",
+      "sha256": "cfdb88029138a1771562995f372855a47f74050ab44c390bb4aa4f797e5ff931"
+    },
+    {
+      "path": "rustls/src/msgs/enums.rs",
+      "sha256": "202fa12d7e8e31cd131b62ca823e1aabc72cc264470c4c43b3de9808adb4e35d"
+    },
+    {
+      "path": "rustls/src/msgs/fragmenter.rs",
+      "sha256": "015d530eed982ccb11db00050d18cf7d04b0de58765a978b8c68b77c994b3346"
+    },
+    {
+      "path": "rustls/src/msgs/handshake-test.1.bin",
+      "sha256": "dfc0687f3b9902e7a0dfd2ebf59d73745b23b103e1d2b337ff555dfe42c5d1dd"
+    },
+    {
+      "path": "rustls/src/msgs/handshake.rs",
+      "sha256": "48a2aa992db6aa6f9e87f12f4f422b192f9f60b53a4da0893439bc212c7949a5"
+    },
+    {
+      "path": "rustls/src/msgs/handshake_test.rs",
+      "sha256": "357d60149820a44b55aaa89e443c250c77deb2c45aeb097705f5d292d237c1a0"
+    },
+    {
+      "path": "rustls/src/msgs/hello-api.devicecheck.apple.com.bin",
+      "sha256": "2bc3d61745598bf03d412fbcf482152d6810f674f6f6e7dab4fca90b71797c93"
+    },
+    {
+      "path": "rustls/src/msgs/macros.rs",
+      "sha256": "b4cd1b4bea6c3e7359d39aa5288e4fc4c286a9cc8aa7b8d1cd4a089d475526d8"
+    },
+    {
+      "path": "rustls/src/msgs/message.rs",
+      "sha256": "6f123dcf0db5077e09149f53fb6e2cb41a76ef2fcfb06042e3e496eb9226ffab"
+    },
+    {
+      "path": "rustls/src/msgs/message_test.rs",
+      "sha256": "ac1cc4a9c9714b9bed19840871c5eb29ba2855a53b5672eeb4a699e00bc139e6"
+    },
+    {
+      "path": "rustls/src/msgs/mod.rs",
+      "sha256": "9019f063165d1354e342e12de14c211fb9b478240b1e6a0f33ff411191c6e1e7"
+    },
+    {
+      "path": "rustls/src/msgs/persist.rs",
+      "sha256": "ba8884d75eb9d1b3812d63e4cdcecf6e2c94f9ee007e5ee2a022b58a3c5e8fa8"
+    },
+    {
+      "path": "rustls/src/quic.rs",
+      "sha256": "6957a404856592b4d36080ff0640d33ba0637cba7cca2445ebf8ccbe30f93cb1"
+    },
+    {
+      "path": "rustls/src/rand.rs",
+      "sha256": "2c85709e7e60166f01bff9fd4b86109ef16f0b9ce29607865ddf0d2910a0ff38"
+    },
+    {
+      "path": "rustls/src/record_layer.rs",
+      "sha256": "b52e07f857e0deb4fd6f07c0e0ac93248629412ffe52658755ec043b9f368b28"
+    },
+    {
+      "path": "rustls/src/server/builder.rs",
+      "sha256": "50219b3f9fd16b6efbbb203e78d64b23612f2f978c2a6a1203e8bc565d5a0e5f"
+    },
+    {
+      "path": "rustls/src/server/common.rs",
+      "sha256": "bf48480e8b6763c8635ea798538ce4d1c89ce992b3644579e3d32676b891b9b1"
+    },
+    {
+      "path": "rustls/src/server/handy.rs",
+      "sha256": "e57deaab676ac273e54ef3df6b1206b3d3b9179cadf18932ffe7ed686af8c7cf"
+    },
+    {
+      "path": "rustls/src/server/hs.rs",
+      "sha256": "b144466bc39e65308490b1051a4e62c100f484568339c611318f8e36b2d267e9"
+    },
+    {
+      "path": "rustls/src/server/server_conn.rs",
+      "sha256": "817a84d4d2dd8c7eb728a2d1edf66dff5256b688ae317311d0c673db18cce60b"
+    },
+    {
+      "path": "rustls/src/server/tls12.rs",
+      "sha256": "482e2b75f0376885edaf2d306f23da492bfbfb55b92526f4b9a5f76ad0986522"
+    },
+    {
+      "path": "rustls/src/server/tls13.rs",
+      "sha256": "fe97b8b7da0f18b569ede8e9a3e003c8e108f78ca02e0b288c071a8908f4b0b9"
+    },
+    {
+      "path": "rustls/src/stream.rs",
+      "sha256": "d5f9b0fa054b50f2e99c1024a836e11c7d79132724a4f29f104a9f61de55fdfd"
+    },
+    {
+      "path": "rustls/src/suites.rs",
+      "sha256": "1cb2562519b4e38e3926739c49d082b8fa79bde7382a16e8342c8ab133e6bedc"
+    },
+    {
+      "path": "rustls/src/ticketer.rs",
+      "sha256": "9be330502c14a67d20868e4e38633732a6916cd436b9377a03dffb1b48c9c00d"
+    },
+    {
+      "path": "rustls/src/tls12/mod.rs",
+      "sha256": "3ef176d87c239d48b26dc392a7286b06628aef107a0929614acda07edff1ae9a"
+    },
+    {
+      "path": "rustls/src/tls13/key_schedule.rs",
+      "sha256": "9405ee6d5f496ac4d363e5870347f7df0336b1cfb9f95a563d83b6cac606337d"
+    },
+    {
+      "path": "rustls/src/tls13/mod.rs",
+      "sha256": "0bc7c9f205d989264d643457b2ea3812fa3f99577b7d496165c68a24fe8785c5"
+    },
+    {
+      "path": "rustls/src/vecbuf.rs",
+      "sha256": "23e95c301ddbb43ea7055fca54c92222d035321d3979ca0679a915d9da926d14"
+    },
+    {
+      "path": "rustls/src/verify.rs",
+      "sha256": "eb626c55116bf2bdd7a231492910d91f657f275267171ca102343c55c8e8bfb6"
+    },
+    {
+      "path": "rustls/src/verifybench.rs",
+      "sha256": "18dec90f008d49cac4aa2447b242e4085ad5497dc7ae77d745918ecd6ecd6447"
+    },
+    {
+      "path": "rustls/src/versions.rs",
+      "sha256": "3bf431b524b19c557f5cf4371681ad6af02a273dfdacedb8d0a8e14cd3055ebc"
+    },
+    {
+      "path": "rustls/src/webpki/anchors.rs",
+      "sha256": "37d120a0d4ae891b6ee68b71c0326631244334004e1f7bb4d1a13a67e5c81be6"
+    },
+    {
+      "path": "rustls/src/webpki/client_verifier.rs",
+      "sha256": "3fc88dec7dbfe2f119c4977db88d5811239d0e913d82111ff8d97342f0cb66c6"
+    },
+    {
+      "path": "rustls/src/webpki/mod.rs",
+      "sha256": "ddeb203acc042c8eed2fd97c4c4a98ee04bfe5686f70eeb2254170339c29a40f"
+    },
+    {
+      "path": "rustls/src/webpki/server_verifier.rs",
+      "sha256": "f414704a5b51ac3c0de2a506db7963e0cdc6281c2d4f1311ca23d6f9fd94c0fc"
+    },
+    {
+      "path": "rustls/src/webpki/verify.rs",
+      "sha256": "8e0ae0e938463c80541a49634b73af15e23cd34d5c4d245438fb11dc79e90d51"
+    },
+    {
+      "path": "rustls/src/x509.rs",
+      "sha256": "e470de470fa57744e50a85e106a5825592abc86dbdb75435db100e2bca0a8a17"
+    }
+  ]
+}

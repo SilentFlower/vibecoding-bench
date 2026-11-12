@@ -16,6 +16,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from install_system_updater import REPO, SOURCE_FILES
+from source_layout import source_path
 from runtime_files import atomic_json, atomic_text, directory_fd
 from storage_maintenance import acquire_storage_lock
 from system_update_contract import safe_read, strict_json
@@ -130,7 +131,7 @@ def _upgrade(policy_path: Path, source_root: Path, service: str, *, apply: bool,
     for name in SOURCE_FILES:
         target = root / 'source' / name
         before[name] = safe_read(target) if target.exists() or target.is_symlink() else None
-        after[name] = safe_read(source_root / name)
+        after[name] = safe_read(source_path(source_root, name))
     plan = {'status': 'planned', 'deployment': policy['deployment'], 'service': service,
         'from_protocol': 1, 'to_protocol': 2, 'previous_upgrades': sorted(journals),
         'before_policy_sha256': hashlib.sha256(original_policy).hexdigest(),

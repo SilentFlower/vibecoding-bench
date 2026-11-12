@@ -2,6 +2,7 @@
 import json
 import re
 from pathlib import Path
+from source_layout import source_path
 
 
 def sender_business_probe() -> str:
@@ -61,7 +62,7 @@ print(json.dumps({'uid':os.getuid(),'caps':{key:status[key].strip() for key in (
             assert configuration['User'] == '0:0'
             assert set(settings.get('CapAdd') or []) == {'SYS_ADMIN', 'SETUID', 'SETGID'}
             policy = next(value[8:] for value in settings['SecurityOpt'] if value.startswith('seccomp='))
-            expected = Path(__file__).resolve().parents[2] / 'orchestrator/native_tls_seccomp.json'
+            expected = source_path(Path(__file__).resolve().parents[2], 'orchestrator/native_tls_seccomp.json')
             assert json.loads(policy) == json.loads(expected.read_text())
         else:
             assert not settings.get('CapAdd')

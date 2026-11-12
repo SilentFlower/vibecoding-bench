@@ -15,9 +15,10 @@ import sys
 import uuid
 from contextlib import ExitStack
 from pathlib import Path
+from source_layout import source_path
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / 'orchestrator'))
+sys.path.insert(0, str(source_path(REPO, 'orchestrator')))
 from manage import load_environment
 from runtime_files import atomic_json, atomic_text
 from storage_maintenance import acquire_storage_lock
@@ -37,7 +38,7 @@ SOURCE_FILES += ('deploy/v3/system_update_database.py', 'deploy/v3/upgrade_syste
     'orchestrator/database_migrations.py', 'orchestrator/database_migration_contract.py',
     'orchestrator/database_schema.py', 'orchestrator/database-migration-registry.json', 'orchestrator/projects_store.py')
 SOURCE_FILES += ('orchestrator/system_update_connection.py',)
-SOURCE_FILES += ('deploy/v3/platform_version.py', 'deploy/v3/release_ci.py')
+SOURCE_FILES += ('deploy/v3/platform_version.py', 'deploy/v3/release_ci.py', 'deploy/v3/source_layout.py')
 
 
 def prepare_installation(env: Path, release_dir: Path, root: Path, public_key: str, *, apply: bool = False,
@@ -90,7 +91,7 @@ def prepare_installation(env: Path, release_dir: Path, root: Path, public_key: s
     for relative in SOURCE_FILES:
         target = root / 'source' / relative
         target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        atomic_text(target, (REPO / relative).read_text())
+        atomic_text(target, source_path(REPO, relative).read_text())
     folder = root / 'releases' / release['release']
     folder.mkdir(mode=0o700)
     atomic_text(folder / 'system-release.json', raw.decode())

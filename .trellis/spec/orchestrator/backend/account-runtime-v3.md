@@ -1,0 +1,1463 @@
+# v3 固定账号运行环境契约
+
+## Scenario: US 宿主管理工具继承既有口令例外
+
+### 1. Scope / Trigger
+
+- 更新 `/opt/vibebench-v3-us/deploy/v3/manage.py` 时，核对该宿主已有 `server-password-override.json`。通用仓库管理工具保持全部秘密至少 32 字符；US 宿主覆盖继承其已批准的现有管理员口令。
+
+### 2. Signatures
+
+```text
+宿主覆盖函数：_existing_us_admin_password(values: dict, deployment: str) -> bool
+宿主记录：/opt/vibebench-v3-us/server-password-override.json
+预检：preflight(values) -> Path
+兼容检查：check_credential_compatibility(root, manifest) -> None
+```
+
+### 3. Contracts
+
+- 工具升级先核对旧宿主文件和部署配置摘要，使用确认 CI 的通用源文件，再继承已有服务器覆盖；运维记录保留来源、base_revision、original_sha256、override_sha256 和批准原因。服务配置与现有口令保持，不把秘密写入命令行、日志或任务记录。
+- 例外只对 `deployment=us`、`V3_DATA_ROOT=/srv/vibebench-v3-us` 生效。记录必须为非链接普通文件，kind 为“服务器管理密码运维调整”，override_file 为 deploy/v3/manage.py；私有 approved_admin_sha256 必须与当前已批准管理员口令一致。字段值留在宿主受保护记录，不在文档写入实际摘要。
+- 仅管理员口令可使用这项既有例外；V3_INTERNAL_TOKEN、V3_SESSION_SECRET 继续至少 32 字符，新口令或其它部署沿用通用长度检查。
+- 候选环境只改变 release/control image/account image/manifest 四项，其他配置逐值相等。按当前 US 选择跳过 RAM 重算时，仍保留此前的端口、归属、镜像能力及凭据所有权回退检查。
+- 发布只读验证包括同批实际镜像源文件、协议能力、两库、管理鉴权与接口响应；自建采样会话单独撤销，用户会话保持。是否等待 API 转发按本次用户授权执行，CLI/Pi 和未确认输入仍须收口。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| US 现有口令与受保护批准记录匹配 | 继承既有口令例外 |
+| 新短口令、其它部署或记录缺失/损坏/链接 | 不使用例外，沿通用长度检查 |
+| 内部服务或会话秘密不足 32 字符 | 预检拒绝 |
+| 工具/配置摘要漂移、镜像协议不匹配 | 停止发布，不覆盖当前配置 |
+
+### 5. Scenarios and Examples
+
+- 正常：从确认 CI 更新宿主工具，保留记录批准的现有管理员口令；新所有权回退保护与原内部秘密校验同时生效。
+- 基础：其它部署继续使用仓库通用管理工具，无 US 例外。
+- 错误用法：直接覆盖宿主工具后，发现旧口令不满足通用长度要求便换密码，或删除所有秘密检查。正确处理：核对已有批准记录，仅继承对应管理员口令，保留内部和会话秘密校验。
+
+### 6. Tests Required
+
+- 宿主定向检查：原已批准口令命中；替换为另一短口令、另一 deployment 均不命中；内部/会话秘密短值分别抛出对应长度错误，且尚未运行资源计算。
+- 正式 CI 镜像在断网空库启动，验证归属协议及迁移；同批预检和实际源文件摘要通过，环境候选仅四项变化。
+- 部署后健康、归属/导航、原持久身份/目标/设置、非目标容器和两库 quick_check 通过。真实供应商 OAuth、真实模型探针与这组检查分别记录。
+
+## Scenario: v3 凭据单一所有者与交接协议 1
+
+### 1. Scope / Trigger
+
+- 修改创建/关联/解绑、关联重授权、OAuth 刷新、后台上游活动、归属展示或联合回退时适用。短期运行租约与长期刷新权分别持久管理，租约过期不能解除长期暂停。
+
+### 2. Signatures
+
+```text
+GET  /admin/runtime/credential-capabilities
+GET  /admin/accounts/{id}/oauth-ownership
+POST /admin/accounts/{id}/oauth-ownership
+POST /api/accounts/{aid}/cc2api/create
+POST /api/accounts/{aid}/cc2api/bind
+DELETE /api/accounts/{aid}/cc2api-binding
+POST /api/environments/{environment_id}/maintenance
+CredentialOwnership.record_local_authorization(account_id, version=None) -> None
+CredentialOwnership.guard(account, source=None) -> None
+check_credential_compatibility(root: Path, manifest: dict) -> None
+```
+
+- 网关表：`oauth_account_ownerships(account_id BIGINT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE, record_json TEXT NOT NULL)`；`oauth_handoff_operations(operation_id TEXT PRIMARY KEY, account_id BIGINT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, record_json TEXT NOT NULL)`。SQLite/PostgreSQL 同事务保存所有权、回执及交接凭据，按完整原所有权 JSON 条件更新。
+- bench 表：`account_credential_ownerships(account_id INTEGER PRIMARY KEY, record_json TEXT NOT NULL)`；`local_credential_authorizations(account_id INTEGER PRIMARY KEY, record_json TEXT NOT NULL)`。本地绑定与相应交接阶段用同一短事务保存；HTTP 在数据库锁外。
+
+### 3. Contracts
+
+- 内部接口同时要求管理 Bearer 与 `x-v3-service-token`；能力返回 `{credential_ownership_protocol:1}`。交接响应含 `protocol:1/ownership/receipt`，完整凭据快照只向受信任内部调用方返回。浏览器仅接收无身份秘密的 `owner/phase/message/remote_id/environment_id/direction` 摘要；列表批量读取，不逐账号刷新或扫描 HOME。
+- 输入为 `protocol/operation_id/action/direction/identity/expected_generation/source_refresh_sha256/lease_owner/credentials`，拒绝未知字段；action 为 prepare/commit/finish/cancel/status，direction 为 create/attach/return/authorize/detach/reauth/retire。操作和代次为 32 位小写十六进制；identity 固定 deployment_id、environment_id、bench_account_id、device_id、email、account_uuid、organization_uuid，device_id 为 64 位十六进制。凭据为 access_token/refresh_token/expires_at（UTC 毫秒），不保存到待办、回执或证明表。
+- owner 为 gateway/local；phase 为 ready/handoff/reauth/reconcile。仅 gateway/ready 允许网关新上游活动；无所有权记录的普通账号沿用原行为。坏记录只隔离所属账号，不影响整个账号列表或其他账号调度。
+- prepare 先关闭新准入、持久归属并排空最多 8 秒。活动许可必须覆盖实际网络发送至结束，SSE 持有到流释放；模型、count_tokens、Hello/bootstrap、预热、额度、测试、遥测、OAuth/401 共用门禁。作用域允许的原 sticky 账号暂停时返回维护，保留绑定；不跨号绕过。归属拒绝不应触发认证停用，RPM/并发/优先级等普通配置仍可热编辑。
+- detach 在本地空闲、网关排空后取当前权威快照，镜像/解绑并发布完整 HOME，远端提交 local/ready 后完成。return 必须有原本地接管回执、原 ID 与代次；由本地所有者按需刷新后交回当前 HOME，绑定并恢复 AT-only，再 finish 为 gateway/ready。root profile 落后时不能作为当前 HOME 的来源证明。
+- attach 仅在当前 RT 摘要及设备/账号证明一致时认可远端当前凭据；来源不明拒绝。成功本地强制重授权可记录无令牌证明：原环境/设备/身份、RT 摘要及本次登录冻结的 `session.version`；关联时再次按该版本核验当前 HOME 后使用 authorize。独立登录未具备设备来源时允许保存本地账号、清除旧证明；不能据此解除 retired/refresh_pending 或跳过后续关联校验。
+- reauth 保留原绑定及原 `login:` 租约；凭据导入回执 `import_operation_id` 与所有权回执关联，确认实际新授权导入后才允许 finish。回执保存 source_phase，取消返回原阶段，原 reconcile 不能被取消变 ready。普通执行不得冒用登录来源；未完成原操作不能开启另一个交接。
+- 受管刷新发送前落库待确认；确定结果保存且 HOME 收口后才恢复 ready。断线/解析失败/崩溃不重试未经确认的旧 RT。finish 已提交而响应丢失时查同操作回执；若同代已提交后又进入远端 reconcile，确认原绑定完成并保持 `gateway_refresh_pending`，允许明确重授权，仍不放开普通执行。
+- retire 无需有效 RT：先暂停原网关账号再本地删除，保留原 ID/HOME/历史；本地 retired 继续关闭普通执行，明确且身份核验成功的本地重授权才可恢复。远端明确删除仍须原绑定完整缺失证明，不能将新目标 404 当成成功。
+- 两角色镜像标签 `vibebench.credential-ownership-protocol=1`，联合清单 `credential_ownership_protocol:1`；已有任一所有权记录时，只读兼容检查拒绝旧清单回退。US 沿用现有资源参数、不做生产备份、不重新计算内存；最终同批发布及健康验收由部署流程承接。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 缺内部证明、协议不匹配、未知字段或代次/来源冲突 | 拒绝交接，原凭据与回执保持 |
+| 网关账号由本地管理或维护中 | 上游准入 503，不发请求、不按认证失败停用 |
+| 本地归属、绑定或固定环境不一致 | 拒绝执行并提示对账，不按空绑定降级 |
+| 交接超时、写入失败或回包未知 | 保留持久待办和维护，查同操作回执恢复 |
+| 历史 receipt 与当前代次不符 | 拒绝旧回执，不覆盖当前 RT、不释放维护 |
+| 独立未知版本登录 / 受管恢复身份未知 | 本地保存但无关联证明 / 继续维护并明确报错 |
+| 任一受管记录 + 旧版联合清单 | 部署兼容检查拒绝，不写数据库 |
+
+### 5. Scenarios and Examples
+
+- 正常：解绑原远端 7 → local/ready；本地连续轮换三次 → return 到原 7 → HOME 仅 AT → gateway/ready，设备、缓存、策略和历史保持。
+- 边界：commit 已生效而 HTTP 回包丢失，重启读取 status 的同代回执，再补镜像/绑定/finish，不能重复上传历史 RT。
+- 错误用法：用到期时间较大的副本覆盖远端，或本地强制授权按后来修改的默认 CLI 版本生成证明。正确处理：按所有者/回执确认来源，证明及重验均使用实际登录冻结版本；不能确认时保留维护或明确重授权。
+
+### 6. Tests Required
+
+- `test_credential_ownership` 与原 runtime/reauth/deleted-binding/publication/main 回归：六个落盘边界、回包丢失、当前 HOME 来源、坏记录隔离、未知刷新关闭、原绑定重授权、独立未知版本登录与冻结版本证明。
+- Rust 归属/活动许可/401/调度回归及 `account_store_timestamp_test` 的 SQLite、独立 PostgreSQL `credential_ownership_storage` 合同：双栈迁移幂等、凭据/回执原子性、条件失配、删除清理、旧 receipt 拒绝与其他账号继续准入。
+- `test_manage.py`：旧联合清单拒绝且数据库字节不变。`verify_stack.py --manifest <联合清单> --browser --ownership`、`--reauth`、`--deleted-binding`：真实 HTTP、两库、Chrome、Docker 和本地合成 TLS 刷新，暂停零上游、三次刷新交回原 ID、AT-only、故障对账及删除恢复。`--source-overlay` 仅本地 dirty 清单可用且记录只读覆盖摘要；生产仍用最终干净 CI。
+- 真实第三方 OAuth 可用性不以合成结果代替；部署后只读验证镜像协议、状态和既有工作，不擅自发起真实授权、解绑或模型请求。
+
+## Scenario: 固定 Docker、API/CLI 独立调度及证据恢复
+
+### 1. Scope / Trigger
+
+- 修改 `services/orchestrator/account_runtime.py`、v3 管理桥/租约/发送器、账号镜像及部署入口时适用。
+- 本规范是 v3 的共同契约；旧版每 run 的 worker/sidecar 路径继续兼容。被动额度算法遵循 [数据库规范](database-guidelines.md)，抓包限频遵循 [官方协议抓包规范](../../platform/deploy/official-protocol-capture.md)。
+- 固定环境解决状态和生命周期归属；CLI 与 Rust 发送器使用不同客户端，不能推断完整指纹相同或保证不被限制。
+
+### 2. Signatures
+
+```text
+account_environments(
+  environment_id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE,
+  account_id INTEGER UNIQUE, fingerprint_json TEXT NOT NULL,
+  generation INTEGER NOT NULL DEFAULT 0, container_id TEXT,
+  state TEXT NOT NULL DEFAULT 'stopped')
+runs: environment_id TEXT, environment_generation INTEGER,
+      execution_source TEXT, runtime_release TEXT
+
+GET  /admin/runtime/accounts/:id/config
+GET  /admin/runtime/accounts/:id/lease
+POST /admin/runtime/accounts/:id/lease
+GET  /internal/v3/transport/{account_id}
+POST /internal/v3/quiesce/{account_id}
+GET  /api/environments
+POST /api/environments/{environment_id}/maintenance
+
+AccountRuntime.execution_flows(account: dict, source: str, flows: Path) -> Path
+AccountRuntime.start_run(account, task, run_id, worker_env, quota_env) -> tuple[str, str]
+AccountRuntime.execution_environment(row: dict) -> dict[str, str]
+V3_DEFAULT_TIMEZONE = "America/Los_Angeles"
+AccountRuntime.cleanup(container_id: str) -> None
+AccountRuntime.environment_jobs(environment_id: str) -> list[dict]
+AccountRuntime.run_session_path(run_id: str) -> Path
+AccountRuntime.reprofile_blocker(row: dict) -> str | None
+derive_v3_fingerprint(timezone: str | None = None) -> dict[str, object]
+NetworkInspectionMode = "passthrough" | "quota" | "capture"
+/run/v3/context.json -> {NETWORK_INSPECTION_MODE, QUOTA_SOURCE, ...}
+/run/v3/context-ack.json -> {NETWORK_INSPECTION_MODE, QUOTA_SOURCE, process}
+```
+
+管理租约输入为 `operation: string`、`owner: string`、`generation: string | null`；操作为 `prepare-cli-shared`、`prepare-cli`、`prepare`、`claim`、`heartbeat`、`fence`、`release`。查询返回 `lease,holders,cli_capacity,active,waiting,importing`；`lease` 保留为旧占用提示，新调用按 `holders` 核对具体 owner／generation。租约包含 `owner,generation,expires_at,phase,exclusive,shared_cli`，TTL 为 30 秒。持久状态 schema 2 保存全部 holder，旧单租约保守读入；旧记录缺少 `exclusive` 时默认 `true`。fence 与在途导入保护见下方重授权场景。
+
+发送绑定 `TransportBinding`：`account_id: i64`、`environment_id: string`、`generation: u64`、`endpoint: string`、`secret: string`、`release_id: string`。`PreparedRequest` 包含 `request_id`（UUID）、`deadline_unix_ms`、`method`、`target_url`、有序 `headers`、`preserve_header_casing` 和网关冻结的 `tls_profile` 注册ID；最终 body 独立传原始字节。sender不自行重选版本，缺字段沿历史兼容默认，显式未知ID在上游提交前拒绝；完整选择、连接池和错误行为见[版本TLS合同](../../gateway/protocol/claude-code-profile-upgrade.md#scenario-tls-画像版本绑定与冻结传输)。秘密只在服务间传递。
+
+```text
+scripts/v3-stack build --release <唯一批次> --manifest <新清单>
+scripts/v3-stack publish --manifest <本地清单> --output <新发布清单> --bundle <新镜像包>
+scripts/v3-stack pull --manifest <发布清单>
+scripts/v3-stack load --manifest <发布清单> --bundle <同批镜像包>
+scripts/v3-stack up --env <独立配置> --manifest <联合清单>
+scripts/v3-stack status --env <独立配置>
+scripts/v3-stack stop --env <独立配置>
+```
+
+配置入口为 `deploy/v3/example.env`，实际参数以 `manage.py --help` 为准。
+
+### 3. Contracts
+
+**数据与凭据**：cc2api 拥有绑定账号、代理、OAuth 和唯一刷新权；bench 拥有环境、任务、持久目录及证据。两侧通过受控 API 协作。绑定 CLI HOME 仅发布 AT，删除 RT；401 沿用 managed 刷新流程。身份导入接受 Recorder 实际请求观察，或经指定官方版本实测验证的本地字段映射，并核对登录账号归属；来源未知或冲突时阻止同步。当前 2.1.293 的 device_id 来自固定 HOME 的 `.claude.json.userID`，不能用 Linux machine-id 或独立 machineID 替代，详见下方身份同步场景。
+
+**环境**：每账号一个固定 account 容器、完整 `/home/node` 和版本缓存。新环境的 `fingerprint_json.profile_version=2`；hostname 为独立随机 12 位小写十六进制，machine-id 为独立随机 32 位小写十六进制，MAC 为独立随机的本地管理单播地址。时区来自账号显式配置，locale 与地区成组持久化；未配置的新环境使用 `America/Los_Angeles` + `en_US.UTF-8`，IANA 时区自动处理夏令时；已有 UTC 或其它画像保持，generation=0 的已登记画像也不重算。环境 ID、profile、RAM/swap 不随 run、改名、停止唤醒或容器重建重算；旧记录缺 `profile_version` 时保持 legacy。重建可换 container ID，但保留 HOME 和环境身份。容器 DNS 为 `v3-<deployment_sha256前12位>-account-<environment_id>`，完整归属由产品/部署/角色/环境 labels 校验。只按本部署精确标签维护，不用宽前缀或 prune。
+
+**调度**：
+
+- `prepare-cli-shared` 用于布局 2 的普通 Tasks／项目计划，账号至多两个 CLI holder，API 可同时入场。`PER_ACCOUNT_CONCURRENCY` 默认 2，合法较低配置继续限制 Tasks 与 Projects 总容量；API 容量独立。`prepare-cli` 仍为 CLI 专用排他，用于养号、抓包和续聊等既有操作，阻止其他 CLI 但允许 API；不能把旧调用自动解释成多 CLI。养号仍让位于正式工作。
+- `prepare` 创建排他维护门禁：重授权、代理修改、绑定切换、停止、重建检查或排空 API。配置 quiesce 验证排他 owner/generation、API 活动数和本环境 CLI/发送器状态。
+- CLI 安装在认领后执行，不持有环境生命周期锁；API 就绪不安装 CLI。API 保留 weighted slot/FIFO 与 SSE permit，精确 Messages 的稳定绑定、当前 RPM 间隔准入及可视化遵守 [v3 API 调度合同](../../gateway/backend/service-architecture.md#scenario-v3-api-稳定会话智能准入与平滑发送)；CLI 不共享该发送预算。OAuth resolve 不等待 CLI 租约。
+- 普通 `_cli_setup()` 的串行交接检查、画像探针与 `claim()` 共用同一个环境锁，评审不能在检查与认领之间停止 CLI；安装版本时释放该锁，由已认领作业阻止评审。坏画像仍在认领前拒绝，健康 API 保留。
+- driver 和续聊 wrapper 使用 `setsid --wait`，Docker exec 生命周期必须跟随实际进程。tmux 登录 shell 显式保留选定 CLI 缓存 PATH。
+- v3 生成 driver 时去除内部时间戳 Stop hook；UID1000 无权写 root 私有 runtime 树，该信号也没有消费者。完成仍由真实主会话 JSONL 的最新稳定最终 assistant 文本判定；配置业务补充时还需 [阶段契约](topic-prompt-contract.md#scenario-自包含题库与冻结的有限业务补充) 核验全部选定轮次，不需要放宽控制目录权限。原 hooks 在作业收口时按快照恢复。
+- `_cli_setup()` 在已认领的环境锁内合并固定 HOME 的 `settings.json.env.DISABLE_AUTOUPDATER="1"` 及画像的 TZ/LANG/LC_ALL，保留其他 env/model/hooks 并发布为 UID1000 文件。普通任务、抓包、登录和续聊的 CLI 准备共用此入口；CLI 版本继续由管理端精确缓存与全局运行配置选择。
+- 实际任务 driver 在合并 worker_env 后覆盖画像的 TZ/LANG/LC_ALL；登录 tmux 命令、短命令、OAuth 探测和续聊 PTY 使用同源值。账号列表 `effective_timezone` 优先只读既有画像，否则返回显式配置或新默认；GET 不创建环境，不再把旧账号名派生值当作 v3 有效设置。
+- 正式普通任务通过 `CLAUDE_EXECUTION_SETTINGS` 和 `--settings` 使用每执行独立的模型／effort／hooks／`v3-cli-quota` 状态栏覆盖，原用户状态栏仍接收相同 stdin；不能来回改写共享 HOME 的运行态设置。原排他入口继续保存并按本代归属恢复字段。采集只消费官方 rate_limits 和主会话响应，不新增 usage／模型请求，详见 [额度契约](database-guidelines.md)。
+- 普通并行作业以环境＋source 登记，私有 `runtime/executions/<source摘要>.json` 保存 schema 2、租约及监督器证明；旧排他入口保留 `runtime/execution.json`。启动监督器是 child subreaper，收养 double-fork／setsid 后代；管理端核对 source、容器、PID／内核启动时刻后才发出启动许可。`v3-cli-control inspect/freeze/resume/stop-job --source <source> --pid <pid> --started <tick>` 仅操作匹配树。
+- 清理使用完整 token；存在多个作业时拒绝裸 container ID。并行入口不按整个 UID 清理、不在结束一个作业时重置兄弟网络／设置。旧 token 不能触及新作业，暂停验收一个作业时兄弟继续。不通过停止整个容器清理普通 CLI。
+- 清理／心跳／重启逐个对账全部执行，失败进入 `cli_reconcile`，阻止下一 CLI、保留健康 API；未知、损坏或链接登记不能视为空闲。维护、登录、重授权、删除和驱逐检查全部作业。公共网络或发送器故障仍关闭容器，CLI 专用 Recorder 故障仅隔离 CLI。
+
+**CLI 网络模式**：CLI 始终经 `tun0 -> hev-socks5-tunnel -> 127.0.0.1:8080` 使用账号代理。普通任务、养号、登录/重授权、额度查询和未绑定账号 OAuth 刷新选择 `passthrough`，本地 relay 只完成 SOCKS5 入站与 HTTP CONNECT/SOCKS5 上游握手并复制原始字节，不启动 mitmproxy，也不注入 MITM CA。显式完整抓包选择 `capture`；`quota` 只保留历史格式兼容，v3 不再用模型请求补样。usage 查询复用原生监听并解析返回 JSON，不需要 MITM。模式切换在 `network.lock` 内先核对并定向收口旧 PID，再写原子 ACK；调度器必须逐字段匹配 mode、source、process 才能启动 CLI。代理缺失、认证失败、旧监听未知、ACK 不符或监听退出都失败关闭，不回退直连；relay 的共享空闲计时由任一方向新字节重置。
+
+普通并行作业复用已核验 PID／启动时刻及 ACK 的 passthrough relay；兄弟存活时不能重启监听。每 source 的额度与采集文件仍独立；结束一个执行，既有 TLS 长连接和另一个执行必须继续。capture 切换使用 CLI 专用排他。
+
+**HTTPS 与证据**：管理端完成选号、改写、重试和响应分类，目标账号内发送器复用现有 HTTP/TLS 实现实际建立上游连接。每账号独立进程/连接池及代理，API 不经 CLI 网络监听。普通 `passthrough` 不生成 HTTP 明文、stats 或 flow；`quota/capture` 才显式信任当前 CA 并由 Recorder 产生对应证据。绑定、批次、目标、截止时间和秘密不符时拒绝；桥接失败无直连回退，提交不确定不能盲重发。API 被动观察单独写 `flows/api/observations.jsonl`，不混入 run 统计。
+
+```text
+bench/environments/<environment_id>/
+  home/                              完整 CLI HOME
+    .claude/projects/<opaque>/       主 session；不进入项目树
+  cli/<version>/                     版本安装缓存
+  projects/project-<12位摘要>/       Claude 可见任务 cwd
+  workspaces/<run_id> -> projects/... 宿主兼容入口
+  flows/group-<relative_path_hash>/
+    executions/<source_hash>/        stats/HTTP/index/原生 flow/被动额度
+  controls/<source_hash>/             独立只读暂停信号
+  runtime/runs/<run_id>/             status/transcript/baseline/followups/刷新控制
+  runtime/                           作业脚本/PID/tmux、上下文/ACK、执行证明
+bench/flows/<account>/<task>/<run>/    固定兼容链接
+```
+
+`execution_flows()` 在账号锁内固定兼容入口；run 与续聊各有自己的证据组。恢复原 run/session/workspace，仅换 source 子目录；QuotaGuard 登记本代实际观察文件，Recorder 使用同一目录。真实 cwd 和 `.claude/projects` 键只能使用 `project-<摘要>`，原 run/environment ID、`.bench-*`、`.claude-home`、cc2api 刷新标记和 Stop hook 控制文件不能进入 Claude 可见项目树；旧系统生成的已知控制文件须定向迁移到 runtime，不能删除未知用户文件。v3 Runner 不再创建 per-run `.claude-home`；准备项目时仅用 rmdir 清理该非链接空目录，既有可核对 session 链接按原归属清理，非空／未知链接及其链接父目录保留。旧 runner 的 per-run HOME 保持。run 统计读取平铺历史及各 run 执行、排除续聊/API并去重路径；抓包索引和文件列表聚合各代及续聊。原生 flow 不覆盖，历史平铺文件保留。跨目录链接拒绝，未部署的旧 v3 原型 source 链接不自动接管。
+
+`_project_view()` 在启动 CLI 前给固定 HOME 的 `.claude.json.projects[cwd]` 设置 `hasTrustDialogAccepted=true`，仅限当前系统专属物理项目目录；原子合并并保留 userID、OAuth 身份、其他项目及未知设置。持久 HOME 不走旧 worker 的顶层配置初始化，需显式保存本项目的确认标记。未登录或异常授权仍按原认证入口处理，不信任任意外部目录。
+
+**显式画像校正**：`maintenance(..., "reprofile")` 只接受未绑定 cc2api、无 task/run/identity/草稿/提交/活动作业、容器已停止的 legacy 正式环境。操作保留账号/HOME/代理/资源预算，清理旧容器网络与 CA 产物，生成一次 profile v2 并回到 stopped，保留原登录凭据；不因环境字段变化强制重授权。启动时原 `profile_reauth` 迁回正常生命周期；原 `profile_reauth_reconcile` 的真实执行/提交故障仍按 reconcile 隔离。profile v2 永久拒绝再次 reprofile，真实认证失败才要求重新授权。
+
+**部署**：两个最终镜像 control/account；control 按 gateway/orchestrator 两个角色启动，当前隔离布局的 N 个账号固定角色共 3N+2 个容器，评审另有受同账号 CLI 互斥门禁约束的临时子容器；只有 orchestrator 挂 Docker socket。CLI 为 UID1000、无网络能力并禁止提权，服务秘密/控制目录不对项目写入开放。root 管理的 `v3-account-init`、`v3-network-context`、`v3-cli-version`、`v3-passthrough` 和 `/sidecar` 为 0700；本地 CLI 额度采集 `v3-cli-quota` 为 0755，中文源码注释不必删除。
+
+**资源**：`resource_budget.account_limits(memory: str, swap: str = "0") -> tuple[int, int]` 共用于预检与账号创建；返回 RAM 字节数和 RAM＋swap 总字节数。`V3_ACCOUNT_MEMORY` 支持正整数 m/g，默认 4g；`V3_ACCOUNT_SWAP` 是额外 swap，默认 0，仅接受 0 或正整数 m/g，不接受 -1/无限额。首次保存 `fingerprint_json.mem/swap`；旧缺 swap 字段为 0，改全局配置不重算旧身份或预算。Compose 必须显式传递两参数。
+
+预检分别比较 `MemAvailable` 与 `SwapFree`：RAM 至少为活跃上限×账号 RAM＋可配置 `V3_MEMORY_HEADROOM_BYTES`（默认 256 MiB），显式更高的 `V3_MIN_FREE_MEMORY_BYTES` 优先；swap 足够覆盖活跃账号额外额度，且 Docker `SwapLimit` 为 true。不能以 swap 抵扣 RAM 余量；已有环境保存的 RAM/swap 超过配置时拒绝启动，禁止下调配置掩盖未来唤醒预算。1536m RAM＋2048m swap、活跃 1 对应 Docker Memory=1610612736、MemorySwap=3758096384，预检要求约 1.75 GiB 可用 RAM与2 GiB空闲 swap；默认4g需4.25 GiB RAM。这是额度边界，真实 CLI 峰值另行验证。
+
+清单记录 `schema=3`、`bridge_protocol=1`、`layout_version=1`、默认 CLI、release、父/子仓 revision、dirty 标记、冻结内容 SHA256 及两个 image ID/平台。`images[role].digest` 保留构建机本地 Docker Id；containerd 可用 OCI 索引作为 Id，所以另保存 `config_digest`（docker save 中原始配置字节 SHA256），发布后 `registry_digest` 才是仓库 manifest/索引 digest。换 daemon 时只接受清单固定的配置或 OCI 根，角色/批次/提交/平台仍检查，不能因 ID 语义不同放弃核对。构建先冻结源码，标签/清单不能覆盖。启动检查清单组合、实际镜像 labels、宿主发布端口、名称/网络/挂载 realpath、数据归属及资源预算。重复 up 只复用本部署 gateway 的精确 5674 映射，其它进程和外部容器占用仍拒绝。 端口探测启用 `SO_REUSEADDR`，已关闭连接的 `TIME_WAIT` 不应延迟启动；真实 TCP 监听及外部 Docker NAT 发布仍必须拒绝，不能通过固定等待几十秒掩盖误判。
+
+**发布**：`.github/workflows/v3-build.yml` 只在 v3 ref 发布，联合 build 后使用 GITHUB_TOKEN（contents:read、packages:write）登录 GHCR；两个包为 `ghcr.io/silentflower/vibebench-v3-{control,account}`，标签 `v3-ci-<run_id>-<run_attempt>`，不写 latest/旧包。publish 校验 Action 的仓库、父提交与 run/attempt、干净构建来源和全新输出，独占 `.started` 标记禁止同次重试；失败保留现场，新 attempt 才重跑，不把仓库 denied 当成“未存在”。两件成功、仓库 digest 可核对且镜像包成功才写最终清单；原构建清单不改。
+
+artifact `v3-release-<run_id>-<run_attempt>` 保存发布清单与同批 gzip 镜像包，保留14天；`bundle={name,sha256,size}` 核对完整包。pull 按 registry_digest 下载再建立受控标签，load 先核对名称/大小/SHA256；现有本地标签若镜像内容不同都拒绝覆盖。包不含部署配置/账号数据或 registry 登录资料；首次私有包不能匿名 pull 时使用同批 artifact，不在服务器保存 PAT或自动改变包可见性。
+
+关键配置：`V3_DEPLOYMENT_ID`、`V3_RELEASE`、`V3_CONTROL_IMAGE`、`V3_ACCOUNT_IMAGE`、`V3_DATA_ROOT`、`V3_INTERNAL_TOKEN`、`V3_SESSION_SECRET`、`V3_ADMIN_PASSWORD`；服务间使用 `V3_RUNTIME_URL`、`V3_NETWORK`、`V3_LEASE_DIR`。默认 CLI 为 `2.1.293`，`V3_CLI_VERSION`、页面覆盖及已有 Run 冻结版本保持原优先级；不覆写用户显式版本。默认宿主端口 `18080`、活跃账号上限 1，与账号内 CLI 并发分别表达；实际冲突拒绝，不自动停旧服务。内存/CPU、空闲停机与日志轮转由 v3 配置控制。
+
+停机 backup 用 lstat 排除不可复制的 Unix socket，保留普通文件及符号链接和 SQLite backup API 快照；tmux 等连接由新进程重建，不把运行 socket 当作持久数据，也不删除源 socket。真实 socket、WAL 事务、普通文件和符号链接须一并回归。
+
+`backup --backup-dir <全新绝对目录>` 默认精简，`--full` 显式完整；独立恢复验证与持久完成标记成功后，才轮换同父目录、同部署、同数据根的旧完整或精简备份，仅留本次一份。备份、维护及 `up` 共享非阻塞磁盘锁；失败保留原恢复点，轮换失败保留新副本并报错。排除证明、恢复清单与维护边界见下方“精简备份与不可变制品维护”场景，不清理其他路径或 Docker 镜像。
+
+统一 Vue 后台通过受鉴权的 `/runtime/` 桥访问 bench，保留 HTTP/SSE/WS。浏览器桥限定路径/方法，拒绝内部和编码绕过；v3 Cookie 名和 scope 独立，退出撤销服务端会话及旧票据。终端资源打包到镜像，不依赖运行时 CDN。
+
+环境页固定资源 `GET|HEAD /runtime/environments.js`、`GET|HEAD /runtime/environments.css` 必须与 `apps/legacy-web/index.html` 的引用同步进入管理桥精确白名单，查询参数随原 URI 转发。资源沿用原 v3 会话鉴权，写方法、近似路径、编码及点段路径继续拒绝。新增本地脚本或样式时同时核对镜像分发和浏览器桥准入。
+
+**管理页面布局**：`route.name === 'environments'` 时 Dashboard 使用 `100dvh` 纵向 flex，隐藏统计卡片，main 全宽且 `flex: 1; min-height: 0`；Environments 的 iframe 填满剩余空间，无额外边距、圆角或固定高度扣减。外层不承担内容滚动，bench 保留原主题和自身滚动；离开该路由后恢复网关普通页的内容宽度、统计卡片和滚动。
+
+bench 导航项不拆分中英文标签。宽屏顶部三列使用 `max-content minmax(0, 1fr) max-content`，品牌和状态栏保留实际宽度；中间 `.tabs` 设置 `min-width:0` 并允许整项换行，不能让不换行的副标题溢入导航列。状态栏限制 `max-width:100%` 并允许控件换行，避免极窄屏横向溢出。
+
+宽度不超过 1440px 时导航独立一行，不超过 920px 时顶部区域单列、隐藏品牌副说明。导航回归覆盖 320～2048px、明暗主题及登录状态，包含 1441／1536／1640px，核对品牌、六个导航项和状态控件均无重叠或横向溢出。工程迭代统一入口及账号/空间 URL 遵循 [导航状态契约](../../legacy-web/frontend/state-management.md#scenario-工程迭代空间与账号-url-状态)。表格保持水平滚动和内容自适应高度，超出 1px 的装饰线不能触发纵向滚动条。静态 CSS 更新时同步 index.html 的样式版本参数，避免缓存保留旧布局。
+
+停机/备份/离线导入只作用于本部署，保留持久数据。离线导入默认 dry-run，来源幂等，拒绝凭据，账号停用、旧活动 run 停止，不恢复旧调度；真实接管不能让旧、新系统同时刷新同一账号。
+
+当前 `us` 环境（`/opt/vibebench-v3-us/v3.env`）的用户明确运维选择：每次部署不做备份、不计算内存，沿用现有资源参数，不再据内存预检暂停部署。该选择不改变 `manage.py` 通用默认或其他部署的规则；本环境交付流程仍核对同批镜像、数据归属、端口、在途任务、身份和严格释放。不得为满足默认预算而擅自下调现有配置。
+
+每次 v3 部署成功并完成健康验收后，必须执行[旧镜像定向回收](#scenario-v3-部署成功后的旧镜像回收)，再复核磁盘与服务状态；不能以 `pull/load`、`up` 成功代替部署收尾。保留当前批次、最近两个完整历史批次及所有容器引用的镜像。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 新环境未指定时区 / 已保存 UTC 画像 | 洛杉矶＋美国英语 UTF-8 / 沿用 UTC，展示与执行一致 |
+| worker_env 或 HOME settings.env 含旧 ja_JP 值 | 按已固化画像覆盖 TZ/LANG/LC_ALL，其他 env 保持 |
+| `.claude-home` 空目录 / 非空或未知链接 | 只移除空目录 / 保留内容与链接 |
+| UID1000 读取管理脚本 / 执行 collector | 拒绝读取 / 允许本地执行 |
+| API 活动或排队，普通 CLI 认领 | 共享认领，不关闭 API 入场 |
+| 两个普通 CLI 同账号竞争／第三个 CLI | 真实容量允许时两个各持独立 holder／第三个等待；低优先级养号顺延 |
+| 普通并行作业与旧排他 CLI／维护竞争 | CLI 专用排他拒绝其他 CLI；维护继续排空 API 和全部 CLI |
+| 活动 API/CLI，空闲维护 | 拒绝，不中断已接受工作 |
+| 旧 token/租约代次清理 | 不清理新作业 |
+| 共享租约过期/服务重启 | 保留 API，先确认旧 CLI 收口，再允许下一 CLI |
+| Recorder 撤销失败 | CLI 隔离，禁止下一 CLI；公共网络健康时 API 保留 |
+| 普通任务、正常养号、登录或未绑定 OAuth 刷新 | `passthrough`，无 mitmproxy/CA 环境；代理失败时不直连 |
+| 普通任务、养号或 usage 查询 / 显式完整抓包 | passthrough 原生 TLS / capture；usage 查询不切换监听 |
+| relay 长连接持续单向传输 / 双向静默 | 任一方向字节重置共享空闲计时 / 达到期限后关闭 |
+| 同 run/续聊第二代 | 固定入口、新观察游标/flow，旧证据不变 |
+| legacy 环境不满足校正条件或已经 profile v2 | 拒绝 reprofile，不旋转任何身份字段 |
+| reprofile 成功 / 历史画像门禁 / 真正收口失败 | stopped 保留凭据 / 迁回正常生命周期 / reconcile 保留执行证据 |
+| Claude 可见项目树出现系统控制文件或原始 run ID | 验证失败；控制文件迁入 runtime，session 留在固定 HOME |
+| 错误环境绑定/镜像批次/秘密/目标 | 拒绝发送，不直连、不重放 |
+| 宿主端口/名称/挂载或数据归属冲突 | 启动前拒绝，不操作旧资源 |
+| 浏览器内部路径/退出后 Cookie 或票据 | 拒绝，服务秘密不下发 |
+| RAM 不足、swap 不足/daemon 不支持、已有固化预算更高 | 拒绝启动，不改旧账号预算或旧服务 |
+| 非当前 v3 Action、dirty 来源、同 attempt 或已有输出 | 拒绝发布，不覆盖批次 |
+| 任一推送、仓库 digest 或镜像包失败 | 无完整发布清单，已推镜像保留 |
+| 包名称/大小/SHA256、镜像角色/ID/平台不符 | 拒绝交付；本地同批标签不覆盖 |
+| 新备份失败／旧目录无完整同源归属 | 保留旧恢复点／该目录不参与自动轮换 |
+| 桌面或窄屏打开环境与任务 | iframe 全宽，底边贴合视口；标签保持横排，外层不产生额外滚动 |
+| 环境页 HTML/API 为 200，脚本或样式为 404 | 页面验收失败，核对固定静态资源白名单及实际 iframe 初始化 |
+
+### 5. Scenarios and Examples
+
+- 正常：首次未指定时区使用洛杉矶；改名或重建后沿用已保存值，旧 worker_env 不影响实际 locale。
+- 错误用法：只设置容器默认 LANG，却在 exec 注入旧日文 LANG/LC_ALL。正确做法：所有实际 CLI 入口与 HOME settings.env 从画像同源覆盖。
+- 正常：API SSE 运行时启动养号 CLI，取消 CLI 后继续收到新 API 数据；同账号第二个 CLI 仍需等待。
+- 正常：同账号两个普通 Tasks 或项目计划独立运行，冻结／停止 A 后 B 和既有 API SSE 继续；默认账号内 CLI 容量为 2，不增加原资源预算。
+- 错误用法：只扩大信号量，仍修改共享 statusLine、按 UID 杀进程或重启 relay。正确做法：每执行独立 settings／租约／监督器及清理，复用已核验的原生透传监听。
+- 正常：普通任务和可信额度养号经 HTTP CONNECT/SOCKS5 账号代理传递原始 TLS 字节，项目 cwd 只含 `project-<摘要>`；显式抓包切到 capture 后仍产生独立 flow。
+- 基础/历史：停止唤醒或镜像重建保留 HOME、环境 ID 和 machine-id；平铺历史统计/抓包仍可读取，空环境返回可展示状态。
+- 基础/历史：legacy 画像继续固定；满足全部条件时用户显式 reprofile 一次，HOME 与原凭据保留，不强制重新授权，profile v2 不可再次旋转。
+- 错误用法：所有 CLI 都经过 Recorder，或正常养号因为 `QUOTA_WARMUP=1` 总是启用 MITM。正确做法：日常 CLI/usage 使用 passthrough，只有显式 capture 注入 CA；阈值数据由正式响应及 CLI 本地状态栏被动更新，usage 仅保留显式手动查询。
+- 错误用法：用 `/workspaces/<run_id>` 作为容器 cwd，或借兼容链接把 `.claude-home` 写进项目。正确做法：项目、session、控制产物分别归属 projects、HOME 和 runtime，兼容入口只供宿主读取。
+- 错误用法：`run:<rid>:1` 把原 run 链接改到新 source 目录，或者复用旧 `capture.flow`，造成冲突/证据覆盖。正确做法：固定证据组、每代独立目录，游标与 Recorder 共用实际路径，读取端汇总。
+- 错误用法：看到 Docker exec 已创建就算 CLI 正在运行，或用 container.wait 判 run 完成。正确做法：`setsid --wait` 并确认 exec/tmux 实际运行，终态由本执行结果判断。
+- 错误用法：只直调 sender 就宣称网关链路通过。正确做法：真实 gateway 入口经短 DNS 绑定到账号 sender，并验证错误绑定拒绝且无重放。
+- 正常：同一 Action 发布两镜像，服务器按仓库 digest 拉取或加载校验过的同批包，再 check/up；空数据库只启动两管理服务。
+- 基础/历史：旧环境没有 swap 字段，继续禁用；Docker 存储实现更换后本地 ID可以不同，但固定 config_digest/registry_digest 与平台仍能核对。
+- 错误用法：将 memswap_limit 设成 RAM值却声称容器可用宿主 swap，或用 SwapFree 抵扣 RAM 预算。正确做法：总限额为RAM＋额外swap，预检分别比较两种余量。
+- 错误用法：把本地 Docker Id 当作仓库 digest，或只成功推一件就生成可部署清单。正确做法：三种哈希明确区分，两个角色都成功后才保存完整交付结果。
+- 错误用法：把 bench 放进网关的 max-width 容器，叠加统计卡片和 iframe 的 `100vh - 100px` 高度。正确做法：环境路由独占导航下方工作区，flex 根据实际导航高度分配 iframe 空间。
+- 错误用法：新增 `environments.js/css` 后，仅验证 HTML 和环境 API 返回 200。正确做法：核对两个资源成功加载，并断言 iframe 的 `renderEnvironments` 已定义及样式表已解析。
+
+### 6. Tests Required
+
+- Rust `cargo fmt --check && cargo test`：画像/改写、weighted FIFO/RPM、共享/排他租约、旧记录/过期/重启、绑定校验、原始字节/有序头/SSE取消、不重放；回环临时 CA 验证 HTTPS 正常响应及错误证书/主机名拒绝。测试 CA 不进入正式客户端。
+- `runtime_bridge::tests::environment_assets_are_exact_and_read_only` 覆盖资源 GET/HEAD、写方法和近似／编码路径拒绝；`verify_browser.py` 在真实 iframe 中核对脚本函数和 CSS 规则，缺失资源必须使浏览器验收失败。
+- Python orchestrator 回归：原快照与 session 恢复、旧 token/绑定保护、并行与安装续租、证据/游标分代、统计不重复、错误链接拒绝、鉴权和永久额度门禁。
+- `images/account/test_passthrough.py` 与 network-context 回归：HTTP CONNECT、SOCKS5/H 认证、IPv4/IPv6/域名、字节保真、代理失败无直连、静默关闭、跨空闲窗口单向活动，以及 PID/ACK/mode/source 归属。
+- 环境回归：默认 LA/en_US、显式 UTC/Tokyo、既有画像和页面 GET 不分配；真实 Runner → AccountRuntime 启动、HOME settings.env、登录与续聊使用同源值；实际 UID1000 locale/date/ls 符合设置。
+- 文件权限回归：UID1000 不能读取四个 root 脚本及 /sidecar，仍能执行 collector；root 初始化、版本准备、监听切换与 Recorder 保持；空目录清理不删除非空目录、未知链接或主 session。
+- profile/project 回归：独立随机画像、时区-locale 配对、重建固定、legacy 不自动迁移、reprofile 全部前置条件/历史门禁迁移/凭据保留/成功后不可重复；容器内项目顶层只出现匿名目录，项目内部没有 `.bench-*`、`.claude-home`、刷新控制或系统 Stop hook。
+- 目录信任回归：实际 `_project_view()` 写入当前 cwd 的信任标记，同时原账号 userID/OAuth 和其他项目配置保持；生产验收必须观察真实会话响应或工具调用，不能只凭 runs.status=running 宣称题目已执行。
+- Stop hook 回归：调用实际 start_run 生成 driver，执行其中 Node 设置片段，断言不注入 Stop；执行生成脚本的完成判定函数，在没有 Stop 信号文件时仍识别最终 assistant。保留 shell 语法校验，不能靠给 runtime 树开放写权限消除错误。
+- Recorder 与部署回归：请求归属冻结、ACK/身份、冲突预检、准确资源归属、停机、备份和导入幂等。
+- 并行回归：`test_account_runtime.py` 的两 holder／独立 settings／全部登记恢复／旧 token 保护，Rust 全量覆盖共享容量 2、旧 CLI 排他、维护和持久 holder；`verify_cli_jobs.py` 在真实 UID1000 容器核验脱离进程组、过期 PID 证明及兄弟保护。
+- 固定 CLI 参数验证：官方 2.1.293 以本地合成 SSE、无外网 Docker 验证 `--settings`、指定 session、原状态栏和零 usage；不能以本机其它版本 help 或合成回复称为真实模型效果。
+- `test_manage.py`：最近一份备份轮换、失败保留、外部署／链接目录不删除、轮换失败保留新备份；`verify_project_scheduling.py` 核对 Tasks 并行与长连接跨补位／收口、relay PID／启动时刻不变。
+- 资源/发布回归：1536m＋2048m 实际 Docker 限额，默认/旧缺字段、非法无限值、RAM/swap不足、已固化预算拒绝；当前 Action 来源/attempt、第一/第二件推送失败无完整清单、错误digest/包拒绝、本地标签不覆盖，跨 store ID相同配置可核对。
+- actionlint 核对 ref、权限与 artifact；实际本地 registry 的 push/pull、归档 config 哈希以及双镜像 save/load 核对。CI/GHCR发布结果与指定服务器实时预检/健康/旧服务不变在发布后验收，不能以本地替身称其已完成。
+- 联合重建后串行跑 `run_local_verification.py --manifest ...`、`verify_stack.py --manifest ... --browser`：实际运行中的合成 CLI、同 run 第二代、API 长流与新增 API、CLI 取消/重启/Recorder故障保留 API、tmux 重连、两账号传输隔离、旧哨兵及数据库不变。
+- 校验冻结源码哈希和最终输入一致，标明平台、失败日志、测试替身及未执行项。真实 CLI OAuth/实际主会话/额度恢复、公网全链路与同宿主压力由隔离部署负责人后续验证；arm64 发布前在对应环境验证。不能用本地 mock 宣称这些真实验收已完成。
+- 只改管理页面布局时运行 `cd services/gateway/web && npm run build`，浏览器覆盖 1541/1280/920/390px 与明暗主题：iframe 宽度等于视口、顶边等于导航底边、底边等于视口高度，外层无溢出，标签不竖排；表格内容高度完整、窄屏水平滚动可用，弹窗及退出可用，切回网关账号页恢复统计卡片和普通布局。
+
+## Scenario: v3 关联重授权提交与恢复
+
+### 1. Scope / Trigger
+
+- 修改绑定账号的 CLI 登录、凭据镜像、取消、启动对账及环境页维护时适用。cc2api 导入 DTO/回执/条件写入以 [服务契约](../../gateway/backend/service-architecture.md#scenario-v3-重授权凭据导入与迟到回包保护) 为准；页面连接以 [终端生命周期](../../legacy-web/frontend/hook-guidelines.md#scenario-v3-登录终端重连与授权链接) 为准。
+
+### 2. Signatures
+
+```text
+POST   /api/accounts/login/start
+GET    /api/accounts/login/{sid}/status
+POST   /api/accounts/login/{sid}/commit
+DELETE /api/accounts/login/{sid}
+WS     /api/accounts/login/ws/{sid}
+POST   /api/environments/{environment_id}/maintenance
+AccountRuntime.ensure(account, version=None, allow_inactive_login=False, allow_login_recovery=False)
+AccountRuntime.login_commit_context(session) -> dict
+AccountRuntime.finish_bound_login(record: dict, snapshot: dict) -> None
+LoginManager.commit_bound(session: LoginSession) -> dict
+LoginManager.cleanup_reconciled(environment_id: str) -> None
+```
+
+### 3. Contracts
+
+- 仅 v3 且明确 `force_reauth:true` 的原绑定 OAuth 账号进入重授权。该路径才允许读取非 active 配置；普通执行仍拒绝。代理沿用 cc2api，时区沿用原账号；固定容器、环境 ID、userID 与固化设备字段保留。活动 run（含 quota_wait）、续聊或其它登录拒绝开始；现有 API 等待排空，不强行截断。
+- start 返回 `session_id/ws_path/name/has_sidecar/reconnectable/cc2api_account_id`。LoginSession 记录原 bench ID、绑定 ID、邮箱/UUID/组织、环境/代次、租约、phase 与提交操作。phase 为 authorizing/submitting/committed/cancelled；成功结果无 AT/RT。
+- force 在原 HOME 下的 `.v3-login/<sid>` 暂存登录；复制设备配置/设置，去掉旧 oauthAccount，不复制旧 credentials。新身份必须来自 CLI 登录产物和 auth status，不从旧配置补齐 UUID/组织。
+- 提交先在 owner 锁内重读原绑定/活动状态，再按 owner → profile 顺序镜像。环境页维护使用 owner → profile → environment 顺序；`cleanup_reconciled` 自行取得非重入 owner 锁，必须在维护外层锁释放后调用。HTTP 在 `_db_lock` 外。
+- HTTP 导入之前原子写 root 私有 `runtime/login-commit.json`（0600），保存 sid、name、两端账号 ID、操作 ID、环境/代次、租约、phase、auth_method 与已验证身份；不保存令牌、授权码或终端全文。内存 payload 保存同操作载荷供重试。
+- 导入成功先镜像权威 AT/RT/expiry 到管理 profile，保留未知配置；主 HOME 与 runtime 只发布 AT，顶层配置只更新已核对的身份字段，保留 userID。不改 bench enabled、养号开关/阈值、限流或已有额度状态。
+- 本地写入/清理未完成时保留暂存和记录，不报成功。重试先查回执，用当前快照；只有明确未提交才以原操作重试。收口 tmux/进程/Recorder并销毁暂存 RT 后再 release。成功结果缓存 1800 秒，仅含账号/同步状态，允许同名同 sid 的重复 commit。
+- pending 记录优先于普通执行恢复。对账先停止新心跳、核对原租约，必要时取得新维护门禁，再 fence；等待 API/发送器收口、停止原容器、查询回执。已提交则镜像当前快照；明确未提交保留原 profile。删暂存、release、删执行/提交记录后才完成。未知结果或租约被其它代次接管时保留 reconcile 和门禁。
+- 普通 TTL 清理处理 authorizing/ended/ready_to_submit；不确定提交不可自动删除。取消已提交只关闭终端，不回滚远端凭据。服务重启恢复结果，不承诺恢复同一交互终端；未提交草稿沿用下方独立契约。
+- status 为 `Cache-Control:no-store`，返回 phase、credentials_ready、expires_at（UTC 秒）、reconnectable 与 authorization_url；已完成返回最小 committed 状态。URL 从同 tmux 的有界屏幕提取，不持久化终端全文。
+
+### 4. Validation & Error Matrix
+
+| 条件 | bench 行为 |
+|---|---|
+| 旧部署绑定重授权、绑定但未 force_reauth | 409，保持原保护 |
+| 账号有活动工作、原绑定/环境改变、身份不符或缺失 | 409，不写其它账号或原 profile |
+| 未登录或导入尚不能确认 | 提交未完成；连接/导入未知为 503，保留维护资料 |
+| profile/HOME/cleanup 写入失败 | 500 或受控冲突，明确重试/对账，不假报成功 |
+| 无 SID、authorizing 到期 | status 404/410；WS 拒绝失效输入 |
+| 环境维护占用/归属冲突、对账连接未知 | 409/503；不强行放行 |
+
+### 5. Scenarios and Examples
+
+- 正常：原绑定账号用 `{"name":"账号名","force_reauth":true}` 登录，提交后仍为原 cc2api ID，管理 profile 有新 AT/RT，HOME 只有 AT。
+- 基础：认证自动停用可恢复，人工停用保持；未绑定登录、普通 CLI/API 并行行为沿用原分支。
+- 错误用法：读复制来的旧 oauthAccount 判断新登录身份，或调用普通 commit_login 把 RT 发到绑定 HOME。正确处理：暂存去旧身份，验证本次登录，走 finish_bound_login。
+- 错误用法：HTTP 超时就清暂存/放门禁，或环境页对账绕开 owner 锁。正确处理：保留记录和原操作，fence 后对账，镜像与提交共用锁顺序。
+
+### 6. Tests Required
+
+- `test_login_reauth.py` 使用临时真实 SQLite/文件覆盖同 ID、设备/策略保留、AT-only、身份冲突/缺失、改绑、响应丢失、部分落盘、重启/未知结果、对账占用清理和维护等待 owner 锁；显式声明远端/Docker 替身。
+- `verify_stack.py --manifest <联合清单> --browser --reauth`：随机独立部署、合成 CLI/本地代理，真实页面/HTTP/WS/tmux/双 DB 验证；控制 `.synthetic-login.json` 仅在验证目录，fixtures 不进正式镜像。
+- `verify_browser.py` 的 insecure_http 模式用 `v3-verify.test` 只解析到回环，Chrome 仍阻止其它公网请求；检查真实非安全上下文的复制降级。原 localhost 属于安全上下文，不能以 HTTP 协议名冒充此验证。
+- 两侧凭据、回执、设备、策略、租约与暂存前后比对；结束只按随机部署精确标签清理，核对旧哨兵 StartedAt/hash 不变。恢复测试数据后再验证无遗留。
+- 单测/模拟通过不证明真实 OAuth 成功或账号限制解除；上线后由部署负责人安排可用测试账号，经真实 CLI 重授权和正式 API 验收。回滚前收口所有 pending 登录，不删除新回执表。
+
+## Scenario: v3 授权码投递与发送回执
+
+### 1. Scope / Trigger
+
+- 修改授权码输入、`LoginCodeIn`、投递/回执 API、原 tmux stdin 或登录 WS 输入时适用。真实 CLI 可以关闭回显，不能用屏幕未显示授权码推断输入未送达；认证仍由 CLI 完成。
+
+### 2. Signatures
+
+```text
+POST /api/accounts/login/{sid}/code
+  {request_id: string, code: string}
+GET /api/accounts/login/{sid}/code/{request_id}
+  -> {request_id: string, status: string, message: string}
+LoginCodeIn: StrictStr request_id/code；extra=forbid
+AccountRuntime.send_login_code(session, request_id: str, code: str) -> None
+LoginSession.code_receipts: dict[str, dict]
+status = sending | delivered | uncertain | rejected
+```
+
+### 3. Contracts
+
+- 管理 API 沿用既有服务鉴权及 `/accounts/` 桥接；只向 v3 原活跃会话发送。请求正文有界读取，最大 64 KiB；手动校验模型并转换为固定错误，默认 422 不得回显秘密 `input`。request_id 为 32 位小写 hex；code 去首尾空白后为 1–8192 字符，原文拒绝 C0/DEL 控制字符，内部不改写或补猜参数。
+- owner 锁内重读原会话、TTL、phase 和草稿代次。缓存命中只返回原回执；未命中的新请求须为 authorizing、未过期且草稿未保存/清理。每 SID 最多保留 32 个不同标识，不淘汰旧标识后允许重放；回执只含标识、状态、说明，不保存 code，随会话结束清除。成功回执为 `Cache-Control:no-store`。
+- 投递先登记 sending，再在 owner → environment 锁序下核对完整执行 token、原 SID/tmux/socket、容器 ID、环境代次和原执行证明；Docker IO 不持有 SQLite 全局锁。授权码经 Docker exec stdin 进入 `tmux load-buffer -b <request_id> -`，stdin EOF 与 exec 成功确认后在原会话 paste-buffer，再发送 Enter。code 不进入 argv、脚本或持久文件。
+- 临时 tmux buffer 在 finally 中清理。投递前的 ValueError 拒绝为 rejected；可能已注入后的 IO、回包或清理异常均为 uncertain，不能误报“未发送”或自动重复 paste/Enter。delivered 只说明原 tmux 投递完成，认证成功仍须既有 CLI auth status/credentials_ready。
+- GET 只查询原回执，不触发投递；原会话/回执不可查不能推断“尚未发送”。管理器重启不恢复授权码或重发队列。v3 登录 WS 保留双向终端交互、resize、ping/pong及同 SID 重连；当前连接的键盘输入只送入原 tmux，不缓存、不重放。授权码仍优先走独立 HTTP 输入框以获得可见回执，页面必须提示不要在两条路径重复发送。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+|---|---|
+| 正文超过 64 KiB | 413，未投递 |
+| 空码、控制字符、超长、错误类型/额外字段或非法请求标识 | 422，固定安全说明，无原始 input |
+| 原会话不存在/非 v3 | POST 404，不宣称投递成功 |
+| 新请求遇到结束/过期会话、保存/清理/换代或已达 32 次 | 409，未开始新投递 |
+| 相同合法标识重复提交 | 返回原回执，不重复注入 |
+| 原执行证明/终端校验 ValueError | 200 + rejected，明确未发送 |
+| 投递或缓冲清理结果无法确认 | 200 + uncertain，不自动补发 |
+| 原回执不可查或非法 GET 标识 | 404，明确结果未知 |
+
+### 5. Scenarios and Examples
+
+- 正常：输入框 POST `{request_id:"32位小写hex",code:"完整授权码"}` 到原 SID，显示 delivered 后继续等 CLI 认证检查；检查通过才提交保存。
+- 基础：WS 断开但原 CLI 活跃，独立 HTTP 仍可投递；输出重连不创建新 CLI。
+- 错误用法：收到 HTTP 超时后生成新标识重发同一授权码。正确处理：GET 原标识回执，未知时检查 CLI 或显式取消/重登。
+- 错误用法：用会回显的合成 CLI 证明真实输入无问题，或把 delivered 当作已登录。正确处理：真实 native 禁网实验验证收到输入，合成成功链验证生命周期，并分别报告验证边界。
+
+### 6. Tests Required
+
+- `test_login_drafts.py`：真实 ASGI 验证鉴权、安全 422/413、no-store、同标识重复/并发单次投递、未知回执、32 次上限及过期拒绝；Docker 替身断言 code 只进 stdin、原 socket 及 buffer 清理，可能已投递的清理异常必须为 uncertain。
+- 测试环境安装 `services/orchestrator/requirements.txt` 与 `services/orchestrator/requirements-test.txt`，后者只用于 ASGI 客户端，不新增产品依赖。
+- 隔离 Chrome/HTTP/WS/tmux 验证真实键盘/原生粘贴、按钮/Enter、回包丢失后查询且不重放、WS 断线独立发送；全新 HOME、禁网的真实支持 CLI 验证收到合成无效码，不访问真实 OAuth，不把实验二进制打入正式镜像。
+
+## Scenario: v3 未提交登录草稿与完整清理
+
+### 1. Scope / Trigger
+
+- 修改新账号登录开始、草稿列表/恢复/重登/删除、首次提交或宕机恢复时适用。已有正式账号的重授权及历史软删除保持原契约；终端交互见 [登录终端生命周期](../../legacy-web/frontend/hook-guidelines.md#scenario-v3-登录终端重连与授权链接)。
+- 正式绑定后的首次准备及历史草稿环境遗漏额度挂载也适用；数据库绑定不会改变 Docker 创建时固定的挂载。
+
+### 2. Signatures
+
+```text
+GET    /api/accounts/login-drafts
+POST   /api/accounts/login-drafts/{environment_id}/resume
+POST   /api/accounts/login-drafts/{environment_id}/restart
+POST   /api/accounts/login-drafts/{environment_id}/reconcile
+DELETE /api/accounts/login-drafts/{environment_id}?generation=<页面代次>
+LoginDraftActionIn: {generation: string}；extra=forbid
+AccountRuntime.recover_login(sid: str, account: dict, version: str, home: str)
+  -> tuple[dict, object]
+AccountRuntime.login_terminal_alive(session) -> bool
+AccountRuntime.ensure(account: dict, version: str | None = None,
+  allow_inactive_login: bool = False, allow_login_recovery: bool = False,
+  preserve_proxy: bool = False, scenario_resources: bool = False,
+  ownership_source: str | None = None, require_quota_mount: bool = True)
+  -> tuple[dict, object]
+bench/login-drafts/<32位小写hex环境ID>.json
+```
+
+### 3. Contracts
+
+- 草稿使用 `account_environments.account_id=NULL`，首次 start 在初始化前写 preparing，成功后写 authorizing；不提前创建正式账号。正式账号列表及任务/养号/额度入口不能把草稿当作可用账号；只有账号页读取独立草稿列表。
+- 列表 DTO 包含 `draft_id/environment_id/name/generation/state/session_id/reconnectable/credentials_ready/credentials_present/container_status/message/can_resume/can_restart/can_delete/can_reconcile/proxy_known/proxy_summary`。ID 是环境 ID，不能作为正式 account_id；`credentials_present` 只表示文件存在，不能推断认证成功。不返回令牌、代理密码、发送器秘密或 OAuth 参数。代理摘要从原私有 sender 配置提取，仅含协议/主机/端口；known=true且summary=null才是明确未配置，known=false显示待检查，不能冒充直连。
+- 元数据使用 `atomic_json`、0600、原子替换与 fsync，保存在环境目录外。字段为环境/name、sid、字符串 generation、phase、version、home、created_at；保存中还可有 saved_account_id/cleanup_home，删除中有 deleting_at。不保存授权 URL/code/AT/RT 或终端全文。草稿 generation 是逻辑操作代次，与环境整数 generation 不同；旧无标记环境使用 `legacy-<环境generation>`，活动旧会话继续时补齐归属。
+- 有效 phase 为 preparing/authorizing/ready_to_submit/committed/cancelled/ended/interrupted/reconcile/deleting/submitting。`home` 只接受 `/home/node` 或 `/home/node/.v3-login/<12位小写hex SID>`；元数据必须是对象，环境/name 一致、generation 是非空字符串、phase 有效。单条损坏或归属冲突显示 reconcile、generation=unverified、所有操作禁用，不能使其他草稿和正式账号不可见；JSON 或名称结构损坏的孤立标记也保留可见诊断。
+- 列表不阻塞等待 owner 锁；初始化或提交锁仍占用时返回只读快照和操作进行中提示，禁用操作，不在该次查询改写会话状态。
+- reconcile 输入沿用 `LoginDraftActionIn`。只允许原未绑定、SID/代次/环境归属可核对、非 preparing/deleting/submitting、无活动作业/发送请求及未知提交的草稿；原执行证明须匹配 login:SID、容器/环境代次，root/runtime/执行记录链接归属异常拒绝。列表只在可验证条件下开放 can_reconcile，状态读取失败只禁用本条恢复，不遮住其它账号。
+- 恢复使用 owner → profile → environment 锁序，复用既有维护对账并保留 HOME、缓存和授权产物；外层 owner 释放后才调用自行加锁的 cleanup_reconciled。未绑定收口重新核对原 SID/草稿代次、环境 stopped、无作业/执行记录，只解除本代会话与名称占用，不能清理新代。取消清理失败返回固定 503 并保留草稿，不能假报取消成功。
+- resume 有活动会话时继续原 SID/tmux，不启动第二个 CLI。重启后没有原会话但有产物时，在原环境/HOME/代理/版本认领新的维护 SID，实际 `claude auth status` 通过后才允许提交，不创建虚假的旧 tmux。restart 必须显式请求：先收口旧登录，再生成新 SID/草稿代次，仍保留原环境、容器、HOME 身份、代理及 CLI 缓存。
+- 管理容器 `unless-stopped`，账号容器 `restart=no`、按需唤醒；启动 reconcile 收口遗留执行，HOME/草稿保留，状态显示中断或待检查产物。不承诺恢复宕机前已死亡的交互进程，不同时自启所有账号。
+- 本地首次提交先写 submitting，持有 owner → profile 锁；中间 accounts 行保持 enabled=0。只要 submitting 标记仍存在，正式列表和 `_get_available_account` 均隔离该账号；仅原登录恢复路径允许 `allow_login_recovery=True` 穿过本地保存门禁。HOME 镜像成功后先把恢复入口改为主 HOME，再清暂存，失败仍能继续提交。全部保存和清理完成才启用账号、移除标记并缓存幂等结果。submitting 拒绝取消、删除及新登录，不能丢掉未确认产物。
+- 完整删除采用 owner → profile → environment 锁序，锁内重读环境和代次。任一正式/软删除账号、同 profile 引用、run/flow 历史、未知提交/对账、其他作业或活动发送连接均拒绝。容器必须通过完整产品/部署/角色/环境 labels；目录须为专属 realpath，根或父目录链接、跨树内部链接均拒绝，npm 指向本专属树的链接允许。
+- 先保存 deleting，收口原登录和执行，再停止并移除唯一归属容器，清环境 HOME/CLI 缓存/暂存和专属 profile；外部清理完成后才条件删除 account_environments，最后删除标记。Docker/文件/最终标记失败不能假成功；保留可见 deleting/reconcile 供重试，禁止期间唤醒/重建。重复删除已不存在草稿返回 ok；草稿已经正式提交时拒绝删除。
+- 布局 2 正式账号复用网络角色前，核对已验证归属并 reload 的实际 `Mounts`：唯一额度挂载必须为 `Type=bind`、`Source=HOST_BENCH_DATA/quota/<bench_id>`、`Destination=/quota-accounts/<bench_id>`、`RW is False`。新建正式环境后也须核对；不能根据数据库 ID 或宿主文件存在推断容器可读。错误账号、来源、可写、重复或不可核验的元数据均拒绝，不能按普通缺失处理。
+- 明确没有额度挂载时，默认 `ensure()` 在原环境锁内补齐：只接受 ready/stopped 且无内存作业、单执行/共享执行登记、未确认提交和 CLI 遗留进程的环境，再经原 `maintenance(..., 'rebuild')` 排他空闲认领核对 active/waiting API、维护租约、发送连接和评审交接。保留环境 ID、画像、HOME/最新凭据、工作区及原任务会话，重读新代次后继续准备；正确挂载及重复准备直接复用。草稿无正式 ID、状态查询和旧隔离布局不触发此补齐。
+- 仅独立 `transport()` 内部传 `require_quota_mount=False`：API 在准备前已持有自身并发许可，也不读取 CLI 额度文件，因此明确缺失时复用健康发送器；错误或不可核验的挂载仍拒绝。CLI 等其它准备沿默认 true，不新增 HTTP 参数或用户配置。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 非 v3 查询草稿 | 空列表；草稿操作 409 |
+| resume/restart 缺少 generation 或带额外字段 | 422 |
+| 已换代、正式/历史/归属冲突、清理或提交门禁 | 409，不操作新代或正式资源 |
+| resume/restart 锁内重读已不存在 | 404，不能转成 503 并误称仍保留 |
+| 重启后无产物或 CLI 认证未通过 | 409，不把文件存在当成功 |
+| 单条元数据坏 JSON/结构/HOME/归属 | 该条 reconcile 只读可见，其他条目继续返回 |
+| Docker/IO 未完成或恢复连接未知 | 503，保留可重试资料，不报删除/恢复成功 |
+| 草稿恢复遇到活动工作、未知提交、旧代次或坏归属 | 409，不解除保护；只提供环境诊断 |
+| 提交期间 DB/HOME/清理中断 | 不启用可用账号，保留 submitting，继续原提交 |
+| 重复删除资源已不存在 | ok；正式提交后新草稿删除仍为 409 |
+| 正式账号明确缺少额度挂载且已通过空闲门禁 | 补齐一次，核实新挂载后才继续准备 |
+| 活动作业、active/waiting API、评审或维护占用 | 保留原容器和执行，沿 `RuntimeBusy` 等待/拒绝语义处理 |
+| 错误/可写/其他账号挂载、坏 Docker 元数据或未知执行 | `ValueError`，不停止原容器来制造空闲 |
+| 补齐时停止/移除/租约收口失败，或新挂载仍缺失 | `reconcile`，保留现场；不得发布 ready 或盲建下一代 |
+
+### 5. Scenarios and Examples
+
+- 正常：start 创建专属环境，刷新账号页后用 `resume {"generation":"页面返回值"}` 继续原 SID；CLI 结束时显式 restart 创建新 SID，环境/CID/userID 保留。
+- 基础：管理器突然退出后发现 interrupted 草稿；没有产物则重新登录，有产物则先验证认证再提交，账号容器仍按需唤醒。
+- 错误用法：只有 credentials 文件就标记已登录，或提交 IO 失败后通过删除放行。正确处理：真实 CLI 认证检查；submitting 保留资料和门禁，继续提交/对账。
+- 错误用法：用旧页面代次删除新登录，或凭账号名称前缀批量删容器。正确处理：锁内重读代次、精确标签和目录归属，仅清专属未提交资源。
+- 基础：取消清理失败进入 reconcile，但原执行可核对且已停止；使用恢复检查收口旧会话，保留 HOME 后开放继续/重登/删除，不把恢复当作删除。
+- 正常/基础：无 ID 草稿保存为正式账号后调用 `runtime.ensure(account)`，空闲时补齐专属只读额度挂载；再次调用沿用新一代。若独立 API 正在转发，先维持 API，后续需要 CLI 额度文件的准备等待空闲。
+- 错误用法：仅更新 `account_environments.account_id` 就认定旧容器额度可读，或挂整个全局额度目录绕过缺失。正确处理：核对实际单账号只读挂载，明确缺失才经过原空闲维护补齐。
+
+### 6. Tests Required
+
+- `test_login_drafts.py` 用临时 SQLite/文件和 Docker 替身覆盖列表/旧环境、非调度、同 SID 继续、原身份重登、重启产物认证、本地保存中断、取消/提交/删除互斥、旧代次/锁内 404、正式/软删除/历史保护、labels/链接拒绝和部分清理重试。
+- 必须断言坏 JSON、错环境及 home=null 只隔离单条，另一正式账号仍可读取，坏孤立标记可见且不能删资源；旧非 v3 status 继续按原凭据存在契约返回 credentials_ready，v3 仍须真实认证检查。
+- `verify_stack.py --manifest <最终联合清单> --browser --reauth` 串入 `verify_login_drafts.py`：真实 Docker/Chrome/HTTP/WS/tmux、刷新原 SID、CLI 结束与迟到事件、管理器 SIGKILL 后对账/恢复、原环境提交、鼠标确认完整删除；验证全部专属目录/CID/DB 消失且正式账号保留。
+- 合成 CLI/OAuth 和故障替身必须明确标注，不访问真实 OAuth；按随机部署精确标签清理测试数据与容器，核对旧哨兵不变和最终冻结源码哈希。真实 OAuth/正式 API 另作上线后验证。
+- 清理故障验证 503、can_reconcile 与原 SID/名称释放；拒绝活动工作、未知证明、旧代次及未确认保存，恢复前后 HOME/身份不变。代理 JSON/DOM 不含 userinfo，配置读取失败为 unknown；真实浏览器点恢复后可完整删除草稿而正式账号保留。
+- `test_account_runtime.py` 从真实形状的无 ID 草稿创建与正式绑定开始，断言补齐一次、并发幂等、原资料不变；覆盖错误挂载、CLI/API active/waiting、评审、持久记录、孤儿进程和部分维护失败。独立 API 自持许可且明确缺挂载时继续准备，不进入排他认领。
+- `verify_login_drafts.py` 在真实浏览器正式提交后准备原环境：容器读取本账号额度 JSON、写入被拒且看不到其他账号目录，Recorder 多次观察不因缺文件误停，重复准备不重建。新账号额度窗口未知允许缺省 `windows`，不能伪造 0% 或主动探测；本地源码覆盖不替代正式镜像发布后验证。
+
+## Scenario: v3 原生 TLS 账号身份与同步
+
+### 1. Scope / Trigger
+
+- 修改首次同步、已有账号绑定、环境身份状态、CLI 版本或网络模式时适用。切换原生 TLS 后不能继续要求普通任务生成只有 Recorder 才能写出的身份文件。
+
+### 2. Signatures
+
+```text
+POST /api/accounts/{aid}/cc2api/sync
+  -> {ok, created, cc2api_account: {id, ...}}
+AccountRuntime.read_cli_identity(row: dict, version: str) -> dict
+AccountRuntime.identity_import(account: dict, version: str) -> dict
+source = cli:/v1/messages:metadata.user_id.device_id
+       | cli:2.1.293:config.userID
+CLI payload: device_id, environment_id, source, canonical_env, canonical_prompt,
+             canonical_process（可选，实测格式见下方独立动作契约）
+```
+
+### 3. Contracts
+
+- 官方 2.1.293 经无外网实际请求验证：`metadata.user_id.device_id` 等于 `.claude.json.userID`，与独立 `machineID` 区分。只有该精确版本开放本地来源；新版本须另做隔离验证，不根据同名字段猜测。
+- 固定 HOME 的 userID 必须为 64 位小写 hex，账号 UUID 必须非空且与管理 profile 一致。不能生成新设备、只按邮箱匹配或回退 Linux machine-id。已完成登录无需额外模型任务或完整抓包。
+- 外部既有 profile 迁入新固定环境时，`identity_import` 只 ensure 并读取身份，不替代登录对 HOME 的初始化。只允许对本次新建、未绑定且无任务历史的环境在空闲停止后创建缺失的 `home/.claude.json` 与 `home/.claude/.credentials.json`，保留原 userID/UUID；已有内容不匹配时拒绝覆盖。随后仍经正式创建/关联校验，绑定后三份运行快照只保留 AT。不能为让校验通过而生成新设备或削弱冲突检查。
+- 已有 `runtime/identity.json` 的 JSON、来源、冲突标记、设备格式及账号归属均须校验；已验证版本的本地设备与旧观察不同仍阻止同步，不能覆盖证据。未知版本只接受已有正式请求观察。
+- 同步按 owner → profile → environment 锁序读取；环境 GET 尝试非阻塞取得同序锁，维护时返回待核对状态，不创建／唤醒环境、不生成证据文件。身份状态必须反映实际校验，不只检查文件存在。
+- cc2api 仍要求内部服务证明及合法环境；本地来源必须与 canonical_env.version 和 version_base 均为 2.1.293 精确匹配。已有设备不自动替换。
+- 已绑定重授权成功返回 `credentials_synced:true` 与原绑定 ID；未绑定 v3 保存返回 `credentials_synced:false, cc2api_account_id:null`。浏览器授权完成不代表保存成功，首次绑定仍须显式同步。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+|---|---|
+| 2.1.293 登录产物齐全，无任务／无 Recorder 文件 | 可导出原设备并同步 |
+| 只有管理 profile、固定 HOME 登录文件缺失 | 409；新建空环境按迁移前置初始化，已有环境拒绝盲目覆盖 |
+| userID 缺失／类型错误／非 64 位小写 hex，或 UUID 不符 | 409，准确错误，不替代身份 |
+| 历史观察损坏、未知来源、冲突或账号不符 | 409，保留原观察 |
+| 未验证版本且无请求观察 | 409，提示版本身份来源未验证 |
+| 来源与版本不符、缺内部服务证明 | cc2api 401，不创建账号 |
+| GET 遇到维护锁 | 显示设备身份待核对，不等待维护完成 |
+
+### 5. Scenarios and Examples
+
+- 正常：官方 2.1.293 登录后按原生 TLS 模式显式创建或关联，cc2api 保存同一 userID；旧 sync API 保持兼容，已绑定重授权更新原账号凭据。
+- 迁移：先关闭源调度/刷新入口并完成锁屏障，再把最终权威登录态与原 CLI 身份放入目标 profile；新建空 HOME 补齐必要文件后走正式绑定。旧任务、会话和工作目录不随账号迁入。
+- 基础：未绑定账号重授权仅保存本地，页面明确尚未关联；未知版本有历史请求观察时沿用旧来源。
+- 错误用法：为了补身份让用户反复跑普通任务，或直接用 machineID 兜底。正确处理：对已验证版本读取官方持久 userID，并保留所有冲突保护。
+
+### 6. Tests Required
+
+- `test_account_runtime.py`：无任务／无抓包导出、缺失及错误类型、UUID 不符、损坏／冲突观察、未知版本、GET 不唤醒及维护锁释放。
+- `verify_cli_quota.py`：真实官方 2.1.293、不同的合成 userID／machineID、两条本地请求身份相符；采集前后请求完全一致且零 usage，Docker network=none。
+- `verify_reauth_stack.py`：空 runs 表、无 identity.json，经正式同步 API 创建及绑定后核对网关 device_id；真实页面重授权后检查两端 DB、profile、AT-only HOME、回执、原账号／设备／策略和可见结果提示。
+- 既有登录态迁移验收：读取源版本真实 DTO；resolve 的有效期必须满足该版 handler（当前 60–7200 秒），不能把参数校验返回的 400 当作刷新锁屏障。核对停用后的锁内 inactive、唯一所有者、原身份/代理/策略、三份 AT-only、原生用户可读与 API Token 范围复原；不运行真实模型压力探针。
+- `test_login_drafts.py` 与 `verify_login_drafts.py`：未绑定提交返回明确 false/null，页面显示仅本地保存。官方 CLI 实证与合成成功链分别报告，不以替身冒充官方验证。
+
+## Scenario: v3 独立账号动作、真实进程指标与完整转发验收
+
+### 1. Scope / Trigger
+
+- 修改 bench → cc2api 创建/关联、进程观察、账号卡片或 v3 转发验收时适用。设备来源沿用上方原生身份契约；凭据更新沿用重授权事务，不能把指标更新接到 OAuth 刷新路径。
+
+### 2. Signatures
+
+```text
+POST /api/accounts/{aid}/cc2api/create
+POST /api/accounts/{aid}/cc2api/bind  {cc2api_account_id: StrictInt > 0}
+POST /api/accounts/{aid}/cc2api/process
+POST /admin/accounts/:id/cli-process/import
+AccountRuntime.ensure(..., preserve_proxy: bool = False)
+AccountRuntime.process_identity_import(account: dict, version: str) -> dict
+AccountRuntime.process_import(row: dict, container, version: str) -> dict
+process_metrics.sample_process_metrics(root, proc, cli, cgroup) -> dict
+AccountService::import_cli_process(id: i64, input: &CliProcessImport) -> Result<Value, AppError>
+AccountStore::update_cli_process(account: &Account, process: &Value) -> Result<(), AppError>
+```
+
+`CliProcessImport` 为 `device_id/email/account_uuid/environment_id/cli_version/canonical_process`，拒绝其它顶层字段。内部导入同时要求管理员鉴权、v3 服务证明和运行门禁。响应为 `{ok, account_id, canonical_process}`；bench 指标响应使用 `cc2api_account_id`，均不含凭据。
+
+### 3. Contracts
+
+- 页面未关联时显示“创建 cc2api 账号”“关联已有账号”，已关联时显示“更新进程指标”；“重新授权”保持独立。关联选择从养号表单移出，后者只保存养号/额度。按钮状态不能替代服务端绑定/身份/占用校验。
+- 创建只接受未关联账号；匹配到现有身份返回冲突及关联提示，不自动切换。关联接受显式目标，只匹配该账号，不创建；按原所有权保护镜像 cc2api 权威凭据，保留养号和目标策略。新 UI 不再调用 `/cc2api/sync`，旧 sync 和 warmup 绑定字段保持兼容。
+- 真正创建的载荷显式设置 `billing_mode="rewrite"`、`upstream_session_pool_enabled=true`、`upstream_session_pool_size=4`、`upstream_session_refresh_policy="owner_only"`、`concurrency=4`、`rpm_limit=50`。TTL 时长沿用默认 60 分钟；不修改 cc2api 手工创建的全局默认，不覆盖关联、指标更新、重复兼容同步或重授权后的既有策略。
+- 指标更新持有 owner → profile → environment 锁序，仅核对代理配置，不能调用 `_sync_proxy` 回写代理或解析/刷新 OAuth。内部服务在排他配置门禁下拒绝活动/等待请求；不为指标写入 quiesce/停止在途发送器。存储只条件更新原身份的 `canonical_process/updated_at`，不能把旧 Account 副本整行写回而覆盖轮换后的凭据/策略。
+- 实际 cgroup v2 `memory.max` 或 v1 `memory.limit_in_bytes` 提供 RAM 上限；零只表示明确的无限制。读取失败不能当作无限制，导入须与固化 RAM 预算交叉核对，不能把 RAM＋swap 或容器占用当作 RAM 限制/RSS。
+- root 监督循环每两秒只读 procfs；只采 UID1000、root 所有且组/其它用户不可写、已完成版本缓存中的原生 `/cli/<version>/node_modules/@anthropic-ai/claude-code/bin/claude.exe`。核对进程启动时刻防 PID 复用，不读取命令正文或环境变量，不把 Node 探针/发送器当 CLI。
+- Docker 默认无 SYS_PTRACE；仅在读 exe 链接时匹配账号 fsuid/fsgid，立即恢复后由 root 核对缓存，不能增加容器权限。root 私有 `runtime/process-metrics.json` 使用 schema=1、环境归属及最多 32 个版本，私有锁内原子写入、0600、文件 fsync；坏记录保留并拒绝导入。采样不发请求、不启动额外模型任务，普通观察失败不停止 API。
+- `canonical_process.observation` 固定 `source="v3:procfs:cli"`、32 位小写 hex `environment_id`、精确 `cli_version`、UTC 秒 `observed_at/sampled_at`、整数 `sample_count`、字节 `rss_bytes/rss_min_bytes/rss_max_bytes`。内存/样本计数必须非负且小于 2^53；时间有限且不超当前 60 秒，采样时刻不晚于观察时刻。count=0 时采样时间及三个 RSS 都为 null；count>0 时它们必须齐全且 `0 < min <= rss <= max < 2^53`。
+- 容器上限可独立导入；RSS 没样本显示“未采集”，有样本显示真实时间。v3 observation 不填旧兼容默认堆/CPU/RSS 范围，上游只发送有依据的 constrainedMemory 和可选 rss，内部来源元数据不进入遥测。普通旧账号画像沿用既有兼容，已有 v3 账号通过独立按钮补齐，不批量迁移设备或凭据。
+- 完整转发验收使用真实调度器、空 SQLite、随机部署、两账号发送器、HTTP CONNECT/SOCKS 与本地 HTTPS 上游；来源 IP、合成标记、发送器 request_id 和响应哈希须可关联。正式 messages JSON/SSE、实际 CLI/API 并行、取消收口和失败关闭分别验收，不能以 ClientHello/502 或 runs-stream 代替成功业务响应。
+- 隔离构建仅显式启用 Cargo `v3-verification` 与 Docker `verification-control/verification-account`，临时根位于 `/run/v3/verification-ca.der`，仍验证签名与主机名。正式 control/account 不依赖这些阶段，不含该读取路径，不新增运行时 CA/跳过校验开关。测试镜像/清单不发布；生产非模型 HTTPS 与真实模型推理分别报告，受限账号不用于模型探测。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 已关联时创建/关联、创建遇已有匹配、关联目标不存在 | bench 409，不自动创建/改绑 |
+| 非 v3 或未关联时更新指标 | 409；不可用账号 404 |
+| 代理不一致、来源/版本/样本/内存预算错误 | 409，不改目标进程、代理或凭据 |
+| 内部证明缺失/伪造 | cc2api 401，不写库 |
+| 活动/等待 API 或 CLI 维护占用 | 内部拒绝，原数据与在途流保持；bench 返回受控 409/502 |
+| 新账号无 CLI 样本 | 上限准确，RSS null / 未采集 |
+| 发送路径、代理、证书/主机名、绑定/代次/目标错误 | 明确失败，无直连回退和不安全重放 |
+
+### 5. Scenarios and Examples
+
+- 正常：未关联账号点击创建，六项为 rewrite/开启/4/owner_only/4/50；已存在则显式选择关联，保留管理员自定义 strip/关闭/2/mapped_request/2/17。关联后更新指标只改进程字段。
+- 基础：`constrained_memory=1610612736`、`sample_count=0`、`sampled_at/rss_*=null`，页面显示容器上限 1.50G 与 CLI RSS 未采集；之后真实 CLI 样本补齐 RSS 和时间，停止/重启不伪造新样本。
+- 错误用法：点击“更新进程指标”顺便 resolve OAuth，或把缺失堆数据填成静态默认值。正确处理：独立身份/观察载荷与条件列更新，未知项不发送。
+- 错误用法：首个 session ID 未改变就判定池无效，或丢弃 urllib3 读取器后再测试“在途”拒绝。正确处理：前四个属主可保留 ID，第五个映射到四成员内；保留读取器并先断言 active>0，再取消及核对上游 completed=false。
+
+### 6. Tests Required
+
+- `test_process_metrics.py`：真实跨 UID procfs 路径及文件身份恢复、v1/v2/无限/损坏 cgroup、官方缓存/权限/PID/RSS、空样本、持久化及归属冲突；`test_account_runtime.py` 断言预算核对和原身份导出。
+- `test_main.py`：创建冲突不刷新/关联、六项载荷、显式关联不创建/改养号、未关联指标拒绝、更新不读凭据或改账号。Rust service/store 测试覆盖坏来源/身份/版本/样本、条件列写入与并发凭据/策略保护；identity/rewriter 测试覆盖对象及 base64 中未知堆/CPU 不外发、旧画像兼容。
+- `verify_forwarding.py --build ...` 复用 canonical 冻结与联合清单；实际浏览器点击三入口、明暗与 1440/720px、官方 CLI RSS → API/SQLite/卡片。正式 `/v1/messages` JSON/SSE 响应哈希、Billing 与 5→4 session、两账号隔离、实际官方 CLI 与 API 并行、取消及全部故障场景均通过；网关专属网络命名空间的公网阻断计数为零，结束按本次精确标签清理。
+- 正式镜像继续跑 `verify_stack.py --browser --reauth`，核对原 ID、AT-only HOME、完整 profile、六项策略/TTL、错误登录/取消/草稿恢复及旧哨兵。页面驱动等首次列表事件处理器就绪，避免人为并发初始查询；失败保留脱敏证据。
+- `cargo fmt --check && cargo test`、Python 全量及前端构建保持。可用账号的真实 Anthropic 推理单独验收，不用测试替身/生产非模型 200 冒充。
+
+## Scenario: cc2api 删除后的悬空绑定收口与凭据交接
+
+### 1. Scope / Trigger
+
+- 修改 v3 解绑、正式账号删除、`owner_transition`、运行凭据发布或作业收尾时适用。远端删除的收口与本地刷新权交接必须同时完成。
+
+### 2. Signatures
+
+```text
+DELETE /api/accounts/{aid}/cc2api-binding -> {ok: true}
+DELETE /api/accounts/{aid}
+AccountRuntime.owner_transition(account: dict, target_id: int | None, *, handoff_credentials: bool = True)
+AccountRuntime.sync_credentials(row: dict, account: dict, *, take_ownership: bool = False) -> None
+Cc2ApiClient.list_accounts(*, require_complete: bool = False) -> list[dict]
+GET /admin/accounts?page=<从1开始的页号>&page_size=100
+runtime/credential-handoff.json -> {schema: 1, account_id, environment_id,
+                                   previous_binding, profile_sha256}
+```
+
+### 3. Contracts
+
+- 只有 `target_id=None` 的解绑/本地删除，且失败 ID 为原绑定，才允许缺失收口。原 lease GET 或 prepare 的 ValueError 必须直接由 `urllib.error.HTTPError(code=404)` 引起；不能匹配错误文案，不能把网络、鉴权、5xx、坏 JSON 或其它冲突当作删除。
+- 404 后再次成功读取完整账号列表，确认原 ID 不存在，才跳过已删除账号的远端门禁；原账号仍存在或列表读取失败时拒绝。新目标、改绑和正常远端账号继续严格查询、prepare、检查占用，并在事务后 release。
+- 缺失证明调用 `list_accounts(require_complete=True)`：`page/page_size/total/total_pages` 为真实整数，页号匹配当前页、容量为 100、total 非负、页数为 ceil(total/100)，每页行数匹配应有数量；每行 ID 为正整数且全量去重后数量等于 total。空列表的 total/total_pages 均为 0。坏行不得静默过滤，不能只查第一页；普通列表调用默认保持原兼容行为。
+- owner 锁内重读绑定并沿用 active run（含 quota_wait）、续聊、登录保护；环境作业和实际发送器仍须空闲。发送器状态未知也拒绝。确认空闲后停止旧容器、写 stopped，再由现有 SQLite 事务清空绑定和关闭未来养号，不能直接改库绕过收口。
+- 解绑保留原账号、环境 ID、固化画像、HOME 和本地凭据。绑定期间管理 profile 持有完整镜像，HOME/access 只发布 AT；解除绑定后显式 `take_ownership=True` 把完整 AT/RT/expiry 交接给同账号 HOME，不调用远端 OAuth resolve/refresh 或自动创建账号。主入口持有 owner → profile → environment 锁序。重复空闲解绑返回成功，旧绑定缺失造成的待对账也可用同一显式入口收口。
+- 本地完整凭据要求 AT/RT 均为非空字符串，expiry 为排除 bool 的有限正数且小于 2^53，允许已过期但结构完整。已有独立 HOME 的完整 RT 是轮换权威，不被旧 profile 回滚。给 AT-only HOME 补 RT 前核对两侧非空字符串 userID/accountUuid 相同；普通补齐还须 AT/expiry 完全相同，显式解绑才可交接原管理侧的更新快照。文件/身份损坏或来源冲突保留现有秘密并拒绝猜测合并。
+- 交接资料先校验，停止旧实例后、DB 提交前原子写 0600 的无令牌意图记录；DB 和 HOME/access 全部发布完成才删除。记录校验账号/环境/原绑定与原管理文件 SHA256；来源变化或改绑目标拒绝。中断保持 reconcile，启动 reconcile/ensure 不能绕过记录；重复显式解绑验证原证明后续办，不能假报成功。
+- 正式未绑定账号的 `release` 仅把完整 HOME 凭据原子镜像回 profile；AT-only、缺字段或坏 JSON 拒绝回写并保留执行证明/隔离，不能抹除已有 RT。未提交草稿没有正式 account_id，不回写正式 profile。显式本地账号删除用 `handoff_credentials=False`，保留原占用与停止门禁，不要求先修复失效 RT；旧 warmup 的 null 继续表示保留绑定。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 原 lease 404＋完整列表明确无原 ID＋本地空闲 | 解绑 200，绑定 null、养号 off、next null |
+| 404 但原账号出现在任一页，或列表不完整/损坏 | 拒绝，原绑定和实例保持 |
+| 鉴权、网络、服务错误或原门禁占用 | 拒绝，不能降级为已删除 |
+| 本地 run/续聊/登录/环境作业或发送器占用/未知 | 拒绝，不中断活动发送 |
+| 新目标缺失或改绑遇缺失原账号 | 继续严格拒绝，不使用解绑例外 |
+| 已解绑的空闲账号再次解绑 | 200，不创建远端账号 |
+| profile 完整、HOME AT-only、身份一致 | 解绑后 HOME 接管 RT，绑定空、养号 off |
+| 未绑定 HOME 已有新完整 AT/RT | 保留轮换结果，收尾镜像回 profile |
+| HOME 不完整/损坏、来源或身份不符 | 不降级覆盖管理凭据；交接前拒绝或收尾隔离 |
+| DB 已解绑但 HOME/access 写入失败 | 保留交接记录与 reconcile，重复解绑可续办 |
+| 交接记录来源变化、启动/普通唤醒/再次改绑 | 保留记录并拒绝自动放行 |
+| 显式删除本地账号但凭据失效 | 无需交接 RT，仍按原空闲/停止/删除规则执行 |
+
+### 5. Scenarios and Examples
+
+- 正常：先在 cc2api 删除账号，再从 bench 点击解绑；确认无原 ID、停止旧实例后清空本地关联，页面恢复“创建 cc2api 账号”和“关联已有账号”。
+- 基础：远端在 lease GET 与 prepare 之间删除；确认完整列表缺失后按相同本地空闲规则收口。重启调度器不改变该显式恢复入口。
+- 错误用法：捕获所有管理请求异常后直接 UPDATE 本地绑定。正确处理：限定原 ID 的真实 404，并核对完整列表与本地发送器，不把“查不到”一概当作删除证明。
+- 错误用法：解绑后继续优先已有 AT-only HOME，再在后台刷新失败的 finally 中覆盖 profile。正确处理：解绑时交接完整凭据，收尾前验证完整性，验收到下一次真实使用边界。
+
+### 6. Tests Required
+
+- `test_deleted_binding.py`：真实异常链/SQLite/运行时，保持原门禁回归，增加正常/悬空解绑 RT 交接、失败作业收尾、独立轮换、旧 AT-only 同源补齐、坏文件/身份冲突、HOME/access 写入故障、重启保留意图及重复恢复、来源变化/改绑拒绝，以及本地删除不依赖 RT。
+- `test_login_drafts.py`：合成成功凭据具备真实 CLI 的 expiry；未提交 AT-only 草稿仍可取消，不污染正式 profile，保存失败和重试门禁保持。
+- `verify_stack.py --manifest <同批正式清单> --browser --deleted-binding`：随机部署经正式创建/绑定、远端删除、重启与页面解绑，核对两库和 RT 交接；真实 scheduler/runner/容器执行仅替换 OAuth 探测为失败，收尾后再次页面创建成功，HOME 回到 AT-only。保留原身份、统一会话/退出与旧哨兵验证，不访问真实 OAuth/usage/模型，只清理本次标签资源。
+
+## Scenario: v3 三角色 Docker 隔离与 OAuth 出口
+
+### 1. Scope / Trigger
+
+- 修改固定账号布局、权限/挂载、网络策略、资源预算、OAuth 客户端或账号迁移/部署验证时适用。本节是布局 2 对前述单容器约定的增量契约；普通 API/CLI 调度、凭据所有权与业务协议继续沿用。
+
+### 2. Signatures
+
+```text
+account_environments.container_id TEXT                 # CLI，保留原字段
+account_environments.network_container_id TEXT
+account_environments.sender_container_id TEXT
+account_environments.isolation_version INTEGER DEFAULT 0
+account_isolation.ISOLATION_VERSION = 2
+ROLE_COLUMNS = {cli: container_id, sender: sender_container_id, network: network_container_id}
+ROLE_LABELS = {cli: account, sender: account-sender, network: account-network}
+isolated_account_limits(memory: str, swap: str = "0") -> dict[str, tuple[int, int]]
+services/gateway/src/service/oauth.rs: validate_oauth_proxy(proxy_url, runtime_url, deployment_id)
+AccountRuntime._adopt_sender_evidence(row: dict) -> None
+verify_roles(cli, sender, network, fingerprint: dict) -> dict
+```
+
+### 3. Contracts
+
+- 一个逻辑环境登记 network/CLI/sender 三个容器，共用同批 account 镜像；control/account 仍为两个交付镜像，清单 layout_version=2。三个角色严格核对 product/deployment/environment/role/release/isolation-version 标签；不能靠名称前缀或第一个环境容器推断角色。发送绑定继续核对环境、整数 generation、批次与秘密。
+- network 持有 TUN/NET_ADMIN；CLI 为 UID1000、sender 为 UID1001，业务角色 cap_drop=ALL、no-new-privileges、根只读、独立 PID/挂载，加入本账号 network 容器的 netns。hostname/MAC 只配置在网络所有者，machine-id 两处只读挂载；保留原 HOME、userID、画像和最新凭据。
+- MAC 使用 `networking_config={network: client.api.create_endpoint_config(mac_address=原画像MAC)}`，不能继续使用 Docker 29 / API 1.52 已废弃的容器顶层配置。验收同时核对网络端点及 CLI/sender 的实际 eth0 地址，并将 hostname/machine-id 与保存画像比较。
+- network 只挂本账号网络控制、版本缓存写入区、私有 CA、CLI 证据/控制及必要 AT 快照，不挂完整 HOME。CLI 不挂 sender 秘密、代理密码、私有 CA 或其他账号额度，/flows/api 用空只读目录遮蔽；sender 只读私有配置并写自己的 API 证据。
+- CLI 的 runtime 父目录 root:GID1000 0750，drivers/runs/jobs 由管理端保护父目录；单作业 group.pid 与 tmux 位于受控 jobs/<handle> 子目录。sender 配置目录 root:GID1001 0750、文件 0640，通过目录挂载接收原子替换。管理 JSON 使用逐级 O_NOFOLLOW 目录 fd、相对原子替换；读取限普通文件和 16 MiB，chown 不跟随账号链接。
+- 创建角色前移交旧 `flows/api/observations.jsonl` 和 `.previous`：逐级 O_NOFOLLOW 目录 fd，以该 fd 将目录设为 1001:1001、0700；文件 O_NOFOLLOW/O_NONBLOCK，确认普通文件且硬链接数为 1 后 fchown 为 1001:1001、fchmod 为 0600。缺失文件由 sender 首次创建，已有内容不重写；只修改父目录无法使旧 root:root 0600 文件可追加。
+- 网络过滤器在本账号 netns 原子安装 INPUT/FORWARD/OUTPUT 默认 DROP，先拒绝 Docker DNS 127.0.0.11，再开放回环、既有连接、指定代理 TCP、TUN；其他私网和 IPv6 拒绝。sender 8091 入站仅允许核验过的本部署 gateway/orchestrator 及桥网关。网络 ready 最多等 120 秒，确认前不启动业务；删路由/网络进程故障不能回退 bridge 直连，不修改宿主共享规则。
+- 服务端 OAuth 仍由 gateway 的原 HTTP/TLS 客户端发出，账号 netns 防火墙不能保护它。`V3_RUNTIME_URL` 或 `V3_DEPLOYMENT_ID` 任一非空时，空串/空白代理在创建 OAuth 客户端前返回 ServiceUnavailable；授权交换、刷新和 usage 共用该入口。非空非法代理解析失败也不得直连；两个标识均为空的独立部署保留原空代理语义。不伪造浏览器网页授权的出口。
+- 基础布局总 RAM/swap 来自已保存画像：network 256 MiB、sender 128 MiB、CLI 取剩余且至少 512 MiB，额外 swap 只归 CLI；Docker memswap 为角色 RAM 加其额外 swap。CPU 按 CLI:network:sender=6:1:1 分配，pids 分别为 512/128/128；CLI /tmp 为 128 MiB noexec。部署预检、容量及停止不能漏计辅助角色或放大账号总预算。
+- 上述 sender 128 MiB 为 legacy 布局；native293 使用下文显式原生预算，CLI/评审/指标从同一冻结预算扣除 sender 份额。
+- 新登录与项目环境均使用基础三角色预算，不再静态预留512MiB或创建 `runtime/project-review-layout.json`。评审先停止原固定CLI，再串行复用扣除network/sender后的RAM，结束后恢复同一CLI。旧schema1布局只读核验实际限制，不隐式扩容、重建或改写固定配额；旧隔离版本仍须显式空闲升级。`account_environments.container_id`始终指固定CLI；交接记录、私有目录、原owner刷新及严格收口以[项目场景契约](project-iterations.md#scenario-内容-schema-2-的真实项目多场景任务与-policy-3)为准。
+- 创建按网络 ready 再业务角色，逐个登记；失败停止本代已创建实例并保留对账证据，未知/部分角色不能 ready。停止按 CLI→sender→network；维护、备份、草稿删除与孤儿处理核对完整角色集合。管理端重启与 CLI 单次取消保留健康 API/SSE；CLI 单独异常仅关闭下一 CLI。
+- 布局 0 的已有实例只在显式空闲重建时转换，GET/普通发送不能静默迁移。先停机备份，转换保存私有 isolation-upgrade 快照；回退保留最新 HOME/凭据，不恢复旧 RT/数据库覆盖轮换结果。未创建实例的新行保持布局 0，受控 ensure 才登记 2。
+- 业务指标取 CLI 实际 PID/cgroup，管理端写私有观察记录。验证 CA 仅供 verification 镜像，sender 的只读 /run/v3 下嵌套 CA bind 必须预置目标；正式镜像不读取该 CA。测试依赖的系统目录仍只读，故障注入使用网络私有运行记录。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| CLI/sender 修改系统目录、路由或读取其他角色秘密 | 拒绝；本账号 HOME/项目可写与执行 |
+| 网络 ready 超时、标签冲突或部分角色创建 | 不发布可用绑定，保留 reconcile/证据 |
+| 旧 root API 证据为普通单链接文件 | 内容保留，移交后可继续追加并轮换 |
+| 旧 API 证据或父目录为链接，文件为多硬链接或特殊文件 | 拒绝创建，不改变链接目标属主/内容 |
+| 删除默认路由后落到 bridge | 默认 DROP 内核计数增加，不直连 |
+| v3 空白代理，包括只剩部署标识的配置 | OAuth 客户端创建前拒绝；不轮换 AT/RT 或停用账号 |
+| 独立部署两个 v3 标识均为空 | 保留显式直连兼容语义 |
+| 账号总 RAM 不足 896 MiB | 明确拒绝，不能静默加配 |
+| CLI 取消或管理端重启时 API 长流健康 | sender 不重启，流完整或按原取消语义收口 |
+| 旧布局仍有活动/提交未决或回退凭据来源不明 | 拒绝转换/覆盖，保留原资料 |
+
+### 5. Scenarios and Examples
+
+- 正常：1536m RAM + 2048m 额外 swap 分配为 CLI 1152m RAM + 2048m swap、network 256m、sender 128m；JSON/SSE 和官方 CLI 本地工具可并行。
+- 基础：已有固定环境停机后显式重建，保留环境 ID、HOME、machine-id 与最新凭据；角色缺失先对账完整集合。
+- 错误用法：只核对 CLI/sender 身份彼此相同，或只 chown API 证据父目录。正确处理：实际身份对照保存画像，同时移交已有证据与轮换文件，再验证真实发送后仍可追加。
+- 错误用法：认为账号网络防火墙已保护 gateway 的所有 OAuth 请求。正确处理：OAuth 公共入口按 v3 标识拒绝空代理，并实测连接尝试为 0。
+- 错误用法：`containers.list(environment)[0]` 后执行 tmux，或 mv 只读系统程序制造故障。正确处理：显式选择 account/account-network，使用私有运行记录注入并在 finally 恢复。
+- 错误用法：用创建时缓存的 StartedAt 判断后续长流是否被重启。正确处理：流首字节之后 reload sender，比较本次在途重启前后的实时状态及完整响应哈希。
+
+### 6. Tests Required
+
+- 账号运行时单元覆盖角色登记/归属、部分创建/孤儿收口、总预算、旧行与受控转换、身份/凭据保持、链接逃逸拒绝。Rust `cargo fmt --check`、`cargo test --locked` 覆盖 v3 两种标识及部分配置、空白代理拒绝、独立部署兼容。
+- MAC 回归使用真实 SDK 的 API 1.52 EndpointConfig 验证创建参数，并通过 Docker 实际网卡对照保存画像。`run_local_verification.py` 预置 root:root 0600 的当前/轮换证据，确认历史字节保留且 sender 能追加；单元覆盖符号链接、硬链接和 FIFO 拒绝且目标不变。
+- `verify_forwarding.py` 标准入口覆盖真实权限/秘密、官方 CLI 本地工具、HTTP CONNECT/SOCKS5 的 OAuth/JSON/SSE、4 成员池、CLI/API 并行取消、管理端重启、错误证书/代理/绑定拒绝。空代理回归核对 AT/RT/oauth_expires_at/status 保持，最终 gateway 公网连接尝试内核计数必须为 0；SQL 字段以 AccountStore 的实际映射为准。
+- `verify_stack.py --browser --reauth` 覆盖草稿取消故障、恢复及完整删除；账号冷启动等待可用 150 秒，普通 DOM 仍为 15 秒。`--deleted-binding` 保留 RT 交接与再次创建回归。脚本不得依赖诊断 wrapper 才通过。
+- `run_local_verification.py` 使用同批正式清单与显式旧 control/account 镜像验收真实转换及离线回退、透传/Recorder、路由故障和总预算；分别记录本地夹具、正式非模型与真实模型证据，不以隔离承诺免封。
+
+## Scenario: v3 按账号固定的常规内核与 CPU 型号画像
+
+### 1. Scope / Trigger
+
+- 修改 `system_profile.py`、账号镜像的 `system-profile.c`、画像挂载、初始化或 CLI 就绪门禁时适用。只覆盖常规软件读取，不把它当作新的安全沙箱或已确认的封禁原因修复。
+
+### 2. Signatures
+
+```text
+fingerprint_json.system_profile = {
+  schema: 1, kernel_template_id: string, kernel_release: string,
+  kernel_version: string, proc_version: string,
+  cpu_template_id: string, cpu_signature: [vendor_id, family, model], cpu_model_name: string
+}
+generate_system_profile(cpuinfo: str) -> dict
+validate_system_profile(profile: dict, cpuinfo: str | None = None) -> dict
+render_system_profile(profile: dict, cpuinfo: str) -> dict[str, str]
+AccountRuntime.prepare_system_profile(row: dict, network) -> None
+AccountRuntime.check_system_profile(row: dict, container) -> None
+```
+
+### 3. Contracts
+
+- `system_profile` 独立于原 `profile_version=2`。首次受控创建时读取真实 Docker 网络角色的 `/proc/cpuinfo`，限定 4 MiB，核对所有逻辑 CPU 代际后从内置兼容模板选择一次；保存后跨 run、续聊、改名、停止唤醒、重建及回退复用。仅缺 key 可补齐，显式 null、未知 schema/模板或改写内容必须拒绝，不能重新随机。模板 ID 及内容只追加，不重解释旧记录。
+- 当前支持 `AuthenticAMD/23/1`（Naples）与 `AuthenticAMD/25/80`（Cezanne）。只替换 CPU 型号文本，保留创建时实际厂商、family/model/stepping、flags、数量/拓扑/频率等原文；真实硬件变化后空闲重建刷新非替换字段，跨代际迁移必须先核对，不能自动换画像。
+- 生成发生在环境锁内、CLI 创建前；有活动 job 或已有 CLI 实例时拒绝应用。旧容器须显式空闲重建，不能在 GET、普通 API 发送或正在运行的 CLI 中静默迁移。既有 hostname、MAC、machine-id、时区、设备、凭据和绑定保留；即使执行已获许可的 legacy reprofile，也保留已有合法 system_profile。
+- account 镜像携带 `vibebench.system-profile-version=1` 能力标签及镜像内编译的共享库；容器可能继承镜像标签，不能据此推断某角色已加载。只有 CLI 挂载 root 所有的只读 `/etc/v3-system-profile`、`/etc/ld.so.preload` 与 `/proc/cpuinfo`；network/sender 的 preload 为空，权限、网络和预算沿用三角色契约。
+- 覆盖库通过 libc uname 替换 release/version，保留 hostname/架构；常规 open/open64/openat/openat64、fopen/fopen64 及 fortified open 对三个内核文件精确重定向：`/proc/version`、`/proc/sys/kernel/osrelease`、`/proc/sys/kernel/version`。支持词法归一化、相对 cwd/目录 fd；写入仍走原接口，保留创建 mode、errno 和原 fortify 拒绝。配置初始化避免 hook 递归并使用 pthread_once，坏字段返回 EIO。
+- raw syscall、静态 uname、CPUID、显式库绕过、符号链接别名及未覆盖 sysfs 可能显示真值。CPU 文本与 CPUID 可不同；挂载/库本身可观察，不宣称全层一致、无指纹或免封。CPU/RAM 实际限额及 RSS 不参与替换。
+- 创建后及 CLI 入口执行实际读取/只读校验，标签不能代替证据。旧 CLI/坏画像只标记 `cli_reconcile`，不停止健康 API；其恢复允许 `exclusive + idle_only + maintenance:` 的显式维护认领，仍检查 API 排空，普通登录/任务不能借此绕过。新角色创建失败则停止本代已创建角色并保留 reconcile 证据。
+- `identity_import` 继续真实执行容器 Node 探针，同源填充 `canonical_env.linux_kernel` 和 `canonical_prompt.os_version`；真实进程指标维持原契约。既有 cc2api 保存环境不自动批量改写，不生成新设备或修改凭据/策略。
+- 回滚用旧镜像/配置在空闲窗口重建并去掉 CLI 画像挂载，保留新增 JSON 对象和最新 HOME/凭据；重新启用复用原对象。画像文本与 JSON 共用逐级 O_NOFOLLOW 目录 fd 的原子写入，不能沿账号链接覆盖外部文件。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 同账号新任务、续聊、唤醒、重建 | 固定替换字段保持，原项目目录规则不变 |
+| 画像缺 key / 显式 null 或内容损坏 | 受控创建时补齐一次 / 拒绝，不重新随机 |
+| 未支持、混合或迁移后的冲突 CPU 代际 | 明确报错，保留原记录 |
+| 活动 job 或已有 CLI 实例调用准备函数 | 拒绝改写，先完成空闲重建 |
+| 旧 CLI 或实际读取不符 | CLI 待对账；健康 API 保留，可显式排空后重建 |
+| preload 或覆盖库未实际加载、其它画像文件不符 | 实际探针失败，不假报 ready |
+| release/build 文件权限、类型或单行格式不合法 | 运行库的 uname 返回 EIO，实际探针失败 |
+| CPU 原始指令、静态或直接 syscall 探针 | 报告真实值，不伪称覆盖 |
+
+### 5. Scenarios and Examples
+
+- 正常：新账号选定一组模板，后续不同 run 及容器重建复用；只读 CPU 文件仅型号行改变。
+- 边界：旧账号没有新对象时保留原身份并等待空闲重建；旧 CLI 校验失败不影响既有 API 长流，也不能让后续普通任务跳过门禁。
+- 错误用法：仅替换外部 uname、修改管理页值、覆盖坏记录重新抽签，或靠增加 SYS_PTRACE/privileged 放宽 proc 挂载。正确处理：只读文件与动态接口配合，实际验证支持路径并明确绕过边界，损坏记录保留等待核对。
+
+### 6. Tests Required
+
+- 单元覆盖型号之外的 CPU 原文保持、未知/混合/迁移代际拒绝、画像损坏不重生成、首次增补一次、改名/重建/legacy reprofile 保持及 CLI 待对账仍可显式维护。
+- 实际 Docker 验证动态与静态 C、直接 uname syscall/CPUID、普通/fortified open、相对 openat、fopen、并发读取、Node/子进程、真实只读挂载及损坏字段 EIO；network/sender 不加载覆盖，实际资源/秘密边界保持。
+- 精确官方 CLI 2.1.293 在无账号断网环境验证版本、认证状态和登录帮助，结合动态绑定证明 uname 确实走覆盖。auth status 的未登录退出码 1 不算启动失败；不能据此声称真实登录或模型交互已验收。
+- 用 `run_local_verification.py` 的正式构建清单及显式旧 control/account 镜像验证 API/CLI 生命周期、重建和回退再启用，核对画像、身份及 HOME/凭据保留；记录本地启动性能及未执行的生产/真实模型边界。
+
+## Scenario: v3 持久计算机身份与 DMI 常规读取
+
+### 1. Scope / Trigger
+
+- 修改计算机身份生成、`fingerprint_json.computer_profile`、DMI 读取库或跨重建持久性时适用。沿用前一场景的 CPU／内核、三角色权限和 CLI 待对账契约，不接入闭源生成器、不新增生产迁移入口。
+
+### 2. Signatures
+
+```text
+fingerprint_json.computer_profile = {
+  schema: 1, template_id: string,
+  dmi: {manufacturer: string, product: string, version: string,
+        family: string, serial: string, uuid: string}
+}
+generate_computer_profile(system_profile: dict) -> dict
+validate_computer_profile(profile: dict, system_profile: dict) -> dict
+render_computer_profile(profile: dict, system_profile: dict) -> dict[str, str]
+verify_computer_profile(container, profile: dict, system_profile: dict) -> None
+account 镜像能力标签：vibebench.computer-profile-version="1"
+只读标记：/etc/v3-system-profile/computer-profile-version，内容为 1 加换行
+```
+
+### 3. Contracts
+
+- 旧 `system_profile` schema=1 保持不变。计算机对象和 dmi 对象必须精确匹配声明的键；schema 必须为整数 1，不能用 bool。厂商／产品／版本／系列作为兼容 CPU 代际的一套合成模板选择，模板 ID 和显示内容只追加、不重解释，也不声称是原厂 DMI 快照。
+- serial 为独立随机生成的 16 位大写十六进制，uuid 为独立标准小写 UUIDv4；不从 MAC、machine-id、账号或官方设备身份派生。已有合法 hostname、MAC、machine-id、时区／语言、CPU／内核、HOME、凭据及绑定继续保留；CPU 能力、实际限额和 RSS 不随机替换。
+- `prepare_system_profile` 在环境锁内、CLI 创建前读取实际 CPU；Docker 读取位于 SQLite 写事务外。`BEGIN IMMEDIATE` 后重读本行指纹、generation 和 container_id，仅缺 key 才生成；不持全局 jobs 锁等待 SQLite。UUID 占用查询与首次提交位于同一事务，未发布碰撞最多尝试 8 次；已保存重复值报错，不能旋转身份。
+- 先提交完整权威 JSON，再用逐级 O_NOFOLLOW 的原子写入渲染只读文件。画像和 dmi 目录 root 所有且 0755，文件 0444，计算机标记最后发布；提交后渲染失败、旧 row 重试或并发初始化都从 DB 复用同一对象。新任务、恢复、进程重启、唤醒、重建和镜像更新不重抽；legacy reprofile 也保留合法计算机对象。
+- 仅 CLI 加载共享库与只读画像，不新增 capability。将 `/sys/class/dmi/id` 和 `/sys/devices/virtual/dmi/id` 下的 sys_vendor、product_name、product_version、product_family、product_serial、product_uuid 映射到同一 dmi 子目录；精确目录打开、相对目录 fd 与受支持 chdir 后读取也适用，不依赖宿主存在 DMI 目录。
+- 内容和元数据共用路径映射：普通／fortified open、fopen，以及 stat/lstat/stat64/lstat64、fstatat/fstatat64、statx、access/faccessat、旧 glibc stat ABI。x86_64 的动态 libc `syscall(SYS_statx, ...)` 同样映射，以覆盖 Node/libuv；其它 syscall 保留原始参数和 errno。不得用 va_arg 读取未传入参数，零参数和六参数透传均须实测。
+- `O_TMPFILE` 包含 `O_DIRECTORY` 位，必须按完整 mask 判断，不能把 `O_RDONLY | O_DIRECTORY` 当作写入。写入仍走原接口；白名单外保持原行为，不扩大为整棵 sysfs 仿真。静态程序、直接内联系统调用、CPUID、符号链接别名、完整 SMBIOS／dmidecode 和未列路径仍在覆盖边界外。
+- 能力标签不代替实际证据：创建和 CLI 入口校验两目录六字段的内容、存在、可读和不可写。旧实例只能显式空闲重建；坏对象／旧 CLI 只隔离 CLI，健康独立 API 保留。库初始化区分旧画像缺标记和已发布标记损坏，后者拒绝 DMI 读取，不回退宿主值。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| key 缺失且处于受控创建窗口 | 生成并提交一次；旧基础身份和未知顶层字段保留 |
+| 显式 null、未知键／版本／模板、格式坏或跨 CPU 代际 | ValueError，原记录保留，不重新随机 |
+| 已提交 JSON，但文件发布或后续创建失败 | 停止本代已创建角色，重试复用已提交身份 |
+| 新值 UUID 碰撞／已有 UUID 重复 | 首次发布前有界重试／已有身份报错不旋转 |
+| 活动 job、CLI 已存在或 generation 改变 | 拒绝应用，等待合法空闲维护 |
+| account 镜像缺少计算机能力 | 创建前拒绝，要求同批支持镜像 |
+| 两目录内容或权限探针不符 | CLI 待对账，不能仅据标签报告已加载 |
+| 已发布标记无效，或 DMI 文件不可读、类型／权限／有界单行格式损坏 | 常规 DMI 读取返回 EIO，不回退预置宿主内容 |
+
+### 5. Scenarios and Examples
+
+- 正常：保存兼容的 CPU 与计算机对象，独立控制端进程恢复、停止唤醒和另一批镜像显式重建后，规范化静态身份 SHA256 相同，实际 DMI 与 DB 一致。
+- 基础：旧记录有合法 CPU／内核但缺计算机对象，在空闲重建时只增补后者；旧 CPU、时区和设备配置保持。
+- 错误用法：`if not saved.get('computer_profile'): ...` 把损坏的 null 重新随机。正确处理：仅检查 key 是否存在，存在则严格校验：
+
+```python
+if 'computer_profile' not in saved:
+    saved['computer_profile'] = generate_computer_profile(saved['system_profile'])
+validate_computer_profile(saved['computer_profile'], saved['system_profile'])
+```
+
+- 错误用法：cat 输出合成文本就报告完成，或 stat 失败后显示缓存页面值。正确处理：分别用 Python、Node 和原生 C 校验内容、exists/stat、access 和相对目录接口，并在预置宿主 DMI 与缺 DMI 两种环境下验证。
+
+### 6. Tests Required
+
+- `test_system_profile.py` 覆盖 Naples／Cezanne 兼容候选、独立 serial／UUID、严格键和格式校验、跨代拒绝；保留型号之外真实 CPU 原文的断言。
+- `test_account_runtime.py` 覆盖两个独立运行时共享 SQLite 的首次并发、提交后写文件失败及 stale row 重试、损坏记录拒绝、未发布 UUID 碰撞、旧身份／legacy reprofile 保留和健康 API 不受 CLI 门禁影响。
+- `verify_system_profile.py --manifest` 与原生探针覆盖两目录六字段、Node/libuv statx、元数据／权限／只读、相对 fd／cwd、零／六参数 syscall 和 errno、静态／CPUID 边界，以及已有宿主值和坏标记不回退。
+- `run_local_verification.py` 核对跨任务／恢复／重建、三角色权限、HOME／凭据和 CLI／API 隔离；任务研究中的 `identity_lifecycle_probe.py` 使用独立控制端进程、持久合成 SQLite 和两批真实镜像证明静态摘要、HOME／设备配置保持。真实账号、OAuth、模型和公网遥测不用于本地验收。
+
+## Scenario: v3 只读物理特征面板与观察快照
+
+### 1. Scope / Trigger
+
+修改环境详情、配置与容器观察对照、物理探针或快照缓存时适用。展示已有身份和真实资源口径，采集不创建/唤醒/重建环境、不生成指纹、不调用模型或 OAuth。
+
+### 2. Signatures
+
+```text
+GET /api/environments -> 每行增加 physical_features 与关联账号 run_window
+POST /api/environments/{environment_id}/physical-features/refresh -> {ok: true}
+AccountRuntime.refresh_physical_features(row: dict) -> None
+validate_features(payload: object) -> dict
+configured_features(row: dict) -> dict
+physical_features_summary(row: dict, path: Path, now: float) -> dict
+runtime/physical-features.json = {
+  schema: 1, environment_id: string, generation: integer,
+  container_id: string, observed_at: UTC秒, values: 白名单字段对象
+}
+```
+
+### 3. Contracts
+
+- 白名单为 runtime_type、hostname、os、kernel、architecture、cpu、cpu_visible、cpu_affinity、cpu_quota、memory_bytes、account_memory_bytes、root_disk、mac、manufacturer、product、version、family、serial、uuid、shell、package_manager、toolchain、timezone、locale、machine_id。不采集完整环境变量、命令、凭据或 machine-id 内容，后者只返回是否存在。
+- 配置取已保存 fingerprint/system_profile/computer_profile，不为展示补齐身份；探针只读当前 CLI 本机文件和可执行工具。CPU 分开显示可见数量、亲和性及配额；RAM 来自实际 cgroup 上限，memory_bytes 对比 CLI 分配，account_memory_bytes 仅列账号合计预算。legacy 对比原总预算，未知不补零，0 只表示明确无限制；不把宿主总内存、RSS 或 RAM+swap 当作 CLI RAM。
+- 列表只读已有缓存并沿原路径读取角色状态，不执行探针。显式刷新按 owner → profile → environment 非阻塞取锁，锁内重读当前代；由 role_container/既有归属核对定位 CLI，有活动 CLI job 或停止容器即拒绝。UID1000、/tmp 下运行 `timeout --signal=KILL 5 python3 -I -c <固定探针>`，Docker SDK 沿已有有限传输超时，不改共享 client 超时。
+- 输出不超过 64 KiB，schema 必须整数 1，顶层及 values 必须精确匹配声明键。数字字段为非 bool、非负且小于 2^53 的整数；machine_id 为 bool；其它值为 null 或最多 512 字符的非空字符串，拒绝码点小于 32 的控制字符。
+- 成功才 atomic_json 原子发布 root 私有 0600 快照；采集失败、超时、坏输出均保留旧观察。读取使用 O_NOFOLLOW/O_NONBLOCK，仅普通文件，限制 64 KiB；核对归属、代次类型、容器 ID、有限正 observed_at 且不超 now+60 秒。
+- summary 返回 status、message、observed_at、generation、fields；字段为 `{key,label,configured,observed,status}`。快照状态 missing/cached/stale/invalid，逐字段 match/mismatch/observed/unobserved/stale；旧代或容器 ID 不符仍保留合法旧值和时间，明确标旧代。cached 只表示本代的上次观察，不承诺实时；保存值不回填到实测。
+- UI 用独立列显示保存配置、容器实测及对照，标采集时间和缺失项；所有来自快照的文字先转义，窄屏可横向查看。停止/占用时禁用刷新，后端仍独立校验。刷新失败保留旧值并明确提示，不能自动修复指纹或放宽容器权限。
+- 当地时钟和运行窗口沿账号已固化时区，契约见 [当地运行窗口](database-guidelines.md#scenario-v3-账号当地运行窗口与准备后复查)。物理缓存与 SQLite 时段各自独立，不互相假设采集或环境创建已执行。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| v3 未启用或环境不存在/关联账号已删除 | 404，不采集 |
+| 锁占用、活动 CLI、停止或归属冲突 | 409，保留旧观察，不启动或重建 |
+| 探针超时、非零退出或非法输出 | 409，固定采集失败说明，旧快照保留 |
+| Docker/请求传输/系统读取失败 | 503，固定说明，旧快照保留 |
+| 缺少缓存、坏格式/链接/越界或跨环境快照 | missing 或 invalid，实测未知，配置仍独立展示 |
+| 合法旧代观察 | stale，保留旧时间和值，不标为当前一致 |
+| 配置与实测不同 | mismatch，如实显示，不自动重抽/改写身份 |
+
+### 5. Scenarios and Examples
+
+- 正常：点击空闲环境的“刷新实测”，真实 DMI/CPU/内核/时区与配置一致，CLI cgroup RAM 与账号总预算分列；指纹、HOME、凭据及绑定摘要保持。
+- 基础：从未采集的环境只显示配置和未采集；停止后打开页面仍显示合法上次观察，不唤醒容器。重建后旧快照标 stale，等空闲显式刷新。
+- 错误用法：把 fingerprint 值填入 observed、用 /proc/meminfo 总量当 RAM，或为 GET 调 ensure。正确处理：保存值与真实观察分列，使用 cgroup 限额，列表只读缓存。
+- 错误用法：把缓存文本拼成 HTML、遇到采集失败清空旧快照，或采集期间绕过 owner/profile 锁。正确处理：白名单严格校验、转义输出、成功才替换，并在锁内复核归属和代次。
+
+### 6. Tests Required
+
+- test_physical_features.py：无快照、实际 CLI/legacy RAM 口径、相同/差异、旧代、跨环境、坏类型/数值/控制字/额外字段及链接拒绝；配置不冒充实测。
+- test_account_runtime.py：只读采集命令与截止/UID、缓存权限、停止/占用不 exec、失败不覆盖、身份和凭据保持。
+- run_local_verification.py --manifest <联合清单> --run-windows-only：实际 CLI 采集 DMI/CPU/内核、cgroup、时区和 locale，核对配置、私有快照及采集前后凭据/指纹摘要。
+- verify_stack.py --manifest <联合清单> --browser --run-boundaries：页面/API/SQLite 与缓存对照、停止不唤醒、来源与旧值、XSS、1280/390px 明暗主题；保持独立 API/CLI 生命周期回归。
+
+## Scenario: v3 精简备份与不可变制品维护
+
+### 1. Scope / Trigger
+
+- 修改 `deploy/v3/manage.py` 的构建、备份或维护入口、`storage_*.py`、CLI 安装脚本及冻结项目安装时适用。减少物理副本，保留账号身份、历史成果与全部逻辑文件；不通过重建账号或重新授权换取空间。
+
+### 2. Signatures
+
+```text
+scripts/v3-stack backup --env <配置> --backup-dir <全新规范绝对目录> [--full]
+scripts/v3-stack verify-backup --backup-dir <新格式备份>
+scripts/v3-stack storage --env <配置> --output <全新私有清单>
+scripts/v3-stack storage --env <配置> --apply --source <清单> --output <全新回执>
+storage_maintenance.acquire_storage_lock(root: Path) -> int
+storage_maintenance.tree_inventory(root: Path, excluded: set[str] | None = None, *, durable: bool = False) -> dict[str, dict]
+storage_maintenance.deduplicate_immutable_tree(root: Path, *, minimum_bytes=4096, owner_uid=None, apply=True, canonical_root=None) -> dict
+storage_backup.verify_backup_data(target: Path) -> dict
+```
+
+### 3. Contracts
+
+- 默认模式 `essential`，显式完整模式 `full`。数据库、HOME 身份/凭据、工作区、成果、恢复证据、未知缓存及历史内容版本保留；命令行备份同时保存配置及存在的宿主来源/密码兼容说明。Unix socket 不复制，普通符号链接原样保存。
+- 仅排除精确 `home/.npm/_cacache`、`cli/.npm-cache/_cacache`，以及已证明恢复来源的程序。CLI 精确版本、公开 npm 依赖锁和程序 SHA256 必须匹配；证明来自 root 私有协议2安装回执、无网络 npm 重建，或同部署/数据根/平台且通过隔离恢复的完成备份。复用旧证明须核对完成标记绑定的恢复清单 SHA256；损坏或来源不明时包含原程序。浏览器恢复来源不足时保留。
+- 当前项目版本只有经同批已核验 control 镜像在隔离目录真实重建且全树字节、权限与归属一致时才可排除，其他版本保留。共享 CLI 缓存只有全部文件被已证明的程序清单覆盖时才可排除。
+- `backup-files.json` 为私有 schema2，包含 `mode/data/configuration/databases/excluded`；文件记录种类、模式、uid/gid、大小/SHA256，链接记录原目标。两库使用 SQLite backup API，保留 WAL 事务，显式关闭连接后盘点，避免清单记录随 GC 消失的 WAL/SHM。
+- `verify-backup` 无需线上 env；仅校验新格式。真实复制到独立目录，恢复权限/归属/链接并核对文件与数据库 `integrity_check`、逻辑摘要。成功返回 `status=passed, files, databases, isolated_restore=true`；不回写生产凭据或数据库。
+- 备份数据文件、目录、恢复清单及发布清单先落盘，再写私有 `.v3-backup.json` schema2：`mode/verified/files_manifest_sha256/deployment/source_root/layout_version/bridge_protocol/release/completed_at`。完成标记和父目录同步后才轮换；未知、跨部署、未完成和目录链接不参与轮换。
+- `storage` 默认只读。schema1 清单以 `source_root/release/plan_sha256` 绑定范围，包含 `caches/content/cli/retained`；缓存条目另绑定设备、inode、逻辑清单摘要及字节数。应用必须全停机，先验证整份清单并独占预留结果文件，再用拒绝链接的目录 fd 收口精确缓存；失败回执包含 `status=failed/error_type/free_bytes`，不冒充清理成功。正常回执含清理路径、去重结果、保留原因及文件系统前后空闲字节。
+- 备份、维护及 `up` 共用 `.v3-storage-maintenance.lock`；非阻塞加锁，要求当前维护用户、0600、普通单链接空文件。读取维护元数据用有界 `O_NOFOLLOW/O_NONBLOCK`，拒绝 FIFO。应用检查本部署全部运行角色，包含验证辅助容器；不处理其他应用、Docker 卷或全局 prune。
+- 账号镜像用 `vibebench.cli-install-version=2` 声明暂存安装协议。安装锁内创建新目录，真实版本校验与 root 私有 `.v3-cli-install.json` 成功后发布 `.ready` 并原子替换；回执 schema1 含 `protocol=2/version/program_sha256/lock_sha256/package_sha256`。失败保留旧程序及原退出码，锁内收口同版本精确命名的遗留暂存；下载缓存回收失败不阻断已验证就绪版本。
+- 管理端只对已核验协议2及隔离布局2的程序复用私有 `bench/cli-artifacts`，大文件下限1MiB；维护入口要求匹配安装回执。旧协议、未知来源或保护不足的程序保留，优化故障沿用已验证私有 CLI，不新增 Docker 查询或改变资源/租约顺序。
+- 去重仅处理同文件系统、可信所有者、文件及父目录无组/其他用户写权限的普通文件；按字节、模式及uid/gid分组，替换前复核，临时硬链接后原子替换。共享缓存0700且独立于账号路径，账号没有跨账号可写挂载；HOME、会话、凭据和候选工作副本不参与。
+- 项目库在构建快照 `COPY` 前和新冻结版本发布前去重，逻辑内容及摘要不变；候选仍独立复制。不能通过在后续镜像层删除文件声称释放下层空间；镜像虚拟大小不与实际文件系统收益相加。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 任一自有角色运行／部署锁已占用 | 拒绝备份或维护，不中断工作 |
+| 备份目标已存在、非规范绝对路径或与数据根重叠 | 拒绝，不覆盖 |
+| 恢复文件/凭据/模式/归属/数据库摘要变化 | 校验失败，保留旧恢复点，不发布半成品 |
+| CLI 来源或旧备份证明无效、浏览器来源不全 | 包含或保留原程序，不扩大排除 |
+| 维护清单过期、路径越界、链接/FIFO或回执已存在 | 删除前拒绝；已有回执不覆盖 |
+| CLI 安装失败、返回错误版本／仅缓存回收失败 | 保留旧程序并报安装错误／就绪程序仍可执行 |
+| 同字节但权限/归属不同、可写父目录或链接 | 不共享 inode，不越界写入 |
+
+### 5. Scenarios and Examples
+
+- 正常：停止本部署全部角色，生成默认精简备份；独立恢复通过后轮换旧副本，再按同发布清单维护，恢复服务并核对历史数据、工具启动和实际空闲变化。
+- 基础：旧 CLI 无安装证明且离线重建失败，仍备份原程序；已有完整备份按原归属参与轮换，新格式才支持 `verify-backup`。需要完整工具副本时显式使用 `--full`。
+- 错误用法：直接删除整个 `.cache`、`cli` 或旧版本，或在完成新恢复验证前删除原全量副本。正确处理：只应用精确清单，来源无法核验的程序保留，成功标记落盘后才轮换。
+- 错误用法：将候选工作区链接到共享依赖，或重装时原地覆盖已共享程序。正确处理：候选复制独立字节，程序写入新暂存目录并原子发布。
+
+### 6. Tests Required
+
+- `deploy/v3/test_manage.py`、`test_storage_backup.py`：默认/完整、WAL事务及GC后日志消失、文件/归属/配置/链接隔离恢复、失败保留旧副本、旧格式轮换、完成来源证明复用与篡改拒绝、回执冲突和活动部署不删除。
+- `services/orchestrator/test_storage_maintenance.py`：实际inode复用、字节/权限不变、幂等、目标变化、可写父目录及链接不参与、UID1000写入拒绝、缓存损坏/锁占用/FIFO及过期维护清单拒绝。
+- `test_account_runtime.py`、`test_project_scenario_content.py`：两账号实际程序共享而HOME独立、旧协议跳过、缓存故障不阻断、冻结依赖去重及候选修改不污染基线。
+- `deploy/v3/verify_storage.py --account-image <本地账号镜像> --output <全新回执>`：真实无网络Docker验证合成安装、共享、UID1000只读、失败/错版/重装、遗留暂存与缓存故障；不调用真实账号或模型。
+- 构建前后逐文件核对完整项目库、Docker COPY及安装摘要，运行代表性真实离线原生观察。生产另核对身份/历史记录/工具及文件系统空闲增量；镜像保留与回收按下方“v3 部署成功后的旧镜像回收”执行，不把本地通过宣称为已上线。
+
+## Scenario: 账号 CLI 版本与迭代抓包
+
+### 1. Scope / Trigger
+
+- 修改账号 CLI 设置、任一 CLI 启动入口、项目/养号抓包、停止收尾或历史读取时适用。账号默认值与执行身份分开：配置只影响后续新执行，已有运行、工作、会话与草稿保持原版本。
+
+### 2. Signatures
+
+```text
+accounts.claude_code_version TEXT NULL
+accounts.projects_capture_enabled INTEGER NOT NULL DEFAULT 0
+accounts.warmup_capture_enabled INTEGER NOT NULL DEFAULT 0
+runs.claude_code_version_source TEXT NULL
+GET/PUT /api/accounts/{aid}/cli-settings
+CaptureRunIn.claude_code_version: Optional[StrictStr]
+_resolve_account_cli_version(account: dict, value: Optional[str] = None) -> tuple[str, str]
+GET /api/projects/work/{work_id}/capture
+GET /api/projects/work/{work_id}/capture/file?path=<相对文件>
+GET /api/accounts/warmup/pi/work/{work_id}/capture
+GET /api/accounts/warmup/pi/work/{work_id}/capture/file?path=<相对文件>
+capture_artifacts.capture_summary(base: Path, *, running: bool = False) -> dict
+execution_role = pi-capture
+network ACK: previous_listener_graceful: bool
+capture-status.json: source, state, updated_at, recorder_graceful?, message?
+```
+
+### 3. Contracts
+
+- 新列用 `_ensure_column` 幂等补齐，旧账号两个开关均关闭。PUT 仅写显式字段；版本为可空严格字符串，trim 后空值清除覆盖，开关为严格布尔，未知字段拒绝。GET/PUT 返回 account_id、配置版本、effective_claude_code_version、claude_code_version_source 与两个布尔开关；来源为 account/global。读或保存不准备环境、启动模型或热切网络。
+- 精确版本解析优先级为单次显式值 > 账号配置 > 全局有效值，来源 explicit/account/global。账号页和两个迭代窗口读取同一权威版本；迭代窗口只提交本空间开关，缺失字段不覆盖另一空间。版本、安装准备、PATH 与 exec 环境必须一致，失败不能静默换版本。
+- 所有 CLI 入口采用账号继承：普通/批量、抓包、项目/养号、兼容项目及 CLI 评审、登录/重授权、续聊和实际 CLI 维护命令。新 run/work/session/draft 保存版本，恢复优先已有快照；旧空 run/work/草稿只回填一次并记录 legacy-* 来源，run 优先匹配原执行证明。只读进程/身份观察不能用当前默认值冒充实际已执行版本；选择版本不升级 cc2api 画像或已验证身份来源。
+- 项目和养号在新执行开始时读取账号的本空间开关，并在执行定位中记录 capture_enabled 和分代路径；既有 work 的版本快照不重写。关闭时沿共享 CLI/passthrough，兄弟作业存在时必须复用监听；开启时 `shared_cli=False, exclusive=False`，使用现有 `prepare-cli`，等待同账号 CLI 空闲，独立 API 继续可用。
+- 捕获使用 pi-capture 监督角色，仍凭 source/PID/started、逐作业 tmux、启动许可和租约控制。保存并恢复 settings_override、network_inspection_mode、capture_flows；不能将独占租约伪装成 shared_cli 或 project-review。Recorder 按当前来源 ACK 后才启动 CLI，仅捕获进程显式信任 CA。
+- 收尾先停止本作业，再恢复 passthrough 并释放租约。网络 ACK 返回 previous_listener_graceful；本代 capture-status.json 状态为 stopping/closed/partial/error，强制收口或未知优雅状态不能冒充完整。重启时可凭原环境行定位网络角色；不能确认收口则保留证据与 cli_reconcile，不停止健康独立 API。
+- 工作读取从本空间 work、账号与固定环境派生 `group-<hash(namespace/work)>`；不接受任意宿主路径，不把 work ID 当 run ID。运行与双迭代共用脱敏聚合，保留旧平铺、分代及同账号受管续聊组链接。摘要含 files、index、index_available、sample_count、status 和 message，状态为 empty/collecting/partial/complete/error；索引缺失但已有数据仍列文件。
+- `/capture/file` 只预览本组清单中的脱敏 capture_index.json、收尾摘要及 TLS 白名单；原始 HTTP、.flow、握手字节与凭据正文不公开。停止或关闭开关不删除旧数据，新代输出不覆盖原代。Recorder 的追加阶段及协议研究边界见 [正式抓包契约](../../platform/deploy/official-protocol-capture.md#35-条件标识正文归因与-tls-的采集边界)，TLS 存储与摘要遵循下方 ClientHello 场景。
+- 配置和查看窗口在切账号、切空间、关闭时使旧回执失效，不覆盖新页面或未保存输入。工作抓包通过手动刷新读取，关闭不新增常驻轮询；运行详情沿原生命周期。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 账号/全局均空覆盖，旧账号无开关值 | 全局版本兜底、抓包关闭 |
+| PUT 只提交一个空间开关或版本 null | 仅改该字段；null 清版本，另一空间保持 |
+| 非法版本 / 非布尔开关 / 未知字段 | 400 / 422 / 422，不保存无效值 |
+| 账号不存在或已软删除 | 配置接口 404，不启动执行 |
+| 修改默认值后恢复排队运行、work、会话或草稿 | 已有非空快照保持；旧空值持久回填一次 |
+| 捕获遇同账号兄弟 CLI | 等待，不能重启兄弟监听或排空独立 API |
+| Recorder 强制收口、退出失败或响应中断 | 保留文件，报告 partial/error 或 interrupted，不假报完整 |
+| 工作/文件不属于当前空间或路径不受支持 | 404；无环境和文件时抓包摘要为空状态 |
+
+### 5. Scenarios and Examples
+
+- 正常：全局 293、账号 303，抓包显式 293 只影响本次；之后未显式覆盖的执行仍用 303。清空账号配置后新执行继承全局，历史仍展示冻结值。
+- 基础：项目开启捕获，养号仍关闭；保存不启动模型，下一次项目执行等 CLI 空闲后捕获，养号继续共享透传。关闭后旧抓包可查。
+- 错误用法：把单次版本输入放进 batch-form，只测试后端创建接口；抓包创建成功后清空不存在字段又报失败。正确处理：控件归属 capture-form，浏览器实际提交并检查请求、清空、详情和无错误弹窗。
+- 错误用法：Recorder 停止后的迟到 response 把 interrupted 改回 complete。正确处理：保留单调中断事实，仅追加实际收到的字节；合成流量通过不等于正式协议画像通过。
+
+### 6. Tests Required
+
+- `test_account_cli_settings.py`：真实 SQLite/API 验证严格类型、增量更新、旧库幂等升级、继承组合、创建事务重读账号、旧 run 执行证明优先及登录版本稳定。
+- `test_capture_settings_runtime.py` 与 `test_account_runtime.py`：两个空间共享/独占分支、精确版本/PATH/CA、监督记录、租约/代次保护、恢复字段、文件隔离和受限预览；关闭不影响共享执行。
+- `images/sidecar/test_recorder.py`：请求先落盘、索引同流去重、停止/错误为 interrupted、迟到 response 不覆盖中断；`images/account/test_network_context.py` 核对忽略 TERM 的监听器定向强停及 false 结果。
+- 实际浏览器提交三种版本来源，验证表单归属、成功重置、详情、账号/全局设置保持及无错误弹窗；两个空间配置默认关闭、切账号、旧 GET/PUT 回执、明暗和窄屏均覆盖。
+- 本地真实 HTTP/SSE + mitmdump 验证完整流后中断、JSONL/索引/stats/.flow 保留与新代不改旧文件哈希；真实账号和生产并行验证按发布授权单列，不以模型或 usage 请求探测配置。
+
+## Scenario: 迁移验收后的旧部署永久退役
+
+### 1. Scope / Trigger
+
+- 用户明确选择永久删除、不归档，且迁移收据和当前 v3 目标账号均验收通过后适用；与只清旧发布镜像的日常流程分别执行。
+
+### 2. Signatures
+
+- 只读 `docker inspect`、`docker volume inspect`、`/proc/self/mountinfo` 盘点；执行只用精确容器 ID 的 `docker stop/rm`、精确卷名的 `docker volume rm` 和精确标签/digest 的 `docker image rm`。
+- 私有 `plan.json` 冻结路径 realpath/inode/device、容器身份与挂载、卷元数据、镜像全部别名、配置摘要、保护发布和磁盘基线；`result.json` 逐项记录完成事实与最终实际空间差，不含源数据库、凭据或历史数据副本。
+
+### 3. Contracts
+
+- 顺序：迁移验收 → 下游退出旧入口 → 旧任务与网关全部账号排空 → 冻结清单 → 重新核对全部引用 → 停止/删除指定旧服务 → 删除固定旧挂载与已证明归属的旧备份/凭据副本 → 删除命名卷和无保护引用旧镜像 → 健康及空间复核。
+- ai-fund 先部署旧来源显式停用，再移除旧地址/管理 Secret；NewAPI 等价切流保留原渠道 ID、模型、分组、并发及额度关系，密钥只在私有传输和进程内存中交接。
+- 路径只接受固定父目录下已盘点的精确目标，拒绝链接根、嵌套挂载、任何其他容器的父子路径引用；递归不跟随链接。不删除整个源码父目录或 Docker 私有存储；命名卷必须经 Docker 删除。
+- 不新建归档。已确认属于旧部署的既有数据库/镜像/配置备份一并纳入清单；未知及共享资源保留。日常镜像保护集继续覆盖当前和最近两套完整 v3 发布，以及全部非目标容器引用。
+- 每次删除前重查引用、配置与身份；失败记录已完成事实和剩余项，不 force、不 prune、不盲目重跑，不把授权扩大为全机清理。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 缺少迁移验收、仍有旧消费者或在途工作 | 拒绝删除 |
+| 归属、inode、配置或容器引用变化 | 停止相关删除并对账，保留已完成事实 |
+| 旧卷没有 Compose 标签 | 必须核对固定卷元数据、精确旧容器身份、Compose 归属及实际挂载，不能猜标签 |
+| Docker 删除失败或目标仍存在 | 不强制重试，不声称完成 |
+
+### 5. Scenarios and Examples
+
+- 正常：旧渠道等价切至 v3、旧来源停用、迁移目标健康，按冻结清单永久删除旧数据及旧副本，只留无秘密收据。
+- 边界：共享挂载或未知文件不进入清单；v3 当前数据和两套历史发布保持。
+- 错误：仅删除旧来源地址而保留自动启用的凭据，或直接清 Docker 卷底层目录。修正：先显式停用消费方，核对全部引用后通过 Docker 删除精确卷。
+
+### 6. Tests Required
+
+- 执行前验证真实收据字段、实时账号/任务排空、全部容器引用、路径边界和保护镜像；过期消费方证明、未知资源或身份变化必须拒绝。
+- 执行后确认旧容器/路径/卷/镜像不存在、所有保留容器 ID/镜像/启动时间/重启次数和配置摘要保持；页面 200、未登录管理 API 401、数据库只读 quick_check=ok。报告同一文件系统实际可用字节差，不累加镜像虚拟大小，不发送真实模型探针。
+
+## Scenario: v3 部署成功后的旧镜像回收
+
+### 1. Scope / Trigger
+
+- 每次 v3 生产部署完成健康验收后必做；磁盘空间不足时也按此流程定向清理。2026-10-27 生产曾因多批旧镜像累积，仅余约 457 MiB。`manage.py pull/load/up` 没有自动回收旧镜像，部署执行者必须完成本步骤。
+- 本步骤只回收已核对的旧发布镜像；数据缓存与不可变制品维护继续走上一场景的停机、归属及锁契约。
+
+### 2. Signatures
+
+```text
+df -h <V3_DATA_ROOT>
+docker system df
+docker ps -a --no-trunc --format '{{json .}}'
+docker image ls --no-trunc --format '{{json .}}'
+docker image inspect <精确镜像引用>
+docker ps -aq --filter ancestor=<精确镜像引用>
+docker image rm <精确旧批次标签>
+docker image rm <已核对属于同一旧镜像的仓库@sha256引用>
+```
+
+- 当前批次与镜像来自生产 `V3_RELEASE`、`V3_CONTROL_IMAGE`、`V3_ACCOUNT_IMAGE`、`V3_RELEASE_MANIFEST`；不输出配置中的秘密。
+- 私有审计目录保存 `plan.json` 与 `result.json`；结果包含 `status`、`removed_images`、`before/after.{total_bytes,free_bytes}`、`freed_bytes`、`protected_releases`、`original_containers_preserved`、`running_containers_preserved`、`deployment_unchanged`。
+
+### 3. Contracts
+
+- 顺序固定为：盘点磁盘和全部容器/镜像 → 发布与健康验收 → 冻结保留集和精确删除清单 → 逐项复核并回收 → 复核空间、服务与部署配置。升级失败或尚未验收时不清理回退镜像；没有可回收项也要记录检查结果。 每次成功部署都必须完成这次定向回收并记录结果，旧镜像不能随发布批次无限累积。
+- 保留当前已验收批次、最近两个完整历史批次的 `control/account` 镜像对，以及显式回退/恢复方案仍需要的镜像。再合并宿主**全部容器（包括已停止容器及其他部署）**实际引用的镜像 ID 和引用；不能因旧容器已停止就删除其镜像或先删容器以释放引用。
+- 仅候选发布清单归属明确、产品标签 `vibebench.product=v3`、`vibebench.role=control|account`、`vibebench.release` 与精确仓库/批次相符，且不在保留集中的镜像可删除。核对清单与实际配置/OCI 身份；未知来源、额外未知标签或跨应用引用均保留。
+- 每次删除前重读当前部署引用和容器占用；部署发生变化或新容器开始引用候选时停止后续删除。只执行精确引用的 `docker image rm`，不使用 `--force`、`docker system prune`、`docker image prune -a` 或 volume/container prune。
+- containerd 存储可能同时保留批次标签和 `repository@sha256` 引用。只有确认它们属于同一候选镜像、无其他保护引用后，才逐个移除并确认目标镜像已不存在；只移除标签不能算实际回收。
+- 全程在线，不停止或重建服务，不修改数据库、账号 HOME/凭据、会话、工作区、项目成果、冻结历史、有效备份或其他应用资源。镜像回收不能借道删除 Docker/containerd 底层文件。
+- 本步骤不新建数据备份；清理前只保存不含秘密的计划与容器状态元数据，逐项记录结果，不能复制数据库或整份状态制造新快照。私有目录 `0700`、记录 `0600`。失败保留已完成事实和剩余清单，明确报告收尾未完成，不为继续清理扩大范围。
+- 以同一文件系统实际 `after.free_bytes - before.free_bytes` 报告释放量，不能累加镜像虚拟大小。清理后核对原容器 ID、镜像、启动时间及重启次数，运行中容器仍运行，网关健康、页面与鉴权正常，配置摘要和受保护镜像保持。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 新批次健康、旧镜像身份匹配且无引用 | 按精确清单在线删除，复核实际释放量 |
+| 当前批次、最近两个完整历史批次、容器引用或显式恢复依赖 | 保留并记录原因，不删除旧容器绕过保护 |
+| 发布未验收、归属未知、额外未知引用或部署发生变化 | 不删除相关镜像；部署变化时停止剩余清单 |
+| Docker 拒绝移除、超时或删除后镜像仍存在 | 记录失败与已完成项，不加 `--force`，不宣称回收完成 |
+| 没有合格候选 | 记录零删除和当前空闲空间，仍完成服务复核 |
+
+### 5. Scenarios and Examples
+
+- 正常：2026-10-27 定向删除 8 批共 16 个无容器引用的镜像，实际释放 `27,255,869,440` 字节，磁盘占用从 100% 降至 74%；26 个原容器保留，11 个运行中容器未重启，当前批次和最近两个完整历史批次保留。
+- 边界：历史账号仍有已停止容器引用旧 `account` 镜像，保留该镜像；空间统计中的 reclaimable 不等于本次授权删除清单。
+- 错误用法：每次只拉新镜像而跳过收尾，或看到磁盘满就全局 prune。正确处理：每次部署健康验收后按发布身份和全部容器引用定向回收，并记录最终空间。
+
+### 6. Tests Required
+
+- 计划核验：当前批次、最近两个完整历史批次、显式恢复依赖及运行/已停止容器的镜像均不进入删除清单；额外未知引用拒绝删除。
+- 执行核验：逐项删除前重查部署和占用，引用变化及 Docker 拒绝时不强删；确认批次标签和已核对的 digest 引用均已移除，目标镜像实际不存在。
+- 生产复核：清理前后 `df` 字节差、保留镜像身份、全部原容器 ID/镜像/启动时间/重启次数、网关健康、页面 200 及未登录管理 API 401；数据库只读 `quick_check=ok`。审计不得含凭据，不调用真实模型作为探针。
+
+## Scenario: 客户端 ClientHello 私有证据与安全摘要
+
+### 1. Scope / Trigger
+
+- 修改 Recorder TLS hook、任一完整抓包入口、网络 context、抓包摘要或预览时适用。普通 run／续聊、Projects 与 warmup 共用；没有完整抓包时不增加 TLS 文件或握手。
+- 本契约仅覆盖客户端到 Recorder 的 TCP ClientHello；官方 CLI 归因须结合真实 HTTP。cc2api TLS 模板、JA4、无解密透传对照、DTLS／QUIC／ECH 内层及 HRR 二次事件完整覆盖另行验证。
+
+### 2. Signatures
+
+```python
+Recorder.tls_clienthello(data: tls.ClientHelloData) -> None
+parse_clienthello(raw: bytes) -> dict[str, Any]
+capture_context_snapshot(raw: str, quota_source: str) -> tuple[dict[str, Any], str, str | None]
+append_private_jsonl(path: Path, record: dict[str, Any]) -> None
+capture_context_json(source: str, version: str, *, run_id: str | None = None,
+    namespace: str | None = None, work_id: str | None = None,
+    version_source: str | None = None) -> str
+capture_summary(base: Path, *, running: bool = False) -> dict
+capture_file_preview(base: Path, relative: str) -> dict
+CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
+```
+
+### 3. Contracts
+
+- 固定 mitmproxy 11.1.3 的 `data.client_hello.raw_bytes(wrap_in_record=False)` 返回 **ClientHello 本体**；不含 handshake／record 头。`raw_format=clienthello_body`、`tls_record_preserved=false`；默认 SDK 合成 record 不能当原始 wire／pcap。
+- 新文件为 `Path(CAPTURE_FILE).with_name('tls_clienthello.jsonl')`，仅 `CAPTURE_FULL_HTTP=1` 时追加；沿实际分代目录，不覆盖同 source 的前次字节。逐级 `dir_fd+O_NOFOLLOW` 打开父目录，目标必须是单链接普通文件，以 `0600` 创建／追加；拒绝文件、父目录链接、硬链接和 FIFO。
+- 每行 `schema=1/event=tls_clienthello/ts/direction=client_to_recorder/transport=tcp/client_connection_id`；连接键取 `data.context.client.id`。HTTP 原始记录和轻量索引使用 `flow.client_conn.id` 的同名键及同一上下文，允许一条握手对应多个 flow；不能用 server ID 或猜未来 flow ID。
+- 私有原始字段 `raw_base64/raw_bytes/raw_saved_bytes/raw_sha256/raw_truncated` 表示保存本体、全长、保存长度、完整本体 SHA256 和截断事实；最多保存 256 KiB（覆盖合法本体）。超限为 `parse_status=oversize`，明确截断且 JA3 为 null。正常／结构错误／SDK 不支持分别为 `ok/error/unsupported`，固定 `parse_error` 不含异常原文。
+- 保留原序 `legacy_version/cipher_suites/extensions/signature_algorithms/supported_groups/supported_versions/ec_point_formats/key_share/sni/alpn_protocols`。扩展为 `{type,length,data_base64}`，key_share 为 `{group,key_exchange_length}`，ALPN 为 `{text,base64}`；缺扩展用 null，合法空 client_shares 用 `[]`。验证长度、偶数向量、重复扩展和 key_share 边界；未知 ID／GREASE 留在原始字段，不按名字表丢弃。
+- `ja3={string,md5}` 使用 legacy_version 与原序 cipher／扩展／组／点格式五字段，仅在 JA3 投影中过滤标准 GREASE。TLS1.3 的 legacy_version 仍为771；签名算法、ALPN 和 key_share 具体值不能由 JA3 推出，JA3 不作为安全身份。
+- TLS 目标范围沿 `CAPTURE_SCOPE/CAPTURE_TARGETS`：all 全收；显式非目标 SNI 跳过，缺 SNI／尚不可归因保留为 unclassified，不据目录或 IP 推断官方 CLI。此策略不改变 HTTP `_should_record`。采集／解析／写入异常只写固定 TLS 诊断，不更改握手参数或取消 TLS／HTTP 转发。
+- `CAPTURE_CONTEXT` 在 Recorder 初始化时冻结并逐字段筛选；`source/claude_code_version` 必需，可选真实 `claude_code_version_source`。run／continue 填原 run_id，Projects／warmup 填 namespace/work_id，不能把 Pi 兼容 job.run_id 冒充 runs.id。五个入口必须取本次实际装载的版本，并通过 network-context 环境允许列表；缺失、非法、source 冲突分别为 missing／invalid／source_mismatch，版本未知，不查当前默认值猜测。现有 ACK 只核原模式／来源，元数据另核实际环境和产物。HTTP `analysis.cc_version` 仍表示 HTTP 观察结果。
+- `capture_summary.tls_clienthello` 和双空间既有 `/capture/file` 共用逐层白名单；普通 run 沿既有摘要，不新增文件路由。只公开时间、方向、连接、受支持上下文、数值 offer、扩展类型／长度、key_share 组／长度、SNI、文本 ALPN、JA3 和状态。raw_*、扩展 payload、session/ticket/PSK/binder、未知字段及异常原文不公开。
+- 全组共用最多4MiB、256行、64条有效记录预算，单行512KiB、公开向量4096项。半行、坏记录、非法公开字段或向量截减、读取异常及未读完必须报告 partial／issues／truncated；不完整时 `count_exact=false,total_records=null`，不能将有界扫描数称为精确总量。旧目录无TLS正常为 unavailable。共用 `renderCaptureDetail` 展示最多8条安全记录及 HTTP 连接键；动态值经 escapeHTML，保留原切换／关闭请求失效逻辑，更新 app.js URL 版本。
+- v3 COPY 整个 sidecar，旧 sidecar Dockerfile 显式 COPY helper；两条打包路径必须均可导入，不能仅本地 PYTHONPATH 通过。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 关闭完整抓包／历史无TLS | 不读握手；无新文件，读取正常为空 |
+| 上下文缺失／非法／source不同 | 明确未知状态；不猜版本，不阻断业务 |
+| 截断、向量错误、重复扩展／超限 | 保留可用私有证据与固定错误；不生成完整 JA3 |
+| 合法空 key_share／未知组或 GREASE | 保留原事实；只在 JA3 投影过滤 GREASE |
+| 文件或父目录链接、硬链接、FIFO、写失败 | 拒绝写入、固定诊断，HTTPS 继续 |
+| 非清单、跨空间、绝对或上跳预览路径 | 沿既有404，不扩展原始 HTTP／flow 权限 |
+| 半行、坏JSON、嵌套材料、预算不足 | 白名单丢弃私有值，明确 partial 与非精确计数 |
+
+### 5. Scenarios and Examples
+
+- 正常：`projects:work:3` 实际装载2.1.303，同一客户端连接两次 messages；TLS 与两个 HTTP flow 使用同一连接键和 namespace/work_id。账号默认版本随后改变，不改 Recorder 的固定快照。
+- 边界：旧TLS1.2无extensions仍可算五字段 JA3；TLS1.3提供空 client_shares 合法。未知ALPN字节留私有base64，公开显示非文本协议。
+- 错误用法：把 `TLSv1.3` 写成772算JA3，或把默认 raw_bytes() 的合成record当原始抓包。正确处理：独立解码已保存本体，使用本体legacy_version及原序有序扩展，另核支持版本和采集方向。
+- 错误用法：将整个 TLS JSON 原样返回，或把64条扫描结果当全部握手。正确处理：逐层重建已定义字段，受预算时保留非精确计数及部分状态。
+
+### 6. Tests Required
+
+- `images/sidecar/test_tls_clienthello.py`：官方JA3向量、GREASE／未知ID／非文本ALPN、每字节截断、错误向量／重复扩展、合法空key_share、超限、上下文未知及私有追加／链接／硬链接／FIFO。
+- `images/sidecar/test_recorder.py`：hook方向与scope、不改握手策略、同连接多HTTP及索引、固定快照、写失败继续转发、部分／中断阶段和原额度回归。
+- `test_capture_settings_runtime.py`、`test_main.py`、`test_account_cli_settings.py` 与 `images/account/test_network_context.py`：五入口实际冻结版本、原run与work分离、真实子进程环境、源允许列表、关闭／收尾保留及三入口摘要权限。
+- `test_tls_capture_artifacts.py`：嵌套canary、全组预算、半行／损坏／缺指纹／链接／读错误、旧数据、合法空值、共用渲染和XSS。已有账号运行生命周期定向回归覆盖独立API及历史目录。
+- 将 `deploy/v3/verify_tls_clienthello.py` 挂入固定11.1.3隔离账号镜像，仅回环模拟上游：TLS1.2／1.3各同socket两GET，独立BytesIO／struct核全部字段和JA3，核HTTP/index连接；真实写失败后另两GET成功。此结果标 synthetic，不能充作官方CLI样本。
+- 上线核同批Actions／镜像源码、真实项目新文件0600、执行版本／来源及成功Claude HTTP连接，独立复算并验证真实鉴权页面的安全展示；目标版本完整对齐仍需无解密透传对照。
+
+## Scenario: V3 原生 sender 共享映像池与资源预算
+
+### 1. Scope / Trigger
+
+- `request_backend=native293` 在现有账号 sender 内执行固定 293 独立二进制。三角色及凭据所有权继续遵循本文件；账号/Gateway 合同见 [按账号选择固定 293 原生后端](../../gateway/backend/service-architecture.md#scenario-按账号选择固定-293-原生后端)。
+- 实现依据：`services/orchestrator/{native_sender,account_runtime,resource_budget,account_isolation}.py`、`images/v3/Dockerfile` 与 `services/gateway/src/service/native_runtime.rs`。
+
+### 2. Signatures
+
+- `sender_config(configuration:dict,memory:str,swap:str='0',budget:str|None=None) -> dict|None`；configuration 的后端及 concurrency 来自网关权威快照。
+- `NativeSenderConfig = {binary_path,work_root,memory_mib:u64,max_workers:usize}`；legacy 的 native 配置为 None。
+- `V3_NATIVE_PREWARM_ACCOUNT_ID` 缺省为空，可配置一个正整数网关账号 ID；`SenderConfig.native_adaptive_prewarm` 为私有布尔字段，旧配置缺省 false。
+- 有限账号显式环境键 `V3_NATIVE_SENDER_MEMORY`；构建可选 `V3_NATIVE_RUNTIME_ASSET` 指定本地候选，否则下载固定 beta.5 附件。`stage_asset(destination:Path,source:str|None=None) -> dict` 冻结版本/大小/SHA。
+- `account_limits(memory,swap)`、`isolated_account_limits`、`scenario_account_limits`、`serial_review_limits` 接受账号 `mem="unlimited"`，无限模式 Docker 额度为 `(0,-1)`；`memory_bytes` 继续只解析有限配置。
+- fingerprint 可选 `native_sender_memory`，无限原生账号保存 `"unlimited"`，布局变更时保存，回退 legacy 时移除；镜像原生能力标签为 `vibebench.native-runtime=293-raw-1`。
+- `AccountRuntime.native_preparation_snapshots() -> tuple[dict[int,dict],str|None]` 通过一次 `GET /admin/native-preparations` 读取批量快照，超时3秒；`native_preparation_summary(row,account,snapshots,read_error=None) -> dict|None` 为 `/api/environments` 生成安全的 `native_preparation`。
+
+### 3. Contracts
+
+- 原生进程上限为 `2*concurrency`，覆盖普通请求2单位和Haiku1单位。有限账号预算预检为 `256+192*max_workers` MiB，容量同时受账号有限总 RAM 与 CLI 最低512 MiB约束。legacy sender 仍为128 MiB。
+- 账号 `fingerprint_json.mem="unlimited"` 显式取消 network/CLI/sender 与静态/串行评审的 RAM/swap 限额；额外 swap 保存原值，仍严格校验其格式。全局 `V3_ACCOUNT_MEMORY` 必须有限；部署预检识别已固化的无限账号，有限账号继续原额度比较。无限账号直接竞争宿主可用内存，不能把其零上限当作零资源占用。
+- 无限账号生成 `NativeSenderConfig.memory_mib=0`，缺省 sender 预算也可准备；Rust 仅豁免 RAM 容量公式，max_workers 始终为正数，版本/摘要/身份/目标/代次及并发许可保持。指标与配置内存均以 0 表示无限，界面显示“未限制”；评审交接接受精确 `(Memory=0,MemorySwap=-1)`，CPU/PID 仍必须有限有效。
+- 已验证有限 N=3、max_workers=6、sender=1536 MiB；预检最低1408 MiB。bench 创建账号默认N=4，最低1792 MiB；1536 MiB 配置须显式设置N=3。配置限额和实际占用分别报告。
+- 原生sender为UID1001，私有可写 `/native` 与CLI UID1000/HOME分离。PID限额 `128+32*max_workers`；CPU份额保持三角色规则，有限模式额外swap只归CLI。CLI指标、physical_features及静态/串行评审从同一冻结sender预算计算剩余份额。
+- 每次新进程先核验固定分发体，通过FD启动，握手验证PID/版本/raw_input_protocol，再核实际执行体SHA。首个实际映像要求 WRITE/GROW/SHRINK/SEAL 四项封存，池缓存只读FD；后续重新exec共享同一dev/inode。分发/执行体固定摘要由消费者代码及桥接运行时合同登记，外部manifest不授信。
+- 每个进程独立HOME/config/cwd、当前bearer及worker_id，每轮独立原生根。账号/身份/代理/凭据/并发摘要改变产生新代次，旧活动自然收口，空闲旧进程退役。单进程一次作业，唯一终态及匹配idle后复用；取消、迟到/损坏帧和状态不明均退役。
+- 单个弱引用回收任务在额外进程空闲60秒后保留1个暖进程；忙进程保持当前归属。映像缓存可在所有原进程退出后支持重建，池销毁释放FD。
+- 运行中原生账号由网关每20秒零模型巡检并按需恢复，具体身份、退避和计时合同见[原生持续预热](../../gateway/backend/service-architecture.md#scenario-原生持续预热实时就绪与请求进程诊断)。巡检只查询已有绑定，不唤醒休眠环境。
+- 批量客户端仅精确GET /admin/native-preparations接受最多4096项对象数组，其余路由继续要求对象。快照返回本次映射及read_failed；缺账号快照为snapshot_missing。页面按实际配置展示adaptive_prewarm，读取保持零模型操作。
+- 环境摘要先核验账号绑定、环境 ID/代次及本地 sender 的 `native.kernel_generation`；检查时间必须在当前时间前0～45000毫秒。只投影受控 state/reason、检查时间、环境归属和非负进程数/正 PID。ready 必须同时有空闲进程和 PID。历史 `native_kernel` 预热回执继续作为历史信息。
+- 启动预热只解析唯一绑定且启用的原生账号；复用环境启动和既有首 worker 准备。有空余环境容量才启动新角色，保持原账号回收与维护策略。启动补偿有界，服务运行期间不循环唤醒。
+- 首条业务拿走唯一进程且账号允许两条普通并发时，sender 可为当前代次登记一次后台补位。首条直接投递；后续请求优先取空闲进程，缺空闲时可在自己的截止前等这一轮就绪。补位失败沿现有 checkout 路径处理。补位使用原物理计数与已核验映像，只提交初始化指令；结果通过真实握手后进入同一空闲池。
+- 布局/预算变化只在job和API活动为空时重建。配置事务已停sender时复用 `_running_sender_active` 记零活动；运行中读取真实活动，归属或查询失败仍拒绝重建。
+- SOCKS5/5h使用逐进程随机Basic鉴权的回环CONNECT，固定目标 `api.anthropic.com:443`，保持原生TLS；socks5本地DNS、socks5h代理DNS。隧道不构造业务请求，生命周期绑定进程。
+- 镜像构建冻结正式beta.5附件，校验27388048 B及分发SHA `64c61cae565e9097de18cf61a35f46e7595f633cb14f7d6b8c6609fcd294ce89`后复制；Rust默认消费者核验执行体SHA `af4cea9e21aa959c5e39c389173ba30ebb19b354b67acfe99164946450e9776d`及112839864 B，固定官方来源仍为2.1.293。默认发行、Python下载、Docker校验和Rust准入同步更新，正式附件真实回环通过后交付。Cargo使用项目独立BuildKit锁定缓存和 `--locked`，输出复制至普通 `/out` 层；联合清单继续登记实际源摘要和最终镜像身份。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 有限账号缺显式预算、容量不足、未知后端 | 准备拒绝，保持原环境 |
+| 无限账号缺 sender 预算 | 生成 memory_mib=0，仍检查并发及原生身份 |
+| 全局无限、未知 mem 或非法 swap | 明确拒绝 |
+| 镜像缺能力、分发/执行体不符或映像未封存 | 准备失败，模型零发送 |
+| 活动中变更布局 | 忙门禁拒绝 |
+| 请求取消、协议故障或旧代次迟到帧 | 退役并等待物理退出后归还进程计数 |
+| 原生方式显式回退legacy | 空闲重建128 MiB sender，另一个账号保持其选择 |
+| 后台预启动遇到环境容量已满或需要维护 | 跳过预启动，保留在运行的账号 |
+| 补位期间切换内核或绑定代次变化 | 撤销旧补位，迟到进程退役 |
+| 批量通道失败、未知能力、绑定或内核代次不符、检查过期 | 环境状态 unknown，显示受控原因 |
+| legacy/草稿或停止环境 | 摘要分别为 null 或 sleeping；读取保持零模型调用 |
+
+### 5. Scenarios and Examples
+
+- 正常：无限账号 N=2、max_workers=4，三个角色与派生评审的 cgroup `memory.max/memory.swap.max` 均为 max，CPU/PID 保留。
+- 正常：有限账号总4g、N=3、原生sender1536m时，network256m、CLI2304m；3普通/6Haiku实际TLS与加权准入保持。
+- 边界：六个进程共享一个封存映像；60秒后剩一个暖进程，下次并发按需重建。隔离合成小请求的V3实测六路峰值约646 MiB、空闲约189 MiB，OOM计数为0；大正文及长流按实际负载另验峰值。
+- 错误用法：把磁盘26.12 MiB当作进程RAM，或用1536m预算承载默认N=4。正确处理：分别登记分发/展开/实际cgroup数据，按当前并发验证预算。
+- 错误用法：布局检查查询已被配置事务停止的HTTP sender。正确处理：核验归属后按停止状态处理；运行中仍查询真实活动。
+- 正常：配置试点后服务启动先准备一个 worker；首条占用后才补位，回收超期额外进程时仍保留一个。
+- 错误用法：用合成 Messages 请求暖机，或让并发等待者各启动一个备用进程。正确处理：只做零模型握手，复用当前代次已有的补位登记。
+- 正常：批量巡检快照显示最近检查时间和暖进程 PID；进程退出后下一轮重新准备。错误用法：将任意错误文本、bearer 或旧内核 ready 转发到环境页面。正确处理：只投影当前归属的白名单摘要。
+
+### 6. Tests Required
+
+- `test_native_unlimited_layout_and_capture_are_frozen_per_account`、`test_serial_unlimited_handoff_restores_exact_cli_limits` 及部署预检：零哨兵、4 物理进程、实际 Docker/cgroup max、指标 0、全局有限默认和旧布局恢复；重画像保留资源与采集开关。
+- `test_native_sender.py`：默认legacy、显式预算、总RAM/CLI下限、未知后端、容量无任意64进程上限；`test_native_layout_rebuild_after_quiesce_keeps_busy_sender_protected`：忙时拒绝、停止后正确重建和代次/预算。
+- Rust实际 `native_real_binary`：共享dev/inode及四项封存、6→1空闲回收、取消→0、全部原进程退出后缓存重建、独立凭据及一次提交。
+- 预启动回归：`test_account_runtime.py` 验证仅启用绑定、满容量时不腾挪、sender 开关先写后通知；`native_real_binary` 验证首个预热 PID、第二个唯一补位、回收到一个以及零模型计数。
+- `test_account_runtime.py` 核验批量读取、绑定/内核代次、新鲜度、非法数字、legacy/休眠及秘密过滤；合成环境页断言读取零写入且准备失败/过期明确显示。
+- `deploy/v3/verify_forwarding.py --native`：真实两账号三角色、HTTP/SOCKS、3普通/6Haiku、同映像/秘密隔离、cgroup峰值与OOM0、60秒回收及按账号回退；验证镜像的额外CA仅限本地夹具。
+- 发布验收从实际Release下载附件，核SHA/大小、冻结构建输入并运行真实消费者；合成回环与真实付费推理分开记录。
+
+## Scenario: 单账号原生内核在线切换与回滚
+
+### 1. Scope / Trigger
+
+- 固定官方293的内核修订；bench分发和状态、cc2api维护鉴权与sender进程生命周期共同生效。
+
+### 2. Signatures
+
+- POST /api/environments/{environment_id}/native-kernel：{operation:prepare|activate|rollback|recover,operation_id:UUID,release?:string,expected_sha256?:string,expected_revision:string}。
+- 环境列表 native_kernel：state、revision、current、previous、prepared、pid、image_sha256、error、operation_id、binding_generation。未配置有效发行公钥、缺少sender或非原生环境返回null。
+- POST /admin/runtime/accounts/:id/native-kernel-probe：owner、lease_generation、binding、target{release:NativeReleaseRef|null,kernel_generation:UUID}；私有 sender /internal/native/prepare-switch 包含 target、identity。
+- NativeSenderConfig可选release{release,launcher_sha256}、kernel_generation；省略时使用当前镜像固定的内置beta.5。历史镜像内置版本按其实际分发身份判定。NativePreparationStatus增加release、kernel_generation、image_sha256。
+
+### 3. Contracts
+
+- V3_NATIVE_RELEASE_PUBLIC_KEY为部署固定Ed25519原始32字节公钥的小写hex，`release_key() -> str`仅返回有效公钥；配置有效公钥后覆盖部署内全部native293账号。旧V3_NATIVE_RELEASE_PILOT_ENVIRONMENT停止参与准入，部署预检只校验可选发行公钥格式。
+- 创建原生sender时只读挂载bench/native-releases至/runtime-releases并传公钥，CLI及network角色不取得该挂载或发行公钥。已有sender首次取得该挂载需要空闲重建；各账号独立保存版本选择与操作记录。
+- 下载固定SilentFlower/cc-runtime-bridge的精确标签，HTTPS跳转只接受github.com、release-assets.githubusercontent.com、objects.githubusercontent.com。清单≤4096B、签名64B、分发≤27933052B；使用签名原字节及独立SHA核验。版本目录按标签/分发SHA寻址，原子写入，已有候选可离线复核。
+- 管理请求绑定唯一账号与环境。expected_revision同时含环境代次和持久操作版本；新准备、激活及对账消费原版本。同操作ID只接受完全相同参数，之后操作消费版本后旧请求拒绝。
+- 环境私有runtime/native-kernel-upgrade.json保存准备、draining、switching、restoring、finishing、active/restored/failed/reconcile及原/候选/上一版。准备不占账号API门禁；激活和回滚使用现有排他租约，CLI忙时延后。排空≤120秒，等待原流收齐，未知活动不得视为空闲。
+- 专用预热由管理员服务证明与对应kernel:UUID维护租约触发；账号凭据所有权保护保持，AT由网关读取，RT不传sender。普通准备遇维护主动取消。
+- sender专用切换锁排除业务和普通准备；在warmup写锁内等待live==idle.len，退役旧空闲集合后等待live=0才启动候选。物理退出等待最多8秒且受本轮截止约束，失败保持明确恢复路径。
+- 分发体仍通过完整SHA和精确FD启动；真实PID/worker_ready、memfd执行体SHA、四项封存逐次核验。共享映像按分发SHA隔离，即使执行体相同也先实际运行新的加载器。
+- 成功预热后持久提交选择及实际PID/映像SHA，再释放门禁；候选失败恢复原版后开放，无法确认则reconcile。启动时识别中断，原账号门禁保持到显式恢复。排空中断且选择仍是原版时按原所有权释放，finishing中断按提交结果补收口。
+- 内核选择与容器布局比较分开；同合同切换只换worker，下一业务不因release/kernel_generation差异重建角色。现有预算、代理、设备及环境身份保持。当前/上一版/操作引用的制品保留，移除信任根前先回到内置版。
+- 基础ready仅证明原生进程完成握手；启用强制1h/5m策略前还须核验cache_ttl_rewrite_protocol=1，并以该策略验证真实消费者。旧beta.3缺少该能力，强制策略下在模型投递前拒绝。显式在线内核选择独立于镜像默认值，升级镜像继续保留账号选择；回滚旧内核前先检查并关闭其不支持的强制策略。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 签名/来源/平台/协议/摘要不符 | 准备失败，原内核运行 |
+| expected_revision或目标摘要过期 | 冲突，版本保持 |
+| 已持CLI租约、排空超时 | 保持原版，释放本操作门禁或明确待对账 |
+| HTTP取消后旧worker尚未退出 | 候选启动等待物理许可；超时恢复/待对账 |
+| 候选预热失败 | 原版真实预热后再开放 |
+| 操作中断或释放结果未知 | 可见reconcile，禁止复跑模型请求 |
+| 下一请求重新读取环境 | 内核选择不触发容器布局重建 |
+
+### 5. Scenarios and Examples
+
+- 历史回归（强制TTL关闭）：从内置beta.3准备beta.4，目标账号长流自然结束，切换预热零模型，下一请求复用新PID；回滚恢复beta.3，所有容器ID和对照账号PID保持。
+- 边界：先激活再回滚，迟到首次激活的相同ID和旧revision必须冲突。
+- 错误用法：HTTP active=0就假定物理进程全部退出。正确处理：等待物理许可并收口旧池后再启动候选。
+
+### 6. Tests Required
+
+- services/orchestrator/test_native_kernel_upgrade.py：两个不同环境在同一发行公钥下开放管理，旧试点字段忽略，缺失/非法公钥与非原生环境保持关闭；签名及摘要拒绝、准备与接单独立、排空/回滚、旧请求重放、超时、恢复及候选摘要漂移。
+- services/orchestrator/test_account_runtime.py核对两个原生sender均有只读版本挂载及发行公钥，其他角色保持隔离；deploy/v3/test_manage.py核对仅公钥即可配置，非法公钥拒绝，旧试点配置兼容忽略。
+- Rust native_real_binary：模拟一个退出未收口许可和一个空闲worker，归还前零启动，归还后换PID；native_real_gateway验证维护归属、长流、实际新PID和零模型切换。
+- deploy/v3/verify_forwarding.py --native --kernel-release <测试签名目录> --kernel-public-key <公钥>：双账号真实三角色、管理端准备/激活/回滚、长流只发送一次、下一业务复用、对照账号PID与所有容器ID/StartedAt保持、管理端公网发送计数为0。
+
+
+## Scenario: 三角色在线CPU与重建恢复
+
+### 1. Scope / Trigger
+- 修改环境资源接口、三角色创建、评审交接或系统更新CPU恢复时适用。仅隔离布局2，内存、PID和账号并发沿原合同。
+
+### 2. Signatures
+- GET/POST `/api/environments/{environment_id}/cpu-resources`，沿既有管理鉴权。
+- POST字段：`expected_generation:StrictInt,expected_revision:StrictStr,cpus:{cli,sender,network}`；额度为严格数字，拒绝额外字段及bool。
+- `cpu_resources.read_resources(runtime,row)`、`set_resources(runtime,row,expected_generation,expected_revision,cpus)`；`read_policy(runtime,row)`读取重建策略。
+- 返回generation、revision、host_cpus、cpus、persisted_cpus；revision冻结环境代次、持久策略及实际容器身份/额度/生命周期。
+
+### 3. Contracts
+- 三角色分别支持0.01到Docker宿主NCPU核，总和不设3核上限。CPU是共享调度额度，按NanoCpus精度校验有限数字，保留正数预算模式。
+- POST先登记部署维护活动，在环境锁内重读当前环境及未删除账号；拒绝维护中、内核切换/对账中、评审串行交接中或旧代次/revision。只通过Docker更新NanoCpus，逐项核对实际归属、镜像、Memory/MemorySwap/PidsLimit、启动时间、重启数及运行状态/PID保持。
+- 私有0600 `runtime/cpu-resources.json`为schema_version=1、environment_id、account_id、revision UUID、三角色nano_cpus；严格拒绝损坏、链接和错误归属。实际额度全部确认后原子发布。Docker异常可能已经生效，尝试集合先登记再调用；失败按原不可变容器恢复额度和原策略，记录restored或reconcile。
+- 角色创建在默认6:1:1及旧评审布局后应用保存策略。旧schema1布局只覆盖CPU核验视图，原内存/PID及文件保持；串行评审借用当前CLI额度，保存策略与三个实际角色逐项相等后使用新额度，历史V3_ACCOUNT_CPUS不再限制其总和。
+- 宿主HostDeployment.environment_cpu在排空后、重建意图前冻结实际额度到operation.environment_cpu_before。新角色重建及软件失败回滚后按不可变ID/标签恢复，仅CPU变化；兼容旧平台忽略新策略文件。旧无限CPU且缺策略保持原升级路径，显式策略与实际预算不符时拒绝。
+- 页面独立CPU表单按需读取，列表轮询保持输入；提交冻结revision，关闭/离页作废迟到回执。失败要求重读实际额度，成功提示即时应用并保存重建配置。
+
+### 4. Validation & Error Matrix
+| 条件 | 结果 |
+| --- | --- |
+| 三项各2核，宿主4核 | 接受合计6核 |
+| bool/非有限值/低于0.01/单项超宿主 | 更新前拒绝 |
+| 旧revision、错误归属、交接或维护占用 | 409，保留当前操作归属 |
+| Docker返回失败但实际生效 | 按已尝试角色恢复并核对 |
+| 策略损坏、链接或跨环境 | 明确拒绝，保持故障可见 |
+| 旧平台重建恢复默认CPU | 宿主恢复维护前实际额度并验收 |
+
+### 5. Scenarios and Examples
+- 正常：CLI=2、sender=1、network=0.5，保存后即时生效，下一次重建按同策略创建；系统回滚也保留实际额度。
+- 基础：历史无策略继续原三角色预算，GET仅观测现状。
+- 错误用法：限制三项合计3核、只调用不支持nano_cpus的Docker SDK Container.update，或重建后丢掉在线调额。正确处理：逐项校验，沿SDK JSON入口发送NanoCpus，并由策略/宿主维护记录分别承接重建与旧版回滚。
+
+### 6. Tests Required
+- test_cpu_resources：合计6核、CAS、真实Docker SDK回环JSON、未知更新恢复、策略归属/链接及评审交接拒绝。
+- test_account_runtime实际三角色创建沿保存额度；test_project_review_runtime旧布局按新CPU交接、原文件及RAM/PID保持、角色漂移拒绝。
+- test_system_update_cpu核维护前持久冻结、重建实际新角色恢复、归属冲突更新前拒绝；原更新器回归保持。
+- verify_native_diagnostics_cpu：轮询保留表单、冻结提交、冲突、晚回执、390像素及零真实模型调用。
+
+
+## Scenario: 账号请求内容采集开关
+
+### 1. Scope / Trigger
+
+修改 `content_capture_settings.py`、`/api/environments/{environment_id}/content-capture`、管理桥准入及环境卡片开关时适用。
+
+### 2. Signatures
+
+- GET 返回 `environment_id`、bench `account_id`、`generation:int`、`revision:string`、`enabled:bool`、`applied:bool`、`supported:bool`及`tls_observer`能力摘要。
+- POST 精确接收 `enabled:StrictBool`、`expected_generation:StrictInt`、`expected_revision:StrictStr`，拒绝附加字段。
+- `read_settings(runtime,row,observation=None)` 只读复用批量巡检；`set_settings(runtime,row,account,enabled,expected_generation,expected_revision)` 在更新准入和账号锁内应用。Rust `NativeReadinessStatus`可选追加`tls_observer`，内部鉴权`/internal/native/status`也提供该摘要。
+
+### 3. Contracts
+
+- GET/POST 都通过实际 SQL 核对未删除账号与唯一网关绑定。row 的 `gateway_account_id` 为 SQL 投影；并发摘要包含该绑定、环境代次、状态、完整画像和 sender 文件摘要。
+- sender 配置沿原 root:1001、0640 合同读取，安全文件读取拒绝链接和越界。`applied` 核对实际 native 配置、采集目录、账号、环境及发送器代次；公开响应排除凭据。
+- `native_capture_policy.capture_enabled(fingerprint)`统一解释缺字段为开启，精确false为关闭，非法类型拒绝。新环境、重建和系统更新共用此解释；显式关闭持久保留，legacy发送器不创建原生采集目录。全局info/debug选择保持独立。
+- 镜像能力标签`vibebench.native-tls-observer=1`对应sender配置`native_tls_observer_protocol=1`。启用采集的原生sender使用镜像内受限broker、固定只读制品和内联seccomp；NoNewPrivs保持true，业务UID1001及P/E/I/A能力为零。加载权限、ABI和回收合同由cc-runtime-bridge的原生TLS采集规范所有。libbpf实际动态库在镜像构建时核对。
+- 摘要`state`为`not_installed|disabled|stopped|preparing|ready|unavailable`，附`reason`、`checked_at_ms`、`protocol_version`及`image_admitted`。ready只接受45秒内同账号/环境/代次/内核的巡检，协议为整数1且映像已准入；动态状态不进入配置revision。安装标签、原生worker_ready和单请求采集完整性分别表示。
+- `pending_upgrade(root, include_preparing=True)` 同时排除候选下载；该关键字参数默认False，原调用沿用既有判定。
+- POST 按 update admission → OAuth owner → profile → environment 锁顺序重读。原生未就绪、配置偏离、旧版本、活动工作、评审交接、内核维护及 API 活动均拒绝切换。
+- 开启前独立核对安装协议，关闭态不能遮蔽旧镜像缺能力；失败在领取租约和重建前要求系统更新。操作只核对实际配置并复用既有异步零模型预备，维护锁内不等待网关反向解析绑定。
+- 使用唯一 `capture:<uuid>` 领取、claim 和释放网关排他维护租约。API 在维护租约持有期间保持关闭；到期保持关闭，原 owner 可释放。维护重建使用独立租约，CLI 作业登记会阻止画像准备。
+- 环境锁阻止其它本地工作进入，更新 admission 覆盖整个操作。重建复用原 ensure，保留 HOME、画像、资源策略及已保存内核。原停止环境在核对后恢复停止状态，过程模型调用为零。
+- 指纹 `native_capture_enabled` 与实际 `native_capture_dir` 一致后返回成功。失败恢复原指纹并重新准备；恢复失败或租约释放不确定时置 reconcile，使用原环境维护对账。私有 `runtime/content-capture-operation.json` 保存操作与恢复状态。
+- prepare 回执丢失时按唯一 owner 重读并释放本次租约。占用/旧版本返回 409；文件、Docker 或连接故障返回受控 503；明确恢复/对账错误保持可见。
+- 开关只影响后续请求，与 request_diagnostics_log_mode 独立。既有脱敏、7 天、50 份、100 MiB、2 MiB 预览及最终 TLS 证据合同沿用。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 重复或删除绑定 | 404，零写入 |
+| 布尔冒充代次、数字冒充开关、附加字段 | DTO 422 |
+| 旧代次/摘要、活动 CLI/API、配置偏离 | 409，保留原策略 |
+| 旧镜像关闭态请求开启 | 409，要求系统更新；零租约、零重建 |
+| 巡检过期、错代次、缺能力或未知映像 | 显示受控缺口，不能以安装配置标记ready |
+| 切换准备失败、恢复成功 | 409，说明原策略已恢复 |
+| 恢复或门禁释放失败 | reconcile，明确要求对账 |
+
+### 5. Scenarios and Examples
+
+- 正常：开启→核对实际 sender 目录→关闭，账号独立，身份和内核选择保持。
+- 边界：停止环境切换后保持停止；prepare 响应丢失后仅释放本次 owner。
+- 正常：首次部署或系统更新后，原生环境自动开启并后台准备；显式关闭经重建继续关闭。错误用法：只检查页面disabled状态决定是否安装探针。正确处理：启用准入独立检查协议，实际ready依赖当前巡检。
+- 错误用法：把采集维护登记为 CLI 作业后调用 ensure，导致画像准备被自身作业阻止。正确处理：在原环境锁和更新准入内独立持有排他维护租约。
+
+### 6. Tests Required
+
+- `test_content_capture_settings` 覆盖 DTO/SQL、实际配置偏离、账号独立、忙碌/旧版本、内核下载中零租约/零重建、回执丢失、恢复及门禁失败。
+- `test_account_runtime.AccountRuntimeTests.test_content_capture_uses_real_lifecycle_and_preserves_identity` 走实际维护租约及配置重建路径；验证 sender 文件、代次、原身份和内核，作业集合与租约正常收口。
+- `test_saved_role_cpu_policy_is_used_when_recreating_containers` 验证三角色重建沿原 CPU 策略；浏览器回归核对冻结版本、独立开关及重复提交。
+- `test_native_tls_isolation.py`与真实`verify_roles`区分加载器、Rust sender及其worker，验证精确入口/能力/seccomp、业务零权限、秘密隔离、本地构建和资源压力；root加载器不能套用旧的容器默认UID断言。
+- 内容采集测试覆盖缺省true、显式false、非法类型、同代次新鲜ready、旧镜像关闭态零维护写入。浏览器覆盖默认开启、取消、关闭再开启和五类TLS能力状态；真实模型调用为0。

@@ -1,0 +1,15231 @@
+use base64::Engine;
+use once_cell::sync::Lazy;
+use rand::Rng;
+use regex::{NoExpand, Regex};
+use serde_json::Value;
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet};
+use std::ops::Range;
+use std::sync::Mutex;
+use tracing::{info, warn};
+
+use crate::error::AppError;
+use crate::model::account::{Account, BillingMode, CanonicalPromptEnvData};
+use crate::model::identity::{
+    DeviceProfile, device_profile, process_snapshot, process_snapshot_json, request_profile,
+};
+use crate::service::version_profile::{
+    CchProfile, ClaudeCodeProfile, EndpointHeaderProfile, FableFallbackProfile, HaikuTitleProfile,
+    MCP_PROTOCOL_VERSION, MessageBodyOrderProfile, OAUTH_BETA_TOKEN, RequestProfile,
+    TelemetryShape, ThinkingProfile, claude_cli_user_agent, claude_code_user_agent,
+    exact_profile_for_version, is_event_logging_path, normalize_version, profile_for_version,
+};
+use crate::store::cache::UpstreamSessionPoolResolve;
+
+/// 固定采用 vm2api 073a04a 的完整 DROP_TOP 集合，只匹配 JSON 根对象的精确键名。
+const MESSAGE_TOP_FIELD_DROP_KEYS: &[&str] = &[
+    "settings",
+    "claude_settings",
+    "env",
+    "user",
+    "user_id",
+    "extra_body",
+    "extra_headers",
+    "extra",
+    "n",
+    "presence_penalty",
+    "frequency_penalty",
+    "logit_bias",
+    "logprobs",
+    "top_logprobs",
+    "functions",
+    "function_call",
+    "response_format",
+    "seed",
+    "parallel_tool_calls",
+    "reasoning_effort",
+    "max_completion_tokens",
+    "max_output_tokens",
+    "store",
+    "modalities",
+    "audio",
+    "prediction",
+    "stream_options",
+    "tool_resources",
+    "instructions",
+    "input",
+    "truncation",
+    "include",
+    "previous_response_id",
+    "reasoning",
+    "prompt",
+    "suffix",
+    "best_of",
+    "echo",
+    "workspace",
+    "rewrite",
+    "frequencyPenalty",
+    "presencePenalty",
+    "logitBias",
+    "functionCall",
+    "responseFormat",
+    "maxCompletionTokens",
+    "parallelToolCalls",
+    "toolResources",
+    "streamOptions",
+    "previousResponseId",
+    "reasoningEffort",
+    "session",
+    "machine_id",
+    "device_id",
+    "account_uuid",
+    "web_search",
+];
+
+/// header wire 大小写映射。
+/// Go 的 HTTP 服务器规范化 header，此映射还原 Claude CLI 抓包原始大小写。
+static HEADER_WIRE_CASING: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    m.insert("accept", "Accept");
+    m.insert("user-agent", "User-Agent");
+    m.insert("x-stainless-retry-count", "X-Stainless-Retry-Count");
+    m.insert("x-stainless-timeout", "X-Stainless-Timeout");
+    m.insert("x-stainless-lang", "X-Stainless-Lang");
+    m.insert("x-stainless-package-version", "X-Stainless-Package-Version");
+    m.insert("x-stainless-os", "X-Stainless-OS");
+    m.insert("x-stainless-arch", "X-Stainless-Arch");
+    m.insert("x-stainless-runtime", "X-Stainless-Runtime");
+    m.insert("x-stainless-runtime-version", "X-Stainless-Runtime-Version");
+    m.insert("x-stainless-helper-method", "x-stainless-helper-method");
+    m.insert(
+        "anthropic-dangerous-direct-browser-access",
+        "anthropic-dangerous-direct-browser-access",
+    );
+    m.insert("anthropic-version", "anthropic-version");
+    m.insert("anthropic-beta", "anthropic-beta");
+    m.insert(
+        "anthropic-mcp-client-capabilities",
+        "anthropic-mcp-client-capabilities",
+    );
+    m.insert("mcp-protocol-version", "mcp-protocol-version");
+    m.insert("x-app", "x-app");
+    m.insert("x-service-name", "x-service-name");
+    m.insert("anthropic-client-platform", "anthropic-client-platform");
+    m.insert("x-organization-uuid", "x-organization-uuid");
+    m.insert("content-type", "content-type");
+    m.insert("accept-language", "accept-language");
+    m.insert("sec-fetch-mode", "sec-fetch-mode");
+    m.insert("accept-encoding", "accept-encoding");
+    m.insert("authorization", "authorization");
+    m.insert("x-claude-code-session-id", "X-Claude-Code-Session-Id");
+    m.insert("x-client-request-id", "x-client-request-id");
+    m.insert("x-claude-code-agent-id", "x-claude-code-agent-id");
+    m.insert(
+        "x-claude-code-parent-agent-id",
+        "x-claude-code-parent-agent-id",
+    );
+    m.insert("x-claude-code-agent-type", "x-claude-code-agent-type");
+    m.insert("x-claude-code-prompt-id", "x-claude-code-prompt-id");
+    m.insert("x-claude-code-request-class", "x-claude-code-request-class");
+    m.insert(
+        "x-claude-code-prev-tool-durations",
+        "x-claude-code-prev-tool-durations",
+    );
+    m.insert("x-frame-cp", "X-Frame-CP");
+    m.insert("x-frame-surface", "X-Frame-Surface");
+    m.insert("x-frame-platform", "X-Frame-Platform");
+    m.insert("x-frame-client-version", "X-Frame-Client-Version");
+    m.insert("x-frame-session-id", "X-Frame-Session-Id");
+    m.insert("x-mcp-client-session-id", "X-Mcp-Client-Session-Id");
+    m.insert("mcp-method", "mcp-method");
+    m.insert("content-length", "content-length");
+    m
+});
+
+/// 将规范化 key 转换为真实 wire 大小写。
+fn resolve_wire_casing(key: &str) -> String {
+    let lower = key.to_lowercase();
+    if let Some(wk) = HEADER_WIRE_CASING.get(lower.as_str()) {
+        wk.to_string()
+    } else {
+        key.to_string()
+    }
+}
+
+/// 请求来源类型。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClientType {
+    ClaudeCode,
+    API,
+}
+
+impl ClientType {
+    /// 返回日志中使用的稳定客户端类型名。
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::ClaudeCode => "claude_code",
+            Self::API => "api",
+        }
+    }
+}
+
+/// 上游 session 改写上下文。
+#[derive(Debug, Clone, Default)]
+pub struct UpstreamSessionRewrite {
+    /// `/v1/messages` 主请求的 session 改写结果。
+    pub message: Option<UpstreamSessionPoolResolve>,
+    /// event_logging 等遥测请求的只读 session 映射表。
+    pub telemetry_session_map: HashMap<String, String>,
+}
+
+const API_MAX_TOKENS_LIMIT: u64 = 64000;
+const API_DEFAULT_MAX_TOKENS: u64 = 32000;
+const CONTEXT_1M_BETA_TOKEN: &str = "context-1m-2025-08-07";
+const FAST_MODE_BETA_TOKEN: &str = "fast-mode-2026-02-01";
+const MESSAGE_BODY_ORDER_OPUS_MAIN: &[&str] = &[
+    "model",
+    "messages",
+    "system",
+    "tools",
+    "metadata",
+    "max_tokens",
+    "thinking",
+    "context_management",
+    "output_config",
+    "diagnostics",
+    "stream",
+];
+// 293 的可选字段仍位于已观察的位置，缺失字段跳过，未知字段按原相对顺序保留。
+const MESSAGE_BODY_ORDER_2_1_293: &[&str] = &[
+    "model",
+    "messages",
+    "system",
+    "tools",
+    "metadata",
+    "max_tokens",
+    "thinking",
+    "context_management",
+    "fallbacks",
+    "safeguards",
+    "output_config",
+    "thread",
+    "diagnostics",
+    "stream",
+];
+const MESSAGE_BODY_ORDER_FABLE_2_1_220: &[&str] = &[
+    "model",
+    "messages",
+    "system",
+    "tools",
+    "metadata",
+    "max_tokens",
+    "thinking",
+    "context_management",
+    "fallbacks",
+    "output_config",
+    "diagnostics",
+    "stream",
+];
+const MESSAGE_BODY_ORDER_HAIKU_TITLE: &[&str] = &[
+    "model",
+    "messages",
+    "system",
+    "tools",
+    "metadata",
+    "max_tokens",
+    "thinking",
+    "temperature",
+    "output_config",
+    "stream",
+];
+const MESSAGE_BODY_ORDER_HAIKU_PROBE: &[&str] = &["model", "max_tokens", "messages", "metadata"];
+
+/// 从逗号分隔的 anthropic-beta header 中剥离指定 token，保留其它 token 和相对顺序。
+///
+/// 对应 sub2api 的 `stripBetaTokensWithSet`：对非白名单模型默认过滤掉
+/// `context-1m-2025-08-07` 这类受控 beta，防止 Sonnet/Haiku 误开 1M 档计费。
+pub(crate) fn strip_beta_token(beta: &str, token: &str) -> String {
+    beta.split(',')
+        .map(|t| t.trim())
+        .filter(|t| !t.is_empty() && *t != token)
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+/// 判断 model_id 是否命中账号配置的 1M 上下文白名单。
+///
+/// `allow_1m_models` 是逗号分隔的子串列表（大小写不敏感，空段被忽略）。
+/// 任一子串在 model_id 中出现即视为命中。全空白名单 → 全部 filter。
+pub(crate) fn matches_1m_whitelist(model_id: &str, allow_1m_models: &str) -> bool {
+    let m = model_id.to_lowercase();
+    allow_1m_models
+        .split(',')
+        .map(|t| t.trim())
+        .filter(|t| !t.is_empty())
+        .any(|pat| m.contains(pat.to_lowercase().as_str()))
+}
+
+/// 根据账号能力过滤客户端传入的受控 beta token。
+///
+/// # 参数
+///
+/// - `beta`: 客户端或已改写请求中的 `anthropic-beta` 值。
+/// - `account`: 决定 1M 与 Fast Mode 是否允许透传的账号。
+/// - `model_id`: 用于匹配账号 1M 模型白名单的最终模型 ID。
+///
+/// # 返回
+///
+/// 过滤后的 beta 值；未被过滤的 token 保持原始相对顺序。
+pub(crate) fn filter_account_beta_tokens(beta: &str, account: &Account, model_id: &str) -> String {
+    let mut filtered = if matches_1m_whitelist(model_id, &account.allow_1m_models) {
+        beta.to_string()
+    } else {
+        strip_beta_token(beta, CONTEXT_1M_BETA_TOKEN)
+    };
+    if !account.allow_fast_mode {
+        filtered = strip_beta_token(&filtered, FAST_MODE_BETA_TOKEN);
+    }
+    filtered
+}
+
+/// 合并必需的 beta 令牌与客户端传入的 beta 令牌。
+pub(crate) fn merge_anthropic_beta(required: &str, incoming: &str) -> String {
+    let mut seen = std::collections::HashSet::new();
+    let mut tokens = Vec::new();
+    for t in required.split(',') {
+        let t = t.trim();
+        if !t.is_empty() && seen.insert(t.to_string()) {
+            tokens.push(t.to_string());
+        }
+    }
+    for t in incoming.split(',') {
+        let t = t.trim();
+        if !t.is_empty() && seen.insert(t.to_string()) {
+            tokens.push(t.to_string());
+        }
+    }
+    tokens.join(",")
+}
+
+/// 按抓包顺序把 `context-1m` 插入到 `oauth` 后面。
+pub(crate) fn order_context_1m_after_oauth(beta: String) -> String {
+    let tokens = beta
+        .split(',')
+        .map(|t| t.trim())
+        .filter(|t| !t.is_empty())
+        .collect::<Vec<_>>();
+    if !tokens.contains(&CONTEXT_1M_BETA_TOKEN) {
+        return tokens.join(",");
+    }
+
+    let mut ordered = Vec::with_capacity(tokens.len());
+    let mut inserted_context = false;
+    for token in tokens
+        .iter()
+        .copied()
+        .filter(|token| *token != CONTEXT_1M_BETA_TOKEN)
+    {
+        ordered.push(token);
+        if token == OAUTH_BETA_TOKEN {
+            ordered.push(CONTEXT_1M_BETA_TOKEN);
+            inserted_context = true;
+        }
+    }
+    if !inserted_context {
+        ordered.push(CONTEXT_1M_BETA_TOKEN);
+    }
+    ordered.join(",")
+}
+
+/// 根据模型返回正确的 anthropic-beta 值。
+fn beta_header_for_model(request_profile: &RequestProfile, model_id: &str) -> String {
+    request_profile
+        .main_model(model_id)
+        .map(|profile| profile.message_beta_tokens)
+        .or_else(|| {
+            request_profile
+                .fable_model(model_id)
+                .map(|profile| profile.message_beta_tokens)
+        })
+        .unwrap_or(request_profile.message_beta_tokens)
+        .to_string()
+}
+
+/// 根据 endpoint 返回当前 Claude Code 画像的必需 beta token。
+fn beta_header_for_path(
+    request_profile: &RequestProfile,
+    path: &str,
+    model_id: &str,
+    body: &serde_json::Value,
+) -> String {
+    let safeguard_beta = (path == "/v1/messages")
+        .then(|| safeguard_beta_header(request_profile, model_id, body))
+        .flatten();
+    let beta = if path == "/v1/messages/count_tokens" {
+        request_profile.count_tokens_beta_tokens.to_string()
+    } else if is_event_logging_path(path)
+        || path.starts_with("/api/eval/")
+        || path.starts_with("/api/oauth/")
+        || path.starts_with("/api/claude_cli/bootstrap")
+        || path.starts_with("/api/claude_code_grove")
+        || path.starts_with("/api/claude_code_penguin_mode")
+    {
+        request_profile.oauth_beta_token.to_string()
+    } else if path.starts_with("/v1/code/triggers") {
+        request_profile.code_triggers_beta_token.to_string()
+    } else if path.starts_with("/v1/mcp_servers") {
+        request_profile.mcp_servers_beta_token.to_string()
+    } else if path.starts_with("/v1/messages") {
+        if let Some(beta) = safeguard_beta {
+            beta.to_string()
+        } else {
+            match haiku_request_kind(request_profile, model_id, body) {
+                Some(HaikuRequestKind::Probe) => {
+                    request_profile.haiku_probe_beta_tokens.to_string()
+                }
+                Some(HaikuRequestKind::Title) => request_profile
+                    .haiku_streaming_title_beta_tokens
+                    .to_string(),
+                Some(HaikuRequestKind::NonStreamAux) => {
+                    request_profile.haiku_non_stream_aux_beta_tokens.to_string()
+                }
+                Some(HaikuRequestKind::Main) => {
+                    if let Some(profile) = request_profile.main_model(model_id) {
+                        if body.get("diagnostics").is_none() {
+                            request_profile
+                                .haiku_main_no_diagnostics_beta_tokens
+                                .to_string()
+                        } else {
+                            profile.message_beta_tokens.to_string()
+                        }
+                    } else if request_profile.main_models.is_empty() {
+                        // 旧画像没有精确主模型表，继续保留已经验证过的 Haiku 族分类行为。
+                        if body.get("diagnostics").is_none() {
+                            request_profile
+                                .haiku_main_no_diagnostics_beta_tokens
+                                .to_string()
+                        } else {
+                            request_profile.haiku_main_beta_tokens.to_string()
+                        }
+                    } else {
+                        beta_header_for_model(request_profile, model_id)
+                    }
+                }
+                None => beta_header_for_model(request_profile, model_id),
+            }
+        }
+    } else {
+        beta_header_for_model(request_profile, model_id)
+    };
+    if safeguard_beta.is_none()
+        && path == "/v1/messages"
+        && body.get("fallbacks").is_some_and(|value| !value.is_null())
+        && !request_profile.message_fallback_beta_tokens.is_empty()
+    {
+        let fallback_beta = request_profile.message_fallback_beta_tokens.join(",");
+        order_message_fallback_beta_tokens(
+            merge_anthropic_beta(&beta, &fallback_beta),
+            request_profile.message_fallback_beta_tokens,
+        )
+    } else {
+        beta
+    }
+}
+
+fn has_dangerous_tool_use_safeguard(body: &serde_json::Value) -> bool {
+    body.get("safeguards")
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|safeguards| {
+            safeguards.iter().any(|safeguard| {
+                safeguard.get("type").and_then(serde_json::Value::as_str)
+                    == Some("dangerous_tool_use")
+            })
+        })
+}
+
+fn safeguard_beta_header<'a>(
+    request_profile: &'a RequestProfile,
+    model_id: &str,
+    body: &serde_json::Value,
+) -> Option<&'a str> {
+    has_dangerous_tool_use_safeguard(body)
+        .then(|| request_profile.safeguard_model(model_id))
+        .flatten()
+        .map(|profile| profile.message_beta_tokens)
+}
+
+fn order_message_fallback_beta_tokens(beta: String, fallback_tokens: &[&str]) -> String {
+    let tokens = beta
+        .split(',')
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
+        .collect::<Vec<_>>();
+    let mut ordered = tokens
+        .iter()
+        .copied()
+        .filter(|token| !fallback_tokens.contains(token))
+        .collect::<Vec<_>>();
+    let insert_at = ordered
+        .iter()
+        .position(|token| *token == "thinking-binding-controls-2026-08-01")
+        .or_else(|| {
+            ordered
+                .iter()
+                .position(|token| *token == "extended-cache-ttl-2025-04-11")
+        })
+        .unwrap_or(ordered.len());
+    // fallback token 的相对位置属于 wire 指纹，固定插在 thinking-binding/缓存 token 前。
+    ordered.splice(insert_at..insert_at, fallback_tokens.iter().copied());
+    ordered.join(",")
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HaikuRequestKind {
+    Probe,
+    Title,
+    Main,
+    NonStreamAux,
+}
+
+fn haiku_request_kind(
+    request_profile: &RequestProfile,
+    model_id: &str,
+    body: &serde_json::Value,
+) -> Option<HaikuRequestKind> {
+    if !model_id.to_ascii_lowercase().contains("haiku") {
+        return None;
+    }
+    let max_tokens = body.get("max_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+    if tools_are_empty(body) && max_tokens == 1 && !is_streaming_messages_body(body) {
+        return Some(HaikuRequestKind::Probe);
+    }
+    if request_profile.haiku_title_profile == HaikuTitleProfile::Legacy
+        && tools_are_empty(body)
+        && max_tokens == 32_000
+        && (is_structured_haiku_title_request(body) || has_title_prompt_marker(body))
+    {
+        return Some(HaikuRequestKind::Title);
+    }
+    if request_profile.haiku_title_profile == HaikuTitleProfile::ClaudeCode21293
+        && is_structured_haiku_title_request_for_profile(body, request_profile)
+    {
+        return Some(HaikuRequestKind::Title);
+    }
+    if tools_are_empty(body) && max_tokens == 1_024 && !is_streaming_messages_body(body) {
+        return Some(HaikuRequestKind::NonStreamAux);
+    }
+    Some(HaikuRequestKind::Main)
+}
+
+fn requires_exact_beta_profile(
+    request_profile: &RequestProfile,
+    path: &str,
+    model_id: &str,
+    body: &serde_json::Value,
+) -> bool {
+    path.starts_with("/v1/messages")
+        && (safeguard_beta_header(request_profile, model_id, body).is_some()
+            || matches!(
+                haiku_request_kind(request_profile, model_id, body),
+                Some(HaikuRequestKind::Probe | HaikuRequestKind::Title)
+            ))
+}
+
+/// 仅保留标题抓包已确认的可选 token，避免把父模型的整套 beta 合入辅助请求。
+fn title_beta_header(request_profile: &RequestProfile, incoming_beta: &str) -> String {
+    let incoming = incoming_beta
+        .split(',')
+        .map(str::trim)
+        .collect::<HashSet<_>>();
+    let mut tokens = request_profile
+        .haiku_streaming_title_beta_tokens
+        .split(',')
+        .collect::<Vec<_>>();
+    let index = tokens
+        .iter()
+        .position(|token| *token == "cache-diagnosis-2026-04-07")
+        .unwrap_or(tokens.len());
+    tokens.splice(
+        index..index,
+        request_profile
+            .haiku_title_optional_beta_tokens
+            .iter()
+            .copied()
+            .filter(|token| incoming.contains(token)),
+    );
+    tokens.join(",")
+}
+
+/// 2.1.280 抓包已验证的非遥测后台端点。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BusinessEndpoint {
+    Frame,
+    Mcp,
+    OrganizationResource,
+}
+
+/// 精确匹配路径段，避免把同前缀的新接口误套为不带 beta 的画像。
+fn business_endpoint(path: &str) -> Option<BusinessEndpoint> {
+    let parts: Vec<_> = path.split('/').collect();
+    match parts.as_slice() {
+        ["", "api", "frame", "contract", "latest"] => Some(BusinessEndpoint::Frame),
+        ["", "v1", "mcp", id] if !id.is_empty() => Some(BusinessEndpoint::Mcp),
+        ["", "api", "organizations", id, "model_selector", "cc"] if !id.is_empty() => {
+            Some(BusinessEndpoint::OrganizationResource)
+        }
+        ["", "api", "oauth", "organizations", id, "marketplaces"]
+        | [
+            "",
+            "api",
+            "oauth",
+            "organizations",
+            id,
+            "plugins",
+            "list-plugins",
+        ]
+        | [
+            "",
+            "api",
+            "oauth",
+            "organizations",
+            id,
+            "skills",
+            "list-skills",
+        ] if !id.is_empty() => Some(BusinessEndpoint::OrganizationResource),
+        [
+            "",
+            "api",
+            "oauth",
+            "organizations",
+            id,
+            "skills",
+            skill,
+            "download",
+        ] if !id.is_empty() && !skill.is_empty() => Some(BusinessEndpoint::OrganizationResource),
+        _ => None,
+    }
+}
+
+/// 按已验证的路径段选择后台 UA/beta；不把相似或新增路径自动纳入画像。
+fn auxiliary_endpoint_headers(
+    profile: &ClaudeCodeProfile,
+    path: &str,
+) -> Option<(String, Option<&'static str>)> {
+    if profile.endpoints.header_profile == EndpointHeaderProfile::Legacy {
+        return None;
+    }
+    let version = profile.identity.version;
+    if profile.endpoints.header_profile == EndpointHeaderProfile::ClaudeCode21293 {
+        // 仅扩展本轮采到的端点，不将旧版其它后台路径推断为 293 的新合同。
+        return match path {
+            "/api/hello" => Some((profile.telemetry.growthbook_user_agent.to_string(), None)),
+            "/api/claude_code_grove" => Some((
+                claude_cli_user_agent(version),
+                Some(profile.request.oauth_beta_token),
+            )),
+            "/api/claude_code_penguin_mode" | "/api/claude_cli/bootstrap" => Some((
+                claude_code_user_agent(version),
+                Some(profile.request.oauth_beta_token),
+            )),
+            "/v1/mcp_servers" => Some((
+                claude_code_user_agent(version),
+                Some(profile.request.mcp_servers_beta_token),
+            )),
+            _ if path.starts_with("/api/eval/") => Some((
+                claude_code_user_agent(version),
+                Some(profile.request.oauth_beta_token),
+            )),
+            _ => None,
+        };
+    }
+    if profile.endpoints.header_profile == EndpointHeaderProfile::ClaudeCode21280 {
+        match business_endpoint(path) {
+            Some(BusinessEndpoint::Frame) => {
+                return Some((
+                    claude_cli_user_agent(version),
+                    Some(profile.request.oauth_beta_token),
+                ));
+            }
+            Some(BusinessEndpoint::Mcp) => {
+                return Some((format!("{} (cli)", claude_code_user_agent(version)), None));
+            }
+            Some(BusinessEndpoint::OrganizationResource) => {
+                return Some((claude_cli_user_agent(version), None));
+            }
+            None => {}
+        }
+    }
+    let code_suffix = path
+        .strip_prefix("/v1/code/sessions/")
+        .and_then(|rest| rest.split_once('/'))
+        .filter(|(session_id, _)| !session_id.is_empty())
+        .map(|(_, suffix)| suffix);
+    if code_suffix == Some("client/presence") {
+        return Some(("axios/1.15.2".to_string(), None));
+    }
+    if path == "/v1/code/sessions"
+        || matches!(
+            code_suffix,
+            Some(
+                "bridge"
+                    | "worker"
+                    | "worker/events"
+                    | "worker/events/stream"
+                    | "worker/internal-events"
+                    | "worker/heartbeat"
+            )
+        )
+    {
+        return Some((claude_code_user_agent(version), None));
+    }
+    if let Some(rest) = path.strip_prefix("/v1/sessions/") {
+        let (session_id, suffix) = rest.split_once('/').unwrap_or((rest, ""));
+        if !session_id.is_empty() && (rest == session_id || suffix == "archive") {
+            return Some((claude_code_user_agent(version), Some("ccr-byoc-2025-07-29")));
+        }
+    }
+    match path {
+        "/api/claude_code/notification/preferences" => Some((
+            claude_cli_user_agent(version),
+            Some(profile.request.oauth_beta_token),
+        )),
+        "/v1/ultrareview/quota" => Some((claude_cli_user_agent(version), None)),
+        _ => None,
+    }
+}
+
+fn is_streaming_messages_body(body: &serde_json::Value) -> bool {
+    body.get("stream")
+        .and_then(|stream| stream.as_bool())
+        .unwrap_or(false)
+}
+
+fn has_title_prompt_marker(body: &serde_json::Value) -> bool {
+    text_values(body).iter().any(|text| {
+        text.contains("Generate a concise, sentence-case title")
+            || text.contains("Please write a 5-10 word title for the following conversation:")
+            || text.contains("extract a 2-3 word title")
+    })
+}
+
+/// 判断请求是否为当前 Claude Code 画像使用的结构化 Haiku 标题请求。
+///
+/// @param body `/v1/messages` JSON 请求体。
+/// @return 同时命中 Haiku、流式、空 tools、disabled thinking 和 title schema 时返回 true。
+pub(crate) fn is_structured_haiku_title_request(body: &serde_json::Value) -> bool {
+    let is_haiku = body
+        .get("model")
+        .and_then(|model| model.as_str())
+        .map(|model| model.to_ascii_lowercase().contains("haiku"))
+        .unwrap_or(false);
+    let thinking_disabled = body
+        .pointer("/thinking/type")
+        .and_then(|value| value.as_str())
+        == Some("disabled");
+    is_haiku
+        && is_streaming_messages_body(body)
+        && tools_are_empty(body)
+        && body.get("max_tokens").and_then(|value| value.as_u64()) == Some(32_000)
+        && thinking_disabled
+        && body
+            .pointer("/output_config/format")
+            .map(schema_requires_only_title)
+            .unwrap_or(false)
+}
+
+/// 按请求画像识别标题，保留旧画像的结构和提示词兼容边界。
+///
+/// @param body 消息请求体。
+/// @param request_profile 本次请求冻结的协议画像。
+/// @return 命中该版本已验证的结构化标题时返回 true。
+pub(crate) fn is_structured_haiku_title_request_for_profile(
+    body: &serde_json::Value,
+    request_profile: &RequestProfile,
+) -> bool {
+    match request_profile.haiku_title_profile {
+        HaikuTitleProfile::Legacy => is_structured_haiku_title_request(body),
+        HaikuTitleProfile::ClaudeCode21293 => {
+            body.get("model").and_then(serde_json::Value::as_str) == Some("claude-haiku-5-5")
+                && is_streaming_messages_body(body)
+                && tools_are_empty(body)
+                && body.get("max_tokens").and_then(serde_json::Value::as_u64) == Some(128_000)
+                && body.get("thinking").is_none()
+                && body
+                    .pointer("/output_config/format")
+                    .is_some_and(schema_requires_only_title)
+        }
+    }
+}
+
+fn tools_are_empty(body: &serde_json::Value) -> bool {
+    body.get("tools")
+        .and_then(|tools| tools.as_array())
+        .map(|tools| tools.is_empty())
+        .unwrap_or(true)
+}
+
+fn schema_requires_only_title(value: &serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::Object(map) => {
+            let required_title = map
+                .get("required")
+                .and_then(|required| required.as_array())
+                .map(|required| required.len() == 1 && required[0].as_str() == Some("title"))
+                .unwrap_or(false);
+            let declares_title = map
+                .get("properties")
+                .and_then(|properties| properties.as_object())
+                .map(|properties| properties.contains_key("title"))
+                .unwrap_or(false);
+            (required_title && declares_title) || map.values().any(schema_requires_only_title)
+        }
+        serde_json::Value::Array(items) => items.iter().any(schema_requires_only_title),
+        _ => false,
+    }
+}
+
+fn text_values(value: &serde_json::Value) -> Vec<&str> {
+    let mut out = Vec::new();
+    collect_text_values(value, &mut out);
+    out
+}
+
+fn collect_text_values<'a>(value: &'a serde_json::Value, out: &mut Vec<&'a str>) {
+    match value {
+        serde_json::Value::String(s) => out.push(s),
+        serde_json::Value::Array(arr) => {
+            for item in arr {
+                collect_text_values(item, out);
+            }
+        }
+        serde_json::Value::Object(map) => {
+            for value in map.values() {
+                collect_text_values(value, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn scan_or_normalize_current_date_context(
+    body: &mut serde_json::Value,
+    config: ClaudeCodeContextSanitizerConfig,
+    client_type: ClientType,
+) {
+    if client_type != ClientType::ClaudeCode || config.mode == ClaudeCodeContextSanitizerMode::Off {
+        return;
+    }
+
+    scan_or_normalize_system_current_date(body, config);
+    scan_or_normalize_message_current_date(body, config);
+}
+
+fn scan_or_normalize_system_current_date(
+    body: &mut serde_json::Value,
+    config: ClaudeCodeContextSanitizerConfig,
+) {
+    let Some(system) = body.get_mut("system") else {
+        return;
+    };
+    match system {
+        serde_json::Value::String(text) => {
+            scan_or_normalize_current_date_text(text, "system", config);
+        }
+        serde_json::Value::Array(items) => {
+            for (idx, item) in items.iter_mut().enumerate() {
+                if let Some(serde_json::Value::String(text)) = item.get_mut("text") {
+                    scan_or_normalize_current_date_text(
+                        text,
+                        &format!("system[{}].text", idx),
+                        config,
+                    );
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn scan_or_normalize_message_current_date(
+    body: &mut serde_json::Value,
+    config: ClaudeCodeContextSanitizerConfig,
+) {
+    let Some(messages) = body
+        .get_mut("messages")
+        .and_then(|messages| messages.as_array_mut())
+    else {
+        return;
+    };
+    for (message_idx, message) in messages.iter_mut().enumerate() {
+        let Some(content) = message.get_mut("content") else {
+            continue;
+        };
+        match content {
+            serde_json::Value::String(text) => {
+                if has_claude_code_context_marker(text) {
+                    scan_or_normalize_current_date_text(
+                        text,
+                        &format!("messages[{}].content", message_idx),
+                        config,
+                    );
+                }
+            }
+            serde_json::Value::Array(blocks) => {
+                let text_block_count = blocks
+                    .iter()
+                    .filter(|block| block.get("text").and_then(|text| text.as_str()).is_some())
+                    .count();
+                let mut is_first_text_block = true;
+                for (block_idx, block) in blocks.iter_mut().enumerate() {
+                    let Some(serde_json::Value::String(text)) = block.get_mut("text") else {
+                        continue;
+                    };
+                    let scan_as_context = has_claude_code_context_marker(text)
+                        || (text_block_count > 1 && is_first_text_block);
+                    is_first_text_block = false;
+                    if scan_as_context {
+                        scan_or_normalize_current_date_text(
+                            text,
+                            &format!("messages[{}].content[{}].text", message_idx, block_idx),
+                            config,
+                        );
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn scan_or_normalize_current_date_text(
+    text: &mut String,
+    path: &str,
+    config: ClaudeCodeContextSanitizerConfig,
+) {
+    if !CLAUDE_CODE_CURRENT_DATE_REGEX.is_match(text) {
+        return;
+    }
+    let original = text.clone();
+    let action = if config.mode == ClaudeCodeContextSanitizerMode::Normalize {
+        *text = normalize_current_date_text(text);
+        "normalize"
+    } else {
+        "report_only"
+    };
+    log_current_date_context_finding(&original, path, config.mode, action);
+}
+
+fn normalize_current_date_text(text: &str) -> String {
+    CLAUDE_CODE_CURRENT_DATE_REGEX
+        .replace_all(text, |caps: &regex::Captures| {
+            if caps.get(2).map(|m| m.as_str()) != caps.get(4).map(|m| m.as_str()) {
+                caps.get(0)
+                    .map(|m| m.as_str())
+                    .unwrap_or_default()
+                    .to_string()
+            } else {
+                format!("Today's date is {}-{}-{}.", &caps[1], &caps[3], &caps[5])
+            }
+        })
+        .to_string()
+}
+
+fn log_current_date_context_finding(
+    text: &str,
+    path: &str,
+    mode: ClaudeCodeContextSanitizerMode,
+    action: &str,
+) {
+    let digest = Sha256::digest(text.as_bytes());
+    let hash = format!("{:x}", digest);
+    let Some(caps) = CLAUDE_CODE_CURRENT_DATE_REGEX.captures(text) else {
+        return;
+    };
+    if caps.get(2).map(|m| m.as_str()) != caps.get(4).map(|m| m.as_str()) {
+        return;
+    }
+    let apostrophe_variant = current_date_apostrophe_variant(text);
+    let date_separator = caps.get(2).map(|m| m.as_str()).unwrap_or("-");
+    warn!(
+        target: "cc2api::context_sanitizer",
+        mode = mode.as_str(),
+        action,
+        path,
+        finding = "claude_code_current_date",
+        date_separator,
+        apostrophe_variant,
+        text_len = text.len(),
+        text_hash = &hash[..16],
+        client_type = ClientType::ClaudeCode.as_str(),
+        "claude_code_context_sanitizer finding"
+    );
+}
+
+fn current_date_apostrophe_variant(text: &str) -> &'static str {
+    if text.contains("Today\u{2019}s date is") {
+        "right_single_quote"
+    } else if text.contains("Today\u{02BC}s date is") {
+        "modifier_letter_apostrophe"
+    } else if text.contains("Today\u{02B9}s date is") {
+        "modifier_letter_prime"
+    } else if text.contains("Today\u{2032}s date is") {
+        "prime"
+    } else {
+        "ascii"
+    }
+}
+
+fn has_claude_code_context_marker(text: &str) -> bool {
+    text.contains("<system-reminder>")
+        || text.contains("<env>")
+        || text.contains("Platform:")
+        || text.contains("Working directory:")
+}
+
+/// 判断该 endpoint 是否应该发送 anthropic-beta。
+fn requires_anthropic_beta(path: &str) -> bool {
+    !path.starts_with("/mcp-registry/") && path != "/"
+}
+
+/// 判断该 endpoint 是否应该主动发送 JSON content-type。
+///
+/// 当前抓包中部分 GET 配置类端点不带 content-type；保留这些差异可以避免
+/// “值正确但 header 集合不像真实客户端”的 wire 指纹偏差。
+fn requires_json_content_type(path: &str) -> bool {
+    !(path == "/"
+        || path.starts_with("/mcp-registry/")
+        || path.starts_with("/api/oauth/")
+        || path.starts_with("/api/claude_code_grove")
+        || path.starts_with("/api/claude_code_penguin_mode"))
+}
+
+/// 按当前 Claude Code 抓包中的 endpoint wire 顺序组织上游 header。
+///
+/// 调用方通过请求级 http1_header_casing 将本列表的大小写交给发送层。
+///
+/// @param path 上游端点路径。
+/// @param headers 已完成画像改写的请求头。
+/// @return 按抓包大小写和顺序排列的名称与值。
+pub fn ordered_anthropic_headers(
+    path: &str,
+    headers: &HashMap<String, String>,
+) -> Vec<(String, String)> {
+    let mut ordered = Vec::new();
+    let mut used = std::collections::HashSet::<String>::new();
+
+    for name in wire_header_order(path) {
+        let lower = name.to_ascii_lowercase();
+        if lower == "host" {
+            ordered.push(((*name).to_string(), "api.anthropic.com".to_string()));
+            used.insert(lower);
+            continue;
+        }
+        if lower == "connection" {
+            let value = find_header_value(headers, name)
+                .cloned()
+                .unwrap_or_else(|| "keep-alive".to_string());
+            ordered.push(((*name).to_string(), value));
+            used.insert(lower);
+            continue;
+        }
+        if let Some(value) = find_header_value(headers, name) {
+            ordered.push(((*name).to_string(), value.clone()));
+            used.insert(lower);
+        }
+    }
+
+    let mut rest = headers
+        .iter()
+        .filter(|(k, _)| !used.contains(k.to_ascii_lowercase().as_str()))
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect::<Vec<_>>();
+    rest.sort_by(|a, b| a.0.to_ascii_lowercase().cmp(&b.0.to_ascii_lowercase()));
+    ordered.extend(rest);
+    ordered
+}
+
+fn find_header_value<'a>(headers: &'a HashMap<String, String>, name: &str) -> Option<&'a String> {
+    headers
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case(name))
+        .map(|(_, v)| v)
+}
+
+fn wire_header_order(path: &str) -> &'static [&'static str] {
+    if path.starts_with("/v1/messages") {
+        &[
+            "Accept",
+            "Authorization",
+            "Content-Type",
+            "User-Agent",
+            "X-Claude-Code-Session-Id",
+            "X-Stainless-Arch",
+            "X-Stainless-Lang",
+            "X-Stainless-OS",
+            "X-Stainless-Package-Version",
+            "X-Stainless-Retry-Count",
+            "X-Stainless-Runtime",
+            "X-Stainless-Runtime-Version",
+            "X-Stainless-Timeout",
+            "anthropic-beta",
+            "anthropic-dangerous-direct-browser-access",
+            "anthropic-version",
+            "x-app",
+            "x-claude-code-prev-tool-durations",
+            "x-claude-code-request-class",
+            "x-client-request-id",
+            "Connection",
+            "Host",
+            "Accept-Encoding",
+        ]
+    } else if business_endpoint(path) == Some(BusinessEndpoint::Frame) {
+        &[
+            "Accept",
+            "User-Agent",
+            "Authorization",
+            "anthropic-beta",
+            "X-Frame-CP",
+            "X-Frame-Surface",
+            "X-Frame-Platform",
+            "X-Frame-Client-Version",
+            "X-Frame-Session-Id",
+            "Accept-Encoding",
+            "Host",
+            "Connection",
+        ]
+    } else if business_endpoint(path) == Some(BusinessEndpoint::Mcp) {
+        &[
+            "Accept",
+            "Accept-Encoding",
+            "Authorization",
+            "Content-Type",
+            "User-Agent",
+            "X-Mcp-Client-Session-Id",
+            "mcp-method",
+            "mcp-protocol-version",
+            "Connection",
+            "Host",
+        ]
+    } else if business_endpoint(path) == Some(BusinessEndpoint::OrganizationResource) {
+        &[
+            "Accept",
+            "Content-Type",
+            "User-Agent",
+            "Authorization",
+            "anthropic-version",
+            "anthropic-client-platform",
+            "x-organization-uuid",
+            "Accept-Encoding",
+            "Host",
+            "Connection",
+        ]
+    } else if path.starts_with("/api/eval/") {
+        &[
+            "Authorization",
+            "Content-Type",
+            "anthropic-beta",
+            "Connection",
+            "User-Agent",
+            "Accept",
+            "Host",
+            "Accept-Encoding",
+        ]
+    } else if path.starts_with("/api/event_logging/") {
+        &[
+            "Accept",
+            "Accept-Encoding",
+            "Authorization",
+            "Content-Type",
+            "User-Agent",
+            "anthropic-beta",
+            "x-service-name",
+            "Connection",
+            "Host",
+        ]
+    } else if path.starts_with("/api/claude_cli/bootstrap") {
+        &[
+            "Accept",
+            "Accept-Encoding",
+            "Authorization",
+            "Content-Type",
+            "User-Agent",
+            "anthropic-beta",
+            "Connection",
+            "Host",
+        ]
+    } else if path.starts_with("/mcp-registry/") {
+        &[
+            "Accept",
+            "Accept-Encoding",
+            "User-Agent",
+            "Connection",
+            "Host",
+        ]
+    } else if path.starts_with("/api/oauth/")
+        || path.starts_with("/api/claude_code_grove")
+        || path.starts_with("/api/claude_code_penguin_mode")
+    {
+        &[
+            "Accept",
+            "Accept-Encoding",
+            "Authorization",
+            "User-Agent",
+            "anthropic-beta",
+            "Connection",
+            "Host",
+        ]
+    } else if path.starts_with("/v1/code/triggers") {
+        &[
+            "Accept",
+            "Accept-Encoding",
+            "Authorization",
+            "Content-Type",
+            "User-Agent",
+            "anthropic-beta",
+            "anthropic-client-platform",
+            "anthropic-version",
+            "x-organization-uuid",
+            "Connection",
+            "Host",
+        ]
+    } else if path.starts_with("/v1/mcp_servers") {
+        &[
+            "Accept",
+            "Accept-Encoding",
+            "Authorization",
+            "Content-Type",
+            "User-Agent",
+            "anthropic-beta",
+            "anthropic-mcp-client-capabilities",
+            "anthropic-version",
+            "mcp-protocol-version",
+            "Connection",
+            "Host",
+        ]
+    } else {
+        &[
+            "Accept",
+            "Accept-Encoding",
+            "Authorization",
+            "Content-Type",
+            "User-Agent",
+            "anthropic-beta",
+            "Connection",
+            "Host",
+        ]
+    }
+}
+
+/// 控制系统提示词 `<env>` 块中各环境字段是否「真值透传」(跳过改写)。
+///
+/// 这三项仅存在于请求体的系统提示词中,不进请求头/遥测,放开改写无跨通道连带风险。
+/// `platform` 不在此列:它是请求头/遥测/提示词三处共享的跨通道字段,必须保持一致。
+#[derive(Clone, Copy, Default)]
+pub struct EnvPassthrough {
+    /// 透传真实 `Shell:` 行。
+    pub shell: bool,
+    /// 透传真实 `OS Version:` 行。
+    pub os_version: bool,
+    /// 透传真实 `Working directory:` 行(同时跳过 home 路径前缀改写)。
+    pub working_dir: bool,
+}
+
+/// `thinking.type=disabled` 的兼容改写配置。
+///
+/// 该配置只处理请求体顶层 `thinking` 参数,不处理历史 assistant thinking block。
+/// 历史 block 带 Anthropic 签名,修改内容会造成另一类签名错误,仍交给网关的签名降级重试。
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DisabledThinkingRewrite {
+    /// 是否启用 `disabled` 到 `adaptive` 的自动改写。
+    pub enabled: bool,
+    /// 需要改写的精确模型 ID 列表。
+    pub models: Vec<String>,
+}
+
+impl DisabledThinkingRewrite {
+    /// 构造关闭状态的配置。
+    ///
+    /// @return 不改写任何请求的配置。
+    pub fn off() -> Self {
+        Self::default()
+    }
+}
+
+/// Claude Code 自动上下文风险扫描/规范化模式。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ClaudeCodeContextSanitizerMode {
+    /// 关闭扫描与日志。
+    Off,
+    /// 只扫描并记录脱敏摘要,不改写请求体。
+    #[default]
+    ReportOnly,
+    /// 扫描并规范化 Claude Code 自动注入的 currentDate 句式。
+    Normalize,
+}
+
+impl ClaudeCodeContextSanitizerMode {
+    /// 从 settings 字符串解析上下文治理模式。
+    ///
+    /// @param raw settings 中保存的原始字符串。
+    /// @return 解析成功返回枚举值,非法值返回业务错误。
+    pub fn parse(raw: &str) -> Result<Self, AppError> {
+        match raw.trim() {
+            "off" => Ok(Self::Off),
+            "report_only" => Ok(Self::ReportOnly),
+            "normalize" => Ok(Self::Normalize),
+            other => Err(AppError::BadRequest(format!(
+                "'claude_code_context_sanitizer_mode' 必须是 off、report_only 或 normalize,当前值: {}",
+                other
+            ))),
+        }
+    }
+
+    /// 返回日志和前端使用的稳定字符串。
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Off => "off",
+            Self::ReportOnly => "report_only",
+            Self::Normalize => "normalize",
+        }
+    }
+}
+
+/// Claude Code 自动上下文风险扫描/规范化配置。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ClaudeCodeContextSanitizerConfig {
+    /// 当前治理模式。
+    pub mode: ClaudeCodeContextSanitizerMode,
+}
+
+impl ClaudeCodeContextSanitizerConfig {
+    /// 构造关闭状态配置。
+    ///
+    /// @return 不扫描、不改写的配置。
+    pub fn off() -> Self {
+        Self {
+            mode: ClaudeCodeContextSanitizerMode::Off,
+        }
+    }
+
+    /// 从 settings 字符串解析治理配置。
+    ///
+    /// @param raw settings 中保存的原始字符串。
+    /// @return 解析成功返回配置,非法值返回业务错误。
+    pub fn parse(raw: &str) -> Result<Self, AppError> {
+        Ok(Self {
+            mode: ClaudeCodeContextSanitizerMode::parse(raw)?,
+        })
+    }
+}
+
+/// Anthropic ephemeral cache_control TTL 改写模式。
+///
+/// 该设置只决定是否覆盖已有 `cache_control.type == "ephemeral"` 的 `ttl`;
+/// 不创建新的 `cache_control`,避免无意增加缓存断点。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum CacheControlTtlRewrite {
+    /// 不改写请求体中的 cache_control ttl。
+    #[default]
+    Off,
+    /// 将已有 ephemeral cache_control 的 ttl 改写为 5m。
+    FiveMinutes,
+    /// 将已有 ephemeral cache_control 的 ttl 改写为 1h。
+    OneHour,
+}
+
+impl CacheControlTtlRewrite {
+    /// 从 settings 字符串解析 TTL 改写模式。
+    ///
+    /// @param raw settings 中保存的原始字符串。
+    /// @return 解析成功返回枚举值,非法值返回业务错误。
+    pub fn parse(raw: &str) -> Result<Self, AppError> {
+        match raw.trim() {
+            "off" => Ok(Self::Off),
+            "5m" => Ok(Self::FiveMinutes),
+            "1h" => Ok(Self::OneHour),
+            other => Err(AppError::BadRequest(format!(
+                "'cache_control_ttl_rewrite' 必须是 off、5m 或 1h,当前值: {}",
+                other
+            ))),
+        }
+    }
+
+    /// 返回目标 TTL 字符串;关闭改写时返回 `None`。
+    ///
+    /// @return 目标 TTL,或关闭改写时的 `None`。
+    pub fn target_ttl(self) -> Option<&'static str> {
+        match self {
+            Self::Off => None,
+            Self::FiveMinutes => Some("5m"),
+            Self::OneHour => Some("1h"),
+        }
+    }
+
+    /// 返回日志中使用的稳定设置名。
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Off => "off",
+            Self::FiveMinutes => "5m",
+            Self::OneHour => "1h",
+        }
+    }
+}
+
+/// Claude Code messages 缓存断点改写模式。
+///
+/// `Auto` 会使用无状态保守滚动策略,稳定 Claude Code cache prefix 后只在相对稳定的
+/// message 边界放置断点。`Rolling` 保留更积极的滚动策略,方便线上对照。
+/// `Stateful` 在 `Auto` 基础上按会话保留上一轮实际发送的断点指纹,并避免异常暴涨
+/// 请求污染正常主线。`Sub2api` 使用最后一条 message + 倒数第二个 user message
+/// 的通用稳定断点策略,用于 API 模式默认策略和 Claude Code 对照实验。旧设置值
+/// `stable` / `anchored` 会兼容解析到 `Auto`,避免历史配置继续进入已废弃的实验路径。
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum MessageCacheControlRewrite {
+    /// 保持客户端原始 message cache_control。
+    #[default]
+    Off,
+    /// 自动缓存修复策略。
+    Auto,
+    /// 更积极的滚动断点策略。
+    Rolling,
+    /// 会话级防污染缓存断点策略。
+    Stateful,
+    /// sub2api 风格的通用稳定尾部断点策略。
+    Sub2api,
+}
+
+impl MessageCacheControlRewrite {
+    /// 返回日志中使用的稳定设置名。
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Off => "off",
+            Self::Auto => "auto",
+            Self::Rolling => "rolling",
+            Self::Stateful => "stateful",
+            Self::Sub2api => "sub2api",
+        }
+    }
+
+    /// 从 settings 字符串解析 message 缓存断点改写模式。
+    ///
+    /// @param raw settings 中保存的原始字符串。
+    /// @return 解析成功返回枚举值,非法值返回业务错误。
+    pub fn parse(raw: &str) -> Result<Self, AppError> {
+        match raw.trim() {
+            "off" => Ok(Self::Off),
+            "auto" | "stable" | "anchored" => Ok(Self::Auto),
+            "rolling" => Ok(Self::Rolling),
+            "stateful" => Ok(Self::Stateful),
+            "sub2api" => Ok(Self::Sub2api),
+            other => Err(AppError::BadRequest(format!(
+                "'message_cache_control_rewrite' 必须是 off、auto、rolling、stateful 或 sub2api,当前值: {}",
+                other
+            ))),
+        }
+    }
+}
+
+/// 处理所有请求的反检测改写。
+pub struct Rewriter {
+    stateful_cache: Mutex<StatefulCacheStore>,
+}
+
+/// stateful 缓存断点的延迟提交句柄。
+///
+/// 网关流式响应只有在上游 body 真正读完后才提交该句柄,避免并行 tool 请求提前复用
+/// 一个 Anthropic 还没完成写入的缓存断点集合。
+pub struct StatefulCacheCompletion {
+    key: String,
+    profile: StatefulRequestProfile,
+    anchors: Vec<AnchorRecord>,
+    snapshot_generation: Option<u64>,
+    snapshot_cache_read_tokens: Option<u64>,
+    has_reused_anchor: bool,
+}
+
+/// Anthropic 响应返回的 prompt cache 使用量。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct StatefulCacheUsage {
+    pub cache_read_input_tokens: u64,
+    pub cache_creation_input_tokens: u64,
+    pub cache_creation_ephemeral_5m_input_tokens: u64,
+    pub cache_creation_ephemeral_1h_input_tokens: u64,
+}
+
+impl Rewriter {
+    /// 创建请求体与请求头改写器。
+    ///
+    /// @return 请求体与请求头改写器实例。
+    pub fn new() -> Self {
+        Self {
+            stateful_cache: Mutex::new(StatefulCacheStore::default()),
+        }
+    }
+
+    // --- Header 改写 ---
+
+    /// 按所选版本画像改写出站请求头。
+    ///
+    /// @param headers 客户端请求头。
+    /// @param path 不含查询参数的请求路径。
+    /// @param account 已选择的上游账号。
+    /// @param client_type 客户端类型。
+    /// @param model_id 当前请求模型。
+    /// @param body_map 改写后的请求体，用于辅助请求分类。
+    /// @return 尚未注入上游 Authorization 的请求头。
+    pub fn rewrite_headers(
+        &self,
+        headers: &HashMap<String, String>,
+        path: &str,
+        account: &Account,
+        client_type: ClientType,
+        model_id: &str,
+        body_map: &serde_json::Value,
+    ) -> HashMap<String, String> {
+        let profile = device_profile(account);
+        let env = &profile.env;
+        let version = normalize_version(&env.version);
+        let version_profile = profile_for_version(version);
+        let business = (version_profile.endpoints.header_profile
+            == EndpointHeaderProfile::ClaudeCode21280)
+            .then(|| business_endpoint(path))
+            .flatten();
+
+        let mut out = HashMap::new();
+
+        if client_type == ClientType::API {
+            // API 模式：使用按 endpoint 拆分的当前 Claude Code header profile。
+            out.insert("Accept".into(), "application/json".into());
+            if requires_anthropic_beta(path) {
+                out.insert(
+                    "anthropic-beta".into(),
+                    beta_header_for_path(&version_profile.request, path, model_id, body_map),
+                );
+            }
+            if requires_json_content_type(path) {
+                out.insert("content-type".into(), "application/json".into());
+            }
+            if path.starts_with("/api/eval/") {
+                out.insert("Accept".into(), "*/*".into());
+                out.insert(
+                    "User-Agent".into(),
+                    version_profile.telemetry.growthbook_user_agent.into(),
+                );
+                out.insert("accept-encoding".into(), "gzip, deflate, br, zstd".into());
+            } else if is_event_logging_path(path) {
+                out.insert("Accept".into(), "application/json, text/plain, */*".into());
+                out.insert("User-Agent".into(), claude_code_user_agent(version));
+                out.insert(
+                    "accept-encoding".into(),
+                    "gzip, compress, deflate, br".into(),
+                );
+                out.insert("x-service-name".into(), "claude-code".into());
+            } else if path.starts_with("/api/claude_code_penguin_mode") {
+                out.insert("Accept".into(), "application/json, text/plain, */*".into());
+                out.insert("User-Agent".into(), "axios/1.15.2".into());
+                out.insert(
+                    "accept-encoding".into(),
+                    "gzip, compress, deflate, br".into(),
+                );
+            } else if path.starts_with("/api/claude_cli/bootstrap") {
+                out.insert("Accept".into(), "application/json, text/plain, */*".into());
+                out.insert("User-Agent".into(), claude_code_user_agent(version));
+                out.insert(
+                    "accept-encoding".into(),
+                    "gzip, compress, deflate, br".into(),
+                );
+            } else if path.starts_with("/v1/code/triggers") {
+                out.insert("Accept".into(), "application/json, text/plain, */*".into());
+                out.insert("User-Agent".into(), claude_cli_user_agent(version));
+                out.insert("anthropic-version".into(), "2023-06-01".into());
+                out.insert("anthropic-client-platform".into(), "claude_code_cli".into());
+                if let Some(ref org) = account.organization_uuid {
+                    out.insert("x-organization-uuid".into(), org.clone());
+                }
+                out.insert(
+                    "accept-encoding".into(),
+                    "gzip, compress, deflate, br".into(),
+                );
+            } else if path.starts_with("/v1/mcp_servers") {
+                out.insert("Accept".into(), "application/json, text/plain, */*".into());
+                out.insert("User-Agent".into(), "axios/1.15.2".into());
+                out.insert(
+                    "anthropic-mcp-client-capabilities".into(),
+                    version_profile.endpoints.mcp_client_capabilities().into(),
+                );
+                out.insert("anthropic-version".into(), "2023-06-01".into());
+                out.insert("mcp-protocol-version".into(), MCP_PROTOCOL_VERSION.into());
+                out.insert(
+                    "accept-encoding".into(),
+                    "gzip, compress, deflate, br".into(),
+                );
+            } else if path.starts_with("/api/")
+                || path.starts_with("/mcp-registry/")
+                || path.starts_with("/")
+            {
+                out.insert("Accept".into(), "application/json, text/plain, */*".into());
+                out.insert("User-Agent".into(), claude_cli_user_agent(version));
+                out.insert(
+                    "accept-encoding".into(),
+                    "gzip, compress, deflate, br".into(),
+                );
+            }
+
+            if path.starts_with("/v1/messages") {
+                out.insert("Accept".into(), "application/json".into());
+                out.insert("User-Agent".into(), claude_cli_user_agent(version));
+                out.insert("anthropic-version".into(), "2023-06-01".into());
+                out.insert(
+                    "anthropic-dangerous-direct-browser-access".into(),
+                    "true".into(),
+                );
+                out.insert("x-app".into(), "cli".into());
+                out.insert("accept-encoding".into(), "gzip, deflate, br, zstd".into());
+                let stainless_os = stainless_os_from_platform(&env.platform);
+                out.insert("X-Stainless-Lang".into(), "js".into());
+                out.insert(
+                    "X-Stainless-Package-Version".into(),
+                    version_profile.identity.stainless_package_version.into(),
+                );
+                out.insert("X-Stainless-OS".into(), stainless_os.into());
+                out.insert("X-Stainless-Arch".into(), env.arch.clone());
+                out.insert("X-Stainless-Runtime".into(), "node".into());
+                out.insert(
+                    "X-Stainless-Runtime-Version".into(),
+                    version_profile.identity.stainless_runtime_version.into(),
+                );
+                out.insert("X-Stainless-Retry-Count".into(), "0".into());
+                out.insert("X-Stainless-Timeout".into(), "600".into());
+
+                let request = request_profile(account, extract_session_id_from_body(body_map));
+                out.insert("X-Claude-Code-Session-Id".into(), request.session_id);
+                out.insert("x-client-request-id".into(), request.client_request_id);
+            }
+        } else {
+            // CC 客户端模式：白名单 + 改写
+            let allowed: std::collections::HashSet<&str> = [
+                "accept",
+                "user-agent",
+                "content-type",
+                "accept-encoding",
+                "accept-language",
+                "anthropic-beta",
+                "anthropic-version",
+                "anthropic-mcp-client-capabilities",
+                "mcp-protocol-version",
+                "anthropic-dangerous-direct-browser-access",
+                "x-app",
+                "sec-fetch-mode",
+                "x-stainless-retry-count",
+                "x-stainless-timeout",
+                "x-stainless-lang",
+                "x-stainless-package-version",
+                "x-stainless-os",
+                "x-stainless-arch",
+                "x-stainless-runtime",
+                "x-stainless-runtime-version",
+                "x-stainless-helper-method",
+                "x-claude-code-session-id",
+                "x-client-request-id",
+                "x-service-name",
+                "anthropic-client-platform",
+                "x-organization-uuid",
+            ]
+            .into_iter()
+            .collect();
+
+            let stainless_os = stainless_os_from_platform(&env.platform);
+            for (k, v) in headers {
+                let lower = k.to_lowercase();
+                let endpoint_header = match lower.as_str() {
+                    // 分类和关联字段来自同一原生调用，不能只保留 subagent 标记却丢失其身份。
+                    "x-claude-code-request-class"
+                    | "x-claude-code-prev-tool-durations"
+                    | "x-claude-code-agent-id"
+                    | "x-claude-code-parent-agent-id"
+                    | "x-claude-code-agent-type"
+                    | "x-claude-code-prompt-id" => path == "/v1/messages",
+                    "x-frame-cp"
+                    | "x-frame-surface"
+                    | "x-frame-platform"
+                    | "x-frame-client-version"
+                    | "x-frame-session-id" => business == Some(BusinessEndpoint::Frame),
+                    "x-mcp-client-session-id" | "mcp-method" => {
+                        business == Some(BusinessEndpoint::Mcp)
+                    }
+                    _ => false,
+                };
+                if !allowed.contains(lower.as_str()) && !endpoint_header {
+                    continue;
+                }
+                let wire_key = resolve_wire_casing(k);
+                match lower.as_str() {
+                    "x-frame-client-version" => {
+                        out.insert(wire_key, version.to_string());
+                    }
+                    "user-agent" => {
+                        let user_agent = if path.starts_with("/api/eval/") {
+                            version_profile.telemetry.growthbook_user_agent.to_string()
+                        } else if is_event_logging_path(path)
+                            || path.starts_with("/api/claude_cli/bootstrap")
+                        {
+                            claude_code_user_agent(version)
+                        } else if path.starts_with("/v1/mcp_servers")
+                            || path.starts_with("/api/claude_code_penguin_mode")
+                        {
+                            "axios/1.15.2".to_string()
+                        } else {
+                            claude_cli_user_agent(version)
+                        };
+                        out.insert(wire_key, user_agent);
+                    }
+                    "x-stainless-package-version" => {
+                        out.insert(
+                            wire_key,
+                            version_profile
+                                .identity
+                                .stainless_package_version
+                                .to_string(),
+                        );
+                    }
+                    "x-stainless-os" => {
+                        out.insert(wire_key, stainless_os.to_string());
+                    }
+                    "x-stainless-arch" => {
+                        out.insert(wire_key, env.arch.clone());
+                    }
+                    "x-stainless-runtime-version" => {
+                        out.insert(
+                            wire_key,
+                            version_profile
+                                .identity
+                                .stainless_runtime_version
+                                .to_string(),
+                        );
+                    }
+                    "x-organization-uuid" => {
+                        if let Some(ref org) = account.organization_uuid {
+                            out.insert(wire_key, org.clone());
+                        }
+                    }
+                    _ => {
+                        out.insert(wire_key, v.clone());
+                    }
+                }
+            }
+
+            if path.starts_with("/v1/messages") {
+                out.entry("anthropic-dangerous-direct-browser-access".into())
+                    .or_insert_with(|| "true".into());
+            }
+
+            // 先按账号能力过滤客户端 beta，再与必需画像合并。Fast Mode 默认禁止，
+            // 只有管理员显式放行后才允许透传；1M 继续沿用现有模型白名单。
+            let existing_beta = out.get("anthropic-beta").cloned().unwrap_or_default();
+            let filtered_existing = filter_account_beta_tokens(&existing_beta, account, model_id);
+            if requires_anthropic_beta(path) {
+                let mut required_beta =
+                    beta_header_for_path(&version_profile.request, path, model_id, body_map);
+                if path == "/v1/messages" {
+                    if let Some(model) = version_profile.request.main_model(model_id) {
+                        // 客户端掌握 feature flag 和会话条件；只保留其显式携带的可选 token。
+                        required_beta = required_beta
+                            .split(',')
+                            .filter(|token| {
+                                !model.client_optional_beta_tokens.contains(token)
+                                    || (version_profile.request.message_body_order
+                                        == MessageBodyOrderProfile::ClaudeCode21293
+                                        && filtered_existing
+                                            .split(',')
+                                            .any(|incoming| incoming == *token))
+                            })
+                            .collect::<Vec<_>>()
+                            .join(",");
+                    }
+                }
+                let beta = if requires_exact_beta_profile(
+                    &version_profile.request,
+                    path,
+                    model_id,
+                    body_map,
+                ) {
+                    if version_profile.request.message_body_order
+                        == MessageBodyOrderProfile::ClaudeCode21293
+                    {
+                        let optional = version_profile
+                            .request
+                            .main_model(model_id)
+                            .map(|model| {
+                                filtered_existing
+                                    .split(',')
+                                    .filter(|token| {
+                                        model.client_optional_beta_tokens.contains(token)
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join(",")
+                            })
+                            .unwrap_or_default();
+                        // 精确 safeguard 仍只接受已验证的客户端可选项，1M 先经过账号白名单。
+                        order_context_1m_after_oauth(merge_anthropic_beta(
+                            &required_beta,
+                            &optional,
+                        ))
+                    } else {
+                        required_beta
+                    }
+                } else {
+                    order_context_1m_after_oauth(merge_anthropic_beta(
+                        required_beta.as_str(),
+                        &filtered_existing,
+                    ))
+                };
+                out.insert("anthropic-beta".into(), beta);
+            }
+            if is_event_logging_path(path) {
+                out.insert("x-service-name".into(), "claude-code".into());
+            }
+            if path.starts_with("/v1/code/triggers") {
+                out.insert("anthropic-client-platform".into(), "claude_code_cli".into());
+                if let Some(ref org) = account.organization_uuid {
+                    out.insert("x-organization-uuid".into(), org.clone());
+                }
+            }
+            if path.starts_with("/v1/mcp_servers") || path.starts_with("/v1/code/triggers") {
+                out.insert("anthropic-version".into(), "2023-06-01".into());
+            }
+            if path.starts_with("/v1/mcp_servers") {
+                out.insert(
+                    "anthropic-mcp-client-capabilities".into(),
+                    version_profile.endpoints.mcp_client_capabilities().into(),
+                );
+                out.insert("mcp-protocol-version".into(), MCP_PROTOCOL_VERSION.into());
+            }
+        }
+
+        // 两种客户端入口共用末端规范化，避免 API 注入和原生客户端合并出现不同结果。
+        if path == "/v1/messages"
+            && haiku_request_kind(&version_profile.request, model_id, body_map)
+                == Some(HaikuRequestKind::Title)
+        {
+            let incoming_beta = find_header_value(headers, "anthropic-beta")
+                .map(String::as_str)
+                .unwrap_or_default();
+            let filtered_beta = filter_account_beta_tokens(incoming_beta, account, model_id);
+            out.insert(
+                "anthropic-beta".into(),
+                title_beta_header(&version_profile.request, &filtered_beta),
+            );
+        }
+        if let Some((user_agent, beta)) = auxiliary_endpoint_headers(version_profile, path) {
+            out.insert("User-Agent".into(), user_agent);
+            if let Some(beta) = beta {
+                out.insert("anthropic-beta".into(), beta.to_string());
+            } else {
+                out.remove("anthropic-beta");
+            }
+        }
+        if version_profile.endpoints.header_profile == EndpointHeaderProfile::ClaudeCode21293 {
+            match path {
+                "/api/hello" => {
+                    out.remove("content-type");
+                    out.remove("anthropic-version");
+                    out.insert("Accept".into(), "*/*".into());
+                    out.insert("accept-encoding".into(), "gzip, deflate, br, zstd".into());
+                }
+                "/api/claude_code_grove" | "/api/claude_code_penguin_mode" => {
+                    out.remove("content-type");
+                    out.remove("anthropic-version");
+                }
+                "/api/claude_cli/bootstrap" => {
+                    out.insert("content-type".into(), "application/json".into());
+                    out.remove("anthropic-version");
+                }
+                _ => {}
+            }
+        }
+        if client_type == ClientType::API && business == Some(BusinessEndpoint::Frame) {
+            // Frame 合同 GET 的原始请求没有 JSON 正文，也没有 Content-Type。
+            out.remove("content-type");
+        }
+
+        out
+    }
+
+    // --- Body 改写 ---
+
+    /// 根据端点和客户端类型改写请求体。
+    pub fn rewrite_body(
+        &self,
+        body: &[u8],
+        path: &str,
+        account: &Account,
+        client_type: ClientType,
+        env_pt: EnvPassthrough,
+        cache_ttl_rewrite: CacheControlTtlRewrite,
+        message_cache_rewrite: MessageCacheControlRewrite,
+        message_body_order_fingerprint_enabled: bool,
+    ) -> Vec<u8> {
+        let (output, completion) = self.rewrite_body_inner(
+            body,
+            path,
+            account,
+            client_type,
+            env_pt,
+            cache_ttl_rewrite,
+            message_cache_rewrite,
+            message_body_order_fingerprint_enabled,
+            &DisabledThinkingRewrite::off(),
+            &UpstreamSessionRewrite::default(),
+            ClaudeCodeContextSanitizerConfig::off(),
+        );
+        self.complete_stateful_cache(completion);
+        output
+    }
+
+    /// 根据端点和客户端类型改写请求体,并返回需要在上游成功完成后提交的缓存状态。
+    ///
+    /// @param body 原始下游请求体。
+    /// @param path 请求路径。
+    /// @param account 当前账号。
+    /// @param client_type 客户端类型。
+    /// @param env_pt 环境透传配置。
+    /// @param cache_ttl_rewrite cache_control TTL 改写配置。
+    /// @param message_cache_rewrite message cache_control 断点改写配置。
+    /// @param message_body_order_fingerprint_enabled 是否对 API mimicry 生成的 `/v1/messages` 顶层字段按 Claude Code 画像排序。
+    /// @param disabled_thinking_rewrite `thinking.type=disabled` 兼容改写配置。
+    /// @param upstream_session_rewrite 上游 session 改写上下文。
+    /// @return 改写后的 body 与可选 stateful 延迟提交句柄。
+    pub fn rewrite_body_with_stateful_completion(
+        &self,
+        body: &[u8],
+        path: &str,
+        account: &Account,
+        client_type: ClientType,
+        env_pt: EnvPassthrough,
+        cache_ttl_rewrite: CacheControlTtlRewrite,
+        message_cache_rewrite: MessageCacheControlRewrite,
+        message_body_order_fingerprint_enabled: bool,
+        disabled_thinking_rewrite: &DisabledThinkingRewrite,
+        upstream_session_rewrite: &UpstreamSessionRewrite,
+        context_sanitizer_config: ClaudeCodeContextSanitizerConfig,
+    ) -> (Vec<u8>, Option<StatefulCacheCompletion>) {
+        self.rewrite_body_inner(
+            body,
+            path,
+            account,
+            client_type,
+            env_pt,
+            cache_ttl_rewrite,
+            message_cache_rewrite,
+            message_body_order_fingerprint_enabled,
+            disabled_thinking_rewrite,
+            upstream_session_rewrite,
+            context_sanitizer_config,
+        )
+    }
+
+    /// 为 Messages 的三条转发分支准备可选的根字段清理正文。
+    ///
+    /// @param body 已解析的原始入站正文，仍由 Gateway 保留用于准入和调度。
+    /// @param path 请求路径，仅精确 `/v1/messages` 适用。
+    /// @param enabled 本请求冻结的清理开关。
+    /// @return 真正删除字段后返回新正文；其它情况返回 None，供调用方复用原字节。
+    pub(crate) fn filter_message_top_fields(
+        body: &serde_json::Value,
+        path: &str,
+        enabled: bool,
+    ) -> Option<Vec<u8>> {
+        if !enabled || path != "/v1/messages" {
+            return None;
+        }
+        let object = body.as_object()?;
+        if !MESSAGE_TOP_FIELD_DROP_KEYS
+            .iter()
+            .any(|key| object.contains_key(*key))
+        {
+            return None;
+        }
+        let mut filtered = object.clone();
+        for key in MESSAGE_TOP_FIELD_DROP_KEYS {
+            // preserve_order 的 remove 会交换尾键；稳定删除才能保留其它根键的相对顺序。
+            filtered.shift_remove(*key);
+        }
+        serde_json::to_vec(&filtered).ok()
+    }
+
+    /// 账号禁止 Fast 时删除根级 Fast 申请，并保留其它字段的相对顺序。
+    ///
+    /// @param body 当前账号待发送的逻辑 JSON 正文。
+    /// @param account 已选中的请求账号，决定是否允许 Fast。
+    /// @return 只有实际删除根级 `speed: "fast"` 时返回新正文，其它情况返回 None。
+    pub(crate) fn filter_account_fast_mode_body(body: &Value, account: &Account) -> Option<Value> {
+        if account.allow_fast_mode || body.get("speed").and_then(Value::as_str) != Some("fast") {
+            return None;
+        }
+        let mut filtered = body.as_object()?.clone();
+        // 稳定删除避免交换尾键，账号策略不应改变其它字段的 wire 顺序。
+        filtered.shift_remove("speed");
+        Some(Value::Object(filtered))
+    }
+
+    /// 正文策略实际修改后，按请求账号画像刷新最终正文中已有的唯一 billing CCH。
+    ///
+    /// @param body 三分支完成其它改写后的最终正文。
+    /// @param account 已冻结请求画像的账号副本。
+    /// @return 刷新已有五位 CCH；无合法唯一目标时保持输入，不生成 billing 或身份块。
+    pub(crate) fn refresh_message_body_policy_cch(
+        &self,
+        body: Vec<u8>,
+        account: &Account,
+    ) -> Vec<u8> {
+        let profile = device_profile(account);
+        // Strip 的 identity-only 旁路仍可能保留已有 CCH，不受公开签名重试入口的门禁限制。
+        refresh_cch_attestation(body, normalize_version(&profile.env.version))
+    }
+
+    /// 仅改写 Claude Code 请求中的账号身份与上游 session 映射。
+    ///
+    /// 该入口用于必须保持原始正文形状的辅助请求，不执行 system、cache_control、
+    /// thinking、字段顺序或 CCH 等通用改写。正文不是 JSON 或身份无需变化时原样返回。
+    ///
+    /// @param body 原始下游请求体。
+    /// @param account 当前选中的代理账号。
+    /// @param upstream_session_rewrite 上游 session 改写上下文。
+    /// @return 只应用身份映射后的请求体字节。
+    pub fn rewrite_claude_code_identity_only(
+        &self,
+        body: &[u8],
+        account: &Account,
+        upstream_session_rewrite: &UpstreamSessionRewrite,
+    ) -> Vec<u8> {
+        if body.is_empty() {
+            return body.to_vec();
+        }
+
+        let mut parsed: serde_json::Value = match serde_json::from_slice(body) {
+            Ok(value) => value,
+            Err(_) => return body.to_vec(),
+        };
+        let original = parsed.clone();
+        let profile = device_profile(account);
+        self.rewrite_metadata_user_id(
+            &mut parsed,
+            &profile,
+            upstream_session_rewrite.message.as_ref(),
+        );
+        if parsed == original {
+            return body.to_vec();
+        }
+
+        serde_json::to_vec(&parsed).unwrap_or_else(|_| body.to_vec())
+    }
+
+    /// 补齐 Claude Code 状态分类请求的 billing/CCH 与官方身份块。
+    ///
+    /// 该入口只处理已经被 Gateway 强特征识别的 classifier 请求。除账号身份、上游
+    /// session、billing、identity 和 CCH 外，不执行普通 system、cache_control、
+    /// thinking、字段顺序或 expansion 改写；结构不符合预期时失败开放并返回原正文。
+    ///
+    /// @param body 原始下游请求体。
+    /// @param account 当前选中的代理账号。
+    /// @param upstream_session_rewrite 上游 session 改写上下文。
+    /// @return 补齐归因前缀并刷新 CCH 后的请求体字节。
+    pub fn rewrite_claude_code_status_classifier_attribution(
+        &self,
+        body: &[u8],
+        account: &Account,
+        upstream_session_rewrite: &UpstreamSessionRewrite,
+    ) -> Vec<u8> {
+        if body.is_empty() {
+            return body.to_vec();
+        }
+
+        let mut parsed: serde_json::Value = match serde_json::from_slice(body) {
+            Ok(value) => value,
+            Err(_) => return body.to_vec(),
+        };
+        let Some(system_blocks) = parsed.get("system").and_then(|system| system.as_array()) else {
+            return body.to_vec();
+        };
+
+        let mut billing_block = None;
+        let mut identity_block = None;
+        let mut classifier_block = None;
+        let mut existing_billing_has_cch = false;
+        for block in system_blocks {
+            if is_claude_code_billing_system_block(block) {
+                if billing_block.replace(block.clone()).is_some() {
+                    return body.to_vec();
+                }
+                existing_billing_has_cch = block
+                    .get("text")
+                    .and_then(|text| text.as_str())
+                    .is_some_and(|text| CCH_VALUE_REGEX.is_match(text));
+                continue;
+            }
+            if is_claude_code_identity_system_block(block) {
+                if identity_block.replace(block.clone()).is_some() {
+                    return body.to_vec();
+                }
+                continue;
+            }
+            let is_ephemeral_classifier = block.get("type").and_then(|value| value.as_str())
+                == Some("text")
+                && block
+                    .get("cache_control")
+                    .and_then(|value| value.as_object())
+                    .and_then(|cache| cache.get("type"))
+                    .and_then(|value| value.as_str())
+                    == Some("ephemeral");
+            if !is_ephemeral_classifier || classifier_block.replace(block.clone()).is_some() {
+                return body.to_vec();
+            }
+        }
+        let Some(classifier_block) = classifier_block else {
+            return body.to_vec();
+        };
+
+        let profile = device_profile(account);
+        let version = normalize_version(&profile.env.version);
+        self.rewrite_metadata_user_id(
+            &mut parsed,
+            &profile,
+            upstream_session_rewrite.message.as_ref(),
+        );
+
+        let had_billing = billing_block.is_some();
+        let billing_block = billing_block
+            .unwrap_or_else(|| build_claude_code_billing_system_block(&parsed, version));
+        let identity_block = identity_block.unwrap_or_else(build_claude_code_identity_system_block);
+        if let Some(object) = parsed.as_object_mut() {
+            object.insert(
+                "system".into(),
+                serde_json::Value::Array(vec![billing_block, identity_block, classifier_block]),
+            );
+        } else {
+            return body.to_vec();
+        }
+
+        let output = match serde_json::to_vec(&parsed) {
+            Ok(output) => output,
+            Err(_) => return body.to_vec(),
+        };
+        if !had_billing {
+            compute_cch_attestation(output, version)
+        } else if existing_billing_has_cch {
+            refresh_cch_attestation(output, version)
+        } else {
+            output
+        }
+    }
+
+    /// 提交已经被上游成功消费完成的 stateful 缓存状态。
+    ///
+    /// @param completion `rewrite_body_with_stateful_completion` 返回的延迟提交句柄。
+    pub fn complete_stateful_cache(&self, completion: Option<StatefulCacheCompletion>) {
+        self.complete_stateful_cache_with_usage(completion, None);
+    }
+
+    /// 根据上游响应 usage 提交已经被确认的 stateful 缓存状态。
+    ///
+    /// @param completion `rewrite_body_with_stateful_completion` 返回的延迟提交句柄。
+    /// @param usage 上游响应中的 cache usage；无 usage 时按完成即确认的旧行为处理。
+    pub fn complete_stateful_cache_with_usage(
+        &self,
+        completion: Option<StatefulCacheCompletion>,
+        usage: Option<StatefulCacheUsage>,
+    ) {
+        let Some(completion) = completion else {
+            return;
+        };
+        if !stateful_completion_usage_is_trustworthy(&completion, usage) {
+            info!(
+                target: "cc2api::cache",
+                session = completion.key.as_str(),
+                snapshot_cache_read_tokens = completion.snapshot_cache_read_tokens.unwrap_or(0),
+                response_cache_read_tokens = usage.map(|u| u.cache_read_input_tokens).unwrap_or(0),
+                response_cache_creation_tokens = usage.map(|u| u.cache_creation_input_tokens).unwrap_or(0),
+                "stateful cache completion rejected by usage feedback"
+            );
+            return;
+        }
+        if let Ok(mut cache) = self.stateful_cache.lock() {
+            info!(
+                target: "cc2api::cache",
+                session = completion.key.as_str(),
+                snapshot_cache_read_tokens = completion.snapshot_cache_read_tokens.unwrap_or(0),
+                response_cache_read_tokens = usage.map(|u| u.cache_read_input_tokens).unwrap_or(0),
+                response_cache_creation_tokens = usage.map(|u| u.cache_creation_input_tokens).unwrap_or(0),
+                anchor_count = completion.anchors.len(),
+                "stateful cache completion accepted"
+            );
+            cache.promote_if_current(
+                completion.key,
+                completion.profile,
+                completion.anchors,
+                completion.snapshot_generation,
+                usage.map(|usage| usage.cache_read_input_tokens),
+                completion.has_reused_anchor,
+            );
+        }
+    }
+
+    fn rewrite_body_inner(
+        &self,
+        body: &[u8],
+        path: &str,
+        account: &Account,
+        client_type: ClientType,
+        env_pt: EnvPassthrough,
+        cache_ttl_rewrite: CacheControlTtlRewrite,
+        message_cache_rewrite: MessageCacheControlRewrite,
+        message_body_order_fingerprint_enabled: bool,
+        disabled_thinking_rewrite: &DisabledThinkingRewrite,
+        upstream_session_rewrite: &UpstreamSessionRewrite,
+        context_sanitizer_config: ClaudeCodeContextSanitizerConfig,
+    ) -> (Vec<u8>, Option<StatefulCacheCompletion>) {
+        if body.is_empty() {
+            return (body.to_vec(), None);
+        }
+
+        let mut parsed: serde_json::Value = match serde_json::from_slice(body) {
+            Ok(v) => v,
+            Err(_) => return (body.to_vec(), None), // 非 JSON，直接透传
+        };
+        let device = device_profile(account);
+        let version = normalize_version(&device.env.version);
+        let version_profile = profile_for_version(version);
+
+        let mut stateful_completion = None;
+        if path.starts_with("/v1/messages") {
+            strip_empty_text_blocks(&mut parsed);
+            self.rewrite_messages(
+                &mut parsed,
+                account,
+                client_type,
+                env_pt,
+                upstream_session_rewrite,
+                context_sanitizer_config,
+                &version_profile.request,
+            );
+            stateful_completion = self.rewrite_message_cache_control(
+                &mut parsed,
+                account,
+                client_type,
+                message_cache_rewrite,
+                upstream_session_rewrite
+                    .message
+                    .as_ref()
+                    .map(|resolved| resolved.real_session_id.as_str()),
+            );
+            rewrite_existing_ephemeral_cache_control_ttl(&mut parsed, cache_ttl_rewrite);
+            rewrite_disabled_thinking_to_adaptive(&mut parsed, disabled_thinking_rewrite);
+            // 真实 Claude Code 客户端已经带原始 wire 顺序；这里只对 API mimicry 生成的 body 套画像顺序。
+            if message_body_order_fingerprint_enabled && client_type == ClientType::API {
+                order_message_body_top_level_fields(&mut parsed, &version_profile.request);
+            }
+        } else if is_event_logging_path(path) {
+            self.rewrite_event_batch(
+                &mut parsed,
+                account,
+                &upstream_session_rewrite.telemetry_session_map,
+            );
+        } else if path.starts_with("/api/eval/") {
+            self.rewrite_growthbook_eval(&mut parsed, account);
+        } else {
+            self.rewrite_generic_identity(&mut parsed, account);
+        }
+        if client_type == ClientType::API {
+            clean_session_id_from_body(&mut parsed);
+        }
+
+        let mut output = serde_json::to_vec(&parsed).unwrap_or_else(|_| body.to_vec());
+
+        if path.starts_with("/v1/messages")
+            && (account.billing_mode == BillingMode::Rewrite || client_type == ClientType::API)
+        {
+            output = compute_cch_attestation(output, version);
+        }
+
+        (output, stateful_completion)
+    }
+
+    /// 在请求体二次变更后刷新 `cch` attestation。
+    ///
+    /// @param body 已改写但后续又被签名整流修改的请求体。
+    /// @param account 当前账号,用于判断 billing 模式和版本 seed。
+    /// @param client_type 当前请求客户端类型,API mimicry 即使账号非 Rewrite 也会生成 CCH。
+    /// @return 门禁关闭或根级 billing 目标缺失、非法、歧义时原样返回；否则刷新其 CCH。
+    pub fn refresh_cch_attestation(
+        &self,
+        body: Vec<u8>,
+        account: &Account,
+        client_type: ClientType,
+    ) -> Vec<u8> {
+        if account.billing_mode != BillingMode::Rewrite && client_type != ClientType::API {
+            return body;
+        }
+        let profile = device_profile(account);
+        let version = normalize_version(&profile.env.version);
+        refresh_cch_attestation(body, version)
+    }
+
+    /// 处理 /v1/messages 请求体。
+    fn rewrite_messages(
+        &self,
+        body: &mut serde_json::Value,
+        account: &Account,
+        client_type: ClientType,
+        env_pt: EnvPassthrough,
+        upstream_session_rewrite: &UpstreamSessionRewrite,
+        context_sanitizer_config: ClaudeCodeContextSanitizerConfig,
+        request_profile: &RequestProfile,
+    ) {
+        let profile = device_profile(account);
+
+        if client_type == ClientType::ClaudeCode {
+            // 替换模式
+            self.rewrite_metadata_user_id(
+                body,
+                &profile,
+                upstream_session_rewrite.message.as_ref(),
+            );
+            self.rewrite_system_prompt(
+                body,
+                &profile.prompt,
+                &profile.env.version,
+                &account.billing_mode,
+                env_pt,
+            );
+            scrub_git_user_in_reminders(body, &account.name);
+            scan_or_normalize_current_date_context(body, context_sanitizer_config, client_type);
+        } else {
+            // 注入模式
+            self.inject_metadata_user_id(body, &profile, account);
+
+            // 剥离 Claude Code 不会发送的字段；stream 保留调用方选择，避免非流请求变为 SSE。
+            if let Some(obj) = body.as_object_mut() {
+                obj.remove("temperature");
+                obj.remove("top_k");
+                obj.remove("top_p");
+                obj.remove("stop_sequences");
+
+                // 确保 tools 字段存在
+                obj.entry("tools")
+                    .or_insert(serde_json::Value::Array(vec![]));
+            }
+
+            // API mimicry 自己接管 system 断点；客户端 message 断点稍后按设置重打。
+            strip_message_cache_control(body);
+
+            normalize_api_max_tokens(body, request_profile);
+            ensure_fable_fallbacks(body, request_profile);
+            ensure_api_model_profile(body, request_profile);
+
+            // 注入 Claude Code-like system 画像，并把原始 system 迁移到 messages。
+            self.rewrite_api_system_prompt(body, &profile.env.version);
+        }
+    }
+
+    /// 替换已有 metadata.user_id 中的设备与账号身份（CC 客户端模式）。
+    fn rewrite_metadata_user_id(
+        &self,
+        body: &mut serde_json::Value,
+        profile: &DeviceProfile,
+        upstream_session: Option<&UpstreamSessionPoolResolve>,
+    ) {
+        let user_id_str = {
+            let metadata = match body.get("metadata").and_then(|m| m.as_object()) {
+                Some(m) => m,
+                None => return,
+            };
+            match metadata.get("user_id").and_then(|u| u.as_str()) {
+                Some(s) if !s.is_empty() => s.to_string(),
+                _ => return,
+            }
+        };
+
+        // 尝试 JSON 格式
+        if let Ok(mut uid) = serde_json::from_str::<serde_json::Value>(&user_id_str) {
+            if let Some(obj) = uid.as_object_mut() {
+                obj.insert(
+                    "device_id".into(),
+                    serde_json::Value::String(profile.device_id.clone()),
+                );
+                obj.insert(
+                    "account_uuid".into(),
+                    serde_json::Value::String(profile.account_uuid.clone()),
+                );
+                if let Some(upstream_session_id) =
+                    upstream_session.and_then(|resolved| resolved.upstream_session_id.as_ref())
+                {
+                    obj.insert(
+                        "session_id".into(),
+                        serde_json::Value::String(upstream_session_id.clone()),
+                    );
+                }
+                let new_str = serde_json::to_string(&uid).unwrap_or_default();
+                if let Some(metadata) = body.get_mut("metadata").and_then(|m| m.as_object_mut()) {
+                    metadata.insert("user_id".into(), serde_json::Value::String(new_str));
+                }
+                return;
+            }
+        }
+
+        // 旧格式：user_{device}_account_{uuid}_session_{uuid}
+        if let Some(account_idx) = user_id_str.find("_account_") {
+            let account_tail = &user_id_str[account_idx + 9..];
+            let new_val = if let Some(session_idx) = account_tail.find("_session_") {
+                let session_id = upstream_session
+                    .and_then(|resolved| resolved.upstream_session_id.as_deref())
+                    .unwrap_or(&account_tail[session_idx + 9..]);
+                format!(
+                    "user_{}_account_{}_session_{}",
+                    profile.device_id, profile.account_uuid, session_id
+                )
+            } else {
+                format!("user_{}_account_{}", profile.device_id, account_tail)
+            };
+            if let Some(metadata) = body.get_mut("metadata").and_then(|m| m.as_object_mut()) {
+                metadata.insert("user_id".into(), serde_json::Value::String(new_val));
+            }
+        }
+    }
+
+    /// 为纯 API 调用创建 metadata.user_id。返回使用的 session_id。
+    fn inject_metadata_user_id(
+        &self,
+        body: &mut serde_json::Value,
+        profile: &DeviceProfile,
+        account: &Account,
+    ) -> Option<String> {
+        let Some(obj) = body.as_object_mut() else {
+            return None;
+        };
+        obj.entry("metadata")
+            .or_insert_with(|| serde_json::json!({}));
+
+        // API mimicry 不能信任下游自带的 user_id；否则 body/header 会话可能不一致。
+        let session_id = stable_api_session_id(account, body);
+        let request = request_profile(account, Some(session_id));
+        let uid = serde_json::json!({
+            "device_id": profile.device_id,
+            "account_uuid": profile.account_uuid,
+            "session_id": request.session_id,
+        });
+        let uid_str = serde_json::to_string(&uid).unwrap_or_default();
+        if let Some(metadata) = body.get_mut("metadata").and_then(|m| m.as_object_mut()) {
+            metadata.insert("user_id".into(), serde_json::Value::String(uid_str));
+        }
+        Some(request.session_id)
+    }
+
+    /// 将 API 模式请求改写为 Claude Code-like system 画像。
+    fn rewrite_api_system_prompt(&self, body: &mut serde_json::Value, version: &str) {
+        let original_system_text = extract_api_original_system_text(body);
+        let version = normalize_version(version);
+        let billing_block = build_claude_code_billing_system_block(body, version);
+        let banner_block = build_claude_code_identity_system_block();
+        let expansion_block = serde_json::json!({
+            "type": "text",
+            "text": CLAUDE_CODE_SYSTEM_PROMPT_EXPANSION,
+            "cache_control": default_message_cache_control()
+        });
+
+        if let Some(obj) = body.as_object_mut() {
+            obj.insert(
+                "system".into(),
+                serde_json::Value::Array(vec![billing_block, banner_block, expansion_block]),
+            );
+        }
+        inject_original_system_as_messages(body, original_system_text);
+    }
+
+    // --- 系统提示词改写（仅 CC 客户端模式）---
+
+    fn rewrite_system_prompt(
+        &self,
+        body: &mut serde_json::Value,
+        pe: &CanonicalPromptEnvData,
+        version: &str,
+        billing_mode: &BillingMode,
+        env_pt: EnvPassthrough,
+    ) {
+        let version = normalize_version(version);
+        let rewrite_billing = *billing_mode == BillingMode::Rewrite;
+
+        // CCH hash 计算
+        let cch_hash = if rewrite_billing {
+            cc_version_suffix_for_body(body, version)
+        } else {
+            String::new()
+        };
+
+        // 先在整个根级 system 中确认唯一目标，避免逐块重置时掩盖重复 billing 的歧义。
+        if rewrite_billing {
+            reset_system_billing_cch(body);
+        }
+
+        let rewrite = |text: &str| -> String {
+            let mut text = text.to_string();
+            if rewrite_billing {
+                text = BILLING_VERSION_REGEX
+                    .replace_all(&text, &format!("cc_version={}.{}", version, cch_hash))
+                    .to_string();
+            } else if *billing_mode == BillingMode::Strip {
+                text = BILLING_LINE_REGEX.replace_all(&text, "").to_string();
+                text = BILLING_REGEX.replace_all(&text, "").to_string();
+            }
+            text = PLATFORM_REGEX
+                .replace_all(&text, &format!("Platform: {}", pe.platform))
+                .to_string();
+            // Shell / OS Version / Working directory 仅在未开启「真值透传」时改写。
+            // 这三项只存在于请求体提示词中,不进请求头/遥测,放开不影响指纹一致性。
+            if !env_pt.shell {
+                text = SHELL_REGEX
+                    .replace_all(&text, &format!("Shell: {}", pe.shell))
+                    .to_string();
+            }
+            if !env_pt.os_version {
+                text = OS_VERSION_REGEX
+                    .replace_all(&text, &format!("OS Version: {}", pe.os_version))
+                    .to_string();
+            }
+            if !env_pt.working_dir {
+                text = WORKING_DIR_REGEX
+                    .replace_all(&text, &format!("${{1}}{}", pe.working_dir))
+                    .to_string();
+                // home 前缀改写与 working_dir 绑定:透传真实工作目录时一并跳过,
+                // 否则真实路径仍会被 home 前缀改写污染。
+                let home_prefix = if let Some(idx) = nth_index(&pe.working_dir, '/', 3) {
+                    &pe.working_dir[..idx + 1]
+                } else {
+                    &pe.working_dir
+                };
+                text = HOME_PATH_REGEX.replace_all(&text, home_prefix).to_string();
+            }
+            text
+        };
+
+        let rewrite_in_reminders = |text: &str| -> String {
+            SYSTEM_REMINDER_REGEX
+                .replace_all(text, |caps: &regex::Captures| rewrite(&caps[0]))
+                .to_string()
+        };
+
+        // 改写 body.system
+        match body.get("system").cloned() {
+            Some(serde_json::Value::String(sys)) => {
+                body.as_object_mut()
+                    .unwrap()
+                    .insert("system".into(), serde_json::Value::String(rewrite(&sys)));
+            }
+            Some(serde_json::Value::Array(sys)) => {
+                let filtered: Vec<serde_json::Value> = if *billing_mode == BillingMode::Strip {
+                    sys.iter()
+                        .filter(|item| {
+                            if item.get("cache_control").is_some() {
+                                return true;
+                            }
+                            if let Some(text) = item.get("text").and_then(|t| t.as_str()) {
+                                if BILLING_LINE_REGEX.is_match(text) {
+                                    let cleaned =
+                                        BILLING_LINE_REGEX.replace_all(text, "").to_string();
+                                    if cleaned.trim().is_empty() {
+                                        return false;
+                                    }
+                                }
+                            }
+                            true
+                        })
+                        .cloned()
+                        .collect()
+                } else {
+                    sys.clone()
+                };
+
+                let rewritten: Vec<serde_json::Value> = filtered
+                    .into_iter()
+                    .map(|mut item| {
+                        if item.get("cache_control").is_some() {
+                            return item;
+                        }
+                        if let Some(text) = item.get("text").and_then(|t| t.as_str()) {
+                            let new_text = rewrite(text);
+                            item.as_object_mut()
+                                .unwrap()
+                                .insert("text".into(), serde_json::Value::String(new_text));
+                        }
+                        item
+                    })
+                    .collect();
+
+                body.as_object_mut()
+                    .unwrap()
+                    .insert("system".into(), serde_json::Value::Array(rewritten));
+            }
+            _ => {}
+        }
+
+        // 改写消息 — 仅在 <system-reminder> 标签内替换
+        if let Some(messages) = body.get_mut("messages").and_then(|m| m.as_array_mut()) {
+            for msg in messages.iter_mut() {
+                rewrite_message_content(msg, &rewrite_in_reminders);
+            }
+        }
+    }
+
+    // --- 事件日志批量改写 ---
+
+    fn rewrite_event_batch(
+        &self,
+        body: &mut serde_json::Value,
+        account: &Account,
+        telemetry_session_map: &HashMap<String, String>,
+    ) {
+        let profile = device_profile(account);
+        let telemetry_shape = profile_for_version(&profile.env.version).telemetry.shape;
+
+        let Some(events) = body.get_mut("events").and_then(|e| e.as_array_mut()) else {
+            rewrite_session_fields_recursive(body, telemetry_session_map);
+            return;
+        };
+
+        let canonical_env = build_event_env_map(&profile, telemetry_shape);
+
+        for event in events.iter_mut() {
+            let e = match event.as_object_mut() {
+                Some(e) => e,
+                None => continue,
+            };
+
+            rewrite_event_fields(e, &profile, telemetry_shape, &canonical_env);
+            if let Some(event_data) = e.get_mut("event_data").and_then(|v| v.as_object_mut()) {
+                rewrite_event_fields(event_data, &profile, telemetry_shape, &canonical_env);
+                rewrite_session_fields_in_map(event_data, telemetry_session_map);
+            }
+            rewrite_session_fields_in_map(e, telemetry_session_map);
+        }
+        // 部分 event_logging 变体会把 session 字段放在 batch 根级或更深层结构里；
+        // 最后做一次全量递归，只替换明确命名的 session 字段，避免遥测绕过池映射。
+        rewrite_session_fields_recursive(body, telemetry_session_map);
+    }
+
+    // --- GrowthBook remoteEval 改写 (POST /api/eval/{clientKey}) ---
+
+    fn rewrite_growthbook_eval(&self, body: &mut serde_json::Value, account: &Account) {
+        let profile = device_profile(account);
+        let telemetry_shape = profile_for_version(&profile.env.version).telemetry.shape;
+        {
+            let attrs = match body.get_mut("attributes").and_then(|a| a.as_object_mut()) {
+                Some(a) => a,
+                None => return,
+            };
+
+            apply_growthbook_attributes(attrs, &profile, telemetry_shape);
+        }
+        rewrite_growthbook_payload_shape(body, telemetry_shape);
+    }
+
+    // --- 通用身份改写 ---
+
+    fn rewrite_generic_identity(&self, body: &mut serde_json::Value, account: &Account) {
+        if let Some(obj) = body.as_object_mut() {
+            let profile = device_profile(account);
+            if obj.contains_key("device_id") {
+                obj.insert(
+                    "device_id".into(),
+                    serde_json::Value::String(profile.device_id),
+                );
+            }
+            if obj.contains_key("email") {
+                obj.insert("email".into(), serde_json::Value::String(profile.email));
+            }
+        }
+    }
+}
+
+// --- 正则表达式 ---
+
+static PLATFORM_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"Platform:\s*\S+").unwrap());
+static SHELL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"Shell:\s*[^\n<]+").unwrap());
+static OS_VERSION_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"OS Version:\s*[^\n<]+").unwrap());
+static WORKING_DIR_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"((?:Primary )?[Ww]orking directory:\s*)/[^\s<]+").unwrap());
+static HOME_PATH_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"/(?:Users|home)/[^/\s]+/").unwrap());
+static BILLING_LINE_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?m)^\s*x-anthropic-billing-header:[^\n]*\n?").unwrap());
+static BILLING_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"cc_version=[\d.]+\.[a-f0-9]{3};[^;]*;?").unwrap());
+/// 仅匹配 cc_version 值部分，用于 Rewrite 模式保留 cc_entrypoint。
+static BILLING_VERSION_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"cc_version=[\d.]+\.[a-f0-9]{3}").unwrap());
+static BILLING_VERSION_SUFFIX_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"cc_version=[\d.]+\.([a-f0-9]{3})").unwrap());
+static CCH_VALUE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"cch=[a-f0-9]{5}").unwrap());
+static CLAUDE_CODE_BILLING_BLOCK_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"^x-anthropic-billing-header: cc_version=[\d.]+\.[a-f0-9]{3}; cc_entrypoint=cli;(?: cch=[a-f0-9]{5};)?$",
+    )
+    .unwrap()
+});
+// 用户名只占当前行的文本，不能跨过标签边界或吞掉 CRLF 的回车。
+static GIT_USER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"Git user:[ \t]*[^\r\n<]+").unwrap());
+static SYSTEM_REMINDER_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?s)<system-reminder>(.*?)</system-reminder>").unwrap());
+static CLAUDE_MD_CONTENTS_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"Contents of /[^\n]*?CLAUDE\.md").unwrap());
+static SKILLS_LIST_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?s)^(.+?\n\n)(- .+?)(\n</system-reminder>\s*)$").unwrap());
+static DEFERRED_TOOLS_LIST_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?s)^(<system-reminder>\nThe following deferred tools are now available[^\n]*\n)(.+?)(\n</system-reminder>\s*)$",
+    )
+    .unwrap()
+});
+static CLAUDE_CODE_CURRENT_DATE_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?i)\bToday['\u{2019}\u{02BC}\u{02B9}\u{2032}]s date is (\d{4})([-/])(\d{2})([-/])(\d{2})\.",
+    )
+    .unwrap()
+});
+
+// --- CCH Attestation (xxhash64) ---
+
+const CCH_ATTESTATION_SEED_LEGACY: u64 = 0x6E52736AC806831E;
+const CCH_ATTESTATION_SEED_2156: u64 = 0x4D659218E32A3268;
+const CCH_PLACEHOLDER: &[u8] = b"cch=00000";
+const BILLING_HEADER_PREFIX: &str = "x-anthropic-billing-header:";
+
+/// 对序列化后的 body 字节计算 cch attestation 并原地替换占位符。
+/// 算法：xxhash64(body_with_placeholder, seed) 取低 20 bits → 5 位十六进制。
+fn compute_cch_attestation(mut body: Vec<u8>, version: &str) -> Vec<u8> {
+    if let Some(pos) = find_cch_value(&body)
+        && &body[pos..pos + 5] == &CCH_PLACEHOLDER[4..]
+    {
+        let hash_input = cch_attestation_input(&body, version);
+        let hash = xxhash_rust::xxh64::xxh64(&hash_input, cch_attestation_seed(version));
+        let cch = format!("{:05x}", hash & 0xFFFFF);
+        body[pos..pos + 5].copy_from_slice(cch.as_bytes());
+    }
+    body
+}
+
+fn refresh_cch_attestation(mut body: Vec<u8>, version: &str) -> Vec<u8> {
+    if let Some(pos) = find_cch_value(&body) {
+        body[pos..pos + 5].copy_from_slice(&CCH_PLACEHOLDER[4..]);
+        compute_cch_attestation(body, version)
+    } else {
+        body
+    }
+}
+
+fn cch_attestation_input(body: &[u8], version: &str) -> Vec<u8> {
+    let profile = match normalize_version(version) {
+        "2.1.172" => CchProfile::ClaudeCode2172DropFallbacks,
+        normalized => match exact_profile_for_version(normalized) {
+            Some(profile) => profile.billing.cch_profile,
+            None => return body.to_vec(),
+        },
+    };
+    let mut normalized = match profile {
+        CchProfile::ClaudeCodeAllModelValues => {
+            replace_all_exact_string_field_values(body, "model", b"\"\"")
+        }
+        _ => replace_top_level_string_value(body, "model", b"\"\""),
+    };
+    normalized = remove_top_level_field(&normalized, "max_tokens");
+    match profile {
+        CchProfile::ClaudeCode2172DropFallbacks => remove_top_level_field(&normalized, "fallbacks"),
+        CchProfile::ClaudeCodeModelAware {
+            preserve_fallback_models,
+        } if top_level_string_field(body, "model")
+            .as_deref()
+            .map(|model| preserve_fallback_models.contains(&model))
+            .unwrap_or(false) =>
+        {
+            normalized
+        }
+        CchProfile::ClaudeCodeModelAware { .. } => remove_top_level_field(&normalized, "fallbacks"),
+        CchProfile::ClaudeCodeAllModelValues => normalized,
+    }
+}
+
+fn top_level_string_field(body: &[u8], field: &str) -> Option<String> {
+    let range = find_top_level_field_value_range(body, field)?;
+    serde_json::from_slice(&body[range]).ok()
+}
+
+/// 定位以 billing 开头的文本中唯一合法 CCH，后续普通文本不参与归因识别。
+fn billing_cch_value_range(text: &str) -> Option<Range<usize>> {
+    let billing = text.trim_start_matches([' ', '\t', '\r', '\n']);
+    let line_end = billing.find('\n').unwrap_or(billing.len());
+    if billing[line_end..]
+        .lines()
+        .any(|line| line.trim_start().starts_with(BILLING_HEADER_PREFIX))
+    {
+        return None;
+    }
+    let fields = billing[..line_end].strip_prefix(BILLING_HEADER_PREFIX)?;
+    let mut offset = text.len() - billing.len() + BILLING_HEADER_PREFIX.len();
+    let mut has_version = false;
+    let mut has_entrypoint = false;
+    let mut cch = None;
+    // 未知归因字段属于既有透传内容；只按独立字段边界识别 CCH，不限定键集合或顺序。
+    for raw_field in fields.split_inclusive(';') {
+        let field = raw_field.trim_start_matches([' ', '\t']);
+        let field_start = offset + raw_field.len() - field.len();
+        offset += raw_field.len();
+        let terminated = field.ends_with(';');
+        let field = field.strip_suffix(';').unwrap_or(field);
+        let Some((key, value)) = field.split_once('=') else {
+            if field.trim_end_matches([' ', '\t']) == "cch" {
+                return None;
+            }
+            continue;
+        };
+        match key.trim_end_matches([' ', '\t']) {
+            "cc_version" => {
+                has_version |= BILLING_VERSION_REGEX
+                    .find(field)
+                    .is_some_and(|matched| matched.start() == 0 && matched.end() == field.len());
+            }
+            "cc_entrypoint" => {
+                has_entrypoint |= key == "cc_entrypoint"
+                    && !value.is_empty()
+                    && !value.chars().any(char::is_whitespace);
+            }
+            "cch" => {
+                if key != "cch"
+                    || !terminated
+                    || value.len() != 5
+                    || !value.bytes().all(|byte| byte.is_ascii_hexdigit())
+                    || cch.is_some()
+                {
+                    return None;
+                }
+                cch = Some(field_start + 4..field_start + 9);
+            }
+            _ => {}
+        }
+    }
+    if has_version && has_entrypoint {
+        cch
+    } else {
+        None
+    }
+}
+
+/// 将唯一根级 billing CCH 归零，保留缓存块和存在歧义的文本。
+fn reset_system_billing_cch(body: &mut serde_json::Value) {
+    let Some(system) = body.get_mut("system") else {
+        return;
+    };
+    let mut target = None;
+    let texts: Vec<_> = match system {
+        serde_json::Value::String(text) => vec![(None, text.as_str())],
+        serde_json::Value::Array(blocks) => blocks
+            .iter()
+            .enumerate()
+            .filter(|(_, block)| block.get("type").and_then(|value| value.as_str()) == Some("text"))
+            .filter_map(|(index, block)| {
+                block.get("text")?.as_str().map(|text| (Some(index), text))
+            })
+            .collect(),
+        _ => return,
+    };
+    for (index, text) in texts {
+        if !text.trim_start().starts_with(BILLING_HEADER_PREFIX) {
+            continue;
+        }
+        let Some(range) = billing_cch_value_range(text) else {
+            return;
+        };
+        if target.replace((index, range)).is_some() {
+            return;
+        }
+    }
+    let Some((index, range)) = target else {
+        return;
+    };
+    let text = if let Some(index) = index {
+        let block = &mut system[index];
+        // 沿用前置改写的键存在即跳过规则，null 的合法性留给缓存策略处理。
+        if block.get("cache_control").is_some() {
+            return;
+        }
+        &mut block["text"]
+    } else {
+        system
+    };
+    if let serde_json::Value::String(text) = text {
+        text.replace_range(range, "00000");
+    }
+}
+
+/// 只扫描根级 system 及直接 text 块，返回五位值在原始 JSON 中的字节下标。
+fn find_cch_value(body: &[u8]) -> Option<usize> {
+    let system_range = find_unique_json_field_value_range(body, "system").ok()??;
+    let system = &body[system_range.clone()];
+    let mut text_ranges = Vec::new();
+    match system.first()? {
+        b'"' => text_ranges.push(system_range),
+        b'[' => {
+            let mut index = skip_json_ws(system, 1);
+            while system.get(index) != Some(&b']') {
+                let end = scan_json_value_end(system, index)?;
+                if end <= index {
+                    return None;
+                }
+                let block = &system[index..end];
+                if block.first() == Some(&b'{') {
+                    let kind = find_unique_json_field_value_range(block, "type").ok()?;
+                    let text = find_unique_json_field_value_range(block, "text").ok()?;
+                    if kind
+                        .and_then(|range| parse_json_string_bytes(&block[range]))
+                        .as_deref()
+                        == Some("text")
+                        && let Some(range) = text
+                    {
+                        let start = system_range.start + index;
+                        text_ranges.push(start + range.start..start + range.end);
+                    }
+                }
+                index = skip_json_ws(system, end);
+                match system.get(index) {
+                    Some(b',') => {
+                        index = skip_json_ws(system, index + 1);
+                        if system.get(index) == Some(&b']') {
+                            return None;
+                        }
+                    }
+                    Some(b']') => break,
+                    _ => return None,
+                }
+            }
+        }
+        _ => return None,
+    }
+
+    let mut target = None;
+    for range in text_ranges {
+        let raw = &body[range.clone()];
+        let text = parse_json_string_bytes(raw)?;
+        if !text.trim_start().starts_with(BILLING_HEADER_PREFIX) {
+            continue;
+        }
+        let value = billing_cch_value_range(&text)?;
+        let field_start = value.start.checked_sub(4)?;
+        let field = &text.as_bytes()[field_start..value.end];
+        // 单次映射解码偏移，避免每个同名示例都重新解析整个前缀；字段被转义时仍保守跳过。
+        let raw_start = json_string_raw_offset(raw, field_start)?;
+        if raw.get(raw_start..raw_start + field.len())? != field {
+            return None;
+        }
+        let raw_position = range.start + raw_start + 4;
+        if target.replace(raw_position).is_some() {
+            return None;
+        }
+    }
+    target
+}
+
+/// 将已通过 JSON 校验的字符串解码字节偏移映射回原始字节，不分配前缀副本。
+/// @param raw 包含双引号的原始 JSON 字符串，调用方已完成严格解码校验。
+/// @param offset 目标在解码后 UTF-8 字符串中的字节偏移。
+/// @return 对应的原始字节下标；偏移位于转义字符内部或越界时返回 None。
+fn json_string_raw_offset(raw: &[u8], offset: usize) -> Option<usize> {
+    if raw.first() != Some(&b'"') {
+        return None;
+    }
+    let mut raw_offset = 1;
+    let mut decoded_offset = 0;
+    while decoded_offset < offset {
+        match *raw.get(raw_offset)? {
+            b'"' => return None,
+            b'\\' => match *raw.get(raw_offset + 1)? {
+                b'u' => {
+                    let unit = raw.get(raw_offset + 2..raw_offset + 6)?.iter().try_fold(
+                        0u16,
+                        |value, byte| {
+                            char::from(*byte)
+                                .to_digit(16)
+                                .map(|digit| (value << 4) | digit as u16)
+                        },
+                    )?;
+                    if (0xD800..=0xDBFF).contains(&unit) {
+                        // 严格 JSON 解码已经验证后续低代理项；整个代理对对应一个四字节字符。
+                        raw_offset += 12;
+                        decoded_offset += 4;
+                    } else {
+                        raw_offset += 6;
+                        decoded_offset += char::from_u32(u32::from(unit))?.len_utf8();
+                    }
+                }
+                b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't' => {
+                    raw_offset += 2;
+                    decoded_offset += 1;
+                }
+                _ => return None,
+            },
+            _ => {
+                // 未转义 UTF-8 的原始与解码字节相同，可以逐字节计数。
+                raw_offset += 1;
+                decoded_offset += 1;
+            }
+        }
+    }
+    (decoded_offset == offset && raw_offset < raw.len()).then_some(raw_offset)
+}
+
+/// 与 CCH 投影的首字段查找分开，归因定位遇到重复键或无效结构必须停止写入。
+fn find_unique_json_field_value_range(
+    body: &[u8],
+    field: &str,
+) -> Result<Option<Range<usize>>, ()> {
+    let mut index = skip_json_ws(body, 0);
+    if body.get(index) != Some(&b'{') {
+        return Err(());
+    }
+    index = skip_json_ws(body, index + 1);
+    let mut found = None;
+    loop {
+        if body.get(index) == Some(&b'}') {
+            return (skip_json_ws(body, index + 1) == body.len())
+                .then_some(found)
+                .ok_or(());
+        }
+        let key_end = scan_json_string_end(body, index).ok_or(())?;
+        let key = parse_json_string_bytes(&body[index..key_end]).ok_or(())?;
+        index = skip_json_ws(body, key_end);
+        if body.get(index) != Some(&b':') {
+            return Err(());
+        }
+        let start = skip_json_ws(body, index + 1);
+        let end = scan_json_value_end(body, start).ok_or(())?;
+        if start == end {
+            return Err(());
+        }
+        if key == field && found.replace(start..end).is_some() {
+            return Err(());
+        }
+        index = skip_json_ws(body, end);
+        match body.get(index) {
+            Some(b',') => {
+                index = skip_json_ws(body, index + 1);
+                if body.get(index) == Some(&b'}') {
+                    return Err(());
+                }
+            }
+            Some(b'}') => {}
+            _ => return Err(()),
+        }
+    }
+}
+
+// --- CCH fingerprint (SHA256) ---
+
+const CCH_SALT: &str = "59cf53e54c78";
+const CCH_POSITIONS: [usize; 3] = [4, 7, 20];
+
+fn compute_cc_version_suffix(first_user_message_text: &str, version: &str) -> String {
+    let code_units: Vec<u16> = first_user_message_text.encode_utf16().collect();
+    // 抽样后的高低代理项可能重新组成有效字符，必须先拼接码元再统一处理孤立代理项。
+    let picked = CCH_POSITIONS.map(|pos| code_units.get(pos).copied().unwrap_or(u16::from(b'0')));
+    let picked = String::from_utf16_lossy(&picked);
+    let input = format!("{}{}{}", CCH_SALT, picked, version);
+    let hash = Sha256::digest(input.as_bytes());
+    format!("{:x}", hash)[..3].to_string()
+}
+
+fn random_cc_version_suffix(bytes: [u8; 2]) -> String {
+    format!("{:04x}", u16::from_be_bytes(bytes))[..3].to_string()
+}
+
+fn is_cc_version_thread_followup(body: &serde_json::Value, version: &str) -> bool {
+    matches!(version, "2.1.280" | "2.1.293")
+        && body
+            .get("thread")
+            .and_then(serde_json::Value::as_object)
+            .and_then(|thread| thread.get("previous_message_id"))
+            .and_then(serde_json::Value::as_str)
+            .is_some()
+}
+
+fn existing_cc_version_suffix(body: &serde_json::Value) -> Option<String> {
+    let suffix_from_text = |text: &str| {
+        BILLING_VERSION_SUFFIX_REGEX
+            .captures(text)
+            .and_then(|captures| captures.get(1))
+            .map(|suffix| suffix.as_str().to_string())
+    };
+    match body.get("system") {
+        Some(serde_json::Value::String(text)) => suffix_from_text(text),
+        Some(serde_json::Value::Array(blocks)) => blocks.iter().find_map(|block| {
+            block
+                .get("text")
+                .and_then(serde_json::Value::as_str)
+                .and_then(&suffix_from_text)
+        }),
+        _ => None,
+    }
+}
+
+fn cc_version_suffix_for_body(body: &serde_json::Value, version: &str) -> String {
+    if is_cc_version_thread_followup(body, version) {
+        // 官方 280/293 在线程续轮复用当前入站会话后缀，不给交错会话建立全局缓存。
+        if let Some(suffix) = existing_cc_version_suffix(body) {
+            return suffix;
+        }
+    } else {
+        let text = extract_first_user_message(body);
+        if !text.is_empty() {
+            return compute_cc_version_suffix(&text, version);
+        }
+    }
+    let mut bytes = [0u8; 2];
+    rand::thread_rng().fill(&mut bytes);
+    random_cc_version_suffix(bytes)
+}
+
+fn build_claude_code_billing_system_block(
+    body: &serde_json::Value,
+    version: &str,
+) -> serde_json::Value {
+    let first_message = extract_first_user_message(body);
+    let cc_suffix = compute_cc_version_suffix(&first_message, version);
+    serde_json::json!({
+        "type": "text",
+        "text": format!(
+            "x-anthropic-billing-header: cc_version={version}.{cc_suffix}; cc_entrypoint=cli; cch=00000;"
+        )
+    })
+}
+
+fn build_claude_code_identity_system_block() -> serde_json::Value {
+    serde_json::json!({
+        "type": "text",
+        "text": CLAUDE_CODE_SYSTEM_PROMPT
+    })
+}
+
+/// 返回指定 Claude Code 版本使用的 CCH attestation seed。
+fn cch_attestation_seed(version: &str) -> u64 {
+    match normalize_version(version) {
+        "2.1.156" | "2.1.169" | "2.1.172" | "2.1.173" | "2.1.185" | "2.1.187" | "2.1.195"
+        | "2.1.197" | "2.1.220" | "2.1.257" | "2.1.260" | "2.1.280" | "2.1.293" => {
+            CCH_ATTESTATION_SEED_2156
+        }
+        _ => CCH_ATTESTATION_SEED_LEGACY,
+    }
+}
+
+fn replace_top_level_string_value(body: &[u8], field: &str, replacement: &[u8]) -> Vec<u8> {
+    if let Some(range) = find_top_level_field_value_range(body, field) {
+        let mut out = Vec::with_capacity(body.len() - range.len() + replacement.len());
+        out.extend_from_slice(&body[..range.start]);
+        out.extend_from_slice(replacement);
+        out.extend_from_slice(&body[range.end..]);
+        out
+    } else {
+        body.to_vec()
+    }
+}
+
+fn replace_all_exact_string_field_values(body: &[u8], field: &str, replacement: &[u8]) -> Vec<u8> {
+    let exact_key = format!("\"{}\"", field);
+    let mut ranges = Vec::new();
+    let mut idx = 0usize;
+    while idx < body.len() {
+        if body[idx] != b'"' {
+            idx += 1;
+            continue;
+        }
+        let Some(string_end) = scan_json_string_end(body, idx) else {
+            return body.to_vec();
+        };
+        if &body[idx..string_end] == exact_key.as_bytes() {
+            let colon = skip_json_ws(body, string_end);
+            if body.get(colon) == Some(&b':') {
+                let value_start = skip_json_ws(body, colon + 1);
+                if body.get(value_start) == Some(&b'"') {
+                    let Some(value_end) = scan_json_string_end(body, value_start) else {
+                        return body.to_vec();
+                    };
+                    ranges.push(value_start..value_end);
+                    idx = value_end;
+                    continue;
+                }
+            }
+        }
+        idx = string_end;
+    }
+    if ranges.is_empty() {
+        return body.to_vec();
+    }
+
+    // 从后向前替换可保持前面已记录的字节下标，且不改变其余序列化字节。
+    let mut normalized = body.to_vec();
+    for range in ranges.into_iter().rev() {
+        normalized.splice(range, replacement.iter().copied());
+    }
+    normalized
+}
+
+fn remove_top_level_field(body: &[u8], field: &str) -> Vec<u8> {
+    if let Some(range) = find_top_level_field_range(body, field) {
+        let mut out = Vec::with_capacity(body.len() - range.len());
+        out.extend_from_slice(&body[..range.start]);
+        out.extend_from_slice(&body[range.end..]);
+        out
+    } else {
+        body.to_vec()
+    }
+}
+
+fn find_top_level_field_range(body: &[u8], field: &str) -> Option<std::ops::Range<usize>> {
+    let found = find_top_level_field_ranges(body, field)?;
+    let mut start = found.key_start;
+    let mut end = found.value_end;
+    let next = skip_json_ws(body, end);
+    if next < body.len() && body[next] == b',' {
+        end = next + 1;
+    } else {
+        let mut prev = start;
+        while prev > 0 && is_json_ws(body[prev - 1]) {
+            prev -= 1;
+        }
+        if prev > 0 && body[prev - 1] == b',' {
+            start = prev - 1;
+        }
+    }
+    Some(start..end)
+}
+
+fn find_top_level_field_value_range(body: &[u8], field: &str) -> Option<std::ops::Range<usize>> {
+    let found = find_top_level_field_ranges(body, field)?;
+    Some(found.value_start..found.value_end)
+}
+
+struct TopLevelFieldRanges {
+    key_start: usize,
+    value_start: usize,
+    value_end: usize,
+}
+
+fn find_top_level_field_ranges(body: &[u8], field: &str) -> Option<TopLevelFieldRanges> {
+    let mut idx = skip_json_ws(body, 0);
+    if body.get(idx) != Some(&b'{') {
+        return None;
+    }
+    idx += 1;
+
+    loop {
+        idx = skip_json_ws(body, idx);
+        match body.get(idx) {
+            Some(b'}') | None => return None,
+            Some(b',') => {
+                idx += 1;
+                continue;
+            }
+            Some(b'"') => {}
+            _ => return None,
+        }
+
+        let key_start = idx;
+        let key_end = scan_json_string_end(body, key_start)?;
+        let key = parse_json_string_bytes(&body[key_start..key_end])?;
+        idx = skip_json_ws(body, key_end);
+        if body.get(idx) != Some(&b':') {
+            return None;
+        }
+        idx = skip_json_ws(body, idx + 1);
+        let value_start = idx;
+        let value_end = scan_json_value_end(body, value_start)?;
+        if key == field {
+            return Some(TopLevelFieldRanges {
+                key_start,
+                value_start,
+                value_end,
+            });
+        }
+        idx = skip_json_ws(body, value_end);
+        if body.get(idx) == Some(&b',') {
+            idx += 1;
+        }
+    }
+}
+
+fn scan_json_string_end(body: &[u8], start: usize) -> Option<usize> {
+    if body.get(start) != Some(&b'"') {
+        return None;
+    }
+    let mut idx = start + 1;
+    let mut escaped = false;
+    while idx < body.len() {
+        let byte = body[idx];
+        if escaped {
+            escaped = false;
+        } else if byte == b'\\' {
+            escaped = true;
+        } else if byte == b'"' {
+            return Some(idx + 1);
+        }
+        idx += 1;
+    }
+    None
+}
+
+fn scan_json_value_end(body: &[u8], start: usize) -> Option<usize> {
+    let mut idx = start;
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    while idx < body.len() {
+        let byte = body[idx];
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+            idx += 1;
+            continue;
+        }
+        match byte {
+            b'"' => in_string = true,
+            b'{' | b'[' => depth += 1,
+            b'}' | b']' => {
+                if depth == 0 {
+                    return Some(idx);
+                }
+                depth -= 1;
+            }
+            b',' if depth == 0 => return Some(idx),
+            _ => {}
+        }
+        idx += 1;
+    }
+    Some(idx)
+}
+
+fn parse_json_string_bytes(bytes: &[u8]) -> Option<String> {
+    serde_json::from_slice(bytes).ok()
+}
+
+fn skip_json_ws(body: &[u8], mut idx: usize) -> usize {
+    while idx < body.len() && is_json_ws(body[idx]) {
+        idx += 1;
+    }
+    idx
+}
+
+fn is_json_ws(byte: u8) -> bool {
+    matches!(byte, b' ' | b'\n' | b'\r' | b'\t')
+}
+
+/// 从 messages 数组中提取首条用户消息文本。
+fn extract_first_user_message(body: &serde_json::Value) -> String {
+    let messages = match body.get("messages").and_then(|m| m.as_array()) {
+        Some(m) => m,
+        None => return String::new(),
+    };
+    for msg in messages {
+        let m = match msg.as_object() {
+            Some(m) => m,
+            None => continue,
+        };
+        if m.get("role").and_then(|r| r.as_str()) != Some("user") {
+            continue;
+        }
+        match m.get("content") {
+            Some(serde_json::Value::String(c)) => return c.clone(),
+            Some(serde_json::Value::Array(arr)) => {
+                // Claude Code 会把环境上下文作为首个 text block，cc_version 后缀实际取用户 prompt block。
+                if let Some(text) = arr
+                    .iter()
+                    .rev()
+                    .find_map(|item| item.get("text").and_then(|t| t.as_str()))
+                {
+                    return text.to_string();
+                }
+            }
+            _ => {}
+        }
+    }
+    String::new()
+}
+
+/// 为 API 模式生成跨轮稳定的 session_id。
+fn stable_api_session_id(account: &Account, body: &serde_json::Value) -> String {
+    let seed = serde_json::json!({
+        "account_id": account.id,
+        "device_id": account.device_id,
+        "first_user_text": extract_first_user_message(body),
+    });
+    stable_uuid_from_seed(&seed.to_string())
+}
+
+/// 从稳定种子生成 RFC 4122 v4 形态 UUID。
+fn stable_uuid_from_seed(seed: &str) -> String {
+    let hash = Sha256::digest(seed.as_bytes());
+    let mut b = [0u8; 16];
+    b.copy_from_slice(&hash[..16]);
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    format!(
+        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+        b[0],
+        b[1],
+        b[2],
+        b[3],
+        b[4],
+        b[5],
+        b[6],
+        b[7],
+        b[8],
+        b[9],
+        b[10],
+        b[11],
+        b[12],
+        b[13],
+        b[14],
+        b[15]
+    )
+}
+
+/// 提取 API 原始 system 文本。
+fn extract_api_original_system_text(body: &serde_json::Value) -> Option<String> {
+    match body.get("system") {
+        Some(serde_json::Value::String(text)) => {
+            let text = text.trim();
+            (!text.is_empty() && !text.starts_with(CLAUDE_CODE_SYSTEM_PROMPT))
+                .then(|| text.to_string())
+        }
+        Some(serde_json::Value::Array(items)) => {
+            let parts = items
+                .iter()
+                .filter_map(|item| item.get("text").and_then(|text| text.as_str()))
+                .map(str::trim)
+                .filter(|text| !text.is_empty() && !text.starts_with(CLAUDE_CODE_SYSTEM_PROMPT))
+                .map(ToString::to_string)
+                .collect::<Vec<_>>();
+            (!parts.is_empty()).then(|| parts.join("\n\n"))
+        }
+        _ => None,
+    }
+}
+
+/// 将 API 原始 system 指令迁移到 messages 前缀，保留用户原有语义。
+fn inject_original_system_as_messages(
+    body: &mut serde_json::Value,
+    original_system_text: Option<String>,
+) {
+    let Some(original_system_text) = original_system_text else {
+        return;
+    };
+    let Some(obj) = body.as_object_mut() else {
+        return;
+    };
+    let mut messages = obj
+        .remove("messages")
+        .and_then(|value| value.as_array().cloned())
+        .unwrap_or_default();
+    let mut prefixed = vec![
+        serde_json::json!({
+            "role": "user",
+            "content": [{
+                "type": "text",
+                "text": format!("[System Instructions]\n{original_system_text}")
+            }]
+        }),
+        serde_json::json!({
+            "role": "assistant",
+            "content": [{
+                "type": "text",
+                "text": "Understood. I will follow these instructions."
+            }]
+        }),
+    ];
+    prefixed.append(&mut messages);
+    obj.insert("messages".into(), serde_json::Value::Array(prefixed));
+}
+
+fn rewrite_message_content<F>(msg: &mut serde_json::Value, rewrite_fn: &F)
+where
+    F: Fn(&str) -> String,
+{
+    match msg.get("content").cloned() {
+        Some(serde_json::Value::String(s)) => {
+            msg.as_object_mut()
+                .unwrap()
+                .insert("content".into(), serde_json::Value::String(rewrite_fn(&s)));
+        }
+        Some(serde_json::Value::Array(arr)) => {
+            let rewritten: Vec<serde_json::Value> = arr
+                .into_iter()
+                .map(|mut item| {
+                    if item.get("cache_control").is_some() {
+                        return item;
+                    }
+                    if let Some(text) = item.get("text").and_then(|t| t.as_str()) {
+                        let new_text = rewrite_fn(text);
+                        item.as_object_mut()
+                            .unwrap()
+                            .insert("text".into(), serde_json::Value::String(new_text));
+                    }
+                    item
+                })
+                .collect();
+            msg.as_object_mut()
+                .unwrap()
+                .insert("content".into(), serde_json::Value::Array(rewritten));
+        }
+        _ => {}
+    }
+}
+
+fn build_event_env_map(profile: &DeviceProfile, shape: TelemetryShape) -> serde_json::Value {
+    let mut env_obj = crate::model::identity::build_full_env_json(&profile.env);
+    if shape == TelemetryShape::ClaudeCode2185 {
+        if let Some(map) = env_obj.as_object_mut() {
+            map.insert(
+                "shell".into(),
+                serde_json::Value::String(profile.prompt.shell.clone()),
+            );
+            map.insert(
+                "is_running_with_bun".into(),
+                serde_json::Value::Bool(profile.env.is_running_with_bun),
+            );
+        }
+    }
+    env_obj
+}
+
+/// 收集遥测 payload 中明确的 session 字段值。
+///
+/// @param body 已解析的 event_logging 请求体。
+/// @return 去重后的 session id 列表。
+pub fn collect_telemetry_session_ids(body: &serde_json::Value) -> Vec<String> {
+    let mut out = Vec::new();
+    collect_telemetry_session_ids_inner(body, &mut out);
+    out.sort();
+    out.dedup();
+    out
+}
+
+fn collect_telemetry_session_ids_inner(value: &serde_json::Value, out: &mut Vec<String>) {
+    match value {
+        serde_json::Value::Object(map) => {
+            for (key, child) in map {
+                if is_explicit_session_field(key) {
+                    if let Some(session_id) =
+                        child.as_str().filter(|session_id| !session_id.is_empty())
+                    {
+                        out.push(session_id.to_string());
+                    }
+                }
+                collect_telemetry_session_ids_inner(child, out);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                collect_telemetry_session_ids_inner(item, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn rewrite_session_fields_in_map(
+    map: &mut serde_json::Map<String, serde_json::Value>,
+    telemetry_session_map: &HashMap<String, String>,
+) {
+    if telemetry_session_map.is_empty() {
+        return;
+    }
+    for (key, value) in map.iter_mut() {
+        if is_explicit_session_field(key) {
+            if let Some(current) = value.as_str() {
+                if let Some(mapped) = telemetry_session_map.get(current) {
+                    *value = serde_json::Value::String(mapped.clone());
+                    continue;
+                }
+            }
+        }
+        rewrite_session_fields_recursive(value, telemetry_session_map);
+    }
+}
+
+fn rewrite_session_fields_recursive(
+    value: &mut serde_json::Value,
+    telemetry_session_map: &HashMap<String, String>,
+) {
+    match value {
+        serde_json::Value::Object(map) => rewrite_session_fields_in_map(map, telemetry_session_map),
+        serde_json::Value::Array(items) => {
+            for item in items {
+                rewrite_session_fields_recursive(item, telemetry_session_map);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn is_explicit_session_field(key: &str) -> bool {
+    let normalized = key.replace(['-', '_'], "").to_ascii_lowercase();
+    matches!(normalized.as_str(), "sessionid" | "parentsessionid")
+}
+
+/// 改写 event_logging 事件字段，兼容旧顶层结构和 2.1.156 的 event_data 结构。
+fn rewrite_event_fields(
+    map: &mut serde_json::Map<String, serde_json::Value>,
+    profile: &DeviceProfile,
+    shape: TelemetryShape,
+    canonical_env: &serde_json::Value,
+) {
+    if map.contains_key("device_id") {
+        map.insert(
+            "device_id".into(),
+            serde_json::Value::String(profile.device_id.clone()),
+        );
+    }
+    if shape == TelemetryShape::ClaudeCode2173 && map.contains_key("email") {
+        map.insert(
+            "email".into(),
+            serde_json::Value::String(profile.email.clone()),
+        );
+    } else if shape == TelemetryShape::ClaudeCode2185 {
+        map.remove("email");
+    }
+
+    map.remove("baseUrl");
+    map.remove("base_url");
+    map.remove("gateway");
+
+    if map.contains_key("account_uuid") {
+        map.insert(
+            "account_uuid".into(),
+            serde_json::Value::String(profile.account_uuid.clone()),
+        );
+    }
+    if map.contains_key("organization_uuid") {
+        if let Some(ref org) = profile.organization_uuid {
+            map.insert(
+                "organization_uuid".into(),
+                serde_json::Value::String(org.clone()),
+            );
+        } else {
+            map.remove("organization_uuid");
+        }
+    }
+
+    if map.contains_key("env") {
+        map.insert("env".into(), canonical_env.clone());
+    }
+
+    if let Some(p) = map.remove("process") {
+        map.insert("process".into(), rewrite_process(&p, profile));
+    }
+
+    if let Some(am) = map.get("additional_metadata").and_then(|v| v.as_str()) {
+        let rewritten = rewrite_additional_metadata(am);
+        map.insert(
+            "additional_metadata".into(),
+            serde_json::Value::String(rewritten),
+        );
+    }
+
+    if let Some(ua_str) = map.get("user_attributes").and_then(|v| v.as_str()) {
+        let rewritten = rewrite_user_attributes_json_with_profile(ua_str, profile);
+        map.insert(
+            "user_attributes".into(),
+            serde_json::Value::String(rewritten),
+        );
+    }
+}
+
+// --- 进程指纹改写 ---
+
+fn rewrite_process(original: &serde_json::Value, profile: &DeviceProfile) -> serde_json::Value {
+    let engine = base64::engine::general_purpose::STANDARD;
+    match original {
+        serde_json::Value::String(s) => {
+            let decoded = match engine.decode(s) {
+                Ok(d) => d,
+                Err(_) => return original.clone(),
+            };
+            let mut obj: serde_json::Value = match serde_json::from_slice(&decoded) {
+                Ok(v) => v,
+                Err(_) => return original.clone(),
+            };
+            rewrite_process_fields(&mut obj, profile);
+            let out = serde_json::to_vec(&obj).unwrap_or_default();
+            serde_json::Value::String(engine.encode(&out))
+        }
+        serde_json::Value::Object(_) => {
+            let mut obj = original.clone();
+            rewrite_process_fields(&mut obj, profile);
+            obj
+        }
+        _ => original.clone(),
+    }
+}
+
+fn rewrite_process_fields(obj: &mut serde_json::Value, profile: &DeviceProfile) {
+    if let Some(map) = obj.as_object_mut() {
+        let uptime = map.get("uptime").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let snapshot = process_snapshot(&profile.process, &profile.device_id, uptime);
+        let snapshot_json = process_snapshot_json(&snapshot);
+        if profile.process.observation.is_some() {
+            // v3 缺失的堆/CPU 数据不可用调用方指标或兼容默认值冒充本容器实测。
+            map.clear();
+        }
+        if let Some(snapshot_map) = snapshot_json.as_object() {
+            for (key, value) in snapshot_map {
+                map.insert(key.clone(), value.clone());
+            }
+        }
+    }
+}
+
+// --- Base64 additional_metadata 改写 ---
+
+fn rewrite_additional_metadata(encoded: &str) -> String {
+    let engine = base64::engine::general_purpose::STANDARD;
+    let decoded = match engine.decode(encoded) {
+        Ok(d) => d,
+        Err(_) => return encoded.to_string(),
+    };
+    let mut obj: serde_json::Value = match serde_json::from_slice(&decoded) {
+        Ok(v) => v,
+        Err(_) => return encoded.to_string(),
+    };
+    if let Some(map) = obj.as_object_mut() {
+        map.remove("baseUrl");
+        map.remove("base_url");
+        map.remove("gateway");
+    }
+    let out = serde_json::to_vec(&obj).unwrap_or_default();
+    engine.encode(&out)
+}
+
+/// 改写 GrowthBook 实验事件中 user_attributes JSON 字符串内的身份字段。
+fn rewrite_user_attributes_json(json_str: &str, account: &Account) -> String {
+    let profile = device_profile(account);
+    rewrite_user_attributes_json_with_profile(json_str, &profile)
+}
+
+/// 改写 GrowthBook 实验事件中 user_attributes JSON 字符串内的身份字段。
+fn rewrite_user_attributes_json_with_profile(json_str: &str, profile: &DeviceProfile) -> String {
+    let shape = profile_for_version(&profile.env.version).telemetry.shape;
+    let mut obj: serde_json::Value = match serde_json::from_str(json_str) {
+        Ok(v) => v,
+        Err(_) => return json_str.to_string(),
+    };
+    if let Some(map) = obj.as_object_mut() {
+        apply_growthbook_attributes(map, profile, shape);
+    }
+    serde_json::to_string(&obj).unwrap_or_else(|_| json_str.to_string())
+}
+
+/// 对 GrowthBook attributes 补齐当前版本画像中的关键身份字段。
+fn apply_growthbook_attributes(
+    map: &mut serde_json::Map<String, serde_json::Value>,
+    profile: &DeviceProfile,
+    shape: TelemetryShape,
+) {
+    map.insert(
+        "id".into(),
+        serde_json::Value::String(profile.device_id.clone()),
+    );
+    map.insert(
+        "deviceID".into(),
+        serde_json::Value::String(profile.device_id.clone()),
+    );
+    if shape == TelemetryShape::ClaudeCode2173 {
+        map.insert(
+            "email".into(),
+            serde_json::Value::String(profile.email.clone()),
+        );
+    } else {
+        map.remove("email");
+    }
+    map.insert(
+        "accountUUID".into(),
+        serde_json::Value::String(profile.account_uuid.clone()),
+    );
+    if let Some(ref org) = profile.organization_uuid {
+        map.insert(
+            "organizationUUID".into(),
+            serde_json::Value::String(org.clone()),
+        );
+    } else {
+        map.remove("organizationUUID");
+    }
+    if let Some(ref sub) = profile.subscription_type {
+        map.insert(
+            "subscriptionType".into(),
+            serde_json::Value::String(sub.clone()),
+        );
+    }
+    map.insert(
+        "userType".into(),
+        serde_json::Value::String("external".into()),
+    );
+    if let Some(tier) = profile.effective_rate_limit_tier() {
+        map.insert("rateLimitTier".into(), serde_json::Value::String(tier));
+    } else {
+        map.remove("rateLimitTier");
+    }
+    map.insert("entrypoint".into(), serde_json::Value::String("cli".into()));
+    map.remove("apiBaseUrlHost");
+
+    if !profile.env.platform.is_empty() {
+        map.insert(
+            "platform".into(),
+            serde_json::Value::String(profile.env.platform.clone()),
+        );
+    }
+    if !profile.env.version.is_empty() {
+        map.insert(
+            "appVersion".into(),
+            serde_json::Value::String(profile.env.version.clone()),
+        );
+    }
+}
+
+fn rewrite_growthbook_payload_shape(body: &mut serde_json::Value, shape: TelemetryShape) {
+    let Some(map) = body.as_object_mut() else {
+        return;
+    };
+    match shape {
+        TelemetryShape::ClaudeCode2173 => {
+            map.remove("forcedVariations");
+            map.remove("url");
+            map.insert("forcedFeatures".into(), serde_json::json!({}));
+        }
+        TelemetryShape::ClaudeCode2185 => {
+            map.insert("forcedVariations".into(), serde_json::json!({}));
+            map.insert("forcedFeatures".into(), serde_json::json!([]));
+            map.insert("url".into(), serde_json::Value::String(String::new()));
+        }
+    }
+}
+
+/// 移除 system 和消息内容块中的 cache_control。
+fn strip_cache_control(body: &mut serde_json::Value) {
+    if let Some(sys) = body.get_mut("system").and_then(|s| s.as_array_mut()) {
+        for item in sys.iter_mut() {
+            if let Some(block) = item.as_object_mut() {
+                block.remove("cache_control");
+            }
+        }
+    }
+    if let Some(messages) = body.get_mut("messages").and_then(|m| m.as_array_mut()) {
+        for msg in messages.iter_mut() {
+            if let Some(content) = msg.get_mut("content").and_then(|c| c.as_array_mut()) {
+                for item in content.iter_mut() {
+                    if let Some(block) = item.as_object_mut() {
+                        block.remove("cache_control");
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Anthropic 单个请求允许的 cache_control 断点数量上限。
+const MAX_CACHE_BREAKPOINTS: usize = 4;
+/// rolling 断点按 19 个真实 message content block 回退,贴近 Anthropic 20-block lookback。
+const CACHE_LOOKBACK_STRIDE: usize = 19;
+/// stateful 模式最多保留的会话数量,避免单进程长期运行时内存无界增长。
+const STATEFUL_CACHE_MAX_SESSIONS: usize = 512;
+/// 当前请求相比主线超过 3 倍时,视为可能的 Claude Code 内部暴涨请求。
+const STATEFUL_SPIKE_RATIO: usize = 3;
+/// 当前请求相比主线多出 128 个 block 以上时,才结合倍数判断为暴涨。
+const STATEFUL_SPIKE_ABSOLUTE_DELTA: usize = 128;
+/// 并发 sibling 与主线相差超过该值且无 anchor 命中时,不允许覆盖主线状态。
+const STATEFUL_PARALLEL_DELTA: usize = CACHE_LOOKBACK_STRIDE * 2;
+/// 主线达到一个 lookback 窗口后才认为成熟,避免 1-block 启动请求锁死会话。
+const STATEFUL_BOOTSTRAP_BLOCKS: usize = CACHE_LOOKBACK_STRIDE;
+/// 读缓存没有增长但写缓存暴涨时,拒绝把本轮断点推进成新的 stateful 主线。
+const STATEFUL_USAGE_CREATION_REJECT_THRESHOLD: u64 = 32 * 1024;
+
+impl Rewriter {
+    /// 按配置改写 Claude Code messages 缓存断点。
+    fn rewrite_message_cache_control(
+        &self,
+        body: &mut serde_json::Value,
+        account: &Account,
+        client_type: ClientType,
+        mode: MessageCacheControlRewrite,
+        real_session_id_override: Option<&str>,
+    ) -> Option<StatefulCacheCompletion> {
+        if client_type == ClientType::API {
+            match mode {
+                MessageCacheControlRewrite::Off => {}
+                MessageCacheControlRewrite::Auto
+                | MessageCacheControlRewrite::Rolling
+                | MessageCacheControlRewrite::Stateful
+                | MessageCacheControlRewrite::Sub2api => {
+                    strip_message_cache_control(body);
+                    add_sub2api_message_cache_control(body, mode, client_type);
+                }
+            }
+            return None;
+        }
+
+        match mode {
+            MessageCacheControlRewrite::Off => {}
+            MessageCacheControlRewrite::Auto => {
+                stabilize_claude_code_cache_prefix(body);
+                strip_cache_control_for_message_rewrite(body, client_type);
+                add_auto_message_cache_control(body, client_type);
+            }
+            MessageCacheControlRewrite::Rolling => {
+                stabilize_claude_code_cache_prefix(body);
+                strip_cache_control_for_message_rewrite(body, client_type);
+                add_rolling_message_cache_control(body, client_type);
+            }
+            MessageCacheControlRewrite::Stateful => {
+                stabilize_claude_code_cache_prefix(body);
+                strip_cache_control_for_message_rewrite(body, client_type);
+                return self.add_stateful_message_cache_control(
+                    body,
+                    account,
+                    real_session_id_override,
+                );
+            }
+            MessageCacheControlRewrite::Sub2api => {
+                strip_message_cache_control(body);
+                add_sub2api_message_cache_control(body, mode, client_type);
+            }
+        }
+        None
+    }
+
+    /// 为同一 Claude Code 会话放置防污染缓存断点。
+    ///
+    /// 这里记录的是上一轮实际发送给上游的 message block 指纹。正常线性请求会优先
+    /// 复用这些断点,再补 bridge/tail；暴涨或并发异常请求只做临时选点,不覆盖主线。
+    fn add_stateful_message_cache_control(
+        &self,
+        body: &mut serde_json::Value,
+        account: &Account,
+        real_session_id_override: Option<&str>,
+    ) -> Option<StatefulCacheCompletion> {
+        let session_key = stateful_session_key(account, body, real_session_id_override);
+        let profile = compute_stateful_request_profile(body);
+        let snapshot = session_key.as_ref().and_then(|key| {
+            self.stateful_cache
+                .lock()
+                .ok()
+                .and_then(|mut cache| cache.get(key))
+        });
+        let outcome = select_stateful_message_cache_control_positions(
+            body,
+            profile.clone(),
+            session_key.is_some(),
+            snapshot.as_ref(),
+        );
+
+        let selected_labels = outcome
+            .selected
+            .iter()
+            .map(|(message_idx, block_idx)| {
+                message_cache_control_position_log_label(body, *message_idx, *block_idx)
+            })
+            .collect::<Vec<_>>();
+
+        for (message_idx, block_idx) in &outcome.selected {
+            add_message_cache_control_at_block(body, *message_idx, *block_idx);
+        }
+
+        let selected_diagnostics =
+            stateful_selected_cache_diagnostics(body, &outcome, snapshot.as_ref());
+        let prefix_diagnostics = cache_prefix_diagnostics(body);
+        let session_key_log = session_key
+            .as_deref()
+            .map(|key| short_hash(&hash_text(key)))
+            .unwrap_or_else(|| "missing".to_string());
+        info!(
+            target: "cc2api::cache",
+            mode = "stateful",
+            session = session_key_log.as_str(),
+            request_class = outcome.request_class.as_str(),
+            available_slots = outcome.available_slots,
+            block_count = outcome.message_content_blocks,
+            normal_block_count = outcome.normal_block_count.unwrap_or(0),
+            reused_count = outcome.reused_count,
+            selected_count = outcome.selected.len(),
+            promotion = outcome.promotion.as_str(),
+            selected = ?selected_labels,
+            selected_diag = ?selected_diagnostics,
+            prefix_diag = ?prefix_diagnostics,
+            skip_reason = outcome.skip_reason.as_deref().unwrap_or(""),
+            "stateful message cache_control 选点完成"
+        );
+
+        let Some(key) = session_key else {
+            return None;
+        };
+        if !outcome.should_promote {
+            return None;
+        }
+        let anchors = outcome
+            .selected
+            .iter()
+            .filter_map(|position| durable_stateful_anchor_record_at(body, *position))
+            .collect::<Vec<_>>();
+        if anchors.is_empty() {
+            return None;
+        }
+        Some(StatefulCacheCompletion {
+            key,
+            profile,
+            anchors,
+            snapshot_generation: outcome.snapshot_generation,
+            snapshot_cache_read_tokens: snapshot
+                .and_then(|state| state.confirmed_cache_read_tokens),
+            has_reused_anchor: outcome.reused_count > 0,
+        })
+    }
+}
+
+/// 移除 auto / rolling 模式要重新接管的所有缓存断点。
+///
+/// 这两个模式的目标是把 4 个 breakpoint 预算尽量用于 message history。top-level
+/// automatic caching 与 system/tools 显式断点都会占用 slot,会让并行 tool 的尾部
+/// 历史只剩 1-2 个断点,无法覆盖真实 20-block lookback。
+fn strip_rewritten_cache_control(body: &mut serde_json::Value) {
+    if let Some(obj) = body.as_object_mut() {
+        obj.remove("cache_control");
+    }
+    if let Some(sys) = body.get_mut("system").and_then(|s| s.as_array_mut()) {
+        for item in sys.iter_mut() {
+            if let Some(block) = item.as_object_mut() {
+                block.remove("cache_control");
+            }
+        }
+    }
+    if let Some(tools) = body.get_mut("tools").and_then(|t| t.as_array_mut()) {
+        for tool in tools.iter_mut() {
+            if let Some(block) = tool.as_object_mut() {
+                block.remove("cache_control");
+            }
+        }
+    }
+    strip_message_cache_control(body);
+}
+
+/// 按客户端类型清理 message cache 改写要接管的断点。
+fn strip_cache_control_for_message_rewrite(body: &mut serde_json::Value, client_type: ClientType) {
+    match client_type {
+        ClientType::ClaudeCode => strip_rewritten_cache_control(body),
+        ClientType::API => strip_message_cache_control(body),
+    }
+}
+
+/// 移除 messages 内容块中的 cache_control,不影响 system/tools 断点。
+fn strip_message_cache_control(body: &mut serde_json::Value) {
+    let Some(messages) = body.get_mut("messages").and_then(|m| m.as_array_mut()) else {
+        return;
+    };
+    for msg in messages.iter_mut() {
+        let Some(content) = msg.get_mut("content").and_then(|c| c.as_array_mut()) else {
+            continue;
+        };
+        for item in content.iter_mut() {
+            if let Some(block) = item.as_object_mut() {
+                block.remove("cache_control");
+            }
+        }
+    }
+}
+
+/// 稳定化 Claude Code prompt cache 的 tools/system 前缀顺序。
+///
+/// Anthropic cache prefix 顺序是 tools -> system -> messages；如果并行 tool 让
+/// tools 或自动注入列表的顺序抖动，message 断点再正确也无法命中旧前缀。
+fn stabilize_claude_code_cache_prefix(body: &mut serde_json::Value) {
+    sort_tools_by_name(body);
+    sort_auto_injected_text_lists(body);
+    sort_parallel_tool_blocks(body);
+}
+
+/// 将 `tools[]` 按工具名排序,保持每个工具对象内容不变。
+fn sort_tools_by_name(body: &mut serde_json::Value) {
+    let Some(tools) = body.get_mut("tools").and_then(|tools| tools.as_array_mut()) else {
+        return;
+    };
+    tools.sort_by(|a, b| {
+        let a_name = a.get("name").and_then(|name| name.as_str()).unwrap_or("");
+        let b_name = b.get("name").and_then(|name| name.as_str()).unwrap_or("");
+        a_name.cmp(b_name)
+    });
+}
+
+/// 排序 system 和首个 user message 中 Claude Code 自动注入的列表文本。
+fn sort_auto_injected_text_lists(body: &mut serde_json::Value) {
+    if let Some(system) = body
+        .get_mut("system")
+        .and_then(|system| system.as_array_mut())
+    {
+        for block in system.iter_mut() {
+            sort_auto_injected_text_block(block);
+        }
+    }
+
+    let Some(messages) = body
+        .get_mut("messages")
+        .and_then(|messages| messages.as_array_mut())
+    else {
+        return;
+    };
+    let Some(first) = messages.first_mut() else {
+        return;
+    };
+    if first.get("role").and_then(|role| role.as_str()) != Some("user") {
+        return;
+    }
+    let Some(content) = first
+        .get_mut("content")
+        .and_then(|content| content.as_array_mut())
+    else {
+        return;
+    };
+    for block in content.iter_mut() {
+        sort_auto_injected_text_block(block);
+    }
+}
+
+/// 对单个文本 block 中的 skills / deferred tools 列表做确定性排序。
+fn sort_auto_injected_text_block(block: &mut serde_json::Value) {
+    let Some(obj) = block.as_object_mut() else {
+        return;
+    };
+    if obj.get("type").and_then(|value| value.as_str()) != Some("text") {
+        return;
+    }
+    let Some(text) = obj.get("text").and_then(|value| value.as_str()) else {
+        return;
+    };
+
+    let sorted = if is_sortable_skills_text(text) {
+        sort_skills_text(text)
+    } else if is_sortable_deferred_tools_text(text) {
+        sort_deferred_tools_text(text)
+    } else {
+        None
+    };
+    if let Some(sorted) = sorted {
+        obj.insert("text".into(), serde_json::Value::String(sorted));
+    }
+}
+
+/// 稳定化同一批并行 tool_use / tool_result 的块顺序。
+///
+/// Claude Code 并行工具返回顺序可能随实际完成时间抖动。这里只排序连续的同类块,
+/// 不跨过 text/thinking 等语义边界,避免改变对话结构。
+fn sort_parallel_tool_blocks(body: &mut serde_json::Value) {
+    let Some(messages) = body
+        .get_mut("messages")
+        .and_then(|messages| messages.as_array_mut())
+    else {
+        return;
+    };
+
+    for message in messages.iter_mut() {
+        let role = message
+            .get("role")
+            .and_then(|role| role.as_str())
+            .unwrap_or("")
+            .to_string();
+        let Some(content) = message
+            .get_mut("content")
+            .and_then(|content| content.as_array_mut())
+        else {
+            continue;
+        };
+        match role.as_str() {
+            "assistant" => sort_contiguous_blocks_by_key(content, "tool_use", tool_use_sort_key),
+            "user" => sort_contiguous_blocks_by_key(content, "tool_result", tool_result_sort_key),
+            _ => {}
+        }
+    }
+}
+
+/// 对连续同类 block 片段排序,其他 block 保持原位。
+fn sort_contiguous_blocks_by_key<F>(blocks: &mut [serde_json::Value], block_type: &str, key_fn: F)
+where
+    F: Fn(&serde_json::Value) -> String,
+{
+    let mut start = 0;
+    while start < blocks.len() {
+        while start < blocks.len() && block_type_of(&blocks[start]) != Some(block_type) {
+            start += 1;
+        }
+        let mut end = start;
+        while end < blocks.len() && block_type_of(&blocks[end]) == Some(block_type) {
+            end += 1;
+        }
+        if end.saturating_sub(start) > 1 {
+            blocks[start..end].sort_by_key(|block| key_fn(block));
+        }
+        start = end;
+    }
+}
+
+/// 返回 content block 的类型。
+fn block_type_of(block: &serde_json::Value) -> Option<&str> {
+    block.get("type").and_then(|value| value.as_str())
+}
+
+/// 构造 tool_use 稳定排序键。
+fn tool_use_sort_key(block: &serde_json::Value) -> String {
+    let id = block
+        .get("id")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    let name = block
+        .get("name")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    let input = block
+        .get("input")
+        .map(|value| value.to_string())
+        .unwrap_or_default();
+    format!("{id}\u{0}{name}\u{0}{input}")
+}
+
+/// 构造 tool_result 稳定排序键。
+fn tool_result_sort_key(block: &serde_json::Value) -> String {
+    block
+        .get("tool_use_id")
+        .and_then(|value| value.as_str())
+        .unwrap_or("")
+        .to_string()
+}
+
+/// 判断文本是否是 Claude Code skills 列表。
+fn is_sortable_skills_text(text: &str) -> bool {
+    text.contains("User-invocable skills")
+        || text.starts_with("<system-reminder>The following skills are available")
+        || text.starts_with("<system-reminder>\nThe following skills are available")
+        || text.contains("<available-skills>")
+        || text.contains("<plugin-skills>")
+}
+
+/// 判断文本是否是 Claude Code deferred tools 列表。
+fn is_sortable_deferred_tools_text(text: &str) -> bool {
+    text.contains("deferred tools are now available")
+}
+
+/// 按条目排序 skills 列表文本。
+fn sort_skills_text(text: &str) -> Option<String> {
+    let captures = SKILLS_LIST_REGEX.captures(text)?;
+    let header = captures.get(1)?.as_str();
+    let entries = captures.get(2)?.as_str();
+    let footer = captures.get(3)?.as_str();
+    let mut parts = split_skill_entries(entries);
+    parts.sort_unstable();
+    let sorted_entries = parts.join("\n");
+    let sorted = format!("{}{}{}", header, sorted_entries, footer);
+    if sorted == text { None } else { Some(sorted) }
+}
+
+/// 按 `- ` 条目边界拆分 skills 文本,避免把多行描述拆散后重排。
+fn split_skill_entries(entries: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    for line in entries.lines() {
+        if line.starts_with("- ") && !current.is_empty() {
+            parts.push(current);
+            current = String::new();
+        } else if !current.is_empty() {
+            current.push('\n');
+        }
+        current.push_str(line);
+    }
+    if !current.is_empty() {
+        parts.push(current);
+    }
+    parts
+}
+
+/// 按条目排序 deferred tools 列表文本。
+fn sort_deferred_tools_text(text: &str) -> Option<String> {
+    let captures = DEFERRED_TOOLS_LIST_REGEX.captures(text)?;
+    let header = captures.get(1)?.as_str();
+    let entries = captures.get(2)?.as_str();
+    let footer = captures.get(3)?.as_str();
+    let mut parts: Vec<&str> = entries
+        .lines()
+        .map(|line| line.trim())
+        .filter(|line| !line.is_empty())
+        .collect();
+    parts.sort_unstable();
+    let sorted_entries = parts.join("\n");
+    let sorted = format!("{}{}{}", header, sorted_entries, footer);
+    if sorted == text { None } else { Some(sorted) }
+}
+
+/// 为 messages 放置自动缓存修复断点。
+fn add_auto_message_cache_control(body: &mut serde_json::Value, client_type: ClientType) {
+    let outcome = select_auto_message_cache_control_positions(body);
+    let selected_labels = outcome
+        .selected
+        .iter()
+        .map(|(message_idx, block_idx)| {
+            message_cache_control_position_log_label(body, *message_idx, *block_idx)
+        })
+        .collect::<Vec<_>>();
+    for (message_idx, block_idx) in &outcome.selected {
+        add_message_cache_control_at_block(body, *message_idx, *block_idx);
+    }
+
+    let selected_diagnostics = selected_cache_diagnostics(body, &outcome.selected, "auto");
+    let prefix_diagnostics = cache_prefix_diagnostics(body);
+    let system_breakpoints = count_system_cache_breakpoints(body);
+    let tool_breakpoints = count_tool_cache_breakpoints(body);
+    info!(
+        target: "cc2api::cache",
+        mode = "auto",
+        client_type = client_type.as_str(),
+        available_slots = outcome.available_slots,
+        message_content_blocks = outcome.message_content_blocks,
+        system_breakpoints,
+        tool_breakpoints,
+        final_breakpoints = system_breakpoints + tool_breakpoints + outcome.selected.len(),
+        selected_count = outcome.selected.len(),
+        selected = ?selected_labels,
+        selected_diag = ?selected_diagnostics,
+        prefix_diag = ?prefix_diagnostics,
+        skip_reason = outcome.skip_reason.as_deref().unwrap_or(""),
+        "auto message cache_control 选点完成"
+    );
+}
+
+/// 为 messages 放置更积极的 rolling 缓存断点。
+fn add_rolling_message_cache_control(body: &mut serde_json::Value, client_type: ClientType) {
+    let outcome = select_rolling_message_cache_control_positions(body);
+    let selected_labels = outcome
+        .selected
+        .iter()
+        .map(|(message_idx, block_idx)| {
+            message_cache_control_position_log_label(body, *message_idx, *block_idx)
+        })
+        .collect::<Vec<_>>();
+    for (message_idx, block_idx) in &outcome.selected {
+        add_message_cache_control_at_block(body, *message_idx, *block_idx);
+    }
+
+    let selected_diagnostics = selected_cache_diagnostics(body, &outcome.selected, "rolling");
+    let prefix_diagnostics = cache_prefix_diagnostics(body);
+    let system_breakpoints = count_system_cache_breakpoints(body);
+    let tool_breakpoints = count_tool_cache_breakpoints(body);
+    info!(
+        target: "cc2api::cache",
+        mode = "rolling",
+        client_type = client_type.as_str(),
+        available_slots = outcome.available_slots,
+        message_content_blocks = outcome.message_content_blocks,
+        system_breakpoints,
+        tool_breakpoints,
+        final_breakpoints = system_breakpoints + tool_breakpoints + outcome.selected.len(),
+        selected_count = outcome.selected.len(),
+        selected = ?selected_labels,
+        selected_diag = ?selected_diagnostics,
+        prefix_diag = ?prefix_diagnostics,
+        skip_reason = outcome.skip_reason.as_deref().unwrap_or(""),
+        "rolling message cache_control 选点完成"
+    );
+}
+
+/// 放置 sub2api 风格的稳定 message 断点。
+///
+/// API 客户端没有 Claude Code 并行 tool 的固定历史形态；这里不复用 rolling/lookback
+/// 算法，避免长历史里断点持续漂移导致上游反复重建 prefix。Claude Code 显式选择
+/// `sub2api` 模式时也使用同一算法,便于和 sub2api 行为做线上对照。
+fn add_sub2api_message_cache_control(
+    body: &mut serde_json::Value,
+    configured_mode: MessageCacheControlRewrite,
+    client_type: ClientType,
+) {
+    normalize_sub2api_message_cache_candidate_contents(body);
+    let outcome = select_sub2api_message_cache_control_positions(body);
+    for (message_idx, block_idx) in &outcome.selected {
+        add_message_cache_control_at_block(body, *message_idx, *block_idx);
+    }
+
+    let selected_labels = outcome
+        .selected
+        .iter()
+        .map(|(message_idx, block_idx)| {
+            message_cache_control_position_log_label(body, *message_idx, *block_idx)
+        })
+        .collect::<Vec<_>>();
+    let selected_diagnostics = selected_cache_diagnostics(body, &outcome.selected, "sub2api");
+    let prefix_diagnostics = cache_prefix_diagnostics(body);
+    let system_breakpoints = count_system_cache_breakpoints(body);
+    let tool_breakpoints = count_tool_cache_breakpoints(body);
+    info!(
+        target: "cc2api::cache",
+        mode = "sub2api",
+        configured_mode = configured_mode.as_str(),
+        client_type = client_type.as_str(),
+        available_slots = outcome.available_slots,
+        message_content_blocks = outcome.message_content_blocks,
+        system_breakpoints,
+        tool_breakpoints,
+        final_breakpoints = system_breakpoints + tool_breakpoints + outcome.selected.len(),
+        selected_count = outcome.selected.len(),
+        selected = ?selected_labels,
+        selected_diag = ?selected_diagnostics,
+        prefix_diag = ?prefix_diagnostics,
+        skip_reason = outcome.skip_reason.as_deref().unwrap_or(""),
+        "sub2api message cache_control 选点完成"
+    );
+}
+
+/// 断点选点结果。
+struct CacheBreakpointSelection {
+    selected: Vec<(usize, usize)>,
+    available_slots: usize,
+    message_content_blocks: usize,
+    skip_reason: Option<String>,
+}
+
+/// stateful 会话缓存快照,用于锁外完成选点。
+#[derive(Clone)]
+struct StatefulCacheSnapshot {
+    normal_profile: StatefulRequestProfile,
+    normal_anchors: Vec<AnchorRecord>,
+    generation: u64,
+    confirmed_cache_read_tokens: Option<u64>,
+}
+
+/// 单个会话的正常主线缓存状态。
+#[derive(Clone)]
+struct SessionCacheState {
+    normal_profile: StatefulRequestProfile,
+    normal_anchors: Vec<AnchorRecord>,
+    generation: u64,
+    confirmed_cache_read_tokens: Option<u64>,
+}
+
+/// 需要持久到内存中的断点记录。
+#[derive(Clone)]
+struct AnchorRecord {
+    fingerprint: String,
+    prefix_hash: String,
+    message_idx: usize,
+    block_idx: usize,
+    block_type: String,
+}
+
+/// 当前请求的结构画像。
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct StatefulRequestProfile {
+    block_count: usize,
+    message_count: usize,
+    tool_result_count: usize,
+    assistant_tool_use_count: usize,
+    last_user_text_hash: Option<String>,
+    tail_role_type: String,
+}
+
+/// stateful 请求分类。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StatefulRequestClass {
+    NormalLinear,
+    TransientSpike,
+    ParallelSibling,
+    Unknown,
+}
+
+impl StatefulRequestClass {
+    /// 返回日志中使用的稳定分类名。
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::NormalLinear => "normal_linear",
+            Self::TransientSpike => "transient_spike",
+            Self::ParallelSibling => "parallel_sibling",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+/// stateful 主线状态更新决策。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StatefulPromotion {
+    Updated,
+    IgnoredSpike,
+    IgnoredParallel,
+    MissingSession,
+    NoReusableAnchor,
+    ColdStart,
+    BootstrapUpdated,
+}
+
+impl StatefulPromotion {
+    /// 返回日志中使用的稳定更新原因。
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Updated => "updated",
+            Self::IgnoredSpike => "ignored_spike",
+            Self::IgnoredParallel => "ignored_parallel",
+            Self::MissingSession => "missing_session",
+            Self::NoReusableAnchor => "ignored_no_reuse",
+            Self::ColdStart => "cold_start",
+            Self::BootstrapUpdated => "bootstrap_updated",
+        }
+    }
+}
+
+/// stateful 断点选点结果。
+struct StatefulCacheBreakpointSelection {
+    selected: Vec<(usize, usize)>,
+    available_slots: usize,
+    message_content_blocks: usize,
+    normal_block_count: Option<usize>,
+    reused_count: usize,
+    request_class: StatefulRequestClass,
+    promotion: StatefulPromotion,
+    should_promote: bool,
+    snapshot_generation: Option<u64>,
+    skip_reason: Option<String>,
+}
+
+/// 单个 stateful 断点的 hash 诊断信息。
+#[derive(Debug, PartialEq, Eq)]
+struct StatefulSelectedCacheDiagnostic {
+    label: String,
+    source: &'static str,
+    block_hash: String,
+    prefix_hash: String,
+    wire_prefix_hash: String,
+}
+
+/// cache prefix 的分段 hash 诊断信息。
+#[derive(Debug, PartialEq, Eq)]
+struct CachePrefixDiagnostics {
+    root_hash: String,
+    system_hash: String,
+    tools_hash: String,
+    messages_hash: String,
+}
+
+/// stateful 模式的内存会话断点缓存。
+#[derive(Default)]
+struct StatefulCacheStore {
+    order: Vec<String>,
+    sessions: HashMap<String, SessionCacheState>,
+}
+
+impl StatefulCacheStore {
+    /// 读取某个 session 的主线快照,并标记为最近使用。
+    ///
+    /// @param key 会话缓存 key。
+    /// @return 命中时返回可锁外使用的主线快照。
+    fn get(&mut self, key: &str) -> Option<StatefulCacheSnapshot> {
+        let state = self.sessions.get(key)?;
+        let snapshot = StatefulCacheSnapshot {
+            normal_profile: state.normal_profile.clone(),
+            normal_anchors: state.normal_anchors.clone(),
+            generation: state.generation,
+            confirmed_cache_read_tokens: state.confirmed_cache_read_tokens,
+        };
+        self.touch(key);
+        Some(snapshot)
+    }
+
+    /// 在快照未被其它请求推进时更新主线状态。
+    ///
+    /// @param key 会话缓存 key。
+    /// @param profile 当前请求画像。
+    /// @param anchors 当前请求实际放置的断点记录。
+    /// @param expected_generation 选点时看到的 generation；冷启动为 `None`。
+    fn promote_if_current(
+        &mut self,
+        key: String,
+        profile: StatefulRequestProfile,
+        anchors: Vec<AnchorRecord>,
+        expected_generation: Option<u64>,
+        confirmed_cache_read_tokens: Option<u64>,
+        has_reused_anchor: bool,
+    ) {
+        if should_delay_stateful_cold_start_promotion(
+            &profile,
+            expected_generation,
+            has_reused_anchor,
+        ) {
+            return;
+        }
+        if let Some(existing) = self.sessions.get(&key) {
+            if let Some(expected) = expected_generation {
+                if existing.generation != expected {
+                    if profile.block_count < existing.normal_profile.block_count {
+                        return;
+                    }
+                    if !anchors_share_fingerprint(&anchors, &existing.normal_anchors) {
+                        return;
+                    }
+                    let class =
+                        classify_stateful_request(&profile, Some(&existing.normal_profile), 0);
+                    if class != StatefulRequestClass::NormalLinear {
+                        return;
+                    }
+                }
+            } else {
+                if !has_reused_anchor && profile.block_count < STATEFUL_BOOTSTRAP_BLOCKS {
+                    return;
+                }
+                if profile.block_count < existing.normal_profile.block_count {
+                    return;
+                }
+                if is_stateful_transient_spike(&profile, &existing.normal_profile) {
+                    return;
+                }
+                // expected_generation=None 表示本请求选点时没有看到任何主线快照。若提交时
+                // 已经有其它请求先完成并建立主线,当前请求必须证明自己仍在同一条前缀上。
+                if !anchors_share_fingerprint(&anchors, &existing.normal_anchors) {
+                    return;
+                }
+            }
+        }
+
+        let previous_cache_read_tokens = self
+            .sessions
+            .get(&key)
+            .and_then(|state| state.confirmed_cache_read_tokens);
+        let generation = self
+            .sessions
+            .get(&key)
+            .map(|state| state.generation.saturating_add(1))
+            .unwrap_or(1);
+        self.sessions.insert(
+            key.clone(),
+            SessionCacheState {
+                normal_profile: profile,
+                normal_anchors: anchors,
+                generation,
+                confirmed_cache_read_tokens: confirmed_cache_read_tokens
+                    .or(previous_cache_read_tokens),
+            },
+        );
+        self.touch(&key);
+        while self.order.len() > STATEFUL_CACHE_MAX_SESSIONS {
+            let old = self.order.remove(0);
+            self.sessions.remove(&old);
+        }
+    }
+
+    /// 将 session key 移动到 LRU 队尾。
+    fn touch(&mut self, key: &str) {
+        self.order.retain(|item| item != key);
+        self.order.push(key.to_string());
+    }
+}
+
+/// 判断冷启动请求是否只应临时打断点,不写入会话主线。
+///
+/// Claude Code 并行 tool 会在一个新会话开始时发出 1-2 个极小请求；这些请求可以
+/// 临时降低单次成本,但没有足够历史证明自己是主线,不能成为后续 stateful anchor。
+fn should_delay_stateful_cold_start_promotion(
+    profile: &StatefulRequestProfile,
+    expected_generation: Option<u64>,
+    has_reused_anchor: bool,
+) -> bool {
+    expected_generation.is_none()
+        && !has_reused_anchor
+        && profile.block_count < STATEFUL_BOOTSTRAP_BLOCKS
+}
+
+/// 判断两个断点集合是否至少共享一个 block 指纹。
+fn anchors_share_fingerprint(left: &[AnchorRecord], right: &[AnchorRecord]) -> bool {
+    let right_keys = right
+        .iter()
+        .map(|anchor| (&anchor.fingerprint, &anchor.prefix_hash))
+        .collect::<HashSet<_>>();
+    left.iter()
+        .any(|anchor| right_keys.contains(&(&anchor.fingerprint, &anchor.prefix_hash)))
+}
+
+/// 判断本轮上游 usage 是否支持把延迟提交断点确认为新的主线。
+fn stateful_completion_usage_is_trustworthy(
+    completion: &StatefulCacheCompletion,
+    usage: Option<StatefulCacheUsage>,
+) -> bool {
+    let Some(usage) = usage else {
+        return true;
+    };
+    let Some(snapshot_read_tokens) = completion.snapshot_cache_read_tokens else {
+        return true;
+    };
+    !(usage.cache_read_input_tokens <= snapshot_read_tokens
+        && usage.cache_creation_input_tokens > STATEFUL_USAGE_CREATION_REJECT_THRESHOLD)
+}
+
+/// 计算自动缓存修复断点位置。
+fn select_auto_message_cache_control_positions(
+    body: &serde_json::Value,
+) -> CacheBreakpointSelection {
+    select_message_cache_control_positions(body, CacheBreakpointMode::Auto)
+}
+
+/// 计算 stateful 可持久化的稳定文本断点位置。
+fn select_stateful_durable_message_cache_control_positions(
+    body: &serde_json::Value,
+) -> CacheBreakpointSelection {
+    select_message_cache_control_positions(body, CacheBreakpointMode::StatefulDurable)
+}
+
+/// 计算更积极的 rolling 断点位置。
+fn select_rolling_message_cache_control_positions(
+    body: &serde_json::Value,
+) -> CacheBreakpointSelection {
+    select_message_cache_control_positions(body, CacheBreakpointMode::Rolling)
+}
+
+/// 计算 sub2api 风格的 message 缓存断点。
+///
+/// 对齐 sub2api 的非 Claude Code 客户端策略：最后一条 message 一个断点；
+/// messages 数量达到 4 时，再给倒数第二个 user message 一个断点。
+fn select_sub2api_message_cache_control_positions(
+    body: &serde_json::Value,
+) -> CacheBreakpointSelection {
+    let non_message_breakpoints = count_non_message_cache_breakpoints(body);
+    let available = MAX_CACHE_BREAKPOINTS.saturating_sub(non_message_breakpoints);
+    let Some(messages) = body
+        .get("messages")
+        .and_then(|messages| messages.as_array())
+    else {
+        return CacheBreakpointSelection {
+            selected: Vec::new(),
+            available_slots: available,
+            message_content_blocks: 0,
+            skip_reason: Some("no_messages".into()),
+        };
+    };
+    let message_content_blocks = message_block_positions(body)
+        .map(|blocks| blocks.len())
+        .unwrap_or(0);
+
+    if available == 0 {
+        return CacheBreakpointSelection {
+            selected: Vec::new(),
+            available_slots: available,
+            message_content_blocks,
+            skip_reason: Some("no_available_slots".into()),
+        };
+    }
+    if messages.is_empty() {
+        return CacheBreakpointSelection {
+            selected: Vec::new(),
+            available_slots: available,
+            message_content_blocks,
+            skip_reason: Some("no_messages".into()),
+        };
+    }
+
+    let mut selected = Vec::new();
+    let mut seen = HashSet::new();
+    if let Some(position) =
+        find_last_cacheable_block_in_message(body, messages.len() - 1, CacheBreakpointMode::Auto)
+    {
+        push_unique_position(&mut selected, &mut seen, position, available);
+    }
+    if messages.len() >= 4 {
+        let mut user_count = 0;
+        for message_idx in (0..messages.len()).rev() {
+            if messages[message_idx]
+                .get("role")
+                .and_then(|role| role.as_str())
+                != Some("user")
+            {
+                continue;
+            }
+            user_count += 1;
+            if user_count != 2 {
+                continue;
+            }
+            if let Some(position) =
+                find_last_cacheable_block_in_message(body, message_idx, CacheBreakpointMode::Auto)
+            {
+                push_unique_position(&mut selected, &mut seen, position, available);
+            }
+            break;
+        }
+    }
+    selected.sort_unstable();
+
+    let skip_reason = if selected.is_empty() {
+        Some("no_cacheable_blocks".into())
+    } else {
+        None
+    };
+    CacheBreakpointSelection {
+        selected,
+        available_slots: available,
+        message_content_blocks,
+        skip_reason,
+    }
+}
+
+/// sub2api 风格断点策略兼容 string content。
+///
+/// sub2api 会把被选中 message 的字符串 content 升级为 text block 数组后再打断点；
+/// 这里提前只规范化两个候选 message，避免改变其它历史消息结构。
+fn normalize_sub2api_message_cache_candidate_contents(body: &mut serde_json::Value) {
+    let Some(messages) = body
+        .get("messages")
+        .and_then(|messages| messages.as_array())
+    else {
+        return;
+    };
+    if messages.is_empty() {
+        return;
+    }
+
+    let mut indexes = vec![messages.len() - 1];
+    if messages.len() >= 4 {
+        let mut user_count = 0;
+        for message_idx in (0..messages.len()).rev() {
+            if messages[message_idx]
+                .get("role")
+                .and_then(|role| role.as_str())
+                != Some("user")
+            {
+                continue;
+            }
+            user_count += 1;
+            if user_count == 2 {
+                indexes.push(message_idx);
+                break;
+            }
+        }
+    }
+
+    let Some(messages) = body
+        .get_mut("messages")
+        .and_then(|messages| messages.as_array_mut())
+    else {
+        return;
+    };
+    for message_idx in indexes {
+        normalize_message_string_content(messages.get_mut(message_idx));
+    }
+}
+
+/// 将单条 message 的字符串 content 升级为单个 text block。
+fn normalize_message_string_content(message: Option<&mut serde_json::Value>) {
+    let Some(message) = message else {
+        return;
+    };
+    let Some(content) = message.get("content").cloned() else {
+        return;
+    };
+    let serde_json::Value::String(text) = content else {
+        return;
+    };
+    if let Some(obj) = message.as_object_mut() {
+        obj.insert(
+            "content".into(),
+            serde_json::json!([{ "type": "text", "text": text }]),
+        );
+    }
+}
+
+/// 计算 stateful 防污染缓存断点位置。
+fn select_stateful_message_cache_control_positions(
+    body: &serde_json::Value,
+    profile: StatefulRequestProfile,
+    has_session_key: bool,
+    snapshot: Option<&StatefulCacheSnapshot>,
+) -> StatefulCacheBreakpointSelection {
+    let base = select_auto_message_cache_control_positions(body);
+    let durable = select_stateful_durable_message_cache_control_positions(body);
+    let normal_block_count = snapshot.map(|state| state.normal_profile.block_count);
+    if base.selected.is_empty() {
+        return StatefulCacheBreakpointSelection {
+            selected: base.selected,
+            available_slots: base.available_slots,
+            message_content_blocks: base.message_content_blocks,
+            normal_block_count,
+            reused_count: 0,
+            request_class: StatefulRequestClass::Unknown,
+            promotion: if has_session_key {
+                StatefulPromotion::NoReusableAnchor
+            } else {
+                StatefulPromotion::MissingSession
+            },
+            should_promote: false,
+            snapshot_generation: snapshot.map(|state| state.generation),
+            skip_reason: base.skip_reason,
+        };
+    }
+
+    let Some(snapshot) = snapshot else {
+        let selected = merge_stateful_anchor_and_auto_positions(
+            body,
+            durable.selected,
+            base.selected,
+            base.available_slots,
+        );
+        return StatefulCacheBreakpointSelection {
+            selected,
+            available_slots: base.available_slots,
+            message_content_blocks: base.message_content_blocks,
+            normal_block_count,
+            reused_count: 0,
+            request_class: StatefulRequestClass::Unknown,
+            promotion: if has_session_key {
+                StatefulPromotion::ColdStart
+            } else {
+                StatefulPromotion::MissingSession
+            },
+            should_promote: has_session_key,
+            snapshot_generation: None,
+            skip_reason: base.skip_reason,
+        };
+    };
+
+    let anchor_positions = find_stateful_anchor_positions(body, &snapshot.normal_anchors);
+    let request_class = classify_stateful_request(
+        &profile,
+        Some(&snapshot.normal_profile),
+        anchor_positions.len(),
+    );
+    if matches!(request_class, StatefulRequestClass::TransientSpike) {
+        return StatefulCacheBreakpointSelection {
+            selected: base.selected,
+            available_slots: base.available_slots,
+            message_content_blocks: base.message_content_blocks,
+            normal_block_count,
+            reused_count: anchor_positions.len(),
+            request_class,
+            promotion: StatefulPromotion::IgnoredSpike,
+            should_promote: false,
+            snapshot_generation: Some(snapshot.generation),
+            skip_reason: base.skip_reason,
+        };
+    }
+
+    if is_stateful_profile_bootstrap(&snapshot.normal_profile) && anchor_positions.is_empty() {
+        let selected = merge_stateful_anchor_and_auto_positions(
+            body,
+            durable.selected,
+            base.selected,
+            base.available_slots,
+        );
+        return StatefulCacheBreakpointSelection {
+            selected,
+            available_slots: base.available_slots,
+            message_content_blocks: base.message_content_blocks,
+            normal_block_count,
+            reused_count: anchor_positions.len(),
+            request_class: StatefulRequestClass::NormalLinear,
+            promotion: if has_session_key {
+                StatefulPromotion::BootstrapUpdated
+            } else {
+                StatefulPromotion::MissingSession
+            },
+            should_promote: has_session_key,
+            snapshot_generation: Some(snapshot.generation),
+            skip_reason: base.skip_reason,
+        };
+    }
+
+    if matches!(request_class, StatefulRequestClass::ParallelSibling) && anchor_positions.len() < 2
+    {
+        return StatefulCacheBreakpointSelection {
+            selected: base.selected,
+            available_slots: base.available_slots,
+            message_content_blocks: base.message_content_blocks,
+            normal_block_count,
+            reused_count: 0,
+            request_class,
+            promotion: StatefulPromotion::IgnoredParallel,
+            should_promote: false,
+            snapshot_generation: Some(snapshot.generation),
+            skip_reason: base.skip_reason,
+        };
+    }
+    if anchor_positions.is_empty() {
+        return StatefulCacheBreakpointSelection {
+            selected: base.selected,
+            available_slots: base.available_slots,
+            message_content_blocks: base.message_content_blocks,
+            normal_block_count,
+            reused_count: 0,
+            request_class,
+            promotion: StatefulPromotion::NoReusableAnchor,
+            should_promote: false,
+            snapshot_generation: Some(snapshot.generation),
+            skip_reason: base.skip_reason,
+        };
+    }
+
+    let selected = merge_stateful_anchor_and_auto_positions(
+        body,
+        anchor_positions,
+        durable.selected.into_iter().chain(base.selected).collect(),
+        base.available_slots,
+    );
+    let reused_count = count_stateful_reused_positions(body, &selected, &snapshot.normal_anchors);
+    let should_promote = has_session_key
+        && (reused_count > 0
+            || matches!(
+                request_class,
+                StatefulRequestClass::NormalLinear | StatefulRequestClass::Unknown
+            ));
+    let promotion = if should_promote {
+        StatefulPromotion::Updated
+    } else if has_session_key {
+        StatefulPromotion::NoReusableAnchor
+    } else {
+        StatefulPromotion::MissingSession
+    };
+
+    StatefulCacheBreakpointSelection {
+        selected,
+        available_slots: base.available_slots,
+        message_content_blocks: base.message_content_blocks,
+        normal_block_count,
+        reused_count,
+        request_class,
+        promotion,
+        should_promote,
+        snapshot_generation: Some(snapshot.generation),
+        skip_reason: base.skip_reason,
+    }
+}
+
+/// 计算当前请求的结构画像。
+fn compute_stateful_request_profile(body: &serde_json::Value) -> StatefulRequestProfile {
+    let messages = body
+        .get("messages")
+        .and_then(|messages| messages.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let message_blocks = message_block_positions(body).unwrap_or_default();
+    let mut tool_result_count = 0;
+    let mut assistant_tool_use_count = 0;
+    let mut last_user_text_hash = None;
+    let mut tail_role_type = String::new();
+
+    for (message_idx, block_idx) in &message_blocks {
+        let Some(message) = messages.get(*message_idx) else {
+            continue;
+        };
+        let role = message
+            .get("role")
+            .and_then(|role| role.as_str())
+            .unwrap_or("");
+        let Some(block) = message
+            .get("content")
+            .and_then(|content| content.as_array())
+            .and_then(|content| content.get(*block_idx))
+        else {
+            continue;
+        };
+        let block_type = block_type_of(block).unwrap_or("unknown");
+        if role == "user" && block_type == "tool_result" {
+            tool_result_count += 1;
+        }
+        if role == "assistant" && block_type == "tool_use" {
+            assistant_tool_use_count += 1;
+        }
+        if role == "user" && block_type == "text" {
+            if let Some(text) = block.get("text").and_then(|text| text.as_str()) {
+                last_user_text_hash = Some(hash_text(text));
+            }
+        }
+        tail_role_type = format!("{role}:{block_type}");
+    }
+
+    StatefulRequestProfile {
+        block_count: message_blocks.len(),
+        message_count: messages.len(),
+        tool_result_count,
+        assistant_tool_use_count,
+        last_user_text_hash,
+        tail_role_type,
+    }
+}
+
+/// 判断当前请求相对主线属于哪类形态。
+fn classify_stateful_request(
+    profile: &StatefulRequestProfile,
+    normal: Option<&StatefulRequestProfile>,
+    reused_count: usize,
+) -> StatefulRequestClass {
+    let Some(normal) = normal else {
+        return StatefulRequestClass::Unknown;
+    };
+    if is_stateful_transient_spike(profile, normal) {
+        return StatefulRequestClass::TransientSpike;
+    }
+    let delta = profile.block_count.abs_diff(normal.block_count);
+    if !is_stateful_profile_bootstrap(normal) && delta > STATEFUL_PARALLEL_DELTA && reused_count < 2
+    {
+        return StatefulRequestClass::ParallelSibling;
+    }
+    StatefulRequestClass::NormalLinear
+}
+
+/// 判断主线是否仍处于冷启动阶段。
+fn is_stateful_profile_bootstrap(profile: &StatefulRequestProfile) -> bool {
+    profile.block_count < STATEFUL_BOOTSTRAP_BLOCKS
+}
+
+/// 判断当前请求是否明显是相对主线的暴涨请求。
+fn is_stateful_transient_spike(
+    profile: &StatefulRequestProfile,
+    normal: &StatefulRequestProfile,
+) -> bool {
+    profile.block_count > normal.block_count.saturating_mul(STATEFUL_SPIKE_RATIO)
+        && profile.block_count.saturating_sub(normal.block_count) > STATEFUL_SPIKE_ABSOLUTE_DELTA
+}
+
+/// 查找上一轮断点在当前请求中的位置。
+fn find_stateful_anchor_positions(
+    body: &serde_json::Value,
+    anchors: &[AnchorRecord],
+) -> Vec<(usize, usize)> {
+    if anchors.is_empty() {
+        return Vec::new();
+    }
+    let message_blocks = message_block_positions(body).unwrap_or_default();
+    let position_by_fingerprint = message_cacheable_position_fingerprint_map(
+        body,
+        &message_blocks,
+        CacheBreakpointMode::StatefulDurable,
+    );
+    let mut positions = anchors
+        .iter()
+        .filter_map(|anchor| {
+            position_by_fingerprint
+                .get(&stateful_anchor_match_key(anchor))
+                .copied()
+        })
+        .collect::<Vec<_>>();
+    positions.sort_unstable();
+    positions.dedup();
+    positions
+}
+
+/// 合并复用锚点与当前 auto 选点。
+fn merge_stateful_anchor_and_auto_positions(
+    body: &serde_json::Value,
+    anchor_positions: Vec<(usize, usize)>,
+    auto_positions: Vec<(usize, usize)>,
+    available: usize,
+) -> Vec<(usize, usize)> {
+    let mut selected = Vec::new();
+    let mut seen = HashSet::new();
+    for position in anchor_positions {
+        push_unique_position(&mut selected, &mut seen, position, available);
+    }
+
+    // 已经占满 slot 时优先保持旧断点集合。只有尾部离最后一个旧断点足够远,
+    // 才替换最后一个旧断点创建新尾部缓存,避免每轮正常增长都重建 cache。
+    if selected.len() >= available {
+        if let Some(replacement) =
+            stateful_tail_anchor_replacement(body, &selected, &auto_positions)
+        {
+            selected.sort_unstable();
+            selected.pop();
+            seen = selected.iter().copied().collect();
+            push_unique_position(&mut selected, &mut seen, replacement, available);
+        }
+        selected.sort_unstable();
+        return selected;
+    }
+
+    for position in auto_positions {
+        if !stateful_auto_position_can_follow_reused_anchors(&selected, position) {
+            continue;
+        }
+        push_unique_position(&mut selected, &mut seen, position, available);
+    }
+    if selected.len() < available {
+        if let Some(boundary) =
+            claude_code_auto_injected_boundary_position(body, CacheBreakpointMode::Auto)
+        {
+            if stateful_auto_position_can_follow_reused_anchors(&selected, boundary) {
+                push_unique_position(&mut selected, &mut seen, boundary, available);
+            }
+        }
+    }
+    selected.sort_unstable();
+    selected
+}
+
+/// 判断是否应该用当前尾部断点替换上一轮最后一个断点。
+fn stateful_tail_anchor_replacement(
+    body: &serde_json::Value,
+    selected: &[(usize, usize)],
+    auto_positions: &[(usize, usize)],
+) -> Option<(usize, usize)> {
+    let tail_candidate = auto_positions
+        .iter()
+        .copied()
+        .filter(|position| is_stateful_durable_anchor_at(body, *position))
+        .max()?;
+    if selected.contains(&tail_candidate) {
+        return None;
+    }
+    let latest_anchor = selected.iter().copied().max()?;
+    if tail_candidate <= latest_anchor {
+        return None;
+    }
+    let distance = message_block_rank_distance(body, latest_anchor, tail_candidate)?;
+    if distance < CACHE_LOOKBACK_STRIDE {
+        return None;
+    }
+    Some(tail_candidate)
+}
+
+/// 判断自动补点是否能追加到复用锚点之后。
+///
+/// Anthropic 的 prompt cache key 包含 cache_control 本身。已有锚点前方新增断点会改变
+/// 该锚点的真实 wire prefix,导致看似复用的旧锚点实际重新建缓存。
+fn stateful_auto_position_can_follow_reused_anchors(
+    selected: &[(usize, usize)],
+    position: (usize, usize),
+) -> bool {
+    selected
+        .iter()
+        .copied()
+        .max()
+        .map(|latest_anchor| position > latest_anchor)
+        .unwrap_or(true)
+}
+
+/// 计算两个 message content block 在请求线性 block 序列中的距离。
+fn message_block_rank_distance(
+    body: &serde_json::Value,
+    from: (usize, usize),
+    to: (usize, usize),
+) -> Option<usize> {
+    let message_blocks = message_block_positions(body)?;
+    let ranks = message_blocks
+        .iter()
+        .enumerate()
+        .map(|(rank, position)| (*position, rank))
+        .collect::<HashMap<_, _>>();
+    let from_rank = ranks.get(&from)?;
+    let to_rank = ranks.get(&to)?;
+    to_rank.checked_sub(*from_rank)
+}
+
+/// 统计本轮实际选中位置中复用了多少历史锚点。
+fn count_stateful_reused_positions(
+    body: &serde_json::Value,
+    selected: &[(usize, usize)],
+    anchors: &[AnchorRecord],
+) -> usize {
+    let anchor_keys = anchors
+        .iter()
+        .map(stateful_anchor_match_key)
+        .collect::<HashSet<_>>();
+    selected
+        .iter()
+        .filter_map(|position| stateful_anchor_match_key_at(body, *position))
+        .filter(|key| anchor_keys.contains(key))
+        .count()
+}
+
+/// 构造 stateful 选点诊断信息,只记录 hash 和结构标签,不记录 prompt 原文。
+fn stateful_selected_cache_diagnostics(
+    body: &serde_json::Value,
+    outcome: &StatefulCacheBreakpointSelection,
+    snapshot: Option<&StatefulCacheSnapshot>,
+) -> Vec<StatefulSelectedCacheDiagnostic> {
+    let anchor_keys = snapshot
+        .map(|snapshot| {
+            snapshot
+                .normal_anchors
+                .iter()
+                .map(stateful_anchor_match_key)
+                .collect::<HashSet<_>>()
+        })
+        .unwrap_or_default();
+
+    outcome
+        .selected
+        .iter()
+        .map(|position| {
+            let block_hash =
+                message_block_fingerprint_at(body, *position).unwrap_or_else(|| "missing".into());
+            let prefix_hash =
+                message_prefix_hash_at(body, *position).unwrap_or_else(|| "missing".into());
+            let wire_prefix_hash =
+                message_wire_prefix_hash_at(body, *position).unwrap_or_else(|| "missing".into());
+            let source = if stateful_anchor_match_key_at(body, *position)
+                .map(|key| anchor_keys.contains(&key))
+                .unwrap_or(false)
+            {
+                "reused_anchor"
+            } else if matches!(outcome.promotion, StatefulPromotion::BootstrapUpdated) {
+                "bootstrap"
+            } else {
+                "auto"
+            };
+            StatefulSelectedCacheDiagnostic {
+                label: message_cache_control_position_log_label(body, position.0, position.1),
+                source,
+                block_hash: short_hash(&block_hash),
+                prefix_hash: short_hash(&prefix_hash),
+                wire_prefix_hash: short_hash(&wire_prefix_hash),
+            }
+        })
+        .collect()
+}
+
+/// 构造 auto / rolling 选点诊断信息,只记录结构标签与 hash。
+fn selected_cache_diagnostics(
+    body: &serde_json::Value,
+    positions: &[(usize, usize)],
+    source: &'static str,
+) -> Vec<StatefulSelectedCacheDiagnostic> {
+    positions
+        .iter()
+        .map(|position| StatefulSelectedCacheDiagnostic {
+            label: message_cache_control_position_log_label(body, position.0, position.1),
+            source,
+            block_hash: short_hash(
+                &message_block_fingerprint_at(body, *position).unwrap_or_else(|| "missing".into()),
+            ),
+            prefix_hash: short_hash(
+                &message_prefix_hash_at(body, *position).unwrap_or_else(|| "missing".into()),
+            ),
+            wire_prefix_hash: short_hash(
+                &message_wire_prefix_hash_at(body, *position).unwrap_or_else(|| "missing".into()),
+            ),
+        })
+        .collect()
+}
+
+/// 构造请求主要前缀段的 hash 诊断信息。
+fn cache_prefix_diagnostics(body: &serde_json::Value) -> CachePrefixDiagnostics {
+    CachePrefixDiagnostics {
+        root_hash: short_hash(&body_root_without_messages_hash(body)),
+        system_hash: short_hash(&stable_json_hash(
+            body.get("system").unwrap_or(&serde_json::Value::Null),
+        )),
+        tools_hash: short_hash(&stable_json_hash(
+            body.get("tools").unwrap_or(&serde_json::Value::Null),
+        )),
+        messages_hash: short_hash(&stable_json_hash(
+            body.get("messages").unwrap_or(&serde_json::Value::Null),
+        )),
+    }
+}
+
+/// 计算指定 message block 之前完整请求前缀的 hash。
+fn message_prefix_hash_at(body: &serde_json::Value, position: (usize, usize)) -> Option<String> {
+    let mut prefix = body.clone();
+    let messages = prefix
+        .get_mut("messages")
+        .and_then(|value| value.as_array_mut())?;
+    if position.0 >= messages.len() {
+        return None;
+    }
+    messages.truncate(position.0 + 1);
+    let message = messages.get_mut(position.0)?;
+    let content = message
+        .get_mut("content")
+        .and_then(|value| value.as_array_mut())?;
+    if position.1 >= content.len() {
+        return None;
+    }
+    content.truncate(position.1 + 1);
+    Some(stable_json_hash(&prefix))
+}
+
+/// 计算指定 message block 之前包含 cache_control 的真实上游前缀 hash。
+fn message_wire_prefix_hash_at(
+    body: &serde_json::Value,
+    position: (usize, usize),
+) -> Option<String> {
+    let mut prefix = body.clone();
+    let messages = prefix
+        .get_mut("messages")
+        .and_then(|value| value.as_array_mut())?;
+    if position.0 >= messages.len() {
+        return None;
+    }
+    messages.truncate(position.0 + 1);
+    let message = messages.get_mut(position.0)?;
+    let content = message
+        .get_mut("content")
+        .and_then(|value| value.as_array_mut())?;
+    if position.1 >= content.len() {
+        return None;
+    }
+    content.truncate(position.1 + 1);
+    Some(wire_json_hash(&prefix))
+}
+
+/// 计算不含 messages 的请求根级 hash。
+fn body_root_without_messages_hash(body: &serde_json::Value) -> String {
+    let mut root = body.clone();
+    if let Some(map) = root.as_object_mut() {
+        map.remove("messages");
+    }
+    stable_json_hash(&root)
+}
+
+/// 缩短 hash 便于日志横向比较。
+fn short_hash(hash: &str) -> String {
+    hash.chars().take(12).collect()
+}
+
+/// 构建可缓存 message block 指纹到当前位置的映射。
+fn message_cacheable_position_fingerprint_map(
+    body: &serde_json::Value,
+    message_blocks: &[(usize, usize)],
+    mode: CacheBreakpointMode,
+) -> HashMap<(String, String), (usize, usize)> {
+    let mut map = HashMap::new();
+    for position in message_blocks {
+        if !is_cacheable_message_block_at(body, *position, mode) {
+            continue;
+        }
+        if let Some(key) = stateful_anchor_match_key_at(body, *position) {
+            map.insert(key, *position);
+        }
+    }
+    map
+}
+
+/// 返回指定 message block 的稳定指纹。
+fn message_block_fingerprint_at(
+    body: &serde_json::Value,
+    position: (usize, usize),
+) -> Option<String> {
+    let messages = body
+        .get("messages")
+        .and_then(|messages| messages.as_array())?;
+    let message = messages.get(position.0)?;
+    let role = message
+        .get("role")
+        .and_then(|role| role.as_str())
+        .unwrap_or("");
+    let content = message
+        .get("content")
+        .and_then(|content| content.as_array())?;
+    let block = content.get(position.1)?;
+    let block_type = block_type_of(block).unwrap_or("unknown");
+    let prev_hash = neighbor_block_hash(content, position.1.checked_sub(1));
+    let payload = serde_json::json!({
+        "role": role,
+        "block_type": block_type,
+        "message_idx": position.0,
+        "block_idx": position.1,
+        "block_hash": stable_json_hash(block),
+        "prev_hash": prev_hash,
+    });
+    Some(stable_json_hash(&payload))
+}
+
+/// 构建当前断点的内存锚点记录。
+fn anchor_record_at(body: &serde_json::Value, position: (usize, usize)) -> Option<AnchorRecord> {
+    let fingerprint = message_block_fingerprint_at(body, position)?;
+    let prefix_hash = message_prefix_hash_at(body, position)?;
+    let block = body
+        .get("messages")
+        .and_then(|messages| messages.as_array())
+        .and_then(|messages| messages.get(position.0))
+        .and_then(|message| message.get("content"))
+        .and_then(|content| content.as_array())
+        .and_then(|content| content.get(position.1))?;
+    Some(AnchorRecord {
+        fingerprint,
+        prefix_hash,
+        message_idx: position.0,
+        block_idx: position.1,
+        block_type: block_type_of(block).unwrap_or("unknown").to_string(),
+    })
+}
+
+/// 构造 stateful 锚点匹配键。
+fn stateful_anchor_match_key(anchor: &AnchorRecord) -> (String, String) {
+    (anchor.fingerprint.clone(), anchor.prefix_hash.clone())
+}
+
+/// 构造当前位置的 stateful 锚点匹配键。
+fn stateful_anchor_match_key_at(
+    body: &serde_json::Value,
+    position: (usize, usize),
+) -> Option<(String, String)> {
+    Some((
+        message_block_fingerprint_at(body, position)?,
+        message_prefix_hash_at(body, position)?,
+    ))
+}
+
+/// 构建可持久化的 stateful 锚点记录。
+fn durable_stateful_anchor_record_at(
+    body: &serde_json::Value,
+    position: (usize, usize),
+) -> Option<AnchorRecord> {
+    if !is_stateful_durable_anchor_at(body, position) {
+        return None;
+    }
+    anchor_record_at(body, position)
+}
+
+/// 判断指定 block 是否适合作为跨请求复用的会话锚点。
+fn is_stateful_durable_anchor_at(body: &serde_json::Value, position: (usize, usize)) -> bool {
+    is_cacheable_message_block_at(body, position, CacheBreakpointMode::StatefulDurable)
+}
+
+/// 计算相邻块 hash,用于避免重复 block 被误匹配。
+fn neighbor_block_hash(content: &[serde_json::Value], index: Option<usize>) -> Option<String> {
+    let index = index?;
+    content.get(index).map(stable_json_hash)
+}
+
+/// 计算剥离 cache_control 后的 JSON hash。
+fn stable_json_hash(value: &serde_json::Value) -> String {
+    let mut stable = value.clone();
+    strip_cache_control_recursive(&mut stable);
+    let bytes = serde_json::to_vec(&stable).unwrap_or_default();
+    hex::encode(Sha256::digest(bytes))
+}
+
+/// 计算保留 cache_control 的 JSON hash,用于比对真实上游缓存前缀。
+fn wire_json_hash(value: &serde_json::Value) -> String {
+    let bytes = serde_json::to_vec(value).unwrap_or_default();
+    hex::encode(Sha256::digest(bytes))
+}
+
+/// 递归剥离 `cache_control`,保证指纹不受本次改写影响。
+fn strip_cache_control_recursive(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(map) => {
+            map.remove("cache_control");
+            for child in map.values_mut() {
+                strip_cache_control_recursive(child);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for child in items {
+                strip_cache_control_recursive(child);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// 计算文本 hash。
+fn hash_text(text: &str) -> String {
+    hex::encode(Sha256::digest(text.as_bytes()))
+}
+
+/// 提取 stateful 会话缓存 key。
+fn stateful_session_key(
+    account: &Account,
+    body: &serde_json::Value,
+    real_session_id_override: Option<&str>,
+) -> Option<String> {
+    let session_id = real_session_id_override
+        .map(str::to_string)
+        .or_else(|| extract_claude_code_session_id(body))?;
+    let profile = device_profile(account);
+    let profile_key = profile_for_version(&profile.env.version).key;
+    Some(format!("{}:{}:{}", account.id, profile_key, session_id))
+}
+
+/// 从 Claude Code metadata.user_id 中提取 session_id。
+fn extract_claude_code_session_id(body: &serde_json::Value) -> Option<String> {
+    let user_id = body
+        .get("metadata")
+        .and_then(|metadata| metadata.get("user_id"))
+        .and_then(|user_id| user_id.as_str())?;
+
+    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(user_id) {
+        if let Some(session_id) = parsed.get("session_id").and_then(|value| value.as_str()) {
+            if !session_id.is_empty() {
+                return Some(session_id.to_string());
+            }
+        }
+    }
+
+    user_id
+        .rfind("_session_")
+        .map(|idx| user_id[idx + 9..].to_string())
+        .filter(|session_id| !session_id.is_empty())
+}
+
+/// 缓存断点选点模式。
+#[derive(Clone, Copy)]
+enum CacheBreakpointMode {
+    /// 保守自动修复。
+    Auto,
+    /// 激进 rolling 对照。
+    Rolling,
+    /// stateful 持久化锚点,只选择稳定文本块。
+    StatefulDurable,
+}
+
+/// 计算 message 缓存断点。
+fn select_message_cache_control_positions(
+    body: &serde_json::Value,
+    mode: CacheBreakpointMode,
+) -> CacheBreakpointSelection {
+    let non_message_breakpoints = count_non_message_cache_breakpoints(body);
+    let available = MAX_CACHE_BREAKPOINTS.saturating_sub(non_message_breakpoints);
+    let Some(message_blocks) = message_block_positions(body) else {
+        return CacheBreakpointSelection {
+            selected: Vec::new(),
+            available_slots: available,
+            message_content_blocks: 0,
+            skip_reason: Some("no_messages".into()),
+        };
+    };
+
+    if available == 0 {
+        return CacheBreakpointSelection {
+            selected: Vec::new(),
+            available_slots: available,
+            message_content_blocks: message_blocks.len(),
+            skip_reason: Some("no_available_slots".into()),
+        };
+    }
+    if message_blocks.is_empty() {
+        return CacheBreakpointSelection {
+            selected: Vec::new(),
+            available_slots: available,
+            message_content_blocks: 0,
+            skip_reason: Some("no_content_blocks".into()),
+        };
+    }
+
+    let Some((tail_idx, tail_position)) =
+        find_tail_message_cache_breakpoint(body, &message_blocks, mode)
+    else {
+        return CacheBreakpointSelection {
+            selected: Vec::new(),
+            available_slots: available,
+            message_content_blocks: message_blocks.len(),
+            skip_reason: Some("no_cacheable_blocks".into()),
+        };
+    };
+
+    let mut selected = Vec::new();
+    let mut seen = HashSet::new();
+    push_unique_position(&mut selected, &mut seen, tail_position, available);
+    let mut cursor = tail_idx;
+    while selected.len() < available && cursor > 0 {
+        let window_start = cursor.saturating_sub(CACHE_LOOKBACK_STRIDE);
+        if let Some((position_idx, position)) =
+            find_window_message_cache_breakpoint(body, &message_blocks, window_start, cursor, mode)
+        {
+            push_unique_position(&mut selected, &mut seen, position, available);
+            cursor = position_idx;
+            continue;
+        }
+        if window_start == 0 {
+            break;
+        }
+        cursor = window_start;
+    }
+
+    if selected.len() < available {
+        if let Some(boundary) = claude_code_auto_injected_boundary_position(body, mode) {
+            push_unique_position(&mut selected, &mut seen, boundary, available);
+        }
+    }
+
+    selected.sort_unstable();
+
+    CacheBreakpointSelection {
+        selected,
+        available_slots: available,
+        message_content_blocks: message_blocks.len(),
+        skip_reason: None,
+    }
+}
+
+/// 追加未选择过的位置,并保持不超过可用断点数量。
+fn push_unique_position(
+    selected: &mut Vec<(usize, usize)>,
+    seen: &mut HashSet<(usize, usize)>,
+    position: (usize, usize),
+    available: usize,
+) {
+    if selected.len() >= available {
+        return;
+    }
+    if seen.insert(position) {
+        selected.push(position);
+    }
+}
+
+/// 从尾部找到最新可放置断点的 message block。
+fn find_tail_message_cache_breakpoint(
+    body: &serde_json::Value,
+    message_blocks: &[(usize, usize)],
+    mode: CacheBreakpointMode,
+) -> Option<(usize, (usize, usize))> {
+    (0..message_blocks.len()).rev().find_map(|idx| {
+        let position = message_blocks[idx];
+        if is_cacheable_message_block_at(body, position, mode) {
+            Some((idx, position))
+        } else {
+            None
+        }
+    })
+}
+
+/// 在 lookback 窗口中找到下一个缓存断点。
+fn find_window_message_cache_breakpoint(
+    body: &serde_json::Value,
+    message_blocks: &[(usize, usize)],
+    window_start: usize,
+    cursor: usize,
+    mode: CacheBreakpointMode,
+) -> Option<(usize, (usize, usize))> {
+    let preferred = (window_start..cursor).find_map(|idx| {
+        let position = message_blocks[idx];
+        if is_preferred_auto_message_block_at(body, position) {
+            Some((idx, position))
+        } else {
+            None
+        }
+    });
+    if preferred.is_some()
+        || matches!(
+            mode,
+            CacheBreakpointMode::Auto | CacheBreakpointMode::StatefulDurable
+        )
+    {
+        return preferred;
+    }
+
+    (window_start..cursor).find_map(|idx| {
+        let position = message_blocks[idx];
+        if is_cacheable_message_block_at(body, position, mode) {
+            Some((idx, position))
+        } else {
+            None
+        }
+    })
+}
+
+/// 查找某条 message 内最后一个可放置 cache_control 的 content block。
+fn find_last_cacheable_block_in_message(
+    body: &serde_json::Value,
+    message_idx: usize,
+    mode: CacheBreakpointMode,
+) -> Option<(usize, usize)> {
+    let content_len = body
+        .get("messages")
+        .and_then(|messages| messages.as_array())
+        .and_then(|messages| messages.get(message_idx))
+        .and_then(|message| message.get("content"))
+        .and_then(|content| content.as_array())
+        .map(|content| content.len())?;
+
+    (0..content_len)
+        .rev()
+        .map(|block_idx| (message_idx, block_idx))
+        .find(|position| is_cacheable_message_block_at(body, *position, mode))
+}
+
+/// 构造缓存断点诊断标签,只记录结构化位置和 block 类型,避免日志泄漏 prompt 文本。
+fn message_cache_control_position_log_label(
+    body: &serde_json::Value,
+    message_idx: usize,
+    block_idx: usize,
+) -> String {
+    let Some(message) = body
+        .get("messages")
+        .and_then(|messages| messages.as_array())
+        .and_then(|messages| messages.get(message_idx))
+    else {
+        return format!("msg[{message_idx}].content[{block_idx}] role=? type=?");
+    };
+    let role = message
+        .get("role")
+        .and_then(|role| role.as_str())
+        .unwrap_or("?");
+    let Some(block) = message
+        .get("content")
+        .and_then(|content| content.as_array())
+        .and_then(|content| content.get(block_idx))
+    else {
+        return format!("msg[{message_idx}].content[{block_idx}] role={role} type=?");
+    };
+    let block_type = block
+        .get("type")
+        .and_then(|value| value.as_str())
+        .unwrap_or("?");
+    let tool_name = if block_type == "tool_use" {
+        block.get("name").and_then(|value| value.as_str())
+    } else {
+        None
+    };
+
+    match tool_name {
+        Some(name) => {
+            format!(
+                "msg[{message_idx}].content[{block_idx}] role={role} type={block_type} tool={name}"
+            )
+        }
+        None => format!("msg[{message_idx}].content[{block_idx}] role={role} type={block_type}"),
+    }
+}
+
+/// 统计 system/tools 上已经占用的 cache_control 断点数量。
+///
+/// 请求根级 `cache_control` 不是 Anthropic message history 的真实 block 断点,
+/// 不参与 message 侧 slot 计算,否则会误跳过尾部历史断点。
+fn count_non_message_cache_breakpoints(body: &serde_json::Value) -> usize {
+    count_system_cache_breakpoints(body) + count_tool_cache_breakpoints(body)
+}
+
+/// 统计 system 上已经占用的 cache_control 断点数量。
+fn count_system_cache_breakpoints(body: &serde_json::Value) -> usize {
+    body.get("system")
+        .and_then(|s| s.as_array())
+        .map(|sys| {
+            sys.iter()
+                .filter(|item| item.get("cache_control").is_some())
+                .count()
+        })
+        .unwrap_or(0)
+}
+
+/// 统计 tools 上已经占用的 cache_control 断点数量。
+fn count_tool_cache_breakpoints(body: &serde_json::Value) -> usize {
+    body.get("tools")
+        .and_then(|t| t.as_array())
+        .map(|tools| {
+            tools
+                .iter()
+                .filter(|tool| tool.get("cache_control").is_some())
+                .count()
+        })
+        .unwrap_or(0)
+}
+
+/// 按请求原始顺序收集 message 顶层 content block 位置。
+fn message_block_positions(body: &serde_json::Value) -> Option<Vec<(usize, usize)>> {
+    let messages = body.get("messages").and_then(|m| m.as_array())?;
+
+    let mut positions = Vec::new();
+    for (message_idx, msg) in messages.iter().enumerate() {
+        let Some(content) = msg.get("content").and_then(|c| c.as_array()) else {
+            continue;
+        };
+        for block_idx in 0..content.len() {
+            positions.push((message_idx, block_idx));
+        }
+    }
+    Some(positions)
+}
+
+/// 判断指定 message content block 是否可以直接放置 cache_control。
+fn is_cacheable_message_block_at(
+    body: &serde_json::Value,
+    position: (usize, usize),
+    mode: CacheBreakpointMode,
+) -> bool {
+    let Some(message) = body
+        .get("messages")
+        .and_then(|messages| messages.as_array())
+        .and_then(|messages| messages.get(position.0))
+    else {
+        return false;
+    };
+    let role = message
+        .get("role")
+        .and_then(|role| role.as_str())
+        .unwrap_or("");
+    let Some(block) = message
+        .get("content")
+        .and_then(|content| content.as_array())
+        .and_then(|content| content.get(position.1))
+    else {
+        return false;
+    };
+    is_cacheable_message_block(role, block, mode)
+}
+
+/// 判断指定 message content block 是否是 auto 模式优先选择的稳定边界。
+fn is_preferred_auto_message_block_at(body: &serde_json::Value, position: (usize, usize)) -> bool {
+    let Some(message) = body
+        .get("messages")
+        .and_then(|messages| messages.as_array())
+        .and_then(|messages| messages.get(position.0))
+    else {
+        return false;
+    };
+    let role = message
+        .get("role")
+        .and_then(|role| role.as_str())
+        .unwrap_or("");
+    let Some(block) = message
+        .get("content")
+        .and_then(|content| content.as_array())
+        .and_then(|content| content.get(position.1))
+    else {
+        return false;
+    };
+    let block_type = block.get("type").and_then(|value| value.as_str());
+    matches!(role, "user" | "assistant") && block_type == Some("text")
+}
+
+/// 返回 Claude Code 自动注入块末尾的位置。
+///
+/// Claude Code 会把 hooks、skills、CLAUDE.md、deferred-tools、MCP 资源等稳定前缀
+/// 放进首个 user message。尾部滚动断点用不满 slot 时,在该边界补一个断点,
+/// 能避免这些稳定前缀被后续真实用户内容一起重写。
+fn claude_code_auto_injected_boundary_position(
+    body: &serde_json::Value,
+    mode: CacheBreakpointMode,
+) -> Option<(usize, usize)> {
+    let messages = body.get("messages").and_then(|m| m.as_array())?;
+    let first = messages.first()?;
+    if first.get("role").and_then(|role| role.as_str()) != Some("user") {
+        return None;
+    }
+    let content = first.get("content").and_then(|c| c.as_array())?;
+
+    content
+        .iter()
+        .enumerate()
+        .filter(|(_, block)| {
+            is_cacheable_message_block("user", block, mode)
+                && is_claude_code_auto_injected_block(block)
+        })
+        .map(|(block_idx, _)| (0, block_idx))
+        .last()
+}
+
+/// 判断 content block 是否属于 Claude Code 自动注入的稳定前缀。
+fn is_claude_code_auto_injected_block(block: &serde_json::Value) -> bool {
+    let Some(text) = block.as_object().and_then(|obj| {
+        if obj.get("type").and_then(|t| t.as_str()) != Some("text") {
+            return None;
+        }
+        obj.get("text").and_then(|text| text.as_str())
+    }) else {
+        return false;
+    };
+
+    if text.starts_with("<system-reminder>") && text.contains("hook success") {
+        return true;
+    }
+    if text.starts_with("<system-reminder>")
+        && (text.contains("<available-skills>") || text.contains("<plugin-skills>"))
+    {
+        return true;
+    }
+    if text.contains("<system-reminder>") && CLAUDE_MD_CONTENTS_REGEX.is_match(text) {
+        return true;
+    }
+    if text.contains("<deferred-tools>") || is_sortable_deferred_tools_text(text) {
+        return true;
+    }
+    text.contains("<mcp-resources>") || text.contains("Available MCP servers:")
+}
+
+/// 在指定 message content block 上设置 cache_control。
+fn add_message_cache_control_at_block(
+    body: &mut serde_json::Value,
+    message_idx: usize,
+    block_idx: usize,
+) {
+    let Some(messages) = body.get_mut("messages").and_then(|m| m.as_array_mut()) else {
+        return;
+    };
+    let Some(msg) = messages.get_mut(message_idx) else {
+        return;
+    };
+    let Some(content) = msg.get_mut("content").and_then(|c| c.as_array_mut()) else {
+        return;
+    };
+    let Some(block) = content
+        .get_mut(block_idx)
+        .and_then(|item| item.as_object_mut())
+    else {
+        return;
+    };
+    block.insert("cache_control".into(), default_message_cache_control());
+}
+
+/// 判断 message 内容块是否可以放置 cache_control。
+fn is_cacheable_message_block(
+    role: &str,
+    block: &serde_json::Value,
+    mode: CacheBreakpointMode,
+) -> bool {
+    let Some(block) = block.as_object() else {
+        return false;
+    };
+    let block_type = block.get("type").and_then(|t| t.as_str());
+    if matches!(block_type, Some("thinking" | "redacted_thinking")) {
+        return false;
+    }
+
+    match mode {
+        CacheBreakpointMode::Auto => match role {
+            // assistant tool_use 是并行工具调度结构,自动修复不把它作为稳定缓存边界。
+            "assistant" => block_type == Some("text"),
+            "user" => matches!(block_type, Some("text" | "tool_result")),
+            _ => false,
+        },
+        CacheBreakpointMode::Rolling => match role {
+            // assistant tool_use 是并行调度结构,rolling 也不把它作为缓存边界。
+            "assistant" => block_type == Some("text"),
+            "user" => matches!(block_type, Some("text" | "tool_result")),
+            _ => false,
+        },
+        CacheBreakpointMode::StatefulDurable => {
+            matches!(role, "user" | "assistant") && block_type == Some("text")
+        }
+    }
+}
+
+/// message 断点稳定化新建 cache_control 的默认值。
+fn default_message_cache_control() -> serde_json::Value {
+    serde_json::json!({ "type": "ephemeral", "ttl": "1h" })
+}
+
+/// 将已有 ephemeral cache_control 的 ttl 改写为目标值。
+///
+/// 这里刻意只处理 sub2api TTL 改写同款范围,不递归 tool_result.content,
+/// 也不新增任何 cache_control,避免改变缓存断点数量。
+fn rewrite_existing_ephemeral_cache_control_ttl(
+    body: &mut serde_json::Value,
+    mode: CacheControlTtlRewrite,
+) {
+    let ttl = match mode.target_ttl() {
+        Some(ttl) => ttl,
+        None => return,
+    };
+
+    if let Some(obj) = body.as_object_mut() {
+        rewrite_block_cache_control_ttl(obj, ttl);
+    }
+
+    if let Some(sys) = body.get_mut("system").and_then(|s| s.as_array_mut()) {
+        for item in sys.iter_mut() {
+            if let Some(block) = item.as_object_mut() {
+                rewrite_block_cache_control_ttl(block, ttl);
+            }
+        }
+    }
+
+    if let Some(messages) = body.get_mut("messages").and_then(|m| m.as_array_mut()) {
+        for msg in messages.iter_mut() {
+            if let Some(content) = msg.get_mut("content").and_then(|c| c.as_array_mut()) {
+                for item in content.iter_mut() {
+                    if let Some(block) = item.as_object_mut() {
+                        rewrite_block_cache_control_ttl(block, ttl);
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(tools) = body.get_mut("tools").and_then(|t| t.as_array_mut()) {
+        for tool in tools.iter_mut() {
+            if let Some(block) = tool.as_object_mut() {
+                rewrite_block_cache_control_ttl(block, ttl);
+            }
+        }
+    }
+}
+
+/// 覆盖单个已有 ephemeral cache_control 的 ttl。
+fn rewrite_block_cache_control_ttl(
+    block: &mut serde_json::Map<String, serde_json::Value>,
+    ttl: &str,
+) {
+    let Some(cache_control) = block
+        .get_mut("cache_control")
+        .and_then(|value| value.as_object_mut())
+    else {
+        return;
+    };
+    if cache_control.get("type").and_then(|value| value.as_str()) != Some("ephemeral") {
+        return;
+    }
+    cache_control.insert("ttl".into(), serde_json::Value::String(ttl.to_string()));
+}
+
+/// 将匹配模型上的顶层 `thinking.type=disabled` 改写为 `adaptive`。
+///
+/// 这个改写只碰顶层请求参数,用于兼容上游已不接受 disabled thinking 的模型。
+/// 历史消息里的 signed thinking block 不在这里处理,避免破坏 Anthropic 签名校验。
+fn rewrite_disabled_thinking_to_adaptive(
+    body: &mut serde_json::Value,
+    config: &DisabledThinkingRewrite,
+) {
+    if !config.enabled {
+        return;
+    }
+    let model = body
+        .get("model")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    if !disabled_thinking_model_matches(model, &config.models) {
+        return;
+    }
+    let Some(thinking) = body
+        .get_mut("thinking")
+        .and_then(|value| value.as_object_mut())
+    else {
+        return;
+    };
+    if thinking.get("type").and_then(|value| value.as_str()) != Some("disabled") {
+        return;
+    }
+    thinking.insert("type".into(), serde_json::Value::String("adaptive".into()));
+}
+
+/// 判断模型是否命中 `thinking.type=disabled` 兼容改写列表。
+fn disabled_thinking_model_matches(model: &str, configured_models: &[String]) -> bool {
+    configured_models
+        .iter()
+        .any(|configured| configured.as_str() == model)
+}
+
+/// 按 Claude Code 2.1.156 抓包约束 API 模式的 `max_tokens`。
+fn normalize_api_max_tokens(body: &mut serde_json::Value, request_profile: &RequestProfile) {
+    let limit = if request_profile.message_body_order == MessageBodyOrderProfile::ClaudeCode21293 {
+        api_default_max_tokens(body, request_profile)
+    } else {
+        API_MAX_TOKENS_LIMIT
+    };
+    match body.get("max_tokens").and_then(|v| v.as_f64()) {
+        Some(max_tokens) if max_tokens > limit as f64 => {
+            if let Some(obj) = body.as_object_mut() {
+                obj.insert("max_tokens".into(), serde_json::json!(limit));
+            }
+        }
+        Some(_) => {}
+        None if body.get("max_tokens").is_none() => {
+            let max_tokens = api_default_max_tokens(body, request_profile);
+            if let Some(obj) = body.as_object_mut() {
+                obj.insert("max_tokens".into(), serde_json::json!(max_tokens));
+            }
+        }
+        None => {}
+    }
+}
+
+/// 返回 API 模式缺省 `max_tokens`。
+fn api_default_max_tokens(body: &serde_json::Value, request_profile: &RequestProfile) -> u64 {
+    let model = body
+        .get("model")
+        .and_then(|m| m.as_str())
+        .unwrap_or_default()
+        .to_lowercase();
+
+    if let Some(profile) = request_profile.main_model(&model) {
+        profile.default_max_tokens
+    } else if model == request_profile.opus_default_max_tokens_model {
+        API_MAX_TOKENS_LIMIT
+    } else if let Some(fable) = request_profile.fable_model(&model) {
+        fable.default_max_tokens
+    } else {
+        API_DEFAULT_MAX_TOKENS
+    }
+}
+
+/// 为 Fable 主请求补齐当前 Claude Code 抓包中的服务端 fallback 列表。
+fn ensure_fable_fallbacks(body: &mut serde_json::Value, request_profile: &RequestProfile) {
+    let model = body
+        .get("model")
+        .and_then(|m| m.as_str())
+        .unwrap_or_default();
+    let Some(fable) = request_profile.fable_model(model) else {
+        return;
+    };
+    let fallback = match fable.fallback {
+        FableFallbackProfile::None => return,
+        FableFallbackProfile::Model(model) => serde_json::json!([{ "model": model }]),
+        FableFallbackProfile::Default => serde_json::Value::String("default".into()),
+    };
+    let Some(obj) = body.as_object_mut() else {
+        return;
+    };
+    obj.entry("fallbacks").or_insert(fallback);
+}
+
+/// 为 API mimicry 补齐精确模型画像中已确认的 thinking 和 effort 字段。
+fn ensure_api_model_profile(body: &mut serde_json::Value, request_profile: &RequestProfile) {
+    let model = body
+        .get("model")
+        .and_then(|m| m.as_str())
+        .unwrap_or_default()
+        .to_string();
+    let main_profile = request_profile.main_model(&model);
+    if model.to_ascii_lowercase().contains("haiku")
+        && !is_haiku_main_for_api_mimicry(body, request_profile)
+    {
+        return;
+    }
+    let Some(obj) = body.as_object_mut() else {
+        return;
+    };
+
+    if let Some(profile) = main_profile {
+        // 显式关闭思考时不能补 display/budget，也不能补与 disabled 冲突的 max effort。
+        if obj
+            .get("thinking")
+            .and_then(|thinking| thinking.get("type"))
+            .and_then(|kind| kind.as_str())
+            == Some("disabled")
+        {
+            return;
+        }
+        let thinking_profile = match profile.thinking {
+            ThinkingProfile::Enabled {
+                budget_tokens,
+                display,
+            } => {
+                // 手动思考与强制工具调用不兼容，保留调用方的工具策略。
+                if matches!(
+                    obj.get("tool_choice")
+                        .and_then(|choice| choice.get("type"))
+                        .and_then(|kind| kind.as_str()),
+                    Some("any" | "tool")
+                ) {
+                    return;
+                }
+                let Some(max_tokens) = obj.get("max_tokens").and_then(|value| value.as_u64())
+                else {
+                    return;
+                };
+                // 思考至少需要 1024 token，且必须给最终回答留出空间；不扩大用户输出上限。
+                let budget_tokens = budget_tokens.min(max_tokens.saturating_sub(1));
+                if budget_tokens < 1_024 {
+                    return;
+                }
+                ThinkingProfile::Enabled {
+                    budget_tokens,
+                    display,
+                }
+            }
+            adaptive => adaptive,
+        };
+        let thinking = obj
+            .entry("thinking")
+            .or_insert_with(|| match thinking_profile {
+                ThinkingProfile::Adaptive { display } => serde_json::json!({
+                    "type": "adaptive",
+                    "display": display,
+                }),
+                ThinkingProfile::Enabled {
+                    budget_tokens,
+                    display,
+                } => serde_json::json!({
+                    "budget_tokens": budget_tokens,
+                    "type": "enabled",
+                    "display": display,
+                }),
+            });
+        if let Some(thinking) = thinking.as_object_mut() {
+            match thinking_profile {
+                ThinkingProfile::Adaptive { display } => {
+                    thinking
+                        .entry("type")
+                        .or_insert_with(|| serde_json::Value::String("adaptive".into()));
+                    if let Some(display) = display {
+                        thinking
+                            .entry("display")
+                            .or_insert_with(|| serde_json::Value::String(display.to_string()));
+                    }
+                }
+                ThinkingProfile::Enabled {
+                    budget_tokens,
+                    display,
+                } => {
+                    thinking
+                        .entry("budget_tokens")
+                        .or_insert_with(|| serde_json::json!(budget_tokens));
+                    thinking
+                        .entry("type")
+                        .or_insert_with(|| serde_json::Value::String("enabled".into()));
+                    if let Some(display) = display {
+                        thinking
+                            .entry("display")
+                            .or_insert_with(|| serde_json::Value::String(display.to_string()));
+                    }
+                }
+            }
+        }
+        if let Some(effort) = profile.output_effort {
+            let output_config = obj
+                .entry("output_config")
+                .or_insert_with(|| serde_json::json!({}));
+            if let Some(output_config) = output_config.as_object_mut() {
+                output_config
+                    .entry("effort")
+                    .or_insert_with(|| serde_json::Value::String(effort.to_string()));
+            }
+        }
+        return;
+    }
+
+    let Some(display) = request_profile
+        .fable_model(&model)
+        .and_then(|fable| fable.thinking_display)
+    else {
+        return;
+    };
+    let thinking = obj
+        .entry("thinking")
+        .or_insert_with(|| serde_json::json!({ "type": "adaptive" }));
+    if let Some(thinking) = thinking.as_object_mut() {
+        thinking
+            .entry("display")
+            .or_insert_with(|| serde_json::Value::String(display.to_string()));
+    }
+}
+
+fn is_haiku_main_for_api_mimicry(
+    body: &serde_json::Value,
+    request_profile: &RequestProfile,
+) -> bool {
+    let max_tokens = body
+        .get("max_tokens")
+        .and_then(|value| value.as_u64())
+        .unwrap_or_default();
+    max_tokens != 1
+        && max_tokens != 1_024
+        && !is_structured_haiku_title_request_for_profile(body, request_profile)
+        && !has_title_prompt_marker(body)
+}
+
+/// 移除消息和 system 中的空文本内容块。
+pub(crate) fn strip_empty_text_blocks(body: &mut serde_json::Value) {
+    fn filter_blocks(blocks: &mut Vec<serde_json::Value>) {
+        blocks.retain(|item| {
+            if let Some(block) = item.as_object() {
+                if block.get("type").and_then(|t| t.as_str()) == Some("text") {
+                    let text = block.get("text").and_then(|t| t.as_str()).unwrap_or("");
+                    if text.is_empty() {
+                        return false;
+                    }
+                }
+            }
+            true
+        });
+        // 递归清理 tool_result 里的嵌套空文本,避免上游拒绝空 block。
+        for item in blocks.iter_mut() {
+            if let Some(block) = item.as_object_mut() {
+                if block.get("type").and_then(|t| t.as_str()) == Some("tool_result") {
+                    if let Some(content) = block.get_mut("content").and_then(|c| c.as_array_mut()) {
+                        filter_blocks(content);
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(sys) = body.get_mut("system").and_then(|s| s.as_array_mut()) {
+        filter_blocks(sys);
+    }
+    if let Some(messages) = body.get_mut("messages").and_then(|m| m.as_array_mut()) {
+        for msg in messages.iter_mut() {
+            if let Some(content) = msg.get_mut("content").and_then(|c| c.as_array_mut()) {
+                filter_blocks(content);
+            }
+        }
+    }
+}
+
+/// 从 body 中提取 Claude Code session_id。
+///
+/// @param body 已解析的请求体。
+/// @return 能从 `metadata.user_id` 解析到 session 时返回 session_id。
+pub fn extract_session_id_from_body(body: &serde_json::Value) -> Option<String> {
+    extract_claude_code_session_id(body)
+}
+
+/// 清理 body 中的内部 _session_id 标记。
+///
+/// @param body 需要清理的请求体。
+pub fn clean_session_id_from_body(body: &mut serde_json::Value) {
+    if let Some(metadata) = body.get_mut("metadata").and_then(|m| m.as_object_mut()) {
+        metadata.remove("_session_id");
+    }
+}
+
+/// 判断请求来自 Claude Code 还是纯 API。
+///
+/// @param user_agent 下游请求的 User-Agent。
+/// @param path 当前转发的 upstream path。
+/// @param body 已解析的请求体。
+/// @return 返回识别出的客户端类型。
+pub fn detect_client_type(user_agent: &str, path: &str, body: &serde_json::Value) -> ClientType {
+    let ua_lower = user_agent.to_lowercase();
+    let is_claude_code_ua =
+        ua_lower.starts_with("claude-code/") || ua_lower.starts_with("claude-cli/");
+    let metadata_diag = claude_code_metadata_user_id_diagnostic(body);
+    let client_type = if is_claude_code_ua {
+        ClientType::ClaudeCode
+    } else {
+        ClientType::API
+    };
+    if path.starts_with("/v1/messages") {
+        info!(
+            target: "cc2api::cache",
+            "[缓存诊断] 客户端识别: type={} ua={} metadata={}",
+            client_type.as_str(),
+            if is_claude_code_ua { "claude_code" } else { "api" },
+            metadata_diag.human_summary()
+        );
+    }
+    client_type
+}
+
+/// `metadata.user_id` 的脱敏诊断信息。
+struct MetadataUserIdDiagnostic {
+    strict_valid: bool,
+    session_usable: bool,
+    reason: &'static str,
+    metadata_type: &'static str,
+    metadata_keys: Vec<String>,
+    user_id_type: &'static str,
+    user_id_len: usize,
+    user_id_hash: String,
+    user_id_json_keys: Vec<String>,
+    has_device_id: bool,
+    has_account_uuid: bool,
+    has_session_id: bool,
+    account_uuid_like: bool,
+    session_uuid_like: bool,
+    legacy_account_marker: bool,
+    legacy_session_marker: bool,
+}
+
+impl MetadataUserIdDiagnostic {
+    /// 生成人类可读的脱敏摘要。
+    fn human_summary(&self) -> String {
+        let keys = if self.metadata_keys.is_empty() {
+            "-".to_string()
+        } else {
+            self.metadata_keys.join(",")
+        };
+        let json_keys = if self.user_id_json_keys.is_empty() {
+            "-".to_string()
+        } else {
+            self.user_id_json_keys.join(",")
+        };
+        let status = if self.strict_valid {
+            "ok"
+        } else if self.session_usable {
+            "present"
+        } else if matches!(self.reason, "missing_metadata" | "missing_user_id") {
+            "missing"
+        } else {
+            "invalid"
+        };
+        if self.strict_valid {
+            return format!(
+                "{}(reason={},strict=Y,uid={} len={} hash={} keys={} json_keys={})",
+                status,
+                self.reason,
+                self.user_id_type,
+                self.user_id_len,
+                empty_dash(&self.user_id_hash),
+                keys,
+                json_keys
+            );
+        }
+        format!(
+            "{}(reason={},strict={},meta={} keys={},uid={} len={} hash={},json_keys={},json_fields=device:{}/account:{}/session:{},uuid=account:{}/session:{},legacy=account:{}/session:{})",
+            status,
+            self.reason,
+            yes_no(self.strict_valid),
+            self.metadata_type,
+            keys,
+            self.user_id_type,
+            self.user_id_len,
+            empty_dash(&self.user_id_hash),
+            json_keys,
+            yes_no(self.has_device_id),
+            yes_no(self.has_account_uuid),
+            yes_no(self.has_session_id),
+            yes_no(self.account_uuid_like),
+            yes_no(self.session_uuid_like),
+            yes_no(self.legacy_account_marker),
+            yes_no(self.legacy_session_marker)
+        )
+    }
+}
+
+/// 生成 `metadata.user_id` 诊断,只记录结构、长度与 hash,不记录原值。
+fn claude_code_metadata_user_id_diagnostic(body: &serde_json::Value) -> MetadataUserIdDiagnostic {
+    let Some(metadata) = body.get("metadata") else {
+        return metadata_user_id_diag("missing_metadata");
+    };
+    let Some(metadata_obj) = metadata.as_object() else {
+        let mut diag = metadata_user_id_diag("metadata_not_object");
+        diag.metadata_type = json_type_name(metadata);
+        return diag;
+    };
+
+    let mut metadata_keys = metadata_obj.keys().cloned().collect::<Vec<_>>();
+    metadata_keys.sort();
+    let Some(user_id_value) = metadata_obj.get("user_id") else {
+        let mut diag = metadata_user_id_diag("missing_user_id");
+        diag.metadata_type = "object";
+        diag.metadata_keys = metadata_keys;
+        return diag;
+    };
+    let Some(user_id) = user_id_value.as_str().map(str::trim) else {
+        let mut diag = metadata_user_id_diag("user_id_not_string");
+        diag.metadata_type = "object";
+        diag.metadata_keys = metadata_keys;
+        diag.user_id_type = json_type_name(user_id_value);
+        return diag;
+    };
+    if user_id.is_empty() {
+        let mut diag = metadata_user_id_diag("user_id_empty");
+        diag.metadata_type = "object";
+        diag.metadata_keys = metadata_keys;
+        diag.user_id_type = "string";
+        return diag;
+    }
+
+    let mut diag = metadata_user_id_diag("invalid_user_id");
+    diag.metadata_type = "object";
+    diag.metadata_keys = metadata_keys;
+    diag.user_id_type = "string";
+    diag.user_id_len = user_id.len();
+    diag.user_id_hash = short_sha256(user_id.as_bytes());
+
+    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(user_id) {
+        let Some(parsed_obj) = parsed.as_object() else {
+            diag.reason = "json_user_id_not_object";
+            return diag;
+        };
+        diag.user_id_json_keys = parsed_obj.keys().cloned().collect();
+        diag.user_id_json_keys.sort();
+        diag.has_device_id = parsed_obj
+            .get("device_id")
+            .and_then(|value| value.as_str())
+            .map(|value| !value.trim().is_empty())
+            .unwrap_or(false);
+        diag.has_account_uuid = parsed_obj
+            .get("account_uuid")
+            .and_then(|value| value.as_str())
+            .map(|value| !value.trim().is_empty())
+            .unwrap_or(false);
+        diag.has_session_id = parsed_obj
+            .get("session_id")
+            .and_then(|value| value.as_str())
+            .map(|value| !value.trim().is_empty())
+            .unwrap_or(false);
+        diag.account_uuid_like = parsed_obj
+            .get("account_uuid")
+            .and_then(|value| value.as_str())
+            .map(is_uuid_like)
+            .unwrap_or(false);
+        diag.session_uuid_like = parsed_obj
+            .get("session_id")
+            .and_then(|value| value.as_str())
+            .map(is_uuid_like)
+            .unwrap_or(false);
+        diag.session_usable = diag.has_session_id;
+        diag.strict_valid = diag.has_device_id && diag.account_uuid_like && diag.session_uuid_like;
+        diag.reason = if diag.strict_valid {
+            "valid_json"
+        } else if diag.session_usable {
+            "json_session_present"
+        } else {
+            "invalid_json_shape"
+        };
+        return diag;
+    }
+
+    diag.legacy_account_marker = user_id.contains("_account_");
+    diag.legacy_session_marker = user_id.contains("_session_");
+    let Some(account_idx) = user_id.find("_account_") else {
+        diag.reason = "missing_legacy_account_marker";
+        return diag;
+    };
+    let Some(session_idx) = user_id[account_idx + 9..].find("_session_") else {
+        diag.reason = "missing_legacy_session_marker";
+        return diag;
+    };
+    let session_idx = account_idx + 9 + session_idx;
+    let account_uuid = &user_id[account_idx + 9..session_idx];
+    let session_uuid = &user_id[session_idx + 9..];
+    diag.account_uuid_like = is_uuid_like(account_uuid);
+    diag.session_uuid_like = is_uuid_like(session_uuid);
+    diag.session_usable = !session_uuid.trim().is_empty();
+    diag.strict_valid =
+        user_id.starts_with("user_") && diag.account_uuid_like && diag.session_uuid_like;
+    diag.reason = if diag.strict_valid {
+        "valid_legacy"
+    } else if diag.session_usable {
+        "legacy_session_present"
+    } else {
+        "invalid_legacy_shape"
+    };
+    diag
+}
+
+/// 构造空白 `metadata.user_id` 诊断。
+fn metadata_user_id_diag(reason: &'static str) -> MetadataUserIdDiagnostic {
+    MetadataUserIdDiagnostic {
+        strict_valid: false,
+        session_usable: false,
+        reason,
+        metadata_type: "missing",
+        metadata_keys: Vec::new(),
+        user_id_type: "missing",
+        user_id_len: 0,
+        user_id_hash: String::new(),
+        user_id_json_keys: Vec::new(),
+        has_device_id: false,
+        has_account_uuid: false,
+        has_session_id: false,
+        account_uuid_like: false,
+        session_uuid_like: false,
+        legacy_account_marker: false,
+        legacy_session_marker: false,
+    }
+}
+
+/// 返回 JSON 值的简短类型名。
+fn json_type_name(value: &serde_json::Value) -> &'static str {
+    match value {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "bool",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "array",
+        serde_json::Value::Object(_) => "object",
+    }
+}
+
+/// 计算日志用 12 位 SHA-256 摘要。
+fn short_sha256(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    hex::encode(&digest[..6])
+}
+
+/// bool 的中文短值,让日志更容易肉眼扫读。
+fn yes_no(value: bool) -> &'static str {
+    if value { "Y" } else { "N" }
+}
+
+/// 空字符串在日志里显示为 `-`。
+fn empty_dash(value: &str) -> &str {
+    if value.is_empty() { "-" } else { value }
+}
+
+/// 校验 UUID 字符串格式,避免普通 API metadata 误触 ClaudeCode 分支。
+fn is_uuid_like(value: &str) -> bool {
+    let value = value.trim();
+    let bytes = value.as_bytes();
+    if bytes.len() != 36 {
+        return false;
+    }
+    for (idx, byte) in bytes.iter().enumerate() {
+        if matches!(idx, 8 | 13 | 18 | 23) {
+            if *byte != b'-' {
+                return false;
+            }
+        } else if !byte.is_ascii_hexdigit() {
+            return false;
+        }
+    }
+    true
+}
+
+/// Claude Code 官方 system 身份块文本。
+pub(crate) const CLAUDE_CODE_SYSTEM_PROMPT: &str =
+    "You are Claude Code, Anthropic's official CLI for Claude.";
+
+/// 判断 system block 是否为精确 Claude Code billing attribution block。
+///
+/// @param block 待检查的 system block。
+/// @return 仅包含标准 `type/text` 字段且 billing 文本合法时返回 `true`。
+pub(crate) fn is_claude_code_billing_system_block(block: &serde_json::Value) -> bool {
+    let Some(object) = block.as_object() else {
+        return false;
+    };
+    object.len() == 2
+        && object.get("type").and_then(|value| value.as_str()) == Some("text")
+        && object
+            .get("text")
+            .and_then(|value| value.as_str())
+            .is_some_and(|text| CLAUDE_CODE_BILLING_BLOCK_REGEX.is_match(text))
+}
+
+/// 判断 system block 是否为精确 Claude Code 官方身份块。
+///
+/// @param block 待检查的 system block。
+/// @return 仅包含标准 `type/text` 字段且文本精确匹配时返回 `true`。
+pub(crate) fn is_claude_code_identity_system_block(block: &serde_json::Value) -> bool {
+    let Some(object) = block.as_object() else {
+        return false;
+    };
+    object.len() == 2
+        && object.get("type").and_then(|value| value.as_str()) == Some("text")
+        && object.get("text").and_then(|value| value.as_str()) == Some(CLAUDE_CODE_SYSTEM_PROMPT)
+}
+
+const CLAUDE_CODE_SYSTEM_PROMPT_EXPANSION: &str = r#"You are an interactive agent that helps users with software engineering tasks. Use the instructions below and the tools available to you to assist the user.
+
+IMPORTANT: Assist with authorized security testing, defensive security, CTF challenges, and educational contexts. Refuse requests for destructive techniques, DoS attacks, mass targeting, supply chain compromise, or detection evasion for malicious purposes. Dual-use security tools (C2 frameworks, credential testing, exploit development) require clear authorization context: pentesting engagements, CTF competitions, security research, or defensive use cases.
+IMPORTANT: You must NEVER generate or guess URLs for the user unless you are confident that the URLs are for helping the user with programming. You may use URLs provided by the user in their messages or local files.
+
+# Tone and style
+ - Only use emojis if the user explicitly requests it. Avoid using emojis in all communication unless asked.
+ - Your responses should be short and concise.
+ - When referencing specific functions or pieces of code include the pattern file_path:line_number to allow the user to easily navigate to the source code location.
+ - When referencing GitHub issues or pull requests, use the owner/repo#123 format (e.g. anthropics/claude-code#100) so they render as clickable links.
+ - Do not use a colon before tool calls. Your tool calls may not be shown directly in the output, so text like "Let me read the file:" followed by a read tool call should just be "Let me read the file." with a period."#;
+
+/// 仅在 `<system-reminder>` 标签内替换 `Git user:` 行。
+/// 不影响 messages、tools 和 `<system-reminder>` 外部的文本，避免破坏 git 操作。
+fn scrub_git_user_in_reminders(body: &mut serde_json::Value, replacement_name: &str) {
+    let replacement = format!("Git user: {}", replacement_name);
+    let scrub = |text: &str| -> String {
+        SYSTEM_REMINDER_REGEX
+            .replace_all(text, |caps: &regex::Captures| {
+                // 账号名称是字面量，不能把其中的 $1、$0 或 ${name} 当成捕获组展开。
+                GIT_USER_REGEX
+                    .replace_all(&caps[0], NoExpand(replacement.as_str()))
+                    .to_string()
+            })
+            .to_string()
+    };
+
+    if let Some(system) = body.get_mut("system") {
+        match system {
+            serde_json::Value::String(s) => {
+                *s = scrub(s);
+            }
+            serde_json::Value::Array(arr) => {
+                for item in arr.iter_mut() {
+                    if item.get("cache_control").is_some() {
+                        continue;
+                    }
+                    if let Some(text) = item.get("text").and_then(|t| t.as_str()) {
+                        let new_text = scrub(text);
+                        item.as_object_mut()
+                            .unwrap()
+                            .insert("text".into(), serde_json::Value::String(new_text));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// 将 canonical env 的 platform 映射为 X-Stainless-OS 值。
+fn stainless_os_from_platform(platform: &str) -> &str {
+    match platform {
+        "darwin" => "Mac OS X",
+        "win32" => "Windows",
+        _ => "Linux",
+    }
+}
+
+fn nth_index(s: &str, c: char, n: usize) -> Option<usize> {
+    let mut count = 0;
+    for (i, ch) in s.chars().enumerate() {
+        if ch == c {
+            count += 1;
+            if count == n {
+                return Some(i);
+            }
+        }
+    }
+    None
+}
+
+/// 按 2.1.195 抓包画像重排 API mimicry 生成的 `/v1/messages` 顶层字段,未知字段追加并保留原相对顺序。
+fn order_message_body_top_level_fields(
+    body: &mut serde_json::Value,
+    request_profile: &RequestProfile,
+) {
+    let Some(map) = body.as_object_mut() else {
+        return;
+    };
+    let profile_order = message_body_order_profile(map, request_profile);
+    let mut original = std::mem::take(map);
+    let mut ordered = serde_json::Map::new();
+    for key in profile_order {
+        if let Some(value) = original.shift_remove(*key) {
+            ordered.insert((*key).to_string(), value);
+        }
+    }
+    for (key, value) in original {
+        ordered.insert(key, value);
+    }
+    *map = ordered;
+}
+
+fn message_body_order_profile(
+    map: &serde_json::Map<String, serde_json::Value>,
+    request_profile: &RequestProfile,
+) -> &'static [&'static str] {
+    if request_profile.message_body_order == MessageBodyOrderProfile::ClaudeCode21293 {
+        return MESSAGE_BODY_ORDER_2_1_293;
+    }
+    let model = map
+        .get("model")
+        .and_then(|value| value.as_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if request_profile.message_body_order == MessageBodyOrderProfile::ClaudeCode21220
+        && request_profile.fable_model(&model).is_some()
+    {
+        return MESSAGE_BODY_ORDER_FABLE_2_1_220;
+    }
+    if model.contains("haiku")
+        && map.get("max_tokens").and_then(|value| value.as_u64()) == Some(1)
+        && !map.contains_key("system")
+        && !map.contains_key("tools")
+    {
+        return MESSAGE_BODY_ORDER_HAIKU_PROBE;
+    }
+    if model.contains("haiku")
+        && map.get("stream").and_then(|value| value.as_bool()) == Some(true)
+        && map.contains_key("temperature")
+        && map
+            .get("tools")
+            .and_then(|value| value.as_array())
+            .is_some_and(|tools| tools.is_empty())
+    {
+        return MESSAGE_BODY_ORDER_HAIKU_TITLE;
+    }
+    MESSAGE_BODY_ORDER_OPUS_MAIN
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        CLAUDE_CODE_SYSTEM_PROMPT, CacheControlTtlRewrite, ClaudeCodeContextSanitizerConfig,
+        ClaudeCodeContextSanitizerMode, ClientType, DisabledThinkingRewrite, EnvPassthrough,
+        MessageCacheControlRewrite, Rewriter, UpstreamSessionRewrite, cch_attestation_input,
+        cch_attestation_seed, compute_cc_version_suffix, compute_cch_attestation,
+        extract_first_user_message, matches_1m_whitelist, ordered_anthropic_headers,
+        scrub_git_user_in_reminders, strip_beta_token,
+    };
+    use crate::model::account::{
+        Account, AccountAuthType, AccountStatus, BillingMode, CanonicalEnvData,
+        CanonicalProcessData, CanonicalPromptEnvData, DEFAULT_ALLOW_1M_MODELS,
+        DEFAULT_UPSTREAM_SESSION_POOL_SIZE, DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY,
+        DEFAULT_UPSTREAM_SESSION_TTL_MINUTES,
+    };
+    use crate::model::identity::device_profile;
+    use crate::service::version_profile::{
+        FABLE_5_MESSAGE_BETA_TOKENS_2_1_257, HAIKU_MAIN_BETA_TOKENS_2_1_280,
+        HAIKU_MAIN_NO_DIAGNOSTICS_BETA_TOKENS_2_1_280, HAIKU_NON_STREAM_AUX_BETA_TOKENS_2_1_257,
+        HAIKU_PROBE_BETA_TOKENS, HAIKU_STREAMING_TITLE_BETA_TOKENS, MCP_PROTOCOL_VERSION,
+        MESSAGE_BETA_TOKENS, OPUS_4_8_MESSAGE_BETA_TOKENS_2_1_280,
+        OPUS_4_8_SAFEGUARD_MESSAGE_BETA_TOKENS_2_1_280, OPUS_5_5_MESSAGE_BETA_TOKENS_2_1_280,
+        OPUS_5_5_SAFEGUARD_MESSAGE_BETA_TOKENS_2_1_280, SONNET_4_5_MESSAGE_BETA_TOKENS_2_1_280,
+        STAINLESS_RUNTIME_VERSION, apply_identity_to_env_json, claude_cli_user_agent,
+        claude_code_user_agent, profile_for_key,
+    };
+    use crate::store::cache::{UpstreamSessionPoolAction, UpstreamSessionPoolResolve};
+    use base64::Engine;
+    use chrono::Utc;
+    use serde_json::{Value, json};
+    use std::collections::HashMap;
+    use xxhash_rust::xxh64::xxh64;
+
+    // 历史回归固定 280，新增 293 用例显式选择新画像，避免默认升级改变旧用例含义。
+    const TEST_VERSION: &str = "2.1.280";
+    const TEST_VERSION_BASE: &str = "2.1.280";
+    const TEST_BUILD_TIME: &str = "2026-09-21T20:40:17Z";
+    const TEST_SDK_VERSION: &str = "0.112.1";
+
+    const CTX_1M: &str = "context-1m-2025-08-07";
+    const FAST_MODE: &str = "fast-mode-2026-02-01";
+
+    fn test_account() -> Account {
+        let env = CanonicalEnvData {
+            platform: "linux".into(),
+            platform_raw: "linux".into(),
+            arch: "x64".into(),
+            node_version: "v22.15.0".into(),
+            terminal: "ssh-session".into(),
+            package_managers: "npm".into(),
+            runtimes: "node".into(),
+            is_claude_ai_auth: true,
+            version: TEST_VERSION.into(),
+            version_base: TEST_VERSION_BASE.into(),
+            build_time: TEST_BUILD_TIME.into(),
+            deployment_environment: "unknown-linux".into(),
+            vcs: "git".into(),
+            ..Default::default()
+        };
+        let prompt = CanonicalPromptEnvData {
+            platform: "linux".into(),
+            shell: "bash".into(),
+            os_version: "Linux 6.5.0-generic".into(),
+            working_dir: "/home/user/project".into(),
+        };
+        let process = CanonicalProcessData {
+            constrained_memory: 0,
+            rss_range: [1, 2],
+            heap_total_range: [1, 2],
+            heap_used_range: [1, 2],
+            external_range: [1, 2],
+            array_buffers_range: [1, 2],
+            observation: None,
+        };
+        Account {
+            id: 1,
+            name: "测试账号".into(),
+            email: "user@example.com".into(),
+            status: AccountStatus::Active,
+            auth_type: AccountAuthType::Oauth,
+            setup_token: String::new(),
+            access_token: "access".into(),
+            refresh_token: "refresh".into(),
+            expires_at: None,
+            oauth_refreshed_at: None,
+            auth_error: String::new(),
+            proxy_url: String::new(),
+            device_id: "device-1".into(),
+            canonical_env: serde_json::to_value(env).unwrap(),
+            canonical_prompt: serde_json::to_value(prompt).unwrap(),
+            canonical_process: serde_json::to_value(process).unwrap(),
+            request_backend: "legacy".into(),
+            billing_mode: BillingMode::Rewrite,
+            account_uuid: Some("account-uuid".into()),
+            organization_uuid: Some("org-uuid".into()),
+            subscription_type: Some("max".into()),
+            rate_limit_tier: None,
+            concurrency: 3,
+            priority: 50,
+            rpm_limit: 0,
+            five_hour_usage_limit_percent: 0,
+            seven_day_usage_limit_percent: 0,
+            rate_limited_at: None,
+            rate_limit_reset_at: None,
+            disable_reason: String::new(),
+            auto_telemetry: false,
+            auto_poll_usage: false,
+            allow_1m_models: DEFAULT_ALLOW_1M_MODELS.into(),
+            allow_fast_mode: false,
+            upstream_session_pool_enabled: false,
+            upstream_session_pool_size: DEFAULT_UPSTREAM_SESSION_POOL_SIZE,
+            upstream_session_ttl_minutes: DEFAULT_UPSTREAM_SESSION_TTL_MINUTES,
+            upstream_session_refresh_policy: DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY.into(),
+            telemetry_count: 0,
+            usage_data: json!({}),
+            usage_fetched_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn test_account_with_profile(key: &str) -> Account {
+        let mut account = test_account();
+        let profile = profile_for_key(key).expect("profile");
+        apply_identity_to_env_json(&mut account.canonical_env, &profile.identity);
+        account
+    }
+
+    fn upstream_session_rewrite(
+        real_session_id: &str,
+        upstream_session_id: &str,
+    ) -> UpstreamSessionRewrite {
+        UpstreamSessionRewrite {
+            message: Some(UpstreamSessionPoolResolve {
+                real_session_id: real_session_id.to_string(),
+                upstream_session_id: Some(upstream_session_id.to_string()),
+                action: UpstreamSessionPoolAction::Mapped,
+                active_count: 1,
+                oldest_last_seen_ms: None,
+                newest_last_seen_ms: None,
+            }),
+            telemetry_session_map: HashMap::new(),
+        }
+    }
+
+    fn rewrite_messages_body(
+        body: serde_json::Value,
+        client_type: ClientType,
+    ) -> serde_json::Value {
+        rewrite_messages_body_with_modes(
+            body,
+            client_type,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+        )
+    }
+
+    fn rewrite_messages_body_for_profile(
+        body: serde_json::Value,
+        client_type: ClientType,
+        profile_key: &str,
+    ) -> serde_json::Value {
+        let account = test_account_with_profile(profile_key);
+        let rewriter = Rewriter::new();
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            client_type,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+        );
+        serde_json::from_slice(&out).unwrap()
+    }
+
+    fn rewrite_messages_body_with_ttl(
+        body: serde_json::Value,
+        client_type: ClientType,
+        cache_ttl_rewrite: CacheControlTtlRewrite,
+    ) -> serde_json::Value {
+        rewrite_messages_body_with_modes(
+            body,
+            client_type,
+            cache_ttl_rewrite,
+            MessageCacheControlRewrite::Off,
+        )
+    }
+
+    fn rewrite_messages_body_with_modes(
+        body: serde_json::Value,
+        client_type: ClientType,
+        cache_ttl_rewrite: CacheControlTtlRewrite,
+        message_cache_rewrite: MessageCacheControlRewrite,
+    ) -> serde_json::Value {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            client_type,
+            EnvPassthrough::default(),
+            cache_ttl_rewrite,
+            message_cache_rewrite,
+            true,
+        );
+        serde_json::from_slice(&out).unwrap()
+    }
+
+    fn rewrite_messages_body_with_disabled_thinking(
+        body: serde_json::Value,
+        disabled_thinking_rewrite: DisabledThinkingRewrite,
+    ) -> serde_json::Value {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let (out, _completion) = rewriter.rewrite_body_with_stateful_completion(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+            &disabled_thinking_rewrite,
+            &UpstreamSessionRewrite::default(),
+            ClaudeCodeContextSanitizerConfig::off(),
+        );
+        serde_json::from_slice(&out).unwrap()
+    }
+
+    fn rewrite_messages_body_with_context_sanitizer(
+        body: serde_json::Value,
+        client_type: ClientType,
+        mode: ClaudeCodeContextSanitizerMode,
+    ) -> serde_json::Value {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let (out, _completion) = rewriter.rewrite_body_with_stateful_completion(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            client_type,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+            &DisabledThinkingRewrite::off(),
+            &UpstreamSessionRewrite::default(),
+            ClaudeCodeContextSanitizerConfig { mode },
+        );
+        serde_json::from_slice(&out).unwrap()
+    }
+
+    fn rewrite_messages_body_with_rewriter(
+        rewriter: &Rewriter,
+        body: serde_json::Value,
+        client_type: ClientType,
+        cache_ttl_rewrite: CacheControlTtlRewrite,
+        message_cache_rewrite: MessageCacheControlRewrite,
+    ) -> serde_json::Value {
+        let account = test_account();
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            client_type,
+            EnvPassthrough::default(),
+            cache_ttl_rewrite,
+            message_cache_rewrite,
+            true,
+        );
+        serde_json::from_slice(&out).unwrap()
+    }
+
+    fn rewrite_messages_body_with_stateful_completion(
+        rewriter: &Rewriter,
+        body: serde_json::Value,
+    ) -> (serde_json::Value, Option<super::StatefulCacheCompletion>) {
+        let account = test_account();
+        let (out, completion) = rewriter.rewrite_body_with_stateful_completion(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+            true,
+            &DisabledThinkingRewrite::off(),
+            &UpstreamSessionRewrite::default(),
+            ClaudeCodeContextSanitizerConfig::off(),
+        );
+        (serde_json::from_slice(&out).unwrap(), completion)
+    }
+
+    fn rewrite_messages_body_bytes(
+        body: serde_json::Value,
+        client_type: ClientType,
+        message_body_order_fingerprint_enabled: bool,
+    ) -> Vec<u8> {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            client_type,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            message_body_order_fingerprint_enabled,
+        )
+    }
+
+    fn rewrite_messages_body_bytes_for_profile(
+        body: serde_json::Value,
+        client_type: ClientType,
+        profile_key: &str,
+    ) -> Vec<u8> {
+        let account = test_account_with_profile(profile_key);
+        let rewriter = Rewriter::new();
+        rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            client_type,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+        )
+    }
+
+    fn top_level_keys(body: &[u8]) -> Vec<String> {
+        let parsed: serde_json::Value = serde_json::from_slice(body).unwrap();
+        parsed
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(|key| key.to_string())
+            .collect()
+    }
+
+    fn message_cache_control_positions(body: &serde_json::Value) -> Vec<(usize, usize)> {
+        let Some(messages) = body.get("messages").and_then(|m| m.as_array()) else {
+            return Vec::new();
+        };
+
+        let mut positions = Vec::new();
+        for (message_idx, msg) in messages.iter().enumerate() {
+            let Some(content) = msg.get("content").and_then(|c| c.as_array()) else {
+                continue;
+            };
+            for (block_idx, block) in content.iter().enumerate() {
+                if block.get("cache_control").is_some() {
+                    positions.push((message_idx, block_idx));
+                }
+            }
+        }
+        positions
+    }
+
+    fn message_cache_fingerprints(body: &serde_json::Value) -> Vec<String> {
+        message_cache_control_positions(body)
+            .into_iter()
+            .filter_map(|position| super::message_block_fingerprint_at(body, position))
+            .collect()
+    }
+
+    fn message_cache_positions_and_fingerprints(
+        body: &serde_json::Value,
+    ) -> Vec<((usize, usize), String)> {
+        message_cache_control_positions(body)
+            .into_iter()
+            .filter_map(|position| {
+                super::message_block_fingerprint_at(body, position)
+                    .map(|fingerprint| (position, fingerprint))
+            })
+            .collect()
+    }
+
+    fn stateful_session_body(session_id: &str, block_count: usize) -> serde_json::Value {
+        let messages: Vec<serde_json::Value> = (0..block_count)
+            .map(|idx| {
+                json!({
+                    "role": if idx % 2 == 0 { "user" } else { "assistant" },
+                    "content": [{
+                        "type": "text",
+                        "text": format!("main-block-{}", idx)
+                    }]
+                })
+            })
+            .collect();
+        json!({
+            "metadata": {
+                "user_id": json!({
+                    "device_id": "device-1",
+                    "account_uuid": "account-uuid",
+                    "session_id": session_id
+                }).to_string()
+            },
+            "messages": messages
+        })
+    }
+
+    fn stateful_session_body_with_prefix(
+        session_id: &str,
+        block_count: usize,
+        prefix: &str,
+    ) -> serde_json::Value {
+        let messages: Vec<serde_json::Value> = (0..block_count)
+            .map(|idx| {
+                json!({
+                    "role": if idx % 2 == 0 { "user" } else { "assistant" },
+                    "content": [{
+                        "type": "text",
+                        "text": format!("{}-block-{}", prefix, idx)
+                    }]
+                })
+            })
+            .collect();
+        json!({
+            "metadata": {
+                "user_id": json!({
+                    "device_id": "device-1",
+                    "account_uuid": "account-uuid",
+                    "session_id": session_id
+                }).to_string()
+            },
+            "messages": messages
+        })
+    }
+
+    fn stateful_tool_result_tail_body(
+        session_id: &str,
+        tool_result_count: usize,
+    ) -> serde_json::Value {
+        let mut messages = vec![json!({
+            "role": "user",
+            "content": [{
+                "type": "text",
+                "text": "stable text anchor"
+            }]
+        })];
+        for idx in 0..tool_result_count {
+            messages.push(json!({
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": format!("toolu_{}", idx),
+                    "content": format!("tool result {}", idx)
+                }]
+            }));
+        }
+        json!({
+            "metadata": {
+                "user_id": json!({
+                    "device_id": "device-1",
+                    "account_uuid": "account-uuid",
+                    "session_id": session_id
+                }).to_string()
+            },
+            "messages": messages
+        })
+    }
+
+    #[test]
+    fn native_293_headers_match_every_observed_variant() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/claude-code-2.1.293-profile.json"
+        ))
+        .unwrap();
+        let account = crate::service::version_profile::account_for_request_profile(
+            &test_account(),
+            Some(profile_for_key("2.1.293").unwrap()),
+        );
+        for case in fixture["native_header_cases"].as_array().unwrap() {
+            let headers = HashMap::from([
+                (
+                    "User-Agent".into(),
+                    "claude-cli/2.1.293 (external, cli)".into(),
+                ),
+                ("x-stainless-package-version".into(), "0.1.0".into()),
+                (
+                    "anthropic-beta".into(),
+                    case["beta"].as_str().unwrap().into(),
+                ),
+            ]);
+            let body = &case["body"];
+            let result = Rewriter::new().rewrite_headers(
+                &headers,
+                "/v1/messages",
+                &account,
+                ClientType::ClaudeCode,
+                body["model"].as_str().unwrap(),
+                body,
+            );
+            assert_eq!(
+                result["anthropic-beta"],
+                case["beta"].as_str().unwrap(),
+                "{}",
+                case
+            );
+            assert_eq!(
+                super::find_header_value(&result, "x-stainless-package-version")
+                    .map(String::as_str),
+                Some("0.128.0")
+            );
+            assert_eq!(result["User-Agent"], "claude-cli/2.1.293 (external, cli)");
+        }
+    }
+
+    #[test]
+    fn cch_293_fixture_matches_independent_bytes_and_interleaved_suffixes() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/claude-code-2.1.293-profile.json"
+        ))
+        .unwrap();
+        for case in fixture["hash_cases"].as_array().unwrap() {
+            let raw = case["body"].as_str().unwrap();
+            let body: serde_json::Value = serde_json::from_str(raw).unwrap();
+            assert_eq!(
+                super::cc_version_suffix_for_body(&body, "2.1.293"),
+                case["expected_cc_version_suffix"].as_str().unwrap()
+            );
+            let output =
+                String::from_utf8(compute_cch_attestation(raw.as_bytes().to_vec(), "2.1.293"))
+                    .unwrap();
+            assert!(output.contains(&format!("cch={}", case["expected_cch"].as_str().unwrap())));
+        }
+    }
+
+    #[test]
+    fn auxiliary_293_header_sets_match_captured_endpoints_and_keep_280_identity() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/claude-code-2.1.293-profile.json"
+        ))
+        .unwrap();
+        let account = crate::service::version_profile::account_for_request_profile(
+            &test_account(),
+            Some(profile_for_key("2.1.293").unwrap()),
+        );
+        let rewriter = Rewriter::new();
+        for case in fixture["endpoint_header_cases"].as_array().unwrap() {
+            let path = case["path"].as_str().unwrap();
+            let incoming: HashMap<String, String> = case["headers"]
+                .as_object()
+                .unwrap()
+                .iter()
+                .filter_map(|(key, value)| value.as_str().map(|value| (key.clone(), value.into())))
+                .collect();
+            for client in [ClientType::API, ClientType::ClaudeCode] {
+                let headers = rewriter.rewrite_headers(
+                    &incoming,
+                    path,
+                    &account,
+                    client,
+                    "claude-opus-5-5",
+                    &json!({}),
+                );
+                for (key, expected) in case["headers"].as_object().unwrap() {
+                    assert_eq!(
+                        super::find_header_value(&headers, key).map(String::as_str),
+                        expected.as_str(),
+                        "{path} {key}"
+                    );
+                }
+            }
+        }
+        let legacy = test_account();
+        for (path, expected) in [
+            ("/api/eval/synthetic", "Bun/1.4.3"),
+            ("/api/claude_code_penguin_mode", "axios/1.15.2"),
+            ("/v1/mcp_servers", "axios/1.15.2"),
+        ] {
+            let headers = rewriter.rewrite_headers(
+                &HashMap::new(),
+                path,
+                &legacy,
+                ClientType::API,
+                "claude-opus-5-5",
+                &json!({}),
+            );
+            assert_eq!(
+                super::find_header_value(&headers, "user-agent").map(String::as_str),
+                Some(expected)
+            );
+        }
+    }
+
+    #[test]
+    fn safeguard_293_context_beta_requires_incoming_token_and_account_permission() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/claude-code-2.1.293-profile.json"
+        ))
+        .unwrap();
+        let case = fixture["native_header_cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| {
+                case["body"]["model"] == "claude-opus-5-5"
+                    && case["body"].get("safeguards").is_some()
+            })
+            .unwrap();
+        let mut account = crate::service::version_profile::account_for_request_profile(
+            &test_account(),
+            Some(profile_for_key("2.1.293").unwrap()),
+        );
+        let incoming = HashMap::from([(
+            "anthropic-beta".into(),
+            format!("{},synthetic-extra", case["beta"].as_str().unwrap()),
+        )]);
+        let rewriter = Rewriter::new();
+        let beta = rewriter.rewrite_headers(
+            &incoming,
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-opus-5-5",
+            &case["body"],
+        )["anthropic-beta"]
+            .clone();
+        assert!(beta.contains("context-1m-2025-08-07"));
+        assert!(!beta.contains("synthetic-extra"));
+        account.allow_1m_models.clear();
+        let blocked = rewriter.rewrite_headers(
+            &incoming,
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-opus-5-5",
+            &case["body"],
+        )["anthropic-beta"]
+            .clone();
+        assert!(!blocked.contains("context-1m-2025-08-07"));
+        let absent = rewriter.rewrite_headers(
+            &HashMap::new(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-opus-5-5",
+            &case["body"],
+        )["anthropic-beta"]
+            .clone();
+        assert!(!absent.contains("context-1m-2025-08-07"));
+    }
+
+    #[test]
+    fn api_293_model_limits_title_and_order_follow_capture() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/claude-code-2.1.293-profile.json"
+        ))
+        .unwrap();
+        let account = crate::service::version_profile::account_for_request_profile(
+            &test_account(),
+            Some(profile_for_key("2.1.293").unwrap()),
+        );
+        let rewriter = Rewriter::new();
+        for (model, expected) in fixture["request_profiles"].as_object().unwrap() {
+            let body = json!({"stream":true,"diagnostics":{},"thread":{"type":"request"},"output_config":{},"synthetic_unknown":{"keep":true},"messages":[{"role":"user","content":"合成文本"}],"model":model});
+            let result = rewriter.rewrite_body(
+                &serde_json::to_vec(&body).unwrap(),
+                "/v1/messages",
+                &account,
+                ClientType::API,
+                EnvPassthrough::default(),
+                CacheControlTtlRewrite::Off,
+                MessageCacheControlRewrite::Off,
+                true,
+            );
+            let value: serde_json::Value = serde_json::from_slice(&result).unwrap();
+            assert_eq!(value["max_tokens"], expected["max_tokens"]);
+            assert_eq!(value["thinking"], expected["thinking"]);
+            assert_eq!(value["output_config"], expected["output_config"]);
+            assert_eq!(value["synthetic_unknown"], body["synthetic_unknown"]);
+            assert!(value.get("fallbacks").is_none());
+            let keys: Vec<_> = value
+                .as_object()
+                .unwrap()
+                .keys()
+                .map(String::as_str)
+                .collect();
+            assert!(
+                keys.iter().position(|k| *k == "thread")
+                    < keys.iter().position(|k| *k == "diagnostics")
+            );
+        }
+        let title = fixture["native_header_cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["kind"] == "title")
+            .unwrap()["body"]
+            .clone();
+        let result = rewriter.rewrite_body(
+            &serde_json::to_vec(&title).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+        );
+        let value: serde_json::Value = serde_json::from_slice(&result).unwrap();
+        assert_eq!(value["max_tokens"], 128000);
+        assert!(value.get("thinking").is_none());
+        assert!(super::is_structured_haiku_title_request_for_profile(
+            &value,
+            &profile_for_key("2.1.293").unwrap().request
+        ));
+        assert!(!super::is_structured_haiku_title_request_for_profile(
+            &value,
+            &profile_for_key("2.1.280").unwrap().request
+        ));
+        let mut main = title;
+        main["thinking"] = json!({"type":"adaptive","display":"updates"});
+        assert!(!super::is_structured_haiku_title_request_for_profile(
+            &main,
+            &profile_for_key("2.1.293").unwrap().request
+        ));
+    }
+
+    #[test]
+    fn cli_bg_identity_only_rewrite_preserves_request_shape() {
+        let account = test_account();
+        let profile = device_profile(&account);
+        let rewriter = Rewriter::new();
+        let original = json!({
+            "model": "claude-fable-5-1",
+            "stream": false,
+            "max_tokens": 3072,
+            "fallbacks": "default",
+            "thinking": {"type": "adaptive", "display": "updates"},
+            "system": [{
+                "type": "text",
+                "text": "synthetic classifier system",
+                "cache_control": {"type": "ephemeral"}
+            }],
+            "messages": [{
+                "role": "user",
+                "content": [{"type": "text", "text": "Current state: working"}]
+            }],
+            "metadata": {
+                "user_id": json!({
+                    "device_id": "123e4567-e89b-12d3-a456-426614174001",
+                    "account_uuid": "123e4567-e89b-12d3-a456-426614174002",
+                    "session_id": "123e4567-e89b-12d3-a456-426614174003"
+                }).to_string()
+            }
+        });
+        let rewrite = upstream_session_rewrite(
+            "123e4567-e89b-12d3-a456-426614174003",
+            "123e4567-e89b-12d3-a456-426614174004",
+        );
+
+        let output = rewriter.rewrite_claude_code_identity_only(
+            &serde_json::to_vec(&original).unwrap(),
+            &account,
+            &rewrite,
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&output).unwrap();
+        let metadata_user_id: serde_json::Value = serde_json::from_str(
+            parsed["metadata"]["user_id"]
+                .as_str()
+                .expect("metadata.user_id"),
+        )
+        .unwrap();
+
+        assert_eq!(parsed["system"], original["system"]);
+        assert_eq!(parsed["messages"], original["messages"]);
+        assert_eq!(parsed["thinking"], original["thinking"]);
+        assert_eq!(parsed["fallbacks"], original["fallbacks"]);
+        assert_eq!(parsed["max_tokens"], original["max_tokens"]);
+        assert_eq!(parsed["system"][0]["cache_control"].get("ttl"), None);
+        assert!(
+            parsed["messages"][0]["content"][0]
+                .get("cache_control")
+                .is_none()
+        );
+        assert_eq!(metadata_user_id["device_id"], profile.device_id);
+        assert_eq!(metadata_user_id["account_uuid"], profile.account_uuid);
+        assert_eq!(
+            metadata_user_id["session_id"],
+            "123e4567-e89b-12d3-a456-426614174004"
+        );
+    }
+
+    #[test]
+    fn cli_bg_identity_only_rewrite_fails_open_for_non_json_body() {
+        let body = b"not-json";
+        let output = Rewriter::new().rewrite_claude_code_identity_only(
+            body,
+            &test_account(),
+            &UpstreamSessionRewrite::default(),
+        );
+
+        assert_eq!(output, body);
+    }
+
+    #[test]
+    fn cli_bg_attribution_rewrite_adds_billing_identity_and_valid_cch() {
+        let account = test_account();
+        let profile = device_profile(&account);
+        let original = json!({
+            "model": "claude-fable-5-1",
+            "stream": false,
+            "max_tokens": 3072,
+            "fallbacks": "default",
+            "thinking": {"type": "adaptive", "display": "updates"},
+            "system": [{
+                "type": "text",
+                "text": "synthetic classifier system",
+                "cache_control": {"type": "ephemeral"}
+            }],
+            "messages": [{
+                "role": "user",
+                "content": "Current state: working\nTool calls so far: Bash×1\nUser's most recent ask: test\nAssistant message tail: checking"
+            }],
+            "metadata": {
+                "user_id": json!({
+                    "device_id": "123e4567-e89b-12d3-a456-426614174001",
+                    "account_uuid": "123e4567-e89b-12d3-a456-426614174002",
+                    "session_id": "123e4567-e89b-12d3-a456-426614174003"
+                }).to_string()
+            }
+        });
+        let rewrite = upstream_session_rewrite(
+            "123e4567-e89b-12d3-a456-426614174003",
+            "123e4567-e89b-12d3-a456-426614174004",
+        );
+
+        let output = Rewriter::new().rewrite_claude_code_status_classifier_attribution(
+            &serde_json::to_vec(&original).unwrap(),
+            &account,
+            &rewrite,
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&output).unwrap();
+        let system = parsed["system"].as_array().unwrap();
+        let billing = system[0]["text"].as_str().unwrap();
+        let metadata_user_id: serde_json::Value =
+            serde_json::from_str(parsed["metadata"]["user_id"].as_str().unwrap()).unwrap();
+
+        assert_eq!(system.len(), 3);
+        assert!(billing.starts_with(
+            format!("x-anthropic-billing-header: cc_version={TEST_VERSION}.").as_str()
+        ));
+        assert!(billing.contains("; cc_entrypoint=cli; cch="));
+        assert!(!billing.contains("cch=00000"));
+        assert_eq!(system[1]["text"], CLAUDE_CODE_SYSTEM_PROMPT);
+        assert_eq!(system[2], original["system"][0]);
+        assert_eq!(parsed["messages"], original["messages"]);
+        assert_eq!(parsed["thinking"], original["thinking"]);
+        assert_eq!(parsed["fallbacks"], original["fallbacks"]);
+        assert_eq!(metadata_user_id["device_id"], profile.device_id);
+        assert_eq!(metadata_user_id["account_uuid"], profile.account_uuid);
+        assert_eq!(
+            metadata_user_id["session_id"],
+            "123e4567-e89b-12d3-a456-426614174004"
+        );
+
+        let mut placeholder = output.clone();
+        let cch_pos = placeholder
+            .windows(super::CCH_PLACEHOLDER.len())
+            .position(|window| window.starts_with(b"cch="))
+            .expect("cch value position");
+        placeholder[cch_pos + 4..cch_pos + 9].copy_from_slice(b"00000");
+        assert_eq!(output, compute_cch_attestation(placeholder, TEST_VERSION));
+    }
+
+    #[test]
+    fn cli_bg_attribution_rewrite_refreshes_existing_cch_and_is_idempotent() {
+        let account = test_account();
+        let body = json!({
+            "model": "claude-fable-5-1",
+            "stream": false,
+            "max_tokens": 3072,
+            "fallbacks": "default",
+            "system": [
+                {
+                    "type": "text",
+                    "cache_control": {"type": "ephemeral"},
+                    "text": "synthetic classifier system"
+                },
+                {
+                    "type": "text",
+                    "text": "x-anthropic-billing-header: cc_version=2.1.257.abc; cc_entrypoint=cli; cch=12345;"
+                },
+                {"type": "text", "text": CLAUDE_CODE_SYSTEM_PROMPT}
+            ],
+            "messages": [{"role": "user", "content": "classifier input"}]
+        });
+        let rewriter = Rewriter::new();
+
+        let first = rewriter.rewrite_claude_code_status_classifier_attribution(
+            &serde_json::to_vec(&body).unwrap(),
+            &account,
+            &UpstreamSessionRewrite::default(),
+        );
+        let second = rewriter.rewrite_claude_code_status_classifier_attribution(
+            &first,
+            &account,
+            &UpstreamSessionRewrite::default(),
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&first).unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(parsed["system"].as_array().unwrap().len(), 3);
+        assert!(
+            parsed["system"][0]["text"]
+                .as_str()
+                .unwrap()
+                .contains("cc_entrypoint=cli; cch=")
+        );
+        assert!(!String::from_utf8_lossy(&first).contains("cch=12345"));
+        assert_eq!(parsed["system"][1]["text"], CLAUDE_CODE_SYSTEM_PROMPT);
+        assert_eq!(parsed["system"][2]["text"], "synthetic classifier system");
+
+        let mut placeholder = first.clone();
+        let cch_pos = placeholder
+            .windows(super::CCH_PLACEHOLDER.len())
+            .position(|window| window.starts_with(b"cch="))
+            .expect("cch value position");
+        placeholder[cch_pos + 4..cch_pos + 9].copy_from_slice(b"00000");
+        assert_eq!(first, compute_cch_attestation(placeholder, TEST_VERSION));
+    }
+
+    #[test]
+    fn cli_bg_attribution_rewrite_keeps_existing_billing_without_cch() {
+        let body = json!({
+            "model": "claude-opus-5",
+            "system": [
+                {
+                    "type": "text",
+                    "text": "x-anthropic-billing-header: cc_version=2.1.257.abc; cc_entrypoint=cli;"
+                },
+                {
+                    "type": "text",
+                    "cache_control": {"type": "ephemeral"},
+                    "text": "synthetic classifier system"
+                }
+            ],
+            "messages": [{"role": "user", "content": "classifier input"}]
+        });
+
+        let output = Rewriter::new().rewrite_claude_code_status_classifier_attribution(
+            &serde_json::to_vec(&body).unwrap(),
+            &test_account(),
+            &UpstreamSessionRewrite::default(),
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&output).unwrap();
+        let billing = parsed["system"][0]["text"].as_str().unwrap();
+
+        assert_eq!(
+            billing,
+            "x-anthropic-billing-header: cc_version=2.1.257.abc; cc_entrypoint=cli;"
+        );
+        assert!(!billing.contains("cch="));
+        assert_eq!(parsed["system"][1]["text"], CLAUDE_CODE_SYSTEM_PROMPT);
+        assert_eq!(parsed["system"][2]["text"], "synthetic classifier system");
+    }
+
+    #[test]
+    fn cache_control_ttl_rewrite_parse_accepts_known_values() {
+        assert_eq!(
+            CacheControlTtlRewrite::parse("off").unwrap(),
+            CacheControlTtlRewrite::Off
+        );
+        assert_eq!(
+            CacheControlTtlRewrite::parse("5m").unwrap(),
+            CacheControlTtlRewrite::FiveMinutes
+        );
+        assert_eq!(
+            CacheControlTtlRewrite::parse("1h").unwrap(),
+            CacheControlTtlRewrite::OneHour
+        );
+    }
+
+    #[test]
+    fn cache_control_ttl_rewrite_parse_rejects_unknown_value() {
+        let err = CacheControlTtlRewrite::parse("30m").unwrap_err();
+
+        assert!(err.to_string().contains("cache_control_ttl_rewrite"));
+    }
+
+    #[test]
+    fn disabled_thinking_rewrite_updates_matched_model_before_output_body() {
+        let out = rewrite_messages_body_with_disabled_thinking(
+            json!({
+                "model": "claude-fable-5",
+                "thinking": {"type": "disabled"},
+                "messages": [{"role": "user", "content": [{"type": "text", "text": "hi"}]}]
+            }),
+            DisabledThinkingRewrite {
+                enabled: true,
+                models: vec!["claude-fable-5".into()],
+            },
+        );
+
+        assert_eq!(out["thinking"]["type"], "adaptive");
+    }
+
+    #[test]
+    fn disabled_thinking_rewrite_keeps_unmatched_model() {
+        let out = rewrite_messages_body_with_disabled_thinking(
+            json!({
+                "model": "claude-opus-4-8",
+                "thinking": {"type": "disabled"},
+                "messages": [{"role": "user", "content": [{"type": "text", "text": "hi"}]}]
+            }),
+            DisabledThinkingRewrite {
+                enabled: true,
+                models: vec!["claude-fable-5".into()],
+            },
+        );
+
+        assert_eq!(out["thinking"]["type"], "disabled");
+    }
+
+    #[test]
+    fn disabled_thinking_rewrite_runs_before_cch_and_keeps_cache_breakpoints() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let messages: Vec<serde_json::Value> = (0..60)
+            .map(|idx| {
+                json!({
+                    "role": if idx % 2 == 0 { "user" } else { "assistant" },
+                    "content": [{
+                        "type": "text",
+                        "text": format!("block-{}", idx)
+                    }]
+                })
+            })
+            .collect();
+        let body = json!({
+            "model": "claude-fable-5",
+            "thinking": {"type": "disabled"},
+            "system": [{
+                "type": "text",
+                "text": "x-anthropic-billing-header: cc_version=2.1.156.abc; cc_entrypoint=cli; cch=12345;"
+            }],
+            "messages": messages
+        });
+
+        let (out, _completion) = rewriter.rewrite_body_with_stateful_completion(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::FiveMinutes,
+            MessageCacheControlRewrite::Auto,
+            true,
+            &DisabledThinkingRewrite {
+                enabled: true,
+                models: vec!["claude-fable-5".into()],
+            },
+            &UpstreamSessionRewrite::default(),
+            ClaudeCodeContextSanitizerConfig::off(),
+        );
+        let text = String::from_utf8(out.clone()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+
+        assert_eq!(parsed["thinking"]["type"], "adaptive");
+        assert_eq!(message_cache_control_positions(&parsed).len(), 4);
+        assert!(!text.contains("cch=12345"));
+        assert!(!text.contains("cch=00000"));
+
+        let actual = super::CCH_VALUE_REGEX
+            .find(&text)
+            .map(|m| m.as_str().to_string())
+            .expect("cch value exists");
+        let mut placeholder_body = out;
+        let cch_pos = placeholder_body
+            .windows(super::CCH_PLACEHOLDER.len())
+            .position(|window| window.starts_with(b"cch="))
+            .expect("cch value position");
+        placeholder_body[cch_pos + 4..cch_pos + 9].copy_from_slice(b"00000");
+        let expected =
+            String::from_utf8(compute_cch_attestation(placeholder_body, TEST_VERSION)).unwrap();
+
+        assert!(expected.contains(&actual));
+    }
+
+    #[test]
+    fn message_cache_control_rewrite_parse_accepts_known_values() {
+        assert_eq!(
+            MessageCacheControlRewrite::parse("off").unwrap(),
+            MessageCacheControlRewrite::Off
+        );
+        assert_eq!(
+            MessageCacheControlRewrite::parse("auto").unwrap(),
+            MessageCacheControlRewrite::Auto
+        );
+        assert_eq!(
+            MessageCacheControlRewrite::parse("stable").unwrap(),
+            MessageCacheControlRewrite::Auto
+        );
+        assert_eq!(
+            MessageCacheControlRewrite::parse("rolling").unwrap(),
+            MessageCacheControlRewrite::Rolling
+        );
+        assert_eq!(
+            MessageCacheControlRewrite::parse("stateful").unwrap(),
+            MessageCacheControlRewrite::Stateful
+        );
+        assert_eq!(
+            MessageCacheControlRewrite::parse("sub2api").unwrap(),
+            MessageCacheControlRewrite::Sub2api
+        );
+        assert_eq!(
+            MessageCacheControlRewrite::parse("anchored").unwrap(),
+            MessageCacheControlRewrite::Auto
+        );
+    }
+
+    #[test]
+    fn message_cache_control_rewrite_parse_rejects_unknown_value() {
+        let err = MessageCacheControlRewrite::parse("last").unwrap_err();
+
+        assert!(err.to_string().contains("message_cache_control_rewrite"));
+    }
+
+    #[test]
+    fn cache_control_ttl_rewrite_off_keeps_existing_ttl_values() {
+        let parsed = rewrite_messages_body_with_ttl(
+            json!({
+                "cache_control": { "type": "ephemeral" },
+                "system": [{
+                    "type": "text",
+                    "text": "sys",
+                    "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                }],
+                "messages": [{
+                    "role": "user",
+                    "content": [{
+                        "type": "text",
+                        "text": "hi",
+                        "cache_control": { "type": "ephemeral", "ttl": "5m" }
+                    }]
+                }],
+                "tools": [{
+                    "name": "a",
+                    "input_schema": {},
+                    "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                }]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+        );
+
+        assert!(parsed["cache_control"].get("ttl").is_none());
+        assert_eq!(parsed["system"][0]["cache_control"]["ttl"], json!("1h"));
+        assert_eq!(
+            parsed["messages"][0]["content"][0]["cache_control"]["ttl"],
+            json!("5m")
+        );
+        assert_eq!(parsed["tools"][0]["cache_control"]["ttl"], json!("1h"));
+    }
+
+    #[test]
+    fn cache_control_ttl_rewrite_updates_only_existing_ephemeral_breakpoints() {
+        let parsed = rewrite_messages_body_with_ttl(
+            json!({
+                "cache_control": { "type": "ephemeral" },
+                "system": [
+                    {
+                        "type": "text",
+                        "text": "cached sys",
+                        "cache_control": { "type": "ephemeral", "ttl": "5m" }
+                    },
+                    {
+                        "type": "text",
+                        "text": "plain sys"
+                    }
+                ],
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "hi",
+                            "cache_control": { "type": "ephemeral" }
+                        },
+                        {
+                            "type": "text",
+                            "text": "persistent",
+                            "cache_control": { "type": "persistent", "ttl": "5m" }
+                        },
+                        {
+                            "type": "tool_result",
+                            "content": [{
+                                "type": "text",
+                                "text": "nested",
+                                "cache_control": { "type": "ephemeral", "ttl": "5m" }
+                            }]
+                        }
+                    ]
+                }],
+                "tools": [
+                    {
+                        "name": "a",
+                        "input_schema": {},
+                        "cache_control": { "type": "ephemeral" }
+                    },
+                    {
+                        "name": "b",
+                        "input_schema": {}
+                    }
+                ]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::OneHour,
+        );
+        let rendered = serde_json::to_string(&parsed).unwrap();
+
+        assert_eq!(rendered.matches("\"cache_control\"").count(), 6);
+        assert_eq!(parsed["cache_control"]["ttl"], json!("1h"));
+        assert_eq!(parsed["system"][0]["cache_control"]["ttl"], json!("1h"));
+        assert!(parsed["system"][1].get("cache_control").is_none());
+        assert_eq!(
+            parsed["messages"][0]["content"][0]["cache_control"]["ttl"],
+            json!("1h")
+        );
+        assert_eq!(
+            parsed["messages"][0]["content"][1]["cache_control"]["ttl"],
+            json!("5m")
+        );
+        assert_eq!(
+            parsed["messages"][0]["content"][2]["content"][0]["cache_control"]["ttl"],
+            json!("5m")
+        );
+        assert_eq!(parsed["tools"][0]["cache_control"]["ttl"], json!("1h"));
+        assert!(parsed["tools"][1].get("cache_control").is_none());
+    }
+
+    #[test]
+    fn cache_control_ttl_rewrite_can_force_five_minutes() {
+        let parsed = rewrite_messages_body_with_ttl(
+            json!({
+                "messages": [{
+                    "role": "user",
+                    "content": [{
+                        "type": "text",
+                        "text": "hi",
+                        "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                    }]
+                }]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::FiveMinutes,
+        );
+
+        assert_eq!(
+            parsed["messages"][0]["content"][0]["cache_control"]["ttl"],
+            json!("5m")
+        );
+    }
+
+    #[test]
+    fn message_cache_control_auto_rewrites_cache_breakpoints() {
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "system": [{
+                    "type": "text",
+                    "text": "sys",
+                    "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                }],
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [{
+                            "type": "text",
+                            "text": "u1",
+                            "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                        }]
+                    },
+                    {
+                        "role": "assistant",
+                        "content": [{
+                            "type": "text",
+                            "text": "a1",
+                            "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                        }]
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "u2-old",
+                                "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                            },
+                            {
+                                "type": "text",
+                                "text": "u2"
+                            }
+                        ]
+                    },
+                    {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "thinking",
+                                "thinking": "skip me"
+                            },
+                            {
+                                "type": "text",
+                                "text": "a2"
+                            },
+                            "tail-marker"
+                        ]
+                    }
+                ],
+                "tools": [{
+                    "name": "a",
+                    "input_schema": {},
+                    "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                }]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert!(parsed["system"][0].get("cache_control").is_none());
+        assert!(parsed["tools"][0].get("cache_control").is_none());
+        assert_eq!(
+            parsed["messages"][0]["content"][0]["cache_control"]["ttl"],
+            json!("1h")
+        );
+        assert!(
+            parsed["messages"][1]["content"][0]
+                .get("cache_control")
+                .is_none()
+        );
+        assert!(
+            parsed["messages"][2]["content"][0]
+                .get("cache_control")
+                .is_none()
+        );
+        assert!(
+            parsed["messages"][2]["content"][1]
+                .get("cache_control")
+                .is_none()
+        );
+        assert!(
+            parsed["messages"][3]["content"][0]
+                .get("cache_control")
+                .is_none()
+        );
+        assert_eq!(
+            parsed["messages"][3]["content"][1]["cache_control"]["ttl"],
+            json!("1h")
+        );
+        assert_eq!(parsed["messages"][3]["content"][2], json!("tail-marker"));
+    }
+
+    #[test]
+    fn message_cache_control_auto_keeps_string_content_unchanged() {
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "messages": [{
+                    "role": "user",
+                    "content": "hello"
+                }]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::FiveMinutes,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(parsed["messages"][0]["content"], json!("hello"));
+    }
+
+    #[test]
+    fn message_cache_control_auto_places_tail_breakpoints_within_lookback() {
+        let messages: Vec<serde_json::Value> = (0..45)
+            .map(|idx| {
+                json!({
+                    "role": if idx % 2 == 0 { "user" } else { "assistant" },
+                    "content": [{
+                        "type": "text",
+                        "text": format!("block-{}", idx),
+                        "cache_control": { "type": "ephemeral", "ttl": "5m" }
+                    }]
+                })
+            })
+            .collect();
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "messages": messages
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        let positions = message_cache_control_positions(&parsed);
+
+        assert_eq!(positions, vec![(0, 0), (6, 0), (25, 0), (44, 0)]);
+        for pair in positions.windows(2) {
+            assert!(pair[1].0 - pair[0].0 <= 19);
+        }
+    }
+
+    #[test]
+    fn message_cache_control_auto_takes_over_non_message_breakpoint_slots() {
+        let messages: Vec<serde_json::Value> = (0..60)
+            .map(|idx| {
+                json!({
+                    "role": "user",
+                    "content": [{
+                        "type": "text",
+                        "text": format!("block-{}", idx)
+                    }]
+                })
+            })
+            .collect();
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "cache_control": { "type": "ephemeral", "ttl": "1h" },
+                "system": [{
+                    "type": "text",
+                    "text": "sys",
+                    "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                }],
+                "tools": [{
+                    "name": "a",
+                    "input_schema": {},
+                    "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                }],
+                "messages": messages
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(
+            message_cache_control_positions(&parsed),
+            vec![(2, 0), (21, 0), (40, 0), (59, 0)]
+        );
+        assert!(parsed.get("cache_control").is_none());
+        assert!(parsed["system"][0].get("cache_control").is_none());
+        assert!(parsed["tools"][0].get("cache_control").is_none());
+    }
+
+    #[test]
+    fn message_cache_control_auto_clears_full_non_message_breakpoint_slots() {
+        let messages: Vec<serde_json::Value> = (0..60)
+            .map(|idx| {
+                json!({
+                    "role": "user",
+                    "content": [{
+                        "type": "text",
+                        "text": format!("block-{}", idx),
+                        "cache_control": { "type": "ephemeral", "ttl": "5m" }
+                    }]
+                })
+            })
+            .collect();
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "cache_control": { "type": "ephemeral", "ttl": "1h" },
+                "system": [
+                    {
+                        "type": "text",
+                        "text": "sys-1",
+                        "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                    },
+                    {
+                        "type": "text",
+                        "text": "sys-2",
+                        "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                    },
+                    {
+                        "type": "text",
+                        "text": "sys-3",
+                        "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                    }
+                ],
+                "tools": [{
+                    "name": "a",
+                    "input_schema": {},
+                    "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                }],
+                "messages": messages
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(
+            message_cache_control_positions(&parsed),
+            vec![(2, 0), (21, 0), (40, 0), (59, 0)]
+        );
+        assert!(parsed.get("cache_control").is_none());
+        assert!(parsed["system"][0].get("cache_control").is_none());
+        assert!(parsed["system"][1].get("cache_control").is_none());
+        assert!(parsed["system"][2].get("cache_control").is_none());
+        assert!(parsed["tools"][0].get("cache_control").is_none());
+    }
+
+    #[test]
+    fn message_cache_control_auto_root_cache_control_does_not_skip_short_tail() {
+        let messages: Vec<serde_json::Value> = (0..6)
+            .map(|idx| {
+                json!({
+                    "role": "user",
+                    "content": [{
+                        "type": "text",
+                        "text": format!("block-{}", idx)
+                    }]
+                })
+            })
+            .collect();
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "cache_control": { "type": "ephemeral", "ttl": "1h" },
+                "messages": messages
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(
+            message_cache_control_positions(&parsed),
+            vec![(0, 0), (5, 0)]
+        );
+        assert!(parsed.get("cache_control").is_none());
+    }
+
+    #[test]
+    fn message_cache_control_auto_marks_claude_code_auto_injected_boundary_when_slot_remains() {
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "<system-reminder>The following skills are available:\n<available-skills>\n- test-skill\n</available-skills></system-reminder>"
+                        },
+                        {
+                            "type": "text",
+                            "text": "<system-reminder>Contents of /repo/CLAUDE.md (project instructions):\n# Project</system-reminder>"
+                        },
+                        {
+                            "type": "text",
+                            "text": "real user prompt"
+                        }
+                    ]
+                }]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(
+            message_cache_control_positions(&parsed),
+            vec![(0, 0), (0, 1), (0, 2)]
+        );
+    }
+
+    #[test]
+    fn message_cache_control_auto_stabilizes_tools_order_by_name() {
+        let body = |tools: serde_json::Value| {
+            json!({
+                "tools": tools,
+                "messages": [{
+                    "role": "user",
+                    "content": [{
+                        "type": "text",
+                        "text": "hello"
+                    }]
+                }]
+            })
+        };
+
+        let first = rewrite_messages_body_with_modes(
+            body(json!([
+                { "name": "Write", "description": "w", "input_schema": { "type": "object" } },
+                { "name": "Bash", "description": "b", "input_schema": { "type": "object" } },
+                { "name": "Read", "description": "r", "input_schema": { "type": "object" } }
+            ])),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+        let second = rewrite_messages_body_with_modes(
+            body(json!([
+                { "name": "Read", "description": "r", "input_schema": { "type": "object" } },
+                { "name": "Write", "description": "w", "input_schema": { "type": "object" } },
+                { "name": "Bash", "description": "b", "input_schema": { "type": "object" } }
+            ])),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(first["tools"], second["tools"]);
+        assert_eq!(first["tools"][0]["name"], json!("Bash"));
+        assert_eq!(first["tools"][1]["name"], json!("Read"));
+        assert_eq!(first["tools"][2]["name"], json!("Write"));
+    }
+
+    #[test]
+    fn message_cache_control_auto_stabilizes_system_skills_and_deferred_tools_lists() {
+        let body = |skills: &str, deferred: &str| {
+            json!({
+                "system": [
+                    {
+                        "type": "text",
+                        "text": skills
+                    },
+                    {
+                        "type": "text",
+                        "text": deferred
+                    }
+                ],
+                "messages": [{
+                    "role": "user",
+                    "content": [{
+                        "type": "text",
+                        "text": "hello"
+                    }]
+                }]
+            })
+        };
+        let skills_unsorted =
+            "User-invocable skills:\n\n- zeta: z\n- alpha: a\n- middle: m\n</system-reminder>";
+        let skills_sorted =
+            "User-invocable skills:\n\n- alpha: a\n- middle: m\n- zeta: z\n</system-reminder>";
+        let deferred_unsorted = "<system-reminder>\nThe following deferred tools are now available:\nWrite\nBash\nRead\n</system-reminder>";
+        let deferred_sorted = "<system-reminder>\nThe following deferred tools are now available:\nBash\nRead\nWrite\n</system-reminder>";
+
+        let first = rewrite_messages_body_with_modes(
+            body(skills_unsorted, deferred_unsorted),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+        let second = rewrite_messages_body_with_modes(
+            body(skills_sorted, deferred_sorted),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(first["system"], second["system"]);
+        assert_eq!(first["system"][0]["text"], json!(skills_sorted));
+        assert_eq!(first["system"][1]["text"], json!(deferred_sorted));
+    }
+
+    #[test]
+    fn message_cache_control_auto_keeps_multiline_skill_entries_intact() {
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "system": [{
+                    "type": "text",
+                    "text": "User-invocable skills:\n\n- zeta: z\n  second line\n- alpha: a\n  more detail\n</system-reminder>"
+                }],
+                "messages": [{
+                    "role": "user",
+                    "content": [{
+                        "type": "text",
+                        "text": "hello"
+                    }]
+                }]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(
+            parsed["system"][0]["text"],
+            json!(
+                "User-invocable skills:\n\n- alpha: a\n  more detail\n- zeta: z\n  second line\n</system-reminder>"
+            )
+        );
+    }
+
+    #[test]
+    fn message_cache_control_auto_stabilizes_first_user_auto_injected_lists() {
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "<system-reminder>The following skills are available:\n\n- zeta: z\n- alpha: a\n</system-reminder>"
+                        },
+                        {
+                            "type": "text",
+                            "text": "<system-reminder>\nThe following deferred tools are now available:\nWrite\nBash\n</system-reminder>"
+                        },
+                        {
+                            "type": "text",
+                            "text": "real user prompt"
+                        }
+                    ]
+                }]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(
+            parsed["messages"][0]["content"][0]["text"],
+            json!(
+                "<system-reminder>The following skills are available:\n\n- alpha: a\n- zeta: z\n</system-reminder>"
+            )
+        );
+        assert_eq!(
+            parsed["messages"][0]["content"][1]["text"],
+            json!(
+                "<system-reminder>\nThe following deferred tools are now available:\nBash\nWrite\n</system-reminder>"
+            )
+        );
+        assert_eq!(
+            message_cache_control_positions(&parsed),
+            vec![(0, 0), (0, 1), (0, 2)]
+        );
+    }
+
+    #[test]
+    fn message_cache_control_stable_alias_uses_auto_sorting() {
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "tools": [
+                    { "name": "Write", "input_schema": {} },
+                    { "name": "Read", "input_schema": {} }
+                ],
+                "messages": [{
+                    "role": "user",
+                    "content": [{
+                        "type": "text",
+                        "text": "hello"
+                    }]
+                }]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::parse("stable").unwrap(),
+        );
+
+        assert_eq!(parsed["tools"][0]["name"], json!("Read"));
+        assert_eq!(parsed["tools"][1]["name"], json!("Write"));
+    }
+
+    #[test]
+    fn message_cache_control_auto_does_not_steal_tail_slots_for_auto_boundary() {
+        let mut messages: Vec<serde_json::Value> = (0..60)
+            .map(|idx| {
+                json!({
+                    "role": "user",
+                    "content": [{
+                        "type": "text",
+                        "text": format!("block-{}", idx)
+                    }]
+                })
+            })
+            .collect();
+        messages[0] = json!({
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "<deferred-tools>\n<tool>Read</tool>\n</deferred-tools>"
+                },
+                {
+                    "type": "text",
+                    "text": "block-0"
+                }
+            ]
+        });
+
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "system": [{
+                    "type": "text",
+                    "text": "sys",
+                    "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                }],
+                "tools": [{
+                    "name": "a",
+                    "input_schema": {},
+                    "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                }],
+                "messages": messages
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(
+            message_cache_control_positions(&parsed),
+            vec![(2, 0), (21, 0), (40, 0), (59, 0)]
+        );
+        assert!(
+            parsed["messages"][0]["content"][0]
+                .get("cache_control")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn message_cache_control_auto_skips_uncacheable_tail_blocks() {
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "messages": [
+                    {
+                        "role": "assistant",
+                        "content": [{
+                            "type": "text",
+                            "text": "cacheable"
+                        }]
+                    },
+                    {
+                        "role": "assistant",
+                        "content": [{
+                            "type": "thinking",
+                            "thinking": "skip"
+                        }]
+                    }
+                ]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(message_cache_control_positions(&parsed), vec![(0, 0)]);
+        assert!(
+            parsed["messages"][1]["content"][0]
+                .get("cache_control")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn message_cache_control_auto_avoids_assistant_tool_use_breakpoints() {
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "system": [{
+                    "type": "text",
+                    "text": "sys",
+                    "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                }],
+                "tools": [{
+                    "name": "Read",
+                    "input_schema": {},
+                    "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                }],
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [{
+                            "type": "text",
+                            "text": "u0"
+                        }]
+                    },
+                    {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "a1"
+                            },
+                            {
+                                "type": "tool_use",
+                                "id": "toolu_1",
+                                "name": "Read",
+                                "input": { "file_path": "/tmp/a" }
+                            }
+                        ]
+                    },
+                    {
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": "toolu_1",
+                            "content": "result"
+                        }]
+                    },
+                    {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "thinking",
+                                "thinking": "skip"
+                            },
+                            {
+                                "type": "tool_use",
+                                "id": "toolu_2",
+                                "name": "Bash",
+                                "input": { "command": "pwd" }
+                            }
+                        ]
+                    }
+                ]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(
+            message_cache_control_positions(&parsed),
+            vec![(0, 0), (2, 0)]
+        );
+        assert!(
+            parsed["messages"][1]["content"][1]
+                .get("cache_control")
+                .is_none()
+        );
+        assert!(
+            parsed["messages"][2]["content"][0]
+                .get("cache_control")
+                .is_some()
+        );
+        assert!(
+            parsed["messages"][3]["content"][1]
+                .get("cache_control")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn message_cache_control_auto_marks_latest_tool_result_tail() {
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [{
+                            "type": "text",
+                            "text": "initial prompt"
+                        }]
+                    },
+                    {
+                        "role": "assistant",
+                        "content": [{
+                            "type": "text",
+                            "text": "older assistant boundary"
+                        }]
+                    },
+                    {
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": "toolu_big",
+                            "content": "large result that must become the newest stable tail"
+                        }]
+                    },
+                    {
+                        "role": "assistant",
+                        "content": [{
+                            "type": "tool_use",
+                            "id": "toolu_tail",
+                            "name": "Read",
+                            "input": { "file_path": "/tmp/tail" }
+                        }]
+                    }
+                ]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(
+            message_cache_control_positions(&parsed),
+            vec![(0, 0), (2, 0)]
+        );
+        assert!(
+            parsed["messages"][1]["content"][0]
+                .get("cache_control")
+                .is_none()
+        );
+        assert!(
+            parsed["messages"][2]["content"][0]
+                .get("cache_control")
+                .is_some()
+        );
+        assert!(
+            parsed["messages"][3]["content"][0]
+                .get("cache_control")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn message_cache_control_rolling_avoids_tool_use_but_allows_tool_result_breakpoints() {
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "system": [{
+                    "type": "text",
+                    "text": "sys",
+                    "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                }],
+                "tools": [{
+                    "name": "Read",
+                    "input_schema": {},
+                    "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                }],
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [{
+                            "type": "text",
+                            "text": "u0"
+                        }]
+                    },
+                    {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "a1"
+                            },
+                            {
+                                "type": "tool_use",
+                                "id": "toolu_1",
+                                "name": "Read",
+                                "input": { "file_path": "/tmp/a" }
+                            }
+                        ]
+                    },
+                    {
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": "toolu_1",
+                            "content": "result"
+                        }]
+                    },
+                    {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "thinking",
+                                "thinking": "skip"
+                            },
+                            {
+                                "type": "tool_use",
+                                "id": "toolu_2",
+                                "name": "Bash",
+                                "input": { "command": "pwd" }
+                            }
+                        ]
+                    }
+                ]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Rolling,
+        );
+
+        assert_eq!(
+            message_cache_control_positions(&parsed),
+            vec![(0, 0), (2, 0)]
+        );
+        assert!(
+            parsed["messages"][1]["content"][1]
+                .get("cache_control")
+                .is_none()
+        );
+        assert!(
+            parsed["messages"][2]["content"][0]
+                .get("cache_control")
+                .is_some()
+        );
+        assert!(
+            parsed["messages"][3]["content"][1]
+                .get("cache_control")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn message_cache_control_auto_counts_blocks_without_using_tool_use_breakpoints() {
+        let mut blocks = Vec::new();
+        blocks.push(json!({
+            "type": "text",
+            "text": "anchor"
+        }));
+        for idx in 0..18 {
+            blocks.push(json!({
+                "type": "thinking",
+                "thinking": format!("thinking-{}", idx)
+            }));
+        }
+        blocks.push(json!({
+            "type": "tool_use",
+            "id": "toolu_tail",
+            "name": "Read",
+            "input": { "file_path": "/tmp/tail" }
+        }));
+        blocks.push(json!({
+            "type": "text",
+            "text": "tail"
+        }));
+
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "messages": [{
+                    "role": "assistant",
+                    "content": blocks
+                }]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(
+            message_cache_control_positions(&parsed),
+            vec![(0, 0), (0, 20)]
+        );
+        assert!(
+            parsed["messages"][0]["content"][18]
+                .get("cache_control")
+                .is_none()
+        );
+        assert!(
+            parsed["messages"][0]["content"][19]
+                .get("cache_control")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn message_cache_control_rolling_counts_blocks_without_using_tool_use_breakpoints() {
+        let mut blocks = Vec::new();
+        blocks.push(json!({
+            "type": "text",
+            "text": "anchor"
+        }));
+        for idx in 0..18 {
+            blocks.push(json!({
+                "type": "thinking",
+                "thinking": format!("thinking-{}", idx)
+            }));
+        }
+        blocks.push(json!({
+            "type": "tool_use",
+            "id": "toolu_tail",
+            "name": "Read",
+            "input": { "file_path": "/tmp/tail" }
+        }));
+        blocks.push(json!({
+            "type": "text",
+            "text": "tail"
+        }));
+
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "messages": [{
+                    "role": "assistant",
+                    "content": blocks
+                }]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Rolling,
+        );
+
+        assert_eq!(
+            message_cache_control_positions(&parsed),
+            vec![(0, 0), (0, 20)]
+        );
+        assert!(
+            parsed["messages"][0]["content"][18]
+                .get("cache_control")
+                .is_none()
+        );
+        assert!(
+            parsed["messages"][0]["content"][19]
+                .get("cache_control")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn message_cache_control_rolling_prefers_text_before_tool_result_in_window() {
+        let mut messages = Vec::new();
+        messages.push(json!({
+            "role": "user",
+            "content": [{
+                "type": "text",
+                "text": "anchor"
+            }]
+        }));
+        for idx in 1..6 {
+            messages.push(json!({
+                "role": "assistant",
+                "content": [{
+                    "type": "tool_use",
+                    "id": format!("toolu_before_{}", idx),
+                    "name": "Read",
+                    "input": { "file_path": format!("/tmp/before-{}", idx) }
+                }]
+            }));
+        }
+        messages.push(json!({
+            "role": "user",
+            "content": [{
+                "type": "tool_result",
+                "tool_use_id": "toolu_window",
+                "content": "window result"
+            }]
+        }));
+        for idx in 7..12 {
+            messages.push(json!({
+                "role": "assistant",
+                "content": [{
+                    "type": "tool_use",
+                    "id": format!("toolu_gap_{}", idx),
+                    "name": "Read",
+                    "input": { "file_path": format!("/tmp/gap-{}", idx) }
+                }]
+            }));
+        }
+        messages.push(json!({
+            "role": "assistant",
+            "content": [{
+                "type": "text",
+                "text": "stable window text"
+            }]
+        }));
+        for idx in 13..25 {
+            messages.push(json!({
+                "role": "assistant",
+                "content": [{
+                    "type": "tool_use",
+                    "id": format!("toolu_after_{}", idx),
+                    "name": "Read",
+                    "input": { "file_path": format!("/tmp/after-{}", idx) }
+                }]
+            }));
+        }
+        messages.push(json!({
+            "role": "user",
+            "content": [{
+                "type": "tool_result",
+                "tool_use_id": "toolu_tail",
+                "content": "tail result"
+            }]
+        }));
+
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "messages": messages
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Rolling,
+        );
+
+        assert_eq!(
+            message_cache_control_positions(&parsed),
+            vec![(0, 0), (12, 0), (25, 0)]
+        );
+        assert!(
+            parsed["messages"][6]["content"][0]
+                .get("cache_control")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn message_cache_control_rolling_falls_back_to_tool_result_when_window_has_no_text() {
+        let mut messages = Vec::new();
+        messages.push(json!({
+            "role": "user",
+            "content": [{
+                "type": "text",
+                "text": "anchor"
+            }]
+        }));
+        for idx in 1..6 {
+            messages.push(json!({
+                "role": "assistant",
+                "content": [{
+                    "type": "tool_use",
+                    "id": format!("toolu_before_{}", idx),
+                    "name": "Read",
+                    "input": { "file_path": format!("/tmp/before-{}", idx) }
+                }]
+            }));
+        }
+        messages.push(json!({
+            "role": "user",
+            "content": [{
+                "type": "tool_result",
+                "tool_use_id": "toolu_window",
+                "content": "window fallback"
+            }]
+        }));
+        for idx in 7..25 {
+            messages.push(json!({
+                "role": "assistant",
+                "content": [{
+                    "type": "tool_use",
+                    "id": format!("toolu_gap_{}", idx),
+                    "name": "Read",
+                    "input": { "file_path": format!("/tmp/gap-{}", idx) }
+                }]
+            }));
+        }
+        messages.push(json!({
+            "role": "user",
+            "content": [{
+                "type": "tool_result",
+                "tool_use_id": "toolu_tail",
+                "content": "tail result"
+            }]
+        }));
+
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "messages": messages
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Rolling,
+        );
+
+        assert_eq!(
+            message_cache_control_positions(&parsed),
+            vec![(0, 0), (6, 0), (25, 0)]
+        );
+        for idx in 7..25 {
+            assert!(
+                parsed["messages"][idx]["content"][0]
+                    .get("cache_control")
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
+    fn message_cache_control_auto_stabilizes_adjacent_tool_use_and_results() {
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "messages": [
+                    {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "id": "toolu_b",
+                                "name": "Bash",
+                                "input": { "command": "pwd" }
+                            },
+                            {
+                                "type": "tool_use",
+                                "id": "toolu_a",
+                                "name": "Read",
+                                "input": { "file_path": "/tmp/a" }
+                            }
+                        ]
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": "toolu_b",
+                                "content": "b"
+                            },
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": "toolu_a",
+                                "content": "a"
+                            }
+                        ]
+                    }
+                ]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(parsed["messages"][0]["content"][0]["id"], json!("toolu_a"));
+        assert_eq!(parsed["messages"][0]["content"][1]["id"], json!("toolu_b"));
+        assert_eq!(
+            parsed["messages"][1]["content"][0]["tool_use_id"],
+            json!("toolu_a")
+        );
+        assert_eq!(
+            parsed["messages"][1]["content"][1]["tool_use_id"],
+            json!("toolu_b")
+        );
+        assert_eq!(message_cache_control_positions(&parsed), vec![(1, 1)]);
+        assert!(
+            parsed["messages"][0]["content"][0]
+                .get("cache_control")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn message_cache_control_rolling_stabilizes_adjacent_tool_use_and_results() {
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "messages": [
+                    {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "id": "toolu_b",
+                                "name": "Bash",
+                                "input": { "command": "pwd" }
+                            },
+                            {
+                                "type": "tool_use",
+                                "id": "toolu_a",
+                                "name": "Read",
+                                "input": { "file_path": "/tmp/a" }
+                            }
+                        ]
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": "toolu_b",
+                                "content": "b"
+                            },
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": "toolu_a",
+                                "content": "a"
+                            }
+                        ]
+                    }
+                ]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Rolling,
+        );
+
+        assert_eq!(parsed["messages"][0]["content"][0]["id"], json!("toolu_a"));
+        assert_eq!(parsed["messages"][0]["content"][1]["id"], json!("toolu_b"));
+        assert_eq!(
+            parsed["messages"][1]["content"][0]["tool_use_id"],
+            json!("toolu_a")
+        );
+        assert_eq!(
+            parsed["messages"][1]["content"][1]["tool_use_id"],
+            json!("toolu_b")
+        );
+        assert_eq!(
+            message_cache_control_positions(&parsed),
+            vec![(1, 0), (1, 1)]
+        );
+        assert!(
+            parsed["messages"][0]["content"][0]
+                .get("cache_control")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn message_cache_control_auto_ttl_rewrite_updates_created_breakpoints() {
+        let messages: Vec<serde_json::Value> = (0..22)
+            .map(|idx| {
+                json!({
+                    "role": "user",
+                    "content": [{
+                        "type": "text",
+                        "text": format!("block-{}", idx)
+                    }]
+                })
+            })
+            .collect();
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "messages": messages
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::FiveMinutes,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        for (message_idx, block_idx) in message_cache_control_positions(&parsed) {
+            assert_eq!(
+                parsed["messages"][message_idx]["content"][block_idx]["cache_control"]["ttl"],
+                json!("5m")
+            );
+        }
+    }
+
+    #[test]
+    fn message_cache_control_stateful_reuses_previous_normal_anchors() {
+        let rewriter = Rewriter::new();
+        let first = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-reuse", 60),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        let first_fingerprints = message_cache_fingerprints(&first);
+
+        let second = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-reuse", 63),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        let second_fingerprints = message_cache_fingerprints(&second);
+        let reused = second_fingerprints
+            .iter()
+            .filter(|fingerprint| first_fingerprints.contains(fingerprint))
+            .count();
+
+        assert!(reused >= 2);
+        assert_eq!(message_cache_control_positions(&second).len(), 4);
+    }
+
+    #[test]
+    fn message_cache_control_stateful_completion_is_delayed_until_upstream_finishes() {
+        let key = format!("1:{}:session-delayed", TEST_VERSION);
+        let rewriter = Rewriter::new();
+        let (first, first_completion) = rewrite_messages_body_with_stateful_completion(
+            &rewriter,
+            stateful_session_body("session-delayed", 60),
+        );
+        let first_completion = first_completion.expect("first request should create completion");
+        let first_fingerprints = message_cache_fingerprints(&first);
+
+        assert!(rewriter.stateful_cache.lock().unwrap().get(&key).is_none());
+
+        let (_second_before_completion, _pending_completion) =
+            rewrite_messages_body_with_stateful_completion(
+                &rewriter,
+                stateful_session_body("session-delayed", 63),
+            );
+        assert!(rewriter.stateful_cache.lock().unwrap().get(&key).is_none());
+
+        rewriter.complete_stateful_cache(Some(first_completion));
+        let snapshot = rewriter
+            .stateful_cache
+            .lock()
+            .unwrap()
+            .get(&key)
+            .expect("snapshot after completion");
+        assert_eq!(snapshot.normal_profile.block_count, 60);
+
+        let (third, third_completion) = rewrite_messages_body_with_stateful_completion(
+            &rewriter,
+            stateful_session_body("session-delayed", 63),
+        );
+        let third_fingerprints = message_cache_fingerprints(&third);
+        let reused = third_fingerprints
+            .iter()
+            .filter(|fingerprint| first_fingerprints.contains(fingerprint))
+            .count();
+
+        assert!(reused >= 2);
+        rewriter.complete_stateful_cache(third_completion);
+    }
+
+    #[test]
+    fn stateful_delayed_completions_keep_same_real_session_profiles_isolated() {
+        let rewriter = Rewriter::new();
+        let pending: Vec<_> = [("2.1.260", 60), ("2.1.280", 80)]
+            .into_iter()
+            .map(|(version, count)| {
+                let account = test_account_with_profile(version);
+                let (_, completion) = rewriter.rewrite_body_with_stateful_completion(
+                    &serde_json::to_vec(&stateful_session_body("shared-real-session", count))
+                        .unwrap(),
+                    "/v1/messages",
+                    &account,
+                    ClientType::ClaudeCode,
+                    EnvPassthrough::default(),
+                    CacheControlTtlRewrite::Off,
+                    MessageCacheControlRewrite::Stateful,
+                    true,
+                    &DisabledThinkingRewrite::off(),
+                    &UpstreamSessionRewrite::default(),
+                    ClaudeCodeContextSanitizerConfig::off(),
+                );
+                completion.expect("延迟提交句柄")
+            })
+            .collect();
+        assert!(
+            rewriter
+                .stateful_cache
+                .lock()
+                .unwrap()
+                .get("1:2.1.260:shared-real-session")
+                .is_none()
+        );
+        let mut pending = pending.into_iter();
+        let old = pending.next().unwrap();
+        let new = pending.next().unwrap();
+        rewriter.complete_stateful_cache(Some(new));
+        rewriter.complete_stateful_cache(Some(old));
+        let mut cache = rewriter.stateful_cache.lock().unwrap();
+        assert_eq!(
+            cache
+                .get("1:2.1.260:shared-real-session")
+                .unwrap()
+                .normal_profile
+                .block_count,
+            60
+        );
+        assert_eq!(
+            cache
+                .get("1:2.1.280:shared-real-session")
+                .unwrap()
+                .normal_profile
+                .block_count,
+            80
+        );
+    }
+
+    #[test]
+    fn message_cache_control_stateful_does_not_persist_tool_result_anchors() {
+        let key = format!("1:{}:session-tool-result-durable", TEST_VERSION);
+        let rewriter = Rewriter::new();
+        let (parsed, completion) = rewrite_messages_body_with_stateful_completion(
+            &rewriter,
+            stateful_tool_result_tail_body("session-tool-result-durable", 25),
+        );
+
+        assert!(
+            message_cache_control_positions(&parsed)
+                .iter()
+                .any(|(message_idx, block_idx)| {
+                    parsed["messages"][*message_idx]["content"][*block_idx]["type"]
+                        == json!("tool_result")
+                })
+        );
+
+        rewriter.complete_stateful_cache(completion);
+        let snapshot = rewriter
+            .stateful_cache
+            .lock()
+            .unwrap()
+            .get(&key)
+            .expect("snapshot");
+
+        assert!(!snapshot.normal_anchors.is_empty());
+        assert!(
+            snapshot
+                .normal_anchors
+                .iter()
+                .all(|anchor| anchor.block_type == "text")
+        );
+    }
+
+    #[test]
+    fn message_cache_control_stateful_rejects_completion_when_usage_shows_rebuild() {
+        let key = format!("1:{}:session-usage-feedback", TEST_VERSION);
+        let rewriter = Rewriter::new();
+        let (_first, first_completion) = rewrite_messages_body_with_stateful_completion(
+            &rewriter,
+            stateful_session_body("session-usage-feedback", 60),
+        );
+        rewriter.complete_stateful_cache_with_usage(
+            first_completion,
+            Some(super::StatefulCacheUsage {
+                cache_read_input_tokens: 70_000,
+                cache_creation_input_tokens: 6_000,
+                ..Default::default()
+            }),
+        );
+        let first_snapshot = rewriter
+            .stateful_cache
+            .lock()
+            .unwrap()
+            .get(&key)
+            .expect("first snapshot");
+        assert_eq!(first_snapshot.confirmed_cache_read_tokens, Some(70_000));
+
+        let (_second, second_completion) = rewrite_messages_body_with_stateful_completion(
+            &rewriter,
+            stateful_session_body("session-usage-feedback", 79),
+        );
+        rewriter.complete_stateful_cache_with_usage(
+            second_completion,
+            Some(super::StatefulCacheUsage {
+                cache_read_input_tokens: 70_000,
+                cache_creation_input_tokens: 120_000,
+                ..Default::default()
+            }),
+        );
+        let rejected_snapshot = rewriter
+            .stateful_cache
+            .lock()
+            .unwrap()
+            .get(&key)
+            .expect("rejected snapshot");
+        assert_eq!(rejected_snapshot.normal_profile.block_count, 60);
+        assert_eq!(rejected_snapshot.confirmed_cache_read_tokens, Some(70_000));
+
+        let (_third, third_completion) = rewrite_messages_body_with_stateful_completion(
+            &rewriter,
+            stateful_session_body("session-usage-feedback", 79),
+        );
+        rewriter.complete_stateful_cache_with_usage(
+            third_completion,
+            Some(super::StatefulCacheUsage {
+                cache_read_input_tokens: 90_000,
+                cache_creation_input_tokens: 120_000,
+                ..Default::default()
+            }),
+        );
+        let accepted_snapshot = rewriter
+            .stateful_cache
+            .lock()
+            .unwrap()
+            .get(&key)
+            .expect("accepted snapshot");
+
+        assert_eq!(accepted_snapshot.normal_profile.block_count, 79);
+        assert_eq!(accepted_snapshot.confirmed_cache_read_tokens, Some(90_000));
+
+        let (_fourth, fourth_completion) = rewrite_messages_body_with_stateful_completion(
+            &rewriter,
+            stateful_session_body("session-usage-feedback", 98),
+        );
+        rewriter.complete_stateful_cache(fourth_completion);
+        let no_usage_snapshot = rewriter
+            .stateful_cache
+            .lock()
+            .unwrap()
+            .get(&key)
+            .expect("no usage snapshot");
+
+        assert_eq!(no_usage_snapshot.normal_profile.block_count, 98);
+        assert_eq!(no_usage_snapshot.confirmed_cache_read_tokens, Some(90_000));
+    }
+
+    #[test]
+    fn message_cache_control_stateful_keeps_full_anchor_set_before_tail_rollover() {
+        let rewriter = Rewriter::new();
+        let first = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-sticky", 48),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        let first_positions = message_cache_positions_and_fingerprints(&first);
+
+        let second = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-sticky", 48),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        let second_positions = message_cache_positions_and_fingerprints(&second);
+
+        let third = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-sticky", 66),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        let third_positions = message_cache_positions_and_fingerprints(&third);
+
+        assert_eq!(first_positions.len(), 4);
+        assert_eq!(second_positions, first_positions);
+        assert_eq!(third_positions, first_positions);
+    }
+
+    #[test]
+    fn message_cache_control_stateful_rolls_one_tail_anchor_after_lookback() {
+        let rewriter = Rewriter::new();
+        let first = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-rollover", 48),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        let first_positions = message_cache_positions_and_fingerprints(&first);
+
+        let second = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-rollover", 67),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        let second_positions = message_cache_positions_and_fingerprints(&second);
+
+        let first_prefix = first_positions.iter().take(3).cloned().collect::<Vec<_>>();
+        let second_prefix = second_positions.iter().take(3).cloned().collect::<Vec<_>>();
+
+        assert_eq!(first_positions.len(), 4);
+        assert_eq!(second_positions.len(), 4);
+        assert_eq!(second_prefix, first_prefix);
+        assert_ne!(second_positions[3], first_positions[3]);
+    }
+
+    #[test]
+    fn message_cache_control_stateful_does_not_insert_auto_before_reused_anchor() {
+        let rewriter = Rewriter::new();
+        let first = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-wire-prefix", 22),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        let first_positions = message_cache_control_positions(&first);
+        let reused_anchor = *first_positions.iter().max().expect("latest anchor");
+        let reused_fingerprint =
+            super::message_block_fingerprint_at(&first, reused_anchor).expect("fingerprint");
+        let first_wire_prefix =
+            super::message_wire_prefix_hash_at(&first, reused_anchor).expect("wire prefix");
+
+        let second = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-wire-prefix", 36),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        let second_positions = message_cache_control_positions(&second);
+        let second_reused_anchor = second_positions
+            .iter()
+            .copied()
+            .find(|position| {
+                super::message_block_fingerprint_at(&second, *position).as_deref()
+                    == Some(reused_fingerprint.as_str())
+            })
+            .expect("reused anchor");
+        let second_wire_prefix =
+            super::message_wire_prefix_hash_at(&second, second_reused_anchor).expect("wire prefix");
+        let new_breakpoints_before_reused_anchor = second_positions
+            .iter()
+            .filter(|position| {
+                **position < second_reused_anchor && !first_positions.contains(position)
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(first_positions, vec![(0, 0), (2, 0), (21, 0)]);
+        assert_eq!(second_reused_anchor, reused_anchor);
+        assert_eq!(first_wire_prefix, second_wire_prefix);
+        assert!(new_breakpoints_before_reused_anchor.is_empty());
+        assert_eq!(second_positions, vec![(0, 0), (2, 0), (21, 0), (35, 0)]);
+    }
+
+    #[test]
+    fn message_cache_control_stateful_bootstrap_promotes_past_tiny_first_request() {
+        let rewriter = Rewriter::new();
+        let first = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-bootstrap", 1),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        assert_eq!(message_cache_control_positions(&first), vec![(0, 0)]);
+        assert!(
+            rewriter
+                .stateful_cache
+                .lock()
+                .unwrap()
+                .get(&format!("1:{}:session-bootstrap", TEST_VERSION))
+                .is_none()
+        );
+
+        for count in [2, 12] {
+            let parsed = rewrite_messages_body_with_rewriter(
+                &rewriter,
+                stateful_session_body("session-bootstrap", count),
+                ClientType::ClaudeCode,
+                CacheControlTtlRewrite::Off,
+                MessageCacheControlRewrite::Stateful,
+            );
+            assert!(!message_cache_control_positions(&parsed).is_empty());
+            assert!(
+                rewriter
+                    .stateful_cache
+                    .lock()
+                    .unwrap()
+                    .get(&format!("1:{}:session-bootstrap", TEST_VERSION))
+                    .is_none()
+            );
+        }
+
+        let bootstrap = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-bootstrap", 22),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        assert!(!message_cache_control_positions(&bootstrap).is_empty());
+
+        let snapshot = rewriter
+            .stateful_cache
+            .lock()
+            .unwrap()
+            .get(&format!("1:{}:session-bootstrap", TEST_VERSION))
+            .expect("snapshot");
+        assert_eq!(snapshot.normal_profile.block_count, 22);
+
+        let mature = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-bootstrap", 36),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        let mature_fingerprints = message_cache_fingerprints(&mature);
+        let reused = mature_fingerprints
+            .iter()
+            .filter(|fingerprint| {
+                snapshot
+                    .normal_anchors
+                    .iter()
+                    .any(|anchor| &anchor.fingerprint == *fingerprint)
+            })
+            .count();
+
+        assert!(reused >= 1);
+    }
+
+    #[test]
+    fn message_cache_control_stateful_spike_does_not_pollute_normal_anchors() {
+        let rewriter = Rewriter::new();
+        let first = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-spike", 76),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        let first_fingerprints = message_cache_fingerprints(&first);
+
+        let spike = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-spike", 567),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        assert_eq!(message_cache_control_positions(&spike).len(), 4);
+
+        let recovered = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-spike", 78),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        let recovered_fingerprints = message_cache_fingerprints(&recovered);
+        let reused = recovered_fingerprints
+            .iter()
+            .filter(|fingerprint| first_fingerprints.contains(fingerprint))
+            .count();
+
+        assert!(reused >= 2);
+        assert_eq!(message_cache_control_positions(&recovered).len(), 4);
+    }
+
+    #[test]
+    fn message_cache_control_stateful_parallel_sibling_without_anchor_does_not_overwrite() {
+        let rewriter = Rewriter::new();
+        let normal = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-parallel", 80),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        let normal_fingerprints = message_cache_fingerprints(&normal);
+
+        let divergent = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-parallel", 30),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        assert!(!message_cache_control_positions(&divergent).is_empty());
+
+        let resumed = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body("session-parallel", 82),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        let resumed_fingerprints = message_cache_fingerprints(&resumed);
+        let reused = resumed_fingerprints
+            .iter()
+            .filter(|fingerprint| normal_fingerprints.contains(fingerprint))
+            .count();
+
+        assert!(reused >= 2);
+    }
+
+    #[test]
+    fn message_cache_control_stateful_miss_does_not_replace_existing_normal_anchors() {
+        let rewriter = Rewriter::new();
+        let normal = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body_with_prefix("session-miss", 80, "normal"),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        let normal_fingerprints = message_cache_fingerprints(&normal);
+
+        let miss = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body_with_prefix("session-miss", 80, "different"),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        assert!(!message_cache_control_positions(&miss).is_empty());
+
+        let resumed = rewrite_messages_body_with_rewriter(
+            &rewriter,
+            stateful_session_body_with_prefix("session-miss", 82, "normal"),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+        let resumed_fingerprints = message_cache_fingerprints(&resumed);
+        let reused = resumed_fingerprints
+            .iter()
+            .filter(|fingerprint| normal_fingerprints.contains(fingerprint))
+            .count();
+
+        assert!(reused >= 2);
+    }
+
+    #[test]
+    fn message_cache_control_stateful_stale_generation_without_shared_anchor_is_rejected() {
+        let key = format!("1:{}:session-stale", TEST_VERSION);
+        let first_body = stateful_session_body_with_prefix("session-stale", 80, "first");
+        let second_body = stateful_session_body_with_prefix("session-stale", 82, "second");
+        let stale_body = stateful_session_body_with_prefix("session-stale", 81, "stale");
+        let first_profile = super::compute_stateful_request_profile(&first_body);
+        let second_profile = super::compute_stateful_request_profile(&second_body);
+        let stale_profile = super::compute_stateful_request_profile(&stale_body);
+        let first_anchors = super::select_auto_message_cache_control_positions(&first_body)
+            .selected
+            .iter()
+            .filter_map(|position| super::durable_stateful_anchor_record_at(&first_body, *position))
+            .collect::<Vec<_>>();
+        let second_anchors = super::select_auto_message_cache_control_positions(&second_body)
+            .selected
+            .iter()
+            .filter_map(|position| {
+                super::durable_stateful_anchor_record_at(&second_body, *position)
+            })
+            .collect::<Vec<_>>();
+        let stale_anchors = super::select_auto_message_cache_control_positions(&stale_body)
+            .selected
+            .iter()
+            .filter_map(|position| super::durable_stateful_anchor_record_at(&stale_body, *position))
+            .collect::<Vec<_>>();
+        let mut store = super::StatefulCacheStore::default();
+
+        store.promote_if_current(
+            key.clone(),
+            first_profile,
+            first_anchors.clone(),
+            None,
+            None,
+            false,
+        );
+        store.promote_if_current(
+            key.clone(),
+            second_profile,
+            second_anchors,
+            Some(1),
+            None,
+            true,
+        );
+        store.promote_if_current(
+            key.clone(),
+            stale_profile,
+            stale_anchors,
+            Some(1),
+            None,
+            false,
+        );
+
+        let snapshot = store.get(&key).expect("snapshot");
+        assert_eq!(snapshot.normal_profile.block_count, 82);
+        assert!(
+            super::anchors_share_fingerprint(&snapshot.normal_anchors, &first_anchors) == false
+        );
+    }
+
+    #[test]
+    fn message_cache_control_stateful_cold_parallel_completion_without_shared_anchor_is_rejected() {
+        let key = format!("1:{}:session-cold-parallel", TEST_VERSION);
+        let first_body = stateful_session_body_with_prefix("session-cold-parallel", 80, "first");
+        let parallel_body =
+            stateful_session_body_with_prefix("session-cold-parallel", 82, "parallel");
+        let first_profile = super::compute_stateful_request_profile(&first_body);
+        let parallel_profile = super::compute_stateful_request_profile(&parallel_body);
+        let first_anchors = super::select_auto_message_cache_control_positions(&first_body)
+            .selected
+            .iter()
+            .filter_map(|position| super::durable_stateful_anchor_record_at(&first_body, *position))
+            .collect::<Vec<_>>();
+        let parallel_anchors = super::select_auto_message_cache_control_positions(&parallel_body)
+            .selected
+            .iter()
+            .filter_map(|position| {
+                super::durable_stateful_anchor_record_at(&parallel_body, *position)
+            })
+            .collect::<Vec<_>>();
+        let mut store = super::StatefulCacheStore::default();
+
+        store.promote_if_current(
+            key.clone(),
+            first_profile,
+            first_anchors.clone(),
+            None,
+            None,
+            false,
+        );
+        store.promote_if_current(
+            key.clone(),
+            parallel_profile,
+            parallel_anchors,
+            None,
+            None,
+            false,
+        );
+
+        let snapshot = store.get(&key).expect("snapshot");
+        assert_eq!(snapshot.normal_profile.block_count, 80);
+        assert!(super::anchors_share_fingerprint(
+            &snapshot.normal_anchors,
+            &first_anchors
+        ));
+    }
+
+    #[test]
+    fn message_cache_control_stateful_appended_neighbor_keeps_anchor_match() {
+        let first = json!({
+            "messages": [{
+                "role": "user",
+                "content": [
+                    { "type": "text", "text": "same" }
+                ]
+            }]
+        });
+        let second = json!({
+            "messages": [{
+                "role": "user",
+                "content": [
+                    { "type": "text", "text": "same" },
+                    { "type": "text", "text": "new-neighbor" }
+                ]
+            }]
+        });
+        let anchor = super::anchor_record_at(&first, (0, 0)).expect("anchor");
+        let positions = super::find_stateful_anchor_positions(&second, &[anchor]);
+
+        assert_eq!(positions, vec![(0, 0)]);
+    }
+
+    #[test]
+    fn message_cache_control_stateful_prefix_mismatch_rejects_anchor_match() {
+        let first = json!({
+            "system": [{
+                "type": "text",
+                "text": "old prefix"
+            }],
+            "messages": [{
+                "role": "user",
+                "content": [
+                    { "type": "text", "text": "same block" }
+                ]
+            }]
+        });
+        let second = json!({
+            "system": [{
+                "type": "text",
+                "text": "new prefix"
+            }],
+            "messages": [{
+                "role": "user",
+                "content": [
+                    { "type": "text", "text": "same block" }
+                ]
+            }]
+        });
+        let anchor = super::anchor_record_at(&first, (0, 0)).expect("anchor");
+        let positions = super::find_stateful_anchor_positions(&second, &[anchor]);
+
+        assert!(positions.is_empty());
+    }
+
+    #[test]
+    fn message_cache_control_stateful_diagnostics_use_hashes_without_prompt_text() {
+        let body = json!({
+            "system": [{
+                "type": "text",
+                "text": "secret-system-text"
+            }],
+            "tools": [{
+                "name": "Read",
+                "description": "secret-tool-text"
+            }],
+            "messages": [{
+                "role": "user",
+                "content": [
+                    { "type": "text", "text": "secret-user-text" },
+                    { "type": "text", "text": "secret-next-text" }
+                ]
+            }]
+        });
+        let outcome = super::StatefulCacheBreakpointSelection {
+            selected: vec![(0, 0)],
+            available_slots: 4,
+            message_content_blocks: 2,
+            normal_block_count: None,
+            reused_count: 0,
+            request_class: super::StatefulRequestClass::Unknown,
+            promotion: super::StatefulPromotion::ColdStart,
+            should_promote: true,
+            snapshot_generation: None,
+            skip_reason: None,
+        };
+
+        let selected = super::stateful_selected_cache_diagnostics(&body, &outcome, None);
+        let prefix = super::cache_prefix_diagnostics(&body);
+        let rendered = format!("{selected:?} {prefix:?}");
+
+        assert_eq!(selected.len(), 1);
+        assert_eq!(selected[0].source, "auto");
+        assert!(!rendered.contains("secret-system-text"));
+        assert!(!rendered.contains("secret-tool-text"));
+        assert!(!rendered.contains("secret-user-text"));
+        assert!(!rendered.contains("secret-next-text"));
+        assert_eq!(selected[0].block_hash.len(), 12);
+        assert_eq!(selected[0].prefix_hash.len(), 12);
+        assert_eq!(selected[0].wire_prefix_hash.len(), 12);
+        assert_eq!(prefix.root_hash.len(), 12);
+        assert_eq!(prefix.system_hash.len(), 12);
+        assert_eq!(prefix.tools_hash.len(), 12);
+        assert_eq!(prefix.messages_hash.len(), 12);
+    }
+
+    #[test]
+    fn message_cache_control_stateful_prefix_hash_changes_when_prefix_changes() {
+        let first = json!({
+            "messages": [{
+                "role": "user",
+                "content": [
+                    { "type": "text", "text": "same" }
+                ]
+            }]
+        });
+        let second = json!({
+            "messages": [{
+                "role": "user",
+                "content": [
+                    { "type": "text", "text": "same" },
+                    { "type": "text", "text": "next" }
+                ]
+            }]
+        });
+
+        assert_eq!(
+            super::message_block_fingerprint_at(&first, (0, 0)),
+            super::message_block_fingerprint_at(&second, (0, 0))
+        );
+        assert_eq!(
+            super::message_prefix_hash_at(&first, (0, 0)),
+            super::message_prefix_hash_at(&second, (0, 0))
+        );
+        assert_ne!(
+            super::message_prefix_hash_at(&first, (0, 0)),
+            super::message_prefix_hash_at(&second, (0, 1))
+        );
+    }
+
+    #[test]
+    fn message_cache_control_stateful_duplicate_blocks_require_context_match() {
+        let first = json!({
+            "messages": [{
+                "role": "user",
+                "content": [
+                    { "type": "text", "text": "before-a" },
+                    { "type": "text", "text": "same" },
+                    { "type": "text", "text": "after-a" },
+                    { "type": "text", "text": "same" },
+                    { "type": "text", "text": "after-b" }
+                ]
+            }]
+        });
+        let second = json!({
+            "messages": [{
+                "role": "user",
+                "content": [
+                    { "type": "text", "text": "before-a" },
+                    { "type": "text", "text": "same" },
+                    { "type": "text", "text": "after-a" },
+                    { "type": "text", "text": "inserted" },
+                    { "type": "text", "text": "same" },
+                    { "type": "text", "text": "after-b" }
+                ]
+            }]
+        });
+        let anchor = super::anchor_record_at(&first, (0, 3)).expect("anchor");
+        let positions = super::find_stateful_anchor_positions(&second, &[anchor]);
+
+        assert!(positions.is_empty());
+    }
+
+    #[test]
+    fn message_cache_control_stateful_ttl_rewrite_updates_created_breakpoints() {
+        let parsed = rewrite_messages_body_with_modes(
+            stateful_session_body("session-ttl", 22),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::FiveMinutes,
+            MessageCacheControlRewrite::Stateful,
+        );
+
+        for (message_idx, block_idx) in message_cache_control_positions(&parsed) {
+            assert_eq!(
+                parsed["messages"][message_idx]["content"][block_idx]["cache_control"]["ttl"],
+                json!("5m")
+            );
+        }
+    }
+
+    #[test]
+    fn message_cache_control_stateful_applies_to_api_mode() {
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "messages": [{
+                    "role": "user",
+                    "content": [{
+                        "type": "text",
+                        "text": "u1",
+                        "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                    }]
+                }]
+            }),
+            ClientType::API,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+        );
+
+        assert_eq!(
+            parsed["messages"][0]["content"][0]["cache_control"]["ttl"],
+            json!("1h")
+        );
+        assert_eq!(parsed["system"][2]["cache_control"]["ttl"], json!("1h"));
+    }
+
+    #[test]
+    fn message_cache_control_auto_alias_applies_to_api_mode() {
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [{
+                            "type": "text",
+                            "text": "u1",
+                            "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                        }]
+                    },
+                    {
+                        "role": "assistant",
+                        "content": [{
+                            "type": "text",
+                            "text": "a1"
+                        }]
+                    }
+                ]
+            }),
+            ClientType::API,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(message_cache_control_positions(&parsed), vec![(1, 0)]);
+        assert_eq!(parsed["system"][2]["cache_control"]["ttl"], json!("1h"));
+    }
+
+    #[test]
+    fn message_cache_control_auto_applies_to_api_mode() {
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [{
+                            "type": "text",
+                            "text": "u1",
+                            "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                        }]
+                    },
+                    {
+                        "role": "assistant",
+                        "content": [{
+                            "type": "text",
+                            "text": "a1"
+                        }]
+                    }
+                ]
+            }),
+            ClientType::API,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+        );
+
+        assert_eq!(message_cache_control_positions(&parsed), vec![(1, 0)]);
+        assert_eq!(parsed["system"][2]["cache_control"]["ttl"], json!("1h"));
+    }
+
+    #[test]
+    fn message_cache_control_api_modes_use_sub2api_style_breakpoints() {
+        for mode in [
+            MessageCacheControlRewrite::Auto,
+            MessageCacheControlRewrite::Rolling,
+            MessageCacheControlRewrite::Stateful,
+            MessageCacheControlRewrite::Sub2api,
+        ] {
+            let parsed = rewrite_messages_body_with_modes(
+                json!({
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": "u1"
+                        },
+                        {
+                            "role": "assistant",
+                            "content": [{
+                                "type": "text",
+                                "text": "a1"
+                            }]
+                        },
+                        {
+                            "role": "user",
+                            "content": [{
+                                "type": "text",
+                                "text": "u2",
+                                "cache_control": { "type": "ephemeral", "ttl": "5m" }
+                            }]
+                        },
+                        {
+                            "role": "assistant",
+                            "content": [{
+                                "type": "tool_use",
+                                "id": "toolu_1",
+                                "name": "Read",
+                                "input": {}
+                            }]
+                        },
+                        {
+                            "role": "user",
+                            "content": [{
+                                "type": "tool_result",
+                                "tool_use_id": "toolu_1",
+                                "content": "result"
+                            }]
+                        }
+                    ]
+                }),
+                ClientType::API,
+                CacheControlTtlRewrite::Off,
+                mode,
+            );
+
+            assert_eq!(
+                message_cache_control_positions(&parsed),
+                vec![(2, 0), (4, 0)]
+            );
+            assert_eq!(parsed["messages"][0]["content"], json!("u1"));
+            assert_eq!(parsed["system"][2]["cache_control"]["ttl"], json!("1h"));
+        }
+    }
+
+    #[test]
+    fn message_cache_control_sub2api_applies_to_claude_code_mode() {
+        let parsed = rewrite_messages_body_with_modes(
+            json!({
+                "system": [{
+                    "type": "text",
+                    "text": "system",
+                    "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                }],
+                "tools": [{
+                    "name": "Read",
+                    "input_schema": {},
+                    "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                }],
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [{
+                            "type": "text",
+                            "text": "u1",
+                            "cache_control": { "type": "ephemeral", "ttl": "5m" }
+                        }]
+                    },
+                    {
+                        "role": "assistant",
+                        "content": [{
+                            "type": "text",
+                            "text": "a1"
+                        }]
+                    },
+                    {
+                        "role": "user",
+                        "content": [{
+                            "type": "text",
+                            "text": "u2"
+                        }]
+                    },
+                    {
+                        "role": "assistant",
+                        "content": [{
+                            "type": "text",
+                            "text": "a2"
+                        }]
+                    }
+                ]
+            }),
+            ClientType::ClaudeCode,
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Sub2api,
+        );
+
+        assert_eq!(
+            message_cache_control_positions(&parsed),
+            vec![(0, 0), (3, 0)]
+        );
+        assert!(parsed["system"][0].get("cache_control").is_some());
+        assert!(parsed["tools"][0].get("cache_control").is_some());
+    }
+
+    #[test]
+    fn api_mode_keeps_ttl_rewrite_without_creating_extra_breakpoints() {
+        let parsed = rewrite_messages_body_with_ttl(
+            json!({
+                "cache_control": { "type": "ephemeral" },
+                "system": [{
+                    "type": "text",
+                    "text": "sys",
+                    "cache_control": { "type": "ephemeral" }
+                }],
+                "messages": [{
+                    "role": "user",
+                    "content": [{
+                        "type": "text",
+                        "text": "hi",
+                        "cache_control": { "type": "ephemeral" }
+                    }]
+                }],
+                "tools": [{
+                    "name": "a",
+                    "input_schema": {},
+                    "cache_control": { "type": "ephemeral" }
+                }]
+            }),
+            ClientType::API,
+            CacheControlTtlRewrite::OneHour,
+        );
+
+        assert_eq!(parsed["cache_control"]["ttl"], json!("1h"));
+        assert!(parsed["system"][0].get("cache_control").is_none());
+        assert!(parsed["system"][1].get("cache_control").is_none());
+        assert_eq!(parsed["system"][2]["cache_control"]["ttl"], json!("1h"));
+        assert!(
+            parsed["messages"][0]["content"][0]
+                .get("cache_control")
+                .is_none()
+        );
+        assert_eq!(parsed["tools"][0]["cache_control"]["ttl"], json!("1h"));
+    }
+
+    #[test]
+    fn api_mode_rewrites_system_to_billing_banner_and_expansion() {
+        let parsed = rewrite_messages_body(
+            json!({
+                "model": "claude-sonnet-4-6",
+                "system": "Be precise.",
+                "messages": [{
+                    "role": "user",
+                    "content": [{ "type": "text", "text": "hello from user" }]
+                }]
+            }),
+            ClientType::API,
+        );
+
+        let system = parsed["system"].as_array().expect("system array");
+        assert_eq!(system.len(), 3);
+        assert!(system[0]["text"].as_str().unwrap().starts_with(
+            format!("x-anthropic-billing-header: cc_version={TEST_VERSION}.").as_str()
+        ));
+        assert!(system[0]["text"].as_str().unwrap().contains("cch="));
+        assert_eq!(system[1]["text"], json!(super::CLAUDE_CODE_SYSTEM_PROMPT));
+        assert_eq!(
+            system[2]["text"],
+            json!(super::CLAUDE_CODE_SYSTEM_PROMPT_EXPANSION)
+        );
+        assert_eq!(system[2]["cache_control"]["ttl"], json!("1h"));
+        assert_eq!(
+            parsed["messages"][0]["content"][0]["text"],
+            json!("[System Instructions]\nBe precise.")
+        );
+        assert_eq!(
+            parsed["messages"][1]["content"][0]["text"],
+            json!("Understood. I will follow these instructions.")
+        );
+        assert_eq!(
+            parsed["messages"][2]["content"][0]["text"],
+            json!("hello from user")
+        );
+    }
+
+    #[test]
+    fn api_mode_preserves_existing_tools_and_tool_choice() {
+        let parsed = rewrite_messages_body(
+            json!({
+                "tool_choice": { "type": "tool", "name": "Read" },
+                "tools": [{
+                    "name": "Read",
+                    "description": "read file",
+                    "input_schema": { "type": "object" }
+                }],
+                "messages": []
+            }),
+            ClientType::API,
+        );
+
+        assert_eq!(parsed["tools"][0]["name"], json!("Read"));
+        assert_eq!(parsed["tool_choice"]["name"], json!("Read"));
+    }
+
+    #[test]
+    fn api_messages_defaults_opus5_max_tokens_to_capture_value() {
+        let parsed = rewrite_messages_body(
+            json!({
+                "model": "claude-opus-5",
+                "messages": []
+            }),
+            ClientType::API,
+        );
+
+        assert_eq!(parsed["max_tokens"], json!(64000));
+        assert_eq!(parsed["thinking"]["type"], json!("adaptive"));
+        assert_eq!(parsed["thinking"]["display"], json!("updates"));
+        assert_eq!(parsed["output_config"]["effort"], json!("max"));
+    }
+
+    #[test]
+    fn api_messages_opus_5_5_uses_21280_capture_profile() {
+        let parsed = rewrite_messages_body(
+            json!({
+                "model": "claude-opus-5-5",
+                "messages": []
+            }),
+            ClientType::API,
+        );
+
+        assert_eq!(parsed["max_tokens"], json!(128000));
+        assert_eq!(parsed["thinking"]["type"], json!("adaptive"));
+        assert_eq!(parsed["thinking"]["display"], json!("updates"));
+        assert_eq!(parsed["output_config"]["effort"], json!("max"));
+    }
+
+    #[test]
+    fn api_messages_21257_fable_5_uses_corrected_capture_profile() {
+        let parsed = rewrite_messages_body_for_profile(
+            json!({
+                "model": "claude-fable-5",
+                "messages": []
+            }),
+            ClientType::API,
+            "2.1.257",
+        );
+
+        assert_eq!(parsed["max_tokens"], json!(64000));
+        assert_eq!(parsed["fallbacks"], json!("default"));
+    }
+
+    #[test]
+    fn api_messages_sonnet_5_uses_21280_capture_profile() {
+        let parsed = rewrite_messages_body(
+            json!({
+                "model": "claude-sonnet-5",
+                "messages": []
+            }),
+            ClientType::API,
+        );
+
+        assert_eq!(parsed["max_tokens"], json!(64000));
+        assert_eq!(parsed["thinking"]["type"], json!("adaptive"));
+        assert_eq!(parsed["thinking"]["display"], json!("updates"));
+        assert_eq!(parsed["output_config"]["effort"], json!("max"));
+    }
+
+    #[test]
+    fn api_messages_fable_5_1_uses_21280_profile_without_forced_fallback() {
+        let parsed = rewrite_messages_body(
+            json!({
+                "model": "claude-fable-5-1",
+                "messages": []
+            }),
+            ClientType::API,
+        );
+
+        assert_eq!(parsed["max_tokens"], json!(64000));
+        assert!(parsed.get("fallbacks").is_none());
+        assert_eq!(parsed["thinking"]["type"], json!("adaptive"));
+        assert_eq!(parsed["thinking"]["display"], json!("updates"));
+        assert_eq!(parsed["output_config"]["effort"], json!("max"));
+    }
+
+    #[test]
+    fn api_messages_haiku_main_uses_21280_capture_profile() {
+        let parsed = rewrite_messages_body(
+            json!({
+                "model": "claude-haiku-4-5-20251001",
+                "messages": []
+            }),
+            ClientType::API,
+        );
+
+        assert_eq!(parsed["max_tokens"], json!(32000));
+        assert_eq!(parsed["thinking"]["budget_tokens"], json!(31999));
+        assert_eq!(parsed["thinking"]["type"], json!("enabled"));
+        assert_eq!(parsed["thinking"]["display"], json!("updates"));
+        assert!(parsed.get("output_config").is_none());
+    }
+
+    #[test]
+    fn api_model_profile_haiku_budget_respects_output_limit() {
+        for (max_tokens, expected_budget) in [
+            (Some(1_u64), None),
+            (Some(512), None),
+            (Some(1_024), None),
+            (Some(1_025), Some(1_024)),
+            (Some(2_048), Some(2_047)),
+            (Some(4_096), Some(4_095)),
+            (Some(8_192), Some(8_191)),
+            (Some(31_999), Some(31_998)),
+            (Some(32_000), Some(31_999)),
+            (Some(64_000), Some(31_999)),
+            (None, Some(31_999)),
+        ] {
+            let mut body = json!({
+                "model": "claude-haiku-4-5-20251001",
+                "messages": [{"role": "user", "content": "合成预算回归请求"}]
+            });
+            if let Some(max_tokens) = max_tokens {
+                body["max_tokens"] = json!(max_tokens);
+            }
+
+            let out = rewrite_messages_body(body, ClientType::API);
+
+            assert_eq!(out["max_tokens"], json!(max_tokens.unwrap_or(32_000)));
+            if let Some(expected_budget) = expected_budget {
+                assert_eq!(out["thinking"]["budget_tokens"], json!(expected_budget));
+                assert_eq!(out["thinking"]["type"], "enabled");
+                assert_eq!(out["thinking"]["display"], "updates");
+                assert!(expected_budget >= 1_024);
+                assert!(expected_budget < out["max_tokens"].as_u64().unwrap());
+            } else {
+                assert!(out.get("thinking").is_none());
+            }
+            assert!(out.get("output_config").is_none());
+        }
+    }
+
+    #[test]
+    fn api_model_profile_preserves_explicit_thinking_budget_and_display() {
+        for display in [None, Some("omitted")] {
+            let mut body = json!({
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 4096,
+                "thinking": {"type": "enabled", "budget_tokens": 2048},
+                "messages": [{"role": "user", "content": "合成显式预算回归请求"}]
+            });
+            if let Some(display) = display {
+                body["thinking"]["display"] = json!(display);
+            }
+
+            let out = rewrite_messages_body(body, ClientType::API);
+
+            assert_eq!(out["max_tokens"], 4096);
+            assert_eq!(out["thinking"]["budget_tokens"], 2048);
+            assert_eq!(out["thinking"]["type"], "enabled");
+            assert_eq!(out["thinking"]["display"], display.unwrap_or("updates"));
+        }
+    }
+
+    #[test]
+    fn api_model_profile_disabled_thinking_does_not_gain_defaults() {
+        for model in [
+            "claude-haiku-4-5-20251001",
+            "claude-opus-5-5",
+            "claude-opus-5",
+            "claude-sonnet-5",
+        ] {
+            for output_config in [None, Some(json!({"effort": "low"}))] {
+                let mut body = json!({
+                    "model": model,
+                    "max_tokens": 4096,
+                    "thinking": {"type": "disabled"},
+                    "messages": [{"role": "user", "content": "合成关闭思考回归请求"}]
+                });
+                if let Some(output_config) = &output_config {
+                    body["output_config"] = output_config.clone();
+                }
+
+                let out = rewrite_messages_body(body, ClientType::API);
+
+                assert_eq!(out["thinking"], json!({"type": "disabled"}), "{model}");
+                assert_eq!(out.get("output_config"), output_config.as_ref(), "{model}");
+                assert_eq!(out["max_tokens"], 4096);
+            }
+        }
+    }
+
+    #[test]
+    fn api_model_profile_haiku_tool_choice_keeps_compatible_thinking() {
+        for tool_choice in [
+            json!({"type": "auto"}),
+            json!({"type": "none"}),
+            json!({"type": "any"}),
+            json!({"type": "tool", "name": "Read"}),
+        ] {
+            for disabled in [false, true] {
+                let mut body = json!({
+                    "model": "claude-haiku-4-5-20251001",
+                    "max_tokens": 32000,
+                    "tool_choice": tool_choice,
+                    "tools": [{"name": "Read", "input_schema": {"type": "object"}}],
+                    "messages": [{"role": "user", "content": "合成工具调用回归请求"}]
+                });
+                if disabled {
+                    body["thinking"] = json!({"type": "disabled"});
+                }
+
+                let out = rewrite_messages_body(body.clone(), ClientType::API);
+
+                assert_eq!(out["tool_choice"], tool_choice);
+                assert_eq!(out["tools"], body["tools"]);
+                assert_eq!(out["max_tokens"], 32000);
+                if disabled {
+                    assert_eq!(out["thinking"], json!({"type": "disabled"}));
+                } else if matches!(tool_choice["type"].as_str(), Some("any" | "tool")) {
+                    assert!(out.get("thinking").is_none(), "{tool_choice}");
+                } else {
+                    assert_eq!(out["thinking"]["type"], "enabled");
+                    assert_eq!(out["thinking"]["budget_tokens"], 31999);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn api_model_profile_adaptive_thinking_supports_forced_tools() {
+        for model in ["claude-opus-5-5", "claude-opus-5", "claude-sonnet-5"] {
+            for tool_choice in [
+                json!({"type": "any"}),
+                json!({"type": "tool", "name": "Read"}),
+            ] {
+                let out = rewrite_messages_body(
+                    json!({
+                        "model": model,
+                        "max_tokens": 4096,
+                        "tool_choice": tool_choice,
+                        "tools": [{"name": "Read", "input_schema": {"type": "object"}}],
+                        "messages": [{"role": "user", "content": "合成自适应思考回归请求"}]
+                    }),
+                    ClientType::API,
+                );
+
+                assert_eq!(out["tool_choice"], tool_choice);
+                assert_eq!(out["thinking"]["type"], "adaptive");
+                assert_eq!(out["thinking"]["display"], "updates");
+                assert_eq!(out["output_config"]["effort"], "max");
+            }
+        }
+    }
+
+    #[test]
+    fn api_model_profile_fix_keeps_rollback_and_claude_code_parameters() {
+        for (client_type, version) in [
+            (ClientType::API, "2.1.257"),
+            (ClientType::ClaudeCode, "2.1.260"),
+        ] {
+            for model in [
+                "claude-haiku-4-5-20251001",
+                "claude-opus-5",
+                "claude-sonnet-5",
+            ] {
+                for parameters in [
+                    json!({"max_tokens": 4096}),
+                    json!({"max_tokens": 32000, "thinking": {"type": "disabled"}}),
+                    json!({"max_tokens": 32000, "tool_choice": {"type": "tool", "name": "Read"}}),
+                ] {
+                    let mut body = parameters.clone();
+                    body["model"] = json!(model);
+                    body["tools"] = json!([{"name": "Read", "input_schema": {"type": "object"}}]);
+                    body["messages"] = json!([{"role": "user", "content": "合成模式边界回归请求"}]);
+
+                    let out = rewrite_messages_body_for_profile(body, client_type, version);
+
+                    for key in ["max_tokens", "thinking", "tool_choice", "output_config"] {
+                        assert_eq!(
+                            out.get(key),
+                            parameters.get(key),
+                            "{client_type:?} {model} {key}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn api_messages_21220_does_not_apply_unverified_fable_5_1_profile() {
+        let account = test_account_with_profile("2.1.220");
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "model": "claude-fable-5-1",
+            "messages": []
+        });
+
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+
+        assert_eq!(parsed["max_tokens"], json!(32000));
+        assert!(parsed.get("fallbacks").is_none());
+        assert!(parsed.get("thinking").is_none());
+    }
+
+    #[test]
+    fn api_messages_rollback_profile_keeps_opus48_limits_and_fable_fallback() {
+        let account = test_account_with_profile("2.1.197");
+        let rewriter = Rewriter::new();
+        let opus = json!({
+            "model": "claude-opus-4-8",
+            "messages": []
+        });
+        let fable = json!({
+            "model": "claude-fable-5",
+            "messages": []
+        });
+
+        let opus_out = rewriter.rewrite_body(
+            &serde_json::to_vec(&opus).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+        );
+        let fable_out = rewriter.rewrite_body(
+            &serde_json::to_vec(&fable).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+        );
+        let opus_parsed: serde_json::Value = serde_json::from_slice(&opus_out).unwrap();
+        let fable_parsed: serde_json::Value = serde_json::from_slice(&fable_out).unwrap();
+
+        assert_eq!(opus_parsed["max_tokens"], json!(64000));
+        assert_eq!(
+            fable_parsed["fallbacks"],
+            json!([{ "model": "claude-opus-4-8" }])
+        );
+    }
+
+    #[test]
+    fn api_messages_keeps_existing_fable_fallbacks() {
+        let parsed = rewrite_messages_body(
+            json!({
+                "model": "claude-fable-5",
+                "messages": [],
+                "fallbacks": [{"model": "custom-fallback"}]
+            }),
+            ClientType::API,
+        );
+
+        assert_eq!(parsed["fallbacks"], json!([{ "model": "custom-fallback" }]));
+    }
+
+    #[test]
+    fn api_messages_defaults_haiku_max_tokens_to_title_generation_value() {
+        let parsed = rewrite_messages_body(
+            json!({
+                "model": "claude-haiku-4-5-20251001",
+                "messages": []
+            }),
+            ClientType::API,
+        );
+
+        assert_eq!(parsed["max_tokens"], json!(32000));
+    }
+
+    #[test]
+    fn api_messages_defaults_other_claude_models_to_standard_max_tokens() {
+        let parsed = rewrite_messages_body(
+            json!({
+                "model": "claude-sonnet-4-6",
+                "messages": []
+            }),
+            ClientType::API,
+        );
+
+        assert_eq!(parsed["max_tokens"], json!(32000));
+    }
+
+    #[test]
+    fn api_messages_preserves_probe_and_capture_max_tokens() {
+        let haiku_probe = rewrite_messages_body(
+            json!({
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 1,
+                "messages": []
+            }),
+            ClientType::API,
+        );
+        let opus_capture = rewrite_messages_body(
+            json!({
+                "model": "claude-opus-4-8",
+                "max_tokens": 64000,
+                "messages": []
+            }),
+            ClientType::API,
+        );
+
+        assert_eq!(haiku_probe["max_tokens"], json!(1));
+        assert_eq!(opus_capture["max_tokens"], json!(64000));
+    }
+
+    #[test]
+    fn api_messages_caps_oversized_max_tokens_to_capture_limit() {
+        let parsed = rewrite_messages_body(
+            json!({
+                "model": "claude-opus-4-8",
+                "max_tokens": 128000,
+                "messages": []
+            }),
+            ClientType::API,
+        );
+
+        assert_eq!(parsed["max_tokens"], json!(64000));
+    }
+
+    #[test]
+    fn claude_code_messages_do_not_normalize_max_tokens() {
+        let existing = rewrite_messages_body(
+            json!({
+                "model": "claude-opus-4-8",
+                "max_tokens": 128000,
+                "messages": []
+            }),
+            ClientType::ClaudeCode,
+        );
+        let missing = rewrite_messages_body(
+            json!({
+                "model": "claude-opus-4-8",
+                "messages": []
+            }),
+            ClientType::ClaudeCode,
+        );
+
+        assert_eq!(existing["max_tokens"], json!(128000));
+        assert!(missing.get("max_tokens").is_none());
+    }
+
+    /// 同行结束标签、相邻提醒与提醒中的其它标签必须保留。
+    /// @return 无；任一相邻结构或非用户名内容丢失时失败。
+    #[test]
+    fn git_user_scrub_preserves_inline_tags_and_adjacent_reminders() {
+        let mut body = json!({"system":[{"type":"text","text":concat!(
+            "前缀 <system-reminder>Git user: caller</system-reminder>",
+            " 中间 <system-reminder>Git user: other<note>保留</note></system-reminder> 后缀"
+        )}]});
+        scrub_git_user_in_reminders(&mut body, "合成账号");
+        assert_eq!(
+            body["system"][0]["text"],
+            concat!(
+                "前缀 <system-reminder>Git user: 合成账号</system-reminder>",
+                " 中间 <system-reminder>Git user: 合成账号<note>保留</note></system-reminder> 后缀"
+            )
+        );
+    }
+
+    /// 账号显示名称中的正则替换符必须按原字符发送。
+    /// @return 无；美元符号、捕获组样式或 Unicode 名称变化时失败。
+    #[test]
+    fn git_user_scrub_preserves_literal_account_names() {
+        for name in ["合成$1账号", "$0", "${missing}$$", "账号$", "普通名字"] {
+            let mut body =
+                json!({"system":"<system-reminder>\nGit user: caller\n</system-reminder>"});
+            scrub_git_user_in_reminders(&mut body, name);
+            assert_eq!(
+                body["system"],
+                format!("<system-reminder>\nGit user: {name}\n</system-reminder>")
+            );
+        }
+    }
+
+    /// 空用户名不能吃掉下一行，正常替换保留原有换行格式。
+    /// @return 无；相邻环境字段或 CRLF/CR/LF 被改动时失败。
+    #[test]
+    fn git_user_scrub_respects_line_boundaries() {
+        for newline in ["\n", "\r\n", "\r"] {
+            let mut body = json!({"system":format!("<system-reminder>Git user: caller{newline}Other: keep</system-reminder>")});
+            scrub_git_user_in_reminders(&mut body, "合成账号");
+            assert_eq!(
+                body["system"],
+                format!(
+                    "<system-reminder>Git user: 合成账号{newline}Other: keep</system-reminder>"
+                )
+            );
+            let original =
+                format!("<system-reminder>Git user:{newline}Other: keep</system-reminder>");
+            let mut empty = json!({"system":original});
+            scrub_git_user_in_reminders(&mut empty, "合成账号");
+            assert_eq!(empty["system"], original);
+        }
+    }
+
+    /// 用户资料、工具描述、标签外文本及带缓存字段的块维持原有透传边界。
+    /// @return 无；替换扩大到非目标位置或缓存块时失败。
+    #[test]
+    fn git_user_scrub_keeps_non_target_and_cached_content() {
+        let reminder = "<system-reminder>Git user: caller</system-reminder>";
+        let mut body = json!({
+            "system":[
+                {"type":"text","text":reminder,"cache_control":{"type":"ephemeral"}},
+                {"type":"text","text":reminder,"cache_control":null},
+                {"type":"text","text":"Git user: outside"}
+            ],
+            "messages":[{"role":"user","content":reminder}],
+            "tools":[{"name":"synthetic","description":reminder}]
+        });
+        let original = body.clone();
+        scrub_git_user_in_reminders(&mut body, "合成账号");
+        assert_eq!(body, original);
+    }
+
+    /// 真实正文改写链应保留标签与账号原文，并在替换后完成版本化 CCH。
+    /// @return 无；280/293 的最终提醒或已有 CCH 不正确时失败。
+    #[test]
+    fn git_user_scrub_keeps_profile_cch_valid() {
+        for version in ["2.1.280", "2.1.293"] {
+            let mut account = test_account_with_profile(version);
+            account.name = "合成$1账号".into();
+            account.billing_mode = BillingMode::Rewrite;
+            let body = json!({
+                "model":"claude-opus-4-8",
+                "system":[
+                    {"type":"text","text":format!("x-anthropic-billing-header: cc_version={version}.abc; cc_entrypoint=cli; cch=00000;")},
+                    {"type":"text","text":"<system-reminder>Git user: caller</system-reminder>"}
+                ],
+                "messages":[{"role":"user","content":"合成用户名替换验证"}],
+                "max_tokens":32
+            });
+            let rewriter = Rewriter::new();
+            let output = rewriter.rewrite_body(
+                &body.to_string().into_bytes(),
+                "/v1/messages",
+                &account,
+                ClientType::ClaudeCode,
+                EnvPassthrough::default(),
+                CacheControlTtlRewrite::Off,
+                MessageCacheControlRewrite::Off,
+                true,
+            );
+            let sent: Value = serde_json::from_slice(&output).unwrap();
+            assert!(
+                sent["system"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|block| block["text"]
+                        == "<system-reminder>Git user: 合成$1账号</system-reminder>")
+            );
+            let billing = sent["system"][0]["text"].as_str().unwrap();
+            assert!(billing.contains("cch="));
+            assert!(!billing.contains("cch=00000"));
+            assert_eq!(
+                rewriter.refresh_cch_attestation(output.clone(), &account, ClientType::API),
+                output
+            );
+        }
+    }
+
+    #[test]
+    fn context_sanitizer_report_only_keeps_current_date_body() {
+        let body = json!({
+            "system": [{
+                "type": "text",
+                "text": "Platform: linux\nToday's date is 2026/07/01."
+            }],
+            "messages": [{
+                "role": "user",
+                "content": [{"type": "text", "text": "真实用户正文"}]
+            }]
+        });
+
+        let parsed = rewrite_messages_body_with_context_sanitizer(
+            body,
+            ClientType::ClaudeCode,
+            ClaudeCodeContextSanitizerMode::ReportOnly,
+        );
+
+        assert_eq!(
+            parsed["system"][0]["text"],
+            json!("Platform: linux\nToday's date is 2026/07/01.")
+        );
+    }
+
+    #[test]
+    fn context_sanitizer_normalize_rewrites_current_date_before_cch() {
+        let body = json!({
+            "system": [{
+                "type": "text",
+                "text": "x-anthropic-billing-header: cc_version=2.1.195.abc; cc_entrypoint=cli; cch=00000;\nPlatform: linux\nToday\u{2019}s date is 2026/07/01."
+            }],
+            "messages": [{
+                "role": "user",
+                "content": [{"type": "text", "text": "hello current date"}]
+            }]
+        });
+
+        let parsed = rewrite_messages_body_with_context_sanitizer(
+            body,
+            ClientType::ClaudeCode,
+            ClaudeCodeContextSanitizerMode::Normalize,
+        );
+        let text = parsed["system"][0]["text"].as_str().unwrap();
+
+        assert!(text.contains("Today's date is 2026-07-01."));
+        assert!(!text.contains("2026/07/01"));
+        assert!(!text.contains("cch=00000"));
+    }
+
+    #[test]
+    fn context_sanitizer_normalize_handles_known_unicode_apostrophes() {
+        for apostrophe in ["'", "\u{2019}", "\u{02BC}", "\u{02B9}"] {
+            let body = json!({
+                "system": [{
+                    "type": "text",
+                    "text": format!("Platform: linux\nToday{}s date is 2026/06/30.", apostrophe)
+                }],
+                "messages": [{
+                    "role": "user",
+                    "content": [{"type": "text", "text": "hello"}]
+                }]
+            });
+
+            let parsed = rewrite_messages_body_with_context_sanitizer(
+                body,
+                ClientType::ClaudeCode,
+                ClaudeCodeContextSanitizerMode::Normalize,
+            );
+
+            assert_eq!(
+                parsed["system"][0]["text"],
+                json!("Platform: linux\nToday's date is 2026-06-30.")
+            );
+        }
+    }
+
+    #[test]
+    fn context_sanitizer_does_not_rewrite_plain_user_date_text() {
+        let body = json!({
+            "messages": [{
+                "role": "user",
+                "content": [{"type": "text", "text": "Today's date is 2026/07/01."}]
+            }]
+        });
+
+        let parsed = rewrite_messages_body_with_context_sanitizer(
+            body,
+            ClientType::ClaudeCode,
+            ClaudeCodeContextSanitizerMode::Normalize,
+        );
+
+        assert_eq!(
+            parsed["messages"][0]["content"][0]["text"],
+            json!("Today's date is 2026/07/01.")
+        );
+    }
+
+    #[test]
+    fn context_sanitizer_does_not_run_for_api_mode() {
+        let body = json!({
+            "system": "Platform: linux\nToday's date is 2026/07/01.",
+            "messages": [{
+                "role": "user",
+                "content": [{"type": "text", "text": "hello"}]
+            }]
+        });
+
+        let parsed = rewrite_messages_body_with_context_sanitizer(
+            body,
+            ClientType::API,
+            ClaudeCodeContextSanitizerMode::Normalize,
+        );
+        let messages = parsed["messages"].as_array().unwrap();
+        let original_system = messages.iter().any(|message| {
+            message["content"]
+                .as_array()
+                .map(|content| {
+                    content.iter().any(|block| {
+                        block["text"]
+                            .as_str()
+                            .map(|text| text.contains("Today's date is 2026/07/01."))
+                            .unwrap_or(false)
+                    })
+                })
+                .unwrap_or(false)
+        });
+
+        assert!(original_system);
+    }
+
+    #[test]
+    fn api_messages_headers_use_current_profile() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "metadata": {
+                "user_id": json!({
+                    "device_id": "device-1",
+                    "account_uuid": "account-uuid",
+                    "session_id": "session-1"
+                }).to_string()
+            }
+        });
+        let headers = rewriter.rewrite_headers(
+            &std::collections::HashMap::new(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            "claude-opus-4-8",
+            &body,
+        );
+        assert_eq!(
+            headers.get("User-Agent").unwrap(),
+            claude_cli_user_agent(TEST_VERSION).as_str()
+        );
+        assert_eq!(
+            headers.get("anthropic-beta").unwrap(),
+            OPUS_4_8_MESSAGE_BETA_TOKENS_2_1_280
+        );
+        assert_eq!(
+            headers.get("X-Stainless-Package-Version").unwrap(),
+            TEST_SDK_VERSION
+        );
+        assert_eq!(
+            headers.get("X-Stainless-Runtime-Version").unwrap(),
+            STAINLESS_RUNTIME_VERSION
+        );
+        assert_eq!(
+            headers.get("X-Claude-Code-Session-Id").unwrap(),
+            "session-1"
+        );
+    }
+
+    #[test]
+    fn integrated_safeguards_use_exact_beta_and_survive_body_rewrite() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let mut incoming = std::collections::HashMap::new();
+        incoming.insert(
+            "anthropic-beta".to_string(),
+            "client-extra-2099-01-01".to_string(),
+        );
+        for permission_mode in ["auto", "plan"] {
+            let safeguards = json!([{
+                "type": "dangerous_tool_use",
+                "classifier_context": {
+                    "v": 1,
+                    "permission_mode": permission_mode,
+                    "auto_mode": {
+                        "allow": [],
+                        "soft_deny": [],
+                        "hard_deny": [],
+                        "environment": []
+                    }
+                }
+            }]);
+            let body = json!({
+                "model": "claude-opus-5-5",
+                "messages": [{"role": "user", "content": "检查当前目录"}],
+                "safeguards": safeguards.clone()
+            });
+            let rewritten = rewrite_messages_body(body, ClientType::ClaudeCode);
+
+            assert_eq!(rewritten["safeguards"], safeguards);
+
+            for (model_id, expected_beta) in [
+                (
+                    "claude-opus-5-5",
+                    OPUS_5_5_SAFEGUARD_MESSAGE_BETA_TOKENS_2_1_280,
+                ),
+                (
+                    "claude-opus-4-8",
+                    OPUS_4_8_SAFEGUARD_MESSAGE_BETA_TOKENS_2_1_280,
+                ),
+            ] {
+                let headers = rewriter.rewrite_headers(
+                    &incoming,
+                    "/v1/messages",
+                    &account,
+                    ClientType::ClaudeCode,
+                    model_id,
+                    &json!({"safeguards": safeguards}),
+                );
+
+                assert_eq!(headers["anthropic-beta"], expected_beta);
+                assert!(!headers["anthropic-beta"].contains("client-extra-2099-01-01"));
+            }
+        }
+    }
+
+    #[test]
+    fn sonnet_4_5_does_not_invent_message_threads_beta_without_safeguards() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let ordinary_headers = rewriter.rewrite_headers(
+            &std::collections::HashMap::new(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-sonnet-4-5",
+            &json!({}),
+        );
+
+        assert_eq!(
+            ordinary_headers["anthropic-beta"],
+            SONNET_4_5_MESSAGE_BETA_TOKENS_2_1_280.trim_end_matches(",message-threads-2026-08-12")
+        );
+        assert!(!ordinary_headers["anthropic-beta"].contains("message-threads-2026-08-12"));
+        assert!(!ordinary_headers["anthropic-beta"].contains("dangerous-tool-use-2026-09-03"));
+
+        let safeguard_headers = rewriter.rewrite_headers(
+            &std::collections::HashMap::new(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-sonnet-4-5",
+            &json!({"safeguards": [{"type": "dangerous_tool_use"}]}),
+        );
+        assert_eq!(safeguard_headers, ordinary_headers);
+    }
+
+    #[test]
+    fn messages_observed_headers_are_preserved_only_on_messages() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        for class in ["main", "auxiliary"] {
+            let incoming = HashMap::from([
+                ("X-Claude-Code-Request-Class".into(), class.into()),
+                ("X-Claude-Code-Prev-Tool-Durations".into(), "Bash=54".into()),
+                ("x-untrusted-header".into(), "discard".into()),
+            ]);
+            for path in [
+                "/v1/messages",
+                "/v1/messages/count_tokens",
+                "/api/oauth/account/settings",
+            ] {
+                let headers = rewriter.rewrite_headers(
+                    &incoming,
+                    path,
+                    &account,
+                    ClientType::ClaudeCode,
+                    "claude-sonnet-4-5",
+                    &json!({}),
+                );
+                if path == "/v1/messages" {
+                    assert_eq!(headers["x-claude-code-request-class"], class);
+                    assert_eq!(headers["x-claude-code-prev-tool-durations"], "Bash=54");
+                    let order = ordered_anthropic_headers(path, &headers);
+                    let names: Vec<_> = order.iter().map(|(name, _)| name.as_str()).collect();
+                    assert!(
+                        names
+                            .iter()
+                            .position(|name| *name == "x-claude-code-prev-tool-durations")
+                            < names
+                                .iter()
+                                .position(|name| *name == "x-claude-code-request-class")
+                    );
+                } else {
+                    assert!(!headers.contains_key("x-claude-code-request-class"));
+                    assert!(!headers.contains_key("x-claude-code-prev-tool-durations"));
+                }
+                assert!(!headers.contains_key("x-untrusted-header"));
+            }
+        }
+        let generated = rewriter.rewrite_headers(
+            &HashMap::new(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            "claude-sonnet-4-5",
+            &json!({}),
+        );
+        assert!(!generated.contains_key("x-claude-code-prev-tool-durations"));
+    }
+
+    #[test]
+    fn messages_agent_context_headers_are_preserved_only_for_native_messages() {
+        let rewriter = Rewriter::new();
+        let context = [
+            ("x-claude-code-agent-id", "synthetic-child"),
+            ("x-claude-code-parent-agent-id", "synthetic-parent"),
+            ("x-claude-code-agent-type", "Explore"),
+            (
+                "x-claude-code-prompt-id",
+                "11111111-1111-4111-8111-111111111111",
+            ),
+        ];
+        for version in ["2.1.280", "2.1.293"] {
+            let account = test_account_with_profile(version);
+            let mut incoming =
+                HashMap::from([("X-Claude-Code-Request-Class".into(), "subagent".into())]);
+            incoming.extend(
+                context
+                    .iter()
+                    .map(|(name, value)| (name.to_ascii_uppercase(), value.to_string())),
+            );
+            for client in [ClientType::ClaudeCode, ClientType::API] {
+                for path in [
+                    "/v1/messages",
+                    "/v1/messages/count_tokens",
+                    "/api/oauth/account/settings",
+                    "/api/hello",
+                ] {
+                    let headers = rewriter.rewrite_headers(
+                        &incoming,
+                        path,
+                        &account,
+                        client,
+                        "claude-sonnet-4-5",
+                        &json!({}),
+                    );
+                    for (name, value) in context {
+                        if client == ClientType::ClaudeCode && path == "/v1/messages" {
+                            assert_eq!(
+                                headers.get(name).map(String::as_str),
+                                Some(value),
+                                "{version} {client:?} {path}: {name}"
+                            );
+                            let ordered = ordered_anthropic_headers(path, &headers);
+                            assert!(ordered.iter().any(|(key, val)| key == name && val == value));
+                            assert_eq!(
+                                headers
+                                    .keys()
+                                    .filter(|key| key.eq_ignore_ascii_case(name))
+                                    .count(),
+                                1
+                            );
+                        } else {
+                            assert!(!headers.keys().any(|key| key.eq_ignore_ascii_case(name)));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn native_main_prompt_id_is_preserved_without_inventing_agent_identity() {
+        let rewriter = Rewriter::new();
+        let account = test_account_with_profile("2.1.293");
+        for prompt in [None, Some("22222222-2222-4222-8222-222222222222")] {
+            let mut incoming =
+                HashMap::from([("x-claude-code-request-class".into(), "main".into())]);
+            if let Some(prompt) = prompt {
+                incoming.insert("x-claude-code-prompt-id".into(), prompt.into());
+            }
+            let headers = rewriter.rewrite_headers(
+                &incoming,
+                "/v1/messages",
+                &account,
+                ClientType::ClaudeCode,
+                "claude-sonnet-4-5",
+                &json!({"messages": [{"role": "user", "content": "synthetic subagent Explore"}]}),
+            );
+            assert_eq!(headers["x-claude-code-request-class"], "main");
+            assert_eq!(
+                headers.get("x-claude-code-prompt-id").map(String::as_str),
+                prompt
+            );
+            for name in [
+                "x-claude-code-agent-id",
+                "x-claude-code-parent-agent-id",
+                "x-claude-code-agent-type",
+            ] {
+                assert!(!headers.contains_key(name));
+            }
+        }
+    }
+
+    #[test]
+    fn sonnet_4_5_threads_beta_follows_native_client_and_keeps_api_default() {
+        let mut account = test_account();
+        let rewriter = Rewriter::new();
+        let token = "message-threads-2026-08-12";
+        for present in [false, true] {
+            for allow_fast in [false, true] {
+                account.allow_fast_mode = allow_fast;
+                let beta = format!(
+                    "{FAST_MODE},{CTX_1M},client-extra-2099-01-01{}",
+                    if present {
+                        format!(",{token},{token}")
+                    } else {
+                        String::new()
+                    }
+                );
+                let incoming = HashMap::from([("anthropic-beta".into(), beta)]);
+                // 是否携带 thread 正文不由网关推测：只有 header 是客户端选择的依据。
+                for body in [json!({}), json!({"thread": {"id": "synthetic-thread"}})] {
+                    let headers = rewriter.rewrite_headers(
+                        &incoming,
+                        "/v1/messages",
+                        &account,
+                        ClientType::ClaudeCode,
+                        "claude-sonnet-4-5",
+                        &body,
+                    );
+                    let tokens: Vec<_> = headers["anthropic-beta"].split(',').collect();
+                    assert_eq!(
+                        tokens.iter().filter(|value| **value == token).count(),
+                        usize::from(present)
+                    );
+                    assert_eq!(tokens.contains(&FAST_MODE), allow_fast);
+                    assert!(!tokens.contains(&CTX_1M));
+                    assert!(tokens.contains(&"client-extra-2099-01-01"));
+                    let generated = rewriter.rewrite_headers(
+                        &incoming,
+                        "/v1/messages",
+                        &account,
+                        ClientType::API,
+                        "claude-sonnet-4-5",
+                        &body,
+                    );
+                    assert_eq!(
+                        generated["anthropic-beta"],
+                        SONNET_4_5_MESSAGE_BETA_TOKENS_2_1_280
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn business_21280_profiles_preserve_scoped_headers_and_exact_betas() {
+        let rewriter = Rewriter::new();
+        let account = test_account();
+        let incoming = HashMap::from([
+            (
+                "user-agent".into(),
+                "claude-cli/2.1.280 (external, cli)".into(),
+            ),
+            ("anthropic-beta".into(), "client-extra-2099-01-01".into()),
+            ("x-frame-cp".into(), "go".into()),
+            ("x-frame-surface".into(), "code".into()),
+            ("x-frame-platform".into(), "cli".into()),
+            ("x-frame-client-version".into(), "2.1.260".into()),
+            (
+                "x-frame-session-id".into(),
+                "synthetic-frame-session".into(),
+            ),
+            (
+                "x-mcp-client-session-id".into(),
+                "synthetic-mcp-session".into(),
+            ),
+            ("Mcp-Method".into(), "tools/list".into()),
+        ]);
+        for (path, beta, ua) in [
+            (
+                "/api/frame/contract/latest",
+                Some("oauth-2025-04-20"),
+                "claude-cli/2.1.280 (external, cli)",
+            ),
+            ("/v1/mcp/synthetic", None, "claude-code/2.1.280 (cli)"),
+            (
+                "/api/organizations/synthetic/model_selector/cc",
+                None,
+                "claude-cli/2.1.280 (external, cli)",
+            ),
+            (
+                "/api/oauth/organizations/synthetic/marketplaces",
+                None,
+                "claude-cli/2.1.280 (external, cli)",
+            ),
+            (
+                "/api/oauth/organizations/synthetic/plugins/list-plugins",
+                None,
+                "claude-cli/2.1.280 (external, cli)",
+            ),
+            (
+                "/api/oauth/organizations/synthetic/skills/list-skills",
+                None,
+                "claude-cli/2.1.280 (external, cli)",
+            ),
+            (
+                "/api/oauth/organizations/synthetic/skills/synthetic-skill/download",
+                None,
+                "claude-cli/2.1.280 (external, cli)",
+            ),
+        ] {
+            for client in [ClientType::ClaudeCode, ClientType::API] {
+                let headers =
+                    rewriter.rewrite_headers(&incoming, path, &account, client, "", &json!({}));
+                assert_eq!(
+                    headers.get("anthropic-beta").map(String::as_str),
+                    beta,
+                    "{path}"
+                );
+                assert_eq!(headers["User-Agent"], ua, "{path}");
+                let frame =
+                    client == ClientType::ClaudeCode && path == "/api/frame/contract/latest";
+                for key in [
+                    "X-Frame-CP",
+                    "X-Frame-Surface",
+                    "X-Frame-Platform",
+                    "X-Frame-Client-Version",
+                    "X-Frame-Session-Id",
+                ] {
+                    assert_eq!(headers.contains_key(key), frame, "{path}: {key}");
+                }
+                if frame {
+                    assert_eq!(headers["X-Frame-Client-Version"], "2.1.280");
+                    assert_eq!(headers["X-Frame-Session-Id"], "synthetic-frame-session");
+                }
+                let mcp = client == ClientType::ClaudeCode && path == "/v1/mcp/synthetic";
+                assert_eq!(headers.contains_key("X-Mcp-Client-Session-Id"), mcp);
+                assert_eq!(headers.contains_key("mcp-method"), mcp);
+                if mcp {
+                    assert_eq!(headers["X-Mcp-Client-Session-Id"], "synthetic-mcp-session");
+                    assert_eq!(headers["mcp-method"], "tools/list");
+                }
+            }
+        }
+        for path in [
+            "/v1/messages",
+            "/api/frame/contract/latest/extra",
+            "/v1/mcp/",
+            "/v1/mcp/synthetic/extra",
+            "/api/organizations//model_selector/cc",
+            "/api/oauth/organizations/synthetic/skills/new-operation",
+            "/api/oauth/organizations/synthetic/marketplaces/extra",
+        ] {
+            let headers = rewriter.rewrite_headers(
+                &incoming,
+                path,
+                &account,
+                ClientType::ClaudeCode,
+                "",
+                &json!({}),
+            );
+            assert!(headers.contains_key("anthropic-beta"), "{path}");
+            assert!(!headers.contains_key("X-Frame-CP"), "{path}");
+            assert!(!headers.contains_key("X-Mcp-Client-Session-Id"), "{path}");
+        }
+    }
+
+    #[test]
+    fn business_profiles_keep_rollback_and_versioned_mcp_capabilities() {
+        let rewriter = Rewriter::new();
+        for version in ["2.1.257", "2.1.260", "2.1.280"] {
+            let account = test_account_with_profile(version);
+            for client in [ClientType::ClaudeCode, ClientType::API] {
+                let headers = rewriter.rewrite_headers(
+                    &HashMap::new(),
+                    "/v1/mcp_servers",
+                    &account,
+                    client,
+                    "",
+                    &json!({}),
+                );
+                let bytes = base64::engine::general_purpose::STANDARD
+                    .decode(&headers["anthropic-mcp-client-capabilities"])
+                    .unwrap();
+                let capabilities: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+                assert_eq!(
+                    capabilities["roots"],
+                    if version == "2.1.280" {
+                        json!({"listChanged":true})
+                    } else {
+                        json!({})
+                    }
+                );
+                for path in [
+                    "/api/frame/contract/latest",
+                    "/v1/mcp/synthetic",
+                    "/api/organizations/synthetic/model_selector/cc",
+                    "/api/oauth/organizations/synthetic/marketplaces",
+                ] {
+                    let headers = rewriter.rewrite_headers(
+                        &HashMap::new(),
+                        path,
+                        &account,
+                        client,
+                        "",
+                        &json!({}),
+                    );
+                    if version != "2.1.280" {
+                        assert!(headers.contains_key("anthropic-beta"), "{version}: {path}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn sonnet5_context_1m_beta_keeps_claude_code_order_when_allowed_by_default() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let mut incoming = std::collections::HashMap::new();
+        incoming.insert("anthropic-beta".to_string(), CTX_1M.to_string());
+
+        let headers = rewriter.rewrite_headers(
+            &incoming,
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-sonnet-5",
+            &json!({}),
+        );
+        let beta = headers.get("anthropic-beta").unwrap();
+
+        assert_eq!(
+            beta,
+            "claude-code-20250219,oauth-2025-04-20,context-1m-2025-08-07,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,mid-conversation-system-2026-04-07,advisor-tool-2026-03-01,advanced-tool-use-2025-11-20,mid-conversation-system-clear-at-2026-08-21,effort-2025-11-24,thinking-binding-controls-2026-08-01,thinking-display-updates-2026-08-18,extended-cache-ttl-2025-04-11,cache-diagnosis-2026-04-07,message-threads-2026-08-12"
+        );
+    }
+
+    #[test]
+    fn fast_mode_body_filter_preserves_nested_fields_and_order() {
+        let account = test_account();
+        let body: Value = serde_json::from_str(
+            r#"{"before":1,"speed":"fast","nested":{"speed":"fast"},"after":2}"#,
+        )
+        .unwrap();
+        let filtered = Rewriter::filter_account_fast_mode_body(&body, &account).unwrap();
+        assert_eq!(
+            filtered.to_string(),
+            r#"{"before":1,"nested":{"speed":"fast"},"after":2}"#
+        );
+        assert_eq!(body["speed"], "fast", "公共输入必须保留供下一个账号使用");
+        let mut allowed = account;
+        allowed.allow_fast_mode = true;
+        assert!(Rewriter::filter_account_fast_mode_body(&body, &allowed).is_none());
+    }
+
+    #[test]
+    fn fast_mode_body_filter_only_matches_exact_root_string() {
+        let account = test_account();
+        for body in [
+            json!({}),
+            json!({"speed":"standard"}),
+            json!({"speed":"FAST"}),
+            json!({"speed":" fast "}),
+            json!({"speed":null}),
+            json!({"speed":true}),
+            json!({"speed":1}),
+            json!({"nested":{"speed":"fast"}}),
+            json!([{"speed":"fast"}]),
+            json!("speed=fast"),
+        ] {
+            assert!(Rewriter::filter_account_fast_mode_body(&body, &account).is_none());
+        }
+    }
+
+    #[test]
+    fn fast_mode_beta_is_filtered_by_default_without_reordering_other_client_tokens() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let mut incoming = std::collections::HashMap::new();
+        incoming.insert(
+            "anthropic-beta".to_string(),
+            format!("client-before,{FAST_MODE},{CTX_1M},client-after"),
+        );
+
+        let headers = rewriter.rewrite_headers(
+            &incoming,
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-sonnet-5",
+            &json!({}),
+        );
+        let beta = headers.get("anthropic-beta").unwrap();
+
+        assert!(!beta.split(',').any(|token| token == FAST_MODE));
+        assert!(beta.split(',').any(|token| token == CTX_1M));
+        assert!(beta.find("client-before").unwrap() < beta.find("client-after").unwrap());
+    }
+
+    #[test]
+    fn fast_mode_beta_is_preserved_when_account_allows_it() {
+        let mut account = test_account();
+        account.allow_fast_mode = true;
+        let rewriter = Rewriter::new();
+        let mut incoming = std::collections::HashMap::new();
+        incoming.insert("anthropic-beta".to_string(), FAST_MODE.to_string());
+
+        let headers = rewriter.rewrite_headers(
+            &incoming,
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-opus-4-8",
+            &json!({}),
+        );
+        let beta = headers.get("anthropic-beta").unwrap();
+
+        assert_eq!(
+            beta.split(',').filter(|token| *token == FAST_MODE).count(),
+            1
+        );
+    }
+
+    #[test]
+    fn fast_mode_filter_uses_exact_beta_token_matching() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let partial_token = format!("{FAST_MODE}-extra");
+        let mut incoming = std::collections::HashMap::new();
+        incoming.insert("anthropic-beta".to_string(), partial_token.clone());
+
+        let headers = rewriter.rewrite_headers(
+            &incoming,
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-opus-4-8",
+            &json!({}),
+        );
+        let beta = headers.get("anthropic-beta").unwrap();
+
+        assert!(beta.split(',').any(|token| token == partial_token));
+    }
+
+    #[test]
+    fn sonnet46_context_1m_beta_is_filtered_by_default() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let mut incoming = std::collections::HashMap::new();
+        incoming.insert("anthropic-beta".to_string(), CTX_1M.to_string());
+
+        let headers = rewriter.rewrite_headers(
+            &incoming,
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-sonnet-4-6",
+            &json!({}),
+        );
+        let beta = headers.get("anthropic-beta").unwrap();
+
+        assert_eq!(beta, OPUS_5_5_MESSAGE_BETA_TOKENS_2_1_280);
+        assert!(!beta.contains(CTX_1M));
+    }
+
+    #[test]
+    fn fable_21257_headers_use_corrected_fallback_beta_without_context_1m() {
+        let account = test_account_with_profile("2.1.257");
+        let rewriter = Rewriter::new();
+        let headers = rewriter.rewrite_headers(
+            &std::collections::HashMap::new(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            "claude-fable-5",
+            &json!({}),
+        );
+        let beta = headers.get("anthropic-beta").unwrap();
+
+        assert_eq!(beta, FABLE_5_MESSAGE_BETA_TOKENS_2_1_257);
+        assert!(!beta.contains(CTX_1M));
+        assert!(beta.contains("effort-2025-11-24,server-side-fallback-2026-07-01"));
+        assert!(beta.contains("fallback-credit-2026-06-01,extended-cache-ttl-2025-04-11"));
+    }
+
+    #[test]
+    fn fable_context_1m_beta_keeps_claude_code_order_when_allowed() {
+        let mut account = test_account_with_profile("2.1.257");
+        account.allow_1m_models = "fable".into();
+        let rewriter = Rewriter::new();
+        let mut incoming = std::collections::HashMap::new();
+        incoming.insert("anthropic-beta".to_string(), CTX_1M.to_string());
+
+        let headers = rewriter.rewrite_headers(
+            &incoming,
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-fable-5",
+            &json!({}),
+        );
+        let beta = headers.get("anthropic-beta").unwrap();
+
+        assert_eq!(
+            beta,
+            "claude-code-20250219,oauth-2025-04-20,context-1m-2025-08-07,interleaved-thinking-2025-05-14,redact-thinking-2026-02-12,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,mid-conversation-system-2026-04-07,advisor-tool-2026-03-01,advanced-tool-use-2025-11-20,effort-2025-11-24,server-side-fallback-2026-07-01,fallback-credit-2026-06-01,extended-cache-ttl-2025-04-11,cache-diagnosis-2026-04-07"
+        );
+    }
+
+    #[test]
+    fn fable_1m_model_without_incoming_context_1m_does_not_inject_beta() {
+        let mut account = test_account_with_profile("2.1.257");
+        account.allow_1m_models = "fable".into();
+        let rewriter = Rewriter::new();
+
+        let headers = rewriter.rewrite_headers(
+            &std::collections::HashMap::new(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-fable-5",
+            &json!({}),
+        );
+        let beta = headers.get("anthropic-beta").unwrap();
+
+        assert_eq!(beta, FABLE_5_MESSAGE_BETA_TOKENS_2_1_257);
+        assert!(!beta.contains(CTX_1M));
+    }
+
+    #[test]
+    fn fable_5_1_headers_use_21280_profile_without_context_1m() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+
+        let headers = rewriter.rewrite_headers(
+            &std::collections::HashMap::new(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            "claude-fable-5-1",
+            &json!({}),
+        );
+        let beta = headers.get("anthropic-beta").unwrap();
+
+        assert_eq!(beta, OPUS_5_5_MESSAGE_BETA_TOKENS_2_1_280);
+        assert!(!beta.contains("redact-thinking-2026-02-12"));
+        assert!(beta.contains("per-turn-control-2026-07-01"));
+        assert!(beta.contains("mid-conversation-tool-changes-2026-07-01"));
+        assert!(!beta.contains("server-side-fallback-2026-07-01"));
+        assert!(beta.contains("thinking-display-updates-2026-08-18"));
+        assert!(!beta.contains(CTX_1M));
+    }
+
+    #[test]
+    fn opus_5_5_fallback_beta_uses_21280_capture_order_in_both_client_modes() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({"fallbacks": "default"});
+
+        for client_type in [ClientType::API, ClientType::ClaudeCode] {
+            let headers = rewriter.rewrite_headers(
+                &std::collections::HashMap::new(),
+                "/v1/messages",
+                &account,
+                client_type,
+                "claude-opus-5-5",
+                &body,
+            );
+            let beta = headers.get("anthropic-beta").unwrap();
+
+            assert!(beta.contains(
+                "effort-2025-11-24,server-side-fallback-2026-07-01,fallback-credit-2026-06-01,thinking-binding-controls-2026-08-01"
+            ));
+            assert_eq!(
+                beta.split(',')
+                    .filter(|token| *token == "server-side-fallback-2026-07-01")
+                    .count(),
+                1,
+                "{client_type:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn count_tokens_does_not_inherit_message_fallback_beta() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({"fallbacks": "default"});
+
+        for client_type in [ClientType::API, ClientType::ClaudeCode] {
+            let headers = rewriter.rewrite_headers(
+                &std::collections::HashMap::new(),
+                "/v1/messages/count_tokens",
+                &account,
+                client_type,
+                "claude-opus-5-5",
+                &body,
+            );
+            let beta = headers.get("anthropic-beta").unwrap();
+
+            assert!(!beta.contains("server-side-fallback-2026-07-01"));
+            assert!(!beta.contains("fallback-credit-2026-06-01"));
+            assert!(beta.contains("token-counting-2024-11-01"));
+        }
+    }
+
+    #[test]
+    fn fable_5_1_explicit_context_1m_obeys_account_allowlist() {
+        let rewriter = Rewriter::new();
+        let mut incoming = std::collections::HashMap::new();
+        incoming.insert("anthropic-beta".to_string(), CTX_1M.to_string());
+
+        let filtered = rewriter.rewrite_headers(
+            &incoming,
+            "/v1/messages",
+            &test_account(),
+            ClientType::ClaudeCode,
+            "claude-fable-5-1",
+            &json!({}),
+        );
+        assert!(!filtered.get("anthropic-beta").unwrap().contains(CTX_1M));
+
+        let mut allowed_account = test_account();
+        allowed_account.allow_1m_models = "fable".into();
+        let allowed = rewriter.rewrite_headers(
+            &incoming,
+            "/v1/messages",
+            &allowed_account,
+            ClientType::ClaudeCode,
+            "claude-fable-5-1",
+            &json!({}),
+        );
+        assert!(allowed.get("anthropic-beta").unwrap().contains(CTX_1M));
+    }
+
+    #[test]
+    fn haiku_non_stream_probe_uses_capture_narrow_beta() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 1,
+            "messages": [{"role": "user", "content": "count"}]
+        });
+
+        let headers = rewriter.rewrite_headers(
+            &std::collections::HashMap::new(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            "claude-haiku-4-5-20251001",
+            &body,
+        );
+
+        assert_eq!(
+            headers.get("anthropic-beta").unwrap(),
+            HAIKU_PROBE_BETA_TOKENS
+        );
+    }
+
+    #[test]
+    fn haiku_streaming_title_uses_capture_narrow_beta() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "model": "claude-haiku-4-5-20251001",
+            "stream": true,
+            "max_tokens": 32000,
+            "tools": [],
+            "system": [
+                {
+                    "type": "text",
+                    "text": "You are Claude Code. Generate a concise, sentence-case title (3-7 words) that captures the main topic or goal of this coding session."
+                }
+            ],
+            "messages": [{"role": "user", "content": "hello"}]
+        });
+        let mut incoming = std::collections::HashMap::new();
+        incoming.insert(
+            "anthropic-beta".to_string(),
+            MESSAGE_BETA_TOKENS.replace(",fallback-credit-2026-06-01", ""),
+        );
+
+        let headers = rewriter.rewrite_headers(
+            &incoming,
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-haiku-4-5-20251001",
+            &body,
+        );
+
+        assert_eq!(
+            headers.get("anthropic-beta").unwrap(),
+            HAIKU_STREAMING_TITLE_BETA_TOKENS
+        );
+    }
+
+    #[test]
+    fn haiku_structured_title_uses_schema_without_prompt_marker() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "model": "claude-haiku-4-5-20251001",
+            "stream": true,
+            "max_tokens": 32000,
+            "tools": [],
+            "thinking": {"type": "disabled"},
+            "output_config": {
+                "format": {
+                    "type": "json_schema",
+                    "schema": {
+                        "type": "object",
+                        "properties": {"title": {"type": "string"}},
+                        "required": ["title"],
+                        "additionalProperties": false
+                    }
+                }
+            },
+            "messages": [{"role": "user", "content": "new title wording"}]
+        });
+
+        let headers = rewriter.rewrite_headers(
+            &std::collections::HashMap::new(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-haiku-4-5-20251001",
+            &body,
+        );
+
+        assert!(super::is_structured_haiku_title_request(&body));
+        assert_eq!(
+            headers.get("anthropic-beta").unwrap(),
+            HAIKU_STREAMING_TITLE_BETA_TOKENS
+        );
+    }
+
+    #[test]
+    fn haiku_main_request_uses_21280_beta() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "model": "claude-haiku-4-5-20251001",
+            "stream": true,
+            "max_tokens": 32000,
+            "tools": [{"name": "Read"}],
+            "diagnostics": {"previous_message_id": "msg_previous"},
+            "messages": [{"role": "user", "content": "请分析这个项目"}]
+        });
+
+        let headers = rewriter.rewrite_headers(
+            &std::collections::HashMap::new(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            "claude-haiku-4-5-20251001",
+            &body,
+        );
+
+        assert_eq!(
+            headers.get("anthropic-beta").unwrap(),
+            HAIKU_MAIN_BETA_TOKENS_2_1_280
+        );
+    }
+
+    #[test]
+    fn haiku_main_without_diagnostics_omits_claude_code_beta() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "model": "claude-haiku-4-5-20251001",
+            "stream": true,
+            "max_tokens": 32000,
+            "tools": [{"name": "Read"}],
+            "messages": [{"role": "user", "content": "请分析这个项目"}]
+        });
+
+        let headers = rewriter.rewrite_headers(
+            &std::collections::HashMap::new(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            "claude-haiku-4-5-20251001",
+            &body,
+        );
+
+        assert_eq!(
+            headers.get("anthropic-beta").unwrap(),
+            HAIKU_MAIN_NO_DIAGNOSTICS_BETA_TOKENS_2_1_280
+        );
+        assert!(
+            !headers
+                .get("anthropic-beta")
+                .unwrap()
+                .contains("claude-code-20250219")
+        );
+    }
+
+    #[test]
+    fn unobserved_haiku_main_uses_generic_21260_beta() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "model": "claude-haiku-unobserved",
+            "stream": true,
+            "max_tokens": 32000,
+            "tools": [{"name": "Read"}],
+            "messages": [{"role": "user", "content": "请分析这个项目"}]
+        });
+
+        let headers = rewriter.rewrite_headers(
+            &std::collections::HashMap::new(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            "claude-haiku-unobserved",
+            &body,
+        );
+
+        assert_eq!(
+            headers.get("anthropic-beta").unwrap(),
+            OPUS_5_5_MESSAGE_BETA_TOKENS_2_1_280
+        );
+    }
+
+    #[test]
+    fn haiku_non_stream_aux_uses_21257_narrow_beta() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "model": "claude-haiku-4-5-20251001",
+            "stream": false,
+            "max_tokens": 1024,
+            "tools": [],
+            "thinking": {"type": "disabled"},
+            "system": [{"type": "text", "text": "auxiliary request"}],
+            "messages": [{"role": "user", "content": "auxiliary input"}]
+        });
+
+        let headers = rewriter.rewrite_headers(
+            &std::collections::HashMap::new(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-haiku-4-5-20251001",
+            &body,
+        );
+
+        assert_eq!(
+            headers.get("anthropic-beta").unwrap(),
+            HAIKU_NON_STREAM_AUX_BETA_TOKENS_2_1_257
+        );
+    }
+
+    #[test]
+    fn opus_claude_code_headers_preserve_context_1m_when_allowed() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let mut incoming = std::collections::HashMap::new();
+        incoming.insert("anthropic-beta".to_string(), CTX_1M.to_string());
+
+        let headers = rewriter.rewrite_headers(
+            &incoming,
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-opus-4-8[1m]",
+            &json!({}),
+        );
+        let beta = headers.get("anthropic-beta").unwrap();
+
+        assert!(beta.contains(CTX_1M));
+        assert!(beta.contains("claude-code-20250219"));
+        assert!(!beta.contains("server-side-fallback-2026-06-01"));
+    }
+
+    #[test]
+    fn claude_code_json_metadata_user_id_rewrites_account_and_keeps_session() {
+        let account = test_account();
+        let body = json!({
+            "metadata": {
+                "user_id": json!({
+                    "device_id": "client-device",
+                    "account_uuid": "client-account",
+                    "session_id": "session-keep"
+                }).to_string(),
+                "trace_id": "keep-me"
+            },
+            "messages": []
+        });
+
+        let parsed = rewrite_messages_body(body, ClientType::ClaudeCode);
+        let user_id = parsed["metadata"]["user_id"].as_str().unwrap();
+        let user_id_json: serde_json::Value = serde_json::from_str(user_id).unwrap();
+
+        assert_eq!(parsed["metadata"]["trace_id"], json!("keep-me"));
+        assert_eq!(user_id_json["device_id"], json!(account.device_id));
+        assert_eq!(
+            user_id_json["account_uuid"],
+            json!(account.account_uuid.clone().unwrap())
+        );
+        assert_eq!(user_id_json["session_id"], json!("session-keep"));
+        assert_eq!(
+            super::extract_session_id_from_body(&parsed).as_deref(),
+            Some("session-keep")
+        );
+    }
+
+    #[test]
+    fn claude_code_legacy_metadata_user_id_rewrites_account_and_keeps_session() {
+        let account = test_account();
+        let body = json!({
+            "metadata": {
+                "user_id": "user_client-device_account_client-account_session_session-keep"
+            },
+            "messages": []
+        });
+
+        let parsed = rewrite_messages_body(body, ClientType::ClaudeCode);
+        let user_id = parsed["metadata"]["user_id"].as_str().unwrap();
+
+        assert_eq!(
+            user_id,
+            format!(
+                "user_{}_account_{}_session_session-keep",
+                account.device_id,
+                account.account_uuid.clone().unwrap()
+            )
+        );
+        assert_eq!(
+            super::extract_session_id_from_body(&parsed).as_deref(),
+            Some("session-keep")
+        );
+    }
+
+    #[test]
+    fn upstream_session_override_rewrites_json_metadata_session() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "metadata": {
+                "user_id": json!({
+                    "device_id": "client-device",
+                    "account_uuid": "client-account",
+                    "session_id": "real-session"
+                }).to_string()
+            },
+            "messages": []
+        });
+
+        let (out, _completion) = rewriter.rewrite_body_with_stateful_completion(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+            &DisabledThinkingRewrite::off(),
+            &upstream_session_rewrite("real-session", "upstream-session"),
+            ClaudeCodeContextSanitizerConfig::off(),
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+
+        assert_eq!(
+            super::extract_session_id_from_body(&parsed).as_deref(),
+            Some("upstream-session")
+        );
+    }
+
+    #[test]
+    fn upstream_session_override_rewrites_legacy_metadata_session() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "metadata": {
+                "user_id": "user_client-device_account_client-account_session_real-session"
+            },
+            "messages": []
+        });
+
+        let (out, _completion) = rewriter.rewrite_body_with_stateful_completion(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+            &DisabledThinkingRewrite::off(),
+            &upstream_session_rewrite("real-session", "upstream-session"),
+            ClaudeCodeContextSanitizerConfig::off(),
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+
+        assert_eq!(
+            super::extract_session_id_from_body(&parsed).as_deref(),
+            Some("upstream-session")
+        );
+    }
+
+    #[test]
+    fn upstream_session_override_keeps_stateful_cache_key_on_real_session() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = stateful_session_body("real-session", 60);
+
+        let (out, completion) = rewriter.rewrite_body_with_stateful_completion(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Stateful,
+            true,
+            &DisabledThinkingRewrite::off(),
+            &upstream_session_rewrite("real-session", "upstream-session"),
+            ClaudeCodeContextSanitizerConfig::off(),
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+        let completion = completion.expect("stateful completion");
+
+        assert_eq!(
+            super::extract_session_id_from_body(&parsed).as_deref(),
+            Some("upstream-session")
+        );
+        assert_eq!(
+            completion.key,
+            format!("{}:{}:real-session", account.id, TEST_VERSION)
+        );
+    }
+
+    #[test]
+    fn event_logging_session_fields_use_read_only_upstream_mapping() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let mut session_map = HashMap::new();
+        session_map.insert("real-session".to_string(), "upstream-session".to_string());
+        let rewrite = UpstreamSessionRewrite {
+            message: None,
+            telemetry_session_map: session_map,
+        };
+        let body = json!({
+            "session_id": "real-session",
+            "metadata": {
+                "parentSessionId": "real-session"
+            },
+            "events": [{
+                "session_id": "real-session",
+                "event_data": {
+                    "parent_session_id": "real-session",
+                    "nested": { "sessionId": "real-session" }
+                }
+            }]
+        });
+
+        let (out, _completion) = rewriter.rewrite_body_with_stateful_completion(
+            &serde_json::to_vec(&body).unwrap(),
+            "/api/event_logging/v2/batch",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+            &DisabledThinkingRewrite::off(),
+            &rewrite,
+            ClaudeCodeContextSanitizerConfig::off(),
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+
+        assert_eq!(parsed["session_id"], json!("upstream-session"));
+        assert_eq!(
+            parsed["metadata"]["parentSessionId"],
+            json!("upstream-session")
+        );
+        assert_eq!(parsed["events"][0]["session_id"], json!("upstream-session"));
+        assert_eq!(
+            parsed["events"][0]["event_data"]["parent_session_id"],
+            json!("upstream-session")
+        );
+        assert_eq!(
+            parsed["events"][0]["event_data"]["nested"]["sessionId"],
+            json!("upstream-session")
+        );
+    }
+
+    #[test]
+    fn event_logging_session_fields_rewrite_without_events_array() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let mut session_map = HashMap::new();
+        session_map.insert("real-session".to_string(), "upstream-session".to_string());
+        let rewrite = UpstreamSessionRewrite {
+            message: None,
+            telemetry_session_map: session_map,
+        };
+        let body = json!({
+            "session_id": "real-session",
+            "metadata": {
+                "parentSessionId": "real-session"
+            }
+        });
+
+        let (out, _completion) = rewriter.rewrite_body_with_stateful_completion(
+            &serde_json::to_vec(&body).unwrap(),
+            "/api/event_logging/v2/batch",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+            &DisabledThinkingRewrite::off(),
+            &rewrite,
+            ClaudeCodeContextSanitizerConfig::off(),
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+
+        assert_eq!(parsed["session_id"], json!("upstream-session"));
+        assert_eq!(
+            parsed["metadata"]["parentSessionId"],
+            json!("upstream-session")
+        );
+    }
+
+    /// 验证普通 API 与原生 CC 在最终序列化后仍保留调用方的流式选择。
+    /// @return 无；任一版本把非流请求改为流式时测试失败。
+    #[test]
+    fn messages_rewrite_preserves_explicit_stream_preference() {
+        for version in ["2.1.260", "2.1.280", "2.1.293"] {
+            for client_type in [ClientType::API, ClientType::ClaudeCode] {
+                for stream in [false, true] {
+                    let body = json!({
+                        "model": "claude-sonnet-5",
+                        "max_tokens": 1024,
+                        "messages": [{"role": "user", "content": "合成流模式回归"}],
+                        "stream": stream
+                    });
+
+                    let output = rewrite_messages_body_for_profile(body, client_type, version);
+
+                    assert_eq!(
+                        output.get("stream"),
+                        Some(&json!(stream)),
+                        "版本={version} 客户端={client_type:?} stream={stream}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// 验证缺省流模式交由上游默认值决定，不因 API 画像改写而补入 true。
+    /// @return 无；任一版本额外生成 stream 字段时测试失败。
+    #[test]
+    fn messages_rewrite_preserves_missing_stream_preference() {
+        for version in ["2.1.260", "2.1.280", "2.1.293"] {
+            for client_type in [ClientType::API, ClientType::ClaudeCode] {
+                let body = json!({
+                    "model": "claude-sonnet-5",
+                    "max_tokens": 1024,
+                    "messages": [{"role": "user", "content": "合成缺省流模式回归"}]
+                });
+
+                let output = rewrite_messages_body_for_profile(body, client_type, version);
+
+                assert!(
+                    output.get("stream").is_none(),
+                    "版本={version} 客户端={client_type:?} 不应补入 stream"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn api_mode_overwrites_client_metadata_user_id_and_aligns_session_header() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "model": "claude-sonnet-4-6",
+            "metadata": {
+                "user_id": "client-supplied-user",
+                "trace_id": "keep-me"
+            },
+            "messages": [{
+                "role": "user",
+                "content": [{ "type": "text", "text": "stable api session" }]
+            }]
+        });
+
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+        let user_id = parsed["metadata"]["user_id"].as_str().unwrap();
+        let user_id_json: serde_json::Value = serde_json::from_str(user_id).unwrap();
+
+        assert_ne!(user_id, "client-supplied-user");
+        assert_eq!(parsed["metadata"]["trace_id"], json!("keep-me"));
+        assert_eq!(user_id_json["device_id"], json!(account.device_id));
+        assert_eq!(
+            user_id_json["account_uuid"],
+            json!(account.account_uuid.clone().unwrap())
+        );
+
+        let headers = rewriter.rewrite_headers(
+            &std::collections::HashMap::new(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            "claude-sonnet-4-6",
+            &parsed,
+        );
+        assert_eq!(
+            headers.get("X-Claude-Code-Session-Id").unwrap(),
+            user_id_json["session_id"].as_str().unwrap()
+        );
+    }
+
+    #[test]
+    fn client_type_uses_claude_code_ua_as_authoritative_signal() {
+        let valid_json_user_id = json!({
+            "device_id": "device-1",
+            "account_uuid": "550e8400-e29b-41d4-a716-446655440000",
+            "session_id": "123e4567-e89b-12d3-a456-426614174000"
+        })
+        .to_string();
+        let valid_legacy_user_id = "user_a1b2c3d4_account_550e8400-e29b-41d4-a716-446655440000_session_123e4567-e89b-12d3-a456-426614174000";
+
+        assert_eq!(
+            super::detect_client_type(
+                "claude-cli/2.1.156 (external, cli)",
+                "/v1/messages",
+                &json!({"metadata": {"user_id": valid_json_user_id}})
+            ),
+            ClientType::ClaudeCode
+        );
+        assert_eq!(
+            super::detect_client_type(
+                "Claude-Code/2.1.156",
+                "/v1/messages",
+                &json!({"metadata": {"user_id": valid_legacy_user_id}})
+            ),
+            ClientType::ClaudeCode
+        );
+        assert_eq!(
+            super::detect_client_type(
+                "curl/8.0",
+                "/v1/messages",
+                &json!({"metadata": {"user_id": valid_legacy_user_id}})
+            ),
+            ClientType::API
+        );
+        assert_eq!(
+            super::detect_client_type(
+                "claude-cli/2.1.156",
+                "/v1/messages",
+                &json!({"metadata": {"user_id": "session_abc"}})
+            ),
+            ClientType::ClaudeCode
+        );
+        assert_eq!(
+            super::detect_client_type(
+                "claude-cli/2.1.156",
+                "/v1/messages",
+                &json!({"messages": []})
+            ),
+            ClientType::ClaudeCode
+        );
+        assert_eq!(
+            super::detect_client_type(
+                "claude-cli/2.1.156",
+                "/api/event_logging/2024-06-01/events",
+                &json!({"events": []})
+            ),
+            ClientType::ClaudeCode
+        );
+    }
+
+    #[test]
+    fn metadata_user_id_diagnostic_treats_json_session_as_present() {
+        let user_id = json!({
+            "device_id": "device-1",
+            "account_uuid": "not-a-uuid",
+            "session_id": "123e4567-e89b-12d3-a456-426614174000"
+        })
+        .to_string();
+
+        let diag = super::claude_code_metadata_user_id_diagnostic(
+            &json!({"metadata": {"user_id": user_id}}),
+        );
+        let summary = diag.human_summary();
+
+        assert!(summary.starts_with("present("), "{summary}");
+        assert!(summary.contains("reason=json_session_present"), "{summary}");
+        assert!(
+            summary.contains("json_fields=device:Y/account:Y/session:Y"),
+            "{summary}"
+        );
+        assert!(summary.contains("uuid=account:N/session:Y"), "{summary}");
+    }
+
+    #[test]
+    fn api_mode_cch_is_computed_from_final_body_without_internal_session_marker() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "model": "claude-sonnet-4-6",
+            "system": "Act as tester.",
+            "messages": [{
+                "role": "user",
+                "content": [{ "type": "text", "text": "hello cch" }]
+            }]
+        });
+
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Auto,
+            true,
+        );
+        let text = String::from_utf8(out.clone()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+
+        assert!(!text.contains("_session_id"));
+        assert!(!text.contains("cch=00000"));
+        assert!(
+            parsed["metadata"]["user_id"]
+                .as_str()
+                .unwrap()
+                .contains("session_id")
+        );
+        assert!(!message_cache_control_positions(&parsed).is_empty());
+
+        let actual = super::CCH_VALUE_REGEX
+            .find(&text)
+            .map(|m| m.as_str().to_string())
+            .expect("cch value exists");
+        let mut placeholder_body = out;
+        let cch_pos = placeholder_body
+            .windows(super::CCH_PLACEHOLDER.len())
+            .position(|window| window.starts_with(b"cch="))
+            .expect("cch value position");
+        placeholder_body[cch_pos + 4..cch_pos + 9].copy_from_slice(b"00000");
+        let expected =
+            String::from_utf8(compute_cch_attestation(placeholder_body, TEST_VERSION)).unwrap();
+
+        assert!(expected.contains(&actual));
+    }
+
+    #[test]
+    fn api_message_body_order_aligns_opus_main_profile_and_keeps_unknown_tail() {
+        let body = json!({
+            "unknown_a": 1,
+            "stream": true,
+            "diagnostics": {"enabled": true},
+            "output_config": {"type": "json"},
+            "context_management": {"enabled": true},
+            "thinking": {"type": "adaptive"},
+            "max_tokens": 64000,
+            "metadata": {
+                "user_id": json!({
+                    "device_id": "client-device",
+                    "account_uuid": "client-account",
+                    "session_id": "session-order"
+                }).to_string()
+            },
+            "tools": [{"name": "Read"}],
+            "system": [{"type": "text", "text": "Platform: linux\nShell: bash\nOS Version: Linux\nWorking directory: /home/user/project"}],
+            "messages": [{"role": "user", "content": [{"type": "text", "text": "hello"}]}],
+            "model": "claude-opus-4-8",
+            "unknown_b": 2
+        });
+
+        let out = rewrite_messages_body_bytes(body, ClientType::API, true);
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+
+        assert_eq!(
+            top_level_keys(&out),
+            vec![
+                "model",
+                "messages",
+                "system",
+                "tools",
+                "metadata",
+                "max_tokens",
+                "thinking",
+                "context_management",
+                "output_config",
+                "diagnostics",
+                "stream",
+                "unknown_a",
+                "unknown_b",
+            ]
+        );
+        assert_eq!(parsed["unknown_a"], json!(1));
+        assert_eq!(parsed["unknown_b"], json!(2));
+    }
+
+    #[test]
+    fn api_message_body_order_uses_21220_fable_fallback_position() {
+        let body = json!({
+            "stream": true,
+            "diagnostics": {"enabled": true},
+            "output_config": {"type": "json"},
+            "context_management": {"enabled": true},
+            "thinking": {"type": "adaptive"},
+            "messages": [{"role": "user", "content": "hello"}],
+            "model": "claude-fable-5"
+        });
+
+        let out = rewrite_messages_body_bytes_for_profile(body, ClientType::API, "2.1.257");
+
+        assert_eq!(
+            top_level_keys(&out),
+            vec![
+                "model",
+                "messages",
+                "system",
+                "tools",
+                "metadata",
+                "max_tokens",
+                "thinking",
+                "context_management",
+                "fallbacks",
+                "output_config",
+                "diagnostics",
+                "stream",
+            ]
+        );
+    }
+
+    #[test]
+    fn api_message_body_order_keeps_2197_fable_legacy_position() {
+        let account = test_account_with_profile("2.1.197");
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "stream": true,
+            "output_config": {"type": "json"},
+            "context_management": {"enabled": true},
+            "thinking": {"type": "adaptive"},
+            "messages": [{"role": "user", "content": "hello"}],
+            "model": "claude-fable-5"
+        });
+
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+        );
+
+        assert_eq!(
+            top_level_keys(&out),
+            vec![
+                "model",
+                "messages",
+                "system",
+                "tools",
+                "metadata",
+                "max_tokens",
+                "thinking",
+                "context_management",
+                "output_config",
+                "stream",
+                "fallbacks",
+            ]
+        );
+    }
+
+    #[test]
+    fn api_message_body_order_aligns_haiku_probe_profile() {
+        let body = json!({
+            "metadata": {
+                "user_id": json!({
+                    "device_id": "client-device",
+                    "account_uuid": "client-account",
+                    "session_id": "session-probe"
+                }).to_string()
+            },
+            "messages": [{"role": "user", "content": [{"type": "text", "text": "probe"}]}],
+            "max_tokens": 1,
+            "model": "claude-haiku-4-5-20251001"
+        });
+
+        let out = rewrite_messages_body_bytes(body, ClientType::API, true);
+
+        assert_eq!(
+            top_level_keys(&out),
+            vec![
+                "model",
+                "messages",
+                "system",
+                "tools",
+                "metadata",
+                "max_tokens"
+            ]
+        );
+    }
+
+    #[test]
+    fn api_message_body_order_aligns_generated_haiku_title_profile() {
+        let body = json!({
+            "stream": true,
+            "output_config": {"type": "text"},
+            "temperature": 0.5,
+            "thinking": {"type": "disabled"},
+            "max_tokens": 32000,
+            "metadata": {
+                "user_id": json!({
+                    "device_id": "client-device",
+                    "account_uuid": "client-account",
+                    "session_id": "session-title"
+                }).to_string()
+            },
+            "tools": [],
+            "system": [{"type": "text", "text": "Generate a concise title"}],
+            "messages": [{"role": "user", "content": [{"type": "text", "text": "title"}]}],
+            "model": "claude-haiku-4-5-20251001"
+        });
+
+        let out = rewrite_messages_body_bytes(body, ClientType::API, true);
+
+        assert_eq!(
+            top_level_keys(&out),
+            vec![
+                "model",
+                "messages",
+                "system",
+                "tools",
+                "metadata",
+                "max_tokens",
+                "thinking",
+                "output_config",
+                "stream",
+            ]
+        );
+    }
+
+    #[test]
+    fn api_message_body_order_switch_off_keeps_existing_top_level_order() {
+        let body = json!({
+            "metadata": {
+                "user_id": json!({
+                    "device_id": "client-device",
+                    "account_uuid": "client-account",
+                    "session_id": "session-off"
+                }).to_string()
+            },
+            "stream": true,
+            "messages": [{"role": "user", "content": [{"type": "text", "text": "hello"}]}],
+            "max_tokens": 64000,
+            "model": "claude-opus-4-8",
+            "system": [{"type": "text", "text": "Platform: linux\nShell: bash\nOS Version: Linux\nWorking directory: /home/user/project"}]
+        });
+
+        let out = rewrite_messages_body_bytes(body, ClientType::API, false);
+
+        assert_eq!(
+            top_level_keys(&out),
+            vec![
+                "metadata",
+                "stream",
+                "output_config",
+                "max_tokens",
+                "model",
+                "system",
+                "tools",
+                "thinking",
+                "messages",
+            ]
+        );
+    }
+
+    #[test]
+    fn claude_code_message_body_order_keeps_original_top_level_order_when_switch_on() {
+        let body = json!({
+            "metadata": {
+                "user_id": json!({
+                    "device_id": "client-device",
+                    "account_uuid": "client-account",
+                    "session_id": "session-cc-order"
+                }).to_string()
+            },
+            "stream": true,
+            "messages": [{"role": "user", "content": [{"type": "text", "text": "hello"}]}],
+            "max_tokens": 64000,
+            "model": "claude-opus-4-8",
+            "system": [{"type": "text", "text": "Platform: linux\nShell: bash\nOS Version: Linux\nWorking directory: /home/user/project"}]
+        });
+
+        let out = rewrite_messages_body_bytes(body, ClientType::ClaudeCode, true);
+
+        assert_eq!(
+            top_level_keys(&out),
+            vec![
+                "metadata",
+                "stream",
+                "messages",
+                "max_tokens",
+                "model",
+                "system",
+            ]
+        );
+    }
+
+    #[test]
+    fn api_message_body_order_happens_before_cch_attestation() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "stream": true,
+            "messages": [{"role": "user", "content": [{"type": "text", "text": "hello cch order"}]}],
+            "max_tokens": 64000,
+            "metadata": {
+                "user_id": json!({
+                    "device_id": "client-device",
+                    "account_uuid": "client-account",
+                    "session_id": "session-cch-order"
+                }).to_string()
+            },
+            "model": "claude-opus-4-8"
+        });
+
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+        );
+        let text = String::from_utf8(out.clone()).unwrap();
+        let actual = super::CCH_VALUE_REGEX
+            .find(&text)
+            .map(|m| m.as_str().to_string())
+            .expect("cch value exists");
+        let mut placeholder_body = out.clone();
+        let cch_pos = placeholder_body
+            .windows(super::CCH_PLACEHOLDER.len())
+            .position(|window| window.starts_with(b"cch="))
+            .expect("cch value position");
+        placeholder_body[cch_pos + 4..cch_pos + 9].copy_from_slice(b"00000");
+        let expected =
+            String::from_utf8(compute_cch_attestation(placeholder_body, TEST_VERSION)).unwrap();
+
+        assert_eq!(
+            top_level_keys(&out),
+            vec![
+                "model",
+                "messages",
+                "system",
+                "tools",
+                "metadata",
+                "max_tokens",
+                "thinking",
+                "output_config",
+                "stream",
+            ]
+        );
+        assert!(expected.contains(&actual));
+    }
+
+    #[test]
+    fn message_beta_tokens_include_cache_features_without_forcing_1m() {
+        let account = Account {
+            allow_1m_models: String::new(),
+            ..test_account()
+        };
+        let rewriter = Rewriter::new();
+        let mut incoming = std::collections::HashMap::new();
+        incoming.insert(
+            "anthropic-beta".to_string(),
+            "context-1m-2025-08-07,extended-cache-ttl-2025-04-11".to_string(),
+        );
+
+        let headers = rewriter.rewrite_headers(
+            &incoming,
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            "claude-sonnet-4-6",
+            &json!({}),
+        );
+        let beta = headers.get("anthropic-beta").unwrap();
+
+        assert!(beta.contains("extended-cache-ttl-2025-04-11"));
+        assert!(beta.contains("cache-diagnosis-2026-04-07"));
+        assert!(!beta.contains("context-1m-2025-08-07"));
+    }
+
+    #[test]
+    fn claude_code_rewrite_skips_cached_system_blocks() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "system": [
+                {
+                    "type": "text",
+                    "text": "x-anthropic-billing-header: cc_version=2.1.156.abc; cc_entrypoint=cli; cch=12345;\nPlatform: darwin\nWorking directory: /Users/real/project\n<system-reminder>Git user: real</system-reminder>",
+                    "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                },
+                {
+                    "type": "text",
+                    "text": "Platform: darwin\nWorking directory: /Users/real/project"
+                }
+            ],
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "<system-reminder>Git user: real\nWorking directory: /Users/real/project</system-reminder>",
+                        "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                    },
+                    {
+                        "type": "text",
+                        "text": "<system-reminder>Git user: real\nWorking directory: /Users/real/project</system-reminder>"
+                    }
+                ]
+            }]
+        });
+
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+
+        assert_eq!(
+            parsed["system"][0]["text"],
+            "x-anthropic-billing-header: cc_version=2.1.156.abc; cc_entrypoint=cli; cch=12345;\nPlatform: darwin\nWorking directory: /Users/real/project\n<system-reminder>Git user: real</system-reminder>"
+        );
+        assert_eq!(
+            parsed["system"][1]["text"],
+            "Platform: linux\nWorking directory: /home/user/project"
+        );
+        assert_eq!(
+            parsed["messages"][0]["content"][0]["text"],
+            "<system-reminder>Git user: real\nWorking directory: /Users/real/project</system-reminder>"
+        );
+        assert_eq!(
+            parsed["messages"][0]["content"][1]["text"],
+            "<system-reminder>Git user: real\nWorking directory: /home/user/project</system-reminder>"
+        );
+    }
+
+    #[test]
+    fn title_fallback_beta_matches_capture_variants_in_both_client_modes() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/claude-code-2.1.260-header-compat.json"
+        ))
+        .unwrap();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 32000,
+            "stream": true,
+            "tools": [],
+            "thinking": {"type": "disabled"},
+            "output_config": {"format": {
+                "type": "json_schema",
+                "schema": {
+                    "type": "object",
+                    "properties": {"title": {"type": "string"}},
+                    "required": ["title"],
+                    "additionalProperties": false
+                }
+            }},
+            "messages": [{"role": "user", "content": "合成标题样本"}]
+        });
+        for version in ["2.1.257", "2.1.260"] {
+            let mut account = test_account_with_profile(version);
+            account.allow_fast_mode = true;
+            account.allow_1m_models = "*".to_string();
+            for case in fixture["title_variants"].as_array().unwrap() {
+                let optional = case["optional_beta"].as_str().unwrap();
+                let reversed = optional.split(',').rev().collect::<Vec<_>>().join(", ");
+                // 刻意混入重复、乱序、相似未知 token 及已放行的能力，验证标题窄画像边界。
+                let incoming = HashMap::from([(
+                    "AnThRoPiC-BeTa".to_string(),
+                    format!(
+                        "{reversed}, {optional},claude-code-20250219,{FAST_MODE},{CTX_1M},server-side-fallback-2026-06-01,fallback-credit-2026-06-01-extra,client-extra"
+                    ),
+                )]);
+                for client_type in [ClientType::ClaudeCode, ClientType::API] {
+                    let headers = rewriter.rewrite_headers(
+                        &incoming,
+                        "/v1/messages",
+                        &account,
+                        client_type,
+                        "claude-haiku-4-5-20251001",
+                        &body,
+                    );
+                    assert_eq!(
+                        headers.get("anthropic-beta").map(String::as_str),
+                        case["expected_beta"].as_str(),
+                        "{version} {client_type:?} {optional}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn title_fallback_fix_keeps_probe_and_rollback_profiles_narrow() {
+        let rewriter = Rewriter::new();
+        let incoming = HashMap::from([(
+            "anthropic-beta".to_string(),
+            "server-side-fallback-2026-07-01,fallback-credit-2026-06-01".to_string(),
+        )]);
+        for version in [
+            "2.1.173", "2.1.185", "2.1.187", "2.1.195", "2.1.197", "2.1.220", "2.1.257", "2.1.260",
+        ] {
+            let account = test_account_with_profile(version);
+            for client_type in [ClientType::ClaudeCode, ClientType::API] {
+                let probe = rewriter.rewrite_headers(
+                    &incoming,
+                    "/v1/messages",
+                    &account,
+                    client_type,
+                    "claude-haiku-4-5-20251001",
+                    &json!({"max_tokens": 1, "messages": [{"role": "user", "content": "合成探针"}]}),
+                );
+                assert_eq!(probe["anthropic-beta"], HAIKU_PROBE_BETA_TOKENS);
+                if !matches!(version, "2.1.257" | "2.1.260") {
+                    let title = rewriter.rewrite_headers(
+                        &incoming,
+                        "/v1/messages",
+                        &account,
+                        client_type,
+                        "claude-haiku-4-5-20251001",
+                        &json!({
+                            "max_tokens": 32000,
+                            "system": "Generate a concise, sentence-case title (3-7 words)",
+                            "messages": [{"role": "user", "content": "合成标题样本"}]
+                        }),
+                    );
+                    assert_eq!(title["anthropic-beta"], HAIKU_STREAMING_TITLE_BETA_TOKENS);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn auxiliary_endpoint_ua_and_beta_match_capture_in_both_client_modes() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/claude-code-2.1.260-header-compat.json"
+        ))
+        .unwrap();
+        let rewriter = Rewriter::new();
+        let incoming = HashMap::from([
+            ("User-Agent".to_string(), "claude-cli/2.1.173".to_string()),
+            (
+                "AnThRoPiC-BeTa".to_string(),
+                format!("{MESSAGE_BETA_TOKENS},client-extra"),
+            ),
+        ]);
+        for version in ["2.1.257", "2.1.260"] {
+            let account = test_account_with_profile(version);
+            for case in fixture["endpoints"].as_array().unwrap() {
+                let path = case["path"].as_str().unwrap();
+                for client_type in [ClientType::ClaudeCode, ClientType::API] {
+                    let headers = rewriter.rewrite_headers(
+                        &incoming,
+                        path,
+                        &account,
+                        client_type,
+                        "",
+                        &json!({}),
+                    );
+                    assert_eq!(
+                        headers["User-Agent"],
+                        case["user_agent"]
+                            .as_str()
+                            .unwrap()
+                            .replace("{version}", version),
+                        "{path} {version} {client_type:?}"
+                    );
+                    assert_eq!(
+                        headers.get("anthropic-beta").map(String::as_str),
+                        case["beta"].as_str(),
+                        "{path} {version} {client_type:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn auxiliary_endpoint_fix_preserves_unknown_paths_and_rollback() {
+        let rewriter = Rewriter::new();
+        let account = test_account();
+        for path in [
+            "/v1/code/sessions-extra",
+            "/v1/code/sessions/synthetic/worker/new-feature",
+            "/v1/code/sessions/synthetic/client/presence-extra",
+            "/v1/code/sessions//worker",
+            "/v1/sessions/",
+            "/v1/sessions/synthetic/",
+            "/v1/sessions/synthetic/new-feature",
+            "/v1/sessions/synthetic/archive/extra",
+            "/api/claude_code/notification/preferences-extra",
+            "/v1/ultrareview/quota-extra",
+        ] {
+            let headers = rewriter.rewrite_headers(
+                &HashMap::new(),
+                path,
+                &account,
+                ClientType::API,
+                "",
+                &json!({}),
+            );
+            assert_eq!(headers["User-Agent"], claude_cli_user_agent(TEST_VERSION));
+            assert_eq!(
+                headers["anthropic-beta"], OPUS_5_5_MESSAGE_BETA_TOKENS_2_1_280,
+                "{path}"
+            );
+        }
+        for version in [
+            "2.1.173", "2.1.185", "2.1.187", "2.1.195", "2.1.197", "2.1.220",
+        ] {
+            let account = test_account_with_profile(version);
+            let headers = rewriter.rewrite_headers(
+                &HashMap::new(),
+                "/v1/sessions/synthetic",
+                &account,
+                ClientType::API,
+                "",
+                &json!({}),
+            );
+            assert_eq!(headers["User-Agent"], claude_cli_user_agent(version));
+            assert_eq!(
+                headers["anthropic-beta"],
+                profile_for_key(version)
+                    .unwrap()
+                    .request
+                    .message_beta_tokens
+            );
+        }
+    }
+
+    #[test]
+    fn endpoint_headers_use_distinct_profiles() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let empty = std::collections::HashMap::new();
+        let body = json!({});
+
+        let event_headers = rewriter.rewrite_headers(
+            &empty,
+            "/api/event_logging/v2/batch",
+            &account,
+            ClientType::API,
+            "",
+            &body,
+        );
+        assert_eq!(
+            event_headers.get("User-Agent").unwrap(),
+            claude_code_user_agent(TEST_VERSION).as_str()
+        );
+        assert_eq!(event_headers.get("x-service-name").unwrap(), "claude-code");
+        assert_eq!(
+            event_headers.get("anthropic-beta").unwrap(),
+            "oauth-2025-04-20"
+        );
+
+        let legacy_event_headers = rewriter.rewrite_headers(
+            &empty,
+            "/api/event_logging/batch",
+            &account,
+            ClientType::API,
+            "",
+            &body,
+        );
+        assert_eq!(
+            legacy_event_headers.get("anthropic-beta").unwrap(),
+            "oauth-2025-04-20"
+        );
+
+        let eval_headers = rewriter.rewrite_headers(
+            &empty,
+            "/api/eval/sdk-zAZezfDKGoZuXXKe",
+            &account,
+            ClientType::API,
+            "",
+            &body,
+        );
+        assert_eq!(eval_headers.get("User-Agent").unwrap(), "Bun/1.4.3");
+
+        let trigger_headers = rewriter.rewrite_headers(
+            &empty,
+            "/v1/code/triggers",
+            &account,
+            ClientType::API,
+            "",
+            &body,
+        );
+        assert_eq!(
+            trigger_headers.get("anthropic-beta").unwrap(),
+            "ccr-triggers-2026-01-30"
+        );
+        assert_eq!(
+            trigger_headers.get("anthropic-client-platform").unwrap(),
+            "claude_code_cli"
+        );
+        assert_eq!(
+            trigger_headers.get("x-organization-uuid").unwrap(),
+            "org-uuid"
+        );
+
+        let mcp_headers = rewriter.rewrite_headers(
+            &empty,
+            "/v1/mcp_servers",
+            &account,
+            ClientType::API,
+            "",
+            &body,
+        );
+        assert_eq!(
+            mcp_headers.get("anthropic-beta").unwrap(),
+            "mcp-servers-2025-12-04"
+        );
+        assert_eq!(mcp_headers.get("User-Agent").unwrap(), "axios/1.15.2");
+        assert_eq!(
+            mcp_headers
+                .get("anthropic-mcp-client-capabilities")
+                .unwrap(),
+            profile_for_key("2.1.280")
+                .unwrap()
+                .endpoints
+                .mcp_client_capabilities()
+        );
+        assert_eq!(
+            mcp_headers.get("mcp-protocol-version").unwrap(),
+            MCP_PROTOCOL_VERSION
+        );
+
+        let mut incoming_mcp_headers = std::collections::HashMap::new();
+        incoming_mcp_headers.insert("User-Agent".to_string(), "claude-cli/2.1.172".to_string());
+        incoming_mcp_headers.insert("anthropic-beta".to_string(), "client-token".to_string());
+        let cc_mcp_headers = rewriter.rewrite_headers(
+            &incoming_mcp_headers,
+            "/v1/mcp_servers",
+            &account,
+            ClientType::ClaudeCode,
+            "",
+            &body,
+        );
+        assert_eq!(
+            cc_mcp_headers
+                .get("anthropic-mcp-client-capabilities")
+                .unwrap(),
+            profile_for_key("2.1.280")
+                .unwrap()
+                .endpoints
+                .mcp_client_capabilities()
+        );
+        assert_eq!(
+            cc_mcp_headers.get("mcp-protocol-version").unwrap(),
+            MCP_PROTOCOL_VERSION
+        );
+
+        let registry_headers = rewriter.rewrite_headers(
+            &empty,
+            "/mcp-registry/v0/servers",
+            &account,
+            ClientType::API,
+            "",
+            &body,
+        );
+        assert!(registry_headers.get("anthropic-beta").is_none());
+
+        let oauth_headers = rewriter.rewrite_headers(
+            &empty,
+            "/api/oauth/account/settings",
+            &account,
+            ClientType::API,
+            "",
+            &body,
+        );
+        assert_eq!(
+            oauth_headers.get("anthropic-beta").unwrap(),
+            "oauth-2025-04-20"
+        );
+        assert_eq!(
+            oauth_headers.get("User-Agent").unwrap(),
+            claude_cli_user_agent(TEST_VERSION).as_str()
+        );
+
+        let penguin_headers = rewriter.rewrite_headers(
+            &empty,
+            "/api/claude_code_penguin_mode",
+            &account,
+            ClientType::API,
+            "",
+            &body,
+        );
+        assert_eq!(
+            penguin_headers.get("anthropic-beta").unwrap(),
+            "oauth-2025-04-20"
+        );
+        assert_eq!(penguin_headers.get("User-Agent").unwrap(), "axios/1.15.2");
+    }
+
+    #[test]
+    fn endpoint_wire_order_matches_current_capture() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let empty = std::collections::HashMap::new();
+        let body = json!({
+            "metadata": {
+                "user_id": json!({
+                    "device_id": "device-1",
+                    "account_uuid": "account-uuid",
+                    "session_id": "session-1"
+                }).to_string()
+            }
+        });
+
+        let mut message_headers = rewriter.rewrite_headers(
+            &empty,
+            "/v1/messages",
+            &account,
+            ClientType::API,
+            "claude-opus-4-8",
+            &body,
+        );
+        message_headers.insert("Authorization".into(), "Bearer redacted".into());
+        assert_eq!(
+            ordered_header_names("/v1/messages", &message_headers),
+            vec![
+                "Accept",
+                "Authorization",
+                "Content-Type",
+                "User-Agent",
+                "X-Claude-Code-Session-Id",
+                "X-Stainless-Arch",
+                "X-Stainless-Lang",
+                "X-Stainless-OS",
+                "X-Stainless-Package-Version",
+                "X-Stainless-Retry-Count",
+                "X-Stainless-Runtime",
+                "X-Stainless-Runtime-Version",
+                "X-Stainless-Timeout",
+                "anthropic-beta",
+                "anthropic-dangerous-direct-browser-access",
+                "anthropic-version",
+                "x-app",
+                "x-client-request-id",
+                "Connection",
+                "Host",
+                "Accept-Encoding",
+            ]
+        );
+
+        let mut event_headers = rewriter.rewrite_headers(
+            &empty,
+            "/api/event_logging/v2/batch",
+            &account,
+            ClientType::API,
+            "",
+            &json!({}),
+        );
+        event_headers.insert("Authorization".into(), "Bearer redacted".into());
+        assert_eq!(
+            ordered_header_names("/api/event_logging/v2/batch", &event_headers),
+            vec![
+                "Accept",
+                "Accept-Encoding",
+                "Authorization",
+                "Content-Type",
+                "User-Agent",
+                "anthropic-beta",
+                "x-service-name",
+                "Connection",
+                "Host",
+            ]
+        );
+
+        let mut eval_headers = rewriter.rewrite_headers(
+            &empty,
+            "/api/eval/sdk-zAZezfDKGoZuXXKe",
+            &account,
+            ClientType::API,
+            "",
+            &json!({}),
+        );
+        eval_headers.insert("Authorization".into(), "Bearer redacted".into());
+        assert_eq!(
+            ordered_header_names("/api/eval/sdk-zAZezfDKGoZuXXKe", &eval_headers),
+            vec![
+                "Authorization",
+                "Content-Type",
+                "anthropic-beta",
+                "Connection",
+                "User-Agent",
+                "Accept",
+                "Host",
+                "Accept-Encoding",
+            ]
+        );
+
+        let mut trigger_headers = rewriter.rewrite_headers(
+            &empty,
+            "/v1/code/triggers",
+            &account,
+            ClientType::API,
+            "",
+            &json!({}),
+        );
+        trigger_headers.insert("Authorization".into(), "Bearer redacted".into());
+        assert_eq!(
+            ordered_header_names("/v1/code/triggers", &trigger_headers),
+            vec![
+                "Accept",
+                "Accept-Encoding",
+                "Authorization",
+                "Content-Type",
+                "User-Agent",
+                "anthropic-beta",
+                "anthropic-client-platform",
+                "anthropic-version",
+                "x-organization-uuid",
+                "Connection",
+                "Host",
+            ]
+        );
+
+        let mut mcp_headers = rewriter.rewrite_headers(
+            &empty,
+            "/v1/mcp_servers",
+            &account,
+            ClientType::API,
+            "",
+            &json!({}),
+        );
+        mcp_headers.insert("Authorization".into(), "Bearer redacted".into());
+        assert_eq!(
+            ordered_header_names("/v1/mcp_servers", &mcp_headers),
+            vec![
+                "Accept",
+                "Accept-Encoding",
+                "Authorization",
+                "Content-Type",
+                "User-Agent",
+                "anthropic-beta",
+                "anthropic-mcp-client-capabilities",
+                "anthropic-version",
+                "mcp-protocol-version",
+                "Connection",
+                "Host",
+            ]
+        );
+    }
+
+    #[test]
+    fn get_profile_omits_content_type_when_capture_has_none() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let empty = std::collections::HashMap::new();
+        let body = json!({});
+
+        for path in [
+            "/api/oauth/account/settings",
+            "/api/claude_code_grove",
+            "/api/claude_code_penguin_mode",
+            "/mcp-registry/v0/servers",
+        ] {
+            let headers =
+                rewriter.rewrite_headers(&empty, path, &account, ClientType::API, "", &body);
+            assert!(
+                !headers.contains_key("content-type"),
+                "{} should not include content-type",
+                path
+            );
+        }
+    }
+
+    fn ordered_header_names(
+        path: &str,
+        headers: &std::collections::HashMap<String, String>,
+    ) -> Vec<String> {
+        ordered_anthropic_headers(path, headers)
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect()
+    }
+
+    #[test]
+    fn growthbook_rewrite_adds_current_attributes() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "attributes": {
+                "apiBaseUrlHost": "proxy.local",
+                "platform": "darwin",
+                "appVersion": "old"
+            }
+        });
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/api/eval/sdk-zAZezfDKGoZuXXKe",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+        let attrs = parsed.get("attributes").unwrap();
+        assert_eq!(attrs.get("id").unwrap(), "device-1");
+        assert!(attrs.get("email").is_none());
+        assert_eq!(attrs.get("userType").unwrap(), "external");
+        assert_eq!(
+            attrs.get("rateLimitTier").unwrap(),
+            "default_claude_max_20x"
+        );
+        assert_eq!(attrs.get("entrypoint").unwrap(), "cli");
+        assert_eq!(attrs.get("appVersion").unwrap(), TEST_VERSION);
+        assert!(parsed.get("forcedVariations").unwrap().is_object());
+        assert!(parsed.get("forcedFeatures").unwrap().is_array());
+        assert_eq!(parsed.get("url").unwrap(), "");
+        assert!(attrs.get("apiBaseUrlHost").is_none());
+    }
+
+    #[test]
+    fn growthbook_rewrite_uses_2173_payload_shape() {
+        let account = test_account_with_profile("2.1.173");
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "attributes": {
+                "email": "old@example.com",
+                "apiBaseUrlHost": "proxy.local"
+            },
+            "forcedVariations": {},
+            "forcedFeatures": [],
+            "url": "",
+        });
+
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/api/eval/sdk-zAZezfDKGoZuXXKe",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+        let attrs = parsed.get("attributes").unwrap();
+
+        assert_eq!(attrs.get("email").unwrap(), "user@example.com");
+        assert_eq!(attrs.get("appVersion").unwrap(), "2.1.173");
+        assert!(parsed.get("forcedVariations").is_none());
+        assert!(parsed.get("forcedFeatures").unwrap().is_object());
+        assert!(parsed.get("url").is_none());
+    }
+
+    #[test]
+    fn event_logging_v2_path_is_rewritten() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let process = {
+            let process = json!({
+                "uptime": 12.0,
+                "rss": 999,
+                "heapTotal": 999,
+                "heapUsed": 999,
+                "external": 999,
+                "arrayBuffers": 999,
+                "constrainedMemory": 999,
+            });
+            base64::engine::general_purpose::STANDARD.encode(serde_json::to_vec(&process).unwrap())
+        };
+        let body = json!({
+            "events": [{
+                "event_type": "ClaudeCodeInternalEvent",
+                "event_data": {
+                    "device_id": "old",
+                    "email": "old@example.com",
+                    "account_uuid": "old-account",
+                    "organization_uuid": "old-org",
+                    "env": {},
+                    "process": process,
+                    "additional_metadata": "",
+                    "user_attributes": "{\"id\":\"old\",\"apiBaseUrlHost\":\"proxy.local\"}"
+                }
+            }]
+        });
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/api/event_logging/v2/batch",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+        let event = &parsed["events"][0]["event_data"];
+        assert_eq!(event["device_id"], "device-1");
+        assert!(event.get("email").is_none());
+        assert_eq!(event["account_uuid"], "account-uuid");
+        assert_eq!(event["organization_uuid"], "org-uuid");
+        let attrs: serde_json::Value =
+            serde_json::from_str(event["user_attributes"].as_str().unwrap()).unwrap();
+        assert!(attrs.get("email").is_none());
+        assert_eq!(attrs["userType"], "external");
+        assert!(attrs.get("apiBaseUrlHost").is_none());
+
+        let rewritten_process_b64 = event["process"].as_str().unwrap();
+        let rewritten_process_bytes = base64::engine::general_purpose::STANDARD
+            .decode(rewritten_process_b64)
+            .unwrap();
+        let rewritten_process: serde_json::Value =
+            serde_json::from_slice(&rewritten_process_bytes).unwrap();
+        assert_eq!(rewritten_process["uptime"], 12.0);
+        assert!(
+            rewritten_process["heapUsed"].as_i64().unwrap()
+                <= rewritten_process["heapTotal"].as_i64().unwrap()
+        );
+        assert_eq!(rewritten_process["constrainedMemory"], 0);
+    }
+
+    #[test]
+    fn observed_cli_process_removes_client_heap_and_internal_metadata() {
+        let mut account = test_account();
+        account.canonical_process = json!({"constrained_memory": 1610612736_i64, "observation": {
+            "source": "v3:procfs:cli", "environment_id": "a".repeat(32), "cli_version": "2.1.293",
+            "observed_at": 100.0, "sampled_at": null, "sample_count": 0,
+            "rss_bytes": null, "rss_min_bytes": null, "rss_max_bytes": null
+        }});
+        let profile = device_profile(&account);
+        let original = json!({"uptime": 12.0, "rss": 999, "heapTotal": 999, "cpuPercent": 12});
+        let encoded = base64::engine::general_purpose::STANDARD
+            .encode(serde_json::to_vec(&original).unwrap());
+        for value in [original, json!(encoded)] {
+            let rewritten = super::rewrite_process(&value, &profile);
+            let decoded = if let Some(encoded) = rewritten.as_str() {
+                serde_json::from_slice(
+                    &base64::engine::general_purpose::STANDARD
+                        .decode(encoded)
+                        .unwrap(),
+                )
+                .unwrap()
+            } else {
+                rewritten
+            };
+            assert_eq!(decoded, json!({"constrainedMemory": 1610612736_i64}));
+        }
+    }
+
+    #[test]
+    fn event_logging_2187_env_preserves_bun_and_shell_profile() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "events": [{
+                "event_type": "ClaudeCodeInternalEvent",
+                "event_data": {
+                    "env": {
+                        "is_running_with_bun": true,
+                        "shell": "bash"
+                    }
+                }
+            }]
+        });
+
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/api/event_logging/v2/batch",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+        let env = &parsed["events"][0]["event_data"]["env"];
+
+        assert_eq!(env["version"], TEST_VERSION);
+        assert_eq!(env["shell"], "bash");
+        assert_eq!(env["is_running_with_bun"], true);
+    }
+
+    #[test]
+    fn cc_version_suffix_uses_string_indices() {
+        assert_eq!(
+            compute_cc_version_suffix("abcdefghijklmno pqrstuvwxyz", "2.1.156"),
+            "c09"
+        );
+        assert_eq!(
+            compute_cc_version_suffix("abcd你fghijklmnopqrstuv", "2.1.156"),
+            "45e"
+        );
+    }
+
+    #[test]
+    fn cc_version_suffix_matches_node_utf16_boundaries() {
+        // 独立 Node.js 参考值覆盖抽样后才组成代理对的情况，避免逐码元替换丢失字符。
+        for (case, text, expected) in [
+            ("空文本", "", "49b"),
+            ("短文本补零", "abcde", "f4b"),
+            ("ASCII", "abcdefghijklmnopqrstuvwxyz", "2e9"),
+            (
+                "普通中文",
+                "这是一个用于验证中文指纹计算的测试消息，请保持一致。",
+                "c7e",
+            ),
+            ("emoji 下标偏移", "😀abcdefghijklmnopqrstuvwxyz", "c16"),
+            ("孤立高代理项", "abcd😀fghijklmnopqrstuvwxyz", "d96"),
+            ("孤立低代理项", "abc😀efghijklmnopqrstuvwxyz", "d96"),
+            ("拼接成有效代理对", "abcd😀😀efghijklmnopqrstuvwxyz", "0e9"),
+            ("高低代理项倒置", "abc😀ab😀efghijklmnopqrstuvwxyz", "52c"),
+            (
+                "最大 Unicode 码点",
+                "abcd\u{10ffff}\u{10ffff}efghijklmnopqrstuvwxyz",
+                "ca3",
+            ),
+            ("真正的 NUL", "abcd\0fghijklmnopqrstuvwxyz", "2f6"),
+        ] {
+            assert_eq!(
+                compute_cc_version_suffix(text, "2.1.283"),
+                expected,
+                "用例：{case}"
+            );
+        }
+    }
+
+    #[test]
+    fn event_logging_rewrite_uses_2173_shape() {
+        let account = test_account_with_profile("2.1.173");
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "events": [{
+                "event_type": "ClaudeCodeInternalEvent",
+                "event_data": {
+                    "device_id": "old",
+                    "email": "old@example.com",
+                    "env": {},
+                    "user_attributes": "{\"email\":\"old@example.com\"}"
+                }
+            }]
+        });
+
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/api/event_logging/v2/batch",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+        let event = &parsed["events"][0]["event_data"];
+        let attrs: serde_json::Value =
+            serde_json::from_str(event["user_attributes"].as_str().unwrap()).unwrap();
+
+        assert_eq!(event["email"], "user@example.com");
+        assert_eq!(event["env"]["version"], "2.1.173");
+        assert_eq!(attrs["email"], "user@example.com");
+    }
+
+    #[test]
+    fn cc_version_suffix_source_uses_last_user_text_block() {
+        let body = json!({
+            "messages": [{
+                "role": "user",
+                "content": [
+                    { "type": "text", "text": "cwd: /tmp\nplatform: linux" },
+                    { "type": "text", "text": "abcd简fgohijklmnopqrse" }
+                ]
+            }]
+        });
+
+        assert_eq!(extract_first_user_message(&body), "abcd简fgohijklmnopqrse");
+        assert_eq!(
+            compute_cc_version_suffix(&extract_first_user_message(&body), "2.1.172"),
+            "51f"
+        );
+        assert_eq!(
+            compute_cc_version_suffix(&extract_first_user_message(&body), "2.1.173"),
+            "262"
+        );
+        assert_eq!(
+            compute_cc_version_suffix(&extract_first_user_message(&body), "2.1.185"),
+            "b04"
+        );
+        assert_eq!(
+            compute_cc_version_suffix(&extract_first_user_message(&body), "2.1.187"),
+            "979"
+        );
+        assert_eq!(
+            compute_cc_version_suffix(&extract_first_user_message(&body), "2.1.195"),
+            "71f"
+        );
+        assert_eq!(
+            compute_cc_version_suffix(&extract_first_user_message(&body), "2.1.197"),
+            "490"
+        );
+        assert_eq!(
+            compute_cc_version_suffix(&extract_first_user_message(&body), "2.1.220"),
+            "1bd"
+        );
+        assert_eq!(
+            compute_cc_version_suffix(&extract_first_user_message(&body), "2.1.257"),
+            "29f"
+        );
+        assert_eq!(
+            compute_cc_version_suffix(&extract_first_user_message(&body), "2.1.260"),
+            "e3f"
+        );
+    }
+
+    #[test]
+    fn cc_version_thread_followup_preserves_existing_session_suffix() {
+        let initial = json!({
+            "thread": {"type": "request"},
+            "messages": [{
+                "role": "user",
+                "content": [{"type": "text", "text": "初始请求文本"}]
+            }]
+        });
+        let followup = json!({
+            "thread": {"type": "request", "previous_message_id": "msg_previous"},
+            "system": [{
+                "type": "text",
+                "text": "x-anthropic-billing-header: cc_version=2.1.280.a7c; cc_entrypoint=cli; cch=00000;"
+            }],
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "tool_previous", "content": "ok"},
+                    {"type": "text", "text": "续轮重新带入的文本"}
+                ]
+            }]
+        });
+
+        assert_eq!(
+            super::cc_version_suffix_for_body(&initial, "2.1.280"),
+            compute_cc_version_suffix("初始请求文本", "2.1.280")
+        );
+        assert_eq!(
+            super::cc_version_suffix_for_body(&followup, "2.1.280"),
+            "a7c"
+        );
+        assert_eq!(
+            super::cc_version_suffix_for_body(&followup, "2.1.260"),
+            compute_cc_version_suffix("续轮重新带入的文本", "2.1.260")
+        );
+    }
+
+    #[test]
+    fn cc_version_suffix_matches_2195_capture_samples() {
+        assert_eq!(
+            compute_cc_version_suffix("aaaagaamaaaaaaaaaaaai", "2.1.195"),
+            "113"
+        );
+        assert_eq!(
+            compute_cc_version_suffix("aaaabaa.aaaaaaaaaaaa3", "2.1.195"),
+            "aff"
+        );
+    }
+
+    #[test]
+    fn random_cc_version_suffix_is_always_three_chars() {
+        assert_eq!(super::random_cc_version_suffix([0, 1]), "000");
+        assert_eq!(super::random_cc_version_suffix([0x0f, 0xff]), "0ff");
+        assert_eq!(super::random_cc_version_suffix([0xff, 0xff]), "fff");
+    }
+
+    /// 根键清理保持其余键序与嵌套顺序，并把无变化情况交回原字节路径。
+    /// @return 无；作用域、稳定顺序或按需序列化失效时失败。
+    #[test]
+    fn message_top_field_filter_preserves_order_and_no_change_boundary() {
+        let original = br#"{ "settings": 1, "keep_first": {"env":2,"user_id":3}, "env":4, "keep_middle":5, "extra_headers":{"Authorization":"synthetic"}, "keep_last":6, "web_search":7 }"#;
+        let parsed: serde_json::Value = serde_json::from_slice(original).unwrap();
+        let before = parsed.clone();
+        let filtered = Rewriter::filter_message_top_fields(&parsed, "/v1/messages", true).unwrap();
+        assert_eq!(
+            filtered,
+            br#"{"keep_first":{"env":2,"user_id":3},"keep_middle":5,"keep_last":6}"#
+        );
+        assert_eq!(parsed, before);
+        assert!(Rewriter::filter_message_top_fields(&parsed, "/v1/messages", false).is_none());
+        for path in [
+            "/v1/messages/count_tokens",
+            "/v1/messages/",
+            "/api/eval/test",
+        ] {
+            assert!(Rewriter::filter_message_top_fields(&parsed, path, true).is_none());
+        }
+        for value in [
+            json!(null),
+            json!([]),
+            json!("settings"),
+            json!({"Settings":1,"nested":{"env":2}}),
+        ] {
+            assert!(Rewriter::filter_message_top_fields(&value, "/v1/messages", true).is_none());
+        }
+        let frozen: Vec<String> = serde_json::from_str(include_str!(
+            "../../tests/fixtures/messages-top-field-drop-keys.json"
+        ))
+        .unwrap();
+        assert_eq!(super::MESSAGE_TOP_FIELD_DROP_KEYS, frozen);
+    }
+
+    /// 三分支完成后只刷新已有合法 CCH，Strip 旁路也使用请求画像。
+    /// @return 无；旧公开门禁变化、失败开放失效或最终 CCH 无效时失败。
+    #[test]
+    fn message_top_field_filter_final_cch_covers_profiles_modes_and_fail_open() {
+        let rewriter = Rewriter::new();
+        for version in ["2.1.280", "2.1.293"] {
+            for mode in [BillingMode::Rewrite, BillingMode::Strip] {
+                let mut account = test_account_with_profile(version);
+                account.billing_mode = mode.clone();
+                for branch in ["ordinary", "identity", "attribution"] {
+                    for system in [
+                        json!([{"type":"text","text":format!("x-anthropic-billing-header: cc_version={version}.abc; cc_entrypoint=cli; cch=abcde;")}]),
+                        json!([{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.280.abc; cc_entrypoint=cli;"}]),
+                        json!([{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.280.abc; cch=invalid;"}]),
+                        json!([{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.280.abc; cch=abcde; cch=12345;"}]),
+                        json!([]),
+                    ] {
+                        let input = json!({"model":"claude-sonnet-5-5", "settings":1, "system":system,
+                            "messages":[{"role":"user","content":"普通文本 cch=00000 cch=12345"}], "max_tokens":32});
+                        let filtered =
+                            Rewriter::filter_message_top_fields(&input, "/v1/messages", true)
+                                .unwrap();
+                        let intermediate = match branch {
+                            "ordinary" => rewriter.rewrite_body(
+                                &filtered,
+                                "/v1/messages",
+                                &account,
+                                ClientType::ClaudeCode,
+                                EnvPassthrough::default(),
+                                CacheControlTtlRewrite::Off,
+                                MessageCacheControlRewrite::Off,
+                                true,
+                            ),
+                            "identity" => rewriter.rewrite_claude_code_identity_only(
+                                &filtered,
+                                &account,
+                                &UpstreamSessionRewrite::default(),
+                            ),
+                            // 不符合归因形状的正文必须失败开放；最终刷新仍应处理已有唯一目标。
+                            _ => rewriter.rewrite_claude_code_status_classifier_attribution(
+                                &filtered,
+                                &account,
+                                &UpstreamSessionRewrite::default(),
+                            ),
+                        };
+                        let final_body = rewriter
+                            .refresh_message_body_policy_cch(intermediate.clone(), &account);
+                        let parsed: serde_json::Value =
+                            serde_json::from_slice(&final_body).unwrap();
+                        assert!(parsed.get("settings").is_none());
+                        assert_eq!(parsed["messages"], input["messages"]);
+                        assert_eq!(
+                            super::refresh_cch_attestation(final_body.clone(), version),
+                            final_body
+                        );
+                        if super::find_cch_value(&intermediate).is_none() {
+                            assert_eq!(final_body, intermediate);
+                        }
+                        if branch == "identity" && mode == BillingMode::Strip {
+                            assert_eq!(
+                                rewriter.refresh_cch_attestation(
+                                    intermediate.clone(),
+                                    &account,
+                                    ClientType::ClaudeCode
+                                ),
+                                intermediate
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn cch_seed_is_versioned() {
+        assert_eq!(cch_attestation_seed(TEST_VERSION), 0x4D659218E32A3268);
+        assert_eq!(cch_attestation_seed("2.1.156"), 0x4D659218E32A3268);
+        assert_eq!(cch_attestation_seed("2.1.169"), 0x4D659218E32A3268);
+        assert_eq!(cch_attestation_seed("2.1.172"), 0x4D659218E32A3268);
+        assert_eq!(cch_attestation_seed("2.1.173"), 0x4D659218E32A3268);
+        assert_eq!(cch_attestation_seed("2.1.185"), 0x4D659218E32A3268);
+        assert_eq!(cch_attestation_seed("2.1.187"), 0x4D659218E32A3268);
+        assert_eq!(cch_attestation_seed("2.1.195"), 0x4D659218E32A3268);
+        assert_eq!(cch_attestation_seed("2.1.197"), 0x4D659218E32A3268);
+        assert_eq!(cch_attestation_seed("2.1.220"), 0x4D659218E32A3268);
+        assert_eq!(cch_attestation_seed("2.1.257"), 0x4D659218E32A3268);
+        assert_eq!(cch_attestation_seed("2.1.260"), 0x4D659218E32A3268);
+        assert_eq!(cch_attestation_seed("2.1.280"), 0x4D659218E32A3268);
+        assert_eq!(cch_attestation_seed("2.1.81"), 0x6E52736AC806831E);
+        assert_eq!(cch_attestation_seed("2.1.999"), 0x6E52736AC806831E);
+    }
+
+    #[test]
+    fn cch_initial_seal_preserves_user_placeholder_before_billing() {
+        let body = r#"{"messages":[{"role":"user","content":"示例 cch=00000"}],"system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.293.abc; cc_entrypoint=cli; cch=00000;"}]}"#.as_bytes();
+        let output = compute_cch_attestation(body.to_vec(), "2.1.293");
+        let parsed: serde_json::Value = serde_json::from_slice(&output).unwrap();
+
+        assert_eq!(parsed["messages"][0]["content"], "示例 cch=00000");
+        assert!(
+            !parsed["system"][0]["text"]
+                .as_str()
+                .unwrap()
+                .contains("cch=00000")
+        );
+    }
+
+    #[test]
+    fn cch_retry_refresh_preserves_user_hex_before_billing() {
+        let body = br#"{"messages":[{"role":"user","content":"example cch=12345"}],"system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.293.abc; cc_entrypoint=cli; cch=abcde;"}]}"#;
+        let output = Rewriter::new().refresh_cch_attestation(
+            body.to_vec(),
+            &test_account_with_profile("2.1.293"),
+            ClientType::ClaudeCode,
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&output).unwrap();
+
+        assert_eq!(parsed["messages"][0]["content"], "example cch=12345");
+        assert!(
+            !parsed["system"][0]["text"]
+                .as_str()
+                .unwrap()
+                .contains("cch=abcde")
+        );
+    }
+
+    #[test]
+    fn cch_placeholder_reset_preserves_system_document_and_reminder() {
+        let account = test_account();
+        let profile = device_profile(&account);
+        let mut body = json!({
+            "system": [
+                {"type": "text", "text": "Documentation example: cch=12345"},
+                {"type": "text", "text": "x-anthropic-billing-header: cc_version=2.1.280.abc; cc_entrypoint=cli; cch=abcde;"}
+            ],
+            "messages": [{"role": "user", "content": "<system-reminder>Example: cch=fedcb</system-reminder>"}]
+        });
+        let original = body.clone();
+        Rewriter::new().rewrite_system_prompt(
+            &mut body,
+            &profile.prompt,
+            TEST_VERSION,
+            &BillingMode::Rewrite,
+            EnvPassthrough::default(),
+        );
+
+        assert_eq!(body["system"][0], original["system"][0]);
+        assert_eq!(body["messages"], original["messages"]);
+        assert!(
+            body["system"][1]["text"]
+                .as_str()
+                .unwrap()
+                .contains("cch=00000")
+        );
+    }
+
+    #[test]
+    fn cch_billing_location_matches_independent_reference_and_exact_bytes() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/cch-billing-location.json"
+        ))
+        .unwrap();
+        for case in fixture["cases"].as_array().unwrap() {
+            let name = case["name"].as_str().unwrap();
+            let body = case["body"].as_str().unwrap().as_bytes();
+            let version = case["version"].as_str().unwrap();
+            let start = case["target_value_start"].as_u64().unwrap() as usize;
+            let expected_cch = case["expected_cch"].as_str().unwrap();
+            assert_eq!(&body[start..start + 5], b"00000", "{name}");
+            let mut expected = body.to_vec();
+            expected[start..start + 5].copy_from_slice(expected_cch.as_bytes());
+
+            if let Some(original) = case["original_body"].as_str() {
+                let output = Rewriter::new().rewrite_body(
+                    original.as_bytes(),
+                    "/v1/messages",
+                    &test_account_with_profile(version),
+                    ClientType::ClaudeCode,
+                    EnvPassthrough::default(),
+                    CacheControlTtlRewrite::Off,
+                    MessageCacheControlRewrite::Off,
+                    true,
+                );
+                assert_eq!(output, expected, "完整改写：{name}");
+            }
+
+            assert_eq!(
+                compute_cch_attestation(body.to_vec(), version),
+                expected,
+                "{name}"
+            );
+            let mut retry = body.to_vec();
+            retry[start..start + 5].copy_from_slice(b"A1b2C");
+            assert_eq!(
+                super::refresh_cch_attestation(retry, version),
+                expected,
+                "{name}"
+            );
+            assert_eq!(
+                super::refresh_cch_attestation(expected.clone(), version),
+                expected,
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn cch_billing_extra_fields_and_field_order_preserve_existing_compatibility() {
+        for billing in [
+            "x-anthropic-billing-header: cc_version=2.1.293.abc; cc_entrypoint=cli; cch=00000; cc_prompt_id=synthetic; cc_is_subagent=true; synthetic_fingerprint=synthetic-canary;",
+            "x-anthropic-billing-header: cc_version=2.1.293.abc; cc_prompt_id=synthetic; cc_is_subagent=true; cch=00000; cc_entrypoint=sdk-cli; synthetic_fingerprint=synthetic-canary;",
+            "x-anthropic-billing-header: cch=00000; synthetic_fingerprint=synthetic-canary; cc_entrypoint=subagent; cc_version=2.1.293.abc;",
+            "x-anthropic-billing-header:\tcc_entrypoint=custom;\t cch=00000; cc_version=2.1.293.abc;",
+            "x-anthropic-billing-header: note=cch=12345; cc_version=2.1.293.abc; cc_entrypoint=cli; cch=00000; xcch=fedcb;",
+        ] {
+            for system in [json!(billing), json!([{"type": "text", "text": billing}])] {
+                let body = json!({
+                    "messages": [{"role": "user", "content": "用户示例 cch=00000 cch=12345"}],
+                    "system": system,
+                    "thread": {"previous_message_id": "synthetic"},
+                });
+                let raw = serde_json::to_vec(&body).unwrap();
+                let sealed = compute_cch_attestation(raw.clone(), "2.1.293");
+                assert_ne!(sealed, raw, "{billing}");
+                let parsed: serde_json::Value = serde_json::from_slice(&sealed).unwrap();
+                let after = if parsed["system"].is_string() {
+                    parsed["system"].as_str().unwrap()
+                } else {
+                    parsed["system"][0]["text"].as_str().unwrap()
+                };
+                let value_start = billing.find("cch=00000").unwrap() + 4;
+                let mut expected_billing = billing.to_string();
+                expected_billing.replace_range(
+                    value_start..value_start + 5,
+                    &after[value_start..value_start + 5],
+                );
+                assert_eq!(after, expected_billing);
+                assert_eq!(parsed["messages"], body["messages"]);
+
+                let mut stale = body.clone();
+                let stale_text = billing.replacen("cch=00000", "cch=abcde", 1);
+                if stale["system"].is_string() {
+                    stale["system"] = json!(stale_text);
+                } else {
+                    stale["system"][0]["text"] = json!(stale_text);
+                }
+                assert_eq!(
+                    super::refresh_cch_attestation(serde_json::to_vec(&stale).unwrap(), "2.1.293"),
+                    sealed
+                );
+                super::reset_system_billing_cch(&mut stale);
+                assert_eq!(stale, body);
+
+                let rewriter = Rewriter::new();
+                assert_eq!(
+                    rewriter.rewrite_body(
+                        &raw,
+                        "/v1/messages",
+                        &test_account_with_profile("2.1.293"),
+                        ClientType::ClaudeCode,
+                        EnvPassthrough::default(),
+                        CacheControlTtlRewrite::Off,
+                        MessageCacheControlRewrite::Off,
+                        true,
+                    ),
+                    sealed
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn cch_missing_invalid_and_ambiguous_system_targets_preserve_input() {
+        let billing =
+            "x-anthropic-billing-header: cc_version=2.1.280.abc; cc_entrypoint=cli; cch=00000;";
+        let block = json!({"type": "text", "text": billing});
+        let mut systems = vec![
+            json!(null),
+            json!([]),
+            json!("cch=00000"),
+            json!(format!("文档中的示例\n{billing}")),
+            json!(format!("near-{billing}")),
+            json!({"system": [block.clone()]}),
+            json!([[block.clone()]]),
+            json!([{"type": "thinking", "text": billing}]),
+            json!([{"type": "text", "text": 123, "system": [block.clone()]}]),
+            json!([block.clone(), block.clone()]),
+            json!(format!("{billing}\n{billing}")),
+        ];
+        for invalid in [
+            "cch=0000;",
+            "cch=000000;",
+            "cch=00000f;",
+            "cch=00000z;",
+            "cch=00g00;",
+            "cch=00000",
+            "cch=00000 ;",
+            "xcch=00000;",
+            "cch=00000; cch=12345;",
+            "cch=12345; cch=00000;",
+            "cch=00000; cc_prompt_id=synthetic; cch=12345;",
+            "cch; cc_prompt_id=synthetic; cch=00000;",
+            "cch=00000; cc_prompt_id=synthetic; cch =12345;",
+            "cch=;",
+            "",
+        ] {
+            let text = billing.replace("cch=00000;", invalid);
+            systems.push(json!(text));
+            systems.push(json!([{"type": "text", "text": text}]));
+            systems.push(json!([block.clone(), {"type": "text", "text": text}]));
+        }
+        for system in systems {
+            let mut parsed = json!({
+                "messages": [{"role": "user", "content": "cch=00000 cch=12345"}],
+                "tools": [{"description": "cch=00000"}],
+                "metadata": {"system": [block.clone()]},
+                "system": system,
+            });
+            let raw = serde_json::to_vec(&parsed).unwrap();
+            assert_eq!(compute_cch_attestation(raw.clone(), TEST_VERSION), raw);
+            assert_eq!(
+                super::refresh_cch_attestation(raw.clone(), TEST_VERSION),
+                raw
+            );
+            super::reset_system_billing_cch(&mut parsed);
+            assert_eq!(serde_json::to_vec(&parsed).unwrap(), raw);
+        }
+        let raw = br#"{"messages":[{"role":"user","content":"cch=00000"}],"metadata":{"system":"cch=12345"}}"#;
+        assert_eq!(compute_cch_attestation(raw.to_vec(), TEST_VERSION), raw);
+        assert_eq!(
+            super::refresh_cch_attestation(raw.to_vec(), TEST_VERSION),
+            raw
+        );
+    }
+
+    #[test]
+    fn cch_duplicate_json_fields_and_escaped_values_do_not_fall_back() {
+        let billing = r#""x-anthropic-billing-header: cc_version=2.1.293.abc; cc_entrypoint=cli; cch=00000;""#;
+        let systems = [
+            format!(r#""system":{billing},"system":{billing}"#),
+            format!(r#""system":{billing},"\u0073ystem":{billing}"#),
+            format!(r#""system":[{{"type":"text","text":{billing},"text":{billing}}}]"#),
+            format!(r#""system":[{{"type":"text","\u0074ype":"text","text":{billing}}}]"#),
+            format!(
+                r#""system":{}"#,
+                billing.replace("cch=00000", r"cch=\u00300000")
+            ),
+            format!(
+                r#""system":{}"#,
+                billing.replace("cch=00000", r"\u0063ch=00000")
+            ),
+        ];
+        for system in systems {
+            let raw = format!(
+                r#"{{"messages":[{{"role":"user","content":"cch=00000 cch=12345"}}],{system}}}"#
+            )
+            .into_bytes();
+            assert_eq!(compute_cch_attestation(raw.clone(), "2.1.293"), raw);
+            assert_eq!(super::refresh_cch_attestation(raw.clone(), "2.1.293"), raw);
+        }
+    }
+
+    /// 原始偏移映射覆盖短转义、不同 UTF-8 宽度和 UTF-16 代理对。
+    #[test]
+    fn cch_raw_offset_preserves_json_escape_boundaries() {
+        for raw in [
+            r#""中文😀 cch=00000;""#,
+            r#""\"\\\/\b\f\n\r\t cch=00000;""#,
+            r#""\u0020\u007F\u0080\u07FF\u0800\u4e2d\u6587 cch=00000;""#,
+            r#""\uD83D\uDE00\uD800\uDC00\uDBFF\uDFFF cch=00000;""#,
+        ] {
+            let decoded: String = serde_json::from_str(raw).unwrap();
+            let offset = decoded.find("cch=00000").unwrap();
+            assert_eq!(
+                super::json_string_raw_offset(raw.as_bytes(), offset),
+                raw.find("cch=00000"),
+                "{raw}"
+            );
+        }
+        let raw = br#""\uD83D\uDE00cch=00000;""#;
+        for offset in 1..4 {
+            assert_eq!(super::json_string_raw_offset(raw, offset), None);
+        }
+    }
+
+    /// 大量字段值中的同名示例不能影响唯一目标，也不能改写其它原始字节。
+    #[test]
+    fn cch_many_decoys_preserve_exact_bytes_and_unicode_offsets() {
+        for count in [4096, 8192] {
+            let text = format!(
+                "x-anthropic-billing-header: cc_version=2.1.293.abc; cc_entrypoint=cli; note=中文😀\\\"/; {}cch=00000;",
+                "note=cch=00000; ".repeat(count)
+            );
+            let raw = serde_json::to_string(&json!({"system":[{"type":"text","text":text}]}))
+                .unwrap()
+                .replace("中文😀", r"\u4e2d\u6587\uD83D\uDE00")
+                .into_bytes();
+            let position = raw
+                .windows(b"cch=00000".len())
+                .rposition(|bytes| bytes == b"cch=00000")
+                .unwrap()
+                + 4;
+            let mut expected = raw.clone();
+            let hash = xxh64(&raw, 0x4D659218E32A3268);
+            expected[position..position + 5]
+                .copy_from_slice(format!("{:05x}", hash & 0xFFFFF).as_bytes());
+            assert_eq!(compute_cch_attestation(raw, "2.1.293"), expected);
+        }
+    }
+
+    #[test]
+    fn cch_full_rewrite_preserves_examples_across_clients_modes_and_caches() {
+        for mode in [BillingMode::Rewrite, BillingMode::Strip] {
+            for client in [ClientType::API, ClientType::ClaudeCode] {
+                for cache in [
+                    MessageCacheControlRewrite::Off,
+                    MessageCacheControlRewrite::Auto,
+                ] {
+                    let mut account = test_account_with_profile("2.1.293");
+                    account.billing_mode = mode.clone();
+                    let original = json!({
+                        "model": "claude-sonnet-5-5",
+                        "messages": [{"role": "user", "content": [
+                            {"type": "text", "text": "用户 cch=00000 cch=12345"},
+                            {"type": "text", "text": "<system-reminder>示例 cch=abcde</system-reminder>"},
+                            {"type": "tool_result", "tool_use_id": "synthetic", "content": "结果 cch=00000"}
+                        ]}],
+                        "tools": [{"name": "synthetic", "description": "工具 cch=00000", "input_schema": {"type": "object"}, "system": [{"type": "text", "text": "嵌套 cch=fedcb"}]}],
+                        "metadata": {"sample": "元数据 cch=00000"},
+                        "system": [
+                            {"type": "text", "text": "普通 system 文档 cch=54321"},
+                            {"type": "text", "extra": true, "text": "x-anthropic-billing-header: cc_version=2.1.293.abc; cc_entrypoint=sdk; cch=45678;"}
+                        ],
+                    });
+                    let rewriter = Rewriter::new();
+                    let output = rewriter.rewrite_body(
+                        &serde_json::to_vec(&original).unwrap(),
+                        "/v1/messages",
+                        &account,
+                        client,
+                        EnvPassthrough::default(),
+                        CacheControlTtlRewrite::Off,
+                        cache,
+                        true,
+                    );
+                    let parsed: serde_json::Value = serde_json::from_slice(&output).unwrap();
+                    let content = parsed["messages"].as_array().unwrap().last().unwrap()["content"]
+                        .as_array()
+                        .unwrap();
+                    for expected in original["messages"][0]["content"].as_array().unwrap() {
+                        assert!(
+                            content.iter().any(|block| block["text"] == expected["text"]
+                                && block["content"] == expected["content"]),
+                            "mode={mode:?}, client={client:?}, cache={cache:?}, expected={expected}, content={content:?}"
+                        );
+                    }
+                    assert_eq!(parsed["metadata"]["sample"], original["metadata"]["sample"]);
+                    assert_eq!(
+                        parsed["tools"][0]["description"],
+                        original["tools"][0]["description"]
+                    );
+                    assert_eq!(parsed["tools"][0]["system"], original["tools"][0]["system"]);
+                    if client == ClientType::API || mode == BillingMode::Rewrite {
+                        let index = if client == ClientType::API { 0 } else { 1 };
+                        let billing = parsed["system"][index]["text"].as_str().unwrap();
+                        assert!(!billing.contains("cch=00000"));
+                        assert!(!billing.contains("cch=45678"));
+                    }
+                    if client == ClientType::ClaudeCode {
+                        assert_eq!(parsed["system"][0], original["system"][0]);
+                    }
+                    assert_eq!(
+                        rewriter.refresh_cch_attestation(output.clone(), &account, client),
+                        output
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn cch_string_system_rewrite_keeps_later_examples_and_public_refresh_gate() {
+        let account = test_account_with_profile("2.1.293");
+        let body = json!({
+            "system": " \nx-anthropic-billing-header: cc_version=2.1.280.abc; cc_entrypoint=subagent; cch=54321;\n普通文档：cch=12345，中文与转义 \\",
+            "messages": [{"role": "user", "content": "<system-reminder>cch=00000</system-reminder>"}],
+        });
+        let rewriter = Rewriter::new();
+        let output = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            true,
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&output).unwrap();
+        let system = parsed["system"].as_str().unwrap();
+        assert!(system.starts_with(" \nx-anthropic-billing-header: cc_version=2.1.293."));
+        assert!(!system.contains("cch=54321"));
+        assert!(system.ends_with("普通文档：cch=12345，中文与转义 \\"));
+        assert_eq!(parsed["messages"], body["messages"]);
+        let mut strip_account = account;
+        strip_account.billing_mode = BillingMode::Strip;
+        let stale = serde_json::to_vec(&body).unwrap();
+        assert_eq!(
+            rewriter.refresh_cch_attestation(stale.clone(), &strip_account, ClientType::ClaudeCode),
+            stale
+        );
+        assert_ne!(
+            rewriter.refresh_cch_attestation(stale.clone(), &strip_account, ClientType::API),
+            stale
+        );
+    }
+
+    #[test]
+    fn cch_initial_reset_keeps_cached_billing_and_rejects_duplicate_billing() {
+        let billing =
+            "x-anthropic-billing-header: cc_version=2.1.280.abc; cc_entrypoint=cli; cch=12345;";
+        for cache_control in [json!(null), json!({"type": "ephemeral", "ttl": "1h"})] {
+            let system = json!([
+                {"type": "text", "text": "文档 cch=00000"},
+                {"type": "text", "text": billing, "cache_control": cache_control}
+            ]);
+            let mut body =
+                json!({"system": system, "messages": [{"role": "user", "content": "cch=00000"}]});
+            let original = body.clone();
+            super::reset_system_billing_cch(&mut body);
+            assert_eq!(body, original);
+            let raw = serde_json::to_vec(&body).unwrap();
+            assert_eq!(compute_cch_attestation(raw.clone(), TEST_VERSION), raw);
+
+            body["system"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"type": "text", "text": billing}));
+            let duplicate = body.clone();
+            super::reset_system_billing_cch(&mut body);
+            assert_eq!(body, duplicate);
+            let raw = serde_json::to_vec(&body).unwrap();
+            assert_eq!(
+                super::refresh_cch_attestation(raw.clone(), TEST_VERSION),
+                raw
+            );
+        }
+    }
+
+    #[test]
+    fn cch_classifier_attribution_preserves_examples_when_adding_and_refreshing_billing() {
+        for existing_billing in [false, true] {
+            let mut body = json!({
+                "messages": [{"role": "user", "content": "classifier cch=00000 cch=12345"}],
+                "tools": [{"description": "cch=00000"}],
+                "metadata": {"example": "cch=abcde"},
+                "system": [{"type": "text", "text": "classifier cch=00000", "cache_control": {"type": "ephemeral"}}],
+            });
+            if existing_billing {
+                body["system"].as_array_mut().unwrap().push(json!({
+                    "type": "text",
+                    "text": "x-anthropic-billing-header: cc_version=2.1.293.abc; cc_entrypoint=cli; cch=54321;"
+                }));
+            }
+            let rewriter = Rewriter::new();
+            let output = rewriter.rewrite_claude_code_status_classifier_attribution(
+                &serde_json::to_vec(&body).unwrap(),
+                &test_account_with_profile("2.1.293"),
+                &UpstreamSessionRewrite::default(),
+            );
+            let parsed: serde_json::Value = serde_json::from_slice(&output).unwrap();
+            assert_eq!(parsed["messages"], body["messages"]);
+            assert_eq!(parsed["tools"], body["tools"]);
+            assert_eq!(parsed["metadata"], body["metadata"]);
+            assert_eq!(parsed["system"][2], body["system"][0]);
+            let billing = parsed["system"][0]["text"].as_str().unwrap();
+            assert!(!billing.contains("cch=00000"));
+            assert!(!billing.contains("cch=54321"));
+            assert_eq!(
+                super::refresh_cch_attestation(output.clone(), "2.1.293"),
+                output
+            );
+        }
+    }
+
+    #[test]
+    fn cch_rewrite_uses_2169_seed() {
+        let body = br#"{"system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.169.b94; cc_entrypoint=cli; cch=00000;"}],"messages":[]}"#;
+        let out = compute_cch_attestation(body.to_vec(), "2.1.169");
+        let text = String::from_utf8(out).unwrap();
+        assert!(text.contains("cch=27300"));
+    }
+
+    #[test]
+    fn cch_2172_2173_2185_and_2187_opus_normalize_top_level_model_and_max_tokens() {
+        let body = br#"{"model":"claude-opus-4-8","max_tokens":64000,"system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.173.b94; cc_entrypoint=cli; cch=00000;"}],"messages":[]}"#;
+        let normalized = cch_attestation_input(body, "2.1.173");
+
+        assert_eq!(
+            normalized,
+            br#"{"model":"","system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.173.b94; cc_entrypoint=cli; cch=00000;"}],"messages":[]}"#
+        );
+        assert_eq!(cch_attestation_input(body, "2.1.172"), normalized);
+        assert_eq!(cch_attestation_input(body, "2.1.185"), normalized);
+        assert_eq!(cch_attestation_input(body, "2.1.187"), normalized);
+        assert_eq!(cch_attestation_input(body, "2.1.195"), normalized);
+        assert_eq!(cch_attestation_input(body, "2.1.197"), normalized);
+        assert_eq!(cch_attestation_input(body, "2.1.220"), normalized);
+
+        let out = compute_cch_attestation(body.to_vec(), "2.1.173");
+        let expected_hash = xxhash_rust::xxh64::xxh64(&normalized, cch_attestation_seed("2.1.173"));
+        let expected_cch = format!("cch={:05x}", expected_hash & 0xFFFFF);
+        assert!(String::from_utf8(out).unwrap().contains(&expected_cch));
+    }
+
+    #[test]
+    fn cch_2172_2173_2185_and_2187_fable_normalize_top_level_fallbacks_only() {
+        let body = br#"{"model":"claude-fable-5","max_tokens":64000,"tools":[{"name":"Nested","input_schema":{"type":"object","properties":{"fallbacks":{"model":"keep-nested"},"max_tokens":{"type":"integer"}}}}],"fallbacks":[{"model":"claude-opus-4-8"}],"system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.173.b94; cc_entrypoint=cli; cch=00000;"}],"messages":[{"role":"user","content":[{"type":"text","text":"nested model and fallbacks stay"}]}]}"#;
+        let normalized = String::from_utf8(cch_attestation_input(body, "2.1.173")).unwrap();
+        let normalized_2172 = String::from_utf8(cch_attestation_input(body, "2.1.172")).unwrap();
+        let normalized_2185 = String::from_utf8(cch_attestation_input(body, "2.1.185")).unwrap();
+        let normalized_2187 = String::from_utf8(cch_attestation_input(body, "2.1.187")).unwrap();
+        let normalized_2195 = String::from_utf8(cch_attestation_input(body, "2.1.195")).unwrap();
+        let normalized_2197 = String::from_utf8(cch_attestation_input(body, "2.1.197")).unwrap();
+        let normalized_21220 = String::from_utf8(cch_attestation_input(body, "2.1.220")).unwrap();
+
+        assert_eq!(normalized_2172, normalized);
+        assert_eq!(normalized_2185, normalized);
+        assert_eq!(normalized_2187, normalized);
+        assert_eq!(normalized_2195, normalized);
+        assert_eq!(normalized_2197, normalized);
+        assert_eq!(normalized_21220, normalized);
+        assert!(normalized.contains(r#""model":"""#));
+        assert!(!normalized.contains(r#","max_tokens":64000"#));
+        assert!(!normalized.contains(r#","fallbacks":[{"model":"claude-opus-4-8"}]"#));
+        assert!(normalized.contains(r#""fallbacks":{"model":"keep-nested"}"#));
+        assert!(normalized.contains(r#""max_tokens":{"type":"integer"}"#));
+        assert!(normalized.contains("nested model and fallbacks stay"));
+    }
+
+    #[test]
+    fn cch_21257_fable_5_1_keeps_top_level_default_fallback() {
+        let body = br#"{"model":"claude-fable-5-1","max_tokens":64000,"fallbacks":"default","system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.257.e73; cc_entrypoint=cli; cch=00000;"}],"messages":[{"role":"user","content":[{"type":"text","text":"fable continuation"}]}]}"#;
+
+        let normalized = cch_attestation_input(body, "2.1.257");
+
+        assert_eq!(
+            normalized,
+            br#"{"model":"","fallbacks":"default","system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.257.e73; cc_entrypoint=cli; cch=00000;"}],"messages":[{"role":"user","content":[{"type":"text","text":"fable continuation"}]}]}"#
+        );
+        let output = String::from_utf8(compute_cch_attestation(body.to_vec(), "2.1.257"))
+            .expect("cch output");
+        assert!(!output.contains("cch=00000"));
+    }
+
+    #[test]
+    fn cch_21280_clears_every_exact_string_model_value_only() {
+        let body = br#"{"model":"top","max_tokens":128000,"tools":[{"model":"advisor"},{"description":"literal \"model\":\"keep\"","model":42},{"\u006dodel":"escaped-key"}],"fallbacks":[{"model":"fallback"}],"system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.280.90c; cc_entrypoint=cli; cch=00000;"}],"messages":[]}"#;
+
+        let normalized = String::from_utf8(cch_attestation_input(body, "2.1.280")).unwrap();
+
+        assert_eq!(normalized.matches(r#""model":"""#).count(), 3);
+        assert!(!normalized.contains("max_tokens"));
+        assert!(normalized.contains(r#""description":"literal \"model\":\"keep\"""#));
+        assert!(normalized.contains(r#""model":42"#));
+        assert!(normalized.contains(r#""\u006dodel":"escaped-key""#));
+        assert!(normalized.contains(r#""fallbacks":[{"model":""}]"#));
+    }
+
+    #[test]
+    fn cch_capture_fixture_matches_21280_nested_model_contract() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/claude-code-2.1.280-profile.json"
+        ))
+        .expect("fixture json");
+        let cases = fixture["hash_cases"].as_array().expect("hash cases");
+
+        for case in cases {
+            let version = case["version"].as_str().expect("version");
+            let body = case["body"].as_str().expect("body");
+            let parsed: serde_json::Value = serde_json::from_str(body).expect("body json");
+            assert_eq!(
+                compute_cc_version_suffix(&extract_first_user_message(&parsed), version),
+                case["expected_cc_version_suffix"]
+                    .as_str()
+                    .expect("cc_version suffix")
+            );
+
+            let output =
+                String::from_utf8(compute_cch_attestation(body.as_bytes().to_vec(), version))
+                    .expect("cch output");
+            let expected_cch = case["expected_cch"].as_str().expect("cch");
+            assert!(
+                output.contains(format!("cch={expected_cch}").as_str()),
+                "2.1.280 fixture CCH 不匹配: model={}",
+                case["model"].as_str().unwrap_or_default()
+            );
+        }
+    }
+
+    #[test]
+    fn cch_capture_fixture_matches_21260_and_21257_baseline_correction() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/claude-code-2.1.260-profile.json"
+        ))
+        .expect("fixture json");
+        let cases = fixture["hash_cases"].as_array().expect("hash cases");
+
+        for case in cases {
+            let version = case["version"].as_str().expect("version");
+            let body = case["body"].as_str().expect("body");
+            let parsed: serde_json::Value = serde_json::from_str(body).expect("body json");
+            let expected_suffix = case["expected_cc_version_suffix"]
+                .as_str()
+                .expect("cc_version suffix");
+            let expected_cch = case["expected_cch"].as_str().expect("cch");
+
+            assert_eq!(
+                compute_cc_version_suffix(&extract_first_user_message(&parsed), version),
+                expected_suffix
+            );
+            let output =
+                String::from_utf8(compute_cch_attestation(body.as_bytes().to_vec(), version))
+                    .expect("cch output");
+            assert!(
+                output.contains(format!("cch={expected_cch}").as_str()),
+                "fixture CCH 不匹配: version={version}, model={}",
+                case["model"].as_str().unwrap_or_default()
+            );
+        }
+    }
+
+    #[test]
+    fn cch_21257_non_fable_5_1_still_removes_top_level_fallbacks() {
+        let body = br#"{"model":"claude-opus-5","max_tokens":64000,"fallbacks":"default","system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.257.e73; cc_entrypoint=cli; cch=00000;"}],"messages":[]}"#;
+        let normalized = String::from_utf8(cch_attestation_input(body, "2.1.257")).unwrap();
+
+        assert!(normalized.contains(r#""model":"""#));
+        assert!(!normalized.contains("max_tokens"));
+        assert!(!normalized.contains("fallbacks"));
+    }
+
+    #[test]
+    fn cch_2169_keeps_full_body_profile() {
+        let body = br#"{"model":"claude-opus-4-8","max_tokens":64000,"system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.169.b94; cc_entrypoint=cli; cch=00000;"}],"messages":[]}"#;
+
+        assert_eq!(cch_attestation_input(body, "2.1.169"), body);
+    }
+
+    #[test]
+    fn cch_rewrite_keeps_legacy_seed_for_old_versions() {
+        let body = br#"{"system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.81.b94; cc_entrypoint=cli; cch=00000;"}],"messages":[]}"#;
+        let out = compute_cch_attestation(body.to_vec(), "2.1.81");
+        let text = String::from_utf8(out).unwrap();
+        assert!(text.contains("cch=afd26"));
+    }
+
+    #[test]
+    fn cch_refresh_recomputes_existing_value_after_retry_body_change() {
+        let body = br#"{"system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.156.b94; cc_entrypoint=cli; cch=40943;"}],"messages":[{"role":"assistant","content":[{"type":"text","text":"sanitized"}]}]}"#;
+        let out = super::refresh_cch_attestation(body.to_vec(), TEST_VERSION);
+        let text = String::from_utf8(out).unwrap();
+
+        assert!(!text.contains("cch=40943"));
+        assert!(!text.contains("cch=00000"));
+        assert!(text.contains("cch="));
+    }
+
+    #[test]
+    fn api_cch_refresh_ignores_account_billing_mode_after_retry_body_change() {
+        let mut account = test_account();
+        account.billing_mode = BillingMode::Strip;
+        let rewriter = Rewriter::new();
+        let body = br#"{"system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.156.b94; cc_entrypoint=cli; cch=40943;"}],"messages":[{"role":"assistant","content":[{"type":"text","text":"api sanitized"}]}]}"#;
+        let out = rewriter.refresh_cch_attestation(body.to_vec(), &account, ClientType::API);
+        let text = String::from_utf8(out.clone()).unwrap();
+
+        assert!(!text.contains("cch=40943"));
+        assert!(!text.contains("cch=00000"));
+
+        let actual = super::CCH_VALUE_REGEX
+            .find(&text)
+            .map(|m| m.as_str().to_string())
+            .expect("cch value exists");
+        let mut placeholder_body = out;
+        let cch_pos = placeholder_body
+            .windows(super::CCH_PLACEHOLDER.len())
+            .position(|window| window.starts_with(b"cch="))
+            .expect("cch value position");
+        placeholder_body[cch_pos + 4..cch_pos + 9].copy_from_slice(b"00000");
+        let expected =
+            String::from_utf8(compute_cch_attestation(placeholder_body, TEST_VERSION)).unwrap();
+
+        assert!(expected.contains(&actual));
+    }
+
+    #[test]
+    fn message_cache_control_legacy_recomputes_cch_after_final_body_changes() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let body = json!({
+            "system": [{
+                "type": "text",
+                "text": "x-anthropic-billing-header: cc_version=2.1.156.abc; cc_entrypoint=cli; cch=12345;"
+            }],
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [{
+                        "type": "text",
+                        "text": "hello"
+                    }]
+                },
+                {
+                    "role": "assistant",
+                    "content": [{
+                        "type": "text",
+                        "text": "ok"
+                    }]
+                },
+                {
+                    "role": "user",
+                    "content": [{
+                        "type": "text",
+                        "text": "again",
+                        "cache_control": { "type": "ephemeral", "ttl": "1h" }
+                    }]
+                },
+                {
+                    "role": "assistant",
+                    "content": [{
+                        "type": "text",
+                        "text": "done"
+                    }]
+                }
+            ]
+        });
+
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::FiveMinutes,
+            MessageCacheControlRewrite::Auto,
+            true,
+        );
+        let text = String::from_utf8(out.clone()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+
+        assert!(!text.contains("cch=12345"));
+        assert!(!text.contains("cch=00000"));
+        assert_eq!(
+            parsed["messages"][0]["content"][0]["cache_control"]["ttl"],
+            json!("5m")
+        );
+        assert_eq!(
+            parsed["messages"][3]["content"][0]["cache_control"]["ttl"],
+            json!("5m")
+        );
+
+        let actual = super::CCH_VALUE_REGEX
+            .find(&text)
+            .map(|m| m.as_str().to_string())
+            .expect("cch value exists");
+        let mut placeholder_body = out;
+        let cch_pos = placeholder_body
+            .windows(super::CCH_PLACEHOLDER.len())
+            .position(|window| window.starts_with(b"cch="))
+            .expect("cch value position");
+        placeholder_body[cch_pos + 4..cch_pos + 9].copy_from_slice(b"00000");
+        let expected =
+            String::from_utf8(compute_cch_attestation(placeholder_body, TEST_VERSION)).unwrap();
+
+        assert!(expected.contains(&actual));
+    }
+
+    #[test]
+    fn message_cache_control_auto_recomputes_cch_after_final_body_changes() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let messages: Vec<serde_json::Value> = (0..60)
+            .map(|idx| {
+                json!({
+                    "role": if idx % 2 == 0 { "user" } else { "assistant" },
+                    "content": [{
+                        "type": "text",
+                        "text": format!("block-{}", idx)
+                    }]
+                })
+            })
+            .collect();
+        let body = json!({
+            "system": [{
+                "type": "text",
+                "text": "x-anthropic-billing-header: cc_version=2.1.156.abc; cc_entrypoint=cli; cch=12345;"
+            }],
+            "messages": messages
+        });
+
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::FiveMinutes,
+            MessageCacheControlRewrite::Auto,
+            true,
+        );
+        let text = String::from_utf8(out.clone()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+
+        assert!(!text.contains("cch=12345"));
+        assert!(!text.contains("cch=00000"));
+        assert_eq!(message_cache_control_positions(&parsed).len(), 4);
+
+        let actual = super::CCH_VALUE_REGEX
+            .find(&text)
+            .map(|m| m.as_str().to_string())
+            .expect("cch value exists");
+        let mut placeholder_body = out;
+        let cch_pos = placeholder_body
+            .windows(super::CCH_PLACEHOLDER.len())
+            .position(|window| window.starts_with(b"cch="))
+            .expect("cch value position");
+        placeholder_body[cch_pos + 4..cch_pos + 9].copy_from_slice(b"00000");
+        let expected =
+            String::from_utf8(compute_cch_attestation(placeholder_body, TEST_VERSION)).unwrap();
+
+        assert!(expected.contains(&actual));
+    }
+
+    #[test]
+    fn message_cache_control_stateful_recomputes_cch_after_final_body_changes() {
+        let account = test_account();
+        let rewriter = Rewriter::new();
+        let mut body = stateful_session_body("session-cch", 60);
+        body.as_object_mut().unwrap().insert(
+            "system".into(),
+            json!([{
+                "type": "text",
+                "text": "x-anthropic-billing-header: cc_version=2.1.156.abc; cc_entrypoint=cli; cch=12345;"
+            }]),
+        );
+
+        let out = rewriter.rewrite_body(
+            &serde_json::to_vec(&body).unwrap(),
+            "/v1/messages",
+            &account,
+            ClientType::ClaudeCode,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::FiveMinutes,
+            MessageCacheControlRewrite::Stateful,
+            true,
+        );
+        let text = String::from_utf8(out.clone()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_slice(&out).unwrap();
+
+        assert!(!text.contains("cch=12345"));
+        assert!(!text.contains("cch=00000"));
+        assert_eq!(message_cache_control_positions(&parsed).len(), 4);
+
+        let actual = super::CCH_VALUE_REGEX
+            .find(&text)
+            .map(|m| m.as_str().to_string())
+            .expect("cch value exists");
+        let mut placeholder_body = out;
+        let cch_pos = placeholder_body
+            .windows(super::CCH_PLACEHOLDER.len())
+            .position(|window| window.starts_with(b"cch="))
+            .expect("cch value position");
+        placeholder_body[cch_pos + 4..cch_pos + 9].copy_from_slice(b"00000");
+        let expected =
+            String::from_utf8(compute_cch_attestation(placeholder_body, TEST_VERSION)).unwrap();
+
+        assert!(expected.contains(&actual));
+    }
+
+    #[test]
+    fn strip_token_in_middle() {
+        let got = strip_beta_token(
+            "oauth-2025-04-20,context-1m-2025-08-07,interleaved-thinking-2025-05-14",
+            CTX_1M,
+        );
+        assert_eq!(got, "oauth-2025-04-20,interleaved-thinking-2025-05-14");
+    }
+
+    #[test]
+    fn strip_token_at_start() {
+        let got = strip_beta_token(
+            "context-1m-2025-08-07,oauth-2025-04-20,interleaved-thinking-2025-05-14",
+            CTX_1M,
+        );
+        assert_eq!(got, "oauth-2025-04-20,interleaved-thinking-2025-05-14");
+    }
+
+    #[test]
+    fn strip_token_at_end() {
+        let got = strip_beta_token(
+            "oauth-2025-04-20,interleaved-thinking-2025-05-14,context-1m-2025-08-07",
+            CTX_1M,
+        );
+        assert_eq!(got, "oauth-2025-04-20,interleaved-thinking-2025-05-14");
+    }
+
+    #[test]
+    fn strip_token_not_present() {
+        let got = strip_beta_token("oauth-2025-04-20,interleaved-thinking-2025-05-14", CTX_1M);
+        assert_eq!(got, "oauth-2025-04-20,interleaved-thinking-2025-05-14");
+    }
+
+    #[test]
+    fn strip_token_with_whitespace() {
+        // 客户端常发带空格格式；trim 后仍能匹配。
+        let got = strip_beta_token(
+            "oauth-2025-04-20, context-1m-2025-08-07 , interleaved-thinking-2025-05-14",
+            CTX_1M,
+        );
+        assert_eq!(got, "oauth-2025-04-20,interleaved-thinking-2025-05-14");
+    }
+
+    #[test]
+    fn strip_token_empty_header() {
+        assert_eq!(strip_beta_token("", CTX_1M), "");
+    }
+
+    #[test]
+    fn strip_token_header_is_only_the_token() {
+        assert_eq!(strip_beta_token(CTX_1M, CTX_1M), "");
+    }
+
+    #[test]
+    fn strip_token_multiple_occurrences() {
+        // 理论上不应该出现，但工具必须全部剥干净。
+        let got = strip_beta_token(
+            "context-1m-2025-08-07,oauth-2025-04-20,context-1m-2025-08-07",
+            CTX_1M,
+        );
+        assert_eq!(got, "oauth-2025-04-20");
+    }
+
+    #[test]
+    fn strip_token_ignores_empty_segments() {
+        // ",,context-1m-2025-08-07,,oauth-2025-04-20,," 这种脏数据也能处理。
+        let got = strip_beta_token(",,context-1m-2025-08-07,,oauth-2025-04-20,,", CTX_1M);
+        assert_eq!(got, "oauth-2025-04-20");
+    }
+
+    // ---- matches_1m_whitelist ----
+
+    #[test]
+    fn whitelist_default_matches_opus_and_sonnet5_models() {
+        assert!(matches_1m_whitelist(
+            "claude-opus-4-7",
+            DEFAULT_ALLOW_1M_MODELS
+        ));
+        assert!(matches_1m_whitelist(
+            "claude-opus-4-6",
+            DEFAULT_ALLOW_1M_MODELS
+        ));
+        assert!(matches_1m_whitelist(
+            "claude-sonnet-5",
+            DEFAULT_ALLOW_1M_MODELS
+        ));
+        // 大小写不敏感
+        assert!(matches_1m_whitelist(
+            "Claude-Opus-4-7",
+            DEFAULT_ALLOW_1M_MODELS
+        ));
+        assert!(matches_1m_whitelist(
+            "claude-sonnet-5",
+            "OPUS,CLAUDE-SONNET-5"
+        ));
+    }
+
+    #[test]
+    fn whitelist_default_rejects_sonnet46_and_haiku() {
+        assert!(!matches_1m_whitelist(
+            "claude-sonnet-4-6",
+            DEFAULT_ALLOW_1M_MODELS
+        ));
+        assert!(!matches_1m_whitelist(
+            "claude-haiku-4-5",
+            DEFAULT_ALLOW_1M_MODELS
+        ));
+    }
+
+    #[test]
+    fn whitelist_empty_means_block_everyone() {
+        // 运维显式置空 = 所有模型都不放行
+        assert!(!matches_1m_whitelist("claude-opus-4-7", ""));
+        assert!(!matches_1m_whitelist("claude-sonnet-4-5", ""));
+    }
+
+    #[test]
+    fn whitelist_multiple_patterns() {
+        // 运维配置 "opus,sonnet" → opus 和 sonnet 都放行
+        assert!(matches_1m_whitelist("claude-opus-4-7", "opus,sonnet"));
+        assert!(matches_1m_whitelist("claude-sonnet-4-5", "opus,sonnet"));
+        assert!(!matches_1m_whitelist("claude-haiku-4-5", "opus,sonnet"));
+    }
+
+    #[test]
+    fn whitelist_ignores_whitespace_and_empty_segments() {
+        // 脏输入："opus, , ,sonnet,," 也能解析
+        assert!(matches_1m_whitelist("claude-opus-4-7", "opus, , ,sonnet,,"));
+        assert!(matches_1m_whitelist(
+            "claude-sonnet-4-5",
+            "opus, , ,sonnet,,"
+        ));
+    }
+
+    #[test]
+    fn whitelist_precise_model_id_match() {
+        // 配置可以用完整 model id 做精确控制
+        assert!(matches_1m_whitelist("claude-opus-4-7", "claude-opus-4-7"));
+        assert!(!matches_1m_whitelist("claude-opus-4-6", "claude-opus-4-7"));
+    }
+}

@@ -15,7 +15,7 @@ from pathlib import Path
 import docker
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'orchestrator'))
+sys.path.insert(0, str(ROOT / 'services/orchestrator'))
 from project_evaluation import check_change_scope
 from project_library import ProjectLibrary, read_document, safe_relative, snapshot_tree
 from project_verifier import ProjectVerifier
@@ -193,7 +193,7 @@ def main() -> None:
     :return: None；任一任务不满足准入条件时非零退出。
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root', type=Path, default=ROOT / 'project_library')
+    parser.add_argument('--root', type=Path, default=ROOT / 'resources/project-library')
     parser.add_argument('--catalog', default='catalog-development.json')
     parser.add_argument('--image', required=True)
     parser.add_argument('--data', type=Path, required=True)

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>请求日志 · CC Runtime Bridge</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%2309684a'/%3E%3Cpath d='M26 12H17l-6 8 6 8h9' fill='none' stroke='white' stroke-width='4'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a href="/" class="brand"><span class="brand-icon">CC</span><span>Runtime Bridge<small>原生请求 · 可审计链路</small></span></a>
+    <div class="top-status"><span id="engine-badge" class="badge neutral">正在连接</span><span class="local-label">本地控制台</span></div>
+  </header>
+  <main>
+    <section class="page-heading"><div><p class="eyebrow">OBSERVABILITY</p><h1>请求日志</h1><p class="description">从调用输入到上游响应，查看每一次请求的实际处理过程。</p></div><button id="refresh" class="button primary">刷新日志</button></section>
+    <div id="health-warning" class="notice warning" hidden></div>
+    <section class="metrics" aria-label="日志概况">
+      <article><span>匹配请求</span><strong id="total-count">—</strong><small>按当前筛选条件</small></article>
+      <article><span>本页成功</span><strong id="success-count">—</strong><small>已验证完整终态</small></article>
+      <article><span>本页未完成 / 异常</span><strong id="issue-count">—</strong><small>包含等待、取消与流中断</small></article>
+      <article><span>日志模式</span><strong id="log-mode">—</strong><small id="capture-hint">凭据默认脱敏</small></article>
+    </section>
+    <section class="log-panel" aria-label="请求查询">
+      <form id="filters" class="filters">
+        <label>请求 ID<input id="requestId" name="requestId" placeholder="搜索请求标识" autocomplete="off"></label>
+        <label>模型<input id="model" name="model" placeholder="全部模型" autocomplete="off"></label>
+        <label>会话 ID<input id="sessionId" name="sessionId" placeholder="按会话关联查看" autocomplete="off"></label>
+        <label>请求类别<select id="requestClass" name="requestClass"><option value="">全部类别</option value="main">主会话</option><option value="subagent">子代理</option><option value="workflow">工作流</option><option value="compaction">压缩</option><option value="auxiliary">辅助</option><option value="side_reply">旁路回复</option><option value="unknown">未解析</option></select></label>
+        <label>状态<select id="state" name="state"><option value="">全部状态</option><option value="success">成功</option><option value="queued">等待中</option><option value="running">执行中</option><option value="http_error">上游 HTTP 错误</option><option value="stream_error">上游响应错误</option><option value="incomplete">终态未确认</option><option value="canceled">已取消</option><option value="error">本地错误</option></select></label>
+        <label>开始时间<input id="since" name="since" type="datetime-local"></label>
+        <label>结束时间<input id="until" name="until" type="datetime-local"></label>
+        <div class="filter-actions"><button class="button" type="submit">应用筛选</button><button class="text-button" id="reset-filters" type="button">重置</button></div>
+      </form>
+      <div class="table-toolbar"><span id="list-note">正在加载请求…</span><label class="toggle"><input id="auto-refresh" type="checkbox" checked> 每 3 秒刷新</label></div>
+      <div class="table-scroll"><table><caption class="sr-only">请求列表，点击请求 ID 查看完整详情</caption><thead><tr><th>时间</th><th>请求 / 会话</th><th>模型</th><th>类别</th><th>状态</th><th>HTTP</th><th>总耗时</th><th>采集</th></tr></thead><tbody id="rows"></tbody></table></div>
+      <div id="empty" class="empty" hidden><span class="empty-symbol">⌕</span><h2>还没有匹配的请求</h2><p>提交一次请求后，这里会展示输入、组装、响应及处理记录。</p></div>
+      <footer class="pagination"><span id="page-note"></span><div><button id="previous" class="button" disabled>上一页</button><button id="next" class="button" disabled>下一页</button></div></footer>
+    </section>
+    <p class="footnote">中间组装值与最终出站采样分开记录。未取得真实最终值时，页面明确显示“未采集”。</p>
+  </main>
+  <dialog id="detail" aria-labelledby="detail-title">
+    <div class="dialog-heading"><div><p class="eyebrow">REQUEST DETAIL</p><h2 id="detail-title">请求详情</h2><p id="detail-id" class="mono"></p></div><div><button id="refresh-detail" class="button">刷新详情</button><button id="close-detail" class="icon-button" aria-label="关闭详情">×</button></div></div>
+    <div class="tabs" role="tablist" aria-label="请求详情页签">
+      <button role="tab" data-tab="summary" aria-selected="true">概览</button><button role="tab" data-tab="headers" aria-selected="false" tabindex="-1">头部处理</button><button role="tab" data-tab="performance" aria-selected="false" tabindex="-1">性能</button><button role="tab" data-tab="raw" aria-selected="false" tabindex="-1">原始数据</button>
+    </div>
+    <div id="detail-content" role="tabpanel" class="detail-content"></div>
+  </dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

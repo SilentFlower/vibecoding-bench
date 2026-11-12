@@ -3,6 +3,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from source_layout import source_path
 
 from system_release import REPO, data_contracts
 from verify_database_definitions import source_ownership, verify
@@ -20,7 +21,7 @@ class DatabaseDefinitionTests(unittest.TestCase):
                 'cc2api/src/store/database_schema.rs', 'cc2api/src/store/database-migration-registry.json'):
             target = self.root / name
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(REPO / name, target)
+            shutil.copy2(source_path(REPO, name), target)
 
     def test_business_queries_and_comments_preserve_contract(self) -> None:
         """普通查询、说明及测试代码保持合同稳定。@return None。"""

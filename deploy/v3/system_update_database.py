@@ -11,10 +11,11 @@ import uuid
 from contextlib import closing
 from datetime import datetime
 from pathlib import Path
+from source_layout import source_path
 from stat import S_ISREG
 
 # 独立维护模块和测试入口沿安装后的相同目录布局定位纯运行模块。
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'orchestrator'))
+sys.path.insert(0, str(source_path(Path(__file__).resolve().parents[2], 'orchestrator')))
 from runtime_files import atomic_json, directory_fd
 from system_update_contract import safe_read, strict_json, utc_now
 

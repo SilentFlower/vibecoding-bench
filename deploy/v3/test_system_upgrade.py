@@ -5,6 +5,7 @@ import os
 from unittest.mock import patch
 import unittest
 from pathlib import Path
+from source_layout import source_path
 
 from install_system_updater import REPO, SOURCE_FILES
 from runtime_files import atomic_json, atomic_text
@@ -26,7 +27,7 @@ class UpdaterUpgradeTests(unittest.TestCase):
         self.policy = base.policy
         atomic_json(self.root / 'policy.json', self.policy)
         for name in SOURCE_FILES:
-            atomic_text(self.root / 'source' / name, (REPO / name).read_text())
+            atomic_text(self.root / 'source' / name, (source_path(REPO, name)).read_text())
         marker = self.root / 'source/deploy/v3/system_updater.py'
         atomic_text(marker, marker.read_text() + '\n# 合成旧安装标记，用于验证精确恢复。\n')
         self.before = {name: (self.root / 'source' / name).read_bytes() for name in SOURCE_FILES}
@@ -86,7 +87,7 @@ class UpdaterUpgradeTests(unittest.TestCase):
         self.assertEqual(json.loads((self.root / 'policy.json').read_text())['schema_version'], 2)
         self.assertEqual(state['catalog'], {})
         for name in SOURCE_FILES:
-            self.assertEqual((self.root / 'source' / name).read_bytes(), (REPO / name).read_bytes())
+            self.assertEqual((self.root / 'source' / name).read_bytes(), (source_path(REPO, name)).read_bytes())
         self.assertTrue(self.active)
 
     def test_failed_start_restores_exact_sources_and_policy(self) -> None:

@@ -13,7 +13,7 @@ import tokenize
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'orchestrator'))
+sys.path.insert(0, str(ROOT / 'services/orchestrator'))
 from project_library import read_document, safe_relative
 
 
@@ -250,7 +250,7 @@ def normalize(root: Path, *, apply: bool = False, translations: Path | None = No
 def main() -> None:
     """解析预览、应用和检查选项，不运行模型或外部服务。:return: None。"""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root', type=Path, default=ROOT / 'project_library')
+    parser.add_argument('--root', type=Path, default=ROOT / 'resources/project-library')
     parser.add_argument('--translations', type=Path, default=ROOT / 'scripts/project-material-language-translations.json')
     parser.add_argument('--version', default='real-development-cycles-v3-600-en-20261024')
     mode = parser.add_mutually_exclusive_group()

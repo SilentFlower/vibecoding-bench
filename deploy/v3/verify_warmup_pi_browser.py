@@ -14,6 +14,7 @@ import threading
 import time
 import urllib.request
 from pathlib import Path
+from source_layout import source_path
 
 import uvicorn
 from fastapi import FastAPI, Request
@@ -21,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from websockets.asyncio.client import connect
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / 'orchestrator'))
+sys.path.insert(0, str(source_path(ROOT, 'orchestrator')))
 
 from project_requester_settings import ProjectRequesterSettings
 from projects import ProjectsService
@@ -34,7 +35,7 @@ async def verify(evidence: Path) -> dict:
     evidence.mkdir(parents=True, exist_ok=True)
     sources = ('webui/app.js', 'webui/projects.js', 'webui/index.html', 'webui/style.css',
         'orchestrator/projects.py', 'orchestrator/projects_store.py', 'orchestrator/projects_api.py', 'deploy/v3/verify_warmup_pi_browser.py')
-    hashes = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in sources}
+    hashes = {name: hashlib.sha256((source_path(ROOT, name)).read_bytes()).hexdigest() for name in sources}
     projects = ProjectsAgentTests('test_pause_rejects_old_generation_before_any_terminal_write')
     warmup = ProjectsAgentTests('test_pause_rejects_old_generation_before_any_terminal_write')
     projects.setUp(); warmup.setUp()
@@ -148,7 +149,7 @@ async def verify(evidence: Path) -> dict:
         """读取共用脱敏模型设置。:return: 公开配置。"""
         return provider.public()
 
-    application.mount('/', StaticFiles(directory=str(ROOT / 'webui'), html=True))
+    application.mount('/', StaticFiles(directory=str(source_path(ROOT, 'webui')), html=True))
     listener = socket.socket(); listener.bind(('127.0.0.1', 0)); port = listener.getsockname()[1]
     server = uvicorn.Server(uvicorn.Config(application, lifespan='off', log_level='error', loop='asyncio'))
     thread = threading.Thread(target=server.run, kwargs={'sockets': [listener]}, daemon=True); thread.start()
@@ -373,7 +374,7 @@ async def verify(evidence: Path) -> dict:
                 assert not errors, errors
                 checks.extend(['无旧题库轮次接口或模板', '导航额度操作无Pi启动原生输入模型请求', '真实Chrome无JS异常'])
                 await rpc('Target.closeTarget', {'targetId': target['targetId']})
-        assert hashes == {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in sources}, '验证期间源码改变，结果不能复用'
+        assert hashes == {name: hashlib.sha256((source_path(ROOT, name)).read_bytes()).hexdigest() for name in sources}, '验证期间源码改变，结果不能复用'
         result = {'status': 'passed', 'checks': checks, 'source_sha256': hashes, 'javascript_errors': errors,
             'model_requests': 0, 'request_count': len(requests), 'cycle_evidence': '服务端DTO夹具驱动真实DOM；循环执行与清理由独立后端测试验证'}
         (evidence / 'report.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')

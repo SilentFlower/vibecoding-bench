@@ -5,8 +5,9 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from source_layout import source_path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'orchestrator'))
+sys.path.insert(0, str(source_path(Path(__file__).resolve().parents[2], 'orchestrator')))
 from platform_version import ensure_forward_version, read_version, signed_changes, version_from_changes
 
 

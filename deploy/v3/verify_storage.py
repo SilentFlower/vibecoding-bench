@@ -3,13 +3,14 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+from source_layout import source_path
 import subprocess
 import sys
 import tempfile
 import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / 'orchestrator'))
+sys.path.insert(0, str(source_path(ROOT, 'orchestrator')))
 from storage_maintenance import deduplicate_immutable_tree
 
 

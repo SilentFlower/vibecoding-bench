@@ -20,13 +20,14 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from source_layout import source_path
 from stat import S_ISREG, S_ISSOCK
 from urllib.parse import quote
 
 REPO = Path(__file__).resolve().parents[2]
 COMPOSE = Path(__file__).with_name("compose.yml")
 # 独立部署脚本复用镜像内的纯预算模块，避免预检和容器解释不同单位。
-sys.path.insert(0, str(REPO / "orchestrator"))
+sys.path.insert(0, str(source_path(REPO, "orchestrator")))
 from resource_budget import account_limits, isolated_account_limits
 from native_sender import prewarm_account_id, stage_asset
 from platform_version import read_version
@@ -371,7 +372,7 @@ def source_snapshot_ignore(directory: str, names: list[str]) -> set[str]:
         'project_library/projects/docutils/seed/library/sandbox/xml2rst/tag.log': 'cd84655f263f61f47c6d6b0c17281c451ce9b98ee33b5682073dd585b65cea8e',
     }
     for relative, checksum in public_files.items():
-        public = REPO / relative
+        public = source_path(REPO, relative)
         if resolved_directory == public.parent and public.name in ignored:
             if public.is_symlink() or hashlib.sha256(public.read_bytes()).hexdigest() != checksum:
                 raise ValueError('固定上游公开文件摘要不符')
@@ -382,7 +383,7 @@ def source_snapshot_ignore(directory: str, names: list[str]) -> set[str]:
         'project_library/projects/docutils/seed/library/sandbox/odf2docutils/tests/textSimple/target': 'bf69411b21f4630b72ca45b23da31db1ece7068f839e76167fef3ba807d494a6',
     }
     for relative, checksum in public_directories.items():
-        public = REPO / relative
+        public = source_path(REPO, relative)
         if resolved_directory == public.parent and public.name in ignored:
             if _public_source_directory_digest(public) != checksum:
                 raise ValueError('固定上游夹具目录摘要不符')
@@ -441,7 +442,7 @@ def build(release: str, manifest_path: Path) -> None:
         raise ValueError("批次名不合法")
     parent = command("git", "rev-parse", "HEAD", capture=True).strip()
     platform_version = read_version(REPO / 'deploy/v3/platform-release.json')['version']
-    gateway = command("git", "-C", "cc2api", "rev-parse", "HEAD", capture=True).strip()
+    gateway = parent
     dirty = bool(command("git", "status", "--porcelain", capture=True).strip())
     if manifest_path.exists():
         raise ValueError("版本清单已经存在，禁止覆盖批次")
@@ -451,10 +452,10 @@ def build(release: str, manifest_path: Path) -> None:
             "images/sidecar", "images/worker", "images/v3", "images/pi-agent", "orchestrator", "webui", "project_library",
             "research/github-projects")
         for relative in folders:
-            shutil.copytree(REPO / relative, snapshot / relative, ignore=source_snapshot_ignore)
+            shutil.copytree(source_path(REPO, relative), snapshot / relative, ignore=source_snapshot_ignore)
         for relative in ("cc2api/Cargo.toml", "cc2api/Cargo.lock", "topics.md", "deploy/v3/platform-release.json"):
             (snapshot / relative).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(REPO / relative, snapshot / relative)
+            shutil.copy2(source_path(REPO, relative), snapshot / relative)
         native_runtime = stage_asset(snapshot / "native-runtime/ccrb-runtime")
         restore_upstream_checkout_bytes(snapshot)
         digest = hashlib.sha256()

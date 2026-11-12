@@ -149,7 +149,7 @@ python3 deploy/v3/upgrade_system_updater.py \
 
 ```bash
 .venv/bin/python -m unittest discover -s deploy/v3 -p 'test_system_*.py'
-PYTHONPATH=orchestrator .venv/bin/python -m unittest discover -s orchestrator -p 'test_system_update*.py'
+PYTHONPATH=services/orchestrator .venv/bin/python -m unittest discover -s services/orchestrator -p 'test_system_update*.py'
 python3 deploy/v3/verify_system_update_browser.py --output .deploy/platform-online-update/browser
 .venv/bin/python deploy/v3/verify_system_update.py --output .deploy/platform-online-update/docker \
   --gateway-binary .deploy/platform-online-update/bookworm-binaries/claude-code-gateway \

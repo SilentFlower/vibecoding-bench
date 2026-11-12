@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import re
 from pathlib import Path
+from source_layout import source_path
 
 from system_release import REPO, migration_registries
 
@@ -20,16 +21,16 @@ def source_ownership(root: Path) -> list[str]:
     :return: 需要迁移登记的位置，不包含 SQL 或业务数据。
     """
     findings = []
-    schema = root / 'orchestrator/database_schema.py'
+    schema = source_path(root, 'orchestrator/database_schema.py')
     for node in ast.walk(ast.parse(schema.read_text())):
         if ((isinstance(node, ast.ImportFrom) and node.module != '__future__')
                 or (isinstance(node, ast.Import) and any(item.name not in ('re', 'sqlite3') for item in node.names))):
             findings.append(str(schema.relative_to(root)) + ':' + str(node.lineno))
-    rust_schema = root / 'cc2api/src/store/database_schema.rs'
+    rust_schema = source_path(root, 'cc2api/src/store/database_schema.rs')
     definitions = rust_schema.read_text().split('#[cfg(test)]', 1)[0]
     if re.search(r'\b(?:crate|super)::', RUST_LITERAL.sub(' ', definitions)):
         findings.append(str(rust_schema.relative_to(root)) + ':1')
-    for path in (root / 'orchestrator').glob('*.py'):
+    for path in (source_path(root, 'orchestrator')).glob('*.py'):
         if path.name.startswith('test_') or path.name == 'database_schema.py':
             continue
         tree = ast.parse(path.read_text())
@@ -45,7 +46,7 @@ def source_ownership(root: Path) -> list[str]:
             if path.name == 'database_migrations.py' and re.match(r'\s*CREATE TABLE IF NOT EXISTS system_schema_migrations\b', node.value):
                 continue
             findings.append(str(path.relative_to(root)) + ':' + str(node.lineno))
-    for path in (root / 'cc2api/src').rglob('*.rs'):
+    for path in (source_path(root, 'cc2api/src')).rglob('*.rs'):
         if path.name == 'database_schema.rs':
             continue
         source = path.read_text().split('#[cfg(test)]', 1)[0]

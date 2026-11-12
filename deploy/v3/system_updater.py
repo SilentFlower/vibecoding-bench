@@ -18,11 +18,12 @@ import time
 import uuid
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
+from source_layout import source_path
 from socket import SOL_SOCKET, SO_PEERCRED
 from urllib.parse import quote
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / 'orchestrator'))
+sys.path.insert(0, str(source_path(REPO, 'orchestrator')))
 from runtime_files import atomic_json, atomic_text, directory_fd
 from storage_maintenance import acquire_storage_lock
 from system_update_contract import (DEPLOYMENT_RE, DOWNLOAD_ROOT, INDEX_LIMIT, MANIFEST_LIMIT,

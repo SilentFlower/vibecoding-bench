@@ -10,9 +10,10 @@ import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from source_layout import source_path
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / 'orchestrator'))
+sys.path.insert(0, str(source_path(REPO, 'orchestrator')))
 from database_migrations import schema_checksum
 from database_migration_contract import load_registry, registry_contract
 from system_update_contract import INDEX_LIMIT, MANIFEST_LIMIT, ROLES, strict_json, utc_now, validate_index, validate_release, validate_migration_evidence, validate_migration_plan
@@ -30,10 +31,10 @@ def data_contracts(root: Path) -> dict:
 
 def migration_registries(root: Path) -> dict:
     """读取源码登记并核对首版纯迁移定义。:param root: 冻结源码根。:return: 两库登记。"""
-    values = {'bench': load_registry(root / 'orchestrator/database-migration-registry.json', 'bench'),
-        'gateway': load_registry(root / 'cc2api/src/store/database-migration-registry.json', 'gateway')}
-    actual = {'bench': schema_checksum(root / 'orchestrator/database_schema.py'),
-        'gateway': hashlib.sha256((root / 'cc2api/src/store/database_schema.rs').read_bytes().split(b'#[cfg(test)]', 1)[0]).hexdigest()}
+    values = {'bench': load_registry(source_path(root, 'orchestrator/database-migration-registry.json'), 'bench'),
+        'gateway': load_registry(source_path(root, 'cc2api/src/store/database-migration-registry.json'), 'gateway')}
+    actual = {'bench': schema_checksum(source_path(root, 'orchestrator/database_schema.py')),
+        'gateway': hashlib.sha256((source_path(root, 'cc2api/src/store/database_schema.rs')).read_bytes().split(b'#[cfg(test)]', 1)[0]).hexdigest()}
     if any(value['steps'][0]['checksum'] != actual[name] for name, value in values.items()):
         raise ValueError('迁移定义与版本登记不符')
     return values
@@ -71,7 +72,7 @@ def component_content(root: Path, role: str) -> str:
             'orchestrator/cli_quota.py', 'orchestrator/process_metrics.py', 'orchestrator/native_sender.py'])
     digest = hashlib.sha256()
     for name in names:
-        source = root / name
+        source = source_path(root, name)
         if not source.exists():
             raise ValueError('组件源码依赖缺失')
         paths = sorted(source.rglob('*')) if source.is_dir() else [source]
@@ -79,7 +80,7 @@ def component_content(root: Path, role: str) -> str:
             if path.is_file() and not any(part in ('__pycache__', 'target', 'node_modules', '.git') for part in path.relative_to(root).parts):
                 if path.is_symlink():
                     raise ValueError('组件源码不能是符号链接')
-                digest.update(str(path.relative_to(root)).encode() + b'\0')
+                digest.update(str(Path(name) / path.relative_to(source) if source.is_dir() else Path(name)).encode() + b'\0')
                 digest.update(hashlib.sha256(path.read_bytes()).digest())
     return digest.hexdigest()
 

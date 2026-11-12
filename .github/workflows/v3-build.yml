@@ -14,10 +14,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: 检出父仓与子仓
+      - name: 检出统一源码仓库
         uses: actions/checkout@v6
         with:
-          submodules: recursive
           persist-credentials: false
       # 与正式镜像保持同一 Python 次版本，避免 runner 默认版本漂移破坏依赖安装。
       - name: 设置 Python 3.12
@@ -27,12 +26,12 @@ jobs:
       - name: 验证系统更新合同与恢复状态机
         run: |
           python3 -m venv "$RUNNER_TEMP/v3-update-venv"
-          "$RUNNER_TEMP/v3-update-venv/bin/pip" install -r orchestrator/requirements.txt PyYAML==6.0.3
+          "$RUNNER_TEMP/v3-update-venv/bin/pip" install -r services/orchestrator/requirements.txt PyYAML==6.0.3
           python3 deploy/v3/verify_database_definitions.py
           # 宿主快照测试需核验跨进程数据库句柄，使用与正式执行器相同的 root 权限。
           sudo "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest discover -s deploy/v3 -p 'test_system*.py'
-          "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest discover -s orchestrator -p 'test_system_update*.py'
-          PYTHONPATH=orchestrator:deploy/v3 "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest test_publication test_system_workflow test_database_definitions test_database_migrations test_database_compatibility
+          "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest discover -s services/orchestrator -p 'test_system_update*.py'
+          PYTHONPATH=services/orchestrator:deploy/v3 "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest test_publication test_system_workflow test_database_definitions test_database_migrations test_database_compatibility
       - name: 构建两个镜像并生成版本清单
         run: python3 deploy/v3/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3-local.json
       - name: 保存本地构建清单

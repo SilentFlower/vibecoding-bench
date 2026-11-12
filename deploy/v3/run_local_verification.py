@@ -136,7 +136,7 @@ def main() -> None:
             service_token=uuid.uuid4().hex+uuid.uuid4().hex
             runner = client.containers.run(manifest["images"]["control"]["reference"], ["/source/deploy/v3/verify_local.py", "--proxy-ip", proxy], entrypoint="python", detach=True,
                 network=network.name, labels={**labels, "vibebench.role": "orchestrator"},
-                environment={"PYTHONPATH": "/source/orchestrator", "V3_DEPLOYMENT_ID": deployment, "V3_RELEASE": manifest["release"],
+                environment={"PYTHONPATH": "/source/services/orchestrator", "V3_DEPLOYMENT_ID": deployment, "V3_RELEASE": manifest["release"],
                     "V3_ACCOUNT_IMAGE": manifest["images"]["account"]["reference"], "V3_NETWORK": network.name, "VERIFY_HOST_ROOT": str(root), "V3_WORKER_SCRIPT": "/source/images/worker/entrypoint.sh",
                     "V3_ACCOUNT_MEMORY": "1536m", "V3_ACCOUNT_SWAP": "2048m",
                     "VERIFY_LEGACY_CONTROL_IMAGE": args.legacy_control_image or "",
@@ -154,7 +154,7 @@ def main() -> None:
                     'VERIFY_SCENARIO_BROWSER':'1' if args.scenario_browser else '0',
                     'VERIFY_SCENARIO_FAILURES':'1' if args.scenario_failures else '0',
                     'VERIFY_SCENARIO_RECOVERY_ONLY':'1' if args.scenario_recovery_only else '0',
-                    'V3_INTERNAL_TOKEN':service_token,'WEBUI_DIR':'/source/webui',
+                    'V3_INTERNAL_TOKEN':service_token,'WEBUI_DIR':'/source/apps/legacy-web',
                     'PER_ACCOUNT_CONCURRENCY':str(args.scenario_capacity) if args.project_scenarios_only else os.environ.get('PER_ACCOUNT_CONCURRENCY','2'),
                     "VERIFY_PROJECT_CATALOG_ONLY": "1" if args.project_catalog_only else "0",
                     "VERIFY_PROJECT_SCHEDULING_TASKS_ONLY": os.environ.get("VERIFY_PROJECT_SCHEDULING_TASKS_ONLY", "0")},

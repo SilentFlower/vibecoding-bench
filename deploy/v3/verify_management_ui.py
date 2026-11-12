@@ -5,6 +5,7 @@ import copy
 import json
 import re
 from pathlib import Path
+from source_layout import source_path
 from urllib.parse import urlsplit
 
 from verify_environment_ui import BASE, ROOT, Fixture
@@ -109,7 +110,7 @@ async def run(output):
         browser = await playwright.chromium.launch()
         for zone, theme in [('Asia/Shanghai', 'light'), ('America/Los_Angeles', 'dark')]:
             context = await browser.new_context(viewport={'width': 1280, 'height': 1000}, timezone_id=zone)
-            fixture = ManagementFixture(ROOT / 'cc2api/web/dist')
+            fixture = ManagementFixture(source_path(ROOT, 'cc2api/web/dist'))
             await context.route('**/*', fixture.route)
             await context.add_init_script(f"localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','{theme}');")
             page = await context.new_page()
@@ -174,7 +175,7 @@ async def run(output):
             await expect(page.locator('tbody')).to_contain_text(expected_time)
             await expect(page.locator('tbody')).to_contain_text(zone)
             await page.get_by_role('button', name='详情', exact=True).click()
-            await expect(page.get_by_text('该账号在本次请求发生时关闭了内容采集。开启后对后续请求生效。')).to_be_visible()
+            await expect(page.get_by_text('本次请求未保存阶段原文。请核对全局 debug 日志级别与账号内容采集设置。')).to_be_visible()
             await page.get_by_role('tab', name='原始数据', exact=True).click()
             assert fixture.capture_reads == 0
             assert await page.get_by_role('button', name='读取阶段证据').count() == 0

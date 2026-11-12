@@ -9,6 +9,7 @@ import mimetypes
 import re
 import time
 from pathlib import Path
+from source_layout import source_path
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -168,7 +169,7 @@ class Fixture:
         else:
             if path.startswith('/runtime/'):
                 filename = path.removeprefix('/runtime/') or 'index.html'
-                directory = ROOT / 'webui'
+                directory = source_path(ROOT, 'webui')
             elif path in ('/', '/environments', '/tasks', '/requests', '/updates'):
                 directory, filename = self.gateway, 'index.html'
             else:
@@ -507,7 +508,7 @@ def main() -> None:
     """解析本地证据路径并执行验收。@return None。"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=ROOT / '.deploy/environment-ui-verification')
-    parser.add_argument('--gateway-dist', type=Path, default=ROOT / 'cc2api/web/dist')
+    parser.add_argument('--gateway-dist', type=Path, default=source_path(ROOT, 'cc2api/web/dist'))
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     assert (args.gateway_dist / 'index.html').is_file(), '先在 cc2api/web 执行 npm run build 准备主后台静态产物'

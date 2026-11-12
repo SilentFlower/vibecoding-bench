@@ -1,0 +1,780 @@
+# Database Guidelines
+
+> 本项目数据库的写法与约定。
+
+---
+
+## Overview
+
+- **数据库**:SQLite 单文件,位于 `data/db.sqlite`(容器内为 `/data/db.sqlite`)
+- **驱动**:Python 标准库 `sqlite3`,**不用任何 ORM**(无 SQLAlchemy / Tortoise / Peewee)
+- **schema 定义**：冻结于 `services/orchestrator/database_schema.py`；原 `_SCHEMA` 和各 store 导出保留兼容别名。
+- **migration**：`services/orchestrator/database_migrations.py` 按固定登记执行，`main.init_db()` 复用同一入口；版本台账为 `system_schema_migrations`。
+- **连接**:每次操作 `get_db()` 新建一个 `sqlite3.Connection`,**用完显式 close**(放进 `try/finally`)
+- **行类型**:`conn.row_factory = sqlite3.Row` —— 取出的行可以按列名访问(`row["name"]`),返回前 `dict(row)` 转为 JSON 友好
+- **并发写**:全局 `_db_lock = threading.Lock()` 保护所有写入(SQLite 写本来就是串行的,加锁是为了让 Python 这一层也不会拿到 `database is locked`)
+
+---
+
+## Query Patterns
+
+### 写入(必须加 `_db_lock`)
+
+```python
+with _db_lock:
+    conn = get_db()
+    try:
+        with conn:                       # with conn → 自动 commit / rollback
+            cur = conn.execute(
+                "INSERT INTO accounts(name, profile_path, enabled) VALUES(?,?,?)",
+                (name, path, 1),
+            )
+            return {"id": cur.lastrowid}
+    except sqlite3.IntegrityError as e:
+        raise HTTPException(400, f"account exists: {e}")
+    finally:
+        conn.close()
+```
+
+### 读取(不需要 `_db_lock`)
+
+```python
+conn = get_db()
+try:
+    rows = conn.execute("SELECT * FROM accounts ORDER BY id").fetchall()
+    return [dict(r) for r in rows]
+finally:
+    conn.close()
+```
+
+### 动态字段 UPDATE(`Scheduler._update` 模式)
+
+调度器要按需更新 runs 的若干列,用这种"列名拼字符串、值用占位符"的写法:
+
+```python
+def _update(self, run_id: str, **fields) -> None:
+    if not fields:
+        return
+    cols = ", ".join(f"{k}=?" for k in fields)   # 列名拼接(只接受内部传参,不来自用户)
+    params = list(fields.values()) + [run_id]
+    with _db_lock:
+        conn = get_db()
+        try:
+            with conn:
+                conn.execute(f"UPDATE runs SET {cols} WHERE id=?", params)
+        finally:
+            conn.close()
+```
+
+> **安全要点**:列名是 f-string 拼接,**只允许来自代码内部 `**fields` 的 keyword**,**绝不能**把用户输入(如 query 参数 / body 字段)直接作为列名拼进 SQL。
+
+### 参数化:永远用 `?`,绝不字符串拼接值
+
+```python
+# ✓ 正确
+conn.execute("SELECT * FROM tasks WHERE id=?", (tid,))
+
+# ✗ 错误(SQL 注入)
+conn.execute(f"SELECT * FROM tasks WHERE id={tid}")
+```
+
+---
+
+## Migrations
+
+现有初始化已登记为 `bench.baseline.1`，纯定义及其默认值、命名空间依赖保持冻结。新增结构或回填按新版本登记并实现执行分支，保留已登记摘要；构建检查拒绝业务模块中的 DDL 和迁移纯模块对可变业务默认值的依赖。
+
+维护入口为 `python3 -m database_migrations plan|apply|verify --operation-id <UUID> --target-version <N>`。默认数据库 `/data/db.sqlite`。已登记库仍核验最低实际结构；兼容新增字段保留。基线沿原幂等初始化，完成后核验再登记；后续增量执行与台账在显式事务内提交。`init_db()` 重复执行保留数据和原台账身份。
+
+字段、错误矩阵、双库快照及回退合同统一见[平台自动迁移规范](../../platform/deploy/platform-online-update.md#scenario-自动数据库迁移与原操作恢复)。
+
+---
+
+## Naming Conventions
+
+- **表名**:复数 + 小写 + 下划线,如 `accounts` / `tasks` / `runs`
+- **主键**:除 `runs` 外都用 `id INTEGER PRIMARY KEY AUTOINCREMENT`。`runs.id` 是 `TEXT PRIMARY KEY`(`uuid.uuid4().hex[:12]`,12 位 hex 短 ID,方便 URL / 日志显示)
+- **外键列**:`<table>_id`,如 `account_id` / `task_id`。**SQLite 默认不校验外键**(若需校验自行 `PRAGMA foreign_keys=ON`),但仍写 `FOREIGN KEY(...) REFERENCES ...` 表达意图
+- **时间戳**:`created_at REAL DEFAULT (julianday('now'))` / `started_at REAL` / `ended_at REAL`,Julian Day 浮点数,客户端按需转。**不存时区**,默认 UTC
+- **布尔**:存 `INTEGER`(0 / 1),Python 侧用 `bool(int(...))` 或 `int(bool)` 互转
+- **索引**:`idx_<table>_<col>`,如 `idx_runs_status` / `idx_runs_account` / `idx_runs_task`。只为 SSE 流端点和 list 端点的 ORDER BY / WHERE 列加索引,**不要预先全列建索引**
+
+---
+
+## Account Soft Deletion Contract
+
+### 1. Scope / Trigger
+
+账号删除必须区分"无历史引用的物理删除"和"有历史引用的软删除"。只要账号被 `tasks`、`runs` 或 `task_batches` 引用,就不能直接硬删账号行,否则历史任务 / 运行记录会留下无法解释的 `account_id`。
+
+### 2. Signatures
+
+- DB: `accounts.deleted_at REAL`
+- 可用账号 SQL: `SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL`
+- 账号列表 API: `GET /api/accounts` 默认只返回 `deleted_at IS NULL`
+- 删除 API: `DELETE /api/accounts/{aid}` 无引用时物理删除;有引用时 `UPDATE accounts SET enabled=0, deleted_at=? WHERE id=?`
+
+### 3. Contracts
+
+- 软删除账号仍保留 `accounts.id` 和 `accounts.name`,用于历史任务 / 运行记录引用。
+- 软删除账号必须退出所有新工作入口:创建任务、创建批次、抓包 run、旧任务再次运行、继续对话、额度查询、后台 OAuth access token 刷新。
+- 同名重新添加 / 登录时,如果存在同名软删除账号,恢复原行并设置 `enabled=1, deleted_at=NULL`,避免 `accounts.name UNIQUE` 造成不可恢复的重复账号错误。
+- 前端依赖 `/api/accounts` 作为可选账号来源;后端过滤后,账号页和下拉应自然隐藏软删除账号。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+|------|------|
+| 删除账号无 `tasks` / `runs` / `task_batches` 引用 | `DELETE FROM accounts WHERE id=?` |
+| 删除账号仍有历史引用 | `enabled=0, deleted_at=<now>` 并返回删除成功语义 |
+| 新工作入口收到软删除账号 ID | 返回 `404 account not found or disabled`,不启动 worker / sidecar |
+| 后台 OAuth refresh 扫描账号 | 只查询 `enabled=1 AND deleted_at IS NULL` |
+| 同名软删除账号重新添加 / 登录 | 恢复原 `accounts.id`,清空 `deleted_at` |
+
+### 5. Good/Base/Bad Cases
+
+**Good**:删除有历史 run 的账号后,账号页和任务下拉不再出现该账号,后台 refresh 不再读取它,历史运行列表仍可用 `acc#<id>` fallback 展示。
+
+**Base**:删除没有任何历史引用的测试账号时,直接物理删除账号行。
+
+**Bad**:只把 `enabled=0` 当删除。这样账号仍会出现在 `/api/accounts` 和前端下拉里,用户看到"已停用"但没有真正从视图移除。
+
+**Bad**:有历史引用时直接 `DELETE FROM accounts`。SQLite 默认不强制外键,这不会立刻报错,但会制造孤儿任务和运行记录。
+
+### 6. Tests Required
+
+- 旧 DB 启动后 `accounts.deleted_at` 会被 `init_db()` 幂等补列。
+- 删除有历史引用账号后,`/api/accounts` 不返回该账号,`_get_available_account()` 返回 `None`。
+- 软删除账号调用额度查询、创建任务、创建批次、抓包、旧任务 run、继续对话时返回 404,且不启动 worker / sidecar。
+- 同名重新添加 / 登录软删除账号时恢复原 `accounts.id`,并清空 `deleted_at`。
+- 删除无历史引用账号时,账号行被物理删除。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```python
+row = conn.execute("SELECT * FROM accounts WHERE id=?", (account_id,)).fetchone()
+```
+
+#### Correct
+
+```python
+row = conn.execute(
+    "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL",
+    (account_id,),
+).fetchone()
+```
+
+---
+
+## Scenario: cc2api 绑定与定时养号状态机
+
+### 1. Scope / Trigger
+
+- 修改 `accounts.cc2api_account_id`、`warmup_*` 字段、`runs.run_kind='warmup'`、养号认领/终态回调，或绑定账号 worker 启动顺序时适用。
+- 目标是让 cc2api 成为绑定账号 AT/RT 的唯一刷新所有者，同时保证调度跨重启恢复且同账号不会创建并行养号 run。
+
+### 2. Signatures
+
+账号绑定与调度字段：
+
+```text
+accounts.cc2api_account_id             INTEGER NULL UNIQUE
+accounts.warmup_enabled                INTEGER DEFAULT 0
+accounts.warmup_interval_min_hours     INTEGER DEFAULT 3
+accounts.warmup_interval_max_hours     INTEGER DEFAULT 5
+accounts.warmup_next_run_at            REAL NULL
+accounts.warmup_last_attempt_at        REAL NULL
+accounts.warmup_last_run_id            TEXT NULL
+accounts.warmup_last_status            TEXT NULL
+accounts.warmup_last_error             TEXT NULL
+accounts.warmup_auth_failures          INTEGER DEFAULT 0
+runs.run_kind                           TEXT; warmup 表示养号真实 run
+```
+
+进程内串行入口：
+
+```python
+_oauth_owner_lock(account_name)
+_profile_lock(account_name)
+_cc2api_binding_lock
+_require_cc2api_binding_available(bench_account_id, cc2api_account_id)
+WarmupScheduler.trigger_account(account_id, require_due=False)
+WarmupScheduler.handle_run_started(run_id)
+WarmupScheduler.handle_run_terminal(run_id, expected_cc2api_account_id=None)
+```
+
+### 3. Contracts
+
+- `init_db()` 必须先 `_ensure_column` 补齐所有绑定/养号列，再创建 `cc2api_account_id IS NOT NULL` 的唯一索引；旧账号默认未绑定且养号关闭。
+- 只要 `cc2api_account_id` 非空，即使 `warmup_enabled=0`，bench 后台和 worker 也不得使用 RT 本地刷新。
+- 绑定、改绑、解绑与 worker 创建共用 `_oauth_owner_lock(account_name)`；worker 必须在锁内重新读取账号、同步 cc2api 最终凭据并完成 `Runner.start_run`，绑定接口必须在同一把锁内检查 active run/continue/login 后再写 DB。
+- 不同 bench 账号的绑定或改绑还必须经过 `_cc2api_binding_lock` 串行化，并在 resolve/profile 写入前调用 `_require_cc2api_binding_available`。唯一索引是最终兜底，不能等 profile 已经写入其它账号的 AT/RT 后才依赖索引报错。
+- 已绑定账号调用“同步到 cc2api”时，当前 `accounts.cc2api_account_id` 是权威来源；只能校验并同步这个 ID。改绑必须走显式选择接口，不能重新按 profile 身份静默匹配到另一个 cc2api 账号。
+- `_oauth_owner_lock` 可以包住 cc2api HTTP 和 profile I/O，但不得包住 `_db_lock` 下的长事务；所有 cc2api HTTP 仍在 `_db_lock` 外执行。锁顺序固定为 `owner lock -> profile lock`，禁止反向获取。
+- 养号到期认领时把 `warmup_next_run_at=NULL`、状态写为 `preparing`；预同步成功后创建 queued run，但 queued run 拿到账号 semaphore 时必须再次同步，不能用“已准备”标记跳过。
+- `handle_run_started` 只把仍启用且 `warmup_last_run_id` 匹配的账号写为 `running`。用户已主动关闭时保持 `off`。
+- 终态后按配置随机写下一次时间；普通失败/超时/停止继续调度，连续 3 次 `auth_failed` 暂停，包含 `invalid_grant`、账号不存在/禁用或凭据结构错误的首个认证失败立即暂停。
+- 终态回调必须携带本次 run 启动时的 `expected_cc2api_account_id`，并在写入认证失败计数、暂停状态或下一次时间前确认当前绑定仍相同。run 写入终态后到回调执行前允许用户改绑，旧 run 不能污染新绑定的调度状态。
+- `stop_run` 把 run 写成 `stopped` 后必须立即调用终态 helper，不能等待原调度线程稍后收口。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 数据库行为 |
+|------|------------|
+| 同一 cc2api ID 绑定第二个 bench 账号 | profile 写入前返回 409；唯一索引继续做最终兜底 |
+| 已绑定账号同步时 profile 身份指向另一个 cc2api 账号 | 返回 409，原绑定和 profile AT/RT 保持不变 |
+| 绑定切换时存在 queued/running/stopping run | 拒绝切换，原绑定不变 |
+| 存在 active continue/login 会话 | 拒绝绑定切换或解绑 |
+| 到期账号已有 active warmup run | 不新建 run，账号最近状态指向已有 run |
+| 预同步成功但排队期间 RT 已轮换 | semaphore 后再次同步，worker 使用最终 AT/RT 快照 |
+| cc2api 临时网络失败 | 不建 task/run，状态 `sync_failed`，`now + WARMUP_SYNC_RETRY_SEC` 重试 |
+| 首次 `auth_failed` 含 `invalid_grant` | `warmup_enabled=0`、状态 `paused`、next 置空 |
+| 用户关闭养号后旧 run 收口 | 保持 `off`，不得改成 `paused` |
+| cc2api#7 的旧 run 终态前账号已改绑到 cc2api#8 | 旧回调直接返回，不修改 cc2api#8 的状态或失败计数 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：养号 run 排队 20 分钟后获得 semaphore，启动前重新 resolve；期间 cc2api 已轮换 RT，最终 profile 和 worker 都使用新快照。
+- Good：两个 bench 账号同时尝试绑定同一个 cc2api ID，绑定锁让其中一个先完成，另一个在 resolve 和 profile 写入前收到 409。
+- Base：未绑定老账号继续走原本本地 OAuth 刷新和普通 run 路径，所有新增列保持默认值。
+- Bad：在认领阶段同步一次后给 task 写 `credentials_prepared=true`，真正启动时跳过同步；排队期间轮换的 RT 会被遗漏。
+- Bad：解绑只检查一次 DB 后直接 UPDATE；检查与 worker 创建之间的竞态会同时产生 cc2api 和 Claude Code 两个 RT 刷新所有者。
+- Bad：已绑定账号点击同步时重新按 UUID/邮箱匹配，先写入新账号凭据，再由 DB 拒绝改绑；这会让 profile 与绑定 ID 短暂或长期不一致。
+- Bad：终态回调只检查 `warmup_last_run_id`，不检查 run 启动时的绑定 ID；旧 `invalid_grant` 可能暂停刚改绑的新账号。
+
+### 6. Tests Required
+
+- 旧 SQLite 幂等升级后断言新增列和唯一索引存在。
+- 并发模拟慢旧 resolve 与快新 resolve，断言 resolve + profile 写入整体串行且最终文件是新快照。
+- worker 创建阶段阻塞并并发解绑，断言解绑等待 owner lock，随后因 active run 返回 409。
+- 覆盖已绑定账号同步不会重新匹配其它 cc2api ID，错误前后 profile AT/RT 不变。
+- 覆盖重复绑定在 resolve/profile 写入前返回 409，且未调用 cc2api 凭据解析。
+- 覆盖 active run、continue、login 分别阻止绑定切换/解绑。
+- 覆盖 warmup 预同步后启动前再次同步、账号状态进入 `running`、停止后立即安排 next。
+- 覆盖首个永久认证错误立即暂停、第三个普通 `auth_failed` 暂停、用户关闭后终态保持 `off`。
+- 覆盖旧绑定 run 终态晚于改绑完成时，新的绑定状态、next 和认证失败计数均保持不变。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```python
+snapshot = cc2api_client.resolve_credentials(account_id, 2400)
+with _profile_lock(name):
+    write_profile(snapshot)
+```
+
+resolve 在锁外时，慢旧响应可能最后写回并覆盖新凭据。
+
+#### Correct
+
+```python
+with _profile_lock(name):
+    snapshot = cc2api_client.resolve_credentials(account_id, 2400)
+    write_profile_locked(snapshot)
+```
+
+绑定所有权切换还必须再包外层 `_oauth_owner_lock(name)`，并让 worker 启动使用同一把 owner lock。
+
+#### Wrong：终态回调使用当前绑定作为更新条件
+
+```python
+account = load_account(run["account_id"])
+update_warmup_state(account["cc2api_account_id"], run["status"])
+```
+
+run 进入终态后、回调执行前可能已经改绑；此时“当前绑定”不是该 run 的凭据所有者。
+
+#### Correct：用 run 启动时的绑定快照保护回调
+
+```python
+def handle_run_terminal(run_id, expected_cc2api_account_id):
+    account = load_account_for_update(run_id)
+    if account["cc2api_account_id"] != expected_cc2api_account_id:
+        return
+    update_warmup_state(account, run_id)
+```
+
+---
+
+## Scenario: run Claude Code 运行身份快照与继续对话
+
+### 1. Scope / Trigger
+
+- 修改 `runs.claude_code_version`、`runs.claude_effort_level`、`runs.capture_permission_mode`、Claude Code 版本/思考预算/抓包权限模式、普通/批量/养号/抓包 run 创建、调度 payload、worker 启动或继续对话时适用。
+- CLI 版本、思考预算和抓包权限模式共同属于 run 的可恢复执行身份。页面覆盖、抓包单次选择或 `.env` 只在创建新 run 时解析，不能在排队启动或继续历史会话时重新解释，否则同一会话会因全局设置变化产生漂移。
+
+### 2. Signatures
+
+数据库字段与兼容升级：
+
+```text
+runs.claude_code_version TEXT NULL
+runs.claude_code_version_source TEXT NULL
+runs.claude_effort_level TEXT NULL
+runs.capture_permission_mode TEXT DEFAULT 'bypassPermissions'
+init_db() -> _ensure_column(conn, "runs", "claude_code_version", "TEXT")
+init_db() -> _ensure_column(conn, "runs", "claude_effort_level", "TEXT")
+init_db() -> _ensure_column(
+    conn,
+    "runs",
+    "capture_permission_mode",
+    "TEXT DEFAULT 'bypassPermissions'",
+)
+```
+
+运行身份解析与 worker 边界：
+
+```python
+effective_claude_code_version() -> str
+effective_runtime_effort() -> str
+_resolve_run_claude_code_version(value: Optional[str]) -> str
+_resolve_run_claude_effort_level(value: Optional[str]) -> str
+_resolve_capture_permission_mode(value: Optional[str]) -> str
+_ensure_run_claude_code_version(run: dict) -> str
+_ensure_run_claude_effort_level(run: dict) -> str
+Runner.start_run(run_id: str, account: dict, task: dict) -> tuple[str, str]
+Runner.start_continue(
+    sid: str,
+    run: dict,
+    account: dict,
+    session_id: str,
+) -> tuple[str, str]
+CaptureRunIn.effort_level: Optional[str]
+CaptureRunIn.claude_code_version: Optional[StrictStr]
+CaptureRunIn.permission_mode: Literal[
+    "manual",
+    "acceptEdits",
+    "plan",
+    "auto",
+    "dontAsk",
+    "bypassPermissions",
+]
+worker env: CLAUDE_PERMISSION_MODE
+Claude CLI: --permission-mode <manual|acceptEdits|plan|auto|dontAsk|bypassPermissions>
+```
+
+相关 API：
+
+```text
+POST /api/tasks/{tid}/run
+POST /api/captures/run
+POST /api/runs/{rid}/continue/start
+GET  /api/runs
+GET  /api/runs/{rid}
+GET  /api/runs/{rid}/capture
+GET  /api/settings/runtime-effort
+```
+
+### 3. Contracts
+
+- 普通、批量和养号入口创建每个 run 时，版本按账号配置优先、全局有效版本兜底解析，思考预算取 `effective_runtime_effort()`；版本及来源写入 `runs`，版本与预算同时传给 scheduler，新 run 的两个身份字段必须非空。批次和旧养号在创建事务内重读账号，不能沿用长期调度对象中的旧配置；全局函数仍只负责页面全局覆盖与 `.env`。完整配置契约见 [账号 CLI 版本与迭代抓包](account-runtime-v3.md#scenario-账号-cli-版本与迭代抓包)。
+- 抓包入口的版本按 `CaptureRunIn.claude_code_version` 显式值 > 账号配置 > 全局有效版本解析，单次值不回写设置；思考预算取 `CaptureRunIn.effort_level`，空值必须回退进程启动时的 `.env` 常量 `CLAUDE_CODE_EFFORT_LEVEL`，不得读取 WebUI 普通/批量 run 的运行时覆盖。
+- 抓包入口的 `permission_mode` 只允许 Claude Code 2.1.280 CLI 暴露的 `manual`、`acceptEdits`、`plan`、`auto`、`dontAsk` 与 `bypassPermissions`，缺省为 `bypassPermissions`；选定值必须同时写入 `runs.capture_permission_mode` 和 scheduler task payload。普通、批量、养号、登录、quota 与 OAuth refresh 不提供单次模式入口。
+- 抓包页面必须从 `GET /api/settings/runtime-effort` 的 `allowed_efforts` 生成独立选择器，并提供“默认 `.env`”选项。该选择只覆盖当前抓包 run；窄屏布局必须换行，不能裁切选择器。
+- 抓包页面的权限模式选择器默认提交 `bypassPermissions`，抓包创建响应和抓包详情都返回实际 `permission_mode`；索引暂不可用时仍须展示该快照。
+- `Runner.start_run()` 必须读取 `task["claude_code_version"]`、`task["claude_effort_level"]` 和可选 `task["capture_permission_mode"]`，并分别注入 worker 环境；普通 run 缺少权限字段时固定回退 `bypassPermissions`。从创建到真正取得 semaphore 期间，即使 WebUI 覆盖或 `.env` 改变，已排队 run 仍使用创建时快照。
+- 同一 task 再次运行会创建新的 run；新 run 使用再次运行时的当前有效运行身份，不继承旧 run 快照，也不修改旧 run。
+- `POST /api/runs/{rid}/continue/start` 必须在启动 worker 前依次调用 `_ensure_run_claude_code_version(run)` 和 `_ensure_run_claude_effort_level(run)`；`Runner.start_continue()` 只使用 run 字典中的三个快照，不得无条件读取当前全局配置。
+- continue worker 使用 `WORKER_MODE=login` 空转，真正恢复会话的是 WebSocket 路径里的独立 `claude --resume`。因此权限模式既要保存到 `ContinueSession` 并传入 exec 环境，也要在该命令上显式追加 `--permission-mode "$CLAUDE_PERMISSION_MODE"`；只给容器设置环境变量并不会自动改变 Claude CLI 权限模式。
+- 历史 run 允许两个快照字段为 NULL。版本为空或空白时，优先核对原执行登记的 source、容器和环境代次，匹配则恢复其版本，否则按账号继承解析；在 `_db_lock` 内重读并条件写入版本及 `legacy-*` 来源一次。思考预算保留 `IS NULL` 条件补写 `.env` 常量。后续继续复用已补写值，即使第一次启动失败或默认配置改变；排队启动也不得重新解释非空快照。
+- 历史 run 的 `capture_permission_mode` 为空时解释为 `bypassPermissions`，无需把 Auto 推断或补写到旧会话。
+- `_resolve_run_claude_code_version()` 和 `_resolve_run_claude_effort_level()` 的空值回退只用于历史测试或旧内部调用兼容；所有生产 run 创建入口都必须显式传递两个快照，不能把回退当作正常调度路径。
+- run 列表/详情通过现有 `SELECT *` 返回三个快照；抓包创建响应和抓包详情必须显式返回 `claude_code_version`、`claude_effort_level` 与 `permission_mode`。抓包索引暂不可用时，详情仍必须展示这些运行身份字段。
+- worker 的 `CLAUDE_CODE_EFFORT_LEVEL` 必须使用 run 快照；`PROFILE_CLAUDE_CODE_EFFORT_LEVEL` 仍使用 `.env` 常量，二者不能混用。
+- 所选抓包模式只通过当前 Claude CLI 的 `--permission-mode <mode>` 生效。orchestrator 与 worker 写入账号 profile 的 `permissions.defaultMode` 必须继续保持 `bypassPermissions`，禁止把单次抓包模式持久化到后续普通 run。
+- 新登录、重授权、额度查询和后台 OAuth refresh 按账号继承版本，不继承某个历史 run；登录会话与草稿在创建时冻结版本，后续 auth 子命令和恢复沿用原值，无账号记录的新草稿使用全局。API-only transport 不因版本配置安装或唤醒 CLI。
+- worker entrypoint 仍负责核对并安装精确版本；指定版本安装失败时 run 明确失败，不得静默退回镜像内版本。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+|------|------|
+| 新建普通/批量/养号 run | DB 行和 scheduler payload 保存同一组非空版本、当前有效思考预算 |
+| 新建抓包 run 并显式选择预算 | DB、scheduler payload、创建响应保存版本和所选预算 |
+| 新建抓包 run 未传权限模式 | DB、scheduler、worker 和响应均使用 `bypassPermissions` |
+| 新建抓包 run 选择任一合法模式 | DB 和 scheduler 保存原值，worker 执行 `claude --permission-mode <mode>` |
+| 抓包权限模式不在六值集合中 | Pydantic 拒绝请求，不创建 task/run，不启动 worker |
+| 抓包预算留空且页面有全局预算覆盖 | 抓包保存 `.env` 预算，忽略普通/批量 run 的页面覆盖 |
+| 抓包预算不是 `max/xhigh/high/medium/low` | 返回 400，不创建 task/run，不启动 worker |
+| run 排队后页面覆盖或 `.env` 改变 | 已排队 run 使用原运行身份；之后新建 run 才使用新配置 |
+| 已有快照的 run 点击继续 | continue worker 使用原版本和预算，不读取当前全局配置 |
+| 任一模式的抓包 run 点击继续 | `ContinueSession` 与真实 `claude --resume` 都使用原模式快照 |
+| 历史 run 两个快照为空 | 首次继续原子补写版本和 `.env` 预算；后续固定使用补写值 |
+| 并发触发同一历史 run 的首次继续 | `_db_lock` 内重新读取，只有第一个空值补写生效，后续读取已保存值 |
+| run 中保存的版本或思考预算格式无效 | 继续接口返回 400，不启动 worker |
+| run 不存在、未结束或账号不可用 | 沿用 continue 接口的 404/400，不执行快照补写和 worker 启动 |
+| worker 无法安装快照指定版本 | run/continue 明确失败，不降级到镜像默认版本 |
+
+### 5. Good/Base/Bad Cases
+
+- Good：以版本 `2.1.260`、预算 `high` 创建抓包 run，关闭 worker 后把页面设置改成版本 `2.1.257`、预算 `low`；继续该 run 仍启动 `2.1.260/high`。
+- Good：普通 run 使用页面预算 `low`，抓包选择器留空且 `.env` 为 `max`；抓包 DB、响应和 worker 都使用 `max`。
+- Good：正式抓包选择 `plan` 后，首次 worker 和 WebSocket continue 的 Claude 命令都显式带 `--permission-mode plan`，账号 profile 仍保存 `bypassPermissions`。
+- Good：历史 NULL run 首次继续时补写版本 `2.1.260` 和 `.env` 预算 `high`；即使启动失败并在第二次继续前改为 `2.1.257/low`，第二次仍使用已补写的 `2.1.260/high`。
+- Base：账号和页面均没有覆盖值时，普通/批量/养号 run 使用 `.env` 的版本和预算；保存合法默认配置后，只有之后创建的新 run 使用新值。
+- Base：历史抓包 run 没有权限模式列值时按 `bypassPermissions` 恢复，不猜测为 Auto。
+- Bad：在 `Runner.start_run()` 或 `Runner.start_continue()` 中直接调用当前有效配置函数。排队等待或关闭后继续会把可变全局配置误当成 run 身份。
+- Bad：抓包预算留空时调用 `effective_runtime_effort()`。这会把普通 run 的页面覆盖错误泄漏到协议抓包。
+- Bad：只把版本或预算放进内存 task payload，不写入 `runs`。进程重启或继续历史会话后无法恢复原运行身份。
+- Bad：历史 NULL run 每次继续都回退当前配置但不补写。相同 Claude session 会随页面设置反复漂移。
+- Bad：只把 `CLAUDE_PERMISSION_MODE=plan` 放进 continue 容器环境，仍执行原来的 `claude --resume`。continue worker 以 login 模式空转，真实 resume 命令不会自动消费 bench 自定义环境变量。
+- Bad：把单次抓包选择的模式写入账号 profile 的 `permissions.defaultMode`。这会让抓包结束后的普通、批量、养号或临时 worker 继承本次诊断策略。
+
+### 6. Tests Required
+
+- 新库断言 `_SCHEMA` 含三个快照列；旧 SQLite 连续执行两次 `init_db()` 后断言列存在、历史权限模式为 `bypassPermissions`，历史 run 和 `app_settings` 数据完整。
+- 普通、批量、养号和抓包四类创建入口分别断言 DB 的版本、预算快照非空，并与 scheduler payload、抓包创建响应完全一致。
+- run 创建后修改当前有效版本和预算，再启动 worker，断言 `CLAUDE_CODE_VERSION` 与 `CLAUDE_CODE_EFFORT_LEVEL` 仍为创建快照，且 `PROFILE_CLAUDE_CODE_EFFORT_LEVEL` 保持 `.env` 值。
+- 抓包显式预算、留空回退 `.env`、忽略页面预算覆盖和非法预算 400 都必须有测试；非法输入不得新增 task/run 或调用 scheduler。
+- 抓包权限模式必须覆盖六个合法值、缺省、非法值、DB/scheduler/创建响应/详情和 worker 环境；普通 run 必须继续回退 `bypassPermissions`。
+- 覆盖抓包 run 以 `2.1.260/high` 创建、当前全局改为 `2.1.257/low` 后继续，断言 continue worker 仍为 `2.1.260/high`。
+- 覆盖非默认抓包模式的继续会话，断言 `ContinueSession.permission_mode` 与 WebSocket resume 命令都显式使用原模式。
+- 历史 NULL run 首次继续补写版本和 `.env` 预算，全局配置变化后再次调用，断言 DB 和返回值仍保持首次补写值。
+- 同一 task 在设置变化前后创建两个 run，断言旧 run 保留旧运行身份，新 run 保存新运行身份。
+- 前端静态契约测试必须覆盖抓包独立选择器、提交字段、run/抓包详情展示、索引不可用分支仍展示快照，以及 920px 以下表单换行规则。
+- 登录、额度查询和 OAuth refresh 测试断言账号版本优先；登录会话、草稿和后续子命令不因默认配置变化而改用另一版本。
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```python
+def start_continue(self, sid, run, account, session_id):
+    claude_code_version = effective_claude_code_version()
+    worker = self.client.containers.run(
+        WORKER_IMAGE,
+        environment={"CLAUDE_CODE_VERSION": claude_code_version},
+    )
+```
+
+继续对话发生时全局设置可能已变化，这会让原 Claude session 换用另一个 CLI 版本。
+
+#### Correct
+
+```python
+@app.post("/api/runs/{rid}/continue/start")
+def continue_run_start(rid: str):
+    run = dict(run_row)
+    _ensure_run_claude_code_version(run)
+    _ensure_run_claude_effort_level(run)
+    session = continue_manager.start(run, account)
+
+def start_continue(self, sid: str, run: dict, account: dict, session_id: str):
+    claude_code_version = _resolve_run_claude_code_version(
+        run.get("claude_code_version")
+    )
+    claude_effort_level = _resolve_run_claude_effort_level(
+        run.get("claude_effort_level")
+    )
+    permission_mode = _resolve_capture_permission_mode(
+        run.get("capture_permission_mode")
+    )
+    worker = self.client.containers.run(
+        WORKER_IMAGE,
+        environment={
+            "CLAUDE_CODE_VERSION": claude_code_version,
+            "CLAUDE_CODE_EFFORT_LEVEL": claude_effort_level,
+            "CLAUDE_PERMISSION_MODE": permission_mode,
+        },
+    )
+
+def continue_run_ws(...):
+    command = (
+        'claude --permission-mode "$CLAUDE_PERMISSION_MODE" '
+        '--resume "$CONTINUE_SESSION_ID"'
+    )
+```
+
+先在持久化边界确保快照存在，再由首次 worker 和真正的 resume 命令消费同一组值，才能保证排队、进程重启和继续会话后的运行身份一致性。
+
+---
+
+## Scenario: 被动额度等待与原任务恢复
+
+### 1. Scope / Trigger
+
+- 修改额度采集、5h/7d 门禁、quota_wait、自动恢复、worker 完成判定、继续对话或相应容器挂载时适用。
+- 单次、批次、再次运行、养号、抓包和继续对话共用账号事实；v3 只消费正式响应和本地 CLI 额度观察，usage 仅由显式手动入口查询，不发模型探测请求。旧 runner 保持原兼容策略。
+
+### 2. Signatures
+
+```text
+account_quota_states(account_id INTEGER PRIMARY KEY, identity TEXT,
+  state_json TEXT, recovery_source TEXT, updated_at REAL)
+quota_observation_cursors(source TEXT PRIMARY KEY, account_id INTEGER,
+  identity TEXT, path TEXT, file_identity TEXT, byte_offset INTEGER DEFAULT 0)
+runs.execution_model TEXT NULL
+runs.quota_attempt INTEGER NOT NULL DEFAULT 0
+runs.quota_resume_at REAL NULL
+runs.quota_identity TEXT NULL
+```
+
+新表用 `CREATE TABLE IF NOT EXISTS`，四个 run 列由 `init_db()` 的 `_ensure_column()` 幂等补齐，不删除历史数据。
+
+纯协议真实源为 `services/orchestrator/quota_protocol.py`，`scripts/sync-quota-protocol.py` 同步到 sidecar 独立构建上下文；两个 Dockerfile 必须复制该模块。
+
+```python
+quota_observation(headers: dict, status: int, now: float) -> dict
+merge_quota_observation(existing: dict, incoming: dict) -> dict
+quota_decision(state: dict, now: float) -> dict
+QuotaGuard.admit(account: dict, source: str, warmup: bool = False) -> bool
+QuotaGuard.consume(account: dict) -> None
+QuotaGuard.record_control_state(account: dict, source: str, payload: dict) -> None
+QuotaGuard.recover() -> None
+QuotaGuard.capture_resume_ready(run_id: str) -> bool
+```
+
+### 3. Contracts
+
+- 身份由 bench ID、绑定 ID、profile 的账号/组织 UUID 构成，不使用轮换 AT/RT。run 固化 quota_identity，身份变化不得自动在新身份执行旧工作。来源为 `run:<rid>:<attempt>` 或 `continue:<sid>:<generation>`。
+- sidecar 仅观察当前 OAuth AT 所属的 `api.anthropic.com/v1/messages`。内部白名单 JSONL 保存 source、identity、ts、status、额度头及有限 account_error，不保存 AT/RT 或任意错误正文。dummy key、其它域名及 OAuth 路径不能污染账号额度。
+- 每窗口保存 observed_at、utilization（百分比）、reset_at（UTC 秒）、rejected、exhausted。响应头比例乘 100；秒、毫秒、带时区 RFC3339 均可解析。缺失/非法窗口保留既有事实，按窗口自身时间合并，乱序或同时间允许不能清掉拒绝；跨周期高位残留按真实允许响应归零。
+- 429 的 rejected 优先，allowed 排除该窗口的高位猜测；普通 RPM 429 不形成通用耗尽。仅 seven_day_fable / 7d_oi 耗尽不阻断通用窗口。通用窗口达到 100% 或明确拒绝后阻止后续正式请求；已接受的成功流可以完成。
+- 多窗口耗尽取全部 reset 及可信 retry-after 的最晚值。无可信 reset 时保持等待，不猜 now+5h/7d。明确 limit 但窗口未知时保存 unknown 补证；已有真实耗尽窗口不再追加未知阻断。
+- 到期仅为 retry_ready，不写成恢复或 0%。共同门禁先认领一个已有正式执行；其真实允许响应合并后，未再耗尽才放行其它工作。执行失败释放本代认领，不能批量冲上游。
+- quota_wait 是非终态，不计批次完成。自动恢复沿用 run/task/prompt、workspace/session、CLI/effort/权限/模型快照；首次额度判定前固化 execution_model，空串也属于有效快照，不能重新读取全局覆盖。恢复使用原主会话并按本次新增 JSONL 判断完成，排除子代理和复制的旧历史。
+- worker 优先处理独立暂停信号，保存状态后以 43 退出。rate_limit、account_on_hold、invalid_grant 及其它 synthetic API 错误不能判 success；明确封号/invalid_grant 固化永久门禁、暂停批次并关闭养号，不按额度到期恢复。
+- 停止、暂停、关闭养号/续聊、账号停用及删除优先。代次/status/父任务/stop_requested_at 必须在恢复与收口时复查；绑定和重授权的活跃检查包含 quota_wait。等待不占 semaphore 或长期 owner/profile lock。
+- 共享状态为 `BENCH_DATA/quota/<aid>/state.json`，原子替换并挂只读目录。控制为 `BENCH_DATA/quota-controls/<rid>/<source_hash>/pause.json`，位于可写 workspace 外，sidecar RW、worker RO；宿主挂载使用 HOST_BENCH_DATA。sidecar 使用 QUOTA_SOURCE、QUOTA_IDENTITY、QUOTA_STATE_FILE、QUOTA_SIGNAL_FILE、QUOTA_OBSERVATIONS_FILE、QUOTA_CREDENTIALS_FILE 和执行级 QUOTA_WARMUP；worker 消费来源、信号文件及养号作用域。固定 v3 的实际路径映射见 [账号运行环境](account-runtime-v3.md)。
+- 日志优先写入，再发布控制；控制携带归一化 quota_state，日志故障仍保留真实 reset 和封号分类。服务启动在清理原容器前后消费观察与控制补证，严格清理失败不得恢复。控制损坏或门禁不可读按执行失败收口。
+- continue HTTP 可返回不占 worker 的等待 session；WS 的 quota_state 事件包含 status、message、resume_at、generation，running 只在 PTY 打开后通知。服务端拒绝等待期文本/二进制输入且不重放；关闭/断连取消重建。抓包 run 与抓包续聊自动恢复共同遵守串行、120 秒间隔和异常后至少 15 分钟暂停。
+- accounts/run/batch API 的 passive_quota 只返回 source、known、windows、observed_at、blocked、exhausted、resume_at、retry_ready、message、account_error，不暴露内部身份或哈希；页面渲染、刷新、SSE 不触发主动查询，显式手动查询仍可更新来源为 manual 的记录。
+- 配套交付 orchestrator、worker、sidecar 和 WebUI。回滚旧版前先停止等待工作并备份 SQLite；旧版不识别 quota_wait，不能将等待记录批量改为 active，不删除 profile/workspace/flows。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 无首次观察 | 正常任务可以启动，页面显示未知 |
+| 排队后才耗尽 | semaphore 后最终门禁拒绝，不创建 worker |
+| 两窗口耗尽且仅一个到期 | 保持等待 |
+| 明确拒绝但 reset 缺失 | 保留该窗口旧未来 reset，否则无限等待有效证据 |
+| 已接受流携带 100% | 本流可完成，下一条模型请求本地阻断 |
+| 控制已写但 JSONL 故障，随后重启 | 原 reset/封号分类由控制恢复，清旧容器后再调度 |
+| 恢复后再次拒绝 | 同一 run 重新等待，不换题或循环探测 |
+| 封号/invalid_grant | auth_failed，无额度自动恢复 |
+| 等待期 WS 文本或二进制输入 | 丢弃，恢复后只接收新输入 |
+| 用户停止、关闭或身份变化 | 不复活原工作 |
+
+### 5. Scenarios and Examples
+
+- 正常：原题耗尽，两个窗口都到期后认领原 run，`--resume` 原 session；真实成功响应更新额度后才推进批次后续题。
+- 边界：拒绝头缺少 reset 且没有旧可信时间，页面显示暂无可信恢复时间，后台不补查；其它账号仍正常运行。
+- 错误用法：把到期缓存直接写成 0%，或者仅禁用前端输入而继续把 WS 二进制帧送给 PTY。
+- 正确处理：到期只认领正常恢复机会；所有输入经过 ContinueManager.send_input 的服务端门禁。
+
+```python
+# 原 run 的空模型快照同样必须保留。
+task["model_override"] = run["execution_model"]
+# 只有旧内部调用未携带该键时才可读取当前全局模型。
+if "model_override" not in task:
+    task["model_override"] = effective_runtime_model()
+```
+
+### 6. Tests Required
+
+- 六类入口、排队期间变化、两个窗口不同 reset、普通 RPM 429、缺失/非法/跨周期/乱序与同时间拒绝优先。
+- 直接执行 worker 内嵌 Python，用真实形状的脱敏 synthetic rate_limit/hold/timeout/认证消息证明不会 success；正常完成与恢复基线仍正确。
+- 同 run/session/config、空模型快照、单账号单次恢复认领、再次拒绝、暂停/停止/停用/身份切换、其它账号隔离。
+- JSONL 半行/轮换/游标重启，观察日志故障和控制先到，清理失败、queued 认领后崩溃；旧 worker 与恢复不能重叠。
+- continue 实际 WS 文本与二进制门禁、自动恢复、无输入重放、关闭不复活；抓包 run/续聊共同限频。
+- 自动路径 mock usage 和 refresh_usage 为调用即失败；API/观察文件不含凭据明文，协议副本字节一致，旧数据库重复升级后原数据与新列默认值保留。
+
+---
+
+## Scenario: 账号级任务与养号额度阈值及被动采集
+
+### 1. Scope / Trigger
+
+修改 v3 账号阈值、普通任务／批次／养号启动、本轮完成后的等待与恢复、CLI 状态栏、usage 手动查询或页面摘要时适用。v3 不在执行边界或 tick 查询 usage；抓包、续聊和网关 API 不受账号百分比阈值限制，共同耗尽及认证门禁仍生效。旧 runner 保持原兼容行为。
+
+### 2. Signatures
+
+```text
+PUT /api/accounts/{aid}/warmup -> 旧 runner {ok, enabled, next_run_at} / v3 {ok, engine: "projects"}
+POST /api/accounts/{aid}/quota -> 标准化 usage
+GET /api/accounts -> quota_policy / warmup_quota
+GET /api/task-batches, GET /api/runs[/{rid}] -> quota_policy
+accounts.warmup_quota_5h_limit_percent INTEGER NULL
+accounts.warmup_quota_7d_limit_percent INTEGER NULL
+QuotaGuard.record_manual_usage(account: dict, usage: dict, source: str = "manual") -> dict
+QuotaGuard.policy_snapshot(account, workload, source=None, *, quota_state=None) -> dict
+passive_recovery_decision(state: dict, limits: dict, now: float) -> dict
+warmup_sample_used(decision: dict, admission: dict | None) -> bool
+ProjectsService.recheck_waiting(account_id: int) -> None
+_public_quota_policy(account, workload="normal") -> dict
+statusline_quota_observation(rate_limits: object, observed_at: float) -> dict
+collect_statusline(payload: object, configuration: dict, now: float) -> bool
+AccountRuntime.wait_worker(container_id: str) -> int
+Runner.wait_worker(worker_id: str) -> int
+runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止意图与终态字段
+```
+
+历史字段和 warmup_quota_admissions 表保留；没有新 schema。v3 移除 refresh_usage／invalidate_usage 与进程内自动刷新失败元数据；认领正常恢复机会复用持久 admissions，服务重启不能再制造一次机会。
+
+### 3. Contracts
+
+- 阈值是 1～100 的已用整数百分比，两个窗口独立，默认 NULL；省略保留，null 关闭，StrictInt 拒绝 bool／字符串／小数。保存不隐式改绑。
+- v3 保存请求显式包含任一阈值时，先落库并发布额度快照，再分别通知项目迭代和养号迭代重查。`recheck_waiting` 只把已启用、`schedule_state='waiting'`、没有在途控制者的计划移到当前本地检查时间，保留控制代次、原工作及会话；保存接口不调用模型。正常轮间 `scheduled`、人工关闭及服务退出不重新排期。
+- 重查仍通过原 `start(..., scheduled=True)` 核对模型／运行故障冷却、账号身份、输入对账及实时门禁，未解除限制时继续等待。成功认领控制者时清空旧 `schedule_message`，避免运行中继续显示旧额度等待原因。
+- 未绑定账号有完整本地 OAuth 时可以启用定时养号；绑定账号核实身份与 active OAuth，只由 cc2api 刷新。未绑定配置缺凭据返回 409，不调用 cc2api；NULL 绑定的调度写入用 IS ?。
+- 首次额度未知不写成 0%，也不因无样本、进程重启或 300 秒缓存年龄而等待主动查询；没有真实拒绝或有效命中时可启动已有正常任务，由正式响应更新。任一有效窗口已用等于或高于启用阈值时，只阻止下一轮；已启动的普通任务／养号按冻结计划完成本轮，包括原定补充、收尾和超时。运行中降低阈值同样只影响后续入场，本轮可能越过自设百分比。
+- Docker exec 等待循环只等待原执行退出并返回真实退出码，不再接受百分比强停回调。Scheduler 在发布终态之前消费最后的本地观察，保证下一轮门禁看到本轮用量；不因百分比写 stopping/stopped，不提前注入收尾。缺失、非法或过期窗口不构成有效阈值命中。
+- 真实额度耗尽、认证失败、用户停止、删除、原超时和清理失败保留各自处理。既有用户停止和自然终态不被百分比重新分类，明确 account_on_hold／invalid_grant 保留永久门禁。历史停止意图只完成旧轮收口；已持久化停止终态仅补实际退出码，不改原因或结束时刻，不改为 quota_wait 或再次提交。
+- 旧命中窗口 reset 到期只给一个已有执行正常恢复机会。共同耗尽到期同样参与认领，即使百分比阈值关闭；普通任务／养号／续聊／抓包共用 `policy_key="v3-passive-recovery"`，周期键包含阈值与 reset，以及已耗尽通用窗口的 reset。同周期并发、失败和重启不能再发探测；真实允许的新周期事实才能继续推进。
+- v3 管理端和 Recorder 必须共用 `passive_recovery_decision`。`warmup_quota.policy_key="v3-passive-recovery"` 选择该规则；内部 `sample_windows` 仅列实际到期的旧命中／共同耗尽窗口，`warmup_sample_used` 据此匹配同一持久周期。空闲 0% 且 reset 为空仍可正常启动，不能因缺少旧 runner 的未知单次许可就写 `pause.json`；旧 runner 继续使用原 `warmup_quota_decision`。Recorder 仍合并当前实际响应，不能直接信任发布快照中的旧 `blocked` 值跳过最新阈值或真实耗尽保护。
+- 真正额度耗尽的 quota_wait 仍保留原 run／批次、prompt、workspace/session 与版本／effort／模型快照并按既有恢复流程续跑。百分比命中后，已完成本轮保持实际终态；下一未执行 run／item 等待额度和原 next_launch_at，不重新执行已完成或历史 stopped item，不清空随机间隔。定时养号按既有间隔安排新一轮；零 run 活动批次依本地事实和恢复机会创建首个正常工作，后台不补查。
+- API 继续消费发送器白名单响应头；CLI 在普通任务、养号、原任务恢复和非抓包续聊临时包装 statusLine，stdin 的 `rate_limits.five_hour/seven_day.used_percentage` 为 0～100，`resets_at` 为 UTC 秒。bool、非有限值、越界值、非未来 reset、超过观察时间 6 小时／8 天的 reset 或缺失窗口不写入；缺失不补零，不删除其它窗口。
+- collector 校验 cwd、主会话目录／文件名、非链接 transcript，最多读取尾部 512 KiB；仅使用本代开始后且不超过当前时间 5 秒的正常主 assistant 响应，排除子会话、synthetic/API 错误和会话冲突。ts 使用响应时间；flock 去重 session／response ID／窗口内容，重复缓存不伪造新观察时间。
+- 观察只保存 source=`cli:<执行来源>`、identity、ts、origin=cli、session_id、response_id 和 rate_limits 白名单；不保存完整 stdin、prompt、工具内容或凭据。QuotaGuard 校验游标来源、身份与 origin，CLI 事件不能提供 account_error。现有用户状态栏获得原 stdin 并保持输出；collector 无网络调用，不增加定时刷新、usage 或模型请求。
+- 采集目录仅为当前 UID1000 开放专用写入和必要路径穿越，不放宽 root runtime。先落盘原 statusLine／本代命令证明，再改 HOME settings；收口及重启对账停止进程后，仅恢复仍由本代管理的字段。抓包保留 Recorder，采集与执行实际路径见 [账号运行环境](account-runtime-v3.md)。
+- 手动 usage 在固定容器使用 Node 原生 TLS，经账号代理发送 GET JSON，不安装 CLI、不切换监听、不注入 MITM CA；请求 15 秒截止，不在脚本内反复重试。只领取／释放共享 CLI 作业，API 可并行。owner 锁不可重入，绑定查询使用 _sync_bound_account_credentials_locked；HTTP／Docker IO 不在数据库锁内执行。
+- 手动错误不安排后台重试，保留旧事实；只有结构化 `account_on_hold`／`invalid_grant` 固化永久门禁，普通 401／403、429、网络或 5xx 不凭状态码推断封禁。手动成功沿已有合并／恢复规则更新，不复活历史 auth_failed run。
+- 公开 quota_policy 保留 enabled/limits/hit/unknown/blocked/resume_at/message/refresh_retry_at，后者为 null；不返回身份、许可或内部策略键。来源显示被动、manual 手动及 automatic 历史查询；页面读取、SSE 和批次等待均不主动查询。
+- v3 lifespan 收口旧执行后恢复仍启用账号的 active 批次；先等待持久 next_launch_at，原 item 不重置，paused/done/deleted 或停用账号不恢复。旧 runner 启动行为保持。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 首次未知且无真实拒绝 | 正常启动，页面显示未知，不请求 usage |
+| v3 抓包启动，5h=0% 且 reset=null、无 admission | 不生成暂停信号或单次标记，终端及正常请求可继续 |
+| 运行中任一有效窗口等于／跨过启用阈值 | 完成原轮次及补充/收尾，按实际结果收口，下一轮等待 |
+| 本轮完成后窗口恢复 | 持久单次更新机会仍生效；下一未执行工作仍等原投放时间，不重跑已完成轮次 |
+| 真正共同耗尽的 quota_wait 在 reset 到期 | 持久认领一次已有执行，沿原题／session 恢复 |
+| 运行中提高／降低／关闭阈值 | 当前轮次不受百分比停止；下一轮使用最新配置 |
+| Pi 已因阈值等待，再保存较高阈值或关闭阈值 | 下一次本地扫描按最新配置重查，不等旧 reset；仍超阈值或处于故障冷却时不调用模型 |
+| 保存阈值时处于正常轮间间隔或人工关闭状态 | 保留原排期及关闭状态，不提前启动 |
+| 已自然结束／用户停止／历史停止意图 | 保留实际终态和停止原因，不因额度更新复活 |
+| 真实清理失败或明确认证失败 | 保留原清理/永久认证门禁，不被百分比策略掩盖 |
+| 恢复机会已使用、并发 tick 或服务重启 | 等待被动更新，不再新增探测 |
+| CLI 窗口缺失／非法／旧响应／重复缓存 | 不追加观察，不覆盖已有有效窗口 |
+| 手动 0%＋过去或空 reset | 沿已有空闲窗口规则记录真实事实，不伪造 reset |
+| 手动查询失败、429、普通 401／403 | 返回脱敏错误，保留旧事实且无自动查询重试 |
+| 明确 account_on_hold／invalid_grant | 保留永久门禁及历史终态 |
+| 关闭阈值 | 共同耗尽、恢复认领及认证保护保持 |
+| 未绑定完整 OAuth / 缺本地凭据 | 可定时养号 / 配置返回 409 |
+| 已绑定省略 ID | 保留当前绑定与唯一刷新权 |
+| 用户停止、账号删除或身份变化 | 不因观察更新复活旧工作 |
+
+### 5. Scenarios and Examples
+
+- 正常：5h 阈值 60%，普通任务从 55% 启动；正式响应报告 60% 或 68% 后仍完成原补充和收尾，实际退出 0 才记 success。下一 pending item 等待阈值恢复及原间隔；reset 到期只取得一次正常更新机会，不调用 usage。
+- 边界：只启用 7d=80% 时，养号观察到 5h=55%／7d=80% 仍完成本轮；下一轮等待。关闭两个阈值不取消共同耗尽或认证保护。
+- 基础：600 题批次尚无 run，未知状态可创建第一条正常工作；已有持久投放时间仍须等待，不能补发历史 item。
+- 基础：未绑定账号持本地 OAuth 独立养号；明确绑定后才移交刷新权，不必为养号创建网关账号。
+- 正常：7d 已用80%、旧阈值80%时 Pi 计划等待窗口重置；保存90%后，下一次本地扫描重新核对门禁并接续原计划，启动后清除旧额度等待提示。错误：只更新额度展示而保留旧检查时间；应同时通知两个迭代空间的等待计划重查。
+- 错误用法：前置／后置／失败 tick 自动请求 usage，或用同一缓存状态栏不断刷新 observed_at。正确做法：仅消费正式响应／本地新响应观察，usage 留给手动按钮。
+- 错误用法：取消阈值后让多个 CLI 同时试探耗尽窗口，或重启清掉恢复机会。正确做法：共同耗尽加入同一持久周期认领，真实新观察确认恢复。
+- 错误用法：调度器按 v3 被动规则放行，Recorder 又按旧未知窗口规则要求许可，导致进程退出 43、页面只显示终端已释放。正确做法：两端使用同一纯函数、策略及周期键；真正旧窗口到期仍核精确来源与落盘单次标记，重启不再发放。
+- 错误用法：owner 锁内再次调用 _sync_bound_account_credentials。正确做法：调用 locked 入口，并用真实不可重入锁回归。
+- 错误用法：运行中百分比命中就 cleanup，或先发布 success 再消费最后额度。正确处理：完成原轮次，先消费最后观察再发布实际终态，由下一轮准入处理等待；真实耗尽仍沿原 quota_wait 恢复。
+
+### 6. Tests Required
+
+- test_auto_usage.py：usage 调用即失败的替身覆盖未知启动、前后和 tick 不查询、有效高位阻断、reset 一次恢复、并发及重启不重复、共同耗尽／关闭阈值／续聊抓包共用恢复、部分返回、手动错误与零 run 批次。
+- test_cli_quota.py：0%／100%、bool／NaN／时间边界／缺窗口、cwd／session／主响应／开始时间验证，重复状态栏不刷新时间、不写完整 payload；原命令输出保持。
+- AccountRuntime 回归：先保存 statusLine 证明、仅恢复本代字段、用户改写保留、真实 Runner 生成 driver 不清采集设置、UID1000 实际可写专用输出、收口／重启无遗留。
+- 隔离官方 CLI＋本地 SSE 验证：采集命中 5h／7d，启用前后模型请求相同、usage 为零；安装在镜像中的 collector 被实际执行，测试替身和无真实账号边界明确。
+- 重启批次回归：只注册 active 且账号启用未删除；未来 next_launch_at 必须等待，取消时不创建 run 或清空时间；终态 item 保持。
+- test_warmup_quota.py/test_quota.py 保留旧 runner、Recorder 单次许可、停止／删除／永久异常、字段校验与历史合并回归。
+- images/sidecar/test_recorder.py：v3 空闲无 reset 不误停；旧命中到期的许可跨重启仅一次；关闭阈值仍限制共同耗尽恢复；最新响应命中不被旧发布快照掩盖。真实隔离 Recorder＋tmux＋监督器验证旧版退出 43、修复后终端保持就绪；合成 CLI 不等于真实业务对话验证。
+- test_projects_schedule.py：80%→90% 后在旧 reset 前重新认领；保存本身不调用模型，仍超阈值时继续等待，正常轮间间隔／人工暂停／模型冷却保留，启动后旧等待文案清除。
+- test_warmup_quota.py/test_projects_engine_cycles.py：真实阈值落库后通知两个空间，省略阈值时不重排；两个空间只更新各自计划，养号随机间隔配置保持。
+- test_quota_completion.py：等值／跨阈值、5h／7d、普通／养号、运行中降低阈值、下一轮及批次原间隔、真实超时/认证/用户停止、历史停止收口与原 exec 实际退出码。
+- run_local_verification.py --manifest <本轮联合清单> --quota-completion-only：真实 driver／tmux 和正式 statusLine 验证 5h=60／68、7d=80 后完成原两条补充与收尾，下一轮等待；关闭阈值成功。旧 --quota-hard-stop-only 保留为参数别名，行为采用新契约。
+- verify_stack.py --manifest <本轮联合清单> --browser --quota-completion：真实页面配置、当前说明、历史 stopped API／SQLite 原因不变、XSS 和 1280／390px 明暗主题；旧 --quota-hard-stop 参数保留为别名。
+- 固定 Docker 验证：真实 TLS 手动 usage JSON、监听 PID 不变、无 MITM CA，普通任务／养号透传与显式抓包、独立 API 长流及重建保持；页面 1280/390 明暗主题、未知／被动／手动／历史来源，只有按钮产生一次查询。
+
+---
+
+## Scenario: v3 账号当地运行窗口与准备后复查
+
+### 1. Scope / Trigger
+
+修改账号当地时段及其配置弹窗、普通/抓包/批次/养号准入、额度恢复、新续聊和 PTY 输入时适用。窗口仅约束下一轮入场；已启动 run 的补充、收尾和在途续聊输出继续。对外 API、登录、OAuth 维护与手动 usage 不加时间门禁。
+
+### 2. Signatures
+
+```text
+accounts.run_window_json TEXT NULL
+runs.window_wait_until REAL NULL
+task_batches.window_wait_until REAL NULL
+GET /api/accounts/{aid}/run-window -> 公开窗口摘要
+PUT /api/accounts/{aid}/run-window -> {ok: true, run_window: 公开窗口摘要}
+RunWindowIntervalIn(start: StrictStr, end: StrictStr), extra=forbid
+RunWindowConfigIn(enabled: StrictBool, days: list[StrictInt], intervals: list[RunWindowIntervalIn]), extra=forbid
+normalize_run_window(value: object) -> dict
+run_window_snapshot(configuration: dict, zone: str, now: float) -> dict
+Scheduler.recover_window_waits() -> None
+Scheduler.stop_window_waits() -> None
+QuotaGuard.release(account: dict, source: str, *, unstarted: bool = False) -> None
+```
+
+前端入口为 `openRunWindowConfig(aid)`、`updateRunWindowForm()`、`saveRunWindowConfig(event)`；共享弹窗节点为 `#run-window-form`、`#run-window-options`。
+
+### 3. Contracts
+
+- HTTP PUT 不接收 schema 或独立 timezone；存储为 `{schema:1,enabled:boolean,days:[0..6],intervals:[{start:"HH:MM",end:"HH:MM"}]}`。0=周一，6=周日；最多 8 段，启用须同时有星期和区间，start=end 拒绝。关闭时保留已保存配置，历史 NULL 默认全天。
+- 弹窗打开时将服务端config保存到form.dataset.savedWindowConfig。启用时从当前DOM读取days／intervals；关闭时禁用`#run-window-options`并提交打开时已保存的days／intervals，不能被未完成的必填时间编辑阻止关闭。关闭再启用保留本次DOM输入；保存关闭不覆盖已保存配置。PUT始终显式发送enabled／days／intervals，不发送schema／timezone。
+- 启用项和星期checkbox与文字同行，使用标准label／fieldset及主题变量；600px及以下时间区间改为单列。宽度检查须覆盖页面、弹窗表单、fieldset及内部控件，不能只以document不溢出判断通过。保存成功的自动关窗须等待API保存及列表刷新完成，自动关窗后立即切页不能与旧列表刷新竞争。
+- 时区沿 `_effective_account_timezone`，已有环境 fingerprint.tz 优先；不按服务器/浏览器时区执行，不为保存或读取创建环境、重抽指纹或同步凭据。PUT 在 owner 与短 DB 写锁内重读账号，仅写该配置；重复 init_db 幂等追加可空列。
+- 开始包含、结束不包含；跨午夜归开始日，重叠区间按并集。当前 UTC 换算当地分钟；下一边界沿真实 UTC 分钟最多搜索 15 天，有界缓存 256 项。DST 缺失分钟跳过，重复小时按两次真实时刻判断；时区或配置坏时拒绝新执行，不静默回退 UTC。控制镜像构建逐个校验允许的 IANA 时区。
+- 账号/环境页面的公开摘要含 enabled、allowed、timezone、server_now、local_time、config、next_open_at、next_close_at、message；未关联账号的草稿窗口为 null。run/batch 也带 run_window，未启用时执行快速路径可省略时钟/config 字段。
+- 窗口外 run 保持 queued，批次保持 active 并延后投放；window_wait_until 是可重算的 UTC 提示，不是许可，未知下次开放时可记 0。等待不计执行超时、不持 CLI 信号量、租约或长期 owner/profile/environment/DB 锁，每不超过 15 秒重读配置、取消、身份和父任务状态，next_launch_at 不被清零。
+- 信号量/owner 等待结束后及凭据准备完成后均复查窗口；发布 running 或调用 start_continue 前已关闭时，普通/抓包保留原 run、attempt 和冻结计划回到等待。立即养号/新续聊明确拒绝；定时养号不提前同步凭据或占许可，保留 due/随机间隔。
+- 续聊新文本和二进制输入由 send_input 再判，不发送、不缓存或重放；已有输出不因窗口结束 cleanup。WS quota_state 含 run_window，拒绝输入可发 type=run_window 事件；quota_tick 在休息时不恢复 CLI。
+- 准备中关窗且确认未发起执行时，release(unstarted=True) 只按 account_id、identity、完整 source 删除本次 warmup_quota_admissions 并释放对应 recovery_source。默认 release 保留已使用的持久机会；旧来源或其它身份不能退还新执行。新建续聊拒绝时去掉临时会话锁，恢复续聊保留原 sid/generation 等待。
+- 额度恢复发布新 queued attempt 时清除上一代 started_at/worker 标识；该代尚未开始才能由窗口等待恢复。启动时 QuotaGuard.recover 跳过明确未发起的窗口 queued，recover_window_waits 用原 run/attempt/prompt、CLI/effort/模型及补充计划重投；历史 stopping 只收口，停用/删除或身份变化不能复活。关停只结束本进程等待，持久队列留待恢复。
+- 下一轮必须同时满足窗口、百分比、真实额度、认证及人工状态。页面显示当地/北京双时钟及服务端边界，沿原秒钟更新并在边界重读摘要，不把前端时钟当许可，不覆盖编辑中的表单。回滚前关闭限制并收口等待，旧版不能保证时间策略。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 旧 NULL 或 enabled=false | 全天，原额度/认证/人工门禁仍有效 |
+| 未知 JSON 字段或 bool/整数/字符串类型错误 | DTO 422；语义非法、超过 8 段、同起止返回 400 |
+| 账号不存在/已删除；非 v3 PUT | 404；409 |
+| 窗口关闭或准备完成后已关闭 | queued/延后；立即养号和续聊前置检查 409，续聊准备后 ValueError 沿既有 HTTP 映射返回 400；提示可用的下次当地开放时间 |
+| 当前一轮跨过结束时刻 | 继续原补充/收尾及实际超时，下一轮等待 |
+| 准备中关窗且已认领恢复机会 | 不启动、退还精确来源许可；已用/其它来源/身份保持 |
+| 窗口与额度分别解除 | 另一个仍拒绝，全部满足才执行原排队 |
+| 配置或时区损坏 | allowed=false 及固定错误说明，等待修正 |
+| 等待中停止/停用/删除/暂停 | 不继续启动，旧间隔与终态不被窗口恢复覆盖 |
+| 弹窗中清空必填时间后关闭限制并保存 | 禁用配置控件，保存已保存的星期／区间；不会被该未完成编辑阻挡 |
+| 保存完成后立即切页 | 弹窗关闭前列表刷新已结束，不再有旧刷新访问移除节点 |
+
+### 5. Scenarios and Examples
+
+- 正常：PUT `{"enabled":true,"days":[0,4],"intervals":[{"start":"22:00","end":"02:00"}]}`；周二 01:00 属于周一窗口，02:00 起关闭。
+- 边界：当地 10:59 通过检查，凭据准备结束已为 11:00，不能发起新执行；退回同轮等待，开放后仍可取得尚未使用的恢复机会。已在 10:59 发起的一轮可完成原补充和收尾。
+- 基础：旧账号未设置窗口，控制端升级、重启或容器重建不替用户启用作息；设置只保存在账号 SQLite 行中。
+- 错误用法：只禁前端按钮、固定睡到旧 deadline、只在同步凭据前查一次，或把上一代 started_at 当作新代已开始。正确处理：服务端多入口复查、短周期取消等待、准备后最终判定及新代开始事实重置。
+- 错误用法：等待恢复删掉整个账号的许可，或普通执行结束也传 unstarted=true。正确处理：仅对明确未发起的精确身份/source 退还；已使用机会保持持久。
+- 错误用法：关闭fieldset后直接依赖FormData收集完整配置，或只检查页面宽度而漏掉弹窗内溢出。正确处理：显式保留已保存配置，启用时读取当前DOM；关闭场景、内部边界和保存后立即切页分别实测。
+
+### 6. Tests Required
+
+- test_run_windows.py：起止边界、跨午夜/周、重叠并集、两账号同 UTC 不同时区、DST 跳时/重复/整段不存在、NULL 及严格格式拒绝。
+- test_run_window_scheduling.py：等待不占信号量/写锁、排队和凭据准备跨关窗、普通/养号/抓包及新建/恢复续聊、精确来源许可退还和默认保留、已运行任务恢复新代后排队重启、取消/停用、原间隔与幂等配置/凭据保持。
+- run_local_verification.py --manifest <联合清单> --run-windows-only：真实 driver 完成本轮跨窗口/阈值、两个门禁分别解除、等待调度器重启、同 run/attempt 恢复及身份/凭据保持。明确镜像批次与挂载源码版本，不使用真实账号。
+- verify_stack.py --manifest <联合清单> --browser --run-boundaries：真实页面键盘空格启停、星期/多区间保存重读、关闭禁用但保留、无效编辑时关闭保存、关窗后立即切页；固化时区与双时钟、API/SQLite对照、1280/390px明暗主题。断言checkbox尺寸、同行布局、表单／fieldset无横向滚动及所有控件在内部边界内，并查看截图；复用既有取消/永久认证/独立API回归。
+
+---
+
+## Common Mistakes
+
+| 反模式 | 为什么不要 | 怎么改 |
+|--------|------------|--------|
+| 在 `with _db_lock:` 里再起一个 `with _db_lock:` | 死锁(threading.Lock 不可重入) | 拆开:外层只做 DB,业务/外部调用挪出 lock 外 |
+| 写操作不加 `_db_lock` | 多线程 worker 可能撞 `database is locked` | 任何 `INSERT/UPDATE/DELETE` 都加 lock |
+| 读操作加 `_db_lock` | 读读互不冲突,加 lock 拖慢 SSE 1Hz 轮询 | 只读路径不加 lock |
+| 忘记 `conn.close()` | SQLite 连接泄漏,长期跑会撞 max connections | 永远 `try/finally` |
+| 字符串拼接列值 | SQL 注入 | 永远用 `?` 占位 + 元组传参 |
+| ORM 风格幻想(`Account.objects.create(...)`) | 项目刻意不用 ORM | 用裸 `conn.execute(SQL, params)` |
+| `SELECT *` 后用下标取列 | 加列后下标错位 | `row["col_name"]` 按列名 |
+| 自己写时间戳字符串 | 难比较、难统计 | 用 `julianday('now')` 或 Python `time.time()` |
+| 给 SSE 流端点加 `_db_lock` 保护读 | 1Hz 轮询里加锁会阻塞写线程 | SSE 只 select,**不加锁**,容忍读到刚 commit 前一瞬的状态 |

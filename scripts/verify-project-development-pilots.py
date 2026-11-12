@@ -26,7 +26,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'orchestrator'))
+sys.path.insert(0, str(ROOT / 'services/orchestrator'))
 sys.path.insert(0, str(ROOT / 'deploy/v3'))
 
 import main as service
@@ -244,7 +244,7 @@ def main() -> None:
             application = FastAPI()
             application.include_router(service.app.router)
             application.exception_handlers.update(service.app.exception_handlers)
-            application.mount('/', StaticFiles(directory=str(ROOT / 'webui'), html=True))
+            application.mount('/', StaticFiles(directory=str(ROOT / 'apps/legacy-web'), html=True))
             with patch.multiple(service, project_iterations=case.scenario_manager,
                     project_requester_settings=settings, _AUTH_ENABLED=False):
                 browser_result = asyncio.run(verify_browser(application, args.evidence_dir / 'browser', results,

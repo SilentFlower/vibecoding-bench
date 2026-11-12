@@ -14,6 +14,7 @@ import threading
 import time
 import urllib.request
 from pathlib import Path
+from source_layout import source_path
 
 import uvicorn
 from fastapi import FastAPI, Request
@@ -22,7 +23,7 @@ from websockets.asyncio.client import connect
 
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / 'orchestrator'))
+sys.path.insert(0, str(source_path(ROOT, 'orchestrator')))
 
 from project_requester_settings import ProjectRequesterSettings
 from project_library import materialize_snapshot, read_document
@@ -83,7 +84,7 @@ async def verify(evidence: Path) -> dict:
     started_at = time.time()
     source_paths = ('webui/projects.js', 'webui/index.html', 'webui/style.css',
         'orchestrator/projects.py', 'orchestrator/projects_pi.py', 'orchestrator/projects_api.py', 'deploy/v3/verify_pi_projects_browser.py')
-    source_sha256 = {relative: hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() for relative in source_paths}
+    source_sha256 = {relative: hashlib.sha256((source_path(ROOT, relative)).read_bytes()).hexdigest() for relative in source_paths}
     fixture = ProjectsAgentTests('test_pause_rejects_old_generation_before_any_terminal_write')
     fixture.setUp()
     fixture.pi = BrowserPi()
@@ -202,7 +203,7 @@ async def verify(evidence: Path) -> dict:
         """供切页检查使用。:return: 空题库。"""
         return []
 
-    application.mount('/', StaticFiles(directory=str(ROOT / 'webui'), html=True))
+    application.mount('/', StaticFiles(directory=str(source_path(ROOT, 'webui')), html=True))
     listener = socket.socket(); listener.bind(('127.0.0.1', 0))
     port = listener.getsockname()[1]
     server = uvicorn.Server(uvicorn.Config(application, lifespan='off', log_level='error', loop='asyncio'))
@@ -662,7 +663,7 @@ async def verify(evidence: Path) -> dict:
                 legacy_paths = ('/api/project-catalog', '/api/project-iteration-batches', '/api/project-instances',
                     '/api/project-step-attempts', '/api/project-iterations-stream')
                 assert not any(path.startswith(legacy_paths) for path in requested_paths), '新页面仍请求旧项目接口'
-        assert source_sha256 == {relative: hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
+        assert source_sha256 == {relative: hashlib.sha256((source_path(ROOT, relative)).read_bytes()).hexdigest()
             for relative in source_paths}, '受测源码在验证期间发生变化，请重新验证'
         result = {'status': 'passed', 'started_at': started_at, 'finished_at': time.time(), 'source_sha256': source_sha256,
             'model_recovery': recovery_display,

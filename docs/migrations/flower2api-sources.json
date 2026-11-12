@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "branch": "flower2api",
+  "baseline": "142ea0c0f35267f33cc0aa3a09eef4be10992bf7",
+  "components": [
+    {
+      "name": "gateway",
+      "source_repository": "https://github.com/SilentFlower/cc2api.git",
+      "source_revision": "7cbf3e354e9e5570b4e323362c18e5133d913a3e",
+      "destination": "services/gateway",
+      "frontend_destination": "apps/web",
+      "files": 475
+    },
+    {
+      "name": "runtime",
+      "source_repository": "https://github.com/SilentFlower/cc-runtime-bridge.git",
+      "source_revision": "7cfe8b3734111dae4758a7e2006f43e5f1cc71e9",
+      "destination": "services/runtime",
+      "files": 256
+    }
+  ],
+  "source_roots": [
+    {
+      "logical": "cc2api/web",
+      "source": "apps/web"
+    },
+    {
+      "logical": "cc2api",
+      "source": "services/gateway"
+    },
+    {
+      "logical": "orchestrator",
+      "source": "services/orchestrator"
+    },
+    {
+      "logical": "webui",
+      "source": "apps/legacy-web"
+    },
+    {
+      "logical": "project_library",
+      "source": "resources/project-library"
+    },
+    {
+      "logical": "topics.md",
+      "source": "resources/topics.md"
+    },
+    {
+      "logical": "research/github-projects",
+      "source": "resources/project-research"
+    }
+  ],
+  "runtime_asset": {
+    "version": "v0.1.0-beta.5",
+    "sha256": "64c61cae565e9097de18cf61a35f46e7595f633cb14f7d6b8c6609fcd294ce89",
+    "bytes": 27388048
+  },
+  "preserved_in_place": [
+    "doc/claude-code-2.1.303-protocol-study.md"
+  ],
+  "spec_mapping": ".trellis/tasks/11-12-flower2api-monorepo-migration/research/spec-map.json",
+  "source_revision_semantics": "新构建的 parent_revision 和 gateway_revision 均指向统一仓库提交；旧独立来源保存在本记录。",
+  "historical_evidence": [
+    {
+      "repository": "runtime",
+      "revision": "7cfe8b3734111dae4758a7e2006f43e5f1cc71e9",
+      "source": ".trellis/tasks/archive/2026-11/11-05-runtime-footprint/research/acceptance.md",
+      "target": "docs/migrations/runtime-footprint-acceptance.md",
+      "sha256": "3ce264ac4f5ac5aeb2c7c0e50825351b651b36a32ec935f939418e7b66a6b095"
+    }
+  ],
+  "verification_notes": [
+    "历史测试夹具按现有数据库必填字段及根设置清理合同同步；业务协议保持原实现。"
+  ]
+}

@@ -4,6 +4,7 @@ import asyncio
 import copy
 import json
 from pathlib import Path
+from source_layout import source_path
 from urllib.parse import urlsplit
 
 from verify_environment_ui import Fixture, BASE, ENVIRONMENT, ROOT
@@ -167,7 +168,7 @@ def main():
     parser.add_argument('--output', type=Path, default=ROOT/'.deploy/native-diagnostics-cpu-browser')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    result = asyncio.run(run(args.output.resolve(), ROOT/'cc2api/web/dist'))
+    result = asyncio.run(run(args.output.resolve(), source_path(ROOT, 'cc2api/web/dist')))
     (args.output/'results.json').write_text(json.dumps(result, ensure_ascii=False, indent=2))
     print(json.dumps(result, ensure_ascii=False))
 

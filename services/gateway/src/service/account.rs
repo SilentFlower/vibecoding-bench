@@ -1,0 +1,5598 @@
+use chrono::Utc;
+use rand::Rng;
+use serde_json::Value;
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicI32, AtomicI64, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::sync::{
+    Mutex as AsyncMutex, MutexGuard, OwnedSemaphorePermit, RwLock, Semaphore, broadcast,
+};
+use tokio::time::{Instant, sleep};
+use tracing::{info, warn};
+use uuid::Uuid;
+
+use crate::error::AppError;
+use crate::model::account::{
+    Account, AccountAuthType, AccountStatus, CanonicalEnvData, CanonicalPromptEnvData,
+    CliProcessImport, DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY,
+    DEFAULT_UPSTREAM_SESSION_TTL_MINUTES, MAX_UPSTREAM_SESSION_POOL_SIZE,
+    MAX_UPSTREAM_SESSION_TTL_MINUTES, MIN_UPSTREAM_SESSION_TTL_MINUTES, OAuthCredentialImport,
+};
+use crate::model::credential_ownership::CredentialOwnershipInput;
+use crate::service::rewriter::ClientType;
+use crate::service::runtime_lease::RuntimeGate;
+use crate::service::v3_scheduling::{
+    PhaseCounts, SchedulingAccountSummary, SchedulingCandidate, SchedulingRequest, V3Scheduler,
+    now_ms, send_interval_ms,
+};
+use crate::service::version_profile::{
+    apply_identity_to_env_json, default_profile, profile_for_key,
+};
+use crate::store::account_store::AccountStore;
+
+#[path = "credential_ownership.rs"]
+mod credential_ownership;
+use crate::store::cache::{
+    CacheStore, UpstreamSessionPoolResolve, UpstreamSessionPoolStatus, UpstreamSessionRefreshPolicy,
+};
+pub use credential_ownership::CredentialActivity;
+use credential_ownership::CredentialGate;
+
+const STICKY_SESSION_TTL: Duration = Duration::from_secs(60 * 60);
+const OAUTH_REFRESH_BUFFER_SECONDS: i64 = 5 * 60;
+const OAUTH_MISSING_REFRESH_TOKEN_REASON: &str = "OAuth refresh unavailable: missing refresh token";
+const OAUTH_LOCK_TTL: Duration = Duration::from_secs(30);
+const OAUTH_WAIT_RETRY: Duration = Duration::from_millis(500);
+const OAUTH_WAIT_ATTEMPTS: usize = 20;
+const RPM_KEY_TTL: Duration = Duration::from_secs(120);
+const RPM_WAIT_MAX: Duration = Duration::from_secs(5);
+const RPM_WAIT_STEP: Duration = Duration::from_millis(250);
+/// 一个标准并发槽对应的内部信号量单位数。
+pub const SLOT_UNIT_SCALE: i32 = 2;
+/// 普通请求占用的内部单位数。
+pub const DEFAULT_REQUEST_SLOT_UNITS: u32 = SLOT_UNIT_SCALE as u32;
+/// Haiku 请求占用的内部单位数。
+pub const HAIKU_REQUEST_SLOT_UNITS: u32 = 1;
+
+/// 用量利用率达到此阈值即视为“撞墙”。
+const USAGE_HIT_THRESHOLD: f64 = 97.0;
+/// rollover 后仍处于该高位的成功样本视为上一周期残留值。
+const USAGE_ROLLOVER_STALE_THRESHOLD: f64 = USAGE_HIT_THRESHOLD;
+/// 撞墙之外的纯速率限制请求级等待时间。瞬时 429 很快即过，只让当前请求等一小段时间再重试，
+/// 不写入账号级冷却,避免把仍可服务其他请求的账号从调度池里摘掉。
+const PURE_RATE_LIMIT_RETRY_DELAY: Duration = Duration::from_secs(10);
+/// retry-after 冷却时长上限（秒）,防御上游给出异常大的值把账号长期下线。
+const MAX_RETRY_AFTER_SECS: i64 = 5 * 60 * 60;
+
+/// 单个窗口的用量详情，用于前端展示计算过程。
+pub struct WindowDetail {
+    /// 原始利用率（0~100）。
+    pub utilization: f64,
+    /// 时间衰减因子（阶梯档位 0.4~1.0，距重置越近越小）。
+    pub decay: f64,
+    /// 有效用量 = utilization × 阶梯衰减。
+    pub effective: f64,
+}
+
+/// 账号调度评分详情，用于前端展示。
+pub struct AccountScoreInfo {
+    /// 综合得分（越低越优先）。
+    pub score: f64,
+    /// 7 天窗口有效用量（utilization × 阶梯衰减）。
+    pub eff_7d: f64,
+    /// 5 小时窗口有效用量（utilization × 阶梯衰减）。
+    pub eff_5h: f64,
+    /// 7 天窗口计算详情。
+    pub detail_7d: WindowDetail,
+    /// 5 小时窗口计算详情。
+    pub detail_5h: WindowDetail,
+    /// 并发负载百分比（当前内部单位 + 排队预计内部单位）/ 最大内部单位 × 100。
+    pub concurrency_pct: f64,
+    /// 当前使用的权重 (w7d, w5h, w_concurrency)。
+    pub weights: (f64, f64, f64),
+    /// 当前占用的标准并发槽位数。
+    pub current_concurrency: f64,
+    /// 当前占用的内部单位数。
+    pub current_concurrency_units: i64,
+    /// 最大内部单位数。
+    pub max_concurrency_units: i64,
+    /// 当前活跃请求数。
+    pub active_requests: i64,
+    /// 当前等待队列中的请求数。
+    pub queued: i64,
+    /// 当前等待队列中请求预计占用的内部单位数。
+    pub queued_request_units: i64,
+    /// 正在等待瞬时 429 软退避的请求数。
+    pub transient_backoff_waiting: i64,
+    /// 瞬时 429 软退避剩余毫秒数。
+    pub transient_backoff_remaining_ms: u64,
+}
+
+/// 账号当前分钟 RPM 状态，用于调度判断和管理端展示。
+pub struct AccountRpmStatus {
+    pub limit: i32,
+    pub current: i64,
+    pub remaining: Option<i64>,
+    pub window_reset_at: chrono::DateTime<Utc>,
+    pub saturated: bool,
+}
+
+/// 账号选择结果，携带是否命中粘性会话。
+#[derive(Debug)]
+pub struct SelectedAccount {
+    pub account: Account,
+    pub sticky: bool,
+    pub should_bind_session: bool,
+}
+
+/// 账号选择和 429 分类需要的请求模型上下文。
+#[derive(Debug, Clone)]
+pub struct AccountSelectionContext {
+    /// 是否为执行账号 5h/7d 用量控制线的消息请求。
+    pub usage_limits_enabled: bool,
+    /// 是否启用 Fable 周用量达到上限后的 sticky fallback 策略。
+    pub fable_quota_fallback_enabled: bool,
+    /// Fable 周用量百分比上限,范围为 1 到 100。
+    pub fable_weekly_usage_limit_percent: u32,
+    /// 当前请求体里的模型 ID；非 `/v1/messages` 或未解析到模型时为空。
+    pub request_model: Option<String>,
+}
+
+impl AccountSelectionContext {
+    /// 构造关闭本地用量限制与模型级 fallback 的兼容上下文。
+    ///
+    /// @return 返回保持旧账号选择与 429 分类行为的上下文。
+    pub fn disabled() -> Self {
+        Self {
+            usage_limits_enabled: false,
+            fable_quota_fallback_enabled: false,
+            fable_weekly_usage_limit_percent: 100,
+            request_model: None,
+        }
+    }
+
+    /// 判断当前请求是否启用 Fable 配额 fallback。
+    ///
+    /// @return 开关开启且模型 ID 属于 Fable 5 时返回 `true`。
+    pub fn is_fable_quota_fallback_active(&self) -> bool {
+        self.fable_quota_fallback_enabled
+            && self
+                .request_model
+                .as_deref()
+                .map(is_fable_quota_model_id)
+                .unwrap_or(false)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RpmAdmissionAction {
+    Allow,
+    Wait,
+    Skip,
+    Reject,
+}
+
+/// 上游 429 的处理结果。
+pub enum RateLimitDecision {
+    /// 已写入账号级冷却窗口。
+    Quarantined,
+    /// 当前账号对本请求模型不可用,调用方可在本轮排除该账号后尝试其他账号。
+    RetryOtherAccount,
+    /// 使用进程内账号级软退避等待指定时间,账号仍保持可调度。
+    RequestBackoff(Duration),
+    /// 单请求级拒绝,不应隔离账号或自动重试。
+    PassThrough,
+}
+
+/// 上游用量观察的语义，用于决定 rollover 时是否信任各窗口的高位利用率。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UsageObservationKind {
+    /// 请求被上游允许，跨周期高位值可能是上一周期残留。
+    Allowed,
+    /// 请求被上游以 429 拒绝，仅列出的窗口可把高位值视为真实耗尽。
+    RejectedWindows(Vec<String>),
+}
+
+impl UsageObservationKind {
+    /// 从完整被动用量中筛出本次 429 明确拒绝的窗口。
+    ///
+    /// @param usage 本次响应头归一化后的完整窗口集合。
+    /// @return 至少存在一个明确拒绝窗口时返回过滤后的用量，否则返回 `None`。
+    pub(crate) fn rejected_usage(&self, usage: &serde_json::Value) -> Option<serde_json::Value> {
+        let UsageObservationKind::RejectedWindows(rejected_windows) = self else {
+            return None;
+        };
+        let source = usage.as_object()?;
+        let mut filtered = serde_json::Map::new();
+        for window in rejected_windows {
+            if let Some(value) = source.get(window) {
+                filtered.insert(window.clone(), value.clone());
+            }
+        }
+        if filtered.is_empty() {
+            None
+        } else {
+            Some(serde_json::Value::Object(filtered))
+        }
+    }
+
+    fn rejects_window(&self, window: &str) -> bool {
+        matches!(
+            self,
+            UsageObservationKind::RejectedWindows(rejected_windows)
+                if rejected_windows.iter().any(|candidate| candidate == window)
+        )
+    }
+}
+
+#[derive(Clone)]
+struct TransientRateLimitBackoff {
+    until: Instant,
+    waiting: Arc<AtomicI64>,
+}
+
+enum RateLimitWindowDecision {
+    Quarantine(&'static str, chrono::DateTime<Utc>),
+    RetryOtherAccount(&'static str, Option<chrono::DateTime<Utc>>),
+    RequestBackoff(Duration),
+    PassThrough,
+}
+
+/// 评分权重默认值。
+const DEFAULT_W7D: f64 = 0.5;
+const DEFAULT_W5H: f64 = 0.3;
+const DEFAULT_WCONC: f64 = 0.2;
+
+fn standard_concurrency_to_slot_units(concurrency: i32) -> i32 {
+    concurrency.max(1).saturating_mul(SLOT_UNIT_SCALE)
+}
+
+fn waiting_queue_capacity(concurrency: i32) -> i32 {
+    concurrency.max(1).saturating_mul(2)
+}
+
+/// 单账号并发槽位 FIFO 排队器。
+///
+/// 底层依赖 [`tokio::sync::Semaphore`]：其 `acquire` 文档保证按调用顺序授予 permit，
+/// 因此同一账号上多个等待者天然按到达顺序获得槽位，不存在"抢锁"竞争。
+///
+/// # 两把信号量的职责
+/// - `slots`：目标 permit 数 = `slot_max`（即 `concurrency × 2` 内部单位），控制同时活跃的请求权重。
+/// - `queue_cap`：目标 permit 数 = `queue_max` = `2 × concurrency`，作为"等待请求数"上限。
+///   只有进入等待队列才会持有该 permit，活跃阶段不占用。用它是为了在等待人数达上限时
+///   快速降级到其他账号。2 倍系数给突发流量留出缓冲，而不是刚好满就拒绝。
+///
+/// # 运行时修改 concurrency
+/// 不重建 queue 实例，而是通过 [`AccountQueue::adjust_capacity`] 原地调整两把信号量：
+/// - 扩容：直接 `add_permits(delta)`，立即生效；
+/// - 缩容：先扣减空闲 permit，剩余槽位差额在已持有许可归还之前销毁；
+///   等待位仍延迟回收，已有排队请求不取消。重新扩容时按最新目标计算差额。
+///
+/// # 单账号系统内最多请求数
+/// `active_units ≤ concurrency × 2` + `waiting_requests ≤ 2 × concurrency`。缩容时
+/// 已有在途请求和等待人数可能暂时超过新上限，后续槽位准入使用新容量。
+///
+/// # 客户端中断 / 超时安全
+/// `acquire` 返回的 `Future` 在被 drop 时：`queue_permit` 自动归还到 `queue_cap`；
+/// 正在 `slots.acquire_owned()` 上挂起的 waiter 会从 semaphore 的 FIFO 链表移除；
+/// `waiting` 原子计数通过 scopeguard 反向减回。无泄漏。
+pub struct AccountQueue {
+    /// CLI draining 与 API 活动计数共用门禁。
+    pub runtime_gate: RuntimeGate,
+    /// 活跃槽位信号量。
+    slots: Arc<Semaphore>,
+    /// 等待位信号量，实际通过槽位和 CLI 门禁后归还。
+    queue_cap: Arc<Semaphore>,
+    /// 槽位容量目标（== 账号当前 `concurrency × 2` 内部单位），归还许可时读取最新目标。
+    slot_max: Arc<AtomicI32>,
+    /// 等待位容量目标（== `2 × concurrency`）。单独存一个 atomic 供 queue_cap 的 shrinker 读取。
+    queue_max: Arc<AtomicI32>,
+    /// `slots` 信号量当前实际总 permit 数（累计 add_permits - 累计 forget）。用于
+    /// `adjust_capacity` 与许可归还时据此计算容量差额。
+    slots_cap: Arc<AtomicI32>,
+    /// 序列化槽位缩扩容与归还，归还前先偿还缩容差额，防止已排队请求抢跑。
+    slot_capacity_lock: Arc<Mutex<()>>,
+    /// `queue_cap` 信号量当前实际总 permit 数。同 `slots_cap`。
+    qc_cap: Arc<AtomicI32>,
+    /// 正在等待槽位的请求数（仅供 UI 展示用）。包 Arc 是为了 scopeguard 的 move 闭包能引用。
+    waiting: Arc<AtomicI64>,
+    /// 正在等待槽位的请求预计占用的内部单位数。
+    waiting_units: Arc<AtomicI64>,
+    /// 已持有槽位但仍等待 CLI 门禁的单位，避免同时计入活跃与等待负载。
+    gate_waiting_units: Arc<AtomicI64>,
+    /// 当前已经拿到槽位的活跃请求数。
+    active_requests: Arc<AtomicI64>,
+}
+
+/// 账号槽位 permit 包装器，Drop 时自动归还底层信号量 permit，并同步减少活跃请求计数。
+pub struct AccountSlotPermit {
+    permit: Option<CapacityPermit>,
+    active_requests: Arc<AtomicI64>,
+    scheduling_request: Option<SchedulingRequest>,
+    credential_activity: Option<CredentialActivity>,
+}
+
+/// 槽位归还前先偿还缩容差额，涵盖等待门禁时取消或超时的路径。
+struct CapacityPermit {
+    permit: Option<OwnedSemaphorePermit>,
+    slots_cap: Arc<AtomicI32>,
+    slot_max: Arc<AtomicI32>,
+    slot_capacity_lock: Arc<Mutex<()>>,
+}
+
+impl AccountSlotPermit {
+    fn new(permit: CapacityPermit, queue: &AccountQueue) -> Self {
+        Self {
+            permit: Some(permit),
+            active_requests: queue.active_requests.clone(),
+            scheduling_request: None,
+            credential_activity: None,
+        }
+    }
+
+    /// 让调度租约随响应流的并发许可存活。
+    /// @param request 当前 v3 请求租约。
+    /// @return 持有调度状态的许可。
+    pub fn with_scheduling_request(mut self, request: SchedulingRequest) -> Self {
+        self.scheduling_request = Some(request);
+        self
+    }
+
+    /// 将凭据活动许可绑定到响应生命周期。@param activity 许可。@return 当前并发许可。
+    pub fn with_credential_activity(mut self, activity: CredentialActivity) -> Self {
+        self.credential_activity = Some(activity);
+        self
+    }
+}
+
+impl Drop for AccountSlotPermit {
+    fn drop(&mut self) {
+        self.active_requests.fetch_sub(1, Ordering::Relaxed);
+        let _ = self.permit.take();
+    }
+}
+
+impl Drop for CapacityPermit {
+    fn drop(&mut self) {
+        let _lock = self
+            .slot_capacity_lock
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        if let Some(mut permit) = self.permit.take() {
+            let debt = (self.slots_cap.load(Ordering::Acquire)
+                - self.slot_max.load(Ordering::Acquire))
+            .max(0) as usize;
+            let retired = debt.min(permit.num_permits());
+            if retired > 0 {
+                // 先销毁超出新上限的单位，再归还余量；FIFO 等待者不能先于缩容拿到它们。
+                if let Some(excess) = permit.split(retired) {
+                    excess.forget();
+                    self.slots_cap.fetch_sub(retired as i32, Ordering::AcqRel);
+                }
+            }
+        }
+    }
+}
+
+/// [`AccountQueue::acquire`] 的错误原因。
+#[derive(Debug)]
+pub enum QueueWaitError {
+    /// 等待队列已满，调用方应降级到其他账号。
+    QueueFull,
+    /// 等待超时（超出 `timeout`），调用方应降级到其他账号。
+    Timeout,
+    /// 底层 semaphore 被 close(不应出现,视为内部错误)。
+    Closed,
+}
+
+impl AccountQueue {
+    /// 构造一个新的排队器，`slots` 容量 = `concurrency × 2`，`queue_cap` 容量 = `2 × concurrency`。
+    fn new(concurrency: i32) -> Self {
+        let cap = standard_concurrency_to_slot_units(concurrency);
+        let qc = waiting_queue_capacity(concurrency);
+        let active_requests = Arc::new(AtomicI64::new(0));
+        Self {
+            runtime_gate: RuntimeGate::new(active_requests.clone()),
+            slots: Arc::new(Semaphore::new(cap as usize)),
+            queue_cap: Arc::new(Semaphore::new(qc as usize)),
+            slot_max: Arc::new(AtomicI32::new(cap)),
+            queue_max: Arc::new(AtomicI32::new(qc)),
+            slots_cap: Arc::new(AtomicI32::new(cap)),
+            slot_capacity_lock: Arc::new(Mutex::new(())),
+            qc_cap: Arc::new(AtomicI32::new(qc)),
+            waiting: Arc::new(AtomicI64::new(0)),
+            waiting_units: Arc::new(AtomicI64::new(0)),
+            gate_waiting_units: Arc::new(AtomicI64::new(0)),
+            active_requests,
+        }
+    }
+
+    /// 原地调整槽位容量（admin 修改 concurrency 时调用），不替换 queue 实例,已占用 permit 不受影响。
+    ///
+    /// @param new 新的标准并发槽位数，内部会换算成 `new × 2` 个信号量单位。
+    ///
+    /// 槽位先销毁空闲许可，其余差额由在途许可归还前偿还，避免后台任务排在旧等待者后面。
+    /// 等待位继续沿用共享目标的延迟缩容，已有排队请求不被取消。
+    fn adjust_capacity(&self, new: i32) {
+        let new_slot_units = standard_concurrency_to_slot_units(new);
+        let new_queue_cap = waiting_queue_capacity(new);
+        {
+            let _lock = self
+                .slot_capacity_lock
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            self.slot_max.store(new_slot_units, Ordering::Release);
+            let current = self.slots_cap.load(Ordering::Acquire);
+            if new_slot_units > current {
+                let added = new_slot_units - current;
+                self.slots_cap.fetch_add(added, Ordering::AcqRel);
+                self.slots.add_permits(added as usize);
+            } else {
+                let retired = self
+                    .slots
+                    .forget_permits((current - new_slot_units) as usize);
+                self.slots_cap.fetch_sub(retired as i32, Ordering::AcqRel);
+            }
+        }
+        self.queue_max.store(new_queue_cap, Ordering::Release);
+        Self::adjust_semaphore(&self.queue_cap, &self.qc_cap, &self.queue_max);
+    }
+
+    /// 把指定 semaphore 的实际容量向 `target_atomic` 看齐。
+    /// `cap` 跟踪该 semaphore 的累计 add_permits - 累计 forget 数。
+    /// `target_atomic` 对 slots 是 `slot_max`,对 queue_cap 是 `queue_max`。
+    fn adjust_semaphore(
+        sem: &Arc<Semaphore>,
+        cap: &Arc<AtomicI32>,
+        target_atomic: &Arc<AtomicI32>,
+    ) {
+        let current = cap.load(Ordering::Acquire);
+        let target = target_atomic.load(Ordering::Acquire);
+        if target == current {
+            return;
+        }
+        if target > current {
+            let delta = (target - current) as usize;
+            sem.add_permits(delta);
+            cap.fetch_add(delta as i32, Ordering::AcqRel);
+            return;
+        }
+        // 缩容：先扣减可用 permit
+        let needed = (current - target) as usize;
+        let took = sem.forget_permits(needed);
+        if took > 0 {
+            cap.fetch_sub(took as i32, Ordering::AcqRel);
+        }
+        if took >= needed {
+            return;
+        }
+        // 剩余部分 spawn 后台任务延迟吞；任务每次循环读共享 target 判断是否继续。
+        let sem_c = sem.clone();
+        let cap_c = cap.clone();
+        let target_c = target_atomic.clone();
+        tokio::spawn(async move {
+            loop {
+                // 每轮先读共享 target：如果此间有扩容把 target 抬到 ≥ cap，直接退出
+                let cur = cap_c.load(Ordering::Acquire);
+                let tgt = target_c.load(Ordering::Acquire);
+                if cur <= tgt {
+                    return;
+                }
+                // 拿一个 permit（可能等待）
+                let permit = match sem_c.clone().acquire_owned().await {
+                    Ok(p) => p,
+                    Err(_) => return, // semaphore 被 close
+                };
+                // 原子决定：若 cap 仍 > target 则吞掉，否则归还 permit 并退出
+                let decision = cap_c.fetch_update(Ordering::AcqRel, Ordering::Acquire, |c| {
+                    if c > target_c.load(Ordering::Acquire) {
+                        Some(c - 1)
+                    } else {
+                        None
+                    }
+                });
+                match decision {
+                    Ok(_) => permit.forget(), // cap 已 -1,permit 不归还
+                    Err(_) => {
+                        drop(permit); // 不应再缩,归还
+                        return;
+                    }
+                }
+            }
+        });
+    }
+
+    /// 获取一个活跃槽位 permit，超时或队列满时返回对应错误。
+    ///
+    /// @param timeout 等待账号槽位的最长时间。
+    /// @param slot_units 当前请求需要占用的内部单位数，普通请求为 2，Haiku 请求为 1。
+    /// @return 成功返回槽位 permit；失败返回队列满、等待超时或信号量关闭。
+    ///
+    /// 成功返回的 [`AccountSlotPermit`] 由调用方持有至请求结束——drop 时自动归还槽位。
+    ///
+    /// # 流程
+    /// 1. `queue_cap.try_acquire_owned()`：拿不到等待位 → `QueueFull`（队列上限，直接降级）；
+    /// 2. `waiting += 1`（scopeguard 保证退出路径反向减）；
+    /// 3. `tokio::time::timeout(..., slots.acquire_owned())` 按 FIFO 等待；
+    ///    即使当前有空闲 permit，若已有 waiter 排在前面，也不会被"插队"。
+    /// 4. 拿到槽位后等待 CLI 门禁；实际准入后才归还等待位。
+    ///
+    /// # 为什么不走 try_acquire_owned 快速路径
+    /// tokio 对 `Semaphore::acquire` 保证公平性，但 `try_acquire` 是**非公平**的
+    /// （官方源码：直接对底层计数 CAS，不走 waker 队列）。一旦走快速路径，新请求就可能
+    /// 插队到已在等的老请求前面，破坏 FIFO。故此处统一走 `acquire_owned`——无人等待时
+    /// 它自己就会立即 ready，不会有额外开销。
+    pub async fn acquire(
+        &self,
+        timeout: Duration,
+        slot_units: u32,
+    ) -> Result<AccountSlotPermit, QueueWaitError> {
+        let started = Instant::now();
+        let slot_units = slot_units.max(1);
+        // 1. 进等待区：拿不到等待位说明队列满，降级。
+        //    queue_cap 用 try_acquire 是 OK 的：它仅作上限计数，无用户 waiter 排队。
+        let queue_permit = self
+            .queue_cap
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| QueueWaitError::QueueFull)?;
+
+        // 2. 等待计数（仅展示用）+ 退出保护（包括 Future 被 drop 的路径）
+        self.waiting.fetch_add(1, Ordering::Relaxed);
+        let waiting = self.waiting.clone();
+        self.waiting_units
+            .fetch_add(slot_units as i64, Ordering::Relaxed);
+        let waiting_units = self.waiting_units.clone();
+        let _w_guard = scopeguard::guard((), move |_| {
+            waiting.fetch_sub(1, Ordering::Relaxed);
+            waiting_units.fetch_sub(slot_units as i64, Ordering::Relaxed);
+        });
+
+        // 3. FIFO 获取槽位（tokio Semaphore 对 acquire 保证公平，不会插队）
+        let slot_permit =
+            match tokio::time::timeout(timeout, self.slots.clone().acquire_many_owned(slot_units))
+                .await
+            {
+                Ok(Ok(p)) => p,
+                Ok(Err(_)) => return Err(QueueWaitError::Closed),
+                Err(_) => return Err(QueueWaitError::Timeout),
+            };
+        let slot_permit = CapacityPermit {
+            permit: Some(slot_permit),
+            slots_cap: self.slots_cap.clone(),
+            slot_max: self.slot_max.clone(),
+            slot_capacity_lock: self.slot_capacity_lock.clone(),
+        };
+
+        // 持有槽位不代表已准入；CLI 占用期间仍须占等待位且只计等待负载。
+        self.gate_waiting_units
+            .fetch_add(slot_units as i64, Ordering::Relaxed);
+        let gate_waiting_units = self.gate_waiting_units.clone();
+        let _gate_guard = scopeguard::guard((), move |_| {
+            gate_waiting_units.fetch_sub(slot_units as i64, Ordering::Relaxed);
+        });
+        if !self
+            .runtime_gate
+            .enter(timeout.saturating_sub(started.elapsed()))
+            .await
+        {
+            return Err(QueueWaitError::Timeout);
+        }
+        drop(queue_permit);
+        Ok(AccountSlotPermit::new(slot_permit, self))
+    }
+
+    /// 当前活跃内部单位数 = `slots` 当前总 permit - 可用 permit - 尚在等门禁的单位。
+    /// 用 `slots_cap`（信号量实际容量）而非 `slot_max`（目标）——缩容过渡期两者可能暂时不等。
+    pub fn active_units(&self) -> i64 {
+        let cap = self.slots_cap.load(Ordering::Relaxed) as i64;
+        (cap - self.slots.available_permits() as i64
+            - self.gate_waiting_units.load(Ordering::Relaxed))
+        .max(0)
+    }
+
+    /// 当前活跃标准槽位数。
+    pub fn active_standard_slots(&self) -> f64 {
+        self.active_units() as f64 / SLOT_UNIT_SCALE as f64
+    }
+
+    /// 当前活跃请求数。
+    pub fn active_request_count(&self) -> i64 {
+        self.active_requests.load(Ordering::Relaxed)
+    }
+
+    /// 当前等待槽位的请求数(仅用于 UI 展示)。
+    pub fn waiting_count(&self) -> i64 {
+        self.waiting.load(Ordering::Relaxed)
+    }
+
+    /// 当前等待请求预计占用的内部单位数。
+    pub fn waiting_units(&self) -> i64 {
+        self.waiting_units.load(Ordering::Relaxed)
+    }
+
+    /// 当前目标最大内部单位数。
+    pub fn max_units(&self) -> i64 {
+        self.slot_max.load(Ordering::Relaxed) as i64
+    }
+}
+
+/// 统一账号硬资格、凭据及并发；v3 按需装配持久调度。
+pub struct AccountService {
+    native_changes: broadcast::Sender<(i64, bool)>,
+    credential_gates: Mutex<HashMap<i64, Arc<CredentialGate>>>,
+    scheduler: Option<Arc<V3Scheduler>>,
+    v3_settings_lock: AsyncMutex<()>,
+    store: Arc<AccountStore>,
+    cache: Arc<dyn CacheStore>,
+    oauth_token_url: String,
+    /// 评分权重缓存 (w7d, w5h, w_concurrency)，更新设置后刷新。
+    score_weights: RwLock<(f64, f64, f64)>,
+    settings_store: Arc<crate::store::settings_store::SettingsStore>,
+    /// 账号级 FIFO 排队器缓存：account_id → queue。
+    ///
+    /// 懒创建(首次调用 `get_or_create_queue` 时建);admin 修改账号 concurrency 后
+    /// 由 `get_or_create_queue` → `AccountQueue::adjust_capacity` 原地调整信号量容量,
+    /// 不替换 queue 实例,保证已占用的 permit 不丢失。
+    queues: RwLock<HashMap<i64, Arc<AccountQueue>>>,
+    /// 纯瞬时 429 的进程内软退避:account_id → 退避状态。
+    ///
+    /// 这里不写数据库、不改变账号状态。它只阻止当前进程在上游临时锁定窗口内继续打同一账号。
+    transient_rate_limit_backoffs: RwLock<HashMap<i64, TransientRateLimitBackoff>>,
+}
+
+/// 提供给受信任管理端消费者的 OAuth 凭据快照。
+///
+/// 快照只在 `AccountService` 完成账号锁内的有效期检查或刷新后返回，调用方不得
+/// 自行使用其中的 refresh token 发起第二条刷新链路。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OAuthCredentialSnapshot {
+    pub account_id: i64,
+    pub access_token: String,
+    pub refresh_token: String,
+    pub expires_at: i64,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct OAuthResolvePolicy {
+    min_validity_seconds: i64,
+    force_refresh: bool,
+    allow_still_valid_fallback: bool,
+}
+
+/// 生成导入/对账快照，不借机刷新或启用人工停用账号。
+/// @param account 当前持久化账号。
+/// @return 最小凭据快照；不完整时拒绝返回。
+fn oauth_import_snapshot(account: Account) -> Result<OAuthCredentialSnapshot, AppError> {
+    if account.auth_type != AccountAuthType::Oauth
+        || account.access_token.is_empty()
+        || account.refresh_token.is_empty()
+    {
+        return Err(AppError::BadRequest("已提交账号凭据不完整".into()));
+    }
+    Ok(OAuthCredentialSnapshot {
+        account_id: account.id,
+        access_token: account.access_token,
+        refresh_token: account.refresh_token,
+        expires_at: account
+            .expires_at
+            .ok_or_else(|| AppError::BadRequest("已提交凭据缺少有效期".into()))?
+            .timestamp_millis(),
+    })
+}
+
+fn validate_managed_oauth_account(account: &Account) -> Result<(), AppError> {
+    if account.status != AccountStatus::Active {
+        return Err(AppError::BadRequest("账号不是 active 状态".into()));
+    }
+    if account.auth_type != AccountAuthType::Oauth {
+        return Err(AppError::BadRequest("账号不是 OAuth 类型".into()));
+    }
+    Ok(())
+}
+
+/// 从最终重读的账号构造满足最小有效期要求的 OAuth 凭据快照。
+///
+/// @param account 已在账号锁内最终重读的 OAuth 账号。
+/// @param min_validity_seconds access token 必须继续有效的最小秒数。
+/// @return 完整且满足有效期要求的 AT、RT 与过期时间快照。
+fn build_oauth_credential_snapshot(
+    account: &Account,
+    min_validity_seconds: i64,
+) -> Result<OAuthCredentialSnapshot, AppError> {
+    validate_managed_oauth_account(account)?;
+    let expires_at = account
+        .expires_at
+        .ok_or_else(|| AppError::ServiceUnavailable("OAuth expires_at 为空".into()))?;
+    if account.refresh_token.is_empty() {
+        return Err(AppError::PermanentCredential(
+            OAUTH_MISSING_REFRESH_TOKEN_REASON.into(),
+        ));
+    }
+    if account.access_token.is_empty() {
+        return Err(AppError::ServiceUnavailable("OAuth 凭据不完整".into()));
+    }
+    if !account.has_valid_oauth_access_token(min_validity_seconds) {
+        return Err(AppError::ServiceUnavailable(format!(
+            "OAuth access token 无法满足 {} 秒最小有效期",
+            min_validity_seconds
+        )));
+    }
+    Ok(OAuthCredentialSnapshot {
+        account_id: account.id,
+        access_token: account.access_token.clone(),
+        refresh_token: account.refresh_token.clone(),
+        expires_at: expires_at.timestamp_millis(),
+    })
+}
+
+impl AccountService {
+    /// 创建保持旧行为的账号服务，v3 通过显式 builder 接入。
+    /// @param store 账号存储。
+    /// @param cache 既有缓存。
+    /// @param settings_store 全局设置。
+    /// @return 尚未装配 v3 调度器的服务。
+    pub fn new(
+        store: Arc<AccountStore>,
+        cache: Arc<dyn CacheStore>,
+        settings_store: Arc<crate::store::settings_store::SettingsStore>,
+    ) -> Self {
+        Self::new_with_oauth_token_url(
+            store,
+            cache,
+            settings_store,
+            crate::service::oauth::OAUTH_TOKEN_URL.to_string(),
+        )
+    }
+
+    /// 使用指定 OAuth token 端点构造账号服务。
+    ///
+    /// @param store 账号持久化存储。
+    /// @param cache 分布式或内存缓存实现。
+    /// @param settings_store 全局设置存储。
+    /// @param oauth_token_url OAuth token 刷新端点。
+    /// @return 返回账号服务实例。
+    pub(crate) fn new_with_oauth_token_url(
+        store: Arc<AccountStore>,
+        cache: Arc<dyn CacheStore>,
+        settings_store: Arc<crate::store::settings_store::SettingsStore>,
+        oauth_token_url: String,
+    ) -> Self {
+        Self {
+            native_changes: broadcast::channel(128).0,
+            store,
+            cache,
+            oauth_token_url,
+            credential_gates: Mutex::new(HashMap::new()),
+            scheduler: None,
+            v3_settings_lock: AsyncMutex::new(()),
+            score_weights: RwLock::new((DEFAULT_W7D, DEFAULT_W5H, DEFAULT_WCONC)),
+            settings_store,
+            queues: RwLock::new(HashMap::new()),
+            transient_rate_limit_backoffs: RwLock::new(HashMap::new()),
+        }
+    }
+
+    /// 仅在 v3 启动时装配新调度，其他调用保留原行为。
+    /// @param scheduler 共享调度器。
+    /// @return 已装配服务。
+    pub fn with_scheduler(mut self, scheduler: Arc<V3Scheduler>) -> Self {
+        self.scheduler = Some(scheduler);
+        self
+    }
+
+    /// 串行化 v3 设置的合并校验、提交和缓存替换，避免并发局部更新拼出非法组合。
+    /// @return 当前管理员更新的独占锁。
+    pub async fn lock_v3_settings(&self) -> MutexGuard<'_, ()> {
+        self.v3_settings_lock.lock().await
+    }
+
+    /// 返回可选的 v3 调度器。
+    /// @return 非 v3 为 None。
+    pub fn scheduler(&self) -> Option<&Arc<V3Scheduler>> {
+        self.scheduler.as_ref()
+    }
+
+    /// 订阅账号原生准备事件，事件只含归属与失效标记。
+    /// @return 有界广播接收器。
+    pub(crate) fn subscribe_native_changes(&self) -> broadcast::Receiver<(i64, bool)> {
+        self.native_changes.subscribe()
+    }
+
+    /// 发布准备通知，实际消费者重新读取账号及当前凭据。
+    /// @param id 已持久化账号 ID。
+    /// @param invalidate 是否取消正在使用旧快照的准备。
+    /// @return 无返回值。
+    pub(crate) fn notify_native_change(&self, id: i64, invalidate: bool) {
+        let _ = self.native_changes.send((id, invalidate));
+    }
+
+    /// 从数据库加载评分权重到内存缓存，启动时和更新设置后调用。
+    pub async fn reload_score_weights(&self) {
+        if let Ok(settings) = self.settings_store.get_all().await {
+            let w7d = settings
+                .get("score_weight_7d")
+                .and_then(|v| v.parse::<f64>().ok())
+                .unwrap_or(DEFAULT_W7D);
+            let w5h = settings
+                .get("score_weight_5h")
+                .and_then(|v| v.parse::<f64>().ok())
+                .unwrap_or(DEFAULT_W5H);
+            let wconc = settings
+                .get("score_weight_concurrency")
+                .and_then(|v| v.parse::<f64>().ok())
+                .unwrap_or(DEFAULT_WCONC);
+            *self.score_weights.write().await = (w7d, w5h, wconc);
+        }
+    }
+
+    /// 获取当前评分权重。
+    async fn get_weights(&self) -> (f64, f64, f64) {
+        *self.score_weights.read().await
+    }
+
+    /// 创建新账号并自动生成身份信息。
+    /// @param a 待创建账号，成功后回填身份与持久化字段。
+    /// @return 创建或配置校验结果。
+    pub async fn create_account(&self, a: &mut Account) -> Result<(), AppError> {
+        let (device_id, env, prompt, process) =
+            crate::model::identity::generate_canonical_identity();
+        a.device_id = device_id;
+        a.canonical_env = self.current_profile_env(env).await;
+        a.canonical_prompt = prompt;
+        a.canonical_process = process;
+
+        if a.status == crate::model::account::AccountStatus::Active
+            && a.status.to_string() == "active"
+        {
+            // default already active
+        }
+        if a.concurrency == 0 {
+            a.concurrency = 3;
+        }
+        if a.priority == 0 {
+            a.priority = 50;
+        }
+        if a.billing_mode == crate::model::account::BillingMode::Strip
+            && a.billing_mode.to_string() == "strip"
+        {
+            // default already strip
+        }
+
+        normalize_account_auth(a)?;
+        normalize_account_subscription(a)?;
+        normalize_upstream_session_pool_config(a)?;
+        validate_account_usage_limits(a)?;
+
+        self.store.create(a).await
+    }
+
+    /// 创建有明确 CLI 设备身份和基础环境的新账号，不重新生成身份。
+    /// @param account 已由受信任导入接口校验的新账号。
+    /// @return 创建结果；已有账号由独立绑定流程处理。
+    pub async fn create_cli_account(&self, account: &mut Account) -> Result<(), AppError> {
+        self.create_cli_account_owned(account, None).await
+    }
+
+    /// 创建时同事务关闭新账号准入，等待本地绑定与 AT-only 发布确认。
+    /// @param account 已确认 CLI 账号。@param input 新协议证明。@return 创建结果。
+    pub async fn create_cli_account_owned(
+        &self,
+        account: &mut Account,
+        input: Option<&CredentialOwnershipInput>,
+    ) -> Result<(), AppError> {
+        let environment: CanonicalEnvData =
+            serde_json::from_value(account.canonical_env.clone())
+                .map_err(|_| AppError::BadRequest("invalid CLI environment".into()))?;
+        let prompt: CanonicalPromptEnvData =
+            serde_json::from_value(account.canonical_prompt.clone())
+                .map_err(|_| AppError::BadRequest("invalid CLI prompt environment".into()))?;
+        if account.device_id.len() != 64
+            || !account
+                .device_id
+                .bytes()
+                .all(|value| value.is_ascii_hexdigit())
+            || environment.platform_raw != "linux"
+            || !matches!(environment.arch.as_str(), "x64" | "arm64")
+            || environment.version.is_empty()
+            || environment.version_base != environment.version
+            || environment.linux_kernel.is_empty()
+            || prompt.platform != "linux"
+            || prompt.os_version != environment.linux_kernel
+            || !prompt.working_dir.starts_with('/')
+        {
+            return Err(AppError::BadRequest("unconfirmed CLI identity".into()));
+        }
+        normalize_account_auth(account)?;
+        normalize_account_subscription(account)?;
+        normalize_upstream_session_pool_config(account)?;
+        validate_account_usage_limits(account)?;
+        let ownership = input
+            .map(|value| credential_ownership::creation_change(account, value))
+            .transpose()?;
+        if let Some(change) = &ownership {
+            if let Some(receipt) = self
+                .store
+                .credential_handoff_receipt(&change.receipt.operation_id)
+                .await?
+            {
+                if receipt.identity != change.receipt.identity
+                    || receipt.request_hash != change.receipt.request_hash
+                    || receipt.direction != "create"
+                {
+                    return Err(AppError::BadRequest("创建交接操作 ID 冲突".into()));
+                }
+                *account = self.store.get_by_id(receipt.account_id).await?;
+                return Ok(());
+            }
+        }
+        self.store.create_with_ownership(account, ownership).await
+    }
+
+    /// 在刷新锁内只更新套餐元数据，不写回旧凭据副本。
+    /// @param id 账号 ID。
+    /// @param subscription_type 未提交或明确的新类型/空值。
+    /// @param rate_limit_tier 未提交或明确的真实分级/空值。
+    /// @return 保存结果。
+    pub async fn update_subscription_metadata(
+        &self,
+        id: i64,
+        subscription_type: Option<Option<String>>,
+        rate_limit_tier: Option<Option<String>>,
+    ) -> Result<(), AppError> {
+        validate_subscription_metadata(
+            subscription_type
+                .as_ref()
+                .and_then(|value| value.as_deref()),
+            rate_limit_tier.as_ref().and_then(|value| value.as_deref()),
+        )?;
+        let (key, owner) = self.acquire_oauth_credential_lock(id).await?;
+        let result = self
+            .store
+            .update_subscription_metadata(id, subscription_type, rate_limit_tier)
+            .await;
+        self.cache.release_lock(&key, &owner).await;
+        result
+    }
+
+    /// 将当前 settings 中选定的 Claude Code 版本画像应用到新账号 env。
+    ///
+    /// @param env 新账号随机预设生成的 canonical env。
+    /// @return 覆盖版本字段后的 canonical env。
+    async fn current_profile_env(&self, mut env: serde_json::Value) -> serde_json::Value {
+        let profile = match self
+            .settings_store
+            .get_value(
+                "claude_code_version_profile",
+                crate::store::settings_store::DEFAULT_CLAUDE_CODE_VERSION_PROFILE_SETTING,
+            )
+            .await
+        {
+            Ok(key) => profile_for_key(&key).unwrap_or_else(|_| default_profile()),
+            Err(_) => default_profile(),
+        };
+        apply_identity_to_env_json(&mut env, &profile.identity);
+        env
+    }
+
+    /// 导入原账号的真实进程指标，不修改设备、凭据、代理或账号策略。
+    /// @param id 原关联账号 ID。
+    /// @param input 带环境、版本与身份证明的实测载荷。
+    /// @return 已持久化的进程 JSON。
+    pub async fn import_cli_process(
+        &self,
+        id: i64,
+        input: &CliProcessImport,
+    ) -> Result<Value, AppError> {
+        let account = self.store.get_by_id(id).await?;
+        let same = |left: &str, right: &str| left.trim().eq_ignore_ascii_case(right.trim());
+        if account.auth_type != AccountAuthType::Oauth
+            || input.device_id.len() != 64
+            || account.device_id != input.device_id
+            || input.email.trim().is_empty()
+            || !same(&account.email, &input.email)
+            || input.account_uuid.trim().is_empty()
+            || account
+                .account_uuid
+                .as_deref()
+                .filter(|value| !value.is_empty())
+                .is_some_and(|value| !same(value, &input.account_uuid))
+            || !input
+                .canonical_process
+                .has_valid_cli_observation(&input.environment_id, &input.cli_version)
+            || account
+                .canonical_process
+                .get("observation")
+                .and_then(|value| value.get("environment_id"))
+                .and_then(|value| value.as_str())
+                .is_some_and(|value| value != input.environment_id)
+        {
+            return Err(AppError::BadRequest(
+                "进程指标与原关联账号身份不匹配".into(),
+            ));
+        }
+        let process = serde_json::to_value(&input.canonical_process)
+            .map_err(|_| AppError::BadRequest("进程指标格式无效".into()))?;
+        self.store.update_cli_process(&account, &process).await?;
+        Ok(process)
+    }
+
+    /// 校验并保存账号配置，未改变的控制线随账号一起保留。
+    /// @param a 需要持久化的完整账号配置。
+    /// @return 保存结果；无效控制线不会写入。
+    pub async fn update_account(&self, a: &Account) -> Result<(), AppError> {
+        let mut normalized = a.clone();
+        normalize_account_auth(&mut normalized)?;
+        normalize_account_subscription(&mut normalized)?;
+        normalize_upstream_session_pool_config(&mut normalized)?;
+        validate_account_usage_limits(&normalized)?;
+        self.store.update(&normalized).await?;
+        if let Some(scheduler) = &self.scheduler {
+            scheduler.account_updated(a.id);
+        }
+        self.notify_native_change(a.id, true);
+        Ok(())
+    }
+
+    /// 校验并热更新普通配置，按列保存且保留现有队列、流和运行租约。
+    /// @param account 本次编辑的配置快照。
+    /// @param fields 明确需要写入的普通配置列。
+    /// @return 校验或写入结果；成功后当前并发和 RPM 等待者立即使用新配置。
+    pub async fn update_account_options(
+        &self,
+        account: &Account,
+        fields: &[&str],
+    ) -> Result<(), AppError> {
+        let mut normalized = account.clone();
+        normalize_account_subscription(&mut normalized)?;
+        normalize_upstream_session_pool_config(&mut normalized)?;
+        validate_account_usage_limits(&normalized)?;
+        // 与队列创建/调整共用写锁，避免保存后旧请求又用过期快照恢复上限。
+        let mut queues = self.queues.write().await;
+        self.store.update_options(&normalized, fields).await?;
+        if fields.contains(&"concurrency") {
+            if let Some(queue) = queues.get(&account.id) {
+                queue.adjust_capacity(normalized.concurrency);
+            } else {
+                let queue = Arc::new(AccountQueue::new(normalized.concurrency));
+                queue.runtime_gate.recover(account.id);
+                queues.insert(account.id, queue);
+            }
+        }
+        drop(queues);
+        if let Some(scheduler) = &self.scheduler {
+            scheduler.account_updated(account.id);
+        }
+        if fields.iter().any(|field| {
+            matches!(
+                *field,
+                "request_backend"
+                    | "status"
+                    | "concurrency"
+                    | "device_id"
+                    | "account_uuid"
+                    | "organization_uuid"
+                    | "email"
+            )
+        }) {
+            self.notify_native_change(account.id, true);
+        }
+        Ok(())
+    }
+
+    /// 校验并独立更新账号用量控制线，不写入快照中的凭据或账号状态。
+    /// @param account 包含账号 ID 和两个控制线的快照。
+    /// @return 校验或数据库写入结果。
+    pub async fn update_account_usage_limits(&self, account: &Account) -> Result<(), AppError> {
+        validate_account_usage_limits(account)?;
+        self.store.update_usage_limits(account).await
+    }
+
+    /// 沿原管理门禁删除账号，v3 附属状态在同一事务清理。
+    /// @param id 已获准删除的账号。
+    /// @return 删除成功或存储错误。
+    pub async fn delete_account(&self, id: i64) -> Result<(), AppError> {
+        if let Some(scheduler) = &self.scheduler {
+            scheduler.store.delete_account(id).await?;
+            scheduler.forget_account(id);
+        } else {
+            self.store.delete(id).await?;
+        }
+        self.notify_native_change(id, true);
+        Ok(())
+    }
+
+    pub async fn get_account(&self, id: i64) -> Result<Account, AppError> {
+        self.store.get_by_id(id).await
+    }
+
+    pub async fn list_accounts(&self) -> Result<Vec<Account>, AppError> {
+        self.store.list().await
+    }
+
+    pub async fn list_accounts_paged(
+        &self,
+        page: i64,
+        page_size: i64,
+    ) -> Result<(Vec<Account>, i64), AppError> {
+        let total = self.store.count().await?;
+        let accounts = self.store.list_paged(page, page_size).await?;
+        Ok((accounts, total))
+    }
+
+    /// 解析账号级上游 session 池。
+    ///
+    /// @param account 当前账号配置。
+    /// @param real_session_id 真实下游 Claude Code session。
+    /// @param allow_insert 是否允许主请求创建新池成员；遥测路径必须传 `false`。
+    /// @return 功能关闭或 session 为空时返回 `Ok(None)`；否则返回池解析结果。
+    pub async fn resolve_upstream_session_pool(
+        &self,
+        account: &Account,
+        real_session_id: &str,
+        allow_insert: bool,
+    ) -> Result<Option<UpstreamSessionPoolResolve>, AppError> {
+        if real_session_id.trim().is_empty()
+            || !account.upstream_session_pool_enabled
+            || account.upstream_session_pool_size <= 0
+        {
+            return Ok(None);
+        }
+        let policy = UpstreamSessionRefreshPolicy::parse(&account.upstream_session_refresh_policy)
+            .unwrap_or(UpstreamSessionRefreshPolicy::MappedRequest);
+        let ttl_minutes = account.upstream_session_ttl_minutes.clamp(
+            MIN_UPSTREAM_SESSION_TTL_MINUTES,
+            MAX_UPSTREAM_SESSION_TTL_MINUTES,
+        );
+        let ttl = Duration::from_secs((ttl_minutes as u64) * 60);
+        self.cache
+            .resolve_upstream_session_pool(
+                account.id,
+                real_session_id,
+                account.upstream_session_pool_size,
+                ttl,
+                policy,
+                allow_insert,
+            )
+            .await
+            .map(Some)
+    }
+
+    /// 读取账号级上游 session 池展示状态。
+    ///
+    /// @param account 当前账号配置。
+    /// @return 返回活跃池状态；功能关闭时活跃数为 0。
+    pub async fn get_upstream_session_pool_status(
+        &self,
+        account: &Account,
+    ) -> Result<UpstreamSessionPoolStatus, AppError> {
+        if !account.upstream_session_pool_enabled || account.upstream_session_pool_size <= 0 {
+            return Ok(UpstreamSessionPoolStatus {
+                active_count: 0,
+                oldest_last_seen_ms: None,
+                newest_last_seen_ms: None,
+            });
+        }
+        let ttl_minutes = account.upstream_session_ttl_minutes.clamp(
+            MIN_UPSTREAM_SESSION_TTL_MINUTES,
+            MAX_UPSTREAM_SESSION_TTL_MINUTES,
+        );
+        self.cache
+            .get_upstream_session_pool_status(
+                account.id,
+                account.upstream_session_pool_size,
+                Duration::from_secs((ttl_minutes as u64) * 60),
+            )
+            .await
+    }
+
+    /// 设置纯瞬时 429 的进程内软退避窗口。
+    ///
+    /// @param account_id 账号 ID。
+    /// @param delay 退避时长。
+    /// @return 无返回值。
+    pub async fn set_transient_rate_limit_backoff(&self, account_id: i64, delay: Duration) {
+        if delay.is_zero() {
+            return;
+        }
+
+        let until = Instant::now() + delay;
+        let mut map = self.transient_rate_limit_backoffs.write().await;
+        if let Some(entry) = map.get_mut(&account_id) {
+            if until > entry.until {
+                entry.until = until;
+            }
+            return;
+        }
+
+        map.insert(
+            account_id,
+            TransientRateLimitBackoff {
+                until,
+                waiting: Arc::new(AtomicI64::new(0)),
+            },
+        );
+    }
+
+    /// 等待账号当前的纯瞬时 429 软退避窗口结束。
+    ///
+    /// 这个等待必须发生在 RPM 预占和并发槽位获取之前,否则会把上游临时锁定时间计入本地限流。
+    ///
+    /// @param account 被选中的账号。
+    /// @return 无返回值。
+    pub async fn wait_transient_rate_limit_backoff(&self, account: &Account) {
+        loop {
+            let entry = {
+                let now = Instant::now();
+                let map = self.transient_rate_limit_backoffs.read().await;
+                match map.get(&account.id).cloned() {
+                    Some(entry) if entry.until > now => Some(entry),
+                    _ => None,
+                }
+            };
+
+            let Some(entry) = entry else {
+                self.clear_expired_transient_rate_limit_backoff(account.id)
+                    .await;
+                return;
+            };
+
+            let remaining = entry.until.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                self.clear_expired_transient_rate_limit_backoff(account.id)
+                    .await;
+                continue;
+            }
+
+            entry.waiting.fetch_add(1, Ordering::Relaxed);
+            let waiting = entry.waiting.clone();
+            let _waiting_guard = scopeguard::guard((), move |_| {
+                waiting.fetch_sub(1, Ordering::Relaxed);
+            });
+
+            info!(
+                "account {} waits {}ms for transient 429 soft backoff",
+                account.id,
+                remaining.as_millis()
+            );
+            sleep(remaining).await;
+        }
+    }
+
+    /// 读取账号当前纯瞬时 429 软退避状态。
+    ///
+    /// @param account_id 账号 ID。
+    /// @return 返回 `(等待请求数, 剩余毫秒数)`。
+    pub async fn transient_rate_limit_backoff_status(&self, account_id: i64) -> (i64, u64) {
+        let now = Instant::now();
+        let entry = {
+            let map = self.transient_rate_limit_backoffs.read().await;
+            map.get(&account_id).cloned()
+        };
+
+        let Some(entry) = entry else {
+            return (0, 0);
+        };
+
+        let waiting = entry.waiting.load(Ordering::Relaxed).max(0);
+        if entry.until > now {
+            let remaining = entry.until.saturating_duration_since(now);
+            let millis = remaining.as_millis().min(u128::from(u64::MAX)) as u64;
+            return (waiting, millis);
+        }
+        if waiting > 0 {
+            return (waiting, 0);
+        }
+
+        self.clear_expired_transient_rate_limit_backoff(account_id)
+            .await;
+        (0, 0)
+    }
+
+    async fn clear_expired_transient_rate_limit_backoff(&self, account_id: i64) {
+        let now = Instant::now();
+        let mut map = self.transient_rate_limit_backoffs.write().await;
+        if map
+            .get(&account_id)
+            .is_some_and(|entry| entry.until <= now && entry.waiting.load(Ordering::Relaxed) <= 0)
+        {
+            map.remove(&account_id);
+        }
+    }
+
+    /// 使用粘性会话为请求选择账号。
+    /// `exclude_ids` 为令牌的不可用账号，`allowed_ids` 为令牌的可用账号（空表示不限制）。
+    pub async fn select_account(
+        &self,
+        session_hash: &str,
+        exclude_ids: &[i64],
+        allowed_ids: &[i64],
+    ) -> Result<Account, AppError> {
+        let selected = self
+            .select_account_with_context(session_hash, exclude_ids, allowed_ids)
+            .await?;
+        if selected.should_bind_session {
+            let _ = self
+                .bind_selected_session(session_hash, selected.account.id)
+                .await;
+        }
+        Ok(selected.account)
+    }
+
+    /// 使用粘性会话为请求选择账号，并返回是否命中粘性绑定。
+    /// `exclude_ids` 为令牌的不可用账号，`allowed_ids` 为令牌的可用账号（空表示不限制）。
+    pub async fn select_account_with_context(
+        &self,
+        session_hash: &str,
+        exclude_ids: &[i64],
+        allowed_ids: &[i64],
+    ) -> Result<SelectedAccount, AppError> {
+        self.select_account_with_selection_context(
+            session_hash,
+            exclude_ids,
+            allowed_ids,
+            &AccountSelectionContext::disabled(),
+        )
+        .await
+    }
+
+    /// 使用粘性会话和请求模型上下文为请求选择账号。
+    ///
+    /// @param session_hash 会话哈希；为空时不读取或写入 sticky 绑定。
+    /// @param exclude_ids 本轮需要排除的账号 ID。
+    /// @param allowed_ids 令牌允许使用的账号 ID；为空表示不限制。
+    /// @param context 当前请求模型与功能开关上下文。
+    /// @return 返回所选账号、是否命中 sticky 以及是否应在真实承载请求后绑定 session。
+    pub async fn select_account_with_selection_context(
+        &self,
+        session_hash: &str,
+        exclude_ids: &[i64],
+        allowed_ids: &[i64],
+        context: &AccountSelectionContext,
+    ) -> Result<SelectedAccount, AppError> {
+        let mut runtime_exclude_ids = exclude_ids.to_vec();
+        let fable_quota_fallback_active = context.is_fable_quota_fallback_active();
+        let fable_weekly_usage_limit_percent = context.fable_weekly_usage_limit_percent;
+        let mut skipped_sticky_for_fable_quota = false;
+        let mut excluded_for_usage_limit = false;
+
+        // 检查粘性会话
+        if !session_hash.is_empty() {
+            if let Ok(Some(account_id)) = self.cache.get_session_account_id(session_hash).await {
+                if account_id > 0 {
+                    if (allowed_ids.is_empty() || allowed_ids.contains(&account_id))
+                        && self
+                            .store
+                            .credential_ownership(account_id)
+                            .await?
+                            .is_some_and(|value| !value.gateway_ready())
+                    {
+                        return Err(AppError::ServiceUnavailable(
+                            "原会话账号正在交接或由本地管理，保持会话绑定".into(),
+                        ));
+                    }
+                    if let Ok(account) = self.store.get_by_id(account_id).await {
+                        let id_allowed =
+                            allowed_ids.is_empty() || allowed_ids.contains(&account_id);
+                        if account.is_schedulable()
+                            && !exclude_ids.contains(&account_id)
+                            && id_allowed
+                        {
+                            let usage_limit_reached = context.usage_limits_enabled
+                                && account_usage_limit_reached(&account);
+                            if usage_limit_reached
+                                || (fable_quota_fallback_active
+                                    && account_fable_weekly_usage_limit_reached(
+                                        &account,
+                                        fable_weekly_usage_limit_percent,
+                                    ))
+                            {
+                                // 控制线只影响本轮选号，保留旧绑定直到替代账号真正承载请求。
+                                if !runtime_exclude_ids.contains(&account_id) {
+                                    runtime_exclude_ids.push(account_id);
+                                }
+                                let _ = self
+                                    .cache
+                                    .set_session_account_id(
+                                        session_hash,
+                                        account_id,
+                                        STICKY_SESSION_TTL,
+                                    )
+                                    .await;
+                                excluded_for_usage_limit = usage_limit_reached;
+                                skipped_sticky_for_fable_quota = !usage_limit_reached;
+                            } else {
+                                // 粘性命中：刷新 TTL，保持活跃会话不过期
+                                let _ = self
+                                    .cache
+                                    .set_session_account_id(
+                                        session_hash,
+                                        account_id,
+                                        STICKY_SESSION_TTL,
+                                    )
+                                    .await;
+                                return Ok(SelectedAccount {
+                                    account,
+                                    sticky: true,
+                                    should_bind_session: false,
+                                });
+                            }
+                        }
+                    }
+                    if !skipped_sticky_for_fable_quota && !excluded_for_usage_limit {
+                        // 过期绑定，删除
+                        let _ = self.cache.delete_session(session_hash).await;
+                    }
+                }
+            }
+        }
+
+        let mut candidates = self
+            .eligible_accounts(
+                &runtime_exclude_ids,
+                allowed_ids,
+                context,
+                skipped_sticky_for_fable_quota,
+                excluded_for_usage_limit,
+            )
+            .await?;
+
+        // 新会话优先避开当前分钟 RPM 已满账号；若全部已满，保留候选交给后续 admission 等待/拒绝。
+        let rpm_available = self.filter_rpm_available(&candidates).await;
+        if !rpm_available.is_empty() {
+            candidates = rpm_available;
+        }
+
+        if candidates.is_empty() {
+            if skipped_sticky_for_fable_quota {
+                return Err(AppError::TooManyRequests(format!(
+                    "Fable 周用量已达到 {}% 上限,暂无可切换账号",
+                    fable_weekly_usage_limit_percent
+                )));
+            }
+            return Err(AppError::ServiceUnavailable("no available accounts".into()));
+        }
+
+        // 按优先级分组，同优先级内按综合评分选择（5h 用量 + 并发负载）
+        let selected = self.select_by_score(&candidates).await;
+
+        Ok(SelectedAccount {
+            account: selected,
+            sticky: false,
+            should_bind_session: !session_hash.is_empty(),
+        })
+    }
+
+    /// 在请求真正进入所选账号后提交粘性会话绑定。
+    ///
+    /// 新会话选择阶段不能提前写绑定：如果随后 RPM admission 发现账号已满并换号，
+    /// 提前绑定会把下一轮误判成粘性请求，导致本应换号的请求被留在满载账号上等待或拒绝。
+    pub async fn bind_selected_session(
+        &self,
+        session_hash: &str,
+        account_id: i64,
+    ) -> Result<(), AppError> {
+        if session_hash.is_empty() {
+            return Ok(());
+        }
+        self.cache
+            .set_session_account_id(session_hash, account_id, STICKY_SESSION_TTL)
+            .await
+    }
+
+    /// 共用的硬资格过滤，保持旧路径与 v3 的权限、额度规则一致。
+    /// @param runtime_exclude_ids 本轮排除账号。
+    /// @param allowed_ids Token 范围。
+    /// @param context 模型与额度合同。
+    /// @param skipped_sticky_for_fable_quota 原绑定是否因 Fable 门禁排除。
+    /// @param excluded_for_usage_limit 原绑定是否命中普通控制线。
+    /// @return 符合硬资格的候选；容量尚未裁决。
+    async fn eligible_accounts(
+        &self,
+        runtime_exclude_ids: &[i64],
+        allowed_ids: &[i64],
+        context: &AccountSelectionContext,
+        skipped_sticky_for_fable_quota: bool,
+        mut excluded_for_usage_limit: bool,
+    ) -> Result<Vec<Account>, AppError> {
+        let fable_quota_fallback_active = context.is_fable_quota_fallback_active();
+        let fable_weekly_usage_limit_percent = context.fable_weekly_usage_limit_percent;
+        // 获取可调度账号
+        let accounts = self.store.list_schedulable().await?;
+        let ownerships = self.store.credential_ownerships().await?;
+
+        // 过滤：排除项 + 可用账号限制
+        let mut candidates: Vec<Account> = accounts
+            .into_iter()
+            .filter(|a| {
+                !runtime_exclude_ids.contains(&a.id)
+                    && (allowed_ids.is_empty() || allowed_ids.contains(&a.id))
+                    && ownerships
+                        .get(&a.id)
+                        .is_none_or(|value| value.gateway_ready())
+            })
+            .collect();
+
+        if context.usage_limits_enabled {
+            let before = candidates.len();
+            candidates.retain(|account| !account_usage_limit_reached(account));
+            if candidates.len() < before {
+                excluded_for_usage_limit = true;
+            }
+            if candidates.is_empty() && excluded_for_usage_limit {
+                return Err(AppError::TooManyRequests(
+                    "账号已达到配置的 5 小时或 7 天用量上限，暂无可切换账号".into(),
+                ));
+            }
+        }
+
+        if fable_quota_fallback_active {
+            let fable_available: Vec<Account> = candidates
+                .iter()
+                .filter(|account| {
+                    !account_fable_weekly_usage_limit_reached(
+                        account,
+                        fable_weekly_usage_limit_percent,
+                    )
+                })
+                .cloned()
+                .collect();
+            if !fable_available.is_empty() {
+                candidates = fable_available;
+            } else if !candidates.is_empty() || skipped_sticky_for_fable_quota {
+                if excluded_for_usage_limit {
+                    return Err(AppError::TooManyRequests(
+                        "所有可用账号均已达到配置的用量上限，暂无可切换账号".into(),
+                    ));
+                }
+                return Err(AppError::TooManyRequests(format!(
+                    "所有可用账号的 Fable 周用量均已达到 {}% 上限",
+                    fable_weekly_usage_limit_percent
+                )));
+            }
+        }
+
+        Ok(candidates)
+    }
+
+    /// v3 严格绑定与新会话容量选择，不读取旧缓存绑定或固定分钟 RPM。
+    /// @param request 本请求的统一期限和匿名会话。
+    /// @param exclude_ids 既有故障／Token 排除。
+    /// @param allowed_ids Token 允许范围。
+    /// @param context 既有模型和硬额度规则。
+    /// @param slot_units 当前请求加权槽位。
+    /// @return 稳定绑定或可接纳的新候选。
+    pub async fn select_v3_account(
+        &self,
+        request: &SchedulingRequest,
+        exclude_ids: &[i64],
+        allowed_ids: &[i64],
+        context: &AccountSelectionContext,
+        slot_units: u32,
+    ) -> Result<SelectedAccount, AppError> {
+        let scheduler = self
+            .scheduler
+            .as_ref()
+            .ok_or_else(|| AppError::ServiceUnavailable("v3 调度未装配".into()))?;
+        request.check_deadline()?;
+        let binding = match request.key() {
+            Some(key) => {
+                let mut binding = scheduler.store.binding(key, now_ms()).await?;
+                if binding.is_none() {
+                    // 活动流在短暂存储故障后仍可能持有旧期限；先 CAS 续租，不能用内存猜权威绑定。
+                    for hint in scheduler.live_bindings(key) {
+                        if scheduler.store.renew(&hint, now_ms(), true).await? {
+                            break;
+                        }
+                    }
+                    binding = scheduler.store.binding(key, now_ms()).await?;
+                }
+                binding
+            }
+            None => None,
+        };
+        if let Some(bound) = &binding {
+            if (allowed_ids.is_empty() || allowed_ids.contains(&bound.account_id))
+                && self
+                    .store
+                    .credential_ownership(bound.account_id)
+                    .await?
+                    .is_some_and(|value| !value.gateway_ready())
+            {
+                return Err(AppError::ServiceUnavailable(
+                    "原会话账号正在交接或由本地管理，保持会话绑定".into(),
+                ));
+            }
+        }
+        let candidates = self
+            .eligible_accounts(exclude_ids, allowed_ids, context, false, false)
+            .await
+            .map_err(|error| match error {
+                AppError::Internal(_) => AppError::ServiceUnavailable("调度账号数据不可用".into()),
+                other => other,
+            })?;
+        if let Some(bound) = &binding {
+            if let Some(account) = candidates.iter().find(|a| a.id == bound.account_id) {
+                scheduler.store.renew(bound, now_ms(), true).await?;
+                request.selected(account, binding.clone());
+                return Ok(SelectedAccount {
+                    account: account.clone(),
+                    sticky: true,
+                    should_bind_session: false,
+                });
+            }
+        }
+        let mut snapshots = Vec::with_capacity(candidates.len());
+        for account in candidates {
+            let score = self.get_account_score_info(&account).await;
+            let next_send_ms = scheduler
+                .store
+                .next_send(account.id, send_interval_ms(account.rpm_limit))
+                .await?;
+            snapshots.push(SchedulingCandidate {
+                account,
+                active_units: score.current_concurrency_units,
+                max_units: score.max_concurrency_units,
+                queued: score.queued,
+                queued_units: score.queued_request_units,
+                legacy_score: score.score,
+                next_send_ms,
+            });
+        }
+        let account = scheduler.choose(snapshots, request, slot_units)?;
+        request.selected(&account, binding);
+        Ok(SelectedAccount {
+            account,
+            sticky: false,
+            should_bind_session: false,
+        })
+    }
+
+    /// 从真实选择器的共享计算构成账号管理摘要。
+    /// @param account 当前持久账号。
+    /// @param score 已读取的加权容量和旧评分。
+    /// @param bound_sessions 批量读取的有效绑定数。
+    /// @return v3 管理摘要或观测不可用。
+    pub async fn v3_summary(
+        &self,
+        account: &Account,
+        score: &AccountScoreInfo,
+        bound_sessions: i64,
+    ) -> Result<SchedulingAccountSummary, AppError> {
+        let scheduler = self
+            .scheduler
+            .as_ref()
+            .ok_or_else(|| AppError::ServiceUnavailable("v3 调度未启用".into()))?;
+        let now = now_ms();
+        let next = scheduler
+            .store
+            .next_send(account.id, send_interval_ms(account.rpm_limit))
+            .await?;
+        let candidate = SchedulingCandidate {
+            account: account.clone(),
+            active_units: score.current_concurrency_units,
+            max_units: score.max_concurrency_units,
+            queued: score.queued,
+            queued_units: score.queued_request_units,
+            legacy_score: score.score,
+            next_send_ms: next,
+        };
+        let config = scheduler.config();
+        let factors = scheduler.factors(&candidate, &config, now);
+        let mut capacity = scheduler.capacity(
+            &candidate,
+            DEFAULT_REQUEST_SLOT_UNITS,
+            config.wait_seconds as i64 * 1000,
+            now,
+        );
+        if !account.is_schedulable() || account_usage_limit_reached(account) {
+            capacity.immediate = false;
+            capacity.can_queue = false;
+            capacity.reason = "account_unavailable".into();
+        }
+        let snapshot = scheduler.snapshot(account.id);
+        let phases = PhaseCounts::of(snapshot.requests.iter());
+        let active_sessions = snapshot
+            .requests
+            .iter()
+            .filter(|r| r.bound)
+            .filter_map(|r| r.session_key.as_deref())
+            .collect::<HashSet<_>>()
+            .len();
+        let unbound_requests = snapshot.requests.iter().filter(|r| !r.bound).count();
+        Ok(SchedulingAccountSummary {
+            config,
+            factors,
+            capacity,
+            observed_at_ms: now,
+            bound_sessions,
+            active_sessions,
+            unbound_requests,
+            phases,
+            next_send_at_ms: (account.rpm_limit > 0).then_some(next.max(now)),
+            submissions_last_60s: snapshot.submissions_last_60s,
+            history_available_from_ms: snapshot.history_available_from_ms,
+            history_truncated: snapshot.history_truncated,
+        })
+    }
+
+    async fn filter_rpm_available(&self, accounts: &[Account]) -> Vec<Account> {
+        let mut available = Vec::with_capacity(accounts.len());
+        for account in accounts {
+            if account.rpm_limit <= 0 {
+                available.push(account.clone());
+                continue;
+            }
+            match self.get_account_rpm_status(account).await {
+                Ok(status) if !status.saturated => available.push(account.clone()),
+                Ok(_) => {
+                    info!(
+                        "[RPM] 账号={} id={} 当前已满 动作=skip 粘性=false",
+                        account.name, account.id
+                    );
+                }
+                Err(e) => {
+                    warn!(
+                        "[RPM] 账号={} id={} 状态读取失败 动作=allow 错误={}",
+                        account.name, account.id, e
+                    );
+                    available.push(account.clone());
+                }
+            }
+        }
+        available
+    }
+
+    /// 返回账号当前分钟 RPM 状态。读取失败由调用方决定是否失败开放。
+    pub async fn get_account_rpm_status(
+        &self,
+        account: &Account,
+    ) -> Result<AccountRpmStatus, AppError> {
+        let (minute_ts, reset_at) = current_rpm_window();
+        let limit = account.rpm_limit.max(0);
+        let current = self.cache.get_account_rpm(account.id, minute_ts).await?;
+        let remaining = if limit > 0 {
+            Some((limit as i64 - current).max(0))
+        } else {
+            None
+        };
+        Ok(AccountRpmStatus {
+            limit,
+            current,
+            remaining,
+            window_reset_at: reset_at,
+            saturated: limit > 0 && current >= limit as i64,
+        })
+    }
+
+    /// 在发往上游前预占账号 RPM。粘性会话超限时等待；非粘性请求超限时让 gateway 换号。
+    pub async fn acquire_account_rpm(
+        &self,
+        account: &Account,
+        sticky: bool,
+        session_hash: &str,
+    ) -> Result<(), AppError> {
+        if account.rpm_limit <= 0 {
+            return Ok(());
+        }
+
+        let deadline = Instant::now() + RPM_WAIT_MAX;
+        loop {
+            let (minute_ts, reset_at) = current_rpm_window();
+            match self
+                .cache
+                .try_acquire_account_rpm(account.id, minute_ts, account.rpm_limit, RPM_KEY_TTL)
+                .await
+            {
+                Ok(result) if result.acquired => {
+                    self.log_rpm_action(
+                        account,
+                        result.current,
+                        sticky,
+                        RpmAdmissionAction::Allow,
+                        None,
+                        session_hash,
+                    );
+                    return Ok(());
+                }
+                Ok(result) if !sticky => {
+                    self.log_rpm_action(
+                        account,
+                        result.current,
+                        sticky,
+                        RpmAdmissionAction::Skip,
+                        None,
+                        session_hash,
+                    );
+                    return Err(AppError::ServiceUnavailable(
+                        "account rpm limit reached".into(),
+                    ));
+                }
+                Ok(result) => {
+                    let now = Utc::now();
+                    let until_reset = (reset_at - now)
+                        .to_std()
+                        .unwrap_or_else(|_| Duration::from_millis(0));
+                    let remaining_budget = deadline.saturating_duration_since(Instant::now());
+                    if remaining_budget.is_zero() {
+                        self.log_rpm_action(
+                            account,
+                            result.current,
+                            sticky,
+                            RpmAdmissionAction::Reject,
+                            Some("wait_timeout"),
+                            session_hash,
+                        );
+                        return Err(AppError::TooManyRequests(
+                            "sticky account rpm limit reached".into(),
+                        ));
+                    }
+                    let wait = until_reset.min(RPM_WAIT_STEP).min(remaining_budget);
+                    self.log_rpm_action(
+                        account,
+                        result.current,
+                        sticky,
+                        RpmAdmissionAction::Wait,
+                        Some(&format!("{}ms", wait.as_millis())),
+                        session_hash,
+                    );
+                    sleep(wait).await;
+                }
+                Err(e) => {
+                    warn!(
+                        "[RPM] 账号={} id={} 预占失败 动作=allow 粘性={} 错误={}",
+                        account.name, account.id, sticky, e
+                    );
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    fn log_rpm_action(
+        &self,
+        account: &Account,
+        current: i64,
+        sticky: bool,
+        action: RpmAdmissionAction,
+        detail: Option<&str>,
+        session_hash: &str,
+    ) {
+        let action_label = match action {
+            RpmAdmissionAction::Allow => "allow",
+            RpmAdmissionAction::Wait => "wait",
+            RpmAdmissionAction::Skip => "skip",
+            RpmAdmissionAction::Reject => "reject",
+        };
+        let session = short_session_hash(session_hash);
+        match detail {
+            Some(detail) => info!(
+                "[RPM] 账号={} id={} 当前={} 限制={} 粘性={} 动作={} 详情={} session={}",
+                account.name,
+                account.id,
+                current,
+                account.rpm_limit,
+                sticky,
+                action_label,
+                detail,
+                session
+            ),
+            None => info!(
+                "[RPM] 账号={} id={} 当前={} 限制={} 粘性={} 动作={} session={}",
+                account.name, account.id, current, account.rpm_limit, sticky, action_label, session
+            ),
+        }
+    }
+
+    /// 获取或懒创建账号的 FIFO 排队器。
+    ///
+    /// 当已缓存 queue 的 `slot_max` 与当前 `concurrency` 不一致(admin 在管理页面改过),
+    /// 调用 [`AccountQueue::adjust_capacity`] **原地**调整信号量容量,不替换 queue 实例,
+    /// 确保旧的已占用 permit 不丢失 —— 避免瞬间超发。
+    pub async fn get_or_create_queue(
+        &self,
+        account_id: i64,
+        concurrency: i32,
+    ) -> Arc<AccountQueue> {
+        let concurrency = concurrency.max(1);
+        let slot_units = standard_concurrency_to_slot_units(concurrency);
+        // 读锁快路径:容量匹配直接返回
+        {
+            let map = self.queues.read().await;
+            if let Some(q) = map.get(&account_id) {
+                if q.slot_max.load(Ordering::Relaxed) == slot_units {
+                    return q.clone();
+                }
+            }
+        }
+        // 写锁:二次检查后原地调整或创建新实例
+        let mut map = self.queues.write().await;
+        if let Some(q) = map.get(&account_id) {
+            if q.slot_max.load(Ordering::Relaxed) != slot_units {
+                // 请求中的 Account 可能早于管理更新；以持久配置为准，读失败保留当前容量。
+                if let Ok(current) = self.store.get_by_id(account_id).await {
+                    if q.slot_max.load(Ordering::Relaxed)
+                        != standard_concurrency_to_slot_units(current.concurrency)
+                    {
+                        q.adjust_capacity(current.concurrency);
+                    }
+                }
+            }
+            return q.clone();
+        }
+        let q = Arc::new(AccountQueue::new(concurrency));
+        q.runtime_gate.recover(account_id);
+        map.insert(account_id, q.clone());
+        q
+    }
+
+    /// 从 Anthropic API 获取账号用量并按 rollover 规则缓存到数据库。
+    ///
+    /// @param id 账号 ID，仅支持 OAuth 账号。
+    /// @return 返回最终持久化的完整用量对象。
+    pub async fn refresh_usage(&self, id: i64) -> Result<serde_json::Value, AppError> {
+        let _credential_activity = self.upstream_activity(id).await?;
+        let account = self.store.get_by_id(id).await?;
+        if account.auth_type != crate::model::account::AccountAuthType::Oauth {
+            return Err(AppError::BadRequest(
+                "usage query is only supported for OAuth accounts, SetupToken accounts cannot query usage via this endpoint".into(),
+            ));
+        }
+        let token = self.resolve_upstream_token(id).await?;
+        let usage = crate::service::oauth::fetch_usage(&token, &account.proxy_url).await?;
+        self.persist_usage_observation(id, usage, UsageObservationKind::Allowed)
+            .await
+    }
+
+    /// 从上游响应头被动采集的用量数据合并到数据库。
+    /// 不发起任何 API 请求，也不会丢失响应头中未包含的窗口。
+    ///
+    /// @param id 账号 ID。
+    /// @param partial 响应头归一化后的完整窗口集合。
+    /// @param kind 本次观察是允许响应还是 429 拒绝响应。
+    /// @return 写入成功时返回空值。
+    pub async fn update_passive_usage(
+        &self,
+        id: i64,
+        partial: serde_json::Value,
+        kind: UsageObservationKind,
+    ) -> Result<(), AppError> {
+        self.persist_usage_observation(id, partial, kind)
+            .await
+            .map(|_| ())
+    }
+
+    async fn persist_usage_observation(
+        &self,
+        id: i64,
+        incoming: serde_json::Value,
+        kind: UsageObservationKind,
+    ) -> Result<serde_json::Value, AppError> {
+        let account = self.store.get_by_id(id).await?;
+        let merged = merge_usage_observation(account.usage_data, incoming, kind, Utc::now());
+        let merged_str = serde_json::to_string(&merged).unwrap_or_else(|_| "{}".into());
+        self.store.update_usage(id, &merged_str).await?;
+        Ok(merged)
+    }
+
+    pub async fn resolve_upstream_token(&self, id: i64) -> Result<String, AppError> {
+        let _credential_activity = self.upstream_activity(id).await?;
+        let account = self.store.get_by_id(id).await?;
+        match account.auth_type {
+            AccountAuthType::SetupToken => {
+                if account.setup_token.is_empty() {
+                    return Err(AppError::ServiceUnavailable("setup token is empty".into()));
+                }
+                Ok(account.setup_token)
+            }
+            AccountAuthType::Oauth => {
+                validate_managed_oauth_account(&account)?;
+                let resolved = self
+                    .resolve_oauth_account(
+                        &account,
+                        OAuthResolvePolicy {
+                            min_validity_seconds: OAUTH_REFRESH_BUFFER_SECONDS,
+                            force_refresh: false,
+                            allow_still_valid_fallback: true,
+                        },
+                    )
+                    .await?;
+                Ok(resolved.access_token)
+            }
+        }
+    }
+
+    /// 在上游返回 401 后恢复 OAuth Access Token。
+    ///
+    /// 同一账号的并发 401 会复用账号级刷新锁。锁内若发现其他请求已替换失败 Token，
+    /// 直接返回新 Token；否则强制刷新且不允许回退旧 Token。
+    ///
+    /// @param id OAuth 账号 ID。
+    /// @param failed_access_token 本次被上游拒绝的 Access Token。
+    /// @return 返回可用于同账号单次重试的 Access Token。
+    pub async fn recover_upstream_token_after_unauthorized(
+        &self,
+        id: i64,
+        failed_access_token: &str,
+    ) -> Result<String, AppError> {
+        let _credential_activity = self.upstream_activity(id).await?;
+        if failed_access_token.is_empty() {
+            return Err(AppError::BadRequest(
+                "失败的 OAuth access token 为空".into(),
+            ));
+        }
+
+        let lock_key = format!("oauth:refresh:account:{}", id);
+        let lock_owner = Uuid::new_v4().to_string();
+        for attempt in 0..=OAUTH_WAIT_ATTEMPTS {
+            let acquired = self
+                .cache
+                .acquire_lock(&lock_key, &lock_owner, OAUTH_LOCK_TTL)
+                .await?;
+            if acquired {
+                let result = self
+                    .recover_upstream_token_after_unauthorized_locked(id, failed_access_token)
+                    .await;
+                self.cache.release_lock(&lock_key, &lock_owner).await;
+                return result;
+            }
+            if attempt < OAUTH_WAIT_ATTEMPTS {
+                sleep(OAUTH_WAIT_RETRY).await;
+            }
+        }
+
+        Err(AppError::ServiceUnavailable(
+            "OAuth 401 恢复等待超时".into(),
+        ))
+    }
+
+    async fn recover_upstream_token_after_unauthorized_locked(
+        &self,
+        id: i64,
+        failed_access_token: &str,
+    ) -> Result<String, AppError> {
+        let latest = self.store.get_by_id(id).await?;
+        validate_managed_oauth_account(&latest)?;
+
+        // 并发请求可能已在等待期间完成刷新。复用新 Token，避免每个等待者依次强刷。
+        if latest.access_token != failed_access_token && latest.has_valid_oauth_access_token(0) {
+            return Ok(latest.access_token);
+        }
+
+        let refreshed = self
+            .refresh_oauth_account(
+                id,
+                OAuthResolvePolicy {
+                    min_validity_seconds: 0,
+                    force_refresh: true,
+                    allow_still_valid_fallback: false,
+                },
+            )
+            .await?;
+        if refreshed.access_token.is_empty() {
+            return Err(AppError::ServiceUnavailable(
+                "OAuth 刷新后 access token 为空".into(),
+            ));
+        }
+        Ok(refreshed.access_token)
+    }
+
+    /// 在账号级刷新锁内解析一份满足有效期要求的 OAuth 凭据。
+    ///
+    /// @param id 账号 ID。
+    /// @param min_validity_seconds 返回时 access token 至少还需有效的秒数。
+    /// @param force_refresh 是否忽略当前有效期并强制刷新一次。
+    /// @return 同一账号最终落库的 AT、RT 和过期时间快照。
+    pub async fn resolve_oauth_credentials(
+        &self,
+        id: i64,
+        min_validity_seconds: i64,
+        force_refresh: bool,
+    ) -> Result<OAuthCredentialSnapshot, AppError> {
+        let _credential_activity = self.upstream_activity(id).await?;
+        if min_validity_seconds < 0 {
+            return Err(AppError::BadRequest(
+                "min_validity_seconds 不能小于 0".into(),
+            ));
+        }
+
+        let lock_key = format!("oauth:refresh:account:{}", id);
+        let lock_owner = Uuid::new_v4().to_string();
+        for attempt in 0..=OAUTH_WAIT_ATTEMPTS {
+            let acquired = self
+                .cache
+                .acquire_lock(&lock_key, &lock_owner, OAUTH_LOCK_TTL)
+                .await?;
+            if acquired {
+                let result = self
+                    .resolve_oauth_credentials_locked(
+                        id,
+                        OAuthResolvePolicy {
+                            min_validity_seconds,
+                            force_refresh,
+                            allow_still_valid_fallback: false,
+                        },
+                    )
+                    .await;
+                self.cache.release_lock(&lock_key, &lock_owner).await;
+                return result;
+            }
+            if attempt < OAUTH_WAIT_ATTEMPTS {
+                sleep(OAUTH_WAIT_RETRY).await;
+            }
+        }
+
+        Err(AppError::ServiceUnavailable(
+            "OAuth 凭据解析等待超时".into(),
+        ))
+    }
+
+    /// 导入同一账号的真实 CLI 重授权凭据，不创建第二个刷新所有者。
+    /// @param id 原关联账号 ID。
+    /// @param input 新凭据、身份和排他登录租约证明。
+    /// @return 最终持久化的权威凭据快照。
+    pub async fn import_oauth_credentials(
+        &self,
+        id: i64,
+        input: &OAuthCredentialImport,
+    ) -> Result<OAuthCredentialSnapshot, AppError> {
+        if input.operation_id.len() != 32
+            || !input
+                .operation_id
+                .bytes()
+                .all(|value| value.is_ascii_hexdigit())
+            || input.email.trim().is_empty()
+            || input.email.len() > 320
+            || [&input.access_token, &input.refresh_token]
+                .iter()
+                .any(|token| {
+                    token.is_empty()
+                        || token.len() > 16384
+                        || token.bytes().any(|value| value <= 32 || value >= 127)
+                })
+        {
+            return Err(AppError::BadRequest("重授权凭据格式不合法".into()));
+        }
+        validate_subscription_metadata(
+            input.subscription_type.as_deref(),
+            input.rate_limit_tier.as_deref(),
+        )?;
+        let encoded = serde_json::to_vec(input)
+            .map_err(|_| AppError::BadRequest("凭据提交格式不合法".into()))?;
+        let request_hash = hex::encode(Sha256::digest(encoded));
+        let (key, owner) = self.acquire_oauth_credential_lock(id).await?;
+        let result = self
+            .import_oauth_credentials_locked(id, input, &request_hash)
+            .await;
+        self.cache.release_lock(&key, &owner).await;
+        result
+    }
+
+    async fn acquire_oauth_credential_lock(&self, id: i64) -> Result<(String, String), AppError> {
+        let key = format!("oauth:refresh:account:{}", id);
+        let owner = Uuid::new_v4().to_string();
+        for attempt in 0..=OAUTH_WAIT_ATTEMPTS {
+            if self
+                .cache
+                .acquire_lock(&key, &owner, OAUTH_LOCK_TTL)
+                .await?
+            {
+                return Ok((key, owner));
+            }
+            if attempt < OAUTH_WAIT_ATTEMPTS {
+                sleep(OAUTH_WAIT_RETRY).await;
+            }
+        }
+        Err(AppError::ServiceUnavailable("重授权凭据等待超时".into()))
+    }
+
+    async fn import_oauth_credentials_locked(
+        &self,
+        id: i64,
+        input: &OAuthCredentialImport,
+        request_hash: &str,
+    ) -> Result<OAuthCredentialSnapshot, AppError> {
+        if let Some(ownership) = self.store.credential_ownership(id).await? {
+            if ownership.direction != "reauth"
+                || ownership.owner != "gateway"
+                || !matches!(ownership.phase.as_str(), "ready" | "reauth")
+                || ownership.lease_owner.as_deref() != Some(input.owner.as_str())
+            {
+                return Err(AppError::ServiceUnavailable(
+                    "原重新授权已被后续凭据交接替代，请核对当前归属".into(),
+                ));
+            }
+        }
+        if let Some((account_id, original_hash)) =
+            self.store.oauth_import_receipt(&input.operation_id).await?
+        {
+            if account_id != id || original_hash != request_hash {
+                return Err(AppError::BadRequest("凭据提交操作 ID 冲突".into()));
+            }
+            return oauth_import_snapshot(self.store.get_by_id(id).await?);
+        }
+        if input.expires_at <= Utc::now().timestamp_millis() + 60_000 {
+            return Err(AppError::BadRequest("新登录凭据已过期或即将过期".into()));
+        }
+        let account = self.store.get_by_id(id).await?;
+        if account.auth_type != AccountAuthType::Oauth {
+            return Err(AppError::BadRequest("关联账号不是 OAuth 类型".into()));
+        }
+        let same = |left: &str, right: &str| left.trim().eq_ignore_ascii_case(right.trim());
+        if !same(&account.email, &input.email)
+            || account
+                .account_uuid
+                .as_deref()
+                .filter(|value| !value.is_empty())
+                .is_some_and(|expected| {
+                    !input
+                        .account_uuid
+                        .as_deref()
+                        .is_some_and(|actual| same(expected, actual))
+                })
+            || account
+                .organization_uuid
+                .as_deref()
+                .filter(|value| !value.is_empty())
+                .is_some_and(|expected| {
+                    !input
+                        .organization_uuid
+                        .as_deref()
+                        .is_some_and(|actual| same(expected, actual))
+                })
+        {
+            return Err(AppError::BadRequest("新登录身份与原关联账号不匹配".into()));
+        }
+        let queue = self.get_or_create_queue(id, account.concurrency).await;
+        let _permit = queue
+            .runtime_gate
+            .begin_oauth_import(&input.owner, &input.generation)?;
+        let restore_auth = oauth_import_restores_auth(&account);
+        let ownership = self.reauth_ownership_change(id, input).await?;
+        self.store
+            .import_oauth_credentials_owned(
+                &account,
+                input,
+                request_hash,
+                restore_auth,
+                ownership.as_ref(),
+            )
+            .await?;
+        self.notify_native_change(id, true);
+        oauth_import_snapshot(self.store.get_by_id(id).await?)
+    }
+}
+
+/// 仅新授权可恢复明确的认证失效；人工停用、封禁与限流保持原状。
+fn oauth_import_restores_auth(account: &Account) -> bool {
+    let reason = account.disable_reason.as_str();
+    let auth_reason = reason
+        .strip_prefix("permanent credential failure: ")
+        .unwrap_or(reason);
+    let permanent_grant = auth_reason.starts_with("OAuth refresh rejected: status ")
+        && auth_reason.ends_with("error=invalid_grant")
+        && auth_reason
+            .split_whitespace()
+            .nth(4)
+            .and_then(|value| value.parse::<u16>().ok())
+            .is_some_and(|status| (400..500).contains(&status) && status != 429);
+    account.status == AccountStatus::Disabled
+        && account.auth_error == reason
+        && (matches!(
+            auth_reason,
+            "401 OAuth 认证恢复失败"
+                | "401 OAuth 认证失败"
+                | "401 OAuth 刷新后仍认证失败"
+                | OAUTH_MISSING_REFRESH_TOKEN_REASON
+        ) || permanent_grant)
+}
+
+impl AccountService {
+    /// 串行读取回执和当前凭据，区分未提交与尚不能确认。
+    /// @param id 原关联账号 ID。
+    /// @param operation_id 唯一操作 ID。
+    /// @return 已提交时返回当前快照；明确未提交时返回 None。
+    pub async fn oauth_import_status(
+        &self,
+        id: i64,
+        operation_id: &str,
+    ) -> Result<Option<OAuthCredentialSnapshot>, AppError> {
+        if operation_id.len() != 32 || !operation_id.bytes().all(|value| value.is_ascii_hexdigit())
+        {
+            return Err(AppError::BadRequest("凭据提交操作 ID 不合法".into()));
+        }
+        let account = self.store.get_by_id(id).await?;
+        let queue = self.get_or_create_queue(id, account.concurrency).await;
+        let (key, owner) = self.acquire_oauth_credential_lock(id).await?;
+        let result = async {
+            if queue.runtime_gate.snapshot()["importing"].as_i64() != Some(0) {
+                return Err(AppError::ServiceUnavailable(
+                    "凭据提交结果尚不能确认".into(),
+                ));
+            }
+            let receipt = self.store.oauth_import_receipt(operation_id).await?;
+            if receipt.is_some() {
+                if let Some(ownership) = self.store.credential_ownership(id).await? {
+                    let current = self
+                        .store
+                        .credential_handoff_receipt(&ownership.operation_id)
+                        .await?;
+                    if ownership.owner != "gateway"
+                        || ownership.direction != "reauth"
+                        || !matches!(ownership.phase.as_str(), "ready" | "reauth")
+                        || !current.is_some_and(|value| {
+                            value.import_operation_id.as_deref() == Some(operation_id)
+                        })
+                    {
+                        return Err(AppError::ServiceUnavailable(
+                            "历史登录回执已被后续凭据交接替代，不能发布旧凭据".into(),
+                        ));
+                    }
+                }
+            }
+            match receipt {
+                Some((account_id, _)) if account_id == id => Ok(Some(oauth_import_snapshot(
+                    self.store.get_by_id(id).await?,
+                )?)),
+                Some(_) => Err(AppError::BadRequest("凭据提交账号不匹配".into())),
+                None => Ok(None),
+            }
+        }
+        .await;
+        self.cache.release_lock(&key, &owner).await;
+        result
+    }
+
+    async fn resolve_oauth_credentials_locked(
+        &self,
+        id: i64,
+        policy: OAuthResolvePolicy,
+    ) -> Result<OAuthCredentialSnapshot, AppError> {
+        let account = self.store.get_by_id(id).await?;
+        validate_managed_oauth_account(&account)?;
+        if account.refresh_token.is_empty() {
+            if !self
+                .store
+                .update_auth_error_if_current(&account, OAUTH_MISSING_REFRESH_TOKEN_REASON)
+                .await?
+            {
+                return build_oauth_credential_snapshot(
+                    &self.store.get_by_id(id).await?,
+                    policy.min_validity_seconds,
+                );
+            }
+            return Err(AppError::PermanentCredential(
+                OAUTH_MISSING_REFRESH_TOKEN_REASON.into(),
+            ));
+        }
+        if policy.force_refresh
+            || !account.has_valid_oauth_access_token(policy.min_validity_seconds)
+        {
+            self.refresh_oauth_account(id, policy).await?;
+        }
+
+        // 即使无需刷新也要在账号锁内最终重读，避免把并发刷新前的旧 RT 返回给 bench。
+        let resolved = self.store.get_by_id(id).await?;
+        build_oauth_credential_snapshot(&resolved, policy.min_validity_seconds)
+    }
+
+    async fn resolve_oauth_account(
+        &self,
+        account: &Account,
+        policy: OAuthResolvePolicy,
+    ) -> Result<Account, AppError> {
+        if account.refresh_token.is_empty() {
+            if !self
+                .store
+                .update_auth_error_if_current(account, OAUTH_MISSING_REFRESH_TOKEN_REASON)
+                .await?
+            {
+                return self.store.get_by_id(account.id).await;
+            }
+            return Err(AppError::PermanentCredential(
+                OAUTH_MISSING_REFRESH_TOKEN_REASON.into(),
+            ));
+        }
+        if !policy.force_refresh
+            && account.has_valid_oauth_access_token(policy.min_validity_seconds)
+        {
+            return Ok(account.clone());
+        }
+
+        let lock_key = format!("oauth:refresh:account:{}", account.id);
+        let lock_owner = Uuid::new_v4().to_string();
+        let acquired = self
+            .cache
+            .acquire_lock(&lock_key, &lock_owner, OAUTH_LOCK_TTL)
+            .await?;
+
+        if acquired {
+            let result = self.refresh_oauth_account(account.id, policy).await;
+            self.cache.release_lock(&lock_key, &lock_owner).await;
+            return result;
+        }
+
+        let initial_access_token = account.access_token.clone();
+        for _ in 0..OAUTH_WAIT_ATTEMPTS {
+            sleep(OAUTH_WAIT_RETRY).await;
+            let latest = self.store.get_by_id(account.id).await?;
+            let refreshed_by_owner =
+                !policy.force_refresh || latest.access_token != initial_access_token;
+            if refreshed_by_owner
+                && latest.has_valid_oauth_access_token(policy.min_validity_seconds)
+            {
+                return Ok(latest);
+            }
+        }
+
+        Err(AppError::ServiceUnavailable(
+            "oauth token refresh timeout".into(),
+        ))
+    }
+
+    async fn refresh_oauth_account(
+        &self,
+        id: i64,
+        policy: OAuthResolvePolicy,
+    ) -> Result<Account, AppError> {
+        let latest = self.store.get_by_id(id).await?;
+        validate_managed_oauth_account(&latest)?;
+        if latest.refresh_token.is_empty() {
+            if !self
+                .store
+                .update_auth_error_if_current(&latest, OAUTH_MISSING_REFRESH_TOKEN_REASON)
+                .await?
+            {
+                return self.store.get_by_id(id).await;
+            }
+            return Err(AppError::PermanentCredential(
+                OAUTH_MISSING_REFRESH_TOKEN_REASON.into(),
+            ));
+        }
+        if !policy.force_refresh && latest.has_valid_oauth_access_token(policy.min_validity_seconds)
+        {
+            return Ok(latest);
+        }
+
+        let fallback_access_token = latest.access_token.clone();
+        let fallback_is_still_valid = latest
+            .expires_at
+            .map(|expires_at| expires_at > Utc::now())
+            .unwrap_or(false);
+
+        let ownership_restore = self.begin_owned_refresh(id).await?;
+
+        match crate::service::oauth::refresh_oauth_token_at(
+            &latest.refresh_token,
+            &latest.proxy_url,
+            &self.oauth_token_url,
+        )
+        .await
+        {
+            Ok(tokens) => {
+                self.store
+                    .update_oauth_tokens_if_current(
+                        &latest,
+                        &tokens.access_token,
+                        &tokens.refresh_token,
+                        tokens.expires_at,
+                    )
+                    .await?;
+                if let Some(change) = &ownership_restore {
+                    self.finish_owned_refresh(change).await?;
+                }
+                self.notify_native_change(id, true);
+                self.store.get_by_id(id).await
+            }
+            Err(err) => {
+                if let Some(change) = &ownership_restore {
+                    if matches!(&err, AppError::Internal(_)) {
+                        // 请求或响应结果未知：保留持久维护，不以旧 AT 降级成功或重试旧 RT。
+                        return Err(AppError::ServiceUnavailable(
+                            "OAuth 刷新结果未知，请核对或重新授权原账号".into(),
+                        ));
+                    }
+                    self.finish_owned_refresh(change).await?;
+                }
+                let msg = err.to_string();
+                if !self
+                    .store
+                    .update_auth_error_if_current(&latest, &msg)
+                    .await?
+                {
+                    // 锁 TTL 可能已到期；迟到失败不能停用或污染新登录凭据。
+                    return self.store.get_by_id(id).await;
+                }
+                // 永久凭据错误说明 RT 已无法继续使用，即使旧 AT 尚未过期也不能伪装刷新成功。
+                if matches!(&err, AppError::PermanentCredential(_)) {
+                    return Err(err);
+                }
+                if policy.allow_still_valid_fallback
+                    && fallback_is_still_valid
+                    && !fallback_access_token.is_empty()
+                {
+                    warn!(
+                        "oauth refresh failed for account {}, using current access token until expiry: {}",
+                        id, msg
+                    );
+                    return Ok(latest);
+                }
+                Err(AppError::ServiceUnavailable(format!(
+                    "OAuth 刷新失败: {}",
+                    msg
+                )))
+            }
+        }
+    }
+
+    pub async fn set_rate_limit(
+        &self,
+        id: i64,
+        reset_at: chrono::DateTime<Utc>,
+    ) -> Result<(), AppError> {
+        self.store.set_rate_limit(id, reset_at).await?;
+        self.notify_native_change(id, true);
+        Ok(())
+    }
+
+    pub async fn disable_account(
+        &self,
+        id: i64,
+        status: crate::model::account::AccountStatus,
+        reason: &str,
+        rate_limit_reset_at: Option<chrono::DateTime<Utc>>,
+    ) -> Result<(), AppError> {
+        self.store
+            .disable_account(id, status, reason, rate_limit_reset_at)
+            .await?;
+        self.notify_native_change(id, true);
+        Ok(())
+    }
+
+    /// 因上游认证失败永久停用账号。
+    ///
+    /// @param id 账号 ID。
+    /// @param reason 不包含凭据内容的认证失败原因。
+    /// @return 更新成功时返回空值。
+    pub async fn disable_for_auth_failure(&self, id: i64, reason: &str) -> Result<(), AppError> {
+        self.store.disable_for_auth_failure(id, reason).await?;
+        self.notify_native_change(id, true);
+        Ok(())
+    }
+
+    /// 仅停用永久凭据失败的原快照，避免迟到回调污染重授权。
+    /// @param expected 原账号快照。
+    /// @param reason 脱敏凭据错误。
+    /// @return 存储成功返回空值；已换凭据时保持新账号状态。
+    pub async fn disable_for_auth_failure_if_current(
+        &self,
+        expected: &Account,
+        reason: &str,
+    ) -> Result<(), AppError> {
+        let changed = self
+            .store
+            .disable_for_auth_failure_if_current(expected, reason)
+            .await?;
+        if changed {
+            self.notify_native_change(expected.id, true);
+        }
+        Ok(())
+    }
+
+    /// 只停用实际收到 401 的当前 OAuth 凭据。
+    /// @param id 原请求账号。
+    /// @param failed_access_token 上游拒绝的实际令牌，仅在内存中使用。
+    /// @param reason 已有脱敏认证停用原因。
+    /// @return 本次是否改变状态；已换凭据或人工停用时返回 false。
+    pub async fn disable_oauth_for_failed_token(
+        &self,
+        id: i64,
+        failed_access_token: &str,
+        reason: &str,
+    ) -> Result<bool, AppError> {
+        // 维护阻止了 401 恢复时，不能把本地门禁误记为凭据永久失效。
+        let _credential_activity = match self.upstream_activity(id).await {
+            Ok(permit) => permit,
+            Err(AppError::ServiceUnavailable(_)) => return Ok(false),
+            Err(error) => return Err(error),
+        };
+        let current = self.store.get_by_id(id).await?;
+        if current.access_token != failed_access_token {
+            return Ok(false);
+        }
+        // 恢复可能已经轮换 RT，重读后仍按 AT/RT 条件落库，防止第二次并发变化。
+        let changed = self
+            .store
+            .disable_for_auth_failure_if_current(&current, reason)
+            .await?;
+        if changed {
+            self.notify_native_change(id, true);
+        }
+        Ok(changed)
+    }
+
+    pub async fn enable_account(&self, id: i64) -> Result<(), AppError> {
+        self.store.enable_account(id).await?;
+        self.notify_native_change(id, true);
+        Ok(())
+    }
+
+    /// 处理上游返回 429 的情况。
+    ///
+    /// 先区分这条 429 是「单请求级拒绝」还是「账号级限流」:
+    /// - **计费/权限类**（响应体含 long context / credit,如 Sonnet 1M 上下文但账号未开
+    ///   按量付费）：属这条请求自身的问题,**不隔离账号**,直接放行(由上层把 429 透传回客户端)。
+    /// - **OAuth 撞墙（5h/7d）**：隔离到真实窗口重置时间，不受 5 小时封顶截断。
+    /// - **Fable 模型级 429**：只切换当前请求账号，不设置全账号冷却。
+    /// - **无法识别窗口但有 `retry-after`**：按指定时长冷却，封顶 [`MAX_RETRY_AFTER_SECS`]。
+    /// - **其余**（未撞墙 / 无法查 usage / SetupToken）：返回请求级等待,由当前请求释放槽位后重试。
+    ///
+    /// Sonnet 7 天墙暂不纳入判断（上游可能只对 Sonnet 请求返回 429,不影响其他模型）。
+    pub async fn handle_rate_limit(
+        &self,
+        account: &Account,
+        retry_after_secs: Option<i64>,
+        body: &str,
+        usage: Option<serde_json::Value>,
+    ) -> Result<RateLimitDecision, AppError> {
+        self.handle_rate_limit_with_context(
+            account,
+            retry_after_secs,
+            body,
+            usage,
+            &AccountSelectionContext::disabled(),
+        )
+        .await
+    }
+
+    /// 按请求模型上下文处理上游返回 429 的情况。
+    ///
+    /// @param account 当前请求使用的账号。
+    /// @param retry_after_secs 上游 `retry-after` 秒数。
+    /// @param body 上游 429 响应体文本。
+    /// @param usage 当前响应明确拒绝的被动用量窗口；`Some({})` 表示当前头存在但无窗口拒绝。
+    /// @param context 当前请求模型与功能开关上下文。
+    /// @return 返回账号级隔离、模型级换号、请求级软退避或透传决策。
+    pub async fn handle_rate_limit_with_context(
+        &self,
+        account: &Account,
+        retry_after_secs: Option<i64>,
+        body: &str,
+        usage: Option<serde_json::Value>,
+        context: &AccountSelectionContext,
+    ) -> Result<RateLimitDecision, AppError> {
+        match Self::determine_rate_limit_window(account, retry_after_secs, body, usage, context) {
+            RateLimitWindowDecision::Quarantine(reason, reset_at) => {
+                warn!(
+                    "account {} rate limited ({}) until {}",
+                    account.id,
+                    reason,
+                    reset_at.to_rfc3339()
+                );
+                self.store
+                    .disable_account(
+                        account.id,
+                        crate::model::account::AccountStatus::Active,
+                        reason,
+                        Some(reset_at),
+                    )
+                    .await?;
+                Ok(RateLimitDecision::Quarantined)
+            }
+            RateLimitWindowDecision::RetryOtherAccount(reason, reset_at) => {
+                if let Some(reset_at) = reset_at {
+                    warn!(
+                        "account {} unavailable for current model ({} until {}), retrying another account without global quarantine",
+                        account.id,
+                        reason,
+                        reset_at.to_rfc3339()
+                    );
+                } else {
+                    warn!(
+                        "account {} unavailable for current model ({}), retrying another account without global quarantine",
+                        account.id, reason
+                    );
+                }
+                Ok(RateLimitDecision::RetryOtherAccount)
+            }
+            RateLimitWindowDecision::RequestBackoff(delay) => {
+                warn!(
+                    "account {} got transient 429, retrying request after {}s without account quarantine",
+                    account.id,
+                    delay.as_secs()
+                );
+                Ok(RateLimitDecision::RequestBackoff(delay))
+            }
+            RateLimitWindowDecision::PassThrough => {
+                // 单请求级拒绝(如长上下文需 credits):不是账号限流,不隔离账号。
+                warn!(
+                    "account {} got non-capacity 429, passing through without quarantine: {}",
+                    account.id,
+                    body.chars().take(160).collect::<String>()
+                );
+                Ok(RateLimitDecision::PassThrough)
+            }
+        }
+    }
+
+    /// 判断这条 429 该如何限流。
+    ///
+    /// 返回账号级冷却、请求级等待或单请求透传三类结果。
+    ///
+    /// 撞墙判断**完全不主动查 usage 接口**,改用被动用量:`usage` 入参为这条 429
+    /// 响应自带的 ratelimit 头(最新),取不到再退回账号已存的 `usage_data`。
+    fn determine_rate_limit_window(
+        account: &Account,
+        retry_after_secs: Option<i64>,
+        body: &str,
+        usage: Option<serde_json::Value>,
+        context: &AccountSelectionContext,
+    ) -> RateLimitWindowDecision {
+        let now = Utc::now();
+        let retry_after_reset_at = retry_after_secs
+            .map(|secs| now + chrono::Duration::seconds(secs.min(MAX_RETRY_AFTER_SECS)));
+        let usage_for_common = usage.as_ref().unwrap_or(&account.usage_data);
+
+        // 当前 429 明确拒绝的普通窗口，或无当前证据时的缓存窗口，比通用 retry-after
+        // 更能说明真实隔离周期。特别是 7 天墙不能被 5 小时防御上限提前截断。
+        match classify_rate_limit(usage_for_common, USAGE_HIT_THRESHOLD) {
+            Some(RateLimitWindow::SevenDay(reset_at)) => {
+                return RateLimitWindowDecision::Quarantine(
+                    "周限额已满",
+                    later_reset_at(reset_at, retry_after_reset_at),
+                );
+            }
+            Some(RateLimitWindow::FiveHour(reset_at)) => {
+                return RateLimitWindowDecision::Quarantine(
+                    "5 小时限额已满",
+                    later_reset_at(reset_at, retry_after_reset_at),
+                );
+            }
+            None => {}
+        }
+
+        if context.is_fable_quota_fallback_active() && account.auth_type == AccountAuthType::Oauth {
+            let fable_reset_at = usage
+                .as_ref()
+                .and_then(|usage| {
+                    fable_weekly_usage_limit_reset_at(
+                        usage,
+                        context.fable_weekly_usage_limit_percent,
+                    )
+                })
+                .or_else(|| {
+                    fable_weekly_usage_limit_reset_at(
+                        &account.usage_data,
+                        context.fable_weekly_usage_limit_percent,
+                    )
+                });
+            return RateLimitWindowDecision::RetryOtherAccount("Fable 模型级 429", fable_reset_at);
+        }
+
+        // 无法识别具体窗口时，retry-after 才作为账号级冷却依据，并保留 5 小时防御上限。
+        if let Some(reset_at) = retry_after_reset_at {
+            return RateLimitWindowDecision::Quarantine("429 速率限制（retry-after）", reset_at);
+        }
+
+        // 计费/权限类拒绝（无 retry-after）:长上下文需 usage credits、额度不足等。
+        //    这是「这条请求」的问题(如 Sonnet 1M 上下文 + 账号没开按量付费),
+        //    与账号容量无关,绝不隔离账号。
+        let body_lc = body.to_lowercase();
+        if body_lc.contains("long context") || body_lc.contains("credit") {
+            return RateLimitWindowDecision::PassThrough;
+        }
+
+        RateLimitWindowDecision::RequestBackoff(PURE_RATE_LIMIT_RETRY_DELAY)
+    }
+
+    /// 综合评分选择账号：同优先级内按 7d/5h 有效用量和并发负载加权评分，分数越低越优先。
+    ///
+    /// 评分公式：`score = eff_7d * w7d + eff_5h * w5h + concurrency_load_pct * wconc`（权重可在设置页面配置）
+    /// - `eff_Xd = utilization × 阶梯衰减`，快重置的窗口衰减更大（分 3 档：1.0/0.8/0.6）
+    /// - 无 resets_at 数据时衰减因子为 1.0（最保守）
+    /// - `concurrency_load_pct = (活跃内部单位 + 排队预计内部单位) / 最大内部单位 × 100`
+    /// - 并发已满的账号优先排除，仅在所有账号都满时才参与评分
+    /// - 得分相同时随机选择
+    async fn select_by_score(&self, accounts: &[Account]) -> Account {
+        if accounts.len() == 1 {
+            return accounts[0].clone();
+        }
+
+        // 找到最高优先级（最小数值）
+        let best_priority = accounts.iter().map(|a| a.priority).min().unwrap_or(50);
+        let best: Vec<&Account> = accounts
+            .iter()
+            .filter(|a| a.priority == best_priority)
+            .collect();
+
+        if best.len() == 1 {
+            return best[0].clone();
+        }
+
+        let now = Utc::now();
+        let (w7d, w5h, wconc) = self.get_weights().await;
+
+        // 计算每个候选的综合得分，同时记录并发是否已满
+        let mut scored: Vec<(&Account, f64, bool)> = Vec::with_capacity(best.len());
+        for acc in &best {
+            let eff_5h =
+                effective_utilization_detail(acc, "five_hour", 5.0 * 3600.0, now).effective;
+            let eff_7d =
+                effective_utilization_detail(acc, "seven_day", 7.0 * 24.0 * 3600.0, now).effective;
+            // 从 FIFO 排队器读取实时活跃/等待数
+            let queue = self.get_or_create_queue(acc.id, acc.concurrency).await;
+            let current_units = queue.active_units();
+            let waiting_units = queue.waiting_units();
+            let max_units = queue.max_units();
+            let full = max_units > 0 && current_units >= max_units;
+            // 把"排队中"的请求也作为负载计入评分：单位统一为内部槽位单位,
+            // 两个账号都活跃满时,排队少的负载百分比更低,优先被选中。
+            let conc_pct = if max_units > 0 {
+                ((current_units + waiting_units) as f64) / (max_units as f64) * 100.0
+            } else {
+                0.0
+            };
+            let score = eff_7d * w7d + eff_5h * w5h + conc_pct * wconc;
+            scored.push((acc, score, full));
+        }
+
+        // 优先从未满的账号中选择；全都满了才回退到全部候选
+        let pool: Vec<(&Account, f64)> = {
+            let not_full: Vec<_> = scored
+                .iter()
+                .filter(|(_, _, full)| !full)
+                .map(|(a, s, _)| (*a, *s))
+                .collect();
+            if not_full.is_empty() {
+                scored.iter().map(|(a, s, _)| (*a, *s)).collect()
+            } else {
+                not_full
+            }
+        };
+
+        // 找到最低分
+        let min_score = pool.iter().map(|(_, s)| *s).fold(f64::MAX, f64::min);
+
+        // 收集得分最低的候选（容差 0.01 处理浮点误差）
+        let winners: Vec<&Account> = pool
+            .iter()
+            .filter(|(_, s)| (*s - min_score).abs() < 0.01)
+            .map(|(a, _)| *a)
+            .collect();
+
+        // 同分随机选择
+        let idx = rand::thread_rng().gen_range(0..winners.len());
+        winners[idx].clone()
+    }
+
+    /// 计算单个账号的调度评分及实时状态（供 API 展示用）。
+    pub async fn get_account_score_info(&self, account: &Account) -> AccountScoreInfo {
+        let now = Utc::now();
+        let (w7d, w5h, wconc) = self.get_weights().await;
+        let d5h = effective_utilization_detail(account, "five_hour", 5.0 * 3600.0, now);
+        let d7d = effective_utilization_detail(account, "seven_day", 7.0 * 24.0 * 3600.0, now);
+
+        // 从 FIFO 排队器读取实时活跃/等待数(替代原 cache.get_slot_count 查询)
+        let queue = self
+            .get_or_create_queue(account.id, account.concurrency)
+            .await;
+        let current_concurrency_units = queue.active_units();
+        let current_concurrency = queue.active_standard_slots();
+        let max_concurrency_units = queue.max_units();
+        let active_requests = queue.active_request_count();
+        let queued = queue.waiting_count();
+        let queued_request_units = queue.waiting_units();
+        let (transient_backoff_waiting, transient_backoff_remaining_ms) =
+            self.transient_rate_limit_backoff_status(account.id).await;
+        // 负载 % = (活跃内部单位 + 排队预计内部单位) / 最大内部单位 × 100,与 select_by_score 保持一致。
+        let concurrency_pct = if max_concurrency_units > 0 {
+            ((current_concurrency_units + queued_request_units) as f64)
+                / (max_concurrency_units as f64)
+                * 100.0
+        } else {
+            0.0
+        };
+
+        let score = d7d.effective * w7d + d5h.effective * w5h + concurrency_pct * wconc;
+
+        AccountScoreInfo {
+            score,
+            eff_7d: d7d.effective,
+            eff_5h: d5h.effective,
+            detail_7d: d7d,
+            detail_5h: d5h,
+            concurrency_pct,
+            weights: (w7d, w5h, wconc),
+            current_concurrency,
+            current_concurrency_units,
+            max_concurrency_units,
+            active_requests,
+            queued,
+            queued_request_units,
+            transient_backoff_waiting,
+            transient_backoff_remaining_ms,
+        }
+    }
+}
+
+const ROLLOVER_USAGE_WINDOWS: [&str; 3] = ["five_hour", "seven_day", "seven_day_fable"];
+
+fn merge_usage_observation(
+    existing: serde_json::Value,
+    incoming: serde_json::Value,
+    kind: UsageObservationKind,
+    now: chrono::DateTime<Utc>,
+) -> serde_json::Value {
+    let mut merged = if existing.is_object() {
+        existing
+    } else {
+        serde_json::json!({})
+    };
+    let (Some(target), Some(source)) = (merged.as_object_mut(), incoming.as_object()) else {
+        return merged;
+    };
+
+    for (key, value) in source {
+        let value = if ROLLOVER_USAGE_WINDOWS.contains(&key.as_str())
+            && should_zero_stale_rollover_window(target.get(key), value, key, &kind, now)
+        {
+            let mut normalized = value.clone();
+            if let Some(window) = normalized.as_object_mut() {
+                // 成功请求已经证明新周期可用；高位值未下降时只能来自上一周期。
+                window.insert("utilization".into(), serde_json::json!(0.0));
+            }
+            normalized
+        } else {
+            value.clone()
+        };
+        target.insert(key.clone(), value);
+    }
+
+    merged
+}
+
+fn should_zero_stale_rollover_window(
+    existing: Option<&serde_json::Value>,
+    incoming: &serde_json::Value,
+    window: &str,
+    kind: &UsageObservationKind,
+    now: chrono::DateTime<Utc>,
+) -> bool {
+    if kind.rejects_window(window) {
+        return false;
+    }
+    let Some((existing_utilization, existing_reset)) = existing.and_then(usage_window_values)
+    else {
+        return false;
+    };
+    let Some((incoming_utilization, incoming_reset)) = usage_window_values(incoming) else {
+        return false;
+    };
+
+    existing_utilization >= USAGE_ROLLOVER_STALE_THRESHOLD
+        && incoming_utilization >= USAGE_ROLLOVER_STALE_THRESHOLD
+        && existing_reset <= now
+        && incoming_reset > now
+        && incoming_reset > existing_reset
+}
+
+fn usage_window_values(window: &serde_json::Value) -> Option<(f64, chrono::DateTime<Utc>)> {
+    let utilization = window.get("utilization")?.as_f64()?;
+    let reset = chrono::DateTime::parse_from_rfc3339(window.get("resets_at")?.as_str()?)
+        .ok()?
+        .with_timezone(&Utc);
+    Some((utilization, reset))
+}
+
+fn current_rpm_window() -> (i64, chrono::DateTime<Utc>) {
+    let now_secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+    let minute_ts = now_secs / 60;
+    let reset_secs = (minute_ts + 1) * 60;
+    let reset_at = chrono::DateTime::<Utc>::from_timestamp(reset_secs, 0).unwrap_or_else(Utc::now);
+    (minute_ts, reset_at)
+}
+
+fn short_session_hash(session_hash: &str) -> String {
+    if session_hash.is_empty() {
+        return "-".to_string();
+    }
+    session_hash.chars().take(8).collect()
+}
+
+/// 计算指定窗口的有效用量详情：utilization × 阶梯衰减因子。
+/// 使用固定阶梯而非线性比例，避免时间衰减过度影响评分：
+///   剩余比例 > 50% → 1.0 | 20%~50% → 0.8 | ≤ 20% → 0.6
+/// 无 resets_at 或无用量数据时衰减因子为 1.0（最保守）。
+/// 当 resets_at 已过期时，说明窗口已重置，直接视为用量清零。
+fn effective_utilization_detail(
+    account: &Account,
+    window: &str,
+    max_window_secs: f64,
+    now: chrono::DateTime<Utc>,
+) -> WindowDetail {
+    let util = account
+        .usage_data
+        .get(window)
+        .and_then(|w| w.get("utilization"))
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0);
+
+    if util == 0.0 {
+        return WindowDetail {
+            utilization: 0.0,
+            decay: 1.0,
+            effective: 0.0,
+        };
+    }
+
+    // 解析 resets_at，计算剩余时间占窗口总时长的比例，再映射到阶梯档位
+    let decay = account
+        .usage_data
+        .get(window)
+        .and_then(|w| w.get("resets_at"))
+        .and_then(|v| v.as_str())
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .map(|reset| {
+            let remaining = (reset.with_timezone(&Utc) - now).num_seconds().max(0) as f64;
+            if remaining == 0.0 {
+                // resets_at 已过期 → 窗口已重置，用量归零
+                return 0.0;
+            }
+            let ratio = (remaining / max_window_secs).clamp(0.0, 1.0);
+            // 固定阶梯：将连续比例映射为离散档位，防止线性衰减过度压低高用量账号
+            tiered_decay(ratio)
+        })
+        .unwrap_or(1.0); // 无数据按最保守处理
+
+    // resets_at 已过期 → 窗口已重置，用量归零
+    if decay == 0.0 {
+        return WindowDetail {
+            utilization: 0.0,
+            decay: 1.0,
+            effective: 0.0,
+        };
+    }
+
+    WindowDetail {
+        utilization: util,
+        decay,
+        effective: util * decay,
+    }
+}
+
+/// 将剩余时间比例映射为阶梯衰减系数。
+/// 比例越低（越接近重置），衰减系数越小，有效用量越低（越优先选中）。
+/// 仅分 3 档，最低 0.6，避免时间因素过度影响评分。
+fn tiered_decay(ratio: f64) -> f64 {
+    match () {
+        _ if ratio > 0.5 => 1.0,
+        _ if ratio > 0.2 => 0.8,
+        _ => 0.6,
+    }
+}
+enum RateLimitWindow {
+    /// 7 天窗口命中，携带其 resets_at。
+    SevenDay(chrono::DateTime<Utc>),
+    /// 5 小时窗口命中，携带其 resets_at。
+    FiveHour(chrono::DateTime<Utc>),
+}
+
+fn later_reset_at(
+    window_reset_at: chrono::DateTime<Utc>,
+    retry_after_reset_at: Option<chrono::DateTime<Utc>>,
+) -> chrono::DateTime<Utc> {
+    retry_after_reset_at
+        .filter(|retry_reset_at| retry_reset_at > &window_reset_at)
+        .unwrap_or(window_reset_at)
+}
+
+/// 根据 usage_data JSON 判断哪个窗口撞墙。
+/// 优先检查 7 天窗口（同时命中时 7 天 reset 更晚，限流更久）。
+/// Sonnet 7 天窗口暂不纳入判断。
+fn classify_rate_limit(usage: &serde_json::Value, threshold: f64) -> Option<RateLimitWindow> {
+    if let Some(reset_at) = check_usage_window(usage, "seven_day", threshold) {
+        return Some(RateLimitWindow::SevenDay(reset_at));
+    }
+    if let Some(reset_at) = check_usage_window(usage, "five_hour", threshold) {
+        return Some(RateLimitWindow::FiveHour(reset_at));
+    }
+    None
+}
+
+/// 检查单个窗口是否达到撞墙阈值，返回其 resets_at（若命中且在未来）。
+fn check_usage_window(
+    usage: &serde_json::Value,
+    key: &str,
+    threshold: f64,
+) -> Option<chrono::DateTime<Utc>> {
+    let window = usage.get(key)?;
+    let util = window.get("utilization")?.as_f64()?;
+    if !util.is_finite() || util < 0.0 || util < threshold {
+        return None;
+    }
+    let resets_at_str = window.get("resets_at")?.as_str()?;
+    let dt = chrono::DateTime::parse_from_rfc3339(resets_at_str)
+        .ok()?
+        .with_timezone(&Utc);
+    if dt <= Utc::now() {
+        return None;
+    }
+    Some(dt)
+}
+
+/// 校验套餐元数据，防止将控制字符或无界文本带入协议。
+fn validate_subscription_metadata(
+    subscription_type: Option<&str>,
+    rate_limit_tier: Option<&str>,
+) -> Result<(), AppError> {
+    for (key, value) in [
+        ("subscription_type", subscription_type),
+        ("rate_limit_tier", rate_limit_tier),
+    ] {
+        if value.is_some_and(|value| value.len() > 256 || value.chars().any(char::is_control)) {
+            return Err(AppError::BadRequest(format!(
+                "{key} 必须为不含控制字符的短文本"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// 规整已校验的官方元数据，不从套餐名补造分级。
+fn normalize_account_subscription(account: &mut Account) -> Result<(), AppError> {
+    validate_subscription_metadata(
+        account.subscription_type.as_deref(),
+        account.rate_limit_tier.as_deref(),
+    )?;
+    for value in [&mut account.subscription_type, &mut account.rate_limit_tier] {
+        *value = value
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned);
+    }
+    Ok(())
+}
+
+/// 校验账号控制线，避免内部创建或更新绕过管理接口的值域校验。
+fn validate_account_usage_limits(account: &Account) -> Result<(), AppError> {
+    for (key, value) in [
+        (
+            "five_hour_usage_limit_percent",
+            account.five_hour_usage_limit_percent,
+        ),
+        (
+            "seven_day_usage_limit_percent",
+            account.seven_day_usage_limit_percent,
+        ),
+    ] {
+        if !(0..=100).contains(&value) {
+            return Err(AppError::BadRequest(format!("{key} 必须是 0～100 的整数")));
+        }
+    }
+    Ok(())
+}
+
+/// 仅用有效且尚未重置的普通窗口判断账号是否达到本地控制线。
+fn account_usage_limit_reached(account: &Account) -> bool {
+    [
+        ("five_hour", account.five_hour_usage_limit_percent),
+        ("seven_day", account.seven_day_usage_limit_percent),
+    ]
+    .into_iter()
+    .any(|(window, limit)| {
+        (1..=100).contains(&limit)
+            && check_usage_window(&account.usage_data, window, f64::from(limit)).is_some()
+    })
+}
+
+fn is_fable_quota_model_id(model: &str) -> bool {
+    let model = model.to_ascii_lowercase();
+    model == "claude-fable-5"
+        || model.starts_with("claude-fable-5[")
+        || model == "claude-fable-5-1"
+        || model.starts_with("claude-fable-5-1[")
+}
+
+/// 判断账号缓存中的 Fable 周用量是否达到配置上限。
+///
+/// @param account 待判断的账号。
+/// @param limit_percent 全局 Fable 周用量百分比上限。
+/// @return OAuth 账号用量达到上限且 `resets_at` 在未来时返回 `true`。
+pub(crate) fn account_fable_weekly_usage_limit_reached(
+    account: &Account,
+    limit_percent: u32,
+) -> bool {
+    account.auth_type == AccountAuthType::Oauth
+        && fable_weekly_usage_limit_reset_at(&account.usage_data, limit_percent).is_some()
+}
+
+fn fable_weekly_usage_limit_reset_at(
+    usage: &serde_json::Value,
+    limit_percent: u32,
+) -> Option<chrono::DateTime<Utc>> {
+    check_usage_window(usage, "seven_day_fable", f64::from(limit_percent))
+}
+
+fn normalize_account_auth(account: &mut Account) -> Result<(), AppError> {
+    match account.auth_type {
+        AccountAuthType::SetupToken => {
+            if account.setup_token.trim().is_empty() {
+                return Err(AppError::BadRequest("setup_token is required".into()));
+            }
+            account.access_token.clear();
+            account.refresh_token.clear();
+            account.expires_at = None;
+            account.oauth_refreshed_at = None;
+            account.auth_error.clear();
+        }
+        AccountAuthType::Oauth => {
+            if account.refresh_token.trim().is_empty() {
+                return Err(AppError::BadRequest("refresh_token is required".into()));
+            }
+            account.setup_token.clear();
+            account.auth_error.clear();
+            if account.access_token.trim().is_empty() {
+                account.access_token.clear();
+                account.expires_at = None;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn normalize_upstream_session_pool_config(account: &mut Account) -> Result<(), AppError> {
+    if account.upstream_session_pool_size == 0 {
+        account.upstream_session_pool_enabled = false;
+    } else if !(1..=MAX_UPSTREAM_SESSION_POOL_SIZE).contains(&account.upstream_session_pool_size) {
+        return Err(AppError::BadRequest(format!(
+            "upstream_session_pool_size 必须为 0 或 1-{}",
+            MAX_UPSTREAM_SESSION_POOL_SIZE
+        )));
+    }
+
+    if account.upstream_session_ttl_minutes == 0 {
+        account.upstream_session_ttl_minutes = DEFAULT_UPSTREAM_SESSION_TTL_MINUTES;
+    }
+    if !(MIN_UPSTREAM_SESSION_TTL_MINUTES..=MAX_UPSTREAM_SESSION_TTL_MINUTES)
+        .contains(&account.upstream_session_ttl_minutes)
+    {
+        return Err(AppError::BadRequest(format!(
+            "upstream_session_ttl_minutes 必须为 {}-{}",
+            MIN_UPSTREAM_SESSION_TTL_MINUTES, MAX_UPSTREAM_SESSION_TTL_MINUTES
+        )));
+    }
+
+    if account.upstream_session_refresh_policy.trim().is_empty() {
+        account.upstream_session_refresh_policy =
+            DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY.to_string();
+    }
+    if UpstreamSessionRefreshPolicy::parse(&account.upstream_session_refresh_policy).is_none() {
+        return Err(AppError::BadRequest(
+            "upstream_session_refresh_policy 必须是 mapped_request 或 owner_only".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// 根据客户端类型创建会话哈希。
+/// CC 客户端：使用 metadata.user_id 中的 session_id。
+/// API 客户端：使用 sha256(UA + 系统提示词/首条消息 + 小时窗口)。
+pub fn generate_session_hash(
+    user_agent: &str,
+    body: &serde_json::Value,
+    client_type: ClientType,
+) -> String {
+    if client_type == ClientType::ClaudeCode {
+        if let Some(metadata) = body.get("metadata").and_then(|m| m.as_object()) {
+            if let Some(user_id_str) = metadata.get("user_id").and_then(|u| u.as_str()) {
+                // JSON 格式
+                if let Ok(uid) = serde_json::from_str::<serde_json::Value>(user_id_str) {
+                    if let Some(sid) = uid.get("session_id").and_then(|s| s.as_str()) {
+                        if !sid.is_empty() {
+                            return sid.to_string();
+                        }
+                    }
+                }
+                // 旧格式
+                if let Some(idx) = user_id_str.rfind("_session_") {
+                    return user_id_str[idx + 9..].to_string();
+                }
+            }
+        }
+    }
+
+    // API 模式：UA + 系统提示词/首条消息 + 小时窗口
+    let mut content = String::new();
+
+    // Try system prompt first
+    match body.get("system") {
+        Some(serde_json::Value::String(sys)) => {
+            content = sys.clone();
+        }
+        Some(serde_json::Value::Array(arr)) => {
+            for item in arr {
+                if let Some(text) = item.get("text").and_then(|t| t.as_str()) {
+                    content = text.to_string();
+                    break;
+                }
+            }
+        }
+        _ => {}
+    }
+
+    // 回退到首条消息
+    if content.is_empty() {
+        if let Some(messages) = body.get("messages").and_then(|m| m.as_array()) {
+            if let Some(msg) = messages.first().and_then(|m| m.as_object()) {
+                match msg.get("content") {
+                    Some(serde_json::Value::String(c)) => {
+                        content = c.clone();
+                    }
+                    Some(serde_json::Value::Array(arr)) => {
+                        for item in arr {
+                            if let Some(text) = item.get("text").and_then(|t| t.as_str()) {
+                                content = text.to_string();
+                                break;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    let hour_window = Utc::now().format("%Y-%m-%dT%H").to_string();
+    let raw = format!("{}|{}|{}", user_agent, content, hour_window);
+    let hash = Sha256::digest(raw.as_bytes());
+    hex::encode(&hash[..16])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::credential_ownership::{
+        CredentialIdentity, CredentialMaterial, CredentialOwnershipInput,
+    };
+
+    #[tokio::test]
+    async fn closed_runtime_gate_preserves_queue_capacity_and_waiting_load() {
+        let queue = Arc::new(AccountQueue::new(1));
+        let lease = queue.runtime_gate.prepare("login:test").unwrap();
+        let first_queue = queue.clone();
+        let first =
+            tokio::spawn(async move { first_queue.acquire(Duration::from_secs(3), 2).await });
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while queue.waiting_count() != 1 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let second_queue = queue.clone();
+        let second =
+            tokio::spawn(async move { second_queue.acquire(Duration::from_secs(3), 2).await });
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while queue.waiting_count() != 2 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(matches!(
+            queue.acquire(Duration::from_millis(20), 2).await,
+            Err(QueueWaitError::QueueFull)
+        ));
+        assert_eq!(queue.active_units(), 0);
+        assert_eq!(queue.active_request_count(), 0);
+        assert_eq!(queue.waiting_units(), 4);
+        queue
+            .runtime_gate
+            .update(&lease.owner, &lease.generation, "release")
+            .unwrap();
+        let first = first.await.unwrap().unwrap();
+        drop(first);
+        drop(second.await.unwrap().unwrap());
+        assert_eq!(queue.waiting_count(), 0);
+        assert_eq!(queue.active_units(), 0);
+    }
+
+    #[tokio::test]
+    async fn cancelled_runtime_gate_wait_releases_capacity_and_load() {
+        let queue = Arc::new(AccountQueue::new(1));
+        let lease = queue.runtime_gate.prepare("login:test").unwrap();
+        let pending_queue = queue.clone();
+        let pending =
+            tokio::spawn(async move { pending_queue.acquire(Duration::from_secs(30), 2).await });
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while queue.gate_waiting_units.load(Ordering::Relaxed) != 2 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        pending.abort();
+        assert!(matches!(pending.await, Err(error) if error.is_cancelled()));
+        assert_eq!(queue.waiting_count(), 0);
+        assert_eq!(queue.waiting_units(), 0);
+        assert_eq!(queue.active_units(), 0);
+        queue
+            .runtime_gate
+            .update(&lease.owner, &lease.generation, "release")
+            .unwrap();
+        drop(queue.acquire(Duration::from_secs(1), 2).await.unwrap());
+    }
+    use crate::model::account::{
+        AccountStatus, BillingMode, DEFAULT_ALLOW_1M_MODELS, DEFAULT_UPSTREAM_SESSION_POOL_SIZE,
+        DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY, DEFAULT_UPSTREAM_SESSION_TTL_MINUTES,
+    };
+    use crate::store::account_store::AccountStore;
+    use crate::store::memory::MemoryStore;
+    use crate::store::settings_store::SettingsStore;
+    use chrono::Duration as ChronoDuration;
+    use serde_json::json;
+    use sqlx::AnyPool;
+
+    async fn setup_account_service() -> (Arc<AccountStore>, Arc<AccountService>) {
+        sqlx::any::install_default_drivers();
+        let tmp =
+            std::env::temp_dir().join(format!("ccgw_account_service_{}.db", rand::random::<u64>()));
+        let dsn = format!("sqlite:{}?mode=rwc", tmp.display());
+        let pool = AnyPool::connect(&dsn).await.expect("pool");
+        crate::store::db::migrate(&pool, "sqlite")
+            .await
+            .expect("migrate");
+
+        let store = Arc::new(AccountStore::new(pool.clone(), "sqlite".into()));
+        let cache = Arc::new(MemoryStore::new());
+        let settings_store = Arc::new(SettingsStore::new(pool));
+        let svc = Arc::new(AccountService::new(store.clone(), cache, settings_store));
+        (store, svc)
+    }
+
+    async fn setup_account_service_with_settings()
+    -> (Arc<AccountStore>, Arc<SettingsStore>, Arc<AccountService>) {
+        sqlx::any::install_default_drivers();
+        let tmp =
+            std::env::temp_dir().join(format!("ccgw_account_service_{}.db", rand::random::<u64>()));
+        let dsn = format!("sqlite:{}?mode=rwc", tmp.display());
+        let pool = AnyPool::connect(&dsn).await.expect("pool");
+        crate::store::db::migrate(&pool, "sqlite")
+            .await
+            .expect("migrate");
+
+        let store = Arc::new(AccountStore::new(pool.clone(), "sqlite".into()));
+        let cache = Arc::new(MemoryStore::new());
+        let settings_store = Arc::new(SettingsStore::new(pool));
+        let svc = Arc::new(AccountService::new(
+            store.clone(),
+            cache,
+            settings_store.clone(),
+        ));
+        (store, settings_store, svc)
+    }
+
+    #[tokio::test]
+    async fn cli_process_import_preserves_credentials_and_rejects_wrong_identity() {
+        let (store, service) = setup_account_service().await;
+        let mut account = test_account_with_usage(json!({}));
+        account.device_id = "d".repeat(64);
+        account.account_uuid = Some("synthetic-account".into());
+        store.create(&mut account).await.unwrap();
+        let now = Utc::now().timestamp_millis() as f64 / 1000.0;
+        let mut input: CliProcessImport = serde_json::from_value(json!({
+            "device_id": account.device_id, "account_uuid": "synthetic-account",
+            "email": account.email, "environment_id": "a".repeat(32), "cli_version": "2.1.293",
+            "canonical_process": {"constrained_memory": 1610612736_i64, "observation": {
+                "source": "v3:procfs:cli", "environment_id": "a".repeat(32), "cli_version": "2.1.293",
+                "observed_at": now, "sampled_at": null, "sample_count": 0,
+                "rss_bytes": null, "rss_min_bytes": null, "rss_max_bytes": null
+            }}
+        })).unwrap();
+        service
+            .import_cli_process(account.id, &input)
+            .await
+            .unwrap();
+        let saved = store.get_by_id(account.id).await.unwrap();
+        assert_eq!(saved.access_token, account.access_token);
+        assert_eq!(saved.refresh_token, account.refresh_token);
+        assert_eq!(saved.billing_mode, account.billing_mode);
+        assert_eq!(saved.proxy_url, account.proxy_url);
+        assert_eq!(saved.concurrency, account.concurrency);
+        let before = saved.canonical_process;
+        for field in ["device", "version", "source", "sample", "environment"] {
+            let original = input.clone();
+            match field {
+                "device" => input.device_id = "e".repeat(64),
+                "version" => input.cli_version = "2.1.280".into(),
+                "source" => {
+                    input.canonical_process.observation.as_mut().unwrap().source = "other".into()
+                }
+                "sample" => {
+                    input
+                        .canonical_process
+                        .observation
+                        .as_mut()
+                        .unwrap()
+                        .rss_bytes = Some(42)
+                }
+                _ => input.environment_id = "b".repeat(32),
+            }
+            assert!(
+                service
+                    .import_cli_process(account.id, &input)
+                    .await
+                    .is_err(),
+                "{field}"
+            );
+            assert_eq!(
+                store.get_by_id(account.id).await.unwrap().canonical_process,
+                before
+            );
+            input = original;
+        }
+        // 存储层即使拿到旧快照，也不能覆盖已经更新的令牌和管理员策略。
+        let mut changed = store.get_by_id(account.id).await.unwrap();
+        changed.access_token = "new-synthetic-access".into();
+        changed.concurrency = 7;
+        changed.rpm_limit = 23;
+        store.update(&changed).await.unwrap();
+        store.update_cli_process(&account, &before).await.unwrap();
+        let final_account = store.get_by_id(account.id).await.unwrap();
+        assert_eq!(final_account.access_token, changed.access_token);
+        assert_eq!(final_account.concurrency, 7);
+        assert_eq!(final_account.rpm_limit, 23);
+    }
+
+    /// 生成一个相对当前时间指定偏移的 RFC3339 字符串。
+    fn rfc3339_at(offset: ChronoDuration) -> String {
+        (Utc::now() + offset).to_rfc3339()
+    }
+
+    fn make_window(util: serde_json::Value, resets_at: &str) -> serde_json::Value {
+        json!({ "utilization": util, "resets_at": resets_at })
+    }
+
+    #[test]
+    fn allowed_rollover_clears_stale_high_usage_for_all_passive_windows() {
+        let now = Utc::now();
+        let expired = (now - ChronoDuration::minutes(1)).to_rfc3339();
+        let next_five_hour = (now + ChronoDuration::hours(5)).to_rfc3339();
+        let next_week = (now + ChronoDuration::days(7)).to_rfc3339();
+        let existing = json!({
+            "five_hour": make_window(json!(100), &expired),
+            "seven_day": make_window(json!(99), &expired),
+            "seven_day_fable": make_window(json!(100), &expired),
+            "seven_day_sonnet": make_window(json!(42), &next_week),
+            "limits": [{"kind": "weekly_scoped"}]
+        });
+        let incoming = json!({
+            "five_hour": make_window(json!(100), &next_five_hour),
+            "seven_day": make_window(json!(99), &next_week),
+            "seven_day_fable": make_window(json!(100), &next_week)
+        });
+
+        let merged =
+            merge_usage_observation(existing, incoming, UsageObservationKind::Allowed, now);
+
+        assert_eq!(merged["five_hour"]["utilization"], json!(0.0));
+        assert_eq!(merged["seven_day"]["utilization"], json!(0.0));
+        assert_eq!(merged["seven_day_fable"]["utilization"], json!(0.0));
+        assert_eq!(merged["seven_day_sonnet"]["utilization"], json!(42));
+        assert_eq!(merged["limits"][0]["kind"], json!("weekly_scoped"));
+    }
+
+    #[test]
+    fn allowed_rollover_accepts_usage_that_dropped_in_new_period() {
+        let now = Utc::now();
+        let expired = (now - ChronoDuration::minutes(1)).to_rfc3339();
+        let next_week = (now + ChronoDuration::days(7)).to_rfc3339();
+        let existing = json!({
+            "seven_day": make_window(json!(99), &expired)
+        });
+        let incoming = json!({
+            "seven_day": make_window(json!(1.5), &next_week)
+        });
+
+        let merged =
+            merge_usage_observation(existing, incoming, UsageObservationKind::Allowed, now);
+
+        assert_eq!(merged["seven_day"]["utilization"], json!(1.5));
+    }
+
+    #[test]
+    fn same_period_follow_up_usage_is_accepted() {
+        let now = Utc::now();
+        let next_week = (now + ChronoDuration::days(7)).to_rfc3339();
+        let existing = json!({
+            "seven_day": make_window(json!(0), &next_week)
+        });
+        let incoming = json!({
+            "seven_day": make_window(json!(2.5), &next_week)
+        });
+
+        let merged =
+            merge_usage_observation(existing, incoming, UsageObservationKind::Allowed, now);
+
+        assert_eq!(merged["seven_day"]["utilization"], json!(2.5));
+    }
+
+    #[test]
+    fn rejected_rollover_only_keeps_explicitly_rejected_windows() {
+        let now = Utc::now();
+        let expired = (now - ChronoDuration::minutes(1)).to_rfc3339();
+        let next_five_hour = (now + ChronoDuration::hours(5)).to_rfc3339();
+        let next_week = (now + ChronoDuration::days(7)).to_rfc3339();
+        let existing = json!({
+            "five_hour": make_window(json!(100), &expired),
+            "seven_day": make_window(json!(100), &expired),
+            "seven_day_fable": make_window(json!(100), &expired)
+        });
+        let incoming = json!({
+            "five_hour": make_window(json!(100), &next_five_hour),
+            "seven_day": make_window(json!(100), &next_week),
+            "seven_day_fable": make_window(json!(100), &next_week)
+        });
+
+        let merged = merge_usage_observation(
+            existing,
+            incoming,
+            UsageObservationKind::RejectedWindows(vec!["five_hour".into()]),
+            now,
+        );
+
+        assert_eq!(merged["five_hour"]["utilization"], json!(100));
+        assert_eq!(merged["seven_day"]["utilization"], json!(0.0));
+        assert_eq!(merged["seven_day_fable"]["utilization"], json!(0.0));
+    }
+
+    #[test]
+    fn rejected_usage_filters_allowed_windows_for_rate_limit_classification() {
+        let usage = json!({
+            "five_hour": { "utilization": 100, "resets_at": rfc3339_at(ChronoDuration::hours(5)) },
+            "seven_day": { "utilization": 100, "resets_at": rfc3339_at(ChronoDuration::days(7)) },
+            "seven_day_fable": { "utilization": 100, "resets_at": rfc3339_at(ChronoDuration::days(7)) }
+        });
+        let kind = UsageObservationKind::RejectedWindows(vec!["five_hour".into()]);
+
+        let rejected = kind.rejected_usage(&usage).expect("应保留拒绝窗口");
+
+        assert!(rejected.get("five_hour").is_some());
+        assert!(rejected.get("seven_day").is_none());
+        assert!(rejected.get("seven_day_fable").is_none());
+    }
+
+    fn test_account_with_usage(usage_data: serde_json::Value) -> Account {
+        Account {
+            id: 1,
+            name: "测试账号".into(),
+            email: "user@example.com".into(),
+            status: AccountStatus::Active,
+            auth_type: AccountAuthType::Oauth,
+            setup_token: String::new(),
+            access_token: "access".into(),
+            refresh_token: "refresh".into(),
+            expires_at: None,
+            oauth_refreshed_at: None,
+            auth_error: String::new(),
+            proxy_url: String::new(),
+            device_id: "device-1".into(),
+            canonical_env: json!({}),
+            canonical_prompt: json!({}),
+            canonical_process: json!({}),
+            request_backend: "legacy".into(),
+            billing_mode: BillingMode::Strip,
+            account_uuid: None,
+            organization_uuid: None,
+            subscription_type: None,
+            rate_limit_tier: None,
+            concurrency: 3,
+            priority: 50,
+            rpm_limit: 0,
+            five_hour_usage_limit_percent: 0,
+            seven_day_usage_limit_percent: 0,
+            rate_limited_at: None,
+            rate_limit_reset_at: None,
+            disable_reason: String::new(),
+            auto_telemetry: false,
+            auto_poll_usage: false,
+            allow_1m_models: DEFAULT_ALLOW_1M_MODELS.into(),
+            allow_fast_mode: false,
+            upstream_session_pool_enabled: false,
+            upstream_session_pool_size: DEFAULT_UPSTREAM_SESSION_POOL_SIZE,
+            upstream_session_ttl_minutes: DEFAULT_UPSTREAM_SESSION_TTL_MINUTES,
+            upstream_session_refresh_policy: DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY.into(),
+            telemetry_count: 0,
+            usage_data,
+            usage_fetched_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn new_account_request(email: &str) -> Account {
+        Account {
+            id: 0,
+            name: "测试账号".into(),
+            email: email.into(),
+            status: AccountStatus::Active,
+            auth_type: AccountAuthType::Oauth,
+            setup_token: String::new(),
+            access_token: "access".into(),
+            refresh_token: "refresh".into(),
+            expires_at: None,
+            oauth_refreshed_at: None,
+            auth_error: String::new(),
+            proxy_url: String::new(),
+            device_id: String::new(),
+            canonical_env: json!({}),
+            canonical_prompt: json!({}),
+            canonical_process: json!({}),
+            request_backend: "legacy".into(),
+            billing_mode: BillingMode::Strip,
+            account_uuid: None,
+            organization_uuid: None,
+            subscription_type: None,
+            rate_limit_tier: None,
+            concurrency: 3,
+            priority: 50,
+            rpm_limit: 0,
+            five_hour_usage_limit_percent: 0,
+            seven_day_usage_limit_percent: 0,
+            rate_limited_at: None,
+            rate_limit_reset_at: None,
+            disable_reason: String::new(),
+            auto_telemetry: false,
+            auto_poll_usage: false,
+            allow_1m_models: DEFAULT_ALLOW_1M_MODELS.into(),
+            allow_fast_mode: false,
+            upstream_session_pool_enabled: false,
+            upstream_session_pool_size: DEFAULT_UPSTREAM_SESSION_POOL_SIZE,
+            upstream_session_ttl_minutes: DEFAULT_UPSTREAM_SESSION_TTL_MINUTES,
+            upstream_session_refresh_policy: DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY.into(),
+            telemetry_count: 0,
+            usage_data: json!({}),
+            usage_fetched_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    async fn wait_until_queue_waiting(queue: &AccountQueue, expected: i64, expected_units: i64) {
+        for _ in 0..50 {
+            if queue.waiting_count() == expected && queue.waiting_units() == expected_units {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        assert_eq!(queue.waiting_count(), expected);
+        assert_eq!(queue.waiting_units(), expected_units);
+    }
+
+    async fn wait_until_queue_capacity_units(queue: &AccountQueue, expected: i32) {
+        for _ in 0..50 {
+            if queue.slots_cap.load(Ordering::Relaxed) == expected {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        assert_eq!(queue.slots_cap.load(Ordering::Relaxed), expected);
+    }
+
+    #[tokio::test]
+    async fn account_queue_regular_request_uses_full_standard_slot() {
+        let queue = AccountQueue::new(1);
+        let permit = queue
+            .acquire(Duration::from_secs(1), DEFAULT_REQUEST_SLOT_UNITS)
+            .await
+            .expect("regular permit");
+
+        assert_eq!(queue.active_units(), 2);
+        assert_eq!(queue.active_standard_slots(), 1.0);
+        assert_eq!(queue.active_request_count(), 1);
+
+        let blocked = queue
+            .acquire(Duration::from_millis(10), HAIKU_REQUEST_SLOT_UNITS)
+            .await;
+        assert!(matches!(blocked, Err(QueueWaitError::Timeout)));
+
+        drop(permit);
+        assert_eq!(queue.active_units(), 0);
+        assert_eq!(queue.active_request_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn account_queue_two_haiku_requests_share_one_standard_slot() {
+        let queue = AccountQueue::new(1);
+        let first = queue
+            .acquire(Duration::from_secs(1), HAIKU_REQUEST_SLOT_UNITS)
+            .await
+            .expect("first haiku permit");
+        let second = queue
+            .acquire(Duration::from_secs(1), HAIKU_REQUEST_SLOT_UNITS)
+            .await
+            .expect("second haiku permit");
+
+        assert_eq!(queue.active_units(), 2);
+        assert_eq!(queue.active_standard_slots(), 1.0);
+        assert_eq!(queue.active_request_count(), 2);
+
+        let blocked = queue
+            .acquire(Duration::from_millis(10), HAIKU_REQUEST_SLOT_UNITS)
+            .await;
+        assert!(matches!(blocked, Err(QueueWaitError::Timeout)));
+
+        drop(first);
+        drop(second);
+    }
+
+    #[tokio::test]
+    async fn account_queue_mixed_requests_use_internal_units() {
+        let queue = AccountQueue::new(2);
+        let regular = queue
+            .acquire(Duration::from_secs(1), DEFAULT_REQUEST_SLOT_UNITS)
+            .await
+            .expect("regular permit");
+        let haiku = queue
+            .acquire(Duration::from_secs(1), HAIKU_REQUEST_SLOT_UNITS)
+            .await
+            .expect("haiku permit");
+
+        assert_eq!(queue.active_units(), 3);
+        assert_eq!(queue.active_standard_slots(), 1.5);
+        assert_eq!(queue.active_request_count(), 2);
+
+        let second_haiku = queue
+            .acquire(Duration::from_secs(1), HAIKU_REQUEST_SLOT_UNITS)
+            .await
+            .expect("second haiku fills remaining half slot");
+        assert_eq!(queue.active_units(), 4);
+
+        let blocked = queue
+            .acquire(Duration::from_millis(10), HAIKU_REQUEST_SLOT_UNITS)
+            .await;
+        assert!(matches!(blocked, Err(QueueWaitError::Timeout)));
+
+        drop(regular);
+        drop(haiku);
+        drop(second_haiku);
+    }
+
+    #[tokio::test]
+    async fn account_queue_keeps_fifo_when_head_needs_two_units() {
+        let queue = Arc::new(AccountQueue::new(1));
+        let held_half_slot = queue
+            .acquire(Duration::from_secs(1), HAIKU_REQUEST_SLOT_UNITS)
+            .await
+            .expect("held haiku permit");
+
+        let (regular_acquired_tx, mut regular_acquired_rx) = tokio::sync::oneshot::channel();
+        let (regular_release_tx, regular_release_rx) = tokio::sync::oneshot::channel();
+        let regular_queue = queue.clone();
+        let regular_waiter = tokio::spawn(async move {
+            let permit = regular_queue
+                .acquire(Duration::from_secs(5), DEFAULT_REQUEST_SLOT_UNITS)
+                .await
+                .expect("regular waiter permit");
+            let _ = regular_acquired_tx.send(());
+            let _ = regular_release_rx.await;
+            drop(permit);
+        });
+        wait_until_queue_waiting(&queue, 1, 2).await;
+
+        let (haiku_acquired_tx, mut haiku_acquired_rx) = tokio::sync::oneshot::channel();
+        let haiku_queue = queue.clone();
+        let haiku_waiter = tokio::spawn(async move {
+            let permit = haiku_queue
+                .acquire(Duration::from_secs(5), HAIKU_REQUEST_SLOT_UNITS)
+                .await
+                .expect("haiku waiter permit");
+            let _ = haiku_acquired_tx.send(());
+            drop(permit);
+        });
+        wait_until_queue_waiting(&queue, 2, 3).await;
+
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), &mut haiku_acquired_rx)
+                .await
+                .is_err()
+        );
+
+        drop(held_half_slot);
+        tokio::time::timeout(Duration::from_secs(1), &mut regular_acquired_rx)
+            .await
+            .expect("regular waiter should acquire first")
+            .expect("regular acquired signal");
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), &mut haiku_acquired_rx)
+                .await
+                .is_err()
+        );
+
+        regular_release_tx.send(()).expect("release regular waiter");
+        tokio::time::timeout(Duration::from_secs(1), &mut haiku_acquired_rx)
+            .await
+            .expect("haiku waiter should acquire after regular releases")
+            .expect("haiku acquired signal");
+        regular_waiter.await.expect("regular waiter task");
+        haiku_waiter.await.expect("haiku waiter task");
+    }
+
+    #[tokio::test]
+    async fn account_queue_waiting_capacity_stays_request_count_based() {
+        let queue = Arc::new(AccountQueue::new(1));
+        let held = queue
+            .acquire(Duration::from_secs(1), DEFAULT_REQUEST_SLOT_UNITS)
+            .await
+            .expect("held regular permit");
+
+        let first_queue = queue.clone();
+        let first_waiter = tokio::spawn(async move {
+            first_queue
+                .acquire(Duration::from_secs(5), HAIKU_REQUEST_SLOT_UNITS)
+                .await
+        });
+        let second_queue = queue.clone();
+        let second_waiter = tokio::spawn(async move {
+            second_queue
+                .acquire(Duration::from_secs(5), HAIKU_REQUEST_SLOT_UNITS)
+                .await
+        });
+        wait_until_queue_waiting(&queue, 2, 2).await;
+
+        let result = queue
+            .acquire(Duration::from_millis(10), HAIKU_REQUEST_SLOT_UNITS)
+            .await;
+        assert!(matches!(result, Err(QueueWaitError::QueueFull)));
+
+        first_waiter.abort();
+        second_waiter.abort();
+        let _ = first_waiter.await;
+        let _ = second_waiter.await;
+        drop(held);
+    }
+
+    #[tokio::test]
+    async fn account_queue_shrink_does_not_cancel_existing_requests() {
+        let queue = AccountQueue::new(2);
+        let first = queue
+            .acquire(Duration::from_secs(1), DEFAULT_REQUEST_SLOT_UNITS)
+            .await
+            .expect("first regular permit");
+        let second = queue
+            .acquire(Duration::from_secs(1), DEFAULT_REQUEST_SLOT_UNITS)
+            .await
+            .expect("second regular permit");
+        assert_eq!(queue.active_units(), 4);
+        assert_eq!(queue.active_request_count(), 2);
+
+        queue.adjust_capacity(1);
+        assert_eq!(queue.max_units(), 2);
+        assert_eq!(queue.active_units(), 4);
+        assert_eq!(queue.active_request_count(), 2);
+
+        drop(first);
+        wait_until_queue_capacity_units(&queue, 2).await;
+        assert_eq!(queue.active_units(), 2);
+        assert_eq!(queue.active_request_count(), 1);
+
+        let blocked = queue
+            .acquire(Duration::from_millis(10), HAIKU_REQUEST_SLOT_UNITS)
+            .await;
+        assert!(matches!(blocked, Err(QueueWaitError::Timeout)));
+
+        drop(second);
+        let next = queue
+            .acquire(Duration::from_secs(1), DEFAULT_REQUEST_SLOT_UNITS)
+            .await
+            .expect("regular permit after shrink settled");
+        drop(next);
+    }
+
+    /// 缩容前已排队的请求不能抢到退还中的旧容量，重新扩容后也不能留下延迟吞槽任务。
+    #[tokio::test]
+    async fn account_queue_hot_shrink_blocks_existing_waiters_and_reexpands() {
+        let queue = Arc::new(AccountQueue::new(2));
+        let first = queue.acquire(Duration::from_secs(1), 2).await.unwrap();
+        let second = queue.acquire(Duration::from_secs(1), 2).await.unwrap();
+        let waiting_queue = queue.clone();
+        let mut waiter =
+            tokio::spawn(async move { waiting_queue.acquire(Duration::from_secs(2), 2).await });
+        wait_until_queue_waiting(&queue, 1, 2).await;
+        queue.adjust_capacity(1);
+        drop(first);
+        assert!(
+            tokio::time::timeout(Duration::from_millis(30), &mut waiter)
+                .await
+                .is_err()
+        );
+        assert_eq!(queue.active_request_count(), 1);
+        drop(second);
+        let next = waiter.await.unwrap().unwrap();
+        assert_eq!(queue.active_request_count(), 1);
+        queue.adjust_capacity(3);
+        let added = queue.acquire(Duration::from_secs(1), 4).await.unwrap();
+        assert_eq!(queue.active_units(), 6);
+        queue.adjust_capacity(1);
+        queue.adjust_capacity(3);
+        drop(next);
+        drop(added);
+        assert_eq!(queue.active_units(), 0);
+        assert_eq!(queue.slots.available_permits(), 6);
+    }
+
+    /// 门禁等待期间取消也须偿还缩容差额，不能漏还或暴露旧容量。
+    #[tokio::test]
+    async fn account_queue_hot_shrink_cancellation_at_runtime_gate_retires_capacity() {
+        let queue = Arc::new(AccountQueue::new(2));
+        let lease = queue
+            .runtime_gate
+            .prepare("login:synthetic-shrink")
+            .unwrap();
+        let waiting_queue = queue.clone();
+        let pending =
+            tokio::spawn(async move { waiting_queue.acquire(Duration::from_secs(30), 4).await });
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while queue.gate_waiting_units.load(Ordering::Relaxed) != 4 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        queue.adjust_capacity(1);
+        pending.abort();
+        let _ = pending.await;
+        assert_eq!(queue.slots_cap.load(Ordering::Relaxed), 2);
+        assert_eq!(queue.slots.available_permits(), 2);
+        assert_eq!(queue.active_units(), 0);
+        queue
+            .runtime_gate
+            .update(&lease.owner, &lease.generation, "release")
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn account_score_info_uses_internal_units_for_concurrency_load() {
+        let (_store, svc) = setup_account_service().await;
+        let mut account = new_account_request("score-half-slot@example.com");
+        account.concurrency = 2;
+        svc.create_account(&mut account)
+            .await
+            .expect("create account");
+        let queue = svc
+            .get_or_create_queue(account.id, account.concurrency)
+            .await;
+        let _haiku = queue
+            .acquire(Duration::from_secs(1), HAIKU_REQUEST_SLOT_UNITS)
+            .await
+            .expect("haiku permit");
+
+        let info = svc.get_account_score_info(&account).await;
+        assert_eq!(info.current_concurrency, 0.5);
+        assert_eq!(info.current_concurrency_units, 1);
+        assert_eq!(info.max_concurrency_units, 4);
+        assert_eq!(info.active_requests, 1);
+        assert_eq!(info.queued, 0);
+        assert_eq!(info.queued_request_units, 0);
+        assert_eq!(info.concurrency_pct, 25.0);
+    }
+
+    #[tokio::test]
+    async fn create_account_uses_selected_claude_code_profile() {
+        let (_store, settings_store, svc) = setup_account_service_with_settings().await;
+        let mut settings = std::collections::HashMap::new();
+        settings.insert(
+            "claude_code_version_profile".to_string(),
+            "2.1.173".to_string(),
+        );
+        settings_store
+            .upsert_many(&settings)
+            .await
+            .expect("upsert setting");
+
+        let mut account = new_account_request("profile@example.com");
+        svc.create_account(&mut account)
+            .await
+            .expect("create account");
+
+        assert_eq!(account.canonical_env["version"], "2.1.173");
+        assert_eq!(account.canonical_env["version_base"], "2.1.173");
+        assert_eq!(account.canonical_env["build_time"], "2026-06-11T01:23:13Z");
+    }
+
+    // ---- check_usage_window ----
+
+    #[test]
+    fn check_window_below_threshold_returns_none() {
+        let future = rfc3339_at(ChronoDuration::hours(1));
+        let usage = json!({ "five_hour": make_window(json!(96.9), &future) });
+        assert!(check_usage_window(&usage, "five_hour", 97.0).is_none());
+    }
+
+    #[test]
+    fn check_window_at_threshold_returns_some() {
+        let future = rfc3339_at(ChronoDuration::hours(1));
+        let usage = json!({ "five_hour": make_window(json!(97.0), &future) });
+        assert!(check_usage_window(&usage, "five_hour", 97.0).is_some());
+    }
+
+    #[test]
+    fn check_window_above_threshold_returns_some() {
+        let future = rfc3339_at(ChronoDuration::hours(1));
+        let usage = json!({ "five_hour": make_window(json!(99.9), &future) });
+        assert!(check_usage_window(&usage, "five_hour", 97.0).is_some());
+    }
+
+    #[test]
+    fn check_window_integer_utilization_works() {
+        let future = rfc3339_at(ChronoDuration::hours(1));
+        let usage = json!({ "five_hour": make_window(json!(100), &future) });
+        assert!(check_usage_window(&usage, "five_hour", 97.0).is_some());
+    }
+
+    #[test]
+    fn check_window_missing_key_returns_none() {
+        let usage = json!({});
+        assert!(check_usage_window(&usage, "five_hour", 97.0).is_none());
+    }
+
+    #[test]
+    fn check_window_missing_utilization_returns_none() {
+        let future = rfc3339_at(ChronoDuration::hours(1));
+        let usage = json!({ "five_hour": { "resets_at": future } });
+        assert!(check_usage_window(&usage, "five_hour", 97.0).is_none());
+    }
+
+    #[test]
+    fn check_window_missing_resets_at_returns_none() {
+        let usage = json!({ "five_hour": { "utilization": 100 } });
+        assert!(check_usage_window(&usage, "five_hour", 97.0).is_none());
+    }
+
+    #[test]
+    fn check_window_invalid_rfc3339_returns_none() {
+        let usage = json!({
+            "five_hour": { "utilization": 100, "resets_at": "not-a-date" }
+        });
+        assert!(check_usage_window(&usage, "five_hour", 97.0).is_none());
+    }
+
+    #[test]
+    fn check_window_past_time_returns_none() {
+        let past = rfc3339_at(ChronoDuration::hours(-1));
+        let usage = json!({ "five_hour": make_window(json!(100), &past) });
+        assert!(check_usage_window(&usage, "five_hour", 97.0).is_none());
+    }
+
+    #[test]
+    fn check_window_null_utilization_returns_none() {
+        let future = rfc3339_at(ChronoDuration::hours(1));
+        let usage = json!({
+            "five_hour": { "utilization": null, "resets_at": future }
+        });
+        assert!(check_usage_window(&usage, "five_hour", 97.0).is_none());
+    }
+
+    #[test]
+    fn check_window_string_utilization_returns_none() {
+        let future = rfc3339_at(ChronoDuration::hours(1));
+        let usage = json!({
+            "five_hour": { "utilization": "100", "resets_at": future }
+        });
+        assert!(check_usage_window(&usage, "five_hour", 97.0).is_none());
+    }
+
+    #[test]
+    fn check_window_returns_parsed_reset_at() {
+        let future = rfc3339_at(ChronoDuration::hours(3));
+        let usage = json!({ "five_hour": make_window(json!(100), &future) });
+        let result = check_usage_window(&usage, "five_hour", 97.0).unwrap();
+        let expected = chrono::DateTime::parse_from_rfc3339(&future)
+            .unwrap()
+            .with_timezone(&Utc);
+        // 允许纳秒级精度差
+        assert_eq!(result.timestamp(), expected.timestamp());
+    }
+
+    #[test]
+    fn fable_weekly_usage_limit_uses_configured_threshold() {
+        let future = rfc3339_at(ChronoDuration::days(3));
+        let account = test_account_with_usage(json!({
+            "seven_day_fable": make_window(json!(49), &future),
+        }));
+
+        assert!(!account_fable_weekly_usage_limit_reached(&account, 50));
+        assert!(account_fable_weekly_usage_limit_reached(&account, 49));
+        assert!(!account_fable_weekly_usage_limit_reached(&account, 100));
+    }
+
+    #[test]
+    fn fable_quota_model_ids_include_5_and_5_1_only() {
+        for model in [
+            "claude-fable-5",
+            "claude-fable-5[1m]",
+            "claude-fable-5-1",
+            "claude-fable-5-1[1m]",
+        ] {
+            assert!(is_fable_quota_model_id(model), "{model}");
+        }
+        for model in [
+            "claude-fable-5-2",
+            "claude-fable-51",
+            "claude-fable-5-1-preview",
+        ] {
+            assert!(!is_fable_quota_model_id(model), "{model}");
+        }
+    }
+
+    #[test]
+    fn setup_token_never_reaches_fable_weekly_usage_limit() {
+        let future = rfc3339_at(ChronoDuration::days(3));
+        let mut account = test_account_with_usage(json!({
+            "seven_day_fable": make_window(json!(100), &future),
+        }));
+        account.auth_type = AccountAuthType::SetupToken;
+
+        assert!(!account_fable_weekly_usage_limit_reached(&account, 50));
+    }
+
+    // ---- classify_rate_limit ----
+
+    #[test]
+    fn classify_empty_usage_returns_none() {
+        let usage = json!({});
+        assert!(classify_rate_limit(&usage, 97.0).is_none());
+    }
+
+    #[test]
+    fn classify_only_five_hour_hit_returns_five_hour() {
+        let future = rfc3339_at(ChronoDuration::hours(2));
+        let usage = json!({
+            "five_hour": make_window(json!(100), &future),
+            "seven_day": make_window(json!(50), &rfc3339_at(ChronoDuration::days(5))),
+        });
+        match classify_rate_limit(&usage, 97.0) {
+            Some(RateLimitWindow::FiveHour(_)) => {}
+            other => panic!(
+                "expected FiveHour, got {:?}",
+                match other {
+                    Some(RateLimitWindow::SevenDay(_)) => "SevenDay",
+                    Some(RateLimitWindow::FiveHour(_)) => "FiveHour",
+                    None => "None",
+                }
+            ),
+        }
+    }
+
+    #[test]
+    fn classify_only_seven_day_hit_returns_seven_day() {
+        let usage = json!({
+            "five_hour": make_window(json!(50), &rfc3339_at(ChronoDuration::hours(2))),
+            "seven_day": make_window(json!(99), &rfc3339_at(ChronoDuration::days(5))),
+        });
+        assert!(matches!(
+            classify_rate_limit(&usage, 97.0),
+            Some(RateLimitWindow::SevenDay(_))
+        ));
+    }
+
+    #[test]
+    fn classify_both_hit_prioritizes_seven_day() {
+        // 同时命中时，7 天窗口优先（限流更久）
+        let usage = json!({
+            "five_hour": make_window(json!(100), &rfc3339_at(ChronoDuration::hours(2))),
+            "seven_day": make_window(json!(100), &rfc3339_at(ChronoDuration::days(5))),
+        });
+        assert!(matches!(
+            classify_rate_limit(&usage, 97.0),
+            Some(RateLimitWindow::SevenDay(_))
+        ));
+    }
+
+    #[test]
+    fn classify_only_sonnet_hit_is_ignored() {
+        // Sonnet 7 天窗口命中，但其他两个未命中 → 返回 None（暂不处理 sonnet）
+        let usage = json!({
+            "five_hour": make_window(json!(10), &rfc3339_at(ChronoDuration::hours(2))),
+            "seven_day": make_window(json!(10), &rfc3339_at(ChronoDuration::days(5))),
+            "seven_day_sonnet": make_window(json!(100), &rfc3339_at(ChronoDuration::days(5))),
+        });
+        assert!(classify_rate_limit(&usage, 97.0).is_none());
+    }
+
+    #[test]
+    fn classify_all_below_threshold_returns_none() {
+        let usage = json!({
+            "five_hour": make_window(json!(80), &rfc3339_at(ChronoDuration::hours(2))),
+            "seven_day": make_window(json!(50), &rfc3339_at(ChronoDuration::days(5))),
+        });
+        assert!(classify_rate_limit(&usage, 97.0).is_none());
+    }
+
+    #[test]
+    fn classify_boundary_at_exactly_97() {
+        let usage = json!({
+            "five_hour": make_window(json!(97), &rfc3339_at(ChronoDuration::hours(2))),
+        });
+        assert!(matches!(
+            classify_rate_limit(&usage, 97.0),
+            Some(RateLimitWindow::FiveHour(_))
+        ));
+    }
+
+    #[test]
+    fn classify_boundary_just_below_97() {
+        let usage = json!({
+            "five_hour": make_window(json!(96.99), &rfc3339_at(ChronoDuration::hours(2))),
+        });
+        assert!(classify_rate_limit(&usage, 97.0).is_none());
+    }
+
+    #[test]
+    fn classify_seven_day_expired_reset_falls_through_to_five_hour() {
+        // 7d utilization 命中但 resets_at 已过期 → check_usage_window 返回 None，降级到 5h 检查
+        let usage = json!({
+            "five_hour": make_window(json!(100), &rfc3339_at(ChronoDuration::hours(2))),
+            "seven_day": make_window(json!(100), &rfc3339_at(ChronoDuration::hours(-1))),
+        });
+        assert!(matches!(
+            classify_rate_limit(&usage, 97.0),
+            Some(RateLimitWindow::FiveHour(_))
+        ));
+    }
+
+    #[test]
+    fn classify_invalid_json_structure_returns_none() {
+        let usage = json!("not-an-object");
+        assert!(classify_rate_limit(&usage, 97.0).is_none());
+    }
+
+    #[test]
+    fn classify_threshold_config_is_honored() {
+        // 测试不同 threshold 参数行为
+        let usage = json!({
+            "five_hour": make_window(json!(95), &rfc3339_at(ChronoDuration::hours(2))),
+        });
+        assert!(classify_rate_limit(&usage, 97.0).is_none());
+        assert!(classify_rate_limit(&usage, 90.0).is_some());
+    }
+
+    #[test]
+    fn transient_429_uses_request_backoff_without_account_quarantine() {
+        let account = test_account_with_usage(json!({}));
+
+        match AccountService::determine_rate_limit_window(
+            &account,
+            None,
+            "rate limited",
+            None,
+            &AccountSelectionContext::disabled(),
+        ) {
+            RateLimitWindowDecision::RequestBackoff(delay) => {
+                assert_eq!(delay, PURE_RATE_LIMIT_RETRY_DELAY);
+            }
+            _ => panic!("expected request-level backoff"),
+        }
+    }
+
+    #[test]
+    fn seven_day_window_is_not_truncated_by_retry_after_cap() {
+        let seven_day_reset = Utc::now() + ChronoDuration::days(4);
+        let account = test_account_with_usage(json!({
+            "seven_day": make_window(json!(100), &seven_day_reset.to_rfc3339()),
+        }));
+
+        match AccountService::determine_rate_limit_window(
+            &account,
+            Some(60 * 60),
+            "rate limited",
+            None,
+            &AccountSelectionContext::disabled(),
+        ) {
+            RateLimitWindowDecision::Quarantine("周限额已满", reset_at) => {
+                assert_eq!(reset_at.timestamp(), seven_day_reset.timestamp());
+            }
+            _ => panic!("expected seven-day quarantine"),
+        }
+    }
+
+    #[test]
+    fn five_hour_window_uses_later_retry_after_deadline() {
+        let account = test_account_with_usage(json!({
+            "five_hour": make_window(
+                json!(100),
+                &rfc3339_at(ChronoDuration::hours(1)),
+            ),
+        }));
+        let before = Utc::now();
+
+        match AccountService::determine_rate_limit_window(
+            &account,
+            Some(4 * 60 * 60),
+            "rate limited",
+            None,
+            &AccountSelectionContext::disabled(),
+        ) {
+            RateLimitWindowDecision::Quarantine("5 小时限额已满", reset_at) => {
+                assert!(reset_at >= before + ChronoDuration::hours(4));
+                assert!(reset_at <= Utc::now() + ChronoDuration::hours(4));
+            }
+            _ => panic!("expected five-hour quarantine"),
+        }
+    }
+
+    #[test]
+    fn unknown_retry_after_remains_capped_at_five_hours() {
+        let account = test_account_with_usage(json!({}));
+        let before = Utc::now();
+
+        match AccountService::determine_rate_limit_window(
+            &account,
+            Some(ChronoDuration::days(2).num_seconds()),
+            "rate limited",
+            None,
+            &AccountSelectionContext::disabled(),
+        ) {
+            RateLimitWindowDecision::Quarantine("429 速率限制（retry-after）", reset_at) => {
+                assert!(reset_at >= before + ChronoDuration::hours(5));
+                assert!(reset_at <= Utc::now() + ChronoDuration::hours(5));
+            }
+            _ => panic!("expected capped retry-after quarantine"),
+        }
+    }
+
+    #[test]
+    fn current_allowed_windows_do_not_fall_back_to_stale_cached_quota() {
+        let account = test_account_with_usage(json!({
+            "seven_day": make_window(json!(100), &rfc3339_at(ChronoDuration::days(4))),
+        }));
+
+        match AccountService::determine_rate_limit_window(
+            &account,
+            None,
+            "rate limited",
+            Some(json!({})),
+            &AccountSelectionContext::disabled(),
+        ) {
+            RateLimitWindowDecision::RequestBackoff(delay) => {
+                assert_eq!(delay, PURE_RATE_LIMIT_RETRY_DELAY);
+            }
+            _ => panic!("current response should suppress stale cached quota"),
+        }
+    }
+
+    #[test]
+    fn credit_429_passes_through_without_backoff_or_quarantine() {
+        let account = test_account_with_usage(json!({}));
+
+        match AccountService::determine_rate_limit_window(
+            &account,
+            None,
+            "This request requires long context usage credits",
+            None,
+            &AccountSelectionContext::disabled(),
+        ) {
+            RateLimitWindowDecision::PassThrough => {}
+            _ => panic!("expected pass-through decision"),
+        }
+    }
+
+    #[test]
+    fn fable_429_with_cached_fable_quota_hit_retries_other_account_before_credit_passthrough() {
+        let account = test_account_with_usage(json!({
+            "seven_day_fable": make_window(json!(50), &rfc3339_at(ChronoDuration::days(3))),
+        }));
+        let context = AccountSelectionContext {
+            usage_limits_enabled: false,
+            fable_quota_fallback_enabled: true,
+            fable_weekly_usage_limit_percent: 50,
+            request_model: Some("claude-fable-5-1".into()),
+        };
+
+        match AccountService::determine_rate_limit_window(
+            &account,
+            None,
+            "This request requires fallback credits",
+            None,
+            &context,
+        ) {
+            RateLimitWindowDecision::RetryOtherAccount("Fable 模型级 429", Some(_)) => {}
+            _ => panic!("expected fable model-level retry decision"),
+        }
+    }
+
+    #[test]
+    fn fable_429_without_cached_quota_hit_still_retries_other_account() {
+        let account = test_account_with_usage(json!({
+            "seven_day_fable": make_window(json!(49), &rfc3339_at(ChronoDuration::days(3))),
+        }));
+        let context = AccountSelectionContext {
+            usage_limits_enabled: false,
+            fable_quota_fallback_enabled: true,
+            fable_weekly_usage_limit_percent: 50,
+            request_model: Some("claude-fable-5[1m]".into()),
+        };
+
+        match AccountService::determine_rate_limit_window(
+            &account,
+            None,
+            "rate limited",
+            None,
+            &context,
+        ) {
+            RateLimitWindowDecision::RetryOtherAccount("Fable 模型级 429", None) => {}
+            _ => panic!("expected fable retry decision without cached reset"),
+        }
+    }
+
+    #[test]
+    fn fable_429_with_retry_after_stays_model_scoped() {
+        let account = test_account_with_usage(json!({
+            "seven_day_fable": make_window(json!(50), &rfc3339_at(ChronoDuration::days(3))),
+        }));
+        let context = AccountSelectionContext {
+            usage_limits_enabled: false,
+            fable_quota_fallback_enabled: true,
+            fable_weekly_usage_limit_percent: 50,
+            request_model: Some("claude-fable-5".into()),
+        };
+
+        match AccountService::determine_rate_limit_window(
+            &account,
+            Some(5 * 60 * 60),
+            "rate limited",
+            None,
+            &context,
+        ) {
+            RateLimitWindowDecision::RetryOtherAccount("Fable 模型级 429", Some(_)) => {}
+            _ => panic!("expected fable model-level retry"),
+        }
+    }
+
+    #[test]
+    fn fable_429_keeps_common_usage_quarantine_when_common_window_hit() {
+        let account = test_account_with_usage(json!({
+            "seven_day": make_window(json!(100), &rfc3339_at(ChronoDuration::days(5))),
+            "seven_day_fable": make_window(json!(50), &rfc3339_at(ChronoDuration::days(3))),
+        }));
+        let context = AccountSelectionContext {
+            usage_limits_enabled: false,
+            fable_quota_fallback_enabled: true,
+            fable_weekly_usage_limit_percent: 50,
+            request_model: Some("claude-fable-5".into()),
+        };
+
+        match AccountService::determine_rate_limit_window(
+            &account,
+            None,
+            "rate limited",
+            None,
+            &context,
+        ) {
+            RateLimitWindowDecision::Quarantine("周限额已满", _) => {}
+            _ => panic!("expected common seven-day quarantine"),
+        }
+    }
+
+    #[test]
+    fn setup_token_fable_429_keeps_legacy_credit_passthrough() {
+        let mut account = test_account_with_usage(json!({
+            "seven_day_fable": make_window(json!(50), &rfc3339_at(ChronoDuration::days(3))),
+        }));
+        account.auth_type = AccountAuthType::SetupToken;
+        let context = AccountSelectionContext {
+            usage_limits_enabled: false,
+            fable_quota_fallback_enabled: true,
+            fable_weekly_usage_limit_percent: 50,
+            request_model: Some("claude-fable-5".into()),
+        };
+
+        match AccountService::determine_rate_limit_window(
+            &account,
+            None,
+            "This request requires fallback credits",
+            None,
+            &context,
+        ) {
+            RateLimitWindowDecision::PassThrough => {}
+            _ => panic!("expected setup token credit pass-through"),
+        }
+    }
+
+    #[tokio::test]
+    async fn transient_backoff_wait_count_is_in_memory_only() {
+        let (_store, svc) = setup_account_service().await;
+        let mut account = test_account_with_usage(json!({}));
+        account.id = 0;
+        svc.create_account(&mut account).await.unwrap();
+
+        svc.set_transient_rate_limit_backoff(account.id, Duration::from_millis(80))
+            .await;
+        let waiter_svc = svc.clone();
+        let waiter_account = account.clone();
+        let waiter = tokio::spawn(async move {
+            waiter_svc
+                .wait_transient_rate_limit_backoff(&waiter_account)
+                .await;
+        });
+
+        let mut saw_waiter = false;
+        for _ in 0..10 {
+            let (waiting, remaining_ms) = svc.transient_rate_limit_backoff_status(account.id).await;
+            if waiting > 0 {
+                saw_waiter = true;
+                assert!(remaining_ms > 0);
+                break;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+        assert!(saw_waiter);
+
+        waiter.await.unwrap();
+        let stored = svc.get_account(account.id).await.unwrap();
+        assert_eq!(stored.status, crate::model::account::AccountStatus::Active);
+        assert!(stored.rate_limit_reset_at.is_none());
+
+        let (waiting, remaining_ms) = svc.transient_rate_limit_backoff_status(account.id).await;
+        assert_eq!(waiting, 0);
+        assert_eq!(remaining_ms, 0);
+    }
+
+    /// 创建真实 SQLite 及同身份凭据，用于交接和重启边界测试。
+    async fn ownership_fixture() -> (
+        Arc<AccountStore>,
+        Arc<SettingsStore>,
+        Arc<AccountService>,
+        Account,
+        CredentialOwnershipInput,
+    ) {
+        let (store, settings, service) = setup_account_service_with_settings().await;
+        let mut account = test_account_with_usage(json!({}));
+        account.id = 0;
+        account.email = "ownership@example.invalid".into();
+        account.device_id = "1".repeat(64);
+        account.account_uuid = Some("synthetic-ownership-uuid".into());
+        account.expires_at = Some(Utc::now() + ChronoDuration::hours(1));
+        account.rpm_limit = 17;
+        account.priority = 63;
+        account.concurrency = 2;
+        store.create(&mut account).await.unwrap();
+        let input = CredentialOwnershipInput {
+            protocol: 1,
+            operation_id: Uuid::new_v4().simple().to_string(),
+            action: "prepare".into(),
+            direction: "detach".into(),
+            identity: CredentialIdentity {
+                deployment_id: "ownership-fixture".into(),
+                environment_id: "2".repeat(32),
+                bench_account_id: 1,
+                device_id: account.device_id.clone(),
+                email: account.email.clone(),
+                account_uuid: account.account_uuid.clone().unwrap(),
+                organization_uuid: None,
+            },
+            expected_generation: None,
+            source_refresh_sha256: None,
+            lease_owner: None,
+            credentials: None,
+        };
+        (store, settings, service, account, input)
+    }
+
+    #[tokio::test]
+    async fn ownership_detach_drains_activities_and_restart_stays_closed() {
+        let (store, settings, service, account, mut input) = ownership_fixture().await;
+        let activity = service.upstream_activity(account.id).await.unwrap();
+        let pending_service = service.clone();
+        let pending_input = input.clone();
+        let id = account.id;
+        let pending =
+            tokio::spawn(
+                async move { pending_service.credential_handoff(id, &pending_input).await },
+            );
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while store.credential_ownership(id).await.unwrap().is_none() {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(service.upstream_activity(id).await.is_err());
+        assert!(
+            !service
+                .disable_oauth_for_failed_token(id, &account.access_token, "401 OAuth 认证恢复失败")
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            store.get_by_id(id).await.unwrap().status,
+            AccountStatus::Active
+        );
+        assert!(!pending.is_finished(), "旧活动结束前不能导出最终凭据");
+        drop(activity);
+        let prepared = pending.await.unwrap().unwrap();
+        assert_eq!(prepared["receipt"]["stage"], "prepared");
+        input.action = "commit".into();
+        let committed = service.credential_handoff(id, &input).await.unwrap();
+        assert_eq!(committed["ownership"]["owner"], "local");
+        assert!(
+            committed["credentials"].is_null(),
+            "已交给本地后不能再返回远端旧凭据"
+        );
+        let restarted = AccountService::new(store, Arc::new(MemoryStore::new()), settings);
+        assert!(restarted.resolve_upstream_token(id).await.is_err());
+        assert!(restarted.refresh_usage(id).await.is_err());
+        assert!(
+            restarted
+                .resolve_oauth_credentials(id, 600, false)
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn ownership_return_is_atomic_idempotent_and_old_reply_cannot_reopen() {
+        let (store, _settings, service, account, mut input) = ownership_fixture().await;
+        let mut native_changes = service.subscribe_native_changes();
+        service
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        input.action = "commit".into();
+        service
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        let detach = input.clone();
+        input.expected_generation = Some(input.operation_id.clone());
+        input.operation_id = Uuid::new_v4().simple().to_string();
+        input.direction = "return".into();
+        input.action = "prepare".into();
+        service
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        input.action = "commit".into();
+        input.credentials = Some(CredentialMaterial {
+            access_token: "local-latest-at".into(),
+            refresh_token: "local-latest-rt".into(),
+            expires_at: (Utc::now() + ChronoDuration::hours(1)).timestamp_millis(),
+        });
+        let imported = service
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        assert_eq!(imported["receipt"]["stage"], "imported");
+        assert_eq!(
+            store.get_by_id(account.id).await.unwrap().refresh_token,
+            "local-latest-rt"
+        );
+        assert!(service.upstream_activity(account.id).await.is_err());
+        while native_changes.try_recv().is_ok() {}
+        input.action = "finish".into();
+        service
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        drop(service.upstream_activity(account.id).await.unwrap());
+        assert_eq!(native_changes.try_recv().unwrap(), (account.id, true));
+        service
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        assert_eq!(native_changes.try_recv().unwrap(), (account.id, true));
+        let current = store.get_by_id(account.id).await.unwrap();
+        store
+            .update_oauth_tokens_if_current(
+                &current,
+                "later-at",
+                "later-rt",
+                Utc::now() + ChronoDuration::hours(1),
+            )
+            .await
+            .unwrap();
+        input.action = "commit".into();
+        service
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        assert_eq!(
+            store.get_by_id(account.id).await.unwrap().refresh_token,
+            "later-rt"
+        );
+        let old = service
+            .credential_handoff(account.id, &detach)
+            .await
+            .unwrap();
+        assert_eq!(old["ownership"]["owner"], "gateway");
+        let stored = store.get_by_id(account.id).await.unwrap();
+        assert_eq!(
+            (stored.rpm_limit, stored.priority, stored.concurrency),
+            (17, 63, 2)
+        );
+        input.credentials.as_mut().unwrap().refresh_token = "conflicting-rt".into();
+        assert!(
+            service
+                .credential_handoff(account.id, &input)
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn ownership_unknown_attach_is_rejected_without_disabling_account() {
+        let (store, _settings, service, account, mut input) = ownership_fixture().await;
+        input.direction = "attach".into();
+        input.source_refresh_sha256 = Some("0".repeat(64));
+        assert!(
+            service
+                .credential_handoff(account.id, &input)
+                .await
+                .is_err()
+        );
+        assert!(
+            store
+                .credential_ownership(account.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            store.get_by_id(account.id).await.unwrap().status,
+            AccountStatus::Active
+        );
+        drop(service.upstream_activity(account.id).await.unwrap());
+    }
+
+    /// 暂停仅保护本调用范围内的原绑定，不阻塞只能使用其他账号的请求。
+    #[tokio::test]
+    async fn ownership_paused_sticky_keeps_binding_and_other_account_scope_works() {
+        let (store, _settings, service, account, mut input) = ownership_fixture().await;
+        let mut other = test_account_with_usage(json!({}));
+        other.id = 0;
+        other.email = "other-ownership@example.invalid".into();
+        store.create(&mut other).await.unwrap();
+        service
+            .cache
+            .set_session_account_id("ownership-sticky", account.id, STICKY_SESSION_TTL)
+            .await
+            .unwrap();
+        service
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        input.action = "commit".into();
+        service
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        assert!(
+            service
+                .select_account_with_context("ownership-sticky", &[], &[account.id, other.id])
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            service
+                .cache
+                .get_session_account_id("ownership-sticky")
+                .await
+                .unwrap(),
+            Some(account.id)
+        );
+        let selected = service
+            .select_account_with_context("ownership-sticky", &[], &[other.id])
+            .await
+            .unwrap();
+        assert_eq!(selected.account.id, other.id);
+    }
+
+    /// 未知刷新保留持久关闭，明确重授权的导入与交接回执原子推进。
+    #[tokio::test]
+    async fn ownership_refresh_uncertainty_requires_original_account_reauthorization() {
+        let (store, settings, service, account, mut input) = ownership_fixture().await;
+        input.direction = "attach".into();
+        input.source_refresh_sha256 = Some(hex::encode(Sha256::digest(
+            account.refresh_token.as_bytes(),
+        )));
+        service
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        input.action = "commit".into();
+        service
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        input.action = "finish".into();
+        service
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        let restore = service
+            .begin_owned_refresh(account.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(service.upstream_activity(account.id).await.is_err());
+        service.finish_owned_refresh(&restore).await.unwrap();
+        drop(service.upstream_activity(account.id).await.unwrap());
+        service.begin_owned_refresh(account.id).await.unwrap();
+        let restarted = AccountService::new(store.clone(), Arc::new(MemoryStore::new()), settings);
+        assert!(restarted.resolve_upstream_token(account.id).await.is_err());
+        let login = login_import_input(&restarted, &account).await;
+        input.expected_generation = Some(input.operation_id.clone());
+        input.operation_id = Uuid::new_v4().simple().to_string();
+        input.direction = "reauth".into();
+        input.action = "prepare".into();
+        input.source_refresh_sha256 = None;
+        input.lease_owner = Some(login.owner.clone());
+        restarted
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        input.action = "cancel".into();
+        let cancelled = restarted
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        assert_eq!(
+            cancelled["ownership"]["phase"], "reconcile",
+            "取消登录不能解除原刷新结果未知的维护"
+        );
+        assert!(restarted.upstream_activity(account.id).await.is_err());
+        input.expected_generation = Some(input.operation_id.clone());
+        input.operation_id = Uuid::new_v4().simple().to_string();
+        input.action = "prepare".into();
+        restarted
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        restarted
+            .import_oauth_credentials(account.id, &login)
+            .await
+            .unwrap();
+        assert_eq!(
+            store
+                .credential_handoff_receipt(&input.operation_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .stage,
+            "imported"
+        );
+        input.action = "finish".into();
+        restarted
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        assert!(
+            store
+                .credential_ownership(account.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .gateway_ready()
+        );
+        assert_eq!(
+            store.get_by_id(account.id).await.unwrap().refresh_token,
+            login.refresh_token
+        );
+        assert!(
+            restarted
+                .oauth_import_status(account.id, &login.operation_id)
+                .await
+                .unwrap()
+                .is_some()
+        );
+        let refreshing = restarted
+            .begin_owned_refresh(account.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            restarted
+                .oauth_import_status(account.id, &login.operation_id)
+                .await
+                .is_err()
+        );
+        restarted.finish_owned_refresh(&refreshing).await.unwrap();
+        let queue = restarted
+            .get_or_create_queue(account.id, account.concurrency)
+            .await;
+        queue
+            .runtime_gate
+            .update(&login.owner, &login.generation, "release")
+            .unwrap();
+        input.expected_generation = Some(input.operation_id.clone());
+        input.operation_id = Uuid::new_v4().simple().to_string();
+        input.direction = "detach".into();
+        input.action = "prepare".into();
+        input.lease_owner = None;
+        restarted
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        input.action = "commit".into();
+        restarted
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        assert!(
+            restarted
+                .oauth_import_status(account.id, &login.operation_id)
+                .await
+                .is_err()
+        );
+        assert!(
+            restarted
+                .import_oauth_credentials(account.id, &login)
+                .await
+                .is_err()
+        );
+    }
+
+    /// 退休只切换归属，不以 RT 完整性限制本地删除。
+    #[tokio::test]
+    async fn ownership_retire_works_without_usable_tokens_and_cleans_records_on_delete() {
+        let (store, _settings, service, account, mut input) = ownership_fixture().await;
+        store
+            .update_oauth_tokens(account.id, "", "", Utc::now())
+            .await
+            .unwrap();
+        input.direction = "retire".into();
+        let prepared = service
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        assert!(prepared["credentials"].is_null());
+        input.action = "commit".into();
+        let retired = service
+            .credential_handoff(account.id, &input)
+            .await
+            .unwrap();
+        assert_eq!(retired["ownership"]["owner"], "local");
+        assert!(service.upstream_activity(account.id).await.is_err());
+        store.delete(account.id).await.unwrap();
+        assert!(
+            store
+                .credential_ownership(account.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            store
+                .credential_handoff_receipt(&input.operation_id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    /// 来源不明的旧目标只接受受信任新授权，保留人工停用和原限额。
+    #[tokio::test]
+    async fn ownership_authorize_restores_only_auth_failure_and_preserves_manual_disable() {
+        for (reason, active) in [
+            ("401 OAuth 认证失败", true),
+            ("手动停用", false),
+            ("403 认证失败", false),
+        ] {
+            let (store, _settings, service, account, mut input) = ownership_fixture().await;
+            service
+                .disable_for_auth_failure(account.id, reason)
+                .await
+                .unwrap();
+            input.direction = "authorize".into();
+            input.source_refresh_sha256 = Some(hex::encode(Sha256::digest(b"new-auth-refresh")));
+            service
+                .credential_handoff(account.id, &input)
+                .await
+                .unwrap();
+            input.action = "commit".into();
+            input.credentials = Some(CredentialMaterial {
+                access_token: "new-auth-access".into(),
+                refresh_token: "new-auth-refresh".into(),
+                expires_at: (Utc::now() + ChronoDuration::hours(1)).timestamp_millis(),
+            });
+            service
+                .credential_handoff(account.id, &input)
+                .await
+                .unwrap();
+            input.action = "finish".into();
+            service
+                .credential_handoff(account.id, &input)
+                .await
+                .unwrap();
+            let stored = store.get_by_id(account.id).await.unwrap();
+            assert_eq!(stored.status == AccountStatus::Active, active);
+            assert_eq!(
+                (stored.rpm_limit, stored.concurrency, stored.priority),
+                (17, 2, 63)
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn resolve_oauth_credentials_returns_valid_snapshot_without_refresh() {
+        let (_store, svc) = setup_account_service().await;
+        let mut account = new_account_request("snapshot@example.com");
+        account.access_token = "access-snapshot".into();
+        account.refresh_token = "refresh-snapshot".into();
+        account.expires_at = Some(Utc::now() + ChronoDuration::hours(1));
+        svc.create_account(&mut account).await.unwrap();
+
+        let snapshot = svc
+            .resolve_oauth_credentials(account.id, 600, false)
+            .await
+            .unwrap();
+
+        assert_eq!(snapshot.account_id, account.id);
+        assert_eq!(snapshot.access_token, "access-snapshot");
+        assert_eq!(snapshot.refresh_token, "refresh-snapshot");
+        assert!(snapshot.expires_at > Utc::now().timestamp_millis());
+    }
+
+    #[tokio::test]
+    async fn unauthorized_recovery_reuses_token_updated_by_lock_owner() {
+        let (store, svc) = setup_account_service().await;
+        let mut account = new_account_request("unauthorized-lock@example.com");
+        account.access_token = "access-rejected".into();
+        account.refresh_token = "refresh-old".into();
+        account.expires_at = Some(Utc::now() + ChronoDuration::hours(1));
+        svc.create_account(&mut account).await.unwrap();
+
+        let lock_key = format!("oauth:refresh:account:{}", account.id);
+        let lock_owner = "unauthorized-test-owner";
+        assert!(
+            svc.cache
+                .acquire_lock(&lock_key, lock_owner, OAUTH_LOCK_TTL)
+                .await
+                .unwrap()
+        );
+
+        let recovering = {
+            let svc = svc.clone();
+            tokio::spawn(async move {
+                svc.recover_upstream_token_after_unauthorized(account.id, "access-rejected")
+                    .await
+            })
+        };
+        sleep(Duration::from_millis(100)).await;
+        assert!(!recovering.is_finished());
+
+        store
+            .update_oauth_tokens(
+                account.id,
+                "access-refreshed",
+                "refresh-refreshed",
+                Utc::now() + ChronoDuration::hours(2),
+            )
+            .await
+            .unwrap();
+        svc.cache.release_lock(&lock_key, lock_owner).await;
+
+        assert_eq!(recovering.await.unwrap().unwrap(), "access-refreshed");
+    }
+
+    #[tokio::test]
+    async fn valid_access_token_does_not_hide_missing_refresh_token() {
+        let (store, svc) = setup_account_service().await;
+        let mut account = new_account_request("missing-refresh-fast-path@example.com");
+        account.access_token = "fixture-access-still-valid".into();
+        account.refresh_token = "fixture-refresh-initial".into();
+        account.expires_at = Some(Utc::now() + ChronoDuration::hours(1));
+        svc.create_account(&mut account).await.unwrap();
+        store
+            .update_oauth_tokens(
+                account.id,
+                "fixture-access-still-valid",
+                "",
+                Utc::now() + ChronoDuration::hours(1),
+            )
+            .await
+            .unwrap();
+
+        let upstream_error = svc.resolve_upstream_token(account.id).await.unwrap_err();
+        assert!(matches!(&upstream_error, AppError::PermanentCredential(_)));
+        let snapshot_error = svc
+            .resolve_oauth_credentials(account.id, 600, false)
+            .await
+            .unwrap_err();
+        assert!(matches!(&snapshot_error, AppError::PermanentCredential(_)));
+
+        let stored = svc.get_account(account.id).await.unwrap();
+        assert_eq!(stored.status, AccountStatus::Active);
+        assert_eq!(stored.auth_error, OAUTH_MISSING_REFRESH_TOKEN_REASON);
+    }
+
+    #[tokio::test]
+    async fn unauthorized_recovery_does_not_fallback_without_refresh_token() {
+        let (store, svc) = setup_account_service().await;
+        let mut account = new_account_request("unauthorized-no-refresh@example.com");
+        account.access_token = "access-still-locally-valid".into();
+        account.refresh_token = "refresh-initial".into();
+        account.expires_at = Some(Utc::now() + ChronoDuration::hours(1));
+        svc.create_account(&mut account).await.unwrap();
+        store
+            .update_oauth_tokens(
+                account.id,
+                "access-still-locally-valid",
+                "",
+                Utc::now() + ChronoDuration::hours(1),
+            )
+            .await
+            .unwrap();
+
+        let error = svc
+            .recover_upstream_token_after_unauthorized(account.id, "access-still-locally-valid")
+            .await
+            .unwrap_err();
+
+        assert!(matches!(&error, AppError::PermanentCredential(_)));
+        assert!(error.to_string().contains("refresh token"));
+        let stored = svc.get_account(account.id).await.unwrap();
+        assert_eq!(stored.access_token, "access-still-locally-valid");
+        assert!(!stored.auth_error.is_empty());
+    }
+
+    #[tokio::test]
+    async fn resolve_oauth_credentials_waits_for_lock_and_returns_latest_snapshot() {
+        let (store, svc) = setup_account_service().await;
+        let mut account = new_account_request("locked-snapshot@example.com");
+        account.access_token = "access-old".into();
+        account.refresh_token = "refresh-old".into();
+        account.expires_at = Some(Utc::now() + ChronoDuration::hours(1));
+        svc.create_account(&mut account).await.unwrap();
+
+        let lock_key = format!("oauth:refresh:account:{}", account.id);
+        let lock_owner = "test-lock-owner";
+        assert!(
+            svc.cache
+                .acquire_lock(&lock_key, lock_owner, OAUTH_LOCK_TTL)
+                .await
+                .unwrap()
+        );
+
+        let resolving = {
+            let svc = svc.clone();
+            tokio::spawn(async move { svc.resolve_oauth_credentials(account.id, 600, false).await })
+        };
+        sleep(Duration::from_millis(100)).await;
+        assert!(!resolving.is_finished());
+
+        store
+            .update_oauth_tokens(
+                account.id,
+                "access-new",
+                "refresh-new",
+                Utc::now() + ChronoDuration::hours(2),
+            )
+            .await
+            .unwrap();
+        svc.cache.release_lock(&lock_key, lock_owner).await;
+
+        let snapshot = resolving.await.unwrap().unwrap();
+        assert_eq!(snapshot.access_token, "access-new");
+        assert_eq!(snapshot.refresh_token, "refresh-new");
+    }
+
+    #[tokio::test]
+    async fn resolve_oauth_credentials_rejects_non_oauth_account() {
+        let (_store, svc) = setup_account_service().await;
+        let mut account = new_account_request("setup@example.com");
+        account.auth_type = AccountAuthType::SetupToken;
+        account.setup_token = "setup-token".into();
+        account.access_token.clear();
+        account.refresh_token.clear();
+        account.expires_at = None;
+        svc.create_account(&mut account).await.unwrap();
+
+        let error = svc
+            .resolve_oauth_credentials(account.id, 600, false)
+            .await
+            .unwrap_err();
+
+        assert!(error.to_string().contains("不是 OAuth 类型"));
+    }
+
+    #[tokio::test]
+    async fn resolve_oauth_credentials_rejects_disabled_account() {
+        let (_store, svc) = setup_account_service().await;
+        let mut account = new_account_request("disabled@example.com");
+        account.access_token = "access-disabled".into();
+        account.refresh_token = "refresh-disabled".into();
+        account.expires_at = Some(Utc::now() + ChronoDuration::hours(1));
+        account.status = AccountStatus::Disabled;
+        svc.create_account(&mut account).await.unwrap();
+
+        let error = svc
+            .resolve_oauth_credentials(account.id, 600, false)
+            .await
+            .unwrap_err();
+
+        assert!(error.to_string().contains("不是 active 状态"));
+    }
+
+    /// 为合成账号准备同一账号租约与新凭据。
+    /// @param svc 被测服务。
+    /// @param account 合成账号。
+    /// @return 严格导入输入。
+    async fn login_import_input(svc: &AccountService, account: &Account) -> OAuthCredentialImport {
+        let queue = svc
+            .get_or_create_queue(account.id, account.concurrency)
+            .await;
+        let lease = queue.runtime_gate.prepare("login:abcdef123456").unwrap();
+        queue
+            .runtime_gate
+            .update(&lease.owner, &lease.generation, "claim")
+            .unwrap();
+        OAuthCredentialImport {
+            operation_id: Uuid::new_v4().simple().to_string(),
+            owner: lease.owner,
+            generation: lease.generation,
+            email: account.email.clone(),
+            account_uuid: account.account_uuid.clone(),
+            organization_uuid: account.organization_uuid.clone(),
+            access_token: "synthetic-new-access".into(),
+            refresh_token: "synthetic-new-refresh".into(),
+            expires_at: (Utc::now() + ChronoDuration::hours(1)).timestamp_millis(),
+            subscription_type: None,
+            rate_limit_tier: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn login_import_restores_only_auth_failures_and_preserves_limits() {
+        for (reason, restored) in [
+            ("", true),
+            ("401 OAuth 认证恢复失败", true),
+            ("401 OAuth 认证失败", true),
+            (
+                "OAuth refresh rejected: status 400 error=invalid_grant",
+                true,
+            ),
+            (
+                "permanent credential failure: OAuth refresh rejected: status 403 error=invalid_grant",
+                true,
+            ),
+            (
+                "OAuth refresh rejected: status 429 error=invalid_grant",
+                false,
+            ),
+            ("手动停用", false),
+            ("账号限制", false),
+        ] {
+            let (_, svc) = setup_account_service().await;
+            let mut account = new_account_request("reauth@example.invalid");
+            account.expires_at = Some(Utc::now() + ChronoDuration::hours(1));
+            account.account_uuid = Some("original-account".into());
+            account.organization_uuid = Some("original-organization".into());
+            svc.create_account(&mut account).await.unwrap();
+            if !reason.is_empty() {
+                svc.disable_for_auth_failure(account.id, reason)
+                    .await
+                    .unwrap();
+            }
+            let reset = Utc::now() + ChronoDuration::hours(2);
+            svc.set_rate_limit(account.id, reset).await.unwrap();
+            let input = login_import_input(&svc, &account).await;
+            let snapshot = svc
+                .import_oauth_credentials(account.id, &input)
+                .await
+                .unwrap();
+            assert_eq!(snapshot.access_token, input.access_token);
+            let stored = svc.get_account(account.id).await.unwrap();
+            assert_eq!(
+                stored.status,
+                if restored {
+                    AccountStatus::Active
+                } else {
+                    AccountStatus::Disabled
+                }
+            );
+            assert_eq!(
+                stored.rate_limit_reset_at.unwrap().timestamp(),
+                reset.timestamp()
+            );
+            assert_eq!(stored.device_id, account.device_id);
+            assert_eq!(stored.account_uuid, account.account_uuid);
+        }
+    }
+
+    #[tokio::test]
+    async fn login_import_retry_returns_latest_tokens_and_rejects_old_refresh_writes() {
+        let (store, svc) = setup_account_service().await;
+        let mut account = new_account_request("retry@example.invalid");
+        account.expires_at = Some(Utc::now() + ChronoDuration::hours(1));
+        svc.create_account(&mut account).await.unwrap();
+        let input = login_import_input(&svc, &account).await;
+        svc.import_oauth_credentials(account.id, &input)
+            .await
+            .unwrap();
+        assert!(
+            !store
+                .update_oauth_tokens_if_current(
+                    &account,
+                    "late-access",
+                    "late-refresh",
+                    Utc::now() + ChronoDuration::hours(1)
+                )
+                .await
+                .unwrap()
+        );
+        assert!(
+            !store
+                .update_auth_error_if_current(&account, "late-invalid-grant")
+                .await
+                .unwrap()
+        );
+        store
+            .update_oauth_tokens(
+                account.id,
+                "later-access",
+                "later-refresh",
+                Utc::now() + ChronoDuration::hours(1),
+            )
+            .await
+            .unwrap();
+        assert!(
+            !store
+                .disable_for_auth_failure_if_current(&account, "late-invalid-grant")
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            svc.get_account(account.id).await.unwrap().status,
+            AccountStatus::Active
+        );
+        assert_eq!(
+            svc.import_oauth_credentials(account.id, &input)
+                .await
+                .unwrap()
+                .refresh_token,
+            "later-refresh"
+        );
+        assert_eq!(
+            svc.oauth_import_status(account.id, &input.operation_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .refresh_token,
+            "later-refresh"
+        );
+        let mut conflict = input.clone();
+        conflict.access_token = "different-payload".into();
+        assert!(
+            svc.import_oauth_credentials(account.id, &conflict)
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn login_import_checks_identity_and_rolls_back_stale_transaction() {
+        let (store, svc) = setup_account_service().await;
+        let mut account = new_account_request("identity@example.invalid");
+        account.expires_at = Some(Utc::now() + ChronoDuration::hours(1));
+        account.account_uuid = Some("original-account".into());
+        account.organization_uuid = Some("original-organization".into());
+        svc.create_account(&mut account).await.unwrap();
+        let mut input = login_import_input(&svc, &account).await;
+        input.account_uuid = None;
+        assert!(
+            svc.import_oauth_credentials(account.id, &input)
+                .await
+                .is_err()
+        );
+        input.account_uuid = account.account_uuid.clone();
+        input.organization_uuid = Some("wrong-organization".into());
+        assert!(
+            svc.import_oauth_credentials(account.id, &input)
+                .await
+                .is_err()
+        );
+        input.organization_uuid = account.organization_uuid.clone();
+        svc.disable_account(account.id, AccountStatus::Disabled, "手动停用", None)
+            .await
+            .unwrap();
+        assert!(
+            store
+                .import_oauth_credentials(&account, &input, "synthetic-hash", true)
+                .await
+                .is_err()
+        );
+        assert!(
+            store
+                .oauth_import_receipt(&input.operation_id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        let current = svc.get_account(account.id).await.unwrap();
+        assert_eq!(current.access_token, account.access_token);
+        assert_eq!(current.disable_reason, "手动停用");
+    }
+
+    #[test]
+    fn oauth_credential_snapshot_rejects_insufficient_final_validity() {
+        let mut account = new_account_request("short-lived@example.com");
+        account.access_token = "access-short-lived".into();
+        account.refresh_token = "refresh-short-lived".into();
+        account.expires_at = Some(Utc::now() + ChronoDuration::minutes(5));
+
+        let error = build_oauth_credential_snapshot(&account, 600).unwrap_err();
+
+        assert!(error.to_string().contains("无法满足 600 秒最小有效期"));
+    }
+
+    // ---- tiered_decay ----
+
+    #[test]
+    fn tiered_decay_high_ratio() {
+        assert_eq!(tiered_decay(0.9), 1.0);
+        assert_eq!(tiered_decay(0.51), 1.0);
+    }
+
+    #[test]
+    fn tiered_decay_boundary_values() {
+        assert_eq!(tiered_decay(0.5), 0.8); // 不满足 >0.5，落入中档
+        assert_eq!(tiered_decay(0.2), 0.6); // 不满足 >0.2，落入最低档
+    }
+
+    #[test]
+    fn tiered_decay_low_ratio() {
+        assert_eq!(tiered_decay(0.1), 0.6);
+        assert_eq!(tiered_decay(0.0), 0.6);
+    }
+
+    #[test]
+    fn tiered_decay_mid_range() {
+        assert_eq!(tiered_decay(0.4), 0.8);
+        assert_eq!(tiered_decay(0.21), 0.8);
+    }
+    /// 新元数据与凭据原子导入，旧字段缺省不改变原有回执序列化合同。
+    /// @return 无；元数据丢失、旧摘要变化或重复导入不幂等时失败。
+    #[tokio::test]
+    async fn login_import_subscription_metadata_and_legacy_payload_contract() {
+        let (_, svc) = setup_account_service().await;
+        let mut account = new_account_request("tier@example.invalid");
+        svc.create_account(&mut account).await.unwrap();
+        let mut input = login_import_input(&svc, &account).await;
+        let legacy = serde_json::to_value(&input).unwrap();
+        assert!(legacy.get("subscription_type").is_none());
+        assert!(legacy.get("rate_limit_tier").is_none());
+        let decoded: OAuthCredentialImport = serde_json::from_value(legacy).unwrap();
+        assert_eq!(
+            serde_json::to_vec(&input).unwrap(),
+            serde_json::to_vec(&decoded).unwrap()
+        );
+        input.subscription_type = Some("max".into());
+        input.rate_limit_tier = Some("default_claude_max_20x".into());
+        svc.import_oauth_credentials(account.id, &input)
+            .await
+            .unwrap();
+        svc.import_oauth_credentials(account.id, &input)
+            .await
+            .unwrap();
+        let saved = svc.get_account(account.id).await.unwrap();
+        assert_eq!(saved.subscription_type.as_deref(), Some("max"));
+        assert_eq!(
+            saved.rate_limit_tier.as_deref(),
+            Some("default_claude_max_20x")
+        );
+        assert_eq!(saved.refresh_token, input.refresh_token);
+        input.rate_limit_tier = Some("default_claude_max_5x".into());
+        assert!(
+            svc.import_oauth_credentials(account.id, &input)
+                .await
+                .is_err()
+        );
+    }
+}

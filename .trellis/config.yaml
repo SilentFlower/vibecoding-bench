@@ -170,11 +170,18 @@ codex:
 # configure them manually here.
 #
 packages:
-  vibecoding-bench:
+  platform:
     path: .
-  cc2api:
-    path: cc2api
-    type: submodule
+  gateway:
+    path: services/gateway
+  orchestrator:
+    path: services/orchestrator
+  runtime:
+    path: services/runtime
+  web:
+    path: apps/web
+  legacy-web:
+    path: apps/legacy-web
 
-# Default package used when --package is not specified.
-default_package: vibecoding-bench
+# 仓库级构建、部署和跨模块任务默认归属平台。
+default_package: platform

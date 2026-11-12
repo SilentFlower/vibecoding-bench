@@ -9,7 +9,7 @@
 # =======================================================================
 services:
   orchestrator:
-    build: ./orchestrator
+    build: ./services/orchestrator
     image: vibebench-orchestrator:latest
     container_name: vibebench-orchestrator
     ports:
@@ -43,8 +43,8 @@ services:
       SIDECAR_READY_TIMEOUT: ${SIDECAR_READY_TIMEOUT:-120}
     volumes:
       - ./data:/data
-      - ./topics.md:/repo/topics.md:ro
-      - ./webui:/webui:ro
+      - ./resources/topics.md:/repo/topics.md:ro
+      - ./apps/legacy-web:/webui:ro
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 

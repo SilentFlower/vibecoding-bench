@@ -1,0 +1,1093 @@
+use crate::service::version_profile::tls_profile_for_account;
+use crate::tlsfp::configured_default_tls_profile;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+use chrono::{NaiveDate, Timelike, Utc};
+use tokio::time::sleep;
+use tracing::{debug, info, warn};
+
+use crate::model::account::{Account, AccountAuthType, AccountStatus};
+use crate::service::account::{AccountService, RateLimitDecision, UsageObservationKind};
+use crate::service::gateway::{extract_passive_usage, extract_rejected_passive_usage_windows};
+use crate::service::rewriter::{
+    CacheControlTtlRewrite, ClientType, EnvPassthrough, MessageCacheControlRewrite, Rewriter,
+    ordered_anthropic_headers,
+};
+use crate::service::runtime_transport::{self, PreparedRequest};
+use crate::service::system_update;
+use crate::store::prime_log_store::{PrimeLogEntry, PrimeLogStore};
+use crate::store::settings_store::{DEFAULT_MESSAGE_BODY_ORDER_FINGERPRINT_ENABLED, SettingsStore};
+
+/// 上游 `/v1/messages` 地址,与 gateway.rs 的 UPSTREAM_BASE 保持一致。
+const UPSTREAM_URL: &str = "https://api.anthropic.com/v1/messages?beta=true";
+
+/// 账号之间的最小间隔,防止瞬间并发打爆上游。
+const PER_ACCOUNT_GAP: Duration = Duration::from_millis(500);
+
+/// 预热请求 TTFB 超时,短于主链路的 gateway 超时(预热非关键路径,快速失败为宜)。
+const PRIME_TTFB_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// 成功响应的流耗尽超时。rewriter 强制 stream=true,必须读完整个 SSE 上游才确定把
+/// 这次调用计入 5h 窗口,duration_ms 也才等于完整调用时间。Haiku 512 tokens 一般 <5s,
+/// 60s 给足余量;若真的超时,视为上游异常,但 ratelimit 响应头已经拿到,仍算触发成功。
+const PRIME_DRAIN_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// 主循环扫描间隔。触发点为 HH:10 分,30s 扫一次足以确保分钟内命中至少一次。
+const TICK_INTERVAL: Duration = Duration::from_secs(30);
+
+/// 约定的触发分钟:每天在 HH:10 分发起预热,避免 :00/:30 的全球流量峰值。
+const TRIGGER_MINUTE: u32 = 10;
+
+/// 错误信息截断字符数。按字符而非字节截,避免多字节字符跨边界导致 panic。
+const ERROR_SNIPPET_CHARS: usize = 200;
+
+/// 预热解析出的有效配置。
+struct PrimeConfig {
+    enabled: bool,
+    hours: Vec<u32>,
+    model: String,
+    message_body_order_fingerprint_enabled: bool,
+}
+
+/// 预热结果,用于写入日志表。
+struct PrimeOutcome {
+    success: bool,
+    error_message: String,
+    duration_ms: i64,
+    passive_usage: Option<serde_json::Value>,
+    usage_observation_kind: UsageObservationKind,
+    /// 上游 HTTP 状态码,None 表示请求没到达上游(如 token 解析失败、序列化失败)。
+    /// 用于后续按状态码做 401/429/403 处理。
+    status: Option<u16>,
+    /// 仅用于延迟 401 的条件状态写入，不写入日志或数据库。
+    failed_access_token: Option<String>,
+}
+
+/// 峰值 5h 窗口预热服务。
+///
+/// 每天在配置的清晨时间点(默认 4:10 / 5:10 / 6:10 本地时间)对所有活跃且未处于速率冷却
+/// 期的账号逐一发送一次 Haiku `/v1/messages` 请求,借此主动启动 Anthropic 侧的 5h 速率
+/// 限制窗口,让窗口重置点落在下午用户高峰之前或之中。
+///
+/// OAuth 账号首次收到 401 时会刷新凭据并原账号重试一次，其他失败不重试。每次调用
+/// （含成功/失败/跳过）都会写入 `prime_logs` 表,供设置页展示。最终 401 / 429 / 403 会联动
+/// `AccountService` 的状态处理,和主链路行为保持一致,防止预热探测到坏账号却让真实流量
+/// 继续选中它。
+pub struct PrimePollerService {
+    account_svc: Arc<AccountService>,
+    settings_store: Arc<SettingsStore>,
+    log_store: Arc<PrimeLogStore>,
+    rewriter: Arc<Rewriter>,
+    upstream_url: String,
+}
+
+impl PrimePollerService {
+    /// 构造服务实例。
+    pub fn new(
+        account_svc: Arc<AccountService>,
+        settings_store: Arc<SettingsStore>,
+        log_store: Arc<PrimeLogStore>,
+        rewriter: Arc<Rewriter>,
+    ) -> Self {
+        Self {
+            account_svc,
+            settings_store,
+            log_store,
+            rewriter,
+            upstream_url: UPSTREAM_URL.to_string(),
+        }
+    }
+
+    /// 启动后台循环。应在 main 中 tokio::spawn 调用。
+    pub async fn run(self: Arc<Self>) {
+        info!(
+            "prime poller: started, trigger minute = :{:02}, tick = {:?}",
+            TRIGGER_MINUTE, TICK_INTERVAL
+        );
+
+        // 去重键:(本地日期, 小时) 用于避免同一触发点内多次 tick 重复执行。
+        let mut last_fired: Option<(NaiveDate, u32)> = None;
+
+        loop {
+            self.check_once(&mut last_fired).await;
+            sleep(TICK_INTERVAL).await;
+        }
+    }
+
+    /// 单次扫描:判断当前本地时间是否命中触发点,命中则执行一轮预热。
+    async fn check_once(&self, last_fired: &mut Option<(NaiveDate, u32)>) {
+        // 使用服务器本地时间(chrono::Local)。部署时需要确保容器 TZ 正确,
+        // 否则 4/5/6 点会错位到 UTC 对应小时。
+        let now = chrono::Local::now();
+        if now.minute() != TRIGGER_MINUTE {
+            return;
+        }
+
+        let h = now.hour();
+        let key = (now.date_naive(), h);
+        // 同一(日期,小时)只触发一次,防止 30s 扫描在同一分钟内重复进入。
+        if *last_fired == Some(key) {
+            return;
+        }
+
+        let cfg = match self.load_config().await {
+            Some(c) => c,
+            None => return,
+        };
+        if !cfg.enabled || !cfg.hours.contains(&h) {
+            return;
+        }
+
+        *last_fired = Some(key);
+        info!(
+            "prime poller: tick at {}:{:02}, model = {}",
+            h, TRIGGER_MINUTE, cfg.model
+        );
+        self.run_round(h, &cfg.model, cfg.message_body_order_fingerprint_enabled)
+            .await;
+    }
+
+    /// 读取并解析设置,解析失败或总开关关闭返回 None。
+    async fn load_config(&self) -> Option<PrimeConfig> {
+        let all = match self.settings_store.get_all().await {
+            Ok(a) => a,
+            Err(e) => {
+                warn!("prime poller: load settings failed: {}", e);
+                return None;
+            }
+        };
+
+        let enabled = all
+            .get("peak_prime_enabled")
+            .map(|s| s == "true")
+            .unwrap_or(true);
+        let hours_raw = all
+            .get("peak_prime_hours")
+            .cloned()
+            .unwrap_or_else(|| "4,5,6".to_string());
+        let hours: Vec<u32> = hours_raw
+            .split(',')
+            .filter_map(|s| s.trim().parse::<u32>().ok())
+            .filter(|h| *h < 24)
+            .collect();
+        let model = all
+            .get("peak_prime_model")
+            .cloned()
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "claude-haiku-4-5-20251001".to_string());
+        let message_body_order_fingerprint_enabled = all
+            .get("message_body_order_fingerprint_enabled")
+            .map(|s| s == "true")
+            .unwrap_or(DEFAULT_MESSAGE_BODY_ORDER_FINGERPRINT_ENABLED == "true");
+
+        Some(PrimeConfig {
+            enabled,
+            hours,
+            model,
+            message_body_order_fingerprint_enabled,
+        })
+    }
+
+    /// 对所有活跃账号依次发起预热请求,账号间间隔 PER_ACCOUNT_GAP。
+    /// 仍处于 429 冷却期的账号会被跳过(避免续命式延长冷却),但仍写入 skip 日志。
+    async fn run_round(
+        &self,
+        hour: u32,
+        model: &str,
+        message_body_order_fingerprint_enabled: bool,
+    ) {
+        let accounts = match self.account_svc.list_accounts().await {
+            Ok(list) => list,
+            Err(e) => {
+                warn!("prime poller: list accounts failed: {}", e);
+                return;
+            }
+        };
+
+        // 只看启用状态的账号;disabled/error 与预热无关。
+        // 冷却期判断在循环内做,因为要记 skip 日志。
+        let targets: Vec<Account> = accounts
+            .into_iter()
+            .filter(|a| a.status == AccountStatus::Active)
+            .collect();
+
+        debug!("prime poller: evaluating {} active accounts", targets.len());
+
+        for account in targets {
+            let triggered_at = chrono::Local::now().to_rfc3339();
+            let outcome = if account.is_schedulable() {
+                self.prime_one(&account, model, message_body_order_fingerprint_enabled)
+                    .await
+            } else {
+                // 处于速率冷却期,不发请求,但在日志里留痕,便于排查"今天没预热"的原因。
+                let reset = account
+                    .rate_limit_reset_at
+                    .map(|t| t.to_rfc3339())
+                    .unwrap_or_else(|| "unknown".into());
+                PrimeOutcome {
+                    success: false,
+                    error_message: format!("skipped: rate-limited until {}", reset),
+                    duration_ms: 0,
+                    passive_usage: None,
+                    usage_observation_kind: UsageObservationKind::Allowed,
+                    status: None,
+                    failed_access_token: None,
+                }
+            };
+
+            // 落日志:success/skipped 用 info,真失败用 warn;跳过是预期行为,不该算告警。
+            if outcome.success {
+                info!(
+                    "prime: account={} hour={} model={} success=true duration={}ms",
+                    account.id, hour, model, outcome.duration_ms
+                );
+            } else if outcome.error_message.starts_with("skipped:") {
+                info!(
+                    "prime: account={} hour={} model={} {}",
+                    account.id, hour, model, outcome.error_message
+                );
+            } else {
+                warn!(
+                    "prime: account={} hour={} model={} success=false duration={}ms error={}",
+                    account.id, hour, model, outcome.duration_ms, outcome.error_message
+                );
+            }
+
+            let entry = PrimeLogEntry {
+                id: 0,
+                account_id: account.id,
+                account_name: account.name.clone(),
+                triggered_at,
+                hour: hour as i32,
+                model: model.to_string(),
+                success: outcome.success,
+                error_message: outcome.error_message.clone(),
+                duration_ms: outcome.duration_ms,
+            };
+            if let Err(e) = self.log_store.insert(&entry).await {
+                warn!(
+                    "prime poller: write log failed for account {}: {}",
+                    account.id, e
+                );
+            }
+
+            // 根据上游状态码联动账号状态,保持与主链路 gateway 一致:
+            // - 401: OAuth 已在 prime_one 内尝试恢复一次,最终仍失败则停用账号。
+            // - 429: 调用 handle_rate_limit,按账号类型/用量设置冷却窗口。
+            // - 403: 若未处于 429 冷却期则永久停用,避免坏账号继续被真实流量选中。
+            if let Some(code) = outcome.status {
+                let rate_limit_usage = outcome.passive_usage.as_ref().map(|usage| {
+                    outcome
+                        .usage_observation_kind
+                        .rejected_usage(usage)
+                        .unwrap_or_else(|| serde_json::json!({}))
+                });
+                self.apply_status_side_effects(
+                    &account,
+                    code,
+                    rate_limit_usage,
+                    outcome.failed_access_token.as_deref(),
+                )
+                .await;
+            }
+
+            // 成功和 429 都只使用响应头被动采集；普通错误不更新窗口。
+            if let (Some(status), Some(usage)) = (outcome.status, outcome.passive_usage) {
+                let kind = if status == 429 {
+                    Some(outcome.usage_observation_kind)
+                } else if (200..300).contains(&status) {
+                    Some(UsageObservationKind::Allowed)
+                } else {
+                    None
+                };
+                if let Some(kind) = kind {
+                    if let Err(e) = self
+                        .account_svc
+                        .update_passive_usage(account.id, usage, kind)
+                        .await
+                    {
+                        warn!(
+                            "prime poller: update passive usage failed for account {}: {}",
+                            account.id, e
+                        );
+                    }
+                }
+            }
+
+            sleep(PER_ACCOUNT_GAP).await;
+        }
+    }
+
+    /// 根据上游 HTTP 状态码联动账号状态。
+    ///
+    /// 与 `src/service/gateway.rs:359/369` 的处理保持一致:
+    /// - 401 → 停用凭据已失效的账号;
+    /// - 429 → `handle_rate_limit` 按类型/用量设置冷却;
+    /// - 403 且未处于 429 冷却期 → `disable_account` 永久停用,防止真实流量继续选中。
+    async fn apply_status_side_effects(
+        &self,
+        account: &Account,
+        status: u16,
+        passive_usage: Option<serde_json::Value>,
+        failed_access_token: Option<&str>,
+    ) {
+        if status == 401 {
+            let reason = match account.auth_type {
+                AccountAuthType::Oauth => "401 OAuth 认证失败",
+                AccountAuthType::SetupToken => "401 SetupToken 认证失败",
+            };
+            let result = if account.auth_type == AccountAuthType::Oauth {
+                let Some(token) = failed_access_token else {
+                    return;
+                };
+                self.account_svc
+                    .disable_oauth_for_failed_token(account.id, token, reason)
+                    .await
+            } else {
+                self.account_svc
+                    .disable_for_auth_failure(account.id, reason)
+                    .await
+                    .map(|_| true)
+            };
+            if let Err(e) = result {
+                warn!(
+                    "prime poller: disable_for_auth_failure failed for account {}: {}",
+                    account.id, e
+                );
+            } else if matches!(result, Ok(true)) {
+                warn!(
+                    "prime poller: account {} disabled after upstream 401",
+                    account.id
+                );
+            }
+            return;
+        }
+        if status == 429 {
+            // 预热请求体极小,不会触发长上下文计费类 429；直接使用本次响应头判断窗口。
+            match self
+                .account_svc
+                .handle_rate_limit(account, None, "", passive_usage)
+                .await
+            {
+                Ok(RateLimitDecision::RequestBackoff(delay)) => {
+                    info!(
+                        "prime poller: transient 429 for account {}, no account quarantine, suggested delay {}s",
+                        account.id,
+                        delay.as_secs()
+                    );
+                }
+                Ok(
+                    RateLimitDecision::Quarantined
+                    | RateLimitDecision::RetryOtherAccount
+                    | RateLimitDecision::PassThrough,
+                ) => {}
+                Err(e) => warn!(
+                    "prime poller: handle_rate_limit failed for account {}: {}",
+                    account.id, e
+                ),
+            }
+            return;
+        }
+        if status == 403 {
+            // 账号可能已在 429 冷却期,此时 403 是冷却期的副作用响应,不做停用。
+            // 该判断与 gateway.rs 完全一致,避免误判断账号。
+            let is_rate_limited = account
+                .rate_limit_reset_at
+                .map(|reset| Utc::now() < reset)
+                .unwrap_or(false);
+            if is_rate_limited {
+                warn!(
+                    "prime poller: account {} got 403 while rate-limited, skipping disable",
+                    account.id
+                );
+                return;
+            }
+            if let Err(e) = self
+                .account_svc
+                .disable_account(account.id, AccountStatus::Disabled, "403 认证失败", None)
+                .await
+            {
+                warn!(
+                    "prime poller: disable_account failed for account {}: {}",
+                    account.id, e
+                );
+            } else {
+                warn!(
+                    "prime poller: account {} permanently disabled for 403",
+                    account.id
+                );
+            }
+        }
+    }
+
+    /// 对单个账号执行一次预热请求,不抛错,所有结果都归并到 PrimeOutcome。
+    async fn prime_one(
+        &self,
+        account: &Account,
+        model: &str,
+        message_body_order_fingerprint_enabled: bool,
+    ) -> PrimeOutcome {
+        let _update_activity = match system_update::admission() {
+            Ok(activity) => activity,
+            Err(_) => {
+                return PrimeOutcome {
+                    success: false,
+                    error_message: "平台维护中，预热等待下次计划".into(),
+                    duration_ms: 0,
+                    passive_usage: None,
+                    usage_observation_kind: UsageObservationKind::Allowed,
+                    status: None,
+                    failed_access_token: None,
+                };
+            }
+        };
+        let started = Instant::now();
+        let _credential_activity = match self.account_svc.upstream_activity(account.id).await {
+            Ok(permit) => permit,
+            Err(_) => {
+                return PrimeOutcome {
+                    success: false,
+                    error_message: "skipped: credential ownership unavailable".into(),
+                    duration_ms: 0,
+                    passive_usage: None,
+                    usage_observation_kind: UsageObservationKind::Allowed,
+                    status: None,
+                    failed_access_token: None,
+                };
+            }
+        };
+
+        // 取账号凭证(OAuth 会自动刷新,SetupToken 直接返回)。
+        let mut token = match self.account_svc.resolve_upstream_token(account.id).await {
+            Ok(t) => t,
+            Err(e) => {
+                return PrimeOutcome {
+                    success: false,
+                    error_message: truncate_chars(
+                        &format!("resolve token: {}", e),
+                        ERROR_SNIPPET_CHARS,
+                    ),
+                    duration_ms: started.elapsed().as_millis() as i64,
+                    passive_usage: None,
+                    usage_observation_kind: UsageObservationKind::Allowed,
+                    status: None,
+                    failed_access_token: None,
+                };
+            }
+        };
+
+        // v3 的后台推理也遵守账号占用；permit 保持至整条响应耗尽。
+        let _runtime_permit = if !std::env::var("V3_RUNTIME_URL")
+            .unwrap_or_default()
+            .is_empty()
+        {
+            let queue = self
+                .account_svc
+                .get_or_create_queue(account.id, account.concurrency)
+                .await;
+            match queue.acquire(Duration::from_secs(1), 1).await {
+                Ok(permit) => Some(permit),
+                Err(_) => {
+                    return PrimeOutcome {
+                        success: false,
+                        error_message: "account runtime occupied".into(),
+                        duration_ms: started.elapsed().as_millis() as i64,
+                        passive_usage: None,
+                        usage_observation_kind: UsageObservationKind::Allowed,
+                        status: None,
+                        failed_access_token: None,
+                    };
+                }
+            }
+        } else {
+            None
+        };
+
+        // 构造最小请求体,其余字段交给 rewriter 补全,保证与真实 Claude Code 流量对齐:
+        // - metadata.user_id 由 rewriter 注入 {device_id, account_uuid, session_id} JSON 字符串
+        // - system prompt、tools、stream=true、去除 temperature 等由 rewriter 统一规范化
+        let minimal_body = serde_json::json!({
+            "model": model,
+            "messages": [{
+                "role": "user",
+                "content": [{ "type": "text", "text": "hi" }]
+            }],
+            "max_tokens": 512
+        });
+        let minimal_bytes = match serde_json::to_vec(&minimal_body) {
+            Ok(b) => b,
+            Err(e) => {
+                return PrimeOutcome {
+                    success: false,
+                    error_message: truncate_chars(
+                        &format!("serialize body: {}", e),
+                        ERROR_SNIPPET_CHARS,
+                    ),
+                    duration_ms: started.elapsed().as_millis() as i64,
+                    passive_usage: None,
+                    usage_observation_kind: UsageObservationKind::Allowed,
+                    status: None,
+                    failed_access_token: None,
+                };
+            }
+        };
+        // 预热请求走注入模式(ClientType::API),不触发系统提示词环境改写,
+        // 故环境透传开关在此无影响,传默认值即可。
+        let rewritten_bytes = self.rewriter.rewrite_body(
+            &minimal_bytes,
+            "/v1/messages",
+            account,
+            ClientType::API,
+            EnvPassthrough::default(),
+            CacheControlTtlRewrite::Off,
+            MessageCacheControlRewrite::Off,
+            message_body_order_fingerprint_enabled,
+        );
+        // rewriter 已把 metadata.user_id 写成最终上游 body；header 直接从同一字段提取 session_id。
+        let body_value: serde_json::Value =
+            serde_json::from_slice(&rewritten_bytes).unwrap_or(serde_json::Value::Null);
+
+        let empty_in: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        let mut headers = self.rewriter.rewrite_headers(
+            &empty_in,
+            "/v1/messages",
+            account,
+            ClientType::API,
+            model,
+            &body_value,
+        );
+        headers.insert("authorization".into(), format!("Bearer {}", token));
+
+        let mut resp = match self
+            .send_prime_upstream(account, &headers, &rewritten_bytes)
+            .await
+        {
+            Ok(resp) => resp,
+            Err(error_message) => {
+                return PrimeOutcome {
+                    success: false,
+                    error_message,
+                    duration_ms: started.elapsed().as_millis() as i64,
+                    passive_usage: None,
+                    usage_observation_kind: UsageObservationKind::Allowed,
+                    status: None,
+                    failed_access_token: None,
+                };
+            }
+        };
+
+        if resp.status().as_u16() == 401 && account.auth_type == AccountAuthType::Oauth {
+            drop(resp);
+            let refreshed_token = match self
+                .account_svc
+                .recover_upstream_token_after_unauthorized(account.id, &token)
+                .await
+            {
+                Ok(token) => token,
+                Err(e) => {
+                    warn!(
+                        "prime poller: OAuth recovery failed for account {} after 401: {}",
+                        account.id, e
+                    );
+                    return PrimeOutcome {
+                        success: false,
+                        error_message: "http 401: OAuth 认证恢复失败".into(),
+                        duration_ms: started.elapsed().as_millis() as i64,
+                        passive_usage: None,
+                        usage_observation_kind: UsageObservationKind::Allowed,
+                        status: Some(401),
+                        failed_access_token: Some(token),
+                    };
+                }
+            };
+            headers.insert(
+                "authorization".into(),
+                format!("Bearer {}", refreshed_token),
+            );
+            token = refreshed_token;
+            resp = match self
+                .send_prime_upstream(account, &headers, &rewritten_bytes)
+                .await
+            {
+                Ok(resp) => resp,
+                Err(error_message) => {
+                    return PrimeOutcome {
+                        success: false,
+                        error_message,
+                        duration_ms: started.elapsed().as_millis() as i64,
+                        passive_usage: None,
+                        usage_observation_kind: UsageObservationKind::Allowed,
+                        status: None,
+                        failed_access_token: None,
+                    };
+                }
+            };
+        }
+
+        let status_code = resp.status().as_u16();
+        let passive_usage = extract_passive_usage(resp.headers());
+        let usage_observation_kind = if status_code == 429 {
+            UsageObservationKind::RejectedWindows(extract_rejected_passive_usage_windows(
+                resp.headers(),
+            ))
+        } else {
+            UsageObservationKind::Allowed
+        };
+
+        // 调试日志：打印预热响应中的 rate limit header 和解析结果，
+        // 用于排查"预热成功但账号未进入 5h 窗口"问题。
+        {
+            let get_hdr = |n: &str| -> Option<String> {
+                resp.headers()
+                    .get(n)
+                    .and_then(|v| v.to_str().ok())
+                    .map(|s| s.to_string())
+            };
+            let h5u = get_hdr("anthropic-ratelimit-unified-5h-utilization");
+            let h5r = get_hdr("anthropic-ratelimit-unified-5h-reset");
+            let h7u = get_hdr("anthropic-ratelimit-unified-7d-utilization");
+            let h7r = get_hdr("anthropic-ratelimit-unified-7d-reset");
+            let h7fu = get_hdr("anthropic-ratelimit-unified-7d_oi-utilization");
+            let h7fr = get_hdr("anthropic-ratelimit-unified-7d_oi-reset");
+            info!(
+                "prime: account={} http={} passive_captured={} \
+                 5h_util={:?} 5h_reset={:?} 7d_util={:?} 7d_reset={:?} \
+                 7d_oi_util={:?} 7d_oi_reset={:?}",
+                account.id,
+                status_code,
+                passive_usage.is_some(),
+                h5u,
+                h5r,
+                h7u,
+                h7r,
+                h7fu,
+                h7fr,
+            );
+        }
+
+        if resp.status().is_success() {
+            // rewriter 强制 stream=true,若此刻立即 drop 会在首包就中断 SSE,
+            // 上游是否计入 5h 窗口、计入几个 token 不可靠,duration 也退化成 TTFB。
+            // 这里必须耗尽整个响应流,上游才会把本次调用完整计入 5h 窗口。
+            // 带 60s 超时保护,避免极端情况下卡住整轮预热。
+            match tokio::time::timeout(PRIME_DRAIN_TIMEOUT, resp.bytes()).await {
+                Ok(Ok(_)) => {}
+                Ok(Err(e)) => warn!(
+                    "prime: account={} body drain error: {} (5h window likely still triggered)",
+                    account.id, e
+                ),
+                Err(_) => warn!(
+                    "prime: account={} body drain timeout after {}s (headers already received)",
+                    account.id,
+                    PRIME_DRAIN_TIMEOUT.as_secs()
+                ),
+            }
+            PrimeOutcome {
+                success: true,
+                error_message: String::new(),
+                duration_ms: started.elapsed().as_millis() as i64,
+                passive_usage,
+                usage_observation_kind,
+                status: Some(status_code),
+                failed_access_token: if status_code == 401 {
+                    Some(token)
+                } else {
+                    None
+                },
+            }
+        } else {
+            // 按字符(不是字节)截断,避免多字节 UTF-8 切片 panic 把整个后台任务打掉。
+            let snippet = match resp.text().await {
+                Ok(t) if !t.is_empty() => truncate_chars(&t, ERROR_SNIPPET_CHARS),
+                _ => String::new(),
+            };
+            PrimeOutcome {
+                success: false,
+                error_message: format!("http {}: {}", status_code, snippet),
+                duration_ms: started.elapsed().as_millis() as i64,
+                passive_usage,
+                usage_observation_kind,
+                status: Some(status_code),
+                failed_access_token: if status_code == 401 {
+                    Some(token)
+                } else {
+                    None
+                },
+            }
+        }
+    }
+
+    async fn send_prime_upstream(
+        &self,
+        account: &Account,
+        headers: &std::collections::HashMap<String, String>,
+        body: &[u8],
+    ) -> Result<reqwest::Response, String> {
+        let prepared = PreparedRequest {
+            tls_profile: tls_profile_for_account(account, configured_default_tls_profile()),
+            account_id: account.id,
+            environment_id: String::new(),
+            generation: 0,
+            request_id: String::new(),
+            deadline_unix_ms: 0,
+            method: "POST".into(),
+            target_url: self.upstream_url.clone(),
+            headers: ordered_anthropic_headers("/v1/messages", headers),
+            preserve_header_casing: false,
+        };
+        runtime_transport::send(account, prepared, body, PRIME_TTFB_TIMEOUT)
+            .await
+            .map_err(|error| {
+                if error.to_string().contains("TTFB timeout") {
+                    "upstream TTFB timeout".into()
+                } else {
+                    "upstream submission status unknown".into()
+                }
+            })
+    }
+}
+
+/// 按字符截断字符串,避免直接字节切片在多字节字符上 panic。
+fn truncate_chars(s: &str, max_chars: usize) -> String {
+    if s.chars().count() <= max_chars {
+        return s.to_string();
+    }
+    s.chars().take(max_chars).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::account::{
+        AccountStatus, BillingMode, DEFAULT_ALLOW_1M_MODELS, DEFAULT_UPSTREAM_SESSION_POOL_SIZE,
+        DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY, DEFAULT_UPSTREAM_SESSION_TTL_MINUTES,
+    };
+    use crate::store::account_store::AccountStore;
+    use crate::store::memory::MemoryStore;
+    use axum::extract::State;
+    use axum::http::HeaderMap;
+    use axum::response::{IntoResponse, Response};
+    use axum::routing::post;
+    use axum::{Json, Router};
+    use serde_json::json;
+    use sqlx::AnyPool;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    async fn setup_prime_poller() -> (PrimePollerService, Arc<AccountService>) {
+        setup_prime_poller_with_urls(
+            UPSTREAM_URL.to_string(),
+            crate::service::oauth::OAUTH_TOKEN_URL.to_string(),
+        )
+        .await
+    }
+
+    async fn setup_prime_poller_with_urls(
+        upstream_url: String,
+        oauth_token_url: String,
+    ) -> (PrimePollerService, Arc<AccountService>) {
+        sqlx::any::install_default_drivers();
+        let tmp =
+            std::env::temp_dir().join(format!("ccgw_prime_poller_{}.db", rand::random::<u64>()));
+        let dsn = format!("sqlite:{}?mode=rwc", tmp.display());
+        let pool = AnyPool::connect(&dsn).await.expect("pool");
+        crate::store::db::migrate(&pool, "sqlite")
+            .await
+            .expect("migrate");
+
+        let account_store = Arc::new(AccountStore::new(pool.clone(), "sqlite".into()));
+        let settings_store = Arc::new(SettingsStore::new(pool.clone()));
+        let account_svc = Arc::new(AccountService::new_with_oauth_token_url(
+            account_store,
+            Arc::new(MemoryStore::new()),
+            settings_store.clone(),
+            oauth_token_url,
+        ));
+        let mut service = PrimePollerService::new(
+            account_svc.clone(),
+            settings_store,
+            Arc::new(PrimeLogStore::new(pool)),
+            Arc::new(Rewriter::new()),
+        );
+        service.upstream_url = upstream_url;
+        (service, account_svc)
+    }
+
+    #[derive(Clone)]
+    struct PrimeAuthMockState {
+        accept_refreshed: bool,
+        authorization_headers: Arc<tokio::sync::Mutex<Vec<String>>>,
+        refresh_calls: Arc<AtomicUsize>,
+    }
+
+    async fn mock_prime_response(
+        State(state): State<PrimeAuthMockState>,
+        headers: HeaderMap,
+    ) -> Response {
+        let authorization = headers
+            .get("authorization")
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or_default()
+            .to_string();
+        state
+            .authorization_headers
+            .lock()
+            .await
+            .push(authorization.clone());
+
+        if authorization == "Bearer access-refreshed" && state.accept_refreshed {
+            return (
+                axum::http::StatusCode::OK,
+                Json(json!({
+                    "id": "msg_prime",
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type":"text","text":"ok"}],
+                    "stop_reason": "end_turn"
+                })),
+            )
+                .into_response();
+        }
+
+        (
+            axum::http::StatusCode::UNAUTHORIZED,
+            Json(json!({"type":"error","error":{"type":"authentication_error","message":"invalid token"}})),
+        )
+            .into_response()
+    }
+
+    async fn mock_prime_oauth_refresh(
+        State(state): State<PrimeAuthMockState>,
+    ) -> Json<serde_json::Value> {
+        state.refresh_calls.fetch_add(1, Ordering::SeqCst);
+        Json(json!({
+            "access_token": "access-refreshed",
+            "refresh_token": "refresh-refreshed",
+            "expires_in": 3600
+        }))
+    }
+
+    async fn spawn_prime_auth_mock_server(
+        accept_refreshed: bool,
+    ) -> (String, PrimeAuthMockState, tokio::task::JoinHandle<()>) {
+        let state = PrimeAuthMockState {
+            accept_refreshed,
+            authorization_headers: Arc::new(tokio::sync::Mutex::new(Vec::new())),
+            refresh_calls: Arc::new(AtomicUsize::new(0)),
+        };
+        let app = Router::new()
+            .route("/v1/messages", post(mock_prime_response))
+            .route("/oauth/token", post(mock_prime_oauth_refresh))
+            .with_state(state.clone());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind prime mock server");
+        let address = listener.local_addr().expect("prime mock server address");
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.expect("serve prime mock");
+        });
+        (format!("http://{}", address), state, server)
+    }
+
+    fn setup_token_account(email: &str) -> Account {
+        Account {
+            id: 0,
+            name: "Prime 测试账号".into(),
+            email: email.into(),
+            status: AccountStatus::Active,
+            auth_type: AccountAuthType::SetupToken,
+            setup_token: "sk-ant-oat01-test-token-placeholder-value".into(),
+            access_token: String::new(),
+            refresh_token: String::new(),
+            expires_at: None,
+            oauth_refreshed_at: None,
+            auth_error: String::new(),
+            proxy_url: String::new(),
+            device_id: String::new(),
+            canonical_env: json!({}),
+            canonical_prompt: json!({}),
+            canonical_process: json!({}),
+            request_backend: "legacy".into(),
+            billing_mode: BillingMode::Strip,
+            account_uuid: None,
+            organization_uuid: None,
+            subscription_type: None,
+            rate_limit_tier: None,
+            concurrency: 3,
+            priority: 50,
+            rpm_limit: 0,
+            five_hour_usage_limit_percent: 0,
+            seven_day_usage_limit_percent: 0,
+            rate_limited_at: Some(Utc::now()),
+            rate_limit_reset_at: Some(Utc::now() + chrono::Duration::hours(1)),
+            disable_reason: String::new(),
+            auto_telemetry: false,
+            auto_poll_usage: false,
+            allow_1m_models: DEFAULT_ALLOW_1M_MODELS.into(),
+            allow_fast_mode: false,
+            upstream_session_pool_enabled: false,
+            upstream_session_pool_size: DEFAULT_UPSTREAM_SESSION_POOL_SIZE,
+            upstream_session_ttl_minutes: DEFAULT_UPSTREAM_SESSION_TTL_MINUTES,
+            upstream_session_refresh_policy: DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY.into(),
+            telemetry_count: 0,
+            usage_data: json!({}),
+            usage_fetched_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn oauth_account(email: &str) -> Account {
+        let mut account = setup_token_account(email);
+        account.auth_type = AccountAuthType::Oauth;
+        account.setup_token.clear();
+        account.access_token = "access-old".into();
+        account.refresh_token = "refresh-old".into();
+        account.expires_at = Some(Utc::now() + chrono::Duration::hours(1));
+        account.rate_limited_at = None;
+        account.rate_limit_reset_at = None;
+        account
+    }
+
+    #[tokio::test]
+    async fn oauth_unauthorized_refreshes_and_retries_prime_request() {
+        let (base_url, state, server) = spawn_prime_auth_mock_server(true).await;
+        let (service, account_svc) = setup_prime_poller_with_urls(
+            format!("{}/v1/messages?beta=true", base_url),
+            format!("{}/oauth/token", base_url),
+        )
+        .await;
+        let mut account = oauth_account("prime-oauth-retry@example.com");
+        account_svc.create_account(&mut account).await.unwrap();
+
+        let outcome = service
+            .prime_one(&account, "claude-haiku-4-5-20251001", true)
+            .await;
+
+        assert!(outcome.success);
+        assert_eq!(outcome.status, Some(200));
+        assert_eq!(state.refresh_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            state.authorization_headers.lock().await.as_slice(),
+            ["Bearer access-old", "Bearer access-refreshed"]
+        );
+        let stored = account_svc.get_account(account.id).await.unwrap();
+        assert_eq!(stored.status, AccountStatus::Active);
+        assert_eq!(stored.access_token, "access-refreshed");
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn repeated_oauth_unauthorized_disables_prime_account() {
+        let (base_url, state, server) = spawn_prime_auth_mock_server(false).await;
+        let (service, account_svc) = setup_prime_poller_with_urls(
+            format!("{}/v1/messages?beta=true", base_url),
+            format!("{}/oauth/token", base_url),
+        )
+        .await;
+        let mut account = oauth_account("prime-oauth-rejected@example.com");
+        account_svc.create_account(&mut account).await.unwrap();
+
+        let outcome = service
+            .prime_one(&account, "claude-haiku-4-5-20251001", true)
+            .await;
+        assert_eq!(outcome.status, Some(401));
+        service
+            .apply_status_side_effects(&account, 401, None, outcome.failed_access_token.as_deref())
+            .await;
+
+        assert_eq!(state.refresh_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(state.authorization_headers.lock().await.len(), 2);
+        let stored = account_svc.get_account(account.id).await.unwrap();
+        assert_eq!(stored.status, AccountStatus::Disabled);
+        assert_eq!(stored.auth_error, "401 OAuth 认证失败");
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn late_prime_unauthorized_preserves_reauthorized_credentials() {
+        let (base_url, _, server) = spawn_prime_auth_mock_server(false).await;
+        let (service, account_svc) = setup_prime_poller_with_urls(
+            format!("{}/v1/messages?beta=true", base_url),
+            format!("{}/oauth/token", base_url),
+        )
+        .await;
+        let mut account = oauth_account("late-prime@example.invalid");
+        account_svc.create_account(&mut account).await.unwrap();
+        let outcome = service
+            .prime_one(&account, "claude-haiku-4-5-20251001", true)
+            .await;
+        assert_eq!(outcome.status, Some(401));
+        let mut reauthorized = account_svc.get_account(account.id).await.unwrap();
+        reauthorized.access_token = "reauth-access".into();
+        reauthorized.refresh_token = "reauth-refresh".into();
+        account_svc.update_account(&reauthorized).await.unwrap();
+        service
+            .apply_status_side_effects(&account, 401, None, outcome.failed_access_token.as_deref())
+            .await;
+        let stored = account_svc.get_account(account.id).await.unwrap();
+        assert_eq!(stored.status, AccountStatus::Active);
+        assert!(stored.auth_error.is_empty());
+        assert_eq!(stored.access_token, "reauth-access");
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn prime_status_side_effects_preserve_forbidden_and_rate_limit_behavior() {
+        let (service, account_svc) = setup_prime_poller().await;
+        let mut forbidden = setup_token_account("prime-403@example.com");
+        forbidden.rate_limited_at = None;
+        forbidden.rate_limit_reset_at = None;
+        account_svc.create_account(&mut forbidden).await.unwrap();
+
+        service
+            .apply_status_side_effects(&forbidden, 403, None, None)
+            .await;
+        assert_eq!(
+            account_svc.get_account(forbidden.id).await.unwrap().status,
+            AccountStatus::Disabled
+        );
+
+        let reset_at = Utc::now() + chrono::Duration::hours(4);
+        let usage = json!({
+            "five_hour": {
+                "utilization": 100,
+                "resets_at": reset_at.to_rfc3339()
+            }
+        });
+        let mut rate_limited = setup_token_account("prime-429@example.com");
+        rate_limited.rate_limited_at = None;
+        rate_limited.rate_limit_reset_at = None;
+        rate_limited.usage_data = usage.clone();
+        account_svc.create_account(&mut rate_limited).await.unwrap();
+
+        service
+            .apply_status_side_effects(&rate_limited, 429, Some(usage), None)
+            .await;
+        let stored = account_svc.get_account(rate_limited.id).await.unwrap();
+        assert_eq!(stored.status, AccountStatus::Active);
+        assert!(
+            stored
+                .rate_limit_reset_at
+                .is_some_and(|reset| reset > Utc::now())
+        );
+    }
+
+    #[tokio::test]
+    async fn final_unauthorized_disables_account_and_clears_rate_limit() {
+        let (service, account_svc) = setup_prime_poller().await;
+        let mut account = setup_token_account("prime-401@example.com");
+        account_svc.create_account(&mut account).await.unwrap();
+
+        service
+            .apply_status_side_effects(&account, 401, None, None)
+            .await;
+
+        let stored = account_svc.get_account(account.id).await.unwrap();
+        assert_eq!(stored.status, AccountStatus::Disabled);
+        assert_eq!(stored.auth_error, "401 SetupToken 认证失败");
+        assert_eq!(stored.disable_reason, "401 SetupToken 认证失败");
+        assert!(stored.rate_limited_at.is_none());
+        assert!(stored.rate_limit_reset_at.is_none());
+    }
+}

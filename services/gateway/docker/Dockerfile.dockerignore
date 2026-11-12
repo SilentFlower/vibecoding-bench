@@ -1,0 +1,21 @@
+# 单仓根目录构建只发送网关与前端源码，私有配置留在宿主。
+*
+!services
+!services/gateway
+!services/gateway/Cargo.toml
+!services/gateway/Cargo.lock
+!services/gateway/src
+!services/gateway/src/**
+!services/gateway/vendor
+!services/gateway/vendor/**
+!services/gateway/craftls
+!services/gateway/craftls/**
+!apps
+!apps/web
+!apps/web/**
+**/target
+**/node_modules
+**/dist
+**/.git
+**/.env
+**/.env.*

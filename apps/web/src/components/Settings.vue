@@ -1,0 +1,1894 @@
+<script setup lang="ts">
+import { ref, onMounted, computed } from 'vue';
+import { api, type PrimeLogEntry } from '../api';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableEmpty,
+} from '@/components/ui/table';
+import { useToast } from '../composables/useToast';
+
+const { show: toast } = useToast();
+
+/** 权重表单 */
+const w7d = ref('0.5');
+const w5h = ref('0.3');
+const wconc = ref('0.2');
+/** v3 配置只影响新会话排序，稳定绑定和平滑发送持续生效。 */
+const v3Mode = ref('smart');
+const v3WaitSeconds = ref<string | number>('120');
+const v3Weights = ref<Array<string | number>>(['1', '0.8', '1', '0.5']);
+const v3WeightLabels = ['可用负载', '有效额度', '真实健康', '首输出延迟'];
+const isValidV3 = computed(() => {
+  const wait = String(v3WaitSeconds.value).trim();
+  const weights = v3Weights.value.map(value => Number(String(value).trim()));
+  return ['smart', 'legacy_score'].includes(v3Mode.value)
+    && /^\d+$/.test(wait) && Number(wait) >= 1 && Number(wait) <= 120
+    && v3Weights.value.every(value => String(value).trim() !== '')
+    && weights.every(value => Number.isFinite(value) && value >= 0 && value <= 10 && Math.abs(value * 10 - Math.round(value * 10)) < 1e-8)
+    && weights.reduce((a, b) => a + b, 0) > 0;
+});
+
+const fableStickyQuotaFallbackEnabled = ref(true);
+const fableWeeklyUsageLimitPercent = ref('50');
+
+/** 峰值预热表单 */
+const primeEnabled = ref(true);
+const primeHours = ref('4,5,6');
+const primeModel = ref('claude-haiku-4-5-20251001');
+
+/** 允许 messages[].role=system 的模型列表 */
+const allowSystemRoleModels = ref('claude-opus-5-5,claude-opus-5,claude-fable-5,claude-fable-5-1,claude-opus-4-8');
+
+/** 客户端访问策略表单 */
+const claudeCodeVersionProfile = ref('2.1.293');
+/** 请求画像选择方式：默认按原始 UA 适配 260/280/293。 */
+const claudeCodeProfileSelectionMode = ref<'client_version' | 'account'>('client_version');
+const allowedClaudeCodeVersions = ref('2.1.89-2.1.293');
+const blockedClaudeCodeVersions = ref('');
+const allowedUserAgents = ref('AI-Hub-Monitor*\npython-httpx*');
+
+/** Claude Code 上下文风险控制模式 */
+const claudeCodeContextSanitizerMode = ref<'off' | 'report_only' | 'normalize'>('report_only');
+
+/** 系统提示词环境字段「真值透传」开关(工作目录默认透传) */
+const passthroughShell = ref(false);
+const passthroughOsVersion = ref(false);
+const passthroughWorkingDir = ref(true);
+
+/** Anthropic cache_control TTL 改写模式 */
+const cacheControlTtlRewrite = ref<'off' | '5m' | '1h'>('off');
+
+/** Claude Code messages 缓存断点改写模式 */
+const messageCacheControlRewrite = ref<'off' | 'auto' | 'rolling' | 'stateful' | 'sub2api'>('off');
+
+/** API mimicry /v1/messages 顶层字段顺序指纹对齐开关 */
+const messageBodyOrderFingerprintEnabled = ref(true);
+
+/** Messages 固定根字段清理开关 */
+const messageTopFieldFilterEnabled = ref(true);
+
+/** thinking.type=disabled 兼容改写配置 */
+const rewriteDisabledThinkingEnabled = ref(false);
+const rewriteDisabledThinkingModels = ref('claude-fable-5');
+
+/** assistant prefill 本地拦截配置 */
+const interceptAssistantPrefillEnabled = ref(false);
+const interceptAssistantPrefillModels = ref('claude-fable-5,claude-opus-5,claude-opus-4-8,claude-opus-4-7');
+
+/** 429 请求观测日志配置 */
+const log429RequestEnabled = ref(false);
+const logNonStreamRequestEnabled = ref(false);
+const nonStreamProbeCacheEnabled = ref(false);
+const log429RequestBodyLimit = ref('8192');
+const streamKeepaliveEnabled = ref(false);
+const streamKeepaliveIntervalSecs = ref('45');
+const streamUpstreamIdleTimeoutSecs = ref('120');
+
+/** Claude Code bootstrap 模型选项配置 */
+const bootstrapModelOptionsMode = ref<'passthrough' | 'configured' | 'hide_fable'>('passthrough');
+const bootstrapAdditionalModelOptions = ref('[{"model":"claude-fable-5-1[1m]","name":"Fable","description":"Most capable for your hardest and longest-running tasks","disabled_reason":null}]');
+
+type AutoModeClassifierMode = 'passthrough' | 'mock_allow' | 'mock_block' | 'error';
+type CliBgStatusClassifierMode = 'passthrough' | 'mock';
+const defaultCliBgStatusClassifierModels = 'claude-fable-5,claude-fable-5-1,claude-opus-5,claude-opus-5-5,claude-opus-4-8,claude-opus-4-7,claude-sonnet-5';
+
+/** 代理 HTTP 客户端连接池复用开关 */
+const proxyClientPoolEnabled = ref(true);
+
+/** 有效上游 Session 首次 Hello 代理探测配置 */
+const sessionHelloProbeEnabled = ref(false);
+const sessionHelloProbeStrict = ref(false);
+const sessionHelloProbeTimeoutSecs = ref('5');
+const sessionHelloProbeSuccessTtlSecs = ref('3600');
+const sessionHelloProbeFailureCooldownSecs = ref('300');
+
+/** 预热与 Auto Mode classifier 本地处理开关 */
+const interceptWarmupTitleEnabled = ref(false);
+const interceptWarmupSuggestionEnabled = ref(false);
+const interceptWarmupHaikuProbeEnabled = ref(false);
+const interceptAutoModeClassifierStage1Mode = ref<AutoModeClassifierMode>('passthrough');
+const interceptAutoModeClassifierStage2Mode = ref<AutoModeClassifierMode>('passthrough');
+const interceptCliBgStatusClassifierMode = ref<CliBgStatusClassifierMode>('passthrough');
+const interceptCliBgStatusClassifierModels = ref(defaultCliBgStatusClassifierModels);
+const interceptCliBgStatusClassifierIdentityInjectionEnabled = ref(false);
+
+/** 预热历史记录 */
+const primeLogs = ref<PrimeLogEntry[]>([]);
+const logsLoading = ref(false);
+
+const saving = ref(false);
+const loaded = ref(false);
+
+/** 将 number input 或历史响应带来的非字符串值统一成表单字符串。 */
+function formString(value: unknown): string {
+  if (value == null) return '';
+  return typeof value === 'string' ? value : String(value);
+}
+
+/** 读取表单字符串并去掉首尾空白，避免对 number 直接调用 trim。 */
+function trimFormString(value: unknown): string {
+  return formString(value).trim();
+}
+
+interface ClaudeCodeVersionProfileOption {
+  key: string;
+  version: string;
+  version_base?: string;
+  build_time: string;
+  allowed_claude_code_versions: string;
+  growthbook_user_agent: string;
+  telemetry_shape: string;
+}
+
+/** Claude Code 版本画像选项 */
+const claudeCodeVersionProfiles = ref<ClaudeCodeVersionProfileOption[]>([
+  {
+    key: '2.1.293',
+    version: '2.1.293',
+    version_base: '2.1.293',
+    build_time: '2026-10-07T06:36:42Z',
+    allowed_claude_code_versions: '2.1.89-2.1.293',
+    growthbook_user_agent: 'Bun/1.4.3',
+    telemetry_shape: 'claude_code_2_1_185',
+  },
+  {
+    key: '2.1.280',
+    version: '2.1.280',
+    version_base: '2.1.280',
+    build_time: '2026-09-21T20:40:17Z',
+    allowed_claude_code_versions: '2.1.89-2.1.280',
+    growthbook_user_agent: 'Bun/1.4.3',
+    telemetry_shape: 'claude_code_2_1_185',
+  },
+  {
+    key: '2.1.260',
+    version: '2.1.260',
+    version_base: '2.1.260',
+    build_time: '2026-09-03T19:41:35Z',
+    allowed_claude_code_versions: '2.1.89-2.1.260',
+    growthbook_user_agent: 'Bun/1.4.1',
+    telemetry_shape: 'claude_code_2_1_185',
+  },
+  {
+    key: '2.1.257',
+    version: '2.1.257',
+    version_base: '2.1.257',
+    build_time: '2026-09-01T05:28:54Z',
+    allowed_claude_code_versions: '2.1.89-2.1.257',
+    growthbook_user_agent: 'Bun/1.4.1',
+    telemetry_shape: 'claude_code_2_1_185',
+  },
+  {
+    key: '2.1.220',
+    version: '2.1.220',
+    version_base: '2.1.220',
+    build_time: '2026-07-24T22:17:45Z',
+    allowed_claude_code_versions: '2.1.89-2.1.220',
+    growthbook_user_agent: 'Bun/1.4.0',
+    telemetry_shape: 'claude_code_2_1_185',
+  },
+  {
+    key: '2.1.197',
+    version: '2.1.197',
+    version_base: '2.1.197',
+    build_time: '2026-06-29T19:08:42Z',
+    allowed_claude_code_versions: '2.1.89-2.1.197',
+    growthbook_user_agent: 'Bun/1.4.0',
+    telemetry_shape: 'claude_code_2_1_185',
+  },
+  {
+    key: '2.1.195',
+    version: '2.1.195',
+    version_base: '2.1.195',
+    build_time: '2026-06-26T01:00:56Z',
+    allowed_claude_code_versions: '2.1.89-2.1.195',
+    growthbook_user_agent: 'Bun/1.4.0',
+    telemetry_shape: 'claude_code_2_1_185',
+  },
+  {
+    key: '2.1.187',
+    version: '2.1.187',
+    version_base: '2.1.187',
+    build_time: '2026-06-23T16:59:46Z',
+    allowed_claude_code_versions: '2.1.89-2.1.187',
+    growthbook_user_agent: 'Bun/1.4.0',
+    telemetry_shape: 'claude_code_2_1_185',
+  },
+  {
+    key: '2.1.185',
+    version: '2.1.185',
+    version_base: '2.1.185',
+    build_time: '2026-06-20T06:38:30Z',
+    allowed_claude_code_versions: '2.1.89-2.1.185',
+    growthbook_user_agent: 'Bun/1.4.0',
+    telemetry_shape: 'claude_code_2_1_185',
+  },
+  {
+    key: '2.1.173',
+    version: '2.1.173',
+    version_base: '2.1.173',
+    build_time: '2026-06-11T01:23:13Z',
+    allowed_claude_code_versions: '2.1.89-2.1.173',
+    growthbook_user_agent: 'Bun/1.3.14',
+    telemetry_shape: 'claude_code_2_1_173',
+  },
+]);
+
+/** 权重总和 */
+const totalWeight = computed(() => {
+  return parseFloat(formString(w7d.value) || '0') + parseFloat(formString(w5h.value) || '0') + parseFloat(formString(wconc.value) || '0');
+});
+
+/** 单个权重是否合法（非负有限数） */
+function isValidWeight(v: unknown): boolean {
+  const n = parseFloat(formString(v));
+  return !isNaN(n) && isFinite(n) && n >= 0;
+}
+
+/** 所有权重是否合法 */
+const allValid = computed(() => {
+  return isValidWeight(w7d.value) && isValidWeight(w5h.value) && isValidWeight(wconc.value);
+});
+
+/** Fable 周用量百分比上限是否合法 */
+const isValidFableWeeklyUsageLimitPercent = computed(() => {
+  const raw = trimFormString(fableWeeklyUsageLimitPercent.value);
+  if (!/^\d+$/.test(raw)) return false;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value >= 1 && value <= 100;
+});
+
+/** 总和是否为 1.0 */
+const isValidTotal = computed(() => {
+  return Math.abs(totalWeight.value - 1.0) < 0.001;
+});
+
+/** 解析 Auto Mode classifier 本地处理模式 */
+function parseAutoModeClassifierMode(raw: string | undefined): AutoModeClassifierMode {
+  if (raw === 'mock_allow' || raw === 'mock_block' || raw === 'error') {
+    return raw;
+  }
+  return 'passthrough';
+}
+
+/** 解析后端返回的 Claude Code 版本画像列表 */
+function parseClaudeCodeVersionProfiles(raw: string | undefined): ClaudeCodeVersionProfileOption[] {
+  if (!raw) return claudeCodeVersionProfiles.value;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return claudeCodeVersionProfiles.value;
+    const options = parsed
+      .map((item) => item as Partial<ClaudeCodeVersionProfileOption>)
+      .filter((item) => {
+        return typeof item.key === 'string'
+          && typeof item.version === 'string'
+          && typeof item.build_time === 'string'
+          && typeof item.allowed_claude_code_versions === 'string'
+          && typeof item.growthbook_user_agent === 'string'
+          && typeof item.telemetry_shape === 'string';
+      })
+      .map((item) => ({
+        key: item.key as string,
+        version: item.version as string,
+        version_base: item.version_base,
+        build_time: item.build_time as string,
+        allowed_claude_code_versions: item.allowed_claude_code_versions as string,
+        growthbook_user_agent: item.growthbook_user_agent as string,
+        telemetry_shape: item.telemetry_shape as string,
+      }));
+    return options.length > 0 ? options : claudeCodeVersionProfiles.value;
+  } catch {
+    return claudeCodeVersionProfiles.value;
+  }
+}
+
+/**
+ * 账号模式保持目标画像的准入范围，客户端模式保留独立配置。
+ * @return 仅更新表单，不发送保存请求。
+ */
+function syncAccountProfileRange(): void {
+  if (claudeCodeProfileSelectionMode.value !== 'account') return;
+  const profile = claudeCodeVersionProfiles.value.find((item) => item.key === claudeCodeVersionProfile.value);
+  if (profile) allowedClaudeCodeVersions.value = profile.allowed_claude_code_versions;
+}
+
+/**
+ * 填入默认 293、仅允许 280/293 的访问策略。
+ * @return 仅更新四项表单，保存后才生效。
+ */
+function use280293AccessPreset(): void {
+  claudeCodeProfileSelectionMode.value = 'client_version';
+  claudeCodeVersionProfile.value = '2.1.293';
+  allowedClaudeCodeVersions.value = '2.1.89-2.1.293';
+  blockedClaudeCodeVersions.value = '2.1.89-2.1.279,2.1.281-2.1.292';
+}
+
+/** 格式化 telemetry 结构标识，避免误读为当前 Claude Code 版本。 */
+function formatTelemetryShape(shape: string): string {
+  if (shape === 'claude_code_2_1_185') {
+    return 'Telemetry 结构兼容 2.1.185';
+  }
+  if (shape === 'claude_code_2_1_173') {
+    return 'Telemetry 结构 2.1.173';
+  }
+  return `Telemetry 结构 ${shape}`;
+}
+
+/** 预热小时输入是否合法(逗号分隔的 0-23,允许空) */
+const isValidHours = computed(() => {
+  const raw = trimFormString(primeHours.value);
+  if (!raw) return true;
+  return raw.split(',').every((s) => {
+    const t = s.trim();
+    if (!t) return true;
+    const n = parseInt(t, 10);
+    return !isNaN(n) && n >= 0 && n <= 23 && String(n) === t;
+  });
+});
+
+/** 预热模型不能为空 */
+const isValidModel = computed(() => trimFormString(primeModel.value).length > 0);
+
+/** 系统角色模型列表是否合法 */
+const isValidSystemRoleModels = computed(() => {
+  const raw = trimFormString(allowSystemRoleModels.value);
+  if (!raw) return true;
+  return raw.split(',').every((s) => {
+    const model = s.trim();
+    return !model || /^[A-Za-z0-9._:-]+$/.test(model);
+  });
+});
+
+/** Claude Code 版本规则列表是否合法 */
+function isValidClaudeCodeVersionRules(rawValue: string): boolean {
+  const raw = rawValue.trim();
+  if (!raw) return true;
+  return raw.split(/[,\n\r]+/).every((s) => {
+    const item = s.trim();
+    if (!item) return true;
+    const version = '\\d+(?:\\.\\d+)*';
+    const exact = new RegExp(`^${version}$`);
+    const wildcard = new RegExp(`^${version}\\.\\*$`);
+    const range = new RegExp(`^${version}-${version}$`);
+    return exact.test(item) || wildcard.test(item) || range.test(item);
+  });
+}
+
+/** Claude Code 版本范围是否合法 */
+const isValidClaudeCodeVersions = computed(() => isValidClaudeCodeVersionRules(allowedClaudeCodeVersions.value));
+
+/** 禁止的 Claude Code 版本范围是否合法 */
+const isValidBlockedClaudeCodeVersions = computed(() => isValidClaudeCodeVersionRules(blockedClaudeCodeVersions.value));
+
+/** UA pattern 列表是否合法 */
+const isValidAllowedUserAgents = computed(() => {
+  const raw = trimFormString(allowedUserAgents.value);
+  if (!raw) return true;
+  return raw.split(/[,\n\r]+/).every((s) => {
+    const pattern = s.trim();
+    return !pattern || /^[\x20-\x7E]+$/.test(pattern);
+  });
+});
+
+/** thinking.type=disabled 改写模型列表是否合法 */
+const isValidRewriteDisabledThinkingModels = computed(() => {
+  const raw = trimFormString(rewriteDisabledThinkingModels.value);
+  if (!raw) return true;
+  return raw.split(',').every((s) => {
+    const model = s.trim();
+    return !model || /^[A-Za-z0-9._:-]+$/.test(model);
+  });
+});
+
+/** assistant prefill 拦截模型列表是否合法 */
+const isValidInterceptAssistantPrefillModels = computed(() => {
+  const raw = trimFormString(interceptAssistantPrefillModels.value);
+  if (!raw) return true;
+  return raw.split(',').every((s) => {
+    const model = s.trim();
+    return !model || /^[A-Za-z0-9._:-]+$/.test(model);
+  });
+});
+
+/** 后台状态分类本地模拟模型列表是否合法 */
+const isValidInterceptCliBgStatusClassifierModels = computed(() => {
+  const raw = trimFormString(interceptCliBgStatusClassifierModels.value);
+  if (!raw) return true;
+  return raw.split(',').every((s) => {
+    const model = s.trim();
+    return !model || /^[A-Za-z0-9._:-]+$/.test(model);
+  });
+});
+
+/** 429 请求体日志字符上限是否合法 */
+const isValidLog429RequestBodyLimit = computed(() => {
+  const raw = trimFormString(log429RequestBodyLimit.value);
+  if (!/^\d+$/.test(raw)) return false;
+  const n = Number(raw);
+  return Number.isSafeInteger(n) && n >= 0 && n <= 1048576;
+});
+
+/** 流式 keep-alive 间隔是否合法 */
+const isValidStreamKeepaliveIntervalSecs = computed(() => {
+  const raw = trimFormString(streamKeepaliveIntervalSecs.value);
+  if (!/^\d+$/.test(raw)) return false;
+  const n = Number(raw);
+  return Number.isSafeInteger(n) && n >= 5 && n <= 240;
+});
+
+/** 上游流静默超时是否合法 */
+const isValidStreamUpstreamIdleTimeoutSecs = computed(() => {
+  const raw = trimFormString(streamUpstreamIdleTimeoutSecs.value);
+  if (!/^\d+$/.test(raw)) return false;
+  const n = Number(raw);
+  return Number.isSafeInteger(n) && n >= 30 && n <= 1800;
+});
+
+/** Session Hello 探测超时是否合法 */
+const isValidSessionHelloProbeTimeoutSecs = computed(() => {
+  const raw = trimFormString(sessionHelloProbeTimeoutSecs.value);
+  if (!/^\d+$/.test(raw)) return false;
+  const n = Number(raw);
+  return Number.isSafeInteger(n) && n >= 1 && n <= 30;
+});
+
+/** Session Hello 成功状态 TTL 是否合法 */
+const isValidSessionHelloProbeSuccessTtlSecs = computed(() => {
+  const raw = trimFormString(sessionHelloProbeSuccessTtlSecs.value);
+  if (!/^\d+$/.test(raw)) return false;
+  const n = Number(raw);
+  return Number.isSafeInteger(n) && n >= 60 && n <= 86400;
+});
+
+/** Session Hello 失败冷却是否设置在支持范围内 */
+const isValidSessionHelloProbeFailureCooldownSecs = computed(() => {
+  const raw = trimFormString(sessionHelloProbeFailureCooldownSecs.value);
+  if (!/^\d+$/.test(raw)) return false;
+  const n = Number(raw);
+  return Number.isSafeInteger(n) && n >= 10 && n <= 3600;
+});
+
+/** bootstrap 模型选项 JSON 是否合法 */
+const isValidBootstrapAdditionalModelOptions = computed(() => {
+  const raw = trimFormString(bootstrapAdditionalModelOptions.value);
+  if (!raw) return true;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return false;
+    return parsed.every((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+      const model = (item as Record<string, unknown>).model;
+      return typeof model === 'string' && model.length > 0 && /^[A-Za-z0-9._:\-[\]]+$/.test(model);
+    });
+  } catch {
+    return false;
+  }
+});
+
+/** 加载设置 */
+async function loadSettings() {
+  try {
+    const data = await api.getSettings();
+    w7d.value = data.score_weight_7d ?? '0.5';
+    w5h.value = data.score_weight_5h ?? '0.3';
+    wconc.value = data.score_weight_concurrency ?? '0.2';
+    v3Mode.value = data.v3_scheduling_mode ?? 'smart';
+    v3WaitSeconds.value = data.v3_admission_wait_seconds ?? '120';
+    v3Weights.value = [data.v3_smart_weight_load ?? '1', data.v3_smart_weight_quota ?? '0.8', data.v3_smart_weight_health ?? '1', data.v3_smart_weight_latency ?? '0.5'];
+
+    fableStickyQuotaFallbackEnabled.value = (data.fable_sticky_quota_fallback_enabled ?? 'true') === 'true';
+    fableWeeklyUsageLimitPercent.value = data.fable_weekly_usage_limit_percent ?? '50';
+    primeEnabled.value = (data.peak_prime_enabled ?? 'true') === 'true';
+    primeHours.value = data.peak_prime_hours ?? '4,5,6';
+    primeModel.value = data.peak_prime_model ?? 'claude-haiku-4-5-20251001';
+    allowSystemRoleModels.value = data.allow_system_role_models ?? 'claude-opus-5-5,claude-opus-5,claude-fable-5,claude-fable-5-1,claude-opus-4-8';
+    claudeCodeVersionProfiles.value = parseClaudeCodeVersionProfiles(data.claude_code_version_profiles);
+    claudeCodeVersionProfile.value = data.claude_code_version_profile ?? '2.1.293';
+    claudeCodeProfileSelectionMode.value = data.claude_code_profile_selection_mode === 'account' ? 'account' : 'client_version';
+    allowedClaudeCodeVersions.value = data.allowed_claude_code_versions ?? '2.1.89-2.1.293';
+    blockedClaudeCodeVersions.value = data.blocked_claude_code_versions ?? '';
+    allowedUserAgents.value = data.allowed_user_agents ?? 'AI-Hub-Monitor*\npython-httpx*';
+    const contextSanitizerMode = data.claude_code_context_sanitizer_mode ?? 'report_only';
+    claudeCodeContextSanitizerMode.value = contextSanitizerMode === 'off' || contextSanitizerMode === 'normalize' ? contextSanitizerMode : 'report_only';
+    passthroughShell.value = (data.passthrough_shell ?? 'false') === 'true';
+    passthroughOsVersion.value = (data.passthrough_os_version ?? 'false') === 'true';
+    passthroughWorkingDir.value = (data.passthrough_working_dir ?? 'true') === 'true';
+    const ttlRewrite = data.cache_control_ttl_rewrite ?? 'off';
+    cacheControlTtlRewrite.value = ttlRewrite === '5m' || ttlRewrite === '1h' ? ttlRewrite : 'off';
+    const messageCacheRewrite = data.message_cache_control_rewrite ?? 'off';
+    if (messageCacheRewrite === 'auto' || messageCacheRewrite === 'rolling' || messageCacheRewrite === 'stateful' || messageCacheRewrite === 'sub2api') {
+      messageCacheControlRewrite.value = messageCacheRewrite;
+    } else if (messageCacheRewrite === 'stable' || messageCacheRewrite === 'anchored') {
+      messageCacheControlRewrite.value = 'auto';
+    } else {
+      messageCacheControlRewrite.value = 'off';
+    }
+    messageBodyOrderFingerprintEnabled.value = (data.message_body_order_fingerprint_enabled ?? 'true') === 'true';
+    messageTopFieldFilterEnabled.value = data.message_top_field_filter_enabled !== 'false';
+    proxyClientPoolEnabled.value = (data.proxy_client_pool_enabled ?? 'true') === 'true';
+    sessionHelloProbeEnabled.value = (data.session_hello_probe_enabled ?? 'false') === 'true';
+    sessionHelloProbeStrict.value = (data.session_hello_probe_strict ?? 'false') === 'true';
+    sessionHelloProbeTimeoutSecs.value = data.session_hello_probe_timeout_secs ?? '5';
+    sessionHelloProbeSuccessTtlSecs.value = data.session_hello_probe_success_ttl_secs ?? '3600';
+    sessionHelloProbeFailureCooldownSecs.value = data.session_hello_probe_failure_cooldown_secs ?? '300';
+    rewriteDisabledThinkingEnabled.value = (data.rewrite_disabled_thinking_enabled ?? 'false') === 'true';
+    rewriteDisabledThinkingModels.value = data.rewrite_disabled_thinking_models ?? 'claude-fable-5';
+    interceptAssistantPrefillEnabled.value = (data.intercept_assistant_prefill_enabled ?? 'false') === 'true';
+    interceptAssistantPrefillModels.value = data.intercept_assistant_prefill_models ?? 'claude-fable-5,claude-opus-5,claude-opus-4-8,claude-opus-4-7';
+    log429RequestEnabled.value = (data.log_429_request_enabled ?? 'false') === 'true';
+    logNonStreamRequestEnabled.value = (data.log_non_stream_request_enabled ?? 'false') === 'true';
+    nonStreamProbeCacheEnabled.value = (data.non_stream_probe_cache_enabled ?? 'false') === 'true';
+    log429RequestBodyLimit.value = data.log_429_request_body_limit ?? '8192';
+    streamKeepaliveEnabled.value = (data.stream_keepalive_enabled ?? 'false') === 'true';
+    streamKeepaliveIntervalSecs.value = data.stream_keepalive_interval_secs ?? '45';
+    streamUpstreamIdleTimeoutSecs.value = data.stream_upstream_idle_timeout_secs ?? '120';
+    const bootstrapMode = data.bootstrap_model_options_mode ?? 'passthrough';
+    bootstrapModelOptionsMode.value = bootstrapMode === 'configured' || bootstrapMode === 'hide_fable' ? bootstrapMode : 'passthrough';
+    bootstrapAdditionalModelOptions.value = data.bootstrap_additional_model_options ?? '[{"model":"claude-fable-5-1[1m]","name":"Fable","description":"Most capable for your hardest and longest-running tasks","disabled_reason":null}]';
+    interceptWarmupTitleEnabled.value = (data.intercept_warmup_title_enabled ?? 'false') === 'true';
+    interceptWarmupSuggestionEnabled.value = (data.intercept_warmup_suggestion_enabled ?? 'false') === 'true';
+    interceptWarmupHaikuProbeEnabled.value = (data.intercept_warmup_haiku_probe_enabled ?? 'false') === 'true';
+    interceptAutoModeClassifierStage1Mode.value = parseAutoModeClassifierMode(data.intercept_auto_mode_classifier_stage1_mode);
+    interceptAutoModeClassifierStage2Mode.value = parseAutoModeClassifierMode(data.intercept_auto_mode_classifier_stage2_mode);
+    interceptCliBgStatusClassifierMode.value = data.intercept_cli_bg_status_classifier_mode === 'mock' ? 'mock' : 'passthrough';
+    interceptCliBgStatusClassifierModels.value = data.intercept_cli_bg_status_classifier_models ?? defaultCliBgStatusClassifierModels;
+    interceptCliBgStatusClassifierIdentityInjectionEnabled.value =
+      (data.intercept_cli_bg_status_classifier_identity_injection_enabled ?? 'false') === 'true';
+    loaded.value = true;
+  } catch (e) {
+    toast((e as Error).message || '加载设置失败');
+  }
+}
+
+/** 加载最近预热记录 */
+async function loadPrimeLogs() {
+  logsLoading.value = true;
+  try {
+    primeLogs.value = await api.getPrimeLogs();
+  } catch (e) {
+    toast((e as Error).message || '加载预热记录失败');
+  } finally {
+    logsLoading.value = false;
+  }
+}
+
+/** 保存设置 */
+async function saveSettings() {
+  if (!allValid.value) {
+    toast('权重必须为非负数');
+    return;
+  }
+  if (!isValidFableWeeklyUsageLimitPercent.value) {
+    toast('Fable 周用量上限必须是 1 到 100 之间的整数');
+    return;
+  }
+  if (!isValidHours.value) {
+    toast('预热小时必须是逗号分隔的 0-23 整数');
+    return;
+  }
+  if (!isValidModel.value) {
+    toast('预热模型不能为空');
+    return;
+  }
+  if (!isValidSystemRoleModels.value) {
+    toast('系统角色模型列表包含非法字符');
+    return;
+  }
+  if (!isValidClaudeCodeVersions.value) {
+    toast('Claude Code 版本范围格式不正确');
+    return;
+  }
+  if (!isValidBlockedClaudeCodeVersions.value) {
+    toast('禁止 Claude Code 版本格式不正确');
+    return;
+  }
+  if (!isValidAllowedUserAgents.value) {
+    toast('UA 白名单包含非法字符');
+    return;
+  }
+  if (!isValidRewriteDisabledThinkingModels.value) {
+    toast('thinking 改写模型列表包含非法字符');
+    return;
+  }
+  if (!isValidInterceptAssistantPrefillModels.value) {
+    toast('assistant prefill 拦截模型列表包含非法字符');
+    return;
+  }
+  if (!isValidInterceptCliBgStatusClassifierModels.value) {
+    toast('后台状态分类模型列表包含非法字符');
+    return;
+  }
+  if (!isValidLog429RequestBodyLimit.value) {
+    toast('429 请求体日志上限必须是 0 到 1048576 的整数');
+    return;
+  }
+  if (!isValidStreamKeepaliveIntervalSecs.value) {
+    toast('流式 keep-alive 间隔必须是 5 到 240 秒的整数');
+    return;
+  }
+  if (!isValidStreamUpstreamIdleTimeoutSecs.value) {
+    toast('上游流静默超时必须是 30 到 1800 秒的整数');
+    return;
+  }
+  if (!isValidSessionHelloProbeTimeoutSecs.value) {
+    toast('Session Hello 探测超时必须是 1 到 30 秒的整数');
+    return;
+  }
+  if (!isValidSessionHelloProbeSuccessTtlSecs.value) {
+    toast('Session Hello 成功 TTL 必须是 60 到 86400 秒的整数');
+    return;
+  }
+  if (!isValidSessionHelloProbeFailureCooldownSecs.value) {
+    toast('Session Hello 失败冷却必须是 10 到 3600 秒的整数');
+    return;
+  }
+  if (!isValidBootstrapAdditionalModelOptions.value) {
+    toast('bootstrap 模型选项必须是 JSON 数组,且每项包含合法 model');
+    return;
+  }
+  if (!isValidV3.value) {
+    toast('v3 等待上限须为 1–120 秒；权重须为 0–10、最多一位小数，且不能全部为零');
+    return;
+  }
+  saving.value = true;
+  try {
+    await api.updateSettings({
+      score_weight_7d: String(w7d.value),
+      score_weight_5h: String(w5h.value),
+      score_weight_concurrency: String(wconc.value),
+      v3_scheduling_mode: v3Mode.value,
+      v3_admission_wait_seconds: String(v3WaitSeconds.value).trim(),
+      v3_smart_weight_load: String(v3Weights.value[0]).trim(),
+      v3_smart_weight_quota: String(v3Weights.value[1]).trim(),
+      v3_smart_weight_health: String(v3Weights.value[2]).trim(),
+      v3_smart_weight_latency: String(v3Weights.value[3]).trim(),
+
+      fable_sticky_quota_fallback_enabled: fableStickyQuotaFallbackEnabled.value ? 'true' : 'false',
+      fable_weekly_usage_limit_percent: trimFormString(fableWeeklyUsageLimitPercent.value),
+      peak_prime_enabled: primeEnabled.value ? 'true' : 'false',
+      peak_prime_hours: trimFormString(primeHours.value),
+      peak_prime_model: trimFormString(primeModel.value),
+      allow_system_role_models: trimFormString(allowSystemRoleModels.value),
+      claude_code_version_profile: claudeCodeVersionProfile.value,
+      claude_code_profile_selection_mode: claudeCodeProfileSelectionMode.value,
+      allowed_claude_code_versions: trimFormString(allowedClaudeCodeVersions.value),
+      blocked_claude_code_versions: trimFormString(blockedClaudeCodeVersions.value),
+      allowed_user_agents: trimFormString(allowedUserAgents.value),
+      claude_code_context_sanitizer_mode: claudeCodeContextSanitizerMode.value,
+      passthrough_shell: passthroughShell.value ? 'true' : 'false',
+      passthrough_os_version: passthroughOsVersion.value ? 'true' : 'false',
+      passthrough_working_dir: passthroughWorkingDir.value ? 'true' : 'false',
+      cache_control_ttl_rewrite: cacheControlTtlRewrite.value,
+      message_cache_control_rewrite: messageCacheControlRewrite.value,
+      message_body_order_fingerprint_enabled: messageBodyOrderFingerprintEnabled.value ? 'true' : 'false',
+      message_top_field_filter_enabled: messageTopFieldFilterEnabled.value ? 'true' : 'false',
+      proxy_client_pool_enabled: proxyClientPoolEnabled.value ? 'true' : 'false',
+      session_hello_probe_enabled: sessionHelloProbeEnabled.value ? 'true' : 'false',
+      session_hello_probe_strict: sessionHelloProbeStrict.value ? 'true' : 'false',
+      session_hello_probe_timeout_secs: trimFormString(sessionHelloProbeTimeoutSecs.value),
+      session_hello_probe_success_ttl_secs: trimFormString(sessionHelloProbeSuccessTtlSecs.value),
+      session_hello_probe_failure_cooldown_secs: trimFormString(sessionHelloProbeFailureCooldownSecs.value),
+      rewrite_disabled_thinking_enabled: rewriteDisabledThinkingEnabled.value ? 'true' : 'false',
+      rewrite_disabled_thinking_models: trimFormString(rewriteDisabledThinkingModels.value),
+      intercept_assistant_prefill_enabled: interceptAssistantPrefillEnabled.value ? 'true' : 'false',
+      intercept_assistant_prefill_models: trimFormString(interceptAssistantPrefillModels.value),
+      log_429_request_enabled: log429RequestEnabled.value ? 'true' : 'false',
+      log_non_stream_request_enabled: logNonStreamRequestEnabled.value ? 'true' : 'false',
+      non_stream_probe_cache_enabled: nonStreamProbeCacheEnabled.value ? 'true' : 'false',
+      log_429_request_body_limit: trimFormString(log429RequestBodyLimit.value),
+      stream_keepalive_enabled: streamKeepaliveEnabled.value ? 'true' : 'false',
+      stream_keepalive_interval_secs: trimFormString(streamKeepaliveIntervalSecs.value),
+      stream_upstream_idle_timeout_secs: trimFormString(streamUpstreamIdleTimeoutSecs.value),
+      bootstrap_model_options_mode: bootstrapModelOptionsMode.value,
+      bootstrap_additional_model_options: trimFormString(bootstrapAdditionalModelOptions.value),
+      intercept_warmup_title_enabled: interceptWarmupTitleEnabled.value ? 'true' : 'false',
+      intercept_warmup_suggestion_enabled: interceptWarmupSuggestionEnabled.value ? 'true' : 'false',
+      intercept_warmup_haiku_probe_enabled: interceptWarmupHaikuProbeEnabled.value ? 'true' : 'false',
+      intercept_auto_mode_classifier_stage1_mode: interceptAutoModeClassifierStage1Mode.value,
+      intercept_auto_mode_classifier_stage2_mode: interceptAutoModeClassifierStage2Mode.value,
+      intercept_cli_bg_status_classifier_mode: interceptCliBgStatusClassifierMode.value,
+      intercept_cli_bg_status_classifier_models: trimFormString(interceptCliBgStatusClassifierModels.value),
+      intercept_cli_bg_status_classifier_identity_injection_enabled:
+        interceptCliBgStatusClassifierIdentityInjectionEnabled.value ? 'true' : 'false',
+    });
+    await loadSettings();
+    toast('保存成功');
+  } catch (e) {
+    toast((e as Error).message || '保存失败');
+  } finally {
+    saving.value = false;
+  }
+}
+
+/** 格式化时间戳 */
+function formatTime(raw: string): string {
+  if (!raw) return '-';
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  return d.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+/** 判断一条日志是否"跳过"而非真正失败。
+ *  后端把冷却期跳过统一用 'skipped: ...' 前缀写入 error_message,
+ *  前端依前缀识别,渲染成琥珀色"跳过"徽章,避免与红色"失败"混淆。 */
+function isSkipped(log: PrimeLogEntry): boolean {
+  return !log.success && log.error_message.startsWith('skipped:');
+}
+
+onMounted(async () => {
+  await loadSettings();
+  await loadPrimeLogs();
+});
+</script>
+
+<template>
+  <div class="space-y-6">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-[#29261e]">设置</h2>
+    </div>
+
+    <!-- v3 调度配置与旧评分分开，防止切换排序时误认为关闭发送限制。 -->
+    <Card class="bg-white border-[#e8e2d9] rounded-xl overflow-hidden">
+      <div class="p-6 space-y-4">
+        <div><h3 class="text-sm font-semibold text-[#29261e]">v3 会话与发送调度</h3><p class="text-xs text-[#8c8475] mt-1">仅在 v3 生效。老会话保持有效绑定；新会话先检查资格和容量。两种排序都按账号 RPM 平滑提交，排队超时保留绑定。</p></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="space-y-1.5"><Label>新会话排序</Label><select v-model="v3Mode" aria-label="v3 新会话排序" class="w-full h-9 rounded-md border border-[#e8e2d9] px-3 text-sm"><option value="smart">智能排序</option><option value="legacy_score">旧评分排序</option></select></div>
+          <div class="space-y-1.5"><Label for="v3-wait-seconds">准入等待上限（秒）</Label><Input id="v3-wait-seconds" v-model="v3WaitSeconds" type="number" min="1" max="120" step="1" class="border-[#e8e2d9]" /></div>
+        </div>
+        <p class="text-xs text-[#8c8475]">并发、环境准备和发送间隔共用一个等待期限，重试不重置；不会中断已提交的健康长流。</p>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3"><div v-for="(label, index) in v3WeightLabels" :key="label" class="space-y-1.5"><Label :for="'v3-weight-' + index">{{ label }}</Label><Input :id="'v3-weight-' + index" v-model="v3Weights[index]" type="number" min="0" max="10" step="0.1" class="border-[#e8e2d9]" /></div></div>
+        <p class="text-xs" :class="isValidV3 ? 'text-[#8c8475]' : 'text-amber-700'">智能因素归一化后高分优先；近优账号轮转。权重 0–10、最多一位小数，不能全零。健康与延迟来自真实请求，不主动探测。</p>
+      </div>
+    </Card>
+
+    <!-- 评分权重 -->
+    <Card class="bg-white border-[#e8e2d9] rounded-xl overflow-hidden">
+      <div class="p-6 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-[#29261e]">旧评分权重（兼容排序）</h3>
+          <p class="text-xs text-[#8c8475] mt-1">
+            调度评分公式：score = eff_7d × W1 + eff_5h × W2 + 负载% × W3，分数越低越优先分配。负载% =（活跃标准槽位+排队预计槽位）/并发 × 100；普通请求=1，Haiku=0.5。时间衰减使用阶梯档位（1.0/0.8/0.6）替代线性比例。
+          </p>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4">
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">7 天窗口 (W1)</Label>
+            <Input
+              v-model="w7d"
+              type="number"
+              step="0.05"
+              min="0"
+              max="1"
+              class="border-[#e8e2d9] focus:ring-[#c4704f] text-center"
+            />
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">5 小时窗口 (W2)</Label>
+            <Input
+              v-model="w5h"
+              type="number"
+              step="0.05"
+              min="0"
+              max="1"
+              class="border-[#e8e2d9] focus:ring-[#c4704f] text-center"
+            />
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">并发负载 (W3)</Label>
+            <Input
+              v-model="wconc"
+              type="number"
+              step="0.05"
+              min="0"
+              max="1"
+              class="border-[#e8e2d9] focus:ring-[#c4704f] text-center"
+            />
+          </div>
+        </div>
+
+        <div class="flex items-center pt-2">
+          <p class="text-xs" :class="isValidTotal ? 'text-emerald-600' : 'text-amber-600'">
+            权重总和: {{ totalWeight.toFixed(2) }}
+            <span v-if="!isValidTotal"> (建议为 1.0)</span>
+          </p>
+        </div>
+
+        <div class="border-t border-[#eee7dc] pt-4 space-y-3">
+          <div>
+            <h4 class="text-sm font-semibold text-[#29261e]">Fable 配额切换</h4>
+            <p class="text-xs text-[#8c8475] mt-1">
+              达到最近观测的 Fable 周用量上限后，停止向该账号分配新的 Fable 请求并尝试切换账号；单次请求可能轻微越线。
+            </p>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-[auto_180px] gap-3 items-end">
+            <label class="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="fableStickyQuotaFallbackEnabled"
+                type="checkbox"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">{{ fableStickyQuotaFallbackEnabled ? '已启用' : '保持粘性' }}</span>
+            </label>
+            <div class="space-y-1.5">
+              <Label class="text-[#5c5647] text-sm">周用量上限 (%)</Label>
+              <Input
+                v-model="fableWeeklyUsageLimitPercent"
+                type="number"
+                min="1"
+                max="100"
+                step="1"
+                :disabled="!fableStickyQuotaFallbackEnabled"
+                class="border-[#e8e2d9] focus:ring-[#c4704f] text-center"
+              />
+            </div>
+          </div>
+          <p v-if="!fableStickyQuotaFallbackEnabled" class="text-[11px] text-[#b5b0a6]">
+            当前关闭限制；重新启用后继续使用已保存的百分比。
+          </p>
+        </div>
+      </div>
+    </Card>
+
+    <!-- 峰值预热 -->
+    <Card class="bg-white border-[#e8e2d9] rounded-xl overflow-hidden">
+      <div class="p-6 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-[#29261e]">峰值预热</h3>
+          <p class="text-xs text-[#8c8475] mt-1">
+            每天在配置的小时 HH:10（<span class="font-medium">服务器本地时间</span>）对所有活跃账号发送一次小型
+            Haiku 请求，主动启动 Anthropic 侧 5h 速率限制窗口，让窗口重置点尽量落在下午高峰前后。失败不重试，所有调用都会记录在下方。
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">总开关</Label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="primeEnabled"
+                type="checkbox"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">{{ primeEnabled ? '已启用' : '已关闭' }}</span>
+            </label>
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">预热小时 (逗号分隔)</Label>
+            <Input
+              v-model="primeHours"
+              placeholder="4,5,6"
+              class="border-[#e8e2d9] focus:ring-[#c4704f]"
+              :class="isValidHours ? '' : 'border-red-400'"
+            />
+            <p class="text-[11px] text-[#b5b0a6]">触发分钟固定为 :10,例如 4 表示 04:10</p>
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">预热模型</Label>
+            <Input
+              v-model="primeModel"
+              placeholder="claude-haiku-4-5-20251001"
+              class="border-[#e8e2d9] focus:ring-[#c4704f]"
+              :class="isValidModel ? '' : 'border-red-400'"
+            />
+            <p class="text-[11px] text-[#b5b0a6]">建议保留为 Haiku,成本最低</p>
+          </div>
+        </div>
+      </div>
+    </Card>
+
+    <!-- 预热请求拦截 -->
+    <Card class="bg-white border-[#e8e2d9] rounded-xl overflow-hidden">
+      <div class="p-6 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-[#29261e]">预热请求拦截</h3>
+          <p class="text-xs text-[#8c8475] mt-1">
+            预热类命中后本地返回 mock 响应；Auto Mode classifier 可单独选择转发或本地处理。
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">标题 / Warmup</Label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="interceptWarmupTitleEnabled"
+                type="checkbox"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">{{ interceptWarmupTitleEnabled ? '本地拦截' : '转发上游' }}</span>
+            </label>
+            <p class="text-[11px] text-[#b5b0a6]">覆盖旧标题提示和新版 JSON 标题提示。</p>
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">Suggestion Mode</Label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="interceptWarmupSuggestionEnabled"
+                type="checkbox"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">{{ interceptWarmupSuggestionEnabled ? '本地拦截' : '转发上游' }}</span>
+            </label>
+            <p class="text-[11px] text-[#b5b0a6]">最后一条 user 消息以 [SUGGESTION MODE: 开头时命中。</p>
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">Haiku 探测</Label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="interceptWarmupHaikuProbeEnabled"
+                type="checkbox"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">{{ interceptWarmupHaikuProbeEnabled ? '本地拦截' : '转发上游' }}</span>
+            </label>
+            <p class="text-[11px] text-[#b5b0a6]">Claude Code 非流式 Haiku max_tokens=1 探测返回 #。</p>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-[#f0ebe4] space-y-3">
+          <div>
+            <Label class="text-[#5c5647] text-sm">Auto Mode classifier</Label>
+            <p class="text-[11px] text-[#b5b0a6] mt-1">
+              仅命中带 XML suffix 和 transcript 的 Claude Code Auto Mode side-query。mock allow 返回 &lt;block&gt;no&lt;/block&gt;。
+            </p>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-1.5">
+              <Label class="text-[#5c5647] text-sm">Stage 1</Label>
+              <select
+                v-model="interceptAutoModeClassifierStage1Mode"
+                class="h-9 w-full rounded-md border border-[#e8e2d9] bg-[#f9f6f1] px-3 text-sm text-[#29261e] focus:outline-none focus:ring-2 focus:ring-[#c4704f]"
+              >
+                <option value="passthrough">转发上游</option>
+                <option value="mock_allow">Mock allow</option>
+                <option value="mock_block">Mock block</option>
+                <option value="error">返回错误</option>
+              </select>
+              <p class="text-[11px] text-[#b5b0a6]">匹配 max_tokens=64/256 与 Stage 1 suffix。</p>
+            </div>
+            <div class="space-y-1.5">
+              <Label class="text-[#5c5647] text-sm">Stage 2</Label>
+              <select
+                v-model="interceptAutoModeClassifierStage2Mode"
+                class="h-9 w-full rounded-md border border-[#e8e2d9] bg-[#f9f6f1] px-3 text-sm text-[#29261e] focus:outline-none focus:ring-2 focus:ring-[#c4704f]"
+              >
+                <option value="passthrough">转发上游</option>
+                <option value="mock_allow">Mock allow</option>
+                <option value="mock_block">Mock block</option>
+                <option value="error">返回错误</option>
+              </select>
+              <p class="text-[11px] text-[#b5b0a6]">匹配 4096-8192 token 与 Stage 2 suffix，不处理 64000 fallback。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-[#f0ebe4] space-y-3">
+          <div>
+            <Label class="text-[#5c5647] text-sm">Claude Code 后台状态分类</Label>
+            <p class="text-[11px] text-[#b5b0a6] mt-1">
+              仅处理匹配完整状态分类特征且模型在下方列表中的 cli-bg 请求。放行保留账号代理链路；模拟在本地返回状态 JSON。
+            </p>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="interceptCliBgStatusClassifierMode"
+                type="radio"
+                value="passthrough"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">放行上游</span>
+            </label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="interceptCliBgStatusClassifierMode"
+                type="radio"
+                value="mock"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">本地模拟</span>
+            </label>
+          </div>
+          <div class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">适用模型 (逗号分隔)</Label>
+            <Input
+              v-model="interceptCliBgStatusClassifierModels"
+              class="border-[#e8e2d9] focus:ring-[#c4704f] font-mono text-sm"
+              :class="isValidInterceptCliBgStatusClassifierModels ? '' : 'border-red-400'"
+            />
+            <p class="text-[11px] text-[#b5b0a6]">按完整模型 ID 匹配；空列表表示不在本地模拟任何模型。</p>
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">Claude Code 身份块</Label>
+            <label
+              class="flex items-center gap-2 min-h-9 px-3 py-2 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] select-none"
+              :class="interceptCliBgStatusClassifierMode === 'mock' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'"
+            >
+              <input
+                v-model="interceptCliBgStatusClassifierIdentityInjectionEnabled"
+                type="checkbox"
+                :disabled="interceptCliBgStatusClassifierMode === 'mock'"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">
+                {{ interceptCliBgStatusClassifierIdentityInjectionEnabled ? '缺失时注入身份块' : '保持原始身份块' }}
+              </span>
+            </label>
+            <p class="text-[11px] text-[#b5b0a6]">
+              {{ interceptCliBgStatusClassifierMode === 'mock'
+                ? '本地模拟不访问上游；切回放行后恢复已保存的开关值。'
+                : '仅处理强特征命中的非 Haiku 状态分类请求；开启后同时补齐缺失的 billing/CCH 归因块。' }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </Card>
+
+    <!-- assistant prefill 拦截 -->
+    <Card class="bg-white border-[#e8e2d9] rounded-xl overflow-hidden">
+      <div class="p-6 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-[#29261e]">assistant prefill 拦截</h3>
+          <p class="text-xs text-[#8c8475] mt-1">
+            开启后,命中模型且最后一条消息为 assistant 的 /v1/messages 请求会在本地返回 400,不进入账号选择、RPM、并发槽或上游转发。
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4">
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">总开关</Label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="interceptAssistantPrefillEnabled"
+                type="checkbox"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">{{ interceptAssistantPrefillEnabled ? '本地拦截' : '转发上游' }}</span>
+            </label>
+          </div>
+          <div class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">拦截模型 (逗号分隔)</Label>
+            <Input
+              v-model="interceptAssistantPrefillModels"
+              placeholder="claude-fable-5,claude-opus-5,claude-opus-4-8,claude-opus-4-7"
+              class="border-[#e8e2d9] focus:ring-[#c4704f] font-mono text-sm"
+              :class="isValidInterceptAssistantPrefillModels ? '' : 'border-red-400'"
+            />
+            <p class="text-[11px] text-[#b5b0a6]">默认只覆盖当前事故相关模型；空列表等价于开启但不拦截任何模型。</p>
+          </div>
+        </div>
+      </div>
+    </Card>
+
+    <!-- 429 请求观测 -->
+    <Card class="bg-white border-[#e8e2d9] rounded-xl overflow-hidden">
+      <div class="p-6 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-[#29261e]">429 请求观测</h3>
+          <p class="text-xs text-[#8c8475] mt-1">
+            可记录 429 请求和异常非流式轮询请求的最终上游请求头与请求体;日志会脱敏 Authorization、Cookie、token、password、secret 等字段并按长度截断。
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">429 捕获</Label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="log429RequestEnabled"
+                type="checkbox"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">{{ log429RequestEnabled ? '记录 429 请求' : '关闭记录' }}</span>
+            </label>
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">非流请求</Label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="logNonStreamRequestEnabled"
+                type="checkbox"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">{{ logNonStreamRequestEnabled ? '记录非流请求' : '关闭记录' }}</span>
+            </label>
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">非流单消息探针缓存</Label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="nonStreamProbeCacheEnabled"
+                type="checkbox"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">{{ nonStreamProbeCacheEnabled ? '30m 缓存' : '关闭' }}</span>
+            </label>
+            <p class="text-[11px] text-[#b5b0a6]">仅缓存 Claude Code 非流单消息探针。</p>
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">请求体字符上限</Label>
+            <Input
+              v-model="log429RequestBodyLimit"
+              type="number"
+              min="0"
+              max="1048576"
+              step="1"
+              class="border-[#e8e2d9] focus:ring-[#c4704f] text-center"
+              :class="isValidLog429RequestBodyLimit ? '' : 'border-red-400'"
+            />
+            <p class="text-[11px] text-[#b5b0a6]">0 表示不输出请求体内容；可填 0 到 1048576 的任意整数，默认 8192。</p>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-[#f0ebe4] space-y-3">
+          <div>
+            <Label class="text-[#5c5647] text-sm">流式稳定性</Label>
+            <p class="text-[11px] text-[#b5b0a6] mt-1">
+              开启后仅在上游首个 SSE chunk 到达后插入 comment keep-alive，不影响首字时间，用于减少 Claude Code non-stream fallback。
+            </p>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="space-y-1.5">
+              <Label class="text-[#5c5647] text-sm">Keep-alive</Label>
+              <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+                <input
+                  v-model="streamKeepaliveEnabled"
+                  type="checkbox"
+                  class="accent-[#c4704f] w-4 h-4"
+                />
+                <span class="text-sm text-[#29261e]">{{ streamKeepaliveEnabled ? '插入 comment' : '关闭' }}</span>
+              </label>
+            </div>
+            <div class="space-y-1.5">
+              <Label class="text-[#5c5647] text-sm">间隔秒数</Label>
+              <Input
+                v-model="streamKeepaliveIntervalSecs"
+                type="number"
+                min="5"
+                max="240"
+                step="1"
+                class="border-[#e8e2d9] focus:ring-[#c4704f] text-center"
+                :class="isValidStreamKeepaliveIntervalSecs ? '' : 'border-red-400'"
+              />
+              <p class="text-[11px] text-[#b5b0a6]">建议 30-60 秒，默认 45。</p>
+            </div>
+            <div class="space-y-1.5">
+              <Label class="text-[#5c5647] text-sm">上游静默超时</Label>
+              <Input
+                v-model="streamUpstreamIdleTimeoutSecs"
+                type="number"
+                min="30"
+                max="1800"
+                step="1"
+                class="border-[#e8e2d9] focus:ring-[#c4704f] text-center"
+                :class="isValidStreamUpstreamIdleTimeoutSecs ? '' : 'border-red-400'"
+              />
+              <p class="text-[11px] text-[#b5b0a6]">默认 120；调大可避免 cc2api 先于客户端 fallback 断流。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
+
+    <!-- 代理连接池 -->
+    <Card class="bg-white border-[#e8e2d9] rounded-xl overflow-hidden">
+      <div class="p-6 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-[#29261e]">代理连接池</h3>
+          <p class="text-xs text-[#8c8475] mt-1">
+            开启后同一代理地址复用 reqwest Client 和底层连接;关闭后每次上游请求新建客户端,用于排查代理连接复用问题。
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">总开关</Label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="proxyClientPoolEnabled"
+                type="checkbox"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">{{ proxyClientPoolEnabled ? '已启用' : '已关闭' }}</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </Card>
+
+    <!-- 有效上游 Session 首次 Hello 代理探测 -->
+    <Card class="bg-white border-[#e8e2d9] rounded-xl overflow-hidden">
+      <div class="p-6 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-[#29261e]">有效上游 Session 首次 Hello 代理探测</h3>
+          <p class="text-xs text-[#8c8475] mt-1">
+            新的有效上游 Session 首次承载请求前，通过最终账号的代理路径检查 Anthropic Hello 连通性。
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">功能开关</Label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="sessionHelloProbeEnabled"
+                type="checkbox"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">{{ sessionHelloProbeEnabled ? '已启用' : '已关闭' }}</span>
+            </label>
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">严格模式</Label>
+            <label
+              class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] select-none"
+              :class="sessionHelloProbeEnabled ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'"
+            >
+              <input
+                v-model="sessionHelloProbeStrict"
+                type="checkbox"
+                :disabled="!sessionHelloProbeEnabled"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">{{ sessionHelloProbeStrict ? '失败阻断' : '失败放行' }}</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">探测超时（秒）</Label>
+            <Input
+              v-model="sessionHelloProbeTimeoutSecs"
+              type="number"
+              min="1"
+              max="30"
+              step="1"
+              :disabled="!sessionHelloProbeEnabled"
+              class="border-[#e8e2d9] focus:ring-[#c4704f] text-center"
+              :class="isValidSessionHelloProbeTimeoutSecs ? '' : 'border-red-400'"
+            />
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">成功 TTL（秒）</Label>
+            <Input
+              v-model="sessionHelloProbeSuccessTtlSecs"
+              type="number"
+              min="60"
+              max="86400"
+              step="1"
+              :disabled="!sessionHelloProbeEnabled"
+              class="border-[#e8e2d9] focus:ring-[#c4704f] text-center"
+              :class="isValidSessionHelloProbeSuccessTtlSecs ? '' : 'border-red-400'"
+            />
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">失败冷却（秒）</Label>
+            <Input
+              v-model="sessionHelloProbeFailureCooldownSecs"
+              type="number"
+              min="10"
+              max="3600"
+              step="1"
+              :disabled="!sessionHelloProbeEnabled"
+              class="border-[#e8e2d9] focus:ring-[#c4704f] text-center"
+              :class="isValidSessionHelloProbeFailureCooldownSecs ? '' : 'border-red-400'"
+            />
+          </div>
+        </div>
+      </div>
+    </Card>
+
+    <!-- 系统角色模型白名单 -->
+    <Card class="bg-white border-[#e8e2d9] rounded-xl overflow-hidden">
+      <div class="p-6 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-[#29261e]">系统角色模型</h3>
+        </div>
+
+        <div class="space-y-2">
+          <Label class="text-[#5c5647] text-sm">允许模型 (逗号分隔)</Label>
+          <Input
+            v-model="allowSystemRoleModels"
+            placeholder="claude-opus-5-5,claude-opus-5,claude-fable-5,claude-fable-5-1,claude-opus-4-8"
+            class="border-[#e8e2d9] focus:ring-[#c4704f] font-mono text-sm"
+            :class="isValidSystemRoleModels ? '' : 'border-red-400'"
+          />
+          <div class="flex flex-wrap gap-1.5">
+            <span class="text-xs text-[#b5b0a6] self-center">预设:</span>
+            <button
+              type="button"
+              @click="allowSystemRoleModels = 'claude-opus-5-5,claude-opus-5,claude-fable-5,claude-fable-5-1,claude-opus-4-8'"
+              class="px-2 py-0.5 text-xs rounded border border-[#e8e2d9] bg-[#f9f6f1] text-[#8c8475] hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+            >默认模型列表</button>
+            <button
+              type="button"
+              @click="allowSystemRoleModels = ''"
+              class="px-2 py-0.5 text-xs rounded border border-[#e8e2d9] bg-[#f9f6f1] text-[#8c8475] hover:border-red-300 hover:bg-red-50 hover:text-red-600 transition-colors"
+            >全部关闭</button>
+          </div>
+        </div>
+      </div>
+    </Card>
+
+    <!-- 系统提示词环境透传 -->
+    <Card class="bg-white border-[#e8e2d9] rounded-xl overflow-hidden">
+      <div class="p-6 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-[#29261e]">环境透传(指纹)</h3>
+          <p class="text-xs text-[#8c8475] mt-1">
+            控制系统提示词 <span class="font-mono">&lt;env&gt;</span> 块中各字段是否使用客户端真实值。开启后该字段不再改写为账号预设,让模型识别真实环境;这三项仅存在于请求体,不影响请求头/遥测。<span class="font-medium">Platform 不在此列(跨通道字段,始终锁定)</span>。
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">Shell</Label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="passthroughShell"
+                type="checkbox"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">{{ passthroughShell ? '透传真实值' : '改写为预设' }}</span>
+            </label>
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">OS Version</Label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="passthroughOsVersion"
+                type="checkbox"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">{{ passthroughOsVersion ? '透传真实值' : '改写为预设' }}</span>
+            </label>
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-sm">Working directory</Label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="passthroughWorkingDir"
+                type="checkbox"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">{{ passthroughWorkingDir ? '透传真实值' : '改写为预设' }}</span>
+            </label>
+          </div>
+        </div>
+        <p class="text-[11px] text-[#b5b0a6]">
+          开启 OS Version / Working directory 透传时,请确保账号预设平台与真机系统一致,否则会出现 Platform 与系统/路径不同系的矛盾。工作目录默认透传以避免误导模型对真实 cwd 的判断。
+        </p>
+      </div>
+    </Card>
+
+    <!-- Anthropic 缓存改写 -->
+    <Card class="bg-white border-[#e8e2d9] rounded-xl overflow-hidden">
+      <div class="p-6 space-y-6">
+        <div>
+          <h3 class="text-sm font-semibold text-[#29261e]">Anthropic 缓存改写</h3>
+          <p class="text-xs text-[#8c8475] mt-1">
+            分别控制 Claude Code messages 缓存断点位置和 ephemeral cache_control.ttl。默认不改写,保持客户端原始缓存策略。
+          </p>
+        </div>
+
+        <div class="space-y-3">
+          <div>
+            <Label class="text-[#5c5647] text-sm">messages 缓存断点</Label>
+            <p class="text-[11px] text-[#b5b0a6] mt-1">
+              会话防污染会记住同一 Claude Code session 的正常主线断点,并忽略并行 tool 或停止恢复触发的异常暴涨请求。
+            </p>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="messageCacheControlRewrite"
+                type="radio"
+                value="off"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">保持原样</span>
+            </label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="messageCacheControlRewrite"
+                type="radio"
+                value="auto"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">自动修复</span>
+            </label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="messageCacheControlRewrite"
+                type="radio"
+                value="stateful"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">会话防污染</span>
+            </label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="messageCacheControlRewrite"
+                type="radio"
+                value="rolling"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">滚动断点</span>
+            </label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="messageCacheControlRewrite"
+                type="radio"
+                value="sub2api"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">sub2api 断点</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <div>
+            <Label class="text-[#5c5647] text-sm">cache_control.ttl</Label>
+            <p class="text-[11px] text-[#b5b0a6] mt-1">
+              仅改写请求体里已经存在或由 messages 缓存断点策略创建的 ephemeral cache_control.ttl。
+            </p>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="cacheControlTtlRewrite"
+                type="radio"
+                value="off"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">不改写</span>
+            </label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="cacheControlTtlRewrite"
+                type="radio"
+                value="5m"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">强制 5m</span>
+            </label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="cacheControlTtlRewrite"
+                type="radio"
+                value="1h"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">强制 1h</span>
+            </label>
+          </div>
+        </div>
+        <p class="text-[11px] text-[#b5b0a6]">
+          这些设置只影响 Anthropic /v1/messages 转发,发生在 CCH attestation 重新计算之前。off 可作为回滚开关。
+        </p>
+
+        <div class="pt-3 border-t border-[#f0ebe4] space-y-3">
+          <div>
+            <Label class="text-[#5c5647] text-sm">请求体字段顺序指纹</Label>
+            <p class="text-[11px] text-[#b5b0a6] mt-1">
+              对齐 API mimicry 生成的 /v1/messages 顶层字段顺序；Claude Code 客户端请求保留原始顺序。
+            </p>
+          </div>
+          <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+            <input
+              v-model="messageBodyOrderFingerprintEnabled"
+              type="checkbox"
+              class="accent-[#c4704f] w-4 h-4"
+            />
+            <span class="text-sm text-[#29261e]">{{ messageBodyOrderFingerprintEnabled ? '已启用' : '保持序列化原序' }}</span>
+          </label>
+          <p class="text-[11px] text-[#b5b0a6]">
+            排序发生在 API body 改写之后、CCH attestation 计算之前；未知字段保留在已知字段之后。
+          </p>
+        </div>
+
+        <div class="pt-3 border-t border-[#f0ebe4] space-y-3">
+          <div>
+            <Label class="text-[#5c5647] text-sm">Messages 顶层字段清理</Label>
+            <p class="text-[11px] text-[#b5b0a6] mt-1">
+              默认开启，对 API、Claude Code 和状态分类请求按固定 56 键清理 Messages 根级附带字段，保留嵌套内容和未知扩展。
+            </p>
+          </div>
+          <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+            <input
+              v-model="messageTopFieldFilterEnabled"
+              type="checkbox"
+              class="accent-[#c4704f] w-4 h-4"
+            />
+            <span class="text-sm text-[#29261e]">{{ messageTopFieldFilterEnabled ? '已启用' : '已关闭' }}</span>
+          </label>
+          <p class="text-[11px] text-[#b5b0a6]">
+            只删除固定根键，不展开 extra_body、extra_headers，不转换 OpenAI 参数。关闭可停用此项清理，保存后新请求即时生效。
+          </p>
+        </div>
+
+        <div class="pt-3 border-t border-[#f0ebe4] space-y-3">
+          <div>
+            <Label class="text-[#5c5647] text-sm">thinking.type=disabled 兼容改写</Label>
+            <p class="text-[11px] text-[#b5b0a6] mt-1">
+              命中模型时,将顶层 thinking.type 从 disabled 改为 adaptive；改写发生在 CCH attestation 计算和 cache 前缀诊断之前。
+            </p>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4">
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="rewriteDisabledThinkingEnabled"
+                type="checkbox"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">{{ rewriteDisabledThinkingEnabled ? '已启用' : '保持原样' }}</span>
+            </label>
+            <div class="space-y-2">
+              <Input
+                v-model="rewriteDisabledThinkingModels"
+                placeholder="claude-fable-5"
+                class="border-[#e8e2d9] focus:ring-[#c4704f] font-mono text-sm"
+                :class="isValidRewriteDisabledThinkingModels ? '' : 'border-red-400'"
+              />
+              <p class="text-[11px] text-[#b5b0a6]">逗号分隔精确模型 ID；默认只匹配 claude-fable-5</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
+
+    <!-- Claude Code bootstrap -->
+    <Card class="bg-white border-[#e8e2d9] rounded-xl overflow-hidden">
+      <div class="p-6 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-[#29261e]">Claude Code bootstrap</h3>
+          <p class="text-xs text-[#8c8475] mt-1">
+            控制 /api/claude_cli/bootstrap 返回给客户端的额外模型选项。透传模式完全使用上游响应；配置模式按下方 JSON 覆盖 additional_model_options 并开启 cedar_lagoon；隐藏模式会移除 Fable 入口。
+          </p>
+        </div>
+
+        <div class="space-y-3">
+          <div>
+            <Label class="text-[#5c5647] text-sm">模型选项模式</Label>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="bootstrapModelOptionsMode"
+                type="radio"
+                value="passthrough"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">透传上游</span>
+            </label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="bootstrapModelOptionsMode"
+                type="radio"
+                value="configured"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">使用配置列表</span>
+            </label>
+            <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+              <input
+                v-model="bootstrapModelOptionsMode"
+                type="radio"
+                value="hide_fable"
+                class="accent-[#c4704f] w-4 h-4"
+              />
+              <span class="text-sm text-[#29261e]">隐藏 Fable</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <Label class="text-[#5c5647] text-sm">additional_model_options JSON</Label>
+          <Textarea
+            v-model="bootstrapAdditionalModelOptions"
+            rows="5"
+            placeholder='[{"model":"claude-fable-5-1[1m]","name":"Fable"}]'
+            class="border-[#e8e2d9] focus:ring-[#c4704f] font-mono text-xs"
+            :class="isValidBootstrapAdditionalModelOptions ? '' : 'border-red-400'"
+          />
+          <p class="text-[11px] text-[#b5b0a6]">必须是 JSON 数组；每项至少包含 model 字符串。空数组表示不额外暴露模型。</p>
+        </div>
+      </div>
+    </Card>
+
+    <!-- Claude Code 上下文风险控制 -->
+    <Card class="bg-white border-[#e8e2d9] rounded-xl overflow-hidden">
+      <div class="p-6 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-[#29261e]">Claude Code 上下文风险控制</h3>
+          <p class="text-xs text-[#8c8475] mt-1">
+            仅作用于 Claude Code /v1/messages 自动上下文中的 currentDate 标记；默认只记录脱敏摘要，不修改请求体。
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+            <input
+              v-model="claudeCodeContextSanitizerMode"
+              type="radio"
+              value="off"
+              class="accent-[#c4704f] w-4 h-4"
+            />
+            <span class="text-sm text-[#29261e]">关闭</span>
+          </label>
+          <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+            <input
+              v-model="claudeCodeContextSanitizerMode"
+              type="radio"
+              value="report_only"
+              class="accent-[#c4704f] w-4 h-4"
+            />
+            <span class="text-sm text-[#29261e]">仅观测</span>
+          </label>
+          <label class="flex items-center gap-2 h-9 px-3 rounded-md border border-[#e8e2d9] bg-[#f9f6f1] cursor-pointer select-none">
+            <input
+              v-model="claudeCodeContextSanitizerMode"
+              type="radio"
+              value="normalize"
+              class="accent-[#c4704f] w-4 h-4"
+            />
+            <span class="text-sm text-[#29261e]">规范化 currentDate</span>
+          </label>
+        </div>
+
+        <p class="text-[11px] text-[#b5b0a6]">
+          normalize 会把命中的日期句式恢复为稳定的 YYYY-MM-DD 格式；telemetry 中的 base URL / gateway / proxy 痕迹会持续清洗。
+        </p>
+      </div>
+    </Card>
+
+    <!-- 客户端访问策略 -->
+    <Card class="bg-white border-[#e8e2d9] rounded-xl overflow-hidden">
+      <div class="p-6 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-[#29261e]">客户端访问策略</h3>
+          <p class="text-xs text-[#8c8475] mt-1">
+            Claude Code / CLI 按版本范围校验；其他客户端按 UA 白名单校验。空值表示对应限制关闭。
+          </p>
+        </div>
+
+        <div class="space-y-3 border-b border-[#f0ebe4] pb-4">
+          <div>
+            <Label class="text-[#5c5647] text-sm">Claude Code 默认版本画像</Label>
+            <p class="text-[11px] text-[#b5b0a6] mt-1">
+              通过准入后，原始 UA 的 260/280/293 请求使用对应画像；缺少、非法或未匹配版本使用默认画像，出厂为 293。禁止版本优先于允许范围。
+            </p>
+            <p class="text-[11px] text-[#b5b0a6] mt-1">
+              保存默认画像仍同步账号基础软件环境；客户端模式的准入范围独立保存，账号模式使用目标画像范围。
+            </p>
+          </div>
+          <div class="space-y-1.5">
+            <Label class="text-[#5c5647] text-xs">画像选择方式</Label>
+            <select
+              v-model="claudeCodeProfileSelectionMode"
+              @change="syncAccountProfileRange"
+              class="h-9 w-full rounded-md border border-[#e8e2d9] bg-[#f9f6f1] px-3 text-sm text-[#29261e] focus:outline-none focus:ring-2 focus:ring-[#c4704f]"
+            >
+              <option value="client_version">按客户端 UA 适配（默认）</option>
+              <option value="account">使用账号画像（旧方式）</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-1.5">
+              <select
+                v-model="claudeCodeVersionProfile"
+                @change="syncAccountProfileRange"
+                class="h-9 w-full rounded-md border border-[#e8e2d9] bg-[#f9f6f1] px-3 text-sm text-[#29261e] focus:outline-none focus:ring-2 focus:ring-[#c4704f]"
+              >
+                <option
+                  v-for="profile in claudeCodeVersionProfiles"
+                  :key="profile.key"
+                  :value="profile.key"
+                >
+                  {{ profile.version }}
+                </option>
+              </select>
+            </div>
+            <div class="text-[11px] text-[#8c8475] leading-5">
+              <template v-for="profile in claudeCodeVersionProfiles" :key="profile.key">
+                <div v-if="profile.key === claudeCodeVersionProfile">
+                  <span class="font-mono">{{ profile.allowed_claude_code_versions }}</span>
+                  <span class="mx-1">·</span>
+                  <span>{{ profile.growthbook_user_agent }}</span>
+                  <span class="mx-1">·</span>
+                  <span>{{ formatTelemetryShape(profile.telemetry_shape) }}</span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">Claude Code 版本范围</Label>
+            <Textarea
+              v-model="allowedClaudeCodeVersions"
+              rows="4"
+              placeholder="2.1.89-2.1.293"
+              class="border-[#e8e2d9] focus:ring-[#c4704f] font-mono text-sm bg-[#f9f6f1]"
+              :class="isValidClaudeCodeVersions ? '' : 'border-red-400'"
+              :readonly="claudeCodeProfileSelectionMode === 'account'"
+            />
+            <p class="text-[11px] text-[#b5b0a6]">客户端模式可独立配置；账号模式由画像决定。保存后回显实际生效值。</p>
+          </div>
+
+          <div class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">禁止 Claude Code 版本</Label>
+            <Textarea
+              v-model="blockedClaudeCodeVersions"
+              rows="4"
+              placeholder="2.1.187&#10;2.2.*"
+              class="border-[#e8e2d9] focus:ring-[#c4704f] font-mono text-sm"
+              :class="isValidBlockedClaudeCodeVersions ? '' : 'border-red-400'"
+            />
+            <p class="text-[11px] text-[#b5b0a6]">支持精确版本、* 通配和区间；优先于允许范围，允许范围为空时仍生效。</p>
+            <button
+              type="button"
+              @click="use280293AccessPreset"
+              class="px-2 py-0.5 text-xs rounded border border-[#e8e2d9] bg-[#f9f6f1] text-[#8c8475] hover:border-emerald-300"
+            >仅允许 280、293（默认 293）</button>
+            <p class="text-[11px] text-[#b5b0a6]">预设填入两段禁止区间，保存后生效；已有画像选项仍保留。</p>
+          </div>
+
+          <div class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">其他允许 UA</Label>
+            <Textarea
+              v-model="allowedUserAgents"
+              rows="4"
+              placeholder="AI-Hub-Monitor*&#10;python-httpx*"
+              class="border-[#e8e2d9] focus:ring-[#c4704f] font-mono text-sm"
+              :class="isValidAllowedUserAgents ? '' : 'border-red-400'"
+            />
+            <p class="text-[11px] text-[#b5b0a6]">支持 * 通配；只用于非 claude-code/claude-cli 客户端</p>
+            <div class="flex flex-wrap gap-1.5">
+              <span class="text-xs text-[#b5b0a6] self-center">预设:</span>
+              <button
+                type="button"
+                @click="allowedUserAgents = 'AI-Hub-Monitor*\npython-httpx*'"
+                class="px-2 py-0.5 text-xs rounded border border-[#e8e2d9] bg-[#f9f6f1] text-[#8c8475] hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+              >默认 UA</button>
+              <button
+                type="button"
+                @click="allowedUserAgents = ''"
+                class="px-2 py-0.5 text-xs rounded border border-[#e8e2d9] bg-[#f9f6f1] text-[#8c8475] hover:border-red-300 hover:bg-red-50 hover:text-red-600 transition-colors"
+              >关闭 UA 限制</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
+
+    <!-- 保存按钮 -->
+    <div class="flex justify-end">
+      <Button
+        @click="saveSettings"
+        :disabled="saving || !allValid || !isValidHours || !isValidModel || !isValidSystemRoleModels || !isValidClaudeCodeVersions || !isValidBlockedClaudeCodeVersions || !isValidAllowedUserAgents || !isValidRewriteDisabledThinkingModels || !isValidInterceptAssistantPrefillModels || !isValidLog429RequestBodyLimit || !isValidStreamKeepaliveIntervalSecs || !isValidStreamUpstreamIdleTimeoutSecs || !isValidSessionHelloProbeTimeoutSecs || !isValidSessionHelloProbeSuccessTtlSecs || !isValidSessionHelloProbeFailureCooldownSecs || !isValidBootstrapAdditionalModelOptions"
+        class="bg-[#c4704f] hover:bg-[#b5623f] text-white font-medium rounded-xl transition-all duration-200 px-6"
+      >
+        {{ saving ? '保存中...' : '保存' }}
+      </Button>
+    </div>
+
+    <!-- 最近预热记录 -->
+    <Card class="bg-white border-[#e8e2d9] rounded-xl overflow-hidden">
+      <div class="p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-semibold text-[#29261e]">最近预热记录</h3>
+            <p class="text-xs text-[#8c8475] mt-1">按触发时间倒序,最多保留 200 条</p>
+          </div>
+          <Button
+            @click="loadPrimeLogs"
+            :disabled="logsLoading"
+            variant="outline"
+            class="border-[#e8e2d9] text-[#5c5647] hover:bg-[#f0ebe4] rounded-lg text-xs h-8"
+          >
+            {{ logsLoading ? '加载中...' : '刷新' }}
+          </Button>
+        </div>
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead class="text-[#8c8475]">时间</TableHead>
+              <TableHead class="text-[#8c8475]">账号</TableHead>
+              <TableHead class="text-[#8c8475]">小时</TableHead>
+              <TableHead class="text-[#8c8475]">模型</TableHead>
+              <TableHead class="text-[#8c8475]">耗时</TableHead>
+              <TableHead class="text-[#8c8475]">结果</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="log in primeLogs" :key="log.id">
+              <TableCell class="text-[#29261e] text-xs whitespace-nowrap">{{ formatTime(log.triggered_at) }}</TableCell>
+              <TableCell class="text-[#29261e] text-xs">
+                <span class="font-medium">{{ log.account_name || `#${log.account_id}` }}</span>
+                <span class="text-[#b5b0a6] ml-1">#{{ log.account_id }}</span>
+              </TableCell>
+              <TableCell class="text-[#5c5647] text-xs">{{ String(log.hour).padStart(2, '0') }}:10</TableCell>
+              <TableCell class="text-[#5c5647] text-xs">{{ log.model }}</TableCell>
+              <TableCell class="text-[#5c5647] text-xs">{{ log.duration_ms }}ms</TableCell>
+              <TableCell>
+                <Badge
+                  v-if="log.success"
+                  class="bg-emerald-50 text-emerald-700 border-emerald-200"
+                >
+                  成功
+                </Badge>
+                <Badge
+                  v-else-if="isSkipped(log)"
+                  class="bg-amber-50 text-amber-700 border-amber-200"
+                  :title="log.error_message"
+                >
+                  跳过
+                </Badge>
+                <Badge
+                  v-else
+                  class="bg-red-50 text-red-700 border-red-200"
+                  :title="log.error_message"
+                >
+                  失败
+                </Badge>
+                <span
+                  v-if="!log.success && log.error_message"
+                  class="ml-2 text-[11px] text-[#b5b0a6] truncate inline-block max-w-[260px] align-middle"
+                  :title="log.error_message"
+                >
+                  {{ log.error_message }}
+                </span>
+              </TableCell>
+            </TableRow>
+            <TableEmpty v-if="primeLogs.length === 0" :colspan="6">
+              暂无预热记录
+            </TableEmpty>
+          </TableBody>
+        </Table>
+      </div>
+    </Card>
+  </div>
+</template>

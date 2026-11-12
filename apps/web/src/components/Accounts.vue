@@ -1,0 +1,1994 @@
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { api, type Account, type OAuthExchangeResult, type UsageWindow } from '../api';
+import UsageWindowStats from './UsageWindowStats.vue';
+import SchedulingDetails from './SchedulingDetails.vue';
+import { subscriptionLabel, fiveHourLabel } from '../lib/subscription';
+import { schedulingReasonLabel } from '../lib/scheduling';
+import { accountUpdateDelta } from '../lib/accountUpdate';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
+import { useToast } from '../composables/useToast';
+
+const DEFAULT_ALLOW_1M_MODELS = 'opus,claude-sonnet-5';
+const DEFAULT_UPSTREAM_SESSION_POOL_SIZE = 3;
+const DEFAULT_UPSTREAM_SESSION_TTL_MINUTES = 60;
+const DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY = 'mapped_request';
+
+const emit = defineEmits<{ refresh: [] }>();
+const { show: toast } = useToast();
+
+/** 账号列表 */
+const accounts = ref<Account[]>([]);
+/** 网关当前生效的画像配置；旧后端未提供时不推测默认值。 */
+const profileSelectionMode = ref<'client_version' | 'account' | null>(null);
+const defaultVersionProfile = ref<string | null>(null);
+/** 分页状态 */
+const currentPage = ref(1);
+const totalPages = ref(1);
+const totalCount = ref(0);
+const pageSize = 12;
+/** 只读调度详情，保留已有账号卡片布局。 */
+const schedulingAccount = ref<Account | null>(null);
+const showScheduling = ref(false);
+const accountLoadFailed = ref(false);
+let accountLoadGeneration = 0;
+let accountLoading = false;
+
+/** 表单弹窗是否可见 */
+const showForm = ref(false);
+/** 编辑开始时的标量快照，用于增量提交。 */
+const editBaseline = ref<Record<string, unknown>>({});
+/** 删除确认弹窗是否可见 */
+const showDeleteConfirm = ref(false);
+/** 待删除账号 ID */
+const deleteTargetId = ref<number | null>(null);
+
+/** 评分 Tooltip 状态 */
+const scoreTooltip = ref<{ visible: boolean; x: number; y: number; account: Account | null }>({
+  visible: false, x: 0, y: 0, account: null,
+});
+/** 显示评分详情 Tooltip */
+function showScoreTooltip(e: MouseEvent, account: Account) {
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  scoreTooltip.value = {
+    visible: true,
+    x: rect.left,
+    y: rect.top - 8,  // 元素上方，后续通过 transform 往上偏移
+    account,
+  };
+}
+/** 隐藏评分详情 Tooltip */
+function hideScoreTooltip() {
+  scoreTooltip.value.visible = false;
+}
+/** 并发 Tooltip 状态 */
+const concurrencyTooltip = ref<{ visible: boolean; x: number; y: number; account: Account | null }>({
+  visible: false, x: 0, y: 0, account: null,
+});
+/** 显示并发详情 Tooltip */
+function showConcurrencyTooltip(e: MouseEvent, account: Account) {
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  concurrencyTooltip.value = {
+    visible: true,
+    x: rect.left + rect.width / 2,
+    y: rect.top - 8,
+    account,
+  };
+}
+/** 隐藏并发详情 Tooltip */
+function hideConcurrencyTooltip() {
+  concurrencyTooltip.value.visible = false;
+}
+/** 当前编辑的账号（null 表示新建） */
+const editing = ref<Account | null>(null);
+/** 表单数据 */
+const form = ref({
+  name: '',
+  email: '',
+  auth_type: 'setup_token',
+  setup_token: '',
+  access_token: '',
+  refresh_token: '',
+  expires_at: '',
+  proxy_url: '',
+  billing_mode: 'strip',
+  request_backend: 'legacy' as 'legacy' | 'native293',
+  account_uuid: '',
+  organization_uuid: '',
+  subscription_type: '',
+  rate_limit_tier: '',
+  concurrency: 3,
+  priority: 50,
+  rpm_limit: 0,
+  five_hour_usage_limit_percent: 0,
+  seven_day_usage_limit_percent: 0,
+  auto_telemetry: false,
+  auto_poll_usage: false,
+  allow_1m_models: DEFAULT_ALLOW_1M_MODELS,
+  allow_fast_mode: false,
+  upstream_session_pool_enabled: false,
+  upstream_session_pool_size: DEFAULT_UPSTREAM_SESSION_POOL_SIZE,
+  upstream_session_ttl_minutes: DEFAULT_UPSTREAM_SESSION_TTL_MINUTES,
+  upstream_session_refresh_policy: DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY,
+});
+/** 正在测试的账号 ID */
+const testing = ref<number | null>(null);
+/** 测试结果 */
+const testResult = ref<{ status: string; message?: string } | null>(null);
+/** 正在刷新用量的账号 ID */
+const refreshingUsage = ref<number | null>(null);
+type UsageWindowKey = 'five_hour' | 'seven_day' | 'seven_day_sonnet' | 'seven_day_fable';
+
+/** 修改原始类型时清除旧分级，防止把上个套餐的真实分级带入新类型。@param value 原始类型。@return 无。 */
+function selectSubscription(value: string) {
+  if (form.value.subscription_type !== value) form.value.rate_limit_tier = '';
+  form.value.subscription_type = value;
+}
+
+/** 加载账号列表 */
+async function load() {
+  if (document.hidden) return;
+  const generation = ++accountLoadGeneration;
+  accountLoading = true;
+  try {
+    const res = await api.listAccounts(currentPage.value, pageSize);
+    if (generation !== accountLoadGeneration) return;
+    accountLoadFailed.value = false;
+    accounts.value = res.data ?? [];
+    profileSelectionMode.value = res.claude_code_profile_selection_mode ?? null;
+    defaultVersionProfile.value = res.claude_code_version_profile ?? null;
+    totalPages.value = res.total_pages;
+    totalCount.value = res.total;
+  } catch {
+    // 读取失败不把原有负载伪装成空列表；旧快照保留并明确标记。
+    if (generation === accountLoadGeneration) accountLoadFailed.value = true;
+  } finally {
+    if (generation === accountLoadGeneration) accountLoading = false;
+  }
+}
+
+/** 页面恢复可见时立即更新，隐藏时不继续拉取。@return 无。 */
+function refreshVisibleAccounts() {
+  if (!document.hidden) void load();
+}
+
+/** 打开只读会话和发送视图。@param account 当前账号。@return 无。 */
+function openScheduling(account: Account) {
+  schedulingAccount.value = account;
+  showScheduling.value = true;
+}
+
+/** 翻页 */
+function goToPage(page: number) {
+  if (page < 1 || page > totalPages.value) return;
+  currentPage.value = page;
+  load();
+}
+
+/** 可见的页码列表 */
+const visiblePages = computed(() => {
+  const pages: number[] = [];
+  const total = totalPages.value;
+  const current = currentPage.value;
+  let start = Math.max(1, current - 2);
+  let end = Math.min(total, start + 4);
+  start = Math.max(1, end - 4);
+  for (let i = start; i <= end; i++) pages.push(i);
+  return pages;
+});
+
+/** 自动重载定时器 */
+let autoReloadTimer: ReturnType<typeof setInterval> | null = null;
+
+onMounted(() => {
+  load();
+  document.addEventListener('visibilitychange', refreshVisibleAccounts);
+  // 每 5 秒静默重拉账户列表，保证秒级 soft backoff 状态能被看到。
+  autoReloadTimer = setInterval(() => {
+    if (!document.hidden && !accountLoading) void load();
+  }, 5 * 1000);
+});
+
+onUnmounted(() => {
+  accountLoadGeneration++;
+  document.removeEventListener('visibilitychange', refreshVisibleAccounts);
+  if (autoReloadTimer) {
+    clearInterval(autoReloadTimer);
+    autoReloadTimer = null;
+  }
+});
+
+/** 打开新建账号弹窗 */
+function openCreate() {
+  editing.value = null;
+  form.value = {
+    name: '',
+    email: '',
+    auth_type: 'setup_token',
+    setup_token: '',
+    access_token: '',
+    refresh_token: '',
+    expires_at: '',
+    proxy_url: '',
+    billing_mode: 'strip',
+    request_backend: 'legacy' as 'legacy' | 'native293',
+    account_uuid: '',
+    organization_uuid: '',
+    subscription_type: '',
+    rate_limit_tier: '',
+    concurrency: 3,
+    priority: 50,
+    rpm_limit: 0,
+    five_hour_usage_limit_percent: 0,
+    seven_day_usage_limit_percent: 0,
+    auto_telemetry: false,
+    auto_poll_usage: false,
+    allow_1m_models: DEFAULT_ALLOW_1M_MODELS,
+    allow_fast_mode: false,
+    upstream_session_pool_enabled: false,
+    upstream_session_pool_size: DEFAULT_UPSTREAM_SESSION_POOL_SIZE,
+    upstream_session_ttl_minutes: DEFAULT_UPSTREAM_SESSION_TTL_MINUTES,
+    upstream_session_refresh_policy: DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY,
+  };
+  showForm.value = true;
+}
+
+/**
+ * 打开编辑账号弹窗
+ * @param a 要编辑的账号对象
+ */
+function openEdit(a: Account) {
+  editing.value = a;
+  form.value = {
+    name: a.name,
+    email: a.email,
+    auth_type: a.auth_type || 'setup_token',
+    setup_token: '',
+    access_token: '',
+    refresh_token: '',
+    expires_at: a.expires_at ? String(a.expires_at) : '',
+    proxy_url: a.proxy_url,
+    billing_mode: a.billing_mode || 'strip',
+    request_backend: a.request_backend ?? 'legacy',
+    account_uuid: a.account_uuid || '',
+    organization_uuid: a.organization_uuid || '',
+    subscription_type: a.subscription_type || '',
+    rate_limit_tier: a.rate_limit_tier || '',
+    concurrency: a.concurrency,
+    priority: a.priority,
+    rpm_limit: a.rpm_limit ?? 0,
+    five_hour_usage_limit_percent: a.five_hour_usage_limit_percent ?? 0,
+    seven_day_usage_limit_percent: a.seven_day_usage_limit_percent ?? 0,
+    auto_telemetry: a.auto_telemetry ?? false,
+    auto_poll_usage: a.auto_poll_usage ?? false,
+    allow_1m_models: a.allow_1m_models ?? DEFAULT_ALLOW_1M_MODELS,
+    allow_fast_mode: a.allow_fast_mode ?? false,
+    upstream_session_pool_enabled: a.upstream_session_pool_enabled ?? false,
+    upstream_session_pool_size: a.upstream_session_pool_size ?? DEFAULT_UPSTREAM_SESSION_POOL_SIZE,
+    upstream_session_ttl_minutes: a.upstream_session_ttl_minutes ?? DEFAULT_UPSTREAM_SESSION_TTL_MINUTES,
+    upstream_session_refresh_policy: a.upstream_session_refresh_policy ?? DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY,
+  };
+  editBaseline.value = { ...form.value };
+  showForm.value = true;
+}
+
+/**
+ * 规整并校验额度输入，拒绝空值和越界数值，避免误将限制关闭。
+ * @param value 输入框当前值。
+ * @param label 用于错误提示的窗口名称。
+ * @return 0～100 的整数百分比。
+ */
+function usageLimitInput(value: unknown, label: string): number {
+  const number = typeof value === 'number' ? value
+    : typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN;
+  if (!Number.isInteger(number) || number < 0 || number > 100) {
+    throw new Error(`${label}用量上限必须为 0～100 的整数，0 表示不限制`);
+  }
+  return number;
+}
+
+/** 保存账号（新建或更新）。@return 保存完成后的空结果。 */
+async function save() {
+  try {
+    const expiresAt = form.value.expires_at.trim();
+    form.value.five_hour_usage_limit_percent = usageLimitInput(form.value.five_hour_usage_limit_percent, '5 小时');
+    form.value.seven_day_usage_limit_percent = usageLimitInput(form.value.seven_day_usage_limit_percent, '7 天');
+    if (form.value.upstream_session_pool_size < 0 || form.value.upstream_session_pool_size > 20) {
+      throw new Error('上游 session 池容量必须为 0 或 1-20');
+    }
+    if (form.value.upstream_session_pool_size !== 0 && form.value.upstream_session_pool_size < 1) {
+      throw new Error('上游 session 池容量必须为 0 或 1-20');
+    }
+    if (form.value.upstream_session_ttl_minutes < 5 || form.value.upstream_session_ttl_minutes > 1440) {
+      throw new Error('上游 session TTL 必须为 5-1440 分钟');
+    }
+    if (editing.value) {
+      if (form.value.auth_type === 'setup_token'
+        && !form.value.setup_token.trim()
+        && editing.value.auth_type !== 'setup_token') {
+        throw new Error('切换到 Setup Token 模式时必须填写 Setup Token');
+      }
+      if (form.value.auth_type === 'oauth'
+        && !form.value.refresh_token.trim()
+        && editing.value.auth_type !== 'oauth') {
+        throw new Error('切换到 OAuth 模式时必须填写 Refresh Token');
+      }
+      const updates = accountUpdateDelta(form.value, editBaseline.value);
+      await api.updateAccount(editing.value.id, updates);
+    } else {
+      if (form.value.auth_type === 'setup_token' && !form.value.setup_token.trim()) {
+        throw new Error('Setup Token 不能为空');
+      }
+      if (form.value.auth_type === 'oauth' && !form.value.refresh_token.trim()) {
+        throw new Error('Refresh Token 不能为空');
+      }
+      const payload: Record<string, unknown> = {
+        name: form.value.name,
+        email: form.value.email,
+        auth_type: form.value.auth_type,
+        setup_token: form.value.setup_token,
+        access_token: form.value.access_token,
+        refresh_token: form.value.refresh_token,
+        proxy_url: form.value.proxy_url,
+        billing_mode: form.value.billing_mode,
+        request_backend: form.value.request_backend,
+        account_uuid: form.value.account_uuid || null,
+        organization_uuid: form.value.organization_uuid || null,
+        subscription_type: form.value.subscription_type || null,
+        rate_limit_tier: form.value.rate_limit_tier || null,
+        concurrency: form.value.concurrency,
+        priority: form.value.priority,
+        rpm_limit: form.value.rpm_limit,
+        five_hour_usage_limit_percent: form.value.five_hour_usage_limit_percent,
+        seven_day_usage_limit_percent: form.value.seven_day_usage_limit_percent,
+        auto_telemetry: form.value.auto_telemetry,
+        auto_poll_usage: form.value.auto_poll_usage,
+        allow_1m_models: form.value.allow_1m_models,
+        allow_fast_mode: form.value.allow_fast_mode,
+        upstream_session_pool_enabled: form.value.upstream_session_pool_enabled,
+        upstream_session_pool_size: form.value.upstream_session_pool_size,
+        upstream_session_ttl_minutes: form.value.upstream_session_ttl_minutes,
+        upstream_session_refresh_policy: form.value.upstream_session_refresh_policy,
+      };
+      if (expiresAt) payload.expires_at = Number(expiresAt);
+      await api.createAccount(payload);
+    }
+    showForm.value = false;
+    await load();
+    emit('refresh');
+  } catch (e: unknown) {
+    toast((e as Error).message || '保存失败');
+  }
+}
+
+/**
+ * 确认删除账号
+ * @param id 账号 ID
+ */
+function confirmDelete(id: number) {
+  deleteTargetId.value = id;
+  showDeleteConfirm.value = true;
+}
+
+/** 执行删除账号 */
+async function executeDelete() {
+  if (deleteTargetId.value === null) return;
+  try {
+    await api.deleteAccount(deleteTargetId.value);
+    showDeleteConfirm.value = false;
+    deleteTargetId.value = null;
+    await load();
+    emit('refresh');
+  } catch (e: unknown) {
+    toast((e as Error).message || '删除失败');
+  }
+}
+
+/**
+ * 测试账号连接
+ * @param id 账号 ID
+ */
+async function test(id: number) {
+  testing.value = id;
+  testResult.value = null;
+  try {
+    testResult.value = await api.testAccount(id);
+    if (testResult.value.status === 'error') {
+      toast(testResult.value.message || '测试失败');
+    }
+  } catch (e: unknown) {
+    toast((e as Error).message || '测试请求失败');
+  }
+  setTimeout(() => { testing.value = null; testResult.value = null; }, 3000);
+}
+
+/**
+ * 刷新账号用量数据
+ * @param id 账号 ID
+ */
+async function refreshUsage(id: number) {
+  refreshingUsage.value = id;
+  try {
+    const res = await api.refreshUsage(id);
+    if (res.status === 'ok' && res.usage) {
+      // 官方 reset 可能已推进，立即重读后端汇总以同步切换费用窗口。
+      await load();
+    } else if (res.status === 'error') {
+      toast(res.message || '刷新用量失败');
+    }
+  } catch (e: unknown) {
+    toast((e as Error).message || '刷新用量失败');
+  }
+  refreshingUsage.value = null;
+}
+
+/**
+ * 切换账号调度状态（启用/停用）
+ * @param a 账号对象
+ */
+async function toggleScheduling(a: Account) {
+  try {
+    const isStopped = a.status === 'disabled' || isRateLimited(a);
+    const newStatus = isStopped ? 'active' : 'disabled';
+    const res = await api.updateAccount(a.id, { status: newStatus });
+    a.status = res.status;
+    a.disable_reason = res.disable_reason ?? '';
+    a.rate_limited_at = res.rate_limited_at;
+    a.rate_limit_reset_at = res.rate_limit_reset_at;
+    emit('refresh');
+  } catch (e: unknown) {
+    toast((e as Error).message || '切换调度失败');
+  }
+}
+
+/**
+ * 格式化剩余时间
+ * @param resetsAt ISO 时间字符串
+ */
+function formatTimeLeft(resetsAt?: string | null): string {
+  if (!resetsAt) return '—';
+  const resetMs = new Date(resetsAt).getTime();
+  if (Number.isNaN(resetMs)) return '未知';
+  const diff = resetMs - Date.now();
+  if (diff <= 0) return '已重置';
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+  const seconds = Math.floor((diff % 60000) / 1000);
+  if (days > 0) return `${days}d${hours}h${minutes}m`;
+  if (hours > 0) return `${hours}h${minutes}m`;
+  if (minutes > 0) return `${minutes}m`;
+  // 不足 1 分钟时显示秒,避免短冷却显示成 “0m” 让人误以为卡住
+  return `${seconds}s`;
+}
+
+/**
+ * 从新版 limits scoped 结构中提取指定模型的周用量窗口。
+ */
+function scopedUsageWindow(data: Account['usage_data'], modelName: string) {
+  const expected = modelName.toLowerCase();
+  const limit = data?.limits?.find(item => {
+    const model = item.scope?.model;
+    const displayName = model?.display_name?.toLowerCase();
+    const modelId = model?.id?.toLowerCase();
+    const matchesModel = displayName === expected || !!modelId?.includes(expected);
+    return matchesModel && (item.kind === 'weekly_scoped' || item.group === 'weekly');
+  });
+  if (typeof limit?.percent !== 'number') return undefined;
+  return {
+    utilization: limit.percent,
+    resets_at: limit.resets_at ?? null,
+  };
+}
+
+/**
+ * 获取页面展示用 usage 窗口；Fable 兼容后端尚未写入稳定字段的旧缓存。
+ */
+function usageWindow(data: Account['usage_data'], key: UsageWindowKey) {
+  const direct = data?.[key];
+  if (direct) return direct;
+  if (key === 'seven_day_fable') return scopedUsageWindow(data, 'Fable');
+  return undefined;
+}
+
+/**
+ * 获取进度条宽度；未知或过期状态由文字单独说明，不能显示成真实 0%。
+ * @param window 官方额度观察。
+ * @return 限制在合法数值范围内的进度条百分比。
+ */
+function effectiveUtil(window?: { utilization: number; resets_at?: string | null }): number {
+  if (!window || !Number.isFinite(window.utilization) || window.utilization < 0) return 0;
+  const resetMs = window.resets_at ? new Date(window.resets_at).getTime() : NaN;
+  if (!Number.isNaN(resetMs) && resetMs <= Date.now()) return 0;
+  return window.utilization;
+}
+
+/**
+ * 区分真实零占用、缺少额度观察和等待新周期观察。
+ * @param window 官方额度窗口。
+ * @return 百分比或明确的未知／待更新状态。
+ */
+function usagePercentLabel(window?: UsageWindow): string {
+  if (!window || !Number.isFinite(window.utilization) || window.utilization < 0) return '未知';
+  if (window.resets_at) {
+    const reset = Date.parse(window.resets_at);
+    if (!Number.isFinite(reset)) return '未知';
+    if (reset <= Date.now()) return '待更新';
+  } else if (window.utilization > 0) {
+    return '未知';
+  }
+  return `${Math.round(window.utilization)}%`;
+}
+
+/**
+ * 只为仍有效的官方窗口展示倒计时，避免过期观察同时显示“已重置”。
+ * @param window 官方额度窗口。
+ * @return 重置时间是否合法且尚未到期。
+ */
+function hasFutureReset(window?: UsageWindow): boolean {
+  if (!window?.resets_at) return false;
+  const reset = Date.parse(window.resets_at);
+  return Number.isFinite(reset) && reset > Date.now();
+}
+
+/**
+ * 获取用量进度条颜色
+ * @param pct 使用百分比 (0-100)
+ */
+function usageBarColor(pct: number): string {
+  if (pct >= 80) return 'bg-red-400';
+  if (pct >= 50) return 'bg-amber-400';
+  return 'bg-emerald-400';
+}
+
+/**
+ * 判断账号是否正在被限流
+ */
+function isRateLimited(a: Account): boolean {
+  return !!(a.rate_limit_reset_at && new Date(a.rate_limit_reset_at) > new Date());
+}
+
+/**
+ * 获取状态徽章样式
+ */
+function statusStyle(a: Account): { class: string; label: string } {
+  if (a.status === 'active' && isRateLimited(a)) {
+    // 短冷却(瞬时速率限制,秒级)与真正撞墙(5h/7d 限额)区分显示,避免误以为账号被长时间限流
+    if ((a.disable_reason || '').includes('短冷却')) {
+      return { class: 'bg-sky-50 text-sky-600 border-sky-200', label: '短冷却' };
+    }
+    return { class: 'bg-amber-50 text-amber-700 border-amber-200', label: '限流中' };
+  }
+  if (a.status === 'active') return { class: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: '活跃' };
+  if (a.status === 'error') return { class: 'bg-red-50 text-red-600 border-red-200', label: '异常' };
+  return { class: 'bg-gray-100 text-gray-500 border-gray-200', label: '停用' };
+}
+
+/**
+ * 遮蔽 Token 显示
+ * @param t Token 原始值
+ */
+function maskToken(t: string): string {
+  if (t.length <= 20) return t;
+  return t.slice(0, 20) + '...';
+}
+
+/**
+ * 获取认证方式标签
+ * @param authType 认证方式
+ */
+function authTypeLabel(authType: string): string {
+  return authType === 'oauth' ? 'OAuth' : 'Setup Token';
+}
+
+/**
+ * 格式化当前分钟 RPM 状态。
+ * @param account 账号对象
+ */
+function rpmLabel(account: Account): string {
+  if (account.v3_scheduling) return `${account.v3_scheduling.submissions_last_60s}/${account.rpm_limit > 0 ? account.rpm_limit : '不限'}`;
+  if (!account.rpm_limit || account.rpm_limit <= 0) return '未限制';
+  const current = account.rpm_current ?? 0;
+  return account.rpm_saturated ? `已满 ${current}/${account.rpm_limit}` : `${current}/${account.rpm_limit}`;
+}
+
+/**
+ * 获取 RPM 文本颜色。
+ * @param account 账号对象
+ */
+function rpmClass(account: Account): string {
+  if (account.v3_scheduling) return account.v3_scheduling.capacity.reason === 'pacing' ? 'text-amber-600' : 'text-[#29261e]';
+  if (!account.rpm_limit || account.rpm_limit <= 0) return 'text-[#8c8475]';
+  if (account.rpm_saturated) return 'text-red-500';
+  const current = account.rpm_current ?? 0;
+  const ratio = current / account.rpm_limit;
+  if (ratio >= 0.8) return 'text-amber-600';
+  return 'text-[#29261e]';
+}
+
+/**
+ * 格式化上游 session 池状态。
+ * @param account 账号对象
+ */
+function upstreamSessionPoolLabel(account: Account): string {
+  if (!account.upstream_session_pool_enabled || account.upstream_session_pool_size <= 0) return '关闭';
+  const active = account.upstream_session_pool_active_count ?? 0;
+  const capacity = account.upstream_session_pool_capacity ?? account.upstream_session_pool_size;
+  return `${active}/${capacity}`;
+}
+
+/**
+ * 获取上游 session 池文本颜色。
+ * @param account 账号对象
+ */
+function upstreamSessionPoolClass(account: Account): string {
+  if (!account.upstream_session_pool_enabled || account.upstream_session_pool_size <= 0) return 'text-[#8c8475]';
+  const active = account.upstream_session_pool_active_count ?? 0;
+  return active >= account.upstream_session_pool_size ? 'text-amber-600' : 'text-emerald-600';
+}
+
+/**
+ * 获取上游 session 池刷新策略显示名。
+ * @param policy 刷新策略值
+ */
+function upstreamSessionPolicyLabel(policy?: string): string {
+  return policy === 'owner_only' ? '仅属主刷新' : '映射请求刷新';
+}
+
+/**
+ * 格式化瞬时 429 软退避剩余时间。
+ * @param account 账号对象
+ */
+function transientBackoffLabel(account: Account): string {
+  const waiting = account.transient_backoff_waiting ?? 0;
+  const remainingMs = account.transient_backoff_remaining_ms ?? 0;
+  if (waiting <= 0 && remainingMs <= 0) return '0';
+  const seconds = Math.max(1, Math.ceil(remainingMs / 1000));
+  return `${waiting} · ${seconds}s`;
+}
+
+/**
+ * 获取瞬时 429 软退避文本颜色。
+ * @param account 账号对象
+ */
+function transientBackoffClass(account: Account): string {
+  return ((account.transient_backoff_waiting ?? 0) > 0 || (account.transient_backoff_remaining_ms ?? 0) > 0)
+    ? 'text-amber-600'
+    : 'text-[#29261e]';
+}
+
+/**
+ * 格式化标准并发槽位。
+ * @param value 标准槽位数
+ */
+function formatConcurrencySlots(value?: number | null): string {
+  const n = Number(value ?? 0);
+  if (!Number.isFinite(n)) return '0';
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
+/**
+ * 格式化内部单位数。
+ * @param value 内部单位数
+ */
+function formatConcurrencyUnits(value?: number | null): string {
+  const n = Number(value ?? 0);
+  if (!Number.isFinite(n)) return '0';
+  return String(Math.round(n));
+}
+
+/**
+ * 获取账号卡片并发显示文本。
+ * @param account 账号对象
+ */
+function concurrencyLabel(account: Account): string {
+  return `${formatConcurrencySlots(account.current_concurrency)}/${formatConcurrencySlots(account.concurrency)}`;
+}
+
+/**
+ * 获取账号卡片并发文本颜色。
+ * @param account 账号对象
+ */
+function concurrencyClass(account: Account): string {
+  return (account.current_concurrency ?? 0) >= account.concurrency
+    ? 'text-red-500'
+    : 'text-[#29261e]';
+}
+
+/**
+ * 获取当前账号显示的凭证摘要
+ * @param account 账号对象
+ */
+function authSecretPreview(account: Account): string {
+  if (account.auth_type === 'oauth') {
+    return maskToken(account.refresh_token || account.access_token || '未配置');
+  }
+  return maskToken(account.setup_token || '未配置');
+}
+
+/**
+ * 格式化 OAuth 过期时间
+ * @param expiresAt 毫秒时间戳
+ */
+function formatExpiresAt(expiresAt?: number | null): string {
+  if (!expiresAt) return '未提供';
+  return new Date(expiresAt).toLocaleString('zh-CN');
+}
+
+/**
+ * 格式化字节数为可读字符串。
+ * @param bytes 字节数。
+ * @param precision 小数位，实测指标保留精度以避免将 1.5G 显示为 2G。
+ * @returns 可读的容量。
+ */
+function formatBytes(bytes?: number, precision = 0): string {
+  if (!bytes) return '—';
+  if (bytes >= 1_073_741_824) return (bytes / 1_073_741_824).toFixed(precision) + 'G';
+  if (bytes >= 1_048_576) return (bytes / 1_048_576).toFixed(precision) + 'M';
+  if (bytes >= 1024) return (bytes / 1024).toFixed(precision) + 'K';
+  return bytes + 'B';
+}
+
+/** 切换认证方式 */
+function setAuthType(authType: 'setup_token' | 'oauth') {
+  form.value.auth_type = authType;
+}
+
+// --- OAuth 授权流程 ---
+const showOAuthFlow = ref(false);
+const oauthMode = ref<'oauth' | 'setup_token'>('oauth');
+const oauthProxyUrl = ref('');
+const oauthSessionId = ref('');
+const oauthAuthUrl = ref('');
+const oauthCode = ref('');
+const oauthLoading = ref(false);
+const oauthResult = ref<OAuthExchangeResult | null>(null);
+const oauthStep = ref<'generate' | 'exchange' | 'done'>('generate');
+
+/** 打开 OAuth 授权流程弹窗 */
+function openOAuthFlow() {
+  oauthMode.value = 'oauth';
+  oauthProxyUrl.value = '';
+  oauthSessionId.value = '';
+  oauthAuthUrl.value = '';
+  oauthCode.value = '';
+  oauthResult.value = null;
+  oauthStep.value = 'generate';
+  oauthLoading.value = false;
+  showOAuthFlow.value = true;
+}
+
+/** 生成授权链接 */
+async function generateOAuthUrl() {
+  oauthLoading.value = true;
+  try {
+    const proxy = oauthProxyUrl.value.trim() || undefined;
+    const res = oauthMode.value === 'oauth'
+      ? await api.generateAuthUrl(proxy)
+      : await api.generateSetupTokenUrl(proxy);
+    oauthSessionId.value = res.session_id;
+    oauthAuthUrl.value = res.auth_url;
+    oauthStep.value = 'exchange';
+  } catch (e: unknown) {
+    toast((e as Error).message || '生成授权链接失败');
+  }
+  oauthLoading.value = false;
+}
+
+/** 交换 code */
+async function exchangeOAuthCode() {
+  const code = oauthCode.value.trim();
+  if (!code) {
+    toast('请输入授权码');
+    return;
+  }
+  oauthLoading.value = true;
+  try {
+    const res = oauthMode.value === 'oauth'
+      ? await api.exchangeCode(oauthSessionId.value, code)
+      : await api.exchangeSetupTokenCode(oauthSessionId.value, code);
+    oauthResult.value = res;
+    oauthStep.value = 'done';
+  } catch (e: unknown) {
+    toast((e as Error).message || '交换 Token 失败');
+  }
+  oauthLoading.value = false;
+}
+
+/** 将授权结果填入新建账号表单 */
+function applyOAuthResult() {
+  const r = oauthResult.value;
+  if (!r) return;
+  showOAuthFlow.value = false;
+  editing.value = null;
+  const isSetupToken = oauthMode.value === 'setup_token';
+  form.value = {
+    name: '',
+    email: r.email_address || '',
+    auth_type: isSetupToken ? 'setup_token' : 'oauth',
+    setup_token: isSetupToken ? r.access_token : '',
+    access_token: isSetupToken ? '' : (r.access_token || ''),
+    refresh_token: isSetupToken ? '' : (r.refresh_token || ''),
+    expires_at: (!isSetupToken && r.expires_at) ? String(r.expires_at * 1000) : '',
+    proxy_url: oauthProxyUrl.value || '',
+    billing_mode: 'strip',
+    request_backend: 'legacy' as 'legacy' | 'native293',
+    account_uuid: r.account_uuid || '',
+    organization_uuid: r.organization_uuid || '',
+    subscription_type: '',
+    rate_limit_tier: '',
+    concurrency: 3,
+    priority: 50,
+    rpm_limit: 0,
+    five_hour_usage_limit_percent: 0,
+    seven_day_usage_limit_percent: 0,
+    auto_telemetry: false,
+    auto_poll_usage: false,
+    allow_1m_models: DEFAULT_ALLOW_1M_MODELS,
+    allow_fast_mode: false,
+    upstream_session_pool_enabled: false,
+    upstream_session_pool_size: DEFAULT_UPSTREAM_SESSION_POOL_SIZE,
+    upstream_session_ttl_minutes: DEFAULT_UPSTREAM_SESSION_TTL_MINUTES,
+    upstream_session_refresh_policy: DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY,
+  };
+  showForm.value = true;
+}
+
+/** 复制文本到剪贴板（兼容非安全上下文） */
+async function copyText(text: string) {
+  if (!text) {
+    toast('没有可复制的内容');
+    return;
+  }
+
+  // 1. 优先使用 Clipboard API（仅在安全上下文 HTTPS / localhost 可用）
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('已复制');
+      return;
+    } catch {
+      // 失败则继续走降级方案
+    }
+  }
+
+  // 2. 降级方案：临时 textarea + execCommand('copy')
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '0';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast(ok ? '已复制' : '复制失败');
+  } catch {
+    toast('复制失败');
+  }
+}
+</script>
+
+<template>
+  <div class="space-y-4">
+    <!-- 标题栏 -->
+    <div class="flex justify-between items-center">
+      <h2 class="text-lg font-semibold text-[#29261e]">账号管理</h2>
+      <div class="flex gap-2">
+        <Button
+          @click="openOAuthFlow"
+          class="bg-[#c4704f] hover:bg-[#b5623f] text-white font-medium rounded-xl transition-all duration-200 hover:shadow-md"
+        >
+          授权登录
+        </Button>
+        <Button
+          @click="openCreate"
+          class="bg-[#c4704f] hover:bg-[#b5623f] text-white font-medium rounded-xl transition-all duration-200 hover:shadow-md"
+        >
+          添加账号
+        </Button>
+      </div>
+    </div>
+
+    <p v-if="accountLoadFailed" role="alert" class="text-xs text-amber-700">账号刷新失败，当前展示上次快照；负载与调度状态可能已陈旧。</p>
+    <!-- 账号卡片列表 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <Card
+        v-for="a in accounts"
+        :key="a.id"
+        class="bg-white border-[#e8e2d9] rounded-xl hover:shadow-md transition-all duration-200 overflow-hidden"
+        :class="(a.status === 'disabled' || isRateLimited(a)) ? 'opacity-60' : ''"
+      >
+        <div class="p-5 space-y-3">
+          <!-- 头部：名称 + 状态 -->
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="w-8 h-8 rounded-lg bg-[#c4704f]/10 flex items-center justify-center flex-shrink-0">
+                <span class="text-[#c4704f] text-sm font-semibold">{{ (a.name || a.email)[0].toUpperCase() }}</span>
+              </div>
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-[#29261e] truncate">{{ a.name || a.email }}</p>
+                <span class="text-xs text-[#8c8475]">{{ subscriptionLabel(a.subscription_type, a.rate_limit_tier) }}</span>
+                <p v-if="a.name" class="text-xs text-[#8c8475] truncate">{{ a.email }}</p>
+              </div>
+            </div>
+            <Badge :class="statusStyle(a).class" class="border text-xs font-medium flex-shrink-0">
+              {{ statusStyle(a).label }}
+            </Badge>
+          </div>
+
+          <!-- 信息 -->
+          <div class="pt-2 border-t border-[#f0ebe4] space-y-2">
+            <p v-if="a.credential_ownership" class="text-xs text-[#8c8475]" role="status">
+              {{ a.credential_ownership.phase === 'ready'
+                ? (a.credential_ownership.owner === 'local' ? '本地管理凭据 · 网关已暂停' : '网关管理凭据')
+                : (a.credential_ownership.phase === 'reauth' ? '重新授权中 · 上游活动暂停' : '凭据交接待确认 · 请在账号环境页对账') }}
+            </p>
+            <div class="grid grid-cols-5 gap-2">
+              <div class="text-center relative"
+                   @mouseenter="showScoreTooltip($event, a)"
+                   @mouseleave="hideScoreTooltip">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider">{{ a.v3_scheduling ? '旧评分' : '评分' }}</p>
+                <p class="text-sm font-medium cursor-help" :class="(a.scheduling_score ?? 0) >= 70 ? 'text-red-500' : (a.scheduling_score ?? 0) >= 40 ? 'text-amber-600' : 'text-emerald-600'">
+                  {{ a.scheduling_score?.toFixed(2) ?? '0.00' }}
+                </p>
+              </div>
+              <div class="text-center relative cursor-help"
+                   @mouseenter="showConcurrencyTooltip($event, a)"
+                   @mouseleave="hideConcurrencyTooltip">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider">并发</p>
+                <p class="text-sm font-medium" :class="concurrencyClass(a)">
+                  {{ concurrencyLabel(a) }}
+                </p>
+              </div>
+              <div class="text-center">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider">排队</p>
+                <p class="text-sm font-medium" :class="(a.queued_requests ?? 0) > 0 ? 'text-amber-600' : 'text-[#29261e]'">
+                  {{ a.queued_requests ?? 0 }}
+                </p>
+              </div>
+              <div class="text-center">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider">429 等待</p>
+                <p class="text-sm font-medium" :class="transientBackoffClass(a)">
+                  {{ transientBackoffLabel(a) }}
+                </p>
+              </div>
+              <div class="text-center">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider">{{ a.v3_scheduling ? '60秒提交 / RPM' : 'RPM' }}</p>
+                <p class="text-sm font-medium" :class="rpmClass(a)">
+                  {{ rpmLabel(a) }}
+                </p>
+              </div>
+            </div>
+            <div v-if="a.v3_scheduling" class="rounded-lg border border-[#e8e2d9] bg-[#fcfaf7] p-3 space-y-2">
+              <div class="flex justify-between items-center gap-2 text-xs"><span class="font-medium text-[#5c5647]">{{ a.v3_scheduling.config.mode === 'smart' ? '智能调度' : '旧评分排序' }}</span><span :class="a.v3_scheduling.capacity.immediate ? 'text-emerald-700' : 'text-amber-700'">{{ schedulingReasonLabel(a.v3_scheduling.capacity.reason) }}</span></div>
+              <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#8c8475]"><span>绑定 {{ a.v3_scheduling.bound_sessions }} 个会话</span><span>活跃 {{ a.v3_scheduling.active_sessions }} 个</span><span>执行 {{ a.v3_scheduling.phases.running }} 个请求</span></div>
+              <p class="text-[11px] text-[#8c8475]">等槽 {{ a.v3_scheduling.phases.waiting_concurrency }} · 准备 {{ a.v3_scheduling.phases.preparing }} · 等发 {{ a.v3_scheduling.phases.waiting_send }} · 退避 {{ a.v3_scheduling.phases.backoff }}</p>
+              <div class="flex justify-between items-center"><span class="text-[10px] text-[#b5b0a6]">{{ a.v3_scheduling.config.mode === 'smart' ? '智能偏好 ' + (a.v3_scheduling.factors.score * 100).toFixed(1) + '（高优）' : '旧评分低分优先' }}</span><Button variant="outline" size="sm" class="text-xs h-7" @click="openScheduling(a)">调度详情</Button></div>
+            </div>
+            <div v-else-if="a.v3_scheduling_error" class="rounded-lg bg-amber-50 p-3 text-xs text-amber-700">{{ a.v3_scheduling_error }}，不代表零负载。<button class="underline ml-2" @click="openScheduling(a)">查看详情</button></div>
+            <p class="text-xs text-[#8c8578]">转发方式：{{ a.request_backend === 'native293' ? '原生运行时 2.1.293' : '原有转发' }}</p>
+            <div class="grid grid-cols-3 gap-3">
+              <div class="text-center">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider">优先级</p>
+                <p class="text-sm font-medium text-[#29261e]">{{ a.priority }}</p>
+              </div>
+              <div class="text-center">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider">Billing</p>
+                <p class="text-sm font-medium" :class="a.billing_mode === 'rewrite' ? 'text-amber-600' : 'text-[#29261e]'">
+                  {{ a.billing_mode === 'rewrite' ? '重写' : '清除' }}
+                </p>
+              </div>
+              <div class="text-center">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider">上游池槽位</p>
+                <p class="text-sm font-medium" :class="upstreamSessionPoolClass(a)">
+                  {{ upstreamSessionPoolLabel(a) }}
+                </p>
+              </div>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider mb-0.5">代理</p>
+                <p class="text-sm text-[#8c8475] truncate">{{ a.proxy_url || '直连' }}</p>
+              </div>
+              <div>
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider mb-0.5">认证方式</p>
+                <p class="text-sm text-[#8c8475] truncate">{{ authTypeLabel(a.auth_type) }}</p>
+              </div>
+              <div>
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider mb-0.5">自动遥测</p>
+                <p class="text-sm" :class="a.auto_telemetry ? 'text-emerald-600' : 'text-[#8c8475]'">
+                  {{ a.auto_telemetry ? '已开启' : '关闭' }}
+                  <span v-if="a.telemetry_count > 0" class="text-[#b5b0a6] text-xs">· 已发送 {{ a.telemetry_count }} 次</span>
+                </p>
+                <p v-if="a.telemetry_expires_at" class="text-xs text-amber-500 mt-0.5">
+                  遥测中 · 停止于 {{ new Date(a.telemetry_expires_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }}
+                </p>
+              </div>
+              <div v-if="a.upstream_session_pool_enabled && a.upstream_session_pool_size > 0">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider mb-0.5">上游 Session 池</p>
+                <p class="text-sm text-[#8c8475] truncate">
+                  TTL {{ a.upstream_session_ttl_minutes }} 分钟 · {{ upstreamSessionPolicyLabel(a.upstream_session_refresh_policy) }}
+                </p>
+              </div>
+              <div v-if="a.auth_type === 'oauth'">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider mb-0.5">自动轮询用量</p>
+                <p class="text-sm" :class="a.auto_poll_usage ? 'text-emerald-600' : 'text-[#8c8475]'">
+                  {{ a.auto_poll_usage ? '已开启' : '关闭' }}
+                </p>
+              </div>
+              <div>
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider mb-0.5">
+                  {{ a.auth_type === 'oauth' ? 'Refresh Token' : 'Setup Token' }}
+                </p>
+                <p class="font-mono text-[11px] text-[#8c8475] truncate">{{ authSecretPreview(a) }}</p>
+              </div>
+              <div v-if="a.auth_type === 'oauth'">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider mb-0.5">过期时间</p>
+                <p class="text-sm text-[#8c8475] truncate">{{ formatExpiresAt(a.expires_at) }}</p>
+              </div>
+              <div v-if="a.auth_type === 'oauth' && a.auth_error">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider mb-0.5">认证错误</p>
+                <p class="text-xs text-red-500 line-clamp-2">{{ a.auth_error }}</p>
+              </div>
+              <div>
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider mb-0.5">环境指纹</p>
+                <p class="text-xs text-[#8c8475] truncate">
+                  {{ a.canonical_env?.platform || '—' }} / {{ a.canonical_env?.arch || '—' }}
+                </p>
+                <p class="text-xs text-[#8c8475] mt-0.5">账号基础版本：v{{ a.canonical_env?.version || '—' }}</p>
+              </div>
+              <div>
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider mb-0.5">画像选择方式</p>
+                <p class="text-xs text-[#8c8475]">
+                  {{ profileSelectionMode === 'client_version' ? '按客户端 UA 适配' : profileSelectionMode === 'account' ? '使用账号画像' : '未提供画像配置' }}
+                </p>
+                <p v-if="profileSelectionMode === 'client_version' && defaultVersionProfile" class="text-xs text-[#8c8475] mt-0.5">
+                  默认回退：v{{ defaultVersionProfile }}（准入通过后）
+                </p>
+              </div>
+              <div>
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider mb-0.5">提示词环境</p>
+                <p class="text-xs text-[#8c8475] truncate">
+                  {{ a.canonical_prompt_env?.platform || '—' }} · {{ a.canonical_prompt_env?.shell || '—' }} · {{ a.canonical_prompt_env?.working_dir || '—' }}
+                </p>
+              </div>
+              <div>
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider mb-0.5">进程指纹</p>
+                <template v-if="a.canonical_process?.observation?.source === 'v3:procfs:cli'">
+                  <p class="text-xs text-[#8c8475]">
+                    容器内存上限 {{ a.canonical_process.constrained_memory === 0 ? '不限' : formatBytes(a.canonical_process.constrained_memory, 2) }}
+                  </p>
+                  <p class="text-xs text-[#8c8475]">
+                    CLI RSS {{ a.canonical_process.observation.sample_count ? formatBytes(a.canonical_process.observation.rss_bytes ?? undefined, 2) : '未采集' }}
+                  </p>
+                  <p v-if="a.canonical_process.observation.sampled_at" class="text-[10px] text-[#b5b0a6]">
+                    官方 CLI 进程采样 · {{ new Date(a.canonical_process.observation.sampled_at * 1000).toLocaleString('zh-CN') }}
+                  </p>
+                </template>
+                <p v-else class="text-xs text-[#8c8475] truncate">
+                  内存 {{ formatBytes(a.canonical_process?.constrained_memory) }} · RSS {{ formatBytes(a.canonical_process?.rss_range?.[0]) }}–{{ formatBytes(a.canonical_process?.rss_range?.[1]) }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 用量窗口 -->
+          <div class="pt-2 border-t border-[#f0ebe4] space-y-2">
+            <div class="flex items-center justify-between">
+              <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider">用量</p>
+              <p v-if="a.usage_fetched_at" class="text-[10px] text-[#b5b0a6]">
+                {{ new Date(a.usage_fetched_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) }}
+              </p>
+              <p v-else class="text-[10px] text-[#b5b0a6]">未刷新</p>
+            </div>
+            <!-- 5 小时 -->
+            <p v-if="a.request_usage" class="text-[10px] text-[#b5b0a6]" title="仅统计经过网关的请求，启用前及其它入口的消费不在此金额中">
+              网关记录始于 {{ new Date(a.request_usage.recorded_since).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) }}
+            </p>
+            <div class="space-y-0.5">
+              <UsageWindowStats :stats="a.request_usage?.five_hour" label="5h" />
+              <div class="flex justify-between text-[11px]">
+                <span class="text-[#8c8475]">5 小时 · {{ a.five_hour_usage_limit_percent > 0 ? `上限 ${a.five_hour_usage_limit_percent}%` : '未限制' }}</span>
+                <span class="text-[#5c5647] font-medium">{{ fiveHourLabel(a.usage_data, usagePercentLabel(usageWindow(a.usage_data, 'five_hour'))) }}
+                  <span v-if="hasFutureReset(usageWindow(a.usage_data, 'five_hour'))" class="text-[#b5b0a6] font-normal">· {{ formatTimeLeft(usageWindow(a.usage_data, 'five_hour')?.resets_at) }}</span>
+                </span>
+              </div>
+              <div class="h-1.5 bg-[#f0ebe4] rounded-full overflow-hidden">
+                <div :class="usageBarColor(effectiveUtil(usageWindow(a.usage_data, 'five_hour')))"
+                  class="h-full rounded-full transition-all duration-300"
+                  :style="{ width: Math.min(effectiveUtil(usageWindow(a.usage_data, 'five_hour')), 100) + '%' }" />
+              </div>
+            </div>
+            <!-- 7 天 -->
+            <div class="space-y-0.5">
+              <UsageWindowStats :stats="a.request_usage?.seven_day" label="7d" />
+              <div class="flex justify-between text-[11px]">
+                <span class="text-[#8c8475]">7 天 · {{ a.seven_day_usage_limit_percent > 0 ? `上限 ${a.seven_day_usage_limit_percent}%` : '未限制' }}</span>
+                <span class="text-[#5c5647] font-medium">{{ usagePercentLabel(usageWindow(a.usage_data, 'seven_day')) }}
+                  <span v-if="hasFutureReset(usageWindow(a.usage_data, 'seven_day'))" class="text-[#b5b0a6] font-normal">· {{ formatTimeLeft(usageWindow(a.usage_data, 'seven_day')?.resets_at) }}</span>
+                </span>
+              </div>
+              <div class="h-1.5 bg-[#f0ebe4] rounded-full overflow-hidden">
+                <div :class="usageBarColor(effectiveUtil(usageWindow(a.usage_data, 'seven_day')))"
+                  class="h-full rounded-full transition-all duration-300"
+                  :style="{ width: Math.min(effectiveUtil(usageWindow(a.usage_data, 'seven_day')), 100) + '%' }" />
+              </div>
+            </div>
+            <!-- 7 天 Sonnet -->
+            <div class="space-y-0.5">
+              <div class="flex justify-between text-[11px]">
+                <span class="text-[#8c8475]">7 天 Sonnet</span>
+                <span class="text-[#5c5647] font-medium">{{ usagePercentLabel(usageWindow(a.usage_data, 'seven_day_sonnet')) }}
+                  <span v-if="hasFutureReset(usageWindow(a.usage_data, 'seven_day_sonnet'))" class="text-[#b5b0a6] font-normal">· {{ formatTimeLeft(usageWindow(a.usage_data, 'seven_day_sonnet')?.resets_at) }}</span>
+                </span>
+              </div>
+              <div class="h-1.5 bg-[#f0ebe4] rounded-full overflow-hidden">
+                <div :class="usageBarColor(effectiveUtil(usageWindow(a.usage_data, 'seven_day_sonnet')))"
+                  class="h-full rounded-full transition-all duration-300"
+                  :style="{ width: Math.min(effectiveUtil(usageWindow(a.usage_data, 'seven_day_sonnet')), 100) + '%' }" />
+              </div>
+            </div>
+            <!-- 7 天 Fable -->
+            <div class="space-y-0.5">
+              <div class="flex justify-between text-[11px]">
+                <span class="text-[#8c8475]">7 天 Fable</span>
+                <span class="text-[#5c5647] font-medium">{{ usagePercentLabel(usageWindow(a.usage_data, 'seven_day_fable')) }}
+                  <span v-if="hasFutureReset(usageWindow(a.usage_data, 'seven_day_fable'))" class="text-[#b5b0a6] font-normal">· {{ formatTimeLeft(usageWindow(a.usage_data, 'seven_day_fable')?.resets_at) }}</span>
+                </span>
+              </div>
+              <div class="h-1.5 bg-[#f0ebe4] rounded-full overflow-hidden">
+                <div :class="usageBarColor(effectiveUtil(usageWindow(a.usage_data, 'seven_day_fable')))"
+                  class="h-full rounded-full transition-all duration-300"
+                  :style="{ width: Math.min(effectiveUtil(usageWindow(a.usage_data, 'seven_day_fable')), 100) + '%' }" />
+              </div>
+            </div>
+          </div>
+
+          <!-- 停用原因 -->
+          <div
+            v-if="a.disable_reason && (a.status === 'disabled' || (a.rate_limit_reset_at && new Date(a.rate_limit_reset_at) > new Date()))"
+            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border"
+            :class="a.status === 'disabled' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'"
+          >
+            <span class="text-xs font-medium" :class="a.status === 'disabled' ? 'text-red-600' : 'text-amber-700'">
+              {{ a.disable_reason }}
+            </span>
+            <span v-if="a.rate_limit_reset_at && new Date(a.rate_limit_reset_at) > new Date()" class="text-xs text-amber-500">
+              · 剩余 {{ formatTimeLeft(a.rate_limit_reset_at) }}
+            </span>
+          </div>
+
+          <!-- 测试结果 -->
+          <div
+            v-if="testing === a.id && testResult"
+            class="text-xs font-medium px-2 py-1 rounded-lg text-center"
+            :class="testResult.status === 'ok' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'"
+          >
+            {{ testResult.status === 'ok' ? '连接正常' : testResult.message }}
+          </div>
+
+          <!-- 操作按钮 -->
+          <div class="flex items-center gap-2 pt-2 border-t border-[#f0ebe4]">
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="toggleScheduling(a)"
+              :class="(a.status === 'disabled' || isRateLimited(a))
+                ? 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50'
+                : 'text-amber-500 hover:text-amber-600 hover:bg-amber-50'"
+              class="h-8 px-3 text-xs flex-1"
+            >
+              {{ (a.status === 'disabled' || isRateLimited(a)) ? '启用' : '停用' }}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="openEdit(a)"
+              class="text-[#8c8475] hover:text-[#29261e] hover:bg-[#f0ebe4] h-8 px-3 text-xs flex-1"
+            >
+              编辑
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="refreshUsage(a.id)"
+              :disabled="refreshingUsage === a.id"
+              class="text-[#c4704f] hover:text-[#b5623f] hover:bg-[#c4704f]/5 h-8 px-3 text-xs flex-1"
+            >
+              {{ refreshingUsage === a.id ? '刷新中...' : '用量' }}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="test(a.id)"
+              :disabled="testing === a.id"
+              class="text-[#c4704f] hover:text-[#b5623f] hover:bg-[#c4704f]/5 h-8 px-3 text-xs flex-1"
+            >
+              {{ testing === a.id ? '测试中...' : '测试' }}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="confirmDelete(a.id)"
+              class="text-red-400 hover:text-red-500 hover:bg-red-50 h-8 px-3 text-xs flex-1"
+            >
+              删除
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <!-- 空状态 -->
+      <div
+        v-if="accounts.length === 0"
+        class="col-span-full flex flex-col items-center justify-center py-16 text-[#b5b0a6]"
+      >
+        <div class="w-12 h-12 rounded-xl bg-[#f0ebe4] flex items-center justify-center mb-3">
+          <svg class="w-6 h-6 text-[#c4704f]/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
+          </svg>
+        </div>
+        <p class="text-sm">暂无账号，点击"添加账号"开始</p>
+      </div>
+    </div>
+
+    <!-- 分页 -->
+    <div v-if="totalPages > 1" class="flex items-center justify-between pt-2">
+      <p class="text-sm text-[#8c8475]">共 {{ totalCount }} 个账号</p>
+      <div class="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          :disabled="currentPage <= 1"
+          @click="goToPage(currentPage - 1)"
+          class="h-8 px-2 text-[#8c8475] hover:text-[#29261e] hover:bg-[#f0ebe4] disabled:opacity-40"
+        >
+          上一页
+        </Button>
+        <Button
+          v-for="p in visiblePages"
+          :key="p"
+          variant="ghost"
+          size="sm"
+          @click="goToPage(p)"
+          class="h-8 w-8 p-0 text-sm"
+          :class="p === currentPage
+            ? 'bg-[#c4704f] text-white hover:bg-[#b5623f]'
+            : 'text-[#8c8475] hover:text-[#29261e] hover:bg-[#f0ebe4]'"
+        >
+          {{ p }}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          :disabled="currentPage >= totalPages"
+          @click="goToPage(currentPage + 1)"
+          class="h-8 px-2 text-[#8c8475] hover:text-[#29261e] hover:bg-[#f0ebe4] disabled:opacity-40"
+        >
+          下一页
+        </Button>
+      </div>
+    </div>
+
+    <!-- 新建/编辑账号弹窗 -->
+    <SchedulingDetails v-model:open="showScheduling" :account-id="schedulingAccount?.id ?? 0" :account-name="schedulingAccount?.name || schedulingAccount?.email || ''" />
+
+    <Dialog v-model:open="showForm">
+      <DialogContent class="bg-white border-[#e8e2d9] rounded-2xl text-[#29261e] sm:max-w-md max-h-[85vh] flex flex-col">
+        <DialogHeader class="flex-shrink-0">
+          <DialogTitle class="text-[#29261e] text-lg">{{ editing ? '编辑账号' : '添加账号' }}</DialogTitle>
+          <DialogDescription class="text-[#8c8475]">
+            {{ editing ? '修改账号信息，凭证留空表示不更改' : '填写新账号信息' }}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form @submit.prevent="save" class="space-y-4 mt-2 overflow-y-auto flex-1 pr-1">
+          <div class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">备注名（选填）</Label>
+            <Input
+              v-model="form.name"
+              class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] placeholder-[#b5b0a6] focus:border-[#c4704f] focus:ring-[#c4704f]/20"
+            />
+          </div>
+          <div class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">邮箱 <span class="text-red-500">*</span></Label>
+            <Input
+              v-model="form.email"
+              required
+              class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] placeholder-[#b5b0a6] focus:border-[#c4704f] focus:ring-[#c4704f]/20"
+            />
+          </div>
+          <div class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">认证方式</Label>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                @click="setAuthType('setup_token')"
+                class="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200"
+                :class="form.auth_type === 'setup_token'
+                  ? 'bg-[#c4704f]/10 border-[#c4704f] text-[#c4704f]'
+                  : 'bg-[#f9f6f1] border-[#e8e2d9] text-[#8c8475] hover:border-[#c4704f]/40'"
+              >
+                Setup Token
+              </button>
+              <button
+                type="button"
+                @click="setAuthType('oauth')"
+                class="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200"
+                :class="form.auth_type === 'oauth'
+                  ? 'bg-amber-50 border-amber-400 text-amber-600'
+                  : 'bg-[#f9f6f1] border-[#e8e2d9] text-[#8c8475] hover:border-amber-300'"
+              >
+                OAuth
+              </button>
+            </div>
+          </div>
+          <div v-if="form.auth_type === 'setup_token'" class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">
+              Setup Token (sk-ant-oat01-...) <span v-if="!editing" class="text-red-500">*</span>
+            </Label>
+            <Textarea
+              v-model="form.setup_token"
+              :required="!editing"
+              :rows="3"
+              :placeholder="editing ? '留空保持不变' : ''"
+              class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] placeholder-[#b5b0a6] focus:border-[#c4704f] focus:ring-[#c4704f]/20 font-mono text-sm"
+            />
+          </div>
+          <template v-else>
+            <div class="space-y-2">
+              <Label class="text-[#5c5647] text-sm">Access Token（选填）</Label>
+              <Textarea
+                v-model="form.access_token"
+                :rows="2"
+                :placeholder="editing ? '留空保持不变' : '已有 access token 时可直接填写'"
+                class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] placeholder-[#b5b0a6] focus:border-[#c4704f] focus:ring-[#c4704f]/20 font-mono text-sm"
+              />
+            </div>
+            <div class="space-y-2">
+              <Label class="text-[#5c5647] text-sm">
+                Refresh Token <span class="text-red-500">*</span>
+              </Label>
+              <Textarea
+                v-model="form.refresh_token"
+                :required="!editing"
+                :rows="2"
+                :placeholder="editing ? '留空保持不变' : ''"
+                class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] placeholder-[#b5b0a6] focus:border-[#c4704f] focus:ring-[#c4704f]/20 font-mono text-sm"
+              />
+            </div>
+            <div class="space-y-2">
+              <Label class="text-[#5c5647] text-sm">Expires At（毫秒时间戳，选填）</Label>
+              <Input
+                v-model="form.expires_at"
+                inputmode="numeric"
+                placeholder="例如：1743600000000"
+                class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] placeholder-[#b5b0a6] focus:border-[#c4704f] focus:ring-[#c4704f]/20 font-mono text-sm"
+              />
+            </div>
+          </template>
+          <div v-if="editing && editing.auth_type === 'oauth' && editing.expires_at" class="rounded-lg bg-[#f9f6f1] px-3 py-2 text-xs text-[#8c8475]">
+            当前过期时间：{{ formatExpiresAt(editing.expires_at) }}
+          </div>
+          <div v-if="editing && editing.auth_type === 'oauth' && editing.auth_error" class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-500">
+            最近认证错误：{{ editing.auth_error }}
+          </div>
+          <div class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">请求转发方式</Label>
+            <select v-model="form.request_backend" class="w-full rounded-md border border-[#e8e2d9] bg-[#f9f6f1] px-3 py-2 text-sm text-[#29261e]">
+              <option value="legacy">原有转发</option>
+              <option value="native293">原生运行时 2.1.293</option>
+            </select>
+            <p class="text-xs text-[#b5b0a6]">原生方式由账号 sender 运行独立进程池，使用显式部署资源预算。请在账号空闲时切换。</p>
+          </div>
+          <div class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">代理地址（选填）</Label>
+            <Input
+              v-model="form.proxy_url"
+              placeholder="http:// 或 socks5://"
+              class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] placeholder-[#b5b0a6] focus:border-[#c4704f] focus:ring-[#c4704f]/20"
+            />
+          </div>
+          <div class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">Billing 模式</Label>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                @click="form.billing_mode = 'strip'"
+                class="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200"
+                :class="form.billing_mode === 'strip'
+                  ? 'bg-[#c4704f]/10 border-[#c4704f] text-[#c4704f]'
+                  : 'bg-[#f9f6f1] border-[#e8e2d9] text-[#8c8475] hover:border-[#c4704f]/40'"
+              >
+                清除 (Strip)
+              </button>
+              <button
+                type="button"
+                @click="form.billing_mode = 'rewrite'"
+                class="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200"
+                :class="form.billing_mode === 'rewrite'
+                  ? 'bg-amber-50 border-amber-400 text-amber-600'
+                  : 'bg-[#f9f6f1] border-[#e8e2d9] text-[#8c8475] hover:border-amber-300'"
+              >
+                重写 (Rewrite)
+              </button>
+            </div>
+          </div>
+          <!-- 遥测身份（选填） -->
+          <div class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">订阅类型（选填，强烈推荐）</Label>
+            <div class="flex gap-2 flex-wrap">
+              <button
+                v-for="opt in [
+                  { value: '', label: '未设置' },
+                  { value: 'max', label: 'Max' },
+                  { value: 'ultra', label: 'Ultra' },
+                  { value: 'pro', label: 'Pro' },
+                  { value: 'team', label: 'Team' },
+                  { value: 'enterprise', label: 'Enterprise' },
+                ]"
+                :key="opt.value"
+                type="button"
+                @click="selectSubscription(opt.value)"
+                class="px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-200"
+                :class="form.subscription_type === opt.value
+                  ? 'bg-[#c4704f]/10 border-[#c4704f] text-[#c4704f]'
+                  : 'bg-[#f9f6f1] border-[#e8e2d9] text-[#8c8475] hover:border-[#c4704f]/40'"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+          </div>
+          <div class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">官方分级（选填）</Label>
+            <Input v-model="form.rate_limit_tier" placeholder="填写官方 profile 中的 rateLimitTier" class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] font-mono text-sm" />
+          </div>
+          <div class="flex gap-4">
+            <div class="flex-1 space-y-2">
+              <Label class="text-[#5c5647] text-sm">Account UUID（选填）</Label>
+              <Input
+                v-model="form.account_uuid"
+                placeholder="OAuth account UUID"
+                class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] placeholder-[#b5b0a6] focus:border-[#c4704f] focus:ring-[#c4704f]/20 font-mono text-sm"
+              />
+            </div>
+            <div class="flex-1 space-y-2">
+              <Label class="text-[#5c5647] text-sm">Organization UUID（选填）</Label>
+              <Input
+                v-model="form.organization_uuid"
+                placeholder="OAuth organization UUID"
+                class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] placeholder-[#b5b0a6] focus:border-[#c4704f] focus:ring-[#c4704f]/20 font-mono text-sm"
+              />
+            </div>
+          </div>
+          <div class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">自动遥测</Label>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                @click="form.auto_telemetry = false"
+                class="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200"
+                :class="!form.auto_telemetry
+                  ? 'bg-[#f9f6f1] border-[#8c8475] text-[#5c5647]'
+                  : 'bg-[#f9f6f1] border-[#e8e2d9] text-[#8c8475] hover:border-[#8c8475]/40'"
+              >
+                关闭
+              </button>
+              <button
+                type="button"
+                @click="form.auto_telemetry = true"
+                class="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200"
+                :class="form.auto_telemetry
+                  ? 'bg-emerald-50 border-emerald-400 text-emerald-600'
+                  : 'bg-[#f9f6f1] border-[#e8e2d9] text-[#8c8475] hover:border-emerald-300'"
+              >
+                开启
+              </button>
+            </div>
+            <p class="text-xs text-[#b5b0a6]">开启后由网关代替客户端发送遥测请求</p>
+          </div>
+          <div v-if="form.auth_type === 'oauth'" class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">自动轮询用量</Label>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                @click="form.auto_poll_usage = false"
+                class="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200"
+                :class="!form.auto_poll_usage
+                  ? 'bg-[#f9f6f1] border-[#8c8475] text-[#5c5647]'
+                  : 'bg-[#f9f6f1] border-[#e8e2d9] text-[#8c8475] hover:border-[#8c8475]/40'"
+              >
+                关闭
+              </button>
+              <button
+                type="button"
+                @click="form.auto_poll_usage = true"
+                class="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200"
+                :class="form.auto_poll_usage
+                  ? 'bg-emerald-50 border-emerald-400 text-emerald-600'
+                  : 'bg-[#f9f6f1] border-[#e8e2d9] text-[#8c8475] hover:border-emerald-300'"
+              >
+                开启
+              </button>
+            </div>
+            <p class="text-xs text-[#b5b0a6]">开启后后台定时拉取该账号的用量数据</p>
+          </div>
+          <div class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">允许客户端 Fast Mode</Label>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                @click="form.allow_fast_mode = false"
+                class="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200"
+                :class="!form.allow_fast_mode
+                  ? 'bg-[#f9f6f1] border-[#8c8475] text-[#5c5647]'
+                  : 'bg-[#f9f6f1] border-[#e8e2d9] text-[#8c8475] hover:border-[#8c8475]/40'"
+              >
+                禁止
+              </button>
+              <button
+                type="button"
+                @click="form.allow_fast_mode = true"
+                class="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200"
+                :class="form.allow_fast_mode
+                  ? 'bg-amber-50 border-amber-400 text-amber-600'
+                  : 'bg-[#f9f6f1] border-[#e8e2d9] text-[#8c8475] hover:border-amber-300'"
+              >
+                允许透传
+              </button>
+            </div>
+            <p class="text-xs text-[#b5b0a6]">默认禁止，客户端 Fast 请求回落普通模式。允许后保留客户端申请，可能增加计费和限流风险。</p>
+          </div>
+          <div class="space-y-3 rounded-lg border border-[#e8e2d9] bg-[#f9f6f1] p-3">
+            <div class="space-y-2">
+              <Label class="text-[#5c5647] text-sm">上游 Session 池</Label>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  @click="form.upstream_session_pool_enabled = false"
+                  class="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200"
+                  :class="!form.upstream_session_pool_enabled
+                    ? 'bg-white border-[#8c8475] text-[#5c5647]'
+                    : 'bg-white border-[#e8e2d9] text-[#8c8475] hover:border-[#8c8475]/40'"
+                >
+                  关闭
+                </button>
+                <button
+                  type="button"
+                  @click="form.upstream_session_pool_enabled = true"
+                  class="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200"
+                  :class="form.upstream_session_pool_enabled
+                    ? 'bg-emerald-50 border-emerald-400 text-emerald-600'
+                    : 'bg-white border-[#e8e2d9] text-[#8c8475] hover:border-emerald-300'"
+                >
+                  开启
+                </button>
+              </div>
+              <p class="text-xs text-[#b5b0a6]">只改写发往上游的 Claude Code session；内部 sticky、RPM 和本地缓存仍按真实 session 隔离。</p>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="space-y-2">
+                <Label class="text-[#5c5647] text-sm">池容量</Label>
+                <Input
+                  v-model.number="form.upstream_session_pool_size"
+                  type="number"
+                  min="0"
+                  max="20"
+                  class="bg-white border-[#e8e2d9] text-[#29261e] focus:border-[#c4704f] focus:ring-[#c4704f]/20"
+                />
+                <p class="text-xs text-[#b5b0a6]">0 表示关闭；开启时建议 3。</p>
+              </div>
+              <div class="space-y-2">
+                <Label class="text-[#5c5647] text-sm">活跃 TTL（分钟）</Label>
+                <Input
+                  v-model.number="form.upstream_session_ttl_minutes"
+                  type="number"
+                  min="5"
+                  max="1440"
+                  class="bg-white border-[#e8e2d9] text-[#29261e] focus:border-[#c4704f] focus:ring-[#c4704f]/20"
+                />
+                <p class="text-xs text-[#b5b0a6]">允许 5-1440，默认 60。</p>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <Label class="text-[#5c5647] text-sm">TTL 刷新策略</Label>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  @click="form.upstream_session_refresh_policy = 'mapped_request'"
+                  class="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200"
+                  :class="form.upstream_session_refresh_policy === 'mapped_request'
+                    ? 'bg-emerald-50 border-emerald-400 text-emerald-600'
+                    : 'bg-white border-[#e8e2d9] text-[#8c8475] hover:border-emerald-300'"
+                >
+                  映射请求刷新
+                </button>
+                <button
+                  type="button"
+                  @click="form.upstream_session_refresh_policy = 'owner_only'"
+                  class="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200"
+                  :class="form.upstream_session_refresh_policy === 'owner_only'
+                    ? 'bg-amber-50 border-amber-400 text-amber-600'
+                    : 'bg-white border-[#e8e2d9] text-[#8c8475] hover:border-amber-300'"
+                >
+                  仅属主刷新
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="space-y-2">
+            <Label class="text-[#5c5647] text-sm">允许 1M 上下文的模型</Label>
+            <input
+              v-model="form.allow_1m_models"
+              type="text"
+              placeholder="opus,claude-sonnet-5"
+              class="w-full px-3 py-2 text-sm rounded-lg border border-[#e8e2d9] bg-[#f9f6f1] text-[#5c5647] focus:border-[#8c8475] focus:outline-none transition-colors"
+            />
+            <div class="flex flex-wrap gap-1.5">
+              <span class="text-xs text-[#b5b0a6] self-center">预设:</span>
+              <button
+                type="button"
+                @click="form.allow_1m_models = 'opus'"
+                class="px-2 py-0.5 text-xs rounded border border-[#e8e2d9] bg-[#f9f6f1] text-[#8c8475] hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+              >仅 Opus</button>
+              <button
+                type="button"
+                @click="form.allow_1m_models = DEFAULT_ALLOW_1M_MODELS"
+                class="px-2 py-0.5 text-xs rounded border border-[#e8e2d9] bg-[#f9f6f1] text-[#8c8475] hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+              >Opus + Sonnet 5</button>
+              <button
+                type="button"
+                @click="form.allow_1m_models = ''"
+                class="px-2 py-0.5 text-xs rounded border border-[#e8e2d9] bg-[#f9f6f1] text-[#8c8475] hover:border-red-300 hover:bg-red-50 hover:text-red-600 transition-colors"
+              >全部关闭</button>
+            </div>
+            <p class="text-xs text-[#b5b0a6]">
+              逗号分隔的子串列表(大小写不敏感)。留空 = 所有模型都过滤掉 context-1m-2025-08-07。默认仅放行 Opus 与 Sonnet 5；不要写宽泛 "sonnet"，否则会影响 Sonnet 4.6。
+            </p>
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div class="flex-1 space-y-2">
+              <Label class="text-[#5c5647] text-sm">并发数</Label>
+              <Input
+                v-model.number="form.concurrency"
+                type="number"
+                min="1"
+                class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] focus:border-[#c4704f] focus:ring-[#c4704f]/20"
+              />
+            </div>
+            <div class="flex-1 space-y-2">
+              <Label class="text-[#5c5647] text-sm">RPM 上限</Label>
+              <Input
+                v-model.number="form.rpm_limit"
+                type="number"
+                min="0"
+                placeholder="0 表示不限制"
+                class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] focus:border-[#c4704f] focus:ring-[#c4704f]/20"
+              />
+            </div>
+            <div class="flex-1 space-y-2">
+              <Label class="text-[#5c5647] text-sm">优先级</Label>
+              <Input
+                v-model.number="form.priority"
+                type="number"
+                min="1"
+                class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] focus:border-[#c4704f] focus:ring-[#c4704f]/20"
+              />
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <div class="grid grid-cols-2 gap-3">
+              <div class="space-y-2">
+                <Label class="text-[#5c5647] text-sm">5 小时用量上限 (%)</Label>
+                <Input
+                  v-model.number="form.five_hour_usage_limit_percent"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] focus:border-[#c4704f] focus:ring-[#c4704f]/20"
+                />
+              </div>
+              <div class="space-y-2">
+                <Label class="text-[#5c5647] text-sm">7 天用量上限 (%)</Label>
+                <Input
+                  v-model.number="form.seven_day_usage_limit_percent"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] focus:border-[#c4704f] focus:ring-[#c4704f]/20"
+                />
+              </div>
+            </div>
+            <p class="text-xs text-[#b5b0a6]">
+              0 表示不限制。达到任一上限后不再分配新消息，窗口重置后恢复。
+              按最近观测用量判断，未知用量允许使用；单次或并发请求可能越线。
+            </p>
+          </div>
+
+          <DialogFooter class="gap-2 pt-2">
+            <Button
+              type="button"
+              variant="ghost"
+              @click="showForm = false"
+              class="text-[#8c8475] hover:text-[#29261e] hover:bg-[#f0ebe4]"
+            >
+              取消
+            </Button>
+            <Button
+              type="submit"
+              class="bg-[#c4704f] hover:bg-[#b5623f] text-white font-medium rounded-xl transition-all duration-200"
+            >
+              保存
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+
+    <!-- 删除确认弹窗 -->
+    <Dialog v-model:open="showDeleteConfirm">
+      <DialogContent class="bg-white border-[#e8e2d9] rounded-2xl text-[#29261e] sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle class="text-[#29261e]">确认删除</DialogTitle>
+          <DialogDescription class="text-[#8c8475]">
+            此操作不可撤销，确认要删除此账号吗？
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter class="gap-2 pt-4">
+          <Button
+            variant="ghost"
+            @click="showDeleteConfirm = false"
+            class="text-[#8c8475] hover:text-[#29261e] hover:bg-[#f0ebe4]"
+          >
+            取消
+          </Button>
+          <Button
+            @click="executeDelete"
+            class="bg-red-500 hover:bg-red-600 text-white font-medium rounded-xl transition-all duration-200"
+          >
+            删除
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- OAuth 授权流程弹窗 -->
+    <Dialog v-model:open="showOAuthFlow">
+      <DialogContent class="bg-white border-[#e8e2d9] rounded-2xl text-[#29261e] sm:max-w-lg max-h-[85vh] flex flex-col">
+        <DialogHeader class="flex-shrink-0">
+          <DialogTitle class="text-[#29261e] text-lg">OAuth 授权</DialogTitle>
+          <DialogDescription class="text-[#8c8475]">
+            通过浏览器完成 OAuth 授权，自动获取 Token 和账号信息
+          </DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-4 mt-2 overflow-y-auto flex-1 pr-1">
+          <!-- 步骤 1：选择模式并生成链接 -->
+          <template v-if="oauthStep === 'generate'">
+            <div class="space-y-2">
+              <Label class="text-[#5c5647] text-sm">授权类型</Label>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  @click="oauthMode = 'oauth'"
+                  class="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200"
+                  :class="oauthMode === 'oauth'
+                    ? 'bg-amber-50 border-amber-400 text-amber-600'
+                    : 'bg-[#f9f6f1] border-[#e8e2d9] text-[#8c8475] hover:border-amber-300'"
+                >
+                  OAuth（完整）
+                </button>
+                <button
+                  type="button"
+                  @click="oauthMode = 'setup_token'"
+                  class="flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200"
+                  :class="oauthMode === 'setup_token'
+                    ? 'bg-[#c4704f]/10 border-[#c4704f] text-[#c4704f]'
+                    : 'bg-[#f9f6f1] border-[#e8e2d9] text-[#8c8475] hover:border-[#c4704f]/40'"
+                >
+                  Setup Token
+                </button>
+              </div>
+              <p class="text-xs text-[#b5b0a6]">
+                {{ oauthMode === 'oauth' ? '完整 scope，支持 profile、用量查询等' : '仅 user:inference scope，有效期 1 年' }}
+              </p>
+            </div>
+            <div class="space-y-2">
+              <Label class="text-[#5c5647] text-sm">代理地址（选填）</Label>
+              <Input
+                v-model="oauthProxyUrl"
+                placeholder="http:// 或 socks5://"
+                class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] placeholder-[#b5b0a6] focus:border-[#c4704f] focus:ring-[#c4704f]/20"
+              />
+            </div>
+            <Button
+              @click="generateOAuthUrl"
+              :disabled="oauthLoading"
+              class="w-full bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-all duration-200"
+            >
+              {{ oauthLoading ? '生成中...' : '生成授权链接' }}
+            </Button>
+          </template>
+
+          <!-- 步骤 2：显示链接 + 输入 code -->
+          <template v-if="oauthStep === 'exchange'">
+            <div class="space-y-2">
+              <Label class="text-[#5c5647] text-sm">授权链接</Label>
+              <div class="relative">
+                <Textarea
+                  :model-value="oauthAuthUrl"
+                  readonly
+                  :rows="3"
+                  class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] font-mono text-xs pr-16"
+                />
+                <div class="absolute right-2 top-2 flex gap-1">
+                  <button
+                    type="button"
+                    @click="copyText(oauthAuthUrl)"
+                    class="px-2 py-1 text-xs bg-[#c4704f] text-white rounded-md hover:bg-[#b5623f] transition-colors"
+                  >
+                    复制
+                  </button>
+                </div>
+              </div>
+              <a
+                :href="oauthAuthUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 underline"
+              >
+                点击打开授权页面 ↗
+              </a>
+            </div>
+            <div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700 space-y-1">
+              <p class="font-medium">操作步骤：</p>
+              <ol class="list-decimal list-inside space-y-0.5 text-amber-600">
+                <li>点击上方链接或复制到浏览器打开</li>
+                <li>完成 Claude 登录授权</li>
+                <li>授权完成后，从回调页面复制授权码</li>
+                <li>将授权码粘贴到下方输入框</li>
+              </ol>
+            </div>
+            <div class="space-y-2">
+              <Label class="text-[#5c5647] text-sm">授权码 <span class="text-red-500">*</span></Label>
+              <Textarea
+                v-model="oauthCode"
+                :rows="2"
+                placeholder="粘贴授权码（authorization code）"
+                class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] placeholder-[#b5b0a6] focus:border-[#c4704f] focus:ring-[#c4704f]/20 font-mono text-sm"
+              />
+            </div>
+            <div class="flex gap-2">
+              <Button
+                variant="ghost"
+                @click="oauthStep = 'generate'"
+                class="text-[#8c8475] hover:text-[#29261e] hover:bg-[#f0ebe4]"
+              >
+                返回
+              </Button>
+              <Button
+                @click="exchangeOAuthCode"
+                :disabled="oauthLoading || !oauthCode.trim()"
+                class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-all duration-200"
+              >
+                {{ oauthLoading ? '交换中...' : '交换 Token' }}
+              </Button>
+            </div>
+          </template>
+
+          <!-- 步骤 3：显示结果 -->
+          <template v-if="oauthStep === 'done' && oauthResult">
+            <div class="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-700 font-medium">
+              授权成功
+            </div>
+            <div class="space-y-3">
+              <div v-if="oauthResult.email_address" class="space-y-1">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider">邮箱</p>
+                <p class="text-sm text-[#29261e]">{{ oauthResult.email_address }}</p>
+              </div>
+              <div v-if="oauthResult.account_uuid" class="space-y-1">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider">Account UUID</p>
+                <p class="font-mono text-xs text-[#5c5647] break-all">{{ oauthResult.account_uuid }}</p>
+              </div>
+              <div v-if="oauthResult.organization_uuid" class="space-y-1">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider">Organization UUID</p>
+                <p class="font-mono text-xs text-[#5c5647] break-all">{{ oauthResult.organization_uuid }}</p>
+              </div>
+              <div class="space-y-1">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider">Access Token</p>
+                <div class="flex items-center gap-2">
+                  <p class="font-mono text-xs text-[#8c8475] truncate flex-1">{{ oauthResult.access_token.slice(0, 30) }}...</p>
+                  <button
+                    type="button"
+                    @click="copyText(oauthResult.access_token)"
+                    class="px-2 py-0.5 text-[10px] bg-[#f0ebe4] text-[#5c5647] rounded hover:bg-[#e8e2d9] transition-colors flex-shrink-0"
+                  >
+                    复制
+                  </button>
+                </div>
+              </div>
+              <div v-if="oauthResult.refresh_token" class="space-y-1">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider">Refresh Token</p>
+                <div class="flex items-center gap-2">
+                  <p class="font-mono text-xs text-[#8c8475] truncate flex-1">{{ oauthResult.refresh_token.slice(0, 30) }}...</p>
+                  <button
+                    type="button"
+                    @click="copyText(oauthResult.refresh_token)"
+                    class="px-2 py-0.5 text-[10px] bg-[#f0ebe4] text-[#5c5647] rounded hover:bg-[#e8e2d9] transition-colors flex-shrink-0"
+                  >
+                    复制
+                  </button>
+                </div>
+              </div>
+              <div class="space-y-1">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider">Scope</p>
+                <p class="text-xs text-[#8c8475]">{{ oauthResult.scope || '—' }}</p>
+              </div>
+              <div class="space-y-1">
+                <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider">过期时间</p>
+                <p class="text-xs text-[#8c8475]">{{ new Date(oauthResult.expires_at * 1000).toLocaleString('zh-CN') }}</p>
+              </div>
+            </div>
+            <div class="flex gap-2 pt-2">
+              <Button
+                variant="ghost"
+                @click="showOAuthFlow = false"
+                class="text-[#8c8475] hover:text-[#29261e] hover:bg-[#f0ebe4]"
+              >
+                关闭
+              </Button>
+              <Button
+                @click="applyOAuthResult"
+                class="flex-1 bg-[#c4704f] hover:bg-[#b5623f] text-white font-medium rounded-xl transition-all duration-200"
+              >
+                填入并创建账号
+              </Button>
+            </div>
+          </template>
+        </div>
+      </DialogContent>
+    </Dialog>
+  </div>
+
+  <!-- 并发详情 Tooltip（Teleport 到 body，不受卡片 overflow-hidden 影响） -->
+  <Teleport to="body">
+    <div v-if="concurrencyTooltip.visible && concurrencyTooltip.account"
+         class="fixed z-50 bg-[#29261e] text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg leading-relaxed pointer-events-none"
+         :style="{ top: concurrencyTooltip.y + 'px', left: concurrencyTooltip.x + 'px', transform: 'translate(-50%, -100%)' }">
+      <div>当前标准槽位: {{ formatConcurrencySlots(concurrencyTooltip.account.current_concurrency) }} / {{ formatConcurrencySlots(concurrencyTooltip.account.concurrency) }}</div>
+      <div>内部单位: {{ formatConcurrencyUnits(concurrencyTooltip.account.current_concurrency_units) }} / {{ formatConcurrencyUnits(concurrencyTooltip.account.max_concurrency_units) }}</div>
+      <div>活跃请求数: {{ concurrencyTooltip.account.active_requests ?? 0 }}</div>
+      <div>排队请求数: {{ concurrencyTooltip.account.queued_requests ?? 0 }}</div>
+      <div>排队单位: {{ formatConcurrencyUnits(concurrencyTooltip.account.queued_request_units) }}</div>
+      <div class="border-t border-white/20 mt-1 pt-1 text-white/70">普通请求 = 1 并发，Haiku = 0.5 并发</div>
+    </div>
+  </Teleport>
+
+  <!-- 评分详情 Tooltip（Teleport 到 body，不受卡片 overflow-hidden 影响） -->
+  <Teleport to="body">
+    <div v-if="scoreTooltip.visible && scoreTooltip.account?.scheduling_detail"
+         class="fixed z-50 bg-[#29261e] text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg leading-relaxed pointer-events-none"
+         :style="{ top: scoreTooltip.y + 'px', left: scoreTooltip.x + 'px', transform: 'translateY(-100%)' }">
+      <div>7d: {{ scoreTooltip.account.scheduling_detail.detail_7d?.utilization?.toFixed(2) ?? '0' }}% × {{ scoreTooltip.account.scheduling_detail.detail_7d?.decay?.toFixed(2) ?? '1' }} = {{ scoreTooltip.account.scheduling_detail.eff_7d.toFixed(2) }} × {{ scoreTooltip.account.scheduling_detail.weights?.w7d ?? 0.5 }} = <span class="text-amber-300">{{ (scoreTooltip.account.scheduling_detail.eff_7d * (scoreTooltip.account.scheduling_detail.weights?.w7d ?? 0.5)).toFixed(2) }}</span></div>
+      <div>5h: {{ scoreTooltip.account.scheduling_detail.detail_5h?.utilization?.toFixed(2) ?? '0' }}% × {{ scoreTooltip.account.scheduling_detail.detail_5h?.decay?.toFixed(2) ?? '1' }} = {{ scoreTooltip.account.scheduling_detail.eff_5h.toFixed(2) }} × {{ scoreTooltip.account.scheduling_detail.weights?.w5h ?? 0.3 }} = <span class="text-amber-300">{{ (scoreTooltip.account.scheduling_detail.eff_5h * (scoreTooltip.account.scheduling_detail.weights?.w5h ?? 0.3)).toFixed(2) }}</span></div>
+      <div>负载: {{ scoreTooltip.account.scheduling_detail.concurrency_pct.toFixed(2) }}% × {{ scoreTooltip.account.scheduling_detail.weights?.wconc ?? 0.2 }} = <span class="text-amber-300">{{ (scoreTooltip.account.scheduling_detail.concurrency_pct * (scoreTooltip.account.scheduling_detail.weights?.wconc ?? 0.2)).toFixed(2) }}</span> <span class="text-white/50">（活跃标准槽位+排队预计槽位）/并发</span></div>
+      <div class="border-t border-white/20 mt-1 pt-1 font-medium">= {{ scoreTooltip.account.scheduling_score?.toFixed(2) }}　<span class="text-white/50">越小越优先</span></div>
+    </div>
+  </Teleport>
+</template>

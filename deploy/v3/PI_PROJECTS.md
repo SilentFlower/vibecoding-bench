@@ -61,13 +61,13 @@ Pi 模型启动前先检查准入。后台每 2 秒扫描在途控制者的被�
 
 | 文件 | 职责 |
 | --- | --- |
-| `orchestrator/projects.py` | 账号控制权、工作、输入意图、停止竞争及接受事实 |
-| `orchestrator/projects_catalog.py` | 公开研究、工程合同及冻结内容版本 |
-| `orchestrator/projects_runtime.py` | 固定账号租约、持久工作区及原生终端工具 |
-| `orchestrator/projects_pi.py`、`images/pi-agent/host.mjs` | Python 与真实 Pi SDK 的独立进程管道 |
+| `services/orchestrator/projects.py` | 账号控制权、工作、输入意图、停止竞争及接受事实 |
+| `services/orchestrator/projects_catalog.py` | 公开研究、工程合同及冻结内容版本 |
+| `services/orchestrator/projects_runtime.py` | 固定账号租约、持久工作区及原生终端工具 |
+| `services/orchestrator/projects_pi.py`、`images/pi-agent/host.mjs` | Python 与真实 Pi SDK 的独立进程管道 |
 | `images/account/projects_cli.py` | 只监督 TUI，不编排对话或注入自动回复 |
-| `orchestrator/projects_verification.py` | 独立程序验收与隔离的无工具语义审查 |
-| `webui/projects.js` | 账号控制台、项目池选择、实时终端及工程记录 |
+| `services/orchestrator/projects_verification.py` | 独立程序验收与隔离的无工具语义审查 |
+| `apps/legacy-web/projects.js` | 账号控制台、项目池选择、实时终端及工程记录 |
 
 新数据表为 `projects_agents`、`projects_work`、`projects_actions`、`projects_events`、`projects_submissions`。Pi 会话保存在 `BENCH_DATA/projects/agents/<账号>/`，冻结候选和报告保存在 `BENCH_DATA/projects/submissions/`。实际源码保留在固定账号环境的项目目录。外接密钥仅通过私有管道交给 Pi，不进入操作记录或会话提示。
 
@@ -82,7 +82,7 @@ cd images/pi-agent
 npm ci --ignore-scripts --no-audit --no-fund
 npm test
 
-cd ../../orchestrator
+cd ../../services/orchestrator
 ../.venv/bin/python -m unittest test_projects_agent test_projects_terminal -v
 
 cd ..

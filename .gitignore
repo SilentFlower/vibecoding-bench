@@ -1,7 +1,7 @@
 .env
-!project_library/projects/typer/seed/library/.env
-!project_library/projects/python-decouple/seed/library/tests/autoconfig/env/.env
-!project_library/projects/python-decouple/seed/library/tests/autoconfig/env/custom-path/.env
+!resources/project-library/projects/typer/seed/library/.env
+!resources/project-library/projects/python-decouple/seed/library/tests/autoconfig/env/.env
+!resources/project-library/projects/python-decouple/seed/library/tests/autoconfig/env/custom-path/.env
 data/
 !data/.gitkeep
 
@@ -21,10 +21,10 @@ venv/
 # Local AI tooling (Trellis / Codex / Claude Code stubs)
 AGENTS.md
 # 仅保留固定上游源码中的说明文件及本任务研究副本。
-!project_library/projects/python-frontmatter/seed/library/AGENTS.md
-!project_library/projects/xmltodict/seed/library/AGENTS.md
-!project_library/projects/markdown-it-py/seed/library/AGENTS.md
-!project_library/projects/path/seed/library/AGENTS.md
+!resources/project-library/projects/python-frontmatter/seed/library/AGENTS.md
+!resources/project-library/projects/xmltodict/seed/library/AGENTS.md
+!resources/project-library/projects/markdown-it-py/seed/library/AGENTS.md
+!resources/project-library/projects/path/seed/library/AGENTS.md
 !.trellis/tasks/10-21-project-scenario-workflows/research/content-drafts/python-frontmatter/seed/library/AGENTS.md
 # .trellis/ 整目录进 git(spec / scripts / config / workflow / tasks / workspace);
 # 哪些是本地状态(.developer/.runtime/*.tmp 等)由 .trellis/.gitignore 内层管。
@@ -44,3 +44,6 @@ tlab-*.png
 !/.flower/plugins.json
 !/.flower/plugin-lock.json
 # END Flower shared records
+
+# 运行时模块保留其来源约束。
+!services/runtime/AGENTS.md

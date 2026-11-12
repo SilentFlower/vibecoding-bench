@@ -15,18 +15,18 @@ RUN npm pack xterm@5.3.0 && npm pack xterm-addon-fit@0.8.0 \
 
 FROM rust:1.96.0-slim-bookworm AS backend
 ENV CARGO_BUILD_JOBS=2 CARGO_HTTP_MULTIPLEXING=false CARGO_HTTP_TIMEOUT=60
-WORKDIR /source/cc2api
+WORKDIR /source/services/gateway
 RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 COPY cc2api/Cargo.toml cc2api/Cargo.lock ./
 COPY cc2api/craftls ./craftls
 COPY cc2api/vendor ./vendor
 COPY cc2api/src ./src
-COPY --from=frontend /source/cc2api/web/dist ./web/dist
+COPY --from=frontend /source/cc2api/web/dist /source/apps/web/dist
 # 依赖及增量产物按项目锁定缓存；交付文件复制到普通镜像层，保持来源与缓存分离。
 RUN --mount=type=cache,id=vibebench-v3-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=vibebench-v3-cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,id=vibebench-v3-cargo-target,target=/source/cc2api/target,sharing=locked \
+    --mount=type=cache,id=vibebench-v3-cargo-target,target=/source/services/gateway/target,sharing=locked \
     cargo build --locked --release --bins \
     && mkdir -p /out && cp target/release/claude-code-gateway target/release/account-sender /out/
 
@@ -159,7 +159,7 @@ ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/v3-account-init"]
 FROM backend AS verification-backend
 RUN --mount=type=cache,id=vibebench-v3-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=vibebench-v3-cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,id=vibebench-v3-cargo-target,target=/source/cc2api/target,sharing=locked \
+    --mount=type=cache,id=vibebench-v3-cargo-target,target=/source/services/gateway/target,sharing=locked \
     cargo build --locked --release --bins --features v3-verification \
     && cp target/release/claude-code-gateway target/release/account-sender /out/
 

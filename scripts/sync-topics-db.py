@@ -12,7 +12,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "orchestrator"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services/orchestrator"))
 from topic_library import Topic, encode_followups, parse_topics, validate_topics
 
 
@@ -112,7 +112,7 @@ def parse_args() -> argparse.Namespace:
     :return: argparse 命名空间
     """
     parser = argparse.ArgumentParser(description="把 topics.md 按编号同步到 SQLite topics 表")
-    parser.add_argument("--topics", default="topics.md", help="topics.md 路径")
+    parser.add_argument("--topics", default="resources/topics.md", help="topics.md 路径")
     parser.add_argument("--db", default="data/db.sqlite", help="SQLite 数据库路径")
     parser.add_argument("--validate-only", action="store_true", help="只校验 topics.md，不访问数据库")
     parser.add_argument("--apply", action="store_true", help="实际写入数据库；默认只输出计划")

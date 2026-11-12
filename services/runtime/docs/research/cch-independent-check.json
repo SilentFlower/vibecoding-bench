@@ -1,0 +1,16 @@
+[
+  {
+    "case": "baseline",
+    "roundtrip_preserves_bytes": true,
+    "wire_cch": "e40d5",
+    "recomputed_cch": "e40d5",
+    "matches": true
+  },
+  {
+    "case": "preload-native",
+    "roundtrip_preserves_bytes": true,
+    "wire_cch": "0231a",
+    "recomputed_cch": "0231a",
+    "matches": true
+  }
+]

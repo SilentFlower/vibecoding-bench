@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from source_layout import source_path
 import subprocess
 import sys
 import tempfile
@@ -14,7 +15,7 @@ import time
 import uuid
 
 import docker
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "orchestrator"))
+sys.path.insert(0, str(source_path(Path(__file__).resolve().parents[2], "orchestrator")))
 from quota_protocol import warmup_quota_decision
 
 

@@ -1,8 +1,10 @@
 # vibecoding-bench
 
-把 [`topics.md`](./topics.md) 里的 300 道题作为题库，让真实的 **Claude Code** 在容器里跑，按账号隔离、按账号并发限流、全程透明代理 + TLS MITM 抓 Anthropic API 原文。
+Flower2API 的单仓迁移沿 v3 持续推进。服务源码位于 `services/`，两套现有界面位于 `apps/`，工程与题库位于 `resources/`。目录、开发命令和升级路径见 [单仓说明](docs/migrations/flower2api-layout.md)，各组件来源见 [迁移记录](docs/migrations/flower2api-sources.json)。
 
-v3 的 **Projects** 由每账号 Pi 自主指挥 Claude Code，支持授权项目池、真实终端交互、持续工作区、前置依赖、独立交付验收和定时继续。当前工程库覆盖 100 个项目、600 个完整功能或缺陷修复目标，问答与开发步骤不单独计数；同项目后续交付必须保留此前已验收能力。内容、准入证据和复核命令见 [工程目标库说明](./project_library/README.md)。
+把 [`topics.md`](resources/topics.md) 里的 300 道题作为题库，让真实的 **Claude Code** 在容器里跑，按账号隔离、按账号并发限流、全程透明代理 + TLS MITM 抓 Anthropic API 原文。
+
+v3 的 **Projects** 由每账号 Pi 自主指挥 Claude Code，支持授权项目池、真实终端交互、持续工作区、前置依赖、独立交付验收和定时继续。当前工程库覆盖 100 个项目、600 个完整功能或缺陷修复目标，问答与开发步骤不单独计数；同项目后续交付必须保留此前已验收能力。内容、准入证据和复核命令见 [工程目标库说明](resources/project-library/README.md)。
 
 Pi 遇到网络、超时、限流或临时服务错误时，会在原会话中有限重试并保留已确认的工具结果。最近成功的模型会跨轮优先使用，失败模型冷却 5 分钟；配置变化重建健康记录，不额外发起探测。短重试耗尽后，已启用的计划按 60／120／300 秒退避最多恢复 3 轮，同时等待模型冷却和账号准入，持续失败才阻塞。重试保留累计预算，暂停可取消；内容过滤、认证、未知输入等不自动恢复。
 
@@ -101,12 +103,12 @@ docker compose -f docker-compose.remote.yml --env-file .env up -d --force-recrea
 bench/
 ├── docker-compose.yml
 ├── .env.example
-├── cc2api/              Git submodule: Claude Code 网关与账号池
-├── orchestrator/        FastAPI 后端
+├── services/gateway/              Git submodule: Claude Code 网关与账号池
+├── services/orchestrator/        FastAPI 后端
 │   ├── main.py
 │   ├── Dockerfile
 │   └── requirements.txt
-├── webui/               静态前端
+├── apps/legacy-web/               静态前端
 │   ├── index.html
 │   ├── style.css
 │   └── app.js

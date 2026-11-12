@@ -5,8 +5,8 @@
 # 部署清单(scp 到远程同一目录):
 #   docker-compose.remote.yml   ← 本文件
 #   .env                        ← 从 .env.example 复制并填值
-#   topics.md                   ← 题库
-#   webui/                      ← 静态前端(3 个文件)
+#   resources/topics.md         ← 题库
+#   apps/legacy-web/            ← 静态前端
 #
 # 远程启动:
 #   docker compose -f docker-compose.remote.yml --env-file .env up -d
@@ -54,7 +54,7 @@ services:
       WEBUI_PASS: ${WEBUI_PASS:-}
     volumes:
       - ./data:/data
-      - ./topics.md:/repo/topics.md:ro
-      - ./webui:/webui:ro
+      - ./resources/topics.md:/repo/topics.md:ro
+      - ./apps/legacy-web:/webui:ro
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped

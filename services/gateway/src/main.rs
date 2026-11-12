@@ -1,0 +1,287 @@
+use claude_code_gateway::config;
+use claude_code_gateway::handler;
+use claude_code_gateway::service;
+use claude_code_gateway::service::v3_scheduling::V3Scheduler;
+use claude_code_gateway::store;
+use claude_code_gateway::store::diagnostics_store::DiagnosticsStore;
+use claude_code_gateway::store::scheduling_store::SchedulingStore;
+use claude_code_gateway::tlsfp;
+
+use std::env;
+use std::process::exit;
+use std::sync::Arc;
+use tracing::{info, warn};
+
+#[tokio::main]
+async fn main() {
+    let arguments: Vec<String> = env::args().collect();
+    if arguments
+        .get(1)
+        .is_some_and(|value| value == "database-migrations")
+    {
+        match store::database_migrations::maintenance(&arguments).await {
+            Ok(value) => println!("{value}"),
+            Err(reason) => {
+                eprintln!("{reason}");
+                exit(1);
+            }
+        }
+        return;
+    }
+    service::system_update::validate_startup().expect("部署维护状态无效，请先恢复更新服务");
+    let cfg = config::Config::load();
+
+    // 初始化日志
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| cfg.log_level.clone().into()),
+        )
+        .init();
+
+    // 注册 sqlx Any 驱动
+    sqlx::any::install_default_drivers();
+
+    // 初始化数据库
+    let driver = cfg.database.driver();
+    let dsn = cfg.database.dsn();
+    info!("database: {} ({})", driver, dsn);
+
+    let pool = store::db::init_db(&driver, &dsn)
+        .await
+        .expect("init db failed");
+    store::db::migrate(&pool, &driver)
+        .await
+        .expect("migrate failed");
+
+    // 缓存：优先 Redis，回退内存
+    let cache: Arc<dyn store::cache::CacheStore> = match &cfg.redis {
+        Some(redis_cfg) => {
+            match store::redis::RedisStore::new(
+                &redis_cfg.host,
+                redis_cfg.port,
+                &redis_cfg.password,
+                redis_cfg.db,
+            )
+            .await
+            {
+                Ok(r) => {
+                    info!("using redis cache");
+                    Arc::new(r)
+                }
+                Err(e) => {
+                    info!("redis unavailable ({}), using in-memory cache", e);
+                    Arc::new(store::memory::MemoryStore::new())
+                }
+            }
+        }
+        None => {
+            info!("no redis configured, using in-memory cache");
+            Arc::new(store::memory::MemoryStore::new())
+        }
+    };
+
+    let account_store = Arc::new(store::account_store::AccountStore::new(
+        pool.clone(),
+        driver.clone(),
+    ));
+    let token_store = Arc::new(store::token_store::TokenStore::new(
+        pool.clone(),
+        driver.clone(),
+    ));
+    let settings_store = Arc::new(store::settings_store::SettingsStore::new_with_driver(
+        pool.clone(),
+        driver.clone(),
+    ));
+    let prime_log_store = Arc::new(store::prime_log_store::PrimeLogStore::new(pool.clone()));
+    let usage_store = Arc::new(store::usage_store::UsageStore::new(pool.clone()));
+    let diagnostics_store = Arc::new(DiagnosticsStore::new(pool.clone()));
+
+    let proxy_client_pool_enabled = settings_store
+        .get_value(
+            "proxy_client_pool_enabled",
+            store::settings_store::DEFAULT_PROXY_CLIENT_POOL_ENABLED,
+        )
+        .await
+        .expect("load proxy client pool setting failed")
+        != "false";
+    tlsfp::set_request_client_pool_enabled(proxy_client_pool_enabled);
+    info!(
+        "proxy client pool: {}",
+        if proxy_client_pool_enabled {
+            "enabled"
+        } else {
+            "disabled"
+        }
+    );
+
+    let mut account_service = service::account::AccountService::new(
+        account_store.clone(),
+        cache.clone(),
+        settings_store.clone(),
+    );
+    if ["V3_RUNTIME_URL", "V3_DEPLOYMENT_ID"]
+        .iter()
+        .any(|key| env::var(key).is_ok_and(|value| !value.is_empty()))
+    {
+        let scheduler = Arc::new(V3Scheduler::new(Arc::new(SchedulingStore::new(
+            pool.clone(),
+        ))));
+        scheduler
+            .reload(&settings_store)
+            .await
+            .expect("加载 v3 调度设置失败");
+        scheduler.start_cleanup();
+        account_service = account_service.with_scheduler(scheduler);
+    }
+    let account_svc = Arc::new(account_service);
+    // 启动时加载评分权重到内存缓存
+    account_svc.reload_score_weights().await;
+    let rewriter = Arc::new(service::rewriter::Rewriter::new());
+    let telemetry_svc = Arc::new(service::telemetry::TelemetryService::new(
+        account_store.clone(),
+        account_svc.clone(),
+    ));
+    let gateway_svc = Arc::new(
+        service::gateway::GatewayService::new(
+            account_svc.clone(),
+            rewriter.clone(),
+            telemetry_svc.clone(),
+            settings_store.clone(),
+            cache.clone(),
+            usage_store,
+        )
+        .with_diagnostics(diagnostics_store),
+    );
+    gateway_svc.start_native_prewarm();
+    gateway_svc
+        .reload_system_role_models()
+        .await
+        .expect("load system role models failed");
+    gateway_svc
+        .reload_access_profile_config()
+        .await
+        .expect("load access/profile config failed");
+    gateway_svc
+        .reload_env_passthrough()
+        .await
+        .expect("load env passthrough failed");
+    gateway_svc
+        .reload_cache_control_ttl_rewrite()
+        .await
+        .expect("load cache control ttl rewrite failed");
+    gateway_svc
+        .reload_message_cache_control_rewrite()
+        .await
+        .expect("load message cache control rewrite failed");
+    gateway_svc
+        .reload_message_body_order_fingerprint_enabled()
+        .await
+        .expect("load message body order fingerprint setting failed");
+    gateway_svc
+        .reload_message_top_field_filter_enabled()
+        .await
+        .expect("读取 Messages 顶层字段清理设置失败");
+    gateway_svc
+        .reload_fable_sticky_quota_fallback_enabled()
+        .await
+        .expect("load fable sticky quota fallback setting failed");
+    gateway_svc
+        .reload_fable_weekly_usage_limit_percent()
+        .await
+        .expect("load fable weekly usage limit percent setting failed");
+    gateway_svc
+        .reload_warmup_intercept_config()
+        .await
+        .expect("load warmup intercept config failed");
+    gateway_svc
+        .reload_cli_bg_status_classifier_config()
+        .await
+        .expect("load cli-bg status classifier config failed");
+    gateway_svc
+        .reload_disabled_thinking_rewrite()
+        .await
+        .expect("load disabled thinking rewrite config failed");
+    gateway_svc
+        .reload_assistant_prefill_intercept_config()
+        .await
+        .expect("load assistant prefill intercept config failed");
+    if gateway_svc.reload_request_log_mode().await.is_err() {
+        warn!("请求日志模式读取失败，沿用当前摘要策略");
+    }
+    gateway_svc
+        .reload_rate_limit_request_log_config()
+        .await
+        .expect("load 429 request log config failed");
+    gateway_svc
+        .reload_non_stream_probe_cache_config()
+        .await
+        .expect("load non-stream probe cache config failed");
+    gateway_svc
+        .reload_stream_stability_config()
+        .await
+        .expect("load stream stability config failed");
+    gateway_svc
+        .reload_bootstrap_profile_config()
+        .await
+        .expect("load bootstrap profile config failed");
+    gateway_svc
+        .reload_context_sanitizer_config()
+        .await
+        .expect("load context sanitizer config failed");
+    gateway_svc
+        .reload_session_hello_probe_config()
+        .await
+        .expect("load session hello probe config failed");
+    let token_tester = Arc::new(service::oauth::TokenTester::new());
+    let oauth_flow_svc = Arc::new(service::oauth_flow::OAuthFlowService::new());
+
+    // v3 只从业务响应被动更新；旧实例仍按账号开关定时查询。
+    let usage_poller = Arc::new(service::usage_poller::UsagePollerService::new(
+        account_svc.clone(),
+        cfg.usage_poll_interval,
+        env::var("V3_RUNTIME_URL")
+            .unwrap_or_default()
+            .trim()
+            .is_empty(),
+    ));
+    tokio::spawn({
+        let poller = usage_poller.clone();
+        async move { poller.run().await }
+    });
+
+    // 峰值 5h 窗口预热调度器:每天 HH:10 对活跃账号发小型 Haiku 请求,
+    // 主动启动 Anthropic 侧的 5h 窗口,使其重置点落在下午用户高峰附近。
+    let prime_poller = Arc::new(service::prime_poller::PrimePollerService::new(
+        account_svc.clone(),
+        settings_store.clone(),
+        prime_log_store.clone(),
+        rewriter.clone(),
+    ));
+    tokio::spawn({
+        let poller = prime_poller.clone();
+        async move { poller.run().await }
+    });
+
+    let app = handler::router::build_router(
+        &cfg,
+        gateway_svc,
+        account_svc,
+        token_tester,
+        token_store,
+        settings_store,
+        prime_log_store,
+        oauth_flow_svc,
+        telemetry_svc,
+    );
+
+    let addr = format!("{}:{}", cfg.server.host, cfg.server.port);
+    if cfg.server.tls_cert.is_some() {
+        info!("claude-code-gateway listening on https://{}", addr);
+    } else {
+        info!("claude-code-gateway listening on http://{}", addr);
+    }
+
+    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+    axum::serve(listener, app).await.unwrap();
+}

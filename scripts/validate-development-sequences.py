@@ -9,7 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import docker
-ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'orchestrator'))
+ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'services/orchestrator'))
 from project_library import read_document,safe_relative,snapshot_tree
 from project_verifier import ProjectVerifier
 

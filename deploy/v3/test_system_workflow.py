@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from source_layout import source_path
 
 import yaml
 from install_system_updater import SOURCE_FILES
@@ -83,11 +84,35 @@ class WorkflowTests(unittest.TestCase):
             for name in SOURCE_FILES:
                 target = root / name
                 target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(ROOT / name, target)
+                shutil.copyfile(source_path(ROOT, name), target)
             result = subprocess.run([sys.executable, '-I', '-c',
                 'import sys; sys.path.insert(0, sys.argv[1]); import manage, system_updater',
                 str(root / 'deploy/v3')], cwd=root, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_git_preserves_frozen_resource_bytes_and_patch_context(self) -> None:
+        """工程库入库时保留原始换行与验证补丁上下文。@return None。"""
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            shutil.copyfile(ROOT / '.gitattributes', root / '.gitattributes')
+            subprocess.run(['git', '-c', 'init.defaultBranch=main', 'init', '-q'],
+                cwd=root, check=True, capture_output=True)
+            resource = 'resources/project-library/projects/fixture/seed/library/CRLF.csv'
+            patch = 'resources/project-library/projects/fixture/verification/fixture.patch'
+            content = b'field,value\r\none,two\r\n'
+            (root / resource).parent.mkdir(parents=True)
+            (root / resource).write_bytes(content)
+            (root / patch).parent.mkdir(parents=True)
+            # 空白上下文是补丁格式的一部分，必须沿用工程库的精确字节约定。
+            (root / patch).write_bytes(b' context\n \n+added\n')
+            subprocess.run(['git', '-c', 'core.autocrlf=input', 'add', '-f', '--',
+                '.gitattributes', resource, patch], cwd=root, check=True, capture_output=True)
+            stored = subprocess.run(['git', 'show', ':' + resource], cwd=root,
+                check=True, capture_output=True)
+            self.assertEqual(stored.stdout, content)
+            checked = subprocess.run(['git', 'diff', '--cached', '--check', '--', patch],
+                cwd=root, capture_output=True, text=True)
+            self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
 
 
 if __name__ == '__main__':

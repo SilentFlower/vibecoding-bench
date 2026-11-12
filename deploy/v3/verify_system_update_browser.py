@@ -8,6 +8,7 @@ import json
 import mimetypes
 import uuid
 from pathlib import Path
+from source_layout import source_path
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -97,11 +98,11 @@ class UpdateFixture:
             elif path.endswith('/recover'):
                 payload = self.state['operation']
         elif path.startswith('/assets/') or path == '/favicon.svg':
-            source = ROOT / 'cc2api/web/dist' / path.lstrip('/')
+            source = source_path(ROOT, 'cc2api/web/dist') / path.lstrip('/')
             await route.fulfill(content_type=mimetypes.guess_type(str(source))[0] or 'application/octet-stream', body=source.read_bytes())
             return
         elif path in ('/', '/updates', '/login', '/environments'):
-            await route.fulfill(content_type='text/html', body=(ROOT / 'cc2api/web/dist/index.html').read_bytes())
+            await route.fulfill(content_type='text/html', body=(source_path(ROOT, 'cc2api/web/dist/index.html')).read_bytes())
             return
         else:
             status, payload = 404, {'error': '合成夹具未声明接口'}

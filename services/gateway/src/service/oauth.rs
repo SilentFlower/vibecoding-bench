@@ -1,0 +1,719 @@
+use crate::error::AppError;
+use crate::model::account::CanonicalEnvData;
+use crate::service::version_profile::{
+    OAUTH_BETA_TOKEN, claude_cli_user_agent, claude_code_user_agent, normalize_version,
+    profile_for_version, tls_profile_for_version,
+};
+use crate::tlsfp::{TlsProfileId, configured_default_tls_profile, get_request_client_for_profile};
+use chrono::{DateTime, Utc};
+use reqwest::{Client, Request};
+use serde::Deserialize;
+use serde_json::{Map, Value, json};
+use std::env;
+
+pub(crate) const OAUTH_TOKEN_URL: &str = "https://platform.claude.com/v1/oauth/token";
+const OAUTH_CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
+const OAUTH_ERROR_BODY_LIMIT: usize = 4 * 1024;
+const OAUTH_ERROR_CODE_LIMIT: usize = 64;
+const OAUTH_SCOPES: &[&str] = &[
+    "user:profile",
+    "user:inference",
+    "user:sessions:claude_code",
+    "user:mcp_servers",
+    "user:file_upload",
+];
+
+fn oauth_request_client(proxy_url: &str) -> Result<reqwest::Client, AppError> {
+    oauth_request_client_for_profile(proxy_url, configured_default_tls_profile())
+}
+
+/// 版本探针和默认 OAuth 共用同一代理保护。@param proxy_url 代理。@param profile TLS 标识。@return 客户端或错误。
+fn oauth_request_client_for_profile(
+    proxy_url: &str,
+    profile: TlsProfileId,
+) -> Result<reqwest::Client, AppError> {
+    validate_oauth_proxy(
+        proxy_url,
+        &env::var("V3_RUNTIME_URL").unwrap_or_default(),
+        &env::var("V3_DEPLOYMENT_ID").unwrap_or_default(),
+    )?;
+    get_request_client_for_profile(proxy_url, profile)
+        .map_err(|_| AppError::Internal("OAuth request client unavailable".into()))
+}
+
+/// v3 的 OAuth 在 gateway 执行，必须在创建客户端前拒绝缺失代理。
+///
+/// @param proxy_url 本次 OAuth 使用的账号代理。
+/// @param runtime_url v3 管理桥配置。
+/// @param deployment_id v3 部署标识；管理桥缺失时仍保持保护。
+/// @return 配置允许请求时返回成功，否则返回临时不可用且不修改账号凭据。
+fn validate_oauth_proxy(
+    proxy_url: &str,
+    runtime_url: &str,
+    deployment_id: &str,
+) -> Result<(), AppError> {
+    if (!runtime_url.is_empty() || !deployment_id.is_empty()) && proxy_url.trim().is_empty() {
+        return Err(AppError::ServiceUnavailable(
+            "v3 OAuth 必须配置账号代理，已阻止直连".into(),
+        ));
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+pub struct RefreshedOAuthTokens {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Deserialize)]
+struct OAuthRefreshResponse {
+    access_token: String,
+    #[serde(default)]
+    refresh_token: String,
+    #[serde(default)]
+    expires_in: i64,
+}
+
+#[derive(Deserialize)]
+struct OAuthErrorResponse {
+    #[serde(default)]
+    error: String,
+}
+
+async fn read_oauth_error_body(mut response: reqwest::Response) -> Vec<u8> {
+    let mut body = Vec::new();
+    while body.len() < OAUTH_ERROR_BODY_LIMIT {
+        let chunk = match response.chunk().await {
+            Ok(Some(chunk)) => chunk,
+            Ok(None) | Err(_) => break,
+        };
+        let remaining = OAUTH_ERROR_BODY_LIMIT - body.len();
+        body.extend_from_slice(&chunk[..chunk.len().min(remaining)]);
+    }
+    body
+}
+
+fn parse_oauth_error_code(body: &[u8]) -> Option<String> {
+    let code = serde_json::from_slice::<OAuthErrorResponse>(body)
+        .ok()?
+        .error;
+    let code = code.trim();
+    if code.is_empty()
+        || code.len() > OAUTH_ERROR_CODE_LIMIT
+        || !code
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-'))
+    {
+        return None;
+    }
+    Some(code.to_string())
+}
+
+fn classify_oauth_refresh_error(status: reqwest::StatusCode, body: &[u8]) -> AppError {
+    let error_code = parse_oauth_error_code(body);
+    let summary = match error_code.as_deref() {
+        Some(code) => format!("OAuth refresh rejected: status {} error={}", status, code),
+        None => format!("OAuth refresh rejected: status {}", status),
+    };
+    let permanent_invalid_grant = status.is_client_error()
+        && status != reqwest::StatusCode::TOO_MANY_REQUESTS
+        && error_code.as_deref() == Some("invalid_grant");
+    if permanent_invalid_grant {
+        AppError::PermanentCredential(summary)
+    } else {
+        AppError::Internal(summary)
+    }
+}
+
+/// 通过轻量级 API 调用验证 Setup Token。
+pub struct TokenTester;
+
+impl TokenTester {
+    /// 创建 Setup Token 验证器。
+    ///
+    /// @return 返回无状态的 TokenTester 实例。
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// 通过发送最小消息请求验证 Setup Token 有效性。
+    /// @param token 待验证的令牌。
+    /// @param proxy_url 账号上游代理。
+    /// @param canonical_env 账号持久环境，用于 HTTP 画像及 TLS 绑定。
+    /// @return 上游接受令牌时返回 Ok，否则返回请求或验证错误。
+    pub async fn test_token(
+        &self,
+        token: &str,
+        proxy_url: &str,
+        canonical_env: &Value,
+    ) -> Result<(), AppError> {
+        let (client, request) = build_test_token_request(
+            token,
+            proxy_url,
+            canonical_env,
+            configured_default_tls_profile(),
+        )?;
+
+        let resp = client
+            .execute(request)
+            .await
+            .map_err(|e| AppError::Internal(format!("request failed: {:?}", e)))?;
+
+        if resp.status() != 200 {
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            return Err(AppError::Internal(format!(
+                "token test failed: status {} {}",
+                status, text
+            )));
+        }
+        Ok(())
+    }
+}
+
+/// 从同一环境构造令牌测试客户端与请求，TLS 缺版本沿配置默认，HTTP 画像独立归一化。
+/// @param token 待验证的令牌。
+/// @param proxy_url 账号代理。
+/// @param canonical_env 账号持久环境。
+/// @param default_tls 本次测试冻结的配置默认 TLS。
+/// @return 具有正确 TLS 选择的客户端及尚未发送的最小测试请求。
+fn build_test_token_request(
+    token: &str,
+    proxy_url: &str,
+    canonical_env: &Value,
+    default_tls: TlsProfileId,
+) -> Result<(Client, Request), AppError> {
+    // TLS 只读取原始版本字段，不能因其它环境字段缺失而丢掉一个已有的明确绑定。
+    let version = canonical_env
+        .get("version")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let tls_profile = tls_profile_for_version(version, default_tls);
+    let client = oauth_request_client_for_profile(proxy_url, tls_profile)?;
+    let env: CanonicalEnvData = serde_json::from_value(canonical_env.clone()).unwrap_or_default();
+    let version = normalize_version(&env.version);
+    let version_profile = profile_for_version(version);
+    let stainless_os = match env.platform.as_str() {
+        "darwin" => "Mac OS X",
+        "win32" => "Windows",
+        _ => "Linux",
+    };
+    let body = serde_json::json!({
+        "model": "claude-haiku-4-5-20251001",
+        "max_tokens": 1,
+        "messages": [{"role": "user", "content": "hi"}]
+    });
+
+    let request = client
+        .post("https://api.anthropic.com/v1/messages?beta=true")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .header("Accept", "application/json")
+        .header("anthropic-version", "2023-06-01")
+        .header(
+            "anthropic-beta",
+            version_profile.request.haiku_probe_beta_tokens,
+        )
+        .header("anthropic-dangerous-direct-browser-access", "true")
+        .header("User-Agent", claude_cli_user_agent(version))
+        .header("x-app", "cli")
+        .header("accept-encoding", "gzip, deflate, br, zstd")
+        .header("X-Stainless-Lang", "js")
+        .header(
+            "X-Stainless-Package-Version",
+            version_profile.identity.stainless_package_version,
+        )
+        .header("X-Stainless-OS", stainless_os)
+        .header("X-Stainless-Arch", &env.arch)
+        .header("X-Stainless-Runtime", "node")
+        .header(
+            "X-Stainless-Runtime-Version",
+            version_profile.identity.stainless_runtime_version,
+        )
+        .header("X-Stainless-Retry-Count", "0")
+        .header("X-Stainless-Timeout", "600")
+        .json(&body)
+        .build()
+        .map_err(|e| AppError::Internal(format!("request build failed: {:?}", e)))?;
+    Ok((client, request))
+}
+
+/// 使用 refresh token 刷新 OAuth access token。
+pub async fn refresh_oauth_token(
+    refresh_token: &str,
+    proxy_url: &str,
+) -> Result<RefreshedOAuthTokens, AppError> {
+    refresh_oauth_token_at(refresh_token, proxy_url, OAUTH_TOKEN_URL).await
+}
+
+/// 使用指定端点刷新 OAuth access token。
+///
+/// @param refresh_token OAuth refresh token。
+/// @param proxy_url 账号代理地址；仅独立部署允许空字符串直连。
+/// @param token_url OAuth token 端点。
+/// @return 返回刷新后的 access token、refresh token 和过期时间。
+pub(crate) async fn refresh_oauth_token_at(
+    refresh_token: &str,
+    proxy_url: &str,
+    token_url: &str,
+) -> Result<RefreshedOAuthTokens, AppError> {
+    let client = oauth_request_client(proxy_url)?;
+    let body = serde_json::json!({
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": OAUTH_CLIENT_ID,
+        "scope": OAUTH_SCOPES.join(" "),
+    });
+
+    let resp = client
+        .post(token_url)
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("oauth refresh request failed: {}", e)))?;
+
+    if resp.status() != 200 {
+        let status = resp.status();
+        let body = read_oauth_error_body(resp).await;
+        return Err(classify_oauth_refresh_error(status, &body));
+    }
+
+    let data: OAuthRefreshResponse = resp
+        .json()
+        .await
+        .map_err(|e| AppError::Internal(format!("oauth refresh parse failed: {}", e)))?;
+
+    let expires_in = if data.expires_in > 0 {
+        data.expires_in
+    } else {
+        3600
+    };
+    let expires_at = Utc::now() + chrono::Duration::seconds(expires_in);
+
+    Ok(RefreshedOAuthTokens {
+        access_token: data.access_token,
+        refresh_token: if data.refresh_token.is_empty() {
+            refresh_token.to_string()
+        } else {
+            data.refresh_token
+        },
+        expires_at,
+    })
+}
+
+/// 从 Anthropic OAuth API 获取账号用量数据。
+pub async fn fetch_usage(token: &str, proxy_url: &str) -> Result<Value, AppError> {
+    let client = oauth_request_client(proxy_url)?;
+
+    let resp = client
+        .get("https://api.anthropic.com/api/oauth/usage")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/json")
+        .header("anthropic-beta", OAUTH_BETA_TOKEN)
+        .header("User-Agent", claude_code_user_agent(""))
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("usage request failed: {}", e)))?;
+
+    let status = resp.status();
+    if status != 200 {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(match status.as_u16() {
+            401 | 403 => AppError::BadRequest(format!(
+                "usage fetch failed: status {} — token may be expired or invalid: {}",
+                status, text
+            )),
+            429 => AppError::TooManyRequests(format!(
+                "usage endpoint rate limited (429), try again later: {}",
+                text
+            )),
+            _ => AppError::Internal(format!("usage fetch failed: status {} {}", status, text)),
+        });
+    }
+
+    let data: Value = resp
+        .json()
+        .await
+        .map_err(|e| AppError::Internal(format!("usage parse failed: {}", e)))?;
+    Ok(normalize_usage_response(data))
+}
+
+/// 规范化 OAuth usage 返回，补齐前端稳定展示字段。
+fn normalize_usage_response(mut data: Value) -> Value {
+    let seven_day_fable = scoped_weekly_usage_window(&data, "Fable");
+    if let Some(obj) = data.as_object_mut() {
+        if !matches!(obj.get("seven_day_fable"), Some(Value::Object(_))) {
+            if let Some(window) = seven_day_fable {
+                obj.insert("seven_day_fable".into(), window);
+            }
+        }
+    }
+    data
+}
+
+/// 从新版 `limits` scoped 结构里提取指定模型的周用量窗口。
+fn scoped_weekly_usage_window(usage: &Value, model_name: &str) -> Option<Value> {
+    let limits = usage.get("limits")?.as_array()?;
+    let expected = model_name.to_ascii_lowercase();
+    for item in limits {
+        let Some(model) = item.get("scope").and_then(|scope| scope.get("model")) else {
+            continue;
+        };
+        let display_name = model.get("display_name").and_then(Value::as_str);
+        let model_id = model.get("id").and_then(Value::as_str);
+        let matches_name = display_name
+            .map(|value| value.eq_ignore_ascii_case(model_name))
+            .unwrap_or(false);
+        let matches_id = model_id
+            .map(|value| value.to_ascii_lowercase().contains(&expected))
+            .unwrap_or(false);
+        if !matches_name && !matches_id {
+            continue;
+        }
+        let kind = item.get("kind").and_then(Value::as_str);
+        let group = item.get("group").and_then(Value::as_str);
+        if kind != Some("weekly_scoped") && group != Some("weekly") {
+            continue;
+        }
+        let Some(percent) = item.get("percent").and_then(Value::as_f64) else {
+            continue;
+        };
+        let reset_at = item.get("resets_at").and_then(Value::as_str);
+        let mut window = Map::new();
+        window.insert("utilization".into(), json!(percent));
+        window.insert(
+            "resets_at".into(),
+            reset_at.map(|value| json!(value)).unwrap_or(Value::Null),
+        );
+        return Some(Value::Object(window));
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tlsfp::parse_test_clienthello;
+    use serde_json::json;
+    use std::net::Ipv4Addr;
+    use std::time::Duration;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    #[test]
+    fn v3_oauth_requires_proxy_even_when_runtime_configuration_is_partial() {
+        for (runtime, deployment) in [
+            ("http://runtime:8000", ""),
+            ("", "fixture"),
+            ("http://runtime:8000", "fixture"),
+        ] {
+            for proxy in ["", " ", "\t\n"] {
+                assert!(matches!(
+                    validate_oauth_proxy(proxy, runtime, deployment),
+                    Err(AppError::ServiceUnavailable(_))
+                ));
+            }
+            for proxy in ["http://proxy.invalid:3128", "socks5h://proxy.invalid:1080"] {
+                assert!(validate_oauth_proxy(proxy, runtime, deployment).is_ok());
+            }
+        }
+        assert!(validate_oauth_proxy("", "", "").is_ok());
+    }
+
+    fn request_header<'a>(request: &'a reqwest::Request, name: &str) -> &'a str {
+        request
+            .headers()
+            .get(name)
+            .unwrap_or_else(|| panic!("缺少请求头: {}", name))
+            .to_str()
+            .expect("请求头必须是有效字符串")
+    }
+
+    fn test_canonical_env(version: &str) -> Value {
+        json!({
+            "platform": "linux",
+            "platform_raw": "linux",
+            "arch": "x64",
+            "node_version": "v26.3.0",
+            "terminal": "",
+            "package_managers": "",
+            "runtimes": "node",
+            "version": version,
+            "version_base": version,
+            "build_time": "",
+            "deployment_environment": "local",
+            "vcs": "git"
+        })
+    }
+
+    /// 经过令牌测试的真实请求准备链捕获 ClientHello，空版本不能被 HTTP 画像吞掉。
+    #[tokio::test]
+    async fn token_test_tls_uses_raw_version_and_configured_fallback() {
+        for (canonical_env, expected_cipher) in [
+            (json!({}), 4866),
+            (json!({"version":null}), 4866),
+            (json!({"version":"2.1.293"}), 4865),
+            (test_canonical_env(""), 4866),
+            (test_canonical_env("2.1.280"), 4866),
+            (test_canonical_env("2.1.999"), 4866),
+            (test_canonical_env("2.1.293"), 4865),
+        ] {
+            let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+            let proxy = format!("http://{}", listener.local_addr().unwrap());
+            let capture = tokio::spawn(async move {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let mut connect = Vec::new();
+                while !connect.ends_with(b"\r\n\r\n") {
+                    assert!(connect.len() < 8192);
+                    connect.push(stream.read_u8().await.unwrap());
+                }
+                assert!(connect.starts_with(b"CONNECT api.anthropic.com:443 "));
+                stream
+                    .write_all(b"HTTP/1.1 200 Connection established\r\n\r\n")
+                    .await
+                    .unwrap();
+                let mut header = [0; 5];
+                stream.read_exact(&mut header).await.unwrap();
+                let size = usize::from(u16::from_be_bytes([header[3], header[4]]));
+                assert!(size <= 16384);
+                let mut record = header.to_vec();
+                record.resize(5 + size, 0);
+                stream.read_exact(&mut record[5..]).await.unwrap();
+                record
+            });
+            let (client, request) = build_test_token_request(
+                "synthetic-token",
+                &proxy,
+                &canonical_env,
+                TlsProfileId::TestReordered,
+            )
+            .unwrap();
+            // 回环代理在握手首包后关闭；不提供业务响应，也不访问真实上游。
+            assert!(
+                tokio::time::timeout(Duration::from_secs(5), client.execute(request))
+                    .await
+                    .unwrap()
+                    .is_err()
+            );
+            let wire = tokio::time::timeout(Duration::from_secs(5), capture)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                parse_test_clienthello(&wire)["cipher_suites"][0],
+                json!(expected_cipher)
+            );
+        }
+    }
+
+    #[test]
+    fn token_test_request_uses_selected_version_profile_headers() {
+        let prepare = |version| {
+            build_test_token_request(
+                "test-token",
+                "http://127.0.0.1:9",
+                &test_canonical_env(version),
+                TlsProfileId::default(),
+            )
+            .expect("构造账号画像请求")
+            .1
+        };
+        let current = prepare("2.1.260");
+        let previous = prepare("2.1.257");
+        let rollback = prepare("2.1.220");
+
+        assert_eq!(
+            request_header(&current, "user-agent"),
+            "claude-cli/2.1.260 (external, cli)"
+        );
+        assert_eq!(
+            request_header(&current, "x-stainless-package-version"),
+            "0.112.1"
+        );
+        assert_eq!(
+            request_header(&current, "x-stainless-runtime-version"),
+            "v26.3.0"
+        );
+        assert_eq!(
+            request_header(&current, "anthropic-beta"),
+            crate::service::version_profile::HAIKU_PROBE_BETA_TOKENS
+        );
+
+        assert_eq!(
+            request_header(&previous, "user-agent"),
+            "claude-cli/2.1.257 (external, cli)"
+        );
+        assert_eq!(
+            request_header(&previous, "x-stainless-package-version"),
+            "0.112.1"
+        );
+        assert_eq!(
+            request_header(&previous, "x-stainless-runtime-version"),
+            "v26.3.0"
+        );
+        assert_eq!(
+            request_header(&previous, "anthropic-beta"),
+            crate::service::version_profile::HAIKU_PROBE_BETA_TOKENS
+        );
+
+        assert_eq!(
+            request_header(&rollback, "user-agent"),
+            "claude-cli/2.1.220 (external, cli)"
+        );
+        assert_eq!(
+            request_header(&rollback, "x-stainless-package-version"),
+            "0.94.0"
+        );
+        assert_eq!(
+            request_header(&rollback, "x-stainless-runtime-version"),
+            "v26.3.0"
+        );
+        assert_eq!(
+            request_header(&rollback, "anthropic-beta"),
+            crate::service::version_profile::HAIKU_PROBE_BETA_TOKENS
+        );
+    }
+
+    #[test]
+    fn invalid_grant_is_classified_as_permanent_without_description() {
+        let error = classify_oauth_refresh_error(
+            reqwest::StatusCode::BAD_REQUEST,
+            br#"{"error":"invalid_grant","error_description":"fixture secret detail"}"#,
+        );
+
+        assert!(matches!(&error, AppError::PermanentCredential(_)));
+        let message = error.to_string();
+        assert!(message.contains("status 400"));
+        assert!(message.contains("invalid_grant"));
+        assert!(!message.contains("fixture secret detail"));
+    }
+
+    #[test]
+    fn unclassified_oauth_error_remains_transient_and_sanitized() {
+        let error = classify_oauth_refresh_error(
+            reqwest::StatusCode::TOO_MANY_REQUESTS,
+            br#"{"error":"temporarily_unavailable","error_description":"fixture response body"}"#,
+        );
+
+        assert!(matches!(&error, AppError::Internal(_)));
+        let message = error.to_string();
+        assert!(message.contains("status 429"));
+        assert!(message.contains("temporarily_unavailable"));
+        assert!(!message.contains("fixture response body"));
+    }
+
+    #[test]
+    fn transient_http_statuses_override_invalid_grant_code() {
+        for status in [
+            reqwest::StatusCode::TOO_MANY_REQUESTS,
+            reqwest::StatusCode::SERVICE_UNAVAILABLE,
+        ] {
+            let error = classify_oauth_refresh_error(
+                status,
+                br#"{"error":"invalid_grant","error_description":"fixture transient detail"}"#,
+            );
+
+            assert!(matches!(&error, AppError::Internal(_)));
+            let message = error.to_string();
+            assert!(message.contains("invalid_grant"));
+            assert!(!message.contains("fixture transient detail"));
+        }
+    }
+
+    #[test]
+    fn normalize_usage_response_adds_fable_from_scoped_limit() {
+        let data = json!({
+            "five_hour": {"utilization": 10, "resets_at": "2026-07-02T05:20:00Z"},
+            "limits": [
+                {
+                    "kind": "session",
+                    "group": "session",
+                    "percent": 10,
+                    "resets_at": "2026-07-02T05:20:00Z",
+                    "scope": null
+                },
+                {
+                    "kind": "weekly_all",
+                    "group": "weekly",
+                    "percent": 2,
+                    "resets_at": "2026-07-07T06:00:00Z",
+                    "scope": null
+                },
+                {
+                    "kind": "weekly_scoped",
+                    "group": "weekly",
+                    "percent": 37.5,
+                    "resets_at": "2026-07-07T06:00:00Z",
+                    "scope": {
+                        "model": {
+                            "id": null,
+                            "display_name": "Fable"
+                        },
+                        "surface": null
+                    }
+                }
+            ]
+        });
+
+        let normalized = normalize_usage_response(data);
+
+        assert_eq!(normalized["seven_day_fable"]["utilization"], json!(37.5));
+        assert_eq!(
+            normalized["seven_day_fable"]["resets_at"],
+            json!("2026-07-07T06:00:00Z")
+        );
+    }
+
+    #[test]
+    fn normalize_usage_response_keeps_existing_fable_window() {
+        let data = json!({
+            "seven_day_fable": {"utilization": 12, "resets_at": null},
+            "limits": [
+                {
+                    "kind": "weekly_scoped",
+                    "group": "weekly",
+                    "percent": 90,
+                    "resets_at": null,
+                    "scope": {
+                        "model": {
+                            "id": null,
+                            "display_name": "Fable"
+                        }
+                    }
+                }
+            ]
+        });
+
+        let normalized = normalize_usage_response(data);
+
+        assert_eq!(normalized["seven_day_fable"]["utilization"], json!(12));
+    }
+
+    #[test]
+    fn normalize_usage_response_ignores_other_scoped_limits() {
+        let data = json!({
+            "limits": [
+                {
+                    "kind": "weekly_scoped",
+                    "group": "weekly",
+                    "percent": 80,
+                    "resets_at": null,
+                    "scope": {
+                        "model": {
+                            "id": null,
+                            "display_name": "Sonnet"
+                        }
+                    }
+                }
+            ]
+        });
+
+        let normalized = normalize_usage_response(data);
+
+        assert!(normalized.get("seven_day_fable").is_none());
+    }
+}

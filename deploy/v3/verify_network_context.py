@@ -79,8 +79,8 @@ def verify_image(image: str, cycles: int) -> dict:
         bundle = Path(temporary)
         files = {'network-context.py': repository / 'images/account/network-context.py',
             'passthrough.py': repository / 'images/account/passthrough.py',
-            'runtime_files.py': repository / 'orchestrator/runtime_files.py',
-            'runtime_diagnostics.py': repository / 'orchestrator/runtime_diagnostics.py',
+            'runtime_files.py': repository / 'services/orchestrator/runtime_files.py',
+            'runtime_diagnostics.py': repository / 'services/orchestrator/runtime_diagnostics.py',
             'verify.py': Path(__file__)}
         for target, source in files.items():
             shutil.copy2(source, bundle / target)

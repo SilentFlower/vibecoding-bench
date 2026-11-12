@@ -24,8 +24,8 @@ jobs:
       matrix:
         include:
           - image: orchestrator
-            context: ./orchestrator
-            dockerfile: ./orchestrator/Dockerfile
+            context: ./services/orchestrator
+            dockerfile: ./services/orchestrator/Dockerfile
           - image: worker
             context: ./images/worker
             dockerfile: ./images/worker/Dockerfile

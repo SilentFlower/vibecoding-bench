@@ -1,0 +1,24 @@
+[
+  {
+    "case": "main",
+    "requestClass": "main",
+    "billingHasSubagent": false
+  },
+  {
+    "case": "subagent",
+    "requestClass": "subagent",
+    "agentType": "Explore",
+    "billingHasSubagent": true
+  },
+  {
+    "case": "compaction",
+    "requestClass": "compaction",
+    "billingHasSubagent": false
+  },
+  {
+    "case": "forced-main-on-subagent",
+    "requestClass": "main",
+    "agentType": "Explore",
+    "billingHasSubagent": true
+  }
+]

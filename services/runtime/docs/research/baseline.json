@@ -1,0 +1,8 @@
+{
+  "version": "2.1.293",
+  "binary_sha256": "8968405e26db478af44eabc4635ab5ca557057b702a54460a59c13e1b253e978",
+  "binary_size": 252755128,
+  "evidence_source": "官方安装程序的无外网、合成凭据实验",
+  "original_research_directory": "/tmp/cc293-patch-study-3r7s_ncy",
+  "source_bundle_committed": false
+}

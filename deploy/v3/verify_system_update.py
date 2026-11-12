@@ -22,6 +22,7 @@ import uuid
 import traceback
 from contextlib import closing
 from pathlib import Path
+from source_layout import source_path
 from urllib.error import HTTPError
 
 import docker
@@ -216,12 +217,12 @@ def verify(output: Path, gateway_binary: Path, sender_binary: Path, migration_ma
         context = root / 'context'
         context.mkdir()
         (context / 'orchestrator').mkdir()
-        for path in (REPO / 'orchestrator').glob('*.py'):
+        for path in (source_path(REPO, 'orchestrator')).glob('*.py'):
             shutil.copy2(path, context / 'orchestrator' / path.name)
-        shutil.copy2(REPO / 'orchestrator/database-migration-registry.json', context / 'orchestrator/database-migration-registry.json')
+        shutil.copy2(source_path(REPO, 'orchestrator/database-migration-registry.json'), context / 'orchestrator/database-migration-registry.json')
         shutil.copy2(gateway_binary, context / 'gateway')
         shutil.copy2(sender_binary, context / 'sender')
-        shutil.copytree(REPO / 'cc2api/web/dist', context / 'dist')
+        shutil.copytree(source_path(REPO, 'cc2api/web/dist'), context / 'dist')
         # 使用现有隔离测试底座提供系统依赖，实际业务程序均由本次源码替换。
         (context / 'Dockerfile').write_text('''FROM vibebench-v3-control:v3-verify-kernel-online-final AS control
 COPY orchestrator/ /app/
@@ -694,8 +695,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description='隔离 Docker 验证平台在线安装、回退和进程恢复')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--retention-only', action='store_true', help='只执行独立真实镜像保留与回收场景')
-    parser.add_argument('--gateway-binary', type=Path, default=REPO / 'cc2api/target/release/claude-code-gateway')
-    parser.add_argument('--sender-binary', type=Path, default=REPO / 'cc2api/target/release/account-sender')
+    parser.add_argument('--gateway-binary', type=Path, default=source_path(REPO, 'cc2api/target/release/claude-code-gateway'))
+    parser.add_argument('--sender-binary', type=Path, default=source_path(REPO, 'cc2api/target/release/account-sender'))
     parser.add_argument('--migration-manifest', type=Path, help='使用真实旧/新镜像验收迁移底座接入及故障恢复')
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
     parser.add_argument('--policy', type=Path, help=argparse.SUPPRESS)

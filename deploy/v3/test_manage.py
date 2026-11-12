@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from source_layout import source_path
 from contextlib import redirect_stdout
 from unittest.mock import Mock, patch
 
@@ -382,7 +383,7 @@ class OfflineAndStatusTests(unittest.TestCase):
         (self.root / ".v3-deployment.json").write_text('{"deployment":"test"}')
         database = self.root / "bench/db.sqlite"
         database.parent.mkdir()
-        tree = ast.parse((manage.REPO / "orchestrator/database_schema.py").read_text())
+        tree = ast.parse((source_path(manage.REPO, "orchestrator/database_schema.py")).read_text())
         assignment = next(node for node in tree.body if isinstance(node, ast.Assign)
             and any(isinstance(target, ast.Name) and target.id == "_SCHEMA" for target in node.targets))
         with sqlite3.connect(database) as connection:
@@ -498,12 +499,12 @@ class PublicSourceSnapshotTests(unittest.TestCase):
             for relative in names:
                 target = root / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes((manage.REPO / relative).read_bytes().replace(b'\n', b'\r\n'))
+                target.write_bytes((source_path(manage.REPO, relative)).read_bytes().replace(b'\n', b'\r\n'))
                 target.chmod(0o755)
             self.assertEqual(names, manage.restore_upstream_checkout_bytes(root))
             self.assertEqual([], manage.restore_upstream_checkout_bytes(root))
             for relative in names:
-                self.assertEqual((manage.REPO / relative).read_bytes(), (root / relative).read_bytes())
+                self.assertEqual((source_path(manage.REPO, relative)).read_bytes(), (root / relative).read_bytes())
                 self.assertEqual(0o755, (root / relative).stat().st_mode & 0o777)
             first, second = [root / relative for relative in names]
             first.write_bytes(first.read_bytes().replace(b'\n', b'\r\n'))
@@ -514,14 +515,14 @@ class PublicSourceSnapshotTests(unittest.TestCase):
             self.assertEqual(original_first, first.read_bytes())
             second.unlink()
             second.parent.rmdir()
-            second.parent.symlink_to((manage.REPO / names[1]).parent, target_is_directory=True)
+            second.parent.symlink_to((source_path(manage.REPO, names[1])).parent, target_is_directory=True)
             with self.assertRaisesRegex(ValueError, '链接'):
                 manage.restore_upstream_checkout_bytes(root)
 
     def test_dynaconf_public_env_keeps_exact_bytes_and_rejects_adjacent_private_files(self) -> None:
         """公开测试原件按路径和SHA放行，未知.env、改字节或换链接均不能进入。@return None。"""
         relative = Path('project_library/projects/dynaconf/seed/library/tests_functional/legacy/simple/.env')
-        original = manage.REPO / relative
+        original = source_path(manage.REPO, relative)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             target = root / relative
@@ -541,7 +542,7 @@ class PublicSourceSnapshotTests(unittest.TestCase):
     def test_tracked_target_requires_whole_original_tree(self) -> None:
         """保留真实期望夹具，但额外文件或字节变化不能借目录例外进入。@return None。"""
         relative = Path('project_library/projects/docutils/seed/library/sandbox/odf2docutils/tests/presentationSimple/target')
-        original = manage.REPO / relative
+        original = source_path(manage.REPO, relative)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             target = root / relative
@@ -561,7 +562,7 @@ class PublicSourceSnapshotTests(unittest.TestCase):
     def test_public_log_exception_does_not_allow_other_logs_or_env(self) -> None:
         """只允许精确路径和原始字节，改内容或换链接必须拒绝。@return None。"""
         relative = Path('project_library/projects/docutils/seed/library/sandbox/docutils_xml/global.log')
-        original = manage.REPO / relative
+        original = source_path(manage.REPO, relative)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             target = root / relative

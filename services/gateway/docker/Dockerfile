@@ -1,0 +1,67 @@
+# Stage 1: Build frontend
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend
+WORKDIR /app/web
+COPY apps/web/package.json apps/web/package-lock.json ./
+RUN npm ci
+COPY apps/web/ ./
+RUN npm run build
+
+# Stage 2: Build Rust backend
+FROM --platform=$BUILDPLATFORM rust:slim-bookworm AS backend
+ARG TARGETPLATFORM
+WORKDIR /app/services/gateway
+
+RUN apt-get update && apt-get install -y pkg-config libssl-dev gcc-aarch64-linux-gnu && rm -rf /var/lib/apt/lists/*
+
+# 根据目标平台设置交叉编译
+RUN case "$TARGETPLATFORM" in \
+      "linux/arm64") \
+        rustup target add aarch64-unknown-linux-gnu \
+        ;; \
+    esac
+
+# ---- 依赖缓存层：复制 Cargo 清单、craftls 和 vendor，构建空壳项目缓存依赖 ----
+COPY services/gateway/Cargo.toml services/gateway/Cargo.lock ./
+COPY services/gateway/craftls/ ./craftls/
+COPY services/gateway/vendor/ ./vendor/
+# 创建空壳 src，让 cargo build 能解析并下载+编译所有依赖
+RUN mkdir -p src && echo 'fn main() {}' > src/main.rs && \
+    case "$TARGETPLATFORM" in \
+      "linux/arm64") \
+        export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc && \
+        cargo build --release --target aarch64-unknown-linux-gnu \
+        ;; \
+      *) \
+        cargo build --release \
+        ;; \
+    esac && \
+    rm -rf src
+
+# ---- 源码层：只有业务代码变动时才重新编译 ----
+COPY services/gateway/src/ ./src/
+COPY --from=frontend /app/web/dist /app/apps/web/dist/
+# 触发重新编译业务代码（touch 确保时间戳比缓存的依赖新）
+RUN touch src/main.rs && \
+    case "$TARGETPLATFORM" in \
+      "linux/arm64") \
+        export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc && \
+        cargo build --release --target aarch64-unknown-linux-gnu && \
+        cp target/aarch64-unknown-linux-gnu/release/claude-code-gateway /app/services/gateway/claude-code-gateway-bin \
+        ;; \
+      *) \
+        cargo build --release && \
+        cp target/release/claude-code-gateway /app/services/gateway/claude-code-gateway-bin \
+        ;; \
+    esac
+
+# Stage 3: Runtime
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+
+COPY --from=backend /app/services/gateway/claude-code-gateway-bin ./claude-code-gateway
+COPY --from=frontend /app/web/dist ./web/dist/
+
+RUN mkdir -p data
+EXPOSE 5674
+CMD ["./claude-code-gateway"]
