@@ -13,6 +13,7 @@ from docker.errors import DockerException, NotFound
 
 from account_isolation import ISOLATION_VERSION, role_container
 from account_runtime import RuntimeBusy, _read_json, atomic_json
+from cpu_resources import read_policy as read_cpu_policy
 from project_library import read_document, safe_relative, write_document
 from resource_budget import isolated_account_limits, scenario_account_limits, serial_review_limits
 from system_profile import SYSTEM_PROFILE_DIRECTORY
@@ -291,6 +292,9 @@ class ProjectReviewRuntime:
         if row.get('isolation_version') != ISOLATION_VERSION:
             raise ValueError('旧账号隔离版本须先显式空闲升级')
         layout = self.check_layout(row,cli)
+        policy = read_cpu_policy(self.runtime,row)
+        if policy and layout['cli_nano_cpus'] != policy['nano_cpus']['cli']:
+            raise ValueError('固定 CLI 的实际CPU额度与保存策略不一致')
         fingerprint = json.loads(row['fingerprint_json'])
         expected = isolated_account_limits(fingerprint['mem'],fingerprint.get('swap','0'),fingerprint.get("native_sender_memory"))
         cpu = layout['cli_nano_cpus']
@@ -299,10 +303,12 @@ class ProjectReviewRuntime:
             current.reload()
             config = current.attrs['HostConfig']
             if (config.get('Memory') != expected[role][0] or config.get('MemorySwap') != expected[role][1]
-                    or type(config.get('NanoCpus')) is not int or config['NanoCpus'] <= 0):
+                    or type(config.get('NanoCpus')) is not int or config['NanoCpus'] <= 0
+                    or (policy and config['NanoCpus'] != policy['nano_cpus'][role])):
                 raise ValueError('账号公共角色的实际限额与固化预算不符')
             cpu += config['NanoCpus']
-        if cpu > int(float(os.environ.get('V3_ACCOUNT_CPUS','2'))*1_000_000_000):
+        # 显式保存的三角色策略已逐项核验，用户调额后沿新额度交接。
+        if policy is None and cpu > int(float(os.environ.get('V3_ACCOUNT_CPUS','2'))*1_000_000_000):
             raise ValueError('账号实际 CPU 限额超过配置预算，拒绝串行交接')
         layout = {**layout,'limits':{**layout['limits'],
             'review':list(serial_review_limits(fingerprint['mem'],fingerprint.get('swap','0'),fingerprint.get("native_sender_memory")))},
@@ -524,6 +530,10 @@ class ProjectReviewRuntime:
             return {'schema':2,'mode':SERIAL_MODE,'limits':{key:list(value) for key,value in limits.items()},
                 'cli_nano_cpus':config['NanoCpus']}
         layout = read_document(path)
+        policy = read_cpu_policy(self.runtime,row)
+        if policy:
+            # 仅覆盖已明确调整的CPU视图，旧布局文件及内存/PID合同继续保留。
+            layout = {**layout,'cli_nano_cpus':policy['nano_cpus']['cli']}
         fingerprint = json.loads(row['fingerprint_json'])
         expected = {key: list(value) for key, value in scenario_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'), fingerprint.get("native_sender_memory")).items()}
         cli.reload()

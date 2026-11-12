@@ -1,5 +1,6 @@
 """固定环境状态及故障收口测试，不使用真实账号或 Docker daemon。"""
 import json
+import uuid
 import os
 import re
 import sqlite3
@@ -176,7 +177,8 @@ class AccountRuntimeTests(unittest.TestCase):
             'state': 'ready', 'pid': 123, 'idle_workers': 1, 'live_workers': 1,
             'checked_at_ms': checked, 'bearer': 'synthetic-secret', 'reason': 'arbitrary-secret'}
         self.gateway._request.return_value = [value]
-        snapshots = self.runtime.native_preparation_snapshots()
+        snapshots, read_error = self.runtime.native_preparation_snapshots()
+        self.assertIsNone(read_error)
         self.gateway._request.assert_called_once_with('GET', '/admin/native-preparations', timeout=3)
         with patch('account_runtime._read_json', return_value={'native': {'binary_path': 'synthetic'}}), \
                 patch.object(self.runtime, 'ensure', side_effect=AssertionError('禁止唤醒')):
@@ -184,6 +186,9 @@ class AccountRuntimeTests(unittest.TestCase):
             self.assertEqual((summary['state'], summary['pid']), ('ready', 123))
             self.assertNotIn('bearer', summary)
             self.assertIsNone(summary['reason'])
+            self.assertFalse(summary['adaptive_prewarm'])
+            self.assertEqual(self.runtime.native_preparation_summary(row, account, {}, 'read_failed')['reason'], 'read_failed')
+            self.assertEqual(self.runtime.native_preparation_summary(row, account, {})['reason'], 'snapshot_missing')
             value['kernel_generation'] = 'old-kernel-generation'
             self.assertEqual(self.runtime.native_preparation_summary(row, account, snapshots)['state'], 'unknown')
             value.pop('kernel_generation')
@@ -196,7 +201,7 @@ class AccountRuntimeTests(unittest.TestCase):
         with patch('account_runtime._read_json', return_value={'native': None}):
             self.assertIsNone(self.runtime.native_preparation_summary(row, account, snapshots))
         self.gateway._request.side_effect = OSError('合成故障')
-        self.assertEqual(self.runtime.native_preparation_snapshots(), {})
+        self.assertEqual(self.runtime.native_preparation_snapshots(), ({}, 'read_failed'))
 
     def test_cli_storage_failure_keeps_verified_private_version_available(self) -> None:
         """去重是可选优化，磁盘缓存故障不能使已验证安装的 CLI 登录失败。@return None。"""
@@ -1741,6 +1746,23 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual(rebuilt['generation'], row['generation'] + 1)
         for container in old_roles:
             container.remove.assert_called_once()
+
+    def test_saved_role_cpu_policy_is_used_when_recreating_containers(self) -> None:
+        """实际三角色创建沿私有CPU策略，重建代次保持原策略。@return None。"""
+        self._isolated_docker()
+        row = self.runtime._row('synthetic', 1)
+        limits = {'cli': 2000000000, 'sender': 1000000000, 'network': 500000000}
+        atomic_json(self.runtime._root(row) / 'runtime/cpu-resources.json', {
+            'schema_version': 1, 'environment_id': row['environment_id'], 'account_id': 1,
+            'revision': str(uuid.uuid4()), 'nano_cpus': limits})
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
+            'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        self.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': '', 'request_backend': 'legacy'}
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), patch.object(self.runtime, '_sender_active', return_value=0):
+            self.runtime.ensure(account)
+        actual = {call.kwargs['labels']['vibebench.role']: call.kwargs['nano_cpus']
+            for call in self.client.containers.run.call_args_list}
+        self.assertEqual(actual, {'account': limits['cli'], 'account-sender': limits['sender'], 'account-network': limits['network']})
 
     def test_native_unlimited_layout_and_capture_are_frozen_per_account(self) -> None:
         """无限账号省略 sender 预算，三角色与私有采集合同保持一致。@return None。"""

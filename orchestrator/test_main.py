@@ -1,6 +1,7 @@
 """定时养号和 cc2api 集成的后端回归测试。"""
 
 import json
+from io import BytesIO
 import os
 import re
 import sqlite3
@@ -18,6 +19,59 @@ from pydantic import ValidationError
 from account_runtime import AccountRuntime
 
 import main
+
+
+class NativePreparationClientTests(unittest.TestCase):
+    """验证实际管理客户端的批量数组合同与其他接口的对象约束。"""
+
+    def test_native_array_is_accepted_only_for_exact_read_route(self) -> None:
+        """数组只允许进入原生准备GET，其他路由与坏形状继续拒绝。@return None。"""
+        client = main.Cc2ApiClient('http://127.0.0.1:19090', 'synthetic-admin', 3)
+        for method, path, payload, accepted in [
+            ('GET', '/admin/native-preparations', [{'account_id': 12, 'state': 'ready'}], True),
+            ('GET', '/admin/accounts', [], False),
+            ('POST', '/admin/native-preparations', [], False),
+            ('GET', '/admin/native-preparations', {}, False),
+            ('GET', '/admin/native-preparations', [7], False),
+        ]:
+            with self.subTest(method=method, path=path, payload=payload):
+                with patch('main.urllib.request.urlopen', return_value=BytesIO(json.dumps(payload).encode())):
+                    if accepted:
+                        self.assertEqual(client._request(method, path), payload)
+                    else:
+                        with self.assertRaises(ValueError):
+                            client._request(method, path)
+
+
+class CpuResourceContractTests(unittest.TestCase):
+    """校验CPU管理入口的严格字段及实际SQL归属过滤。"""
+
+    def test_cpu_model_allows_overcommit_and_rejects_boolean_values(self):
+        """总和6核的请求合法，布尔及额外字段拒绝。@return None。"""
+        value = {'expected_generation':14,'expected_revision':'a'*64,'cpus':{'cli':2,'sender':2,'network':2}}
+        self.assertEqual(sum(main.CpuResourceOperation(**value).cpus.values()),6)
+        for invalid in [{**value,'expected_generation':True},{**value,'cpus':{**value['cpus'],'sender':True}},
+                {**value,'unexpected':1}]:
+            with self.assertRaises(ValidationError):main.CpuResourceOperation(**invalid)
+
+    def test_cpu_environment_uses_current_generation_and_excludes_deleted_accounts(self):
+        """实际参数化查询读取新代次，已删除账号的环境拒绝。@return None。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)/'state.sqlite'
+            with sqlite3.connect(path) as connection:
+                connection.executescript("CREATE TABLE accounts(id INTEGER,deleted_at TEXT);"
+                    "CREATE TABLE account_environments(environment_id TEXT,account_id INTEGER,generation INTEGER);"
+                    "INSERT INTO accounts VALUES(7,NULL);INSERT INTO account_environments VALUES('synthetic',7,15);")
+            def connect():
+                connection = sqlite3.connect(path)
+                connection.row_factory = sqlite3.Row
+                return connection
+            with patch('main.get_db',side_effect=connect):
+                self.assertEqual(main._cpu_environment('synthetic')['generation'],15)
+                with sqlite3.connect(path) as connection:
+                    connection.execute("UPDATE accounts SET deleted_at='synthetic-deleted'")
+                with self.assertRaises(main.HTTPException) as error:main._cpu_environment('synthetic')
+                self.assertEqual(error.exception.status_code,404)
 
 
 class TopicPromptTests(unittest.TestCase):

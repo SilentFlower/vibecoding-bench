@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 from docker.types import Mount
+from cpu_resources import read_policy as read_cpu_policy
 
 from account_update_identity import configured_release, image_origin, role_release, save_image_origin
 
@@ -159,6 +160,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     # 同一个宿主源不能在 dict 中重复作为键，machine-id 的第二个目标使用 Docker mounts。
     machine_mount = Mount('/var/lib/dbus/machine-id', str(host_root / 'runtime/machine-id'), type='bind', read_only=True)
     cpu = int(float(os.environ.get('V3_ACCOUNT_CPUS', '2')) * 1_000_000_000)
+    cpu_policy = read_cpu_policy(runtime, row)
     created = []
 
     def launch(role, **options):
@@ -173,6 +175,8 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
             options.update(nano_cpus=review_layout['cli_nano_cpus'], pids_limit=384)
             options['labels']['vibebench.review-layout'] = '1'
             options['tmpfs']['/tmp'] = 'rw,noexec,nosuid,nodev,size=64m,mode=1777'
+        if cpu_policy:
+            options['nano_cpus'] = cpu_policy['nano_cpus'][role]
         if role == 'cli':
             options['labels'][SYSTEM_PROFILE_LABEL] = str(SYSTEM_PROFILE_VERSION)
             options['labels'][COMPUTER_PROFILE_LABEL] = str(COMPUTER_PROFILE_VERSION)

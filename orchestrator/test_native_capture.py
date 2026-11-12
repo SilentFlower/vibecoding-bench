@@ -43,6 +43,38 @@ class NativeCaptureTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 read_capture(root, 7, attempt)
 
+    def test_optional_stages_are_bounded_and_old_snapshots_remain_readable(self):
+        """新增阶段只接纳定义过的有界明细，历史缺字段保持可读。@return None。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            directory = root / 'flows/api/cc-prepared'
+            directory.mkdir(parents=True)
+            attempt, now = str(uuid.uuid4()), int(time.time()*1000)
+            path = directory / (attempt+'.json')
+            base = {'schema_version':1,'stage':'cc_prepared','account_id':7,'attempt_id':attempt,
+                'captured_at_ms':now,'body':'{}','headers':[]}
+            value = {**base,'header_policy':{'source':'native_header_policy','status':'complete','observed_count':1,
+                'stored_count':1,'decisions':[{'name':'x-unregistered','action':'drop','reason':'未登记到协议白名单'}]},
+                'body_changes':{'source':'observed_diff','status':'complete','items':[{'path':'/settings','action':'removed','reason':'本机配置'}]},
+                'ingress':{'status':'complete','body':'{}','headers':[['x-unregistered','synthetic']],
+                    'captured_at_ms':now,'body_truncated':False,'headers_truncated':False,
+                    'original_body_bytes':2,'original_body_sha256':'a'*64},
+                'stages':[{'stage':'wire_final','source':'unavailable','representation':'unavailable','status':'unavailable'}]}
+            path.write_text(json.dumps(value))
+            self.assertEqual(read_capture(root,7,attempt,now_ms=now),value)
+            for field, invalid in [
+                    ('header_policy',{**value['header_policy'],'stored_count':2}),
+                    ('header_policy',{**value['header_policy'],'decisions':[{'name':'x','action':'unknown','reason':'bad'}]}),
+                    ('body_changes',{**value['body_changes'],'items':[{'path':'x'*2049,'action':'removed','reason':'bad'}]}),
+                    ('ingress',{**value['ingress'],'headers':[['x',7]]}),
+                    ('ingress',{**value['ingress'],'original_body_sha256':'bad'}),
+                    ('stages',value['stages']*2)]:
+                with self.subTest(field=field):
+                    path.write_text(json.dumps({**value,field:invalid}))
+                    with self.assertRaises(ValueError):read_capture(root,7,attempt,now_ms=now)
+            path.write_text(json.dumps(base))
+            self.assertEqual(read_capture(root,7,attempt,now_ms=now),base)
+
     def test_seven_day_boundary_and_safe_background_cleanup(self):
         """边界保留、过期读取明确、仅删除归属正确的普通快照。@return None。"""
         with tempfile.TemporaryDirectory() as temporary:

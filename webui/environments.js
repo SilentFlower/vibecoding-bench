@@ -14,6 +14,7 @@ function leaveEnvironments() {
   clearTimeout(ui.timer);
   ui.timer = null;
   closeNativeKernelDialog(true);
+  closeCpuResourceDialog(true);
 }
 
 /**
@@ -123,6 +124,7 @@ function renderEnvironmentCard(row) {
     ${ui.feedback.has(id) ? `<p class="env-notice" role="status">${escapeHTML(ui.feedback.get(id))}</p>` : ''}
     ${renderNativeKernel(row)}
     ${renderNativePreparation(row)}
+    ${row.isolation_version === 2 ? `<section class="env-window"><div><h4>CPU 额度</h4><p class="env-muted">分别调整 CLI、API 发送器和网络的额度，保存后重建沿用。</p></div><button type="button" class="btn btn-sm" data-cpu-resources data-environment="${escapeHTML(id)}" data-env-focus="${escapeHTML(id + ':cpu')}" ${pending ? 'disabled' : ''}>调整额度</button></section>` : ''}
     <section class="env-window"><div><h4>当地运行窗口</h4>${row.run_window ? renderAccountRunWindow({id: row.account_id, run_window: row.run_window}) : '<p class="env-muted">运行窗口尚未提供</p>'}</div>${row.run_window && row.account_id != null ? `<button type="button" class="btn btn-sm" data-run-window-config="${escapeHTML(row.account_id)}" data-environment="${escapeHTML(id)}" data-env-focus="${escapeHTML(id + ':window')}">配置时段</button>` : ''}</section>
     <details class="env-details" data-env-details="${escapeHTML(id + ':technical')}"><summary>环境与物理详情</summary><div class="env-details-body"><dl><dt>环境 ID</dt><dd><code>${escapeHTML(id)}</code></dd><dt>主机名</dt><dd>${escapeHTML(fingerprint.hostname || '未提供')}</dd><dt>设备身份</dt><dd>${escapeHTML(row.identity_status || '待核对')}</dd><dt>语言区域</dt><dd>${escapeHTML(fingerprint.lang || '未提供')}</dd><dt>画像版本</dt><dd>${escapeHTML(fingerprint.profile_version ?? '未提供')}</dd></dl>${row.physical_features ? renderPhysicalFeatures(row) : '<p class="env-muted">物理实测尚未采集。</p>'}</div></details>
     <details class="env-details" data-env-details="${escapeHTML(id + ':maintenance')}"><summary>维护操作</summary><div class="env-details-body"><p class="env-muted">停止和重建保留 HOME、身份及证据。画像校正按服务器许可执行。</p><div class="env-actions">${action('stop', '停止环境', row.busy)}${action('rebuild', '重建容器', row.busy)}${action('reconcile', '故障对账', row.busy)}${action('reprofile', '校正画像', !row.can_reprofile)}</div>${row.reprofile_message ? `<p class="env-muted">${escapeHTML(row.reprofile_message)}</p>` : ''}</div></details>
@@ -142,6 +144,7 @@ function renderNativePreparation(row) {
   const reasons = {identity_changed: '运行身份已变化', worker_unavailable: '进程退出或管道异常',
     check_expired: '最近检查已过期', check_failed: '状态检查失败', preparation_failed: '本地准备失败',
     invalidated: '准备已失效', capability_unknown: '原生能力待核对', binding_unverified: '当前环境代次待核对',
+    read_failed: '准备状态读取失败', snapshot_missing: '尚未收到本账号的准备快照',
     maintenance: '账号正在维护', sleeping: '环境休眠', disabled: '账号已停用'};
   const tone = value.state === 'ready' ? 'good' : ['busy', 'sleeping', 'disabled'].includes(value.state) ? 'muted' : 'warning';
   const checked = typeof value.checked_at_ms === 'number' && Number.isFinite(value.checked_at_ms)
@@ -150,6 +153,7 @@ function renderNativePreparation(row) {
     <div class="env-card-head"><h4>原生准备</h4><span class="env-badge env-${tone}">${escapeHTML(labels[value.state] || '未知状态')}</span></div>
     <div class="env-resources"><div><span>空闲热进程</span><strong>${escapeHTML(value.idle_workers ?? '未观测')}</strong></div><div><span>实际进程数</span><strong>${escapeHTML(value.live_workers ?? '未观测')}</strong></div><div><span>空闲 PID</span><strong>${escapeHTML(value.pid ?? '未观测')}</strong></div></div>
     <p class="env-muted">最近检查：${escapeHTML(checked)}</p>
+    ${typeof value.adaptive_prewarm === 'boolean' ? `<p class="env-muted">并发备用：${value.adaptive_prewarm ? '已启用第二进程补位' : '未启用，保留一个常驻热进程'}。超出已就绪热容量时按需扩容。</p>` : ''}
     ${value.reason ? `<p class="env-notice">${escapeHTML(reasons[value.reason] || '状态待核对')}</p>` : ''}
   </section>`;
 }
@@ -185,6 +189,7 @@ async function handleEnvironmentAction(button) {
   const ui = state.environmentUI, id = button.dataset.environment, generation = state.viewGeneration;
   if (!id || ui.pending.has(id)) return;
   if (button.dataset.kernelAction) return openNativeKernelDialog(button);
+  if (button.hasAttribute('data-cpu-resources')) return openCpuResourceDialog(button);
   if (button.dataset.runWindowConfig) {
     try { await openRunWindowConfig(button.dataset.runWindowConfig); }
     catch (error) {
@@ -362,3 +367,91 @@ function renderPhysicalFeatures(row) {
   </details>`;
 }
 
+
+/** 打开独立CPU表单，列表轮询保持当前输入。
+ * @param {HTMLButtonElement} button 本环境资源入口。
+ * @return {Promise<void>} 读取当前实际额度完成。
+ */
+async function openCpuResourceDialog(button) {
+  if (state.cpuDialog) return;
+  const id = button.dataset.environment, row = state.environmentUI.rows.find(item => item.environment_id === id);
+  if (!row) return;
+  const request = {id, generation: state.viewGeneration, focus: button.dataset.envFocus, sending: false, resources: null};
+  state.cpuDialog = request;
+  const modal = $('#cpu-resource-modal'), form = $('#cpu-resource-form');
+  $('#cpu-resource-description').textContent = `${row.name || '当前环境'} · 正在读取实际额度`;
+  $('#cpu-resource-feedback').textContent = '';
+  $$('input, button[type="submit"]', form).forEach(node => { node.disabled = true; if (node.tagName === 'INPUT') node.value = ''; });
+  form.onsubmit = submitCpuResources;
+  modal.onkeydown = event => {
+    if (event.key !== 'Tab') return;
+    const nodes = $$('button:not(:disabled), input:not(:disabled)', modal).filter(node => node.getClientRects().length);
+    const index = nodes.indexOf(document.activeElement);
+    if (event.shiftKey && index <= 0) { event.preventDefault(); nodes.at(-1)?.focus(); }
+    else if (!event.shiftKey && index === nodes.length - 1) { event.preventDefault(); nodes[0]?.focus(); }
+  };
+  openModal('#cpu-resource-modal');
+  $('[data-close]', modal).focus();
+  try {
+    const resources = await API(`/environments/${encodeURIComponent(id)}/cpu-resources`);
+    if (state.cpuDialog !== request) return;
+    request.resources = resources;
+    $('#cpu-resource-description').textContent = `${row.name || '当前环境'} · 宿主 ${resources.host_cpus} 核 · 代次 ${resources.generation}`;
+    for (const role of ['cli', 'sender', 'network']) {
+      form.elements[role].value = resources.cpus[role];
+      form.elements[role].max = resources.host_cpus;
+      form.elements[role].disabled = false;
+    }
+    $('button[type="submit"]', form).disabled = false;
+  } catch (error) {
+    if (state.cpuDialog === request) $('#cpu-resource-feedback').textContent = '读取失败：' + error.message;
+  }
+}
+
+/** 关闭CPU窗口并使迟到回执失效。
+ * @param {boolean} force 导航离页时强制收口窗口。
+ * @return {boolean} 是否完成关闭。
+ */
+function closeCpuResourceDialog(force = false) {
+  const request = state.cpuDialog, modal = $('#cpu-resource-modal');
+  if (!modal || (request?.sending && !force)) return false;
+  state.cpuDialog = null;
+  modal.classList.add('hidden');
+  modal.onkeydown = null;
+  $$('[data-close]', modal).forEach(button => { button.disabled = false; });
+  if (request && !force) {
+    const trigger = $$('[data-env-focus]').find(node => node.dataset.envFocus === request.focus && !node.disabled);
+    (trigger || $('#environment-refresh'))?.focus({preventScroll: true});
+  }
+  return true;
+}
+
+/** 提交用户已看到的实际版本，失败时要求重新读取，避免覆盖并发设置。
+ * @param {SubmitEvent} event 表单提交事件。
+ * @return {Promise<void>} 保存及当前页面刷新完成。
+ */
+async function submitCpuResources(event) {
+  event.preventDefault();
+  const request = state.cpuDialog;
+  if (!request?.resources || request.sending) return;
+  const modal = $('#cpu-resource-modal'), form = $('#cpu-resource-form');
+  const cpus = Object.fromEntries(['cli', 'sender', 'network'].map(role => [role, Number(form.elements[role].value)]));
+  request.sending = true;
+  $$('input, button', modal).forEach(node => { node.disabled = true; });
+  $('#cpu-resource-feedback').textContent = '正在应用并核对实际额度…';
+  try {
+    await API(`/environments/${encodeURIComponent(request.id)}/cpu-resources`, {method: 'POST', body: JSON.stringify({
+      expected_generation: request.resources.generation, expected_revision: request.resources.revision, cpus
+    })});
+    if (state.cpuDialog !== request) return;
+    request.sending = false;
+    closeCpuResourceDialog();
+    state.environmentUI.feedback.set(request.id, 'CPU 额度已应用，重建配置已保存。');
+  } catch (error) {
+    if (state.cpuDialog === request) $('#cpu-resource-feedback').textContent = '保存失败：' + error.message + '。请关闭窗口并重新读取实际额度。';
+  } finally {
+    request.sending = false;
+    if (state.cpuDialog === request) $$('[data-close]', modal).forEach(button => { button.disabled = false; });
+    if (request.generation === state.viewGeneration && currentTab() === 'environments') await renderEnvironments();
+  }
+}

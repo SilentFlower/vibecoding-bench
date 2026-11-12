@@ -16,6 +16,7 @@ from account_isolation import ISOLATION_VERSION, role_labels
 from account_runtime import AccountRuntime, RuntimeBusy
 from project_library import read_document, write_document
 from project_review_runtime import SERIAL_MODE
+from runtime_files import atomic_json
 from resource_budget import isolated_account_limits, scenario_account_limits, serial_review_limits
 import main
 
@@ -132,6 +133,29 @@ class PrivateReviewTests(unittest.TestCase):
         self.assertEqual((512*1024**2,)*2,serial_review_limits('896m'))
         with self.assertRaises(ValueError):
             serial_review_limits('895m')
+
+    def test_explicit_cpu_policy_overrides_legacy_cpu_view_and_total_budget(self) -> None:
+        """旧布局沿明确CPU策略交接，保留冻结内存、PID及原文件。@return None。"""
+        fixture=self._serial_fixture(legacy=True)
+        path=self.runtime._root(self.row)/'runtime/project-review-layout.json'
+        original=path.read_bytes()
+        atomic_json(self.runtime._root(self.row)/'runtime/cpu-resources.json',
+            {'schema_version':1,'environment_id':self.row['environment_id'],'account_id':self.row['account_id'],
+             'revision':'a77005a0-7fef-4d22-ab21-c66a183d09dd',
+             'nano_cpus':{'cli':2000000000,'sender':2000000000,'network':2000000000}})
+        for role in fixture.roles.values():
+            role.attrs['HostConfig']['NanoCpus']=2000000000
+        layout=self.review.serial_layout(self.row,fixture.cli)
+        self.assertEqual(2000000000,layout['cli_nano_cpus'])
+        self.assertEqual(2000000000,layout['review_nano_cpus'])
+        self.assertEqual(original,path.read_bytes())
+        fixture.roles['sender'].attrs['HostConfig']['NanoCpus']=1000000000
+        with self.assertRaisesRegex(ValueError,'固化预算不符'):
+            self.review.serial_layout(self.row,fixture.cli)
+        fixture.roles['sender'].attrs['HostConfig']['NanoCpus']=2000000000
+        fixture.cli.attrs['HostConfig']['PidsLimit']=512
+        with self.assertRaisesRegex(ValueError,'布局与实际固定容器不一致'):
+            self.review.serial_layout(self.row,fixture.cli)
 
     def test_serial_cleanup_stops_review_before_restoring_same_cli(self) -> None:
         """非共享评审完整清理后恢复原 CLI，网络与发送器不停止。@return None。"""

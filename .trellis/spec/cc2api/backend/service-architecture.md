@@ -38,7 +38,7 @@ src/tlsfp/
 - 零模型接口：`POST /internal/native/prepare` 接收 `NativePreparation`，`POST /internal/native/prepare/cancel` 接收 `NativePreparationControl`；均沿用当前 sender 私有鉴权和绑定校验。
 - 管理接口 `GET|POST /admin/accounts/:id/native-preparation` 分别查询状态、合并准备提示；POST 返回 `queued:true,preparation`，不等待加载。`GET /internal/v3/transport/:id?wake=false` 只解析已运行绑定，缺失/休眠返回 null。
 - `NativePreparation` 字段：`account_id:i64,environment_id:String,generation:u64,preparation_id:UUID,deadline_unix_ms:u64,bearer,device_id,account_uuid?,organization_uuid?,email,concurrency:i32`；取消合同仅含前四个归属字段。准备响应包含 `state,account_id,environment_id,generation,preparation_id,version,raw_input_protocol,pid?,idle_workers,reused`。
-- `NativeSubmission` 字段为 `request: PreparedRequest,input: Value,bearer,device_id,account_uuid?,organization_uuid?,email,concurrency:i32,log_mode:RequestLogMode`，禁止 Debug 输出。input 为同 request_id 的 schema 1 原始信封；日志模式缺省 info，详见[CC 组装后私有采集](./settings-database.md#scenario-cc-组装后私有采集)。
+- `NativeSubmission` 字段为 `request: PreparedRequest,input: Value,bearer,device_id,account_uuid?,organization_uuid?,email,concurrency:i32,log_mode:RequestLogMode,ingress_capture?:Value,cache_ttl_rewrite?:String`，禁止 Debug 输出。input 为同 request_id 的 schema 1 原始信封；日志模式缺省 info，详见[CC 组装后私有采集](./settings-database.md#scenario-cc-组装后私有采集)。
 - `validate_request(prepared: &PreparedRequest, config: &SenderConfig) -> Result<tokio::time::Instant, AppError>`冻结接收边界的单调截止。`NativePool::submit_validated(config, submission, deadline)`只接收已校验信封；直接`submit`先校验一次。
 
 ### 3. Contracts
@@ -47,6 +47,8 @@ src/tlsfp/
 - 普通准入、账号选择、凭据解析及加权许可仍由 Gateway 所有。原生分支在 Rust 正文/头部/CCH 重写前接管精确 Messages；保留逻辑 JSON 与 HeaderMap 多值，头值在私有信封中按 Latin-1 字节串传递。
 - 账号 Fast/1M 权限先明确拒绝越权申请；允许时保持原始输入交给二进制。当前 bearer 和受控身份进入工作进程，RT 留在既有凭据所有者。原生池的 Linux x64、身份、封存、预算及回收规则由 [V3 原生 sender](../../vibecoding-bench/backend/account-runtime-v3.md#scenario-v3-原生-sender-共享映像池与资源预算)所有。
 - 原生请求最多一次模型提交，错误直接返回；legacy 的重写、401/signature/429 重试与其他端点保持各自原路径。调度 submitted 记录实际内部 POST，包含原生初始化耗时，不能解释为供应商已接收。
+- Gateway逐请求冻结当前cache_control_ttl_rewrite（off/5m/1h），私有TTL策略在checkout前校验。worker_ready能力cache_ttl_rewrite_protocol=1才发送该字段；强制模式遇旧内核返回503且零模型提交，off兼容旧版。策略不参与池身份，修改设置继续复用暖PID；配套内核先激活，再更新平台。旧内核回滚前先关闭强制TTL。
+- 响应流日志按网关根request_id、原生job/attempt UUID、worker/PID关联。本层EOF、body_error、静默超时、下游Drop及IPC/运行时错误分别记录，含持续时间、片段/字节及最后收包间隔。错误链最多八层，仅投影reqwest/hyper/io类型标志及OS代码；运行时原错误只保存SHA与受控code。代理隧道仅记录worker/tunnel UUID及密文流量数字，不能据双向复制收口断言首个关闭方。普通日志禁止异常原文、URL、代理凭据及正文。
 - sender 校验现有绑定、代次、deadline、目标及秘密，原生目标仅 POST `/v1/messages` 且无 query。response 继续经过共用用量观察及流许可，取消、EOF、Drop 各按既有一次收口。
 - 私有`deadline_unix_ms`采用一次墙钟采样：过期拒绝，未来上限允许120秒预算加5秒跨进程时钟偏差，实际剩余预算钳制120秒。legacy发送和原生启动、首响应共用接收时冻结的单调截止；池内不重复按墙钟验期。暖进程在业务投递前复核单调截止，启动耗时不能换取新预算。
 - 准备仅 checkout/真实 worker_ready/回池，禁止调用 execute、模型或计费。后台协调并行2、待处理账号最多128；启动及5/20/60秒补偿只解析运行绑定。bench 环境就绪在生命周期锁外按环境/代次通知一次；在途新提示合并为一次后续执行。账号更新、凭据提交及交接重新开放门禁后触发准备。
@@ -104,6 +106,7 @@ src/tlsfp/
 
 - `NativeReadinessStatus` 字段为 `state:String,account_id:i64,environment_id:String,generation:u64,kernel_generation:Option<String>,release:Option<NativeReleaseRef>,checked_at_ms:u64,idle_workers:usize,live_workers:usize,pid:Option<u32>,reason:Option<String>`。池状态为 `ready|busy|preparing|unprepared|failed`，协调器另投影休眠、停用、维护、失败和未知。
 - 就绪必须属于与业务相同的配置、bearer、账号身份及并发池键。检查真实子进程与空闲管道，坏进程退役；固定分发体、执行映像及封存校验完成后才记录 worker 的 ready 时刻。旧身份物理进程仍忙时不得充当新身份 busy。
+- 池身份统一规范化SenderConfig.quota_identity为空、native_adaptive_prewarm=false；额度观察字段首次补写与备用开关变化保持暖池。bearer、代理、设备、账号、组织、环境/内核代次及并发继续隔离。准备、readiness、切换与业务共用这一入口。
 - readiness 只检查本地状态，不启动进程或执行模型。业务 checkout 再原子校验和占用。准备仍由原 prepare 接口完成真实握手并回到同一池；冷池首轮初始化共享代次锁，后续扩容维持原物理上限。
 - 启动补偿外，每20秒巡检已启用原生账号，仅解析 `wake=false` 运行绑定。待处理最多128、并行2、按账号去重，轮转扫描避免高 ID 饥饿；失败退避40/80/160/300秒，显式变更提示清除退避。`busy|preparing` 等待后续巡检，`unprepared|failed` 才重新准备。
 - 发布前重读权威账号与绑定；排他维护、更新门禁、凭据活动关闭和取消继续优先。批量缓存的 ready 超过45秒转 `unknown/check_expired`。`last_preparation` 仅保存历史准备回执；GET 主动检查不承担恢复启动。
@@ -130,6 +133,7 @@ src/tlsfp/
 
 - `native_real_binary`：当前/错误身份、真实61秒等待与可控1800/14400秒空闲年龄、同 PID 首次复用、冷暖相同正文与资源对照、并发上限及取消退役；长空闲年龄与实际等待分别标注。
 - `native_real_gateway`：终止预热进程后周期恢复为新 PID，恢复模型计数增量0；业务诊断持久化真实 PID、暖命中与启动字段，凭据轮换隔离。
+- `native_real_gateway`另核候选激活/回滚后首次补写quota_identity保持预热PID；设置强制1h经真实SettingsStore和能力声明到达回环出站。`stream_error`及流日志测试覆盖截断、超时、EOF、Drop、秘密过滤与关联字段。
 - 诊断与历史记录单测覆盖缺字段、非法 PID/UUID 和计时越界；前端构建及合成浏览器覆盖历史未观测、实际暖命中与阶段口径。
 
 ## Gateway 热路径规则

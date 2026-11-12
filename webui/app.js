@@ -2562,6 +2562,7 @@ function openModal(sel) { $(sel).classList.remove('hidden'); }
  */
 function closeModal(sel) {
   if (sel === '#native-kernel-modal') return closeNativeKernelDialog();
+  if (sel === '#cpu-resource-modal') return closeCpuResourceDialog();
   if (sel === '#cli-settings-modal') state.cliSettings = null;
   if (sel === '#work-capture-modal') state.workCapture = null;
   if (sel === '#run-window-modal') {

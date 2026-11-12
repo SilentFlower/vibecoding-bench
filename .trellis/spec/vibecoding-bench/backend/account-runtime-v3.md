@@ -1255,7 +1255,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 有限账号显式环境键 `V3_NATIVE_SENDER_MEMORY`；构建可选 `V3_NATIVE_RUNTIME_ASSET` 指定本地候选，否则下载固定 beta.2 附件。`stage_asset(destination:Path,source:str|None=None) -> dict` 冻结版本/大小/SHA。
 - `account_limits(memory,swap)`、`isolated_account_limits`、`scenario_account_limits`、`serial_review_limits` 接受账号 `mem="unlimited"`，无限模式 Docker 额度为 `(0,-1)`；`memory_bytes` 继续只解析有限配置。
 - fingerprint 可选 `native_sender_memory`，无限原生账号保存 `"unlimited"`，布局变更时保存，回退 legacy 时移除；镜像原生能力标签为 `vibebench.native-runtime=293-raw-1`。
-- `AccountRuntime.native_preparation_snapshots() -> dict[int,dict]` 通过一次 `GET /admin/native-preparations` 读取批量快照，超时3秒；`native_preparation_summary(row,account,snapshots) -> dict|None` 为 `/api/environments` 生成安全的 `native_preparation`。
+- `AccountRuntime.native_preparation_snapshots() -> tuple[dict[int,dict],str|None]` 通过一次 `GET /admin/native-preparations` 读取批量快照，超时3秒；`native_preparation_summary(row,account,snapshots,read_error=None) -> dict|None` 为 `/api/environments` 生成安全的 `native_preparation`。
 
 ### 3. Contracts
 
@@ -1268,6 +1268,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 每个进程独立HOME/config/cwd、当前bearer及worker_id，每轮独立原生根。账号/身份/代理/凭据/并发摘要改变产生新代次，旧活动自然收口，空闲旧进程退役。单进程一次作业，唯一终态及匹配idle后复用；取消、迟到/损坏帧和状态不明均退役。
 - 单个弱引用回收任务在额外进程空闲60秒后保留1个暖进程；忙进程保持当前归属。映像缓存可在所有原进程退出后支持重建，池销毁释放FD。
 - 运行中原生账号由网关每20秒零模型巡检并按需恢复，具体身份、退避和计时合同见[原生持续预热](../../cc2api/backend/service-architecture.md#scenario-原生持续预热实时就绪与请求进程诊断)。巡检只查询已有绑定，不唤醒休眠环境。
+- 批量客户端仅精确GET /admin/native-preparations接受最多4096项对象数组，其余路由继续要求对象。快照返回本次映射及read_failed；缺账号快照为snapshot_missing。页面按实际配置展示adaptive_prewarm，读取保持零模型操作。
 - 环境摘要先核验账号绑定、环境 ID/代次及本地 sender 的 `native.kernel_generation`；检查时间必须在当前时间前0～45000毫秒。只投影受控 state/reason、检查时间、环境归属和非负进程数/正 PID。ready 必须同时有空闲进程和 PID。历史 `native_kernel` 预热回执继续作为历史信息。
 - 启动预热只解析唯一绑定且启用的原生账号；复用环境启动和既有首 worker 准备。有空余环境容量才启动新角色，保持原账号回收与维护策略。启动补偿有界，服务运行期间不循环唤醒。
 - 首条业务拿走唯一进程且账号允许两条普通并发时，sender 可为当前代次登记一次后台补位。首条直接投递；后续请求优先取空闲进程，缺空闲时可在自己的截止前等这一轮就绪。补位失败沿现有 checkout 路径处理。补位使用原物理计数与已核验映像，只提交初始化指令；结果通过真实握手后进入同一空闲池。
@@ -1360,3 +1361,44 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - orchestrator/test_native_kernel_upgrade.py：签名及摘要拒绝、准备与接单独立、排空/回滚、旧请求重放、超时、恢复及候选摘要漂移。
 - Rust native_real_binary：模拟一个退出未收口许可和一个空闲worker，归还前零启动，归还后换PID；native_real_gateway验证维护归属、长流、实际新PID和零模型切换。
 - deploy/v3/verify_forwarding.py --native --kernel-release <测试签名目录> --kernel-public-key <公钥>：双账号真实三角色、管理端准备/激活/回滚、长流只发送一次、下一业务复用、对照账号PID与所有容器ID/StartedAt保持、管理端公网发送计数为0。
+
+
+## Scenario: 三角色在线CPU与重建恢复
+
+### 1. Scope / Trigger
+- 修改环境资源接口、三角色创建、评审交接或系统更新CPU恢复时适用。仅隔离布局2，内存、PID和账号并发沿原合同。
+
+### 2. Signatures
+- GET/POST `/api/environments/{environment_id}/cpu-resources`，沿既有管理鉴权。
+- POST字段：`expected_generation:StrictInt,expected_revision:StrictStr,cpus:{cli,sender,network}`；额度为严格数字，拒绝额外字段及bool。
+- `cpu_resources.read_resources(runtime,row)`、`set_resources(runtime,row,expected_generation,expected_revision,cpus)`；`read_policy(runtime,row)`读取重建策略。
+- 返回generation、revision、host_cpus、cpus、persisted_cpus；revision冻结环境代次、持久策略及实际容器身份/额度/生命周期。
+
+### 3. Contracts
+- 三角色分别支持0.01到Docker宿主NCPU核，总和不设3核上限。CPU是共享调度额度，按NanoCpus精度校验有限数字，保留正数预算模式。
+- POST先登记部署维护活动，在环境锁内重读当前环境及未删除账号；拒绝维护中、内核切换/对账中、评审串行交接中或旧代次/revision。只通过Docker更新NanoCpus，逐项核对实际归属、镜像、Memory/MemorySwap/PidsLimit、启动时间、重启数及运行状态/PID保持。
+- 私有0600 `runtime/cpu-resources.json`为schema_version=1、environment_id、account_id、revision UUID、三角色nano_cpus；严格拒绝损坏、链接和错误归属。实际额度全部确认后原子发布。Docker异常可能已经生效，尝试集合先登记再调用；失败按原不可变容器恢复额度和原策略，记录restored或reconcile。
+- 角色创建在默认6:1:1及旧评审布局后应用保存策略。旧schema1布局只覆盖CPU核验视图，原内存/PID及文件保持；串行评审借用当前CLI额度，保存策略与三个实际角色逐项相等后使用新额度，历史V3_ACCOUNT_CPUS不再限制其总和。
+- 宿主HostDeployment.environment_cpu在排空后、重建意图前冻结实际额度到operation.environment_cpu_before。新角色重建及软件失败回滚后按不可变ID/标签恢复，仅CPU变化；兼容旧平台忽略新策略文件。旧无限CPU且缺策略保持原升级路径，显式策略与实际预算不符时拒绝。
+- 页面独立CPU表单按需读取，列表轮询保持输入；提交冻结revision，关闭/离页作废迟到回执。失败要求重读实际额度，成功提示即时应用并保存重建配置。
+
+### 4. Validation & Error Matrix
+| 条件 | 结果 |
+| --- | --- |
+| 三项各2核，宿主4核 | 接受合计6核 |
+| bool/非有限值/低于0.01/单项超宿主 | 更新前拒绝 |
+| 旧revision、错误归属、交接或维护占用 | 409，保留当前操作归属 |
+| Docker返回失败但实际生效 | 按已尝试角色恢复并核对 |
+| 策略损坏、链接或跨环境 | 明确拒绝，保持故障可见 |
+| 旧平台重建恢复默认CPU | 宿主恢复维护前实际额度并验收 |
+
+### 5. Scenarios and Examples
+- 正常：CLI=2、sender=1、network=0.5，保存后即时生效，下一次重建按同策略创建；系统回滚也保留实际额度。
+- 基础：历史无策略继续原三角色预算，GET仅观测现状。
+- 错误用法：限制三项合计3核、只调用不支持nano_cpus的Docker SDK Container.update，或重建后丢掉在线调额。正确处理：逐项校验，沿SDK JSON入口发送NanoCpus，并由策略/宿主维护记录分别承接重建与旧版回滚。
+
+### 6. Tests Required
+- test_cpu_resources：合计6核、CAS、真实Docker SDK回环JSON、未知更新恢复、策略归属/链接及评审交接拒绝。
+- test_account_runtime实际三角色创建沿保存额度；test_project_review_runtime旧布局按新CPU交接、原文件及RAM/PID保持、角色漂移拒绝。
+- test_system_update_cpu核维护前持久冻结、重建实际新角色恢复、归属冲突更新前拒绝；原更新器回归保持。
+- verify_native_diagnostics_cpu：轮询保留表单、冻结提交、冲突、晚回执、390像素及零真实模型调用。

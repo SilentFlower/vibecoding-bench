@@ -51,7 +51,8 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
-from pydantic import BaseModel, ConfigDict, StrictBool, StrictInt, StrictStr, ValidationError
+from pydantic import BaseModel, ConfigDict, StrictBool, StrictFloat, StrictInt, StrictStr, ValidationError
+from cpu_resources import read_resources as read_cpu_resources, set_resources as set_cpu_resources
 from requests.exceptions import RequestException
 from sse_starlette.sse import EventSourceResponse
 from starlette.websockets import WebSocketState
@@ -722,7 +723,7 @@ class Cc2ApiClient:
         path: str,
         body: Optional[dict] = None,
         *, timeout: float | None = None,
-    ) -> dict:
+    ) -> dict | list[dict]:
         """
         发送管理 API JSON 请求。
 
@@ -730,7 +731,7 @@ class Cc2ApiClient:
         :param path: 以 `/` 开头的管理 API 路径
         :param body: 可选 JSON 请求体
         :param timeout: 特定内部维护请求的最长等待时长。
-        :return: JSON object 响应
+        :return: JSON对象；原生准备批量GET为有界对象数组。
         """
         if not self.is_configured():
             raise ValueError("cc2api 集成尚未配置")
@@ -780,6 +781,11 @@ class Cc2ApiClient:
             data = json.loads(raw.decode("utf-8")) if raw else {}
         except json.JSONDecodeError as exc:
             raise ValueError("cc2api 响应不是有效 JSON") from exc
+        # 该批量只读接口定义为数组，其余管理接口继续要求对象，避免放宽全局合同。
+        if method == 'GET' and path == '/admin/native-preparations':
+            if not isinstance(data, list) or len(data) > 4096 or any(not isinstance(item, dict) for item in data):
+                raise ValueError('原生准备状态响应必须是有界对象数组')
+            return data
         if not isinstance(data, dict):
             raise ValueError("cc2api 响应必须是 JSON object")
         return data
@@ -12480,7 +12486,7 @@ def v3_environments() -> list[dict]:
     finally:
         connection.close()
     ownerships = credential_ownership.summaries() if credential_ownership else {}
-    native_preparations = account_runtime.native_preparation_snapshots()
+    native_preparations, native_preparation_error = account_runtime.native_preparation_snapshots()
     for row in rows:
         account = None
         row['credential_ownership'] = ownerships.get(row['account_id'])
@@ -12496,7 +12502,7 @@ def v3_environments() -> list[dict]:
             row["run_window"] = _account_run_window(dict(account), public=True, zone=row["fingerprint"]["tz"]) if account else None
         else:
             row["run_window"] = None
-        row['native_preparation'] = account_runtime.native_preparation_summary(row, dict(account) if account else None, native_preparations)
+        row['native_preparation'] = account_runtime.native_preparation_summary(row, dict(account) if account else None, native_preparations, native_preparation_error)
         row["physical_features"] = physical_features_summary(row,
             account_runtime._root(row) / "runtime/physical-features.json", time.time())
         with account_runtime.lock:
@@ -12573,6 +12579,67 @@ def refresh_v3_physical_features(environment_id: str) -> dict:
     except (DockerException, RequestException, OSError):
         raise HTTPException(503, "容器暂时不可读取，已保留上次观察") from None
     return {"ok": True}
+
+
+class CpuResourceOperation(BaseModel):
+    """页面冻结的角色CPU设置与并发前置条件。"""
+
+    model_config = ConfigDict(extra='forbid')
+    expected_generation: StrictInt
+    expected_revision: StrictStr
+    cpus: dict[Literal['cli', 'sender', 'network'], StrictFloat | StrictInt]
+
+
+def _cpu_environment(environment_id: str) -> dict:
+    connection = get_db()
+    try:
+        row = connection.execute("SELECT e.* FROM account_environments e WHERE e.environment_id=? "
+            "AND (e.account_id IS NULL OR EXISTS(SELECT 1 FROM accounts a WHERE a.id=e.account_id "
+            "AND a.deleted_at IS NULL))", (environment_id,)).fetchone()
+    finally:
+        connection.close()
+    if row is None:
+        raise HTTPException(404, "环境不存在")
+    return dict(row)
+
+
+@app.get("/api/environments/{environment_id}/cpu-resources")
+def v3_cpu_resources(environment_id: str) -> dict:
+    """读取固定角色CPU额度，不唤醒环境。
+
+    :param environment_id: 环境标识。
+    :return: 当前额度与保存操作所需的版本摘要。
+    """
+    if not account_runtime:
+        raise HTTPException(404)
+    try:
+        with account_runtime.environment_lock(environment_id):
+            return read_cpu_resources(account_runtime, _cpu_environment(environment_id))
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(409, str(error)) from None
+    except (DockerException, OSError):
+        raise HTTPException(503, "CPU资源暂时不可读取，请刷新核对") from None
+
+
+@app.post("/api/environments/{environment_id}/cpu-resources")
+def v3_set_cpu_resources(environment_id: str, body: CpuResourceOperation) -> dict:
+    """在线应用角色CPU配置，并保存重建时使用的策略。
+
+    :param environment_id: 环境标识。
+    :param body: 角色额度及冻结版本。
+    :return: 校验后的实际CPU额度。
+    """
+    if not account_runtime:
+        raise HTTPException(404)
+    try:
+        with UPDATE_GATE.admission('environment-cpu'):
+            with account_runtime.environment_lock(environment_id):
+                return set_cpu_resources(account_runtime, _cpu_environment(environment_id),
+                    body.expected_generation, body.expected_revision, body.cpus)
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(409, str(error)) from None
+    except (DockerException, OSError):
+        raise HTTPException(503, "CPU调整暂时未完成，请重新读取实际额度") from None
 
 
 class NativeKernelOperation(BaseModel):

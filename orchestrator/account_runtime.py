@@ -788,26 +788,27 @@ class AccountRuntime:
             self._notify_native_preparation(account, row)
         return row, container
 
-    def native_preparation_snapshots(self) -> dict[int, dict]:
+    def native_preparation_snapshots(self) -> tuple[dict[int, dict], str | None]:
         """批量读取最近巡检结果，避免列表逐账号阻塞。
 
-        :return: 按网关账号 ID 索引的快照；通道失败时为空。
+        :return: 按网关账号ID索引的快照及本次读取错误。
         """
         try:
             values = self.gateway._request('GET', '/admin/native-preparations', timeout=3)
-            if not isinstance(values, list):
-                return {}
-            return {value['account_id']: value for value in values if isinstance(value, dict)
-                and type(value.get('account_id')) is int and value['account_id'] > 0}
+            if (not isinstance(values, list) or len(values) > 4096 or any(not isinstance(value, dict)
+                    or type(value.get('account_id')) is not int or value['account_id'] <= 0 for value in values)):
+                return {}, 'read_failed'
+            return {value['account_id']: value for value in values}, None
         except (ValueError, OSError, RuntimeError):
-            return {}
+            return {}, 'read_failed'
 
-    def native_preparation_summary(self, row: dict, account: dict | None, snapshots: dict[int, dict]) -> dict | None:
+    def native_preparation_summary(self, row: dict, account: dict | None, snapshots: dict[int, dict], read_error: str | None = None) -> dict | None:
         """将巡检快照投影到当前环境，秘密和旧代次证据不进入页面。
 
         :param row: 当前环境记录
         :param account: bench 账号和网关绑定
         :param snapshots: 本次批量读取的网关快照
+        :param read_error: 本次请求的受控读取错误。
         :return: 原生安全状态；legacy 或草稿为空。
         """
         if not account or not account.get('cc2api_account_id'):
@@ -822,6 +823,10 @@ class AccountRuntime:
             return {'state': 'unknown', 'reason': 'capability_unknown'}
         if row.get('state') == 'stopped':
             return {'state': 'sleeping', 'reason': None}
+        if read_error:
+            return {'state': 'unknown', 'reason': 'read_failed'}
+        if account['cc2api_account_id'] not in snapshots:
+            return {'state': 'unknown', 'reason': 'snapshot_missing'}
         value = snapshots.get(account['cc2api_account_id'], {})
         state = value.get('state')
         if state in ('sleeping', 'disabled', 'maintenance'):
@@ -838,6 +843,7 @@ class AccountRuntime:
         result = {key: value[key] for key in ('checked_at_ms', 'generation', 'environment_id') if key in value}
         result['state'] = state if state in states else 'unknown'
         result['reason'] = value.get('reason') if value.get('reason') in reasons else None
+        result['adaptive_prewarm'] = configuration.get('native_adaptive_prewarm') is True
         for key in ('idle_workers', 'live_workers', 'pid'):
             number = value.get(key)
             result[key] = number if type(number) is int and number >= (1 if key == 'pid' else 0) else None

@@ -549,6 +549,49 @@ class HostDeployment:
                 docker('stop', '-t', '5', item['Id'])
             docker('rm', item['Id'])
 
+    def environment_cpu(self, environment: dict, restore: dict | None = None) -> dict:
+        """冻结或恢复三角色实际CPU，兼容旧平台重建时不读取新策略文件。
+
+        :param environment: 维护门禁内的新鲜权威环境快照。
+        :param restore: 原角色NanoCpus；省略时仅冻结。
+        :return: 核对后的各角色CPU额度；其他资源或归属变化拒绝收口。
+        """
+        roles = {'cli': 'account', 'sender': 'account-sender', 'network': 'account-network'}
+        if set(environment.get('roles', {})) != set(roles):
+            raise ValueError('CPU保留需要完整的三个归属角色')
+        if restore is not None and (set(restore) != set(roles)
+                or any(type(value) is not int or value < 10_000_000 for value in restore.values())):
+            raise ValueError('原CPU额度证据不完整')
+        observed = {}
+        for role, label in roles.items():
+            reference = environment['roles'][role]
+            info = json.loads(docker('inspect', reference['id']))[0]
+            labels = info['Config'].get('Labels') or {}
+            if (info['Id'] != reference['id'] or info['Image'] != reference['image_id']
+                    or any(labels.get(key) != value for key, value in {
+                        'vibebench.product': 'v3', 'vibebench.deployment': self.policy['deployment'],
+                        'vibebench.environment': environment['environment_id'], 'vibebench.role': label,
+                        'vibebench.isolation-version': '2'}.items())):
+                raise ValueError('CPU额度的角色归属或镜像不符')
+            if type(info['HostConfig'].get('NanoCpus')) is not int or info['HostConfig']['NanoCpus'] < 0:
+                raise ValueError('CPU实际额度尚未核验')
+            observed[role] = info
+        for role, info in observed.items():
+            if restore is None or info['HostConfig']['NanoCpus'] == restore[role]:
+                continue
+            docker('update', '--cpus', format(restore[role] / 1_000_000_000, '.9f'), info['Id'])
+            after = json.loads(docker('inspect', info['Id']))[0]
+            # 在线CPU变更只允许HostConfig.NanoCpus变化，不能借恢复扩大其他预算。
+            before_limits = dict(info['HostConfig'])
+            before_limits['NanoCpus'] = restore[role]
+            if (after['HostConfig'] != before_limits or after['Id'] != info['Id']
+                    or after['Image'] != info['Image'] or after['Config'].get('Labels') != info['Config'].get('Labels')
+                    or after['State']['StartedAt'] != info['State']['StartedAt']
+                    or any(after['State'].get(key) != info['State'].get(key) for key in ('Status', 'Running', 'Pid'))
+                    or after['RestartCount'] != info['RestartCount']):
+                raise ValueError('CPU恢复后的额度或容器生命周期不符')
+        return restore if restore is not None else {role: info['HostConfig']['NanoCpus'] for role, info in observed.items()}
+
     def update_environments(self, operation: dict, selected: dict, save) -> None:
         """按原运行状态逐项维护需要变化的账号环境。
 
@@ -565,9 +608,19 @@ class HostDeployment:
             evidence = self.drained(operation)
             current = next(item for item in evidence['environments'] if item['environment_id'] == original['environment_id'])
             if current.get('origin', {}).get('release') == selected['selection']['account']['release']:
+                frozen = operation.get('environment_cpu_before', {}).get(current['environment_id'])
+                if frozen is not None:
+                    self.environment_cpu(current, frozen)
                 continue
             if not evidence['ready']:
                 raise ValueError('账号更新期间出现新的阻塞活动')
+            if current['environment_id'] not in operation.setdefault('environment_cpu_before', {}):
+                frozen = self.environment_cpu(current)
+                if all(value >= 10_000_000 for value in frozen.values()):
+                    operation['environment_cpu_before'][current['environment_id']] = frozen
+                    save()
+                elif (self.data / 'bench/environments' / current['environment_id'] / 'runtime/cpu-resources.json').exists():
+                    raise ValueError('已保存CPU策略与实际预算模式不符，需要先对账')
             operation.setdefault('environment_intents', {})[current['environment_id']] = {
                 'generation': current['generation'], 'allowed_image_ids': list({
                     *[item['image_id'] for item in original.get('roles', {}).values()],
@@ -576,6 +629,11 @@ class HostDeployment:
             result = self.request('orchestrator', '/internal/v3/system-updates/environment',
                 {'operation_id': operation['operation_id'], 'epoch': operation['epoch'],
                     'environment_id': current['environment_id'], 'generation': current['generation'], 'action': 'rebuild'}, timeout=180)
+            fresh = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+            rebuilt = next(item for item in fresh['environments'] if item['environment_id'] == current['environment_id'])
+            frozen = operation['environment_cpu_before'].get(current['environment_id'])
+            if frozen is not None:
+                self.environment_cpu(rebuilt, frozen)
             operation.setdefault('environment_results', {})[current['environment_id']] = result
             save()
 
@@ -625,6 +683,10 @@ class HostDeployment:
         evidence = self.drained(operation)
         if not evidence['ready']:
             raise ValueError('更新验收存在未收口工作或未知证据')
+        for environment_id, expected_cpu in operation.get('environment_cpu_before', {}).items():
+            current = next(item for item in evidence['environments'] if item['environment_id'] == environment_id)
+            if self.environment_cpu(current) != expected_cpu:
+                raise ValueError('更新或恢复后的CPU额度与维护前不符')
         if operation['original']['selection']['account']['content_sha256'] == operation['selected']['selection']['account']['content_sha256']:
             for original in operation['before']['environments']:
                 current = next(item for item in evidence['environments'] if item['environment_id'] == original['environment_id'])
@@ -736,6 +798,11 @@ class HostDeployment:
                     {'operation_id': operation['operation_id'], 'epoch': operation['epoch'],
                         'environment_id': environment_id, 'generation': current['generation'],
                         'action': 'restore', 'allowed_image_ids': intent['allowed_image_ids']}, timeout=180)
+                frozen = operation.get('environment_cpu_before', {}).get(environment_id)
+                if frozen is not None:
+                    fresh = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+                    restored = next(item for item in fresh['environments'] if item['environment_id'] == environment_id)
+                    self.environment_cpu(restored, frozen)
                 operation.setdefault('environment_restored', {})[environment_id] = result
                 save()
         self.health(operation, original, restoring=True)

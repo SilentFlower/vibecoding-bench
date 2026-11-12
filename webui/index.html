@@ -541,6 +541,21 @@
     </div>
   </div>
 
+  <div class="modal hidden" id="cpu-resource-modal" role="dialog" aria-modal="true" aria-labelledby="cpu-resource-title">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-titlebar"><span class="modal-titlebar-name" id="cpu-resource-title">调整 CPU 额度</span><button type="button" class="modal-close" data-close="#cpu-resource-modal" aria-label="关闭 CPU 配置">×</button></div>
+      <form id="cpu-resource-form" class="form">
+        <p id="cpu-resource-description"></p>
+        <p class="env-muted">各角色共享宿主算力，额度可超配。保存后即时生效，并供容器重建时恢复。</p>
+        <label><span class="lbl">CLI（核）</span><input name="cli" type="number" min="0.01" step="any" required /></label>
+        <label><span class="lbl">API 发送器（核）</span><input name="sender" type="number" min="0.01" step="any" required /></label>
+        <label><span class="lbl">网络（核）</span><input name="network" type="number" min="0.01" step="any" required /></label>
+        <p id="cpu-resource-feedback" class="env-error" role="status" aria-live="polite"></p>
+        <div class="row-end"><button type="button" class="btn" data-close="#cpu-resource-modal">取消</button><button type="submit" class="btn btn-primary">保存并应用</button></div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal hidden" id="run-window-modal">
     <div class="modal-card modal-card-md">
       <div class="modal-titlebar">
@@ -891,7 +906,7 @@
   </div>
 
   <script src="projects.js?v=20261106-pi-auto-recovery"></script>
-  <script src="environments.js?v=20261112-native-readiness"></script>
-  <script src="app.js?v=20261111-environment-ui"></script>
+  <script src="environments.js?v=20261112-native-cpu"></script>
+  <script src="app.js?v=20261112-cpu-resources"></script>
 </body>
 </html>
