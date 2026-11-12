@@ -241,3 +241,55 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 - `test_system_platform_version` 覆盖实际元数据、历史说明、递增和不同源码拒绝；`test_system_release` 验证原签名与字段合同。
 - Vue/TypeScript 生产构建和 `verify_management_ui.py` 覆盖当前/最新/历史、单展开、取消零写入及两个浏览器时区。
+
+
+## Scenario: 构建与手动发布解耦及 v3 升级连续性
+
+### 1. Scope / Trigger
+
+修改 v3-build.yml、v3-release.yml、两个 Python 发布入口、发行序号或固定宿主源码包时适用。v3/Flower2API 按小版本沿原部署演进。
+
+### 2. Signatures
+
+- `release_ci.validate_publish_source(build: dict | None = None) -> str`：校验来源，返回当前 `ci-<run_id>-<attempt>`。
+- `publish_system_release.check_signing_key() -> None`、`python3 deploy/v3/publish_system_release.py --check-signing`：核对实际手动入口和 Ed25519 签名配置。
+- `gh workflow run v3-build.yml --ref flower2api`：只构建验证。
+- `gh workflow run v3-release.yml --ref flower2api -f publish=true`：明确发布。
+
+### 3. Contracts
+
+- v3-build 的 push/目标 PR 分支为 v3、flower2api，另有手动构建。权限 contents:read，checkout 关闭持久凭据；仅测试、构建两镜像并上传本地清单，发布副作用为零。
+- v3-release 仅 workflow_dispatch；布尔 input `publish` 默认 false，必须明确选中。本仓 v3/flower2api 分支可发布，同一 runner 冻结实际 SHA 并重新验证构建，真实旧库兼容演练通过后才推镜像。只有发布 job 取得 contents/packages 写权限。
+- 两个 Python 发布入口共用来源校验：`GITHUB_ACTIONS=true`、`GITHUB_EVENT_NAME=workflow_dispatch`、`V3_PUBLISH_CONFIRMED=true`、精确 repo/ref，以及 `GITHUB_WORKFLOW_REF=<repo>/.github/workflows/v3-release.yml@<ref>`。run/attempt 为正整数串、SHA 为40位小写hex；清单批次、revision和clean标记必须匹配。
+- 发布预检要求有效 `V3_SYSTEM_RELEASE_PRIVATE_KEY`，用实际 DER 格式确认 Ed25519。缺配置/错误类型在构建及推送前失败。签名私钥仅供手动发布侧使用。
+- 工作流拆分后的 run_number 不用作发行序号；从同信任根已验签目录主序号最大值加1，第二项使用实际 attempt。历史目录按签发时刻校验原合同，主序号达到2^53-1时拒绝新发行。完整附件后才普通 fast-forward 推进目录，保留原版本递增与批次不可覆盖规则。
+- 原仓库、v3镜像名、system-ci/v3-ci身份、updates/v3-migrations及updates/v3语义、信任根与双库兼容合同保持。管理员从原系统更新页准备/安装；旧底座按既有SOP原地补齐能力。
+- `install_system_updater.SOURCE_FILES` 含 manage 的直接依赖 platform_version.py、release_ci.py；固定源码复制后必须能在仓库外独立导入。
+- 旧 main 的 docker-publish 只接受手动事件+main ref。触发规则按所在分支生效；修复需同步到 v3/main，新手动入口需在默认分支 main 注册。分支同步、正式发布和线上安装分别验收。
+
+### 4. Validation & Error Matrix
+
+| 场景 | 结果 |
+| --- | --- |
+| push/PR/构建入口调用发布脚本 | ValueError，Docker/GitHub发布副作用为零 |
+| 错误分支、仓库、SHA、工作流或缺确认标记 | 发布前拒绝 |
+| 缺私钥、密钥非Ed25519 | 预检失败 |
+| 历史目录主序号700，新工作流run_number=1 | 发行主序号701，原发行继续可读 |
+| 历史签名损坏或序号达到上限 | 正式发行写入前失败 |
+| 附件上传或目录并发推送失败 | 原目录受保护，已完成事实保留，无force覆盖 |
+| 更新器源码包缺直接依赖 | 独立导入回归失败 |
+
+### 5. Scenarios and Examples
+
+正常：push flower2api→构建通过→手动发布→原v3管理员检查并安装后继版本。
+
+边界：迁移通道首发承接原v1签名历史，并在原序号之后生成新序号。
+
+错误用法：仅修改flower2api中的工作流就宣称v3/main远端自动发布已关闭。正确处理：将精确修复同步至各目标分支并分别验证实际触发规则。
+
+### 6. Tests Required
+
+- test_publication：两分支手动来源通过，自动/未确认/错误入口零Docker副作用，原批次与digest保护成立。
+- test_system_publish：真实临时签名、高历史序号、迁移通道首发继承、签名损坏、目录竞争和安全整数上限。
+- test_system_workflow：实际YAML事件、权限、零发布步骤、签名预检/兼容演练顺序，以及固定源码包仓库外独立导入。CI测试依赖固定PyYAML 6.0.3。
+- actionlint覆盖三个工作流；原系统更新、双库合同及宿主恢复回归继续通过。

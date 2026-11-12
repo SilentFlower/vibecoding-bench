@@ -30,6 +30,7 @@ sys.path.insert(0, str(REPO / "orchestrator"))
 from resource_budget import account_limits, isolated_account_limits
 from native_sender import prewarm_account_id, stage_asset
 from platform_version import read_version
+from release_ci import validate_publish_source
 from storage_assets import essential_exclusions
 from storage_backup import create_backup_data, verify_backup_data
 from storage_cleanup import apply_storage_plan, storage_plan
@@ -620,17 +621,11 @@ def publish(manifest_path: Path, output_path: Path, bundle_path: Path,
     :return: 已发布的联合清单；失败保留发布标记，必须使用新 attempt 重跑
     """
     manifest = json.loads(manifest_path.read_text())
-    expected_release = "ci-" + os.environ.get("GITHUB_RUN_ID", "") + "-" + os.environ.get("GITHUB_RUN_ATTEMPT", "")
+    validate_publish_source(manifest)
     owner = os.environ.get("GITHUB_REPOSITORY_OWNER", "").lower()
-    if (os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("GITHUB_REF") != "refs/heads/v3"
-            or not re.fullmatch(r"ci-[1-9][0-9]*-[1-9][0-9]*", expected_release)
-            or manifest.get("release") != expected_release
-            or manifest.get("parent_revision") != os.environ.get("GITHUB_SHA")
-            or os.environ.get("GITHUB_REPOSITORY", "").lower() != owner + "/vibecoding-bench"
+    if (os.environ.get("GITHUB_REPOSITORY", "").lower() != owner + "/vibecoding-bench"
             or namespace != "ghcr.io/" + owner or not re.fullmatch(r"ghcr.io/[a-z0-9][a-z0-9-]*", namespace)):
-        raise ValueError("发布必须使用当前 v3 Action 的仓库、提交与唯一 run/attempt 批次")
-    if manifest.get("dirty_worktree") is not False:
-        raise ValueError("不能发布含未提交修改或来源未知的批次")
+        raise ValueError("发布必须使用当前 Action 仓库 owner 的镜像命名空间")
     paths = [manifest_path.resolve(), output_path.resolve(), bundle_path.resolve()]
     if len(set(paths)) != 3 or output_path.exists() or bundle_path.exists():
         raise ValueError("发布清单和镜像包必须使用全新独立路径")

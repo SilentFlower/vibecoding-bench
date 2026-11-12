@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import argparse
 import json
 import os
 import subprocess
@@ -11,6 +12,7 @@ from pathlib import Path
 
 from system_release import REPO, create_index, create_release, sign_file
 from platform_version import ensure_forward_version, read_version, signed_changes
+from release_ci import validate_publish_source
 from datetime import datetime, timedelta, timezone
 from system_update_contract import INDEX_LIMIT, MANIFEST_LIMIT, REPOSITORY, strict_json, verify_signed, utc_now, validate_index, validate_release
 
@@ -41,12 +43,9 @@ def publish(manifest: Path, bundle: Path, private_key: str, migration_evidence: 
     """
     build = strict_json(manifest.read_bytes())
     metadata = read_version(Path(__file__).with_name('platform-release.json'))
-    expected = f'ci-{os.environ.get("GITHUB_RUN_ID", "")}-{os.environ.get("GITHUB_RUN_ATTEMPT", "")}'
-    if (os.environ.get('GITHUB_ACTIONS') != 'true' or os.environ.get('GITHUB_REF') != 'refs/heads/v3'
-            or os.environ.get('GITHUB_REPOSITORY', '').lower() != REPOSITORY.lower()
-            or build.get('release') != expected or build.get('parent_revision') != os.environ.get('GITHUB_SHA')
-            or build.get('dirty_worktree') is not False or not os.environ.get('GH_TOKEN')):
-        raise ValueError('系统发行只能发布当前 v3 Action 的完整同批来源')
+    validate_publish_source(build)
+    if not os.environ.get('GH_TOKEN'):
+        raise ValueError('系统发行缺少当前 Action 的发布令牌')
     if build['bundle']['name'] != bundle.name or build['bundle']['size'] != bundle.stat().st_size:
         raise ValueError('系统发行镜像包身份不匹配')
     with bundle.open('rb') as stream:
@@ -59,32 +58,25 @@ def publish(manifest: Path, bundle: Path, private_key: str, migration_evidence: 
             os.fchmod(stream.fileno(), 0o600)
             stream.write(private_key)
         public = run('openssl', 'pkey', '-in', str(key), '-pubout', '-outform', 'DER')[-32:].hex()
+        channel = 'updates/v3-migrations' if migration_evidence is not None else 'updates/v3'
+        catalogs = {}
+        for name in dict.fromkeys((channel, 'updates/v3')):
+            catalogs[name] = _read_catalog(name, public)
+        # 工作流拆分会重置 run_number；序号从已验签历史连续推进。
+        highest = max((entry[0]['sequence'][0] for entry in catalogs.values() if entry), default=0)
+        if highest >= 2 ** 53 - 1:
+            raise ValueError('发行顺序已到达安全整数上限')
         release = create_release(manifest, Path(__file__).with_name('system-update-policy.json'), root / 'release', key,
-            [int(os.environ['GITHUB_RUN_NUMBER']), int(os.environ['GITHUB_RUN_ATTEMPT'])],
+            [highest + 1, int(os.environ['GITHUB_RUN_ATTEMPT'])],
             signed_changes(metadata), migration_evidence=migration_evidence)
-        channel = 'updates/v3-migrations' if release['schema_version'] == 2 else 'updates/v3'
-        reference = run('git', 'ls-remote', 'origin', 'refs/heads/' + channel).decode().strip()
         previous, parent = None, None
-        if reference:
-            run('git', 'fetch', '--depth=1', 'origin', 'refs/heads/' + channel)
-            parent = run('git', 'rev-parse', 'FETCH_HEAD').decode().strip()
-            raw = run('git', 'show', parent + ':index.json')
-            signature = run('git', 'show', parent + ':index.sig')
-            old = verify_signed(raw, signature, public, INDEX_LIMIT)
-            if old.get('sequence', []) >= release['sequence']:
-                return {'status': 'skipped', 'reason': '通道已有更新的完整发行', 'release': release['release']}
+        selected = catalogs[channel] or catalogs['updates/v3']
+        if catalogs[channel]:
+            parent = catalogs[channel][2]
+        if selected:
+            _, raw, _ = selected
             previous = root / 'previous.json'
             previous.write_bytes(raw)
-        elif release['schema_version'] == 2:
-            # 新通道首发承接旧受信发行，让后续 CI 继续验证尚未升级的安装来源。
-            legacy = run('git', 'ls-remote', 'origin', 'refs/heads/updates/v3').decode().strip()
-            if legacy:
-                run('git', 'fetch', '--depth=1', 'origin', 'refs/heads/updates/v3')
-                legacy_parent = run('git', 'rev-parse', 'FETCH_HEAD').decode().strip()
-                raw = run('git', 'show', legacy_parent + ':index.json')
-                verify_signed(raw, run('git', 'show', legacy_parent + ':index.sig'), public, INDEX_LIMIT)
-                previous = root / 'previous.json'
-                previous.write_bytes(raw)
         if previous:
             # 沿原已签目录定位完整旧清单；版本属于说明展示，安装身份仍以原摘要为准。
             previous_value = strict_json(previous.read_bytes(), INDEX_LIMIT)
@@ -128,6 +120,38 @@ def publish(manifest: Path, bundle: Path, private_key: str, migration_evidence: 
         return {'status': 'published', 'release': tag, 'catalog_commit': commit}
 
 
+def _read_catalog(channel: str, public_key: str) -> tuple[dict, bytes, str] | None:
+    """按原信任根读取目录，并在签发时刻核对历史合同。"""
+    reference = run('git', 'ls-remote', 'origin', 'refs/heads/' + channel).decode().strip()
+    if not reference:
+        return None
+    run('git', 'fetch', '--depth=1', 'origin', 'refs/heads/' + channel)
+    parent = run('git', 'rev-parse', 'FETCH_HEAD').decode().strip()
+    raw = run('git', 'show', parent + ':index.json')
+    value = verify_signed(raw, run('git', 'show', parent + ':index.sig'), public_key, INDEX_LIMIT)
+    value = validate_index(value, now=datetime.fromisoformat(value['issued_at'].replace('Z', '+00:00')).timestamp())
+    return value, raw, parent
+
+
+def check_signing_key() -> None:
+    """在构建前核对手动来源及 Ed25519 签名材料。
+
+    :return: None；私钥缺失或类型不符时抛出 ValueError。
+    """
+    validate_publish_source()
+    private_key = os.environ.get('V3_SYSTEM_RELEASE_PRIVATE_KEY', '')
+    if not private_key.strip():
+        raise ValueError('正式发布需要配置 V3_SYSTEM_RELEASE_PRIVATE_KEY')
+    with tempfile.TemporaryDirectory(prefix='v3-signing-check-') as temporary:
+        key = Path(temporary) / 'key.pem'
+        with key.open('x') as stream:
+            os.fchmod(stream.fileno(), 0o600)
+            stream.write(private_key)
+        public = run('openssl', 'pkey', '-in', str(key), '-pubout', '-outform', 'DER')
+        if len(public) != 44 or not public.startswith(bytes.fromhex('302a300506032b6570032100')):
+            raise ValueError('平台发行签名密钥必须为 Ed25519')
+
+
 def refresh_legacy_catalog(root: Path, key: Path, public_key: str, sequence: list[int]) -> None:
     """刷新旧通道已支持发行的有效期，保持旧格式目录可用。
 
@@ -161,14 +185,18 @@ def refresh_legacy_catalog(root: Path, key: Path, public_key: str, sequence: lis
 
 
 def main() -> None:
-    """在配置独立私钥后启用发布，缺少密钥时保留现有镜像交付。
+    """预检签名材料或执行已确认的同批签名发布。
 
     :return: None。
     """
-    key = os.environ.get('V3_SYSTEM_RELEASE_PRIVATE_KEY', '')
-    if not key:
-        print(json.dumps({'status': 'skipped', 'reason': 'signing_not_configured'}))
+    parser = argparse.ArgumentParser(description='平台手动签名发行')
+    parser.add_argument('--check-signing', action='store_true')
+    arguments = parser.parse_args()
+    check_signing_key()
+    if arguments.check_signing:
+        print(json.dumps({'status': 'signing_ready'}))
         return
+    key = os.environ['V3_SYSTEM_RELEASE_PRIVATE_KEY']
     evidence = REPO / 'releases/database-compatibility.json'
     if not evidence.is_file():
         raise ValueError('真实数据库升级与回退演练证据缺失，停止签名发布')

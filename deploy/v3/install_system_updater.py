@@ -37,6 +37,7 @@ SOURCE_FILES += ('deploy/v3/system_update_database.py', 'deploy/v3/upgrade_syste
     'orchestrator/database_migrations.py', 'orchestrator/database_migration_contract.py',
     'orchestrator/database_schema.py', 'orchestrator/database-migration-registry.json', 'orchestrator/projects_store.py')
 SOURCE_FILES += ('orchestrator/system_update_connection.py',)
+SOURCE_FILES += ('deploy/v3/platform_version.py', 'deploy/v3/release_ci.py')
 
 
 def prepare_installation(env: Path, release_dir: Path, root: Path, public_key: str, *, apply: bool = False,

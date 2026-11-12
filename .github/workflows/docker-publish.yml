@@ -1,8 +1,6 @@
-name: 构建并发布 Docker 镜像
+name: 手动发布旧版 Docker 镜像
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -19,7 +17,7 @@ env:
 jobs:
   publish:
     name: 发布 ${{ matrix.image }}
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

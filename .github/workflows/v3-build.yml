@@ -1,25 +1,24 @@
-name: v3 联合构建与发布
+name: v3 联合构建验证
 on:
   workflow_dispatch:
   push:
-    branches: [v3]
+    branches: [v3, flower2api]
+  pull_request:
+    branches: [v3, flower2api]
 permissions:
   contents: read
+concurrency:
+  group: v3-build-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build:
-    if: github.ref == 'refs/heads/v3'
-    permissions:
-      contents: write
-      packages: write
-    concurrency:
-      group: v3-signed-system-release
-      cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
       - name: 检出父仓与子仓
         uses: actions/checkout@v6
         with:
           submodules: recursive
+          persist-credentials: false
       # 与正式镜像保持同一 Python 次版本，避免 runner 默认版本漂移破坏依赖安装。
       - name: 设置 Python 3.12
         uses: actions/setup-python@v7
@@ -28,46 +27,18 @@ jobs:
       - name: 验证系统更新合同与恢复状态机
         run: |
           python3 -m venv "$RUNNER_TEMP/v3-update-venv"
-          "$RUNNER_TEMP/v3-update-venv/bin/pip" install -r orchestrator/requirements.txt
+          "$RUNNER_TEMP/v3-update-venv/bin/pip" install -r orchestrator/requirements.txt PyYAML==6.0.3
           python3 deploy/v3/verify_database_definitions.py
           # 宿主快照测试需核验跨进程数据库句柄，使用与正式执行器相同的 root 权限。
           sudo "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest discover -s deploy/v3 -p 'test_system*.py'
           "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest discover -s orchestrator -p 'test_system_update*.py'
-          PYTHONPATH=orchestrator:deploy/v3 "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest test_database_definitions test_database_migrations test_database_compatibility
+          PYTHONPATH=orchestrator:deploy/v3 "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest test_publication test_system_workflow test_database_definitions test_database_migrations test_database_compatibility
       - name: 构建两个镜像并生成版本清单
         run: python3 deploy/v3/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3-local.json
-      - name: 登录 GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: 真实旧库升级与旧程序回退演练
-        env:
-          V3_SYSTEM_RELEASE_PRIVATE_KEY: ${{ secrets.V3_SYSTEM_RELEASE_PRIVATE_KEY }}
-        run: |
-          if [ -n "$V3_SYSTEM_RELEASE_PRIVATE_KEY" ]; then
-            # 真实恢复演练沿宿主权限执行，保留签名密钥并将证明文件交回 runner。
-            sudo --preserve-env=V3_SYSTEM_RELEASE_PRIVATE_KEY "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/v3/verify_database_compatibility.py --manifest releases/v3-local.json --output releases/database-compatibility.json
-            sudo chown -- "$(id -u):$(id -g)" releases/database-compatibility.json
-          else
-            echo "签名未配置，保留镜像交付；受信数据库迁移发布等待配置。"
-          fi
-      - name: 发布同批镜像并保存交付包
-        run: python3 deploy/v3/manage.py publish --manifest releases/v3-local.json --output releases/v3.json --bundle releases/v3-images.tar.gz
-      - name: 保存联合清单与同批镜像包
+      - name: 保存本地构建清单
         uses: actions/upload-artifact@v4
         with:
-          name: v3-release-${{ github.run_id }}-${{ github.run_attempt }}
+          name: v3-build-${{ github.run_id }}-${{ github.run_attempt }}
           retention-days: 14
-          compression-level: 0
           if-no-files-found: error
-          path: |
-            releases/v3.json
-            releases/database-compatibility.json
-            releases/v3-images.tar.gz
-      - name: 发布受信系统版本与原子目录
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          V3_SYSTEM_RELEASE_PRIVATE_KEY: ${{ secrets.V3_SYSTEM_RELEASE_PRIVATE_KEY }}
-        run: python3 deploy/v3/publish_system_release.py
+          path: releases/v3-local.json

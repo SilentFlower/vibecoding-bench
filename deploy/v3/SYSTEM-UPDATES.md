@@ -14,12 +14,32 @@
    ```
 
 2. 将完整 PEM 私钥配置为仓库 Actions secret `V3_SYSTEM_RELEASE_PRIVATE_KEY`。宿主仅安装上述 64 字符公钥。密钥配置由运维单独执行。
-3. `v3-build.yml` 联合构建两类镜像，在合成旧库上执行真实候选迁移、重复执行、新旧程序读写和快照恢复演练。证据通过后发布 `system-ci-<run_id>-<attempt>`。v2 发行附件包括 `system-release.json`、`system-release.sig`、`v3.json`、联合镜像包、`database-migrations.json` 和 `database-compatibility.json`。完整附件发布后，CI 原子推进 `updates/v3-migrations` 分支的签名目录。
-4. 保持发行附件与批次不可覆盖。目录有效期为三十天。无签名 secret 时，原有镜像交付链继续执行。
+3. 手动运行 `v3-release.yml`，选择 v3 或 flower2api 并勾选 `publish`。流程联合构建两类镜像，在合成旧库上执行真实候选迁移、重复执行、新旧程序读写和快照恢复演练。证据通过后发布 `system-ci-<run_id>-<attempt>`。v2 发行附件包括 `system-release.json`、`system-release.sig`、`v3.json`、联合镜像包、`database-migrations.json` 和 `database-compatibility.json`。完整附件发布后，CI 原子推进 `updates/v3-migrations` 分支的签名目录。
+4. 保持发行附件与批次不可覆盖。目录有效期为三十天。发布前必须配置有效 Ed25519 签名 secret，流程在构建前核验。
 
-v1 的 `updates/v3` 保持原发行格式并续签三十天有效期。新通道首发承接旧发行引用。每次 CI 对受支持的最近八个来源执行演练，来源清单摘要、实际镜像配置摘要和目标迁移合同一起绑定到签名发行。证据失败会阻断签名发布。
+v1 的 `updates/v3` 保持原发行格式并续签三十天有效期。新通道首发承接旧发行引用。每次手动发布对受支持的最近八个来源执行演练，来源清单摘要、实际镜像配置摘要和目标迁移合同一起绑定到签名发行。证据失败会阻断签名发布。
 
 两库合同来自固定迁移登记。普通查询、日志及页面修改保持合同稳定。登记字段为 `id/version/predecessor/checksum/engine/kind/rollback_mode`，当前初始版本为 1。已发布迁移定义及校验和保持不可变。新增建表、补列、索引和回填应增加顺序迁移及固定执行实现，并经 CI 兼容演练。`verify_database_definitions.py` 检查数据库定义所有权和登记摘要。未知及破坏性迁移沿专项维护处理。
+
+## 构建与手动发布
+
+1. 日常提交到 v3/flower2api，或创建目标为这些分支的 PR，运行 `v3-build.yml`。可手动运行同一构建入口。它执行合同测试和本地镜像构建，仅上传 `v3-build-<run_id>-<attempt>` 清单 artifact。构建完成表示候选通过此轮 CI 验证。
+2. 准备正式发行时更新 `deploy/v3/platform-release.json`，修复递增补丁，功能递增次版本。手动运行 `v3-release.yml`，通过分支选择器选择 v3 或 flower2api，并勾选 `publish`。发布入口从本次实际提交重新验证及构建，保留 run/attempt 与 SHA 绑定。
+3. 命令行等价入口：
+
+   ```bash
+   gh workflow run v3-build.yml --ref flower2api
+   gh workflow run v3-release.yml --ref flower2api -f publish=true
+   ```
+
+4. 发布流程核对手动事件、工作流文件、所选分支及明确标记。签名配置提前校验，真实旧库兼容演练先于镜像推送；完整发行附件上传后才推进受信目录。发行序号从已验签的历史目录连续递增，工作流运行计数独立记录。
+5. 发行完成后，由原 v3 实例管理员在“系统更新”中检查、准备和安装。仓库、镜像名、发行身份、信任根、数据合同、部署和持久数据沿既有更新链保持兼容；原 v1 底座按下节 SOP 补齐迁移能力。
+
+### 分支生效步骤
+
+本轮代码在 flower2api 开发。GitHub 的 push 触发规则取自事件对应分支；v3/main 上的旧自动发布在各自同步工作流修复后生效。因此必须将构建发布修复同步到 v3，将旧 `docker-publish.yml` 的手动化修复同步到 main。默认分支当前为 main；新 `v3-release.yml` 也须在默认分支注册，才能稳定展示和触发手动入口。该工作流仍只允许 v3/flower2api 的手动发布。
+
+同步时使用明确的提交和目标分支，并在推送前复核目标中的事件与 job 条件。当前分支文件的本地验证与远端各分支触发规则分别验收。分支同步、正式发行及生产安装各自按明确的 Git/上线授权执行。
 
 ## 首次接入底座
 

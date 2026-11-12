@@ -52,13 +52,13 @@ open http://localhost:8000
 
 ## 镜像发布与远程升级
 
-push 到 `main` 后，[Docker 发布 workflow](https://github.com/SilentFlower/vibecoding-bench/actions/workflows/docker-publish.yml) 会构建并推送三组 `linux/amd64`、`linux/arm64` 镜像：
+旧版部署通过手动运行 [Docker 发布 workflow](https://github.com/SilentFlower/vibecoding-bench/actions/workflows/docker-publish.yml)（选择 `main`）构建并推送三组 `linux/amd64`、`linux/arm64` 镜像。普通 push 仅更新源码。
 
 - `ghcr.io/silentflower/vibebench-orchestrator`
 - `ghcr.io/silentflower/vibebench-worker`
 - `ghcr.io/silentflower/vibebench-sidecar`
 
-每组镜像同时发布 `latest` 和原始 7 位短 Git SHA tag。也可以在 Actions 页面手动运行 workflow，但发布 job 只接受 `main` ref，避免功能分支覆盖 `latest`。
+每组镜像同时发布 `latest` 和原始 7 位短 Git SHA tag。发布 job 同时校验手动事件和 `main` ref。v3 与 Flower2API 使用独立的[构建与原地升级流程](deploy/v3/SYSTEM-UPDATES.md)，自动构建完成后由管理员明确触发发行。
 
 首次发布后，三个 GHCR package 默认是 private。需要分别进入 package settings，将可见性改为 **Public**，再在未登录 GHCR 的远程主机验证镜像可以匿名拉取。package 公开后不能再改回 private。
 
