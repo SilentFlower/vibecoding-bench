@@ -22,7 +22,13 @@ gateway 显式使用 `TZ=Asia/Shanghai`，峰值预热的小时配置按北京�
 
 ## GHCR 发布与远程交付
 
-v3 分支的 Action 联合构建后发布两个专用包：`ghcr.io/silentflower/vibebench-v3-control` 和 `ghcr.io/silentflower/vibebench-v3-account`，统一标签 `v3-ci-<run_id>-<run_attempt>`。仅 v3 ref 的当前 Action 可以调用 publish；使用 `GITHUB_TOKEN`，不写旧版包或 latest。父提交必须对应当前 Action，未提交来源拒绝发布，同一 attempt 的发布标记禁止重试；失败重跑必须使用新 attempt。
+`v3-build.yml` 在 v3/flower2api 的 push、目标分支 PR 或手动触发时执行合同验证和两镜像构建，上传本地清单。该入口使用只读权限，发布操作为零。
+
+正式交付由 `v3-release.yml` 的手动入口执行：选择 v3 或 flower2api，明确勾选 `publish`，冻结当前提交并重新验证、构建，完成真实旧库升级和回退演练，再发布 `ghcr.io/silentflower/vibebench-v3-control`、`ghcr.io/silentflower/vibebench-v3-account`。统一标签继续为 `v3-ci-<run_id>-<run_attempt>`。签名私钥为必需配置，缺失时在构建前失败。
+
+现有 v3 实例沿原“系统更新”页面安装后继版本，继续使用原部署标识、数据根、账号身份及更新信任根。更早底座按[系统更新 SOP](SYSTEM-UPDATES.md)在原部署补齐能力。Flower2API 按后继小版本持续演进。
+
+构建、显式发布和管理员安装是三个独立动作。精确入口、分支生效及默认分支注册说明见[系统更新 SOP](SYSTEM-UPDATES.md#构建与手动发布)。
 
 只有两个镜像都推送成功并取得仓库 digest 后才保存发布清单。`digest` 是构建机 Docker 的本地 ID，可能指向 OCI 索引；`config_digest` 根据归档原始配置字节计算，`registry_digest` 则是推送的仓库 manifest/索引 digest。不同 Docker 存储实现的本地 ID 可以不同，启动仍必须匹配清单固定的配置或 OCI 根及相同平台。Action 的 `v3-release-<run_id>-<run_attempt>` artifact 保存发布清单、同批压缩镜像包及其 SHA256/大小，保留 14 天，不包含部署配置或账号资料。
 

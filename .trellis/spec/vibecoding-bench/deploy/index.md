@@ -6,7 +6,7 @@
 
 ## Overview
 
-本项目交付路径:**本地写代码与验证 → push main → GitHub Actions 构建并推 GHCR → 远程 git pull + docker compose pull + recreate**。每一步都踩过坑,这里把"必须这么做、否则会出 X 问题"的契约写清楚,避免重复踩。
+本项目交付路径:**本地验证 → push/PR 构建验证 → 显式手动发布 → 管理员安装**。每一步都踩过坑,这里把"必须这么做、否则会出 X 问题"的契约写清楚,避免重复踩。
 
 镜像清单:
 - `ghcr.io/silentflower/vibebench-orchestrator` — FastAPI 后端

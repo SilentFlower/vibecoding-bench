@@ -6,14 +6,14 @@
 
 ## Scope / Trigger
 
-每次 push 到 `main` 都触发 `.github/workflows/docker-publish.yml`,并构建 + 推送全部三个镜像。下表只说明哪些文件会改变对应镜像内容:
+手动运行 `.github/workflows/docker-publish.yml` 并选择 `main`，构建并推送全部三个镜像。普通 push 不触发该发布入口。下表只说明哪些文件会改变对应镜像内容:
 
 | 改了 | 重建 |
 |------|------|
 | `orchestrator/main.py` 或 `orchestrator/requirements.txt` 或 `orchestrator/Dockerfile` | orchestrator |
 | `images/worker/entrypoint.sh` 或 `images/worker/Dockerfile` | worker |
 | `images/sidecar/start.sh` / `recorder.py` / `Dockerfile` | sidecar |
-| `webui/*` 或 `topics.md` | **不改变镜像内容**(都是 bind mount,远程 git pull 即可;workflow 仍按 main push 契约发布三件套 tag) |
+| `webui/*` 或 `topics.md` | **不改变镜像内容**(都是 bind mount,远程 git pull 即可;手动发布仍按 main ref 契约发布三件套 tag) |
 
 ---
 
@@ -36,8 +36,8 @@
 
 ### Trigger
 
-- push 到 `main`:自动发布。
-- `workflow_dispatch`:只允许选择 `main` ref;其它 ref 的发布 job 会跳过,防止功能分支覆盖 `latest`。
+- 普通 push：不触发发布。
+- `workflow_dispatch`：发布 job 同时校验手动事件和 `main` ref;其它 ref 的发布 job 会跳过,防止功能分支覆盖 `latest`。
 - concurrency group 为 `docker-publish-${{ github.ref }}`,同 ref 的新运行取消旧运行。
 
 ### Permissions / Auth
@@ -584,9 +584,9 @@ webui/ 和 topics.md 是 bind mount → **改它们不需要 recreate**,远程 g
 
 ## Good / Base / Bad Cases
 
-**Good**:改 orchestrator 一处 → push `main` → workflow 三个 matrix 项全部成功并发布同一短 SHA + latest → 远程锁定该短 SHA → `pull && up -d --force-recreate`。
+**Good**:改 orchestrator 一处 → push `main` → 手动触发 workflow（main ref）→ workflow 三个 matrix 项全部成功并发布同一短 SHA + latest → 远程锁定该短 SHA → `pull && up -d --force-recreate`。
 
-**Base**:只改 `webui/` 或 `topics.md` → workflow 仍发布三镜像同一新 tag,但镜像内容层可复用缓存;远程仍必须 `git pull`,因为实际前端 / 题库来自 bind mount。
+**Base**:只改 `webui/` 或 `topics.md` → 手动运行 workflow 时仍发布三镜像同一新 tag,但镜像内容层可复用缓存;远程仍必须 `git pull`,因为实际前端 / 题库来自 bind mount。
 
 **Bad**:workflow 有一个 matrix 项失败仍部署 `latest`;或首次发布后没有把 package 改为 public,远程匿名 pull 直接失败;或 pull 后只 `restart`,远程仍跑旧容器。
 
@@ -633,7 +633,7 @@ docker push ghcr.io/silentflower/vibebench-orchestrator:158b462
 ### ✅ Correct: 由 workflow 发布三件套对齐 sha tag
 
 ```bash
-git push origin main
+gh workflow run docker-publish.yml --ref main
 # 等待 docker-publish.yml 的 orchestrator / worker / sidecar 三个 matrix 项全部成功。
 docker buildx imagetools inspect ghcr.io/silentflower/vibebench-orchestrator:158b462
 docker buildx imagetools inspect ghcr.io/silentflower/vibebench-worker:158b462

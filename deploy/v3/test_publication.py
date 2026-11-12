@@ -36,6 +36,8 @@ class PublicationTests(unittest.TestCase):
                 for role, value in (("control", "1"), ("account", "2"))}}
         self.input.write_text(json.dumps(self.manifest))
         environment = patch.dict(os.environ, {"GITHUB_ACTIONS": "true", "GITHUB_REF": "refs/heads/v3",
+            "GITHUB_EVENT_NAME": "workflow_dispatch", "V3_PUBLISH_CONFIRMED": "true",
+            "GITHUB_WORKFLOW_REF": "SilentFlower/vibecoding-bench/.github/workflows/v3-release.yml@refs/heads/v3",
             "GITHUB_RUN_ID": "123", "GITHUB_RUN_ATTEMPT": "1", "GITHUB_SHA": "a" * 40,
             "GITHUB_REPOSITORY_OWNER": "SilentFlower", "GITHUB_REPOSITORY": "SilentFlower/vibecoding-bench"})
         environment.start()
@@ -80,6 +82,26 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(gzip.decompress(self.bundle.read_bytes()), b"synthetic docker image package")
         self.assertEqual(result["bundle"]["sha256"], manage._file_sha256(self.bundle))
         self.assertEqual(self.output.stat().st_mode & 0o777, 0o600)
+
+    def test_flower2api_manual_publication_keeps_v3_image_identity(self) -> None:
+        """融合分支手动发布仍沿原 v3 镜像身份。@return None。"""
+        with patch.dict(os.environ, {"GITHUB_REF": "refs/heads/flower2api",
+                "GITHUB_WORKFLOW_REF": "SilentFlower/vibecoding-bench/.github/workflows/v3-release.yml@refs/heads/flower2api"}):
+            result = self._publish()
+        self.assertTrue(all('/vibebench-v3-' in entry['reference'] for entry in result['images'].values()))
+
+    def test_automatic_or_unconfirmed_publication_refuses_before_docker(self) -> None:
+        """构建及其它入口在 Docker 副作用前拒绝发布。@return None。"""
+        cases = [{'GITHUB_EVENT_NAME': event} for event in ('push', 'pull_request', 'workflow_run', '')]
+        cases += [{'V3_PUBLISH_CONFIRMED': 'false'}, {'V3_PUBLISH_CONFIRMED': ''},
+            {'GITHUB_WORKFLOW_REF': 'SilentFlower/vibecoding-bench/.github/workflows/v3-build.yml@refs/heads/v3'},
+            {'GITHUB_SHA': 'invalid'}, {'GITHUB_RUN_ID': '0'}]
+        for changes in cases:
+            with self.subTest(changes=changes), patch.dict(os.environ, changes), patch.object(manage, 'command') as command:
+                with self.assertRaises(ValueError):
+                    manage.publish(self.input, self.output, self.bundle)
+                command.assert_not_called()
+                self.assertFalse(self.output.with_name(self.output.name + '.started').exists())
 
     def test_push_failure_retains_marker_and_refuses_same_attempt(self) -> None:
         """任一推送失败均无完整清单；同次重试不能覆盖部分发布。

@@ -1,12 +1,16 @@
 """离线验证发行附件发布顺序、CI 来源限制与失败时目录保持。"""
 import hashlib
+import copy
 import json
 import subprocess
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import publish_system_release
 import test_system_release as release_tests
+from system_release import create_index, sign_file
+from system_update_contract import validate_index, validate_release, verify_signed
 from test_system_migrations import evidence_for
 
 
@@ -25,7 +29,14 @@ class SystemPublishTests(unittest.TestCase):
         self.fixture.manifest.write_text(json.dumps(self.fixture.build))
         self.calls = []
         self.fail_upload = False
+        self.catalogs = {}
+        self.fetched_channel = None
+        self.published_release = None
+        self.published_index = None
+        self.fail_push = False
         environment = patch.dict('os.environ', {'GITHUB_ACTIONS': 'true', 'GITHUB_REF': 'refs/heads/v3',
+            'GITHUB_EVENT_NAME': 'workflow_dispatch', 'V3_PUBLISH_CONFIRMED': 'true',
+            'GITHUB_WORKFLOW_REF': 'SilentFlower/vibecoding-bench/.github/workflows/v3-release.yml@refs/heads/v3',
             'GITHUB_REPOSITORY': 'SilentFlower/vibecoding-bench', 'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '1',
             'GITHUB_RUN_NUMBER': '10', 'GITHUB_SHA': 'a' * 40, 'GH_TOKEN': 'synthetic-ci-token'})
         environment.start()
@@ -45,7 +56,27 @@ class SystemPublishTests(unittest.TestCase):
         if arguments[:3] == ('gh', 'release', 'upload') and self.fail_upload:
             raise RuntimeError('合成附件上传失败')
         if arguments[:2] == ('git', 'ls-remote'):
-            return b''
+            return b'a' * 40 if arguments[-1] in self.catalogs else b''
+        if arguments[:2] == ('git', 'fetch'):
+            self.fetched_channel = arguments[-1]
+        if arguments[:2] == ('git', 'rev-parse'):
+            return b'a' * 40
+        if arguments[:2] == ('git', 'show'):
+            catalog = self.catalogs[self.fetched_channel]
+            return catalog[1] if arguments[-1].endswith(':index.sig') else catalog[0]
+        if arguments[:3] == ('gh', 'release', 'download'):
+            folder = Path(arguments[arguments.index('--dir') + 1])
+            (folder / 'system-release.json').write_bytes(self.history_release)
+        if arguments[:3] == ('gh', 'release', 'upload'):
+            for argument in arguments:
+                if argument.endswith('/system-release.json'):
+                    raw = Path(argument).read_bytes()
+                    self.published_release = validate_release(verify_signed(raw,
+                        Path(argument).with_suffix('.sig').read_bytes(), self.fixture.public))
+        if arguments[:2] == ('git', 'hash-object') and data.startswith(b'{'):
+            self.published_index = validate_index(json.loads(data))
+        if arguments[:2] == ('git', 'push') and self.fail_push:
+            raise RuntimeError('合成目录竞争冲突')
         if arguments[:2] in (('git', 'hash-object'), ('git', 'mktree'), ('git', 'commit-tree')):
             return b'a' * 40 + b'\n'
         return b''
@@ -110,6 +141,92 @@ class SystemPublishTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, '上传失败'):
             self.publish()
         self.assertFalse(any(value[:3] == ('gh', 'release', 'edit') or value[:2] == ('git', 'push') for value in self.calls))
+
+    def test_automatic_and_unconfirmed_sources_rejected(self) -> None:
+        """签名发布同样在外部命令前核对手动入口。@return None。"""
+        for changes in ({'GITHUB_EVENT_NAME': 'push'}, {'V3_PUBLISH_CONFIRMED': 'false'},
+                {'GITHUB_WORKFLOW_REF': 'other'}, {'GITHUB_SHA': 'b' * 40}):
+            with self.subTest(changes=changes), patch.dict('os.environ', changes), self.assertRaises(ValueError):
+                self.publish()
+            self.assertEqual(self.calls, [])
+
+    def install_history(self, sequence: int, channel: str = 'updates/v3') -> None:
+        """安装真实签名旧目录，保留原发行格式和镜像身份。
+
+        :param sequence: 历史主序号。
+        :param channel: 模拟的受信目录分支。
+        :return: None。
+        """
+        old = copy.deepcopy(self.fixture.release)
+        old.update(release='system-ci-122-1', sequence=[sequence, 1], changes='平台版本：v1.1.0\n旧版')
+        for role in ('control', 'account'):
+            old[role].update(release='ci-122-1', reference=f'ghcr.io/silentflower/vibebench-v3-{role}:v3-ci-122-1')
+        path = self.fixture.root / 'history-release.json'
+        path.write_text(json.dumps(old))
+        sign_file(path, self.fixture.key)
+        index = self.fixture.root / 'history-index.json'
+        create_index(path, None, index, self.fixture.key)
+        self.history_release = path.read_bytes()
+        self.catalogs['refs/heads/' + channel] = (index.read_bytes(), index.with_suffix('.sig').read_bytes())
+
+    def test_high_history_sequence_survives_workflow_counter_reset(self) -> None:
+        """新工作流计数为 1 时接续真实签名旧目录。@return None。"""
+        self.install_history(700)
+        with patch.dict('os.environ', {'GITHUB_RUN_NUMBER': '1', 'GITHUB_REF': 'refs/heads/flower2api',
+                'GITHUB_WORKFLOW_REF': 'SilentFlower/vibecoding-bench/.github/workflows/v3-release.yml@refs/heads/flower2api'}):
+            self.assertEqual(self.publish()['status'], 'published')
+        self.assertEqual(self.published_release['sequence'], [701, 1])
+        self.assertEqual(self.published_index['sequence'], [701, 1])
+        self.assertEqual(self.published_index['releases'][1]['release'], 'system-ci-122-1')
+        self.assertEqual(self.published_release['compatibility'], self.fixture.release['compatibility'])
+        self.assertEqual(self.published_release['data_compatibility'], self.fixture.release['data_compatibility'])
+
+    def test_corrupted_history_blocks_before_release_write(self) -> None:
+        """历史签名字节损坏时停止正式写入。@return None。"""
+        self.install_history(700)
+        raw, signature = self.catalogs['refs/heads/updates/v3']
+        self.catalogs['refs/heads/updates/v3'] = (raw + b' ', signature)
+        with self.assertRaises(ValueError):
+            self.publish()
+        self.assertFalse(any(value[:3] == ('gh', 'release', 'create') for value in self.calls))
+
+    def test_migration_channel_inherits_high_legacy_sequence(self) -> None:
+        """迁移通道首发继承旧签名发行并连续推进。@return None。"""
+        self.install_history(900)
+        original_raw = (self.fixture.output / 'system-release.json').read_bytes()
+        evidence = self.fixture.root / 'evidence.json'
+        evidence.write_text(json.dumps(evidence_for(self.fixture, json.loads(original_raw), original_raw)))
+        self.assertEqual(self.publish(evidence)['status'], 'published')
+        self.assertEqual(self.published_release['sequence'], [901, 1])
+        self.assertEqual(self.published_release['schema_version'], 2)
+        self.assertTrue(any(call[:2] == ('git', 'push') and call[-1].endswith('updates/v3-migrations') for call in self.calls))
+
+    def test_directory_conflict_preserves_completed_release(self) -> None:
+        """目录竞争失败保留完整发行，并保持普通推送保护。@return None。"""
+        self.fail_push = True
+        with self.assertRaisesRegex(RuntimeError, '竞争'):
+            self.publish()
+        self.assertTrue(any(value[:3] == ('gh', 'release', 'edit') for value in self.calls))
+        self.assertFalse(any('--force' in value for value in self.calls))
+
+    def test_sequence_overflow_refuses_publication(self) -> None:
+        """历史序号达到安全上限时拒绝生成新发行。@return None。"""
+        self.install_history(2 ** 53 - 1)
+        with self.assertRaisesRegex(ValueError, '上限'):
+            self.publish()
+        self.assertFalse(any(value[:3] == ('gh', 'release', 'create') for value in self.calls))
+
+    def test_signing_preflight_rejects_wrong_key_type(self) -> None:
+        """签名预检核对实际 Ed25519 公钥格式。@return None。"""
+        with patch.dict('os.environ', {'V3_SYSTEM_RELEASE_PRIVATE_KEY': self.fixture.key.read_text()}):
+            publish_system_release.check_signing_key()
+            with patch.object(publish_system_release, 'run', return_value=b'foreign-key'), self.assertRaises(ValueError):
+                publish_system_release.check_signing_key()
+
+    def test_missing_signing_key_fails(self) -> None:
+        """缺签名材料应明确失败。@return None。"""
+        with patch.dict('os.environ', {'V3_SYSTEM_RELEASE_PRIVATE_KEY': ''}), self.assertRaises(ValueError):
+            publish_system_release.check_signing_key()
 
     def test_other_ci_source_rejected_before_external_commands(self) -> None:
         """跨分支或伪造来源在副作用前拒绝。@return None。"""
