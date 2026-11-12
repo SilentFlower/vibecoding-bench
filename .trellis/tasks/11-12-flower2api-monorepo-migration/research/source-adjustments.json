@@ -1,0 +1,187 @@
+[
+  {
+    "path": "services/gateway/README.md",
+    "before": "c9c5577553e392d9ec2258cecc8505ff0db7b35692f066546cd447ed997ded19",
+    "after": "bd0363d157e931055da47d2f558b5c59a07cb2d27b7fa2908ff03f76cdf55844"
+  },
+  {
+    "path": "services/gateway/docker/Dockerfile",
+    "before": "72171505bdad13de30cbeb22d11ccf0ace6696cd287065a2724928c48a69f251",
+    "after": "47956d40cb9ff4ffdf0eae6446f041ae15b44c20c53d38aaa78ee1a5620f8949"
+  },
+  {
+    "path": "services/gateway/scripts/build.bat",
+    "before": "4ffd0f8d42257619ccb371d8d66030f4ed8a2223755a599b1977366e1494d881",
+    "after": "e1447719c0b0ab268dafbae673265bd1963047fb9f7898fffbc5a19d0fd82bb9"
+  },
+  {
+    "path": "services/gateway/scripts/build.sh",
+    "before": "8ded0f5b6166efc288e14b33d03835c36722da68df1a6ae0d9b03bff9e1df285",
+    "after": "d929f3ac32c55c1ab6d525724becea77dd19189a461ccd944c7b2b5809c6cd31"
+  },
+  {
+    "path": "services/gateway/scripts/dev.sh",
+    "before": "f30b4d5aff4aeec663b6c792528c8f01b79a2a5dc20bc08321910a7ed671c859",
+    "after": "8eff45a937f5730873db00430827e115d3d84ca943708d2bee8161a65ab1205a"
+  },
+  {
+    "path": "services/gateway/src/handler/router.rs",
+    "before": "cd72247fb7e401f97ef4f525af2673cf37be07bcc80d6cc92a584a13c90bf2bc",
+    "after": "100efba40ebb80f60d2a99e48471491d14363f454490d7dd576f2c425a8aa81f"
+  },
+  {
+    "path": "services/orchestrator/Dockerfile",
+    "before": "74265cfd17712d17de1e29ff26bf29adaab5458a5f711507ca411faa7fcab3a0",
+    "after": "19c4bdbc5d8d90d7e3b9d3c840a4241b60387ad17f6c3d84f565a75b6c0807de"
+  },
+  {
+    "path": "services/orchestrator/main.py",
+    "before": "940f9c341b431d77b911950678938a1adcb7ec6a2f2c66ed64fa617daf7c64da",
+    "after": "61299578756d2eeeae2de96a251abb869e84246e6b4068f1ecdabfee061c9ba5"
+  },
+  {
+    "path": "services/orchestrator/pi_terminal.py",
+    "before": "8ddd1e2b53ecad6c88b05082d0da2baa1249b876c666d0c705af7877bcb3662e",
+    "after": "85aaf0df48c1112472d2e216280f69f76b130c37c9d6bfb897870e1784c183f9"
+  },
+  {
+    "path": "services/orchestrator/project_plans.py",
+    "before": "dcc340502a2dbb6be3aac65b147e23b7cc25280c085403097c47b61454e48016",
+    "after": "fc5742f3e626870e6c4ce04024bc105bc9570bd949c63ca5c8cdfa1a03625286"
+  },
+  {
+    "path": "services/orchestrator/projects_pi.py",
+    "before": "e2a84459f6bb2e45ab4ba35b4765ca8a2c25bb8dc1ce5822792ea1442a5e62ab",
+    "after": "c62d1b898568b92b997b34ff832f5cc500aea60e618b97da2ecb4fd8e62e6295"
+  },
+  {
+    "path": "services/orchestrator/test_account_cli_settings.py",
+    "before": "335b12c22e018c6d4498b29e3e0e291603bc8503af7fe9e6b1925f88cff4b8bc",
+    "after": "5d0a68e3b2e86dd73c7035e603bd0395cc23442934bddb98394d4f98f07f359a"
+  },
+  {
+    "path": "services/orchestrator/test_account_runtime.py",
+    "before": "0ea0bbb6bf96242dec8c2bc4c6179cc76d1c764923f1b7d3c594ea02f85d2de4",
+    "after": "bf019a4bfa11141590a5644a125a133b1a52fc13e434365c20ce4dc5f646faab"
+  },
+  {
+    "path": "services/orchestrator/test_english_content.py",
+    "before": "b5b20a584dac7c5d28fea74dab8cd51c5ba8768d9764771ff53b8abd249fa56c",
+    "after": "ca47690b7de41908a9fe06782959926dbda88e028dd49b9d3e1c5ab9177f09ac"
+  },
+  {
+    "path": "services/orchestrator/test_main.py",
+    "before": "0249f3a44f90f45020004cac2ed8fd8d835f4a5c9aa55828c96e429f0a8fa433",
+    "after": "b11f563eb3bfb55fa2a977602c9c24a5b2cbbe13eb4252f9c920f25766c2d904"
+  },
+  {
+    "path": "services/orchestrator/test_pi_interaction.py",
+    "before": "153a2d082c4aaf82e696cfab12fae61e7a3b7c4decafad2797d739b344de72ad",
+    "after": "c2a70b4e987212ff4fb6486a3715b735435e8dd6beef1b7d761b9a05218e8bec"
+  },
+  {
+    "path": "services/orchestrator/test_project_arrow_adapter.py",
+    "before": "b4d6e4e8dfaf2ed67060c8ed504b4fc94ba10b139192c27fec66ec11e4610330",
+    "after": "23fd719dcf89928137c8ca24dd20266769ffe65410b7df6e63283cb5875236e8"
+  },
+  {
+    "path": "services/orchestrator/test_project_attrs_adapter.py",
+    "before": "2af28b5ca4071c2b3f0ec1428a73d4af3fbe738a7eaf25b27e8c126f7c28c230",
+    "after": "891988f3c6fb4777babdddb5e0ae01643bd9b676cfdfdfb6516d83c0f39778f6"
+  },
+  {
+    "path": "services/orchestrator/test_project_behavior_observers.py",
+    "before": "ebcf8615e19495bca87bedd807f4fd310a0bb239c86f243cefee97ed8258d95c",
+    "after": "926ba6996c8780e1c9ba78ec1e4e71ff5a7caa7730072869f8ab2b1f53127327"
+  },
+  {
+    "path": "services/orchestrator/test_project_contract_observers.py",
+    "before": "4456043e0b44f73068101694b790bbd6c7182ca14321ed42993fd3ac39422503",
+    "after": "6a6aee7565da10d6f66482c33f6d3c88cfc2cbdebe98bb2c6884b8830074271f"
+  },
+  {
+    "path": "services/orchestrator/test_project_duplicate_adapter.py",
+    "before": "5c739a44788c225c7863f30761536fc2b7829361b18dcb4f16090c664a7b8d3f",
+    "after": "6701df12879ba6b8f743026f6d7eab3842eb2948802b6e06ef2f9453eea1a0cf"
+  },
+  {
+    "path": "services/orchestrator/test_project_iterations.py",
+    "before": "f9011f3b646b2759cdbd0d79870efe5fe53ed79570faacbdab6f234627ec9c32",
+    "after": "c5d48b1b415806cc6acf15288c5e8a8bd209e784ec20c1822afb5b3ab74b3f1c"
+  },
+  {
+    "path": "services/orchestrator/test_project_material_language.py",
+    "before": "f2d923ae6ad44c692519487f15630d6b355fb97ff8b95d27bf2014c98595f2ad",
+    "after": "b3024f7cf2f2d7c699dde47ca2a6aa6e9f2e21bb4fd99bcca17df2faee3454e5"
+  },
+  {
+    "path": "services/orchestrator/test_project_native_contract.py",
+    "before": "eecdfa87ab83bd01a299c54f8418b9c0bf546fb071af5efcf639609380fea459",
+    "after": "9a88a33b8f0dab008a3dbe2d1a06f88e8e6f408584bcd99c3f07762cd1a2993e"
+  },
+  {
+    "path": "services/orchestrator/test_project_native_verifier.py",
+    "before": "3dfe4476ea78f6dd11d7e798bfa14c0a017278d025f20d9d2e5c475a4aff4c9e",
+    "after": "461810770fb8e80be6ca94e699aa7dc5359e7374336a13dc51dc681903657878"
+  },
+  {
+    "path": "services/orchestrator/test_project_schema_adapter.py",
+    "before": "36c0080c8e5ec3a5e20d11b57c8908199f1c310eb7344788c86f8575681d210c",
+    "after": "6e6cdcf50bbf0a3ae4ae44255392dede491840da6d8d5a74b6a4337fe8938db3"
+  },
+  {
+    "path": "services/orchestrator/test_project_weighted_adapter.py",
+    "before": "6ecfaf49a72dc9f29872eb69fdb5afe44a833a1db23e4b7652172c2e9a8bedf6",
+    "after": "f7be31a62370827874edcac54fa6342ac64ab2f6264a733dde5d3d66f8b76aee"
+  },
+  {
+    "path": "services/orchestrator/test_projects_pi_round.py",
+    "before": "9b6f39e2f332831c7a3ab76696de771a43aacb963026bdde96fff86fa8e55684",
+    "after": "0f041ba884e09ab16fe76b00f55ec320d7b85cca61159e7070587e16b8ff67eb"
+  },
+  {
+    "path": "services/orchestrator/test_projects_runtime_resilience.py",
+    "before": "8467819434af9dfdd0e2beebb2b2188aa2a897028051473f9c13ab82bb697afc",
+    "after": "e792b94f249e0a10f13d0319f9851490122e3fe89c67380d1de324ed2d0484c4"
+  },
+  {
+    "path": "services/orchestrator/test_projects_terminal.py",
+    "before": "3f7882d68f505f53191bab4371a4ebb0eb4c1db615406901e8d31c82b6a39cde",
+    "after": "1a60987148ca0a4af8302406f5bbcba294ee057d7e7bbc0d2e3b49d3d0262f18"
+  },
+  {
+    "path": "services/orchestrator/test_quota.py",
+    "before": "2b3434668dc8ed38dab375fef21716cc2099281a932bf4d5bafdbae164c2ebb2",
+    "after": "829f1037fe9a498e62df2ba3db2960b6c65037e32e5bb2479632d9ec4a281ab4"
+  },
+  {
+    "path": "services/orchestrator/test_tls_capture_artifacts.py",
+    "before": "fefacf3b92b78b95cd4436400f77ec12febe29cb9db829981d82ef6e3c4c04e8",
+    "after": "36176c81efc2ec639c7c58797967b34716323fed63b27289dcf2847cd2ca155c"
+  },
+  {
+    "path": "services/orchestrator/test_topic_followups.py",
+    "before": "0cb2b944d87b7e7f8d8fec45a55431cf0b599218f2be1de1fd6351474cae1646",
+    "after": "02458464a024ce15fb8620ff22dfe08c835f0973771db41ad82eeb862fea1584"
+  },
+  {
+    "path": "services/orchestrator/test_warmup_quota.py",
+    "before": "31b3132204f1100e2b4428afd4685d4d5d06a0795c9795f76ca203ca3ed7f972",
+    "after": "427c72369c3b5c75f059b27ebae4cd07b96374821d41e77afc219eb2a2eb1e98"
+  },
+  {
+    "path": "services/orchestrator/test_worker_startup.py",
+    "before": "44a81a43f3ab8a3c15d66a087b978c3bacaf15f23e5e4975d08c9e4d4f590f10",
+    "after": "28fa00f762280b575592dbc072e844dc84aaf655994438035d3e03bab862fb7c"
+  },
+  {
+    "path": "services/runtime/tests/local-pool/gateway.test.ts",
+    "before": "c0b68d92ce0ec028303498fb80b50a99ad4b3f7ef54055191ea710a17940c4cb",
+    "after": "3be51ff2612063191f38338132503d2f297a5d7f85ee0c81b172ce131a59f896"
+  },
+  {
+    "path": "services/runtime/native/tls-observer/README.md",
+    "before": "4f3e712d113872387956354d3a2d4f369c447fe4c06e5ca9e7194a9e9b0d4831",
+    "after": "79d37eb47b5ea8a91d5292818e8795b78733a426830a6c91a65c5145f638ac04"
+  }
+]

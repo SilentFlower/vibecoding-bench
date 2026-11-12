@@ -1,0 +1,287 @@
+{
+  "bench": {
+    "head": "142ea0c0f35267f33cc0aa3a09eef4be10992bf7",
+    "specs": [
+      {
+        "path": ".trellis/spec/cc2api/README.md",
+        "sha256": "91770e241b0fd1e7088bd3e8f9e757cdbfd67e063cb51c0bc01b95aa33532396",
+        "bytes": 751
+      },
+      {
+        "path": ".trellis/spec/cc2api/backend/index.md",
+        "sha256": "6ab8046de2581e9738ad39a772c9955754effe44f30d0fda32494c17ee56311d",
+        "bytes": 2024
+      },
+      {
+        "path": ".trellis/spec/cc2api/backend/service-architecture.md",
+        "sha256": "cf374d7e73b4ffcb87dab1aa4fcf82ba11cdff50131e7de03d97f6a2fdc01918",
+        "bytes": 133053
+      },
+      {
+        "path": ".trellis/spec/cc2api/backend/settings-database.md",
+        "sha256": "e8675c60e332ebc232bbfdcbe75cfba95b9b96563c2db7959e9d0232bd8d9233",
+        "bytes": 52123
+      },
+      {
+        "path": ".trellis/spec/cc2api/backend/testing-quality.md",
+        "sha256": "a8029569c22412606ed523af01338ec2fbe3a70862dc14b521a466a05dbc08b6",
+        "bytes": 2886
+      },
+      {
+        "path": ".trellis/spec/cc2api/deploy/deploy-guidelines.md",
+        "sha256": "02d0c885013087bda085370310c987f0d89769b445f09156923887d3e79a2367",
+        "bytes": 2322
+      },
+      {
+        "path": ".trellis/spec/cc2api/deploy/index.md",
+        "sha256": "ba2692dc9d550343fbd417a9712e0bd4237124e5314ee2a93927c368c49d1875",
+        "bytes": 1209
+      },
+      {
+        "path": ".trellis/spec/cc2api/frontend/frontend-guidelines.md",
+        "sha256": "176fcfe2545bc0fe5ff5d20678b62d8c23f938e05da6ce86ba6db5749e090318",
+        "bytes": 12748
+      },
+      {
+        "path": ".trellis/spec/cc2api/frontend/index.md",
+        "sha256": "7a92b54b16ca52b83fb7fc5d9fe8292f888dbe50eb624e80f9f5e10bb07b9be4",
+        "bytes": 999
+      },
+      {
+        "path": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md",
+        "sha256": "45ae3859f8ce8d4414c6a2fa64f8ec1979545b0665cbf7d87da06762c0e7d6e5",
+        "bytes": 132520
+      },
+      {
+        "path": ".trellis/spec/cc2api/protocol/index.md",
+        "sha256": "dad61bbf684729dd701ad828a0b312a7c3e94903558c84abbab454d6ca06817c",
+        "bytes": 1681
+      },
+      {
+        "path": ".trellis/spec/guides/code-reuse-thinking-guide.md",
+        "sha256": "384a39773b375d2e690c90d0760508d2d423b98e05a8cd6a2b57914cb6357180",
+        "bytes": 2808
+      },
+      {
+        "path": ".trellis/spec/guides/cross-layer-thinking-guide.md",
+        "sha256": "1f767a2564a58abbcf04cc94679546f3129fe518be8f674f55f8c57fe735a948",
+        "bytes": 6639
+      },
+      {
+        "path": ".trellis/spec/guides/index.md",
+        "sha256": "c41ea8dd33dc9ae01b376f2bf66c6b2f80e699d84a895ca87d55c7a44368d2d5",
+        "bytes": 2347
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md",
+        "sha256": "c758f938f7bc153fc6defbf8ac004fc9a09b98a896d548f5abde5f4efc88552a",
+        "bytes": 182149
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/backend/database-guidelines.md",
+        "sha256": "9f52fa204c765a22f29d5e2faf469d134ee789200ab9c0a17aac23b5960ba037",
+        "bytes": 64984
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/backend/directory-structure.md",
+        "sha256": "827d06da66f45435626b91656317c96b3aae0d202760b2b1699b7e409d76f2b7",
+        "bytes": 5857
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/backend/error-handling.md",
+        "sha256": "fdbc303223fc1941367893c32817add4c1e35b94a986c79de7b82d5adeff604c",
+        "bytes": 6625
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/backend/index.md",
+        "sha256": "ab2fee6f7b5e5e3baf29e248c49b59ce3252820c19c925294c034537684dd9b8",
+        "bytes": 2940
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/backend/logging-guidelines.md",
+        "sha256": "2aeeba7dceb70bf1ab890e9521a6f7a76e5580d811af580338046f64bc9bbfe5",
+        "bytes": 5150
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/backend/project-iterations.md",
+        "sha256": "b9c15e72aa7887ce1195485e2fdd57788674ecbba1af0ed3f8746ff82a9d914a",
+        "bytes": 178236
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md",
+        "sha256": "b7d5cfc5118ce2ceac85eabf2592c31f7972b94e3a5910583c932f8fb146c5d3",
+        "bytes": 7935
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/backend/topic-prompt-contract.md",
+        "sha256": "7290f9b7953f35c10330427057cbda9369a92788f4db97d627d6880bed1a429d",
+        "bytes": 34928
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/deploy/auth-design.md",
+        "sha256": "42a5eee60e137132053e3d05a4025371559f118758e9d9fb9221f222f6946ade",
+        "bytes": 9314
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/deploy/image-build-push.md",
+        "sha256": "f8a916361f91e5666b7224afce99eecad3a0f390ab00953e82c69fe465488f49",
+        "bytes": 38660
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/deploy/index.md",
+        "sha256": "6208c7c7f2326d02bcfc9667b22d03ddff374d802ddff5a5e52a384f0ada21f6",
+        "bytes": 2949
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md",
+        "sha256": "3bc8a3e3224966ad4ee40b793e69d207a558506b988c671a57b4b5b87d4077ac",
+        "bytes": 17342
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/deploy/platform-online-update.md",
+        "sha256": "57664558b1f60ec018727350a4e3c4738b51b3a4fdd53327d8a2d73ec074350d",
+        "bytes": 30145
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/deploy/remote-deploy.md",
+        "sha256": "2199b1badb71dbb4a9b435a58f98980a96c33cab2eee84c83549a81d76e6bd84",
+        "bytes": 37434
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/frontend/component-guidelines.md",
+        "sha256": "9d642581773fedfc822ee80dc0aa96500ca4a157a80a1d3bd3547bfa5b8435bf",
+        "bytes": 16176
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/frontend/directory-structure.md",
+        "sha256": "46a3ae01925c636f476693a015cb63fd451aaa3e0aea70169132cc39970839be",
+        "bytes": 6516
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/frontend/hook-guidelines.md",
+        "sha256": "b731aac4b3e74b8d48f1feeb54249a5adf86aafce98131ba68776ab9cbfd6734",
+        "bytes": 16482
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/frontend/index.md",
+        "sha256": "7beffd9658eacc4f58d92fc53118e160c9cec3c122f8e1f98527fadf3d3bc101",
+        "bytes": 2987
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md",
+        "sha256": "99469149685360186e521efc21a287038f0d18be5df36eb04ce3215f83f2c870",
+        "bytes": 8818
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/frontend/state-management.md",
+        "sha256": "63484c85ce5f81d8f037d88894828088162658e160e48b629448a73455482f6c",
+        "bytes": 9869
+      },
+      {
+        "path": ".trellis/spec/vibecoding-bench/frontend/type-safety.md",
+        "sha256": "131ee50732246b68beeb2fceb17cbe3d377f43c2f039e72e068c3dcbd4c4e149",
+        "bytes": 6379
+      }
+    ]
+  },
+  "runtime": {
+    "head": "7cfe8b3734111dae4758a7e2006f43e5f1cc71e9",
+    "specs": [
+      {
+        "path": ".trellis/spec/backend/database-guidelines.md",
+        "sha256": "fa04a37014f16acc116e095d97ab02937cc06a0e120c4b96c3b5702f38fb06cb",
+        "bytes": 776
+      },
+      {
+        "path": ".trellis/spec/backend/directory-structure.md",
+        "sha256": "57edf3199e6baca66a782280a52083ef5d8b65ab3c6b436d7efd92410a3f94cc",
+        "bytes": 777
+      },
+      {
+        "path": ".trellis/spec/backend/error-handling.md",
+        "sha256": "f6b4145a8fcdfd8f0006bec6dd9c9b4a7fa69a7bd5f6e0c851dee5db39ea7273",
+        "bytes": 720
+      },
+      {
+        "path": ".trellis/spec/backend/index.md",
+        "sha256": "a909a7de0571ddeaffcbe67af969d12ff9255eb7af1d459a9a989b32323a6fe1",
+        "bytes": 1418
+      },
+      {
+        "path": ".trellis/spec/backend/logging-guidelines.md",
+        "sha256": "4928318b96637328f4cc1eac6a3b44f0481b4390a5b62e62caea39d702077ebb",
+        "bytes": 59537
+      },
+      {
+        "path": ".trellis/spec/backend/quality-guidelines.md",
+        "sha256": "262fa49d9c4bd29b8490edd0c11ddb8f7e23fd2eb4418c8a388e176aab550357",
+        "bytes": 747
+      },
+      {
+        "path": ".trellis/spec/backend/runtime-contract.md",
+        "sha256": "4594af29e836c89d1da7c84e86ad2c9395f0cac986e0598a384ecc2840fbac52",
+        "bytes": 82020
+      },
+      {
+        "path": ".trellis/spec/frontend/component-guidelines.md",
+        "sha256": "7ca6ea4f9305a8267b7570505f9ebf6030bb5911cbe3f2a135cfb7ebd402805b",
+        "bytes": 878
+      },
+      {
+        "path": ".trellis/spec/frontend/directory-structure.md",
+        "sha256": "731713ac66d21f383bb49fb19d30888aa8db9e50acb5c77329fa4b98546cd7bc",
+        "bytes": 745
+      },
+      {
+        "path": ".trellis/spec/frontend/hook-guidelines.md",
+        "sha256": "49801cb1eb7c779e9b01cdeabcd47dd0bc12be018405fc248646cf8a829aaf6c",
+        "bytes": 745
+      },
+      {
+        "path": ".trellis/spec/frontend/index.md",
+        "sha256": "31de63226267221c008b780f9b053d4c5e6aefded01b7abfbdecc90d85300d9b",
+        "bytes": 1395
+      },
+      {
+        "path": ".trellis/spec/frontend/quality-guidelines.md",
+        "sha256": "ac5a4da858d93492cbb4c721b164850b625f38696905e463e8feb5968eae78bc",
+        "bytes": 748
+      },
+      {
+        "path": ".trellis/spec/frontend/state-management.md",
+        "sha256": "7575b0ec9029ee016fb100e7d67a0a7e7a0956f1aa790c48da5a37e92c905299",
+        "bytes": 6730
+      },
+      {
+        "path": ".trellis/spec/frontend/type-safety.md",
+        "sha256": "1ced8d3ea4f5e6e63599a5a606db52fa86b3973046db57d550ed2964a8d4c40f",
+        "bytes": 741
+      },
+      {
+        "path": ".trellis/spec/guides/code-reuse-thinking-guide.md",
+        "sha256": "86fd10dc10916c00309714aa2275234f01b0ad40d21a485d43b3422e7ca79397",
+        "bytes": 7381
+      },
+      {
+        "path": ".trellis/spec/guides/cross-layer-thinking-guide.md",
+        "sha256": "4c54130c02a7b8bc43f9a012e0837f798f43e2d137d6bc6d7498d2adb0bac3f4",
+        "bytes": 14979
+      },
+      {
+        "path": ".trellis/spec/guides/index.md",
+        "sha256": "aa45e5d0f245aae0b34677b121f7d083620308b4b87cda929bd134c77d1f61fd",
+        "bytes": 3680
+      },
+      {
+        "path": ".trellis/spec/operations/auto-loop-recovery.md",
+        "sha256": "781331646cbb33238b4ad327cd146fc4f0ce4be1f1ce701698be1ab9442c0165",
+        "bytes": 2583
+      },
+      {
+        "path": ".trellis/spec/operations/index.md",
+        "sha256": "48c1d6a5a0d34e7f6b77b5acd5a600f1f4390309c92416b20646d838becd1bda",
+        "bytes": 194
+      }
+    ]
+  }
+}

@@ -1,0 +1,6340 @@
+[
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/cc2api/README.md",
+    "source_sha256": "91770e241b0fd1e7088bd3e8f9e757cdbfd67e063cb51c0bc01b95aa33532396",
+    "target": ".trellis/spec/gateway/README.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "cc2api Spec Package"
+      ]
+    ],
+    "target_sha256": "be9e49e568f0b903fe526308a0c8dcba8929ed8124a73403b7022a348a1554fe"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/cc2api/backend/index.md",
+    "source_sha256": "6ab8046de2581e9738ad39a772c9955754effe44f30d0fda32494c17ee56311d",
+    "target": ".trellis/spec/gateway/backend/index.md",
+    "action": "index_rebuilt",
+    "headings": [
+      [
+        "#",
+        "cc2api Backend Code-Spec Index"
+      ],
+      [
+        "##",
+        "Guidelines Index"
+      ],
+      [
+        "##",
+        "Pre-Development Checklist"
+      ],
+      [
+        "##",
+        "Quality Check"
+      ]
+    ],
+    "target_sha256": "61062345f0a4c4e9fa9fe1bbedcd522cbd38a0aa332fcd5e268ae684d46fa080"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/cc2api/backend/service-architecture.md",
+    "source_sha256": "cf374d7e73b4ffcb87dab1aa4fcf82ba11cdff50131e7de03d97f6a2fdc01918",
+    "target": ".trellis/spec/gateway/backend/service-architecture.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "cc2api Backend Service Architecture"
+      ],
+      [
+        "##",
+        "适用范围"
+      ],
+      [
+        "##",
+        "分层契约"
+      ],
+      [
+        "##",
+        "Scenario: 按账号选择固定 293 原生后端"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 原生持续预热、实时就绪与请求进程诊断"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Gateway 热路径规则"
+      ],
+      [
+        "##",
+        "Scenario: Gateway 压缩请求编解码"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 响应观察的 SSE 与有界解码"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 账号级上游 session 池"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "##",
+        "Scenario: 普通 CC Messages Session header 对齐"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: Gateway 账号槽位与 RPM Admission 顺序"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "##",
+        "Scenario: OAuth Usage Scoped 模型窗口"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "##",
+        "Scenario: 每账号 5h/7d 用量控制线"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: Fable 周用量上限 fallback"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "##",
+        "Scenario: 受信任管理端解析 OAuth 凭据"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "##",
+        "Scenario: OAuth Token 预解析永久凭据错误停用与切号"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "##",
+        "Scenario: 有效上游 Session 首次 Hello 代理探测"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "##",
+        "Scenario: Claude Code 状态分类旁路与归因补齐"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "##",
+        "Scenario: v3 重授权凭据导入与迟到回包保护"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "设置热刷新模式"
+      ],
+      [
+        "##",
+        "后台任务边界"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ],
+      [
+        "##",
+        "Scenario: v3 CLI 本地身份来源导入"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: v3 API 稳定会话、智能准入与平滑发送"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 运行中账号普通配置热更新"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ]
+    ],
+    "target_sha256": "896c7e65bfaa3d8c6b0381398eaa38606e17468f9c83cf9632fb55c175f676f4"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/cc2api/backend/settings-database.md",
+    "source_sha256": "e8675c60e332ebc232bbfdcbe75cfba95b9b96563c2db7959e9d0232bd8d9233",
+    "target": ".trellis/spec/gateway/backend/settings-database.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "cc2api Settings & Database"
+      ],
+      [
+        "##",
+        "数据库栈"
+      ],
+      [
+        "##",
+        "迁移规则"
+      ],
+      [
+        "##",
+        "Settings Key 契约"
+      ],
+      [
+        "##",
+        "Account 字段同步"
+      ],
+      [
+        "##",
+        "时间字段"
+      ],
+      [
+        "##",
+        "Scenario: PostgreSQL 账号可空参数的类型缓存"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 创建账号的提交可见性"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 网关请求窗口费用"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 请求级诊断与发送尝试关联"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: Messages 响应的有界事件观察"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ],
+      [
+        "##",
+        "Scenario: 官方套餐分级与 Ultra 展示"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: CC 组装后私有采集"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ]
+    ],
+    "target_sha256": "0c299f9eb1e7529678bf22c3e1af6f6e84c6a2f70ea9cee6013a8e4c8e988844"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/cc2api/backend/testing-quality.md",
+    "source_sha256": "a8029569c22412606ed523af01338ec2fbe3a70862dc14b521a466a05dbc08b6",
+    "target": ".trellis/spec/gateway/backend/testing-quality.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "cc2api Backend Testing & Quality"
+      ],
+      [
+        "##",
+        "基础验证"
+      ],
+      [
+        "##",
+        "定向测试策略"
+      ],
+      [
+        "##",
+        "敏感数据边界"
+      ],
+      [
+        "##",
+        "本地拒绝错误体边界"
+      ],
+      [
+        "##",
+        "Review Checklist"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ]
+    ],
+    "target_sha256": "33fa68ff4ec24acf33fa1fadf457077a5f57673848b528841f54d37630377602"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/cc2api/deploy/deploy-guidelines.md",
+    "source_sha256": "02d0c885013087bda085370310c987f0d89769b445f09156923887d3e79a2367",
+    "target": ".trellis/spec/gateway/deploy/deploy-guidelines.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "cc2api Deploy Guidelines"
+      ],
+      [
+        "##",
+        "构建形态"
+      ],
+      [
+        "##",
+        "本地开发"
+      ],
+      [
+        "##",
+        "Docker Compose"
+      ],
+      [
+        "##",
+        "远程部署规则"
+      ],
+      [
+        "##",
+        "验证清单"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ]
+    ],
+    "target_sha256": "41838ea75cc5a7a59693051daf12080e38da5942bad9998edbef7ed5826a5d4d"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/cc2api/deploy/index.md",
+    "source_sha256": "ba2692dc9d550343fbd417a9712e0bd4237124e5314ee2a93927c368c49d1875",
+    "target": ".trellis/spec/gateway/deploy/index.md",
+    "action": "index_rebuilt",
+    "headings": [
+      [
+        "#",
+        "cc2api Deploy Code-Spec Index"
+      ],
+      [
+        "##",
+        "Guidelines Index"
+      ],
+      [
+        "##",
+        "Pre-Development Checklist"
+      ],
+      [
+        "##",
+        "Quality Check"
+      ]
+    ],
+    "target_sha256": "c053531605b89c8baffc910cc0ebc74b25902d264b7c635008ebe74ac03e6f04"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/cc2api/frontend/frontend-guidelines.md",
+    "source_sha256": "176fcfe2545bc0fe5ff5d20678b62d8c23f938e05da6ce86ba6db5749e090318",
+    "target": ".trellis/spec/web/frontend/frontend-guidelines.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "cc2api Frontend Guidelines"
+      ],
+      [
+        "##",
+        "技术栈"
+      ],
+      [
+        "##",
+        "API Client 契约"
+      ],
+      [
+        "##",
+        "Router / Auth"
+      ],
+      [
+        "##",
+        "Settings 页面规则"
+      ],
+      [
+        "###",
+        "Scenario: Settings 表单字符串契约"
+      ],
+      [
+        "####",
+        "1. Scope / Trigger"
+      ],
+      [
+        "####",
+        "2. Signatures"
+      ],
+      [
+        "####",
+        "3. Contracts"
+      ],
+      [
+        "####",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "####",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "####",
+        "6. Tests Required"
+      ],
+      [
+        "####",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "##",
+        "账号与凭据展示"
+      ],
+      [
+        "###",
+        "Scenario: 账号基础版本与画像选择配置展示"
+      ],
+      [
+        "####",
+        "1. Scope / Trigger"
+      ],
+      [
+        "####",
+        "2. Signatures"
+      ],
+      [
+        "####",
+        "3. Contracts"
+      ],
+      [
+        "####",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "####",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "####",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "UI 风格"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ],
+      [
+        "##",
+        "Scenario: 管理页面版本、导航与请求详情"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ]
+    ],
+    "target_sha256": "00bfee80d3ad23519f7d1a4d03f211bafbff576f8b5dc71054e61458bbed9a52"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/cc2api/frontend/index.md",
+    "source_sha256": "7a92b54b16ca52b83fb7fc5d9fe8292f888dbe50eb624e80f9f5e10bb07b9be4",
+    "target": ".trellis/spec/web/frontend/index.md",
+    "action": "index_rebuilt",
+    "headings": [
+      [
+        "#",
+        "cc2api Frontend Code-Spec Index"
+      ],
+      [
+        "##",
+        "Guidelines Index"
+      ],
+      [
+        "##",
+        "Pre-Development Checklist"
+      ],
+      [
+        "##",
+        "Quality Check"
+      ]
+    ],
+    "target_sha256": "4721e57a5c691d9faf9eb6483542e5b8b2086091c949d1b5d56a4d9f435b88e2"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md",
+    "source_sha256": "45ae3859f8ce8d4414c6a2fa64f8ec1979545b0665cbf7d87da06762c0e7d6e5",
+    "target": ".trellis/spec/gateway/protocol/claude-code-profile-upgrade.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Claude Code Profile Upgrade"
+      ],
+      [
+        "##",
+        "Scenario: Claude Code 版本画像升级"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong: 标题精确画像始终删除全部客户端可选 beta"
+      ],
+      [
+        "####",
+        "Correct: 标题基础画像加版本化的已携带白名单"
+      ],
+      [
+        "####",
+        "Wrong: `cc_version` 固定取第一个 text block"
+      ],
+      [
+        "####",
+        "Correct: 对多 text block 取最后一个 prompt block"
+      ],
+      [
+        "####",
+        "Wrong: 把客户端 1M beta 追加到末尾"
+      ],
+      [
+        "####",
+        "Correct: 按抓包把 1M beta 放到 oauth 后"
+      ],
+      [
+        "####",
+        "Wrong: 用 Fable family 前缀选择 wire 画像"
+      ],
+      [
+        "####",
+        "Correct: 版本画像内按精确模型 ID 查找"
+      ],
+      [
+        "####",
+        "Wrong: Haiku main 只按 family 选择最新 beta"
+      ],
+      [
+        "####",
+        "Correct: 新画像的 Haiku main 先精确命中"
+      ],
+      [
+        "####",
+        "Wrong: 假设 hello 跟随模型 base URL"
+      ],
+      [
+        "####",
+        "Correct: 先按目标版本验证真实请求边界"
+      ],
+      [
+        "##",
+        "Scenario: Auto/Plan 集成式 safeguards 协议"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Contracts"
+      ],
+      [
+        "###",
+        "3. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: Auto Mode classifier 版本化协议"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong: 从全部请求文本猜测协议"
+      ],
+      [
+        "####",
+        "Correct: 只读取可信 classifier 指令"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ],
+      [
+        "##",
+        "Scenario: Claude Fast Mode 账号级透传控制"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong: 账号允许后主动注入 Fast Mode"
+      ],
+      [
+        "####",
+        "Correct: 只过滤或保留客户端已有 token"
+      ],
+      [
+        "####",
+        "Wrong: bench 同步既有账号时重置管理员配置"
+      ],
+      [
+        "####",
+        "Correct: 只在首次创建时显式关闭"
+      ],
+      [
+        "##",
+        "Scenario: Claude Code currentDate 风险治理"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong: 只匹配 ASCII 撇号"
+      ],
+      [
+        "####",
+        "Correct: 明确列出已知 Unicode 变体"
+      ],
+      [
+        "####",
+        "Wrong: report_only 中改写请求体"
+      ],
+      [
+        "####",
+        "Correct: report_only 只输出脱敏摘要"
+      ],
+      [
+        "##",
+        "Scenario: Claude Code 版本画像切换"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong: 任意版本字符串直通"
+      ],
+      [
+        "####",
+        "Correct: 只能选择内置画像"
+      ],
+      [
+        "####",
+        "Wrong: 切版本时顺手覆盖 UA 白名单"
+      ],
+      [
+        "####",
+        "Correct: 不顺带写入 UA 白名单"
+      ],
+      [
+        "##",
+        "Scenario: 按客户端 UA 选择请求画像"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: Claude Code 2.1.293 画像与 280/293 准入预设"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: Messages 保留调用方流式选择"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: Messages 固定顶层字段清理开关"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: Messages beta 多值与查询参数规范化"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: Git 用户名提醒替换的边界与字面量"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 统一出站 TLS 对齐原生 293 主请求"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: TLS 画像版本绑定与冻结传输"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 原生 Messages 代理关联头透传"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ]
+    ],
+    "target_sha256": "ed1f86b687ec9b568a06cb0dda78619b823ef83dcd287698ff9f91856aa2512a"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/cc2api/protocol/index.md",
+    "source_sha256": "dad61bbf684729dd701ad828a0b312a7c3e94903558c84abbab454d6ca06817c",
+    "target": ".trellis/spec/gateway/protocol/index.md",
+    "action": "index_rebuilt",
+    "headings": [
+      [
+        "#",
+        "cc2api Protocol Code-Spec Index"
+      ],
+      [
+        "##",
+        "Guidelines Index"
+      ],
+      [
+        "##",
+        "Pre-Development Checklist"
+      ],
+      [
+        "##",
+        "Quality Check"
+      ]
+    ],
+    "target_sha256": "5381f1bfe125c2c9dfcf7a9119fb6e5b2b30cab6005ad3d2435290bbb19c7278"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/guides/code-reuse-thinking-guide.md",
+    "source_sha256": "384a39773b375d2e690c90d0760508d2d423b98e05a8cd6a2b57914cb6357180",
+    "target": ".trellis/spec/guides/code-reuse-thinking-guide.md",
+    "action": "merged_by_section",
+    "headings": [
+      [
+        "#",
+        "Code Reuse Thinking Guide"
+      ],
+      [
+        "##",
+        "The Problem"
+      ],
+      [
+        "##",
+        "Before Writing New Code"
+      ],
+      [
+        "###",
+        "Step 1: Search First"
+      ],
+      [
+        "#",
+        "Search for similar function names"
+      ],
+      [
+        "#",
+        "Search for similar logic"
+      ],
+      [
+        "###",
+        "Step 2: Ask These Questions"
+      ],
+      [
+        "##",
+        "Common Duplication Patterns"
+      ],
+      [
+        "###",
+        "Pattern 1: Copy-Paste Functions"
+      ],
+      [
+        "###",
+        "Pattern 2: Similar Components"
+      ],
+      [
+        "###",
+        "Pattern 3: Repeated Constants"
+      ],
+      [
+        "##",
+        "When to Abstract"
+      ],
+      [
+        "##",
+        "After Batch Modifications"
+      ],
+      [
+        "##",
+        "Gotcha: Asymmetric Mechanisms Producing Same Output"
+      ],
+      [
+        "##",
+        "Checklist Before Commit"
+      ]
+    ],
+    "sections": [
+      "The Problem",
+      "Before Writing New Code",
+      "Common Duplication Patterns",
+      "When to Abstract",
+      "After Batch Modifications",
+      "Gotcha: Asymmetric Mechanisms Producing Same Output",
+      "Checklist Before Commit"
+    ],
+    "target_sha256": "4185c0e11f489e99242240e312623374bf4ef7f920e08dd4ba48790eaac9154b"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/guides/cross-layer-thinking-guide.md",
+    "source_sha256": "1f767a2564a58abbcf04cc94679546f3129fe518be8f674f55f8c57fe735a948",
+    "target": ".trellis/spec/guides/cross-layer-thinking-guide.md",
+    "action": "merged_by_section",
+    "headings": [
+      [
+        "#",
+        "Cross-Layer Thinking Guide"
+      ],
+      [
+        "##",
+        "The Problem"
+      ],
+      [
+        "##",
+        "Before Implementing Cross-Layer Features"
+      ],
+      [
+        "###",
+        "Step 1: Map the Data Flow"
+      ],
+      [
+        "###",
+        "Step 2: Identify Boundaries"
+      ],
+      [
+        "###",
+        "Step 3: Define Contracts"
+      ],
+      [
+        "##",
+        "Common Cross-Layer Mistakes"
+      ],
+      [
+        "###",
+        "Mistake 1: Implicit Format Assumptions"
+      ],
+      [
+        "###",
+        "Mistake 2: Scattered Validation"
+      ],
+      [
+        "###",
+        "Mistake 3: Leaky Abstractions"
+      ],
+      [
+        "##",
+        "Checklist for Cross-Layer Features"
+      ],
+      [
+        "##",
+        "Cross-Platform Template Consistency"
+      ],
+      [
+        "###",
+        "Checklist: After Modifying Any Command Template"
+      ],
+      [
+        "##",
+        "Generated Runtime Template Upgrade Consistency"
+      ],
+      [
+        "###",
+        "Checklist: After Modifying A Runtime-Parsed Template"
+      ],
+      [
+        "##",
+        "Mode-Detection Probe Checklist"
+      ],
+      [
+        "###",
+        "Before implementing:"
+      ],
+      [
+        "###",
+        "After implementing:"
+      ],
+      [
+        "##",
+        "When to Create Flow Documentation"
+      ]
+    ],
+    "sections": [
+      "The Problem",
+      "Before Implementing Cross-Layer Features",
+      "Common Cross-Layer Mistakes",
+      "Checklist for Cross-Layer Features",
+      "Cross-Platform Template Consistency",
+      "Generated Runtime Template Upgrade Consistency",
+      "Mode-Detection Probe Checklist",
+      "When to Create Flow Documentation"
+    ],
+    "target_sha256": "f79675a0ddff2bbdba7a59021a1c9c4770bb3bb687341611ba43c0c7916a99f5"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/guides/index.md",
+    "source_sha256": "c41ea8dd33dc9ae01b376f2bf66c6b2f80e699d84a895ca87d55c7a44368d2d5",
+    "target": ".trellis/spec/guides/index.md",
+    "action": "merged_by_section",
+    "headings": [
+      [
+        "#",
+        "Thinking Guides"
+      ],
+      [
+        "##",
+        "Why Thinking Guides?"
+      ],
+      [
+        "##",
+        "Available Guides"
+      ],
+      [
+        "##",
+        "Quick Reference: Thinking Triggers"
+      ],
+      [
+        "###",
+        "When to Think About Cross-Layer Issues"
+      ],
+      [
+        "###",
+        "When to Think About Code Reuse"
+      ],
+      [
+        "##",
+        "Pre-Modification Rule (CRITICAL)"
+      ],
+      [
+        "#",
+        "Search for the value you're about to change"
+      ],
+      [
+        "##",
+        "How to Use This Directory"
+      ],
+      [
+        "##",
+        "Contributing"
+      ]
+    ],
+    "sections": [
+      "Why Thinking Guides?",
+      "Available Guides",
+      "Quick Reference: Thinking Triggers",
+      "Pre-Modification Rule (CRITICAL)",
+      "How to Use This Directory",
+      "Contributing"
+    ],
+    "target_sha256": "a17aed6d68fe13244a9f7ea6219eabecd6738229ad2c61d831bfb5048ff17e94"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md",
+    "source_sha256": "c758f938f7bc153fc6defbf8ac004fc9a09b98a896d548f5abde5f4efc88552a",
+    "target": ".trellis/spec/orchestrator/backend/account-runtime-v3.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "v3 固定账号运行环境契约"
+      ],
+      [
+        "##",
+        "Scenario: US 宿主管理工具继承既有口令例外"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: v3 凭据单一所有者与交接协议 1"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 固定 Docker、API/CLI 独立调度及证据恢复"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: v3 关联重授权提交与恢复"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: v3 授权码投递与发送回执"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: v3 未提交登录草稿与完整清理"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: v3 原生 TLS 账号身份与同步"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: v3 独立账号动作、真实进程指标与完整转发验收"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: cc2api 删除后的悬空绑定收口与凭据交接"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: v3 三角色 Docker 隔离与 OAuth 出口"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: v3 按账号固定的常规内核与 CPU 型号画像"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: v3 持久计算机身份与 DMI 常规读取"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: v3 只读物理特征面板与观察快照"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: v3 精简备份与不可变制品维护"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 账号 CLI 版本与迭代抓包"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 迁移验收后的旧部署永久退役"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: v3 部署成功后的旧镜像回收"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 客户端 ClientHello 私有证据与安全摘要"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: V3 原生 sender 共享映像池与资源预算"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 单账号原生内核在线切换与回滚"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 三角色在线CPU与重建恢复"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 账号请求内容采集开关"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ]
+    ],
+    "target_sha256": "fac0b9e133fc818411d0da0c0c095eb142572c8d9d8c5d238793baaaea4a1490"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/backend/database-guidelines.md",
+    "source_sha256": "9f52fa204c765a22f29d5e2faf469d134ee789200ab9c0a17aac23b5960ba037",
+    "target": ".trellis/spec/orchestrator/backend/database-guidelines.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Database Guidelines"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Query Patterns"
+      ],
+      [
+        "###",
+        "写入(必须加 `_db_lock`)"
+      ],
+      [
+        "###",
+        "读取(不需要 `_db_lock`)"
+      ],
+      [
+        "###",
+        "动态字段 UPDATE(`Scheduler._update` 模式)"
+      ],
+      [
+        "###",
+        "参数化:永远用 `?`,绝不字符串拼接值"
+      ],
+      [
+        "#",
+        "✓ 正确"
+      ],
+      [
+        "#",
+        "✗ 错误(SQL 注入)"
+      ],
+      [
+        "##",
+        "Migrations"
+      ],
+      [
+        "##",
+        "Naming Conventions"
+      ],
+      [
+        "##",
+        "Account Soft Deletion Contract"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "##",
+        "Scenario: cc2api 绑定与定时养号状态机"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "####",
+        "Wrong：终态回调使用当前绑定作为更新条件"
+      ],
+      [
+        "####",
+        "Correct：用 run 启动时的绑定快照保护回调"
+      ],
+      [
+        "##",
+        "Scenario: run Claude Code 运行身份快照与继续对话"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "##",
+        "Scenario: 被动额度等待与原任务恢复"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "#",
+        "原 run 的空模型快照同样必须保留。"
+      ],
+      [
+        "#",
+        "只有旧内部调用未携带该键时才可读取当前全局模型。"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 账号级任务与养号额度阈值及被动采集"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: v3 账号当地运行窗口与准备后复查"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ]
+    ],
+    "target_sha256": "3bee10d9ef48782cb3d69ae2c58d59b4a64f3bd1dac81e73787128b0d683d522"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/backend/directory-structure.md",
+    "source_sha256": "827d06da66f45435626b91656317c96b3aae0d202760b2b1699b7e409d76f2b7",
+    "target": ".trellis/spec/orchestrator/backend/directory-structure.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Directory Structure"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Directory Layout"
+      ],
+      [
+        "##",
+        "Module Organization"
+      ],
+      [
+        "#",
+        "============== 配置 ==============         # 环境变量、路径常量"
+      ],
+      [
+        "#",
+        "============== DB ==============           # _SCHEMA 字符串、get_db()、init_db()"
+      ],
+      [
+        "#",
+        "============== Topics 解析 ==============   # _CAT_RE / _ITEM_RE + load_seed_topics()"
+      ],
+      [
+        "#",
+        "============== Docker 运行器 ==============  # class Runner"
+      ],
+      [
+        "#",
+        "============== Login 会话管理 ==============  # class LoginSession / LoginManager"
+      ],
+      [
+        "#",
+        "============== 调度器 ==============         # class Scheduler"
+      ],
+      [
+        "#",
+        "============== FastAPI ==============       # app = FastAPI(...) + lifespan"
+      ],
+      [
+        "#",
+        "---------- accounts ----------              # 路由按资源分组,二级 # ---------- 分隔"
+      ],
+      [
+        "#",
+        "---------- accounts: 内嵌 OAuth 登录 ----------"
+      ],
+      [
+        "#",
+        "---------- topics ----------"
+      ],
+      [
+        "#",
+        "---------- tasks ----------"
+      ],
+      [
+        "#",
+        "---------- runs ----------"
+      ],
+      [
+        "#",
+        "---------- SSE ----------"
+      ],
+      [
+        "#",
+        "---------- 静态 WebUI ----------"
+      ],
+      [
+        "##",
+        "Naming Conventions"
+      ],
+      [
+        "##",
+        "Examples"
+      ]
+    ],
+    "target_sha256": "044a2946036f2adae356ea91fad6ccb924b566d4a1a8e813518af248fb93f93a"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/backend/error-handling.md",
+    "source_sha256": "fdbc303223fc1941367893c32817add4c1e35b94a986c79de7b82d5adeff604c",
+    "target": ".trellis/spec/orchestrator/backend/error-handling.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Error Handling"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Error Types"
+      ],
+      [
+        "##",
+        "Error Handling Patterns"
+      ],
+      [
+        "###",
+        "Pattern 1:API 路由 —— 验证 + 转 HTTPException"
+      ],
+      [
+        "###",
+        "Pattern 2:内层抛 `ValueError`,路由层翻译"
+      ],
+      [
+        "#",
+        "LoginManager 层"
+      ],
+      [
+        "#",
+        "路由层翻译"
+      ],
+      [
+        "###",
+        "Pattern 3:清理路径必须吞异常"
+      ],
+      [
+        "###",
+        "Pattern 4:`try/finally` 保证资源释放"
+      ],
+      [
+        "##",
+        "API Error Responses"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ]
+    ],
+    "target_sha256": "978699c01d2b4e1ef70c46ed8c8e9a855c7d62001c6f0dc4448d461b9ca38f96"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/backend/index.md",
+    "source_sha256": "ab2fee6f7b5e5e3baf29e248c49b59ce3252820c19c925294c034537684dd9b8",
+    "target": ".trellis/spec/orchestrator/backend/index.md",
+    "action": "index_rebuilt",
+    "headings": [
+      [
+        "#",
+        "Backend Development Guidelines"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Guidelines Index"
+      ],
+      [
+        "##",
+        "How to Use These Guidelines"
+      ]
+    ],
+    "target_sha256": "35b268c203c0326157458b32bb0f1827527b36bf7ad94610b9db38d4683d4beb"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/backend/logging-guidelines.md",
+    "source_sha256": "2aeeba7dceb70bf1ab890e9521a6f7a76e5580d811af580338046f64bc9bbfe5",
+    "target": ".trellis/spec/orchestrator/backend/logging-guidelines.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Logging Guidelines"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Log Levels"
+      ],
+      [
+        "##",
+        "Structured Logging"
+      ],
+      [
+        "##",
+        "What to Log"
+      ],
+      [
+        "##",
+        "What NOT to Log"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ]
+    ],
+    "target_sha256": "2aeeba7dceb70bf1ab890e9521a6f7a76e5580d811af580338046f64bc9bbfe5"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/backend/project-iterations.md",
+    "source_sha256": "b9c15e72aa7887ce1195485e2fdd57788674ecbba1af0ed3f8746ff82a9d914a",
+    "target": ".trellis/spec/orchestrator/backend/project-iterations.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "项目迭代模式契约"
+      ],
+      [
+        "##",
+        "Scenario: legacy 内容 schema 1 的线性步骤与计划执行"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 内容 schema 2 的真实项目多场景任务与 policy 3"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 真实 GitHub 项目逐仓研究与百项目扩展 SOP"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 内容 schema 3 的完整开发周期与动态需求方配置"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: Pi 项目与工程养号每次指挥只处理一个目标"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "#",
+        "project_submit 完整通过并成功释放原执行后的工具结果："
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: Pi 按工程目标隔离上下文及可配置 token 摘要"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: Pi 中断自动恢复与历史断流诊断"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 验收反馈与自动复验"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 项目与养号工程的自然目录命名及历史接续"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: Pi 观察的事件唤醒与模型增量"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: Python 补丁兼容与持久启动故障"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: Pi CLI 同代次恢复的启动尝试隔离"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 项目与账号管理状态的有界只读查询"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ]
+    ],
+    "target_sha256": "3e0fd43d319aabd0111721eaa62e320e4f0f4b3e4c4ba30b821e562ce328b2f9"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md",
+    "source_sha256": "b7d5cfc5118ce2ceac85eabf2592c31f7972b94e3a5910583c932f8fb146c5d3",
+    "target": ".trellis/spec/orchestrator/backend/quality-guidelines.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Quality Guidelines"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Forbidden Patterns"
+      ],
+      [
+        "##",
+        "Required Patterns"
+      ],
+      [
+        "##",
+        "Testing Requirements"
+      ],
+      [
+        "##",
+        "Code Review Checklist"
+      ]
+    ],
+    "target_sha256": "cf5b36ba07779acd8793d38c256113d5b2f4ea99aa62555bcc40c1062df7e5d6"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/backend/topic-prompt-contract.md",
+    "source_sha256": "7290f9b7953f35c10330427057cbda9369a92788f4db97d627d6880bed1a429d",
+    "target": ".trellis/spec/orchestrator/backend/topic-prompt-contract.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Topic Prompt Contract"
+      ],
+      [
+        "##",
+        "Scenario: Topic 提示词模式与持久化一致性"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good / Base / Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "##",
+        "Scenario: 自包含题库与冻结的有限业务补充"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 随机时间投递与阶段证据"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ]
+    ],
+    "target_sha256": "a49b821d5044b02554fd12532e924e779bcbf126f8bc7a974f6d78983c46f743"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/deploy/auth-design.md",
+    "source_sha256": "42a5eee60e137132053e3d05a4025371559f118758e9d9fb9221f222f6946ade",
+    "target": ".trellis/spec/platform/deploy/auth-design.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Auth Design (Cookie Session)"
+      ],
+      [
+        "##",
+        "Scope / Trigger"
+      ],
+      [
+        "##",
+        "Design Decision: Cookie Session 而非 HTTP Basic Auth"
+      ],
+      [
+        "###",
+        "Context"
+      ],
+      [
+        "###",
+        "Options Considered"
+      ],
+      [
+        "###",
+        "Decision"
+      ],
+      [
+        "##",
+        "Signatures"
+      ],
+      [
+        "###",
+        "路由"
+      ],
+      [
+        "###",
+        "Token 格式"
+      ],
+      [
+        "###",
+        "Cookie 属性"
+      ],
+      [
+        "##",
+        "Contracts"
+      ],
+      [
+        "###",
+        "环境变量"
+      ],
+      [
+        "###",
+        "中间件豁免规则(关键)"
+      ],
+      [
+        "###",
+        "WebSocket 不经此中间件"
+      ],
+      [
+        "##",
+        "Validation & Error Matrix"
+      ],
+      [
+        "##",
+        "Good / Base / Bad Cases"
+      ],
+      [
+        "##",
+        "Tests Required"
+      ],
+      [
+        "##",
+        "Wrong vs Correct"
+      ],
+      [
+        "###",
+        "❌ Wrong:中间件把 `/` 也拦了"
+      ],
+      [
+        "###",
+        "✅ Correct:静态放行,只拦 /api/*(且豁免 /api/auth/*)"
+      ],
+      [
+        "#",
+        "鉴权检查"
+      ],
+      [
+        "###",
+        "❌ Wrong:错凭据返回不同消息"
+      ],
+      [
+        "###",
+        "✅ Correct:统一 \"invalid credentials\" + secrets.compare_digest"
+      ],
+      [
+        "###",
+        "❌ Wrong:cookie 不签名"
+      ],
+      [
+        "#",
+        "前端 cookie 是明文 user,无签名 → 任何能写 cookie 的攻击都能伪造身份"
+      ],
+      [
+        "###",
+        "✅ Correct:HMAC 签名,服务端 verify"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ]
+    ],
+    "target_sha256": "7fb225b012cfdf8497d239e2c398efd160f040ec9ac27c9d17987a4de94e494d"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/deploy/image-build-push.md",
+    "source_sha256": "f8a916361f91e5666b7224afce99eecad3a0f390ab00953e82c69fe465488f49",
+    "target": ".trellis/spec/platform/deploy/image-build-push.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Image Build & GHCR Push"
+      ],
+      [
+        "##",
+        "Scope / Trigger"
+      ],
+      [
+        "##",
+        "命名 & Tag 契约(锁定)"
+      ],
+      [
+        "##",
+        "GitHub Actions 发布流程"
+      ],
+      [
+        "###",
+        "Trigger"
+      ],
+      [
+        "###",
+        "Permissions / Auth"
+      ],
+      [
+        "###",
+        "Build Matrix"
+      ],
+      [
+        "###",
+        "First Publish: Package Visibility"
+      ],
+      [
+        "###",
+        "Local Build Smoke"
+      ],
+      [
+        "###",
+        "Compose Image Wiring"
+      ],
+      [
+        "##",
+        "账号上游代理协议契约"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "##",
+        "Worker 完成判定契约"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "##",
+        "Scenario: Claude 首次 Auto 默认模式推荐"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: cc2api managed OAuth worker"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "##",
+        "Recreate 协议(关键 ⚠)"
+      ],
+      [
+        "##",
+        "Validation & Error Matrix"
+      ],
+      [
+        "##",
+        "Good / Base / Bad Cases"
+      ],
+      [
+        "##",
+        "Tests Required"
+      ],
+      [
+        "##",
+        "Wrong vs Correct"
+      ],
+      [
+        "###",
+        "❌ Wrong: 改 main.py 后只 restart"
+      ],
+      [
+        "#",
+        "错:用 docker compose restart"
+      ],
+      [
+        "###",
+        "✅ Correct: 改 main.py 后 force-recreate"
+      ],
+      [
+        "###",
+        "❌ Wrong: 手工只 push 改了的镜像 sha tag"
+      ],
+      [
+        "#",
+        "worker/sidecar 还停在 9787fc1 — sha 配套缺失"
+      ],
+      [
+        "###",
+        "✅ Correct: 由 workflow 发布三件套对齐 sha tag"
+      ],
+      [
+        "#",
+        "等待 docker-publish.yml 的 orchestrator / worker / sidecar 三个 matrix 项全部成功。"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ]
+    ],
+    "target_sha256": "e87242d6609c755bb4575a0a78540347c80f51874345c08bd012df661843914f"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/deploy/index.md",
+    "source_sha256": "6208c7c7f2326d02bcfc9667b22d03ddff374d802ddff5a5e52a384f0ada21f6",
+    "target": ".trellis/spec/platform/deploy/index.md",
+    "action": "index_rebuilt",
+    "headings": [
+      [
+        "#",
+        "Deployment & Operations Guidelines"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Guidelines Index"
+      ],
+      [
+        "##",
+        "How to Use"
+      ]
+    ],
+    "target_sha256": "878c3b673a460699c15edc659cab3206ca7a62771c3918a6fe3309927fb884ef"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md",
+    "source_sha256": "3bc8a3e3224966ad4ee40b793e69d207a558506b988c671a57b4b5b87d4077ac",
+    "target": ".trellis/spec/platform/deploy/official-protocol-capture.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Claude Code 官方协议抓包"
+      ],
+      [
+        "##",
+        "1. Scope / Trigger"
+      ],
+      [
+        "##",
+        "2. Signatures"
+      ],
+      [
+        "##",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "3.1 基线与矩阵"
+      ],
+      [
+        "###",
+        "3.2 限频与运行隔离"
+      ],
+      [
+        "###",
+        "3.3 每条主请求的漂移复核"
+      ],
+      [
+        "###",
+        "3.4 中间网关请求体保真"
+      ],
+      [
+        "###",
+        "3.5 条件标识、正文归因与 TLS 的采集边界"
+      ],
+      [
+        "##",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "##",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "##",
+        "6. Tests Required"
+      ]
+    ],
+    "target_sha256": "74d92e7355fab72d974ecb80824faa187b4e2506913c9cde4068791144bbaf5c"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/deploy/platform-online-update.md",
+    "source_sha256": "57664558b1f60ec018727350a4e3c4738b51b3a4fdd53327d8a2d73ec074350d",
+    "target": ".trellis/spec/platform/deploy/platform-online-update.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "v3 平台在线更新合同"
+      ],
+      [
+        "##",
+        "1. 范围与触发"
+      ],
+      [
+        "##",
+        "2. 签名与入口"
+      ],
+      [
+        "###",
+        "管理 API"
+      ],
+      [
+        "##",
+        "3. 数据与环境合同"
+      ],
+      [
+        "###",
+        "受信发行"
+      ],
+      [
+        "###",
+        "冻结操作与响应"
+      ],
+      [
+        "###",
+        "来源、准入与恢复"
+      ],
+      [
+        "##",
+        "4. 校验与错误矩阵"
+      ],
+      [
+        "##",
+        "5. 场景与示例"
+      ],
+      [
+        "##",
+        "6. 必需验证与断言"
+      ],
+      [
+        "##",
+        "Scenario: 自动数据库迁移与原操作恢复"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 平台语义版本展示与旧发行兼容"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 构建与手动发布解耦及 v3 升级连续性"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ]
+    ],
+    "target_sha256": "202ca1e4e3ab0fc3b74ad476fde08efaff51a52483d3b98c902b816d7bd12907"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/deploy/remote-deploy.md",
+    "source_sha256": "2199b1badb71dbb4a9b435a58f98980a96c33cab2eee84c83549a81d76e6bd84",
+    "target": ".trellis/spec/platform/deploy/remote-deploy.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Remote Deploy"
+      ],
+      [
+        "##",
+        "Scope / Trigger"
+      ],
+      [
+        "##",
+        "部署清单(4 件套必齐)"
+      ],
+      [
+        "##",
+        "Compose 选择:`docker-compose.yml` vs `docker-compose.remote.yml`"
+      ],
+      [
+        "###",
+        "GHCR 可见性前置条件"
+      ],
+      [
+        "##",
+        ".env 关键字段契约"
+      ],
+      [
+        "#",
+        "必填:远程主机上 data/ 目录的【宿主机绝对路径】"
+      ],
+      [
+        "#",
+        "极易错!不是容器内 /data,也不是相对路径"
+      ],
+      [
+        "#",
+        "必填:WebUI 监听端口(宿主机侧)"
+      ],
+      [
+        "#",
+        "强烈建议填(留空 = 任何人可访问)"
+      ],
+      [
+        "#",
+        "可选:跨重启的 session secret(不填则进程启动随机生成,重启注销所有登录)"
+      ],
+      [
+        "#",
+        "可选:锁定镜像 tag(默认 latest)"
+      ],
+      [
+        "#",
+        "可选:普通 run / 批量 run 的兜底默认模型(默认 opus[1m]);"
+      ],
+      [
+        "#",
+        "WebUI「运行」页保存的页面覆盖值优先于这里。"
+      ],
+      [
+        "#",
+        "可选:普通 run / 批量 run 的兜底思考预算(默认 max);"
+      ],
+      [
+        "#",
+        "WebUI「运行」页保存的页面覆盖值优先于这里。"
+      ],
+      [
+        "#",
+        "可选:新启动 worker 的 Claude Code CLI 兜底版本(默认 2.1.293);"
+      ],
+      [
+        "#",
+        "WebUI「运行」页保存的页面覆盖值优先于这里。"
+      ],
+      [
+        "###",
+        "HOST_BENCH_DATA 怎么填(最常错)"
+      ],
+      [
+        "###",
+        "CLAUDE_DEFAULT_MODEL 兜底默认模型"
+      ],
+      [
+        "###",
+        "CLAUDE_CODE_EFFORT_LEVEL 兜底思考预算"
+      ],
+      [
+        "###",
+        "CLAUDE_CODE_VERSION 兜底 CLI 版本"
+      ],
+      [
+        "##",
+        "Scenario: cc2api 集成与养号调度环境"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "#",
+        "值保存在 gitignored .env；服务名按实际共享网络填写。"
+      ],
+      [
+        "##",
+        "BENCH_PORT 选择"
+      ],
+      [
+        "##",
+        "完整部署流程"
+      ],
+      [
+        "###",
+        "首次部署"
+      ],
+      [
+        "#",
+        "远程上"
+      ],
+      [
+        "#",
+        "编辑 .env:填 HOST_BENCH_DATA / BENCH_PORT / WEBUI_USER / WEBUI_PASS"
+      ],
+      [
+        "#",
+        "用 remote.yml 匿名拉取 GHCR 镜像 + 启动"
+      ],
+      [
+        "#",
+        "验证"
+      ],
+      [
+        "###",
+        "升级(开发推完新版后)"
+      ],
+      [
+        "##",
+        "Pull 冲突协议"
+      ],
+      [
+        "#",
+        "重新 rename(因为 git checkout 恢复了 .yml 是 build 版,不再是 remote)"
+      ],
+      [
+        "##",
+        "Topic 题库同步"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good / Base / Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "#",
+        "误以为已 seed 过的远程 DB 会自动刷新"
+      ],
+      [
+        "#",
+        "分类正则只到「十」,「十一、…」匹配失败 → 后续题目 category 为空或串类"
+      ],
+      [
+        "#",
+        "validate 要求 numbers == list(range(1,N+1)) 文件顺序,会误杀「按类追加」题库"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "#",
+        "全量固定编号集合；正式工具还校验分类、英文及每题两条补充"
+      ],
+      [
+        "##",
+        "Validation & Error Matrix"
+      ],
+      [
+        "##",
+        "Good / Base / Bad Cases"
+      ],
+      [
+        "##",
+        "Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: `cc2api.env` 远程升级与重启"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "##",
+        "Scenario: vibecoding-bench 与 cc2api 联合回滚"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Good/Base/Bad Cases"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "###",
+        "7. Wrong vs Correct"
+      ],
+      [
+        "####",
+        "Wrong"
+      ],
+      [
+        "####",
+        "Correct"
+      ],
+      [
+        "##",
+        "Wrong vs Correct"
+      ],
+      [
+        "###",
+        "❌ Wrong:HOST_BENCH_DATA 写容器内路径"
+      ],
+      [
+        "###",
+        "✅ Correct:HOST_BENCH_DATA 用宿主绝对路径"
+      ],
+      [
+        "###",
+        "❌ Wrong:升级用 restart"
+      ],
+      [
+        "###",
+        "✅ Correct:升级用 force-recreate"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ]
+    ],
+    "target_sha256": "ff4544ad8628c67107f13b8e2b5bf5275de11deeb13e503cad27e49fc8df2235"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/frontend/component-guidelines.md",
+    "source_sha256": "9d642581773fedfc822ee80dc0aa96500ca4a157a80a1d3bd3547bfa5b8435bf",
+    "target": ".trellis/spec/legacy-web/frontend/component-guidelines.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Component Guidelines"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Component Structure"
+      ],
+      [
+        "###",
+        "视图组件(整页 tab)"
+      ],
+      [
+        "###",
+        "弹窗组件(modal)"
+      ],
+      [
+        "###",
+        "行 / 卡片组件"
+      ],
+      [
+        "##",
+        "Props Conventions"
+      ],
+      [
+        "##",
+        "Styling Patterns"
+      ],
+      [
+        "###",
+        "主题 / 状态全部通过 CSS variable"
+      ],
+      [
+        "###",
+        "class 命名(从代码现状归纳)"
+      ],
+      [
+        "###",
+        "终端皮肤硬约束"
+      ],
+      [
+        "##",
+        "Accessibility"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ],
+      [
+        "##",
+        "Scenario: 环境页与主后台视觉一致性及内核弹窗"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ]
+    ],
+    "target_sha256": "d0f4c7cf7d744f5d291a6e4a64f0ca58aaffdeb560b4f991a66748d0685c75a5"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/frontend/directory-structure.md",
+    "source_sha256": "46a3ae01925c636f476693a015cb63fd451aaa3e0aea70169132cc39970839be",
+    "target": ".trellis/spec/legacy-web/frontend/directory-structure.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Directory Structure"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Directory Layout"
+      ],
+      [
+        "##",
+        "Module Organization"
+      ],
+      [
+        "##",
+        "Naming Conventions"
+      ],
+      [
+        "##",
+        "Examples"
+      ]
+    ],
+    "target_sha256": "5a93d87fcf4ceb59d5345928753d848b56d5b1ffdff53152223f158743bca2f9"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/frontend/hook-guidelines.md",
+    "source_sha256": "b731aac4b3e74b8d48f1feeb54249a5adf86aafce98131ba68776ab9cbfd6734",
+    "target": ".trellis/spec/legacy-web/frontend/hook-guidelines.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Hook Guidelines"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Custom Hook Patterns"
+      ],
+      [
+        "###",
+        "需要\"清理\"的有状态副作用 —— 用 setup/teardown 对"
+      ],
+      [
+        "##",
+        "Data Fetching"
+      ],
+      [
+        "###",
+        "SSE / WebSocket"
+      ],
+      [
+        "##",
+        "Naming Conventions"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ],
+      [
+        "##",
+        "Scenario: v3 登录终端重连与授权链接"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ]
+    ],
+    "target_sha256": "ecab40bd223b6dfbb7bbb7d1bd9e7dd94b451011b7ba37d2e19dcab4952d44f0"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/frontend/index.md",
+    "source_sha256": "7beffd9658eacc4f58d92fc53118e160c9cec3c122f8e1f98527fadf3d3bc101",
+    "target": ".trellis/spec/legacy-web/frontend/index.md",
+    "action": "index_rebuilt",
+    "headings": [
+      [
+        "#",
+        "Frontend Development Guidelines"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Guidelines Index"
+      ],
+      [
+        "##",
+        "How to Use These Guidelines"
+      ]
+    ],
+    "target_sha256": "74d2ac34bed32557af1bf4896cb5573f066df4b7981385d654ebe9018da04fef"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md",
+    "source_sha256": "99469149685360186e521efc21a287038f0d18be5df36eb04ce3215f83f2c870",
+    "target": ".trellis/spec/legacy-web/frontend/quality-guidelines.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Quality Guidelines"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Forbidden Patterns"
+      ],
+      [
+        "##",
+        "Required Patterns"
+      ],
+      [
+        "##",
+        "Testing Requirements"
+      ],
+      [
+        "##",
+        "Code Review Checklist"
+      ]
+    ],
+    "target_sha256": "35cc721102f3c54f01230ffe5b67b1fc72eb86ea8df7dc05925d4b03dd5c8ada"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/frontend/state-management.md",
+    "source_sha256": "63484c85ce5f81d8f037d88894828088162658e160e48b629448a73455482f6c",
+    "target": ".trellis/spec/legacy-web/frontend/state-management.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "State Management"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "State Categories"
+      ],
+      [
+        "##",
+        "When to Use Global State"
+      ],
+      [
+        "##",
+        "Scenario: 工程迭代空间与账号 URL 状态"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Server State"
+      ],
+      [
+        "###",
+        "SSE 处理范式"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ]
+    ],
+    "target_sha256": "88c3300e628e9e82816b84cf6a38e1eb0a634cd4c5fe9b12e8f7e1fc52636eef"
+  },
+  {
+    "repository": "bench",
+    "source": ".trellis/spec/vibecoding-bench/frontend/type-safety.md",
+    "source_sha256": "131ee50732246b68beeb2fceb17cbe3d377f43c2f039e72e068c3dcbd4c4e149",
+    "target": ".trellis/spec/legacy-web/frontend/type-safety.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Type Safety"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Type Organization"
+      ],
+      [
+        "##",
+        "Validation"
+      ],
+      [
+        "##",
+        "Common Patterns"
+      ],
+      [
+        "###",
+        "模式 1:从 API 响应取字段,带 fallback"
+      ],
+      [
+        "###",
+        "模式 2:数字字段必须显式 `Number(...)`"
+      ],
+      [
+        "###",
+        "模式 3:任何拼进 HTML 的字符串 → `escapeHTML`"
+      ],
+      [
+        "###",
+        "模式 4:enum 状态值 → CSS class 拼接"
+      ],
+      [
+        "##",
+        "Forbidden Patterns"
+      ],
+      [
+        "##",
+        "Common Mistakes(略,见 component-guidelines.md 的 Common Mistakes —— escapeHTML 部分重复)"
+      ]
+    ],
+    "target_sha256": "a26348b23c4d40df4b7e178fd2f87ca09834a2e8fb31024cbc212a3b15ff04a4"
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/backend/database-guidelines.md",
+    "source_sha256": "fa04a37014f16acc116e095d97ab02937cc06a0e120c4b96c3b5702f38fb06cb",
+    "target": null,
+    "action": "template_archived",
+    "headings": [
+      [
+        "#",
+        "Database Guidelines"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Query Patterns"
+      ],
+      [
+        "##",
+        "Migrations"
+      ],
+      [
+        "##",
+        "Naming Conventions"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ]
+    ]
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/backend/directory-structure.md",
+    "source_sha256": "57edf3199e6baca66a782280a52083ef5d8b65ab3c6b436d7efd92410a3f94cc",
+    "target": null,
+    "action": "template_archived",
+    "headings": [
+      [
+        "#",
+        "Directory Structure"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Directory Layout"
+      ],
+      [
+        "##",
+        "Module Organization"
+      ],
+      [
+        "##",
+        "Naming Conventions"
+      ],
+      [
+        "##",
+        "Examples"
+      ]
+    ]
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/backend/error-handling.md",
+    "source_sha256": "f6b4145a8fcdfd8f0006bec6dd9c9b4a7fa69a7bd5f6e0c851dee5db39ea7273",
+    "target": null,
+    "action": "template_archived",
+    "headings": [
+      [
+        "#",
+        "Error Handling"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Error Types"
+      ],
+      [
+        "##",
+        "Error Handling Patterns"
+      ],
+      [
+        "##",
+        "API Error Responses"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ]
+    ]
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/backend/index.md",
+    "source_sha256": "a909a7de0571ddeaffcbe67af969d12ff9255eb7af1d459a9a989b32323a6fe1",
+    "target": ".trellis/spec/runtime/backend/index.md",
+    "action": "index_rebuilt",
+    "headings": [
+      [
+        "#",
+        "Backend Development Guidelines"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Guidelines Index"
+      ],
+      [
+        "##",
+        "How to Fill These Guidelines"
+      ]
+    ],
+    "target_sha256": "d43863cd8955a62557b6403bac03688e5f389bc374374cf954f7308e96f16a80"
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/backend/logging-guidelines.md",
+    "source_sha256": "4928318b96637328f4cc1eac6a3b44f0481b4390a5b62e62caea39d702077ebb",
+    "target": ".trellis/spec/runtime/backend/logging-guidelines.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "请求日志合同"
+      ],
+      [
+        "##",
+        "Scenario: Linux x64 原生 TLS 接受边界旁路采集"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 采集、持久化及只读查询"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 原生模型选择与最后 TLS 本地写出采集"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 测试专用 TLS 最终采集与池 Messages 验证"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 本地 Claude Code 常驻池联调与最终采集"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 基于客户端启动证据的代理关联视图"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 本地池启动诊断与双客户端故障隔离"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 手工本地池失败现场自动取证"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ]
+    ],
+    "target_sha256": "b1432fd45191851064602d148c2b33a2d35710acb8a13b0d48b990bb69bf5820"
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/backend/quality-guidelines.md",
+    "source_sha256": "262fa49d9c4bd29b8490edd0c11ddb8f7e23fd2eb4418c8a388e176aab550357",
+    "target": null,
+    "action": "template_archived",
+    "headings": [
+      [
+        "#",
+        "Quality Guidelines"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Forbidden Patterns"
+      ],
+      [
+        "##",
+        "Required Patterns"
+      ],
+      [
+        "##",
+        "Testing Requirements"
+      ],
+      [
+        "##",
+        "Code Review Checklist"
+      ]
+    ]
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/backend/runtime-contract.md",
+    "source_sha256": "4594af29e836c89d1da7c84e86ad2c9395f0cac986e0598a384ecc2840fbac52",
+    "target": ".trellis/spec/runtime/backend/runtime-contract.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "固定 293 原生运行时合同"
+      ],
+      [
+        "##",
+        "Scenario: 结构化 API 到单次原生发送"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 前置上游选择与按需 TLS 验证"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 固定 293 原生正文接入与构造失败收口"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 官方运行时压缩与新版本适配"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 可选 sub2api 消息缓存策略"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 默认关闭的官方第一方遥测"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 本地 Base URL 的固定 293 原生入站兼容"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 实际 CLI 原生用途归因"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 调用方请求头精确白名单"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 独立二进制的原始输入消费者"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 固定 293 内核修订的签名分发"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ],
+      [
+        "##",
+        "Scenario: 首响应预算归属与逐请求缓存TTL"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ]
+    ],
+    "target_sha256": "0a869e151273866755f7356b6c6cdc6c751562028438f817483cdaa8e5d6bb90"
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/frontend/component-guidelines.md",
+    "source_sha256": "7ca6ea4f9305a8267b7570505f9ebf6030bb5911cbe3f2a135cfb7ebd402805b",
+    "target": null,
+    "action": "template_archived",
+    "headings": [
+      [
+        "#",
+        "Component Guidelines"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Component Structure"
+      ],
+      [
+        "##",
+        "Props Conventions"
+      ],
+      [
+        "##",
+        "Styling Patterns"
+      ],
+      [
+        "##",
+        "Accessibility"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ]
+    ]
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/frontend/directory-structure.md",
+    "source_sha256": "731713ac66d21f383bb49fb19d30888aa8db9e50acb5c77329fa4b98546cd7bc",
+    "target": null,
+    "action": "template_archived",
+    "headings": [
+      [
+        "#",
+        "Directory Structure"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Directory Layout"
+      ],
+      [
+        "##",
+        "Module Organization"
+      ],
+      [
+        "##",
+        "Naming Conventions"
+      ],
+      [
+        "##",
+        "Examples"
+      ]
+    ]
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/frontend/hook-guidelines.md",
+    "source_sha256": "49801cb1eb7c779e9b01cdeabcd47dd0bc12be018405fc248646cf8a829aaf6c",
+    "target": null,
+    "action": "template_archived",
+    "headings": [
+      [
+        "#",
+        "Hook Guidelines"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Custom Hook Patterns"
+      ],
+      [
+        "##",
+        "Data Fetching"
+      ],
+      [
+        "##",
+        "Naming Conventions"
+      ],
+      [
+        "##",
+        "Common Mistakes"
+      ]
+    ]
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/frontend/index.md",
+    "source_sha256": "31de63226267221c008b780f9b053d4c5e6aefded01b7abfbdecc90d85300d9b",
+    "target": ".trellis/spec/runtime/frontend/index.md",
+    "action": "index_rebuilt",
+    "headings": [
+      [
+        "#",
+        "Frontend Development Guidelines"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Guidelines Index"
+      ],
+      [
+        "##",
+        "How to Fill These Guidelines"
+      ]
+    ],
+    "target_sha256": "7a474d5aa28ef52a6aedf2d5a1e048533b705c27b22432f1382fa699f1ca2133"
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/frontend/quality-guidelines.md",
+    "source_sha256": "ac5a4da858d93492cbb4c721b164850b625f38696905e463e8feb5968eae78bc",
+    "target": null,
+    "action": "template_archived",
+    "headings": [
+      [
+        "#",
+        "Quality Guidelines"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Forbidden Patterns"
+      ],
+      [
+        "##",
+        "Required Patterns"
+      ],
+      [
+        "##",
+        "Testing Requirements"
+      ],
+      [
+        "##",
+        "Code Review Checklist"
+      ]
+    ]
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/frontend/state-management.md",
+    "source_sha256": "7575b0ec9029ee016fb100e7d67a0a7e7a0956f1aa790c48da5a37e92c905299",
+    "target": ".trellis/spec/runtime/frontend/state-management.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "日志页面状态合同"
+      ],
+      [
+        "##",
+        "Scenario: 筛选、详情及阶段原文"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ]
+    ],
+    "target_sha256": "a7e3e6f92611fd8e404e82fb621027c704a88c231cac18da860eee045d16a0fc"
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/frontend/type-safety.md",
+    "source_sha256": "1ced8d3ea4f5e6e63599a5a606db52fa86b3973046db57d550ed2964a8d4c40f",
+    "target": null,
+    "action": "template_archived",
+    "headings": [
+      [
+        "#",
+        "Type Safety"
+      ],
+      [
+        "##",
+        "Overview"
+      ],
+      [
+        "##",
+        "Type Organization"
+      ],
+      [
+        "##",
+        "Validation"
+      ],
+      [
+        "##",
+        "Common Patterns"
+      ],
+      [
+        "##",
+        "Forbidden Patterns"
+      ]
+    ]
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/guides/code-reuse-thinking-guide.md",
+    "source_sha256": "86fd10dc10916c00309714aa2275234f01b0ad40d21a485d43b3422e7ca79397",
+    "target": ".trellis/spec/guides/code-reuse-thinking-guide.md",
+    "action": "merged_by_section",
+    "headings": [
+      [
+        "#",
+        "Code Reuse Thinking Guide"
+      ],
+      [
+        "##",
+        "The Problem"
+      ],
+      [
+        "##",
+        "Before Writing New Code"
+      ],
+      [
+        "###",
+        "Step 1: Search First"
+      ],
+      [
+        "#",
+        "Search for similar function names"
+      ],
+      [
+        "#",
+        "Search for similar logic"
+      ],
+      [
+        "###",
+        "Step 2: Ask These Questions"
+      ],
+      [
+        "##",
+        "Common Duplication Patterns"
+      ],
+      [
+        "###",
+        "Pattern 1: Copy-Paste Functions"
+      ],
+      [
+        "###",
+        "Pattern 2: Similar Components"
+      ],
+      [
+        "###",
+        "Pattern 3: Repeated Constants"
+      ],
+      [
+        "###",
+        "Pattern 4: Repeated Payload Field Extraction"
+      ],
+      [
+        "##",
+        "When to Abstract"
+      ],
+      [
+        "##",
+        "After Batch Modifications"
+      ],
+      [
+        "###",
+        "Reducers Should Use Exhaustive Structure"
+      ],
+      [
+        "##",
+        "Checklist Before Commit"
+      ],
+      [
+        "##",
+        "Gotcha: Python if/elif/else Exhaustive Check"
+      ],
+      [
+        "#",
+        "BAD: \"gemini\" falls through to else, returns \"claude\""
+      ],
+      [
+        "#",
+        "GOOD: explicit branch for every platform"
+      ],
+      [
+        "##",
+        "Gotcha: Asymmetric Mechanisms Producing Same Output"
+      ],
+      [
+        "##",
+        "Template File Registration (Trellis-specific)"
+      ],
+      [
+        "###",
+        "Quick Checklist for New Scripts"
+      ],
+      [
+        "#",
+        "After adding a new .py file, verify it's in getAllScripts():"
+      ],
+      [
+        "###",
+        "Template Sync Convention"
+      ]
+    ],
+    "sections": [
+      "The Problem",
+      "Before Writing New Code",
+      "Common Duplication Patterns",
+      "When to Abstract",
+      "After Batch Modifications",
+      "Checklist Before Commit",
+      "Gotcha: Python if/elif/else Exhaustive Check",
+      "Gotcha: Asymmetric Mechanisms Producing Same Output",
+      "Template File Registration (Trellis-specific)"
+    ],
+    "target_sha256": "4185c0e11f489e99242240e312623374bf4ef7f920e08dd4ba48790eaac9154b"
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/guides/cross-layer-thinking-guide.md",
+    "source_sha256": "4c54130c02a7b8bc43f9a012e0837f798f43e2d137d6bc6d7498d2adb0bac3f4",
+    "target": ".trellis/spec/guides/cross-layer-thinking-guide.md",
+    "action": "merged_by_section",
+    "headings": [
+      [
+        "#",
+        "Cross-Layer Thinking Guide"
+      ],
+      [
+        "##",
+        "The Problem"
+      ],
+      [
+        "##",
+        "Before Implementing Cross-Layer Features"
+      ],
+      [
+        "###",
+        "Step 1: Map the Data Flow"
+      ],
+      [
+        "###",
+        "Step 2: Identify Boundaries"
+      ],
+      [
+        "###",
+        "Step 3: Define Contracts"
+      ],
+      [
+        "##",
+        "Common Cross-Layer Mistakes"
+      ],
+      [
+        "###",
+        "Mistake 1: Implicit Format Assumptions"
+      ],
+      [
+        "###",
+        "Mistake 2: Scattered Validation"
+      ],
+      [
+        "###",
+        "Mistake 3: Leaky Abstractions"
+      ],
+      [
+        "###",
+        "Mistake 4: Every Consumer Parses The Same Payload"
+      ],
+      [
+        "##",
+        "Checklist for Cross-Layer Features"
+      ],
+      [
+        "##",
+        "Cross-Platform Template Consistency"
+      ],
+      [
+        "###",
+        "Checklist: After Modifying Any Command Template"
+      ],
+      [
+        "##",
+        "Generated Runtime Template Upgrade Consistency"
+      ],
+      [
+        "###",
+        "Checklist: After Modifying A Runtime-Parsed Template"
+      ],
+      [
+        "##",
+        "Versioned Documentation Boundary"
+      ],
+      [
+        "###",
+        "Checklist: Before Editing Versioned Docs"
+      ],
+      [
+        "##",
+        "Mode-Detection Probe Checklist"
+      ],
+      [
+        "###",
+        "Before implementing:"
+      ],
+      [
+        "###",
+        "After implementing:"
+      ],
+      [
+        "##",
+        "Cross-Platform Template Consistency"
+      ],
+      [
+        "###",
+        "Checklist: After Modifying Any Command Template"
+      ],
+      [
+        "##",
+        "Generated Runtime Template Upgrade Consistency"
+      ],
+      [
+        "###",
+        "Checklist: After Modifying A Runtime-Parsed Template"
+      ],
+      [
+        "##",
+        "Mode-Detection Probe Checklist"
+      ],
+      [
+        "###",
+        "Before implementing:"
+      ],
+      [
+        "###",
+        "After implementing:"
+      ],
+      [
+        "##",
+        "When to Create Flow Documentation"
+      ],
+      [
+        "##",
+        "Event Log / Projection Boundary"
+      ],
+      [
+        "###",
+        "Checklist: After Adding A New Event Kind Or Field"
+      ]
+    ],
+    "sections": [
+      "The Problem",
+      "Before Implementing Cross-Layer Features",
+      "Common Cross-Layer Mistakes",
+      "Checklist for Cross-Layer Features",
+      "Cross-Platform Template Consistency",
+      "Generated Runtime Template Upgrade Consistency",
+      "Versioned Documentation Boundary",
+      "Mode-Detection Probe Checklist",
+      "Cross-Platform Template Consistency",
+      "Generated Runtime Template Upgrade Consistency",
+      "Mode-Detection Probe Checklist",
+      "When to Create Flow Documentation",
+      "Event Log / Projection Boundary"
+    ],
+    "target_sha256": "f79675a0ddff2bbdba7a59021a1c9c4770bb3bb687341611ba43c0c7916a99f5"
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/guides/index.md",
+    "source_sha256": "aa45e5d0f245aae0b34677b121f7d083620308b4b87cda929bd134c77d1f61fd",
+    "target": ".trellis/spec/guides/index.md",
+    "action": "merged_by_section",
+    "headings": [
+      [
+        "#",
+        "Thinking Guides"
+      ],
+      [
+        "##",
+        "Why Thinking Guides?"
+      ],
+      [
+        "##",
+        "Available Guides"
+      ],
+      [
+        "##",
+        "Quick Reference: Thinking Triggers"
+      ],
+      [
+        "###",
+        "When to Think About Cross-Layer Issues"
+      ],
+      [
+        "###",
+        "When to Think About Code Reuse"
+      ],
+      [
+        "###",
+        "When Verifying AI Cross-Review Results"
+      ],
+      [
+        "##",
+        "Pre-Modification Rule (CRITICAL)"
+      ],
+      [
+        "#",
+        "Search for the value you're about to change"
+      ],
+      [
+        "##",
+        "How to Use This Directory"
+      ],
+      [
+        "##",
+        "Contributing"
+      ]
+    ],
+    "sections": [
+      "Why Thinking Guides?",
+      "Available Guides",
+      "Quick Reference: Thinking Triggers",
+      "Pre-Modification Rule (CRITICAL)",
+      "How to Use This Directory",
+      "Contributing"
+    ],
+    "target_sha256": "a17aed6d68fe13244a9f7ea6219eabecd6738229ad2c61d831bfb5048ff17e94"
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/operations/auto-loop-recovery.md",
+    "source_sha256": "781331646cbb33238b4ad327cd146fc4f0ce4be1f1ce701698be1ab9442c0165",
+    "target": ".trellis/spec/platform/operations/auto-loop-recovery.md",
+    "action": "moved",
+    "headings": [
+      [
+        "#",
+        "Auto loop 多仓恢复"
+      ],
+      [
+        "##",
+        "Scenario: 基于开工前证据补登关联仓库"
+      ],
+      [
+        "###",
+        "1. Scope / Trigger"
+      ],
+      [
+        "###",
+        "2. Signatures"
+      ],
+      [
+        "###",
+        "3. Contracts"
+      ],
+      [
+        "###",
+        "4. Validation & Error Matrix"
+      ],
+      [
+        "###",
+        "5. Scenarios and Examples"
+      ],
+      [
+        "###",
+        "6. Tests Required"
+      ]
+    ],
+    "target_sha256": "139eddbe726f228c74f3627da9b3c664c6ee66f04ba8e65a94d725c72fc3683b"
+  },
+  {
+    "repository": "runtime",
+    "source": ".trellis/spec/operations/index.md",
+    "source_sha256": "48c1d6a5a0d34e7f6b77b5acd5a600f1f4390309c92416b20646d838becd1bda",
+    "target": ".trellis/spec/platform/operations/index.md",
+    "action": "index_rebuilt",
+    "headings": [
+      [
+        "#",
+        "项目运维合同"
+      ]
+    ],
+    "target_sha256": "330a9fc2ca21425d98bc27fa3913b9049489b0a1a8ee6b7c1d6a1c29d7dd2b13"
+  }
+]

@@ -1,0 +1,32 @@
+{
+  "finding": "CHK-001",
+  "resource_git_index": {
+    "resources_checked": 37625,
+    "mismatches": [],
+    "all_git_blobs_and_modes_match": true
+  },
+  "fresh_checkout_build_snapshot": {
+    "raw_checkout_existing_eol_case": "python-dateutil 两个已登记原件",
+    "restored": [
+      "project_library/projects/python-dateutil/seed/library/NEWS",
+      "project_library/projects/python-dateutil/seed/library/docs/make.bat"
+    ],
+    "validation_exit_code": 0,
+    "library": {
+      "content_schema": 3,
+      "projects": 100,
+      "scenarios": 600,
+      "tasks": 600,
+      "reviewed_projects": 100,
+      "blocked_projects": 0,
+      "digest": "96d27cdbd7a24969ba5acd5c7e17e8e98d98c8edcc2aebf1f5c3bb25d7dfb72b",
+      "evidence": "内容结构及离线制品摘要，不代表原生验收或模型完成"
+    }
+  },
+  "regression": "deploy/v3/test_system_workflow.py::WorkflowTests::test_git_preserves_frozen_resource_bytes_and_patch_context",
+  "deploy_tests": {
+    "passed": 155,
+    "exit_code": 0,
+    "seconds": 35.215
+  }
+}

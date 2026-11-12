@@ -1,0 +1,9 @@
+{
+  "mapped_files": 38750,
+  "runtime_imports": 256,
+  "project_library_files": 37625,
+  "content_adjustments": 37,
+  "symlinks": 0,
+  "git_modes_and_resource_checks": "passed",
+  "permission_note": "运行时归档的0664按安全提取规则落为0644；Git记录的执行位完整保留。"
+}

@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/platform/deploy/platform-online-update.md", "reason": "原地升级、固定宿主包与构建发布合同"}
+{"file": ".trellis/spec/orchestrator/backend/account-runtime-v3.md", "reason": "账号环境及数据身份保护"}
+{"file": ".trellis/spec/runtime/backend/runtime-contract.md", "reason": "固定运行时来源与离线验证"}
+{"file": ".trellis/tasks/11-12-flower2api-monorepo-migration/research/migration-map.md", "reason": "源码与规范逐模块迁移映射"}

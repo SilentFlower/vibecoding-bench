@@ -1,0 +1,56 @@
+[
+  {
+    "package": "gateway",
+    "query": "gateway Rust Axum settings 账号池",
+    "matches": [
+      ".trellis/spec/gateway/backend/settings-database.md",
+      ".trellis/spec/gateway/backend/index.md",
+      ".trellis/spec/gateway/backend/service-architecture.md"
+    ]
+  },
+  {
+    "package": "orchestrator",
+    "query": "orchestrator Python 调度 工程执行",
+    "matches": [
+      ".trellis/spec/orchestrator/backend/project-iterations.md",
+      ".trellis/spec/orchestrator/backend/directory-structure.md",
+      ".trellis/spec/orchestrator/backend/index.md"
+    ]
+  },
+  {
+    "package": "runtime",
+    "query": "runtime 原生运行时 header TLS 日志",
+    "matches": [
+      ".trellis/spec/runtime/backend/runtime-contract.md",
+      ".trellis/spec/runtime/backend/index.md",
+      ".trellis/spec/runtime/backend/logging-guidelines.md"
+    ]
+  },
+  {
+    "package": "web",
+    "query": "apps/web Vue TypeScript 管理后台",
+    "matches": [
+      ".trellis/spec/web/frontend/index.md",
+      ".trellis/spec/web/frontend/frontend-guidelines.md",
+      ".trellis/spec/legacy-web/frontend/component-guidelines.md"
+    ]
+  },
+  {
+    "package": "legacy-web",
+    "query": "legacy-web 原生JS 工程静态界面",
+    "matches": [
+      ".trellis/spec/legacy-web/frontend/index.md",
+      ".trellis/spec/legacy-web/frontend/state-management.md",
+      ".trellis/spec/legacy-web/frontend/directory-structure.md"
+    ]
+  },
+  {
+    "package": "platform",
+    "query": "platform v3 手动发布 宿主更新器 原地升级",
+    "matches": [
+      ".trellis/spec/platform/deploy/platform-online-update.md",
+      ".trellis/spec/orchestrator/backend/account-runtime-v3.md",
+      ".trellis/spec/platform/deploy/image-build-push.md"
+    ]
+  }
+]

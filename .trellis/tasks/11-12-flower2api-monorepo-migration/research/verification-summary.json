@@ -1,0 +1,77 @@
+{
+  "orchestrator": {
+    "discovered_cases": 1238,
+    "unique_ids": 1188,
+    "covered_unique_ids": 1188,
+    "passed": 1237,
+    "skipped": 1,
+    "evidence_parts": [
+      "orchestrator-tests-final.log",
+      "orchestrator-tail-tests.log"
+    ],
+    "note": "全量前段发现原有旧库夹具失配；修复后重跑末组37项，覆盖全部用例。"
+  },
+  "gateway": {
+    "passed": 874,
+    "ignored": 8,
+    "evidence": "cargo-test.log"
+  },
+  "deploy": {
+    "passed": 155,
+    "evidence": "deploy-tests-repair.log",
+    "additional_path_regression": 10,
+    "git_frozen_resource_regression": "passed"
+  },
+  "runtime": {
+    "unit_passed": 180,
+    "integration_passed": 48,
+    "integration_retry_passed": 1,
+    "retry_evidence": "runtime-timeout-retry.log",
+    "native_local_pool_cases": 20,
+    "note": "集成末轮有一项20秒超时，单独复验通过。"
+  },
+  "frontend": {
+    "vue_build": "passed",
+    "management_browser": {
+      "passed": true,
+      "timezones": [
+        "Asia/Shanghai",
+        "America/Los_Angeles"
+      ],
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "widths": [
+        1280,
+        390
+      ],
+      "real_model_requests": 0
+    }
+  },
+  "library": {
+    "projects": 100,
+    "objectives": 600,
+    "files_preserved": 37625,
+    "git_blobs_and_modes_preserved": 37625,
+    "fresh_checkout_build_digest": "96d27cdbd7a24969ba5acd5c7e17e8e98d98c8edcc2aebf1f5c3bb25d7dfb72b"
+  },
+  "pending": [],
+  "checks": {
+    "actionlint": "passed",
+    "gateway_docker_check": "passed",
+    "python_ast": "passed",
+    "shell_syntax": "passed",
+    "legacy_javascript_syntax": "passed",
+    "compose_config": "passed",
+    "spec_links": "passed",
+    "framework_files_unchanged": 155,
+    "original_dirty_sha256_verified": 343
+  },
+  "upgrade": {
+    "passed": 14,
+    "real_model_calls": 0,
+    "release": "flower2api-layout-verified-20261112",
+    "evidence": "research/upgrade-verification.json"
+  }
+}
