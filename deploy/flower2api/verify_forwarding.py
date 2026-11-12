@@ -239,7 +239,7 @@ def verify(manifest_path, output, binary, native=False, kernel_release=None, ker
         environment_file.write_text(''.join(key + '=' + value + '\n' for key, value in values.items()))
         environment_file.chmod(0o600)
         wrapper = root / 'manage.py'
-        wrapper.write_text(f'import sys\nfrom pathlib import Path\nsys.path.insert(0,{str(REPO / "deploy/v3")!r})\n'
+        wrapper.write_text(f'import sys\nfrom pathlib import Path\nsys.path.insert(0,{str(REPO / "deploy/flower2api")!r})\n'
             f'import manage\nmanage.COMPOSE=Path({str(compose)!r})\nmanage.main()\n')
         manager = ['python3', str(wrapper)]
         session = requests.Session()
@@ -356,7 +356,7 @@ def verify(manifest_path, output, binary, native=False, kernel_release=None, ker
                 proxy = client.containers.run(values['V3_CONTROL_IMAGE'], ['/fixtures/forwarding_network.py'],
                     entrypoint='python', detach=True, network='vibebench-v3-' + deployment,
                     labels={**labels, 'vibebench.role': 'verification'},
-                    volumes={str(REPO / 'deploy/v3/fixtures'): {'bind': '/fixtures', 'mode': 'ro'},
+                    volumes={str(REPO / 'deploy/flower2api/fixtures'): {'bind': '/fixtures', 'mode': 'ro'},
                         str(network_data): {'bind': '/fixtures-data', 'mode': 'rw'}})
                 proxies.append(proxy)
                 wait_until(lambda: (network_data / 'ready').exists(), '隔离代理未就绪')

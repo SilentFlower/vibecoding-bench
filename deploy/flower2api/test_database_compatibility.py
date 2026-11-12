@@ -41,8 +41,8 @@ class CompatibilitySourceTests(unittest.TestCase):
         """CI 默认环境可直接加载演练入口及独立快照测试。@return None。"""
         environment = dict(os.environ)
         environment.pop('PYTHONPATH', None)
-        for arguments in ([str(verifier.REPO / 'deploy/v3/verify_database_compatibility.py'), '--help'],
-                ['-m', 'unittest', 'discover', '-s', 'deploy/v3', '-p', 'test_system_database.py']):
+        for arguments in ([str(verifier.REPO / 'deploy/flower2api/verify_database_compatibility.py'), '--help'],
+                ['-m', 'unittest', 'discover', '-s', 'deploy/flower2api', '-p', 'test_system_database.py']):
             result = subprocess.run([sys.executable, *arguments], cwd=verifier.REPO, env=environment,
                 capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stderr)

@@ -1,26 +1,26 @@
 # flower2api 部署
 
-部署目录和内部标识沿用 `v3`，支持现有实例持续升级。构建与发布入口见 [系统更新 SOP](SYSTEM-UPDATES.md#构建与手动发布)。
+部署源码位于 `deploy/flower2api/`，日常入口为 `scripts/flower2api-stack`。原 `scripts/v3-stack` 继续转发同一组参数和退出状态。固定宿主包、镜像及更新通道沿用已有 v3 身份，支持现有实例持续升级。构建与发布入口见 [系统更新 SOP](SYSTEM-UPDATES.md#构建与手动发布)。
 
 本轮交付管理和账号两个镜像。管理镜像分别启动 gateway 和 orchestrator；每账号一个固定逻辑环境，包含 network、CLI、sender 三个角色容器（共 3N+2 个容器），账号角色没有宿主端口。原部署不会自动迁移或切流。
 
 ```bash
-python3 deploy/v3/manage.py build --release local-20261012 --manifest releases/v3-local-20261012.json
-cp deploy/v3/example.env /absolute/path/v3.env
+python3 deploy/flower2api/manage.py build --release local-20261012 --manifest releases/v3-local-20261012.json
+cp deploy/flower2api/example.env /absolute/path/v3.env
 # 填写独立数据目录、两个镜像标签、清单绝对路径及至少 32 字符的密码/秘密。
 chmod 600 /absolute/path/v3.env
-python3 deploy/v3/manage.py check --env /absolute/path/v3.env
-python3 deploy/v3/manage.py up --env /absolute/path/v3.env
-python3 deploy/v3/manage.py status --env /absolute/path/v3.env
-python3 deploy/v3/manage.py stop --env /absolute/path/v3.env
-python3 deploy/v3/manage.py backup --env /absolute/path/v3.env --backup-dir /absolute/path/new-v3-backup
+python3 deploy/flower2api/manage.py check --env /absolute/path/v3.env
+python3 deploy/flower2api/manage.py up --env /absolute/path/v3.env
+python3 deploy/flower2api/manage.py status --env /absolute/path/v3.env
+python3 deploy/flower2api/manage.py stop --env /absolute/path/v3.env
+python3 deploy/flower2api/manage.py backup --env /absolute/path/v3.env --backup-dir /absolute/path/new-v3-backup
 ```
 
 建议端口 18080 只是默认值，实际启动前必须空闲。默认绑定 127.0.0.1；远程访问按现有安全反代配置接入这个新端口。内部账号和调度器服务只在独立 Docker 网络通信。
 
 gateway 显式使用 `TZ=Asia/Shanghai`，峰值预热的小时配置按北京时间解释，例如 `4,6` 在每天 04:10、06:10 触发。账号容器继续使用各自保存的时区。
 
-每个构建批次使用唯一 `v3-<release>` 标签。清单记录父仓和子仓提交、冻结源码内容哈希、工作区是否有未提交修改、平台、默认 CLI、布局与传输版本及两个镜像的本地 ID（`digest`）与原始配置哈希（`config_digest`）；启动逐项核对标签、角色、批次和镜像身份。不得用旧 latest、混用批次或覆盖清单。本地构建不会推送镜像。`scripts/v3-stack` 提供同一组命令的短入口。
+每个构建批次使用唯一 `v3-<release>` 标签。清单记录父仓和子仓提交、冻结源码内容哈希、工作区是否有未提交修改、平台、默认 CLI、布局与传输版本及两个镜像的本地 ID（`digest`）与原始配置哈希（`config_digest`）；启动逐项核对标签、角色、批次和镜像身份。不得用旧 latest、混用批次或覆盖清单。本地构建不会推送镜像。`scripts/flower2api-stack` 提供同一组命令的短入口。
 
 ## GHCR 发布与远程交付
 
@@ -36,9 +36,9 @@ gateway 显式使用 `TZ=Asia/Shanghai`，峰值预热的小时配置按北京�
 
 ```bash
 # 从对应 Action 下载同批 artifact，先保存发布清单。
-scripts/v3-stack pull --manifest /absolute/path/v3.json
+scripts/flower2api-stack pull --manifest /absolute/path/v3.json
 # 首次包默认私有、无法匿名拉取时，使用同一 artifact 的镜像包。
-scripts/v3-stack load --manifest /absolute/path/v3.json --bundle /absolute/path/v3-images.tar.gz
+scripts/flower2api-stack load --manifest /absolute/path/v3.json --bundle /absolute/path/v3-images.tar.gz
 ```
 
 pull 按 `registry_digest` 固定下载，核对配置 ID后建立清单中的标签；load 先核对包名称、大小和 SHA256。随后两者都执行角色、批次、提交与平台核对。首次发布不自动修改包可见性；离线交付不需要服务器保存 GHCR PAT。env 中的两个镜像引用必须和发布清单完全一致。
@@ -67,15 +67,15 @@ pull 按 `registry_digest` 固定下载，核对配置 ID后建立清单中的�
 
 ```bash
 # 默认精简；只有明确需要完整工具副本时才使用 --full。
-scripts/v3-stack backup --env /absolute/path/v3.env --backup-dir /absolute/path/new-backup
-scripts/v3-stack backup --env /absolute/path/v3.env --backup-dir /absolute/path/new-full-backup --full
+scripts/flower2api-stack backup --env /absolute/path/v3.env --backup-dir /absolute/path/new-backup
+scripts/flower2api-stack backup --env /absolute/path/v3.env --backup-dir /absolute/path/new-full-backup --full
 # 可离线复验新格式备份，不需要加载线上配置或调用账号。
-scripts/v3-stack verify-backup --backup-dir /absolute/path/new-backup
+scripts/flower2api-stack verify-backup --backup-dir /absolute/path/new-backup
 # 先生成维护清单，再停机应用；清单变化后必须重新生成。
-scripts/v3-stack storage --env /absolute/path/v3.env --output /absolute/path/new-storage-plan.json
-scripts/v3-stack stop --env /absolute/path/v3.env
-scripts/v3-stack storage --env /absolute/path/v3.env --apply --source /absolute/path/new-storage-plan.json --output /absolute/path/new-storage-result.json
-scripts/v3-stack up --env /absolute/path/v3.env
+scripts/flower2api-stack storage --env /absolute/path/v3.env --output /absolute/path/new-storage-plan.json
+scripts/flower2api-stack stop --env /absolute/path/v3.env
+scripts/flower2api-stack storage --env /absolute/path/v3.env --apply --source /absolute/path/new-storage-plan.json --output /absolute/path/new-storage-result.json
+scripts/flower2api-stack up --env /absolute/path/v3.env
 ```
 
 备份、维护和 `up` 共用部署级非阻塞磁盘锁，维护时不可同时启动服务。`storage` 只清理本部署精确 `_cacache` 路径，并对冻结项目内容与具有新安装回执的静态 CLI 制品去重；账号 HOME、会话、凭据和候选工作区保持独立。浏览器及旧安装协议 CLI 在无法证明安全时保留，清单会记录原因。新 CLI 在暂存目录安装、验证精确版本、生成回执后原子发布，结束清理下载缓存；同版本遗留暂存会在取得安装锁后收口，缓存回收失败不阻断已验证就绪的程序。同字节且同权限的程序通过管理端私有 `bench/cli-artifacts` 复用，账号没有该缓存的跨账号可写挂载。已完成且通过隔离恢复的同部署备份保存带摘要保护的来源证明，程序及依赖锁未变时可以复用，清缓存后不必重新下载才能生成下一份精简备份。不要对 Docker 卷、其它应用目录或未知账号目录执行全局 prune。
@@ -98,26 +98,26 @@ run 与续聊的证据入口保持固定，各次执行在 `executions/<source_h
 
 ```bash
 # 需在已安装 orchestrator requirements 的 Python 环境运行。
-python3 deploy/v3/run_local_verification.py --manifest /absolute/path/release.json
+python3 deploy/flower2api/run_local_verification.py --manifest /absolute/path/release.json
 # 真实忙碌 driver 跨过 5h／7d 阈值后完成原补充和收尾，下一轮等待。
-python3 deploy/v3/run_local_verification.py --manifest /absolute/path/release.json --quota-completion-only
+python3 deploy/flower2api/run_local_verification.py --manifest /absolute/path/release.json --quota-completion-only
 # 真实物理采集、当前轮次跨时段及阈值、排队重启与两个门禁分别恢复。
-python3 deploy/v3/run_local_verification.py --manifest /absolute/path/release.json --run-windows-only
-python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json
+python3 deploy/flower2api/run_local_verification.py --manifest /absolute/path/release.json --run-windows-only
+python3 deploy/flower2api/verify_stack.py --manifest /absolute/path/release.json
 # 已安装 Chrome/Chromium 时，验证真实页面的统一退出和旧 Cookie 重放拒绝。
-python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser
+python3 deploy/flower2api/verify_stack.py --manifest /absolute/path/release.json --browser
 # 本轮完成阈值说明、历史停止记录的 API／SQLite 兼容与页面转义。
-python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser --quota-completion
+python3 deploy/flower2api/verify_stack.py --manifest /absolute/path/release.json --browser --quota-completion
 # 当地时段保存/重读、双时钟、物理特征来源、XSS 和窄屏明暗主题。
-python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser --run-boundaries
+python3 deploy/flower2api/verify_stack.py --manifest /absolute/path/release.json --browser --run-boundaries
 # 验证实际 Recorder 的本地 HTTPS/SSE、未知一次机会及重启不重复。
-python3 deploy/v3/verify_warmup_quota.py --manifest /absolute/path/release.json
+python3 deploy/flower2api/verify_warmup_quota.py --manifest /absolute/path/release.json
 # 在统一后台验证合成账号阈值配置、保存重读、明暗主题和 390px。
-python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser --warmup-quota
+python3 deploy/flower2api/verify_stack.py --manifest /absolute/path/release.json --browser --warmup-quota
 # 关联重授权的页面/WS/tmux/凭据落盘演练，使用专用合成账号和本地代理
-python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser --reauth
+python3 deploy/flower2api/verify_stack.py --manifest /absolute/path/release.json --browser --reauth
 # 原 cc2api 删除后页面解绑、RT 交接、后台刷新失败收尾及再次创建，交叉核对两库和原身份。
-python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --browser --deleted-binding
+python3 deploy/flower2api/verify_stack.py --manifest /absolute/path/release.json --browser --deleted-binding
 ```
 
 演练创建随机部署标识的内部 Docker 网络，使用空 SQLite、合成凭据、CLI 测试替身及仅在本地处理的 SOCKS/DNS/HTTP。Docker 检查分别验证发送器直调和真实网关入口到账号的 ClientHello，断言合法短 DNS 绑定可用、共享 CLI 租约不阻止网关发送、错误账号绑定拒绝且无重复发送；另保持账号发送器 API 长流并启动 CLI 养号/抓包、发送第二次 API，验证 CLI 取消及调度器重启对账后长流继续且容器不变。Rust 的 `cargo test --lib local_https` 另用临时 CA 和回环 TLS 服务验证完整响应、原始字节/头顺序、非信任证书及错误主机名拒绝、长流取消。额外信任根仅编译进测试，正式镜像不提供跳过证书校验或追加测试 CA 的开关。TLS 测试需要 Python3 和 OpenSSL。结束只删除本次创建的测试资料与资源。
@@ -129,8 +129,8 @@ python3 deploy/v3/verify_stack.py --manifest /absolute/path/release.json --brows
 旧资料可使用去凭据 JSON 做离线元数据导入，格式见 `fixtures/offline_metadata.json`。只接受账号名、历史任务标题/题号、运行 ID/状态及来源标识；凭据、代理、profile、提示词正文和工作目录内容均拒收。需先初始化并停止独立 v3 部署，默认演练在事务中验证后回滚，显式 `--apply` 才保存。按来源/类型/历史 ID 幂等，内容改变或账号名碰撞拒绝覆盖；账号统一停用且不绑定 cc2api，历史任务归档，未完成运行记为已停止，不恢复调度。真实旧账号接管仍需单独安排。
 
 ```bash
-scripts/v3-stack import-offline --env /absolute/path/v3.env --source /absolute/path/metadata.json
-scripts/v3-stack import-offline --env /absolute/path/v3.env --source /absolute/path/metadata.json --apply
+scripts/flower2api-stack import-offline --env /absolute/path/v3.env --source /absolute/path/metadata.json
+scripts/flower2api-stack import-offline --env /absolute/path/v3.env --source /absolute/path/metadata.json --apply
 ```
 
 
@@ -151,9 +151,9 @@ CLI 为 UID1000、sender 为 UID1001，两者 capabilities 全部删除、no-new
 ```bash
 # 需要本地 Docker、OpenSSL、Chrome/Chromium，以及包含 requests/docker/websockets 的 Python 环境。
 # 批次、清单和输出目录都必须是全新的；官方二进制由调用方提供，不下载、不读真实凭据。
-python3 deploy/v3/verify_forwarding.py --build --release verify-process-local \
+python3 deploy/flower2api/verify_forwarding.py --build --release verify-process-local \
   --manifest /absolute/path/v3-verification.json
-python3 deploy/v3/verify_forwarding.py --manifest /absolute/path/v3-verification.json \
+python3 deploy/flower2api/verify_forwarding.py --manifest /absolute/path/v3-verification.json \
   --cli-binary /absolute/path/official-2.1.293/claude.exe \
   --output /absolute/path/new-verification-results
 ```

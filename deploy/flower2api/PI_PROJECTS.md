@@ -83,11 +83,11 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm test
 
 cd ../../services/orchestrator
-../.venv/bin/python -m unittest test_projects_agent test_projects_terminal -v
+../../.venv/bin/python -m unittest test_projects_agent test_projects_terminal -v
 
-cd ..
-.venv/bin/python deploy/v3/verify_pi_projects_browser.py
-.venv/bin/python deploy/v3/run_local_verification.py \
+cd ../..
+.venv/bin/python deploy/flower2api/verify_pi_projects_browser.py
+.venv/bin/python deploy/flower2api/run_local_verification.py \
   --manifest <包含新运行时的本地镜像清单> --pi-projects-only \
   --evidence-dir <新的证据目录>
 ```

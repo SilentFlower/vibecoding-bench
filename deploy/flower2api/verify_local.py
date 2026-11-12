@@ -69,7 +69,7 @@ def verify_legacy_transition(runtime, row: dict, account: dict, client) -> None:
         output = client.containers.run(control, ['/fixtures/legacy_runtime.py'], entrypoint='python', remove=True,
             network=runtime.network, labels={'vibebench.product':'v3','vibebench.deployment':runtime.deployment,'vibebench.role':'orchestrator'},
             environment=environment, volumes={os.environ['VERIFY_HOST_ROOT']:{'bind':'/verify','mode':'rw'},
-                str(Path(os.environ['VERIFY_SOURCE_ROOT']) / 'deploy/v3/fixtures'):{'bind':'/fixtures','mode':'ro'},
+                str(Path(os.environ['VERIFY_SOURCE_ROOT']) / 'deploy/flower2api/fixtures'):{'bind':'/fixtures','mode':'ro'},
                 '/var/run/docker.sock':{'bind':'/var/run/docker.sock','mode':'rw'}})
         observed = json.loads(output.decode().strip().splitlines()[-1])
         assert observed == {'environment_id':row['environment_id'],'machine_id':machine}

@@ -480,7 +480,7 @@ def build(release: str, manifest_path: Path) -> None:
     # 先校验缓存设置，配置错误不能在快照或 Docker 操作之后才暴露。
     build_commands = {role: _build_arguments(role) for role in ('control', 'account')}
     parent = command("git", "rev-parse", "HEAD", capture=True).strip()
-    platform_version = read_version(REPO / 'deploy/v3/platform-release.json')['version']
+    platform_version = read_version(source_path(REPO, 'deploy/v3/platform-release.json'))['version']
     gateway = parent
     dirty = bool(command("git", "status", "--porcelain", capture=True).strip())
     if manifest_path.exists():

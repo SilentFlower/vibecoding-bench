@@ -127,14 +127,14 @@ def main() -> None:
                 "-subj", "/CN=api.anthropic.com", "-addext", "subjectAltName=DNS:api.anthropic.com",
                 "-keyout", str(root / "native-usage.key"), "-out", str(root / "native-usage.crt")],
                 check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            fixtures = repository / "deploy" / "v3" / "fixtures"
+            fixtures = repository / "deploy" / "flower2api" / "fixtures"
             mock = client.containers.run(manifest["images"]["control"]["reference"], ["/fixtures/mock_network.py"], entrypoint="python", detach=True,
                 network=network.name, labels={**labels, "vibebench.role": "verification"},
                 volumes={str(fixtures): {"bind": "/fixtures", "mode": "ro"}, str(root): {"bind": "/fixtures-data", "mode": "rw"}})
             mock.reload()
             proxy = mock.attrs["NetworkSettings"]["Networks"][network.name]["IPAddress"]
             service_token=uuid.uuid4().hex+uuid.uuid4().hex
-            runner = client.containers.run(manifest["images"]["control"]["reference"], ["/source/deploy/v3/verify_local.py", "--proxy-ip", proxy], entrypoint="python", detach=True,
+            runner = client.containers.run(manifest["images"]["control"]["reference"], ["/source/deploy/flower2api/verify_local.py", "--proxy-ip", proxy], entrypoint="python", detach=True,
                 network=network.name, labels={**labels, "vibebench.role": "orchestrator"},
                 environment={"PYTHONPATH": "/source/services/orchestrator", "V3_DEPLOYMENT_ID": deployment, "V3_RELEASE": manifest["release"],
                     "V3_ACCOUNT_IMAGE": manifest["images"]["account"]["reference"], "V3_NETWORK": network.name, "VERIFY_HOST_ROOT": str(root), "V3_WORKER_SCRIPT": "/source/images/worker/entrypoint.sh",

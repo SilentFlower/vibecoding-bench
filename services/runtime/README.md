@@ -1,6 +1,6 @@
 # flower2api 运行时
 
-flower2api 的原生内核适配与诊断组件，源码整合自 `SilentFlower/cc-runtime-bridge@7cfe8b3734111dae4758a7e2006f43e5f1cc71e9`。来源与固定执行制品见 [迁移记录](../../docs/migrations/flower2api-sources.json)，平台安装与原地升级见 [系统更新 SOP](../../deploy/v3/SYSTEM-UPDATES.md)。
+flower2api 的原生内核适配与诊断组件，源码整合自 `SilentFlower/cc-runtime-bridge@7cfe8b3734111dae4758a7e2006f43e5f1cc71e9`。来源与固定执行制品见 [迁移记录](../../docs/migrations/flower2api-sources.json)，平台安装与原地升级见 [系统更新 SOP](../../deploy/flower2api/SYSTEM-UPDATES.md)。
 
 以下命令在 `services/runtime/` 内执行。内部包名、二进制名和 `CCRB_*` 参数沿现有协议保留。
 

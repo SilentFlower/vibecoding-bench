@@ -137,7 +137,7 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
     (home / ".claude.json").write_text(json.dumps({"userID": "d" * 64}))
     binary = root / "cli/9.9.9/node_modules/.bin/claude"
     binary.parent.mkdir(parents=True)
-    shutil.copy2(REPO / "deploy/v3/fixtures/mock_cli.py", binary)
+    shutil.copy2(REPO / "deploy/flower2api/fixtures/mock_cli.py", binary)
     binary.chmod(0o755)
     (root / "cli/9.9.9/.ready").touch()
     (home / ".synthetic-login.json").write_text(json.dumps({"wait_for_code": True, "new_endpoint": True}))
@@ -274,7 +274,7 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
     (delete_root / "home").mkdir(parents=True)
     delete_binary = delete_root / "cli/9.9.9/node_modules/.bin/claude"
     delete_binary.parent.mkdir(parents=True)
-    shutil.copy2(REPO / "deploy/v3/fixtures/mock_cli.py", delete_binary)
+    shutil.copy2(REPO / "deploy/flower2api/fixtures/mock_cli.py", delete_binary)
     delete_binary.chmod(0o755)
     (delete_root / "cli/9.9.9/.ready").touch()
     (delete_root / "home/.synthetic-login.json").write_text(json.dumps({"wait_for_code": True}))

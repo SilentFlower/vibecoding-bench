@@ -2,6 +2,8 @@
 
 管理员通过统一后台的“系统更新”页面检查发行、安装及回退。默认每六小时检查一次，安装由管理员明确点击。下载阶段继续接单；切换阶段先暂停新工作，等待已有 API、CLI、Pi、评审和凭据活动结束。
 
+本文仓库命令使用 `deploy/flower2api/` 源码入口。已安装更新器的固定包继续位于 `source/deploy/v3/`，由来源映射从新目录复制。systemd 启动路径、Compose 策略及服务归属检查沿既有合同。日常短入口为 `scripts/flower2api-stack`，原 `scripts/v3-stack` 兼容转发。
+
 ## 发布端一次性配置
 
 1. 在受控运维环境生成独立 Ed25519 密钥。平台签名密钥与请求内核签名密钥分别管理。
@@ -24,7 +26,7 @@ v1 的 `updates/v3` 保持原发行格式并续签三十天有效期。新通道
 ## 构建与手动发布
 
 1. 日常提交到 v3/flower2api，或创建目标为这些分支的 PR，运行 `v3-build.yml`。可手动运行同一构建入口。它执行合同测试和本地镜像构建，仅上传 `v3-build-<run_id>-<attempt>` 清单 artifact。构建完成表示候选通过此轮 CI 验证。
-2. 准备正式发行时更新 `deploy/v3/platform-release.json`，修复递增补丁，功能递增次版本。手动运行 `v3-release.yml`，通过分支选择器选择 v3 或 flower2api，并勾选 `publish`。发布入口从本次实际提交重新验证及构建，保留 run/attempt 与 SHA 绑定。
+2. 准备正式发行时更新 `deploy/flower2api/platform-release.json`，修复递增补丁，功能递增次版本。手动运行 `v3-release.yml`，通过分支选择器选择 v3 或 flower2api，并勾选 `publish`。发布入口从本次实际提交重新验证及构建，保留 run/attempt 与 SHA 绑定。
 3. 命令行等价入口：
 
    ```bash
@@ -71,7 +73,7 @@ builder 和 scope 仅接受最长 64 字符的字母、数字、下划线、点�
 2. 预览接入计划。`--release-dir` 中包含已签名清单、签名及原始 `v3.json`。v2 发行还需上述两项迁移附件。准备镜像时使用同一发行的 registry digest 或经过校验的镜像包。
 
    ```bash
-   python3 deploy/v3/install_system_updater.py prepare \
+   python3 deploy/flower2api/install_system_updater.py prepare \
      --env /srv/example/v3.env \
      --release-dir /srv/example/release \
      --state-root /srv/example/updates \
@@ -86,7 +88,7 @@ builder 和 scope 仅接受最长 64 字符的字母、数字、下划线、点�
    docker compose --env-file /srv/example/updates/bootstrap.env \
      -f /srv/example/updates/source/deploy/v3/compose.yml \
      -f /srv/example/updates/source/deploy/v3/compose-updates.yml up -d
-   python3 deploy/v3/install_system_updater.py finalize \
+   python3 deploy/flower2api/install_system_updater.py finalize \
      --policy /srv/example/updates/policy.json
    ```
 
@@ -110,7 +112,7 @@ builder 和 scope 仅接受最长 64 字符的字母、数字、下划线、点�
 此操作在每个原 v1 宿主执行一次。执行前按上线授权固定源码版本和精确文件 SHA、部署策略路径及 systemd 服务名。工具默认预览：
 
 ```bash
-python3 deploy/v3/upgrade_system_updater.py \
+python3 deploy/flower2api/upgrade_system_updater.py \
   --policy /srv/example/updates/policy.json \
   --source-root /srv/example/reviewed-source \
   --service vibebench-updater-example.service
@@ -121,7 +123,7 @@ python3 deploy/v3/upgrade_system_updater.py \
 进程中断会留下 `updater-upgrades/<UUID>/upgrade.json`。未完成记录会阻止新接入。使用同一已核验源码入口按原 UUID 预览恢复，服务 inactive 时也可执行：
 
 ```bash
-python3 deploy/v3/upgrade_system_updater.py \
+python3 deploy/flower2api/upgrade_system_updater.py \
   --policy /srv/example/updates/policy.json \
   --service vibebench-updater-example.service \
   --recover <原接入UUID>
@@ -168,10 +170,10 @@ python3 deploy/v3/upgrade_system_updater.py \
 ## 本地隔离验证
 
 ```bash
-.venv/bin/python -m unittest discover -s deploy/v3 -p 'test_system_*.py'
+.venv/bin/python -m unittest discover -s deploy/flower2api -p 'test_system_*.py'
 PYTHONPATH=services/orchestrator .venv/bin/python -m unittest discover -s services/orchestrator -p 'test_system_update*.py'
-python3 deploy/v3/verify_system_update_browser.py --output .deploy/platform-online-update/browser
-.venv/bin/python deploy/v3/verify_system_update.py --output .deploy/platform-online-update/docker \
+python3 deploy/flower2api/verify_system_update_browser.py --output .deploy/platform-online-update/browser
+.venv/bin/python deploy/flower2api/verify_system_update.py --output .deploy/platform-online-update/docker \
   --gateway-binary .deploy/platform-online-update/bookworm-binaries/claude-code-gateway \
   --sender-binary .deploy/platform-online-update/bookworm-binaries/account-sender
 ```

@@ -152,16 +152,16 @@ NetworkInspectionMode = "passthrough" | "quota" | "capture"
 发送绑定 `TransportBinding`：`account_id: i64`、`environment_id: string`、`generation: u64`、`endpoint: string`、`secret: string`、`release_id: string`。`PreparedRequest` 包含 `request_id`（UUID）、`deadline_unix_ms`、`method`、`target_url`、有序 `headers`、`preserve_header_casing` 和网关冻结的 `tls_profile` 注册ID；最终 body 独立传原始字节。sender不自行重选版本，缺字段沿历史兼容默认，显式未知ID在上游提交前拒绝；完整选择、连接池和错误行为见[版本TLS合同](../../gateway/protocol/claude-code-profile-upgrade.md#scenario-tls-画像版本绑定与冻结传输)。秘密只在服务间传递。
 
 ```text
-scripts/v3-stack build --release <唯一批次> --manifest <新清单>
-scripts/v3-stack publish --manifest <本地清单> --output <新发布清单> --bundle <新镜像包>
-scripts/v3-stack pull --manifest <发布清单>
-scripts/v3-stack load --manifest <发布清单> --bundle <同批镜像包>
-scripts/v3-stack up --env <独立配置> --manifest <联合清单>
-scripts/v3-stack status --env <独立配置>
-scripts/v3-stack stop --env <独立配置>
+scripts/flower2api-stack build --release <唯一批次> --manifest <新清单>
+scripts/flower2api-stack publish --manifest <本地清单> --output <新发布清单> --bundle <新镜像包>
+scripts/flower2api-stack pull --manifest <发布清单>
+scripts/flower2api-stack load --manifest <发布清单> --bundle <同批镜像包>
+scripts/flower2api-stack up --env <独立配置> --manifest <联合清单>
+scripts/flower2api-stack status --env <独立配置>
+scripts/flower2api-stack stop --env <独立配置>
 ```
 
-配置入口为 `deploy/v3/example.env`，实际参数以 `manage.py --help` 为准。
+配置入口为 `deploy/flower2api/example.env`，实际参数以 `manage.py --help` 为准。
 
 ### 3. Contracts
 
@@ -958,15 +958,15 @@ runtime/physical-features.json = {
 
 ### 1. Scope / Trigger
 
-- 修改 `deploy/v3/manage.py` 的构建、备份或维护入口、`storage_*.py`、CLI 安装脚本及冻结项目安装时适用。减少物理副本，保留账号身份、历史成果与全部逻辑文件；不通过重建账号或重新授权换取空间。
+- 修改 `deploy/flower2api/manage.py` 的构建、备份或维护入口、`storage_*.py`、CLI 安装脚本及冻结项目安装时适用。减少物理副本，保留账号身份、历史成果与全部逻辑文件；不通过重建账号或重新授权换取空间。
 
 ### 2. Signatures
 
 ```text
-scripts/v3-stack backup --env <配置> --backup-dir <全新规范绝对目录> [--full]
-scripts/v3-stack verify-backup --backup-dir <新格式备份>
-scripts/v3-stack storage --env <配置> --output <全新私有清单>
-scripts/v3-stack storage --env <配置> --apply --source <清单> --output <全新回执>
+scripts/flower2api-stack backup --env <配置> --backup-dir <全新规范绝对目录> [--full]
+scripts/flower2api-stack verify-backup --backup-dir <新格式备份>
+scripts/flower2api-stack storage --env <配置> --output <全新私有清单>
+scripts/flower2api-stack storage --env <配置> --apply --source <清单> --output <全新回执>
 storage_maintenance.acquire_storage_lock(root: Path) -> int
 storage_maintenance.tree_inventory(root: Path, excluded: set[str] | None = None, *, durable: bool = False) -> dict[str, dict]
 storage_maintenance.deduplicate_immutable_tree(root: Path, *, minimum_bytes=4096, owner_uid=None, apply=True, canonical_root=None) -> dict
@@ -1009,10 +1009,10 @@ storage_backup.verify_backup_data(target: Path) -> dict
 
 ### 6. Tests Required
 
-- `deploy/v3/test_manage.py`、`test_storage_backup.py`：默认/完整、WAL事务及GC后日志消失、文件/归属/配置/链接隔离恢复、失败保留旧副本、旧格式轮换、完成来源证明复用与篡改拒绝、回执冲突和活动部署不删除。
+- `deploy/flower2api/test_manage.py`、`test_storage_backup.py`：默认/完整、WAL事务及GC后日志消失、文件/归属/配置/链接隔离恢复、失败保留旧副本、旧格式轮换、完成来源证明复用与篡改拒绝、回执冲突和活动部署不删除。
 - `services/orchestrator/test_storage_maintenance.py`：实际inode复用、字节/权限不变、幂等、目标变化、可写父目录及链接不参与、UID1000写入拒绝、缓存损坏/锁占用/FIFO及过期维护清单拒绝。
 - `test_account_runtime.py`、`test_project_scenario_content.py`：两账号实际程序共享而HOME独立、旧协议跳过、缓存故障不阻断、冻结依赖去重及候选修改不污染基线。
-- `deploy/v3/verify_storage.py --account-image <本地账号镜像> --output <全新回执>`：真实无网络Docker验证合成安装、共享、UID1000只读、失败/错版/重装、遗留暂存与缓存故障；不调用真实账号或模型。
+- `deploy/flower2api/verify_storage.py --account-image <本地账号镜像> --output <全新回执>`：真实无网络Docker验证合成安装、共享、UID1000只读、失败/错版/重装、遗留暂存与缓存故障；不调用真实账号或模型。
 - 构建前后逐文件核对完整项目库、Docker COPY及安装摘要，运行代表性真实离线原生观察。生产另核对身份/历史记录/工具及文件系统空闲增量；镜像保留与回收按下方“v3 部署成功后的旧镜像回收”执行，不把本地通过宣称为已上线。
 
 ## Scenario: 账号 CLI 版本与迭代抓包
@@ -1237,7 +1237,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - `images/sidecar/test_recorder.py`：hook方向与scope、不改握手策略、同连接多HTTP及索引、固定快照、写失败继续转发、部分／中断阶段和原额度回归。
 - `test_capture_settings_runtime.py`、`test_main.py`、`test_account_cli_settings.py` 与 `images/account/test_network_context.py`：五入口实际冻结版本、原run与work分离、真实子进程环境、源允许列表、关闭／收尾保留及三入口摘要权限。
 - `test_tls_capture_artifacts.py`：嵌套canary、全组预算、半行／损坏／缺指纹／链接／读错误、旧数据、合法空值、共用渲染和XSS。已有账号运行生命周期定向回归覆盖独立API及历史目录。
-- 将 `deploy/v3/verify_tls_clienthello.py` 挂入固定11.1.3隔离账号镜像，仅回环模拟上游：TLS1.2／1.3各同socket两GET，独立BytesIO／struct核全部字段和JA3，核HTTP/index连接；真实写失败后另两GET成功。此结果标 synthetic，不能充作官方CLI样本。
+- 将 `deploy/flower2api/verify_tls_clienthello.py` 挂入固定11.1.3隔离账号镜像，仅回环模拟上游：TLS1.2／1.3各同socket两GET，独立BytesIO／struct核全部字段和JA3，核HTTP/index连接；真实写失败后另两GET成功。此结果标 synthetic，不能充作官方CLI样本。
 - 上线核同批Actions／镜像源码、真实项目新文件0600、执行版本／来源及成功Claude HTTP连接，独立复算并验证真实鉴权页面的安全展示；目标版本完整对齐仍需无解密透传对照。
 
 ## Scenario: V3 原生 sender 共享映像池与资源预算
@@ -1310,7 +1310,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - Rust实际 `native_real_binary`：共享dev/inode及四项封存、6→1空闲回收、取消→0、全部原进程退出后缓存重建、独立凭据及一次提交。
 - 预启动回归：`test_account_runtime.py` 验证仅启用绑定、满容量时不腾挪、sender 开关先写后通知；`native_real_binary` 验证首个预热 PID、第二个唯一补位、回收到一个以及零模型计数。
 - `test_account_runtime.py` 核验批量读取、绑定/内核代次、新鲜度、非法数字、legacy/休眠及秘密过滤；合成环境页断言读取零写入且准备失败/过期明确显示。
-- `deploy/v3/verify_forwarding.py --native`：真实两账号三角色、HTTP/SOCKS、3普通/6Haiku、同映像/秘密隔离、cgroup峰值与OOM0、60秒回收及按账号回退；验证镜像的额外CA仅限本地夹具。
+- `deploy/flower2api/verify_forwarding.py --native`：真实两账号三角色、HTTP/SOCKS、3普通/6Haiku、同映像/秘密隔离、cgroup峰值与OOM0、60秒回收及按账号回退；验证镜像的额外CA仅限本地夹具。
 - 发布验收从实际Release下载附件，核SHA/大小、冻结构建输入并运行真实消费者；合成回环与真实付费推理分开记录。
 
 ## Scenario: 单账号原生内核在线切换与回滚
@@ -1361,9 +1361,9 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 ### 6. Tests Required
 
 - services/orchestrator/test_native_kernel_upgrade.py：两个不同环境在同一发行公钥下开放管理，旧试点字段忽略，缺失/非法公钥与非原生环境保持关闭；签名及摘要拒绝、准备与接单独立、排空/回滚、旧请求重放、超时、恢复及候选摘要漂移。
-- services/orchestrator/test_account_runtime.py核对两个原生sender均有只读版本挂载及发行公钥，其他角色保持隔离；deploy/v3/test_manage.py核对仅公钥即可配置，非法公钥拒绝，旧试点配置兼容忽略。
+- services/orchestrator/test_account_runtime.py核对两个原生sender均有只读版本挂载及发行公钥，其他角色保持隔离；deploy/flower2api/test_manage.py核对仅公钥即可配置，非法公钥拒绝，旧试点配置兼容忽略。
 - Rust native_real_binary：模拟一个退出未收口许可和一个空闲worker，归还前零启动，归还后换PID；native_real_gateway验证维护归属、长流、实际新PID和零模型切换。
-- deploy/v3/verify_forwarding.py --native --kernel-release <测试签名目录> --kernel-public-key <公钥>：双账号真实三角色、管理端准备/激活/回滚、长流只发送一次、下一业务复用、对照账号PID与所有容器ID/StartedAt保持、管理端公网发送计数为0。
+- deploy/flower2api/verify_forwarding.py --native --kernel-release <测试签名目录> --kernel-public-key <公钥>：双账号真实三角色、管理端准备/激活/回滚、长流只发送一次、下一业务复用、对照账号PID与所有容器ID/StartedAt保持、管理端公网发送计数为0。
 
 
 ## Scenario: 三角色在线CPU与重建恢复

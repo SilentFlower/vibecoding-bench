@@ -27,7 +27,7 @@ def deleted_binding_fixture(client, deployment, data, manifest, browser, base, a
     proxy = client.containers.run(manifest['images']['control']['reference'], ['/fixtures/mock_network.py'],
         entrypoint='python', detach=True, network='vibebench-v3-' + deployment,
         labels={'vibebench.product': 'v3', 'vibebench.deployment': deployment, 'vibebench.role': 'verification'},
-        volumes={str(REPO / 'deploy/v3/fixtures'): {'bind': '/fixtures', 'mode': 'ro'},
+        volumes={str(REPO / 'deploy/flower2api/fixtures'): {'bind': '/fixtures', 'mode': 'ro'},
                  str(network_data): {'bind': '/fixtures-data', 'mode': 'rw'}})
     aid = None
     gid = None
@@ -60,7 +60,7 @@ def deleted_binding_fixture(client, deployment, data, manifest, browser, base, a
         (profile / '.credentials.json').write_text(json.dumps(credentials))
         cached = env_root / 'cli/2.1.293/node_modules/.bin/claude'
         cached.parent.mkdir(parents=True)
-        shutil.copy2(REPO / 'deploy/v3/fixtures/mock_cli.py', cached)
+        shutil.copy2(REPO / 'deploy/flower2api/fixtures/mock_cli.py', cached)
         cached.chmod(0o755)
         (cached.parents[2] / '.ready').touch()
         response = browser.post(base + f'/runtime/api/accounts/{aid}/cc2api/create', timeout=90)

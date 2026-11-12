@@ -37,8 +37,8 @@
 本地仅使用合成账号和联合测试镜像验证，可执行：
 
 ```bash
-PYTHONPATH=services/orchestrator python3 deploy/v3/verify_system_profile.py --manifest <本地联合清单>
-python3 deploy/v3/run_local_verification.py --manifest <本地联合清单>
+PYTHONPATH=services/orchestrator python3 deploy/flower2api/verify_system_profile.py --manifest <本地联合清单>
+python3 deploy/flower2api/run_local_verification.py --manifest <本地联合清单>
 ```
 
 前者验证默认 sysfs、模拟已有宿主 DMI 及损坏标记，包含 Python、Node、原生 C、相对目录、静态／直接 uname syscall 边界和零／六参数 syscall 透传。后者验证实际三角色、账号生命周期、重建、HOME 与凭据保留；日志分别标注原生探针和 CLI 替身，不能把替身当作官方 CLI 实测。

@@ -262,8 +262,8 @@ LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.v
         counter = int(uuid.uuid4().hex[:12], 16)
         releases, folders = [], []
         env = root / 'v3.env'
-        compose = REPO / 'deploy/v3/compose.yml'
-        override = REPO / 'deploy/v3/compose-updates.yml'
+        compose = REPO / 'deploy/flower2api/compose.yml'
+        override = REPO / 'deploy/flower2api/compose-updates.yml'
         values = {}
         business_token = None
 
@@ -344,7 +344,7 @@ LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.v
             proxy = client.containers.run(values['V3_CONTROL_IMAGE'], ['/fixtures/forwarding_network.py'], entrypoint='python',
                 detach=True, network='vibebench-v3-' + deployment,
                 labels={'vibebench.product': 'v3', 'vibebench.deployment': deployment, 'vibebench.role': 'verification'},
-                volumes={str(REPO / 'deploy/v3/fixtures'): {'bind': '/fixtures', 'mode': 'ro'},
+                volumes={str(REPO / 'deploy/flower2api/fixtures'): {'bind': '/fixtures', 'mode': 'ro'},
                     str(proxy_data): {'bind': '/fixtures-data', 'mode': 'rw'}})
             wait_for(lambda: proxy.exec_run(['python', '-c', "import socket;socket.create_connection(('127.0.0.1',1081),timeout=1).close()"]).exit_code == 0,
                 '本地 DNS 与代理夹具未就绪')
@@ -417,7 +417,7 @@ finally:r.heartbeat_pool.shutdown()
                 if candidate and index:
                     evidence_path = root / ('evidence-' + str(index) + '.json')
                     verify_database_compatibility(manifest, public, evidence_path, history_root=root / 'history')
-                value = create_release(manifest, REPO / 'deploy/v3/system-update-policy.json', folder, key,
+                value = create_release(manifest, REPO / 'deploy/flower2api/system-update-policy.json', folder, key,
                     [counter + index, 1], '隔离平台更新验证', migration_evidence=evidence_path)
                 if candidate and index == 0:
                     # 合成历史发行绑定真实旧镜像，旧合同取自已归档的预热版本。

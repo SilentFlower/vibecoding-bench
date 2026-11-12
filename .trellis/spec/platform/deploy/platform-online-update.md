@@ -2,7 +2,7 @@
 
 ## 1. 范围与触发
 
-适用于 v3 的签名发行、管理页面 `/updates`、Python/Rust 共同维护门禁、独立宿主执行器和首次接入恢复。修改这些边界时，应同步核对本文与实际测试。日常操作见 [系统更新 SOP](../../../../deploy/v3/SYSTEM-UPDATES.md)；原账号归属和内核生命周期继续由 [账号运行时规范](../../orchestrator/backend/account-runtime-v3.md) 定义。
+适用于 v3 的签名发行、管理页面 `/updates`、Python/Rust 共同维护门禁、独立宿主执行器和首次接入恢复。修改这些边界时，应同步核对本文与实际测试。日常操作见 [系统更新 SOP](../../../../deploy/flower2api/SYSTEM-UPDATES.md)；原账号归属和内核生命周期继续由 [账号运行时规范](../../orchestrator/backend/account-runtime-v3.md) 定义。
 
 默认每六小时检查受信目录，安装由管理员触发。宿主执行器独立于两个控制服务运行，使用固定策略和 Compose 模板。发行材料只提供受限声明。
 
@@ -31,7 +31,7 @@ compatible_data(original: dict, target: dict) -> bool
 fetch_repository_file(name: str, commit: str, limit: int) -> bytes
 ```
 
-首次接入使用 `python3 deploy/v3/install_system_updater.py prepare --env <配置> --release-dir <发行目录> --state-root <目录> --public-key <公钥>`；提交使用 `finalize --policy <策略>`。两者默认预览，实际执行显式追加 `--apply`。
+首次接入使用 `python3 deploy/flower2api/install_system_updater.py prepare --env <配置> --release-dir <发行目录> --state-root <目录> --public-key <公钥>`；提交使用 `finalize --policy <策略>`。两者默认预览，实际执行显式追加 `--apply`。
 
 ## 3. 数据与环境合同
 
@@ -121,7 +121,7 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 
 - CI 权限验证：宿主文件描述符检查采用 root，普通 runner 的 PermissionError 保持失败；同一虚拟环境解释器、明确保留的密钥变量及证据归属回交必须匹配工作流。
 - CI 解释器变更：用干净 Python 3.12 虚拟环境安装 `services/orchestrator/requirements.txt`，执行 workflow 中两条 `unittest discover` 命令；检查设置步骤先于验证，且与两个正式镜像的 Python 次版本一致。工作流 YAML、shell 语法和 `git diff --check` 通过。
-- `deploy/v3/test_system_*.py`：签名、目录顺序/时间、严格字段与大小、数据兼容、同参幂等、revision 冲突、恢复与清理保护。首次接入覆盖 dry-run、状态提交中断、释放响应中断、原 installed_at、外来门禁、后来 revision、配置 CAS、真实文件锁互斥。
+- `deploy/flower2api/test_system_*.py`：签名、目录顺序/时间、严格字段与大小、数据兼容、同参幂等、revision 冲突、恢复与清理保护。首次接入覆盖 dry-run、状态提交中断、释放响应中断、原 installed_at、外来门禁、后来 revision、配置 CAS、真实文件锁互斥。
 - 目录读取覆盖 Contents 载荷转换、真实签名字节保留、错误编码/大小/blob SHA 及非固定来源拒绝；取消覆盖执行线程旧快照、最后一次现场采集中的取消，以及切换后的 `409`。真实 Docker 取消验收断言原控制容器保留且操作最终为 `cancelled`。
 - `services/orchestrator/test_system_update*.py`：实际线程/文件准入、ASGI 正文结束、原登录撤销、部分恢复边界；真实 Scheduler + SQLite 验证批次等待不阻塞排空、维护抢先分派、重启续调度、原工程续接与时间窗口/被动配额拒绝。
 - Rust `cargo test` 与 `cargo fmt --check`：门禁启动验证、完整 HttpBody 释放、租约与管理桥回归。Vue `npm --prefix apps/web run build` 在仓库根验证类型和构建。
@@ -141,8 +141,8 @@ v3 的双 SQLite、签名发行及固定宿主执行器共同改变持久合同�
 ```text
 python3 -m database_migrations plan|apply|verify --operation-id <UUID> --target-version <N>
 claude-code-gateway database-migrations plan|apply|verify --operation-id <UUID> --target-version <N>
-python3 deploy/v3/upgrade_system_updater.py --policy <绝对路径> --source-root <核验源码根> --service <原服务> [--apply]
-python3 deploy/v3/upgrade_system_updater.py --policy <原策略> --service <原服务> --recover <原UUID> [--apply]
+python3 deploy/flower2api/upgrade_system_updater.py --policy <绝对路径> --source-root <核验源码根> --service <原服务> [--apply]
+python3 deploy/flower2api/upgrade_system_updater.py --policy <原策略> --service <原服务> --recover <原UUID> [--apply]
 system_schema_migrations(migration_id TEXT PRIMARY KEY, version INTEGER NOT NULL UNIQUE,
   checksum TEXT NOT NULL, applied_at TEXT NOT NULL, operation_id TEXT NOT NULL)
 ```
@@ -207,7 +207,7 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 ### 2. Signatures
 
-- `deploy/v3/platform-release.json` 精确字段为 `schema_version:1`、`version:string`、`changes:string`。
+- `deploy/flower2api/platform-release.json` 精确字段为 `schema_version:1`、`version:string`、`changes:string`。
 - `read_version(path)` 校验规范 `v<major>.<minor>.<patch>` 及说明；`signed_changes(metadata)` 生成受控首行 `平台版本：v1.0.0` 与正文。
 - `ensure_forward_version(current,previous)` 检查受信前后发行；前端使用 `VITE_PLATFORM_VERSION` 构建输入。
 
@@ -252,7 +252,7 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 ### 2. Signatures
 
 - `release_ci.validate_publish_source(build: dict | None = None) -> str`：校验来源，返回当前 `ci-<run_id>-<attempt>`。
-- `publish_system_release.check_signing_key() -> None`、`python3 deploy/v3/publish_system_release.py --check-signing`：核对实际手动入口和 Ed25519 签名配置。
+- `publish_system_release.check_signing_key() -> None`、`python3 deploy/flower2api/publish_system_release.py --check-signing`：核对实际手动入口和 Ed25519 签名配置。
 - `gh workflow run v3-build.yml --ref flower2api`：只构建验证。
 - `gh workflow run v3-release.yml --ref flower2api -f publish=true`：明确发布。
 
@@ -298,7 +298,7 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 ### 1. Scope / Trigger
 
-移动 services、apps、resources 下的源码，或修改构建快照、固定宿主源码复制和 Git 属性规则时适用。源码物理位置由本节定义，部署数据身份继续遵循原 v3 合同。
+移动 deploy、services、apps、resources 下的源码，或修改构建快照、固定宿主源码复制和 Git 属性规则时适用。源码物理位置由本节定义，部署数据身份继续遵循原 v3 合同。
 
 ### 2. Signatures
 
@@ -314,6 +314,7 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 
 | v3 逻辑路径 | 单仓源码路径 |
 | --- | --- |
+| deploy/v3 | deploy/flower2api |
 | cc2api/web | apps/web |
 | cc2api | services/gateway |
 | orchestrator | services/orchestrator |
@@ -322,7 +323,10 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 | topics.md | resources/topics.md |
 | research/github-projects | resources/project-research |
 
-- `source_path` 先匹配 `cc2api/web`，再匹配 `cc2api`。根目录存在 `services/` 时采用新映射；旧构建快照及固定宿主包采用原逻辑路径。未匹配路径相对原根解析。
+- 部署逻辑路径 `deploy/v3` 独立以 `deploy/flower2api/` 目录识别迁移；兼容旧独立源码、已有 `services/` 的上一版单仓及固定宿主包。新目录存在时，缺失文件保持缺失，拒绝回落到残留旧副本。
+- 其余模块映射先匹配 `cc2api/web`，再匹配 `cc2api`。根目录存在 `services/` 时采用新映射；旧构建快照及固定宿主包采用原逻辑路径。未匹配路径相对原根解析。
+- 仓库源码命令使用 `deploy/flower2api/` 和 `scripts/flower2api-stack`。旧 `scripts/v3-stack` 原样转发参数和退出状态。固定清单、systemd ExecStart、Compose 策略及底座归属仍使用 `source/deploy/v3/`，安装模板摘要从映射来源计算；构建快照保留原逻辑版本文件路径。
+- 根工作流统一维护构建与明确手动发布，网关导入的两份嵌套 workflow 归历史来源。根 `v3-build.yml`、`v3-release.yml` 文件身份及发行校验沿原合同；默认 main 注册同步实际源码命令及缓存指纹，并保留目标分支准入。
 - `manage.build` 在暂存快照中沿用逻辑目录名。Rust 构建位置为 `/source/services/gateway`，Vue 产物复制到 `/source/apps/web/dist`，匹配 `RustEmbed` 的 `../../apps/web/dist`。
 - `component_content` 从物理来源读字节，以原逻辑路径参与摘要。纯搬迁保持组件内容身份，真实内容变化仍触发重建判断。数据库定义及登记使用同一来源映射并核对原冻结合同。
 - 根 `.gitattributes` 必须包含 `resources/project-library/** -text eol=lf` 和 `resources/project-library/projects/**/verification/*.patch whitespace=-blank-at-eol`，保留冻结输入的换行及补丁上下文。迁移验证同时比较工作区字节、Git blob 与 Git 模式。
@@ -346,11 +350,15 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 
 边界：旧固定宿主包根目录中存在 `orchestrator/`，由相同适配器按旧布局解析。搬迁前后内容相同的两套来源具有相同组件摘要。
 
+部署示例：`source_path(repo, 'deploy/v3/manage.py')` 在新源码树返回 `deploy/flower2api/manage.py`；上一版单仓和冻结宿主包仍返回各自根下的 `deploy/v3/manage.py`。
+
+错误用法：仅凭 `services/` 存在就认定部署源码已迁移，导致上一版单仓读取缺失目录。正确处理：部署映射独立检查 `deploy/flower2api/`，新目录中缺文件时保留缺失状态。
+
 错误用法：仅比较搬迁前后的工作区文件，遗漏 Git 入库时的 CRLF 转换。正确处理：同步根属性路径，核对候选 Git blob 与模式，再从新检出副本构建快照并验证工程库摘要。
 
 ### 6. Tests Required
 
-- `test_source_layout`：新旧布局的两种组件身份相同；真实账号源码修改产生不同摘要；新来源缺失时保持新路径；越界路径拒绝。
+- `test_source_layout`：新旧布局的两种组件身份相同；真实账号源码修改产生不同摘要；独立源码、上一版单仓、新部署目录和固定宿主包分别读取正确；新来源缺失时保持新路径；越界路径拒绝；新旧脚本在外部及含空格目录原样转发参数与退出状态。
 - `test_system_workflow`：真实 Git 在 `core.autocrlf=input` 下保留工程库 CRLF 字节，补丁空白上下文通过检查；固定源码包在仓库外独立导入。
 - 工程库迁移：逐项核对 Git blob、执行位及内容清单；新检出副本经正式快照的已登记上游补偿后，完整工程库验证通过。
 - `verify_system_update.py --migration-manifest <同批候选清单>`：离线真实 Docker 验证旧底座升级、原三角色/环境身份复用、内容变化重建、停止状态保留、回退及中断恢复。
@@ -359,13 +367,13 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 
 ### 1. Scope / Trigger
 
-修改共享缓存 action、manage 构建驱动、历史双库演练、工作流名称或组件展示名时适用。操作入口见 [系统更新 SOP](../../../../deploy/v3/SYSTEM-UPDATES.md#构建缓存与兼容演练提速)。
+修改共享缓存 action、manage 构建驱动、历史双库演练、工作流名称或组件展示名时适用。操作入口见 [系统更新 SOP](../../../../deploy/flower2api/SYSTEM-UPDATES.md#构建缓存与兼容演练提速)。
 
 ### 2. Signatures
 
 - `manage.build(release: str, manifest_path: Path) -> None` 保留原调用方式；`_build_arguments(role: str) -> list[str]` 为两个角色生成受限命令前缀。
 - `verify_database_compatibility.verify(manifest: Path, public_key: str, output: Path, *, history_root: Path | None = None, workers: int = 1) -> dict`。
-- `python3 deploy/v3/verify_database_compatibility.py --manifest <候选清单> --output <新证据> --workers {1,2}`。
+- `python3 deploy/flower2api/verify_database_compatibility.py --manifest <候选清单> --output <新证据> --workers {1,2}`。
 
 ### 3. Contracts
 

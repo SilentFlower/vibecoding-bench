@@ -36,7 +36,7 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
     proxy = client.containers.run(manifest["images"]["control"]["reference"],
         ["/fixtures/mock_network.py"], entrypoint="python", detach=True,
         network="vibebench-v3-" + deployment, labels=labels,
-        volumes={str(REPO / "deploy/v3/fixtures"): {"bind": "/fixtures", "mode": "ro"},
+        volumes={str(REPO / "deploy/flower2api/fixtures"): {"bind": "/fixtures", "mode": "ro"},
                  str(fixture_data): {"bind": "/fixtures-data", "mode": "rw"}})
     account_id = None
     environment_id = None
@@ -71,7 +71,7 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
         for version in ("2.1.293", "9.9.9"):
             binary = environment_root / f"cli/{version}/node_modules/.bin/claude"
             binary.parent.mkdir(parents=True)
-            shutil.copy2(REPO / "deploy/v3/fixtures/mock_cli.py", binary)
+            shutil.copy2(REPO / "deploy/flower2api/fixtures/mock_cli.py", binary)
             binary.chmod(0o755)
             (environment_root / f"cli/{version}/.ready").touch()
         # 此处只验证同步产品链；官方二进制与字段映射另由禁网的 verify_cli_quota 验证。

@@ -70,9 +70,9 @@ def prepare_installation(env: Path, release_dir: Path, root: Path, public_key: s
     policy = {'schema_version': release['schema_version'], 'deployment': values['V3_DEPLOYMENT_ID'], 'data_root': str(data),
         'env_file': str(env), 'state_root': str(root), 'public_key': public_key,
         'compose_file': str(root / 'source/deploy/v3/compose.yml'),
-        'compose_file_sha256': hashlib.sha256((REPO / 'deploy/v3/compose.yml').read_bytes()).hexdigest(),
+        'compose_file_sha256': hashlib.sha256(source_path(REPO, 'deploy/v3/compose.yml').read_bytes()).hexdigest(),
         'override_file': str(root / 'source/deploy/v3/compose-updates.yml'),
-        'override_file_sha256': hashlib.sha256((REPO / 'deploy/v3/compose-updates.yml').read_bytes()).hexdigest()}
+        'override_file_sha256': hashlib.sha256(source_path(REPO, 'deploy/v3/compose-updates.yml').read_bytes()).hexdigest()}
     validate_policy(policy)
     backend = backend_type(policy)
     backend.values()

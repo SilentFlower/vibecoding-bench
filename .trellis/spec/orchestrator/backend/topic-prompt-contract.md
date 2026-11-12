@@ -236,8 +236,8 @@ driver 已确认收尾回复或 CLI 退出后，`advance --no-next` 缺少匹配
 - 两个消费者对同一混合正文和原生乱序记录同时断言；覆盖 0/1/2 阶段、附件父链、倒序时钟、旧执行字节基线、无 UUID/时间、异根、坏链及完成后恢复复核；输入包装接受/拒绝矩阵、no-next 缺证据不空等。
 - 原生附件覆盖消费先于最终回复、1/2条及与普通user混合、共享回复、原queued恢复、旧阶段兼容、乱序/倒序时钟和原字节键；错误来源/会话/正文、渲染/工具引用、重复/丢失及旧字节基线不得误认。用helper实际生成状态，经真实SQLite运行详情验证消费/完成计数。
 - 实际按键多行保留空行、尾换行和字面字符，仅提交一次，Tab/CR 兼容输入不改变正文；原生 CLI 使用独立 HOME 与本地合成 SSE 核对真实格式，不能加载生产账号。
-- `deploy/v3/run_local_verification.py --manifest <清单> [--followups-only]` 用正式 driver/tmux 与 CLI 替身断言 1/2/3 条输入、原 cwd/session、认证错误 42 且无补充、两种收尾及时以 124 退出且保留未完成。替身允许整体包装、thinking/text 混合及回复先落盘，区分 Ctrl+J 换行与 Enter 提交，并记录 keys/paste；错误样例包含结构化 error 字段。正式镜像还须核对模块/命令链接及 control driver 与被测源码一致。
-- `deploy/v3/verify_stack.py --manifest <清单> --browser --topic-followups` 核对页面保存→API→SQLite、运行冻结正文、阶段摘要、XSS、1280/390px 明暗主题。替身和离线格式核对不能声称真实模型推理通过。
+- `deploy/flower2api/run_local_verification.py --manifest <清单> [--followups-only]` 用正式 driver/tmux 与 CLI 替身断言 1/2/3 条输入、原 cwd/session、认证错误 42 且无补充、两种收尾及时以 124 退出且保留未完成。替身允许整体包装、thinking/text 混合及回复先落盘，区分 Ctrl+J 换行与 Enter 提交，并记录 keys/paste；错误样例包含结构化 error 字段。正式镜像还须核对模块/命令链接及 control driver 与被测源码一致。
+- `deploy/flower2api/verify_stack.py --manifest <清单> --browser --topic-followups` 核对页面保存→API→SQLite、运行冻结正文、阶段摘要、XSS、1280/390px 明暗主题。替身和离线格式核对不能声称真实模型推理通过。
 
 ## Scenario: 随机时间投递与阶段证据
 

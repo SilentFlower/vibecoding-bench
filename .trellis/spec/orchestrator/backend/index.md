@@ -29,5 +29,5 @@ services/orchestrator/ 的 Python 服务、数据库、账号运行环境和工�
 在仓库根执行以下命令。模块内命令以 `cd` 为界：
 
 ```bash
-PYTHONPATH=services/orchestrator:deploy/v3 .venv/bin/python -m unittest discover -s services/orchestrator
+PYTHONPATH=services/orchestrator:deploy/flower2api .venv/bin/python -m unittest discover -s services/orchestrator
 ```

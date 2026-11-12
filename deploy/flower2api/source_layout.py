@@ -4,6 +4,7 @@ from pathlib import Path
 
 # 对外清单和已安装宿主继续使用左侧逻辑路径，源码搬迁只改变右侧来源。
 SOURCE_ROOTS = (
+    ('deploy/v3', 'deploy/flower2api'),
     ('cc2api/web', 'apps/web'),
     ('cc2api', 'services/gateway'),
     ('orchestrator', 'services/orchestrator'),
@@ -28,6 +29,7 @@ def source_path(root: Path, logical: str | Path) -> Path:
         prefix = Path(original)
         if relative.is_relative_to(prefix):
             candidate = root / migrated / relative.relative_to(prefix)
-            # 单仓以 services 目录识别布局，缺失的新文件也不能回退到残留旧副本。
-            return candidate if (root / 'services').is_dir() else root / relative
+            # 部署源码单独识别迁移，兼容已有 services 目录的上一版单仓和固定宿主包。
+            marker = root / ('deploy/flower2api' if original == 'deploy/v3' else 'services')
+            return candidate if marker.is_dir() else root / relative
     return root / relative

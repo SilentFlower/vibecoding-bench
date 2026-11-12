@@ -47,6 +47,6 @@ cargo build --locked --release --bins
 
 ## 平台部署与升级
 
-flower2api 通过 [联合构建入口](../../deploy/v3/README.md) 生成同批 control／account 两类镜像。网关与编排服务按原部署配置协作。正式发行、签名目录、数据库迁移和现有实例原地升级统一遵循 [系统更新 SOP](../../deploy/v3/SYSTEM-UPDATES.md)。
+flower2api 通过 [联合构建入口](../../deploy/flower2api/README.md) 生成同批 control／account 两类镜像。网关与编排服务按原部署配置协作。正式发行、签名目录、数据库迁移和现有实例原地升级统一遵循 [系统更新 SOP](../../deploy/flower2api/SYSTEM-UPDATES.md)。
 
 目录整合和旧路径映射见 [单仓说明](../../docs/migrations/flower2api-layout.md)。

@@ -27,7 +27,7 @@ from fastapi.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'services/orchestrator'))
-sys.path.insert(0, str(ROOT / 'deploy/v3'))
+sys.path.insert(0, str(ROOT / 'deploy/flower2api'))
 
 import main as service
 from project_dialogue import ProjectDialogueClient, _NoRedirect

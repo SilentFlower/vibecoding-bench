@@ -60,7 +60,7 @@
 
 ## Testing Requirements
 
-在仓库根运行 `PYTHONPATH=services/orchestrator:deploy/v3 .venv/bin/python -m unittest discover -s services/orchestrator`。跨层交付另按以下业务路径选择隔离验收：
+在仓库根运行 `PYTHONPATH=services/orchestrator:deploy/flower2api .venv/bin/python -m unittest discover -s services/orchestrator`。跨层交付另按以下业务路径选择隔离验收：
 
 | 路径 | 怎么验 |
 |------|--------|
@@ -72,7 +72,7 @@
 | 任务运行(并发) | 单账号 repeat_n=4 → 一次提交 → 运行页同账号最多 2 个 running,其余 queued |
 | 失败兜底 | 故意停 docker daemon → 单次 ▶ run → 应当 failed 而不是 orchestrator 崩 |
 
-新测试沿现有 `unittest` 与合成夹具实现。Docker 调度、更新恢复和浏览器链路使用 `deploy/v3/` 的独立验证工具。
+新测试沿现有 `unittest` 与合成夹具实现。Docker 调度、更新恢复和浏览器链路使用 `deploy/flower2api/` 的独立验证工具。
 
 ---
 

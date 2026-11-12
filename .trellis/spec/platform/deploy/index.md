@@ -27,6 +27,6 @@ deploy/、images/ 与 .github/workflows/；跨模块升级和发行合同。
 在仓库根执行以下命令。模块内命令以 `cd` 为界：
 
 ```bash
-python3 deploy/v3/verify_database_definitions.py
-PYTHONPATH=services/orchestrator:deploy/v3 .venv/bin/python -m unittest discover -s deploy/v3
+python3 deploy/flower2api/verify_database_definitions.py
+PYTHONPATH=services/orchestrator:deploy/flower2api .venv/bin/python -m unittest discover -s deploy/flower2api
 ```

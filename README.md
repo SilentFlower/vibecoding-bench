@@ -25,7 +25,7 @@
 | [services/runtime](services/runtime/README.md) | 原生内核适配与诊断工具 |
 | [resources](resources) | 工程库、题库和研究资料 |
 | [images](images) | 镜像定义和角色入口 |
-| [deploy/v3](deploy/v3/README.md) | 联合构建、部署、备份和更新 |
+| [deploy/flower2api](deploy/flower2api/README.md) | 联合构建、部署、备份和更新 |
 | [.trellis](.trellis) | 项目规范与开发任务 |
 
 组件已整合为普通源码目录。布局和路径兼容机制见 [单仓说明](docs/migrations/flower2api-layout.md)。
@@ -37,16 +37,16 @@
 本地从仓库根生成两个镜像和同批清单：
 
 ```bash
-python3 deploy/v3/manage.py build --release local-001 --manifest releases/local-001.json
+python3 deploy/flower2api/manage.py build --release local-001 --manifest releases/local-001.json
 ```
 
-每次使用新的批次名和清单路径。部署配置、资源要求和启动命令见 [部署指南](deploy/v3/README.md)。
+每次使用新的批次名和清单路径。部署配置、资源要求和启动命令见 [部署指南](deploy/flower2api/README.md)。
 
 ## 现有实例升级
 
 已接入系统更新的实例，通过后台“系统更新”检查、准备和安装发行。原 v3 的部署路径、镜像标识、环境变量和数据身份继续沿现有合同使用。
 
-首次接入更新器、旧底座升级、数据库保护和回退步骤，统一见 [系统更新 SOP](deploy/v3/SYSTEM-UPDATES.md)。生产安装按对应实例的维护流程执行。
+首次接入更新器、旧底座升级、数据库保护和回退步骤，统一见 [系统更新 SOP](deploy/flower2api/SYSTEM-UPDATES.md)。生产安装按对应实例的维护流程执行。
 
 ## 本地开发
 

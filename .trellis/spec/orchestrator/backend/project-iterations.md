@@ -117,7 +117,7 @@ SQLite 的 `PROJECT_SCHEMA` 由 `init_db()` 幂等执行，新增：
 
 批次调度提示按七种状态分别显示：仅active使用实时wait_reasons或自动推进提示；暂停、收尾、停止、阻塞及完成各自说明。`next_launch_at`只有active且仍在未来时显示，终态不显示等待启动或失效投放时间。
 
-control 镜像的项目库、`images/v3/Dockerfile.dockerignore` 放行项、`deploy/v3/manage.py` 的源码快照列表须同步。`PROJECT_LIBRARY_DIR` 可覆盖内容路径，容器默认 `/repo/project_library`；当前 catalog 损坏只使目录／新建准入返回 503；历史从冻结 release 读取，普通题库保持原入口。账号删除引用计数包含新批次，不能将尚无 run 的项目批次变成孤儿。
+control 镜像的项目库、`images/v3/Dockerfile.dockerignore` 放行项、`deploy/flower2api/manage.py` 的源码快照列表须同步。`PROJECT_LIBRARY_DIR` 可覆盖内容路径，容器默认 `/repo/project_library`；当前 catalog 损坏只使目录／新建准入返回 503；历史从冻结 release 读取，普通题库保持原入口。账号删除引用计数包含新批次，不能将尚无 run 的项目批次变成孤儿。
 
 ### 4. Validation & Error Matrix
 
@@ -158,9 +158,9 @@ control 镜像的项目库、`images/v3/Dockerfile.dockerignore` 放行项、`de
 - `test_project_plans.py`：严格策略、实际容量 1、固定随机队列、2＋2＋1 轮换、共享容量与持久间隔；同 Run 两步、逐步 token、业务修复、停止竞争、重复决定及父链乱序；1／2 超时接续、原 Run quota_wait、检查点／会话缺失与截断、确认丢失和禁止盲发；旧结构主键／索引／序列幂等迁移。
 - 文件／停止回归：发布边界实际UID1000读取、相同决定inode不变、缺失补发、普通文档0600；open与fstat间替换、持续替换上限、非法文件与fd关闭；初始终态／SQL认领前独立连接终态／新代次／清理中终态不覆盖，不重复清理、不伪造释放，局部blocked首次原因与健康补位。
 - `ProjectVerifier`：独立 Docker 正例／反例、程序超时与基础设施错误区分；控制端 umask 不影响 UID 1000 读取候选。
-- `deploy/v3/run_local_verification.py --manifest <清单> --project-iterations-only`：合成 CLI 经过真实 Scheduler、driver、会话、清理和 Docker 验收的两步闭环。不得当作真实模型能力证据。
-- `deploy/v3/run_local_verification.py --manifest <清单> --project-scheduling-only`：真实 Docker／driver／tmux 中两个 CLI 重叠、冻结 A 时 B 继续、同 Run 两步及 60 秒真实 timeout 后只补剩余一步；Tasks 两 CLI 和既有 passthrough 长连接跨补位／清理保持。多个验收入口顺序创建独立网络，避免测试子网竞争。
-- `deploy/v3/verify_stack.py --manifest <清单> --browser --project-iteration`：真实 UI/API/SQLite，目录等待与重启保留、XSS、SSE 状态保持、1280/390px 明暗主题。
+- `deploy/flower2api/run_local_verification.py --manifest <清单> --project-iterations-only`：合成 CLI 经过真实 Scheduler、driver、会话、清理和 Docker 验收的两步闭环。不得当作真实模型能力证据。
+- `deploy/flower2api/run_local_verification.py --manifest <清单> --project-scheduling-only`：真实 Docker／driver／tmux 中两个 CLI 重叠、冻结 A 时 B 继续、同 Run 两步及 60 秒真实 timeout 后只补剩余一步；Tasks 两 CLI 和既有 passthrough 长连接跨补位／清理保持。多个验收入口顺序创建独立网络，避免测试子网竞争。
+- `deploy/flower2api/verify_stack.py --manifest <清单> --browser --project-iteration`：真实 UI/API/SQLite，目录等待与重启保留、XSS、SSE 状态保持、1280/390px 明暗主题。
 - `--project-scheduling-only`还须验证定向局部阻塞后兄弟及原队列后续项目继续。`--project-catalog-only --evidence-dir <新目录>`为可选100×20长测，保持默认10秒稳定等待并独立对账；部分运行不能记为全库通过。中断先停止本次标签下的写入容器，再清临时目录，保留证据及精确清理结论。
 - 原 `--run-boundaries`、`--topic-followups` 分别回归；新管理桥运行 `cargo fmt --check` 与 `cargo test --locked`，保留内部路径拒绝断言。
 
@@ -204,9 +204,9 @@ _process_pool_workers(workers: int) -> Iterator[None]
 _fixture_aliases(baseline: Path, project: Path, suite: dict) -> list[dict]
 _build_native_extension(project: Path, suite: dict, environment: dict, evidence: Path, timeout: int) -> dict
 _system_libraries(specification: tuple[str, str]) -> list[dict]
-source_snapshot_ignore(directory: str, names: list[str]) -> set[str]  # deploy/v3/manage.py
-_public_source_directory_digest(root: Path) -> str  # deploy/v3/manage.py
-restore_upstream_checkout_bytes(root: Path) -> list[str]  # deploy/v3/manage.py
+source_snapshot_ignore(directory: str, names: list[str]) -> set[str]  # deploy/flower2api/manage.py
+_public_source_directory_digest(root: Path) -> str  # deploy/flower2api/manage.py
+restore_upstream_checkout_bytes(root: Path) -> list[str]  # deploy/flower2api/manage.py
 ```
 
 受控回归 CLI 为 `project_native_regression.py --project <SUITES中的key> --baseline-root <原版> (--freeze-baseline-contract <新合同> | --contract <冻结合同> --candidate-root <候选>) --evidence-dir <空目录> [--timeout-sec 600]`，超时范围为1～1800秒。校准与候选回归互斥，不能覆盖既有合同或非空证据目录。
@@ -370,7 +370,7 @@ Dynaconf的76份和Flask的一份固定公开.env原件沿既有精确路径／S
 - 第三阶段适配：同类48项包含候选C源码、只读docstring、真实扩展后缀、受控私有链接、库目录绑定、进程池默认值／恢复和大集合完整性拒绝边界；153项项目单测（含该48项）、30项部署测试及最终目录单项回归分别留证。六项审计适配测试基于真实SQLGlot产品结果，拒绝错误数量／SHA／匹配证明、原件／控制器篡改和链接，并核冻结输入文件全集及字节不被写入。完整30仓主集合、170业务控制和15组真实产品链原件独立保存，不以单测代替原生或产品验收。
 - 内容评审协议：逐任务及必要披露／无材料路径构造真实 `review_package` 并执行 `parse_review`，核证据标识与候选文件存在性；隐藏具体事实只有实际消费后可用于相应结论。模拟对账同时统计唯一码、路径、披露消费、业务尝试和接受父链，不能把分支或补充材料当作独立任务。
 - Git 交付：`git check-attr text`核对冻结数据`unset`、普通代码保持原规则；`git check-ignore`核精确上游例外与本地工具文件仍忽略。被通用规则忽略的其他上游原件，仅在固定Git来源、逐文件SHA／执行位证明后列出精确force-add路径，不宽泛放开目录。用`git checkout-index`导出拟提交内容并按上文同生产函数精确恢复，分别留存恢复前后事实；核文件全集、逐文件字节／执行位及catalog摘要，再沿正式快照过滤器与Docker忽略文件实际COPY核相同集合；工作区摘要不能替代导出证据。
-- 真实调度与UI：`deploy/v3/run_local_verification.py --manifest <隔离清单> --project-scenarios-only --scenario-capacity 1`，另测容量2；需要UI与失败恢复时加现有 `--scenario-browser`／`--scenario-failures`。核原Scheduler／driver／SQLite、holder容量、私有挂载与AT-only、超时半成品、仅续验收及页面状态／预算／用量对账；模拟CLI证据明确real_model_calls=0。旧project-iterations／project-scheduling、quota／window及普通题库适用回归继续保留。
+- 真实调度与UI：`deploy/flower2api/run_local_verification.py --manifest <隔离清单> --project-scenarios-only --scenario-capacity 1`，另测容量2；需要UI与失败恢复时加现有 `--scenario-browser`／`--scenario-failures`。核原Scheduler／driver／SQLite、holder容量、私有挂载与AT-only、超时半成品、仅续验收及页面状态／预算／用量对账；模拟CLI证据明确real_model_calls=0。旧project-iterations／project-scheduling、quota／window及普通题库适用回归继续保留。
 
 
 ## Scenario: 真实 GitHub 项目逐仓研究与百项目扩展 SOP
@@ -721,7 +721,7 @@ GET /api/accounts/warmup/pi
 
 - `cd images/pi-agent && npm test`：真实 SDK 的缺失结束标记、半截工具、已确认结果复用、持续失败交接、明确拒绝优先与响应隐私；普通推理及摘要共享恢复继续通过。
 - `.venv/bin/python -m unittest discover -s orchestrator -p 'test_projects*.py'`：两空间旧诊断幂等、关闭计划、临时占用／额度等待、取消与代次竞争、坏会话、会话时间不符、执行收口优先，以及 `ValueError/OSError` 时另一账号继续恢复和提示竞争。
-- `.venv/bin/python deploy/v3/verify_pi_projects_browser.py --evidence <临时证据目录>`：真实 Chrome、API、SQLite、SSE 核对等待／低频状态、原因、次数、下次时间、刷新与账号切换；合成验证不代表正式上游或生产目标已恢复。
+- `.venv/bin/python deploy/flower2api/verify_pi_projects_browser.py --evidence <临时证据目录>`：真实 Chrome、API、SQLite、SSE 核对等待／低频状态、原因、次数、下次时间、刷新与账号切换；合成验证不代表正式上游或生产目标已恢复。
 
 ## Scenario: 验收反馈与自动复验
 
@@ -1066,10 +1066,10 @@ ProjectsTerminal.startup_recovery_ready(account: dict, work: dict) -> bool
 - `test_projects_runtime_resilience`：版本／策略边界、标准库兼容补丁及源码摘要／第三方版本／插件元数据漂移拒绝、输入不变、全部已核冻结来源及篡改拒绝、缓存实测、两空间故障投影、无模型空转、真实计数、成功才解除、重启截止、迟到取消、启动后异常脱敏及后续模型错误优先。
 - `test_runtime_diagnostics`、`test_capture_settings_runtime`：原故障与清理故障独立、类型／errno／栈位置保持且合成敏感值不入记录，权限／拒绝链接／写入失败、网络协议来源和两空间 handle 归属；`test_startup_recovery` 以真实环境表和注册核对实际角色、原生会话、孤儿、执行登记和未知状态拒绝。
 - `test_projects_runtime_resilience`、`test_projects_agent`：人工未启动恢复保留 work/session/冻结设置且只审计一次，自动扫描／recover、任何输入动作、已启动、运行时、cleanup／starting 和代次不符均拒绝；沿原身份／合同／授权门禁，不提前解除故障。
-- `images/account/test_network_context.py` 用真实内核进程验证 stat/cmdline 已打开后的退出竞争，保留未知 PID 拒绝和定向强停；故障注入核 CA 错误只发布一次且保留阶段。`deploy/v3/verify_network_context.py --image <本地account镜像> --cycles 3` 在禁网合成容器内执行 7 次真实透传／抓包切换，核监听确认、持久 CA 和优雅收口，记录当前源码摘要；该底座覆盖测试不代替正式联合镜像和生产恢复验收。
+- `images/account/test_network_context.py` 用真实内核进程验证 stat/cmdline 已打开后的退出竞争，保留未知 PID 拒绝和定向强停；故障注入核 CA 错误只发布一次且保留阶段。`deploy/flower2api/verify_network_context.py --image <本地account镜像> --cycles 3` 在禁网合成容器内执行 7 次真实透传／抓包切换，核监听确认、持久 CA 和优雅收口，记录当前源码摘要；该底座覆盖测试不代替正式联合镜像和生产恢复验收。
 - `test_project_native_verifier`、`test_project_duplicate_adapter`、`test_project_arrow_adapter`：环境错误分类与版本事实、组合适配、原文件不改及可信内层只读挂载；`test_project_native_regression` 继续核冻结节点与结果约束。
 - `test_projects_pi_round` 和 `images/pi-agent/host.test.mjs`：真实 Python／Node／SDK 回执先落盘，故障交接仅一次上游请求，伪造／非布尔标志无效，混合批次及下一轮边界正确。
-- 两个 `deploy/v3/verify_*pi*browser.py` 既有入口：API／SQLite／SSE 驱动真实 Chrome，核明暗主题、390／1280、刷新、次数／阶段／实际版本、恢复解除、XSS、旧历史不借当前时间和未保存配置保护。
+- 两个 `deploy/flower2api/verify_*pi*browser.py` 既有入口：API／SQLite／SSE 驱动真实 Chrome，核明暗主题、390／1280、刷新、次数／阶段／实际版本、恢复解除、XSS、旧历史不借当前时间和未保存配置保护。
 - 实际核对为 3.12.16 的本地禁网容器：冻结 Cerberus 环境准备及缓存复用，原版失败、参考和完整原生回归通过；显式 exact 返回带期望／实际版本的环境错误。不以 mock 版本函数代替此证据。
 - 同版禁网容器另核 ConfigObj 冻结原版及原线上候选：业务检查通过、79 个原生节点及 524 个补充示例全部匹配原合同；改变标准库源码摘要仍返回环境 error。`test_project_native_regression` 在补丁版本不同的真实 unittest 子进程中继续拒绝错误候选、跳过漂移和空集合。
 

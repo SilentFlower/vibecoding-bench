@@ -213,5 +213,5 @@ const isValidLimit = computed(() => {
 ### 6. Tests Required
 
 - `npm --prefix apps/web run build`；通过 Vue/TypeScript 和生产构建。
-- `python deploy/v3/verify_management_ui.py --output .deploy/management-ui/combined`：实际产物、合成 API、两个时区、390px、版本单展开、导航历史、采集开关及异步关闭。
+- `python deploy/flower2api/verify_management_ui.py --output .deploy/management-ui/combined`：实际产物、合成 API、两个时区、390px、版本单展开、导航历史、采集开关及异步关闭。
 - 原 `verify_environment_ui.py` 继续覆盖内核、时段、焦点、乱序和物理实测；所有浏览器模型调用为零。

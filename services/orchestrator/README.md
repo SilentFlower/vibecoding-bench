@@ -30,19 +30,19 @@ Python／FastAPI 编排服务，负责账号环境、任务调度、工程迭代
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r services/orchestrator/requirements.txt
-PYTHONPATH=services/orchestrator:deploy/v3 .venv/bin/python -m unittest discover -s services/orchestrator
+PYTHONPATH=services/orchestrator:deploy/flower2api .venv/bin/python -m unittest discover -s services/orchestrator
 ```
 
-系统更新与发布相关测试另见 `deploy/v3/test_*.py`。数据库定义校验入口为：
+系统更新与发布相关测试另见 `deploy/flower2api/test_*.py`。数据库定义校验入口为：
 
 ```bash
-python3 deploy/v3/verify_database_definitions.py
+python3 deploy/flower2api/verify_database_definitions.py
 ```
 
 当前镜像把模块复制至 `/app`，固定宿主更新包也有显式文件清单。调整目录时需要同步 Python 导入、镜像复制和固定包清单，并验证仓库外独立导入。
 
 ## 部署与来源
 
-正式平台通过 [联合部署](../../deploy/v3/README.md) 启动编排服务，与同批网关及账号镜像协作。配置、签名更新、备份和回退见 [系统更新 SOP](../../deploy/v3/SYSTEM-UPDATES.md)。
+正式平台通过 [联合部署](../../deploy/flower2api/README.md) 启动编排服务，与同批网关及账号镜像协作。配置、签名更新、备份和回退见 [系统更新 SOP](../../deploy/flower2api/SYSTEM-UPDATES.md)。
 
 本目录沿原 vibecoding-bench v3 编排服务演进。迁移基线和路径映射见 [组件来源](../../docs/migrations/flower2api-sources.json) 与 [单仓说明](../../docs/migrations/flower2api-layout.md)。

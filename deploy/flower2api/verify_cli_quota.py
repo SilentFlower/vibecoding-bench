@@ -18,7 +18,7 @@ def verify(image: str, binary: Path, settings_override: bool = False) -> None:
     :return: None；字段、原输出或请求计数不符时抛出异常
     """
     repository = Path(__file__).resolve().parents[2]
-    fixtures = repository / "deploy/v3/fixtures"
+    fixtures = repository / "deploy/flower2api/fixtures"
     client = docker.from_env()
     results = {}
     with tempfile.TemporaryDirectory(prefix="v3-official-quota-") as temporary:

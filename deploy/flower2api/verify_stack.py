@@ -179,7 +179,7 @@ def main() -> None:
             print('本地源码覆盖：', len(overlay), '个只读文件；sha256=', digest.hexdigest(), flush=True)
         compose.write_text(compose_text + f'    ipam:\n      config:\n        - subnet: {subnet}\n')
         wrapper = root / 'manage.py'
-        wrapper.write_text(f'import sys\nfrom pathlib import Path\nsys.path.insert(0,{str(REPO / "deploy/v3")!r})\nimport manage\nmanage.COMPOSE=Path({str(compose)!r})\nmanage.main()\n')
+        wrapper.write_text(f'import sys\nfrom pathlib import Path\nsys.path.insert(0,{str(REPO / "deploy/flower2api")!r})\nimport manage\nmanage.COMPOSE=Path({str(compose)!r})\nmanage.main()\n')
         manager = ["python3", str(wrapper)]
         try:
             for action in ("check", "up"):
@@ -281,7 +281,7 @@ def main() -> None:
                 json={"path": "/api/accounts/login/ws/abcdef123456"}, timeout=5).status_code == 401
             subprocess.run(manager + ["status", "--env", str(configuration)], check=True, cwd=REPO)
             subprocess.run(manager + ["stop", "--env", str(configuration)], check=True, cwd=REPO)
-            offline = manager + ["import-offline", "--env", str(configuration), "--source", str(REPO / "deploy/v3/fixtures/offline_metadata.json")]
+            offline = manager + ["import-offline", "--env", str(configuration), "--source", str(REPO / "deploy/flower2api/fixtures/offline_metadata.json")]
             subprocess.run(offline, check=True, cwd=REPO)
             subprocess.run(offline + ["--apply"], check=True, cwd=REPO)
             subprocess.run(offline + ["--apply"], check=True, cwd=REPO)

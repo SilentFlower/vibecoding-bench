@@ -14,7 +14,7 @@
 | `test_*.py`、`testdata/` | unittest 与冻结测试资料 |
 | `requirements.txt` | Python 运行依赖 |
 
-仓库级工具位于 `scripts/`，角色脚本与容器定义位于 `images/`，跨组件构建与验证位于 `deploy/v3/`。题库和工程种子位于 `resources/`，两套界面位于 `apps/`。实际部署路径通过 `deploy/v3/source_layout.py` 映射。
+仓库级工具位于 `scripts/`，角色脚本与容器定义位于 `images/`，跨组件构建与验证位于 `deploy/flower2api/`。题库和工程种子位于 `resources/`，两套界面位于 `apps/`。实际部署路径通过 `deploy/flower2api/source_layout.py` 映射。
 
 ## 模块组织
 

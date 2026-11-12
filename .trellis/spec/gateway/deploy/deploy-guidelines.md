@@ -32,7 +32,7 @@ claude-code-gateway
 
 - 远程环境变量通常由本仓 `.deploy/cc2api.env` 记录 SSH 信息；不要把密码或 token 写入 spec、README 或任务日志。
 - 网关由统一仓库直接管理。构建使用当前仓库提交，原独立仓来源记录于 `docs/migrations/flower2api-sources.json`。
-- 网关独立镜像从仓库根执行 `docker build -f services/gateway/docker/Dockerfile .`；v3 两镜像使用 `deploy/v3/manage.py build`。
+- 网关独立镜像从仓库根执行 `docker build -f services/gateway/docker/Dockerfile .`；v3 两镜像使用 `deploy/flower2api/manage.py build`。
 - 镜像升级后必须 recreate 服务，不能只 `docker compose pull`。
 - 涉及 `canonical_env`、settings、allowed versions 的改动，部署后必须查 DB 分布，不只看容器 `Up`。
 - 远程时区使用 `TZ=Asia/Shanghai`，峰值预热依赖本地小时。

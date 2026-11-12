@@ -13,7 +13,7 @@ runs:
       shell: bash
       env:
         DEPENDENCIES: ${{ hashFiles('images/v3/Dockerfile', 'services/gateway/Cargo.toml', 'services/gateway/Cargo.lock', 'services/gateway/vendor/**', 'services/gateway/craftls/**') }}
-        SOURCES: ${{ hashFiles('services/gateway/src/**', 'apps/web/**', 'deploy/v3/platform-release.json') }}
+        SOURCES: ${{ hashFiles('services/gateway/src/**', 'apps/web/**', 'deploy/flower2api/platform-release.json') }}
         CACHE_PLATFORM: ${{ runner.os }}-${{ runner.arch }}
         CACHE_WRITE: ${{ github.repository == 'SilentFlower/vibecoding-bench' && (github.ref == 'refs/heads/v3' || github.ref == 'refs/heads/flower2api') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
       run: |
