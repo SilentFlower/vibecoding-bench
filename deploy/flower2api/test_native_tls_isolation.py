@@ -20,8 +20,8 @@ class NativeTlsIsolationTests(unittest.TestCase):
             9: {'Name': 'ccrb-worker', 'PPid': '7', 'Uid': '1001 1001 1001 1001'},
         }
 
-    def inspect(self, rows):
-        """以合成proc运行原验收程序。@param rows 进程状态。@return 探针结果；失效抛断言。"""
+    def inspect(self, rows, criu=False):
+        """以合成proc运行验收程序。@param rows 进程状态。@param criu 是否为恢复入口。@return 探针结果；失效抛断言。"""
         def read(path, *args, **kwargs):
             """提供固定系统文件。@param path proc或画像路径。@return 合成内容。"""
             if str(path) == '/proc/sys/kernel/hostname':
@@ -29,12 +29,15 @@ class NativeTlsIsolationTests(unittest.TestCase):
             if str(path) == '/etc/machine-id':
                 return 'a'*32
             values = {'CapInh': '0'*16, 'CapPrm': '0'*16, 'CapEff': '0'*16,
-                'CapBnd': f'{self.allowed:016x}', 'CapAmb': '0'*16, 'NoNewPrivs': '1', **rows[int(path.parent.name)]}
+                'CapBnd': f'{self.allowed:016x}', 'CapAmb': '0'*16, 'NoNewPrivs': '1',
+                'NSpid': path.parent.name, 'Seccomp': '0' if int(path.parent.name) == 1 else '2', **rows[int(path.parent.name)]}
             return '\n'.join(key+':\t'+value for key, value in values.items())
         with patch.object(Path, 'read_text', autospec=True, side_effect=read), \
                 patch.object(Path, 'glob', return_value=[Path(f'/proc/{pid}/status') for pid in rows]), \
+                patch.object(Path, 'readlink', autospec=True, side_effect=lambda path: Path('/memfd:ccrb-native-runtime (deleted)') if path.parent.name == '12' else Path('/usr/local/bin/account-sender')), \
+                patch.object(Path, 'read_bytes', return_value=b'python3\0-E\0-s\0/opt/ccrb-criu/supervisor.py\0'), \
                 patch('builtins.print') as output:
-            exec(sender_business_probe(), {})
+            exec(sender_business_probe(criu), {})
         return json.loads(output.call_args.args[0])
 
     def test_loader_and_business_have_separate_capability_rules(self):
@@ -64,6 +67,22 @@ class NativeTlsIsolationTests(unittest.TestCase):
         rows[8] = dict(rows[7])
         with self.assertRaises(AssertionError):
             self.inspect(rows)
+
+    def test_criu_supervisor_and_nested_business_keep_distinct_permissions(self):
+        """受信恢复监督器与嵌套业务进程按各自身份核验。@return None。"""
+        self.allowed = sum(1 << cap for cap in (0, 1, 3, 5, 6, 7, 8, 12, 18, 19, 21, 24, 25))
+        rows = copy.deepcopy(self.rows)
+        rows[1].update(CapEff=f'{self.allowed:016x}', CapPrm=f'{self.allowed:016x}')
+        rows[10] = {'Name': 'python3', 'PPid': '1', 'Uid': '0 0 0 0', 'NSpid': '10 1', 'Seccomp': '0',
+            'CapEff': f'{self.allowed:016x}', 'CapPrm': f'{self.allowed:016x}'}
+        rows[12] = {'Name': 'ccrb-worker', 'PPid': '10', 'Uid': '1001 1001 1001 1001', 'NSpid': '12 1057'}
+        value = self.inspect(rows, True)
+        self.assertEqual({child['pid'] for child in value['children']}, {9, 12})
+        for pid, field, changed in ((12, 'CapEff', '1'), (12, 'Seccomp', '0'), (10, 'NSpid', '10 2')):
+            wrong = copy.deepcopy(rows)
+            wrong[pid][field] = changed
+            with self.assertRaises(AssertionError):
+                self.inspect(wrong, True)
 
 
 if __name__ == '__main__':

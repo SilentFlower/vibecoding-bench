@@ -15,6 +15,8 @@ import { initializeCli } from './cli';
 import { readCachePolicy, readTelemetryPolicy, readCacheTtlRewrite } from '../../shared/runtime-policy';
 import { createNativeTelemetry } from './telemetry';
 import { readNativeIngressPolicy } from '../../shared/upstream';
+import { resetRestoredRandomState } from './restore';
+import { nativeErrorDiagnostics, type NativeErrorStage } from '../../shared/native-error-diagnostics';
 
 const WORKER_ID = /^[a-f0-9-]{36}$/;
 
@@ -40,8 +42,13 @@ export async function reportStartupFailure(error: unknown): Promise<void> {
  * @return 控制管道关闭且当前作业已收口。
  */
 export async function startWorker(bindings: NativeBindings): Promise<void> {
-  const workerId = process.env.CCRB_WORKER_ID;
-  if (!workerId || !WORKER_ID.test(workerId)) throw new Error('缺少工作进程归属');
+  const initialWorkerId = process.env.CCRB_WORKER_ID;
+  if (!initialWorkerId || !WORKER_ID.test(initialWorkerId)) throw new Error('缺少工作进程归属');
+  let workerId = initialWorkerId;
+  const templateId = process.env.CCRB_TEMPLATE_ID;
+  if (templateId !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(templateId)) throw new Error('模板归属不合法');
+  let bound = templateId === undefined;
+  let binding = false;
   const cachePolicy = readCachePolicy(process.env.CCRB_CACHE_POLICY);
   const telemetryPolicy = readTelemetryPolicy(process.env.CCRB_TELEMETRY);
   const ingressPolicy = readNativeIngressPolicy(process.env.CCRB_NATIVE_INGRESS_POLICY);
@@ -68,6 +75,7 @@ export async function startWorker(bindings: NativeBindings): Promise<void> {
     await generateNativeRequest(bootstrap, bindings, new AbortController().signal);
   });
   const telemetryState = telemetry.start();
+  if (templateId) Bun.gc(true);
   const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
   let current: { id: string; abort: AbortController; finished: Promise<void> } | null = null;
   let closing = false;
@@ -76,6 +84,12 @@ export async function startWorker(bindings: NativeBindings): Promise<void> {
   const write = async (frame: WorkerFrame): Promise<void> => {
     if (!process.stdout.write(JSON.stringify(frame) + '\n')) await once(process.stdout, 'drain');
   };
+  const ready = (receipt?: { template_id: string; nonce: string; entropy_profile: 'bun143-wipeonfork-v1' }): WorkerFrame => ({
+    type: 'worker_ready', schema_version: 2, worker_id: workerId, version: PROFILE_293.version, pid: process.pid,
+    cache_policy: cachePolicy, telemetry: telemetryState, raw_input_protocol: 1, cache_ttl_rewrite_protocol: 1,
+    restore_protocol: 1, ...(templateId && !receipt ? { restore_template: templateId } : {}),
+    ...(receipt ? { restore_binding: receipt } : {}),
+  });
   const stop = (): void => {
     closing = true;
     input.close();
@@ -94,6 +108,21 @@ export async function startWorker(bindings: NativeBindings): Promise<void> {
       if (closing) throw new Error('工作进程正在关闭');
       const command = decodeWorkerCommand(JSON.parse(line), workerId);
       if (command.type === 'worker_shutdown') { stop(); return; }
+      if (command.type === 'worker_restore_bind') {
+        if (!templateId || command.template_id !== templateId || bound || binding || current) throw new Error('恢复绑定状态错误');
+        binding = true;
+        void (async () => {
+          await resetRestoredRandomState();
+          workerId = command.new_worker_id;
+          process.env.CCRB_WORKER_ID = workerId;
+          delete process.env.CCRB_TEMPLATE_ID;
+          await write(ready({ template_id: templateId, nonce: command.nonce, entropy_profile: PROFILE_293.restore.entropyProfile }));
+          bound = true;
+          binding = false;
+        })().catch(async error => { await reportStartupFailure(error); fatal(); });
+        return;
+      }
+      if (!bound) throw new Error('恢复实例尚未完成绑定');
       if (command.type === 'request_cancel') {
         if (!current || current.id !== command.request_id) throw new Error('取消归属错误');
         current.abort.abort();
@@ -112,11 +141,13 @@ export async function startWorker(bindings: NativeBindings): Promise<void> {
         await write({ type: 'request_event', schema_version: 2, worker_id: workerId, request_id: command.request_id, payload });
       };
       let prepared: PreparedInput | undefined;
+      let failureStage: NativeErrorStage = 'input';
       const finished = Promise.resolve().then(async () => {
         try {
           if (abort.signal.aborted) throw abort.signal.reason;
           const job = command.type === 'request_input' ? prepareInput(parseInput(command.input, [], ingressPolicy)) : command.prepared;
           prepared = job;
+          failureStage = 'context';
           if (command.type === 'request_input') await emit({ type: 'header_policy', attempt: 1, decisions: job.decisions });
           // 每轮都建立独立原生根，池内复用不能继承上一轮上下文或迟到事件。
           const session = bindings.state.nEr({ host: base.host, id: job.context.sessionId, project: base.project });
@@ -125,7 +156,7 @@ export async function startWorker(bindings: NativeBindings): Promise<void> {
             await storage.run(scope, async () => {
               bindings.state.t_(job.context.sessionId, 'resume');
               await runNativeJob(job, bindings, abort.signal, redactor, emit, cachePolicy,
-                readCacheTtlRewrite(command.type === 'request_input' ? command.cache_ttl_rewrite : undefined));
+                readCacheTtlRewrite(command.type === 'request_input' ? command.cache_ttl_rewrite : undefined), stage => { failureStage = stage; });
             });
           } finally { scope.telemetry = false; }
         } catch (error) {
@@ -133,7 +164,16 @@ export async function startWorker(bindings: NativeBindings): Promise<void> {
           retire = prepared !== undefined;
           if (terminal) throw error;
           if (abort.signal.aborted) await emit({ type: 'completed', attempt: 1, state: 'canceled' });
-          else await emit({ type: 'error', error: redactor.text(errorText(error)), ...(error instanceof BridgeError ? { code: error.code, status: error.status } : {}) });
+          else {
+            const diagnostics = nativeErrorDiagnostics(error, failureStage);
+            let message = '原生异常详情不可读取';
+            try { message = errorText(error); } catch { /* 异常 getter 不能阻断安全诊断。 */ }
+            let contract: { code?: string; status?: number } = {};
+            try {
+              if (error instanceof BridgeError) contract = { code: error.code, status: error.status };
+            } catch { diagnostics.inspection_failed = true; }
+            await emit({ type: 'error', error: redactor.text(message), diagnostics, ...contract });
+          }
         } finally {
           active = false;
         }
@@ -146,7 +186,7 @@ export async function startWorker(bindings: NativeBindings): Promise<void> {
     } catch { fatal(); }
   });
   input.on('close', () => { if (!closing) stop(); });
-  await write({ type: 'worker_ready', schema_version: 2, worker_id: workerId, version: PROFILE_293.version, pid: process.pid, cache_policy: cachePolicy, telemetry: telemetryState, raw_input_protocol: 1, cache_ttl_rewrite_protocol: 1 });
+  await write(ready());
   await closed;
   await telemetry.close();
   storage.disable();

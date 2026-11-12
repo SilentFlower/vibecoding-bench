@@ -5,16 +5,17 @@ from pathlib import Path
 from source_layout import source_path
 
 
-def sender_business_probe() -> str:
-    """构造只读实际业务进程探针。@return 受限加载器与其业务子进程的安全状态。"""
-    return '''import json,pathlib
+def sender_business_probe(criu: bool = False) -> str:
+    """构造只读实际业务进程探针。@param criu 是否为显式恢复入口。@return 加载器与实际业务子进程安全状态。"""
+    allowed = sum(1 << cap for cap in ((0, 1, 3, 5, 6, 7, 8, 12, 18, 19, 21, 24, 25) if criu else (21, 6, 7)))
+    return f'allowed={allowed}\ncriu={criu!r}\n' + '''import json,pathlib
 def status(pid):
  values=dict(line.split(':',1) for line in pathlib.Path(f'/proc/{pid}/status').read_text().splitlines() if ':' in line)
  return {'pid':int(pid),'parent':int(values['PPid']),'uid':int(values['Uid'].split()[0]),'name':values['Name'].strip(),
-  'caps':{key:values[key].strip() for key in ('CapInh','CapPrm','CapEff','CapBnd','CapAmb','NoNewPrivs')}}
+  'namespace_pid':int(values['NSpid'].split()[-1]) if criu else None,
+  'caps':{key:values[key].strip() for key in ('CapInh','CapPrm','CapEff','CapBnd','CapAmb','NoNewPrivs')+(('Seccomp',) if criu else ())}}
 broker=status(1)
 assert broker['uid']==0 and broker['caps']['NoNewPrivs']=='1'
-allowed=(1<<21)|(1<<6)|(1<<7)
 assert int(broker['caps']['CapEff'],16)==allowed and int(broker['caps']['CapPrm'],16)==allowed
 assert broker['caps']['CapInh']==broker['caps']['CapAmb']=='0000000000000000'
 rows=[]
@@ -25,10 +26,24 @@ senders=[row for row in rows if row['parent']==1 and row['name']=='account-sende
 assert len(senders)==1
 sender=senders[0]
 children=[row for row in rows if row['parent']==sender['pid']]
+if criu:
+ assert broker['caps']['Seccomp']=='0'
+ for row in rows:
+  if row['uid']!=1001 or row['parent']==sender['pid']:continue
+  try:executable=str(pathlib.Path(f"/proc/{row['pid']}/exe").readlink())
+  except FileNotFoundError:continue
+  if 'memfd:ccrb-native-runtime' not in executable:continue
+  owner=status(row['parent'])
+  assert owner['uid']==0 and owner['namespace_pid']==1
+  assert int(owner['caps']['CapEff'],16)==allowed and owner['caps']['NoNewPrivs']=='1' and owner['caps']['Seccomp']=='0'
+  arguments=pathlib.Path(f"/proc/{owner['pid']}/cmdline").read_bytes().split(b'\\0')
+  assert arguments[3]==b'/opt/ccrb-criu/supervisor.py'
+  children.append(row)
 for row in [sender,*children]:
  assert row['uid']==1001 and row['caps']['NoNewPrivs']=='1'
  assert all(row['caps'][key]=='0000000000000000' for key in ('CapInh','CapPrm','CapEff','CapAmb'))
  assert int(row['caps']['CapBnd'],16)&~allowed==0
+ if criu:assert row['caps']['Seccomp']=='2'
 print(json.dumps({**sender,'broker':broker,'children':children,
  'hostname':pathlib.Path('/proc/sys/kernel/hostname').read_text().strip(),
  'machine_id':pathlib.Path('/etc/machine-id').read_text().strip()}))
@@ -58,7 +73,14 @@ print(json.dumps({'uid':os.getuid(),'caps':{key:status[key].strip() for key in (
         configuration = container.attrs['Config']
         observer = role == 'sender' and configuration.get('Entrypoint') == [
             '/usr/local/bin/python3', '-E', '-s', '/opt/ccrb-tls-observer/broker.py']
-        if observer:
+        criu = role == 'sender' and configuration.get('Entrypoint') == [
+            '/usr/local/bin/python3', '-E', '-s', '/opt/ccrb-criu/entry.py']
+        if criu:
+            assert configuration['User'] == '0:0'
+            assert set(settings.get('CapAdd') or []) == {'CHOWN', 'DAC_OVERRIDE', 'FOWNER', 'KILL', 'SETUID', 'SETGID', 'SETPCAP',
+                'NET_ADMIN', 'SYS_CHROOT', 'SYS_PTRACE', 'SYS_ADMIN', 'SYS_RESOURCE', 'SYS_TIME'}
+            assert 'seccomp=unconfined' in settings['SecurityOpt']
+        elif observer:
             assert configuration['User'] == '0:0'
             assert set(settings.get('CapAdd') or []) == {'SYS_ADMIN', 'SETUID', 'SETGID'}
             policy = next(value[8:] for value in settings['SecurityOpt'] if value.startswith('seccomp='))
@@ -66,11 +88,11 @@ print(json.dumps({'uid':os.getuid(),'caps':{key:status[key].strip() for key in (
             assert json.loads(policy) == json.loads(expected.read_text())
         else:
             assert not settings.get('CapAdd')
-        result = container.exec_run(['python3', '-I', '-c', sender_business_probe() if observer else probe])
+        result = container.exec_run(['python3', '-I', '-c', sender_business_probe(criu) if observer or criu else probe])
         assert result.exit_code == 0, role + ' 身份读取失败'
         observed = json.loads(result.output)
         assert observed['uid'] == uid and observed['caps']['NoNewPrivs'] == '1'
-        excluded = ('NoNewPrivs', 'CapBnd') if observer else ('NoNewPrivs',)
+        excluded = ('NoNewPrivs', 'CapBnd', 'Seccomp') if observer or criu else ('NoNewPrivs',)
         assert all(value == '0000000000000000' for key, value in observed['caps'].items() if key not in excluded)
         assert container.exec_run(['touch', '/etc/isolation-must-fail']).exit_code != 0
         facts[role] = {**observed, 'memory': settings['Memory'], 'memory_swap': settings['MemorySwap']}

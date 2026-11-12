@@ -457,3 +457,53 @@ bun run collect:pool-incidents --run manual-001 --run-dir artifacts/local-pool-r
 - tests/integration/pool-incidents.test.ts：真实表只读补采、源记录不变、正文未打开、权限、分页／晚终态、并发采集、跨运行、CLI、来源和输出故障、停止后无活动。
 - 同集成套件固定回归 CHK-001/FBK-001/FBK-002：保留字 ID、旧平铺报告、首中尾页故障及恢复、末页成功仍保留前页错误、损坏嵌套／额外字段与合法部分证据的区别。
 - tests/local-pool/incidents.test.ts：无外网固定原版的连接拒绝、收头前断连、HTTP／流错误、缺终态、多会话精确归属、随后独立请求成功、取证不可用不影响业务、零真实推理及无重放。
+
+## Scenario: 原生发送器安全异常摘要
+
+### 1. Scope / Trigger
+
+- 原生 worker、共享私有协议及平台 sender 的错误诊断必须保留可检索证据。异常信息保持独立于失败进程 HOME 的清理。
+
+### 2. Signatures
+
+- src/shared/native-error-diagnostics.ts：nativeErrorDiagnostics(error: unknown, stage: NativeErrorStage): NativeErrorDiagnostics；isNativeErrorDiagnostics(value: unknown): value is NativeErrorDiagnostics。
+- RuntimePayload.error 可选 diagnostics: NativeErrorDiagnostics 与 diagnostics_state: 'invalid'。validateRuntimeEvent、decodeWorkerFrame、scripts/testing/local-pool-protocol.ts 的 decodeLocalDriverFrame 消费规范化结果。
+- services/gateway/src/service/native_error.rs：project(payload: &Value) -> NativeErrorProjection，state 为 available / unavailable / invalid，details 为已校验摘要或 None。
+
+### 3. Contracts
+
+- 摘要固定 schema_version=1、stage、causes、chain_truncated、cycle_detected、inspection_failed 六字段。stage 为 input / context / construction / dispatch / response_headers / response_body / unknown，来自实际操作边界。
+- causes 含根错误在内最多八层，每项仅 name/code。两个字段按固定白名单投影，未知值为 unknown。忽略任意 message、stack、URL、聚合 errors 数组及扩展属性；getter 失败标 inspection_failed，访问集合检测环，超限标 chain_truncated。
+- TypeScript 先校验基础错误及请求归属，再重建白名单 error 载荷。非法摘要移除并标 diagnostics_state=invalid，原 code/status 保留；所有解码消费者必须交付返回值，不能只验证再转交原帧。
+- 旧事件缺省诊断保持原形状，Rust 显示 unavailable。显式失效标记或不合法摘要显示 invalid；Rust 独立校验字段、枚举及规模后才复制摘要，业务响应与单次提交语义保持原合同。
+- account-sender 默认 info、JSON、无 ANSI，支持 RUST_LOG；native_error_event 记录 job/attempt、worker/PID、account_id、generation、diagnostics_state、error_stage、安全摘要及原错误 SHA。网关提交日志提供根请求到 attempt 的关联。worker stdout 仅传私有协议，sender 日志沿 Docker 既有轮转保存。
+- TS/Rust 的枚举目录和实际摘要用 services/gateway/tests/fixtures/native-error-diagnostics.json 交叉验证。完整新摘要需构建并接纳配套内核，固定 SHA、签名及 TLS 探针准入仍沿发行合同。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 诊断与业务行为 |
+| --- | --- |
+| 已知系统或 TLS 错误及 cause | 记录实际阶段与受控 name/code |
+| 未知类型、未知 code、抛异常 getter、环或超长链 | unknown 或对应边界标记，最多八层 |
+| 旧事件省略诊断 | 请求继续按原错误处理，Rust 记 unavailable |
+| 原 422 附非法或未知版本摘要 | 保留 422 和原 code，移除摘要，标 invalid |
+| 错请求/worker 归属或基础状态非法 | runtime_protocol，沿既有隔离收口 |
+| 进程退役或目录清理 | 先记录普通日志，沿原规则清理私有目录 |
+
+### 5. Scenarios and Examples
+
+```json
+{"schema_version":1,"stage":"dispatch","causes":[{"name":"TypeError","code":"unknown"},{"name":"Error","code":"ECONNRESET"}],"chain_truncated":false,"cycle_detected":false,"inspection_failed":false}
+```
+
+- 正常：管理员用网关根 request_id 找到 native_job_id，再查询 sender 的该 job、PID、阶段和 cause。
+- 边界：旧内核没有摘要，明确显示 unavailable，保留原错误状态。
+- 错误用法：因诊断损坏把 unsupported_parameter/422 改为 runtime_protocol/502，或只校验后转发原帧。正确做法：保留基础业务错误并交付规范化后的失效标记。
+- 错误用法：将任意 error.message/stack 或原 cause 对象写入普通日志。正确做法：在提取和消费两个边界分别作有界白名单投影。
+
+### 6. Tests Required
+
+- tests/unit/native-error-diagnostics.test.ts：秘密、getter、撤销代理、环、八层边界、真实 fetch 超时、共享目录、新旧事件、失效标记跨边界保持、基础状态及归属拒绝。
+- tests/integration/control.test.ts：实际共享解码器到控制 API 及日志库，非法摘要保留 422/code、一次调用且私有扩展不落盘。
+- tests/native/native.test.ts：实际固定原版在离线回环复现构造失败、代理拒绝、连接拒绝、提前关闭和 TLS 错误；核对阶段、错误码与发送计数。
+- gateway 的 native_error、native_runtime 定向测试及 tests/sender_logging.rs：独立拒绝非法摘要、记录关联字段、旧内核降级、真实入口 JSON 日志和 RUST_LOG 过滤。

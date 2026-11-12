@@ -42,6 +42,14 @@ Linux x64 分发文件为 `ccrb-runtime-linux-x64`，实际大小 **27387960 字
 
 二进制依次返回实际 `header_policy` 决策、`cc_prepared` 组装快照、响应头、base64 响应片段、唯一终态和匹配 `worker_idle`。组装快照是原生封口前值。只有终态及 idle 收齐后才复用进程。取消和通道错误退役进程，下一请求按需重建。
 
+error 事件可选携带 `diagnostics`，版本为 1。`stage` 标记实际 input、context、construction、dispatch、response_headers 或 response_body 边界；未知时为 unknown。`causes` 最多八项，只包含受控 `name/code`，并通过 `chain_truncated/cycle_detected/inspection_failed` 标记边界。白名单由 `src/shared/native-error-diagnostics.ts` 所有，TypeScript 与 Rust 共用夹具核对目录。异常 message、stack、URL 和扩展属性不进入摘要。
+
+TypeScript 解码器先验证业务错误及请求归属，再重建 error 载荷。非法或未知版本摘要被移除，并附加 `diagnostics_state="invalid"`；原 code/status 保持。worker 帧的消费者接收规范化后的载荷。旧事件省略该字段，Rust 也识别规范化失效标记。
+
+平台 sender 默认将结构化 JSON 日志写入标准输出，支持 `RUST_LOG`。`native_error_event` 日志包含 job/attempt、worker/PID、账号、环境代次，以及 `diagnostics_state`、`error_stage` 和安全摘要。网关提交日志提供根 request_id 到 job 的关联。旧内核缺省摘要时标为 unavailable，Rust 消费端拒绝畸形摘要并标为 invalid，保持原业务响应。worker 的 stdout 继续只承载私有协议。
+
+完整 cause 采集依赖已构建并接纳相应源码的内核制品；只更新平台 sender 时可以恢复既有日志及缺省状态。固定制品身份、签名接纳与 TLS 探针准入沿原发行流程。
+
 ## 离线验收
 
 ```bash

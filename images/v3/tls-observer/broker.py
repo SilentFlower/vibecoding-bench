@@ -11,7 +11,7 @@ import socket
 import struct
 from uuid import UUID
 
-from observer import IMAGE_SHA256
+from observer import IMAGE_SHA256, ADMITTED_IMAGES
 
 ROOT = Path('/opt/ccrb-tls-observer')
 SOCKET = Path('/run/ccrb-observer/control.sock')
@@ -24,15 +24,23 @@ def identity(pid: int) -> tuple[int, int, str]:
     return int(status['PPid']), int(status['Uid'].split()[0]), started
 
 
-def validate(value: dict, peer: int, sender: int) -> str:
+def validate(value: dict, peer: int, sender: int, owners: dict | None = None) -> str:
     """核对固定协议和本sender直属进程。@param value 请求。@param peer 真实客户端。@param sender 权威父PID。@return 目标启动时刻。"""
     if (not isinstance(value, dict) or set(value) != {'pid', 'worker', 'capture', 'image'}
-            or type(value['pid']) is not int or value['pid'] < 2 or value['image'] != IMAGE_SHA256):
+            or type(value['pid']) is not int or value['pid'] < 2 or value['image'] not in ADMITTED_IMAGES):
         raise ValueError('OBSERVER_COMMAND_INVALID')
     for key in ('worker', 'capture'):
         if not isinstance(value[key], str) or str(UUID(value[key])) != value[key]:
             raise ValueError('OBSERVER_COMMAND_INVALID')
-    if identity(peer)[:2] != (sender, 1001) or identity(value['pid'])[:2] != (sender, 1001):
+    if identity(peer)[:2] != (sender, 1001):
+        raise ValueError('WORKER_OWNERSHIP')
+    registered = owners.get(value['pid']) if owners is not None else None
+    target = identity(value['pid'])
+    if registered:
+        if (target != (registered['owner'], 1001, registered['started'])
+                or registered['worker'] != value['worker'] or registered['image'] != value['image']):
+            raise ValueError('WORKER_OWNERSHIP')
+    elif target[:2] != (sender, 1001):
         raise ValueError('WORKER_OWNERSHIP')
     return identity(value['pid'])[2]
 
@@ -40,12 +48,15 @@ def validate(value: dict, peer: int, sender: int) -> str:
 class Broker:
     """持有本账号sender和有界的单worker采集代次。"""
 
-    def __init__(self, sender: int, maximum: int):
+    def __init__(self, sender: int, maximum: int, owners: dict | None = None):
         """绑定权威sender。@param sender 实际子进程。@param maximum 配置worker上限。@return None。"""
         self.sender = sender
+        self.owners = owners
         self.maximum = maximum
         self.active = set()
         self.clients = 0
+        self.tasks = set()
+        self.cleaning = set()
 
     async def handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         """受理单次私有采集，断开时释放。@param reader 客户端。@param writer 私有结果。@return None。"""
@@ -55,6 +66,7 @@ class Broker:
         admitted = False
         tasks = []
         self.clients += 1
+        self.tasks.add(asyncio.current_task())
         try:
             peer, uid, _ = struct.unpack('3i', writer.get_extra_info('socket').getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
             if uid != 1001 or self.clients > self.maximum:
@@ -63,7 +75,7 @@ class Broker:
             if len(raw) > 4096 or not raw.endswith(b'\n'):
                 return
             value = json.loads(raw)
-            started = validate(value, peer, self.sender)
+            started = validate(value, peer, self.sender, self.owners)
             target = value['pid']
             if target in self.active or len(self.active) >= self.maximum:
                 return
@@ -72,9 +84,11 @@ class Broker:
                 return
             self.active.add(target)
             admitted = True
+            registered = self.owners.get(target) if self.owners is not None else None
+            owner = registered['owner'] if registered else self.sender
             process = await asyncio.create_subprocess_exec(str(ROOT / 'launch'), 'observer',
                 '--pid', str(target), '--worker', value['worker'], '--capture', value['capture'],
-                '--image', value['image'], '--owner', str(self.sender), '--started', started,
+                '--image', value['image'], '--owner', str(owner), '--started', started,
                 stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
                 env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'LANG': 'C.UTF-8'})
 
@@ -108,6 +122,7 @@ class Broker:
         except (OSError, ValueError, KeyError, TypeError, asyncio.TimeoutError):
             pass
         finally:
+            self.cleaning.add(asyncio.current_task())
             for task in tasks:
                 task.cancel()
             if tasks:
@@ -116,7 +131,7 @@ class Broker:
                 # 固定C监督进程在EOF时以同UID回收观察器，清理不再依赖帮助进程pidfd分配。
                 process.stdin.close()
                 try:
-                    await asyncio.wait_for(process.wait(), 2)
+                    await asyncio.wait_for(process.communicate(), 2)
                 except asyncio.TimeoutError:
                     pass
             if target_fd is not None:
@@ -130,6 +145,17 @@ class Broker:
             except (OSError, asyncio.TimeoutError):
                 # 放弃读取的客户端不能让尾部缓冲拖住连接资源回收。
                 writer.transport.abort()
+            self.tasks.discard(asyncio.current_task())
+            self.cleaning.discard(asyncio.current_task())
+
+    async def close(self) -> None:
+        """撤销全部在途采集并等待其监督进程收口。@return 无。"""
+        tasks = list(self.tasks)
+        for task in tasks:
+            # EOF可能已进入清理；再次取消会截断communicate，留下尚未关闭的子进程管道。
+            if task not in self.cleaning:
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 async def main() -> None:
@@ -167,6 +193,7 @@ async def main() -> None:
     finally:
         server.close()
         await server.wait_closed()
+        await broker.close()
         if sender.returncode is None:
             stopper = await asyncio.create_subprocess_exec(str(ROOT / 'launch'), 'stop', str(sender_fd), pass_fds=(sender_fd,))
             await stopper.wait()

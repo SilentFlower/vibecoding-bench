@@ -13,6 +13,12 @@ ASSET = 'ccrb-runtime-linux-x64'
 SHA256 = '64c61cae565e9097de18cf61a35f46e7595f633cb14f7d6b8c6609fcd294ce89'
 POOL_MIB = 256
 WORKER_MIB = 192
+RESTORE_IMAGE_MIB = 108
+
+
+def criu_enabled() -> bool:
+    """读取部署侧显式恢复开关。@return 仅精确1启用，其余值关闭。"""
+    return os.environ.get('V3_NATIVE_CRIU', '') == '1'
 
 
 def prewarm_account_id(value: str) -> int | None:
@@ -48,7 +54,8 @@ def sender_config(configuration: dict, memory: str, swap: str = '0', budget: str
         raise ValueError('原生方式需要显式 V3_NATIVE_SENDER_MEMORY')
     workers = int(configuration.get('concurrency', 3)) * 2
     ram = 0 if unlimited else memory_bytes(value)
-    if workers <= 0 or (not unlimited and ram < (POOL_MIB + workers * WORKER_MIB) * 1024 ** 2):
+    worker_mib = WORKER_MIB + (RESTORE_IMAGE_MIB if criu_enabled() else 0)
+    if workers <= 0 or (not unlimited and ram < (POOL_MIB + workers * worker_mib) * 1024 ** 2):
         raise ValueError('原生 sender 预算不足以覆盖账号加权并发')
     isolated_account_limits(memory, swap, value)
     return {'binary_path': '/usr/local/bin/ccrb-runtime', 'work_root': '/native',

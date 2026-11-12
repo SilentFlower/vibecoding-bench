@@ -95,6 +95,7 @@ class HttpCaptureTest(unittest.TestCase):
         for missing in range(3):
             observer = Observer.__new__(Observer)
             observer.pid = 1234
+            observer.namespace_pid = 1234
             observer.connections = {}
             observer.writes = observer.accepted = 0
             observer.reason = None

@@ -1,0 +1,34 @@
+--- a/criu/mem.c
++++ b/criu/mem.c
+@@ -747,7 +747,9 @@
+ 	if (ret <= 0)
+ 		return ret;
+ 
+-	if (collect_special_file(ri->mm->exe_file_id) == NULL)
++	/* 封存 memfd 执行体使用 MEMFD 记录，按实际类型收集其引用。 */
++	if (find_file_desc_raw(FD_TYPES__MEMFD, ri->mm->exe_file_id) == NULL &&
++	    collect_special_file(ri->mm->exe_file_id) == NULL)
+ 		return -1;
+ 
+ 	pr_debug("Found %zd VMAs in image\n", ri->mm->n_vmas);
+--- a/criu/cr-restore.c
++++ b/criu/cr-restore.c
+@@ -2481,6 +2481,7 @@
+ 
+ static int prepare_mm(pid_t pid, struct task_restore_args *args)
+ {
++	struct file_desc *exe_memfd;
+ 	int exe_fd, i, ret = -1;
+ 	MmEntry *mm = rsti(current)->mm;
+ 
+@@ -2498,7 +2499,9 @@
+ 		args->mm_saved_auxv[i] = (auxv_t)mm->mm_saved_auxv[i];
+ 	}
+ 
+-	exe_fd = open_reg_by_id(mm->exe_file_id);
++	/* 与内存映射复用同一 memfd，保持执行体与映射的归属。 */
++	exe_memfd = find_file_desc_raw(FD_TYPES__MEMFD, mm->exe_file_id);
++	exe_fd = exe_memfd ? memfd_open(exe_memfd, NULL, false) : open_reg_by_id(mm->exe_file_id);
+ 	if (exe_fd < 0)
+ 		goto out;
+ 

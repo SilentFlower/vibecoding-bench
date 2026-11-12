@@ -7,6 +7,7 @@ import { isNativeModelCall, prepareCli } from './cli';
 import { prepareNativeBody } from '../../shared/native-input';
 import { applyCachePolicy, rewriteCacheTtl } from '../../shared/cache-policy';
 import type { CachePolicy, CacheTtlRewrite } from '../../shared/runtime-policy';
+import type { NativeErrorStage } from '../../shared/native-error-diagnostics';
 
 function unsupported(message: string): never {
   throw new BridgeError('unsupported_parameter', message, 422);
@@ -254,9 +255,11 @@ export async function generateNativeRequest(prepared: PreparedInput, bindings: N
  * @param emit 本轮有背压的事件输出。
  * @param cachePolicy 本机启动时固定的缓存策略。
  * @param cacheTtlRewrite 前置服务按本次设置冻结的已有缓存TTL覆盖。
+ * @param onStage 记录实际失败边界的本地观察器。
  * @return 作业和流已收口。
  */
-export async function runNativeJob(prepared: PreparedInput, bindings: NativeBindings, signal: AbortSignal, redactor: Redactor, emit: (payload: RuntimePayload) => Promise<void>, cachePolicy: CachePolicy = 'preserve', cacheTtlRewrite: CacheTtlRewrite = 'off'): Promise<void> {
+export async function runNativeJob(prepared: PreparedInput, bindings: NativeBindings, signal: AbortSignal, redactor: Redactor, emit: (payload: RuntimePayload) => Promise<void>, cachePolicy: CachePolicy = 'preserve', cacheTtlRewrite: CacheTtlRewrite = 'off', onStage: (stage: NativeErrorStage) => void = () => {}): Promise<void> {
+  onStage('construction');
   redactor.register(prepared.input);
   redactor.register({ api_key: process.env.ANTHROPIC_API_KEY, token: process.env.CLAUDE_CODE_OAUTH_TOKEN });
   const { api } = bindings;
@@ -317,8 +320,10 @@ export async function runNativeJob(prepared: PreparedInput, bindings: NativeBind
       const snapshot: RuntimePayload = { type: 'cc_prepared', attempt: 1, body: init.body, headers: outgoing, body_bytes: Buffer.byteLength(init.body), body_sha256: createHash('sha256').update(init.body).digest('hex'), cache_policy: cache.decision };
       const fail = (error: unknown): never => { dispatch.abort(); cancelNative(); throw error; };
       // 快照在 Ree 前固定；等待两方收口后才交付响应事件，失败时取消并释放未交付的响应。
+      onStage('dispatch');
       const [written, sent] = await Promise.allSettled([emit(snapshot).catch(fail), (async () => api.Ree(target, init))().catch(fail)]);
       if (written.status === 'rejected') {
+        onStage('construction');
         if (sent.status === 'fulfilled') await sent.value.body?.cancel().catch(() => {});
         throw written.reason;
       }
@@ -338,9 +343,11 @@ export async function runNativeJob(prepared: PreparedInput, bindings: NativeBind
   let drained = false;
   try {
     const response = await responseReady;
+    onStage('response_headers');
     status = response.status;
     const responseHeaders = [...response.headers.entries()] as HeaderPair[];
     await emit({ type: 'response_headers', attempt: 1, status, headers: responseHeaders });
+    onStage('response_body');
     reader = response.body?.getReader();
     if (reader) {
       while (true) {

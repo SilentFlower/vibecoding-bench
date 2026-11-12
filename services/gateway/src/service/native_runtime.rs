@@ -91,6 +91,25 @@ fn validate_distribution_config(config: &NativeSenderConfig) -> Result<(), AppEr
     Ok(())
 }
 
+/// 独立恢复memfd也计入预算；容量不足时沿正常共享映像路径。
+fn criu_available(config: &SenderConfig) -> bool {
+    let Some(native) = config.native.as_ref() else {
+        return false;
+    };
+    if !super::native_criu::enabled() {
+        return false;
+    }
+    let Ok(artifact) = artifact(native) else {
+        return false;
+    };
+    let extra = artifact.image_bytes.div_ceil(1024 * 1024);
+    native.memory_mib == 0
+        || native.memory_mib
+            >= POOL_MEMORY_MIB.saturating_add(
+                (WORKER_MEMORY_MIB + extra).saturating_mul(native.max_workers as u64),
+            )
+}
+
 /// 完整核验新进程使用的登记分发体，返回精确只读句柄。
 /// @param config 冻结的部署配置。
 /// @return 经完整摘要验证的文件。
@@ -233,6 +252,32 @@ struct PoolState {
     idle: Vec<Worker>,
     reaper_running: bool,
     spare: Option<SparePreparation>,
+    template: Option<Arc<HotTemplate>>,
+    template_retry_at: Option<Instant>,
+}
+
+/// 模板登记与其已缓存代理端点共同存活。
+struct HotTemplate {
+    registration: super::native_criu::Template,
+    proxy: Arc<NativeProxy>,
+}
+
+/// 恢复失败或取消时，许可保留到命名空间实际退出。
+struct RestoreGuard {
+    process: Option<super::native_criu::Process>,
+    lease: Option<WorkerLease>,
+}
+
+impl Drop for RestoreGuard {
+    fn drop(&mut self) {
+        let lease = self.lease.take();
+        if let Some(process) = self.process.take() {
+            tokio::spawn(async move {
+                process.retire().await;
+                drop(lease);
+            });
+        }
+    }
 }
 
 /// 当前代次唯一的后台补位；丢弃撤销端会收口尚未就绪的进程。
@@ -357,15 +402,18 @@ struct Worker {
     tls_observer: Option<super::native_tls_observer::NativeTlsSlot>,
     id: String,
     cache_ttl_rewrite_supported: bool,
+    restore_supported: bool,
     child: Option<Child>,
+    restored: Option<super::native_criu::Process>,
+    stderr_task: Option<JoinHandle<()>>,
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
-    root: PathBuf,
+    root: Option<PathBuf>,
     _image: File,
     execution_image: Option<Arc<File>>,
     idle_since: Instant,
     _lease: Option<WorkerLease>,
-    _proxy: NativeProxy,
+    _proxy: Arc<NativeProxy>,
     image_sha256: String,
     ready_at: Instant,
     started_at: Instant,
@@ -543,7 +591,7 @@ async fn native_socks_tunnel(
             Socks5Stream::connect_with_password(endpoint, target, &user, &password).await
         }
         .map_err(|error| {
-            tracing::warn!(worker_id, %tunnel_id, layer = "native_proxy", reason = "socks_connect_error",
+            tracing::warn!(proxy_id = worker_id, %tunnel_id, layer = "native_proxy", reason = "socks_connect_error",
                 error_summary = ?super::stream_error::summarize(&error), "SOCKS连接失败");
             unavailable()
         })?;
@@ -557,23 +605,23 @@ async fn native_socks_tunnel(
     let mut target = match timeout(Duration::from_secs(15), operation).await {
         Ok(Ok(target)) => target,
         failure => {
-            tracing::warn!(worker_id, %tunnel_id, layer = "native_proxy", phase,
+            tracing::warn!(proxy_id = worker_id, %tunnel_id, layer = "native_proxy", phase,
                 reason = if failure.is_err() { "local_connect_timeout" } else { "connect_failed" },
                 elapsed_ms = started.elapsed().as_millis(), "原生代理握手结束");
             return Err(unavailable());
         }
     };
-    tracing::info!(worker_id, %tunnel_id, layer = "native_proxy", reason = "tunnel_established",
+    tracing::info!(proxy_id = worker_id, %tunnel_id, layer = "native_proxy", reason = "tunnel_established",
         elapsed_ms = started.elapsed().as_millis(), "原生代理隧道已建立");
     // 仅复制原生 TLS 密文；SDK 保持证书校验、CCH 及唯一模型发送所有权。
     match copy_bidirectional(&mut socket, &mut target).await {
         Ok((sent, received)) => {
-            tracing::info!(worker_id, %tunnel_id, layer = "native_proxy", reason = "tunnel_eof",
+            tracing::info!(proxy_id = worker_id, %tunnel_id, layer = "native_proxy", reason = "tunnel_eof",
                 sent_bytes = sent, received_bytes = received, elapsed_ms = started.elapsed().as_millis(),
                 "代理隧道双向复制已结束");
         }
         Err(error) => {
-            tracing::warn!(worker_id, %tunnel_id, layer = "native_proxy", reason = "tunnel_io_error",
+            tracing::warn!(proxy_id = worker_id, %tunnel_id, layer = "native_proxy", reason = "tunnel_io_error",
                 elapsed_ms = started.elapsed().as_millis(),
                 error_summary = ?super::stream_error::summarize(&error), "代理隧道复制失败");
             return Err(protocol_error());
@@ -584,34 +632,56 @@ async fn native_socks_tunnel(
 
 impl Drop for Worker {
     fn drop(&mut self) {
-        if let Some(slot) = &self.tls_observer {
-            slot.close();
-        }
-        if let Some(mut child) = self.child.take() {
-            let _ = child.start_kill();
-            let root = self.root.clone();
-            let lease = self._lease.take();
-            // 等待已创建的子进程退出，再回收该进程专属目录。
-            tokio::spawn(async move {
-                let _ = child.wait().await;
-                let _ = fs::remove_dir_all(root);
-                drop(lease);
-            });
-        }
+        self.cleanup();
     }
 }
 
 impl Worker {
-    async fn retire(mut self) {
+    /// 将清理和许可一起移入独立任务；等待者取消也会保留实际退出所有权。
+    fn cleanup(&mut self) -> Option<JoinHandle<()>> {
         if let Some(slot) = &self.tls_observer {
             slot.close();
         }
-        if let Some(mut child) = self.child.take() {
-            let _ = child.start_kill();
-            let _ = child.wait().await;
-            let _ = fs::remove_dir_all(&self.root);
+        if let Some(task) = self.stderr_task.take() {
+            task.abort();
         }
-        self._lease.take();
+        let process = self.restored.take();
+        let mut child = self.child.take();
+        if process.is_none() && child.is_none() {
+            return None;
+        }
+        if let Some(child) = &mut child {
+            let _ = child.start_kill();
+        }
+        let root = self.root.take();
+        let lease = self._lease.take();
+        let proxy = self._proxy.clone();
+        Some(tokio::spawn(async move {
+            if let Some(process) = process {
+                process.retire().await;
+            }
+            if let Some(mut child) = child {
+                let _ = child.wait().await;
+            }
+            if let Some(root) = root {
+                let _ = fs::remove_dir_all(root);
+            }
+            drop(proxy);
+            drop(lease);
+        }))
+    }
+    /// 返回最终承载worker的真实外部PID。@return 存活句柄绑定的PID。
+    fn pid(&self) -> Option<u32> {
+        self.restored
+            .as_ref()
+            .and_then(|process| process.pid)
+            .or_else(|| self.child.as_ref().and_then(Child::id))
+    }
+
+    async fn retire(mut self) {
+        if let Some(cleanup) = self.cleanup() {
+            let _ = cleanup.await;
+        }
     }
 
     async fn send(
@@ -648,14 +718,19 @@ impl Worker {
                 protocol_error()
             })?;
             if available.is_empty() {
+                let pid = self.pid();
                 let exit = self
                     .child
                     .as_mut()
                     .and_then(|child| child.try_wait().ok())
                     .flatten();
-                tracing::warn!(worker_id = %self.id, reason = "ipc_eof",
+                let process_exited = self
+                    .restored
+                    .as_ref()
+                    .map_or(exit.is_some(), |process| !process.alive());
+                tracing::warn!(worker_id = %self.id, worker_pid = pid, reason = "ipc_eof",
                     exit_code = exit.as_ref().and_then(|status| status.code()),
-                    process_exited = exit.is_some(), "原生IPC已关闭");
+                    process_exited, "原生IPC已关闭");
                 return Err(protocol_error());
             }
             let count = available
@@ -691,12 +766,23 @@ impl Worker {
         execution_image: Option<Arc<File>>,
         deadline: Instant,
     ) -> Result<Self, AppError> {
+        Self::start_inner(config, identity, lease, execution_image, deadline, None).await
+    }
+
+    async fn start_inner(
+        config: &SenderConfig,
+        identity: &WorkerIdentity,
+        lease: WorkerLease,
+        execution_image: Option<Arc<File>>,
+        deadline: Instant,
+        template: Option<&str>,
+    ) -> Result<Self, AppError> {
         let started = Instant::now();
         let native = config.native.as_ref().ok_or_else(unavailable)?;
         let artifact = artifact(native)?;
         let image = verify_artifact(&artifact)?;
         let id = Uuid::new_v4().to_string();
-        let proxy = NativeProxy::create(&config.proxy_url, &id).await?;
+        let proxy = Arc::new(NativeProxy::create(&config.proxy_url, &id).await?);
         fs::create_dir_all(&native.work_root).map_err(|_| unavailable())?;
         fs::set_permissions(&native.work_root, fs::Permissions::from_mode(0o700))
             .map_err(|_| unavailable())?;
@@ -747,6 +833,21 @@ impl Worker {
                 .stdout(Stdio::piped())
                 .stderr(Stdio::null())
                 .kill_on_drop(true);
+            if let Some(template) = template {
+                command
+                    .env("CCRB_TEMPLATE_ID", template)
+                    .stderr(Stdio::piped());
+                // 快照种子的会话首进程必须位于账号PID空间内，避免继承容器外会话归属。
+                unsafe {
+                    command.pre_exec(|| {
+                        if libc::setsid() < 0 {
+                            Err(io::Error::last_os_error())
+                        } else {
+                            Ok(())
+                        }
+                    });
+                }
+            }
             if !proxy.url.is_empty() {
                 command
                     .env("HTTP_PROXY", &proxy.url)
@@ -778,14 +879,22 @@ impl Worker {
         };
         let stdin = child.stdin.take().ok_or_else(unavailable)?;
         let stdout = BufReader::new(child.stdout.take().ok_or_else(unavailable)?);
+        let stderr_task = child.stderr.take().map(|mut errors| {
+            tokio::spawn(async move {
+                let _ = tokio::io::copy(&mut errors, &mut tokio::io::sink()).await;
+            })
+        });
         let mut worker = Self {
             tls_observer: None,
             id,
             cache_ttl_rewrite_supported: false,
+            restore_supported: false,
             child: Some(child),
+            restored: None,
+            stderr_task,
             stdin,
             stdout,
-            root,
+            root: Some(root),
             _image: image,
             execution_image: execution_image.clone(),
             image_sha256: String::new(),
@@ -810,10 +919,13 @@ impl Worker {
             || ready["pid"].as_u64() != Some(pid as u64)
             || (ready.get("cache_ttl_rewrite_protocol").is_some()
                 && ready["cache_ttl_rewrite_protocol"] != 1)
+            || template
+                .is_some_and(|id| ready["restore_protocol"] != 1 || ready["restore_template"] != id)
         {
             return Err(unavailable());
         }
         worker.cache_ttl_rewrite_supported = ready["cache_ttl_rewrite_protocol"] == 1;
+        worker.restore_supported = ready["restore_protocol"] == 1;
         let mut executable = File::open(format!("/proc/{pid}/exe")).map_err(|_| unavailable())?;
         if executable.metadata().map_err(|_| unavailable())?.len() != artifact.image_bytes {
             return Err(unavailable());
@@ -839,27 +951,262 @@ impl Worker {
         } else {
             worker.execution_image = Some(Arc::new(executable));
         }
-        if config.native_capture_dir.is_some() {
-            let slot = super::native_tls_observer::NativeTlsSlot::new(
-                pid,
-                &worker.id,
-                &worker.image_sha256,
-            );
-            // 等待期间取消也要由Worker的Drop撤销同代帮助进程。
-            worker.tls_observer = Some(slot.clone());
-            // 冷启动和取消后的新进程必须先完成同PID采集预备，再交给首条业务取用。
-            slot.prepare(deadline).await;
+        if template.is_none() {
+            worker.prepare_tls(config, deadline).await;
         }
         worker.ready_at = Instant::now();
         worker.startup_ms = started.elapsed().as_millis() as u64;
         Ok(worker)
     }
 
+    /// 给最终实例重新预备TLS观察器。@param config 当前配置。@param deadline 原请求截止。@return 无。
+    async fn prepare_tls(&mut self, config: &SenderConfig, deadline: Instant) {
+        if config.native_capture_dir.is_some() {
+            let Some(pid) = self.pid() else { return };
+            let slot =
+                super::native_tls_observer::NativeTlsSlot::new(pid, &self.id, &self.image_sha256);
+            // 等待期间取消也要由Worker的Drop撤销同代帮助进程。
+            self.tls_observer = Some(slot.clone());
+            // 冷启动和取消后的新进程必须先完成同PID采集预备，再交给首条业务取用。
+            slot.prepare(deadline).await;
+        }
+    }
+
+    /// 在业务投递前绑定全新实例身份。@param seed 原种子身份。@param template 模板标识。@param nonce 随机挑战。@param deadline 原截止。@return 无。
+    async fn bind(
+        &mut self,
+        seed: &str,
+        template: &str,
+        nonce: &str,
+        expected_pid: u32,
+        deadline: Instant,
+    ) -> Result<(), AppError> {
+        let frame = json!({"schema_version":2,"type":"worker_restore_bind","worker_id":seed,
+            "template_id":template,"new_worker_id":self.id,"nonce":nonce});
+        let mut bytes = serde_json::to_vec(&frame).map_err(|_| unavailable())?;
+        bytes.push(b'\n');
+        timeout_at(deadline, self.stdin.write_all(&bytes))
+            .await
+            .map_err(|_| unavailable())?
+            .map_err(|_| unavailable())?;
+        let ready = timeout_at(deadline, self.next())
+            .await
+            .map_err(|_| unavailable())??;
+        if ready["type"] != "worker_ready"
+            || ready["version"] != "2.1.293"
+            || ready["raw_input_protocol"] != 1
+            || ready["restore_protocol"] != 1
+            || ready["pid"].as_u64() != Some(u64::from(expected_pid))
+            || ready.get("restore_template").is_some()
+            || ready["restore_binding"]
+                != json!({"template_id":template,"nonce":nonce,
+                "entropy_profile":super::native_criu::ENTROPY_PROFILE})
+            || (ready.get("cache_ttl_rewrite_protocol").is_some()
+                && ready["cache_ttl_rewrite_protocol"] != 1)
+        {
+            return Err(unavailable());
+        }
+        self.cache_ttl_rewrite_supported = ready["cache_ttl_rewrite_protocol"] == 1;
+        Ok(())
+    }
+
+    /// 在统一物理预算内生成模板，再把种子交回普通空闲池。@param config 冻结配置。@param identity 账号身份。@param lease 物理许可。@param image 已核验映像。@param deadline 准备截止。@param key 完整池身份。@return 种子与模板登记。
+    async fn start_template(
+        config: &SenderConfig,
+        identity: &WorkerIdentity,
+        lease: WorkerLease,
+        image: Arc<File>,
+        deadline: Instant,
+        key: &str,
+    ) -> Result<(Self, Arc<HotTemplate>), AppError> {
+        let template_id = Uuid::new_v4().to_string();
+        let mut worker = Self::start_inner(
+            config,
+            identity,
+            lease,
+            Some(image),
+            deadline,
+            Some(&template_id),
+        )
+        .await?;
+        let seed = worker.id.clone();
+        let dump_started = Instant::now();
+        let registration = timeout_at(
+            deadline,
+            super::native_criu::Template::register(
+                key,
+                &template_id,
+                &seed,
+                worker.pid().ok_or_else(unavailable)?,
+                &worker.image_sha256,
+            ),
+        )
+        .await
+        .map_err(|_| unavailable())?
+        .map_err(|_| unavailable())?;
+        let dump_ms = dump_started.elapsed().as_millis() as u64;
+        let template = Arc::new(HotTemplate {
+            registration,
+            proxy: worker._proxy.clone(),
+        });
+        worker.id = Uuid::new_v4().to_string();
+        let pid = worker.pid().ok_or_else(unavailable)?;
+        let bind_started = Instant::now();
+        worker
+            .bind(
+                &seed,
+                &template_id,
+                &super::native_criu::nonce(),
+                pid,
+                deadline,
+            )
+            .await?;
+        let bind_ms = bind_started.elapsed().as_millis() as u64;
+        let tls_started = Instant::now();
+        worker.prepare_tls(config, deadline).await;
+        let tls_ms = tls_started.elapsed().as_millis() as u64;
+        worker.ready_at = Instant::now();
+        worker.startup_ms = worker.started_at.elapsed().as_millis() as u64;
+        tracing::info!(worker_id = %worker.id, template_id, elapsed_ms = worker.startup_ms, dump_ms, bind_ms, tls_ms,
+            source = "criu_template", "原生零业务模板已准备");
+        Ok((worker, template))
+    }
+
+    /// 尝试恢复；失败清理真实进程后把同一许可交还正常启动路径。
+    async fn restore(
+        config: &SenderConfig,
+        template: &HotTemplate,
+        key: &str,
+        lease: WorkerLease,
+        image: Arc<File>,
+        deadline: Instant,
+    ) -> Result<Self, WorkerLease> {
+        let mut guard = RestoreGuard {
+            process: None,
+            lease: Some(lease),
+        };
+        let operation = async {
+            let started = Instant::now();
+            let artifact = artifact(config.native.as_ref().ok_or_else(unavailable)?)?;
+            if template.registration.image != artifact.image_sha256 {
+                return Err(unavailable());
+            }
+            let distribution = verify_artifact(&artifact)?;
+            let distribution_verify_ms = started.elapsed().as_millis() as u64;
+            let id = Uuid::new_v4().to_string();
+            let nonce = super::native_criu::nonce();
+            let handoff_started = Instant::now();
+            guard.process = Some(
+                super::native_criu::Process::connect()
+                    .await
+                    .map_err(|_| unavailable())?,
+            );
+            let process = guard.process.as_mut().ok_or_else(unavailable)?;
+            let (stdin, stdout) = process
+                .start(&template.registration, key, &id, &nonce)
+                .await
+                .map_err(|_| unavailable())?;
+            let handoff_ms = handoff_started.elapsed().as_millis() as u64;
+            let verify_started = Instant::now();
+            let pid = process.pid.ok_or_else(unavailable)?;
+            let inner_pid = process.inner_pid.ok_or_else(unavailable)?;
+            let mut executable =
+                File::open(format!("/proc/{pid}/exe")).map_err(|_| unavailable())?;
+            let required = F_SEAL_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL;
+            if executable.metadata().map_err(|_| unavailable())?.len() != artifact.image_bytes
+                || digest_file(&mut executable).map_err(|_| unavailable())? != artifact.image_sha256
+                || unsafe { fcntl(executable.as_raw_fd(), F_GET_SEALS) } & required != required
+            {
+                return Err(unavailable());
+            }
+            let image_verify_ms = verify_started.elapsed().as_millis() as u64;
+            let mut worker = Self {
+                tls_observer: None,
+                id,
+                cache_ttl_rewrite_supported: false,
+                restore_supported: true,
+                child: None,
+                restored: None,
+                stderr_task: None,
+                stdin,
+                stdout: BufReader::new(stdout),
+                root: None,
+                _image: distribution,
+                execution_image: Some(image),
+                idle_since: Instant::now(),
+                _lease: None,
+                _proxy: template.proxy.clone(),
+                image_sha256: artifact.image_sha256,
+                ready_at: started,
+                started_at: started,
+                startup_ms: 0,
+            };
+            let bind_started = Instant::now();
+            worker
+                .bind(
+                    &template.registration.seed_worker,
+                    &template.registration.id,
+                    &nonce,
+                    inner_pid,
+                    deadline,
+                )
+                .await?;
+            let bind_ms = bind_started.elapsed().as_millis() as u64;
+            // 全部可失败的准入完成后，连续移交进程与许可，中间没有await。
+            worker.restored = guard.process.take();
+            worker._lease = guard.lease.take();
+            Ok((
+                worker,
+                distribution_verify_ms,
+                handoff_ms,
+                image_verify_ms,
+                bind_ms,
+            ))
+        };
+        match timeout_at(deadline, operation).await {
+            Ok(Ok((mut worker, distribution_verify_ms, handoff_ms, image_verify_ms, bind_ms))) => {
+                let tls_started = Instant::now();
+                worker.prepare_tls(config, deadline).await;
+                let tls_ms = tls_started.elapsed().as_millis() as u64;
+                worker.ready_at = Instant::now();
+                worker.startup_ms = worker.started_at.elapsed().as_millis() as u64;
+                tracing::info!(worker_id = %worker.id, worker_pid = worker.pid(), template_id = %template.registration.id,
+                    distribution_verify_ms, handoff_ms, image_verify_ms, bind_ms, tls_ms,
+                    elapsed_ms = worker.startup_ms, source = "criu_restore", "原生进程恢复完成");
+                Ok(worker)
+            }
+            _ => {
+                tracing::warn!(
+                    source = "criu_restore",
+                    reason = "restore_admission_failed",
+                    "原生恢复准备回退"
+                );
+                let lease = guard.lease.take().expect("恢复守卫仍持有物理许可");
+                if let Some(process) = guard.process.take() {
+                    // 即使回退等待本身被取消，独立清理任务也会保留许可直到实际退出。
+                    Err(tokio::spawn(async move {
+                        process.retire().await;
+                        lease
+                    })
+                    .await
+                    .expect("恢复清理任务正常结束"))
+                } else {
+                    Err(lease)
+                }
+            }
+        }
+    }
+
     /// 空闲管道出现 EOF、部分帧或迟到事件时隔离进程，避免跨请求污染。
     fn reusable(&mut self) -> bool {
-        self.child
-            .as_mut()
-            .is_some_and(|child| matches!(child.try_wait(), Ok(None)))
+        (self
+            .restored
+            .as_ref()
+            .is_some_and(|process| process.alive())
+            || self
+                .child
+                .as_mut()
+                .is_some_and(|child| matches!(child.try_wait(), Ok(None))))
             && self.stdout.fill_buf().now_or_never().is_none()
     }
 
@@ -881,7 +1228,7 @@ impl Worker {
         let mut stream_log = NativeExecutionLog {
             job_id: id.clone(),
             worker_id: self.id.clone(),
-            worker_pid: self.child.as_ref().and_then(Child::id),
+            worker_pid: self.pid(),
             account_id: submission.request.account_id,
             generation: submission.request.generation,
             started: received,
@@ -1093,9 +1440,15 @@ impl Worker {
                     Some("error") => {
                         if let Some(capture) = tls_capture.take() { capture.background(); }
                         stream_log.reason = "native_error_event";
+                        let diagnostics = super::native_error::project(payload);
                         tracing::warn!(native_job_id = %id, worker_id = %self.id,
+                            worker_pid = runtime.worker_pid, account_id = submission.request.account_id,
+                            generation = submission.request.generation,
                             layer = "native_sender", reason = "native_error_event",
                             headers_seen, previous_event_gap_ms, error_code = native_error_code(payload),
+                            diagnostics_state = diagnostics.state,
+                            error_stage = diagnostics.details.as_ref().map(|details| details.stage.as_str()).unwrap_or("unknown"),
+                            error_summary = ?diagnostics.details,
                             error_sha256 = %format!("{:x}", Sha256::digest(payload["error"].as_str().unwrap_or("").as_bytes())),
                             "固定运行时返回错误事件");
                         let status = payload["status"]
@@ -1171,8 +1524,8 @@ impl NativePool {
                 result["state"] = json!(status);
                 result["reason"] = json!(reason);
                 result["image_admitted"] = json!(
-                    worker.image_sha256
-                        == "af4cea9e21aa959c5e39c389173ba30ebb19b354b67acfe99164946450e9776d"
+                    worker.image_sha256 == IMAGE_SHA256
+                        || worker.image_sha256 == super::native_criu::IMAGE_SHA256
                 );
                 if status == "ready" {
                     break;
@@ -1233,10 +1586,7 @@ impl NativePool {
                     }
                 }
                 result.idle_workers = state.idle.len();
-                result.pid = state
-                    .idle
-                    .last()
-                    .and_then(|worker| worker.child.as_ref().and_then(Child::id));
+                result.pid = state.idle.last().and_then(|worker| worker.pid());
                 result.state = if result.pid.is_some() {
                     "ready"
                 } else if state.starting > 0 {
@@ -1303,6 +1653,7 @@ impl NativePool {
     async fn retire_for_switch(&self, deadline: Instant) -> Result<(), AppError> {
         let deadline = deadline.min(Instant::now() + Duration::from_secs(8));
         self.state.lock().unwrap().spare.take();
+        self.state.lock().unwrap().template.take();
         let old_idle = loop {
             {
                 let mut state = self.state.lock().unwrap();
@@ -1435,11 +1786,7 @@ impl NativePool {
                 state.idle.iter().map(|worker| worker.id.clone()).collect()
             };
             let (key, mut worker) = self.checkout(&config, &identity, deadline, false).await?;
-            let pid = worker
-                .child
-                .as_ref()
-                .and_then(Child::id)
-                .ok_or_else(unavailable)?;
+            let pid = worker.pid().ok_or_else(unavailable)?;
             let reused = prior.contains(&worker.id);
             // 发布 idle 与取消登记共用线性化点，撤销后的完成结果不能重新留池。
             let registration = self.preparations.lock().unwrap();
@@ -1575,7 +1922,8 @@ impl NativePool {
         business: bool,
     ) -> Result<(String, Worker), AppError> {
         let prepare_spare =
-            business && config.native_adaptive_prewarm && submission.concurrency >= 2;
+            (business && config.native_adaptive_prewarm && submission.concurrency >= 2)
+                || criu_available(config);
         let mut generation = self.generation.lock().await;
         let (key, slots) = pool_identity(config, submission)?;
         let retired;
@@ -1584,6 +1932,8 @@ impl NativePool {
             retired = if state.key != key {
                 state.key = key.clone();
                 state.spare.take();
+                state.template.take();
+                state.template_retry_at = None;
                 std::mem::take(&mut state.idle)
             } else {
                 Vec::new()
@@ -1631,6 +1981,7 @@ impl NativePool {
                         submission,
                         &key,
                         worker.execution_image.clone(),
+                        worker.restore_supported,
                         deadline,
                     );
                 }
@@ -1675,7 +2026,8 @@ impl NativePool {
         let worker = if let Some((_, image)) = cached.as_ref() {
             let image = image.clone();
             drop(cached);
-            Worker::start(config, &identity, lease, Some(image), deadline).await?
+            self.create_worker(config, &identity, &key, lease, image, deadline)
+                .await?
         } else {
             // 只让首个进程解压；其它启动者等待封存映像后并行exec。
             let worker = Worker::start(config, &identity, lease, None, deadline).await?;
@@ -1697,10 +2049,57 @@ impl NativePool {
                 submission,
                 &key,
                 worker.execution_image.clone(),
+                worker.restore_supported,
                 deadline,
             );
         }
         Ok((key, worker))
+    }
+
+    /// 仅在业务投递前尝试恢复，并复用同一截止和物理许可。
+    async fn create_worker(
+        &self,
+        config: &SenderConfig,
+        identity: &WorkerIdentity,
+        key: &str,
+        mut lease: WorkerLease,
+        image: Arc<File>,
+        deadline: Instant,
+    ) -> Result<Worker, AppError> {
+        let template = if criu_available(config) {
+            let state = self.state.lock().unwrap();
+            // 旧代已受理的创建者沿自身配置收口，不能借用或撤销新代模板。
+            if state.key == key {
+                state.template.clone()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        if let Some(template) = template {
+            match Worker::restore(config, &template, key, lease, image.clone(), deadline).await {
+                Ok(worker) => return Ok(worker),
+                Err(returned) => {
+                    lease = returned;
+                    template.registration.invalidate();
+                    let mut state = self.state.lock().unwrap();
+                    if state
+                        .template
+                        .as_ref()
+                        .is_some_and(|current| Arc::ptr_eq(current, &template))
+                    {
+                        // 准入失败的同代模板停止复用；关闭登记租约后由控制器等在途副本收口。
+                        state.template.take();
+                        state.template_retry_at = Some(Instant::now() + Duration::from_secs(30));
+                    }
+                }
+            }
+        }
+        if Instant::now() >= deadline {
+            return Err(unavailable());
+        }
+        Worker::start(config, identity, lease, Some(image), deadline).await
     }
 
     /// 使用已加载的映像补位，业务请求无需等待本次握手。
@@ -1710,6 +2109,7 @@ impl NativePool {
         submission: &NativeSubmission,
         key: &str,
         image: Option<Arc<File>>,
+        restore_supported: bool,
         deadline: Instant,
     ) {
         let Some(image) = image else { return };
@@ -1718,6 +2118,14 @@ impl NativePool {
         {
             let mut state = self.state.lock().unwrap();
             if state.key != key || state.live != 1 || state.spare.is_some() {
+                return;
+            }
+            if !config.native_adaptive_prewarm
+                && (!restore_supported
+                    || state
+                        .template_retry_at
+                        .is_some_and(|retry| retry > Instant::now()))
+            {
                 return;
             }
             // 先登记并占用物理许可；并发 checkout 只能复用这一轮补位。
@@ -1740,15 +2148,35 @@ impl NativePool {
         let key = key.to_owned();
         tokio::spawn(async move {
             let started = Instant::now();
-            let worker = tokio::select! {
+            let make_template = criu_available(&config) && restore_supported && {
+                let state = pool.state.lock().unwrap();
+                state.template.is_none()
+                    && state
+                        .template_retry_at
+                        .is_none_or(|retry| retry <= Instant::now())
+            };
+            let operation = async {
+                if make_template {
+                    Worker::start_template(&config, &identity, lease, image, deadline, &key)
+                        .await
+                        .map(|(worker, template)| (worker, Some(template)))
+                } else {
+                    pool.create_worker(&config, &identity, &key, lease, image, deadline)
+                        .await
+                        .map(|worker| (worker, None))
+                }
+            };
+            let prepared = tokio::select! {
                 biased;
                 _ = cancelled => None,
-                result = timeout_at(deadline, Worker::start(&config, &identity, lease, Some(image), deadline)) => {
+                result = timeout_at(deadline, operation) => {
                     result.ok().and_then(Result::ok)
                 }
             };
             drop(starting);
-            let mut worker = worker;
+            let (mut worker, mut template) = prepared
+                .map(|(worker, template)| (Some(worker), template))
+                .unwrap_or((None, None));
             let mut outcome = "cancelled";
             {
                 let mut state = pool.state.lock().unwrap();
@@ -1759,7 +2187,13 @@ impl NativePool {
                         .is_some_and(|spare| spare.ready.same_channel(&ready))
                 {
                     state.spare.take();
+                    if let Some(template) = template.take() {
+                        state.template = Some(template);
+                    }
                     outcome = "failed";
+                    if make_template && worker.is_none() {
+                        state.template_retry_at = Some(Instant::now() + Duration::from_secs(30));
+                    }
                     if let Some(mut worker) = worker.take() {
                         worker.idle_since = Instant::now();
                         state.idle.push(worker);
@@ -1829,11 +2263,7 @@ impl NativePool {
                 drop(warmup);
                 let runtime = NativeRuntimeObservation {
                     worker_id: worker.id.clone(),
-                    worker_pid: worker
-                        .child
-                        .as_ref()
-                        .and_then(Child::id)
-                        .ok_or_else(unavailable)?,
+                    worker_pid: worker.pid().ok_or_else(unavailable)?,
                     kernel_generation: config
                         .native
                         .as_ref()
@@ -1909,20 +2339,290 @@ mod tests {
     use std::fs::FileTimes;
     use std::io::Write;
 
+    /// 真实恢复句柄的EOF日志区分管道断开与物理退出，保留外部PID。
+    #[tokio::test]
+    async fn native_criu_eof_log_tracks_actual_worker_exit() {
+        use std::os::fd::{FromRawFd, OwnedFd};
+        use tokio::net::UnixStream;
+
+        let (subscriber, output) = crate::service::stream_error::test_support::capture();
+        let _guard = tracing::subscriber::set_default(subscriber);
+        let mut child = Command::new("python3")
+            .args(["-c", "import os,sys;os.close(1);sys.stdin.buffer.read(1)"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+        let pid = child.id().unwrap();
+        let raw = unsafe { libc::syscall(libc::SYS_pidfd_open, pid, 0) } as i32;
+        assert!(raw >= 0);
+        let descriptor = unsafe { OwnedFd::from_raw_fd(raw) };
+        let (connection, _controller) = UnixStream::pair().unwrap();
+        let mut worker = Worker {
+            tls_observer: None,
+            id: Uuid::new_v4().to_string(),
+            cache_ttl_rewrite_supported: false,
+            restore_supported: true,
+            child: None,
+            restored: Some(super::super::native_criu::Process::test_worker(
+                connection, descriptor, pid,
+            )),
+            stderr_task: None,
+            stdin: child.stdin.take().unwrap(),
+            stdout: BufReader::new(child.stdout.take().unwrap()),
+            root: None,
+            _image: File::open("/dev/null").unwrap(),
+            execution_image: None,
+            idle_since: Instant::now(),
+            _lease: None,
+            _proxy: Arc::new(NativeProxy {
+                url: String::new(),
+                task: None,
+            }),
+            image_sha256: String::new(),
+            ready_at: Instant::now(),
+            started_at: Instant::now(),
+            startup_ms: 0,
+        };
+        // 先只关闭stdout，再终止进程；同一个EOF不能被一律解释成已退出或仍存活。
+        assert!(
+            timeout(Duration::from_secs(2), worker.next())
+                .await
+                .unwrap()
+                .is_err()
+        );
+        assert!(child.try_wait().unwrap().is_none());
+        let alive_log = String::from_utf8(output.lock().unwrap().clone()).unwrap();
+        assert!(alive_log.contains("process_exited=false"));
+        output.lock().unwrap().clear();
+        child.start_kill().unwrap();
+        child.wait().await.unwrap();
+        assert!(worker.next().await.is_err());
+        let exited_log = String::from_utf8(output.lock().unwrap().clone()).unwrap();
+        assert!(exited_log.contains("process_exited=true"), "{exited_log}");
+        assert!(
+            exited_log.contains(&format!("worker_pid={pid}")),
+            "{exited_log}"
+        );
+        assert!(!exited_log.contains("exit_code=0"));
+        worker.retire().await;
+    }
+
+    #[tokio::test]
+    async fn native_criu_cancelled_guard_keeps_capacity_until_actual_exit() {
+        use std::os::fd::{FromRawFd, OwnedFd};
+        use tokio::net::UnixStream;
+
+        let pool = Arc::new(NativePool::default());
+        let key = "synthetic-criu-generation".to_owned();
+        {
+            let mut state = pool.state.lock().unwrap();
+            state.live = 1;
+            state.live_by_key.insert(key.clone(), 1);
+        }
+        let mut child = Command::new("python3")
+            .args(["-c", "import sys;sys.stdin.buffer.read(1)"])
+            .stdin(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+        let raw = unsafe { libc::syscall(libc::SYS_pidfd_open, child.id().unwrap(), 0) } as i32;
+        assert!(raw >= 0);
+        let descriptor = unsafe { OwnedFd::from_raw_fd(raw) };
+        let (connection, mut controller) = UnixStream::pair().unwrap();
+        let guard = RestoreGuard {
+            process: Some(super::super::native_criu::Process::test_namespace(
+                connection, descriptor,
+            )),
+            lease: Some(WorkerLease {
+                pool: Arc::downgrade(&pool),
+                key,
+            }),
+        };
+        let task = tokio::spawn(async move {
+            let _guard = guard;
+            std::future::pending::<()>().await;
+        });
+        task.abort();
+        let _ = task.await;
+        assert_eq!(
+            timeout(Duration::from_secs(1), controller.read_u8())
+                .await
+                .unwrap()
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::UnexpectedEof
+        );
+        assert_eq!(pool.state.lock().unwrap().live, 1);
+        assert!(child.try_wait().unwrap().is_none());
+        child.start_kill().unwrap();
+        child.wait().await.unwrap();
+        timeout(Duration::from_secs(1), async {
+            while pool.state.lock().unwrap().live != 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(pool.state.lock().unwrap().live_by_key.is_empty());
+    }
+
+    /// 由隔离KVM夹具显式驱动完整checkout、执行体核验和真实TLS槽准备。
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore = "需要独立CRIU控制器、签署候选、UID1001/seccomp2及回环TLS夹具"]
+    async fn native_criu_isolated_paired_preparation() {
+        let _ = tracing_subscriber::fmt().with_ansi(false).try_init();
+        let config: SenderConfig =
+            serde_json::from_slice(&fs::read(var("CCRB_TEST_CRIU_CONFIG").unwrap()).unwrap())
+                .unwrap();
+        let submission: NativeSubmission =
+            serde_json::from_slice(&fs::read(var("CCRB_TEST_CRIU_IDENTITY").unwrap()).unwrap())
+                .unwrap();
+        assert!(criu_available(&config));
+        let pool = Arc::new(NativePool::default());
+        let deadline = Instant::now() + Duration::from_secs(180);
+        let (key, first) = pool
+            .checkout(&config, &submission, deadline, false)
+            .await
+            .unwrap();
+        assert!(first.restore_supported);
+        assert_eq!(first.tls_observer.as_ref().unwrap().status().0, "ready");
+        let mut template = timeout_at(
+            deadline.min(Instant::now() + Duration::from_secs(20)),
+            async {
+                loop {
+                    if let Some(template) = pool.state.lock().unwrap().template.clone() {
+                        break template;
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            },
+        )
+        .await
+        .unwrap();
+        let mut sources = std::mem::take(&mut pool.state.lock().unwrap().idle);
+        sources.push(first);
+        assert_eq!(sources.len(), 2);
+        let source_pids = sources
+            .iter()
+            .map(|worker| worker.pid().unwrap())
+            .collect::<Vec<_>>();
+        let source_startup_ms = sources.iter().map(|worker| json!({"startup_ms":worker.startup_ms,
+            "template_seed":worker.root.as_ref().is_some_and(|root| root.ends_with(&template.registration.seed_worker))})).collect::<Vec<_>>();
+        let mut normal = Vec::new();
+        let mut restored = Vec::new();
+        for index in 0..20 {
+            for restore in if index % 2 == 0 {
+                [false, true]
+            } else {
+                [true, false]
+            } {
+                pool.state.lock().unwrap().template = restore.then(|| template.clone());
+                let began = Instant::now();
+                let (actual_key, mut worker) = pool
+                    .checkout(&config, &submission, deadline, false)
+                    .await
+                    .unwrap();
+                let elapsed = began.elapsed().as_secs_f64() * 1000.0;
+                assert_eq!(actual_key, key);
+                assert_eq!(worker.restored.is_some(), restore);
+                assert_eq!(worker.tls_observer.as_ref().unwrap().status().0, "ready");
+                assert!(worker.reusable());
+                if restore {
+                    restored.push(elapsed);
+                } else {
+                    normal.push(elapsed);
+                }
+                worker.retire().await;
+                assert_eq!(pool.state.lock().unwrap().live, 2);
+            }
+        }
+        let median = |samples: &[f64]| {
+            let mut sorted = samples.to_vec();
+            sorted.sort_by(f64::total_cmp);
+            (sorted[9] + sorted[10]) / 2.0
+        };
+        let normal_p50 = median(&normal);
+        let restore_p50 = median(&restored);
+        println!(
+            "CRIU_PAIRED_PROOF {}",
+            json!({"pairs":20,"normal_ms":normal,"restored_ms":restored,
+            "normal_p50_ms":normal_p50,"restore_p50_ms":restore_p50,"reduction":1.0-restore_p50/normal_p50,
+            "source_pids":source_pids,"source_startup":source_startup_ms,"tls_ready":40,"scope":"pool_checkout_identity_bind_tls_ready"})
+        );
+        pool.state.lock().unwrap().template.take();
+        // 模拟已失效的登记，完整submit必须在零模型恢复边界回退，并且只发送一笔业务。
+        Arc::get_mut(&mut template).unwrap().registration.id = Uuid::new_v4().to_string();
+        pool.state.lock().unwrap().template = Some(template.clone());
+        let mut fallback = submission.clone();
+        let request_id = Uuid::new_v4().to_string();
+        let marker = format!("clone-request-{request_id}");
+        fallback.request.request_id = request_id.clone();
+        fallback.request.deadline_unix_ms = now_ms() + 60_000;
+        fallback.input = json!({"schema_version":1,"request_id":request_id,"headers":[],
+            "body":{"model":"claude-sonnet-4-6","max_tokens":64,"stream":false,
+                "messages":[{"role":"user","content":marker}]}});
+        let response = pool.submit(config.clone(), fallback).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+        assert!(String::from_utf8(body.to_vec()).unwrap().contains(&marker));
+        assert!(pool.state.lock().unwrap().template.is_none());
+        let extra = std::mem::take(&mut pool.state.lock().unwrap().idle);
+        assert_eq!(extra.len(), 1);
+        assert!(extra[0].restored.is_none());
+        for worker in extra {
+            worker.retire().await;
+        }
+        println!(
+            "CRIU_FALLBACK_PROOF {}",
+            json!({"normal_exec":true,"failed_template_evicted":true,"expected_posts":1})
+        );
+        drop(template);
+        for worker in sources {
+            worker.retire().await;
+        }
+        assert_eq!(pool.state.lock().unwrap().live, 0);
+        assert!(
+            restore_p50 <= normal_p50 * 0.5,
+            "完整准备p50必须降低至少50%"
+        );
+    }
+
     #[tokio::test]
     async fn native_execution_logs_error_event_eof_and_deadline() {
         let (subscriber, output) = crate::service::stream_error::test_support::capture();
         let _guard = tracing::subscriber::set_default(subscriber);
-        for scenario in ["error", "eof", "deadline", "ttl", "unsupported-ttl"] {
+        for scenario in [
+            "error",
+            "diagnostic",
+            "invalid-diagnostic",
+            "wrong-request",
+            "eof",
+            "deadline",
+            "ttl",
+            "unsupported-ttl",
+        ] {
             let worker_id = Uuid::new_v4().to_string();
             let job_id = Uuid::new_v4().to_string();
-            let frame = json!({"schema_version":2,"worker_id":worker_id,"request_id":job_id,
+            let mut frame = json!({"schema_version":2,"worker_id":worker_id,"request_id":job_id,
                 "type":"request_event","payload":{"type":"error","error":"synthetic-private-error-secret",
                 "code":"request_timeout","status":502}});
+            if scenario == "diagnostic" {
+                let fixture: Value = serde_json::from_str(include_str!(
+                    "../../tests/fixtures/native-error-diagnostics.json"
+                ))
+                .unwrap();
+                frame["payload"]["diagnostics"] = fixture["diagnostics"].clone();
+            } else if scenario == "invalid-diagnostic" {
+                frame["payload"]["diagnostics"] = json!({"stage":"synthetic-private-error-secret"});
+            } else if scenario == "wrong-request" {
+                frame["request_id"] = json!("other-request");
+            }
             let idle = json!({"schema_version":2,"worker_id":worker_id,"request_id":job_id,"type":"worker_idle"});
             // 直接驱动私有事件读取路径，合成进程只写受控帧，不启动任何模型或原生构造。
             let mut child = Command::new("python3").args(["-u", "-c",
-                "import sys,time,json; command=json.loads(sys.stdin.readline()); mode=sys.argv[1]; assert mode!='ttl' or command['cache_ttl_rewrite']=='1h'; time.sleep(2) if mode=='deadline' else None; print(sys.argv[2],flush=True) if mode in ('error','ttl') else None; print(sys.argv[3],flush=True) if mode in ('error','ttl') else None"])
+                "import sys,time,json; command=json.loads(sys.stdin.readline()); mode=sys.argv[1]; assert mode!='ttl' or command['cache_ttl_rewrite']=='1h'; time.sleep(2) if mode=='deadline' else None; print(sys.argv[2],flush=True) if mode in ('error','ttl','diagnostic','invalid-diagnostic','wrong-request') else None; print(sys.argv[3],flush=True) if mode in ('error','ttl','diagnostic','invalid-diagnostic','wrong-request') else None"])
                 .arg(scenario).arg(frame.to_string()).arg(idle.to_string())
                 .stdin(Stdio::piped()).stdout(Stdio::piped()).kill_on_drop(true).spawn().unwrap();
             let root = temp_dir().join(format!("native-log-test-{}", Uuid::new_v4()));
@@ -1931,19 +2631,22 @@ mod tests {
             let mut worker = Worker {
                 tls_observer: None,
                 cache_ttl_rewrite_supported: scenario == "ttl",
+                restore_supported: false,
                 id: worker_id.clone(),
                 stdin: child.stdin.take().unwrap(),
                 stdout: BufReader::new(child.stdout.take().unwrap()),
                 child: Some(child),
-                root,
+                restored: None,
+                stderr_task: None,
+                root: Some(root),
                 _image: File::open("/dev/null").unwrap(),
                 execution_image: None,
                 idle_since: Instant::now(),
                 _lease: None,
-                _proxy: NativeProxy {
+                _proxy: Arc::new(NativeProxy {
                     url: String::new(),
                     task: None,
-                },
+                }),
                 image_sha256: String::new(),
                 ready_at: Instant::now(),
                 started_at: Instant::now(),
@@ -1997,7 +2700,10 @@ mod tests {
                     },
                 )
                 .await;
-            if matches!(scenario, "error" | "ttl") {
+            if matches!(
+                scenario,
+                "error" | "ttl" | "diagnostic" | "invalid-diagnostic"
+            ) {
                 assert!(result.unwrap());
                 assert_eq!(receive.await.unwrap().unwrap().status(), 502);
             } else {
@@ -2015,6 +2721,13 @@ mod tests {
             assert!(logs.contains(reason), "缺少结束原因 {reason}");
         }
         assert!(logs.contains("request_timeout"));
+        assert!(logs.contains("ECONNRESET"));
+        assert!(logs.contains("error_stage=\"dispatch\""));
+        for state in ["available", "unavailable", "invalid"] {
+            assert!(logs.contains(&format!("diagnostics_state=\"{state}\"")));
+        }
+        assert!(logs.contains("account_id=7"));
+        assert!(logs.contains("worker_pid="));
         assert!(logs.contains("native_job_id="));
         assert!(!logs.contains("synthetic-private-error-secret"));
         assert!(!logs.contains("synthetic-bearer"));

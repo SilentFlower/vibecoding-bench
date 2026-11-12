@@ -53,6 +53,10 @@ pull 按 `registry_digest` 固定下载，核对配置 ID后建立清单中的�
 
 最低 sender 预算为 `256 + 192 × 2 × 标准并发` MiB。bench 创建账号默认标准并发 4，需要至少 `1792m`；使用已验证的 `1536m` 时，将该账号标准并发显式设为 3。账号总 RAM 还须覆盖 network 的 256 MiB 和 CLI 最低 512 MiB。
 
+`V3_NATIVE_CRIU` 默认 `0`。显式设为 `1` 后，支持 CRIU 的账号镜像通过受信任控制器为同账号创建零业务热模板，新增进程优先恢复。配套的已签名原生内核须支持恢复绑定协议 1。旧内核继续正常启动，恢复失败在业务发送前回退。开启后的最低 sender 预算为 `256 + (192 + 108) × 2 × 标准并发` MiB，标准并发 3 至少需要 `2056m`。模板快照含账号身份数据，存放于 root 专属目录。
+
+CRIU 控制器单独启用受限 capability 集合和恢复所需的 seccomp 配置。业务 sender 与 worker 保持 UID 1001、capability 为零、NNP 与业务 seccomp 过滤。权限清单、固定构建来源、内核要求及回退步骤见 [CRIU 操作说明](../../services/runtime/native/criu/README.md)。启用属于部署权限变更，应按上线流程执行。
+
 后端配置来自网关账号 runtime config。模式或资源布局改变时，环境无活动作业才允许重建。缺能力或预算时准备失败。空闲时切回 `legacy` 会恢复原 sender 布局。
 
 `V3_ACCOUNT_MEMORY` 是每账号 RAM 上限，`V3_ACCOUNT_SWAP` 是额外 swap 上限，默认 `0` 保持禁用。Docker 的内存加 swap 总上限由两者相加生成，账号首次保存预算；历史环境缺 swap 字段时保持关闭。以后修改全局配置不会自动改已有账号预算或身份。隔离布局 2 在原总额度内预留 network 256 MiB、sender 128 MiB，剩余分配 CLI；额外 swap 只分配 CLI。CLI 至少需要 512 MiB，总预算不足时拒绝启动。1536 MiB 账号的 CLI 实际 constrainedMemory 为 1152 MiB。

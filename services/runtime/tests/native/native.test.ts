@@ -24,7 +24,7 @@ native('官方 293 的无外网回环链路', () => {
   let upstream: Bun.Server<undefined>;
   let proxy: ReturnType<typeof createServer>;
   let base: string;
-  let mode: 'normal' | 'tool' | 'local_tool' | 'http_error' | 'network_error' | 'sse_error' | 'incomplete' | 'slow' = 'normal';
+  let mode: 'normal' | 'tool' | 'local_tool' | 'http_error' | 'network_error' | 'network_reset' | 'sse_error' | 'incomplete' | 'slow' = 'normal';
   const requests: { raw: string; body: Record<string, unknown>; headers: HeaderPair[] }[] = [];
   const telemetryRequests: { raw: string; body: { events: { event_type: string; event_data: Record<string, unknown> }[] }; headers: HeaderPair[] }[] = [];
   const telemetryCases: Record<string, unknown>[] = [];
@@ -113,6 +113,7 @@ native('官方 293 的无外网回环链路', () => {
       proxyTargets.push(request.url ?? '');
       if (request.url !== 'api.anthropic.com:443') { socket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return; }
       if (mode === 'network_error') { socket.end('HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n'); return; }
+      if (mode === 'network_reset') { socket.destroy(); return; }
       sockets.add(socket); socket.on('close', () => sockets.delete(socket));
       const target = connect(upstream.port!, '127.0.0.1', () => {
         socket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
@@ -507,6 +508,34 @@ native('官方 293 的无外网回环链路', () => {
     const next = await send({ model: 'claude-sonnet-4-6', messages: [{ role: 'user', content: '传输失败后的下一轮' }], stream: false });
     expect(next.response.status).toBe(200); expect(requests.length - count).toBe(1);
     expect(nativeEngine.workerPid).not.toBe(pid); assertCch(requests.at(-1)!.raw);
+  });
+
+  test('真实原生失败事件保留发送及构造阶段，TLS 原因经过安全协议', async () => {
+    for (const scenario of ['proxy', 'refused', 'reset', 'tls', 'construction'] as const) {
+      for (const socket of sockets) socket.destroy();
+      mode = scenario === 'proxy' ? 'network_error' : scenario === 'reset' ? 'network_reset' : 'normal';
+      const engine = await createEngine({ ...config.engine, caFile: scenario === 'tls' ? undefined : config.engine.caFile,
+        proxyUrl: scenario === 'refused' ? 'http://127.0.0.1:1' : config.engine.proxyUrl });
+      const events: RuntimePayload[] = [];
+      const count = requests.length;
+      const body = { model: 'claude-sonnet-4-6', messages: [{ role: 'user', content: '安全错误诊断回环' }], stream: false,
+        ...(scenario === 'construction' ? { system: [{ type: 'text', text: '合成不支持参数', cache_control: { type: 'ephemeral' } }] } : {}) };
+      try {
+        await engine.run(prepareInput(parseInput({ request_id: 'diagnostic-' + scenario, body })), new AbortController().signal, async event => { events.push(event); });
+        const failure = events.find(event => event.type === 'error');
+        if (failure?.type !== 'error') throw new Error('原生失败缺少错误事件');
+        expect(failure.diagnostics?.stage).toBe(scenario === 'construction' ? 'construction' : 'dispatch');
+        expect(failure.diagnostics?.causes.length).toBeGreaterThan(0);
+        expect(JSON.stringify(failure.diagnostics)).not.toContain(upstreamSecret);
+        expect(requests.length).toBe(count);
+        expect(engine.workerPid).toBeNull();
+        if (scenario === 'construction') expect(failure.code).toBe('unsupported_parameter');
+        if (scenario === 'refused') expect(failure.diagnostics?.causes.some(cause => ['ECONNREFUSED', 'ConnectionRefused'].includes(cause.code))).toBe(true);
+        if (scenario === 'reset') expect(failure.diagnostics?.causes.some(cause => ['ECONNRESET', 'ConnectionReset', 'ConnectionClosed', 'SocketClosed'].includes(cause.code))).toBe(true);
+        if (scenario === 'tls') expect(failure.diagnostics?.causes.some(cause => ['DEPTH_ZERO_SELF_SIGNED_CERT', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'CERT_HAS_EXPIRED'].includes(cause.code))).toBe(true);
+      } finally { await engine.close(); }
+    }
+    mode = 'normal';
   });
 
   test('采集输出失败时取消唯一发送并退役，下一轮不接收迟到事件', async () => {

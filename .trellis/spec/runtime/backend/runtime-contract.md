@@ -40,6 +40,8 @@
 - OM 的 deps.callModel 仅进入一次 K_t；其 fetchOverride 取得同一官方 SDK 的正文、头及发送上下文，在显式字段核验后由 Ree 唯一发送。stream 仅按调用方明确值映射；SDK 不取得 Response，桥接独占原始逻辑响应，读取收口后立即取消原生解析。调用次数守卫禁止模型重试，不创建第二个 SDK，不替换全局 fetch；本地工具、代理循环及自动辅助压缩禁用，显式 compaction 保留。
 - 只在精简构建复用固定摘要的六个纯正文格式化函数 KLo、XLo、QLo、nNo、sNo、pNo。每次仍求值原生条件与外层钩子，每个工厂仅保留最近一次原始条件及字符串；UTF-8 键和值每项 ≤64 KiB、六项 ≤384 KiB，不代表堆或 RSS 上限。失败和超限不入缓存；整份提示词、权限/工具选择、会话段落表、memory 读取及请求正文不跨作业缓存。
 - HTTP 与 RuntimeEvent 保持 schema_version=1、request_id；事件包含 ready、cc_prepared、response_headers、response_chunk、completed、error；final_capture_ready(attempt=1) 仅由控制侧独立采集器产生，工作进程不得伪造。ready 表示本轮已绑定就绪进程，不代表每轮新建 PID。attempt=1，片段使用可逆 base64。
+- error 可选 diagnostics 为 schema_version=1、stage、causes、chain_truncated、cycle_detected、inspection_failed。阶段在 worker/job 实际边界记录，causes 最多八层，只投影 src/shared/native-error-diagnostics.ts 的固定 name/code 白名单；未知值为 unknown，任意 message/stack/URL 不进入摘要。getter 和 cause 环安全降级；共享协议验证结构及字段，旧事件省略保持兼容。完整摘要需重新构建并按原发行合同接纳内核，固定 SHA 与探针准入保持原规则。
+- 诊断校验独立于基础 error/归属校验。TypeScript 移除非法摘要及任意扩展字段，标记 diagnostics_state=invalid，保留 code/status；decodeWorkerFrame 交付该规范化结果。缺省旧事件保持原形状，错误归属或非法基础状态仍按 runtime_protocol 拒绝。
 - 私有 stdin/stdout 使用 schema_version=2、worker_id；request_start 携带 request_id/prepared，可协商的 request_input 原始信封见下文；request_cancel 携带匹配 request_id，worker_shutdown 关闭进程。输出为 worker_ready(version,pid)、request_event(request_id,payload)、worker_idle(request_id)。payload 禁止覆盖 schema_version、worker_id、request_id。
 - 握手前还可返回 worker_error(code=native_configuration,status=503,error)，不带 request_id 或额外字段。error 只公开受控 BridgeError 配置说明，先脱敏且 ≤2048 UTF-8 B，未知异常用通用中文消息；入口等待帧写入完成后退出。错进程归属、握手后错误帧或畸形字段按 runtime_protocol/502 隔离，失败作业不重放。
 - 每个物理进程只有一个持续读取器。唯一终态与匹配 worker_idle 缺一不可；释放响应并等待 SDK 收口后才发 idle。重复握手、错代次/错请求、双终态、终态后事件、缺 idle 或畸形帧均隔离进程；读取回调和输出闭包绑定旧代次，不得归入下一作业。取消、异常或状态不明时退役，下一轮重建，不重放当前请求；取消采用 1500 ms 强制终止宽限，空闲关闭优先 shutdown，1500 ms 后仍未退出则强制终止。
@@ -666,3 +668,55 @@ bun scripts/benchmark-runtime.ts --binary /绝对路径/新产物 --reference /r
 - `scripts/testing/native-stream-budget.ts`：校验实际二进制SHA，在隔离回环对照旧版181秒误断与新候选185秒完整流；主动取消和每条唯一提交。
 - `tests/unit/{cache-policy,worker-protocol}.test.ts`：off对象保持、5m/1h切换、嵌套业务保持及非法私有值拒绝。
 - `tests/native/native.test.ts`：同PID三个模式，cc_prepared与TLS实收仅规范已知CCH占位后相等；另独立核验最终CCH。
+
+## Scenario: 原生进程池 CRIU 热模板恢复协议 1
+
+### 1. Scope / Trigger
+
+- gateway NativePool 扩容、runtime 恢复绑定、受信任恢复控制器、TLS 归属与部署配置共同遵守本合同。一个物理 worker 继续串行执行作业，业务构造与发送沿原生栈。
+
+### 2. Signatures
+
+- `worker_restore_bind` 使用 schema_version=2，字段固定为 `type/worker_id/template_id/new_worker_id/nonce`；模板与新 worker 为规范 UUID，新旧 worker 必须不同，nonce 为64位小写十六进制。拒绝额外字段。
+- `worker_ready` 可选 `restore_protocol:1`；模板态带 `restore_template:UUID`，绑定态带 `restore_binding:{template_id,nonce,entropy_profile:'bun143-wipeonfork-v1'}`，两者互斥。旧 ready 继续兼容。
+- Linux x64 的 `native_criu::Template::register(key,id,worker,pid,image)` 登记模板；`Process::start(template,key,worker,nonce)` 接管私有管道和 pidfd，`Process::retire()` 等待实际命名空间退出。
+- 控制器固定 socket `/run/ccrb-criu/control.sock`。`template` 命令仅含 `type/key/template/worker/pid`，`restore` 仅含 `type/key/template/worker/nonce`；key 为64位小写十六进制。控制帧最多4096字节。
+
+### 3. Contracts
+
+- `V3_NATIVE_CRIU` 默认0，部署只接受空值、0或1。显式1与账号镜像标签 `vibebench.native-criu=1` 共同选择 `/opt/ccrb-criu/entry.py`。入口将实际恢复可用性通过 `CCRB_CRIU=1|0` 交给 sender。协议1内核沿原签名发行及激活合同使用。
+- 模板 key 复用完整池身份，覆盖 bearer、账号/设备/组织、环境与内核代次、代理及有效启动配置。后台种子服从同一物理容量；先完成零模型 bootstrap，再 dump/leave-running。种子绑定为普通暖进程后继续归池。模板只接纳尚未执行业务的受控种子。
+- 普通 exec 的共享 memfd dev/inode 与四项封存校验保持原合同。CRIU 会重建 memfd，恢复分支独立校验实际外部 PID 的执行体 SHA、大小、四项 seals、新 ready、模板及随机挑战。每个恢复副本的独立代码映像额外按向上取整 MiB 预算；当前画像为108MiB。有限 sender 最低 RAM 为 `256 + max_workers × (192 + 108)` MiB。
+- 固定配方为 CRIU4.2 加 memfd 执行体修补，记录来源归档/补丁/二进制 SHA、编译器、功能配置与许可；按目标 ABI 构建。源码束与生成镜像输入逐文件核对。TLS束继续使用既有正式来源导出检查。
+- 控制器必须持有权威 sender PID；对端必须是该 sender 自身、UID1001。种子为其直属受限子进程，模板标记、worker ID、HOME/config/cwd及执行体须匹配。IPC禁止指定任意程序、路径与其他进程。控制目录0750、socket0660；模板磁盘根目录0700，快照0600。
+- 控制器权限集合为 `CHOWN DAC_OVERRIDE FOWNER KILL SETUID SETGID SETPCAP NET_ADMIN SYS_CHROOT SYS_PTRACE SYS_ADMIN SYS_RESOURCE SYS_TIME`，有效掩码032c11eb、NNP1、seccomp0。固定C入口安装冻结业务BPF并降权；sender和worker为UID1001、capability0、NNP1、seccomp2。入口先核验降权入口/BPF，失败终止启动；恢复环境预检失败使用受限正常exec。
+- 每个实例独立PID/挂载命名空间、HOME/config/cwd副本及管道。冻结文件拒绝链接、设备、外来归属和超预算；恢复前核对完整条目集合及包含ctime的文件身份。文件原权限/时间在独立映射中重建，原快照保持私有。
+- 固定 Bun1.4.3/revision `eecfd55debb281c3fe3518098b1a49f76429637c`。恢复进程全线程暂停时，控制器核验执行体、线程组及唯一WIPEONFORK页，只清零原生fork标志4字节；绑定时耗尽2048字节UUID缓存，并使用系统熵重新播种主执行域。执行域或熵画像不匹配拒绝恢复。
+- SCM_RIGHTS先交接命名空间pidfd，sender保存后ACK；之后才恢复业务worker并交接stdin/stdout及实际worker pidfd。取消或连接关闭触发实例退出。WorkerLease、代理引用及目录清理所有权保留至实际退出；清理中的finally避免二次取消。
+- 模板持有同账号稳定代理引用。身份/内核切换、维护排空和关闭撤销模板，已受理实例沿原生命周期收口。恢复失败在业务投递前清理并回退正常exec，复用原单调截止。已提交业务继续遵守唯一发送合同。
+- TLS broker为恢复实例登记外部PID、父进程、启动时刻、worker及映像；探针使用目标活动PID命名空间和内部PID，最终证据保存外部物理PID。实际TLS正文/头与独立接收端比对；cc_prepared保持其组装阶段含义。
+- `criu_template/criu_restore`安全日志记录来源、实例及dump/交接/映像核验/绑定/TLS准备时间，CRIU命令与熵核验时间在私有日志单列。IPC EOF的`worker_pid`来自实际承载进程；普通Child与恢复pidfd分别判断`process_exited`，恢复退出码缺省为空。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 旧内核缺恢复能力、无可用模板或权限预检失败 | 正常共享映像exec，保留原业务截止与唯一发送 |
+| 对端/PID/模板身份错误、额外控制字段、快照污染或租约过期 | 业务前拒绝，日志只输出受控原因 |
+| 熵画像、映像、封存或新绑定不匹配 | 清理恢复实例后按原截止回退；失败模板停止准入并退避 |
+| ACK前后取消、控制器退出、管道断开 | 通过真实pidfd等待收口，实际退出后释放许可；新入口清理私有遗留 |
+| IPC已EOF且worker仍存活 / pidfd已退出 | 分别记录process_exited=false / true，保持实际外部PID |
+
+### 5. Scenarios and Examples
+
+- 正常：同账号模板已就绪，需要第三个worker时恢复独立实例，经新UUID/nonce绑定、执行体核验与TLS准备后接单。
+- 边界：关闭部署开关或使用旧协议内核时继续现有正常启动。普通Child与恢复worker共同服从账号物理上限。
+- 错误用法：直接复用快照中的worker_id、旧ready或探针PID，或把CRIU命令时间当作完整准备时间。正确处理：独立绑定与真实执行体/TLS准入，性能从checkout计到可接单，首次建模板单列。
+
+### 6. Tests Required
+
+- `tests/unit/worker-protocol.test.ts`：版本、新旧UUID、随机挑战、额外字段、互斥模板/绑定及旧ready兼容。
+- `native/criu/test_{entropy,protocol,entry}.py`：全线程暂停与熵画像、冻结目录权限/链接/预算、入口降权准入及umask下socket权限。
+- gateway `native_criu` 定向测试：SCM_RIGHTS数量/截断/CLOEXEC、真实pidfd归属、取消时许可保留、EOF前后真实退出日志。普通Child错误/EOF/截止日志继续回归。
+- 隔离验收：同源存活时串行3/并发4副本，独立会话和两模型、每笔一次模拟POST，最终TLS与独立接收端匹配；控制器强退/重启、污染/过期模板与完整submit回退；至少20轮完整准备配对，p50降低至少50%。
+- 目标ABI实际构建并核验包文件SHA；运行环境失败的受限exec回退；编排预算、部署开关/角色权限与受影响回归通过。生产启用沿独立上线授权验收。

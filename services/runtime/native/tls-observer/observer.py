@@ -13,6 +13,8 @@ import sys
 from http_capture import HttpCapture, unavailable
 
 IMAGE_SHA256 = 'af4cea9e21aa959c5e39c389173ba30ebb19b354b67acfe99164946450e9776d'
+RESTORE_IMAGE_SHA256 = '564019c9560e960e96875c9663975491534b27c789ea3d23e5c13309ff293c79'
+ADMITTED_IMAGES = frozenset((IMAGE_SHA256, RESTORE_IMAGE_SHA256))
 WRITE_OFFSET = 0x232D5B3
 WRITE_BYTES = bytes.fromhex('4883c4185b415c415d415e415f5dc3')
 SAMPLE = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_void_p, c.c_size_t)
@@ -43,10 +45,11 @@ class Observer:
         self.lib = None
         self.obj = self.link = self.ring = None
         self.pid = pid
+        self.namespace_pid = pid
         self.connections = {}
         self.writes = self.accepted = 0
         self.reason = None
-        if image != IMAGE_SHA256:
+        if image not in ADMITTED_IMAGES:
             raise CaptureError('IMAGE_NOT_ADMITTED')
         try:
             status = Path(f'/proc/{pid}/status').read_text()
@@ -54,6 +57,8 @@ class Observer:
                 raise CaptureError('WORKER_OWNERSHIP')
             if started is not None and Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()[19] != started:
                 raise CaptureError('WORKER_OWNERSHIP')
+            fields = dict(line.split(':', 1) for line in status.splitlines() if ':' in line)
+            self.namespace_pid = int(fields['NSpid'].split()[-1])
             with open(f'/proc/{pid}/exe', 'rb') as source:
                 digest = hashlib.file_digest(source, 'sha256').hexdigest()
                 source.seek(WRITE_OFFSET)
@@ -84,8 +89,10 @@ class Observer:
             self.obj = _checked(self.lib.bpf_object__open_file(path, None), 'PROBE_ARTIFACT')
             if self.lib.bpf_object__load(self.obj):
                 raise CaptureError('BPF_LOAD_FAILED')
-            namespace = Path('/proc/self/ns/pid').stat()
-            config = c.create_string_buffer(struct.pack('<QQII', namespace.st_dev, namespace.st_ino, pid, 0))
+            # 内核helper仅接受实际执行线程的活动PID空间；恢复副本位于嵌套空间。
+            # 探针附着与最终证据仍使用外部物理PID，事件核验使用已读取的内部PID。
+            namespace = Path(f'/proc/{pid}/ns/pid').stat()
+            config = c.create_string_buffer(struct.pack('<QQII', namespace.st_dev, namespace.st_ino, self.namespace_pid, 0))
             key = c.c_uint(0)
             fd = self.lib.bpf_object__find_map_fd_by_name(self.obj, b'config')
             if fd < 0 or self.lib.bpf_map_update_elem(fd, c.byref(key), config, 0):
@@ -108,7 +115,7 @@ class Observer:
                 raise CaptureError('EVENT_INVALID')
             raw = c.string_at(pointer, 32)
             pid_tid, ssl, sequence, accepted, requested = struct.unpack_from('<QQQII', raw)
-            if pid_tid >> 32 != self.pid or not 0 < accepted <= min(requested, size - 32):
+            if pid_tid >> 32 != self.namespace_pid or not 0 < accepted <= min(requested, size - 32):
                 raise CaptureError('EVENT_OWNERSHIP')
             if sequence != self.writes + 1:
                 self.reason = 'EVENT_SEQUENCE'

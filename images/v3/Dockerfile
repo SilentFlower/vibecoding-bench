@@ -40,6 +40,15 @@ RUN python3 -c "import hashlib,json,os;from pathlib import Path;p=Path('/opt/ccr
     && cc -O2 -Wall -Wextra -Werror -Wl,-z,relro,-z,now /opt/ccrb-tls-observer/launch.c -o /opt/ccrb-tls-observer/launch \
     && chmod -R go-w /opt/ccrb-tls-observer
 
+FROM python:3.12-slim-bookworm AS criu-build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc make patch pkg-config protobuf-compiler protobuf-c-compiler libprotobuf-dev libprotobuf-c-dev \
+    libnl-3-dev libcap-dev libnet1-dev uuid-dev libseccomp2 ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY images/v3/criu/ /source/criu/
+RUN python3 /source/criu/package.py --source /source/criu --out /opt/ccrb-criu \
+    && chmod -R go-w /opt/ccrb-criu
+
 FROM python:3.12-slim-bookworm AS control
 RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates openssl \
     && rm -rf /var/lib/apt/lists/*
@@ -92,7 +101,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential pkg-config git curl wget unzip \
     ca-certificates locales tmux jq ripgrep tini util-linux iproute2 iptables iputils-ping \
-    proxychains4 unbound dnsutils procps \
+    proxychains4 unbound dnsutils procps libprotobuf-c1 libnet1 libnl-3-200 libuuid1 \
     && sed -i -E 's/^# (en_US|en_GB|ja_JP|ko_KR|de_DE|fr_FR)\.UTF-8 UTF-8/\1.UTF-8 UTF-8/' /etc/locale.gen \
     && locale-gen && rm -rf /var/lib/apt/lists/*
 COPY --from=frontend /usr/local/bin/node /usr/local/bin/node
@@ -127,8 +136,9 @@ COPY orchestrator/process_metrics.py /usr/local/bin/process_metrics.py
 COPY orchestrator/process_metrics.py /usr/local/bin/v3-process-metrics
 COPY --from=backend /out/account-sender /usr/local/bin/account-sender
 COPY --from=tls-observer-build /opt/ccrb-tls-observer/ /opt/ccrb-tls-observer/
+COPY --from=criu-build /opt/ccrb-criu/ /opt/ccrb-criu/
 # iproute2已有libbpf运行依赖；在镜像内验证真实动态库，避免重复刷新整层系统依赖。
-RUN python3 -c "import ctypes; ctypes.CDLL('libbpf.so.1')"
+RUN python3 -c "import ctypes,hashlib,json,subprocess;from pathlib import Path;ctypes.CDLL('libbpf.so.1');p=Path('/opt/ccrb-criu');m=json.loads((p/'profile.json').read_text());assert all(hashlib.sha256((p/n).read_bytes()).hexdigest()==s for n,s in m['files'].items());assert subprocess.check_output([str(p/'criu'),'--version'],text=True).strip()=='Version: 4.2'"
 COPY native-runtime/ccrb-runtime /usr/local/bin/ccrb-runtime
 RUN echo '64c61cae565e9097de18cf61a35f46e7595f633cb14f7d6b8c6609fcd294ce89  /usr/local/bin/ccrb-runtime' | sha256sum -c - \
     && chmod 755 /usr/local/bin/ccrb-runtime
@@ -148,6 +158,7 @@ LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELE
     vibebench.cli-install-version="2" \
     vibebench.native-runtime="293-raw-1" \
     vibebench.native-tls-observer="1" \
+    vibebench.native-criu="1" \
     vibebench.system-profile-version="1" \
     vibebench.computer-profile-version="1" \
     vibebench.parent-revision=$V3_PARENT_REV vibebench.gateway-revision=$V3_GATEWAY_REV \

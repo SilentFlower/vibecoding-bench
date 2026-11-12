@@ -20,7 +20,8 @@ class SourceLayoutTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             old, new = root / 'old', root / 'new'
-            names = ('images/v3/Dockerfile', 'cc2api/src/main.rs', 'cc2api/Cargo.toml',
+            names = ('images/v3/Dockerfile', 'images/v3/criu/controller.py', 'images/v3/tls-observer/observer.py',
+                'cc2api/src/main.rs', 'cc2api/Cargo.toml',
                 'cc2api/Cargo.lock', 'cc2api/vendor/dependency.rs', 'cc2api/craftls/lib.rs',
                 'orchestrator/runtime_files.py', 'orchestrator/runtime_diagnostics.py',
                 'orchestrator/cli_quota.py', 'orchestrator/process_metrics.py',

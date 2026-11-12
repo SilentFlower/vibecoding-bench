@@ -68,6 +68,7 @@ def component_content(root: Path, role: str) -> str:
         'cc2api/vendor', 'cc2api/craftls']
     names = (common + ['orchestrator', 'webui', 'cc2api/web/src', 'cc2api/web/package-lock.json'] if role == 'control'
         else common + ['images/account', 'images/sidecar', 'images/worker/task_followups.py',
+            'images/v3/criu', 'images/v3/tls-observer',
             'orchestrator/runtime_files.py', 'orchestrator/runtime_diagnostics.py',
             'orchestrator/cli_quota.py', 'orchestrator/process_metrics.py', 'orchestrator/native_sender.py'])
     digest = hashlib.sha256()

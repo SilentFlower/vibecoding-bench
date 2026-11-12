@@ -2,6 +2,13 @@
 export const PROFILE_293 = {
   version: '2.1.293',
   sha256: '8968405e26db478af44eabc4635ab5ca557057b702a54460a59c13e1b253e978',
+  restore: {
+    protocol: 1,
+    bunVersion: '1.4.3',
+    bunRevision: 'eecfd55debb281c3fe3518098b1a49f76429637c',
+    entropyCacheBytes: 2048,
+    entropyProfile: 'bun143-wipeonfork-v1',
+  },
   modules: {
     core: '/$bunfs/root/chunk-g263vvvn.js',
     api: '/$bunfs/root/chunk-aqh2c7wz.js',

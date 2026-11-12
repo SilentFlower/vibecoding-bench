@@ -3,6 +3,10 @@ import { BridgeError, isObject } from './errors';
 import { isCachePolicyDecision, isTelemetryHandshake, readCacheTtlRewrite } from './runtime-policy';
 import { isNativeClassificationContext } from './request-attribution';
 import { isModelSelection } from './upstream';
+import { isNativeErrorDiagnostics } from './native-error-diagnostics';
+
+const RESTORE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const RESTORE_NONCE = /^[0-9a-f]{64}$/;
 
 function headerPairs(value: unknown): value is HeaderPair[] {
   return Array.isArray(value) && value.every(x => Array.isArray(x) && x.length === 2 && typeof x[0] === 'string' && typeof x[1] === 'string');
@@ -36,6 +40,16 @@ export function validateRuntimeEvent(value: unknown, requestId: string): Runtime
     case 'error': valid = typeof value.error === 'string' && (value.code === undefined || typeof value.code === 'string') && (value.status === undefined || (Number.isInteger(value.status) && Number(value.status) >= 400 && Number(value.status) <= 599)); break;
   }
   if (!valid) throw new BridgeError('runtime_protocol', '运行时事件格式错误', 502);
+  if (value.type === 'error') {
+    // 诊断属于旁路元数据；重建字段可保留真实错误，避免损坏摘要覆盖业务状态或携带扩展原文。
+    return runtimeEvent(requestId, {
+      type: 'error', error: value.error as string,
+      ...(value.code === undefined ? {} : { code: value.code as string }),
+      ...(value.status === undefined ? {} : { status: value.status as number }),
+      ...(isNativeErrorDiagnostics(value.diagnostics) ? { diagnostics: value.diagnostics }
+        : value.diagnostics !== undefined || value.diagnostics_state !== undefined ? { diagnostics_state: 'invalid' as const } : {}),
+    });
+  }
   return value as unknown as RuntimeEvent;
 }
 
@@ -71,6 +85,10 @@ export function runtimeEvent(requestId: string, payload: RuntimePayload): Runtim
 export function decodeWorkerCommand(value: unknown, workerId: string): WorkerCommand {
   if (!isObject(value) || value.schema_version !== 2 || value.worker_id !== workerId) throw new BridgeError('runtime_protocol', '工作进程指令归属不匹配', 502);
   if (value.type === 'worker_shutdown') return value as unknown as WorkerCommand;
+  if (value.type === 'worker_restore_bind') {
+    if (typeof value.template_id !== 'string' || !RESTORE_UUID.test(value.template_id) || typeof value.new_worker_id !== 'string' || !RESTORE_UUID.test(value.new_worker_id) || value.new_worker_id === workerId || typeof value.nonce !== 'string' || !RESTORE_NONCE.test(value.nonce) || Object.keys(value).some(key => !['type', 'schema_version', 'worker_id', 'template_id', 'new_worker_id', 'nonce'].includes(key))) throw new BridgeError('runtime_protocol', '恢复绑定格式错误', 502);
+    return value as unknown as WorkerCommand;
+  }
   if (typeof value.request_id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(value.request_id)) throw new BridgeError('runtime_protocol', '工作进程缺少有效请求归属', 502);
   if (value.type === 'request_cancel') return value as unknown as WorkerCommand;
   if (value.type === 'request_input') {
@@ -96,6 +114,14 @@ export function decodeWorkerFrame(line: string, workerId: string): WorkerFrame {
     if (value.code !== 'native_configuration' || value.status !== 503 || typeof value.error !== 'string' || !value.error.trim() || Buffer.byteLength(value.error) > 2048 || Object.keys(value).some(key => !['type', 'schema_version', 'worker_id', 'code', 'status', 'error'].includes(key))) throw new BridgeError('runtime_protocol', '工作进程初始化错误帧格式错误', 502);
     return value as unknown as WorkerFrame;
   }
+  if (value.type === 'worker_ready') {
+    if (value.restore_protocol !== undefined && value.restore_protocol !== 1) throw new BridgeError('runtime_protocol', '恢复协议版本错误', 502);
+    if (value.restore_template !== undefined && (value.restore_protocol !== 1 || typeof value.restore_template !== 'string' || !RESTORE_UUID.test(value.restore_template))) throw new BridgeError('runtime_protocol', '恢复模板归属错误', 502);
+    if (value.restore_binding !== undefined) {
+      const binding = value.restore_binding;
+      if (value.restore_protocol !== 1 || value.restore_template !== undefined || !isObject(binding) || typeof binding.template_id !== 'string' || !RESTORE_UUID.test(binding.template_id) || typeof binding.nonce !== 'string' || !RESTORE_NONCE.test(binding.nonce) || binding.entropy_profile !== 'bun143-wipeonfork-v1' || Object.keys(binding).some(key => !['template_id', 'nonce', 'entropy_profile'].includes(key))) throw new BridgeError('runtime_protocol', '恢复握手归属错误', 502);
+    }
+  }
   if (value.type === 'worker_ready' && typeof value.version === 'string' && Number.isSafeInteger(value.pid) && Number(value.pid) > 0 && (value.raw_input_protocol === undefined || value.raw_input_protocol === 1) && (value.cache_ttl_rewrite_protocol === undefined || value.cache_ttl_rewrite_protocol === 1) && (value.cache_policy === undefined || value.cache_policy === 'preserve' || value.cache_policy === 'sub2api') && (value.telemetry === undefined || isTelemetryHandshake(value.telemetry))) return value as unknown as WorkerFrame;
   if (typeof value.request_id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(value.request_id)) throw new BridgeError('runtime_protocol', '工作进程事件缺少有效请求归属', 502);
   if (value.type === 'worker_idle') return value as unknown as WorkerFrame;
@@ -103,9 +129,10 @@ export function decodeWorkerFrame(line: string, workerId: string): WorkerFrame {
     const payload = value.payload;
     if (['schema_version', 'request_id', 'worker_id'].some(key => key in payload)) throw new BridgeError('runtime_protocol', '请求载荷不能覆盖协议归属', 502);
     // 同一 JSONL 已经解析；直接校验对象，避免完整 CLI 正文再次编码和解析。
-    validateRuntimeEvent({ ...payload, schema_version: 1, request_id: value.request_id }, value.request_id);
+    const validated = validateRuntimeEvent({ ...payload, schema_version: 1, request_id: value.request_id }, value.request_id);
     if (payload.type === 'ready' || payload.type === 'final_capture_ready') throw new BridgeError('runtime_protocol', '工作进程不能声明控制侧握手或最终采集', 502);
-    return value as unknown as WorkerFrame;
+    const { schema_version, request_id, ...normalized } = validated;
+    return { ...value, payload: normalized } as unknown as WorkerFrame;
   }
   throw new BridgeError('runtime_protocol', '工作进程帧格式错误', 502);
 }

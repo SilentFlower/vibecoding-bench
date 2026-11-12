@@ -15,6 +15,7 @@ from account_update_identity import configured_release, image_origin, role_relea
 
 from native_kernel_upgrade import applied_kernel, release_key
 from native_capture_policy import capture_enabled
+from native_sender import criu_enabled
 from resource_budget import isolated_account_limits, scenario_account_limits
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_VERSION, SYSTEM_PROFILE_DIRECTORY,
     SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_VERSION)
@@ -264,6 +265,14 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
                 cap_add=['SYS_ADMIN', 'SETUID', 'SETGID'],
                 security_opt=['no-new-privileges:true', 'seccomp=' + json.dumps(profile, separators=(',', ':'))])
             sender_options['tmpfs']['/run/ccrb-observer'] = 'rw,noexec,nosuid,nodev,size=1m,mode=0750'
+        if native and criu_enabled() and image_labels.get('vibebench.native-criu') == '1':
+            # 控制器单独持有恢复权限；固定C入口为sender安装原业务过滤器并清零能力。
+            _directory(root / 'runtime/native-criu', 0, 0, 0o700)
+            sender_mounts[str(host_root / 'runtime/native-criu')] = {'bind': '/var/lib/ccrb-criu', 'mode': 'rw'}
+            sender_options.update(user='0:0', entrypoint=['/usr/local/bin/python3', '-E', '-s', '/opt/ccrb-criu/entry.py'],
+                cap_add=['CHOWN', 'DAC_OVERRIDE', 'FOWNER', 'KILL', 'SETUID', 'SETGID', 'SETPCAP', 'NET_ADMIN', 'SYS_CHROOT', 'SYS_PTRACE', 'SYS_ADMIN', 'SYS_RESOURCE', 'SYS_TIME'],
+                security_opt=['no-new-privileges:true', 'seccomp=unconfined'])
+            sender_options['tmpfs']['/run/ccrb-criu'] = 'rw,noexec,nosuid,nodev,size=1m,mode=0750'
         launch('sender', **base, **sender_options, environment=sender_env, volumes=sender_mounts)
     except Exception:
         for container in reversed(created):

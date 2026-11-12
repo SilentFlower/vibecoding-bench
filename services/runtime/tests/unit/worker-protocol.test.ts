@@ -6,7 +6,35 @@ import type { WorkerCommand, WorkerFrame } from '../../src/shared/contracts';
 import { applyCachePolicy } from '../../src/shared/cache-policy';
 
 const workerId = '11111111-1111-4111-8111-111111111111';
+const restoredWorker = '22222222-2222-4222-8222-222222222222';
+const templateId = '33333333-3333-4333-8333-333333333333';
 const prepared = prepareInput(parseInput({ request_id: 'protocol-job', body: { model: 'fixture', messages: [{ role: 'user', content: '测试' }] } }));
+
+test('恢复绑定严格核对模板、实例及挑战，拒绝额外控制字段', () => {
+  const command: WorkerCommand = { schema_version: 2, type: 'worker_restore_bind', worker_id: workerId,
+    template_id: templateId, new_worker_id: restoredWorker, nonce: 'a'.repeat(64) };
+  expect(decodeWorkerCommand(command, workerId)).toEqual(command);
+  for (const changes of [{ template_id: 'other' }, { new_worker_id: workerId }, { new_worker_id: 'invalid' },
+    { nonce: 'a'.repeat(63) }, { nonce: 'A'.repeat(64) }, { pid: 1 }, { path: '/proc/1/mem' }]) {
+    expect(() => decodeWorkerCommand({ ...command, ...changes }, workerId)).toThrow('恢复绑定');
+  }
+  expect(() => decodeWorkerCommand(command, restoredWorker)).toThrow('归属');
+});
+
+test('恢复后握手须声明已知能力与完整归属，保留旧内核兼容', () => {
+  const ready: WorkerFrame = { schema_version: 2, type: 'worker_ready', worker_id: restoredWorker,
+    version: '2.1.293', pid: 100, restore_protocol: 1,
+    restore_binding: { template_id: templateId, nonce: 'a'.repeat(64), entropy_profile: 'bun143-wipeonfork-v1' } };
+  expect(decodeWorkerFrame(JSON.stringify(ready), restoredWorker)).toEqual(ready);
+  for (const changes of [{ restore_protocol: 2 }, { restore_protocol: undefined }, { restore_template: templateId },
+    { restore_binding: {} }, { restore_binding: { ...ready.restore_binding, nonce: '' } },
+    { restore_binding: { ...ready.restore_binding, entropy_profile: 'unknown' } },
+    { restore_binding: { ...ready.restore_binding, token: 'unexpected' } }]) {
+    expect(() => decodeWorkerFrame(JSON.stringify({ ...ready, ...changes }), restoredWorker)).toThrow('恢复');
+  }
+  const legacy: WorkerFrame = { schema_version: 2, type: 'worker_ready', worker_id: workerId, version: '2.1.293', pid: 10 };
+  expect(decodeWorkerFrame(JSON.stringify(legacy), workerId)).toEqual(legacy);
+});
 
 test('原始输入协商与请求归属严格匹配，业务格式留给作业校验', () => {
   const input = { schema_version: 1, request_id: 'raw-job', body: null };

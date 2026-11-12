@@ -1,5 +1,6 @@
 """原生 sender 的显式预算、加权容量及旧布局回归。"""
 import unittest
+from unittest.mock import patch
 
 from native_sender import sender_config
 from resource_budget import account_limits, memory_bytes, isolated_account_limits, scenario_account_limits, serial_review_limits
@@ -7,6 +8,17 @@ from resource_budget import account_limits, memory_bytes, isolated_account_limit
 
 class NativeSenderTests(unittest.TestCase):
     """使用合成配置核对有限资源与可回退的后端选择。"""
+
+    def test_criu_accounts_for_each_restored_code_image(self):
+        """显式恢复开关覆盖每进程独立代码映像预算。@return 无。"""
+        account = {'request_backend': 'native293', 'concurrency': 3}
+        with patch.dict('os.environ', {'V3_NATIVE_CRIU': '1'}):
+            with self.assertRaises(ValueError):
+                sender_config(account, '4g', budget='1536m')
+            self.assertEqual(sender_config(account, '4g', budget='2056m')['max_workers'], 6)
+            self.assertEqual(sender_config(account, 'unlimited', budget='')['memory_mib'], 0)
+        with patch.dict('os.environ', {'V3_NATIVE_CRIU': '0'}):
+            self.assertEqual(sender_config(account, '4g', budget='1408m')['max_workers'], 6)
 
     def test_default_keeps_legacy_budget(self):
         """省略后端保持原 sender 布局。@return None。"""

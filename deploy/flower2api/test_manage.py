@@ -109,6 +109,21 @@ class PreflightTests(unittest.TestCase):
                 with self.subTest(key=key), self.assertRaisesRegex(ValueError, '有效发布公钥'):
                     manage.preflight(self.values)
 
+    def test_native_criu_flag_requires_explicit_binary_value(self) -> None:
+        """防止恢复权限开关被拼写错误静默关闭。@return None。"""
+        self.values['V3_ACCOUNT_MEMORY'] = '1536m'
+        with patch.object(manage, 'command', return_value=''), \
+                patch.object(manage, 'inspect_images', return_value={}), \
+                patch.object(manage.Path, 'read_text', return_value='MemAvailable: 2097152 kB\nSwapFree: 0 kB\n'):
+            for value in ('', '0', '1'):
+                self.values['V3_NATIVE_CRIU'] = value
+                with self.subTest(value=value):
+                    self.assertEqual(manage.preflight(self.values), self.root)
+            for value in ('true', '2', ' 1'):
+                self.values['V3_NATIVE_CRIU'] = value
+                with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'CRIU 开关'):
+                    manage.preflight(self.values)
+
     def test_published_docker_nat_port_rejects_without_host_listener(self) -> None:
         """Docker 禁用 userland proxy 时，也必须检查 NAT 发布端口。@return None。"""
         self.values["V3_HOST_PORT"] = "18080"

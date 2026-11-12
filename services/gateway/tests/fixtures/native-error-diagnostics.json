@@ -1,0 +1,81 @@
+{
+  "stages": [
+    "input",
+    "context",
+    "construction",
+    "dispatch",
+    "response_headers",
+    "response_body",
+    "unknown"
+  ],
+  "names": [
+    "Error",
+    "TypeError",
+    "RangeError",
+    "SyntaxError",
+    "AbortError",
+    "TimeoutError",
+    "DOMException",
+    "AggregateError",
+    "BridgeError",
+    "unknown"
+  ],
+  "codes": [
+    "ECONNREFUSED",
+    "ECONNRESET",
+    "ECONNABORTED",
+    "EPIPE",
+    "ETIMEDOUT",
+    "ENOTFOUND",
+    "EAI_AGAIN",
+    "EHOSTUNREACH",
+    "ENETUNREACH",
+    "ENOENT",
+    "EACCES",
+    "EPERM",
+    "EADDRINUSE",
+    "CERT_NOT_YET_VALID",
+    "CERT_HAS_EXPIRED",
+    "DEPTH_ZERO_SELF_SIGNED_CERT",
+    "SELF_SIGNED_CERT_IN_CHAIN",
+    "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+    "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+    "ERR_TLS_CERT_ALTNAME_INVALID",
+    "ERR_TLS_CERT_SIGNATURE_ALGORITHM_UNSUPPORTED",
+    "ERR_SSL_WRONG_VERSION_NUMBER",
+    "ERR_SSL_SSLV3_ALERT_HANDSHAKE_FAILURE",
+    "ConnectionRefused",
+    "ConnectionClosed",
+    "ConnectionReset",
+    "SocketClosed",
+    "ERR_STREAM_PREMATURE_CLOSE",
+    "ABORT_ERR",
+    "UND_ERR_CONNECT_TIMEOUT",
+    "UND_ERR_SOCKET",
+    "request_timeout",
+    "runtime_protocol",
+    "native_configuration",
+    "native_construction",
+    "native_identity",
+    "unsupported_parameter",
+    "context_conflict",
+    "unknown"
+  ],
+  "diagnostics": {
+    "schema_version": 1,
+    "stage": "dispatch",
+    "causes": [
+      {
+        "name": "TypeError",
+        "code": "unknown"
+      },
+      {
+        "name": "Error",
+        "code": "ECONNRESET"
+      }
+    ],
+    "chain_truncated": false,
+    "cycle_detected": false,
+    "inspection_failed": false
+  }
+}

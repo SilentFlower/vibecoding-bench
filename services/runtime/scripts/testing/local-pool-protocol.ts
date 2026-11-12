@@ -27,8 +27,7 @@ export function decodeLocalDriverFrame(line: string): LocalDriverFrame {
     if (value.type === 'fatal' && typeof value.message === 'string') return { type: 'fatal', message: '本地隔离驱动失败，未自动重放', ...(value.startup === undefined ? {} : { startup: decodeLocalPoolStartup(value.startup) }) };
     if (value.type === 'ready' && typeof value.namespace === 'string' && strings(value.interfaces) && strings(value.envNames) && value.rejectedTargetProbe === true && typeof value.name === 'string' && typeof value.binarySha256 === 'string' && /^[a-f0-9]{64}$/.test(value.binarySha256)) return value as unknown as LocalDriverFrame;
     if (value.type === 'event' && isObject(value.event) && typeof value.event.request_id === 'string' && pid(value.workerPid)) {
-      validateRuntimeEvent(value.event, value.event.request_id);
-      return value as unknown as LocalDriverFrame;
+      return { type: 'event', event: validateRuntimeEvent(value.event, value.event.request_id), workerPid: value.workerPid as number | null };
     }
     if (value.type === 'idle' && typeof value.requestId === 'string' && pid(value.workerPid) && strings(value.workerEnvNames) && typeof value.syntheticCredential === 'boolean' && ['off','pending','initialized','suppressed','unavailable'].includes(String(value.telemetryState))) {
       if (value.error !== undefined && (!isObject(value.error) || typeof value.error.code !== 'string' || typeof value.error.message !== 'string' || !Number.isInteger(value.error.status) || Number(value.error.status) < 400 || Number(value.error.status) > 599)) throw new Error('本地驱动异常格式错误');

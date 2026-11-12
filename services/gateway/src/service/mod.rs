@@ -4,6 +4,9 @@ pub mod diagnostics;
 pub mod gateway;
 mod native_capture;
 pub(crate) mod native_contract;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+mod native_criu;
+mod native_error;
 pub(crate) mod native_prewarm;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod native_release;

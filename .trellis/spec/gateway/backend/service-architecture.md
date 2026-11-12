@@ -49,6 +49,7 @@ src/tlsfp/
 - 原生请求最多一次模型提交，错误直接返回；legacy 的重写、401/signature/429 重试与其他端点保持各自原路径。调度 submitted 记录实际内部 POST，包含原生初始化耗时，不能解释为供应商已接收。
 - Gateway逐请求冻结当前cache_control_ttl_rewrite（off/5m/1h），私有TTL策略在checkout前校验。worker_ready能力cache_ttl_rewrite_protocol=1才发送该字段；强制模式遇旧内核返回503且零模型提交，off兼容旧版。策略不参与池身份，修改设置继续复用暖PID；配套内核先激活，再更新平台。旧内核回滚前先关闭强制TTL。
 - 响应流日志按网关根request_id、原生job/attempt UUID、worker/PID关联。本层EOF、body_error、静默超时、下游Drop及IPC/运行时错误分别记录，含持续时间、片段/字节及最后收包间隔。错误链最多八层，仅投影reqwest/hyper/io类型标志及OS代码；运行时原错误只保存SHA与受控code。代理隧道仅记录worker/tunnel UUID及密文流量数字，不能据双向复制收口断言首个关闭方。普通日志禁止异常原文、URL、代理凭据及正文。
+- account-sender 启动时初始化 JSON tracing 日志，默认 info，支持 RUST_LOG，关闭 ANSI。原生 error 事件的可选 diagnostics 经 native_error::project 独立有界校验后，记录实际阶段、最多八层白名单 name/code 及截断/循环/读取失败标记；保留原错误 SHA。日志包含 job、worker/PID、account_id、generation。缺省摘要记 unavailable，畸形记 invalid，均保持原业务响应。TS/Rust 目录及实际事件结构由 tests/fixtures/native-error-diagnostics.json 交叉验证；进程退役前记录，保留期沿 Docker 日志轮转。
 - sender 校验现有绑定、代次、deadline、目标及秘密，原生目标仅 POST `/v1/messages` 且无 query。response 继续经过共用用量观察及流许可，取消、EOF、Drop 各按既有一次收口。
 - 私有`deadline_unix_ms`采用一次墙钟采样：过期拒绝，未来上限允许120秒预算加5秒跨进程时钟偏差，实际剩余预算钳制120秒。legacy发送和原生启动、首响应共用接收时冻结的单调截止；池内不重复按墙钟验期。暖进程在业务投递前复核单调截止，启动耗时不能换取新预算。
 - 准备仅 checkout/真实 worker_ready/回池，禁止调用 execute、模型或计费。后台协调并行2、待处理账号最多128；启动及5/20/60秒补偿只解析运行绑定。bench 环境就绪在生命周期锁外按环境/代次通知一次；在途新提示合并为一次后续执行。账号更新、凭据提交及交接重新开放门禁后触发准备。

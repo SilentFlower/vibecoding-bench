@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Engine } from '../../src/control/engine';
 import type { PreparedInput, RuntimeEvent, RuntimePayload } from '../../src/shared/contracts';
-import { runtimeEvent } from '../../src/shared/protocol';
+import { decodeWorkerFrame, runtimeEvent } from '../../src/shared/protocol';
 import { readConfig, startServer, type RunningServer, type ServerStartupOptions } from '../../src/control/server';
 import { createHash } from 'node:crypto';
 import { Database } from 'bun:sqlite';
@@ -28,6 +28,42 @@ function post(base: string, value: unknown): Promise<Response> {
 const request = { model: 'claude-sonnet-4-6', messages: [{ role: 'user', content: '本地集成测试' }], stream: true };
 
 describe('控制、持久日志与查询', () => {
+  test('非法原生诊断降级后仍返回原业务错误，私有扩展不落盘', async () => {
+    const secret = 'diagnostic-invalid-secret-canary';
+    for (const [index, diagnostics] of [null, { schema_version: 2 }, { stage: secret, message: secret }].entries()) {
+      let calls = 0;
+      let state: string | undefined;
+      const engine: Engine = {
+        name: 'diagnostic-fixture', binarySha256: null, workerPid: null,
+        /** 将合成错误经过实际共享解码器交给控制层。
+         * @param prepared 当前作业。
+         * @param _signal 当前取消信号。
+         * @param emit 实际事件消费者。
+         * @return 错误事件已交付。
+         */
+        async run(prepared, _signal, emit) {
+          calls++;
+          const worker = '11111111-1111-4111-8111-111111111111';
+          const frame = decodeWorkerFrame(JSON.stringify({ type: 'request_event', schema_version: 2, worker_id: worker, request_id: prepared.input.request_id,
+            payload: { type: 'error', error: '合成参数错误', code: 'unsupported_parameter', status: 422, diagnostics, extra: secret } }), worker);
+          if (frame.type !== 'request_event' || frame.payload.type !== 'error') throw new Error('夹具缺少错误事件');
+          state = frame.payload.diagnostics_state;
+          await emit(runtimeEvent(prepared.input.request_id, frame.payload));
+        },
+        /** 结束无外部资源的合成引擎。@return 已结束。 */
+        async close() {},
+      };
+      const { app: running, base } = await app(engine);
+      const response = await post(base, { request_id: 'invalid-diagnostic-' + index, body: request });
+      const body = await response.json(); await running.store.flush();
+      expect(response.status).toBe(422);
+      expect(body.error.type).toBe('unsupported_parameter');
+      expect(state).toBe('invalid'); expect(calls).toBe(1);
+      expect(JSON.stringify(body)).not.toContain(secret);
+      expect(JSON.stringify(await running.store.detail('invalid-diagnostic-' + index))).not.toContain(secret);
+    }
+  });
+
   test('前置模型覆盖贯通提交、原始入站及日志选择证据', async () => {
     const { app: running, base } = await app(undefined, { CCRB_MODEL_OVERRIDE: 'fixture-routed-model' });
     const original = { request_id: 'model-selection', body: request };
