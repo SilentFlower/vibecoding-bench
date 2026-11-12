@@ -133,13 +133,31 @@ async def verify(output: Path) -> dict:
         fixture = UpdateFixture()
         context, page = await page_for(fixture)
         await expect(page.get_by_role('button', name='安装更新', exact=True)).to_be_visible()
-        await expect(page.get_by_role('button', name='兼容验证待补齐')).to_be_disabled()
+        await page.get_by_role('button', name='查看历史版本与回退', exact=False).click()
+        await expect(page.get_by_role('button', name='待验证兼容')).to_be_disabled()
+        await page.locator('[data-release-card]').nth(1).locator('button[aria-expanded]').click()
         await expect(page.get_by_text('此来源版本的升级与回退演练证据待发布端补齐。')).to_be_visible()
+        await page.locator('[data-release-card]').first.locator('button[aria-expanded]').click()
         await expect(page.get_by_text('平台数据库 → 版本 1 · 1 项登记')).to_be_visible()
         assert await page.evaluate('window.fixtureXss') is None
         await page.screenshot(path=str(output / 'updates-1280.png'), full_page=True)
         await page.get_by_role('button', name='安装更新', exact=True).click()
         await expect(page.locator('dialog')).to_be_visible()
+        for width, height in [(1280, 900), (390, 900), (390, 300)]:
+            await page.set_viewport_size({'width': width, 'height': height})
+            box = await page.locator('dialog').bounding_box()
+            assert box and abs(box['x'] + box['width'] / 2 - width / 2) <= 1, box
+            assert abs(box['y'] + box['height'] / 2 - height / 2) <= 1, box
+            assert box['y'] >= 15 and box['y'] + box['height'] <= height - 15, box
+            await page.get_by_role('button', name='确认执行', exact=True).scroll_into_view_if_needed()
+            control = await page.get_by_role('button', name='确认执行', exact=True).bounding_box()
+            assert control and control['y'] >= 0 and control['y'] + control['height'] <= height, control
+            await page.screenshot(path=str(output / f'centered-dialog-{width}-{height}.png'))
+        await page.set_viewport_size({'width': 1280, 'height': 900})
+        await page.mouse.click(5, 5)
+        await expect(page.locator('dialog')).not_to_be_visible()
+        assert not fixture.writes
+        await page.get_by_role('button', name='安装更新', exact=True).click()
         assert not fixture.writes
         await page.get_by_role('button', name='取消', exact=True).click()
         assert not fixture.writes
@@ -162,6 +180,7 @@ async def verify(output: Path) -> dict:
         assert body['drain_timeout_seconds'] == 1800 and body['target_manifest_sha256'] == 'b' * 64
         assert str(uuid.UUID(body['operation_id'])) == body['operation_id']
         await expect(page.get_by_text('合成账号：等待原 CLI 作业自然完成')).to_be_visible()
+        await page.get_by_text('操作详情与数据库快照', exact=True).click()
         fixture.unavailable = True
         await expect(page.get_by_role('alert')).to_contain_text('正在重新连接', timeout=7000)
         fixture.unavailable = False
@@ -175,7 +194,7 @@ async def verify(output: Path) -> dict:
         await expect(page.get_by_text('网关数据库 · 目标版本 1 · 正在迁移')).to_be_visible()
         await page.screenshot(path=str(output / 'migrations-390.png'), full_page=True)
         fixture.state['operation']['database_migrations']['gateway']['state'] = 'synthetic-new-state'
-        await expect(page.get_by_text('网关数据库 · 目标版本 1 · 未知状态：synthetic-new-state')).to_be_visible(timeout=15000)
+        await expect(page.get_by_text('网关数据库 · 目标版本 1 · synthetic-new-state', exact=True)).to_be_visible(timeout=15000)
         fixture.state['operation'].update(phase='restoring_data')
         await expect(page.get_by_role('heading', name='正在恢复数据库', exact=True)).to_be_visible(timeout=15000)
         fixture.state.update(busy=False, current_release='system-ci-101-1')
@@ -216,6 +235,7 @@ async def verify(output: Path) -> dict:
 
         fixture = UpdateFixture()
         context, page = await page_for(fixture)
+        await page.get_by_role('button', name='查看历史版本与回退', exact=False).click()
         await page.get_by_role('button', name='回退到此版本').click()
         await expect(page.get_by_role('heading', name='确认版本回退')).to_be_visible()
         await page.get_by_role('button', name='确认执行').click()
@@ -226,6 +246,23 @@ async def verify(output: Path) -> dict:
         assert fixture.writes[-1]['path'].endswith('/cancel')
         total_writes += len(fixture.writes)
         cases.append('回退冻结目标与取消等待使用原操作身份')
+        await context.close()
+
+        fixture = UpdateFixture()
+        operation_id = str(uuid.uuid4())
+        fixture.state.update(busy=True, operation={'operation_id': operation_id, 'phase': 'reconcile',
+            'action': 'install', 'target_release': 'system-ci-101-1'})
+        context, page = await page_for(fixture, 390)
+        await page.get_by_role('button', name='恢复操作', exact=True).click()
+        await expect(page.get_by_role('heading', name='恢复本次操作', exact=True)).to_be_visible()
+        box = await page.locator('dialog').bounding_box()
+        assert box and abs(box['x'] + box['width'] / 2 - 195) <= 1, box
+        await page.get_by_role('button', name='开始恢复', exact=True).click()
+        assert len(fixture.writes) == 1 and fixture.writes[0]['path'].endswith('/recover')
+        assert fixture.writes[0]['path'].endswith('/' + operation_id + '/recover')
+        assert fixture.writes[0]['body'] == {'expected_revision': fixture.state['revision']}
+        total_writes += len(fixture.writes)
+        cases.append('恢复窗口居中，继续使用原操作身份')
         await context.close()
         await browser.close()
     if errors:

@@ -833,17 +833,27 @@ class AccountRuntime:
         if state in ('sleeping', 'disabled', 'maintenance'):
             return {'state': state, 'reason': state}
         native = configuration.get('native')
+        checking = value.get('checking') is True
+        # 首轮检查尚未得到身份；仅提供进度，不能把旧进程投影到当前环境。
+        if (not value.get('environment_id') or type(value.get('generation')) is not int
+                or isinstance(native, dict) and native.get('kernel_generation') is not None
+                and value.get('kernel_generation') is None):
+            reason = value.get('reason')
+            if reason not in ('check_failed', 'preparation_failed', 'invalidated', 'identity_changed'):
+                reason = 'snapshot_pending'
+            return {'state': 'unknown', 'reason': reason, 'checking': checking}
         if (value.get('environment_id') != row['environment_id'] or value.get('generation') != row['generation']
                 or not isinstance(native, dict) or value.get('kernel_generation') != native.get('kernel_generation')):
-            return {'state': 'unknown', 'reason': 'binding_unverified'}
+            return {'state': 'unknown', 'reason': 'binding_unverified', 'checking': checking}
         checked = value.get('checked_at_ms')
         if type(checked) is not int or not 0 <= time.time() * 1000 - checked <= 45000:
-            return {'state': 'unknown', 'reason': 'check_expired', 'checked_at_ms': checked if type(checked) is int else None}
+            return {'state': 'unknown', 'reason': 'check_expired', 'checked_at_ms': checked if type(checked) is int else None, 'checking': checking}
         states = {'ready', 'busy', 'preparing', 'unprepared', 'failed', 'unknown'}
         reasons = {'identity_changed', 'worker_unavailable', 'check_expired', 'check_failed', 'preparation_failed', 'invalidated'}
         result = {key: value[key] for key in ('checked_at_ms', 'generation', 'environment_id') if key in value}
         result['state'] = state if state in states else 'unknown'
         result['reason'] = value.get('reason') if value.get('reason') in reasons else None
+        result['checking'] = checking
         result['adaptive_prewarm'] = configuration.get('native_adaptive_prewarm') is True
         for key in ('idle_workers', 'live_workers', 'pid'):
             number = value.get(key)

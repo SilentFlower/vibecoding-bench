@@ -55,7 +55,7 @@ onMounted(loadDashboard);
       <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
         <div class="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2">
           <div class="flex min-w-0 items-center gap-2">
-            <img src="/favicon.svg" alt="Logo" class="w-6 h-6" />
+            <img src="/favicon.svg?v=flower2api-pink-04" alt="flower2api 标志" class="w-6 h-6" />
             <h1 class="text-lg font-semibold text-foreground tracking-tight">flower2api</h1>
           </div>
           <nav class="flex flex-wrap items-center gap-1" aria-label="主导航">

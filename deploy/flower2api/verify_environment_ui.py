@@ -276,6 +276,23 @@ async def run(output: Path, gateway: Path) -> dict:
             fixture.rows[0]['native_preparation'] = {'state': 'preparing', 'checked_at_ms': int(time.time() * 1000)}
             await refresh()
             await expect(preparation).to_contain_text('正在准备')
+            fixture.rows[0]['native_preparation'] = {'state': 'unknown', 'reason': 'snapshot_pending', 'checking': True}
+            await refresh()
+            await expect(preparation).to_contain_text('正在检查')
+            await expect(preparation).to_contain_text('每20秒自动读取')
+            await expect(preparation.locator('.env-resources')).to_contain_text('未观测')
+            reads = fixture.reads
+            fixture.rows[0]['native_preparation'] = sample_rows()[0]['native_preparation']
+            # 使用真实20秒轮询，不手动刷新或缩短业务计时器。
+            await expect(preparation).to_contain_text('热进程就绪', timeout=25000)
+            assert fixture.reads > reads
+            await expect(preparation).to_contain_text('27')
+            for reason, label in [('binding_unverified', '其他环境或内核代次'),
+                    ('read_failed', '准备状态读取失败'), ('preparation_failed', '本地准备失败')]:
+                fixture.rows[0]['native_preparation'] = {'state': 'unknown', 'reason': reason}
+                await refresh()
+                await expect(preparation).to_contain_text(label)
+                await expect(preparation.locator('.env-resources')).to_contain_text('未观测')
             fixture.rows[0]['native_preparation'] = sample_rows()[0]['native_preparation']
             await refresh()
             assert len(fixture.writes) == previous

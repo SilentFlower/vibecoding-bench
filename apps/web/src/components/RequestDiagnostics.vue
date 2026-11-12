@@ -201,10 +201,48 @@ function milliseconds(value?: number | null): string {
   return value == null ? '未观测' : value >= 1000 ? `${(value / 1000).toFixed(2)} s` : `${value} ms`;
 }
 
-/** 复制当前可见的安全标识。@param value 已脱敏标识。@return 复制结束。 */
-async function copy(value: string): Promise<void> {
-  try { await navigator.clipboard.writeText(value); toast.show('已复制', 'success'); }
-  catch { toast.show('复制失败，请选择文本手动复制'); }
+/** 复制当前安全标识并兼容 HTTP 与弹窗焦点域。@param value 完整标识。@param event 触发事件。@return 复制结束。 */
+async function copy(value: string, event: MouseEvent): Promise<void> {
+  const trigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  if (window.isSecureContext && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.show('已复制', 'success');
+      return;
+    } catch {
+      // 权限拒绝时继续使用当前点击允许的选中复制。
+    }
+  }
+  const host = trigger?.closest('[role="dialog"]') ?? document.body;
+  const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const selection = window.getSelection();
+  const ranges = selection ? Array.from({ length: selection.rangeCount }, (_, index) => selection.getRangeAt(index).cloneRange()) : [];
+  const textarea = document.createElement('textarea');
+  let copied = false;
+  try {
+    textarea.value = value;
+    textarea.readOnly = true;
+    textarea.tabIndex = -1;
+    textarea.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+    // Reka 会把焦点限制在弹窗中，临时输入框必须属于同一焦点域。
+    if (host.isConnected && trigger?.isConnected) {
+      host.appendChild(textarea);
+      textarea.focus({ preventScroll: true });
+      textarea.select();
+      textarea.setSelectionRange(0, value.length);
+      copied = document.execCommand('copy');
+    }
+  } catch {
+    copied = false;
+  } finally {
+    textarea.remove();
+    if (focused?.isConnected) focused.focus({ preventScroll: true });
+    if (selection) {
+      selection.removeAllRanges();
+      for (const range of ranges) selection.addRange(range);
+    }
+  }
+  toast.show(copied ? '已复制' : '复制失败，请选择文本手动复制', copied ? 'success' : 'error');
 }
 
 /** 切换尝试时清理原快照与在途读取。@return 无返回值。 */
@@ -259,7 +297,7 @@ onUnmounted(() => { mounted = false; listGeneration++; detailGeneration++; listC
     <div class="relative overflow-x-auto rounded-xl border bg-card">
       <table class="w-full text-left sm:whitespace-nowrap"><thead class="bg-muted/40 text-xs text-muted-foreground"><tr><th class="px-4 py-3 font-medium">时间 / 请求</th><th class="hidden px-3 py-3 font-medium sm:table-cell">账号</th><th class="px-3 py-3 font-medium">结果</th><th class="hidden px-3 py-3 font-medium sm:table-cell">总耗时</th><th class="hidden px-3 py-3 font-medium sm:table-cell">尝试</th><th class="px-4 py-3 font-medium"><span class="sr-only">操作</span></th></tr></thead>
         <tbody class="divide-y"><tr v-for="row in rows" :key="row.request_id" class="hover:bg-muted/35">
-          <td class="max-w-48 px-3 py-3 sm:max-w-none sm:px-4"><time :datetime="row.started_at" :title="row.started_at" class="block whitespace-normal break-words text-[11px] sm:whitespace-nowrap sm:text-xs">{{ formatLocalTime(row.started_at) }}</time><div class="mt-1 flex items-center gap-2"><code class="text-xs text-muted-foreground" :title="row.request_id">{{ row.request_id.slice(0, 8) }}…</code><button type="button" :aria-label="`复制请求 ${row.request_id}`" class="text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring" @click="copy(row.request_id)"><Copy class="size-3" /></button><span class="text-[11px] text-muted-foreground">{{ row.log_mode ?? '历史模式未知' }}</span><span class="text-[11px] text-muted-foreground sm:hidden">账号 {{ row.account_id ?? '未知' }}</span></div></td>
+          <td class="max-w-48 px-3 py-3 sm:max-w-none sm:px-4"><time :datetime="row.started_at" :title="row.started_at" class="block whitespace-normal break-words text-[11px] sm:whitespace-nowrap sm:text-xs">{{ formatLocalTime(row.started_at) }}</time><div class="mt-1 flex items-center gap-2"><code class="text-xs text-muted-foreground" :title="row.request_id">{{ row.request_id.slice(0, 8) }}…</code><button type="button" :aria-label="`复制请求 ${row.request_id}`" class="text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring" @click="copy(row.request_id, $event)"><Copy class="size-3" /></button><span class="text-[11px] text-muted-foreground">{{ row.log_mode ?? '历史模式未知' }}</span><span class="text-[11px] text-muted-foreground sm:hidden">账号 {{ row.account_id ?? '未知' }}</span></div></td>
           <td class="hidden px-3 font-mono text-xs sm:table-cell">{{ row.account_id ?? '未知' }}</td>
           <td class="px-3"><button type="button" class="diagnostic-badge" :class="outcomeTone(row.outcome)" @click="open(row, $event)">{{ row.status_code ?? '待终结' }} · {{ outcomeLabel(row.outcome) }}</button></td>
           <td class="hidden px-3 font-mono text-xs sm:table-cell">{{ milliseconds(elapsed(row)) }}</td><td class="hidden px-3 font-mono text-xs sm:table-cell">{{ row.attempt_count }}</td>
@@ -271,7 +309,7 @@ onUnmounted(() => { mounted = false; listGeneration++; detailGeneration++; listC
     <div class="flex flex-wrap items-center justify-between gap-3"><p class="text-xs text-muted-foreground">info 保存摘要；debug 配合账号内容采集开关保存脱敏原文。</p><div class="flex items-center gap-3"><Button size="sm" variant="outline" :disabled="loading || page <= 1" @click="load(page - 1)">上一页</Button><span class="text-xs tabular-nums text-muted-foreground">{{ page }} / {{ Math.max(1, Math.ceil(total / 20)) }}</span><Button size="sm" variant="outline" :disabled="loading || page * 20 >= total" @click="load(page + 1)">下一页</Button></div></div>
     <Dialog :open="dialogOpen" @update:open="setDialogOpen">
       <DialogContent class="sm:max-w-4xl max-h-[88dvh] flex flex-col gap-0 overflow-hidden p-0" @close-auto-focus="restoreFocus">
-        <DialogHeader class="shrink-0 border-b px-5 py-4 pr-12"><DialogTitle class="flex items-center gap-2 text-lg">请求详情<span v-if="selected" class="diagnostic-badge text-xs" :class="outcomeTone(selected.outcome)">{{ selected.status_code ?? '待终结' }} · {{ outcomeLabel(selected.outcome) }}</span></DialogTitle><DialogDescription class="flex items-center gap-2 min-w-0"><code class="min-w-0 truncate text-xs" :title="selected?.request_id">{{ selected?.request_id }}</code><button v-if="selected" type="button" aria-label="复制完整请求 ID" class="shrink-0 hover:text-foreground" @click="copy(selected.request_id)"><Copy class="size-3" /></button></DialogDescription></DialogHeader>
+        <DialogHeader class="shrink-0 border-b px-5 py-4 pr-12"><DialogTitle class="flex items-center gap-2 text-lg">请求详情<span v-if="selected" class="diagnostic-badge text-xs" :class="outcomeTone(selected.outcome)">{{ selected.status_code ?? '待终结' }} · {{ outcomeLabel(selected.outcome) }}</span></DialogTitle><DialogDescription class="flex items-center gap-2 min-w-0"><code class="min-w-0 truncate text-xs" :title="selected?.request_id">{{ selected?.request_id }}</code><button v-if="selected" type="button" aria-label="复制完整请求 ID" class="shrink-0 hover:text-foreground" @click="copy(selected.request_id, $event)"><Copy class="size-3" /></button></DialogDescription></DialogHeader>
         <div role="tablist" aria-label="请求详情分类" class="flex shrink-0 gap-1 overflow-x-auto border-b px-4" @keydown="tabKeys"><button v-for="tab in tabs" :id="`request-tab-${tab.id}`" :key="tab.id" type="button" role="tab" :aria-selected="activeTab === tab.id" :aria-controls="`request-panel-${tab.id}`" :tabindex="activeTab === tab.id ? 0 : -1" class="whitespace-nowrap border-b-2 px-3 py-3 text-sm transition-colors" :class="activeTab === tab.id ? 'border-primary font-medium text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'" @click="activeTab = tab.id">{{ tab.label }}</button></div>
         <div class="min-h-0 overflow-y-auto px-5 py-5 text-sm">
           <p v-if="detailLoading" role="status" class="mb-3 text-muted-foreground">读取中…</p><p v-if="detailError" role="alert" class="mb-3 text-destructive">{{ detailError }}</p>

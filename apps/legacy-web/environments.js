@@ -150,16 +150,21 @@ function renderNativePreparation(row) {
     sleeping: '环境休眠', disabled: '账号停用', maintenance: '维护中', failed: '准备失败', unknown: '待检查'};
   const reasons = {identity_changed: '运行身份已变化', worker_unavailable: '进程退出或管道异常',
     check_expired: '最近检查已过期', check_failed: '状态检查失败', preparation_failed: '本地准备失败',
-    invalidated: '准备已失效', capability_unknown: '原生能力待核对', binding_unverified: '当前环境代次待核对',
+    invalidated: '准备已失效', capability_unknown: '原生能力待核对', binding_unverified: '最近快照属于其他环境或内核代次，等待当前代次检查',
     read_failed: '准备状态读取失败', snapshot_missing: '尚未收到本账号的准备快照',
+    snapshot_pending: '等待首次检查返回当前环境快照',
     maintenance: '账号正在维护', sleeping: '环境休眠', disabled: '账号已停用'};
   const tone = value.state === 'ready' ? 'good' : ['busy', 'sleeping', 'disabled'].includes(value.state) ? 'muted' : 'warning';
   const checked = typeof value.checked_at_ms === 'number' && Number.isFinite(value.checked_at_ms)
     ? new Date(value.checked_at_ms).toLocaleString() : '未观测';
+  const pending = ['snapshot_pending', 'snapshot_missing'].includes(value.reason);
+  const label = value.state === 'unknown' ? (pending ? (value.checking === true ? '正在检查' : '等待快照')
+    : value.reason === 'check_expired' ? '检查已过期' : '状态待核对') : labels[value.state] || '未知状态';
   return `<section class="env-preparation" data-native-preparation>
-    <div class="env-card-head"><h4>原生准备</h4><span class="env-badge env-${tone}">${escapeHTML(labels[value.state] || '未知状态')}</span></div>
+    <div class="env-card-head"><h4>原生准备</h4><span class="env-badge env-${tone}">${escapeHTML(label)}</span></div>
     <div class="env-resources"><div><span>空闲热进程</span><strong>${escapeHTML(value.idle_workers ?? '未观测')}</strong></div><div><span>实际进程数</span><strong>${escapeHTML(value.live_workers ?? '未观测')}</strong></div><div><span>空闲 PID</span><strong>${escapeHTML(value.pid ?? '未观测')}</strong></div></div>
     <p class="env-muted">最近检查：${escapeHTML(checked)}</p>
+    ${value.checking === true ? '<p class="env-muted">后台正在检查。页面每20秒自动读取检查结果。</p>' : ''}
     ${typeof value.adaptive_prewarm === 'boolean' ? `<p class="env-muted">并发备用：${value.adaptive_prewarm ? '已启用第二进程补位' : '未启用，保留一个常驻热进程'}。超出已就绪热容量时按需扩容。</p>` : ''}
     ${value.reason ? `<p class="env-notice">${escapeHTML(reasons[value.reason] || '状态待核对')}</p>` : ''}
   </section>`;
