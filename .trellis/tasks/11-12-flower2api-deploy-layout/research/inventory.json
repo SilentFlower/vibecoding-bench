@@ -1,0 +1,496 @@
+{
+  "baseline": "eda1a735cee4fd53622f7e5b70966630d973f796",
+  "tracked": [
+    {
+      "path": "deploy/v3/PI_PROJECTS.md",
+      "mode": "100644",
+      "blob": "d3b7b936664abecdcd92b1637c53e46f46ec61a0"
+    },
+    {
+      "path": "deploy/v3/README.md",
+      "mode": "100644",
+      "blob": "5e00b80d6c9f014bf80142eb2deeac84d2d1ef03"
+    },
+    {
+      "path": "deploy/v3/SYSTEM-UPDATES.md",
+      "mode": "100644",
+      "blob": "b03020285371d9d0978b922754ffbf97f06eb9c8"
+    },
+    {
+      "path": "deploy/v3/compose-updates.yml",
+      "mode": "100644",
+      "blob": "5c241d99729477576128e879ec732f1b561c3b37"
+    },
+    {
+      "path": "deploy/v3/compose.yml",
+      "mode": "100644",
+      "blob": "6451543866a71edde8623d236d284b469e44a321"
+    },
+    {
+      "path": "deploy/v3/example.env",
+      "mode": "100644",
+      "blob": "1b29d89ab1a221741dc613cc8c9f29db37632cdb"
+    },
+    {
+      "path": "deploy/v3/fixtures/forwarding_network.py",
+      "mode": "100644",
+      "blob": "c846839e88728c3549ca9568f8b8caba3b0fcc1f"
+    },
+    {
+      "path": "deploy/v3/fixtures/legacy_runtime.py",
+      "mode": "100644",
+      "blob": "4d86c88795a6e3173d62256618719d95dde9e449"
+    },
+    {
+      "path": "deploy/v3/fixtures/mock_cli.py",
+      "mode": "100644",
+      "blob": "02d22e61ab24941e9d25edab9e390b18599eecde"
+    },
+    {
+      "path": "deploy/v3/fixtures/mock_network.py",
+      "mode": "100644",
+      "blob": "85b27ebc76026051bee4ff8f6c05f56b3fe756e7"
+    },
+    {
+      "path": "deploy/v3/fixtures/official_cli_quota.py",
+      "mode": "100644",
+      "blob": "028b77165ee8115fbcf496728de34366d462738b"
+    },
+    {
+      "path": "deploy/v3/fixtures/offline_metadata.json",
+      "mode": "100644",
+      "blob": "cb353c8ab7fb2da19bab4f4959ef120d28b00d15"
+    },
+    {
+      "path": "deploy/v3/fixtures/quota_statusline.py",
+      "mode": "100644",
+      "blob": "05c9ab104bc9ed1aef42d94f7fe091cff36de9d7"
+    },
+    {
+      "path": "deploy/v3/fixtures/system_profile_probe.c",
+      "mode": "100644",
+      "blob": "88571940b097f9acb71311090a66c9af325fe1d3"
+    },
+    {
+      "path": "deploy/v3/install_system_updater.py",
+      "mode": "100644",
+      "blob": "41983b0e735a437edc89ec22ca04f847310dc1b7"
+    },
+    {
+      "path": "deploy/v3/manage.py",
+      "mode": "100644",
+      "blob": "64a2a447f7bb5afdd48873236e99a2cea954d83e"
+    },
+    {
+      "path": "deploy/v3/platform-release.json",
+      "mode": "100644",
+      "blob": "18c079d76907adb527ae05ca7b87371f23107813"
+    },
+    {
+      "path": "deploy/v3/platform_version.py",
+      "mode": "100644",
+      "blob": "d8c536e37561a100cb28544c3bac0a2372194e27"
+    },
+    {
+      "path": "deploy/v3/publish_system_release.py",
+      "mode": "100644",
+      "blob": "d9f6d4e5d3c61731c42655480c097865d8a4973e"
+    },
+    {
+      "path": "deploy/v3/release_ci.py",
+      "mode": "100644",
+      "blob": "33aec5f942aafb0e6887b8897dae17c249da75ed"
+    },
+    {
+      "path": "deploy/v3/run_local_verification.py",
+      "mode": "100644",
+      "blob": "96b5c9ce6a6f3e65c8169255b5f6221cd026a4aa"
+    },
+    {
+      "path": "deploy/v3/source_layout.py",
+      "mode": "100644",
+      "blob": "f481cf35117d3332d9c2b736bbd83a2eae160d6e"
+    },
+    {
+      "path": "deploy/v3/system-update-policy.json",
+      "mode": "100644",
+      "blob": "c87d964bcb2376835d2beed6dd487b449bc1debb"
+    },
+    {
+      "path": "deploy/v3/system_release.py",
+      "mode": "100644",
+      "blob": "4ba931ebb5889f0b0d10d1a455c02e0683164e42"
+    },
+    {
+      "path": "deploy/v3/system_update_database.py",
+      "mode": "100644",
+      "blob": "6db7a7922557d9d8d0fc7f1500b17b38a72cb9e1"
+    },
+    {
+      "path": "deploy/v3/system_update_host.py",
+      "mode": "100644",
+      "blob": "5870acb2b2080ec7db750ccc7e43449117028ffb"
+    },
+    {
+      "path": "deploy/v3/system_updater.py",
+      "mode": "100644",
+      "blob": "97a6c533ea1cb97f486f2a93f2728a8a41c2af63"
+    },
+    {
+      "path": "deploy/v3/test_database_compatibility.py",
+      "mode": "100644",
+      "blob": "344095ae2021ee901b19881923ceb7365dffa096"
+    },
+    {
+      "path": "deploy/v3/test_database_definitions.py",
+      "mode": "100644",
+      "blob": "3ba7ce95621b0eb4f6f499e362b4adee8fd092bc"
+    },
+    {
+      "path": "deploy/v3/test_manage.py",
+      "mode": "100644",
+      "blob": "39acb8cdead1a8c9fce8472385aede9c14cb5376"
+    },
+    {
+      "path": "deploy/v3/test_native_tls_isolation.py",
+      "mode": "100644",
+      "blob": "2bdbdaa04e075632bb08674579d274369c31cee5"
+    },
+    {
+      "path": "deploy/v3/test_publication.py",
+      "mode": "100644",
+      "blob": "7a42bbeead9b5243902ebd5a80106973a79e3e66"
+    },
+    {
+      "path": "deploy/v3/test_source_layout.py",
+      "mode": "100644",
+      "blob": "f276d35cc0ddccad74357542d85a4c9200d7fb54"
+    },
+    {
+      "path": "deploy/v3/test_storage_backup.py",
+      "mode": "100644",
+      "blob": "74255f501c2ce9559295052c2389f7f0e426f2b4"
+    },
+    {
+      "path": "deploy/v3/test_system_build_cache.py",
+      "mode": "100644",
+      "blob": "6d816b433a83db44eb650bd0070619071785272e"
+    },
+    {
+      "path": "deploy/v3/test_system_database.py",
+      "mode": "100644",
+      "blob": "849b2457d092df8e4a16c513a9b4da75864e438b"
+    },
+    {
+      "path": "deploy/v3/test_system_host.py",
+      "mode": "100644",
+      "blob": "dc2baf92e872f460f0d39532ae62140e1c1e8062"
+    },
+    {
+      "path": "deploy/v3/test_system_install.py",
+      "mode": "100644",
+      "blob": "561e7d028ee27d28bf561fa9e30682adec98f5ae"
+    },
+    {
+      "path": "deploy/v3/test_system_migrations.py",
+      "mode": "100644",
+      "blob": "4bd47a8b29bebe5d2a7078997f0f6e78e4b702f2"
+    },
+    {
+      "path": "deploy/v3/test_system_platform_version.py",
+      "mode": "100644",
+      "blob": "cfa1cf8860a109d07452734aea3b54f6bb37e390"
+    },
+    {
+      "path": "deploy/v3/test_system_publish.py",
+      "mode": "100644",
+      "blob": "16046604907080976623d7979e02a0e985eb00e7"
+    },
+    {
+      "path": "deploy/v3/test_system_release.py",
+      "mode": "100644",
+      "blob": "ec54500ae4943b4ad36f13ea1ad55e436b758cd2"
+    },
+    {
+      "path": "deploy/v3/test_system_update_cpu.py",
+      "mode": "100644",
+      "blob": "dbaeff9eed85853af78529accd65929ebd159299"
+    },
+    {
+      "path": "deploy/v3/test_system_updater.py",
+      "mode": "100644",
+      "blob": "2ef01c4bc2cff61b33a0f68004d35ee50ebeebe2"
+    },
+    {
+      "path": "deploy/v3/test_system_upgrade.py",
+      "mode": "100644",
+      "blob": "818fc737baef6ff1aa44b7c3436587cd213fde13"
+    },
+    {
+      "path": "deploy/v3/test_system_workflow.py",
+      "mode": "100644",
+      "blob": "a9bbfa09a303745a294b3052bc9683ca3f4d4e62"
+    },
+    {
+      "path": "deploy/v3/upgrade_system_updater.py",
+      "mode": "100644",
+      "blob": "24ef20591acb053e047291032ad1cc2b701bc55a"
+    },
+    {
+      "path": "deploy/v3/verify_browser.py",
+      "mode": "100644",
+      "blob": "24fb78d9f58d94f44aca0d222a2e3144afa4ae43"
+    },
+    {
+      "path": "deploy/v3/verify_cli_jobs.py",
+      "mode": "100644",
+      "blob": "6a1bccfd01023d253fe03daed754586cbb2e0e39"
+    },
+    {
+      "path": "deploy/v3/verify_cli_quota.py",
+      "mode": "100644",
+      "blob": "19bfd3f4e3799d96c378e42110e2163a1614fc68"
+    },
+    {
+      "path": "deploy/v3/verify_credential_ownership.py",
+      "mode": "100644",
+      "blob": "747ce623963a65709d81474b5ca4b8c3286cb64e"
+    },
+    {
+      "path": "deploy/v3/verify_database_compatibility.py",
+      "mode": "100644",
+      "blob": "67e4ce9a5d1c36a1bdfdb62fee939ac66d9507b5"
+    },
+    {
+      "path": "deploy/v3/verify_database_definitions.py",
+      "mode": "100644",
+      "blob": "801a1a0868d4949afa9b28c68d3cb53959e1bea7"
+    },
+    {
+      "path": "deploy/v3/verify_deleted_binding.py",
+      "mode": "100644",
+      "blob": "f44704425957f6c1f4ebdcd510f1039086cb76a3"
+    },
+    {
+      "path": "deploy/v3/verify_development_browser.py",
+      "mode": "100644",
+      "blob": "3ad424193d8fdd596eef0b3b9e0465dc643f9bf2"
+    },
+    {
+      "path": "deploy/v3/verify_environment_ui.py",
+      "mode": "100644",
+      "blob": "ac8b887a57d5ea72ff5be3a278374e71bb154e82"
+    },
+    {
+      "path": "deploy/v3/verify_followup_browser.py",
+      "mode": "100644",
+      "blob": "2fd8c18bdc554fa8b8b85a48583c90c3690e33ac"
+    },
+    {
+      "path": "deploy/v3/verify_followups.py",
+      "mode": "100644",
+      "blob": "63ccc7c1ddefec971c4a4dfabdef686aa347a9fc"
+    },
+    {
+      "path": "deploy/v3/verify_forwarding.py",
+      "mode": "100644",
+      "blob": "1e79058af46d5d0a8d9c7d5f38ac41b589ca3a7f"
+    },
+    {
+      "path": "deploy/v3/verify_isolation.py",
+      "mode": "100644",
+      "blob": "3c1d12a3e0a413e485c22e3e6c7153fea5b922fb"
+    },
+    {
+      "path": "deploy/v3/verify_local.py",
+      "mode": "100644",
+      "blob": "c63c6c0710c1c20661847630f901868156b1abcf"
+    },
+    {
+      "path": "deploy/v3/verify_login_drafts.py",
+      "mode": "100644",
+      "blob": "996d6ca67f26b84b5bb7a32093925339450c233d"
+    },
+    {
+      "path": "deploy/v3/verify_management_ui.py",
+      "mode": "100644",
+      "blob": "3d2e23016327c1ed730cb0a122c3dd6251aebff5"
+    },
+    {
+      "path": "deploy/v3/verify_native_diagnostics_cpu.py",
+      "mode": "100644",
+      "blob": "886913c7ae55fb4392e91256d4f19df696e83049"
+    },
+    {
+      "path": "deploy/v3/verify_network_context.py",
+      "mode": "100644",
+      "blob": "11f9fe6c66d32f3d6732f6b341b3709c4ad2da88"
+    },
+    {
+      "path": "deploy/v3/verify_pi_projects_browser.py",
+      "mode": "100644",
+      "blob": "bb6830cd507901f0a907a1e335a4effc3879e48a"
+    },
+    {
+      "path": "deploy/v3/verify_pi_projects_execution.py",
+      "mode": "100644",
+      "blob": "4f1a697e623325115c366f9972a42cb78630f9b9"
+    },
+    {
+      "path": "deploy/v3/verify_project_browser.py",
+      "mode": "100644",
+      "blob": "96c6d9b6cff69981f171779b35eee8b98f7eb3ba"
+    },
+    {
+      "path": "deploy/v3/verify_project_catalog.py",
+      "mode": "100644",
+      "blob": "99919ef14fa5c3b3ef8ddbc92f143dabd2f7dc6b"
+    },
+    {
+      "path": "deploy/v3/verify_project_execution.py",
+      "mode": "100644",
+      "blob": "bd412da114998223c6a1b052144b45fb57b7f419"
+    },
+    {
+      "path": "deploy/v3/verify_project_scenarios.py",
+      "mode": "100644",
+      "blob": "712cc3f4cfd821d503e24e8948791e903ba99b3e"
+    },
+    {
+      "path": "deploy/v3/verify_project_scheduling.py",
+      "mode": "100644",
+      "blob": "bd4d11b798adcdb9478b7b04732099b062db19e7"
+    },
+    {
+      "path": "deploy/v3/verify_quota_completion.py",
+      "mode": "100644",
+      "blob": "eb8a8cd663d610ea54dcf48495f7304a43b7b1f4"
+    },
+    {
+      "path": "deploy/v3/verify_quota_completion_browser.py",
+      "mode": "100644",
+      "blob": "952ed9a5f55156be108950e1ac7cb43f561877c8"
+    },
+    {
+      "path": "deploy/v3/verify_reauth_stack.py",
+      "mode": "100644",
+      "blob": "5856c1e38848c6a39ea93fa2b5fdc9e7245bb770"
+    },
+    {
+      "path": "deploy/v3/verify_run_boundaries_browser.py",
+      "mode": "100644",
+      "blob": "c1715d3f2c2c89c9a6f9e8609b8497f7ece07c83"
+    },
+    {
+      "path": "deploy/v3/verify_run_windows.py",
+      "mode": "100644",
+      "blob": "4d2c5cc12c662a89e1f59dad8c46533a0ead86ad"
+    },
+    {
+      "path": "deploy/v3/verify_scenario_browser.py",
+      "mode": "100644",
+      "blob": "351e1115251371befae7276f86580319eb650af5"
+    },
+    {
+      "path": "deploy/v3/verify_stack.py",
+      "mode": "100644",
+      "blob": "67b45e3165b69460190868f09f37c3c7a9b18d0c"
+    },
+    {
+      "path": "deploy/v3/verify_storage.py",
+      "mode": "100644",
+      "blob": "7b42bcee25531fdbc47b9a5b10cf19a53a3f9c8b"
+    },
+    {
+      "path": "deploy/v3/verify_system_profile.py",
+      "mode": "100644",
+      "blob": "e0ef7ba0d17aca1b710e7579aab7b01b1420f0ba"
+    },
+    {
+      "path": "deploy/v3/verify_system_update.py",
+      "mode": "100644",
+      "blob": "c4d6878817eea495d6914bc53779d12ca88fb475"
+    },
+    {
+      "path": "deploy/v3/verify_system_update_browser.py",
+      "mode": "100644",
+      "blob": "315e896a50c1f57b2eb20554cc56bdec0e02ae0a"
+    },
+    {
+      "path": "deploy/v3/verify_tls_clienthello.py",
+      "mode": "100644",
+      "blob": "8d87d973c4a75a979845d0a6818a976483f1d6fc"
+    },
+    {
+      "path": "deploy/v3/verify_warmup_browser.py",
+      "mode": "100644",
+      "blob": "fcdf6d3947e8260ad840aff42fd3a20e98af5008"
+    },
+    {
+      "path": "deploy/v3/verify_warmup_pi_browser.py",
+      "mode": "100644",
+      "blob": "a27c4f10578aa91dd9cd26dfdb6802ecc1267ee4"
+    },
+    {
+      "path": "deploy/v3/verify_warmup_quota.py",
+      "mode": "100644",
+      "blob": "fd7cb37db36ee449cd772b985af43d496846123d"
+    },
+    {
+      "path": "services/gateway/.github/workflows/docker.yml",
+      "mode": "100644",
+      "blob": "3e7c248b3887cc03ebb046b2c4b9ffb9ad079945"
+    },
+    {
+      "path": "services/gateway/.github/workflows/release.yml",
+      "mode": "100644",
+      "blob": "1e77dcf695840e723faee59c7b7b542839a97f71"
+    }
+  ],
+  "active_reference_candidates": [
+    "README.md",
+    "scripts/v3-stack",
+    ".trellis/spec/web/frontend/frontend-guidelines.md",
+    "docs/v3-system-profile.md",
+    "scripts/verify-project-development-pilots.py",
+    "docs/migrations/flower2api-layout.md",
+    "deploy/v3/manage.py",
+    "deploy/v3/verify_stack.py",
+    "deploy/v3/test_system_upgrade.py",
+    "deploy/v3/verify_reauth_stack.py",
+    ".github/actions/flower2api-build-cache/action.yml",
+    ".github/workflows/v3-release.yml",
+    ".github/workflows/v3-build.yml",
+    "deploy/v3/verify_forwarding.py",
+    "deploy/v3/verify_cli_quota.py",
+    "deploy/v3/run_local_verification.py",
+    ".trellis/spec/legacy-web/frontend/component-guidelines.md",
+    ".trellis/spec/orchestrator/backend/topic-prompt-contract.md",
+    "deploy/v3/verify_pi_projects_browser.py",
+    "deploy/v3/verify_warmup_pi_browser.py",
+    ".trellis/spec/orchestrator/backend/account-runtime-v3.md",
+    ".trellis/spec/orchestrator/backend/quality-guidelines.md",
+    "deploy/v3/install_system_updater.py",
+    ".trellis/spec/orchestrator/backend/directory-structure.md",
+    ".trellis/spec/orchestrator/backend/project-iterations.md",
+    ".trellis/spec/gateway/deploy/deploy-guidelines.md",
+    "deploy/v3/README.md",
+    ".trellis/spec/orchestrator/backend/index.md",
+    "deploy/v3/test_system_workflow.py",
+    "deploy/v3/upgrade_system_updater.py",
+    "deploy/v3/PI_PROJECTS.md",
+    ".trellis/spec/platform/deploy/index.md",
+    "deploy/v3/test_database_compatibility.py",
+    ".trellis/spec/platform/deploy/platform-online-update.md",
+    "deploy/v3/verify_system_update.py",
+    "deploy/v3/verify_deleted_binding.py",
+    "deploy/v3/verify_local.py",
+    "deploy/v3/test_system_install.py",
+    "deploy/v3/SYSTEM-UPDATES.md",
+    "deploy/v3/verify_login_drafts.py",
+    "services/orchestrator/README.md",
+    "services/gateway/README.md",
+    "services/runtime/README.md"
+  ],
+  "protected_original_paths": 349
+}

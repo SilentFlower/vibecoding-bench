@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/platform/deploy/index.md", "reason": "构建与部署开发清单"}
+{"file": ".trellis/spec/platform/deploy/platform-online-update.md", "reason": "单仓来源映射、固定宿主包、发布门禁与数据库合同"}
+{"file": ".trellis/spec/gateway/deploy/deploy-guidelines.md", "reason": "网关与统一平台构建入口"}
+{"file": ".trellis/tasks/11-12-flower2api-deploy-layout/research/inventory.md", "reason": "读取路径和固定目标分类"}
+{"file": ".trellis/tasks/11-12-flower2api-deploy-layout/research/inventory.json", "reason": "受控文件blob、模式与引用盘点"}

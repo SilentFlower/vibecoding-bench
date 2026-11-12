@@ -1,0 +1,167 @@
+{
+  "status": "passed",
+  "baseline": "eda1a735cee4fd53622f7e5b70966630d973f796",
+  "validation_groups": [
+    {
+      "id": "deployment-unit",
+      "command": "PYTHONPATH=services/orchestrator:deploy/flower2api .venv/bin/python -m unittest discover -s deploy/flower2api",
+      "passed": true,
+      "tests": 168
+    },
+    {
+      "id": "orchestrator-update-unit",
+      "command": "PYTHONPATH=services/orchestrator:deploy/flower2api .venv/bin/python -m unittest discover -s services/orchestrator -p 'test_system_update*.py'",
+      "passed": true,
+      "tests": 13
+    },
+    {
+      "id": "database-definitions",
+      "command": ".venv/bin/python deploy/flower2api/verify_database_definitions.py",
+      "passed": true,
+      "databases": {
+        "bench": 1,
+        "gateway": 1
+      }
+    },
+    {
+      "id": "workflow-projections",
+      "command": "actionlint v1.7.7 -shellcheck=：当前分支与main注册检出中的v3-build.yml、v3-release.yml",
+      "passed": true,
+      "workflow_count": 4,
+      "refreshed_contract_tests": 15
+    },
+    {
+      "id": "shell-entries",
+      "command": "bash -n scripts/flower2api-stack scripts/v3-stack；仓库外真实--help；test_source_layout参数/退出状态回归",
+      "passed": true
+    },
+    {
+      "id": "identity-modes-protection",
+      "command": "source-before/source-after对照；Git blob/执行位清单；原有dirty路径状态及SHA256逐项核验",
+      "passed": true,
+      "migrated_files": 87,
+      "protected_original_paths": 349,
+      "components": {
+        "control": "2074f331af88c8d2983350d163805dbc29a5b7219c1cf7a543d55c4ed1121cb2",
+        "account": "c9b9a07ecfd72dcbde643fa023897c075bf28836b28c378e78c892020908649a"
+      },
+      "data_contracts": {
+        "bench": "02fefd191491b43fe1f6eabb81d67dd34e6531f6ae78d9b0c290dc7b48af7c6c",
+        "gateway": "b303593f9b601b556b62e43dbc5d8669d00af409999e9ed72a7c3d46cbfc7a9e"
+      },
+      "pure_move_identity": "使用基线orchestrator/README.md字节时两角色身份均相同；当前control变化来自文档路径同步"
+    },
+    {
+      "id": "syntax-links-context",
+      "command": "迁移Python源码AST解析；当前部署文档本地链接；当前任务JSONL；Pi示例目录/解释器路径；git diff --check",
+      "passed": true,
+      "deployment_links": 41
+    },
+    {
+      "id": "candidate-build",
+      "command": "V3_NATIVE_RUNTIME_ASSET=<已核验本地制品> .venv/bin/python deploy/flower2api/manage.py build --release flower2api-deploy-layout-20261112-v1 --manifest .trellis/.runtime/flower2api-deploy-layout/build.json；manage.inspect_images",
+      "passed": true,
+      "manifest": {
+        "schema": 3,
+        "bridge_protocol": 1,
+        "credential_ownership_protocol": 1,
+        "system_update_protocol": 1,
+        "layout_version": 2,
+        "default_cli_version": "2.1.293",
+        "release": "flower2api-deploy-layout-20261112-v1",
+        "parent_revision": "eda1a735cee4fd53622f7e5b70966630d973f796",
+        "gateway_revision": "eda1a735cee4fd53622f7e5b70966630d973f796",
+        "dirty_worktree": true,
+        "source_content_sha256": "a1d58cc52c02fb830eca726e95ef3570beef24b466b9940d0558ae911cb74425",
+        "native_runtime": {
+          "version": "v0.1.0-beta.5",
+          "asset": "ccrb-runtime-linux-x64",
+          "sha256": "64c61cae565e9097de18cf61a35f46e7595f633cb14f7d6b8c6609fcd294ce89",
+          "bytes": 27388048
+        },
+        "images": {
+          "control": {
+            "reference": "vibebench-v3-control:v3-flower2api-deploy-layout-20261112-v1",
+            "digest": "sha256:8d4bd838a3116fbf4e37314a15ed83e6dcdb438b91e9fbd1631985f4f3b94b77",
+            "config_digest": "sha256:cf1b7c63d6a2eb5ef86b5d4de52fbf47ec75f931bd983b065efd7486d7c973c5",
+            "unpacked_bytes": 883383858,
+            "platform": "linux/amd64"
+          },
+          "account": {
+            "reference": "vibebench-v3-account:v3-flower2api-deploy-layout-20261112-v1",
+            "digest": "sha256:f9d58c988ba91b103ee6192194ade1388a6c7c850ac641b6aa86c3f17d44212a",
+            "config_digest": "sha256:3c876400b7deecdb47a15c7c74a1e51ac83a06f962f5bd3ce1b16ce3799f7736",
+            "unpacked_bytes": 320504348,
+            "platform": "linux/amd64"
+          }
+        }
+      },
+      "role_build_seconds": {
+        "control": 19.68,
+        "account": 5.011
+      }
+    },
+    {
+      "id": "isolated-update-recovery",
+      "command": ".venv/bin/python deploy/flower2api/verify_system_update.py --migration-manifest .trellis/.runtime/flower2api-deploy-layout/build.json --output .trellis/.runtime/flower2api-deploy-layout/update-verification",
+      "passed": true,
+      "scenes": [
+        "真实镜像、独立签名和原始构建清单准备",
+        "真实独立进程、Unix接口和安装历史的v2底座接入",
+        "已复制底座源码在独立解释器中完成导入及状态核验",
+        "真实首次底座接入和三层管理桥",
+        "未知实际 CLI 活动阻断切换、新请求拒绝及取消等待",
+        "真实迁移后切换并保留三角色ID、代次、画像和账号来源",
+        "真实账号组件按需重建与停止环境保留",
+        "真实显式回退和历史来源恢复",
+        "真实第一库迁移完成后进程中断及双库恢复",
+        "候选验收失败后真实控制服务恢复",
+        "双库恢复完成且原程序启动后掉电，重启继续同一恢复",
+        "真实账号缺失部分角色后恢复原镜像和身份",
+        "实际切换后进程中断与持久恢复",
+        "真实容器引用保护、最近两个完整组合保留和精确旧镜像回收"
+      ],
+      "real_model_calls": 0,
+      "owned_resources_cleaned": true
+    },
+    {
+      "id": "source-mount-and-cli",
+      "command": ".venv/bin/python deploy/flower2api/run_local_verification.py --manifest .trellis/.runtime/flower2api-deploy-layout/build.json --followups-only --evidence-dir .trellis/.runtime/flower2api-deploy-layout/local-verification",
+      "passed": true,
+      "driver_tmux_cli_scenes": 17,
+      "owned_resources_cleaned": true
+    }
+  ],
+  "post_push_verification": {
+    "status": "passed",
+    "run": {
+      "id": 43237274556,
+      "url": "https://github.com/SilentFlower/vibecoding-bench/actions/runs/43237274556",
+      "sha": "258d0e93051884e75c4f26834478b9fe7cb579b3",
+      "conclusion": "success"
+    },
+    "default_main_registration": [
+      {
+        "workflow": "v3-build.yml",
+        "state": "active",
+        "path": ".github/workflows/v3-build.yml",
+        "main_sha256": "6096bd78e6ebdd7e5d3bf3e508fad6f69801bba0d4ab7245e045dc435848e123",
+        "yaml_matches": true
+      },
+      {
+        "workflow": "v3-release.yml",
+        "state": "active",
+        "path": ".github/workflows/v3-release.yml",
+        "main_sha256": "235a23cb955ba74bd7e7ff8c9928135a7abab02f1c6b998be8f70ee3fd69fa78",
+        "yaml_matches": true
+      }
+    ],
+    "source_hashes": {
+      "worktree": "a1d58cc52c02fb830eca726e95ef3570beef24b466b9940d0558ae911cb74425",
+      "clean_checkout_projection": "056c2d2e24db74d69ab5f70e3571301b7a1d291fcfecd61bf4fe675a8a6f870d"
+    },
+    "input_difference": "本地快照含25个apps/web/dist已构建文件；跟踪源码字节与Git完全一致。去掉这25个构建产物后精确复现CI快照摘要。",
+    "clean_checkout": true,
+    "image_count": 2
+  }
+}
