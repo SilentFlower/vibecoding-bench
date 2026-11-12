@@ -6,6 +6,7 @@ import asyncio
 import copy
 import json
 import mimetypes
+import re
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -33,6 +34,9 @@ def sample_rows() -> list[dict]:
             {'key': 'cpu', 'label': 'CPU 型号', 'configured': None, 'observed': None, 'status': 'unobserved'}]},
         'native_preparation': {'state': 'ready', 'idle_workers': 1, 'live_workers': 1,
             'pid': 27, 'checked_at_ms': int(time.time() * 1000)},
+        'content_capture': {'enabled': True, 'applied': True, 'supported': True,
+            'generation': 10, 'revision': 'a'*64,
+            'tls_observer': {'state': 'ready', 'reason': None, 'protocol_version': 1}},
         'native_kernel': {'state': 'active', 'revision': '10:initial',
             'current': {'release': 'v0.1.0-beta.3', 'launcher_sha256': OLD_SHA},
             'prepared': {'release': 'v0.1.0-beta.4', 'launcher_sha256': NEW_SHA},
@@ -109,7 +113,16 @@ class Fixture:
             if request.method != 'GET':
                 body = json.loads(request.post_data or '{}')
                 self.writes.append({'path': path, 'body': body})
-                if api.endswith('/native-kernel'):
+                if api.endswith('/content-capture'):
+                    current = self.rows[0]['content_capture']
+                    if body['expected_generation'] != current['generation'] or body['expected_revision'] != current['revision']:
+                        status, payload = 409, {'detail': '采集配置已变化，请重新读取'}
+                    else:
+                        self.revision += 1
+                        current.update(enabled=body['enabled'], revision=str(self.revision)*64,
+                            tls_observer={'state': 'preparing' if body['enabled'] else 'disabled', 'reason': None})
+                        payload = copy.deepcopy(current)
+                elif api.endswith('/native-kernel'):
                     kernel = self.rows[0]['native_kernel']
                     self.operation_started.set()
                     if self.operation_gate:
@@ -141,6 +154,8 @@ class Fixture:
                     await self.read_gate.wait()
                 if self.fail_read:
                     status, payload = 503, {'detail': '合成读取故障'}
+            elif api.endswith('/content-capture'):
+                payload = copy.deepcopy(self.rows[0]['content_capture'])
             elif api.endswith('/run-window'):
                 payload = self.rows[0]['run_window']
             elif api in ('accounts', 'accounts/login-drafts', 'topics', 'task-batches'):
@@ -434,8 +449,9 @@ async def run(output: Path, gateway: Path) -> dict:
             await frame.locator('html').evaluate("node=>node.dataset.theme='dark'")
             await page.get_by_role('link', name='任务', exact=True).click()
             await frame.locator('[data-tab="topics"]').click()
-            assert await frame.locator('html').evaluate("node=>!node.classList.contains('environment-page')&&node.dataset.theme==='dark'")
-            assert await frame.locator('body').evaluate('node=>getComputedStyle(node).backgroundColor') != 'rgb(249, 246, 241)'
+            await expect(frame.locator('html')).not_to_have_class(re.compile('environment-page'))
+            await expect(frame.locator('html')).to_have_attribute('data-theme', 'dark')
+            await expect(frame.locator('body')).not_to_have_css('background-color', 'rgb(249, 246, 241)')
             await page.get_by_role('link', name='环境', exact=True).click()
             await expect(frame.locator('.env-card')).to_have_count(4)
             scenes.append('环境作用域退出后恢复原主题偏好和其他页样式')
@@ -449,6 +465,30 @@ async def run(output: Path, gateway: Path) -> dict:
             await expect(page.get_by_text('原生进程与本地阶段：未观测', exact=True)).to_be_visible()
             assert await page.locator('html').evaluate('node=>node.scrollWidth<=innerWidth')
             scenes.append('请求详情展示真实 PID/热命中/本地分段；历史记录保留未观测，手机无溢出')
+            await page.keyboard.press('Escape')
+            await page.get_by_role('link', name='环境', exact=True).click()
+            target = frame.locator('.env-card').filter(has=frame.get_by_role('heading', name='演示环境 A', exact=True))
+            toggle = target.locator('[data-content-capture]')
+            await expect(toggle).to_have_attribute('aria-checked', 'true')
+            await expect(target).to_contain_text('原生 TLS 采集：已就绪')
+            before = len(fixture.writes)
+            await toggle.click()
+            await frame.locator('#content-capture-modal').get_by_role('button', name='取消', exact=True).click()
+            assert len(fixture.writes) == before
+            for enabled in (False, True):
+                await toggle.click()
+                await expect(frame.locator('#content-capture-form button[type="submit"]')).to_be_enabled()
+                await frame.locator('#content-capture-form button[type="submit"]').click()
+                await expect(toggle).to_have_attribute('aria-checked', str(enabled).lower())
+                assert fixture.writes[-1]['body']['enabled'] is enabled
+            for state, text in [('not_installed', '需系统更新'), ('preparing', '准备中'), ('unavailable', '暂不可用'),
+                                ('stopped', '停止待启动'), ('ready', '已就绪')]:
+                fixture.rows[0]['content_capture']['tls_observer'] = {'state': state, 'reason': None}
+                await refresh()
+                await expect(target).to_contain_text('原生 TLS 采集：' + text)
+            await page.screenshot(path=str(output/'tls-capture-390.png'))
+            assert await frame.locator('html').evaluate('node=>node.scrollWidth<=innerWidth')
+            scenes.append('默认开启、取消零写入、关闭再开启及五种TLS能力状态，390px无溢出')
             assert not errors, errors
             assert not fixture.unexpected, fixture.unexpected
             return {'status': 'passed', 'scenes': scenes, 'scene_count': len(scenes), 'script_errors': errors,

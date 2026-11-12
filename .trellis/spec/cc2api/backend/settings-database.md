@@ -397,7 +397,7 @@ let observed = capture.observation(complete);
 
 ### 2. Signatures
 
-- 账号固化 `fingerprint_json.native_capture_enabled:bool`，仅精确 true 开启；sender 的 `native_capture_dir:Option<String>` 缺省 None。V3 生成 `/flows/api/cc-prepared`，布局变更空闲重建，重画像保留开关。
+- 账号固化 `fingerprint_json.native_capture_enabled:bool`，缺字段默认开启，精确false保持关闭，非法类型拒绝；策略由平台`native_capture_policy`统一解释。sender 的 `native_capture_dir:Option<String>`独立缺省None，V3仅对启用采集的原生账号生成`/flows/api/cc-prepared`。布局变更空闲重建，重画像保留选择；页面生命周期与实际TLS能力归平台账号运行时规范所有。
 - `native_capture::record(Option<&str>, &NativeSubmission, &Value, Option<&Value>) -> String`（async），末参为同次实际header_policy；输出 disabled/saved/dropped/failed/timeout。受信任私有观察和 `AttemptDiagnostic.capture_status:Option<String>` 保存状态，历史缺字段为 None。诊断沿已有 summary_json 保存，无追加数据库列。
 - `native_capture::record_queued(Option<&str>, &NativeSubmission, &Value, Option<&Value>) -> String`同步准入初始快照，返回queued/disabled/dropped；实际文件在后台保存。`record`的250ms等待只用于后台最终收口。
 - 私有 `NativeSubmission.log_mode:RequestLogMode` 缺省 info，未知枚举拒绝；只由网关冻结，调用方 headers/body/context 无法覆盖。该字段不进入进程复用 key。Python `read_capture(root,account_id,attempt_id,*,now_ms=None)` 只读验期；`cleanup_captures(...)` 以逐项计数迭代器供独立后台批次消费。
@@ -425,7 +425,7 @@ let observed = capture.observation(complete);
 
 | 条件 | 结果 |
 | --- | --- |
-| 默认关闭 / 历史缺状态 | disabled / 状态缺失，保持历史摘要 |
+| 显式关闭或info / 历史缺状态 | disabled / 状态缺失，保持历史摘要；不以disabled区分日志级别与账号选择 |
 | 未鉴权 / 尝试属于其他请求 | 401 / 404 |
 | 文件轮转、未产生或缺失 | missing，显示缺失原因 |
 | 保存许可已满 / I/O 失败 / 250 ms 超时 | dropped / failed / timeout，独立于模型状态 |
@@ -438,7 +438,7 @@ let observed = capture.observation(complete);
 
 ### 5. Scenarios and Examples
 
-- 正常：原生账号显式开启，管理员从请求详情看到 CC 组装后的多值头与正文，Authorization 为 `[REDACTED]`。
+- 正常：原生账号默认开启，debug请求的管理员详情显示 CC 组装后的多值头与正文，Authorization 为 `[REDACTED]`。
 - 边界：正文超过 2 MiB 时显示截断；saved 记录轮转后显示文件缺失；timeout 的落盘结果通过详情读取核对。
 - 错误用法：只从过滤后的出站 Authorization 注册秘密，遗漏入站客户端密钥在消息正文中的重复引用。正确处理：先注册原始头数组的凭据值，再对头和正文统一脱敏。
 - 错误用法：把组装快照重标为最终 TLS。正确处理：固定 stage=cc_prepared，保留独立来源。

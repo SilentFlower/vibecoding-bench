@@ -130,7 +130,7 @@ function renderEnvironmentCard(row) {
     ${ui.feedback.has(id) ? `<p class="env-notice" role="status">${escapeHTML(ui.feedback.get(id))}</p>` : ''}
     ${renderNativeKernel(row)}
     ${renderNativePreparation(row)}
-    <section class="env-window"><div><h4>请求内容采集</h4><p class="env-muted">${row.content_capture?.applied ? (row.content_capture.enabled ? '已开启' : '已关闭') : '实际配置待核对'} · 后续 debug 请求保存脱敏原文</p></div><button type="button" class="env-switch" role="switch" aria-label="${escapeHTML((row.name || '当前环境') + '请求内容采集')}" aria-checked="${row.content_capture?.enabled === true}" data-content-capture data-environment="${escapeHTML(id)}" data-env-focus="${escapeHTML(id + ':capture')}" ${pending || row.busy || KERNEL_BUSY_STATES.includes(row.native_kernel?.state) || row.native_kernel?.state === 'reconcile' || !['ready', 'stopped'].includes(row.state) || !row.content_capture?.supported || !row.content_capture?.applied ? 'disabled' : ''}><span></span></button></section>
+    <section class="env-window"><div><h4>请求内容采集</h4><p class="env-muted">${row.content_capture?.applied ? (row.content_capture.enabled ? '已开启' : '已关闭') : '实际配置待核对'} · 默认开启 · debug 保存脱敏原文</p><p class="env-muted">${escapeHTML(tlsCaptureDescription(row.content_capture?.tls_observer))}</p></div><button type="button" class="env-switch" role="switch" aria-label="${escapeHTML((row.name || '当前环境') + '请求内容采集')}" aria-checked="${row.content_capture?.enabled === true}" data-content-capture data-environment="${escapeHTML(id)}" data-env-focus="${escapeHTML(id + ':capture')}" ${pending || row.busy || KERNEL_BUSY_STATES.includes(row.native_kernel?.state) || row.native_kernel?.state === 'reconcile' || !['ready', 'stopped'].includes(row.state) || !row.content_capture?.supported || !row.content_capture?.applied ? 'disabled' : ''}><span></span></button></section>
     ${row.isolation_version === 2 ? `<section class="env-window"><div><h4>CPU 额度</h4><p class="env-muted">分别调整 CLI、API 发送器和网络的额度，保存后重建沿用。</p></div><button type="button" class="btn btn-sm" data-cpu-resources data-environment="${escapeHTML(id)}" data-env-focus="${escapeHTML(id + ':cpu')}" ${pending ? 'disabled' : ''}>调整额度</button></section>` : ''}
     <section class="env-window"><div><h4>当地运行窗口</h4>${row.run_window ? renderAccountRunWindow({id: row.account_id, run_window: row.run_window}) : '<p class="env-muted">运行窗口尚未提供</p>'}</div>${row.run_window && row.account_id != null ? `<button type="button" class="btn btn-sm" data-run-window-config="${escapeHTML(row.account_id)}" data-environment="${escapeHTML(id)}" data-env-focus="${escapeHTML(id + ':window')}">配置时段</button>` : ''}</section>
     <details class="env-details" data-env-details="${escapeHTML(id + ':technical')}"><summary>环境与物理详情</summary><div class="env-details-body"><dl><dt>环境 ID</dt><dd><code>${escapeHTML(id)}</code></dd><dt>主机名</dt><dd>${escapeHTML(fingerprint.hostname || '未提供')}</dd><dt>设备身份</dt><dd>${escapeHTML(row.identity_status || '待核对')}</dd><dt>语言区域</dt><dd>${escapeHTML(fingerprint.lang || '未提供')}</dd><dt>画像版本</dt><dd>${escapeHTML(fingerprint.profile_version ?? '未提供')}</dd></dl>${row.physical_features ? renderPhysicalFeatures(row) : '<p class="env-muted">物理实测尚未采集。</p>'}</div></details>
@@ -496,6 +496,18 @@ async function openContentCaptureDialog(button) {
   } catch (error) {
     if (state.captureDialog === request) $('#content-capture-feedback').textContent = '读取失败：' + error.message;
   }
+}
+
+/** 显示同代次TLS能力，完整性由单次请求记录说明。@param {object} value 服务端状态。@return {string} 安全文字。 */
+function tlsCaptureDescription(value) {
+  const names = {not_installed: '需系统更新安装采集器', disabled: '已关闭', stopped: '停止待启动', preparing: '准备中', ready: '已就绪', unavailable: '暂不可用'};
+  const reasons = {OBSERVER_NOT_CONFIGURED: '采集器尚未安装', OBSERVER_STATUS_STALE: '检查结果已过期',
+    OBSERVER_STATUS_UNAVAILABLE: '等待实际检查', IMAGE_NOT_ADMITTED: '当前内核尚未准入',
+    PROBE_ATTACH_FAILED: '探针附着失败', BPF_LOAD_FAILED: '探针加载失败',
+    OBSERVER_FAILED: '采集器已退出', CAPTURE_PREPARING: '后台准备中'};
+  const name = names[value?.state] || '状态待检查';
+  const reason = value?.reason && value.state !== 'preparing' ? (reasons[value.reason] || value.reason) : '';
+  return `原生 TLS 采集：${name}${reason ? ' · ' + reason : ''}`;
 }
 
 /** 统一关闭采集窗口并作废旧回执。@param {boolean} force 离页强制关闭。@return {boolean} 是否关闭。 */

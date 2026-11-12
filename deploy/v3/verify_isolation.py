@@ -1,6 +1,37 @@
 """在实际账号角色中验证权限、秘密挂载与本地构建，不调用真实上游。"""
 import json
 import re
+from pathlib import Path
+
+
+def sender_business_probe() -> str:
+    """构造只读实际业务进程探针。@return 受限加载器与其业务子进程的安全状态。"""
+    return '''import json,pathlib
+def status(pid):
+ values=dict(line.split(':',1) for line in pathlib.Path(f'/proc/{pid}/status').read_text().splitlines() if ':' in line)
+ return {'pid':int(pid),'parent':int(values['PPid']),'uid':int(values['Uid'].split()[0]),'name':values['Name'].strip(),
+  'caps':{key:values[key].strip() for key in ('CapInh','CapPrm','CapEff','CapBnd','CapAmb','NoNewPrivs')}}
+broker=status(1)
+assert broker['uid']==0 and broker['caps']['NoNewPrivs']=='1'
+allowed=(1<<21)|(1<<6)|(1<<7)
+assert int(broker['caps']['CapEff'],16)==allowed and int(broker['caps']['CapPrm'],16)==allowed
+assert broker['caps']['CapInh']==broker['caps']['CapAmb']=='0000000000000000'
+rows=[]
+for path in pathlib.Path('/proc').glob('[0-9]*/status'):
+ try:rows.append(status(path.parent.name))
+ except FileNotFoundError:pass
+senders=[row for row in rows if row['parent']==1 and row['name']=='account-sender' and row['uid']==1001]
+assert len(senders)==1
+sender=senders[0]
+children=[row for row in rows if row['parent']==sender['pid']]
+for row in [sender,*children]:
+ assert row['uid']==1001 and row['caps']['NoNewPrivs']=='1'
+ assert all(row['caps'][key]=='0000000000000000' for key in ('CapInh','CapPrm','CapEff','CapAmb'))
+ assert int(row['caps']['CapBnd'],16)&~allowed==0
+print(json.dumps({**sender,'broker':broker,'children':children,
+ 'hostname':pathlib.Path('/proc/sys/kernel/hostname').read_text().strip(),
+ 'machine_id':pathlib.Path('/etc/machine-id').read_text().strip()}))
+'''
 
 
 def verify_roles(cli, sender, network, fingerprint: dict) -> dict:
@@ -23,11 +54,23 @@ print(json.dumps({'uid':os.getuid(),'caps':{key:status[key].strip() for key in (
         assert settings['ReadonlyRootfs'] and settings['CapDrop'] == ['ALL']
         assert 'no-new-privileges:true' in settings['SecurityOpt']
         assert not settings.get('Devices') and settings['NetworkMode'] == 'container:' + network.id
-        result = container.exec_run(['python3', '-I', '-c', probe])
+        configuration = container.attrs['Config']
+        observer = role == 'sender' and configuration.get('Entrypoint') == [
+            '/usr/local/bin/python3', '-E', '-s', '/opt/ccrb-tls-observer/broker.py']
+        if observer:
+            assert configuration['User'] == '0:0'
+            assert set(settings.get('CapAdd') or []) == {'SYS_ADMIN', 'SETUID', 'SETGID'}
+            policy = next(value[8:] for value in settings['SecurityOpt'] if value.startswith('seccomp='))
+            expected = Path(__file__).resolve().parents[2] / 'orchestrator/native_tls_seccomp.json'
+            assert json.loads(policy) == json.loads(expected.read_text())
+        else:
+            assert not settings.get('CapAdd')
+        result = container.exec_run(['python3', '-I', '-c', sender_business_probe() if observer else probe])
         assert result.exit_code == 0, role + ' 身份读取失败'
         observed = json.loads(result.output)
         assert observed['uid'] == uid and observed['caps']['NoNewPrivs'] == '1'
-        assert all(value == '0000000000000000' for key, value in observed['caps'].items() if key != 'NoNewPrivs')
+        excluded = ('NoNewPrivs', 'CapBnd') if observer else ('NoNewPrivs',)
+        assert all(value == '0000000000000000' for key, value in observed['caps'].items() if key not in excluded)
         assert container.exec_run(['touch', '/etc/isolation-must-fail']).exit_code != 0
         facts[role] = {**observed, 'memory': settings['Memory'], 'memory_swap': settings['MemorySwap']}
     assert facts['cli']['hostname'] == facts['sender']['hostname'] == fingerprint['hostname']
@@ -74,7 +117,8 @@ printf '{"name":"local-isolation-package","version":"1.0.0"}\n' > dependency/pac
 printf '{"name":"local-isolation-work","version":"1.0.0"}\n' > package.json
 npm install --offline --no-audit --no-fund ./dependency >/dev/null
 '''
-    assert cli.exec_run(['bash', '-c', build]).exit_code == 0
+    checked = cli.exec_run(['bash', '-c', build])
+    assert checked.exit_code == 0, checked.output.decode(errors='replace')[-1000:]
     pressure = '''import errno,json,pathlib,tempfile
 limit=int(pathlib.Path('/sys/fs/cgroup/memory.max').read_text())
 allocated=bytearray(min(limit//4,384*1024**2))

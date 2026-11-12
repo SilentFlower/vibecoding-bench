@@ -12535,7 +12535,8 @@ def v3_environments() -> list[dict]:
             if guard.acquire(blocking=False):
                 try:
                     current, _ = _content_capture_account(row['environment_id'])
-                    row['content_capture'] = read_content_capture(account_runtime, current)
+                    row['content_capture'] = read_content_capture(account_runtime, current,
+                        native_preparations.get(current.get('gateway_account_id')))
                 except (HTTPException, OSError, ValueError, RuntimeError):
                     pass
                 finally:
@@ -12627,10 +12628,11 @@ def v3_content_capture(environment_id: str) -> dict:
     """
     if not account_runtime:
         raise HTTPException(404)
+    snapshots, _ = account_runtime.native_preparation_snapshots()
     try:
         with account_runtime.environment_lock(environment_id):
             row, _ = _content_capture_account(environment_id)
-            return read_content_capture(account_runtime, row)
+            return read_content_capture(account_runtime, row, snapshots.get(row.get('gateway_account_id')))
     except (ValueError, RuntimeError) as error:
         raise HTTPException(409, str(error)) from None
     except (DockerException, RequestException, OSError):

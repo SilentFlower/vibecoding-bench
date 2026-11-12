@@ -170,7 +170,7 @@ python3 deploy/v3/verify_forwarding.py --manifest /absolute/path/v3-verification
 
 无限模式下原生池配置 `memory_mib=0`，省略 `V3_NATIVE_SENDER_MEMORY` 也能准备。物理进程上限仍为标准并发的两倍，按需创建并回收。有限账号仍执行显式 sender 预算与加权容量检查。资源调整和评审布局迁移均在空闲时重建，使用同批控制与账号镜像。
 
-账号固化配置 `native_capture_enabled=true` 开启私有 CC 组装后头与正文采集。默认关闭。管理员在「请求记录 → 详情」读取已脱敏内容。每账号保留至多 50 份、100 MiB，单份正文 2 MiB、请求头 128 KiB，超限截断及采集失败单独显示。原始凭据和完整正文均不进入普通服务日志。
+账号固化配置 `native_capture_enabled` 控制私有 CC 组装后头与正文采集。缺省开启，显式 `false` 保持关闭。管理员在「请求记录 → 详情」读取已脱敏内容。每账号保留至多 50 份、100 MiB，单份正文 2 MiB、请求头 128 KiB，超限截断及采集失败单独显示。原始凭据和完整正文均不进入普通服务日志。
 
 ## 按账号请求内核在线升级
 

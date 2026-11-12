@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 from content_capture_settings import read_settings, set_settings
+from native_capture_policy import capture_enabled
 from native_kernel_upgrade import pending_upgrade
 from runtime_files import atomic_json
 
@@ -21,11 +22,11 @@ class ContentCaptureTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.row = {'environment_id': 'a' * 32, 'account_id': 7, 'gateway_account_id': 12, 'generation': 10, 'state': 'ready',
-            'fingerprint_json': json.dumps({'mem': 'unlimited', 'tz': 'Asia/Shanghai', 'hostname': 'demo'})}
+            'fingerprint_json': json.dumps({'mem': 'unlimited', 'tz': 'Asia/Shanghai', 'hostname': 'demo', 'native_capture_enabled': False})}
         self.account = {'id': 7, 'cc2api_account_id': 12, 'name': '演示账号'}
         self.path = self.root / 'runtime/sender.json'
         self.config = {'native': {'release': {'release': 'v0.1.0-beta.5', 'launcher_sha256': 'a' * 64}},
-            'binding': {'account_id': 12, 'environment_id': 'a' * 32, 'generation': 10}, 'memory': 'unlimited', 'proxy_url': 'synthetic'}
+            'binding': {'account_id': 12, 'environment_id': 'a' * 32, 'generation': 10}, 'memory': 'unlimited', 'proxy_url': 'synthetic', 'native_tls_observer_protocol': 1}
         atomic_json(self.path, self.config)
         self.path.chmod(0o640)
         self.lease = None
@@ -47,8 +48,10 @@ class ContentCaptureTests(unittest.TestCase):
                 self.failures -= 1
                 raise RuntimeError('合成准备故障')
             current = copy.deepcopy(self.config)
-            if json.loads(self.row['fingerprint_json']).get('native_capture_enabled') is True:
+            if capture_enabled(json.loads(self.row['fingerprint_json'])):
                 current['native_capture_dir'] = '/flows/api/cc-prepared'
+            else:
+                current.pop('native_capture_dir', None)
             self.row['generation'] += 1
             self.row['state'] = 'ready'
             current['binding']['generation'] = self.row['generation']
@@ -106,7 +109,7 @@ class ContentCaptureTests(unittest.TestCase):
         self.assertEqual(self.row['state'], 'reconcile')
         self.row['state'] = 'ready'
         atomic_json(self.path, self.config)
-        self.row['fingerprint_json'] = '{}'
+        self.row['fingerprint_json'] = '{"native_capture_enabled":false}'
         original_gateway = self.runtime.gateway._request.side_effect
         def fail_release(method, path, body=None):
             if method == 'POST' and body['operation'] == 'release':
@@ -165,6 +168,54 @@ class ContentCaptureTests(unittest.TestCase):
         self.runtime.gateway._request.assert_not_called()
         self.runtime._stop_environment.assert_not_called()
         self.runtime.ensure.assert_not_called()
+
+    def test_default_enabled_explicit_disabled_and_invalid_policy(self):
+        """缺省开启、显式关闭及非法类型共用同一解释。@return None。"""
+        self.assertTrue(capture_enabled({}))
+        self.assertTrue(capture_enabled({'native_capture_enabled': True}))
+        self.assertFalse(capture_enabled({'native_capture_enabled': False}))
+        for value in (None, 0, 1, 'false'):
+            with self.assertRaises(ValueError):
+                capture_enabled({'native_capture_enabled': value})
+        self.row['fingerprint_json'] = '{}'
+        self.config['native_capture_dir'] = '/flows/api/cc-prepared'
+        atomic_json(self.path, self.config)
+        result = read_settings(self.runtime, self.row)
+        self.assertTrue(result['enabled'] and result['applied'])
+        self.apply(False)
+        self.assertFalse(capture_enabled(json.loads(self.row['fingerprint_json'])))
+
+    def test_tls_status_requires_fresh_same_generation_observation(self):
+        """标签只代表安装，实际ready需要同代次新鲜观测。@return None。"""
+        import time
+        self.row['fingerprint_json'] = '{}'
+        self.config['native_capture_dir'] = '/flows/api/cc-prepared'
+        atomic_json(self.path, self.config)
+        observation = {'environment_id': self.row['environment_id'], 'generation': 10,
+            'checked_at_ms': int(time.time()*1000), 'tls_observer': {'state': 'ready', 'reason': None, 'image_admitted': True, 'protocol_version': 1}}
+        self.assertEqual(read_settings(self.runtime, self.row)['tls_observer']['state'], 'unavailable')
+        self.assertEqual(read_settings(self.runtime, self.row, observation)['tls_observer']['state'], 'ready')
+        for changed in ({'generation': 9}, {'checked_at_ms': 1}, {'kernel_generation': 'old'}):
+            self.assertEqual(read_settings(self.runtime, self.row, {**observation, **changed})['tls_observer']['state'], 'unavailable')
+        for changed in ({'image_admitted': False}, {'protocol_version': 2}):
+            self.assertEqual(read_settings(self.runtime, self.row, {**observation,
+                'tls_observer': {**observation['tls_observer'], **changed}})['tls_observer']['state'], 'unavailable')
+        self.config.pop('native_tls_observer_protocol')
+        atomic_json(self.path, self.config)
+        self.assertEqual(read_settings(self.runtime, self.row, observation)['tls_observer']['state'], 'not_installed')
+
+    def test_disabled_old_image_rejects_enable_before_maintenance(self):
+        """关闭态独立核对制品能力，拒绝无效重建。@return None。"""
+        self.config.pop('native_tls_observer_protocol')
+        atomic_json(self.path, self.config)
+        before = dict(self.row)
+        self.assertEqual(read_settings(self.runtime, self.row)['tls_observer']['state'], 'disabled')
+        with self.assertRaisesRegex(ValueError, '系统更新'):
+            self.apply(True)
+        self.assertEqual(self.row, before)
+        self.runtime.gateway._request.assert_not_called()
+        self.runtime.ensure.assert_not_called()
+        self.runtime._stop_environment.assert_not_called()
 
 
 class ContentCaptureContractTests(unittest.TestCase):

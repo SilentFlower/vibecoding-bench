@@ -14,6 +14,7 @@ from cpu_resources import read_policy as read_cpu_policy
 from account_update_identity import configured_release, image_origin, role_release, save_image_origin
 
 from native_kernel_upgrade import applied_kernel, release_key
+from native_capture_policy import capture_enabled
 from resource_budget import isolated_account_limits, scenario_account_limits
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_VERSION, SYSTEM_PROFILE_DIRECTORY,
     SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_VERSION)
@@ -145,9 +146,13 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
         'secret': secrets.token_hex(32), 'release_id': configured_release(runtime)}
     userinfo = parsed.netloc.rsplit('@', 1)[0] + '@' if '@' in parsed.netloc else ''
     resolved_proxy = urlunsplit((parsed.scheme, f'{userinfo}{address}:{parsed.port}', parsed.path, parsed.query, ''))
+    image_labels = runtime.client.images.get(runtime.image).attrs['Config'].get('Labels') or {}
+    observer_protocol = 1 if native and image_labels.get('vibebench.native-tls-observer') == '1' else None
     sender_file = paths['sender'] / 'sender.json'
     write_json(sender_file, {'binding': binding, 'proxy_url': resolved_proxy, 'proxy_source': proxy,
-        'native': native, 'native_capture_dir': '/flows/api/cc-prepared' if fingerprint.get('native_capture_enabled') is True else None, 'allowed_origin': 'https://api.anthropic.com', 'evidence_file': '/flows/api/observations.jsonl', 'quota_identity': ''}, 0o640)
+        'native': native, 'native_capture_dir': '/flows/api/cc-prepared' if native and capture_enabled(fingerprint) else None,
+        'native_tls_observer_protocol': observer_protocol,
+        'allowed_origin': 'https://api.anthropic.com', 'evidence_file': '/flows/api/observations.jsonl', 'quota_identity': ''}, 0o640)
     os.chown(sender_file, 0, 1001)
     write_json(paths['network'] / 'context.json', {'NETWORK_INSPECTION_MODE': 'passthrough', 'QUOTA_SOURCE': ''})
     (paths['network'] / 'ready').unlink(missing_ok=True)
@@ -169,7 +174,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
         options.update(name=name if role == 'network' else name + '-' + role,
             labels=role_labels(runtime, row, role), detach=True, auto_remove=False, read_only=True,
             mem_limit=memory, memswap_limit=total, nano_cpus=cpu * (6 if role == 'cli' else 1) // 8,
-            pids_limit=role_pids, security_opt=['no-new-privileges:true'],
+            pids_limit=role_pids, security_opt=options.pop('security_opt', ['no-new-privileges:true']),
             log_config={'type': 'json-file', 'config': {'max-size': '10m', 'max-file': '3'}}, mounts=[machine_mount])
         if role == 'cli' and review_layout:
             options.update(nano_cpus=review_layout['cli_nano_cpus'], pids_limit=384)
@@ -249,9 +254,17 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
             # 父目录按只读挂载，runc 不能在其中创建嵌套 bind 的目标文件。
             (paths['sender'] / 'verification-ca.der').touch(mode=0o444)
             sender_mounts[str(host_root / 'runtime/verification-ca.der')] = {'bind': '/run/v3/verification-ca.der', 'mode': 'ro'}
-        launch('sender', **base, user='1001:1001', entrypoint=['/usr/local/bin/account-sender'],
-            environment=sender_env,
-            volumes=sender_mounts, tmpfs={'/tmp': 'rw,noexec,nosuid,nodev,size=16m,mode=1777'})
+        sender_options = {'user': '1001:1001', 'entrypoint': ['/usr/local/bin/account-sender'],
+            'tmpfs': {'/tmp': 'rw,noexec,nosuid,nodev,size=16m,mode=1777'}}
+        if native and capture_enabled(fingerprint) and image_labels.get('vibebench.native-tls-observer') == '1':
+            # 可信入口持有加载权限；业务子进程由固定启动器清零能力后降权。
+            profile = json.loads(Path(__file__).with_name('native_tls_seccomp.json').read_text())
+            sender_env['CCRB_TLS_OBSERVER'] = '/opt/ccrb-tls-observer/client.py'
+            sender_options.update(user='0:0', entrypoint=['/usr/local/bin/python3', '-E', '-s', '/opt/ccrb-tls-observer/broker.py'],
+                cap_add=['SYS_ADMIN', 'SETUID', 'SETGID'],
+                security_opt=['no-new-privileges:true', 'seccomp=' + json.dumps(profile, separators=(',', ':'))])
+            sender_options['tmpfs']['/run/ccrb-observer'] = 'rw,noexec,nosuid,nodev,size=1m,mode=0750'
+        launch('sender', **base, **sender_options, environment=sender_env, volumes=sender_mounts)
     except Exception:
         for container in reversed(created):
             try:

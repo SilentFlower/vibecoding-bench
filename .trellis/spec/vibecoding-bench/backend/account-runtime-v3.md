@@ -1415,16 +1415,20 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 ### 2. Signatures
 
-- GET 返回 `environment_id`、bench `account_id`、`generation:int`、`revision:string`、`enabled:bool`、`applied:bool`、`supported:bool`。
+- GET 返回 `environment_id`、bench `account_id`、`generation:int`、`revision:string`、`enabled:bool`、`applied:bool`、`supported:bool`及`tls_observer`能力摘要。
 - POST 精确接收 `enabled:StrictBool`、`expected_generation:StrictInt`、`expected_revision:StrictStr`，拒绝附加字段。
-- `read_settings(runtime,row)` 只读；`set_settings(runtime,row,account,enabled,expected_generation,expected_revision)` 在更新准入和账号锁内应用。
+- `read_settings(runtime,row,observation=None)` 只读复用批量巡检；`set_settings(runtime,row,account,enabled,expected_generation,expected_revision)` 在更新准入和账号锁内应用。Rust `NativeReadinessStatus`可选追加`tls_observer`，内部鉴权`/internal/native/status`也提供该摘要。
 
 ### 3. Contracts
 
 - GET/POST 都通过实际 SQL 核对未删除账号与唯一网关绑定。row 的 `gateway_account_id` 为 SQL 投影；并发摘要包含该绑定、环境代次、状态、完整画像和 sender 文件摘要。
 - sender 配置沿原 root:1001、0640 合同读取，安全文件读取拒绝链接和越界。`applied` 核对实际 native 配置、采集目录、账号、环境及发送器代次；公开响应排除凭据。
+- `native_capture_policy.capture_enabled(fingerprint)`统一解释缺字段为开启，精确false为关闭，非法类型拒绝。新环境、重建和系统更新共用此解释；显式关闭持久保留，legacy发送器不创建原生采集目录。全局info/debug选择保持独立。
+- 镜像能力标签`vibebench.native-tls-observer=1`对应sender配置`native_tls_observer_protocol=1`。启用采集的原生sender使用镜像内受限broker、固定只读制品和内联seccomp；NoNewPrivs保持true，业务UID1001及P/E/I/A能力为零。加载权限、ABI和回收合同由cc-runtime-bridge的原生TLS采集规范所有。libbpf实际动态库在镜像构建时核对。
+- 摘要`state`为`not_installed|disabled|stopped|preparing|ready|unavailable`，附`reason`、`checked_at_ms`、`protocol_version`及`image_admitted`。ready只接受45秒内同账号/环境/代次/内核的巡检，协议为整数1且映像已准入；动态状态不进入配置revision。安装标签、原生worker_ready和单请求采集完整性分别表示。
 - `pending_upgrade(root, include_preparing=True)` 同时排除候选下载；该关键字参数默认False，原调用沿用既有判定。
 - POST 按 update admission → OAuth owner → profile → environment 锁顺序重读。原生未就绪、配置偏离、旧版本、活动工作、评审交接、内核维护及 API 活动均拒绝切换。
+- 开启前独立核对安装协议，关闭态不能遮蔽旧镜像缺能力；失败在领取租约和重建前要求系统更新。操作只核对实际配置并复用既有异步零模型预备，维护锁内不等待网关反向解析绑定。
 - 使用唯一 `capture:<uuid>` 领取、claim 和释放网关排他维护租约。API 在维护租约持有期间保持关闭；到期保持关闭，原 owner 可释放。维护重建使用独立租约，CLI 作业登记会阻止画像准备。
 - 环境锁阻止其它本地工作进入，更新 admission 覆盖整个操作。重建复用原 ensure，保留 HOME、画像、资源策略及已保存内核。原停止环境在核对后恢复停止状态，过程模型调用为零。
 - 指纹 `native_capture_enabled` 与实际 `native_capture_dir` 一致后返回成功。失败恢复原指纹并重新准备；恢复失败或租约释放不确定时置 reconcile，使用原环境维护对账。私有 `runtime/content-capture-operation.json` 保存操作与恢复状态。
@@ -1438,6 +1442,8 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 | 重复或删除绑定 | 404，零写入 |
 | 布尔冒充代次、数字冒充开关、附加字段 | DTO 422 |
 | 旧代次/摘要、活动 CLI/API、配置偏离 | 409，保留原策略 |
+| 旧镜像关闭态请求开启 | 409，要求系统更新；零租约、零重建 |
+| 巡检过期、错代次、缺能力或未知映像 | 显示受控缺口，不能以安装配置标记ready |
 | 切换准备失败、恢复成功 | 409，说明原策略已恢复 |
 | 恢复或门禁释放失败 | reconcile，明确要求对账 |
 
@@ -1445,6 +1451,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 - 正常：开启→核对实际 sender 目录→关闭，账号独立，身份和内核选择保持。
 - 边界：停止环境切换后保持停止；prepare 响应丢失后仅释放本次 owner。
+- 正常：首次部署或系统更新后，原生环境自动开启并后台准备；显式关闭经重建继续关闭。错误用法：只检查页面disabled状态决定是否安装探针。正确处理：启用准入独立检查协议，实际ready依赖当前巡检。
 - 错误用法：把采集维护登记为 CLI 作业后调用 ensure，导致画像准备被自身作业阻止。正确处理：在原环境锁和更新准入内独立持有排他维护租约。
 
 ### 6. Tests Required
@@ -1452,3 +1459,5 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - `test_content_capture_settings` 覆盖 DTO/SQL、实际配置偏离、账号独立、忙碌/旧版本、内核下载中零租约/零重建、回执丢失、恢复及门禁失败。
 - `test_account_runtime.AccountRuntimeTests.test_content_capture_uses_real_lifecycle_and_preserves_identity` 走实际维护租约及配置重建路径；验证 sender 文件、代次、原身份和内核，作业集合与租约正常收口。
 - `test_saved_role_cpu_policy_is_used_when_recreating_containers` 验证三角色重建沿原 CPU 策略；浏览器回归核对冻结版本、独立开关及重复提交。
+- `test_native_tls_isolation.py`与真实`verify_roles`区分加载器、Rust sender及其worker，验证精确入口/能力/seccomp、业务零权限、秘密隔离、本地构建和资源压力；root加载器不能套用旧的容器默认UID断言。
+- 内容采集测试覆盖缺省true、显式false、非法类型、同代次新鲜ready、旧镜像关闭态零维护写入。浏览器覆盖默认开启、取消、关闭再开启和五类TLS能力状态；真实模型调用为0。

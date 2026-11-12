@@ -1752,6 +1752,7 @@ class AccountRuntimeTests(unittest.TestCase):
         """真实维护链重建采集配置，身份与内核选择沿用。@return None。"""
         self._isolated_docker()
         self.client.images.get.return_value.attrs['Config']['Labels']['vibebench.native-runtime'] = '293-raw-1'
+        self.client.images.get.return_value.attrs['Config']['Labels']['vibebench.native-tls-observer'] = '1'
         account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
             'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
         lease = None
@@ -1775,7 +1776,15 @@ class AccountRuntimeTests(unittest.TestCase):
             row['gateway_account_id'] = 7
             original = json.loads(row['fingerprint_json'])
             kernel = json.loads(self.runtime._sender_config(row).read_text())['native'].get('release')
-            for enabled in [True, False]:
+            self.assertTrue(read_content_capture(self.runtime, row)['enabled'])
+            sender = next(call.kwargs for call in self.client.containers.run.call_args_list
+                if call.kwargs['labels']['vibebench.role'] == 'account-sender')
+            self.assertEqual(sender['user'], '0:0')
+            self.assertEqual(sender['cap_add'], ['SYS_ADMIN', 'SETUID', 'SETGID'])
+            self.assertEqual(sender['environment']['CCRB_TLS_OBSERVER'], '/opt/ccrb-tls-observer/client.py')
+            self.assertEqual(sender['security_opt'][0], 'no-new-privileges:true')
+            self.assertTrue(sender['security_opt'][1].startswith('seccomp={'))
+            for enabled in [False, True]:
                 before = read_content_capture(self.runtime, row)
                 result = set_content_capture(self.runtime, row, account, enabled, before['generation'], before['revision'])
                 self.assertEqual(result['enabled'], enabled)

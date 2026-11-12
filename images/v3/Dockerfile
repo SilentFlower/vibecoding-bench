@@ -30,6 +30,16 @@ RUN --mount=type=cache,id=vibebench-v3-cargo-registry,target=/usr/local/cargo/re
     cargo build --locked --release --bins \
     && mkdir -p /out && cp target/release/claude-code-gateway target/release/account-sender /out/
 
+FROM debian:bookworm-slim AS tls-observer-build
+ARG V3_TLS_OBSERVER_DEVELOPMENT=0
+RUN apt-get update && apt-get install -y --no-install-recommends clang gcc libc6-dev linux-libc-dev python3 \
+    && rm -rf /var/lib/apt/lists/*
+COPY images/v3/tls-observer/ /opt/ccrb-tls-observer/
+RUN python3 -c "import hashlib,json,os;from pathlib import Path;p=Path('/opt/ccrb-tls-observer');m=json.loads((p/'manifest.json').read_text());assert m['protocol_version']==1;assert m['development'] is False or os.environ['V3_TLS_OBSERVER_DEVELOPMENT']=='1';assert all(hashlib.sha256((p/n).read_bytes()).hexdigest()==s for n,s in m['files'].items())" \
+    && python3 /opt/ccrb-tls-observer/build.py \
+    && cc -O2 -Wall -Wextra -Werror -Wl,-z,relro,-z,now /opt/ccrb-tls-observer/launch.c -o /opt/ccrb-tls-observer/launch \
+    && chmod -R go-w /opt/ccrb-tls-observer
+
 FROM python:3.12-slim-bookworm AS control
 RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates openssl \
     && rm -rf /var/lib/apt/lists/*
@@ -44,6 +54,7 @@ COPY orchestrator/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 RUN python -c "from zoneinfo import ZoneInfo; [ZoneInfo(name) for name in ('UTC','Asia/Tokyo','Asia/Singapore','Asia/Seoul','Australia/Sydney','Europe/London','Europe/Berlin','Europe/Paris','America/Los_Angeles','America/New_York','America/Chicago')]"
 COPY orchestrator/*.py ./
+COPY orchestrator/native_tls_seccomp.json ./
 COPY orchestrator/database-migration-registry.json ./
 COPY topics.md /repo/topics.md
 COPY project_library /repo/project_library
@@ -115,6 +126,9 @@ COPY orchestrator/cli_quota.py /usr/local/bin/v3-cli-quota
 COPY orchestrator/process_metrics.py /usr/local/bin/process_metrics.py
 COPY orchestrator/process_metrics.py /usr/local/bin/v3-process-metrics
 COPY --from=backend /out/account-sender /usr/local/bin/account-sender
+COPY --from=tls-observer-build /opt/ccrb-tls-observer/ /opt/ccrb-tls-observer/
+# iproute2已有libbpf运行依赖；在镜像内验证真实动态库，避免重复刷新整层系统依赖。
+RUN python3 -c "import ctypes; ctypes.CDLL('libbpf.so.1')"
 COPY native-runtime/ccrb-runtime /usr/local/bin/ccrb-runtime
 RUN echo '64c61cae565e9097de18cf61a35f46e7595f633cb14f7d6b8c6609fcd294ce89  /usr/local/bin/ccrb-runtime' | sha256sum -c - \
     && chmod 755 /usr/local/bin/ccrb-runtime
@@ -133,6 +147,7 @@ LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELE
     vibebench.isolation-version="2" \
     vibebench.cli-install-version="2" \
     vibebench.native-runtime="293-raw-1" \
+    vibebench.native-tls-observer="1" \
     vibebench.system-profile-version="1" \
     vibebench.computer-profile-version="1" \
     vibebench.parent-revision=$V3_PARENT_REV vibebench.gateway-revision=$V3_GATEWAY_REV \

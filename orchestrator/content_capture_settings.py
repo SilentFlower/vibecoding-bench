@@ -2,17 +2,20 @@
 import hashlib
 import json
 import uuid
+import time
 
+from native_capture_policy import capture_enabled
 from native_kernel_upgrade import pending_upgrade
 from runtime_files import atomic_json
 from system_update_contract import safe_read, strict_json
 
 
-def read_settings(runtime, row: dict) -> dict:
+def read_settings(runtime, row: dict, observation: dict | None = None) -> dict:
     """只读取得采集配置与并发版本。
 
     :param runtime: 权威账号运行时。
     :param row: 锁内当前环境记录。
+    :param observation: 既有批量巡检取得的同代次状态。
     :return: 不含凭据的策略、实际配置及版本摘要。
     """
     fingerprint = json.loads(row['fingerprint_json'])
@@ -22,7 +25,7 @@ def read_settings(runtime, row: dict) -> dict:
         configuration = strict_json(raw, 1024 * 1024)
     except FileNotFoundError:
         raw, configuration = b'', {}
-    enabled = fingerprint.get('native_capture_enabled') is True
+    enabled = capture_enabled(fingerprint)
     actual = configuration.get('native_capture_dir') == '/flows/api/cc-prepared'
     supported = isinstance(configuration.get('native'), dict)
     binding = configuration.get('binding') if isinstance(configuration.get('binding'), dict) else {}
@@ -34,9 +37,42 @@ def read_settings(runtime, row: dict) -> dict:
         'generation': row['generation'], 'state': row['state'],
         'fingerprint': fingerprint, 'sender_sha256': hashlib.sha256(raw).hexdigest()},
         sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    protocol = configuration.get('native_tls_observer_protocol')
+    installed = type(protocol) is int and protocol == 1
+    tls = {'state': 'preparing', 'reason': 'CAPTURE_PREPARING', 'checked_at_ms': None,
+        'protocol_version': 1 if installed else None, 'image_admitted': None}
+    if not enabled:
+        tls.update(state='disabled', reason=None)
+    elif not installed:
+        tls.update(state='not_installed', reason='OBSERVER_NOT_CONFIGURED')
+    elif row['state'] == 'stopped':
+        tls.update(state='stopped', reason=None)
+    elif observation and owned:
+        tls.update(state='unavailable', reason='OBSERVER_STATUS_UNAVAILABLE')
+        native = configuration.get('native') or {}
+        checked = observation.get('checked_at_ms')
+        if (observation.get('environment_id') == row['environment_id']
+                and observation.get('generation') == row['generation']
+                and observation.get('kernel_generation') == native.get('kernel_generation')
+                and type(checked) is int and 0 <= time.time() * 1000 - checked <= 45000):
+            candidate = observation.get('tls_observer')
+            if (isinstance(candidate, dict) and type(candidate.get('protocol_version')) is int
+                    and candidate.get('protocol_version') == 1
+                    and candidate.get('state') in ('preparing', 'ready', 'unavailable')
+                    and (candidate.get('state') != 'ready' or candidate.get('image_admitted') is True)):
+                reason = candidate.get('reason')
+                # 仅固定诊断码进入页面，避免私有管道的异常原文被投影。
+                if reason is None or (isinstance(reason, str) and 1 <= len(reason) <= 64
+                        and all(char in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789' for char in reason)):
+                    tls.update(state=candidate['state'], reason=reason, checked_at_ms=checked,
+                        image_admitted=candidate.get('image_admitted') if type(candidate.get('image_admitted')) is bool else None)
+        else:
+            tls.update(state='unavailable', reason='OBSERVER_STATUS_STALE')
+    else:
+        tls.update(state='unavailable', reason='OBSERVER_STATUS_UNAVAILABLE')
     return {'environment_id': row['environment_id'], 'account_id': row['account_id'],
         'generation': row['generation'], 'revision': revision, 'enabled': enabled,
-        'applied': supported and owned and actual == enabled, 'supported': supported}
+        'applied': supported and owned and actual == enabled, 'supported': supported, 'tls_observer': tls}
 
 
 def set_settings(runtime, row: dict, account: dict, enabled: bool,
@@ -62,6 +98,8 @@ def set_settings(runtime, row: dict, account: dict, enabled: bool,
         raise ValueError('请求内核正在维护，请完成后再切换采集')
     if before['enabled'] == enabled:
         return before
+    if enabled and before['tls_observer']['protocol_version'] != 1:
+        raise ValueError('当前镜像需要先通过系统更新安装原生TLS采集能力')
     original = json.loads(row['fingerprint_json'])
     was_stopped = row['state'] == 'stopped'
     owner = f'capture:{uuid.uuid4().hex}'

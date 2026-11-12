@@ -1,0 +1,17 @@
+{
+  "development": false,
+  "files": {
+    "LICENSE.seccomp": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "broker.py": "51c897c1b39cf993287208368f2cebd6c8d891407f53ae0f329465aaa3f51230",
+    "build.py": "95859f097542ded0d7cae46a99222471fd45ca93e2fc025258376055ae81f102",
+    "capture.bpf.c": "40f7ab7280c1e6e078928f44c1cd9db018f4f108ae743989f080aa6aa36f901f",
+    "client.py": "5d1a73db952111c9b4cac343f4dbf9d81735af39de33396970558e4665a4abc3",
+    "http_capture.py": "8f0f60d3102d102f88147cc5dcb36e461eb995373c5ab352fd836eceb654b98a",
+    "launch.c": "56aae2feab1242b4cfd9810581b1194db8fd0443573f99e18c332f86a0832f7f",
+    "observer.py": "a565aed9855228e70f3f6340e4748691219455c1e2dd6c2afb9a6c2da60becca",
+    "seccomp.json": "7fe525474af2ca78ee9f2e6158c6d0672d161488b3816e1ead14d4d8b9f257a1"
+  },
+  "protocol_version": 1,
+  "schema_version": 1,
+  "source_revision": "fb685603545485855f5b3a9c328c1c00681eba5a"
+}
