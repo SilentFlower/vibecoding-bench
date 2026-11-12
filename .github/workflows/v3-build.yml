@@ -30,11 +30,11 @@ jobs:
         run: |
           python3 -m venv "$RUNNER_TEMP/v3-update-venv"
           "$RUNNER_TEMP/v3-update-venv/bin/pip" install -r services/orchestrator/requirements.txt PyYAML==6.0.3
-          python3 deploy/v3/verify_database_definitions.py
+          python3 deploy/flower2api/verify_database_definitions.py
           # 宿主快照测试需核验跨进程数据库句柄，使用与正式执行器相同的 root 权限。
-          sudo "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest discover -s deploy/v3 -p 'test_system*.py'
+          sudo "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest discover -s deploy/flower2api -p 'test_system*.py'
           "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest discover -s services/orchestrator -p 'test_system_update*.py'
-          PYTHONPATH=services/orchestrator:deploy/v3 "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest test_publication test_system_workflow test_database_definitions test_database_migrations test_database_compatibility
+          PYTHONPATH=services/orchestrator:deploy/flower2api "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest test_publication test_system_workflow test_database_definitions test_database_migrations test_database_compatibility test_source_layout
       - name: 准备共享构建缓存
         id: flower2api-cache
         continue-on-error: true
@@ -43,7 +43,7 @@ jobs:
         if: steps.flower2api-cache.outcome == 'failure'
         run: printf '%s\n' '::warning::CI缓存准备失败，本次沿普通Docker构建路径执行。'
       - name: 构建两个镜像并生成版本清单
-        run: python3 deploy/v3/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3-local.json
+        run: python3 deploy/flower2api/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3-local.json
       - name: 保存本地构建清单
         uses: actions/upload-artifact@v4
         with:
