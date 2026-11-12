@@ -37,6 +37,8 @@ fetch_repository_file(name: str, commit: str, limit: int) -> bytes
 
 CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设置 `python-version: '3.12'`，与 `images/v3/Dockerfile` 的两个正式 Python 阶段一致。验证虚拟环境和后续发行命令继承该解释器。变更次版本时应联合验证锁定依赖与正式镜像。
 
+宿主快照测试及真实兼容恢复演练通过 `sudo` 调用同一虚拟环境解释器，匹配正式更新器的 root 权限，以读取跨进程数据库文件描述符。演练仅显式保留 `V3_SYSTEM_RELEASE_PRIVATE_KEY`，完成后把 `releases/database-compatibility.json` 归属交回 runner，供后续上传与签名发布读取。
+
 ### 受信发行
 
 - 独立 Ed25519 密钥由 CI secret `V3_SYSTEM_RELEASE_PRIVATE_KEY` 提供。宿主保存 64 位十六进制公钥，签名原始长度为 64 字节，按原始 JSON 字节验签。
@@ -117,6 +119,7 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 
 ## 6. 必需验证与断言
 
+- CI 权限验证：宿主文件描述符检查采用 root，普通 runner 的 PermissionError 保持失败；同一虚拟环境解释器、明确保留的密钥变量及证据归属回交必须匹配工作流。
 - CI 解释器变更：用干净 Python 3.12 虚拟环境安装 `orchestrator/requirements.txt`，执行 workflow 中两条 `unittest discover` 命令；检查设置步骤先于验证，且与两个正式镜像的 Python 次版本一致。工作流 YAML、shell 语法和 `git diff --check` 通过。
 - `deploy/v3/test_system_*.py`：签名、目录顺序/时间、严格字段与大小、数据兼容、同参幂等、revision 冲突、恢复与清理保护。首次接入覆盖 dry-run、状态提交中断、释放响应中断、原 installed_at、外来门禁、后来 revision、配置 CAS、真实文件锁互斥。
 - 目录读取覆盖 Contents 载荷转换、真实签名字节保留、错误编码/大小/blob SHA 及非固定来源拒绝；取消覆盖执行线程旧快照、最后一次现场采集中的取消，以及切换后的 `409`。真实 Docker 取消验收断言原控制容器保留且操作最终为 `cancelled`。
