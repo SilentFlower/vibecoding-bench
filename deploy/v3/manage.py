@@ -32,6 +32,7 @@ from resource_budget import account_limits, isolated_account_limits
 from native_sender import prewarm_account_id, stage_asset
 from platform_version import read_version
 from release_ci import validate_publish_source
+from system_update_contract import REPOSITORY
 from storage_assets import essential_exclusions
 from storage_backup import create_backup_data, verify_backup_data
 from storage_cleanup import apply_storage_plan, storage_plan
@@ -431,6 +432,42 @@ def restore_upstream_checkout_bytes(root: Path) -> list[str]:
     return [relative for relative, _, _ in pending]
 
 
+def _build_arguments(role: str) -> list[str]:
+    """选择本地或 CI 构建驱动，缓存鉴权仅从进程环境读取。
+
+    :param role: control 或 account，用于隔离两类镜像的层缓存。
+    :return: 不含源快照、标签及秘密的构建命令前缀。
+    """
+    if role not in ('control', 'account'):
+        raise ValueError('构建角色无效')
+    builder = os.environ.get('FLOWER2API_BUILDX_BUILDER', '')
+    scope = os.environ.get('FLOWER2API_BUILD_CACHE_SCOPE', '')
+    write = os.environ.get('FLOWER2API_BUILD_CACHE_WRITE', 'false')
+    for value in (builder, scope):
+        if value and not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}', value):
+            raise ValueError('构建缓存名称无效')
+    if write not in ('true', 'false'):
+        raise ValueError('构建缓存写入开关无效')
+    if not builder:
+        return ['docker', 'build']
+    arguments = ['docker', 'buildx', 'build', '--builder', builder, '--load', '--progress', 'plain']
+    if not scope:
+        return arguments
+    if not all(os.environ.get(name) for name in ('ACTIONS_RUNTIME_TOKEN', 'ACTIONS_RESULTS_URL')):
+        print('GitHub缓存上下文不可用，本次构建使用本机缓存。', file=sys.stderr)
+        return arguments
+    # 镜像角色分开保存，避免 account 的导出覆盖 control 专属构建层。
+    cache = f'type=gha,version=2,scope={scope}-{role}'
+    arguments += ['--cache-from', cache + ',timeout=2m']
+    trusted = (os.environ.get('GITHUB_ACTIONS') == 'true'
+        and os.environ.get('GITHUB_REPOSITORY', '').lower() == REPOSITORY.lower()
+        and os.environ.get('GITHUB_REF') in ('refs/heads/v3', 'refs/heads/flower2api')
+        and os.environ.get('GITHUB_EVENT_NAME') in ('push', 'workflow_dispatch'))
+    if write == 'true' and trusted:
+        arguments += ['--cache-to', cache + ',mode=max,ignore-error=true,timeout=2m']
+    return arguments
+
+
 def build(release: str, manifest_path: Path) -> None:
     """构建两个最终镜像，完成后生成可核对的联合清单。
 
@@ -440,6 +477,8 @@ def build(release: str, manifest_path: Path) -> None:
     """
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", release):
         raise ValueError("批次名不合法")
+    # 先校验缓存设置，配置错误不能在快照或 Docker 操作之后才暴露。
+    build_commands = {role: _build_arguments(role) for role in ('control', 'account')}
     parent = command("git", "rev-parse", "HEAD", capture=True).strip()
     platform_version = read_version(REPO / 'deploy/v3/platform-release.json')['version']
     gateway = parent
@@ -471,10 +510,13 @@ def build(release: str, manifest_path: Path) -> None:
             reference = f"vibebench-v3-{role}:v3-{release}"
             if subprocess.run(["docker", "image", "inspect", reference], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
                 raise ValueError("批次镜像标签已经存在，禁止覆盖")
-            command("docker", "build", "-f", str(snapshot / "images/v3/Dockerfile"), "--target", role,
+            started = time.monotonic()
+            command(*build_commands[role], "-f", str(snapshot / "images/v3/Dockerfile"), "--target", role,
                 "--build-arg", f"V3_RELEASE={release}", "--build-arg", f"V3_PARENT_REV={parent}",
                 "--build-arg", f"V3_GATEWAY_REV={gateway}", "--build-arg", f"VITE_PLATFORM_VERSION={platform_version}",
                 "-t", reference, str(snapshot))
+            print(json.dumps({'event': 'flower2api-build-role', 'role': role,
+                'seconds': round(time.monotonic() - started, 3)}, ensure_ascii=False), flush=True)
             info = json.loads(command("docker", "image", "inspect", reference, capture=True))[0]
             images[role] = {"reference": reference, "digest": info["Id"],
                 "config_digest": _image_config_digest(reference),

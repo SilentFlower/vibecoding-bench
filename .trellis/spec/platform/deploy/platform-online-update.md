@@ -354,3 +354,60 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 - `test_system_workflow`：真实 Git 在 `core.autocrlf=input` 下保留工程库 CRLF 字节，补丁空白上下文通过检查；固定源码包在仓库外独立导入。
 - 工程库迁移：逐项核对 Git blob、执行位及内容清单；新检出副本经正式快照的已登记上游补偿后，完整工程库验证通过。
 - `verify_system_update.py --migration-manifest <同批候选清单>`：离线真实 Docker 验证旧底座升级、原三角色/环境身份复用、内容变化重建、停止状态保留、回退及中断恢复。
+
+## Scenario: flower2api 构建缓存与有限并发验收
+
+### 1. Scope / Trigger
+
+修改共享缓存 action、manage 构建驱动、历史双库演练、工作流名称或组件展示名时适用。操作入口见 [系统更新 SOP](../../../../deploy/v3/SYSTEM-UPDATES.md#构建缓存与兼容演练提速)。
+
+### 2. Signatures
+
+- `manage.build(release: str, manifest_path: Path) -> None` 保留原调用方式；`_build_arguments(role: str) -> list[str]` 为两个角色生成受限命令前缀。
+- `verify_database_compatibility.verify(manifest: Path, public_key: str, output: Path, *, history_root: Path | None = None, workers: int = 1) -> dict`。
+- `python3 deploy/v3/verify_database_compatibility.py --manifest <候选清单> --output <新证据> --workers {1,2}`。
+
+### 3. Contracts
+
+- 新缓存选项只读取进程环境：`FLOWER2API_BUILDX_BUILDER`、`FLOWER2API_BUILD_CACHE_SCOPE`、`FLOWER2API_BUILD_CACHE_WRITE`。部署配置文件仍按原 `V3_*` 格式解析。
+- builder 与 scope 非空时匹配 `[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}`，write 只接受 `true|false`，默认 false。配置在快照及 Docker 操作前校验。
+- 无 builder 使用原 `docker build`；有 builder 使用 `docker buildx build --builder ... --load --progress plain`。scope 为空或缺少 runtime token／results URL 时使用本地缓存。缓存凭据通过 job runtime 提供。
+- GHA 层缓存为 API v2，control／account 分 scope，导入与导出分别限两分钟。导出使用 `mode=max,ignore-error=true`。写入同时要求显式 write=true、GitHub Actions、本仓、v3／flower2api ref 及 push／workflow_dispatch 事件。
+- 共享 action 位于 `.github/actions/flower2api-build-cache/action.yml`。Cargo registry／git／target 沿 Dockerfile 的三个具名 mount id 和 target 恢复；key 包含平台、依赖配方与源码，restore 前缀限定兼容依赖配方。可信分支注册保存动作，PR使用只读恢复。
+- composite 内先注册 Actions cache 保存，再注册 cache-dance 挂载提取，post 按相反顺序提取、保存及回收 builder。只在所有准备成功后向 GITHUB_ENV 激活三个缓存选项；调用方仅容忍缓存准备错误，实际构建与验收错误继续阻断。
+- 两镜像继续来自同一受控源码快照，读取实际加载的镜像生成原联合清单，保留来源标签、run／attempt／SHA 与摘要检查。
+- workers 严格为整数1或2，bool 拒绝；默认串行，发行工作流显式2。协调器先核验候选、迁移合同及全部签名来源，再分发最多两路单来源演练。
+- 各来源使用独立临时根、双库、UUID及容器，保留原安全参数和期限，完整执行两次迁移、新旧程序读写和快照恢复。首次失败通知共享停止状态，排队项停止，已启动项先执行原 finally 收口，再传播附来源 note 的原异常。
+- 全部来源成功后才原子写入证据，来源顺序沿受信目录，schema与checks字段维持原合同。每角色、每来源及总体耗时分别用 flower2api 性能事件记录。
+- 对外展示名为小写 `flower2api`；既有部署路径、镜像名、CLI／API、浏览器存储键及签名身份按原升级合同保留。默认 main 注册手动构建入口；其 build job 只允许本仓 v3／flower2api，main自身跳过。实际工作使用所选目标分支源码。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 无缓存选项、首次未命中 | 沿完整本地构建入口生成两镜像 |
+| 名称含参数分隔符或非法 write | Docker与快照前 ValueError |
+| 缺 runtime 环境 | 记录原因，使用本地 builder 缓存 |
+| 缓存导入服务不可达 | BuildKit报告缓存错误，完整构建继续；实际编译失败仍阻断 |
+| PR、外仓、其它 ref／事件 | 无 GHA 缓存导出 |
+| workers为bool、0、3或字符串 | 文件和Docker读取前 ValueError |
+| 首项晚完成、不同来源乱序完成 | 最终证据仍按原目录顺序排列 |
+| 任一来源失败 | 等待已启动项收口后抛原异常，零成功证据写入 |
+| main手动选择构建 | job跳过，目标分支由分支选择器明确指定 |
+
+### 5. Scenarios and Examples
+
+- 正常：push flower2api完成只构建CI及缓存保存，再对同SHA手动构建；核对跨runner命中和含恢复／保存开销的完整耗时。
+- 基础：本地普通build保留原行为；显式builder使用load生成实际可检查的镜像；workers=1保留串行。
+- 错误用法：把构建步骤设为continue-on-error以隐藏缓存故障。正确方式：仅缓存准备可回退，编译、迁移、签名与发布失败继续阻断。
+- 错误用法：将四个真实历史镜像组成的八条合成历史测量写成正式八版本CI结果。正确方式：记录夹具构成；正式最近八个发行的双路演练由下一次明确发行独立验收。
+
+### 6. Tests Required
+
+- `test_system_build_cache`：本地默认、角色scope、可信写入、非法配置零副作用、精确mount映射、恢复与提取顺序、仅缓存准备可容错。
+- `test_database_compatibility`：真实线程上限2、默认串行、乱序结果归位、待运行取消、运行项收口、原错误和来源note、非法workers。
+- 原 `test_system_workflow`、`test_publication` 及系统更新回归覆盖手动发布门禁、固定包仓库外独立导入和摘要身份；actionlint核验实际两个分支工作流。
+- 真实隔离Docker对同一八来源做串行／双路对照及迁移启动故障注入，核对完整证据等价、成功证据边界和全部自有容器收口。使用合成密钥及测试数据。
+- 实际Buildx缓存导入故障与真实构建失败分别验证；实际两轮同源构建后用 `manage.inspect_images` 核对两镜像的标签、平台和摘要。
+- Vue与运行时页面构建、原浏览器验收覆盖展示名称所在页面及原交互；README的本地链接与历史来源正文保留核对。
+- GitHub缓存命中、恢复／保存和完整冷热耗时依赖批准推送后的外部CI验收。正式八发行的双路证据由下一次明确发行承接。两类结果分别记录。

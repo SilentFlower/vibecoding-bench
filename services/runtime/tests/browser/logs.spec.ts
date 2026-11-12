@@ -48,7 +48,8 @@ test('列表、四页签、脱敏复制和真实采集边界', async ({ page, co
   const detail = page.getByRole('dialog');
   await expect(detail.getByText('root-ui', { exact: true }).first()).toBeVisible();
   await detail.getByRole('tab', { name: '头部处理', exact: true }).click();
-  await expect(detail.getByRole('row').filter({ hasText: 'x-future-ui' })).toContainText('保留');
+  await expect(detail.getByRole('row').filter({ hasText: 'x-future-ui' })).toContainText('删除');
+  await expect(detail.getByRole('row').filter({ hasText: 'x-future-ui' })).toContainText('调用方请求头未登记到协议白名单');
   await expect(detail.getByRole('row').filter({ hasText: 'Authorization' })).toContainText('删除');
   await detail.getByRole('tab', { name: '性能', exact: true }).click();
   await expect(detail.getByText('发送至首个有效输出', { exact: true })).toBeVisible();

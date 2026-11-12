@@ -1,8 +1,12 @@
-# cc-runtime-bridge
+# flower2api 运行时
+
+flower2api 的原生内核适配与诊断组件，源码整合自 `SilentFlower/cc-runtime-bridge@7cfe8b3734111dae4758a7e2006f43e5f1cc71e9`。来源与固定执行制品见 [迁移记录](../../docs/migrations/flower2api-sources.json)，平台安装与原地升级见 [系统更新 SOP](../../deploy/v3/SYSTEM-UPDATES.md)。
+
+以下命令在 `services/runtime/` 内执行。内部包名、二进制名和 `CCRB_*` 参数沿现有协议保留。
 
 用于本地联调的运行时适配与日志工具，提供 HTTP 接口和日志查看页面。
 
-本地控制服务按单账号、串行请求运行，默认监听本机回环地址。独立二进制可由 cc2api 的账号工作进程池调用，保留账号加权并发。
+本地控制服务按单账号、串行请求运行，默认监听本机回环地址。独立二进制可由 flower2api 网关的账号工作进程池调用，保留账号加权并发。
 
 ## 功能
 
@@ -10,11 +14,11 @@
 - 保存请求关联信息、头部处理结果和各阶段日志。
 - 在本地页面筛选记录、查看详情和复制脱敏内容。
 
-## 独立二进制与 cc2api
+## 独立二进制与网关
 
-Linux x64 二进制 `ccrb-runtime-linux-x64` 为 **27387960 字节（26.12 MiB）**，内含固定官方 2.1.293 的请求构造与发送逻辑。通过私有 JSONL 协议调用，运行依赖 Linux、glibc、`/proc`、可执行 memfd 及独立可写目录。
+本组件的 Linux x64 二进制名为 `ccrb-runtime-linux-x64`，内含固定官方 2.1.293 的请求构造与发送逻辑。通过私有 JSONL 协议调用，运行依赖 Linux、glibc、`/proc`、可执行 memfd 及独立可写目录。平台实际安装版本、字节数和摘要以签名发行及上述迁移记录为准。
 
-cc2api 可按账号选择 `request_backend=native293`，历史默认 `legacy`。V3 sender 使用显式有限内存预算；标准并发 3 对应 3 路普通或 6 路 Haiku 请求。安装、SHA256、资源配置与回退见 [cc2api 接入说明](docs/cc2api-native293.md)。
+flower2api 网关可按账号选择 `request_backend=native293`，历史默认 `legacy`。固定账号环境的 sender 使用显式有限内存预算；标准并发 3 对应 3 路普通或 6 路 Haiku 请求。安装、SHA256、资源配置与回退见 [网关接入说明](docs/cc2api-native293.md)。
 
 ## 本地预览
 

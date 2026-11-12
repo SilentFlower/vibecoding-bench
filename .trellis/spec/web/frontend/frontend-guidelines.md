@@ -77,7 +77,7 @@ apps/web/src/style.css
 
 #### 6. Tests Required
 
-- 前端: `cd services/gateway/web && npm run build` 必须通过，覆盖 TypeScript 和 Vite 构建。
+- 前端: `npm --prefix apps/web run build` 必须通过，覆盖 TypeScript 和 Vite 构建。
 - 后端: 涉及 Fable 周限 setting 时运行 `cd services/gateway && cargo test fable_weekly_usage_limit`，断言默认值、非法值拒绝、热加载仍成立。
 - 手动/自动交互验证: 修改 number input 后点击保存，确认不会出现 `.trim is not a function`，且请求体里的 setting 值是字符串。
 
@@ -212,6 +212,6 @@ const isValidLimit = computed(() => {
 
 ### 6. Tests Required
 
-- `cd services/gateway/web && npm run build`；通过 Vue/TypeScript 和生产构建。
+- `npm --prefix apps/web run build`；通过 Vue/TypeScript 和生产构建。
 - `python deploy/v3/verify_management_ui.py --output .deploy/management-ui/combined`：实际产物、合成 API、两个时区、390px、版本单展开、导航历史、采集开关及异步关闭。
 - 原 `verify_environment_ui.py` 继续覆盖内核、时段、焦点、乱序和物理实测；所有浏览器模型调用为零。

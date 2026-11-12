@@ -269,7 +269,7 @@ P1 阶段做到的:
 ### 6. Tests Required
 
 - `node --check apps/legacy-web/app.js`、`node --check apps/legacy-web/environments.js`、`node --check apps/legacy-web/projects.js`。
-- 在已有 Playwright 和 gateway `web/dist` 的本地环境运行 `python3 deploy/v3/verify_environment_ui.py --output .deploy/environment-ui-verification`。缺少 gateway 静态产物时先执行 `cd services/gateway/web && npm run build`。
+- 在已有 Playwright 和 `apps/web/dist` 的本地环境运行 `python3 deploy/v3/verify_environment_ui.py --output .deploy/environment-ui-verification`。缺少 gateway 静态产物时先执行 `npm --prefix apps/web run build`。
 - 合成浏览器须覆盖实际 gateway 导航和 iframe、1280/720/390px 及原明暗偏好、真实按钮操作、版本冲突、提交去重、取消、轮询编辑、乱序回包、切页清理、长字段、空列表、错误文本转义及原运行窗口/物理实测入口。
 - 断言进入页面没有业务写入，主动操作 payload 保持既有合同，所有请求使用合成接口；实际账号、OAuth 与模型调用不作为本地 UI 验收前提。
 - 准备状态回归覆盖 ready/preparing/failed/过期、390px、定时刷新归属及零写入；请求诊断合成场景同时核验实际暖命中、PID、重叠计时与历史未观测。

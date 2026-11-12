@@ -658,7 +658,7 @@ async function saveSettings() {
     return;
   }
   if (!isValidV3.value) {
-    toast('v3 等待上限须为 1–120 秒；权重须为 0–10、最多一位小数，且不能全部为零');
+    toast('flower2api 等待上限须为 1–120 秒；权重须为 0–10、最多一位小数，且不能全部为零');
     return;
   }
   saving.value = true;
@@ -767,9 +767,9 @@ onMounted(async () => {
     <!-- v3 调度配置与旧评分分开，防止切换排序时误认为关闭发送限制。 -->
     <Card class="bg-white border-[#e8e2d9] rounded-xl overflow-hidden">
       <div class="p-6 space-y-4">
-        <div><h3 class="text-sm font-semibold text-[#29261e]">v3 会话与发送调度</h3><p class="text-xs text-[#8c8475] mt-1">仅在 v3 生效。老会话保持有效绑定；新会话先检查资格和容量。两种排序都按账号 RPM 平滑提交，排队超时保留绑定。</p></div>
+        <div><h3 class="text-sm font-semibold text-[#29261e]">flower2api 会话与发送调度</h3><p class="text-xs text-[#8c8475] mt-1">适用于固定账号环境。老会话保持有效绑定；新会话先检查资格和容量。两种排序都按账号 RPM 平滑提交，排队超时保留绑定。</p></div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="space-y-1.5"><Label>新会话排序</Label><select v-model="v3Mode" aria-label="v3 新会话排序" class="w-full h-9 rounded-md border border-[#e8e2d9] px-3 text-sm"><option value="smart">智能排序</option><option value="legacy_score">旧评分排序</option></select></div>
+          <div class="space-y-1.5"><Label>新会话排序</Label><select v-model="v3Mode" aria-label="flower2api 新会话排序" class="w-full h-9 rounded-md border border-[#e8e2d9] px-3 text-sm"><option value="smart">智能排序</option><option value="legacy_score">旧评分排序</option></select></div>
           <div class="space-y-1.5"><Label for="v3-wait-seconds">准入等待上限（秒）</Label><Input id="v3-wait-seconds" v-model="v3WaitSeconds" type="number" min="1" max="120" step="1" class="border-[#e8e2d9]" /></div>
         </div>
         <p class="text-xs text-[#8c8475]">并发、环境准备和发送间隔共用一个等待期限，重试不重置；不会中断已提交的健康长流。</p>
