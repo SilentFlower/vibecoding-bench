@@ -213,7 +213,7 @@ def _verify_source(release: dict, raw: bytes, candidate: str, registries: dict,
     try:
         source = release['control']
         if history_root is None:
-            reference = f'ghcr.io/silentflower/vibebench-v3-control@{source["registry_digest"]}'
+            reference = source['reference'].rsplit(':', 1)[0] + '@' + source['registry_digest']
             command('docker', 'pull', reference, timeout=600)
         else:
             reference = source['reference']

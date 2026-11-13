@@ -44,7 +44,7 @@ class PublicationTests(unittest.TestCase):
         self.addCleanup(environment.stop)
 
     def _image(self, role):
-        reference = f"ghcr.io/silentflower/vibebench-v3-{role}"
+        reference = f"ghcr.io/silentflower/flower2api-{role}"
         return {"Id": self.manifest["images"][role]["digest"], "Os": "linux", "Architecture": "amd64",
             "RepoDigests": [reference + "@sha256:" + ("3" if role == "control" else "4") * 64],
             "Config": {"Labels": {"vibebench.product": "v3", "vibebench.role": role,
@@ -78,17 +78,17 @@ class PublicationTests(unittest.TestCase):
             entry = result["images"][role]
             self.assertEqual(entry["digest"], self.manifest["images"][role]["digest"])
             self.assertNotEqual(entry["digest"], entry["registry_digest"])
-            self.assertTrue(entry["reference"].startswith("ghcr.io/silentflower/vibebench-v3-"))
+            self.assertEqual(entry["reference"], f"ghcr.io/silentflower/flower2api-{role}:v3-ci-123-1")
         self.assertEqual(gzip.decompress(self.bundle.read_bytes()), b"synthetic docker image package")
         self.assertEqual(result["bundle"]["sha256"], manage._file_sha256(self.bundle))
         self.assertEqual(self.output.stat().st_mode & 0o777, 0o600)
 
-    def test_flower2api_manual_publication_keeps_v3_image_identity(self) -> None:
-        """融合分支手动发布仍沿原 v3 镜像身份。@return None。"""
+    def test_flower2api_manual_publication_uses_new_package_names(self) -> None:
+        """融合分支手动发布生成新包名并保持实际镜像配置身份。@return None。"""
         with patch.dict(os.environ, {"GITHUB_REF": "refs/heads/flower2api",
                 "GITHUB_WORKFLOW_REF": "SilentFlower/vibecoding-bench/.github/workflows/v3-release.yml@refs/heads/flower2api"}):
             result = self._publish()
-        self.assertTrue(all('/vibebench-v3-' in entry['reference'] for entry in result['images'].values()))
+        self.assertTrue(all('/flower2api-' in entry['reference'] for entry in result['images'].values()))
 
     def test_automatic_or_unconfirmed_publication_refuses_before_docker(self) -> None:
         """构建及其它入口在 Docker 副作用前拒绝发布。@return None。"""

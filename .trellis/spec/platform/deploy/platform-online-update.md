@@ -43,7 +43,7 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 
 - 独立 Ed25519 密钥由 CI secret `V3_SYSTEM_RELEASE_PRIVATE_KEY` 提供。宿主保存 64 位十六进制公钥，签名原始长度为 64 字节，按原始 JSON 字节验签。
 - v1 平台发行 `system-ci-*` 的必需字段为 `schema_version=1`、`release`、`sequence`、`published_at`、`platform`、`build_manifests`、`control`、`account`、`compatibility`、`data_compatibility`、`changes`、`bundle`。平台固定为 `linux/amd64`。
-- 组件字段固定为 `release`、`reference`、`registry_digest`、`config_digest`、`revision`、`unpacked_bytes`、`content_sha256`。镜像仓固定为 `ghcr.io/silentflower/vibebench-v3-{control|account}`，精确来源为 `v3-ci-*`。仓库摘要、配置摘要和内容摘要分别校验。
+- 组件字段固定为 `release`、`reference`、`registry_digest`、`config_digest`、`revision`、`unpacked_bytes`、`content_sha256`。正式发布镜像仓为 `ghcr.io/silentflower/flower2api-{control|account}`；读取端精确兼容同角色、同批次的历史 `vibebench-v3-{control|account}`，精确来源为 `v3-ci-*`。仓库摘要、配置摘要和内容摘要分别校验。
 - v1 兼容能力固定为 `updater=1`、`gate=1`、`bridge=1`、`layout=2`、`cli_install=2`、`credential_ownership=1`、`account_protocols=[1]`。
 - 双库 `bench`、`gateway` 各有 `contract` 和 `rollback_compatible`。目标声明必须包含原版合同，才允许在线切换。默认策略仅认可自身合同。新增旧合同需要实际兼容验证。
 - 签名目录字段固定为 `schema_version=1`、`sequence`、`issued_at`、`expires_at`、`releases`。目录和签名从同一 Git commit 获取；序号不得低于最高已接受序号。发布有效期为 30 天，校验上限为 31 天。准备和安装需要新鲜目录；回退使用独立验签的已安装历史。
@@ -74,7 +74,7 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 
 - `V3_RELEASE` 表示平台来源；`V3_ACCOUNT_RELEASE` 表示选定账号镜像来源。共享只读门禁通过 `V3_UPDATE_GATE_DIR` 接入；调度器通过 `V3_UPDATE_SOCKET_DIR` 连接更新服务。
 - 账号私有 `runtime/account-image.json` 固定 `schema_version`、`environment_id`、`release`、`reference`、`image_id`、`protocol`，与真实 Docker image ID、标签及原角色归属共同核验。首次旧角色通过受控生命周期重建建立来源。
-- 仅平台变化且账号内容摘要相同时，保留原账号镜像、三角色容器 ID、环境代次及内核选择。账号内容变化时逐项重建原本运行的环境；原本停止或退休的环境保留状态。
+- 仅平台变化且账号内容摘要与仓库族均相同时，保留原账号镜像、三角色容器 ID、环境代次及内核选择。账号内容或仓库族变化时逐项重建原本运行的环境；原本停止或退休的环境保留状态。
 - 门禁 `admission.json` 固定 `schema_version`、`deployment`、`operation_id`、`epoch`、`phase`、`target_release`、`revision`、`created_at`；phase 为 `idle|blocked`。目录 0700、私有文件 0600，拒绝符号链接等不安全读取。接入后缺失或损坏门禁进入拒绝准入和对账路径。
 - 两端活动计数覆盖响应正文 EOF、错误及断连。批次排队等待属于待认领工作；有限分派事务和实际执行计入活动。维护期间保留待认领项，释放门禁或控制重启后继续调度。
 - 原工程或登录只能凭实际仍登记的有限作业续接。续接继续检查身份、时间窗口与配额；作业撤销后证明失效。
@@ -364,7 +364,7 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 - `test_source_layout`：新旧布局的两种组件身份相同；真实账号源码修改产生不同摘要；独立源码、上一版单仓、新部署目录和固定宿主包分别读取正确；新来源缺失时保持新路径；越界路径拒绝；新旧脚本在外部及含空格目录原样转发参数与退出状态。
 - `test_system_workflow`：真实 Git 在 `core.autocrlf=input` 下保留工程库 CRLF 字节，补丁空白上下文通过检查；固定源码包在仓库外独立导入。
 - 工程库迁移：逐项核对 Git blob、执行位及内容清单；新检出副本经正式快照的已登记上游补偿后，完整工程库验证通过。
-- `verify_system_update.py --migration-manifest <同批候选清单>`：离线真实 Docker 验证旧底座升级、原三角色/环境身份复用、内容变化重建、停止状态保留、回退及中断恢复。
+- `verify_system_update.py --migration-manifest <同批候选清单>`：离线真实 Docker 验证旧底座升级、同仓库同内容三角色复用、跨仓库或内容变化重建、环境身份及停止状态保留、新正式基线内回退和首次迁移失败恢复。
 
 ## Scenario: flower2api 构建缓存与有限并发验收
 
@@ -390,7 +390,7 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 - workers 严格为整数1或2，bool 拒绝；默认串行，发行工作流显式2。协调器先核验候选、迁移合同及全部签名来源，再分发最多两路单来源演练。
 - 各来源使用独立临时根、双库、UUID及容器，保留原安全参数和期限，完整执行两次迁移、新旧程序读写和快照恢复。首次失败通知共享停止状态，排队项停止，已启动项先执行原 finally 收口，再传播附来源 note 的原异常。
 - 全部来源成功后才原子写入证据，来源顺序沿受信目录，schema与checks字段维持原合同。每角色、每来源及总体耗时分别用 flower2api 性能事件记录。
-- 对外展示名为小写 `flower2api`；既有部署路径、镜像名、CLI／API、浏览器存储键及签名身份按原升级合同保留。默认 main 注册手动构建入口；其 build job 只允许本仓 v3／flower2api，main自身跳过。实际工作使用所选目标分支源码。
+- 对外展示名为小写 `flower2api`；既有部署路径、CLI／API、浏览器存储键及签名身份按原升级合同保留；镜像及容器名称遵循下方名称切换合同。默认 main 注册手动构建入口；其 build job 只允许本仓 v3／flower2api，main自身跳过。实际工作使用所选目标分支源码。
 
 ### 4. Validation & Error Matrix
 
@@ -422,3 +422,60 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 - 实际Buildx缓存导入故障与真实构建失败分别验证；实际两轮同源构建后用 `manage.inspect_images` 核对两镜像的标签、平台和摘要。
 - Vue与运行时页面构建、原浏览器验收覆盖展示名称所在页面及原交互；README的本地链接与历史来源正文保留核对。
 - GitHub缓存命中、恢复／保存和完整冷热耗时依赖批准推送后的外部CI验收。正式八发行的双路证据由下一次明确发行承接。两类结果分别记录。
+
+
+## Scenario: Flower2API 单部署名称切换与完整快照
+
+### 1. Scope / Trigger
+
+正式包、Compose 项目/网络、账号容器名称或固定宿主更新器交接发生变化时适用。v1.4.0 建立新的正式维护基线；当前旧来源和已签材料承担首次交接及失败恢复，后续正式升级与回退从该基线起算。持久目录、部署 ID、V3 配置、内部归属标签、签名发行身份及资源策略保持原合同。
+
+### 2. Signatures
+
+```python
+runtime_names.image_reference(role: str, release: str, *, namespace: str = '', legacy: bool = False) -> str
+runtime_names.matches_image_reference(reference: str, role: str, release: str, *, namespace: str = 'ghcr.io/silentflower') -> bool
+runtime_names.account_rebuild_required(before: dict, after: dict) -> bool
+runtime_names.deployment_network_names(deployment: str) -> tuple[str, str]
+runtime_names.account_container_prefix(deployment: str, *, legacy: bool = False) -> str
+```
+
+`POST /internal/v3/system-updates/environment` 输入保持 `operation_id,epoch,environment_id,generation,action,allowed_image_ids`，新增 `action=retire`。沿原内部鉴权和 `X-V3-Update-Token`；返回 `environment_id,generation,state,origin`，retire 成功为 stopped、原 generation、origin=null。
+
+### 3. Contracts
+
+- 新构建及正式发布单写 `flower2api-control/account:v3-<批次>`；正式前缀为 `ghcr.io/silentflower/`。旧读取仅接受精确仓库、角色和批次。原签名字节、仓库/配置/内容摘要及标签校验继续执行。数据库兼容演练从已验签 reference 取得仓库并按 registry_digest 拉取。
+- 新控制项目及网络为 `flower2api-<deployment>`。账号基名为 `flower2api-<deployment SHA256 前12位>-<完整环境ID>`，CLI/sender 继续原后缀，完整 sender 名最多63字节。网关只接纳本部署和环境的新/旧精确发送绑定，其余 URL、账号、版本、秘密校验继续执行。
+- `account_rebuild_required` 比较 content_sha256 和 reference 去除标签后的仓库。跨仓库即使内容相同也重建；同仓库同内容仅换标签继续复用。更新预览、选择、实际重建及恢复使用同一判断。
+- 固定宿主包 SOURCE_FILES 包含 `orchestrator/runtime_names.py`。已有 v2 沿同协议源码维护 SOP 刷新，精确冻结源码 SHA、ExecStart、策略与受信模板摘要，在 service/storage 锁下替换并核验原状态；失败恢复原文件、策略和服务。
+- 控制寻址必须只命中本部署新/旧受信网络之一。切换按实际 ID 停止控制角色；只删除冻结的原项目、原 ID/镜像且已停止的角色，继续核对同一操作/epoch 的 blocked 门禁。
+- 新控制网络上线后，只临时接入当前数据库登记且属于冻结环境集合的网络角色。核对原版/候选镜像、精确名称及全部归属标签，采用 `docker network connect --gw-priority=-1 --alias <原精确名>` 保留 tun0 默认出口。沿原 network-guard 更新管理白名单，地址只取本部署新网关及实际双控制 IP。已接网角色仍重新应用管理白名单；停止环境保持停止。
+- 维护快照对环境生命周期锁最多等待1秒。持续占锁仍阻断。宿主对切换/重建后的新鲜排空证明使用5秒重试窗口，单次请求沿原 HTTP 超时；最终 capture 在 blocked 阶段必须取得 ready=true 的完整快照才冻结角色来源。
+- 环境动作仅对两类副作用前409使用5秒重试窗口，单次请求沿原 HTTP 超时：`平台在途工作尚未排空`、`其他环境仍有在途工作或未知证据`。重放同一操作、epoch、代次及请求；身份冲突和提交结果未知沿原失败恢复处理。
+- 首次失败恢复旧解析器前，由候选程序沿持久 environment_intents 收口已登记新来源角色。retire 逐项核验原/候选最多两个精确镜像 ID、角色登记、CLI 孤儿、sender、作业及租约；允许兄弟环境的来源证据待恢复，全局 active 仍须为零。移除角色后保留账号、环境及 HOME，恢复继续服从 release_started 边界。restore 仍要求兄弟环境证据完整。
+- 新包可见性及匿名拉取在生产切换前验收。历史正式包保留；宿主回收继续保护当前、最近两个完整组合及全部容器/恢复引用。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 未知仓库、错角色/批次或摘要/签名冲突 | 拒绝读取、准备或切换 |
+| 控制网络缺失或同时命中新旧网络 | 拒绝寻址 |
+| 原角色 ID、镜像、项目、标签或停止状态不符 | 拒绝删除/接网 |
+| 快照持续未知或动作期限内未排空 | 保留阻塞，进入原失败恢复路径 |
+| retire 的 token、epoch、代次、允许镜像或实际活动不符 | 403/409，保留维护门禁 |
+| 原身份及源码证明一致，完整验收通过 | 持久提交并沿原状态机释放准入 |
+
+### 5. Scenarios and Examples
+
+- 正常：旧名部署排空并冻结完整来源，切换新控制项目和网络，临时交接账号管理连接，再逐项重建新名角色。原账号身份、HOME、策略和停止状态保留。
+- 边界：两个运行环境加一个停止环境迁移；短暂页面查询占锁结束后重新核验，持续锁和真实孤儿进程继续阻断。正式后继版本回退新基线时保留后来业务写入。
+- 错误用法：仅比较账号内容摘要就跳过跨仓库重建，或将一次缺失角色的快照持久为完整来源。正确处理：统一比较内容和仓库，并在 blocked capture 取得完整 ready 证明后冻结。
+- 错误用法：普通接网修改账号默认网关，或接网后绕开默认拒绝。正确处理：低网关优先级接入，并沿原 network-guard 只授权实际管理 IP。
+
+### 6. Tests Required
+
+- `test_runtime_names`、`test_publication`、`test_system_release`、`test_system_updater`：精确新写旧读、旧签名字节、跨仓库同内容重建、同仓库同内容复用及错误引用拒绝。
+- `test_system_host`：受信网络唯一性、冻结角色删除、已接网/停止角色、精确管理白名单、完整 capture、限定409重试、意图先持久及重复收口。
+- `test_system_update_snapshot_lock`：真实线程短锁释放后 ready；持续锁仍 blocked。`test_system_update_retirement` 与既有恢复测试：token/epoch/代次、未知角色/镜像/活动和部分恢复边界。
+- `verify_system_update.py --migration-manifest <候选清单>`：真实旧名部署进入新基线、两个运行环境和一个停止环境、真实 CLI 孤儿及取消、基线内升级/回退、控制验收失败、部分角色/进程中断恢复、镜像引用保护与精确回收。固定源码刷新另验成功、部分替换、导入失败及重启失败恢复，使用合成身份且真实模型调用为零。

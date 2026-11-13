@@ -186,6 +186,26 @@ class SystemUpdaterTests(unittest.TestCase):
         with self.assertRaises(UpdateConflict):
             self.engine.submit('install', body)
 
+    def test_equal_content_repository_migration_selects_new_account_source(self) -> None:
+        """同内容跨仓库也展示重建，并选择新签名来源。@return None。"""
+        self.fixture.build['release'] = 'ci-125-1'
+        for role, entry in self.fixture.build['images'].items():
+            entry['reference'] = f'ghcr.io/silentflower/flower2api-{role}:v3-ci-125-1'
+        self.fixture.manifest.write_text(json.dumps(self.fixture.build))
+        folder = self.root / 'releases/system-ci-125-1'
+        target = create_release(self.fixture.manifest, self.fixture.policy, folder,
+            self.fixture.key, [12, 1], '同内容仓库迁移')
+        self.assertEqual(target['account']['content_sha256'], self.old['account']['content_sha256'])
+        self.engine.state['catalog'] = create_index(folder / 'system-release.json', self.fixture.root / 'catalog.json',
+            self.fixture.root / 'new-catalog.json', self.fixture.key)
+        row = next(item for item in self.engine.releases()['releases'] if item['release'] == target['release'])
+        self.assertTrue(row['account_changed'])
+        self.engine.submit('install', self.request(target))
+        state = self.join()
+        self.assertEqual(state['operation']['phase'], 'succeeded')
+        self.assertEqual(state['components']['account']['reference'], target['account']['reference'])
+        self.assertEqual(state['components']['account']['release'], 'ci-125-1')
+
     def test_prepare_failure_keeps_current_and_gate_open(self) -> None:
         """准备失败保持原安装，维护副作用为零。
 

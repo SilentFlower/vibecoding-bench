@@ -101,8 +101,8 @@ class EnvironmentUpdate(BaseModel):
     :param epoch: 维护代次。
     :param environment_id: 精确环境身份。
     :param generation: 预期当前环境代次。
-    :param action: inspect、rebuild 或 stop。
-    :param allowed_image_ids: 原操作重建意图固化的镜像集合，仅用于部分恢复。
+    :param action: inspect、rebuild、stop、restore 或 retire。
+    :param allowed_image_ids: 原操作重建意图固化的镜像集合，用于部分恢复及回退收口。
     """
     model_config = ConfigDict(extra='forbid')
     operation_id: StrictStr
@@ -177,7 +177,8 @@ def runtime_snapshot(runtime) -> dict:
         try:
             with ExitStack() as locks:
                 guard = runtime.environment_lock(row['environment_id'])
-                if not guard.acquire(blocking=False):
+                # 更新页只读轮询也使用此锁；有界等待其收口，持续生命周期占锁继续阻断维护。
+                if not guard.acquire(timeout=1):
                     raise RuntimeError('环境生命周期仍在维护')
                 locks.callback(guard.release)
                 if runtime.environment_jobs(row['environment_id']):
@@ -424,9 +425,9 @@ def system_updates_router(runtime_provider) -> APIRouter:
             raise HTTPException(409, '维护操作或代次已经变化')
         runtime = runtime_provider()
         evidence = runtime_snapshot(runtime)
-        if body.action != 'restore' and not evidence['ready']:
+        if body.action not in ('restore', 'retire') and not evidence['ready']:
             raise HTTPException(409, '平台在途工作尚未排空')
-        if body.action not in ('inspect', 'rebuild', 'stop', 'restore'):
+        if body.action not in ('inspect', 'rebuild', 'stop', 'restore', 'retire'):
             raise HTTPException(400, '环境维护动作无效')
         connection = runtime.database()
         try:
@@ -438,21 +439,23 @@ def system_updates_router(runtime_provider) -> APIRouter:
             raise HTTPException(409, '环境身份或代次已经变化')
         row = dict(stored)
         with runtime.environment_lock(row['environment_id']):
-            if body.action == 'restore':
-                if evidence['active'] or any(item['blockers'] for item in evidence['environments'] if item['environment_id'] != row['environment_id']):
+            if body.action in ('restore', 'retire'):
+                if evidence['active'] or (body.action == 'restore' and any(item['blockers']
+                        for item in evidence['environments'] if item['environment_id'] != row['environment_id'])):
                     raise HTTPException(409, '其他环境仍有在途工作或未知证据')
                 try:
                     partial_restore_ready(runtime, row, dict(account) if account else None, body.allowed_image_ids)
                 except (OSError, ValueError) as error:
                     raise HTTPException(409, '部分角色恢复证据尚未完整核验') from error
             if body.action != 'inspect':
-                runtime._stop_environment(row, remove=body.action in ('rebuild', 'restore'))
+                # 历史回退先由新解析器收口角色；retire 保留账号行及 HOME，随后由旧生命周期重建。
+                runtime._stop_environment(row, remove=body.action in ('rebuild', 'restore', 'retire'))
                 runtime._update(row, state='stopped')
                 if body.action in ('rebuild', 'restore'):
                     if not account:
                         raise HTTPException(409, '环境缺少原始账号归属')
                     row, _ = runtime.ensure(dict(account))
         return {'environment_id': row['environment_id'], 'generation': row['generation'],
-            'state': row['state'], 'origin': image_origin(runtime, row)}
+            'state': row['state'], 'origin': None if body.action == 'retire' else image_origin(runtime, row)}
 
     return router

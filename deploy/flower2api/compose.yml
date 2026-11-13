@@ -1,4 +1,4 @@
-name: vibebench-v3-${V3_DEPLOYMENT_ID:?需要部署标识}
+name: flower2api-${V3_DEPLOYMENT_ID:?需要部署标识}
 services:
   gateway:
     image: ${V3_CONTROL_IMAGE:?需要管理镜像}
@@ -42,7 +42,7 @@ services:
       V3_ROLE: orchestrator
       V3_RELEASE: ${V3_RELEASE}
       V3_DEPLOYMENT_ID: ${V3_DEPLOYMENT_ID}
-      V3_NETWORK: vibebench-v3-${V3_DEPLOYMENT_ID}
+      V3_NETWORK: flower2api-${V3_DEPLOYMENT_ID}
       V3_ACCOUNT_IMAGE: ${V3_ACCOUNT_IMAGE:?需要账号镜像}
       V3_INTERNAL_TOKEN: ${V3_INTERNAL_TOKEN}
       V3_MAX_ACTIVE_ACCOUNTS: ${V3_MAX_ACTIVE_ACCOUNTS:-1}
@@ -82,7 +82,7 @@ services:
       options: {max-size: 10m, max-file: "3"}
 networks:
   v3:
-    name: vibebench-v3-${V3_DEPLOYMENT_ID}
+    name: flower2api-${V3_DEPLOYMENT_ID}
     labels:
       vibebench.product: v3
       vibebench.deployment: ${V3_DEPLOYMENT_ID}

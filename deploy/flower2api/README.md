@@ -26,7 +26,7 @@ gateway 显式使用 `TZ=Asia/Shanghai`，峰值预热的小时配置按北京�
 
 `v3-build.yml` 在 v3/flower2api 的 push、目标分支 PR 或手动触发时执行合同验证和两镜像构建，上传本地清单。该入口使用只读权限，发布操作为零。
 
-正式交付由 `v3-release.yml` 的手动入口执行：选择 v3 或 flower2api，明确勾选 `publish`，冻结当前提交并重新验证、构建，完成真实旧库升级和回退演练，再发布 `ghcr.io/silentflower/vibebench-v3-control`、`ghcr.io/silentflower/vibebench-v3-account`。统一标签继续为 `v3-ci-<run_id>-<run_attempt>`。签名私钥为必需配置，缺失时在构建前失败。
+正式交付由 `v3-release.yml` 的手动入口执行：选择 v3 或 flower2api，明确勾选 `publish`，冻结当前提交并重新验证、构建，完成真实旧库升级和恢复演练，再发布 `ghcr.io/silentflower/flower2api-control`、`ghcr.io/silentflower/flower2api-account`。统一标签继续为 `v3-ci-<run_id>-<run_attempt>`。签名私钥为必需配置，缺失时在构建前失败。本版建立 Flower2API 正式维护基线。当前旧来源和已签材料用于首次交接与失败恢复；现有单部署首次名称切换见[系统更新 SOP](SYSTEM-UPDATES.md#单部署镜像与容器名称切换)。
 
 现有 v3 实例沿原“系统更新”页面安装后继版本，继续使用原部署标识、数据根、账号身份及更新信任根。更早底座按[系统更新 SOP](SYSTEM-UPDATES.md)在原部署补齐能力。Flower2API 按后继小版本持续演进。
 

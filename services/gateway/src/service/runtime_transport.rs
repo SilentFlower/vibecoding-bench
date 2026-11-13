@@ -742,6 +742,19 @@ fn validate_binding(
     let endpoint = reqwest::Url::parse(&binding.endpoint)
         .map_err(|_| AppError::ServiceUnavailable("invalid sender endpoint".into()))?;
     let deployment_key = format!("{:x}", Sha256::digest(deployment.as_bytes()));
+    // 新名称省略 account 段以满足 DNS 标签长度；旧精确名称保留历史部署读取能力。
+    let hosts = [
+        format!(
+            "flower2api-{}-{}",
+            &deployment_key[..12],
+            binding.environment_id
+        ),
+        format!(
+            "v3-{}-account-{}",
+            &deployment_key[..12],
+            binding.environment_id
+        ),
+    ];
     if deployment.is_empty()
         || release.is_empty()
         || binding.release_id != release
@@ -750,15 +763,9 @@ fn validate_binding(
             .environment_id
             .bytes()
             .all(|byte| byte.is_ascii_hexdigit())
-        || endpoint.host_str()
-            != Some(
-                format!(
-                    "v3-{}-account-{}",
-                    &deployment_key[..12],
-                    binding.environment_id
-                )
-                .as_str(),
-            )
+        || !hosts
+            .iter()
+            .any(|host| endpoint.host_str() == Some(host.as_str()))
         || binding.account_id != account_id
         || binding.secret.len() < 32
         || endpoint.scheme() != "http"
@@ -1422,6 +1429,13 @@ mod tests {
             release_id: "test".into(),
         };
         assert!(validate_binding(&binding, 7, deployment, "test").is_ok());
+        let renamed = TransportBinding {
+            endpoint: format!("http://flower2api-{}-{environment_id}:8091", &key[..12]),
+            ..binding.clone()
+        };
+        assert!(validate_binding(&renamed, 7, deployment, "test").is_ok());
+        assert!(validate_binding(&renamed, 8, deployment, "test").is_err());
+        assert!(validate_binding(&renamed, 7, "other-deployment", "test").is_err());
         assert!(validate_binding(&binding, 8, deployment, "test").is_err());
         assert!(validate_binding(&binding, 7, "other-deployment", "test").is_err());
         assert!(validate_binding(&binding, 7, deployment, "other-release").is_err());
@@ -1429,6 +1443,11 @@ mod tests {
         assert!(validate_binding(&binding, 7, deployment, "").is_err());
         for endpoint in [
             format!("http://vibebench-v3-{deployment}-account-{environment_id}:8091"),
+            format!(
+                "http://flower2api-{}-account-{environment_id}:8091",
+                &key[..12]
+            ),
+            format!("http://flower2api-{}-{}:8091", &key[..12], "b".repeat(32)),
             format!("http://v3-{}-account-{}:8091", &key[..12], "b".repeat(32)),
             binding.endpoint.replace(":8091", ":8092"),
             binding.endpoint.replace("http://", "https://"),

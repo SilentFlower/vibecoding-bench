@@ -167,7 +167,7 @@ scripts/flower2api-stack stop --env <独立配置>
 
 **数据与凭据**：cc2api 拥有绑定账号、代理、OAuth 和唯一刷新权；bench 拥有环境、任务、持久目录及证据。两侧通过受控 API 协作。绑定 CLI HOME 仅发布 AT，删除 RT；401 沿用 managed 刷新流程。身份导入接受 Recorder 实际请求观察，或经指定官方版本实测验证的本地字段映射，并核对登录账号归属；来源未知或冲突时阻止同步。当前 2.1.293 的 device_id 来自固定 HOME 的 `.claude.json.userID`，不能用 Linux machine-id 或独立 machineID 替代，详见下方身份同步场景。
 
-**环境**：每账号一个固定 account 容器、完整 `/home/node` 和版本缓存。新环境的 `fingerprint_json.profile_version=2`；hostname 为独立随机 12 位小写十六进制，machine-id 为独立随机 32 位小写十六进制，MAC 为独立随机的本地管理单播地址。时区来自账号显式配置，locale 与地区成组持久化；未配置的新环境使用 `America/Los_Angeles` + `en_US.UTF-8`，IANA 时区自动处理夏令时；已有 UTC 或其它画像保持，generation=0 的已登记画像也不重算。环境 ID、profile、RAM/swap 不随 run、改名、停止唤醒或容器重建重算；旧记录缺 `profile_version` 时保持 legacy。重建可换 container ID，但保留 HOME 和环境身份。容器 DNS 为 `v3-<deployment_sha256前12位>-account-<environment_id>`，完整归属由产品/部署/角色/环境 labels 校验。只按本部署精确标签维护，不用宽前缀或 prune。
+**环境**：每账号一个固定 account 容器、完整 `/home/node` 和版本缓存。新环境的 `fingerprint_json.profile_version=2`；hostname 为独立随机 12 位小写十六进制，machine-id 为独立随机 32 位小写十六进制，MAC 为独立随机的本地管理单播地址。时区来自账号显式配置，locale 与地区成组持久化；未配置的新环境使用 `America/Los_Angeles` + `en_US.UTF-8`，IANA 时区自动处理夏令时；已有 UTC 或其它画像保持，generation=0 的已登记画像也不重算。环境 ID、profile、RAM/swap 不随 run、改名、停止唤醒或容器重建重算；旧记录缺 `profile_version` 时保持 legacy。重建可换 container ID，但保留 HOME 和环境身份。新建容器 DNS 为 `flower2api-<deployment_sha256前12位>-<environment_id>`；网关精确兼容历史 `v3-<deployment_sha256前12位>-account-<environment_id>`。sender 后缀完整名称最多63字节，完整归属由产品/部署/角色/环境 labels 校验。名称切换、跨仓库重建与首次失败恢复见[平台在线更新合同](../../platform/deploy/platform-online-update.md#scenario-flower2api-单部署名称切换与完整快照)。只按本部署精确标签维护，不用宽前缀或 prune。
 
 **调度**：
 
@@ -219,7 +219,7 @@ bench/flows/<account>/<task>/<run>/    固定兼容链接
 
 清单记录 `schema=3`、`bridge_protocol=1`、`layout_version=1`、默认 CLI、release、父/子仓 revision、dirty 标记、冻结内容 SHA256 及两个 image ID/平台。`images[role].digest` 保留构建机本地 Docker Id；containerd 可用 OCI 索引作为 Id，所以另保存 `config_digest`（docker save 中原始配置字节 SHA256），发布后 `registry_digest` 才是仓库 manifest/索引 digest。换 daemon 时只接受清单固定的配置或 OCI 根，角色/批次/提交/平台仍检查，不能因 ID 语义不同放弃核对。构建先冻结源码，标签/清单不能覆盖。启动检查清单组合、实际镜像 labels、宿主发布端口、名称/网络/挂载 realpath、数据归属及资源预算。重复 up 只复用本部署 gateway 的精确 5674 映射，其它进程和外部容器占用仍拒绝。 端口探测启用 `SO_REUSEADDR`，已关闭连接的 `TIME_WAIT` 不应延迟启动；真实 TCP 监听及外部 Docker NAT 发布仍必须拒绝，不能通过固定等待几十秒掩盖误判。
 
-**发布**：`.github/workflows/v3-build.yml` 只在 v3 ref 发布，联合 build 后使用 GITHUB_TOKEN（contents:read、packages:write）登录 GHCR；两个包为 `ghcr.io/silentflower/vibebench-v3-{control,account}`，标签 `v3-ci-<run_id>-<run_attempt>`，不写 latest/旧包。publish 校验 Action 的仓库、父提交与 run/attempt、干净构建来源和全新输出，独占 `.started` 标记禁止同次重试；失败保留现场，新 attempt 才重跑，不把仓库 denied 当成“未存在”。两件成功、仓库 digest 可核对且镜像包成功才写最终清单；原构建清单不改。
+**发布**：`.github/workflows/v3-build.yml` 执行候选构建。正式发布通过 `v3-release.yml` 的 v3/flower2api 手动入口及明确 publish 标记，联合 build 后使用 GITHUB_TOKEN（contents:write、packages:write）登录 GHCR；两个包为 `ghcr.io/silentflower/flower2api-{control,account}`，标签 `v3-ci-<run_id>-<run_attempt>`，不写 latest/旧包。publish 校验 Action 的仓库、父提交与 run/attempt、干净构建来源和全新输出，独占 `.started` 标记禁止同次重试；失败保留现场，新 attempt 才重跑，不把仓库 denied 当成“未存在”。两件成功、仓库 digest 可核对且镜像包成功才写最终清单；原构建清单不改。
 
 artifact `v3-release-<run_id>-<run_attempt>` 保存发布清单与同批 gzip 镜像包，保留14天；`bundle={name,sha256,size}` 核对完整包。pull 按 registry_digest 下载再建立受控标签，load 先核对名称/大小/SHA256；现有本地标签若镜像内容不同都拒绝覆盖。包不含部署配置/账号数据或 registry 登录资料；首次私有包不能匿名 pull 时使用同批 artifact，不在服务器保存 PAT或自动改变包可见性。
 

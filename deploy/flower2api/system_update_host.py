@@ -13,10 +13,12 @@ import time
 from contextlib import closing
 from pathlib import Path
 from urllib.parse import quote
+from urllib.error import HTTPError
 from urllib.request import ProxyHandler, Request, build_opener
 
 from manage import _check_local_reference, _local_image_matches, _container_image_matches, load_bundle, load_environment
 from runtime_files import atomic_json, atomic_text
+from runtime_names import account_container_prefix, account_rebuild_required, deployment_network_names, image_reference
 from system_update_contract import DOWNLOAD_ROOT, ROLES, ReleaseRedirect, fetch_bytes, safe_read, strict_json, validate_migration_plan
 from system_update_gate import read_gate
 from system_update_database import assert_quiescent, create_snapshot, restore_snapshot, rotate_snapshots
@@ -110,7 +112,11 @@ class HostDeployment:
             token = values['V3_ADMIN_PASSWORD']
         else:
             control = self.controls()['orchestrator']
-            network = 'vibebench-v3-' + self.policy['deployment']
+            networks = [name for name in deployment_network_names(self.policy['deployment'])
+                if name in control['NetworkSettings']['Networks']]
+            if len(networks) != 1:
+                raise ValueError('控制服务的部署网络缺失或存在歧义')
+            network = networks[0]
             address = str(ipaddress.IPv4Address(control['NetworkSettings']['Networks'][network]['IPAddress']))
             base = 'http://' + address + ':8000'
             token = values['V3_INTERNAL_TOKEN']
@@ -297,6 +303,13 @@ class HostDeployment:
                     {**current['selection']['control'], 'digest': current['selection']['control']['config_digest']}):
                 raise ValueError('实际控制服务与当前安装记录不符')
         evidence = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+        deadline = time.monotonic() + 5
+        while evidence.get('phase') == 'blocked' and evidence.get('ready') is not True:
+            # 已排空后的冻结必须使用完整快照；历史程序的只读占锁不能变成缺失角色来源。
+            if time.monotonic() >= deadline:
+                raise ValueError('维护冻结快照仍有未收口活动或未知证据')
+            time.sleep(0.1)
+            evidence = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
         return {'controls': {role: {'id': item['Id'], 'image_id': item['Image']} for role, item in controls.items()},
             'env_sha256': hashlib.sha256(safe_read(self.env, private=True)).hexdigest(),
             'metadata': self.metadata(), 'environments': evidence['environments']}
@@ -335,6 +348,127 @@ class HostDeployment:
                 raise ValueError('受信 Compose 模板已经变化')
         docker('compose', '--env-file', str(self.env), '-f', self.policy['compose_file'],
             '-f', self.policy['override_file'], *arguments, timeout=240)
+
+    def _settled(self, operation: dict) -> dict:
+        """有界等待切换后的完整排空证明，兼容历史更新页的短暂只读占锁。
+
+        :param operation: 仍持有维护门禁的冻结操作。
+        :return: 新鲜排空证明；期限内仍有阻塞时保留最终阻塞事实。
+        """
+        deadline = time.monotonic() + 5
+        while True:
+            evidence = self.drained(operation)
+            if evidence['ready'] or time.monotonic() >= deadline:
+                return evidence
+            time.sleep(0.1)
+
+    def _environment_request(self, body: dict) -> dict:
+        """仅重试服务明确在副作用前拒绝的排空冲突，沿用原身份和代次。
+
+        :param body: 原操作、环境、代次和动作的冻结请求。
+        :return: 实际维护回执；其它错误直接保留原失败路径。
+        """
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                return self.request('orchestrator', '/internal/v3/system-updates/environment', body, timeout=180)
+            except HTTPError as error:
+                if error.code != 409:
+                    raise
+                try:
+                    reply = strict_json(error.read(4096), 4096)
+                except (ValueError, UnicodeError):
+                    raise error
+                if (not isinstance(reply, dict) or reply.get('detail') not in (
+                        '平台在途工作尚未排空', '其他环境仍有在途工作或未知证据')
+                        or time.monotonic() >= deadline):
+                    raise
+                error.close()
+                time.sleep(0.1)
+
+    def _stop_controls(self) -> None:
+        """按已核对的实际 ID 停止控制角色，兼容 Compose 项目改名。@return None。"""
+        controls = self.controls(require_both=False)
+        for role in ('orchestrator', 'gateway'):
+            item = controls.get(role)
+            if item and item['State']['Running']:
+                docker('stop', '-t', '30', item['Id'])
+
+    def _retire_legacy_controls(self, operation: dict) -> None:
+        """收口原项目的精确控制角色，避免新项目与原端口并存。
+
+        :param operation: 含维护代次与原控制 ID 的持久操作。
+        :return: None；归属或生命周期变化时拒绝删除。
+        """
+        gate = read_gate(self.gate, self.policy['deployment'])
+        if gate['phase'] != 'blocked' or gate['epoch'] != operation['epoch'] or gate['operation_id'] != operation['operation_id']:
+            raise ValueError('控制角色改名的维护归属失效')
+        current, legacy = deployment_network_names(self.policy['deployment'])
+        for role, item in self.controls(require_both=False).items():
+            project = item['Config']['Labels'].get('com.docker.compose.project')
+            if project == current:
+                continue
+            before = operation['before']['controls'].get(role, {})
+            if (project != legacy or item['Id'] != before.get('id') or item['Image'] != before.get('image_id')
+                    or item['State']['Running']):
+                raise ValueError('原项目控制角色的归属或停止状态不符')
+            docker('rm', item['Id'])
+
+    def _connect_legacy_environments(self, operation: dict) -> None:
+        """让新控制网络临时访问已登记的原账号，逐项重建沿原 owner 执行。
+
+        :param operation: 原环境快照及候选来源已冻结的维护操作。
+        :return: None；未知角色或来源不参与网络连接。
+        """
+        target, legacy = deployment_network_names(self.policy['deployment'])
+        network = json.loads(docker('network', 'inspect', target))[0]
+        labels = network.get('Labels') or {}
+        if labels.get('vibebench.product') != 'v3' or labels.get('vibebench.deployment') != self.policy['deployment']:
+            raise ValueError('目标网络归属无效')
+        managers = {str(ipaddress.IPv4Address(item['Gateway'])) for item in network.get('IPAM', {}).get('Config') or []
+            if item.get('Gateway')}
+        for control in self.controls().values():
+            address = control['NetworkSettings']['Networks'].get(target, {}).get('IPAddress')
+            if not control['State']['Running'] or not address:
+                raise ValueError('新控制角色的管理地址尚未就绪')
+            managers.add(str(ipaddress.IPv4Address(address)))
+        if not managers:
+            raise ValueError('新网络管理地址缺失')
+        frozen = {item['environment_id']: item for item in operation['before']['environments']}
+        with closing(sqlite3.connect((self.data / 'bench/db.sqlite').as_uri() + '?mode=ro', uri=True)) as connection:
+            rows = connection.execute('SELECT environment_id,network_container_id FROM account_environments').fetchall()
+        candidate = self.verify_images(operation['selected']['selection'])['account']['Id']
+        for environment_id, identifier in rows:
+            if environment_id not in frozen or not identifier:
+                continue
+            # 部分角色重建可能已移除原网络，恢复路径继续由既有环境意图核对其余角色。
+            present = docker('ps', '-aq', '--filter', 'id=' + identifier).split()
+            if not present:
+                if environment_id in operation.get('environment_intents', {}):
+                    continue
+                raise ValueError('原账号网络角色缺失')
+            item = json.loads(docker('inspect', identifier))[0]
+            labels = item['Config'].get('Labels') or {}
+            original = frozen[environment_id].get('roles', {}).get('network', {})
+            expected = {'vibebench.product': 'v3', 'vibebench.deployment': self.policy['deployment'],
+                'vibebench.environment': environment_id, 'vibebench.role': 'account-network'}
+            names = {account_container_prefix(self.policy['deployment'], legacy=old) + environment_id for old in (False, True)}
+            if (item['Id'] != identifier or item['Image'] not in (original.get('image_id'), candidate)
+                    or any(labels.get(key) != value for key, value in expected.items())
+                    or item['Name'].lstrip('/') not in names):
+                raise ValueError('账号网络角色的来源或名称不符')
+            if not item['State']['Running']:
+                # 原停止环境保持停止，后续由原生命周期按候选配置唤醒。
+                continue
+            attached = item['NetworkSettings']['Networks']
+            if target not in attached:
+                if legacy not in attached:
+                    raise ValueError('原账号网络挂载不符')
+                # 次级网络不能接管默认网关；账号出口继续由原 tun0 与代理链持有。
+                docker('network', 'connect', '--gw-priority=-1', '--alias', item['Name'].lstrip('/'), target, identifier)
+            # 新网段的控制 IP 必须经原默认拒绝入口授权，单纯接网不能穿过旧管理白名单。
+            docker('exec', '--env', 'V3_MANAGEMENT_ADDRESSES=' + json.dumps(sorted(managers)), identifier,
+                'python3', '/usr/local/bin/v3-network-guard')
 
     def _stage_selection(self, operation: dict, selected: dict) -> None:
         """仅切换两个控制服务，所有账号操作继续由目标运行时执行。
@@ -376,9 +510,11 @@ class HostDeployment:
         folder = self.root / 'operations' / operation['operation_id']
         candidate = safe_read(folder / 'candidate.env', private=True).decode()
         # 原门禁和排空证明仍被持有；通用 stop 会影响账号容器，所以仅指定控制服务。
-        self._compose('stop', '-t', '30', 'orchestrator', 'gateway')
+        self._stop_controls()
+        self._retire_legacy_controls(operation)
         atomic_text(self.env, candidate)
         self._compose('up', '-d', '--no-deps', 'gateway', 'orchestrator')
+        self._connect_legacy_environments(operation)
 
     def wait_controls(self, deadline: float) -> None:
         """等待实际双端服务可读，保留总截止期限。
@@ -404,7 +540,8 @@ class HostDeployment:
         :return: None。
         """
         self._stage_selection(operation, selected)
-        self._compose('stop', '-t', '30', 'orchestrator', 'gateway')
+        self._retire_rollback_environments(operation, selected, save)
+        self._stop_controls()
         if any(item['State']['Running'] for item in self.controls().values()):
             raise ValueError('数据库快照前控制服务仍在运行')
         gate = read_gate(self.gate, self.policy['deployment'])
@@ -416,6 +553,45 @@ class HostDeployment:
         operation['database_snapshot'] = {'state': 'verified', 'completed_at': snapshot['completed_at'],
             'bytes': sum(item['size'] for item in snapshot['databases'].values())}
         save()
+
+    def _retire_rollback_environments(self, operation: dict, selected: dict, save) -> None:
+        """由当前所有者收口新包角色，供历史旧解析器按原来源重建。
+
+        :param operation: 冻结的原环境、维护代次和可恢复意图。
+        :param selected: 历史目标组合。
+        :param save: 副作用前后的持久回调。
+        :return: None；在途或归属不符时沿原恢复路径收口。
+        """
+        before, target = operation['original']['selection']['account'], selected['selection']['account']
+        if (before['reference'] != image_reference('account', before['release'], namespace='ghcr.io/silentflower')
+                or target['reference'] != image_reference('account', target['release'], namespace='ghcr.io/silentflower', legacy=True)):
+            return
+        for original in operation['before']['environments']:
+            identifier = original['environment_id']
+            if (not any(item['state'] == 'running' for item in original.get('roles', {}).values())
+                    or identifier in operation.get('environment_retired', {})):
+                continue
+            evidence = self._settled(operation)
+            if not evidence['ready']:
+                raise ValueError('历史回退收口前仍有在途活动')
+            current = next(item for item in evidence['environments'] if item['environment_id'] == identifier)
+            if current['generation'] != original['generation'] or current.get('roles') != original.get('roles'):
+                raise ValueError('历史回退前环境身份已变化')
+            frozen = self.environment_cpu(current)
+            if all(value >= 10_000_000 for value in frozen.values()):
+                operation.setdefault('environment_cpu_before', {})[identifier] = frozen
+            elif (self.data / 'bench/environments' / identifier / 'runtime/cpu-resources.json').exists():
+                raise ValueError('历史回退前的CPU策略需要对账')
+            operation.setdefault('environment_intents', {})[identifier] = {
+                'generation': current['generation'], 'allowed_image_ids': list({
+                    *[item['image_id'] for item in original['roles'].values()],
+                    self.verify_images(selected['selection'])['account']['Id']})}
+            save()
+            result = self._environment_request({'operation_id': operation['operation_id'], 'epoch': operation['epoch'],
+                    'environment_id': identifier, 'generation': current['generation'], 'action': 'retire',
+                    'allowed_image_ids': operation['environment_intents'][identifier]['allowed_image_ids']})
+            operation.setdefault('environment_retired', {})[identifier] = result
+            save()
 
     def migrate_databases(self, operation: dict, plan: dict, save) -> None:
         """在精确候选镜像内离线执行固定维护入口。
@@ -600,21 +776,22 @@ class HostDeployment:
         :param save: 每一步副作用后的持久回调。
         :return: None。
         """
-        if operation['original']['selection']['account']['content_sha256'] == selected['selection']['account']['content_sha256']:
+        if not account_rebuild_required(operation['original']['selection']['account'], selected['selection']['account']):
             return
         for original in operation['before']['environments']:
             if not any(item['state'] == 'running' for item in original.get('roles', {}).values()):
                 continue
-            evidence = self.drained(operation)
+            evidence = self._settled(operation)
             current = next(item for item in evidence['environments'] if item['environment_id'] == original['environment_id'])
-            if current.get('origin', {}).get('release') == selected['selection']['account']['release']:
+            if (current.get('origin') or {}).get('release') == selected['selection']['account']['release']:
                 frozen = operation.get('environment_cpu_before', {}).get(current['environment_id'])
                 if frozen is not None:
                     self.environment_cpu(current, frozen)
                 continue
             if not evidence['ready']:
                 raise ValueError('账号更新期间出现新的阻塞活动')
-            if current['environment_id'] not in operation.setdefault('environment_cpu_before', {}):
+            if (current['environment_id'] not in operation.setdefault('environment_cpu_before', {})
+                    and current['environment_id'] not in operation.get('environment_retired', {})):
                 frozen = self.environment_cpu(current)
                 if all(value >= 10_000_000 for value in frozen.values()):
                     operation['environment_cpu_before'][current['environment_id']] = frozen
@@ -626,9 +803,8 @@ class HostDeployment:
                     *[item['image_id'] for item in original.get('roles', {}).values()],
                     self.verify_images(selected['selection'])['account']['Id']})}
             save()
-            result = self.request('orchestrator', '/internal/v3/system-updates/environment',
-                {'operation_id': operation['operation_id'], 'epoch': operation['epoch'],
-                    'environment_id': current['environment_id'], 'generation': current['generation'], 'action': 'rebuild'}, timeout=180)
+            result = self._environment_request({'operation_id': operation['operation_id'], 'epoch': operation['epoch'],
+                'environment_id': current['environment_id'], 'generation': current['generation'], 'action': 'rebuild'})
             fresh = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
             rebuilt = next(item for item in fresh['environments'] if item['environment_id'] == current['environment_id'])
             frozen = operation['environment_cpu_before'].get(current['environment_id'])
@@ -680,14 +856,14 @@ class HostDeployment:
             == selected['release']['data_compatibility']['gateway']['contract'])
         if (restoring or same_contract) and after['software'] != before['software']:
             self.restore_software(before['software'], after['software'])
-        evidence = self.drained(operation)
+        evidence = self._settled(operation)
         if not evidence['ready']:
             raise ValueError('更新验收存在未收口工作或未知证据')
         for environment_id, expected_cpu in operation.get('environment_cpu_before', {}).items():
             current = next(item for item in evidence['environments'] if item['environment_id'] == environment_id)
             if self.environment_cpu(current) != expected_cpu:
                 raise ValueError('更新或恢复后的CPU额度与维护前不符')
-        if operation['original']['selection']['account']['content_sha256'] == operation['selected']['selection']['account']['content_sha256']:
+        if not account_rebuild_required(operation['original']['selection']['account'], operation['selected']['selection']['account']):
             for original in operation['before']['environments']:
                 current = next(item for item in evidence['environments'] if item['environment_id'] == original['environment_id'])
                 if current['generation'] != original['generation'] or current.get('roles') != original.get('roles'):
@@ -773,7 +949,8 @@ class HostDeployment:
         if actual not in (before, candidate):
             raise ValueError('恢复发现外部修改的部署配置')
         self.stop_database_jobs(operation)
-        self._compose('stop', '-t', '30', 'orchestrator', 'gateway')
+        self._retire_restore_environments(operation, save)
+        self._stop_controls()
         if operation.get('database_snapshot') and not operation.get('release_started') and not operation.get('database_restored'):
             assert_quiescent(self.data)
             self.capture_restore_bindings(operation, folder / 'database-snapshot', save)
@@ -787,17 +964,18 @@ class HostDeployment:
         if operation.get('database_restored') and not operation.get('release_started'):
             self.restore_environment_bindings(operation, save)
         atomic_text(self.env, before.decode())
+        self._retire_legacy_controls(operation)
         self._compose('up', '-d', '--no-deps', 'gateway', 'orchestrator')
+        self._connect_legacy_environments(operation)
         self.wait_controls(time.monotonic() + 180)
-        if original['selection']['account']['content_sha256'] != operation['selected']['selection']['account']['content_sha256']:
+        if account_rebuild_required(original['selection']['account'], operation['selected']['selection']['account']):
             # 已持久登记的重建意图允许收口本操作造成的部分角色，未知活动仍拒绝。
             for environment_id, intent in operation.get('environment_intents', {}).items():
                 evidence = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
                 current = next(item for item in evidence['environments'] if item['environment_id'] == environment_id)
-                result = self.request('orchestrator', '/internal/v3/system-updates/environment',
-                    {'operation_id': operation['operation_id'], 'epoch': operation['epoch'],
+                result = self._environment_request({'operation_id': operation['operation_id'], 'epoch': operation['epoch'],
                         'environment_id': environment_id, 'generation': current['generation'],
-                        'action': 'restore', 'allowed_image_ids': intent['allowed_image_ids']}, timeout=180)
+                        'action': 'restore', 'allowed_image_ids': intent['allowed_image_ids']})
                 frozen = operation.get('environment_cpu_before', {}).get(environment_id)
                 if frozen is not None:
                     fresh = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
@@ -807,6 +985,40 @@ class HostDeployment:
                 save()
         self.health(operation, original, restoring=True)
         self.release(operation)
+
+    def _retire_restore_environments(self, operation: dict, save) -> None:
+        """失败恢复旧解析器之前，用当前候选程序收口本操作的角色。
+
+        :param operation: 含原版、候选及已持久环境意图的操作。
+        :param save: 副作用前后持久回调。
+        :return: None；候选程序或部分角色证明不可核验时保持维护关闭。
+        """
+        original = operation['original']['selection']['account']
+        candidate = operation['selected']['selection']['account']
+        pending = set(operation.get('environment_intents', {})) - set(operation.get('environment_restore_retired', {}))
+        if (not pending or original['reference'] != image_reference('account', original['release'],
+                namespace='ghcr.io/silentflower', legacy=True)
+                or candidate['reference'] != image_reference('account', candidate['release'], namespace='ghcr.io/silentflower')):
+            return
+        # 多个新来源同时存在时，旧解析器会把兄弟环境都判为未知，须先由新所有者逐项收口。
+        self._stop_controls()
+        self._retire_legacy_controls(operation)
+        folder = self.root / 'operations' / operation['operation_id']
+        atomic_text(self.env, safe_read(folder / 'candidate.env', private=True).decode())
+        self._compose('up', '-d', '--no-deps', 'gateway', 'orchestrator')
+        self._connect_legacy_environments(operation)
+        self.wait_controls(time.monotonic() + 180)
+        for identifier in sorted(pending):
+            evidence = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+            current = next(item for item in evidence['environments'] if item['environment_id'] == identifier)
+            intent = operation['environment_intents'][identifier]
+            if not intent['generation'] <= current['generation'] <= intent['generation'] + 1:
+                raise ValueError('失败恢复收口发现外来环境代次')
+            result = self._environment_request({'operation_id': operation['operation_id'], 'epoch': operation['epoch'],
+                    'environment_id': identifier, 'generation': current['generation'], 'action': 'retire',
+                    'allowed_image_ids': intent['allowed_image_ids']})
+            operation.setdefault('environment_restore_retired', {})[identifier] = result
+            save()
 
     def cleanup(self, current: dict, history: list[dict], active: list[dict]) -> dict:
         """按精确历史来源和所有容器引用定向清理，保留完整恢复集合。

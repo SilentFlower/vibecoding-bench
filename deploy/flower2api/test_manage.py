@@ -62,6 +62,17 @@ class PreflightTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "网络"):
                 manage.preflight(self.values)
 
+    def test_new_foreign_network_and_container_names_reject(self) -> None:
+        """新品牌名称也必须通过原部署归属检查。@return None。"""
+        with patch.object(manage, 'command', side_effect=['', '{"Name":"flower2api-test"}', '[{"Labels":{}}]']):
+            with self.assertRaisesRegex(ValueError, '网络'):
+                manage.preflight(self.values)
+        for name in ('flower2api-test-gateway-1', manage.account_container_prefix('test') + 'a' * 32 + '-cli'):
+            container = {'Name': '/' + name, 'Config': {'Labels': {}}, 'Mounts': []}
+            with self.subTest(name=name), patch.object(manage, 'command', side_effect=['synthetic', json.dumps([container])]):
+                with self.assertRaisesRegex(ValueError, '容器名称'):
+                    manage.preflight(self.values)
+
     def test_real_occupied_port_rejects_without_changing_owner(self) -> None:
         """真实 socket 占用应在 up 之前失败。@return None。"""
         with socket.socket() as listener:

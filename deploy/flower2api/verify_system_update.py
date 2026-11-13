@@ -27,6 +27,7 @@ from urllib.error import HTTPError
 
 import docker
 import requests
+import system_update_host
 
 from install_system_updater import finalize_installation, prepare_installation
 from manage import REPO, _image_config_digest
@@ -121,27 +122,58 @@ def worker(policy_path: Path, fault: str | None) -> None:
     root = Path(policy['state_root'])
     descriptor = os.open(root / 'service.lock', os.O_CREAT | os.O_RDWR, 0o600)
     fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    def diagnostic_docker(*arguments, timeout=120):
+        """保留隔离 Docker 失败事实。:param arguments: 固定参数。:param timeout: 秒。@return 标准输出。"""
+        result = subprocess.run(['docker', *arguments], capture_output=True, text=True, timeout=timeout)
+        if result.returncode:
+            atomic_json(root / 'worker-error.json', {'arguments': list(arguments), 'returncode': result.returncode,
+                'stderr': result.stderr[-16000:], 'stdout': result.stdout[-16000:]})
+            raise RuntimeError('隔离 Docker 部署动作失败')
+        return result.stdout
+    system_update_host.docker = diagnostic_docker
     class FaultHost(HostDeployment):
         """正式宿主动作之后注入故障，保留真实持久现场。"""
+
+        def drained(self, operation):
+            """保留隔离排空阻塞事实。:param operation: 本次操作。@return 排空证明。"""
+            evidence = super().drained(operation)
+            if not evidence['ready']:
+                atomic_json(root / 'worker-error.json', {'phase': 'drained', 'evidence': evidence})
+            return evidence
 
         def request(self, service, path, body=None, timeout=15):
             """保留隔离夹具的 HTTP 失败证据。:param service: 服务。:param path: 路径。:param body: 载荷。:param timeout: 秒。@return 实际响应。"""
             try:
                 return super().request(service, path, body, timeout)
             except HTTPError as error:
+                detail = error.read(4096)
                 logs = {}
                 for role, container in self.controls(require_both=False).items():
                     captured = subprocess.run(['docker', 'logs', '--tail', '80', container['Id']], capture_output=True, timeout=10)
                     logs[role] = (captured.stdout + captured.stderr).decode(errors='replace')[-16000:]
                 atomic_json(root / 'worker-error.json', {'service': service, 'path': path, 'status': error.code,
-                    'detail': error.read(4096).decode(errors='replace'), 'traceback': traceback.format_exc()[-6000:], 'logs': logs})
-                raise
+                    'detail': detail.decode(errors='replace'), 'traceback': traceback.format_exc()[-6000:], 'logs': logs})
+                replay = HTTPError(error.filename, error.code, error.msg, error.headers, io.BytesIO(detail))
+                error.close()
+                raise replay from error
 
         def switch(self, operation, selected) -> None:
             """实际切换后模拟进程掉电。:param operation: 原操作。:param selected: 候选。@return None。"""
-            super().switch(operation, selected)
+            try:
+                super().switch(operation, selected)
+            except Exception:
+                atomic_json(root / 'switch-error.json', {'traceback': traceback.format_exc()})
+                raise
             if fault == 'switched-crash':
                 os._exit(92)
+
+        def restore(self, operation, save) -> None:
+            """保留恢复失败现场。:param operation: 原操作。:param save: 持久回调。@return None。"""
+            try:
+                super().restore(operation, save)
+            except Exception:
+                atomic_json(root / 'restore-error.json', {'traceback': traceback.format_exc()})
+                raise
 
         def migrate_databases(self, operation, plan, save) -> None:
             """真实迁移后注入进程掉电。:param operation: 操作。:param plan: 计划。:param save: 持久回调。@return None。"""
@@ -262,7 +294,9 @@ LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.v
         counter = int(uuid.uuid4().hex[:12], 16)
         releases, folders = [], []
         env = root / 'v3.env'
-        compose = REPO / 'deploy/flower2api/compose.yml'
+        compose = root / 'compose-before.yml'
+        # 初始栈沿历史项目/网络名，固定更新器安装包使用当前新模板，真实覆盖名称交接。
+        compose.write_text((REPO / 'deploy/flower2api/compose.yml').read_text().replace('flower2api-${V3_DEPLOYMENT_ID', 'vibebench-v3-${V3_DEPLOYMENT_ID'))
         override = REPO / 'deploy/flower2api/compose-updates.yml'
         values = {}
         business_token = None
@@ -342,18 +376,19 @@ LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.v
                 bundle.addfile(entry, io.BytesIO(payload))
             gateway.put_archive('/run/v3', archive.getvalue())
             proxy = client.containers.run(values['V3_CONTROL_IMAGE'], ['/fixtures/forwarding_network.py'], entrypoint='python',
-                detach=True, network='vibebench-v3-' + deployment,
+                detach=True, network='vibebench-v3-' + deployment, ports={'1081/tcp': ('0.0.0.0', 0)},
                 labels={'vibebench.product': 'v3', 'vibebench.deployment': deployment, 'vibebench.role': 'verification'},
                 volumes={str(REPO / 'deploy/flower2api/fixtures'): {'bind': '/fixtures', 'mode': 'ro'},
                     str(proxy_data): {'bind': '/fixtures-data', 'mode': 'rw'}})
             wait_for(lambda: proxy.exec_run(['python', '-c', "import socket;socket.create_connection(('127.0.0.1',1081),timeout=1).close()"]).exit_code == 0,
                 '本地 DNS 与代理夹具未就绪')
             proxy.reload()
-            address = proxy.attrs['NetworkSettings']['Networks']['vibebench-v3-' + deployment]['IPAddress']
-            # 合成代理自己终止 DNS 和隧道，全部账号流量只在本次网络内处理。
+            address = client.networks.get('vibebench-v3-' + deployment).attrs['IPAM']['Config'][0]['Gateway']
+            proxy_port = int(proxy.attrs['NetworkSettings']['Ports']['1081/tcp'][0]['HostPort'])
+            # 经本地宿主端口访问合成代理，使账号网络切换后仍使用同一冻结代理配置。
             response = request('POST', '/admin/accounts', json={'name': 'synthetic-running', 'email': 'update@example.invalid',
                 'auth_type': 'oauth', 'access_token': 'synthetic-access', 'refresh_token': 'synthetic-refresh',
-                'expires_at': int((time.time() + 7200) * 1000), 'proxy_url': f'http://{address}:1081',
+                'expires_at': int((time.time() + 7200) * 1000), 'proxy_url': f'http://{address}:{proxy_port}',
                 'auto_poll_usage': False, 'auto_telemetry': False})
             assert response.status_code == 201, response.text[:512]
             gateway_account_id = response.json()['id']
@@ -364,13 +399,13 @@ LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.v
 from account_runtime import AccountRuntime
 r=AccountRuntime(docker.from_env(),main.BENCH_DATA,main.HOST_BENCH_DATA,main.get_db,main.derive_v3_fingerprint,main.cc2api_client)
 try:
- for name in ('synthetic-running','synthetic-stopped'):
+ for name in ('synthetic-running','synthetic-second','synthetic-stopped'):
   with main.get_db() as db:
-   aid=db.execute('INSERT INTO accounts(name,profile_path,timezone,upstream_proxy_scheme,upstream_socks5_host,upstream_socks5_port,enabled,warmup_enabled) VALUES(?,?,?,?,?,?,0,0)',(name,'profiles/'+name,'Asia/Tokyo','http',PROXY,1081)).lastrowid
+   aid=db.execute('INSERT INTO accounts(name,profile_path,timezone,upstream_proxy_scheme,upstream_socks5_host,upstream_socks5_port,enabled,warmup_enabled) VALUES(?,?,?,?,?,?,0,0)',(name,'profiles/'+name,'Asia/Tokyo','http',PROXY,PROXY_PORT)).lastrowid
    account=dict(db.execute('SELECT * FROM accounts WHERE id=?',(aid,)).fetchone())
-  if name.endswith('running'):
-   with main.get_db() as db:db.execute('UPDATE accounts SET cc2api_account_id=?,enabled=1 WHERE id=?',(REMOTE,aid))
-   account.update(cc2api_account_id=REMOTE,enabled=1)
+  if not name.endswith('stopped'):
+   with main.get_db() as db:db.execute('UPDATE accounts SET cc2api_account_id=?,enabled=1 WHERE id=?',(REMOTE if name.endswith('running') else None,aid))
+   account.update(cc2api_account_id=REMOTE if name.endswith('running') else None,enabled=1)
    row=r._row(name,aid,'Asia/Tokyo')
    import pathlib,base64
    ca=r._root(row)/'runtime/verification-ca.der';ca.parent.mkdir(parents=True,exist_ok=True);ca.write_bytes(base64.b64decode(CERTIFICATE))
@@ -378,11 +413,11 @@ try:
   else:
    row=r._row(name,aid,'Asia/Tokyo');r._update(row,state='stopped')
 finally:r.heartbeat_pool.shutdown()
-'''.replace('PROXY', repr(address)).replace('REMOTE', str(gateway_account_id)).replace('CERTIFICATE', repr(base64.b64encode((proxy_data / 'ca.der').read_bytes()).decode()))
+'''.replace('PROXY_PORT', str(proxy_port)).replace('PROXY', repr(address)).replace('REMOTE', str(gateway_account_id)).replace('CERTIFICATE', repr(base64.b64encode((proxy_data / 'ca.der').read_bytes()).decode()))
             result = runtime.exec_run(['python', '-c', code])
             assert result.exit_code == 0, result.output.decode(errors='replace')[-2000:]
             rows = account_rows()
-            assert rows[0]['state'] == 'ready' and rows[1]['state'] == 'stopped'
+            assert all(row['state'] == 'ready' for row in rows[:-1]) and rows[-1]['state'] == 'stopped'
             assert all(rows[0][key] for key in ('container_id', 'sender_container_id', 'network_container_id'))
 
         try:
@@ -396,7 +431,8 @@ finally:r.heartbeat_pool.shutdown()
                         else {role: candidate['images'][role]['reference'] for role in ('control', 'account')})
                     extra_arguments = ['--build-arg', 'CONTROL_BASE=' + bases['control'], '--build-arg', 'ACCOUNT_BASE=' + bases['account']]
                 for role in ('control', 'account'):
-                    reference = f'ghcr.io/silentflower/vibebench-v3-{role}:v3-{release}'
+                    prefix = 'vibebench-v3' if index == 0 else 'flower2api'
+                    reference = f'ghcr.io/silentflower/{prefix}-{role}:v3-{release}'
                     references.append(reference)
                     build_metadata = root / f'build-{index}-{role}.json'
                     subprocess.run(['docker', 'build', '--pull=false', '--target', role, '--metadata-file', str(build_metadata), '--build-arg', 'RELEASE=' + release,
@@ -462,12 +498,14 @@ finally:r.heartbeat_pool.shutdown()
                 for item in network.attrs.get('IPAM', {}).get('Config') or [] if item.get('Subnet')]
             routes = json.loads(subprocess.check_output(['ip', '-j', 'route', 'show']))
             occupied.extend(ipaddress.ip_network(item['dst']) for item in routes if item.get('dst') not in (None, 'default'))
-            subnet = next(ipaddress.ip_network(f'10.233.{index}.0/24') for index in range(200, 250)
-                if not any(ipaddress.ip_network(f'10.233.{index}.0/24').overlaps(item) for item in occupied if item.version == 4))
-            client.networks.create('vibebench-v3-' + deployment, driver='bridge',
-                ipam=docker.types.IPAMConfig(pool_configs=[docker.types.IPAMPool(subnet=str(subnet))]),
-                labels={'vibebench.product': 'v3', 'vibebench.deployment': deployment,
-                    'com.docker.compose.project': 'vibebench-v3-' + deployment, 'com.docker.compose.network': 'v3'})
+            subnets = [ipaddress.ip_network(f'10.233.{index}.0/24') for index in range(200, 250)
+                if not any(ipaddress.ip_network(f'10.233.{index}.0/24').overlaps(item) for item in occupied if item.version == 4)][:2]
+            assert len(subnets) == 2, '名称迁移验证需要两个独立测试网段'
+            for prefix, subnet in zip(('vibebench-v3-', 'flower2api-'), subnets):
+                client.networks.create(prefix + deployment, driver='bridge',
+                    ipam=docker.types.IPAMConfig(pool_configs=[docker.types.IPAMPool(subnet=str(subnet))]),
+                    labels={'vibebench.product': 'v3', 'vibebench.deployment': deployment,
+                        'com.docker.compose.project': prefix + deployment, 'com.docker.compose.network': 'v3'})
             subprocess.run(['docker', 'compose', '--env-file', str(env), '-f', str(compose), 'up', '-d'], check=True,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             wait_for(runtime_ready, '初始隔离控制服务未就绪')
@@ -531,9 +569,18 @@ assert engine.status()['migration_capability'] is True
             old_controls = {role: item.id for role, item in controls().items() if role in ('gateway', 'orchestrator')}
             # 真实未知 CLI 子进程必须阻塞切换，取消后保持原进程自然完成。
             cli = controls()['account']
-            assert cli.exec_run(['sleep', '8'], detach=True).exit_code is None
+            marker = '/tmp/verification-release-' + uuid.uuid4().hex
+            waiting = "from pathlib import Path; import sys,time\nwhile not Path(sys.argv[1]).exists(): time.sleep(0.1)\n"
+            # Docker exec 的进程属于管理命令；父进程退出后让子进程由 PID1 接管，才是真实孤儿。
+            launcher = ('import subprocess,sys; subprocess.Popen([sys.executable,"-c",sys.argv[1],sys.argv[2]],'
+                'stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)')
+            assert cli.exec_run(['python3', '-c', launcher, waiting, marker]).exit_code == 0
+            wait_for(lambda: json.loads(cli.exec_run(['python3', '-I', '/usr/local/bin/v3-cli-control', 'orphans']).output)['orphans'],
+                '真实 CLI 孤儿夹具未出现', timeout=10)
             cancellation = submit(1)
             wait_for(lambda: status()['operation']['phase'] == 'draining', '未观察到实际进程排空阶段', timeout=30)
+            wait_for(lambda: any('CLI' in reason for reason in status()['operation'].get('blockers') or []),
+                '实际 CLI 活动未形成排空阻塞', timeout=15)
             assert request('POST', '/v1/messages', json={'model': 'synthetic'}).status_code == 503
             response = request('POST', '/runtime/api/system-updates/operations/' + cancellation['operation_id'] + '/cancel',
                 json={'expected_revision': status()['revision']})
@@ -542,6 +589,9 @@ assert engine.status()['migration_capability'] is True
             assert result['phase'] == 'cancelled', result
             assert all(controls()[role].id == identity for role, identity in old_controls.items())
             passed('未知实际 CLI 活动阻断切换、新请求拒绝及取消等待', operation=result)
+            assert cli.exec_run(['touch', marker]).exit_code == 0
+            wait_for(lambda: json.loads(cli.exec_run(['python3', '-I', '/usr/local/bin/v3-cli-control', 'orphans']).output)['orphans'] == [],
+                '受控 CLI 夹具未自然结束', timeout=15)
             if candidate:
                 submit(1)
             else:
@@ -557,11 +607,17 @@ assert engine.status()['migration_capability'] is True
             result = wait_for(finished, '控制更新未结束')
             assert result['phase'] == 'succeeded', result
             assert status()['current_release'] == releases[1]['release']
-            assert status()['components']['account']['release'] == releases[0]['account']['release']
+            assert status()['components']['account']['release'] == releases[1]['account']['release']
             assert all(controls()[role].id != identity for role, identity in old_controls.items())
-            assert account_rows() == before_accounts
-            passed('真实迁移后切换并保留三角色ID、代次、画像和账号来源' if candidate else
-                '真实 TLS 长 API 完整收口后切换，保留三角色 ID、代次、画像和账号来源', operation=result)
+            assert all(controls()[role].name.startswith('flower2api-' + deployment + '-') for role in ('gateway', 'orchestrator'))
+            migrated = account_rows()
+            assert all(row['generation'] > before['generation'] and row['fingerprint_json'] == before['fingerprint_json']
+                for row, before in zip(migrated[:-1], before_accounts[:-1]))
+            assert migrated[-1] == before_accounts[-1]
+            assert all(client.containers.get(row[key]).name.startswith('flower2api-') for row in migrated[:-1]
+                for key in ('container_id', 'sender_container_id', 'network_container_id'))
+            passed('真实旧命名部署迁入 flower2api 正式基线', operation=result)
+            before_accounts = migrated
             submit(2)
             result = wait_for(finished, '账号组件重建未结束')
             assert result['phase'] == 'succeeded', result
@@ -570,46 +626,27 @@ assert engine.status()['migration_capability'] is True
             assert all(after_accounts[0][key] != before_accounts[0][key]
                 for key in ('container_id', 'sender_container_id', 'network_container_id'))
             assert after_accounts[0]['fingerprint_json'] == before_accounts[0]['fingerprint_json']
-            assert after_accounts[1] == before_accounts[1]
+            assert all(client.containers.get(after_accounts[0][key]).name.startswith('flower2api-')
+                for key in ('container_id', 'sender_container_id', 'network_container_id'))
+            assert after_accounts[-1] == before_accounts[-1]
+            assert all(row['generation'] > before['generation'] for row, before in zip(after_accounts[:-1], before_accounts[:-1]))
             passed('真实账号组件按需重建与停止环境保留', operation=result)
             if candidate:
                 with closing(sqlite3.connect(data / 'bench/db.sqlite')) as database, database:
                     database.execute("INSERT INTO topics(no,title) VALUES(-91212,'migration-later-business')")
-            submit(0, 'rollback')
+            submit(1, 'rollback')
             result = wait_for(finished, '显式回退未结束')
             assert result['phase'] == 'succeeded', result
-            assert status()['current_release'] == releases[0]['release']
+            assert status()['current_release'] == releases[1]['release']
             if candidate:
                 with closing(sqlite3.connect(data / 'bench/db.sqlite')) as database, database:
                     assert database.execute("SELECT 1 FROM topics WHERE no=-91212 AND title='migration-later-business'").fetchone()
-            passed('真实显式回退和历史来源恢复', operation=result)
-            if candidate:
-                # 在独立旧程序夹具中恢复“从未登记迁移”的旧库形态，实际制造只迁移一侧的状态。
-                for name, filename in (('bench', 'db.sqlite'), ('gateway', 'gateway.sqlite')):
-                    with closing(sqlite3.connect(data / name / filename)) as database, database:
-                        database.execute('DROP TABLE IF EXISTS system_schema_migrations')
-                start_worker('first-database-crash')
-                submit(2)
-                wait_for(lambda: child.poll() == 93, '第一库迁移后故障进程未退出')
-                assert read_gate(update_root / 'gate', deployment)['phase'] == 'blocked'
-                versions = []
-                for name, filename in (('bench', 'db.sqlite'), ('gateway', 'gateway.sqlite')):
-                    with closing(sqlite3.connect(data / name / filename)) as database:
-                        exists = database.execute("SELECT 1 FROM sqlite_master WHERE name='system_schema_migrations'").fetchone()
-                        versions.append(database.execute('SELECT MAX(version) FROM system_schema_migrations').fetchone()[0] if exists else 0)
-                assert versions == [1, 0], versions
-                start_worker()
-                result = wait_for(finished, '双库部分迁移恢复未结束')
-                assert result['phase'] == 'restored', result
-                for name, filename in (('bench', 'db.sqlite'), ('gateway', 'gateway.sqlite')):
-                    with closing(sqlite3.connect(data / name / filename)) as database:
-                        assert database.execute("SELECT 1 FROM sqlite_master WHERE name='system_schema_migrations'").fetchone() is None
-                passed('真实第一库迁移完成后进程中断及双库恢复', operation=result, versions_before_recovery=versions)
+            passed('正式后继版本回退新基线并保留后来业务数据', operation=result)
             start_worker('health')
             submit(2)
             result = wait_for(finished, '候选失败恢复未结束')
             assert result['phase'] == 'restored', result
-            assert status()['current_release'] == releases[0]['release']
+            assert status()['current_release'] == releases[1]['release']
             assert read_gate(update_root / 'gate', deployment)['phase'] == 'idle'
             passed('候选验收失败后真实控制服务恢复', operation=result)
             if candidate:
@@ -626,8 +663,8 @@ assert engine.status()['migration_capability'] is True
             result = wait_for(finished, '账号部分重建失败恢复未结束')
             assert result['phase'] == 'restored', result
             assert account_rows()[0]['state'] == 'ready'
-            assert account_rows()[1]['state'] == 'stopped'
-            assert status()['current_release'] == releases[0]['release']
+            assert account_rows()[-1]['state'] == 'stopped'
+            assert status()['current_release'] == releases[1]['release']
             passed('真实账号缺失部分角色后恢复原镜像和身份', operation=result)
             start_worker('switched-crash')
             submit(3)
@@ -636,9 +673,9 @@ assert engine.status()['migration_capability'] is True
             start_worker()
             result = wait_for(finished, '独立执行器重启恢复未结束')
             assert result['phase'] == 'restored', result
-            assert status()['current_release'] == releases[0]['release']
+            assert status()['current_release'] == releases[1]['release']
             passed('实际切换后进程中断与持久恢复', operation=result)
-            retained = client.containers.create(releases[1]['control']['reference'], ['-c', 'pass'], entrypoint='python',
+            retained = client.containers.create(releases[0]['account']['reference'], ['-c', 'pass'], entrypoint='python',
                 network_mode='none', labels={'vibebench.product': 'v3', 'vibebench.deployment': deployment,
                     'vibebench.role': 'retention-proof'})
             submit(3)
@@ -647,12 +684,12 @@ assert engine.status()['migration_capability'] is True
             if candidate:
                 snapshots = result['cleanup']['database_snapshots']
                 assert snapshots['retained_groups'] == 2 and snapshots['preserved_unverified_groups'] == 0, snapshots
-            assert releases[1]['control']['reference'] in result['cleanup']['retained']
+            assert releases[0]['account']['reference'] in result['cleanup']['retained']
             retained.remove()
             installed = strict_json(safe_read(update_root / 'state.json'))
             policy = strict_json(safe_read(update_root / 'policy.json'))
             cleaned = HostDeployment(policy).cleanup(installed['current'], installed['history'], [])
-            assert releases[1]['control']['reference'] in cleaned['removed'], cleaned
+            assert releases[0]['account']['reference'] in cleaned['removed'], cleaned
             for installation in [installed['current'], *installed['history'][:2]]:
                 for entry in installation['selection'].values():
                     client.images.get(entry['reference'])
@@ -669,15 +706,22 @@ assert engine.status()['migration_capability'] is True
                         logs = logs.replace(values[key_name], '[已脱敏]')
                 facts.append({'role': role, 'logs': logs})
             diagnostic = root / 'updates/worker-error.json'
+            state = strict_json(safe_read(update_root / 'state.json')) if (update_root / 'state.json').exists() else {}
+            last = update_root / 'operations' / state['last_operation'] / 'operation.json' if state.get('last_operation') else None
             atomic_json(output / 'failure.json', {'scenes': results, 'containers': facts,
-                'worker_error': strict_json(diagnostic.read_bytes()) if diagnostic.exists() else None})
+                'worker_error': strict_json(diagnostic.read_bytes()) if diagnostic.exists() else None,
+                'operation': strict_json(safe_read(last)) if last and last.exists() else None,
+                'active_operation': state.get('active_operation'),
+                'host_errors': {name: strict_json((update_root / name).read_bytes()) for name in
+                    ('switch-error.json', 'restore-error.json') if (update_root / name).exists()}})
             raise
         finally:
             if child is not None and child.poll() is None:
                 child.terminate()
                 child.wait(timeout=10)
             # 清理对象逐个来自本次随机部署标签及本次唯一精确镜像引用。
-            for container in controls().values():
+            for container in client.containers.list(all=True, filters={'label': [
+                    'vibebench.product=v3', 'vibebench.deployment=' + deployment]}):
                 container.remove(force=True)
             for network in client.networks.list(filters={'label': 'vibebench.deployment=' + deployment}):
                 network.remove()

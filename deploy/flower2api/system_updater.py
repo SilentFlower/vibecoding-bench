@@ -25,6 +25,7 @@ from urllib.parse import quote
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(source_path(REPO, 'orchestrator')))
 from runtime_files import atomic_json, atomic_text, directory_fd
+from runtime_names import account_rebuild_required
 from storage_maintenance import acquire_storage_lock
 from system_update_contract import (DEPLOYMENT_RE, DOWNLOAD_ROOT, INDEX_LIMIT, MANIFEST_LIMIT,
     RELEASE_RE, REPOSITORY, SHA_RE, TERMINAL, compatible_data, fetch_bytes, fetch_repository_file, safe_read, strict_json,
@@ -172,7 +173,7 @@ class SystemUpdater:
                         'published_at': value['published_at'], 'changes': value['changes'],
                         'manifest_sha256': entry['manifest']['sha256'],
                         'data_compatible': compatible, 'compatibility_reason': reason, 'migrations': migrations,
-                        'account_changed': self.state['current']['selection']['account']['content_sha256'] != value['account']['content_sha256']})
+                        'account_changed': account_rebuild_required(self.state['current']['selection']['account'], value['account'])})
                 except (ValueError, OSError):
                     continue
             return {'releases': rows, 'fresh': fresh, 'checking': self.checking, 'checked_at': self.state.get('checked_at'),
@@ -350,7 +351,7 @@ class SystemUpdater:
                 raise ValueError('本版本涉及不兼容数据迁移，需要专项维护')
             elif target['schema_version'] == 2:
                 self._migration_path(original, target)
-            if action != 'rollback' and original['selection']['account']['content_sha256'] == target['account']['content_sha256']:
+            if action != 'rollback' and not account_rebuild_required(original['selection']['account'], target['account']):
                 selected['selection']['account'] = copy.deepcopy(original['selection']['account'])
             if (action != 'prepare' and selected['release']['release'] == original['release']['release']
                     and selected['selection'] == original['selection']):

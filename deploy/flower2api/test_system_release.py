@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from system_release import REPO, create_index, create_release, data_contracts, sign_file
 from system_update_contract import compatible_data, fetch_repository_file, safe_read, strict_json, validate_index, validate_operation, validate_release, verify_signed
+from runtime_names import image_reference
 
 
 class SystemReleaseTests(unittest.TestCase):
@@ -93,6 +94,24 @@ class SystemReleaseTests(unittest.TestCase):
             create_index(self.output / 'system-release.json', path, self.root / 'next.json', self.key)
         with self.assertRaises(FileExistsError):
             create_release(self.manifest, self.policy, self.output, self.key, [10, 1], '同身份')
+
+    def test_new_package_names_and_old_signed_bytes(self) -> None:
+        """新引用保持精确验签合同，历史签名字节保持原样。@return None。"""
+        raw = (self.output / 'system-release.json').read_bytes()
+        signature = (self.output / 'system-release.sig').read_bytes()
+        self.assertEqual(validate_release(verify_signed(raw, signature, self.public)), self.release)
+        current = copy.deepcopy(self.release)
+        for role in ('control', 'account'):
+            current[role]['reference'] = image_reference(role, current[role]['release'], namespace='ghcr.io/silentflower')
+        self.assertEqual(validate_release(current), current)
+        for replacement in ('ghcr.io/foreign/flower2api-control:v3-ci-123-1',
+                'ghcr.io/silentflower/flower2api-account:v3-ci-123-1',
+                'ghcr.io/silentflower/flower2api-control:v3-ci-124-1'):
+            invalid = copy.deepcopy(current)
+            invalid['control']['reference'] = replacement
+            with self.subTest(reference=replacement), self.assertRaises(ValueError):
+                validate_release(invalid)
+        self.assertEqual((self.output / 'system-release.json').read_bytes(), raw)
 
     def test_data_contract_change_requires_explicit_rollback_proof(self) -> None:
         """旧库合同不同默认阻断，显式受信兼容集合决定可回退性。

@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from runtime_files import directory_fd
+from runtime_names import matches_image_reference
 
 REPOSITORY = 'SilentFlower/vibecoding-bench'
 DOWNLOAD_ROOT = f'https://github.com/{REPOSITORY}/releases/download'
@@ -176,8 +177,7 @@ def validate_release(value: dict) -> dict:
         _fields(entry, {'release', 'reference', 'registry_digest', 'config_digest', 'revision', 'unpacked_bytes', 'content_sha256'}, '组件镜像')
         if not isinstance(entry['release'], str) or not BUILD_RE.fullmatch(entry['release']):
             raise ValueError('组件来源批次无效')
-        reference = f'ghcr.io/silentflower/vibebench-v3-{role}:v3-{entry["release"]}'
-        if entry['reference'] != reference or not isinstance(entry['revision'], str) or not REV_RE.fullmatch(entry['revision']):
+        if not matches_image_reference(entry['reference'], role, entry['release']) or not isinstance(entry['revision'], str) or not REV_RE.fullmatch(entry['revision']):
             raise ValueError('组件来源仓库或提交无效')
         _digest(entry['registry_digest'], '仓库镜像', True)
         _digest(entry['config_digest'], '镜像配置', True)

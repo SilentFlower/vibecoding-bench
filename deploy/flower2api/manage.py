@@ -34,6 +34,7 @@ from cpu_resources import default_cpu_limits
 from platform_version import read_version
 from release_ci import validate_publish_source
 from system_update_contract import REPOSITORY
+from runtime_names import account_container_prefix, deployment_network_names, image_reference, matches_image_reference
 from storage_assets import essential_exclusions
 from storage_backup import create_backup_data, verify_backup_data
 from storage_cleanup import apply_storage_plan, storage_plan
@@ -163,8 +164,9 @@ def preflight(values: dict) -> Path:
             if not own and (source == root or source in root.parents or root in source.parents):
                 raise ValueError("数据挂载与其它部署重叠")
         name = container["Name"].lstrip("/")
-        account_prefix = "v3-" + hashlib.sha256(deployment.encode()).hexdigest()[:12] + "-account-"
-        if (name.startswith(f"vibebench-v3-{deployment}-") or name.startswith(account_prefix)) and not own:
+        prefixes = tuple(value + '-' for value in deployment_network_names(deployment)) + (
+            account_container_prefix(deployment), account_container_prefix(deployment, legacy=True))
+        if name.startswith(prefixes) and not own:
             raise ValueError("容器名称被其它部署占用")
         for container_port, bindings in (container.get("HostConfig", {}).get("PortBindings") or {}).items():
             for binding in bindings or []:
@@ -174,10 +176,11 @@ def preflight(values: dict) -> Path:
                         owned_port = owned_port or bool(container.get("State", {}).get("Running"))
                         continue
                     raise ValueError("宿主端口已被容器发布，拒绝启动")
-    network_name = f"vibebench-v3-{deployment}"
+    network_names = deployment_network_names(deployment)
     networks = [json.loads(line) for line in command("docker", "network", "ls", "--format", "{{json .}}", capture=True).splitlines()]
     for network in networks:
-        if network["Name"] == network_name:
+        if network["Name"] in network_names:
+            network_name = network["Name"]
             info = json.loads(command("docker", "network", "inspect", network_name, capture=True))[0]
             labels = info.get("Labels") or {}
             if labels.get("vibebench.product") != "v3" or labels.get("vibebench.deployment") != deployment:
@@ -511,7 +514,7 @@ def build(release: str, manifest_path: Path) -> None:
         deduplicate_immutable_tree(snapshot / 'project_library')
         images = {}
         for role in ("control", "account"):
-            reference = f"vibebench-v3-{role}:v3-{release}"
+            reference = image_reference(role, release)
             if subprocess.run(["docker", "image", "inspect", reference], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
                 raise ValueError("批次镜像标签已经存在，禁止覆盖")
             started = time.monotonic()
@@ -680,7 +683,7 @@ def publish(manifest_path: Path, output_path: Path, bundle_path: Path,
     if started.exists():
         raise ValueError("本批次已经开始发布，请使用新的 Action attempt 重跑")
     inspect_images(_manifest_values(manifest_path))
-    references = {role: f"{namespace}/vibebench-v3-{role}:v3-{manifest['release']}" for role in ("control", "account")}
+    references = {role: image_reference(role, manifest['release'], namespace=namespace) for role in ("control", "account")}
     for role, reference in references.items():
         _check_local_reference(reference, manifest["images"][role])
     # GitHub 重跑增加 attempt；本次标记防止进程重试复用同批标签覆盖部分发布。
@@ -733,7 +736,8 @@ def _published_manifest(manifest_path: Path) -> dict:
     for role in ("control", "account"):
         entry = manifest["images"][role]
         reference = entry["reference"]
-        if not re.fullmatch(r"ghcr.io/[a-z0-9][a-z0-9-]*/vibebench-v3-" + role + ":v3-" + re.escape(manifest["release"]), reference):
+        if (not isinstance(reference, str) or not re.match(r"ghcr.io/[a-z0-9][a-z0-9-]*/", reference)
+                or not matches_image_reference(reference, role, manifest['release'], namespace=reference.rsplit('/', 1)[0])):
             raise ValueError("发布镜像引用不属于指定 v3 角色和批次")
         if not re.fullmatch(r"sha256:[0-9a-f]{64}", entry.get("registry_digest", "")):
             raise ValueError("发布清单缺少有效仓库 digest")

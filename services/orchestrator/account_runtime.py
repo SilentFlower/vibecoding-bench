@@ -42,6 +42,7 @@ from native_capture import cleanup_captures
 from native_capture_policy import capture_enabled
 from runtime_diagnostics import NetworkContextError, network_failure
 from runtime_files import atomic_json, atomic_text, directory_fd as _directory_fd
+from runtime_names import account_container_prefix
 from storage_maintenance import deduplicate_immutable_tree
 from system_update_gate import UPDATE_GATE, update_open
 from system_profile import (MAX_CPUINFO_BYTES, generate_computer_profile, generate_system_profile,
@@ -746,8 +747,7 @@ class AccountRuntime:
                         fingerprint.pop("native_sender_memory", None)
                     self._update(row, fingerprint_json=json.dumps(fingerprint))
                     self._make_room(row, allow_eviction=not startup_prewarm)
-                    deployment_key = hashlib.sha256(self.deployment.encode()).hexdigest()[:12]
-                    name = f"v3-{deployment_key}-account-{row['environment_id']}"
+                    name = account_container_prefix(self.deployment) + row['environment_id']
                     create_environment(self, row, account, name, atomic_json)
                     configuration = None
                     if account.get("id") is not None:
