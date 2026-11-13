@@ -1,0 +1,260 @@
+{
+  "environment": {
+    "kernel": "6.12.117-0-virt",
+    "cpus": 2,
+    "guest_ram_mib": 3072,
+    "network": "仅回环，无外部网卡",
+    "controller_caps": "032c11eb",
+    "controller_nnp": 1,
+    "controller_seccomp": 0,
+    "business_uid": 1001,
+    "business_seccomp": 2
+  },
+  "memory": {
+    "scope": "同负载四个恢复副本加种子，共五个进程同时就绪",
+    "baseline": {
+      "workers": 5,
+      "unique_image_inodes": 5,
+      "image_allocated_bytes": 564224000,
+      "processes": {
+        "472": {
+          "device": 1,
+          "inode": 1024,
+          "bytes": 112843960,
+          "image_fds": []
+        },
+        "623": {
+          "device": 1,
+          "inode": 1037,
+          "bytes": 112843960,
+          "image_fds": []
+        },
+        "610": {
+          "device": 1,
+          "inode": 9,
+          "bytes": 112843960,
+          "image_fds": []
+        },
+        "624": {
+          "device": 1,
+          "inode": 10,
+          "bytes": 112843960,
+          "image_fds": []
+        },
+        "631": {
+          "device": 1,
+          "inode": 11,
+          "bytes": 112843960,
+          "image_fds": []
+        }
+      },
+      "memory": {
+        "memory.current": 1677750272,
+        "memory.peak": 1677750272,
+        "anon": 749867008,
+        "file": 809168896,
+        "shmem": 564228096
+      }
+    },
+    "shared": {
+      "workers": 5,
+      "unique_image_inodes": 1,
+      "image_allocated_bytes": 112844800,
+      "processes": {
+        "472": {
+          "device": 1,
+          "inode": 1024,
+          "bytes": 112843960,
+          "uid": 0,
+          "mode": "0o555",
+          "image_fds": []
+        },
+        "624": {
+          "device": 1,
+          "inode": 1024,
+          "bytes": 112843960,
+          "uid": 0,
+          "mode": "0o555",
+          "image_fds": []
+        },
+        "610": {
+          "device": 1,
+          "inode": 1024,
+          "bytes": 112843960,
+          "uid": 0,
+          "mode": "0o555",
+          "image_fds": []
+        },
+        "631": {
+          "device": 1,
+          "inode": 1024,
+          "bytes": 112843960,
+          "uid": 0,
+          "mode": "0o555",
+          "image_fds": []
+        },
+        "619": {
+          "device": 1,
+          "inode": 1024,
+          "bytes": 112843960,
+          "uid": 0,
+          "mode": "0o555",
+          "image_fds": []
+        }
+      },
+      "memory": {
+        "memory.current": 1240227840,
+        "memory.peak": 1240227840,
+        "anon": 765685760,
+        "file": 356802560,
+        "shmem": 112848896
+      }
+    },
+    "image_saved_bytes": 451379200
+  },
+  "requests": {
+    "matched": 9,
+    "total_posts": 19,
+    "stream_tool_replies": 9,
+    "business_cancel": 1,
+    "unique_sessions": 9,
+    "models": [
+      "claude-haiku-4-5",
+      "claude-sonnet-4-6"
+    ]
+  },
+  "lifecycle": {
+    "restore_after_seed_exit": true,
+    "template_revoked_during_requests": true,
+    "release": {
+      "shmem_bytes": 4096,
+      "non_image_shmem_at_peak": 4096,
+      "image_holders": []
+    },
+    "cleanup": {
+      "active": 0,
+      "templates": 0,
+      "owners": 0,
+      "instances": 0,
+      "posts": 19
+    }
+  },
+  "paired": {
+    "pairs": 20,
+    "normal_ms": [
+      1254.14418,
+      1358.435526,
+      1246.0500670000001,
+      1401.964636,
+      1210.271891,
+      1259.875149,
+      1222.348082,
+      1264.818781,
+      1229.600564,
+      1254.0320359999998,
+      1242.6159189999998,
+      1223.512786,
+      1259.9243150000002,
+      1226.7067140000001,
+      1252.4026939999999,
+      1253.7340829999998,
+      1233.749159,
+      1240.838779,
+      1247.1477,
+      1236.839058
+    ],
+    "restored_ms": [
+      428.154475,
+      471.857777,
+      471.129473,
+      435.412622,
+      431.27916999999997,
+      445.36688000000004,
+      470.746319,
+      431.806893,
+      465.04812200000003,
+      442.849426,
+      471.234577,
+      436.604518,
+      434.355011,
+      434.995399,
+      460.32296,
+      466.89325599999995,
+      469.506875,
+      430.388439,
+      439.056046,
+      476.13455700000003
+    ],
+    "normal_p50_ms": 1246.5988835,
+    "restore_p50_ms": 444.108153,
+    "reduction": 0.6437441434624869,
+    "source_pids": [
+      755,
+      745
+    ],
+    "source_startup": [
+      {
+        "startup_ms": 1803,
+        "template_seed": true
+      },
+      {
+        "startup_ms": 2687,
+        "template_seed": false
+      }
+    ],
+    "tls_ready": 40,
+    "scope": "pool_checkout_identity_bind_tls_ready"
+  },
+  "fallback": {
+    "normal_exec": true,
+    "failed_template_evicted": true,
+    "expected_posts": 1
+  },
+  "entry_cleanup": {
+    "instances": 0,
+    "templates": 0,
+    "posts": 1
+  },
+  "death": {
+    "controller_killed": true,
+    "namespace_exited": true,
+    "worker_exited": true,
+    "seed_alive": true,
+    "worker_pid": 1394,
+    "namespace_pid": 1387,
+    "posts": 0
+  },
+  "death_recovery": {
+    "before": {
+      "templates": 1,
+      "instances": 1
+    },
+    "after": {
+      "templates": 0,
+      "instances": 0
+    },
+    "entry_exit": 0
+  },
+  "build": {
+    "schema_version": 1,
+    "source_version": "4.2",
+    "source_url": "https://codeload.github.com/checkpoint-restore/criu/tar.gz/refs/tags/v4.2",
+    "archive_sha256": "0c6e51af878e63df7391e6dffbbe5f0ced429bc9f1e5a603020bfd2503065c39",
+    "patch_sha256": "fb92f5ec7bd5b3260ac3e720535cfabbe65cef47aaf8867ef8e7f638b9b597ae",
+    "binary_sha256": "638572670aeb31abacc317e01bf9ee665c25a8b34b57553b4fcbd351e8bbe4d6",
+    "binary_bytes": 6093568,
+    "platform": "linux-x64",
+    "compiler": "gcc-12.2.0",
+    "source_date_epoch": 0,
+    "memfd_executable_restore": 1,
+    "shared_memfd_restore": 1,
+    "configuration_sha256": "6c184e64a803ce2febaa0a9d3891f90b6d16aca08b31d52cf0ea5e3c8c231872",
+    "configuration": "#ifndef __CR_CONFIG_H__\n#define __CR_CONFIG_H__\n\n#define CONFIG_HAS_TCP_REPAIR\n// CONFIG_HAS_PTRACE_PEEKSIGINFO is not set\n// CONFIG_HAS_SETPROCTITLE_INIT is not set\n#define CONFIG_HAS_TCP_REPAIR_WINDOW\n#define CONFIG_HAS_MEMFD_CREATE\n#define CONFIG_HAS_OPENAT2\n// CONFIG_HAS_NO_LIBC_RSEQ_DEFS is not set\n#endif /* __CR_CONFIG_H__ */\n"
+  },
+  "notes": [
+    "p50为完整进程池checkout、身份绑定和TLS就绪，不含模型响应时间。",
+    "残留4KiB shmem与峰值时非映像开销一致；执行映像的FD与映射引用归零。",
+    "调试版配对因SHA校验开销超过180秒；正式性能数据使用优化版Rust测试。",
+    "首次Rust全量有连接重置，定向复核通过；相同源码以test-threads=2全量通过。"
+  ]
+}

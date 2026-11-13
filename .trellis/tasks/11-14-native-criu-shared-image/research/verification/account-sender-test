@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /opt/criu4/lib/ld-linux-x86-64.so.2 --library-path /opt/criu4/lib /probe/gateway-tests --ignored --exact service::native_runtime::tests::native_criu_isolated_paired_preparation --nocapture --test-threads=1
