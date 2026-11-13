@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/platform/deploy/platform-online-update.md", "reason": "受信发行、固定源码专项维护、排空快照与失败恢复合同"}
+{"file": ".trellis/spec/platform/deploy/image-build-push.md", "reason": "GHCR 正式包保护及原发布入口边界"}
+{"file": ".trellis/spec/orchestrator/backend/account-runtime-v3.md", "reason": "账号三角色、持久身份、镜像来源、资源冻结与历史回收"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "共享名称与引用常量的消费者盘点和复用"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "发布清单、控制应用和固定宿主执行器的跨层同步"}
+{"file": ".trellis/tasks/11-12-flower2api-image-name-migration/research/single-deployment-cutover.md", "reason": "单部署决策、现场身份、代码锚点及新 GHCR 包权限依据"}
