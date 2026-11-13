@@ -45,8 +45,24 @@ int main(int argc, char **argv) {
         execl("/opt/ccrb-tls-observer/launch", "launch", "sender", NULL);
         return 111;
     }
-    if (argc != 8 || strcmp(argv[1], "namespace") || strlen(argv[2]) != 36
+    if (argc != 9 || strcmp(argv[1], "namespace") || strlen(argv[2]) != 36
             || strspn(argv[2], "0123456789abcdef-") != 36) return 111;
+    int descriptors[6];
+    for (int index = 3; index < argc; index++) {
+        const char *token = argv[index];
+        int descriptor = 0;
+        if (!*token) return 111;
+        /* 启动前核对全部句柄，避免格式错误发生在创建命名空间之后。 */
+        while (*token) {
+            if (*token < '0' || *token > '9' || descriptor > (INT_MAX - (*token - '0')) / 10) return 111;
+            descriptor = descriptor * 10 + (*token++ - '0');
+        }
+        if (descriptor < 3 || fcntl(descriptor, F_GETFD) < 0) return 111;
+        for (int previous = 3; previous < index; previous++) {
+            if (descriptors[previous - 3] == descriptor) return 111;
+        }
+        descriptors[index - 3] = descriptor;
+    }
     int parent_fd = syscall(SYS_pidfd_open, getpid(), 0);
     if (parent_fd < 0 || unshare(CLONE_NEWNS | CLONE_NEWPID)) return 111;
     pid_t child = fork();
@@ -56,7 +72,7 @@ int main(int argc, char **argv) {
         if (prctl(PR_SET_PDEATHSIG, SIGKILL) || poll(&alive, 1, 0) != 0) return 111;
         close(parent_fd);
         char *arguments[] = {"python3", "-E", "-s", "/opt/ccrb-criu/supervisor.py",
-            argv[2], argv[3], argv[4], argv[5], argv[6], argv[7], NULL};
+            argv[2], argv[3], argv[4], argv[5], argv[6], argv[7], argv[8], NULL};
         execv("/usr/local/bin/python3", arguments);
         return 111;
     }
@@ -65,16 +81,7 @@ int main(int argc, char **argv) {
     fflush(stdout);
     close(STDOUT_FILENO);
     for (int index = 3; index < argc; index++) {
-        const char *token = argv[index];
-        int descriptor = 0;
-        if (!*token) return 111;
-        /* FD语法与范围在固定入口再次收紧，避免文本解析附带符号或溢出。 */
-        while (*token) {
-            if (*token < '0' || *token > '9' || descriptor > (INT_MAX - (*token - '0')) / 10) return 111;
-            descriptor = descriptor * 10 + (*token++ - '0');
-        }
-        if (descriptor < 3) return 111;
-        close(descriptor);
+        close(descriptors[index - 3]);
     }
     int status;
     if (waitpid(child, &status, 0) != child) return 111;

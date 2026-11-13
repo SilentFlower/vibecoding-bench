@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import shutil
 
-FILES = ('controller.py', 'entry.py', 'entropy.py', 'protocol.py', 'supervisor.py', 'launch.c', 'memfd-executable.patch')
+FILES = ('controller.py', 'entry.py', 'entropy.py', 'protocol.py', 'shared_image.py', 'supervisor.py', 'launch.c', 'memfd-executable.patch')
 
 
 def main() -> None:

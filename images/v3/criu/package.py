@@ -77,7 +77,7 @@ def main() -> None:
                     '--patch', str(source / 'memfd-executable.patch')], check=True)
     shutil.copyfile(output / 'build/criu', output / 'criu')
     os.chmod(output / 'criu', 0o755)
-    for name in ('controller.py', 'entry.py', 'entropy.py', 'protocol.py', 'supervisor.py', 'LICENSE.seccomp'):
+    for name in ('controller.py', 'entry.py', 'entropy.py', 'protocol.py', 'shared_image.py', 'supervisor.py', 'LICENSE.seccomp'):
         shutil.copyfile(source / name, output / name)
     shutil.copytree(output / 'build/licenses', output / 'licenses')
     subprocess.run(['cc', '-O2', '-Wall', '-Wextra', '-Werror', '-Wl,-z,relro,-z,now',

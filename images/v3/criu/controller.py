@@ -1,7 +1,6 @@
 """每账号受信恢复控制器；控制面只接受本sender与已登记零业务模板。"""
 import asyncio
 from dataclasses import dataclass, field
-import fcntl
 import hashlib
 import json
 import os
@@ -14,6 +13,7 @@ from uuid import uuid4
 
 from entropy import PROFILE
 from protocol import command, freeze_tree, receive, send
+from shared_image import pin_image, reopen_image, verify_restored_image
 
 ROOT = Path('/var/lib/ccrb-criu')
 TOOLS = Path('/opt/ccrb-criu')
@@ -33,23 +33,15 @@ def restricted(fields: dict) -> bool:
             and fields['NoNewPrivs'].strip() == '1' and fields['Seccomp'].strip() == '2')
 
 
-def verify_image(pid: int, profile: dict) -> None:
-    """校验实际封存执行体。@param pid 已持有进程。@param profile 构建冻结画像。@return 无。"""
-    with open(f'/proc/{pid}/exe', 'rb') as source:
-        if (os.fstat(source.fileno()).st_size != profile['image_bytes']
-                or fcntl.fcntl(source, fcntl.F_GET_SEALS) & 15 != 15
-                or hashlib.file_digest(source, 'sha256').hexdigest() != profile['image_sha256']):
-            raise ValueError('RESTORE_IMAGE_IDENTITY')
-
-
 @dataclass
 class Template:
-    """已冻结模板及在途引用。@param value 精确登记命令。@param root 私有目录。@param configuration 内部恢复参数。@param files 冻结文件身份及摘要。@param filesystem 原生目录权限与时间。"""
+    """已冻结模板及在途引用。@param value 登记命令。@param root 私有目录。@param configuration 恢复参数。@param files 冻结身份。@param filesystem 文件元数据。@param image 模板持有的只读映像FD。"""
     value: dict
     root: Path
     configuration: dict
     files: dict
     filesystem: dict
+    image: int
     valid: bool = True
     users: int = 0
     drained: asyncio.Event = field(default_factory=asyncio.Event)
@@ -99,6 +91,7 @@ class Controller:
         root = ROOT / 'templates' / identifier
         template = None
         pidfd = None
+        image = None
         created = False
         try:
             root.mkdir(mode=0o700)
@@ -116,7 +109,7 @@ class Controller:
                     or environment.get(b'CLAUDE_CONFIG_DIR') != str(source / 'config').encode()
                     or Path(f'/proc/{pid}/cwd').resolve() != source / 'cwd'):
                 raise ValueError('RESTORE_SEED_BINDING')
-            verify_image(pid, self.profile)
+            image = pin_image(pid, self.profile)
             pipes = {str(fd): os.readlink(f'/proc/{pid}/fd/{fd}') for fd in (0, 1, 2)}
             if any(not name.startswith('pipe:[') or not name.endswith(']') for name in pipes.values()):
                 raise ValueError('RESTORE_SEED_PIPES')
@@ -131,7 +124,7 @@ class Controller:
             configuration = {'images': str(root / 'images'), 'work_root': str(self.work_root),
                 'source_root': str(source), 'source_pid': pid,
                 'source_max_pid': max(int(path.name) for path in Path(f'/proc/{pid}/task').iterdir()), 'pipes': pipes,
-                'image_sha256': self.profile['image_sha256']}
+                'image_sha256': self.profile['image_sha256'], 'image_bytes': self.profile['image_bytes']}
             files = {}
             paths = [path for name in ('images', 'fs') for path in [root / name, *(root / name).rglob('*')]]
             for path in paths:
@@ -145,7 +138,7 @@ class Controller:
             # 摘要在零业务冻结时生成；私有目录不可由sender改写，后续用含ctime的身份拒绝变化。
             (root / 'images-manifest.json').write_text(json.dumps(files, sort_keys=True))
             (root / 'images-manifest.json').chmod(0o600)
-            template = Template(value, root, configuration, files, filesystem)
+            template = Template(value, root, configuration, files, filesystem, image)
             template.drained.set()
             self.templates[identifier] = template
             await send(connection, {'protocol': 1, 'type': 'template_ready', 'template': identifier,
@@ -160,6 +153,8 @@ class Controller:
                 template.valid = False
                 self.templates.pop(identifier, None)
                 await template.drained.wait()
+            if image is not None:
+                os.close(image)
             if created:
                 shutil.rmtree(root, ignore_errors=True)
 
@@ -200,13 +195,20 @@ class Controller:
                 os.chown(path, 1001, metadata['gid'])
             (root / 'config.json').write_text(json.dumps(template.configuration))
             os.chmod(root / 'config.json', 0o600)
-            gate_r, gate_w = os.pipe2(os.O_CLOEXEC)
-            report_r, report_w = os.pipe2(os.O_CLOEXEC)
-            incoming_r, incoming_w = os.pipe2(os.O_CLOEXEC)
-            outgoing_r, outgoing_w = os.pipe2(os.O_CLOEXEC)
-            errors_r, errors_w = os.pipe2(os.O_CLOEXEC)
-            descriptors.extend((gate_r, gate_w, report_r, report_w, incoming_r, incoming_w, outgoing_r, outgoing_w, errors_r, errors_w))
-            inherited = (gate_r, report_w, incoming_r, outgoing_w, errors_w)
+            image = reopen_image(template.image, self.profile)
+            descriptors.append(image)
+            def pipe_pair() -> tuple[int, int]:
+                """立即登记每次成功分配，确保下一次失败仍可清理。@return 管道两端FD。"""
+                pair = os.pipe2(os.O_CLOEXEC)
+                descriptors.extend(pair)
+                return pair
+
+            gate_r, gate_w = pipe_pair()
+            report_r, report_w = pipe_pair()
+            incoming_r, incoming_w = pipe_pair()
+            outgoing_r, outgoing_w = pipe_pair()
+            errors_r, errors_w = pipe_pair()
+            inherited = (gate_r, report_w, incoming_r, outgoing_w, errors_w, image)
             with (root / 'namespace.log').open('xb') as private_log:
                 os.chmod(root / 'namespace.log', 0o600)
                 process = await asyncio.create_subprocess_exec(str(TOOLS / 'launch'), 'namespace', root.name,
@@ -260,6 +262,7 @@ class Controller:
             parent, started, status = process_identity(pid)
             if parent != namespace or not restricted(status):
                 raise ValueError('RESTORE_WORKER_OWNERSHIP')
+            verify_restored_image(pid, template.image, self.profile)
             worker_fd = os.pidfd_open(pid)
             descriptors.append(worker_fd)
             self.owners[pid] = {'owner': namespace, 'started': started, 'worker': value['worker'],
@@ -318,7 +321,7 @@ class Controller:
                     await asyncio.gather(pending, return_exceptions=True)
         except (OSError, ValueError, KeyError, TypeError, asyncio.TimeoutError) as error:
             reasons = {'RESTORE_TEMPLATE_BUSY', 'RESTORE_SEED_OWNERSHIP', 'RESTORE_SEED_BINDING',
-                'RESTORE_IMAGE_IDENTITY', 'RESTORE_SEED_PIPES', 'RESTORE_CRIU_FAILED', 'RESTORE_SEED_EXITED',
+                'RESTORE_IMAGE_IDENTITY', 'RESTORE_IMAGE_MAPPING', 'RESTORE_SEED_PIPES', 'RESTORE_CRIU_FAILED', 'RESTORE_SEED_EXITED',
                 'RESTORE_TEMPLATE_UNAVAILABLE', 'RESTORE_NAMESPACE_OWNERSHIP', 'RESTORE_START_ACK',
                 'RESTORE_TEMPLATE_EXPIRED', 'RESTORE_CONNECTION_CLOSED', 'RESTORE_WORKER_OWNERSHIP',
                 'RESTORE_TEMPLATE_CHANGED',

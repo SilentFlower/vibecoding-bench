@@ -15,7 +15,7 @@ VERSION = '4.2'
 ARCHIVE_SHA256 = '0c6e51af878e63df7391e6dffbbe5f0ced429bc9f1e5a603020bfd2503065c39'
 ARCHIVE_URL = 'https://codeload.github.com/checkpoint-restore/criu/tar.gz/refs/tags/v4.2'
 PATCH = Path(__file__).resolve().parents[2] / 'native/criu/memfd-executable.patch'
-PATCH_SHA256 = '5a2d61a6666fd0b50dc089776a00b355df1258aa0ab6f8392f38a33d54dbfa92'
+PATCH_SHA256 = 'fb92f5ec7bd5b3260ac3e720535cfabbe65cef47aaf8867ef8e7f638b9b597ae'
 
 
 def digest(path: Path) -> str:
@@ -105,7 +105,7 @@ def build(output: Path, archive: Path | None = None, dependency_prefix: Path | N
                         'archive_sha256': ARCHIVE_SHA256, 'patch_sha256': digest(patch),
                         'binary_sha256': digest(executable), 'binary_bytes': executable.stat().st_size,
                         'platform': 'linux-x64', 'compiler': 'gcc-' + compiler,
-                        'source_date_epoch': 0, 'memfd_executable_restore': 1,
+                        'source_date_epoch': 0, 'memfd_executable_restore': 1, 'shared_memfd_restore': 1,
                         'configuration_sha256': digest(configuration),
                         'configuration': configuration.read_text()}
             (output / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n')

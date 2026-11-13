@@ -2,7 +2,7 @@
 
 本目录保存 CRIU 4.2 的 memfd 执行体恢复补丁。来源归档、补丁、构建二进制与编译器版本写入构建清单。
 
-CRIU 的 `prepare_mm()` 当前按普通文件收集执行体引用。封存 memfd 执行体的快照使用 MEMFD 类型。补丁使执行体收集与打开遵循实际类型，并复用 CRIU 的 memfd 内容和封存恢复实现。
+封存 memfd 执行体的快照使用 MEMFD 类型。补丁使执行体收集与打开遵循实际类型，并通过专用 `ccrb-executable:ccrb-native-runtime` 资源接入模板持有的同一背板。FD、执行体和内存映射统一使用该 inode。原有私有脏页、匿名内存及 FD 偏移、状态和别名继续按 CRIU 规则恢复。
 
 构建环境需要 GCC、make、patch、pkg-config、protobuf 及 protobuf-c 编译器与开发包、libnl-3、libcap、libnet 和 uuid 开发包。依赖需与目标系统 ABI 匹配。
 
@@ -30,6 +30,10 @@ python3 services/runtime/scripts/criu/build.py --archive /受控目录/criu-v4.2
 
 同账号模板保持原代理引用。恢复后保留原生构造和发送栈，每轮仍使用独立原生请求上下文。BoringSSL fork 标志、UUID 缓存与主执行域随机状态按固定 Bun1.4.3 配方重新建立。运行时版本、执行域结构或随机源画像变化会拒绝恢复。
 
+模板登记时核验实际执行体摘要、大小与四项 seal，并由可信控制器固定为 root 所有、0555。内容 seal 与权限控制分别执行。模板持有只读 FD，种子退出后仍可维持背板存活。每个实例重新打开同一 inode，保留独立打开文件描述；模板撤销后等待在途实例收口，再释放模板引用。
+
+CRIU 共享分支拒绝同名的其他 inode、错误类型、大小、封存及元数据。监督进程在恢复暂停期核对实际 exe 和执行体映射，Rust 在业务投递前再次核验实际 SHA、大小、seals 和缓存映像的 dev/inode。共享路径跟随现有 CRIU 开关，构建画像 `shared_memfd_restore=1` 为配套能力条件；旧工具或准入失败沿原截止回退普通共享映像 exec。
+
 ## 镜像与启用
 
 ```bash
@@ -41,7 +45,7 @@ python3 /全新目录/criu/package.py --source /全新目录/criu --out /全新�
 
 部署开关缺省及空值为开启，显式 `V3_NATIVE_CRIU=0` 关闭；账号指纹 `native_criu_enabled` 缺省为true，显式false持久关闭。镜像标签 `vibebench.native-criu=1` 与独立恢复内存额度共同决定恢复入口。有限额度不足时保持普通exec。恢复内核需要协议1，默认配套beta.6，当前准入映像为 `564019c9560e960e96875c9663975491534b27c789ea3d23e5c13309ff293c79`、112843960字节；持久选择沿现有内核激活流程保持。旧内核继续正常exec。环境卡片按实际入口与同代遥测展示模板状态。
 
-每个恢复实例的独立代码映像额外预算108MiB。有限账号最低 sender RAM 为 `256 + max_workers × (192 + 108)` MiB；无限账号仍受显式 worker 上限约束。
+共享版本第一阶段继续保留每个恢复副本108MiB的预算余量。有限账号最低 sender RAM 仍为 `256 + max_workers × (192 + 108)` MiB；无限账号受显式 worker 上限约束。实际映像分配按唯一 inode 计量，预算调整以完整负载的峰值和切代重叠结果为依据。
 
 入口先核验降权加载器与业务 BPF。该基础准入失败会终止启动。恢复权限或环境预检失败时，受限 sender 沿普通 exec 运行。模板、恢复或绑定失败在业务投递前清理，再沿原请求截止回退。每笔业务维持一次模型提交。
 

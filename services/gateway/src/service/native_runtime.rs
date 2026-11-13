@@ -1117,7 +1117,11 @@ impl Worker {
             let mut executable =
                 File::open(format!("/proc/{pid}/exe")).map_err(|_| unavailable())?;
             let required = F_SEAL_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL;
-            if executable.metadata().map_err(|_| unavailable())?.len() != artifact.image_bytes
+            let actual_image = executable.metadata().map_err(|_| unavailable())?;
+            let shared_image = image.metadata().map_err(|_| unavailable())?;
+            if actual_image.dev() != shared_image.dev()
+                || actual_image.ino() != shared_image.ino()
+                || actual_image.len() != artifact.image_bytes
                 || digest_file(&mut executable).map_err(|_| unavailable())? != artifact.image_sha256
                 || unsafe { fcntl(executable.as_raw_fd(), F_GET_SEALS) } & required != required
             {
@@ -2572,6 +2576,7 @@ mod tests {
             .unwrap();
         assert!(first.restore_supported);
         assert_eq!(first.tls_observer.as_ref().unwrap().status().0, "ready");
+        let shared_image = first.execution_image.as_ref().unwrap().metadata().unwrap();
         let mut template = timeout_at(
             deadline.min(Instant::now() + Duration::from_secs(20)),
             async {
@@ -2613,6 +2618,10 @@ mod tests {
                 assert_eq!(worker.restored.is_some(), restore);
                 assert_eq!(worker.tls_observer.as_ref().unwrap().status().0, "ready");
                 assert!(worker.reusable());
+                let actual_image =
+                    fs::metadata(format!("/proc/{}/exe", worker.pid().unwrap())).unwrap();
+                assert_eq!(actual_image.dev(), shared_image.dev());
+                assert_eq!(actual_image.ino(), shared_image.ino());
                 if restore {
                     restored.push(elapsed);
                 } else {

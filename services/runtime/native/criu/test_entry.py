@@ -25,6 +25,17 @@ class EntryBoundaryTest(unittest.TestCase):
             self.assertEqual(directory.stat().st_mode & 0o777, 0o750)
             chown.assert_called_once_with(directory, 0, 1001)
 
+    def test_shared_restore_requires_matching_tool_capability(self):
+        """旧工具画像走恢复预检拒绝，避免错用独立映像恢复。@return 无。"""
+        profile = {'protocol': 1, 'entropy_profile': 'bun143-wipeonfork-v1',
+            'criu': {'source_version': '4.2', 'memfd_executable_restore': 1}, 'files': {}}
+        context = 'Seccomp:\t0\nCapEff:\tffffffffffffffff\n'
+        with patch.object(entry.os, 'getuid', return_value=0), patch.object(Path, 'read_text', return_value=context):
+            with self.assertRaisesRegex(ValueError, 'PROFILE_INVALID'):
+                entry.preflight(profile)
+            profile['criu']['shared_memfd_restore'] = 1
+            self.assertEqual(entry.preflight(profile), profile)
+
     @unittest.skipUnless(os.getuid() == 0, '降权入口的实际root所有权检查需要root测试环境')
     def test_changed_filter_stops_before_any_fallback_exec(self):
         """恢复能力失败也不得借用已变化的业务过滤器。@return 无。"""

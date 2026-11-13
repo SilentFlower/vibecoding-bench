@@ -1265,6 +1265,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 已验证有限 N=3、max_workers=6、sender=1536 MiB；预检最低1408 MiB。bench 创建账号默认N=4，最低1792 MiB；1536 MiB 配置须显式设置N=3。配置限额和实际占用分别报告。
 - 原生sender为UID1001，私有可写 `/native` 与CLI UID1000/HOME分离。PID限额 `128+32*max_workers`；CPU份额保持三角色规则，有限模式额外swap只归CLI。CLI指标、physical_features及静态/串行评审从同一冻结sender预算计算剩余份额。
 - 每次新进程先核验固定分发体，通过FD启动，握手验证PID/版本/raw_input_protocol，再核实际执行体SHA。首个实际映像要求 WRITE/GROW/SHRINK/SEAL 四项封存，池缓存只读FD；后续重新exec共享同一dev/inode。分发/执行体固定摘要由消费者代码及桥接运行时合同登记，外部manifest不授信。
+- CRIU恢复同样要求实际exe与池缓存共享dev/inode，并继续核验SHA、大小和四项封存；控制器持有root归属0555的封存映像，各实例独立打开FD，exe及目标VMA复用同一背板。独立进程、会话、私有页、绑定代次及唯一投递保持原合同，详细准入与生命周期见[原生CRIU热模板恢复协议](../../runtime/backend/runtime-contract.md#scenario-原生进程池-criu-热模板恢复协议-1)。共享上线初期保持保守恢复预算 `256+max_workers*(192+108)` MiB；旧画像缺 `shared_memfd_restore=1` 或恢复准入失败沿受限普通exec回退。
 - 每个进程独立HOME/config/cwd、当前bearer及worker_id，每轮独立原生根。账号/身份/代理/凭据/并发摘要改变产生新代次，旧活动自然收口，空闲旧进程退役。单进程一次作业，唯一终态及匹配idle后复用；取消、迟到/损坏帧和状态不明均退役。
 - 单个弱引用回收任务在额外进程空闲60秒后保留1个暖进程；忙进程保持当前归属。映像缓存可在所有原进程退出后支持重建，池销毁释放FD。
 - 运行中原生账号由网关每20秒零模型巡检并按需恢复，具体身份、退避和计时合同见[原生持续预热](../../gateway/backend/service-architecture.md#scenario-原生持续预热实时就绪与请求进程诊断)。巡检只查询已有绑定，不唤醒休眠环境。

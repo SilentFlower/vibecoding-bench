@@ -1,6 +1,10 @@
 """验证固定 CRIU 配方的来源校验及失败目录所有权。"""
 import importlib.util
 import io
+import hashlib
+import json
+import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -27,6 +31,20 @@ class BuildBoundaryTest(unittest.TestCase):
                 execute.assert_not_called()
             self.assertFalse((root / 'output').exists())
             self.assertEqual(archive.read_bytes(), b'wrong-source')
+
+    def test_export_includes_shared_image_and_matching_source_digests(self):
+        """真实导出同时包含共享模块及精确来源摘要。@return 无。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'export'
+            subprocess.run([sys.executable, str(Path(__file__).with_name('export_bundle.py')),
+                            '--output', str(output)], check=True, capture_output=True, timeout=10)
+            source = Path(__file__).resolve().parents[2] / 'native/criu/shared_image.py'
+            self.assertEqual((output / 'shared_image.py').read_bytes(), source.read_bytes())
+            manifest = json.loads((output / 'source-manifest.json').read_text())
+            self.assertIn('shared_image.py', manifest)
+            for name, digest in manifest.items():
+                self.assertEqual(hashlib.sha256((output / name).read_bytes()).hexdigest(), digest)
+            self.assertEqual(manifest['memfd-executable.patch'], BUILD.PATCH_SHA256)
 
     def test_existing_output_is_preserved(self):
         """已有输出及其内容保持原所有权。@return 无。"""

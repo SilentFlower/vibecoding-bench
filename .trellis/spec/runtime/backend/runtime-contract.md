@@ -681,14 +681,19 @@ bun scripts/benchmark-runtime.ts --binary /绝对路径/新产物 --reference /r
 - `worker_ready` 可选 `restore_protocol:1`；模板态带 `restore_template:UUID`，绑定态带 `restore_binding:{template_id,nonce,entropy_profile:'bun143-wipeonfork-v1'}`，两者互斥。旧 ready 继续兼容。
 - Linux x64 的 `native_criu::Template::register(key,id,worker,pid,image)` 登记模板；`Process::start(template,key,worker,nonce)` 接管私有管道和 pidfd，`Process::retire()` 等待实际命名空间退出。
 - 控制器固定 socket `/run/ccrb-criu/control.sock`。`template` 命令仅含 `type/key/template/worker/pid`，`restore` 仅含 `type/key/template/worker/nonce`；key 为64位小写十六进制。控制帧最多4096字节。
+- `shared_image.pin_image(pid:int,profile:dict)->int` 核验种子并返回模板持有的只读FD；`reopen_image(descriptor:int,profile:dict)->int` 独立打开同一inode；`verify_restored_image(pid:int,descriptor:int,profile:dict)->None` 核验实际exe及映射。返回FD归调用方关闭。
+- 私有 `launch namespace` 向supervisor移交六个FD，顺序为 `gate/report/incoming/outgoing/errors/image`。CRIU恢复增加 `--inherit-fd fd[N]:ccrb-executable:ccrb-native-runtime`；打包画像要求 `criu.shared_memfd_restore=1`。
 
 ### 3. Contracts
 
 - `V3_NATIVE_CRIU` 缺省及空值为1，精确0关闭；其它值拒绝。账号指纹 `native_criu_enabled` 缺省true，显式false持久关闭。镜像标签 `vibebench.native-criu=1` 与独立恢复预算共同选择 `/opt/ccrb-criu/entry.py`。入口将实际恢复可用性通过 `CCRB_CRIU=1|0` 交给sender；预检失败时设置固定 `CCRB_CRIU_REASON=controller_preflight_failed`。协议1内核沿原签名发行及激活合同使用。
 - 模板 key 复用完整池身份，覆盖 bearer、账号/设备/组织、环境与内核代次、代理及有效启动配置。后台种子服从同一物理容量；先完成零模型 bootstrap，再 dump/leave-running。种子绑定为普通暖进程后继续归池。模板只接纳尚未执行业务的受控种子。
-- 普通exec的共享memfd dev/inode与四项封存校验保持原合同。CRIU会重建memfd，恢复分支独立校验实际外部PID的执行体SHA、大小、四项seals、新ready、模板及随机挑战。普通池最低RAM仍为 `256 + max_workers × 192` MiB；每个恢复副本独立映像额外向上取整MiB，当前为108MiB，恢复最低RAM为 `256 + max_workers × (192 + 108)` MiB。不足恢复额度时选择普通exec；memory_mib=0通过静态额度条件，物理进程上限保持。
+- 普通exec与CRIU恢复共享同一封存执行映像的dev/inode。控制器从受控种子的 `/proc/PID/exe` 只读打开，核验固定名称 `ccrb-native-runtime`、SHA、大小、零链接及WRITE/GROW/SHRINK/SEAL四项封存，依次执行chmod0555、chown0:0、chmod0555并复核；首次改权失败发生在改属主之前，取得所有权后再次固化权限以关闭过渡窗口。模板持有FD，每个恢复实例通过 `/proc/self/fd/N` 重新打开独立文件描述，避免共享offset。
+- CRIU补丁在 `memfd_open_inode_nocache` 的统一inode路径接纳专用资源键 `ccrb-executable:ccrb-native-runtime`，校验源FD与快照的名称、大小、root归属、0555、完整seals、只读访问及无hugetlb，同名快照inode必须唯一；复用该inode并跳过重建内容、改权和reseal。通用inherit-fd继续遵循上游语义，普通FD的访问标志、位置及别名继续恢复。exe与VMA背板统一继承，匿名页和私有脏页保持独立。
+- supervisor在停态核验实际exe和所有目标名称VMA的dev/inode，拒绝可写共享映射及缺失目标映射；控制器交接前再次核验，Rust准入继续检查实际exe与池缓存相同dev/inode以及SHA、大小、四项seals、新ready、模板及随机挑战。模板撤销先停止准入，持有FD待在途users归零后关闭；实例FD、实际exe和VMA各自保持存活引用，种子退出不影响模板恢复。
+- 普通池最低RAM仍为 `256 + max_workers × 192` MiB；共享恢复上线初期保留旧保守恢复额度 `256 + max_workers × (192 + 108)` MiB，不按实测节省自动调低预算。不足恢复额度时选择普通exec；memory_mib=0通过静态额度条件，物理进程上限保持。
 - `NativeReadinessStatus.restore?:Value` 省略时兼容旧sender。版本化摘要为 `{schema_version:1,state,reason,checked_at_ms,template_ready,last_start_source}`；state为ready/preparing/unavailable/unknown。只读按当前完整池身份、执行体、预算、部署入口、模板登记连接存活及退避投影；登记EOF不得报告ready。last_start_source仅记录当前身份最近成功创建worker的exec或criu_restore，身份变化清空。协调器与页面投影见账号环境的CRIU场景。
-- 固定配方为 CRIU4.2 加 memfd 执行体修补，记录来源归档/补丁/二进制 SHA、编译器、功能配置与许可；按目标 ABI 构建。源码束与生成镜像输入逐文件核对。TLS束继续使用既有正式来源导出检查。
+- 固定配方为 CRIU4.2 加共享memfd执行体修补，画像标记 `shared_memfd_restore:1`，记录来源归档/补丁/二进制 SHA、编译器、功能配置与许可；按目标 ABI 构建。源码束包含 `shared_image.py`，与生成镜像输入逐文件核对。TLS束继续使用既有正式来源导出检查。
 - 控制器必须持有权威 sender PID；对端必须是该 sender 自身、UID1001。种子为其直属受限子进程，模板标记、worker ID、HOME/config/cwd及执行体须匹配。IPC禁止指定任意程序、路径与其他进程。控制目录0750、socket0660；模板磁盘根目录0700，快照0600。
 - 控制器权限集合为 `CHOWN DAC_OVERRIDE FOWNER KILL SETUID SETGID SETPCAP NET_ADMIN SYS_CHROOT SYS_PTRACE SYS_ADMIN SYS_RESOURCE SYS_TIME`，有效掩码032c11eb、NNP1、seccomp0。固定C入口安装冻结业务BPF并降权；sender和worker为UID1001、capability0、NNP1、seccomp2。入口先核验降权入口/BPF，失败终止启动；恢复环境预检失败使用受限正常exec。
 - 每个实例独立PID/挂载命名空间、HOME/config/cwd副本及管道。冻结文件拒绝链接、设备、外来归属和超预算；恢复前核对完整条目集合及包含ctime的文件身份。文件原权限/时间在独立映射中重建，原快照保持私有。
@@ -705,6 +710,10 @@ bun scripts/benchmark-runtime.ts --binary /绝对路径/新产物 --reference /r
 | 旧内核缺恢复能力、无可用模板或权限预检失败 | 正常共享映像exec，保留原业务截止与唯一发送 |
 | 对端/PID/模板身份错误、额外控制字段、快照污染或租约过期 | 业务前拒绝，日志只输出受控原因 |
 | 熵画像、映像、封存或新绑定不匹配 | 清理恢复实例后按原截止回退；失败模板停止准入并退避 |
+| 旧画像缺shared_memfd_restore=1 | 入口恢复预检失败，沿受限普通exec启动 |
+| 专用资源身份不符或快照同名多inode | CRIU恢复拒绝，按现有命令失败清理及回退收口 |
+| 实际exe/VMA背板不符或可写共享映射 | 以RESTORE_IMAGE_IDENTITY或RESTORE_IMAGE_MAPPING拒绝，按现有清理及回退收口 |
+| pin改权、dump、launch或中途pipe2分配失败 | 关闭本次已取得的所有FD并清理失败模板或实例；保留普通exec回退条件 |
 | ACK前后取消、控制器退出、管道断开 | 通过真实pidfd等待收口，实际退出后释放许可；新入口清理私有遗留 |
 | IPC已EOF且worker仍存活 / pidfd已退出 | 分别记录process_exited=false / true，保持实际外部PID |
 | 普通内存足够、恢复内存不足 | 正常启动并报告memory_budget |
@@ -714,14 +723,18 @@ bun scripts/benchmark-runtime.ts --binary /绝对路径/新产物 --reference /r
 
 - 正常：同账号模板已就绪，需要第三个worker时恢复独立实例，经新UUID/nonce绑定、执行体核验与TLS准备后接单。
 - 边界：关闭部署开关或使用旧协议内核时继续现有正常启动。普通Child与恢复worker共同服从账号物理上限。
+- 共享边界：种子退出后从模板FD恢复新实例；模板撤销后已受理实例继续完成请求。最后一个模板、缓存及进程映射引用释放后，执行映像可被回收。
+- 错误用法：只对exe路径替换FD，或者仅凭相同SHA接纳另一inode。正确处理：在统一memfd inode路径继承专用资源，交接与Rust准入核验实际dev/inode，VMA仍受完整校验。
 - 预算示例：max_workers=6、sender1536MiB可普通启动；恢复需2056MiB。错误用法：因默认开启而拒绝原本可用的1536MiB账号。正确处理：单独报告恢复额度不足并普通启动。
 - 错误用法：直接复用快照中的worker_id、旧ready或探针PID，或把CRIU命令时间当作完整准备时间。正确处理：独立绑定与真实执行体/TLS准入，性能从checkout计到可接单，首次建模板单列。
 
 ### 6. Tests Required
 
 - `tests/unit/worker-protocol.test.ts`：版本、新旧UUID、随机挑战、额外字段、互斥模板/绑定及旧ready兼容。
-- `native/criu/test_{entropy,protocol,entry}.py`：全线程暂停与熵画像、冻结目录权限/链接/预算、入口降权准入及umask下socket权限。
+- `native/criu/test_{entropy,protocol,entry}.py`：全线程暂停与熵画像、冻结目录权限/链接/预算、入口降权准入、旧共享能力画像回退及umask下socket权限。
+- `native/criu/test_{shared_image,controller}.py`：名称/元数据/seals/独立offset、私有映射、首次改权及改属主失败顺序、模板dump失败/撤销/drain、launch失败和部分pipe2失败后的FD清理；配方测试核验shared模块导出及source-manifest摘要。
 - gateway `native_criu` 定向测试：SCM_RIGHTS数量/截断/CLOEXEC、真实pidfd归属、取消时许可保留、EOF前后真实退出日志。普通Child错误/EOF/截止日志继续回归。
 - gateway状态测试覆盖登记断开、独立恢复额度的饱和计算及旧readiness反序列化；编排策略覆盖缺省开启、全局0、账号false、有限降级及无限额度。
-- 隔离验收：同源存活时串行3/并发4副本，独立会话和两模型、每笔一次模拟POST，最终TLS与独立接收端匹配；控制器强退/重启、污染/过期模板与完整submit回退；至少20轮完整准备配对，p50降低至少50%。
+- 隔离验收：同源存活时串行3/并发4副本，独立会话和两模型、每笔一次模拟POST、流式工具回复及业务取消，最终TLS与独立接收端匹配；种子退出后恢复、撤销模板时在途完成、控制器强退/重启、污染/过期模板与完整submit回退；至少20轮完整准备配对，p50降低至少50%。
+- 相同负载对比旧恢复与共享恢复：记录四个恢复副本加种子的实际exe/VMA身份、映像分配量、cgroup current/peak/anon/file/shmem；共享组仅一个映像inode。最终映像FD及VMA引用归零，并与原有非映像shmem基线区分，不能要求整个cgroup的shmem必为零。
 - 目标ABI实际构建并核验包文件SHA；运行环境失败的受限exec回退；编排预算、部署开关/角色权限与受影响回归通过。生产启用沿独立上线授权验收。

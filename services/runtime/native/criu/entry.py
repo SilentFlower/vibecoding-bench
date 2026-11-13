@@ -48,7 +48,8 @@ def preflight(profile: dict) -> dict:
             or int(status['CapEff'], 16) & required != required):
         raise ValueError('RESTORE_PRIVILEGE_UNAVAILABLE')
     if (profile['protocol'] != 1 or profile['entropy_profile'] != 'bun143-wipeonfork-v1'
-            or profile['criu']['source_version'] != '4.2' or profile['criu']['memfd_executable_restore'] != 1):
+            or profile['criu']['source_version'] != '4.2' or profile['criu']['memfd_executable_restore'] != 1
+            or profile['criu'].get('shared_memfd_restore') != 1):
         raise ValueError('RESTORE_PROFILE_INVALID')
     for name, digest in profile['files'].items():
         if Path(name).name != name:

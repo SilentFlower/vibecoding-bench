@@ -1,34 +1,78 @@
 --- a/criu/mem.c
 +++ b/criu/mem.c
-@@ -747,7 +747,9 @@
- 	if (ret <= 0)
- 		return ret;
- 
+@@ -750 +750,3 @@
 -	if (collect_special_file(ri->mm->exe_file_id) == NULL)
-+	/* 封存 memfd 执行体使用 MEMFD 记录，按实际类型收集其引用。 */
++	/* 封存执行体按实际MEMFD类型收集。 */
 +	if (find_file_desc_raw(FD_TYPES__MEMFD, ri->mm->exe_file_id) == NULL &&
 +	    collect_special_file(ri->mm->exe_file_id) == NULL)
- 		return -1;
- 
- 	pr_debug("Found %zd VMAs in image\n", ri->mm->n_vmas);
 --- a/criu/cr-restore.c
 +++ b/criu/cr-restore.c
-@@ -2481,6 +2481,7 @@
- 
- static int prepare_mm(pid_t pid, struct task_restore_args *args)
- {
+@@ -2483,0 +2484 @@
 +	struct file_desc *exe_memfd;
- 	int exe_fd, i, ret = -1;
- 	MmEntry *mm = rsti(current)->mm;
- 
-@@ -2498,7 +2499,9 @@
- 		args->mm_saved_auxv[i] = (auxv_t)mm->mm_saved_auxv[i];
- 	}
- 
+@@ -2501 +2502,3 @@
 -	exe_fd = open_reg_by_id(mm->exe_file_id);
-+	/* 与内存映射复用同一 memfd，保持执行体与映射的归属。 */
++	/* 执行体与映射统一通过memfd的受控背板恢复。 */
 +	exe_memfd = find_file_desc_raw(FD_TYPES__MEMFD, mm->exe_file_id);
 +	exe_fd = exe_memfd ? memfd_open(exe_memfd, NULL, false) : open_reg_by_id(mm->exe_file_id);
- 	if (exe_fd < 0)
- 		goto out;
- 
+--- a/criu/memfd.c
++++ b/criu/memfd.c
+@@ -1,0 +2,2 @@
++#include <limits.h>
++#include <sys/stat.h>
+@@ -49,0 +52 @@
++	bool inherited_executable;
+@@ -237,0 +241 @@
++	inode->inherited_executable = false;
+@@ -256,0 +261,40 @@
++/** 接入明确命名的共享执行体。@param inode 快照inode。@param fd 输出句柄。@return 1已接入，0无外部资源，-1拒绝。 */
++static int inherit_executable_memfd(struct memfd_restore_inode *inode, int *fd)
++{
++	MemfdInodeEntry *mie = inode->mie;
++	struct memfd_restore_inode *other;
++	struct stat info;
++	char resource[PATH_MAX];
++	int seals;
++	const unsigned int required = F_SEAL_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL;
++
++	if (snprintf(resource, sizeof(resource), "ccrb-executable:%s", mie->name) >= sizeof(resource))
++		return -1;
++	*fd = inherit_fd_lookup_id(resource);
++	if (*fd < 0)
++		return 0;
++
++	/* 名称不是身份，拒绝快照中同名的其他inode。 */
++	list_for_each_entry(other, &memfd_inodes, list) {
++		if (other != inode && !strcmp(other->mie->name, mie->name))
++			goto reject;
++	}
++	seals = fcntl(*fd, F_GET_SEALS);
++	if (strcmp(mie->name, "ccrb-native-runtime") || fstat(*fd, &info) < 0 || seals < 0 ||
++	    !S_ISREG(info.st_mode) || !is_memfd(info.st_dev) || info.st_nlink ||
++	    info.st_size != mie->size || info.st_uid || info.st_gid || (info.st_mode & 07777) != 0555 ||
++	    mie->uid || mie->gid || !mie->has_mode || (mie->mode & 07777) != 0555 ||
++	    seals != mie->seals || (seals & required) != required || mie->has_hugetlb_flag ||
++	    (fcntl(*fd, F_GETFL) & O_ACCMODE) != O_RDONLY)
++		goto reject;
++
++	/* 已封存背板不再填充、改权或加seal，私有写页仍沿原恢复规则处理。 */
++	inode->inherited_executable = true;
++	return 1;
++reject:
++	pr_err("Shared executable memfd identity mismatch\n");
++	close(*fd);
++	*fd = -1;
++	return -1;
++}
++
+@@ -264,0 +309,5 @@
++	flags = inherit_executable_memfd(inode, &fd);
++	if (flags < 0)
++		goto out;
++	if (flags > 0)
++		goto store;
+@@ -295,0 +345,2 @@
++store:
++	ret = -1;
+@@ -348 +399 @@
+-	if (!mfi->inode->was_opened_rw && (flags & O_ACCMODE) == O_RDWR) {
++	if (!mfi->inode->inherited_executable && !mfi->inode->was_opened_rw && (flags & O_ACCMODE) == O_RDWR) {
