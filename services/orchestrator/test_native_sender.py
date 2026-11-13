@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from native_sender import sender_config
+from native_criu_policy import restore_policy
 from resource_budget import account_limits, memory_bytes, isolated_account_limits, scenario_account_limits, serial_review_limits
 
 
@@ -13,8 +14,8 @@ class NativeSenderTests(unittest.TestCase):
         """显式恢复开关覆盖每进程独立代码映像预算。@return 无。"""
         account = {'request_backend': 'native293', 'concurrency': 3}
         with patch.dict('os.environ', {'V3_NATIVE_CRIU': '1'}):
-            with self.assertRaises(ValueError):
-                sender_config(account, '4g', budget='1536m')
+            ordinary = sender_config(account, '4g', budget='1536m')
+            self.assertEqual(restore_policy(ordinary, {}, True)['reason'], 'memory_budget')
             self.assertEqual(sender_config(account, '4g', budget='2056m')['max_workers'], 6)
             self.assertEqual(sender_config(account, 'unlimited', budget='')['memory_mib'], 0)
         with patch.dict('os.environ', {'V3_NATIVE_CRIU': '0'}):

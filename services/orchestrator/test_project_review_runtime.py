@@ -271,10 +271,22 @@ class PrivateReviewTests(unittest.TestCase):
     def test_serial_public_cpu_overbudget_is_rejected_before_switch(self) -> None:
         """公共角色也计入有限 CPU 预算，不能额外叠加评审份额。@return None。"""
         fixture=self._serial_fixture()
-        fixture.roles['network'].attrs['HostConfig']['NanoCpus']+=1
+        fixture.roles['network'].attrs['HostConfig']['NanoCpus']+=1_000_000_001
         with self.assertRaisesRegex(ValueError,'CPU 限额超过'):
             self.review.serial_layout(self.row,fixture.cli)
         fixture.cli.stop.assert_not_called()
+
+    def test_new_role_defaults_preserve_exact_limits_across_serial_review(self) -> None:
+        """新三核默认布局在串行评审后恢复原CLI额度。@return 无。"""
+        fixture=self._serial_fixture()
+        for role,nano in (('cli',1500000000),('sender',1000000000),('network',500000000)):
+            fixture.roles[role].attrs['HostConfig']['NanoCpus']=nano
+        layout=self.review.serial_layout(self.row,fixture.cli)
+        self.assertEqual(layout['cli_nano_cpus'],1500000000)
+        self.review.prepare_serial(fixture.job,fixture.cli,layout)
+        self.runtime.cleanup(fixture.job['token'])
+        self.assertEqual(fixture.cli.attrs['HostConfig']['NanoCpus'],1500000000)
+        self.assertEqual(fixture.roles['sender'].attrs['HostConfig']['NanoCpus'],1000000000)
 
     def test_serial_record_without_execution_remains_blocked(self) -> None:
         """不能只凭孤立切换记录伪造退租和恢复成功。@return None。"""

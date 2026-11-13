@@ -144,6 +144,16 @@ pub(super) struct Template {
 }
 
 impl Template {
+    /// 只检查登记通道存活，不发送控制命令。@return 登记连接尚无EOF或错误。
+    pub fn alive(&self) -> bool {
+        let mut descriptor = libc::pollfd {
+            fd: self._connection.as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        unsafe { libc::poll(&mut descriptor, 1, 0) == 0 }
+    }
+
     /// 立即撤销登记通道；在途实例保留各自的物理退出句柄。@return 无。
     pub fn invalidate(&self) {
         // shutdown不依赖Arc引用计数，让并发持有旧模板的创建者也失去后续准入。
@@ -324,6 +334,21 @@ mod tests {
     use super::*;
     use std::io::Read;
     use std::os::unix::net::UnixStream as StdStream;
+
+    /// 登记通道关闭后立刻撤销模板就绪状态。@return 无。
+    #[tokio::test]
+    async fn native_criu_template_status_tracks_registration_disconnect() {
+        let (connection, controller) = UnixStream::pair().unwrap();
+        let template = Template {
+            id: String::new(),
+            seed_worker: String::new(),
+            image: String::new(),
+            _connection: connection,
+        };
+        assert!(template.alive());
+        drop(controller);
+        assert!(!template.alive());
+    }
 
     fn handoff(connection: &StdStream, descriptors: &[i32]) {
         let mut marker = b'F';

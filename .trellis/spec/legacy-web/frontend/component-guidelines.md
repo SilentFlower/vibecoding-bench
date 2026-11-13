@@ -230,7 +230,8 @@ P1 阶段做到的:
 ### 2. Signatures
 
 - `renderEnvironments(): Promise<void>` 读取 `/api/environments`；`paintEnvironments(): void` 仅重绘列表。
-- `openNativeKernelDialog(button): void`、`submitNativeKernel(event): Promise<void>`、`closeNativeKernelDialog(force=false): boolean` 管理内核表单；`leaveEnvironments(): void` 收口页面资源。
+- `openNativeKernelDialog(button): Promise<void>`、`submitNativeKernel(event): Promise<void>`、`closeNativeKernelDialog(force=false): boolean` 管理内核表单；`leaveEnvironments(): void` 收口页面资源。
+- `checkKernelUpdates(button): Promise<void>`只读发现发行版本；`applyEnvironmentCriu(button): Promise<void>`读取CAS后显式应用账号选择。
 - 内核仍使用 `POST /api/environments/{environment_id}/native-kernel`，字段为 `operation`、`operation_id`、`release`、`expected_sha256`、`expected_revision`。服务端状态与准入以 [运行环境合同](../../orchestrator/backend/account-runtime-v3.md) 的单账号内核场景为准。
 - `openRunWindowConfig(aid)` 在打开窗口时绑定共享表单，直接进入环境页也能操作原时段配置。
 
@@ -242,7 +243,8 @@ P1 阶段做到的:
 - 列表读取同时检查 `viewGeneration` 与请求序号，旧页面或旧请求结果不得覆盖新视图。工具栏与弹窗位于列表重绘区外，输入、光标和焦点不被进度刷新重置。
 - 内核状态只读 `native_kernel`。null 显示当前未提供管理，未知状态保留可见提示并禁用普通动作；候选缺失或与当前摘要一致时禁用激活，CLI 忙碌与本地操作中时阻止重复提交，待对账仅提供对应恢复入口。
 - 原生准备区只读 `native_preparation`，与历史内核预热回执分开展示；字段投影见[原生 sender 合同](../../orchestrator/backend/account-runtime-v3.md#scenario-v3-原生-sender-共享映像池与资源预算)。显示当前状态、空闲/物理进程数、PID、检查时间和白名单原因，缺证据显示未知。存在原生准备摘要时每20秒串行刷新，操作中的2秒轮询优先；复用原请求序号、页面归属及离页清理。
-- 准备表单使用发布标签 `v0.1.0-beta.[1-9][0-9]{0,8}`；激活和回滚确认显示账号、当前版本与目标版本。打开窗口时冻结 revision、release 和摘要；列表刷新不得替换该上下文。写入只由用户提交触发，每次使用独立操作 ID，失败或冲突不自动重放。
+- 检查更新只读调用版本发现接口，kernelReleases/checkingReleases按环境保存；显示新版、缓存陈旧及不可用。选择版本打开prepare窗口并异步填充select，标签为 `v0.1.0-beta.[1-9][0-9]{0,8}`；只允许提交本次发现选项，加载或空列表时禁用提交。激活和回滚确认显示账号、当前版本与目标版本。打开窗口时冻结revision、release和摘要；列表刷新不得替换上下文。写入只由用户提交触发，每次独立操作ID，失败或冲突不自动重放。
+- CRIU区独立显示账号期望、实际应用、模板与最近扩容来源，原因只读服务器安全枚举；旧遥测显示待核对，额度不足展示普通启动及所需MiB。按钮开启/关闭或应用历史选择，先GET冻结generation/revision，再经明确确认POST严格布尔值。pending覆盖读取与提交，响应按视图代次归属；维护、CLI忙碌、平台关闭开启目标时禁用相应动作，GET列表保持零业务写入。
 - 进度轮询为操作期间每两秒的串行 GET。离页清理定时器并使窗口归属失效；已经发出的服务端操作仍由原所有者收口，迟到回包不重开窗口。普通提交中关窗保持等待，导航强制关闭只使本地回调失效。
 - 关闭按钮、遮罩与 Esc 统一走 `closeModal` 及内核窗口收口。窗口提供可见焦点与 Tab 边界；取消尚未提交的表单保持零写入。原运行窗口、实测、交接与维护入口继续沿用现有接口和服务器许可。
 
@@ -257,6 +259,7 @@ P1 阶段做到的:
 | 重复点击、轮询或取消 | 不增加非预期写入；取消不提交操作 |
 | 切页及乱序 HTTP 回包 | 清理旧定时器/窗口，丢弃过期页面或列表结果 |
 | 原生准备失败、过期或准备中 | 展示相应状态与最近检查，刷新保持只读 |
+| 发行发现失败或旧恢复遥测 | 显示陈旧/不可用或待核对，保留当前服务端状态 |
 
 ### 5. Scenarios and Examples
 
@@ -265,6 +268,7 @@ P1 阶段做到的:
 - 错误用法：每两秒重建整个 view 并重填确认窗口的新 revision。正确方式：只更新列表，确认请求保持用户打开窗口时看到的版本。
 - 错误用法：用全局圆角和色板覆盖其它页面。正确方式：环境路由设置作用域，离页恢复原主题偏好。
 - 正常：原生环境显示暖进程 PID 与检查时间；错误用法：把内核历史准备成功显示为实时就绪。正确方式：读取独立 `native_preparation` 摘要。
+- 正常：检查更新、选择版本、准备后显式激活；CRIU按模板实际状态显示。错误用法：将镜像能力标签视为加速已生效。正确方式：读取criu.applied及同代模板摘要。
 
 ### 6. Tests Required
 
@@ -272,4 +276,5 @@ P1 阶段做到的:
 - 在已有 Playwright 和 `apps/web/dist` 的本地环境运行 `python3 deploy/flower2api/verify_environment_ui.py --output .deploy/environment-ui-verification`。缺少 gateway 静态产物时先执行 `npm --prefix apps/web run build`。
 - 合成浏览器须覆盖实际 gateway 导航和 iframe、1280/720/390px 及原明暗偏好、真实按钮操作、版本冲突、提交去重、取消、轮询编辑、乱序回包、切页清理、长字段、空列表、错误文本转义及原运行窗口/物理实测入口。
 - 断言进入页面没有业务写入，主动操作 payload 保持既有合同，所有请求使用合成接口；实际账号、OAuth 与模型调用不作为本地 UI 验收前提。
+- 合成浏览器追加检查更新只读、新版与陈旧缓存、select选项白名单及取消、CRIU开关CAS/旧遥测/内存降级；加载和离页回执保持现有页面与弹窗归属。
 - 准备状态回归覆盖 ready/preparing/failed/过期、390px、定时刷新归属及零写入；请求诊断合成场景同时核验实际暖命中、PID、重叠计时与历史未观测。

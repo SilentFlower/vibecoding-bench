@@ -535,7 +535,7 @@
       <form id="native-kernel-form" class="form">
         <p id="native-kernel-description"></p>
         <dl class="env-operation-summary"><dt>账号</dt><dd id="native-kernel-account"></dd><dt>当前版本</dt><dd id="native-kernel-current"></dd><dt>操作目标</dt><dd id="native-kernel-target"></dd></dl>
-        <label id="native-kernel-release-field"><span class="lbl">发布标签</span><input name="release" required pattern="v0\.1\.0-beta\.[1-9][0-9]{0,8}" maxlength="32" autocomplete="off" placeholder="例如 v0.1.0-beta.4" title="请输入 v0.1.0-beta. 加 1 至 9 位正整数" /></label>
+        <label id="native-kernel-release-field"><span class="lbl">已发布版本</span><select name="release" required aria-label="选择已发布的请求内核版本"><option value="">正在读取版本…</option></select></label>
         <p id="native-kernel-feedback" class="env-error" role="status" aria-live="polite"></p>
         <div class="row-end"><button type="button" class="btn" data-close="#native-kernel-modal">取消</button><button type="submit" class="btn btn-primary">确认操作</button></div>
       </form>
@@ -920,7 +920,7 @@
   </div>
 
   <script src="projects.js?v=20261106-pi-auto-recovery"></script>
-  <script src="environments.js?v=20261113-preparation-status"></script>
-  <script src="app.js?v=20261112-navigation"></script>
+  <script src="environments.js?v=20261113-native-management"></script>
+  <script src="app.js?v=20261113-native-management"></script>
 </body>
 </html>

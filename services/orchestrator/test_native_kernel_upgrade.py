@@ -149,6 +149,13 @@ class NativeKernelUpgradeTest(unittest.TestCase):
             self.reference['launcher_sha256'] if action == 'activate' else upgrade.SHA256 if action == 'rollback' else None,
             revision or upgrade.status(self.runtime, self.row)['revision'])
 
+    def test_saved_release_remains_valid_when_becoming_builtin(self):
+        """平台内置升级到持久选择时仍能重新验签缓存及读取状态。@return 无。"""
+        with patch.object(upgrade, 'SHA256', self.reference['launcher_sha256']), patch.object(upgrade, 'VERSION', self.release):
+            self.assertEqual(self.operate('prepare', self.release)['prepared'], self.reference)
+            with patch.object(upgrade, '_download', side_effect=AssertionError('缓存应离线核验')):
+                self.assertEqual(upgrade.stage_release(self.runtime.data / 'native-releases', self.release, self.key), self.reference)
+
     def test_签名或分发摘要错误保留运行版本(self):
         signature = self.source / 'runtime-release.sig'
         valid = signature.read_bytes()

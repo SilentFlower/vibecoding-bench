@@ -140,7 +140,7 @@ COPY --from=criu-build /opt/ccrb-criu/ /opt/ccrb-criu/
 # iproute2已有libbpf运行依赖；在镜像内验证真实动态库，避免重复刷新整层系统依赖。
 RUN python3 -c "import ctypes,hashlib,json,subprocess;from pathlib import Path;ctypes.CDLL('libbpf.so.1');p=Path('/opt/ccrb-criu');m=json.loads((p/'profile.json').read_text());assert all(hashlib.sha256((p/n).read_bytes()).hexdigest()==s for n,s in m['files'].items());assert subprocess.check_output([str(p/'criu'),'--version'],text=True).strip()=='Version: 4.2'"
 COPY native-runtime/ccrb-runtime /usr/local/bin/ccrb-runtime
-RUN echo '64c61cae565e9097de18cf61a35f46e7595f633cb14f7d6b8c6609fcd294ce89  /usr/local/bin/ccrb-runtime' | sha256sum -c - \
+RUN echo 'fce50a30d739dbc614e450d4d1913208fa35c6373c4f07a3986657393a99261e  /usr/local/bin/ccrb-runtime' | sha256sum -c - \
     && chmod 755 /usr/local/bin/ccrb-runtime
 RUN chmod 700 /usr/local/bin/v3-account-init /usr/local/bin/v3-network-context \
     /usr/local/bin/v3-cli-version /usr/local/bin/v3-passthrough /usr/local/bin/process_metrics.py \

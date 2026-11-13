@@ -112,7 +112,7 @@ def stage_release(store: Path, release: str, key: str) -> dict:
         if candidates:
             cached = candidates[0]
             manifest = _verify_manifest(cached, release, key)
-            if manifest['launcher_sha256'] != cached.name or cached.name == SHA256:
+            if manifest['launcher_sha256'] != cached.name:
                 raise ValueError('已准备内核的精确身份不一致')
             _verify_binary(cached / ASSET, manifest)
             return {'release': release, 'launcher_sha256': cached.name}
@@ -126,8 +126,7 @@ def stage_release(store: Path, release: str, key: str) -> dict:
         manifest = _verify_manifest(folder, release, key)
         sha = manifest['launcher_sha256']
         reference = {'release': release, 'launcher_sha256': sha}
-        if sha == SHA256:
-            raise ValueError('候选与镜像内置内核字节相同')
+        # 已选发行在平台升级后可能成为内置版本；仍按签名来源准备，保留持久选择。
         target = store / release / sha
         target.parent.mkdir(mode=0o755, exist_ok=True)
         if not target.exists():
@@ -218,7 +217,7 @@ def status(runtime, row: dict) -> dict | None:
     return {'state': 'preparing' if value.get('preparing_release') else value.get('state', 'idle'),
         'preparing_release': value.get('preparing_release'), 'operation_id': value.get('operation_id'),
         'revision': _revision(value, row),
-        'current': _shown(value.get('current')),
+        'current': _shown(value.get('current')), 'builtin': _shown(None),
         'previous': _shown(value.get('previous')) if value.get('previous_available') else None,
         'prepared': value.get('prepared'), 'pid': value.get('pid') if same_generation else None,
         'image_sha256': value.get('image_sha256') if same_generation else None, 'error': value.get('prepare_error') or value.get('error'),

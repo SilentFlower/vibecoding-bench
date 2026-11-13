@@ -2,6 +2,7 @@
 import json
 import tempfile
 import unittest
+from decimal import localcontext
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -9,12 +10,34 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from docker import APIClient
 
-from cpu_resources import read_policy, read_resources, set_resources, _update_cpu
+from cpu_resources import default_cpu_limits, read_policy, read_resources, set_resources, _update_cpu
 from runtime_files import atomic_json
 
 
 class CpuResourcesTests(unittest.TestCase):
     """使用实际角色归属校验和可注入未知结果的Docker边界。"""
+
+    def test_independent_defaults_ignore_legacy_total_and_validate_overrides(self):
+        """三角色缺省独立，非法覆盖在容器创建前拒绝。@return 无。"""
+        defaults = {'cli': 1500000000, 'sender': 1000000000, 'network': 500000000}
+        self.assertEqual(default_cpu_limits({'V3_ACCOUNT_CPUS': '2'}), defaults)
+        self.assertEqual(default_cpu_limits({'V3_ACCOUNT_SENDER_CPUS': '2.25'}), {**defaults, 'sender': 2250000000})
+        self.assertEqual(default_cpu_limits({'V3_ACCOUNT_SENDER_CPUS': ''}), defaults)
+        for value in (False, None, 0, 'NaN', 'Infinity', '-1', '0.001', '1.0000000001', 'invalid'):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                default_cpu_limits({'V3_ACCOUNT_SENDER_CPUS': value})
+
+    def test_default_cpu_precision_is_exact_under_decimal_context_changes(self):
+        """超长小数精确拒绝，合法纳核值不受Decimal上下文精度影响。@return 无。"""
+        for precision in (3, 28):
+            with self.subTest(precision=precision), localcontext() as context:
+                context.prec = precision
+                for value, expected in (('1.000000001', 1000000001),
+                        ('1.0000000010000000000000000000', 1000000001), ('1e-2', 10000000)):
+                    self.assertEqual(default_cpu_limits({'V3_ACCOUNT_SENDER_CPUS': value})['sender'], expected)
+                for value in ('1.0000000000000000000000000001', '1.0000000009999999999999999999'):
+                    with self.subTest(value=value), self.assertRaises(ValueError):
+                        default_cpu_limits({'V3_ACCOUNT_SENDER_CPUS': value})
 
     def setUp(self):
         """建立固定三角色测试环境。@return None。"""

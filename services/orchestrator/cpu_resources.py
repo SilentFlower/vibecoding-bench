@@ -13,6 +13,31 @@ ROLES = ('cli', 'sender', 'network')
 NANO = 1_000_000_000
 
 
+def default_cpu_limits(values: dict | None = None) -> dict[str, int]:
+    """统一解析新隔离角色的独立默认CPU。@param values 部署配置，省略时读取环境。@return CLI/sender/network的NanoCpus；非法配置拒绝。"""
+    configuration = os.environ if values is None else values
+    result = {}
+    for role, default in (('cli', '1.5'), ('sender', '1'), ('network', '0.5')):
+        raw = configuration.get(f'V3_ACCOUNT_{role.upper()}_CPUS', default)
+        if raw == '':
+            raw = default
+        try:
+            if type(raw) not in (str, int, float):
+                raise ValueError('CPU默认值必须为数字')
+            amount = Decimal(str(raw))
+            if not amount.is_finite() or amount < Decimal('0.01'):
+                raise ValueError('CPU默认额度至少0.01核，且最多九位有效小数')
+            # 先转精确整数比，避免Decimal上下文在乘法时抹掉超出纳核精度的小数。
+            numerator, denominator = amount.as_integer_ratio()
+            nano_cpus, remainder = divmod(numerator * NANO, denominator)
+            if remainder:
+                raise ValueError('CPU默认额度至少0.01核，且最多九位有效小数')
+            result[role] = nano_cpus
+        except InvalidOperation:
+            raise ValueError('CPU默认额度格式无效') from None
+    return result
+
+
 def read_policy(runtime, row: dict) -> dict | None:
     """读取本环境的私有CPU策略，历史缺失采用原默认额度。
 

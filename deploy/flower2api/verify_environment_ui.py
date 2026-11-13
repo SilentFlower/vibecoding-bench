@@ -38,6 +38,10 @@ def sample_rows() -> list[dict]:
         'content_capture': {'enabled': True, 'applied': True, 'supported': True,
             'generation': 10, 'revision': 'a'*64,
             'tls_observer': {'state': 'ready', 'reason': None, 'protocol_version': 1}},
+        'criu': {'schema_version': 1, 'enabled': True, 'platform_enabled': True, 'applied': True,
+            'supported': True, 'installed': True, 'state': 'ready', 'reason': None, 'template_ready': True,
+            'generation': 10, 'revision': 'c'*64, 'memory_mib': 0, 'required_memory_mib': 2056,
+            'last_start_source': 'criu_restore'},
         'native_kernel': {'state': 'active', 'revision': '10:initial',
             'current': {'release': 'v0.1.0-beta.3', 'launcher_sha256': OLD_SHA},
             'prepared': {'release': 'v0.1.0-beta.4', 'launcher_sha256': NEW_SHA},
@@ -65,8 +69,11 @@ class Fixture:
         self.sessions = 0
         self.reads = 0
         self.revision = 0
+        self.criu_revision = 0
         self.fail_read = False
         self.fail_operation = False
+        self.fail_releases = False
+        self.release_reads = 0
         self.operation_gate: asyncio.Event | None = None
         self.operation_started = asyncio.Event()
         self.hold_next_read = False
@@ -114,7 +121,15 @@ class Fixture:
             if request.method != 'GET':
                 body = json.loads(request.post_data or '{}')
                 self.writes.append({'path': path, 'body': body})
-                if api.endswith('/content-capture'):
+                if api.endswith('/criu'):
+                    current = self.rows[0]['criu']
+                    assert type(body['enabled']) is bool
+                    assert body['expected_generation'] == current['generation'] and body['expected_revision'] == current['revision']
+                    self.criu_revision += 1
+                    current.update(enabled=body['enabled'], revision=str(self.criu_revision)*64,
+                        state='preparing' if body['enabled'] else 'disabled', reason=None, template_ready=False)
+                    payload = copy.deepcopy(current)
+                elif api.endswith('/content-capture'):
                     current = self.rows[0]['content_capture']
                     if body['expected_generation'] != current['generation'] or body['expected_revision'] != current['revision']:
                         status, payload = 409, {'detail': '采集配置已变化，请重新读取'}
@@ -155,6 +170,13 @@ class Fixture:
                     await self.read_gate.wait()
                 if self.fail_read:
                     status, payload = 503, {'detail': '合成读取故障'}
+            elif api.endswith('/native-kernel/releases'):
+                self.release_reads += 1
+                payload = {'state': 'stale' if self.fail_releases else 'ready',
+                    'reason': 'release_rate_limited' if self.fail_releases else None, 'latest': 'v0.1.0-beta.4',
+                    'versions': [{'release': 'v0.1.0-beta.4'}, {'release': 'v0.1.0-beta.3'}]}
+            elif api.endswith('/criu'):
+                payload = copy.deepcopy(self.rows[0]['criu'])
             elif api.endswith('/content-capture'):
                 payload = copy.deepcopy(self.rows[0]['content_capture'])
             elif api.endswith('/run-window'):
@@ -195,6 +217,7 @@ async def run(output: Path, gateway: Path) -> dict:
         await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','dark');")
         page = await context.new_page()
         page.on('pageerror', lambda error: errors.append(str(error)))
+        page.on('dialog', lambda dialog: dialog.accept())
         try:
             # 真实网关产物负责外层路由、导航及 iframe，认证接口只返回合成会话。
             await page.goto(BASE + '/environments')
@@ -215,7 +238,7 @@ async def run(output: Path, gateway: Path) -> dict:
 
             async def open_operation(label: str) -> None:
                 """通过真实按钮打开操作窗口。@param label 按钮文字。@return 窗口可见。"""
-                await target.get_by_role('button', name=label, exact=True).click()
+                await target.get_by_role('button', name='选择版本' if label == '准备内核' else label, exact=True).click()
                 await expect(frame.locator('#native-kernel-modal')).to_be_visible()
 
             async def submit_operation(label: str) -> None:
@@ -230,11 +253,36 @@ async def run(output: Path, gateway: Path) -> dict:
             await refresh()
             other = frame.locator('.env-card').filter(has=frame.get_by_role('heading', name='演示环境 2', exact=True))
             await expect(frame.locator('.env-tag').filter(has_text='在线内核管理')).to_have_count(2)
-            await other.get_by_role('button', name='准备内核', exact=True).click()
+            await other.get_by_role('button', name='选择版本', exact=True).click()
             await expect(frame.locator('#native-kernel-account')).to_have_text('演示环境 2')
             await frame.locator('#native-kernel-modal').get_by_role('button', name='取消', exact=True).click()
             assert not fixture.writes
             scenes.append('两个原生账号均显示在线管理，第二账号窗口保持独立归属且取消零写入')
+
+            previous = len(fixture.writes)
+            await target.get_by_role('button', name='检查更新', exact=True).click()
+            await expect(target).to_contain_text('发现新版')
+            assert len(fixture.writes) == previous and fixture.release_reads >= 1
+            fixture.fail_releases = True
+            await target.get_by_role('button', name='检查更新', exact=True).click()
+            await expect(target).to_contain_text('显示上次发现结果')
+            fixture.fail_releases = False
+            scenes.append('显式检查更新只读，新版提示及限流陈旧缓存可见')
+
+            assert await target.get_by_text('模板已就绪', exact=False).count() >= 1
+            await target.get_by_role('button', name='关闭加速', exact=True).click()
+            await expect(target.get_by_role('button', name='开启加速', exact=True)).to_be_enabled()
+            assert fixture.writes[-1]['body']['enabled'] is False
+            await target.get_by_role('button', name='开启加速', exact=True).click()
+            await expect(target).to_contain_text('模板准备中')
+            assert fixture.writes[-1]['body']['enabled'] is True
+            fixture.rows[0]['criu'].update(state='unknown', reason='telemetry_missing')
+            await refresh()
+            await expect(target).to_contain_text('当前版本尚未提供恢复状态')
+            fixture.rows[0]['criu'].update(state='unavailable', reason='memory_budget', memory_mib=1536)
+            await refresh()
+            await expect(target).to_contain_text('2056')
+            scenes.append('CRIU真实模板、开关CAS、旧遥测与内存不足状态可见')
 
             for width in (1280, 720, 390):
                 await page.set_viewport_size({'width': width, 'height': 1000 if width > 390 else 844})
@@ -310,7 +358,7 @@ async def run(output: Path, gateway: Path) -> dict:
 
             previous = len(fixture.writes)
             await open_operation('准备内核')
-            await frame.locator('[name="release"]').fill('v0.1.0-beta.4')
+            await frame.locator('[name="release"]').select_option('v0.1.0-beta.4')
             await frame.locator('#native-kernel-modal').get_by_role('button', name='取消', exact=True).click()
             await open_operation('准备内核')
             await frame.locator('[name="release"]').press('Escape')
@@ -321,14 +369,14 @@ async def run(output: Path, gateway: Path) -> dict:
             await expect(frame.locator('#native-kernel-modal')).to_be_hidden()
             await open_operation('准备内核')
             field = frame.locator('[name="release"]')
-            await field.fill('https://invalid.example/release')
+            await field.evaluate("node=>{node.append(new Option('畸形发现项','https://invalid.example/release'));node.value='https://invalid.example/release'}")
             await frame.locator('#native-kernel-form').get_by_role('button', name='准备内核', exact=True).click()
             assert len(fixture.writes) == previous
-            await field.fill('v0.1.0-beta.4')
-            await field.evaluate('node=>node.setSelectionRange(3,3)')
+            await field.select_option('v0.1.0-beta.4')
+            await field.focus()
             await field.evaluate('()=>renderEnvironments()')
             await expect(field).to_have_value('v0.1.0-beta.4')
-            assert await field.evaluate('node=>document.activeElement===node&&node.selectionStart===3')
+            assert await field.evaluate('node=>document.activeElement===node')
             await page.screenshot(path=str(output / 'prepare-dialog-1280.png'))
             await page.set_viewport_size({'width': 390, 'height': 844})
             await page.screenshot(path=str(output / 'prepare-dialog-390.png'))
@@ -359,7 +407,7 @@ async def run(output: Path, gateway: Path) -> dict:
             kernel = fixture.rows[0]['native_kernel']
             fixture.rows[0]['busy'] = True
             await refresh()
-            await expect(target.get_by_role('button', name='准备内核', exact=True)).to_be_disabled()
+            await expect(target.get_by_role('button', name='选择版本', exact=True)).to_be_disabled()
             fixture.rows[0]['busy'] = False
             saved = kernel['prepared']
             kernel['prepared'] = None
@@ -368,7 +416,7 @@ async def run(output: Path, gateway: Path) -> dict:
             kernel['prepared'] = saved
             kernel['state'] = 'reconcile'
             await refresh()
-            await expect(target.get_by_role('button', name='准备内核', exact=True)).to_be_disabled()
+            await expect(target.get_by_role('button', name='选择版本', exact=True)).to_be_disabled()
             await open_operation('恢复对账')
             await submit_operation('恢复对账')
             assert fixture.writes[-1]['body']['operation'] == 'recover'

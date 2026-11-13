@@ -30,7 +30,7 @@ from system_updater import SystemUpdater, validate_policy
 SOURCE_FILES = ('deploy/v3/manage.py', 'deploy/v3/system_release.py', 'deploy/v3/system_updater.py',
     'deploy/v3/system_update_host.py', 'deploy/v3/install_system_updater.py', 'deploy/v3/compose.yml',
     'deploy/v3/compose-updates.yml', 'orchestrator/system_update_contract.py', 'orchestrator/system_update_gate.py',
-    'orchestrator/runtime_files.py', 'orchestrator/resource_budget.py', 'orchestrator/native_sender.py',
+    'orchestrator/runtime_files.py', 'orchestrator/resource_budget.py', 'orchestrator/native_sender.py', 'orchestrator/cpu_resources.py',
     'orchestrator/storage_assets.py', 'orchestrator/storage_backup.py', 'orchestrator/storage_cleanup.py',
     'orchestrator/storage_maintenance.py')
 

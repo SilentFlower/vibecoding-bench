@@ -684,9 +684,10 @@ bun scripts/benchmark-runtime.ts --binary /绝对路径/新产物 --reference /r
 
 ### 3. Contracts
 
-- `V3_NATIVE_CRIU` 默认0，部署只接受空值、0或1。显式1与账号镜像标签 `vibebench.native-criu=1` 共同选择 `/opt/ccrb-criu/entry.py`。入口将实际恢复可用性通过 `CCRB_CRIU=1|0` 交给 sender。协议1内核沿原签名发行及激活合同使用。
+- `V3_NATIVE_CRIU` 缺省及空值为1，精确0关闭；其它值拒绝。账号指纹 `native_criu_enabled` 缺省true，显式false持久关闭。镜像标签 `vibebench.native-criu=1` 与独立恢复预算共同选择 `/opt/ccrb-criu/entry.py`。入口将实际恢复可用性通过 `CCRB_CRIU=1|0` 交给sender；预检失败时设置固定 `CCRB_CRIU_REASON=controller_preflight_failed`。协议1内核沿原签名发行及激活合同使用。
 - 模板 key 复用完整池身份，覆盖 bearer、账号/设备/组织、环境与内核代次、代理及有效启动配置。后台种子服从同一物理容量；先完成零模型 bootstrap，再 dump/leave-running。种子绑定为普通暖进程后继续归池。模板只接纳尚未执行业务的受控种子。
-- 普通 exec 的共享 memfd dev/inode 与四项封存校验保持原合同。CRIU 会重建 memfd，恢复分支独立校验实际外部 PID 的执行体 SHA、大小、四项 seals、新 ready、模板及随机挑战。每个恢复副本的独立代码映像额外按向上取整 MiB 预算；当前画像为108MiB。有限 sender 最低 RAM 为 `256 + max_workers × (192 + 108)` MiB。
+- 普通exec的共享memfd dev/inode与四项封存校验保持原合同。CRIU会重建memfd，恢复分支独立校验实际外部PID的执行体SHA、大小、四项seals、新ready、模板及随机挑战。普通池最低RAM仍为 `256 + max_workers × 192` MiB；每个恢复副本独立映像额外向上取整MiB，当前为108MiB，恢复最低RAM为 `256 + max_workers × (192 + 108)` MiB。不足恢复额度时选择普通exec；memory_mib=0通过静态额度条件，物理进程上限保持。
+- `NativeReadinessStatus.restore?:Value` 省略时兼容旧sender。版本化摘要为 `{schema_version:1,state,reason,checked_at_ms,template_ready,last_start_source}`；state为ready/preparing/unavailable/unknown。只读按当前完整池身份、执行体、预算、部署入口、模板登记连接存活及退避投影；登记EOF不得报告ready。last_start_source仅记录当前身份最近成功创建worker的exec或criu_restore，身份变化清空。协调器与页面投影见账号环境的CRIU场景。
 - 固定配方为 CRIU4.2 加 memfd 执行体修补，记录来源归档/补丁/二进制 SHA、编译器、功能配置与许可；按目标 ABI 构建。源码束与生成镜像输入逐文件核对。TLS束继续使用既有正式来源导出检查。
 - 控制器必须持有权威 sender PID；对端必须是该 sender 自身、UID1001。种子为其直属受限子进程，模板标记、worker ID、HOME/config/cwd及执行体须匹配。IPC禁止指定任意程序、路径与其他进程。控制目录0750、socket0660；模板磁盘根目录0700，快照0600。
 - 控制器权限集合为 `CHOWN DAC_OVERRIDE FOWNER KILL SETUID SETGID SETPCAP NET_ADMIN SYS_CHROOT SYS_PTRACE SYS_ADMIN SYS_RESOURCE SYS_TIME`，有效掩码032c11eb、NNP1、seccomp0。固定C入口安装冻结业务BPF并降权；sender和worker为UID1001、capability0、NNP1、seccomp2。入口先核验降权入口/BPF，失败终止启动；恢复环境预检失败使用受限正常exec。
@@ -706,11 +707,14 @@ bun scripts/benchmark-runtime.ts --binary /绝对路径/新产物 --reference /r
 | 熵画像、映像、封存或新绑定不匹配 | 清理恢复实例后按原截止回退；失败模板停止准入并退避 |
 | ACK前后取消、控制器退出、管道断开 | 通过真实pidfd等待收口，实际退出后释放许可；新入口清理私有遗留 |
 | IPC已EOF且worker仍存活 / pidfd已退出 | 分别记录process_exited=false / true，保持实际外部PID |
+| 普通内存足够、恢复内存不足 | 正常启动并报告memory_budget |
+| 旧readiness缺restore / 模板登记断开 | 兼容省略 / 停止报告模板就绪 |
 
 ### 5. Scenarios and Examples
 
 - 正常：同账号模板已就绪，需要第三个worker时恢复独立实例，经新UUID/nonce绑定、执行体核验与TLS准备后接单。
 - 边界：关闭部署开关或使用旧协议内核时继续现有正常启动。普通Child与恢复worker共同服从账号物理上限。
+- 预算示例：max_workers=6、sender1536MiB可普通启动；恢复需2056MiB。错误用法：因默认开启而拒绝原本可用的1536MiB账号。正确处理：单独报告恢复额度不足并普通启动。
 - 错误用法：直接复用快照中的worker_id、旧ready或探针PID，或把CRIU命令时间当作完整准备时间。正确处理：独立绑定与真实执行体/TLS准入，性能从checkout计到可接单，首次建模板单列。
 
 ### 6. Tests Required
@@ -718,5 +722,6 @@ bun scripts/benchmark-runtime.ts --binary /绝对路径/新产物 --reference /r
 - `tests/unit/worker-protocol.test.ts`：版本、新旧UUID、随机挑战、额外字段、互斥模板/绑定及旧ready兼容。
 - `native/criu/test_{entropy,protocol,entry}.py`：全线程暂停与熵画像、冻结目录权限/链接/预算、入口降权准入及umask下socket权限。
 - gateway `native_criu` 定向测试：SCM_RIGHTS数量/截断/CLOEXEC、真实pidfd归属、取消时许可保留、EOF前后真实退出日志。普通Child错误/EOF/截止日志继续回归。
+- gateway状态测试覆盖登记断开、独立恢复额度的饱和计算及旧readiness反序列化；编排策略覆盖缺省开启、全局0、账号false、有限降级及无限额度。
 - 隔离验收：同源存活时串行3/并发4副本，独立会话和两模型、每笔一次模拟POST，最终TLS与独立接收端匹配；控制器强退/重启、污染/过期模板与完整submit回退；至少20轮完整准备配对，p50降低至少50%。
 - 目标ABI实际构建并核验包文件SHA；运行环境失败的受限exec回退；编排预算、部署开关/角色权限与受影响回归通过。生产启用沿独立上线授权验收。

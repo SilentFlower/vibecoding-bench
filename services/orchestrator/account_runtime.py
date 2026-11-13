@@ -36,6 +36,7 @@ from physical_features import MAX_SNAPSHOT_BYTES, PHYSICAL_FEATURES_PROBE, valid
 from project_runtime_policy import ProjectRuntimeError, check_python_runtime
 from resource_budget import account_limits, isolated_account_limits
 from native_kernel_upgrade import pending_upgrade, recover_interrupted
+from native_criu_policy import restore_policy
 from native_sender import prewarm_account_id, sender_config
 from native_capture import cleanup_captures
 from native_capture_policy import capture_enabled
@@ -694,7 +695,9 @@ class AccountRuntime:
                         # 内核选择属于 sender 进程代次；只有部署预算及路径变化才要求重建角色。
                         actual_native = {key: value for key, value in actual_native.items()
                             if key not in ("release", "kernel_generation")}
+                    restore = restore_policy(native, fingerprint, image_labels.get('vibebench.native-criu') == '1')
                     if (actual_native != native
+                            or bool(configuration.get('native_criu_enabled')) != restore['eligible']
                             or configuration.get("native_capture_dir") != ("/flows/api/cc-prepared" if native and capture_enabled(fingerprint) else None)):
                         if startup_prewarm:
                             raise RuntimeBusy("后台预启动跳过需要重建的账号环境")

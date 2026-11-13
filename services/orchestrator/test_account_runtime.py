@@ -1842,6 +1842,27 @@ class AccountRuntimeTests(unittest.TestCase):
             for call in self.client.containers.run.call_args_list}
         self.assertEqual(actual, {'account': limits['cli'], 'account-sender': limits['sender'], 'account-network': limits['network']})
 
+    def test_default_criu_entry_and_independent_cpu_limits(self) -> None:
+        """无限原生账号缺省选择恢复器与新角色CPU。@return 无。"""
+        self._isolated_docker()
+        self.client.images.get.return_value.attrs['Config']['Labels'].update({
+            'vibebench.native-runtime': '293-raw-1', 'vibebench.native-criu': '1'})
+        row = self.runtime._row('synthetic', 1)
+        self.runtime._update(row, fingerprint_json=json.dumps({**json.loads(row['fingerprint_json']), 'mem': 'unlimited'}))
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
+            'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        self.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': '',
+            'request_backend': 'native293', 'concurrency': 4}
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
+                patch.object(self.runtime, '_sender_active', return_value=0), patch.dict(os.environ, {
+                    'V3_NATIVE_CRIU': '', 'V3_NATIVE_SENDER_MEMORY': '', 'V3_ACCOUNT_CPUS': '2'}):
+            row, _ = self.runtime.ensure(account)
+        sender = next(call.kwargs for call in self.client.containers.run.call_args_list
+            if call.kwargs['labels']['vibebench.role'] == 'account-sender')
+        self.assertEqual(sender['entrypoint'], ['/usr/local/bin/python3', '-E', '-s', '/opt/ccrb-criu/entry.py'])
+        self.assertEqual(sender['nano_cpus'], 1000000000)
+        self.assertTrue(json.loads(self.runtime._sender_config(row).read_text())['native_criu_enabled'])
+
     def test_native_unlimited_layout_and_capture_are_frozen_per_account(self) -> None:
         """无限账号省略 sender 预算，三角色与私有采集合同保持一致。@return None。"""
         self._isolated_docker()
@@ -1938,7 +1959,8 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual("ro", mounted["/flows/api"])
         self.assertNotIn("/ca", mounted)
         self.assertNotIn(str(self.runtime._sender_config(row).parent), cli["volumes"])
-        self.assertEqual(2_000_000_000, sum(value["nano_cpus"] for value in roles.values()))
+        self.assertEqual({'account': 1500000000, 'account-sender': 1000000000, 'account-network': 500000000},
+            {name: value['nano_cpus'] for name, value in roles.items()})
         network = roles["account-network"]
         self.assertNotIn("/home/node", {value["bind"] for value in network["volumes"].values()})
         self.assertNotIn("mac_address", network)

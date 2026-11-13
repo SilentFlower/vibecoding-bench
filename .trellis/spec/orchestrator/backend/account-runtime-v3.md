@@ -1252,7 +1252,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - `sender_config(configuration:dict,memory:str,swap:str='0',budget:str|None=None) -> dict|None`；configuration 的后端及 concurrency 来自网关权威快照。
 - `NativeSenderConfig = {binary_path,work_root,memory_mib:u64,max_workers:usize}`；legacy 的 native 配置为 None。
 - `V3_NATIVE_PREWARM_ACCOUNT_ID` 缺省为空，可配置一个正整数网关账号 ID；`SenderConfig.native_adaptive_prewarm` 为私有布尔字段，旧配置缺省 false。
-- 有限账号显式环境键 `V3_NATIVE_SENDER_MEMORY`；构建可选 `V3_NATIVE_RUNTIME_ASSET` 指定本地候选，否则下载固定 beta.5 附件。`stage_asset(destination:Path,source:str|None=None) -> dict` 冻结版本/大小/SHA。
+- 有限账号显式环境键 `V3_NATIVE_SENDER_MEMORY`；构建可选 `V3_NATIVE_RUNTIME_ASSET` 指定本地候选，否则下载固定 beta.6 附件。`stage_asset(destination:Path,source:str|None=None) -> dict` 冻结版本/大小/SHA。
 - `account_limits(memory,swap)`、`isolated_account_limits`、`scenario_account_limits`、`serial_review_limits` 接受账号 `mem="unlimited"`，无限模式 Docker 额度为 `(0,-1)`；`memory_bytes` 继续只解析有限配置。
 - fingerprint 可选 `native_sender_memory`，无限原生账号保存 `"unlimited"`，布局变更时保存，回退 legacy 时移除；镜像原生能力标签为 `vibebench.native-runtime=293-raw-1`。
 - `AccountRuntime.native_preparation_snapshots() -> tuple[dict[int,dict],str|None]` 通过一次 `GET /admin/native-preparations` 读取批量快照，超时3秒；`native_preparation_summary(row,account,snapshots,read_error=None) -> dict|None` 为 `/api/environments` 生成安全的 `native_preparation`。
@@ -1276,7 +1276,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 首条业务拿走唯一进程且账号允许两条普通并发时，sender 可为当前代次登记一次后台补位。首条直接投递；后续请求优先取空闲进程，缺空闲时可在自己的截止前等这一轮就绪。补位失败沿现有 checkout 路径处理。补位使用原物理计数与已核验映像，只提交初始化指令；结果通过真实握手后进入同一空闲池。
 - 布局/预算变化只在job和API活动为空时重建。配置事务已停sender时复用 `_running_sender_active` 记零活动；运行中读取真实活动，归属或查询失败仍拒绝重建。
 - SOCKS5/5h使用逐进程随机Basic鉴权的回环CONNECT，固定目标 `api.anthropic.com:443`，保持原生TLS；socks5本地DNS、socks5h代理DNS。隧道不构造业务请求，生命周期绑定进程。
-- 镜像构建冻结正式beta.5附件，校验27388048 B及分发SHA `64c61cae565e9097de18cf61a35f46e7595f633cb14f7d6b8c6609fcd294ce89`后复制；Rust默认消费者核验执行体SHA `af4cea9e21aa959c5e39c389173ba30ebb19b354b67acfe99164946450e9776d`及112839864 B，固定官方来源仍为2.1.293。默认发行、Python下载、Docker校验和Rust准入同步更新，正式附件真实回环通过后交付。Cargo使用项目独立BuildKit锁定缓存和 `--locked`，输出复制至普通 `/out` 层；联合清单继续登记实际源摘要和最终镜像身份。
+- 镜像构建冻结正式beta.6附件，校验27388048 B及分发SHA `fce50a30d739dbc614e450d4d1913208fa35c6373c4f07a3986657393a99261e`后复制；Rust默认消费者核验执行体SHA `564019c9560e960e96875c9663975491534b27c789ea3d23e5c13309ff293c79`及112843960 B，固定官方来源仍为2.1.293。默认发行、Python下载、Docker校验和Rust准入同步更新；TLS准入同时保留前版beta.5执行体身份。Cargo使用项目独立BuildKit锁定缓存和 `--locked`，输出复制至普通 `/out` 层；联合清单继续登记实际源摘要和最终镜像身份。
 
 ### 4. Validation & Error Matrix
 
@@ -1328,15 +1328,18 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 ### 2. Signatures
 
 - POST /api/environments/{environment_id}/native-kernel：{operation:prepare|activate|rollback|recover,operation_id:UUID,release?:string,expected_sha256?:string,expected_revision:string}。
-- 环境列表 native_kernel：state、revision、current、previous、prepared、pid、image_sha256、error、operation_id、binding_generation。未配置有效发行公钥、缺少sender或非原生环境返回null。
+- 环境列表native_kernel：state、revision、current、builtin、previous、prepared、pid、image_sha256、error、operation_id、binding_generation。builtin展示当前镜像内置身份。未配置有效发行公钥、缺少sender或非原生环境返回null。
+- GET `/api/environments/{environment_id}/native-kernel/releases?refresh=bool`：沿管理鉴权及唯一账号绑定，只读返回 `{state:ready|stale|unavailable,reason,versions:[{release,published_at}],latest,checked_at_ms,builtin}`。
 - POST /admin/runtime/accounts/:id/native-kernel-probe：owner、lease_generation、binding、target{release:NativeReleaseRef|null,kernel_generation:UUID}；私有 sender /internal/native/prepare-switch 包含 target、identity。
-- NativeSenderConfig可选release{release,launcher_sha256}、kernel_generation；省略时使用当前镜像固定的内置beta.5。历史镜像内置版本按其实际分发身份判定。NativePreparationStatus增加release、kernel_generation、image_sha256。
+- NativeSenderConfig可选release{release,launcher_sha256}、kernel_generation；省略时使用当前镜像固定的内置beta.6。历史镜像内置版本按其实际分发身份判定。NativePreparationStatus增加release、kernel_generation、image_sha256。
 
 ### 3. Contracts
 
 - V3_NATIVE_RELEASE_PUBLIC_KEY为部署固定Ed25519原始32字节公钥的小写hex，`release_key() -> str`仅返回有效公钥；配置有效公钥后覆盖部署内全部native293账号。旧V3_NATIVE_RELEASE_PILOT_ENVIRONMENT停止参与准入，部署预检只校验可选发行公钥格式。
 - 创建原生sender时只读挂载bench/native-releases至/runtime-releases并传公钥，CLI及network角色不取得该挂载或发行公钥。已有sender首次取得该挂载需要空闲重建；各账号独立保存版本选择与操作记录。
 - 下载固定SilentFlower/cc-runtime-bridge的精确标签，HTTPS跳转只接受github.com、release-assets.githubusercontent.com、objects.githubusercontent.com。清单≤4096B、签名64B、分发≤27933052B；使用签名原字节及独立SHA核验。版本目录按标签/分发SHA寻址，原子写入，已有候选可离线复核。
+- 版本发现固定GitHub发行API的前100条，响应最多2MiB，连接/读取超时5秒并逐块检查10秒预算；只取合法beta标签、draft=false且固定分发/清单/签名三附件各唯一的版本，按beta数字降序。进程内缓存五分钟，refresh=true主动刷新；403/429投影release_rate_limited，其余失败release_fetch_failed。有缓存返回stale及旧采样时刻，无缓存unavailable；任意发布正文和下载URL不进入投影。列表轮询不发起发行查询，发现不替代准备验签。
+- 持久选择在平台升级后成为内置版本时，已下载版本仍按原签名/SHA独立复核；相同内置分发可以准备，页面禁用与当前SHA相同的激活。
 - 管理请求绑定唯一账号与环境。expected_revision同时含环境代次和持久操作版本；新准备、激活及对账消费原版本。同操作ID只接受完全相同参数，之后操作消费版本后旧请求拒绝。
 - 环境私有runtime/native-kernel-upgrade.json保存准备、draining、switching、restoring、finishing、active/restored/failed/reconcile及原/候选/上一版。准备不占账号API门禁；激活和回滚使用现有排他租约，CLI忙时延后。排空≤120秒，等待原流收齐，未知活动不得视为空闲。
 - 专用预热由管理员服务证明与对应kernel:UUID维护租约触发；账号凭据所有权保护保持，AT由网关读取，RT不传sender。普通准备遇维护主动取消。
@@ -1357,16 +1360,19 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 | 候选预热失败 | 原版真实预热后再开放 |
 | 操作中断或释放结果未知 | 可见reconcile，禁止复跑模型请求 |
 | 下一请求重新读取环境 | 内核选择不触发容器布局重建 |
+| 版本发现限流或读取失败 | stale/unavailable，保留当前内核与已准备候选 |
 
 ### 5. Scenarios and Examples
 
 - 历史回归（强制TTL关闭）：从内置beta.3准备beta.4，目标账号长流自然结束，切换预热零模型，下一请求复用新PID；回滚恢复beta.3，所有容器ID和对照账号PID保持。
 - 边界：先激活再回滚，迟到首次激活的相同ID和旧revision必须冲突。
 - 错误用法：HTTP active=0就假定物理进程全部退出。正确处理：等待物理许可并收口旧池后再启动候选。
+- 正常：检查更新后从select选择已发布版本，准备验签后显式激活。错误用法：将发现列表当成已授信制品。正确处理：准备时继续独立验证固定签名和精确摘要。
 
 ### 6. Tests Required
 
 - services/orchestrator/test_native_kernel_upgrade.py：两个不同环境在同一发行公钥下开放管理，旧试点字段忽略，缺失/非法公钥与非原生环境保持关闭；签名及摘要拒绝、准备与接单独立、排空/回滚、旧请求重放、超时、恢复及候选摘要漂移。
+- test_native_kernel_releases覆盖元数据过滤、数字排序、有界数组JSON、固定来源、缓存副本与限流降级；test_native_kernel_upgrade覆盖已选版本成为内置后的离线复核。
 - services/orchestrator/test_account_runtime.py核对两个原生sender均有只读版本挂载及发行公钥，其他角色保持隔离；deploy/flower2api/test_manage.py核对仅公钥即可配置，非法公钥拒绝，旧试点配置兼容忽略。
 - Rust native_real_binary：模拟一个退出未收口许可和一个空闲worker，归还前零启动，归还后换PID；native_real_gateway验证维护归属、长流、实际新PID和零模型切换。
 - deploy/flower2api/verify_forwarding.py --native --kernel-release <测试签名目录> --kernel-public-key <公钥>：双账号真实三角色、管理端准备/激活/回滚、长流只发送一次、下一业务复用、对照账号PID与所有容器ID/StartedAt保持、管理端公网发送计数为0。
@@ -1381,13 +1387,15 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - GET/POST `/api/environments/{environment_id}/cpu-resources`，沿既有管理鉴权。
 - POST字段：`expected_generation:StrictInt,expected_revision:StrictStr,cpus:{cli,sender,network}`；额度为严格数字，拒绝额外字段及bool。
 - `cpu_resources.read_resources(runtime,row)`、`set_resources(runtime,row,expected_generation,expected_revision,cpus)`；`read_policy(runtime,row)`读取重建策略。
+- `cpu_resources.default_cpu_limits(values:dict|None=None) -> dict[str,int]`：省略values读取环境，返回三个角色的NanoCpus；部署预检与角色创建共用。
 - 返回generation、revision、host_cpus、cpus、persisted_cpus；revision冻结环境代次、持久策略及实际容器身份/额度/生命周期。
 
 ### 3. Contracts
 - 三角色分别支持0.01到Docker宿主NCPU核，总和不设3核上限。CPU是共享调度额度，按NanoCpus精度校验有限数字，保留正数预算模式。
 - POST先登记部署维护活动，在环境锁内重读当前环境及未删除账号；拒绝维护中、内核切换/对账中、评审串行交接中或旧代次/revision。只通过Docker更新NanoCpus，逐项核对实际归属、镜像、Memory/MemorySwap/PidsLimit、启动时间、重启数及运行状态/PID保持。
 - 私有0600 `runtime/cpu-resources.json`为schema_version=1、environment_id、account_id、revision UUID、三角色nano_cpus；严格拒绝损坏、链接和错误归属。实际额度全部确认后原子发布。Docker异常可能已经生效，尝试集合先登记再调用；失败按原不可变容器恢复额度和原策略，记录restored或reconcile。
-- 角色创建在默认6:1:1及旧评审布局后应用保存策略。旧schema1布局只覆盖CPU核验视图，原内存/PID及文件保持；串行评审借用当前CLI额度，保存策略与三个实际角色逐项相等后使用新额度，历史V3_ACCOUNT_CPUS不再限制其总和。
+- 新角色CPU默认CLI1.5/sender1/network0.5核，通过 `V3_ACCOUNT_CLI_CPUS`、`V3_ACCOUNT_SENDER_CPUS`、`V3_ACCOUNT_NETWORK_CPUS` 独立覆盖。缺省或空字符串使用默认；有限数字至少0.01核且精确表示为整数纳核，bool、非法数值及超长小数拒绝。转换使用Decimal精确整数比，禁止依赖乘法上下文先舍入后验精度。固定宿主更新包SOURCE_FILES包含cpu_resources.py。
+- 角色创建先使用独立默认及旧评审布局，最后应用合法保存策略。旧schema1布局只覆盖CPU核验视图，原内存/PID及文件保持；串行评审借用当前CLI额度，保存策略与三个实际角色逐项相等后使用新额度。无保存策略时总上界取三角色默认总量与旧V3_ACCOUNT_CPUS较大者；旧总量2核不将新角色按6:1:1重新分配。
 - 宿主HostDeployment.environment_cpu在排空后、重建意图前冻结实际额度到operation.environment_cpu_before。新角色重建及软件失败回滚后按不可变ID/标签恢复，仅CPU变化；兼容旧平台忽略新策略文件。旧无限CPU且缺策略保持原升级路径，显式策略与实际预算不符时拒绝。
 - 页面独立CPU表单按需读取，列表轮询保持输入；提交冻结revision，关闭/离页作废迟到回执。失败要求重读实际额度，成功提示即时应用并保存重建配置。
 
@@ -1400,14 +1408,17 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 | Docker返回失败但实际生效 | 按已尝试角色恢复并核对 |
 | 策略损坏、链接或跨环境 | 明确拒绝，保持故障可见 |
 | 旧平台重建恢复默认CPU | 宿主恢复维护前实际额度并验收 |
+| 默认配置超长小数或非有限值 | 部署预检及创建前拒绝，保持精确纳核校验 |
 
 ### 5. Scenarios and Examples
 - 正常：CLI=2、sender=1、network=0.5，保存后即时生效，下一次重建按同策略创建；系统回滚也保留实际额度。
-- 基础：历史无策略继续原三角色预算，GET仅观测现状。
+- 基础：新环境无策略使用1.5/1/0.5，历史实际角色由GET观测；已有显式策略优先。
+- 精度边界：1.000000001与相同值的尾随零合法，1.0000000000000000000000000001拒绝；禁止先舍入为1再接受。
 - 错误用法：限制三项合计3核、只调用不支持nano_cpus的Docker SDK Container.update，或重建后丢掉在线调额。正确处理：逐项校验，沿SDK JSON入口发送NanoCpus，并由策略/宿主维护记录分别承接重建与旧版回滚。
 
 ### 6. Tests Required
 - test_cpu_resources：合计6核、CAS、真实Docker SDK回环JSON、未知更新恢复、策略归属/链接及评审交接拒绝。
+- default_cpu_limits覆盖独立覆盖、旧总量忽略、非法类型、科学计数法与尾随零；低精度Decimal上下文下合法纳核保持、超长小数拒绝。test_manage覆盖部署预检拒绝同一超长输入，test_system_workflow覆盖固定宿主包独立导入。
 - test_account_runtime实际三角色创建沿保存额度；test_project_review_runtime旧布局按新CPU交接、原文件及RAM/PID保持、角色漂移拒绝。
 - test_system_update_cpu核维护前持久冻结、重建实际新角色恢复、归属冲突更新前拒绝；原更新器回归保持。
 - verify_native_diagnostics_cpu：轮询保留表单、冻结提交、冲突、晚回执、390像素及零真实模型调用。
@@ -1467,3 +1478,49 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - `test_saved_role_cpu_policy_is_used_when_recreating_containers` 验证三角色重建沿原 CPU 策略；浏览器回归核对冻结版本、独立开关及重复提交。
 - `test_native_tls_isolation.py`与真实`verify_roles`区分加载器、Rust sender及其worker，验证精确入口/能力/seccomp、业务零权限、秘密隔离、本地构建和资源压力；root加载器不能套用旧的容器默认UID断言。
 - 内容采集测试覆盖缺省true、显式false、非法类型、同代次新鲜ready、旧镜像关闭态零维护写入。浏览器覆盖默认开启、取消、关闭再开启和五类TLS能力状态；真实模型调用为0。
+
+## Scenario: CRIU默认选择、维护应用与实际状态
+
+### 1. Scope / Trigger
+
+- 修改恢复默认值、账号选择、sender入口、预算或前端状态时适用；恢复协议和业务权限沿[runtime合同](../../runtime/backend/runtime-contract.md#scenario-原生进程池-criu-热模板恢复协议-1)。
+
+### 2. Signatures
+
+- GET/POST `/api/environments/{environment_id}/criu`；POST为 `{enabled:StrictBool,expected_generation:StrictInt,expected_revision:StrictStr}`，拒绝额外字段。
+- `native_criu_policy.account_enabled(fingerprint) -> bool`；`restore_policy(native,fingerprint,installed) -> dict`供角色创建、ensure与读取共用。
+- `native_criu_settings.read_settings(runtime,row,observation=None)`与`set_settings(runtime,row,account,enabled,expected_generation,expected_revision)`；`native_settings_operation.apply_settings(...)`复用采集开关维护生命周期。
+
+### 3. Contracts
+
+- 全局 `V3_NATIVE_CRIU` 缺省/空值为1、精确0关闭；账号指纹可选 `native_criu_enabled:bool` 缺省true，非法类型拒绝。native配置、镜像能力、全局/账号选择及独立内存条件共同决定恢复入口；普通池仍按256+192×max_workers准入，恢复另需256+300×max_workers MiB，memory_mib=0为配置无限。
+- sender.json保存有效 `native_criu_enabled`、固定原因 `native_criu_reason`、可选 `native_criu_protocol:1`。创建选择实际入口；ensure比较有效配置沿原空闲重建门禁。列表查询保持只读。
+- 完整摘要包含schema_version=1、environment_id/generation/revision、enabled/platform_enabled/eligible、supported/installed/applied、memory_mib/required_memory_mib、state/reason、checked_at_ms、template_ready和last_start_source。state为disabled/not_installed/requires_rebuild/preparing/ready/unavailable/unknown。revision冻结指纹、策略、sender文件摘要及实际容器/入口身份。
+- 镜像标签仅表明installed；applied同时核对唯一绑定、配置选择和实际Entrypoint。旧入口显示requires_rebuild。当前观测需匹配环境、generation、kernel_generation及45秒内整数时间戳；只接受schema1、受控state/reason与精确bool，ready和template_ready必须一致。旧字段缺失显示telemetry_missing，陈旧/跨代显示telemetry_stale；last_start_source仅接受exec/criu_restore。
+- reason区分legacy_backend、platform_disabled、account_disabled、image_unsupported、memory_budget、container_rebuild_required、binding_unverified、environment_stopped、telemetry_missing/stale、controller_preflight_failed/unavailable、kernel_unsupported、template_failed/preparing及identity_changed；临时列表读取失败可仅返回schema1/unknown/read_failed。
+- POST沿更新准入→owner/profile→environment锁顺序重读唯一账号及CAS。拒绝待处理内核维护、未就绪绑定、CLI/评审作业、API活动或占用租约；开启需核对平台与安装能力。同值且applied直接返回，历史未应用同值沿重建路径执行。
+- 唯一criu:UUID owner申请prepare/claim，停止并移除原角色、持久选择、保留代理/HOME/身份及内核选择后ensure重建；原停止环境保持停止。核对后写私有runtime/criu-operation.json。失败恢复原指纹和角色；恢复或释放结果未知进入reconcile。finally只释放本owner租约，prepare回包丢失也重读归属。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 普通预算够、恢复预算不足 | 普通启动，unavailable/memory_budget |
+| 全局0或账号false | 显示关闭原因，保留账号选择与普通启动 |
+| 镜像具备工具、实际为旧入口 | requires_rebuild，空闲应用后核对 |
+| 旧遥测、过期或跨代 | unknown及固定原因，禁止沿用旧ready |
+| 未鉴权 / DTO错误 / CAS过期或忙碌 | 401 / 422 / 409 |
+| 切换或释放失败 | 恢复原策略或reconcile，错误内容受控 |
+
+### 5. Scenarios and Examples
+
+- 正常：新无限原生账号缺省选择控制器；当前模板登记存活后显示ready，最近扩容来源可为criu_restore。
+- 边界：1536MiB、max_workers=6继续普通启动并展示恢复需2056MiB；全局关闭时可保留账号true作为期望值。
+- 错误用法：仅凭镜像标签或缺少恢复字段的旧巡检推定ready。正确处理：分别核对目标、实际入口和同代真实模板。
+- 上线后：静态准入为受控重建前置条件；发布负责人仍需验收权限、实际恢复、唯一发送及宿主并发资源峰值。
+
+### 6. Tests Required
+
+- test_native_criu_settings：缺省/显式关闭、有限降级、无限额度、实际文件CAS、维护租约、失败恢复、同值旧入口、严格同代遥测；实际ASGI覆盖鉴权、严格DTO、旧CAS及只读发现。
+- test_account_runtime：实际Docker调用选择控制器与新CPU，持久策略/采集/内核身份及旧维护回归。
+- gateway：可选restore兼容、登记断开、独立预算与饱和计算；verify_environment_ui核对开关及实际状态，所有本地夹具零真实模型调用。

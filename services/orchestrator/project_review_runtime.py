@@ -13,7 +13,7 @@ from docker.errors import DockerException, NotFound
 
 from account_isolation import ISOLATION_VERSION, role_container
 from account_runtime import RuntimeBusy, _read_json, atomic_json
-from cpu_resources import read_policy as read_cpu_policy
+from cpu_resources import default_cpu_limits, read_policy as read_cpu_policy
 from project_library import read_document, safe_relative, write_document
 from resource_budget import isolated_account_limits, scenario_account_limits, serial_review_limits
 from system_profile import SYSTEM_PROFILE_DIRECTORY
@@ -308,7 +308,7 @@ class ProjectReviewRuntime:
                 raise ValueError('账号公共角色的实际限额与固化预算不符')
             cpu += config['NanoCpus']
         # 显式保存的三角色策略已逐项核验，用户调额后沿新额度交接。
-        if policy is None and cpu > int(float(os.environ.get('V3_ACCOUNT_CPUS','2'))*1_000_000_000):
+        if policy is None and cpu > max(sum(default_cpu_limits().values()), int(float(os.environ.get('V3_ACCOUNT_CPUS','2'))*1_000_000_000)):
             raise ValueError('账号实际 CPU 限额超过配置预算，拒绝串行交接')
         layout = {**layout,'limits':{**layout['limits'],
             'review':list(serial_review_limits(fingerprint['mem'],fingerprint.get('swap','0'),fingerprint.get("native_sender_memory")))},

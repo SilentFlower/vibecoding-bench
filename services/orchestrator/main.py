@@ -54,6 +54,8 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from pydantic import BaseModel, ConfigDict, StrictBool, StrictFloat, StrictInt, StrictStr, ValidationError
 from cpu_resources import read_resources as read_cpu_resources, set_resources as set_cpu_resources
 from content_capture_settings import read_settings as read_content_capture, set_settings as set_content_capture
+from native_criu_settings import read_settings as read_criu, set_settings as set_criu
+from native_kernel_releases import discover_releases
 from requests.exceptions import RequestException
 from sse_starlette.sse import EventSourceResponse
 from starlette.websockets import WebSocketState
@@ -12530,6 +12532,7 @@ def v3_environments() -> list[dict]:
             row["native_kernel"] = None
         row["platform_release"] = account_runtime.release_id
         row['content_capture'] = None
+        row['criu'] = None
         if account and account['cc2api_account_id'] is not None:
             guard = account_runtime.environment_lock(row['environment_id'])
             if guard.acquire(blocking=False):
@@ -12537,6 +12540,11 @@ def v3_environments() -> list[dict]:
                     current, _ = _content_capture_account(row['environment_id'])
                     row['content_capture'] = read_content_capture(account_runtime, current,
                         native_preparations.get(current.get('gateway_account_id')))
+                    try:
+                        row['criu'] = read_criu(account_runtime, current,
+                            native_preparations.get(current.get('gateway_account_id')))
+                    except (DockerException, OSError, ValueError, RuntimeError, TypeError):
+                        row['criu'] = {'schema_version': 1, 'state': 'unknown', 'reason': 'read_failed'}
                 except (HTTPException, OSError, ValueError, RuntimeError):
                     pass
                 finally:
@@ -12663,6 +12671,59 @@ def v3_set_content_capture(environment_id: str, body: ContentCaptureOperation) -
         raise HTTPException(409, str(error)) from None
     except (DockerException, RequestException, OSError):
         raise HTTPException(503, '采集切换尚未完成，请重新读取实际状态') from None
+
+
+@app.get('/api/environments/{environment_id}/native-kernel/releases')
+def v3_native_kernel_releases(environment_id: str, refresh: bool = False) -> dict:
+    """检查固定发行源的内核版本。@param environment_id 唯一环境。@param refresh 显式刷新缓存。@return 版本发现结果，准备与激活仍沿原验签入口。"""
+    if not account_runtime:
+        raise HTTPException(404)
+    with account_runtime.environment_lock(environment_id):
+        row, _ = _content_capture_account(environment_id)
+        if native_kernel_status(account_runtime, row) is None:
+            raise HTTPException(409, '当前环境尚未提供原生内核管理')
+    return discover_releases(refresh)
+
+
+class CriuOperation(ContentCaptureOperation):
+    """CRIU账号选择及页面冻结的代次和配置摘要。"""
+
+
+@app.get('/api/environments/{environment_id}/criu')
+def v3_criu(environment_id: str) -> dict:
+    """只读恢复配置及真实状态。@param environment_id 唯一环境。@return 版本化安全摘要。"""
+    if not account_runtime:
+        raise HTTPException(404)
+    snapshots, _ = account_runtime.native_preparation_snapshots()
+    try:
+        with account_runtime.environment_lock(environment_id):
+            row, _ = _content_capture_account(environment_id)
+            return read_criu(account_runtime, row, snapshots.get(row.get('gateway_account_id')))
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(409, str(error)) from None
+    except (DockerException, RequestException, OSError):
+        raise HTTPException(503, 'CRIU配置暂时不可读取，请刷新核对') from None
+
+
+@app.post('/api/environments/{environment_id}/criu')
+def v3_set_criu(environment_id: str, body: CriuOperation) -> dict:
+    """沿原维护门禁应用账号恢复选择。@param environment_id 唯一环境。@param body 冻结选择及CAS。@return 重建后实际配置。"""
+    if not account_runtime:
+        raise HTTPException(404)
+    _, original = _content_capture_account(environment_id)
+    try:
+        with UPDATE_GATE.admission('environment-criu'):
+            with _oauth_owner_lock(original['name']), _profile_lock(original['name']):
+                with account_runtime.environment_lock(environment_id):
+                    row, account = _content_capture_account(environment_id)
+                    if account['id'] != original['id'] or account['name'] != original['name']:
+                        raise ValueError('账号环境归属已变化，请重新读取')
+                    return set_criu(account_runtime, row, account, body.enabled,
+                        body.expected_generation, body.expected_revision)
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(409, str(error)) from None
+    except (DockerException, RequestException, OSError):
+        raise HTTPException(503, 'CRIU切换尚未完成，请重新读取实际状态') from None
 
 
 class CpuResourceOperation(BaseModel):

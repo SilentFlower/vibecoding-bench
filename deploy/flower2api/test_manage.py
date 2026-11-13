@@ -124,6 +124,17 @@ class PreflightTests(unittest.TestCase):
                 with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'CRIU 开关'):
                     manage.preflight(self.values)
 
+    def test_invalid_role_cpu_default_is_rejected_during_preflight(self) -> None:
+        """创建前拒绝非法角色默认值，防止部分角色已启动。@return 无。"""
+        self.values.update(V3_ACCOUNT_MEMORY='1536m')
+        with patch.object(manage, 'command', return_value=''), \
+                patch.object(manage, 'inspect_images', return_value={}), \
+                patch.object(manage.Path, 'read_text', return_value='MemAvailable: 2097152 kB\nSwapFree: 0 kB\n'):
+            for value in ('NaN', '1.0000000000000000000000000001'):
+                self.values['V3_ACCOUNT_SENDER_CPUS'] = value
+                with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'CPU默认'):
+                    manage.preflight(self.values)
+
     def test_published_docker_nat_port_rejects_without_host_listener(self) -> None:
         """Docker 禁用 userland proxy 时，也必须检查 NAT 发布端口。@return None。"""
         self.values["V3_HOST_PORT"] = "18080"

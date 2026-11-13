@@ -94,6 +94,7 @@ async def main() -> None:
     ROOT.chmod(0o700)
     environment = dict(os.environ)
     environment['CCRB_CRIU'] = '1' if profile else '0'
+    environment['CCRB_CRIU_REASON'] = '' if profile else 'controller_preflight_failed'
     sender = await asyncio.create_subprocess_exec(str(TOOLS / 'launch'), 'sender', env=environment)
     sender_fd = os.pidfd_open(sender.pid)
     controller = Controller(sender.pid, maximum, native['work_root'], profile) if profile else None

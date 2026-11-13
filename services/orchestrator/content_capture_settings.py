@@ -1,12 +1,11 @@
 """账号内容采集策略；在原空闲维护门禁内重建并核对实际配置。"""
 import hashlib
 import json
-import uuid
 import time
 
 from native_capture_policy import capture_enabled
 from native_kernel_upgrade import pending_upgrade
-from runtime_files import atomic_json
+from native_settings_operation import apply_settings
 from system_update_contract import safe_read, strict_json
 
 
@@ -100,75 +99,5 @@ def set_settings(runtime, row: dict, account: dict, enabled: bool,
         return before
     if enabled and before['tls_observer']['protocol_version'] != 1:
         raise ValueError('当前镜像需要先通过系统更新安装原生TLS采集能力')
-    original = json.loads(row['fingerprint_json'])
-    was_stopped = row['state'] == 'stopped'
-    owner = f'capture:{uuid.uuid4().hex}'
-    if runtime.credential_ownership:
-        runtime.credential_ownership.guard(account, owner)
-    if runtime.environment_jobs(row['environment_id']) or runtime.reviews.serial_state(row):
-        raise ValueError('账号正在工作或评审交接，请空闲后切换采集')
-    lease_path = f'/admin/runtime/accounts/{account["cc2api_account_id"]}/lease'
-    snapshot = runtime.gateway._request('GET', lease_path)
-    if snapshot.get('lease') or snapshot.get('holders') or snapshot.get('active') != 0 or snapshot.get('waiting', 0):
-        raise ValueError('账号正在工作，请空闲后切换采集')
-    if runtime._running_sender_active(row):
-        raise ValueError('账号仍有发送连接，请空闲后切换采集')
-    audit_path = runtime._root(row) / 'runtime/content-capture-operation.json'
-    audit = {'schema_version': 1, 'environment_id': row['environment_id'],
-        'account_id': account['cc2api_account_id'], 'operation_id': owner,
-        'original_enabled': before['enabled'], 'target_enabled': enabled, 'state': 'applying'}
-    changed = False
-    try:
-        # 维护租约持续关闭 API 入场；CLI 作业登记会阻止画像复用与重建，不能用于这条路径。
-        prepared = runtime.gateway._request('POST', lease_path, {'operation': 'prepare', 'owner': owner})
-        lease = runtime._owned_lease(prepared, owner)
-        if not lease or prepared.get('active') != 0 or runtime._running_sender_active(row):
-            raise ValueError('账号已开始工作，请空闲后重新操作')
-        runtime.gateway._request('POST', lease_path,
-            {'operation': 'claim', 'owner': owner, 'generation': lease['generation']})
-        atomic_json(audit_path, {**audit, 'lease_generation': lease['generation']})
-        changed = True
-        runtime._stop_environment(row, remove=True)
-        runtime._update(row, fingerprint_json=json.dumps({**original, 'native_capture_enabled': enabled}), state='stopped')
-        current, _ = runtime.ensure(account, preserve_proxy=True)
-        row.update(current)
-        if was_stopped:
-            runtime._stop_environment(row)
-            runtime._update(row, state='stopped')
-        result = read_settings(runtime, row)
-        if result['enabled'] != enabled or not result['applied']:
-            raise ValueError('发送器实际采集配置与目标不一致')
-        atomic_json(audit_path, {**audit, 'state': 'applied'})
-        return result
-    except Exception:
-        if changed:
-            restored = False
-            try:
-                runtime._stop_environment(row, remove=True)
-                runtime._update(row, fingerprint_json=json.dumps(original), state='stopped')
-                current, _ = runtime.ensure(account, preserve_proxy=True)
-                row.update(current)
-                if was_stopped:
-                    runtime._stop_environment(row)
-                    runtime._update(row, state='stopped')
-                recovered = read_settings(runtime, row)
-                restored = recovered['enabled'] == before['enabled'] and recovered['applied']
-            except Exception:
-                runtime._update(row, state='reconcile')
-            if not restored:
-                runtime._update(row, state='reconcile')
-            atomic_json(audit_path, {**audit, 'state': 'restored' if restored else 'reconcile'})
-            raise RuntimeError('采集切换失败，原策略已恢复' if restored else '采集配置需要对账，请查看环境维护状态') from None
-        raise
-    finally:
-        try:
-            # prepare 的响应也可能丢失，按唯一 owner 重读后只释放本次租约。
-            snapshot = runtime.gateway._request('GET', lease_path)
-            lease = runtime._owned_lease(snapshot, owner)
-            if lease:
-                # 门禁到期仍保持关闭，原 owner 可释放；重建期间无业务提交许可依赖续租。
-                runtime.gateway._request('POST', lease_path,
-                    {'operation': 'release', 'owner': owner, 'generation': lease['generation']})
-        except Exception:
-            runtime._update(row, state='reconcile')
-            raise RuntimeError('采集维护门禁尚未释放，请通过环境维护对账') from None
+    return apply_settings(runtime, row, account, enabled, before, read_settings,
+        field='native_capture_enabled', label='采集', prefix='capture', audit_name='content-capture-operation.json')

@@ -30,6 +30,7 @@ COMPOSE = Path(__file__).with_name("compose.yml")
 sys.path.insert(0, str(source_path(REPO, "orchestrator")))
 from resource_budget import account_limits, isolated_account_limits
 from native_sender import prewarm_account_id, stage_asset
+from cpu_resources import default_cpu_limits
 from platform_version import read_version
 from release_ci import validate_publish_source
 from system_update_contract import REPOSITORY
@@ -206,7 +207,8 @@ def preflight(values: dict) -> Path:
     if values.get("V3_NATIVE_SENDER_MEMORY"):
         isolated_account_limits(values.get("V3_ACCOUNT_MEMORY", "4g"), values.get("V3_ACCOUNT_SWAP", "0"), values["V3_NATIVE_SENDER_MEMORY"])
     prewarm_account_id(values.get("V3_NATIVE_PREWARM_ACCOUNT_ID", ""))
-    if values.get("V3_NATIVE_CRIU", "0") not in ("", "0", "1"):
+    default_cpu_limits(values)
+    if values.get("V3_NATIVE_CRIU", "1") not in ("", "0", "1"):
         raise ValueError("原生 CRIU 开关必须为 0 或 1")
     public_key = values.get("V3_NATIVE_RELEASE_PUBLIC_KEY", "")
     if public_key and not re.fullmatch(r"[a-f0-9]{64}", public_key):

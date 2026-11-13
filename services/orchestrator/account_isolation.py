@@ -9,13 +9,13 @@ from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 from docker.types import Mount
-from cpu_resources import read_policy as read_cpu_policy
+from cpu_resources import default_cpu_limits, read_policy as read_cpu_policy
 
 from account_update_identity import configured_release, image_origin, role_release, save_image_origin
 
 from native_kernel_upgrade import applied_kernel, release_key
 from native_capture_policy import capture_enabled
-from native_sender import criu_enabled
+from native_criu_policy import restore_policy
 from resource_budget import isolated_account_limits, scenario_account_limits
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_VERSION, SYSTEM_PROFILE_DIRECTORY,
     SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_VERSION)
@@ -149,10 +149,13 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     resolved_proxy = urlunsplit((parsed.scheme, f'{userinfo}{address}:{parsed.port}', parsed.path, parsed.query, ''))
     image_labels = runtime.client.images.get(runtime.image).attrs['Config'].get('Labels') or {}
     observer_protocol = 1 if native and image_labels.get('vibebench.native-tls-observer') == '1' else None
+    restore = restore_policy(native, fingerprint, image_labels.get('vibebench.native-criu') == '1')
     sender_file = paths['sender'] / 'sender.json'
     write_json(sender_file, {'binding': binding, 'proxy_url': resolved_proxy, 'proxy_source': proxy,
         'native': native, 'native_capture_dir': '/flows/api/cc-prepared' if native and capture_enabled(fingerprint) else None,
         'native_tls_observer_protocol': observer_protocol,
+        'native_criu_enabled': restore['eligible'], 'native_criu_reason': restore['reason'],
+        'native_criu_protocol': 1 if native and image_labels.get('vibebench.native-criu') == '1' else None,
         'allowed_origin': 'https://api.anthropic.com', 'evidence_file': '/flows/api/observations.jsonl', 'quota_identity': ''}, 0o640)
     os.chown(sender_file, 0, 1001)
     write_json(paths['network'] / 'context.json', {'NETWORK_INSPECTION_MODE': 'passthrough', 'QUOTA_SOURCE': ''})
@@ -165,7 +168,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     common_files = [('runtime/machine-id', '/etc/machine-id', 'ro'), ('runtime/resolv.conf', '/etc/resolv.conf', 'ro')]
     # 同一个宿主源不能在 dict 中重复作为键，machine-id 的第二个目标使用 Docker mounts。
     machine_mount = Mount('/var/lib/dbus/machine-id', str(host_root / 'runtime/machine-id'), type='bind', read_only=True)
-    cpu = int(float(os.environ.get('V3_ACCOUNT_CPUS', '2')) * 1_000_000_000)
+    default_cpus = default_cpu_limits()
     cpu_policy = read_cpu_policy(runtime, row)
     created = []
 
@@ -174,7 +177,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
         role_pids = 128 + 32 * native['max_workers'] if role == 'sender' and native else 512 if role == 'cli' else 128
         options.update(name=name if role == 'network' else name + '-' + role,
             labels=role_labels(runtime, row, role), detach=True, auto_remove=False, read_only=True,
-            mem_limit=memory, memswap_limit=total, nano_cpus=cpu * (6 if role == 'cli' else 1) // 8,
+            mem_limit=memory, memswap_limit=total, nano_cpus=default_cpus[role],
             pids_limit=role_pids, security_opt=options.pop('security_opt', ['no-new-privileges:true']),
             log_config={'type': 'json-file', 'config': {'max-size': '10m', 'max-file': '3'}}, mounts=[machine_mount])
         if role == 'cli' and review_layout:
@@ -246,6 +249,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
         _directory(root / 'runtime/native', 1001, 1001, 0o700)
         sender_mounts = mounts([*common_files, ('runtime/sender', '/run/v3', 'ro'), ('flows/api', '/flows/api', 'rw'), ('runtime/native', '/native', 'rw')])
         sender_env = {'V3_SENDER_CONFIG': '/run/v3/sender.json', 'TOKIO_WORKER_THREADS': '2'}
+        sender_env['CCRB_CRIU_REASON'] = restore['reason'] or ''
         if kernel_key:
             _directory(runtime.data / 'native-releases', mode=0o755)
             sender_mounts[str(runtime.host_data / 'native-releases')] = {'bind': '/runtime-releases', 'mode': 'ro'}
@@ -265,7 +269,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
                 cap_add=['SYS_ADMIN', 'SETUID', 'SETGID'],
                 security_opt=['no-new-privileges:true', 'seccomp=' + json.dumps(profile, separators=(',', ':'))])
             sender_options['tmpfs']['/run/ccrb-observer'] = 'rw,noexec,nosuid,nodev,size=1m,mode=0750'
-        if native and criu_enabled() and image_labels.get('vibebench.native-criu') == '1':
+        if restore['eligible']:
             # 控制器单独持有恢复权限；固定C入口为sender安装原业务过滤器并清零能力。
             _directory(root / 'runtime/native-criu', 0, 0, 0o700)
             sender_mounts[str(host_root / 'runtime/native-criu')] = {'bind': '/var/lib/ccrb-criu', 'mode': 'rw'}

@@ -49,7 +49,7 @@ const state = {
   cliSettings: null,
   workCapture: null,
   environmentUI: {rows: [], query: '', status: 'all', expanded: new Set(), pending: new Set(),
-    feedback: new Map(), request: 0, timer: null, loaded: false},
+    feedback: new Map(), kernelReleases: new Map(), checkingReleases: new Set(), request: 0, timer: null, loaded: false},
   kernelDialog: null,
   captureDialog: null,
 };

@@ -52,9 +52,11 @@ use crate::service::runtime_transport::{
     CLOCK_SKEW_MS, REQUEST_BUDGET_MS, SenderConfig, now_ms, validate_request,
 };
 
-const LAUNCHER_SHA256: &str = "64c61cae565e9097de18cf61a35f46e7595f633cb14f7d6b8c6609fcd294ce89";
-const IMAGE_SHA256: &str = "af4cea9e21aa959c5e39c389173ba30ebb19b354b67acfe99164946450e9776d";
-const IMAGE_BYTES: u64 = 112_839_864;
+const LAUNCHER_SHA256: &str = "fce50a30d739dbc614e450d4d1913208fa35c6373c4f07a3986657393a99261e";
+const IMAGE_SHA256: &str = "564019c9560e960e96875c9663975491534b27c789ea3d23e5c13309ff293c79";
+const IMAGE_BYTES: u64 = 112_843_960;
+const PREVIOUS_IMAGE_SHA256: &str =
+    "af4cea9e21aa959c5e39c389173ba30ebb19b354b67acfe99164946450e9776d";
 const FRAME_LIMIT: usize = 32 * 1024 * 1024;
 fn unavailable() -> AppError {
     AppError::ServiceUnavailable("原生运行时准备失败，请核对能力、身份和资源配置".into())
@@ -254,6 +256,8 @@ struct PoolState {
     spare: Option<SparePreparation>,
     template: Option<Arc<HotTemplate>>,
     template_retry_at: Option<Instant>,
+    restore_supported: Option<bool>,
+    last_start_source: Option<&'static str>,
 }
 
 /// 模板登记与其已缓存代理端点共同存活。
@@ -1525,11 +1529,70 @@ impl NativePool {
                 result["reason"] = json!(reason);
                 result["image_admitted"] = json!(
                     worker.image_sha256 == IMAGE_SHA256
-                        || worker.image_sha256 == super::native_criu::IMAGE_SHA256
+                        || worker.image_sha256 == PREVIOUS_IMAGE_SHA256
                 );
                 if status == "ready" {
                     break;
                 }
+            }
+        }
+        result
+    }
+
+    /// 只读投影当前身份的恢复能力与模板，不创建进程。@param config 冻结配置。@param key 权威池身份。@return 版本化安全摘要。
+    fn restore_status(&self, config: &SenderConfig, key: &str) -> Value {
+        let mut result = json!({"schema_version":1,"state":"unavailable","reason":null,
+            "checked_at_ms":now_ms(),"template_ready":false,"last_start_source":null});
+        let Some(native) = config.native.as_ref() else {
+            result["reason"] = json!("legacy_backend");
+            return result;
+        };
+        let Ok(image) = artifact(native) else {
+            result["reason"] = json!("kernel_unsupported");
+            return result;
+        };
+        if image.image_sha256 != super::native_criu::IMAGE_SHA256 {
+            result["reason"] = json!("kernel_unsupported");
+        } else if native.memory_mib != 0
+            && native.memory_mib
+                < POOL_MEMORY_MIB.saturating_add(
+                    (WORKER_MEMORY_MIB + image.image_bytes.div_ceil(1024 * 1024))
+                        .saturating_mul(native.max_workers as u64),
+                )
+        {
+            result["reason"] = json!("memory_budget");
+        } else if !super::native_criu::enabled() {
+            let reason = std::env::var("CCRB_CRIU_REASON").unwrap_or_default();
+            result["reason"] = json!(if reason == "controller_preflight_failed" {
+                "controller_preflight_failed"
+            } else {
+                "controller_unavailable"
+            });
+        } else {
+            let state = self.state.lock().unwrap();
+            if state.key != key {
+                result["state"] = json!("unknown");
+                result["reason"] = json!("identity_changed");
+                return result;
+            }
+            result["last_start_source"] = json!(state.last_start_source);
+            if let Some(template) = &state.template {
+                if template.registration.alive() {
+                    result["state"] = json!("ready");
+                    result["template_ready"] = json!(true);
+                } else {
+                    result["reason"] = json!("controller_unavailable");
+                }
+            } else if state.restore_supported == Some(false) {
+                result["reason"] = json!("kernel_unsupported");
+            } else if state
+                .template_retry_at
+                .is_some_and(|retry| retry > Instant::now())
+            {
+                result["reason"] = json!("template_failed");
+            } else {
+                result["state"] = json!("preparing");
+                result["reason"] = json!("template_preparing");
             }
         }
         result
@@ -1568,6 +1631,7 @@ impl NativePool {
             pid: None,
             reason: None,
             tls_observer: None,
+            restore: None,
         };
         {
             let mut state = self.state.lock().unwrap();
@@ -1608,6 +1672,7 @@ impl NativePool {
         }
         result.live_workers = self.state.lock().unwrap().live;
         result.tls_observer = Some(self.tls_status(config));
+        result.restore = Some(self.restore_status(config, &key));
         Ok(result)
     }
 
@@ -1934,6 +1999,8 @@ impl NativePool {
                 state.spare.take();
                 state.template.take();
                 state.template_retry_at = None;
+                state.restore_supported = None;
+                state.last_start_source = None;
                 std::mem::take(&mut state.idle)
             } else {
                 Vec::new()
@@ -2042,6 +2109,17 @@ impl NativePool {
             drop(cached);
             worker
         };
+        {
+            let mut state = self.state.lock().unwrap();
+            if state.key == key {
+                state.restore_supported = Some(worker.restore_supported);
+                state.last_start_source = Some(if worker.restored.is_some() {
+                    "criu_restore"
+                } else {
+                    "exec"
+                });
+            }
+        }
         drop(generation);
         if prepare_spare {
             self.start_spare(
@@ -2195,6 +2273,12 @@ impl NativePool {
                         state.template_retry_at = Some(Instant::now() + Duration::from_secs(30));
                     }
                     if let Some(mut worker) = worker.take() {
+                        state.restore_supported = Some(worker.restore_supported);
+                        state.last_start_source = Some(if worker.restored.is_some() {
+                            "criu_restore"
+                        } else {
+                            "exec"
+                        });
                         worker.idle_since = Instant::now();
                         state.idle.push(worker);
                         outcome = "ready";
@@ -3063,6 +3147,29 @@ mod tests {
         config.max_workers = 0;
         config.memory_mib = u64::MAX;
         assert!(config.verify().is_err());
+    }
+
+    /// 恢复状态独立报告内存准入，旧readiness仍可反序列化。@return 无。
+    #[test]
+    fn native_restore_status_independent_budget_and_old_readiness() {
+        let mut config: SenderConfig = serde_json::from_value(json!({
+            "native":{"binary_path":"/missing","work_root":"/tmp/synthetic","memory_mib":1536,"max_workers":6},
+            "binding":{"account_id":7,"environment_id":"synthetic","generation":1,"endpoint":"http://localhost:8091","secret":"synthetic","release_id":"synthetic"},
+            "proxy_url":"","allowed_origin":"https://api.anthropic.com"
+        })).unwrap();
+        let pool = NativePool::default();
+        assert_eq!(
+            pool.restore_status(&config, "synthetic")["reason"],
+            "memory_budget"
+        );
+        config.native.as_mut().unwrap().max_workers = usize::MAX;
+        assert_eq!(
+            pool.restore_status(&config, "synthetic")["reason"],
+            "memory_budget"
+        );
+        let old: NativeReadinessStatus = serde_json::from_value(json!({"state":"ready","account_id":7,
+            "environment_id":"synthetic","generation":1,"checked_at_ms":1,"idle_workers":1,"live_workers":1})).unwrap();
+        assert!(old.restore.is_none());
     }
 
     #[tokio::test]
