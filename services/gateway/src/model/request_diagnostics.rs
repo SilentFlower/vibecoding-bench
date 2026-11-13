@@ -45,6 +45,11 @@ pub struct RequestDiagnostic {
     pub finished_at: Option<String>,
     pub status_code: Option<u16>,
     pub account_id: Option<i64>,
+    /// 管理查询时读取的当前资料；记录入口保持为空，邮箱不进入持久摘要。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_email: Option<String>,
     pub response_request_id: Option<String>,
     pub outcome: String,
     pub error_stage: Option<String>,
@@ -200,6 +205,11 @@ pub struct AttemptDiagnostic {
     pub request_id: String,
     pub ordinal: u32,
     pub account_id: i64,
+    /// 各次尝试独立关联当前账号资料，兼容旧持久 JSON 缺字段。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_email: Option<String>,
     pub profile_version: String,
     pub profile_selection: String,
     pub parameters: DiagnosticParameters,

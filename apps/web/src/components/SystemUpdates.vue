@@ -20,7 +20,8 @@ const checking = ref(false);
 const conflicted = ref(false);
 const sent = ref(false);
 const dialog = ref<HTMLDialogElement | null>(null);
-const minutes = ref(15);
+const DEFAULT_DRAIN_MINUTES = 1;
+const minutes = ref(DEFAULT_DRAIN_MINUTES);
 const frozen = ref<{ action: 'install' | 'rollback' | 'recover'; body: SystemUpdateRequest; accountChanged: boolean; label: string } | null>(null);
 let alive = true;
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -122,11 +123,11 @@ async function check(): Promise<void> {
 /** 冻结现场及目标后显示确认，轮询保持原参数。@param action 动作。@param release 版本。@param digest 摘要。@param accountChanged 环境影响。@return 弹窗就绪。 */
 async function confirm(action: 'install' | 'rollback' | 'recover', release: string, digest: string, accountChanged = true): Promise<void> {
   if (!status.value?.revision || writing.value || (status.value.busy && action !== 'recover')) return;
-  minutes.value = 15;
+  minutes.value = DEFAULT_DRAIN_MINUTES;
   conflicted.value = false;
   sent.value = false;
   frozen.value = { action, accountChanged, label: releaseLabel(release), body: { operation_id: action === 'recover' ? progress.value!.operation_id : operationId(),
-    expected_revision: status.value.revision, target_release: release, target_manifest_sha256: digest, drain_timeout_seconds: 900 } };
+    expected_revision: status.value.revision, target_release: release, target_manifest_sha256: digest, drain_timeout_seconds: DEFAULT_DRAIN_MINUTES * 60 } };
   await nextTick();
   dialog.value?.showModal();
 }

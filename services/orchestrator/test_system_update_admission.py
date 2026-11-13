@@ -8,9 +8,25 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from pydantic import ValidationError
+
 from runtime_files import atomic_json
 from system_update_gate import DeploymentGate
-from system_updates import SystemUpdateAdmissionMiddleware
+from system_updates import SystemUpdateAdmissionMiddleware, UpdateRequest
+
+
+class UpdateRequestTests(unittest.TestCase):
+    """验证新操作默认期限与显式期限的严格类型合同。"""
+
+    def test_default_minute_preserves_explicit_and_rejects_non_integer(self) -> None:
+        """缺省一分钟，显式期限保持，布尔和字符串继续拒绝。@return None。"""
+        fields = {'operation_id': str(uuid.uuid4()), 'expected_revision': str(uuid.uuid4()),
+            'target_release': 'system-ci-1-1', 'target_manifest_sha256': 'a' * 64}
+        self.assertEqual(UpdateRequest(**fields).drain_timeout_seconds, 60)
+        self.assertEqual(UpdateRequest(**fields, drain_timeout_seconds=1800).drain_timeout_seconds, 1800)
+        for value in (True, '60', 60.5):
+            with self.subTest(value=value), self.assertRaises(ValidationError):
+                UpdateRequest(**fields, drain_timeout_seconds=value)
 
 
 class UpdateAdmissionTests(unittest.IsolatedAsyncioTestCase):

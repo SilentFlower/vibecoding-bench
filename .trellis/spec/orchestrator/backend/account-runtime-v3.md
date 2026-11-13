@@ -1269,6 +1269,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 单个弱引用回收任务在额外进程空闲60秒后保留1个暖进程；忙进程保持当前归属。映像缓存可在所有原进程退出后支持重建，池销毁释放FD。
 - 运行中原生账号由网关每20秒零模型巡检并按需恢复，具体身份、退避和计时合同见[原生持续预热](../../gateway/backend/service-architecture.md#scenario-原生持续预热实时就绪与请求进程诊断)。巡检只查询已有绑定，不唤醒休眠环境。
 - 批量客户端仅精确GET /admin/native-preparations接受最多4096项对象数组，其余路由继续要求对象。快照返回本次映射及read_failed；缺账号快照为snapshot_missing。页面按实际配置展示adaptive_prewarm，读取保持零模型操作。
+- `native_preparation.state=maintenance` 仅保留已知 `system_maintenance|maintenance` 原因，分别表示平台更新与账号维护；其它原因回到账号维护固定说明，PID 和进程数保持未观测。平台维护与真实失败恢复调度遵循网关原生持续预热合同，页面读取继续零写入。
 - 环境摘要先核验账号绑定、环境 ID/代次及本地 sender 的 `native.kernel_generation`；检查时间必须在当前时间前0～45000毫秒。只投影受控 state/reason、检查时间、环境归属和非负进程数/正 PID。ready 必须同时有空闲进程和 PID。历史 `native_kernel` 预热回执继续作为历史信息。
 - `native_preparation.checking?:bool` 只在网关值严格为 true 时为真，仅表示后台检查进行中；不能授予 ready 或进程归属。首轮缺少环境 ID、整数代次或已配置的内核代次时返回 unknown/snapshot_pending；已有受控检查失败原因继续保留。身份冲突仍为 binding_unverified，过期仍为 check_expired，这些分支均不提供 PID 或进程数。
 - 环境页将 snapshot_pending/snapshot_missing 区分为“正在检查”或“等待快照”；身份冲突、过期及读取失败分别展示真实原因。同代新鲜结果通过既有20秒串行 GET 自动恢复就绪。旧响应缺少 checking 时继续按原状态与原因展示，页面读取不主动准备或刷新凭据。
@@ -1293,6 +1294,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 | 补位期间切换内核或绑定代次变化 | 撤销旧补位，迟到进程退役 |
 | 批量通道失败、未知能力、绑定或内核代次不符、检查过期 | 环境状态 unknown，显示受控原因 |
 | 首轮 checking=true 但身份尚未返回 | unknown/snapshot_pending，显示检查进度，PID 与进程数未观测 |
+| 平台 / 账号维护 | maintenance/system_maintenance 或 maintenance/maintenance，仅提供固定说明 |
 | 旧代次或过期快照携带 checking=true | 保持 unknown 与原原因，检查进度不授予就绪 |
 | legacy/草稿或停止环境 | 摘要分别为 null 或 sleeping；读取保持零模型调用 |
 
@@ -1308,7 +1310,11 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 正常：批量巡检快照显示最近检查时间和暖进程 PID；进程退出后下一轮重新准备。错误用法：将任意错误文本、bearer 或旧内核 ready 转发到环境页面。正确处理：只投影当前归属的白名单摘要。
 - 边界：首次检查仅返回 preparing/checking=true，页面显示“正在检查”；同代新鲜 ready 到达后自动恢复。错误用法：把 checking=true 当作旧快照仍可就绪的依据。正确处理：身份与新鲜度继续独立校验。
 
+- 正常：平台更新时显示“平台更新中，结束后自动准备”。错误用法：把维护一律解释为本地准备失败，或把任意原因原文转发页面。正确处理：维护原因沿白名单区分，失败观察继续独立投影。
+
 ### 6. Tests Required
+
+- `test_native_readiness_preserves_only_known_maintenance_reasons` 及 `verify_environment_ui.py`：平台与账号维护分别展示，任意原因被固定投影，进程证据保持未观测且零业务写入。
 
 - `test_native_unlimited_layout_and_capture_are_frozen_per_account`、`test_serial_unlimited_handoff_restores_exact_cli_limits` 及部署预检：零哨兵、4 物理进程、实际 Docker/cgroup max、指标 0、全局有限默认和旧布局恢复；重画像保留资源与采集开关。
 - `test_native_sender.py`：默认legacy、显式预算、总RAM/CLI下限、未知后端、容量无任意64进程上限；`test_native_layout_rebuild_after_quiesce_keeps_busy_sender_protected`：忙时拒绝、停止后正确重建和代次/预算。

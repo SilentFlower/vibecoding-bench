@@ -60,7 +60,9 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 | `expected_revision` | 状态接口取得的规范形式 UUID |
 | `target_release` | 精确 `system-ci-*` 发行 |
 | `target_manifest_sha256` | 原始清单 SHA256，64 位小写十六进制 |
-| `drain_timeout_seconds` | 整数 60～7200，API 默认 900 |
+| `drain_timeout_seconds` | 整数 60～7200，API 默认 60；新确认默认一分钟 |
+
+页面初开及取消重开使用一分钟；显式选择30分钟提交1800秒。已登记操作继续原冻结期限。错误用法：网络重试时重新应用新默认值。正确处理：沿原 UUID 重放原参数，恢复仅核对原操作与现场版本。
 
 同一 UUID 与同一动作、参数重试返回原操作。复用 UUID 改动参数属于冲突。取消与恢复请求精确包含 `expected_revision`。
 
@@ -126,6 +128,7 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 - `services/orchestrator/test_system_update*.py`：实际线程/文件准入、ASGI 正文结束、原登录撤销、部分恢复边界；真实 Scheduler + SQLite 验证批次等待不阻塞排空、维护抢先分派、重启续调度、原工程续接与时间窗口/被动配额拒绝。
 - Rust `cargo test` 与 `cargo fmt --check`：门禁启动验证、完整 HttpBody 释放、租约与管理桥回归。Vue `npm --prefix apps/web run build` 在仓库根验证类型和构建。
 - `verify_system_update_browser.py`：真实构建页面配合合成 API，覆盖桌面/移动端、确认、断线重连、409、回退/恢复、未接入；断言零脚本异常与零真实模型调用。
+- `UpdateRequestTests` 与更新浏览器场景：缺省60秒、严格整数、初开及取消重开一分钟、显式30分钟提交1800秒；已有操作的原 UUID 和期限保持。
 - `verify_system_update.py`：随机部署、独立数据根、本地 TLS 和合成密钥下验证真实 Docker 长流排空、控制复用、账号重建、停止状态保留、显式回退、健康失败恢复、部分角色恢复、独立进程中断恢复、容器引用保护与精确回收。Bookworm 二进制沿项目 Docker 构建路径验证兼容性。
 - 生产首次接入、CI 私钥配置和真实发行获取由上线单另行核验。进程中断证据命名为进程恢复，宿主重启采用独立现场核验。
 

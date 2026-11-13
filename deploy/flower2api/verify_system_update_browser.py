@@ -171,6 +171,21 @@ async def verify(output: Path) -> dict:
         fixture = UpdateFixture()
         context, page = await page_for(fixture, 390)
         await page.get_by_role('button', name='安装更新', exact=True).click()
+        await expect(page.get_by_role('combobox')).to_have_value('1')
+        await page.get_by_role('combobox').select_option('5')
+        await page.get_by_role('button', name='取消', exact=True).click()
+        assert not fixture.writes
+        await page.get_by_role('button', name='安装更新', exact=True).click()
+        await expect(page.get_by_role('combobox')).to_have_value('1')
+        await page.get_by_role('button', name='确认执行', exact=True).click()
+        await expect(page.get_by_role('heading', name='等待在途完成')).to_be_visible()
+        assert len(fixture.writes) == 1 and fixture.writes[0]['body']['drain_timeout_seconds'] == 60
+        cases.append('初开及修改后取消重开均默认一分钟，直接确认提交60秒')
+        await context.close()
+
+        fixture = UpdateFixture()
+        context, page = await page_for(fixture, 390)
+        await page.get_by_role('button', name='安装更新', exact=True).click()
         await page.get_by_role('combobox').select_option('30')
         await page.screenshot(path=str(output / 'install-dialog-390.png'), full_page=True)
         await page.get_by_role('button', name='确认执行').dblclick()
@@ -238,10 +253,12 @@ async def verify(output: Path) -> dict:
         await page.get_by_role('button', name='查看历史版本与回退', exact=False).click()
         await page.get_by_role('button', name='回退到此版本').click()
         await expect(page.get_by_role('heading', name='确认版本回退')).to_be_visible()
+        await expect(page.get_by_role('combobox')).to_have_value('1')
         await page.get_by_role('button', name='确认执行').click()
         await expect(page.get_by_role('heading', name='等待在途完成')).to_be_visible()
         assert fixture.writes[0]['path'].endswith('/rollback')
         assert fixture.writes[0]['body']['target_release'] == 'system-ci-99-1'
+        assert fixture.writes[0]['body']['drain_timeout_seconds'] == 60
         await page.get_by_role('button', name='取消等待').click()
         assert fixture.writes[-1]['path'].endswith('/cancel')
         total_writes += len(fixture.writes)

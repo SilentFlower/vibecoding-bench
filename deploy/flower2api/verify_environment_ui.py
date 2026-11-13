@@ -346,6 +346,17 @@ async def run(output: Path, gateway: Path) -> dict:
             assert len(fixture.writes) == previous
             scenes.append('实时准备、过期与准备中状态准确展示，状态读取零业务写入')
 
+            for reason, label in [('system_maintenance', '平台更新中，结束后自动准备'),
+                    ('maintenance', '账号正在维护')]:
+                fixture.rows[0]['native_preparation'] = {'state': 'maintenance', 'reason': reason}
+                await refresh()
+                await expect(preparation).to_contain_text(label)
+                await expect(preparation.locator('.env-resources')).to_contain_text('未观测')
+            fixture.rows[0]['native_preparation'] = sample_rows()[0]['native_preparation']
+            await refresh()
+            assert len(fixture.writes) == previous
+            scenes.append('平台更新维护与账号维护分别展示，读取保持零业务写入')
+
             await target.get_by_text('环境与物理详情', exact=True).click()
             physical = target.locator('details.physical-features')
             await physical.locator('summary').click()

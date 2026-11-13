@@ -26,6 +26,18 @@ use crate::service::system_update;
 const QUEUE_LIMIT: usize = 128;
 const PREPARE_PARALLELISM: usize = 2;
 
+/// 真实失败的冷却记录；维护中断标记用于保留原截止及失败次数。
+struct PreparationFailure {
+    count: u32,
+    next: Instant,
+    maintenance_seen: bool,
+    observation: Value,
+}
+
+#[cfg(all(test, unix))]
+#[path = "native_prewarm_tests.rs"]
+mod tests;
+
 /// 管理准备生命周期与受控状态；RT 和业务正文不进入此对象。
 pub(crate) struct NativePrewarmer {
     accounts: Arc<AccountService>,
@@ -87,12 +99,21 @@ impl NativePrewarmer {
             let mut inspections =
                 interval_at(startup + Duration::from_secs(20), Duration::from_secs(20));
             inspections.set_missed_tick_behavior(MissedTickBehavior::Skip);
-            let mut failures: HashMap<i64, (u32, Instant)> = HashMap::new();
+            let mut maintenance_checks =
+                interval_at(startup + Duration::from_secs(1), Duration::from_secs(1));
+            maintenance_checks.set_missed_tick_behavior(MissedTickBehavior::Skip);
+            let mut maintenance_waiting = BTreeSet::new();
+            let mut failures: HashMap<i64, PreparationFailure> = HashMap::new();
             let mut scan_after = 0;
             loop {
                 while jobs.len() < PREPARE_PARALLELISM {
-                    let Some(id) = pending.iter().copied().find(|id| !active.contains_key(id))
-                    else {
+                    let Some(id) = pending.iter().copied().find(|id| {
+                        !active.contains_key(id)
+                            && !maintenance_waiting.contains(id)
+                            && failures.get(id).is_none_or(|failure| {
+                                !failure.maintenance_seen || Instant::now() >= failure.next
+                            })
+                    }) else {
                         break;
                     };
                     pending.remove(&id);
@@ -115,6 +136,21 @@ impl NativePrewarmer {
                 // select 的禁用分支仍会构造 future，取值必须在最后一次补偿后保持有效。
                 let retry_deadline = retries.get(retry_index).copied().unwrap_or(retries[2]);
                 tokio::select! {
+                    _ = maintenance_checks.tick(), if !maintenance_waiting.is_empty() => {
+                        // 等待项仍属于原有界队列；坏门禁也重新检查并沿真实失败路径收口。
+                        if !system_update::snapshot().is_ok_and(|value| value["phase"] == "blocked") {
+                            let now = Instant::now();
+                            let mut states = states.lock().unwrap();
+                            for id in &maintenance_waiting {
+                                if let Some(failure) = failures.get(id).filter(|failure| now < failure.next) {
+                                    // 开放后展示原真实故障，并归还队列位置，沿原巡检等待冷却。
+                                    pending.remove(id);
+                                    states.insert(*id, failure.observation.clone());
+                                }
+                            }
+                            maintenance_waiting.clear();
+                        }
+                    }
                     _ = inspections.tick() => {
                         if let Ok(mut items) = accounts.list_accounts().await {
                             // 队列有界时轮转扫描起点，避免高 ID 的运行账号一直被前批挤出。
@@ -124,7 +160,7 @@ impl NativePrewarmer {
                                 if account.status == AccountStatus::Active && account.request_backend == "native293"
                                     && !active.contains_key(&account.id)
                                     && !pending.contains(&account.id)
-                                    && failures.get(&account.id).is_none_or(|(_, next)| Instant::now() >= *next) {
+                                    && failures.get(&account.id).is_none_or(|failure| Instant::now() >= failure.next) {
                                     pending.insert(account.id);
                                     scan_after = account.id;
                                 }
@@ -139,13 +175,14 @@ impl NativePrewarmer {
                     }
                     _ = sleep_until(retry_deadline), if retry_index < retries.len() => {
                         retry_index += 1;
-                        // 控制面独立启动可能迟到；成功和在途账号跳过，休眠解析仍保持只读。
+                        // 保留首次启动的补偿；维护中断过的真实故障继续遵守原截止。
                         if let Ok(items) = accounts.list_accounts().await {
                             let states = states.lock().unwrap();
                             for account in items {
                                 if pending.len() >= QUEUE_LIMIT { break; }
                                 if account.status == AccountStatus::Active && account.request_backend == "native293"
                                     && !active.contains_key(&account.id)
+                                    && failures.get(&account.id).is_none_or(|failure| !failure.maintenance_seen || Instant::now() >= failure.next)
                                     && states.get(&account.id).is_none_or(|state| state["state"] != "ready") {
                                     pending.insert(account.id);
                                 }
@@ -155,6 +192,7 @@ impl NativePrewarmer {
                     event = events.recv() => match event {
                         Ok((id, invalidate)) => {
                             failures.remove(&id);
+                            maintenance_waiting.remove(&id);
                             if invalidate {
                                 if let Some(cancel) = active.get_mut(&id).and_then(Option::take) { let _ = cancel.send(()); }
                                 states.lock().unwrap().insert(id, json!({"state":"preparing","reason":"invalidated"}));
@@ -181,15 +219,34 @@ impl NativePrewarmer {
                             result["preparation_id"] = json!(preparation_id);
                             result["account_id"] = json!(id);
                             result["checking"] = json!(false);
-                            if matches!(result["state"].as_str(), Some("failed" | "unknown")) {
-                                let count = failures.get(&id).map_or(1, |(count, _)| count.saturating_add(1));
-                                let delay = 20_u64.saturating_mul(1 << count.min(4)).min(300);
-                                failures.insert(id, (count, Instant::now() + Duration::from_secs(delay)));
-                            } else { failures.remove(&id); }
+                            let maintenance = result["state"] == "maintenance"
+                                && result["reason"] == "system_maintenance";
+                            if maintenance {
+                                if let Some(failure) = failures.get_mut(&id) {
+                                    failure.maintenance_seen = true;
+                                }
+                                // 晚于门禁开放的维护回执也登记等待，下一次检查仍可唤醒。
+                                if pending.len() < QUEUE_LIMIT || pending.contains(&id) {
+                                    pending.insert(id);
+                                    maintenance_waiting.insert(id);
+                                } else {
+                                    result["state"] = json!("dropped");
+                                    result["reason"] = json!("queue_full");
+                                }
+                            }
                             let previous = states.lock().unwrap().get(&id).and_then(|value| value.get("last_preparation")).cloned();
                             if result.get("last_preparation").is_none() {
                                 if let Some(previous) = previous { result["last_preparation"] = previous; }
                             }
+                            if matches!(result["state"].as_str(), Some("failed" | "unknown")) {
+                                let count = failures.get(&id).map_or(1, |failure| failure.count.saturating_add(1));
+                                let maintenance_seen = failures.get(&id).is_some_and(|failure| failure.maintenance_seen);
+                                let delay = 20_u64.saturating_mul(1 << count.min(4)).min(300);
+                                failures.insert(id, PreparationFailure {
+                                    count, next: Instant::now() + Duration::from_secs(delay), maintenance_seen,
+                                    observation: result.clone(),
+                                });
+                            } else if !maintenance { failures.remove(&id); }
                             states.lock().unwrap().insert(id, result);
                         }
                     }
@@ -270,7 +327,9 @@ async fn check_one(
     mut cancellation: oneshot::Receiver<()>,
     allow_prepare: bool,
 ) -> Result<Value, AppError> {
-    let _update_activity = system_update::admission()?;
+    let Some(_update_activity) = system_update::background_admission()? else {
+        return Ok(json!({"state":"maintenance","reason":"system_maintenance"}));
+    };
     let deadline = Instant::now() + Duration::from_secs(120);
     let account = accounts.get_account(id).await?;
     if account.status != AccountStatus::Active || account.request_backend != "native293" {

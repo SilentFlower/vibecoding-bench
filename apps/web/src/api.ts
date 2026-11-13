@@ -375,6 +375,8 @@ function normalizeSettingsMap(data: RawSettingsMap): SettingsMap {
 
 /** 管理端请求诊断列表行。 */
 export interface DiagnosticRequest {
+  account_name?: string | null
+  account_email?: string | null
   log_mode?: 'info' | 'debug' | null
   request_id: string
   started_at: string
@@ -401,6 +403,8 @@ export interface NativeRuntimeObservation {
 
 /** 单次实际提交及私有采集状态。 */
 export interface DiagnosticAttempt {
+  account_name?: string | null
+  account_email?: string | null
   runtime?: NativeRuntimeObservation | null
   log_mode?: 'info' | 'debug' | null
   attempt_id: string

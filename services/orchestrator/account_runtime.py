@@ -834,7 +834,8 @@ class AccountRuntime:
         value = snapshots.get(account['cc2api_account_id'], {})
         state = value.get('state')
         if state in ('sleeping', 'disabled', 'maintenance'):
-            return {'state': state, 'reason': state}
+            reason = 'system_maintenance' if state == 'maintenance' and value.get('reason') == 'system_maintenance' else state
+            return {'state': state, 'reason': reason}
         native = configuration.get('native')
         checking = value.get('checking') is True
         # 首轮检查尚未得到身份；仅提供进度，不能把旧进程投影到当前环境。

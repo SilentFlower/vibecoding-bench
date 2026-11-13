@@ -232,6 +232,19 @@ class AccountRuntimeTests(unittest.TestCase):
             summary = self.runtime.native_preparation_summary(row, account, {7: current})
             self.assertEqual((summary['state'], summary['pid'], summary['checking']), ('ready', 123, True))
 
+    def test_native_readiness_preserves_only_known_maintenance_reasons(self) -> None:
+        """平台维护与账号维护分别展示，任意原因保持白名单投影。@return None。"""
+        row = self.runtime._row('synthetic', 1)
+        row.update(state='ready', generation=3)
+        account = {'cc2api_account_id': 7}
+        with patch('account_runtime._read_json', return_value={'native': {'kernel_generation': 'current'}}):
+            for reason, expected in [('system_maintenance', 'system_maintenance'),
+                    ('maintenance', 'maintenance'), ('arbitrary-secret', 'maintenance'), (None, 'maintenance')]:
+                with self.subTest(reason=reason):
+                    value = {'state': 'maintenance', 'reason': reason, 'pid': 123, 'bearer': 'synthetic-secret'}
+                    summary = self.runtime.native_preparation_summary(row, account, {7: value})
+                    self.assertEqual(summary, {'state': 'maintenance', 'reason': expected})
+
     def test_cli_storage_failure_keeps_verified_private_version_available(self) -> None:
         """去重是可选优化，磁盘缓存故障不能使已验证安装的 CLI 登录失败。@return None。"""
         row = self.runtime._row('synthetic', 1)

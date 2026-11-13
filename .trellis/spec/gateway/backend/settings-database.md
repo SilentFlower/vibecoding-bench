@@ -220,7 +220,11 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - `RequestLogMode::{Info,Debug}` 序列化为 `info|debug`；根请求与尝试的 `log_mode:Option<RequestLogMode>` 兼容历史缺字段。`GatewayService::reload_request_log_mode()` 热加载，`request_log_mode()` 返回实际缓存。
 - `/admin/settings` 的 `request_diagnostics_log_mode` 为字符串，默认 `info`；GET 返回实际生效缓存，PUT 在全部写入前校验 `info|debug`。迁移只补缺键，保留显式 debug。
 
+- `RequestDiagnostic`、`AttemptDiagnostic` 管理投影可选字段 `account_name:Option<String>`、`account_email:Option<String>`；None 在响应中省略。
+
 ### 3. Contracts
+
+- 账号展示字段兼容旧 JSON 缺失。列表根请求与详情各次尝试分别按实际 account_id LEFT JOIN 当前账号，仅查询 name/email 安全列；空资料为 None。字段只在查询时填充，持久摘要保持匿名及原表结构，账号改名按当前资料展示。
 
 - 仅在网关 Token 鉴权后的精确 `/v1/messages` 入口建立根请求 UUID；每次真实提交建立独立尝试 UUID。`count_tokens`、Hello、后台遥测不混入此请求尝试链。
 - 下游新增 `X-CC2API-Request-Id` 根 UUID；保留已有 `X-Request-Id`，缺失时补根 UUID。根 UUID、最终响应 ID、上游 `request-id/x-request-id` 可用于列表反查；标准 UUID 和 `req_` 字母数字 ID 保留，其它头值先 SHA256。诊断 ID 不增加到发往上游的业务 headers/body。
@@ -241,6 +245,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 | --- | --- |
 | 401 恢复、签名修复或换号 | 同一根请求，独立尝试与实际账号/状态/重试原因 |
 | 模拟、缓存、本地拒绝 | 根结果明确，未发送时尝试数为零 |
+| 账号改名 / 删除 / 旧记录缺展示字段 | 查询当前名称邮箱 / LEFT JOIN 保留诊断及 ID，资料为空 / 兼容读取 |
 | 流内错误、读取异常、取消 | 保留部分 token，受控终态，响应原始字节继续透传 |
 | 损坏压缩、采样超限、非法 JSON | `partial=true`，受控错误类型与观察失败计数，不阻断业务 |
 | 队列满、写入或清理失败 | 记录脱敏失败信号，不改变转发/费用，不返回假完整覆盖 |
@@ -258,9 +263,11 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - PostgreSQL 可空正整数示例：`.bind(request.account_id.unwrap_or(0))` 配合 `NULLIF($7,0)`；不能直接复用先绑定 `None::<i64>`、再绑定实值的 Any 缓存语句，也不能把未知账号持久化为真实 0。
 - 正常：info 请求排队后切换 debug，该次仍保存 info 摘要且完整内容零落盘；后续请求采用 debug。错误用法是发送时重读模式或用当前设置填补历史模式。正确处理是入口冻结并读取各记录的可选字段。
 
+- 正常：根请求最终使用账号8，各次重试分别关联账号7和8；管理员修改名称后下一次查询显示新名称。错误用法：查询完整账号凭据再交前端逐行映射，或把邮箱写入持久诊断。正确处理：管理查询只关联当前安全字段，根请求与每次尝试独立匹配实际 ID。
+
 ### 6. Tests Required
 
-- `sqlite_diagnostics_storage_contract` 与显式执行 `postgres_diagnostics_storage_contract`：开始→终态、重复写入、迟到快照、NULL、分页/账号/关联过滤、重开连接、七天精确边界。PG 使用 `CC2API_DIAGNOSTICS_TEST_POSTGRES_DSN` 指向独立临时库，ignored 不等于通过。
+- `sqlite_diagnostics_storage_contract` 与显式执行 `postgres_diagnostics_storage_contract`：开始→终态、重复写入、迟到快照、NULL、分页/账号/关联过滤、重开连接、七天精确边界；追加跨账号名称邮箱、改名、空资料、删除后保留记录及 ID、持久摘要无邮箱与凭据的断言。PG 使用 `CC2API_DIAGNOSTICS_TEST_POSTGRES_DSN` 指向独立临时库，ignored 不等于通过。
 - `retention_protects_live_requests_and_expires_stale_unfinished_records`、`migrate_request_log_mode_preserves_explicit_debug`、`log_mode_setting_validates_atomically_and_defaults_to_info`、`request_log_mode_reload_preserves_effective_cache_on_failure`：真实在途保护、结束回收、默认迁移/幂等、校验原子性与实际缓存。
 - `diagnostics_preserve_bytes_and_correlate_anonymous_sessions`：最终参数、stop_reason、null token、匿名标识、头值保留/散列反查及合成秘密不泄露。
 - `diagnostics_record_stream_errors_and_cancellation_once`、`diagnostics_report_observation_failures_without_changing_bytes`、`diagnostics_cover_early_cancellation_and_unavailable_storage`：流内错误、读取失败、取消、超限/解码/解析、数据库故障与响应保真。

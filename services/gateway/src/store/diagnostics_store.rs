@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, Duration as ChronoDuration, SecondsFormat, Utc};
 use serde::de::DeserializeOwned;
+use sqlx::any::AnyRow;
 use sqlx::{AnyPool, Row};
 use tokio::sync::{mpsc, oneshot};
 use tracing::warn;
@@ -220,7 +221,9 @@ impl DiagnosticsStore {
             .await
             .map_err(|_| unavailable())?;
         let sql = format!(
-            "SELECT r.summary_json FROM request_diagnostics r {FILTER} ORDER BY r.started_at DESC,r.request_id DESC LIMIT $8 OFFSET $9"
+            "SELECT r.summary_json,COALESCE(a.name,'') AS account_name,COALESCE(a.email,'') AS account_email
+             FROM request_diagnostics r LEFT JOIN accounts a ON a.id=r.account_id
+             {FILTER} ORDER BY r.started_at DESC,r.request_id DESC LIMIT $8 OFFSET $9"
         );
         let rows = sqlx::query(&sql)
             .bind(account)
@@ -237,8 +240,13 @@ impl DiagnosticsStore {
             .map_err(|_| unavailable())?;
         let items = rows
             .iter()
-            .map(|row| decode(row.try_get("summary_json").map_err(|_| unavailable())?))
-            .collect::<Result<_, _>>()?;
+            .map(|row| {
+                let mut item: RequestDiagnostic =
+                    decode(row.try_get("summary_json").map_err(|_| unavailable())?)?;
+                (item.account_name, item.account_email) = account_display(row)?;
+                Ok(item)
+            })
+            .collect::<Result<_, AppError>>()?;
         Ok(DiagnosticPage {
             items,
             total,
@@ -256,20 +264,45 @@ impl DiagnosticsStore {
     /// @param request_id 列表或响应返回的内部请求 UUID。
     /// @return 请求详情；不存在时返回 NotFound。
     pub async fn detail(&self, request_id: &str) -> Result<DiagnosticDetail, AppError> {
-        let value: Option<String> =
-            sqlx::query_scalar("SELECT summary_json FROM request_diagnostics r WHERE request_id=$1 AND (started_at >= $2 OR $3 LIKE '%\"' || r.request_id || '\"%')")
+        let row =
+            sqlx::query("SELECT r.summary_json,COALESCE(a.name,'') AS account_name,COALESCE(a.email,'') AS account_email
+                FROM request_diagnostics r LEFT JOIN accounts a ON a.id=r.account_id
+                WHERE r.request_id=$1 AND (r.started_at >= $2 OR $3 LIKE '%\"' || r.request_id || '\"%')")
                 .bind(request_id)
                 .bind(retention_cutoff(Utc::now()))
                 .bind(active_json(&self.active))
                 .fetch_optional(&self.pool)
                 .await
                 .map_err(|_| unavailable())?;
-        let request = decode(value.ok_or(AppError::NotFound)?)?;
-        let values: Vec<String> = sqlx::query_scalar("SELECT summary_json FROM request_diagnostic_attempts WHERE request_id=$1 ORDER BY ordinal,attempt_id")
+        let row = row.ok_or(AppError::NotFound)?;
+        let mut request: RequestDiagnostic =
+            decode(row.try_get("summary_json").map_err(|_| unavailable())?)?;
+        (request.account_name, request.account_email) = account_display(&row)?;
+        let rows = sqlx::query("SELECT d.summary_json,COALESCE(a.name,'') AS account_name,COALESCE(a.email,'') AS account_email
+            FROM request_diagnostic_attempts d LEFT JOIN accounts a ON a.id=d.account_id
+            WHERE d.request_id=$1 ORDER BY d.ordinal,d.attempt_id")
             .bind(request_id).fetch_all(&self.pool).await.map_err(|_| unavailable())?;
-        let attempts = values.into_iter().map(decode).collect::<Result<_, _>>()?;
+        let attempts = rows
+            .iter()
+            .map(|row| {
+                let mut item: AttemptDiagnostic =
+                    decode(row.try_get("summary_json").map_err(|_| unavailable())?)?;
+                (item.account_name, item.account_email) = account_display(row)?;
+                Ok(item)
+            })
+            .collect::<Result<_, AppError>>()?;
         Ok(DiagnosticDetail { request, attempts })
     }
+}
+
+fn account_display(row: &AnyRow) -> Result<(Option<String>, Option<String>), AppError> {
+    // 只投影读取时的安全资料；持久摘要及业务热路径继续保持原来的匿名边界。
+    let name: String = row.try_get("account_name").map_err(|_| unavailable())?;
+    let email: String = row.try_get("account_email").map_err(|_| unavailable())?;
+    Ok((
+        (!name.trim().is_empty()).then_some(name),
+        (!email.trim().is_empty()).then_some(email),
+    ))
 }
 
 fn unavailable() -> AppError {
@@ -373,6 +406,7 @@ mod tests {
         AttemptDiagnostic, DiagnosticParameters, DiagnosticQuery, DiagnosticSessions,
         DiagnosticTokens, RequestDiagnostic,
     };
+    use crate::store::db::migrate;
     use chrono::{DateTime, Duration as ChronoDuration, SecondsFormat, Utc};
     use sqlx::any::AnyPoolOptions;
     use std::sync::atomic::Ordering;
@@ -387,6 +421,8 @@ mod tests {
             finished_at: Some(at.to_rfc3339_opts(SecondsFormat::Millis, true)),
             status_code: Some(200),
             account_id: Some(7),
+            account_name: None,
+            account_email: None,
             response_request_id: Some(request_id),
             outcome: "success".into(),
             error_stage: None,
@@ -403,6 +439,8 @@ mod tests {
             request_id: request.request_id.clone(),
             ordinal: 1,
             account_id: 7,
+            account_name: None,
+            account_email: None,
             profile_version: "2.1.293".into(),
             profile_selection: "client_version".into(),
             parameters: DiagnosticParameters::default(),
@@ -433,7 +471,16 @@ mod tests {
             .connect(dsn)
             .await
             .unwrap();
-        DiagnosticsStore::migrate(&pool).await.unwrap();
+        migrate(
+            &pool,
+            if dsn.starts_with("sqlite:") {
+                "sqlite"
+            } else {
+                "postgres"
+            },
+        )
+        .await
+        .unwrap();
         DiagnosticsStore::migrate(&pool).await.unwrap();
         // 用未来一天作为裁剪参考，使后台真实时钟不会影响精确边界断言。
         let now = Utc::now() + ChronoDuration::days(1);
@@ -594,6 +641,124 @@ mod tests {
         let detail = reopened.detail(&current.request_id).await.unwrap();
         assert_eq!(detail.attempts.len(), 1);
         assert_eq!(detail.attempts[0].attempt_id, attempted.attempt_id);
+        assert!(detail.request.account_name.is_none());
+        assert!(detail.attempts[0].account_email.is_none());
+
+        // 名称邮箱只在读取时关联；同一根请求的各次重试保留各自实际账号。
+        for (id, name, email) in [
+            (7_i64, "演示账号甲", "first@example.test"),
+            (8, "演示账号乙", "second@example.test"),
+        ] {
+            sqlx::query("INSERT INTO accounts(id,name,email,token,device_id) VALUES($1,$2,$3,'synthetic-private-account-token','synthetic-device')")
+                .bind(id).bind(name).bind(email).execute(&reader).await.unwrap();
+        }
+        let mut retried = current.clone();
+        retried.account_id = Some(8);
+        retried.attempt_count = 2;
+        let mut second = attempt(&retried);
+        second.account_id = 8;
+        second.ordinal = 2;
+        write_event(
+            &reader,
+            &DiagnosticEvent {
+                request: retried,
+                attempt: Some(second),
+            },
+        )
+        .await
+        .unwrap();
+        let detail = reopened.detail(&current.request_id).await.unwrap();
+        assert_eq!(detail.request.account_name.as_deref(), Some("演示账号乙"));
+        assert_eq!(
+            detail.request.account_email.as_deref(),
+            Some("second@example.test")
+        );
+        assert_eq!(
+            detail.attempts[0].account_name.as_deref(),
+            Some("演示账号甲")
+        );
+        assert_eq!(
+            detail.attempts[0].account_email.as_deref(),
+            Some("first@example.test")
+        );
+        assert_eq!(detail.attempts[1].account_name, detail.request.account_name);
+        assert!(
+            !serde_json::to_string(&detail)
+                .unwrap()
+                .contains("synthetic-private-account-token")
+        );
+        let page = reopened
+            .list(DiagnosticQuery {
+                account_id: Some(7),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(page.total, 1);
+        assert_eq!(page.items[0].account_id, Some(8));
+        assert_eq!(page.items[0].account_name, detail.request.account_name);
+
+        sqlx::query("UPDATE accounts SET name=$1,email='' WHERE id=$2")
+            .bind("已改名账号")
+            .bind(8_i64)
+            .execute(&reader)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE accounts SET name='' WHERE id=$1")
+            .bind(7_i64)
+            .execute(&reader)
+            .await
+            .unwrap();
+        let renamed = reopened.detail(&current.request_id).await.unwrap();
+        assert_eq!(renamed.request.account_name.as_deref(), Some("已改名账号"));
+        assert!(renamed.request.account_email.is_none());
+        assert!(renamed.attempts[0].account_name.is_none());
+        assert_eq!(
+            renamed.attempts[0].account_email.as_deref(),
+            Some("first@example.test")
+        );
+        let raw: String =
+            sqlx::query_scalar("SELECT summary_json FROM request_diagnostics WHERE request_id=$1")
+                .bind(&current.request_id)
+                .fetch_one(&reader)
+                .await
+                .unwrap();
+        assert!(
+            !raw.contains("account_name")
+                && !raw.contains("account_email")
+                && !raw.contains("@example.test")
+        );
+        let raw_attempts: Vec<String> = sqlx::query_scalar(
+            "SELECT summary_json FROM request_diagnostic_attempts WHERE request_id=$1",
+        )
+        .bind(&current.request_id)
+        .fetch_all(&reader)
+        .await
+        .unwrap();
+        assert!(
+            raw_attempts
+                .iter()
+                .all(|raw| !raw.contains("account_email") && !raw.contains("@example.test"))
+        );
+
+        sqlx::query("DELETE FROM accounts WHERE id=$1 OR id=$2")
+            .bind(7_i64)
+            .bind(8_i64)
+            .execute(&reader)
+            .await
+            .unwrap();
+        let deleted = reopened.detail(&current.request_id).await.unwrap();
+        assert_eq!(deleted.request.account_id, Some(8));
+        assert!(deleted.request.account_name.is_none() && deleted.request.account_email.is_none());
+        assert_eq!(deleted.attempts.len(), 2);
+        assert!(
+            deleted
+                .attempts
+                .iter()
+                .all(|item| item.account_name.is_none() && item.account_email.is_none())
+        );
+        let unknown = reopened.detail(&boundary.request_id).await.unwrap();
+        assert!(unknown.request.account_id.is_none() && unknown.request.account_name.is_none());
         drop(reopened);
         reader.close().await;
     }
@@ -615,7 +780,7 @@ mod tests {
             .connect("sqlite::memory:")
             .await
             .unwrap();
-        DiagnosticsStore::migrate(&pool).await.unwrap();
+        migrate(&pool, "sqlite").await.unwrap();
         let store = DiagnosticsStore::new(pool.clone());
         store.flush().await.unwrap();
         let now = Utc::now();
@@ -684,7 +849,7 @@ mod tests {
             .connect("sqlite::memory:")
             .await
             .unwrap();
-        DiagnosticsStore::migrate(&pool).await.unwrap();
+        migrate(&pool, "sqlite").await.unwrap();
         let store = DiagnosticsStore::new(pool.clone());
         let root = request(Utc::now());
         for _ in 0..QUEUE_CAPACITY + 5 {

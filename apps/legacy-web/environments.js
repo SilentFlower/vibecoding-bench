@@ -164,7 +164,7 @@ function renderNativePreparation(row) {
     invalidated: '准备已失效', capability_unknown: '原生能力待核对', binding_unverified: '最近快照属于其他环境或内核代次，等待当前代次检查',
     read_failed: '准备状态读取失败', snapshot_missing: '尚未收到本账号的准备快照',
     snapshot_pending: '等待首次检查返回当前环境快照',
-    maintenance: '账号正在维护', sleeping: '环境休眠', disabled: '账号已停用'};
+    maintenance: '账号正在维护', system_maintenance: '平台更新中，结束后自动准备', sleeping: '环境休眠', disabled: '账号已停用'};
   const tone = value.state === 'ready' ? 'good' : ['busy', 'sleeping', 'disabled'].includes(value.state) ? 'muted' : 'warning';
   const checked = typeof value.checked_at_ms === 'number' && Number.isFinite(value.checked_at_ms)
     ? new Date(value.checked_at_ms).toLocaleString() : '未观测';

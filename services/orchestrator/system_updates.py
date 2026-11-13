@@ -82,7 +82,7 @@ class UpdateRequest(BaseModel):
     expected_revision: StrictStr
     target_release: StrictStr
     target_manifest_sha256: StrictStr
-    drain_timeout_seconds: StrictInt = 900
+    drain_timeout_seconds: StrictInt = 60
 
 
 class UpdateControl(BaseModel):

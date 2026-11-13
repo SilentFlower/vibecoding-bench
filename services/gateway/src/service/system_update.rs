@@ -153,14 +153,19 @@ pub fn validate_startup() -> Result<(), AppError> {
 /// 在同一锁内核验准入并登记活动，后台调用亦使用该入口。
 /// @return 活动证明；维护中拒绝新工作。
 pub fn admission() -> Result<UpdateActivity, AppError> {
+    background_admission()?
+        .ok_or_else(|| AppError::ServiceUnavailable("平台正在维护，请稍后重试".into()))
+}
+
+/// 在原活动锁内区分合法维护等待与门禁故障，后台等待不占用活动名额。
+/// @return 开放时的活动证明、合法维护时的 None，或需要对账的门禁错误。
+pub(crate) fn background_admission() -> Result<Option<UpdateActivity>, AppError> {
     let mut active = ACTIVITIES.lock().unwrap_or_else(|error| error.into_inner());
     if gate()?.is_some_and(|value| value.phase != "idle") {
-        return Err(AppError::ServiceUnavailable(
-            "平台正在维护，请稍后重试".into(),
-        ));
+        return Ok(None);
     }
     *active += 1;
-    Ok(UpdateActivity)
+    Ok(Some(UpdateActivity))
 }
 
 /// 允许原在途账号任务完成必要凭据解析，和 ACK 共用登记锁。

@@ -85,6 +85,8 @@ impl TraceContext {
                     finished_at: None,
                     status_code: None,
                     account_id: None,
+                    account_name: None,
+                    account_email: None,
                     response_request_id: None,
                     outcome: "in_progress".into(),
                     error_stage: None,
@@ -282,6 +284,8 @@ fn prepare_observation(account: &Account, body: Value) -> Option<AttemptTrace> {
                 request_id: state.request.request_id.clone(),
                 ordinal: 0,
                 account_id: account.id,
+                account_name: None,
+                account_email: None,
                 profile_version: profile_for_version(&device_profile(account).env.version)
                     .key
                     .into(),
@@ -759,6 +763,7 @@ mod tests {
     use crate::service::usage::USAGE_BUFFER_LIMIT;
     use crate::service::v3_scheduling::{SchedulingCandidate, V3Scheduler, now_ms};
     use crate::store::cache::{UpstreamSessionPoolAction, UpstreamSessionPoolResolve};
+    use crate::store::db::migrate;
     use crate::store::diagnostics_store::DiagnosticsStore;
     use crate::store::scheduling_store::SchedulingStore;
     use axum::body::{Body, Bytes, to_bytes};
@@ -781,7 +786,7 @@ mod tests {
             .connect("sqlite::memory:")
             .await
             .unwrap();
-        DiagnosticsStore::migrate(&pool).await.unwrap();
+        migrate(&pool, "sqlite").await.unwrap();
         Arc::new(DiagnosticsStore::new(pool))
     }
 
@@ -1010,7 +1015,7 @@ mod tests {
             .connect("sqlite::memory:")
             .await
             .unwrap();
-        DiagnosticsStore::migrate(&pool).await.unwrap();
+        migrate(&pool, "sqlite").await.unwrap();
         let unavailable = Arc::new(DiagnosticsStore::new(pool.clone()));
         let trace = TraceContext::new(unavailable.clone());
         let response =

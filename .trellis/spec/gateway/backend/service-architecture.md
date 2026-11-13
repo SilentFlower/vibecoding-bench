@@ -103,6 +103,8 @@ src/tlsfp/
 - `GET /admin/accounts/:id/native-preparation` 主动检查当前身份；`GET /admin/native-preparations` 返回最近巡检快照数组；既有 POST 继续合并准备提示。
 - `NativeRequestObservation.runtime`、持久化 `AttemptDiagnostic.runtime` 为可选 `NativeRuntimeObservation`，历史记录缺字段按 None 解析；沿用诊断 JSON，数据库结构保持原合同。
 
+- `system_update::background_admission() -> Result<Option<UpdateActivity>, AppError>` 与普通准入共用安全门禁读取及活动锁；合法维护返回 None，开放返回活动证明，损坏门禁返回错误。
+
 ### 3. Contracts
 
 - `NativeReadinessStatus` 字段为 `state:String,account_id:i64,environment_id:String,generation:u64,kernel_generation:Option<String>,release:Option<NativeReleaseRef>,checked_at_ms:u64,idle_workers:usize,live_workers:usize,pid:Option<u32>,reason:Option<String>`。池状态为 `ready|busy|preparing|unprepared|failed`，协调器另投影休眠、停用、维护、失败和未知。
@@ -112,6 +114,8 @@ src/tlsfp/
 - 取消后的补热沿原prepare及20秒巡检协调路径；进程就绪、TLS就绪与单请求完整性分别判断。连续快速请求沿同一交接收口，旧PID和迟到代次隔离。
 - readiness 只检查本地状态，不启动进程或执行模型。业务 checkout 再原子校验和占用。准备仍由原 prepare 接口完成真实握手并回到同一池；冷池首轮初始化共享代次锁，后续扩容维持原物理上限。
 - 启动补偿外，每20秒巡检已启用原生账号，仅解析 `wake=false` 运行绑定。待处理最多128、并行2、按账号去重，轮转扫描避免高 ID 饥饿；失败退避40/80/160/300秒，显式变更提示清除退避。`busy|preparing` 等待后续巡检，`unprepared|failed` 才重新准备。
+- 合法平台维护投影 `maintenance/system_maintenance`，准备前返回且不登记活动、不增加失败次数；待恢复账号仍占原有界队列，仅在存在等待项时每秒核对门禁。开放后解除等待，执行前再次核验准入；晚到维护回执继续登记下一轮检查。未知或损坏门禁沿错误路径收口。
+- 首次控制面迟到保留5/20/60秒启动补偿。真实故障遇维护后记录中断标记，后续出队和启动补偿均遵守其原 next 截止。维护开放时恢复原失败观察、准备 UUID 和时间，归还冷却账号的队列位置，沿原巡检等待。单纯维护等待继续按一秒周期恢复；显式账号变更清除原退避。
 - 发布前重读权威账号与绑定；排他维护、更新门禁、凭据活动关闭和取消继续优先。批量缓存的 ready 超过45秒转 `unknown/check_expired`。`last_preparation` 仅保存历史准备回执；GET 主动检查不承担恢复启动。
 - `NativeRuntimeObservation` 字段为 `worker_id:UUID,worker_pid:u32,kernel_generation:Option<UUID>,warm_hit:bool,preparation_wait_ms:u64,checkout_ms:u64,worker_start_ms:Option<u64>,prepared_ms:u64`。毫秒值来自单调时钟。`warm_hit` 表示该 worker 在本次池接收前已经 ready；`worker_start_ms` 仅记录本次 checkout 启动的 worker。
 - `prepared_ms` 从已验证信封进入 `submit_validated` 计至实际收到 `cc_prepared`，包含准备锁等待、checkout 与正文组装；`worker_start_ms` 包含于 checkout。该段不包含此前网关上传及解码，也不等于最终 TLS 发出或上游首字。原完整提交耗时继续保留，页面不得将重叠字段相加。
@@ -122,6 +126,8 @@ src/tlsfp/
 | --- | --- |
 | 身份改变、进程退出、EOF 或迟到帧 | 原 ready 失效，后台按当前身份恢复；业务保留原截止与单次提交 |
 | 正在初始化或全忙 | preparing 或 busy，保持原并发与物理上限 |
+| 平台门禁合法 blocked / 开放 | maintenance/system_maintenance 且零新准备 / 一秒周期解除等待，仍核对原故障冷却 |
+| 维护前已有真实故障 / 门禁损坏 | 保留原次数、截止及失败观察 / 明确错误且拒绝新工作 |
 | TLS探针启动失败、未配置或原截止先到 | 保留受控缺口；超时撤销该代采集，业务沿原截止至多一次发送，过期零发送 |
 | 错误绑定、过期信封、证据禁用或平台不支持 | 沿私有通道拒绝，模型零发送 |
 | 诊断 PID 为0、UUID非法或计时关系越界 | 丢弃损坏观察，保持观察缺口可见；计时关系允许2毫秒取整偏差 |
@@ -133,7 +139,11 @@ src/tlsfp/
 - 边界：慢流取消后先退休原PID，再以原零模型prepare补热，新PID完成探针准备后交接；连续下一请求同样等待有界准备。准备与业务竞争时，业务记录实际等待；凭据轮换后旧忙进程自然收口，新身份单独建立可接单进程。进程故障恢复包含巡检及启动时间。
 - 错误用法：用上次准备成功回执显示持续就绪，或把 `prepared_ms` 当作端到端首字延迟。正确处理：核对实时身份、活性及检查时间，并分别显示原始阶段口径。
 
+- 正常：维护结束后无故障历史的账号及时准备，已有故障的账号继续原冷却。错误用法：把 blocked 计为准备失败，或开放时清空真实故障退避。正确处理：维护等待和真实故障分别保存，恢复原故障归属与截止。
+
 ### 6. Tests Required
+
+- `maintenance_waits_without_failure_and_reopens_promptly`：隔离进程核对维护期间零活动、无故障一秒恢复、坏门禁拒绝、首次启动补偿、真实故障遇维护后调用次数与原准备 ID 保持、显式变更恢复。
 
 - `native_tls_observer`：慢探针交接、原截止超时、关闭唤醒、迟到代次、未配置及替换PID。`CCRB_TEST_TLS_ONLY=1`覆盖六worker并发、慢流取消、同身份补热和连续两次请求；实际模拟请求9次、完整TLS实体与独立接收器一致、准备模型增量0。
 - `native_real_binary`：当前/错误身份、真实61秒等待与可控1800/14400秒空闲年龄、同 PID 首次复用、冷暖相同正文与资源对照、并发上限及取消退役；长空闲年龄与实际等待分别标注。

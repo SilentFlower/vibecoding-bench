@@ -25,6 +25,9 @@ class ManagementFixture(Fixture):
         self.conflict = False
         self.status_reads = 0
         self.current = 'system-ci-200-1'
+        self.diagnostic_account = {'account_name': '主用演示账号', 'account_email': 'primary@example.test'}
+        self.diagnostic_account_id = 11
+        self.extra_attempt = False
         self.releases = [dict(release=f'system-ci-{number}-1', sequence=[number, 1],
             published_at='2026-11-12T05:31:49.455Z', changes=f'平台版本：v1.0.{number-200}\n\n管理后台交互与采集状态改进。',
             manifest_sha256=str(number % 10) * 64, data_compatible=True, account_changed=False) for number in [201, 200, 199, 198]]
@@ -80,6 +83,9 @@ class ManagementFixture(Fixture):
             root = {'request_id': '11111111-1111-4111-8111-111111111111', 'started_at': '2026-11-12T05:31:49.455Z',
                 'finished_at': '2026-11-12T05:31:51.455Z', 'status_code': 200, 'account_id': 11,
                 'outcome': 'success', 'attempt_count': 1, 'log_mode': 'debug', 'response_request_id': 'synthetic-response'}
+            root.update(account_id=self.diagnostic_account_id, **self.diagnostic_account)
+            if self.diagnostic_account_id is None:
+                root['attempt_count'] = 0
             if '/captures/' in path:
                 self.capture_reads += 1
                 self.capture_started.set()
@@ -97,7 +103,14 @@ class ManagementFixture(Fixture):
                 'duration_ms': 2000, 'ttft_ms': 700, 'first_output_ms': 900, 'tokens': {'input_tokens': 0},
                 'runtime': {'worker_id': 'synthetic-worker', 'worker_pid': 16, 'kernel_generation': 'synthetic',
                     'warm_hit': True, 'preparation_wait_ms': 0, 'checkout_ms': 0, 'worker_start_ms': None, 'prepared_ms': 222}}
-            return await self.respond(route, {'request': root, 'attempts': [attempt]})
+            attempt.update(account_id=self.diagnostic_account_id, **self.diagnostic_account)
+            attempts = [attempt] if self.diagnostic_account_id is not None else []
+            if self.extra_attempt:
+                attempt['ordinal'] = 2
+                attempts.insert(0, {**attempt, 'attempt_id': '33333333-3333-4333-8333-333333333333',
+                    'ordinal': 1, 'account_id': 12, 'account_name': '备用演示账号', 'account_email': 'backup@example.test'})
+                root['attempt_count'] = 2
+            return await self.respond(route, {'request': root, 'attempts': attempts})
         return await super().route(route)
 
 
@@ -174,6 +187,8 @@ async def run(output):
             expected_time = '2026/11/12 13:31:49' if zone == 'Asia/Shanghai' else '2026/11/11 21:31:49'
             await expect(page.locator('tbody')).to_contain_text(expected_time)
             await expect(page.locator('tbody')).to_contain_text(zone)
+            await expect(page.locator('tbody')).to_contain_text('主用演示账号')
+            await expect(page.locator('tbody')).to_contain_text('primary@example.test')
             await page.get_by_role('button', name='详情', exact=True).click()
             await expect(page.get_by_text('本次请求未保存阶段原文。请核对全局 debug 日志级别与账号内容采集设置。')).to_be_visible()
             await page.get_by_role('tab', name='原始数据', exact=True).click()
@@ -224,6 +239,46 @@ async def run(output):
             fixture.capture_gate.set()
             await expect(page.get_by_role('dialog')).to_have_count(0)
             await expect(page.get_by_role('button', name='详情', exact=True)).to_be_focused()
+
+            fixture.capture_gate = None
+            fixture.diagnostic_account = {'account_name': '长名称演示账号' * 8,
+                'account_email': 'long.' + 'address.' * 12 + 'primary@example.test'}
+            fixture.extra_attempt = True
+            await page.get_by_role('button', name='刷新', exact=True).click()
+            for width in [1280, 390]:
+                await page.set_viewport_size({'width': width, 'height': 1000})
+                await expect(page.locator('tbody')).to_contain_text(fixture.diagnostic_account['account_name'])
+                await expect(page.locator('tbody')).to_contain_text(fixture.diagnostic_account['account_email'])
+                assert await page.locator('html').evaluate('node=>node.scrollWidth<=innerWidth')
+                await page.get_by_role('button', name='详情', exact=True).click()
+                for tab in ['概览', '请求链路', '性能']:
+                    await page.get_by_role('tab', name=tab, exact=True).click()
+                    panel = page.get_by_role('tabpanel')
+                    await expect(panel).to_contain_text(fixture.diagnostic_account['account_name'])
+                    await expect(panel).to_contain_text(fixture.diagnostic_account['account_email'])
+                    await expect(panel).to_contain_text('备用演示账号')
+                    await expect(panel).to_contain_text('backup@example.test')
+                    assert await panel.evaluate('node=>node.scrollWidth<=node.clientWidth')
+                await page.get_by_role('tab', name='原始数据', exact=True).click()
+                options = page.get_by_role('combobox', name='当前尝试').locator('option')
+                await expect(options.nth(0)).to_contain_text('backup@example.test')
+                await expect(options.nth(1)).to_contain_text(fixture.diagnostic_account['account_email'])
+                assert await page.get_by_role('tabpanel').evaluate('node=>node.scrollWidth<=node.clientWidth')
+                await page.screenshot(path=str(output / f'account-names-{width}-{theme}.png'))
+                await page.keyboard.press('Escape')
+
+            fixture.extra_attempt = False
+            for fields, account_id, label in [({}, 11, '账号信息缺失（ID 11）'),
+                    ({'account_name': '', 'account_email': 'email-only@example.test'}, 11, 'email-only@example.test'),
+                    ({'account_name': 'name-only', 'account_email': ''}, 11, 'name-only'),
+                    ({'account_name': 'same@example.test', 'account_email': 'same@example.test'}, 11, 'same@example.test'),
+                    ({}, None, '未知账号')]:
+                fixture.diagnostic_account, fixture.diagnostic_account_id = fields, account_id
+                await page.get_by_role('button', name='刷新', exact=True).click()
+                await expect(page.locator('tbody')).to_contain_text(label)
+                await page.get_by_role('button', name='详情', exact=True).click()
+                await expect(page.get_by_role('tabpanel')).to_contain_text(label)
+                await page.keyboard.press('Escape')
             await page.screenshot(path=str(output / f'requests-390-{theme}.png'), full_page=True)
             assert not errors, errors
             assert not fixture.unexpected, fixture.unexpected
