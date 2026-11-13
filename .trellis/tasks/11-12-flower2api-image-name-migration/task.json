@@ -3,7 +3,7 @@
   "name": "flower2api-image-name-migration",
   "title": "单部署迁移 flower2api 镜像与容器名称",
   "description": "按用户单人部署决定，通过一次正式发布和维护同步迁移 GHCR 镜像、控制/账号容器及网络命名，保留持久身份、数据和首次迁移恢复；本版作为后续正式维护基线。",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": "platform",
@@ -11,10 +11,10 @@
   "creator": "silentflower",
   "assignee": "silentflower",
   "createdAt": "2026-11-12",
-  "completedAt": null,
+  "completedAt": "2026-11-13",
   "closeout": {
-    "status": "pending",
-    "closedAt": null,
+    "status": "closed",
+    "closedAt": "2026-11-13T09:43:09Z",
     "blockers": []
   },
   "branch": "flower2api",
@@ -4457,15 +4457,18 @@
     }
   },
   "progress": {
-    "updatedAt": "2026-11-13T08:57:49.789917+00:00",
+    "updatedAt": "2026-11-13T09:43:09.621760+00:00",
     "completedSteps": [
-      "镜像、容器及网络命名迁移实现与本地隔离验收",
-      "完整Check-All与权威规范更新",
-      "业务代码提交推送",
-      "CI干净依赖故障修复及170项合同测试本地通过"
+      "镜像、容器及网络命名迁移实现与隔离验收",
+      "完整Check-All及权威规范更新",
+      "CI干净依赖修复及170项合同测试通过",
+      "v1.4.0正式发行、八来源兼容与签名摘要核验",
+      "US真实镜像匿名拉取及固定更新器刷新",
+      "四账号环境迁移、身份资源与原生CRIU验收",
+      "按保护集回收历史镜像及快照"
     ],
-    "partialStep": "首轮正式发布在测试阶段失败；测试修复待补充提交后重新发布",
-    "nextStep": "提交已验证测试修复，重新发布v1.4.0并完成US迁移验收",
-    "notes": "线上仍为v1.3.1，门禁空闲、四环境ready；保留历史verification容器及其引用。"
+    "partialStep": null,
+    "nextStep": "已完成",
+    "notes": "v1.4.0作为正式维护基线；四环境ready、门禁idle，历史verification容器及引用保留。"
   }
 }

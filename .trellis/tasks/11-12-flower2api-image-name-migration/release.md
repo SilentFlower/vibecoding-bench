@@ -55,3 +55,16 @@
 - 恢复测试已改为直接调用真实 ASGI 路由。新建 Python3.12 虚拟环境仅安装正式 requirements 与 PyYAML，确认 httpx 缺省后，原三组 CI 命令102+17+51项全部通过。补充提交及后续正式发行继续沿原流程核对。
 - 线上只读复查仍为 v1.3.1、门禁 idle、更新服务 active，四个账号环境均 ready。除14个正式角色外，另有历史 `verification` 容器 `v3-us-simulation-demo-network-20261020`，按既有全部容器引用保护合同保留。其网络或镜像引用仍存在时保留对应资源。
 - 当前任务保持 in_progress，正式发行和 US 迁移验收待完成。
+
+## 正式发布与 US 迁移验收（2026-11-13）
+
+- 补充测试修复 `a4ba539abf4951a540a58ec80ecbeb504d313c22` 已推送。[正式发布运行43398962266](https://github.com/SilentFlower/vibecoding-bench/actions/runs/43398962266) 成功，[v1.4.0发行](https://github.com/SilentFlower/vibecoding-bench/releases/tag/system-ci-43398962266-1) 绑定同一提交。
+- 原信任根验签、原始构建清单、迁移计划及八个历史来源的兼容证据通过；六个附件大小及摘要核对通过。迁移通道序号为211/1，原v1通道保持196/1。US使用空Docker配置完整匿名拉取两个候选镜像成功。
+- 正式control仓库摘要为 `sha256:a753ab73f3c4355f039818d141140c2825d8cafc0048249017706667eda0bf56`；account为 `sha256:23992a384762cab68bef89191a62e6df2e33e505c0408d06e20501b56c0d6ed3`。
+- 固定包从本次实际提交冻结29份源码，刷新其中15份，保留原revision及安装历史；独立导入、服务重启、原状态及15个容器生命周期核验通过。恢复材料保存在宿主私有 `operations/flower2api-name-source-refresh`。
+- 原更新入口登记操作 `374bcad6-a136-4022-95b0-fbe5b1fa5587`，等待期限60秒。双库快照283365376字节已验证，bench/gateway均完成目标版本1，操作最终succeeded，当前为system-ci-43398962266-1，门禁idle、更新服务active。
+- 14个正式角色全部采用flower2api命名；四个账号环境均ready、代次各增加1。受保护身份摘要、原账号/环境ID、名称、绑定、完整画像及CPU/RAM/swap/PID限额逐项一致。原HOME、projects、flows及controls挂载路径核对通过，四个网络角色默认出口均为tun0。
+- 10-30和11-5的原生准备及CRIU模板均ready，10-30最近扩容观测到criu_restore。10-23沿原legacy_backend，11-13沿原未绑定状态。历史verification容器的ID、镜像、网络和生命周期保持一致，其旧网络继续保留。
+- 网关维护状态idle，首页及更新页实际资产HTTP核验通过，更新页资产版本为v1.4.0。验收采用只读管理、身份、容器及资源检查。
+- 原保护集回收完成，精确移除ci-43331912433-1的旧control/account引用；当前及最近两套完整历史继续保留。回收前后实际空闲空间增加2005516288字节，约1.87GiB；双库完成快照保留2组，未知快照组为0。
+- 发布、迁移及现场验收全部完成，v1.4.0作为Flower2API正式维护基线，任务进入完成与Close同步。
