@@ -1,0 +1,106 @@
+{
+  "host": {
+    "cpus": 4,
+    "mem_available_mib": 3346
+  },
+  "control": [
+    {
+      "name": "vibebench-v3-us-orchestrator-1",
+      "release": "ci-43331912433-1",
+      "criu": null,
+      "sender_memory": ""
+    }
+  ],
+  "accounts": [
+    {
+      "gateway_account_id": 11,
+      "bench_account_id": 8,
+      "environment_id": "3153c22bf5a9480a9af4f8e372c66f65",
+      "account_memory": "1536m",
+      "sender_memory_mib": 128,
+      "sender_cpus": 0.25,
+      "native": {
+        "max_workers": null,
+        "memory_mib": null,
+        "kernel_generation": null,
+        "release": null
+      },
+      "criu_image_installed": true,
+      "criu_socket": false,
+      "processes": [
+        {
+          "pid": 1,
+          "criu": ""
+        }
+      ],
+      "entrypoint": [
+        "/usr/local/bin/account-sender"
+      ],
+      "eligibility": "legacy_backend"
+    },
+    {
+      "gateway_account_id": 10,
+      "bench_account_id": 10,
+      "environment_id": "4201ce3f913841d4b2a5a96bc996bb40",
+      "account_memory": "unlimited",
+      "sender_memory_mib": 0,
+      "sender_cpus": 1.0,
+      "native": {
+        "max_workers": 8,
+        "memory_mib": 0,
+        "kernel_generation": "de013871-b51c-4004-9be3-f7677cef4f5d",
+        "release": {
+          "release": "v0.1.0-beta.6",
+          "launcher_sha256": "fce50a30d739dbc614e450d4d1913208fa35c6373c4f07a3986657393a99261e"
+        }
+      },
+      "criu_image_installed": true,
+      "criu_socket": false,
+      "processes": [
+        {
+          "pid": 7,
+          "criu": ""
+        }
+      ],
+      "entrypoint": [
+        "/usr/local/bin/python3",
+        "-E",
+        "-s",
+        "/opt/ccrb-tls-observer/broker.py"
+      ],
+      "eligibility": "static_ready_requires_controller_rebuild"
+    },
+    {
+      "gateway_account_id": 12,
+      "bench_account_id": 14,
+      "environment_id": "15551aa6f302494cb9b5440750899c2c",
+      "account_memory": "unlimited",
+      "sender_memory_mib": 0,
+      "sender_cpus": 1.0,
+      "native": {
+        "max_workers": 8,
+        "memory_mib": 0,
+        "kernel_generation": "3a8848d9-be91-4f7b-bbbd-1ce68f6a8621",
+        "release": {
+          "release": "v0.1.0-beta.6",
+          "launcher_sha256": "fce50a30d739dbc614e450d4d1913208fa35c6373c4f07a3986657393a99261e"
+        }
+      },
+      "criu_image_installed": true,
+      "criu_socket": false,
+      "processes": [
+        {
+          "pid": 7,
+          "criu": ""
+        }
+      ],
+      "entrypoint": [
+        "/usr/local/bin/python3",
+        "-E",
+        "-s",
+        "/opt/ccrb-tls-observer/broker.py"
+      ],
+      "eligibility": "static_ready_requires_controller_rebuild"
+    }
+  ]
+}
