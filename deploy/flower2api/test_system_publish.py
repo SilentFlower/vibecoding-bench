@@ -73,7 +73,8 @@ class SystemPublishTests(unittest.TestCase):
                     raw = Path(argument).read_bytes()
                     self.published_release = validate_release(verify_signed(raw,
                         Path(argument).with_suffix('.sig').read_bytes(), self.fixture.public))
-        if arguments[:2] == ('git', 'hash-object') and data.startswith(b'{'):
+        # Ed25519签名固定64字节，二进制首字节也可能是左花括号，不能据此当作JSON。
+        if arguments[:2] == ('git', 'hash-object') and len(data) != 64 and data.startswith(b'{'):
             self.published_index = validate_index(json.loads(data))
         if arguments[:2] == ('git', 'push') and self.fail_push:
             raise RuntimeError('合成目录竞争冲突')
@@ -85,6 +86,12 @@ class SystemPublishTests(unittest.TestCase):
         """调用实际发布协调逻辑。:param evidence: 合成兼容证据。@return 发布结果。"""
         with patch.object(publish_system_release, 'run', self.command_run):
             return publish_system_release.publish(self.fixture.manifest, self.bundle, self.fixture.key.read_text(), evidence)
+
+    def test_binary_signature_with_json_prefix_remains_opaque(self) -> None:
+        """确定性覆盖以左花括号开头的64字节签名。@return None。"""
+        signature = b'{' + b'\xff' * 63
+        self.assertEqual(self.command_run('git', 'hash-object', '-w', '--stdin', data=signature), b'a' * 40 + b'\n')
+        self.assertIsNone(self.published_index)
 
     def test_v2_assets_are_published_before_migration_catalog(self) -> None:
         """迁移附件上传成功后推进独立新通道。@return None。"""
