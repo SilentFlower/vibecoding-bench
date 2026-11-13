@@ -1,0 +1,42 @@
+{
+  "id": "native-prewarm-maintenance-recovery",
+  "name": "native-prewarm-maintenance-recovery",
+  "title": "修复平台维护期间原生预热误报与恢复延迟",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-13",
+  "completedAt": "2026-11-13",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-13T03:32:47Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-13-native-maintenance-records",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "修复平台维护分类及一秒恢复检查",
+      "修复 FBK-001 并保留首次启动补偿、原故障归属和冷却",
+      "通过网关及运行时、环境页验证并更新规范"
+    ],
+    "partialStep": null,
+    "nextStep": "本轮交付完成",
+    "notes": "合成数据与离线验证，真实模型调用为零。",
+    "updatedAt": "2026-11-13T03:32:47Z"
+  }
+}

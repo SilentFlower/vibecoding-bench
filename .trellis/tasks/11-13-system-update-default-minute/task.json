@@ -1,0 +1,41 @@
+{
+  "id": "system-update-default-minute",
+  "name": "system-update-default-minute",
+  "title": "系统更新确认默认等待一分钟",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-13",
+  "completedAt": "2026-11-13",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-13T03:32:47Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-13-native-maintenance-records",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "更新确认及 API 缺省期限统一一分钟",
+      "通过默认、取消重开、显式期限及冻结恢复验证"
+    ],
+    "partialStep": null,
+    "nextStep": "本轮交付完成",
+    "notes": "合成数据与离线验证，真实模型调用为零。",
+    "updatedAt": "2026-11-13T03:32:47Z"
+  }
+}
