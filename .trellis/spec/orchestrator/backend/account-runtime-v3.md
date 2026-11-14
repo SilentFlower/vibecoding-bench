@@ -1338,7 +1338,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 ### 6. Tests Required
 
 - `test_cli_prepares_finite_native_selection_without_sender_budget`、`test_cli_keeps_running_layout_when_selected_sender_budget_is_insufficient`、`test_cli_preserves_applied_native_budget_flags_and_workers`：首次/停止、API活动、角色资源与ID、代次、冻结native及开关保持；API预算拒绝独立。`test_cli_rejects_corrupt_or_missing_applied_sender_configuration` 保留配置对账保护。
-- `test_review_reaches_cli_handoff_with_native_selection_and_no_sender_budget` 核真实评审入口可到达CLI资源交接；`test_environment_actions_require_proof_and_preserve_applied_layout` 经真实HTTP、SQLite及生命周期核对基础和native布局的rebuild/restore、原证明和代次门禁。实际隔离Docker验证同输入首次与停止后准备、角色cgroup额度、模型调用0及API受控拒绝。
+- `test_review_reaches_cli_handoff_with_native_selection_and_no_sender_budget` 核真实评审入口可到达CLI资源交接；`test_environment_actions_require_proof_and_preserve_applied_layout` 经真实HTTP、SQLite及生命周期核对基础和native布局的rebuild/restore、原证明和代次门禁。实际隔离Docker验证同输入首次与停止后准备、角色cgroup额度、模型调用0及API受控拒绝。 系统更新合成测试同时模拟宿主文件归属和权限调用，以普通UID运行CI原命令验证；真实root归属和只读保护继续由专用Docker验收覆盖。
 
 - `test_account_runtime` 覆盖旧布局目标原生的等待与预算失败、秘密过滤、显式重试唯一绑定和当前后端校验；`test_native_sender` 断言三项错误码及 N=4 的1792/2560 MiB边界。
 - `verify_environment_ui.py` 覆盖旧布局等待、明确预算失败、显式重试到实际 ready，沿既有明暗、移动端及迟到响应场景核验。

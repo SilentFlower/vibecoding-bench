@@ -113,7 +113,8 @@ class RetirementTests(unittest.TestCase):
                 runtime._update(row, fingerprint_json=json.dumps({**json.loads(row['fingerprint_json']), 'mem': '1536m'}))
                 fixture.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active',
                     'proxy_url': runtime._proxy(account), 'request_backend': 'native293', 'concurrency': 4}
-                with patch.object(runtime, '_make_room'), patch.object(runtime, '_sender_active', return_value=0), \
+                # Docker与宿主权限操作一起模拟，避免合成重建依赖root；真实归属和只读保护由独立Docker验收覆盖。
+                with patch('os.chown'), patch('os.fchown'), patch('os.chmod'), patch.object(runtime, '_make_room'), patch.object(runtime, '_sender_active', return_value=0), \
                         patch.dict('os.environ', {'V3_NATIVE_SENDER_MEMORY': ''}):
                     row, _ = runtime.ensure(account, prepare_sender=False)
                     fingerprint = row['fingerprint_json']
