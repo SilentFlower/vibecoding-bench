@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/legacy-web/frontend/component-guidelines.md", "reason": "任务二级导航、视图生命周期与迟到回执"}
+{"file": ".trellis/spec/platform/deploy/auth-design.md", "reason": "统一后台同源会话与原有鉴权边界"}
+{"file": ".trellis/spec/orchestrator/backend/account-runtime-v3.md", "reason": "CLI执行环境、账号门禁及暖进程资源合同"}
+{"file": ".trellis/spec/runtime/backend/runtime-contract.md", "reason": "CLI与原生发送栈遥测所有权区分"}
+{"file": ".trellis/spec/gateway/backend/testing-quality.md", "reason": "网关测试与隐私要求"}
