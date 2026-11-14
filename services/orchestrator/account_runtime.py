@@ -481,6 +481,40 @@ class AccountRuntime:
         parent = self._root(row) / "runtime"
         return (parent / "sender" if row.get("isolation_version") == ISOLATION_VERSION else parent) / "sender.json"
 
+    def _applied_native_sender(self, row: dict) -> dict | None:
+        """按冻结布局准备 CLI，避免目标 API 预算改变现有角色。
+
+        :param row: 当前账号环境及冻结画像。
+        :return: 已生效的原生配置；首次或基础布局返回 None，损坏配置明确拒绝。
+        """
+        fingerprint = json.loads(row["fingerprint_json"])
+        path = self._sender_config(row)
+        if path.is_symlink():
+            raise ValueError("账号发送器配置来源异常，请先对账")
+        if not path.is_file():
+            if any(row.get(column) for column in ROLE_COLUMNS.values()) or fingerprint.get("native_sender_memory"):
+                raise ValueError("账号发送器配置缺失，请先对账")
+            return None
+        configuration = _read_json(path)
+        if "native" not in configuration and fingerprint.get("native_sender_memory"):
+            raise ValueError("账号发送器布局缺失，请先对账")
+        native = configuration.get("native")
+        if native is None:
+            if fingerprint.get("native_sender_memory"):
+                raise ValueError("账号发送器布局与冻结预算不符，请先对账")
+            return None
+        if (not isinstance(native, dict) or type(native.get("memory_mib")) is not int
+                or native["memory_mib"] < 0 or type(native.get("max_workers")) is not int
+                or native["max_workers"] <= 0 or native.get("binary_path") != "/usr/local/bin/ccrb-runtime"
+                or native.get("work_root") != "/native"):
+            raise ValueError("账号原生发送器配置无效，请先对账")
+        budget = "unlimited" if native["memory_mib"] == 0 else str(native["memory_mib"]) + "m"
+        if fingerprint.get("native_sender_memory") != budget:
+            raise ValueError("账号原生发送器与冻结预算不符，请先对账")
+        isolated_account_limits(fingerprint["mem"], fingerprint.get("swap", "0"), budget)
+        # 内核选择继续由原生命周期处理，CLI 不将其误判为资源布局变化。
+        return {key: value for key, value in native.items() if key not in ("release", "kernel_generation")}
+
     def _write_sender_config(self, row: dict, configuration: dict) -> None:
         path = self._sender_config(row)
         atomic_json(path, configuration, 0o640 if row.get("isolation_version") == ISOLATION_VERSION else 0o600)
@@ -596,7 +630,8 @@ class AccountRuntime:
     def ensure(self, account: dict, version: str | None = None, allow_inactive_login: bool = False,
                allow_login_recovery: bool = False, preserve_proxy: bool = False,
                scenario_resources: bool = False, ownership_source: str | None = None,
-               require_quota_mount: bool = True, startup_prewarm: bool = False) -> tuple[dict, object]:
+               require_quota_mount: bool = True, startup_prewarm: bool = False,
+               prepare_sender: bool = True) -> tuple[dict, object]:
         """创建或唤醒固定环境，沿用首次固化参数。
 
         :param account: bench 账号或登录草稿
@@ -608,6 +643,7 @@ class AccountRuntime:
         :param ownership_source: 只有原受控登录会话可进入凭据维护阶段
         :param require_quota_mount: 是否要求补齐额度挂载；仅独立 API 传输准备可跳过明确缺失
         :param startup_prewarm: 后台启动只使用空余容量，且不重建现有容器
+        :param prepare_sender: API 准备目标发送器；CLI/管理操作只使用已生效布局
         :return: 环境记录与 Docker container
         """
         with self._account_lock(account):
@@ -634,7 +670,8 @@ class AccountRuntime:
                 else:
                     self._sync_proxy(account, configuration)
             fingerprint = json.loads(row["fingerprint_json"])
-            native = sender_config(gateway_configuration, fingerprint["mem"], fingerprint.get("swap", "0"))
+            native = (sender_config(gateway_configuration, fingerprint["mem"], fingerprint.get("swap", "0"))
+                if prepare_sender else self._applied_native_sender(row))
             if startup_prewarm and (not native or self.stopping.is_set() or row["state"] not in ("ready", "stopped")):
                 raise RuntimeBusy("账号环境当前不接受预启动")
             account = {**account, "native_sender": native}
@@ -698,7 +735,7 @@ class AccountRuntime:
                         actual_native = {key: value for key, value in actual_native.items()
                             if key not in ("release", "kernel_generation")}
                     restore = restore_policy(native, fingerprint, image_labels.get('vibebench.native-criu') == '1')
-                    if (actual_native != native
+                    if prepare_sender and (actual_native != native
                             or bool(configuration.get('native_criu_enabled')) != restore['eligible']
                             or configuration.get("native_capture_dir") != ("/flows/api/cc-prepared" if native and capture_enabled(fingerprint) else None)):
                         if startup_prewarm:
@@ -779,7 +816,7 @@ class AccountRuntime:
                 if configuration is None:
                     configuration = _read_json(self._sender_config(row))
                 adaptive = bool(native and account.get("cc2api_account_id") == self.native_prewarm_account_id)
-                if configuration.get("native_adaptive_prewarm", False) != adaptive:
+                if prepare_sender and configuration.get("native_adaptive_prewarm", False) != adaptive:
                     configuration["native_adaptive_prewarm"] = adaptive
                     self._write_sender_config(row, configuration)
         # 版本缓存准备不持有环境生命周期锁，API 不等待 CLI 安装。
@@ -789,7 +826,7 @@ class AccountRuntime:
         if scenario_resources:
             with self.environment_lock(row['environment_id']):
                 self.reviews.serial_layout(row,container)
-        if native:
+        if native and prepare_sender:
             self._notify_native_preparation(account, row)
         return row, container
 
@@ -1607,7 +1644,7 @@ class AccountRuntime:
                    shared_cli: bool = False, scenario_resources: bool = False):
         row, container = self.ensure(account, allow_inactive_login=allow_inactive_login,
             allow_login_recovery=source.startswith("login:"), scenario_resources=scenario_resources,
-            ownership_source=source)
+            ownership_source=source, prepare_sender=False)
         with self.environment_lock(row["environment_id"]):
             # 检查至认领必须连续持锁，否则评审可在画像 exec 前停止尚未认领的 CLI。
             if self.reviews.serial_state(row):
@@ -3069,7 +3106,7 @@ class AccountRuntime:
         :param version: 当前 CLI 基础版本
         :return: 无凭据的身份载荷；缺少证据时阻止导入
         """
-        row, container = self.ensure(account, version)
+        row, container = self.ensure(account, version, prepare_sender=False)
         with self.environment_lock(row["environment_id"]):
             identity = self.read_cli_identity(row, version)
         probe = '''const os=require('os');const fs=require('fs');const distro=Object.fromEntries(fs.readFileSync('/etc/os-release','utf8').split('\\n').filter(x=>x.includes('=')).map(x=>{const i=x.indexOf('=');return[x.slice(0,i),x.slice(i+1).replace(/^"|"$/g,'')]}));console.log(JSON.stringify({platform_raw:process.platform,arch:process.arch,node_version:process.version,linux_distro_id:distro.ID||'',linux_distro_version:distro.VERSION_ID||'',linux_kernel:os.release()}));'''
@@ -3141,7 +3178,7 @@ class AccountRuntime:
         :param version: 当前官方 CLI 版本。
         :return: 独立进程导入载荷。
         """
-        row, container = self.ensure(account, preserve_proxy=True)
+        row, container = self.ensure(account, preserve_proxy=True, prepare_sender=False)
         with self.environment_lock(row["environment_id"]):
             identity = self.read_cli_identity(row, version)
             top = _read_json(self._root(row) / "home/.claude.json")

@@ -597,7 +597,7 @@ class ProjectReviewRuntime:
         """
         runtime = self.runtime
         source = worker_env['QUOTA_SOURCE']
-        row, cli = runtime.ensure(account, scenario_resources=True)
+        row, cli = runtime.ensure(account, scenario_resources=True, prepare_sender=False)
         with runtime.environment_lock(row['environment_id']):
             layout = self.serial_layout(row, cli)
             self.check_orphans(row)

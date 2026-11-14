@@ -57,6 +57,18 @@ class StartupRecoveryProofTests(unittest.TestCase):
         command = self.containers['cli'].exec_run.call_args.args[0]
         self.assertEqual(['python3', '-I', '/usr/local/bin/v3-cli-control', 'orphans'], command)
 
+    def test_manual_environment_preparation_is_separate_from_read_only_proof(self) -> None:
+        """明确准备只调用CLI职责，证明仍单独检查角色和实际孤儿。:return: None。"""
+        with patch.object(self.runtime, 'ensure', return_value=(self.row, self.containers['cli'])) as prepare:
+            self.terminal.prepare_startup_recovery(self.account, self.work)
+            prepare.assert_called_once_with(self.account, prepare_sender=False)
+        self.assertTrue(self.terminal.startup_recovery_ready(self.account, self.work))
+        with patch.object(self.runtime, 'ensure', side_effect=ValueError('synthetic-secret')):
+            with self.assertRaisesRegex(ValueError, '账号环境准备失败') as raised:
+                self.terminal.prepare_startup_recovery(self.account, self.work)
+            self.assertNotIn('synthetic-secret', str(raised.exception))
+        self.fixture.client.containers.run.assert_not_called()
+
     def test_active_jobs_and_persisted_executions_are_not_idle(self) -> None:
         """内存作业、排他登记或共享登记任一存在时都不能核发恢复证明。:return: None。"""
         job = {'row': self.row, 'source': 'projects:fixture:1', 'shared_cli': True}

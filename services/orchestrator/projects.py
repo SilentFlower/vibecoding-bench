@@ -1404,6 +1404,51 @@ class ProjectsService:
             return None
         return event
 
+    def _prepare_manual_startup_retry(self, account_id: int) -> tuple[dict, dict, int, str] | None:
+        """在锁外准备明确人工恢复的未知启动，保持原工作及故障快照。
+
+        :param account_id: 用户点击启动的账号。
+        :return: 需在认领前再次核对的账号控制、工作、故障事件及身份；其它状态返回 None。
+        """
+        with self.lock:
+            if self.closed or account_id in self.controllers:
+                return None
+            agent = self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
+            account = self.account(account_id)
+            if not agent or not account or agent['status'] != 'blocked':
+                return None
+            work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
+            if (not work or work['status'] != 'blocked' or work['runtime_json']
+                    or work['started_at'] is not None or work['segment_started_at'] is not None):
+                return None
+            failure = json.loads(work['failure_json']) if work.get('failure_json') else {}
+            if (failure.get('code') != 'startup_unknown' or failure.get('phase') != 'preparing'
+                    or failure.get('resolved_at')):
+                return None
+            event = self._one("SELECT * FROM projects_events WHERE account_id=? "
+                "AND kind IN ('error','started','manual_retry','auto_retry','gate_wait') ORDER BY id DESC LIMIT 1", (account_id,))
+            if not event or event['kind'] != 'error' or event['work_id'] != work['id']:
+                return None
+            payload = json.loads(event['payload_json'])
+            if (payload.get('reason') != 'runtime_preparation'
+                    or type(payload.get('generation')) is not int
+                    or payload.get('generation') != failure.get('generation')
+                    or not work['generation'] <= payload.get('generation', -1) <= agent['generation']
+                    or self._one('SELECT id FROM projects_actions WHERE work_id=? LIMIT 1', (work['id'],))):
+                return None
+            identity = self.identity(account)
+            if agent['schedule_enabled'] and agent['schedule_identity'] != identity:
+                return None
+            if self._one("SELECT a.id FROM projects_actions a JOIN projects_work w ON w.id=a.work_id "
+                    "WHERE w.account_id=? AND a.status IN ('intent','unknown') LIMIT 1", (account_id,)):
+                return None
+            # 只豁免当前待人工核验的故障，额度、时间窗口及其它执行条件仍先检查。
+            unavailable, _ = self._eligibility(agent, {**work, 'status': 'paused'})
+            if unavailable or not self.admission(account, work)['allowed']:
+                return None
+        self.terminal.prepare_startup_recovery(account, work)
+        return agent, work, event['id'], identity
+
     def start(self, account_id: int, *, scheduled: bool = False, now: float | None = None, recovering: bool = False) -> dict:
         """启动一个账号控制者，重复请求不产生第二个 Pi。
 
@@ -1413,12 +1458,24 @@ class ProjectsService:
         :param recovering: 是否由服务重启接续，不能重置自动恢复计数。
         :return: 公开状态。
         """
+        prepared_retry = self._prepare_manual_startup_retry(account_id) if not scheduled and not recovering else None
         with self.lock:
             if self.closed:
                 raise ValueError('服务正在退出')
             if account_id in self.controllers:
                 return self.state(account_id)
             agent = self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
+            if prepared_retry:
+                original_agent, original_work, original_event, original_identity = prepared_retry
+                saved_work = self._one('SELECT * FROM projects_work WHERE id=?', (original_work['id'],))
+                latest = self._one("SELECT id FROM projects_events WHERE account_id=? "
+                    "AND kind IN ('error','started','manual_retry','auto_retry','gate_wait') ORDER BY id DESC LIMIT 1", (account_id,))
+                current_account = self.account(account_id)
+                # Docker I/O 期间的暂停、换代、改绑或新故障优先，旧点击不能覆盖后来操作。
+                if (agent != original_agent or saved_work != original_work or not latest
+                        or latest['id'] != original_event or not current_account
+                        or self.identity(current_account) != original_identity):
+                    raise ValueError('环境准备期间原工作或账号状态已变化，请重新核对后启动')
             if not agent or not self.account(account_id):
                 raise ValueError('请先为可用账号配置项目池')
             now = time.time() if now is None else now

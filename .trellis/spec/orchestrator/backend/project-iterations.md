@@ -1005,6 +1005,7 @@ ProjectRuntimeError(code: str, message: str, *, retryable: bool = False,
                     phase: str = 'preparing', details: dict | None = None)
 runtime_failure(error: BaseException, phase: str, context: dict | None = None) -> dict
 write_runtime_failure(directory: Path, record: dict) -> Path | None
+ProjectsTerminal.prepare_startup_recovery(account: dict, work: dict) -> None
 ProjectsTerminal.startup_recovery_ready(account: dict, work: dict) -> bool
 ```
 
@@ -1028,7 +1029,8 @@ ProjectsTerminal.startup_recovery_ready(account: dict, work: dict) -> bool
 - 页面当前目标、工程历史和详情读取同一事实，按 started_at 区分启动／恢复失败。自动重试时间使用当前工作对应账号的真实 `schedule.next_run_at`，历史工作不能借用当前计划；已停止先显示停止。所有外部文本转义，未保存配置不被 SSE 回填，旧记录正常展示。
 - 私有启动诊断使用 schema1：`at/phase/context/exceptions`，可嵌套一层 `network`；仅保留固定账号／工作／代次／handle／source、异常类型、可用 errno 和栈的文件名／函数／行号。因果链最多 4 项、每项最多 32 帧、单记录最多 64 KiB；不读取异常正文、源码行、局部变量或任意上下文字段。网络端记录在 `/run/v3/diagnostics/<随机ID>.json`，管理端记录在 `<数据根>/<projects|warmup>/startup-failures/<随机ID>.json`，目录 0700、文件 0600、原子发布并拒绝链接；保存失败不覆盖原异常或放行执行。
 - 原准备错误须在 cleanup 前留证；cleanup 再失败时独立记录并保留原因果链，公开阶段为 cleanup 时继续阻塞。`runtime_files.py` 共用原安全目录／原子发布实现，`account_runtime` 保留 `atomic_json/atomic_text` 导出；control 与 account 同批镜像都必须包含诊断及文件模块。
-- 只有现有人工 start、`scheduled=False` 且 `recovering=False` 可以核对 `startup_unknown` 的未启动工作。须为 preparing，原 `started_at/segment_started_at/runtime_json` 为空、没有任何输入动作；在环境锁内重读环境，确认布局2、ready、三角色归属且运行、无内存／持久执行登记和评审交接、累计工作区注册唯一且合法、原生会话不存在，实际 `v3-cli-control orphans` 成功且为空。缺失／损坏／未知证据均拒绝，不创建环境或改写现场。
+- 只有现有人工 start、`scheduled=False` 且 `recovering=False` 可以准备和核对 `startup_unknown` 的未启动工作。须为preparing，原started_at/segment_started_at/runtime_json为空、没有任何输入动作，最近故障事件及代次匹配；核对当前身份、计划、执行准入和其它未知输入后，在服务锁外调用prepare_startup_recovery，以prepare_sender=False做零模型基础环境准备。准备失败公开固定runtime_preparation_failed说明并保留原阻塞。
+- 准备后在服务锁内重读并比较原agent、work、最近错误与账号身份，后来暂停、换代、改绑或新故障均优先。独立startup_recovery_ready仍只读：环境锁内核对布局2、ready、三角色归属且运行、无内存／持久执行登记和评审交接、累计工作区注册唯一且合法、原生会话不存在，实际v3-cli-control orphans成功且为空。证明自身不创建资源或改写现场；缺失／损坏／未知证据继续拒绝。
 - 人工恢复仍核对原身份、授权、冻结合同、前置、额度与控制权，沿原事务重读工作／最近错误并原子保存 manual_retry 和新控制代次；不先清空 failure 或在事务外把工作改成 paused。自动扫描及服务 recover 不核发该许可；已开始过的工作、已有输入、未知收口和旧错误不能借本分支恢复。
 - 监听进程的 `/proc` 文件已打开后退出可能返回 `ProcessLookupError / ESRCH`，与路径消失一样表示原进程已结束；未知 PID／内核启动时刻核验和定向 TERM／KILL 仍保持。socket 重试只包建连探测，CA 发布或 ACK 写入的 OSError 必须按原步骤失败并留证，不能被重试吞成监听超时。
 
@@ -1043,6 +1045,8 @@ ProjectsTerminal.startup_recovery_ready(account: dict, work: dict) -> bool
 | 缓存证明冲突、制品摘要不符或离线安装失败 | `python_cache_invalid`／`artifact_invalid`／`offline_install_failed`，处理后显式重试 |
 | 工作区归属冲突 | `workspace_conflict`，保留原现场，仍核对身份及未知输入 |
 | 未知启动、基线或收口结果 | `startup_unknown`；固定说明和异常类型，先人工核对，不自动重发 |
+| 人工恢复的未启动工作处于停止环境 | 先核原故障和准入，锁外零模型准备；重读身份/代次后再核实际现场 |
+| 准备期间出现暂停、改绑、工作或最近故障变化 | 拒绝旧点击，保留后来状态 |
 | preparing 未启动、无输入，实际环境／工作区／进程证明全部通过 | 仅明确人工 start 接续原工作；真实启动成功前保留故障 |
 | 已有输入／会话／运行时、曾启动、收口或归属未知、自动扫描／recover | 保留 blocked，不能以空运行时或旧清理回执放行 |
 | `/proc` 打开后原进程退出／CA 或 ACK 写盘失败 | 前者按已结束继续；后者保存原阶段和 errno，不能伪装为连接重试 |
@@ -1057,11 +1061,13 @@ ProjectsTerminal.startup_recovery_ready(account: dict, work: dict) -> bool
 - 边界：旧缓存只有 profile_digest，实测兼容后补齐证明；原工作较旧代次可恢复，重启不增加尝试次数。显式 `{"python":"3.12.15","python_compatibility":"exact"}` 在 3.12.16 返回明确环境拒绝。
 - 错误：Pi settled 后改写成“正常结束”、把历史任务显示为当前计划的下次重试，或在每次计划到期重新请求模型解释同一确定故障。正确：读取持久 failure，历史停止任务保留停止说明，确定问题处理后从原入口恢复同一工作。
 - 错误：把普通工具参数拒绝或未知执行结果加入自动重试白名单。正确：仅真实启动边界记录故障；显式恢复仍经过原身份、输入、额度、工作区及清理门禁。
-- 正常：网络准备失败且没有发过输入，人工 start 取得实际空闲证明后接续原 work/session/cwd 和冻结设置；API/SSE 在实际启动确认后才展示故障已解除。
+- 正常：基础环境停止、旧工作在准备阶段失败且没有发过输入，人工start先零模型准备环境，再取得实际空闲证明，续原work/session/cwd与冻结设置。API/SSE在实际启动确认后才展示故障已解除。错误：自动扫描调用人工准备，或准备成功就清除旧failure。正确：自动路径保持阻塞，恢复仍需现场证明及原事务。
 - 基础：`/proc/<pid>/cmdline` 已打开后，进程在读取前退出并返回 ESRCH；只移交原监听生命周期，不杀同 PID 的未知进程。CA 磁盘故障则保存 publish_ca／errno，而非反复探测端口。
 - 错误：为排障保存 `str(error)`、完整 traceback 源码／locals，或把全部 startup_unknown 加入人工白名单。正确：使用固定字段私有记录，只对满足全部未启动证明的原目标开放人工恢复。
 
 ### 6. Tests Required
+
+- `test_manual_environment_preparation_is_separate_from_read_only_proof` 核对CLI准备职责、独立真实现场证明及失败脱敏；`test_manual_unknown_startup_prepares_outside_lock_and_rejects_later_pause` 核准备期间另一线程可暂停且旧点击拒绝。`test_manual_preparation_failure_and_denied_gate_keep_original_block` 保留原故障；自动扫描/recover不得调用prepare_startup_recovery。
 
 - `test_projects_runtime_resilience`：版本／策略边界、标准库兼容补丁及源码摘要／第三方版本／插件元数据漂移拒绝、输入不变、全部已核冻结来源及篡改拒绝、缓存实测、两空间故障投影、无模型空转、真实计数、成功才解除、重启截止、迟到取消、启动后异常脱敏及后续模型错误优先。
 - `test_runtime_diagnostics`、`test_capture_settings_runtime`：原故障与清理故障独立、类型／errno／栈位置保持且合成敏感值不入记录，权限／拒绝链接／写入失败、网络协议来源和两空间 handle 归属；`test_startup_recovery` 以真实环境表和注册核对实际角色、原生会话、孤儿、执行登记和未知状态拒绝。

@@ -757,7 +757,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                 patch.object(main, "effective_claude_code_version", return_value="2.1.293"), \
                 patch.object(main.uuid, "uuid4", return_value=Mock(hex="synthetic")):
             self.assertTrue(runner.refresh_account_oauth_token(account))
-        runtime.ensure.assert_called_once_with(account)
+        runtime.ensure.assert_called_once_with(account, prepare_sender=False)
         runtime.claim.assert_called_once_with(row, account, "oauth-refresh:synthetic", exclusive=True)
         runtime._configure_network_context.assert_called_once_with(container, {
             "NETWORK_INSPECTION_MODE": "passthrough",

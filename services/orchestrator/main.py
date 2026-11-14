@@ -4319,7 +4319,7 @@ fs.renameSync(tmp, dst);
         if account_runtime:
             if account.get("cc2api_account_id") is None and _read_account_oauth_status(account["name"])["oauth_token_state"] in ("expiring", "expired"):
                 self.refresh_account_oauth_token(account)
-            row, container = account_runtime.ensure(account)
+            row, container = account_runtime.ensure(account, prepare_sender=False)
             job = account_runtime.claim(row, account, f"quota:{uuid.uuid4().hex}")
             try:
                 if account.get("cc2api_account_id") is not None:
@@ -4581,7 +4581,7 @@ JS
             if account_runtime:
                 version, _ = _resolve_account_cli_version(account)
                 source = f"oauth-refresh:{uuid.uuid4().hex}"
-                row, container = account_runtime.ensure(account)
+                row, container = account_runtime.ensure(account, prepare_sender=False)
                 job = account_runtime.claim(row, account, source, exclusive=True)
                 managed_refresh, refresh_known = False, False
                 try:

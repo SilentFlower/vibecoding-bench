@@ -46,6 +46,19 @@ class ProjectsTerminal(PiTerminal):
             quota_observation=quota_observation, namespace=namespace, scenario_resources=True)
         self.catalog = catalog
 
+    def prepare_startup_recovery(self, account: dict, work: dict) -> None:
+        """明确人工恢复时只准备环境，原会话及输入现场留给独立证明核验。
+
+        :param account: 经过当前准入的账号。
+        :param work: 尚未启动且没有投递记录的原工作。
+        :return: None；失败保留原阻塞，不启动 CLI 或模型。
+        """
+        try:
+            self.runtime.ensure(account, prepare_sender=False)
+        except Exception as error:
+            raise ProjectRuntimeError('runtime_preparation_failed',
+                '账号环境准备失败，请检查环境状态后重试') from error
+
     def startup_recovery_ready(self, account: dict, work: dict) -> bool:
         """只读证明未启动原工作的环境、源码和输入现场已具备人工恢复条件。
 

@@ -12,13 +12,14 @@ from unittest.mock import Mock, patch
 from fastapi import FastAPI
 
 from system_updates import system_updates_router
+import test_account_runtime
 
 
 class RetirementTests(unittest.TestCase):
     """核对门禁、代次和排空后才允许移除，身份及重建由原生命周期负责。"""
 
-    def test_retirement_requires_proof_idle_and_exact_generation(self) -> None:
-        """授权成功只收口角色；错误证明、代次及在途分别拒绝。@return None。"""
+    def test_environment_actions_require_proof_and_preserve_applied_layout(self) -> None:
+        """退役保留身份，重建和恢复沿实际布局；错误证明、代次及在途均拒绝。@return None。"""
         with tempfile.TemporaryDirectory() as folder:
             database = Path(folder) / 'bench.sqlite'
             with sqlite3.connect(database) as connection:
@@ -94,3 +95,52 @@ class RetirementTests(unittest.TestCase):
                 self.assertTrue(runtime._stop_environment.call_args.kwargs['remove'])
                 self.assertEqual(partial.call_args.args[-1], body['allowed_image_ids'])
                 runtime.ensure.assert_not_called()
+
+                # 更新恢复承接实际基础布局，不能因目标原生预算为空而再次阻断CLI。
+                fixture = test_account_runtime.AccountRuntimeTests()
+                fixture.setUp()
+                self.addCleanup(fixture.doCleanups)
+                fixture._isolated_docker()
+                runtime = fixture.runtime
+                with fixture.database() as connection:
+                    for name, definition in (('upstream_proxy_scheme', "TEXT DEFAULT 'socks5'"),
+                            ('upstream_socks5_host', "TEXT DEFAULT '192.0.2.2'"),
+                            ('upstream_socks5_port', 'INTEGER DEFAULT 1080'),
+                            ('upstream_socks5_user', "TEXT DEFAULT ''"), ('upstream_socks5_pass', "TEXT DEFAULT ''")):
+                        connection.execute('ALTER TABLE accounts ADD COLUMN ' + name + ' ' + definition)
+                    account = dict(connection.execute('SELECT * FROM accounts WHERE id=1').fetchone())
+                row = runtime._row('synthetic', 1)
+                runtime._update(row, fingerprint_json=json.dumps({**json.loads(row['fingerprint_json']), 'mem': '1536m'}))
+                fixture.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active',
+                    'proxy_url': runtime._proxy(account), 'request_backend': 'native293', 'concurrency': 4}
+                with patch.object(runtime, '_make_room'), patch.object(runtime, '_sender_active', return_value=0), \
+                        patch.dict('os.environ', {'V3_NATIVE_SENDER_MEMORY': ''}):
+                    row, _ = runtime.ensure(account, prepare_sender=False)
+                    fingerprint = row['fingerprint_json']
+                    for action in ('rebuild', 'restore'):
+                        evidence.update(ready=True, active=0, environments=[])
+                        response = post({**body, 'action': action, 'environment_id': row['environment_id'],
+                            'generation': row['generation']}, headers)
+                        self.assertEqual(200, response.status_code)
+                        self.assertEqual('ready', response.json()['state'])
+                        current = runtime._row('synthetic', 1)
+                        self.assertEqual(row['generation'] + 1, current['generation'])
+                        self.assertEqual(fingerprint, current['fingerprint_json'])
+                        self.assertIsNone(json.loads(runtime._sender_config(current).read_text())['native'])
+                        row = current
+
+                    fixture.client.images.get.return_value.attrs['Config']['Labels']['vibebench.native-runtime'] = '293-raw-1'
+                    runtime._update(row, fingerprint_json=json.dumps({**json.loads(row['fingerprint_json']), 'mem': '4g'}))
+                    fixture.gateway._request.return_value['concurrency'] = 3
+                    with patch.dict('os.environ', {'V3_NATIVE_SENDER_MEMORY': '1536m'}):
+                        row, _ = runtime.ensure(account)
+                    fingerprint = row['fingerprint_json']
+                    native = json.loads(runtime._sender_config(row).read_text())['native']
+                    for action in ('rebuild', 'restore'):
+                        response = post({**body, 'action': action, 'environment_id': row['environment_id'],
+                            'generation': row['generation']}, headers)
+                        self.assertEqual(200, response.status_code)
+                        current = runtime._row('synthetic', 1)
+                        self.assertEqual(fingerprint, current['fingerprint_json'])
+                        self.assertEqual(native, json.loads(runtime._sender_config(current).read_text())['native'])
+                        row = current

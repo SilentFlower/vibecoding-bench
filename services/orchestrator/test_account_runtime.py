@@ -23,6 +23,7 @@ from account_isolation import ROLE_COLUMNS, role_labels
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_PROBE, DMI_DIRECTORIES,
     SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_PROBE, generate_computer_profile, generate_system_profile)
 from physical_features import FEATURE_LABELS, physical_features_summary
+from native_sender import NativePreparationBlocked
 from project_library import digest_json
 import main
 
@@ -1821,6 +1822,126 @@ class AccountRuntimeTests(unittest.TestCase):
             self.assertEqual(self.runtime.transport(account, "9.9.9"), configuration["binding"])
             installer.assert_not_called()
         self.assertEqual(self.runtime._row("synthetic", 1)["state"], "cli_reconcile")
+
+    def test_cli_prepares_finite_native_selection_without_sender_budget(self) -> None:
+        """有限账号首次与停止布局能准备CLI，API仍在投递前拒绝缺失预算。@return None。"""
+        containers = self._isolated_docker()
+        row = self.runtime._row('synthetic', 1)
+        self.runtime._update(row, fingerprint_json=json.dumps({**json.loads(row['fingerprint_json']), 'mem': '1536m'}))
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
+            'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        self.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': '',
+            'request_backend': 'native293', 'concurrency': 4}
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
+                patch.object(self.runtime, '_sender_active', return_value=0), \
+                patch.object(self.runtime, '_notify_native_preparation') as notify, \
+                patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': ''}):
+            with self.assertRaises(NativePreparationBlocked) as raised:
+                self.runtime.transport(account, '2.1.293')
+            self.assertEqual('native_sender_budget_missing', raised.exception.reason)
+            self.client.containers.run.assert_not_called()
+            prepared, _ = self.runtime.ensure(account, prepare_sender=False)
+            initial = {key: prepared[column] for key, column in ROLE_COLUMNS.items()}
+            configuration = json.loads(self.runtime._sender_config(prepared).read_text())
+            self.assertIsNone(configuration['native'])
+            self.assertEqual(7, configuration['binding']['account_id'])
+            limits = {item.kwargs['labels']['vibebench.role']: item.kwargs['mem_limit'] // 1024 ** 2
+                for item in self.client.containers.run.call_args_list}
+            self.assertEqual({'account-network': 256, 'account-sender': 128, 'account': 1152}, limits)
+            for container in containers.values():
+                container.status = 'exited'
+                container.start.side_effect = lambda target=container: setattr(target, 'status', 'running')
+            self.runtime._update(prepared, state='stopped')
+            restored, _ = self.runtime.ensure(account, prepare_sender=False)
+            self.assertEqual(initial, {key: restored[column] for key, column in ROLE_COLUMNS.items()})
+            self.assertEqual(prepared['generation'] + 1, restored['generation'])
+            with self.assertRaises(NativePreparationBlocked):
+                self.runtime.transport(account, '2.1.293')
+            notify.assert_not_called()
+        self.assertEqual(3, self.client.containers.run.call_count)
+
+    def test_cli_keeps_running_layout_when_selected_sender_budget_is_insufficient(self) -> None:
+        """API活动中CLI保持原布局，目标发送器预算不足独立拒绝。@return None。"""
+        containers = self._isolated_docker()
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
+            'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        self.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': '',
+            'request_backend': 'native293', 'concurrency': 4}
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
+                patch.object(self.runtime, '_sender_active', return_value=2), \
+                patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '128m'}):
+            row, _ = self.runtime.ensure(account, prepare_sender=False)
+            original = self.runtime._sender_config(row).read_bytes()
+            repeated, _ = self.runtime.ensure(account, prepare_sender=False)
+            self.assertEqual(row['generation'], repeated['generation'])
+            self.assertEqual(original, self.runtime._sender_config(repeated).read_bytes())
+            with self.assertRaises(NativePreparationBlocked) as raised:
+                self.runtime.transport(account, '2.1.293')
+            self.assertEqual('native_sender_budget_insufficient', raised.exception.reason)
+        for container in containers.values():
+            container.stop.assert_not_called()
+            container.remove.assert_not_called()
+        self.assertEqual(3, self.client.containers.run.call_count)
+
+    def test_review_reaches_cli_handoff_with_native_selection_and_no_sender_budget(self) -> None:
+        """真实评审入口先准备基础CLI，发送器预算不会阻断串行资源交接。@return None。"""
+        self._isolated_docker()
+        row = self.runtime._row('synthetic', 1)
+        self.runtime._update(row, fingerprint_json=json.dumps({**json.loads(row['fingerprint_json']), 'mem': '1536m'}))
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
+            'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        self.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': '',
+            'request_backend': 'native293', 'concurrency': 4}
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
+                patch.object(self.runtime, '_sender_active', return_value=0), \
+                patch.object(self.runtime.reviews, 'serial_layout', side_effect=RuntimeBusy('已进入CLI资源交接')) as handoff, \
+                patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': ''}):
+            with self.assertRaisesRegex(RuntimeBusy, '已进入CLI资源交接'):
+                self.runtime.reviews.start_run(account, {}, 'review-proof', {'QUOTA_SOURCE': 'review:proof'}, {})
+        self.assertEqual(3, self.client.containers.run.call_count)
+        self.assertEqual('ready', self.runtime._row('synthetic', 1)['state'])
+        handoff.assert_called_once()
+
+    def test_cli_preserves_applied_native_budget_flags_and_workers(self) -> None:
+        """部署预算和并发变化不经CLI改动已生效原生池或补位开关。@return None。"""
+        containers = self._isolated_docker()
+        self.runtime.native_prewarm_account_id = 7
+        self.client.images.get.return_value.attrs['Config']['Labels']['vibebench.native-runtime'] = '293-raw-1'
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
+            'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        configuration = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': '',
+            'request_backend': 'native293', 'concurrency': 3}
+        self.gateway._request.return_value = configuration
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
+                patch.object(self.runtime, '_sender_active', return_value=1), \
+                patch.object(self.runtime, '_notify_native_preparation'), \
+                patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '1536m'}):
+            row, _ = self.runtime.ensure(account)
+            original, fingerprint = self.runtime._sender_config(row).read_bytes(), row['fingerprint_json']
+            configuration['concurrency'] = 4
+            with patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': ''}):
+                preserved, _ = self.runtime.ensure(account, prepare_sender=False)
+                self.assertEqual(row['generation'], preserved['generation'])
+                self.assertEqual(fingerprint, preserved['fingerprint_json'])
+                self.assertEqual(original, self.runtime._sender_config(preserved).read_bytes())
+                with self.assertRaises(NativePreparationBlocked):
+                    self.runtime.ensure(account)
+        for container in containers.values():
+            container.stop.assert_not_called()
+        self.assertEqual(3, self.client.containers.run.call_count)
+
+    def test_cli_rejects_corrupt_or_missing_applied_sender_configuration(self) -> None:
+        """现有角色缺配置或冻结预算矛盾时拒绝，不能借CLI准备重写现场。@return None。"""
+        self._isolated_docker()
+        row = self.runtime._row('synthetic', 1)
+        self.runtime._update(row, isolation_version=2, container_id='missing-role')
+        with self.assertRaisesRegex(ValueError, '配置缺失'):
+            self.runtime._applied_native_sender(row)
+        atomic_json(self.runtime._sender_config(row), {'native': {'binary_path': '/usr/local/bin/ccrb-runtime',
+            'work_root': '/native', 'memory_mib': 1536, 'max_workers': 6}})
+        with self.assertRaisesRegex(ValueError, '冻结预算'):
+            self.runtime._applied_native_sender(row)
+        self.client.containers.run.assert_not_called()
 
     def test_native_layout_rebuild_after_quiesce_keeps_busy_sender_protected(self) -> None:
         """忙时保留原角色，配置事务已停止 sender 后允许空闲重建。@return None。"""

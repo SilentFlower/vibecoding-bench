@@ -174,10 +174,57 @@ class StartupFailureTests(unittest.TestCase):
                 self.service.pause(1)
                 controller.join(2)
 
+    def test_manual_unknown_startup_prepares_outside_lock_and_rejects_later_pause(self):
+        """准备I/O允许并发暂停，旧点击必须保留后来控制状态及原故障。:return: None。"""
+        work = self.failing_round(failure=ValueError('synthetic-secret'))
+        entered = threading.Event()
+
+        def prepare(account, current):
+            """在独立线程取得服务锁并模拟用户暂停。:param account: 账号。:param current: 原工作。:return: None。"""
+            self.assertEqual(work['id'], current['id'])
+
+            def pause():
+                """写入后来的明确控制状态。:return: None。"""
+                with self.service.lock:
+                    self.service._write("UPDATE projects_agents SET status='paused',message=? WHERE account_id=?",
+                        ('后来人工暂停', account['id']))
+                    entered.set()
+
+            thread = threading.Thread(target=pause)
+            thread.start()
+            self.assertTrue(entered.wait(2))
+            thread.join(2)
+
+        self.terminal.prepare_startup_recovery = Mock(side_effect=prepare)
+        self.terminal.startup_recovery_ready = Mock(return_value=True)
+        with self.assertRaisesRegex(ValueError, '状态已变化'):
+            self.service.start(1)
+        self.assertEqual('paused', self.service._one('SELECT status FROM projects_agents WHERE account_id=1')['status'])
+        self.assertEqual(work['failure'], self.service.state(1)['agents'][0]['work']['failure'])
+        self.terminal.startup_recovery_ready.assert_not_called()
+        self.assertEqual(1, self.pi.run.call_count)
+
+    def test_manual_preparation_failure_and_denied_gate_keep_original_block(self):
+        """环境准备失败或额度不允许时不解除未知故障，也不创建新控制者。:return: None。"""
+        work = self.failing_round(failure=ValueError('synthetic-secret'))
+        prepare = Mock(side_effect=ProjectRuntimeError('runtime_preparation_failed', '账号环境准备失败'))
+        self.terminal.prepare_startup_recovery = prepare
+        with self.assertRaisesRegex(ProjectRuntimeError, '账号环境准备失败'):
+            self.service.start(1)
+        self.assertEqual(work['failure'], self.service.state(1)['agents'][0]['work']['failure'])
+        prepare.reset_mock()
+        self.service.admission = lambda account, current: {'allowed': False, 'reason': 'quota',
+            'message': '等待额度', 'retryable': True, 'retry_at': time.time() + 60}
+        with self.assertRaises(ValueError):
+            self.service.start(1)
+        prepare.assert_not_called()
+        self.assertEqual(1, self.pi.run.call_count)
+
     def test_unknown_startup_never_recovers_automatically(self):
         """计划扫描和服务恢复不能代替人工确认未知启动现场。:return: None。"""
         work = self.failing_round(failure=ValueError('synthetic-secret'))
         self.terminal.startup_recovery_ready = Mock(return_value=True)
+        self.terminal.prepare_startup_recovery = Mock()
         self.service.start(1, scheduled=True, now=time.time() + 1)
         self.service.tick(time.time() + 86400)
         with self.assertRaises(ValueError):
@@ -186,6 +233,7 @@ class StartupFailureTests(unittest.TestCase):
         self.assertEqual(work['failure'], self.service.state(1)['agents'][0]['work']['failure'])
         self.assertEqual(1, self.pi.run.call_count)
         self.terminal.startup_recovery_ready.assert_not_called()
+        self.terminal.prepare_startup_recovery.assert_not_called()
 
     def test_unknown_startup_retry_rejects_any_input_or_unconfirmed_execution(self):
         """输入、旧执行、收口故障、代次或实际证明变化均保留原阻塞。:return: None。"""

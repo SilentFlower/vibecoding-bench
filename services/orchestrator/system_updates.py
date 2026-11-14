@@ -454,7 +454,7 @@ def system_updates_router(runtime_provider) -> APIRouter:
                 if body.action in ('rebuild', 'restore'):
                     if not account:
                         raise HTTPException(409, '环境缺少原始账号归属')
-                    row, _ = runtime.ensure(dict(account))
+                    row, _ = runtime.ensure(dict(account), prepare_sender=False)
         return {'environment_id': row['environment_id'], 'generation': row['generation'],
             'state': row['state'], 'origin': None if body.action == 'retire' else image_origin(runtime, row)}
 

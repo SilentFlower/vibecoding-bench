@@ -63,6 +63,10 @@ class TerminalFixture:
         """返回合法冻结配置。:return: CLI 配置。"""
         return {'claude_code_version': '2.1.293', 'claude_effort_level': 'high', 'execution_model': None}
 
+    def prepare_startup_recovery(self, account, work):
+        """模拟零模型环境准备，实际安全证明仍由各场景提供。:param account: 账号。:param work: 原工作。:return: None。"""
+        return None
+
     def startup_recovery_ready(self, account, work):
         """夹具默认不提供真实收口证明。:param account: 账号。:param work: 原工作。:return: False。"""
         return False

@@ -1250,6 +1250,8 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 ### 2. Signatures
 
+- `AccountRuntime.ensure(..., prepare_sender: bool = True) -> tuple[dict, object]` 在原参数尾部增加准备职责；默认仍准备目标发送器。`_applied_native_sender(row: dict) -> dict | None` 读取并核验已生效布局。
+
 - `sender_config(configuration:dict,memory:str,swap:str='0',budget:str|None=None) -> dict|None`；configuration 的后端及 concurrency 来自网关权威快照。
 - `NativeSenderConfig = {binary_path,work_root,memory_mib:u64,max_workers:usize}`；legacy 的 native 配置为 None。
 - `V3_NATIVE_PREWARM_ACCOUNT_ID` 缺省为空，可配置一个正整数网关账号 ID；`SenderConfig.native_adaptive_prewarm` 为私有布尔字段，旧配置缺省 false。
@@ -1262,6 +1264,10 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - `NativePreparationBlocked(ValueError)` 携带 `reason`；私有 transport 503 通过 `x-v3-runtime-reason` 仅传递 `native_sender_budget_missing|native_sender_budget_insufficient|account_memory_insufficient`，未知错误保持通用准备失败。
 
 ### 3. Contracts
+
+- API transport、显式原生准备、启动预热及原生设置切换继续使用严格默认，按权威后端、并发和部署sender预算生成目标布局。CLI、额度查询、本地OAuth刷新、身份/指标读取、独立评审及系统更新rebuild/restore显式传 `prepare_sender=False`，沿已生效布局准备基础环境。
+- CLI准备核验私有sender配置、固定binary/work路径、整数memory_mib/max_workers与指纹的native_sender_memory；已登记角色缺配置、链接、损坏或预算矛盾均拒绝。原生内核release/kernel_generation由原生命周期处理。CLI不因新的目标预算、并发、CRIU或采集差异改写现有布局、补位开关或通知目标预热。
+- 首次环境没有已生效native时使用原基础三角色布局。目标native293保持，API原生准备仍在取得投递绑定前拒绝缺失/不足预算；基础布局不授权目标原生请求转用legacy业务发送。已有native沿冻结实际预算重建和恢复，CLI不会将其改回基础布局。
 
 - `/api/environments` 的 `request_backend` 表示权威目标，实际 sender 布局独立判断。目标原生而本地 native 为空时，只投影白名单等待、维护或失败摘要，PID 与进程数保持未观测；预算失败也可显示在 stopped 环境。真实 ready 继续核验当前身份、环境/内核代次和新鲜度。
 - 页面准备中以2秒串行读取，普通状态20秒读取。显式重试沿唯一绑定及同一准备队列，离页/旧 generation 响应丢弃；读取零唤醒，准备基础、CRIU 模板及 TLS 采集分别展示。
@@ -1291,7 +1297,10 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 | 条件 | 行为 |
 | --- | --- |
-| 有限账号缺显式预算、容量不足、未知后端 | 准备拒绝，保持原环境 |
+| API准备的有限账号缺显式预算、容量不足、未知后端 | 准备拒绝，保持原环境 |
+| CLI首次或已生效基础布局，目标原生且sender预算缺失/不足 | 沿基础布局准备CLI；API独立拒绝 |
+| 已生效native，部署sender预算或目标并发后来改变 | CLI及更新恢复保留冻结布局；API准备继续核验目标 |
+| CLI读取到缺失/链接/损坏sender配置或冻结预算矛盾 | 明确要求对账，保留原现场 |
 | 无限账号缺 sender 预算 | 生成 memory_mib=0，仍检查并发及原生身份 |
 | 全局无限、未知 mem 或非法 swap | 明确拒绝 |
 | 镜像缺能力、分发/执行体不符或映像未封存 | 准备失败，模型零发送 |
@@ -1310,6 +1319,8 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 ### 5. Scenarios and Examples
 
+- 正常：1536m账号选择native293且sender预算为空，`ensure(account, prepare_sender=False)` 使用network256m、sender128m和CLI1152m，停止后唤醒保留容器ID并增加代次；API transport返回native_sender_budget_missing。错误：在CLI入口沿目标预算重建sender，或用捕获任意ValueError后回退来放行API。正确：显式区分准备职责，已生效native继续使用其冻结预算。
+
 - 正常：旧布局选原生后先显示等待，后台准备成功才显示当前热进程。边界：总 RAM 1536 MiB、默认 N=4 且 sender 预算为空时，显示缺显式预算；普通启动需 sender 至少1792 MiB、总量至少2560 MiB，CRIU另行准入。错误用法：由目标 native293 推导 CRIU/TLS 已就绪，或将任意503原文透传页面。正确处理：独立核验实际状态，仅传资源原因白名单。
 
 - 正常：无限账号 N=2、max_workers=4，三个角色与派生评审的 cgroup `memory.max/memory.swap.max` 均为 max，CPU/PID 保留。
@@ -1325,6 +1336,9 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 正常：平台更新时显示“平台更新中，结束后自动准备”。错误用法：把维护一律解释为本地准备失败，或把任意原因原文转发页面。正确处理：维护原因沿白名单区分，失败观察继续独立投影。
 
 ### 6. Tests Required
+
+- `test_cli_prepares_finite_native_selection_without_sender_budget`、`test_cli_keeps_running_layout_when_selected_sender_budget_is_insufficient`、`test_cli_preserves_applied_native_budget_flags_and_workers`：首次/停止、API活动、角色资源与ID、代次、冻结native及开关保持；API预算拒绝独立。`test_cli_rejects_corrupt_or_missing_applied_sender_configuration` 保留配置对账保护。
+- `test_review_reaches_cli_handoff_with_native_selection_and_no_sender_budget` 核真实评审入口可到达CLI资源交接；`test_environment_actions_require_proof_and_preserve_applied_layout` 经真实HTTP、SQLite及生命周期核对基础和native布局的rebuild/restore、原证明和代次门禁。实际隔离Docker验证同输入首次与停止后准备、角色cgroup额度、模型调用0及API受控拒绝。
 
 - `test_account_runtime` 覆盖旧布局目标原生的等待与预算失败、秘密过滤、显式重试唯一绑定和当前后端校验；`test_native_sender` 断言三项错误码及 N=4 的1792/2560 MiB边界。
 - `verify_environment_ui.py` 覆盖旧布局等待、明确预算失败、显式重试到实际 ready，沿既有明暗、移动端及迟到响应场景核验。
