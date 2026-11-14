@@ -1,0 +1,7 @@
+# 离线诊断验收夹具
+
+本目录在已提交的11-14-native-criu-shared-image/research/verification夹具上增加两次真实CRIU非零退出注入。其余guard、受限入口、合成接收端、身份及真实池配对夹具复用原任务版本。
+
+只能在带/probe/.disposable-criu-guest标记的无外网一次性KVM中运行。controller端仅在合成管理路径收到指令后，分别将内部恢复配置的images路径指向该私有模板中的缺失目录和空目录，覆盖CRIU日志尚未创建与日志已有实际错误两种情况。真实CRIU返回失败后，客户端核对namespace退出；controller在清理前汇总supervisor首错，随后从有界私有目录读取摘要，断言实例已清理、原CRIU退出码与report_decode异常分别保留。
+
+注入完成后继续真实恢复、请求与在途模板撤销验收。合成模型POST总量保持原19笔；失败恢复阶段的额外模型调用为零。镜像、实际运行代码和画像沿本任务正式打包产物核对，私有完整日志保存在当前任务runtime目录。

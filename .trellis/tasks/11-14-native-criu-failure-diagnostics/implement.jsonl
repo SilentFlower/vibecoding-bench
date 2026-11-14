@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/runtime/backend/runtime-contract.md", "reason": "CRIU恢复、共享映像、取消与清理合同"}
+{"file": ".trellis/spec/runtime/backend/logging-guidelines.md", "reason": "受控错误、脱敏及有界私有取证边界"}
+{"file": ".trellis/spec/orchestrator/backend/account-runtime-v3.md", "reason": "原私有CRIU挂载、预算与真实状态合同"}
+{"file": "services/runtime/AGENTS.md", "reason": "原生运行时来源、隐私和离线验证约束"}

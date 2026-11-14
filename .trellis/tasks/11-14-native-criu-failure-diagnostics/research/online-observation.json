@@ -1,0 +1,32 @@
+{
+  "observed_release": "v1.5.0",
+  "failure_at_utc": "2026-11-14T01:47:02Z",
+  "controlled_reason": "RESTORE_OPERATION_FAILED",
+  "root_cause": "unknown",
+  "background_preparation_ms": 1855,
+  "earlier_restore_ms": [
+    848,
+    680
+  ],
+  "template_rebuilt_at_utc": "2026-11-14T01:48:08Z",
+  "runtime_observations": {
+    "samples": 40,
+    "warm_hits": 40,
+    "prepared_p50_ms": 73.5,
+    "prepared_max_ms": 492,
+    "initial_27_checkout_max_ms": 0
+  },
+  "resource_events": {
+    "oom": 0,
+    "oom_kill": 0,
+    "pids_max": 0
+  },
+  "source_anchors": [
+    "services/runtime/native/criu/controller.py:299",
+    "services/runtime/native/criu/controller.py:322",
+    "services/runtime/native/criu/supervisor.py:47",
+    "services/gateway/src/service/native_runtime.rs:1986",
+    "services/gateway/src/service/native_runtime.rs:2188",
+    "services/gateway/src/service/native_runtime.rs:2340"
+  ]
+}
