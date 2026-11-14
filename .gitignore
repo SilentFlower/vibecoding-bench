@@ -37,6 +37,9 @@ AGENTS.md
 # Local screenshots / playwright MCP dumps
 tlab-*.png
 .playwright-mcp/
+
+# 运行时模块保留其来源约束。
+!services/runtime/AGENTS.md
 # BEGIN Flower shared records
 !/.flower/
 /.flower/*
@@ -44,6 +47,3 @@ tlab-*.png
 !/.flower/plugins.json
 !/.flower/plugin-lock.json
 # END Flower shared records
-
-# 运行时模块保留其来源约束。
-!services/runtime/AGENTS.md
