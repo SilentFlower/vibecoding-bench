@@ -146,6 +146,21 @@ class PreflightTests(unittest.TestCase):
                 with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'CPU默认'):
                     manage.preflight(self.values)
 
+    def test_cli_telemetry_configuration_is_validated_before_start(self) -> None:
+        """部署预检与服务共用遥测值域，错误配置在启动前拒绝。@return None。"""
+        self.values['V3_ACCOUNT_MEMORY'] = '1536m'
+        with patch.object(manage, 'command', return_value=''), \
+                patch.object(manage, 'inspect_images', return_value={}), \
+                patch.object(manage.Path, 'read_text', return_value='MemAvailable: 2097152 kB\nSwapFree: 0 kB\n'):
+            for value in ('', 'off', 'on'):
+                self.values['V3_CLI_TELEMETRY'] = value
+                with self.subTest(value=value):
+                    self.assertEqual(manage.preflight(self.values), self.root)
+            for value in ('0', 'false', 'unknown'):
+                self.values['V3_CLI_TELEMETRY'] = value
+                with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'V3_CLI_TELEMETRY'):
+                    manage.preflight(self.values)
+
     def test_published_docker_nat_port_rejects_without_host_listener(self) -> None:
         """Docker 禁用 userland proxy 时，也必须检查 NAT 发布端口。@return None。"""
         self.values["V3_HOST_PORT"] = "18080"

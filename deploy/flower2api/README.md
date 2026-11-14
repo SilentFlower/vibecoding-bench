@@ -47,7 +47,7 @@ pull 按 `registry_digest` 固定下载，核对配置 ID后建立清单中的�
 
 账号可在 cc2api 选择 `request_backend=native293`。该方式使用固定 2.1.293 单文件执行内核，在独立 sender 角色中按需启动进程。构建会下载并校验固定 beta 二进制；发布前可设置 `V3_NATIVE_RUNTIME_ASSET` 指向同 SHA256 的本地候选。联合清单记录其版本、大小和摘要，镜像再次校验分发文件。
 
-原生方式需要显式 `V3_NATIVE_SENDER_MEMORY`。标准并发 3 对应最多 6 个 Haiku 进程，已验证配置为 `1536m`，账号总 RAM `4g` 时 CLI 剩余 2304 MiB。sender 和 network 使用各自有限 RAM，额外 swap 只交给 CLI。原生池的 HOME/config/cwd 位于 UID 1001 独占的 `/native`，与 CLI 角色的 HOME 分离。池内共享经SHA与封存校验的只读执行映像，进程保持独立堆和上下文。额外进程空闲60秒后回收并保留1个暖进程。真实V3六路峰值约646 MiB，1536 MiB限额内OOM为0，回收后sender约189 MiB。
+原生方式需要显式 `V3_NATIVE_SENDER_MEMORY`。标准并发 3 对应最多 6 个 Haiku 进程，已验证配置为 `1536m`，账号总 RAM `4g` 时 CLI 剩余 2304 MiB。sender 和 network 使用各自有限 RAM，额外 swap 只交给 CLI。原生池的 HOME/config/cwd 位于 UID 1001 独占的 `/native`，与 CLI 角色的 HOME 分离。池内共享经SHA与封存校验的只读执行映像，进程保持独立堆和上下文。额外进程空闲300秒（5分钟）后回收并保留1个暖进程。既有隔离V3六路实测峰值约646 MiB，1536 MiB限额内OOM为0，回收后sender约189 MiB。
 
 `V3_NATIVE_PREWARM_ACCOUNT_ID` 默认为空。设为单个网关账号 ID 后，orchestrator 启动时尝试用空余容量提前启动该启用的原生账号，并准备一个 worker。首条业务占用唯一进程时，有足够并发额度则后台准备第二个。预热零模型调用，额外空闲进程仍按原时限回收。容量不足或账号需要维护时跳过后台启动。
 
@@ -169,6 +169,8 @@ python3 deploy/flower2api/verify_forwarding.py --manifest /absolute/path/v3-veri
 测试替身成功只证明隔离业务链路。生产发送器经账号代理完成非模型 HTTPS 往返、真实 Anthropic 模型推理是另外两项验收；受限账号不能用来证明成功推理。
 
 默认 CLI 版本为 `2.1.293`；显式 `V3_CLI_VERSION`、页面版本覆盖及已有 Run 的冻结版本继续按原优先级生效。
+
+官方 Claude Code CLI 的遥测和错误上报默认关闭，配置 `V3_CLI_TELEMETRY=off|on`，空值按 `off` 处理。`off` 为受控 CLI 设置和执行环境写入 `DISABLE_TELEMETRY=1`、`DISABLE_ERROR_REPORTING=1`；`on` 移除这两个关闭键，恢复官方默认许可。任务、养号、项目及交互 CLI 在下次启动时应用策略。CLI 自动更新继续由平台单独关闭。原生发送栈的遥测设置沿其自身配置。
 
 ## 完整开发周期的外接需求方
 

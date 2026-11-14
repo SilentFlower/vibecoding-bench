@@ -65,6 +65,7 @@ from account_runtime import AccountRuntime, RuntimeBusy, V3_DEFAULT_TIMEZONE, at
 from account_update_identity import role_release
 from credential_ownership import CredentialOwnership
 from cli_quota import statusline_quota_observation
+from cli_telemetry_policy import cli_telemetry_environment, cli_telemetry_mode
 from capture_artifacts import _capture_files, _read_capture_index, _redact_capture_headers, _redact_capture_record, _redact_capture_value, capture_context_json, capture_summary
 from login_terminal import authorization_url
 from login_drafts import LoginDraftStore
@@ -91,6 +92,8 @@ from topic_library import (decode_followup_timing, decode_followups, encode_foll
 
 
 # ============== 配置 ==============
+# 启动时拒绝非法部署值，避免错误配置到实际作业启动时才暴露。
+cli_telemetry_mode()
 # 容器内路径
 BENCH_DATA = Path(os.environ.get("BENCH_DATA", "/data"))
 DB_PATH = BENCH_DATA / "db.sqlite"
@@ -1325,7 +1328,7 @@ def _claude_exec_env(use_sidecar: bool, extra: Optional[dict[str, str]] = None) 
         })
     if extra:
         env.update(extra)
-    return env
+    return cli_telemetry_environment(env)
 
 
 def _host_bench_data_path(container_path: Path) -> Path:
@@ -3828,7 +3831,7 @@ class Runner:
             })
         timing = decode_followup_timing(task.get("followup_timing_json"),
             len(decode_followups(task.get("followup_plan_json"))))
-        worker_env = {
+        worker_env = cli_telemetry_environment({
             "TASK_PROMPT": task["prompt"],
             "TASK_FOLLOWUP_TIMING_JSON": json.dumps(timing, separators=(",", ":")) if timing else "",
             "TASK_FOLLOWUPS_JSON": encode_followups(decode_followups(task.get("followup_plan_json"))),
@@ -3851,7 +3854,7 @@ class Runner:
             "TZ": tz,
             "LANG": fp["lang"],
             "LC_ALL": fp["lang"],
-        }
+        })
         source = _quota_source(run_id, int(task.get("quota_attempt") or 0))
         quota_env, quota_sidecar_volumes, quota_worker_volumes = self._quota_mounts(
             account, run_id, source, FLOWS_DIR / acc_name / str(task["id"]) / run_id, warmup=bool(task.get("warmup")))

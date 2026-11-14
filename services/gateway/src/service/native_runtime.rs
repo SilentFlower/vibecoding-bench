@@ -338,13 +338,13 @@ pub struct NativePool {
 }
 
 impl Default for NativePool {
-    /// 创建按需池，额外暖进程空闲60秒后回收。@return 空池及独立映像缓存。
+    /// 创建按需池，额外暖进程空闲300秒后回收，减少短间歇下的重复补位。@return 空池及独立映像缓存。
     fn default() -> Self {
         Self {
             state: Mutex::new(PoolState::default()),
             generation: tokio::sync::Mutex::new(()),
             image: tokio::sync::Mutex::new(None),
-            idle_timeout: Duration::from_secs(60),
+            idle_timeout: Duration::from_secs(300),
             verified: Mutex::new(None),
             warmup: RwLock::new(()),
             preparations: Mutex::new(HashMap::new()),
@@ -2426,6 +2426,84 @@ mod tests {
     use std::env::{temp_dir, var};
     use std::fs::FileTimes;
     use std::io::Write;
+
+    /// 额外暖进程跨过旧窗口继续保留，到新阈值后只留一个。@return 无。
+    #[tokio::test]
+    async fn default_idle_reaper_keeps_spare_until_five_minutes() {
+        for (idle_seconds, expected_idle) in [(120, 2), (301, 1)] {
+            let pool = Arc::new(NativePool::default());
+            let key = "synthetic-idle-retention".to_owned();
+            let mut workers = Vec::new();
+            for _ in 0..2 {
+                let mut child = Command::new("python3")
+                    .args(["-c", "import sys;sys.stdin.buffer.read(1)"])
+                    .stdin(Stdio::piped())
+                    .stdout(Stdio::piped())
+                    .kill_on_drop(true)
+                    .spawn()
+                    .unwrap();
+                workers.push(Worker {
+                    tls_observer: None,
+                    id: Uuid::new_v4().to_string(),
+                    cache_ttl_rewrite_supported: false,
+                    restore_supported: false,
+                    stdin: child.stdin.take().unwrap(),
+                    stdout: BufReader::new(child.stdout.take().unwrap()),
+                    child: Some(child),
+                    restored: None,
+                    stderr_task: None,
+                    root: None,
+                    _image: File::open("/dev/null").unwrap(),
+                    execution_image: None,
+                    // 使用真实空闲年龄触发生产回收逻辑，避免回归测试等待五分钟。
+                    idle_since: Instant::now() - Duration::from_secs(idle_seconds),
+                    _lease: Some(WorkerLease {
+                        pool: Arc::downgrade(&pool),
+                        key: key.clone(),
+                    }),
+                    _proxy: Arc::new(NativeProxy {
+                        url: String::new(),
+                        task: None,
+                    }),
+                    image_sha256: String::new(),
+                    ready_at: Instant::now(),
+                    started_at: Instant::now(),
+                    startup_ms: 0,
+                });
+            }
+            {
+                let mut state = pool.state.lock().unwrap();
+                state.key = key.clone();
+                state.live = workers.len();
+                state.live_by_key.insert(key.clone(), workers.len());
+                state.idle = workers;
+            }
+            pool.schedule_idle_reap();
+            if expected_idle == 2 {
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            } else {
+                timeout(Duration::from_secs(2), async {
+                    while pool.state.lock().unwrap().live != expected_idle {
+                        tokio::task::yield_now().await;
+                    }
+                })
+                .await
+                .unwrap();
+            }
+            {
+                let mut state = pool.state.lock().unwrap();
+                assert_eq!(state.idle.len(), expected_idle);
+                assert_eq!(state.live, expected_idle);
+                assert!(state.idle.iter_mut().all(Worker::reusable));
+            }
+            let workers = std::mem::take(&mut pool.state.lock().unwrap().idle);
+            for worker in workers {
+                worker.retire().await;
+            }
+            assert_eq!(pool.state.lock().unwrap().live, 0);
+            assert!(pool.state.lock().unwrap().live_by_key.is_empty());
+        }
+    }
 
     /// 真实恢复句柄的EOF日志区分管道断开与物理退出，保留外部PID。
     #[tokio::test]

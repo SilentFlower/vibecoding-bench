@@ -741,6 +741,19 @@ class QuotaGuardTests(unittest.TestCase):
         self.assertEqual("manual", main.list_accounts()[0]["passive_quota"]["source"])
         self.runner.query_quota.assert_not_called()
 
+    def test_auth_gate_requires_successful_explicit_usage_verification(self) -> None:
+        """普通额度观察和失败核验保留门禁，完整手动核验后解除。@return None。"""
+        self.guard.record_auth_failure(self.account, "invalid_grant")
+        self._state(quota_headers(time.time(), 600))
+        self.assertEqual("invalid_grant", self.guard.snapshot(self.account)["account_error"])
+        self.guard.record_manual_usage(self.account, {"ok": False, "message": "invalid_grant"})
+        self.assertTrue(self.guard.snapshot(self.account)["blocked"])
+        self.guard.record_manual_usage(self.account, {"ok": True,
+            "five_hour": {"utilization": 10, "resets_at": time.time() + 600},
+            "seven_day": {"utilization": 20, "resets_at": time.time() + 1000}})
+        self.assertFalse(self.guard.snapshot(self.account)["blocked"])
+        self.assertFalse(main.list_accounts()[0]["passive_quota"].get("account_error"))
+
     def test_resume_does_not_choose_subagent_or_copied_profile_history(self) -> None:
         """主会话恢复排除子代理及首轮未写入的账号旧历史。"""
         self._run()

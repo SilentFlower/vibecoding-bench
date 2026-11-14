@@ -31,6 +31,7 @@ from docker.errors import DockerException, NotFound
 from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, ROLE_LABELS, create_environment, role_container
 from account_update_identity import configured_release, image_origin, role_release
 from capture_artifacts import capture_context_json
+from cli_telemetry_policy import cli_telemetry_environment
 from process_metrics import PROCESS_SOURCE, merge_process_metrics, validate_process_metrics
 from physical_features import MAX_SNAPSHOT_BYTES, PHYSICAL_FEATURES_PROBE, validate_features
 from project_runtime_policy import ProjectRuntimeError, check_python_runtime
@@ -1581,10 +1582,10 @@ class AccountRuntime:
         """从已固化画像提取实际 CLI 环境，避免上层旧派生值覆盖。
 
         :param row: 含 fingerprint_json 的持久环境行
-        :return: TZ、LANG 和 LC_ALL 环境变量
+        :return: TZ、LANG、LC_ALL 以及官方 CLI 遥测策略环境变量
         """
         fingerprint = json.loads(row["fingerprint_json"])
-        return {"TZ": fingerprint["tz"], "LANG": fingerprint["lang"], "LC_ALL": fingerprint["lang"]}
+        return cli_telemetry_environment({"TZ": fingerprint["tz"], "LANG": fingerprint["lang"], "LC_ALL": fingerprint["lang"]})
 
     @contextmanager
     def _cli_setup(self, account: dict, source: str, version: str,
@@ -1610,7 +1611,7 @@ class AccountRuntime:
                 settings = self._root(row) / "home/.claude/settings.json"
                 value = _read_json(settings) if settings.is_file() else {}
                 environment = value.get("env") if isinstance(value.get("env"), dict) else {}
-                value["env"] = {**environment, "DISABLE_AUTOUPDATER": "1", **self.execution_environment(row)}
+                value["env"] = cli_telemetry_environment({**environment, "DISABLE_AUTOUPDATER": "1", **self.execution_environment(row)})
                 atomic_json(settings, value)
                 os.chown(settings, 1000, 1000, follow_symlinks=False)
                 yield row, container, job
@@ -1745,7 +1746,7 @@ class AccountRuntime:
                 else:
                     atomic_json(self._network_runtime(row) / "context.json", context)
                     self._configure_network_context(container, context)
-                environment = dict(worker_env)
+                environment = cli_telemetry_environment(worker_env)
                 environment.update(self.execution_environment(row))
                 environment.update(V3_PERSISTENT_HOME="1", USE_SIDECAR_DNS="1", HOME="/home/node",
                     PATH=f"/cli/{worker_env['CLAUDE_CODE_VERSION']}/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",

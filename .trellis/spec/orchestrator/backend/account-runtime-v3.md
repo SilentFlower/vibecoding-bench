@@ -177,7 +177,7 @@ scripts/flower2api-stack stop --env <独立配置>
 - 普通 `_cli_setup()` 的串行交接检查、画像探针与 `claim()` 共用同一个环境锁，评审不能在检查与认领之间停止 CLI；安装版本时释放该锁，由已认领作业阻止评审。坏画像仍在认领前拒绝，健康 API 保留。
 - driver 和续聊 wrapper 使用 `setsid --wait`，Docker exec 生命周期必须跟随实际进程。tmux 登录 shell 显式保留选定 CLI 缓存 PATH。
 - v3 生成 driver 时去除内部时间戳 Stop hook；UID1000 无权写 root 私有 runtime 树，该信号也没有消费者。完成仍由真实主会话 JSONL 的最新稳定最终 assistant 文本判定；配置业务补充时还需 [阶段契约](topic-prompt-contract.md#scenario-自包含题库与冻结的有限业务补充) 核验全部选定轮次，不需要放宽控制目录权限。原 hooks 在作业收口时按快照恢复。
-- `_cli_setup()` 在已认领的环境锁内合并固定 HOME 的 `settings.json.env.DISABLE_AUTOUPDATER="1"` 及画像的 TZ/LANG/LC_ALL，保留其他 env/model/hooks 并发布为 UID1000 文件。普通任务、抓包、登录和续聊的 CLI 准备共用此入口；CLI 版本继续由管理端精确缓存与全局运行配置选择。
+- `_cli_setup()` 在已认领的环境锁内合并固定 HOME 的 `settings.json.env.DISABLE_AUTOUPDATER="1"`、画像的 TZ/LANG/LC_ALL 及下文“官方 CLI 遥测部署策略”，保留其他 env/model/hooks 并发布为 UID1000 文件。普通任务、抓包、登录和续聊的 CLI 准备共用此入口；CLI 版本继续由管理端精确缓存与全局运行配置选择。
 - 实际任务 driver 在合并 worker_env 后覆盖画像的 TZ/LANG/LC_ALL；登录 tmux 命令、短命令、OAuth 探测和续聊 PTY 使用同源值。账号列表 `effective_timezone` 优先只读既有画像，否则返回显式配置或新默认；GET 不创建环境，不再把旧账号名派生值当作 v3 有效设置。
 - 正式普通任务通过 `CLAUDE_EXECUTION_SETTINGS` 和 `--settings` 使用每执行独立的模型／effort／hooks／`v3-cli-quota` 状态栏覆盖，原用户状态栏仍接收相同 stdin；不能来回改写共享 HOME 的运行态设置。原排他入口继续保存并按本代归属恢复字段。采集只消费官方 rate_limits 和主会话响应，不新增 usage／模型请求，详见 [额度契约](database-guidelines.md)。
 - 普通并行作业以环境＋source 登记，私有 `runtime/executions/<source摘要>.json` 保存 schema 2、租约及监督器证明；旧排他入口保留 `runtime/execution.json`。启动监督器是 child subreaper，收养 double-fork／setsid 后代；管理端核对 source、容器、PID／内核启动时刻后才发出启动许可。`v3-cli-control inspect/freeze/resume/stop-job --source <source> --pid <pid> --started <tick>` 仅操作匹配树。
@@ -1267,7 +1267,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 每次新进程先核验固定分发体，通过FD启动，握手验证PID/版本/raw_input_protocol，再核实际执行体SHA。首个实际映像要求 WRITE/GROW/SHRINK/SEAL 四项封存，池缓存只读FD；后续重新exec共享同一dev/inode。分发/执行体固定摘要由消费者代码及桥接运行时合同登记，外部manifest不授信。
 - CRIU恢复同样要求实际exe与池缓存共享dev/inode，并继续核验SHA、大小和四项封存；控制器持有root归属0555的封存映像，各实例独立打开FD，exe及目标VMA复用同一背板。独立进程、会话、私有页、绑定代次及唯一投递保持原合同，详细准入与生命周期见[原生CRIU热模板恢复协议](../../runtime/backend/runtime-contract.md#scenario-原生进程池-criu-热模板恢复协议-1)。共享上线初期保持保守恢复预算 `256+max_workers*(192+108)` MiB；旧画像缺 `shared_memfd_restore=1` 或恢复准入失败沿受限普通exec回退。
 - 每个进程独立HOME/config/cwd、当前bearer及worker_id，每轮独立原生根。账号/身份/代理/凭据/并发摘要改变产生新代次，旧活动自然收口，空闲旧进程退役。单进程一次作业，唯一终态及匹配idle后复用；取消、迟到/损坏帧和状态不明均退役。
-- 单个弱引用回收任务在额外进程空闲60秒后保留1个暖进程；忙进程保持当前归属。映像缓存可在所有原进程退出后支持重建，池销毁释放FD。
+- 单个弱引用回收任务在额外进程空闲300秒（5分钟）后保留1个暖进程；忙进程保持当前归属。映像缓存可在所有原进程退出后支持重建，池销毁释放FD。
 - 运行中原生账号由网关每20秒零模型巡检并按需恢复，具体身份、退避和计时合同见[原生持续预热](../../gateway/backend/service-architecture.md#scenario-原生持续预热实时就绪与请求进程诊断)。巡检只查询已有绑定，不唤醒休眠环境。
 - 批量客户端仅精确GET /admin/native-preparations接受最多4096项对象数组，其余路由继续要求对象。快照返回本次映射及read_failed；缺账号快照为snapshot_missing。页面按实际配置展示adaptive_prewarm，读取保持零模型操作。
 - `native_preparation.state=maintenance` 仅保留已知 `system_maintenance|maintenance` 原因，分别表示平台更新与账号维护；其它原因回到账号维护固定说明，PID 和进程数保持未观测。平台维护与真实失败恢复调度遵循网关原生持续预热合同，页面读取继续零写入。
@@ -1303,7 +1303,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 - 正常：无限账号 N=2、max_workers=4，三个角色与派生评审的 cgroup `memory.max/memory.swap.max` 均为 max，CPU/PID 保留。
 - 正常：有限账号总4g、N=3、原生sender1536m时，network256m、CLI2304m；3普通/6Haiku实际TLS与加权准入保持。
-- 边界：六个进程共享一个封存映像；60秒后剩一个暖进程，下次并发按需重建。隔离合成小请求的V3实测六路峰值约646 MiB、空闲约189 MiB，OOM计数为0；大正文及长流按实际负载另验峰值。
+- 边界：六个进程共享一个封存映像；额外进程空闲300秒后剩一个暖进程，下次并发按需重建。既有隔离合成小请求的V3实测六路峰值约646 MiB、空闲约189 MiB，OOM计数为0；五分钟保留下的大正文、长流及并发峰值按实际负载另验。
 - 错误用法：把磁盘26.12 MiB当作进程RAM，或用1536m预算承载默认N=4。正确处理：分别登记分发/展开/实际cgroup数据，按当前并发验证预算。
 - 错误用法：布局检查查询已被配置事务停止的HTTP sender。正确处理：核验归属后按停止状态处理；运行中仍查询真实活动。
 - 正常：配置试点后服务启动先准备一个 worker；首条占用后才补位，回收超期额外进程时仍保留一个。
@@ -1323,7 +1323,8 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 预启动回归：`test_account_runtime.py` 验证仅启用绑定、满容量时不腾挪、sender 开关先写后通知；`native_real_binary` 验证首个预热 PID、第二个唯一补位、回收到一个以及零模型计数。
 - `test_account_runtime.py` 核验批量读取、绑定/内核代次、新鲜度、非法数字、legacy/休眠及秘密过滤；合成环境页断言读取零写入且准备失败/过期明确显示。
 - `test_native_readiness_distinguishes_pending_checks_without_trusting_old_workers` 覆盖首次缺身份、严格布尔进度、真实失败、旧环境/内核及过期快照不投影 PID；`verify_environment_ui.py` 使用实际20秒轮询确认检查中到就绪，失败/冲突原因和零业务写入保持。
-- `deploy/flower2api/verify_forwarding.py --native`：真实两账号三角色、HTTP/SOCKS、3普通/6Haiku、同映像/秘密隔离、cgroup峰值与OOM0、60秒回收及按账号回退；验证镜像的额外CA仅限本地夹具。
+- `default_idle_reaper_keeps_spare_until_five_minutes` 使用真实子进程及空闲年龄：120秒保留两个，301秒回收到一个，实际退出后物理许可归零。
+- `deploy/flower2api/verify_forwarding.py --native`：真实两账号三角色、HTTP/SOCKS、3普通/6Haiku、同映像/秘密隔离、cgroup峰值与OOM0、300秒回收及按账号回退；N4等待上限315秒，验证镜像的额外CA仅限本地夹具。
 - 发布验收从实际Release下载附件，核SHA/大小、冻结构建输入并运行真实消费者；合成回环与真实付费推理分开记录。
 
 ## Scenario: 单账号原生内核在线切换与回滚
@@ -1531,3 +1532,44 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - test_native_criu_settings：缺省/显式关闭、有限降级、无限额度、实际文件CAS、维护租约、失败恢复、同值旧入口、严格同代遥测；实际ASGI覆盖鉴权、严格DTO、旧CAS及只读发现。
 - test_account_runtime：实际Docker调用选择控制器与新CPU，持久策略/采集/内核身份及旧维护回归。
 - gateway：可选restore兼容、登记断开、独立预算与饱和计算；verify_environment_ui核对开关及实际状态，所有本地夹具零真实模型调用。
+
+## Scenario: 官方 CLI 遥测部署策略
+
+### 1. Scope / Trigger
+
+修改官方 Claude Code CLI 的任务、项目/Pi、养号、登录或交互执行环境及部署配置时适用。原生发送栈的 `CCRB_TELEMETRY` 沿运行时合同独立管理。
+
+### 2. Signatures
+
+- `cli_telemetry_policy.cli_telemetry_mode(value: str | None = None) -> str`：显式值或环境值校验，返回 off/on。
+- `cli_telemetry_policy.cli_telemetry_environment(environment: dict[str, str]) -> dict[str, str]`：返回应用策略后的副本。
+- 部署变量 `V3_CLI_TELEMETRY=off|on` 由 compose 传至 orchestrator，服务导入与部署 preflight 共用校验。
+
+### 3. Contracts
+
+- 缺省、空值及去空白后空值使用 off；其它仅接受精确小写 off/on，非法值抛 ValueError。
+- off 在受控 settings.env 和最终执行环境写入 `DISABLE_TELEMETRY=1`、`DISABLE_ERROR_REPORTING=1`。on 从两者删除这两个关闭键，恢复官方默认许可；不将0解释为开启，不承诺实际上传。
+- `_cli_setup` 覆盖现有 HOME 设置，`execution_environment` 投影到任务、评审、登录及交互执行；Runner worker_env和子命令 `_claude_exec_env` 在最终合并边界应用同一策略。下次CLI启动应用部署选择。
+- 自动更新的 `DISABLE_AUTOUPDATER=1` 独立保留，其他模型/env/hooks保持原归属；官方CLI分发体、原生sender及其身份、TLS和模型发送链路各沿自身合同。
+- orchestrator镜像的 `COPY *.py` 包含纯策略模块；宿主 `manage.py` 的直接依赖同步登记 `install_system_updater.SOURCE_FILES`，固定源码包须支持仓库外独立导入。
+
+### 4. Validation & Error Matrix
+
+| 配置 | 结果 |
+| --- | --- |
+| 缺省、空值、off | 两个官方关闭键均为1 |
+| on且旧settings/env含关闭键 | 删除两个键，其他设置保留 |
+| 0、false、OFF或未知值 | 部署预检及服务策略入口拒绝 |
+| 设置on | 恢复官方默认许可，上传仍由官方CLI决定 |
+
+### 5. Scenarios and Examples
+
+- 正常：部署未配置该键，普通任务、项目和养号的官方CLI设置及执行环境均关闭遥测和错误上报。
+- 边界：切换on后重新启动CLI，旧的两个关闭键被清理，自动更新继续关闭。
+- 错误用法：写入 `DISABLE_TELEMETRY=0` 表示开启，或把CLI策略当作原生sender的遥测开关。正确处理：on删除受控关闭键，两条执行链分别管理。
+
+### 6. Tests Required
+
+- `test_cli_telemetry_policy`：默认/空/off、已有关闭键覆盖、on最终环境清理、非法值拒绝。
+- `test_account_runtime`：实际CLI准备入口保留model/hooks/其他env，任务driver及交互exec环境应用策略，on清理旧settings。
+- `test_manage`：预检共用值域；`test_system_workflow`：固定宿主包在仓库外独立导入实际依赖。

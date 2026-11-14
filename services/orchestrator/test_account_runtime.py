@@ -1067,6 +1067,8 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual("UTC", executed["TZ"])
         self.assertEqual("en_US.UTF-8", executed["LANG"])
         self.assertEqual("en_US.UTF-8", executed["LC_ALL"])
+        self.assertEqual("1", executed["DISABLE_TELEMETRY"])
+        self.assertEqual("1", executed["DISABLE_ERROR_REPORTING"])
         self.assertEqual({'schema':2,'offsets_sec':[3],'timeout_sec':60,'wrapup_sec':20},
             json.loads(executed['TASK_FOLLOWUP_TIMING_JSON']))
         self.assertEqual('20',executed['TIMEOUT_WRAPUP_SEC'])
@@ -1124,6 +1126,37 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual(original["env"]["CLAUDE_CODE_EFFORT_LEVEL"], current["env"]["CLAUDE_CODE_EFFORT_LEVEL"])
         self.assertEqual(original["model"], current["model"])
         self.assertEqual(original["hooks"], current["hooks"])
+
+    def test_cli_setup_and_interactive_exec_apply_telemetry_policy(self) -> None:
+        """实际准备入口和交互 exec 一致应用开关并清理旧设置。@return None。"""
+        row = self.runtime._row("synthetic", 1)
+        settings = self.runtime._root(row) / "home/.claude/settings.json"
+        container = Mock()
+        job = {"row": row, "token": "synthetic-token"}
+        self.runtime.jobs[row["environment_id"]] = job
+        for mode in ("off", "on"):
+            for source in ("run:test", "warmup:test", "projects:test", "login:test"):
+                with self.subTest(mode=mode, source=source), patch.dict(os.environ, {"V3_CLI_TELEMETRY": mode}), \
+                        patch.object(self.runtime, "ensure", return_value=(row, container)), \
+                        patch.object(self.runtime, "claim", return_value=job), \
+                        patch.object(self.runtime, "check_system_profile"), \
+                        patch.object(self.runtime, "_ensure_version"), \
+                        patch.object(self.runtime, "job_for_container", return_value=job), \
+                        patch.object(self.runtime, "_container", return_value=container):
+                    atomic_json(settings, {"model": "sonnet", "env": {"DISABLE_TELEMETRY": "1", "DISABLE_ERROR_REPORTING": "1"}})
+                    with self.runtime._cli_setup({"id": 1, "name": "synthetic"}, source, "2.1.293"):
+                        current = json.loads(settings.read_text())
+                        self.runtime.exec_cli("synthetic-token", ["claude", "auth", "status"], "/home/node", "2.1.293")
+                    executed = container.exec_run.call_args.kwargs["environment"]
+                    for key in ("DISABLE_TELEMETRY", "DISABLE_ERROR_REPORTING"):
+                        if mode == "off":
+                            self.assertEqual("1", current["env"][key])
+                            self.assertEqual("1", executed[key])
+                        else:
+                            self.assertNotIn(key, current["env"])
+                            self.assertNotIn(key, executed)
+                    self.assertEqual("sonnet", current["model"])
+                    self.assertEqual("1", current["env"]["DISABLE_AUTOUPDATER"])
 
     def test_reprofile_rejects_existing_task_history(self) -> None:
         """已有任务历史时不能旋转画像。@return None。"""

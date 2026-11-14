@@ -633,6 +633,7 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 - 采集目录仅为当前 UID1000 开放专用写入和必要路径穿越，不放宽 root runtime。先落盘原 statusLine／本代命令证明，再改 HOME settings；收口及重启对账停止进程后，仅恢复仍由本代管理的字段。抓包保留 Recorder，采集与执行实际路径见 [账号运行环境](account-runtime-v3.md)。
 - 手动 usage 在固定容器使用 Node 原生 TLS，经账号代理发送 GET JSON，不安装 CLI、不切换监听、不注入 MITM CA；请求 15 秒截止，不在脚本内反复重试。只领取／释放共享 CLI 作业，API 可并行。owner 锁不可重入，绑定查询使用 _sync_bound_account_credentials_locked；HTTP／Docker IO 不在数据库锁内执行。
 - 手动错误不安排后台重试，保留旧事实；只有结构化 `account_on_hold`／`invalid_grant` 固化永久门禁，普通 401／403、429、网络或 5xx 不凭状态码推断封禁。手动成功沿已有合并／恢复规则更新，不复活历史 auth_failed run。
+- 任务账号卡片的 account_error 是任务侧持久认证门禁；普通业务成功或网关 auth_error 为空不自动清除。提示用户通过既有“额度”按钮执行 `POST /api/accounts/{aid}/quota`；返回后重新读取账号 passive_quota，再展示本次结果。后台仅在完整可信手动窗口满足原恢复条件时解除，失败保留门禁；切页后的回执不重开窗口。
 - 公开 quota_policy 保留 enabled/limits/hit/unknown/blocked/resume_at/message/refresh_retry_at，后者为 null；不返回身份、许可或内部策略键。来源显示被动、manual 手动及 automatic 历史查询；页面读取、SSE 和批次等待均不主动查询。
 - v3 lifespan 收口旧执行后恢复仍启用账号的 active 批次；先等待持久 next_launch_at，原 item 不重置，paused/done/deleted 或停用账号不恢复。旧 runner 启动行为保持。
 
@@ -655,6 +656,8 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 | 手动 0%＋过去或空 reset | 沿已有空闲窗口规则记录真实事实，不伪造 reset |
 | 手动查询失败、429、普通 401／403 | 返回脱敏错误，保留旧事实且无自动查询重试 |
 | 明确 account_on_hold／invalid_grant | 保留永久门禁及历史终态 |
+| 普通成功观察 / 显式手动核验失败 | 原认证门禁保持，卡片沿服务端摘要展示 |
+| 完整手动窗口符合原恢复条件 | 解除历史认证门禁，核验完成刷新卡片 |
 | 关闭阈值 | 共同耗尽、恢复认领及认证保护保持 |
 | 未绑定完整 OAuth / 缺本地凭据 | 可定时养号 / 配置返回 409 |
 | 已绑定省略 ID | 保留当前绑定与唯一刷新权 |
@@ -671,12 +674,14 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 - 错误用法：取消阈值后让多个 CLI 同时试探耗尽窗口，或重启清掉恢复机会。正确做法：共同耗尽加入同一持久周期认领，真实新观察确认恢复。
 - 错误用法：调度器按 v3 被动规则放行，Recorder 又按旧未知窗口规则要求许可，导致进程退出 43、页面只显示终端已释放。正确做法：两端使用同一纯函数、策略及周期键；真正旧窗口到期仍核精确来源与落盘单次标记，重启不再发放。
 - 错误用法：owner 锁内再次调用 _sync_bound_account_credentials。正确做法：调用 locked 入口，并用真实不可重入锁回归。
+- 正常：卡片保留 invalid_grant，点击额度核验成功后从新摘要恢复显示用量。错误用法：只关闭前端错误提示或凭普通 API 200 清门禁。正确处理：复用原 owner 核验与手动恢复规则，再读取服务端状态。
 - 错误用法：运行中百分比命中就 cleanup，或先发布 success 再消费最后额度。正确处理：完成原轮次，先消费最后观察再发布实际终态，由下一轮准入处理等待；真实耗尽仍沿原 quota_wait 恢复。
 
 ### 6. Tests Required
 
 - test_auto_usage.py：usage 调用即失败的替身覆盖未知启动、前后和 tick 不查询、有效高位阻断、reset 一次恢复、并发及重启不重复、共同耗尽／关闭阈值／续聊抓包共用恢复、部分返回、手动错误与零 run 批次。
 - test_cli_quota.py：0%／100%、bool／NaN／时间边界／缺窗口、cwd／session／主响应／开始时间验证，重复状态栏不刷新时间、不写完整 payload；原命令输出保持。
+- `test_auth_gate_requires_successful_explicit_usage_verification` 核验普通观察/失败手动查询保持认证门禁、完整手动核验后解除；`verify_management_ui.py` 核验失败卡片保留、成功摘要更新及离页后迟到核验不弹窗。
 - AccountRuntime 回归：先保存 statusLine 证明、仅恢复本代字段、用户改写保留、真实 Runner 生成 driver 不清采集设置、UID1000 实际可写专用输出、收口／重启无遗留。
 - 隔离官方 CLI＋本地 SSE 验证：采集命中 5h／7d，启用前后模型请求相同、usage 为零；安装在镜像中的 collector 被实际执行，测试替身和无真实账号边界明确。
 - 重启批次回归：只注册 active 且账号启用未删除；未来 next_launch_at 必须等待，取消时不创建 run 或清空时间；终态 item 保持。

@@ -810,10 +810,10 @@ except urllib.error.HTTPError as error:print(json.dumps({'status':error.code,'ph
                     probe = account['sender_container'].exec_run(['python3','-c',account['native_probe']])
                     assert probe.exit_code == 0
                     return json.loads(probe.output) == {'workers':1,'images':1}
-                wait_until(idle_reclaimed, '原生池空闲后未回收到一个暖进程', seconds=75)
+                wait_until(idle_reclaimed, '原生池空闲后未回收到一个暖进程', seconds=315)
                 current = account['sender_container'].exec_run(['cat','/sys/fs/cgroup/memory.current'])
                 assert current.exit_code == 0 and int(current.output.strip()) < 512 * 1024 ** 2
-                passed('N4 共享封存映像，60秒空闲回收后保留一个暖进程', sender_idle=int(current.output.strip()))
+                passed('N4 共享封存映像，300秒空闲回收后保留一个暖进程', sender_idle=int(current.output.strip()))
                 if pilot:
                     verify_kernel_switch(client, filters, request, accounts, release_data, passed)
                 response = request('PUT', f"/admin/accounts/{account['gid']}", headers=admin, json={'request_backend':'legacy'})

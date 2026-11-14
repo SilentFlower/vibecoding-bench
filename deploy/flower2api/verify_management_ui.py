@@ -28,6 +28,14 @@ class ManagementFixture(Fixture):
         self.diagnostic_account = {'account_name': '主用演示账号', 'account_email': 'primary@example.test'}
         self.diagnostic_account_id = 11
         self.extra_attempt = False
+        self.task_accounts = [{'id': 1, 'name': '合成任务账号', 'enabled': 1, 'cc2api_account_id': 11,
+            'profile_path': 'profiles/synthetic', 'passive_quota': {'account_error': 'invalid_grant',
+                'blocked': True, 'message': 'invalid_grant：账号异常，需重新授权或人工核实'}}]
+        self.quota_ok = True
+        self.task_runs = []
+        self.hold_api = None
+        self.api_started = asyncio.Event()
+        self.api_gate = asyncio.Event()
         self.releases = [dict(release=f'system-ci-{number}-1', sequence=[number, 1],
             published_at='2026-11-12T05:31:49.455Z', changes=f'平台版本：v1.0.{number-200}\n\n管理后台交互与采集状态改进。',
             manifest_sha256=str(number % 10) * 64, data_compatible=True, account_changed=False) for number in [201, 200, 199, 198]]
@@ -46,6 +54,43 @@ class ManagementFixture(Fixture):
         """拦截管理合同；所有其它请求仍受原夹具约束。@param route 浏览器请求。@return None。"""
         request = route.request
         path = urlsplit(request.url).path
+        if path == '/runtime/api/accounts/1/quota':
+            assert request.method == 'POST'
+            self.writes.append({'path': path, 'body': {}})
+            if self.hold_api == path:
+                self.hold_api = None
+                self.api_started.set()
+                await self.api_gate.wait()
+            if self.quota_ok:
+                self.task_accounts[0]['passive_quota'] = {'known': True, 'blocked': False, 'source': 'manual',
+                    'windows': {'five_hour': {'utilization': 10}, 'seven_day': {'utilization': 20}}}
+                return await self.respond(route, {'ok': True, 'five_hour': {'utilization': 10}, 'seven_day': {'utilization': 20}})
+            return await self.respond(route, {'ok': False, 'message': 'invalid_grant'})
+        if path == '/runtime/api/runs-stream':
+            return await route.fulfill(content_type='text/event-stream', body='event: runs\ndata: ' + json.dumps(self.task_runs) + '\n\n')
+        if path == '/runtime/api/accounts/warmup/pi/stream':
+            return await route.fulfill(content_type='text/event-stream', body=': synthetic\n\n')
+        task_payloads = {'/runtime/api/accounts': self.task_accounts, '/runtime/api/tasks': [], '/runtime/api/runs': self.task_runs,
+            '/runtime/api/runs/synthetic-run': self.task_runs[0] if self.task_runs else {},
+            '/runtime/api/runs/synthetic-run/stats': {'available': False},
+            '/runtime/api/runs/synthetic-run/files': [], '/runtime/api/runs/synthetic-run/transcript': {},
+            '/runtime/api/settings/runtime-model': {}, '/runtime/api/settings/runtime-effort': {},
+            '/runtime/api/settings/claude-code-version': {},
+            '/runtime/api/projects': {'agents': [], 'pi_available': True},
+            '/runtime/api/accounts/warmup/pi': {'agents': [], 'pi_available': True},
+            '/runtime/api/projects/catalog': {'projects': []}, '/runtime/api/accounts/warmup/pi/catalog': {'projects': []},
+            '/runtime/api/accounts/warmup/pi/agents/1/snapshot': {'state': {'agents': []}, 'cursor': 0,
+                'observation': None, 'events': {'items': [], 'next_before': None}},
+            '/runtime/api/accounts/warmup/pi/agents/1/work/page': {'items': [], 'next_before': None},
+            '/runtime/api/accounts/warmup/pi/agents/1/actions': [],
+            '/runtime/api/settings/project-requester': {'base_url': '', 'models': [], 'ready': False}}
+        if path in task_payloads:
+            payload = copy.deepcopy(task_payloads[path])
+            if self.hold_api == path:
+                self.hold_api = None
+                self.api_started.set()
+                await self.api_gate.wait()
+            return await self.respond(route, payload)
         if path == '/admin/settings':
             if request.method == 'POST':
                 self.writes.append({'path': path, 'body': json.loads(request.post_data)})
@@ -114,6 +159,74 @@ class ManagementFixture(Fixture):
         return await super().route(route)
 
 
+async def verify_navigation_edges(page, fixture, expect):
+    """核对弹窗离页、程序化导航和连续历史。@param page 页面。@param fixture 合成接口。@param expect 断言入口。@return None。"""
+    fixture.task_accounts[0]['warmup_engine'] = 'projects'
+    await page.goto(BASE + '/tasks')
+    frame = page.frame_locator('iframe')
+    await expect(frame.locator('[data-quota="1"]')).to_be_visible()
+    await expect(frame.locator('script[src^="app.js?"]')).to_have_attribute('src', 'app.js?v=20261114-task-account-navigation')
+    await page.locator('iframe').evaluate("node=>{node.contentWindow.__taskDocument='edge-cases';}")
+    await frame.locator('[data-tab="topics"]').click()
+    await frame.locator('[data-tab="accounts"]').click()
+    await frame.locator('[data-quota="1"]').click()
+    await expect(frame.locator('#modal')).to_be_visible()
+    await page.go_back()
+    await expect(page).to_have_url(BASE + '/tasks?tab=topics')
+    await expect(frame.locator('#modal')).to_be_hidden()
+    await page.go_forward()
+    await expect(page).to_have_url(BASE + '/tasks')
+    await frame.locator('[data-quota="1"]').click()
+    await expect(frame.locator('#modal')).to_be_visible()
+    await frame.locator('body').press('4')
+    await expect(page).to_have_url(BASE + '/tasks?tab=tasks')
+    await expect(frame.locator('#modal')).to_be_hidden()
+    for suffix in ['/tasks', '/tasks?tab=topics', '/tasks']:
+        await page.go_back()
+        await expect(page).to_have_url(BASE + suffix)
+    await frame.locator('body').press('/')
+    await expect(page).to_have_url(BASE + '/tasks?tab=topics')
+    await page.go_back()
+    await expect(page).to_have_url(BASE + '/tasks')
+    await frame.locator('[data-warmup-console="1"]').click()
+    await expect(page).to_have_url(BASE + '/tasks?tab=warmup&account=1')
+    await page.go_back()
+    await expect(page).to_have_url(BASE + '/tasks')
+    assert await page.locator('iframe').evaluate("node=>node.contentWindow.__taskDocument==='edge-cases'")
+    # 使用实际详情入口，详情已加载或仍在途时，离页均应使旧回执与刷新失效。
+    fixture.task_runs = [{'id': 'synthetic-run', 'task_id': 1, 'account_id': 1, 'status': 'running'}]
+    await frame.locator('[data-tab="runs"]').click()
+    await frame.locator('[data-detail="synthetic-run"]').click()
+    await expect(frame.locator('#run-detail-status')).to_have_class(re.compile(r'.*\bpill-running\b.*'))
+    await page.go_back()
+    await expect(frame.locator('#modal')).to_be_hidden()
+    assert await frame.locator('body').evaluate('()=>state.runDetail === null')
+    await frame.locator('[data-tab="runs"]').click()
+    fixture.hold_api = '/runtime/api/runs/synthetic-run'
+    fixture.api_started.clear()
+    fixture.api_gate.clear()
+    await frame.locator('[data-detail="synthetic-run"]').click()
+    await asyncio.wait_for(fixture.api_started.wait(), timeout=10)
+    await page.go_back()
+    async with page.expect_response(lambda response: urlsplit(response.url).path == '/runtime/api/runs/synthetic-run') as old_detail:
+        fixture.api_gate.set()
+    await (await old_detail.value).body()
+    await page.locator('iframe').evaluate('node=>new Promise(resolve=>node.contentWindow.requestAnimationFrame(()=>node.contentWindow.requestAnimationFrame(resolve)))')
+    await expect(frame.locator('#modal')).to_be_hidden()
+    assert await frame.locator('body').evaluate('()=>state.runDetail === null')
+    fixture.task_runs = []
+    standalone = await page.context.new_page()
+    try:
+        await standalone.goto(BASE + '/runtime/#accounts')
+        await expect(standalone.locator('[data-quota="1"]')).to_be_visible()
+        await standalone.locator('body').press('4')
+        await expect(standalone).to_have_url(BASE + '/runtime/#tasks')
+        await standalone.go_back()
+        await expect(standalone).to_have_url(BASE + '/runtime/#accounts')
+    finally:
+        await standalone.close()
+
+
 async def run(output):
     """运行跨主题、宽度与时区交互矩阵。@param output 证据目录。@return 聚合报告。"""
     from playwright.async_api import async_playwright, expect
@@ -175,14 +288,82 @@ async def run(output):
             await frame.locator('#content-capture-form').get_by_role('button', name='取消', exact=True).click()
             await page.screenshot(path=str(output / f'environments-390-{theme}.png'), full_page=True)
             await page.get_by_role('link', name='任务', exact=True).click()
-            await expect(frame.locator('#batches-body')).to_be_attached()
+            await expect(frame.locator('#accounts-body')).to_contain_text('合成任务账号')
             await expect(frame.locator('[data-tab="environments"]')).to_be_hidden()
+            # 保存真实 iframe 元素与文档标记，后续点击和浏览历史必须复用两者。
+            await page.locator('iframe').evaluate("node=>{window.__taskFrame=node;node.contentWindow.__taskDocument='retained';}")
             await frame.locator('[data-tab="topics"]').click()
             await expect(page).to_have_url(BASE + '/tasks?tab=topics')
+            assert await page.locator('iframe').evaluate("node=>node===window.__taskFrame && node.contentWindow.__taskDocument==='retained'")
+            await page.go_back()
+            await expect(frame.locator('#accounts-body')).to_contain_text('合成任务账号')
+            await page.go_forward()
+            await expect(frame.locator('#topics-list')).to_be_attached()
+            assert await page.locator('iframe').evaluate("node=>node.contentWindow.__taskDocument==='retained'")
             await page.reload()
             await expect(frame.locator('[data-tab="topics"]')).to_have_class(re.compile(r'.*\bactive\b.*'))
             await page.go_back()
+            await expect(frame.locator('#accounts-body')).to_contain_text('invalid_grant')
+            fixture.quota_ok = False
+            await frame.locator('[data-quota="1"]').click()
+            await expect(frame.locator('#modal')).to_be_visible()
+            await expect(frame.locator('#accounts-body')).to_contain_text('invalid_grant')
+            await frame.locator('body').press('Escape')
+            fixture.quota_ok = True
+            await frame.locator('[data-quota="1"]').click()
+            await expect(frame.locator('#modal')).to_be_visible()
+            await expect(frame.locator('#accounts-body')).not_to_contain_text('invalid_grant')
+            await expect(frame.locator('#accounts-body')).to_contain_text('手动更新')
+            await frame.locator('body').press('Escape')
+            for width in [1280, 390]:
+                await page.set_viewport_size({'width': width, 'height': 1000})
+                await page.locator('iframe').evaluate("node=>{node.contentWindow.__taskDocument='retained';}")
+                for child_tab, selector in [('tasks', '#batches-body'), ('runs', '#runs-body'),
+                        ('projects', '#projects-overview'), ('warmup', '#projects-overview'), ('accounts', '#accounts-body')]:
+                    link = frame.locator(f'[data-tab="{child_tab}"]') if child_tab != 'warmup' else frame.locator('[data-iteration-mode="warmup"]')
+                    await link.click()
+                    await expect(frame.locator(selector)).to_be_attached()
+                    expected = BASE + ('/tasks' if child_tab == 'accounts' else '/tasks?tab=' + child_tab)
+                    await expect(page).to_have_url(expected)
+                    assert await page.locator('iframe').evaluate("node=>node.contentWindow.__taskDocument==='retained'")
+                await page.screenshot(path=str(output / f'task-accounts-{width}-{theme}.png'), full_page=True)
+            # 旧账号 GET 在来回切换后才返回，代次校验应保留新一轮卡片。
+            fixture.hold_api = '/runtime/api/accounts'
+            fixture.api_gate.clear()
+            fixture.api_started.clear()
+            await frame.locator('[data-tab="tasks"]').click()
+            await asyncio.wait_for(fixture.api_started.wait(), timeout=10)
+            fixture.task_accounts[0]['name'] = '新一轮任务账号'
+            await frame.locator('[data-tab="accounts"]').click()
+            await expect(frame.locator('#accounts-body')).to_contain_text('新一轮任务账号')
+            async with page.expect_response(lambda response: urlsplit(response.url).path == '/runtime/api/accounts') as old_accounts:
+                fixture.api_gate.set()
+            await (await old_accounts.value).body()
+            await page.locator('iframe').evaluate('node=>new Promise(resolve=>node.contentWindow.requestAnimationFrame(()=>node.contentWindow.requestAnimationFrame(resolve)))')
+            await expect(frame.locator('#accounts-body')).to_contain_text('新一轮任务账号')
+            # 在途核验完成时已离页，结果只能更新后台合成事实，不能重新弹出额度窗口。
+            fixture.hold_api = '/runtime/api/accounts/1/quota'
+            fixture.api_gate.clear()
+            fixture.api_started.clear()
+            await frame.locator('[data-quota="1"]').click()
+            await asyncio.wait_for(fixture.api_started.wait(), timeout=10)
+            await frame.locator('[data-tab="topics"]').click()
+            async with page.expect_response(lambda response: urlsplit(response.url).path == '/runtime/api/accounts/1/quota') as old_quota:
+                fixture.api_gate.set()
+            await (await old_quota.value).body()
+            await page.locator('iframe').evaluate('node=>new Promise(resolve=>node.contentWindow.requestAnimationFrame(()=>node.contentWindow.requestAnimationFrame(resolve)))')
+            await expect(frame.locator('#topics-list')).to_be_attached()
+            await expect(frame.locator('#modal')).to_be_hidden()
+            await page.goto(BASE + '/tasks?tab=tasks&account=1&environment=synthetic&gateway_account=11')
             await expect(frame.locator('#batches-body')).to_be_attached()
+            assert await page.locator('iframe').evaluate("node=>node.contentWindow.location.hash==='#tasks?account=1&environment=synthetic&gateway_account=11'")
+            await page.locator('iframe').evaluate("node=>{node.contentWindow.__taskDocument='deep-link';}")
+            await frame.locator('[data-tab="topics"]').click()
+            await expect(page).to_have_url(BASE + '/tasks?tab=topics')
+            await page.go_back()
+            await expect(frame.locator('#batches-body')).to_be_attached()
+            assert await page.locator('iframe').evaluate("node=>node.contentWindow.__taskDocument==='deep-link' && node.contentWindow.location.hash==='#tasks?account=1&environment=synthetic&gateway_account=11'")
+            await verify_navigation_edges(page, fixture, expect)
             await page.get_by_role('link', name='请求记录', exact=True).click()
             expected_time = '2026/11/12 13:31:49' if zone == 'Asia/Shanghai' else '2026/11/11 21:31:49'
             await expect(page.locator('tbody')).to_contain_text(expected_time)
@@ -283,7 +464,11 @@ async def run(output):
             assert not errors, errors
             assert not fixture.unexpected, fixture.unexpected
             scenes.append({'timezone': zone, 'theme_preference': theme, 'capture_reads': fixture.capture_reads,
-                'synthetic_writes': len(fixture.writes), 'real_model_requests': 0})
+                'synthetic_writes': len(fixture.writes), 'real_model_requests': 0,
+                'task_navigation': ['accounts_default', 'stable_document', 'six_tabs', 'history', 'reload', 'deep_link', 'late_response'],
+                'quota_verification': ['failed_gate_retained', 'success_card_refreshed', 'late_dialog_discarded'],
+                'navigation_repairs': ['dialog_closed_on_history', 'single_keyboard_history', 'search_history',
+                    'account_deep_link_history', 'detail_closed_on_leave', 'late_detail_discarded', 'static_version', 'standalone_hash']})
             await context.close()
         await browser.close()
     return {'passed': True, 'scenes': scenes, 'errors': errors, 'real_model_requests': 0}

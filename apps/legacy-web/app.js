@@ -106,7 +106,7 @@ function renderProjects() {
 function openWarmupAccount(accountId) {
   const target = iterationUrl('warmup', accountId);
   if (location.hash === target) navigate();
-  else location.hash = target;
+  else navigateTo(target);
 }
 
 // ===================== 路由 =====================
@@ -137,7 +137,7 @@ function syncRuntimeNavigation(hash = location.hash, replace = false) {
   const tab = hash.replace(/^#/, '').split('?')[0], query = new URLSearchParams(hash.split('?')[1] || '');
   if (!Object.hasOwn(ROUTES, tab)) return false;
   const target = new URL(tab === 'environments' ? '/environments' : '/tasks', location.origin);
-  if (!['environments', 'tasks'].includes(tab)) target.searchParams.set('tab', tab);
+  if (!['environments', 'accounts'].includes(tab)) target.searchParams.set('tab', tab);
   for (const key of ['account', 'environment', 'gateway_account']) {
     if (query.has(key)) target.searchParams.set(key, query.get(key));
   }
@@ -146,6 +146,11 @@ function syncRuntimeNavigation(hash = location.hash, replace = false) {
   window.parent.postMessage({type: 'runtime:navigate', tab, replace,
     account: query.get('account'), environment: query.get('environment'), gateway_account: query.get('gateway_account')}, location.origin);
   return true;
+}
+
+/** 统一程序化跳转，嵌入时只由顶层写入历史。@param {string} hash 目标内部地址。@return {void} */
+function navigateTo(hash) {
+  if (!syncRuntimeNavigation(hash)) location.hash = hash;
 }
 
 // 由顶层路由创建唯一历史项，避免一次点击同时写入 iframe 和主页面历史。
@@ -158,11 +163,14 @@ document.addEventListener('click', event => {
 /** 切换视图并使旧页面、时段弹窗的异步回调失效。@return {void} */
 function navigate() {
   state.viewGeneration += 1;
+  const tab = currentTab();
+  // 文档会跨二级导航保留，旧页面的窗口与详情刷新必须显式收口。
+  endRunDetail();
+  for (const selector of ['#modal', '#cc2api-binding-modal', '#warmup-modal', '#topic-modal', '#task-modal']) closeModal(selector);
   leaveEnvironments();
   closeModal('#run-window-modal');
   closeProjectDialogs();
   window.ProjectsUI.unmount();
-  const tab = currentTab();
   const embedded = new URLSearchParams(location.search).get('view');
   document.documentElement.classList.toggle('embedded-environments', !!RUNTIME_BASE && embedded === 'environments');
   document.documentElement.classList.toggle('embedded-tasks', !!RUNTIME_BASE && embedded === 'tasks');
@@ -180,7 +188,6 @@ function navigate() {
     state.runsEventSource.close();
     state.runsEventSource = null;
   }
-  if (tab !== 'runs') endRunDetail();
   ROUTES[tab]();
 }
 
@@ -420,9 +427,13 @@ async function renderAccounts() {
       e.target.disabled = true;
       try {
         const quota = await API(`/accounts/${quotaId}/quota`, { method: 'POST' });
+        if (currentTab() !== 'accounts' || generation !== state.viewGeneration) return;
+        // 核验会更新服务端门禁，重新读取摘要，避免卡片继续显示上一次认证异常。
+        await renderAccounts();
+        if (currentTab() !== 'accounts' || generation !== state.viewGeneration) return;
         openQuotaDetail(quotaId, quota);
       } catch (err) {
-        alert('查询额度失败: ' + err.message);
+        if (currentTab() === 'accounts' && generation === state.viewGeneration) alert('查询额度失败: ' + err.message);
       } finally {
         e.target.disabled = false;
       }
@@ -548,7 +559,10 @@ async function renderAccounts() {
  * @return {Promise<void>} 候选账号加载后显示窗口
  */
 async function openCc2apiBindingModal(account) {
-  state.cc2apiAccounts = await API('/cc2api/accounts');
+  const generation = state.viewGeneration;
+  const accounts = await API('/cc2api/accounts');
+  if (currentTab() !== 'accounts' || generation !== state.viewGeneration) return;
+  state.cc2apiAccounts = accounts;
   const form = $('#cc2api-binding-form');
   form.account_id.value = account.id;
   const available = state.cc2apiAccounts.filter(item => !state.accounts.some(a =>
@@ -891,7 +905,7 @@ function renderAccountTimezone(account) {
  * @return {string} 已转义的 HTML
  */
 function renderPassiveQuota(quota) {
-  if (quota?.account_error) return `<div class="passive-quota">${escapeHTML(quota.message)}</div>`;
+  if (quota?.account_error) return `<div class="passive-quota">${escapeHTML(quota.message)}<div>任务侧保留了认证异常记录。点击“额度”重新核验授权并更新状态。</div></div>`;
   if (!quota?.known) return '<div class="passive-quota muted">被动额度：未知</div>';
   const source = quota.source === 'manual' ? '额度记录（手动更新）'
     : quota.source === 'automatic' ? '额度记录（历史查询）' : '被动额度';
@@ -1634,9 +1648,17 @@ async function endAccLogin({ alsoCloseModal = false, skipServerCancel = false } 
 
 // ===================== Topics =====================
 async function renderTopics() {
+  if (currentTab() !== 'topics') return;
+  const generation = state.viewGeneration;
   if (state.topics.length === 0) {
-    try { state.topics = await API('/topics'); }
-    catch (e) { return alert('加载题库失败: ' + e.message); }
+    try {
+      const topics = await API('/topics');
+      if (currentTab() !== 'topics' || generation !== state.viewGeneration) return;
+      state.topics = topics;
+    } catch (e) {
+      if (currentTab() === 'topics' && generation === state.viewGeneration) alert('加载题库失败: ' + e.message);
+      return;
+    }
   }
 
   $('#topics-count').textContent = `(${state.topics.length})`;
@@ -1768,18 +1790,23 @@ function openTaskModal(topicNo) {
     try {
       await API('/tasks', { method: 'POST', body: JSON.stringify(body) });
       closeModal('#task-modal');
-      location.hash = '#tasks';
+      navigateTo('#tasks');
     } catch (err) { alert('创建任务失败: ' + err.message); }
   };
 }
 
 // ===================== Tasks =====================
 async function renderTasks() {
+  if (currentTab() !== 'tasks') return;
+  const generation = state.viewGeneration;
   try {
-    state.batches = await API('/task-batches');
-    state.accounts = await API('/accounts');
-    state.topics = await API('/topics');
-  } catch (e) { return alert('加载任务失败: ' + e.message); }
+    const values = await Promise.all([API('/task-batches'), API('/accounts'), API('/topics')]);
+    if (currentTab() !== 'tasks' || generation !== state.viewGeneration) return;
+    [state.batches, state.accounts, state.topics] = values;
+  } catch (e) {
+    if (currentTab() === 'tasks' && generation === state.viewGeneration) alert('加载任务失败: ' + e.message);
+    return;
+  }
 
   const accMap = Object.fromEntries(state.accounts.map(a => [a.id, a.name]));
   const form = $('#batch-form');
@@ -1867,7 +1894,7 @@ async function renderTasks() {
     try {
       const res = await API('/task-batches', { method: 'POST', body: JSON.stringify(body) });
       alert(`已启动批次 #${res.id}`);
-      location.hash = '#runs';
+      navigateTo('#runs');
     } catch (err) {
       alert('启动批次失败: ' + err.message);
     }
@@ -2163,15 +2190,17 @@ function updateRunDetailContent(rid, run, files, stats, transcript, transcriptSt
 
 // ===================== Runs (SSE 实时) =====================
 async function renderRuns() {
+  if (currentTab() !== 'runs') return;
+  const generation = state.viewGeneration;
+  const current = () => currentTab() === 'runs' && generation === state.viewGeneration;
   try {
-    state.accounts = await API('/accounts');
-    state.tasks = await API('/tasks');
-    state.topics = await API('/topics');
-    state.runtimeModel = await API('/settings/runtime-model');
-    state.runtimeEffort = await API('/settings/runtime-effort');
-    state.claudeCodeVersion = await API('/settings/claude-code-version');
+    const values = await Promise.all([API('/accounts'), API('/tasks'), API('/topics'),
+      API('/settings/runtime-model'), API('/settings/runtime-effort'), API('/settings/claude-code-version')]);
+    if (!current()) return;
+    [state.accounts, state.tasks, state.topics, state.runtimeModel, state.runtimeEffort, state.claudeCodeVersion] = values;
   } catch (e) {
-    return alert('加载运行依赖失败: ' + e.message);
+    if (current()) alert('加载运行依赖失败: ' + e.message);
+    return;
   }
   bindRuntimeModelForm();
   bindRuntimeEffortForm();
@@ -2181,13 +2210,14 @@ async function renderRuns() {
   if (state.runsEventSource) state.runsEventSource.close();
   state.runsEventSource = new EventSource(RUNTIME_BASE + '/api/runs-stream');
   state.runsEventSource.addEventListener('runs', (e) => {
+    if (!current()) return;
     try {
       state.runs = JSON.parse(e.data);
       paintRuns(state.runs);
     } catch {}
   });
   // 首次也拉一下
-  API('/runs').then(rs => { state.runs = rs; paintRuns(rs); }).catch(() => {});
+  API('/runs').then(rs => { if (current()) { state.runs = rs; paintRuns(rs); } }).catch(() => {});
 }
 
 function paintRuntimeModelSetting() {
@@ -2810,7 +2840,7 @@ function bindShortcuts() {
         filter?.focus();
         return;
       }
-      if (currentTab() !== 'topics') location.hash = '#topics';
+      if (currentTab() !== 'topics') navigateTo('#topics');
       setTimeout(() => { const f = $('#topic-filter'); if (f) f.focus(); }, 60);
       return;
     }
@@ -2818,7 +2848,7 @@ function bindShortcuts() {
     // 数字快捷键与导航栏顺序保持一致。
     if (TAB_KEYS[e.key]) {
       e.preventDefault();
-      location.hash = '#' + TAB_KEYS[e.key];
+      navigateTo('#' + TAB_KEYS[e.key]);
     }
   });
 }

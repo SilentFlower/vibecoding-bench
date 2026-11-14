@@ -40,6 +40,7 @@ SOURCE_FILES += ('deploy/v3/system_update_database.py', 'deploy/v3/upgrade_syste
 SOURCE_FILES += ('orchestrator/system_update_connection.py',)
 SOURCE_FILES += ('deploy/v3/platform_version.py', 'deploy/v3/release_ci.py', 'deploy/v3/source_layout.py')
 SOURCE_FILES += ('orchestrator/runtime_names.py',)
+SOURCE_FILES += ('orchestrator/cli_telemetry_policy.py',)
 
 
 def prepare_installation(env: Path, release_dir: Path, root: Path, public_key: str, *, apply: bool = False,
