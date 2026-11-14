@@ -153,6 +153,9 @@ class Fixture:
                             kernel['previous'], kernel['current'] = kernel['current'], target
                         kernel['state'] = 'active'
                         payload = copy.deepcopy(kernel)
+                elif api.endswith('/native-preparation'):
+                    self.rows[0]['native_preparation'] = {'state': 'preparing', 'checking': True, 'reason': 'backend_pending'}
+                    payload = {'queued': True}
                 elif api.endswith('/physical-features/refresh') or api.endswith('/maintenance'):
                     payload = {'ok': True}
                 elif api.endswith('/run-window') and request.method == 'PUT':
@@ -356,6 +359,29 @@ async def run(output: Path, gateway: Path) -> dict:
             await refresh()
             assert len(fixture.writes) == previous
             scenes.append('平台更新维护与账号维护分别展示，读取保持零业务写入')
+
+            saved = copy.deepcopy(fixture.rows[0])
+            fixture.rows[0].update(state='stopped', request_backend='native293', native_kernel=None,
+                native_preparation={'state': 'unprepared', 'reason': 'backend_pending'},
+                criu={**saved['criu'], 'supported': False, 'applied': False, 'reason': 'legacy_backend'})
+            await refresh()
+            await expect(preparation).to_contain_text('已选择原生运行时，等待环境准备')
+            await expect(target).not_to_contain_text('当前为普通发送后端')
+            await expect(target).not_to_contain_text('此环境当前未提供在线内核管理')
+            await expect(preparation.locator('.env-resources')).to_contain_text('未观测')
+            previous = len(fixture.writes)
+            await target.get_by_role('button', name='重试原生准备', exact=True).click()
+            await expect(preparation).to_contain_text('正在准备')
+            assert len(fixture.writes) == previous + 1
+            assert fixture.writes[-1]['path'].endswith('/native-preparation')
+            fixture.rows[0]['native_preparation'] = {'state': 'failed', 'reason': 'native_sender_budget_missing'}
+            await refresh()
+            await expect(preparation).to_contain_text('原生发送器内存预算尚未配置')
+            await expect(target.get_by_role('button', name='重试原生准备', exact=True)).to_be_enabled()
+            fixture.rows[0] = saved
+            await refresh()
+            await expect(preparation).to_contain_text('热进程就绪')
+            scenes.append('切换原生后的旧布局等待、显式重试、预算失败和真实就绪展示')
 
             await target.get_by_text('环境与物理详情', exact=True).click()
             physical = target.locator('details.physical-features')

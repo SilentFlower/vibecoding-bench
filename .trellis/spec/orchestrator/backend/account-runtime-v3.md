@@ -602,7 +602,7 @@ AccountStore::update_cli_process(account: &Account, process: &Value) -> Result<(
 
 - 页面未关联时显示“创建 cc2api 账号”“关联已有账号”，已关联时显示“更新进程指标”；“重新授权”保持独立。关联选择从养号表单移出，后者只保存养号/额度。按钮状态不能替代服务端绑定/身份/占用校验。
 - 创建只接受未关联账号；匹配到现有身份返回冲突及关联提示，不自动切换。关联接受显式目标，只匹配该账号，不创建；按原所有权保护镜像 cc2api 权威凭据，保留养号和目标策略。新 UI 不再调用 `/cc2api/sync`，旧 sync 和 warmup 绑定字段保持兼容。
-- 真正创建的载荷显式设置 `billing_mode="rewrite"`、`upstream_session_pool_enabled=true`、`upstream_session_pool_size=4`、`upstream_session_refresh_policy="owner_only"`、`concurrency=4`、`rpm_limit=50`。TTL 时长沿用默认 60 分钟；不修改 cc2api 手工创建的全局默认，不覆盖关联、指标更新、重复兼容同步或重授权后的既有策略。
+- 任务侧真正创建的载荷显式设置 `request_backend="native293"`、`five_hour_usage_limit_percent=85`、`seven_day_usage_limit_percent=80`、`billing_mode="rewrite"`、`upstream_session_pool_enabled=true`、`upstream_session_pool_size=4`、`upstream_session_refresh_policy="owner_only"`、`concurrency=4`、`rpm_limit=50`。额度闸线按对应窗口已用百分比计算。TTL 时长沿用默认 60 分钟；不修改 cc2api 手工创建的全局默认，不覆盖关联、指标更新、重复兼容同步或重授权后的既有策略。
 - 指标更新持有 owner → profile → environment 锁序，仅核对代理配置，不能调用 `_sync_proxy` 回写代理或解析/刷新 OAuth。内部服务在排他配置门禁下拒绝活动/等待请求；不为指标写入 quiesce/停止在途发送器。存储只条件更新原身份的 `canonical_process/updated_at`，不能把旧 Account 副本整行写回而覆盖轮换后的凭据/策略。
 - 实际 cgroup v2 `memory.max` 或 v1 `memory.limit_in_bytes` 提供 RAM 上限；零只表示明确的无限制。读取失败不能当作无限制，导入须与固化 RAM 预算交叉核对，不能把 RAM＋swap 或容器占用当作 RAM 限制/RSS。
 - root 监督循环每两秒只读 procfs；只采 UID1000、root 所有且组/其它用户不可写、已完成版本缓存中的原生 `/cli/<version>/node_modules/@anthropic-ai/claude-code/bin/claude.exe`。核对进程启动时刻防 PID 复用，不读取命令正文或环境变量，不把 Node 探针/发送器当 CLI。
@@ -617,6 +617,7 @@ AccountStore::update_cli_process(account: &Account, process: &Value) -> Result<(
 | 条件 | 结果 |
 | --- | --- |
 | 已关联时创建/关联、创建遇已有匹配、关联目标不存在 | bench 409，不自动创建/改绑 |
+| 任务侧首次创建 cc2api 账号 | 原生运行时 native293；5h 已用闸线 85%，7d 已用闸线 80% |
 | 非 v3 或未关联时更新指标 | 409；不可用账号 404 |
 | 代理不一致、来源/版本/样本/内存预算错误 | 409，不改目标进程、代理或凭据 |
 | 内部证明缺失/伪造 | cc2api 401，不写库 |
@@ -626,7 +627,7 @@ AccountStore::update_cli_process(account: &Account, process: &Value) -> Result<(
 
 ### 5. Scenarios and Examples
 
-- 正常：未关联账号点击创建，六项为 rewrite/开启/4/owner_only/4/50；已存在则显式选择关联，保留管理员自定义 strip/关闭/2/mapped_request/2/17。关联后更新指标只改进程字段。
+- 正常：未关联账号点击创建，使用原生运行时 native293、5h 已用闸线 85%、7d 已用闸线 80%，其余六项为 rewrite/开启/4/owner_only/4/50；已存在则显式选择关联，保留管理员自定义 strip/关闭/2/mapped_request/2/17 及运行时、额度闸线。关联后更新指标只改进程字段。
 - 基础：`constrained_memory=1610612736`、`sample_count=0`、`sampled_at/rss_*=null`，页面显示容器上限 1.50G 与 CLI RSS 未采集；之后真实 CLI 样本补齐 RSS 和时间，停止/重启不伪造新样本。
 - 错误用法：点击“更新进程指标”顺便 resolve OAuth，或把缺失堆数据填成静态默认值。正确处理：独立身份/观察载荷与条件列更新，未知项不发送。
 - 错误用法：首个 session ID 未改变就判定池无效，或丢弃 urllib3 读取器后再测试“在途”拒绝。正确处理：前四个属主可保留 ID，第五个映射到四成员内；保留读取器并先断言 active>0，再取消及核对上游 completed=false。
@@ -634,9 +635,9 @@ AccountStore::update_cli_process(account: &Account, process: &Value) -> Result<(
 ### 6. Tests Required
 
 - `test_process_metrics.py`：真实跨 UID procfs 路径及文件身份恢复、v1/v2/无限/损坏 cgroup、官方缓存/权限/PID/RSS、空样本、持久化及归属冲突；`test_account_runtime.py` 断言预算核对和原身份导出。
-- `test_main.py`：创建冲突不刷新/关联、六项载荷、显式关联不创建/改养号、未关联指标拒绝、更新不读凭据或改账号。Rust service/store 测试覆盖坏来源/身份/版本/样本、条件列写入与并发凭据/策略保护；identity/rewriter 测试覆盖对象及 base64 中未知堆/CPU 不外发、旧画像兼容。
+- `test_main.py`：创建冲突不刷新/关联，`test_explicit_create_sends_runtime_quota_defaults_and_preserves_warmup` 断言九项创建默认配置及保留本地养号设置；显式关联不创建/改养号、未关联指标拒绝、更新不读凭据或改账号。Rust service/store 测试覆盖坏来源/身份/版本/样本、条件列写入与并发凭据/策略保护；identity/rewriter 测试覆盖对象及 base64 中未知堆/CPU 不外发、旧画像兼容。
 - `verify_forwarding.py --build ...` 复用 canonical 冻结与联合清单；实际浏览器点击三入口、明暗与 1440/720px、官方 CLI RSS → API/SQLite/卡片。正式 `/v1/messages` JSON/SSE 响应哈希、Billing 与 5→4 session、两账号隔离、实际官方 CLI 与 API 并行、取消及全部故障场景均通过；网关专属网络命名空间的公网阻断计数为零，结束按本次精确标签清理。
-- 正式镜像继续跑 `verify_stack.py --browser --reauth`，核对原 ID、AT-only HOME、完整 profile、六项策略/TTL、错误登录/取消/草稿恢复及旧哨兵。页面驱动等首次列表事件处理器就绪，避免人为并发初始查询；失败保留脱敏证据。
+- 正式镜像继续跑 `verify_stack.py --browser --reauth`，核对原 ID、AT-only HOME、完整 profile、创建默认策略/TTL、错误登录/取消/草稿恢复及旧哨兵。页面驱动等首次列表事件处理器就绪，避免人为并发初始查询；失败保留脱敏证据。
 - `cargo fmt --check && cargo test`、Python 全量及前端构建保持。可用账号的真实 Anthropic 推理单独验收，不用测试替身/生产非模型 200 冒充。
 
 ## Scenario: cc2api 删除后的悬空绑定收口与凭据交接
@@ -1257,7 +1258,13 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - fingerprint 可选 `native_sender_memory`，无限原生账号保存 `"unlimited"`，布局变更时保存，回退 legacy 时移除；镜像原生能力标签为 `vibebench.native-runtime=293-raw-1`。
 - `AccountRuntime.native_preparation_snapshots() -> tuple[dict[int,dict],str|None]` 通过一次 `GET /admin/native-preparations` 读取批量快照，超时3秒；`native_preparation_summary(row,account,snapshots,read_error=None) -> dict|None` 为 `/api/environments` 生成安全的 `native_preparation`。
 
+- `POST /api/environments/{environment_id}/native-preparation` 校验唯一账号绑定、环境 ready/stopped 及当前目标 native293，代理管理员 `wake=true` 入队；维护或非原生为409，准备通道失败固定503。
+- `NativePreparationBlocked(ValueError)` 携带 `reason`；私有 transport 503 通过 `x-v3-runtime-reason` 仅传递 `native_sender_budget_missing|native_sender_budget_insufficient|account_memory_insufficient`，未知错误保持通用准备失败。
+
 ### 3. Contracts
+
+- `/api/environments` 的 `request_backend` 表示权威目标，实际 sender 布局独立判断。目标原生而本地 native 为空时，只投影白名单等待、维护或失败摘要，PID 与进程数保持未观测；预算失败也可显示在 stopped 环境。真实 ready 继续核验当前身份、环境/内核代次和新鲜度。
+- 页面准备中以2秒串行读取，普通状态20秒读取。显式重试沿唯一绑定及同一准备队列，离页/旧 generation 响应丢弃；读取零唤醒，准备基础、CRIU 模板及 TLS 采集分别展示。
 
 - 原生进程上限为 `2*concurrency`，覆盖普通请求2单位和Haiku1单位。有限账号预算预检为 `256+192*max_workers` MiB，容量同时受账号有限总 RAM 与 CLI 最低512 MiB约束。legacy sender 仍为128 MiB。
 - 账号 `fingerprint_json.mem="unlimited"` 显式取消 network/CLI/sender 与静态/串行评审的 RAM/swap 限额；额外 swap 保存原值，仍严格校验其格式。全局 `V3_ACCOUNT_MEMORY` 必须有限；部署预检识别已固化的无限账号，有限账号继续原额度比较。无限账号直接竞争宿主可用内存，不能把其零上限当作零资源占用。
@@ -1268,7 +1275,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - CRIU恢复同样要求实际exe与池缓存共享dev/inode，并继续核验SHA、大小和四项封存；控制器持有root归属0555的封存映像，各实例独立打开FD，exe及目标VMA复用同一背板。独立进程、会话、私有页、绑定代次及唯一投递保持原合同，详细准入与生命周期见[原生CRIU热模板恢复协议](../../runtime/backend/runtime-contract.md#scenario-原生进程池-criu-热模板恢复协议-1)。共享上线初期保持保守恢复预算 `256+max_workers*(192+108)` MiB；旧画像缺 `shared_memfd_restore=1` 或恢复准入失败沿受限普通exec回退。
 - 每个进程独立HOME/config/cwd、当前bearer及worker_id，每轮独立原生根。账号/身份/代理/凭据/并发摘要改变产生新代次，旧活动自然收口，空闲旧进程退役。单进程一次作业，唯一终态及匹配idle后复用；取消、迟到/损坏帧和状态不明均退役。
 - 单个弱引用回收任务在额外进程空闲300秒（5分钟）后保留1个暖进程；忙进程保持当前归属。映像缓存可在所有原进程退出后支持重建，池销毁释放FD。
-- 运行中原生账号由网关每20秒零模型巡检并按需恢复，具体身份、退避和计时合同见[原生持续预热](../../gateway/backend/service-architecture.md#scenario-原生持续预热实时就绪与请求进程诊断)。巡检只查询已有绑定，不唤醒休眠环境。
+- 运行中原生账号由网关每20秒零模型巡检并按需恢复，具体身份、退避和计时合同见[原生持续预热](../../gateway/backend/service-architecture.md#scenario-原生持续预热实时就绪与请求进程诊断)。普通巡检只查询已有绑定，不唤醒休眠环境。显式保存原生选择与重试由网关在门禁释放后允许唤醒。
 - 批量客户端仅精确GET /admin/native-preparations接受最多4096项对象数组，其余路由继续要求对象。快照返回本次映射及read_failed；缺账号快照为snapshot_missing。页面按实际配置展示adaptive_prewarm，读取保持零模型操作。
 - `native_preparation.state=maintenance` 仅保留已知 `system_maintenance|maintenance` 原因，分别表示平台更新与账号维护；其它原因回到账号维护固定说明，PID 和进程数保持未观测。平台维护与真实失败恢复调度遵循网关原生持续预热合同，页面读取继续零写入。
 - 环境摘要先核验账号绑定、环境 ID/代次及本地 sender 的 `native.kernel_generation`；检查时间必须在当前时间前0～45000毫秒。只投影受控 state/reason、检查时间、环境归属和非负进程数/正 PID。ready 必须同时有空闲进程和 PID。历史 `native_kernel` 预热回执继续作为历史信息。
@@ -1297,9 +1304,13 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 | 首轮 checking=true 但身份尚未返回 | unknown/snapshot_pending，显示检查进度，PID 与进程数未观测 |
 | 平台 / 账号维护 | maintenance/system_maintenance 或 maintenance/maintenance，仅提供固定说明 |
 | 旧代次或过期快照携带 checking=true | 保持 unknown 与原原因，检查进度不授予就绪 |
-| legacy/草稿或停止环境 | 摘要分别为 null 或 sleeping；读取保持零模型调用 |
+| 目标 legacy、草稿或普通停止环境 | 按原条件返回 null 或 sleeping；读取保持零模型调用 |
+| 目标 native293 但实际仍为旧布局 | 显示等待/维护/受控失败；无 PID 或进程数 |
+| 有限预算缺失、sender 低于公式或账号总量不足 | 分别投影三个资源白名单原因，已保存选择保持 |
 
 ### 5. Scenarios and Examples
+
+- 正常：旧布局选原生后先显示等待，后台准备成功才显示当前热进程。边界：总 RAM 1536 MiB、默认 N=4 且 sender 预算为空时，显示缺显式预算；普通启动需 sender 至少1792 MiB、总量至少2560 MiB，CRIU另行准入。错误用法：由目标 native293 推导 CRIU/TLS 已就绪，或将任意503原文透传页面。正确处理：独立核验实际状态，仅传资源原因白名单。
 
 - 正常：无限账号 N=2、max_workers=4，三个角色与派生评审的 cgroup `memory.max/memory.swap.max` 均为 max，CPU/PID 保留。
 - 正常：有限账号总4g、N=3、原生sender1536m时，network256m、CLI2304m；3普通/6Haiku实际TLS与加权准入保持。
@@ -1314,6 +1325,9 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 正常：平台更新时显示“平台更新中，结束后自动准备”。错误用法：把维护一律解释为本地准备失败，或把任意原因原文转发页面。正确处理：维护原因沿白名单区分，失败观察继续独立投影。
 
 ### 6. Tests Required
+
+- `test_account_runtime` 覆盖旧布局目标原生的等待与预算失败、秘密过滤、显式重试唯一绑定和当前后端校验；`test_native_sender` 断言三项错误码及 N=4 的1792/2560 MiB边界。
+- `verify_environment_ui.py` 覆盖旧布局等待、明确预算失败、显式重试到实际 ready，沿既有明暗、移动端及迟到响应场景核验。
 
 - `test_native_readiness_preserves_only_known_maintenance_reasons` 及 `verify_environment_ui.py`：平台与账号维护分别展示，任意原因被固定投影，进程证据保持未观测且零业务写入。
 

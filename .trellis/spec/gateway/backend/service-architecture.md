@@ -100,12 +100,16 @@ src/tlsfp/
 ### 2. Signatures
 
 - 私有鉴权 `POST /internal/native/readiness` 接收既有 `NativePreparation`，返回 `NativeReadinessStatus`。`GET /internal/native/status` 继续只表示能力。
-- `GET /admin/accounts/:id/native-preparation` 主动检查当前身份；`GET /admin/native-preparations` 返回最近巡检快照数组；既有 POST 继续合并准备提示。
+- `GET /admin/accounts/:id/native-preparation` 主动检查当前身份；`GET /admin/native-preparations` 返回最近巡检快照数组；`POST /admin/accounts/:id/native-preparation` 接受布尔查询参数 `wake=false,cancel=false`，合并准备提示；两者同时为 true 返回400。
 - `NativeRequestObservation.runtime`、持久化 `AttemptDiagnostic.runtime` 为可选 `NativeRuntimeObservation`，历史记录缺字段按 None 解析；沿用诊断 JSON，数据库结构保持原合同。
 
 - `system_update::background_admission() -> Result<Option<UpdateActivity>, AppError>` 与普通准入共用安全门禁读取及活动锁；合法维护返回 None，开放返回活动证明，损坏门禁返回错误。
 
 ### 3. Contracts
+
+- 成功更新中明确提交 `request_backend=native293` 且最终账号 active 时，普通和 status 快捷出口均先释放配置门禁，再发出显式唤醒事件；同值保存也适用。事件为 `(account_id,invalidate,wake)`，原通知默认 wake=false。显式事件调用 `runtime_transport::prepare`，普通扫描、启动补偿、周期巡检及 GET 检查保持 `prepare_existing` / wake=false。
+- 显式唤醒沿同一有界队列、去重及截止执行。账号与平台维护等待、失败退避保留该意图；`cancel=true`、停用、切回 legacy 或身份失效撤销旧工作及其失败唤醒重试。人工停止在领取维护作业前先撤销意图。
+- 批量快照附加当前权威 `request_backend`；缺缓存时使用 unprepared。该目标字段不授予 ready、PID 或实际环境归属。
 
 - `NativeReadinessStatus` 字段为 `state:String,account_id:i64,environment_id:String,generation:u64,kernel_generation:Option<String>,release:Option<NativeReleaseRef>,checked_at_ms:u64,idle_workers:usize,live_workers:usize,pid:Option<u32>,reason:Option<String>`。池状态为 `ready|busy|preparing|unprepared|failed`，协调器另投影休眠、停用、维护、失败和未知。
 - 就绪必须属于与业务相同的配置、bearer、账号身份及并发池键。检查真实子进程与空闲管道，坏进程退役；固定分发体、执行映像及封存校验完成后才记录 worker 的 ready 时刻。旧身份物理进程仍忙时不得充当新身份 busy。
@@ -124,6 +128,8 @@ src/tlsfp/
 
 | 条件 | 行为 |
 | --- | --- |
+| 成功显式选择 active/native293 / 保存失败或最终停用 | 释放配置门禁后允许唤醒 / 不发显式唤醒 |
+| wake=true 且 cancel=true | 400，拒绝互斥意图 |
 | 身份改变、进程退出、EOF 或迟到帧 | 原 ready 失效，后台按当前身份恢复；业务保留原截止与单次提交 |
 | 正在初始化或全忙 | preparing 或 busy，保持原并发与物理上限 |
 | 平台门禁合法 blocked / 开放 | maintenance/system_maintenance 且零新准备 / 一秒周期解除等待，仍核对原故障冷却 |
@@ -135,6 +141,8 @@ src/tlsfp/
 
 ### 5. Scenarios and Examples
 
+- 正常：停止的旧布局账号成功保存原生选择，门禁释放后后台唤醒并做零模型握手。边界：同值重存及显式重试进入同一去重队列。错误用法：让列表 GET 自动唤醒休眠环境。正确处理：普通检查仍为 wake=false，仅保存和 `wake=true` 重试赋予唤醒意图。
+
 - 正常：准备得到 PID 123，业务到达前该 worker 已 ready，首次业务记录 `worker_pid=123,warm_hit=true,worker_start_ms=null`。准备与巡检的模型 POST 增量为0。
 - 边界：慢流取消后先退休原PID，再以原零模型prepare补热，新PID完成探针准备后交接；连续下一请求同样等待有界准备。准备与业务竞争时，业务记录实际等待；凭据轮换后旧忙进程自然收口，新身份单独建立可接单进程。进程故障恢复包含巡检及启动时间。
 - 错误用法：用上次准备成功回执显示持续就绪，或把 `prepared_ms` 当作端到端首字延迟。正确处理：核对实时身份、活性及检查时间，并分别显示原始阶段口径。
@@ -142,6 +150,9 @@ src/tlsfp/
 - 正常：维护结束后无故障历史的账号及时准备，已有故障的账号继续原冷却。错误用法：把 blocked 计为准备失败，或开放时清空真实故障退避。正确处理：维护等待和真实故障分别保存，恢复原故障归属与截止。
 
 ### 6. Tests Required
+
+- 账号更新路由测试核对两个成功出口的 active/native293 条件、门禁已释放、保存失败零唤醒。隔离协调器测试核对维护期间零唤醒、开放后准备、受控预算失败、显式重试和取消后普通检查保持只读。
+- `native_real_gateway` 在 `CCRB_TEST_EXPLICIT_WAKE=1` 下，从 sleeping 开始显式唤醒真实二进制；断言准备模型计数增量0、首个业务请求复用准备 PID。
 
 - `maintenance_waits_without_failure_and_reopens_promptly`：隔离进程核对维护期间零活动、无故障一秒恢复、坏门禁拒绝、首次启动补偿、真实故障遇维护后调用次数与原准备 ID 保持、显式变更恢复。
 

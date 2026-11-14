@@ -204,6 +204,43 @@ class AccountRuntimeTests(unittest.TestCase):
         self.gateway._request.side_effect = OSError('合成故障')
         self.assertEqual(self.runtime.native_preparation_snapshots(), ({}, 'read_failed'))
 
+    def test_native_selection_shows_pending_and_budget_failure_before_layout_exists(self) -> None:
+        """旧布局显示真实目标及预算失败，所有读取保持零唤醒。@return None。"""
+        row = self.runtime._row('synthetic', 1)
+        row.update(state='stopped', generation=3)
+        account = {'cc2api_account_id': 7}
+        with patch('account_runtime._read_json', return_value={'native': None}), \
+                patch.object(self.runtime, 'ensure', side_effect=AssertionError('禁止唤醒')):
+            for status, reason in [('preparing', 'backend_pending'),
+                    ('failed', 'native_sender_budget_missing'), ('failed', 'account_memory_insufficient')]:
+                value = {'request_backend': 'native293', 'state': status, 'reason': reason,
+                    'pid': 123, 'idle_workers': 1, 'bearer': 'synthetic-secret'}
+                summary = self.runtime.native_preparation_summary(row, account, {7: value})
+                self.assertEqual((status, reason), (summary['state'], summary['reason']))
+                self.assertTrue(all(key not in summary for key in ('pid', 'idle_workers', 'bearer')))
+            value.update(state='ready', reason='synthetic-secret')
+            summary = self.runtime.native_preparation_summary(row, account, {7: value})
+            self.assertEqual(('unprepared', 'backend_pending'), (summary['state'], summary['reason']))
+            value['request_backend'] = 'legacy'
+            self.assertIsNone(self.runtime.native_preparation_summary(row, account, {7: value}))
+
+    def test_native_retry_checks_current_backend_and_uses_explicit_wake(self) -> None:
+        """管理员重试核对目标并只入队，普通读取不唤醒。@return None。"""
+        row = {'state': 'stopped'}
+        account = {'cc2api_account_id': 7}
+        client = Mock()
+        client._request.side_effect = [{'request_backend': 'native293'}, {'queued': True}]
+        with patch('main._content_capture_account', return_value=(row, account)), patch('main.cc2api_client', client):
+            self.assertEqual({'queued': True}, main.v3_request_native_preparation('a' * 32))
+            self.assertEqual(client._request.call_args_list, [call('GET', '/admin/runtime/accounts/7/config'),
+                call('POST', '/admin/accounts/7/native-preparation?wake=true', {})])
+            client.reset_mock()
+            client._request.side_effect = [{'request_backend': 'legacy'}]
+            with self.assertRaises(main.HTTPException) as error:
+                main.v3_request_native_preparation('a' * 32)
+            self.assertEqual(409, error.exception.status_code)
+            self.assertEqual(1, client._request.call_count)
+
     def test_native_readiness_distinguishes_pending_checks_without_trusting_old_workers(self) -> None:
         """检查进度只用于展示，首次、旧代和过期快照均不泄露进程归属。@return None。"""
         row = self.runtime._row('synthetic', 1)

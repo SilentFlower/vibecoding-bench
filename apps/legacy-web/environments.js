@@ -65,7 +65,9 @@ async function renderEnvironments() {
     if (current()) {
       refresh.disabled = false;
       // 操作期间只串行读取状态；离页立即释放定时器，避免迟到回执污染下一页。
-      if (ui.pending.size || ui.rows.some(row => KERNEL_BUSY_STATES.includes(row.native_kernel?.state))) {
+      if (ui.pending.size || ui.rows.some(row => KERNEL_BUSY_STATES.includes(row.native_kernel?.state)
+          || row.native_preparation?.checking === true || row.native_preparation?.state === 'preparing'
+          || row.native_preparation?.reason === 'backend_pending')) {
         ui.timer = setTimeout(renderEnvironments, 2000);
       } else if (ui.rows.some(row => row.native_preparation)) {
         ui.timer = setTimeout(renderEnvironments, 20000);
@@ -141,7 +143,7 @@ function renderEnvironmentCard(row) {
     ${renderNativeKernel(row)}
     ${renderNativePreparation(row)}
     ${renderEnvironmentCriu(row, pending)}
-    <section class="env-window"><div><h4>请求内容采集</h4><p class="env-muted">${row.content_capture?.applied ? (row.content_capture.enabled ? '已开启' : '已关闭') : '实际配置待核对'} · 默认开启 · debug 保存脱敏原文</p><p class="env-muted">${escapeHTML(tlsCaptureDescription(row.content_capture?.tls_observer))}</p></div><button type="button" class="env-switch" role="switch" aria-label="${escapeHTML((row.name || '当前环境') + '请求内容采集')}" aria-checked="${row.content_capture?.enabled === true}" data-content-capture data-environment="${escapeHTML(id)}" data-env-focus="${escapeHTML(id + ':capture')}" ${pending || row.busy || KERNEL_BUSY_STATES.includes(row.native_kernel?.state) || row.native_kernel?.state === 'reconcile' || !['ready', 'stopped'].includes(row.state) || !row.content_capture?.supported || !row.content_capture?.applied ? 'disabled' : ''}><span></span></button></section>
+    <section class="env-window"><div><h4>请求内容采集</h4><p class="env-muted">${row.content_capture?.applied ? (row.content_capture.enabled ? '已开启' : '已关闭') : '实际配置待核对'} · 默认开启 · debug 保存脱敏原文</p><p class="env-muted">${escapeHTML(nativeRuntimePending(row) ? '原生 TLS 采集：等待原生环境准备' : tlsCaptureDescription(row.content_capture?.tls_observer))}</p></div><button type="button" class="env-switch" role="switch" aria-label="${escapeHTML((row.name || '当前环境') + '请求内容采集')}" aria-checked="${row.content_capture?.enabled === true}" data-content-capture data-environment="${escapeHTML(id)}" data-env-focus="${escapeHTML(id + ':capture')}" ${pending || row.busy || KERNEL_BUSY_STATES.includes(row.native_kernel?.state) || row.native_kernel?.state === 'reconcile' || !['ready', 'stopped'].includes(row.state) || !row.content_capture?.supported || !row.content_capture?.applied ? 'disabled' : ''}><span></span></button></section>
     ${row.isolation_version === 2 ? `<section class="env-window"><div><h4>CPU 额度</h4><p class="env-muted">分别调整 CLI、API 发送器和网络的额度，保存后重建沿用。</p></div><button type="button" class="btn btn-sm" data-cpu-resources data-environment="${escapeHTML(id)}" data-env-focus="${escapeHTML(id + ':cpu')}" ${pending ? 'disabled' : ''}>调整额度</button></section>` : ''}
     <section class="env-window"><div><h4>当地运行窗口</h4>${row.run_window ? renderAccountRunWindow({id: row.account_id, run_window: row.run_window}) : '<p class="env-muted">运行窗口尚未提供</p>'}</div>${row.run_window && row.account_id != null ? `<button type="button" class="btn btn-sm" data-run-window-config="${escapeHTML(row.account_id)}" data-environment="${escapeHTML(id)}" data-env-focus="${escapeHTML(id + ':window')}">配置时段</button>` : ''}</section>
     <details class="env-details" data-env-details="${escapeHTML(id + ':technical')}"><summary>环境与物理详情</summary><div class="env-details-body"><dl><dt>环境 ID</dt><dd><code>${escapeHTML(id)}</code></dd><dt>主机名</dt><dd>${escapeHTML(fingerprint.hostname || '未提供')}</dd><dt>设备身份</dt><dd>${escapeHTML(row.identity_status || '待核对')}</dd><dt>语言区域</dt><dd>${escapeHTML(fingerprint.lang || '未提供')}</dd><dt>画像版本</dt><dd>${escapeHTML(fingerprint.profile_version ?? '未提供')}</dd></dl>${row.physical_features ? renderPhysicalFeatures(row) : '<p class="env-muted">物理实测尚未采集。</p>'}</div></details>
@@ -164,6 +166,10 @@ function renderNativePreparation(row) {
     invalidated: '准备已失效', capability_unknown: '原生能力待核对', binding_unverified: '最近快照属于其他环境或内核代次，等待当前代次检查',
     read_failed: '准备状态读取失败', snapshot_missing: '尚未收到本账号的准备快照',
     snapshot_pending: '等待首次检查返回当前环境快照',
+    backend_pending: '已选择原生运行时，等待环境准备',
+    native_sender_budget_missing: '原生发送器内存预算尚未配置，请配置后重试',
+    native_sender_budget_insufficient: '原生发送器内存预算不足以覆盖当前并发，请调整后重试',
+    account_memory_insufficient: '账号总内存不足以容纳网络、原生发送器和 CLI，请调整后重试',
     maintenance: '账号正在维护', system_maintenance: '平台更新中，结束后自动准备', sleeping: '环境休眠', disabled: '账号已停用'};
   const tone = value.state === 'ready' ? 'good' : ['busy', 'sleeping', 'disabled'].includes(value.state) ? 'muted' : 'warning';
   const checked = typeof value.checked_at_ms === 'number' && Number.isFinite(value.checked_at_ms)
@@ -178,7 +184,32 @@ function renderNativePreparation(row) {
     ${value.checking === true ? '<p class="env-muted">后台正在检查。页面每20秒自动读取检查结果。</p>' : ''}
     ${typeof value.adaptive_prewarm === 'boolean' ? `<p class="env-muted">并发备用：${value.adaptive_prewarm ? '已启用第二进程补位' : '未启用，保留一个常驻热进程'}。超出已就绪热容量时按需扩容。</p>` : ''}
     ${value.reason ? `<p class="env-notice">${escapeHTML(reasons[value.reason] || '状态待核对')}</p>` : ''}
+    ${row.request_backend === 'native293' && ['failed', 'unknown', 'unprepared', 'sleeping'].includes(value.state)
+      ? `<button type="button" class="btn btn-sm" data-native-prepare data-environment="${escapeHTML(row.environment_id)}" ${state.environmentUI.pending.has(row.environment_id) || row.busy || !['ready', 'stopped'].includes(row.state) ? 'disabled' : ''}>重试原生准备</button>` : ''}
   </section>`;
+}
+
+/** 判断目标已为原生而实际发送器仍待应用。@param {object} row 环境快照。@return {boolean} 是否等待布局准备。 */
+function nativeRuntimePending(row) {
+  return row.request_backend === 'native293' && row.criu?.supported === false;
+}
+
+/** 明确重试当前账号准备，离页后忽略旧回执。@param {HTMLButtonElement} button 重试按钮。@return {Promise<void>} 入队并刷新。 */
+async function retryNativePreparation(button) {
+  const ui = state.environmentUI, id = button.dataset.environment, generation = state.viewGeneration;
+  ui.pending.add(id);
+  ui.feedback.delete(id);
+  paintEnvironments();
+  try {
+    await API(`/environments/${encodeURIComponent(id)}/native-preparation`, {method: 'POST', body: '{}'});
+    if (generation !== state.viewGeneration || currentTab() !== 'environments') return;
+    ui.feedback.set(id, '已安排后台原生准备。');
+  } catch (error) {
+    if (generation === state.viewGeneration && currentTab() === 'environments') ui.feedback.set(id, '安排原生准备失败：' + error.message);
+  } finally {
+    ui.pending.delete(id);
+    if (generation === state.viewGeneration && currentTab() === 'environments') await renderEnvironments();
+  }
 }
 
 /** 展示期望选择、实际入口与模板状态。@param {object} row 环境快照。@param {boolean} pending 操作中。@return {string} 加速配置区。 */
@@ -192,7 +223,7 @@ function renderEnvironmentCriu(row, pending) {
     || !['ready', 'stopped'].includes(row.state) || KERNEL_BUSY_STATES.includes(row.native_kernel?.state) || row.native_kernel?.state === 'reconcile';
   const memory = value?.reason === 'memory_budget' ? ` · 当前 ${value.memory_mib} MiB，恢复需 ${value.required_memory_mib} MiB` : '';
   const source = value?.last_start_source === 'criu_restore' ? ' · 最近扩容使用CRIU恢复' : value?.last_start_source === 'exec' ? ' · 最近扩容使用普通启动' : '';
-  return `<section class="env-window"><div><h4>CRIU 加速</h4><p class="env-muted">${known ? (enabled ? '自动开启' : '手动关闭') : '选择待核对'} · ${escapeHTML(CRIU_STATES[value?.state] || '状态待核对')}</p><p class="env-muted">${escapeHTML((CRIU_REASONS[value?.reason] || (value?.state === 'ready' ? '同账号热模板可用于新进程恢复' : '等待恢复状态采样')) + memory + source)}</p></div><button type="button" class="btn btn-sm" data-criu-enabled="${target === true}" data-environment="${escapeHTML(row.environment_id)}" data-env-focus="${escapeHTML(row.environment_id + ':criu')}" ${disabled ? 'disabled' : ''}>${label}</button></section>`;
+  return `<section class="env-window"><div><h4>CRIU 加速</h4><p class="env-muted">${known ? (enabled ? '自动开启' : '手动关闭') : '选择待核对'} · ${escapeHTML(CRIU_STATES[value?.state] || '状态待核对')}</p><p class="env-muted">${escapeHTML((nativeRuntimePending(row) ? '已选择原生运行时，等待环境准备' : CRIU_REASONS[value?.reason] || (value?.state === 'ready' ? '同账号热模板可用于新进程恢复' : '等待恢复状态采样')) + memory + source)}</p></div><button type="button" class="btn btn-sm" data-criu-enabled="${target === true}" data-environment="${escapeHTML(row.environment_id)}" data-env-focus="${escapeHTML(row.environment_id + ':criu')}" ${disabled ? 'disabled' : ''}>${label}</button></section>`;
 }
 
 /** 在明确点击后读取CAS并应用账号选择。@param {HTMLButtonElement} button 操作按钮。@return {Promise<void>} 实际提交及刷新。 */
@@ -226,6 +257,7 @@ async function applyEnvironmentCriu(button) {
  */
 function renderNativeKernel(row) {
   const kernel = row.native_kernel, id = row.environment_id;
+  if (!kernel && nativeRuntimePending(row)) return '<section class="env-kernel env-kernel-unavailable"><h4>请求内核</h4><p>已选择原生运行时，等待环境准备。</p></section>';
   if (!kernel) return '<section class="env-kernel env-kernel-unavailable"><h4>请求内核</h4><p>此环境当前未提供在线内核管理。</p></section>';
   const busy = KERNEL_BUSY_STATES.includes(kernel.state) || state.environmentUI.pending.has(id);
   const available = !busy && !row.busy && Object.hasOwn(KERNEL_STATES, kernel.state) && kernel.state !== 'reconcile';
@@ -257,6 +289,7 @@ function renderNativeKernel(row) {
 async function handleEnvironmentAction(button) {
   const ui = state.environmentUI, id = button.dataset.environment, generation = state.viewGeneration;
   if (!id || ui.pending.has(id)) return;
+  if (button.hasAttribute('data-native-prepare')) return retryNativePreparation(button);
   if (button.dataset.kernelAction) return openNativeKernelDialog(button);
   if (button.hasAttribute('data-kernel-check')) return checkKernelUpdates(button);
   if (button.hasAttribute('data-criu-enabled')) return applyEnvironmentCriu(button);

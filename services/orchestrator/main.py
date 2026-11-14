@@ -56,6 +56,7 @@ from cpu_resources import read_resources as read_cpu_resources, set_resources as
 from content_capture_settings import read_settings as read_content_capture, set_settings as set_content_capture
 from native_criu_settings import read_settings as read_criu, set_settings as set_criu
 from native_kernel_releases import discover_releases
+from native_sender import NativePreparationBlocked
 from requests.exceptions import RequestException
 from sse_starlette.sse import EventSourceResponse
 from starlette.websockets import WebSocketState
@@ -134,6 +135,9 @@ CC2API_ADMIN_PASSWORD = os.environ.get("CC2API_ADMIN_PASSWORD", "")
 CC2API_REQUEST_TIMEOUT_SEC = float(os.environ.get("CC2API_REQUEST_TIMEOUT_SEC", "15"))
 WARMUP_SCHEDULER_TICK_SEC = float(os.environ.get("WARMUP_SCHEDULER_TICK_SEC", "30"))
 WARMUP_SYNC_RETRY_SEC = int(os.environ.get("WARMUP_SYNC_RETRY_SEC", "900"))
+# 任务工程与新建 cc2api 账号共用已用额度默认值，避免两个入口漂移。
+_DEFAULT_FIVE_HOUR_USAGE_LIMIT_PERCENT = 85
+_DEFAULT_SEVEN_DAY_USAGE_LIMIT_PERCENT = 80
 _CC2API_SECRET_RE = re.compile(r"(?:sk|ant)-[A-Za-z0-9_\-]{12,}")
 
 
@@ -8852,7 +8856,11 @@ def _require_cc2api_binding_available(
 
 @app.post("/api/accounts")
 def create_account(body: AccountIn):
-    """创建已有 profile 对应的账号记录。"""
+    """创建已有 profile 对应的账号记录并初始化工程额度闸线。
+
+    :param body: 账号名、代理配置、时区及启用状态。
+    :return: 账号标识及可选的软删除恢复标记。
+    """
     pp = PROFILES_DIR / body.name
     if not pp.exists() or not any(pp.iterdir()):
         raise HTTPException(
@@ -8891,13 +8899,15 @@ def create_account(body: AccountIn):
                 columns = (
                     "id, name, profile_path, upstream_proxy_scheme, "
                     "upstream_socks5_host, upstream_socks5_port, "
-                    "upstream_socks5_user, upstream_socks5_pass, timezone, enabled"
+                    "upstream_socks5_user, upstream_socks5_pass, timezone, enabled, "
+                    "warmup_quota_5h_limit_percent, warmup_quota_7d_limit_percent"
                 ) if restored_account_id is not None else (
                     "name, profile_path, upstream_proxy_scheme, "
                     "upstream_socks5_host, upstream_socks5_port, "
-                    "upstream_socks5_user, upstream_socks5_pass, timezone, enabled"
+                    "upstream_socks5_user, upstream_socks5_pass, timezone, enabled, "
+                    "warmup_quota_5h_limit_percent, warmup_quota_7d_limit_percent"
                 )
-                values_sql = "(?,?,?,?,?,?,?,?,?,?)" if restored_account_id is not None else "(?,?,?,?,?,?,?,?,?)"
+                values_sql = "(?,?,?,?,?,?,?,?,?,?,?,?)" if restored_account_id is not None else "(?,?,?,?,?,?,?,?,?,?,?)"
                 base_values = (
                     body.name,
                     f"profiles/{body.name}",
@@ -8908,6 +8918,8 @@ def create_account(body: AccountIn):
                     body.upstream_socks5_pass,
                     timezone,
                     int(body.enabled),
+                    _DEFAULT_FIVE_HOUR_USAGE_LIMIT_PERCENT,
+                    _DEFAULT_SEVEN_DAY_USAGE_LIMIT_PERCENT,
                 )
                 values = ((restored_account_id,) + base_values) if restored_account_id is not None else base_values
                 cur = conn.execute(
@@ -9101,7 +9113,7 @@ def update_account_process(aid: int) -> dict:
 
 
 def _cc2api_creation_payload(account: dict, profile: dict, observed: Optional[dict]) -> dict:
-    """构造首次创建载荷，统一新旧入口的原有默认配置。
+    """构造任务侧首次创建载荷，显式选择原生运行时和额度闸线。
 
     :param account: 本地账号。
     :param profile: 已读取的身份与凭据。
@@ -9114,7 +9126,10 @@ def _cc2api_creation_payload(account: dict, profile: dict, observed: Optional[di
         'expires_at': profile['expires_at'], 'proxy_url': _account_proxy_url(account),
         'account_uuid': profile.get('account_uuid'), 'organization_uuid': profile.get('organization_uuid'),
         'subscription_type': profile.get('subscription_type'), 'rate_limit_tier': profile.get('rate_limit_tier'),
-        'allow_fast_mode': False, 'billing_mode': 'rewrite', 'upstream_session_pool_enabled': True,
+        'allow_fast_mode': False, 'billing_mode': 'rewrite', 'request_backend': 'native293',
+        'five_hour_usage_limit_percent': _DEFAULT_FIVE_HOUR_USAGE_LIMIT_PERCENT,
+        'seven_day_usage_limit_percent': _DEFAULT_SEVEN_DAY_USAGE_LIMIT_PERCENT,
+        'upstream_session_pool_enabled': True,
         'upstream_session_pool_size': 4, 'upstream_session_refresh_policy': 'owner_only',
         'concurrency': 4, 'rpm_limit': 50}
 
@@ -10489,13 +10504,15 @@ def _login_commit_locked(sid: str, body: LoginStartIn):
                     columns = (
                         "id, name, profile_path, upstream_proxy_scheme, "
                         "upstream_socks5_host, upstream_socks5_port, "
-                        "upstream_socks5_user, upstream_socks5_pass, timezone, enabled"
+                        "upstream_socks5_user, upstream_socks5_pass, timezone, enabled, "
+                        "warmup_quota_5h_limit_percent, warmup_quota_7d_limit_percent"
                     ) if restored_account_id is not None else (
                         "name, profile_path, upstream_proxy_scheme, "
                         "upstream_socks5_host, upstream_socks5_port, "
-                        "upstream_socks5_user, upstream_socks5_pass, timezone, enabled"
+                        "upstream_socks5_user, upstream_socks5_pass, timezone, enabled, "
+                        "warmup_quota_5h_limit_percent, warmup_quota_7d_limit_percent"
                     )
-                    values_sql = "(?,?,?,?,?,?,?,?,?,?)" if restored_account_id is not None else "(?,?,?,?,?,?,?,?,?)"
+                    values_sql = "(?,?,?,?,?,?,?,?,?,?,?,?)" if restored_account_id is not None else "(?,?,?,?,?,?,?,?,?,?,?)"
                     values: tuple[object, ...]
                     base_values = (
                         name,
@@ -10507,6 +10524,8 @@ def _login_commit_locked(sid: str, body: LoginStartIn):
                         body.upstream_socks5_pass,
                         timezone,
                         0 if session.environment_id else 1,
+                        _DEFAULT_FIVE_HOUR_USAGE_LIMIT_PERCENT,
+                        _DEFAULT_SEVEN_DAY_USAGE_LIMIT_PERCENT,
                     )
                     values = ((restored_account_id,) + base_values) if restored_account_id is not None else base_values
                     cur = conn.execute(
@@ -12468,6 +12487,9 @@ def v3_transport(account_id: int, wake: bool = True):
         if not wake:
             return account_runtime.existing_transport(dict(rows[0]))
         return account_runtime.transport(dict(rows[0]), effective_claude_code_version())
+    except NativePreparationBlocked as error:
+        raise HTTPException(503, "原生运行时资源预算不满足，请调整后重试",
+            headers={'x-v3-runtime-reason': error.reason}) from None
     except (ValueError, RuntimeError):
         raise HTTPException(503, "账号环境未就绪或需要维护")
 
@@ -12509,6 +12531,8 @@ def v3_environments() -> list[dict]:
             row['gateway_account_id'] = account['cc2api_account_id'] if account else None
         else:
             row["run_window"] = None
+        target = native_preparations.get(row.get('gateway_account_id'), {}).get('request_backend')
+        row['request_backend'] = target if target in ('legacy', 'native293') else None
         row['native_preparation'] = account_runtime.native_preparation_summary(row, dict(account) if account else None, native_preparations, native_preparation_error)
         row["physical_features"] = physical_features_summary(row,
             account_runtime._root(row) / "runtime/physical-features.json", time.time())
@@ -12628,6 +12652,25 @@ def _content_capture_account(environment_id: str) -> tuple[dict, dict]:
     if row is None or account is None:
         raise HTTPException(404, '账号没有唯一的 V3 环境绑定')
     return dict(row), dict(account)
+
+
+@app.post('/api/environments/{environment_id}/native-preparation')
+def v3_request_native_preparation(environment_id: str) -> dict:
+    """显式重试当前环境的原生准备，仅入队。
+
+    :param environment_id: 当前可见环境。
+    :return: 后台入队及当前安全准备摘要。
+    """
+    row, account = _content_capture_account(environment_id)
+    if row['state'] not in ('ready', 'stopped'):
+        raise HTTPException(409, '环境正在维护，请完成后重试')
+    try:
+        configuration = cc2api_client._request('GET', f"/admin/runtime/accounts/{account['cc2api_account_id']}/config")
+        if configuration.get('request_backend') != 'native293':
+            raise HTTPException(409, '请先选择原生运行时')
+        return cc2api_client._request('POST', f"/admin/accounts/{account['cc2api_account_id']}/native-preparation?wake=true", {})
+    except (ValueError, RuntimeError, RequestException, OSError):
+        raise HTTPException(503, '原生准备暂不可用，请稍后重试') from None
 
 
 @app.get('/api/environments/{environment_id}/content-capture')

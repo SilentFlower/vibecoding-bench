@@ -5,6 +5,7 @@ import threading
 import time
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
+from uuid import UUID
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -138,6 +139,41 @@ class ProjectsFeedTests(unittest.TestCase):
         self.assertNotIn('不应公开', json.dumps(progress, ensure_ascii=False))
         self.assertEqual('business', progress['stages'][-1]['stage'])
         self.assertTrue(all(stage['elapsed_sec'] >= 0 for stage in progress['stages']))
+
+    def test_equal_timestamp_uses_submission_order_in_both_namespaces(self):
+        """相同时间与反向 UUID 仍读取最后交付，历史列表和两个空间一致。:return: None。"""
+        projects = self.service
+        for namespace in ('projects', 'warmup'):
+            with self.subTest(namespace=namespace):
+                if namespace == 'warmup':
+                    self.service = ProjectsService(self.root, self.database, threading.Lock(), self.catalog, self.terminal,
+                        projects.account, projects.admission, projects.provider, projects.verifier, self.pi, namespace='warmup')
+                    self.addCleanup(self.service.close)
+                    self.activate()
+                    self.work = self.service._one('SELECT * FROM projects_work WHERE id=?', (self.start_work()['work_id'],))
+                counter = [2 ** 128]
+
+                def descending_uuid():
+                    """让后一次交付的随机标识排序更小。:return: 合法 UUID。"""
+                    counter[0] -= 1
+                    return UUID(int=counter[0])
+
+                now = time.time()
+                with patch('projects.time.time', return_value=now), patch('projects.uuid.uuid4', side_effect=descending_uuid):
+                    first = self.tool('project_submit', {'summary': '首次交付'}, 'tie-first')['submission_id']
+                    second = self.tool('project_submit', {'summary': '返工交付'}, 'tie-second')['submission_id']
+                    self.assertLess(second, first)
+                    self.service._event(1, 'verification_progress', {'submission_id': first,
+                        'stage': 'review', 'message': '旧交付迟到'}, self.work['id'])
+                    self.service._event(1, 'verification_progress', {'submission_id': second,
+                        'stage': 'business', 'message': '当前业务检查'}, self.work['id'])
+                    progress = self.service.snapshot(1)['state']['agents'][0]['verification']
+                    self.assertEqual(second, progress['submission_id'])
+                    self.assertEqual('business', progress['stages'][-1]['stage'])
+                    self.assertNotIn('旧交付迟到', json.dumps(progress, ensure_ascii=False))
+                    history = self.service.work_detail(self.work['id'])['submissions']
+                    self.assertEqual([second, first], [item['id'] for item in history])
+                    self.assertEqual([now, now], [item['created_at'] for item in history])
 
     def test_legacy_submission_and_paused_work_do_not_show_active_verification(self):
         """旧提交没有阶段时不编造进度，暂停也不能继续显示执行中。:return: None。"""

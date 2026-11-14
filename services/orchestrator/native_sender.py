@@ -37,6 +37,15 @@ def prewarm_account_id(value: str) -> int | None:
     return int(value)
 
 
+class NativePreparationBlocked(ValueError):
+    """携带白名单资源原因，供内部准备状态安全投影。"""
+
+    def __init__(self, reason: str, message: str) -> None:
+        """保存受控原因。@param reason 固定故障码。@param message 本地说明。@return None。"""
+        super().__init__(message)
+        self.reason = reason
+
+
 def sender_config(configuration: dict, memory: str, swap: str = '0', budget: str | None = None) -> dict | None:
     """以权威后端和显式部署预算生成 sender 配置。
 
@@ -54,13 +63,16 @@ def sender_config(configuration: dict, memory: str, swap: str = '0', budget: str
     value = os.environ.get('V3_NATIVE_SENDER_MEMORY', '') if budget is None else budget
     unlimited = memory == 'unlimited'
     if not value and not unlimited:
-        raise ValueError('原生方式需要显式 V3_NATIVE_SENDER_MEMORY')
+        raise NativePreparationBlocked('native_sender_budget_missing', '原生方式需要显式 V3_NATIVE_SENDER_MEMORY')
     workers = int(configuration.get('concurrency', 3)) * 2
     ram = 0 if unlimited else memory_bytes(value)
     # 恢复预算另行准入；默认开启不能让原先可用的有限账号失去普通启动能力。
     if workers <= 0 or (not unlimited and ram < (POOL_MIB + workers * WORKER_MIB) * 1024 ** 2):
-        raise ValueError('原生 sender 预算不足以覆盖账号加权并发')
-    isolated_account_limits(memory, swap, value)
+        raise NativePreparationBlocked('native_sender_budget_insufficient', '原生 sender 预算不足以覆盖账号加权并发')
+    try:
+        isolated_account_limits(memory, swap, value)
+    except ValueError as error:
+        raise NativePreparationBlocked('account_memory_insufficient', str(error)) from error
     return {'binary_path': '/usr/local/bin/ccrb-runtime', 'work_root': '/native',
             'memory_mib': ram // 1024 ** 2, 'max_workers': workers}
 

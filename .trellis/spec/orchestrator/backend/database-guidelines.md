@@ -594,6 +594,8 @@ if "model_override" not in task:
 ### 2. Signatures
 
 ```text
+POST /api/accounts -> 新增已有 profile 的账号记录
+POST /api/accounts/login/{sid}/commit -> 保存登录并新增或更新账号记录
 PUT /api/accounts/{aid}/warmup -> 旧 runner {ok, enabled, next_run_at} / v3 {ok, engine: "projects"}
 POST /api/accounts/{aid}/quota -> 标准化 usage
 GET /api/accounts -> quota_policy / warmup_quota
@@ -617,7 +619,7 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 
 ### 3. Contracts
 
-- 阈值是 1～100 的已用整数百分比，两个窗口独立，默认 NULL；省略保留，null 关闭，StrictInt 拒绝 bool／字符串／小数。保存不隐式改绑。
+- 阈值是 1～100 的已用整数百分比，两个窗口独立。任务侧通过已有 profile 添加账号或首次登录保存新增记录时，显式写入 `warmup_quota_5h_limit_percent=85`、`warmup_quota_7d_limit_percent=80`，工程额度窗口据实际记录启用两个开关；与任务侧创建 cc2api 账号使用同一组已用百分比默认常量。数据库列仍可为 NULL，历史账号、软删除恢复及同名重登／提交重试保留已保存值和关闭状态。编辑时省略保留，null 关闭，StrictInt 拒绝 bool／字符串／小数。保存不隐式改绑。
 - v3 保存请求显式包含任一阈值时，先落库并发布额度快照，再分别通知项目迭代和养号迭代重查。`recheck_waiting` 只把已启用、`schedule_state='waiting'`、没有在途控制者的计划移到当前本地检查时间，保留控制代次、原工作及会话；保存接口不调用模型。正常轮间 `scheduled`、人工关闭及服务退出不重新排期。
 - 重查仍通过原 `start(..., scheduled=True)` 核对模型／运行故障冷却、账号身份、输入对账及实时门禁，未解除限制时继续等待。成功认领控制者时清空旧 `schedule_message`，避免运行中继续显示旧额度等待原因。
 - 未绑定账号有完整本地 OAuth 时可以启用定时养号；绑定账号核实身份与 active OAuth，只由 cc2api 刷新。未绑定配置缺凭据返回 409，不调用 cc2api；NULL 绑定的调度写入用 IS ?。
@@ -641,6 +643,8 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 
 | 条件 | 结果 |
 | --- | --- |
+| 添加账号或首次登录保存新增记录 | 工程额度默认启用 5h 已用 85%、7d 已用 80% |
+| 同名重登、提交重试或软删除恢复 | 保留已保存阈值及 NULL 关闭状态 |
 | 首次未知且无真实拒绝 | 正常启动，页面显示未知，不请求 usage |
 | v3 抓包启动，5h=0% 且 reset=null、无 admission | 不生成暂停信号或单次标记，终端及正常请求可继续 |
 | 运行中任一有效窗口等于／跨过启用阈值 | 完成原轮次及补充/收尾，按实际结果收口，下一轮等待 |
@@ -665,6 +669,7 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 
 ### 5. Scenarios and Examples
 
+- 正常：新账号首次保存后打开“工程额度”，5h 显示 85%、7d 显示 80%，两个窗口均启用。错误用法：表单展示默认值却仍保存 NULL，或重试登录时重置用户阈值。正确处理：仅新增账号记录时显式写入默认值，后续展示和编辑读取实际记录。
 - 正常：5h 阈值 60%，普通任务从 55% 启动；正式响应报告 60% 或 68% 后仍完成原补充和收尾，实际退出 0 才记 success。下一 pending item 等待阈值恢复及原间隔；reset 到期只取得一次正常更新机会，不调用 usage。
 - 边界：只启用 7d=80% 时，养号观察到 5h=55%／7d=80% 仍完成本轮；下一轮等待。关闭两个阈值不取消共同耗尽或认证保护。
 - 基础：600 题批次尚无 run，未知状态可创建第一条正常工作；已有持久投放时间仍须等待，不能补发历史 item。
@@ -679,6 +684,7 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 
 ### 6. Tests Required
 
+- `test_main.py::ScheduledWarmupTests.test_new_local_account_defaults_quota_and_restoration_preserves_policy`：新增记录和历史 ID 重建均落库 85/80，软删除恢复保留 NULL/72。`test_login_drafts.py`：首次登录提交落库 85/80，保存中断后重试保留已保存 NULL/72 及原账号 ID。
 - test_auto_usage.py：usage 调用即失败的替身覆盖未知启动、前后和 tick 不查询、有效高位阻断、reset 一次恢复、并发及重启不重复、共同耗尽／关闭阈值／续聊抓包共用恢复、部分返回、手动错误与零 run 批次。
 - test_cli_quota.py：0%／100%、bool／NaN／时间边界／缺窗口、cwd／session／主响应／开始时间验证，重复状态栏不刷新时间、不写完整 payload；原命令输出保持。
 - `test_auth_gate_requires_successful_explicit_usage_verification` 核验普通观察/失败手动查询保持认证门禁、完整手动核验后解除；`verify_management_ui.py` 核验失败卡片保留、成功摘要更新及离页后迟到核验不弹窗。

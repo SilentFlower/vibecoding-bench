@@ -119,7 +119,10 @@ class LoginDraftTests(unittest.TestCase):
         atomic_json(session.profile_dir / ".credentials.json", {"claudeAiOauth": {"accessToken": "synthetic", "refreshToken": "synthetic-rt", "expiresAt": int(time.time() * 1000) + 3600000}})
         self.manager.auth_status.return_value = {"loggedIn": True}
         self.manager.persist_top_config = Mock()
-        self.assertIn("id", main.login_commit(session.sid, main.LoginStartIn(name=session.name)))
+        result = main.login_commit(session.sid, main.LoginStartIn(name=session.name))
+        with self.database() as connection:
+            account = connection.execute("SELECT * FROM accounts WHERE id=?", (result["id"],)).fetchone()
+            self.assertEqual((85, 80), (account["warmup_quota_5h_limit_percent"], account["warmup_quota_7d_limit_percent"]))
 
     def test_preparing_draft_is_visible_while_start_owns_lock(self) -> None:
         """耗时初始化期间列表仍能读准备快照，不能被 owner 锁卡住。@return None。"""
@@ -240,9 +243,12 @@ class LoginDraftTests(unittest.TestCase):
                 main.login_commit(session.sid, main.LoginStartIn(name=session.name))
         self.assertEqual(main.list_accounts(), [])
         with self.database() as connection:
-            pending_id = connection.execute("SELECT id FROM accounts").fetchone()[0]
+            account = connection.execute("SELECT * FROM accounts").fetchone()
+            pending_id = account["id"]
+            self.assertEqual((85, 80), (account["warmup_quota_5h_limit_percent"], account["warmup_quota_7d_limit_percent"]))
             self.assertIsNone(main._get_available_account(connection, pending_id))
-            connection.execute("UPDATE accounts SET enabled=1 WHERE id=?", (pending_id,))
+            connection.execute("UPDATE accounts SET enabled=1, warmup_quota_5h_limit_percent=NULL, "
+                "warmup_quota_7d_limit_percent=72 WHERE id=?", (pending_id,))
             connection.commit()
             self.assertIsNone(main._get_available_account(connection, pending_id))
         # 模拟重启丢失内存名称占用；持久提交意图仍必须生效。
@@ -257,6 +263,8 @@ class LoginDraftTests(unittest.TestCase):
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM accounts").fetchone()[0], 1)
             self.assertEqual(connection.execute("SELECT account_id FROM account_environments").fetchone()[0], result["id"])
             self.assertIsNotNone(main._get_available_account(connection, result["id"]))
+            account = connection.execute("SELECT * FROM accounts WHERE id=?", (result["id"],)).fetchone()
+            self.assertEqual((None, 72), (account["warmup_quota_5h_limit_percent"], account["warmup_quota_7d_limit_percent"]))
 
     def test_restart_discovers_marker_and_validates_retained_credentials(self) -> None:
         """管理器内存丢失后从标记找 HOME，实际认证检查失败不得宣称待提交。@return None。"""

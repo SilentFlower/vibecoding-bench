@@ -1131,6 +1131,8 @@ ProjectsTerminal.startup_recovery_ready(account: dict, work: dict) -> bool
 ```text
 ProjectsService(..., *, namespace='projects', auto_cycle=False, view_admission=None)
 ProjectsService.state(account_id=None, *, summary_only=False, proof_metadata=False) -> dict
+ProjectsService._verification_progress(work: dict | None) -> dict | None
+ProjectsService.work_detail(work_id: str) -> dict
 ProjectsCatalog.proof_contract(work: dict, snapshots: dict) -> tuple[str, dict]
 _projects_admission(account, work, *, snapshot_only=False) -> dict
 _warmup_projects_admission(account, work, *, snapshot_only=False) -> dict
@@ -1141,6 +1143,8 @@ GET /runtime/api/accounts
 ```
 
 ### 3. Contracts
+
+- 当前验收提交与详情历史均按 `created_at DESC,rowid DESC` 选择。时间相同由 SQLite 插入先后决定，随机 UUID 仅表示身份；projects 与 warmup 使用现有独立 rowid 表。响应、历史字段与数据库结构保持，旧提交迟到事件仍按当前 submission_id 排除。
 
 - 生产两空间通过 `view_admission=partial(..., snapshot_only=True)` 提供页面判定；省略该回调时沿用当前 `admission`。实际启动、恢复及输入仍调用严格 `admission`，不得用页面允许结果授权执行。
 - 快照跳过 `QuotaGuard.consume`，读取已有持久额度和当前策略；不缓存跨请求的允许结果。读取执行登记用非阻塞锁，拿不到时返回 `allowed=False, reason='unavailable', retryable=True, retry_at=None`，页面消息为“执行状态正在更新，请稍后刷新”。不伪造空闲或额度充足。
@@ -1156,6 +1160,7 @@ GET /runtime/api/accounts
 
 | 条件 | 处理 |
 | --- | --- |
+| 两次提交 created_at 相同且后一次 UUID 更小 | 当前进度与历史首项均为后一次；旧提交事件不进入当前进度 |
 | 后台持有额度消费锁 | 页面读持久快照；真实执行仍消费新观察 |
 | 执行登记锁正忙 | 页面明确未知且不可放行；真实执行仍等待原锁 |
 | 后续请求额度发生变化 | 重新判定，不复用此前允许结果 |
@@ -1167,12 +1172,16 @@ GET /runtime/api/accounts
 
 ### 5. Scenarios and Examples
 
+- 正常：同一工作连续提交时读取后一次验收进度。边界：时间完全相同仍由插入顺序决定。错误：用随机 UUID 大小判定新旧。修正：最新提交与历史列表同步使用时间、rowid 倒序，保持 submission_id 事件过滤。
+
 - 正常：页面读取 projects 和工程养号时不扫描消费日志；真正开始下一轮时继续消费观察并复核互斥与额度。
 - 边界：执行准备正在持锁，页面及时显示暂不可读取；释放后刷新重新判断。两个账号引用同项目时本次只展开一次目录，下次仍读取新目录。
 - 冷启动：首次打开历史较多的项目页，只核对冻结合同元数据；真正申请目标时再完整校验原冻结内容。不能让 SSE 在事件循环内同步扫描历史库。
 - 错误：给全部管理请求统一设置10秒，截断事件订阅，或把快照允许结果用于启动。修正：仅限定四个普通 GET，执行保留原严格准入。
 
 ### 6. Tests Required
+
+- `test_equal_timestamp_uses_submission_order_in_both_namespaces` 固定同时间戳并生成递减 UUID，项目和养号均断言当前进度归后一次、旧迟到事件被排除、历史顺序与真实提交顺序一致。
 
 - `test_projects_admission`：真实线程持有额度／执行锁时快照及时完成且锁忙不可放行；严格执行等待并消费，后续请求看到新额度。
 - `test_projects_feed`：真实页面使用快照回调；卡片五字段等价；多账号目录请求内复用、跨请求重读，进度与历史读取保持。

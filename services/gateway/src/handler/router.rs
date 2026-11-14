@@ -1226,6 +1226,13 @@ async fn update_account(
                         .await?;
                 }
                 existing = state.account_svc.get_account(id).await?;
+                drop(_runtime_permit);
+                if updates.get("request_backend").is_some()
+                    && existing.request_backend == "native293"
+                    && existing.status == AccountStatus::Active
+                {
+                    state.account_svc.request_native_wake(id);
+                }
                 return Ok(Json(existing));
             }
         }
@@ -1293,6 +1300,14 @@ async fn update_account(
             .await?;
     }
     existing = state.account_svc.get_account(id).await?;
+    // 准备会反向读取环境及凭据，必须在配置排他门禁释放后才允许唤醒。
+    drop(_runtime_permit);
+    if updates.get("request_backend").is_some()
+        && existing.request_backend == "native293"
+        && existing.status == AccountStatus::Active
+    {
+        state.account_svc.request_native_wake(id);
+    }
     Ok(Json(existing))
 }
 
@@ -2251,16 +2266,34 @@ fn validate_usize_range(key: &str, raw: &str, min: usize, max: usize) -> Result<
     }
 }
 
-/// 将账号原生准备入队，调用方不等待本地加载。
-/// @param state 已通过管理鉴权的共享服务。
-/// @param id 唯一账号 ID。
-/// @return 入队确认及当前准备状态。
+/// 显式管理员重试可允许唤醒；旧环境就绪通知缺省仅检查运行绑定。
+#[derive(Deserialize, Default)]
+struct NativePreparationQuery {
+    #[serde(default)]
+    wake: bool,
+    #[serde(default)]
+    cancel: bool,
+}
+
+/// 将账号准备入队，调用方不等待本地加载。
+/// @param state 已鉴权服务。@param id 账号。@param query 明确唤醒选择。
+/// @return 入队确认及当前安全状态。
 async fn request_native_preparation(
     State(state): State<AppState>,
     Path(id): Path<i64>,
+    Query(query): Query<NativePreparationQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     state.account_svc.get_account(id).await?;
-    state.account_svc.notify_native_change(id, false);
+    if query.wake && query.cancel {
+        return Err(AppError::BadRequest("准备与取消不能同时请求".into()));
+    }
+    if query.cancel {
+        state.account_svc.notify_native_change(id, true);
+    } else if query.wake {
+        state.account_svc.request_native_wake(id);
+    } else {
+        state.account_svc.notify_native_change(id, false);
+    }
     Ok(Json(
         serde_json::json!({"queued":true,"preparation":state.gateway_svc.native_preparation_status(id)}),
     ))
@@ -2283,8 +2316,23 @@ async fn native_preparation_status(
 /// @return 安全状态快照数组。
 async fn native_preparation_snapshots(
     State(state): State<AppState>,
-) -> Json<Vec<serde_json::Value>> {
-    Json(state.gateway_svc.native_preparation_snapshots())
+) -> Result<Json<Vec<serde_json::Value>>, AppError> {
+    let snapshots = state.gateway_svc.native_preparation_snapshots();
+    let accounts = state.account_svc.list_accounts().await?;
+    Ok(Json(
+        accounts
+            .into_iter()
+            .map(|account| {
+                let mut value = snapshots
+                    .iter()
+                    .find(|item| item["account_id"] == account.id)
+                    .cloned()
+                    .unwrap_or_else(|| json!({"account_id":account.id,"state":"unprepared"}));
+                value["request_backend"] = json!(account.request_backend);
+                value
+            })
+            .collect(),
+    ))
 }
 
 /// 分页查询已鉴权业务请求的白名单诊断。
@@ -3123,6 +3171,7 @@ mod tests {
             "legacy"
         );
         drop(permit);
+        let mut changes = accounts.subscribe_native_changes();
         for backend in ["native293", "legacy"] {
             let response = app
                 .clone()
@@ -3150,6 +3199,31 @@ mod tests {
                     .request_backend,
                 "native293"
             );
+            let mut wakes = 0;
+            while let Ok((id, _, wake)) = changes.try_recv() {
+                assert_eq!(id, first.id);
+                wakes += usize::from(wake);
+            }
+            assert_eq!(wakes, usize::from(backend == "native293"));
+            assert!(queue.runtime_gate.snapshot()["lease"].is_null());
+        }
+        for status in ["active", "disabled"] {
+            let response = app
+                .clone()
+                .oneshot(request(
+                    Method::PUT,
+                    &path,
+                    json!({"request_backend":"native293","status":status}),
+                ))
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            let mut wakes = 0;
+            while let Ok((_, _, wake)) = changes.try_recv() {
+                wakes += usize::from(wake);
+            }
+            assert_eq!(wakes, usize::from(status == "active"));
+            assert!(queue.runtime_gate.snapshot()["lease"].is_null());
         }
     }
 

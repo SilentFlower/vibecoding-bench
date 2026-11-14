@@ -1,6 +1,6 @@
 //! 原生账号的有界后台准备；通知只携带账号归属，执行时重新解析权威状态。
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -19,7 +19,7 @@ use crate::service::native_contract::{
     NativeKernelTarget, NativePreparation, NativePreparationStatus,
 };
 use crate::service::runtime_transport::{
-    PreparedTransport, TransportBinding, now_ms, prepare_existing,
+    PreparedTransport, TransportBinding, now_ms, prepare, prepare_existing,
 };
 use crate::service::system_update;
 
@@ -32,6 +32,7 @@ struct PreparationFailure {
     next: Instant,
     maintenance_seen: bool,
     observation: Value,
+    wake: bool,
 }
 
 #[cfg(all(test, unix))]
@@ -78,7 +79,7 @@ impl NativePrewarmer {
         let (stop, mut stopping) = oneshot::channel();
         *self.shutdown.lock().unwrap() = Some(stop);
         tokio::spawn(async move {
-            let mut pending = BTreeSet::new();
+            let mut pending = BTreeMap::new();
             if let Ok(items) = accounts.list_accounts().await {
                 pending.extend(
                     items
@@ -88,7 +89,7 @@ impl NativePrewarmer {
                                 && account.request_backend == "native293"
                         })
                         .take(QUEUE_LIMIT)
-                        .map(|account| account.id),
+                        .map(|account| (account.id, false)),
                 );
             }
             let mut active: HashMap<i64, Option<oneshot::Sender<()>>> = HashMap::new();
@@ -107,7 +108,7 @@ impl NativePrewarmer {
             let mut scan_after = 0;
             loop {
                 while jobs.len() < PREPARE_PARALLELISM {
-                    let Some(id) = pending.iter().copied().find(|id| {
+                    let Some(id) = pending.keys().copied().find(|id| {
                         !active.contains_key(id)
                             && !maintenance_waiting.contains(id)
                             && failures.get(id).is_none_or(|failure| {
@@ -116,7 +117,7 @@ impl NativePrewarmer {
                     }) else {
                         break;
                     };
-                    pending.remove(&id);
+                    let wake = pending.remove(&id).unwrap_or(false);
                     let preparation_id = Uuid::new_v4().to_string();
                     states
                         .lock()
@@ -127,10 +128,16 @@ impl NativePrewarmer {
                     active.insert(id, Some(cancel));
                     let accounts = accounts.clone();
                     jobs.spawn(async move {
-                        let result =
-                            check_one(accounts, id, preparation_id.clone(), cancellation, true)
-                                .await;
-                        (id, preparation_id, result)
+                        let result = check_one(
+                            accounts,
+                            id,
+                            preparation_id.clone(),
+                            cancellation,
+                            true,
+                            wake,
+                        )
+                        .await;
+                        (id, preparation_id, wake, result)
                     });
                 }
                 // select 的禁用分支仍会构造 future，取值必须在最后一次补偿后保持有效。
@@ -159,9 +166,9 @@ impl NativePrewarmer {
                                 if pending.len() >= QUEUE_LIMIT { break; }
                                 if account.status == AccountStatus::Active && account.request_backend == "native293"
                                     && !active.contains_key(&account.id)
-                                    && !pending.contains(&account.id)
+                                    && !pending.contains_key(&account.id)
                                     && failures.get(&account.id).is_none_or(|failure| Instant::now() >= failure.next) {
-                                    pending.insert(account.id);
+                                    pending.entry(account.id).or_insert_with(|| failures.get(&account.id).is_some_and(|failure| failure.wake));
                                     scan_after = account.id;
                                 }
                             }
@@ -184,50 +191,52 @@ impl NativePrewarmer {
                                     && !active.contains_key(&account.id)
                                     && failures.get(&account.id).is_none_or(|failure| !failure.maintenance_seen || Instant::now() >= failure.next)
                                     && states.get(&account.id).is_none_or(|state| state["state"] != "ready") {
-                                    pending.insert(account.id);
+                                    pending.entry(account.id).or_insert_with(|| failures.get(&account.id).is_some_and(|failure| failure.wake));
                                 }
                             }
                         }
                     }
                     event = events.recv() => match event {
-                        Ok((id, invalidate)) => {
-                            failures.remove(&id);
+                        Ok((id, invalidate, wake)) => {
+                            let retry_wake = failures.remove(&id).is_some_and(|failure| failure.wake);
                             maintenance_waiting.remove(&id);
                             if invalidate {
                                 if let Some(cancel) = active.get_mut(&id).and_then(Option::take) { let _ = cancel.send(()); }
                                 states.lock().unwrap().insert(id, json!({"state":"preparing","reason":"invalidated"}));
                             }
                             // 在途任务结束后仍消费一次新提示，环境重建的唯一通知不能丢失。
-                            if pending.len() < QUEUE_LIMIT || pending.contains(&id) { pending.insert(id); }
+                            if pending.len() < QUEUE_LIMIT || pending.contains_key(&id) {
+                                if invalidate { pending.insert(id, wake); }
+                                else { *pending.entry(id).or_default() |= wake || retry_wake; }
+                            }
                             else { states.lock().unwrap().insert(id, json!({"state":"dropped","reason":"queue_full"})); }
                         }
                         Err(broadcast::error::RecvError::Lagged(_)) => {
                             for cancel in active.values_mut().filter_map(Option::take) { let _ = cancel.send(()); }
                             if let Ok(items) = accounts.list_accounts().await {
                                 for account in items.into_iter().take(QUEUE_LIMIT) {
-                                    if pending.len() < QUEUE_LIMIT { pending.insert(account.id); }
+                                    if pending.len() < QUEUE_LIMIT { pending.entry(account.id).or_insert_with(|| failures.get(&account.id).is_some_and(|failure| failure.wake)); }
                                 }
                             }
                         }
                         Err(broadcast::error::RecvError::Closed) => break,
                     },
                     completed = jobs.join_next(), if !jobs.is_empty() => {
-                        if let Some(Ok((id, preparation_id, result))) = completed {
+                        if let Some(Ok((id, preparation_id, wake, result))) = completed {
                             let cancelled = matches!(active.remove(&id), Some(None));
                             let mut result = if cancelled { json!({"state":"cancelled","reason":"invalidated"}) }
                                 else { result.unwrap_or_else(|_| json!({"state":"failed","reason":"preparation_failed"})) };
                             result["preparation_id"] = json!(preparation_id);
                             result["account_id"] = json!(id);
                             result["checking"] = json!(false);
-                            let maintenance = result["state"] == "maintenance"
-                                && result["reason"] == "system_maintenance";
+                            let maintenance = result["state"] == "maintenance";
                             if maintenance {
                                 if let Some(failure) = failures.get_mut(&id) {
                                     failure.maintenance_seen = true;
                                 }
                                 // 晚于门禁开放的维护回执也登记等待，下一次检查仍可唤醒。
-                                if pending.len() < QUEUE_LIMIT || pending.contains(&id) {
-                                    pending.insert(id);
+                                if pending.len() < QUEUE_LIMIT || pending.contains_key(&id) {
+                                    *pending.entry(id).or_default() |= wake;
                                     maintenance_waiting.insert(id);
                                 } else {
                                     result["state"] = json!("dropped");
@@ -244,7 +253,7 @@ impl NativePrewarmer {
                                 let delay = 20_u64.saturating_mul(1 << count.min(4)).min(300);
                                 failures.insert(id, PreparationFailure {
                                     count, next: Instant::now() + Duration::from_secs(delay), maintenance_seen,
-                                    observation: result.clone(),
+                                    observation: result.clone(), wake,
                                 });
                             } else if !maintenance { failures.remove(&id); }
                             states.lock().unwrap().insert(id, result);
@@ -301,6 +310,7 @@ impl NativePrewarmer {
             Uuid::new_v4().to_string(),
             cancellation,
             false,
+            false,
         )
         .await;
         let mut result =
@@ -326,6 +336,7 @@ async fn check_one(
     preparation_id: String,
     mut cancellation: oneshot::Receiver<()>,
     allow_prepare: bool,
+    wake: bool,
 ) -> Result<Value, AppError> {
     let Some(_update_activity) = system_update::background_admission()? else {
         return Ok(json!({"state":"maintenance","reason":"system_maintenance"}));
@@ -342,8 +353,33 @@ async fn check_one(
     {
         return Ok(json!({"state":"maintenance","reason":"maintenance"}));
     }
-    let Some(transport) = prepare_existing(&account).await? else {
-        return Ok(json!({"state":"sleeping"}));
+    let transport = if wake {
+        // 明确切换才可创建环境；普通巡检与读取始终只解析运行绑定。
+        let prepared = tokio::select! {
+            biased;
+            _ = &mut cancellation => return Ok(json!({"state":"cancelled","reason":"invalidated"})),
+            _ = queue.runtime_gate.wait_exclusive() => return Ok(json!({"state":"maintenance","reason":"maintenance"})),
+            result = prepare(&account, deadline.saturating_duration_since(Instant::now())) => result,
+        };
+        match prepared {
+            Ok(transport) => transport,
+            Err(AppError::ServiceUnavailable(reason))
+                if matches!(
+                    reason.as_str(),
+                    "native_sender_budget_missing"
+                        | "native_sender_budget_insufficient"
+                        | "account_memory_insufficient"
+                ) =>
+            {
+                return Ok(json!({"state":"failed","reason":reason}));
+            }
+            Err(error) => return Err(error),
+        }
+    } else {
+        let Some(transport) = prepare_existing(&account).await? else {
+            return Ok(json!({"state":"sleeping"}));
+        };
+        transport
     };
     let activity = accounts.upstream_activity(id).await?;
     // 凭据刷新由现有所有者完整完成；取消不能打断 RT 的持久归属事务。

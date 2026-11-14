@@ -621,7 +621,7 @@ impl AccountQueue {
 
 /// 统一账号硬资格、凭据及并发；v3 按需装配持久调度。
 pub struct AccountService {
-    native_changes: broadcast::Sender<(i64, bool)>,
+    native_changes: broadcast::Sender<(i64, bool, bool)>,
     credential_gates: Mutex<HashMap<i64, Arc<CredentialGate>>>,
     scheduler: Option<Arc<V3Scheduler>>,
     v3_settings_lock: AsyncMutex<()>,
@@ -797,7 +797,7 @@ impl AccountService {
 
     /// 订阅账号原生准备事件，事件只含归属与失效标记。
     /// @return 有界广播接收器。
-    pub(crate) fn subscribe_native_changes(&self) -> broadcast::Receiver<(i64, bool)> {
+    pub(crate) fn subscribe_native_changes(&self) -> broadcast::Receiver<(i64, bool, bool)> {
         self.native_changes.subscribe()
     }
 
@@ -806,7 +806,14 @@ impl AccountService {
     /// @param invalidate 是否取消正在使用旧快照的准备。
     /// @return 无返回值。
     pub(crate) fn notify_native_change(&self, id: i64, invalidate: bool) {
-        let _ = self.native_changes.send((id, invalidate));
+        let _ = self.native_changes.send((id, invalidate, false));
+    }
+
+    /// 为管理员明确选择或重试登记一次允许唤醒的准备。
+    /// @param id 已保存且已释放配置门禁的账号 ID。
+    /// @return 无返回值，后台执行时重新核验账号。
+    pub(crate) fn request_native_wake(&self, id: i64) {
+        let _ = self.native_changes.send((id, false, true));
     }
 
     /// 从数据库加载评分权重到内存缓存，启动时和更新设置后调用。
@@ -4781,12 +4788,18 @@ mod tests {
             .await
             .unwrap();
         drop(service.upstream_activity(account.id).await.unwrap());
-        assert_eq!(native_changes.try_recv().unwrap(), (account.id, true));
+        assert_eq!(
+            native_changes.try_recv().unwrap(),
+            (account.id, true, false)
+        );
         service
             .credential_handoff(account.id, &input)
             .await
             .unwrap();
-        assert_eq!(native_changes.try_recv().unwrap(), (account.id, true));
+        assert_eq!(
+            native_changes.try_recv().unwrap(),
+            (account.id, true, false)
+        );
         let current = store.get_by_id(account.id).await.unwrap();
         store
             .update_oauth_tokens_if_current(

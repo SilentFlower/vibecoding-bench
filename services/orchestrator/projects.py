@@ -801,8 +801,9 @@ class ProjectsService:
         """
         if not work:
             return None
+        # 同一时刻可以连续交付；UUID 是随机身份，时间相同时以 SQLite 插入顺序选最新记录。
         submission = self._one('SELECT id,status,created_at,ended_at FROM projects_submissions '
-            'WHERE work_id=? ORDER BY created_at DESC,id DESC LIMIT 1', (work['id'],))
+            'WHERE work_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1', (work['id'],))
         if not submission:
             return None
         rows = self._rows("SELECT payload_json,created_at FROM projects_events WHERE work_id=? "
@@ -1022,7 +1023,7 @@ class ProjectsService:
         if not work:
             raise ValueError('工作不存在')
         return {'work': self._public_work(work), 'submissions': self._rows(
-            'SELECT id,status,digest,created_at,ended_at FROM projects_submissions WHERE work_id=? ORDER BY created_at DESC LIMIT 50', (work_id,))}
+            'SELECT id,status,digest,created_at,ended_at FROM projects_submissions WHERE work_id=? ORDER BY created_at DESC,rowid DESC LIMIT 50', (work_id,))}
 
     def work_capture(self, work_id: str, relative: str | None = None) -> dict:
         """按服务端工作归属读取本空间抓包，历史读取不准备账号环境。

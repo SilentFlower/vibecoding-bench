@@ -2,7 +2,7 @@
 import unittest
 from unittest.mock import patch
 
-from native_sender import sender_config
+from native_sender import NativePreparationBlocked, sender_config
 from native_criu_policy import restore_policy
 from resource_budget import account_limits, memory_bytes, isolated_account_limits, scenario_account_limits, serial_review_limits
 
@@ -43,6 +43,17 @@ class NativeSenderTests(unittest.TestCase):
         self.assertEqual(sum(value[0] for value in review.values()), 4 * 1024 ** 3)
         self.assertEqual(review['cli'][0], 1792 * 1024 ** 2)
         self.assertEqual(serial_review_limits('4g', '1g', '1536m'), (2304 * 1024 ** 2,) * 2)
+
+    def test_preparation_resource_failures_use_explicit_safe_codes(self):
+        """资源预检保留兼容异常并提供固定原因，UI 无需猜测 503。@return None。"""
+        account = {'request_backend': 'native293', 'concurrency': 4}
+        for memory, budget, reason in [('1536m', '', 'native_sender_budget_missing'),
+                ('4g', '1536m', 'native_sender_budget_insufficient'),
+                ('1536m', '1792m', 'account_memory_insufficient')]:
+            with self.subTest(reason=reason), self.assertRaises(NativePreparationBlocked) as error:
+                sender_config(account, memory, budget=budget)
+            self.assertEqual(reason, error.exception.reason)
+        self.assertEqual(8, sender_config(account, '2560m', budget='1792m')['max_workers'])
 
     def test_capacity_follows_account_budget_without_artificial_worker_ceiling(self):
         """更高账号并发由显式预算决定。@return None。"""

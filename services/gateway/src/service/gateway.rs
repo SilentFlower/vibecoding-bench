@@ -10098,6 +10098,14 @@ mod tests {
             .await
             .unwrap();
         service.native_prewarmer.start_with_retries([5, 3600, 7200]);
+        if var("CCRB_TEST_EXPLICIT_WAKE").as_deref() == Ok("1") {
+            let deadline = TokioInstant::now() + Duration::from_secs(10);
+            while service.native_preparation_status(account.id)["state"] != "sleeping" {
+                assert!(TokioInstant::now() < deadline, "普通检查应保持环境停止");
+                tokio_sleep(Duration::from_millis(10)).await;
+            }
+            service.account_svc.request_native_wake(account.id);
+        }
         let deadline = TokioInstant::now() + Duration::from_secs(45);
         let prepared_pid = loop {
             let status = service.native_preparation_status(account.id);

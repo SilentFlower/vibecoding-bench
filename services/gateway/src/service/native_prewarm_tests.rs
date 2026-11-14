@@ -10,11 +10,14 @@ use std::time::Duration;
 
 use axum::Json;
 use axum::Router;
+use axum::extract::Query;
 use axum::http::StatusCode;
+use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::serve;
 use serde_json::{Value, from_value, json};
 use sqlx::any::{AnyPoolOptions, install_default_drivers};
+use std::collections::HashMap;
 use tokio::net::TcpListener;
 use tokio::process::Command;
 use tokio::spawn;
@@ -146,14 +149,26 @@ async fn maintenance_waits_without_failure_and_reopens_promptly() {
     let calls = Arc::new(AtomicUsize::new(0));
     let failing = Arc::new(AtomicBool::new(true));
     let observed = calls.clone();
+    let wake_calls = Arc::new(AtomicUsize::new(0));
+    let observed_wakes = wake_calls.clone();
     let fault = failing.clone();
     let router = Router::new().route(
         "/internal/v3/transport/:id",
-        get(move || {
+        get(move |Query(query): Query<HashMap<String, String>>| {
             let observed = observed.clone();
+            let observed_wakes = observed_wakes.clone();
             let fault = fault.clone();
             async move {
                 observed.fetch_add(1, Ordering::SeqCst);
+                if query.get("wake").map(String::as_str) != Some("false") {
+                    observed_wakes.fetch_add(1, Ordering::SeqCst);
+                    return (
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        [("x-v3-runtime-reason", "native_sender_budget_missing")],
+                        Json(Value::Null),
+                    )
+                        .into_response();
+                }
                 (
                     if fault.load(Ordering::SeqCst) {
                         StatusCode::SERVICE_UNAVAILABLE
@@ -162,6 +177,7 @@ async fn maintenance_waits_without_failure_and_reopens_promptly() {
                     },
                     Json(Value::Null),
                 )
+                    .into_response()
             }
         }),
     );
@@ -239,6 +255,43 @@ async fn maintenance_waits_without_failure_and_reopens_promptly() {
     publish_gate(&root, &gate);
     wait_state(&prewarmer, account.id, "sleeping", None).await;
     assert_eq!(calls.load(Ordering::SeqCst), 6);
+    assert_eq!(wake_calls.load(Ordering::SeqCst), 0);
+    // 明确切换可唤醒；普通 GET、维护等待、失败与重试都通过真实协调循环。
+    let queue = accounts
+        .get_or_create_queue(account.id, account.concurrency)
+        .await;
+    let lease = queue.runtime_gate.prepare("synthetic-config").unwrap();
+    accounts.request_native_wake(account.id);
+    wait_state(&prewarmer, account.id, "maintenance", None).await;
+    assert_eq!(wake_calls.load(Ordering::SeqCst), 0);
+    queue
+        .runtime_gate
+        .update(&lease.owner, &lease.generation, "release")
+        .unwrap();
+    let failed = wait_state(&prewarmer, account.id, "failed", None).await;
+    assert_eq!(failed["reason"], "native_sender_budget_missing");
+    assert_eq!(wake_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(prewarmer.inspect(account.id).await["state"], "sleeping");
+    assert_eq!(wake_calls.load(Ordering::SeqCst), 1);
+    accounts.request_native_wake(account.id);
+    wait_state(
+        &prewarmer,
+        account.id,
+        "failed",
+        Some(&failed["preparation_id"]),
+    )
+    .await;
+    assert_eq!(wake_calls.load(Ordering::SeqCst), 2);
+    // 人工停止撤销失败后的唤醒重试，后续检查恢复只读绑定。
+    accounts.notify_native_change(account.id, true);
+    wait_state(&prewarmer, account.id, "sleeping", None).await;
+    assert_eq!(wake_calls.load(Ordering::SeqCst), 2);
+    account.setup_token = "synthetic-setup-token".into();
+    account.request_backend = "legacy".into();
+    accounts.update_account(&account).await.unwrap();
+    accounts.request_native_wake(account.id);
+    wait_state(&prewarmer, account.id, "disabled", None).await;
+    assert_eq!(wake_calls.load(Ordering::SeqCst), 2);
     drop(prewarmer);
     server.abort();
     pool.close().await;

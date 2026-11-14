@@ -2348,8 +2348,37 @@ global.fetch = async (_url, options) => {
         client.resolve_credentials.assert_not_called()
         self.assertEqual(before, (main.PROFILES_DIR / 'main/.credentials.json').read_bytes())
 
-    def test_explicit_create_sends_six_defaults_and_preserves_warmup(self) -> None:
-        """显式创建提交六项配置，不能顺便关闭已有本地养号设置。
+    def test_new_local_account_defaults_quota_and_restoration_preserves_policy(self) -> None:
+        """新增记录启用两窗口默认闸线，软删除恢复保留用户策略。
+
+        :return: None。
+        """
+        main.init_db()
+        for name, inferred_id in [('new-default', None), ('historical-id', 17)]:
+            with self.subTest(name=name):
+                profile = main.PROFILES_DIR / name
+                profile.mkdir(parents=True)
+                (profile / 'settings.json').write_text('{}')
+                with patch('main._infer_deleted_account_id', return_value=inferred_id):
+                    result = main.create_account(main.AccountIn(name=name))
+                connection = main.get_db()
+                try:
+                    row = connection.execute('SELECT * FROM accounts WHERE id=?', (result['id'],)).fetchone()
+                    self.assertEqual((85, 80), (row['warmup_quota_5h_limit_percent'], row['warmup_quota_7d_limit_percent']))
+                    if inferred_id is not None:
+                        self.assertEqual(inferred_id, result['id'])
+                    with connection:
+                        connection.execute('UPDATE accounts SET warmup_quota_5h_limit_percent=NULL, '
+                            'warmup_quota_7d_limit_percent=72, deleted_at=? WHERE id=?', ('synthetic', result['id']))
+                    restored = main.create_account(main.AccountIn(name=name))
+                    self.assertEqual({'id': result['id'], 'restored': True}, restored)
+                    row = connection.execute('SELECT * FROM accounts WHERE id=?', (result['id'],)).fetchone()
+                    self.assertEqual((None, 72), (row['warmup_quota_5h_limit_percent'], row['warmup_quota_7d_limit_percent']))
+                finally:
+                    connection.close()
+
+    def test_explicit_create_sends_runtime_quota_defaults_and_preserves_warmup(self) -> None:
+        """显式创建提交原生运行时、额度闸线及既有策略，并保留本地养号设置。
 
         :return: None。
         """
@@ -2357,10 +2386,13 @@ global.fetch = async (_url, options) => {
         result = main.create_account_in_cc2api(1)
         self.assertTrue(result['created'])
         payload = client.create_account.call_args.args[0]
-        self.assertEqual({'billing_mode': 'rewrite', 'upstream_session_pool_enabled': True,
+        self.assertEqual({'billing_mode': 'rewrite', 'request_backend': 'native293',
+            'five_hour_usage_limit_percent': 85, 'seven_day_usage_limit_percent': 80,
+            'upstream_session_pool_enabled': True,
             'upstream_session_pool_size': 4, 'upstream_session_refresh_policy': 'owner_only',
             'concurrency': 4, 'rpm_limit': 50}, {key: payload[key] for key in (
-                'billing_mode', 'upstream_session_pool_enabled', 'upstream_session_pool_size',
+                'billing_mode', 'request_backend', 'five_hour_usage_limit_percent', 'seven_day_usage_limit_percent',
+                'upstream_session_pool_enabled', 'upstream_session_pool_size',
                 'upstream_session_refresh_policy', 'concurrency', 'rpm_limit')})
         connection = main.get_db()
         try:

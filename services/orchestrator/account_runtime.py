@@ -823,9 +823,23 @@ class AccountRuntime:
             if not isinstance(configuration, dict):
                 return {'state': 'unknown', 'reason': 'capability_unknown'}
             if not configuration.get('native'):
-                return None
+                value = snapshots.get(account['cc2api_account_id'], {})
+                if value.get('request_backend') != 'native293':
+                    return None
+                reason = value.get('reason')
+                allowed = ('native_sender_budget_missing', 'native_sender_budget_insufficient',
+                    'account_memory_insufficient', 'preparation_failed', 'system_maintenance', 'maintenance')
+                state = value.get('state')
+                return {'state': state if state in ('failed', 'maintenance', 'preparing', 'disabled') else 'unprepared',
+                    'reason': reason if reason in allowed else 'backend_pending',
+                    'checking': value.get('checking') is True}
+
         except (OSError, ValueError, TypeError):
             return {'state': 'unknown', 'reason': 'capability_unknown'}
+        failure = snapshots.get(account['cc2api_account_id'], {})
+        if (failure.get('request_backend') == 'native293' and failure.get('state') == 'failed'
+                and failure.get('reason') in ('native_sender_budget_missing', 'native_sender_budget_insufficient', 'account_memory_insufficient')):
+            return {'state': 'failed', 'reason': failure['reason'], 'checking': failure.get('checking') is True}
         if row.get('state') == 'stopped':
             return {'state': 'sleeping', 'reason': None}
         if read_error:
@@ -2926,6 +2940,9 @@ class AccountRuntime:
                 if self._row(row["name"], row["account_id"])["state"] in ("profile_reauth_reconcile", "reconcile", "cli_reconcile"):
                     raise ValueError("遗留执行对账未完成")
                 return
+            if operation == "stop" and account.get('cc2api_account_id') is not None:
+                # 人工停止撤销此前切换的唤醒意图，避免失败退避随后重新启动环境。
+                self.gateway._request('POST', f"/admin/accounts/{account['cc2api_account_id']}/native-preparation?cancel=true", {})
             job = None
             if operation != "reconcile":
                 job = self.claim(row, account, f"maintenance:{uuid.uuid4().hex}", idle_only=True, exclusive=True)

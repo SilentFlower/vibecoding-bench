@@ -341,7 +341,7 @@ async fn prepare_from_runtime(
     release: &str,
     preparation_timeout: Duration,
 ) -> Result<PreparedTransport, AppError> {
-    let binding: TransportBinding = client
+    let response = client
         .get(format!(
             "{}/internal/v3/transport/{}",
             base.trim_end_matches('/'),
@@ -351,9 +351,25 @@ async fn prepare_from_runtime(
         .timeout(preparation_timeout.min(Duration::from_secs(120)))
         .send()
         .await
-        .map_err(|_| AppError::ServiceUnavailable("account environment unavailable".into()))?
-        .error_for_status()
-        .map_err(|_| AppError::ServiceUnavailable("account environment not ready".into()))?
+        .map_err(|_| AppError::ServiceUnavailable("account environment unavailable".into()))?;
+    if !response.status().is_success() {
+        // 内部错误仅接受明确资源码，未知状态不能伪装成预算不足。
+        let reason = response
+            .headers()
+            .get("x-v3-runtime-reason")
+            .and_then(|value| value.to_str().ok())
+            .filter(|value| {
+                matches!(
+                    *value,
+                    "native_sender_budget_missing"
+                        | "native_sender_budget_insufficient"
+                        | "account_memory_insufficient"
+                )
+            })
+            .unwrap_or("account environment not ready");
+        return Err(AppError::ServiceUnavailable(reason.into()));
+    }
+    let binding: TransportBinding = response
         .json()
         .await
         .map_err(|_| AppError::ServiceUnavailable("invalid runtime binding".into()))?;
