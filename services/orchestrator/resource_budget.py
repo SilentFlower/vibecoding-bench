@@ -1,5 +1,19 @@
 """部署预检与固定账号容器共用的账号内存策略。"""
+import os
 import re
+
+
+def default_account_memory(values: dict | None = None) -> str:
+    """解析部署的默认账号RAM，缺省及空值使用无限额。
+
+    :param values: 部署配置；省略时读取进程环境。
+    :return: unlimited或已验证的有限RAM配置。
+    """
+    configuration = os.environ if values is None else values
+    value = configuration.get('V3_ACCOUNT_MEMORY') or 'unlimited'
+    if value != 'unlimited':
+        memory_bytes(value)
+    return value
 
 
 def memory_bytes(value: str, allow_zero: bool = False) -> int:

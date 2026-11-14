@@ -47,23 +47,23 @@ pull 按 `registry_digest` 固定下载，核对配置 ID后建立清单中的�
 
 账号可在 cc2api 选择 `request_backend=native293`。该方式使用固定 2.1.293 单文件执行内核，在独立 sender 角色中按需启动进程。构建会下载并校验固定 beta 二进制；发布前可设置 `V3_NATIVE_RUNTIME_ASSET` 指向同 SHA256 的本地候选。联合清单记录其版本、大小和摘要，镜像再次校验分发文件。
 
-原生方式需要显式 `V3_NATIVE_SENDER_MEMORY`。标准并发 3 对应最多 6 个 Haiku 进程，已验证配置为 `1536m`，账号总 RAM `4g` 时 CLI 剩余 2304 MiB。sender 和 network 使用各自有限 RAM，额外 swap 只交给 CLI。原生池的 HOME/config/cwd 位于 UID 1001 独占的 `/native`，与 CLI 角色的 HOME 分离。池内共享经SHA与封存校验的只读执行映像，进程保持独立堆和上下文。额外进程空闲300秒（5分钟）后回收并保留1个暖进程。既有隔离V3六路实测峰值约646 MiB，1536 MiB限额内OOM为0，回收后sender约189 MiB。
+账号默认 `V3_ACCOUNT_MEMORY=unlimited`，原生方式可省略 `V3_NATIVE_SENDER_MEMORY`。显式有限账号需要配置该发送器预算。标准并发 3 对应最多 6 个 Haiku 进程，已验证配置为 `1536m`，账号总 RAM `4g` 时 CLI 剩余 2304 MiB。有限模式的sender和network使用各自有限RAM，额外swap只交给CLI。原生池的 HOME/config/cwd 位于 UID 1001 独占的 `/native`，与 CLI 角色的 HOME 分离。池内共享经SHA与封存校验的只读执行映像，进程保持独立堆和上下文。额外进程空闲300秒（5分钟）后回收并保留1个暖进程。既有隔离V3六路实测峰值约646 MiB，1536 MiB限额内OOM为0，回收后sender约189 MiB。
 
 `V3_NATIVE_PREWARM_ACCOUNT_ID` 默认为空。设为单个网关账号 ID 后，orchestrator 启动时尝试用空余容量提前启动该启用的原生账号，并准备一个 worker。首条业务占用唯一进程时，有足够并发额度则后台准备第二个。预热零模型调用，额外空闲进程仍按原时限回收。容量不足或账号需要维护时跳过后台启动。
 
-最低 sender 预算为 `256 + 192 × 2 × 标准并发` MiB。bench 创建账号默认标准并发 4，需要至少 `1792m`；使用已验证的 `1536m` 时，将该账号标准并发显式设为 3。账号总 RAM 还须覆盖 network 的 256 MiB 和 CLI 最低 512 MiB。
+有限模式的最低sender预算为 `256 + 192 × 2 × 标准并发` MiB。bench 创建账号默认标准并发 4，需要至少 `1792m`；使用已验证的 `1536m` 时，将该账号标准并发显式设为 3。账号总 RAM 还须覆盖 network 的 256 MiB 和 CLI 最低 512 MiB。
 
 `V3_NATIVE_CRIU` 缺省及空值为 `1`，显式 `0` 关闭。账号选择缺省开启，管理员可在环境卡片关闭或空闲应用设置。支持 CRIU 的账号镜像通过受信任控制器创建同账号零业务热模板，新增进程优先恢复。配套内核需要恢复绑定协议 1，默认镜像内置 beta.6。恢复最低 sender 内存额度为 `256 + (192 + 108) × 2 × 标准并发` MiB，标准并发 3 为 `2056m`。额度不足时继续普通启动，业务最低额度仍为 `256 + 192 × 2 × 标准并发` MiB。内存无限模式通过静态额度条件，实际容量受共享宿主限制。卡片显示实际入口、模板状态及回退原因，旧遥测显示待核对。模板快照含账号身份数据，存放于 root 专属目录。
 
-新隔离环境 CLI、sender、network 的 CPU 默认值分别为 `1.5`、`1`、`0.5` 核。使用 `V3_ACCOUNT_CLI_CPUS`、`V3_ACCOUNT_SENDER_CPUS`、`V3_ACCOUNT_NETWORK_CPUS` 独立覆盖。已保存的 `cpu-resources.json` 策略优先，旧 `V3_ACCOUNT_CPUS=2` 保留兼容用途。
+新隔离环境CLI、sender、network的CPU默认值分别为 `1.5`、`1.5`、`0.5` 核。使用 `V3_ACCOUNT_CLI_CPUS`、`V3_ACCOUNT_SENDER_CPUS`、`V3_ACCOUNT_NETWORK_CPUS` 独立覆盖。已保存的 `cpu-resources.json` 策略优先，旧 `V3_ACCOUNT_CPUS=2` 保留兼容用途。
 
 CRIU 控制器单独启用受限 capability 集合和恢复所需的 seccomp 配置。业务 sender 与 worker 保持 UID 1001、capability 为零、NNP 与业务 seccomp 过滤。权限清单、固定构建来源、内核要求及回退步骤见 [CRIU 操作说明](../../services/runtime/native/criu/README.md)。启用属于部署权限变更，应按上线流程执行。
 
 后端配置来自网关账号 runtime config。模式或资源布局改变时，环境无活动作业才允许重建。缺能力或预算时准备失败。空闲时切回 `legacy` 会恢复原 sender 布局。
 
-`V3_ACCOUNT_MEMORY` 是每账号 RAM 上限，`V3_ACCOUNT_SWAP` 是额外 swap 上限，默认 `0` 保持禁用。Docker 的内存加 swap 总上限由两者相加生成，账号首次保存预算；历史环境缺 swap 字段时保持关闭。以后修改全局配置不会自动改已有账号预算或身份。隔离布局 2 在原总额度内预留 network 256 MiB、sender 128 MiB，剩余分配 CLI；额外 swap 只分配 CLI。CLI 至少需要 512 MiB，总预算不足时拒绝启动。1536 MiB 账号的 CLI 实际 constrainedMemory 为 1152 MiB。
+`V3_ACCOUNT_MEMORY`缺省或空值为 `unlimited`，三个角色及派生评审共享宿主RAM和swap。显式有限值是每账号RAM上限，`V3_ACCOUNT_SWAP` 是额外 swap 上限，默认 `0` 保持禁用。Docker 的内存加 swap 总上限由两者相加生成，账号首次保存预算；历史环境缺 swap 字段时保持关闭。部署选择unlimited后，旧有限账号在下一次空闲准备或重建时解除内存限额。活动CLI、API和评审继续原环境，迁移顺延；停止账号保持停止。显式有限部署值继续沿用已冻结预算。身份和HOME保持。隔离布局 2 在原总额度内预留 network 256 MiB、sender 128 MiB，剩余分配 CLI；额外 swap 只分配 CLI。CLI 至少需要 512 MiB，总预算不足时拒绝启动。1536 MiB 账号的 CLI 实际 constrainedMemory 为 1152 MiB。
 
-美国服务器起步配置：`V3_ACCOUNT_MEMORY=1536m`、`V3_ACCOUNT_SWAP=2048m`、`V3_MAX_ACTIVE_ACCOUNTS=1`，RAM 1.5 GiB，额外 swap 2 GiB，总额度 3.5 GiB。部署预检分别要求可用 RAM 至少为账号预算加可配置余量 `V3_MEMORY_HEADROOM_BYTES`（默认 256 MiB）、空闲 swap 足够覆盖活跃账号额度且 Docker 支持 swap 限额；显式更高的 `V3_MIN_FREE_MEMORY_BYTES` 仍生效。默认 4 GiB、单账号配置要求至少 4.25 GiB 可用 RAM，swap 不能代替物理余量。起步上限不代表真实 CLI 的峰值已经验证。
+有限内存部署的可选起步配置：`V3_ACCOUNT_MEMORY=1536m`、`V3_ACCOUNT_SWAP=2048m`、`V3_MAX_ACTIVE_ACCOUNTS=1`，RAM 1.5 GiB，额外 swap 2 GiB，总额度 3.5 GiB。部署预检分别要求可用 RAM 至少为账号预算加可配置余量 `V3_MEMORY_HEADROOM_BYTES`（默认 256 MiB）、空闲 swap 足够覆盖活跃账号额度且 Docker 支持 swap 限额；显式更高的 `V3_MIN_FREE_MEMORY_BYTES` 仍生效。显式4GiB、单账号配置要求至少4.25GiB可用RAM，swap不能代替物理余量。默认无限模式继续核验宿主余量，尚未迁移的有限环境继续计入实际预算。起步上限不代表真实 CLI 的峰值已经验证。
 
 首次使用空目录；不复制旧账号有效 RT。每账号 HOME、CA、工作目录、CLI 版本缓存和 Recorder 证据归属保存在 `bench/environments/<环境 ID>`。停止固定容器保留目录和容器，重启服务先对账遗留执行。停止入口按产品及部署标签收口，不 prune Docker、不删除数据或旧网络。
 
@@ -182,9 +182,9 @@ python3 deploy/flower2api/verify_forwarding.py --manifest /absolute/path/v3-veri
 
 ### 按账号无限内存与组装快照
 
-全局 `V3_ACCOUNT_MEMORY` 保持有限值。账号固化资源 `mem="unlimited"` 显式取消三个角色及派生评审的 RAM/swap 上限，Docker 对应 `Memory=0, MemorySwap=-1`。该账号直接与整机服务竞争内存。CPU/PID、标准并发和 RPM 沿用原值。
+全局 `V3_ACCOUNT_MEMORY`默认 `unlimited`。账号固化资源 `mem="unlimited"` 取消三个角色及派生评审的RAM/swap上限，Docker 对应 `Memory=0, MemorySwap=-1`。该账号直接与整机服务竞争内存。CPU/PID、标准并发和 RPM 沿用原值。
 
-无限模式下原生池配置 `memory_mib=0`，省略 `V3_NATIVE_SENDER_MEMORY` 也能准备。物理进程上限仍为标准并发的两倍，按需创建并回收。有限账号仍执行显式 sender 预算与加权容量检查。资源调整和评审布局迁移均在空闲时重建，使用同批控制与账号镜像。
+无限模式下原生池配置 `memory_mib=0`，省略 `V3_NATIVE_SENDER_MEMORY` 也能准备。物理进程上限仍为标准并发的两倍，按需创建并回收。有限账号仍执行显式 sender 预算与加权容量检查。内存策略调整在空闲时通过原排他维护租约重建，核验CLI孤儿、API及评审活动，使用同批控制与账号镜像。已有部署的显式 `V3_ACCOUNT_MEMORY=1536m` 仍是有限模式；上线时将其改为 `unlimited` 后应用新策略。
 
 账号固化配置 `native_capture_enabled` 控制私有 CC 组装后头与正文采集。缺省开启，显式 `false` 保持关闭。管理员在「请求记录 → 详情」读取已脱敏内容。每账号保留至多 50 份、100 MiB，单份正文 2 MiB、请求头 128 KiB，超限截断及采集失败单独显示。原始凭据和完整正文均不进入普通服务日志。
 

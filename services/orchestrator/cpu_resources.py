@@ -17,7 +17,7 @@ def default_cpu_limits(values: dict | None = None) -> dict[str, int]:
     """统一解析新隔离角色的独立默认CPU。@param values 部署配置，省略时读取环境。@return CLI/sender/network的NanoCpus；非法配置拒绝。"""
     configuration = os.environ if values is None else values
     result = {}
-    for role, default in (('cli', '1.5'), ('sender', '1'), ('network', '0.5')):
+    for role, default in (('cli', '1.5'), ('sender', '1.5'), ('network', '0.5')):
         raw = configuration.get(f'V3_ACCOUNT_{role.upper()}_CPUS', default)
         if raw == '':
             raw = default

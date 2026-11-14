@@ -19,7 +19,7 @@ class CpuResourcesTests(unittest.TestCase):
 
     def test_independent_defaults_ignore_legacy_total_and_validate_overrides(self):
         """三角色缺省独立，非法覆盖在容器创建前拒绝。@return 无。"""
-        defaults = {'cli': 1500000000, 'sender': 1000000000, 'network': 500000000}
+        defaults = {'cli': 1500000000, 'sender': 1500000000, 'network': 500000000}
         self.assertEqual(default_cpu_limits({'V3_ACCOUNT_CPUS': '2'}), defaults)
         self.assertEqual(default_cpu_limits({'V3_ACCOUNT_SENDER_CPUS': '2.25'}), {**defaults, 'sender': 2250000000})
         self.assertEqual(default_cpu_limits({'V3_ACCOUNT_SENDER_CPUS': ''}), defaults)

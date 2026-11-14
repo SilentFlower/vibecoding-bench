@@ -1256,7 +1256,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - `NativeSenderConfig = {binary_path,work_root,memory_mib:u64,max_workers:usize}`；legacy 的 native 配置为 None。
 - `V3_NATIVE_PREWARM_ACCOUNT_ID` 缺省为空，可配置一个正整数网关账号 ID；`SenderConfig.native_adaptive_prewarm` 为私有布尔字段，旧配置缺省 false。
 - 有限账号显式环境键 `V3_NATIVE_SENDER_MEMORY`；构建可选 `V3_NATIVE_RUNTIME_ASSET` 指定本地候选，否则下载固定 beta.6 附件。`stage_asset(destination:Path,source:str|None=None) -> dict` 冻结版本/大小/SHA。
-- `account_limits(memory,swap)`、`isolated_account_limits`、`scenario_account_limits`、`serial_review_limits` 接受账号 `mem="unlimited"`，无限模式 Docker 额度为 `(0,-1)`；`memory_bytes` 继续只解析有限配置。
+- `account_limits(memory,swap)`、`isolated_account_limits`、`scenario_account_limits`、`serial_review_limits` 接受账号 `mem="unlimited"`，无限模式 Docker 额度为 `(0,-1)`；`memory_bytes` 继续只解析有限配置。 `default_account_memory(values:dict|None=None)->str`统一解析部署策略，`V3_ACCOUNT_MEMORY`缺省/空值为unlimited，显式有限值继续校验；`AccountRuntime._apply_unlimited_memory(row,image,*,startup_prewarm:bool)->None`在原环境锁内应用策略。
 - fingerprint 可选 `native_sender_memory`，无限原生账号保存 `"unlimited"`，布局变更时保存，回退 legacy 时移除；镜像原生能力标签为 `vibebench.native-runtime=293-raw-1`。
 - `AccountRuntime.native_preparation_snapshots() -> tuple[dict[int,dict],str|None]` 通过一次 `GET /admin/native-preparations` 读取批量快照，超时3秒；`native_preparation_summary(row,account,snapshots,read_error=None) -> dict|None` 为 `/api/environments` 生成安全的 `native_preparation`。
 
@@ -1273,7 +1273,8 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 页面准备中以2秒串行读取，普通状态20秒读取。显式重试沿唯一绑定及同一准备队列，离页/旧 generation 响应丢弃；读取零唤醒，准备基础、CRIU 模板及 TLS 采集分别展示。
 
 - 原生进程上限为 `2*concurrency`，覆盖普通请求2单位和Haiku1单位。有限账号预算预检为 `256+192*max_workers` MiB，容量同时受账号有限总 RAM 与 CLI 最低512 MiB约束。legacy sender 仍为128 MiB。
-- 账号 `fingerprint_json.mem="unlimited"` 显式取消 network/CLI/sender 与静态/串行评审的 RAM/swap 限额；额外 swap 保存原值，仍严格校验其格式。全局 `V3_ACCOUNT_MEMORY` 必须有限；部署预检识别已固化的无限账号，有限账号继续原额度比较。无限账号直接竞争宿主可用内存，不能把其零上限当作零资源占用。
+- 账号 `fingerprint_json.mem="unlimited"` 取消network/CLI/sender与静态/串行评审的RAM/swap限额；额外swap保存原值并校验格式。全局 `V3_ACCOUNT_MEMORY`缺省或空值为unlimited，显式有限部署配置继续沿首次冻结预算。预检保留宿主余量及显式最低可用RAM；尚未迁移的有限环境按最大RAM/swap乘活跃账号数计入，有限全局继续拒绝超出其冻结预算的历史环境。无限模式直接共享宿主资源，不能把零上限当作零占用。
+- 部署无限策略在空闲ensure阶段迁移旧有限指纹，独立于CLI/API的prepare_sender职责。平台更新门禁关闭、startup_prewarm、活动CLI/API、串行评审或内核维护时保留原环境，迁移顺延；扫描及只读解析不唤醒停止环境。迁移先核验实际sender和原预算，再经共用 `_rebuild_idle_environment` 验证持久执行记录、CLI孤儿及排他maintenance租约；保留env ID、身份、HOME、会话和CPU策略，按原生命周期重建。实际native的memory_mib及指纹native_sender_memory一并变为0/unlimited；发布中断进入reconcile，禁止混合预算继续创建。已有部署显式1536m需在上线窗口改为unlimited。
 - 无限账号生成 `NativeSenderConfig.memory_mib=0`，缺省 sender 预算也可准备；Rust 仅豁免 RAM 容量公式，max_workers 始终为正数，版本/摘要/身份/目标/代次及并发许可保持。指标与配置内存均以 0 表示无限，界面显示“未限制”；评审交接接受精确 `(Memory=0,MemorySwap=-1)`，CPU/PID 仍必须有限有效。
 - 已验证有限 N=3、max_workers=6、sender=1536 MiB；预检最低1408 MiB。bench 创建账号默认N=4，最低1792 MiB；1536 MiB 配置须显式设置N=3。配置限额和实际占用分别报告。
 - 原生sender为UID1001，私有可写 `/native` 与CLI UID1000/HOME分离。PID限额 `128+32*max_workers`；CPU份额保持三角色规则，有限模式额外swap只归CLI。CLI指标、physical_features及静态/串行评审从同一冻结sender预算计算剩余份额。
@@ -1302,7 +1303,10 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 | 已生效native，部署sender预算或目标并发后来改变 | CLI及更新恢复保留冻结布局；API准备继续核验目标 |
 | CLI读取到缺失/链接/损坏sender配置或冻结预算矛盾 | 明确要求对账，保留原现场 |
 | 无限账号缺 sender 预算 | 生成 memory_mib=0，仍检查并发及原生身份 |
-| 全局无限、未知 mem 或非法 swap | 明确拒绝 |
+| 全局缺省/空值/unlimited | 使用无限模式，保留宿主余量与待迁移有限预算预检 |
+| 未知mem或非法swap | 明确拒绝 |
+| 无限策略遇到CLI/API活动、评审、更新门禁或后台预启动 | 保留旧限额，沿下一次空闲准备迁移 |
+| 内存迁移的角色移除或配置发布中断 | 保留原有限画像或reconcile现场，沿原维护恢复 |
 | 镜像缺能力、分发/执行体不符或映像未封存 | 准备失败，模型零发送 |
 | 活动中变更布局 | 忙门禁拒绝 |
 | 请求取消、协议故障或旧代次迟到帧 | 退役并等待物理退出后归还进程计数 |
@@ -1319,7 +1323,9 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 ### 5. Scenarios and Examples
 
-- 正常：1536m账号选择native293且sender预算为空，`ensure(account, prepare_sender=False)` 使用network256m、sender128m和CLI1152m，停止后唤醒保留容器ID并增加代次；API transport返回native_sender_budget_missing。错误：在CLI入口沿目标预算重建sender，或用捕获任意ValueError后回退来放行API。正确：显式区分准备职责，已生效native继续使用其冻结预算。
+- 正常：显式有限部署下，1536m账号选择native293且sender预算为空，`ensure(account, prepare_sender=False)` 使用network256m、sender128m和CLI1152m，停止后唤醒保留容器ID并增加代次；API transport返回native_sender_budget_missing。错误：在CLI入口沿目标预算重建sender，或用捕获任意ValueError后回退来放行API。正确：显式区分准备职责，已生效native继续使用其冻结预算。
+
+- 正常：部署默认无限，新环境无需sender预算即可准备；旧1536m环境在空闲准备时应用，N=4生成memory_mib=0/max_workers=8。错误用法：只改示例默认就认定线上显式1536m已解除，或直接改数据库而保留原cgroup。正确处理：上线修改实际部署配置，沿原维护租约排空、重建并核验HostConfig/cgroup及原身份。
 
 - 正常：旧布局选原生后先显示等待，后台准备成功才显示当前热进程。边界：总 RAM 1536 MiB、默认 N=4 且 sender 预算为空时，显示缺显式预算；普通启动需 sender 至少1792 MiB、总量至少2560 MiB，CRIU另行准入。错误用法：由目标 native293 推导 CRIU/TLS 已就绪，或将任意503原文透传页面。正确处理：独立核验实际状态，仅传资源原因白名单。
 
@@ -1345,7 +1351,8 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 - `test_native_readiness_preserves_only_known_maintenance_reasons` 及 `verify_environment_ui.py`：平台与账号维护分别展示，任意原因被固定投影，进程证据保持未观测且零业务写入。
 
-- `test_native_unlimited_layout_and_capture_are_frozen_per_account`、`test_serial_unlimited_handoff_restores_exact_cli_limits` 及部署预检：零哨兵、4 物理进程、实际 Docker/cgroup max、指标 0、全局有限默认和旧布局恢复；重画像保留资源与采集开关。
+- `test_native_unlimited_layout_and_capture_are_frozen_per_account`、`test_serial_unlimited_handoff_restores_exact_cli_limits` 及部署预检：零哨兵、4 物理进程、实际 Docker/cgroup max、指标 0、全局默认无限与显式有限覆盖、混合历史预算及旧布局恢复；重画像保留资源与采集开关。
+- `test_default_memory_is_unlimited_for_missing_and_empty_configuration`、`test_unlimited_policy_migrates_idle_native_and_preserves_applied_identity`、`test_memory_migration_defers_cli_api_and_background_activity`、`test_memory_migration_failure_retains_budget_and_requires_reconciliation`：默认无限、旧native迁移、HOME与CPU策略保持、CLI/API/更新门禁延后及失败恢复。部署 `test_unlimited_deployment_counts_unmigrated_finite_budgets` 覆盖混合预算和只读预检；真实Docker核验三角色Memory=0/MemorySwap=-1、cgroup max、sender1.5核、N=4原生ready及模型调用0。
 - `test_native_sender.py`：默认legacy、显式预算、总RAM/CLI下限、未知后端、容量无任意64进程上限；`test_native_layout_rebuild_after_quiesce_keeps_busy_sender_protected`：忙时拒绝、停止后正确重建和代次/预算。
 - Rust实际 `native_real_binary`：共享dev/inode及四项封存、6→1空闲回收、取消→0、全部原进程退出后缓存重建、独立凭据及一次提交。
 - 预启动回归：`test_account_runtime.py` 验证仅启用绑定、满容量时不腾挪、sender 开关先写后通知；`native_real_binary` 验证首个预热 PID、第二个唯一补位、回收到一个以及零模型计数。
@@ -1430,7 +1437,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 三角色分别支持0.01到Docker宿主NCPU核，总和不设3核上限。CPU是共享调度额度，按NanoCpus精度校验有限数字，保留正数预算模式。
 - POST先登记部署维护活动，在环境锁内重读当前环境及未删除账号；拒绝维护中、内核切换/对账中、评审串行交接中或旧代次/revision。只通过Docker更新NanoCpus，逐项核对实际归属、镜像、Memory/MemorySwap/PidsLimit、启动时间、重启数及运行状态/PID保持。
 - 私有0600 `runtime/cpu-resources.json`为schema_version=1、environment_id、account_id、revision UUID、三角色nano_cpus；严格拒绝损坏、链接和错误归属。实际额度全部确认后原子发布。Docker异常可能已经生效，尝试集合先登记再调用；失败按原不可变容器恢复额度和原策略，记录restored或reconcile。
-- 新角色CPU默认CLI1.5/sender1/network0.5核，通过 `V3_ACCOUNT_CLI_CPUS`、`V3_ACCOUNT_SENDER_CPUS`、`V3_ACCOUNT_NETWORK_CPUS` 独立覆盖。缺省或空字符串使用默认；有限数字至少0.01核且精确表示为整数纳核，bool、非法数值及超长小数拒绝。转换使用Decimal精确整数比，禁止依赖乘法上下文先舍入后验精度。固定宿主更新包SOURCE_FILES包含cpu_resources.py。
+- 新角色CPU默认CLI1.5/sender1.5/network0.5核，通过 `V3_ACCOUNT_CLI_CPUS`、`V3_ACCOUNT_SENDER_CPUS`、`V3_ACCOUNT_NETWORK_CPUS` 独立覆盖。缺省或空字符串使用默认；有限数字至少0.01核且精确表示为整数纳核，bool、非法数值及超长小数拒绝。转换使用Decimal精确整数比，禁止依赖乘法上下文先舍入后验精度。固定宿主更新包SOURCE_FILES包含cpu_resources.py。
 - 角色创建先使用独立默认及旧评审布局，最后应用合法保存策略。旧schema1布局只覆盖CPU核验视图，原内存/PID及文件保持；串行评审借用当前CLI额度，保存策略与三个实际角色逐项相等后使用新额度。无保存策略时总上界取三角色默认总量与旧V3_ACCOUNT_CPUS较大者；旧总量2核不将新角色按6:1:1重新分配。
 - 宿主HostDeployment.environment_cpu在排空后、重建意图前冻结实际额度到operation.environment_cpu_before。新角色重建及软件失败回滚后按不可变ID/标签恢复，仅CPU变化；兼容旧平台忽略新策略文件。旧无限CPU且缺策略保持原升级路径，显式策略与实际预算不符时拒绝。
 - 页面独立CPU表单按需读取，列表轮询保持输入；提交冻结revision，关闭/离页作废迟到回执。失败要求重读实际额度，成功提示即时应用并保存重建配置。

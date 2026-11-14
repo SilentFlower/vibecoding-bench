@@ -35,7 +35,7 @@ from cli_telemetry_policy import cli_telemetry_environment
 from process_metrics import PROCESS_SOURCE, merge_process_metrics, validate_process_metrics
 from physical_features import MAX_SNAPSHOT_BYTES, PHYSICAL_FEATURES_PROBE, validate_features
 from project_runtime_policy import ProjectRuntimeError, check_python_runtime
-from resource_budget import account_limits, isolated_account_limits
+from resource_budget import account_limits, default_account_memory, isolated_account_limits
 from native_kernel_upgrade import pending_upgrade, recover_interrupted
 from native_criu_policy import restore_policy
 from native_sender import prewarm_account_id, sender_config
@@ -318,7 +318,7 @@ class AccountRuntime:
                 raise ValueError("账号名称不合法")
             environment_id = uuid.uuid4().hex
             fingerprint = self.fingerprint(timezone)
-            fingerprint["mem"] = os.environ.get("V3_ACCOUNT_MEMORY", "4g")
+            fingerprint["mem"] = default_account_memory()
             fingerprint["swap"] = os.environ.get("V3_ACCOUNT_SWAP", "0")
             account_limits(fingerprint["mem"], fingerprint["swap"])
             with connection:
@@ -669,14 +669,6 @@ class AccountRuntime:
                         raise ValueError("代理配置不一致，请先完成账号配置维护")
                 else:
                     self._sync_proxy(account, configuration)
-            fingerprint = json.loads(row["fingerprint_json"])
-            native = (sender_config(gateway_configuration, fingerprint["mem"], fingerprint.get("swap", "0"))
-                if prepare_sender else self._applied_native_sender(row))
-            if startup_prewarm and (not native or self.stopping.is_set() or row["state"] not in ("ready", "stopped")):
-                raise RuntimeBusy("账号环境当前不接受预启动")
-            account = {**account, "native_sender": native}
-            if native and image_labels.get("vibebench.native-runtime") != "293-raw-1":
-                raise ValueError("账号镜像缺少固定 293 原生能力")
             draft_path = self.data / "login-drafts" / (row["environment_id"] + ".json")
             if draft_path.exists() and _read_json(draft_path).get("phase") == "submitting" and not allow_login_recovery:
                 raise ValueError("原登录保存尚未完成，请先继续登录提交")
@@ -703,6 +695,19 @@ class AccountRuntime:
                 self._update(row, isolation_version=ISOLATION_VERSION)
             if image_labels.get("vibebench.isolation-version") != str(ISOLATION_VERSION):
                 raise ValueError("账号镜像不支持当前隔离布局，请使用同批新镜像")
+            if (default_account_memory() == 'unlimited' and prepare_sender
+                    and gateway_configuration.get('request_backend') == 'native293'
+                    and image_labels.get('vibebench.native-runtime') != '293-raw-1'):
+                raise ValueError("账号镜像缺少固定 293 原生能力")
+            self._apply_unlimited_memory(row, image, startup_prewarm=startup_prewarm)
+            fingerprint = json.loads(row["fingerprint_json"])
+            native = (sender_config(gateway_configuration, fingerprint["mem"], fingerprint.get("swap", "0"))
+                if prepare_sender else self._applied_native_sender(row))
+            if startup_prewarm and (not native or self.stopping.is_set() or row["state"] not in ("ready", "stopped")):
+                raise RuntimeBusy("账号环境当前不接受预启动")
+            account = {**account, "native_sender": native}
+            if native and image_labels.get("vibebench.native-runtime") != "293-raw-1":
+                raise ValueError("账号镜像缺少固定 293 原生能力")
             configuration = None
             with self.capacity_lock:
                 present = [bool(row.get(column)) for column in ROLE_COLUMNS.values()]
@@ -747,7 +752,7 @@ class AccountRuntime:
                     elif (account.get("id") is not None
                             and not self._network_has_quota_mount(account["id"], containers["network"])
                             and require_quota_mount):
-                        self._rebuild_missing_quota_mount(row, containers)
+                        self._rebuild_idle_environment(row, containers)
                         row = self._row(account["name"], account["id"])
                         present = [False]
                     elif configuration.get("proxy_source", configuration["proxy_url"]) != self._proxy(account):
@@ -1001,21 +1006,69 @@ class AccountRuntime:
             raise ValueError("账号额度挂载的归属、来源或只读属性不符，请核对环境")
         return True
 
-    def _rebuild_missing_quota_mount(self, row: dict, containers: dict) -> None:
-        """正式账号首次使用时，经原空闲维护门禁补齐草稿阶段遗漏的挂载。
+    def _apply_unlimited_memory(self, row: dict, image, *, startup_prewarm: bool) -> None:
+        """在原生命周期锁内应用部署无限策略，忙环境保留原限额。
+
+        :param row: 调用者持有环境锁的当前登记；成功时原地更新。
+        :param image: 已核验的账号镜像。
+        :param startup_prewarm: 后台预启动禁止重建已有环境。
+        :return: None；不确定现场沿原对账路径收口。
+        """
+        fingerprint = json.loads(row['fingerprint_json'])
+        if (default_account_memory() != 'unlimited' or fingerprint['mem'] == 'unlimited'
+                or startup_prewarm or not update_open() or row['state'] not in ('ready', 'stopped')
+                or self.environment_jobs(row['environment_id']) or pending_upgrade(self._root(row))):
+            return
+        account_limits(fingerprint['mem'], fingerprint.get('swap', '0'))
+        present = [bool(row.get(column)) for column in ROLE_COLUMNS.values()]
+        if any(present) and not all(present):
+            raise ValueError('账号隔离角色登记不完整，需要先对账')
+        if all(present) and os.environ.get('V3_UPDATE_GATE_DIR'):
+            if image_origin(self, row)['image_id'] != image.attrs['Id']:
+                return
+        # 先校验原生配置与旧预算，避免用迁移掩盖损坏的实际布局。
+        native = self._applied_native_sender(row)
+        if native and image.attrs['Config']['Labels'].get('vibebench.native-runtime') != '293-raw-1':
+            raise ValueError('账号镜像缺少固定 293 原生能力')
+        if all(present):
+            if self._running_sender_active(row):
+                return
+            containers = {role: role_container(self, row, role) for role in ROLE_COLUMNS}
+            for current in containers.values():
+                current.reload()
+            try:
+                self._rebuild_idle_environment(row, containers)
+            except RuntimeBusy:
+                return
+            row.update(self._row(row['name'], row['account_id']))
+        fingerprint['mem'] = 'unlimited'
+        try:
+            if native:
+                configuration = _read_json(self._sender_config(row))
+                configuration['native']['memory_mib'] = 0
+                self._write_sender_config(row, configuration)
+                fingerprint['native_sender_memory'] = 'unlimited'
+            self._update(row, fingerprint_json=json.dumps(fingerprint))
+        except Exception:
+            # 旧角色已排空；配置发布中断后保留对账状态，禁止沿混合预算重建。
+            self._update(row, state='reconcile')
+            raise
+
+    def _rebuild_idle_environment(self, row: dict, containers: dict) -> None:
+        """经原空闲维护门禁应用内存或只读挂载变化。
 
         :param row: 已持有生命周期锁并核验的布局 2 环境。
         :param containers: 已刷新且归属正确的原三角色容器。
         :return: None；占用或未知执行保留现场，拒绝自动重建。
         """
         if self.environment_jobs(row["environment_id"]):
-            raise RuntimeBusy("账号仍有 CLI 或维护工作，等待空闲后补齐额度挂载")
+            raise RuntimeBusy("账号仍有 CLI 或维护工作，等待空闲后重建环境")
         root = self._root(row)
         execution = root / "runtime/execution.json"
         pending = root / "runtime/login-commit.json"
         if (row["state"] not in ("ready", "stopped") or execution.exists() or execution.is_symlink()
                 or pending.exists() or pending.is_symlink() or self._execution_records(row)):
-            raise ValueError("账号有未确认的执行或提交，请先对账再补齐额度挂载")
+            raise ValueError("账号有未确认的执行或提交，请先对账再重建环境")
         if containers["cli"].status == "running":
             result = containers["cli"].exec_run(["python3", "-I", "/usr/local/bin/v3-cli-control", "orphans"])
             try:
@@ -1027,7 +1080,7 @@ class AccountRuntime:
         elif containers["cli"].status not in ("exited", "created"):
             raise ValueError("账号 CLI 状态不可核验，拒绝自动重建")
         try:
-            # 挂载在 Docker 创建时固定；复用原排他租约，不能截断已有 API 或兄弟 CLI。
+            # 复用原排他租约保护整个旧角色移除阶段，避免截断API或兄弟CLI。
             self.maintenance(row["environment_id"], "rebuild")
         except RuntimeBusy:
             raise
@@ -2944,7 +2997,7 @@ class AccountRuntime:
                 if "computer_profile" in previous:
                     fingerprint["computer_profile"] = validate_computer_profile(previous["computer_profile"],
                         fingerprint.get("system_profile"))
-                fingerprint["mem"] = previous.get("mem", os.environ.get("V3_ACCOUNT_MEMORY", "4g"))
+                fingerprint["mem"] = previous.get("mem", default_account_memory())
                 fingerprint["swap"] = previous.get("swap", "0")
                 if "native_capture_enabled" in previous:
                     fingerprint["native_capture_enabled"] = previous["native_capture_enabled"]

@@ -326,7 +326,11 @@ class ResourceBudgetTests(unittest.TestCase):
 
     def _preflight(self, ram: int, swap: int, supported: bool = True):
         content = f"MemAvailable: {ram // 1024} kB\nSwapFree: {swap // 1024} kB\n"
-        with patch.object(manage.Path, "read_text", return_value=content), patch.object(manage, "inspect_images", return_value={}), patch.object(manage, "command", side_effect=["", "", json.dumps(supported)]):
+        original_read = Path.read_text
+        def read(path, *args, **kwargs):
+            """只模拟宿主指标，部署归属与真实SQLite路径继续核验。@return 文件正文。"""
+            return content if path == Path('/proc/meminfo') else original_read(path, *args, **kwargs)
+        with patch.object(manage.Path, "read_text", read), patch.object(manage, "inspect_images", return_value={}), patch.object(manage, "command", side_effect=["", "", json.dumps(supported)]):
             return manage.preflight(self.values)
 
     def test_us_budget_accepts_available_ram_and_swap_separately(self) -> None:
@@ -348,11 +352,12 @@ class ResourceBudgetTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "余量"):
             self._preflight(3 * 1024**3, 3 * 1024**3)
 
-    def test_default_budget_still_requires_five_gib_ram(self) -> None:
-        """默认 4g 账号仍预留管理服务余量，不能借 swap 越过物理预算。
+    def test_explicit_four_gib_budget_still_requires_headroom(self) -> None:
+        """显式4g账号仍预留管理服务余量，不能借 swap 越过物理预算。
 
         :return: None
         """
+        self.values["V3_ACCOUNT_MEMORY"] = "4g"
         with self.assertRaisesRegex(ValueError, "内存不足"):
             self._preflight(3 * 1024**3, 8 * 1024**3)
 
@@ -389,8 +394,8 @@ class ResourceBudgetTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     manage.account_limits(ram, swap)
 
-    def test_unlimited_is_account_only_and_keeps_global_preflight_finite(self) -> None:
-        """显式无限账号沿用有限全局预检，全局无限配置明确拒绝。@return None。"""
+    def test_unlimited_default_and_explicit_finite_deployment_are_supported(self) -> None:
+        """缺省及空部署值采用无限，显式有限配置继续保留。@return None。"""
         self.root.mkdir()
         (self.root / '.v3-deployment.json').write_text('{"deployment":"test"}')
         database = self.root / 'bench/db.sqlite'
@@ -398,12 +403,40 @@ class ResourceBudgetTests(unittest.TestCase):
         with sqlite3.connect(database) as connection:
             connection.execute('CREATE TABLE account_environments(fingerprint_json TEXT)')
             connection.execute('INSERT INTO account_environments VALUES(?)', (json.dumps({'mem':'unlimited','swap':'2048m'}),))
-        with patch.object(manage, 'inspect_images', return_value={}), patch.object(manage, 'command', side_effect=['', '']):
-            self.assertEqual(manage.preflight(self.values), self.root)
+        for value in (None, '', 'unlimited', '1536m'):
+            if value is None:
+                self.values.pop('V3_ACCOUNT_MEMORY', None)
+            else:
+                self.values['V3_ACCOUNT_MEMORY'] = value
+            with self.subTest(value=value):
+                self.assertEqual(self._preflight(2 * 1024**3, 0), self.root)
         self.values['V3_ACCOUNT_MEMORY'] = 'unlimited'
-        with patch.object(manage, 'inspect_images', return_value={}), patch.object(manage, 'command', side_effect=['', '']):
-            with self.assertRaisesRegex(ValueError, '全局默认必须有限'):
-                manage.preflight(self.values)
+        with self.assertRaisesRegex(ValueError, '内存不足'):
+            self._preflight(128 * 1024**2, 0)
+        self.values['V3_MIN_FREE_MEMORY_BYTES'] = str(3 * 1024**3)
+        with self.assertRaisesRegex(ValueError, '内存不足'):
+            self._preflight(2 * 1024**3, 0)
+
+    def test_unlimited_deployment_counts_unmigrated_finite_budgets(self) -> None:
+        """混合部署预检继续覆盖尚待空闲迁移的有限RAM与swap。@return None。"""
+        self.root.mkdir()
+        (self.root / '.v3-deployment.json').write_text('{"deployment":"test"}')
+        path = self.root / 'bench/db.sqlite'
+        path.parent.mkdir()
+        with sqlite3.connect(path) as connection:
+            connection.execute('CREATE TABLE account_environments(fingerprint_json TEXT)')
+            for value in ({'mem': 'unlimited', 'swap': '2048m'}, {'mem': '1536m', 'swap': '2048m'}):
+                connection.execute('INSERT INTO account_environments VALUES(?)', (json.dumps(value),))
+        original = path.read_bytes()
+        self.values['V3_ACCOUNT_MEMORY'] = 'unlimited'
+        self.assertEqual(self._preflight(2 * 1024**3, 3 * 1024**3), self.root)
+        with self.assertRaisesRegex(ValueError, '内存不足'):
+            self._preflight(1024**3, 3 * 1024**3)
+        with self.assertRaisesRegex(ValueError, 'swap 不足'):
+            self._preflight(2 * 1024**3, 1024**3)
+        with self.assertRaisesRegex(ValueError, '不支持 swap'):
+            self._preflight(2 * 1024**3, 3 * 1024**3, False)
+        self.assertEqual(path.read_bytes(), original)
 
     def test_frozen_existing_budget_cannot_be_hidden_by_lower_global_config(self) -> None:
         """既有大预算账号仍可能被唤醒，下调配置必须拒绝且不改其记录。

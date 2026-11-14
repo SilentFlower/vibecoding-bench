@@ -28,7 +28,7 @@ REPO = Path(__file__).resolve().parents[2]
 COMPOSE = Path(__file__).with_name("compose.yml")
 # 独立部署脚本复用镜像内的纯预算模块，避免预检和容器解释不同单位。
 sys.path.insert(0, str(source_path(REPO, "orchestrator")))
-from resource_budget import account_limits, isolated_account_limits
+from resource_budget import account_limits, default_account_memory, isolated_account_limits
 from native_sender import prewarm_account_id, stage_asset
 from cpu_resources import default_cpu_limits
 from cli_telemetry_policy import cli_telemetry_mode
@@ -204,12 +204,13 @@ def preflight(values: dict) -> Path:
         for line in Path("/proc/meminfo").read_text().splitlines()
         if line.startswith(("MemAvailable:", "SwapFree:"))}
     active_limit = int(values.get("V3_MAX_ACTIVE_ACCOUNTS", "1"))
-    account_memory, total_memory = account_limits(values.get("V3_ACCOUNT_MEMORY", "4g"), values.get("V3_ACCOUNT_SWAP", "0"))
-    if account_memory == 0:
-        raise ValueError("无限内存仅允许显式配置到账号，全局默认必须有限")
-    isolated_account_limits(values.get("V3_ACCOUNT_MEMORY", "4g"), values.get("V3_ACCOUNT_SWAP", "0"))
+    default_memory = default_account_memory(values)
+    account_memory, total_memory = account_limits(default_memory, values.get("V3_ACCOUNT_SWAP", "0"))
+    reserved_memory = account_memory
+    reserved_swap = 0 if default_memory == 'unlimited' else total_memory - account_memory
+    isolated_account_limits(default_memory, values.get("V3_ACCOUNT_SWAP", "0"))
     if values.get("V3_NATIVE_SENDER_MEMORY"):
-        isolated_account_limits(values.get("V3_ACCOUNT_MEMORY", "4g"), values.get("V3_ACCOUNT_SWAP", "0"), values["V3_NATIVE_SENDER_MEMORY"])
+        isolated_account_limits(default_memory, values.get("V3_ACCOUNT_SWAP", "0"), values["V3_NATIVE_SENDER_MEMORY"])
     prewarm_account_id(values.get("V3_NATIVE_PREWARM_ACCOUNT_ID", ""))
     default_cpu_limits(values)
     cli_telemetry_mode(values.get("V3_CLI_TELEMETRY", ""))
@@ -232,18 +233,21 @@ def preflight(values: dict) -> Path:
                     if fingerprint["mem"] == "unlimited":
                         # 显式无限账号使用共享宿主资源，有限账号仍按全局预算核验。
                         continue
-                    if ram > account_memory or combined - ram > total_memory - account_memory:
+                    if default_memory != 'unlimited' and (ram > account_memory or combined - ram > total_memory - account_memory):
                         raise ValueError("已有账号固化预算超过当前配置，请提高部署预算后再启动")
+                    # 迁移可能被在途作业延后；启动前仍须覆盖尚未迁移的有限预算。
+                    reserved_memory = max(reserved_memory, ram)
+                    reserved_swap = max(reserved_swap, combined - ram)
     if active_limit < 1 or float(values.get("V3_ACCOUNT_CPUS", "2")) <= 0:
         raise ValueError("账号 CPU、内存或活跃环境预算无效")
     # 账号预算与运维余量分开；小内存部署无需绕过完整归属和镜像预检。
     headroom = int(values.get("V3_MEMORY_HEADROOM_BYTES", str(256 * 1024**2)))
     if headroom < 0:
         raise ValueError("内存余量不能为负数")
-    minimum = max(int(values.get("V3_MIN_FREE_MEMORY_BYTES", "0")), active_limit * account_memory + headroom)
+    minimum = max(int(values.get("V3_MIN_FREE_MEMORY_BYTES", "0")), active_limit * reserved_memory + headroom)
     if memory.get("MemAvailable", 0) < minimum:
         raise ValueError("宿主可用内存不足，拒绝启动")
-    swap = total_memory - account_memory
+    swap = reserved_swap
     if swap:
         if memory.get("SwapFree", 0) < active_limit * swap:
             raise ValueError("宿主空闲 swap 不足，拒绝启动")

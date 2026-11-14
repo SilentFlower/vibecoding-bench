@@ -1823,6 +1823,107 @@ class AccountRuntimeTests(unittest.TestCase):
             installer.assert_not_called()
         self.assertEqual(self.runtime._row("synthetic", 1)["state"], "cli_reconcile")
 
+    def test_default_memory_is_unlimited_for_missing_and_empty_configuration(self) -> None:
+        """默认及空部署值创建无限角色，身份与CPU/PID保持有效。@return None。"""
+        self._isolated_docker()
+        with patch.dict(os.environ, {'V3_ACCOUNT_MEMORY': ''}), \
+                patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sender_active', return_value=0):
+            row, _ = self.runtime.ensure({'id': 1, 'name': 'synthetic',
+                'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080})
+        self.assertEqual(json.loads(row['fingerprint_json'])['mem'], 'unlimited')
+        for item in self.client.containers.run.call_args_list:
+            self.assertEqual((item.kwargs['mem_limit'], item.kwargs['memswap_limit']), (0, -1))
+        with patch.dict(os.environ):
+            os.environ.pop('V3_ACCOUNT_MEMORY', None)
+            self.assertEqual(json.loads(self.runtime._row('second')['fingerprint_json'])['mem'], 'unlimited')
+
+    def test_unlimited_policy_migrates_idle_native_and_preserves_applied_identity(self) -> None:
+        """有限native空闲重建后取消内存上限，CPU策略及HOME保持。@return None。"""
+        self._isolated_docker()
+        self.client.images.get.return_value.attrs['Config']['Labels']['vibebench.native-runtime'] = '293-raw-1'
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
+            'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        configuration = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': '',
+            'request_backend': 'native293', 'concurrency': 2}
+        self.gateway._request.return_value = configuration
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
+                patch.object(self.runtime, '_sender_active', return_value=0), \
+                patch.object(self.runtime, '_notify_native_preparation'), \
+                patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '1024m'}):
+            original, _ = self.runtime.ensure(account)
+            before = json.loads(original['fingerprint_json'])
+            marker = self.runtime._root(original) / 'home/preserved-session'
+            marker.write_text('original-session')
+            saved = self.runtime._root(original) / 'runtime/cpu-resources.json'
+            atomic_json(saved, {'schema_version': 1, 'environment_id': original['environment_id'],
+                'account_id': 1, 'revision': str(uuid.uuid4()),
+                'nano_cpus': {'cli': 1200000000, 'sender': 1700000000, 'network': 400000000}})
+            cpu_bytes = saved.read_bytes()
+            # 合成网关提供真实维护claim/release所需的租约合同。
+            lease = {'owner': None, 'generation': 'lease-generation'}
+            def gateway(method, path, payload=None, **kwargs):
+                """维护期间返回原账号配置和唯一租约。@return 当前合同对象。"""
+                if path.endswith('/config'):
+                    return configuration
+                if method == 'POST':
+                    lease['owner'] = payload['owner']
+                return {'active': 0, 'waiting': 0, 'lease': dict(lease) if lease['owner'] else None}
+            self.gateway._request.side_effect = gateway
+            with patch.dict(os.environ, {'V3_ACCOUNT_MEMORY': 'unlimited', 'V3_NATIVE_SENDER_MEMORY': ''}):
+                current, _ = self.runtime.ensure(account, prepare_sender=False)
+            self.assertEqual(current['environment_id'], original['environment_id'])
+            self.assertGreater(current['generation'], original['generation'])
+            expected = {**before, 'mem': 'unlimited', 'native_sender_memory': 'unlimited'}
+            self.assertEqual(json.loads(current['fingerprint_json']), expected)
+            native = json.loads(self.runtime._sender_config(current).read_text())['native']
+            self.assertEqual((native['memory_mib'], native['max_workers']), (0, 4))
+            self.assertEqual(marker.read_text(), 'original-session')
+            self.assertEqual(saved.read_bytes(), cpu_bytes)
+            created = self.client.containers.run.call_args_list[-3:]
+            self.assertTrue(all((x.kwargs['mem_limit'], x.kwargs['memswap_limit']) == (0, -1) for x in created))
+            self.assertEqual({x.kwargs['labels']['vibebench.role']: x.kwargs['nano_cpus'] for x in created},
+                {'account': 1200000000, 'account-sender': 1700000000, 'account-network': 400000000})
+
+    def test_memory_migration_defers_cli_api_and_background_activity(self) -> None:
+        """活动CLI/API和预启动均保留有限角色，原执行记录保持。@return None。"""
+        containers = self._isolated_docker()
+        account = {'id': 1, 'name': 'synthetic', 'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sender_active', return_value=0):
+            row, _ = self.runtime.ensure(account, prepare_sender=False)
+            before = row['fingerprint_json']
+            with patch.dict(os.environ, {'V3_ACCOUNT_MEMORY': 'unlimited'}):
+                self.runtime.jobs[row['environment_id']] = {'row': row, 'source': 'original-work'}
+                current, _ = self.runtime.ensure(account, prepare_sender=False)
+                self.assertEqual(current['fingerprint_json'], before)
+                self.runtime.jobs.clear()
+                with patch.object(self.runtime, '_running_sender_active', return_value=1):
+                    current, _ = self.runtime.ensure(account, prepare_sender=False)
+                    self.assertEqual(current['fingerprint_json'], before)
+                with patch('account_runtime.update_open', return_value=False):
+                    current, _ = self.runtime.ensure(account, prepare_sender=False)
+                    self.assertEqual(current['fingerprint_json'], before)
+                with self.assertRaises(RuntimeBusy):
+                    self.runtime.ensure(account, startup_prewarm=True)
+                self.assertEqual(self.runtime._row('synthetic', 1)['fingerprint_json'], before)
+        self.assertEqual(self.client.containers.run.call_count, 3)
+        for container in containers.values():
+            container.stop.assert_not_called()
+
+    def test_memory_migration_failure_retains_budget_and_requires_reconciliation(self) -> None:
+        """旧角色移除中断时保留有限画像及明确对账状态。@return None。"""
+        self._isolated_docker()
+        account = {'id': 1, 'name': 'synthetic', 'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sender_active', return_value=0):
+            row, _ = self.runtime.ensure(account, prepare_sender=False)
+            with patch.dict(os.environ, {'V3_ACCOUNT_MEMORY': 'unlimited'}), \
+                    patch.object(self.runtime, 'maintenance', side_effect=OSError('合成移除中断')):
+                with self.assertRaises(OSError):
+                    self.runtime.ensure(account, prepare_sender=False)
+        saved = self.runtime._row('synthetic', 1)
+        self.assertEqual(saved['fingerprint_json'], row['fingerprint_json'])
+        self.assertEqual(saved['state'], 'reconcile')
+        self.assertEqual(self.client.containers.run.call_count, 3)
+
     def test_cli_prepares_finite_native_selection_without_sender_budget(self) -> None:
         """有限账号首次与停止布局能准备CLI，API仍在投递前拒绝缺失预算。@return None。"""
         containers = self._isolated_docker()
@@ -2064,7 +2165,7 @@ class AccountRuntimeTests(unittest.TestCase):
         sender = next(call.kwargs for call in self.client.containers.run.call_args_list
             if call.kwargs['labels']['vibebench.role'] == 'account-sender')
         self.assertEqual(sender['entrypoint'], ['/usr/local/bin/python3', '-E', '-s', '/opt/ccrb-criu/entry.py'])
-        self.assertEqual(sender['nano_cpus'], 1000000000)
+        self.assertEqual(sender['nano_cpus'], 1500000000)
         self.assertTrue(json.loads(self.runtime._sender_config(row).read_text())['native_criu_enabled'])
 
     def test_native_unlimited_layout_and_capture_are_frozen_per_account(self) -> None:
@@ -2163,7 +2264,7 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual("ro", mounted["/flows/api"])
         self.assertNotIn("/ca", mounted)
         self.assertNotIn(str(self.runtime._sender_config(row).parent), cli["volumes"])
-        self.assertEqual({'account': 1500000000, 'account-sender': 1000000000, 'account-network': 500000000},
+        self.assertEqual({'account': 1500000000, 'account-sender': 1500000000, 'account-network': 500000000},
             {name: value['nano_cpus'] for name, value in roles.items()})
         network = roles["account-network"]
         self.assertNotIn("/home/node", {value["bind"] for value in network["volumes"].values()})
