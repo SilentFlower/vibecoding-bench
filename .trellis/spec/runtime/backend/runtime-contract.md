@@ -702,6 +702,7 @@ bun scripts/benchmark-runtime.ts --binary /绝对路径/新产物 --reference /r
 - 模板持有同账号稳定代理引用。身份/内核切换、维护排空和关闭撤销模板，已受理实例沿原生命周期收口。恢复失败在业务投递前清理并回退正常exec，复用原单调截止。已提交业务继续遵守唯一发送合同。
 - TLS broker为恢复实例登记外部PID、父进程、启动时刻、worker及映像；探针使用目标活动PID命名空间和内部PID，最终证据保存外部物理PID。实际TLS正文/头与独立接收端比对；cc_prepared保持其组装阶段含义。
 - `criu_template/criu_restore`安全日志记录来源、实例及dump/交接/映像核验/绑定/TLS准备时间，CRIU命令与熵核验时间在私有日志单列。IPC EOF的`worker_pid`来自实际承载进程；普通Child与恢复pidfd分别判断`process_exited`，恢复退出码缺省为空。
+- 模板/恢复失败在原finally清理前生成`criu_failure`白名单摘要；监督进程首错与控制器派生错误分别保留。字段、私有留存及异常边界由[CRIU 模板与恢复失败诊断](logging-guidelines.md#scenario-criu-模板与恢复失败诊断)所有。
 
 ### 4. Validation & Error Matrix
 

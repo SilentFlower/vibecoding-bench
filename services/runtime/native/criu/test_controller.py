@@ -1,14 +1,20 @@
 """共享映像模板的失败、撤销及恢复取消资源回归。"""
 import asyncio
+from contextlib import redirect_stdout
+import errno
+import io
+import json
 import os
 from pathlib import Path
 import socket
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import controller
+from diagnostics import FailureDiagnostic
 from protocol import receive, send
 
 
@@ -63,6 +69,7 @@ class ControllerImageLifetimeTest(unittest.IsolatedAsyncioTestCase):
         for item in self.patches:
             item.start()
         (self.root / 'criu/templates').mkdir(parents=True)
+        (self.root / 'criu').chmod(0o700)
         self.service = controller.Controller(12, 4, str(self.work), {'image_bytes': 42, 'image_sha256': 'a' * 64})
         self.service.run = AsyncMock()
         self.value = {'type': 'template', 'key': 'b' * 64, 'template': self.identifier, 'worker': self.worker, 'pid': 4242}
@@ -88,6 +95,9 @@ class ControllerImageLifetimeTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.service.templates)
         self.assertFalse(self.service.building)
         self.assertFalse((self.root / 'criu/templates' / self.identifier).exists())
+        record = json.loads(next((self.root / 'criu/failures').iterdir()).read_text())
+        self.assertEqual(record['stage'], 'template_dump')
+        self.assertEqual(record['reason'], 'RESTORE_CRIU_FAILED')
 
     async def test_template_revocation_retains_image_until_inflight_cleanup(self) -> None:
         """模板EOF与控制器close共同等待在途引用，避免二次取消清理。@return 无。"""
@@ -150,7 +160,7 @@ class ControllerImageLifetimeTest(unittest.IsolatedAsyncioTestCase):
         before = len(list(Path('/proc/self/fd').iterdir()))
         value = {'template': self.identifier, 'key': self.value['key'], 'worker': str(uuid4())}
         with patch.object(controller, 'reopen_image', return_value=opened), patch.object(
-                controller.asyncio, 'create_subprocess_exec', AsyncMock(side_effect=OSError('合成启动失败'))):
+                controller.asyncio, 'create_subprocess_exec', AsyncMock(side_effect=OSError(errno.EAGAIN, '合成启动失败'))):
             with self.assertRaisesRegex(OSError, '合成启动失败'):
                 await self.service.restore(value, None)
         self.assertEqual(self.service.active, 0)
@@ -161,6 +171,9 @@ class ControllerImageLifetimeTest(unittest.IsolatedAsyncioTestCase):
             os.fstat(opened)
         self.assertEqual(os.fstat(self.pinned).st_size, 0)
         self.assertEqual(list((self.root / 'criu/instances').iterdir()), [])
+        record = json.loads(next((self.root / 'criu/failures').iterdir()).read_text())
+        self.assertEqual(record['stage'], 'namespace_launch')
+        self.assertEqual(record['errno'], errno.EAGAIN)
 
     async def test_partial_pipe_failure_releases_all_previously_created_fds(self) -> None:
         """第二次管道分配失败时，首对管道和实例映像均关闭。@return 无。"""
@@ -188,6 +201,79 @@ class ControllerImageLifetimeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(template.users, 0)
         self.assertTrue(template.drained.is_set())
         self.assertEqual(os.fstat(self.pinned).st_size, 0)
+        record = json.loads(next((self.root / 'criu/failures').iterdir()).read_text())
+        self.assertEqual(record['stage'], 'pipes')
+
+    async def test_empty_report_preserves_supervisor_failure_before_instance_cleanup(self) -> None:
+        """模拟监督进程失败后的真实管道EOF，原异常与上游首错分别保留。@return 无。"""
+        template = self.make_restorable_template()
+        opened = os.dup(self.base)
+        left, right = socket.socketpair()
+        left.setblocking(False)
+        right.setblocking(False)
+        child_descriptors = []
+
+        async def wait():
+            """模拟子进程退出时关闭继承的gate。@return 退出码。"""
+            while child_descriptors:
+                os.close(child_descriptors.pop())
+            return 0
+
+        process = SimpleNamespace(pid=12, returncode=0, stdout=asyncio.StreamReader(),
+            wait=AsyncMock(side_effect=wait), communicate=AsyncMock(return_value=(b'', b'')))
+        process.stdout.feed_data(b'4242\n')
+        process.stdout.feed_eof()
+
+        async def launch(*arguments, **options):
+            """先落本实例副摘要，父进程关闭报告写端后产生EOF。@param arguments 加载器参数。@param options 子进程选项。@return 合成进程。"""
+            instance = self.root / 'criu/instances' / arguments[2]
+            child_descriptors.append(os.dup(int(arguments[3])))
+            FailureDiagnostic(self.root / 'criu', 'restore', instance=instance,
+                stage='criu_restore', criu_returncode=27).report(SystemExit(111), supervisor=True)
+            return process
+
+        value = {'template': self.identifier, 'key': self.value['key'], 'worker': str(uuid4())}
+        try:
+            await send(right, {'type': 'start'})
+            with patch.object(controller, 'reopen_image', return_value=opened), patch.object(
+                    controller.asyncio, 'create_subprocess_exec', side_effect=launch), patch.object(
+                    controller, 'process_identity', return_value=(12, '10', {'NSpid':'4242 1'})), patch.object(
+                    controller.signal, 'pidfd_send_signal'), redirect_stdout(io.StringIO()):
+                with self.assertRaises(json.JSONDecodeError):
+                    await self.service.restore(value, left)
+        finally:
+            left.close()
+            right.close()
+            while child_descriptors:
+                os.close(child_descriptors.pop())
+        self.assertEqual(list((self.root / 'criu/instances').iterdir()), [])
+        self.assertEqual(self.service.active, 0)
+        self.assertEqual(template.users, 0)
+        self.assertTrue(template.drained.is_set())
+        record = json.loads(next((self.root / 'criu/failures').iterdir()).read_text())
+        self.assertEqual(record['stage'], 'report_decode')
+        self.assertEqual(record['exception_type'], 'JSONDecodeError')
+        self.assertEqual(record['upstream_status'], 'available')
+        self.assertEqual(record['upstream']['stage'], 'criu_restore')
+        self.assertEqual(record['upstream']['criu_returncode'], 27)
+
+    async def test_diagnostic_disk_failure_keeps_original_exception_and_fd_cleanup(self) -> None:
+        """摘要磁盘不可写时，原加载器异常和FD回收继续收口。@return 无。"""
+        template = self.make_restorable_template()
+        opened = os.dup(self.base)
+        before = len(list(Path('/proc/self/fd').iterdir()))
+        value = {'template': self.identifier, 'key': self.value['key'], 'worker': str(uuid4())}
+        with patch.object(controller, 'reopen_image', return_value=opened), patch.object(
+                controller.asyncio, 'create_subprocess_exec', AsyncMock(side_effect=OSError(errno.EMFILE, '原始失败'))), patch(
+                'diagnostics._store', side_effect=OSError(errno.ENOSPC, '取证落盘失败')), redirect_stdout(io.StringIO()) as output:
+            with self.assertRaises(OSError) as caught:
+                await self.service.restore(value, None)
+        self.assertEqual(caught.exception.errno, errno.EMFILE)
+        self.assertEqual(json.loads(output.getvalue())['persistence'], 'DIAGNOSTIC_STORE_FAILED')
+        self.assertEqual(len(list(Path('/proc/self/fd').iterdir())), before - 1)
+        self.assertEqual(template.users, 0)
+        self.assertEqual(self.service.active, 0)
+        self.assertEqual(list((self.root / 'criu/instances').iterdir()), [])
 
 
 if __name__ == '__main__':

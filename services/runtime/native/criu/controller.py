@@ -11,6 +11,7 @@ import socket
 import struct
 from uuid import uuid4
 
+from diagnostics import FailureDiagnostic
 from entropy import PROFILE
 from protocol import command, freeze_tree, receive, send
 from shared_image import pin_image, reopen_image, verify_restored_image
@@ -70,12 +71,15 @@ class Controller:
         if pid != self.sender or uid != 1001:
             raise ValueError('RESTORE_PEER_INVALID')
 
-    async def run(self, arguments: list[str], timeout: float) -> None:
-        """有界执行固定CRIU命令并等待真实退出。@param arguments 内部参数。@param timeout 秒预算。@return 无。"""
+    async def run(self, arguments: list[str], timeout: float, diagnostic: FailureDiagnostic | None = None) -> None:
+        """有界执行固定CRIU命令。@param arguments 内部参数。@param timeout 秒预算。@param diagnostic 可选失败上下文。@return 无。"""
         process = await asyncio.create_subprocess_exec(str(TOOLS / 'criu'), '--no-default-config', *arguments,
             stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
         try:
-            if await asyncio.wait_for(process.wait(), timeout):
+            returned = await asyncio.wait_for(process.wait(), timeout)
+            if diagnostic:
+                diagnostic.criu_returncode = returned
+            if returned:
                 raise ValueError('RESTORE_CRIU_FAILED')
         finally:
             if process.returncode is None:
@@ -85,8 +89,11 @@ class Controller:
     async def template(self, value: dict, connection: socket.socket) -> None:
         """冻结本sender的零业务种子并维持模板租约。@param value 白名单登记。@param connection 存活租约。@return 无。"""
         identifier = value['template']
+        diagnostic = FailureDiagnostic(ROOT, 'template', identifier, value['worker'], stage='template_admission')
         if identifier in self.templates or identifier in self.building or self.templates or self.building:
-            raise ValueError('RESTORE_TEMPLATE_BUSY')
+            error = ValueError('RESTORE_TEMPLATE_BUSY')
+            diagnostic.report(error)
+            raise error
         self.building.add(identifier)
         root = ROOT / 'templates' / identifier
         template = None
@@ -94,13 +101,16 @@ class Controller:
         image = None
         created = False
         try:
+            diagnostic.stage = 'template_directory'
             root.mkdir(mode=0o700)
             created = True
+            diagnostic.stage = 'seed_identity'
             pid = value['pid']
             pidfd = os.pidfd_open(pid)
             parent, started, status = process_identity(pid)
             if parent != self.sender or not restricted(status):
                 raise ValueError('RESTORE_SEED_OWNERSHIP')
+            diagnostic.stage = 'seed_environment'
             environment = dict(entry.split(b'=', 1) for entry in Path(f'/proc/{pid}/environ').read_bytes().split(b'\0') if b'=' in entry)
             source = self.work_root / value['worker']
             if (environment.get(b'CCRB_TEMPLATE_ID') != identifier.encode()
@@ -109,15 +119,20 @@ class Controller:
                     or environment.get(b'CLAUDE_CONFIG_DIR') != str(source / 'config').encode()
                     or Path(f'/proc/{pid}/cwd').resolve() != source / 'cwd'):
                 raise ValueError('RESTORE_SEED_BINDING')
+            diagnostic.stage = 'seed_image'
             image = pin_image(pid, self.profile)
+            diagnostic.stage = 'seed_pipes'
             pipes = {str(fd): os.readlink(f'/proc/{pid}/fd/{fd}') for fd in (0, 1, 2)}
             if any(not name.startswith('pipe:[') or not name.endswith(']') for name in pipes.values()):
                 raise ValueError('RESTORE_SEED_PIPES')
             (root / 'images').mkdir(mode=0o700)
+            diagnostic.stage = 'template_dump'
+            diagnostic.log = root / 'dump.log'
             await self.run(['dump', '-t', str(pid), '-D', str(root / 'images'), '--shell-job', '--leave-running',
-                            '-v2', '-o', str(root / 'dump.log')], 30)
+                            '-v2', '-o', str(root / 'dump.log')], 30, diagnostic)
             if process_identity(pid)[:2] != (parent, started):
                 raise ValueError('RESTORE_SEED_EXITED')
+            diagnostic.stage = 'template_files'
             filesystem = freeze_tree(source, root / 'fs', 1001)
             for path in (root / 'images').iterdir():
                 path.chmod(0o600)
@@ -125,6 +140,7 @@ class Controller:
                 'source_root': str(source), 'source_pid': pid,
                 'source_max_pid': max(int(path.name) for path in Path(f'/proc/{pid}/task').iterdir()), 'pipes': pipes,
                 'image_sha256': self.profile['image_sha256'], 'image_bytes': self.profile['image_bytes']}
+            diagnostic.stage = 'template_manifest'
             files = {}
             paths = [path for name in ('images', 'fs') for path in [root / name, *(root / name).rglob('*')]]
             for path in paths:
@@ -141,9 +157,14 @@ class Controller:
             template = Template(value, root, configuration, files, filesystem, image)
             template.drained.set()
             self.templates[identifier] = template
+            diagnostic.stage = 'template_publish'
             await send(connection, {'protocol': 1, 'type': 'template_ready', 'template': identifier,
                                     'image': self.profile['image_sha256']})
+            diagnostic.stage = 'template_wait'
             await asyncio.get_running_loop().sock_recv(connection, 1)
+        except BaseException as error:
+            diagnostic.report(error)
+            raise
         finally:
             self.cleaning.add(asyncio.current_task())
             self.building.discard(identifier)
@@ -160,19 +181,25 @@ class Controller:
 
     async def restore(self, value: dict, connection: socket.socket) -> None:
         """先移交存活句柄，再恢复单个物理实例。@param value 绑定元数据。@param connection 生命周期连接。@return 无。"""
-        template = self.templates.get(value['template'])
-        if (not template or not template.valid or value['key'] != template.value['key']
-                or value['worker'] == template.value['worker'] or self.active >= self.maximum):
-            raise ValueError('RESTORE_TEMPLATE_UNAVAILABLE')
-        paths = [path for name in ('images', 'fs') for path in [template.root / name, *(template.root / name).rglob('*')]]
-        if {str(path.relative_to(template.root)) for path in paths} != set(template.files):
-            raise ValueError('RESTORE_TEMPLATE_CHANGED')
-        for name, frozen in template.files.items():
-            info = (template.root / name).lstat()
-            actual = (info.st_dev, info.st_ino, info.st_size, info.st_ctime_ns,
-                      info.st_mtime_ns, info.st_mode, info.st_uid, info.st_nlink)
-            if actual != frozen['identity']:
+        diagnostic = FailureDiagnostic(ROOT, 'restore', value['template'], value['worker'], stage='restore_admission')
+        try:
+            template = self.templates.get(value['template'])
+            if (not template or not template.valid or value['key'] != template.value['key']
+                    or value['worker'] == template.value['worker'] or self.active >= self.maximum):
+                raise ValueError('RESTORE_TEMPLATE_UNAVAILABLE')
+            diagnostic.stage = 'template_verify'
+            paths = [path for name in ('images', 'fs') for path in [template.root / name, *(template.root / name).rglob('*')]]
+            if {str(path.relative_to(template.root)) for path in paths} != set(template.files):
                 raise ValueError('RESTORE_TEMPLATE_CHANGED')
+            for name, frozen in template.files.items():
+                info = (template.root / name).lstat()
+                actual = (info.st_dev, info.st_ino, info.st_size, info.st_ctime_ns,
+                          info.st_mtime_ns, info.st_mode, info.st_uid, info.st_nlink)
+                if actual != frozen['identity']:
+                    raise ValueError('RESTORE_TEMPLATE_CHANGED')
+        except BaseException as error:
+            diagnostic.report(error)
+            raise
         template.users += 1
         template.drained.clear()
         self.active += 1
@@ -184,17 +211,23 @@ class Controller:
         descriptors = []
         tasks = []
         created = False
+        diagnostic.instance = root
+        diagnostic.log = root / 'restore.log'
         try:
+            diagnostic.stage = 'instance_directory'
             root.mkdir(mode=0o700)
             created = True
+            diagnostic.stage = 'instance_files'
             freeze_tree(template.root / 'fs', root / 'fs', 0)
             for relative, metadata in template.filesystem.items():
                 path = root / 'fs' / relative
                 os.chmod(path, metadata['mode'])
                 os.utime(path, ns=(metadata['atime_ns'], metadata['mtime_ns']))
                 os.chown(path, 1001, metadata['gid'])
+            diagnostic.stage = 'instance_config'
             (root / 'config.json').write_text(json.dumps(template.configuration))
             os.chmod(root / 'config.json', 0o600)
+            diagnostic.stage = 'image_open'
             image = reopen_image(template.image, self.profile)
             descriptors.append(image)
             def pipe_pair() -> tuple[int, int]:
@@ -203,12 +236,14 @@ class Controller:
                 descriptors.extend(pair)
                 return pair
 
+            diagnostic.stage = 'pipes'
             gate_r, gate_w = pipe_pair()
             report_r, report_w = pipe_pair()
             incoming_r, incoming_w = pipe_pair()
             outgoing_r, outgoing_w = pipe_pair()
             errors_r, errors_w = pipe_pair()
             inherited = (gate_r, report_w, incoming_r, outgoing_w, errors_w, image)
+            diagnostic.stage = 'namespace_launch'
             with (root / 'namespace.log').open('xb') as private_log:
                 os.chmod(root / 'namespace.log', 0o600)
                 process = await asyncio.create_subprocess_exec(str(TOOLS / 'launch'), 'namespace', root.name,
@@ -217,12 +252,15 @@ class Controller:
             for descriptor in inherited:
                 os.close(descriptor)
                 descriptors.remove(descriptor)
+            diagnostic.stage = 'namespace_identity'
             namespace = int(await asyncio.wait_for(process.stdout.readline(), 2))
             parent, started, status = process_identity(namespace)
             if parent != process.pid or status['NSpid'].split()[-1] != '1':
                 raise ValueError('RESTORE_NAMESPACE_OWNERSHIP')
             namespace_fd = os.pidfd_open(namespace)
+            diagnostic.stage = 'namespace_handoff'
             await send(connection, {'protocol': 1, 'type': 'namespace_ready', 'pid': namespace, 'started': started}, (namespace_fd,))
+            diagnostic.stage = 'start_ack'
             if await asyncio.wait_for(receive(connection), 2) != {'type': 'start'}:
                 raise ValueError('RESTORE_START_ACK')
             if not template.valid:
@@ -246,13 +284,16 @@ class Controller:
                 while await read_pipe(errors_r, 65536):
                     pass
 
+            diagnostic.stage = 'report_read'
             tasks.append(asyncio.create_task(drain_errors()))
             reporting = asyncio.create_task(asyncio.wait_for(read_pipe(report_r, 4096), 35))
             tasks.append(reporting)
             completed, _ = await asyncio.wait((reporting, disconnected), return_when=asyncio.FIRST_COMPLETED)
             if disconnected in completed:
                 raise ValueError('RESTORE_CONNECTION_CLOSED')
+            diagnostic.stage = 'report_decode'
             report = json.loads(reporting.result())
+            diagnostic.stage = 'worker_identity'
             inner = report['inner_pid']
             children = Path(f'/proc/{namespace}/task/{namespace}/children').read_text().split()
             candidates = [int(child) for child in children if process_identity(int(child))[2]['NSpid'].split()[-1] == str(inner)]
@@ -262,18 +303,24 @@ class Controller:
             parent, started, status = process_identity(pid)
             if parent != namespace or not restricted(status):
                 raise ValueError('RESTORE_WORKER_OWNERSHIP')
+            diagnostic.stage = 'image_verify'
             verify_restored_image(pid, template.image, self.profile)
             worker_fd = os.pidfd_open(pid)
             descriptors.append(worker_fd)
             self.owners[pid] = {'owner': namespace, 'started': started, 'worker': value['worker'],
                                 'image': self.profile['image_sha256']}
+            diagnostic.stage = 'worker_handoff'
             await send(connection, {'protocol': 1, 'type': 'restore_ready', 'pid': pid, 'parent': namespace,
                 'inner_pid': inner, 'started': started, 'template': value['template'],
                 'seed_worker': template.value['worker'], 'worker': value['worker'], 'nonce': value['nonce'],
                 'image': self.profile['image_sha256'], 'entropy_profile': PROFILE}, (incoming_w, outgoing_r, worker_fd))
             exited = asyncio.create_task(process.wait())
             tasks.append(exited)
+            diagnostic.stage = 'worker_wait'
             await asyncio.wait((exited, disconnected), return_when=asyncio.FIRST_COMPLETED)
+        except BaseException as error:
+            diagnostic.report(error)
+            raise
         finally:
             self.cleaning.add(asyncio.current_task())
             if namespace_fd is not None:

@@ -1,14 +1,15 @@
 {
   "LICENSE.seccomp": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
   "build.py": "6d06d4205db776e00690fa20b084f07a9335834779fc67cf24b3f6a69a12e983",
-  "controller.py": "369582e92cdf3e70c3d2add74dc8062be08dd208015d40dbe11587bbd92effb6",
+  "controller.py": "992b2530bf2210a5c24de1246f590475ae0b5310d820eebc98caf261fae431ab",
+  "diagnostics.py": "0bf83d3d8725f1f95a98b579ea98c393b4a75f079d1e3d974aa3446378ab790b",
   "entropy.py": "ff1bfcc172b0b53b322e750858f17e4b8c31443daaeb3a6683901a615f2faa1c",
   "entry.py": "9a3cf6a7022c7456866e6ab7f6cd6fa601f54e7d9414ea757fc4387a675cfe21",
   "launch.c": "4d5e78780ada01414c20016eb995e7d41ba70fac6b64b68f6f132f516ee8da82",
   "memfd-executable.patch": "fb92f5ec7bd5b3260ac3e720535cfabbe65cef47aaf8867ef8e7f638b9b597ae",
-  "package.py": "3eec618e48378f12c2e99f9a8fd67dc90515eaf0ceda89ceeb1aa33afced70b1",
+  "package.py": "d88749713d25be7a71ebd6f2ee65197a5ff643abb4a7392c8ee4d45b45d3b89a",
   "protocol.py": "075bd26642ecfb292cb8c1d8766664ad9ffc8cc401c2857f779e3a0574353010",
   "seccomp.json": "7fe525474af2ca78ee9f2e6158c6d0672d161488b3816e1ead14d4d8b9f257a1",
   "shared_image.py": "713cf7ca3ea2388c0fda24ac0161fc9d85ee31c7b6e3bedd673e04694fcfe7b3",
-  "supervisor.py": "8dde0368eaf3760312b6757648f5be109914d8d41be78b387e7240efb0bab1d1"
+  "supervisor.py": "a72710230f2d06ac4068afa2e1d6f257c8ada51025b1d473b326a828e0580043"
 }

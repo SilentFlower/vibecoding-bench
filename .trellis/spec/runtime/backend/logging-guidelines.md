@@ -507,3 +507,55 @@ bun run collect:pool-incidents --run manual-001 --run-dir artifacts/local-pool-r
 - tests/integration/control.test.ts：实际共享解码器到控制 API 及日志库，非法摘要保留 422/code、一次调用且私有扩展不落盘。
 - tests/native/native.test.ts：实际固定原版在离线回环复现构造失败、代理拒绝、连接拒绝、提前关闭和 TLS 错误；核对阶段、错误码与发送计数。
 - gateway 的 native_error、native_runtime 定向测试及 tests/sender_logging.rs：独立拒绝非法摘要、记录关联字段、旧内核降级、真实入口 JSON 日志和 RUST_LOG 过滤。
+
+## Scenario: CRIU 模板与恢复失败诊断
+
+### 1. Scope / Trigger
+
+- `native/criu/controller.py`与`supervisor.py`的模板建立、恢复及交接失败需要在原清理前保留受控证据。复用`/var/lib/ccrb-criu`原root私有持久挂载，诊断不改变原IPC、唯一业务投递、截止、预算或回退合同。
+
+### 2. Signatures
+
+- `diagnostics.FailureDiagnostic(root:Path, operation:str, template:str|None=None, worker:str|None=None, instance:Path|None=None, stage:str='unknown', criu_returncode:int|None=None, log:Path|None=None)`跟踪实际操作边界。
+- `FailureDiagnostic.report(error:BaseException, *, supervisor:bool=False)->None`尽力保存受控摘要；supervisor模式写本实例副摘要，controller模式聚合并留存。
+- `Controller.run(arguments:list[str], timeout:float, diagnostic:FailureDiagnostic|None=None)->None`为异步内部方法，可将实际CRIU退出码写入上下文，原非零退出错误保持`RESTORE_CRIU_FAILED`。
+
+### 3. Contracts
+
+- 摘要字段精确为`schema_version/at_ms/operation/stage/exception_type/errno/reason/template/worker/instance/criu_returncode/process_returncode/source/log_status/log_evidence/upstream_status/upstream`。`schema_version`严格整数1；`at_ms`为0至2^63-1的严格整数；`operation`为template或restore。
+- `stage`、异常名称及reason按`diagnostics.py`中的`STAGES/EXCEPTIONS/REASONS`白名单投影；未知阶段为unknown，未知异常为UnknownError，非白名单原因为RESTORE_OPERATION_FAILED。标识仅接受规范UUID，其余为null。errno仅接受严格整数1至4095，其余为null；两个退出码字段为null或严格整数-255至255，非法副摘要拒绝。
+- `source`仅为null或`{module,line}`，模块来自`PYTHON_MODULES`，行号为1至10^7严格整数。禁止复制异常原文、命令、stderr、traceback正文、完整路径、环境、配置、凭据及业务正文。
+- 固定当前操作的dump.log或restore.log只读取最多16KiB尾部。`log_status`为not_applicable/available_tail/missing/invalid；`log_evidence`最多8项，精确字段为`{level,category,module,line}`。level为error/warning，去重后错误优先；category来自`CATEGORIES`或unknown，模块来自`CRIU_MODULES`或null，未知模块的行号为null。分类只表示日志线索。
+- supervisor在原异常继续传播前排他写`<instance>/failure.json`。controller在原finally清理前读取并验证副摘要，记录自身阶段与异常，并以`upstream`保留首个上游摘要。`upstream_status`为not_applicable/available/missing/invalid；最多一层，必须为同instance的restore摘要，内部upstream_status必须为not_applicable；拒绝额外字段、重复JSON键、跨实例及递归嵌套。
+- controller留存至`/var/lib/ccrb-criu/failures/<UUID>.json`，最多32条、每条8192字节。写前验证既有记录，满32条时先删除at_ms最旧的受控记录。目录0700、文件0600且归当前受信任UID，生产为root；逐级O_NOFOLLOW打开目录，文件要求常规、单链接、受控名称与有效内容。外来或损坏内容使本次留存失败，保留原文件。
+- 发布使用同目录排他临时文件、完整写入和排他硬链接，随后清理临时文件。controller普通日志为`{layer:'criu_failure',persistence:'saved'|'DIAGNOSTIC_STORE_FAILED',diagnostic:<摘要>}`；提取失败仅输出固定`DIAGNOSTIC_CAPTURE_FAILED`。正常成功路径保持原流程。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 诊断与原流程 |
+| --- | --- |
+| CRIU非零退出后报告EOF | 上游criu_restore、CRIU_EXIT_NONZERO及实际退出码与控制器report_decode分别保存 |
+| dump/pipe/namespace/映像核验失败 | 记录实际stage、受控异常及可用errno，原异常继续传播和清理 |
+| 日志不存在/非法权限、链接或归属 | log_status为missing/invalid，原异常继续处理 |
+| 副摘要缺失/损坏、超限或实例不符 | upstream_status为missing/invalid，保留控制器自身摘要 |
+| 留存目录不安全、记录损坏或写入失败 | DIAGNOSTIC_STORE_FAILED，原异常与finally继续 |
+| 诊断提取或普通日志输出失败 | 固定故障标记或尽力结束诊断，原清理与回退继续 |
+| asyncio.CancelledError或精确ValueError('RESTORE_CONNECTION_CLOSED') | 跳过失败摘要，沿原取消和连接关闭清理 |
+
+### 5. Scenarios and Examples
+
+```json
+{"level":"error","category":"unexpected_eof","module":"protobuf.c","line":72}
+```
+
+- 正常失败：CRIU4.2的`Unexpected EOF`在protobuf.c:72归类为unexpected_eof；控制器report_decode摘要保留upstream.criu_returncode=1，实例清理后全局摘要仍可读。
+- 边界：日志尚未创建时明确标missing；第33份摘要触发受控轮换，保留数量仍为32。
+- 错误用法：把控制器JSONDecodeError直接作为底层根因，或保存原始异常和日志行。正确处理：分别核对upstream和派生错误，只输出白名单源码位置与分类。
+- 计时：后台spare总耗时包含失败恢复及普通exec回退。有空闲worker时checkout直接取用；空闲耗尽后等待spare的时间计入checkout/prepared。后台CPU竞争按实测评估。
+
+### 6. Tests Required
+
+- `native/criu/test_diagnostics.py`：敏感消息、路径、命令与输出过滤，未知值/严格整数范围，真实CRIU EOF分类、16KiB尾部与最多8项、32条轮换和权限、排他副摘要、损坏/重复键/嵌套/跨实例、链接/硬链接/FIFO/归属、父目录链接、写入失败与FD清理、正常取消及日志输出故障。
+- `native/criu/test_controller.py`：模板失败、部分管道/launch失败、报告EOF与监督进程首错关联、诊断写入失败后原errno和FD清理、模板撤销及实际退出收口。
+- `scripts/criu/test_build.py`：新增模块进入导出、镜像source-manifest及打包画像，正式源码与分发输入逐文件摘要一致。
+- 隔离链路：真实CRIU非零退出与空报告，实例清理后仍有上游摘要；后续成功恢复、独立会话/TLS、取消、控制器强退与重启清理，以及普通exec回退每笔一次模拟POST。生产部署后核对自然故障事件及私有摘要。

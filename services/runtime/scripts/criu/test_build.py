@@ -40,6 +40,7 @@ class BuildBoundaryTest(unittest.TestCase):
                             '--output', str(output)], check=True, capture_output=True, timeout=10)
             source = Path(__file__).resolve().parents[2] / 'native/criu/shared_image.py'
             self.assertEqual((output / 'shared_image.py').read_bytes(), source.read_bytes())
+            self.assertEqual((output / 'diagnostics.py').read_bytes(), source.with_name('diagnostics.py').read_bytes())
             manifest = json.loads((output / 'source-manifest.json').read_text())
             self.assertIn('shared_image.py', manifest)
             for name, digest in manifest.items():

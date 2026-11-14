@@ -34,6 +34,16 @@ python3 services/runtime/scripts/criu/build.py --archive /受控目录/criu-v4.2
 
 CRIU 共享分支拒绝同名的其他 inode、错误类型、大小、封存及元数据。监督进程在恢复暂停期核对实际 exe 和执行体映射，Rust 在业务投递前再次核验实际 SHA、大小、seals 和缓存映像的 dev/inode。共享路径跟随现有 CRIU 开关，构建画像 `shared_memfd_restore=1` 为配套能力条件；旧工具或准入失败沿原截止回退普通共享映像 exec。
 
+## 失败诊断
+
+模板建立和恢复失败先记录 `criu_failure` 结构化事件，再沿原 finally 清理。摘要包含受控阶段、异常类型、可用 errno、CRIU/子进程退出码、规范模板/worker/实例 UUID 与受限源码位置。监督进程先把本实例首错写入私有 `failure.json`，控制器在清理前汇总；例如 `upstream.stage=criu_restore`、`upstream.criu_returncode=27` 与当前 `stage=report_decode` 分别表示原CRIU失败和后续空报告解码失败。
+
+诊断只提取固定 CRIU 日志末尾最多16KiB中的错误/警告分类及受控源码位置，最多8项。`log_status` 区分 `available_tail/missing/invalid/not_applicable`，`upstream_status` 区分 `available/missing/invalid/not_applicable`。分类用于保留证据，根因需结合实际阶段判断。原始异常、stderr、路径、环境、配置、凭据、正文与内存快照排除在摘要之外。
+
+摘要保存在 `/var/lib/ccrb-criu/failures/<UUID>.json`，复用账号root私有持久挂载，保留最多32条、每条8KiB，目录0700、文件0600。读写逐级拒绝链接，文件必须属于当前可信UID、单链接且为普通文件；轮换只处理合法受控摘要。`persistence=DIAGNOSTIC_STORE_FAILED` 表示普通日志仍包含摘要，私有留存失败；`DIAGNOSTIC_CAPTURE_FAILED` 表示取证自身失败。诊断失败继续原异常和资源清理，正常取消保持原语义。
+
+sender的“原生第二 worker 预热”计时属于后台补暖。现有空闲进程可用时，业务直接领取该进程；空闲耗尽且补暖进行中时，等待计入 `checkout_ms` 与 `prepared_ms`。后台CPU消耗与请求等待分别观察。
+
 ## 镜像与启用
 
 ```bash
