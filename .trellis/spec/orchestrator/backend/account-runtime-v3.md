@@ -233,7 +233,7 @@ artifact `v3-release-<run_id>-<run_attempt>` 保存发布清单与同批 gzip �
 
 环境页固定资源 `GET|HEAD /runtime/environments.js`、`GET|HEAD /runtime/environments.css` 必须与 `apps/legacy-web/index.html` 的引用同步进入管理桥精确白名单，查询参数随原 URI 转发。资源沿用原 v3 会话鉴权，写方法、近似路径、编码及点段路径继续拒绝。新增本地脚本或样式时同时核对镜像分发和浏览器桥准入。
 
-**管理页面布局**：`route.name === 'environments'` 时 Dashboard 使用 `100dvh` 纵向 flex，隐藏统计卡片，main 全宽且 `flex: 1; min-height: 0`；Environments 的 iframe 填满剩余空间，无额外边距、圆角或固定高度扣减。外层不承担内容滚动，bench 保留原主题和自身滚动；离开该路由后恢复网关普通页的内容宽度、统计卡片和滚动。
+**管理页面布局**：环境由`RuntimeEnvironments.vue`直接渲染，任务由`TasksWorkspace.vue`挂载编译的执行模块；主文档承担页面滚动，详情工作区独立滚动。侧栏固定到视口，宽屏内容铺满。原任务明暗偏好、执行生命周期与独立`/runtime/`地址保留。具体组件和资源清理合同见web/frontend/ui-guidelines.md。
 
 bench 导航项不拆分中英文标签。宽屏顶部三列使用 `max-content minmax(0, 1fr) max-content`，品牌和状态栏保留实际宽度；中间 `.tabs` 设置 `min-width:0` 并允许整项换行，不能让不换行的副标题溢入导航列。状态栏限制 `max-width:100%` 并允许控件换行，避免极窄屏横向溢出。
 
@@ -275,8 +275,8 @@ bench 导航项不拆分中英文标签。宽屏顶部三列使用 `max-content 
 | 任一推送、仓库 digest 或镜像包失败 | 无完整发布清单，已推镜像保留 |
 | 包名称/大小/SHA256、镜像角色/ID/平台不符 | 拒绝交付；本地同批标签不覆盖 |
 | 新备份失败／旧目录无完整同源归属 | 保留旧恢复点／该目录不参与自动轮换 |
-| 桌面或窄屏打开环境与任务 | iframe 全宽，底边贴合视口；标签保持横排，外层不产生额外滚动 |
-| 环境页 HTML/API 为 200，脚本或样式为 404 | 页面验收失败，核对固定静态资源白名单及实际 iframe 初始化 |
+| 桌面或窄屏打开环境与任务 | 原生页面填满侧栏右侧，标签保持横排，主页面滚动且没有iframe |
+| 环境页 HTML/API 为 200，脚本或样式为 404 | 页面验收失败，核对固定静态资源白名单及实际原生路由模块初始化 |
 
 ### 5. Scenarios and Examples
 
@@ -297,13 +297,13 @@ bench 导航项不拆分中英文标签。宽屏顶部三列使用 `max-content 
 - 基础/历史：旧环境没有 swap 字段，继续禁用；Docker 存储实现更换后本地 ID可以不同，但固定 config_digest/registry_digest 与平台仍能核对。
 - 错误用法：将 memswap_limit 设成 RAM值却声称容器可用宿主 swap，或用 SwapFree 抵扣 RAM 预算。正确做法：总限额为RAM＋额外swap，预检分别比较两种余量。
 - 错误用法：把本地 Docker Id 当作仓库 digest，或只成功推一件就生成可部署清单。正确做法：三种哈希明确区分，两个角色都成功后才保存完整交付结果。
-- 错误用法：把 bench 放进网关的 max-width 容器，叠加统计卡片和 iframe 的 `100vh - 100px` 高度。正确做法：环境路由独占导航下方工作区，flex 根据实际导航高度分配 iframe 空间。
-- 错误用法：新增 `environments.js/css` 后，仅验证 HTML 和环境 API 返回 200。正确做法：核对两个资源成功加载，并断言 iframe 的 `renderEnvironments` 已定义及样式表已解析。
+- 错误用法：把 bench 放进网关的 max-width 容器，叠加统计卡片和 iframe 的 `100vh - 100px` 高度。正确做法：原生环境和任务路由直接填充侧栏右侧，页面与详情各自拥有滚动。
+- 错误用法：新增 `environments.js/css` 后，仅验证 HTML 和环境 API 返回 200。正确做法：核对两个资源成功加载，并分别验证原生Vue环境组件与独立兼容页的脚本、样式和真实按钮。
 
 ### 6. Tests Required
 
 - Rust `cargo fmt --check && cargo test`：画像/改写、weighted FIFO/RPM、共享/排他租约、旧记录/过期/重启、绑定校验、原始字节/有序头/SSE取消、不重放；回环临时 CA 验证 HTTPS 正常响应及错误证书/主机名拒绝。测试 CA 不进入正式客户端。
-- `runtime_bridge::tests::environment_assets_are_exact_and_read_only` 覆盖资源 GET/HEAD、写方法和近似／编码路径拒绝；`verify_browser.py` 在真实 iframe 中核对脚本函数和 CSS 规则，缺失资源必须使浏览器验收失败。
+- `runtime_bridge::tests::environment_assets_are_exact_and_read_only` 覆盖资源 GET/HEAD、写方法和近似／编码路径拒绝；`verify_native_environments.py`验证主路由，独立兼容页核对脚本函数和CSS规则，缺失资源必须使浏览器验收失败。
 - Python orchestrator 回归：原快照与 session 恢复、旧 token/绑定保护、并行与安装续租、证据/游标分代、统计不重复、错误链接拒绝、鉴权和永久额度门禁。
 - `images/account/test_passthrough.py` 与 network-context 回归：HTTP CONNECT、SOCKS5/H 认证、IPv4/IPv6/域名、字节保真、代理失败无直连、静默关闭、跨空闲窗口单向活动，以及 PID/ACK/mode/source 归属。
 - 环境回归：默认 LA/en_US、显式 UTC/Tokyo、既有画像和页面 GET 不分配；真实 Runner → AccountRuntime 启动、HOME settings.env、登录与续聊使用同源值；实际 UID1000 locale/date/ls 符合设置。
@@ -319,7 +319,7 @@ bench 导航项不拆分中英文标签。宽屏顶部三列使用 `max-content 
 - actionlint 核对 ref、权限与 artifact；实际本地 registry 的 push/pull、归档 config 哈希以及双镜像 save/load 核对。CI/GHCR发布结果与指定服务器实时预检/健康/旧服务不变在发布后验收，不能以本地替身称其已完成。
 - 联合重建后串行跑 `run_local_verification.py --manifest ...`、`verify_stack.py --manifest ... --browser`：实际运行中的合成 CLI、同 run 第二代、API 长流与新增 API、CLI 取消/重启/Recorder故障保留 API、tmux 重连、两账号传输隔离、旧哨兵及数据库不变。
 - 校验冻结源码哈希和最终输入一致，标明平台、失败日志、测试替身及未执行项。真实 CLI OAuth/实际主会话/额度恢复、公网全链路与同宿主压力由隔离部署负责人后续验证；arm64 发布前在对应环境验证。不能用本地 mock 宣称这些真实验收已完成。
-- 只改管理页面布局时运行 `cd services/gateway/web && npm run build`，浏览器覆盖 1541/1280/920/390px 与明暗主题：iframe 宽度等于视口、顶边等于导航底边、底边等于视口高度，外层无溢出，标签不竖排；表格内容高度完整、窄屏水平滚动可用，弹窗及退出可用，切回网关账号页恢复统计卡片和普通布局。
+- 只改管理页面布局时运行`npm --prefix apps/web run build`，浏览器覆盖1541/1280/920/390px与任务明暗主题。验证侧栏占位、无iframe、无横向溢出、六模块导航、原生环境分区、弹窗和离页清理，切回账号页保持普通布局。
 
 ## Scenario: v3 关联重授权提交与恢复
 
@@ -600,7 +600,7 @@ AccountStore::update_cli_process(account: &Account, process: &Value) -> Result<(
 
 ### 3. Contracts
 
-- 页面未关联时显示“创建 cc2api 账号”“关联已有账号”，已关联时显示“更新进程指标”；“重新授权”保持独立。关联选择从养号表单移出，后者只保存养号/额度。按钮状态不能替代服务端绑定/身份/占用校验。
+- 页面未关联时显示“创建网关账号”“关联已有账号”；已关联账号的“更新进程指标”位于任务账号配置的折叠“高级维护”。“重新授权”保持独立。关联选择从养号表单移出，后者只保存养号/额度。按钮状态不能替代服务端绑定/身份/占用校验。公开凭据归属消息使用“网关”，内部 cc2api 字段和路径保持兼容。
 - 创建只接受未关联账号；匹配到现有身份返回冲突及关联提示，不自动切换。关联接受显式目标，只匹配该账号，不创建；按原所有权保护镜像 cc2api 权威凭据，保留养号和目标策略。新 UI 不再调用 `/cc2api/sync`，旧 sync 和 warmup 绑定字段保持兼容。
 - 任务侧真正创建的载荷显式设置 `request_backend="native293"`、`five_hour_usage_limit_percent=85`、`seven_day_usage_limit_percent=80`、`billing_mode="rewrite"`、`upstream_session_pool_enabled=true`、`upstream_session_pool_size=4`、`upstream_session_refresh_policy="owner_only"`、`concurrency=4`、`rpm_limit=50`。额度闸线按对应窗口已用百分比计算。TTL 时长沿用默认 60 分钟；不修改 cc2api 手工创建的全局默认，不覆盖关联、指标更新、重复兼容同步或重授权后的既有策略。
 - 指标更新持有 owner → profile → environment 锁序，仅核对代理配置，不能调用 `_sync_proxy` 回写代理或解析/刷新 OAuth。内部服务在排他配置门禁下拒绝活动/等待请求；不为指标写入 quiesce/停止在途发送器。存储只条件更新原身份的 `canonical_process/updated_at`，不能把旧 Account 副本整行写回而覆盖轮换后的凭据/策略。
@@ -610,6 +610,7 @@ AccountStore::update_cli_process(account: &Account, process: &Value) -> Result<(
 - `canonical_process.observation` 固定 `source="v3:procfs:cli"`、32 位小写 hex `environment_id`、精确 `cli_version`、UTC 秒 `observed_at/sampled_at`、整数 `sample_count`、字节 `rss_bytes/rss_min_bytes/rss_max_bytes`。内存/样本计数必须非负且小于 2^53；时间有限且不超当前 60 秒，采样时刻不晚于观察时刻。count=0 时采样时间及三个 RSS 都为 null；count>0 时它们必须齐全且 `0 < min <= rss <= max < 2^53`。
 - 容器上限可独立导入；RSS 没样本显示“未采集”，有样本显示真实时间。v3 observation 不填旧兼容默认堆/CPU/RSS 范围，上游只发送有依据的 constrainedMemory 和可选 rss，内部来源元数据不进入遥测。普通旧账号画像沿用既有兼容，已有 v3 账号通过独立按钮补齐，不批量迁移设备或凭据。
 - 完整转发验收使用真实调度器、空 SQLite、随机部署、两账号发送器、HTTP CONNECT/SOCKS 与本地 HTTPS 上游；来源 IP、合成标记、发送器 request_id 和响应哈希须可关联。正式 messages JSON/SSE、实际 CLI/API 并行、取消收口和失败关闭分别验收，不能以 ClientHello/502 或 runs-stream 代替成功业务响应。
+- 原生池验收探针显式以 `user='1001:1001'` 执行并校验 `geteuid()==1001`，避免 root 启动的 TLS broker 与降权 worker 的 procfs 权限混淆。保留六 worker、一个封存映像、内存预算和300秒空闲回收断言，不能因探针权限失败放宽数量要求。
 - 隔离构建仅显式启用 Cargo `v3-verification` 与 Docker `verification-control/verification-account`，临时根位于 `/run/v3/verification-ca.der`，仍验证签名与主机名。正式 control/account 不依赖这些阶段，不含该读取路径，不新增运行时 CA/跳过校验开关。测试镜像/清单不发布；生产非模型 HTTPS 与真实模型推理分别报告，受限账号不用于模型探测。
 
 ### 4. Validation & Error Matrix
@@ -1030,6 +1031,8 @@ accounts.projects_capture_enabled INTEGER NOT NULL DEFAULT 0
 accounts.warmup_capture_enabled INTEGER NOT NULL DEFAULT 0
 runs.claude_code_version_source TEXT NULL
 GET/PUT /api/accounts/{aid}/cli-settings
+AccountCliSettingsIn.display_name: Optional[StrictStr]
+app_settings.key = 'account_display_name:' + str(accounts.id)
 CaptureRunIn.claude_code_version: Optional[StrictStr]
 _resolve_account_cli_version(account: dict, value: Optional[str] = None) -> tuple[str, str]
 GET /api/projects/work/{work_id}/capture
@@ -1044,7 +1047,8 @@ capture-status.json: source, state, updated_at, recorder_graceful?, message?
 
 ### 3. Contracts
 
-- 新列用 `_ensure_column` 幂等补齐，旧账号两个开关均关闭。PUT 仅写显式字段；版本为可空严格字符串，trim 后空值清除覆盖，开关为严格布尔，未知字段拒绝。GET/PUT 返回 account_id、配置版本、effective_claude_code_version、claude_code_version_source 与两个布尔开关；来源为 account/global。读或保存不准备环境、启动模型或热切网络。
+- 新列用 `_ensure_column` 幂等补齐，旧账号两个开关均关闭。PUT 仅写显式字段；版本为可空严格字符串，trim 后空值清除覆盖，开关为严格布尔，未知字段拒绝。GET/PUT 返回 account_id、display_name、配置版本、effective_claude_code_version、claude_code_version_source 与两个布尔开关；来源为 account/global。读或保存不准备环境、启动模型或热切网络。
+- `display_name` 是显示别名，trim 后须为1～128字符且不含ASCII控制字符。省略保持，null或原name清除别名。保存在已有 `app_settings`，与同次版本修改共用事务；账号列表一次联表读取，可空别名由页面回退到name。原name参与路径、锁与授权身份，禁止随显示名修改；账号ID、profile_path、环境、凭据及历史保持。旧客户端省略此字段继续兼容。
 - 精确版本解析优先级为单次显式值 > 账号配置 > 全局有效值，来源 explicit/account/global。账号页和两个迭代窗口读取同一权威版本；迭代窗口只提交本空间开关，缺失字段不覆盖另一空间。版本、安装准备、PATH 与 exec 环境必须一致，失败不能静默换版本。
 - 所有 CLI 入口采用账号继承：普通/批量、抓包、项目/养号、兼容项目及 CLI 评审、登录/重授权、续聊和实际 CLI 维护命令。新 run/work/session/draft 保存版本，恢复优先已有快照；旧空 run/work/草稿只回填一次并记录 legacy-* 来源，run 优先匹配原执行证明。只读进程/身份观察不能用当前默认值冒充实际已执行版本；选择版本不升级 cc2api 画像或已验证身份来源。
 - 项目和养号在新执行开始时读取账号的本空间开关，并在执行定位中记录 capture_enabled 和分代路径；既有 work 的版本快照不重写。关闭时沿共享 CLI/passthrough，兄弟作业存在时必须复用监听；开启时 `shared_cli=False, exclusive=False`，使用现有 `prepare-cli`，等待同账号 CLI 空闲，独立 API 继续可用。
@@ -1061,6 +1065,8 @@ capture-status.json: source, state, updated_at, recorder_graceful?, message?
 | 账号/全局均空覆盖，旧账号无开关值 | 全局版本兜底、抓包关闭 |
 | PUT 只提交一个空间开关或版本 null | 仅改该字段；null 清版本，另一空间保持 |
 | 非法版本 / 非布尔开关 / 未知字段 | 400 / 422 / 422，不保存无效值 |
+| 空白、超过128字符、含控制字符的显示名 / 非字符串显示名 | 400 / 422；同次版本修改一并保持原值 |
+| 省略display_name / 显式null | 保留别名 / 清除别名并显示原name |
 | 账号不存在或已软删除 | 配置接口 404，不启动执行 |
 | 修改默认值后恢复排队运行、work、会话或草稿 | 已有非空快照保持；旧空值持久回填一次 |
 | 捕获遇同账号兄弟 CLI | 等待，不能重启兄弟监听或排空独立 API |
@@ -1071,12 +1077,14 @@ capture-status.json: source, state, updated_at, recorder_graceful?, message?
 
 - 正常：全局 293、账号 303，抓包显式 293 只影响本次；之后未显式覆盖的执行仍用 303。清空账号配置后新执行继承全局，历史仍展示冻结值。
 - 基础：项目开启捕获，养号仍关闭；保存不启动模型，下一次项目执行等 CLI 空闲后捕获，养号继续共享透传。关闭后旧抓包可查。
+- 正常：`{display_name:"团队账号",claude_code_version:"2.1.303"}` 同次保存；原name为main时，其配置目录与授权仍使用main。错误：把显示名直接写回accounts.name或拼进路径。修正：只写独立别名键，显示时使用display_name/name回退。
 - 错误用法：把单次版本输入放进 batch-form，只测试后端创建接口；抓包创建成功后清空不存在字段又报失败。正确处理：控件归属 capture-form，浏览器实际提交并检查请求、清空、详情和无错误弹窗。
 - 错误用法：Recorder 停止后的迟到 response 把 interrupted 改回 complete。正确处理：保留单调中断事实，仅追加实际收到的字节；合成流量通过不等于正式协议画像通过。
 
 ### 6. Tests Required
 
 - `test_account_cli_settings.py`：真实 SQLite/API 验证严格类型、增量更新、旧库幂等升级、继承组合、创建事务重读账号、旧 run 执行证明优先及登录版本稳定。
+- 显示名覆盖原账号行、路径、凭据及历史快照保持，非法组合零写入、旧客户端省略保持、null恢复与列表回读。`verify_task_account_config.py`连接真实配置API，验证名称保存/取消、子窗草稿、局部路由、维护操作、迟到回执和原型计算样式。
 - `test_capture_settings_runtime.py` 与 `test_account_runtime.py`：两个空间共享/独占分支、精确版本/PATH/CA、监督记录、租约/代次保护、恢复字段、文件隔离和受限预览；关闭不影响共享执行。
 - `images/sidecar/test_recorder.py`：请求先落盘、索引同流去重、停止/错误为 interrupted、迟到 response 不覆盖中断；`images/account/test_network_context.py` 核对忽略 TERM 的监听器定向强停及 false 结果。
 - 实际浏览器提交三种版本来源，验证表单归属、成功重置、详情、账号/全局设置保持及无错误弹窗；两个空间配置默认关闭、切账号、旧 GET/PUT 回执、明暗和窄屏均覆盖。
@@ -1608,3 +1616,16 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - `test_cli_telemetry_policy`：默认/空/off、已有关闭键覆盖、on最终环境清理、非法值拒绝。
 - `test_account_runtime`：实际CLI准备入口保留model/hooks/其他env，任务driver及交互exec环境应用策略，on清理旧settings。
 - `test_manage`：预检共用值域；`test_system_workflow`：固定宿主包在仓库外独立导入实际依赖。
+
+## 代理引用与有界日志读取补充
+
+`GET /internal/v3/proxy-references`沿用内部服务鉴权，返回任务账号及登录草稿的规范连接摘要、公开身份与complete。绑定任务由网关权威配置去重；未初始化运行时、损坏草稿或未知连接使complete=false。摘要不转发浏览器；目录公开及删除保护见[代理目录合同](../../gateway/backend/proxy-directory.md)。
+
+`GET /api/runs/{rid}/transcript?tail_bytes=131072`沿用可见运行与原artifact路径校验，可选范围1024～1048576。仅seek读取尾部，丢弃首个不完整行，以`X-Log-Truncated`标记截断；省略参数继续完整FileResponse，支持原独立页面。`test_run_log_tail.py`使用合成文件验证边界与兼容入口。
+
+### 运行产物与公开抓包预览
+
+- `GET /api/runs/{rid}/file?path=...` 先执行 `_require_visible_run`。普通运行通过 `AccountRuntime.run_workspace_path` 按 runs.environment_id 和既有摘要别名解析物理项目目录，避开 workspaces 兼容链接。每级目录使用 `O_NOFOLLOW`；拒绝私有目录、链接、设备和FIFO，文本最多64KiB，并区分空文件、二进制和截断。
+- 工程运行复用现有冻结 `artifact_file` 读取器；场景运行选择与文件列表一致的最新冻结评测。历史预览不能回落到当前活动工作目录。
+- `GET /api/runs/{rid}/capture?path=...` 继续经过可见性、run_kind和抓包目录归属检查，复用 `capture_file_preview` 的公开元数据白名单。路径最长512字符，拒绝原始请求/响应正文；错误返回受控400/404。
+- 浏览器文件读取拥有独立取消信号及代次。切文件、关闭详情和换运行后，旧读取不能覆盖当前内容，也不能重新打开窗口。

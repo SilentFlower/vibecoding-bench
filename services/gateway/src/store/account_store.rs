@@ -23,6 +23,27 @@ pub struct AccountStore {
 }
 
 impl AccountStore {
+    /// 仅同步代理列，保留期间变化的凭据、限额和状态。
+    /// @param id 账号。@param expected 原连接。@param replacement 新连接。@return CAS是否成功。
+    pub async fn replace_proxy_connection(
+        &self,
+        id: i64,
+        expected: &str,
+        replacement: &str,
+    ) -> Result<bool, AppError> {
+        let sql = format!(
+            "UPDATE accounts SET proxy_url=$1,updated_at={} WHERE id=$2 AND proxy_url=$3",
+            self.now_expr()
+        );
+        let result = sqlx::query(&sql)
+            .bind(replacement)
+            .bind(id)
+            .bind(expected)
+            .execute(&self.pool)
+            .await
+            .map_err(|_| AppError::ServiceUnavailable("关联代理配置暂不可更新".into()))?;
+        Ok(result.rows_affected() == 1)
+    }
     /// 创建与目标数据库驱动匹配的账号存储。
     /// @param pool 数据库连接池。
     /// @param driver sqlite 或 postgres。
@@ -1008,6 +1029,47 @@ impl AccountStore {
         Ok(rows.iter().map(Self::row_to_account).collect())
     }
 
+    /// 按名称/邮箱字面子串及状态筛选后分页，计数使用同一过滤条件。
+    /// @param page 从1开始的页码。
+    /// @param page_size 每页上限由管理入口校验。
+    /// @param search 搜索文本；空字符串匹配全部。
+    /// @param status active/error/disabled；空字符串匹配全部。
+    /// @return 当前页账号与筛选总数。
+    pub async fn list_filtered(
+        &self,
+        page: i64,
+        page_size: i64,
+        search: &str,
+        status: &str,
+    ) -> Result<(Vec<Account>, i64), AppError> {
+        // 使用显式转义字符，让百分号与下划线按用户输入原样搜索。
+        let pattern = format!(
+            "%{}%",
+            search
+                .replace('!', "!!")
+                .replace('%', "!%")
+                .replace('_', "!_")
+        );
+        let filter = "($2 = '' OR status = $2) AND (LOWER(name) LIKE LOWER($1) ESCAPE '!' OR LOWER(email) LIKE LOWER($1) ESCAPE '!')";
+        let total: i64 =
+            sqlx::query_scalar(&format!("SELECT COUNT(*) FROM accounts WHERE {filter}"))
+                .bind(&pattern)
+                .bind(status)
+                .fetch_one(&self.pool)
+                .await?;
+        let rows: Vec<AnyRow> = sqlx::query(&format!(
+            "SELECT {} FROM accounts WHERE {filter} ORDER BY priority ASC, id ASC LIMIT $3 OFFSET $4",
+            ACCOUNT_COLS
+        ))
+        .bind(&pattern)
+        .bind(status)
+        .bind(page_size)
+        .bind((page - 1).saturating_mul(page_size))
+        .fetch_all(&self.pool)
+        .await?;
+        Ok((rows.iter().map(Self::row_to_account).collect(), total))
+    }
+
     pub async fn update_usage(&self, id: i64, usage_data: &str) -> Result<(), AppError> {
         let q = format!(
             "UPDATE accounts SET usage_data=$1, usage_fetched_at={}, updated_at={} WHERE id=$3",
@@ -1083,6 +1145,69 @@ mod tests {
             pool,
             driver: driver.to_string(),
         }
+    }
+
+    /// 验证过滤发生在分页前，搜索特殊字符按字面匹配。
+    /// 同步只修改代理且以实际原值CAS，避免覆盖并发账号编辑。
+    #[tokio::test]
+    async fn proxy_sync_updates_only_current_connection() {
+        let store = make_store("sqlite").await;
+        migrate_legacy(&store.pool, "sqlite").await.unwrap();
+        sqlx::query("INSERT INTO accounts(name,email,status,token,device_id,canonical_env,canonical_prompt_env,canonical_process,proxy_url) VALUES('保持名称','test@example.test','disabled','synthetic','device','{}','{}','{}','http://old.test:80')").execute(&store.pool).await.unwrap();
+        let id: i64 = sqlx::query_scalar("SELECT id FROM accounts LIMIT 1")
+            .fetch_one(&store.pool)
+            .await
+            .unwrap();
+        assert!(
+            store
+                .replace_proxy_connection(id, "http://old.test:80", "http://new.test:80")
+                .await
+                .unwrap()
+        );
+        assert!(
+            !store
+                .replace_proxy_connection(id, "http://old.test:80", "http://other.test:80")
+                .await
+                .unwrap()
+        );
+        let row = sqlx::query("SELECT name,status,token,proxy_url FROM accounts WHERE id=$1")
+            .bind(id)
+            .fetch_one(&store.pool)
+            .await
+            .unwrap();
+        assert_eq!(row.get::<String, _>("name"), "保持名称");
+        assert_eq!(row.get::<String, _>("status"), "disabled");
+        assert_eq!(row.get::<String, _>("token"), "synthetic");
+        assert_eq!(row.get::<String, _>("proxy_url"), "http://new.test:80");
+    }
+
+    #[tokio::test]
+    async fn filtered_accounts_preserve_pagination_and_literal_search() {
+        let store = make_store("sqlite").await;
+        migrate_legacy(&store.pool, "sqlite").await.unwrap();
+        for (name, email, status) in [
+            ("研发_%!", "Alpha@example.test", "active"),
+            ("研发其他", "beta@example.test", "disabled"),
+            ("后续账号", "gamma@example.test", "error"),
+        ] {
+            sqlx::query("INSERT INTO accounts(name,email,status,token,device_id,canonical_env,canonical_prompt_env,canonical_process) VALUES($1,$2,$3,'synthetic','device','{}','{}','{}')")
+                .bind(name).bind(email).bind(status).execute(&store.pool).await.unwrap();
+        }
+        let (rows, total) = store.list_filtered(1, 1, "", "").await.unwrap();
+        assert_eq!(total, 3);
+        assert_eq!(rows.len(), 1);
+        let (rows, total) = store.list_filtered(1, 1, "GAMMA", "error").await.unwrap();
+        assert_eq!(total, 1);
+        assert_eq!(rows[0].email, "gamma@example.test");
+        let (rows, total) = store.list_filtered(1, 12, "_%!", "").await.unwrap();
+        assert_eq!(total, 1);
+        assert_eq!(rows[0].name, "研发_%!");
+        let (rows, total) = store.list_filtered(2, 1, "", "disabled").await.unwrap();
+        assert_eq!(total, 1);
+        assert!(rows.is_empty());
+        let (rows, total) = store.list_filtered(1, 12, "no-match", "").await.unwrap();
+        assert_eq!(total, 0);
+        assert!(rows.is_empty());
     }
 
     #[tokio::test]

@@ -69,6 +69,40 @@ class AccountCliSettingsTests(unittest.TestCase):
         self.assertEqual(404, self.client.get('/api/accounts/1/cli-settings').status_code)
         self.assertEqual(404, self.client.put('/api/accounts/1/cli-settings', json={}).status_code)
 
+    def test_display_name_is_atomic_and_preserves_account_identity(self) -> None:
+        """显示名独立持久化，错误组合回滚，旧客户端和原资源标识保持兼容。:return: None。"""
+        profile = main.PROFILES_DIR / 'main'
+        profile.mkdir(parents=True, exist_ok=True)
+        credentials = profile / '.credentials.json'
+        credentials.write_bytes(b'{"synthetic":"stable-credential"}')
+        self.sql("INSERT INTO runs(id,task_id,account_id,claude_code_version) VALUES('history',1,1,'2.1.293')")
+        original = self.sql('SELECT * FROM accounts WHERE id=1')[0]
+        response = self.client.put('/api/accounts/1/cli-settings', json={'display_name': '  团队账号  '})
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('团队账号', response.json()['display_name'])
+        self.assertEqual(original, self.sql('SELECT * FROM accounts WHERE id=1')[0])
+        self.assertEqual('团队账号', self.client.get('/api/accounts/1/cli-settings').json()['display_name'])
+        account = self.client.get('/api/accounts').json()[0]
+        self.assertEqual(('main', '团队账号'), (account['name'], account['display_name']))
+        for payload, status in [({'display_name': ''}, 400), ({'display_name': 'x' * 129}, 400),
+                ({'display_name': 'a\nb'}, 400), ({'display_name': 3}, 422),
+                ({'display_name': '新名称', 'claude_code_version': 'latest'}, 400)]:
+            with self.subTest(payload=payload):
+                self.assertEqual(status, self.client.put('/api/accounts/1/cli-settings', json=payload).status_code)
+                self.assertEqual('团队账号', self.client.get('/api/accounts/1/cli-settings').json()['display_name'])
+                self.assertEqual(original, self.sql('SELECT * FROM accounts WHERE id=1')[0])
+        saved = self.client.put('/api/accounts/1/cli-settings', json={
+            'display_name': '团队二号', 'claude_code_version': '2.1.303'}).json()
+        self.assertEqual(('团队二号', '2.1.303'), (saved['display_name'], saved['claude_code_version']))
+        self.client.put('/api/accounts/1/cli-settings', json={'projects_capture_enabled': True})
+        self.assertEqual('团队二号', self.client.get('/api/accounts/1/cli-settings').json()['display_name'])
+        current = self.sql('SELECT * FROM accounts WHERE id=1')[0]
+        self.assertEqual({**original, 'claude_code_version': '2.1.303', 'projects_capture_enabled': 1}, current)
+        self.assertEqual(b'{"synthetic":"stable-credential"}', credentials.read_bytes())
+        self.assertEqual('2.1.293', self.sql("SELECT claude_code_version FROM runs WHERE id='history'")[0]['claude_code_version'])
+        self.assertEqual('main', self.client.put('/api/accounts/1/cli-settings', json={'display_name': None}).json()['display_name'])
+        self.assertEqual([], self.sql("SELECT * FROM app_settings WHERE key='account_display_name:1'"))
+
     def test_all_run_creators_freeze_account_version_and_single_override(self) -> None:
         """普通、批次、旧养号与抓包同规则，单次值不回写账号和全局。:return: None。"""
         self.sql("UPDATE accounts SET claude_code_version='2.1.303' WHERE id=1")

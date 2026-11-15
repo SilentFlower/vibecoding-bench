@@ -155,6 +155,8 @@ const isValidLimit = computed(() => {
 
 ## UI 风格
 
+- 新设计与逐页迁移的视觉/控件合同见 [控制台 UI 与复用控件](./ui-guidelines.md)。该规范区分已实现的通用控件与待迁移页面；既有业务行为合同继续有效。
+
 - 这是运维管理后台，优先信息密度和可扫描性。
 - 新功能应放进已有 Accounts / Tokens / Settings / Dashboard 结构，不新增营销页。
 - 使用已有 toast 模式提示保存、错误和测试结果。
@@ -174,14 +176,14 @@ const isValidLimit = computed(() => {
 
 ### 1. Scope / Trigger
 
-修改 `Dashboard.vue`、`Environments.vue`、`SystemUpdates.vue`、`RequestDiagnostics.vue` 及其共享展示工具时适用。
+修改 `Dashboard.vue`、`RuntimeEnvironments.vue`、`TasksWorkspace.vue`、`SystemUpdates.vue`、`RequestDiagnostics.vue` 及其共享展示工具时适用。
 
 ### 2. Signatures
 
 - `formatLocalTime(value?: string | null): string` 按浏览者时区显示日期、秒与 IANA 时区，空值及非法值显示“未观测”。原始 UTC 值仍用于查询与追溯。
 - `RequestDiagnostics.copy(value: string, event: MouseEvent): Promise<void>` 复制按钮对应的完整请求 ID，事件提供当前焦点域。
 - 顶层 `/environments` 为环境列表，`/tasks` 默认内部 accounts；`/tasks?tab=topics|tasks|runs|projects|warmup` 显式选择其它内部页面，兼容 `tab=accounts`。
-- iframe `/runtime/?view=environments|tasks#<tab>?account=...&environment=...&gateway_account=...` 只传受控视图及筛选参数。
+- 主路由使用Vue环境组件与任务ES模块宿主；独立兼容地址`/runtime/?view=environments|tasks#<tab>?account=...&environment=...&gateway_account=...`保留受控参数。
 
 ### 3. Contracts
 
@@ -189,8 +191,8 @@ const isValidLimit = computed(() => {
 - 品牌文字为小写 flower2api；登录、主导航和 favicon 共用粉红五瓣节点花图形 `public/favicon.svg`，颜色 `#ED6EA7`，通道透明。三个消费者同步版本参数 `?v=flower2api-pink-04`，资源更新时共同更新缓存标识。
 - SystemUpdates 的原生 `dialog.showModal()` 显式设置 `margin:auto`，避免 Tailwind preflight 的零外边距覆盖浏览器居中；最大高度为视口减 2rem，内容超高时内部滚动。安装、回退和恢复继续沿用冻结操作、冲突保护及取消/Esc/遮罩收口。
 - 系统安装与回退确认每次打开默认一分钟，冻结请求为60秒；可选1/5/15/30/60/120分钟，已登记操作与恢复继续使用原参数。后端默认及冲突合同见[平台在线更新](../../platform/deploy/platform-online-update.md)。
-- 顶层环境页隐藏重复内层导航；任务页隐藏环境子 Tab。旧内部链接通过 `runtime:navigate` 消息同步顶层 URL。父页同时核对 `origin`、当前 iframe `contentWindow` 和 Tab 白名单；忽略其它来源。
-- iframe 仅按文档 view（environments/tasks）设置 key，src 在同一 view 内固定。顶层 URL 变化通过同源 location.replace 同步内部 hash；初次加载完成再核对最新目标。二级导航保持 iframe 元素与文档身份。
+- 环境直接使用Vue分区，任务模块隐藏环境子Tab。原任务内部链接通过作用域回调`runtime:navigate`同步Vue Router；宿主校验Tab、账号身份及受控查询字段，浏览器消息不直接调用模块内部函数。
+- 任务子页共享同一模块实例及DOM根。顶层URL变化通过作用域`setRoute`同步内部地址模型；离开路由释放资源。环境与任务统一由主文档滚动，详情内部滚动。
 - 点击内部链接先阻止内部 hash 入栈；数字键、搜索、账号直达及创建后的程序化跳转统一走 `navigateTo(hash)`，嵌入时由 `runtime:navigate` 创建唯一顶层历史项，独立页面继续 hash 导航。账号筛选以 replace 同步，刷新和前进后退均以 URL 为准。
 - 切页递增 viewGeneration，账号/题库/任务/运行的迟到列表、运行流和首屏 GET 不写入新页面。关闭普通详情、关联、养号配置、题目和任务弹窗，使运行详情刷新失效；专用环境及项目窗口沿原收口入口。交互登录与续聊继续由各自显式关闭流程管理。
 - `gateway_account` 表示网关账号 ID，环境列表按公开 `gateway_account_id` 精确筛选。bench 账号 ID 与网关 ID 分开处理。提供“显示全部环境”清除直达筛选。
@@ -227,13 +229,13 @@ const isValidLimit = computed(() => {
 - 错误用法：把降级 textarea 放到弹窗外，或仅凭点击显示复制成功。正确处理：保持弹窗焦点域，以真实复制结果决定提示。
 
 - 正常：重试链显示两个账号各自名称邮箱；取消更新确认后重开恢复一分钟。错误用法：把最终账号资料套用到每次尝试，或用上次未提交的期限作为新确认默认值。正确处理：每次尝试独立读取投影，新确认使用统一默认值。
-- 正常：从账号页打开额度窗口，后退到题库后窗口关闭。错误用法：数字键先写 iframe hash 再 push 顶层，或用完整 source 重建文档。正确处理：程序化导航先交给顶层，同 view 只替换内部 hash。
+- 正常：从账号页打开额度窗口，后退到题库后窗口关闭。错误用法：数字键先写浏览器hash再push顶层，或用完整 source 重建文档。正确处理：程序化导航先交给顶层，同 view 只替换内部 hash。
 
 ### 6. Tests Required
 
 - `npm --prefix apps/web run build`；通过 Vue/TypeScript 和生产构建。
 - `python deploy/flower2api/verify_management_ui.py --output .deploy/management-ui/combined`：实际产物、合成 API、两个时区、390px、版本单展开、导航历史、采集开关及异步关闭；覆盖长名称邮箱、跨账号尝试、资料缺失与空账号及原 ID 直达。
-- 同一浏览器验证覆盖默认 accounts、六个内部页面、真实 iframe/文档身份、深链接参数、刷新/连续后退/前进、快捷键/搜索/账号直达、独立页面兼容、已打开弹窗与迟到详情收口，以及实际 app.js 静态版本标识。
+- 同一浏览器验证覆盖默认 accounts、六个内部页面、真实模块/DOM根身份、深链接参数、刷新/连续后退/前进、快捷键/搜索/账号直达、独立页面兼容、已打开弹窗与迟到详情收口，以及实际构建模块和独立兼容入口资源。
 - 原 `verify_environment_ui.py` 继续覆盖内核、时段、焦点、乱序和物理实测；所有浏览器模型调用为零。
 - `verify_management_polish.py` 使用实际构建产物，覆盖 HTTPS、HTTP、权限拒绝和全部失败的列表/弹窗复制；独立安全页回读实际剪贴板，核对完整 ID 或失败时原值，断言临时节点清理及焦点恢复。品牌验收覆盖三个入口、24/40px 和深浅背景。
 - `verify_system_update_browser.py` 核对 1280×900、390×900、390×300 的弹窗中心及按钮滚动可达性，取消/Esc/遮罩零安装写入，初开及取消重开默认一分钟、直接提交60秒、显式30分钟提交1800秒；恢复请求继续使用原操作 ID。

@@ -1033,6 +1033,10 @@ class AccountRuntimeTests(unittest.TestCase):
         with self.database() as connection:
             connection.execute("CREATE TABLE runs(id TEXT PRIMARY KEY,environment_id TEXT)")
             connection.execute("INSERT INTO runs VALUES(?,?)", ("internal-run-id", row["environment_id"]))
+        self.assertEqual(physical, self.runtime.run_workspace_path("internal-run-id"))
+        self.assertEqual(self.root / "missing-run-workspace" / "missing-run", self.runtime.run_workspace_path("missing-run"))
+        with self.assertRaises(ValueError):
+            self.runtime.run_workspace_path("../outside")
         self.runtime._session_view(row, "internal-run-id", cwd)
         self.assertTrue(self.runtime.run_session_path("internal-run-id").is_dir())
         self.assertFalse((physical / ".claude-home").exists())

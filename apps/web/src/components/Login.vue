@@ -31,40 +31,28 @@ async function submit() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center px-4">
-    <Card class="w-full max-w-sm bg-white border-[#e8e2d9] rounded-2xl shadow-lg shadow-black/5">
-      <CardHeader class="text-center pb-2">
-        <div class="flex justify-center mb-2">
-          <img src="/favicon.svg?v=flower2api-pink-04" alt="flower2api 标志" class="w-10 h-10" />
-        </div>
-        <CardTitle class="text-2xl font-semibold text-[#29261e] tracking-tight">flower2api</CardTitle>
-        <p class="text-[#8c8475] text-sm mt-1">管理控制台</p>
-      </CardHeader>
-      <CardContent>
-        <form @submit.prevent="submit" class="space-y-4">
-          <div>
-            <Input
-              v-model="password"
-              type="password"
-              placeholder="管理员密码"
-              class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] placeholder-[#b5b0a6] focus:border-[#c4704f] focus:ring-[#c4704f]/20 h-11"
-            />
-          </div>
-          <p
-            v-if="error"
-            class="text-red-500 text-sm text-center"
-          >
-            {{ error }}
-          </p>
-          <Button
-            type="submit"
-            :disabled="loading"
-            class="w-full bg-[#c4704f] hover:bg-[#b5623f] text-white font-medium h-11 rounded-xl transition-all duration-200 hover:shadow-md"
-          >
-            {{ loading ? '登录中...' : '登录' }}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+  <div class="login-page">
+    <section class="login-intro" aria-label="控制台介绍">
+      <img src="/favicon.svg?v=flower2api-pink-04" alt="" aria-hidden="true" class="size-12" />
+      <h1>flower2api</h1><p>账号、环境与任务，一个清晰的工作空间。</p>
+    </section>
+    <div class="login-form-area">
+      <Card>
+        <CardHeader class="px-0 pb-6">
+          <img src="/favicon.svg?v=flower2api-pink-04" alt="flower2api 标志" class="size-10 mb-4" />
+          <CardTitle class="text-2xl font-semibold tracking-tight">登录控制台</CardTitle>
+          <p class="page-description">输入管理员密码，继续管理你的工作空间</p>
+        </CardHeader>
+        <CardContent class="px-0">
+          <form @submit.prevent="submit" class="space-y-5">
+            <div class="space-y-2"><label for="admin-password" class="text-sm font-medium">管理员密码</label>
+              <Input id="admin-password" v-model="password" type="password" autocomplete="current-password" placeholder="管理员密码" class="h-11" />
+            </div>
+            <p v-if="error" role="alert" class="text-red-600 text-sm">{{ error }}</p>
+            <Button type="submit" :disabled="loading" class="w-full h-11">{{ loading ? '登录中...' : '登录' }}</Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   </div>
 </template>

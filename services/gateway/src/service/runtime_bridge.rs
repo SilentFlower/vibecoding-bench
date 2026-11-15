@@ -2,7 +2,7 @@
 
 use axum::body::{Body, Bytes};
 use axum::extract::ws::{Message, WebSocket};
-use axum::extract::{OriginalUri, WebSocketUpgrade};
+use axum::extract::{OriginalUri, State, WebSocketUpgrade};
 use axum::http::{HeaderMap, Method, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{any, get};
@@ -20,7 +20,9 @@ use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::handler::router::AppState;
+use crate::model::proxy::ProxySyncTarget;
 use crate::service::runtime_lease::RuntimeLease;
+use crate::store::proxy_store::ProxyRecord;
 
 const SESSION_TIMEOUT: Duration = Duration::from_secs(5);
 const STATUS_TIMEOUT: Duration = Duration::from_secs(10);
@@ -100,6 +102,54 @@ pub async fn quiesce(account_id: i64, lease: &RuntimeLease) -> Result<(), AppErr
         ));
     }
     Ok(())
+}
+
+/// 只读聚合任务账号及登录草稿的代理引用。
+/// @return 内部摘要；未配置运行时的独立网关返回空引用。
+pub async fn proxy_references() -> Result<Value, AppError> {
+    if std::env::var("V3_RUNTIME_URL")
+        .unwrap_or_default()
+        .is_empty()
+    {
+        return Ok(json!({"references": [], "complete": true}));
+    }
+    let (base, token, client) = config()?;
+    let response = client
+        .get(format!("{base}/internal/v3/proxy-references"))
+        .bearer_auth(token)
+        .timeout(STATUS_TIMEOUT)
+        .send()
+        .await
+        .map_err(|_| AppError::ServiceUnavailable("任务代理引用暂不可核对".into()))?
+        .error_for_status()
+        .map_err(|_| AppError::ServiceUnavailable("任务代理引用核对失败".into()))?;
+    response
+        .json()
+        .await
+        .map_err(|_| AppError::ServiceUnavailable("任务代理引用格式无效".into()))
+}
+
+/// 通过内部证明更新空闲任务账号或草稿，忙碌状态交回持久队列重试。
+/// @param target 固定身份。@param source 原连接摘要。@param destination 新私有连接。@return 同步状态及可能的新网关身份。
+pub async fn synchronize_proxy(
+    target: &ProxySyncTarget,
+    source: &str,
+    destination: &str,
+) -> Result<Value, AppError> {
+    let (base, token, client) = config()?;
+    client
+        .post(format!("{base}/internal/v3/proxy-sync"))
+        .bearer_auth(token)
+        .json(&json!({"target":target,"source":source,"destination":destination}))
+        .timeout(Duration::from_secs(20))
+        .send()
+        .await
+        .map_err(|_| AppError::ServiceUnavailable("线路关联同步待重试".into()))?
+        .error_for_status()
+        .map_err(|_| AppError::ServiceUnavailable("线路关联同步待重试".into()))?
+        .json()
+        .await
+        .map_err(|_| AppError::ServiceUnavailable("线路同步回执无效".into()))
 }
 
 fn config() -> Result<(String, String, reqwest::Client), AppError> {
@@ -283,6 +333,16 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
                 | "/environments.css"
                 | "/projects.js"
                 | "/style.css"
+                | "/console.css"
+                | "/approved-design.css"
+                | "/work-design.css"
+                | "/environment-design.css"
+                | "/capture-workspace.css"
+                | "/pagination.css"
+                | "/approved-icons.svg"
+                | "/ui-controls.js"
+                | "/fonts/inter-variable.woff2"
+                | "/fonts/jetbrains-mono-variable.woff2"
                 | "/vendor/xterm.js"
                 | "/vendor/xterm.css"
                 | "/vendor/xterm-addon-fit.js"
@@ -368,7 +428,50 @@ fn status_timeout(method: &Method, path: &str) -> Option<Duration> {
     .then_some(STATUS_TIMEOUT)
 }
 
+/// 把目录选择转换为运行时既有登录字段；私有连接仅存在于服务端请求中。
+/// @param body 用户的登录配置。@param record 本次锁内读取的目录记录。
+/// @return 经过版本校验的运行时载荷。
+fn translate_login_proxy(mut body: Value, record: Option<&ProxyRecord>) -> Result<Value, AppError> {
+    let object = body
+        .as_object_mut()
+        .ok_or_else(|| AppError::BadRequest("登录配置无效".into()))?;
+    if object.keys().any(|key| key.starts_with("upstream_")) {
+        return Err(AppError::BadRequest(
+            "代理目录选择与手动连接不能同时提交".into(),
+        ));
+    }
+    match record {
+        Some(proxy) => {
+            if object.get("proxy_id").and_then(Value::as_str) != Some(proxy.id.as_str())
+                || object.get("proxy_revision").and_then(Value::as_str)
+                    != Some(proxy.revision.as_str())
+            {
+                return Err(AppError::BadRequest("所选代理已变化，请重新选择".into()));
+            }
+            let connection = &proxy.connection;
+            object.insert("upstream_proxy_scheme".into(), json!(connection.protocol));
+            object.insert("upstream_socks5_host".into(), json!(connection.host));
+            object.insert("upstream_socks5_port".into(), json!(connection.port));
+            object.insert("upstream_socks5_user".into(), json!(connection.username));
+            object.insert("upstream_socks5_pass".into(), json!(connection.password));
+        }
+        None => {
+            if object.get("proxy_id") != Some(&Value::Null)
+                || object
+                    .get("proxy_revision")
+                    .is_some_and(|value| !value.is_null())
+            {
+                return Err(AppError::BadRequest("请选择有效代理或直连".into()));
+            }
+        }
+    }
+    object.remove("proxy_id");
+    object.remove("proxy_revision");
+    Ok(body)
+}
+
 async fn http_bridge(
+    State(state): State<AppState>,
     OriginalUri(uri): OriginalUri,
     method: Method,
     headers: HeaderMap,
@@ -382,6 +485,37 @@ async fn http_bridge(
         return Err(AppError::NotFound);
     }
     authenticated(&headers).await?;
+    let login = if method == Method::POST && browser_path == "/api/accounts/login/start" {
+        Some(
+            serde_json::from_slice::<Value>(&body)
+                .map_err(|_| AppError::BadRequest("登录配置无效".into()))?,
+        )
+    } else {
+        None
+    };
+    let selected = login
+        .as_ref()
+        .is_some_and(|value| value.get("proxy_id").is_some());
+    // 目录选择与删改共用锁，直到启动回执返回后，草稿引用才已由运行时登记。
+    let _proxy_guard = if selected {
+        Some(state.proxy_svc.mutations.lock().await)
+    } else {
+        None
+    };
+    let body = if selected {
+        let value = login.unwrap();
+        let record = match value.get("proxy_id") {
+            Some(Value::String(id)) => Some(state.proxy_svc.store.get(id).await?),
+            Some(Value::Null) => None,
+            _ => return Err(AppError::BadRequest("请选择有效代理或直连".into())),
+        };
+        Bytes::from(
+            serde_json::to_vec(&translate_login_proxy(value, record.as_ref())?)
+                .map_err(|_| AppError::BadRequest("登录配置无效".into()))?,
+        )
+    } else {
+        body
+    };
     let (base, token, client) = config()?;
     let timeout = status_timeout(&method, browser_path);
     let path = uri
@@ -410,6 +544,34 @@ async fn http_bridge(
         .send()
         .await
         .map_err(|_| AppError::ServiceUnavailable("v3 management request failed".into()))?;
+    if selected {
+        // 下游校验错误可能回显请求内容，目录账密一律不随原始响应返回浏览器。
+        if !upstream.status().is_success() {
+            return Err(AppError::BadRequest(
+                "登录启动失败，请核对账号状态和所选代理后重试".into(),
+            ));
+        }
+        let value: Value = upstream
+            .json()
+            .await
+            .map_err(|_| AppError::ServiceUnavailable("登录启动回执无效".into()))?;
+        let mut output = json!({});
+        for key in [
+            "session_id",
+            "ws_path",
+            "has_sidecar",
+            "name",
+            "reconnectable",
+            "cc2api_account_id",
+            "environment_id",
+            "draft_generation",
+        ] {
+            if let Some(item) = value.get(key) {
+                output[key] = item.clone();
+            }
+        }
+        return Ok(Json(output).into_response());
+    }
     Ok(response(upstream))
 }
 
@@ -532,6 +694,45 @@ mod tests {
     use tokio::net::TcpListener;
     use tokio::time::timeout;
 
+    /// 目录代理在服务端展开，冲突和手动混用均在发送前拒绝。
+    #[test]
+    fn login_directory_translation_preserves_private_boundary() {
+        use crate::model::proxy::ProxyConnection;
+        use crate::store::proxy_store::ProxyRecord;
+        use serde_json::json;
+        let proxy = ProxyRecord {
+            id: "route-1".into(),
+            name: "线路".into(),
+            connection: ProxyConnection::parse(
+                "socks5://private-user:private-password@proxy.example.test:1080",
+            )
+            .unwrap(),
+            expires_at: None,
+            revision: "revision-1".into(),
+            observation: None,
+            checked_at: None,
+            status: "unknown".into(),
+            created_at: String::new(),
+            updated_at: String::new(),
+        };
+        let value=super::translate_login_proxy(json!({"name":"test","force_reauth":false,"proxy_id":"route-1","proxy_revision":"revision-1"}),Some(&proxy)).unwrap();
+        assert_eq!(value["upstream_socks5_pass"], "private-password");
+        assert_eq!(value["upstream_socks5_port"], 1080);
+        assert!(value.get("proxy_id").is_none());
+        for body in [
+            json!({"proxy_id":"route-1","proxy_revision":"stale"}),
+            json!({"proxy_id":"route-1","proxy_revision":"revision-1","upstream_socks5_host":"other"}),
+            json!({"proxy_id":"other","proxy_revision":"revision-1"}),
+        ] {
+            assert!(super::translate_login_proxy(body, Some(&proxy)).is_err());
+        }
+        assert_eq!(
+            super::translate_login_proxy(json!({"name":"direct","proxy_id":null}), None).unwrap(),
+            json!({"name":"direct"})
+        );
+        assert!(super::translate_login_proxy(json!({"proxy_id":"missing"}), None).is_err());
+    }
+
     /// 有限状态 GET 设置期限，流式读取、长写操作及相似路径保持原生命周期。
     #[test]
     fn management_status_timeouts_preserve_streams_and_long_operations() {
@@ -618,6 +819,35 @@ mod tests {
         assert!(browser_path_allowed(&Method::GET, "/projects.js"));
         assert!(!browser_path_allowed(&Method::POST, "/projects.js"));
         assert!(!browser_path_allowed(&Method::POST, "/app.js"));
+    }
+
+    /// 新界面依赖的精确资源仅允许只读，不扩展为任意目录访问。
+    #[test]
+    fn design_assets_remain_available_through_runtime_bridge() {
+        for path in [
+            "/console.css",
+            "/approved-design.css",
+            "/work-design.css",
+            "/environment-design.css",
+            "/capture-workspace.css",
+            "/pagination.css",
+            "/approved-icons.svg",
+            "/ui-controls.js",
+            "/fonts/inter-variable.woff2",
+            "/fonts/jetbrains-mono-variable.woff2",
+        ] {
+            assert!(browser_path_allowed(&Method::GET, path), "{path}");
+            assert!(browser_path_allowed(&Method::HEAD, path), "{path}");
+            assert!(!browser_path_allowed(&Method::POST, path), "{path}");
+        }
+        for path in [
+            "/fonts/private",
+            "/fonts/../private",
+            "/fonts/%2e%2e/private",
+            "/unknown.css",
+        ] {
+            assert!(!browser_path_allowed(&Method::GET, path), "{path}");
+        }
     }
 
     /// 采集开关只开放精确环境资源和读写方法。

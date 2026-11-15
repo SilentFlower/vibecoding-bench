@@ -1,18 +1,21 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="console-design">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>flower2api / terminal</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;0,800;1,400&family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&display=swap" rel="stylesheet">
   <!-- xterm.js: 浏览器端终端，渲染 worker 容器里 `claude auth login` 的 PTY -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261103-iteration-console" />
-  <link rel="stylesheet" href="environments.css?v=20261112-management-ui" />
+  <link rel="stylesheet" href="style.css?v=20261114-console-redesign" />
+  <link rel="stylesheet" href="environments.css?v=20261114-console-redesign" />
+  <link rel="stylesheet" href="console.css?v=20261114-console-redesign" />
+  <link rel="stylesheet" href="approved-design.css?v=20261115-stability" />
+  <link rel="stylesheet" href="work-design.css?v=20261116-account-config" />
+  <link rel="stylesheet" href="environment-design.css?v=20261115-stability" />
+  <link rel="stylesheet" href="capture-workspace.css?v=20261115-stability" />
+  <link rel="stylesheet" href="pagination.css?v=20261115-stability" />
   <script>
     // 防 FOUC: 在 CSS 应用前确定主题
     (function () {
@@ -25,24 +28,20 @@
     })();
   </script>
 </head>
-<body>
+<body class="work-console">
   <div class="scanlines" aria-hidden="true"></div>
 
-  <header class="topbar">
+  <header class="runtime-heading"><button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换明暗主题" title="切换明暗主题">☀</button><p class="page-eyebrow">工作区</p><h1>任务与工程</h1><p>从任务准备到执行与交付，在一个工作区内完成。</p></header>
+  <header class="runtime-module-bar">
     <div class="brand">
-      <span class="prompt">~/flower2api</span><span class="caret">_</span>
-      <span class="brand-sub">300·topics · claude-code · mitm</span>
+      <span class="prompt">flower2api</span><span class="caret">_</span>
+      <span class="brand-sub">工程工作区</span>
     </div>
-    <nav class="tabs" role="tablist">
-      <a href="#accounts" data-tab="accounts" data-nav-group="基础配置" title="基础配置"><span class="tab-en">accounts</span><span class="tab-cn">账号</span></a>
-      <a href="#environments" data-tab="environments"><span class="tab-en">environments</span><span class="tab-cn">环境</span></a>
-      <a href="#topics"   data-tab="topics" class="nav-group-start" data-nav-group="普通任务" title="普通任务"><span class="tab-en">topics</span><span class="tab-cn">题库</span></a>
-      <a href="#tasks"    data-tab="tasks"><span class="tab-en">tasks</span><span class="tab-cn">普通任务</span></a>
-      <a href="#runs"     data-tab="runs"><span class="tab-en">runs</span><span class="tab-cn">运行记录</span></a>
-      <a href="#projects" data-tab="projects" class="nav-group-start" data-nav-group="工程迭代" title="工程迭代"><span class="tab-en">projects</span><span class="tab-cn">工程迭代</span></a>
+    <nav class="tabs work-navigation" aria-label="任务与工程模块">
+<a href="#accounts" data-tab="accounts"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-users"></use></svg><span class="tab-cn">任务账号</span></a><a href="#projects" data-tab="projects" data-iteration-mode="projects"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-box"></use></svg><span class="tab-cn">工程迭代</span></a><a href="#warmup" data-tab="warmup" data-iteration-mode="warmup"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-spark"></use></svg><span class="tab-cn">养号迭代</span></a><a href="#tasks" data-tab="tasks"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-task"></use></svg><span class="tab-cn">普通任务</span></a><a href="#runs" data-tab="runs"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-wave"></use></svg><span class="tab-cn">运行记录</span></a><a href="#topics" data-tab="topics"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-task"></use></svg><span class="tab-cn">题库</span></a><a href="#environments" data-tab="environments"><span class="tab-cn">运行环境</span></a>
     </nav>
     <div class="statline">
-      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="toggle theme" title="switch theme">☀</button>
+
       <span class="statline-sep">·</span>
       <span class="auth-pill hidden" id="auth-pill" title="logged-in user">
         <span class="auth-pill-prefix">~</span><span id="auth-user">—</span><button class="auth-logout" id="auth-logout" type="button" aria-label="logout" title="logout">×</button>
@@ -71,215 +70,89 @@
   <template id="tpl-environments">
     <section class="env-page" aria-labelledby="environment-title">
       <header class="env-page-head">
-        <div><h2 id="environment-title">账号环境</h2><p>查看运行状态、管理请求内核与维护账号环境</p></div>
-        <button type="button" class="btn" id="environment-refresh">刷新</button>
+        <div><p class="page-eyebrow">资源</p><h2 id="environment-title">运行环境</h2><p>运行组件、资源与准备状态，一眼掌握。</p></div>
+        <button type="button" class="btn" id="environment-refresh"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-refresh"></use></svg>刷新状态</button>
       </header>
       <div id="environment-feedback" class="env-error" role="alert"></div>
-      <section id="environment-summary" class="env-summary" aria-label="环境统计"></section>
-      <div class="env-toolbar">
-        <label><span class="env-sr-only">搜索账号名称或环境 ID</span><input type="search" id="environment-search" placeholder="搜索账号名称、环境 ID…" /></label>
-        <label><span class="env-sr-only">按环境状态筛选</span><select id="environment-status"><option value="all">全部状态</option></select></label>
+      <div class="environment-toolbar">
+        <section id="environment-summary" class="env-summary tabs" aria-label="环境状态筛选"></section>
+        <label class="search"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-search"></use></svg><span class="env-sr-only">搜索账号名称或环境 ID</span><input type="search" id="environment-search" placeholder="搜索账号名称或环境 ID" /></label>
+      </div>
+      <div id="environment-list" class="env-list"><p class="env-empty" role="status">正在读取环境…</p></div>
+      <div class="environment-extra-tools">
+        <label class="environment-state-select"><span class="env-sr-only">按环境状态筛选</span><select id="environment-status"><option value="all">全部状态</option></select></label>
         <span id="environment-result-count" class="env-muted" role="status"></span>
         <a href="#environments" id="environment-clear-target" class="btn btn-sm" hidden>显示全部环境</a>
       </div>
-      <div id="environment-list" class="env-list"><p class="env-empty" role="status">正在读取环境…</p></div>
+      <div id="environment-workspace" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="environment-workspace-title"><div class="modal-card environment-workspace"><header class="environment-workspace-head dialog-head"><h2 id="environment-workspace-title">环境管理</h2><button type="button" data-close="#environment-workspace" aria-label="关闭环境详情"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button></header><div class="dialog-body"><div class="workspace-panel-context" id="environment-workspace-context"></div><div class="workspace-panel-layout"><nav class="environment-sections" id="environment-workspace-tabs" role="tablist" aria-label="环境配置分区"><button type="button" role="tab" data-env-tab="overview" aria-controls="environment-section-overview"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-box"></use></svg>运行概览</button><button type="button" role="tab" data-env-tab="resources" aria-controls="environment-section-resources"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-settings"></use></svg>资源与采集</button><button type="button" role="tab" data-env-tab="kernel" aria-controls="environment-section-kernel"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-spark"></use></svg>请求内核</button><button type="button" role="tab" data-env-tab="schedule" aria-controls="environment-section-schedule"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-clock"></use></svg>运行时段</button><button type="button" role="tab" data-env-tab="maintenance" aria-controls="environment-section-maintenance"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-shield"></use></svg>维护操作</button></nav><div id="environment-workspace-body" class="environment-section-content env-detail-pane"></div></div></div></div></div>
+
     </section>
   </template>
   <template id="tpl-projects">
-    <section class="view project-view">
-      <nav class="iteration-modes" aria-label="工程迭代空间">
-        <a href="#projects" data-iteration-mode="projects">项目迭代</a>
-        <a href="#warmup" data-iteration-mode="warmup">养号迭代</a>
-      </nav>
-      <header class="view-head projects-header">
-        <div><h2 class="view-title"><span class="bracket">▌</span><span id="projects-title">项目迭代</span> <span class="muted">// Pi 指挥</span></h2>
-          <p class="hint" id="projects-runtime">正在读取运行时</p></div>
-        <label class="projects-account-picker"><span class="lbl">运行账号</span><select id="projects-account" form="projects-agent-form" required></select></label>
-      </header>
-      <section id="projects-overview" class="batch-panel projects-overview">
-        <div class="projects-overview-head">
-          <div><span class="lbl">运行状态</span><h3 id="projects-state">请选择账号</h3><p id="projects-message" class="hint"></p></div>
-          <div class="view-actions projects-controls">
-            <button class="btn" type="button" id="projects-cli-settings" disabled>配置</button>
-            <button class="btn" type="button" id="projects-capture" disabled>查看抓包</button>
-            <button class="btn btn-primary" type="button" data-pi-action="start" disabled>启动 / 恢复 Pi</button>
-            <button class="btn" type="button" data-pi-action="pause" disabled>暂停</button>
-            <button class="btn" type="button" data-pi-action="stop" disabled>停止当前目标</button>
-          </div>
-        </div>
-        <p id="projects-feedback" class="hint projects-feedback hidden" role="status" aria-live="polite" aria-atomic="true"></p>
-        <p id="projects-admission" class="projects-admission" role="status">选择账号后显示执行条件。</p>
-        <div class="projects-overview-grid">
-          <article class="projects-summary-card projects-target"><span class="lbl" id="projects-target-label">当前目标</span><div id="projects-current"></div><p class="hint" id="projects-budget" title="目标累计耗时按实际执行时间统计，暂停和计划等待不计入；本轮剩余时间独立计时，下一轮接续原目标。"></p><p class="hint" id="projects-activity"></p></article>
-          <article class="projects-summary-card"><span class="lbl">授权项目池进度</span><strong class="projects-metric" id="projects-progress-text">尚未采集</strong><p class="hint" id="projects-cycle">周期进度尚未采集</p><progress class="projects-progress hidden" id="projects-progress-bar" max="100" aria-label="已通过工程目标占比"></progress><p class="hint" id="projects-progress-detail">以独立验收通过的目标计数。</p></article>
-          <article class="projects-summary-card"><span class="lbl">下一步</span><p id="projects-next-action">选择账号并保存项目池。</p><p class="hint" id="projects-schedule-status" role="status">尚未启用定时指挥</p><p class="hint" id="projects-schedule-next"></p></article>
-        </div>
-        <div class="projects-quota-grid">
-          <article id="projects-quota-five_hour" class="projects-quota"><div class="projects-quota-head"><span>5h 已用额度</span><strong data-quota-value>未采集</strong></div><div class="projects-quota-meter"><span class="projects-quota-fill hidden" data-quota-fill role="progressbar" aria-label="5h已用额度" aria-valuemin="0" aria-valuemax="100"></span><i class="projects-quota-limit hidden" data-quota-limit></i></div><p class="hint" data-quota-description>额度阈值、截止时间和观察时间尚未采集。</p></article>
-          <article id="projects-quota-seven_day" class="projects-quota"><div class="projects-quota-head"><span>7d 已用额度</span><strong data-quota-value>未采集</strong></div><div class="projects-quota-meter"><span class="projects-quota-fill hidden" data-quota-fill role="progressbar" aria-label="7d已用额度" aria-valuemin="0" aria-valuemax="100"></span><i class="projects-quota-limit hidden" data-quota-limit></i></div><p class="hint" data-quota-description>额度阈值、截止时间和观察时间尚未采集。</p></article>
-        </div>
-        <details class="projects-usage-detail"><summary>查看 Pi 与 Claude 用量</summary><p class="hint" id="projects-usage"></p></details>
-      </section>
-      <section id="projects-reconciliation" class="batch-panel hidden"><h3>输入结果待核对</h3><div id="projects-actions"></div></section>
-      <section id="projects-workspace" class="batch-panel projects-workspace">
-        <section id="projects-verification" class="projects-verification hidden" aria-label="独立验收进度">
-          <strong id="projects-verification-stage" role="status" aria-live="polite"></strong>
-          <p id="projects-verification-clock" class="hint"></p>
-          <details><summary>查看各阶段耗时</summary><ol id="projects-verification-stages"></ol></details>
-        </section>
-        <div class="projects-tabs" role="tablist" aria-label="执行现场">
-          <button id="projects-tab-terminal" type="button" role="tab" aria-controls="projects-terminal-panel" aria-selected="true">Claude Code 终端</button>
-          <button id="projects-tab-events" type="button" role="tab" aria-controls="projects-events-panel" aria-selected="false">Pi 与 Claude 交互</button>
-        </div>
-        <div id="projects-terminal-panel" role="tabpanel" aria-labelledby="projects-tab-terminal"><p id="projects-screen-status" class="hint">选择账号后查看当前目标的最新画面。</p><pre id="projects-screen" class="projects-screen">等待 Pi 观察 Claude Code 终端。</pre></div>
-        <div id="projects-events-panel" class="hidden" role="tabpanel" aria-labelledby="projects-tab-events">
-          <div class="projects-pagination" aria-label="交互记录分页"><span id="projects-events-page" class="hint" role="status"></span><button id="projects-events-latest" type="button" class="btn btn-sm" disabled>最新一页</button><button id="projects-events-previous" type="button" class="btn btn-sm" disabled>上一页</button><button id="projects-events-next" type="button" class="btn btn-sm" disabled>下一页</button></div>
-          <button id="projects-events-new" type="button" class="btn btn-sm hidden"></button><ol id="projects-events" class="projects-events"></ol>
-        </div>
-      </section>
-      <div class="projects-settings">
-        <details id="projects-agent-settings" class="batch-panel">
-          <summary class="projects-settings-title"><strong>项目池与业务指南</strong><span class="hint" id="projects-selected-count" role="status"></span></summary>
-          <form id="projects-agent-form" class="form">
-            <label><span class="lbl">单轮指挥时长 · 分钟</span><input type="number" name="budget_minutes" min="1" max="1440" value="60" required></label>
-            <p class="hint">每轮到时保留原目标与会话，开启定时后按计划接续；新一轮重新计时，目标累计耗时仅作统计。</p>
-            <label><span class="lbl">给 Pi 的业务指南</span><textarea name="instructions" rows="4" maxlength="12000" placeholder="例如：先调查并讨论方案，确认后实施；优先完成一个目标，再换项目。"></textarea></label>
-            <p class="hint">可用中文补充业务指南，保存后的原文会交给 Pi；与 Claude Code 的自然语言交流使用英文。修改指南前请先暂停，保存后启动 / 恢复生效。</p>
-            <label><span class="lbl">授权项目池</span><input id="projects-filter" type="search" placeholder="搜索项目研究"></label>
-            <p class="hint" id="projects-research-count"></p>
-            <div class="view-actions"><button class="btn btn-sm" type="button" id="projects-select-all" title="选择全部项目，包含当前搜索隐藏的项目">全选</button><button class="btn btn-sm" type="button" id="projects-clear-all" title="清空全部项目的选择">清空</button></div>
-            <div id="projects-projects" class="projects-choices"></div>
-            <button class="btn btn-primary" type="submit">保存项目池与指南</button>
-          </form>
-        </details>
-        <details id="projects-schedule-settings" class="batch-panel">
-          <summary class="projects-settings-title"><strong>自动指挥计划</strong><span class="hint">按账号当地运行时段执行</span></summary>
-          <form id="projects-schedule-form" class="form">
-            <label class="toggle-line"><input type="checkbox" name="schedule_enabled" disabled><span>启用定时指挥</span></label>
-            <label><span class="lbl" id="projects-interval-label">每轮结束后的间隔 · 分钟</span><input type="number" name="interval_minutes" min="1" max="1440" value="60" required disabled></label>
-            <label class="hidden" id="projects-interval-max"><span class="lbl">间隔上限 · 分钟，留空使用固定间隔</span><input type="number" name="interval_max_minutes" min="1" max="1440" disabled></label>
+    <section class="project-view"><div class="work-context"><div><label class="field"><select id="projects-account" form="projects-agent-form" required aria-label="运行账号"></select></label></div><span><span id="projects-title">工程迭代</span><small id="projects-runtime">正在读取运行时</small></span><button class="btn btn-sm" type="button" id="projects-refresh"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-refresh"></use></svg>刷新快照</button></div><nav class="work-subnav" id="projects-pane-nav" aria-label="工程工作区分区"><button type="button" data-project-pane="overview" class="active">运行总览</button><button type="button" data-project-pane="pool" class="">项目池与指南</button><button type="button" data-project-pane="schedule" class="">自动计划</button><button type="button" data-project-pane="model" class="">模型配置</button><button type="button" data-project-pane="history" class="">交付历史</button></nav><p id="projects-feedback" class="work-form-error hidden" role="status" aria-live="polite"></p><div data-project-panel="overview"><section id="projects-overview" class="work-hero"><div class="work-hero-heading"><div><span id="projects-state" class="work-badge">请选择账号</span><span id="projects-key" class="work-project-key"></span></div><div class="buttons"><button class="btn btn-sm" type="button" id="projects-cli-settings" disabled><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-settings"></use></svg>执行配置</button><button class="btn btn-primary btn-sm" type="button" data-pi-action="start" disabled>启动 / 恢复 Pi</button><button class="btn btn-sm" type="button" data-pi-action="pause" disabled>暂停</button><button class="btn btn-sm btn-danger" type="button" data-pi-action="stop" disabled>停止当前目标</button></div></div><h2 id="projects-goal">选择账号后查看当前目标</h2><p id="projects-message"></p><p id="projects-activity" class="work-note"></p><div class="work-summary-grid"><div><span>项目池 · 独立验收</span><strong id="projects-progress-text">尚未采集</strong><progress class="projects-progress hidden" id="projects-progress-bar" max="100" aria-label="已通过工程目标占比"></progress><small id="projects-cycle"></small></div><div><span>目标累计执行</span><strong id="projects-elapsed">未采集</strong><small id="projects-budget"></small></div><div><span>单轮预算</span><strong id="projects-turn-budget">未采集</strong><small>到时保留目标，下一轮接续</small></div><div><span>自动指挥计划</span><strong id="projects-schedule-status" class="work-summary-text">尚未启用</strong><small id="projects-schedule-next"></small><button type="button" data-show-project-pane="schedule">配置下一次执行 <svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-arrow"></use></svg></button></div></div></section><div class="work-execution-grid"><section id="projects-workspace" class="work-panel work-live"><header><div class="work-screen-tabs" role="tablist" aria-label="执行现场"><button id="projects-tab-terminal" type="button" role="tab" aria-controls="projects-terminal-panel" aria-selected="true" class="active">Claude 终端</button><button id="projects-tab-events" type="button" role="tab" aria-controls="projects-events-panel" aria-selected="false">交互记录</button><button id="projects-tab-verification" type="button" role="tab" aria-controls="projects-verification-panel" aria-selected="false">独立验收</button></div><span>实时观察</span></header><div id="projects-terminal-panel" role="tabpanel" aria-labelledby="projects-tab-terminal"><div class="work-terminal-meta"><span id="projects-screen-status">等待当前目标的画面</span><span id="projects-terminal-state">现场保留</span></div><pre id="projects-screen" class="work-terminal">等待 Pi 观察 Claude Code 终端。</pre></div><div id="projects-events-panel" class="hidden" role="tabpanel" aria-labelledby="projects-tab-events">
+          <button id="projects-events-new" type="button" class="btn btn-sm hidden"></button><div id="projects-events" class="work-events upgrade-events"></div>
+          <div class="projects-pagination" aria-label="交互记录分页"><label class="pagination-size-native">每页条数<select id="projects-events-size" aria-label="交互记录每页条数"><option value="10">10 条 / 页</option><option value="20" selected>20 条 / 页</option><option value="50">50 条 / 页</option><option value="100">100 条 / 页</option></select></label><span id="projects-events-page" class="hint" role="status"></span><button id="projects-events-latest" type="button" class="btn btn-sm" disabled="">最新一页</button><button id="projects-events-previous" type="button" class="btn btn-sm" disabled="">上一页</button><button id="projects-events-next" type="button" class="btn btn-sm" disabled="">下一页</button></div>
+        </div><div id="projects-verification-panel" class="hidden work-verification" role="tabpanel" aria-labelledby="projects-tab-verification"><section id="projects-verification" class="hidden" aria-label="独立验收进度"><h3 id="projects-verification-stage" role="status" aria-live="polite"></h3><p id="projects-verification-clock"></p><ol id="projects-verification-stages" class="work-verification-steps"></ol></section><section id="projects-verification-empty"><h3>等待提交独立验收</h3><p>终端测试成功后，仍需独立验收通过才计入完成进度。</p><ol class="work-verification-steps"><li><span>1</span><div>保存候选变更与提交</div><small>待开始</small></li><li><span>2</span><div>运行独立验收</div><small>待开始</small></li><li><span>3</span><div>保存通过事实并释放执行</div><small>待开始</small></li></ol></section></div><footer><code id="projects-work-id">尚无工程目标</code><button type="button" data-show-project-pane="history">交付历史</button><button class="btn btn-sm" type="button" id="projects-capture" disabled><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-wave"></use></svg>查看抓包</button></footer></section><aside class="work-side-stack"><section class="work-panel"><header><h3>运行条件</h3><span id="projects-admission-badge" class="work-badge">待观测</span></header><div class="work-condition"><span>账号共享 CLI 容量</span><strong id="projects-capacity">未采集</strong></div><div class="work-condition"><span>当地运行时段</span><strong id="projects-window">未采集</strong></div><p id="projects-admission" class="work-note">选择账号后显示执行条件。</p><div class="projects-quota-grid">
+          <article id="projects-quota-five_hour" class="projects-quota"><div class="projects-quota-head"><span>5 小时已用</span><strong><span data-quota-value="">未采集</span><small data-quota-threshold></small></strong></div><div class="projects-quota-meter"><span class="projects-quota-fill hidden" data-quota-fill="" role="progressbar" aria-label="5h已用额度" aria-valuemin="0" aria-valuemax="100"></span><i class="projects-quota-limit hidden" data-quota-limit=""></i></div><p class="hint" data-quota-description="">额度阈值、截止时间和观察时间尚未采集。</p></article>
+          <article id="projects-quota-seven_day" class="projects-quota"><div class="projects-quota-head"><span>7 天已用</span><strong><span data-quota-value="">未采集</span><small data-quota-threshold></small></strong></div><div class="projects-quota-meter"><span class="projects-quota-fill hidden" data-quota-fill="" role="progressbar" aria-label="7d已用额度" aria-valuemin="0" aria-valuemax="100"></span><i class="projects-quota-limit hidden" data-quota-limit=""></i></div><p class="hint" data-quota-description="">额度阈值、截止时间和观察时间尚未采集。</p></article>
+        </div><details class="projects-usage-detail"><summary>查看 Pi 与 Claude 用量</summary><p class="hint" id="projects-usage"></p></details></section><section class="work-panel"><header><h3>接下来的工作</h3><button type="button" data-show-project-pane="pool">项目池 <svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-arrow"></use></svg></button></header><ol id="projects-current" class="work-objectives"></ol><div id="projects-target-failure"></div><p id="projects-next-action" class="work-note">选择账号并保存项目池。</p><span id="projects-target-label" class="env-sr-only">当前目标</span><details class="work-progress-explanation"><summary>目标进度说明</summary><p id="projects-progress-detail" class="work-note"></p></details></section></aside></div><section id="projects-reconciliation" class="batch-panel hidden"><h3>输入结果待核对</h3><div id="projects-actions"></div></section></div><section class="work-panel work-config" id="projects-agent-settings" data-project-panel="pool" hidden><header><div><h3>项目池与业务指南</h3><p>选择可执行项目，设置单轮预算与业务指南。</p></div></header><form id="projects-agent-form" class=""><div class="work-config-columns"><div><label class="field"><span class="lbl">单轮指挥时长 · 分钟</span><input type="number" name="budget_minutes" min="1" max="1440" value="60" required=""></label><label class="field"><span class="lbl">给 Pi 的业务指南</span><textarea name="instructions" rows="7" maxlength="12000" placeholder="例如：先调查并讨论方案，确认后实施；优先完成一个目标，再换项目。"></textarea></label><p class="work-note">每次指挥处理一个目标。修改指南前请先暂停；保存后通过启动 / 恢复应用。</p></div><fieldset class="work-pool"><legend>授权项目池</legend><label class="work-search"><svg class="runtime-icon"><use href="approved-icons.svg#i-search"></use></svg><input id="projects-filter" type="search" placeholder="搜索项目名称" aria-label="搜索项目池"></label><div class="work-pool-actions"><button class="btn btn-sm" type="button" id="projects-select-all" title="选择全部项目，包含当前搜索隐藏的项目">全选</button><button class="btn btn-sm" type="button" id="projects-clear-all" title="清空全部项目的选择">清空</button></div><p class="hint" id="projects-research-count"></p><span class="hint" id="projects-selected-count" role="status"></span><div id="projects-projects" class="projects-choices"></div></fieldset></div><footer class="work-form-footer"><span>保存后应用到当前账号</span><button type="button" class="btn" data-work-discard="pool">撤销修改</button><button type="submit" class="btn btn-primary">保存项目池与指南</button></footer></form></section><section class="work-panel work-config" id="projects-schedule-settings" data-project-panel="schedule" hidden><header><div><h3>自动指挥计划</h3><p>按当前账号的当地运行时段执行。</p></div></header><form id="projects-schedule-form" class="">
+            <label class="switch-field"><span><strong>启用定时指挥</strong><small>关闭计划保留当前任务；暂停和停止会同时关闭计划。</small></span><input type="checkbox" name="schedule_enabled" disabled=""></label><div class="work-form-grid"><label class="field"><span class="lbl" id="projects-interval-label">每轮结束后的间隔 · 分钟</span><input type="number" name="interval_minutes" min="1" max="1440" value="60" required="" disabled=""></label><label class="hidden field" id="projects-interval-max"><span class="lbl">间隔上限 · 分钟，留空使用固定间隔</span><input type="number" name="interval_max_minutes" min="1" max="1440" disabled=""></label></div>
+
+
             <p class="hint">先保存项目池。开启后立即检查，后续按间隔继续；关闭计划保留当前任务。“暂停”和“停止当前目标”会同时关闭自动计划。</p>
-            <button class="btn btn-primary" type="submit" disabled>保存自动计划</button>
-          </form>
-        </details>
-        <details id="projects-model-settings" class="batch-panel">
-          <summary class="projects-settings-title"><strong>Pi 模型配置</strong><span class="hint">服务与模型优先级</span></summary>
-          <form id="projects-model-form" class="form">
-            <div class="row"><label><span class="lbl">服务地址</span><input name="base_url" type="url" maxlength="2048" placeholder="https://ai.flower-cli.com/v1" required></label><label><span class="lbl">API Key</span><input name="api_key" type="password" autocomplete="new-password" maxlength="4096" placeholder="留空沿用已配置密钥"></label></div>
-            <label><span class="lbl">模型 · 按优先级一行一个</span><textarea name="models" rows="2" required></textarea></label>
-            <label><span class="lbl">上下文摘要压缩阈值 · token</span><input name="compaction_threshold_tokens" type="number" min="10000" max="900000" step="1" value="350000" required></label>
+
+          <footer class="work-form-footer"><span>按当前账号当地运行时段执行</span><button type="button" class="btn" data-work-discard="schedule">撤销修改</button><button class="btn btn-primary" type="submit" disabled="">保存计划</button></footer></form></section><section class="work-panel work-config" id="projects-model-settings" data-project-panel="model" hidden><header><div><h3>Pi 模型配置</h3><p>按优先级选择模型，下次启动或恢复时生效。</p></div></header><form id="projects-model-form" class="">
+            <div class="work-form-grid"><label class="field"><span class="lbl">服务地址</span><input name="base_url" type="url" maxlength="2048" placeholder="https://ai.flower-cli.com/v1" required=""></label><label class="field"><span class="lbl">API Key</span><input name="api_key" type="password" autocomplete="new-password" maxlength="4096" placeholder="留空沿用已配置密钥"></label></div>
+            <label class="field"><span class="lbl">模型 · 按优先级一行一个</span><textarea name="models" rows="4" required=""></textarea></label>
+            <label class="field"><span class="lbl">上下文摘要压缩阈值 · token</span><input name="compaction_threshold_tokens" type="number" min="10000" max="900000" step="1" value="350000" required=""></label>
             <p class="hint">同一目标达到阈值后生成摘要并继续；新目标从干净上下文开始。默认 350,000 token，保存后在下次启动或恢复时生效。</p>
             <p class="hint" id="projects-model-status"></p>
-            <div class="row-end"><button type="button" class="btn btn-sm" id="projects-model-reset">恢复环境配置</button><button class="btn btn-primary" type="submit">保存模型配置</button></div>
-          </form>
-        </details>
-      </div>
-      <section class="projects-records">
-        <details class="batch-panel" open><summary>工程与交付记录</summary>
-          <div class="projects-pagination" aria-label="工程记录分页"><span id="projects-history-page" class="hint" role="status"></span><button id="projects-history-latest" type="button" class="btn btn-sm" disabled>最新一页</button><button id="projects-history-previous" type="button" class="btn btn-sm" disabled>上一页</button><button id="projects-history-next" type="button" class="btn btn-sm" disabled>下一页</button></div>
+            <div class="work-form-footer"><span>下次启动或恢复时生效</span><button class="btn" type="button" data-work-discard="model">撤销修改</button><button type="button" class="btn btn-sm" id="projects-model-reset">恢复环境配置</button><button class="btn btn-primary" type="submit">保存模型配置</button></div>
+          </form></section><section class="projects-records" data-project-panel="history" hidden="">
+        <section class="work-panel work-history"><header><h3>工程与交付记录</h3><span>按实际工作记录查看</span></header>
+
           <button id="projects-history-new" type="button" class="btn btn-sm hidden"></button><div id="projects-history"></div>
-        </details>
-        <details class="batch-panel" id="projects-delivery"><summary id="projects-delivery-title">冻结交付与源码</summary><p id="projects-delivery-duration" class="hint" title="按实际累计执行时间统计，暂停和计划等待不计入。"></p><div id="projects-delivery-failure"></div><div id="projects-submissions"></div><div id="projects-delivery-files"></div><pre class="projects-document" id="projects-delivery-preview"></pre></details>
-      </section>
-      <details id="projects-research" class="batch-panel"><summary id="projects-research-title">项目研究</summary><pre id="projects-research-body" class="projects-document"></pre></details>
-    </section>
+          <div class="projects-pagination" aria-label="工程记录分页"><label class="pagination-size-native">每页条数<select id="projects-history-size" aria-label="工程记录每页条数"><option value="10" selected>10 条 / 页</option><option value="20">20 条 / 页</option><option value="50">50 条 / 页</option><option value="100">100 条 / 页</option></select></label><span id="projects-history-page" class="hint" role="status"></span><button id="projects-history-latest" type="button" class="btn btn-sm" disabled="">最新一页</button><button id="projects-history-previous" type="button" class="btn btn-sm" disabled="">上一页</button><button id="projects-history-next" type="button" class="btn btn-sm" disabled="">下一页</button></div>
+        </section>
+        <div id="projects-delivery" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="projects-delivery-title"><div class="modal-card work-delivery-workspace"><header class="modal-titlebar"><h2>交付与独立验收</h2><button type="button" class="modal-close" data-close="#projects-delivery" aria-label="关闭冻结交付"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button></header><div class="upgrade-document-meta"><div><span id="projects-delivery-project"></span><h3 id="projects-delivery-title">冻结交付与源码</h3></div><span id="projects-delivery-duration" class="hint"></span></div><div class="upgrade-document-toolbar"><label class="field"><span class="lbl">候选提交</span><select id="projects-submission" aria-label="候选提交"></select></label></div><div class="upgrade-document-scroll"><div id="projects-delivery-failure"></div><div id="projects-delivery-summary" class="upgrade-delivery-summary"></div><div class="upgrade-delivery-grid"><section class="upgrade-card"><header><h3>候选文件</h3><span id="projects-delivery-file-count"></span></header><div id="projects-delivery-files"></div></section><section class="upgrade-card"><header><h3>验收报告</h3></header><div id="projects-delivery-report" class="upgrade-card-body"></div></section></div><section class="upgrade-code-panel"><header><span id="projects-delivery-path">选择文件查看内容</span><small>冻结交付快照</small></header><pre class="work-file-preview" id="projects-delivery-preview">选择提交或文件查看冻结内容。</pre></section></div></div></div>
+      </section><div id="projects-research" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="projects-research-title"><div class="modal-card work-research-workspace"><header class="modal-titlebar"><h2>项目研究</h2><button type="button" class="modal-close" data-close="#projects-research" aria-label="关闭项目研究"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button></header><div class="upgrade-document-meta"><div><span id="projects-research-key"></span><h3 id="projects-research-title">项目研究</h3></div><span class="pill">研究资料</span></div><div class="upgrade-reading-tabs"><button type="button" data-research-tab="report" class="active">研究报告</button><button type="button" data-research-tab="roadmap">实施路线</button><button type="button" data-research-tab="objectives">工程目标</button></div><div id="projects-research-body" class="upgrade-document-scroll"></div></div></div></section>
   </template>
 
   <template id="tpl-accounts">
     <section class="view">
-      <header class="view-head">
-        <div>
-          <h2 class="view-title"><span class="bracket">▌</span>accounts <span class="muted">// oauth profiles</span></h2>
-          <p class="hint">添加账号后可查询 Claude Code 5h / 7d 额度；所有查询和运行都走该账号代理。</p>
-        </div>
-        <button class="btn btn-primary" id="add-account">+ 添加账号</button>
-      </header>
+      <div class="work-list-title"><div><h2>任务账号</h2><p>授权、CLI 设置、额度与网关关联集中管理。</p></div><button class="btn btn-primary" type="button" id="add-account"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-plus"></use></svg>添加任务账号</button></div><div class="work-list-toolbar"><label class="work-search"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-search"></use></svg><input type="search" id="work-account-search" aria-label="搜索当前列表" placeholder="搜索账号、邮箱、代理或出口 IP"></label><div class="buttons"></div></div>
       <p class="hint hidden" id="account-login-result" role="status"></p>
-      <div class="table-frame">
-        <table class="data accounts-table">
-          <thead><tr>
-            <th>id</th><th>name</th><th>profile</th>
-            <th>upstream proxy</th><th>timezone</th><th>access token</th><th>cc2api / warmup</th><th>on</th><th>op</th>
-          </tr></thead>
-          <tbody id="accounts-body"></tbody>
-        </table>
-      </div>
+      <section id="work-login-drafts" class="work-panel work-login-drafts" hidden></section><div id="accounts-body" class="work-account-grid"></div>
     </section>
   </template>
 
   <template id="tpl-topics">
     <section class="view">
-      <header class="view-head">
-        <div>
-          <h2 class="view-title"><span class="bracket">▌</span>topics <span class="muted" id="topics-count"></span></h2>
-          <p class="hint">题库持久化在 SQLite。点击卡片查看 / 编辑，不再直接创建任务。</p>
-        </div>
-        <div class="view-actions">
-          <button class="btn btn-primary" id="add-topic" type="button">+ 新增题目</button>
-          <div class="filter-wrap">
-            <span class="filter-prefix">filter&gt;</span>
-            <input type="search" id="topic-filter" placeholder="title / category / no" />
-          </div>
-        </div>
-      </header>
-      <div id="topics-list" class="topics-grid"></div>
+      <div class="work-list-title"><div><h2>题库 <small id="topics-count"></small></h2><p>管理初始需求与自动补充，创建可重复的任务。</p></div><button class="btn btn-primary" type="button" id="add-topic"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-plus"></use></svg>新建题目</button></div><div class="work-list-toolbar"><label class="work-search"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-search"></use></svg><input type="search" id="topic-filter" aria-label="搜索当前列表" placeholder="搜索标题、分类或题号"></label><div class="buttons"></div></div>
+      <div id="topics-list" class="work-topic-grid"></div>
     </section>
   </template>
 
   <template id="tpl-tasks">
     <section class="view">
-      <header class="view-head">
-        <div>
-          <h2 class="view-title"><span class="bracket">▌</span>tasks <span class="muted">// dispatched</span></h2>
-          <p class="hint">先选账号，再多选 topic；批次会随机打乱选中题目，并按最多 2 并发和随机间隔投放。</p>
-        </div>
-      </header>
-      <form id="batch-form" class="form batch-panel">
-        <div class="row">
-          <label><span class="lbl">$ account</span>
-            <select name="account_id" required></select>
-          </label>
-          <label><span class="lbl">$ concurrency</span>
-            <input name="concurrency" type="number" min="1" max="2" value="2" />
-          </label>
-          <label><span class="lbl">$ timeout_sec</span>
-            <input name="timeout_sec" type="number" min="60" value="1800" />
-          </label>
-        </div>
-        <div class="row">
-          <label><span class="lbl">$ interval_min_sec</span>
-            <input name="interval_min_sec" type="number" min="0" value="0" />
-          </label>
-          <label><span class="lbl">$ interval_max_sec</span>
-            <input name="interval_max_sec" type="number" min="0" value="0" />
-          </label>
-        </div>
-        <fieldset class="prompt-mode-field">
-          <legend class="lbl">$ prompt_mode</legend>
-          <div class="segmented-control">
-            <label><input type="radio" name="prompt_mode" value="natural" checked /><span>自然</span></label>
-            <label><input type="radio" name="prompt_mode" value="canonical" /><span>规范</span></label>
-          </div>
-        </fieldset>
-        <label><span class="lbl">$ prompt_override</span>
+      <div class="work-list-title"><div><h2>普通任务</h2><p>按账号组织执行批次，保留并发与随机间隔。</p></div><button class="btn btn-primary" type="button" id="open-batch-form"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-plus"></use></svg>新建批次</button></div><div class="work-list-toolbar"><label class="work-search"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-search"></use></svg><input type="search" id="work-batch-search" aria-label="搜索当前列表" placeholder="搜索账号或批次 ID"></label><div class="buttons"></div></div>
+      <div id="batch-create-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="batch-create-title"><div class="modal-card task-batch-editor"><div class="modal-titlebar"><h2 id="batch-create-title">新建任务批次</h2><button type="button" class="modal-close" data-close="#batch-create-modal" aria-label="关闭批次编辑"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button></div>      <form id="batch-form" class="upgrade-sheet"><div class="upgrade-sheet-body"><div class="upgrade-intro"><span><svg class="runtime-icon"><use href="approved-icons.svg#i-task"></use></svg></span><div><h3>准备本次执行</h3><p>选择题目和账号，确认执行节奏后启动。</p></div></div><div class="upgrade-batch-grid"><section class="upgrade-card"><header><h3>选择题目</h3><span class="hint" id="batch-selected-count">0 selected</span></header><div class="upgrade-topic-tools"><label class="work-search"><svg class="runtime-icon"><use href="approved-icons.svg#i-search"></use></svg><input type="search" id="batch-topic-search" aria-label="搜索批次题目" placeholder="题号、标题或分类"></label><div data-selection-actions=""><button class="btn btn-sm" type="button" id="batch-select-all">全选搜索结果</button><button class="btn btn-sm" type="button" id="batch-clear-all">清空全部</button></div></div><div id="batch-topic-list" class="upgrade-topic-list"></div></section><section class="upgrade-card"><header><h3>执行配置</h3><span>仅作用于本次批次</span></header><div class="upgrade-card-body"><label class="field"><span class="lbl">运行账号</span>
+            <select name="account_id" required=""></select>
+          </label><div class="work-form-grid"><label class="field"><span class="lbl">任务并发</span>
+            <input name="concurrency" type="number" min="1" max="2" value="2">
+          </label><label class="field"><span class="lbl">超时（秒）</span>
+            <input name="timeout_sec" type="number" min="60" value="1800">
+          </label><label class="field"><span class="lbl">最小间隔（秒）</span>
+            <input name="interval_min_sec" type="number" min="0" value="0">
+          </label><label class="field"><span class="lbl">最大间隔（秒）</span>
+            <input name="interval_max_sec" type="number" min="0" value="0">
+          </label></div><label class="field"><span class="lbl">输入方式</span><select name="prompt_mode"><option value="natural" selected>自然语言</option><option value="canonical">规范输入</option></select></label><label class="field"><span class="lbl">批次需求覆盖</span>
           <span class="hint inline">留空则每个 topic 使用所选模式生成 prompt</span>
           <textarea name="prompt" rows="4" placeholder="可选：给本批次所有 topic 使用同一段 prompt"></textarea>
-        </label>
-        <div class="batch-toolbar">
-          <button class="btn btn-sm" type="button" id="batch-select-all">全选</button>
-          <button class="btn btn-sm" type="button" id="batch-clear-all">清空</button>
-          <span class="hint" id="batch-selected-count">0 selected</span>
-          <span class="hint inline">默认并发上限固定为 2，避免单账号挤爆额度。</span>
-          <button class="btn btn-primary" type="submit">启动批次</button>
-        </div>
-        <div id="batch-topic-list" class="batch-topic-list"></div>
-      </form>
-      <div class="table-frame">
-        <table class="data batches-table">
-          <thead><tr>
-            <th>id</th><th>account</th><th>status</th><th class="right">items</th>
-            <th class="right">concurrency</th><th class="right">interval</th><th>op</th>
-          </tr></thead>
+        </label></div></section></div></div><footer class="work-form-footer"><span>启动后按账号执行条件调度</span><button type="button" class="btn" data-close="#batch-create-modal">取消</button><button class="btn btn-primary" type="submit">创建并启动</button></footer></form></div></div>
+      <div class="work-panel work-table-wrap">
+        <table class="work-table batches-table">
+          <thead><tr><th>批次 / 账号</th><th>状态</th><th>完成进度</th><th>并发</th><th>间隔</th><th>操作</th></tr></thead>
           <tbody id="batches-body"></tbody>
         </table>
       </div>
@@ -288,73 +161,14 @@
 
   <template id="tpl-runs">
     <section class="view">
-      <header class="view-head">
-        <div>
-          <h2 class="view-title"><span class="bracket">▌</span>runs <span class="muted">// live · sse</span></h2>
-          <p class="hint">实时刷新。每行点 <code>detail</code> 看 transcript / 产物 / token 统计。</p>
-        </div>
-        <div class="legend">
-          <span class="pill pill-queued">queued</span>
-          <span class="pill pill-running">running</span>
-          <span class="pill pill-quota_wait">额度等待</span>
-          <span class="pill pill-success">success</span>
-          <span class="pill pill-failed">failed</span>
-          <span class="pill pill-auth_failed">auth_failed</span>
-          <span class="pill pill-timeout">timeout</span>
-          <span class="pill pill-stopped">stopped</span>
-        </div>
-      </header>
-      <form id="runtime-model-form" class="form runtime-model-panel">
-        <div class="capture-title">
-          <strong>默认模型</strong>
-          <span class="muted">// 普通 run + 批量 run</span>
-        </div>
-        <div class="row">
-          <label><span class="lbl">$ default_model</span>
-            <span class="hint inline">页面保存后影响新的普通 / 批量运行；额度等待恢复时沿用原模型。留空并保存则回退到 .env。</span>
-            <input name="default_model" list="claude-model-options" placeholder="例如 opus[1m] 或 sonnet[1m]" />
-          </label>
-          <div class="runtime-model-status">
-            <span class="muted">当前生效</span>
-            <strong id="runtime-model-effective">加载中</strong>
-            <span class="hint inline" id="runtime-model-source">读取配置中</span>
-          </div>
-        </div>
-        <div class="row-end">
-          <button class="btn btn-sm" type="button" id="runtime-model-reset">回退 .env</button>
-          <button class="btn btn-primary" type="submit">保存默认模型</button>
-        </div>
-      </form>
-      <form id="runtime-effort-form" class="form runtime-model-panel">
-        <div class="capture-title">
-          <strong>思考预算</strong>
-          <span class="muted">// 普通 run + 批量 run</span>
-        </div>
-        <div class="row">
-          <label><span class="lbl">$ effort_level</span>
-            <span class="hint inline">页面保存后立即影响新启动的普通 / 批量 run；抓包使用下方独立选择。</span>
-            <select name="effort_level"></select>
-          </label>
-          <div class="runtime-model-status">
-            <span class="muted">当前生效</span>
-            <strong id="runtime-effort-effective">加载中</strong>
-            <span class="hint inline" id="runtime-effort-source">读取配置中</span>
-          </div>
-        </div>
-        <div class="row-end">
-          <button class="btn btn-sm" type="button" id="runtime-effort-reset">回退 .env</button>
-          <button class="btn btn-primary" type="submit">保存思考预算</button>
-        </div>
-      </form>
-      <form id="claude-code-version-form" class="form runtime-model-panel">
-        <div class="capture-title">
-          <strong>Claude Code 版本</strong>
-          <span class="muted">// 新启动的 worker</span>
-        </div>
-        <div class="row">
-          <label><span class="lbl">$ claude_code_version</span>
-            <span class="hint inline">页面保存后立即影响新启动的 task / 抓包 / 登录容器；留空并保存则回退到 .env。</span>
-            <input name="claude_code_version" list="claude-code-version-options" placeholder="例如 2.1.293 或 2.1.280" />
+      <div class="work-list-title"><div><h2>运行记录</h2><p>查看执行结果、文件产物与诊断记录。</p></div><button class="btn btn-primary" type="button" id="runtime-open-settings"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-settings"></use></svg>运行配置</button></div><div class="work-list-toolbar"><label class="work-search"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-search"></use></svg><input type="search" id="work-run-search" aria-label="搜索当前列表" placeholder="搜索名称、账号或记录 ID"></label><div class="buttons"><div class="work-filter" id="work-run-status"><button type="button" data-run-status="all" class="active">全部</button><button type="button" data-run-status="running">执行中</button><button type="button" data-run-status="failed">失败</button></div><button type="button" class="btn btn-sm" id="work-capture-new">启动抓包</button></div></div>
+      <div class="modal hidden" id="runtime-settings-modal" role="dialog" aria-modal="true" aria-labelledby="runtime-settings-title"><div class="modal-card runtime-settings-workspace"><div class="modal-titlebar"><h2 id="runtime-settings-title">后续运行配置</h2><button type="button" class="modal-close" data-close="#runtime-settings-modal" aria-label="关闭运行配置"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button></div><div class="runtime-settings-scroll">      <div class="run-config-grid">
+
+
+
+      <form id="claude-code-version-form" class="form runtime-model-panel"><label class="field"><span class="lbl">Claude Code 版本</span>
+
+            <input name="claude_code_version" list="claude-code-version-options" placeholder="例如 2.1.293 或 2.1.280">
             <datalist id="claude-code-version-options">
               <option value="2.1.293"></option>
               <option value="2.1.280"></option>
@@ -365,56 +179,60 @@
               <option value="2.1.169"></option>
               <option value="2.1.156"></option>
             </datalist>
-          </label>
-          <div class="runtime-model-status">
+          </label><details class="runtime-setting-provenance"><span class="hint inline">页面保存后立即影响新启动的 task / 抓包 / 登录容器；留空并保存则回退到 .env。</span><summary>当前生效配置与独立操作</summary><div class="runtime-model-status">
             <span class="muted">当前生效</span>
             <strong id="claude-code-version-effective">加载中</strong>
             <span class="hint inline" id="claude-code-version-source">读取配置中</span>
-          </div>
-        </div>
-        <div class="row-end">
+          </div><div class="row-end">
           <button class="btn btn-sm" type="button" id="claude-code-version-reset">回退 .env</button>
           <button class="btn btn-primary" type="submit">保存版本</button>
-        </div>
-      </form>
-      <form id="capture-form" class="form capture-panel">
-        <div class="capture-title">
-          <strong>完整抓包</strong>
-          <span class="muted">// 单 topic + 单账号 + MITM 请求/响应全文</span>
-        </div>
-        <div class="row">
-          <label><span class="lbl">$ account</span>
-            <select name="account_id" required></select>
-          </label>
-          <label><span class="lbl">$ topic</span>
-            <select name="topic_id" required></select>
-          </label>
-          <label><span class="lbl">$ Claude Code 版本</span>
-            <input name="claude_code_version" type="text" placeholder="留空继承账号 / 全局" />
-            <span class="hint inline">只覆盖本次抓包，不修改账号版本。</span>
-          </label>
-          <label><span class="lbl">$ timeout_sec</span>
-            <input name="timeout_sec" type="number" min="60" value="1800" />
-          </label>
-          <label><span class="lbl">$ effort_level</span>
-            <span class="hint inline">只覆盖当前抓包 run；默认使用 .env。</span>
+        </div></details></form><form id="runtime-model-form" class="form runtime-model-panel"><label class="field"><span class="lbl">默认模型</span>
+
+            <input name="default_model" list="claude-model-options" placeholder="例如 opus[1m] 或 sonnet[1m]">
+          </label><details class="runtime-setting-provenance"><span class="hint inline">页面保存后影响新的普通 / 批量运行；额度等待恢复时沿用原模型。留空并保存则回退到 .env。</span><summary>当前生效配置与独立操作</summary><div class="runtime-model-status">
+            <span class="muted">当前生效</span>
+            <strong id="runtime-model-effective">加载中</strong>
+            <span class="hint inline" id="runtime-model-source">读取配置中</span>
+          </div><div class="row-end">
+          <button class="btn btn-sm" type="button" id="runtime-model-reset">回退 .env</button>
+          <button class="btn btn-primary" type="submit">保存默认模型</button>
+        </div></details></form><form id="runtime-effort-form" class="form runtime-model-panel"><label class="field"><span class="lbl">思考预算</span>
+
             <select name="effort_level"></select>
-          </label>
-          <label><span class="lbl">$ permission_mode</span>
-            <span class="hint inline">只覆盖当前抓包 run；Plan 在 Auto 可用时也可能调用分类器。</span>
+          </label><details class="runtime-setting-provenance"><span class="hint inline">页面保存后立即影响新启动的普通 / 批量 run；抓包使用下方独立选择。</span><summary>当前生效配置与独立操作</summary><div class="runtime-model-status">
+            <span class="muted">当前生效</span>
+            <strong id="runtime-effort-effective">加载中</strong>
+            <span class="hint inline" id="runtime-effort-source">读取配置中</span>
+          </div><div class="row-end">
+          <button class="btn btn-sm" type="button" id="runtime-effort-reset">回退 .env</button>
+          <button class="btn btn-primary" type="submit">保存思考预算</button>
+        </div></details></form></div>
+
+</div><footer class="work-form-footer"><span id="runtime-settings-feedback" role="status">配置影响后续新执行；额度等待恢复沿用原参数。</span><button type="button" class="btn" data-close="#runtime-settings-modal">取消</button><button type="button" class="btn btn-primary" id="runtime-settings-save" disabled>保存运行配置</button></footer></div></div>
+      <div id="runtime-capture-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="runtime-capture-title"><div class="modal-card runtime-capture-workspace"><div class="modal-titlebar"><h2 id="runtime-capture-title">启动抓包</h2><button type="button" class="modal-close" data-close="#runtime-capture-modal" aria-label="关闭抓包配置"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button></div>      <form id="capture-form" class="upgrade-sheet"><div class="upgrade-sheet-body"><div class="upgrade-intro"><span><svg class="runtime-icon"><use href="approved-icons.svg#i-shield"></use></svg></span><div><h3>准备一次诊断运行</h3><p>独立选择账号、版本与需求，配置仅作用于本次抓包。</p></div></div><section class="upgrade-card"><header><h3>运行目标</h3></header><div class="upgrade-card-body work-form-grid" data-capture-target=""><label class="field"><span class="lbl">运行账号</span>
+            <select name="account_id" required=""></select>
+          </label><label class="field"><span class="lbl">题目</span>
+            <select name="topic_id" required=""></select>
+          </label></div></section><section class="upgrade-card"><header><h3>本次执行配置</h3></header><div class="upgrade-card-body"><div class="work-form-grid" data-capture-config=""><label class="field"><span class="lbl">Claude Code 版本</span>
+            <input name="claude_code_version" type="text" placeholder="留空继承账号 / 全局">
+
+            <span class="hint inline">只覆盖本次抓包，不修改账号版本。</span></label><label class="field"><span class="lbl">思考预算</span>
+            <select name="effort_level"></select>
+
+            <span class="hint inline">只覆盖当前抓包 run；默认使用 .env。</span></label><label class="field"><span class="lbl">超时（秒）</span>
+            <input name="timeout_sec" type="number" min="60" value="1800">
+          </label><label class="field"><span class="lbl">权限方式</span>
             <select name="permission_mode">
-              <option value="bypassPermissions" selected>bypassPermissions（默认）</option>
+              <option value="bypassPermissions" selected="">bypassPermissions（默认）</option>
               <option value="auto">auto</option>
               <option value="plan">plan</option>
               <option value="manual">manual</option>
               <option value="acceptEdits">acceptEdits</option>
               <option value="dontAsk">dontAsk</option>
             </select>
-          </label>
-        </div>
-        <label><span class="lbl">$ model 覆盖</span>
-          <span class="hint inline">只覆盖当前抓包 run；留空则沿用抓包默认模型，不受上方默认模型影响。</span>
-          <input name="model_override" list="claude-model-options" placeholder="例如 claude-opus-5-5 或 opus[1m]" />
+
+            <span class="hint inline">只覆盖当前抓包 run；Plan 在 Auto 可用时也可能调用分类器。</span></label></div><div data-capture-prompt=""><label class="field"><span class="lbl">本次运行模型</span>
+          <input name="model_override" list="claude-model-options" placeholder="例如 claude-opus-5-5 或 opus[1m]">
           <datalist id="claude-model-options">
             <option value="claude-opus-5-5"></option>
             <option value="claude-opus-5-5[1m]"></option>
@@ -429,37 +247,15 @@
             <option value="claude-opus-4-7"></option>
             <option value="claude-fable-5"></option>
           </datalist>
-        </label>
-        <fieldset class="prompt-mode-field">
-          <legend class="lbl">$ prompt_mode</legend>
-          <div class="segmented-control">
-            <label><input type="radio" name="prompt_mode" value="natural" /><span>自然</span></label>
-            <label><input type="radio" name="prompt_mode" value="canonical" checked /><span>规范</span></label>
-          </div>
-        </fieldset>
-        <label><span class="lbl">$ prompt 覆盖</span>
-          <span class="hint inline">留空则使用该 topic 默认 prompt；抓包 run 会保存请求体和响应体全文。</span>
+
+          <span class="hint inline">只覆盖当前抓包 run；留空则沿用抓包默认模型，不受上方默认模型影响。</span></label><label class="field"><span class="lbl">输入方式</span><select name="prompt_mode"><option value="natural">自然语言</option><option value="canonical" selected="">规范输入</option></select></label><label class="field"><span class="lbl">本次需求覆盖</span>
           <textarea name="prompt" rows="3" placeholder="可选：覆盖本次抓包运行的 prompt"></textarea>
-        </label>
-        <div class="row-end">
-          <button class="btn btn-primary" type="submit">启动抓包</button>
-        </div>
-      </form>
-      <div class="table-frame">
-        <table class="data runs-table">
-          <colgroup>
-            <col class="run-col-id" />
-            <col class="run-col-task" />
-            <col class="run-col-account" />
-            <col class="run-col-status" />
-            <col class="run-col-duration" />
-            <col class="run-col-exit" />
-            <col class="run-col-op" />
-          </colgroup>
-          <thead><tr>
-            <th>id</th><th>task</th><th>account</th><th>status</th>
-            <th class="right">duration</th><th class="right">exit</th><th>op</th>
-          </tr></thead>
+
+          <span class="hint inline">留空则使用该 topic 默认 prompt；抓包 run 会保存请求体和响应体全文。</span></label></div></div></section></div><footer class="work-form-footer"><span>配置只应用于本次诊断运行</span><button type="button" class="btn" data-close="#runtime-capture-modal">取消</button><button class="btn btn-primary" type="submit">启动抓包</button></footer></form></div></div>
+      <div class="work-panel work-table-wrap">
+        <table class="work-table runs-table">
+
+          <thead><tr><th>任务 / 运行 ID</th><th>账号</th><th>状态</th><th>耗时</th><th>退出码</th><th>操作</th></tr></thead>
           <tbody id="runs-body"></tbody>
         </table>
       </div>
@@ -475,7 +271,7 @@
       </div>
       <div class="modal-titlebar">
         <span class="modal-titlebar-name">run · detail</span>
-        <button class="modal-close" id="modal-close" aria-label="close">×</button>
+        <button class="modal-close" id="modal-close" aria-label="关闭"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button>
       </div>
       <div id="modal-content"></div>
     </div>
@@ -486,11 +282,11 @@
     <div class="modal-card modal-card-sm">
       <div class="modal-titlebar">
         <span class="modal-titlebar-name">关联已有账号 <span class="muted" id="cc2api-binding-title"></span></span>
-        <button type="button" class="modal-close" data-close="#cc2api-binding-modal" aria-label="关闭关联窗口">×</button>
+        <button type="button" class="modal-close" data-close="#cc2api-binding-modal" aria-label="关闭关联窗口"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button>
       </div>
       <form id="cc2api-binding-form" class="form">
         <input type="hidden" name="account_id" />
-        <label><span class="lbl">cc2api 账号</span><select name="cc2api_account_id" required></select></label>
+        <label><span class="lbl">网关账号</span><select name="cc2api_account_id" required></select></label>
         <p class="hint" id="cc2api-binding-hint"></p>
         <div class="row-end">
           <button type="button" class="btn" data-close="#cc2api-binding-modal">取消</button>
@@ -501,28 +297,30 @@
   </div>
 
   <div class="modal hidden" id="cli-settings-modal">
-    <div class="modal-card modal-card-md">
+    <div class="modal-card work-dialog task-account-config">
       <div class="modal-titlebar">
-        <span class="modal-titlebar-name" id="cli-settings-title">Claude Code 配置</span>
-        <button type="button" class="modal-close" data-close="#cli-settings-modal" aria-label="关闭 Claude Code 配置">×</button>
+        <span class="modal-titlebar-name" id="cli-settings-title">任务账号配置</span>
+        <button type="button" class="modal-close" data-close="#cli-settings-modal" aria-label="关闭账号配置"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button>
       </div>
-      <form id="cli-settings-form" class="form">
-        <label><span class="lbl">账号 Claude Code 版本</span><input name="claude_code_version" type="text" placeholder="留空继承全局，例如 2.1.303" /></label>
-        <p class="hint">此账号的全部 CLI 入口共用此版本；已有运行和会话保留原版本。</p>
-        <p class="hint" id="cli-settings-effective" role="status"></p>
-        <label id="cli-settings-capture" class="toggle-line"><input name="capture_enabled" type="checkbox" /> 采集本空间的 Claude Code HTTP 请求与响应</label>
+      <form id="cli-settings-form" class="dialog-body work-dialog-content">
+        <label class="field" id="cli-settings-name">名称<input name="display_name" maxlength="128" required /></label>
+        <div class="work-form-grid"><label class="field">Claude Code 版本<input name="claude_code_version" type="text" maxlength="64" pattern="[0-9]+[.][0-9]+[.][0-9]+([+\-][A-Za-z0-9._\-]+)?" placeholder="留空继承全局，例如 2.1.303" /><small class="upgrade-help">支持精确版本及版本后缀，留空沿用全局配置。</small></label></div>
+        <p class="hint hidden" id="cli-settings-effective" role="status"></p>
+        <div id="cli-settings-account-links"><p class="work-note">网关账号创建、关联和解绑请使用账号卡片上的独立操作。</p><div class="work-account-links"><button type="button" id="cli-settings-gateway">网关配置 <svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-arrow"></use></svg></button><button type="button" id="cli-settings-environment">运行时段与环境 <svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-arrow"></use></svg></button><button type="button" id="cli-settings-quota">养号 / 额度设置 <svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-arrow"></use></svg></button></div></div>
+        <details class="work-advanced-maintenance" id="cli-settings-maintenance"><summary>高级维护</summary><p class="work-note">需要核对运行环境的进程观测时，可手动更新关联账号的进程指标。</p><button type="button" class="btn btn-sm" id="cli-settings-process"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-refresh"></use></svg>更新进程指标</button></details>
+        <label id="cli-settings-capture" class="switch-field"><span><strong>后续工程执行开启抓包</strong><small>仅影响当前空间的新执行</small></span><input name="capture_enabled" type="checkbox" /></label>
         <p class="hint" id="cli-settings-capture-hint">默认关闭。保存后仅对后续新执行生效；开启时等待同账号其他 CLI 空闲，关闭后历史抓包保留。</p>
-        <p class="hint" id="cli-settings-feedback" role="status" aria-live="polite"></p>
-        <div class="row row-end"><button type="button" class="btn" data-close="#cli-settings-modal">关闭</button><button type="submit" class="btn btn-primary" disabled>保存</button></div>
+        <p class="work-form-error" id="cli-settings-feedback" role="status" aria-live="polite"></p>
+        <footer class="work-form-footer"><button type="button" class="btn" data-close="#cli-settings-modal">取消</button><button type="submit" class="btn btn-primary" disabled>保存账号配置</button></footer>
       </form>
     </div>
   </div>
 
-  <div class="modal hidden" id="work-capture-modal">
+  <div class="modal hidden" id="work-capture-modal" role="dialog" aria-modal="true" aria-labelledby="work-capture-title">
     <div class="modal-card">
-      <div class="modal-titlebar"><span class="modal-titlebar-name">Claude Code 抓包</span><button type="button" class="modal-close" data-close="#work-capture-modal" aria-label="关闭抓包详情">×</button></div>
+      <div class="modal-titlebar"><span class="modal-titlebar-name" id="work-capture-title">Claude Code 抓包</span><button type="button" class="modal-close" data-close="#work-capture-modal" aria-label="关闭抓包详情"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button></div>
       <div class="view-actions"><button type="button" class="btn btn-sm" id="work-capture-refresh">刷新已采集数据</button></div>
-      <div id="work-capture-content" class="detail-section" role="status"></div>
+      <div id="work-capture-content" class="detail-section"><p id="work-capture-status" role="status"></p><div id="work-capture-view"></div></div>
     </div>
   </div>
 
@@ -530,7 +328,7 @@
     <div class="modal-card modal-card-sm">
       <div class="modal-titlebar">
         <span class="modal-titlebar-name" id="native-kernel-title">请求内核</span>
-        <button type="button" class="modal-close" data-close="#native-kernel-modal" aria-label="关闭内核操作">×</button>
+        <button type="button" class="modal-close" data-close="#native-kernel-modal" aria-label="关闭内核操作"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button>
       </div>
       <form id="native-kernel-form" class="form">
         <p id="native-kernel-description"></p>
@@ -544,7 +342,7 @@
 
   <div class="modal hidden" id="content-capture-modal" role="dialog" aria-modal="true" aria-labelledby="content-capture-title">
     <div class="modal-card modal-card-sm">
-      <div class="modal-titlebar"><span class="modal-titlebar-name" id="content-capture-title">请求内容采集</span><button type="button" class="modal-close" data-close="#content-capture-modal" aria-label="关闭采集配置">×</button></div>
+      <div class="modal-titlebar"><span class="modal-titlebar-name" id="content-capture-title">请求内容采集</span><button type="button" class="modal-close" data-close="#content-capture-modal" aria-label="关闭采集配置"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button></div>
       <form id="content-capture-form" class="form">
         <p id="content-capture-description"></p>
         <p class="env-muted">在账号空闲时重新配置发送器，保留身份、资源和内核。开关仅影响后续请求。完整阶段原文同时需要请求记录的 debug 模式。</p>
@@ -557,102 +355,48 @@
 
   <div class="modal hidden" id="cpu-resource-modal" role="dialog" aria-modal="true" aria-labelledby="cpu-resource-title">
     <div class="modal-card modal-card-sm">
-      <div class="modal-titlebar"><span class="modal-titlebar-name" id="cpu-resource-title">调整 CPU 额度</span><button type="button" class="modal-close" data-close="#cpu-resource-modal" aria-label="关闭 CPU 配置">×</button></div>
+      <div class="modal-titlebar"><span class="modal-titlebar-name" id="cpu-resource-title">调整 CPU 额度</span><button type="button" class="modal-close" data-close="#cpu-resource-modal" aria-label="关闭 CPU 配置"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button></div>
       <form id="cpu-resource-form" class="form">
         <p id="cpu-resource-description"></p>
         <p class="env-muted">各角色共享宿主算力，额度可超配。保存后即时生效，并供容器重建时恢复。</p>
-        <label><span class="lbl">CLI（核）</span><input name="cli" type="number" min="0.01" step="any" required /></label>
-        <label><span class="lbl">API 发送器（核）</span><input name="sender" type="number" min="0.01" step="any" required /></label>
-        <label><span class="lbl">网络（核）</span><input name="network" type="number" min="0.01" step="any" required /></label>
-        <p id="cpu-resource-feedback" class="env-error" role="status" aria-live="polite"></p>
+        <div class="cpu-fields"><label class="field"><span class="lbl">CLI CPU（核）</span><input name="cli" type="number" min="0.01" step="any" required /></label>
+        <label class="field"><span class="lbl">发送器 CPU（核）</span><input name="sender" type="number" min="0.01" step="any" required /></label>
+        <label class="field"><span class="lbl">网络 CPU（核）</span><input name="network" type="number" min="0.01" step="any" required /></label>
+        </div><p id="cpu-resource-feedback" class="env-error" role="status" aria-live="polite"></p>
         <div class="row-end"><button type="button" class="btn" data-close="#cpu-resource-modal">取消</button><button type="submit" class="btn btn-primary">保存并应用</button></div>
       </form>
     </div>
   </div>
 
-  <div class="modal hidden" id="run-window-modal">
-    <div class="modal-card modal-card-md">
-      <div class="modal-titlebar">
-        <span class="modal-titlebar-name">账号当地运行时段</span>
-        <button type="button" class="modal-close" data-close="#run-window-modal" aria-label="关闭运行时段配置">×</button>
-      </div>
-      <form id="run-window-form" class="form">
-        <input type="hidden" name="account_id">
-        <p>使用环境时区：<strong id="run-window-timezone"></strong></p>
-        <label class="toggle-line"><input type="checkbox" name="enabled"><span>启用当地可运行时段</span></label>
-        <p class="hint" id="run-window-summary" aria-live="polite"></p>
-        <p class="hint">关闭限制时可全天运行。时段结束后，本轮仍按原计划完成（包括补充与收尾），下一轮再等待。</p>
-        <fieldset id="run-window-options" class="run-window-options">
-          <legend>允许开始的星期与时间段</legend>
-          <div class="run-window-days" id="run-window-days"></div>
-          <div id="run-window-intervals"></div>
-          <button type="button" class="btn btn-sm" id="run-window-add">添加时间段</button>
-        </fieldset>
-        <p class="hint">最多 8 个区间。结束早于开始表示跨午夜，按开始星期归属；重叠区间合并生效。夏令时按当地实际时间执行。</p>
-        <p class="hint">作用于普通任务、批次、养号、抓包和新续聊输入；对外 API、登录与 OAuth 维护不受此时段限制。</p>
-        <div class="row row-end">
-          <button type="button" class="btn" data-close="#run-window-modal">取消</button>
-          <button type="submit" class="btn btn-primary">保存运行时段</button>
-        </div>
+  <div class="modal hidden task-config-modal" id="run-window-modal" role="dialog" aria-modal="true" aria-labelledby="run-window-title">
+    <div class="modal-card">
+      <div class="modal-titlebar"><span class="modal-titlebar-name" id="run-window-title">运行时段</span><button type="button" class="modal-close" data-close="#run-window-modal" aria-label="关闭运行时段配置"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button></div>
+      <form id="run-window-form" class="form task-settings-form">
+        <div class="task-settings-scroll"><input type="hidden" name="account_id">
+          <div class="field"><span class="lbl">环境时区</span><div class="task-timezone"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-globe"></use></svg><strong id="run-window-timezone"></strong><small>沿用账号环境</small></div></div>
+          <label class="switch-field"><span><strong>启用当地可运行时段</strong><small>仅在选中的星期与时段开始新任务</small></span><input type="checkbox" name="enabled"></label>
+          <p class="work-note" id="run-window-summary" aria-live="polite"></p>
+          <fieldset id="run-window-options" class="run-window-options"><legend>运行窗口</legend><span class="lbl">允许开始的星期</span><div class="run-window-days" id="run-window-days"></div><div id="run-window-intervals"></div><button type="button" class="btn btn-sm" id="run-window-add">添加时间段</button></fieldset>
+          <details class="task-settings-help"><summary>生效规则与适用范围</summary><p>时段结束后，本轮仍按原计划完成（包括补充与收尾），下一轮再等待。关闭限制可全天运行。</p><p>最多 8 个区间。结束早于开始表示跨午夜，按开始星期归属；重叠区间合并生效。夏令时按当地实际时间执行。</p><p>作用于普通任务、批次、养号、抓包和新续聊输入；对外 API、登录与 OAuth 维护不受此时段限制。</p></details>
+        </div><footer class="work-form-footer"><span>按账号当地时间生效</span><button type="button" class="btn" data-close="#run-window-modal">取消</button><button type="submit" class="btn btn-primary">保存运行时段</button></footer>
       </form>
     </div>
   </div>
 
-  <div class="modal hidden" id="warmup-modal">
-    <div class="modal-card modal-card-sm">
-      <div class="modal-frame" aria-hidden="true">
-        <span class="frame-tl">┌</span><span class="frame-tr">┐</span>
-        <span class="frame-bl">└</span><span class="frame-br">┘</span>
-      </div>
-      <div class="modal-titlebar">
-        <span class="modal-titlebar-name">acc / warmup &amp; quota <span class="muted" id="warmup-modal-title"></span></span>
-        <button class="modal-close" data-close="#warmup-modal" aria-label="close">×</button>
-      </div>
-      <form id="warmup-form" class="form">
-        <input type="hidden" name="account_id" />
-        <p class="hint" id="warmup-binding-hint"></p>
-        <div class="row warmup-interval-row" id="warmup-legacy-interval">
-          <label><span class="lbl">$ min_hours</span>
-            <input name="interval_min_hours" type="number" min="1" max="720" required />
-          </label>
-          <label><span class="lbl">$ max_hours</span>
-            <input name="interval_max_hours" type="number" min="1" max="720" required />
-          </label>
-        </div>
-        <label class="toggle-line" id="warmup-legacy-enabled">
-          <input name="enabled" type="checkbox" />
-          <span>启用定时养号</span>
-        </label>
-        <button type="button" class="btn btn-sm hidden" id="warmup-projects-link">前往养号工程计划</button>
-        <p class="hint"><strong>普通任务与养号额度控制</strong>：阈值按已用百分比判断。</p>
-        <div class="row warmup-interval-row">
-          <div class="warmup-quota-panel">
-            <label class="toggle-line">
-              <input name="quota_5h_enabled" type="checkbox" />
-              <span>启用 5h 阈值</span>
-            </label>
-            <label><span class="lbl">$ 5h 已用百分比</span>
-              <input name="warmup_quota_5h_limit_percent" type="number" min="1" max="100" step="1" placeholder="1～100" disabled />
-            </label>
-            <p class="hint" id="warmup-quota-5h-hint"></p>
-          </div>
-          <div class="warmup-quota-panel">
-            <label class="toggle-line">
-              <input name="quota_7d_enabled" type="checkbox" />
-              <span>启用 7d 阈值</span>
-            </label>
-            <label><span class="lbl">$ 7d 已用百分比</span>
-              <input name="warmup_quota_7d_limit_percent" type="number" min="1" max="100" step="1" placeholder="1～100" disabled />
-            </label>
-            <p class="hint" id="warmup-quota-7d-hint"></p>
-          </div>
-        </div>
-        <p class="hint" id="warmup-quota-policy-hint">额度从正常响应中被动更新。观测到任一阈值命中时，当前普通任务或养号仍按原计划完成本轮（包括补充与收尾），下一轮等待窗口重置或真实额度更新，并遵守原投放间隔。单次响应仍可能跨过阈值。cc2api API 转发不受此阈值控制。</p>
-        <div class="row-end">
-          <button type="button" class="btn" data-close="#warmup-modal">cancel</button>
-          <button type="submit" class="btn btn-primary">save</button>
-        </div>
-      </form>
+  <div class="modal hidden task-config-modal" id="warmup-modal" role="dialog" aria-modal="true" aria-labelledby="warmup-heading">
+    <div class="modal-card">
+      <div class="modal-titlebar"><span class="modal-titlebar-name" id="warmup-heading">任务与养号额度</span><button type="button" class="modal-close" data-close="#warmup-modal" aria-label="关闭养号与额度设置"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button></div>
+      <form id="warmup-form" class="form task-settings-form"><div class="task-settings-scroll">
+        <input type="hidden" name="account_id" /><p class="task-settings-account" id="warmup-modal-title"></p>
+        <label class="switch-field" id="warmup-legacy-enabled"><span><strong>启用定时养号</strong><small>使用原任务养号流程</small></span><input name="enabled" type="checkbox" /></label>
+        <div class="work-form-grid" id="warmup-legacy-interval"><label class="field"><span class="lbl">间隔下限（小时）</span><input name="interval_min_hours" type="number" min="1" max="720" required /></label><label class="field"><span class="lbl">间隔上限（小时）</span><input name="interval_max_hours" type="number" min="1" max="720" required /></label></div>
+        <label class="switch-field"><span><strong>5 小时额度阈值</strong><small>关闭阈值后仍遵守真实额度耗尽保护</small></span><input name="quota_5h_enabled" type="checkbox" /></label>
+        <label class="field"><span class="lbl">5 小时上限（%）</span><input name="warmup_quota_5h_limit_percent" type="number" min="1" max="100" step="1" placeholder="1～100" disabled /><small class="upgrade-help" id="warmup-quota-5h-hint"></small></label>
+        <label class="switch-field"><span><strong>7 天额度阈值</strong><small>关闭阈值后仍遵守真实额度耗尽保护</small></span><input name="quota_7d_enabled" type="checkbox" /></label>
+        <label class="field"><span class="lbl">7 天上限（%）</span><input name="warmup_quota_7d_limit_percent" type="number" min="1" max="100" step="1" placeholder="1～100" disabled /><small class="upgrade-help" id="warmup-quota-7d-hint"></small></label>
+        <div class="task-policy-note"><p id="warmup-binding-hint"></p><button type="button" class="btn btn-sm hidden" id="warmup-projects-link">前往养号工程计划</button></div>
+        <details class="task-settings-help"><summary>额度控制生效规则</summary><p id="warmup-quota-policy-hint"></p></details>
+      </div><footer class="work-form-footer"><span>阈值按已用百分比判断</span><button type="button" class="btn" data-close="#warmup-modal">取消</button><button type="submit" class="btn btn-primary">保存额度配置</button></footer></form>
     </div>
   </div>
 
@@ -664,63 +408,54 @@
         <span class="frame-bl">└</span><span class="frame-br">┘</span>
       </div>
       <div class="modal-titlebar">
-        <span class="modal-titlebar-name">topic / edit <span class="muted" id="topic-modal-title"></span></span>
-        <button class="modal-close" data-close="#topic-modal" aria-label="close">×</button>
+        <span class="modal-titlebar-name">题目编辑 <span class="muted" id="topic-modal-title"></span></span>
+        <button class="modal-close" data-close="#topic-modal" aria-label="关闭"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button>
       </div>
-      <form id="topic-form" class="form">
-        <input type="hidden" name="topic_id" />
-        <label><span class="lbl">$ no</span>
-          <input name="no" type="number" min="1" required />
-        </label>
-        <label><span class="lbl">$ title</span>
-          <input name="title" required />
-        </label>
-        <label><span class="lbl">$ description</span>
-          <textarea name="description" rows="5"></textarea>
-        </label>
-        <label><span class="lbl">$ follow-up 1</span>
+      <form id="topic-form" class="form"><input type="hidden" name="topic_id"><div class="work-form-grid"><label class="field"><span class="lbl">题号</span>
+          <input name="no" type="number" min="1" required="">
+        </label><label class="field"><span class="lbl">分类</span>
+          <input name="category">
+        </label></div><label class="field"><span class="lbl">标题</span>
+          <input name="title" required="">
+        </label><label class="field"><span class="lbl">初始需求</span>
+          <textarea name="description" rows="4"></textarea>
+        </label><div class="work-form-grid"><label class="field"><span class="lbl">自动补充 1</span>
           <span class="hint inline">英文业务补充，初始需求完成后可自动追加</span>
-          <textarea name="followup_1" rows="3" maxlength="8000"></textarea>
-        </label>
-        <label><span class="lbl">$ follow-up 2</span>
+          <textarea name="followup_1" rows="4" maxlength="8000"></textarea>
+        </label><label class="field"><span class="lbl">自动补充 2</span>
           <span class="hint inline">在第一条补充基础上继续，保持无需外部文件即可开工</span>
-          <textarea name="followup_2" rows="3" maxlength="8000"></textarea>
-        </label>
-        <label><span class="lbl">$ category</span>
-          <input name="category" />
-        </label>
-        <div class="row-end">
-          <button type="button" class="btn btn-danger" id="topic-delete">删除</button>
-          <button type="button" class="btn" data-close="#topic-modal">cancel</button>
-          <button type="submit" class="btn btn-primary">save</button>
-        </div>
-      </form>
+          <textarea name="followup_2" rows="4" maxlength="8000"></textarea>
+        </label></div><div class="work-form-footer">
+          <button type="button" class="btn btn-danger" id="topic-delete">删除题目</button>
+          <button type="button" class="btn" data-close="#topic-modal">取消</button>
+          <button type="submit" class="btn btn-primary">保存题目</button>
+        </div></form>
     </div>
   </div>
 
   <!-- 添加账号弹窗：两步流，step 1=配置 / step 2=PTY 终端登录 -->
   <div class="modal hidden" id="acc-modal">
-    <div class="modal-card modal-card-md">
+    <div class="modal-card modal-card-md task-login-workspace">
       <div class="modal-frame" aria-hidden="true">
         <span class="frame-tl">┌</span><span class="frame-tr">┐</span>
         <span class="frame-bl">└</span><span class="frame-br">┘</span>
       </div>
       <div class="modal-titlebar">
-        <span class="modal-titlebar-name">acc / new <span class="muted" id="acc-modal-stage">step 1 · configure</span></span>
-        <button class="modal-close" id="acc-modal-close" aria-label="close">×</button>
+        <span class="modal-titlebar-name">添加任务账号 <span class="muted" id="acc-modal-stage">配置账号与代理</span></span>
+        <button class="modal-close" id="acc-modal-close" aria-label="关闭"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button>
       </div>
 
       <!-- Step 1: 配置 + 启动登录会话 -->
       <form id="acc-form" class="form acc-step acc-step-config">
-        <input type="hidden" id="acc-force-reauth" name="force_reauth" value="false" />
-        <label><span class="lbl">$ name</span>
+        <input type="hidden" id="acc-force-reauth" name="force_reauth" value="false">
+        <label><span class="lbl">账号标识</span>
           <span class="hint inline">本地账号标签（独一无二即可）</span>
-          <input name="name" required pattern="[A-Za-z0-9_\-]+" placeholder="main" />
+          <input name="name" required="" pattern="[A-Za-z0-9_\-]+" placeholder="main">
         </label>
-        <label><span class="lbl">$ timezone</span>
+        <label><span class="lbl">环境时区</span>
           <span class="hint inline">auto = flower2api 新环境默认洛杉矶时区＋美国英语 UTF-8；已有环境沿用保存值</span>
           <select name="timezone">
-            <option value="">auto</option>
+            <option value="">自动使用环境时区</option>
             <option value="UTC">UTC</option>
             <option value="Asia/Tokyo">Asia/Tokyo</option>
             <option value="Asia/Singapore">Asia/Singapore</option>
@@ -734,84 +469,66 @@
             <option value="America/Chicago">America/Chicago</option>
           </select>
         </label>
+        <div id="runtime-login-proxy"></div>
+        <details id="acc-proxy-manual" class="login-manual-proxy"><summary>手动连接配置</summary><label class="switch-field"><span><strong>使用手动代理配置</strong></span><input id="acc-use-manual" type="checkbox"></label>
         <label class="paste-helper">
-          <span class="lbl">$ proxy_url <span class="muted">// paste &amp; auto-fill</span></span>
+          <span class="lbl">粘贴代理地址以自动识别</span>
           <span class="hint inline">粘贴整条 URL 自动拆到下面 5 项;格式: <code>http://user:pass@host:port</code>(也支持 <code>socks5://</code> / <code>socks5h://</code>)</span>
-          <input id="acc-proxy-url" placeholder="http://user:pass@host:8080" autocomplete="off" spellcheck="false" />
+          <input id="acc-proxy-url" placeholder="http://user:pass@host:8080" autocomplete="off" spellcheck="false">
         </label>
-        <label><span class="lbl">$ proxy_scheme</span>
+        <label><span class="lbl">代理类型</span>
           <select name="upstream_proxy_scheme">
-            <option value="socks5" selected>socks5</option>
+            <option value="socks5" selected="">socks5</option>
             <option value="socks5h">socks5h</option>
             <option value="http">http</option>
           </select>
         </label>
-        <label><span class="lbl">$ proxy_host</span>
+        <label><span class="lbl">代理主机</span>
           <span class="hint inline">OAuth 必须走代理；空 = 直连宿主网络（不推荐）</span>
-          <input name="upstream_socks5_host" placeholder="host.docker.internal" />
+          <input name="upstream_socks5_host" placeholder="host.docker.internal">
         </label>
-        <label><span class="lbl">$ proxy_port</span>
-          <input name="upstream_socks5_port" type="number" min="1" max="65535" placeholder="8080 / 1080" />
+        <label><span class="lbl">代理端口</span>
+          <input name="upstream_socks5_port" type="number" min="1" max="65535" placeholder="8080 / 1080">
         </label>
-        <label><span class="lbl">$ proxy_user</span>
-          <input name="upstream_socks5_user" />
+        <label><span class="lbl">代理用户名</span>
+          <input name="upstream_socks5_user">
         </label>
-        <label><span class="lbl">$ proxy_pass</span>
-          <input name="upstream_socks5_pass" type="password" />
+        <label><span class="lbl">代理密码</span>
+          <input name="upstream_socks5_pass" type="password">
         </label>
+        </details>
         <div class="row-end">
-          <button type="button" class="btn" data-close="#acc-modal">cancel</button>
-          <button type="submit" class="btn btn-primary">start login</button>
+          <button type="button" class="btn" data-close="#acc-modal">取消</button>
+          <button type="submit" class="btn btn-primary">开始授权</button>
         </div>
       </form>
 
       <!-- Step 2: 内嵌 PTY 终端 + 提交按钮 -->
-      <div class="acc-step acc-step-terminal hidden">
-        <div class="login-meta">
-          <span>session</span>
-          <code id="acc-login-sid">—</code>
-          <span class="muted">·</span>
-          <span>sidecar</span>
-          <span id="acc-login-sidecar">—</span>
-          <span class="muted">·</span>
-          <span>name</span>
-          <code id="acc-login-name">—</code>
-        </div>
-        <div class="login-hint">
-          <strong>下一步：</strong><span id="acc-login-input-hint">打开授权链接完成登录。授权码优先填入下方输入框；CLI 的其它提示可在黑色终端直接操作。等待认证检查通过后点击“提交保存”。</span>
-          已关联账号会同步凭据到原关联账号；重授权期间该账号暂停接收新的请求。
-        </div>
-        <div class="login-connection">
-          <span id="acc-login-connection-status" role="status" aria-live="polite">正在连接登录终端…</span>
-          <button type="button" class="btn btn-sm" id="acc-login-reconnect" disabled>重新连接</button>
-          <button type="button" class="btn btn-sm hidden" id="acc-login-restart">重新登录</button>
-        </div>
-        <div class="login-link">
+      <div class="acc-step acc-step-terminal hidden" data-login-workspace=""><div class="upgrade-session-banner"><span><svg class="runtime-icon"><use href="approved-icons.svg#i-key"></use></svg></span><div><code id="acc-login-name">—</code><span id="acc-login-connection-status" role="status" aria-live="polite">正在连接登录终端…</span></div></div><ol class="upgrade-steps"><li class="done">1<span>准备环境</span></li><li class="active">2<span>浏览器授权</span></li><li>3<span>提交保存</span></li></ol><div class="upgrade-session-scroll"><div class="login-link upgrade-card"><header><h3>授权链接</h3><small>来自当前CLI会话</small></header><div class="upgrade-card-body">
           <label for="acc-auth-url" class="lbl">授权链接</label>
-          <textarea id="acc-auth-url" rows="3" readonly spellcheck="false" placeholder="等待 CLI 输出完整授权链接"></textarea>
+          <textarea id="acc-auth-url" rows="3" readonly="" spellcheck="false" placeholder="等待 CLI 输出完整授权链接"></textarea>
           <div class="login-link-actions">
-            <button type="button" class="btn btn-sm" id="acc-login-copy" disabled>复制链接</button>
-            <button type="button" class="btn btn-sm" id="acc-login-open" disabled>打开授权页</button>
+            <button type="button" class="btn btn-sm" id="acc-login-copy" disabled="">复制链接</button>
+            <button type="button" class="btn btn-sm" id="acc-login-open" disabled="">打开授权页</button>
             <span id="acc-login-link-status" role="status" aria-live="polite">等待 CLI 输出授权链接</span>
           </div>
-        </div>
-        <form id="acc-code-form" class="form login-code hidden" autocomplete="off">
-          <label for="acc-auth-code" class="lbl">授权码（推荐输入）</label>
-          <input id="acc-auth-code" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" placeholder="粘贴完整授权码" aria-describedby="acc-code-length acc-code-status" />
+        </div></div><form id="acc-code-form" class="form login-code hidden upgrade-auth-code" autocomplete="off">
+          <label for="acc-auth-code" class="lbl field">授权码（推荐输入）<input id="acc-auth-code" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" placeholder="粘贴完整授权码" aria-describedby="acc-code-length acc-code-status"></label>
+
           <div class="login-link-actions">
             <button type="button" class="btn btn-sm" id="acc-code-toggle" aria-pressed="false">显示授权码</button>
             <span id="acc-code-length">已输入 0 个字符</span>
-            <button type="submit" class="btn btn-sm btn-primary" id="acc-code-send" disabled>发送到 CLI</button>
+            <button type="submit" class="btn btn-sm btn-primary" id="acc-code-send" disabled="">发送到 CLI</button>
             <button type="button" class="btn btn-sm hidden" id="acc-code-query">查询本次结果</button>
           </div>
           <p id="acc-code-status" role="status" aria-live="polite">尚未发送</p>
-        </form>
-        <div class="xterm-host" id="acc-login-xterm"></div>
-        <div class="row-end">
+        </form><section class="upgrade-terminal"><header><span>登录终端</span><div><button type="button" class="btn btn-sm" id="acc-login-reconnect" disabled="">重新连接</button><button type="button" class="btn btn-sm hidden" id="acc-login-restart">重新登录</button></div></header><div class="xterm-host" id="acc-login-xterm"></div></section><details class="upgrade-preview-controls"><summary>当前登录上下文与授权说明</summary><div>登录会话 <code id="acc-login-sid">—</code></div><div>代理环境 <span id="acc-login-sidecar">—</span></div><div class="login-hint">
+          <strong>下一步：</strong><span id="acc-login-input-hint">打开授权链接完成登录。授权码优先填入下方输入框；CLI 的其它提示可在黑色终端直接操作。等待认证检查通过后点击“提交保存”。</span>
+          已关联账号会同步凭据到原关联账号；重授权期间该账号暂停接收新的请求。
+        </div></details></div><div class="work-form-footer">
           <button type="button" class="btn btn-danger" id="acc-login-cancel">取消登录</button>
           <button type="button" class="btn btn-primary" id="acc-login-commit">提交保存</button>
-        </div>
-      </div>
+        </div></div>
     </div>
   </div>
 
@@ -823,36 +540,30 @@
         <span class="frame-bl">└</span><span class="frame-br">┘</span>
       </div>
       <div class="modal-titlebar">
-        <span class="modal-titlebar-name">task / new <span class="muted" id="task-modal-title"></span></span>
-        <button class="modal-close" data-close="#task-modal" aria-label="close">×</button>
+        <span class="modal-titlebar-name">新建任务 <span class="muted" id="task-modal-title"></span></span>
+        <button class="modal-close" data-close="#task-modal" aria-label="关闭"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button>
       </div>
       <form id="task-form" class="form">
         <input type="hidden" name="topic_no" />
-        <label><span class="lbl">$ account</span>
+        <label><span class="lbl">运行账号</span>
           <select name="account_id" required></select>
         </label>
-        <fieldset class="prompt-mode-field">
-          <legend class="lbl">$ prompt_mode</legend>
-          <div class="segmented-control">
-            <label><input type="radio" name="prompt_mode" value="natural" checked /><span>自然</span></label>
-            <label><input type="radio" name="prompt_mode" value="canonical" /><span>规范</span></label>
-          </div>
-        </fieldset>
-        <label><span class="lbl">$ prompt</span>
+        <label class="field"><span class="lbl">输入方式</span><select name="prompt_mode"><option value="natural" selected>自然语言</option><option value="canonical">规范输入</option></select></label>
+        <label><span class="lbl">需求内容</span>
           <span class="hint inline">留空则按所选模式自动生成</span>
           <textarea name="prompt" rows="6" placeholder="# 自由输入完整 prompt …"></textarea>
         </label>
         <div class="row">
-          <label><span class="lbl">$ timeout_sec</span>
+          <label><span class="lbl">超时（秒）</span>
             <input name="timeout_sec" type="number" min="60" value="1800" />
           </label>
-          <label><span class="lbl">$ repeat_n</span>
+          <label><span class="lbl">重复次数</span>
             <input name="repeat_n" type="number" min="1" value="1" />
           </label>
         </div>
         <div class="row-end">
-          <button type="button" class="btn" data-close="#task-modal">cancel</button>
-          <button type="submit" class="btn btn-primary">create</button>
+          <button type="button" class="btn" data-close="#task-modal">取消</button>
+          <button type="submit" class="btn btn-primary">创建任务</button>
         </div>
       </form>
     </div>
@@ -867,7 +578,7 @@
       </div>
       <div class="modal-titlebar">
         <span class="modal-titlebar-name">run / continue <span class="muted" id="continue-modal-title"></span></span>
-        <button class="modal-close" data-close="#continue-modal" aria-label="close">×</button>
+        <button class="modal-close" data-close="#continue-modal" aria-label="关闭"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button>
       </div>
       <div class="acc-step-terminal">
         <div class="login-meta">
@@ -905,10 +616,10 @@
         </div>
       </div>
       <form id="auth-form" class="form" autocomplete="on">
-        <label><span class="lbl">$ user</span>
+        <label><span class="lbl">用户名</span>
           <input name="user" required autofocus autocomplete="username" placeholder="login as…" spellcheck="false" />
         </label>
-        <label><span class="lbl">$ pwd</span>
+        <label><span class="lbl">密码</span>
           <input name="pwd" type="password" required autocomplete="current-password" placeholder="••••••••" />
         </label>
         <div id="auth-error" class="auth-error hidden"></div>
@@ -919,8 +630,11 @@
     </div>
   </div>
 
-  <script src="projects.js?v=20261106-pi-auto-recovery"></script>
-  <script src="environments.js?v=20261114-native-switch-prepare"></script>
-  <script src="app.js?v=20261114-task-account-navigation"></script>
+  <div id="runtime-confirm-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="runtime-confirm-title"><div class="modal-card runtime-confirm-card"><header class="modal-titlebar"><h2 id="runtime-confirm-title">确认操作</h2><button type="button" class="modal-close" data-close="#runtime-confirm-modal" aria-label="关闭操作确认"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button></header><div class="runtime-confirm-body"><p id="runtime-confirm-message"></p><footer><button type="button" class="btn" data-close="#runtime-confirm-modal">取消</button><button type="button" class="btn btn-danger" id="runtime-confirm-accept">确认继续</button></footer></div></div></div>
+  <div id="runtime-toast" class="runtime-toast hidden" role="status" aria-live="polite"><span id="runtime-toast-message"></span><button type="button" id="runtime-toast-close" aria-label="关闭消息">×</button></div>
+  <script src="ui-controls.js?v=20261115-stability"></script>
+  <script src="projects.js?v=20261116-account-config"></script>
+  <script src="environments.js?v=20261115-stability"></script>
+  <script src="app.js?v=20261116-account-config"></script>
 </body>
 </html>

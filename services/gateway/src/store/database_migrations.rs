@@ -12,6 +12,7 @@ use uuid::Uuid;
 use crate::config::Config;
 use crate::store::database_schema::migrate_legacy;
 use crate::store::db::init_db;
+use crate::store::{proxy_schema, proxy_sync_schema};
 
 /// 返回初始迁移源码摘要，测试代码不进入持久合同。
 /// @return 纯迁移定义的 SHA256。
@@ -37,6 +38,13 @@ fn registry() -> Result<Value, sqlx::Error> {
         return Err(sqlx::Error::Protocol("迁移定义与登记不符".into()));
     }
     for (index, step) in steps.iter().enumerate() {
+        if step["id"] == "gateway.proxies.2" && step["checksum"] != proxy_schema::checksum() {
+            return Err(sqlx::Error::Protocol("代理目录迁移定义与登记不符".into()));
+        }
+        if step["id"] == "gateway.proxy-sync.3" && step["checksum"] != proxy_sync_schema::checksum()
+        {
+            return Err(sqlx::Error::Protocol("代理同步迁移定义与登记不符".into()));
+        }
         if step["version"] != index + 1
             || step["predecessor"] != index
             || step["engine"] != "sqlite"
@@ -217,6 +225,12 @@ pub async fn plan(pool: &AnyPool, target: Option<usize>) -> Result<Value, sqlx::
         }
     }
     validate_structure(pool, !rows.is_empty()).await?;
+    if rows.len() >= 2 {
+        proxy_schema::verify(pool).await?;
+    }
+    if rows.len() >= 3 {
+        proxy_sync_schema::verify(pool).await?;
+    }
     for step in &mut steps {
         step["state"] = json!(
             if step["version"].as_u64().unwrap_or(u64::MAX) <= rows.len() as u64 {
@@ -239,7 +253,12 @@ pub async fn plan(pool: &AnyPool, target: Option<usize>) -> Result<Value, sqlx::
 /// @return 初始化结果。
 pub async fn migrate(pool: &AnyPool, driver: &str) -> Result<(), sqlx::Error> {
     if driver != "sqlite" {
-        return migrate_legacy(pool, driver).await;
+        migrate_legacy(pool, driver).await?;
+        let mut transaction = pool.begin().await?;
+        proxy_schema::apply(&mut transaction).await?;
+        proxy_sync_schema::apply(&mut transaction).await?;
+        transaction.commit().await?;
+        return Ok(());
     }
     apply(pool, &Uuid::new_v4().to_string(), None)
         .await
@@ -272,10 +291,19 @@ pub async fn apply(
         }
         match step["id"].as_str() {
             Some("gateway.baseline.1") => migrate_legacy(pool, "sqlite").await?,
+            Some("gateway.proxies.2" | "gateway.proxy-sync.3") => {}
             _ => return Err(sqlx::Error::Protocol("迁移实现尚未登记".into())),
         }
         validate_structure(pool, true).await?;
         let mut transaction = pool.begin().await?;
+        if step["id"] == "gateway.proxies.2" {
+            proxy_schema::apply(&mut transaction).await?;
+            proxy_schema::verify_connection(&mut transaction).await?;
+        }
+        if step["id"] == "gateway.proxy-sync.3" {
+            proxy_sync_schema::apply(&mut transaction).await?;
+            proxy_sync_schema::verify_connection(&mut transaction).await?;
+        }
         sqlx::query("CREATE TABLE IF NOT EXISTS system_schema_migrations (migration_id TEXT PRIMARY KEY,version INTEGER NOT NULL UNIQUE,checksum TEXT NOT NULL,applied_at TEXT NOT NULL,operation_id TEXT NOT NULL)")
             .execute(&mut *transaction).await?;
         sqlx::query("INSERT INTO system_schema_migrations VALUES($1,$2,$3,$4,$5) ON CONFLICT(migration_id) DO NOTHING")
@@ -368,7 +396,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 1);
+        assert_eq!(result["current_version"], 3);
         let original: String =
             sqlx::query_scalar("SELECT operation_id FROM system_schema_migrations")
                 .fetch_one(&database)
@@ -389,6 +417,27 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(profile, "2.1.280");
+    }
+
+    /// 新增表保持版本1数据，损坏的目录不登记为迁移成功。
+    #[tokio::test]
+    async fn proxy_migration_rejects_invalid_primary_key_before_ledger_commit() {
+        let database = pool().await;
+        apply(&database, &Uuid::new_v4().to_string(), Some(1))
+            .await
+            .unwrap();
+        sqlx::query("CREATE TABLE proxy_routes(id TEXT,name TEXT,connection TEXT,public_url TEXT,expires_at TEXT,revision TEXT,observation TEXT,checked_at TEXT,status TEXT,created_at TEXT,updated_at TEXT)")
+            .execute(&database).await.unwrap();
+        assert!(
+            apply(&database, &Uuid::new_v4().to_string(), None)
+                .await
+                .is_err()
+        );
+        let versions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM system_schema_migrations")
+            .fetch_one(&database)
+            .await
+            .unwrap();
+        assert_eq!(versions, 1);
     }
 
     /// 台账摘要冲突在业务修改前明确拒绝。
@@ -421,13 +470,13 @@ mod tests {
             .execute(&database)
             .await
             .unwrap();
-        sqlx::query("INSERT INTO system_schema_migrations VALUES('gateway.synthetic.2',2,$1,'synthetic-time',$2)")
+        sqlx::query("INSERT INTO system_schema_migrations VALUES('gateway.synthetic.4',4,$1,'synthetic-time',$2)")
             .bind("a".repeat(64)).bind(Uuid::new_v4().to_string()).execute(&database).await.unwrap();
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
         assert_eq!(result["state"], "compatible_newer");
-        assert_eq!(result["current_version"], 2);
+        assert_eq!(result["current_version"], 4);
         assert!(plan(&database, Some(0)).await.is_err());
     }
 

@@ -1115,6 +1115,26 @@ impl AccountService {
         self.store.get_by_id(id).await
     }
 
+    /// 在已取得维护许可后同步代理并使原生准备快照失效。
+    /// @param account 本次读取的账号。@param replacement 新连接。@return 单列CAS结果。
+    pub async fn synchronize_proxy_connection(
+        &self,
+        account: &Account,
+        replacement: &str,
+    ) -> Result<bool, AppError> {
+        let updated = self
+            .store
+            .replace_proxy_connection(account.id, &account.proxy_url, replacement)
+            .await?;
+        if updated {
+            if let Some(scheduler) = &self.scheduler {
+                scheduler.account_updated(account.id);
+            }
+            self.notify_native_change(account.id, true);
+        }
+        Ok(updated)
+    }
+
     pub async fn list_accounts(&self) -> Result<Vec<Account>, AppError> {
         self.store.list().await
     }
@@ -1127,6 +1147,24 @@ impl AccountService {
         let total = self.store.count().await?;
         let accounts = self.store.list_paged(page, page_size).await?;
         Ok((accounts, total))
+    }
+
+    /// 查询管理账号列表，过滤在存储分页之前执行。
+    /// @param page 页码。
+    /// @param page_size 每页数量。
+    /// @param search 名称或邮箱子串。
+    /// @param status 状态筛选。
+    /// @return 当前页及匹配总数。
+    pub async fn list_accounts_filtered(
+        &self,
+        page: i64,
+        page_size: i64,
+        search: &str,
+        status: &str,
+    ) -> Result<(Vec<Account>, i64), AppError> {
+        self.store
+            .list_filtered(page, page_size, search, status)
+            .await
     }
 
     /// 解析账号级上游 session 池。
@@ -1891,6 +1929,17 @@ impl AccountService {
                 account.name, account.id, current, account.rpm_limit, sticky, action_label, session
             ),
         }
+    }
+
+    /// 一次读取已有排队器的活动请求数，目录查询不创建空排队器。
+    /// @return 账号ID与当前处理中请求数。
+    pub async fn active_request_counts(&self) -> HashMap<i64, i64> {
+        self.queues
+            .read()
+            .await
+            .iter()
+            .map(|(id, queue)| (*id, queue.active_request_count()))
+            .collect()
     }
 
     /// 获取或懒创建账号的 FIFO 排队器。

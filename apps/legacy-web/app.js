@@ -19,7 +19,7 @@ const API = (path, opts = {}) =>
     }
     if (!r.ok) {
       let msg = `${r.status} ${r.statusText}`;
-      try { const j = await r.json(); msg = j.detail || msg; } catch {}
+      try { const j = await r.json(); msg = j.detail || j.error || msg; } catch {}
       const error = new Error(msg);
       error.status = r.status;
       throw error;
@@ -29,6 +29,48 @@ const API = (path, opts = {}) =>
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+/**
+ * 增量更新已经转义的展示模板，保留控件、滚动容器和独立编辑宿主。
+ * @param {Element} target 当前展示容器。
+ * @param {string} html 已经过原模板转义的HTML。
+ * @return {void}
+ */
+function patchRuntimeContent(target, html) {
+  const template = document.createElement('template');
+  template.innerHTML = html;
+  const key = node => node.nodeType === Node.ELEMENT_NODE
+    ? node.getAttribute('id') || node.getAttribute('data-runtime-key') || node.getAttribute('data-env-details') || node.getAttribute('data-workspace-section') : null;
+  const compatible = (left, right) => left.nodeType === right.nodeType && left.nodeName === right.nodeName && key(left) === key(right);
+  const patchChildren = (parent, desired) => {
+    let cursor = parent.firstChild;
+    for (const next of [...desired.childNodes]) {
+      let node = cursor;
+      if (!node || !compatible(node, next)) {
+        node = null;
+        for (let candidate = cursor; candidate; candidate = candidate.nextSibling) {
+          if (compatible(candidate, next)) { node = candidate; break; }
+        }
+        if (!node) { parent.insertBefore(next.cloneNode(true), cursor); continue; }
+        parent.insertBefore(node, cursor);
+      }
+      if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.COMMENT_NODE) {
+        if (node.nodeValue !== next.nodeValue) node.nodeValue = next.nodeValue;
+      } else if (!node.hasAttribute('data-runtime-preserve')) {
+        for (const attribute of [...node.attributes]) {
+          if (!next.hasAttribute(attribute.name) && !['data-active-scroll', 'open'].includes(attribute.name)) node.removeAttribute(attribute.name);
+        }
+        for (const attribute of [...next.attributes]) {
+          if (node.getAttribute(attribute.name) !== attribute.value) node.setAttribute(attribute.name, attribute.value);
+        }
+        patchChildren(node, next);
+      }
+      cursor = node.nextSibling;
+    }
+    while (cursor) { const next = cursor.nextSibling; cursor.remove(); cursor = next; }
+  };
+  patchChildren(target, template.content);
+}
 
 const state = {
   accounts: [],
@@ -40,8 +82,14 @@ const state = {
   runs: [],
   runtimeModel: null,
   runtimeEffort: null,
+  runtimeSettingsSaving: null,
   claudeCodeVersion: null,
+  pendingTopicId: null,
   topicFilter: '',
+  accountQuery: '',
+  batchQuery: '',
+  runQuery: '',
+  runStatus: 'all',
   runsEventSource: null,
   runDetail: null,
   viewGeneration: 0,
@@ -135,16 +183,18 @@ function syncRuntimeNavigation(hash = location.hash, replace = false) {
   const embedded = new URLSearchParams(location.search).get('view');
   if (!RUNTIME_BASE || window.parent === window || !['environments', 'tasks'].includes(embedded)) return false;
   const tab = hash.replace(/^#/, '').split('?')[0], query = new URLSearchParams(hash.split('?')[1] || '');
+  // 重复账号参数保持无效选择，不能经父路由同步悄悄变成第一个账号。
+  const account = query.getAll('account').length > 1 ? '0' : query.get('account');
   if (!Object.hasOwn(ROUTES, tab)) return false;
   const target = new URL(tab === 'environments' ? '/environments' : '/tasks', location.origin);
   if (!['environments', 'accounts'].includes(tab)) target.searchParams.set('tab', tab);
-  for (const key of ['account', 'environment', 'gateway_account']) {
-    if (query.has(key)) target.searchParams.set(key, query.get(key));
+  for (const key of ['account', 'environment', 'gateway_account', 'section']) {
+    if (query.has(key)) target.searchParams.set(key, key === 'account' ? account : query.get(key));
   }
   // 初次进入与父地址相同，避免 iframe 加载和顶层导航相互触发。
   if (target.pathname + target.search === window.parent.location.pathname + window.parent.location.search) return false;
   window.parent.postMessage({type: 'runtime:navigate', tab, replace,
-    account: query.get('account'), environment: query.get('environment'), gateway_account: query.get('gateway_account')}, location.origin);
+    account, environment: query.get('environment'), gateway_account: query.get('gateway_account'), section: query.get('section')}, location.origin);
   return true;
 }
 
@@ -161,14 +211,15 @@ document.addEventListener('click', event => {
 });
 
 /** 切换视图并使旧页面、时段弹窗的异步回调失效。@return {void} */
-function navigate() {
+async function navigate() {
   state.viewGeneration += 1;
+  const generation = state.viewGeneration;
   const tab = currentTab();
   // 文档会跨二级导航保留，旧页面的窗口与详情刷新必须显式收口。
   endRunDetail();
-  for (const selector of ['#modal', '#cc2api-binding-modal', '#warmup-modal', '#topic-modal', '#task-modal']) closeModal(selector);
+  for (const selector of ['#modal', '#cc2api-binding-modal', '#warmup-modal', '#topic-modal', '#task-modal', '#batch-create-modal', '#runtime-settings-modal', '#runtime-capture-modal', '#runtime-confirm-modal']) closeModal(selector);
   leaveEnvironments();
-  closeModal('#run-window-modal');
+  closeRunWindowConfig(true);
   closeProjectDialogs();
   window.ProjectsUI.unmount();
   const embedded = new URLSearchParams(location.search).get('view');
@@ -176,7 +227,8 @@ function navigate() {
   document.documentElement.classList.toggle('embedded-tasks', !!RUNTIME_BASE && embedded === 'tasks');
   syncRuntimeNavigation();
   document.documentElement.classList.toggle('environment-page', tab === 'environments');
-  $$('.tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === (tab === 'warmup' ? 'projects' : tab)));
+  document.body.classList.toggle('work-console', tab !== 'environments');
+  $$('.tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === tab));
   const view = $('#view');
   view.innerHTML = '';
   // 两个空间共用 DOM 结构；组件每次挂载都会清理上一个空间的订阅、选择和分页。
@@ -188,7 +240,14 @@ function navigate() {
     state.runsEventSource.close();
     state.runsEventSource = null;
   }
-  ROUTES[tab]();
+  try {
+    await Promise.all([ROUTES[tab](), document.fonts.ready]);
+  } catch (error) {
+    if (generation === state.viewGeneration) notifyRuntime('工作区读取失败：' + error.message);
+  } finally {
+    // 首屏与字体一起就绪后显示嵌入文档，避免依次展示空模板和字体回退。
+    if (generation === state.viewGeneration && window.parent !== window) window.parent.postMessage({type:'runtime:ready'},location.origin);
+  }
 }
 
 window.addEventListener('hashchange', navigate);
@@ -307,7 +366,7 @@ function renderWarmupStatus(account) {
     ? `<div class="warmup-error" title="${escapeHTML(account.warmup_last_error)}">${escapeHTML(account.warmup_last_error)}</div>`
     : '';
   return `
-    <div><code>${account.cc2api_account_id == null ? '本地 CLI' : `cc#${escapeHTML(account.cc2api_account_id)}`}</code> <span class="pill ${statusClass}">${escapeHTML(status === 'quota_wait' ? '额度等待' : status)}</span></div>
+    <div><code>${account.cc2api_account_id == null ? '本地 CLI' : `网关 #${escapeHTML(account.cc2api_account_id)}`}</code> <span class="pill ${statusClass}">${escapeHTML(status === 'quota_wait' ? '额度等待' : status)}</span></div>
     <div>${escapeHTML(account.warmup_interval_min_hours || 3)}-${escapeHTML(account.warmup_interval_max_hours || 5)}h</div>
     <div class="muted">next ${escapeHTML(formatWarmupTime(account.warmup_next_run_at))}</div>
     ${thresholds ? `<div class="muted">普通任务 / 养号阈值：${escapeHTML(thresholds)}</div>` : ''}
@@ -315,6 +374,27 @@ function renderWarmupStatus(account) {
     ${error}
   `;
 }
+
+/** 代理归属仍由关联的网关账号管理；独立账号沿原授权配置流程处理。@param {number} id 任务账号。@return {void} */
+function openAccountProxyConfig(id) {
+ const account=state.accounts.find(item=>item.id===id);if(!account)return;
+ if(account.cc2api_account_id!=null && RUNTIME_BASE){
+  if(window.parent!==window)window.parent.postMessage({type:'runtime:account-edit',id:account.cc2api_account_id},location.origin);
+  else location.href='/?account='+encodeURIComponent(account.cc2api_account_id);
+  return;
+ }
+ openAccLoginModal(account);
+}
+
+/** 任务显示名称独立于配置目录标识。@param {object} account 公开账号。@return {string} 界面名称。 */
+function accountDisplayName(account){return account?.display_name || account?.name || ''; }
+
+/** 绘制定稿图标。@param {string} name 白名单符号名。@return {string} 图标。 */
+function runtimeIcon(name){return `<svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-${name}"></use></svg>`;}
+/** 展示真实状态，保持状态枚举与业务控制分离。@param {object} row 运行或批次。@return {string} 状态标记。 */
+function runtimeBadge(row){const value=row.status,labels={running:'执行中',active:'执行中',success:'成功',passed:'已通过',queued:'排队中',quota_wait:'额度等待',stopping:'停止中',paused:'已暂停',failed:'失败',auth_failed:'授权异常',sync_failed:'同步异常',stopped:'已停止',timeout:'超时'};const label=row.run_window?.allowed===false?runStatusLabel(row):labels[value]||value;return `<span class="work-badge ${['running','active','success','passed'].includes(value)?'good':['failed','auth_failed','timeout','quota_wait'].includes(value)?'warning':''}" data-status="${escapeHTML(value)}"><i></i>${escapeHTML(label)}</span>`;}
+/** 保留卡片DOM与草稿，只切换当前搜索结果。@return {void} */
+function filterTaskAccountCards(){const query=state.accountQuery.trim().toLocaleLowerCase();$$('[data-work-account-card]',$('#accounts-body')).forEach(card=>{card.hidden=!!query&&!`${card.textContent} ${card.dataset.workAccountCard}`.toLocaleLowerCase().includes(query);});}
 
 /**
  * 分别载入正式账号与登录草稿，只有正式账号进入共享任务选择状态。
@@ -329,60 +409,50 @@ async function renderAccounts() {
     if (currentTab() !== 'accounts' || generation !== state.viewGeneration) return;
     [state.accounts, state.loginDrafts] = [accounts, loginDrafts];
   } catch (e) {
-    if (currentTab() === 'accounts' && generation === state.viewGeneration) alert('加载账号失败: ' + e.message);
+    if (currentTab() === 'accounts' && generation === state.viewGeneration) notifyRuntime('加载账号失败: ' + e.message);
     return;
   }
 
   const body = $('#accounts-body');
+  const search=$('#work-account-search');search.value=state.accountQuery;search.oninput=()=>{state.accountQuery=search.value;filterTaskAccountCards();};
   const loginResult = $('#account-login-result');
   loginResult.textContent = state.accountLoginMessage;
   loginResult.classList.toggle('hidden', !state.accountLoginMessage);
-  body.innerHTML = state.accounts.map(a => `
-    <tr>
-      <td>${a.id}</td>
-      <td><strong>${escapeHTML(a.name)}</strong></td>
-      <td><code>${escapeHTML(a.profile_path)}</code></td>
-      <td>${renderProxyEndpoint(a)}</td>
-      <td>${renderAccountTimezone(a)}</td>
-      <td>${renderOauthTokenStatus(a)}${renderPassiveQuota(a.passive_quota)}${a.credential_ownership ? `<p class="muted" role="status">${escapeHTML(a.credential_ownership.message)}</p>` : ''}</td>
-      <td class="warmup-status">${renderWarmupStatus(a)}</td>
-      <td>${a.enabled ? '✓' : '✗'}</td>
-      <td><div class="op-actions account-actions">
-        <button type="button" class="btn btn-sm" data-cli-settings="${a.id}">Claude Code 配置</button>
-        <button class="btn btn-sm" data-quota="${a.id}">额度</button>
-        ${a.credential_ownership?.phase && a.credential_ownership.phase !== 'ready' ? `<a class="btn btn-sm" href="#environments">凭据交接对账</a>` : ''}
-        ${a.cc2api_account_id == null ? `<button type="button" class="btn btn-sm" data-cc2-create="${a.id}">创建 cc2api 账号</button>
-        <button type="button" class="btn btn-sm" data-cc2-bind="${a.id}">关联已有账号</button>` :
-          (RUNTIME_BASE ? `<button type="button" class="btn btn-sm" data-cc2-process="${a.id}">更新进程指标</button>` : '')}
-        ${RUNTIME_BASE ? `<button type="button" class="btn btn-sm" data-run-window-config="${a.id}">运行时段</button>` : ''}
-        <button class="btn btn-sm" data-warmup-config="${a.id}">${a.warmup_engine === 'projects' ? '工程额度' : '养号 / 额度'}</button>
-        ${a.warmup_engine === 'projects' ? `<button class="btn btn-sm" data-warmup-console="${a.id}">Pi 养号迭代</button>` : ''}
-        ${a.warmup_engine !== 'projects' && Number(a.warmup_enabled || 0) === 1 ? `<button class="btn btn-sm btn-primary" data-warmup-now="${a.id}">立即运行</button>` : ''}
-        ${a.warmup_engine !== 'projects' && Number(a.warmup_enabled || 0) !== 1 && (a.cc2api_account_id != null || a.warmup_last_status === 'paused') ? `<button class="btn btn-sm" data-warmup-resume="${a.id}">恢复</button>` : ''}
-        ${a.cc2api_account_id == null || RUNTIME_BASE ? `<button class="btn btn-sm" data-relogin="${a.id}">重新授权</button>` : ''}
-        ${a.cc2api_account_id != null ? `<button class="btn btn-sm btn-danger" data-cc2-unbind="${a.id}">解绑</button>` : ''}
-        <button class="btn btn-sm btn-danger" data-del="${a.id}">删除</button>
-      </div></td>
-    </tr>
-  `).join('') + (state.loginDrafts || []).map(draft => {
+  body.innerHTML = state.accounts.map(a => {
+    const bound=a.cc2api_account_id!=null,worker=a.warmup_engine!=='projects';
+    const workerAction=Number(a.warmup_enabled||0)===1?`<button type="button" data-warmup-now="${a.id}">立即运行养号 ${runtimeIcon('play')}</button>`:(bound||a.warmup_last_status==='paused')?`<button type="button" data-warmup-resume="${a.id}">恢复养号 ${runtimeIcon('play')}</button>`:`<button type="button" data-warmup-config="${a.id}">配置养号 ${runtimeIcon('arrow')}</button>`;
+    const message=a.passive_quota?.account_error?a.passive_quota.message:a.passive_quota?.source==='manual'?'额度已手动更新。':bound?'重新授权提交后，同步更新关联账号的凭据。':'从已有网关账号关联，或创建新的网关账号。';
+    return `<article class="work-panel work-account" data-work-account-card="${a.id}">
+      <header><span class="initial">${runtimeIcon('users')}</span><div><h3><button type="button" class="work-title-button" data-account-details="${a.id}">${escapeHTML(accountDisplayName(a))}</button></h3><small>任务账号 #${a.id}</small></div><span class="work-badge ${a.enabled?'good':''}">${a.enabled?'已启用':'已停用'}</span></header>
+      <div class="work-proxy-row"><span class="work-proxy-compact">${runtimeIcon('globe')}<span class="work-proxy-name">${a.upstream_socks5_host?renderProxyEndpoint(a):'直连'}</span></span><button type="button" class="work-proxy-switch" data-proxy-config="${a.id}">${bound?'切换代理':'配置代理与授权'}</button></div>
+      <div class="work-condition"><span>网关关联</span><strong>${bound?'网关账号 #'+escapeHTML(a.cc2api_account_id):'尚未关联'}</strong></div>
+      <div class="work-condition"><span>环境时区</span><strong>${escapeHTML(a.effective_timezone||a.timezone||'未提供')}</strong></div>
+      <div class="work-condition"><span>Claude Code</span><strong>${escapeHTML(a.claude_code_version||'继承全局')}</strong></div>
+      <div class="work-account-links"><a href="#projects?account=${a.id}">工程迭代 ${runtimeIcon('arrow')}</a>${worker?workerAction:`<a href="#warmup?account=${a.id}">Pi 养号 ${runtimeIcon('arrow')}</a>`}</div>
+      <section class="work-gateway-actions" aria-label="${escapeHTML(accountDisplayName(a))}的网关账号操作"><div class="work-gateway-heading"><span>${runtimeIcon('key')}网关账号</span><strong>${bound?'#'+escapeHTML(a.cc2api_account_id):'尚未关联'}</strong></div><div class="work-gateway-buttons">${!bound?`<button type="button" class="btn btn-sm" data-cc2-create="${a.id}">${runtimeIcon('plus')}创建网关账号</button><button type="button" class="btn btn-sm" data-cc2-bind="${a.id}">关联已有账号</button>`:''}${!bound||RUNTIME_BASE?`<button type="button" class="btn btn-sm" data-relogin="${a.id}">${runtimeIcon('key')}${bound?'重新授权并同步':'重新授权'}</button>`:''}${bound?`<button type="button" class="btn btn-sm btn-danger danger" data-cc2-unbind="${a.id}">解绑</button>`:''}${a.credential_ownership?.phase&&a.credential_ownership.phase!=='ready'?'<a class="btn btn-sm" href="#environments">凭据交接对账</a>':''}</div><p role="status">${escapeHTML(message||'')}</p></section>
+      <footer><button type="button" class="btn btn-sm" data-cli-settings="${a.id}">CLI 配置</button><button type="button" class="btn btn-sm" data-quota="${a.id}">额度</button><button type="button" class="btn btn-sm" data-warmup-config="${a.id}">养号 / 额度设置</button>${RUNTIME_BASE?`<button type="button" class="btn btn-sm" data-run-window-config="${a.id}">运行时段</button>`:''}<button type="button" class="btn btn-sm btn-danger danger" data-del="${a.id}">删除</button></footer>
+    </article>`;
+  }).join('') || '<div class="work-empty"><h3>暂无任务账号</h3><p>添加账号后可以授权并开始任务。</p></div>';
+  const drafts=$('#work-login-drafts');drafts.hidden=!state.loginDrafts.length;
+  drafts.innerHTML='<header><h3>未完成的登录</h3><span>'+state.loginDrafts.length+' 个草稿</span></header>'+(state.loginDrafts || []).map(draft => {
     const phase = { preparing: '准备登录', authorizing: '登录中 · 未提交', ready_to_submit: '认证通过 · 待提交', ended: '终端已结束',
       interrupted: '登录已中断', cancelled: '已取消 · 环境保留', submitting: '保存未完成 · 请继续提交', reconcile: '需检查 / 对账', deleting: '清理未完成 · 可重试' }[draft.state] || '未完成登录';
     const id = escapeHTML(draft.environment_id);
-    return `<tr class="account-draft-row">
-      <td><span class="muted">草稿</span></td><td><strong>${escapeHTML(draft.name)}</strong></td>
-      <td><strong>${escapeHTML(phase)}</strong><div class="muted">${escapeHTML(draft.message || (draft.credentials_present && !draft.credentials_ready ? '保留授权产物；继续后检查认证状态' : '尚未保存账号'))}</div></td>
-      <td>${escapeHTML(draft.proxy_known ? (draft.proxy_summary || '未配置代理') : '配置待检查')}</td><td>—</td><td>未提交</td>
-      <td>不参与任务与养号</td><td>—</td><td><div class="op-actions account-actions">
+    return `<article class="work-history-row account-draft-row"><span class="initial">${runtimeIcon('key')}</span><div><strong>${escapeHTML(draft.name)}</strong><small>${escapeHTML(phase)}</small><small>${escapeHTML(draft.message || (draft.credentials_present && !draft.credentials_ready ? '保留授权产物；继续后检查认证状态' : '尚未保存账号'))}</small><small class="work-draft-network">${escapeHTML(draft.proxy_known ? (draft.proxy_summary || '未配置代理') : '配置待检查')} · 不参与任务与养号</small></div><div class="buttons account-actions">
         <button type="button" class="btn btn-sm" data-draft-resume="${id}" ${draft.can_resume ? '' : 'disabled'}>继续登录</button>
         <button type="button" class="btn btn-sm" data-draft-restart="${id}" ${draft.can_restart ? '' : 'disabled'}>重新登录</button>
         ${draft.session_id ? `<button type="button" class="btn btn-sm" data-draft-cancel="${id}" ${draft.can_restart ? '' : 'disabled'}>取消登录</button>` : ''}
         <button type="button" class="btn btn-sm btn-danger" data-draft-delete="${id}" ${draft.can_delete ? '' : 'disabled'}>删除草稿</button>
         ${draft.can_reconcile ? `<button type="button" class="btn btn-sm" data-draft-reconcile="${id}">恢复检查</button>` : ''}
         ${draft.state === 'reconcile' ? '<a class="btn btn-sm" href="#environments">查看环境</a>' : ''}
-      </div></td></tr>`;
-  }).join('') || '<tr><td colspan="9" class="muted empty-cell">暂无账号</td></tr>';
+      </div></article>`;
+  }).join('') || '<div class="work-empty"><h3>暂无任务账号</h3><p>添加账号后可以授权并开始任务。</p></div>';
 
-  body.onclick = async (e) => {
+  filterTaskAccountCards();
+
+  drafts.onclick = body.onclick = async (e) => {
+    if(e.target.dataset.accountDetails){const account=state.accounts.find(item=>String(item.id)===e.target.dataset.accountDetails);if(account){endRunDetail();$('#modal .modal-titlebar-name').textContent='账号详情';$('#modal-content').innerHTML=`<div class="work-dialog-content"><h2>账号详情 · ${escapeHTML(accountDisplayName(account))}</h2><p class="work-note">配置目录 ${escapeHTML(account.profile_path)}</p>${renderOauthTokenStatus(account)}${renderPassiveQuota(account.passive_quota)}${renderAccountTimezone(account)}${renderWarmupStatus(account)}${account.credential_ownership?`<p>${escapeHTML(account.credential_ownership.message)}</p>`:''}</div>`;$('#modal-content').onclick=body.onclick;openModal('#modal');}return;}
+    if (e.target.dataset.proxyConfig) { await openAccountProxyConfig(Number(e.target.dataset.proxyConfig));return; }
     if (e.target.dataset.cliSettings) {
       await openCliSettingsConfig(Number(e.target.dataset.cliSettings));
       return;
@@ -391,7 +461,7 @@ async function renderAccounts() {
     if (draftId) {
       const draft = state.loginDrafts.find(item => item.environment_id === draftId);
       if (!draft) return;
-      if (e.target.dataset.draftDelete && !confirm(`删除未提交草稿「${draft.name}」？将取消登录，并删除专属容器、HOME、缓存及未提交授权产物。`)) return;
+      if (e.target.dataset.draftDelete && !await confirmRuntimeAction(`删除未提交草稿「${draft.name}」？将取消登录，并删除专属容器、HOME、缓存及未提交授权产物。`)) return;
       e.target.disabled = true;
       try {
         if (e.target.dataset.draftDelete) {
@@ -403,7 +473,7 @@ async function renderAccounts() {
         } else {
           await openLoginDraft(draft, e.target.dataset.draftRestart ? 'restart' : 'resume');
         }
-      } catch (error) { alert('草稿操作未完成：' + error.message); }
+      } catch (error) { notifyRuntime('草稿操作未完成：' + error.message); }
       finally { await renderAccounts(); }
       return;
     }
@@ -415,7 +485,7 @@ async function renderAccounts() {
     const processId = e.target.dataset.cc2Process;
     if (e.target.dataset.runWindowConfig) {
       try { await openRunWindowConfig(e.target.dataset.runWindowConfig); }
-      catch (error) { alert('载入运行时段失败：' + error.message); }
+      catch (error) { notifyRuntime('载入运行时段失败：' + error.message); }
       return;
     }
     const warmupConfigId = e.target.dataset.warmupConfig;
@@ -433,7 +503,7 @@ async function renderAccounts() {
         if (currentTab() !== 'accounts' || generation !== state.viewGeneration) return;
         openQuotaDetail(quotaId, quota);
       } catch (err) {
-        if (currentTab() === 'accounts' && generation === state.viewGeneration) alert('查询额度失败: ' + err.message);
+        if (currentTab() === 'accounts' && generation === state.viewGeneration) notifyRuntime('查询额度失败: ' + err.message);
       } finally {
         e.target.disabled = false;
       }
@@ -449,7 +519,7 @@ async function renderAccounts() {
       if (!account) return;
       e.target.disabled = true;
       try { await openCc2apiBindingModal(account); }
-      catch (error) { alert('加载可关联账号失败：' + error.message); }
+      catch (error) { notifyRuntime('加载可关联账号失败：' + error.message); }
       finally { e.target.disabled = false; }
       return;
     }
@@ -458,11 +528,15 @@ async function renderAccounts() {
       try {
         const result = await API(`/accounts/${createId || processId}/cc2api/${createId ? 'create' : 'process'}`, { method: 'POST' });
         state.accountLoginMessage = createId
-          ? `已创建 cc2api 账号 #${result.cc2api_account.id} 并完成关联`
-          : `已更新 cc2api 账号 #${result.cc2api_account_id} 的进程指标${result.canonical_process.observation?.sample_count ? '' : '；CLI RSS 尚未采集'}`;
+          ? `已创建 网关账号 #${result.cc2api_account.id} 并完成关联`
+          : `已更新 网关账号 #${result.cc2api_account_id} 的进程指标${result.canonical_process.observation?.sample_count ? '' : '；CLI RSS 尚未采集'}`;
         await renderAccounts();
+        if (processId && state.cliSettings?.accountId === Number(processId)) {
+          $('#cli-settings-feedback').classList.remove('is-error');
+          $('#cli-settings-feedback').textContent = state.accountLoginMessage;
+        }
       } catch (err) {
-        alert((createId ? '创建 cc2api 账号失败：' : '更新进程指标失败：') + err.message);
+        notifyRuntime((createId ? '创建 网关账号失败：' : '更新进程指标失败：') + err.message);
       } finally {
         e.target.disabled = false;
       }
@@ -482,11 +556,11 @@ async function renderAccounts() {
       try {
         const result = await API(`/accounts/${warmupNowId}/warmup/run`, { method: 'POST' });
         if (!result.started) {
-          alert(result.warmup_last_error || `未启动：${result.warmup_last_status || '账号当前不可认领'}`);
+          notifyRuntime(result.warmup_last_error || `未启动：${result.warmup_last_status || '账号当前不可认领'}`);
         }
         await renderAccounts();
       } catch (err) {
-        alert('立即运行失败: ' + err.message);
+        notifyRuntime('立即运行失败: ' + err.message);
       } finally {
         e.target.disabled = false;
       }
@@ -498,25 +572,25 @@ async function renderAccounts() {
         await API(`/accounts/${warmupResumeId}/warmup/resume`, { method: 'POST' });
         await renderAccounts();
       } catch (err) {
-        alert('恢复养号失败: ' + err.message);
+        notifyRuntime('恢复养号失败: ' + err.message);
       } finally {
         e.target.disabled = false;
       }
       return;
     }
-    if (unbindId && confirm(`解绑账号 #${unbindId} 的 cc2api 账号并停止未来养号?`)) {
+    if (unbindId && await confirmRuntimeAction(`解绑账号 #${unbindId} 的 网关账号并停止未来养号?`)) {
       e.target.disabled = true;
       try {
         await API(`/accounts/${unbindId}/cc2api-binding`, { method: 'DELETE' });
         await renderAccounts();
       } catch (err) {
-        alert('解绑失败: ' + err.message);
+        notifyRuntime('解绑失败: ' + err.message);
       } finally {
         e.target.disabled = false;
       }
       return;
     }
-    if (id && confirm(`删除账号 #${id}?`)) {
+    if (id && await confirmRuntimeAction(`删除账号 #${id}?`)) {
       await API(`/accounts/${id}`, { method: 'DELETE' });
       await renderAccounts();
     }
@@ -532,6 +606,15 @@ async function renderAccounts() {
       if (k.endsWith('_port')) body[k] = Number(v);
       else if (k === 'force_reauth') body[k] = v === 'true';
       else body[k] = v;
+    }
+    const host=$('#runtime-login-proxy');
+    if(host.dataset.managed==='true'&&!$('#acc-use-manual').checked&&host.dataset.proxyDisabled!=='true'){
+      const choice=host.dataset.proxyChoice;
+      if(choice!==undefined||state.accLogin?.mode==='new'){
+        const selected=choice?JSON.parse(choice):null;
+        for(const key of Object.keys(body))if(key.startsWith('upstream_'))delete body[key];
+        body.proxy_id=selected?.id??null;if(selected)body.proxy_revision=selected.revision;
+      }
     }
     startAccLogin(body);
   };
@@ -554,7 +637,7 @@ async function renderAccounts() {
 }
 
 /**
- * 独立选择已有 cc2api 账号，关联动作不修改养号设置。
+ * 独立选择已有 网关账号，关联动作不修改养号设置。
  * @param {Object} account 当前未关联的本地账号
  * @return {Promise<void>} 候选账号加载后显示窗口
  */
@@ -572,8 +655,8 @@ async function openCc2apiBindingModal(account) {
   form.querySelector('button[type="submit"]').disabled = available.length === 0;
   $('#cc2api-binding-hint').textContent = available.length
     ? '关联会核对登录身份和设备，保留目标账号配置；不会创建账号或修改养号设置。'
-    : '当前没有可关联的账号。可先在账号页创建 cc2api 账号。';
-  $('#cc2api-binding-title').textContent = `#${account.id} ${account.name}`;
+    : '当前没有可关联的账号。可先在账号页创建 网关账号。';
+  $('#cc2api-binding-title').textContent = `#${account.id} ${accountDisplayName(account)}`;
   openModal('#cc2api-binding-modal');
 }
 
@@ -591,10 +674,10 @@ async function saveCc2apiBinding(event) {
     const result = await API(`/accounts/${Number(form.account_id.value)}/cc2api/bind`, {
       method: 'POST', body: JSON.stringify({ cc2api_account_id: Number(form.cc2api_account_id.value) }),
     });
-    state.accountLoginMessage = `已关联现有 cc2api 账号 #${result.cc2api_account.id}，保留该账号原配置`;
+    state.accountLoginMessage = `已关联现有 网关账号 #${result.cc2api_account.id}，保留该账号原配置`;
     closeModal('#cc2api-binding-modal');
     await renderAccounts();
-  } catch (error) { alert('关联已有账号失败：' + error.message); }
+  } catch (error) { notifyRuntime('关联已有账号失败：' + error.message); }
   finally { button.disabled = false; }
 }
 
@@ -621,7 +704,7 @@ async function openWarmupModal(account) {
   }
   updateWarmupQuotaInputs(form);
   updateWarmupBindingState(form);
-  $('#warmup-modal-title').textContent = `#${account.id} ${account.name}`;
+  $('#warmup-modal-title').textContent = `#${account.id} ${accountDisplayName(account)}`;
   openModal('#warmup-modal');
 }
 
@@ -647,11 +730,11 @@ function updateWarmupBindingState(form) {
   $('#warmup-binding-hint').textContent = unified
     ? 'Pi 养号使用独立的工程现场、项目池、追加指南、预算和自动计划；此处只修改账号额度阈值。'
     : bound
-    ? `定时养号使用已关联的 cc2api 账号 #${account.cc2api_account_id}；此处只修改养号与额度设置。`
+    ? `定时养号使用已关联的 网关账号 #${account.cc2api_account_id}；此处只修改养号与额度设置。`
     : '使用此账号已有的 CLI OAuth 凭据，可独立启用定时养号与额度阈值。';
   $('#warmup-quota-policy-hint').textContent = unified
     ? '额度从正常响应中被动更新。命中阈值时由工程门禁暂停；保留原会话与累计预算，等待窗口重置或真实被动额度更新后继续。此处不修改养号工程计划，也不主动查询额度。'
-    : '额度从正常响应中被动更新。观测到任一阈值命中时，当前普通任务或养号仍按原计划完成本轮（包括补充与收尾），下一轮等待窗口重置或真实额度更新，并遵守原投放间隔。单次响应仍可能跨过阈值。cc2api API 转发不受此阈值控制。';
+    : '额度从正常响应中被动更新。观测到任一阈值命中时，当前普通任务或养号仍按原计划完成本轮（包括补充与收尾），下一轮等待窗口重置或真实额度更新，并遵守原投放间隔。单次响应仍可能跨过阈值。网关 API 转发不受此阈值控制。';
 }
 
 /**
@@ -666,6 +749,7 @@ function updateWarmupQuotaInputs(form) {
     const enabled = form.elements[`quota_${window}_enabled`].checked;
     input.disabled = !enabled;
     input.required = enabled;
+    input.closest('.field')?.classList.toggle('upgrade-disabled', !enabled);
     const value = Number(input.value);
     $(`#warmup-quota-${window}-hint`).textContent = !enabled ? '已关闭，沿用额度用满保护'
       : input.value && Number.isInteger(value) && value >= 1 && value <= 100
@@ -704,7 +788,7 @@ async function saveWarmupConfig(e) {
     closeModal('#warmup-modal');
     await renderAccounts();
   } catch (err) {
-    alert('保存养号与额度配置失败: ' + err.message);
+    notifyRuntime('保存养号与额度配置失败: ' + err.message);
   } finally {
     button.disabled = false;
   }
@@ -793,8 +877,8 @@ function runStatusLabel(record) {
  * @return {string} 已转义的输入行
  */
 function runWindowIntervalRow(interval = {start: '09:00', end: '18:00'}) {
-  return `<div class="row run-window-interval"><label>开始<input type="time" data-window-start value="${escapeHTML(interval.start)}" required></label>
-    <label>结束<input type="time" data-window-end value="${escapeHTML(interval.end)}" required></label>
+  return `<div class="run-window-interval"><label class="field"><span class="lbl">开始时间</span><input type="time" data-window-start value="${escapeHTML(interval.start)}" required></label>
+    <label class="field"><span class="lbl">结束时间</span><input type="time" data-window-end value="${escapeHTML(interval.end)}" required></label>
     <button type="button" class="btn btn-sm" data-window-remove>移除</button></div>`;
 }
 
@@ -816,6 +900,8 @@ function updateRunWindowForm() {
  * @return {Promise<void>} 完成表单初始化
  */
 async function openRunWindowConfig(aid) {
+  if(window.nativeEnvironmentWorkspace){window.nativeEnvironmentWorkspace(Number(aid));return;}
+  if(state.runWindowConfig?.sending)return;
   $('#run-window-form').onsubmit = saveRunWindowConfig;
   $('#run-window-form').elements.enabled.onchange = updateRunWindowForm;
   $('#run-window-add').onclick = () => {
@@ -826,7 +912,8 @@ async function openRunWindowConfig(aid) {
     if (event.target.hasAttribute('data-window-remove')) event.target.closest('.run-window-interval').remove();
   };
   closeModal('#run-window-modal');
-  const request = {accountId: aid};
+  const inline=!!environmentWorkspace && state.environmentUI.rows.find(row=>row.environment_id===environmentWorkspace.id)?.account_id===Number(aid);
+  const request = {accountId: aid, inline, sending:false};
   state.runWindowConfig = request;
   let policy;
   try {
@@ -847,7 +934,16 @@ async function openRunWindowConfig(aid) {
     `<label><input type="checkbox" data-window-day value="${index}" ${config.days.includes(index) ? 'checked' : ''}>周${day}</label>`).join('');
   $('#run-window-intervals').innerHTML = (config.intervals.length ? config.intervals : [{start: '09:00', end: '18:00'}]).map(runWindowIntervalRow).join('');
   updateRunWindowForm();
-  openModal('#run-window-modal');
+  if(inline){const host=$('#environment-schedule-editor');if(host){host.replaceChildren(form);host.closest('[data-section-body]').classList.add('editing');}else closeRunWindowConfig(true);}
+  else openModal('#run-window-modal');
+}
+
+/** 结束时段编辑并归还唯一共享表单。@param {boolean} force 导航强制关闭。@return {boolean} 是否关闭。 */
+function closeRunWindowConfig(force=false){
+  const request=state.runWindowConfig;if(request?.sending&&!force)return false;
+  state.runWindowConfig=null;const form=$('#run-window-form');
+  if(request?.inline){$('#run-window-modal .modal-card').append(form);$('#environment-schedule-editor')?.closest('[data-section-body]')?.classList.remove('editing');}
+  $('button[type=submit]',form).disabled=false;$('#run-window-modal').classList.add('hidden');return true;
 }
 
 /**
@@ -860,8 +956,8 @@ async function saveRunWindowConfig(event) {
   const form = event.currentTarget;
   const submit = $('button[type="submit"]', form);
   const request = state.runWindowConfig;
-  if (!request || submit.disabled || $('#run-window-modal').classList.contains('hidden')) return;
-  submit.disabled = true;
+  if (!request || submit.disabled || (!request.inline && $('#run-window-modal').classList.contains('hidden'))) return;
+  submit.disabled = true;request.sending=true;
   try {
     const enabled = form.elements.enabled.checked;
     // 关闭限制不应被尚未完成的编辑阻拦，也不能把已保存的配置清空。
@@ -876,11 +972,14 @@ async function saveRunWindowConfig(event) {
     if (state.runWindowConfig !== request) return;
     if (currentTab() === 'environments') await renderEnvironments();
     else if (currentTab() === 'accounts') await renderAccounts();
-    if (state.runWindowConfig === request) closeModal('#run-window-modal');
+    if (state.runWindowConfig === request) {
+      if(request.inline){form.dataset.savedWindowConfig=JSON.stringify({enabled,days:config.days,intervals:config.intervals});notifyRuntime('运行时段已保存');}
+      else {request.sending=false;closeModal('#run-window-modal');}
+    }
   } catch (error) {
-    if (state.runWindowConfig === request) alert('保存运行时段失败：' + error.message);
+    if (state.runWindowConfig === request) notifyRuntime('保存运行时段失败：' + error.message);
   } finally {
-    if (state.runWindowConfig === request) submit.disabled = false;
+    if (state.runWindowConfig === request) {request.sending=false;submit.disabled=false;}
   }
 }
 
@@ -924,45 +1023,27 @@ function renderPassiveQuota(quota) {
   return `<div class="passive-quota muted">${source}：${escapeHTML(windows)}<div>观察于 ${escapeHTML(formatWarmupTime(quota.observed_at))}</div>${reason}${resume}</div>`;
 }
 
-function openQuotaDetail(accountId, quota) {
-  endRunDetail();
-  const row = state.accounts.find(a => String(a.id) === String(accountId));
-  const formatResetAt = (value) => {
-    if (!value) return '-';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value);
-    return new Intl.DateTimeFormat('zh-CN', {
-      timeZone: 'Asia/Shanghai',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }).format(date).replace(/\//g, '-');
+/** 以窗口展示本次真实额度查询。@param {number|string} accountId 账号ID。@param {object} quota 查询回执。@return {void} */
+function openQuotaDetail(accountId,quota){
+  endRunDetail();const row=state.accounts.find(value=>String(value.id)===String(accountId));
+  $('#modal').classList.add('task-quota-modal');$('#modal .modal-titlebar-name').textContent='账号额度';$('#modal-close').setAttribute('aria-label','关闭账号额度');
+  const windows=[['five_hour','5 小时'],['seven_day','7 天'],['seven_day_fable','7 天 Fable']];
+  $('#modal-content').innerHTML=`<section class="work-quota-content"><div class="work-quota-identity"><span class="initial">${runtimeIcon('users')}</span><div><strong>${escapeHTML(accountDisplayName(row)||`账号 #${accountId}`)}</strong><span>${escapeHTML(`任务账号 #${accountId}`)}</span></div><small>${quota.ok?'查询已更新':'等待有效额度'}</small></div>${!quota.ok?`<p class="work-quota-note" role="status">${escapeHTML(quota.message||'额度接口尚未提供有效窗口')}</p>`:''}<div class="work-quota-windows">${windows.map(([key,label])=>{
+    const value=quota[key],raw=value?.used_percentage??value?.utilization,number=Number(raw),known=raw!=null&&raw!==''&&Number.isFinite(number)&&number>=0;
+    const date=value?.resets_at?new Date(value.resets_at):null;
+    return `<article class="work-quota-window ${key==='seven_day_fable'?'quota-fable':''} ${known&&number>=80?'warning':''}"><header><span>${runtimeIcon('clock')}${label}窗口</span><small>已使用</small></header><div class="work-quota-number">${known?Number(number.toFixed(1)):'—'}${known?'<span>%</span>':''}</div><div class="work-quota-meter" ${known?`role="progressbar" aria-label="${label}已用额度" aria-valuenow="${Math.min(100,number)}" aria-valuemin="0" aria-valuemax="100"`:''}><i style="width:${known?Math.min(100,number):0}%"></i></div><div class="work-quota-remaining"><span>${known?'剩余额度':'额度状态'}</span><strong>${known?Number(Math.max(0,100-number).toFixed(1))+'%':'未观测'}</strong></div><div class="work-quota-reset"><span>重置时间 · 北京时间</span><strong>${date&&Number.isFinite(date.getTime())?escapeHTML(date.toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})):'暂未提供'}</strong></div></article>`;
+  }).join('')}</div><footer class="work-quota-footer"><div>${runtimeIcon('clock')}<span>最近查询 ${escapeHTML(new Date().toLocaleTimeString('zh-CN',{hour12:false}))}<small>通过账号当前线路查询额度</small></span></div><button type="button" class="btn" data-quota-refresh>${runtimeIcon('refresh')}刷新额度</button></footer><p class="work-quota-error" role="alert" hidden></p></section>`;
+  const panel=$('.work-quota-content'),button=$('[data-quota-refresh]',panel),generation=state.viewGeneration;
+  // 关闭、重开或切区后，旧查询只更新服务端事实，不能重新打开额度弹窗。
+  const owns=()=>panel.isConnected&&!$('#modal').classList.contains('hidden')&&$('#modal').classList.contains('task-quota-modal')&&generation===state.viewGeneration;
+  button.onclick=async()=>{
+    if(button.disabled)return;button.disabled=true;$('.work-quota-error',panel).hidden=true;
+    try{const result=await API(`/accounts/${accountId}/quota`,{method:'POST'});if(!owns())return;await renderAccounts();if(owns()){openQuotaDetail(accountId,result);$('[data-quota-refresh]').focus({preventScroll:true});}}
+    catch(error){if(owns()){const feedback=$('.work-quota-error',panel);feedback.hidden=false;feedback.textContent='查询失败：'+error.message;}}
+    finally{if(owns())button.disabled=false;}
   };
-  const fmt = (v) => {
-    if (!v) return '<span class="muted">暂无数据 / 需一次 API 响应后可用</span>';
-    const used = v.used_percentage ?? v.utilization ?? '-';
-    return `
-      <div>used: <strong>${escapeHTML(used)}%</strong></div>
-      <div>reset: <code>${escapeHTML(formatResetAt(v.resets_at))}</code> <span class="muted">UTC+8</span></div>
-    `;
-  };
-  $('#modal-content').innerHTML = `
-    <h3>Quota <code>${escapeHTML(row?.name || `acc#${accountId}`)}</code></h3>
-    ${quota.ok ? '' : `<div class="detail-section"><pre>${escapeHTML(quota.message || 'usage API 未返回额度窗口')}</pre></div>`}
-    <div class="stats-grid">
-      <div class="stat-box"><div class="stat-label">5h</div><div class="stat-value-sm">${fmt(quota.five_hour)}</div></div>
-      <div class="stat-box"><div class="stat-label">7d</div><div class="stat-value-sm">${fmt(quota.seven_day)}</div></div>
-      <div class="stat-box"><div class="stat-label">7d sonnet</div><div class="stat-value-sm">${fmt(quota.seven_day_sonnet)}</div></div>
-      <div class="stat-box"><div class="stat-label">7d fable</div><div class="stat-value-sm">${fmt(quota.seven_day_fable)}</div></div>
-    </div>
-  `;
   openModal('#modal');
 }
-
 /**
  * 解析 http / socks5 / socks5h URL,成功则回填 acc-form 的 5 个字段。
  * 支持格式:
@@ -1023,6 +1104,7 @@ function applyProxyUrl(raw) {
 //   step 2: 打开 WS PTY → 用户在 xterm 里走 claude auth login → 点 commit
 //   commit: POST /api/accounts/login/{sid}/commit → 校验 → 写库 → 关容器
 // 取消任意一步都 DELETE /api/accounts/login/{sid} 清场。
+/** 展示账号授权配置，关联账号沿用原代理与时区。@param {object|null} account 原任务账号或新建。@return {void} */
 function openAccLoginModal(account = null) {
   // 重置到 step 1
   const form = $('#acc-form');
@@ -1044,13 +1126,23 @@ function openAccLoginModal(account = null) {
     form.elements[name].disabled = bound;
   }
   $('#acc-proxy-url').disabled = bound;
+  const proxyHost=$('#runtime-login-proxy');
+  delete proxyHost.dataset.proxyChoice;
+  proxyHost.dataset.proxyDisabled=String(bound);
+  proxyHost.dataset.proxyLabel=account?.upstream_socks5_host?`${account.upstream_proxy_scheme||'socks5'}://${account.upstream_socks5_host}:${account.upstream_socks5_port||1080}`:'直连';
+  proxyHost.hidden=false;$('#acc-use-manual').checked=false;$('#acc-use-manual').disabled=bound;
+  $('#acc-proxy-manual').open=!RUNTIME_BASE;
+  $('#acc-use-manual').onchange=()=>{proxyHost.hidden=$('#acc-use-manual').checked;};
+
   $('#acc-force-reauth').value = account ? 'true' : 'false';
-  $('.modal-titlebar-name', $('#acc-modal')).firstChild.textContent = account ? 'acc / relogin ' : 'acc / new ';
-  $('#acc-modal-stage').textContent = 'step 1 · configure';
+  $('.modal-titlebar-name', $('#acc-modal')).firstChild.textContent = account ? '重新授权 ' : '添加任务账号 ';
+  $('#acc-modal-stage').textContent = '配置账号与代理';
   openModal('#acc-modal');
 }
 
+/** 切换授权配置与终端布局，保留原会话及终端节点。@param {string} which 配置或终端阶段。@return {void} */
 function showAccStep(which) {
+  $('#acc-modal .modal-card').classList.toggle('login-session',which==='terminal');
   // which = 'config' | 'terminal'
   $('.acc-step-config').classList.toggle('hidden', which !== 'config');
   $('.acc-step-terminal').classList.toggle('hidden', which !== 'terminal');
@@ -1080,7 +1172,7 @@ async function startAccLogin(body) {
       await endAccLogin({ alsoCloseModal: true, skipServerCancel: true });
       return;
     }
-    return alert('启动登录会话失败: ' + e.message);
+    return notifyRuntime('启动登录会话失败: ' + e.message);
   }
   loginState.starting = false;
   startButton.disabled = false;
@@ -1168,7 +1260,7 @@ async function showAccLoginSession(resp, body, loginState) {
   $('#acc-login-sid').textContent = resp.session_id;
   $('#acc-login-sidecar').textContent = resp.has_sidecar ? 'yes' : 'no (direct)';
   $('#acc-login-name').textContent = resp.name;
-  $('#acc-modal-stage').textContent = 'step 2 · terminal';
+  $('#acc-modal-stage').textContent = '完成授权并提交';
 
   showAccStep('terminal');
   if (loginState.closeRequested) {
@@ -1196,7 +1288,7 @@ async function restartAccLogin() {
   try {
     if (draft.environment_id) await openLoginDraft(draft, 'restart');
     else openAccLoginModal(account || null);
-  } catch (error) { alert('重新登录失败：' + error.message); }
+  } catch (error) { notifyRuntime('重新登录失败：' + error.message); }
   await renderAccounts();
 }
 
@@ -1238,6 +1330,7 @@ async function attachAccLoginTerminal(wsPath) {
         if (state.accLogin !== login || login.closing) return;
         login.authorizationURL = status.authorization_url || null;
         login.loginPhase = status.phase;
+        const ready=status.credentials_ready===true;const steps=$$('#acc-modal .upgrade-steps li');steps[1]?.classList.toggle('done',ready);steps[1]?.classList.toggle('active',!ready);steps[2]?.classList.toggle('active',ready);
         updateAccCodeControls();
         $('#acc-auth-url').value = login.authorizationURL || '';
         $('#acc-login-copy').disabled = !login.authorizationURL;
@@ -1379,6 +1472,7 @@ async function queryAccCodeReceipt() {
  * @return {Promise<object>} 当前连接与幂等收口句柄。
  */
 async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', options = {}) {
+  await window.loadRuntimeTerminal?.();
   const vendorDeadline = Date.now() + 10000;
   while (typeof Terminal === 'undefined' || typeof FitAddon === 'undefined') {
     if (options.isActive && !options.isActive()) throw new Error('登录窗口已关闭');
@@ -1391,7 +1485,7 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', o
   host.innerHTML = '';
 
   const term = new Terminal({
-    fontFamily: '"JetBrains Mono", ui-monospace, Menlo, monospace',
+    fontFamily: '"JetBrains Mono Variable", ui-monospace, Menlo, monospace',
     fontSize: 13,
     cursorBlink: true,
     disableStdin: Boolean(options.readOnly),
@@ -1581,7 +1675,7 @@ async function commitAccLogin() {
     });
     if (state.accLogin !== al) return;
     const action = r.credentials_synced ? '已重授权并同步关联账号' : (r.credentials_synced === false
-      ? `${al.mode === 'relogin' ? '已重新授权' : '账号已保存'}，仅保存到本地，尚未关联 cc2api`
+      ? `${al.mode === 'relogin' ? '已重新授权' : '账号已保存'}，仅保存到本地，尚未关联网关账号`
       : (al.mode === 'relogin' ? '已重新授权' : '账号已保存'));
     if (al.term) al.term.write(`\r\n\x1b[32m[完成] ${action} (#${r.id})\x1b[0m\r\n`);
     // commit 成功后服务端已清容器；前端关 WS + 弹窗 + 刷列表
@@ -1592,7 +1686,7 @@ async function commitAccLogin() {
   } catch (e) {
     if (state.accLogin === al) {
       btn.disabled = false;
-      alert('提交失败: ' + e.message + '\n\n如果还没登录成功，请先在终端完成 OAuth。');
+      notifyRuntime('提交失败: ' + e.message + '\n\n如果还没登录成功，请先在终端完成 OAuth。');
     }
   } finally {
     al.committing = false;
@@ -1641,7 +1735,7 @@ async function endAccLogin({ alsoCloseModal = false, skipServerCancel = false } 
   if (alsoCloseModal) closeModal('#acc-modal');
   // 重置 step
   showAccStep('config');
-  $('#acc-modal-stage').textContent = 'step 1 · configure';
+  $('#acc-modal-stage').textContent = '配置账号与代理';
   $('#acc-login-commit').disabled = false;
   if (!skipServerCancel && currentTab() === 'accounts') await renderAccounts();
 }
@@ -1656,7 +1750,7 @@ async function renderTopics() {
       if (currentTab() !== 'topics' || generation !== state.viewGeneration) return;
       state.topics = topics;
     } catch (e) {
-      if (currentTab() === 'topics' && generation === state.viewGeneration) alert('加载题库失败: ' + e.message);
+      if (currentTab() === 'topics' && generation === state.viewGeneration) notifyRuntime('加载题库失败: ' + e.message);
       return;
     }
   }
@@ -1670,21 +1764,16 @@ async function renderTopics() {
       t.title.toLowerCase().includes(filter) ||
       t.category.toLowerCase().includes(filter) ||
       String(t.no).includes(filter))
-    .map(t => `
-      <div class="topic-card" data-id="${t.id}">
-        <div class="topic-no">#${t.no}</div>
-        <div class="topic-title">${escapeHTML(t.title)}</div>
-        <div class="topic-desc">${escapeHTML(t.description)}</div>
-        <div class="topic-cat">${escapeHTML(t.category)}</div>
-      </div>
-    `).join('') || '<div class="muted empty-panel">暂无 topic</div>';
+    .map(t => `<article class="work-panel work-topic" data-id="${t.id}"><div><span class="work-topic-no">#${String(t.no).padStart(3,'0')}</span><span class="pill">${escapeHTML(t.category||'未分类')}</span></div><h3>${escapeHTML(t.title)}</h3><p>${escapeHTML(t.description)}</p><footer><span>${t.followups?.length||0} 条自动补充</span><button type="button" data-topic-edit="${t.id}">编辑</button><button type="button" data-topic-batch="${t.id}">创建任务 ${runtimeIcon('arrow')}</button></footer></article>`).join('') || '<div class="muted empty-panel">暂无 topic</div>';
 
   list.onclick = (e) => {
-    const card = e.target.closest('.topic-card');
+    const card = e.target.closest('.work-topic');
     if (!card) return;
+    if(e.target.closest('[data-topic-batch]')){state.pendingTopicId=Number(card.dataset.id);navigateTo('#tasks');return;}
     openTopicModal(Number(card.dataset.id));
   };
 
+  list.onkeydown = event => {if(event.target.closest('button'))return;if(event.key==='Enter' || event.key===' '){const card=event.target.closest('.work-topic');if(card){event.preventDefault();openTopicModal(Number(card.dataset.id));}}};
   $('#topic-filter').oninput = (e) => {
     state.topicFilter = e.target.value;
     renderTopics();
@@ -1700,12 +1789,13 @@ function openTopicModal(topicId) {
   form.reset();
   form.topic_id.value = topic ? topic.id : '';
   form.no.value = topic ? topic.no : nextTopicNo();
+  $('.modal-titlebar-name',$('#topic-modal')).firstChild.textContent=topic?'编辑题目 ':'新建题目 ';
   form.title.value = topic ? topic.title : '';
   form.description.value = topic ? topic.description : '';
   form.followup_1.value = topic?.followups?.[0] || '';
   form.followup_2.value = topic?.followups?.[1] || '';
   form.category.value = topic ? topic.category : '';
-  $('#topic-modal-title').textContent = topic ? `#${topic.no}` : 'new';
+  $('#topic-modal-title').textContent = topic ? `#${topic.no}` : '';
   $('#topic-delete').classList.toggle('hidden', !topic);
   openModal('#topic-modal');
 
@@ -1714,7 +1804,7 @@ function openTopicModal(topicId) {
     const fd = new FormData(form);
     const first = String(fd.get('followup_1') || '').trim();
     const second = String(fd.get('followup_2') || '').trim();
-    if (second && !first) return alert('请先填写第一条补充需求');
+    if (second && !first) return notifyRuntime('请先填写第一条补充需求');
     const body = {
       no: Number(fd.get('no')),
       title: fd.get('title'),
@@ -1735,21 +1825,21 @@ function openTopicModal(topicId) {
       state.topics = [];
       await renderTopics();
     } catch (err) {
-      alert('保存题目失败: ' + err.message);
+      notifyRuntime('保存题目失败: ' + err.message);
     } finally {
       submit.disabled = false;
     }
   };
 
   $('#topic-delete').onclick = async () => {
-    if (!topic || !confirm(`删除 topic #${topic.no}?`)) return;
+    if (!topic || !await confirmRuntimeAction(`删除 topic #${topic.no}?`)) return;
     try {
       await API(`/topics/${topic.id}`, { method: 'DELETE' });
       closeModal('#topic-modal');
       state.topics = [];
       await renderTopics();
     } catch (err) {
-      alert('删除题目失败: ' + err.message);
+      notifyRuntime('删除题目失败: ' + err.message);
     }
   };
 }
@@ -1760,14 +1850,14 @@ function nextTopicNo() {
 
 function openTaskModal(topicNo) {
   if (state.accounts.length === 0) {
-    return alert('请先添加账号');
+    return notifyRuntime('请先添加账号');
   }
   const topic = state.topics.find(t => t.no === topicNo);
   $('#task-modal-title').textContent = `#${topic.no} ${topic.title}`;
   const form = $('#task-form');
   form.topic_no.value = topicNo;
   form.account_id.innerHTML = state.accounts
-    .map(a => `<option value="${a.id}">${escapeHTML(a.name)}</option>`).join('');
+    .map(a => `<option value="${a.id}">${escapeHTML(accountDisplayName(a))}</option>`).join('');
   const concurrencyLimit = state.accounts[0].cli_concurrency_limit || 2;
   form.elements.concurrency.max = concurrencyLimit;
   form.elements.concurrency.value = Math.min(Number(form.elements.concurrency.value), concurrencyLimit);
@@ -1791,7 +1881,7 @@ function openTaskModal(topicNo) {
       await API('/tasks', { method: 'POST', body: JSON.stringify(body) });
       closeModal('#task-modal');
       navigateTo('#tasks');
-    } catch (err) { alert('创建任务失败: ' + err.message); }
+    } catch (err) { notifyRuntime('创建任务失败: ' + err.message); }
   };
 }
 
@@ -1804,12 +1894,13 @@ async function renderTasks() {
     if (currentTab() !== 'tasks' || generation !== state.viewGeneration) return;
     [state.batches, state.accounts, state.topics] = values;
   } catch (e) {
-    if (currentTab() === 'tasks' && generation === state.viewGeneration) alert('加载任务失败: ' + e.message);
+    if (currentTab() === 'tasks' && generation === state.viewGeneration) notifyRuntime('加载任务失败: ' + e.message);
     return;
   }
 
-  const accMap = Object.fromEntries(state.accounts.map(a => [a.id, a.name]));
+  const accMap = Object.fromEntries(state.accounts.map(a => [a.id, accountDisplayName(a)]));
   const form = $('#batch-form');
+  $('#open-batch-form').onclick=()=>openModal('#batch-create-modal');
   if (state.accounts.length === 0) {
     form.account_id.innerHTML = '';
     $('#batch-topic-list').innerHTML = '<div class="muted">请先添加账号</div>';
@@ -1817,31 +1908,24 @@ async function renderTasks() {
     return;
   }
   form.account_id.innerHTML = state.accounts
-    .map(a => `<option value="${a.id}">${escapeHTML(a.name)}</option>`).join('');
+    .map(a => `<option value="${a.id}">${escapeHTML(accountDisplayName(a))}</option>`).join('');
   paintBatchTopics();
+  if(state.pendingTopicId){const selected=$(`#batch-topic-list input[value="${state.pendingTopicId}"]`);if(selected)selected.checked=true;state.pendingTopicId=null;updateBatchSelectedCount();openModal('#batch-create-modal');}
 
   const body = $('#batches-body');
-  body.innerHTML = state.batches.map(b => `
-    <tr>
-      <td>${b.id}</td>
-      <td>${escapeHTML(accMap[b.account_id] || `acc#${b.account_id}`)}</td>
-      <td><span class="pill pill-${b.status}">${escapeHTML(runStatusLabel(b))}</span>${b.status === 'quota_wait' ? `<div class="warmup-error">${escapeHTML(b.quota_policy?.message || b.passive_quota?.message || '等待最新额度')}</div>` : ''}</td>
-      <td>${b.done_count || 0}/${b.item_count || 0}</td>
-      <td>${b.effective_concurrency ?? b.concurrency}${b.effective_concurrency != null && b.effective_concurrency !== b.concurrency ? `<div class="hint">已存配置 ${b.concurrency}，受账号上限限制</div>` : ''}</td>
-      <td>${b.interval_min_sec}-${b.interval_max_sec}s</td>
-      <td>${renderBatchActions(b)}</td>
-    </tr>
-  `).join('') || '<tr><td colspan="7" class="muted empty-cell">暂无批次</td></tr>';
+  $('#work-batch-search').value=state.batchQuery;$('#work-batch-search').oninput=event=>{state.batchQuery=event.target.value;$$('tr',body).forEach(row=>{row.hidden=!!state.batchQuery.trim()&&!row.textContent.toLocaleLowerCase().includes(state.batchQuery.trim().toLocaleLowerCase());});};
+  body.innerHTML = state.batches.map(b => `<tr><td><strong>批次 #${b.id}</strong><small>${escapeHTML(accMap[b.account_id]||`账号 #${b.account_id}`)}</small></td><td>${runtimeBadge(b)}${b.status==='quota_wait'?`<small>${escapeHTML(b.quota_policy?.message||b.passive_quota?.message||'等待最新额度')}</small>`:''}</td><td><strong>${b.done_count||0} / ${b.item_count||0}</strong><div class="bar"><i style="width:${b.item_count?Math.min(100,(b.done_count||0)/b.item_count*100):0}%"></i></div></td><td>${b.effective_concurrency??b.concurrency}${b.effective_concurrency!=null&&b.effective_concurrency!==b.concurrency?`<small>已存配置 ${b.concurrency}，受账号上限限制</small>`:''}</td><td>${b.interval_min_sec}–${b.interval_max_sec} 秒</td><td>${renderBatchActions(b)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty-cell">暂无批次</td></tr>';
+  $('#work-batch-search').dispatchEvent(new Event('input',{bubbles:true}));
 
   body.onclick = async (e) => {
     const pauseBatchId = e.target.dataset.pauseBatch;
-    if (pauseBatchId && confirm(`暂停批次 #${pauseBatchId}? 已运行的 run 会停止，未完成项目可继续。`)) {
+    if (pauseBatchId && await confirmRuntimeAction(`暂停批次 #${pauseBatchId}? 已运行的 run 会停止，未完成项目可继续。`)) {
       e.target.disabled = true;
       try {
         await API(`/task-batches/${pauseBatchId}/pause`, { method: 'POST' });
         renderTasks();
       } catch (err) {
-        alert('暂停批次失败: ' + err.message);
+        notifyRuntime('暂停批次失败: ' + err.message);
         e.target.disabled = false;
       }
       return;
@@ -1853,22 +1937,23 @@ async function renderTasks() {
         await API(`/task-batches/${resumeBatchId}/resume`, { method: 'POST' });
         renderTasks();
       } catch (err) {
-        alert('继续批次失败: ' + err.message);
+        notifyRuntime('继续批次失败: ' + err.message);
         e.target.disabled = false;
       }
       return;
     }
     const batchId = e.target.dataset.delBatch;
-    if (batchId && confirm(`删除批次 #${batchId}?`)) {
+    if (batchId && await confirmRuntimeAction(`删除批次 #${batchId}?`)) {
       try {
         await API(`/task-batches/${batchId}`, { method: 'DELETE' });
         renderTasks();
-      } catch (err) { alert('删除批次失败: ' + err.message); }
+      } catch (err) { notifyRuntime('删除批次失败: ' + err.message); }
     }
   };
 
+  $('#batch-topic-search').oninput=event=>{const query=event.target.value.trim().toLocaleLowerCase();$$('#batch-topic-list label').forEach(label=>{label.hidden=!!query&&!label.textContent.toLocaleLowerCase().includes(query);});};
   $('#batch-select-all').onclick = () => {
-    $$('#batch-topic-list input[type=checkbox]').forEach(i => { i.checked = true; });
+    $$('#batch-topic-list label:not([hidden]) input[type=checkbox]').forEach(i => { i.checked = true; });
     updateBatchSelectedCount();
   };
   $('#batch-clear-all').onclick = () => {
@@ -1880,7 +1965,7 @@ async function renderTasks() {
     const fd = new FormData(form);
     const topicIds = $$('#batch-topic-list input[type=checkbox]:checked')
       .map(i => Number(i.value));
-    if (topicIds.length === 0) return alert('请至少选择一个 topic');
+    if (topicIds.length === 0) return notifyRuntime('请至少选择一个 topic');
     const body = {
       account_id: Number(fd.get('account_id')),
       topic_ids: topicIds,
@@ -1893,10 +1978,10 @@ async function renderTasks() {
     };
     try {
       const res = await API('/task-batches', { method: 'POST', body: JSON.stringify(body) });
-      alert(`已启动批次 #${res.id}`);
-      navigateTo('#runs');
+      notifyRuntime(`已启动批次 #${res.id}`);
+      closeModal('#batch-create-modal');await renderTasks();
     } catch (err) {
-      alert('启动批次失败: ' + err.message);
+      notifyRuntime('启动批次失败: ' + err.message);
     }
   };
 }
@@ -1904,11 +1989,9 @@ async function renderTasks() {
 function paintBatchTopics() {
   const list = $('#batch-topic-list');
   list.innerHTML = state.topics.map(t => `
-    <label class="batch-topic">
+    <label class="work-pool-item">
       <input type="checkbox" value="${t.id}" />
-      <span class="topic-no">#${t.no}</span>
-      <span class="batch-topic-title">${escapeHTML(t.title)}</span>
-      <span class="topic-cat">${escapeHTML(t.category)}</span>
+      <span><strong>#${t.no} ${escapeHTML(t.title)}</strong><small>${escapeHTML(t.category)}</small></span>
     </label>
   `).join('') || '<div class="muted">暂无 topic</div>';
   list.onchange = updateBatchSelectedCount;
@@ -1918,7 +2001,7 @@ function paintBatchTopics() {
 function updateBatchSelectedCount() {
   const n = $$('#batch-topic-list input[type=checkbox]:checked').length;
   const el = $('#batch-selected-count');
-  if (el) el.textContent = `${n} selected`;
+  if (el) el.textContent = `已选 ${n} 项`;
 }
 
 function renderBatchActions(batch) {
@@ -1967,48 +2050,63 @@ function renderRunFollowups(run) {
 
 /** 创建运行详情容器。@param {string} rid 运行标识。@returns {void} */
 function renderRunDetailShell(rid) {
+  $('#modal .modal-titlebar-name').textContent='运行详情';
+  $('#modal').classList.add('approved-run-modal');
+  $('#modal .modal-titlebar-name').textContent = '运行详情';
+  $('#modal-close').setAttribute('aria-label', '关闭运行详情');
   $('#modal-content').innerHTML = `
-    <h3>Run <code>${rid}</code> <span id="run-detail-status" class="pill pill-queued">queued</span></h3>
-
-    <div class="detail-section">
-      <h4>统计</h4>
-      <div class="stats-grid">
-        <div class="stat-box"><div class="stat-label">输入 token</div><div class="stat-value" data-stat-key="tokens_in">等待采集</div></div>
-        <div class="stat-box"><div class="stat-label">输出 token</div><div class="stat-value" data-stat-key="tokens_out">等待采集</div></div>
-        <div class="stat-box"><div class="stat-label">请求数</div><div class="stat-value" data-stat-key="requests">等待采集</div></div>
-        <div class="stat-box"><div class="stat-label">退出码</div><div class="stat-value" data-stat-key="exit_code">-</div></div>
-        <div class="stat-box"><div class="stat-label">Claude Code</div><div class="stat-value-sm" data-stat-key="claude_code_version">-</div></div>
-        <div class="stat-box"><div class="stat-label">思考预算</div><div class="stat-value-sm" data-stat-key="claude_effort_level">-</div></div>
-        <div class="stat-box"><div class="stat-label">模型覆盖</div><div class="stat-value-sm" data-stat-key="model_override">默认</div></div>
+    <div class="work-run-detail">
+      <div class="run-detail-meta"><div><span id="run-detail-status" class="pill pill-queued">等待读取</span><span id="run-detail-kind">运行记录</span><span id="run-detail-account"></span></div><code>${escapeHTML(rid)}</code></div>
+      <div class="run-detail-tabs" role="tablist" aria-label="运行详情">
+        ${[['overview','概览'],['logs','日志'],['files','产物文件'],['capture','抓包']].map(([key,label],index)=>`<button type="button" role="tab" id="run-tab-${key}" aria-controls="run-panel-${key}" aria-selected="${index === 0}" tabindex="${index ? -1 : 0}" data-run-tab="${key}" class="${index ? '' : 'active'}">${label}${key === 'files' ? '<small id="run-detail-file-count">0</small>' : ''}</button>`).join('')}
       </div>
-      <div class="hint inline hidden" id="run-detail-stats-error"></div>
-    </div>
-
-    <div class="detail-section">
-      <h4>需求与自动补充</h4>
-      <div id="run-detail-followups">等待运行计划</div>
-    </div>
-
-    <div class="detail-section">
-      <h4>产物文件 (<span id="run-detail-file-count">0</span>)</h4>
-      <div class="file-tree" id="run-detail-files"><div class="muted">（空）</div></div>
-    </div>
-
-    <div class="detail-section hidden" id="run-detail-capture-section">
-      <h4>抓包</h4>
-      <div class="capture-summary" id="run-detail-capture">等待抓包索引</div>
-    </div>
-
-    <div class="detail-section">
-      <h4>Transcript</h4>
-      <pre class="transcript-pre" id="run-detail-transcript">等待 transcript</pre>
-    </div>
-
-    <div class="detail-section hidden" id="run-detail-error-section">
-      <h4 id="run-detail-error-title">错误</h4>
-      <pre id="run-detail-error"></pre>
-    </div>
-  `;
+      <div class="run-detail-scroll">
+        <section id="run-panel-overview" role="tabpanel" aria-labelledby="run-tab-overview">
+          <div class="run-stat-grid">
+            <article><span>输入 Token</span><strong data-stat-key="tokens_in">等待采集</strong><small>本次运行累计输入</small></article>
+            <article><span>输出 Token</span><strong data-stat-key="tokens_out">等待采集</strong><small>本次运行累计输出</small></article>
+            <article><span>请求数</span><strong data-stat-key="requests">等待采集</strong><small>本次运行累计请求</small></article>
+            <article><span>退出码</span><strong data-stat-key="exit_code">待结束</strong><small>进程最终退出状态</small></article>
+          </div>
+          <div class="hint inline hidden" id="run-detail-stats-error"></div>
+          <div class="run-state-notice failure hidden" id="run-detail-error-section"><strong id="run-detail-error-title">错误</strong><pre id="run-detail-error"></pre></div>
+          <div class="run-overview-grid">
+            <article class="run-info-panel"><header><h3>需求与自动补充</h3><span>本次运行记录</span></header><div class="run-prompt" id="run-detail-followups">等待运行计划</div></article>
+            <aside class="run-info-panel"><header><h3>执行配置</h3></header><dl class="run-config-list"><div><dt>运行版本</dt><dd data-stat-key="claude_code_version">未采集</dd></div><div><dt>冻结模型</dt><dd data-stat-key="model_override">未采集</dd></div><div><dt>思考预算</dt><dd data-stat-key="claude_effort_level">未采集</dd></div></dl><p class="run-config-note">配置以本次运行保存的记录为准。</p></aside>
+          </div>
+        </section>
+        <section id="run-panel-logs" role="tabpanel" aria-labelledby="run-tab-logs" hidden><div class="run-log-panel"><header><strong>运行日志</strong><span id="run-detail-log-state">等待日志</span></header><pre class="transcript-pre" id="run-detail-transcript">等待日志</pre><footer>输出按当前运行持续更新</footer></div></section>
+        <section id="run-panel-files" role="tabpanel" aria-labelledby="run-tab-files" hidden><div class="run-info-panel"><header><h3>产物文件</h3><span>当前工作目录</span></header><div class="file-tree" id="run-detail-files"><div class="muted">等待文件列表</div></div></div></section>
+        <section id="run-panel-capture" role="tabpanel" aria-labelledby="run-tab-capture" hidden><div class="run-empty-state" id="run-detail-capture-empty"><strong>本次运行未启用抓包</strong><p>抓包运行的请求索引和 TLS 观测会显示在这里。</p></div><div class="detail-section hidden" id="run-detail-capture-section"><div class="capture-summary" id="run-detail-capture">等待抓包索引</div></div></section>
+      </div><footer class="run-detail-footer"><span>运行记录与实际观测</span><span id="run-detail-updated">正在读取…</span></footer>
+    </div>`;
+  const modal = $('#modal');
+  modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-label', '运行详情');
+  modal.onkeydown = event => {
+    if (event.key !== 'Tab') return;
+    const nodes = [...modal.querySelectorAll('button:not(:disabled),a[href],input,textarea,summary,[tabindex="0"]')].filter(node => node.offsetParent !== null);
+    const first = nodes[0], last = nodes[nodes.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  };
+  const tabs = $('#modal-content .run-detail-tabs');
+  /** 页签切换保留正文DOM、文件内容和正在进行的观测。@param {HTMLElement} button 目标页签。@return {void} */
+  const selectTab = button => {
+    for (const tab of tabs.querySelectorAll('[data-run-tab]')) {
+      const selected = tab === button;
+      tab.classList.toggle('active', selected); tab.setAttribute('aria-selected', String(selected)); tab.tabIndex = selected ? 0 : -1;
+      $('#' + tab.getAttribute('aria-controls')).hidden = !selected;
+    }
+  };
+  tabs.onclick = event => { const button = event.target.closest('[data-run-tab]'); if (button) selectTab(button); };
+  tabs.onkeydown = event => {
+    const buttons = [...tabs.querySelectorAll('[data-run-tab]')], index = buttons.indexOf(event.target);
+    if (index < 0 || !['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
+    event.preventDefault(); event.stopPropagation();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+    selectTab(buttons[next]); buttons[next].focus();
+  };
 }
 
 function setRunDetailText(selector, html) {
@@ -2122,6 +2220,14 @@ function updateRunDetailContent(rid, run, files, stats, transcript, transcriptSt
   const detail = state.runDetail;
   if (!detail?.rendered) renderRunDetailShell(rid);
   const safeStatus = escapeHTML(run.status);
+  const task = state.tasks.find(item => item.id === run.task_id);
+  const account = state.accounts.find(item => item.id === run.account_id);
+  $('#modal .modal-titlebar-name').textContent = task?.title || '运行详情';
+  setRunDetailText('#run-detail-account', escapeHTML(accountDisplayName(account) || '账号信息未提供'));
+  setRunDetailText('#run-detail-kind', escapeHTML(({normal:'普通任务',capture:'抓包任务',warmup:'养号任务'})[run.run_kind] || '运行记录'));
+  setRunDetailText('#run-detail-updated', '更新于 ' + escapeHTML(new Date().toLocaleTimeString('zh-CN', {hour12:false})));
+  setRunDetailText('#run-detail-log-state', isLiveRunStatus(run.status) ? '持续观测中' : '本次运行已结束');
+
   setRunDetailText('#run-detail-followups', renderRunFollowups(run));
 
   const statusEl = $('#run-detail-status');
@@ -2135,7 +2241,7 @@ function updateRunDetailContent(rid, run, files, stats, transcript, transcriptSt
   setRunDetailText('[data-stat-key="tokens_in"]', renderStatValue(stats, 'tokens_in'));
   setRunDetailText('[data-stat-key="tokens_out"]', renderStatValue(stats, 'tokens_out'));
   setRunDetailText('[data-stat-key="requests"]', renderStatValue(stats, 'requests'));
-  setRunDetailText('[data-stat-key="exit_code"]', escapeHTML(run.exit_code ?? '-'));
+  setRunDetailText('[data-stat-key="exit_code"]', escapeHTML(run.exit_code ?? (isLiveRunStatus(run.status) ? '待结束' : '未采集')));
   setRunDetailText('[data-stat-key="claude_code_version"]', escapeHTML(run.claude_code_version || '-'));
   setRunDetailText('[data-stat-key="claude_effort_level"]', escapeHTML(run.claude_effort_level || '-'));
   const executionModel = run.execution_model ?? run.capture_model_override;
@@ -2160,6 +2266,7 @@ function updateRunDetailContent(rid, run, files, stats, transcript, transcriptSt
   if (captureSection) {
     const isCapture = (run.run_kind || 'normal') === 'capture';
     captureSection.classList.toggle('hidden', !isCapture);
+    $('#run-detail-capture-empty').classList.toggle('hidden', isCapture);
     if (isCapture) {
       const captureHTML = renderCaptureDetail(capture);
       if (detail.lastCaptureHTML !== captureHTML) {
@@ -2190,6 +2297,12 @@ function updateRunDetailContent(rid, run, files, stats, transcript, transcriptSt
 
 // ===================== Runs (SSE 实时) =====================
 async function renderRuns() {
+  $$('[data-run-status]').forEach(button=>button.classList.toggle('active',button.dataset.runStatus===state.runStatus));
+  $('#work-run-search').value=state.runQuery;$('#work-run-search').oninput=event=>{state.runQuery=event.target.value;paintRuns(state.runs);};
+  $('#work-run-status').onclick=event=>{const button=event.target.closest('[data-run-status]');if(!button)return;state.runStatus=button.dataset.runStatus;$$('[data-run-status]').forEach(item=>item.classList.toggle('active',item===button));paintRuns(state.runs);};
+  $('#work-capture-new').onclick=()=>openModal('#runtime-capture-modal');
+  $('#runtime-open-settings').onclick=()=>{paintClaudeCodeVersionSetting();paintRuntimeModelSetting();paintRuntimeEffortSetting();$$('.runtime-setting-provenance').forEach(node=>{node.open=false;});$('#runtime-settings-feedback').textContent='配置影响后续新执行；额度等待恢复沿用原参数。';openModal('#runtime-settings-modal');};
+  $('#runtime-settings-save').onclick=saveRuntimeSettings;
   if (currentTab() !== 'runs') return;
   const generation = state.viewGeneration;
   const current = () => currentTab() === 'runs' && generation === state.viewGeneration;
@@ -2199,13 +2312,14 @@ async function renderRuns() {
     if (!current()) return;
     [state.accounts, state.tasks, state.topics, state.runtimeModel, state.runtimeEffort, state.claudeCodeVersion] = values;
   } catch (e) {
-    if (current()) alert('加载运行依赖失败: ' + e.message);
+    if (current()) notifyRuntime('加载运行依赖失败: ' + e.message);
     return;
   }
   bindRuntimeModelForm();
   bindRuntimeEffortForm();
   bindClaudeCodeVersionForm();
   bindCaptureForm();
+  $('#runtime-settings-save').disabled=false;
   paintRuns(state.runs);
   if (state.runsEventSource) state.runsEventSource.close();
   state.runsEventSource = new EventSource(RUNTIME_BASE + '/api/runs-stream');
@@ -2220,12 +2334,32 @@ async function renderRuns() {
   API('/runs').then(rs => { if (current()) { state.runs = rs; paintRuns(rs); } }).catch(() => {});
 }
 
+/** 保存有修改的后续运行配置，分别回读原接口并明确部分失败。@return {Promise<void>} 保存完成。 */
+async function saveRuntimeSettings(){
+  if(state.runtimeSettingsSaving?.generation===state.viewGeneration)return;
+  const fields=[['claude-code-version-form','claude_code_version'],['runtime-model-form','default_model'],['runtime-effort-form','effort_level']];
+  const changed=fields.map(([id,name])=>({form:$('#'+id),name})).filter(({form,name})=>form.elements[name].value!==form.dataset.savedValue);
+  if(changed.some(({form})=>!form.reportValidity()))return;
+  const request={generation:state.viewGeneration};state.runtimeSettingsSaving=request;
+  const modal=$('#runtime-settings-modal'),button=$('#runtime-settings-save');button.disabled=true;$$('[data-close]',modal).forEach(node=>{node.disabled=true;});
+  try{
+    const results=await Promise.all(changed.map(({form})=>form.onsubmit(new Event('submit',{cancelable:true}))));
+    if(state.runtimeSettingsSaving!==request||request.generation!==state.viewGeneration)return;
+    if(results.every(Boolean)){state.runtimeSettingsSaving=null;closeModal('#runtime-settings-modal');notifyRuntime('后续运行配置已保存');}
+    else $('#runtime-settings-feedback').textContent='部分配置保存失败。已保存的配置保留，请检查失败项后重试。';
+  }finally{
+    if(state.runtimeSettingsSaving===request)state.runtimeSettingsSaving=null;
+    button.disabled=false;$$('[data-close]',modal).forEach(node=>{node.disabled=false;});
+  }
+}
+
 function paintRuntimeModelSetting() {
   const form = $('#runtime-model-form');
   if (!form || !state.runtimeModel) return;
   const configured = state.runtimeModel.configured_model;
   const effective = state.runtimeModel.effective_model || state.runtimeModel.env_default_model || '-';
   form.default_model.value = configured || '';
+  form.dataset.savedValue=form.default_model.value;
   $('#runtime-model-effective').textContent = effective;
   $('#runtime-model-source').innerHTML = configured
     ? `页面覆盖；.env 兜底为 <code>${escapeHTML(state.runtimeModel.env_default_model || '-')}</code>`
@@ -2249,6 +2383,7 @@ function bindRuntimeModelForm() {
     const body = {
       default_model: (new FormData(form).get('default_model') || '').trim() || null,
     };
+    if(btn.disabled)return false;const generation=state.viewGeneration;
     btn.disabled = true;
     if (resetBtn) resetBtn.disabled = true;
     try {
@@ -2256,9 +2391,10 @@ function bindRuntimeModelForm() {
         method: 'PUT',
         body: JSON.stringify(body),
       });
-      paintRuntimeModelSetting();
+      if(generation===state.viewGeneration)paintRuntimeModelSetting();
+      return true;
     } catch (err) {
-      alert('保存默认模型失败: ' + err.message);
+      notifyRuntime('保存默认模型失败: ' + err.message);return false;
     } finally {
       btn.disabled = false;
       if (resetBtn) resetBtn.disabled = false;
@@ -2277,6 +2413,7 @@ function paintRuntimeEffortSetting() {
     ...allowed.map(v => `<option value="${escapeHTML(v)}">${escapeHTML(v)}</option>`),
   ].join('');
   form.effort_level.value = configured || '';
+  form.dataset.savedValue=form.effort_level.value;
   $('#runtime-effort-effective').textContent = effective;
   $('#runtime-effort-source').innerHTML = configured
     ? `页面覆盖；.env 兜底为 <code>${escapeHTML(state.runtimeEffort.env_default_effort || '-')}</code>`
@@ -2300,6 +2437,7 @@ function bindRuntimeEffortForm() {
     const body = {
       effort_level: (new FormData(form).get('effort_level') || '').trim() || null,
     };
+    if(btn.disabled)return false;const generation=state.viewGeneration;
     btn.disabled = true;
     if (resetBtn) resetBtn.disabled = true;
     try {
@@ -2307,9 +2445,10 @@ function bindRuntimeEffortForm() {
         method: 'PUT',
         body: JSON.stringify(body),
       });
-      paintRuntimeEffortSetting();
+      if(generation===state.viewGeneration)paintRuntimeEffortSetting();
+      return true;
     } catch (err) {
-      alert('保存思考预算失败: ' + err.message);
+      notifyRuntime('保存思考预算失败: ' + err.message);return false;
     } finally {
       btn.disabled = false;
       if (resetBtn) resetBtn.disabled = false;
@@ -2323,6 +2462,7 @@ function paintClaudeCodeVersionSetting() {
   const configured = state.claudeCodeVersion.configured_version;
   const effective = state.claudeCodeVersion.effective_version || state.claudeCodeVersion.env_default_version || '-';
   form.claude_code_version.value = configured || '';
+  form.dataset.savedValue=form.claude_code_version.value;
   $('#claude-code-version-effective').textContent = effective;
   $('#claude-code-version-source').innerHTML = configured
     ? `页面覆盖；.env 兜底为 <code>${escapeHTML(state.claudeCodeVersion.env_default_version || '-')}</code>`
@@ -2346,6 +2486,7 @@ function bindClaudeCodeVersionForm() {
     const body = {
       claude_code_version: (new FormData(form).get('claude_code_version') || '').trim() || null,
     };
+    if(btn.disabled)return false;const generation=state.viewGeneration;
     btn.disabled = true;
     if (resetBtn) resetBtn.disabled = true;
     try {
@@ -2353,9 +2494,10 @@ function bindClaudeCodeVersionForm() {
         method: 'PUT',
         body: JSON.stringify(body),
       });
-      paintClaudeCodeVersionSetting();
+      if(generation===state.viewGeneration)paintClaudeCodeVersionSetting();
+      return true;
     } catch (err) {
-      alert('保存 Claude Code 版本失败: ' + err.message);
+      notifyRuntime('保存 Claude Code 版本失败: ' + err.message);return false;
     } finally {
       btn.disabled = false;
       if (resetBtn) resetBtn.disabled = false;
@@ -2367,7 +2509,7 @@ function bindCaptureForm() {
   const form = $('#capture-form');
   if (!form) return;
   form.account_id.innerHTML = state.accounts
-    .map(a => `<option value="${a.id}">${escapeHTML(a.name)}</option>`).join('');
+    .map(a => `<option value="${a.id}">${escapeHTML(accountDisplayName(a))}</option>`).join('');
   form.topic_id.innerHTML = state.topics
     .map(t => `<option value="${t.id}">#${t.no} ${escapeHTML(t.title)}</option>`).join('');
   const effortSetting = state.runtimeEffort || {};
@@ -2379,8 +2521,8 @@ function bindCaptureForm() {
   form.effort_level.value = '';
   form.onsubmit = async (e) => {
     e.preventDefault();
-    if (state.accounts.length === 0) return alert('请先添加账号');
-    if (state.topics.length === 0) return alert('请先添加题目');
+    if (state.accounts.length === 0) return notifyRuntime('请先添加账号');
+    if (state.topics.length === 0) return notifyRuntime('请先添加题目');
     const btn = form.querySelector('button[type=submit]');
     const fd = new FormData(form);
     const body = {
@@ -2410,9 +2552,10 @@ function bindCaptureForm() {
         API('/runs').then(rs => { state.runs = rs; }),
       ]).catch(() => {});
       paintRuns(state.runs);
+      closeModal('#runtime-capture-modal');
       openRunDetail(res.run_id);
     } catch (err) {
-      alert('启动抓包失败: ' + err.message);
+      notifyRuntime('启动抓包失败: ' + err.message);
     } finally {
       btn.disabled = false;
     }
@@ -2422,9 +2565,10 @@ function bindCaptureForm() {
 function paintRuns(runs) {
   const body = $('#runs-body');
   if (!body) return;
-  const accMap = Object.fromEntries(state.accounts.map(a => [a.id, a.name]));
+  const accMap = Object.fromEntries(state.accounts.map(a => [a.id, accountDisplayName(a)]));
   const taskMap = Object.fromEntries(state.tasks.map(t => [t.id, t]));
-  body.innerHTML = runs.map(r => {
+  const filtered=runs.filter(row=>(state.runStatus==='all'||(state.runStatus==='running'?['running','queued','stopping','quota_wait']:['failed','timeout','auth_failed']).includes(row.status))&&[row.id,accMap[row.account_id],taskMap[row.task_id]?.title].join(' ').toLocaleLowerCase().includes(state.runQuery.trim().toLocaleLowerCase()));
+  patchRuntimeContent(body, filtered.map(r => {
     const task = taskMap[r.task_id];
     const runKind = r.run_kind || 'normal';
     const tname = task ? `${['project_iteration', 'project_review'].includes(runKind) ? '' : `#${task.topic_no} `}${escapeHTML(task.title)}` : `task#${r.task_id}`;
@@ -2435,11 +2579,10 @@ function paintRuns(runs) {
                 (r.started_at ? `${(Date.now()/1000 - r.started_at).toFixed(0)}s` : '-');
     const terminal = ['success', 'failed', 'timeout', 'stopped', 'auth_failed'].includes(r.status);
     return `
-      <tr>
-        <td><code>${r.id}</code></td>
-        <td>${tname}${kind}</td>
+      <tr data-runtime-key="${escapeHTML(r.id)}">
+        <td><button type="button" class="work-title-button" data-detail="${escapeHTML(r.id)}">${tname}</button><small><code>${escapeHTML(r.id)}</code>${kind}</small></td>
         <td>${escapeHTML(accMap[r.account_id] || `acc#${r.account_id}`)}</td>
-        <td><span class="pill pill-${r.status}" title="${escapeHTML(r.status === 'quota_wait' ? r.quota_policy?.message || r.error || '额度等待' : '')}">${r.read_only ? '只读历史 · ' : ''}${escapeHTML(runStatusLabel(r))}</span></td>
+        <td>${runtimeBadge(r)}${r.read_only?'<small>只读历史</small>':''}</td>
         <td>${dur}</td>
         <td>${r.exit_code ?? '-'}</td>
         <td><div class="op-actions run-actions">
@@ -2450,30 +2593,30 @@ function paintRuns(runs) {
         </div></td>
       </tr>
     `;
-  }).join('') || '<tr><td colspan="7" class="muted empty-cell">暂无运行</td></tr>';
+  }).join('') || '<tr><td colspan="6" class="empty-cell">暂无运行</td></tr>');
 
   body.onclick = async (e) => {
     const rid = e.target.dataset.detail;
     if (rid) openRunDetail(rid);
     const stopId = e.target.dataset.stop;
-    if (stopId && confirm(`停止 run ${stopId}?`)) {
+    if (stopId && await confirmRuntimeAction(`停止 run ${stopId}?`)) {
       e.target.disabled = true;
       try { await API(`/runs/${stopId}/stop`, { method: 'POST' }); }
-      catch (err) { alert('停止失败: ' + err.message); e.target.disabled = false; }
+      catch (err) { notifyRuntime('停止失败: ' + err.message); e.target.disabled = false; }
       return;
     }
     const contId = e.target.dataset.continue;
     if (contId) {
       e.target.disabled = true;
       try { await startContinueRun(contId); }
-      catch (err) { alert('继续对话失败: ' + err.message); }
+      catch (err) { notifyRuntime('继续对话失败: ' + err.message); }
       finally { e.target.disabled = false; }
       return;
     }
     const delId = e.target.dataset.delRun;
-    if (delId && confirm(`删除 run ${delId}?`)) {
+    if (delId && await confirmRuntimeAction(`删除 run ${delId}?`)) {
       try { await API(`/runs/${delId}`, { method: 'DELETE' }); }
-      catch (err) { alert('删除运行失败: ' + err.message); }
+      catch (err) { notifyRuntime('删除运行失败: ' + err.message); }
     }
   };
 }
@@ -2486,6 +2629,9 @@ function endRunDetail() {
   const detail = state.runDetail;
   if (detail && detail.timer) clearTimeout(detail.timer);
   state.runDetail = null;
+  $('#modal').classList.remove('approved-run-modal','task-quota-modal');
+  $('#modal-content').onclick=null;
+  if (detail?.opener?.isConnected) detail.opener.focus({ preventScroll:true });
 }
 
 function renderStatValue(stats, key) {
@@ -2494,7 +2640,8 @@ function renderStatValue(stats, key) {
   if ((key === 'tokens_in' || key === 'tokens_out') && stats.usage_available === false) {
     return '<span class="stat-waiting">等待采集</span>';
   }
-  return escapeHTML(stats[key] ?? 0);
+  const value = stats[key] ?? 0;
+  return escapeHTML(typeof value === 'number' ? value.toLocaleString() : value);
 }
 
 async function fetchRunTranscript(rid) {
@@ -2554,15 +2701,27 @@ async function refreshRunDetail() {
     }
   } catch (e) {
     if (!state.runDetail || state.runDetail.rid !== rid || state.runDetail.seq !== seq) return;
-    if (!detail.rendered) $('#modal-content').innerHTML = `<p>加载失败: ${escapeHTML(e.message)}</p>`;
+    const error = $('#run-detail-stats-error');
+    if (error) { error.classList.remove('hidden'); error.textContent = `加载失败：${e.message}，正在重试`; }
     detail.timer = setTimeout(refreshRunDetail, 2500);
   }
 }
 
 async function openRunDetail(rid) {
+  // 新控制台在顶层渲染复用详情，独立旧地址继续使用本页容器。
+  let nativeDetails = false;
+  try { nativeDetails = window.parent !== window && !!window.parent.document.querySelector('[data-native-run-details]'); } catch { /* 跨源独立嵌入沿用当前页面。 */ }
+  if (nativeDetails) {
+    const run = state.runs.find(item => item.id === rid);
+    const task = state.tasks.find(item => item.id === run?.task_id);
+    const account = state.accounts.find(item => item.id === run?.account_id);
+    window.parent.postMessage({type:'runtime:run-detail',id:rid,title:task?.title || '运行详情',accountName:accountDisplayName(account) || ''},location.origin);
+    return;
+  }
   endRunDetail();
   state.runDetail = {
     rid,
+    opener: document.activeElement,
     timer: null,
     seq: 0,
     files: null,
@@ -2575,8 +2734,10 @@ async function openRunDetail(rid) {
     lastCaptureHTML: '',
     capture: null,
   };
-  $('#modal-content').innerHTML = '<p class="muted">加载中…</p>';
+  renderRunDetailShell(rid);
+  state.runDetail.rendered = true;
   openModal('#modal');
+  $('#modal-close').focus();
   refreshRunDetail();
 }
 
@@ -2619,27 +2780,48 @@ function endContinueRun({ alsoCloseModal = false } = {}) {
 }
 
 // ===================== Modal helpers =====================
-function openModal(sel) { $(sel).classList.remove('hidden'); }
+let modalOrder=0;
+const modalOpeners=new WeakMap();
+/** 按打开顺序维护层级，子窗口关闭后保留父工作区。@param {string} sel 选择器。@return {void} */
+function openModal(sel) { const modal=$(sel);if(modal.classList.contains('hidden'))modalOpeners.set(modal,document.activeElement);modal.classList.remove('hidden');modal.dataset.modalOrder=String(++modalOrder);modal.style.zIndex=String(100+modalOrder); }
 /**
  * 统一关闭弹窗，时段弹窗的旧请求失效后不得操作下一次打开的表单。
  * @param {string} sel 弹窗选择器
  * @return {void}
  */
 function closeModal(sel) {
+  if(sel==='#runtime-confirm-modal'&&runtimeConfirmation){const pending=runtimeConfirmation;runtimeConfirmation=null;pending.resolve(false);}
+  if (sel === '#environment-workspace') return closeEnvironmentWorkspace();
   if (sel === '#native-kernel-modal') return closeNativeKernelDialog();
   if (sel === '#cpu-resource-modal') return closeCpuResourceDialog();
   if (sel === '#content-capture-modal') return closeContentCaptureDialog();
+  if(sel==='#runtime-settings-modal'&&state.runtimeSettingsSaving?.generation===state.viewGeneration)return false;
   if (sel === '#cli-settings-modal') state.cliSettings = null;
   if (sel === '#work-capture-modal') state.workCapture = null;
-  if (sel === '#run-window-modal') {
-    state.runWindowConfig = null;
-    $('#run-window-form button[type="submit"]').disabled = false;
-  }
-  $(sel).classList.add('hidden');
+  if (sel === '#run-window-modal') return closeRunWindowConfig();
+  const modal=$(sel);modal?.classList.add('hidden');const opener=modal&&modalOpeners.get(modal);if(opener?.isConnected)opener.focus({preventScroll:true});
+}
+
+let runtimeConfirmation=null, runtimeToastTimer;
+/** 展示与确认稿一致的异步确认，取消及离页返回false。@param {string} message 操作影响。@return {Promise<boolean>} 明确选择。 */
+function confirmRuntimeAction(message) {
+  closeModal('#runtime-confirm-modal');
+  return new Promise(resolve=>{
+    runtimeConfirmation={resolve};$('#runtime-confirm-message').textContent=message;
+    $('#runtime-confirm-accept').onclick=()=>{const pending=runtimeConfirmation;runtimeConfirmation=null;closeModal('#runtime-confirm-modal');pending?.resolve(true);};
+    openModal('#runtime-confirm-modal');$('#runtime-confirm-modal [data-close]').focus();
+  });
+}
+/** 反馈操作结果，正文以文本呈现。@param {string} message 消息。@return {void} */
+function notifyRuntime(message) {
+  clearTimeout(runtimeToastTimer);$('#runtime-toast-message').textContent=String(message);$('#runtime-toast').classList.remove('hidden');
+  const close=()=>{clearTimeout(runtimeToastTimer);$('#runtime-toast').classList.add('hidden');};$('#runtime-toast-close').onclick=close;runtimeToastTimer=setTimeout(close,6000);
 }
 
 /** 关闭工程配置与抓包窗口，使换账号、换空间前的回执失效。@return {void} */
 function closeProjectDialogs() {
+  closeModal('#projects-research');
+  closeModal('#projects-delivery');
   closeModal('#cli-settings-modal');
   closeModal('#work-capture-modal');
 }
@@ -2652,50 +2834,83 @@ function closeProjectDialogs() {
  */
 async function openCliSettingsConfig(accountId, namespace = null) {
   closeModal('#cli-settings-modal');
+  const account = state.accounts.find(item => item.id === accountId);
   const request = {accountId, namespace, generation: state.viewGeneration, loaded: false};
   state.cliSettings = request;
   const form = $('#cli-settings-form'), submit = form.querySelector('[type=submit]');
   const current = () => state.cliSettings === request && request.generation === state.viewGeneration;
   const field = namespace === 'warmup' ? 'warmup_capture_enabled' : 'projects_capture_enabled';
+  let baselineName = accountDisplayName(account);
   const fill = value => {
+    baselineName = value.display_name || accountDisplayName(account);
+    form.elements.display_name.value = baselineName;
     form.elements.claude_code_version.value = value.claude_code_version || '';
     form.elements.capture_enabled.checked = value[field] === true;
+    $('#cli-settings-title').textContent = namespace ? '执行配置' : `任务账号配置 · ${baselineName}`;
     $('#cli-settings-effective').textContent = `当前有效版本：${value.effective_claude_code_version} · 来源：${value.claude_code_version_source === 'account' ? '账号配置' : '全局配置'}`;
   };
-  $('#cli-settings-title').textContent = `账号 #${accountId} · ${namespace === 'projects' ? '项目迭代配置' : namespace === 'warmup' ? '养号迭代配置' : 'Claude Code 版本'}`;
+  form.reset(); submit.disabled = true;
+  $('#cli-settings-title').textContent = namespace ? '执行配置' : `任务账号配置 · ${baselineName}`;
+  $('#cli-settings-name').classList.toggle('hidden', namespace != null);
+  $('#cli-settings-account-links').classList.toggle('hidden', namespace != null);
+  $('#cli-settings-maintenance').classList.toggle('hidden', namespace != null || !RUNTIME_BASE || account?.cc2api_account_id == null);
+  $('#cli-settings-maintenance').open = false;
   $('#cli-settings-capture').classList.toggle('hidden', namespace == null);
   $('#cli-settings-capture-hint').classList.toggle('hidden', namespace == null);
+  $('#cli-settings-effective').classList.toggle('hidden', namespace == null);
   $('#cli-settings-effective').textContent = '';
   $('#cli-settings-feedback').textContent = '正在读取配置…';
-  form.reset(); submit.disabled = true;
+  $('#cli-settings-feedback').classList.remove('is-error');
+  submit.textContent = namespace ? '保存执行配置' : '保存账号配置';
+  form.elements.display_name.disabled = true;
   form.elements.claude_code_version.disabled = true;
   form.elements.capture_enabled.disabled = true;
+  $('#cli-settings-gateway').disabled = account?.cc2api_account_id == null;
+  $('#cli-settings-environment').disabled = !RUNTIME_BASE;
+  $('#cli-settings-gateway').onclick = () => { closeModal('#cli-settings-modal');openAccountProxyConfig(accountId); };
+  $('#cli-settings-environment').onclick = () => { closeModal('#cli-settings-modal');openRunWindowConfig(accountId); };
+  $('#cli-settings-quota').onclick = () => { if (account) openWarmupModal(account); };
+  $('#cli-settings-process').dataset.cc2Process = String(accountId);
+  $('#cli-settings-process').onclick = event => $('#accounts-body').onclick(event);
   openModal('#cli-settings-modal');
   form.onsubmit = async event => {
     event.preventDefault();
     if (!current() || !request.loaded || submit.disabled) return;
     const payload = {claude_code_version: form.elements.claude_code_version.value.trim() || null};
     if (namespace != null) payload[field] = form.elements.capture_enabled.checked;
+    else if (form.elements.display_name.value.trim() !== baselineName) payload.display_name = form.elements.display_name.value.trim();
     submit.disabled = true;
+    $('#cli-settings-feedback').classList.remove('is-error');
     try {
       const saved = await API(`/accounts/${accountId}/cli-settings`, {method: 'PUT', body: JSON.stringify(payload)});
       if (!current()) return;
       fill(saved);
-      $('#cli-settings-feedback').textContent = '配置已保存，后续新执行生效。';
+      if (namespace == null) {
+        closeModal('#cli-settings-modal');
+        await renderAccounts();
+        if (request.generation === state.viewGeneration) notifyRuntime('账号配置已保存');
+      } else $('#cli-settings-feedback').textContent = '配置已保存，后续新执行生效。';
     } catch (error) {
-      if (current()) $('#cli-settings-feedback').textContent = `保存失败：${error.message}`;
+      if (current()) {
+        $('#cli-settings-feedback').classList.add('is-error');
+        $('#cli-settings-feedback').textContent = `保存失败：${error.message}`;
+      }
     } finally { if (current()) submit.disabled = false; }
   };
   try {
     const value = await API(`/accounts/${accountId}/cli-settings`);
     if (!current()) return;
     fill(value); request.loaded = true;
+    form.elements.display_name.disabled = namespace != null;
     form.elements.claude_code_version.disabled = false;
-    form.elements.capture_enabled.disabled = false;
+    form.elements.capture_enabled.disabled = namespace == null;
     submit.disabled = false;
     $('#cli-settings-feedback').textContent = '';
   } catch (error) {
-    if (current()) $('#cli-settings-feedback').textContent = `读取失败：${error.message}`;
+    if (current()) {
+      $('#cli-settings-feedback').classList.add('is-error');
+      $('#cli-settings-feedback').textContent = `读取失败：${error.message}`;
+    }
   }
 }
 
@@ -2716,22 +2931,27 @@ async function openWorkCapture(workId, namespace) {
     button.disabled = true;
     try {
       const capture = await API(`${prefix}/work/${encodeURIComponent(workId)}/capture`);
-      if (state.workCapture === request && revision === request.revision)
-        $('#work-capture-content').innerHTML = renderCaptureDetail(capture);
+      if (state.workCapture === request && revision === request.revision){
+        const host=$('#work-capture-view');$('#work-capture-status').textContent='';
+        if(RUNTIME_BASE&&window.parent!==window){host.dataset.captureUrl=RUNTIME_BASE+'/api'+prefix+'/work/'+encodeURIComponent(workId)+'/capture/file';host.dataset.capturePayload=JSON.stringify(capture);}
+        else host.innerHTML=renderCaptureDetail(capture);
+      }
     } catch (error) {
       if (state.workCapture === request && revision === request.revision)
-        $('#work-capture-content').textContent = `读取抓包失败：${error.message}`;
+        $('#work-capture-status').textContent = `读取抓包失败：${error.message}`;
     } finally { if (state.workCapture === request && revision === request.revision) button.disabled = false; }
   };
-  $('#work-capture-content').textContent = '正在读取抓包…';
+  delete $('#work-capture-view').dataset.capturePayload;
+  $('#work-capture-status').textContent = '正在读取抓包…';
   button.onclick = refresh;
   openModal('#work-capture-modal');
   await refresh();
 }
 
 document.addEventListener('click', (e) => {
-  if (e.target.id === 'modal-close' || e.target.matches('[data-close]')) {
-    const sel = e.target.dataset.close || '#modal';
+  const closeButton = e.target.closest('#modal-close,[data-close]');
+  if (closeButton && !closeButton.disabled) {
+    const sel = closeButton.dataset.close || '#modal';
     // acc-modal 关闭走 endAccLogin（同时清服务端 session 容器；无 session 时幂等）
     if (sel === '#acc-modal' && typeof endAccLogin === 'function') {
       return endAccLogin({ alsoCloseModal: true });
@@ -2805,11 +3025,21 @@ function startClock() {
 function bindShortcuts() {
   const TAB_KEYS = { '1': 'accounts', '2': 'environments', '3': 'topics', '4': 'tasks', '5': 'runs', '6': 'projects' };
   document.addEventListener('keydown', (e) => {
+    if(e.defaultPrevented)return;
     const inField = /^(INPUT|TEXTAREA|SELECT)$/i.test(e.target.tagName);
+    const topModal=$$('.modal:not(.hidden)').filter(node=>node.getClientRects().length).sort((a,b)=>Number(a.dataset.modalOrder||0)-Number(b.dataset.modalOrder||0)).at(-1);
+    // 弹窗键盘操作只在当前层内循环，避免跳到背景页或父文档侧栏。
+    if(e.key==='Tab'&&topModal&&!e.defaultPrevented){
+      const nodes=$$('button:not(:disabled),a[href],input:not(:disabled):not([type=hidden]),select:not(:disabled),textarea:not(:disabled),summary,[tabindex="0"]',topModal).filter(node=>node.getClientRects().length&&node.tabIndex>=0);
+      const index=nodes.indexOf(document.activeElement);
+      if(nodes.length&&(e.shiftKey&&index<=0||!e.shiftKey&&index===nodes.length-1)){e.preventDefault();nodes[e.shiftKey?nodes.length-1:0].focus();}
+      return;
+    }
+
 
     // Esc: close any open modal —— 但 data-no-esc 的模态框(如登录框)免疫
     if (e.key === 'Escape') {
-      $$('.modal:not(.hidden)').forEach((m) => {
+      $$('.modal:not(.hidden)').sort((a,b)=>Number(a.dataset.modalOrder||0)-Number(b.dataset.modalOrder||0)).slice(-1).forEach((m) => {
         if (m.hasAttribute('data-no-esc')) return;
         if (m.id === 'acc-modal' && typeof endAccLogin === 'function') {
           endAccLogin({ alsoCloseModal: true });
@@ -2823,7 +3053,7 @@ function bindShortcuts() {
       return;
     }
 
-    if (!$('#native-kernel-modal').classList.contains('hidden')) return;
+    if(topModal)return;
     if (inField) return;     // 后续快捷键在输入框中不响应
 
     // 登录框未关之前，数字键和搜索键都不导航，防止键盘漏到底层页面。
@@ -2945,7 +3175,7 @@ function wireAuth() {
     if (RUNTIME_BASE) { logoutBtn.style.display = 'none'; return; }
     logoutBtn.onclick = async (e) => {
       e.stopPropagation();
-      if (!confirm('退出登录?')) return;
+      if (!await confirmRuntimeAction('退出登录?')) return;
       try {
         await fetch(RUNTIME_BASE + '/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
       } catch {}
@@ -2965,4 +3195,5 @@ function wireAuth() {
   // ok=true 时(已登录 或 后端未启用 auth)才渲染;未登录时只显示登录框,
   // 避免立刻调 /api/accounts 拉数据触发一连串 401 + alert
   if (ok) navigate();
+  else if (window.parent !== window) window.parent.postMessage({type:'runtime:ready'},location.origin);
 }) ();

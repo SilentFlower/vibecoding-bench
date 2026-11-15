@@ -1,4 +1,8 @@
+use crate::handler::proxies;
+use crate::model::proxy::ProxyConnection;
 use crate::service::account::AccountQueue;
+use crate::service::oauth_flow::GenerateAuthUrlRequest;
+use crate::service::proxy::ProxyService;
 use crate::service::runtime_lease::RuntimeLease;
 use axum::extract::{Path, Query, Request, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
@@ -96,6 +100,7 @@ pub struct AppState {
     pub prime_log_store: Arc<PrimeLogStore>,
     pub oauth_flow_svc: Arc<OAuthFlowService>,
     pub telemetry_svc: Arc<TelemetryService>,
+    pub proxy_svc: Arc<ProxyService>,
     pub admin_password: String,
 }
 
@@ -110,7 +115,9 @@ pub fn build_router(
     oauth_flow_svc: Arc<OAuthFlowService>,
     telemetry_svc: Arc<TelemetryService>,
 ) -> Router {
+    let proxy_svc = Arc::new(ProxyService::new(settings_store.database_pool()));
     let state = AppState {
+        proxy_svc,
         gateway_svc,
         account_svc,
         token_tester,
@@ -123,13 +130,17 @@ pub fn build_router(
     };
 
     let admin_password = state.admin_password.clone();
+    super::proxy_sync::start(state.clone());
 
     // 前端页面（显式注册 SPA 路由）
     let frontend_routes = Router::new()
         .route("/", get(spa_handler))
         .route("/login", get(spa_handler))
         .route("/tokens", get(spa_handler))
+        .route("/requests", get(spa_handler))
+        .route("/tasks", get(spa_handler))
         .route("/settings", get(spa_handler))
+        .route("/proxies", get(spa_handler))
         .route("/updates", get(spa_handler))
         .route("/environments", get(spa_handler));
 
@@ -140,6 +151,14 @@ pub fn build_router(
 
     // 管理 API（密码认证，完整路径注册）
     let admin_routes = Router::new()
+        .route("/admin/proxies", get(proxies::list).post(proxies::create))
+        .route("/admin/proxies/import", post(proxies::import))
+        .route("/admin/proxies/identify", post(proxies::identify))
+        .route(
+            "/admin/proxies/:id",
+            put(proxies::update).delete(proxies::delete),
+        )
+        .route("/admin/proxies/:id/probe", post(proxies::probe))
         .route(
             "/admin/runtime/system-update/status",
             get(system_update_status),
@@ -151,7 +170,7 @@ pub fn build_router(
         .route("/admin/accounts", get(list_accounts).post(create_account))
         .route(
             "/admin/accounts/:id",
-            put(update_account).delete(delete_account),
+            get(get_account).put(update_account).delete(delete_account),
         )
         .route("/admin/accounts/:id/test", post(test_account))
         .route("/admin/accounts/:id/usage", post(refresh_usage))
@@ -352,6 +371,15 @@ struct PageQuery {
     page_size: Option<i64>,
 }
 
+/// 管理账号筛选参数，旧分页请求仍可省略新增字段。
+#[derive(Deserialize)]
+struct AccountListQuery {
+    page: Option<i64>,
+    page_size: Option<i64>,
+    q: Option<String>,
+    status: Option<String>,
+}
+
 /// 分页返回账号和网关当前生效的画像配置。
 ///
 /// @param state 管理应用状态。
@@ -359,13 +387,18 @@ struct PageQuery {
 /// @return 账号分页与只读画像配置。
 async fn list_accounts(
     State(state): State<AppState>,
-    Query(query): Query<PageQuery>,
+    Query(query): Query<AccountListQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let page = query.page.unwrap_or(1).max(1);
     let page_size = query.page_size.unwrap_or(12).clamp(1, 100);
+    let search = query.q.as_deref().unwrap_or("").trim();
+    let status = query.status.as_deref().unwrap_or("");
+    if search.chars().count() > 256 || !["", "active", "error", "disabled"].contains(&status) {
+        return Err(AppError::BadRequest("账号搜索或状态参数无效".into()));
+    }
     let (accounts, total) = state
         .account_svc
-        .list_accounts_paged(page, page_size)
+        .list_accounts_filtered(page, page_size, search, status)
         .await?;
     let total_pages = (total + page_size - 1) / page_size;
     let profile_config = state.gateway_svc.profile_selection_config().await;
@@ -392,10 +425,30 @@ async fn list_accounts(
     };
 
     let credential_ownerships = state.account_svc.credential_ownerships().await?;
+    let connections = accounts
+        .iter()
+        .filter_map(|account| {
+            ProxyConnection::parse(&account.proxy_url)
+                .ok()
+                .map(|value| value.private_url)
+        })
+        .collect::<Vec<_>>();
+    let proxy_records = state.proxy_svc.store.matching(&connections).await?;
+
     // 为每个账号附加遥测会话过期时间 + 调度评分信息
     let mut data: Vec<serde_json::Value> = Vec::with_capacity(accounts.len());
     for a in &accounts {
         let mut obj = serde_json::to_value(a).unwrap_or_default();
+        if let Ok(connection) = ProxyConnection::parse(&a.proxy_url) {
+            if let Some(proxy) = proxy_records
+                .iter()
+                .find(|proxy| proxy.connection.private_url == connection.private_url)
+            {
+                obj["proxy_id"] = json!(proxy.id);
+                obj["proxy_name"] = json!(proxy.name);
+            }
+        }
+
         obj["credential_ownership"] = credential_ownerships
             .get(&a.id)
             .map(|value| json!({"owner":value.owner,"phase":value.phase,"protocol":value.protocol}))
@@ -507,6 +560,8 @@ struct CreateAccountRequest {
     refresh_token: Option<String>,
     expires_at: Option<i64>,
     proxy_url: Option<String>,
+    proxy_id: Option<String>,
+    proxy_revision: Option<String>,
     billing_mode: Option<String>,
     request_backend: Option<String>,
     account_uuid: Option<String>,
@@ -787,11 +842,36 @@ fn validate_request_backend(value: &str) -> Result<String, AppError> {
     }
 }
 
+/// 按身份读取配置供跨页直达编辑。@param state 服务。@param id 身份。@return 账号配置。
+async fn get_account(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Json<Account>, AppError> {
+    Ok(Json(state.account_svc.get_account(id).await?))
+}
+
 async fn create_account(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(req): Json<CreateAccountRequest>,
 ) -> Result<(StatusCode, Json<Account>), AppError> {
+    let _proxy_guard = state.proxy_svc.mutations.lock().await;
+    let selected_proxy = if let Some(id) = req.proxy_id.as_deref() {
+        if req.proxy_url.is_some() {
+            return Err(AppError::BadRequest("代理ID与地址不能同时提交".into()));
+        }
+        let proxy = state.proxy_svc.store.get(id).await?;
+        if req
+            .proxy_revision
+            .as_deref()
+            .is_some_and(|revision| revision != proxy.revision)
+        {
+            return Err(AppError::BadRequest("所选代理已变化，请重新选择".into()));
+        }
+        Some(proxy.connection.private_url)
+    } else {
+        req.proxy_url
+    };
     let backend = validate_request_backend(req.request_backend.as_deref().unwrap_or("legacy"))?;
     if req.email.is_empty() {
         return Err(AppError::BadRequest("email is required".into()));
@@ -810,7 +890,7 @@ async fn create_account(
         expires_at: req.expires_at.and_then(timestamp_millis_to_utc),
         oauth_refreshed_at: None,
         auth_error: String::new(),
-        proxy_url: req.proxy_url.unwrap_or_default(),
+        proxy_url: selected_proxy.unwrap_or_default(),
         device_id: String::new(),
         canonical_env: serde_json::json!({}),
         canonical_prompt: serde_json::json!({}),
@@ -941,7 +1021,7 @@ async fn import_cli_process(
 }
 
 /// 配置修改期间阻止新推理进入，检查和写库之间不能出现新活动请求。
-struct RuntimeConfigPermit {
+pub(super) struct RuntimeConfigPermit {
     queue: Arc<AccountQueue>,
     lease: RuntimeLease,
 }
@@ -959,7 +1039,10 @@ impl Drop for RuntimeConfigPermit {
     }
 }
 
-async fn config_permit(
+/// 持有原账号配置门禁并核对当前活动。
+/// @param state 应用服务。@param account 当前账号。@param force 强制核对独立网关队列。
+/// @return 维护许可，释放时恢复原接单状态。
+pub(super) async fn config_permit(
     state: &AppState,
     account: &Account,
     force: bool,
@@ -1030,6 +1113,39 @@ async fn update_account(
     Path(id): Path<i64>,
     Json(updates): Json<serde_json::Value>,
 ) -> Result<Json<Account>, AppError> {
+    let _proxy_guard = if updates.get("proxy_id").is_some() || updates.get("proxy_url").is_some() {
+        Some(state.proxy_svc.mutations.lock().await)
+    } else {
+        None
+    };
+    let mut updates = updates;
+    if let Some(selected) = updates.get("proxy_id").cloned() {
+        if updates.get("proxy_url").is_some() {
+            return Err(AppError::BadRequest("代理ID与地址不能同时提交".into()));
+        }
+        let url = if selected.is_null() {
+            String::new()
+        } else {
+            let id = selected
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("代理ID格式无效".into()))?;
+            let proxy = state.proxy_svc.store.get(id).await?;
+            if updates
+                .get("proxy_revision")
+                .and_then(Value::as_str)
+                .is_some_and(|revision| revision != proxy.revision)
+            {
+                return Err(AppError::BadRequest("所选代理已变化，请重新选择".into()));
+            }
+            proxy.connection.private_url
+        };
+        let object = updates
+            .as_object_mut()
+            .ok_or_else(|| AppError::BadRequest("账号更新必须是对象".into()))?;
+        object.remove("proxy_id");
+        object.remove("proxy_revision");
+        object.insert("proxy_url".into(), json!(url));
+    }
     let mut existing = state.account_svc.get_account(id).await?;
     let mut option_fields: Vec<&str> = updates
         .as_object()
@@ -1547,24 +1663,52 @@ async fn get_dashboard(State(state): State<AppState>) -> Result<Json<serde_json:
 
 // --- OAuth Flow Handlers ---
 
+/// 从目录解析授权线路，私有认证仅传入服务器内存会话。
+/// @param state 管理服务。@param req 原授权请求。@return 完整私有授权配置。
+async fn resolve_oauth_proxy(
+    state: &AppState,
+    mut req: GenerateAuthUrlRequest,
+) -> Result<GenerateAuthUrlRequest, AppError> {
+    if let Some(id) = req.proxy_id.as_deref() {
+        if req.proxy_url.is_some() {
+            return Err(AppError::BadRequest("代理ID与地址不能同时提交".into()));
+        }
+        let proxy = state.proxy_svc.store.get(id).await?;
+        if req
+            .proxy_revision
+            .as_deref()
+            .is_some_and(|revision| revision != proxy.revision)
+        {
+            return Err(AppError::BadRequest("所选代理已变化，请重新选择".into()));
+        }
+        req.proxy_url = Some(proxy.connection.private_url);
+    }
+    Ok(req)
+}
+
 async fn oauth_generate_auth_url(
     State(state): State<AppState>,
     Json(req): Json<crate::service::oauth_flow::GenerateAuthUrlRequest>,
-) -> Json<crate::service::oauth_flow::GenerateAuthUrlResponse> {
-    Json(state.oauth_flow_svc.generate_auth_url(&req))
+) -> Result<Json<crate::service::oauth_flow::GenerateAuthUrlResponse>, AppError> {
+    let _guard = state.proxy_svc.mutations.lock().await;
+    let req = resolve_oauth_proxy(&state, req).await?;
+    Ok(Json(state.oauth_flow_svc.generate_auth_url(&req)))
 }
 
 async fn oauth_generate_setup_token_url(
     State(state): State<AppState>,
     Json(req): Json<crate::service::oauth_flow::GenerateAuthUrlRequest>,
-) -> Json<crate::service::oauth_flow::GenerateAuthUrlResponse> {
-    Json(state.oauth_flow_svc.generate_setup_token_url(&req))
+) -> Result<Json<crate::service::oauth_flow::GenerateAuthUrlResponse>, AppError> {
+    let _guard = state.proxy_svc.mutations.lock().await;
+    let req = resolve_oauth_proxy(&state, req).await?;
+    Ok(Json(state.oauth_flow_svc.generate_setup_token_url(&req)))
 }
 
 async fn oauth_exchange_code(
     State(state): State<AppState>,
     Json(req): Json<crate::service::oauth_flow::ExchangeCodeRequest>,
 ) -> Result<Json<crate::service::oauth_flow::ExchangeCodeResponse>, AppError> {
+    let _guard = state.proxy_svc.mutations.lock().await;
     let resp = state.oauth_flow_svc.exchange_code(&req).await?;
     Ok(Json(resp))
 }
@@ -1573,6 +1717,7 @@ async fn oauth_exchange_setup_token_code(
     State(state): State<AppState>,
     Json(req): Json<crate::service::oauth_flow::ExchangeCodeRequest>,
 ) -> Result<Json<crate::service::oauth_flow::ExchangeCodeResponse>, AppError> {
+    let _guard = state.proxy_svc.mutations.lock().await;
     let resp = state.oauth_flow_svc.exchange_setup_token_code(&req).await?;
     Ok(Json(resp))
 }
@@ -2646,6 +2791,64 @@ mod tests {
         }
     }
 
+    /// 授权从目录解析连接并保护未完成会话，公开回执不泄露账密。
+    #[tokio::test]
+    async fn oauth_directory_selection_validates_revision_and_registers_reference() {
+        let (app, _, _, pool, _) = test_router_with_scheduling(false).await;
+        let (status, created) = account_admin_json(
+            &app,
+            Method::POST,
+            "/admin/proxies",
+            json!({
+                "name":"合成授权线路", "protocol":"socks5", "host":"synthetic.invalid", "port":1080,
+                "username":"synthetic-user", "password":"synthetic-secret"
+            }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let id = created["id"].as_str().unwrap();
+        let revision: String = sqlx::query_scalar("SELECT revision FROM proxy_routes WHERE id=$1")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        for path in [
+            "/admin/oauth/generate-auth-url",
+            "/admin/oauth/generate-setup-token-url",
+        ] {
+            let (status, _) = account_admin_json(
+                &app,
+                Method::POST,
+                path,
+                json!({"proxy_id":id,"proxy_revision":"stale"}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+            let (status, result) = account_admin_json(
+                &app,
+                Method::POST,
+                path,
+                json!({"proxy_id":id,"proxy_revision":revision}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            assert!(result["session_id"].is_string());
+            assert!(!result.to_string().contains("synthetic-secret"));
+        }
+        let (_, list) = account_admin_json(&app, Method::GET, "/admin/proxies", json!({})).await;
+        assert_eq!(list["data"][0]["users"].as_array().unwrap().len(), 2);
+        assert_eq!(list["data"][0]["users"][0]["kind"], "authorization");
+        assert!(!list.to_string().contains("synthetic-secret"));
+        let (status, _) = account_admin_json(
+            &app,
+            Method::POST,
+            "/admin/oauth/generate-auth-url",
+            json!({"proxy_id":id,"proxy_url":"http://other.invalid:80"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
     /// 调用管理 JSON 接口并读取受限大小的返回值。
     /// @param app 测试路由。
     /// @param method HTTP 方法。
@@ -2679,6 +2882,58 @@ mod tests {
             status,
             serde_json::from_slice(&bytes).unwrap_or(Value::Null),
         )
+    }
+
+    /// 忙碌账号保留旧连接，空闲后后台真实同步；公开响应不包含认证字段。
+    #[tokio::test]
+    async fn used_proxy_edit_queues_until_idle_and_synchronizes() {
+        let (app, _, _, pool, accounts) = test_router_with_scheduling(true).await;
+        let (_,proxy)=account_admin_json(&app,Method::POST,"/admin/proxies",json!({"name":"同步线路","protocol":"http","host":"old.test","port":8080,"username":"demo","password":"synthetic-private"})).await;
+        let proxy_id = proxy["id"].as_str().unwrap();
+        let revision: String = sqlx::query_scalar("SELECT revision FROM proxy_routes WHERE id=$1")
+            .bind(proxy_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let (status,created)=account_admin_json(&app,Method::POST,"/admin/accounts",json!({"name":"保持名称","email":"sync@example.invalid","auth_type":"oauth","access_token":"synthetic-access","refresh_token":"synthetic-refresh","expires_at":(Utc::now()+ChronoDuration::hours(2)).timestamp_millis(),"proxy_id":proxy_id,"proxy_revision":revision,"concurrency":2})).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let id = created["id"].as_i64().unwrap();
+        let queue = accounts.get_or_create_queue(id, 2).await;
+        let active = queue.acquire(Duration::from_secs(1), 1).await.unwrap();
+        let (status,saved)=account_admin_json(&app,Method::PUT,&format!("/admin/proxies/{proxy_id}"),json!({"name":"同步线路","protocol":"socks5","host":"new.test","port":1080,"revision":revision})).await;
+        assert_eq!(status, StatusCode::OK, "{saved}");
+        assert_eq!(saved["sync_pending"], true);
+        let (_, list) = account_admin_json(&app, Method::GET, "/admin/proxies", json!({})).await;
+        assert_eq!(list["data"][0]["users"].as_array().unwrap().len(), 1);
+        assert_eq!(list["data"][0]["sync_pending"], true);
+        assert!(!list.to_string().contains("synthetic-private"));
+        assert!(
+            accounts
+                .get_account(id)
+                .await
+                .unwrap()
+                .proxy_url
+                .contains("old.test")
+        );
+        drop(active);
+        tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM proxy_route_sync")
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+                if count == 0 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        })
+        .await
+        .unwrap();
+        let account = accounts.get_account(id).await.unwrap();
+        assert!(account.proxy_url.contains("new.test:1080"));
+        assert_eq!(account.name, "保持名称");
+        assert_eq!(account.access_token, "synthetic-access");
     }
 
     /// bench 现有创建载荷省略新字段时继续成功，后续局部更新不覆盖已保存限制。
@@ -3356,6 +3611,38 @@ mod tests {
         assert_eq!(response.headers()[header::CONTENT_LENGTH], "20");
         let body = body::to_bytes(response.into_body(), 1024).await.unwrap();
         assert!(body.is_empty());
+    }
+
+    #[tokio::test]
+    async fn frontend_routes_support_direct_navigation_and_reload() {
+        let app = test_router().await;
+        for path in [
+            "/",
+            "/login",
+            "/tokens",
+            "/requests",
+            "/tasks",
+            "/settings",
+            "/proxies",
+            "/updates",
+            "/environments",
+            "/tasks?tab=warmup&account=42",
+        ] {
+            let response = app
+                .clone()
+                .oneshot(Request::builder().uri(path).body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK, "{path}");
+            assert_eq!(response.headers()[header::CONTENT_TYPE], "text/html");
+            let html = body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            assert!(
+                String::from_utf8_lossy(&html).contains("id=\"app\""),
+                "{path}"
+            );
+        }
     }
 
     #[tokio::test]

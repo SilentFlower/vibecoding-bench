@@ -1,24 +1,39 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { Copy, Filter, RefreshCw, Search, FileText, ArrowUpRight } from 'lucide-vue-next';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import { Copy, Settings2, RefreshCw, Search, FileText, ArrowUpRight, ArrowRight, ShieldCheck, LayoutGrid, AlertCircle, Clock } from './ui/icon';
+import { ChoiceSelect, SearchInput, DateTimeControl, InfoTooltip, Pagination } from './ui/controls';
+import AccountFilterSelect from './AccountFilterSelect.vue';
+import '../request-design.css';
 import { formatLocalTime } from '../lib/time';
 import { useToast } from '../composables/useToast';
 import NativeStageDetails from './NativeStageDetails.vue';
 import { api, type DiagnosticRequest, type DiagnosticAttempt, type NativeCapture } from '../api';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 const toast = useToast();
 const filtersOpen = ref(false);
 const outcome = ref('');
-const since = ref('');
-const until = ref('');
+const since = ref<string | null>(null);
+const until = ref<string | null>(null);
+const counts = ref<{all:number;errors:number;processing:number} | null>(null);
+const quick = ref('all');
+const quickTabs=[{id:'all',label:'全部',icon:LayoutGrid},{id:'errors',label:'错误',icon:AlertCircle},{id:'processing',label:'处理中',icon:Clock}] as const;
+const outcomeOptions=['success','in_progress','incomplete','local_rejected','local_response','mock','cache_hit','upstream_rejected','upstream_error','transport_error','body_error','cancelled'].map(value=>({value,label:outcomeLabel(value)}));
+/** 快捷结果和具体结果使用同一查询维度。@param value 快捷结果。@return 无。 */
+function chooseQuick(value: string): void { quick.value=value;outcome.value='';void load(); }
+/** 清除筛选后重新查询。@return 无。 */
+function resetFilters(): void { account.value='';outcome.value='';since.value=null;until.value=null;correlation.value='';quick.value='all';void load(); }
 const tabs = [{id: 'overview', label: '概览'}, {id: 'chain', label: '请求链路'}, {id: 'performance', label: '性能'}, {id: 'raw', label: '原始数据'}] as const;
 const activeTab = ref<typeof tabs[number]['id']>('overview');
-const account = ref('');
+const route = useRoute();
+const linkedAccount = Number(route.query.account);
+const account = ref(Number.isSafeInteger(linkedAccount) && linkedAccount > 0 ? String(linkedAccount) : '');
 const correlation = ref('');
 const page = ref(1);
+const pageSize = ref(20);
+watch(pageSize, () => { page.value=1;void load(1); });
 const total = ref(0);
 const rows = ref<DiagnosticRequest[]>([]);
 const selected = ref<DiagnosticRequest | null>(null);
@@ -64,9 +79,10 @@ function begin(): { version: number; signal: AbortSignal } {
 async function load(target = 1): Promise<void> {
   const accountId = String(account.value).trim();
   if (accountId && !/^[1-9][0-9]*$/.test(accountId)) { error.value = '请输入正整数账号 ID'; return; }
-  const query = new URLSearchParams({ page: String(target), page_size: '20' });
+  const query = new URLSearchParams({ page: String(target), page_size: String(pageSize.value) });
   if (accountId) query.set('account_id', accountId);
   if (outcome.value) query.set('outcome', outcome.value);
+  else if (quick.value !== 'all') query.set('outcome',quick.value === 'errors' ? 'errors' : 'in_progress');
   for (const [key, value] of [['since', since.value], ['until', until.value]]) {
     if (value) {
       const time = new Date(value);
@@ -81,7 +97,7 @@ async function load(target = 1): Promise<void> {
   try {
     const result = await api.requestDiagnostics(query.toString(), signal);
     if (version !== listGeneration) return;
-    rows.value = result.items; total.value = result.total; health.value = result.health; page.value = target;
+    rows.value = result.items; total.value = result.total; health.value = result.health; counts.value = result.counts ?? null; page.value = target;
   } catch (cause) {
     if (version === listGeneration && !signal.aborted) error.value = cause instanceof Error ? cause.message : '请求列表读取失败';
   } finally { if (version === listGeneration) loading.value = false; }
@@ -151,10 +167,8 @@ async function loadMode(): Promise<void> {
   }
 }
 
-/** 保存后续请求使用的模式。@param event 原生选择事件。@return 保存结束。 */
-async function saveMode(event: Event): Promise<void> {
-  const target = event.target as HTMLSelectElement;
-  const value = target.value;
+/** 保存后续请求使用的模式。@param value 日志模式。@return 保存结束。 */
+async function saveMode(value: string): Promise<void> {
   if (value !== 'info' && value !== 'debug') return;
   modeSaving.value = true; modeError.value = '';
   try {
@@ -163,7 +177,7 @@ async function saveMode(event: Event): Promise<void> {
   } catch (cause) {
     if (mounted) modeError.value = cause instanceof Error ? cause.message : '日志模式保存失败';
   } finally {
-    if (mounted) { modeSaving.value = false; target.value = mode.value; }
+    if (mounted) { modeSaving.value = false; }
   }
 }
 
@@ -276,73 +290,55 @@ onUnmounted(() => { mounted = false; listGeneration++; detailGeneration++; listC
 </script>
 
 <template>
-  <section class="space-y-5 text-sm text-foreground" aria-label="请求记录">
-    <header class="flex flex-wrap items-start justify-between gap-4">
-      <div><h1 class="text-2xl font-bold tracking-tight">请求记录</h1><p class="mt-1 text-muted-foreground">查看请求结果、处理链路与脱敏阶段证据</p></div>
-      <label class="flex items-center gap-2 text-xs text-muted-foreground">后续请求日志
-        <select :value="mode" :disabled="modeSaving || mode === 'unknown'" class="h-9 rounded-lg border bg-card px-3 text-foreground" aria-label="日志模式" @change="saveMode">
-          <option value="unknown" disabled>读取中</option><option value="info">info · 摘要</option><option value="debug">debug · 脱敏内容</option>
-        </select><span v-if="modeSaving" role="status">保存中</span>
-      </label>
-    </header>
+  <section class="requests-page" aria-label="请求记录">
+    <header class="request-page-heading"><div class="page-heading"><div><p class="page-eyebrow">观测与诊断</p><h1>请求记录</h1><p class="page-description">从请求结果、用量到处理链路，快速找到需要关注的调用。</p></div></div><div class="request-mode"><ChoiceSelect :model-value="mode" label="后续请求日志" :options="[{value:'unknown',label:'读取中',disabled:true},{value:'info',label:'info · 摘要'},{value:'debug',label:'debug · 脱敏内容'}]" :disabled="modeSaving || mode === 'unknown'" @update:model-value="saveMode" /><small>仅影响后续请求</small></div></header>
     <p v-if="modeError" role="alert" class="text-destructive">{{ modeError }}</p>
-    <form class="space-y-3" @submit.prevent="load()">
-      <div class="flex flex-wrap items-center gap-2">
-        <div class="relative min-w-48 flex-1 sm:max-w-md"><Search class="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" /><Input v-model="correlation" placeholder="搜索请求 ID / 响应关联 ID" class="h-9 pl-9 bg-card" aria-label="请求关联 ID" /></div>
-        <Button type="button" variant="outline" class="h-9 shadow-none" :aria-expanded="filtersOpen" aria-controls="request-filters" @click="filtersOpen = !filtersOpen"><Filter />筛选<span v-if="account || outcome || since || until" class="size-1.5 rounded-full bg-primary"></span></Button>
-        <Button type="submit" variant="outline" :disabled="loading" class="h-9 shadow-none"><RefreshCw class="size-4" :class="loading ? 'animate-spin motion-reduce:animate-none' : ''" />刷新</Button>
-        <span class="ml-auto text-xs text-muted-foreground tabular-nums">{{ total }} 条记录 · 保留 7 天</span>
-      </div>
-      <div v-if="filtersOpen" id="request-filters" class="flex flex-wrap gap-3 rounded-xl border bg-muted/40 p-4">
-        <label class="space-y-1 text-xs text-muted-foreground">账号 ID<Input v-model="account" class="w-28 bg-card" aria-label="账号 ID" placeholder="全部账号" /></label>
-        <label class="space-y-1 text-xs text-muted-foreground">请求结果<select v-model="outcome" class="block h-9 rounded-md border bg-card px-3 text-foreground" aria-label="请求结果"><option value="">全部结果</option><option value="success">成功</option><option value="in_progress">处理中</option><option value="incomplete">未完整结束</option><option value="local_rejected">本地拒绝</option></select></label>
-        <label class="space-y-1 text-xs text-muted-foreground">开始时间<input v-model="since" type="datetime-local" aria-label="开始时间" class="block h-9 rounded-md border bg-card px-2 text-foreground" /></label>
-        <label class="space-y-1 text-xs text-muted-foreground">结束时间<input v-model="until" type="datetime-local" aria-label="结束时间" class="block h-9 rounded-md border bg-card px-2 text-foreground" /></label>
-        <Button type="button" variant="ghost" class="self-end" @click="account = ''; outcome = ''; since = ''; until = ''; load()">重置</Button>
-      </div>
-    </form>
-    <p v-if="Object.values(health).some(value => value > 0)" role="status" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800">诊断采集健康：{{ health }}</p>
-    <p v-if="error" role="alert" class="text-destructive">{{ error }}</p>
-    <div class="relative overflow-x-auto rounded-xl border bg-card">
-      <table class="w-full text-left sm:whitespace-nowrap"><thead class="bg-muted/40 text-xs text-muted-foreground"><tr><th class="px-4 py-3 font-medium">时间 / 请求</th><th class="hidden px-3 py-3 font-medium sm:table-cell">账号</th><th class="px-3 py-3 font-medium">结果</th><th class="hidden px-3 py-3 font-medium sm:table-cell">总耗时</th><th class="hidden px-3 py-3 font-medium sm:table-cell">尝试</th><th class="px-4 py-3 font-medium"><span class="sr-only">操作</span></th></tr></thead>
-        <tbody class="divide-y"><tr v-for="row in rows" :key="row.request_id" class="hover:bg-muted/35">
-          <td class="max-w-48 px-3 py-3 sm:max-w-none sm:px-4"><time :datetime="row.started_at" :title="row.started_at" class="block whitespace-normal break-words text-[11px] sm:whitespace-nowrap sm:text-xs">{{ formatLocalTime(row.started_at) }}</time><div class="mt-1 flex items-center gap-2"><code class="text-xs text-muted-foreground" :title="row.request_id">{{ row.request_id.slice(0, 8) }}…</code><button type="button" :aria-label="`复制请求 ${row.request_id}`" class="text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring" @click="copy(row.request_id, $event)"><Copy class="size-3" /></button><span class="text-[11px] text-muted-foreground">{{ row.log_mode ?? '历史模式未知' }}</span></div><p class="mt-1 break-all text-[11px] text-muted-foreground sm:hidden">{{ accountLabel(row) }}</p></td>
-          <td class="hidden max-w-64 whitespace-normal break-all px-3 text-xs sm:table-cell">{{ accountLabel(row) }}</td>
-          <td class="px-3"><button type="button" class="diagnostic-badge" :class="outcomeTone(row.outcome)" @click="open(row, $event)">{{ row.status_code ?? '待终结' }} · {{ outcomeLabel(row.outcome) }}</button></td>
-          <td class="hidden px-3 font-mono text-xs sm:table-cell">{{ milliseconds(elapsed(row)) }}</td><td class="hidden px-3 font-mono text-xs sm:table-cell">{{ row.attempt_count }}</td>
-          <td class="px-4 text-right"><Button variant="ghost" size="sm" aria-label="详情" @click="open(row, $event)"><span class="hidden sm:inline">详情</span><ArrowUpRight class="size-3.5" /></Button></td>
-        </tr></tbody>
-      </table>
-      <div v-if="!rows.length" class="flex flex-col items-center gap-2 p-12 text-muted-foreground"><FileText class="size-7 opacity-50" /><p>{{ loading ? '正在读取记录…' : '当前筛选下没有请求记录' }}</p></div>
-    </div>
-    <div class="flex flex-wrap items-center justify-between gap-3"><p class="text-xs text-muted-foreground">info 保存摘要；debug 配合账号内容采集开关保存脱敏原文。</p><div class="flex items-center gap-3"><Button size="sm" variant="outline" :disabled="loading || page <= 1" @click="load(page - 1)">上一页</Button><span class="text-xs tabular-nums text-muted-foreground">{{ page }} / {{ Math.max(1, Math.ceil(total / 20)) }}</span><Button size="sm" variant="outline" :disabled="loading || page * 20 >= total" @click="load(page + 1)">下一页</Button></div></div>
+    <section class="request-query-panel"><div class="request-quick-tabs" role="group" aria-label="请求快捷筛选"><button v-for="item in quickTabs" :key="item.id" type="button" :class="{active:quick===item.id && !outcome}" :aria-pressed="quick===item.id && !outcome" @click="chooseQuick(item.id)"><component :is="item.icon" :size="14" />{{ item.label }}<span>{{ counts?.[item.id] ?? '—' }}</span></button></div>
+      <form @submit.prevent="load()"><div class="request-query-toolbar"><SearchInput v-model="correlation" label="请求关联 ID" placeholder="输入完整请求 ID / 响应关联 ID / 上游请求 ID" @search="load()" /><Button type="button" variant="outline" :aria-expanded="filtersOpen" aria-controls="request-filters" @click="filtersOpen=!filtersOpen"><Settings2 :size="14" />筛选<i v-if="account || outcome || since || until" class="request-filter-dot" /></Button><Button type="submit" :disabled="loading"><Search :size="14" />查询</Button><Button type="button" variant="outline" :disabled="loading" @click="load(page)"><RefreshCw :size="14" />刷新</Button></div>
+      <div v-show="filtersOpen" id="request-filters" class="request-filter-fields"><AccountFilterSelect v-model="account" /><ChoiceSelect :model-value="outcome" label="具体结果" :options="[{value:'',label:'全部结果'},...outcomeOptions]" @update:model-value="value=>{outcome=value;quick='all'}" /><DateTimeControl v-model="since" label="开始时间" /><DateTimeControl v-model="until" label="结束时间" /><div class="request-filter-footer"><span>按浏览器本地时间查询 · 结束时间不包含边界时刻</span><button type="button" @click="resetFilters">重置条件</button></div></div><p v-if="error" role="alert" class="request-health">{{ error }}</p></form>
+    </section>
+    <p v-if="Object.values(health).some(value=>value>0)" role="status" class="request-health">诊断采集健康：{{ health }}</p>
+    <div class="request-page-summary"><span><strong>{{ total }}</strong> 条匹配记录</span><span>本页成功 <b>{{ rows.filter(row=>['success','cache_hit'].includes(row.outcome)).length }}</b></span><span>本页错误 <b>{{ rows.filter(row=>outcomeTone(row.outcome)==='diagnostic-error').length }}</b></span><small>保留 7 天</small></div>
+    <section class="request-records" :aria-busy="loading"><table><thead><tr><th>时间 / 请求</th><th>账号</th><th class="request-extra">模型 / 转发方式</th><th>结果</th><th class="request-extra">总耗时 / 首输出</th><th class="request-extra">Token（末次）</th><th class="request-extra">尝试</th><th>操作</th></tr></thead><tbody><tr v-for="row in rows" :key="row.request_id"><td><time :datetime="row.started_at">{{ formatLocalTime(row.started_at) }}</time><div class="request-id"><code>{{ row.request_id.slice(0,8) }}…</code><button type="button" :aria-label="`复制请求 ${row.request_id}`" @click="copy(row.request_id,$event)"><Copy :size="12" /></button><span>{{ row.log_mode || '模式未知' }}</span></div></td><td><strong>{{ row.account_name?.trim() || row.account_email?.trim() || accountLabel(row) }}</strong><small>{{ row.account_email || '资料未提供' }}</small></td><td class="request-extra"><strong>{{ row.last_attempt?.parameters?.model || row.last_attempt?.response_model || '未观测' }}</strong><small>{{ row.last_attempt?.profile_selection?.includes('native') ? '原生运行时' : row.last_attempt ? '原有转发' : '转发方式未观测' }}</small></td><td><button type="button" class="request-result-button" @click="open(row,$event)"><span class="request-status" :class="outcomeTone(row.outcome).replace('diagnostic-','is-')"><i></i>{{ outcomeLabel(row.outcome) }}<small>{{ row.status_code ?? '待终结' }}</small></span></button></td><td class="request-extra"><strong>{{ milliseconds(elapsed(row)) }}</strong><small>首输出 {{ milliseconds(row.last_attempt?.first_output_ms) }}</small></td><td class="request-extra"><strong>{{ row.last_attempt?.tokens?.input_tokens?.toLocaleString() ?? '—' }} / {{ row.last_attempt?.tokens?.output_tokens?.toLocaleString() ?? '—' }}</strong><small>缓存读 {{ row.last_attempt?.tokens?.cache_read_tokens?.toLocaleString() ?? '—' }}</small></td><td class="request-extra">{{ row.attempt_count }}</td><td><Button variant="ghost" size="sm" aria-label="详情" @click="open(row,$event)">详情<ArrowUpRight :size="13" /></Button></td></tr><tr v-if="!rows.length"><td colspan="8" class="request-empty"><FileText :size="28" /><strong>{{ loading ? '正在读取记录…' : '没有符合条件的请求' }}</strong><p>可以调整结果、时间或关联 ID。</p><Button size="sm" variant="outline" @click="resetFilters">重置查询</Button></td></tr></tbody></table></section>
+    <footer class="request-list-footer"><p>模型、Token、首输出取末次尝试；总耗时按请求起止时间计算。</p><Pagination v-model:page-size="pageSize" :page="page" :total="total" :disabled="loading" label="请求记录分页" @update:page="load" /></footer>
     <Dialog :open="dialogOpen" @update:open="setDialogOpen">
-      <DialogContent class="sm:max-w-4xl max-h-[88dvh] flex flex-col gap-0 overflow-hidden p-0" @close-auto-focus="restoreFocus">
-        <DialogHeader class="shrink-0 border-b px-5 py-4 pr-12"><DialogTitle class="flex items-center gap-2 text-lg">请求详情<span v-if="selected" class="diagnostic-badge text-xs" :class="outcomeTone(selected.outcome)">{{ selected.status_code ?? '待终结' }} · {{ outcomeLabel(selected.outcome) }}</span></DialogTitle><DialogDescription class="flex items-center gap-2 min-w-0"><code class="min-w-0 truncate text-xs" :title="selected?.request_id">{{ selected?.request_id }}</code><button v-if="selected" type="button" aria-label="复制完整请求 ID" class="shrink-0 hover:text-foreground" @click="copy(selected.request_id, $event)"><Copy class="size-3" /></button></DialogDescription></DialogHeader>
-        <div role="tablist" aria-label="请求详情分类" class="flex shrink-0 gap-1 overflow-x-auto border-b px-4" @keydown="tabKeys"><button v-for="tab in tabs" :id="`request-tab-${tab.id}`" :key="tab.id" type="button" role="tab" :aria-selected="activeTab === tab.id" :aria-controls="`request-panel-${tab.id}`" :tabindex="activeTab === tab.id ? 0 : -1" class="whitespace-nowrap border-b-2 px-3 py-3 text-sm transition-colors" :class="activeTab === tab.id ? 'border-primary font-medium text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'" @click="activeTab = tab.id">{{ tab.label }}</button></div>
-        <div class="min-h-0 overflow-y-auto px-5 py-5 text-sm">
-          <p v-if="detailLoading" role="status" class="mb-3 text-muted-foreground">读取中…</p><p v-if="detailError" role="alert" class="mb-3 text-destructive">{{ detailError }}</p>
-          <section v-if="selected" :id="`request-panel-${activeTab}`" role="tabpanel" :aria-labelledby="`request-tab-${activeTab}`" tabindex="0" class="space-y-4 outline-none">
+      <DialogContent class="request-workspace translate-x-0 translate-y-0 flex flex-col gap-0 overflow-hidden p-0" @close-auto-focus="restoreFocus">
+        <DialogHeader class="request-detail-head">
+          <span class="request-detail-eyebrow">请求诊断</span>
+          <DialogTitle>请求详情</DialogTitle>
+          <DialogDescription class="request-detail-identity"><code>{{ selected?.request_id }}</code><button v-if="selected" type="button" data-request-copy aria-label="复制完整请求 ID" @click="copy(selected.request_id, $event)"><Copy :size="13" /></button></DialogDescription>
+        </DialogHeader>
+        <div role="tablist" aria-label="请求详情分类" class="request-detail-tabs" @keydown="tabKeys"><button v-for="tab in tabs" :id="`request-tab-${tab.id}`" :key="tab.id" type="button" role="tab" :aria-selected="activeTab === tab.id" :aria-controls="`request-panel-${tab.id}`" :tabindex="activeTab === tab.id ? 0 : -1" :class="{active:activeTab === tab.id}" @click="activeTab = tab.id">{{ tab.label }}</button></div>
+        <div class="request-detail-scroll">
+          <p v-if="detailLoading" role="status" class="form-help">读取中…</p><p v-if="detailError" role="alert" class="text-destructive">{{ detailError }}</p>
+          <section v-if="selected" :id="`request-panel-${activeTab}`" role="tabpanel" :aria-labelledby="`request-tab-${activeTab}`" tabindex="0" class="outline-none">
             <template v-if="activeTab === 'overview'">
-              <div class="grid grid-cols-2 gap-3 sm:grid-cols-4"><div class="diagnostic-metric"><span>请求总耗时</span><strong>{{ milliseconds(elapsed(selected)) }}</strong></div><div class="diagnostic-metric"><span>尝试数</span><strong>{{ selected.attempt_count }}</strong></div><div class="diagnostic-metric"><span>账号</span><strong>{{ accountLabel(selected) }}</strong></div><div class="diagnostic-metric"><span>日志模式</span><strong>{{ selected.log_mode ?? '未知' }}</strong></div></div>
-              <dl class="diagnostic-definition"><dt>开始时间</dt><dd :title="selected.started_at">{{ formatLocalTime(selected.started_at) }}</dd><dt>结束时间</dt><dd :title="selected.finished_at ?? undefined">{{ formatLocalTime(selected.finished_at) }}</dd><dt>响应关联 ID</dt><dd><code>{{ selected.response_request_id ?? '未观测' }}</code></dd><dt>错误阶段</dt><dd>{{ selected.error_stage ?? '未记录错误阶段' }}</dd></dl>
-              <div v-for="attempt in attempts" :key="attempt.attempt_id" class="rounded-xl border p-4"><div class="flex flex-wrap items-center justify-between gap-2"><h3 class="min-w-0 break-all font-medium">尝试 {{ attempt.ordinal }} · {{ accountLabel(attempt) }}</h3><span class="text-xs text-muted-foreground">{{ captureLabel(attempt.capture_status) }}</span></div><p class="mt-2 text-xs text-muted-foreground">{{ attempt.parameters?.model ?? attempt.response_model ?? '模型未观测' }} · {{ modeLabel(attempt.log_mode) }}</p><p v-if="attempt.capture_status === 'disabled'" class="mt-3 text-muted-foreground">本次请求未保存阶段原文。请核对全局 debug 日志级别与账号内容采集设置。</p><router-link :to="{name: 'environments', query: {gateway_account: String(attempt.account_id)}}" class="mt-2 inline-flex items-center gap-1 text-xs text-primary">管理该账号内容采集<ArrowUpRight class="size-3" /></router-link><Button v-if="canInspect(attempt)" variant="outline" size="sm" class="ml-3 mt-2" :disabled="detailLoading" @click="inspect(attempt)">查看脱敏处理详情</Button></div>
-              <p v-if="!attempts.length && !detailLoading" class="text-muted-foreground">此请求没有已记录的上游尝试。</p>
+              <div class="request-detail-hero"><div><span class="request-status" :class="outcomeTone(selected.outcome).replace('diagnostic-','is-')"><i></i>{{ outcomeLabel(selected.outcome) }}<small>{{ selected.status_code ?? '待终结' }}</small></span><h3>{{ selected.account_name || selected.account_email || accountLabel(selected) }}</h3><p>{{ selected.account_email || '暂无账号邮箱' }}</p></div><div><span>请求总耗时</span><strong>{{ milliseconds(elapsed(selected)) }}</strong></div></div>
+              <div v-if="selected.error_stage" class="request-error-explanation"><AlertCircle /><div><strong>{{ outcomeLabel(selected.outcome) }}</strong><p>错误阶段：{{ selected.error_stage }}{{ selected.status_code===200?' · HTTP 200，响应未完整结束':'' }}</p></div></div>
+              <dl class="request-definitions"><dt>开始时间</dt><dd :title="selected.started_at">{{ formatLocalTime(selected.started_at) }}</dd><dt>结束时间</dt><dd :title="selected.finished_at ?? undefined">{{ formatLocalTime(selected.finished_at) }}</dd><dt>响应关联 ID</dt><dd><code>{{ selected.response_request_id ?? '未观测' }}</code></dd><dt>发生时日志</dt><dd>{{ selected.log_mode || '历史模式未知' }}</dd><dt>尝试次数</dt><dd>{{ selected.attempt_count }}</dd><dt>显示时区</dt><dd>{{ Intl.DateTimeFormat().resolvedOptions().timeZone }}</dd></dl>
+              <section class="request-section"><div class="request-section-head"><h3>上游尝试</h3><span>{{ attempts.length }} 次</span></div>
+                <article v-for="attempt in attempts" :key="attempt.attempt_id" class="request-attempt-summary"><div class="request-attempt-icon">{{ attempt.ordinal }}</div><div><strong>{{ attempt.account_name || attempt.account_email || accountLabel(attempt) }}</strong><small>{{ attempt.account_email || '暂无账号邮箱' }} · {{ attempt.parameters?.model || attempt.response_model || '模型未观测' }}</small><span>{{ captureLabel(attempt.capture_status) }} · {{ modeLabel(attempt.log_mode) }}</span></div><div class="request-attempt-actions"><button type="button" class="btn small" @click="activeTab='chain'">查看链路<ArrowRight :size="13" /></button><button v-if="canInspect(attempt)" type="button" class="btn small" :disabled="detailLoading" @click="inspect(attempt)">阶段证据</button><router-link :to="{name:'environments',query:{gateway_account:String(attempt.account_id)}}" class="request-text-button">内容采集设置</router-link></div></article>
+                <div v-if="!attempts.length && !detailLoading" class="request-empty-capture">此请求没有已记录的上游尝试。</div>
+              </section>
             </template>
             <template v-else-if="activeTab === 'chain'">
-              <article v-for="attempt in attempts" :key="attempt.attempt_id" class="rounded-xl border p-4"><div class="flex flex-wrap justify-between gap-2"><h3 class="min-w-0 break-all font-medium">尝试 {{ attempt.ordinal }} · {{ accountLabel(attempt) }}</h3><span class="diagnostic-badge" :class="outcomeTone(attempt.outcome)">{{ attempt.status_code ?? '未观测' }} · {{ outcomeLabel(attempt.outcome) }}</span></div><dl class="diagnostic-definition mt-4"><dt>转发方式</dt><dd>{{ attempt.profile_selection }}</dd><dt>画像版本</dt><dd>{{ attempt.profile_version ?? '未观测' }}</dd><dt>上游模型</dt><dd>{{ attempt.response_model ?? '未观测' }}</dd><dt>上游请求 ID</dt><dd>{{ attempt.upstream_request_id ?? '未观测' }}</dd><dt>重试原因</dt><dd>{{ attempt.retry_reason ?? '未记录重试' }}</dd><dt>错误阶段</dt><dd>{{ attempt.error_stage ?? '未记录错误阶段' }}</dd><dt>真实会话摘要</dt><dd>{{ attempt.sessions?.real_session_hash ?? '未观测' }}</dd><dt>上游会话摘要</dt><dd>{{ attempt.sessions?.upstream_session_hash ?? '未观测' }}</dd></dl></article>
+              <div class="request-chain-heading"><h3>请求处理链路</h3><p>按实际提交顺序展示，每次尝试保留自己的账号与结果。</p></div>
+              <article v-for="attempt in attempts" :key="attempt.attempt_id" class="request-chain-card"><header><span class="request-attempt-icon">{{ attempt.ordinal }}</span><div><h3>{{ attempt.account_name || attempt.account_email || accountLabel(attempt) }}</h3><p>{{ attempt.account_email || '暂无账号邮箱' }}</p></div><span class="request-status" :class="outcomeTone(attempt.outcome).replace('diagnostic-','is-')"><i></i>{{ outcomeLabel(attempt.outcome) }}<small>{{ attempt.status_code ?? '未观测' }}</small></span></header><dl class="request-definitions"><dt>转发方式</dt><dd>{{ attempt.profile_selection }}</dd><dt>画像版本</dt><dd>{{ attempt.profile_version ?? '未观测' }}</dd><dt>上游模型</dt><dd>{{ attempt.response_model ?? '未观测' }}</dd><dt>上游请求 ID</dt><dd>{{ attempt.upstream_request_id ?? '未观测' }}</dd><dt>重试原因</dt><dd>{{ attempt.retry_reason ?? '未记录重试' }}</dd><dt>错误阶段</dt><dd>{{ attempt.error_stage ?? '未记录错误阶段' }}</dd><dt>真实会话摘要</dt><dd>{{ attempt.sessions?.real_session_hash ?? '未观测' }}</dd><dt>上游会话摘要</dt><dd>{{ attempt.sessions?.upstream_session_hash ?? '未观测' }}</dd></dl></article>
+              <div v-if="!attempts.length && !detailLoading" class="request-empty-capture">没有已记录的上游尝试。</div>
             </template>
             <template v-else-if="activeTab === 'performance'">
-              <article v-for="attempt in attempts" :key="attempt.attempt_id" class="space-y-4 rounded-xl border p-4"><h3 class="min-w-0 break-all font-medium">尝试 {{ attempt.ordinal }} · {{ accountLabel(attempt) }}</h3><div class="grid grid-cols-2 gap-3 sm:grid-cols-3"><div class="diagnostic-metric"><span>响应头耗时</span><strong>{{ milliseconds(attempt.ttft_ms) }}</strong></div><div class="diagnostic-metric"><span>首次有效输出</span><strong>{{ milliseconds(attempt.first_output_ms) }}</strong></div><div class="diagnostic-metric"><span>本次尝试总耗时</span><strong>{{ milliseconds(attempt.duration_ms) }}</strong></div></div>
-                <div v-if="attempt.runtime" class="space-y-2 rounded-lg bg-muted/50 p-3 text-xs" data-native-runtime><p class="font-medium">原生进程：{{ attempt.runtime.warm_hit ? '命中热进程' : '本次等待初始化' }} · PID {{ attempt.runtime.worker_pid }}</p><p>准备等待 {{ attempt.runtime.preparation_wait_ms }} ms · 获取进程 {{ attempt.runtime.checkout_ms }} ms · 进程启动 {{ attempt.runtime.worker_start_ms == null ? '沿用现有进程' : `${attempt.runtime.worker_start_ms} ms` }}</p><p>本地准备合计 {{ attempt.runtime.prepared_ms }} ms（包含上述等待，计至组装完成）</p><p class="text-muted-foreground">本地阶段存在包含关系；准备耗时单独展示。</p></div><p v-else class="text-xs text-muted-foreground">原生进程与本地阶段：未观测</p>
-                <dl class="diagnostic-definition"><dt>输入 tokens</dt><dd>{{ attempt.tokens?.input_tokens ?? '未观测' }}</dd><dt>输出 tokens</dt><dd>{{ attempt.tokens?.output_tokens ?? '未观测' }}</dd><dt>缓存读取 tokens</dt><dd>{{ attempt.tokens?.cache_read_tokens ?? '未观测' }}</dd><dt>缓存写入 tokens</dt><dd>{{ attempt.tokens?.cache_write_tokens ?? '未观测' }}</dd></dl>
-              </article>
+              <section v-for="attempt in attempts" :key="attempt.attempt_id" class="request-performance-card"><header><h3><InfoTooltip :label="'账号 ' + accountLabel(attempt)" title="尝试账号" portal-target=".request-workspace"><template #trigger>尝试 {{ attempt.ordinal }} · {{ attempt.account_name || attempt.account_email || accountLabel(attempt) }}</template><p>{{ attempt.account_name || '名称未提供' }}</p><p>{{ attempt.account_email || '邮箱未提供' }}</p><p>账号 ID：{{ attempt.account_id ?? '未知' }}</p></InfoTooltip></h3><span>{{ attempt.response_model || '模型未观测' }}</span></header><div class="request-performance-metrics"><div><span>响应头耗时</span><strong>{{ milliseconds(attempt.ttft_ms) }}</strong></div><div><span>首次有效输出</span><strong>{{ milliseconds(attempt.first_output_ms) }}</strong></div><div><span>本次尝试耗时</span><strong>{{ milliseconds(attempt.duration_ms) }}</strong></div></div>
+                <div v-if="attempt.runtime" class="request-runtime" data-native-runtime><div><strong>{{ attempt.runtime.warm_hit ? '命中热进程' : '本次等待初始化' }}</strong><span>PID {{ attempt.runtime.worker_pid }}</span></div><div class="request-runtime-metrics"><span>准备等待<b>{{ milliseconds(attempt.runtime.preparation_wait_ms) }}</b></span><span>获取进程<b>{{ milliseconds(attempt.runtime.checkout_ms) }}</b></span><span>进程启动<b>{{ attempt.runtime.worker_start_ms == null ? '沿用现有进程' : milliseconds(attempt.runtime.worker_start_ms) }}</b></span><span>本地准备合计<b>{{ milliseconds(attempt.runtime.prepared_ms) }}</b></span></div><p>本地准备包含等待与获取进程，各项存在包含关系。</p></div><p v-else class="form-help">原生进程与本地阶段：未观测</p>
+                <div class="request-token-metrics"><div><span>输入 Token</span><strong>{{ attempt.tokens?.input_tokens?.toLocaleString('zh-CN') ?? '未观测' }}</strong></div><div><span>输出 Token</span><strong>{{ attempt.tokens?.output_tokens?.toLocaleString('zh-CN') ?? '未观测' }}</strong></div><div><span>缓存读取</span><strong>{{ attempt.tokens?.cache_read_tokens?.toLocaleString('zh-CN') ?? '未观测' }}</strong></div><div><span>缓存写入</span><strong>{{ attempt.tokens?.cache_write_tokens?.toLocaleString('zh-CN') ?? '未观测' }}</strong></div></div>
+              </section>
+              <div v-if="!attempts.length && !detailLoading" class="request-empty-capture">没有已记录的性能数据。</div>
             </template>
             <template v-else>
-              <div class="flex flex-wrap items-center gap-2"><label class="min-w-0 w-full text-xs text-muted-foreground sm:w-auto">当前尝试<select :value="currentAttempt?.attempt_id" class="mt-1 block h-8 w-full max-w-full rounded-lg border bg-card px-2 text-foreground sm:max-w-lg" aria-label="当前尝试" :title="currentAttempt ? accountLabel(currentAttempt) : undefined" @change="selectedAttempt = ($event.target as HTMLSelectElement).value; changeAttempt()"><option v-for="attempt in attempts" :key="attempt.attempt_id" :value="attempt.attempt_id">尝试 {{ attempt.ordinal }} · {{ accountLabel(attempt) }}</option></select></label><Button v-if="currentAttempt && canInspect(currentAttempt)" size="sm" variant="outline" :disabled="detailLoading" @click="inspect(currentAttempt)">{{ capture ? '刷新阶段证据' : '读取阶段证据' }}</Button></div>
-              <div v-if="currentAttempt && !canInspect(currentAttempt)" class="rounded-xl border bg-muted/40 p-4"><h3 class="font-medium">{{ currentAttempt.log_mode === 'info' ? '本次仅保存摘要' : captureLabel(currentAttempt.capture_status) }}</h3><p class="mt-2 text-muted-foreground">完整阶段原文需要账号内容采集开启及 debug 日志模式。设置对后续请求生效。</p><router-link :to="{name: 'environments', query: {gateway_account: String(currentAttempt.account_id)}}" class="mt-3 inline-flex text-primary">前往该账号环境配置 →</router-link></div>
-              <section v-if="capture" class="space-y-3"><h3 class="font-medium">阶段证据 · {{ capture.state === 'missing' ? '文件缺失或已清理' : capture.state === 'expired' ? '已超过保留期' : capture.state === 'available' ? '已读取' : capture.state }}</h3><p v-if="capture.message" role="status" class="text-muted-foreground">{{ capture.message }}</p><NativeStageDetails v-if="capture.snapshot" :key="selectedAttempt" :snapshot="capture.snapshot" /></section>
-              <details class="rounded-xl border"><summary class="cursor-pointer px-4 py-3 text-xs text-muted-foreground">已脱敏诊断字段 · 原始时间</summary><pre class="max-h-80 overflow-auto border-t bg-muted/30 p-4 text-xs">{{ JSON.stringify({ request: selected, attempts }, null, 2) }}</pre></details>
+              <div class="request-raw-controls"><ChoiceSelect :model-value="currentAttempt?.attempt_id" label="当前尝试" :options="attempts.map(attempt=>({value:attempt.attempt_id,label:`尝试 ${attempt.ordinal} · ${accountLabel(attempt)}`}))" @update:model-value="value=>{selectedAttempt=value;changeAttempt()}" /><button v-if="currentAttempt && canInspect(currentAttempt)" type="button" class="btn" :disabled="detailLoading" @click="inspect(currentAttempt)"><RefreshCw :size="14" />{{ detailLoading ? '读取中…' : capture ? '刷新阶段证据' : '读取阶段证据' }}</button></div>
+              <div v-if="currentAttempt && !canInspect(currentAttempt)" class="request-empty-capture"><ShieldCheck :size="20" /><strong>{{ currentAttempt.log_mode === 'info' ? '本次仅保存摘要' : captureLabel(currentAttempt.capture_status) }}</strong><p>完整阶段原文需要账号内容采集开启及 debug 日志模式。设置对后续请求生效。</p><router-link :to="{name:'environments',query:{gateway_account:String(currentAttempt.account_id)}}" class="btn small">前往该账号环境配置<ArrowRight :size="13" /></router-link></div>
+              <section v-else-if="capture"><p v-if="capture.state!=='available' || capture.message" role="status" class="form-help">阶段证据 · {{ capture.state === 'missing' ? '文件缺失或已清理' : capture.state === 'expired' ? '已超过保留期' : capture.state === 'available' ? '已读取' : capture.state }}{{ capture.message ? ' · '+capture.message : '' }}</p><NativeStageDetails v-if="capture.snapshot" :key="selectedAttempt" :snapshot="capture.snapshot" /></section>
+              <div v-else-if="!detailLoading" class="request-empty-capture"><strong>按需读取阶段证据</strong><p>选择上方尝试后读取脱敏处理信息。</p></div>
+              <details class="request-code-block"><summary>已脱敏诊断字段 · 原始时间</summary><pre>{{ JSON.stringify({request:selected,attempts},null,2) }}</pre></details>
             </template>
           </section>
         </div>

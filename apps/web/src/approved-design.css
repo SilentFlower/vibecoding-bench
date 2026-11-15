@@ -1,0 +1,261 @@
+/* 对照 flower2api-concept.html 的共享排版及账号结构；具体值来自渲染结果。 */
+html{color:#0e1726;font-family:var(--font-body);font-size:14px;font-weight:400;line-height:normal;font-synthesis:none}
+body{line-height:normal;font-synthesis:none}
+:root{--muted-foreground:#848894;--border:#e9e8ed}
+.console-shell{max-width:none;margin:0}
+.console-sidebar{left:0}
+.console-content{max-width:none;width:100%;padding:38px 40px 48px}
+.account-card-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:18px}
+.page-heading{padding:0;gap:24px;margin-bottom:32px}
+.page-heading h1,.page-heading h2{font-size:26px;font-weight:650;line-height:1.3;letter-spacing:-.5px;color:#0e1726}
+.page-heading .page-description{font-size:13px;line-height:1.65;color:#5f6876;margin-top:9px}
+.page-eyebrow{font-size:11px;font-weight:600;line-height:normal;letter-spacing:.8px;text-transform:uppercase;color:#7760c5;margin:0 0 10px}
+.console-sidebar{padding-top:29px}
+.console-brand strong{font-size:18px;font-weight:650;letter-spacing:-.7px}
+.console-navigation{gap:0;padding-top:0}
+.navigation-group{gap:0}
+.navigation-group-label{margin:22px 0 10px;padding:0 13px;font-size:11px;color:#9b9eb4;letter-spacing:.5px;line-height:normal}
+.navigation-item{padding:12px 13px;gap:12px;min-height:44px;line-height:normal;font-size:14px;font-weight:550;color:#aeb0c4}
+.navigation-item.is-active{background:#3a3453;color:#eee8ff;font-weight:650}
+.navigation-item.is-active svg{color:#c5b1f5}
+.navigation-item svg{width:20px;height:20px;stroke-width:1.7}
+.sidebar-tagline{padding:0;margin:12px 0 11px 35px;font-size:11px;line-height:normal}
+.sidebar-footer{border-top-color:#383a4c;gap:7px;padding:20px 5px 0}
+.sidebar-identity{gap:0}.sidebar-identity strong{font-size:12px;color:#dfdfeb}.sidebar-identity small{font-size:11px;color:#a0a5b9}
+[data-slot=button]{font-size:13px;font-weight:600;line-height:1.3;gap:7px;padding:10px 15px;height:auto;min-height:38px}
+[data-slot=button][data-size=sm]{font-size:12px;padding:7px 10px;min-height:30px}
+[data-slot=button][data-size^=icon]{padding:6px;min-height:0}
+[data-slot=button] svg{stroke-width:1.7}
+.account-card{border-color:#e5e9f0;box-shadow:0 5px 16px -13px #24304a24}
+.account-card-body{padding:20px 18px 17px;gap:0}
+.account-identity{gap:12px;padding:0 1px}
+.account-avatar{width:36px;height:36px;border-radius:9px}
+.account-identity h3{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:15px;line-height:normal;color:#0e1726;font-weight:650}
+.account-identity p{font-size:12px;line-height:1.45;margin-top:5px;color:#5f6876}
+.account-status-switch{width:30px;height:18px;padding:3px}
+.account-status-switch span{width:12px;height:12px}
+.account-status-switch[aria-checked=true]{background:#7a6b9e}
+.account-status-switch[aria-checked=true] span{transform:translateX(12px)}
+.account-network{font-size:12px;color:#7b8496;gap:13px;flex-wrap:wrap;padding:13px 1px 12px}
+.account-health{border-color:#e3efea;border-radius:7px;padding:9px 10px;font-size:12px;line-height:1.5;margin-bottom:15px;color:#288369}
+.account-health svg{width:13px;height:13px;stroke-width:1.7;flex-shrink:0}
+.account-health.is-warning{color:#a47728;background:#fbf6ec;border-color:#f0e6d3}
+.account-health.is-disabled{color:#8b8f9c;background:#f6f6f8;border-color:#eeeef2}
+.account-routing{display:flex;align-items:center;gap:14px;background:#f7f8fb;border-color:#eef0f5;border-radius:7px;padding:9px 11px}
+.account-routing>div{flex:1;min-width:0;display:grid;gap:4px}
+.account-routing span{font-size:11px;color:#8a95a6}
+.account-routing strong{font-size:12px;font-weight:600;color:#50647a;line-height:1.5}
+.account-routing strong small{font-size:11px;font-weight:400;margin-left:3px;color:#7f8ca0}
+.account-routing button{display:grid;gap:4px;min-width:83px;padding:0 0 0 14px;border-left:1px solid #e5e9f0}
+.account-routing button strong{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.account-routing svg{width:12px;height:12px;color:#8c80a9}
+.account-usage-windows{padding:18px 0 15px}
+.account-usage-windows>header{font-size:12px;line-height:normal;color:#8591a4;margin-bottom:7px}
+.account-usage-windows>header small{font-size:10px;color:#8b96a5}
+.account-usage-windows>header button{display:flex;align-items:center;gap:4px;font-size:10px;color:#8b96a5;padding:0}
+.usage-record-start{font-size:10px;line-height:normal;color:#9ca8b8;margin:0 0 16px}
+.account-usage-window{margin-top:14px}
+.usage-stats{font-size:10px;color:#7c899d;height:16px;line-height:16px;margin-bottom:4px}
+.usage-stats .fui-info-trigger{font-size:10px;line-height:16px;height:16px;border-radius:3px}
+.usage-window-label{align-items:baseline;gap:8px;font-size:11px;color:#8491a5;margin:0 0 8px}
+.usage-window-label strong{font-family:'JetBrains Mono Variable','Microsoft YaHei UI',monospace;font-size:12px;font-weight:600;color:#455975;line-height:normal}
+.usage-window-bar{height:5px;background:#edf1f6}
+.usage-window-reset{margin-top:6px;color:#9ca8b8;font-size:10px;line-height:1.5}
+.account-live-metrics{border-top-color:#e9edf3;margin-top:auto;padding-top:15px}
+.account-live-metrics button{display:block;padding:0 0 0 12px;border-left-color:#e9edf3}
+.account-live-metrics span{font-size:12px;line-height:normal;color:#8a96a9;margin-bottom:9px}
+.account-live-metrics strong{font-family:'JetBrains Mono Variable',monospace;font-size:21px;font-weight:650;color:#27374f;line-height:normal}
+.account-live-metrics strong small{font-family:'Inter Variable',sans-serif;font-size:10px;color:#8995a7;font-weight:400;margin-left:3px}
+.account-live-metrics .metric-track{width:48px;height:3px;margin-top:8px}
+.account-card-actions{display:flex;justify-content:space-between;gap:2px;padding:11px 13px;border-top-color:#edf0f5;background:#fdfdfe}
+.account-card-actions button{display:flex;gap:4px;border:0;background:none;color:#7b86a0;font-size:11px;line-height:normal;padding:6px 4px;border-radius:5px}
+.account-card-actions button.danger{color:#bb8690}
+.account-card-actions svg{width:13px;height:13px;stroke-width:1.7}
+@media(max-width:1000px) and (min-width:761px){.console-shell{--navigation-width:224px}.console-sidebar{padding-inline:12px}.console-content{padding-inline:26px}}
+@media(max-width:760px){.console-content{padding:22px 18px 35px}.page-heading{align-items:flex-start;flex-direction:column;gap:17px}.page-heading h1,.page-heading h2{font-size:24px}.sidebar-tagline{margin-bottom:11px}}
+
+/* 令牌行与账号范围选择复用定稿的组件样式。 */
+.token-row{display:flex;align-items:center;gap:14px;padding:22px 24px;border-bottom:1px solid var(--border)}
+.token-row:last-child{border-bottom:0}
+.token-row>.initial{width:38px;height:38px;background:#eff0f6;color:#70758c}
+.token-identity{min-width:0;flex:1}
+.token-identity>strong{font-size:14px;font-weight:650;overflow-wrap:anywhere}
+.token-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px 13px;margin-top:8px;color:var(--muted-foreground);font-size:12px}
+.token-meta code{font-family:'JetBrains Mono Variable',monospace;font-size:11px}
+.token-copy{display:inline-flex;align-items:center;gap:5px;border:0;background:#f2f4f8;border-radius:5px;color:#646d7e;font-size:11px;padding:4px 7px}
+.token-copy svg{width:12px;height:12px}
+.token-actions{display:flex;align-items:center;gap:12px}
+.token-actions .btn{border-color:transparent;background:#f3f4f8;font-weight:550}
+.token-delete{display:flex;align-items:center;gap:5px;border:0;background:transparent;color:#a5707c;font-size:12px;padding:8px;border-radius:6px}
+.token-delete:hover{color:#c24460;background:#fff0f3}
+.token-delete svg{width:14px;height:14px}
+.action-divider{height:17px;width:1px;background:var(--border);margin:0 2px}
+.token-toggle{display:flex;align-items:center;gap:7px;background:none;border:0;color:#626d7c;font-size:12px;padding:5px 0}
+.switch-track{width:30px;height:18px;border-radius:20px;background:#c6cbd5;position:relative;transition:background .15s}
+.switch-track i{width:12px;height:12px;border-radius:50%;background:#fff;position:absolute;left:3px;top:3px;box-shadow:0 1px 3px #0002;transition:transform .15s}
+.token-toggle[aria-checked="true"] .switch-track{background:#7a6b9e}
+.token-toggle[aria-checked="true"] .switch-track i{transform:translateX(12px)}
+.account-picker{margin:0 0 23px}
+.picker-label{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;font-size:13px;color:#535c6b;font-weight:550}
+.picker-count{font-size:11px;font-weight:400;color:#8a7a9e}
+.picker-selected{display:flex;flex-wrap:wrap;gap:6px}
+.picker-selected:not(:empty){margin-bottom:9px}
+.account-chip{display:inline-flex;align-items:center;gap:7px;background:#efebf6;color:#79638e;border-radius:6px;padding:5px 7px 5px 9px;font-size:12px}
+.account-chip button{display:grid;place-items:center;background:none;border:0;padding:1px;color:#9c8eab;border-radius:3px}
+.account-chip button:hover{background:#ded5eb;color:#655478}
+.account-chip svg{width:12px;height:12px}
+.picker-trigger{display:flex;align-items:center;justify-content:space-between;width:100%;padding:11px 13px;background:#f7f8fa;border:1px solid transparent;color:#7d8492;border-radius:8px;font-size:12px}
+.picker-trigger>span{display:flex;align-items:center;gap:7px}
+.picker-trigger svg{width:14px;height:14px}
+.picker-trigger>svg{transform:rotate(90deg);width:12px;height:12px}
+.picker-trigger[aria-expanded="true"]{border-color:#c9bddb;background:#fbf9fe}
+.picker-trigger[aria-expanded="true"]>svg{transform:rotate(-90deg)}
+.picker-help{font-size:11px;color:#9399a4;margin-top:7px;line-height:1.5}
+.picker-options{margin-top:8px;border:1px solid #e7e2ef;border-radius:9px;box-shadow:0 8px 22px -12px #29203a25;padding:6px;background:#fff}
+.picker-search{display:flex;align-items:center;gap:8px;padding:8px 9px;border-bottom:1px solid #f0edf5;color:#9691a0}
+.picker-search svg{width:14px;height:14px}
+.picker-search input{border:0;outline:0;background:none;font-size:12px;width:100%;min-width:0}
+.picker-list{max-height:214px;overflow:auto;padding-top:5px}
+.picker-option{display:flex;align-items:center;gap:10px;padding:9px;border-radius:6px;cursor:pointer}
+.picker-option:hover{background:#f8f6fc}
+.picker-option:has(input:checked){background:#f5f1fb}
+.picker-option input{width:15px;height:15px;accent-color:#8c78ae;flex-shrink:0;margin:0}
+.picker-avatar{display:grid;place-items:center;width:28px;height:28px;border-radius:7px;font-size:11px;flex-shrink:0}
+.picker-option>span:last-of-type{min-width:0;flex:1}
+.picker-option strong{display:block;font-size:12px;font-weight:550}
+.picker-option small{display:block;font-size:10px;color:#9694a0;margin-top:3px;overflow-wrap:anywhere}
+.picker-empty{text-align:center;padding:18px;color:var(--muted-foreground);font-size:12px}
+.token-panel{border:1px solid #e9e8ed;border-radius:14px;background:white;overflow:hidden}
+.token-panel-head{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #e9e8ed}.token-panel-head h3{font-size:14px;font-weight:650}.token-panel-head>span{font-size:12px;color:#848894}
+.token-icon{width:38px;height:38px;display:grid;place-items:center;flex:none;background:#eff0f6;color:#70758c;border-radius:10px}
+.token-actions .token-delete{border-color:transparent;background:transparent}.token-actions .token-delete:hover{color:#c24460;background:#fff0f3}.token-actions [data-slot=button]{font-size:12px;font-weight:550}
+.token-empty{padding:48px 20px;text-align:center;font-size:12px;color:#848894}.token-load-error{font-size:12px;line-height:1.7;color:#b45b67;margin:12px 0}.token-load-error button{text-decoration:underline}
+.approved-token-editor[data-slot=dialog-content]{width:520px;max-width:calc(100vw - 32px);padding:0;gap:0;border-radius:16px;background:white;max-height:calc(100dvh - 32px);display:flex;flex-direction:column;overflow:hidden}
+.approved-token-editor>[data-slot=dialog-header]{padding:23px 26px;flex-shrink:0;border-bottom:1px solid #e9e8ed;text-align:left}.approved-token-editor [data-slot=dialog-title]{font-size:18px;font-weight:650}.approved-token-editor>form{display:flex;flex-direction:column;min-height:0;overflow:hidden}.token-form-scroll{overflow:auto;min-height:0;padding:24px 26px 0}
+.token-editor-intro{display:flex;gap:11px;align-items:center;margin-bottom:24px}.token-editor-intro .token-icon{width:35px;height:35px;background:#f2eff8;color:#8f7ca9}.token-editor-intro strong{font-size:13px;font-weight:600}.token-editor-intro p{font-size:12px;color:#848894;margin-top:4px}
+.token-name{display:block;margin:0 0 23px}.token-name>span{display:block;font-size:13px;color:#535c6b;margin-bottom:9px}.token-name input{background:#f7f8fa;border:1px solid transparent;font-size:13px;padding:11px 13px;border-radius:8px;box-shadow:none}
+.account-picker{min-width:0;padding:0;border:0}.picker-label{width:100%}.picker-avatar{background:#eee7fa;color:#8a6fac}.token-editor-footer{margin:8px 0 0;flex-shrink:0}
+@media(max-width:760px){.token-row{flex-wrap:wrap;padding:19px 18px;gap:12px}.token-actions{flex-basis:100%;justify-content:flex-end;border-top:1px solid #e9e8ed;padding-top:13px;margin-top:3px}.token-meta{gap:7px}.token-meta>span{flex-basis:100%}.token-form-scroll{padding:20px 20px 0}.token-editor-footer{padding-inline:20px}.approved-token-editor>[data-slot=dialog-header]{padding:20px}.picker-list{max-height:180px}}
+
+.resource-grid>.account-card[data-slot=card]{gap:normal;box-shadow:0 5px 16px -13px #24304a24;border-color:#e5e9f0}
+.resource-grid>.account-card[data-slot=card]:hover{box-shadow:0 5px 16px -13px #24304a24;border-color:#e5e9f0}
+.account-routing>div>strong{display:block}
+.account-usage-windows{margin:0}
+.token-meta>span{overflow-wrap:anywhere}
+.console-brand{min-height:28px}.sidebar-tagline{margin-bottom:11px}.navigation-group-label{margin-top:22px}.account-network{padding-top:16px}
+.account-toolbar .fui-search{background:transparent;border-color:transparent;box-shadow:none}
+.account-toolbar .fui-search:focus-within{border-color:#ad9bc4;background:white;box-shadow:0 0 0 3px #a28eb414}
+
+@media(min-width:761px) and (max-width:767px){.console-sidebar{display:flex}.console-workspace{margin-left:var(--navigation-width)}.console-toolbar{display:none}}
+@media(max-width:760px){.account-card-grid{grid-template-columns:minmax(0,1fr);gap:16px}}
+/* 用量气泡按定稿两列信息层级呈现。 */
+.fui-info-content.usage-cost-bubble{width:300px;max-width:calc(100vw - 20px);padding:17px 18px;border-color:#e6e2ed;color:#43516a}
+.usage-cost-bubble>header{display:flex;justify-content:space-between;gap:12px;font-size:13px;font-weight:600;margin-bottom:13px}
+.usage-cost-bubble>header small{font-size:10px;color:#9a91a8;font-weight:400}
+.usage-bubble-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px 18px;margin:0}
+.usage-bubble-grid dt{display:block;font-size:11px;color:#8e96a6}
+.usage-bubble-grid dd{display:block;font-size:13px;font-weight:550;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;margin:2px 0 0}
+.usage-cost-bubble>p{margin-top:13px;padding-top:11px;border-top:1px solid #eeedf3;font-size:10px;color:#8f98a8;line-height:1.7}
+.usage-cost-bubble>p.usage-bubble-estimate{border:0;padding-top:0;margin-top:5px;color:#9a8aac}
+.approved-oauth-body .account-proxy-picker{margin-top:20px}
+@media(hover:hover){
+ .account-filter-tabs button:not(.active):hover{background:#f6f4fa;color:#78649d}
+ .account-network button:hover,.account-network a:hover,.account-usage-windows>header button:hover{color:#78649d}
+ .proxy-expand:hover,.proxy-expiry-actions button:hover{color:#70528f;background:#f5f2fa}
+ .account-workspace-tabs button:hover{background:#f8f6fc;color:#856b9e}
+ .token-copy:hover{background:#eae6f2;color:#70528f}
+}
+
+/* 账号快捷筛选沿用定稿 .account-toolbar .tab 的完整规则。 */
+.account-filter-tabs{gap:4px}
+.account-filter-tabs button{font-size:13px;font-weight:550;padding:8px 12px;color:#5f6876;background:transparent;border:0;line-height:normal}
+.account-filter-tabs button.active{color:#65528c;font-weight:600;background:#fff;box-shadow:0 2px 4px #11182708}
+@media(max-width:600px){.account-filter-tabs button{font-size:11px;padding:7px 8px}}
+
+.account-filter-tabs button span{font-family:"JetBrains Mono Variable",monospace}
+
+/* 侧栏直接对齐定稿品牌、版本与分组的像素值。 */
+.console-sidebar{padding:29px 17px 20px;border:0}
+.console-brand-row{gap:7px;padding:0 1px;min-height:28px}
+.console-brand{gap:7px;min-height:28px}
+.console-brand img{width:28px;height:28px}
+.console-brand strong{font-size:18px;font-weight:750;letter-spacing:-.6px}
+.brand-update{position:relative;display:flex;align-items:center;gap:3px;padding:4px 5px;border:1px solid #525268;border-radius:6px;background:#303247;color:#d3c7ff;font:650 9px "JetBrains Mono Variable",monospace;line-height:normal}
+.brand-update svg{width:10px;height:10px}
+.brand-update.has-update::after{content:'';position:absolute;right:-2px;top:-2px;width:5px;height:5px;border-radius:50%;background:#c5f0b1;box-shadow:0 0 0 3px #202235}
+.sidebar-tagline{padding:0;margin:12px 0 18px 35px;color:#a0a5b9;letter-spacing:.5px}
+.navigation-group{display:flex;flex-direction:column;gap:5px}
+.navigation-group-label{margin-bottom:5px}
+.navigation-system{margin-top:24px}
+.navigation-count{margin-left:auto;font-size:10px;font-weight:500;background:#48405f;color:#e1d6fa;padding:2px 7px;border-radius:5px}
+.navigation-running{margin-left:auto;display:inline-flex;align-items:center;font-size:10px;font-weight:500;color:#8e6ab6;background:#f0eafa;border-radius:5px;padding:4px 7px}
+.sidebar-collapsed .navigation-count,.sidebar-collapsed .navigation-running{display:none}
+
+@media(max-width:1000px) and (min-width:761px){.console-sidebar{padding-inline:12px}.console-brand strong{font-size:16px}.brand-update{font-size:8px}}
+
+/* 宽屏铺满视口，账号保持定稿四列，避免卡片随分辨率增加而过密。 */
+@media(min-width:1680px){.account-card-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* 交互指针属于共享控件合同，所有页面和Portal浮层统一应用。 */
+:where(button:not(:disabled),a[href],summary,select:not(:disabled),input[type=button]:not(:disabled),input[type=submit]:not(:disabled),[role=button]:not([aria-disabled=true]),[role=option]:not([aria-disabled=true]):not([data-disabled]),[role=tab]:not([aria-disabled=true])){cursor:pointer}
+button:not(:disabled){cursor:pointer}
+button:disabled,select:disabled,[aria-disabled=true]{cursor:not-allowed}
+button[data-slot=button]:disabled{pointer-events:auto;cursor:not-allowed}
+
+/* 令牌列表遵循桌面横向布局；窄屏规则只在媒体查询内生效。 */
+.token-panel{border:0;border-radius:14px;box-shadow:0 10px 22px -18px #0e172614}
+.token-panel-head{justify-content:normal;flex-wrap:wrap;gap:18px;padding:17px 20px;border-bottom:1px solid #edf0f5}.token-panel-head>span{margin-left:auto;color:#5f6876}
+.token-row{border-bottom-color:#edf0f5}.token-meta{color:#5f6876}
+.token-actions [data-slot=button]{border-color:transparent;background:#f3f4f8;padding:6px 9px;font-size:12px;font-weight:550}
+.token-actions [data-slot=button]:hover{background:#f6f4fa;border-color:#c6bbdf}
+@media(min-width:761px){.token-row{flex-wrap:nowrap;padding:22px 24px;gap:14px}.token-actions{flex-basis:auto;justify-content:normal;border-top:0;padding-top:0;margin-top:0}.token-meta{gap:8px 13px}.token-meta>span{flex-basis:auto}}
+.token-panel-head h3{font-size:15px}
+.account-queue-alert{border:0;background:#fff5df;border-radius:4px;padding:3px 6px;color:#b18236;font-size:10px;line-height:1.5;white-space:nowrap}
+.account-live-metrics>button:nth-child(3){padding-right:6px}
+.account-live-metrics>button:nth-child(3) strong.text-amber-600{color:#b28235}
+
+/* 系统更新采用原型的标题与正文层次，真实维护信息位于原有展开区。 */
+.approved-update-dialog{border-radius:17px;font-size:14px;line-height:normal;max-height:calc(100dvh - 28px)}
+.approved-update-head{padding:22px 28px;background:#fff}
+.approved-update-head h2{font-size:17px;font-weight:650;line-height:normal;letter-spacing:-.4px;margin:0}
+.approved-update-head button{width:28px;height:28px;border-radius:7px;background:#f3f1f7;color:#9291a0}
+.approved-update-head button svg{width:16px;height:16px}
+.approved-update-scroll{padding:27px 28px;font-size:13px;line-height:normal}
+.update-page>.approved-update-banner{margin:0;font-size:13px;position:relative;overflow:hidden}
+.approved-update-banner>div:first-child{flex:initial}
+.approved-update-banner h2{letter-spacing:-.4px;line-height:normal}
+.approved-update-banner p:last-child{max-width:370px}
+.approved-version{color:#0e1726}
+.approved-update-banner .approved-update-orbit{margin-left:auto}
+.update-page>.approved-update-columns{margin:24px 0 0}
+.update-page>.approved-update-footer{margin:23px 0 0}
+.update-page .approved-section-title{font-size:14px;font-weight:650;line-height:normal;color:#0e1726;margin-bottom:17px}
+.approved-release-notes{font-size:13px;line-height:normal;color:#0e1726;white-space:normal}
+.approved-change-item{display:flex;gap:13px;margin-bottom:21px;min-width:0}
+.approved-change-icon{width:29px;height:29px;background:#f3f0f8;border-radius:8px;display:grid;place-items:center;color:#9b86bb;flex:none}
+.approved-change-item>div{min-width:0}
+.approved-change-item h3{font-size:14px;font-weight:650;line-height:normal;margin:1px 0 6px;overflow-wrap:anywhere}
+.approved-change-item p{font-size:13px;line-height:1.65;color:#5f6876;white-space:pre-line;overflow-wrap:anywhere}
+@media(max-width:600px){.approved-update-scroll{padding:20px}.approved-update-head{padding:20px}.approved-update-banner>div:first-child{flex:1}}
+.approved-update-head p{color:#5f6876;line-height:1.5}
+.approved-update-banner .eyebrow{font-size:12px;font-weight:600;letter-spacing:.8px;color:#7760c5}
+.approved-platform dl>div{font-size:12px;padding:9px 0;gap:16px}
+.approved-platform dt{color:#5f6876}
+.approved-platform dd{font-weight:600;color:#0e1726}
+.approved-compatibility p{font-size:12px;font-weight:550;color:#21856a}
+.approved-compatibility small{font-size:10px;color:#8a97aa}
+.approved-version{font-family:'JetBrains Mono Variable',monospace}
+.update-page>.approved-maintenance{margin:22px 0 0;padding-top:19px}
+/* 账号诊断先展示真实环境摘要，底部保留原型三个直接操作。 */
+.account-workspace .account-diagnostics{padding:22px 25px 26px;font-size:13px;line-height:normal;color:#0e1726}
+.account-diagnostic-summary{margin:0}
+.account-diagnostic-summary>div{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:13px 0;font-size:13px;color:#5f6876}
+.account-diagnostic-summary dd{min-width:0;text-align:right;overflow-wrap:anywhere;font-weight:600;color:#0e1726}
+.account-diagnostic-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:23px}
+.account-diagnostic-actions [data-slot=button]{height:auto;min-height:38px;padding:10px 15px;font-size:13px;font-weight:600;line-height:1.3;gap:7px;border-radius:8px}
+.account-diagnostic-technical{margin-top:28px;padding-top:18px;border-top:1px solid #edf0f5}
+.account-diagnostic-technical>summary{font-size:12px;color:#8a97aa;cursor:pointer}
+.account-diagnostic-error{font-size:12px;line-height:1.6;color:#b15d70;margin-top:14px}
+.proxy-page .proxy-user-chips button{font-size:10px;padding:4px 6px;background:#f2f4f8;color:#7c879a;border-radius:4px}
+.proxy-account-identity:is(button){cursor:pointer}
+/* 页码选中态使用明确按钮变体，避免透明ghost覆盖背景后留下白字。 */

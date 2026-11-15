@@ -47,7 +47,7 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from native_capture import CaptureExpired, read_capture
 from native_kernel_upgrade import run_upgrade, status as native_kernel_status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
@@ -67,12 +67,15 @@ from account_update_identity import role_release
 from credential_ownership import CredentialOwnership
 from cli_quota import statusline_quota_observation
 from cli_telemetry_policy import cli_telemetry_environment, cli_telemetry_mode
-from capture_artifacts import _capture_files, _read_capture_index, _redact_capture_headers, _redact_capture_record, _redact_capture_value, capture_context_json, capture_summary
+from capture_artifacts import _capture_files, _read_capture_index, _redact_capture_headers, _redact_capture_record, _redact_capture_value, capture_context_json, capture_summary, capture_file_preview
 from login_terminal import authorization_url
 from login_drafts import LoginDraftStore
+from proxy_references import collect_references
+from proxy_sync import synchronize_proxy
 from physical_features import physical_features_summary
 from run_windows import normalize_run_window, run_window_snapshot
-from project_library import ProjectLibrary
+from project_library import ProjectLibrary, safe_relative
+from run_artifacts import read_workspace_file
 from project_requester_settings import ProjectRequesterSettings
 from project_scenarios import initialize_scenario_schema
 from project_iteration import PROJECT_RUN_KIND, PROJECT_RUN_KINDS, PROJECT_SCHEMA, ProjectIterationManager, initialize_plan_schema
@@ -1799,7 +1802,8 @@ def _account_cli_settings(account: dict) -> dict:
     :return: 权威配置、有效版本、来源及两个空间独立的抓包开关。
     """
     version, source = _resolve_account_cli_version(account)
-    return {"account_id": account["id"], "claude_code_version": account.get("claude_code_version"),
+    return {"account_id": account["id"], "display_name": account.get("display_name") or account["name"],
+        "claude_code_version": account.get("claude_code_version"),
         "effective_claude_code_version": version, "claude_code_version_source": source,
         "projects_capture_enabled": bool(account.get("projects_capture_enabled", 0)),
         "warmup_capture_enabled": bool(account.get("warmup_capture_enabled", 0))}
@@ -7894,12 +7898,15 @@ def _engineering_pi_admission(account: dict, work: dict | None, namespace: str, 
     finally:
         connection.close()
     quota_work, other_job = work, False
+    cli_capacity = None
     if account_runtime:
         if not account_runtime.lock.acquire(blocking=not snapshot_only):
             return {'allowed': False, 'reason': 'unavailable', 'retryable': True, 'retry_at': None,
-                'message': '执行状态正在更新，请稍后刷新'}
+                'message': '执行状态正在更新，请稍后刷新', 'cli_capacity': None}
         try:
             jobs = [job for job in account_runtime.jobs.values() if job['row']['account_id'] == account['id']]
+            # 复用当前锁内登记，容量观察不额外访问Docker或触发执行。
+            cli_capacity = {'active': len(jobs), 'limit': PER_ACCOUNT_CONCURRENCY}
             own_jobs = [job for job in jobs if preparing_source and job['source'] == preparing_source]
             if own_jobs:
                 source = preparing_source
@@ -7910,6 +7917,7 @@ def _engineering_pi_admission(account: dict, work: dict | None, namespace: str, 
         finally:
             account_runtime.lock.release()
     gate = _pi_admission(account, quota_work, snapshot_only=snapshot_only)
+    gate['cli_capacity'] = cli_capacity
     if not gate['allowed']:
         return gate
     busy = bool(legacy) or other_job or bool(continue_manager and continue_manager.has_active_account(account['id']))
@@ -8607,12 +8615,14 @@ class AccountIn(BaseModel):
 class AccountCliSettingsIn(BaseModel):
     """账号 CLI 设置增量请求，省略字段保持不变。
 
+    :param display_name: 可编辑的显示名称，null 恢复原账号标识。
     :param claude_code_version: 精确版本，null 表示继承全局。
     :param projects_capture_enabled: 当前账号在项目迭代空间的抓包开关。
     :param warmup_capture_enabled: 当前账号在养号迭代空间的抓包开关。
     """
 
     model_config = ConfigDict(extra="forbid")
+    display_name: Optional[StrictStr] = None
     claude_code_version: Optional[StrictStr] = None
     projects_capture_enabled: StrictBool = False
     warmup_capture_enabled: StrictBool = False
@@ -8627,7 +8637,8 @@ def get_account_cli_settings(aid: int) -> dict:
     """
     connection = get_db()
     try:
-        row = connection.execute("SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL", (aid,)).fetchone()
+        row = connection.execute("SELECT a.*, s.value AS display_name FROM accounts a LEFT JOIN app_settings s "
+            "ON s.key='account_display_name:' || a.id WHERE a.id=? AND a.deleted_at IS NULL", (aid,)).fetchone()
     finally:
         connection.close()
     if row is None:
@@ -8640,10 +8651,16 @@ def update_account_cli_settings(aid: int, body: AccountCliSettingsIn) -> dict:
     """仅保存显式提交的设置，当前执行及已有快照保持原值。
 
     :param aid: 账号标识。
-    :param body: 版本与两个空间开关的增量配置。
+    :param body: 显示名称、版本与两个空间开关的增量配置。
     :return: 保存后的权威配置及有效版本来源。
     """
     values = body.model_dump(exclude_unset=True)
+    rename = "display_name" in values
+    display_name = values.pop("display_name", None)
+    if display_name is not None:
+        display_name = display_name.strip()
+        if not display_name or len(display_name) > 128 or any(ord(char) < 32 or ord(char) == 127 for char in display_name):
+            raise HTTPException(400, "名称须为1～128个字符，且不包含控制字符")
     if "claude_code_version" in values:
         try:
             values["claude_code_version"] = _normalize_claude_code_version(values["claude_code_version"], "claude_code_version")
@@ -8653,7 +8670,8 @@ def update_account_cli_settings(aid: int, body: AccountCliSettingsIn) -> dict:
         connection = get_db()
         try:
             with connection:
-                row = connection.execute("SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL", (aid,)).fetchone()
+                row = connection.execute("SELECT a.*, s.value AS display_name FROM accounts a LEFT JOIN app_settings s "
+                    "ON s.key='account_display_name:' || a.id WHERE a.id=? AND a.deleted_at IS NULL", (aid,)).fetchone()
                 if row is None:
                     raise HTTPException(404, "账号不存在")
                 if values:
@@ -8661,6 +8679,15 @@ def update_account_cli_settings(aid: int, body: AccountCliSettingsIn) -> dict:
                     connection.execute(f"UPDATE accounts SET {columns} WHERE id=?", (*values.values(), aid))
                 account = dict(row)
                 account.update(values)
+                if rename:
+                    # name 参与既有路径与锁归属，显示名称独立持久化，禁止随重命名移动身份。
+                    key = f"account_display_name:{aid}"
+                    if display_name is None or display_name == account["name"]:
+                        connection.execute("DELETE FROM app_settings WHERE key=?", (key,))
+                    else:
+                        connection.execute("INSERT INTO app_settings(key,value,updated_at) VALUES(?,?,julianday('now')) "
+                            "ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at", (key, display_name))
+                    account["display_name"] = display_name
         finally:
             connection.close()
     return _account_cli_settings(account)
@@ -8940,7 +8967,8 @@ def list_accounts():
     conn = get_db()
     try:
         rows = conn.execute(
-            "SELECT * FROM accounts WHERE deleted_at IS NULL ORDER BY id"
+            "SELECT a.*, s.value AS display_name FROM accounts a LEFT JOIN app_settings s "
+            "ON s.key='account_display_name:' || a.id WHERE a.deleted_at IS NULL ORDER BY a.id"
         ).fetchall()
         accounts = []
         for row in rows:
@@ -11566,6 +11594,23 @@ def run_task(tid: int):
 
 
 
+@app.get("/api/summary")
+def runtime_summary() -> dict:
+    """读取导航使用的有界聚合摘要。
+
+    :return: 当前排队、执行、停止中及额度等待的运行总数。
+    """
+    conn = get_db()
+    try:
+        active = conn.execute(
+            "SELECT COUNT(*) FROM runs WHERE deleted_at IS NULL "
+            "AND status IN ('queued','running','stopping','quota_wait')"
+        ).fetchone()[0]
+        return {"active_runs": active}
+    finally:
+        conn.close()
+
+
 @app.get("/api/runs")
 def list_runs(limit: int = 200):
     """读取运行列表，并明确标记旧 Projects 的只读记录。
@@ -11708,11 +11753,12 @@ def get_run(rid: str):
 
 
 @app.get("/api/runs/{rid}/transcript")
-def get_transcript(rid: str):
+def get_transcript(rid: str, tail_bytes: Optional[int] = None):
     """
     返回 run workspace 中当前可读的 transcript 文本。
 
     :param rid: runs.id
+    :param tail_bytes: 可选的尾部读取字节上限，1024～1048576；省略沿用完整文件响应
     :return: 当前运行 transcript 文本响应
     """
     _require_visible_run(rid)
@@ -11721,6 +11767,18 @@ def get_transcript(rid: str):
     )
     if not p.exists():
         raise HTTPException(404, "transcript not yet available")
+    if tail_bytes is not None:
+        if not 1024 <= tail_bytes <= 1048576:
+            raise HTTPException(400, "日志读取范围无效")
+        # 轮询仅读取有界尾部，避免长时间任务重复下载完整日志。
+        with p.open("rb") as source:
+            source.seek(0, os.SEEK_END)
+            offset = max(0, source.tell() - tail_bytes)
+            source.seek(offset)
+            data = source.read(tail_bytes)
+        if offset and b"\n" in data:
+            data = data.split(b"\n", 1)[1]
+        return PlainTextResponse(data.decode("utf-8", errors="replace"), headers={"X-Log-Truncated": str(offset > 0).lower()})
     return FileResponse(p, media_type="text/plain")
 
 
@@ -11763,6 +11821,45 @@ def list_workspace(rid: str):
         else:
             out.append({"path": str(rel), "type": "file", "size": p.stat().st_size})
     return out
+
+
+@app.get("/api/runs/{rid}/file")
+def preview_run_file(rid: str, path: str) -> dict:
+    """预览运行产物，工程记录始终读取该轮冻结版本。
+
+    :param rid: 已存在且可见的运行标识。
+    :param path: 文件列表内的相对路径。
+    :return: 有界文本及截断状态。
+    """
+    _require_visible_run(rid)
+    connection = get_db()
+    try:
+        row = connection.execute("SELECT run_kind FROM runs WHERE id=?", (rid,)).fetchone()
+    finally:
+        connection.close()
+    if row is None:
+        raise HTTPException(404, "运行记录不存在")
+    try:
+        relative = safe_relative(path)
+        if row["run_kind"] in PROJECT_RUN_KINDS:
+            if not project_iterations:
+                raise HTTPException(503, "项目历史成果读取器未就绪")
+            context = project_iterations.run_context(rid)
+            if not context:
+                raise HTTPException(404, "运行的冻结产物尚未提供")
+            if context.get('scenario_execution'):
+                job = project_iterations._one('SELECT j.id FROM project_evaluation_jobs j JOIN project_execution_sources x ON x.id=j.source_id '
+                    'JOIN project_task_executions e ON e.id=x.execution_id WHERE e.run_id=? ORDER BY j.id DESC LIMIT 1', (rid,))
+                if not job:
+                    raise HTTPException(404, "运行的冻结产物尚未提供")
+                return project_iterations.scenarios.artifact_file(context['id'], context['scenario_task_id'], relative, job['id'])
+            return project_iterations.artifact_file(context['attempt_id'], relative)
+        workspace = account_runtime.run_workspace_path(rid) if account_runtime else WORKSPACES_DIR / rid
+        return read_workspace_file(workspace.parent, workspace.name, relative)
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from None
+    except OSError:
+        raise HTTPException(404, "产物文件已移除或暂时不可读取") from None
 
 
 @app.get("/api/runs/{rid}/stats")
@@ -11850,11 +11947,12 @@ def get_stats(rid: str):
 
 
 @app.get("/api/runs/{rid}/capture")
-def get_capture(rid: str):
+def get_capture(rid: str, path: Optional[str] = None):
     """
-    返回抓包 run 的索引和文件列表。
+    返回抓包 run 的索引、文件列表或白名单文件预览。
 
     :param rid: runs.id
+    :param path: 可选的公开清单相对路径。
     :return: 脱敏后的抓包索引与文件元信息
     """
     _require_visible_run(rid)
@@ -11877,6 +11975,13 @@ def get_capture(rid: str):
     except ValueError:
         capture_dirs = None
     flows_dir = capture_dirs[0] if capture_dirs else FLOWS_DIR / "_missing" / rid
+    if path is not None:
+        if not 1 <= len(path) <= 512:
+            raise HTTPException(400, "抓包文件路径无效")
+        try:
+            return capture_file_preview(flows_dir, path)
+        except (ValueError, OSError):
+            raise HTTPException(404, "文件不存在或不支持公开预览") from None
     index_path = Path(run["capture_summary_path"]) if run.get("capture_summary_path") else flows_dir / "capture_index.json"
     summary = capture_summary(flows_dir, running=run.get("status") in ("running", "stopping"))
     return {
@@ -12403,6 +12508,37 @@ def v3_terminal_ticket(request: Request, body: dict):
     payload = f"{path}|{int(time.time()) + 60}|{hashlib.sha256(cookie.encode()).hexdigest()}"
     signature = hmac.new(_SESSION_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
     return {"ticket": base64.urlsafe_b64encode(f"{payload}|{signature}".encode()).decode().rstrip("=")}
+
+
+@app.get("/internal/v3/proxy-references")
+def v3_proxy_references():
+    """提供内部目录引用，沿用服务鉴权且禁止公开代理认证。
+
+    :return: 任务账号及草稿的内部摘要引用
+    """
+    if not V3_ENABLED:
+        raise HTTPException(404)
+    result = collect_references(get_db, _login_drafts() if account_runtime else None)
+    if not account_runtime:
+        result["complete"] = False
+    return result
+
+
+@app.post("/internal/v3/proxy-sync")
+def v3_proxy_sync(body: dict):
+    """使用内部服务证明同步空闲任务或草稿，保持原维护门禁。
+
+    :param body: 私有同步目标与连接
+    :return: 可重试的同步状态，禁止公开私有配置
+    """
+    if not V3_ENABLED or not account_runtime or not login_manager:
+        raise HTTPException(503, "线路同步运行时尚未就绪")
+    try:
+        with UPDATE_GATE.admission('proxy-linked-sync'):
+            return synchronize_proxy(body, get_db, _db_lock, account_runtime, _login_drafts(),
+                _oauth_owner_lock, _profile_lock, login_manager.has_active_name)
+    except (ValueError, KeyError, TypeError, OSError, RuntimeError, DockerException):
+        raise HTTPException(409, "关联环境正在使用或等待对账，稍后重试同步") from None
 
 
 @app.post("/internal/v3/quiesce/{account_id}")

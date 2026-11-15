@@ -68,7 +68,7 @@ try:
             :param session_id: 本次 Chrome 会话。
             :return: None；失败时抛错。
             """
-            doc, win = "document.querySelector('iframe').contentDocument", "document.querySelector('iframe').contentWindow"
+            doc, win = "document", "window"
             assert request('DELETE', f'/runtime/api/accounts/{account_id}/cc2api-binding').status_code == 200
             assert request('PUT', f'/admin/accounts/{remote_id}', headers=authorization,
                 json={'rpm_limit': 23, 'concurrency': 3, 'priority': 71}).status_code == 200
@@ -91,8 +91,10 @@ except (ValueError,ConnectionError) as error:
 else:
     raise AssertionError('已解绑账号不应允许刷新')""")
             assert before == (evidence.read_bytes() if evidence.exists() else b''), '暂停入口建立了上游连接'
-            await evaluate(f'{win}.location.hash="#accounts";{win}.renderAccounts()')
-            await wait_for(f'{doc}.body.textContent.includes("本地管理，cc2api 已暂停")')
+            await evaluate(f'{win}.__nativeProbe.refreshAccounts()')
+            await evaluate(f'document.querySelector("[data-account-details=\\\"{account_id}\\\"]").click()')
+            await wait_for(f'{doc}.body.textContent.includes("本地管理，网关已暂停")')
+            await evaluate('document.querySelector("#modal-close").click()')
             print('通过：暂停后的模型、count_tokens、测试、额度、强制刷新零上游连接；普通配置仍可编辑')
 
             network = data / 'synthetic-network'
@@ -143,8 +145,10 @@ except ConnectionError:
 else:
     raise AssertionError('未注入回包丢失')
 assert o.state(a['id'])['phase']=='handoff'""")
-            await evaluate(f'{win}.renderAccounts()')
+            await evaluate(f'{win}.__nativeProbe.refreshAccounts()')
+            await evaluate(f'document.querySelector("[data-account-details=\\\"{account_id}\\\"]").click()')
             await wait_for(f'{doc}.body.textContent.includes("凭据交接中")')
+            await evaluate('document.querySelector("#modal-close").click()')
             result = request('POST', f'/runtime/api/environments/{environment_id}/maintenance', json={'operation': 'reconcile'})
             assert result.status_code == 200, result.status_code
             with sqlite3.connect(bench) as database:

@@ -1,17 +1,50 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref, watch, nextTick, defineAsyncComponent, onMounted, onUnmounted } from 'vue';
+import { Menu, PanelLeftClose, PanelLeftOpen, ChevronRight, LogOut, X } from '@/components/ui/icon';
+import AppNavigation from './AppNavigation.vue';
+import { api } from '../api';
+import { platformVersion, releaseVersion } from '../lib/platformVersion';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { useRoute } from 'vue-router';
-import { api, type Dashboard as DashboardData } from '../api';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { logout } from '../router';
 import { useToast } from '../composables/useToast';
 
 const route = useRoute();
-const embedded = computed(() => ['environments', 'tasks'].includes(String(route.name)));
-const links = [{name: 'updates', label: '系统更新'}, {name: 'environments', label: '环境'},
-  {name: 'tasks', label: '任务'}, {name: 'accounts', label: '账号'}, {name: 'requests', label: '请求记录'},
-  {name: 'tokens', label: '令牌'}, {name: 'settings', label: '设置'}];
+const nativeTasks = computed(() => route.name === 'tasks');
+/** 读取本机侧栏偏好，存储不可用时保留默认展开。@return 是否折叠。 */
+function savedCollapsed(): boolean { try { return localStorage.getItem('flower2api-sidebar-collapsed') === 'true'; } catch { return false; } }
+const collapsed = ref(savedCollapsed());
+watch(collapsed, value => { try { localStorage.setItem('flower2api-sidebar-collapsed', String(value)); } catch { /* 隐私模式仍保持本次会话选择。 */ } });
+const mobileOpen = ref(false);
+const currentVersion = ref<string | null>(platformVersion);
+const updateAvailable = ref(false);
+const accountCount = ref<number | null>(null);
+const runningCount = ref<number | null>(null);
+const metadataController = new AbortController();
+let metadataAt = 0;
+let metadataLoading = false;
+/** 读取品牌与角标的真实摘要，页面切换复用30秒快照。@param force 强制刷新。@return 读取完成。 */
+async function refreshMetadata(force=false): Promise<void> {
+ if(metadataLoading || metadataController.signal.aborted || (!force && Date.now()-metadataAt<30000))return;
+ metadataLoading=true;metadataAt=Date.now();
+ const results=await Promise.allSettled([api.getDashboard(),api.systemUpdateStatus(metadataController.signal),api.runtimeSummary(metadataController.signal)]);
+ if(!metadataController.signal.aborted){
+  if(results[0].status==='fulfilled')accountCount.value=results[0].value.accounts.total;
+  if(results[2].status==='fulfilled')runningCount.value=results[2].value.active_runs;
+  if(results[1].status==='fulfilled'){
+   const status=results[1].value;
+   if(status.installed){try {const catalog=await api.systemUpdateReleases(metadataController.signal);if(!metadataController.signal.aborted){const installed=catalog.releases.find(item=>item.release===status.current_release);currentVersion.value=platformVersion ?? (installed ? releaseVersion(installed.changes) : null);updateAvailable.value=!!catalog.releases[0] && !!installed && catalog.releases[0].sequence.some((value,index)=>value!==(installed.sequence[index]??0)) && catalog.releases[0].release!==status.current_release;}}catch{/* 品牌保留已读取版本，面板负责展示目录读取错误。 */}}
+  }
+ }
+ metadataLoading=false;
+}
+onMounted(()=>{void refreshMetadata();});
+onUnmounted(()=>metadataController.abort());
+watch(()=>route.fullPath,()=>{void refreshMetadata();});
+const titles: Record<string, string> = { proxies: '代理管理', updates: '系统更新', environments: '运行环境', tasks: '任务与工程', accounts: '账号', requests: '请求记录', tokens: '访问令牌', settings: '系统设置' };
+const pageTitle = computed(() => titles[String(route.name)] ?? '管理控制台');
+watch(() => route.fullPath, () => { mobileOpen.value = false; });
 const toast = useToast();
 const loggingOut = ref(false);
 
@@ -28,93 +61,72 @@ async function handleLogout(): Promise<void> {
   }
 }
 
-/** 仪表盘统计数据 */
-const dashboard = ref<DashboardData | null>(null);
-
-/** 加载仪表盘数据 */
-async function loadDashboard() {
-  try {
-    dashboard.value = await api.getDashboard();
-  } catch {
-    // 忽略瞬态错误
-  }
+const SystemUpdates = defineAsyncComponent(() => import('./SystemUpdates.vue'));
+const updatePanel = ref<HTMLDialogElement | null>(null);
+const updatesOpen = ref(false);
+/** 从品牌打开更新工作区，保留当前页面；修饰键沿用独立深链接。@param event 链接点击。@return 面板打开完成。 */
+async function openUpdatePanel(event: MouseEvent): Promise<void> {
+  if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  mobileOpen.value = false;
+  updatesOpen.value = true;
+  await nextTick();
+  updatePanel.value?.showModal();
 }
-
-/** 格式化大数字为千分位 */
-function formatNum(n: number): string {
-  return n.toLocaleString();
-}
-
-onMounted(loadDashboard);
+/** 关闭更新面板并卸载轮询。@return 无。 */
+function closeUpdatePanel(): void { const wasOpen=updatesOpen.value;updatePanel.value?.close();updatesOpen.value = false;if(wasOpen)void refreshMetadata(true); }
+watch(() => route.fullPath, closeUpdatePanel);
 </script>
 
 <template>
-  <div :class="embedded ? 'h-dvh flex flex-col overflow-hidden' : 'min-h-screen'">
-    <!-- 顶部导航栏 -->
-    <header class="sticky top-0 z-40 shrink-0 bg-card/95 backdrop-blur-md border-b border-border px-4 sm:px-6 py-3">
-      <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
-        <div class="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2">
-          <div class="flex min-w-0 items-center gap-2">
-            <img src="/favicon.svg?v=flower2api-pink-04" alt="flower2api 标志" class="w-6 h-6" />
-            <h1 class="text-lg font-semibold text-foreground tracking-tight">flower2api</h1>
-          </div>
-          <nav class="flex flex-wrap items-center gap-1" aria-label="主导航">
-            <router-link v-for="link in links" :key="link.name" :to="{name: link.name}"
-              class="px-3 py-1.5 text-sm rounded-lg transition-colors"
-              :class="route.name === link.name ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
-              :aria-current="route.name === link.name ? 'page' : undefined">{{ link.label }}</router-link>
-          </nav>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          @click="handleLogout"
-          :disabled="loggingOut"
-          class="text-muted-foreground hover:text-foreground hover:bg-muted"
-        >
-          退出
+  <div class="console-shell" :class="{ 'sidebar-collapsed': collapsed, 'console-native-tasks': nativeTasks }">
+    <aside class="console-sidebar" aria-label="侧边栏">
+      <div class="console-brand-row">
+        <router-link :to="{ name: 'accounts' }" class="console-brand" aria-label="flower2api 首页">
+          <img src="/favicon.svg?v=flower2api-pink-04" alt="flower2api 标志" class="size-7 shrink-0" />
+          <span class="sidebar-label"><strong>flower2api</strong></span>
+        </router-link>
+        <a href="/updates" class="brand-update" aria-label="系统更新" :class="{'has-update': updateAvailable}" :title="updateAvailable ? '系统更新 · 有可用新版' : '系统更新'" @click="openUpdatePanel">
+          <span v-if="!collapsed">{{ currentVersion ?? '版本' }}</span><ChevronRight class="size-3" />
+        </a>
+      </div>
+      <p class="sidebar-tagline sidebar-label">让每一次调用井然有序</p>
+      <AppNavigation :collapsed="collapsed" :account-count="accountCount" :running-count="runningCount" />
+      <div class="sidebar-footer">
+        <span class="sidebar-avatar" aria-hidden="true">管</span>
+        <div class="sidebar-label sidebar-identity"><strong>管理员</strong><small>本地管理控制台</small></div>
+
+        <Button variant="ghost" size="icon" class="desktop-sidebar-toggle" :aria-label="collapsed ? '展开侧边栏' : '收起侧边栏'" :aria-expanded="!collapsed" @click="collapsed = !collapsed">
+          <PanelLeftOpen v-if="collapsed" class="size-4" /><PanelLeftClose v-else class="size-4" />
         </Button>
-      </div>
-    </header>
 
-    <!-- bench 自己管理内容滚动；外层只分配导航下方的空间，避免双重滚动和宽度压缩。 -->
-    <main :class="embedded ? 'flex-1 min-h-0 w-full overflow-hidden' : 'max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6'">
-      <!-- 统计卡片 -->
-      <div v-if="dashboard && !['environments', 'tasks', 'updates', 'requests'].includes(String(route.name))" class="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card class="bg-card border-border rounded-xl hover:shadow-md transition-all duration-200 !py-0 !gap-0">
-          <CardContent class="py-3 px-4">
-            <p class="text-muted-foreground text-xs mb-1">总账号</p>
-            <p class="text-2xl font-bold text-foreground">{{ formatNum(dashboard.accounts.total) }}</p>
-          </CardContent>
-        </Card>
-        <Card class="bg-card border-border rounded-xl hover:shadow-md transition-all duration-200 !py-0 !gap-0">
-          <CardContent class="py-3 px-4">
-            <p class="text-muted-foreground text-xs mb-1">活跃</p>
-            <p class="text-2xl font-bold text-emerald-600">{{ formatNum(dashboard.accounts.active) }}</p>
-          </CardContent>
-        </Card>
-        <Card class="bg-card border-border rounded-xl hover:shadow-md transition-all duration-200 !py-0 !gap-0">
-          <CardContent class="py-3 px-4">
-            <p class="text-muted-foreground text-xs mb-1">异常</p>
-            <p class="text-2xl font-bold text-red-500">{{ formatNum(dashboard.accounts.error) }}</p>
-          </CardContent>
-        </Card>
-        <Card class="bg-card border-border rounded-xl hover:shadow-md transition-all duration-200 !py-0 !gap-0">
-          <CardContent class="py-3 px-4">
-            <p class="text-muted-foreground text-xs mb-1">停用</p>
-            <p class="text-2xl font-bold text-muted-foreground">{{ formatNum(dashboard.accounts.disabled) }}</p>
-          </CardContent>
-        </Card>
-        <Card class="bg-card border-border rounded-xl hover:shadow-md transition-all duration-200 !py-0 !gap-0">
-          <CardContent class="py-3 px-4">
-            <p class="text-muted-foreground text-xs mb-1">令牌</p>
-            <p class="text-2xl font-bold text-foreground">{{ formatNum(dashboard.tokens) }}</p>
-          </CardContent>
-        </Card>
+        <Button variant="ghost" size="icon" @click="handleLogout" :disabled="loggingOut" class="sidebar-exit" aria-label="退出" title="退出"><LogOut class="size-4" /></Button>
       </div>
-
+    </aside>
+    <div class="console-workspace">
+      <header class="console-toolbar">
+        <Dialog v-model:open="mobileOpen">
+          <DialogTrigger as-child><Button variant="ghost" size="icon" class="mobile-sidebar-toggle" aria-label="打开主导航"><Menu class="size-5" /></Button></DialogTrigger>
+          <DialogContent class="mobile-navigation-panel" :aria-describedby="undefined">
+            <DialogTitle>flower2api</DialogTitle>
+            <a href="/updates" class="brand-update" aria-label="系统更新" @click="openUpdatePanel">{{ platformVersion ?? '系统更新' }}<ChevronRight class="size-3" /></a>
+            <DialogDescription class="sr-only">选择管理页面</DialogDescription>
+            <AppNavigation :account-count="accountCount" :running-count="runningCount" @navigate="mobileOpen = false" />
+            <Button variant="outline" @click="handleLogout" :disabled="loggingOut"><LogOut class="size-4" />退出</Button>
+          </DialogContent>
+        </Dialog>
+        <span class="toolbar-page">{{ pageTitle }}</span>
+        <span class="toolbar-brand">flower2api</span>
+      </header>
+      <!-- 嵌入工作区沿用自己的滚动容器；折叠侧栏只改变宽度，保留文档身份。 -->
+      <main id="console-content" class="console-content space-y-6">
       <!-- 子路由内容 -->
-      <router-view @refresh="loadDashboard" />
-    </main>
+      <router-view />
+      </main>
+    </div>
+    <dialog ref="updatePanel" class="approved-update-dialog" aria-labelledby="system-update-panel-title" @close="updatesOpen = false" @click="event => { if (event.target === updatePanel) closeUpdatePanel(); }">
+      <header class="approved-update-head"><div><h2 id="system-update-panel-title">系统更新</h2><p>flower2api · 应用与运行组件</p></div><button type="button" aria-label="关闭更新面板" @click="closeUpdatePanel"><X :size="18" /></button></header>
+      <div class="approved-update-scroll"><SystemUpdates v-if="updatesOpen" embedded /></div>
+    </dialog>
   </div>
 </template>

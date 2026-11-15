@@ -79,6 +79,7 @@ impl TraceContext {
             state: Arc::new(Mutex::new(TraceState {
                 retention: Some(retention),
                 request: RequestDiagnostic {
+                    last_attempt: None,
                     log_mode: Some(current_log_mode()),
                     request_id,
                     started_at: now(),

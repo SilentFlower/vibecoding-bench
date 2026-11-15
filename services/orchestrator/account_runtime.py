@@ -2526,6 +2526,26 @@ class AccountRuntime:
         project_key = f"/home/node/projects/{alias}".replace("/", "-")
         return self._root(row) / "home" / ".claude" / "projects" / project_key
 
+    def run_workspace_path(self, run_id: str) -> Path:
+        """按数据库归属解析普通运行的物理工作区，不经过兼容链接。
+
+        :param run_id: 已有普通运行的标识。
+        :return: 该环境下的专属物理项目目录；不存在时返回缺失路径。
+        """
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", run_id):
+            raise ValueError("运行 ID 不合法")
+        connection = self.database()
+        try:
+            record = connection.execute("SELECT environment_id FROM runs WHERE id=?", (run_id,)).fetchone()
+            row = connection.execute("SELECT * FROM account_environments WHERE environment_id=?",
+                (record["environment_id"],)).fetchone() if record and record["environment_id"] else None
+        finally:
+            connection.close()
+        if not row:
+            return self.data / "missing-run-workspace" / run_id
+        alias = "project-" + hashlib.sha256(f"{row['environment_id']}:{run_id}".encode()).hexdigest()[:12]
+        return self._root(dict(row)) / "projects" / alias
+
     def run_artifact_path(self, run_id: str, name: str) -> Path:
         """
         解析 v3 run 的受限状态或 transcript 文件。

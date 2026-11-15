@@ -1154,6 +1154,7 @@ GET /runtime/api/accounts
 
 - 生产两空间通过 `view_admission=partial(..., snapshot_only=True)` 提供页面判定；省略该回调时沿用当前 `admission`。实际启动、恢复及输入仍调用严格 `admission`，不得用页面允许结果授权执行。
 - 快照跳过 `QuotaGuard.consume`，读取已有持久额度和当前策略；不缓存跨请求的允许结果。读取执行登记用非阻塞锁，拿不到时返回 `allowed=False, reason='unavailable', retryable=True, retry_at=None`，页面消息为“执行状态正在更新，请稍后刷新”。不伪造空闲或额度充足。
+- 两空间公开 `admission.cli_capacity: {active:int>=0,limit:int>0}|null`。active从同一运行锁内的jobs按账号ID计数，limit使用 `PER_ACCOUNT_CONCURRENCY`；不额外请求Docker或改变准入。锁忙、运行时缺失或非法投影保持null，不能转成0。公开层只保留active/limit，布尔值不按整数接受。
 - 完整状态保留原目标、进度、历史用量与校验信息。项目目录和自动轮次目标只在一次 `state()` 内复用；已传入当前身份时依赖检查不重复读取账号，未提供时仍读取。下一请求重新取事实。
 - `view()` 单独启用 `proof_metadata=True`：页面对照当前账号通过记录、冻结项目 seed 摘要及完整目标合同；历史目录仅读取受限 catalog/项目 JSON，不构造历史 `ProjectLibrary`，不扫描源码或离线制品。按冻结路径、版本和项目复用正／负合同快照，仅在本次读取内有效，不缓存账号通过判定。当前已验证内容可复用内存合同。
 - `proof_contract` 拒绝越界目录、符号链接、未登记项目、非法 schema/合同入口、损坏或重复目标。它只提供页面元数据；默认 `state()`、实际启动、恢复、输入和验收仍走原 `for_work` 及完整内容校验，不能把页面 ready 用作执行许可。
@@ -1169,6 +1170,7 @@ GET /runtime/api/accounts
 | 两次提交 created_at 相同且后一次 UUID 更小 | 当前进度与历史首项均为后一次；旧提交事件不进入当前进度 |
 | 后台持有额度消费锁 | 页面读持久快照；真实执行仍消费新观察 |
 | 执行登记锁正忙 | 页面明确未知且不可放行；真实执行仍等待原锁 |
+| 登记为空 / 有其他账号登记 / 运行时未启用 | 当前账号active=0 / 仅计当前账号 / cli_capacity=null |
 | 后续请求额度发生变化 | 重新判定，不复用此前允许结果 |
 | 历史合同缺失、越界、链接或元数据损坏 | 不承认该前置证明；失败只在本次页面读取内复用，修复后下一请求重读 |
 | 历史源码损坏但已有通过合同仍可读取 | 页面保留已接受合同事实；默认状态及真实执行继续完整校验，损坏内容不能因此启动 |
@@ -1182,6 +1184,7 @@ GET /runtime/api/accounts
 
 - 正常：页面读取 projects 和工程养号时不扫描消费日志；真正开始下一轮时继续消费观察并复核互斥与额度。
 - 边界：执行准备正在持锁，页面及时显示暂不可读取；释放后刷新重新判断。两个账号引用同项目时本次只展开一次目录，下次仍读取新目录。
+- 正常：同账号登记一个CLI时两个空间均显示1/实际上限；额度拒绝时仍可显示该容量观察。错误：把null当0，或用页面容量代替执行准入。修正：未知单独展示，真正执行继续原锁和准入检查。
 - 冷启动：首次打开历史较多的项目页，只核对冻结合同元数据；真正申请目标时再完整校验原冻结内容。不能让 SSE 在事件循环内同步扫描历史库。
 - 错误：给全部管理请求统一设置10秒，截断事件订阅，或把快照允许结果用于启动。修正：仅限定四个普通 GET，执行保留原严格准入。
 
@@ -1190,6 +1193,7 @@ GET /runtime/api/accounts
 - `test_equal_timestamp_uses_submission_order_in_both_namespaces` 固定同时间戳并生成递减 UUID，项目和养号均断言当前进度归后一次、旧迟到事件被排除、历史顺序与真实提交顺序一致。
 
 - `test_projects_admission`：真实线程持有额度／执行锁时快照及时完成且锁忙不可放行；严格执行等待并消费，后续请求看到新额度。
+- `test_capacity_snapshot_is_account_scoped_and_keeps_zero_and_unknown`及`test_projects_feed`覆盖两空间真实0、账号隔离、锁忙/运行时缺失未知，以及非法类型过滤和额外字段脱敏。
 - `test_projects_feed`：真实页面使用快照回调；卡片五字段等价；多账号目录请求内复用、跨请求重读，进度与历史读取保持。
 - `test_projects_catalog`、`test_projects_dependencies`：真实跨版本目录的合同元数据与完整合同等价、请求内复用、修复后重读、越界／链接／坏合同拒绝；破坏冻结源码后页面事实仍在，默认状态和真实启动拒绝。
 - `test_projects_feed.test_sse_slow_reads_keep_the_event_loop_responsive`：同步事件和状态分别阻塞时，真实流生成器仍允许事件循环解除门闩，事件内容和游标保持。

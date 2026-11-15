@@ -1,6 +1,7 @@
 /** 新 Projects：围绕账号 Pi、真实终端与工作记录组织界面。 */
 window.ProjectsUI = (() => {
   let api, prefix, source, accountId = null, agents = [], catalog = [], accounts = [], cursor = 0;
+  let deliveryRevision = 0, researchRevision = 0;
   let revision = 0, selection = 0, scheduleClock = null, recordPages = {};
   let namespace = 'projects', servicePath = '/projects';
   let configureCli, showCapture, closePanels, onAccountChange;
@@ -11,6 +12,7 @@ window.ProjectsUI = (() => {
     ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[character]));
   const names = {off: '未启动', running: 'Pi 指挥中', waiting: '等待执行条件', paused: '已暂停',
     blocked: '需要处理', ready: '待开始', verifying: '独立验收中', passed: '验收通过', stopped: '已停止', deferred: '待自动复验'};
+  const submissionNames = {verifying:'独立验收中',passed:'验收通过',failed:'验收未通过',error:'验收异常',cancelled:'验收已取消'};
 
   /**
    * 在当前页面显示操作结果，页面切换后不再写入旧 DOM。
@@ -46,6 +48,9 @@ window.ProjectsUI = (() => {
     unmount();
     ({configureCli, showCapture, closePanels, onAccountChange} = options);
     const current = revision;
+    const accountControl = $('#projects-account');
+    // 初始模型与快照尚在读取时，避免用户选择被迟到的路由预选覆盖。
+    accountControl.disabled = true;
     namespace = options.namespace === 'warmup' ? 'warmup' : 'projects';
     servicePath = namespace === 'warmup' ? '/accounts/warmup/pi' : '/projects';
     const endpoint = servicePath;
@@ -53,7 +58,18 @@ window.ProjectsUI = (() => {
     api = (path, settings) => options.api(path === '/projects' || path.startsWith('/projects/')
       ? endpoint + path.slice('/projects'.length) : path, settings);
     prefix = options.prefix;
-    $('#projects-title').textContent = namespace === 'warmup' ? '养号迭代' : '项目迭代';
+    $('#projects-title').textContent = namespace === 'warmup' ? '养号空间' : '项目空间';
+    $('#projects-refresh').onclick=()=>perform(refreshView);
+    document.querySelectorAll('[data-show-project-pane]').forEach(button=>{button.onclick=()=>document.querySelector(`[data-project-pane="${button.dataset.showProjectPane}"]`).click();});
+    document.querySelectorAll('[data-work-discard]').forEach(button=>{button.onclick=()=>perform(async()=>{const group=button.dataset.workDiscard;if(group==='model'){await loadModel();return;}if(group==='schedule'){fillSchedule();return;}const agent=agents.find(item=>item.account_id===accountId),form=$('#projects-agent-form');form.elements.instructions.value=agent?.instructions||'';form.elements.budget_minutes.value=(agent?.budget_sec||3600)/60;paintCatalog(agent?.project_keys||[]);});});
+    $('#projects-pane-nav').onclick = event => {
+      const button=event.target.closest('[data-project-pane]');if(!button)return;
+      const pane=button.dataset.projectPane;
+      closeModal('#projects-research');closeModal('#projects-delivery');
+      document.querySelectorAll('[data-project-panel]').forEach(panel=>{panel.hidden=panel.dataset.projectPanel!==pane;if(!panel.hidden&&panel.tagName==='DETAILS')panel.open=true;});
+      document.querySelectorAll('[data-project-pane]').forEach(item=>{item.classList.toggle('active',item===button);item.setAttribute('aria-pressed',String(item===button));});
+    };
+
     $('#projects-overview').dataset.namespace = namespace;
     $('#projects-agent-form').onsubmit = event => { event.preventDefault(); perform(saveAgent); };
     $('#projects-schedule-form').onsubmit = event => { event.preventDefault(); perform(saveSchedule); };
@@ -78,7 +94,30 @@ window.ProjectsUI = (() => {
     }, 1000);
     $('#projects-tab-terminal').onclick = () => selectTab('terminal');
     $('#projects-tab-events').onclick = () => selectTab('events');
+    $('#projects-tab-verification').onclick=()=>selectTab('verification');
     for (const kind of ['events', 'history']) {
+      $(`#projects-${kind}-size`).onchange = event => perform(async () => {
+        const size = Number(event.target.value);
+        if (![10,20,50,100].includes(size)) return;
+        const previous = recordPages[kind];
+        previous.controller?.abort();
+        const next = {size, pages:[], index:0, loading:false, pending:new Set(), incoming:[]};
+        recordPages[kind] = next;
+        try { await loadPage(kind, 'latest'); }
+        catch (error) {
+          if (recordPages[kind] === next) {
+            previous.loading = false;
+            recordPages[kind] = previous;
+            // 失败回退时仍接收期间到达的真实事件，避免旧页快照吞掉实时更新。
+            next.pending.forEach(id => previous.pending.add(id));
+            receiveRecords(kind, next.pages.flatMap(page => page.items).concat(next.incoming));
+            event.target.value = previous.size;
+            window.enhanceRuntimeControls?.();
+            paintRecords(kind);
+          }
+          throw error;
+        }
+      });
       for (const direction of ['previous', 'next', 'latest']) {
         $(`#projects-${kind}-${direction}`).onclick = () => perform(() => loadPage(kind, direction));
       }
@@ -95,7 +134,7 @@ window.ProjectsUI = (() => {
       $('#projects-research-count').textContent = `${catalog.length} 个研究项目 · ${catalog.filter(item => item.ready).length} 个具备工程验收`;
       const usable = accounts.filter(item => item.enabled && !item.deleted_at);
       $('#projects-account').innerHTML = '<option value="">选择运行账号</option>' + usable.map(item =>
-        `<option value="${item.id}">${escape(item.name)}</option>`).join('');
+        `<option value="${item.id}">${escape(item.display_name || item.name)}</option>`).join('');
       paintCatalog();
       await loadModel();
       if (current !== revision) return;
@@ -107,6 +146,7 @@ window.ProjectsUI = (() => {
       if (selected) { $('#projects-account').value = selected; await selectAccount(selected); }
       else if (requested != null) feedback('该账号当前不可用，请选择其他运行账号', 'error');
     } catch (error) { if (current === revision) feedback(error.message); }
+    finally { if (current === revision) { accountControl.disabled = false; window.enhanceRuntimeControls?.(); } }
   }
 
   /**
@@ -129,8 +169,9 @@ window.ProjectsUI = (() => {
    * @return {void}
    */
   function resetRecords() {
+    Object.values(recordPages).forEach(record => record.controller?.abort());
     recordPages = Object.fromEntries([['events', 20], ['history', 10]].map(([kind, size]) =>
-      [kind, {size, pages: [], index: 0, loading: false, pending: new Set(), incoming: []}]));
+      [kind, {size:Number($(`#projects-${kind}-size`)?.value)||size, pages: [], index: 0, loading: false, pending: new Set(), incoming: []}]));
   }
 
   /**
@@ -152,8 +193,9 @@ window.ProjectsUI = (() => {
    * @return {void}
    */
   function selectTab(name) {
-    for (const tab of ['terminal', 'events']) {
+    for (const tab of ['terminal', 'events','verification']) {
       $(`#projects-tab-${tab}`).setAttribute('aria-selected', String(tab === name));
+      $(`#projects-tab-${tab}`).classList.toggle('active',tab===name);
       $(`#projects-${tab}-panel`).classList.toggle('hidden', tab !== name);
     }
   }
@@ -221,12 +263,15 @@ window.ProjectsUI = (() => {
     paintScreen();
     if (!accountId) return;
     const selected = accountId, current = revision;
+    const eventsRecord=recordPages.events, historyRecord=recordPages.history;
     try {
-      const [snapshot, history] = await Promise.all([api(`/projects/agents/${selected}/snapshot`),
-        api(`/projects/agents/${selected}/work/page?limit=10`), loadReconciliation()]);
+      const [snapshot, history, events] = await Promise.all([api(`/projects/agents/${selected}/snapshot`),
+        api(`/projects/agents/${selected}/work/page?limit=${historyRecord.size}`),
+        eventsRecord.size === 20 ? null : api(`/projects/agents/${selected}/events/page?limit=${eventsRecord.size}`), loadReconciliation()]);
       if (current !== revision || selected !== accountId || request !== selection) return;
       updateAgents(snapshot.state); cursor = snapshot.cursor;
-      recordPages.events.pages = [snapshot.events]; recordPages.history.pages = [history];
+      if(recordPages.events===eventsRecord)eventsRecord.pages=[events || snapshot.events];
+      if(recordPages.history===historyRecord)historyRecord.pages=[history];
       paintState(); paintRecords('events'); paintRecords('history');
       paintScreen(snapshot.observation);
       source = new EventSource(`${prefix}/api${servicePath}/stream?account_id=${selected}&after=${cursor}`);
@@ -279,15 +324,33 @@ window.ProjectsUI = (() => {
     paintSelectionCount();
     document.querySelectorAll('[data-research]').forEach(button => {
       button.onclick = () => perform(async () => {
-        const selectedRevision = revision;
-        const project = await api('/projects/catalog/' + encodeURIComponent(button.dataset.research));
-        if (selectedRevision !== revision) return;
-        $('#projects-research-title').textContent = project.title;
-        $('#projects-research-body').textContent = [project.research.report, project.research.roadmap,
-          ...project.objectives.map(item => `${item.goal}\n\n${item.prompt}`)].filter(Boolean).join('\n\n');
-        $('#projects-research').open = true;
+        const selectedRevision=revision, selectedAccount=accountId, request=++researchRevision;
+        $('#projects-research-title').textContent='正在读取研究资料';$('#projects-research-body').textContent='读取中…';openModal('#projects-research');
+        let project;try{project=await api('/projects/catalog/'+encodeURIComponent(button.dataset.research));}catch(error){if(selectedRevision===revision&&request===researchRevision&&!$('#projects-research').classList.contains('hidden'))$('#projects-research-body').textContent='读取研究失败：'+error.message;return;}
+        if(selectedRevision!==revision||selectedAccount!==accountId||request!==researchRevision||$('#projects-research').classList.contains('hidden'))return;
+        $('#projects-research-title').textContent=project.title;$('#projects-research-key').textContent=project.project_key;
+        $('#projects-research-body').innerHTML=`<section data-research-panel="report"><article class="upgrade-reading">${researchText(project.research.report)}</article></section><section data-research-panel="roadmap" hidden><article class="upgrade-reading">${researchText(project.research.roadmap)}</article></section><section data-research-panel="objectives" hidden>${project.objectives.map((item,index)=>`<article class="upgrade-objective"><small>目标 ${index+1} · ${escape(item.id)}</small><h3>${escape(item.goal)}</h3><div class="research-prompt">${researchText(item.prompt)}</div></article>`).join('')||'<p class="work-note">当前项目没有公开工程目标。</p>'}</section>`;
+        document.querySelectorAll('[data-research-tab]').forEach(tab=>{tab.onclick=()=>{
+          document.querySelectorAll('[data-research-tab]').forEach(node=>node.classList.toggle('active',node===tab));
+          document.querySelectorAll('[data-research-panel]').forEach(panel=>{panel.hidden=panel.dataset.researchPanel!==tab.dataset.researchTab;});
+        };});$('[data-research-tab=report]').click();
       });
     });
+  }
+
+  /** 以安全阅读结构显示公开Markdown，原HTML始终作为文本。@param {string} text 文档。@return {string} 已转义的阅读内容。 */
+  function researchText(text){
+    if(!text)return '<p class="work-note">暂无公开资料。</p>';
+    let code=false,buffer=[],result=[];
+    const flush=()=>{if(buffer.length){result.push(code?'<pre>'+escape(buffer.join('\n'))+'</pre>':'<p>'+escape(buffer.join('\n'))+'</p>');buffer=[];}};
+    for(const line of String(text).split('\n')){
+      if(line.startsWith('```')){flush();code=!code;continue;}
+      if(code){buffer.push(line);continue;}
+      const heading=line.match(/^(#{1,6})\s+(.+)$/);
+      if(heading){flush();const level=heading[1].length===1?'h2':'h3';result.push('<'+level+'>'+escape(heading[2])+'</'+level+'>');}
+      else if(!line.trim())flush();else buffer.push(line);
+    }
+    flush();return result.join('');
   }
 
   /**
@@ -373,7 +436,7 @@ window.ProjectsUI = (() => {
     if (!status || !next) return;
     const agent = agents.find(item => item.account_id === accountId);
     if (!agent) {
-      status.textContent = '先保存账号项目池，再启用自动指挥。';
+      status.textContent = '尚未配置';
       next.textContent = '';
       return;
     }
@@ -383,10 +446,8 @@ window.ProjectsUI = (() => {
     if (agent.recovery && schedule?.state === 'waiting') states.waiting = '等待自动恢复';
     const interval = schedule?.interval_max_minutes > schedule?.interval_minutes
       ? `${schedule.interval_minutes}～${schedule.interval_max_minutes} 分钟随机` : `${schedule?.interval_minutes} 分钟`;
-    status.textContent = schedule?.enabled
-      ? `定时已开启 · ${states[schedule.state] || schedule.state} · 每轮结束后间隔 ${interval}`
-      : `定时已关闭${agent.controller_active ? ' · 当前 Pi 继续运行' : ''}`;
-    if (schedule?.message) status.textContent += `；${schedule.message}`;
+    status.textContent = schedule?.enabled ? '已启用' : '已关闭';
+    status.title=schedule?.enabled?`每轮结束后间隔 ${interval} · ${states[schedule.state]||schedule.state}${schedule.message?' · '+schedule.message:''}`:'自动计划已关闭';
     const timestamp = schedule?.next_run_at;
     if (schedule?.enabled && typeof timestamp === 'number' && Number.isFinite(timestamp)) {
       const seconds = Math.max(0, Math.ceil(timestamp - Date.now() / 1000));
@@ -472,6 +533,7 @@ window.ProjectsUI = (() => {
       const limit = quota?.limits?.[key], limited = typeof limit === 'number' && Number.isFinite(limit) && limit > 0;
       const fill = element.querySelector('[data-quota-fill]'), marker = element.querySelector('[data-quota-limit]');
       element.querySelector('[data-quota-value]').textContent = measured ? `${Number(value.toFixed(1))}%` : '未采集';
+      element.querySelector('[data-quota-threshold]').textContent = limited ? ` / 上限 ${limit}%` : '';
       element.dataset.known = String(measured);
       element.dataset.hit = String((quota?.hit || []).includes(key));
       fill.classList.toggle('hidden', !measured);
@@ -500,7 +562,8 @@ window.ProjectsUI = (() => {
     const progress = agent?.progress, bar = $('#projects-progress-bar');
     const known = Number.isInteger(progress?.completed) && Number.isInteger(progress?.remaining)
       && Number.isInteger(progress?.total) && progress.total >= 0;
-    $('#projects-progress-text').textContent = known ? `${progress.completed} / ${progress.total} 项已通过` : '尚未采集';
+    patchRuntimeContent($('#projects-progress-text'), known ? `${progress.completed}<small> / ${progress.total} 个目标</small>` : '未采集');
+    $('#projects-progress-text').classList.toggle('unknown', !known);
     const cycle = agent?.cycle;
     const cycleKnown = Number.isInteger(cycle?.number) && cycle.number > 0 && Number.isInteger(cycle.completed)
       && cycle.completed >= 0 && Number.isInteger(cycle.total) && cycle.total >= cycle.completed;
@@ -514,12 +577,27 @@ window.ProjectsUI = (() => {
       ? ` · 可开始 ${progress.ready} 项 · 等待前置或复验 ${progress.waiting} 项${progress.deferred ? ` · 待自动复验 ${progress.deferred} 项` : ''}` : '';
     $('#projects-progress-detail').textContent = known ? `授权池内剩余 ${progress.remaining} 项工程目标${readiness} · 通过独立验收才计入完成` : '以独立验收通过的目标计数。';
     const work = agent?.work, unfinished = work && !['passed', 'stopped', 'deferred'].includes(work.status);
+    $('#projects-goal').textContent=work?.goal||'选择账号并保存项目池，开始新的工程目标';
+    $('#projects-key').textContent=work?`${work.project_key} / ${work.objective_id}`:'';
+    $('#projects-work-id').textContent=work?.id||'尚无工程目标';
+    $('#projects-terminal-state').textContent=agent?.controller_active?'执行中':work?'现场已保留':'尚无目标';
+    const elapsed=progress?.elapsed_work_sec??work?.work_sec;
+    patchRuntimeContent($('#projects-elapsed'), typeof elapsed==='number'&&Number.isFinite(elapsed)&&elapsed>=0?`${Math.floor(elapsed/60)}<small> 分 </small>${Math.floor(elapsed%60)}<small> 秒</small>`:'未采集');
+    patchRuntimeContent($('#projects-turn-budget'), typeof agent?.budget_sec==='number'&&Number.isFinite(agent.budget_sec)?`${agent.budget_sec/60}<small> 分钟</small>`:'未采集');
+
     $('#projects-target-label').textContent = !work || unfinished ? '当前目标' : work.status === 'passed' ? '最近完成目标' : work.status === 'deferred' ? '待复验目标' : '最近停止目标';
-    $('#projects-current').innerHTML = work
-      ? `<p class="projects-target-state">${unfinished ? escape(workStatus(work)) : work.status === 'passed' ? '上一目标已验收通过' : work.status === 'deferred' ? '保留原会话，冷却后自动复验' : '上一目标已停止'}</p><strong>${escape(work.goal)}</strong><p class="hint">${escape(work.project_key)} · 原会话 ${escape(work.session_id.slice(0, 8))}</p>${failureDetails(work, agent.schedule)}`
-      : '<p class="hint">尚未开始工程目标，Pi 会从授权项目池选择。</p>';
+    // 当前、通过和等待来自后端快照，目录排序不能冒充实际完成或可执行状态。
+    const objectives=[],seen=new Set();
+    const add=(item,kind,label)=>{const key=`${item.project_key}/${item.objective_id}`;if(seen.has(key))return;seen.add(key);objectives.push({item,kind,label,key});};
+    const completed=agent?.passed?.at(-1);if(completed)add(completed,'done','已通过');
+    if(work)add(work,unfinished?'current':work.status==='passed'?'done':'',unfinished?'当前目标':workStatus(work));
+    for(const item of agent?.available_objectives||[]){if(objectives.length>=3)break;add(item,'','可以开始');}
+    for(const item of agent?.waiting_objectives||[]){if(objectives.length>=3)break;add(item,'',item.message||'等待前置目标或复验');}
+    const objectiveRow=({item,kind,label,key})=>`<li class="${kind}" data-runtime-key="${escape(key)}">${escape(item.goal||item.objective_id)}<small>${escape(label)} · ${escape(item.project_key)}</small></li>`;
+    patchRuntimeContent($('#projects-current'),objectives.slice(0,3).map(objectiveRow).join('')||'<li>等待选择工程目标<small>保存项目池后，可查看当前目标与后续工作。</small></li>');
+    patchRuntimeContent($('#projects-target-failure'),work?failureDetails(work,agent.schedule):'');
     $('#projects-budget').textContent = unfinished
-      ? `目标累计耗时 ${duration(progress?.elapsed_work_sec)} · ${progress?.turn_active ? '本轮剩余' : '下轮可用时长'} ${duration(progress?.remaining_work_sec)}`
+      ? `${progress?.turn_active ? '本轮剩余' : '下轮可用时长'} ${duration(progress?.remaining_work_sec)} · 暂停期间不计入`
       : work ? workDuration(work) : '';
     const activity = agent?.activity;
     $('#projects-activity').textContent = activity?.text
@@ -559,6 +637,13 @@ window.ProjectsUI = (() => {
     $('#projects-admission').textContent = !agent ? '选择账号并保存项目池后，查看运行条件。'
       : admission?.allowed === false ? admission.message || '当前执行条件未满足。'
       : admission?.allowed === true ? `运行条件允许${admission.window?.timezone ? ` · 账号时区 ${admission.window.timezone}` : ''}` : '执行条件尚未采集。';
+    const badge=$('#projects-admission-badge'),allowed=admission?.allowed;
+    badge.textContent=allowed===true?'满足执行条件':allowed===false?'等待条件':'待观测';badge.className='work-badge '+(allowed===true?'good':allowed===false?'warning':'');
+    const capacity=admission?.cli_capacity;
+    $('#projects-capacity').textContent=Number.isSafeInteger(capacity?.active)&&capacity.active>=0&&Number.isSafeInteger(capacity?.limit)&&capacity.limit>0?`${capacity.active} / ${capacity.limit}`:'未采集';
+    const window=admission?.window;
+    $('#projects-window').textContent=window?window.enabled===false?'全天可运行':window.allowed?'当前窗口内':'等待窗口开放':'待观测';
+    $('#projects-window').title=window?.timezone||'';
     let next = '选择账号并保存项目池。';
     if (agent) {
       if (pending) next = '控制操作已提交，请等待运行状态更新。';
@@ -603,6 +688,7 @@ window.ProjectsUI = (() => {
     const panel = $('#projects-verification');
     if (!panel) return;
     const agent = agents.find(item => item.account_id === accountId), verification = agent?.verification;
+    $('#projects-verification-empty').hidden=!!verification;
     panel.classList.toggle('hidden', !verification);
     if (!verification) return;
     const stages = verification.stages || [], latest = stages.at(-1), active = verification.active;
@@ -622,11 +708,11 @@ window.ProjectsUI = (() => {
     $('#projects-verification-clock').textContent = `验收总耗时 ${duration(total)}`
       + (latest ? ` · ${active ? '当前阶段已用' : '最后阶段耗时'} ${duration(elapsed)} · 阶段更新于 ${updated}` : ' · 该次验收未记录阶段明细')
       + (active ? '。计时表示已等待时间，阶段结束后更新结果。' : '');
-    $('#projects-verification-stages').innerHTML = stages.map((stage, index) => {
+    patchRuntimeContent($('#projects-verification-stages'), stages.map((stage, index) => {
       const running = active && index === stages.length - 1;
       const seconds = running ? Math.max(0, now - stage.started_at) : stage.elapsed_sec;
-      return `<li data-active="${running}"><span>${escape(stage.message)}</span><span>${running ? '进行中 · ' : ''}${escape(duration(seconds))}</span></li>`;
-    }).join('') || '<li>该次验收未记录阶段明细。</li>';
+      return `<li data-runtime-key="${index}" data-active="${running}"><span>${index+1}</span><div>${escape(stage.message)}</div><small>${running ? '进行中 · ' : ''}${escape(duration(seconds))}</small></li>`;
+    }).join('') || '<li><span>—</span><div>等待阶段明细</div><small>待观测</small></li>');
   }
 
   /**
@@ -700,13 +786,17 @@ window.ProjectsUI = (() => {
     const current = revision, selected = accountId, chosen = selection;
     const active = () => current === revision && selected === accountId && chosen === selection && recordPages[kind] === record;
     record.loading = true; record.incoming = []; paintPagination(kind);
+    const controller = new AbortController();
+    record.controller = controller;
     try {
       const path = kind === 'events' ? 'events' : 'work';
-      const page = await api(`/projects/agents/${selected}/${path}/page?limit=${record.size}${before == null ? '' : '&before=' + encodeURIComponent(before)}`);
+      const page = await api(`/projects/agents/${selected}/${path}/page?limit=${record.size}${before == null ? '' : '&before=' + encodeURIComponent(before)}`, {signal:controller.signal});
       if (!active()) return;
       if (direction === 'latest') { record.pages = [page]; record.index = 0; record.pending.clear(); }
       else { record.pages[target] = page; record.index = target; }
       paintRecords(kind, true);
+    } catch (error) {
+      if (!controller.signal.aborted) throw error;
     } finally {
       if (active()) {
         record.loading = false;
@@ -727,6 +817,9 @@ window.ProjectsUI = (() => {
     $(`#projects-${kind}-previous`).disabled = record.loading || record.index === 0;
     $(`#projects-${kind}-next`).disabled = record.loading || page?.next_before == null;
     $(`#projects-${kind}-latest`).disabled = record.loading || record.index === 0 && !record.pending.size;
+    // 原生Vue宿主接管展示，分页游标和失败恢复继续由原记录所有者维护。
+    window.nativePagination?.({kind,page:record.index+1,size:record.size,loading:record.loading,
+      hasPrevious:record.index>0,hasNext:page?.next_before!=null,canLatest:record.index>0||record.pending.size>0});
     const notice = $(`#projects-${kind}-new`);
     notice.classList.toggle('hidden', !record.pending.size); notice.disabled = record.loading;
     notice.textContent = `有 ${record.pending.size} 条新${kind === 'events' ? '交互' : '工程记录'}，查看最新`;
@@ -755,7 +848,7 @@ window.ProjectsUI = (() => {
     const labels = {pi: 'Pi', input: '发送到 Claude', started: '原生会话', error: '异常',
       verification: '独立验收', verification_progress: '验收进度', input_unknown: '输入待核对', reconciled: '人工核对', recovery: '模型恢复', manual_retry: '人工重试',
       guide_loaded: '业务指南', runtime_recovered: '运行已恢复', auto_retry: '自动恢复'};
-    element.innerHTML = (recordPages.events.pages[recordPages.events.index]?.items || []).map(item => {
+    patchRuntimeContent(element, (recordPages.events.pages[recordPages.events.index]?.items || []).map(item => {
       const payload = item.payload;
       let message = payload.text || payload.message;
       if (item.kind === 'recovery') {
@@ -768,9 +861,8 @@ window.ProjectsUI = (() => {
       } else if (item.kind === 'manual_retry') message ||= '已人工确认重试，继续原目标和原会话。';
       else if (item.kind === 'auto_retry') message ||= '原故障已核实，自动接续原目标和原会话。';
       else if (item.kind === 'guide_loaded') message = '本轮已将保存的追加业务指南与默认指南一起交给 Pi。';
-      return `<li data-event-id="${escape(item.id)}"><small class="muted">${escape(new Date(item.created_at * 1000).toLocaleString('zh-CN', {hour12: false}))} · ${escape(labels[item.kind] || item.kind)}</small><pre>${escape(message || JSON.stringify(payload, null, 2))}</pre></li>`;
-    }).join('')
-      || '<li class="hint">启动后在这里查看 Pi 的判断、实际输入和验收结果。</li>';
+      return `<article data-runtime-key="${escape(item.id)}" data-event-id="${escape(item.id)}"><span class="work-event-avatar">${item.kind==='pi'?'P':item.kind==='input'?'C':runtimeIcon(item.kind==='error'?'wave':'clock')}</span><div><strong>${escape(labels[item.kind]||item.kind)}<time>${escape(new Date(item.created_at*1000).toLocaleString('zh-CN',{hour12:false}))}</time></strong><p>${escape(message||JSON.stringify(payload,null,2))}</p></div></article>`;
+    }).join('') || `<div class="work-empty work-record-empty"><span class="work-empty-symbol">${runtimeIcon('wave')}</span><h3>等待第一条交互</h3><p>开始运行后，Pi 的判断、发送内容与验收反馈会显示在这里。</p></div>`);
   }
 
   /**
@@ -780,38 +872,46 @@ window.ProjectsUI = (() => {
    */
   function paintHistory(rows) {
     const agent = agents.find(item => item.account_id === accountId);
-    $('#projects-history').innerHTML = rows.map(item => `<div class="projects-history-row"><strong>${escape(item.project_key)}</strong><span>${escape(item.goal)}<small class="hint">${namespace === 'warmup' ? `第 ${escape(Number.isInteger(item.cycle_no) && item.cycle_no > 0 ? item.cycle_no : 1)} 轮 · ` : ''}${escape(new Date(item.created_at * 1000).toLocaleString('zh-CN', {hour12: false}))}</small>${failureDetails(item, agent?.work?.id === item.id ? agent.schedule : undefined)}</span><span>${escape(workStatus(item))}</span><span data-work-duration="${escape(item.id)}" title="按实际累计执行时间统计，暂停和计划等待不计入。">${escape(workDuration(item))}</span><div class="op-actions"><button type="button" class="btn btn-sm" data-work="${escape(item.id)}">查看交付</button><button type="button" class="btn btn-sm" data-work-capture="${escape(item.id)}">抓包</button></div></div>`).join('') || '<p class="hint">尚无新工作记录。</p>';
+    patchRuntimeContent($('#projects-history'), rows.map(item => `<div class="work-history-row" data-runtime-key="${escape(item.id)}"><span class="work-history-icon">${runtimeIcon(item.status==='passed'?'check':'clock')}</span><div><strong>${escape(item.goal)}</strong><small class="hint">${namespace === 'warmup' ? `第 ${escape(Number.isInteger(item.cycle_no) && item.cycle_no > 0 ? item.cycle_no : 1)} 轮 · ` : ''}${escape(new Date(item.created_at * 1000).toLocaleString('zh-CN', {hour12: false}))}</small>${failureDetails(item, agent?.work?.id === item.id ? agent.schedule : undefined)}<small>${escape(item.project_key)}</small></div><span class="work-badge">${escape(workStatus(item))}</span><span data-work-duration="${escape(item.id)}" title="按实际累计执行时间统计，暂停和计划等待不计入。">${escape(workDuration(item))}</span><div class="op-actions"><button type="button" class="btn btn-sm" data-work="${escape(item.id)}">查看交付</button><button type="button" class="btn btn-sm" data-work-capture="${escape(item.id)}">抓包</button></div></div>`).join('') || `<div class="work-empty work-record-empty"><span class="work-empty-symbol">${runtimeIcon('box')}</span><h3>暂无工程与交付记录</h3><p>启动目标后，可在这里查看执行过程、交付文件与独立验收结果。</p></div>`);
     document.querySelectorAll('[data-work-capture]').forEach(button => {
       button.onclick = () => showCapture?.(button.dataset.workCapture, namespace);
     });
     document.querySelectorAll('[data-work]').forEach(button => {
       button.onclick = () => perform(async () => {
-        const current = revision, selected = accountId;
-        const detail = await api('/projects/work/' + encodeURIComponent(button.dataset.work));
-        if (current !== revision || selected !== accountId) return;
-        $('#projects-delivery').open = true;
+        const current = revision, selected = accountId, delivery = ++deliveryRevision;
+        openModal('#projects-delivery');$('#projects-delivery-title').textContent='正在读取冻结交付';$('#projects-delivery-files').innerHTML='';$('#projects-delivery-preview').textContent='正在读取…';
+        $('#projects-submission').innerHTML='';$('#projects-delivery-report').textContent='读取中…';$('#projects-delivery-summary').textContent='';$('#projects-delivery-file-count').textContent='';
+        let detail;try{detail=await api('/projects/work/'+encodeURIComponent(button.dataset.work));}catch(error){if(current===revision&&delivery===deliveryRevision&&!$('#projects-delivery').classList.contains('hidden'))$('#projects-delivery-preview').textContent='读取交付失败：'+error.message;return;}
+        if (current !== revision || selected !== accountId || delivery !== deliveryRevision || $('#projects-delivery').classList.contains('hidden')) return;
         $('#projects-delivery-title').textContent = detail.work.goal;
         $('#projects-delivery-duration').textContent = workDuration(detail.work);
         const facts = detail.work.failure?.details;
         const currentAgent = agents.find(item => item.account_id === accountId);
         $('#projects-delivery-failure').innerHTML = failureDetails(detail.work, currentAgent?.work?.id === detail.work.id ? currentAgent.schedule : undefined)
           + (facts?.actual_python ? `<p class="hint">${escape(`验证版本：${facts.expected_python} · 实际版本：${facts.actual_python} · ${facts.python_compatibility === 'exact' ? '要求精确版本' : '允许同主次补丁差异'}`)}</p>` : '');
-        $('#projects-submissions').innerHTML = detail.submissions.map(item => `<button class="btn btn-sm" type="button" data-submission="${escape(item.id)}">${escape(names[item.status] || item.status)} · ${escape(new Date(item.created_at * 1000).toLocaleString())}</button>`).join(' ') || '<p class="hint">尚未提交独立验收。</p>';
-        $('#projects-delivery-files').innerHTML = ''; $('#projects-delivery-preview').textContent = '';
-        document.querySelectorAll('[data-submission]').forEach(submission => {
-          submission.onclick = () => perform(async () => {
-            const value = await api('/projects/submissions/' + encodeURIComponent(submission.dataset.submission));
-            if (current !== revision || selected !== accountId) return;
-            $('#projects-delivery-preview').textContent = JSON.stringify(value.report, null, 2);
-            $('#projects-delivery-files').innerHTML = value.files.map(file => `<button type="button" class="btn btn-sm" data-candidate-path="${escape(file.path)}"${file.deleted ? ' disabled' : ''}>${escape(file.path)}${file.deleted ? '（已删除）' : ''}</button>`).join(' ');
-            document.querySelectorAll('[data-candidate-path]').forEach(file => {
-              file.onclick = () => perform(async () => {
-                const preview = await api(`/projects/submissions/${encodeURIComponent(value.id)}?path=${encodeURIComponent(file.dataset.candidatePath)}`);
-                if (current === revision && selected === accountId) $('#projects-delivery-preview').textContent = preview.text ?? preview.message;
-              });
-            });
-          });
-        });
+        $('#projects-delivery-project').textContent=detail.work.project_key;
+        const chooser=$('#projects-submission');chooser.innerHTML=detail.submissions.map(item=>`<option value="${escape(item.id)}">${escape(submissionNames[item.status]||item.status)} · ${escape(new Date(item.created_at*1000).toLocaleString('zh-CN',{hour12:false}))}</option>`).join('')||'<option value="">尚无提交</option>';chooser.disabled=!detail.submissions.length;
+        $('#projects-delivery-files').innerHTML='';$('#projects-delivery-preview').textContent='选择候选文件查看冻结内容。';$('#projects-delivery-report').textContent='尚未提交独立验收。';$('#projects-delivery-summary').textContent='';
+        let previewSequence=0;
+        chooser.onchange=()=>perform(async()=>{
+          if(!chooser.value)return;const chosen=++previewSequence;
+          const active=()=>current===revision&&selected===accountId&&delivery===deliveryRevision&&!$('#projects-delivery').classList.contains('hidden');
+          $('#projects-delivery-files').replaceChildren();$('#projects-delivery-preview').textContent='正在读取候选提交…';$('#projects-delivery-report').textContent='正在读取验收报告…';$('#projects-delivery-summary').textContent='';
+          let value;try{value=await api('/projects/submissions/'+encodeURIComponent(chooser.value));}catch(error){if(active()&&chosen===previewSequence)$('#projects-delivery-preview').textContent='读取候选失败：'+error.message;return;}
+          if(!active()||chosen!==previewSequence)return;
+          $('#projects-delivery-summary').innerHTML=`<span class="work-badge ${value.status==='passed'?'good':'warning'}">${escape(submissionNames[value.status]||value.status)}</span><strong>${escape(submissionNames[value.status]||value.status)}</strong><span>提交 ${escape(value.id)}</span>`;
+          $('#projects-delivery-file-count').textContent=value.files.length+' 个';
+          const feedback=value.report?.feedback;
+          $('#projects-delivery-report').innerHTML=`<div class="upgrade-report-state ${value.status==='passed'?'':'warning'}">${escape(Array.isArray(feedback)?feedback.join('\n'):feedback||'验收结果见完整报告')}</div><details class="work-report-details"><summary>完整验收报告</summary><pre>${escape(JSON.stringify(value.report,null,2))}</pre></details>`;
+          $('#projects-delivery-preview').textContent='选择候选文件查看冻结内容。';$('#projects-delivery-path').textContent='选择文件查看内容';
+          $('#projects-delivery-files').innerHTML=value.files.map(file=>`<button type="button" class="upgrade-file-choice" data-candidate-path="${escape(file.path)}"${file.deleted?' disabled':''}><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-task"></use></svg><span>${escape(file.path)}</span><small>${file.deleted?'已删除':'查看'}</small></button>`).join('');
+          document.querySelectorAll('[data-candidate-path]').forEach(file=>{file.onclick=()=>perform(async()=>{
+            const chosen=++previewSequence;
+            $('#projects-delivery-preview').textContent='正在读取冻结文件…';$('#projects-delivery-path').textContent=file.dataset.candidatePath;
+            let preview;try{preview=await api(`/projects/submissions/${encodeURIComponent(value.id)}?path=${encodeURIComponent(file.dataset.candidatePath)}`);}catch(error){if(active()&&chosen===previewSequence)$('#projects-delivery-preview').textContent='读取文件失败：'+error.message;return;}
+            if(active()&&chosen===previewSequence){$('#projects-delivery-preview').textContent=preview.text??preview.message;$('#projects-delivery-path').textContent=file.dataset.candidatePath;document.querySelectorAll('[data-candidate-path]').forEach(node=>node.classList.toggle('active',node===file));}
+          });});$('[data-candidate-path]:not(:disabled)')?.click();
+        });if(chooser.value)chooser.onchange();
       });
     });
   }

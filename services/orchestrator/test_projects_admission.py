@@ -94,6 +94,30 @@ class ProjectsAdmissionTests(unittest.TestCase):
             main._projects_admission(self.account, self.work)
             consume.assert_called_once_with(self.account)
 
+    def test_capacity_snapshot_is_account_scoped_and_keeps_zero_and_unknown(self):
+        """共用登记按账号计数，零占用与运行时缺失分别投影。:return: None。"""
+        self.observe()
+        for read in (main._projects_admission, main._warmup_projects_admission):
+            self.assertEqual({'active': 0, 'limit': main.PER_ACCOUNT_CONCURRENCY},
+                read(self.account, self.work, snapshot_only=True)['cli_capacity'])
+        own = {'row': {'account_id': 1, 'environment_id': 'capacity-one'},
+            'source': self.source, 'shared_cli': True, 'claimed': True}
+        other = {'row': {'account_id': 2, 'environment_id': 'capacity-two'},
+            'source': 'other-source', 'shared_cli': True, 'claimed': True}
+        with self.runtime.lock:
+            self.runtime._register_job(own)
+            self.runtime._register_job(other)
+        for read in (main._projects_admission, main._warmup_projects_admission):
+            with self.subTest(namespace=read.__name__):
+                self.assertEqual({'active': 1, 'limit': main.PER_ACCOUNT_CONCURRENCY},
+                    read(self.account, self.work, snapshot_only=True)['cli_capacity'])
+        self.observe(used=99)
+        snapshot = main._projects_admission(self.account, self.work, snapshot_only=True)
+        self.assertEqual('quota', snapshot['reason'])
+        self.assertEqual(1, snapshot['cli_capacity']['active'])
+        with patch.object(main, 'account_runtime', None):
+            self.assertIsNone(main._projects_admission(self.account, self.work, snapshot_only=True)['cli_capacity'])
+
     def test_view_admission_returns_unknown_while_execution_lock_is_held(self):
         """锁忙的页面及时返回未知且不可放行；真正启动检查仍等待原锁。:return: None。"""
         self.observe()
@@ -118,6 +142,7 @@ class ProjectsAdmissionTests(unittest.TestCase):
                 snapshot = executor.submit(main._projects_admission, self.account, self.work, snapshot_only=True).result(1)
                 self.assertFalse(snapshot['allowed'])
                 self.assertEqual('unavailable', snapshot['reason'])
+                self.assertIsNone(snapshot['cli_capacity'])
                 future = executor.submit(real_admission)
                 self.assertTrue(checking.wait(1))
                 try:

@@ -10552,7 +10552,9 @@ mod tests {
                 .await
                 .unwrap();
             let service = Arc::new(service);
+            use crate::service::proxy::ProxyService;
             let app = AppState {
+                proxy_svc: Arc::new(ProxyService::new(pool.clone())),
                 gateway_svc: service.clone(),
                 account_svc: service.account_svc.clone(),
                 token_tester: Arc::new(TokenTester::new()),

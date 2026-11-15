@@ -12,15 +12,15 @@ use tracing::warn;
 
 use crate::error::AppError;
 use crate::model::request_diagnostics::{
-    AttemptDiagnostic, DiagnosticDetail, DiagnosticHealth, DiagnosticPage, DiagnosticQuery,
-    RequestDiagnostic, normalize_correlation_id,
+    AttemptDiagnostic, DiagnosticCounts, DiagnosticDetail, DiagnosticHealth, DiagnosticPage,
+    DiagnosticQuery, RequestDiagnostic, normalize_correlation_id,
 };
 
 const QUEUE_CAPACITY: usize = 1024;
 const MAX_RECORD_BYTES: usize = 16 * 1024;
 const FILTER: &str = "WHERE ($1=0 OR r.account_id=$1 OR EXISTS(SELECT 1 FROM request_diagnostic_attempts a WHERE a.request_id=r.request_id AND a.account_id=$1))
  AND ($2='' OR r.request_id=$2 OR r.response_request_id=$2 OR EXISTS(SELECT 1 FROM request_diagnostic_attempts a WHERE a.request_id=r.request_id AND a.upstream_request_id=$2))
- AND ($3='' OR r.outcome=$3) AND ($4='' OR r.started_at >= $4) AND ($5='' OR r.started_at < $5)
+ AND ($3='' OR r.outcome=$3 OR ($3='errors' AND r.outcome IN ('incomplete','upstream_error','upstream_rejected','local_rejected','transport_error','body_error'))) AND ($4='' OR r.started_at >= $4) AND ($5='' OR r.started_at < $5)
  AND (r.started_at >= $6 OR $7 LIKE '%\"' || r.request_id || '\"%')";
 
 /// 当前进程真实请求的保留许可，终结与异常 Drop 均释放。
@@ -183,6 +183,7 @@ impl DiagnosticsStore {
         let outcome = query.outcome.unwrap_or_default();
         if !outcome.is_empty()
             && ![
+                "errors",
                 "in_progress",
                 "success",
                 "local_rejected",
@@ -221,7 +222,7 @@ impl DiagnosticsStore {
             .await
             .map_err(|_| unavailable())?;
         let sql = format!(
-            "SELECT r.summary_json,COALESCE(a.name,'') AS account_name,COALESCE(a.email,'') AS account_email
+            "SELECT r.summary_json,COALESCE((SELECT latest.summary_json FROM request_diagnostic_attempts latest WHERE latest.request_id=r.request_id ORDER BY latest.ordinal DESC LIMIT 1),'') AS last_attempt,COALESCE(a.name,'') AS account_name,COALESCE(a.email,'') AS account_email
              FROM request_diagnostics r LEFT JOIN accounts a ON a.id=r.account_id
              {FILTER} ORDER BY r.started_at DESC,r.request_id DESC LIMIT $8 OFFSET $9"
         );
@@ -244,14 +245,28 @@ impl DiagnosticsStore {
                 let mut item: RequestDiagnostic =
                     decode(row.try_get("summary_json").map_err(|_| unavailable())?)?;
                 (item.account_name, item.account_email) = account_display(row)?;
+                let attempt: String = row.try_get("last_attempt").map_err(|_| unavailable())?;
+                item.last_attempt = if attempt.is_empty() {
+                    None
+                } else {
+                    Some(Box::new(decode(attempt)?))
+                };
                 Ok(item)
             })
             .collect::<Result<_, AppError>>()?;
+        let counts = sqlx::query(&format!("SELECT CAST(COUNT(*) AS BIGINT) AS total,CAST(COALESCE(SUM(CASE WHEN r.outcome IN ('incomplete','upstream_error','upstream_rejected','local_rejected','transport_error','body_error') THEN 1 ELSE 0 END),0) AS BIGINT) AS errors,CAST(COALESCE(SUM(CASE WHEN r.outcome='in_progress' THEN 1 ELSE 0 END),0) AS BIGINT) AS processing FROM request_diagnostics r {FILTER}"))
+            .bind(account).bind(&id).bind("").bind(&since).bind(&until).bind(&cutoff).bind(&active)
+            .fetch_one(&self.pool).await.map_err(|_| unavailable())?;
         Ok(DiagnosticPage {
             items,
             total,
             page,
             page_size,
+            counts: DiagnosticCounts {
+                all: counts.try_get("total").map_err(|_| unavailable())?,
+                errors: counts.try_get("errors").map_err(|_| unavailable())?,
+                processing: counts.try_get("processing").map_err(|_| unavailable())?,
+            },
             health: DiagnosticHealth {
                 dropped_records: self.dropped.load(Ordering::Relaxed),
                 write_failures: self.failures.load(Ordering::Relaxed),
@@ -415,6 +430,7 @@ mod tests {
     fn request(at: DateTime<Utc>) -> RequestDiagnostic {
         let request_id = Uuid::new_v4().to_string();
         RequestDiagnostic {
+            last_attempt: None,
             log_mode: None,
             request_id: request_id.clone(),
             started_at: at.to_rfc3339_opts(SecondsFormat::Millis, true),
@@ -697,6 +713,52 @@ mod tests {
         assert_eq!(page.total, 1);
         assert_eq!(page.items[0].account_id, Some(8));
         assert_eq!(page.items[0].account_name, detail.request.account_name);
+        assert_eq!(page.counts.all, 1);
+        assert_eq!(page.counts.errors, 0);
+        assert_eq!(page.items[0].last_attempt.as_ref().unwrap().ordinal, 2);
+        let errors = reopened
+            .list(DiagnosticQuery {
+                account_id: Some(7),
+                outcome: Some("errors".into()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(errors.total, 0);
+        // 快捷计数保留账号条件，并独立于当前结果筛选。
+        assert_eq!(errors.counts.all, 1);
+        assert_eq!(errors.counts.errors, 0);
+        let mut failed = current.clone();
+        failed.request_id = uuid::Uuid::new_v4().to_string();
+        failed.account_id = Some(7);
+        failed.outcome = "transport_error".into();
+        let failed_id = failed.request_id.clone();
+        write_event(
+            &reader,
+            &DiagnosticEvent {
+                request: failed,
+                attempt: None,
+            },
+        )
+        .await
+        .unwrap();
+        let errors = reopened
+            .list(DiagnosticQuery {
+                account_id: Some(7),
+                outcome: Some("errors".into()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(errors.total, 1);
+        assert_eq!(errors.counts.all, 2);
+        assert_eq!(errors.counts.errors, 1);
+        assert_eq!(errors.items[0].request_id, failed_id);
+        sqlx::query("DELETE FROM request_diagnostics WHERE request_id=$1")
+            .bind(failed_id)
+            .execute(&reader)
+            .await
+            .unwrap();
 
         sqlx::query("UPDATE accounts SET name=$1,email='' WHERE id=$2")
             .bind("已改名账号")

@@ -23,6 +23,8 @@ function leaveEnvironments() {
   ui.request += 1;
   clearTimeout(ui.timer);
   ui.timer = null;
+  ui.openedLocation = null;
+  closeEnvironmentWorkspace(true);
   closeNativeKernelDialog(true);
   closeCpuResourceDialog(true);
   closeContentCaptureDialog(true);
@@ -57,6 +59,14 @@ async function renderEnvironments() {
     ui.loaded = true;
     $('#environment-feedback').textContent = '';
     paintEnvironments();
+    const parameters = new URLSearchParams(location.hash.split('?')[1] || '');
+    const section = parameters.get('section');
+    if (section && ['overview','resources','kernel','schedule','maintenance'].includes(section) && ui.openedLocation !== location.hash) {
+      const target = rows.find(row => parameters.get('environment') ? row.environment_id === parameters.get('environment')
+        : parameters.has('gateway_account') && String(row.gateway_account_id) === parameters.get('gateway_account'));
+      const button = target && $$('[data-env-open]', $('#environment-list')).find(node => node.dataset.environment === target.environment_id && node.dataset.envOpen === section);
+      if (button) { ui.openedLocation = location.hash; openEnvironmentWorkspace(button); }
+    }
   } catch (error) {
     if (!current()) return;
     $('#environment-feedback').textContent = '读取环境失败：' + error.message + (ui.loaded ? '。当前展示上次读取结果。' : '。请点击刷新重试。');
@@ -87,8 +97,8 @@ function paintEnvironments() {
   const focus = list.contains(document.activeElement) ? document.activeElement.dataset.envFocus : null;
   const counts = [ui.rows.length, ui.rows.filter(row => row.state === 'ready').length,
     ui.rows.filter(row => row.state === 'stopped').length, ui.rows.filter(row => row.native_kernel).length];
-  $('#environment-summary').innerHTML = ['全部环境', '就绪', '已停止', '内核管理'].map((label, index) =>
-    `<div class="env-metric"><span>${label}</span><strong>${counts[index]}</strong></div>`).join('');
+  patchRuntimeContent($('#environment-summary'), [['all','全部环境',counts[0]],['ready','就绪',counts[1]],['attention','需要关注',ui.rows.filter(row=>!['ready','stopped'].includes(row.state)).length],['stopped','已停止',counts[2]]].map(([value,label,count]) => `<button type="button" data-environment-filter="${value}" class="tab ${ui.status===value?'active':''}" aria-pressed="${ui.status===value}">${label}<span>${count}</span></button>`).join(''));
+  $('#environment-summary').onclick = event => {const button=event.target.closest('[data-environment-filter]');if(button){ui.status=button.dataset.environmentFilter;paintEnvironments();}};
   const statuses = new Set(ui.rows.map(row => row.state || 'unknown'));
   if (ui.status !== 'all') statuses.add(ui.status);
   const select = $('#environment-status');
@@ -101,11 +111,11 @@ function paintEnvironments() {
   const gateway = parameters.get('gateway_account'), environment = parameters.get('environment');
   const rows = ui.rows.filter(row => (!gateway || String(row.gateway_account_id) === gateway)
     && (!environment || row.environment_id === environment)
-    && (ui.status === 'all' || (row.state || 'unknown') === ui.status)
+    && (ui.status === 'all' || (ui.status === 'attention' ? !['ready','stopped'].includes(row.state) : (row.state || 'unknown') === ui.status))
     && `${row.name || ''} ${row.environment_id || ''}`.toLocaleLowerCase().includes(query));
   $('#environment-result-count').textContent = `显示 ${rows.length} / ${ui.rows.length} 个环境${gateway ? ` · 网关账号 ${gateway}` : ''}`;
   $('#environment-clear-target').hidden = !gateway && !environment;
-  list.innerHTML = rows.map(renderEnvironmentCard).join('') || `<p class="env-empty">${ui.rows.length ? '没有匹配的环境，请调整搜索或筛选。' : '暂无账号环境。'}</p>`;
+  patchRuntimeContent(list, rows.map(renderEnvironmentCard).join('') || `<p class="env-empty">${ui.rows.length ? '没有匹配的环境，请调整搜索或筛选。' : '暂无账号环境。'}</p>`);
   $$('details[data-env-details]', list).forEach(details => {
     details.open = ui.expanded.has(details.dataset.envDetails);
     details.ontoggle = () => {
@@ -114,6 +124,7 @@ function paintEnvironments() {
       else ui.expanded.delete(details.dataset.envDetails);
     };
   });
+  paintEnvironmentWorkspace();
   if (focus) $$('[data-env-focus]', list).find(node => node.dataset.envFocus === focus)?.focus({preventScroll: true});
 }
 
@@ -122,7 +133,7 @@ function paintEnvironments() {
  * @param {object} row 服务器公开环境摘要。
  * @return {string} 已转义的账号卡片。
  */
-function renderEnvironmentCard(row) {
+function renderEnvironmentDetailCard(row) {
   const id = row.environment_id, fingerprint = row.fingerprint || {}, ui = state.environmentUI;
   const status = ENVIRONMENT_STATES[row.state] || `未知状态：${row.state || '未提供'}`;
   const tone = row.state === 'ready' ? 'good' : row.state === 'stopped' ? 'muted' : 'warning';
@@ -134,7 +145,7 @@ function renderEnvironmentCard(row) {
   }).join('');
   const ownership = row.credential_ownership;
   const action = (operation, label, disabled = false) => `<button type="button" class="btn btn-sm ${['stop', 'rebuild'].includes(operation) ? 'btn-danger' : ''}" data-operation="${operation}" data-environment="${escapeHTML(id)}" data-env-focus="${escapeHTML(id + ':' + operation)}" ${disabled || pending ? 'disabled' : ''}>${label}</button>`;
-  return `<article class="env-card" aria-label="${escapeHTML(row.name || '未命名环境')}">
+  return `<article class="env-detail-pane" aria-label="${escapeHTML(row.name || '未命名环境')}">
     <header class="env-card-head"><div><h3>${escapeHTML(row.name || '未命名环境')}</h3><p>${escapeHTML(fingerprint.tz || '时区待核对')} · 环境代次 ${escapeHTML(row.generation ?? '未提供')}</p></div><span class="env-badge env-${tone}">${escapeHTML(status)}</span></header>
     <div class="env-roles">${roles}</div>
     <div class="env-resources"><div><span>内存配置</span><strong>${escapeHTML(fingerprint.mem === 'unlimited' ? '未限制' : fingerprint.mem || '未提供')}</strong></div><div><span>CLI 版本</span><strong>${escapeHTML((row.cli_versions || []).join(' / ') || '未安装')}</strong></div><div><span>CLI 作业</span><strong>${row.busy ? '执行中' : '当前空闲'}</strong></div></div>
@@ -149,6 +160,118 @@ function renderEnvironmentCard(row) {
     <details class="env-details" data-env-details="${escapeHTML(id + ':technical')}"><summary>环境与物理详情</summary><div class="env-details-body"><dl><dt>环境 ID</dt><dd><code>${escapeHTML(id)}</code></dd><dt>主机名</dt><dd>${escapeHTML(fingerprint.hostname || '未提供')}</dd><dt>设备身份</dt><dd>${escapeHTML(row.identity_status || '待核对')}</dd><dt>语言区域</dt><dd>${escapeHTML(fingerprint.lang || '未提供')}</dd><dt>画像版本</dt><dd>${escapeHTML(fingerprint.profile_version ?? '未提供')}</dd></dl>${row.physical_features ? renderPhysicalFeatures(row) : '<p class="env-muted">物理实测尚未采集。</p>'}</div></details>
     <details class="env-details" data-env-details="${escapeHTML(id + ':maintenance')}"><summary>维护操作</summary><div class="env-details-body"><p class="env-muted">停止和重建保留 HOME、身份及证据。画像校正按服务器许可执行。</p><div class="env-actions">${action('stop', '停止环境', row.busy)}${action('rebuild', '重建容器', row.busy)}${action('reconcile', '故障对账', row.busy)}${action('reprofile', '校正画像', !row.can_reprofile)}</div>${row.reprofile_message ? `<p class="env-muted">${escapeHTML(row.reprofile_message)}</p>` : ''}</div></details>
   </article>`;
+}
+
+
+/** 按真实环境摘要绘制定稿卡片，未观测值保持未知。@param {object} row 环境。@return {string} 卡片。 */
+function renderEnvironmentCard(row) {
+ const cpu=state.environmentUI.cpuSnapshots?.get(row.environment_id)?.cpus;
+ const id=escapeHTML(row.environment_id),name=escapeHTML(row.name||'未命名环境'),fp=row.fingerprint||{},prep=row.native_preparation;
+ const roleLabels={running:'运行中',exited:'已退出',stopped:'已停止',created:'已创建',restarting:'重启中',missing:'未创建'};
+ const tone=row.state==='ready'?'healthy':row.state==='stopped'?'muted':'warning';
+ const open=(tab,label,extra='')=>`<button type="button" data-env-open="${tab}" data-environment="${id}" ${extra}>${label}</button>`;
+ return `<article class="env-card environment environment-rich" data-runtime-key="${id}" aria-label="${name}">
+  <header class="environment-card-head"><span class="environment-avatar"><svg class="runtime-icon"><use href="approved-icons.svg#i-box"></use></svg></span><div class="environment-identity"><h3>${name}</h3><span>${row.gateway_account_id!=null?'网关账号 #'+escapeHTML(row.gateway_account_id):row.account_id!=null?'任务账号 #'+escapeHTML(row.account_id):'待提交的授权环境'}</span></div><span class="environment-status ${tone}"><i></i>${escapeHTML(ENVIRONMENT_STATES[row.state]||'未知状态：'+(row.state||'未提供'))}</span></header>
+  <div class="environment-id"><code>${id}</code><span>第 ${escapeHTML(row.generation??'未知')} 代</span></div>
+  <div class="environment-role-strip">${[['cli','CLI'],['sender','发送器'],['network','网络']].map(([role,label])=>`<div class="${row.role_status?.[role]==='running'?'running':''}"><i></i><span>${label}</span><strong>${escapeHTML(roleLabels[row.role_status?.[role]]||'未知')}</strong></div>`).join('')}</div>
+  <div class="environment-resources-grid"><div><span>内存配置</span><strong>${escapeHTML(fp.mem==='unlimited'?'未限制':fp.mem||'未提供')}</strong></div><div><span>CLI CPU</span><strong>${escapeHTML(cpu?.cli??'未采集')}<small>${cpu?.cli!=null?' 核':''}</small></strong></div><div><span>发送器 CPU</span><strong>${escapeHTML(cpu?.sender??'未采集')}<small>${cpu?.sender!=null?' 核':''}</small></strong></div><div><span>网络 CPU</span><strong>${escapeHTML(cpu?.network??'未采集')}<small>${cpu?.network!=null?' 核':''}</small></strong></div></div>
+  <div class="environment-version-line"><span>CLI <strong>${escapeHTML((row.cli_versions||[]).join(' / ')||'未安装')}</strong></span>${open('kernel','内核 <strong>'+escapeHTML(row.native_kernel?.current?.release||'未提供')+'</strong> ›')}</div>
+  <section class="environment-readiness ${tone==='healthy'?'':tone}"><div><strong>${escapeHTML(({ready:'热进程就绪',busy:'进程使用中',preparing:'正在准备',unprepared:'等待准备',sleeping:'环境休眠',disabled:'常规请求通道',failed:'准备失败'})[prep?.state]||'准备状态待核对')}</strong><span class="environment-job">${row.busy?'CLI 作业执行中':'CLI 作业空闲'}</span></div><p>空闲暖进程 <b>${escapeHTML(prep?.idle_workers??'—')}</b> / 存活 <b>${escapeHTML(prep?.live_workers??'—')}</b> · 空闲 PID ${escapeHTML(prep?.pid??'未观测')}</p></section>
+  <div class="environment-feature-row">${open('resources','<span>CRIU 加速</span><strong>'+escapeHTML(CRIU_STATES[row.criu?.state]||'待核对')+'</strong>')}${open('resources','<span>内容采集</span><strong>'+(row.content_capture?.applied?(row.content_capture.enabled?'已开启':'已关闭'):'待核对')+'</strong>')}</div>
+  ${open('schedule','<span>'+escapeHTML(row.run_window?.message||'运行时段尚未提供')+' <small>'+escapeHTML(fp.tz||'')+'</small></span> ›','class="environment-schedule-summary"')}
+  ${state.environmentUI.feedback.has(row.environment_id)?`<p class="env-notice" role="status">${escapeHTML(state.environmentUI.feedback.get(row.environment_id))}</p>`:''}
+  <footer class="environment-card-actions">${open('overview',runtimeIcon('box')+'环境详情')}${open('resources',runtimeIcon('settings')+'资源配置')}${open('kernel',runtimeIcon('spark')+'内核管理')}${open('maintenance',runtimeIcon('shield')+'维护')}</footer>
+ </article>`;
+}
+let environmentWorkspace=null;
+/** 打开同一环境工作区；各分类共享同一DOM。@param {HTMLElement} button 入口。@return {void} */
+function openEnvironmentWorkspace(button) {
+ const id=button.dataset.environment,row=state.environmentUI.rows.find(item=>item.environment_id===id);if(!row)return;
+ environmentWorkspace={id,tab:button.dataset.envOpen||'overview',opener:button};
+ $('#environment-workspace').onkeydown=event=>{
+  if(event.key!=='Tab')return;
+  const nodes=$$('button:not(:disabled),input:not(:disabled),a[href],summary',$('#environment-workspace')).filter(node=>node.getClientRects().length),index=nodes.indexOf(document.activeElement);
+  if(event.shiftKey&&index<=0){event.preventDefault();nodes.at(-1)?.focus();}
+  else if(!event.shiftKey&&index===nodes.length-1){event.preventDefault();nodes[0]?.focus();}
+ };
+
+ $('#environment-workspace-title').textContent='环境管理';
+ paintEnvironmentWorkspace();openModal('#environment-workspace');$('#environment-workspace [data-close]').focus();
+}
+/** 关闭工作区并恢复原焦点。@return {void} */
+function closeEnvironmentWorkspace(force=false) {
+ if((state.cpuDialog?.inline&&state.cpuDialog.sending||state.runWindowConfig?.inline&&state.runWindowConfig.sending)&&!force)return false;
+ const context=environmentWorkspace;environmentWorkspace=null;
+ $('#environment-workspace')?.classList.add('hidden');
+ if(state.cpuDialog?.inline)closeCpuResourceDialog(true);
+ if(state.runWindowConfig?.inline)closeRunWindowConfig(true);
+ if(context?.opener?.isConnected)context.opener.focus({preventScroll:true});
+}
+/** 更新服务器摘要，页签和已有独立编辑草稿由各自所有者保留。@return {void} */
+function paintEnvironmentWorkspace() {
+ if(!environmentWorkspace)return;
+ const row=state.environmentUI.rows.find(item=>item.environment_id===environmentWorkspace.id);if(!row){closeEnvironmentWorkspace(true);return;}
+ const currentContent=$('#environment-workspace-body');if(!currentContent)return;
+ let content=document.createElement('div');
+ const previousFocus=currentContent.contains(document.activeElement)?document.activeElement:null;
+ const focus=previousFocus?.dataset.envFocus;
+ // 轮询重绘只更新摘要，已经挂载的资源表单保留同一节点和冻结版本。
+ const inlineForm=state.cpuDialog?.inline&&state.cpuDialog.id===row.environment_id?$('#cpu-resource-form'):null;
+
+ const scheduleForm=state.runWindowConfig?.inline?$('#run-window-form'):null;
+ const context=$('#environment-workspace-context'),status=ENVIRONMENT_STATES[row.state]||'未知状态：'+(row.state||'未提供');
+ patchRuntimeContent(context,`<span class="initial">${runtimeIcon('box')}</span><div><strong>${escapeHTML(row.name||'未命名环境')}</strong><p>${row.gateway_account_id!=null?'网关账号 #'+escapeHTML(row.gateway_account_id):row.account_id!=null?'任务账号 #'+escapeHTML(row.account_id):'待提交的授权环境'} · 第 ${escapeHTML(row.generation??'未知')} 代</p></div><span class="status-dot ${row.state==='ready'?'':'off'}">${escapeHTML(status)}</span>`);
+ const labels={overview:['运行概览','当前环境状态与运行组件'],resources:['资源与采集','在这里调整额度、内容采集与加速设置'],kernel:['请求内核','检查版本、准备候选并选择维护动作'],schedule:['运行时段','按账号当地时间安排工作窗口'],maintenance:['维护操作','选择操作后确认影响，当前环境信息持续保留']};
+ content.innerHTML=Object.entries(labels).map(([key,[title,note]])=>`<section id="environment-section-${key}" data-workspace-section="${key}" role="tabpanel"><div class="workspace-section-heading"><h3>${title}</h3><p>${note}</p></div><div data-section-body="${key}"></div></section>`).join('');
+ const scratch=document.createElement('div');scratch.innerHTML=renderEnvironmentDetailCard(row);
+ for(const node of [...scratch.firstElementChild.children]){
+  let tab='overview';
+  if(node.matches('header'))continue;
+  if(node.classList.contains('env-kernel'))tab='kernel';
+  if(node.classList.contains('env-window'))tab=node.querySelector('[data-run-window-config]')?'schedule':'resources';
+  if(node.dataset.envDetails?.endsWith(':maintenance'))tab='maintenance';
+  if(node.querySelector('[data-cpu-resources]'))node.classList.add('environment-cpu-section');
+  content.querySelector(`[data-section-body="${tab}"]`).append(node);
+  if(node.matches('details.env-details'))node.open=state.environmentUI.expanded.has(node.dataset.envDetails);
+ }
+ const overview=content.querySelector('[data-section-body=overview]');
+ const additional=document.createElement('details');additional.className='environment-observations';additional.dataset.envDetails=row.environment_id+':observations';additional.innerHTML='<summary>运行组件与准备详情</summary>';
+ for(const node of [...overview.children])if(node.matches('.env-roles,.env-resources,.env-preparation'))additional.append(node);
+ overview.prepend(additional);
+ const cpu=state.environmentUI.cpuSnapshots?.get(row.environment_id)?.cpus;
+ const prepLabel=({ready:'原生准备就绪',busy:'暖进程使用中',preparing:'原生准备中',failed:'原生准备失败',unknown:'准备状态待检查',disabled:'使用原有转发'})[row.native_preparation?.state]||'状态待核对';
+ const feature=value=>value?.applied===true?(value.enabled?'已生效':'已关闭'):value?.applied===false?'待应用':'状态未知';
+ const metrics=`<div class="environment-dialog-stats"><div><span>CPU 额度</span><strong>${cpu?.cli!=null?escapeHTML(cpu.cli)+' 核':'未采集'}</strong></div><div><span>CRIU 加速</span><strong>${feature(row.criu)}</strong></div><div><span>内容采集</span><strong>${feature(row.content_capture)}</strong></div></div>`;
+ const fields=[['CLI 版本',(row.cli_versions||[]).join(' / ')||'未安装'],['请求内核',row.native_kernel?.current?.release||'未提供'],['环境状态',status+' · '+(row.busy?'CLI 作业执行中':'CLI 作业空闲')],['原生准备',prepLabel]];
+ const properties='<div class="workspace-properties">'+fields.map(([label,value])=>`<div class="kv"><span>${label}</span><strong>${escapeHTML(value)}</strong></div>`).join('')+'</div>';
+ const disabled=row.busy||state.environmentUI.pending.has(row.environment_id)||row.role_status?.cli!=='running';
+ overview.insertAdjacentHTML('afterbegin',metrics+properties+`<div class="workspace-inline-actions"><button type="button" class="btn" data-physical-refresh="${escapeHTML(row.environment_id)}" data-environment="${escapeHTML(row.environment_id)}" ${disabled?'disabled':''}>${runtimeIcon('refresh')}刷新物理实测</button><button type="button" class="btn" data-env-tab="resources">调整资源与采集 ${runtimeIcon('arrow')}</button></div>`);
+ const maintenance=content.querySelector('[data-section-body=maintenance]'),actions=[...maintenance.querySelectorAll('[data-operation]')];
+ const descriptions={stop:'暂停该环境的运行，保留持久数据',rebuild:'保留账号数据并重新准备运行容器',reconcile:'核对服务端操作与环境状态',reprofile:row.reprofile_message||'按服务端许可更新环境画像'};
+ if(actions.length){maintenance.innerHTML='';for(const button of actions){const item=document.createElement('div');item.className='maintenance-option';item.innerHTML=`<div><strong>${escapeHTML(button.textContent)}</strong><p>${escapeHTML(descriptions[button.dataset.operation]||'按服务器许可执行')}</p></div>`;item.append(button);maintenance.append(item);}}
+ const resourceBody=content.querySelector('[data-section-body=resources]');
+ const cpuSection=resourceBody.querySelector('.environment-cpu-section');
+ if(cpuSection){resourceBody.prepend(cpuSection);const host=document.createElement('div');host.id='environment-resource-editor';host.dataset.runtimePreserve='';cpuSection.append(host);if(inlineForm){cpuSection.classList.add('editing');}}
+ const scheduleBody=content.querySelector('[data-section-body=schedule]');if(scheduleBody.querySelector('[data-run-window-config]')){const host=document.createElement('div');host.id='environment-schedule-editor';host.dataset.runtimePreserve='';scheduleBody.append(host);if(scheduleForm){scheduleBody.classList.add('editing');}}
+ patchRuntimeContent(currentContent,content.innerHTML);content=currentContent;
+ content.onclick=event=>{const button=event.target.closest('button');if(!button||button.disabled)return;if(button.dataset.envTab){environmentWorkspace.tab=button.dataset.envTab;applyEnvironmentWorkspaceTab();return;}handleEnvironmentAction(button);};
+ for(const details of $$('details[data-env-details]',content)){
+  if(details.dataset.envDetails.endsWith(':maintenance'))continue;
+  details.open=state.environmentUI.expanded.has(details.dataset.envDetails);
+  details.ontoggle=()=>{if(!details.isConnected)return;if(details.open)state.environmentUI.expanded.add(details.dataset.envDetails);else state.environmentUI.expanded.delete(details.dataset.envDetails);};
+ }
+ const tabs=$('#environment-workspace-tabs');tabs.onclick=event=>{const button=event.target.closest('[data-env-tab]');if(button){environmentWorkspace.tab=button.dataset.envTab;applyEnvironmentWorkspaceTab();}};
+ applyEnvironmentWorkspaceTab();
+ if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});
+ else if(focus)$$('[data-env-focus]',content).find(node=>node.dataset.envFocus===focus)?.focus({preventScroll:true});
+}
+/** 切换可见区块，保留资源草稿及同一表单节点。@return {void} */
+function applyEnvironmentWorkspaceTab(){
+ const tab=environmentWorkspace?.tab;if(!tab)return;
+ $$('[data-workspace-section]',$('#environment-workspace-body')).forEach(node=>{node.hidden=node.dataset.workspaceSection!==tab;});
+ $$('[data-env-tab]',$('#environment-workspace-tabs')).forEach(button=>{button.classList.toggle('active',button.dataset.envTab===tab);button.setAttribute('aria-selected',String(button.dataset.envTab===tab));});
+ if(tab==='schedule'&&!environmentWorkspace.scheduleRequested&&!state.runWindowConfig){const button=$('#environment-section-schedule [data-run-window-config]');if(button&&!button.disabled){environmentWorkspace.scheduleRequested=true;void openRunWindowConfig(button.dataset.runWindowConfig).catch(error=>{if(environmentWorkspace)notifyRuntime('读取运行时段失败：'+error.message);});}}
+ if(tab==='resources'&&!environmentWorkspace.cpuRequested&&!state.cpuDialog){const button=$('#environment-resource-editor')?.closest('.environment-cpu-section')?.querySelector('[data-cpu-resources]');if(button&&!button.disabled){environmentWorkspace.cpuRequested=true;void openCpuResourceDialog(button);}}
 }
 
 /**
@@ -223,7 +346,7 @@ function renderEnvironmentCriu(row, pending) {
     || !['ready', 'stopped'].includes(row.state) || KERNEL_BUSY_STATES.includes(row.native_kernel?.state) || row.native_kernel?.state === 'reconcile';
   const memory = value?.reason === 'memory_budget' ? ` · 当前 ${value.memory_mib} MiB，恢复需 ${value.required_memory_mib} MiB` : '';
   const source = value?.last_start_source === 'criu_restore' ? ' · 最近扩容使用CRIU恢复' : value?.last_start_source === 'exec' ? ' · 最近扩容使用普通启动' : '';
-  return `<section class="env-window"><div><h4>CRIU 加速</h4><p class="env-muted">${known ? (enabled ? '自动开启' : '手动关闭') : '选择待核对'} · ${escapeHTML(CRIU_STATES[value?.state] || '状态待核对')}</p><p class="env-muted">${escapeHTML((nativeRuntimePending(row) ? '已选择原生运行时，等待环境准备' : CRIU_REASONS[value?.reason] || (value?.state === 'ready' ? '同账号热模板可用于新进程恢复' : '等待恢复状态采样')) + memory + source)}</p></div><button type="button" class="btn btn-sm" data-criu-enabled="${target === true}" data-environment="${escapeHTML(row.environment_id)}" data-env-focus="${escapeHTML(row.environment_id + ':criu')}" ${disabled ? 'disabled' : ''}>${label}</button></section>`;
+  return `<section class="env-window"><div><h4>CRIU 加速</h4><p class="env-muted">${known ? (enabled ? '自动开启' : '手动关闭') : '选择待核对'} · ${escapeHTML(CRIU_STATES[value?.state] || '状态待核对')}</p><p class="env-muted">${escapeHTML((nativeRuntimePending(row) ? '已选择原生运行时，等待环境准备' : CRIU_REASONS[value?.reason] || (value?.state === 'ready' ? '同账号热模板可用于新进程恢复' : '等待恢复状态采样')) + memory + source)}</p></div><button type="button" class="env-switch" role="switch" aria-label="${label}" aria-checked="${enabled === true}" data-criu-enabled="${target === true}" data-environment="${escapeHTML(row.environment_id)}" data-env-focus="${escapeHTML(row.environment_id + ':criu')}" ${disabled ? 'disabled' : ''}><span></span></button></section>`;
 }
 
 /** 在明确点击后读取CAS并应用账号选择。@param {HTMLButtonElement} button 操作按钮。@return {Promise<void>} 实际提交及刷新。 */
@@ -237,7 +360,7 @@ async function applyEnvironmentCriu(button) {
   try {
     const before = await API(`/environments/${encodeURIComponent(id)}/criu`);
     if (generation !== state.viewGeneration || currentTab() !== 'environments') return;
-    if (!confirm(`为 ${row.name} ${enabled ? '开启' : '关闭'}CRIU加速？将在空闲时重建环境，保留HOME与账号身份。`)) return;
+    if (!await confirmRuntimeAction(`为 ${row.name} ${enabled ? '开启' : '关闭'}CRIU加速？将在空闲时重建环境，保留HOME与账号身份。`)) return;
     await API(`/environments/${encodeURIComponent(id)}/criu`, {method: 'POST', body: JSON.stringify({
       enabled, expected_generation: before.generation, expected_revision: before.revision,
     })});
@@ -287,6 +410,7 @@ function renderNativeKernel(row) {
  * @return {Promise<void>} 当前动作及状态刷新完成。
  */
 async function handleEnvironmentAction(button) {
+  if (button.dataset.envOpen) return openEnvironmentWorkspace(button);
   const ui = state.environmentUI, id = button.dataset.environment, generation = state.viewGeneration;
   if (!id || ui.pending.has(id)) return;
   if (button.hasAttribute('data-native-prepare')) return retryNativePreparation(button);
@@ -305,7 +429,7 @@ async function handleEnvironmentAction(button) {
   const operation = button.dataset.operation;
   const physical = button.hasAttribute('data-physical-refresh');
   if (!physical && !['stop', 'rebuild', 'reconcile', 'reprofile', 'cancel-credential-return'].includes(operation)) return;
-  if (!physical && !confirm(operation === 'reprofile' ? '画像校正会生成新的环境参数，并保留登录凭据。确认继续？' : '确认在账号空闲时执行此维护操作？持久数据会保留。')) return;
+  if (!physical && !await confirmRuntimeAction(operation === 'reprofile' ? '画像校正会生成新的环境参数，并保留登录凭据。确认继续？' : '确认在账号空闲时执行此维护操作？持久数据会保留。')) return;
   ui.pending.add(id);
   ui.feedback.delete(id);
   paintEnvironments();
@@ -521,7 +645,7 @@ async function openCpuResourceDialog(button) {
   if (state.cpuDialog) return;
   const id = button.dataset.environment, row = state.environmentUI.rows.find(item => item.environment_id === id);
   if (!row) return;
-  const request = {id, generation: state.viewGeneration, focus: button.dataset.envFocus, sending: false, resources: null};
+  const request = {id, generation: state.viewGeneration, focus: button.dataset.envFocus, sending: false, resources: null, inline: !!environmentWorkspace && environmentWorkspace.id===id && environmentWorkspace.tab==='resources'};
   state.cpuDialog = request;
   const modal = $('#cpu-resource-modal'), form = $('#cpu-resource-form');
   $('#cpu-resource-description').textContent = `${row.name || '当前环境'} · 正在读取实际额度`;
@@ -535,12 +659,13 @@ async function openCpuResourceDialog(button) {
     if (event.shiftKey && index <= 0) { event.preventDefault(); nodes.at(-1)?.focus(); }
     else if (!event.shiftKey && index === nodes.length - 1) { event.preventDefault(); nodes[0]?.focus(); }
   };
-  openModal('#cpu-resource-modal');
-  $('[data-close]', modal).focus();
+  if(request.inline){$('#environment-resource-editor').append(form);form.closest('.environment-cpu-section').classList.add('editing');}
+  else {openModal('#cpu-resource-modal');$('[data-close]', modal).focus();}
   try {
     const resources = await API(`/environments/${encodeURIComponent(id)}/cpu-resources`);
     if (state.cpuDialog !== request) return;
     request.resources = resources;
+    (state.environmentUI.cpuSnapshots ||= new Map()).set(id, resources);
     $('#cpu-resource-description').textContent = `${row.name || '当前环境'} · 宿主 ${resources.host_cpus} 核 · 代次 ${resources.generation}`;
     for (const role of ['cli', 'sender', 'network']) {
       form.elements[role].value = resources.cpus[role];
@@ -561,6 +686,7 @@ function closeCpuResourceDialog(force = false) {
   const request = state.cpuDialog, modal = $('#cpu-resource-modal');
   if (!modal || (request?.sending && !force)) return false;
   state.cpuDialog = null;
+  if(request?.inline){$('.modal-card',modal).append($('#cpu-resource-form'));$('#environment-workspace-body .environment-cpu-section')?.classList.remove('editing');}
   modal.classList.add('hidden');
   modal.onkeydown = null;
   $$('[data-close]', modal).forEach(button => { button.disabled = false; });
@@ -582,21 +708,26 @@ async function submitCpuResources(event) {
   const modal = $('#cpu-resource-modal'), form = $('#cpu-resource-form');
   const cpus = Object.fromEntries(['cli', 'sender', 'network'].map(role => [role, Number(form.elements[role].value)]));
   request.sending = true;
-  $$('input, button', modal).forEach(node => { node.disabled = true; });
+  $$('input, button', request.inline ? form : modal).forEach(node => { node.disabled = true; });
   $('#cpu-resource-feedback').textContent = '正在应用并核对实际额度…';
   try {
-    await API(`/environments/${encodeURIComponent(request.id)}/cpu-resources`, {method: 'POST', body: JSON.stringify({
+    const result=await API(`/environments/${encodeURIComponent(request.id)}/cpu-resources`, {method: 'POST', body: JSON.stringify({
       expected_generation: request.resources.generation, expected_revision: request.resources.revision, cpus
     })});
     if (state.cpuDialog !== request) return;
     request.sending = false;
-    closeCpuResourceDialog();
+    if(request.inline){
+      request.resources=result;(state.environmentUI.cpuSnapshots ||= new Map()).set(request.id,result);
+      $$('input,button',form).forEach(node=>{node.disabled=false;});
+      for(const role of ['cli','sender','network'])form.elements[role].value=result.cpus[role];
+      $('#cpu-resource-feedback').textContent='CPU 额度已应用，重建配置已保存。';
+    }else closeCpuResourceDialog();
     state.environmentUI.feedback.set(request.id, 'CPU 额度已应用，重建配置已保存。');
   } catch (error) {
     if (state.cpuDialog === request) $('#cpu-resource-feedback').textContent = '保存失败：' + error.message + '。请关闭窗口并重新读取实际额度。';
   } finally {
     request.sending = false;
-    if (state.cpuDialog === request) $$('[data-close]', modal).forEach(button => { button.disabled = false; });
+    if (state.cpuDialog === request) $$('[data-close]', request.inline?form:modal).forEach(button => { button.disabled = false; });
     if (request.generation === state.viewGeneration && currentTab() === 'environments') await renderEnvironments();
   }
 }

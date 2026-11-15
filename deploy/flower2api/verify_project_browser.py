@@ -6,6 +6,7 @@ import sqlite3
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from native_ui import navigate, click_text
 
 
 @contextmanager
@@ -94,11 +95,13 @@ def project_browser_fixture(client, deployment: str, data: Path, browser, base: 
         :param session_id: 浏览器会话。
         :return: None；断言失败即停止。
         """
-        doc = "document.querySelector('iframe').contentDocument"
+        doc = "document"
         win = doc + '.defaultView'
         await wait_for(f'Boolean({doc}?.querySelector(".tabs"))')
         await rpc('Page.addScriptToEvaluateOnNewDocument', {'source': probe}, session_id)
-        await evaluate(f'{win}.eval({json.dumps(probe)})')
+        await evaluate('window.__reloadPending=true')
+        await rpc('Page.reload',{},session_id)
+        await wait_for('!window.__reloadPending && Boolean(document.querySelector(".task-runtime[aria-busy=false]"))')
 
         async def ready(mode, account=aid):
             """等真实选择、配置、终端及 SSE 完成。@param mode 空间。@param account 账号。@return None。"""
@@ -116,24 +119,24 @@ def project_browser_fixture(client, deployment: str, data: Path, browser, base: 
                 f'Array.from({win}.__iterationProbe.sources)[0].readyState===1')
 
         async def go(mode, account=aid):
-            """通过现有 hash 路由进入空间。@param mode 空间。@param account 账号。@return None。"""
-            await evaluate(f'{win}.location.hash={json.dumps("#" + mode + "?account=" + str(account))}')
+            """通过原生分区及账号选择进入空间。@param mode 空间。@param account 账号。@return None。"""
+            await navigate(evaluate,wait_for,mode,account)
             await ready(mode, account)
 
         await go('projects')
         assert await evaluate(f'{doc}.querySelectorAll(".tabs [data-tab=projects]").length') == 1
-        assert await evaluate(f'{doc}.querySelectorAll(".tabs [data-tab=warmup]").length') == 0
+        assert await evaluate(f'{doc}.querySelectorAll(".tabs [data-tab=warmup]").length') == 1
         assert await evaluate(f'{doc}.querySelector(".tabs .active .tab-cn").textContent') == '工程迭代'
         timers = await evaluate(f'{win}.__iterationProbe.timers.size')
-        assert await evaluate(f'{doc}.querySelector("[data-iteration-mode=projects]").getAttribute("aria-current")') == 'page'
+        assert await evaluate(f'{doc}.querySelector("[data-tab=projects]").classList.contains("active")')
         # 真正键盘激活链接，不能靠直接调用渲染器掩盖可访问性问题。
-        await evaluate(f'{doc}.querySelector("[data-iteration-mode=warmup]").focus()')
+        await evaluate(f'{doc}.querySelector("[data-tab=warmup]").focus()')
         for kind in ('keyDown', 'keyUp'):
             await rpc('Input.dispatchKeyEvent', {'type': kind, 'key': 'Enter', 'code': 'Enter'}, session_id)
         await ready('warmup')
         assert await evaluate(f'{doc}.querySelector("#projects-schedule-form").elements.interval_minutes.value') == '22'
         assert keys[1] == await evaluate(f'{doc}.querySelector("[name=project_key]:checked").value')
-        await evaluate(f'{doc}.querySelector("[data-iteration-mode=projects]").click()')
+        await evaluate(f'{doc}.querySelector("[data-tab=projects]").click()')
         await ready('projects')
         await evaluate(f'{win}.history.back()')
         await ready('warmup')
@@ -142,22 +145,25 @@ def project_browser_fixture(client, deployment: str, data: Path, browser, base: 
         await evaluate(f'{doc}.querySelector("#projects-account").value="{bid}"; '
             f'{doc}.querySelector("#projects-account").dispatchEvent(new ({win}.Event)("change"))')
         await ready('projects', bid)
-        await evaluate(f'{doc}.querySelector("[data-iteration-mode=warmup]").click()')
+        assert await evaluate('location.hash') == ''
+        await evaluate(f'{doc}.querySelector("[data-tab=warmup]").click()')
         await ready('warmup', bid)
         await evaluate(f'window.__iterationPreviousDocument={doc}; {win}.location.reload()')
         # reload 返回时旧页面仍可读取，必须等新 Document 才能检验真正的刷新恢复。
         await wait_for(f'{doc}!==window.__iterationPreviousDocument && {doc}?.readyState==="complete"')
         await ready('warmup', bid)
-        assert await evaluate(f'{win}.location.hash') == f'#warmup?account={bid}'
+        assert await evaluate('location.pathname+location.search') == f'/tasks?tab=warmup&account={bid}'
         assert not await evaluate(f'Boolean({win}.__iterationXss)')
         print('通过：统一顶层入口、键盘切换、账号保留、刷新及前进后退，账号名转义', flush=True)
 
         for mode in ('projects', 'warmup'):
             await go(mode)
             assert await evaluate(f'{doc}.querySelector("#projects-history").textContent.includes("{mode}-goal")')
-            await evaluate(f'{doc}.querySelector("#projects-events-next").click()')
+            await evaluate('document.querySelector("#projects-tab-events").click()')
+            await click_text(evaluate,'[aria-label=交互记录分页] button','下一页')
             await wait_for(f'{doc}.querySelector("#projects-events-page").textContent.includes("第 2 页")')
-            await evaluate(f'{doc}.querySelector("#projects-history-next").click()')
+            await evaluate('document.querySelector("[data-project-pane=history]").click()')
+            await click_text(evaluate,'[aria-label=工程记录分页] button','下一页')
             await wait_for(f'{doc}.querySelector("#projects-history-page").textContent.includes("第 2 页")')
             await evaluate(f'{doc}.querySelector("#projects-agent-form").elements.instructions.value="未保存输入"')
         assert facts() == baseline
@@ -166,9 +172,9 @@ def project_browser_fixture(client, deployment: str, data: Path, browser, base: 
         await evaluate(f'{win}.__iterationProbe.requests=[]; '
             f'{win}.__iterationProbe.hold="/runtime/api/projects/agents/{aid}/snapshot"')
         await go('warmup')
-        await evaluate(f'{doc}.querySelector("[data-iteration-mode=projects]").click()')
+        await evaluate(f'{doc}.querySelector("[data-tab=projects]").click()')
         await wait_for(f'{win}.__iterationProbe.releases.length>0')
-        await evaluate(f'{doc}.querySelector("[data-iteration-mode=warmup]").click()')
+        await evaluate(f'{doc}.querySelector("[data-tab=warmup]").click()')
         await ready('warmup')
         await evaluate(f'{win}.__iterationProbe.hold=""; {win}.__iterationProbe.releases.splice(0).forEach(resolve=>resolve())')
         await asyncio.sleep(0.2)
@@ -176,7 +182,7 @@ def project_browser_fixture(client, deployment: str, data: Path, browser, base: 
         timers = await evaluate(f'{win}.__iterationProbe.timers.size')
         for index in range(20):
             mode = 'projects' if index % 2 == 0 else 'warmup'
-            await evaluate(f'{doc}.querySelector("[data-iteration-mode={mode}]").click()')
+            await evaluate(f'{doc}.querySelector("[data-tab={mode}]").click()')
             await wait_for(f'{doc}.querySelector("#projects-overview")?.dataset.namespace==="{mode}"')
         await ready('warmup')
         assert await evaluate(f'{win}.__iterationProbe.sources.size') == 1
@@ -187,42 +193,50 @@ def project_browser_fixture(client, deployment: str, data: Path, browser, base: 
         print('通过：不同项目池/计划/终端/记录与分页；未保存表单不写入；慢响应及20次切换无串空间、额外SSE或定时器', flush=True)
 
         for invalid in ('-1', 'abc', f'{aid}?unexpected', '9007199254740992', f'{aid}&account={bid}', str(disabled), '999999'):
-            await evaluate(f'{win}.location.hash={json.dumps("#projects?account=" + invalid)}')
-            await wait_for(f'{doc}.querySelector("#projects-feedback")?.textContent.includes("账号当前不可用")')
+            await evaluate("window.__reloadPending=true")
+            await rpc("Page.navigate",{"url":base+"/tasks?tab=projects&account="+invalid},session_id)
+            await wait_for('!window.__reloadPending && Boolean(document.querySelector(".task-runtime[aria-busy=false]"))')
+            try:
+                await wait_for(f'{doc}.querySelector("#projects-feedback")?.textContent.includes("账号当前不可用")')
+            except TimeoutError:
+                raise AssertionError('无效账号入口未拒绝：'+invalid+'；'+str(await evaluate('location.pathname+location.search'))) from None
             assert await evaluate(f'{doc}.querySelector("#projects-account").value') == ''
             assert await evaluate(f'{win}.__iterationProbe.sources.size') == 0
         with sqlite3.connect(database) as connection:
             connection.execute('UPDATE accounts SET deleted_at=? WHERE id=?', (time.time(), bid))
-        await evaluate(f'{win}.location.hash="#warmup?account={bid}"')
+        await evaluate("window.__reloadPending=true")
+        await rpc("Page.navigate",{"url":base+f"/tasks?tab=warmup&account={bid}"},session_id)
+        await wait_for('!window.__reloadPending && Boolean(document.querySelector(".task-runtime[aria-busy=false]"))')
         await wait_for(f'{doc}.querySelector("#projects-feedback")?.textContent.includes("账号当前不可用")')
         assert await evaluate(f'{doc}.querySelector("#projects-account").value') == ''
         for mode in ('projects', 'warmup'):
-            await evaluate(f'{win}.location.hash="#{mode}"')
+            await navigate(evaluate,wait_for,mode,aid)
             await ready(mode)
-        await evaluate(f'{win}.location.hash="#accounts"')
-        await wait_for(f'Boolean({doc}.querySelector("[data-warmup-console=\\"{aid}\\"]"))')
-        await evaluate(f'{doc}.querySelector("[data-warmup-console=\\"{aid}\\"]").click()')
+        await navigate(evaluate,wait_for,'accounts')
+        await wait_for(f'Boolean({doc}.querySelector(".work-account-links a[href=\\"#warmup?account={aid}\\"]"))')
+        await evaluate(f'{doc}.querySelector(".work-account-links a[href=\\"#warmup?account={aid}\\"]").click()')
         await ready('warmup')
         print('通过：旧链接、账号页直达；非法/重复/失效/已删除账号不默认操作其他账号', flush=True)
 
         for mode in ('projects', 'warmup'):
             await go(mode)
+            await evaluate('document.querySelector("[data-project-pane=overview]").click()')
             await evaluate(f'{doc}.querySelector("#projects-cli-settings").click()')
-            await wait_for(f'{doc}.querySelector("#cli-settings-title").textContent.includes("'
-                + ('项目迭代配置' if mode == 'projects' else '养号迭代配置') + '")')
+            await wait_for(f'{doc}.querySelector("#cli-settings-title").textContent==="执行配置"')
             await wait_for(f'!{doc}.querySelector("#cli-settings-form button[type=submit]").disabled')
             await evaluate(f'{doc}.querySelector("#cli-settings-form").elements.capture_enabled.checked=true; '
                 f'{doc}.querySelector("#cli-settings-form").requestSubmit()')
             await wait_for(f'{doc}.querySelector("#cli-settings-feedback").textContent.includes("配置已保存")')
             other = 'warmup' if mode == 'projects' else 'projects'
-            await evaluate(f'{doc}.querySelector("[data-iteration-mode={other}]").click()')
+            await evaluate(f'{doc}.querySelector("[data-tab={other}]").click()')
             await ready(other)
             assert await evaluate(f'{doc}.querySelector("#cli-settings-modal").classList.contains("hidden")')
+            await evaluate('document.querySelector("[data-project-pane=history]").click()')
             await evaluate(f'{doc}.querySelector("#projects-capture").click()')
-            await wait_for(f'{doc}.querySelector("#work-capture-content").textContent!=="正在读取抓包…"')
+            await wait_for(f'{doc}.querySelector("#work-capture-view").textContent!=="正在读取抓包…"')
             assert await evaluate(f'{win}.__iterationProbe.requests.some(item=>item.path.includes("'
                 + endpoints[other] + '/work/' + other + f'-{aid}-11/capture"))')
-            await evaluate(f'{doc}.querySelector("[data-iteration-mode={mode}]").click()')
+            await evaluate(f'{doc}.querySelector("[data-tab={mode}]").click()')
             await ready(mode)
             assert await evaluate(f'{doc}.querySelector("#work-capture-modal").classList.contains("hidden")')
         with sqlite3.connect(database) as connection:
@@ -232,14 +246,14 @@ def project_browser_fixture(client, deployment: str, data: Path, browser, base: 
             await rpc('Emulation.setDeviceMetricsOverride', {'width': width, 'height': height,
                 'deviceScaleFactor': 1, 'mobile': width < 500}, session_id)
             for theme in ('dark', 'light'):
-                if await evaluate(f'{doc}.documentElement.dataset.theme') != theme:
+                if await evaluate(f'{doc}.querySelector(".task-runtime").dataset.theme') != theme:
                     await evaluate(f'{doc}.querySelector("#theme-toggle").click()')
-                await wait_for(f'{doc}.documentElement.dataset.theme==="{theme}"')
+                await wait_for(f'{doc}.querySelector(".task-runtime").dataset.theme==="{theme}"')
                 assert await evaluate(f'{doc}.documentElement.scrollWidth <= {win}.innerWidth+2')
                 shot = await rpc('Page.captureScreenshot', {'format': 'png'}, session_id)
                 Path(f'/tmp/v3-iteration-console-{width}-{theme}.png').write_bytes(base64.b64decode(shot['data']))
         before_leave = await evaluate(f'{win}.__iterationProbe.timers.size')
-        await evaluate(f'{win}.location.hash="#accounts"')
+        await navigate(evaluate,wait_for,'accounts')
         await wait_for(f'{win}.__iterationProbe.sources.size===0 && {win}.__iterationProbe.timers.size==={before_leave - 1}')
         assert facts() == baseline
         print('通过：两空间配置/抓包正确，切换关闭弹窗；1280/720/390px明暗主题；卸载释放SSE/时钟且持久工作/计划不变；未调用真实模型', flush=True)

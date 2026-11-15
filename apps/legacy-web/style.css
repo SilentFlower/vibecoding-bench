@@ -44,7 +44,7 @@
 /* ===== reset ===== */
 *, *::before, *::after {
   box-sizing: border-box;
-  border-radius: 0 !important;     /* terminal: no rounded corners anywhere */
+  /* 圆角由具体控件定义，保持弹窗、按钮和信息表面的层级。 */
 }
 
 html, body {

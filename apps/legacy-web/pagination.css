@@ -1,0 +1,31 @@
+/* Vue与原生记录分页共享尺寸、字体及菜单层次。 */
+.pagination-size,.pagination-size-native{display:inline-flex;align-items:center;gap:8px;flex:none;white-space:nowrap;font:400 11px/normal 'Inter Variable','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',system-ui,sans-serif;color:#8a97aa}
+.pagination-size>.fui-field{display:contents}
+.pagination-size .fui-label{font-size:11px;line-height:normal;color:#8a97aa}
+.pagination-size .fui-choice,.pagination-size-native .native-choice-trigger,.pagination-size-native>select{width:105px;min-width:0;min-height:32px;height:32px;padding:6px 10px;gap:8px;border:1px solid #e2e6ed;border-radius:7px;background:#fff;box-shadow:none;color:#52647e;font:400 12px/normal 'Inter Variable','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',system-ui,sans-serif;cursor:pointer}
+.pagination-size .fui-choice:hover,.pagination-size-native .native-choice-trigger:hover{border-color:#c6b9d7;background:#faf8fd}
+.pagination-size .fui-choice:focus-visible,.pagination-size .fui-choice[data-state=open]{outline:none;border-color:#ad9bc4;box-shadow:0 0 0 3px #a28eb414}
+.pagination-size-menu{min-width:125px;width:var(--reka-select-trigger-width);max-height:250px;padding:5px;overflow:auto;border:1px solid #e2e6ed;border-radius:9px;background:#fff;box-shadow:0 8px 28px #26203b1c;color:#52647e;z-index:100;font-family:'Inter Variable','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',system-ui,sans-serif}
+.pagination-size-menu .fui-choice-option{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:32px;padding:8px 10px;border-radius:5px;font-size:12px;line-height:1.5;cursor:pointer;outline:none}
+.pagination-size-menu .fui-choice-option[data-highlighted]{background:#f0ecf7;color:#7c629c}
+.pagination-size-menu .fui-choice-option[data-state=checked]{color:#7c629c;font-weight:500}
+.pagination-size-menu svg{width:14px;height:14px}
+@media(max-width:600px){.pagination-size .fui-label{font-size:10px}.pagination-size .fui-choice{width:98px}.pagination-size{gap:6px}}
+.proxy-pagination,.capture-workspace .capture-pager,.request-list-footer>div{flex-wrap:wrap}
+
+/* 共享分页在Vue路由及迁移期间的同源工作区保持同一外观。 */
+
+.fui-pagination{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;width:100%;font-size:12px;color:#8a97aa}
+.fui-pagination-summary{display:flex;align-items:center;flex-wrap:wrap;gap:14px}
+.fui-pagination-controls{display:flex;align-items:center;gap:6px}
+.fui-pagination-controls [data-slot=button]{display:inline-flex;align-items:center;justify-content:center;gap:4px;font-family:inherit;font-weight:500;white-space:nowrap;flex-shrink:0;height:32px;min-height:32px;padding:6px 10px;font-size:12px;line-height:1.3;background:#fff;border:1px solid #e2e6ed;border-radius:7px;color:#52647e;box-shadow:none;cursor:pointer;pointer-events:auto}
+.fui-pagination-controls [data-slot=button]:hover{background:#faf8fd;border-color:#c6b9d7;color:#77648f}
+.fui-pagination-controls .fui-pagination-number{min-width:32px;padding:6px 9px;font-variant-numeric:tabular-nums}
+.fui-pagination-controls [data-slot=button]:disabled{opacity:1;background:#f3f4f8;border-color:#e7eaf0;color:#9ba6b7;cursor:not-allowed}
+.fui-pagination-controls [data-slot=button][aria-current=page]{background:#77648f;border-color:#77648f;color:#fff}
+.fui-pagination-controls [data-slot=button][aria-current=page]:hover{background:#68547f;border-color:#68547f;color:#fff}
+.fui-pagination-gap{width:16px;text-align:center;color:#8a97aa}
+@media(max-width:600px){.fui-pagination-direction{display:none}.fui-pagination-controls [data-slot=button]{padding:6px 8px}.fui-pagination-controls{gap:4px}.fui-pagination-gap{width:12px}}
+
+.fui-pagination-controls [data-slot=button] svg{width:13px;height:13px;pointer-events:none}
+.fui-pagination-controls [data-slot=button]:focus-visible{outline:2px solid #ad9bc4;outline-offset:2px}

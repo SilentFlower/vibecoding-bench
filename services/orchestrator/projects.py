@@ -757,6 +757,10 @@ class ProjectsService:
             except Exception:
                 gate = {'allowed': False, 'reason': 'unavailable', 'retryable': False, 'message': '执行条件暂不可读取'}
             public = {key: gate.get(key) for key in ('allowed', 'reason', 'retryable', 'retry_at', 'message')}
+            capacity = gate.get('cli_capacity')
+            public['cli_capacity'] = ({key: capacity[key] for key in ('active', 'limit')}
+                if isinstance(capacity, dict) and type(capacity.get('active')) is int and capacity['active'] >= 0
+                and type(capacity.get('limit')) is int and capacity['limit'] > 0 else None)
             quota = gate.get('quota')
             public['quota'] = None if not isinstance(quota, dict) else {
                 'known': bool(quota.get('known')), 'source': quota.get('source'),

@@ -9,6 +9,7 @@ use sha2::{Digest, Sha256};
 use tracing::debug;
 
 use crate::error::AppError;
+use crate::model::proxy::ProxyConnection;
 
 // ---------------------------------------------------------------------------
 // OAuth 常量
@@ -110,6 +111,8 @@ impl SessionStore {
 #[derive(Deserialize)]
 pub struct GenerateAuthUrlRequest {
     pub proxy_url: Option<String>,
+    pub proxy_id: Option<String>,
+    pub proxy_revision: Option<String>,
 }
 
 /// 生成授权 URL 的响应。
@@ -180,10 +183,38 @@ pub struct OAuthFlowService {
 }
 
 impl OAuthFlowService {
+    /// 在目录配置锁内更新尚未交换的授权连接，过期会话无需重建。
+    /// @param id 授权会话。@param source 原指纹。@param destination 新连接。@return 目标已收口。
+    pub fn synchronize_proxy_connection(&self, id: &str, source: &str, destination: &str) -> bool {
+        let mut sessions = self.store.sessions.lock().unwrap();
+        sessions.retain(|_, session| session.created_at.elapsed() < SESSION_TTL);
+        let Some(session) = sessions.get_mut(id) else {
+            return true;
+        };
+        let Ok(connection) = ProxyConnection::parse(&session.proxy_url) else {
+            return false;
+        };
+        if connection.fingerprint() == source {
+            session.proxy_url = destination.to_owned();
+        }
+        true
+    }
     pub fn new() -> Self {
         Self {
             store: SessionStore::new(),
         }
+    }
+
+    /// 读取未过期授权流程的私有代理连接，供目录引用保护使用。
+    /// @return 私有会话身份与连接，调用方只公开白名单身份。
+    pub fn proxy_references(&self) -> Vec<(String, String)> {
+        let mut sessions = self.store.sessions.lock().unwrap();
+        sessions.retain(|_, session| session.created_at.elapsed() < SESSION_TTL);
+        sessions
+            .iter()
+            .filter(|(_, session)| !session.proxy_url.is_empty())
+            .map(|(id, session)| (id.clone(), session.proxy_url.clone()))
+            .collect()
     }
 
     /// 生成 OAuth 授权 URL（完整 scope）。
@@ -364,4 +395,25 @@ fn percent_encode(input: &str) -> String {
         }
     }
     result
+}
+
+#[cfg(test)]
+mod directory_tests {
+    use super::*;
+
+    #[test]
+    fn selected_connection_is_frozen_for_original_authorization_session() {
+        let service = OAuthFlowService::new();
+        let request = GenerateAuthUrlRequest {
+            proxy_url: Some("socks5://user:secret@synthetic.invalid:1080".into()),
+            proxy_id: None,
+            proxy_revision: None,
+        };
+        let response = service.generate_auth_url(&request);
+        let references = service.proxy_references();
+        assert_eq!(references[0].0, response.session_id);
+        let session = service.store.take(&response.session_id).unwrap();
+        assert_eq!(session.proxy_url, request.proxy_url.unwrap());
+        assert!(service.proxy_references().is_empty());
+    }
 }

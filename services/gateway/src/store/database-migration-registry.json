@@ -10,6 +10,24 @@
       "predecessor": 0,
       "rollback_mode": "compatible",
       "version": 1
+    },
+    {
+      "checksum": "0d9f202884e52578a73ddd95b79850ef97005778a9c30573f1f9b7874a895f1d",
+      "engine": "sqlite",
+      "id": "gateway.proxies.2",
+      "kind": "schema",
+      "predecessor": 1,
+      "rollback_mode": "compatible",
+      "version": 2
+    },
+    {
+      "checksum": "d8794ebf887fc2e08857bc1972beb452a47dc219361c03112a196c8f5cd32430",
+      "engine": "sqlite",
+      "id": "gateway.proxy-sync.3",
+      "kind": "schema",
+      "predecessor": 2,
+      "rollback_mode": "compatible",
+      "version": 3
     }
   ]
 }

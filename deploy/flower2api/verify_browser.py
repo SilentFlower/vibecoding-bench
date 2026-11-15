@@ -6,6 +6,7 @@ import shutil
 import signal
 import socket
 import tempfile
+from pathlib import Path
 import urllib.request
 from urllib.parse import urlsplit
 
@@ -73,6 +74,8 @@ async def verify_visible_logout(base: str, password: str, exercise=None, insecur
                 attached = await rpc("Target.attachToTarget", {"targetId": target["targetId"], "flatten": True})
                 session_id = attached["sessionId"]
                 await rpc("Page.enable", session=session_id)
+                await rpc("Page.addScriptToEvaluateOnNewDocument", {"source": Path(__file__).with_name('native_browser_probe.js').read_text()}, session_id)
+                await rpc("Emulation.setDeviceMetricsOverride", {"width": 1440, "height": 1000, "deviceScaleFactor": 1, "mobile": False}, session_id)
 
                 async def evaluate(expression):
                     """执行页面操作并只返回所需值；脚本异常不回显认证信息。"""
@@ -100,19 +103,18 @@ async def verify_visible_logout(base: str, password: str, exercise=None, insecur
                 # Input 使用 passive useVModel，需先等组件的异步状态同步，再模拟提交。
                 await evaluate("new Promise(resolve=>requestAnimationFrame(()=>resolve()))")
                 await evaluate("document.querySelector('form').requestSubmit()")
-                await wait_for("Boolean(Array.from(document.querySelectorAll('a')).find(a=>a.textContent.trim()==='环境与任务'))")
-                await evaluate("Array.from(document.querySelectorAll('a')).find(a=>a.textContent.trim()==='环境与任务').click()")
-                await wait_for("Boolean(document.querySelector('iframe'))")
-                # HTML 与 API 返回 200 时，资源白名单缺项仍会让 iframe 初始化失败。
-                await wait_for("(() => {const frame=document.querySelector('iframe'), view=frame?.contentWindow, doc=frame?.contentDocument;"
-                    "return Boolean(doc && typeof view.renderEnvironments==='function' && Array.from(doc.styleSheets).some(sheet=>"
-                    "sheet.href && new URL(sheet.href).pathname.endsWith('/environments.css') && sheet.cssRules.length>0));})()")
+                await wait_for("Boolean(document.querySelector('.console-sidebar a[href=\"/tasks\"]'))")
+                await evaluate("document.querySelector('.console-sidebar a[href=\"/tasks\"]').click()")
+                await wait_for("Boolean(document.querySelector('.task-runtime[aria-busy=false] #accounts-body'))")
+                assert await evaluate("document.querySelectorAll('iframe').length") == 0
+                await evaluate('document.fonts.ready')
                 assert await evaluate("fetch('/runtime/api/environments').then(response=>response.status)") == 200
                 if exercise is not None:
                     await exercise(rpc, evaluate, wait_for, session_id)
                 cookies = await rpc("Network.getCookies", {"urls": [browser_base + "/runtime/"]}, session_id)
                 old = next(cookie for cookie in cookies["cookies"] if cookie["name"] == "vb_v3_session")
-                await evaluate("Array.from(document.querySelectorAll('button')).find(button=>button.textContent.trim()==='退出').click()")
+                await rpc("Emulation.setDeviceMetricsOverride", {"width": 1440, "height": 1000, "deviceScaleFactor": 1, "mobile": False}, session_id)
+                await evaluate("document.querySelector('.sidebar-exit').click()")
                 await wait_for("location.pathname==='/login'")
                 assert await evaluate("fetch('/runtime/api/environments').then(response=>response.status)") == 401
                 client = requests.Session()

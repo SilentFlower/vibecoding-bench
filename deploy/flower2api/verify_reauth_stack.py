@@ -35,7 +35,7 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
     labels = {"vibebench.product": "v3", "vibebench.deployment": deployment, "vibebench.role": "verification"}
     proxy = client.containers.run(manifest["images"]["control"]["reference"],
         ["/fixtures/mock_network.py"], entrypoint="python", detach=True,
-        network="vibebench-v3-" + deployment, labels=labels,
+        network="flower2api-" + deployment, labels=labels,
         volumes={str(REPO / "deploy/flower2api/fixtures"): {"bind": "/fixtures", "mode": "ro"},
                  str(fixture_data): {"bind": "/fixtures-data", "mode": "rw"}})
     account_id = None
@@ -108,9 +108,9 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
             :param session_id: 私有浏览器会话
             :return: None；不符合期望时抛错
             """
-            doc = "document.querySelector('iframe').contentDocument"
-            win = "document.querySelector('iframe').contentWindow"
-            state = win + ".eval('state.accLogin')"
+            doc = "document"
+            win = "window"
+            state = "window.__nativeProbe.readLogin()"
             assert not await evaluate(f"{win}.isSecureContext"), "复制降级必须在真实 HTTP 非安全上下文验证"
             await wait_for(f"Boolean({doc}?.querySelector('[data-relogin=\"{account_id}\"]'))")
             await evaluate(f"{doc}.querySelector('[data-relogin=\"{account_id}\"]').click()")
@@ -159,7 +159,7 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
             for width in (1280, 390):
                 await rpc("Emulation.setDeviceMetricsOverride", {"width": width, "height": 900, "deviceScaleFactor": 1, "mobile": False}, session_id)
                 for theme in ("dark", "light"):
-                    await evaluate(f"if({doc}.documentElement.dataset.theme !== '{theme}') {doc}.querySelector('#theme-toggle').click()")
+                    await evaluate(f"if({doc}.querySelector('.task-runtime').dataset.theme !== '{theme}') {doc}.querySelector('#theme-toggle').click()")
                     await evaluate("new Promise(resolve=>setTimeout(resolve,250))")
                     bounds = await evaluate(f"(() => {{const d={doc},r=d.querySelector('#acc-modal .modal-card').getBoundingClientRect();return {{left:r.left,right:r.right,width:d.defaultView.innerWidth}};}})()")
                     assert bounds["left"] >= -1 and bounds["right"] <= bounds["width"] + 1
@@ -175,12 +175,12 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
             await evaluate(f"{doc}.querySelector('#acc-login-xterm').scrollIntoView({{block:'center'}})")
             for offset in (1, 5):
                 await evaluate(f"{doc}.querySelector('#acc-auth-url').focus()")
-                point = await evaluate(f"(() => {{const f=document.querySelector('iframe').getBoundingClientRect(),r={doc}.querySelector('#acc-login-xterm').getBoundingClientRect();return {{x:f.left+r.left+{offset},y:f.top+r.top+20}};}})()")
+                point = await evaluate(f"(() => {{const f={{left:0,top:0}},r={doc}.querySelector('#acc-login-xterm').getBoundingClientRect();return {{x:f.left+r.left+{offset},y:f.top+r.top+20}};}})()")
                 await rpc("Input.dispatchMouseEvent", {"type": "mousePressed", **point, "button": "left", "clickCount": 1}, session_id)
                 await rpc("Input.dispatchMouseEvent", {"type": "mouseReleased", **point, "button": "left", "clickCount": 1}, session_id)
                 assert await evaluate(f"{doc}.activeElement.classList.contains('xterm-helper-textarea')"), "点击终端边缘后没有获得输入焦点"
             await evaluate(f"{doc}.querySelector('#acc-auth-code').scrollIntoView({{block:'center'}})")
-            point = await evaluate(f"(() => {{const f=document.querySelector('iframe').getBoundingClientRect(),r={doc}.querySelector('#acc-auth-code').getBoundingClientRect();return {{x:f.left+r.left+r.width/2,y:f.top+r.top+r.height/2}};}})()")
+            point = await evaluate(f"(() => {{const f={{left:0,top:0}},r={doc}.querySelector('#acc-auth-code').getBoundingClientRect();return {{x:f.left+r.left+r.width/2,y:f.top+r.top+r.height/2}};}})()")
             await rpc("Input.dispatchMouseEvent", {"type": "mousePressed", **point, "button": "left", "clickCount": 1}, session_id)
             await rpc("Input.dispatchMouseEvent", {"type": "mouseReleased", **point, "button": "left", "clickCount": 1}, session_id)
             assert await evaluate(f"{doc}.activeElement.id") == 'acc-auth-code'
@@ -193,7 +193,7 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
             await evaluate(f"{win}.__originalCodeFetch={win}.fetch;{win}.fetch=async(...args)=>{{const r=await {win}.__originalCodeFetch(...args);if(String(args[0]).endsWith('/code'))throw new Error('synthetic response lost');return r;}}")
             await rpc("Input.insertText", {"text": "synthetic-wrong"}, session_id)
             await evaluate(f"{doc}.querySelector('#acc-code-send').scrollIntoView({{block:'center'}})")
-            point = await evaluate(f"(() => {{const f=document.querySelector('iframe').getBoundingClientRect(),r={doc}.querySelector('#acc-code-send').getBoundingClientRect();return {{x:f.left+r.left+r.width/2,y:f.top+r.top+r.height/2}};}})()")
+            point = await evaluate(f"(() => {{const f={{left:0,top:0}},r={doc}.querySelector('#acc-code-send').getBoundingClientRect();return {{x:f.left+r.left+r.width/2,y:f.top+r.top+r.height/2}};}})()")
             await rpc("Input.dispatchMouseEvent", {"type": "mousePressed", **point, "button": "left", "clickCount": 1}, session_id)
             await rpc("Input.dispatchMouseEvent", {"type": "mouseReleased", **point, "button": "left", "clickCount": 1}, session_id)
             await wait_for(f"{state}.codeStatus === 'uncertain'")
@@ -240,7 +240,7 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
                 print("页面状态诊断：", await evaluate(f"{doc}.querySelector('#acc-login-link-status').textContent"), flush=True)
                 raise
             await evaluate(f"{doc}.querySelector('#acc-login-commit').scrollIntoView({{block:'center'}})")
-            point = await evaluate(f"(() => {{const f=document.querySelector('iframe').getBoundingClientRect(),b={doc}.querySelector('#acc-login-commit').getBoundingClientRect();return {{x:f.left+b.left+b.width/2,y:f.top+b.top+b.height/2}};}})()")
+            point = await evaluate(f"(() => {{const f={{left:0,top:0}},b={doc}.querySelector('#acc-login-commit').getBoundingClientRect();return {{x:f.left+b.left+b.width/2,y:f.top+b.top+b.height/2}};}})()")
             await rpc("Input.dispatchMouseEvent", {"type": "mousePressed", **point, "button": "left", "clickCount": 1}, session_id)
             await rpc("Input.dispatchMouseEvent", {"type": "mouseReleased", **point, "button": "left", "clickCount": 1}, session_id)
             await wait_for(f"{doc}.querySelector('#acc-modal').classList.contains('hidden')")
@@ -301,9 +301,15 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
                 assert database.execute("SELECT count(*) FROM oauth_credential_imports WHERE account_id=?", (gateway_id,)).fetchone()[0] == 1
             print("通过：真实 Docker/HTTP 错登拒绝、取消后会话和暂存收口，原关联凭据保持")
 
-            # 模拟输出组件缺失：授权码与认证轮询继续，不能启用不存在的重连方法。
-            await evaluate(f"{win}.__codeVendor={{Terminal:{win}.Terminal,FitAddon:{win}.FitAddon}};{win}.Terminal=undefined;{win}.FitAddon=undefined")
+            # 拦截实际动态构建块；原生模块加载失败仍必须保留授权码及认证状态通道。
+            await rpc("Network.enable", session=session_id)
+            await rpc("Network.setCacheDisabled", {"cacheDisabled": True}, session_id)
+            await rpc("Network.setBlockedURLs", {"urls": ["*/assets/xterm-*.js", "*/assets/xterm-addon-fit-*.js"]}, session_id)
+            await evaluate("window.__reloadPending=true")
+            await rpc("Page.reload", {}, session_id)
+            await wait_for("!window.__reloadPending && Boolean(document.querySelector('.task-runtime[aria-busy=false]'))")
             try:
+                await wait_for(f"Boolean({doc}.querySelector('[data-relogin=\"{account_id}\"]'))")
                 await evaluate(f"{doc}.querySelector('[data-relogin=\"{account_id}\"]').click();{doc}.querySelector('#acc-form').requestSubmit()")
                 await wait_for(f"Boolean({state}?.sid)")
                 await wait_for(f"Boolean({state}?.connection && {state}?.authorizationURL)")
@@ -316,9 +322,13 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
                 await wait_for(f"{state}.codeStatus === 'delivered' && !{state}.codeSending")
                 await evaluate(f"{doc}.querySelector('#acc-login-cancel').click()")
                 await wait_for(f"{state} === null")
-                print("通过：输出组件加载失败时重连按钮禁用，原生输入、独立HTTP投递及取消仍正常")
+                print("通过：实际终端构建块加载失败时重连禁用，HTTP授权码、认证轮询及取消正常")
             finally:
-                await evaluate(f"{win}.Terminal={win}.__codeVendor.Terminal;{win}.FitAddon={win}.__codeVendor.FitAddon;delete {win}.__codeVendor")
+                await rpc("Network.setBlockedURLs", {"urls": []}, session_id)
+                await evaluate("window.__reloadPending=true")
+                await rpc("Page.reload", {}, session_id)
+                await wait_for("!window.__reloadPending && Boolean(document.querySelector('.task-runtime[aria-busy=false]'))")
+                await wait_for(f"Boolean({doc}.querySelector('[data-relogin=\"{account_id}\"]'))")
 
             try:
                 await verify_login_drafts(client, deployment, data, browser, base, address, rpc, evaluate, wait_for, session_id)

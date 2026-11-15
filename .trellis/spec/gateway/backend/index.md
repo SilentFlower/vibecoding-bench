@@ -29,3 +29,5 @@ cd services/gateway
 cargo fmt --check
 cargo test --locked
 ```
+
+- [代理目录与账号选线](./proxy-directory.md)：目录API、凭据与引用边界、出口检测及版本2/3迁移。

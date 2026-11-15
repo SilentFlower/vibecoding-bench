@@ -52,6 +52,8 @@ export interface Account {
   auth_error?: string
   credential_ownership?: { protocol: number; owner: string; phase: string } | null
   proxy_url: string
+  proxy_id?: string
+  proxy_name?: string
   device_id: string
   canonical_env?: Record<string, unknown>
   canonical_prompt_env?: Record<string, unknown>
@@ -387,6 +389,7 @@ export interface DiagnosticRequest {
   account_id: number | null
   outcome: string
   attempt_count: number
+  last_attempt?: DiagnosticAttempt | null
 }
 
 /** 原生请求实际复用的进程及本地阶段观测。 */
@@ -518,8 +521,44 @@ export interface NativeCapture {
   }
 }
 
+/** 代理线路公开投影，认证字段仅显示是否已设置。 */
+export interface ProxyRoute {
+  id: string; name: string; protocol: string; host: string; port: number; public_url: string;
+  has_username: boolean; has_password: boolean; expires_at: string | null; revision: string;
+  status: 'unknown' | 'ready' | 'failed'; checked_at: string | null;
+  observation: { ip: string; country: string | null; country_code: string | null; region: string | null; city: string | null; latency_ms: number; observed_at: string } | null;
+  users: { kind: 'gateway' | 'task' | 'draft' | 'authorization'; id: string; name: string; status: string; in_flight: number | null }[];
+  sync_pending?: boolean; references_complete: boolean; active_accounts: number; in_flight: number;
+}
+/** 账号诊断读取的环境公开摘要，身份匹配采用网关账号ID。 */
+export interface RuntimeEnvironmentSummary {
+  environment_id: string; gateway_account_id?: number | null; state: string;
+  cli_versions?: string[]; native_kernel?: { current?: { release?: string } | null } | null;
+  run_window?: { message?: string } | null;
+}
+/** 结构化代理表单；缺省认证字段表示保留。 */
+export interface ProxyConnectionInput { protocol: string; host: string; port: number; username?: string; password?: string }
+/** 线路编辑快照。 */
+export interface ProxyInput extends ProxyConnectionInput { name: string; expires_at: string | null; revision?: string }
+
 export const api = {
+  /** 搜索公开线路。@param page 页码。@param q 公开搜索。@param signal 取消信号。@return 分页。 */
+  listProxies: (page = 1, q = '', signal?: AbortSignal, usage = true, pageSize = 20) => request<PagedResult<ProxyRoute> & { references_complete: boolean; counts?: { all:number; available:number; used:number|null } }>('GET', `/admin/proxies?page=${page}&page_size=${pageSize}&q=${encodeURIComponent(q)}&usage=${usage}`, undefined, signal),
+  /** 保存线路。@param id 编辑身份，空为新建。@param input 草稿。@return 保存身份。 */
+  saveProxy: (id: string | null, input: ProxyInput) => request<{id: string; sync_pending?: boolean}>(id ? 'PUT' : 'POST', id ? `/admin/proxies/${encodeURIComponent(id)}` : '/admin/proxies', input),
+  /** 原子导入。@param text 多行连接。@return 创建条数。 */
+  importProxies: (text: string) => request<{created: number}>('POST', '/admin/proxies/import', {text}),
+  /** 拆分刚输入的连接。@param text 私有连接。@return 结构化字段。 */
+  identifyProxy: (text: string) => request<ProxyConnectionInput>('POST', '/admin/proxies/identify', {text}),
+  /** 探测出口。@param id 线路身份。@return 实际状态。 */
+  probeProxy: (id: string) => request<Pick<ProxyRoute, 'id' | 'status' | 'observation' | 'checked_at'>>('POST', `/admin/proxies/${encodeURIComponent(id)}/probe`),
+  /** 删除确认版本。@param id 线路身份。@param revision 原版本。@return 回执。 */
+  deleteProxy: (id: string, revision: string) => request<{ok: boolean}>('DELETE', `/admin/proxies/${encodeURIComponent(id)}`, {revision}),
   /** 读取系统更新底座及实际安装。@param signal 取消信号。@return 更新状态。 */
+  /** 读取任务运行数量，使用数据库聚合避免下载运行列表。@param signal 取消信号。@return 活动运行数。 */
+  runtimeSummary: (signal?: AbortSignal) => request<{active_runs:number}>('GET','/runtime/api/summary',undefined,signal),
+  /** 读取账号诊断摘要。@param signal 取消信号。@return 环境公开列表。 */
+  runtimeEnvironments: (signal: AbortSignal) => request<RuntimeEnvironmentSummary[]>('GET', '/runtime/api/environments', undefined, signal),
   systemUpdateStatus: (signal?: AbortSignal) => request<SystemUpdateStatus>('GET', '/runtime/api/system-updates/status', undefined, signal),
   /** 读取已验证目录。@param signal 取消信号。@return 版本缓存。 */
   systemUpdateReleases: (signal?: AbortSignal) => request<SystemUpdateCatalog>('GET', '/runtime/api/system-updates/releases', undefined, signal),
@@ -530,7 +569,7 @@ export const api = {
   /** 原操作取消或恢复。@param id 原操作。@param action 受控动作。@param revision 当前现场版本。@return 操作状态。 */
   systemUpdateControl: (id: string, action: 'cancel' | 'recover', revision: string) => request<SystemUpdateOperation>('POST', `/runtime/api/system-updates/operations/${encodeURIComponent(id)}/${action}`, { expected_revision: revision }),
   /** 分页读取请求诊断。@param query 已编码筛选。@return 请求列表与采集健康。 */
-  requestDiagnostics: (query: string, signal?: AbortSignal) => request<{ items: DiagnosticRequest[]; total: number; health: Record<string, number> }>('GET', `/admin/request-diagnostics?${query}`, undefined, signal),
+  requestDiagnostics: (query: string, signal?: AbortSignal) => request<{ items: DiagnosticRequest[]; total: number; health: Record<string, number>; counts?: {all: number; errors: number; processing: number} }>('GET', `/admin/request-diagnostics?${query}`, undefined, signal),
   /** 读取请求尝试详情。@param id 请求 UUID。@return 摘要与尝试列表。 */
   requestDiagnosticDetail: (id: string, signal?: AbortSignal) => request<{ request: DiagnosticRequest; attempts: DiagnosticAttempt[] }>('GET', `/admin/request-diagnostics/${encodeURIComponent(id)}`, undefined, signal),
   /** 读取归属本请求的私有快照。@param requestId 请求 UUID。@param attemptId 尝试 UUID。@return 脱敏组装内容。 */
@@ -546,17 +585,19 @@ export const api = {
    * @param pageSize 每页账号数。
    * @return 账号分页及画像配置；兼容旧后端缺少新增字段的响应。
    */
-  listAccounts: (page = 1, pageSize = 12) =>
+  /** 按身份读取账号供跨页直达。@param id 账号身份。@return 账号。 */
+  accountById: (id: number) => request<Account>('GET', `/admin/accounts/${id}`),
+  listAccounts: (page = 1, pageSize = 12, query = '', status = '', signal?: AbortSignal) =>
     request<PagedResult<Account> & {
       claude_code_profile_selection_mode?: 'client_version' | 'account'
       claude_code_version_profile?: string
-    }>('GET', `/admin/accounts?page=${page}&page_size=${pageSize}`),
+    }>('GET', `/admin/accounts?page=${page}&page_size=${pageSize}&q=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}`, undefined, signal),
   /** 获取只读调度快照。@param id 账号 ID。@param signal 关闭详情时取消读取。@return 当前状态与真实提交点。 */
   accountScheduling: (id: number, signal?: AbortSignal) =>
     request<SchedulingDetail>('GET', `/admin/accounts/${id}/scheduling`, undefined, signal),
   /** 分页读取匿名会话。@param id 账号。@param page 页码。@param state 活跃筛选。@param prefix 摘要前缀。@param signal 取消信号。@return 绑定分页。 */
-  accountSchedulingSessions: (id: number, page: number, state = 'all', prefix = '', signal?: AbortSignal) =>
-    request<SchedulingSessions>('GET', `/admin/accounts/${id}/scheduling/sessions?page=${page}&page_size=20&state=${encodeURIComponent(state)}&prefix=${encodeURIComponent(prefix)}`, undefined, signal),
+  accountSchedulingSessions: (id: number, page: number, state = 'all', prefix = '', signal?: AbortSignal, pageSize = 20) =>
+    request<SchedulingSessions>('GET', `/admin/accounts/${id}/scheduling/sessions?page=${page}&page_size=${pageSize}&state=${encodeURIComponent(state)}&prefix=${encodeURIComponent(prefix)}`, undefined, signal),
   createAccount: (a: Partial<Account>) => request<Account>('POST', '/admin/accounts', a),
   updateAccount: (id: number, a: Partial<Account>) => request<Account>('PUT', `/admin/accounts/${id}`, a),
   deleteAccount: (id: number) => request<void>('DELETE', `/admin/accounts/${id}`),
@@ -569,14 +610,14 @@ export const api = {
   deleteToken: (id: number) => request<void>('DELETE', `/admin/tokens/${id}`),
   getDashboard: () => request<Dashboard>('GET', '/admin/dashboard'),
 
-  generateAuthUrl: (proxyUrl?: string) =>
-    request<OAuthGenerateResult>('POST', '/admin/oauth/generate-auth-url', { proxy_url: proxyUrl || null }),
-  generateSetupTokenUrl: (proxyUrl?: string) =>
-    request<OAuthGenerateResult>('POST', '/admin/oauth/generate-setup-token-url', { proxy_url: proxyUrl || null }),
-  exchangeCode: (sessionId: string, code: string) =>
-    request<OAuthExchangeResult>('POST', '/admin/oauth/exchange-code', { session_id: sessionId, code }),
-  exchangeSetupTokenCode: (sessionId: string, code: string) =>
-    request<OAuthExchangeResult>('POST', '/admin/oauth/exchange-setup-token-code', { session_id: sessionId, code }),
+  generateAuthUrl: (proxy?: { proxy_id?: string; proxy_revision?: string; proxy_url?: string }, signal?: AbortSignal) =>
+    request<OAuthGenerateResult>('POST', '/admin/oauth/generate-auth-url', proxy ?? {}, signal),
+  generateSetupTokenUrl: (proxy?: { proxy_id?: string; proxy_revision?: string; proxy_url?: string }, signal?: AbortSignal) =>
+    request<OAuthGenerateResult>('POST', '/admin/oauth/generate-setup-token-url', proxy ?? {}, signal),
+  exchangeCode: (sessionId: string, code: string, signal?: AbortSignal) =>
+    request<OAuthExchangeResult>('POST', '/admin/oauth/exchange-code', { session_id: sessionId, code }, signal),
+  exchangeSetupTokenCode: (sessionId: string, code: string, signal?: AbortSignal) =>
+    request<OAuthExchangeResult>('POST', '/admin/oauth/exchange-setup-token-code', { session_id: sessionId, code }, signal),
 
   // 设置
   getSettings: (signal?: AbortSignal) => request<RawSettingsMap>('GET', '/admin/settings', undefined, signal).then(normalizeSettingsMap),

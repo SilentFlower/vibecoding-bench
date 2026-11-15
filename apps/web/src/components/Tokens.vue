@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { KeyRound, Copy, Pencil, Trash2, Plus } from '@/components/ui/icon';
+import AccountScopePicker from './AccountScopePicker.vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { api, type ApiToken, type Account } from '../api';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
@@ -29,25 +28,31 @@ const editing = ref<ApiToken | null>(null);
 const form = ref({ name: '', allowed_accounts: '', blocked_accounts: '' });
 /** 已复制的令牌 ID */
 const copiedId = ref<number | null>(null);
+const loading = ref(false);
+const loadError = ref('');
+const accountError = ref('');
+let alive = true;
+onUnmounted(() => { alive = false; });
 
-/** 加载令牌列表 */
-async function load() {
+/** 分页读取令牌，失败时保留已有记录。@return 完成。 */
+async function load(): Promise<void> {
+  loading.value = true; loadError.value = '';
   try {
-    const res = await api.listTokens(1, 100);
-    tokens.value = res.data ?? [];
-  } catch {
-    tokens.value = [];
-  }
+    const values: ApiToken[] = []; let page = 1;
+    do { const result = await api.listTokens(page,100); values.push(...result.data); if (page >= result.total_pages || !alive) break; page++; } while (alive);
+    if (alive) tokens.value = values;
+  } catch (cause) { if (alive) loadError.value = (cause as Error).message || '令牌读取失败'; }
+  finally { loading.value = false; }
 }
 
-/** 加载所有账号 */
-async function loadAccounts() {
+/** 完整读取账号范围，名称缺失的历史ID继续保留。@return 完成。 */
+async function loadAccounts(): Promise<void> {
+  accountError.value = '';
   try {
-    const res = await api.listAccounts(1, 100);
-    allAccounts.value = res.data ?? [];
-  } catch {
-    allAccounts.value = [];
-  }
+    const values: Account[] = []; let page = 1;
+    do { const result = await api.listAccounts(page,100); values.push(...result.data); if (page >= result.total_pages || !alive) break; page++; } while (alive);
+    if (alive) allAccounts.value = values;
+  } catch (cause) { if (alive) accountError.value = (cause as Error).message || '账号范围读取失败'; }
 }
 
 onMounted(() => {
@@ -171,253 +176,29 @@ function formatAccountIds(ids: string): string {
   }).join(', ');
 }
 
-/**
- * 获取状态徽章样式
- * @param status 令牌状态
- */
-function statusStyle(status: string): { class: string; label: string } {
-  if (status === 'active') return { class: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: '活跃' };
-  return { class: 'bg-gray-100 text-gray-500 border-gray-200', label: '停用' };
-}
-
-/**
- * 切换账号 ID 在输入框中的选中状态
- * @param field 目标字段
- * @param id 账号 ID
- */
-function toggleAccountId(field: 'allowed' | 'blocked', id: number) {
-  const key = field === 'allowed' ? 'allowed_accounts' : 'blocked_accounts';
-  const ids = form.value[key]
-    .split(',')
-    .map(s => s.trim())
-    .filter(s => s !== '');
-
-  const idx = ids.indexOf(String(id));
-  if (idx >= 0) {
-    ids.splice(idx, 1);
-  } else {
-    ids.push(String(id));
-  }
-  form.value[key] = ids.join(',');
-}
-
-/**
- * 判断账号 ID 是否已选中
- * @param field 目标字段
- * @param id 账号 ID
- */
-function isAccountSelected(field: 'allowed' | 'blocked', id: number): boolean {
-  const key = field === 'allowed' ? 'allowed_accounts' : 'blocked_accounts';
-  return form.value[key]
-    .split(',')
-    .map(s => s.trim())
-    .includes(String(id));
-}
 </script>
 
 <template>
-  <div class="space-y-4">
-    <!-- 标题栏 -->
-    <div class="flex justify-between items-center">
-      <h2 class="text-lg font-semibold text-[#29261e]">令牌管理</h2>
-      <Button
-        @click="openCreate"
-        class="bg-[#c4704f] hover:bg-[#b5623f] text-white font-medium rounded-xl transition-all duration-200 hover:shadow-md"
-      >
-        创建令牌
-      </Button>
-    </div>
-
-    <!-- 令牌卡片列表 -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-      <Card
-        v-for="t in tokens"
-        :key="t.id"
-        class="bg-white border-[#e8e2d9] rounded-xl hover:shadow-md transition-all duration-200 overflow-hidden"
-      >
-        <div class="p-5 space-y-3">
-          <!-- 头部：名称 + 状态 -->
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2 min-w-0">
-              <div class="w-8 h-8 rounded-lg bg-[#c4704f]/10 flex items-center justify-center flex-shrink-0">
-                <svg class="w-4 h-4 text-[#c4704f]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" />
-                </svg>
-              </div>
-              <div class="min-w-0">
-                <p class="text-sm font-medium text-[#29261e] truncate">{{ t.name || '未命名令牌' }}</p>
-                <p class="text-xs text-[#8c8475]">{{ new Date(t.created_at).toLocaleDateString('zh-CN') }}</p>
-              </div>
-            </div>
-            <Badge :class="statusStyle(t.status).class" class="border text-xs font-medium flex-shrink-0">
-              {{ statusStyle(t.status).label }}
-            </Badge>
-          </div>
-
-          <!-- Token 值 -->
-          <div class="pt-2 border-t border-[#f0ebe4]">
-            <div class="flex items-center gap-2">
-              <code class="font-mono text-[11px] text-[#8c8475] truncate flex-1">{{ maskToken(t.token) }}</code>
-              <Button
-                variant="ghost"
-                size="sm"
-                @click="copyToken(t)"
-                class="h-7 px-2 text-[#8c8475] hover:text-[#29261e] hover:bg-[#f0ebe4] flex-shrink-0"
-              >
-                {{ copiedId === t.id ? '已复制' : '复制' }}
-              </Button>
-            </div>
-          </div>
-
-          <!-- 账号限制 -->
-          <div class="space-y-2">
-            <div>
-              <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider mb-0.5">可用账号</p>
-              <p class="text-xs text-[#8c8475] truncate">{{ formatAccountIds(t.allowed_accounts) }}</p>
-            </div>
-            <div>
-              <p class="text-[10px] text-[#b5b0a6] uppercase tracking-wider mb-0.5">不可用账号</p>
-              <p class="text-xs text-[#8c8475] truncate">{{ formatAccountIds(t.blocked_accounts) }}</p>
-            </div>
-          </div>
-
-          <!-- 操作按钮 -->
-          <div class="flex items-center gap-2 pt-2 border-t border-[#f0ebe4]">
-            <Button
-              variant="ghost"
-              size="sm"
-              @click="openEdit(t)"
-              class="text-[#8c8475] hover:text-[#29261e] hover:bg-[#f0ebe4] h-8 px-3 text-xs flex-1"
-            >
-              编辑
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              @click="toggleStatus(t)"
-              class="h-8 px-3 text-xs flex-1"
-              :class="t.status === 'active'
-                ? 'text-[#8c8475] hover:text-[#29261e] hover:bg-[#f0ebe4]'
-                : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'"
-            >
-              {{ t.status === 'active' ? '停用' : '启用' }}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              @click="confirmDelete(t.id)"
-              class="text-red-400 hover:text-red-500 hover:bg-red-50 h-8 px-3 text-xs flex-1"
-            >
-              删除
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      <!-- 空状态 -->
-      <div
-        v-if="tokens.length === 0"
-        class="col-span-full flex flex-col items-center justify-center py-16 text-[#b5b0a6]"
-      >
-        <div class="w-12 h-12 rounded-xl bg-[#f0ebe4] flex items-center justify-center mb-3">
-          <svg class="w-6 h-6 text-[#c4704f]/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" />
-          </svg>
-        </div>
-        <p class="text-sm">暂无令牌，点击"创建令牌"开始</p>
-      </div>
-    </div>
-
-    <!-- 新建/编辑令牌弹窗 -->
-    <Dialog v-model:open="showForm">
-      <DialogContent class="bg-white border-[#e8e2d9] rounded-2xl text-[#29261e] sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle class="text-[#29261e] text-lg">{{ editing ? '编辑令牌' : '创建令牌' }}</DialogTitle>
-          <DialogDescription class="text-[#8c8475]">
-            {{ editing ? '修改令牌设置' : '创建新的 API 令牌，令牌将自动生成' }}
-          </DialogDescription>
-        </DialogHeader>
-
-        <form @submit.prevent="save" class="space-y-4 mt-2">
-          <div class="space-y-2">
-            <Label class="text-[#5c5647] text-sm">备注名（选填）</Label>
-            <Input
-              v-model="form.name"
-              placeholder="例如：生产环境、测试用"
-              class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] placeholder-[#b5b0a6] focus:border-[#c4704f] focus:ring-[#c4704f]/20"
-            />
-          </div>
-          <div class="space-y-2">
-            <Label class="text-[#5c5647] text-sm">可用账号（选填，留空不限制）</Label>
-            <Input
-              v-model="form.allowed_accounts"
-              placeholder="账号 ID，逗号分隔"
-              class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] placeholder-[#b5b0a6] focus:border-[#c4704f] focus:ring-[#c4704f]/20"
-            />
-            <div v-if="allAccounts.length" class="flex flex-wrap gap-1.5">
-              <button
-                v-for="a in allAccounts"
-                :key="a.id"
-                type="button"
-                @click="toggleAccountId('allowed', a.id)"
-                class="text-[10px] px-2 py-0.5 rounded-md border transition-colors"
-                :class="isAccountSelected('allowed', a.id)
-                  ? 'bg-[#c4704f]/10 border-[#c4704f]/30 text-[#c4704f]'
-                  : 'bg-[#f9f6f1] border-[#e8e2d9] text-[#8c8475] hover:border-[#c4704f]/30'"
-              >
-                #{{ a.id }} {{ a.name || a.email }}
-              </button>
-            </div>
-          </div>
-          <div class="space-y-2">
-            <Label class="text-[#5c5647] text-sm">不可用账号（选填）</Label>
-            <Input
-              v-model="form.blocked_accounts"
-              placeholder="账号 ID，逗号分隔"
-              class="bg-[#f9f6f1] border-[#e8e2d9] text-[#29261e] placeholder-[#b5b0a6] focus:border-[#c4704f] focus:ring-[#c4704f]/20"
-            />
-            <div v-if="allAccounts.length" class="flex flex-wrap gap-1.5">
-              <button
-                v-for="a in allAccounts"
-                :key="a.id"
-                type="button"
-                @click="toggleAccountId('blocked', a.id)"
-                class="text-[10px] px-2 py-0.5 rounded-md border transition-colors"
-                :class="isAccountSelected('blocked', a.id)
-                  ? 'bg-red-50 border-red-200 text-red-500'
-                  : 'bg-[#f9f6f1] border-[#e8e2d9] text-[#8c8475] hover:border-red-200'"
-              >
-                #{{ a.id }} {{ a.name || a.email }}
-              </button>
-            </div>
-          </div>
-
-          <DialogFooter class="gap-2 pt-2">
-            <Button
-              type="button"
-              variant="ghost"
-              @click="showForm = false"
-              class="text-[#8c8475] hover:text-[#29261e] hover:bg-[#f0ebe4]"
-            >
-              取消
-            </Button>
-            <Button
-              type="submit"
-              class="bg-[#c4704f] hover:bg-[#b5623f] text-white font-medium rounded-xl transition-all duration-200"
-            >
-              保存
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+  <div class="tokens-page">
+    <header class="page-heading"><div><p class="page-eyebrow">访问控制</p><h2>访问令牌</h2><p class="page-description">管理客户端凭据和可用账号范围。</p></div><Button @click="openCreate"><Plus :size="15" />创建令牌</Button></header>
+    <p v-if="loadError" class="token-load-error" role="alert">{{ loadError }} <button type="button" @click="load">重试</button></p>
+    <section class="token-panel" :aria-busy="loading"><header class="token-panel-head"><h3>访问令牌</h3><span>{{ tokens.length }} 个令牌</span></header>
+      <article v-for="t in tokens" :key="t.id" class="token-row"><span class="token-icon"><KeyRound :size="19" /></span><div class="token-identity"><strong>{{ t.name || '未命名令牌' }}</strong><div class="token-meta"><code>{{ maskToken(t.token) }}</code><button type="button" class="token-copy" @click="copyToken(t)"><Copy :size="12" />{{ copiedId === t.id ? '已复制' : '复制' }}</button><span>{{ t.allowed_accounts ? `仅允许 ${formatAccountIds(t.allowed_accounts)}` : '全部可用账号' }}<template v-if="t.blocked_accounts"> · 排除 {{ formatAccountIds(t.blocked_accounts) }}</template></span></div></div>
+      <div class="token-actions"><button type="button" class="token-toggle" role="switch" :aria-checked="t.status === 'active'" :aria-label="`${t.name || '未命名令牌'}启用状态`" @click="toggleStatus(t)"><span class="switch-track"><i /></span>{{ t.status === 'active' ? '启用' : '停用' }}</button><span class="action-divider" /><Button variant="outline" size="sm" @click="openEdit(t)"><Pencil :size="13" />编辑权限</Button><button type="button" class="token-delete" @click="confirmDelete(t.id)"><Trash2 :size="14" />删除</button></div>
+      </article><p v-if="!tokens.length" class="token-empty">{{ loading ? '正在读取令牌…' : '还没有令牌，可创建客户端凭据。' }}</p>
+    </section>
+    <Dialog v-model:open="showForm"><DialogContent class="approved-token-editor"><DialogHeader><DialogTitle>{{ editing ? '编辑令牌权限' : '创建令牌' }}</DialogTitle><DialogDescription class="sr-only">选择允许与排除的账号，保存后生效。</DialogDescription></DialogHeader>
+      <form @submit.prevent="save"><div class="token-form-scroll"><div class="token-editor-intro"><span class="token-icon"><KeyRound :size="17" /></span><div><strong>客户端访问权限</strong><p>按用途命名，方便日后管理。</p></div></div><label class="token-name"><span>名称</span><Input v-model="form.name" placeholder="例如：开发客户端" /></label>
+      <p v-if="accountError" class="token-load-error" role="alert">{{ accountError }} <button type="button" @click="loadAccounts">重试</button></p><AccountScopePicker v-model="form.allowed_accounts" :accounts="allAccounts" label="允许的账号" help="留空允许使用全部可用账号。" /><AccountScopePicker v-model="form.blocked_accounts" :accounts="allAccounts" label="排除的账号" help="排除的账号不会用于此令牌。" />
+      </div><footer class="token-editor-footer"><span>保存后应用到此令牌</span><Button type="button" variant="outline" @click="showForm = false">取消</Button><Button type="submit">{{ editing ? '保存权限' : '创建令牌' }}</Button></footer></form>
+    </DialogContent></Dialog>
 
     <!-- 删除确认弹窗 -->
     <Dialog v-model:open="showDeleteConfirm">
-      <DialogContent class="bg-white border-[#e8e2d9] rounded-2xl text-[#29261e] sm:max-w-sm">
+      <DialogContent class="bg-white border-border rounded-2xl text-foreground sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle class="text-[#29261e]">确认删除</DialogTitle>
-          <DialogDescription class="text-[#8c8475]">
+          <DialogTitle class="text-foreground">确认删除</DialogTitle>
+          <DialogDescription class="text-muted-foreground">
             此操作不可撤销，删除后使用该令牌的客户端将无法访问。
           </DialogDescription>
         </DialogHeader>
@@ -425,12 +206,12 @@ function isAccountSelected(field: 'allowed' | 'blocked', id: number): boolean {
           <Button
             variant="ghost"
             @click="showDeleteConfirm = false"
-            class="text-[#8c8475] hover:text-[#29261e] hover:bg-[#f0ebe4]"
+            class="text-muted-foreground hover:text-foreground hover:bg-muted"
           >
             取消
           </Button>
           <Button
-            @click="executeDelete"
+            @click="executeDelete" variant="destructive"
             class="bg-red-500 hover:bg-red-600 text-white font-medium rounded-xl transition-all duration-200"
           >
             删除

@@ -166,6 +166,11 @@ impl SettingsStore {
         Self { pool, driver }
     }
 
+    /// 复用管理数据库连接池。@return 克隆的连接池句柄。
+    pub fn database_pool(&self) -> AnyPool {
+        self.pool.clone()
+    }
+
     /// 读取所有设置项。
     pub async fn get_all(&self) -> Result<HashMap<String, String>, AppError> {
         let rows = sqlx::query("SELECT key, value FROM settings")

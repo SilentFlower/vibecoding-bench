@@ -1,0 +1,45 @@
+/* 运行、工程与养号共用的定稿抓包界面；CSS同时由Vite和原生文档加载。 */
+.capture-workspace{font-family:'Inter Variable','Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',system-ui,sans-serif;color:#52647e;font-size:13px;min-width:0}
+.capture-workspace .upgrade-capture-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:20px}
+.capture-workspace .upgrade-capture-overview>div{background:#fff;border:1px solid #e2e8f2;border-radius:9px;padding:17px;min-width:0}
+.capture-workspace .upgrade-capture-overview span{font-size:11px;color:#8b9db3;display:block}
+.capture-workspace .upgrade-capture-overview strong{font-size:19px;color:#4e6684;font-weight:550;display:block;margin-top:10px;overflow-wrap:anywhere}
+.capture-workspace .upgrade-capture-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.capture-workspace .upgrade-reading-tabs{display:flex;gap:24px;border-bottom:1px solid #e5ebf4;overflow-x:auto;flex:1}
+.capture-workspace .upgrade-reading-tabs button{border:0;border-bottom:2px solid transparent;background:none;padding:14px 0;font-size:12px;color:#8595ab;white-space:nowrap}
+.capture-workspace .upgrade-reading-tabs button.active{border-color:#987bb6;color:#80609c}
+.capture-workspace button{font-family:inherit;cursor:pointer}
+.capture-workspace button:disabled{cursor:not-allowed;opacity:.45}
+.capture-workspace button:focus-visible{outline:2px solid #ad9bc4;outline-offset:2px}
+.capture-workspace .capture-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #e1e6ef;border-radius:6px;background:#fff;color:#52647e;font-size:11px;padding:7px 10px;flex:none}
+.capture-workspace .capture-button:hover:not(:disabled){background:#f6f4fa;border-color:#c6bbdf}
+.capture-workspace .work-note{font-size:11px;line-height:1.8;color:#8296af;margin:12px 0 18px}
+.capture-workspace .work-table-wrap{overflow:auto}
+.capture-workspace .work-table{width:100%;min-width:620px;border-collapse:collapse;text-align:left;font-size:12px}
+.capture-workspace .work-table th{font-size:11px;color:#7c8ba1;font-weight:500;background:#fafbfe;padding:15px 20px;white-space:nowrap}
+.capture-workspace .work-table td{padding:22px 20px;border-top:1px solid #edf0f5;color:#536984;vertical-align:middle}
+.capture-workspace .work-table strong{font-weight:550;color:#3d526d;overflow-wrap:anywhere}
+.capture-workspace .work-table small{display:block;font-size:10px;color:#8494aa;margin-top:8px;overflow-wrap:anywhere}
+.capture-workspace .work-table button,.capture-workspace .work-file button{border:0;background:none;color:#82649f;font-size:12px;padding:0}
+.capture-workspace .work-file{display:flex;align-items:center;gap:12px;padding:17px 0;border-bottom:1px solid #e8edf4}
+.capture-workspace .work-file svg{width:16px;color:#94a0b2;flex:none}
+.capture-workspace .work-file code{flex:1;min-width:0;overflow-wrap:anywhere;font-size:12px}
+.capture-workspace .work-file small{font-size:10px;color:#8494aa;flex:none}
+.capture-workspace .work-log{white-space:pre-wrap;overflow-wrap:anywhere;padding:22px;background:#f6f8fc;border:1px solid #e3e9f0;border-radius:9px;color:#4b627d;font:12px/1.9 'JetBrains Mono Variable',monospace;max-height:350px;overflow:auto;margin-top:15px}
+.capture-workspace .capture-pager{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:16px 0;font-size:11px;color:#8494ab}
+.capture-workspace .capture-pager>span{margin-right:auto}
+.capture-workspace .upgrade-card{border:1px solid #e2e8f1;background:#fff;border-radius:11px;overflow:hidden;min-width:0}
+.capture-workspace .upgrade-card>header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:17px 19px;border-bottom:1px solid #edf1f6;font-size:12px}
+.capture-workspace .upgrade-card>header h3{font-size:13px;color:#4b6380;font-weight:650;margin:0}
+.capture-workspace .upgrade-card>header>span{font-size:10px;color:#8a9bb0}
+.capture-workspace .upgrade-card-body{padding:20px}
+.capture-workspace .capture-file-preview>header{font-size:11px;color:#8494ab;margin-top:20px;overflow-wrap:anywhere}
+.capture-workspace .capture-file-preview>p{padding:15px;font-size:12px;color:#a66c80}
+.capture-workspace .capture-file-preview button{border:0;background:none;color:#82649f}
+.capture-workspace .capture-metadata{border-top:1px solid #e7edf4;padding-top:16px;margin-top:24px;font-size:11px;color:#8494ab}
+.capture-workspace .capture-metadata summary,.capture-workspace .capture-tls-entry summary{cursor:pointer;font-size:11px;color:#8494ab;padding:10px 0}
+.capture-workspace .capture-metadata dl{display:grid;grid-template-columns:90px minmax(0,1fr);gap:12px;margin-top:16px}
+.capture-workspace .capture-metadata dd{margin:0;overflow-wrap:anywhere;color:#536984}
+.capture-workspace .capture-empty{display:grid;justify-items:center;gap:12px;padding:30px;text-align:center;color:#8a9bb0;font-size:12px}
+.capture-workspace .capture-empty strong{font-size:14px;font-weight:500}
+@media(max-width:520px){.capture-workspace .upgrade-capture-overview{gap:8px}.capture-workspace .upgrade-capture-overview>div{padding:12px}.capture-workspace .upgrade-capture-overview strong{font-size:15px}.capture-workspace .upgrade-capture-overview span{font-size:10px}.capture-workspace .upgrade-capture-toolbar{flex-wrap:wrap}.capture-workspace .upgrade-reading-tabs{width:100%;flex-basis:100%}.capture-workspace .work-file{gap:8px}.capture-workspace .work-file code{font-size:11px}}

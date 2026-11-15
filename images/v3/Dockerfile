@@ -4,6 +4,8 @@ WORKDIR /source/cc2api/web
 COPY cc2api/web/package.json cc2api/web/package-lock.json ./
 RUN npm ci
 COPY cc2api/web/ ./
+# 原生任务模块与共享控件在构建时读取同一份页面源码。
+COPY webui/ /source/cc2api/legacy-web/
 ARG VITE_PLATFORM_VERSION
 ENV VITE_PLATFORM_VERSION=$VITE_PLATFORM_VERSION
 RUN npm run build

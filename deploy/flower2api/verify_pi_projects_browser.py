@@ -289,7 +289,7 @@ async def verify(evidence: Path) -> dict:
                 await until('window.projectStreams.some(value=>value.readyState===EventSource.OPEN)')
                 assert not await evaluate('window.projectScreens.some(text=>text.includes("旧历史画面"))')
                 assert stream_requests and stream_requests[0]['query'] == {'account_id': '1', 'after': str(initial_cursor)}
-                assert await evaluate('document.querySelectorAll("#projects-events li[data-event-id]").length === 20 && document.querySelectorAll("#projects-history [data-work]").length === 10')
+                assert await evaluate('document.querySelectorAll("#projects-events [data-event-id]").length === 20 && document.querySelectorAll("#projects-history [data-work]").length === 10')
                 assert await evaluate('(()=>{const ids=Array.from(document.querySelectorAll("#projects-events [data-event-id]"),value=>Number(value.dataset.eventId));return ids.every((id,index)=>!index || id<ids[index-1])})()')
                 assert await evaluate('document.querySelector("#projects-history [data-work]").dataset.work === ' + json.dumps(work['id']))
                 assert await evaluate('document.querySelector(' + json.dumps('[data-work-duration="' + work['id'] + '"]') + ').textContent === "完成耗时 6 分 58 秒"')

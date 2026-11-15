@@ -59,6 +59,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--browser", action="store_true")
+    parser.add_argument("--browser-only", action="store_true", help="仅验证管理桥与浏览器场景；部署生命周期和备份需单独完整验证")
+    parser.add_argument("--startup-timeout", type=int, default=60, help="首次安装工程库的就绪等待秒数，范围 30～300")
+    parser.add_argument("--compact-library", action="store_true", help="使用合成工程库隔离页面验证；完整工程库须单独验证")
     parser.add_argument("--source-overlay", action="store_true", help="仅本地脏构建：只读挂载当前 Python/WebUI，Rust 仍来自联合镜像")
     parser.add_argument("--project-iteration", action="store_true")
     parser.add_argument("--run-boundaries", action="store_true")
@@ -69,6 +72,10 @@ def main() -> None:
     parser.add_argument("--topic-followups", action="store_true")
     parser.add_argument("--quota-completion", "--quota-hard-stop", dest="quota_completion", action="store_true")
     args = parser.parse_args()
+    if args.browser_only and not args.browser:
+        parser.error("--browser-only 需要同时指定 --browser")
+    if not 30 <= args.startup_timeout <= 300:
+        parser.error("启动等待时间须在 30～300 秒之间")
     if args.ownership and (not args.browser or any((args.reauth,args.deleted_binding,args.warmup_quota,
             args.project_iteration,args.run_boundaries,args.topic_followups,args.quota_completion))):
         parser.error('凭据归属验证需要 --browser，并单独执行')
@@ -89,7 +96,7 @@ def main() -> None:
     manifest = json.loads(args.manifest.read_text())
     if args.source_overlay and manifest.get('dirty_worktree') is not True:
         parser.error('源码覆盖仅限明确标记的本地脏构建，正式发布须验证镜像内产物')
-    minimal_library = any((args.project_iteration, args.ownership, args.reauth, args.deleted_binding))
+    minimal_library = any((args.compact_library, args.project_iteration, args.ownership, args.reauth, args.deleted_binding))
     client = docker.from_env()
     deployment = "stack-verify-" + uuid.uuid4().hex[:10]
     filters = {"label": ["vibebench.product=v3", "vibebench.deployment=" + deployment]}
@@ -188,7 +195,8 @@ def main() -> None:
             browser = requests.Session()
             browser.trust_env = False
             authorization = {"Authorization": "Bearer " + values["V3_ADMIN_PASSWORD"]}
-            deadline = time.monotonic() + 60
+            started = time.monotonic()
+            deadline = started + args.startup_timeout
             while True:
                 response = browser.post(base + "/admin/runtime/session", headers=authorization, timeout=5)
                 if response.status_code == 200:
@@ -196,6 +204,7 @@ def main() -> None:
                 if time.monotonic() > deadline:
                     raise AssertionError("调度器未就绪")
                 time.sleep(0.5)
+            print(f"调度器就绪：{time.monotonic() - started:.1f} 秒；工程库={'合成夹具' if minimal_library else '完整内置库'}", flush=True)
             assert "HttpOnly" in response.headers["Set-Cookie"]
             assert "Path=/runtime" in response.headers["Set-Cookie"]
             assert requests.get(base + "/runtime/api/environments", timeout=5).status_code == 401
@@ -205,6 +214,9 @@ def main() -> None:
             assert browser.get(base + "/runtime/api/topics", timeout=5).status_code == 200
             for path in ("/runtime/", "/runtime/app.js", "/runtime/vendor/xterm.js", "/environments"):
                 assert browser.get(base + path, timeout=5).status_code == 200, path
+            for path in ("/", "/login", "/tokens", "/requests", "/tasks?tab=projects", "/settings", "/proxies", "/updates", "/environments"):
+                page = browser.get(base + path, timeout=5)
+                assert page.status_code == 200 and 'text/html' in page.headers.get('Content-Type', '') and 'id="app"' in page.text, path
             assert browser.post(base + "/runtime/api/auth/login", json={"user": "v3", "pwd": "synthetic"}, timeout=5).status_code == 404
             for path in ("/runtime/internal/v3/session/verify", "/runtime/internal/v3/transport/1", "/runtime/api/%252e%252e/internal/v3/session"):
                 assert browser.get(base + path, timeout=5).status_code == 404
@@ -279,6 +291,9 @@ def main() -> None:
             assert requests.get(base + "/runtime/api/environments", headers={"Cookie": cookie}, timeout=5).status_code == 401
             assert requests.post(base + "/runtime/api/terminal-ticket", headers={"Cookie": cookie},
                 json={"path": "/api/accounts/login/ws/abcdef123456"}, timeout=5).status_code == 401
+            if args.browser_only:
+                print("通过：浏览器专项及管理桥；部署生命周期沿用单独完整验证", flush=True)
+                return
             subprocess.run(manager + ["status", "--env", str(configuration)], check=True, cwd=REPO)
             subprocess.run(manager + ["stop", "--env", str(configuration)], check=True, cwd=REPO)
             offline = manager + ["import-offline", "--env", str(configuration), "--source", str(REPO / "deploy/flower2api/fixtures/offline_metadata.json")]

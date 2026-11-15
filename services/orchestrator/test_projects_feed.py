@@ -78,6 +78,21 @@ class ProjectsFeedTests(unittest.TestCase):
         self.assertEqual(2, snapshot.call_count)
         strict.assert_not_called()
 
+    def test_capacity_public_projection_preserves_zero_and_discards_private_fields(self):
+        """公开容量只保留计数和上限，旧/异常回执保持未知。:return: None。"""
+        application = FastAPI()
+        application.include_router(projects_router(lambda: self.service))
+        for capacity, expected in (({'active': 0, 'limit': 2, 'private': 'synthetic-only'}, {'active': 0, 'limit': 2}),
+                ({'active': 3, 'limit': 2}, {'active': 3, 'limit': 2}),
+                (None, None), ({'active': True, 'limit': 2}, None), ({'active': 0, 'limit': 0}, None)):
+            with self.subTest(capacity=capacity):
+                self.service.view_admission = lambda *_: {'allowed': True, 'cli_capacity': capacity}
+                with TestClient(application) as client:
+                    response = client.get('/api/projects')
+                self.assertEqual(200, response.status_code)
+                self.assertEqual(expected, response.json()['agents'][0]['admission']['cli_capacity'])
+                self.assertNotIn('synthetic-only', response.text)
+
     def test_inflight_verification_is_visible_before_the_verifier_returns(self):
         """验收尚未返回时页面可读取阶段，结束后保留固定耗时且读取不触发额外操作。:return: None。"""
         entered, finish = threading.Event(), threading.Event()

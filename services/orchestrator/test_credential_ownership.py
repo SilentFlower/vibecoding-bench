@@ -122,6 +122,7 @@ class CredentialOwnershipTests(unittest.TestCase):
         self.ownership.detach(self.account())
         self.assertIsNone(self.account()['cc2api_account_id'])
         self.assertEqual('local', self.ownership.state(1)['owner'])
+        self.assertEqual('本地管理，网关已暂停', self.ownership.summaries()[1]['message'])
         for number in range(3):
             atomic_json(self.home / '.claude/.credentials.json', {'claudeAiOauth': {
                 'accessToken': f'local-at-{number}', 'refreshToken': f'local-rt-{number}', 'expiresAt': self.tokens['expires_at']}})
@@ -131,6 +132,7 @@ class CredentialOwnershipTests(unittest.TestCase):
         self.assertEqual('local-rt-2', self.tokens['refresh_token'])
         self.assertNotIn('refreshToken', json.loads((self.home / '.claude/.credentials.json').read_text())['claudeAiOauth'])
         self.assertEqual('gateway', self.ownership.state(1)['owner'])
+        self.assertEqual('网关管理凭据', self.ownership.summaries()[1]['message'])
 
     def test_lost_detach_reply_and_restart_do_not_publish_stale_remote_credentials(self) -> None:
         """远端提交回包丢失时本地保持关闭，重启查询回执完成。@return None。"""

@@ -3,6 +3,7 @@ import sqlite3
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from native_ui import open_run
 
 
 @contextmanager
@@ -26,20 +27,19 @@ def quota_completion_browser_fixture(data: Path):
 
     async def exercise(rpc, evaluate, wait_for, session_id: str) -> None:
         """操作真实额度表单和运行详情，核对公开状态和转义。@return None。"""
-        doc = "document.querySelector('iframe').contentDocument"
-        await evaluate(f'{doc}.defaultView.location.hash="#accounts"')
+        doc = "document"
         await wait_for(f'Boolean({doc}.querySelector("[data-warmup-config]"))')
         await evaluate(f'{doc}.querySelector("[data-warmup-config]").click()')
         await wait_for(f'!{doc}.querySelector("#warmup-modal").classList.contains("hidden")')
         content = await evaluate(f'{doc}.querySelector("#warmup-modal").textContent')
-        assert all(text in content for text in ['完成本轮','包括补充与收尾','下一轮等待','被动更新']),content
+        assert all(text in content for text in ['工程门禁暂停','保留原会话与累计预算','等待窗口重置','被动更新']),content
         assert '自动查询额度' not in content and '强制结束当前' not in content,content
         assert await evaluate(f'{doc}.querySelector("#warmup-quota-5h-hint").textContent.includes("达到 60%")')
         await evaluate(f'{doc}.querySelector("#warmup-form").requestSubmit()')
         await wait_for(f'{doc}.querySelector("#warmup-modal").classList.contains("hidden")')
         result = await evaluate(f'fetch("/runtime/api/runs/{rid}").then(response=>response.json())')
         assert result['status']=='stopped' and result['exit_code']==143 and result['error']==reason,result
-        await evaluate(f'{doc}.defaultView.openRunDetail("{rid}")')
+        await open_run(evaluate,wait_for,rid)
         await wait_for(f'{doc}.body.textContent.includes("5h 已用 68%")')
         assert await evaluate(f'{doc}.querySelectorAll("img[src=x]").length')==0
         assert await evaluate(f'{doc}.defaultView.__quotaXss||0')==0
@@ -47,20 +47,22 @@ def quota_completion_browser_fixture(data: Path):
             await rpc('Emulation.setDeviceMetricsOverride',{'width':width,'height':900,
                 'deviceScaleFactor':1,'mobile':False},session_id)
             for theme in ('dark','light'):
-                await evaluate(f'(() => {{const doc={doc};if(doc.documentElement.dataset.theme!=="{theme}")'
+                await evaluate(f'(() => {{const doc={doc};if(doc.querySelector(".task-runtime").dataset.theme!=="{theme}")'
                                'doc.querySelector("#theme-toggle").click();})()')
+                await wait_for("(() => {const r=document.querySelector('.approved-run-dialog').getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1;})()")
                 bounds = await evaluate(f'(() => {{const doc={doc};const card=doc.querySelector('
-                    '\'.modal:not(.hidden) .modal-card\').getBoundingClientRect();'
+                    '\'.approved-run-dialog\').getBoundingClientRect();'
                     'return {left:card.left,right:card.right,width:doc.defaultView.innerWidth};})()')
                 assert bounds['left']>=-1 and bounds['right']<=bounds['width']+1,bounds
         await rpc('Emulation.setDeviceMetricsOverride',{'width':1280,'height':900,
             'deviceScaleFactor':1,'mobile':False},session_id)
+        await evaluate('document.querySelector(".approved-run-dialog [data-slot=dialog-close]").click()')
         with sqlite3.connect(database) as connection:
             saved = connection.execute('SELECT status,error,stop_requested_at FROM runs WHERE id=?',(rid,)).fetchone()
             limits = connection.execute('SELECT warmup_quota_5h_limit_percent,warmup_quota_7d_limit_percent '
                                        'FROM accounts WHERE id=?',(aid,)).fetchone()
         assert saved==('stopped',reason,now) and limits==(60,80)
-        print('通过：本轮完成说明、保存重读、历史 stopped API／SQLite 原因、XSS、1280／390px 明暗主题',flush=True)
+        print('通过：工程额度门禁说明、保存重读、历史 stopped API／SQLite 原因、XSS、1280／390px 明暗主题',flush=True)
 
     try:
         yield exercise

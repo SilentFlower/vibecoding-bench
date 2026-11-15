@@ -54,6 +54,9 @@ pub struct RequestDiagnostic {
     pub outcome: String,
     pub error_stage: Option<String>,
     pub attempt_count: u32,
+    /// 管理列表投影的末次尝试；记录入口保持为空。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_attempt: Option<Box<AttemptDiagnostic>>,
 }
 
 /// 实际提交给上游的白名单参数，未知字段保留为空。
@@ -262,6 +265,14 @@ pub struct DiagnosticHealth {
     pub observation_failures: u64,
 }
 
+/// 快捷结果筛选计数，不以当前页推算总量。
+#[derive(Debug, Default, Serialize)]
+pub struct DiagnosticCounts {
+    pub all: i64,
+    pub errors: i64,
+    pub processing: i64,
+}
+
 /// 管理员分页结果与采集健康状态。
 #[derive(Debug, Serialize)]
 pub struct DiagnosticPage {
@@ -270,6 +281,8 @@ pub struct DiagnosticPage {
     pub page: u32,
     pub page_size: u32,
     pub health: DiagnosticHealth,
+    /// 保持账号、时间与关联条件的全量结果分类计数。
+    pub counts: DiagnosticCounts,
 }
 
 /// 规范化响应关联 ID，非标准头值只保存散列。

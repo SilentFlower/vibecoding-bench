@@ -6,14 +6,14 @@
 
 ## Overview
 
-**本项目没有组件框架**(无 React / Vue / Svelte / lit-html)。这里的"组件"是指**逻辑上独立的 UI 块**,有以下几种表现:
+**本目录保留无框架控制器源码**，通过ES模块供Vue任务路由和独立兼容入口复用。这里的"组件"是指**逻辑上独立的 UI 块**,有以下几种表现:
 
 1. **视图组件**(整页) → `<template id="tpl-<tab>">` + `render<Tab>()` 函数对
 2. **弹窗组件**(modal) → `<div class="modal hidden" id="<feature>-modal">` + 一组 open/close 函数
 3. **行 / 卡片组件**(列表元素) → render 函数里的模板字符串
 4. **状态徽章 / 按钮**(原子) → 直接写 class,无函数封装
 
-整体哲学:**HTML 写结构、CSS 写样式、JS 写数据 → DOM 注入**。每次 render 整段 `innerHTML = ...` 覆写,**不做 diff、不做虚拟 DOM**,所以渲染必须够快(P1 数据量小,无问题)。
+整体哲学:**HTML 写结构、CSS 写样式、JS 写数据 → DOM 注入**。首屏和一次性片段使用模板注入。环境卡片、详情、工程计时和记录等实时区域通过 `patchRuntimeContent` 增量更新，保留节点身份、滚动与焦点。`data-runtime-preserve` 标识独立编辑或组件宿主，轮询不得拆卸宿主及内部表单。
 
 ---
 
@@ -274,7 +274,18 @@ P1 阶段做到的:
 
 - `node --check apps/legacy-web/app.js`、`node --check apps/legacy-web/environments.js`、`node --check apps/legacy-web/projects.js`。
 - 在已有 Playwright 和 `apps/web/dist` 的本地环境运行 `python3 deploy/flower2api/verify_environment_ui.py --output .deploy/environment-ui-verification`。缺少 gateway 静态产物时先执行 `npm --prefix apps/web run build`。
-- 合成浏览器须覆盖实际 gateway 导航和 iframe、1280/720/390px 及原明暗偏好、真实按钮操作、版本冲突、提交去重、取消、轮询编辑、乱序回包、切页清理、长字段、空列表、错误文本转义及原运行窗口/物理实测入口。
+- 合成浏览器须覆盖实际gateway导航、原生路由及独立兼容入口、1280/720/390px 及原明暗偏好、真实按钮操作、版本冲突、提交去重、取消、轮询编辑、乱序回包、切页清理、长字段、空列表、错误文本转义及原运行窗口/物理实测入口。
 - 断言进入页面没有业务写入，主动操作 payload 保持既有合同，所有请求使用合成接口；实际账号、OAuth 与模型调用不作为本地 UI 验收前提。
 - 合成浏览器追加检查更新只读、新版与陈旧缓存、select选项白名单及取消、CRIU开关CAS/旧遥测/内存降级；加载和离页回执保持现有页面与弹窗归属。
 - 准备状态回归覆盖 ready/preparing/failed/过期、390px、定时刷新归属及零写入；请求诊断合成场景同时核验实际暖命中、PID、重叠计时与历史未观测。
+
+## 定稿工作区复用补充
+
+- `environment-workspace` 内资源与时段使用原CPU/运行时段表单，保留唯一DOM节点、冻结版本、取消及提交中的关闭限制。摘要轮询先临时移出表单，刷新摘要后归还；切换分区保留输入和焦点。CPU冲突保留取消入口，重新编辑必须重读实际CAS。
+- 工程研究保留报告、路线和工程目标三个阅读区，实际文本先转义。交付详情使用实际候选下拉、候选文件、验收报告及冻结代码预览；候选和文件切换分别检查当前账号、空间、窗口代次与选择代次。读取失败在当前窗口展示。
+- 抓包宿主分为原生状态节点 `#work-capture-status` 和 Vue 专属节点 `#work-capture-view`。原生刷新通过宿主公开payload更新共享组件，保持组件DOM、页签和文件草稿。关闭/切页使旧读取与浮层失效。
+- 原生模态窗口采用异步组件确认与站内通知；危险操作保留原状态许可、CAS和服务器请求。Tab在当前最上层循环；Esc、遮罩、关闭按钮统一走原收口函数。
+
+## Vue原生宿主复用
+
+任务入口已由`TasksWorkspace.vue`直接挂载；原控制器通过Vite构建插件编译为ES模块，单份源码继续服务独立`/runtime/`地址。禁止在模块直接注册未经作用域登记的全局定时器/监听/长连接；公共控件宿主`data-vue-managed`不归增强器或增量绘制修改。新增宿主事件定义于`runtimeScope.ts`，主路由和共享Vue窗口只通过受控事件桥通信。详情见web/frontend/ui-guidelines.md的原生工作区合同。

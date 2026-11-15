@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { useToast } from './composables/useToast';
+import { useActiveScrollbars } from './composables/useActiveScrollbars';
+
+useActiveScrollbars();
 
 const { toasts, dismiss } = useToast();
 </script>

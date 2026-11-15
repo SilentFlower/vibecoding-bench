@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { InfoTooltip } from '@/components/ui/controls';
 import type { WindowUsageStats } from '../api';
 
 const props = defineProps<{
@@ -38,18 +39,19 @@ function compact(value: number): string {
 </script>
 
 <template>
-  <div v-if="current" class="flex flex-wrap items-center gap-1 pb-1 text-[10px] text-[#8c8475]" :title="description">
-    <span v-if="current.basis === 'rolling'" class="text-[#b5b0a6]">最近 {{ label }}</span>
-    <span class="rounded bg-[#f6f3ee] px-1.5 py-0.5">{{ compact(current.requests) }} 请求</span>
-    <span class="rounded bg-[#f6f3ee] px-1.5 py-0.5">{{ compact(current.tokens) }} Token</span>
-    <span v-if="current.requests > 0 && current.unpriced_requests === current.requests" class="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">费用未知</span>
-    <span v-else class="rounded bg-[#f6f3ee] px-1.5 py-0.5">
-      {{ current.unpriced_requests || current.partial_requests ? '已知' : '折算' }} ${{ current.cost_usd.toFixed(2) }}
-    </span>
-    <span v-if="current.estimated_total_cost_usd != null" class="rounded bg-[#f6f3ee] px-1.5 py-0.5"
-      title="按本窗口网关费用除以官方已用比例估算；同账号其它入口的消费可能使估算偏低，并非官方美元配额">
-      预计总费用 ${{ current.estimated_total_cost_usd.toFixed(2) }}
-    </span>
+  <div v-if="current" class="usage-stats">
+    <InfoTooltip :label="`查看${label}完整费用统计`" content-class="usage-cost-bubble">
+      <template #trigger><span class="usage-stats-line"><template v-if="current.basis === 'rolling'">最近 {{ label }} · </template>{{ compact(current.requests) }} 请求 · {{ compact(current.tokens) }} Token · <template v-if="current.requests > 0 && current.unpriced_requests === current.requests">费用未知</template><template v-else>{{ current.unpriced_requests || current.partial_requests ? '已知' : '折算' }} ${{ current.cost_usd.toFixed(2) }}</template><template v-if="current.estimated_total_cost_usd != null"> · 预计总费用 ${{ current.estimated_total_cost_usd.toFixed(2) }}</template></span></template>
+      <header><span>{{ label === '5h' ? '5 小时' : label === '7d' ? '7 天' : label }}用量统计</span><small>网关记录</small></header>
+      <dl class="usage-bubble-grid">
+        <div><dt>请求数</dt><dd>{{ current.requests.toLocaleString('zh-CN') }}</dd></div>
+        <div><dt>Token</dt><dd>{{ current.tokens.toLocaleString('zh-CN') }}</dd></div>
+        <div><dt>{{ current.unpriced_requests || current.partial_requests ? '已知费用' : '折算费用' }}</dt><dd>{{ current.requests > 0 && current.unpriced_requests === current.requests ? '费用未知' : (current.unpriced_requests || current.partial_requests ? '已知 $' : '折算 $') + current.cost_usd.toFixed(2) }}</dd></div>
+        <div v-if="current.estimated_total_cost_usd != null"><dt>预计总费用</dt><dd>${{ current.estimated_total_cost_usd.toFixed(2) }}</dd></div>
+      </dl>
+      <p>{{ description }}</p>
+      <p v-if="current.estimated_total_cost_usd != null" class="usage-bubble-estimate">预计总费用由当前费用与官方用量比例估算。</p>
+    </InfoTooltip>
   </div>
-  <p v-else class="pb-1 text-[10px] text-[#b5b0a6]">统计待更新</p>
+  <p v-else class="usage-record-start">统计待更新</p>
 </template>

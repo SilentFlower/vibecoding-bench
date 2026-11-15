@@ -25,7 +25,7 @@ def deleted_binding_fixture(client, deployment, data, manifest, browser, base, a
     network_data = data / 'synthetic-unbind-network'
     network_data.mkdir()
     proxy = client.containers.run(manifest['images']['control']['reference'], ['/fixtures/mock_network.py'],
-        entrypoint='python', detach=True, network='vibebench-v3-' + deployment,
+        entrypoint='python', detach=True, network='flower2api-' + deployment,
         labels={'vibebench.product': 'v3', 'vibebench.deployment': deployment, 'vibebench.role': 'verification'},
         volumes={str(REPO / 'deploy/flower2api/fixtures'): {'bind': '/fixtures', 'mode': 'ro'},
                  str(network_data): {'bind': '/fixtures-data', 'mode': 'rw'}})
@@ -82,8 +82,8 @@ def deleted_binding_fixture(client, deployment, data, manifest, browser, base, a
             :return: None；不满足验收时立即失败。
             """
             nonlocal gid
-            doc = "document.querySelector('iframe').contentDocument"
-            win = "document.querySelector('iframe').contentWindow"
+            doc = "document"
+            win = "window"
             await wait_for(f"Boolean({doc}?.querySelector('[data-cc2-unbind=\"{aid}\"]') && {doc}.querySelector('#accounts-body').onclick)")
             await evaluate(f"{{const w={win},original=w.fetch;w.__unbindResponses=[];w.__unbindAlerts=[];w.confirm=()=>true;w.alert=m=>w.__unbindAlerts.push(m);w.fetch=async(...args)=>{{const r=await original(...args);if(String(args[0]).includes('/cc2api-binding'))w.__unbindResponses.push(r.status);return r}}}}")
             # 通过正式删除 API 产生悬空绑定；不直接删远端数据库绕过配置门禁。
@@ -107,9 +107,11 @@ def deleted_binding_fixture(client, deployment, data, manifest, browser, base, a
                     raise AssertionError('合成调度器重启后未就绪')
                 time.sleep(0.2)
             await evaluate(f"{doc}.querySelector('[data-cc2-unbind=\"{aid}\"]').click()")
+            await wait_for(f"!{doc}.querySelector('#runtime-confirm-modal').classList.contains('hidden')")
+            await evaluate(f"{doc}.querySelector('#runtime-confirm-accept').click()")
             await wait_for(f"Boolean({doc}.querySelector('[data-cc2-create=\"{aid}\"]'))")
             assert await evaluate(f"{win}.__unbindResponses") == [200]
-            assert not await evaluate(f"{win}.__unbindAlerts")
+            assert await evaluate(f"{doc}.querySelector('#runtime-toast').classList.contains('hidden')")
             assert await evaluate(f"Boolean({doc}.querySelector('[data-cc2-bind=\"{aid}\"]'))")
             with sqlite3.connect(data / 'bench/db.sqlite') as database:
                 assert database.execute('SELECT cc2api_account_id,warmup_enabled,warmup_next_run_at,warmup_last_status FROM accounts WHERE id=?', (aid,)).fetchone() == (None, 0, None, 'off')
@@ -146,7 +148,7 @@ finally:
             # 再次点击真实创建按钮，确认后续使用边界也能读取 RT，而非只验即时快照。
             await evaluate(f"{doc}.querySelector('[data-cc2-create=\"{aid}\"]').click()")
             await wait_for(f"Boolean({doc}.querySelector('[data-cc2-unbind=\"{aid}\"]'))")
-            assert not await evaluate(f"{win}.__unbindAlerts")
+            assert await evaluate(f"{doc}.querySelector('#runtime-toast').classList.contains('hidden')")
             with sqlite3.connect(data / 'bench/db.sqlite') as database:
                 gid = database.execute('SELECT cc2api_account_id FROM accounts WHERE id=?', (aid,)).fetchone()[0]
                 assert gid is not None

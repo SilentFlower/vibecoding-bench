@@ -87,13 +87,13 @@ class CredentialOwnership:
                     'message': '凭据归属记录损坏，需要核对', 'environment_id': None, 'direction': None}
                 continue
             messages = {'handoff': '凭据交接中，请重试原操作或对账', 'reauth': '重新授权中',
-                'reconcile': '凭据交接需要核对', 'ready': '本地管理，cc2api 已暂停' if record['owner'] == 'local' else 'cc2api 管理凭据'}
+                'reconcile': '凭据交接需要核对', 'ready': '本地管理，网关已暂停' if record['owner'] == 'local' else '网关管理凭据'}
             if record.get('retired') and record['phase'] == 'ready':
-                messages['ready'] = '原账号已停用，重新授权后可恢复；cc2api 已暂停'
+                messages['ready'] = '原账号已停用，重新授权后可恢复；网关已暂停'
             if record.get('refresh_pending'):
-                messages['reconcile'] = '本地刷新结果待确认，请核对或明确重新授权；cc2api 已暂停'
+                messages['reconcile'] = '本地刷新结果待确认，请核对或明确重新授权；网关已暂停'
             if record.get('gateway_refresh_pending'):
-                messages['reconcile'] = 'cc2api 刷新结果待确认，请重新授权原账号'
+                messages['reconcile'] = '网关刷新结果待确认，请重新授权原账号'
             result[row['account_id']] = {'owner': record['owner'], 'phase': record['phase'],
                 'remote_id': record['remote_id'], 'message': messages[record['phase']],
                 'environment_id': record['input']['identity']['environment_id'],
@@ -415,23 +415,23 @@ class CredentialOwnership:
         binding = account.get('cc2api_account_id')
         if binding is not None:
             if action != 'sync':
-                raise ValueError('账号已经关联 cc2api，无需再次创建或关联')
+                raise ValueError('账号已经关联网关，无需再次创建或关联')
             self.guard(account)
             snapshot = self.gateway.resolve_credentials(binding, 2400)
             self.mirror(account['name'], snapshot)
             self.runtime.sync_credentials(self.runtime._row(account['name'], account['id']), account)
             remote = next((item for item in self.gateway.list_accounts() if item['id'] == binding), None)
             if not remote:
-                raise ValueError('原关联 cc2api 账号不存在')
+                raise ValueError('原关联网关账号不存在')
             return {'ok': True, 'created': False, 'cc2api_account': remote}
         self.idle(account)
         profile = self.read_profile(account['name'])
         accounts = self.gateway.list_accounts()
         matched = next((item for item in accounts if item['id'] == target_id), None) if action == 'bind' else self.find(profile, accounts)
         if action == 'bind' and matched is None:
-            raise ValueError('所选 cc2api 账号不存在，未创建或关联任何账号')
+            raise ValueError('所选网关账号不存在，未创建或关联任何账号')
         if action == 'create' and matched is not None:
-            raise ValueError('已有匹配的 cc2api 账号，请使用“关联已有账号”')
+            raise ValueError('已有匹配的网关账号，请使用“关联已有账号”')
         if matched is None:
             capability = self.gateway._request('GET', '/admin/runtime/credential-capabilities')
             if capability.get('credential_ownership_protocol') != 1:
@@ -448,7 +448,7 @@ class CredentialOwnership:
             authorized = self._authorized_profile(account, profile) if direction == 'attach' else None
             observed = self.read_identity(account, authorized.get('cli_version')) if authorized else self.identity(account)
             if matched.get('device_id') != observed['device_id']:
-                raise ValueError('已有 cc2api 设备身份与 CLI 观测不一致，保留已有身份并阻止绑定')
+                raise ValueError('已有网关设备身份与 CLI 观测不一致，保留已有身份并阻止绑定')
             if direction == 'attach':
                 # CLI 收尾可能尚未镜像 root profile；来源证明必须来自已核验身份的当前 HOME。
                 # 此处只读当前凭据，不在远端仍管理刷新时主动尝试本地 RT。
@@ -466,7 +466,7 @@ class CredentialOwnership:
                     raise ValueError('新授权凭据已临期，请重新授权后立即关联')
                 direction = 'authorize'
             elif matched.get('status') != 'active' or matched.get('auth_type') != 'oauth':
-                raise ValueError('匹配到的 cc2api 账号不是 active OAuth 账号')
+                raise ValueError('匹配到的网关账号不是 active OAuth 账号')
             self._record(account, matched['id'], direction, profile, observed, remote, action=action)
         return self.resume(account)
 

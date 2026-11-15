@@ -121,9 +121,9 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
     :return: None；偏差立即失败，由外层清理本次部署
     """
     name = "draft-ui-fixture"
-    doc = "document.querySelector('iframe').contentDocument"
-    win = "document.querySelector('iframe').contentWindow"
-    state = win + ".eval('state.accLogin')"
+    doc = "document"
+    win = "window"
+    state = "window.__nativeProbe.readLogin()"
     orchestrator = client.containers.list(filters={"label": ["vibebench.deployment=" + deployment, "vibebench.role=orchestrator"]})[0]
     code = "import main,docker;from account_runtime import AccountRuntime;" \
         "r=AccountRuntime(docker.from_env(),main.BENCH_DATA,main.HOST_BENCH_DATA,main.get_db,main.derive_v3_fingerprint,main.cc2api_client);" \
@@ -143,7 +143,7 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
     (home / ".synthetic-login.json").write_text(json.dumps({"wait_for_code": True, "new_endpoint": True}))
     bench_db = data / "bench/db.sqlite"
 
-    async def reload_iframe():
+    async def reload_workspace():
         """等待新文档完成，避免误点刷新前的旧按钮。@return None。"""
         await evaluate(f"{win}.__draftReloadMarker=true;{win}.location.reload()")
         await wait_for(f"Boolean({doc}?.readyState==='complete' && !{win}.__draftReloadMarker && {doc}.querySelector('#add-account'))")
@@ -163,25 +163,25 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
                 pass
             assert time.monotonic() < deadline, "测试管理器未恢复"
             await evaluate("new Promise(resolve=>setTimeout(resolve,100))")
-        await reload_iframe()
+        await reload_workspace()
 
     async def click_button(selector):
         """滚动到实际可见按钮，用 Chrome 鼠标事件点击。@param selector DOM 选择器；@return None。"""
         selected = json.dumps(selector)
         await evaluate(f"{doc}.querySelector({selected}).scrollIntoView({{block:'center',inline:'center'}})")
-        point = await evaluate(f"(() => {{const d={doc},b=d.querySelector({selected}),r=b.getBoundingClientRect(),f=document.querySelector('iframe').getBoundingClientRect();if(d.elementFromPoint(r.left+r.width/2,r.top+r.height/2)!==b) throw Error('按钮被遮挡');return {{x:f.left+r.left+r.width/2,y:f.top+r.top+r.height/2}};}})()")
+        point = await evaluate(f"(() => {{const d={doc},b=d.querySelector({selected}),r=b.getBoundingClientRect(),f={{left:0,top:0}};if(d.elementFromPoint(r.left+r.width/2,r.top+r.height/2)!==b) throw Error('按钮被遮挡');return {{x:f.left+r.left+r.width/2,y:f.top+r.top+r.height/2}};}})()")
         await rpc("Input.dispatchMouseEvent", {"type": "mousePressed", **point, "button": "left", "clickCount": 1}, session_id)
         await rpc("Input.dispatchMouseEvent", {"type": "mouseReleased", **point, "button": "left", "clickCount": 1}, session_id)
 
     await evaluate(f"{doc}.querySelector('#add-account').click()")
-    await evaluate(f"(() => {{const f={doc}.querySelector('#acc-form');f.elements.name.value='{name}';f.elements.upstream_proxy_scheme.value='socks5h';f.elements.upstream_socks5_host.value='{proxy_address}';f.elements.upstream_socks5_port.value='1080';f.requestSubmit();}})()")
+    await evaluate(f"(() => {{const f={doc}.querySelector('#acc-form');f.elements.name.value='{name}';{doc}.querySelector('#acc-proxy-manual').open=true;{doc}.querySelector('#acc-use-manual').checked=true;{doc}.querySelector('#acc-use-manual').dispatchEvent(new Event('change'));f.elements.upstream_proxy_scheme.value='socks5h';f.elements.upstream_socks5_host.value='{proxy_address}';f.elements.upstream_socks5_port.value='1080';f.requestSubmit();}})()")
     await wait_for(f"Boolean({state}?.authorizationURL)", timeout=ACCOUNT_STARTUP_TIMEOUT)
     sid = await evaluate(f"{state}.sid")
     assert await evaluate(f"{doc}.querySelector('#acc-auth-url').value.startsWith('https://claude.com/cai/oauth/authorize?')")
     draft = browser.get(base + "/runtime/api/accounts/login-drafts", timeout=10).json()[0]
     assert draft["environment_id"] == environment_id and draft["state"] == "authorizing"
     assert not any(row["name"] == name for row in browser.get(base + "/runtime/api/accounts", timeout=10).json())
-    assert not await evaluate(f"{win}.eval('state.accounts').some(a=>a.name==='{name}')")
+    assert not await evaluate(f"Array.from({doc}.querySelectorAll('.work-account h3')).some(a=>a.textContent==='{name}')")
     container = client.containers.list(filters={"label": ["vibebench.deployment=" + deployment,
         "vibebench.environment=" + environment_id, "vibebench.role=account"]})[0]
     container.reload()
@@ -190,15 +190,14 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
     print("通过：新草稿/新官方入口可见，不进入正式账号及任务/养号选择，账号容器按需启动")
 
     # 刷新销毁浏览器句柄，服务端原 SID/tmux 必须仍可继续。
-    await reload_iframe()
+    await reload_workspace()
     await wait_for(f"Boolean({doc}?.querySelector('[data-draft-resume=\"{environment_id}\"]'))")
-    await evaluate(f"{win}.__draftAlerts=[];{win}.alert=message=>{win}.__draftAlerts.push(message)")
     await click_button(f'[data-draft-resume="{environment_id}"]')
     try:
         await wait_for(f"Boolean({state}?.authorizationURL && {state}?.ws?.readyState===1)")
     except TimeoutError:
         print("草稿继续诊断：", browser.get(base + "/runtime/api/accounts/login-drafts", timeout=10).json(), flush=True)
-        print("页面继续诊断：", await evaluate(f"[Boolean({state}),{doc}.querySelector('#acc-login-link-status').textContent,{doc}.querySelector('#acc-login-connection-status').textContent,{win}.__draftAlerts]"), flush=True)
+        print("页面继续诊断：", await evaluate(f"[Boolean({state}),{doc}.querySelector('#acc-login-link-status').textContent,{doc}.querySelector('#acc-login-connection-status').textContent,{doc}.querySelector('#runtime-toast-message').textContent]"), flush=True)
         raise
     assert await evaluate(f"{state}.sid") == sid
     await evaluate(f"{doc}.querySelector('#acc-auth-code').focus()")
@@ -215,7 +214,7 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
         await wait_for(f"Boolean({state}?.authorizationURL && {state}.sid !== '{sid}')", timeout=ACCOUNT_STARTUP_TIMEOUT)
     except TimeoutError:
         print("草稿重新登录诊断：", browser.get(base + "/runtime/api/accounts/login-drafts", timeout=10).json(), flush=True)
-        print("页面重新登录诊断：", await evaluate(f"[{win}.__draftAlerts,Boolean({state}),{doc}.querySelector('#acc-login-connection-status').textContent]"), flush=True)
+        print("页面重新登录诊断：", await evaluate(f"[{doc}.querySelector('#runtime-toast-message').textContent,Boolean({state}),{doc}.querySelector('#acc-login-connection-status').textContent]"), flush=True)
         raise
     assert await evaluate(f"{state}.environmentId") == environment_id
     assert json.loads((home / ".claude.json").read_text())["userID"] == "d" * 64
@@ -225,7 +224,7 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
 
     await restart_manager()
     # 管理器启动 reconcile 收口原执行；刷新列表只发现草稿，不创建新 CLI。
-    await wait_for(f"{doc}.querySelector('#accounts-body').textContent.includes('登录已中断')")
+    await wait_for(f"{doc}.querySelector('#work-login-drafts').textContent.includes('登录已中断')")
     interrupted = browser.get(base + "/runtime/api/accounts/login-drafts", timeout=10).json()[0]
     assert interrupted["state"] == "interrupted" and interrupted["session_id"] is None
     container.reload()
@@ -245,7 +244,7 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
         await wait_for(f"Boolean({doc}.querySelector('[data-draft-resume=\"{environment_id}\"]:not([disabled])'))")
     except TimeoutError:
         print("重启后草稿入口诊断：", browser.get(base + "/runtime/api/accounts/login-drafts", timeout=10).json(), flush=True)
-        print("重启后草稿按钮诊断：", await evaluate(f"{doc}.querySelector('#accounts-body').textContent"), flush=True)
+        print("重启后草稿按钮诊断：", await evaluate(f"{doc}.querySelector('#work-login-drafts').textContent"), flush=True)
         raise
     await click_button(f'[data-draft-resume="{environment_id}"]')
     try:
@@ -256,7 +255,7 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
         raise
     await click_button('#acc-login-commit')
     await wait_for(f"{doc}.querySelector('#acc-modal').classList.contains('hidden')")
-    await wait_for(f"{doc}.querySelector('#account-login-result').textContent.includes('仅保存到本地，尚未关联 cc2api')")
+    await wait_for(f"{doc}.querySelector('#account-login-result').textContent.includes('仅保存到本地，尚未关联网关账号')")
     with sqlite3.connect(bench_db) as connection:
         account_id = connection.execute("SELECT id FROM accounts WHERE name=?", (name,)).fetchone()[0]
         assert connection.execute("SELECT account_id FROM account_environments WHERE environment_id=?", (environment_id,)).fetchone()[0] == account_id
@@ -299,21 +298,23 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
     failed = next(row for row in browser.get(base + "/runtime/api/accounts/login-drafts", timeout=10).json() if row["environment_id"] == delete_id)
     assert failed["state"] == "reconcile" and failed["can_reconcile"]
     assert failed["proxy_known"] and failed["proxy_summary"] == f"socks5h://{proxy_address}:1080"
-    await evaluate(f"{win}.renderAccounts()")
+    await evaluate(f"{win}.__nativeProbe.refreshAccounts()")
     await wait_for(f"Boolean({doc}.querySelector('[data-draft-reconcile=\"{delete_id}\"]'))")
-    assert f"socks5h://{proxy_address}:1080" in await evaluate(f"{doc}.querySelector('#accounts-body').textContent")
+    assert f"socks5h://{proxy_address}:1080" in await evaluate(f"{doc}.querySelector('#work-login-drafts').textContent")
     await click_button(f'[data-draft-reconcile="{delete_id}"]')
     await wait_for(f"Boolean({doc}.querySelector('[data-draft-delete=\"{delete_id}\"]:not([disabled])'))")
     assert browser.get(base + f"/runtime/api/accounts/login/{failed_sid}/status", timeout=10).status_code == 404
     assert (delete_root / "home/.claude.json").read_bytes() == before_home
     assert not (delete_root / "runtime/execution.json").exists()
     print("通过：真实清理故障后页面恢复检查收口原 SID，恢复删除操作，HOME 保留且草稿代理可见")
-    await evaluate(f"{win}.__draftDeleteConfirmation='';{win}.confirm=message=>{{{win}.__draftDeleteConfirmation=message;return true}};{win}.renderAccounts()")
+    await evaluate(f"{win}.__nativeProbe.refreshAccounts()")
     await wait_for(f"Boolean({doc}.querySelector('[data-draft-delete=\"{delete_id}\"]'))")
     await click_button(f'[data-draft-delete="{delete_id}"]')
+    await wait_for(f"!{doc}.querySelector('#runtime-confirm-modal').classList.contains('hidden')")
+    assert '未提交授权产物' in await evaluate(f"{doc}.querySelector('#runtime-confirm-message').textContent")
+    await click_button('#runtime-confirm-accept')
     await wait_for(f"!{doc}.querySelector('[data-draft-delete=\"{delete_id}\"]')")
     assert not delete_root.exists() and not (data / "bench/profiles" / name).exists()
-    assert "未提交授权产物" in await evaluate(f"{win}.__draftDeleteConfirmation")
     assert not client.containers.list(all=True, filters={"label": ["vibebench.deployment=" + deployment, "vibebench.environment=" + delete_id]})
     with sqlite3.connect(bench_db) as connection:
         assert connection.execute("SELECT count(*) FROM account_environments WHERE environment_id=?", (delete_id,)).fetchone()[0] == 0

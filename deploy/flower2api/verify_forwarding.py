@@ -28,6 +28,7 @@ import requests
 import manage
 from manage import REPO
 from native_sender import VERSION as NATIVE_RUNTIME_VERSION
+from native_ui import click_text
 from verify_browser import ACCOUNT_STARTUP_TIMEOUT, verify_visible_logout
 from verify_isolation import verify_official_tools, verify_roles
 
@@ -66,7 +67,7 @@ def build_verification(release, destination):
         :return: 正式命令输出。
         """
         arguments = list(arguments)
-        if arguments[:2] == ['docker', 'build']:
+        if arguments[:2] == ['docker', 'build'] or arguments[:3] == ['docker', 'buildx', 'build']:
             index = arguments.index('--target') + 1
             arguments[index] = 'verification-' + arguments[index]
         return original(*arguments, **options)
@@ -354,7 +355,7 @@ def verify(manifest_path, output, binary, native=False, kernel_release=None, ker
                 network_data = root / ('proxy-' + str(index))
                 shutil.copytree(fixture, network_data)
                 proxy = client.containers.run(values['V3_CONTROL_IMAGE'], ['/fixtures/forwarding_network.py'],
-                    entrypoint='python', detach=True, network='vibebench-v3-' + deployment,
+                    entrypoint='python', detach=True, network='flower2api-' + deployment,
                     labels={**labels, 'vibebench.role': 'verification'},
                     volumes={str(REPO / 'deploy/flower2api/fixtures'): {'bind': '/fixtures', 'mode': 'ro'},
                         str(network_data): {'bind': '/fixtures-data', 'mode': 'rw'}})
@@ -411,13 +412,13 @@ def verify(manifest_path, output, binary, native=False, kernel_release=None, ker
                 :param session_id: 当前私有浏览器会话。
                 :return: None。
                 """
-                doc = "document.querySelector('iframe').contentDocument"
-                win = "document.querySelector('iframe').contentWindow"
+                doc = "document"
+                win = "window"
                 await wait_for(f"Boolean({doc}?.querySelector('[data-cc2-create]'))")
                 for width in (1440, 720):
                     await rpc('Emulation.setDeviceMetricsOverride', {'width': width, 'height': 950, 'deviceScaleFactor': 1, 'mobile': False}, session_id)
                     for theme in ('dark', 'light'):
-                        await evaluate(f"{doc}.documentElement.dataset.theme={json.dumps(theme)};{doc}.querySelector('[data-cc2-create]').scrollIntoView({{block:'center',inline:'end'}})")
+                        await evaluate(f"{doc}.querySelector('.task-runtime').dataset.theme={json.dumps(theme)};{doc}.querySelector('[data-cc2-create]').scrollIntoView({{block:'center',inline:'end'}})")
                         shot = await rpc('Page.captureScreenshot', {'format': 'png'}, session_id)
                         (output / f'unbound-actions-{width}-{theme}.png').write_bytes(base64.b64decode(shot['data']))
                 # 在点击前记录有限 fetch 路径与结果，避免错过短暂成功状态。
@@ -425,7 +426,7 @@ def verify(manifest_path, output, binary, native=False, kernel_release=None, ker
                 for account in accounts:
                     aid = account['aid']
                     await evaluate(f"{doc}.querySelector('[data-cc2-create=\"{aid}\"]').click()")
-                    await wait_for(f"Boolean({doc}.querySelector('[data-cc2-process=\"{aid}\"]'))", timeout=ACCOUNT_STARTUP_TIMEOUT)
+                    await wait_for(f"Boolean({doc}.querySelector('[data-cc2-unbind=\"{aid}\"]'))", timeout=ACCOUNT_STARTUP_TIMEOUT)
                     with sqlite3.connect(data / 'bench/db.sqlite') as database:
                         gid = database.execute('SELECT cc2api_account_id FROM accounts WHERE id=?', (aid,)).fetchone()[0]
                     account['gid'] = gid
@@ -434,6 +435,8 @@ def verify(manifest_path, output, binary, native=False, kernel_release=None, ker
                     assert row[:7] == ('rewrite', 1, 4, 'owner_only', 4, 50, 60), row[:7]
                     metrics = json.loads(row[7])
                     assert metrics['constrained_memory'] == (3712 if native else 1152) * 1024 ** 2 and metrics['observation']['rss_bytes'] is None
+                    # 创建默认原生后端；先显式验证旧转发，后续单独切换原生并核对预算。
+                    assert request('PUT',f"/admin/accounts/{gid}",headers=admin,json={'request_backend':'legacy'}).status_code==200
                     wake(account)
                 with sqlite3.connect(data / 'bench/db.sqlite') as database:
                     fingerprint = json.loads(database.execute('SELECT fingerprint_json FROM account_environments WHERE environment_id=?',
@@ -452,16 +455,16 @@ def verify(manifest_path, output, binary, native=False, kernel_release=None, ker
                     warmup_before = database.execute('SELECT warmup_enabled,warmup_next_run_at,warmup_last_status FROM accounts WHERE id=?', (account['aid'],)).fetchone()
                 with sqlite3.connect(data / 'gateway/gateway.sqlite') as database:
                     remote_before = database.execute('SELECT count(*) FROM accounts').fetchone()[0]
-                await evaluate(f"{win}.eval('renderAccounts()')")
+                await evaluate(f"{win}.__nativeProbe.refreshAccounts()")
                 await evaluate(f"{doc}.querySelector('[data-cc2-create=\"{account['aid']}\"]').click()")
-                await wait_for(f"{win}.__alerts.some(value=>value.includes('关联已有账号'))")
+                await wait_for(f"{doc}.querySelector('#runtime-toast-message').textContent.includes('关联已有账号')")
                 assert request('POST', f"/runtime/api/accounts/{account['aid']}/cc2api/process").status_code == 409
                 with sqlite3.connect(data / 'bench/db.sqlite') as database:
                     assert database.execute('SELECT cc2api_account_id FROM accounts WHERE id=?', (account['aid'],)).fetchone() == (None,)
                 await evaluate(f"{doc}.querySelector('[data-cc2-bind=\"{account['aid']}\"]').click()")
                 await wait_for(f"!{doc}.querySelector('#cc2api-binding-modal').classList.contains('hidden')")
                 await evaluate(f"{doc}.querySelector('#cc2api-binding-form').elements.cc2api_account_id.value='{account['gid']}';{doc}.querySelector('#cc2api-binding-form').requestSubmit()")
-                await wait_for(f"Boolean({doc}.querySelector('[data-cc2-process=\"{account['aid']}\"]'))", timeout=ACCOUNT_STARTUP_TIMEOUT)
+                await wait_for(f"Boolean({doc}.querySelector('[data-cc2-unbind=\"{account['aid']}\"]'))", timeout=ACCOUNT_STARTUP_TIMEOUT)
                 with sqlite3.connect(data / 'bench/db.sqlite') as database:
                     assert database.execute('SELECT warmup_enabled,warmup_next_run_at,warmup_last_status FROM accounts WHERE id=?', (account['aid'],)).fetchone() == warmup_before
                     assert database.execute('SELECT cc2api_account_id FROM accounts WHERE id=?', (account['aid'],)).fetchone() == (account['gid'],)
@@ -485,8 +488,11 @@ def verify(manifest_path, output, binary, native=False, kernel_release=None, ker
                     before = dict(database.execute('SELECT * FROM accounts WHERE id=?', (account['gid'],)).fetchone())
                 before_files = [(path, hashlib.sha256(path.read_bytes()).hexdigest()) for path in (
                     account['profile'] / '.credentials.json', account['root'] / 'home/.claude/.credentials.json')]
+                await evaluate(f"{doc}.querySelector('[data-cli-settings=\"{account['aid']}\"]').click()")
+                await wait_for(f"!{doc}.querySelector('#cli-settings-form button[type=submit]').disabled")
+                await evaluate(f"{doc}.querySelector('#cli-settings-maintenance').open=true")
                 await evaluate(f"{doc}.querySelector('[data-cc2-process=\"{account['aid']}\"]').click()")
-                await wait_for(f"{win}.eval('state.accountLoginMessage').includes('进程指标')", timeout=ACCOUNT_STARTUP_TIMEOUT)
+                await wait_for(f"{doc}.querySelector('#account-login-result').textContent.includes('进程指标')", timeout=ACCOUNT_STARTUP_TIMEOUT)
                 with sqlite3.connect(data / 'gateway/gateway.sqlite') as database:
                     database.row_factory = sqlite3.Row
                     after = dict(database.execute('SELECT * FROM accounts WHERE id=?', (account['gid'],)).fetchone())
@@ -499,19 +505,31 @@ def verify(manifest_path, output, binary, native=False, kernel_release=None, ker
                 for width in (1440, 720):
                     await rpc('Emulation.setDeviceMetricsOverride', {'width': width, 'height': 950, 'deviceScaleFactor': 1, 'mobile': False}, session_id)
                     for theme in ('dark', 'light'):
-                        await evaluate(f"{doc}.documentElement.dataset.theme={json.dumps(theme)};{doc}.querySelector('[data-cc2-process]').scrollIntoView({{block:'center',inline:'end'}})")
+                        await evaluate(f"{doc}.querySelector('.task-runtime').dataset.theme={json.dumps(theme)};{doc}.querySelector('[data-cc2-process]').scrollIntoView({{block:'center',inline:'end'}})")
                         shot = await rpc('Page.captureScreenshot', {'format': 'png'}, session_id)
                         (output / f'actions-{width}-{theme}.png').write_bytes(base64.b64decode(shot['data']))
                 actions = await evaluate(f'{win}.__actions')
                 assert sum(item['path'].endswith('/cc2api/create') and item['status'] == 200 for item in actions) == 2
                 assert any(item['path'].endswith('/cc2api/process') and item['status'] == 200 for item in actions)
-                await evaluate("Array.from(document.querySelectorAll('a')).find(item=>item.textContent.trim()==='账号').click()")
-                await wait_for("document.body.textContent.includes('官方 CLI 进程采样') && document.body.textContent.includes('CLI RSS 未采集')")
-                assert await evaluate("Array.from(document.querySelectorAll('p')).filter(item=>item.textContent.includes('容器内存上限')).length") == 2
-                await evaluate("Array.from(document.querySelectorAll('p')).find(item=>item.textContent.includes('容器内存上限')).scrollIntoView({block:'center'})")
-                shot = await rpc('Page.captureScreenshot', {'format': 'png'}, session_id)
-                (output / 'account-metrics.png').write_bytes(base64.b64decode(shot['data']))
-                passed('S2 网关卡片区分容器上限、实测 RSS/时间与未采集状态')
+                sampled_id=account['aid']
+                await evaluate("document.querySelector('#cli-settings-modal [data-close]').click()")
+                await evaluate('document.querySelector(\'.console-sidebar a[href="/"]\').click()')
+                await wait_for('document.querySelectorAll(".account-identity-text").length===2')
+                for observed_account in accounts:
+                    name=json.dumps(observed_account['name'])
+                    await evaluate(f"[...document.querySelectorAll('.account-identity-text')].find(item=>item.querySelector('h3').textContent.startsWith({name})).click()")
+                    await wait_for('Boolean(document.querySelector(".account-workspace-tabs"))')
+                    await click_text(evaluate,'.account-workspace-tabs button','环境与诊断')
+                    await evaluate('document.querySelector(".account-diagnostic-technical").open=true')
+                    await wait_for('document.querySelector(".account-diagnostic-technical").textContent.includes("容器内存上限")')
+                    content=await evaluate('document.querySelector(".account-diagnostic-technical").textContent')
+                    assert ('官方 CLI 进程采样' in content) if observed_account['aid']==sampled_id else ('CLI RSS 未采集' in content),content
+                    await evaluate('document.querySelector(".account-diagnostic-technical").scrollIntoView({block:"center"})')
+                    shot=await rpc('Page.captureScreenshot',{'format':'png'},session_id)
+                    (output / f"account-metrics-{observed_account['aid']}.png").write_bytes(base64.b64decode(shot['data']))
+                    await evaluate('document.querySelector(".account-workspace [data-slot=dialog-close]").click()')
+                    await wait_for('!document.querySelector(".account-workspace")')
+                passed('S2 网关详情区分容器上限、实测 RSS/时间与未采集状态')
 
             asyncio.run(verify_visible_logout(base, values['V3_ADMIN_PASSWORD'], exercise=exercise))
             # 浏览器退出撤销了共享管理会话，HTTP 场景重新获取本次会话。
@@ -790,12 +808,15 @@ except urllib.error.HTTPError as error:print(json.dumps({'status':error.code,'ph
                                 return result.status_code
                         with ThreadPoolExecutor(max_workers=count) as executor:
                             assert list(executor.map(submit, range(count))) == [200] * count
+                    # PID 1 等受保护进程不属于工作池；工作进程数量与封存映像仍严格核验。
                     account['native_probe'] = (
-                        "import pathlib,json,fcntl;ps=[p for p in pathlib.Path('/proc').iterdir() if p.name.isdigit()];workers=[];images=set();"
-                        "\nfor p in ps:\n try:\n  if 'memfd:ccrb' in str((p/'exe').readlink()):\n   env=(p/'environ').read_bytes();assert b'REFRESH_TOKEN=' not in env;workers.append(p.name)\n   with (p/'exe').open('rb') as image:assert fcntl.fcntl(image,fcntl.F_GET_SEALS)&15==15\n   images.add((p/'exe').stat().st_ino)\n except FileNotFoundError:pass\n"
+                        "import pathlib,json,fcntl,os;assert os.geteuid()==1001;ps=[p for p in pathlib.Path('/proc').iterdir() if p.name.isdigit()];workers=[];images=set();"
+                        "\nfor p in ps:\n try:\n  if 'memfd:ccrb' in str((p/'exe').readlink()):\n   env=(p/'environ').read_bytes();assert b'REFRESH_TOKEN=' not in env;workers.append(p.name)\n   with (p/'exe').open('rb') as image:assert fcntl.fcntl(image,fcntl.F_GET_SEALS)&15==15\n   images.add((p/'exe').stat().st_ino)\n except (FileNotFoundError,PermissionError):pass\n"
                         "print(json.dumps({'workers':len(workers),'images':len(images)}))")
-                    probe = account['sender_container'].exec_run(['python3','-c',account['native_probe']])
-                    assert probe.exit_code == 0 and json.loads(probe.output) == {'workers':6,'images':1}
+                    probe = account['sender_container'].exec_run(['python3','-c',account['native_probe']], user='1001:1001')
+                    pool_observation = {'exit_code': probe.exit_code, 'result': probe.output.decode(errors='replace')}
+                    (output / f"native-pool-{account['aid']}.json").write_text(json.dumps(pool_observation, ensure_ascii=False, indent=2))
+                    assert probe.exit_code == 0 and json.loads(probe.output) == {'workers':6,'images':1}, pool_observation
                     assert request('POST', '/api/v3-verification', headers=account['headers'], json={'marker':'legacy-endpoint-native-account'}).status_code == 200
                     peak = account['sender_container'].exec_run(['cat','/sys/fs/cgroup/memory.peak'])
                     assert peak.exit_code == 0 and int(peak.output.strip()) < 1536 * 1024 ** 2
@@ -807,7 +828,7 @@ except urllib.error.HTTPError as error:print(json.dumps({'status':error.code,'ph
                 account = accounts[0]
                 def idle_reclaimed():
                     """读取实际池的空闲回收结果。@return 是否仅剩一个暖进程。"""
-                    probe = account['sender_container'].exec_run(['python3','-c',account['native_probe']])
+                    probe = account['sender_container'].exec_run(['python3','-c',account['native_probe']], user='1001:1001')
                     assert probe.exit_code == 0
                     return json.loads(probe.output) == {'workers':1,'images':1}
                 wait_until(idle_reclaimed, '原生池空闲后未回收到一个暖进程', seconds=315)
