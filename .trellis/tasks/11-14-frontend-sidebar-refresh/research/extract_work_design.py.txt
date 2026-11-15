@@ -1,0 +1,18 @@
+"""从确认稿CSSOM提取任务样式，保持媒体查询和规则顺序。"""
+import asyncio
+from playwright.async_api import async_playwright
+from verify_environment_ui import ROOT
+
+
+async def main():
+    """原样提取声明并限定原生工作区作用域。@return 无。"""
+    async with async_playwright() as p:
+        browser=await p.chromium.launch();page=await browser.new_page();await page.goto((ROOT/'doc/design/flower2api-concept.html').as_uri())
+        css=await page.evaluate('''()=>{
+          function selectors(text){let result=[],start=0,depth=0,quote='';for(let i=0;i<text.length;i++){const char=text[i];if(quote){if(char===quote&&text[i-1]!=='\\\\')quote='';continue;}if(char==='"'||char==="'"){quote=char;continue;}if(char==='('||char==='[')depth++;if(char===')'||char===']')depth--;if(char===','&&!depth){result.push(text.slice(start,i));start=i+1;}}result.push(text.slice(start));return result.map(value=>':root.console-design '+value.trim()).join(',');}
+          function walk(rules){return [...rules].map(rule=>{if(rule.selectorText){if(!/\\.(?:work-|upgrade-)/.test(rule.selectorText))return '';return selectors(rule.selectorText)+'{'+rule.style.cssText+'}';}if(rule.cssRules){const children=walk(rule.cssRules);return children?rule.cssText.slice(0,rule.cssText.indexOf('{')+1)+children+'}':'';}return '';}).filter(Boolean).join('\\n');}
+          return [...document.styleSheets].map(sheet=>walk(sheet.cssRules)).join('\\n');
+        }''');(ROOT/'apps/legacy-web/work-design.css').write_text('/* 样式声明来自确认稿，媒体查询完整保留。 */\n'+css+'\n');await browser.close()
+
+
+if __name__=='__main__':asyncio.run(main())

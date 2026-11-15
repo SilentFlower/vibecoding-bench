@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/web/frontend/frontend-guidelines.md", "reason": "Vue管理后台行为与导航合同"}
+{"file": ".trellis/spec/legacy-web/frontend/component-guidelines.md", "reason": "原生页面事件与环境合同"}
+{"file": ".trellis/tasks/11-14-frontend-sidebar-refresh/research/feature-map.md", "reason": "功能入口保留清单"}
+{"file": ".trellis/spec/web/frontend/ui-guidelines.md", "reason": "已确认UI风格、复用控件接口和交互验收合同"}
+{"file": ".trellis/spec/gateway/backend/proxy-directory.md", "reason": "真实代理目录与账号选线、凭据及迁移合同"}

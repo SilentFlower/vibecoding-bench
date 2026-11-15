@@ -1,0 +1,2517 @@
+{
+  "note": "规划时源码入口基线；含数据属性和容器，实施时按业务入口归类，不能用字符串计数替代浏览器可达性验收。",
+  "files": [
+    {
+      "path": "apps/web/src/components/Accounts.vue",
+      "sha256": "917c6e73e950a7f34f9b6e8744c384a00b20cd31b2e1d066102731c175e7a906",
+      "entries": [
+        {
+          "line": 891,
+          "attribute": "@click",
+          "value": "openOAuthFlow"
+        },
+        {
+          "line": 897,
+          "attribute": "@click",
+          "value": "openCreate"
+        },
+        {
+          "line": 979,
+          "attribute": "@click",
+          "value": "openScheduling(a)"
+        },
+        {
+          "line": 981,
+          "attribute": "@click",
+          "value": "openScheduling(a)"
+        },
+        {
+          "line": 1188,
+          "attribute": "@click",
+          "value": "toggleScheduling(a)"
+        },
+        {
+          "line": 1199,
+          "attribute": "@click",
+          "value": "openEdit(a)"
+        },
+        {
+          "line": 1207,
+          "attribute": "@click",
+          "value": "refreshUsage(a.id)"
+        },
+        {
+          "line": 1216,
+          "attribute": "@click",
+          "value": "test(a.id)"
+        },
+        {
+          "line": 1225,
+          "attribute": "@click",
+          "value": "confirmDelete(a.id)"
+        },
+        {
+          "line": 1256,
+          "attribute": "@click",
+          "value": "goToPage(currentPage - 1)"
+        },
+        {
+          "line": 1266,
+          "attribute": "@click",
+          "value": "goToPage(p)"
+        },
+        {
+          "line": 1278,
+          "attribute": "@click",
+          "value": "goToPage(currentPage + 1)"
+        },
+        {
+          "line": 1287,
+          "attribute": "id",
+          "value": "schedulingAccount?.id ?? 0"
+        },
+        {
+          "line": 1298,
+          "attribute": "@submit.prevent",
+          "value": "save"
+        },
+        {
+          "line": 1319,
+          "attribute": "@click",
+          "value": "setAuthType('setup_token')"
+        },
+        {
+          "line": 1329,
+          "attribute": "@click",
+          "value": "setAuthType('oauth')"
+        },
+        {
+          "line": 1410,
+          "attribute": "@click",
+          "value": "form.billing_mode = 'strip'"
+        },
+        {
+          "line": 1420,
+          "attribute": "@click",
+          "value": "form.billing_mode = 'rewrite'"
+        },
+        {
+          "line": 1445,
+          "attribute": "@click",
+          "value": "selectSubscription(opt.value)"
+        },
+        {
+          "line": 1482,
+          "attribute": "@click",
+          "value": "form.auto_telemetry = false"
+        },
+        {
+          "line": 1492,
+          "attribute": "@click",
+          "value": "form.auto_telemetry = true"
+        },
+        {
+          "line": 1508,
+          "attribute": "@click",
+          "value": "form.auto_poll_usage = false"
+        },
+        {
+          "line": 1518,
+          "attribute": "@click",
+          "value": "form.auto_poll_usage = true"
+        },
+        {
+          "line": 1534,
+          "attribute": "@click",
+          "value": "form.allow_fast_mode = false"
+        },
+        {
+          "line": 1544,
+          "attribute": "@click",
+          "value": "form.allow_fast_mode = true"
+        },
+        {
+          "line": 1561,
+          "attribute": "@click",
+          "value": "form.upstream_session_pool_enabled = false"
+        },
+        {
+          "line": 1571,
+          "attribute": "@click",
+          "value": "form.upstream_session_pool_enabled = true"
+        },
+        {
+          "line": 1611,
+          "attribute": "@click",
+          "value": "form.upstream_session_refresh_policy = 'mapped_request'"
+        },
+        {
+          "line": 1621,
+          "attribute": "@click",
+          "value": "form.upstream_session_refresh_policy = 'owner_only'"
+        },
+        {
+          "line": 1644,
+          "attribute": "@click",
+          "value": "form.allow_1m_models = 'opus'"
+        },
+        {
+          "line": 1649,
+          "attribute": "@click",
+          "value": "form.allow_1m_models = DEFAULT_ALLOW_1M_MODELS"
+        },
+        {
+          "line": 1654,
+          "attribute": "@click",
+          "value": "form.allow_1m_models = ''"
+        },
+        {
+          "line": 1728,
+          "attribute": "@click",
+          "value": "showForm = false"
+        },
+        {
+          "line": 1756,
+          "attribute": "@click",
+          "value": "showDeleteConfirm = false"
+        },
+        {
+          "line": 1762,
+          "attribute": "@click",
+          "value": "executeDelete"
+        },
+        {
+          "line": 1789,
+          "attribute": "@click",
+          "value": "oauthMode = 'oauth'"
+        },
+        {
+          "line": 1799,
+          "attribute": "@click",
+          "value": "oauthMode = 'setup_token'"
+        },
+        {
+          "line": 1821,
+          "attribute": "@click",
+          "value": "generateOAuthUrl"
+        },
+        {
+          "line": 1843,
+          "attribute": "@click",
+          "value": "copyText(oauthAuthUrl)"
+        },
+        {
+          "line": 1851,
+          "attribute": "href",
+          "value": "oauthAuthUrl"
+        },
+        {
+          "line": 1880,
+          "attribute": "@click",
+          "value": "oauthStep = 'generate'"
+        },
+        {
+          "line": 1886,
+          "attribute": "@click",
+          "value": "exchangeOAuthCode"
+        },
+        {
+          "line": 1919,
+          "attribute": "@click",
+          "value": "copyText(oauthResult.access_token)"
+        },
+        {
+          "line": 1932,
+          "attribute": "@click",
+          "value": "copyText(oauthResult.refresh_token)"
+        },
+        {
+          "line": 1951,
+          "attribute": "@click",
+          "value": "showOAuthFlow = false"
+        },
+        {
+          "line": 1957,
+          "attribute": "@click",
+          "value": "applyOAuthResult"
+        }
+      ]
+    },
+    {
+      "path": "apps/web/src/components/Dashboard.vue",
+      "sha256": "6d2c5cbc4cf22eea1a55f42ca77b8289087f848617ce9f246a1e6013b1a738ba",
+      "entries": [
+        {
+          "line": 62,
+          "attribute": ":to",
+          "value": "{name: link.name}"
+        },
+        {
+          "line": 71,
+          "attribute": "@click",
+          "value": "handleLogout"
+        }
+      ]
+    },
+    {
+      "path": "apps/web/src/components/Environments.vue",
+      "sha256": "6c0c100d9f7f0f73c7de91f21920c7435503ef20acf5c0163d0da00c929ee99f",
+      "entries": []
+    },
+    {
+      "path": "apps/web/src/components/Login.vue",
+      "sha256": "b6d76ab1ebbf9900d7135581d7700f24246c8c357e1c82977d1036a6c6c69cdd",
+      "entries": [
+        {
+          "line": 44,
+          "attribute": "@submit.prevent",
+          "value": "submit"
+        }
+      ]
+    },
+    {
+      "path": "apps/web/src/components/NativeStageDetails.vue",
+      "sha256": "58a0c9ac036b445cdf1ce94d9693017d637b3218df648065f736e0907fc2b607",
+      "entries": []
+    },
+    {
+      "path": "apps/web/src/components/RequestDiagnostics.vue",
+      "sha256": "d0e14d0ed772bead9a7d12b9c911350325e317353adbb06a3dab9a059fc30fae",
+      "entries": [
+        {
+          "line": 283,
+          "attribute": "@change",
+          "value": "saveMode"
+        },
+        {
+          "line": 289,
+          "attribute": "@submit.prevent",
+          "value": "load()"
+        },
+        {
+          "line": 292,
+          "attribute": "@click",
+          "value": "filtersOpen = !filtersOpen"
+        },
+        {
+          "line": 296,
+          "attribute": "id",
+          "value": "request-filters"
+        },
+        {
+          "line": 301,
+          "attribute": "@click",
+          "value": "account = ''; outcome = ''; since = ''; until = ''; load()"
+        },
+        {
+          "line": 309,
+          "attribute": "@click",
+          "value": "copy(row.request_id, $event)"
+        },
+        {
+          "line": 311,
+          "attribute": "@click",
+          "value": "open(row, $event)"
+        },
+        {
+          "line": 313,
+          "attribute": "@click",
+          "value": "open(row, $event)"
+        },
+        {
+          "line": 318,
+          "attribute": "@click",
+          "value": "load(page - 1)"
+        },
+        {
+          "line": 318,
+          "attribute": "@click",
+          "value": "load(page + 1)"
+        },
+        {
+          "line": 321,
+          "attribute": "@click",
+          "value": "copy(selected.request_id, $event)"
+        },
+        {
+          "line": 322,
+          "attribute": "id",
+          "value": "`request-tab-${tab.id}`"
+        },
+        {
+          "line": 322,
+          "attribute": "@click",
+          "value": "activeTab = tab.id"
+        },
+        {
+          "line": 325,
+          "attribute": "id",
+          "value": "`request-panel-${activeTab}`"
+        },
+        {
+          "line": 329,
+          "attribute": ":to",
+          "value": "{name: 'environments', query: {gateway_account: String(attempt.account_id)}}"
+        },
+        {
+          "line": 329,
+          "attribute": "@click",
+          "value": "inspect(attempt)"
+        },
+        {
+          "line": 342,
+          "attribute": "@change",
+          "value": "selectedAttempt = ($event.target as HTMLSelectElement).value; changeAttempt()"
+        },
+        {
+          "line": 342,
+          "attribute": "@click",
+          "value": "inspect(currentAttempt)"
+        },
+        {
+          "line": 343,
+          "attribute": ":to",
+          "value": "{name: 'environments', query: {gateway_account: String(currentAttempt.account_id)}}"
+        }
+      ]
+    },
+    {
+      "path": "apps/web/src/components/SchedulingDetails.vue",
+      "sha256": "716bf39a8c702c81a4bf667d85e83c4c1b33bea51d17efcc093ce31e267c806d",
+      "entries": [
+        {
+          "line": 180,
+          "attribute": "@click",
+          "value": "rangeMs = 60000"
+        },
+        {
+          "line": 180,
+          "attribute": "@click",
+          "value": "rangeMs = 300000"
+        },
+        {
+          "line": 203,
+          "attribute": "@change",
+          "value": "applyFilter"
+        },
+        {
+          "line": 205,
+          "attribute": "@click",
+          "value": "applyFilter"
+        },
+        {
+          "line": 213,
+          "attribute": "@click",
+          "value": "changePage(page - 1)"
+        },
+        {
+          "line": 213,
+          "attribute": "@click",
+          "value": "changePage(page + 1)"
+        }
+      ]
+    },
+    {
+      "path": "apps/web/src/components/Settings.vue",
+      "sha256": "0feda32a153e5342337411496398059df764f1c14017b489b81b51e389d99860",
+      "entries": [
+        {
+          "line": 773,
+          "attribute": "id",
+          "value": "v3-wait-seconds"
+        },
+        {
+          "line": 776,
+          "attribute": "id",
+          "value": "'v3-weight-' + index"
+        },
+        {
+          "line": 1339,
+          "attribute": "@click",
+          "value": "allowSystemRoleModels = 'claude-opus-5-5,claude-opus-5,claude-fable-5,claude-fable-5-1,claude-opus-4-8'"
+        },
+        {
+          "line": 1344,
+          "attribute": "@click",
+          "value": "allowSystemRoleModels = ''"
+        },
+        {
+          "line": 1709,
+          "attribute": "@change",
+          "value": "syncAccountProfileRange"
+        },
+        {
+          "line": 1720,
+          "attribute": "@change",
+          "value": "syncAccountProfileRange"
+        },
+        {
+          "line": 1772,
+          "attribute": "@click",
+          "value": "use280293AccessPreset"
+        },
+        {
+          "line": 1792,
+          "attribute": "@click",
+          "value": "allowedUserAgents = 'AI-Hub-Monitor*\\npython-httpx*'"
+        },
+        {
+          "line": 1797,
+          "attribute": "@click",
+          "value": "allowedUserAgents = ''"
+        },
+        {
+          "line": 1809,
+          "attribute": "@click",
+          "value": "saveSettings"
+        },
+        {
+          "line": 1826,
+          "attribute": "@click",
+          "value": "loadPrimeLogs"
+        }
+      ]
+    },
+    {
+      "path": "apps/web/src/components/SystemUpdates.vue",
+      "sha256": "0f3c8d6f60faae164eb8e6cbb527c105ccb793475adf20fb583d711c98d25ddd",
+      "entries": [
+        {
+          "line": 214,
+          "attribute": "@click",
+          "value": "check"
+        },
+        {
+          "line": 220,
+          "attribute": "@click",
+          "value": "toggleDetails('current')"
+        },
+        {
+          "line": 221,
+          "attribute": ":to",
+          "value": "{name: 'environments'}"
+        },
+        {
+          "line": 222,
+          "attribute": ":to",
+          "value": "{name: 'environments'}"
+        },
+        {
+          "line": 225,
+          "attribute": "@click",
+          "value": "cancel"
+        },
+        {
+          "line": 225,
+          "attribute": "@click",
+          "value": "confirm('recover', progress.target_release, '', true)"
+        },
+        {
+          "line": 233,
+          "attribute": "@click",
+          "value": "toggleDetails(release.release)"
+        },
+        {
+          "line": 233,
+          "attribute": "@click",
+          "value": "confirm('install', release.release, release.manifest_sha256, release.account_changed)"
+        },
+        {
+          "line": 234,
+          "attribute": "id",
+          "value": "`release-detail-${release.release}`"
+        },
+        {
+          "line": 237,
+          "attribute": "@click",
+          "value": "historyOpen = !historyOpen; expanded = ''"
+        },
+        {
+          "line": 238,
+          "attribute": "id",
+          "value": "update-history"
+        },
+        {
+          "line": 238,
+          "attribute": "@click",
+          "value": "confirm('rollback', item.release, item.manifest_sha256)"
+        },
+        {
+          "line": 241,
+          "attribute": "@click",
+          "value": "event => { if (event.target === dialog) closeConfirm(); }"
+        },
+        {
+          "line": 241,
+          "attribute": "@click",
+          "value": "closeConfirm"
+        },
+        {
+          "line": 241,
+          "attribute": "@click",
+          "value": "execute"
+        }
+      ]
+    },
+    {
+      "path": "apps/web/src/components/Tokens.vue",
+      "sha256": "485e10c4256f7fec948e8de9134da954ba3eea28404a1389119baa204115e754",
+      "entries": [
+        {
+          "line": 224,
+          "attribute": "@click",
+          "value": "openCreate"
+        },
+        {
+          "line": 264,
+          "attribute": "@click",
+          "value": "copyToken(t)"
+        },
+        {
+          "line": 289,
+          "attribute": "@click",
+          "value": "openEdit(t)"
+        },
+        {
+          "line": 297,
+          "attribute": "@click",
+          "value": "toggleStatus(t)"
+        },
+        {
+          "line": 308,
+          "attribute": "@click",
+          "value": "confirmDelete(t.id)"
+        },
+        {
+          "line": 341,
+          "attribute": "@submit.prevent",
+          "value": "save"
+        },
+        {
+          "line": 362,
+          "attribute": "@click",
+          "value": "toggleAccountId('allowed', a.id)"
+        },
+        {
+          "line": 384,
+          "attribute": "@click",
+          "value": "toggleAccountId('blocked', a.id)"
+        },
+        {
+          "line": 399,
+          "attribute": "@click",
+          "value": "showForm = false"
+        },
+        {
+          "line": 427,
+          "attribute": "@click",
+          "value": "showDeleteConfirm = false"
+        },
+        {
+          "line": 433,
+          "attribute": "@click",
+          "value": "executeDelete"
+        }
+      ]
+    },
+    {
+      "path": "apps/web/src/components/UsageWindowStats.vue",
+      "sha256": "072ef7bd03e815b4ae68ac467bc917eee3c7e6cca898eee79019722344f72b85",
+      "entries": []
+    },
+    {
+      "path": "apps/web/src/router.ts",
+      "sha256": "59bb47e8c1b02cbdcf3821ae93d22a05d86c4623f50225a77201de8c8bef0842",
+      "entries": []
+    },
+    {
+      "path": "apps/legacy-web/index.html",
+      "sha256": "c43d75055b62f456f658a812ff4eb4026da737f598384814f4926a3c8640673b",
+      "entries": [
+        {
+          "line": 7,
+          "attribute": "href",
+          "value": "https://fonts.googleapis.com"
+        },
+        {
+          "line": 8,
+          "attribute": "href",
+          "value": "https://fonts.gstatic.com"
+        },
+        {
+          "line": 9,
+          "attribute": "href",
+          "value": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;0,800;1,400&family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&display=swap"
+        },
+        {
+          "line": 11,
+          "attribute": "href",
+          "value": "https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css"
+        },
+        {
+          "line": 14,
+          "attribute": "href",
+          "value": "style.css?v=20261103-iteration-console"
+        },
+        {
+          "line": 15,
+          "attribute": "href",
+          "value": "environments.css?v=20261112-management-ui"
+        },
+        {
+          "line": 37,
+          "attribute": "href",
+          "value": "#accounts"
+        },
+        {
+          "line": 37,
+          "attribute": "data-tab",
+          "value": "accounts"
+        },
+        {
+          "line": 37,
+          "attribute": "data-nav-group",
+          "value": "基础配置"
+        },
+        {
+          "line": 38,
+          "attribute": "href",
+          "value": "#environments"
+        },
+        {
+          "line": 38,
+          "attribute": "data-tab",
+          "value": "environments"
+        },
+        {
+          "line": 39,
+          "attribute": "href",
+          "value": "#topics"
+        },
+        {
+          "line": 39,
+          "attribute": "data-tab",
+          "value": "topics"
+        },
+        {
+          "line": 39,
+          "attribute": "data-nav-group",
+          "value": "普通任务"
+        },
+        {
+          "line": 40,
+          "attribute": "href",
+          "value": "#tasks"
+        },
+        {
+          "line": 40,
+          "attribute": "data-tab",
+          "value": "tasks"
+        },
+        {
+          "line": 41,
+          "attribute": "href",
+          "value": "#runs"
+        },
+        {
+          "line": 41,
+          "attribute": "data-tab",
+          "value": "runs"
+        },
+        {
+          "line": 42,
+          "attribute": "href",
+          "value": "#projects"
+        },
+        {
+          "line": 42,
+          "attribute": "data-tab",
+          "value": "projects"
+        },
+        {
+          "line": 42,
+          "attribute": "data-nav-group",
+          "value": "工程迭代"
+        },
+        {
+          "line": 45,
+          "attribute": "id",
+          "value": "theme-toggle"
+        },
+        {
+          "line": 47,
+          "attribute": "id",
+          "value": "auth-pill"
+        },
+        {
+          "line": 48,
+          "attribute": "id",
+          "value": "auth-user"
+        },
+        {
+          "line": 48,
+          "attribute": "id",
+          "value": "auth-logout"
+        },
+        {
+          "line": 54,
+          "attribute": "id",
+          "value": "clock"
+        },
+        {
+          "line": 58,
+          "attribute": "id",
+          "value": "view"
+        },
+        {
+          "line": 67,
+          "attribute": "id",
+          "value": "build-tag"
+        },
+        {
+          "line": 71,
+          "attribute": "id",
+          "value": "tpl-environments"
+        },
+        {
+          "line": 74,
+          "attribute": "id",
+          "value": "environment-title"
+        },
+        {
+          "line": 75,
+          "attribute": "id",
+          "value": "environment-refresh"
+        },
+        {
+          "line": 77,
+          "attribute": "id",
+          "value": "environment-feedback"
+        },
+        {
+          "line": 78,
+          "attribute": "id",
+          "value": "environment-summary"
+        },
+        {
+          "line": 80,
+          "attribute": "id",
+          "value": "environment-search"
+        },
+        {
+          "line": 81,
+          "attribute": "id",
+          "value": "environment-status"
+        },
+        {
+          "line": 82,
+          "attribute": "id",
+          "value": "environment-result-count"
+        },
+        {
+          "line": 83,
+          "attribute": "href",
+          "value": "#environments"
+        },
+        {
+          "line": 83,
+          "attribute": "id",
+          "value": "environment-clear-target"
+        },
+        {
+          "line": 85,
+          "attribute": "id",
+          "value": "environment-list"
+        },
+        {
+          "line": 88,
+          "attribute": "id",
+          "value": "tpl-projects"
+        },
+        {
+          "line": 91,
+          "attribute": "href",
+          "value": "#projects"
+        },
+        {
+          "line": 91,
+          "attribute": "data-iteration-mode",
+          "value": "projects"
+        },
+        {
+          "line": 92,
+          "attribute": "href",
+          "value": "#warmup"
+        },
+        {
+          "line": 92,
+          "attribute": "data-iteration-mode",
+          "value": "warmup"
+        },
+        {
+          "line": 95,
+          "attribute": "id",
+          "value": "projects-title"
+        },
+        {
+          "line": 96,
+          "attribute": "id",
+          "value": "projects-runtime"
+        },
+        {
+          "line": 97,
+          "attribute": "id",
+          "value": "projects-account"
+        },
+        {
+          "line": 99,
+          "attribute": "id",
+          "value": "projects-overview"
+        },
+        {
+          "line": 101,
+          "attribute": "id",
+          "value": "projects-state"
+        },
+        {
+          "line": 101,
+          "attribute": "id",
+          "value": "projects-message"
+        },
+        {
+          "line": 103,
+          "attribute": "id",
+          "value": "projects-cli-settings"
+        },
+        {
+          "line": 104,
+          "attribute": "id",
+          "value": "projects-capture"
+        },
+        {
+          "line": 105,
+          "attribute": "data-pi-action",
+          "value": "start"
+        },
+        {
+          "line": 106,
+          "attribute": "data-pi-action",
+          "value": "pause"
+        },
+        {
+          "line": 107,
+          "attribute": "data-pi-action",
+          "value": "stop"
+        },
+        {
+          "line": 110,
+          "attribute": "id",
+          "value": "projects-feedback"
+        },
+        {
+          "line": 111,
+          "attribute": "id",
+          "value": "projects-admission"
+        },
+        {
+          "line": 113,
+          "attribute": "id",
+          "value": "projects-target-label"
+        },
+        {
+          "line": 113,
+          "attribute": "id",
+          "value": "projects-current"
+        },
+        {
+          "line": 113,
+          "attribute": "id",
+          "value": "projects-budget"
+        },
+        {
+          "line": 113,
+          "attribute": "id",
+          "value": "projects-activity"
+        },
+        {
+          "line": 114,
+          "attribute": "id",
+          "value": "projects-progress-text"
+        },
+        {
+          "line": 114,
+          "attribute": "id",
+          "value": "projects-cycle"
+        },
+        {
+          "line": 114,
+          "attribute": "id",
+          "value": "projects-progress-bar"
+        },
+        {
+          "line": 114,
+          "attribute": "id",
+          "value": "projects-progress-detail"
+        },
+        {
+          "line": 115,
+          "attribute": "id",
+          "value": "projects-next-action"
+        },
+        {
+          "line": 115,
+          "attribute": "id",
+          "value": "projects-schedule-status"
+        },
+        {
+          "line": 115,
+          "attribute": "id",
+          "value": "projects-schedule-next"
+        },
+        {
+          "line": 118,
+          "attribute": "id",
+          "value": "projects-quota-five_hour"
+        },
+        {
+          "line": 119,
+          "attribute": "id",
+          "value": "projects-quota-seven_day"
+        },
+        {
+          "line": 121,
+          "attribute": "id",
+          "value": "projects-usage"
+        },
+        {
+          "line": 123,
+          "attribute": "id",
+          "value": "projects-reconciliation"
+        },
+        {
+          "line": 123,
+          "attribute": "id",
+          "value": "projects-actions"
+        },
+        {
+          "line": 124,
+          "attribute": "id",
+          "value": "projects-workspace"
+        },
+        {
+          "line": 125,
+          "attribute": "id",
+          "value": "projects-verification"
+        },
+        {
+          "line": 126,
+          "attribute": "id",
+          "value": "projects-verification-stage"
+        },
+        {
+          "line": 127,
+          "attribute": "id",
+          "value": "projects-verification-clock"
+        },
+        {
+          "line": 128,
+          "attribute": "id",
+          "value": "projects-verification-stages"
+        },
+        {
+          "line": 131,
+          "attribute": "id",
+          "value": "projects-tab-terminal"
+        },
+        {
+          "line": 132,
+          "attribute": "id",
+          "value": "projects-tab-events"
+        },
+        {
+          "line": 134,
+          "attribute": "id",
+          "value": "projects-terminal-panel"
+        },
+        {
+          "line": 134,
+          "attribute": "id",
+          "value": "projects-screen-status"
+        },
+        {
+          "line": 134,
+          "attribute": "id",
+          "value": "projects-screen"
+        },
+        {
+          "line": 135,
+          "attribute": "id",
+          "value": "projects-events-panel"
+        },
+        {
+          "line": 136,
+          "attribute": "id",
+          "value": "projects-events-page"
+        },
+        {
+          "line": 136,
+          "attribute": "id",
+          "value": "projects-events-latest"
+        },
+        {
+          "line": 136,
+          "attribute": "id",
+          "value": "projects-events-previous"
+        },
+        {
+          "line": 136,
+          "attribute": "id",
+          "value": "projects-events-next"
+        },
+        {
+          "line": 137,
+          "attribute": "id",
+          "value": "projects-events-new"
+        },
+        {
+          "line": 137,
+          "attribute": "id",
+          "value": "projects-events"
+        },
+        {
+          "line": 141,
+          "attribute": "id",
+          "value": "projects-agent-settings"
+        },
+        {
+          "line": 142,
+          "attribute": "id",
+          "value": "projects-selected-count"
+        },
+        {
+          "line": 143,
+          "attribute": "id",
+          "value": "projects-agent-form"
+        },
+        {
+          "line": 148,
+          "attribute": "id",
+          "value": "projects-filter"
+        },
+        {
+          "line": 149,
+          "attribute": "id",
+          "value": "projects-research-count"
+        },
+        {
+          "line": 150,
+          "attribute": "id",
+          "value": "projects-select-all"
+        },
+        {
+          "line": 150,
+          "attribute": "id",
+          "value": "projects-clear-all"
+        },
+        {
+          "line": 151,
+          "attribute": "id",
+          "value": "projects-projects"
+        },
+        {
+          "line": 155,
+          "attribute": "id",
+          "value": "projects-schedule-settings"
+        },
+        {
+          "line": 157,
+          "attribute": "id",
+          "value": "projects-schedule-form"
+        },
+        {
+          "line": 159,
+          "attribute": "id",
+          "value": "projects-interval-label"
+        },
+        {
+          "line": 160,
+          "attribute": "id",
+          "value": "projects-interval-max"
+        },
+        {
+          "line": 165,
+          "attribute": "id",
+          "value": "projects-model-settings"
+        },
+        {
+          "line": 167,
+          "attribute": "id",
+          "value": "projects-model-form"
+        },
+        {
+          "line": 172,
+          "attribute": "id",
+          "value": "projects-model-status"
+        },
+        {
+          "line": 173,
+          "attribute": "id",
+          "value": "projects-model-reset"
+        },
+        {
+          "line": 179,
+          "attribute": "id",
+          "value": "projects-history-page"
+        },
+        {
+          "line": 179,
+          "attribute": "id",
+          "value": "projects-history-latest"
+        },
+        {
+          "line": 179,
+          "attribute": "id",
+          "value": "projects-history-previous"
+        },
+        {
+          "line": 179,
+          "attribute": "id",
+          "value": "projects-history-next"
+        },
+        {
+          "line": 180,
+          "attribute": "id",
+          "value": "projects-history-new"
+        },
+        {
+          "line": 180,
+          "attribute": "id",
+          "value": "projects-history"
+        },
+        {
+          "line": 182,
+          "attribute": "id",
+          "value": "projects-delivery"
+        },
+        {
+          "line": 182,
+          "attribute": "id",
+          "value": "projects-delivery-title"
+        },
+        {
+          "line": 182,
+          "attribute": "id",
+          "value": "projects-delivery-duration"
+        },
+        {
+          "line": 182,
+          "attribute": "id",
+          "value": "projects-delivery-failure"
+        },
+        {
+          "line": 182,
+          "attribute": "id",
+          "value": "projects-submissions"
+        },
+        {
+          "line": 182,
+          "attribute": "id",
+          "value": "projects-delivery-files"
+        },
+        {
+          "line": 182,
+          "attribute": "id",
+          "value": "projects-delivery-preview"
+        },
+        {
+          "line": 184,
+          "attribute": "id",
+          "value": "projects-research"
+        },
+        {
+          "line": 184,
+          "attribute": "id",
+          "value": "projects-research-title"
+        },
+        {
+          "line": 184,
+          "attribute": "id",
+          "value": "projects-research-body"
+        },
+        {
+          "line": 188,
+          "attribute": "id",
+          "value": "tpl-accounts"
+        },
+        {
+          "line": 195,
+          "attribute": "id",
+          "value": "add-account"
+        },
+        {
+          "line": 197,
+          "attribute": "id",
+          "value": "account-login-result"
+        },
+        {
+          "line": 204,
+          "attribute": "id",
+          "value": "accounts-body"
+        },
+        {
+          "line": 210,
+          "attribute": "id",
+          "value": "tpl-topics"
+        },
+        {
+          "line": 214,
+          "attribute": "id",
+          "value": "topics-count"
+        },
+        {
+          "line": 218,
+          "attribute": "id",
+          "value": "add-topic"
+        },
+        {
+          "line": 221,
+          "attribute": "id",
+          "value": "topic-filter"
+        },
+        {
+          "line": 225,
+          "attribute": "id",
+          "value": "topics-list"
+        },
+        {
+          "line": 229,
+          "attribute": "id",
+          "value": "tpl-tasks"
+        },
+        {
+          "line": 237,
+          "attribute": "id",
+          "value": "batch-form"
+        },
+        {
+          "line": 269,
+          "attribute": "id",
+          "value": "batch-select-all"
+        },
+        {
+          "line": 270,
+          "attribute": "id",
+          "value": "batch-clear-all"
+        },
+        {
+          "line": 271,
+          "attribute": "id",
+          "value": "batch-selected-count"
+        },
+        {
+          "line": 275,
+          "attribute": "id",
+          "value": "batch-topic-list"
+        },
+        {
+          "line": 283,
+          "attribute": "id",
+          "value": "batches-body"
+        },
+        {
+          "line": 289,
+          "attribute": "id",
+          "value": "tpl-runs"
+        },
+        {
+          "line": 307,
+          "attribute": "id",
+          "value": "runtime-model-form"
+        },
+        {
+          "line": 319,
+          "attribute": "id",
+          "value": "runtime-model-effective"
+        },
+        {
+          "line": 320,
+          "attribute": "id",
+          "value": "runtime-model-source"
+        },
+        {
+          "line": 324,
+          "attribute": "id",
+          "value": "runtime-model-reset"
+        },
+        {
+          "line": 328,
+          "attribute": "id",
+          "value": "runtime-effort-form"
+        },
+        {
+          "line": 340,
+          "attribute": "id",
+          "value": "runtime-effort-effective"
+        },
+        {
+          "line": 341,
+          "attribute": "id",
+          "value": "runtime-effort-source"
+        },
+        {
+          "line": 345,
+          "attribute": "id",
+          "value": "runtime-effort-reset"
+        },
+        {
+          "line": 349,
+          "attribute": "id",
+          "value": "claude-code-version-form"
+        },
+        {
+          "line": 358,
+          "attribute": "id",
+          "value": "claude-code-version-options"
+        },
+        {
+          "line": 371,
+          "attribute": "id",
+          "value": "claude-code-version-effective"
+        },
+        {
+          "line": 372,
+          "attribute": "id",
+          "value": "claude-code-version-source"
+        },
+        {
+          "line": 376,
+          "attribute": "id",
+          "value": "claude-code-version-reset"
+        },
+        {
+          "line": 380,
+          "attribute": "id",
+          "value": "capture-form"
+        },
+        {
+          "line": 418,
+          "attribute": "id",
+          "value": "claude-model-options"
+        },
+        {
+          "line": 463,
+          "attribute": "id",
+          "value": "runs-body"
+        },
+        {
+          "line": 470,
+          "attribute": "id",
+          "value": "modal"
+        },
+        {
+          "line": 478,
+          "attribute": "id",
+          "value": "modal-close"
+        },
+        {
+          "line": 480,
+          "attribute": "id",
+          "value": "modal-content"
+        },
+        {
+          "line": 485,
+          "attribute": "id",
+          "value": "cc2api-binding-modal"
+        },
+        {
+          "line": 488,
+          "attribute": "id",
+          "value": "cc2api-binding-title"
+        },
+        {
+          "line": 489,
+          "attribute": "data-close",
+          "value": "#cc2api-binding-modal"
+        },
+        {
+          "line": 491,
+          "attribute": "id",
+          "value": "cc2api-binding-form"
+        },
+        {
+          "line": 494,
+          "attribute": "id",
+          "value": "cc2api-binding-hint"
+        },
+        {
+          "line": 496,
+          "attribute": "data-close",
+          "value": "#cc2api-binding-modal"
+        },
+        {
+          "line": 503,
+          "attribute": "id",
+          "value": "cli-settings-modal"
+        },
+        {
+          "line": 506,
+          "attribute": "id",
+          "value": "cli-settings-title"
+        },
+        {
+          "line": 507,
+          "attribute": "data-close",
+          "value": "#cli-settings-modal"
+        },
+        {
+          "line": 509,
+          "attribute": "id",
+          "value": "cli-settings-form"
+        },
+        {
+          "line": 512,
+          "attribute": "id",
+          "value": "cli-settings-effective"
+        },
+        {
+          "line": 513,
+          "attribute": "id",
+          "value": "cli-settings-capture"
+        },
+        {
+          "line": 514,
+          "attribute": "id",
+          "value": "cli-settings-capture-hint"
+        },
+        {
+          "line": 515,
+          "attribute": "id",
+          "value": "cli-settings-feedback"
+        },
+        {
+          "line": 516,
+          "attribute": "data-close",
+          "value": "#cli-settings-modal"
+        },
+        {
+          "line": 521,
+          "attribute": "id",
+          "value": "work-capture-modal"
+        },
+        {
+          "line": 523,
+          "attribute": "data-close",
+          "value": "#work-capture-modal"
+        },
+        {
+          "line": 524,
+          "attribute": "id",
+          "value": "work-capture-refresh"
+        },
+        {
+          "line": 525,
+          "attribute": "id",
+          "value": "work-capture-content"
+        },
+        {
+          "line": 529,
+          "attribute": "id",
+          "value": "native-kernel-modal"
+        },
+        {
+          "line": 532,
+          "attribute": "id",
+          "value": "native-kernel-title"
+        },
+        {
+          "line": 533,
+          "attribute": "data-close",
+          "value": "#native-kernel-modal"
+        },
+        {
+          "line": 535,
+          "attribute": "id",
+          "value": "native-kernel-form"
+        },
+        {
+          "line": 536,
+          "attribute": "id",
+          "value": "native-kernel-description"
+        },
+        {
+          "line": 537,
+          "attribute": "id",
+          "value": "native-kernel-account"
+        },
+        {
+          "line": 537,
+          "attribute": "id",
+          "value": "native-kernel-current"
+        },
+        {
+          "line": 537,
+          "attribute": "id",
+          "value": "native-kernel-target"
+        },
+        {
+          "line": 538,
+          "attribute": "id",
+          "value": "native-kernel-release-field"
+        },
+        {
+          "line": 539,
+          "attribute": "id",
+          "value": "native-kernel-feedback"
+        },
+        {
+          "line": 540,
+          "attribute": "data-close",
+          "value": "#native-kernel-modal"
+        },
+        {
+          "line": 545,
+          "attribute": "id",
+          "value": "content-capture-modal"
+        },
+        {
+          "line": 547,
+          "attribute": "id",
+          "value": "content-capture-title"
+        },
+        {
+          "line": 547,
+          "attribute": "data-close",
+          "value": "#content-capture-modal"
+        },
+        {
+          "line": 548,
+          "attribute": "id",
+          "value": "content-capture-form"
+        },
+        {
+          "line": 549,
+          "attribute": "id",
+          "value": "content-capture-description"
+        },
+        {
+          "line": 552,
+          "attribute": "id",
+          "value": "content-capture-feedback"
+        },
+        {
+          "line": 553,
+          "attribute": "data-close",
+          "value": "#content-capture-modal"
+        },
+        {
+          "line": 558,
+          "attribute": "id",
+          "value": "cpu-resource-modal"
+        },
+        {
+          "line": 560,
+          "attribute": "id",
+          "value": "cpu-resource-title"
+        },
+        {
+          "line": 560,
+          "attribute": "data-close",
+          "value": "#cpu-resource-modal"
+        },
+        {
+          "line": 561,
+          "attribute": "id",
+          "value": "cpu-resource-form"
+        },
+        {
+          "line": 562,
+          "attribute": "id",
+          "value": "cpu-resource-description"
+        },
+        {
+          "line": 567,
+          "attribute": "id",
+          "value": "cpu-resource-feedback"
+        },
+        {
+          "line": 568,
+          "attribute": "data-close",
+          "value": "#cpu-resource-modal"
+        },
+        {
+          "line": 573,
+          "attribute": "id",
+          "value": "run-window-modal"
+        },
+        {
+          "line": 577,
+          "attribute": "data-close",
+          "value": "#run-window-modal"
+        },
+        {
+          "line": 579,
+          "attribute": "id",
+          "value": "run-window-form"
+        },
+        {
+          "line": 581,
+          "attribute": "id",
+          "value": "run-window-timezone"
+        },
+        {
+          "line": 583,
+          "attribute": "id",
+          "value": "run-window-summary"
+        },
+        {
+          "line": 585,
+          "attribute": "id",
+          "value": "run-window-options"
+        },
+        {
+          "line": 587,
+          "attribute": "id",
+          "value": "run-window-days"
+        },
+        {
+          "line": 588,
+          "attribute": "id",
+          "value": "run-window-intervals"
+        },
+        {
+          "line": 589,
+          "attribute": "id",
+          "value": "run-window-add"
+        },
+        {
+          "line": 594,
+          "attribute": "data-close",
+          "value": "#run-window-modal"
+        },
+        {
+          "line": 601,
+          "attribute": "id",
+          "value": "warmup-modal"
+        },
+        {
+          "line": 608,
+          "attribute": "id",
+          "value": "warmup-modal-title"
+        },
+        {
+          "line": 609,
+          "attribute": "data-close",
+          "value": "#warmup-modal"
+        },
+        {
+          "line": 611,
+          "attribute": "id",
+          "value": "warmup-form"
+        },
+        {
+          "line": 613,
+          "attribute": "id",
+          "value": "warmup-binding-hint"
+        },
+        {
+          "line": 614,
+          "attribute": "id",
+          "value": "warmup-legacy-interval"
+        },
+        {
+          "line": 622,
+          "attribute": "id",
+          "value": "warmup-legacy-enabled"
+        },
+        {
+          "line": 626,
+          "attribute": "id",
+          "value": "warmup-projects-link"
+        },
+        {
+          "line": 637,
+          "attribute": "id",
+          "value": "warmup-quota-5h-hint"
+        },
+        {
+          "line": 647,
+          "attribute": "id",
+          "value": "warmup-quota-7d-hint"
+        },
+        {
+          "line": 650,
+          "attribute": "id",
+          "value": "warmup-quota-policy-hint"
+        },
+        {
+          "line": 652,
+          "attribute": "data-close",
+          "value": "#warmup-modal"
+        },
+        {
+          "line": 660,
+          "attribute": "id",
+          "value": "topic-modal"
+        },
+        {
+          "line": 667,
+          "attribute": "id",
+          "value": "topic-modal-title"
+        },
+        {
+          "line": 668,
+          "attribute": "data-close",
+          "value": "#topic-modal"
+        },
+        {
+          "line": 670,
+          "attribute": "id",
+          "value": "topic-form"
+        },
+        {
+          "line": 693,
+          "attribute": "id",
+          "value": "topic-delete"
+        },
+        {
+          "line": 694,
+          "attribute": "data-close",
+          "value": "#topic-modal"
+        },
+        {
+          "line": 702,
+          "attribute": "id",
+          "value": "acc-modal"
+        },
+        {
+          "line": 709,
+          "attribute": "id",
+          "value": "acc-modal-stage"
+        },
+        {
+          "line": 710,
+          "attribute": "id",
+          "value": "acc-modal-close"
+        },
+        {
+          "line": 714,
+          "attribute": "id",
+          "value": "acc-form"
+        },
+        {
+          "line": 715,
+          "attribute": "id",
+          "value": "acc-force-reauth"
+        },
+        {
+          "line": 740,
+          "attribute": "id",
+          "value": "acc-proxy-url"
+        },
+        {
+          "line": 763,
+          "attribute": "data-close",
+          "value": "#acc-modal"
+        },
+        {
+          "line": 772,
+          "attribute": "id",
+          "value": "acc-login-sid"
+        },
+        {
+          "line": 775,
+          "attribute": "id",
+          "value": "acc-login-sidecar"
+        },
+        {
+          "line": 778,
+          "attribute": "id",
+          "value": "acc-login-name"
+        },
+        {
+          "line": 781,
+          "attribute": "id",
+          "value": "acc-login-input-hint"
+        },
+        {
+          "line": 785,
+          "attribute": "id",
+          "value": "acc-login-connection-status"
+        },
+        {
+          "line": 786,
+          "attribute": "id",
+          "value": "acc-login-reconnect"
+        },
+        {
+          "line": 787,
+          "attribute": "id",
+          "value": "acc-login-restart"
+        },
+        {
+          "line": 791,
+          "attribute": "id",
+          "value": "acc-auth-url"
+        },
+        {
+          "line": 793,
+          "attribute": "id",
+          "value": "acc-login-copy"
+        },
+        {
+          "line": 794,
+          "attribute": "id",
+          "value": "acc-login-open"
+        },
+        {
+          "line": 795,
+          "attribute": "id",
+          "value": "acc-login-link-status"
+        },
+        {
+          "line": 798,
+          "attribute": "id",
+          "value": "acc-code-form"
+        },
+        {
+          "line": 800,
+          "attribute": "id",
+          "value": "acc-auth-code"
+        },
+        {
+          "line": 802,
+          "attribute": "id",
+          "value": "acc-code-toggle"
+        },
+        {
+          "line": 803,
+          "attribute": "id",
+          "value": "acc-code-length"
+        },
+        {
+          "line": 804,
+          "attribute": "id",
+          "value": "acc-code-send"
+        },
+        {
+          "line": 805,
+          "attribute": "id",
+          "value": "acc-code-query"
+        },
+        {
+          "line": 807,
+          "attribute": "id",
+          "value": "acc-code-status"
+        },
+        {
+          "line": 809,
+          "attribute": "id",
+          "value": "acc-login-xterm"
+        },
+        {
+          "line": 811,
+          "attribute": "id",
+          "value": "acc-login-cancel"
+        },
+        {
+          "line": 812,
+          "attribute": "id",
+          "value": "acc-login-commit"
+        },
+        {
+          "line": 819,
+          "attribute": "id",
+          "value": "task-modal"
+        },
+        {
+          "line": 826,
+          "attribute": "id",
+          "value": "task-modal-title"
+        },
+        {
+          "line": 827,
+          "attribute": "data-close",
+          "value": "#task-modal"
+        },
+        {
+          "line": 829,
+          "attribute": "id",
+          "value": "task-form"
+        },
+        {
+          "line": 854,
+          "attribute": "data-close",
+          "value": "#task-modal"
+        },
+        {
+          "line": 862,
+          "attribute": "id",
+          "value": "continue-modal"
+        },
+        {
+          "line": 869,
+          "attribute": "id",
+          "value": "continue-modal-title"
+        },
+        {
+          "line": 870,
+          "attribute": "data-close",
+          "value": "#continue-modal"
+        },
+        {
+          "line": 874,
+          "attribute": "id",
+          "value": "continue-run-id"
+        },
+        {
+          "line": 876,
+          "attribute": "id",
+          "value": "continue-session-id"
+        },
+        {
+          "line": 878,
+          "attribute": "id",
+          "value": "continue-xterm"
+        },
+        {
+          "line": 879,
+          "attribute": "id",
+          "value": "continue-quota-status"
+        },
+        {
+          "line": 885,
+          "attribute": "id",
+          "value": "auth-modal"
+        },
+        {
+          "line": 907,
+          "attribute": "id",
+          "value": "auth-form"
+        },
+        {
+          "line": 914,
+          "attribute": "id",
+          "value": "auth-error"
+        },
+        {
+          "line": 916,
+          "attribute": "id",
+          "value": "auth-submit"
+        }
+      ]
+    },
+    {
+      "path": "apps/legacy-web/app.js",
+      "sha256": "4645084894f6832aa48d5b56a12ce3b1e38c676cc735f605e31ef0c49877712c",
+      "entries": [
+        {
+          "line": 351,
+          "attribute": "data-cli-settings",
+          "value": "${a.id}"
+        },
+        {
+          "line": 352,
+          "attribute": "data-quota",
+          "value": "${a.id}"
+        },
+        {
+          "line": 353,
+          "attribute": "href",
+          "value": "#environments"
+        },
+        {
+          "line": 354,
+          "attribute": "data-cc2-create",
+          "value": "${a.id}"
+        },
+        {
+          "line": 355,
+          "attribute": "data-cc2-bind",
+          "value": "${a.id}"
+        },
+        {
+          "line": 356,
+          "attribute": "data-cc2-process",
+          "value": "${a.id}"
+        },
+        {
+          "line": 357,
+          "attribute": "data-run-window-config",
+          "value": "${a.id}"
+        },
+        {
+          "line": 358,
+          "attribute": "data-warmup-config",
+          "value": "${a.id}"
+        },
+        {
+          "line": 359,
+          "attribute": "data-warmup-console",
+          "value": "${a.id}"
+        },
+        {
+          "line": 360,
+          "attribute": "data-warmup-now",
+          "value": "${a.id}"
+        },
+        {
+          "line": 361,
+          "attribute": "data-warmup-resume",
+          "value": "${a.id}"
+        },
+        {
+          "line": 362,
+          "attribute": "data-relogin",
+          "value": "${a.id}"
+        },
+        {
+          "line": 363,
+          "attribute": "data-cc2-unbind",
+          "value": "${a.id}"
+        },
+        {
+          "line": 364,
+          "attribute": "data-del",
+          "value": "${a.id}"
+        },
+        {
+          "line": 376,
+          "attribute": "data-draft-resume",
+          "value": "${id}"
+        },
+        {
+          "line": 377,
+          "attribute": "data-draft-restart",
+          "value": "${id}"
+        },
+        {
+          "line": 378,
+          "attribute": "data-draft-cancel",
+          "value": "${id}"
+        },
+        {
+          "line": 379,
+          "attribute": "data-draft-delete",
+          "value": "${id}"
+        },
+        {
+          "line": 380,
+          "attribute": "data-draft-reconcile",
+          "value": "${id}"
+        },
+        {
+          "line": 381,
+          "attribute": "href",
+          "value": "#environments"
+        },
+        {
+          "line": 748,
+          "attribute": "data-run-window-account",
+          "value": "${escapeHTML(account.id)}"
+        },
+        {
+          "line": 749,
+          "attribute": "data-clock-offset",
+          "value": "${Number.isFinite(now) ? now * 1000 - Date.now() : 0}"
+        },
+        {
+          "line": 749,
+          "attribute": "data-refresh-at",
+          "value": "${escapeHTML(boundary)}"
+        },
+        {
+          "line": 750,
+          "attribute": "data-local-clock",
+          "value": "${escapeHTML(policy.timezone || '')}"
+        },
+        {
+          "line": 1674,
+          "attribute": "data-id",
+          "value": "${t.id}"
+        },
+        {
+          "line": 1926,
+          "attribute": "data-pause-batch",
+          "value": "${batch.id}"
+        },
+        {
+          "line": 1929,
+          "attribute": "data-resume-batch",
+          "value": "${batch.id}"
+        },
+        {
+          "line": 1935,
+          "attribute": "data-del-batch",
+          "value": "${batch.id}"
+        },
+        {
+          "line": 1971,
+          "attribute": "id",
+          "value": "run-detail-status"
+        },
+        {
+          "line": 1976,
+          "attribute": "data-stat-key",
+          "value": "tokens_in"
+        },
+        {
+          "line": 1977,
+          "attribute": "data-stat-key",
+          "value": "tokens_out"
+        },
+        {
+          "line": 1978,
+          "attribute": "data-stat-key",
+          "value": "requests"
+        },
+        {
+          "line": 1979,
+          "attribute": "data-stat-key",
+          "value": "exit_code"
+        },
+        {
+          "line": 1980,
+          "attribute": "data-stat-key",
+          "value": "claude_code_version"
+        },
+        {
+          "line": 1981,
+          "attribute": "data-stat-key",
+          "value": "claude_effort_level"
+        },
+        {
+          "line": 1982,
+          "attribute": "data-stat-key",
+          "value": "model_override"
+        },
+        {
+          "line": 1984,
+          "attribute": "id",
+          "value": "run-detail-stats-error"
+        },
+        {
+          "line": 1989,
+          "attribute": "id",
+          "value": "run-detail-followups"
+        },
+        {
+          "line": 1993,
+          "attribute": "id",
+          "value": "run-detail-file-count"
+        },
+        {
+          "line": 1994,
+          "attribute": "id",
+          "value": "run-detail-files"
+        },
+        {
+          "line": 1997,
+          "attribute": "id",
+          "value": "run-detail-capture-section"
+        },
+        {
+          "line": 1999,
+          "attribute": "id",
+          "value": "run-detail-capture"
+        },
+        {
+          "line": 2004,
+          "attribute": "id",
+          "value": "run-detail-transcript"
+        },
+        {
+          "line": 2007,
+          "attribute": "id",
+          "value": "run-detail-error-section"
+        },
+        {
+          "line": 2008,
+          "attribute": "id",
+          "value": "run-detail-error-title"
+        },
+        {
+          "line": 2009,
+          "attribute": "id",
+          "value": "run-detail-error"
+        },
+        {
+          "line": 2135,
+          "attribute": "data-stat-key",
+          "value": "tokens_in"
+        },
+        {
+          "line": 2136,
+          "attribute": "data-stat-key",
+          "value": "tokens_out"
+        },
+        {
+          "line": 2137,
+          "attribute": "data-stat-key",
+          "value": "requests"
+        },
+        {
+          "line": 2138,
+          "attribute": "data-stat-key",
+          "value": "exit_code"
+        },
+        {
+          "line": 2139,
+          "attribute": "data-stat-key",
+          "value": "claude_code_version"
+        },
+        {
+          "line": 2140,
+          "attribute": "data-stat-key",
+          "value": "claude_effort_level"
+        },
+        {
+          "line": 2142,
+          "attribute": "data-stat-key",
+          "value": "model_override"
+        },
+        {
+          "line": 2446,
+          "attribute": "data-detail",
+          "value": "${r.id}"
+        },
+        {
+          "line": 2447,
+          "attribute": "data-stop",
+          "value": "${r.id}"
+        },
+        {
+          "line": 2448,
+          "attribute": "data-continue",
+          "value": "${r.id}"
+        },
+        {
+          "line": 2449,
+          "attribute": "data-del-run",
+          "value": "${r.id}"
+        }
+      ]
+    },
+    {
+      "path": "apps/legacy-web/environments.js",
+      "sha256": "05a6f22defe9a38d5b1691ef86c8b603503ec2161269aa1fa7a07f0554846c5b",
+      "entries": [
+        {
+          "line": 136,
+          "attribute": "data-operation",
+          "value": "${operation}"
+        },
+        {
+          "line": 136,
+          "attribute": "data-environment",
+          "value": "${escapeHTML(id)}"
+        },
+        {
+          "line": 136,
+          "attribute": "data-env-focus",
+          "value": "${escapeHTML(id + ':' + operation)}"
+        },
+        {
+          "line": 146,
+          "attribute": "data-environment",
+          "value": "${escapeHTML(id)}"
+        },
+        {
+          "line": 146,
+          "attribute": "data-env-focus",
+          "value": "${escapeHTML(id + ':capture')}"
+        },
+        {
+          "line": 147,
+          "attribute": "data-environment",
+          "value": "${escapeHTML(id)}"
+        },
+        {
+          "line": 147,
+          "attribute": "data-env-focus",
+          "value": "${escapeHTML(id + ':cpu')}"
+        },
+        {
+          "line": 148,
+          "attribute": "data-run-window-config",
+          "value": "${escapeHTML(row.account_id)}"
+        },
+        {
+          "line": 148,
+          "attribute": "data-environment",
+          "value": "${escapeHTML(id)}"
+        },
+        {
+          "line": 148,
+          "attribute": "data-env-focus",
+          "value": "${escapeHTML(id + ':window')}"
+        },
+        {
+          "line": 149,
+          "attribute": "data-env-details",
+          "value": "${escapeHTML(id + ':technical')}"
+        },
+        {
+          "line": 150,
+          "attribute": "data-env-details",
+          "value": "${escapeHTML(id + ':maintenance')}"
+        },
+        {
+          "line": 188,
+          "attribute": "data-environment",
+          "value": "${escapeHTML(row.environment_id)}"
+        },
+        {
+          "line": 226,
+          "attribute": "data-criu-enabled",
+          "value": "${target === true}"
+        },
+        {
+          "line": 226,
+          "attribute": "data-environment",
+          "value": "${escapeHTML(row.environment_id)}"
+        },
+        {
+          "line": 226,
+          "attribute": "data-env-focus",
+          "value": "${escapeHTML(row.environment_id + ':criu')}"
+        },
+        {
+          "line": 272,
+          "attribute": "data-kernel-action",
+          "value": "${operation}"
+        },
+        {
+          "line": 272,
+          "attribute": "data-environment",
+          "value": "${escapeHTML(id)}"
+        },
+        {
+          "line": 272,
+          "attribute": "data-kernel-revision",
+          "value": "${escapeHTML(kernel.revision)}"
+        },
+        {
+          "line": 272,
+          "attribute": "data-kernel-release",
+          "value": "${escapeHTML(kernel.prepared?.release || '')}"
+        },
+        {
+          "line": 272,
+          "attribute": "data-kernel-digest",
+          "value": "${escapeHTML(digest)}"
+        },
+        {
+          "line": 272,
+          "attribute": "data-env-focus",
+          "value": "${escapeHTML(id + ':' + operation)}"
+        },
+        {
+          "line": 279,
+          "attribute": "data-environment",
+          "value": "${escapeHTML(id)}"
+        },
+        {
+          "line": 279,
+          "attribute": "data-env-focus",
+          "value": "${escapeHTML(id + ':updates')}"
+        },
+        {
+          "line": 280,
+          "attribute": "data-env-details",
+          "value": "${escapeHTML(id + ':kernel')}"
+        },
+        {
+          "line": 498,
+          "attribute": "data-physical-details",
+          "value": "${escapeHTML(row.environment_id)}"
+        },
+        {
+          "line": 498,
+          "attribute": "data-env-details",
+          "value": "${escapeHTML(row.environment_id + ':physical')}"
+        },
+        {
+          "line": 501,
+          "attribute": "data-physical-refresh",
+          "value": "${escapeHTML(row.environment_id)}"
+        },
+        {
+          "line": 501,
+          "attribute": "data-environment",
+          "value": "${escapeHTML(row.environment_id)}"
+        },
+        {
+          "line": 501,
+          "attribute": "data-env-focus",
+          "value": "${escapeHTML(row.environment_id + ':physical-refresh')}"
+        }
+      ]
+    },
+    {
+      "path": "apps/legacy-web/projects.js",
+      "sha256": "cf633d258ae11864c48d6f107317ddc34230f306692eb063a4b9d9d0431f2012",
+      "entries": [
+        {
+          "line": 277,
+          "attribute": "data-research",
+          "value": "${escape(item.project_key)}"
+        },
+        {
+          "line": 628,
+          "attribute": "data-active",
+          "value": "${running}"
+        },
+        {
+          "line": 771,
+          "attribute": "data-event-id",
+          "value": "${escape(item.id)}"
+        },
+        {
+          "line": 783,
+          "attribute": "data-work-duration",
+          "value": "${escape(item.id)}"
+        },
+        {
+          "line": 783,
+          "attribute": "data-work",
+          "value": "${escape(item.id)}"
+        },
+        {
+          "line": 783,
+          "attribute": "data-work-capture",
+          "value": "${escape(item.id)}"
+        },
+        {
+          "line": 799,
+          "attribute": "data-submission",
+          "value": "${escape(item.id)}"
+        },
+        {
+          "line": 806,
+          "attribute": "data-candidate-path",
+          "value": "${escape(file.path)}"
+        },
+        {
+          "line": 829,
+          "attribute": "data-reconcile",
+          "value": "${escape(item.id)}"
+        },
+        {
+          "line": 829,
+          "attribute": "data-sent",
+          "value": "true"
+        },
+        {
+          "line": 829,
+          "attribute": "data-reconcile",
+          "value": "${escape(item.id)}"
+        },
+        {
+          "line": 829,
+          "attribute": "data-sent",
+          "value": "false"
+        }
+      ]
+    }
+  ]
+}

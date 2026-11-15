@@ -1,0 +1,142 @@
+"""验证账号工作区、统计气泡与侧栏滚动布局。"""
+import asyncio,json,re
+from pathlib import Path
+from playwright.async_api import async_playwright,expect
+
+async def main():
+ """运行离线交互检查并保存截图及报告。@return 无。"""
+ out=Path('.deploy/frontend-sidebar-refresh/concept');errors=[];network=[]
+ async with async_playwright() as p:
+  browser=await p.chromium.launch()
+  page=await browser.new_page(viewport={'width':1440,'height':1000})
+  page.on('pageerror',lambda error:errors.append(str(error)))
+  page.on('request',lambda request:network.append(request.url) if request.url.startswith(('http:','https:')) else None)
+  await page.goto(Path('doc/design/flower2api-concept.html').resolve().as_uri())
+  async def choose(name,value):
+   native=page.locator(f'select[name="{name}"]')
+   index=await native.evaluate('(el,value)=>[...el.options].findIndex(option=>option.value===value)',value)
+   await native.locator('..').get_by_role('combobox').click()
+   await page.locator('#account-choice-popup [role=option]').nth(index).click()
+
+  await expect(page.locator('[data-account-card]')).to_have_count(6)
+  # 原生标题已移除，组件气泡在鼠标、键盘和侧栏中均可见。
+  row=page.locator('[data-account-card="1"] .usage-stat-chips').first
+  assert await row.get_attribute('title') is None
+  await row.hover();bubble=page.locator('#usage-bubble')
+  await expect(bubble).to_be_visible();await expect(bubble).to_contain_text('预计总费用');await expect(bubble).to_contain_text('$15.16')
+  await page.screenshot(path=str(out/'usage-component-bubble.png'))
+  await page.keyboard.press('Escape');await expect(bubble).not_to_be_visible()
+  await row.focus();await expect(bubble).to_be_visible()
+  await page.keyboard.press('Escape');await expect(bubble).not_to_be_visible()
+  await page.locator('[data-account-card="1"] [data-account-action="edit"]').click()
+  await expect(page.locator('#account-drawer')).to_have_class(re.compile('account-workspace-wide'))
+  form=page.locator('[data-form="account"]')
+  original=Path('apps/web/src/components/Accounts.vue').read_text().split('const form = ref({',1)[1].split('\n});',1)[0]
+  expected=set(re.findall(r'^  ([a-z_1-9]+):',original,re.M));expected.remove('proxy_url');expected.add('proxyId')
+  actual=set(await form.locator('[name]').evaluate_all('(items)=>items.map(item=>item.name)'))
+  assert expected<=actual,expected-actual
+  await expect(form.locator('[name=auth_type]')).not_to_be_visible()
+  await form.locator('[name=name]').fill('暂存名称')
+  await page.locator('[data-detail=scheduling]').click()
+  await expect(page.locator('.scheduling-workspace')).to_be_visible()
+  await page.locator('[data-detail=configuration]').click()
+  await expect(form.locator('[name=name]')).to_have_value('暂存名称')
+  await form.get_by_role('button',name='取消',exact=True).click()
+  assert await page.evaluate('accounts[0].name')=='日常开发'
+  await page.locator('[data-account-card="1"] [data-account-action="edit"]').click()
+  await form.locator('[name=concurrency]').fill('5')
+  await form.locator('[name=rpm_limit]').fill('42')
+  await form.locator('[name=priority]').fill('60')
+  await form.locator('[name=five_hour_usage_limit_percent]').fill('75')
+  await form.locator('[name=seven_day_usage_limit_percent]').fill('85')
+  await choose('billing_mode','rewrite')
+  await form.get_by_role('button',name='仅 Opus',exact=True).click()
+  await form.locator('[name=allow_fast_mode]').check()
+  await form.locator('[name=auto_telemetry]').check()
+  await form.locator('[name=auto_poll_usage]').check()
+  await form.locator('[name=upstream_session_pool_enabled]').check()
+  await form.locator('[name=upstream_session_pool_size]').fill('8')
+  await form.locator('[name=upstream_session_ttl_minutes]').fill('120')
+  await choose('upstream_session_refresh_policy','owner_only')
+  await form.locator('.account-advanced summary').click()
+  await form.locator('[name=rate_limit_tier]').fill('old-tier')
+  await choose('subscription_type','team')
+  await expect(form.locator('[name=rate_limit_tier]')).to_have_value('')
+  await form.locator('[name=rate_limit_tier]').fill('team-tier')
+  await form.locator('[name=account_uuid]').fill('demo-account')
+  await form.locator('[name=organization_uuid]').fill('demo-org')
+  await choose('auth_type','setup_token')
+  await expect(form.locator('[name=auto_poll_usage]')).not_to_be_visible()
+  await form.get_by_role('button',name='保存修改',exact=True).click()
+  await expect(form.locator('[data-account-error]')).to_contain_text('请填写 Setup Token')
+  await form.locator('[name=setup_token]').fill('preview-token-only')
+  await form.get_by_role('button',name='保存修改',exact=True).click()
+  state=await page.evaluate('({...accounts[0],setup_token:accounts[0].setup_token==="preview-token-only"})')
+  for key,value in {'concurrency':5,'rpm_limit':42,'priority':60,'five_hour_usage_limit_percent':75,'seven_day_usage_limit_percent':85,'billing_mode':'rewrite','allow_1m_models':'opus','allow_fast_mode':True,'auto_telemetry':True,'auto_poll_usage':False,'upstream_session_pool_size':8,'upstream_session_ttl_minutes':120,'upstream_session_refresh_policy':'owner_only','subscription_type':'team','rate_limit_tier':'team-tier','setup_token':True}.items():assert state[key]==value,(key,state[key])
+  await page.locator('[data-account-card="1"] [data-account-action="edit"]').click()
+  await form.locator('.account-advanced summary').click()
+  await expect(form.locator('[name=setup_token]')).to_have_value('')
+  await form.get_by_role('button',name='保存修改',exact=True).click()
+  assert await page.evaluate('accounts[0].setup_token==="preview-token-only"')
+  # 重新加载恢复示例，截图使用默认配置。
+  await page.reload()
+  await page.locator('[data-account-card="1"] [data-account-action="edit"]').click()
+  await page.screenshot(path=str(out/'complete-account-editor.png'))
+  await form.locator('[name=upstream_session_pool_size]').fill('21')
+  await form.get_by_role('button',name='保存修改',exact=True).click()
+  await expect(page.locator('#account-drawer')).to_be_visible()
+  assert await form.locator('[name=upstream_session_pool_size]').evaluate('el=>!el.validity.valid')
+  await page.keyboard.press('Escape')
+  # 调度沿用同一侧栏，队列、阶段和会话分页均可操作。
+  await page.locator('[data-account-card="2"] .queue-metric').click()
+  await expect(page.locator('.scheduling-metrics .queue-number')).to_have_text('4')
+  assert await page.locator('#drawer-body').evaluate('el=>el.scrollTop')==0
+  await expect(page.locator('.scheduling-sessions tbody tr')).to_have_count(20)
+  await page.screenshot(path=str(out/'scheduling-workspace.png'))
+  await page.get_by_role('button',name='下一页',exact=True).click()
+  await expect(page.locator('.scheduling-sessions tbody tr')).to_have_count(4)
+  await choose('state','active')
+  await page.get_by_role('button',name='筛选',exact=True).click()
+  await expect(page.locator('.scheduling-sessions tbody tr')).to_have_count(6)
+  await page.locator('[name=prefix]').fill('ffff')
+  await page.get_by_role('button',name='筛选',exact=True).click()
+  await expect(page.locator('.schedule-empty')).to_contain_text('没有有效绑定')
+  await page.locator('[data-scheduling-range="60000"]').click()
+  await expect(page.locator('[data-scheduling-range="60000"]')).to_have_class(re.compile('active'))
+  await page.locator('[data-scheduling-refresh]').click()
+  await page.locator('[data-detail=overview]').click()
+  await page.locator('#drawer-body .usage-stat-chips').first.hover()
+  await expect(bubble).to_be_visible()
+  await page.keyboard.press('Escape');await expect(bubble).not_to_be_visible();await expect(page.locator('#account-drawer')).to_be_visible()
+  await page.keyboard.press('Escape')
+  for width,height in [(1440,1000),(1280,650),(390,800)]:
+   await page.set_viewport_size({'width':width,'height':height})
+   await page.reload()
+   if width>760:
+    for scroll in [0,500,100000]:
+     await page.evaluate('(value)=>window.scrollTo(0,value)',scroll)
+     await page.wait_for_timeout(100)
+     box=await page.locator('.sidebar').bounding_box()
+     assert abs(box['y']+box['height']-height)<2,(width,scroll,box)
+    await page.screenshot(path=str(out/f'sidebar-bottom-{width}.png'))
+    await page.evaluate('window.scrollTo(0,0)')
+    await page.locator('.collapse-toggle').click()
+    await page.evaluate('window.scrollTo(0,100000)');await page.wait_for_timeout(100)
+    box=await page.locator('.sidebar').bounding_box();assert abs(box['y']+box['height']-height)<2
+   await page.locator('[data-account-card="1"] [data-account-action="edit"]').click()
+   assert await page.locator('#drawer-body').evaluate('el=>el.scrollWidth<=el.clientWidth')
+   await page.screenshot(path=str(out/f'account-editor-{width}.png'))
+   await page.locator('[data-detail=scheduling]').click()
+   assert await page.locator('#drawer-body').evaluate('el=>el.scrollWidth<=el.clientWidth')
+   await page.screenshot(path=str(out/f'scheduling-{width}.png'))
+   await page.locator('[data-detail=overview]').click()
+   await page.locator('#drawer-body .usage-stat-chips').first.click()
+   await expect(bubble).to_be_visible()
+   box=await bubble.bounding_box();assert box['x']>=0 and box['x']+box['width']<=width and box['y']>=0
+   await page.keyboard.press('Escape');await page.keyboard.press('Escape')
+  assert not errors,errors
+  assert not network,network
+  await browser.close()
+ (out/'account-workspace-verification.json').write_text(json.dumps({'passed':True,'errors':errors,'network':network,'fields':sorted(expected),'scenes':['气泡鼠标键盘点击与顶层展示','完整编辑字段保存取消及草稿保留','认证切换空凭证与数字范围','调度会话筛选分页时间轴','侧栏顶部底部折叠高度与窄屏布局']},ensure_ascii=False,indent=2))
+ print('账号工作区验证通过')
+asyncio.run(main())
