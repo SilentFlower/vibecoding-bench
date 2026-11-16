@@ -184,6 +184,7 @@ const isValidLimit = computed(() => {
 - `RequestDiagnostics.copy(value: string, event: MouseEvent): Promise<void>` 复制按钮对应的完整请求 ID，事件提供当前焦点域。
 - 顶层 `/environments` 为环境列表，`/tasks` 默认内部 accounts；`/tasks?tab=topics|tasks|runs|projects|warmup` 显式选择其它内部页面，兼容 `tab=accounts`。
 - 主路由使用Vue环境组件与任务ES模块宿主；独立兼容地址`/runtime/?view=environments|tasks#<tab>?account=...&environment=...&gateway_account=...`保留受控参数。
+- 首页沿用 `api.systemUpdateStatus(signal)`、`api.systemUpdateReleases(signal)` 和 `api.systemUpdateCheck()`，消费既有 `installed/current_release/busy`、`releases/checking` 字段。
 
 ### 3. Contracts
 
@@ -191,6 +192,7 @@ const isValidLimit = computed(() => {
 - 品牌文字为小写 flower2api；登录、主导航和 favicon 共用粉红五瓣节点花图形 `public/favicon.svg`，颜色 `#ED6EA7`，通道透明。三个消费者同步版本参数 `?v=flower2api-pink-04`，资源更新时共同更新缓存标识。
 - SystemUpdates 的原生 `dialog.showModal()` 显式设置 `margin:auto`，避免 Tailwind preflight 的零外边距覆盖浏览器居中；最大高度为视口减 2rem，内容超高时内部滚动。安装、回退和恢复继续沿用冻结操作、冲突保护及取消/Esc/遮罩收口。
 - 系统安装与回退确认每次打开默认一分钟，冻结请求为60秒；可选1/5/15/30/60/120分钟，已登记操作与恢复继续使用原参数。后端默认及冲突合同见[平台在线更新](../../platform/deploy/platform-online-update.md)。
+- 管理外壳首次挂载时，已接入更新器且空闲的实例自动检查一次受信目录；已有检查直接复用。检查期间每2秒串行读取状态与目录，完成后停止，路由切换复用30秒摘要且不重复发起检查。桌面和移动导航共用版本与角标；目录最新发行身份不同于当前发行即提示，当前发行退出最近八项目录仍能提示。失败保留已读取版本，具体错误由更新面板展示；外壳卸载清理计时器、取消读取并丢弃迟到回执。
 - 环境直接使用Vue分区，任务模块隐藏环境子Tab。原任务内部链接通过作用域回调`runtime:navigate`同步Vue Router；宿主校验Tab、账号身份及受控查询字段，浏览器消息不直接调用模块内部函数。
 - 任务子页共享同一模块实例及DOM根。顶层URL变化通过作用域`setRoute`同步内部地址模型；离开路由释放资源。环境与任务统一由主文档滚动，详情内部滚动。
 - 点击内部链接先阻止内部 hash 入栈；数字键、搜索、账号直达及创建后的程序化跳转统一走 `navigateTo(hash)`，嵌入时由 `runtime:navigate` 创建唯一顶层历史项，独立页面继续 hash 导航。账号筛选以 replace 同步，刷新和前进后退均以 URL 为准。
@@ -219,6 +221,8 @@ const isValidLimit = computed(() => {
 | 已打开普通弹窗后退或切页 / 旧详情回包 | 关闭旧窗口 / 保持关闭且刷新状态失效 |
 | HTTP 缺少 Clipboard API，或 HTTPS 写入拒绝 | 在当前焦点域尝试选中复制，成功值须为完整 ID |
 | 复制命令失败或异常 | 清理临时节点并恢复焦点，显示手动复制提示 |
+| 更新器未接入 / 维护忙碌 / 已在检查 | 跳过自动检查 / 跳过新检查 / 复用并轮询已有检查 |
+| 自动检查失败 / 最新发行与当前相同 | 保留已有版本展示 / 保持普通版本入口 |
 
 ### 5. Scenarios and Examples
 
@@ -230,10 +234,12 @@ const isValidLimit = computed(() => {
 
 - 正常：重试链显示两个账号各自名称邮箱；取消更新确认后重开恢复一分钟。错误用法：把最终账号资料套用到每次尝试，或用上次未提交的期限作为新确认默认值。正确处理：每次尝试独立读取投影，新确认使用统一默认值。
 - 正常：从账号页打开额度窗口，后退到题库后窗口关闭。错误用法：数字键先写浏览器hash再push顶层，或用完整 source 重建文档。正确处理：程序化导航先交给顶层，同 view 只替换内部 hash。
+- 正常：首页先显示缓存，后台检查完成后桌面与移动端同时提示新版。边界：当前发行已退出目录仍提示最新可用发行。错误用法：只读目录缓存或每次轮询都提交检查。正确处理：首次挂载发起一次检查，后续只读跟进结果。
 
 ### 6. Tests Required
 
 - `npm --prefix apps/web run build`；通过 Vue/TypeScript 和生产构建。
+- `.venv/bin/python deploy/flower2api/verify_dashboard_update.py`：实际产物与合成接口覆盖首次检查、已有检查、未接入、维护、失败、当前发行退出目录、已最新及卸载；断言检查次数、轮询停止、路由复用和桌面/移动提示。
 - `python deploy/flower2api/verify_management_ui.py --output .deploy/management-ui/combined`：实际产物、合成 API、两个时区、390px、版本单展开、导航历史、采集开关及异步关闭；覆盖长名称邮箱、跨账号尝试、资料缺失与空账号及原 ID 直达。
 - 同一浏览器验证覆盖默认 accounts、六个内部页面、真实模块/DOM根身份、深链接参数、刷新/连续后退/前进、快捷键/搜索/账号直达、独立页面兼容、已打开弹窗与迟到详情收口，以及实际构建模块和独立兼容入口资源。
 - 原 `verify_environment_ui.py` 继续覆盖内核、时段、焦点、乱序和物理实测；所有浏览器模型调用为零。

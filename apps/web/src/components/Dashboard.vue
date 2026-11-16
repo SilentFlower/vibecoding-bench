@@ -24,23 +24,42 @@ const runningCount = ref<number | null>(null);
 const metadataController = new AbortController();
 let metadataAt = 0;
 let metadataLoading = false;
-/** 读取品牌与角标的真实摘要，页面切换复用30秒快照。@param force 强制刷新。@return 读取完成。 */
-async function refreshMetadata(force=false): Promise<void> {
+let updateLoading = false;
+let updateTimer: ReturnType<typeof setTimeout> | undefined;
+/** 读取受信目录，首次进入时检查新版，并跟进后台检查结果。@param checkUpdates 是否发起检查。@return 读取完成。 */
+async function refreshUpdateMetadata(checkUpdates=false): Promise<void> {
+ if(updateLoading || metadataController.signal.aborted)return;
+ updateLoading=true;
+ clearTimeout(updateTimer);
+ try {
+  const status=await api.systemUpdateStatus(metadataController.signal);
+  if(metadataController.signal.aborted || !status.installed)return;
+  const catalog=await api.systemUpdateReleases(metadataController.signal);
+  if(metadataController.signal.aborted)return;
+  const installed=catalog.releases.find(item=>item.release===status.current_release);
+  currentVersion.value=platformVersion ?? (installed ? releaseVersion(installed.changes) : null);
+  updateAvailable.value=!!catalog.releases[0] && catalog.releases[0].release!==status.current_release;
+  // 检查异步执行，短暂轮询才能让首页角标及时反映新目录。
+  if(checkUpdates && !catalog.checking && !status.busy)await api.systemUpdateCheck();
+  if(!metadataController.signal.aborted && (catalog.checking || (checkUpdates && !status.busy))){
+   updateTimer=setTimeout(()=>{void refreshUpdateMetadata();},2000);
+  }
+ } catch { /* 自动检查失败时保留已读取版本，手动更新面板展示具体错误。 */ }
+ finally { updateLoading=false; }
+}
+/** 读取品牌与角标的真实摘要，页面切换复用30秒快照。@param force 强制刷新。@param checkUpdates 是否检查新版。@return 读取完成。 */
+async function refreshMetadata(force=false,checkUpdates=false): Promise<void> {
  if(metadataLoading || metadataController.signal.aborted || (!force && Date.now()-metadataAt<30000))return;
  metadataLoading=true;metadataAt=Date.now();
- const results=await Promise.allSettled([api.getDashboard(),api.systemUpdateStatus(metadataController.signal),api.runtimeSummary(metadataController.signal)]);
+ const results=await Promise.allSettled([api.getDashboard(),refreshUpdateMetadata(checkUpdates),api.runtimeSummary(metadataController.signal)]);
  if(!metadataController.signal.aborted){
   if(results[0].status==='fulfilled')accountCount.value=results[0].value.accounts.total;
   if(results[2].status==='fulfilled')runningCount.value=results[2].value.active_runs;
-  if(results[1].status==='fulfilled'){
-   const status=results[1].value;
-   if(status.installed){try {const catalog=await api.systemUpdateReleases(metadataController.signal);if(!metadataController.signal.aborted){const installed=catalog.releases.find(item=>item.release===status.current_release);currentVersion.value=platformVersion ?? (installed ? releaseVersion(installed.changes) : null);updateAvailable.value=!!catalog.releases[0] && !!installed && catalog.releases[0].sequence.some((value,index)=>value!==(installed.sequence[index]??0)) && catalog.releases[0].release!==status.current_release;}}catch{/* 品牌保留已读取版本，面板负责展示目录读取错误。 */}}
-  }
  }
  metadataLoading=false;
 }
-onMounted(()=>{void refreshMetadata();});
-onUnmounted(()=>metadataController.abort());
+onMounted(()=>{void refreshMetadata(false,true);});
+onUnmounted(()=>{clearTimeout(updateTimer);metadataController.abort();});
 watch(()=>route.fullPath,()=>{void refreshMetadata();});
 const titles: Record<string, string> = { proxies: '代理管理', updates: '系统更新', environments: '运行环境', tasks: '任务与工程', accounts: '账号', requests: '请求记录', tokens: '访问令牌', settings: '系统设置' };
 const pageTitle = computed(() => titles[String(route.name)] ?? '管理控制台');
@@ -109,7 +128,7 @@ watch(() => route.fullPath, closeUpdatePanel);
           <DialogTrigger as-child><Button variant="ghost" size="icon" class="mobile-sidebar-toggle" aria-label="打开主导航"><Menu class="size-5" /></Button></DialogTrigger>
           <DialogContent class="mobile-navigation-panel" :aria-describedby="undefined">
             <DialogTitle>flower2api</DialogTitle>
-            <a href="/updates" class="brand-update" aria-label="系统更新" @click="openUpdatePanel">{{ platformVersion ?? '系统更新' }}<ChevronRight class="size-3" /></a>
+            <a href="/updates" class="brand-update" aria-label="系统更新" :class="{'has-update': updateAvailable}" :title="updateAvailable ? '系统更新 · 有可用新版' : '系统更新'" @click="openUpdatePanel">{{ currentVersion ?? '系统更新' }}<ChevronRight class="size-3" /></a>
             <DialogDescription class="sr-only">选择管理页面</DialogDescription>
             <AppNavigation :account-count="accountCount" :running-count="runningCount" @navigate="mobileOpen = false" />
             <Button variant="outline" @click="handleLogout" :disabled="loggingOut"><LogOut class="size-4" />退出</Button>
