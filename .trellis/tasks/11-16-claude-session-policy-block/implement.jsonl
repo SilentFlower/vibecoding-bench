@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/gateway/backend/service-architecture.md", "reason": "真实下游会话、上游映射和提交边界合同"}
+{"file": ".trellis/spec/gateway/backend/settings-database.md", "reason": "设置、迁移登记与有界响应观察合同"}
+{"file": ".trellis/spec/gateway/backend/testing-quality.md", "reason": "Rust 验证及敏感数据边界"}
+{"file": ".trellis/spec/web/frontend/frontend-guidelines.md", "reason": "管理鉴权、统一 API 和设置字符串合同"}
+{"file": ".trellis/spec/web/frontend/ui-guidelines.md", "reason": "复用现有控件、分页、反馈与响应式交互"}
+{"file": ".trellis/spec/platform/deploy/platform-online-update.md", "reason": "数据库版本登记和向前兼容"}
+{"file": ".trellis/tasks/11-16-claude-session-policy-block/research.md", "reason": "本任务入口与代码研究依据"}
