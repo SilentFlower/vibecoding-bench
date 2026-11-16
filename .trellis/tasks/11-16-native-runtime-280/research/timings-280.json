@@ -1,0 +1,15 @@
+{
+  "source_version": "2.1.280",
+  "image_sha256": "2b64ee7d8f0863a37bce90800226bda102387e5cff082f947b2b71e66d9a38e7",
+  "http_control_setup_ms": 156.94503400000002,
+  "warm_complete": {
+    "samples": 68,
+    "median_ms": 22.09477699999843
+  },
+  "cold_complete": {
+    "samples": 8,
+    "median_ms": 3178.6766195000055
+  },
+  "conditions": "HTTP 控制面及日志启用、TLS CONNECT 合成上游；与裸协议基准不同，不直接相减计算开销",
+  "note": "并行执行其它本地验证；冷样本含取消或异常退役后的重建，不代表生产延时承诺"
+}

@@ -1,0 +1,16 @@
+{
+  "package": "@anthropic-ai/claude-code-linux-x64",
+  "version": "2.1.280",
+  "registry": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/2.1.280",
+  "integrity": "sha512-dJHWFrDSIZ26hdLucnK3ehLmzdzYl3MsPC1RzUctAUaYnZlH5kfAZxnK8qYRAQ89GX3OPrLsnFdt/QnP+0Ck6Q==",
+  "binary_sha256": "1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b",
+  "binary_bytes": 233709640,
+  "bun_version": "1.4.3",
+  "bun_revision": "f08e57bec002878c0281e86fbf9c76f53c20a117",
+  "bun_section_bytes": 144806548,
+  "module_count": 2196,
+  "module_record_bytes": 52,
+  "entry_index": 5,
+  "flags": 7167,
+  "research_status": "官方来源、模块绑定、原版与精简行为矩阵、重复构建和独立部署已通过"
+}

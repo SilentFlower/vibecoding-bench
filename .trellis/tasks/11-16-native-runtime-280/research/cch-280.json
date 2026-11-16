@@ -1,0 +1,14 @@
+[
+  {
+    "suite": "matrix-original",
+    "requests": 99,
+    "independent_xxhash_mismatches": [],
+    "real_upstream_requests": 0
+  },
+  {
+    "suite": "matrix-compact-2",
+    "requests": 99,
+    "independent_xxhash_mismatches": [],
+    "real_upstream_requests": 0
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "source_version": "2.1.280",
+  "image_sha256": "2b64ee7d8f0863a37bce90800226bda102387e5cff082f947b2b71e66d9a38e7",
+  "write_offset": "0x2308523",
+  "write_bytes": "4883c4185b415c415d415e415f5dc3",
+  "abi": "RBX=SSL,R14=buffer,R15d=length,EAX=accepted",
+  "basis": "固定来源与实际执行体寄存器流核对；真实eBPF在隔离账号容器采集512KiB、4.5MiB和六进程并发正文，实体与HTTP摘要均与独立接收器一致，采集开关前后ClientHello协议投影一致"
+}
