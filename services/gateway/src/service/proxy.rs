@@ -4,7 +4,7 @@ use std::sync::atomic::AtomicBool;
 use std::time::{Duration, Instant};
 
 use chrono::Utc;
-use reqwest::{Client, Proxy, redirect::Policy};
+use reqwest::{Proxy, redirect::Policy};
 use serde_json::Value;
 use sqlx::AnyPool;
 use tokio::sync::{Mutex, Semaphore};
@@ -12,6 +12,7 @@ use tokio::sync::{Mutex, Semaphore};
 use crate::error::AppError;
 use crate::model::proxy::ProxyObservation;
 use crate::store::proxy_store::{ProxyRecord, ProxyStore};
+use crate::tlsfp::make_request_client_builder;
 
 /// 目录写入与账号选线共用配置锁；探测拥有独立并发限制。
 pub struct ProxyService {
@@ -50,8 +51,8 @@ impl ProxyService {
 }
 
 async fn observe(record: &ProxyRecord) -> Result<ProxyObservation, ()> {
-    let client = Client::builder()
-        .no_proxy()
+    // craftls 在握手时要求指纹配置；复用统一 TLS 工厂并保留探测自身的超时边界。
+    let client = make_request_client_builder()
         .redirect(Policy::none())
         .proxy(Proxy::all(&record.connection.private_url).map_err(|_| ())?)
         .connect_timeout(Duration::from_secs(5))
@@ -105,7 +106,87 @@ fn decode_observation(bytes: &[u8], latency_ms: u64) -> Result<ProxyObservation,
 
 #[cfg(test)]
 mod tests {
-    use super::decode_observation;
+    use super::{ProxyService, decode_observation};
+    use crate::model::proxy::ProxyConnection;
+    use crate::store::database_migrations;
+    use sqlx::any::{AnyPoolOptions, install_default_drivers};
+    use std::time::Duration;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+    use tokio::time::timeout;
+    use uuid::Uuid;
+
+    /// 真实 CONNECT 后发出 TLS 握手；断连按检测失败保存，并保留历史观测。
+    #[tokio::test]
+    async fn probe_sends_tls_clienthello_and_records_connection_failure() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let proxy = tokio::spawn(async move {
+            timeout(Duration::from_secs(10), async {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let mut request = Vec::new();
+                while !request.ends_with(b"\r\n\r\n") {
+                    assert!(request.len() < 8192);
+                    request.push(stream.read_u8().await.unwrap());
+                }
+                let request = String::from_utf8(request).unwrap();
+                assert!(request.starts_with("CONNECT ipwho.is:443 HTTP/1.1\r\n"));
+                assert!(
+                    request
+                        .to_ascii_lowercase()
+                        .contains("proxy-authorization: basic ")
+                );
+                stream
+                    .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+                    .await
+                    .unwrap();
+
+                // 只在本地观察 ClientHello，随后模拟连接中断，避免访问真实观测服务。
+                let mut header = [0; 5];
+                stream.read_exact(&mut header).await.unwrap();
+                assert_eq!(header[0], 22);
+                let mut body = vec![0; usize::from(u16::from_be_bytes([header[3], header[4]]))];
+                stream.read_exact(&mut body).await.unwrap();
+                assert_eq!(body[0], 1);
+            })
+            .await
+            .unwrap();
+        });
+
+        install_default_drivers();
+        let pool = AnyPoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        database_migrations::apply(&pool, &Uuid::new_v4().to_string(), None)
+            .await
+            .unwrap();
+        let service = ProxyService::new(pool);
+        let connection =
+            ProxyConnection::parse(&format!("http://fixture:password@{address}")).unwrap();
+        let id = service
+            .store
+            .insert_many(&[("测试线路".into(), connection, None)])
+            .await
+            .unwrap()
+            .remove(0);
+        let record = service.store.get(&id).await.unwrap();
+        let previous = decode_observation(br#"{"success":true,"ip":"203.0.113.1"}"#, 42).unwrap();
+        service
+            .store
+            .observe(&record, Some(&previous))
+            .await
+            .unwrap();
+
+        let result = service.probe(&record).await.unwrap();
+        proxy.await.unwrap();
+        assert_eq!(result.status, "failed");
+        assert!(result.checked_at.is_some());
+        let observed = result.observation.unwrap();
+        assert_eq!(observed.ip, previous.ip);
+        assert_eq!(observed.observed_at, previous.observed_at);
+    }
 
     #[test]
     fn probe_accepts_only_observed_ip_and_whitelisted_fields() {

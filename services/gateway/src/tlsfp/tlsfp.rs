@@ -1,4 +1,5 @@
 use once_cell::sync::Lazy;
+use reqwest::ClientBuilder;
 use rustls::craft::{
     CraftExtension, ExtensionSpec, Fingerprint, GreaseOrCipher, GreaseOrCurve, GreaseOrVersion,
     KeepExtension, OCSP_REQ,
@@ -420,6 +421,12 @@ fn request_client_builder(tls_config: ClientConfig) -> reqwest::ClientBuilder {
         .connect_timeout(Duration::from_secs(30))
         .tcp_keepalive(Duration::from_secs(30))
         .no_proxy()
+}
+
+/// 创建带默认 TLS 指纹和公有信任根的客户端构建器，供有独立超时要求的请求复用。
+/// @return 禁用环境代理、保留证书与主机名校验的构建器；调用者显式指定代理和请求边界。
+pub(crate) fn make_request_client_builder() -> ClientBuilder {
+    request_client_builder(build_tls_config(configured_default_tls_profile()))
 }
 
 /// 本地 TLS 测试复用生产指纹和客户端设置；额外信任根仅编译进测试。

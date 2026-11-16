@@ -10,6 +10,7 @@
 - `POST /admin/proxies`、`PUT /admin/proxies/:id`：`name/protocol/host/port/username?/password?/expires_at/revision?`；更新必须匹配revision。
 - `POST /admin/proxies/identify`、`POST /admin/proxies/import`：`{text}`，导入1～200行，全部验证后在同一事务写入。
 - `POST /admin/proxies/:id/probe`；`DELETE /admin/proxies/:id`带`{revision}`。
+- 内部 `tlsfp::make_request_client_builder() -> reqwest::ClientBuilder` 提供当前默认指纹、公有信任根和禁用环境代理的基础配置；探测在其上设置独立请求边界。
 - 账号创建/增量更新兼容`proxy_url`，增加虚拟`proxy_id/proxy_revision`。两种选择不能同时提交；更新`proxy_id:null`为直连。
 
 ## 3. Contracts
@@ -20,19 +21,26 @@
 - 引用涵盖网关账号、未绑定任务账号和登录草稿。已绑定任务由网关计数；停用账号仍属于引用。未知引用不冒充零使用，连接改写及删除失败关闭。使用中连接参数可直接编辑，目录CAS与固定关联目标在同一事务登记后台同步；名称与到期可独立编辑。同步期间进一步的连接变更等待当前批次收口。
 - 到期仅用于维护提醒。列表搜索只匹配公开字段，并在分页前使用同一过滤条件统计总数。账号页的目录匹配批量读取，引用聚合不逐条创建排队器。
 - 出口探测固定`https://ipwho.is/`，不跟随重定向；并发4、连接超时5秒、请求8秒、整体10秒、响应最多64KiB。成功仅保留IP/国家地区城市/耗时与时间戳。失败保留上次成功观测并标记失败。连接或元数据revision变化后丢弃迟到探测。
+- 探测必须复用带指纹的TLS构建器，并显式挂载所选私有代理；证书与主机名校验继续开启。普通`reqwest::Client::builder()`缺少craftls必需的fingerprint，会在HTTPS握手时panic并使管理连接断开。构建器复用不改变转发客户端的长流超时策略。
 - SQLite追加`gateway.proxies.2`，基线1保持冻结。目录DDL与台账在同一事务，提交前检查主键/唯一约束。PostgreSQL使用相同目录DDL初始化；SQLite校验不可在PostgreSQL运行。调整未发布版本2定义后同步登记checksum。
 
 ## 4. Error Matrix
 
 非法参数/重复连接/版本冲突/同步中再次改连接或删除已引用线路返回受控400；引用不可核对返回503；并发检测容量满返回429；不存在返回404。探测网络失败以`status=failed`表达，同时保留旧观测。
 
+代理CONNECT后的TLS断连也走`status=failed`与历史观测保留路径；不得以panic断开管理响应。
+
 ## 5. Good / Bad Examples
 
 正确：账号保存`{proxy_id:"UUID",proxy_revision:"打开时版本"}`，由服务端解析账密。错误：从公开列表恢复密码，或代理页直接改多个账号绑定。正确：修改到期采用CAS且保留刚完成的最新观测。错误：用打开表单时的旧观测覆盖数据库。
 
+正确：探测使用`make_request_client_builder().proxy(Proxy::all(private_url)?)`并设置5/8秒超时、禁止重定向。错误：直接用普通reqwest构建器发送HTTPS，或在代理失败后回退直连。
+
 ## 6. Verification
 
 `cargo test --locked --manifest-path services/gateway/Cargo.toml`；聚焦`--lib proxy`及`--lib store::`；Python `test_proxy_references`；浏览器`deploy/flower2api/verify_proxy_design.py`。覆盖分页、字面搜索、导入回滚、凭据保护、CAS、迟到观测、账号草稿及窄屏。
+
+`probe_sends_tls_clienthello_and_records_connection_failure`使用本地认证HTTP代理接收真实CONNECT与TLS ClientHello，再主动断连；断言检测正常返回failed、更新检测时间且保留历史IP和观测时间。测试只使用合成账密，并验证实际握手路径，避免仅测JSON解码而遗漏craftls初始化。
 
 ## 授权目录选择补充
 
