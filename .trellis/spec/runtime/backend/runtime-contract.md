@@ -26,7 +26,7 @@
 - 280原生SDK默认global fetch，映射到共享发送槽；turnOrigin/turnPosition沿280省略语义。280工具工厂create保留初始化权限声明，仅封闭返回对象的call执行入口。280保持原生正文工厂；293静态正文复用沿原配方。
 - 完整原生billing的版本必须匹配冻结运行时。普通API仍由所选原生版本构造，保持CCH、上下文、工具/thinking、原始响应及唯一发送合同。
 - 每账号只有一个物理容量所有者，各版本共享live/starting许可，合计遵守max_workers。版本子状态隔离映像FD、暖进程、补位、模板及核验缓存；凭据/代理/环境公共身份变化统一撤销两版旧空闲状态。取消其它版本补位或退役空闲进程后，必须等待真实退出归还许可。
-- 额外进程空闲300秒回收，各版合计保留最近使用的一个基础暖进程。有限双版exec预算为`384+192*max_workers` MiB；历史293单版为`256+192*max_workers`，具体账号资源归属沿orchestrator合同。
+- 额外进程空闲300秒回收，各版合计保留最近使用的一个基础暖进程。普通exec的双版与历史293单版均不按固定MiB公式限制并发；memory_mib=0表示无限，正数冻结实际有限额度，具体角色总额与资源归属沿orchestrator合同。CRIU恢复预算独立判断。
 - 新镜像标签`vibebench.native-runtime-versions=2.1.280,2.1.293`；固定安装路径分别为`/usr/local/bin/ccrb-runtime-280`和`/usr/local/bin/ccrb-runtime`。缺标签的历史镜像提供293。各版能力独立报告，293缺失时可继续准入已核验280。
 - 签名清单的source_version/source_sha256按目标版本核验，分发摘要、执行体及实际握手须同时一致。记录分别为`native-kernel-upgrade-280.json`和历史293记录。升级/回滚只改所选子状态，共用账号维护门禁；公共身份失效仍统一排空。
 - 准备投影按每版独立核对环境/代次、内核代次及45秒新鲜度。293失败或过期时保留280独立观察，错误版本和旧回执不能授予ready。诊断来源为`native280_cc_prepared|native293_cc_prepared`，完整快照入口接纳两者。
@@ -40,7 +40,7 @@
 | 私有源版本省略 / 未知枚举 | 历史293 / 解码拒绝 |
 | 完整原生billing与目标版本冲突 | 422，模型发送为0 |
 | 目标制品缺失、签名/来源/摘要/握手不符 | 受控503，模型发送为0 |
-| 双版有限预算低于384+192*max_workers | 准备拒绝；无限模式保持max_workers检查 |
+| 单版/双版有限额度低于旧公式且配置合法 | 普通exec配置准入；正max_workers、版本/制品核验及跨版物理上限保持 |
 | 旧版本快照、旧环境/内核代次或检查过期 | unknown及受控原因，PID保持未观测 |
 | 280 side_reply / 280 CRIU模板 / 280固定TLS模拟 | 类别422 / 模板拒绝并走同版exec / 模拟验证器启动拒绝 |
 
@@ -55,7 +55,7 @@
 
 - 两版原版及精简适用原生矩阵、真实TLS CCH独立复算；工具/thinking、Unicode、多轮、流式、取消和26MiB正文。
 - 真实Gateway→私有sender→两版执行体：UA/默认/账号画像、六路混合容量、暖命中、凭据轮换、版本冲突及部分制品缺失的零发送拒绝。
-- 共享物理许可、取消其它版本补位及真实退出归还；历史293序列化、未知枚举、双版预算边界和升级资源身份。
+- 共享物理许可、取消其它版本补位及真实退出归还；历史293序列化、未知枚举、单版/双版低额度配置准入和升级资源身份。`native_exec_accepts_finite_budget_and_preserves_config_validation`核有限/零额度、零worker、非法路径与缺制品；`native_version_selection_preserves_finite_budget_and_installation_boundary`核两版选择、128MiB实际额度保持与旧单版安装边界。
 - Python与Rust真实Ed25519按源版本校验；280准备/激活/回滚保持293状态；各版准备代次/时效独立投影。
 - `verify_native_runtime_versions.py`：版本冻结、旧发行回执失效、部分就绪、280诊断入口及明暗390/1280px。
 - 固定源重复构建、CI准备路径、脱离源码/Bun的独立部署，以及两版真实TLS旁路探针与独立实收摘要对照。
@@ -749,7 +749,7 @@ bun scripts/benchmark-runtime.ts --binary /绝对路径/新产物 --reference /r
 - 普通exec与CRIU恢复共享同一封存执行映像的dev/inode。控制器从受控种子的 `/proc/PID/exe` 只读打开，核验固定名称 `ccrb-native-runtime`、SHA、大小、零链接及WRITE/GROW/SHRINK/SEAL四项封存，依次执行chmod0555、chown0:0、chmod0555并复核；首次改权失败发生在改属主之前，取得所有权后再次固化权限以关闭过渡窗口。模板持有FD，每个恢复实例通过 `/proc/self/fd/N` 重新打开独立文件描述，避免共享offset。
 - CRIU补丁在 `memfd_open_inode_nocache` 的统一inode路径接纳专用资源键 `ccrb-executable:ccrb-native-runtime`，校验源FD与快照的名称、大小、root归属、0555、完整seals、只读访问及无hugetlb，同名快照inode必须唯一；复用该inode并跳过重建内容、改权和reseal。通用inherit-fd继续遵循上游语义，普通FD的访问标志、位置及别名继续恢复。exe与VMA背板统一继承，匿名页和私有脏页保持独立。
 - supervisor在停态核验实际exe和所有目标名称VMA的dev/inode，拒绝可写共享映射及缺失目标映射；控制器交接前再次核验，Rust准入继续检查实际exe与池缓存相同dev/inode以及SHA、大小、四项seals、新ready、模板及随机挑战。模板撤销先停止准入，持有FD待在途users归零后关闭；实例FD、实际exe和VMA各自保持存活引用，种子退出不影响模板恢复。
-- 普通池最低RAM仍为 `256 + max_workers × 192` MiB；共享恢复上线初期保留旧保守恢复额度 `256 + max_workers × (192 + 108)` MiB，不按实测节省自动调低预算。不足恢复额度时选择普通exec；memory_mib=0通过静态额度条件，物理进程上限保持。
+- 普通exec按实际资源配置运行；共享恢复上线初期保留旧保守恢复额度 `256 + max_workers × (192 + 108)` MiB，不按实测节省自动调低恢复预算。不足恢复额度时选择普通exec；memory_mib=0通过静态额度条件，物理进程上限保持。
 - `NativeReadinessStatus.restore?:Value` 省略时兼容旧sender。版本化摘要为 `{schema_version:1,state,reason,checked_at_ms,template_ready,last_start_source}`；state为ready/preparing/unavailable/unknown。只读按当前完整池身份、执行体、预算、部署入口、模板登记连接存活及退避投影；登记EOF不得报告ready。last_start_source仅记录当前身份最近成功创建worker的exec或criu_restore，身份变化清空。协调器与页面投影见账号环境的CRIU场景。
 - 固定配方为 CRIU4.2 加共享memfd执行体修补，画像标记 `shared_memfd_restore:1`，记录来源归档/补丁/二进制 SHA、编译器、功能配置与许可；按目标 ABI 构建。源码束包含 `shared_image.py`，与生成镜像输入逐文件核对。TLS束继续使用既有正式来源导出检查。
 - 控制器必须持有权威 sender PID；对端必须是该 sender 自身、UID1001。种子为其直属受限子进程，模板标记、worker ID、HOME/config/cwd及执行体须匹配。IPC禁止指定任意程序、路径与其他进程。控制目录0750、socket0660；模板磁盘根目录0700，快照0600。

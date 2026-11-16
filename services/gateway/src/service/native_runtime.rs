@@ -80,12 +80,9 @@ fn digest_file(file: &mut File) -> io::Result<String> {
     Ok(format!("{:x}", digest.finalize()))
 }
 
-// 能力查询与新进程启动共用资源校验，暖路径仍逐次检查预算。
+// 能力查询与新进程启动共用配置校验，物理许可负责限制并发容量。
 fn validate_distribution_config(config: &NativeSenderConfig) -> Result<(), AppError> {
     if config.max_workers == 0
-        || (config.memory_mib != 0
-            && config.max_workers as u64
-                > config.memory_mib.saturating_sub(POOL_MEMORY_MIB) / WORKER_MEMORY_MIB)
         || !Path::new(&config.binary_path).is_absolute()
         || !Path::new(&config.work_root).is_absolute()
     {
@@ -3521,8 +3518,9 @@ mod tests {
         );
     }
 
+    /// 普通配置准入保留容量与路径校验，有限额度交给实际资源上限。@return 无。
     #[test]
-    fn native_budget_is_explicit_and_covers_weighted_capacity() {
+    fn native_exec_accepts_finite_budget_and_preserves_config_validation() {
         let config = NativeSenderConfig {
             source_version: Default::default(),
             runtimes: Default::default(),
@@ -3533,11 +3531,21 @@ mod tests {
             memory_mib: 1407,
             max_workers: 6,
         };
-        assert!(config.verify().is_err());
         let mut config = config;
-        config.max_workers = 0;
-        config.memory_mib = u64::MAX;
+        for memory_mib in [0, 1, 128, 1407, u64::MAX] {
+            config.memory_mib = memory_mib;
+            assert!(validate_distribution_config(&config).is_ok());
+        }
+        // 配置准入与分发体验证分别断言，缺失制品仍须拒绝。
         assert!(config.verify().is_err());
+        config.max_workers = 0;
+        assert!(validate_distribution_config(&config).is_err());
+        config.max_workers = 6;
+        config.binary_path = "relative-runtime".into();
+        assert!(validate_distribution_config(&config).is_err());
+        config.binary_path = "/missing".into();
+        config.work_root = "relative-home".into();
+        assert!(validate_distribution_config(&config).is_err());
     }
 
     /// 恢复状态独立报告内存准入，旧readiness仍可反序列化。@return 无。
@@ -3631,7 +3639,8 @@ mod tests {
                     .map(|value| serde_json::from_str(&value).unwrap()),
                 binary_path: var("CCRB_TEST_BINARY").unwrap(),
                 work_root: root.to_string_lossy().into_owned(),
-                memory_mib: if unlimited { 0 } else { 1536 },
+                // 低于旧公式的有限配置用于验证真实exec准入，实际占用另行测量。
+                memory_mib: if unlimited { 0 } else { 128 },
                 max_workers: normal * 2,
             }),
             binding: TransportBinding {
@@ -3890,13 +3899,12 @@ mod tests {
             fs::remove_dir_all(root).unwrap();
             return;
         }
-        let mut insufficient = config.clone();
-        insufficient.native.as_mut().unwrap().memory_mib =
-            (POOL_MEMORY_MIB + (normal * 2) as u64 * WORKER_MEMORY_MIB) - 1;
+        let mut invalid_capacity = config.clone();
+        invalid_capacity.native.as_mut().unwrap().max_workers = 0;
         assert!(matches!(
             pool.submit(
-                insufficient,
-                make("insufficient-budget", "synthetic-bearer-a")
+                invalid_capacity,
+                make("invalid-capacity", "synthetic-bearer-a")
             )
             .await,
             Err(AppError::ServiceUnavailable(_))

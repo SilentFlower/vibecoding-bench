@@ -105,15 +105,6 @@ fn native_version_config(
         .native
         .as_mut()
         .ok_or_else(|| AppError::ServiceUnavailable("未配置原生运行时".into()))?;
-    if !native.runtimes.is_empty()
-        && native.memory_mib != 0
-        && native.memory_mib
-            < 384_u64.saturating_add(192_u64.saturating_mul(native.max_workers as u64))
-    {
-        return Err(AppError::ServiceUnavailable(
-            "双版本原生运行时内存预算不足".into(),
-        ));
-    }
     if let Some(runtime) = native.runtimes.get(&version) {
         native.binary_path = runtime.binary_path.clone();
         native.release = runtime.release.clone();
@@ -1377,6 +1368,41 @@ mod tests {
     use std::path::PathBuf;
     use std::process::{Child, Command, Stdio};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    /// 双版按安装表选择并保留真实额度，旧单版继续限定已安装版本。@return 无。
+    #[test]
+    fn native_version_selection_preserves_finite_budget_and_installation_boundary() {
+        let mut config: SenderConfig = serde_json::from_value(json!({
+            "native":{"binary_path":"/usr/local/bin/ccrb-runtime","work_root":"/native",
+                "memory_mib":128,"max_workers":8,
+                "runtimes":{"2.1.280":{"binary_path":"/usr/local/bin/ccrb-runtime-280"}}},
+            "binding":{"account_id":7,"environment_id":"synthetic","generation":1,
+                "endpoint":"http://localhost:8091","secret":"synthetic","release_id":"synthetic"},
+            "proxy_url":"","allowed_origin":"https://api.anthropic.com"
+        }))
+        .unwrap();
+        for memory_mib in [0, 128, 1535] {
+            config.native.as_mut().unwrap().memory_mib = memory_mib;
+            for version in [NativeSourceVersion::Cc280, NativeSourceVersion::Cc293] {
+                let selected = native_version_config(&config, version).unwrap();
+                let native = selected.native.unwrap();
+                assert_eq!(native.source_version, version);
+                assert_eq!((native.memory_mib, native.max_workers), (memory_mib, 8));
+                assert!(native.runtimes.is_empty());
+                assert_eq!(
+                    (native.binary_path.as_str(), native.work_root.as_str()),
+                    if version == NativeSourceVersion::Cc280 {
+                        ("/usr/local/bin/ccrb-runtime-280", "/native/280")
+                    } else {
+                        ("/usr/local/bin/ccrb-runtime", "/native")
+                    }
+                );
+            }
+        }
+        config.native.as_mut().unwrap().runtimes.clear();
+        assert!(native_version_config(&config, NativeSourceVersion::Cc293).is_ok());
+        assert!(native_version_config(&config, NativeSourceVersion::Cc280).is_err());
+    }
 
     #[tokio::test]
     async fn sender_preserves_tls_profile_legacy_default_and_rejects_unknown_before_submission() {

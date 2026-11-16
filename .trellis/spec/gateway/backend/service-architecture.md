@@ -1537,6 +1537,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 - `SessionPolicyBlockService::begin(self: &Arc<Self>, token_id: i64, body: &Value) -> Result<Option<Response>, AppError>`：异步，绑定原始会话身份并执行首次检查。
 - `session_policy_block::check_current() -> Result<Option<Response>, AppError>`：异步，复查有效封禁并累计实际拦截。
 - `session_policy_block::remember_current(account_id: i64, reason: &str) -> Result<(), AppError>`：异步，持久登记实际拒答。
+- `SessionPolicyBlockStore::hit(&self,key:&str,now:i64) -> Result<Option<SessionPolicyBlock>,AppError>`：异步，原子增加有效轮次计数并等待写入完成。
 - `GET /admin/session-policy-blocks?state=active&session_prefix=&page=1&page_size=20`；`POST /admin/session-policy-blocks/:id/release`，均使用管理员鉴权。
 - SQLite 版本 4：`gateway.session-policy-blocks.4`；新增 `session_policy_block_keys(session_key,revision)` 与历史表 `session_policy_blocks`，定义位于 `store/session_policy_block_schema.rs`。迁移登记、校验摘要及发行来源同步；PostgreSQL 初始化应用同等增量结构。
 
@@ -1545,6 +1546,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 - 匿名键采用独立域 `flower2api:session-policy-block:v1`、Token ID 大端字节与改写前显式 SID 的 SHA256。上游池映射、诊断开关及换账号不能改变封禁身份；无可靠 SID 沿用原入口行为。新封禁表只保存摘要、模型字段、原因分类和可选诊断关联。
 - 开关 `session_policy_block_enabled` 默认字符串 `true`；时长 `session_policy_block_duration_minutes` 默认字符串 `1440`，必须是可安全换算并加到当前时间的正整数分钟。设置保存后热刷新，时长在实际拒答识别时读取；修改不延长已有轮次。
 - 关闭功能停止新封禁与本地拦截，历史保留；重新开启后未到期记录继续有效。到期或解除后再次拒答新增一轮。有效期内并发拒答通过数据库事务锁合并，重复拦截仅增加计数和最近命中时间。
+- 命中计数的 `UPDATE ... RETURNING id` 使用 `fetch_all` 完整消费唯一ID结果及语句完成，再读取和返回记录，独立连接随即可见计数。SQLite首行可能早于隐式提交，写入完成边界沿[账号创建可见性](settings-database.md#scenario-创建账号的提交可见性)的同类规则；保持原SQL原子更新和失败停止放行语义。
 - 入口检查在账号选择、Hello、排队及遥测激活之前；排队后与真正提交前复查。最终复查必须先于 `AttemptTrace::commit` 和 `SendPermit::submitted`，本地拦截保持零上游调用、零真实 attempt。许可在复查期间保持持有；已有在途调用沿原生命周期结束。
 - 仅识别结构化错误、SSE error、refusal 内容块及 `stop_reason=refusal`；`reasoning_extraction`、safeguards flagged、Usage Policy 等匹配限定错误字段，普通回答引用保持正常处理。HTTP 401/429 保留原分类，明确策略拒答不进入账号停用或签名修复重试。
 - 响应观察独立于诊断，复用有界解码与增量解析。SSE 拒答在当前帧交付前等待持久写入，原协议字节及 trailers 保留；完整 JSON 在结束观察时登记。观察上下文由响应流持有，不能依赖请求 task-local 在流读取时仍存在。
@@ -1573,6 +1575,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 ### 6. Tests Required
 
 - `session_policy_block_lifecycle_and_history`、`session_policy_block_concurrency_and_restart`：固定到期、计数、解除幂等、自然到期、新轮次、跨连接合并及重开持久。
+- `session_policy_block_hit_is_visible_to_independent_reader`：连续命中后由独立连接池立即读取相同计数；排队复查用例同时断言 `session_policy_blocked` 与计数，避免其它400响应混入成功证据。
 - `session_policy_block_duration_reload_preserves_existing_expiry` 与配置/识别测试：默认值、非法值、进行中请求取最新时长、隔离、关闭、正文与认证排除。
 - `session_policy_block_gateway_stops_upstream_requests`、`session_policy_block_queued_request_rechecks_before_send`、`session_policy_block_v3_send_wait_has_no_attempt`、`session_policy_block_query_failure_is_local_503`：真实本地HTTP/SSE拒答、两后端前置拦截、计数入口、队列/发送复查、零上游调用和零attempt、许可回收及查询故障。
 - 响应观察测试覆盖压缩/分块SSE及完整JSON拒答，断言原字节保留、诊断关闭仍登记。`session_policy_block_admin_contract` 验证鉴权、参数、设置热刷新、历史及SPA入口；版本3迁移用例保留自定义值。

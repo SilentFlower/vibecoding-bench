@@ -11,15 +11,16 @@ class NativeSenderTests(unittest.TestCase):
     """使用合成配置核对有限资源与可回退的后端选择。"""
 
     def test_dual_version_budget_and_resource_identity(self):
-        """两版共享六槽并额外计入一个映像，发行切换保持资源身份。@return None。"""
+        """两版低额度配置保留共享六槽及发行切换资源身份。@return None。"""
         self.assertEqual(installed_versions({}), ('2.1.293',))
         versions = installed_versions({'vibebench.native-runtime-versions': '2.1.280,2.1.293'})
         with self.assertRaises(ValueError):
             installed_versions({'vibebench.native-runtime-versions': '2.1.280'})
         account = {'request_backend': 'native293', 'concurrency': 3}
-        with self.assertRaises(NativePreparationBlocked):
-            sender_config(account, '4g', budget='1535m', versions=versions)
-        config = sender_config(account, '4g', budget='1536m', versions=versions)
+        for budget, expected in [('128m', 128), ('1535m', 1535), ('1536m', 1536)]:
+            config = sender_config(account, '4g', budget=budget, versions=versions)
+            self.assertEqual(config['memory_mib'], expected)
+            self.assertEqual(config['max_workers'], 6)
         self.assertEqual(config['max_workers'], 6)
         self.assertEqual(config['runtimes']['2.1.280']['binary_path'], '/usr/local/bin/ccrb-runtime-280')
         before = native_resource_layout(config)
@@ -30,7 +31,7 @@ class NativeSenderTests(unittest.TestCase):
         """显式恢复开关覆盖每进程独立代码映像预算。@return 无。"""
         account = {'request_backend': 'native293', 'concurrency': 3}
         with patch.dict('os.environ', {'V3_NATIVE_CRIU': '1'}):
-            ordinary = sender_config(account, '4g', budget='1536m')
+            ordinary = sender_config(account, '4g', budget='128m')
             self.assertEqual(restore_policy(ordinary, {}, True)['reason'], 'memory_budget')
             self.assertEqual(sender_config(account, '4g', budget='2056m')['max_workers'], 6)
             self.assertEqual(sender_config(account, 'unlimited', budget='')['memory_mib'], 0)
@@ -45,12 +46,13 @@ class NativeSenderTests(unittest.TestCase):
     def test_native_requires_budget_and_preserves_account_total(self):
         """默认标准并发三覆盖六个物理进程，总预算保持不变。@return None。"""
         account = {'request_backend': 'native293', 'concurrency': 3}
-        for budget in ['', '0', '1407m', '4g']:
+        for budget in ['', '0', '-1m', 'unlimited', '1.5g', '4g']:
             with self.assertRaises(ValueError):
                 sender_config(account, '4g', budget=budget)
         configuration = sender_config(account, '4g', budget='1536m')
         self.assertEqual(configuration['max_workers'], 6)
         self.assertEqual(sender_config(account, '4g', budget='1408m')['memory_mib'], 1408)
+        self.assertEqual(sender_config(account, '4g', budget='1407m')['memory_mib'], 1407)
         limits = isolated_account_limits('4g', '1g', '1536m')
         self.assertEqual(sum(value[0] for value in limits.values()), 4 * 1024 ** 3)
         self.assertEqual(limits['sender'], (1536 * 1024 ** 2,) * 2)
@@ -64,21 +66,24 @@ class NativeSenderTests(unittest.TestCase):
         """资源预检保留兼容异常并提供固定原因，UI 无需猜测 503。@return None。"""
         account = {'request_backend': 'native293', 'concurrency': 4}
         for memory, budget, reason in [('1536m', '', 'native_sender_budget_missing'),
-                ('4g', '1536m', 'native_sender_budget_insufficient'),
                 ('1536m', '1792m', 'account_memory_insufficient')]:
             with self.subTest(reason=reason), self.assertRaises(NativePreparationBlocked) as error:
                 sender_config(account, memory, budget=budget)
             self.assertEqual(reason, error.exception.reason)
         self.assertEqual(8, sender_config(account, '2560m', budget='1792m')['max_workers'])
+        self.assertEqual(8, sender_config(account, '4g', budget='1536m')['max_workers'])
 
-    def test_capacity_follows_account_budget_without_artificial_worker_ceiling(self):
-        """更高账号并发由显式预算决定。@return None。"""
-        configuration = sender_config({'request_backend':'native293', 'concurrency':33}, '32g', budget='30g')
-        self.assertEqual(configuration['max_workers'], 66)
+    def test_capacity_follows_account_concurrency_without_memory_formula(self):
+        """更高账号并发保持原容量，显式额度独立冻结。@return None。"""
+        for concurrency in [33, 100]:
+            configuration = sender_config({'request_backend':'native293', 'concurrency':concurrency}, '32g', budget='128m')
+            self.assertEqual(configuration['max_workers'], concurrency * 2)
+            self.assertEqual(configuration['memory_mib'], 128)
 
-    def test_unknown_backend_and_excessive_concurrency_fail(self):
-        """未知后端与超出有限池容量的配置明确拒绝。@return None。"""
-        for configuration in [{'request_backend':'unknown'}, {'request_backend':'native293', 'concurrency':100}]:
+    def test_unknown_backend_and_nonpositive_concurrency_fail(self):
+        """未知后端与非正数并发明确拒绝。@return None。"""
+        for configuration in [{'request_backend':'unknown'}, {'request_backend':'native293', 'concurrency':0},
+                {'request_backend':'native293', 'concurrency':-1}]:
             with self.assertRaises(ValueError):
                 sender_config(configuration, '32g', budget='30g')
 

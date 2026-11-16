@@ -72,7 +72,7 @@ pub struct NativeSenderConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kernel_generation: Option<String>,
     pub work_root: String,
-    /// 显式零表示账号无限内存，正数沿用加权容量公式。
+    /// 显式零表示账号无限内存，正数记录 sender 的实际有限额度。
     pub memory_mib: u64,
     pub max_workers: usize,
 }

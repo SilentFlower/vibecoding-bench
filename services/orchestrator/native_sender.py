@@ -89,7 +89,7 @@ def sender_config(configuration: dict, memory: str, swap: str = '0', budget: str
     :param swap: 已冻结的额外 swap。
     :param budget: 原生 sender RAM；省略时读取部署环境。
     :param versions: 已核验镜像提供的源版本集合，历史镜像仅293。
-    :return: 原生池配置；legacy 返回 None，预算不足抛出 ValueError。
+    :return: 原生池配置；legacy 返回 None，配置或账号总预算无效时抛出 ValueError。
     """
     backend = configuration.get('request_backend', 'legacy')
     if backend == 'legacy':
@@ -104,10 +104,8 @@ def sender_config(configuration: dict, memory: str, swap: str = '0', budget: str
     ram = 0 if unlimited else memory_bytes(value)
     if versions not in (('2.1.293',), ('2.1.280', '2.1.293')):
         raise ValueError('原生运行时版本集合无效')
-    pool_mib = POOL_MIB + (128 if '2.1.280' in versions else 0)
-    # 恢复预算另行准入；默认开启不能让原先可用的有限账号失去普通启动能力。
-    if workers <= 0 or (not unlimited and ram < (pool_mib + workers * WORKER_MIB) * 1024 ** 2):
-        raise NativePreparationBlocked('native_sender_budget_insufficient', '原生 sender 预算不足以覆盖账号加权并发')
+    if workers <= 0:
+        raise ValueError('原生 sender 的账号并发必须为正数')
     try:
         isolated_account_limits(memory, swap, value)
     except ValueError as error:

@@ -1984,8 +1984,8 @@ class AccountRuntimeTests(unittest.TestCase):
             notify.assert_not_called()
         self.assertEqual(3, self.client.containers.run.call_count)
 
-    def test_cli_keeps_running_layout_when_selected_sender_budget_is_insufficient(self) -> None:
-        """API活动中CLI保持原布局，目标发送器预算不足独立拒绝。@return None。"""
+    def test_cli_keeps_running_layout_when_sender_exceeds_account_total(self) -> None:
+        """API活动中CLI保持原布局，目标发送器侵占角色预算时独立拒绝。@return None。"""
         containers = self._isolated_docker()
         account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
             'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
@@ -1993,7 +1993,7 @@ class AccountRuntimeTests(unittest.TestCase):
             'request_backend': 'native293', 'concurrency': 4}
         with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
                 patch.object(self.runtime, '_sender_active', return_value=2), \
-                patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '128m'}):
+                patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '4g'}):
             row, _ = self.runtime.ensure(account, prepare_sender=False)
             original = self.runtime._sender_config(row).read_bytes()
             repeated, _ = self.runtime.ensure(account, prepare_sender=False)
@@ -2001,7 +2001,7 @@ class AccountRuntimeTests(unittest.TestCase):
             self.assertEqual(original, self.runtime._sender_config(repeated).read_bytes())
             with self.assertRaises(NativePreparationBlocked) as raised:
                 self.runtime.transport(account, '2.1.293')
-            self.assertEqual('native_sender_budget_insufficient', raised.exception.reason)
+            self.assertEqual('account_memory_insufficient', raised.exception.reason)
         for container in containers.values():
             container.stop.assert_not_called()
             container.remove.assert_not_called()
@@ -2068,7 +2068,7 @@ class AccountRuntimeTests(unittest.TestCase):
         self.client.containers.run.assert_not_called()
 
     def test_native_layout_rebuild_after_quiesce_keeps_busy_sender_protected(self) -> None:
-        """忙时保留原角色，配置事务已停止 sender 后允许空闲重建。@return None。"""
+        """忙时保护原角色，空闲重建允许低额度并落实到实际sender。@return None。"""
         containers = self._isolated_docker()
         self.client.images.get.return_value.attrs['Config']['Labels']['vibebench.native-runtime'] = '293-raw-1'
         account = {'id': 1, 'name': 'synthetic', 'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
@@ -2081,7 +2081,7 @@ class AccountRuntimeTests(unittest.TestCase):
 
         with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
                 patch.object(self.runtime, '_sender_active', side_effect=sender_active), \
-                patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '1536m'}):
+                patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '128m'}):
             row, _ = self.runtime.ensure(account)
             old_roles = list(containers.values())
             self.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': '',
@@ -2098,8 +2098,11 @@ class AccountRuntimeTests(unittest.TestCase):
             rebuilt, _ = self.runtime.ensure(account)
         configuration = json.loads(self.runtime._sender_config(rebuilt).read_text())
         self.assertEqual(configuration['native']['max_workers'], 6)
-        self.assertEqual(configuration['native']['memory_mib'], 1536)
-        self.assertEqual(json.loads(rebuilt['fingerprint_json'])['native_sender_memory'], '1536m')
+        self.assertEqual(configuration['native']['memory_mib'], 128)
+        self.assertEqual(json.loads(rebuilt['fingerprint_json'])['native_sender_memory'], '128m')
+        sender_calls = [call for call in self.client.containers.run.call_args_list
+            if call.kwargs['labels']['vibebench.role'] == 'account-sender']
+        self.assertEqual(sender_calls[-1].kwargs['mem_limit'], 128 * 1024 ** 2)
         self.assertEqual(rebuilt['generation'], row['generation'] + 1)
         for container in old_roles:
             container.remove.assert_called_once()

@@ -1275,16 +1275,16 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 - API transport、显式原生准备、启动预热及原生设置切换继续使用严格默认，按权威后端、并发和部署sender预算生成目标布局。CLI、额度查询、本地OAuth刷新、身份/指标读取、独立评审及系统更新rebuild/restore显式传 `prepare_sender=False`，沿已生效布局准备基础环境。
 - CLI准备核验私有sender配置、固定binary/work路径、整数memory_mib/max_workers与指纹的native_sender_memory；已登记角色缺配置、链接、损坏或预算矛盾均拒绝。原生内核release/kernel_generation由原生命周期处理。CLI不因新的目标预算、并发、CRIU或采集差异改写现有布局、补位开关或通知目标预热。
-- 首次环境没有已生效native时使用原基础三角色布局。目标native293保持，API原生准备仍在取得投递绑定前拒绝缺失/不足预算；基础布局不授权目标原生请求转用legacy业务发送。已有native沿冻结实际预算重建和恢复，CLI不会将其改回基础布局。
+- 首次环境没有已生效native时使用原基础三角色布局。目标native293保持，API原生准备仍在取得投递绑定前拒绝有限预算缺失、格式错误或账号总量不足；基础布局不授权目标原生请求转用legacy业务发送。已有native沿冻结实际预算重建和恢复，CLI不会将其改回基础布局。
 
 - `/api/environments` 的 `request_backend` 表示权威目标，实际 sender 布局独立判断。目标原生而本地 native 为空时，只投影白名单等待、维护或失败摘要，PID 与进程数保持未观测；预算失败也可显示在 stopped 环境。真实 ready 继续核验当前身份、环境/内核代次和新鲜度。
 - 页面准备中以2秒串行读取，普通状态20秒读取。显式重试沿唯一绑定及同一准备队列，离页/旧 generation 响应丢弃；读取零唤醒，准备基础、CRIU 模板及 TLS 采集分别展示。
 
-- 原生进程上限为 `2*concurrency`，覆盖普通请求2单位和Haiku1单位。双版本合计共享物理上限，有限账号预算为`384+192*max_workers` MiB；历史293单版为`256+192*max_workers`。容量同时受账号有限总RAM与CLI最低512 MiB约束。legacy sender仍为128 MiB。安装表、版本化私有合同与独立准备/升级记录见[双版本自动选择](../../runtime/backend/runtime-contract.md#scenario-双版本自动选择与独立来源准入)。
+- 原生进程上限为 `2*concurrency`，覆盖普通请求2单位和Haiku1单位。双版本合计共享物理上限；普通exec的双版本及历史293单版均不按固定MiB公式限制并发。有限sender显式正数额度继续冻结并落实到实际cgroup，账号总RAM须覆盖sender、network256 MiB及CLI最低512 MiB。legacy sender仍为128 MiB。安装表、版本化私有合同与独立准备/升级记录见[双版本自动选择](../../runtime/backend/runtime-contract.md#scenario-双版本自动选择与独立来源准入)。
 - 账号 `fingerprint_json.mem="unlimited"` 取消network/CLI/sender与静态/串行评审的RAM/swap限额；额外swap保存原值并校验格式。全局 `V3_ACCOUNT_MEMORY`缺省或空值为unlimited，显式有限部署配置继续沿首次冻结预算。预检保留宿主余量及显式最低可用RAM；尚未迁移的有限环境按最大RAM/swap乘活跃账号数计入，有限全局继续拒绝超出其冻结预算的历史环境。无限模式直接共享宿主资源，不能把零上限当作零占用。
 - 部署无限策略在空闲ensure阶段迁移旧有限指纹，独立于CLI/API的prepare_sender职责。平台更新门禁关闭、startup_prewarm、活动CLI/API、串行评审或内核维护时保留原环境，迁移顺延；扫描及只读解析不唤醒停止环境。迁移先核验实际sender和原预算，再经共用 `_rebuild_idle_environment` 验证持久执行记录、CLI孤儿及排他maintenance租约；保留env ID、身份、HOME、会话和CPU策略，按原生命周期重建。实际native的memory_mib及指纹native_sender_memory一并变为0/unlimited；发布中断进入reconcile，禁止混合预算继续创建。已有部署显式1536m需在上线窗口改为unlimited。
-- 无限账号生成 `NativeSenderConfig.memory_mib=0`，缺省 sender 预算也可准备；Rust 仅豁免 RAM 容量公式，max_workers 始终为正数，版本/摘要/身份/目标/代次及并发许可保持。指标与配置内存均以 0 表示无限，界面显示“未限制”；评审交接接受精确 `(Memory=0,MemorySwap=-1)`，CPU/PID 仍必须有限有效。
-- 双版本有限N=3、max_workers=6最低1536 MiB；bench默认N=4最低1920 MiB。历史293单版分别为1408/1792 MiB。1536 MiB配置须显式设置N=3。配置限额和实际占用分别报告。
+- 无限账号生成 `NativeSenderConfig.memory_mib=0`，缺省 sender 预算也可准备；正数表示实际有限额度，max_workers 始终为正数，版本/摘要/身份/目标/代次及并发许可保持。指标与配置内存均以 0 表示无限，界面显示“未限制”；评审交接接受精确 `(Memory=0,MemorySwap=-1)`，CPU/PID 仍必须有限有效。
+- N=3、max_workers=6与N=4、max_workers=8的合法有限配置均按实际额度准入。配置限额、共享映像字节数和实际cgroup占用分别报告，过小额度可能触发真实准备或运行资源不足；CRIU恢复额度继续独立判断。
 - 原生sender为UID1001，私有可写 `/native` 与CLI UID1000/HOME分离。PID限额 `128+32*max_workers`；CPU份额保持三角色规则，有限模式额外swap只归CLI。CLI指标、physical_features及静态/串行评审从同一冻结sender预算计算剩余份额。
 - 每次新进程先核验固定分发体，通过FD启动，握手验证PID/版本/raw_input_protocol，再核实际执行体SHA。首个实际映像要求 WRITE/GROW/SHRINK/SEAL 四项封存，池缓存只读FD；后续重新exec共享同一dev/inode。分发/执行体固定摘要由消费者代码及桥接运行时合同登记，外部manifest不授信。
 - CRIU恢复同样要求实际exe与池缓存共享dev/inode，并继续核验SHA、大小和四项封存；控制器持有root归属0555的封存映像，各实例独立打开FD，exe及目标VMA复用同一背板。独立进程、会话、私有页、绑定代次及唯一投递保持原合同，详细准入与生命周期见[原生CRIU热模板恢复协议](../../runtime/backend/runtime-contract.md#scenario-原生进程池-criu-热模板恢复协议-1)。共享上线初期保持保守恢复预算 `256+max_workers*(192+108)` MiB；旧画像缺 `shared_memfd_restore=1` 或恢复准入失败沿受限普通exec回退。
@@ -1306,8 +1306,9 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 | 条件 | 行为 |
 | --- | --- |
-| API准备的有限账号缺显式预算、容量不足、未知后端 | 准备拒绝，保持原环境 |
-| CLI首次或已生效基础布局，目标原生且sender预算缺失/不足 | 沿基础布局准备CLI；API独立拒绝 |
+| API准备的有限账号缺显式预算、格式错误、账号总量不足、未知后端 | 准备拒绝，保持原环境 |
+| CLI首次或已生效基础布局，目标原生且有限预算缺失/账号总量不足 | 沿基础布局准备CLI；API独立拒绝 |
+| 有限额度低于旧单版/双版公式且配置及总量合法 | 普通exec配置准入，保留实际额度和跨版物理进程上限 |
 | 已生效native，部署sender预算或目标并发后来改变 | CLI及更新恢复保留冻结布局；API准备继续核验目标 |
 | CLI读取到缺失/链接/损坏sender配置或冻结预算矛盾 | 明确要求对账，保留原现场 |
 | 无限账号缺 sender 预算 | 生成 memory_mib=0，仍检查并发及原生身份 |
@@ -1327,7 +1328,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 | 旧代次或过期快照携带 checking=true | 保持 unknown 与原原因，检查进度不授予就绪 |
 | 目标 legacy、草稿或普通停止环境 | 按原条件返回 null 或 sleeping；读取保持零模型调用 |
 | 目标 native293 但实际仍为旧布局 | 显示等待/维护/受控失败；无 PID 或进程数 |
-| 有限预算缺失、sender 低于公式或账号总量不足 | 分别投影三个资源白名单原因，已保存选择保持 |
+| 有限预算缺失或账号总量不足 | 分别投影native_sender_budget_missing/account_memory_insufficient；旧sender的native_sender_budget_insufficient继续兼容，已保存选择保持 |
 
 ### 5. Scenarios and Examples
 
@@ -1335,12 +1336,12 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 - 正常：部署默认无限，新环境无需sender预算即可准备；旧1536m环境在空闲准备时应用，N=4生成memory_mib=0/max_workers=8。错误用法：只改示例默认就认定线上显式1536m已解除，或直接改数据库而保留原cgroup。正确处理：上线修改实际部署配置，沿原维护租约排空、重建并核验HostConfig/cgroup及原身份。
 
-- 正常：旧布局选原生后先显示等待，后台准备成功才显示当前热进程。边界：总 RAM 1536 MiB、默认 N=4 且 sender 预算为空时，显示缺显式预算；普通启动需 sender 至少1792 MiB、总量至少2560 MiB，CRIU另行准入。错误用法：由目标 native293 推导 CRIU/TLS 已就绪，或将任意503原文透传页面。正确处理：独立核验实际状态，仅传资源原因白名单。
+- 正常：旧布局选原生后先显示等待，后台准备成功才显示当前热进程。边界：总 RAM 1536 MiB、默认 N=4 且 sender 预算为空时，显示缺显式预算；合法有限额度准入后，CRIU另行判断恢复条件。错误用法：由目标 native293 推导 CRIU/TLS 已就绪，或将任意503原文透传页面。正确处理：独立核验实际状态，仅传资源原因白名单。
 
 - 正常：无限账号 N=2、max_workers=4，三个角色与派生评审的 cgroup `memory.max/memory.swap.max` 均为 max，CPU/PID 保留。
 - 正常：有限账号总4g、N=3、原生sender1536m时，network256m、CLI2304m；3普通/6Haiku实际TLS与加权准入保持。
-- 边界：六个进程共享一个封存映像；额外进程空闲300秒后剩一个暖进程，下次并发按需重建。既有隔离合成小请求的V3实测六路峰值约646 MiB、空闲约189 MiB，OOM计数为0；五分钟保留下的大正文、长流及并发峰值按实际负载另验。
-- 错误用法：把磁盘26.12 MiB当作进程RAM，或用1536m预算承载默认N=4。正确处理：分别登记分发/展开/实际cgroup数据，按当前并发验证预算。
+- 边界：同账号同版的六个进程共享一个封存映像，各worker堆及请求缓冲独立，各账号分别持有池；额外进程空闲300秒后剩一个暖进程，下次并发按需重建。既有293隔离合成小请求的V3实测六路峰值约646 MiB、空闲约189 MiB，OOM计数为0；280/293混合、大正文和长流峰值按实际负载另验。
+- 错误用法：把分发或执行映像大小当作进程RAM，或将合法低额度配置准入视为实际负载容量保证。正确处理：分别登记分发/展开/实际cgroup数据，按实际负载验证容量。
 - 错误用法：布局检查查询已被配置事务停止的HTTP sender。正确处理：核验归属后按停止状态处理；运行中仍查询真实活动。
 - 正常：配置试点后服务启动先准备一个 worker；首条占用后才补位，回收超期额外进程时仍保留一个。
 - 错误用法：用合成 Messages 请求暖机，或让并发等待者各启动一个备用进程。正确处理：只做零模型握手，复用当前代次已有的补位登记。
@@ -1351,10 +1352,11 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 ### 6. Tests Required
 
-- `test_cli_prepares_finite_native_selection_without_sender_budget`、`test_cli_keeps_running_layout_when_selected_sender_budget_is_insufficient`、`test_cli_preserves_applied_native_budget_flags_and_workers`：首次/停止、API活动、角色资源与ID、代次、冻结native及开关保持；API预算拒绝独立。`test_cli_rejects_corrupt_or_missing_applied_sender_configuration` 保留配置对账保护。
+- `test_cli_prepares_finite_native_selection_without_sender_budget`、`test_cli_keeps_running_layout_when_sender_exceeds_account_total`、`test_cli_preserves_applied_native_budget_flags_and_workers`：首次/停止、API活动、角色资源与ID、代次、冻结native及开关保持；API缺预算和总量不足拒绝独立。`test_cli_rejects_corrupt_or_missing_applied_sender_configuration` 保留配置对账保护。
+- `test_native_sender`覆盖双版128m/1535m及单版1407m准入、N=4/1536m、实际额度冻结、非法有限配置和非正并发拒绝；`test_native_layout_rebuild_after_quiesce_keeps_busy_sender_protected`核对128m低额度真实生命周期传入Docker参数，忙时保护保持。
 - `test_review_reaches_cli_handoff_with_native_selection_and_no_sender_budget` 核真实评审入口可到达CLI资源交接；`test_environment_actions_require_proof_and_preserve_applied_layout` 经真实HTTP、SQLite及生命周期核对基础和native布局的rebuild/restore、原证明和代次门禁。实际隔离Docker验证同输入首次与停止后准备、角色cgroup额度、模型调用0及API受控拒绝。 系统更新合成测试同时模拟宿主文件归属和权限调用，以普通UID运行CI原命令验证；真实root归属和只读保护继续由专用Docker验收覆盖。
 
-- `test_account_runtime` 覆盖旧布局目标原生的等待与预算失败、秘密过滤、显式重试唯一绑定和当前后端校验；`test_native_sender` 断言三项错误码及 N=4 的1792/2560 MiB边界。
+- `test_account_runtime` 覆盖旧布局目标原生的等待与真实预算失败、秘密过滤、显式重试唯一绑定和当前后端校验；`test_native_sender` 断言缺预算、账号总量不足两项原因及 N=4 低于旧公式的合法额度准入。
 - `verify_environment_ui.py` 覆盖旧布局等待、明确预算失败、显式重试到实际 ready，沿既有明暗、移动端及迟到响应场景核验。
 
 - `test_native_readiness_preserves_only_known_maintenance_reasons` 及 `verify_environment_ui.py`：平台与账号维护分别展示，任意原因被固定投影，进程证据保持未观测且零业务写入。
@@ -1544,7 +1546,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 ### 3. Contracts
 
-- 全局 `V3_NATIVE_CRIU` 缺省/空值为1、精确0关闭；账号指纹可选 `native_criu_enabled:bool` 缺省true，非法类型拒绝。native配置、镜像能力、全局/账号选择及独立内存条件共同决定恢复入口；普通池仍按256+192×max_workers准入，恢复另需256+300×max_workers MiB，memory_mib=0为配置无限。
+- 全局 `V3_NATIVE_CRIU` 缺省/空值为1、精确0关闭；账号指纹可选 `native_criu_enabled:bool` 缺省true，非法类型拒绝。native配置、镜像能力、全局/账号选择及独立内存条件共同决定恢复入口；普通exec使用实际资源配置，恢复另需256+300×max_workers MiB，memory_mib=0为配置无限。
 - sender.json保存有效 `native_criu_enabled`、固定原因 `native_criu_reason`、可选 `native_criu_protocol:1`。创建选择实际入口；ensure比较有效配置沿原空闲重建门禁。列表查询保持只读。
 - 完整摘要包含schema_version=1、environment_id/generation/revision、enabled/platform_enabled/eligible、supported/installed/applied、memory_mib/required_memory_mib、state/reason、checked_at_ms、template_ready和last_start_source。state为disabled/not_installed/requires_rebuild/preparing/ready/unavailable/unknown。revision冻结指纹、策略、sender文件摘要及实际容器/入口身份。
 - 镜像标签仅表明installed；applied同时核对唯一绑定、配置选择和实际Entrypoint。旧入口显示requires_rebuild。当前观测需匹配环境、generation、kernel_generation及45秒内整数时间戳；只接受schema1、受控state/reason与精确bool，ready和template_ready必须一致。旧字段缺失显示telemetry_missing，陈旧/跨代显示telemetry_stale；last_start_source仅接受exec/criu_restore。

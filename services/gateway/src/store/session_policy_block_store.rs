@@ -42,14 +42,15 @@ impl SessionPolicyBlockStore {
         let sql = format!(
             "UPDATE session_policy_blocks SET blocked_request_count=blocked_request_count+1,last_blocked_at_ms=$2 WHERE id=(SELECT id FROM session_policy_blocks WHERE session_key=$1 AND released_at_ms IS NULL AND expires_at_ms>$2 ORDER BY blocked_at_ms DESC,id DESC LIMIT 1) RETURNING id"
         );
-        let id: Option<String> = sqlx::query_scalar(&sql)
+        // RETURNING首行可能早于SQLite隐式事务提交；读完结果后才向其它连接发布拦截成功。
+        let ids: Vec<String> = sqlx::query_scalar(&sql)
             .bind(key)
             .bind(now)
-            .fetch_optional(&self.pool)
+            .fetch_all(&self.pool)
             .await
             .map_err(unavailable)?;
-        match id {
-            Some(id) => self.get(&id, now).await.map(Some),
+        match ids.first() {
+            Some(id) => self.get(id, now).await.map(Some),
             None => Ok(None),
         }
     }
@@ -216,7 +217,10 @@ fn from_row(row: &AnyRow, now: i64) -> Result<SessionPolicyBlock, AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::store::db::migrate;
     use sqlx::any::{AnyPoolOptions, install_default_drivers};
+    use std::env::temp_dir;
+    use std::fs::remove_file;
 
     async fn store() -> SessionPolicyBlockStore {
         install_default_drivers();
@@ -325,6 +329,51 @@ mod tests {
                 .total,
             1
         );
+    }
+
+    /// 命中返回前计数已经提交，独立连接立即读取也保持一致。@return 无。
+    #[tokio::test]
+    async fn session_policy_block_hit_is_visible_to_independent_reader() {
+        install_default_drivers();
+        let file = temp_dir().join(format!("session-block-hit-{}.sqlite", Uuid::new_v4()));
+        let dsn = format!("sqlite:{}?mode=rwc", file.display());
+        let writer = AnyPoolOptions::new()
+            .max_connections(4)
+            .connect(&dsn)
+            .await
+            .unwrap();
+        migrate(&writer, "sqlite").await.unwrap();
+        let reader = AnyPoolOptions::new()
+            .max_connections(1)
+            .connect(&dsn)
+            .await
+            .unwrap();
+        let store = SessionPolicyBlockStore::new(writer.clone());
+        let observer = SessionPolicyBlockStore::new(reader.clone());
+        let identity = identity();
+        let now = 1_800_000_000_000;
+        store
+            .remember(&identity, 7, "usage_policy", now, 60_000)
+            .await
+            .unwrap();
+        for count in 1..=8 {
+            let hit = store
+                .hit(&identity.session_key, now + count)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(hit.blocked_request_count, count);
+            let observed = observer
+                .list("active", "", 1, 20, now + count)
+                .await
+                .unwrap();
+            assert_eq!(observed.items[0].blocked_request_count, count);
+        }
+        writer.close().await;
+        reader.close().await;
+        for suffix in ["", "-wal", "-shm"] {
+            let _ = remove_file(format!("{}{suffix}", file.display()));
+        }
     }
 
     /// 多连接竞争合并有效轮次，重新打开数据库保留封禁。

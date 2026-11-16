@@ -9035,6 +9035,11 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        // 明确核对封禁原因，避免其它400响应被误当作排队复查成功。
+        let error: Value =
+            serde_json::from_slice(&body::to_bytes(response.into_body(), 8192).await.unwrap())
+                .unwrap();
+        assert_eq!(error["error"]["code"], "session_policy_blocked", "{error}");
         assert_eq!(
             service
                 .session_policy_block_svc
@@ -10446,7 +10451,8 @@ mod tests {
                     .map(|value| serde_json::from_str(&value).unwrap()),
                 binary_path: var("CCRB_TEST_BINARY").unwrap(),
                 work_root: root.join("workers").to_string_lossy().into_owned(),
-                memory_mib: if unlimited { 0 } else { 1536 },
+                // 双版真实回环使用低于旧公式的配置，核对版本入口同步准入。
+                memory_mib: if unlimited { 0 } else { 128 },
                 max_workers: 6,
             }),
             binding,
