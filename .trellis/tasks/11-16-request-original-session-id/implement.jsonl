@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/gateway/backend/settings-database.md", "reason": "原始会话字段、匿名摘要例外、持久化和保留期"}
+{"file": ".trellis/spec/gateway/backend/testing-quality.md", "reason": "Rust 回归与合成数据要求"}
+{"file": ".trellis/spec/web/frontend/ui-guidelines.md", "reason": "列表布局、TPS 口径、复制及响应式"}
+{"file": ".trellis/spec/web/frontend/frontend-guidelines.md", "reason": "接口类型、时间格式与管理端鉴权"}
