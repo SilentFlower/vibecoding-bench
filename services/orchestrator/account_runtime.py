@@ -38,7 +38,7 @@ from project_runtime_policy import ProjectRuntimeError, check_python_runtime
 from resource_budget import account_limits, default_account_memory, isolated_account_limits
 from native_kernel_upgrade import pending_upgrade, recover_interrupted
 from native_criu_policy import restore_policy
-from native_sender import prewarm_account_id, sender_config
+from native_sender import installed_versions, native_resource_layout, prewarm_account_id, sender_config
 from native_capture import cleanup_captures
 from native_capture_policy import capture_enabled
 from runtime_diagnostics import NetworkContextError, network_failure
@@ -513,7 +513,7 @@ class AccountRuntime:
             raise ValueError("账号原生发送器与冻结预算不符，请先对账")
         isolated_account_limits(fingerprint["mem"], fingerprint.get("swap", "0"), budget)
         # 内核选择继续由原生命周期处理，CLI 不将其误判为资源布局变化。
-        return {key: value for key, value in native.items() if key not in ("release", "kernel_generation")}
+        return native_resource_layout(native)
 
     def _write_sender_config(self, row: dict, configuration: dict) -> None:
         path = self._sender_config(row)
@@ -701,7 +701,7 @@ class AccountRuntime:
                 raise ValueError("账号镜像缺少固定 293 原生能力")
             self._apply_unlimited_memory(row, image, startup_prewarm=startup_prewarm)
             fingerprint = json.loads(row["fingerprint_json"])
-            native = (sender_config(gateway_configuration, fingerprint["mem"], fingerprint.get("swap", "0"))
+            native = (sender_config(gateway_configuration, fingerprint["mem"], fingerprint.get("swap", "0"), versions=installed_versions(image_labels))
                 if prepare_sender else self._applied_native_sender(row))
             if startup_prewarm and (not native or self.stopping.is_set() or row["state"] not in ("ready", "stopped")):
                 raise RuntimeBusy("账号环境当前不接受预启动")
@@ -737,8 +737,7 @@ class AccountRuntime:
                     actual_native = configuration.get("native")
                     if isinstance(actual_native, dict):
                         # 内核选择属于 sender 进程代次；只有部署预算及路径变化才要求重建角色。
-                        actual_native = {key: value for key, value in actual_native.items()
-                            if key not in ("release", "kernel_generation")}
+                        actual_native = native_resource_layout(actual_native)
                     restore = restore_policy(native, fingerprint, image_labels.get('vibebench.native-criu') == '1')
                     if prepare_sender and (actual_native != native
                             or bool(configuration.get('native_criu_enabled')) != restore['eligible']
@@ -849,21 +848,51 @@ class AccountRuntime:
         except (ValueError, OSError, RuntimeError):
             return {}, 'read_failed'
 
-    def native_preparation_summary(self, row: dict, account: dict | None, snapshots: dict[int, dict], read_error: str | None = None) -> dict | None:
+    def native_preparation_summary(self, row: dict, account: dict | None, snapshots: dict[int, dict], read_error: str | None = None,
+                                   source_version: str = '2.1.293') -> dict | None:
         """将巡检快照投影到当前环境，秘密和旧代次证据不进入页面。
 
         :param row: 当前环境记录
         :param account: bench 账号和网关绑定
         :param snapshots: 本次批量读取的网关快照
         :param read_error: 本次请求的受控读取错误。
+        :param source_version: 投影的官方源版本；历史入口为293。
         :return: 原生安全状态；legacy 或草稿为空。
         """
         if not account or not account.get('cc2api_account_id'):
             return None
+        if source_version not in ('2.1.280', '2.1.293'):
+            raise ValueError('未知原生准备版本')
+        original = snapshots.get(account['cc2api_account_id'], {})
+        if source_version == '2.1.293' and isinstance(original.get('versions'), dict):
+            # 各版独立核验代次和时效，根293失败也保留280的真实观察值。
+            base = {key: value for key, value in original.items() if key != 'versions'}
+            result = self.native_preparation_summary(row, account, {account['cc2api_account_id']: base}, read_error)
+            if result is None:
+                return None
+            return {**result, 'versions': {'2.1.293': dict(result), '2.1.280': self.native_preparation_summary(
+                row, account, snapshots, read_error, '2.1.280')}}
         try:
             configuration = _read_json(self._sender_config(row))
             if not isinstance(configuration, dict):
                 return {'state': 'unknown', 'reason': 'capability_unknown'}
+            native = configuration.get('native')
+            if source_version == '2.1.293' and isinstance(native, dict):
+                selected = native.get('runtimes', {}).get(source_version)
+                if isinstance(selected, dict):
+                    configuration = {**configuration, 'native': {**native, 'release': None, 'kernel_generation': None, **selected}}
+            if source_version == '2.1.280':
+                native = configuration.get('native')
+                selected = native.get('runtimes', {}).get(source_version) if isinstance(native, dict) else None
+                if not isinstance(selected, dict):
+                    return {'state': 'unknown', 'reason': 'runtime_not_installed'}
+                configuration = {**configuration, 'native': {**native, 'release': None, 'kernel_generation': None, **selected}}
+                original = snapshots.get(account['cc2api_account_id'], {})
+                versions = original.get('versions')
+                selected_snapshot = versions.get(source_version) if isinstance(versions, dict) else None
+                if not isinstance(selected_snapshot, dict) or selected_snapshot.get('source_version') != source_version:
+                    return {'state': 'unknown', 'reason': 'runtime_unavailable'}
+                snapshots = {account['cc2api_account_id']: selected_snapshot}
             if not configuration.get('native'):
                 value = snapshots.get(account['cc2api_account_id'], {})
                 if value.get('request_backend') != 'native293':
@@ -889,6 +918,8 @@ class AccountRuntime:
         if account['cc2api_account_id'] not in snapshots:
             return {'state': 'unknown', 'reason': 'snapshot_missing'}
         value = snapshots.get(account['cc2api_account_id'], {})
+        if value.get('source_version', '2.1.293') != source_version:
+            return {'state': 'unknown', 'reason': 'binding_unverified'}
         state = value.get('state')
         if state in ('sleeping', 'disabled', 'maintenance'):
             reason = 'system_maintenance' if state == 'maintenance' and value.get('reason') == 'system_maintenance' else state

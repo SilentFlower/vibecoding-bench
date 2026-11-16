@@ -23,12 +23,19 @@ export interface EnvironmentFeature {
 export interface KernelReference { release: string; launcher_sha256: string }
 /** 持久内核操作状态。 */
 export interface EnvironmentKernel {
+  source_version?: '2.1.280' | '2.1.293';
   state: string; revision: string; current?: KernelReference | null; prepared?: KernelReference | null;
   previous?: KernelReference | null; builtin?: KernelReference | null; error?: string | null; pid?: number;
   image_sha256?: string; warmup?: unknown;
 }
 /** 内核版本发现结果。 */
 export interface KernelReleases { state: string; latest?: string; versions?: { release: string }[] }
+/** 某一源版本的实际准备观察，版本集合保持独立归属。 */
+export interface NativePreparationSnapshot {
+  state: string; reason?: string; checking?: boolean; idle_workers?: number; live_workers?: number;
+  pid?: number; checked_at_ms?: number; adaptive_prewarm?: boolean;
+  versions?: Partial<Record<'2.1.280' | '2.1.293', NativePreparationSnapshot | null>>;
+}
 /** 环境列表的真实公开投影，所有身份继续由服务端解释。 */
 export interface RuntimeEnvironment {
   environment_id: string; name: string; account_id: number | null; gateway_account_id?: number | null;
@@ -38,7 +45,8 @@ export interface RuntimeEnvironment {
   can_reprofile?: boolean; reprofile_message?: string; run_window?: RunWindow | null;
   request_backend?: string; content_capture?: EnvironmentFeature | null; criu?: EnvironmentFeature | null;
   native_kernel?: EnvironmentKernel | null;
-  native_preparation?: { state: string; reason?: string; checking?: boolean; idle_workers?: number; live_workers?: number; pid?: number; checked_at_ms?: number; adaptive_prewarm?: boolean } | null;
+  native_kernels?: Partial<Record<'2.1.280' | '2.1.293', EnvironmentKernel | null>>;
+  native_preparation?: NativePreparationSnapshot | null;
   credential_ownership?: { phase?: string; direction?: string; message?: string } | null;
   physical_features?: { message?: string; observed_at?: number; fields: { key: string; label: string; configured?: string | number | boolean | null; observed?: string | number | boolean | null; status: string }[] };
 }

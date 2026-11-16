@@ -8,10 +8,10 @@
     "client.py": "5d1a73db952111c9b4cac343f4dbf9d81735af39de33396970558e4665a4abc3",
     "http_capture.py": "8f0f60d3102d102f88147cc5dcb36e461eb995373c5ab352fd836eceb654b98a",
     "launch.c": "56aae2feab1242b4cfd9810581b1194db8fd0443573f99e18c332f86a0832f7f",
-    "observer.py": "62df967ade834fd72bd5e873455fbb7413451c5930af94279f8c01761d01e7be",
+    "observer.py": "2dcc3338649f2dabc13f0efd87a12165f8fc32e3702f75f6e946ad9699ff8bd2",
     "seccomp.json": "7fe525474af2ca78ee9f2e6158c6d0672d161488b3816e1ead14d4d8b9f257a1"
   },
   "protocol_version": 1,
   "schema_version": 1,
-  "source_revision": "a6a12bf1acce958c9682b1a72d31ab9c4efb0f53"
+  "source_revision": "d3b11372b46816858a9ef428c06a0674d1b8ef8c"
 }

@@ -12,7 +12,26 @@ function fixture(): MessageBody {
   return { model: 'claude-sonnet-4-6', system: [{ type: 'text', text: 'x-anthropic-billing-header: cc_version=2.1.293.abc; cc_entrypoint=cli; cch=12345; cc_prompt_id=' + prompt + '; cc_turn_origin=human; cc_prompt_index=3; cc_turn_index=4;' }, { type: 'text', text: '调用方业务 system', cache_control: marker }], messages: [{ role: 'user', content: [{ type: 'text', text: '历史', cache_control: marker }] }, { role: 'system', content: '原生会话中的系统消息' }, { role: 'user', content: '下一轮' }], metadata: { user_id: JSON.stringify({ device_id: 'a'.repeat(64), account_uuid: '', session_id: session }), trace_extension: 'keep' }, thread: { type: 'request', previous_message_id: 'msg_previous' }, diagnostics: { previous_message_id: null }, fallbacks: 'default', safeguards: [], future_official: { nested: ['keep'] } };
 }
 
-describe('固定 293 原生入站合同', () => {
+describe('固定官方源版本的原生入站合同', () => {
+  test('280必须由受信运行时选择，入站控制字段不能覆盖冻结版本', () => {
+    const body = fixture();
+    (body.system as { text: string }[])[0]!.text = (body.system as { text: string }[])[0]!.text.replace('2.1.293', '2.1.280');
+    expect(() => parseInput(body)).toThrow('2.1.293');
+    expect(() => parseInput({ ...body, source_version: '2.1.280' })).toThrow();
+    const input = parseInput(body, [], 'strict', '2.1.280');
+    expect(input.inputFormat).toBe('claude_code');
+    expect(prepareInput(input, '2.1.280').context.sessionId).toBe(session);
+    expect(() => prepareNativeBody(body, body.metadata, 'strict', fixture().system, '2.1.280')).toThrow('CLI billing');
+    expect(readNativeInput(prepareNativeBody(body, body.metadata, 'strict', body.system, '2.1.280'), 'strict', '2.1.280')?.fields.cc_version).toBe('2.1.280.abc');
+    expect(() => parseInput(fixture(), [], 'strict', '2.1.280')).toThrow('2.1.280');
+  });
+
+  test('280的side_reply在模型构造前明确拒绝', () => {
+    const body = { model: 'm', messages: [{ role: 'user', content: 'q' }] };
+    const input = parseInput(body, [['x-claude-code-request-class', 'side_reply']], 'strict', '2.1.280');
+    expect(() => prepareInput(input, '2.1.280')).toThrow('side_reply');
+    expect(prepareInput(input).context.requestClass).toBe('side_reply');
+  });
   test('内部自定义目标省略 CCH 时，不由入站兼容补丁重新增加', () => {
     const generated = fixture();
     (generated.system as { text: string }[])[0]!.text = (generated.system as { text: string }[])[0]!.text.replace('cch=12345;', '');

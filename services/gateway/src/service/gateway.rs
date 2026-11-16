@@ -43,6 +43,7 @@ use crate::service::account::{
     HAIKU_REQUEST_SLOT_UNITS, QueueWaitError, RateLimitDecision, UsageObservationKind,
 };
 use crate::service::diagnostics::{self, CURRENT_TRACE, RequestTraceGuard, TraceContext};
+use crate::service::native_contract::NativeSourceVersion;
 use crate::service::native_prewarm::NativePrewarmer;
 use crate::service::native_runtime::NativeSubmission;
 use crate::service::request_body_codec::{
@@ -2412,6 +2413,12 @@ impl GatewayService {
                 SlotReleaseGuard::new(admission.permit.with_credential_activity(activity));
             if account.request_backend == "native293" && method == "POST" && path == "/v1/messages"
             {
+                let request_account = account_for_request_profile(&account, request_profile);
+                let source_version = if device_profile(&request_account).env.version == "2.1.280" {
+                    NativeSourceVersion::Cc280
+                } else {
+                    NativeSourceVersion::Cc293
+                };
                 // HTTP 头按 Latin-1 字节串交给统一白名单，合法 obs-text 也能先被过滤。
                 let native_headers: Vec<(String, String)> = native_header_map
                     .iter()
@@ -2427,6 +2434,7 @@ impl GatewayService {
                 let response = self
                     .forward_native_messages(
                         &account,
+                        source_version,
                         &native_headers,
                         &body_bytes,
                         &body_map,
@@ -3658,6 +3666,7 @@ impl GatewayService {
     async fn forward_native_messages(
         &self,
         account: &Account,
+        source_version: NativeSourceVersion,
         headers: &[(String, String)],
         body: &[u8],
         body_map: &serde_json::Value,
@@ -3729,7 +3738,11 @@ impl GatewayService {
             ),
         )
         .await??;
-        await_preparation(scheduling, transport.native_ready()).await??;
+        await_preparation(
+            scheduling,
+            transport.native_ready_for_version(source_version),
+        )
+        .await??;
         if extract_session_id_from_body(body_map).is_none()
             && !headers
                 .iter()
@@ -3746,6 +3759,7 @@ impl GatewayService {
         // 映射副本直接移入信封，大正文无需在 json! 中再次完整序列化和复制。
         input["body"] = native_body.into_owned();
         let submission = NativeSubmission {
+            source_version,
             cache_ttl_rewrite: Some(
                 self.cache_control_ttl_rewrite
                     .read()
@@ -3820,7 +3834,8 @@ impl GatewayService {
                     .filter(|value| value.len() <= 8192)
                     .and_then(|value| STANDARD.decode(value).ok())
             })
-            .and_then(|bytes| serde_json::from_slice::<NativeRequestObservation>(&bytes).ok());
+            .and_then(|bytes| serde_json::from_slice::<NativeRequestObservation>(&bytes).ok())
+            .filter(|observation| observation.source_version == source_version);
         let mut diagnostic = observation
             .and_then(|observation| diagnostics::prepare_native_attempt(account, observation, &id));
         if let Some(trace) = diagnostic.as_mut() {
@@ -3829,7 +3844,11 @@ impl GatewayService {
             }
             trace.commit_native(native_started);
         } else if response.status().is_success() || response.status().is_server_error() {
-            diagnostics::local_outcome("native293_unobserved");
+            diagnostics::local_outcome(if source_version == NativeSourceVersion::Cc280 {
+                "native280_unobserved"
+            } else {
+                "native293_unobserved"
+            });
             diagnostics::error_stage("native_observation");
         } else {
             diagnostics::error_stage("native_prepare");
@@ -10373,12 +10392,14 @@ mod tests {
     #[ignore = "由 cc2api-native 隔离夹具提供二进制、V3 归属及 TLS 上游"]
     async fn native_real_gateway() {
         use crate::model::request_diagnostics::DiagnosticQuery;
+        use crate::service::native_contract::NativeSourceVersion;
         use crate::service::native_runtime::NativeSenderConfig;
         use crate::service::runtime_bridge;
         use crate::service::runtime_transport::{SenderConfig, TransportBinding, sender_router};
+        use std::collections::HashSet;
         use std::env::{temp_dir, var, var_os};
         use std::fs;
-        use tokio::time::{Instant as TokioInstant, sleep as tokio_sleep};
+        use tokio::time::{Instant as TokioInstant, sleep as tokio_sleep, timeout};
 
         let unlimited = var("CCRB_TEST_UNLIMITED").as_deref() == Ok("1");
         let root = temp_dir().join(format!("cc2api-native-gateway-{}", Uuid::new_v4()));
@@ -10417,6 +10438,8 @@ mod tests {
         };
         let config = SenderConfig {
             native: Some(NativeSenderConfig {
+                source_version: Default::default(),
+                runtimes: Default::default(),
                 kernel_generation: None,
                 release: var("CCRB_TEST_RELEASE_REF")
                     .ok()
@@ -10437,9 +10460,22 @@ mod tests {
             ),
             quota_identity: String::new(),
         };
+        let mut config = config;
+        if let Ok(binary) = var("CCRB_TEST_BINARY_280") {
+            use crate::service::native_contract::NativeRuntimeConfig;
+            config.native.as_mut().unwrap().runtimes.insert(
+                NativeSourceVersion::Cc280,
+                NativeRuntimeConfig {
+                    binary_path: binary,
+                    release: None,
+                    kernel_generation: None,
+                },
+            );
+        }
         let capture_directory = config.native_capture_dir.clone().unwrap();
         let path = root.join("sender.json");
         fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+        let sender_path = path.clone();
         let listener = tokio::net::TcpListener::bind("0.0.0.0:8091").await.unwrap();
         let sender = tokio::spawn(async move {
             axum::serve(listener, sender_router(path.to_string_lossy().into_owned()))
@@ -10464,6 +10500,253 @@ mod tests {
         };
         let control = var("CCRB_TEST_CONTROL").unwrap();
         let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        if var("CCRB_TEST_MULTI_VERSION").as_deref() == Ok("1") {
+            use futures_util::future::join_all;
+            let make = |version: &str, label: &str, native: bool, haiku: bool| {
+                let mut body = json!({"model":if haiku {"claude-haiku-4-5"} else {"claude-sonnet-4-6"},
+                    "max_tokens":64,"stream":false,"messages":[{"role":"user","content":label}]});
+                if native {
+                    body["system"] = json!([{"type":"text","text":format!("x-anthropic-billing-header: cc_version={version}.abc; cc_entrypoint=cli; cch=12345;")}]);
+                    body["metadata"] = json!({"user_id":json!({"device_id":"c".repeat(64),"account_uuid":"",
+                        "session_id":"22222222-2222-4222-8222-222222222222"}).to_string()});
+                }
+                let mut value = request(body);
+                value.headers_mut().insert(
+                    "user-agent",
+                    HeaderValue::from_str(&format!("claude-cli/{version} (external, cli)"))
+                        .unwrap(),
+                );
+                value
+            };
+            for (version, label) in [
+                ("2.1.280", "gateway-dual-280-a"),
+                ("2.1.293", "gateway-dual-293-a"),
+                ("2.1.280", "gateway-dual-280-b"),
+                ("2.1.293", "gateway-dual-293-b"),
+            ] {
+                let response = service
+                    .handle_request(make(version, label, false, false), None)
+                    .await;
+                assert_eq!(response.status(), StatusCode::OK);
+                axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                    .await
+                    .unwrap();
+            }
+            let parallel = (0..6).map(|index| {
+                let version = if index % 2 == 0 { "2.1.280" } else { "2.1.293" };
+                let request = make(
+                    version,
+                    &format!("gateway-dual-parallel-{index}"),
+                    false,
+                    true,
+                );
+                let service = &service;
+                async move {
+                    let response = service.handle_request(request, None).await;
+                    assert_eq!(response.status(), StatusCode::OK);
+                    axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                        .await
+                        .unwrap();
+                }
+            });
+            timeout(Duration::from_secs(90), join_all(parallel))
+                .await
+                .expect("双版本并发必须完整收口");
+            let physical = fs::read_dir(root.join("workers"))
+                .unwrap()
+                .filter(|entry| entry.as_ref().unwrap().file_name() != "280")
+                .count()
+                + fs::read_dir(root.join("workers/280")).unwrap().count();
+            assert_eq!(physical, 6, "两版共同遵守账号物理进程上限");
+            let diagnostics = service.diagnostics_store().unwrap();
+            diagnostics.flush().await.unwrap();
+            let page = diagnostics
+                .list(DiagnosticQuery {
+                    account_id: Some(account.id),
+                    ..Default::default()
+                })
+                .await
+                .unwrap();
+            let mut initial_pids = HashSet::new();
+            let mut warm_hits = HashMap::new();
+            for item in page.items {
+                let detail = diagnostics.detail(&item.request_id).await.unwrap();
+                let attempt = &detail.attempts[0];
+                assert!(matches!(
+                    attempt.profile_version.as_str(),
+                    "2.1.280" | "2.1.293"
+                ));
+                let runtime = attempt.runtime.as_ref().unwrap();
+                initial_pids.insert(runtime.worker_pid);
+                if runtime.warm_hit {
+                    *warm_hits
+                        .entry(attempt.profile_version.clone())
+                        .or_insert(0) += 1;
+                }
+            }
+            assert_eq!(initial_pids.len(), 6);
+            assert!(warm_hits.get("2.1.280").copied().unwrap_or(0) > 0);
+            assert!(warm_hits.get("2.1.293").copied().unwrap_or(0) > 0);
+            account.setup_token = "synthetic-bearer-b".into();
+            service.account_svc.update_account(&account).await.unwrap();
+            for (version, label) in [
+                ("2.1.280", "gateway-dual-280-rotated"),
+                ("2.1.293", "gateway-dual-293-rotated"),
+            ] {
+                let response = service
+                    .handle_request(make(version, label, false, false), None)
+                    .await;
+                assert_eq!(response.status(), StatusCode::OK);
+                axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                    .await
+                    .unwrap();
+            }
+            for pid in initial_pids {
+                assert!(
+                    fs::metadata(format!("/proc/{pid}/exe")).is_err(),
+                    "凭据轮换统一退役两版旧空闲进程"
+                );
+            }
+            for (default, label) in [
+                ("2.1.280", "gateway-dual-default-280"),
+                ("2.1.293", "gateway-dual-default-293"),
+            ] {
+                service
+                    .settings_store
+                    .upsert_many(&HashMap::from([(
+                        "claude_code_version_profile".into(),
+                        default.into(),
+                    )]))
+                    .await
+                    .unwrap();
+                service.reload_access_profile_config().await.unwrap();
+                let mut value = make(default, label, false, false);
+                value.headers_mut().insert(
+                    "user-agent",
+                    HeaderValue::from_static("claude-cli/2.1.281 (external, cli)"),
+                );
+                let response = service.handle_request(value, None).await;
+                assert_eq!(response.status(), StatusCode::OK);
+                axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                    .await
+                    .unwrap();
+            }
+            account =
+                account_for_request_profile(&account, Some(profile_for_key("2.1.280").unwrap()));
+            service.account_svc.update_account(&account).await.unwrap();
+            store
+                .update_all_canonical_env_identity(&profile_for_key("2.1.280").unwrap().identity)
+                .await
+                .unwrap();
+            for (mode, label) in [
+                ("account", "gateway-dual-account-280"),
+                ("client_version", "gateway-dual-client-293"),
+            ] {
+                service
+                    .settings_store
+                    .upsert_many(&HashMap::from([(
+                        "claude_code_profile_selection_mode".into(),
+                        mode.into(),
+                    )]))
+                    .await
+                    .unwrap();
+                service.reload_access_profile_config().await.unwrap();
+                let response = service
+                    .handle_request(make("2.1.293", label, false, false), None)
+                    .await;
+                assert_eq!(response.status(), StatusCode::OK);
+                axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                    .await
+                    .unwrap();
+            }
+            let response = service
+                .handle_request(
+                    make("2.1.280", "gateway-dual-native-280", true, false),
+                    None,
+                )
+                .await;
+            assert_eq!(response.status(), StatusCode::OK);
+            axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            let mut conflict = make("2.1.280", "gateway-dual-conflict", true, false);
+            conflict.headers_mut().insert(
+                "user-agent",
+                HeaderValue::from_static("claude-cli/2.1.293 (external, cli)"),
+            );
+            let response = service.handle_request(conflict, None).await;
+            assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+            axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            let mut missing = config.clone();
+            missing.native.as_mut().unwrap().runtimes.clear();
+            fs::write(&sender_path, serde_json::to_vec(&missing).unwrap()).unwrap();
+            let response = service
+                .handle_request(make("2.1.280", "gateway-dual-missing", false, false), None)
+                .await;
+            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+            axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            let mut partial = config.clone();
+            partial.native.as_mut().unwrap().binary_path = "/missing-293".into();
+            fs::write(&sender_path, serde_json::to_vec(&partial).unwrap()).unwrap();
+            let response = service
+                .handle_request(
+                    make("2.1.280", "gateway-dual-partial-280", false, false),
+                    None,
+                )
+                .await;
+            assert_eq!(response.status(), StatusCode::OK);
+            axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            let response = service
+                .handle_request(
+                    make("2.1.293", "gateway-dual-partial-293", false, false),
+                    None,
+                )
+                .await;
+            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+            axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            fs::write(&sender_path, serde_json::to_vec(&config).unwrap()).unwrap();
+            let observed: Value = client
+                .get(&control)
+                .send()
+                .await
+                .unwrap()
+                .json()
+                .await
+                .unwrap();
+            let messages = observed["messages"].as_array().unwrap();
+            assert_eq!(messages.len(), 18, "拒绝路径保持零模型发送");
+            for message in messages {
+                let expected = if message["label"].as_str().unwrap().contains("293") {
+                    "2.1.293"
+                } else if let Some(index) = message["label"]
+                    .as_str()
+                    .unwrap()
+                    .strip_prefix("gateway-dual-parallel-")
+                {
+                    if index.parse::<usize>().unwrap() % 2 == 0 {
+                        "2.1.280"
+                    } else {
+                        "2.1.293"
+                    }
+                } else {
+                    "2.1.280"
+                };
+                assert_eq!(message["source_version"], expected);
+            }
+            assert_eq!(observed["parallel_peak"], 6);
+            sender.abort();
+            let _ = sender.await;
+            let _ = fs::remove_dir_all(&root);
+            return;
+        }
         let before: Value = client
             .get(&control)
             .send()

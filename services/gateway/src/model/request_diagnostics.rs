@@ -1,3 +1,4 @@
+use crate::service::native_contract::NativeSourceVersion;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -75,6 +76,8 @@ pub struct DiagnosticParameters {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NativeRequestObservation {
+    #[serde(default, skip_serializing_if = "NativeSourceVersion::is_default")]
+    pub source_version: NativeSourceVersion,
     pub schema_version: u8,
     pub parameters: DiagnosticParameters,
     pub session_id: Option<String>,

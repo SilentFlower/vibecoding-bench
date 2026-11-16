@@ -5,7 +5,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const BILLING = /^\s*x-anthropic-billing-header:/;
 const CONTROL_FIELDS = new Set(['settings', 'claude_settings', 'env', 'extra_headers', 'extra_body', 'headers', 'proxy_url', 'api_key', 'oauth_token', 'claude_binary', 'claude_home', 'claude_config_dir', 'workdir']);
 
-/** 固定 293 原生正文中可证明的归因证据，不能授权本机配置或执行。
+/** 已选官方源版本的原生正文归因证据。
  * @property billingIndex 独立 billing 文本块的位置。
  * @property fields 原始 billing 字段，保留扩展字段与轮次信息。
  * @property user 原生 metadata.user_id 的结构。
@@ -18,12 +18,13 @@ export interface NativeInput {
   context: ContextInput;
 }
 
-/** 识别并校验完整的固定 293 原生请求；普通 API 返回空值。
+/** 识别并校验完整的已选版本原生请求；普通 API 返回空值。
  * @param body 尚未裁剪或重新组装的请求正文。
  * @param policy 启动侧入站策略，默认要求完整 CLI billing。
+ * @param sourceVersion 已核验执行体的固定源版本，历史入口缺省为293。
  * @return 原生归因证据；缺少原生 billing 时为空，疑似原生但损坏时明确失败。
  */
-export function readNativeInput(body: JsonObject, policy: NativeIngressPolicy = 'strict'): NativeInput | null {
+export function readNativeInput(body: JsonObject, policy: NativeIngressPolicy = 'strict', sourceVersion: '2.1.280' | '2.1.293' = '2.1.293'): NativeInput | null {
   if (!['strict', 'local_base_url'].includes(policy)) throw new BridgeError('invalid_native_policy', '原生入站策略不合法');
   const system = body.system;
   const blocks = Array.isArray(system) ? system : typeof system === 'string' ? [{ type: 'text', text: system }] : [];
@@ -42,7 +43,7 @@ export function readNativeInput(body: JsonObject, policy: NativeIngressPolicy = 
     fields[pair![1]!] = pair![2]!;
   }
   if (cchCount !== (fields.cch === undefined ? 0 : 1)) invalid('原生 billing 的 CCH 位置存在歧义');
-  if (!/^2\.1\.293\.[0-9a-f]{3}$/.test(fields.cc_version ?? '') || !(policy === 'local_base_url' ? ['cli', 'sdk-cli'] : ['cli']).includes(fields.cc_entrypoint ?? '')) invalid('当前只接纳固定 2.1.293 CLI 原生请求');
+  if (!['2.1.280', '2.1.293'].includes(sourceVersion) || !new RegExp('^' + sourceVersion.replaceAll('.', '\\.') + '\\.[0-9a-f]{3}$').test(fields.cc_version ?? '') || !(policy === 'local_base_url' ? ['cli', 'sdk-cli'] : ['cli']).includes(fields.cc_entrypoint ?? '')) invalid('当前只接纳固定 ' + sourceVersion + ' CLI 原生请求');
   if ((policy === 'strict' || fields.cch !== undefined) && !/^[0-9a-f]{5}$/.test(fields.cch ?? '')) invalid('原生 billing 缺少有效 CCH');
   if (fields.cc_is_subagent !== undefined && !['true', 'false'].includes(fields.cc_is_subagent)) invalid('原生子代理标识不合法');
   if (fields.cc_prompt_id !== undefined && !UUID.test(fields.cc_prompt_id)) invalid('原生 prompt ID 必须为 UUID');
@@ -71,10 +72,11 @@ export function mergeNativeContext(context: ContextInput, native: NativeInput): 
  * @param generatedMetadata 同一 SDK 按专用账号生成的身份。
  * @param policy 启动侧入站策略。
  * @param generatedSystem 同次 SDK 实际生成的 CLI system，用来取得发送入口及原生 CCH 分支。
+ * @param sourceVersion 已核验执行体的源版本。
  * @return 业务字段和缓存位置保持不变的请求正文。
  */
-export function prepareNativeBody(body: MessageBody, generatedMetadata: unknown, policy: NativeIngressPolicy = 'strict', generatedSystem?: unknown): JsonObject {
-  const native = readNativeInput(body, policy);
+export function prepareNativeBody(body: MessageBody, generatedMetadata: unknown, policy: NativeIngressPolicy = 'strict', generatedSystem?: unknown, sourceVersion: '2.1.280' | '2.1.293' = '2.1.293'): JsonObject {
+  const native = readNativeInput(body, policy, sourceVersion);
   if (!native || !isObject(generatedMetadata) || typeof generatedMetadata.user_id !== 'string') throw new BridgeError('native_identity', '无法取得当前账号的原生身份', 503);
   const account: unknown = JSON.parse(generatedMetadata.user_id);
   if (!isObject(account) || typeof account.device_id !== 'string' || typeof account.account_uuid !== 'string') throw new BridgeError('native_identity', '当前账号原生身份结构不匹配', 503);
@@ -86,7 +88,7 @@ export function prepareNativeBody(body: MessageBody, generatedMetadata: unknown,
   if (generatedSystem !== undefined || policy === 'local_base_url') {
     // 入站是否缺 CCH 与内部目标是否生成 CCH 是两件事，必须以同次真实 CC 上下文判断。
     let generated: NativeInput | null;
-    try { generated = readNativeInput({ system: generatedSystem, metadata: generatedMetadata }, 'local_base_url'); }
+    try { generated = readNativeInput({ system: generatedSystem, metadata: generatedMetadata }, 'local_base_url', sourceVersion); }
     catch { throw new BridgeError('native_identity', '同次 CLI billing 上下文校验失败', 503); }
     if (!generated || generated.fields.cc_entrypoint !== 'cli') throw new BridgeError('native_identity', '无法取得同次 CLI billing 上下文', 503);
     generatedCch = generated.fields.cch !== undefined;

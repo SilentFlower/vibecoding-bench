@@ -8,6 +8,7 @@ use std::os::fd::AsRawFd;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 
@@ -41,7 +42,7 @@ use crate::model::request_diagnostics::{
     NativeRuntimeObservation,
 };
 use crate::service::native_contract::{
-    NativePreparationControl, NativePreparationStatus, NativeReadinessStatus,
+    NativePreparationControl, NativePreparationStatus, NativeReadinessStatus, NativeSourceVersion,
 };
 pub use crate::service::native_contract::{
     NativeSenderConfig, NativeSubmission, POOL_MEMORY_MIB, WORKER_MEMORY_MIB,
@@ -98,6 +99,9 @@ fn criu_available(config: &SenderConfig) -> bool {
     let Some(native) = config.native.as_ref() else {
         return false;
     };
+    if native.source_version != NativeSourceVersion::Cc293 {
+        return false;
+    }
     if !super::native_criu::enabled() {
         return false;
     }
@@ -122,7 +126,15 @@ pub(crate) fn verify_distribution(config: &NativeSenderConfig) -> Result<File, A
 
 fn artifact(config: &NativeSenderConfig) -> Result<ReleaseArtifact, AppError> {
     match &config.release {
-        Some(reference) => ReleaseArtifact::signed(reference),
+        Some(reference) => ReleaseArtifact::signed(reference, config.source_version),
+        None if config.source_version == NativeSourceVersion::Cc280 => Ok(ReleaseArtifact {
+            path: PathBuf::from(&config.binary_path),
+            launcher_sha256: "3666887daafb75290597be37b84a1c5cfd92ab664de8bb862c79a501ea75deed"
+                .into(),
+            launcher_bytes: 27_097_232,
+            image_sha256: "2b64ee7d8f0863a37bce90800226bda102387e5cff082f947b2b71e66d9a38e7".into(),
+            image_bytes: 111_595_592,
+        }),
         None => Ok(ReleaseArtifact {
             path: PathBuf::from(&config.binary_path),
             launcher_sha256: LAUNCHER_SHA256.into(),
@@ -130,6 +142,24 @@ fn artifact(config: &NativeSenderConfig) -> Result<ReleaseArtifact, AppError> {
             image_sha256: IMAGE_SHA256.into(),
             image_bytes: IMAGE_BYTES,
         }),
+    }
+}
+
+/// 同一账号各版共用物理进程容量，弱引用避免延长池的生命周期。
+#[derive(Default)]
+struct SharedCapacity {
+    live: AtomicUsize,
+    pools: Mutex<Vec<Weak<NativePool>>>,
+    identity: Mutex<String>,
+    identity_gate: tokio::sync::Mutex<()>,
+}
+
+/// 物理退出后独立归还账号总容量。
+struct PhysicalSlot(Arc<SharedCapacity>);
+
+impl Drop for PhysicalSlot {
+    fn drop(&mut self) {
+        self.0.live.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
@@ -194,6 +224,9 @@ fn validate_worker_identity(
         return Err(unavailable());
     }
     let native = config.native.as_ref().ok_or_else(unavailable)?;
+    if native.source_version != submission.source_version {
+        return Err(AppError::BadRequest("原生请求版本与执行配置不一致".into()));
+    }
     validate_distribution_config(native)?;
     let slots = usize::try_from(submission.concurrency)
         .ok()
@@ -328,6 +361,9 @@ enum PreparationState {
 
 /// 一个账号 sender 的按需进程池；互斥锁只保护本地所有权变更。
 pub struct NativePool {
+    source_version: NativeSourceVersion,
+    shared: Arc<SharedCapacity>,
+    versions: Mutex<HashMap<NativeSourceVersion, Arc<NativePool>>>,
     state: Mutex<PoolState>,
     generation: tokio::sync::Mutex<()>,
     image: tokio::sync::Mutex<Option<(String, Arc<File>)>>,
@@ -341,6 +377,9 @@ impl Default for NativePool {
     /// 创建按需池，额外暖进程空闲300秒后回收，减少短间歇下的重复补位。@return 空池及独立映像缓存。
     fn default() -> Self {
         Self {
+            source_version: NativeSourceVersion::default(),
+            shared: Arc::new(SharedCapacity::default()),
+            versions: Mutex::new(HashMap::new()),
             state: Mutex::new(PoolState::default()),
             generation: tokio::sync::Mutex::new(()),
             image: tokio::sync::Mutex::new(None),
@@ -371,6 +410,7 @@ impl Drop for PreparationLease {
 
 /// 物理进程计数覆盖启动、活动及空闲，故障和取消均自动归还。
 struct WorkerLease {
+    _capacity: Option<PhysicalSlot>,
     pool: Weak<NativePool>,
     key: String,
 }
@@ -918,7 +958,7 @@ impl Worker {
             .and_then(Child::id)
             .ok_or_else(unavailable)?;
         if ready["type"] != "worker_ready"
-            || ready["version"] != "2.1.293"
+            || ready["version"] != native.source_version.as_str()
             || ready["raw_input_protocol"] != 1
             || ready["pid"].as_u64() != Some(pid as u64)
             || (ready.get("cache_ttl_rewrite_protocol").is_some()
@@ -1360,6 +1400,7 @@ impl Worker {
                             header_policy.as_ref(),
                         );
                         observation = Some(NativeRequestObservation {
+                            source_version: submission.source_version,
                             runtime: Some(runtime.clone()),
                             capture_status: Some(capture_status),
                             schema_version: 1,
@@ -1508,6 +1549,156 @@ impl Worker {
 }
 
 impl NativePool {
+    /// 取得本账号对应版本的独立状态，物理容量继续共享。
+    /// @param version 已冻结的请求版本。
+    /// @return 对应版本的池；调用本身不会启动进程。
+    pub(crate) fn for_version(self: &Arc<Self>, version: NativeSourceVersion) -> Arc<Self> {
+        {
+            let mut pools = self.shared.pools.lock().unwrap();
+            pools.retain(|pool| pool.strong_count() > 0);
+            if !pools.iter().any(|pool| pool.ptr_eq(&Arc::downgrade(self))) {
+                pools.push(Arc::downgrade(self));
+            }
+        }
+        if self.source_version == version {
+            return self.clone();
+        }
+        self.versions
+            .lock()
+            .unwrap()
+            .entry(version)
+            .or_insert_with(|| {
+                let pool = Arc::new(Self {
+                    source_version: version,
+                    shared: self.shared.clone(),
+                    ..Self::default()
+                });
+                self.shared
+                    .pools
+                    .lock()
+                    .unwrap()
+                    .push(Arc::downgrade(&pool));
+                pool
+            })
+            .clone()
+    }
+
+    fn try_physical_slot(&self, slots: usize) -> Option<PhysicalSlot> {
+        self.shared
+            .live
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |live| {
+                (live < slots).then(|| live + 1)
+            })
+            .ok()
+            .map(|_| PhysicalSlot(self.shared.clone()))
+    }
+
+    async fn physical_slot(
+        &self,
+        slots: usize,
+        deadline: Instant,
+    ) -> Result<PhysicalSlot, AppError> {
+        let mut cancelling_spare = false;
+        loop {
+            if Instant::now() >= deadline {
+                return Err(unavailable());
+            }
+            if let Some(slot) = self.try_physical_slot(slots) {
+                return Ok(slot);
+            }
+            let pools: Vec<_> = self
+                .shared
+                .pools
+                .lock()
+                .unwrap()
+                .iter()
+                .filter_map(Weak::upgrade)
+                .collect();
+            let mut retired = None;
+            for pool in pools {
+                if pool.source_version != self.source_version {
+                    let mut state = pool.state.lock().unwrap();
+                    retired = state.idle.pop();
+                    if retired.is_none() && state.spare.take().is_some() {
+                        cancelling_spare = true;
+                    }
+                    if retired.is_some() {
+                        break;
+                    }
+                }
+            }
+            let Some(worker) = retired else {
+                if cancelling_spare {
+                    // 取消补位只发出信号，必须等真实退出释放容量后再启动目标版本。
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                    continue;
+                }
+                return Err(unavailable());
+            };
+            // 优先释放其它版本的空闲进程；活动进程的许可一直保持到真实退出。
+            worker.retire().await;
+        }
+    }
+
+    async fn synchronize_identity(
+        self: &Arc<Self>,
+        config: &SenderConfig,
+        submission: &NativeSubmission,
+    ) -> Result<(), AppError> {
+        let native = config.native.as_ref().ok_or_else(unavailable)?;
+        let key = format!(
+            "{:x}",
+            Sha256::digest(
+                serde_json::to_vec(&(
+                    &config.binding,
+                    &config.proxy_url,
+                    &config.allowed_origin,
+                    &config.native_capture_dir,
+                    &submission.bearer,
+                    &submission.device_id,
+                    &submission.account_uuid,
+                    &submission.organization_uuid,
+                    &submission.email,
+                    submission.concurrency,
+                    native.memory_mib,
+                    native.max_workers,
+                ))
+                .map_err(|_| unavailable())?
+            )
+        );
+        let _gate = self.shared.identity_gate.lock().await;
+        {
+            let mut current = self.shared.identity.lock().unwrap();
+            if *current == key {
+                return Ok(());
+            }
+            *current = key;
+        }
+        let pools: Vec<_> = self
+            .shared
+            .pools
+            .lock()
+            .unwrap()
+            .iter()
+            .filter_map(Weak::upgrade)
+            .collect();
+        let mut retired = Vec::new();
+        for pool in pools {
+            let mut state = pool.state.lock().unwrap();
+            state.key.clear();
+            state.spare.take();
+            state.template.take();
+            state.template_retry_at = None;
+            state.restore_supported = None;
+            state.last_start_source = None;
+            retired.append(&mut state.idle);
+        }
+        // 凭据与环境属于账号公共身份，轮换时统一撤销两版旧代的空闲工作。
+        for worker in retired {
+            worker.retire().await;
+        }
+        Ok(())
+    }
     /// 汇总当前闲置worker的真实TLS槽。@param config 当前绑定配置。@return 安全能力摘要，不创建进程。
     pub(crate) fn tls_status(&self, config: &SenderConfig) -> Value {
         let mut result = json!({"state":"preparing","reason":"CAPTURE_PREPARING",
@@ -1534,6 +1725,8 @@ impl NativePool {
                 result["image_admitted"] = json!(
                     worker.image_sha256 == IMAGE_SHA256
                         || worker.image_sha256 == PREVIOUS_IMAGE_SHA256
+                        || worker.image_sha256
+                            == "2b64ee7d8f0863a37bce90800226bda102387e5cff082f947b2b71e66d9a38e7"
                 );
                 if status == "ready" {
                     break;
@@ -1617,6 +1810,7 @@ impl NativePool {
         let generation = self.generation.try_lock().ok();
         let mut retired = Vec::new();
         let mut result = NativeReadinessStatus {
+            source_version: identity.source_version,
             state: "unprepared".into(),
             account_id: identity.request.account_id,
             environment_id: identity.request.environment_id.clone(),
@@ -1836,7 +2030,7 @@ impl NativePool {
                         environment_id: identity.request.environment_id.clone(),
                         generation: identity.request.generation,
                         preparation_id: id.clone(),
-                        version: "2.1.293".into(),
+                        version: identity.source_version.as_str().into(),
                         raw_input_protocol: 1,
                         pid: None,
                         idle_workers: 0,
@@ -1878,7 +2072,7 @@ impl NativePool {
                 environment_id: identity.request.environment_id.clone(),
                 generation: identity.request.generation,
                 preparation_id: id.clone(),
-                version: "2.1.293".into(),
+                version: identity.source_version.as_str().into(),
                 raw_input_protocol: 1,
                 pid: Some(pid),
                 idle_workers: state.idle.len(),
@@ -1929,11 +2123,60 @@ impl NativePool {
         true
     }
 
-    /// 用一个弱引用任务回收过期空闲进程，保留最近使用的一个暖进程。
+    /// 在账号各版之间保留最近使用的一个基础暖进程。
+    fn minimum_idle(&self) -> usize {
+        let pools: Vec<_> = self
+            .shared
+            .pools
+            .lock()
+            .unwrap()
+            .iter()
+            .filter_map(Weak::upgrade)
+            .collect();
+        let mut newest = None;
+        for pool in pools {
+            let at = pool
+                .state
+                .lock()
+                .unwrap()
+                .idle
+                .iter()
+                .map(|worker| worker.idle_since)
+                .max();
+            if let Some(at) = at {
+                if newest.is_none_or(|(previous, _)| at > previous) {
+                    newest = Some((at, pool.source_version));
+                }
+            }
+        }
+        usize::from(newest.is_none_or(|(_, version)| version == self.source_version))
+    }
+
+    /// 新增暖进程后同步各版回收计划，备用保留期限按账号共用。
     fn schedule_idle_reap(self: &Arc<Self>) {
+        let pools: Vec<_> = self
+            .shared
+            .pools
+            .lock()
+            .unwrap()
+            .iter()
+            .filter_map(Weak::upgrade)
+            .collect();
+        if pools.is_empty() {
+            self.schedule_local_idle_reap();
+        } else {
+            for pool in pools {
+                pool.schedule_local_idle_reap();
+            }
+        }
+    }
+
+    /// 用弱引用任务回收本版过期空闲进程，账号基础暖进程由公共状态决定。
+    fn schedule_local_idle_reap(self: &Arc<Self>) {
+        let minimum = self.minimum_idle();
         {
             let mut state = self.state.lock().unwrap();
-            if state.reaper_running || state.idle.len() <= 1 {
+            if state.reaper_running || state.idle.len() <= minimum {
                 return;
             }
             state.reaper_running = true;
@@ -1945,8 +2188,9 @@ impl NativePool {
                     let Some(pool) = weak.upgrade() else {
                         return;
                     };
+                    let minimum = pool.minimum_idle();
                     let mut state = pool.state.lock().unwrap();
-                    if state.idle.len() <= 1 {
+                    if state.idle.len() <= minimum {
                         state.reaper_running = false;
                         return;
                     }
@@ -1963,9 +2207,10 @@ impl NativePool {
                     return;
                 };
                 let mut retired = Vec::new();
+                let minimum = pool.minimum_idle();
                 {
                     let mut state = pool.state.lock().unwrap();
-                    while state.idle.len() > 1 {
+                    while state.idle.len() > minimum {
                         let Some(index) = state
                             .idle
                             .iter()
@@ -1990,6 +2235,7 @@ impl NativePool {
         deadline: Instant,
         business: bool,
     ) -> Result<(String, Worker), AppError> {
+        self.synchronize_identity(config, submission).await?;
         let prepare_spare =
             (business && config.native_adaptive_prewarm && submission.concurrency >= 2)
                 || criu_available(config);
@@ -2060,6 +2306,7 @@ impl NativePool {
             }
             worker.retire().await;
         }
+        let physical = self.physical_slot(slots, deadline).await?;
         let initial_start;
         {
             let mut state = self.state.lock().unwrap();
@@ -2081,6 +2328,7 @@ impl NativePool {
         let _starting = StartupLease(Arc::downgrade(self));
         let identity = WorkerIdentity::from(submission);
         let lease = WorkerLease {
+            _capacity: Some(physical),
             pool: Arc::downgrade(self),
             key: key.clone(),
         };
@@ -2195,6 +2443,13 @@ impl NativePool {
         deadline: Instant,
     ) {
         let Some(image) = image else { return };
+        let Some(physical) = config
+            .native
+            .as_ref()
+            .and_then(|native| self.try_physical_slot(native.max_workers))
+        else {
+            return;
+        };
         let (done, ready) = watch::channel(());
         let (cancel, cancelled) = oneshot::channel();
         {
@@ -2221,6 +2476,7 @@ impl NativePool {
         }
         let pool = self.clone();
         let lease = WorkerLease {
+            _capacity: Some(physical),
             pool: Arc::downgrade(self),
             key: key.to_owned(),
         };
@@ -2427,6 +2683,45 @@ mod tests {
     use std::fs::FileTimes;
     use std::io::Write;
 
+    /// 两版物理许可共用上限，取消补位须等许可归还。@return 无。
+    #[tokio::test]
+    async fn native_versions_share_physical_capacity_and_cancel_foreign_spare() {
+        let root = Arc::new(NativePool::default());
+        let peer = root.for_version(NativeSourceVersion::Cc280);
+        assert!(Arc::ptr_eq(
+            &root,
+            &root.for_version(NativeSourceVersion::Cc293)
+        ));
+        assert!(Arc::ptr_eq(
+            &peer,
+            &root.for_version(NativeSourceVersion::Cc280)
+        ));
+        let first = root.try_physical_slot(2).unwrap();
+        let second = peer.try_physical_slot(2).unwrap();
+        assert!(root.try_physical_slot(2).is_none());
+        assert!(peer.try_physical_slot(2).is_none());
+        let (cancel, cancelled) = oneshot::channel();
+        let (_done, ready) = watch::channel(());
+        peer.state.lock().unwrap().spare = Some(SparePreparation {
+            ready,
+            _cancel: cancel,
+        });
+        tokio::spawn(async move {
+            let _ = cancelled.await;
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            drop(second);
+        });
+        let replacement = root
+            .physical_slot(2, Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
+        assert_eq!(root.shared.live.load(Ordering::SeqCst), 2);
+        assert!(peer.state.lock().unwrap().spare.is_none());
+        drop(first);
+        drop(replacement);
+        assert_eq!(root.shared.live.load(Ordering::SeqCst), 0);
+    }
+
     /// 额外暖进程跨过旧窗口继续保留，到新阈值后只留一个。@return 无。
     #[tokio::test]
     async fn default_idle_reaper_keeps_spare_until_five_minutes() {
@@ -2458,6 +2753,7 @@ mod tests {
                     // 使用真实空闲年龄触发生产回收逻辑，避免回归测试等待五分钟。
                     idle_since: Instant::now() - Duration::from_secs(idle_seconds),
                     _lease: Some(WorkerLease {
+                        _capacity: None,
                         pool: Arc::downgrade(&pool),
                         key: key.clone(),
                     }),
@@ -2602,6 +2898,7 @@ mod tests {
                 connection, descriptor,
             )),
             lease: Some(WorkerLease {
+                _capacity: None,
                 pool: Arc::downgrade(&pool),
                 key,
             }),
@@ -2824,6 +3121,7 @@ mod tests {
                 startup_ms: 0,
             };
             let submission = NativeSubmission {
+                source_version: Default::default(),
                 cache_ttl_rewrite: scenario.contains("ttl").then(|| "1h".into()),
                 ingress_capture: None,
                 log_mode: RequestLogMode::Info,
@@ -2991,6 +3289,8 @@ mod tests {
         let id = Uuid::new_v4().to_string();
         let config = SenderConfig {
             native: Some(NativeSenderConfig {
+                source_version: Default::default(),
+                runtimes: Default::default(),
                 kernel_generation: None,
                 release: None,
                 binary_path: "/missing".into(),
@@ -3014,6 +3314,7 @@ mod tests {
             quota_identity: String::new(),
         };
         let identity = NativeSubmission {
+            source_version: Default::default(),
             cache_ttl_rewrite: None,
             ingress_capture: None,
             log_mode: RequestLogMode::Info,
@@ -3123,6 +3424,7 @@ mod tests {
         .await
         .unwrap();
         let mut control = NativePreparationControl {
+            source_version: Default::default(),
             account_id: 7,
             environment_id: "synthetic".into(),
             generation: 1,
@@ -3222,6 +3524,8 @@ mod tests {
     #[test]
     fn native_budget_is_explicit_and_covers_weighted_capacity() {
         let config = NativeSenderConfig {
+            source_version: Default::default(),
+            runtimes: Default::default(),
             kernel_generation: None,
             release: None,
             binary_path: "/missing".into(),
@@ -3319,6 +3623,8 @@ mod tests {
         let root = temp_dir().join(format!("cc2api-native-{}", Uuid::new_v4()));
         let config = SenderConfig {
             native: Some(NativeSenderConfig {
+                source_version: Default::default(),
+                runtimes: Default::default(),
                 kernel_generation: None,
                 release: var("CCRB_TEST_RELEASE_REF")
                     .ok()
@@ -3346,6 +3652,7 @@ mod tests {
         let make = |label: &str, bearer: &str| {
             let id = Uuid::new_v4().to_string();
             NativeSubmission {
+                source_version: Default::default(),
                 cache_ttl_rewrite: None,
                 ingress_capture: None,
                 log_mode: RequestLogMode::Debug,
@@ -3603,6 +3910,7 @@ mod tests {
         let mut cancelling = make("cancelled-initialization", "synthetic-bearer-a");
         cancelling.input = json!({"schema_version":1,"request_id":cancelling.request.request_id});
         let control = NativePreparationControl {
+            source_version: Default::default(),
             account_id: config.binding.account_id,
             environment_id: config.binding.environment_id.clone(),
             generation: config.binding.generation,
@@ -3968,6 +4276,7 @@ mod tests {
         // 用额外物理许可模拟 HTTP 已退出、进程尚未收口，同时保留一个暖进程。
         pool.state.lock().unwrap().live += 1;
         let retiring = WorkerLease {
+            _capacity: None,
             key: String::new(),
             pool: Arc::downgrade(&pool),
         };

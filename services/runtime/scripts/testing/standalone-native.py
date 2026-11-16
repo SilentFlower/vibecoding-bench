@@ -22,8 +22,14 @@ LAUNCHER = '423a6a848c84e09bcc73a8b7be481ed4ead44a6644cef94bbf47d2009d3f6b80'
 EXECUTABLE = '22f26d7803f80630968caf21b6170cf9bb94d87bea6f5eef678464f3bb0d3ecd'
 
 
-def inside(launcher, executable):
-    """仅在隔离容器中执行真实请求与满并发测量。@return 可审计的合成验证结果。"""
+def inside(launcher, executable, version='2.1.293'):
+    """在隔离容器中执行真实请求与满并发测量。
+
+    @param launcher 待核验分发体的完整SHA256。
+    @param executable 待核验实际执行映像的完整SHA256。
+    @param version 目标官方源版本，缺省293；用于原生billing验收。
+    @return 可审计的合成验证结果。
+    """
     assert shutil.which('bun') is None
     assert not Path('/root/project').exists()
     assert hashlib.sha256(Path('/opt/ccrb-runtime').read_bytes()).hexdigest() == launcher
@@ -106,7 +112,7 @@ def inside(launcher, executable):
         workers.append((process, worker_id))
         ready = json.loads(process.stdout.readline())
         assert ready['type'] == 'worker_ready' and ready.get('raw_input_protocol') == 1, ready
-        assert ready['pid'] == process.pid and ready['version'] == '2.1.293'
+        assert ready['pid'] == process.pid and ready['version'] == version
         assert hashlib.sha256(Path(f'/proc/{process.pid}/exe').read_bytes()).hexdigest() == executable
         return process, worker_id
 
@@ -168,12 +174,13 @@ def main():
     parser.add_argument('--output', type=Path)
     parser.add_argument('--expected-launcher', default=LAUNCHER)
     parser.add_argument('--expected-executable', default=EXECUTABLE)
+    parser.add_argument('--source-version', choices=('2.1.280', '2.1.293'), default='2.1.293')
     args = parser.parse_args()
     for digest in (args.expected_launcher, args.expected_executable):
         if len(digest) != 64 or any(c not in '0123456789abcdef' for c in digest):
             parser.error('预期 SHA256 必须为 64 位小写十六进制')
     if args.inside:
-        inside(args.expected_launcher, args.expected_executable)
+        inside(args.expected_launcher, args.expected_executable, args.source_version)
         return
     output = args.output.resolve()
     output.mkdir(mode=0o700)
@@ -188,7 +195,7 @@ def main():
         '--mount',f'type=bind,src={args.binary.resolve()},dst=/opt/ccrb-runtime,readonly',
         '--mount',f'type=bind,src={output},dst=/fixture,readonly',
         '--mount',f'type=bind,src={output},dst=/output',IMAGE,'python','/fixture/check.py','--inside', '--expected-launcher', args.expected_launcher,
-        '--expected-executable', args.expected_executable], check=True, timeout=240)
+        '--expected-executable', args.expected_executable, '--source-version', args.source_version], check=True, timeout=240)
     print(json.loads((output/'standalone-report.json').read_text())['cgroup'])
 
 

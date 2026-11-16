@@ -2,13 +2,29 @@
 import unittest
 from unittest.mock import patch
 
-from native_sender import NativePreparationBlocked, sender_config
+from native_sender import NativePreparationBlocked, sender_config, installed_versions, native_resource_layout
 from native_criu_policy import restore_policy
 from resource_budget import account_limits, memory_bytes, isolated_account_limits, scenario_account_limits, serial_review_limits
 
 
 class NativeSenderTests(unittest.TestCase):
     """使用合成配置核对有限资源与可回退的后端选择。"""
+
+    def test_dual_version_budget_and_resource_identity(self):
+        """两版共享六槽并额外计入一个映像，发行切换保持资源身份。@return None。"""
+        self.assertEqual(installed_versions({}), ('2.1.293',))
+        versions = installed_versions({'vibebench.native-runtime-versions': '2.1.280,2.1.293'})
+        with self.assertRaises(ValueError):
+            installed_versions({'vibebench.native-runtime-versions': '2.1.280'})
+        account = {'request_backend': 'native293', 'concurrency': 3}
+        with self.assertRaises(NativePreparationBlocked):
+            sender_config(account, '4g', budget='1535m', versions=versions)
+        config = sender_config(account, '4g', budget='1536m', versions=versions)
+        self.assertEqual(config['max_workers'], 6)
+        self.assertEqual(config['runtimes']['2.1.280']['binary_path'], '/usr/local/bin/ccrb-runtime-280')
+        before = native_resource_layout(config)
+        config['runtimes']['2.1.280'].update(release={'release': 'synthetic', 'launcher_sha256': 'a'*64}, kernel_generation='new')
+        self.assertEqual(native_resource_layout(config), before)
 
     def test_criu_accounts_for_each_restored_code_image(self):
         """显式恢复开关覆盖每进程独立代码映像预算。@return 无。"""

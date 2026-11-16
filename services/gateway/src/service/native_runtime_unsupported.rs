@@ -121,6 +121,8 @@ mod tests {
     #[test]
     fn unsupported_platform_is_explicit_before_execution() {
         let config = NativeSenderConfig {
+            source_version: Default::default(),
+            runtimes: Default::default(),
             kernel_generation: None,
             release: None,
             binary_path: "/missing".into(),

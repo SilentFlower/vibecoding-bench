@@ -59,6 +59,10 @@ export class TlsVerifierEngine implements Engine {
     const target = new URL(readNativeBaseUrl(config.baseUrl) ?? 'https://api.anthropic.com');
     if (process.platform !== 'linux' || process.arch !== 'x64' || config.mode !== 'native' || target.protocol !== 'https:' || (config.telemetryPolicy ?? 'off') !== 'off' || !config.binaryPath) throw new BridgeError('tls_verifier_configuration', 'TLS verify 仅支持 Linux x64 固定官方原版、HTTPS Messages 和关闭遥测的组合', 503);
     const verified = await verifyRuntime(config.binaryPath);
+    if (verified.identity.sourceVersion === '2.1.280') {
+      await verified.handle.close();
+      throw new BridgeError('tls_verifier_configuration', '280使用原生TLS发送；当前独立TLS验证画像仅适配293', 503);
+    }
     try { if (verified.identity.kind !== 'original') throw new BridgeError('tls_verifier_configuration', 'TLS verify 尚未验证旧精简运行时', 503); }
     finally { await verified.handle.close(); }
     let proxy: { host: string; port: number; authorization: string | null } | null = null;

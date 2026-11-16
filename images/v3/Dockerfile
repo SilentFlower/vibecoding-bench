@@ -142,8 +142,11 @@ COPY --from=criu-build /opt/ccrb-criu/ /opt/ccrb-criu/
 # iproute2已有libbpf运行依赖；在镜像内验证真实动态库，避免重复刷新整层系统依赖。
 RUN python3 -c "import ctypes,hashlib,json,subprocess;from pathlib import Path;ctypes.CDLL('libbpf.so.1');p=Path('/opt/ccrb-criu');m=json.loads((p/'profile.json').read_text());assert all(hashlib.sha256((p/n).read_bytes()).hexdigest()==s for n,s in m['files'].items());assert subprocess.check_output([str(p/'criu'),'--version'],text=True).strip()=='Version: 4.2'"
 COPY native-runtime/ccrb-runtime /usr/local/bin/ccrb-runtime
+COPY native-runtime/ccrb-runtime-280 /usr/local/bin/ccrb-runtime-280
 RUN echo 'fce50a30d739dbc614e450d4d1913208fa35c6373c4f07a3986657393a99261e  /usr/local/bin/ccrb-runtime' | sha256sum -c - \
     && chmod 755 /usr/local/bin/ccrb-runtime
+RUN echo '3666887daafb75290597be37b84a1c5cfd92ab664de8bb862c79a501ea75deed  /usr/local/bin/ccrb-runtime-280' | sha256sum -c - \
+    && chmod 755 /usr/local/bin/ccrb-runtime-280
 RUN chmod 700 /usr/local/bin/v3-account-init /usr/local/bin/v3-network-context \
     /usr/local/bin/v3-cli-version /usr/local/bin/v3-passthrough /usr/local/bin/process_metrics.py \
     /usr/local/bin/v3-process-metrics /usr/local/bin/v3-network-guard /sidecar \
@@ -159,6 +162,7 @@ LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELE
     vibebench.isolation-version="2" \
     vibebench.cli-install-version="2" \
     vibebench.native-runtime="293-raw-1" \
+    vibebench.native-runtime-versions="2.1.280,2.1.293" \
     vibebench.native-tls-observer="1" \
     vibebench.native-criu="1" \
     vibebench.system-profile-version="1" \

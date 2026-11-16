@@ -16,7 +16,7 @@ use crate::error::AppError;
 use crate::model::account::{Account, AccountAuthType, AccountStatus};
 use crate::service::account::AccountService;
 use crate::service::native_contract::{
-    NativeKernelTarget, NativePreparation, NativePreparationStatus,
+    NativeKernelTarget, NativePreparation, NativePreparationStatus, NativeSourceVersion,
 };
 use crate::service::runtime_transport::{
     PreparedTransport, TransportBinding, now_ms, prepare, prepare_existing,
@@ -389,6 +389,7 @@ async fn check_one(
         return Ok(json!({"state":"disabled"}));
     }
     let preparation = NativePreparation {
+        source_version: Default::default(),
         account_id: id,
         environment_id: String::new(),
         generation: 0,
@@ -423,6 +424,13 @@ async fn check_one(
                 status = serde_json::to_value(current).map_err(|_| AppError::Internal("检查状态编码失败".into()))?;
                 status["last_preparation"] = serde_json::to_value(prepared).map_err(|_| AppError::Internal("准备状态编码失败".into()))?;
             }
+            let mut alternate = preparation.clone();
+            alternate.source_version = NativeSourceVersion::Cc280;
+            let alternate = match timeout_at(deadline.min(Instant::now() + Duration::from_secs(2)), transport.native_readiness(alternate)).await {
+                Ok(Ok(current)) => serde_json::to_value(current).map_err(|_| AppError::Internal("检查状态编码失败".into()))?,
+                _ => json!({"source_version":"2.1.280","state":"unknown","reason":"runtime_unavailable"}),
+            };
+            status["versions"] = json!({"2.1.293":status.clone(),"2.1.280":alternate});
             // sender 回执只代表原绑定；发布前重新读取运行环境和权威身份。
             let current_transport = prepare_existing(&account).await?;
             let current_account = accounts.get_account(id).await?;
@@ -513,6 +521,7 @@ pub(crate) async fn probe_kernel(
         AccountAuthType::Oauth => account.access_token.clone(),
     };
     let preparation = NativePreparation {
+        source_version: Default::default(),
         account_id: id,
         environment_id: String::new(),
         generation: 0,
@@ -524,6 +533,10 @@ pub(crate) async fn probe_kernel(
         organization_uuid: account.organization_uuid.clone(),
         email: account.email.clone(),
         concurrency: account.concurrency,
+    };
+    let preparation = NativePreparation {
+        source_version: input.target.source_version,
+        ..preparation
     };
     let result =
         PreparedTransport::probe_native_kernel(input.binding, preparation.clone(), input.target)

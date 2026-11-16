@@ -16,9 +16,11 @@ ATTEMPT = '22222222-2222-4222-8222-222222222222'
 class DiagnosticsCpuFixture(Fixture):
     """复用原环境夹具并追加两项新管理合同。"""
 
-    def __init__(self, gateway: Path):
-        """建立独立资源状态。@param gateway 真实网关产物。@return None。"""
+    def __init__(self, gateway: Path, source_version: str = '2.1.293'):
+        """建立独立资源状态。@param gateway 真实网关产物。@param source_version 诊断的实际官方源版本。@return None。"""
         super().__init__(gateway)
+        assert source_version in ('2.1.280', '2.1.293')
+        self.source_version = source_version
         self.rows[0]['isolation_version'] = 2
         self.cpus = {'cli': 1.5, 'sender': 1, 'network': 0.5}
         self.cpu_revision = 'a'*64
@@ -55,7 +57,7 @@ class DiagnosticsCpuFixture(Fixture):
         if parsed.path.startswith('/admin/request-diagnostics'):
             root = {'request_id': REQUEST, 'started_at': '2026-11-12T00:00:00Z', 'status_code': 200,
                 'account_id': 1, 'outcome': 'success', 'attempt_count': 2, 'log_mode': 'debug'}
-            attempt = {'attempt_id': ATTEMPT, 'account_id': 1, 'ordinal': 1, 'profile_selection': 'native293_cc_prepared',
+            attempt = {'attempt_id': ATTEMPT, 'account_id': 1, 'ordinal': 1, 'profile_selection': 'native' + self.source_version.rsplit('.', 1)[1] + '_cc_prepared',
                 'status_code': 200, 'outcome': 'success', 'log_mode': 'debug', 'capture_status': 'saved'}
             if '/captures/' in parsed.path:
                 snapshot = {'stage': 'cc_prepared', 'headers': [['accept', 'application/json']], 'body': '{"model":"synthetic"}',

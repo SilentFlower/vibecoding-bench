@@ -1029,7 +1029,7 @@ async function copyText(text: string) {
           <p v-if="a.v3_scheduling_error" class="text-xs text-amber-700">{{ a.v3_scheduling_error }}，调度观测待更新。</p>
           <p v-if="a.credential_ownership" class="text-xs text-muted-foreground" role="status">{{ a.credential_ownership.phase === 'ready' ? (a.credential_ownership.owner === 'local' ? '本地管理凭据 · 网关已暂停' : '网关管理凭据') : (a.credential_ownership.phase === 'reauth' ? '重新授权中 · 上游活动暂停' : '凭据交接待确认 · 请在账号环境页对账') }}</p>
           <div class="account-routing">
-            <div><span>转发方式</span><strong><template v-if="a.request_backend === 'native293'">原生运行时 <small>2.1.293</small></template><template v-else>原有转发</template></strong></div>
+            <div><span>转发方式</span><strong><template v-if="a.request_backend === 'native293'">原生运行时 <small>280 / 293 自动匹配</small></template><template v-else>原有转发</template></strong></div>
             <button type="button" @click="openScheduling(a)"><span>调度优先级</span><strong>{{ a.priority }}<ArrowRight :size="13" /></strong></button>
           </div>
 
@@ -1115,7 +1115,7 @@ async function copyText(text: string) {
         <form v-show="workspaceTab === 'configuration'" @submit.prevent="save" class="account-editor-form">
           <div class="account-editor-scroll complete-account-form">
             <section class="account-form-section"><h3>基础配置</h3><div class="account-edit-grid"><label class="approved-field"><span>备注名（选填）</span><Input v-model="form.name"  /></label><label class="approved-field"><span>邮箱</span><Input v-model="form.email" type="email" required /></label></div>
-              <fieldset class="forwarding-field"><legend>转发方式</legend><div class="forwarding-options"><label><input type="radio" v-model="form.request_backend" value="native293"><span><strong>原生运行时</strong><small>2.1.293</small></span></label><label><input type="radio" v-model="form.request_backend" value="legacy"><span><strong>原有转发</strong><small>现有转发通道</small></span></label></div><p class="form-help">请在账号空闲时切换转发方式。</p></fieldset>
+              <fieldset class="forwarding-field"><legend>转发方式</legend><div class="forwarding-options"><label><input type="radio" v-model="form.request_backend" value="native293"><span><strong>原生运行时</strong><small>280 / 293 自动匹配</small></span></label><label><input type="radio" v-model="form.request_backend" value="legacy"><span><strong>原有转发</strong><small>现有转发通道</small></span></label></div><p class="form-help">请在账号空闲时切换转发方式。</p></fieldset>
               <ProxyPicker v-model="proxyChoice" :current-label="editing?.proxy_name || publicProxy(form.proxy_url)" /></section>
             <section class="account-form-section"><h3>用量与调度</h3><div class="account-edit-grid three"><NumberInput v-model="numberDrafts.concurrency" label="并发上限" :min="1" required /><NumberInput v-model="numberDrafts.rpm_limit" label="RPM 上限" :min="0" required /><NumberInput v-model="numberDrafts.priority" label="调度优先级" :min="1" required /></div><div class="account-edit-grid"><NumberInput v-model="numberDrafts.five_hour_usage_limit_percent" label="5 小时用量上限（%）" :min="0" :max="100" required /><NumberInput v-model="numberDrafts.seven_day_usage_limit_percent" label="7 天用量上限（%）" :min="0" :max="100" required /></div><p class="form-help">RPM 和用量上限填 0 表示不限。达到任一用量上限后停止分配新消息，窗口重置后恢复。未知用量保持可用，单次或并发请求可能越线。</p></section>
             <section class="account-form-section"><h3>请求与模型</h3><div class="account-edit-grid"><ChoiceSelect v-model="form.billing_mode" label="Billing 模式" :options="[{value:'strip',label:'清除（Strip）'},{value:'rewrite',label:'重写（Rewrite）'}]" /><label class="approved-field"><span>允许 1M 上下文的模型</span><Input v-model="form.allow_1m_models"  /></label></div><div class="model-presets"><span>模型预设</span><button type="button" @click="form.allow_1m_models = 'opus'">仅 Opus</button><button type="button" @click="form.allow_1m_models = DEFAULT_ALLOW_1M_MODELS">Opus + Sonnet 5</button><button type="button" @click="form.allow_1m_models = ''">全部关闭</button></div><p class="form-help">模型以逗号分隔，按子串匹配。留空关闭 1M 上下文。Sonnet 5 使用完整名称以区分 Sonnet 4.6。</p>
@@ -1168,7 +1168,7 @@ async function copyText(text: string) {
               <div class="flex justify-between items-center"><span class="text-[length:var(--ui-font-small)] text-muted-foreground">{{ detailAccount.v3_scheduling.config.mode === 'smart' ? '智能偏好 ' + (detailAccount.v3_scheduling.factors.score * 100).toFixed(1) + '（高优）' : '旧评分低分优先' }}</span><Button variant="outline" size="sm" class="text-xs h-7" @click="changeWorkspaceTab('scheduling')">调度详情</Button></div>
             </div>
             <div v-else-if="detailAccount.v3_scheduling_error" class="rounded-lg bg-amber-50 p-3 text-xs text-amber-700">{{ detailAccount.v3_scheduling_error }}，不代表零负载。<button class="underline ml-2" @click="changeWorkspaceTab('scheduling')">查看详情</button></div>
-            <p class="text-xs text-muted-foreground">转发方式：{{ detailAccount.request_backend === 'native293' ? '原生运行时 2.1.293' : '原有转发' }}</p>
+            <p class="text-xs text-muted-foreground">转发方式：{{ detailAccount.request_backend === 'native293' ? '原生运行时（280 / 293 自动匹配）' : '原有转发' }}</p>
             <div class="grid grid-cols-3 gap-3">
               <div class="text-center">
                 <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider">优先级</p>

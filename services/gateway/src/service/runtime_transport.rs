@@ -36,7 +36,7 @@ use crate::model::account::Account;
 use crate::model::request_diagnostics::RequestLogMode;
 use crate::service::native_contract::{
     NativeKernelPreparation, NativeKernelTarget, NativePreparation, NativePreparationControl,
-    NativePreparationStatus, NativeReadinessStatus,
+    NativePreparationStatus, NativeReadinessStatus, NativeSourceVersion,
 };
 use crate::service::native_runtime::{NativePool, NativeSenderConfig, NativeSubmission};
 use crate::tlsfp::{TlsProfileId, get_request_client_for_profile};
@@ -93,6 +93,46 @@ pub struct SenderConfig {
     pub evidence_file: Option<String>,
     #[serde(default)]
     pub quota_identity: String,
+}
+
+/// 从受信安装表冻结单版执行配置，历史配置仅提供293。
+fn native_version_config(
+    config: &SenderConfig,
+    version: NativeSourceVersion,
+) -> Result<SenderConfig, AppError> {
+    let mut selected = config.clone();
+    let native = selected
+        .native
+        .as_mut()
+        .ok_or_else(|| AppError::ServiceUnavailable("未配置原生运行时".into()))?;
+    if !native.runtimes.is_empty()
+        && native.memory_mib != 0
+        && native.memory_mib
+            < 384_u64.saturating_add(192_u64.saturating_mul(native.max_workers as u64))
+    {
+        return Err(AppError::ServiceUnavailable(
+            "双版本原生运行时内存预算不足".into(),
+        ));
+    }
+    if let Some(runtime) = native.runtimes.get(&version) {
+        native.binary_path = runtime.binary_path.clone();
+        native.release = runtime.release.clone();
+        native.kernel_generation = runtime.kernel_generation.clone();
+    } else if native.source_version != version {
+        return Err(AppError::ServiceUnavailable(format!(
+            "原生运行时 {} 尚未安装",
+            version.as_str()
+        )));
+    }
+    native.source_version = version;
+    native.runtimes.clear();
+    if version == NativeSourceVersion::Cc280 {
+        native.work_root = Path::new(&native.work_root)
+            .join("280")
+            .to_string_lossy()
+            .into_owned();
+    }
+    Ok(selected)
 }
 
 fn record_headers(
@@ -531,7 +571,7 @@ impl PreparedTransport {
             || status.environment_id != binding.environment_id
             || status.generation != binding.generation
             || status.preparation_id != preparation.preparation_id
-            || status.version != "2.1.293"
+            || status.version != preparation.source_version.as_str()
             || status.raw_input_protocol != 1
             || !matches!(status.state.as_str(), "ready" | "busy")
             || target.as_ref().is_some_and(|target| {
@@ -564,6 +604,7 @@ impl PreparedTransport {
             ))
             .bearer_auth(&binding.secret)
             .json(&NativePreparationControl {
+                source_version: Default::default(),
                 account_id: self.account_id,
                 environment_id: binding.environment_id.clone(),
                 generation: binding.generation,
@@ -581,6 +622,17 @@ impl PreparedTransport {
     /// 在发送准入之前校验账号原生能力，准备失败不记录模型提交。
     /// @return 已验证原始输入协议和环境代次，或明确准备错误。
     pub async fn native_ready(&self) -> Result<(), AppError> {
+        self.native_ready_for_version(NativeSourceVersion::Cc293)
+            .await
+    }
+
+    /// 检查冻结目标版本的原始输入能力与环境代次。
+    /// @param version 本次请求的官方源版本。
+    /// @return 目标版本可用或明确准备错误。
+    pub async fn native_ready_for_version(
+        &self,
+        version: NativeSourceVersion,
+    ) -> Result<(), AppError> {
         let PreparedRoute::V3 { client, binding } = &self.route else {
             return Err(AppError::ServiceUnavailable(
                 "原生方式需要 V3 账号 sender".into(),
@@ -609,6 +661,14 @@ impl PreparedTransport {
             return Err(AppError::ServiceUnavailable(
                 "原生 sender 能力或代次不匹配".into(),
             ));
+        }
+        if (version != NativeSourceVersion::Cc293 || capability.get("versions").is_some())
+            && capability["versions"][version.as_str()]["available"] != true
+        {
+            return Err(AppError::ServiceUnavailable(format!(
+                "原生运行时 {} 尚未就绪",
+                version.as_str()
+            )));
         }
         Ok(())
     }
@@ -983,17 +1043,33 @@ async fn native_status(
 ) -> Result<Json<serde_json::Value>, AppError> {
     let config = read_config(&state.config_path)?;
     authenticate(&headers, &config)?;
-    state.native_pool.verify(
-        config
-            .native
-            .as_ref()
-            .ok_or_else(|| AppError::ServiceUnavailable("未配置原生运行时".into()))?,
-    )?;
+    config
+        .native
+        .as_ref()
+        .ok_or_else(|| AppError::ServiceUnavailable("未配置原生运行时".into()))?;
     if state.evidence_error.load(Ordering::SeqCst) {
         return Err(AppError::ServiceUnavailable("账号证据写入异常".into()));
     }
+    let mut versions = serde_json::Map::new();
+    for version in [NativeSourceVersion::Cc280, NativeSourceVersion::Cc293] {
+        let available = native_version_config(&config, version)
+            .and_then(|selected| {
+                state.native_pool.for_version(version).verify(
+                    selected
+                        .native
+                        .as_ref()
+                        .ok_or_else(|| AppError::ServiceUnavailable("未配置原生运行时".into()))?,
+                )
+            })
+            .is_ok();
+        versions.insert(
+            version.as_str().into(),
+            serde_json::json!({"available":available,"version":version.as_str()}),
+        );
+    }
     Ok(Json(
         serde_json::json!({"raw_input_protocol":1,"version":"2.1.293","environment_id":config.binding.environment_id,"generation":config.binding.generation,
+            "versions":versions,
             "release":config.native.as_ref().and_then(|native| native.release.as_ref()),
             "tls_observer":state.native_pool.tls_status(&config)}),
     ))
@@ -1023,18 +1099,20 @@ async fn native_readiness(
     headers: HeaderMap,
     Json(preparation): Json<NativePreparation>,
 ) -> Result<Json<NativeReadinessStatus>, AppError> {
-    let config = read_config(&state.config_path)?;
-    authenticate(&headers, &config)?;
+    let original_config = read_config(&state.config_path)?;
+    authenticate(&headers, &original_config)?;
+    let config = native_version_config(&original_config, preparation.source_version)?;
+    let pool = state.native_pool.for_version(preparation.source_version);
     if state.evidence_error.load(Ordering::SeqCst) {
         return Err(AppError::ServiceUnavailable("账号证据写入异常".into()));
     }
     let identity = preparation_identity(preparation, &config);
     let deadline = validate_request(&identity.request, &config)?;
-    let status = timeout_at(deadline, state.native_pool.readiness(&config, &identity))
+    let status = timeout_at(deadline, pool.readiness(&config, &identity))
         .await
         .map_err(|_| AppError::ServiceUnavailable("原生检查超时".into()))??;
     if serde_json::to_vec(&read_config(&state.config_path)?).ok()
-        != serde_json::to_vec(&config).ok()
+        != serde_json::to_vec(&original_config).ok()
     {
         return Err(AppError::ServiceUnavailable(
             "原生检查期间环境配置已变化".into(),
@@ -1067,8 +1145,10 @@ async fn prepare_sender(
     preparation: NativePreparation,
     target: Option<NativeKernelTarget>,
 ) -> Result<Json<NativePreparationStatus>, AppError> {
-    let config = read_config(&state.config_path)?;
-    authenticate(headers, &config)?;
+    let original_config = read_config(&state.config_path)?;
+    authenticate(headers, &original_config)?;
+    let config = native_version_config(&original_config, preparation.source_version)?;
+    let pool = state.native_pool.for_version(preparation.source_version);
     if state.evidence_error.load(Ordering::SeqCst) {
         return Err(AppError::ServiceUnavailable("账号证据写入异常".into()));
     }
@@ -1077,7 +1157,8 @@ async fn prepare_sender(
             .native
             .as_ref()
             .ok_or_else(|| AppError::ServiceUnavailable("未配置原生运行时".into()))?;
-        if state.active.load(Ordering::SeqCst) != 0
+        if target.source_version != preparation.source_version
+            || state.active.load(Ordering::SeqCst) != 0
             || native.release != target.release
             || native.kernel_generation.as_deref() != Some(target.kernel_generation.as_str())
         {
@@ -1086,7 +1167,7 @@ async fn prepare_sender(
             ));
         }
     }
-    state.native_pool.verify(
+    pool.verify(
         config
             .native
             .as_ref()
@@ -1096,18 +1177,13 @@ async fn prepare_sender(
     let identity = preparation_identity(preparation, &config);
     let deadline = validate_request(&identity.request, &config)?;
     let status = if target.is_some() {
-        state
-            .native_pool
-            .prepare_switch(config.clone(), identity, deadline)
+        pool.prepare_switch(config.clone(), identity, deadline)
             .await?
     } else {
-        state
-            .native_pool
-            .prepare(config.clone(), identity, deadline)
-            .await?
+        pool.prepare(config.clone(), identity, deadline).await?
     };
     let current = read_config(&state.config_path)?;
-    if serde_json::to_vec(&current).ok() != serde_json::to_vec(&config).ok() {
+    if serde_json::to_vec(&current).ok() != serde_json::to_vec(&original_config).ok() {
         return Err(AppError::ServiceUnavailable(
             "原生准备期间环境配置已变化".into(),
         ));
@@ -1118,6 +1194,7 @@ async fn prepare_sender(
 /// 准备和只读检查使用同一身份信封，避免字段映射分叉。
 fn preparation_identity(preparation: NativePreparation, config: &SenderConfig) -> NativeSubmission {
     NativeSubmission {
+        source_version: preparation.source_version,
         cache_ttl_rewrite: None,
         ingress_capture: None,
         log_mode: RequestLogMode::Info,
@@ -1162,7 +1239,11 @@ async fn native_prepare_cancel(
     {
         return Err(AppError::BadRequest("准备取消归属不匹配".into()));
     }
-    if !state.native_pool.cancel_preparation(&control) {
+    if !state
+        .native_pool
+        .for_version(control.source_version)
+        .cancel_preparation(&control)
+    {
         return Err(AppError::ServiceUnavailable("原生准备撤销登记已满".into()));
     }
     Ok(Json(serde_json::json!({"cancelled":true})))
@@ -1176,8 +1257,10 @@ async fn native_forward(
     let mut submitted = false;
     let operation = async {
         let transition = state.native_transition.clone().read_owned().await;
-        let config = read_config(&state.config_path)?;
-        authenticate(&headers, &config)?;
+        let original_config = read_config(&state.config_path)?;
+        authenticate(&headers, &original_config)?;
+        let config = native_version_config(&original_config, submission.source_version)?;
+        let pool = state.native_pool.for_version(submission.source_version);
         let deadline = validate_request(&submission.request, &config)?;
         let target = reqwest::Url::parse(&submission.request.target_url)
             .map_err(|_| AppError::BadRequest("原生目标无效".into()))?;
@@ -1190,7 +1273,7 @@ async fn native_forward(
         if state.evidence_error.load(Ordering::SeqCst) {
             return Err(AppError::ServiceUnavailable("账号证据写入异常".into()));
         }
-        state.native_pool.verify(
+        pool.verify(
             config
                 .native
                 .as_ref()
@@ -1199,8 +1282,7 @@ async fn native_forward(
         state.active.fetch_add(1, Ordering::SeqCst);
         let guard = ActiveRequest(state.active.clone());
         submitted = true;
-        let response = state
-            .native_pool
+        let response = pool
             .submit_validated(config.clone(), submission.clone(), deadline)
             .await?;
         // 共用额度证据格式，进程池和响应流由同一活动许可覆盖。

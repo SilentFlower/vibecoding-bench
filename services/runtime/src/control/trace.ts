@@ -149,14 +149,15 @@ export class RequestTrace {
    */
   event(event: RuntimeEvent): void {
     if (event.type === 'cc_prepared') {
+      const sourceProfile = this.options.engine === 'claude-code/2.1.280' ? '280' : '293';
       this.sentAt = performance.now();
       this.redactor.register(event.headers);
-      this.capture('cc_prepared', event.body, event.headers, this.options.engine.startsWith('demo') ? 'demo_fixture' : 'claude_code_293_cli_prepared', 'json_before_native_transport');
+      this.capture('cc_prepared', event.body, event.headers, this.options.engine.startsWith('demo') ? 'demo_fixture' : 'claude_code_' + sourceProfile + '_cli_prepared', 'json_before_native_transport');
       const captured = this.captures.get('cc_prepared')!;
       captured.observedBytes = event.body_bytes;
       captured.sha256 = event.body_sha256;
       if (!this.options.engine.startsWith('demo') && this.prepared?.context.inputFormat === 'claude_code') {
-        captured.source = 'claude_code_293_native_ingress_prepared';
+        captured.source = 'claude_code_' + sourceProfile + '_native_ingress_prepared';
         captured.note = event.cache_policy?.action === 'applied' ? '原生入站业务正文保留，改写账号身份、原生 CCH 占位及明确启用的消息缓存断点；此处仍为最终传输前的中间值' : '原生入站业务正文保留，仅改写账号身份及原生 CCH 占位；此处仍为最终传输前的中间值';
         if (this.prepared.input.nativeIngressPolicy === 'local_base_url') captured.note = '本地 Base URL 原生入站保留业务正文，按同次 CLI 上下文准备入口、账号归属与 CCH 占位；此处仍为最终传输前的中间值';
       }

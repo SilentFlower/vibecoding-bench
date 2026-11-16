@@ -101,7 +101,7 @@ export class BridgeService {
     let prepared: PreparedInput;
     try {
       if (this.closing) throw new BridgeError('service_closing', '服务正在关闭，不再接收作业', 503);
-      prepared = selectUpstreamModel(prepareInput(parseInput(raw, headers, this.options.nativeIngressPolicy)), this.options.modelOverride);
+      prepared = selectUpstreamModel(prepareInput(parseInput(raw, headers, this.options.nativeIngressPolicy, this.engine.sourceVersion), this.engine.sourceVersion), this.options.modelOverride);
       if (this.recentIds.has(prepared.input.request_id) || this.store.exists(prepared.input.request_id)) throw new BridgeError('duplicate_request', 'request_id 已使用，不能覆盖已有日志', 409);
     } catch (error) {
       const trace = new RequestTrace(null, raw, headers, this.store, { ...this.options, ingressText, engine: this.engine.name, binarySha256: this.engine.binarySha256 });

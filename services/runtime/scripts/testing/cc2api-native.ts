@@ -23,7 +23,7 @@ assert.equal(Bun.spawnSync(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-
 const senderHost = 'v3-' + createHash('sha256').update('native-offline').digest('hex').slice(0, 12) + '-account-' + 'a'.repeat(32);
 await writeFile(join(root, 'hosts'), await readFile('/etc/hosts', 'utf8') + '\n127.0.0.1 ' + senderHost + '\n');
 assert.equal(Bun.spawnSync(['mount', '--bind', join(root, 'hosts'), '/etc/hosts']).exitCode, 0);
-const messages: { label: string; device: string; account: string; bearer: string; cache_ttls: unknown[] }[] = [];
+const messages: { label: string; device: string; account: string; bearer: string; cache_ttls: unknown[]; source_version: string }[] = [];
 const tlsBodies = new Map<string, { bytes: number; sha256: string }>();
 let parallel = 0, parallelPeak = 0;
 let gatewayIdentity: { device_id: string; account_uuid: string } | undefined;
@@ -37,7 +37,7 @@ const upstream = Bun.serve({ hostname: '127.0.0.1', port: 0, tls: { key: Bun.fil
   tlsBodies.set(request.headers.get('x-client-request-id')!, { bytes: Buffer.byteLength(raw), sha256: createHash('sha256').update(raw).digest('hex') });
   for (const name of ['cf-ray', 'new-api-user', 'x-unregistered']) assert.equal(request.headers.has(name), false);
   const body = JSON.parse(raw);
-  const label = body.messages.flatMap((message: { content: string | { type: string; text?: string }[] }) => typeof message.content === 'string' ? [message.content] : message.content.filter(block => block.type === 'text').map(block => block.text)).find((text: string | undefined) => text && /^(parallel-[2346]|slow|rotated|http-error|second-account|readiness-latency|gateway-normal|gateway-error|gateway-info|gateway-native|gateway-mapped-main|gateway-agent|gateway-kernel-long|gateway-kernel-next)$/.test(text));
+  const label = body.messages.flatMap((message: { content: string | { type: string; text?: string }[] }) => typeof message.content === 'string' ? [message.content] : message.content.filter(block => block.type === 'text').map(block => block.text)).find((text: string | undefined) => text && /^(parallel-[2346]|slow|rotated|http-error|second-account|readiness-latency|gateway-normal|gateway-error|gateway-info|gateway-native|gateway-mapped-main|gateway-agent|gateway-kernel-long|gateway-kernel-next|gateway-dual-[a-z0-9-]+)$/.test(text));
   assert.ok(label, '必须从真实用户文本取得场景标识');
   const metadata = JSON.parse(body.metadata.user_id);
   const bearer = request.headers.get('authorization')!;
@@ -54,11 +54,12 @@ const upstream = Bun.serve({ hostname: '127.0.0.1', port: 0, tls: { key: Bun.fil
       pending.push(...Object.values(object));
     } else if (Array.isArray(node)) pending.push(...node);
   }
-  messages.push({ label, device: metadata.device_id, account: metadata.account_uuid, bearer, cache_ttls: cacheTtls });
-  if (label?.startsWith('parallel-')) {
-    const target = Number(label.split('-')[1]);
-    let group = groups.get(label);
-    if (!group) { let release!: () => void; const promise = new Promise<void>(done => { release = done; }); group = { count: 0, release, promise }; groups.set(label, group); }
+  messages.push({ label, device: metadata.device_id, account: metadata.account_uuid, bearer, cache_ttls: cacheTtls, source_version: /claude-cli\/(2\.1\.(?:280|293))/.exec(request.headers.get('user-agent') ?? '')?.[1] ?? '' });
+  if (label?.startsWith('parallel-') || label?.startsWith('gateway-dual-parallel-')) {
+    const target = label.startsWith('gateway-dual-parallel-') ? 6 : Number(label.split('-')[1]);
+    const key = label.startsWith('gateway-dual-parallel-') ? 'gateway-dual-parallel' : label;
+    let group = groups.get(key);
+    if (!group) { let release!: () => void; const promise = new Promise<void>(done => { release = done; }); group = { count: 0, release, promise }; groups.set(key, group); }
     group.count++; parallel++; parallelPeak = Math.max(parallelPeak, parallel);
     if (group.count === target) group.release();
     await group.promise; parallel--;
@@ -177,7 +178,7 @@ try {
   };
   const tlsOnly = process.env.CCRB_TEST_TLS_ONLY === '1';
   const benchmarkOnly = process.env.CCRB_TEST_READINESS_BENCH_ONLY === '1';
-  const phases = tlsOnly ? ['native_real_binary'] : benchmarkOnly ? ['native_real_binary'] : process.env.CCRB_TEST_GATEWAY_ONLY === '1' ? ['native_real_gateway'] : ['native_real_binary', 'native_real_gateway'];
+  const phases = tlsOnly ? ['native_real_binary'] : benchmarkOnly ? ['native_real_binary'] : (process.env.CCRB_TEST_GATEWAY_ONLY === '1' || process.env.CCRB_TEST_MULTI_VERSION === '1') ? ['native_real_gateway'] : ['native_real_binary', 'native_real_gateway'];
   let code = 0;
   for (const phase of phases) {
     const child = Bun.spawn(['cargo', 'test', '--locked', '--lib', phase, '--', '--ignored', '--nocapture'], { cwd: resolve(consumer), env: { ...process.env, CCRB_TEST_BINARY: resolve(binary), CCRB_TEST_CAPTURE_DIR: join(root, 'environment/flows/api/cc-prepared'), CCRB_TEST_CA_FILE: ca, CCRB_TEST_PROXY: proxyUrl, CCRB_TEST_CONTROL: control.url.toString(), CCRB_TEST_SENDER_HOST: senderHost, V3_RUNTIME_URL: control.url.toString(), V3_INTERNAL_TOKEN: 'synthetic-private-management-key'.repeat(2), V3_DEPLOYMENT_ID: 'native-offline', V3_RELEASE: 'native-offline' }, stdout: 'inherit', stderr: 'inherit' });
@@ -188,8 +189,8 @@ try {
     assert.equal(code, 0);
   }
   assert.equal(code, 0);
-  assert.equal(messages.length, (tlsOnly ? 9 : benchmarkOnly ? 9 : phases.length === 2 ? (process.env.CCRB_TEST_UNLIMITED === '1' ? 25 : 28) : 6) + (process.env.CCRB_TEST_SWITCH_DIGEST ? 3 : 0));
-  if (!benchmarkOnly && !tlsOnly) assert.ok(runningBindingReads >= 3, '启动补偿与凭据轮换均重新核对只读运行绑定');
+  assert.equal(messages.length, (process.env.CCRB_TEST_MULTI_VERSION === '1' ? 18 : tlsOnly ? 9 : benchmarkOnly ? 9 : phases.length === 2 ? (process.env.CCRB_TEST_UNLIMITED === '1' ? 25 : 28) : 6) + (process.env.CCRB_TEST_SWITCH_DIGEST ? 3 : 0));
+  if (!benchmarkOnly && !tlsOnly && process.env.CCRB_TEST_MULTI_VERSION !== '1') assert.ok(runningBindingReads >= 3, '启动补偿与凭据轮换均重新核对只读运行绑定');
   if (phases.length === 2) assert.equal(messages.find(message => message.label === 'rotated')?.bearer, 'Bearer synthetic-bearer-b');
   console.log(JSON.stringify({ messages: messages.length, parallelPeak, processTreePeakRssKiB: peakRssKiB }));
 } finally { upstream.stop(true); control.stop(true); proxy.closeAllConnections(); proxy.close(); socks.close(); await rm(root, { recursive: true, force: true }); }

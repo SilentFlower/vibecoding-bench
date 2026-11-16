@@ -19,6 +19,7 @@ export const preparationReasons:Record<string,string> = {identity_changed: '运�
     read_failed: '准备状态读取失败', snapshot_missing: '尚未收到本账号的准备快照',
     snapshot_pending: '等待首次检查返回当前环境快照',
     backend_pending: '已选择原生运行时，等待环境准备',
+    runtime_unavailable: '此版本的准备状态暂不可用', runtime_not_installed: '当前镜像尚未安装此版本运行时',
     native_sender_budget_missing: '原生发送器内存预算尚未配置，请配置后重试',
     native_sender_budget_insufficient: '原生发送器内存预算不足以覆盖当前并发，请调整后重试',
     account_memory_insufficient: '账号总内存不足以容纳网络、原生发送器和 CLI，请调整后重试',

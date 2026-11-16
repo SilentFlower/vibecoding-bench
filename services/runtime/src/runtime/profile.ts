@@ -2,12 +2,14 @@ import { createHash } from 'node:crypto';
 import { open, realpath, stat, type FileHandle } from 'node:fs/promises';
 import { createReadStream, type BigIntStats } from 'node:fs';
 import { PROFILE_293 } from './293/source-profile';
+import { PROFILE_280 } from './280/source-profile';
 import { COMPACT_RUNTIMES } from './compact-profile';
 
 export { PROFILE_293 } from './293/source-profile';
 
 /** 固定来源、分发文件与实际执行体的独立身份。 */
 export interface RuntimeIdentity {
+  sourceVersion?: '2.1.280' | '2.1.293';
   kind: 'original' | 'memfd';
   launcherSha256: string;
   imageSha256: string;
@@ -61,9 +63,10 @@ export async function verifyRuntime(path: string): Promise<VerifiedRuntime> {
     for await (const chunk of handle.createReadStream({ autoClose: false, start: 0 })) hash.update(chunk);
     const digest = hash.digest('hex');
     const compact = COMPACT_RUNTIMES.find(value => value.launcherSha256 === digest);
-    if (digest !== PROFILE_293.sha256 && !compact) throw new Error('运行时二进制校验不匹配，仅支持已验证的 2.1.293 来源产物');
+    if (digest !== PROFILE_293.sha256 && digest !== PROFILE_280.sha256 && !compact) throw new Error('运行时二进制校验不匹配，仅支持已验证的280/293来源产物');
     if (stamp(actual, await handle.stat({ bigint: true })) !== before || await runtimeFileStamp(path) !== before) throw new Error('运行时文件在校验期间改变');
-    const identity: RuntimeIdentity = compact ? { kind: 'memfd', ...compact } : { kind: 'original', launcherSha256: digest, imageSha256: digest, imageBytes: Number((await handle.stat()).size) };
+    const sourceVersion = digest === PROFILE_280.sha256 ? PROFILE_280.version : PROFILE_293.version;
+    const identity: RuntimeIdentity = compact ? { kind: 'memfd', ...compact } : { kind: 'original', sourceVersion, launcherSha256: digest, imageSha256: digest, imageBytes: Number((await handle.stat()).size) };
     return { handle, stamp: before, identity };
   } catch (error) {
     await handle.close();

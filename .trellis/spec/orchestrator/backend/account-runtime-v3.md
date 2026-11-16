@@ -1280,11 +1280,11 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - `/api/environments` 的 `request_backend` 表示权威目标，实际 sender 布局独立判断。目标原生而本地 native 为空时，只投影白名单等待、维护或失败摘要，PID 与进程数保持未观测；预算失败也可显示在 stopped 环境。真实 ready 继续核验当前身份、环境/内核代次和新鲜度。
 - 页面准备中以2秒串行读取，普通状态20秒读取。显式重试沿唯一绑定及同一准备队列，离页/旧 generation 响应丢弃；读取零唤醒，准备基础、CRIU 模板及 TLS 采集分别展示。
 
-- 原生进程上限为 `2*concurrency`，覆盖普通请求2单位和Haiku1单位。有限账号预算预检为 `256+192*max_workers` MiB，容量同时受账号有限总 RAM 与 CLI 最低512 MiB约束。legacy sender 仍为128 MiB。
+- 原生进程上限为 `2*concurrency`，覆盖普通请求2单位和Haiku1单位。双版本合计共享物理上限，有限账号预算为`384+192*max_workers` MiB；历史293单版为`256+192*max_workers`。容量同时受账号有限总RAM与CLI最低512 MiB约束。legacy sender仍为128 MiB。安装表、版本化私有合同与独立准备/升级记录见[双版本自动选择](../../runtime/backend/runtime-contract.md#scenario-双版本自动选择与独立来源准入)。
 - 账号 `fingerprint_json.mem="unlimited"` 取消network/CLI/sender与静态/串行评审的RAM/swap限额；额外swap保存原值并校验格式。全局 `V3_ACCOUNT_MEMORY`缺省或空值为unlimited，显式有限部署配置继续沿首次冻结预算。预检保留宿主余量及显式最低可用RAM；尚未迁移的有限环境按最大RAM/swap乘活跃账号数计入，有限全局继续拒绝超出其冻结预算的历史环境。无限模式直接共享宿主资源，不能把零上限当作零占用。
 - 部署无限策略在空闲ensure阶段迁移旧有限指纹，独立于CLI/API的prepare_sender职责。平台更新门禁关闭、startup_prewarm、活动CLI/API、串行评审或内核维护时保留原环境，迁移顺延；扫描及只读解析不唤醒停止环境。迁移先核验实际sender和原预算，再经共用 `_rebuild_idle_environment` 验证持久执行记录、CLI孤儿及排他maintenance租约；保留env ID、身份、HOME、会话和CPU策略，按原生命周期重建。实际native的memory_mib及指纹native_sender_memory一并变为0/unlimited；发布中断进入reconcile，禁止混合预算继续创建。已有部署显式1536m需在上线窗口改为unlimited。
 - 无限账号生成 `NativeSenderConfig.memory_mib=0`，缺省 sender 预算也可准备；Rust 仅豁免 RAM 容量公式，max_workers 始终为正数，版本/摘要/身份/目标/代次及并发许可保持。指标与配置内存均以 0 表示无限，界面显示“未限制”；评审交接接受精确 `(Memory=0,MemorySwap=-1)`，CPU/PID 仍必须有限有效。
-- 已验证有限 N=3、max_workers=6、sender=1536 MiB；预检最低1408 MiB。bench 创建账号默认N=4，最低1792 MiB；1536 MiB 配置须显式设置N=3。配置限额和实际占用分别报告。
+- 双版本有限N=3、max_workers=6最低1536 MiB；bench默认N=4最低1920 MiB。历史293单版分别为1408/1792 MiB。1536 MiB配置须显式设置N=3。配置限额和实际占用分别报告。
 - 原生sender为UID1001，私有可写 `/native` 与CLI UID1000/HOME分离。PID限额 `128+32*max_workers`；CPU份额保持三角色规则，有限模式额外swap只归CLI。CLI指标、physical_features及静态/串行评审从同一冻结sender预算计算剩余份额。
 - 每次新进程先核验固定分发体，通过FD启动，握手验证PID/版本/raw_input_protocol，再核实际执行体SHA。首个实际映像要求 WRITE/GROW/SHRINK/SEAL 四项封存，池缓存只读FD；后续重新exec共享同一dev/inode。分发/执行体固定摘要由消费者代码及桥接运行时合同登记，外部manifest不授信。
 - CRIU恢复同样要求实际exe与池缓存共享dev/inode，并继续核验SHA、大小和四项封存；控制器持有root归属0555的封存映像，各实例独立打开FD，exe及目标VMA复用同一背板。独立进程、会话、私有页、绑定代次及唯一投递保持原合同，详细准入与生命周期见[原生CRIU热模板恢复协议](../../runtime/backend/runtime-contract.md#scenario-原生进程池-criu-热模板恢复协议-1)。共享上线初期保持保守恢复预算 `256+max_workers*(192+108)` MiB；旧画像缺 `shared_memfd_restore=1` 或恢复准入失败沿受限普通exec回退。

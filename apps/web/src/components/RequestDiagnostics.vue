@@ -196,7 +196,7 @@ const currentAttempt = computed(() => attempts.value.find(item => item.attempt_i
 
 /** 按冻结状态判断是否提供私有文件读取。@param attempt 当前尝试。@return 是否可读取。 */
 function canInspect(attempt: DiagnosticAttempt): boolean {
-  return attempt.profile_selection === 'native293_cc_prepared' && attempt.log_mode !== 'info'
+  return ['native280_cc_prepared', 'native293_cc_prepared'].includes(attempt.profile_selection ?? '') && attempt.log_mode !== 'info'
     && [null, undefined, 'saved', 'queued', 'timeout'].includes(attempt.capture_status);
 }
 

@@ -270,6 +270,25 @@ class AccountRuntimeTests(unittest.TestCase):
             summary = self.runtime.native_preparation_summary(row, account, {7: current})
             self.assertEqual((summary['state'], summary['pid'], summary['checking']), ('ready', 123, True))
 
+    def test_native_readiness_versions_validate_independently(self) -> None:
+        """293旧代状态与280同代状态独立投影，过期280证据立即失效。@return None。"""
+        row = self.runtime._row('synthetic', 1)
+        row.update(state='ready', generation=3)
+        current = {'source_version': '2.1.280', 'environment_id': row['environment_id'], 'generation': 3,
+            'kernel_generation': '280-current', 'state': 'ready', 'checked_at_ms': int(time.time() * 1000),
+            'pid': 280, 'idle_workers': 1, 'live_workers': 1}
+        snapshot = {**current, 'source_version': '2.1.293', 'generation': 2, 'versions': {'2.1.280': current}}
+        config = {'native': {'kernel_generation': '293-current', 'runtimes': {'2.1.280': {
+            'binary_path': '/usr/local/bin/ccrb-runtime-280', 'kernel_generation': '280-current'}}}}
+        with patch('account_runtime._read_json', return_value=config):
+            result = self.runtime.native_preparation_summary(row, {'cc2api_account_id': 7}, {7: snapshot})
+            self.assertEqual(result['reason'], 'binding_unverified')
+            self.assertEqual(result['versions']['2.1.280']['pid'], 280)
+            current['checked_at_ms'] -= 46000
+            result = self.runtime.native_preparation_summary(row, {'cc2api_account_id': 7}, {7: snapshot})
+            self.assertEqual(result['versions']['2.1.280']['reason'], 'check_expired')
+            self.assertIsNone(result['versions']['2.1.280'].get('pid'))
+
     def test_native_readiness_preserves_only_known_maintenance_reasons(self) -> None:
         """平台维护与账号维护分别展示，任意原因保持白名单投影。@return None。"""
         row = self.runtime._row('synthetic', 1)

@@ -158,6 +158,8 @@ export interface NativeState {
 
 /** 原版预加载与精简静态入口共享的原生绑定。 */
 export interface NativeBindings {
+  /** 固定适配来源；历史293绑定省略此字段。 */
+  sourceVersion?: '2.1.280' | '2.1.293';
   core: NativeCore;
   api: NativeApi;
   state: NativeState;

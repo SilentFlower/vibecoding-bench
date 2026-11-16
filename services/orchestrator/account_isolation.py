@@ -86,12 +86,20 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     native = account.get('native_sender')
     kernel_key = release_key() if native else ''
     if native:
-        saved_kernel = applied_kernel(root, int(account.get('cc2api_account_id') or 0))
-        if saved_kernel.get('current') and not kernel_key:
-            raise ValueError('已生效内核仍依赖发行信任根，请先回滚')
-        if saved_kernel:
-            native = {**native, 'release': saved_kernel.get('current'),
-                'kernel_generation': saved_kernel.get('kernel_generation')}
+        for source_version in ('2.1.293', '2.1.280'):
+            saved = applied_kernel(root, int(account.get('cc2api_account_id') or 0), source_version)
+            if not saved:
+                continue
+            if saved.get('current') and not kernel_key:
+                raise ValueError('已生效内核仍依赖发行信任根，请先回滚')
+            update = {'release': saved.get('current'), 'kernel_generation': saved.get('kernel_generation')}
+            selected = native.get('runtimes', {}).get(source_version)
+            if selected is not None:
+                native = {**native, 'runtimes': {**native['runtimes'], source_version: {**selected, **update}}}
+            elif source_version == '2.1.293':
+                native = {**native, **update}
+            else:
+                raise ValueError('当前镜像缺少已生效280内核的安装合同')
     limits = isolated_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'),
         ('unlimited' if native['memory_mib'] == 0 else str(native['memory_mib']) + 'm') if native else None)
     layout_path = root / 'runtime/project-review-layout.json'

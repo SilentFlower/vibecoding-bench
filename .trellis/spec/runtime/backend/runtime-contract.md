@@ -1,6 +1,64 @@
 > 本文源码路径及命令以 `services/runtime/` 为工作目录。
 
-# 固定 293 原生运行时合同
+# 固定280/293原生运行时合同
+
+## Scenario: 双版本自动选择与独立来源准入
+
+### 1. Scope / Trigger
+
+- 280新增适配及网关自动选择属于来源、私有协议、并发和升级跨层合同。下文既有293专属符号、TLS模拟和CRIU画像继续按其源版本使用。
+- 实现依据：`src/runtime/280/{source-profile,native,preload}.ts`、共享293桥接；gateway的`native_contract/native_runtime/runtime_transport/gateway`；orchestrator的`native_sender/native_kernel_upgrade/account_runtime`。
+
+### 2. Signatures
+
+- `NativeSourceVersion`仅为`2.1.280|2.1.293`，缺省293。`NativeSubmission/NativePreparation/NativePreparationControl/NativeReadinessStatus/NativeKernelTarget.source_version`使用此枚举；293序列化省略该字段，280显式发送。
+- `NativeSenderConfig.runtimes: BTreeMap<NativeSourceVersion,NativeRuntimeConfig>`；每项含`binary_path,release?,kernel_generation?`。旧根配置表示293。
+- `PreparedTransport::native_ready_for_version(version)`检查冻结目标。`NativePool::for_version(version)`只分配版本子状态；调用本身不启动进程。
+- `readNativeInput(body,policy='strict',sourceVersion='2.1.293')`、`parseInput(raw,headers=[],policy='strict',sourceVersion='2.1.293')`、`prepareInput(input,sourceVersion='2.1.293')`及`prepareNativeBody`最后一个版本参数只由已核验运行时提供。
+- 管理发行查询的query和内核操作JSON增加`source_version`，省略293。环境摘要保留`native_kernel`为293别名，增加`native_kernels`及`native_preparation.versions`。
+- `python3 services/runtime/scripts/prepare-ci-runtime.py --directory <目录>`从固定npm来源准备280；本地联合构建输入为`V3_NATIVE_RUNTIME_280_ASSET`，293继续使用`V3_NATIVE_RUNTIME_ASSET`或固定beta.6附件。
+
+### 3. Contracts
+
+- 历史账号后端键`native293`表示原生自动匹配。客户端模式精确匹配原始Claude UA；其它已准入版本的普通API沿已冻结默认画像，出厂293。账号模式沿最终账号画像。版本冻结在原生投递之前；账号并发、RPM及凭据仍由原账号所有者管理。
+- 280官方源SHA为`1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b`，Bun1.4.3 revision为`f08e57bec002878c0281e86fbf9c76f53c20a117`。Bun节144806548字节、2196模块、记录52字节、entry5、flags0x1bff；节摘要和ICU偏移按280独立断言。
+- 280分发体27097232字节/SHA`3666887daafb75290597be37b84a1c5cfd92ab664de8bb862c79a501ea75deed`；执行体111595592字节/SHA`2b64ee7d8f0863a37bce90800226bda102387e5cff082f947b2b71e66d9a38e7`。293现用beta.6分发体27388048字节/SHA`fce50a30d739dbc614e450d4d1913208fa35c6373c4f07a3986657393a99261e`，执行体112843960字节/SHA`564019c9560e960e96875c9663975491534b27c789ea3d23e5c13309ff293c79`。
+- 280原生SDK默认global fetch，映射到共享发送槽；turnOrigin/turnPosition沿280省略语义。280工具工厂create保留初始化权限声明，仅封闭返回对象的call执行入口。280保持原生正文工厂；293静态正文复用沿原配方。
+- 完整原生billing的版本必须匹配冻结运行时。普通API仍由所选原生版本构造，保持CCH、上下文、工具/thinking、原始响应及唯一发送合同。
+- 每账号只有一个物理容量所有者，各版本共享live/starting许可，合计遵守max_workers。版本子状态隔离映像FD、暖进程、补位、模板及核验缓存；凭据/代理/环境公共身份变化统一撤销两版旧空闲状态。取消其它版本补位或退役空闲进程后，必须等待真实退出归还许可。
+- 额外进程空闲300秒回收，各版合计保留最近使用的一个基础暖进程。有限双版exec预算为`384+192*max_workers` MiB；历史293单版为`256+192*max_workers`，具体账号资源归属沿orchestrator合同。
+- 新镜像标签`vibebench.native-runtime-versions=2.1.280,2.1.293`；固定安装路径分别为`/usr/local/bin/ccrb-runtime-280`和`/usr/local/bin/ccrb-runtime`。缺标签的历史镜像提供293。各版能力独立报告，293缺失时可继续准入已核验280。
+- 签名清单的source_version/source_sha256按目标版本核验，分发摘要、执行体及实际握手须同时一致。记录分别为`native-kernel-upgrade-280.json`和历史293记录。升级/回滚只改所选子状态，共用账号维护门禁；公共身份失效仍统一排空。
+- 准备投影按每版独立核对环境/代次、内核代次及45秒新鲜度。293失败或过期时保留280独立观察，错误版本和旧回执不能授予ready。诊断来源为`native280_cc_prepared|native293_cc_prepared`，完整快照入口接纳两者。
+- 280尚未接纳CRIU模板，固定293恢复画像不借用；280使用同版受限exec。293独立TLS模拟verifier拒绝280。真实TLS采集按执行体摘要选SSL_write偏移：280为0x2308523，293为0x232d5b3；ABI与接受字节核对沿采集器合同。
+- CI使用固定官方npm归档SHA512和源文件SHA256，隔离构建后严格核对上述分发SHA，缓存命中同样核验。正式采集束沿canonical提交干净后export的原有顺序生成，开发清单显式development=true。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 私有源版本省略 / 未知枚举 | 历史293 / 解码拒绝 |
+| 完整原生billing与目标版本冲突 | 422，模型发送为0 |
+| 目标制品缺失、签名/来源/摘要/握手不符 | 受控503，模型发送为0 |
+| 双版有限预算低于384+192*max_workers | 准备拒绝；无限模式保持max_workers检查 |
+| 旧版本快照、旧环境/内核代次或检查过期 | unknown及受控原因，PID保持未观测 |
+| 280 side_reply / 280 CRIU模板 / 280固定TLS模拟 | 类别422 / 模板拒绝并走同版exec / 模拟验证器启动拒绝 |
+
+### 5. Scenarios and Examples
+
+- 正常：同账号交错280与293，分别命中各自暖进程；六路混合Haiku的物理进程合计为6。
+- 边界：历史配置及省略source_version的信封继续293。仅293损坏时280沿自身制品核验继续接单。
+- 错误用法：把UA293的完整280 billing交给293或在公开信封中指定source_version。正确处理：由受信画像冻结版本，入口严格核对billing并拒绝控制字段。
+- 错误用法：复制293混淆符号、ICU偏移或熵恢复画像到280。正确处理：独立读取固定官方源定义，完成实际原生矩阵、执行体及TLS准入。
+
+### 6. Tests Required
+
+- 两版原版及精简适用原生矩阵、真实TLS CCH独立复算；工具/thinking、Unicode、多轮、流式、取消和26MiB正文。
+- 真实Gateway→私有sender→两版执行体：UA/默认/账号画像、六路混合容量、暖命中、凭据轮换、版本冲突及部分制品缺失的零发送拒绝。
+- 共享物理许可、取消其它版本补位及真实退出归还；历史293序列化、未知枚举、双版预算边界和升级资源身份。
+- Python与Rust真实Ed25519按源版本校验；280准备/激活/回滚保持293状态；各版准备代次/时效独立投影。
+- `verify_native_runtime_versions.py`：版本冻结、旧发行回执失效、部分就绪、280诊断入口及明暗390/1280px。
+- 固定源重复构建、CI准备路径、脱离源码/Bun的独立部署，以及两版真实TLS旁路探针与独立实收摘要对照。
 
 ## Scenario: 结构化 API 到单次原生发送
 

@@ -9,7 +9,7 @@ services/runtime/ 的 TypeScript 控制层、原生适配和日志协议。
 | 规范 | 说明 |
 | --- | --- |
 | [请求日志合同](./logging-guidelines.md) | 当前合同与验证要求 |
-| [固定 293 原生运行时合同](./runtime-contract.md) | 当前合同与验证要求 |
+| [固定280/293原生运行时合同](./runtime-contract.md) | 双版本选择、来源、执行与验证合同 |
 
 ## Pre-Development Checklist
 

@@ -18,9 +18,10 @@ function validateKeys(value: Record<string, unknown>, allowed: Set<string>, owne
  * @param raw API 正文或包含 body 的内部信封。
  * @param incomingHeaders HTTP 入口携带的头。
  * @param nativeIngressPolicy 启动侧选择的原生入站策略，默认严格。
+ * @param sourceVersion 已核验执行体的源版本。
  * @return 已验证、尚未应用头部策略的输入。
  */
-export function parseInput(raw: unknown, incomingHeaders: HeaderPair[] = [], nativeIngressPolicy: NativeIngressPolicy = 'strict'): BridgeInput {
+export function parseInput(raw: unknown, incomingHeaders: HeaderPair[] = [], nativeIngressPolicy: NativeIngressPolicy = 'strict', sourceVersion: '2.1.280' | '2.1.293' = '2.1.293'): BridgeInput {
   if (!isObject(raw)) throw new BridgeError('invalid_request', '请求必须是 JSON 对象');
   const envelope = 'body' in raw && !('model' in raw || 'messages' in raw) ? raw : { body: raw };
   validateKeys(envelope, new Set(['schema_version', 'request_id', 'body', 'headers', 'context']), '信封');
@@ -29,7 +30,7 @@ export function parseInput(raw: unknown, incomingHeaders: HeaderPair[] = [], nat
   const body = { ...envelope.body };
   // 本机设置由账号运行时管理；只清理正文根字段，保留原始入站及嵌套业务数据。
   for (const key of CLIENT_SETTINGS_KEYS) delete body[key];
-  const native = readNativeInput(body, nativeIngressPolicy);
+  const native = readNativeInput(body, nativeIngressPolicy, sourceVersion);
   if (!native) validateKeys(body, BODY_KEYS, '正文');
   if (typeof body.model !== 'string' || !body.model.trim()) throw new BridgeError('invalid_model', 'model 必须是非空字符串');
   if (!Array.isArray(body.messages) || body.messages.length === 0) throw new BridgeError('invalid_messages', 'messages 必须是非空数组');

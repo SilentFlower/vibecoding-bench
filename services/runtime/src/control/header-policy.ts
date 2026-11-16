@@ -25,9 +25,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** 应用调用方协议白名单、运行时归属和原生调用上下文。
  * @param input 共享入口已经验证的输入。
+ * @param sourceVersion 固定运行时版本；历史入口为293。
  * @return 含处理决策的原生作业。
  */
-export function prepareInput(input: BridgeInput): PreparedInput {
+export function prepareInput(input: BridgeInput, sourceVersion: '2.1.280' | '2.1.293' = '2.1.293'): PreparedInput {
   const connectionNames = new Set<string>();
   const decisions: HeaderDecision[] = [];
   const forwarded: HeaderPair[] = [];
@@ -65,6 +66,7 @@ export function prepareInput(input: BridgeInput): PreparedInput {
   const classified = classification ? classificationContext(classification) : undefined;
   if (classified && context.requestClass !== undefined && context.requestClass !== classified.requestClass) throw new BridgeError('context_conflict', '原生分类用途与显式请求类别冲突');
   const requestClass = context.requestClass ?? classified?.requestClass ?? (context.agentKind === 'main' ? 'main' : context.agentId ? 'subagent' : 'main');
+  if (sourceVersion === '2.1.280' && requestClass === 'side_reply') throw new BridgeError('unsupported_context', '280原生运行时尚未提供side_reply类别', 422);
   if (!REQUEST_CLASSES.includes(requestClass as RequestClass)) throw new BridgeError('unsupported_context', '当前 293 不支持该请求类别', 422);
   const kind = context.agentKind ?? ((requestClass === 'subagent' || requestClass === 'workflow' || context.agentId) ? (context.agentType === 'teammate' ? 'teammate' : 'subagent') : 'main');
   if (requestClass === 'main' && kind !== 'main') throw new BridgeError('context_conflict', '主请求类别与子代理上下文冲突');

@@ -16,7 +16,7 @@ flower2api 的原生内核适配与诊断组件，源码整合自 `SilentFlower/
 
 ## 独立二进制与网关
 
-本组件的 Linux x64 二进制名为 `ccrb-runtime-linux-x64`，内含固定官方 2.1.293 的请求构造与发送逻辑。通过私有 JSONL 协议调用，运行依赖 Linux、glibc、`/proc`、可执行 memfd 及独立可写目录。平台实际安装版本、字节数和摘要以签名发行及上述迁移记录为准。
+本组件为固定官方280与293分别提供 Linux x64 单文件二进制，通过私有 JSONL 协议调用。运行依赖 Linux、glibc、`/proc`、可执行 memfd 及独立可写目录。自动选择、当前身份、构建与版本隔离见[双版本说明](docs/native-versions.md)。
 
 flower2api 网关可按账号选择 `request_backend=native293`，历史默认 `legacy`。固定账号环境的 sender 使用显式有限内存预算；标准并发 3 对应 3 路普通或 6 路 Haiku 请求。安装、SHA256、资源配置与回退见 [网关接入说明](docs/cc2api-native293.md)。
 
@@ -40,7 +40,7 @@ curl --no-buffer http://127.0.0.1:8787/api/requests \
 
 ## 连接运行时
 
-当前适配 Claude Code 2.1.293，程序需与[来源配置](src/runtime/293/source-profile.ts)登记的版本和 SHA256 匹配。运行时程序需自行准备，构建、校验和回退方式见[运行时说明](docs/runtime.md)。
+当前适配 Claude Code 2.1.280 / 2.1.293，程序需与对应来源配置登记的版本和 SHA256 匹配。运行时程序需自行准备，构建、校验和回退方式见[双版本说明](docs/native-versions.md)。
 
 参考 [.env.example](.env.example) 创建本机 `.env`，填写运行时路径、专用 HOME、配置目录及所需凭据。配置文件和运行数据不纳入版本管理。
 

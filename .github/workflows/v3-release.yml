@@ -21,7 +21,7 @@ jobs:
     concurrency:
       group: v3-signed-system-release
       cancel-in-progress: false
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       V3_PUBLISH_CONFIRMED: ${{ inputs.publish }}
     steps:
@@ -52,6 +52,8 @@ jobs:
       - name: 记录缓存准备回退
         if: steps.flower2api-cache.outcome == 'failure'
         run: printf '%s\n' '::warning::CI缓存准备失败，本次沿普通Docker构建路径执行。'
+      - name: 准备双版本原生运行时
+        uses: ./.github/actions/flower2api-native-runtime
       - name: 构建两个镜像并生成版本清单
         run: python3 deploy/flower2api/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3-local.json
       - name: 登录 GHCR

@@ -26,6 +26,8 @@ src/tlsfp/
 
 ## Scenario: 按账号选择固定 293 原生后端
 
+历史后端键native293现为280/293自动匹配。新增私有版本字段、选择冻结、版本池与部分可用合同见[双版本自动选择](../../runtime/backend/runtime-contract.md#scenario-双版本自动选择与独立来源准入)；下文既有生命周期继续适用。
+
 ### 1. Scope / Trigger
 
 - 账号管理、Gateway Messages 分流与 V3 sender 原生池属于跨层合同。实现依据为 `model/account.rs`、`handler/router.rs`、`service/{gateway,native_contract,native_runtime,runtime_transport}.rs` 及账号前端。
@@ -56,7 +58,7 @@ src/tlsfp/
 - 准备执行时重读权威账号，解析 bearer 后核对同一身份；成功前再次核对账号及只读运行绑定。失效、维护、凭据门禁关闭及取消优先收口，已处理取消的迟到完成不能发布 ready。取消按账号/环境/代次/准备 UUID 隔离，保留130秒撤销记录覆盖提前到达与迟到重放；最多16个在途和256条登记，满时明确拒绝。
 - 原生能力检查和热路径复用保持打开的已验证分发体 FD；每轮检查规范路径、dev/inode、大小、mode/uid/gid、纳秒 mtime/ctime，变化后重新完整校验 SHA。新进程启动仍执行固定分发体、精确执行 FD、执行体 SHA 和四项封存核验。
 - Claude Code 原生 messages 在封口前复用现有账号级上游会话池开关、容量、TTL、刷新策略与缓存原子映射；缓存故障沿现有失败开放。窄映射只替换一致的 UUID session 头及 metadata，真实下游 session 继续拥有 sticky/RPM/排队/取消/本地历史。Prompt ID、轮次、thread、显式代理/父代理保留；隐式主代理 ID 冻结为真实 session，避免池映射改变子代理父归属。冲突/重复/畸形会话继续由原生边界拒绝。诊断将预期上游 session 与实际 cc_prepared 核对，异常显示观察缺口。
-- 诊断通过 `x-v3-native-observation` 取得实际 cc_prepared 的受限摘要，固定画像 `2.1.293`、来源 `native293_cc_prepared`，私有作业 UUID 与 sender 证据关联。上游同名控制头先剔除；网关消费后移除内部头。观察缺失标记 `native293_unobserved`，准备拒绝保持零模型尝试；组装快照不能当作最终 TLS。按账号开启的完整头与正文遵循[CC 组装后私有采集](settings-database.md#scenario-cc-组装后私有采集)，观察仅新增可选采集状态，完整内容经独立管理员入口读取。
+- 诊断通过 `x-v3-native-observation` 取得实际 cc_prepared 的受限摘要，画像按实际source_version记录280/293，来源对应`native280_cc_prepared|native293_cc_prepared`，私有作业UUID与sender证据关联。观察版本与冻结目标不符时拒绝采纳。上游同名控制头先剔除；网关消费后移除内部头。观察缺失标记对应版本的native*_unobserved，准备拒绝保持零模型尝试；组装快照不能当作最终TLS。按账号开启的完整头与正文遵循[CC 组装后私有采集](settings-database.md#scenario-cc-组装后私有采集)，完整内容经独立管理员入口读取。
 
 ### 4. Validation & Error Matrix
 

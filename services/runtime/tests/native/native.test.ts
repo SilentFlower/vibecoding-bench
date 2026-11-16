@@ -17,8 +17,10 @@ import { parseInput } from '../../src/shared/input';
 
 const isolated = process.env.CCRB_NATIVE_ISOLATED === '1';
 const native = isolated ? describe : describe.skip;
+const sourceVersion = process.env.CCRB_TEST_SOURCE_VERSION ?? '2.1.293';
+if (!['2.1.280', '2.1.293'].includes(sourceVersion)) throw new Error('原生验收仅接受固定280/293来源');
 
-native('官方 293 的无外网回环链路', () => {
+native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
   let root: string;
   let app: RunningServer;
   let upstream: Bun.Server<undefined>;
@@ -134,6 +136,7 @@ native('官方 293 的无外网回环链路', () => {
       CCRB_TIMEOUT_MS: '15000',
     });
     // 模拟凭据仅由原生端持有的配置路径，控制层不能依赖预先知道密钥来脱敏。
+    if (sourceVersion === '2.1.280') config.engine.preloadPath = join(dirname(config.engine.preloadPath), 'preload-280.mjs');
     const setupStarted = performance.now();
     nativeEngine = await createEngine(config.engine);
     app = await startServer({ ...config, engine: { ...config.engine, apiKey: undefined } }, nativeEngine);
@@ -321,11 +324,11 @@ native('官方 293 的无外网回环链路', () => {
     expect(headers.get('x-client-request-id')).not.toContain(',');
     expect(headers.get('x-claude-code-request-class')).toBe('main');
     expect(headers.get('x-claude-code-session-id')).toBe(session);
-    expect(headers.get('x-claude-code-prompt-id')).toBe(prompt);
+    expect(headers.get('x-claude-code-prompt-id')).toBe(sourceVersion === '2.1.293' ? prompt : null);
     expect(JSON.stringify(request.body.metadata)).toContain(session);
     expect(request.raw).toContain('cc_prompt_id=' + prompt + ';');
-    expect(headers.get('user-agent')).toContain('2.1.293');
-    expect(headers.get('user-agent')).toBe('claude-cli/2.1.293 (external, cli)');
+    expect(headers.get('user-agent')).toContain(sourceVersion);
+    expect(headers.get('user-agent')).toBe('claude-cli/' + sourceVersion + ' (external, cli)');
     expect(JSON.stringify(request.body.messages)).toContain('原生主请求');
     assertCch(request.raw);
     await app.store.flush();
@@ -348,8 +351,13 @@ native('官方 293 的无外网回环链路', () => {
     const system = (request.body.system as { text: string }[]).map(block => block.text);
     expect(system).toContain("You are Claude Code, Anthropic's official CLI for Claude.");
     expect(system.join('\n')).not.toContain('You are a Claude agent, built on');
-    expect(system.join('\n')).toContain('cc_turn_origin=human;');
-    expect(system.join('\n')).toContain('cc_prompt_index=1; cc_turn_index=1;');
+    if (sourceVersion === '2.1.293') {
+      expect(system.join('\n')).toContain('cc_turn_origin=human;');
+      expect(system.join('\n')).toContain('cc_prompt_index=1; cc_turn_index=1;');
+    } else {
+      expect(system.join('\n')).not.toContain('cc_turn_origin=');
+      expect(system.join('\n')).not.toContain('cc_turn_index=');
+    }
     const tools = request.body.tools as { name: string }[];
     expect(tools).toEqual([]);
     expect(request.body).toMatchObject({ max_tokens: 32000, thinking: { type: 'adaptive', display: 'updates' }, output_config: { effort: 'high' }, context_management: { edits: [{ type: 'clear_thinking_20251015', keep: 'all' }] } });
@@ -452,6 +460,10 @@ native('官方 293 的无外网回环链路', () => {
   ] as const)('原生 %s 上下文保持分类与 billing 一致 %#', async (requestClass, extra) => {
     mode = 'normal'; const count = requests.length;
     const result = await send({ model: 'claude-sonnet-4-6', messages: [{ role: 'user', content: '分类验证' }], stream: false }, { requestClass, ...extra });
+    if (sourceVersion === '2.1.280' && requestClass === 'side_reply') {
+      expect(result.response.status).toBe(422); expect(requests.length).toBe(count);
+      return;
+    }
     expect(result.response.status).toBe(200); expect(result.raw).toBe(expectedResponse);
     expect(requests.length - count).toBe(1);
     const request = requests.at(-1)!; const headers = new Headers(request.headers);
@@ -606,7 +618,7 @@ native('官方 293 的无外网回环链路', () => {
       expect(nativeEngine.workerPid).toBe(pid);
       const request = requests.at(-1)!;
       const headers = new Headers(request.headers);
-      expect(headers.get('x-claude-code-prompt-id')).toBe(promptId);
+      expect(headers.get('x-claude-code-prompt-id')).toBe(sourceVersion === '2.1.293' ? promptId : null);
       expect(headers.get('x-claude-code-session-id')).toBe(sessionId);
       expect(headers.get('x-claude-code-agent-id')).toBe(i % 2 ? 'child-' + i : null);
       expect(request.raw).toContain('cc_prompt_id=' + promptId);
@@ -869,7 +881,7 @@ native('官方 293 的无外网回环链路', () => {
   }, 30000);
 
   function nativeBody(extra: Record<string, unknown> = {}): Record<string, unknown> {
-    return { model: 'claude-sonnet-4-6', messages: [{ role: 'user', content: [{ type: 'text', text: '原生正文保真验证', cache_control: { type: 'ephemeral', ttl: '5m' } }] }], system: [{ type: 'text', text: 'x-anthropic-billing-header: cc_version=2.1.293.abc; cc_entrypoint=cli; cch=12345; cc_prompt_id=11111111-1111-4111-8111-111111111111; cc_turn_origin=human; cc_prompt_index=3; cc_turn_index=4;' }, { type: 'text', text: '原生调用方业务 system', cache_control: { type: 'ephemeral', ttl: '5m' } }], metadata: { user_id: JSON.stringify({ device_id: 'c'.repeat(64), account_uuid: '44444444-4444-4444-8444-444444444444', session_id: '22222222-2222-4222-8222-222222222222' }), trace_extension: 'kept' }, max_tokens: 128, stream: false, ...extra };
+    return { model: 'claude-sonnet-4-6', messages: [{ role: 'user', content: [{ type: 'text', text: '原生正文保真验证', cache_control: { type: 'ephemeral', ttl: '5m' } }] }], system: [{ type: 'text', text: 'x-anthropic-billing-header: cc_version=' + sourceVersion + '.abc; cc_entrypoint=cli; cch=12345; cc_prompt_id=11111111-1111-4111-8111-111111111111; cc_turn_origin=human; cc_prompt_index=3; cc_turn_index=4;' }, { type: 'text', text: '原生调用方业务 system', cache_control: { type: 'ephemeral', ttl: '5m' } }], metadata: { user_id: JSON.stringify({ device_id: 'c'.repeat(64), account_uuid: '44444444-4444-4444-8444-444444444444', session_id: '22222222-2222-4222-8222-222222222222' }), trace_extension: 'kept' }, max_tokens: 128, stream: false, ...extra };
   }
   const nativeTool = { name: 'lookup_status', input_schema: { type: 'object', properties: {} } };
   const nativeHistory = [{ role: 'user', content: '查询状态' }, { role: 'assistant', content: [{ type: 'thinking', thinking: '已有推理', signature: 'synthetic-native-signature' }, { type: 'tool_use', id: 'toolu_native_history', name: 'lookup_status', input: {} }] }, { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_native_history', content: 'ready' }] }];
@@ -935,7 +947,7 @@ native('官方 293 的无外网回环链路', () => {
     assertCch(wire.raw);
     await app.store.flush(); const detail = await app.store.detail(result.id);
     expect(detail?.context?.inputFormat).toBe('claude_code');
-    expect(detail?.captures.find(c => c.stage === 'cc_prepared')?.source).toBe('claude_code_293_native_ingress_prepared');
+    expect(detail?.captures.find(c => c.stage === 'cc_prepared')?.source).toBe('claude_code_' + sourceVersion.split('.')[2] + '_native_ingress_prepared');
     expect(JSON.stringify(detail)).not.toContain('native-caller-canary');
   });
 
@@ -952,7 +964,13 @@ native('官方 293 的无外网回环链路', () => {
     const body = nativeBody({ tools: [nativeTool], messages: nativeHistory });
     if (child) (body.system as { text: string }[])[0]!.text += ' cc_is_subagent=true;';
     const context = { requestClass, ...(child ? { agentId: 'native-child', parentAgentId: 'native-parent', agentType: 'Explore' } : {}), ...(requestClass === 'workflow' ? { workflowRunId: 'native-workflow' } : {}) };
-    const result = await send(body, context); expect(result.response.status).toBe(200);
+    const count = requests.length;
+    const result = await send(body, context);
+    if (sourceVersion === '2.1.280' && requestClass === 'side_reply') {
+      expect(result.response.status).toBe(422); expect(requests.length).toBe(count);
+      return;
+    }
+    expect(result.response.status).toBe(200);
     const wire = requests.at(-1)!, headers = new Headers(wire.headers);
     expect(headers.get('x-claude-code-request-class')).toBe(requestClass);
     expect(headers.get('x-claude-code-agent-id')).toBe(child ? 'native-child' : null);
@@ -978,9 +996,13 @@ native('官方 293 的无外网回环链路', () => {
     const messages = nativeHistory.map(message => message.role === 'assistant' ? { ...message, content: (message.content as { type: string }[]).filter(block => block.type !== 'thinking') } : message);
     const before = requests.length;
     const result = await send({ model: 'claude-sonnet-5-5', messages, tools: [nativeTool], stream: true }, context);
+    if (sourceVersion === '2.1.280' && requestClass === 'side_reply') {
+      expect(result.response.status).toBe(422); expect(requests.length).toBe(before);
+      return;
+    }
     expect(result.response.status).toBe(200); expect(requests.length).toBe(before + 1);
     const wire = requests.at(-1)!, headers = new Headers(wire.headers);
-    expect(headers.get('x-claude-code-prompt-id')).toBe(promptId);
+    expect(headers.get('x-claude-code-prompt-id')).toBe(sourceVersion === '2.1.293' ? promptId : null);
     expect(headers.get('x-claude-code-session-id')).toBe(sessionId);
     expect(wire.raw).toContain('cc_prompt_id=' + promptId);
     const detail = await app.store.detail(result.id);
@@ -1006,7 +1028,7 @@ native('官方 293 的无外网回环链路', () => {
       const detail = (await app.store.detail(result.id))!;
       ids.push(detail.context!.promptId);
       const wire = requests.at(-1)!;
-      expect(new Headers(wire.headers).get('x-claude-code-prompt-id')).toBe(detail.context!.promptId);
+      expect(new Headers(wire.headers).get('x-claude-code-prompt-id')).toBe(sourceVersion === '2.1.293' ? detail.context!.promptId : null);
       expect(detail.context!.promptId).not.toBe(sessionId);
       expect(wire.raw).toContain('new-ready'); expect(wire.raw).toContain('客户端补充的结果说明');
       assertCch(wire.raw);
@@ -1023,7 +1045,7 @@ native('官方 293 的无外网回环链路', () => {
   });
 
   test('原生版本和上下文冲突、私有控制字段在发送前明确拒绝', async () => {
-    const wrong = nativeBody(); (wrong.system as { text: string }[])[0]!.text = (wrong.system as { text: string }[])[0]!.text.replace('2.1.293', '2.1.303');
+    const wrong = nativeBody(); (wrong.system as { text: string }[])[0]!.text = (wrong.system as { text: string }[])[0]!.text.replace(sourceVersion, '2.1.303');
     for (const [body, context] of [[wrong, {}], [nativeBody(), { sessionId: 'different' }], [nativeBody({ settings: {}, proxy_url: 'http://untrusted.invalid' }), {}]] as [Record<string, unknown>, Record<string, unknown>][]) {
       const count = requests.length, started = performance.now(); const result = await send(body, context);
       expect([400, 422]).toContain(result.response.status); expect(requests.length).toBe(count); expect(performance.now() - started).toBeLessThan(10000);

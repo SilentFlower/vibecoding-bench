@@ -313,6 +313,8 @@ html根字号与原型共用`--ui-font-body`的14/15/16px三档规则，font-fam
 
 ### 原生工作区生命周期
 
+- 原生后端沿历史native293键，账号文案为“280 / 293 自动匹配”。内核按native_kernels选择280/293，操作冻结source_version和CAS；换版取消旧发行读取。两版共用忙碌/维护门禁，准备及进程数按实际版本展示；旧响应沿293别名。诊断内容入口同时接纳native280_cc_prepared与native293_cc_prepared。`verify_native_runtime_versions.py`覆盖版本、旧回执、部分就绪、诊断与明暗390/1280px。
+
 - `/environments`使用`RuntimeEnvironments.vue`，资源/内核/时段为独立Vue编辑组件。访问过的分区保持挂载，CPU输入和时段草稿不随轮询或切区重建。CAS失败禁止重放原版本，提供重新读取；页签/关闭在提交中受控。
 - 环境列表每轮成功读取后，隔离布局2的卡片自动通过既有`GET /runtime/api/environments/{id}/cpu-resources`补齐三角色实际CPU配额，每轮最多并行3个环境。缓存按环境ID和generation核对；换代或移除时清理，旧页面/旧请求/代次不符回执拒绝覆盖，编辑器读取或保存的新回执优先于并发摘要。列表轮询只刷新卡片，不覆盖表单草稿。配额显示真实核数，首读为“读取中”，单环境错误为“读取失败”并保留错误提示，历史布局为“未提供”；工具栏刷新和后续轮询可重试，离页取消请求。合同与CAS规则沿用[三角色在线CPU](../../orchestrator/backend/account-runtime-v3.md#scenario-三角色在线cpu与重建恢复)。
 - `/tasks`使用`TasksWorkspace.vue`。构建插件`runtimeModule.ts`从单份原任务模板/控制器编译ES模块；主路由直接挂载DOM，运行时不创建iframe、不执行脚本字符串。CSS选择器通过AST限定在任务根，禁止正则替换误伤属性和类名；逗号组前导空格不能改变根类组合。

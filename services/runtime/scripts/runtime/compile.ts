@@ -3,12 +3,18 @@ import { createHash } from 'node:crypto';
 import { dirname, resolve, sep } from 'node:path';
 import ts from 'typescript';
 import { NATIVE_EXPORTS_293, PROFILE_293 } from '../../src/runtime/293/source-profile';
+import { NATIVE_ALIASES_280, PROFILE_280 } from '../../src/runtime/280/source-profile';
 import { rewriteStaticText } from './static-prompts';
 import type { StaticTextRewrite } from './static-prompts';
 
 const root = process.env.CCRB_BUILD_ROOT!;
 const source = process.env.CCRB_BUILD_SOURCE!;
 const project = process.env.CCRB_BUILD_PROJECT!;
+const version = process.env.CCRB_BUILD_VERSION ?? PROFILE_293.version;
+if (!['2.1.280', '2.1.293'].includes(version)) throw new Error('固定构建源版本无效');
+const profile = version === PROFILE_280.version ? PROFILE_280 : PROFILE_293;
+const requireBinding = version === PROFILE_280.version ? { module: '/$bunfs/root/chunk-8ykqrhh5.js', name: 'Re' } : { module: '/$bunfs/root/chunk-0y12vz6b.js', name: 'He' };
+const toolFactory = version === PROFILE_280.version ? 'Ht' : 'Vt';
 const modules = resolve(root, 'modules');
 const manifest: { name: string; sha256: string }[] = JSON.parse(await readFile(resolve(root, 'modules.json'), 'utf8'));
 const sourceHashes = new Map(manifest.map(row => [row.name, row.sha256]));
@@ -21,14 +27,21 @@ const terminalAddons = new Map([
   ['/$bunfs/root/chunk-y8bhqk9z.js', '/$bunfs/root/audio-capture.node'],
   ['/$bunfs/root/chunk-2jb0trbw.js', '/$bunfs/root/clipboard-napi.node'],
 ]);
+if (version === PROFILE_280.version) {
+  terminalAddons.clear();
+  terminalAddons.set('/$bunfs/root/chunk-1r5zk7vg.js', '/$bunfs/root/audio-capture.node');
+  terminalAddons.set('/$bunfs/root/chunk-097fdbvh.js', '/$bunfs/root/clipboard-napi.node');
+}
 const plainResources = new Map<string, Promise<string>>();
 const resourceTranscodes: { file: string; source_sha256: string; plain_sha256: string; source_bytes: number; plain_bytes: number }[] = [];
-const nativeModules = new Set(['child_process', 'bun:ffi', 'perf_hooks', 'fs', 'path', 'stream', 'constants', 'util', 'assert', 'events', 'http', 'https', 'net', 'tls', 'url', 'http2', 'crypto', 'undici', 'os', 'tty', 'process', 'buffer', 'fs/promises', 'querystring', 'zlib', 'dns']);
+const nativeModules = new Set(['child_process', 'bun:ffi', 'perf_hooks', 'fs', 'path', 'stream', 'constants', 'util', 'assert', 'events', 'http', 'https', 'net', 'tls', 'url', 'http2', 'crypto', 'undici', 'os', 'tty', 'process', 'buffer', 'fs/promises', 'querystring', 'zlib', 'dns', 'module']);
 const mappings = new Set<string>();
-const definitions = Object.entries(PROFILE_293.modules).map(([role, file]) => [role, file, NATIVE_EXPORTS_293[role as keyof typeof NATIVE_EXPORTS_293]] as const);
-const entry = definitions.map(([, file, symbols]) => 'import {' + symbols.join(',') + '} from ' + JSON.stringify(file) + ';').join('\n') +
+const definitions = Object.entries(profile.modules).map(([role, file]) => [role, file, version === PROFILE_280.version ? Object.values(NATIVE_ALIASES_280[role as keyof typeof NATIVE_ALIASES_280]) : NATIVE_EXPORTS_293[role as keyof typeof NATIVE_EXPORTS_293]] as const);
+const imports = definitions.map(([role, file, symbols]) => 'import {' + symbols.map(symbol => symbol + ' as __' + role + '_' + symbol).join(',') + '} from ' + JSON.stringify(file) + ';').join('\n');
+const nativeBindings = '{' + definitions.map(([role, , symbols]) => role + ':{' + symbols.map(symbol => symbol + ':__' + role + '_' + symbol).join(',') + '}').join(',') + '}';
+const entry = imports + (version === PROFILE_280.version ? '\nimport {bindNative280} from ' + JSON.stringify(resolve(project, 'src/runtime/280/native.ts')) + ';' : '') +
   '\nimport {reportStartupFailure,startWorker} from ' + JSON.stringify(resolve(project, 'src/runtime/293/worker.ts')) + ';\n' +
-  'try { await startWorker({' + definitions.map(([role, , symbols]) => role + ':{' + symbols.join(',') + '}').join(',') + '}); process.exit(0); } catch (error) { await reportStartupFailure(error); process.exit(111); }\n';
+  'try { await startWorker(' + (version === PROFILE_280.version ? 'bindNative280(' + nativeBindings + ')' : nativeBindings) + '); process.exit(0); } catch (error) { await reportStartupFailure(error); process.exit(111); }\n';
 await writeFile(resolve(root, 'entry.mjs'), entry);
 
 try {
@@ -70,7 +83,7 @@ try {
         const file = '/$bunfs/root/' + path.slice(modules.length + 1);
         if (createHash('sha256').update(bytes).digest('hex') !== sourceHashes.get(file)) throw new Error('提取模块在构建期间改变');
         const text = bytes.toString('utf8');
-        if (!text.includes('import.meta.require') && !text.includes('He(') && !text.includes('.zst') && !text.includes(PROFILE_293.modules.permissions) && !text.includes('"local"') && !text.includes('"local-jsx"')) return { contents: text, loader: 'js' };
+        if (!text.includes('import.meta.require') && !text.includes(requireBinding.name + '(') && !text.includes('.zst') && !text.includes(profile.modules.permissions) && !text.includes('"local"') && !text.includes('"local-jsx"')) return { contents: text, loader: 'js' };
         // 只改真实语法节点，避免把内嵌示例、模板文本或普通字符串误当作依赖表达式。
         const tree = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
         const aliases = new Set<string>();
@@ -79,14 +92,14 @@ try {
           if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier)) continue;
           const bindings = node.importClause?.namedBindings;
           if (bindings && ts.isNamedImports(bindings)) for (const element of bindings.elements) {
-            if (node.moduleSpecifier.text === '/$bunfs/root/chunk-0y12vz6b.js' && (element.propertyName ?? element.name).text === 'He') aliases.add(element.name.text);
-            if (node.moduleSpecifier.text === PROFILE_293.modules.permissions && (element.propertyName ?? element.name).text === 'Vt') toolFactories.add(element.name.text);
+            if (node.moduleSpecifier.text === requireBinding.module && (element.propertyName ?? element.name).text === requireBinding.name) aliases.add(element.name.text);
+            if (node.moduleSpecifier.text === profile.modules.permissions && (element.propertyName ?? element.name).text === toolFactory) toolFactories.add(element.name.text);
           }
         }
         const changes: { start: number; end: number; text: string }[] = [];
         const imports: string[] = [];
         const excludedBodies = new Set<ts.Node>();
-        if (file === PROFILE_293.modules.core) {
+        if (version === PROFILE_293.version && file === PROFILE_293.modules.core) {
           const staticText = rewriteStaticText(tree);
           changes.push(...staticText.changes);
           staticText.bodies.forEach(body => excludedBodies.add(body));
@@ -106,10 +119,24 @@ try {
               const create = definition.properties.find(property => property.name && ts.isIdentifier(property.name) && property.name.text === 'create');
               const hasName = definition.properties.some(property => property.name && ts.isIdentifier(property.name) && property.name.text === 'name');
               if (hasName && create && ts.isMethodDeclaration(create) && create.body) {
-                const start = create.body.getStart(tree), end = create.body.getEnd();
-                changes.push({ start, end, text: '{throw new Error("单轮桥接禁止执行本地工具");}' });
-                executionGuards.push({ file, start, end, factory: callee.text, kind: 'tool-create' });
-                excludedBodies.add(create.body);
+                // 280在模块初始化时调用create取得权限声明，必须保留工厂，仅封闭返回对象的执行入口。
+                const guard = (body: ts.Block, kind: string): void => {
+                  const start = body.getStart(tree), end = body.getEnd();
+                  changes.push({ start, end, text: '{throw new Error("单轮桥接禁止执行本地工具");}' });
+                  executionGuards.push({ file, start, end, factory: callee.text, kind });
+                  excludedBodies.add(body);
+                };
+                if (version === PROFILE_293.version) guard(create.body, 'tool-create');
+                else {
+                  const visitFactory = (child: ts.Node): void => {
+                    if (ts.isMethodDeclaration(child) && child.name && ts.isIdentifier(child.name) && child.name.text === 'call' && child.body && ts.isObjectLiteralExpression(child.parent) && ts.isReturnStatement(child.parent.parent)) {
+                      guard(child.body, 'tool-call');
+                      return;
+                    }
+                    ts.forEachChild(child, visitFactory);
+                  };
+                  visitFactory(create.body);
+                }
               }
             }
             const direct = ts.isPropertyAccessExpression(callee) && callee.name.text === 'require' && ts.isMetaProperty(callee.expression) && callee.expression.keywordToken === ts.SyntaxKind.ImportKeyword;
@@ -130,7 +157,7 @@ try {
                 return;
               }
               if (first && ts.isStringLiteral(first)) {
-                if (!nativeModules.has(first.text)) throw new Error('固定闭包出现未登记的外部依赖');
+                if (!nativeModules.has(first.text)) throw new Error('固定闭包出现未登记的外部依赖：' + first.text + '，模块=' + file);
                 nativeImports.push({ file, start: node.getStart(tree), specifier: first.text });
               } else dynamic.push({ file, start: node.getStart(tree), kind: direct ? 'dynamic-require' : 'helper-dynamic-require' });
             }
@@ -181,10 +208,11 @@ try {
     } }],
     compile: { executablePath: source, outfile: resolve(root, 'ccrb-worker'), autoloadDotenv: false, autoloadBunfig: false, autoloadTsconfig: false, autoloadPackageJson: false },
   });
-  if (!result.success) throw new Error('固定源码构建失败，诊断数量=' + result.logs.length);
+  if (!result.success) throw new Error('固定源码构建失败：' + result.logs.map(log => log.message.slice(0, 240)).slice(0, 6).join('；'));
   await writeFile(resolve(root, 'closure.json'), JSON.stringify({ bun_version: Bun.version, bun_revision: Bun.revision, mapped_modules: [...mappings].sort(), rewrites, tool_execution_guards: executionGuards, static_text_generators: staticTextGenerators, resource_transcodes: resourceTranscodes.sort((a, b) => a.file.localeCompare(b.file)), native_imports: nativeImports, remaining_dynamic_calls: dynamic, actual_file_bytes: (await stat(resolve(root, 'ccrb-worker'))).size }, null, 2));
   process.exit(0);
-} catch {
-  process.stderr.write('固定 293 依赖转换或原生构建失败\n');
+} catch (error) {
+  const causes = error instanceof AggregateError ? error.errors.map(value => value instanceof Error ? value.message : String(value)).slice(0, 6).join('；') : error instanceof Error ? error.message : '未知构建错误';
+  process.stderr.write('固定版本依赖转换或原生构建失败：' + causes + '\n');
   process.exit(111);
 }

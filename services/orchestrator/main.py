@@ -12736,6 +12736,10 @@ def _v3_environment_summary(row: dict, ownerships: dict, native_preparations: di
         row["native_kernel"] = native_kernel_status(account_runtime, row)
     except (OSError, ValueError, TypeError):
         row["native_kernel"] = None
+    try:
+        row['native_kernels'] = {'2.1.293': row['native_kernel'], '2.1.280': native_kernel_status(account_runtime, row, '2.1.280')}
+    except (OSError, ValueError, TypeError):
+        row['native_kernels'] = {'2.1.293': row['native_kernel'], '2.1.280': None}
     row["platform_release"] = account_runtime.release_id
     row['content_capture'] = None
     row['criu'] = None
@@ -12929,13 +12933,20 @@ def v3_set_content_capture(environment_id: str, body: ContentCaptureOperation) -
 
 
 @app.get('/api/environments/{environment_id}/native-kernel/releases')
-def v3_native_kernel_releases(environment_id: str, refresh: bool = False) -> dict:
-    """检查固定发行源的内核版本。@param environment_id 唯一环境。@param refresh 显式刷新缓存。@return 版本发现结果，准备与激活仍沿原验签入口。"""
+def v3_native_kernel_releases(environment_id: str, refresh: bool = False,
+                             source_version: Literal['2.1.280', '2.1.293'] = '2.1.293') -> dict:
+    """检查固定发行源的内核版本。
+
+    :param environment_id: 唯一环境标识。
+    :param refresh: 是否显式刷新发行缓存。
+    :param source_version: 核对管理能力的官方源版本，省略时为293。
+    :return: 版本发现结果；准备和激活继续沿签名与源版本核验入口。
+    """
     if not account_runtime:
         raise HTTPException(404)
     with account_runtime.environment_lock(environment_id):
         row, _ = _content_capture_account(environment_id)
-        if native_kernel_status(account_runtime, row) is None:
+        if native_kernel_status(account_runtime, row, source_version) is None:
             raise HTTPException(409, '当前环境尚未提供原生内核管理')
     return discover_releases(refresh)
 
@@ -13046,6 +13057,7 @@ class NativeKernelOperation(BaseModel):
     """管理页面提交的单环境内核操作。"""
 
     model_config = ConfigDict(extra='forbid')
+    source_version: Literal['2.1.280', '2.1.293'] = '2.1.293'
     operation: Literal['prepare', 'activate', 'rollback', 'recover']
     operation_id: str
     release: str | None = None
@@ -13076,7 +13088,8 @@ def v3_native_kernel(environment_id: str, body: NativeKernelOperation) -> dict:
         raise HTTPException(404, "账号没有唯一的 V3 环境绑定")
     try:
         return run_upgrade(account_runtime, dict(entry), entry['gateway_account'],
-            body.operation, body.operation_id, body.release, body.expected_sha256, body.expected_revision)
+            body.operation, body.operation_id, body.release, body.expected_sha256, body.expected_revision,
+            source_version=body.source_version)
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
     except (OSError, DockerException, RequestException):

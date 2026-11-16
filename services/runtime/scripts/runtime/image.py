@@ -12,6 +12,21 @@ KERNEL = {
     '.text': '413d169839d53a8d479b7b2002d7a0b8ff8681a57dc53d13beda5ee96022125a',
     '.data': '00366dc1835ad0f8cf830623a4d7eaf04c6c2f2596d6c9f2fe35bdc8c75ced28',
 }
+KERNEL_280 = {
+    '.rodata': 'fb0f5da1cfc7d38c88d11629960aaa33cda9b2825f2057036b1a22d5f174b9cd',
+    '.bun_builtins': 'dc1c0f79e1bc820fe8e32afe8202e3db6e35911fc706abda9b2fdfb1686fb10c',
+    '.text': '7a6b7c125b9726e933ae2d47e6efbdfa7076046b721fb2ceadefa55553fbe4b1',
+    '.data': 'af461210735340393a386c3080edc0bf810d699252438f12eddc3c68c51671bf',
+}
+
+
+def fixed_kernel(version):
+    """解析已登记的固定内核。@param version 源版本。@return 原生节摘要。"""
+    if version == '2.1.280':
+        return KERNEL_280
+    if version == '2.1.293':
+        return KERNEL
+    raise ValueError('未知固定源版本')
 
 
 def checked(data, offset, size):
@@ -50,42 +65,46 @@ def sections(data):
     return result
 
 
-def kernel_sections(data):
+def kernel_sections(data, version='2.1.293'):
     """核验构建前后的四个原生节。
     @param data 完整 ELF。
+    @param version 目标官方源版本，缺省293；选择独立的原生节摘要。
     @return 各原生节 SHA256。
     """
     table = sections(data)
-    result = {name: hashlib.sha256(checked(data, *table[name])).hexdigest() for name in KERNEL}
-    if result != KERNEL:
+    expected = fixed_kernel(version)
+    result = {name: hashlib.sha256(checked(data, *table[name])).hexdigest() for name in expected}
+    if result != expected:
         raise ValueError('固定原生内核的节摘要不匹配')
     return result
 
 
-def extract(source, destination, expected):
+def extract(source, destination, expected, version='2.1.293'):
     """提取固定来源的可读模块，不携带原版字节码缓存。
     @param source 已固定身份的官方文件。
     @param destination 临时模块目录。
     @param expected 源程序完整 SHA256。
+    @param version 目标官方源版本，缺省293；选择对应的Bun模块布局。
     @return 写入模块与逐项来源清单。
     """
     raw = source.read_bytes()
     if hashlib.sha256(raw).hexdigest() != expected:
         raise ValueError('官方源程序校验不匹配')
-    kernel_sections(raw)
+    kernel_sections(raw, version)
+    section_bytes, module_count, entry_index = (144806548, 2196, 5) if version == '2.1.280' else (163574530, 2511, 6)
     section = checked(raw, *sections(raw)['.bun'])
-    if len(section) != 163574530 or section[-16:] != b'\n---- Bun! ----\n' or struct.unpack_from('<Q', section)[0] != len(section) - 8:
+    if len(section) != section_bytes or section[-16:] != b'\n---- Bun! ----\n' or struct.unpack_from('<Q', section)[0] != len(section) - 8:
         raise ValueError('未知 Bun 应用容器布局')
     graph = section[8:]
     limit, offset, size, entry, argv, argv_size, flags = struct.unpack_from('<Q6I', graph, len(graph) - 48)
-    if limit != len(graph) - 48 or size != 2511 * 52 or entry != 6 or flags != 0x1bff:
+    if limit != len(graph) - 48 or size != module_count * 52 or entry != entry_index or flags != 0x1bff:
         raise ValueError('未知 Bun 模块表合同')
     checked(graph, argv, argv_size)
     module_data = graph[:limit]
     manifest = []
     seen = set()
     destination.mkdir(parents=True, exist_ok=False)
-    for i in range(2511):
+    for i in range(module_count):
         record = struct.unpack('<12I4B', checked(graph, offset + i * 52, 52))
         fields = []
         for j in range(0, 12, 2):
@@ -116,23 +135,24 @@ def extract(source, destination, expected):
     (destination.parent / 'modules.json').write_text(json.dumps(manifest, ensure_ascii=False))
 
 
-def prune(source, destination, report):
+def prune(source, destination, report, version='2.1.293'):
     """仅裁剪固定工作环境无需的 locale 定制资源。
     @param source 由官方原生内核编译的专用入口。
     @param destination 裁剪后的完整 ELF。
     @param report 元数据报告路径。
+    @param version 目标官方源版本，缺省293；选择对应的内核和ICU布局。
     @return 写入保留原生代码的候选及差异摘要。
     """
     raw = source.read_bytes()
-    hashes = kernel_sections(raw)
-    header, base, dictionary = 1524704, 1524848, 13635856
+    hashes = kernel_sections(raw, version)
+    header, base, dictionary = (1523104, 1523248, 13634256) if version == '2.1.280' else (1524704, 1524848, 13635856)
     if raw[header + 2:header + 4] != b'\xda\x27' or raw[header + 12:header + 16] != b'CmnD' or struct.unpack_from('<I', raw, base)[0] != 3990:
         raise ValueError('ICU 固定目录布局不匹配')
     if hashlib.sha256(checked(raw, dictionary, 131072)).hexdigest() != 'ab8658c8ab8d5eb92f17b7c6625d2b39e19bf27e1752dafe5852522118ff1d01' or struct.unpack_from('<I', raw, dictionary + 131072)[0] != 131072:
         raise ValueError('ICU 共享字典不匹配')
     entries = [struct.unpack_from('<II', raw, base + 4 + i * 8) for i in range(3990)]
     first_data = base + entries[0][1]
-    if first_data != 1647104:
+    if first_data != (1645504 if version == '2.1.280' else 1647104):
         raise ValueError('ICU 数据起点不匹配')
     output = bytearray(raw)
     kept, removed, previous = [], [], ''
@@ -171,9 +191,9 @@ def prune(source, destination, report):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 5 or sys.argv[1] not in ['extract', 'prune']:
+    if len(sys.argv) not in [5, 6] or sys.argv[1] not in ['extract', 'prune']:
         raise SystemExit('用法：image.py extract 来源 临时模块目录 源SHA256 | prune 输入 输出 报告')
     if sys.argv[1] == 'extract':
-        extract(Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4])
+        extract(Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4], sys.argv[5] if len(sys.argv) == 6 else '2.1.293')
     else:
-        prune(Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4]))
+        prune(Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4]), sys.argv[5] if len(sys.argv) == 6 else '2.1.293')

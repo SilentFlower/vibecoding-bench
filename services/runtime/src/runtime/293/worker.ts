@@ -43,9 +43,11 @@ export async function reportStartupFailure(error: unknown): Promise<void> {
  */
 export async function startWorker(bindings: NativeBindings): Promise<void> {
   const initialWorkerId = process.env.CCRB_WORKER_ID;
+  const sourceVersion = bindings.sourceVersion ?? PROFILE_293.version;
   if (!initialWorkerId || !WORKER_ID.test(initialWorkerId)) throw new Error('缺少工作进程归属');
   let workerId = initialWorkerId;
   const templateId = process.env.CCRB_TEMPLATE_ID;
+  if (templateId !== undefined && sourceVersion !== PROFILE_293.version) throw new Error('当前源版本尚未接纳恢复模板');
   if (templateId !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(templateId)) throw new Error('模板归属不合法');
   let bound = templateId === undefined;
   let binding = false;
@@ -85,9 +87,9 @@ export async function startWorker(bindings: NativeBindings): Promise<void> {
     if (!process.stdout.write(JSON.stringify(frame) + '\n')) await once(process.stdout, 'drain');
   };
   const ready = (receipt?: { template_id: string; nonce: string; entropy_profile: 'bun143-wipeonfork-v1' }): WorkerFrame => ({
-    type: 'worker_ready', schema_version: 2, worker_id: workerId, version: PROFILE_293.version, pid: process.pid,
+    type: 'worker_ready', schema_version: 2, worker_id: workerId, version: sourceVersion, pid: process.pid,
     cache_policy: cachePolicy, telemetry: telemetryState, raw_input_protocol: 1, cache_ttl_rewrite_protocol: 1,
-    restore_protocol: 1, ...(templateId && !receipt ? { restore_template: templateId } : {}),
+    ...(sourceVersion === PROFILE_293.version ? { restore_protocol: 1 as const } : {}), ...(templateId && !receipt ? { restore_template: templateId } : {}),
     ...(receipt ? { restore_binding: receipt } : {}),
   });
   const stop = (): void => {
@@ -145,7 +147,8 @@ export async function startWorker(bindings: NativeBindings): Promise<void> {
       const finished = Promise.resolve().then(async () => {
         try {
           if (abort.signal.aborted) throw abort.signal.reason;
-          const job = command.type === 'request_input' ? prepareInput(parseInput(command.input, [], ingressPolicy)) : command.prepared;
+          const job = command.type === 'request_input' ? prepareInput(parseInput(command.input, [], ingressPolicy, sourceVersion), sourceVersion) : command.prepared;
+          if (sourceVersion === '2.1.280' && job.context.requestClass === 'side_reply') throw new BridgeError('unsupported_context', '280原生运行时尚未提供side_reply类别', 422);
           prepared = job;
           failureStage = 'context';
           if (command.type === 'request_input') await emit({ type: 'header_policy', attempt: 1, decisions: job.decisions });

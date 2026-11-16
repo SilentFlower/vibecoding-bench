@@ -103,7 +103,7 @@ export async function prepareCli(prepared: PreparedInput, bindings: NativeBindin
     }
     const human = context.requestClass === 'main' && context.agentKind === 'main' && content.length > 0 && !content.some(block => block.type === 'tool_result');
     const value = core.Re({ content, ...(index === promptIndex ? { promptId: context.promptId } : {}), ...(human ? { origin: { kind: 'human' } } : {}) });
-    if (human) {
+    if (human && bindings.sourceVersion !== '2.1.280') {
       value.turnOrigin = 'human';
       value.turnPosition = core.Fyn(business, 'human');
     }

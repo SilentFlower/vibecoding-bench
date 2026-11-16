@@ -509,6 +509,7 @@ def build(release: str, manifest_path: Path) -> None:
             (snapshot / relative).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source_path(REPO, relative), snapshot / relative)
         native_runtime = stage_asset(snapshot / "native-runtime/ccrb-runtime")
+        native_runtime['runtimes'] = {'2.1.280': stage_asset(snapshot / 'native-runtime/ccrb-runtime-280', version='2.1.280')}
         restore_upstream_checkout_bytes(snapshot)
         digest = hashlib.sha256()
         for path in sorted(item for item in snapshot.rglob("*") if item.is_file()):

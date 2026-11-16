@@ -57,7 +57,8 @@ class FixtureRuntime:
             self.events.append(('probe', target['release']))
             if self.rejected and target['release']:
                 raise ConnectionError('候选不就绪')
-            return {**body['binding'], **target, 'state': 'ready', 'pid': 210 + len(self.events), 'image_sha256': 'a' * 64}
+            return {**body['binding'], **target, 'version': target.get('source_version', '2.1.293'),
+                'state': 'ready', 'pid': 210 + len(self.events), 'image_sha256': 'a' * 64}
         action = body['operation']
         self.events.append((action, self.active))
         if action == 'prepare':
@@ -136,18 +137,46 @@ class NativeKernelUpgradeTest(unittest.TestCase):
         self.runtime.events.clear()
         for mock in (
             patch.object(upgrade, 'release_key', return_value=self.key),
-            patch.object(upgrade, '_context', side_effect=lambda rt, row, account: json.loads(json.dumps(rt.config))),
+            patch.object(upgrade, '_context', side_effect=lambda rt, row, account, source_version='2.1.293': json.loads(json.dumps(rt.config))),
             patch.object(upgrade, '_download', side_effect=lambda url, path, limit: shutil.copyfile(self.source / path.name, path)),
             patch.object(upgrade.time, 'sleep'),
         ):
             mock.start()
             self.addCleanup(mock.stop)
 
-    def operate(self, action, release=None, operation_id=None, revision=None):
+    def operate(self, action, release=None, operation_id=None, revision=None, source_version='2.1.293'):
+        """沿目标版本提交冻结CAS。@param action 操作。@param release 发行标签。@param operation_id 唯一操作。@param revision 状态版本。@param source_version 官方源版本。@return 操作回执。"""
         return upgrade.run_upgrade(self.runtime, self.row, 7, action,
             operation_id or str(uuid.uuid4()), release,
-            self.reference['launcher_sha256'] if action == 'activate' else upgrade.SHA256 if action == 'rollback' else None,
-            revision or upgrade.status(self.runtime, self.row)['revision'])
+            self.reference['launcher_sha256'] if action == 'activate' else upgrade._shown(None, source_version)['launcher_sha256'] if action == 'rollback' else None,
+            revision or upgrade.status(self.runtime, self.row, source_version)['revision'], source_version)
+
+    def test_280签名准入激活回滚与293状态隔离(self):
+        """真实Ed25519验签绑定源版本，280操作保持293配置和记录。@return None。"""
+        self.runtime.config['native']['runtimes'] = {'2.1.280': {'binary_path': '/usr/local/bin/ccrb-runtime-280'}}
+        self.runtime._write_sender_config(self.row, self.runtime.config)
+        before = upgrade.status(self.runtime, self.row)
+        metadata = self.source / 'runtime-release.json'
+        manifest = json.loads(metadata.read_text())
+        manifest.update(source_version='2.1.280', source_sha256=upgrade._source_identity('2.1.280'))
+        metadata.write_text(json.dumps(manifest))
+        subprocess.run(['openssl', 'pkeyutl', '-sign', '-rawin', '-inkey', self.root / 'private.pem',
+            '-in', metadata, '-out', self.source / 'runtime-release.sig'], check=True)
+        with self.assertRaisesRegex(ValueError, '来源或协议'):
+            upgrade._verify_manifest(self.source, self.release, self.key)
+        self.assertEqual(self.operate('prepare', self.release, source_version='2.1.280')['prepared'], self.reference)
+        self.assertEqual(upgrade.status(self.runtime, self.row), before)
+        result = self.operate('activate', self.release, source_version='2.1.280')
+        self.assertEqual(result['state'], 'active')
+        self.assertEqual(result['source_version'], '2.1.280')
+        self.assertEqual(self.runtime.config['native']['runtimes']['2.1.280']['release'], self.reference)
+        self.assertNotIn('release', self.runtime.config['native'])
+        self.assertEqual(upgrade.status(self.runtime, self.row), before)
+        result = self.operate('rollback', source_version='2.1.280')
+        self.assertEqual(result['current']['launcher_sha256'], upgrade.SHA256_280)
+        self.assertEqual(result['previous'], self.reference)
+        self.assertEqual(upgrade.status(self.runtime, self.row), before)
+        self.assertIsNone(self.runtime.lease)
 
     def test_saved_release_remains_valid_when_becoming_builtin(self):
         """平台内置升级到持久选择时仍能重新验签缓存及读取状态。@return 无。"""

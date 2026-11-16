@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { PROFILE_293 } from '../src/runtime/293/source-profile';
+import { PROFILE_280 } from '../src/runtime/280/source-profile';
 
 const LIMIT_BYTES = 27933052;
 const TOOL_SHA = 'd32657a7a0e4cdc0a8aa57cafe474746944d76e861e753e9c902b9c9356fa886';
@@ -47,23 +48,26 @@ export async function buildRuntime(args: string[]): Promise<void> {
   }
   const source = options.get('--source'), output = options.get('--out');
   if (!source || !output) throw new Error('必须显式提供 --source 和 --out');
-  if (await digest(source) !== PROFILE_293.sha256) throw new Error('固定官方源程序校验不匹配');
+  const sourceDigest = await digest(source);
+  const profile = [PROFILE_293, PROFILE_280].find(value => value.sha256 === sourceDigest);
+  if (!profile) throw new Error('固定官方源程序校验不匹配');
   if (await Bun.file(output).exists() || await Bun.file(output + '.manifest.json').exists()) throw new Error('输出已存在，不能覆盖原版或其它产物');
   const root = await mkdtemp(join(tmpdir(), 'ccrb-build-'));
   try {
-    const bridgeSources = Object.fromEntries(await Promise.all(BRIDGE_SOURCES.map(async path => [path, await digest(join(project, path))])));
+    const bridgePaths = [...BRIDGE_SOURCES, 'src/runtime/280/source-profile.ts', 'src/runtime/280/native.ts', 'src/runtime/280/preload.ts'];
+    const bridgeSources = Object.fromEntries(await Promise.all(bridgePaths.map(async path => [path, await digest(join(project, path))])));
     const home = join(root, 'home');
     await mkdir(home);
     const environment = { HOME: home, PATH: process.env.PATH ?? '/usr/bin:/bin', LANG: 'C.UTF-8', CLAUDE_CONFIG_DIR: home,
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1', DISABLE_AUTOUPDATER: '1', DISABLE_TELEMETRY: '1', DISABLE_ERROR_REPORTING: '1' };
     const isolated = (command: string[], env: Record<string, string> = environment): Promise<string> => run(['unshare', '--net', ...command], root, env);
-    console.log('核验并提取固定 293 来源');
-    await isolated(['python3', join(project, 'scripts/runtime/image.py'), 'extract', source, join(root, 'modules'), PROFILE_293.sha256]);
+    console.log('核验并提取固定 ' + profile.version + ' 来源');
+    await isolated(['python3', join(project, 'scripts/runtime/image.py'), 'extract', source, join(root, 'modules'), profile.sha256, profile.version]);
     const compiledDriver = await Bun.build({ entrypoints: [join(project, 'scripts/runtime/compile.ts')], target: 'bun', format: 'esm', outdir: root, naming: 'compiler.mjs' });
     if (!compiledDriver.success) throw new Error('构建驱动打包失败');
     console.log('以原版 Bun 1.4.3 编译专用常驻入口');
-    await isolated([source, '--version'], { ...environment, BUN_OPTIONS: '--preload ' + join(root, 'compiler.mjs'), CCRB_BUILD_ROOT: root, CCRB_BUILD_SOURCE: source, CCRB_BUILD_PROJECT: project });
-    await isolated(['python3', join(project, 'scripts/runtime/image.py'), 'prune', join(root, 'ccrb-worker'), join(root, 'ccrb-runtime.image'), join(root, 'image.json')]);
+    await isolated([source, '--version'], { ...environment, BUN_OPTIONS: '--preload ' + join(root, 'compiler.mjs'), CCRB_BUILD_ROOT: root, CCRB_BUILD_SOURCE: source, CCRB_BUILD_PROJECT: project, CCRB_BUILD_VERSION: profile.version });
+    await isolated(['python3', join(project, 'scripts/runtime/image.py'), 'prune', join(root, 'ccrb-worker'), join(root, 'ccrb-runtime.image'), join(root, 'image.json'), profile.version]);
     const image: { image_sha256: string; image_bytes: number; kernel_before: Record<string, string>; icu_kept: number; icu_removed: number; locale_policy: string } = JSON.parse(await readFile(join(root, 'image.json'), 'utf8'));
     let sevenzip = options.get('--sevenzip');
     if (!sevenzip) {
@@ -103,7 +107,7 @@ export async function buildRuntime(args: string[]): Promise<void> {
     const launcherSha256 = await digest(loader);
     const closure = JSON.parse(await readFile(join(root, 'closure.json'), 'utf8'));
     const manifest = {
-      schema_version: 1, source: { version: PROFILE_293.version, sha256: PROFILE_293.sha256 },
+      schema_version: 1, source: { version: profile.version, sha256: profile.sha256 },
       kernel: { version: closure.bun_version, revision: closure.bun_revision, sections_before_prune: image.kernel_before },
       launcher: { sha256: launcherSha256, bytes }, image: { sha256: image.image_sha256, bytes: image.image_bytes },
       deployment: { files: [{ name: output.split('/').at(-1), bytes, sha256: launcherSha256 }], total_bytes: bytes, limit_bytes: LIMIT_BYTES, required_external_files: [], existing_system_libraries: ['librt.so.1', 'libc.so.6', 'ld-linux-x86-64.so.2', 'libpthread.so.0', 'libdl.so.2', 'libm.so.6'], disk_expansion_bytes: 0, memory_file_bytes: image.image_bytes },
@@ -111,7 +115,7 @@ export async function buildRuntime(args: string[]): Promise<void> {
       closure,
       admission: '构建通过不自动授信；必须对最终哈希执行原生回归、常驻隔离、部署验证并保留计时记录后登记',
     };
-    if (await digest(source) !== PROFILE_293.sha256) throw new Error('官方来源在构建期间改变');
+    if (await digest(source) !== profile.sha256) throw new Error('官方来源在构建期间改变');
     for (const [path, expected] of Object.entries(bridgeSources)) if (await digest(join(project, path)) !== expected) throw new Error('桥接源码在构建期间改变：' + path);
     await mkdir(dirname(output), { recursive: true });
     await copyFile(loader, output, constants.COPYFILE_EXCL);

@@ -14,7 +14,7 @@ const loading=ref(false),saving=ref(false),failed=ref(false),error=ref(''),messa
 const feature=ref<{kind:'criu'|'content-capture';snapshot:EnvironmentFeature;enabled:boolean}|null>(null),featureLoading=ref(false),featureError=ref(''),featureFailed=ref(false),featureSaving=ref(false);
 let alive=true,controller:AbortController|undefined,featureController:AbortController|undefined;
 const roles=[{id:'cli',label:'CLI CPU'},{id:'sender',label:'发送器 CPU'},{id:'network',label:'网络 CPU'}] as const;
-const kernelBusy=computed(()=>['preparing','draining','switching','restoring','finishing','reconcile'].includes(props.environment.native_kernel?.state??''));
+const kernelBusy=computed(()=>Object.values(props.environment.native_kernels??{'2.1.293':props.environment.native_kernel}).some(value=>['preparing','draining','switching','restoring','finishing','reconcile'].includes(value?.state??'')));
 const locked=computed(()=>props.environment.busy||!['ready','stopped'].includes(props.environment.state)||kernelBusy.value||saving.value||featureSaving.value||featureLoading.value);
 /** 重新读取实际配置后才允许重试，取消旧读请求。@return 读取结束。 */
 async function load():Promise<void>{controller?.abort();controller=new AbortController();const signal=controller.signal;loading.value=true;error.value='';failed.value=false;try{const value=await runtimeRequest<CpuResources>(`/environments/${props.environment.environment_id}/cpu-resources`,{signal});if(!alive||signal.aborted)return;cpu.value=value;cpus.value={...value.cpus};emit('cpu',value);}catch(cause){if(alive&&!signal.aborted)error.value=(cause as Error).message;}finally{if(alive&&!signal.aborted)loading.value=false;}}

@@ -386,8 +386,11 @@ pub(crate) fn prepare_native_attempt(
     let mut attempt = prepare_observation(account, context)?;
     let record = attempt.record.as_mut()?;
     record.attempt_id = attempt_id.to_owned();
-    record.profile_version = "2.1.293".into();
-    record.profile_selection = "native293_cc_prepared".into();
+    record.profile_version = observation.source_version.as_str().into();
+    record.profile_selection = format!(
+        "native{}_cc_prepared",
+        observation.source_version.as_str().rsplit('.').next()?
+    );
     record.parameters = observation.parameters;
     record.capture_status = observation.capture_status;
     record.runtime = observation.runtime;
