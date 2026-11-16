@@ -175,6 +175,13 @@ async def run(output: Path, gateway: Path) -> dict:
             await expect(help_text).to_contain_text('默认 24 小时（1440 分钟）。')
             assert await help_text.evaluate("el=>getComputedStyle(el).textDecorationLine") == 'none'
             assert await help_text.evaluate("el=>getComputedStyle(el).whiteSpace") == 'pre-line'
+            policy_link = page.get_by_role('link', name='查看会话封禁及历史记录 →', exact=True)
+            help_bounds = await help_text.bounding_box()
+            link_bounds = await policy_link.bounding_box()
+            assert help_bounds is not None and link_bounds is not None
+            # 顶部边框必须位于说明之外；仅检查文字装饰会漏掉相邻行内链接的覆盖。
+            assert link_bounds['y'] >= help_bounds['y'] + help_bounds['height']
+            assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
             await duration.fill('60')
             await page.get_by_role('button', name='保存配置', exact=True).click()
             await expect(duration).to_have_value('60')
@@ -185,7 +192,7 @@ async def run(output: Path, gateway: Path) -> dict:
             assert not errors, errors
             assert not fixture.external, fixture.external
             assert not fixture.unexpected, fixture.unexpected
-            checks.append({'width':width, 'checks':['服务器时间基准','分页','状态筛选','取消解除','解除失败重试','居中空态与重置','静默刷新布局稳定','未提交搜索保持','读取失败保留','设置直达','默认时长分行说明','字符串设置保存','窄屏无溢出'], 'passed':True})
+            checks.append({'width':width, 'checks':['服务器时间基准','分页','状态筛选','取消解除','解除失败重试','居中空态与重置','静默刷新布局稳定','未提交搜索保持','读取失败保留','设置直达','默认时长分行说明','链接边框与说明分离','字符串设置保存','窄屏无溢出'], 'passed':True})
             await context.close()
         await browser.close()
     return {'passed':True, 'scenes':checks, 'real_model_requests':0}

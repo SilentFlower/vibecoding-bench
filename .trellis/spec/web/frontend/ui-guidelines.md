@@ -115,6 +115,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 ### 系统设置表单与草稿
 
+- `.settings-inline-note` 统一使用块级布局，链接与段落共享顶部分隔线和垂直间距；行内链接的顶部边框会覆盖上一行说明。`verify_session_policy_blocks_ui.py` 在390/1440/1920/2560px断言封禁记录链接的边框顶部不小于时长说明底部，避免仅检查 `text-decoration:none` 漏掉相邻元素覆盖。
 - 以现有 `Settings.vue::saveSettings` 的真实键集合核对完整性，按用途分组。新增分组或换肤不能删除字段、访问预设或预热记录入口。
 - 静态实现使用 `settingsFields` 定义控件与约束，`settingsSaved` / `settingsDraft` 分别维护已保存值和草稿。搜索、分类切换与页面往返保留草稿，保存栏显示全局待保存项数。
 - 所有设置提交值规整为字符串；数字清空保留空值并在保存时校验。非法字段定位到实际分类，搜索条件清空后让错误控件可见。
