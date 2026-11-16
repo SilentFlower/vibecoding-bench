@@ -14,9 +14,14 @@ from http_capture import HttpCapture, unavailable
 
 IMAGE_SHA256 = 'af4cea9e21aa959c5e39c389173ba30ebb19b354b67acfe99164946450e9776d'
 RESTORE_IMAGE_SHA256 = '564019c9560e960e96875c9663975491534b27c789ea3d23e5c13309ff293c79'
-ADMITTED_IMAGES = frozenset((IMAGE_SHA256, RESTORE_IMAGE_SHA256))
 WRITE_OFFSET = 0x232D5B3
 WRITE_BYTES = bytes.fromhex('4883c4185b415c415d415e415f5dc3')
+IMAGE_WRITE_OFFSETS = {
+    IMAGE_SHA256: WRITE_OFFSET,
+    RESTORE_IMAGE_SHA256: WRITE_OFFSET,
+    '2b64ee7d8f0863a37bce90800226bda102387e5cff082f947b2b71e66d9a38e7': 0x2308523,
+}
+ADMITTED_IMAGES = frozenset(IMAGE_WRITE_OFFSETS)
 SAMPLE = c.CFUNCTYPE(c.c_int, c.c_void_p, c.c_void_p, c.c_size_t)
 
 
@@ -51,6 +56,7 @@ class Observer:
         self.reason = None
         if image not in ADMITTED_IMAGES:
             raise CaptureError('IMAGE_NOT_ADMITTED')
+        write_offset = IMAGE_WRITE_OFFSETS[image]
         try:
             status = Path(f'/proc/{pid}/status').read_text()
             if f'PPid:\t{owner if owner is not None else os.getppid()}\n' not in status:
@@ -61,7 +67,7 @@ class Observer:
             self.namespace_pid = int(fields['NSpid'].split()[-1])
             with open(f'/proc/{pid}/exe', 'rb') as source:
                 digest = hashlib.file_digest(source, 'sha256').hexdigest()
-                source.seek(WRITE_OFFSET)
+                source.seek(write_offset)
                 if digest != image or source.read(len(WRITE_BYTES)) != WRITE_BYTES:
                     raise CaptureError('IMAGE_MISMATCH')
         except OSError:
@@ -104,7 +110,7 @@ class Observer:
                 raise CaptureError('PROBE_ARTIFACT')
             self.ring = _checked(self.lib.ring_buffer__new(fd, self.callback, None, None), 'RING_UNAVAILABLE')
             self.link = _checked(self.lib.bpf_program__attach_uprobe(program, False, pid,
-                                  f'/proc/{pid}/exe'.encode(), WRITE_OFFSET), 'PROBE_ATTACH_FAILED')
+                                  f'/proc/{pid}/exe'.encode(), write_offset), 'PROBE_ATTACH_FAILED')
         except Exception:
             self.close()
             raise

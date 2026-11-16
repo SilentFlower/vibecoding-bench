@@ -13,6 +13,9 @@ def main() -> None:
     parser.add_argument('--image', required=True)
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--source-version', choices=('2.1.280', '2.1.293'), default='2.1.293')
+    parser.add_argument('--image-sha256', default='af4cea9e21aa959c5e39c389173ba30ebb19b354b67acfe99164946450e9776d')
+    parser.add_argument('--observer-source', type=Path)
     args = parser.parse_args()
     source = Path(__file__).resolve().parent
     args.output.mkdir(parents=True, exist_ok=True)
@@ -30,10 +33,14 @@ def main() -> None:
             '--memory', '1536m', '--memory-swap', '1536m', '--pids-limit', '256',
             '--tmpfs', '/tmp:rw,nosuid,nodev,size=128m,mode=1777',
             '--tmpfs', '/run/ccrb-observer:rw,noexec,nosuid,nodev,size=1m,mode=0750',
+            '-e', 'CCRB_TEST_SOURCE_VERSION=' + args.source_version,
+            '-e', 'CCRB_TEST_IMAGE_SHA256=' + args.image_sha256,
             '-v', str(sender) + ':/usr/local/bin/account-sender:ro',
             '-v', str(config) + ':/run/v3/sender.json:ro',
             '-v', str(args.binary.resolve()) + ':/usr/local/bin/ccrb-runtime:ro',
             '--entrypoint', '/usr/local/bin/python3', args.image, '/opt/ccrb-tls-observer/broker.py']
+        if args.observer_source:
+            command[2:2] = ['-v', str(args.observer_source.resolve()) + ':/opt/ccrb-tls-observer/observer.py:ro']
         try:
             with (args.output / 'container.log').open('w') as log:
                 result = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, timeout=180)
@@ -44,6 +51,9 @@ def main() -> None:
                 raise SystemExit('隔离验收失败，请查看安全合成日志及state.json')
             last = (args.output / 'container.log').read_text().strip().splitlines()[-1]
             value = json.loads(last)
+            value['source_version'] = args.source_version
+            value['image_sha256'] = args.image_sha256
+            value['observer_overlay'] = args.observer_source is not None
             assert value['model_requests'] == 0 and value['parallel_complete'] == 6
             (args.output / 'result.json').write_text(json.dumps(value, indent=2) + '\n')
             print(json.dumps(value), flush=True)

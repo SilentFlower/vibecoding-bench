@@ -155,7 +155,7 @@ def execute(size: int, enabled: bool, cancel_first: bool = False) -> dict:
             assert 'NoNewPrivs:\t1' in worker_status
             if enabled:
                 arguments = ['/usr/local/bin/python3', '/opt/ccrb-tls-observer/client.py',
-                    '--pid', str(worker.pid), '--image', 'af4cea9e21aa959c5e39c389173ba30ebb19b354b67acfe99164946450e9776d',
+                    '--pid', str(worker.pid), '--image', os.environ['CCRB_TEST_IMAGE_SHA256'],
                     '--worker', worker_id, '--capture', capture_id]
                 observer = subprocess.Popen(arguments, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
                 assert select.select([observer.stdout], [], [], 2)[0]
@@ -184,7 +184,7 @@ def execute(size: int, enabled: bool, cancel_first: bool = False) -> dict:
                     assert select.select([observer.stdout], [], [], 2)[0]
                     assert json.loads(observer.stdout.readline()).get('ready') is True
             body = {'model': 'claude-sonnet-4-6', 'max_tokens': 64, 'stream': False,
-                'system': [{'type': 'text', 'text': 'x-anthropic-billing-header: cc_version=2.1.293.abc; cc_entrypoint=cli; cch=00000;'}],
+                'system': [{'type': 'text', 'text': 'x-anthropic-billing-header: cc_version=' + os.environ['CCRB_TEST_SOURCE_VERSION'] + '.abc; cc_entrypoint=cli; cch=00000;'}],
                 'metadata': {'user_id': json.dumps({'device_id': 'c'*64, 'account_uuid': '44444444-4444-4444-8444-444444444444', 'session_id': '22222222-2222-4222-8222-222222222222'})},
                 'messages': [{'role': 'user', 'content': [{'type': 'text', 'text': 'x'*min(size - index, 384*1024)} for index in range(0, size, 384*1024)]}]}
             worker.stdin.write(json.dumps({'type': 'request_input', 'schema_version': 2, 'worker_id': worker_id,
