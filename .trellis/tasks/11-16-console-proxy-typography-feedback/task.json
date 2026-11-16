@@ -1,0 +1,53 @@
+{
+  "id": "console-proxy-typography-feedback",
+  "name": "console-proxy-typography-feedback",
+  "title": "统一任务代理选择与全站字号、操作反馈",
+  "description": "按用户要求单任务统一任务代理目录选择、大屏阅读尺寸与操作通知/确认/账号测试反馈，并完成原型与全站回归。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": "console-ui",
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-16",
+  "completedAt": "2026-11-16",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-16T05:25:22Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "apps/web/src/components/TasksWorkspace.vue",
+    "apps/web/src/components/Accounts.vue",
+    "apps/web/src/components/ProxyPicker.vue",
+    "apps/web/src/composables/useToast.ts",
+    "apps/web/src/App.vue",
+    "apps/legacy-web/app.js",
+    "services/gateway/src/service/runtime_bridge.rs",
+    "services/orchestrator/proxy_sync.py",
+    "doc/design/flower2api-concept.html"
+  ],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "完成任务代理目录选择与受控保存",
+      "完成全站阅读尺寸及公共反馈升级",
+      "修复全部Check-All问题并完成跨层和界面验证",
+      "同步UI、代理目录与编排运行时规范"
+    ],
+    "partialStep": null,
+    "nextStep": "按需进入独立发版及上线验收流程",
+    "notes": "本地验证通过。发布后验证真实Docker恢复及代理出口。",
+    "updatedAt": "2026-11-16T05:25:22Z"
+  }
+}
