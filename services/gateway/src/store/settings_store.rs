@@ -96,6 +96,8 @@ pub const DEFAULT_STREAM_KEEPALIVE_ENABLED: &str = "false";
 pub const DEFAULT_STREAM_KEEPALIVE_INTERVAL_SECS: &str = "45";
 /// 上游流静默超时默认保持历史 120 秒行为。
 pub const DEFAULT_STREAM_UPSTREAM_IDLE_TIMEOUT_SECS: &str = "120";
+/// 原生账号额外空闲进程默认保留120秒，映像缓存独立保留。
+pub const DEFAULT_NATIVE_IDLE_TIMEOUT_SECS: &str = "120";
 /// bootstrap 模型选项默认透传上游响应,避免未配置时改变上游能力列表。
 pub const DEFAULT_BOOTSTRAP_MODEL_OPTIONS_MODE: &str = "passthrough";
 /// bootstrap 自定义模型选项默认保留当前抓包中出现的 Fable 入口。
@@ -174,6 +176,20 @@ impl SettingsStore {
     /// 复用管理数据库连接池。@return 克隆的连接池句柄。
     pub fn database_pool(&self) -> AnyPool {
         self.pool.clone()
+    }
+
+    /// 为历史数据库补齐原生空闲默认值，保留管理员保存的配置。
+    /// @return 默认值已存在或成功补齐；写入失败返回数据库错误。
+    pub async fn ensure_native_idle_timeout(&self) -> Result<(), AppError> {
+        sqlx::query(
+            "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING",
+        )
+        .bind("native_idle_timeout_secs")
+        .bind(DEFAULT_NATIVE_IDLE_TIMEOUT_SECS)
+        .execute(&self.pool)
+        .await
+        .map_err(|error| AppError::Internal(format!("补齐原生空闲配置失败: {}", error)))?;
+        Ok(())
     }
 
     /// 读取所有设置项。

@@ -26,7 +26,7 @@
 - 280原生SDK默认global fetch，映射到共享发送槽；turnOrigin/turnPosition沿280省略语义。280工具工厂create保留初始化权限声明，仅封闭返回对象的call执行入口。280保持原生正文工厂；293静态正文复用沿原配方。
 - 完整原生billing的版本必须匹配冻结运行时。普通API仍由所选原生版本构造，保持CCH、上下文、工具/thinking、原始响应及唯一发送合同。
 - 每账号只有一个物理容量所有者，各版本共享live/starting许可，合计遵守max_workers。版本子状态隔离映像FD、暖进程、补位、模板及核验缓存；凭据/代理/环境公共身份变化统一撤销两版旧空闲状态。取消其它版本补位或退役空闲进程后，必须等待真实退出归还许可。
-- 额外进程空闲300秒回收，各版合计保留最近使用的一个基础暖进程。普通exec的双版与历史293单版均不按固定MiB公式限制并发；memory_mib=0表示无限，正数冻结实际有限额度，具体角色总额与资源归属沿orchestrator合同。CRIU恢复预算独立判断。
+- 额外进程默认空闲120秒回收，各版合计保留最近使用的一个基础暖进程及执行映像缓存。全局`native_idle_timeout_secs`支持30–3600秒，后台独立管理接口同步到两版池；完整合同见[空闲回收时间热配置](../../gateway/backend/settings-database.md#scenario-原生额外空闲进程回收时间热配置)。普通exec的双版与历史293单版均不按固定MiB公式限制并发；memory_mib=0表示无限，正数冻结实际有限额度，具体角色总额与资源归属沿orchestrator合同。CRIU恢复预算独立判断。
 - 新镜像标签`vibebench.native-runtime-versions=2.1.280,2.1.293`；固定安装路径分别为`/usr/local/bin/ccrb-runtime-280`和`/usr/local/bin/ccrb-runtime`。缺标签的历史镜像提供293。各版能力独立报告，293缺失时可继续准入已核验280。
 - 签名清单的source_version/source_sha256按目标版本核验，分发摘要、执行体及实际握手须同时一致。记录分别为`native-kernel-upgrade-280.json`和历史293记录。升级/回滚只改所选子状态，共用账号维护门禁；公共身份失效仍统一排空。
 - 准备投影按每版独立核对环境/代次、内核代次及45秒新鲜度。293失败或过期时保留280独立观察，错误版本和旧回执不能授予ready。诊断来源为`native280_cc_prepared|native293_cc_prepared`，完整快照入口接纳两者。

@@ -100,6 +100,7 @@ const log429RequestBodyLimit = ref('8192');
 const streamKeepaliveEnabled = ref(false);
 const streamKeepaliveIntervalSecs = ref('45');
 const streamUpstreamIdleTimeoutSecs = ref('120');
+const nativeIdleTimeoutSecs = ref('120');
 
 /** Claude Code bootstrap 模型选项配置 */
 const bootstrapModelOptionsMode = ref<'passthrough' | 'configured' | 'hide_fable'>('passthrough');
@@ -462,6 +463,14 @@ const isValidStreamUpstreamIdleTimeoutSecs = computed(() => {
   return Number.isSafeInteger(n) && n >= 30 && n <= 1800;
 });
 
+/** 额外空闲进程回收时间是否合法。 */
+const isValidNativeIdleTimeoutSecs = computed(() => {
+  const raw = trimFormString(nativeIdleTimeoutSecs.value);
+  if (!/^\d+$/.test(raw)) return false;
+  const n = Number(raw);
+  return Number.isSafeInteger(n) && n >= 30 && n <= 3600;
+});
+
 /** Session Hello 探测超时是否合法 */
 const isValidSessionHelloProbeTimeoutSecs = computed(() => {
   const raw = trimFormString(sessionHelloProbeTimeoutSecs.value);
@@ -562,6 +571,7 @@ async function loadSettings() {
     streamKeepaliveEnabled.value = (data.stream_keepalive_enabled ?? 'false') === 'true';
     streamKeepaliveIntervalSecs.value = data.stream_keepalive_interval_secs ?? '45';
     streamUpstreamIdleTimeoutSecs.value = data.stream_upstream_idle_timeout_secs ?? '120';
+    nativeIdleTimeoutSecs.value = data.native_idle_timeout_secs ?? '120';
     const bootstrapMode = data.bootstrap_model_options_mode ?? 'passthrough';
     bootstrapModelOptionsMode.value = bootstrapMode === 'configured' || bootstrapMode === 'hide_fable' ? bootstrapMode : 'passthrough';
     bootstrapAdditionalModelOptions.value = data.bootstrap_additional_model_options ?? '[{"model":"claude-fable-5-1[1m]","name":"Fable","description":"Most capable for your hardest and longest-running tasks","disabled_reason":null}]';
@@ -650,6 +660,10 @@ async function saveSettings() {
   }
   if (!isValidStreamUpstreamIdleTimeoutSecs.value) {
     toast('上游流静默超时必须是 30 到 1800 秒的整数');
+    return;
+  }
+  if (!isValidNativeIdleTimeoutSecs.value) {
+    toast('额外空闲进程回收时间必须是 30 到 3600 秒的整数');
     return;
   }
   if (!isValidSessionHelloProbeTimeoutSecs.value) {
@@ -753,6 +767,7 @@ const fieldBindings: Record<string, {get: () => string;set: (value: string) => v
   log_429_request_body_limit: { get: () => formString(trimFormString(log429RequestBodyLimit.value)), set: value => { log429RequestBodyLimit.value = value as typeof log429RequestBodyLimit.value; } },
   stream_keepalive_enabled: { get: () => formString(streamKeepaliveEnabled.value ? 'true' : 'false'), set: value => { streamKeepaliveEnabled.value = value === 'true'; } },
   stream_keepalive_interval_secs: { get: () => formString(trimFormString(streamKeepaliveIntervalSecs.value)), set: value => { streamKeepaliveIntervalSecs.value = value as typeof streamKeepaliveIntervalSecs.value; } },
+  native_idle_timeout_secs: { get: () => trimFormString(nativeIdleTimeoutSecs.value), set: value => { nativeIdleTimeoutSecs.value = value as typeof nativeIdleTimeoutSecs.value; } },
   stream_upstream_idle_timeout_secs: { get: () => formString(trimFormString(streamUpstreamIdleTimeoutSecs.value)), set: value => { streamUpstreamIdleTimeoutSecs.value = value as typeof streamUpstreamIdleTimeoutSecs.value; } },
   bootstrap_model_options_mode: { get: () => formString(bootstrapModelOptionsMode.value), set: value => { bootstrapModelOptionsMode.value = value as typeof bootstrapModelOptionsMode.value; } },
   bootstrap_additional_model_options: { get: () => formString(trimFormString(bootstrapAdditionalModelOptions.value)), set: value => { bootstrapAdditionalModelOptions.value = value as typeof bootstrapAdditionalModelOptions.value; } },
@@ -810,7 +825,7 @@ function applyPreset(preset:string):void {
 }
 /** 先定位实际错误，再执行原有业务校验与保存。@return 保存结束。 */
 async function submitSettings():Promise<void> {
- const checks:Record<string,boolean>={session_policy_block_duration_minutes:isValidSessionPolicyBlockMinutes.value,score_weight_7d:allValid.value,score_weight_5h:allValid.value,score_weight_concurrency:allValid.value,v3_admission_wait_seconds:isValidV3.value,v3_smart_weight_load:isValidV3.value,fable_weekly_usage_limit_percent:isValidFableWeeklyUsageLimitPercent.value,peak_prime_hours:isValidHours.value,peak_prime_model:isValidModel.value,allow_system_role_models:isValidSystemRoleModels.value,allowed_claude_code_versions:isValidClaudeCodeVersions.value,blocked_claude_code_versions:isValidBlockedClaudeCodeVersions.value,allowed_user_agents:isValidAllowedUserAgents.value,rewrite_disabled_thinking_models:isValidRewriteDisabledThinkingModels.value,intercept_assistant_prefill_models:isValidInterceptAssistantPrefillModels.value,intercept_cli_bg_status_classifier_models:isValidInterceptCliBgStatusClassifierModels.value,log_429_request_body_limit:isValidLog429RequestBodyLimit.value,stream_keepalive_interval_secs:isValidStreamKeepaliveIntervalSecs.value,stream_upstream_idle_timeout_secs:isValidStreamUpstreamIdleTimeoutSecs.value,session_hello_probe_timeout_secs:isValidSessionHelloProbeTimeoutSecs.value,session_hello_probe_success_ttl_secs:isValidSessionHelloProbeSuccessTtlSecs.value,session_hello_probe_failure_cooldown_secs:isValidSessionHelloProbeFailureCooldownSecs.value,bootstrap_additional_model_options:isValidBootstrapAdditionalModelOptions.value};
+ const checks:Record<string,boolean>={session_policy_block_duration_minutes:isValidSessionPolicyBlockMinutes.value,score_weight_7d:allValid.value,score_weight_5h:allValid.value,score_weight_concurrency:allValid.value,v3_admission_wait_seconds:isValidV3.value,v3_smart_weight_load:isValidV3.value,fable_weekly_usage_limit_percent:isValidFableWeeklyUsageLimitPercent.value,peak_prime_hours:isValidHours.value,peak_prime_model:isValidModel.value,allow_system_role_models:isValidSystemRoleModels.value,allowed_claude_code_versions:isValidClaudeCodeVersions.value,blocked_claude_code_versions:isValidBlockedClaudeCodeVersions.value,allowed_user_agents:isValidAllowedUserAgents.value,rewrite_disabled_thinking_models:isValidRewriteDisabledThinkingModels.value,intercept_assistant_prefill_models:isValidInterceptAssistantPrefillModels.value,intercept_cli_bg_status_classifier_models:isValidInterceptCliBgStatusClassifierModels.value,log_429_request_body_limit:isValidLog429RequestBodyLimit.value,stream_keepalive_interval_secs:isValidStreamKeepaliveIntervalSecs.value,stream_upstream_idle_timeout_secs:isValidStreamUpstreamIdleTimeoutSecs.value,native_idle_timeout_secs:isValidNativeIdleTimeoutSecs.value,session_hello_probe_timeout_secs:isValidSessionHelloProbeTimeoutSecs.value,session_hello_probe_success_ttl_secs:isValidSessionHelloProbeSuccessTtlSecs.value,session_hello_probe_failure_cooldown_secs:isValidSessionHelloProbeFailureCooldownSecs.value,bootstrap_additional_model_options:isValidBootstrapAdditionalModelOptions.value};
  fieldErrors.value={};
  for(const field of allFields){const value=fieldBindings[field.key]!.get();if(checks[field.key]===false || (field.kind==='number' && (!value.trim() || !Number.isFinite(Number(value)) || (field.min!=null && Number(value)<field.min) || (field.max!=null && Number(value)>field.max))) || (field.kind==='select' && !fieldOptions(field).some(option=>option.value===value)))fieldErrors.value[field.key]='请检查此配置的格式或范围';}
  const key=Object.keys(fieldErrors.value)[0];

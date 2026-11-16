@@ -49,6 +49,7 @@ use crate::service::gateway::{
     parse_bootstrap_additional_model_options,
 };
 use crate::service::native_contract::NativePreparationStatus;
+use crate::service::native_contract::validate_idle_timeout;
 use crate::service::native_prewarm::{NativeKernelProbe, probe_kernel};
 use crate::service::oauth::TokenTester;
 use crate::service::oauth_flow::OAuthFlowService;
@@ -2114,6 +2115,10 @@ async fn get_settings(State(state): State<AppState>) -> Result<Json<serde_json::
     settings
         .entry("stream_upstream_idle_timeout_secs".into())
         .or_insert_with(|| DEFAULT_STREAM_UPSTREAM_IDLE_TIMEOUT_SECS.to_string());
+    settings.insert(
+        "native_idle_timeout_secs".into(),
+        state.gateway_svc.native_idle_timeout().to_string(),
+    );
     settings
         .entry("bootstrap_model_options_mode".into())
         .or_insert_with(|| DEFAULT_BOOTSTRAP_MODEL_OPTIONS_MODE.to_string());
@@ -2328,6 +2333,12 @@ async fn update_settings(
     if let Some(val) = body.get("stream_upstream_idle_timeout_secs") {
         validate_usize_range("stream_upstream_idle_timeout_secs", val, 30, 1800)?;
     }
+    if let Some(val) = body.get("native_idle_timeout_secs") {
+        let seconds = val.parse::<u64>().map_err(|_| {
+            AppError::BadRequest("额外空闲进程回收时间必须是30到3600秒的整数".into())
+        })?;
+        validate_idle_timeout(seconds)?;
+    }
     if let Some(val) = body.get("session_hello_probe_timeout_secs") {
         validate_usize_range("session_hello_probe_timeout_secs", val, 1, 30)?;
     }
@@ -2503,6 +2514,9 @@ async fn update_settings(
             .await?;
     }
     // 通知 AccountService 刷新缓存
+    if body.contains_key("native_idle_timeout_secs") {
+        state.gateway_svc.reload_native_idle_timeout().await?;
+    }
     state.account_svc.reload_score_weights().await;
     Ok(Json(serde_json::json!({"ok": true})))
 }
@@ -4344,6 +4358,84 @@ mod tests {
                 .unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST, "value={value}");
         }
+    }
+
+    /// 新默认、持久化、热刷新及非法值原子拒绝沿真实管理路由验证。@return 无。
+    #[tokio::test]
+    async fn native_idle_settings_default_reload_and_atomic_validation() {
+        let (app, gateway, settings, _) = test_router_with_gateway_and_settings().await;
+        gateway.reload_native_idle_timeout().await.unwrap();
+        assert_eq!(gateway.native_idle_timeout(), 120);
+        assert_eq!(
+            settings
+                .get_value("native_idle_timeout_secs", "missing")
+                .await
+                .unwrap(),
+            "120"
+        );
+        for value in ["30", "60", "300", "3600", "120"] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(Method::PUT)
+                        .uri("/admin/settings")
+                        .header(header::AUTHORIZATION, "Bearer admin")
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Body::from(
+                            json!({"native_idle_timeout_secs":value}).to_string(),
+                        ))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(gateway.native_idle_timeout(), value.parse::<u64>().unwrap());
+            gateway.reload_native_idle_timeout().await.unwrap();
+            assert_eq!(
+                settings
+                    .get_value("native_idle_timeout_secs", "missing")
+                    .await
+                    .unwrap(),
+                value
+            );
+        }
+        for value in ["", "0", "29", "3601", "60.5", "bad", "-1", " 120"] {
+            let response = app.clone().oneshot(Request::builder()
+                .method(Method::PUT).uri("/admin/settings")
+                .header(header::AUTHORIZATION, "Bearer admin")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(json!({"native_idle_timeout_secs":value,"stream_keepalive_interval_secs":"100"}).to_string())).unwrap()).await.unwrap();
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST, "值={value}");
+            assert_eq!(gateway.native_idle_timeout(), 120);
+            assert_ne!(
+                settings
+                    .get_value("stream_keepalive_interval_secs", "45")
+                    .await
+                    .unwrap(),
+                "100"
+            );
+        }
+        settings
+            .upsert_many(&HashMap::from([(
+                "native_idle_timeout_secs".into(),
+                "invalid".into(),
+            )]))
+            .await
+            .unwrap();
+        gateway.reload_native_idle_timeout().await.unwrap();
+        assert_eq!(gateway.native_idle_timeout(), 120);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/settings")
+                    .header(header::AUTHORIZATION, "Bearer admin")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
     }
 
     #[tokio::test]

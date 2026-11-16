@@ -47,7 +47,7 @@ pull 按 `registry_digest` 固定下载，核对配置 ID后建立清单中的�
 
 账号可在 cc2api 选择 `request_backend=native293`，界面显示280 / 293自动匹配。新版镜像分别安装两版单文件执行内核。293沿固定beta.6附件，280由CI从固定官方来源隔离构建并校验最终摘要。本地分别用 `V3_NATIVE_RUNTIME_ASSET`、`V3_NATIVE_RUNTIME_280_ASSET` 提供同摘要制品。来源、安装、双版本准备和升级说明见[原生双版本合同](../../services/runtime/docs/native-versions.md)。
 
-账号默认 `V3_ACCOUNT_MEMORY=unlimited`，原生方式可省略 `V3_NATIVE_SENDER_MEMORY`。显式有限账号需要配置该发送器预算。标准并发 3 对应最多 6 个 Haiku 进程，已验证配置为 `1536m`，账号总 RAM `4g` 时 CLI 剩余 2304 MiB。有限模式的sender和network使用各自有限RAM，额外swap只交给CLI。原生池的 HOME/config/cwd 位于 UID 1001 独占的 `/native`，与 CLI 角色的 HOME 分离。同账号同版本的池内共享经SHA与封存校验的只读执行映像，进程保持独立堆和上下文，各账号分别持有池。额外进程空闲300秒（5分钟）后回收并保留1个暖进程。既有293隔离V3六路实测峰值约646 MiB，1536 MiB限额内OOM为0，回收后sender约189 MiB。280/293混合池峰值需要独立测量。
+账号默认 `V3_ACCOUNT_MEMORY=unlimited`，原生方式可省略 `V3_NATIVE_SENDER_MEMORY`。显式有限账号需要配置该发送器预算。标准并发 3 对应最多 6 个 Haiku 进程，已验证配置为 `1536m`，账号总 RAM `4g` 时 CLI 剩余 2304 MiB。有限模式的sender和network使用各自有限RAM，额外swap只交给CLI。原生池的 HOME/config/cwd 位于 UID 1001 独占的 `/native`，与 CLI 角色的 HOME 分离。同账号同版本的池内共享经SHA与封存校验的只读执行映像，进程保持独立堆和上下文，各账号分别持有池。额外空闲进程默认120秒后回收，账号整体保留1个基础暖进程，执行映像缓存继续保留。可在系统设置“预热与拦截 → 原生进程池”调整 `native_idle_timeout_secs`（30–3600秒）；保存后由后台巡检同步至已运行sender，沿原20秒巡检及有界排队、维护和重试规则生效。后续调整沿同一设置入口热更新。既有293隔离V3六路实测峰值约646 MiB，1536 MiB限额内OOM为0，回收后sender约189 MiB。280/293混合池峰值需要独立测量。
 
 `V3_NATIVE_PREWARM_ACCOUNT_ID` 默认为空。设为单个网关账号 ID 后，orchestrator 启动时尝试用空余容量提前启动该启用的原生账号，并准备一个 worker。首条业务占用唯一进程时，有足够并发额度则后台准备第二个。预热零模型调用，额外空闲进程仍按原时限回收。容量不足或账号需要维护时跳过后台启动。
 

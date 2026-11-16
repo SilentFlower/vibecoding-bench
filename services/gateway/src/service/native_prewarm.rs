@@ -1,7 +1,7 @@
 //! 原生账号的有界后台准备；通知只携带账号归属，执行时重新解析权威状态。
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -22,6 +22,7 @@ use crate::service::runtime_transport::{
     PreparedTransport, TransportBinding, now_ms, prepare, prepare_existing,
 };
 use crate::service::system_update;
+use crate::store::settings_store::DEFAULT_NATIVE_IDLE_TIMEOUT_SECS;
 
 const QUEUE_LIMIT: usize = 128;
 const PREPARE_PARALLELISM: usize = 2;
@@ -45,6 +46,7 @@ pub(crate) struct NativePrewarmer {
     states: Arc<Mutex<HashMap<i64, Value>>>,
     started: AtomicBool,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
+    idle_timeout_secs: Arc<AtomicU64>,
 }
 
 impl NativePrewarmer {
@@ -57,7 +59,22 @@ impl NativePrewarmer {
             states: Arc::new(Mutex::new(HashMap::new())),
             started: AtomicBool::new(false),
             shutdown: Mutex::new(None),
+            idle_timeout_secs: Arc::new(AtomicU64::new(
+                DEFAULT_NATIVE_IDLE_TIMEOUT_SECS
+                    .parse()
+                    .expect("默认空闲秒数合法"),
+            )),
         }
+    }
+
+    /// 热更新后台同步使用的回收秒数。@param seconds 已验证秒数。@return 无返回值。
+    pub(crate) fn set_idle_timeout(&self, seconds: u64) {
+        self.idle_timeout_secs.store(seconds, Ordering::SeqCst);
+    }
+
+    /// 读取后台当前采用的回收秒数。@return 已验证的秒数。
+    pub(crate) fn idle_timeout(&self) -> u64 {
+        self.idle_timeout_secs.load(Ordering::SeqCst)
     }
 
     /// 在网关装配完成后启动，首次扫描仅触及已运行环境。
@@ -76,6 +93,7 @@ impl NativePrewarmer {
         let mut events = self.accounts.subscribe_native_changes();
         let accounts = self.accounts.clone();
         let states = self.states.clone();
+        let idle_timeout_secs = self.idle_timeout_secs.clone();
         let (stop, mut stopping) = oneshot::channel();
         *self.shutdown.lock().unwrap() = Some(stop);
         tokio::spawn(async move {
@@ -127,6 +145,7 @@ impl NativePrewarmer {
                     let (cancel, cancellation) = oneshot::channel();
                     active.insert(id, Some(cancel));
                     let accounts = accounts.clone();
+                    let idle_timeout = idle_timeout_secs.load(Ordering::SeqCst);
                     jobs.spawn(async move {
                         let result = check_one(
                             accounts,
@@ -135,6 +154,7 @@ impl NativePrewarmer {
                             cancellation,
                             true,
                             wake,
+                            Some(idle_timeout),
                         )
                         .await;
                         (id, preparation_id, wake, result)
@@ -311,6 +331,7 @@ impl NativePrewarmer {
             cancellation,
             false,
             false,
+            None,
         )
         .await;
         let mut result =
@@ -337,6 +358,7 @@ async fn check_one(
     mut cancellation: oneshot::Receiver<()>,
     allow_prepare: bool,
     wake: bool,
+    idle_timeout_secs: Option<u64>,
 ) -> Result<Value, AppError> {
     let Some(_update_activity) = system_update::background_admission()? else {
         return Ok(json!({"state":"maintenance","reason":"system_maintenance"}));
@@ -415,6 +437,12 @@ async fn check_one(
         _ = queue.runtime_gate.wait_exclusive() => None,
         _ = activity.closed() => None,
         result = timeout_at(deadline, async {
+            if let Some(seconds) = idle_timeout_secs {
+                // 策略同步是独立管理写入；主动只读inspect从不携带此值。
+                if transport.sync_native_idle_timeout(seconds).await.is_err() {
+                    tracing::warn!(account_id = id, "原生空闲策略同步失败，将在后续巡检重试");
+                }
+            }
             let current = transport.native_readiness(preparation.clone()).await?;
             let mut status = serde_json::to_value(current).map_err(|_| AppError::Internal("检查状态编码失败".into()))?;
             last_readiness = Some(status.clone());

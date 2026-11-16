@@ -468,3 +468,50 @@ let observed = capture.observation(complete);
 - `scripts/testing/cc2api-native.ts`通过实际Python read_capture读取Rust落盘；`verify_native_diagnostics_cpu.py`覆盖三块诊断、动作筛选、历史兼容、HTML安全文本及390像素。
 - `info_short_circuits_before_creating_capture_files` 与 `native_real_gateway`：默认 info、未知私有模式拒绝、排队后模式切换仍零完整落盘、debug 脱敏及暖 PID 复用。Python覆盖七天边界、过期只读、未来/错账号/链接/替换/停止保护、启动无流量与512步游标/故障恢复。浏览器覆盖弹窗即开、关闭/卸载/快速切换、焦点、长正文、筛选分页、模式失败恢复和无尝试根摘要。
 - `tls_discontinuous_previews_are_withheld_before_persistence`、`tls_final_is_redacted_bounded_and_monotonic`、`tls_partial_and_shared_budget_preserve_unknown_ranges`：真实私有文件排除凭据片段、单调合并、null范围与共享预算。原生槽位测试覆盖慢启动、取消及运行时关闭。Python核验wire_final可选字段、空范围及历史兼容；浏览器覆盖最终变化的完整空/截断空/截断非空列表、390像素及后台重读归属。
+
+
+## Scenario: 原生额外空闲进程回收时间热配置
+
+### 1. Scope / Trigger
+
+- 系统设置、原生后台巡检及280/293共享账号池的额外空闲进程回收共同遵守本合同。
+
+### 2. Signatures
+
+- `native_idle_timeout_secs`：管理API及settings表使用字符串，默认`"120"`，范围30–3600秒整数。
+- `GatewayService::reload_native_idle_timeout()`补缺省并热加载；`SettingsStore::ensure_native_idle_timeout()`使用双库通用`INSERT ... ON CONFLICT (key) DO NOTHING`，保留已保存值及冻结迁移合同。
+- `POST /internal/native/idle-policy`私有DTO为`NativeIdlePolicy { account_id:i64, environment_id:String, generation:u64, idle_timeout_secs:u64 }`，拒绝额外字段。成功返回`{ok:true,idle_timeout_secs:<值>}`。
+- `PreparedTransport::sync_native_idle_timeout(seconds)`按运行绑定同步；`NativePool::set_idle_timeout(seconds)`更新本账号各版本回收计时器。
+
+### 3. Contracts
+
+- 启动在后台预热之前补齐缺失值；非法存量值回退120。GET返回Gateway当前有效值。PUT在任何写入前校验，本次所有设置沿原事务保存，然后热加载。
+- 设置位于“预热与拦截→原生进程池”，数字编辑及提交统一规整为字符串。分类切换保留草稿，撤销恢复已保存值。
+- 后台巡检沿原20秒扫描、128项队列、并行2及维护/重试边界同步已运行账号。策略只影响额外空闲进程；账号整体保留最近使用的一个基础暖进程，执行映像缓存继续保留，业务、准备身份及池代次保持。
+- 策略使用独立管理POST；主动`inspect`及readiness保持只读。同步失败仅记录受控告警并在后续巡检重试；旧sender返回404时保留原能力，并继续状态检查。
+- sender必须先校验服务凭据、当前native布局和账号/环境/代次精确绑定，再应用范围内策略。HTTP请求正文及上游协议不携带该管理配置。
+- 各版本的`watch::Sender<Duration>`更新会唤醒旧计时器；从原`idle_since`重新计算截止。新建版本池继承当前值。等待仅持有弱引用，池的存活仍由原所有者决定。回收仅遍历idle集合，活动进程继续原归属。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 缺失 / 非法存量值 | 补齐120 / 有效值回退120 |
+| PUT空值、负数、小数、范围外值 | 400，本次其它设置一起保持原值 |
+| 私有凭据错误 / 账号、环境或代次不符 | 401 / 503，策略保持原值 |
+| 旧sender缺同步接口 / 当前同步故障 | 兼容404 / 后续后台巡检重试 |
+| 缩短 / 延长期限 | 唤醒旧等待并按原空闲起点重算 |
+
+### 5. Scenarios and Examples
+
+- 正常：默认120秒，60秒龄的两个空闲进程继续保留；121秒龄回收到一个。改为30秒后，原计时器被唤醒并回收已超期的额外进程。
+- 边界：改为300秒时121秒龄进程继续保留；同账号280/293同步同一值，新版本池继承该值，活动进程和映像缓存继续存活。
+- 错误用法：把空闲秒数加入完整启动身份导致暖进程换代，或让页面readiness读取附带策略写入。正确处理：独立受鉴权管理接口同步运行策略，保持身份与只读入口原语义。
+
+### 6. Tests Required
+
+- `native_idle_settings_default_reload_and_atomic_validation`：默认补齐、合法值热加载及保存保留、非法值原子拒绝、存量损坏回退。
+- `native_idle_policy_requires_authentication_and_exact_binding`：真实HTTP同步、错误凭据/账号/代次/范围拒绝及旧接口404兼容。
+- `default_idle_reaper_keeps_spare_until_two_minutes`：真实子进程、默认阈值、缩短唤醒、延长保留、忙进程存活、一个基础暖进程、映像引用及原池身份保持。
+- `idle_policy_updates_all_versions_without_replacing_pool_identity`：已有及后建版本继承更新，保持零进程启动。
+- 浏览器基于真实构建产物核对1440/390px的120默认、跨分类草稿、范围拒绝、字符串保存、回读、撤销及页面宽度；沿既有全量Rust与前端构建验证。

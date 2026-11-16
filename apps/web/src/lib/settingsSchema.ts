@@ -542,6 +542,20 @@ export const settingsGroups:SettingsGroup[] = [
     "description": "峰值预热与客户端探针处理",
     "sections": [
       {
+        "title": "原生进程池",
+        "description": "调整并发结束后的空闲保留时间。",
+        "fields": [
+          {
+            "key": "native_idle_timeout_secs",
+            "label": "额外空闲进程回收时间（秒）",
+            "kind": "number",
+            "help": "30–3600 秒，默认 120 秒。保存后由后台巡检同步，无需重启。账号整体保留一个基础暖进程，执行映像缓存继续保留。并发增加时按需补建进程。",
+            "min": 30,
+            "max": 3600
+          }
+        ]
+      },
+      {
         "title": "峰值预热",
         "description": "配置预热时间与模型，最近执行情况在预热记录中查看。",
         "fields": [

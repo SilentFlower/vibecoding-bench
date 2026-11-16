@@ -153,6 +153,10 @@ async fn main() {
         )
         .with_diagnostics(diagnostics_store),
     );
+    gateway_svc
+        .reload_native_idle_timeout()
+        .await
+        .expect("原生空闲配置加载失败");
     gateway_svc.start_native_prewarm();
     gateway_svc
         .reload_system_role_models()

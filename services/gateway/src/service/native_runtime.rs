@@ -52,6 +52,7 @@ use crate::service::rewriter::{CacheControlTtlRewrite, extract_session_id_from_b
 use crate::service::runtime_transport::{
     CLOCK_SKEW_MS, REQUEST_BUDGET_MS, SenderConfig, now_ms, validate_request,
 };
+use crate::store::settings_store::DEFAULT_NATIVE_IDLE_TIMEOUT_SECS;
 
 const LAUNCHER_SHA256: &str = "fce50a30d739dbc614e450d4d1913208fa35c6373c4f07a3986657393a99261e";
 const IMAGE_SHA256: &str = "564019c9560e960e96875c9663975491534b27c789ea3d23e5c13309ff293c79";
@@ -364,14 +365,14 @@ pub struct NativePool {
     state: Mutex<PoolState>,
     generation: tokio::sync::Mutex<()>,
     image: tokio::sync::Mutex<Option<(String, Arc<File>)>>,
-    idle_timeout: Duration,
+    idle_timeout: watch::Sender<Duration>,
     verified: Mutex<Option<VerifiedDistribution>>,
     warmup: RwLock<()>,
     preparations: Mutex<HashMap<PreparationKey, PreparationState>>,
 }
 
 impl Default for NativePool {
-    /// 创建按需池，额外暖进程空闲300秒后回收，减少短间歇下的重复补位。@return 空池及独立映像缓存。
+    /// 创建按需池，额外暖进程默认空闲120秒后回收。@return 空池及独立映像缓存。
     fn default() -> Self {
         Self {
             source_version: NativeSourceVersion::default(),
@@ -380,7 +381,12 @@ impl Default for NativePool {
             state: Mutex::new(PoolState::default()),
             generation: tokio::sync::Mutex::new(()),
             image: tokio::sync::Mutex::new(None),
-            idle_timeout: Duration::from_secs(300),
+            idle_timeout: watch::channel(Duration::from_secs(
+                DEFAULT_NATIVE_IDLE_TIMEOUT_SECS
+                    .parse()
+                    .expect("默认空闲秒数合法"),
+            ))
+            .0,
             verified: Mutex::new(None),
             warmup: RwLock::new(()),
             preparations: Mutex::new(HashMap::new()),
@@ -1568,6 +1574,7 @@ impl NativePool {
                 let pool = Arc::new(Self {
                     source_version: version,
                     shared: self.shared.clone(),
+                    idle_timeout: watch::channel(*self.idle_timeout.borrow()).0,
                     ..Self::default()
                 });
                 self.shared
@@ -2149,6 +2156,34 @@ impl NativePool {
         usize::from(newest.is_none_or(|(_, version)| version == self.source_version))
     }
 
+    /// 同步账号各版的空闲期限，并唤醒旧计时器重新计算。
+    /// @param seconds 已验证的回收秒数。
+    /// @return 无返回值；当前业务及映像缓存保持各自生命周期。
+    pub(crate) fn set_idle_timeout(self: &Arc<Self>, seconds: u64) {
+        let duration = Duration::from_secs(seconds);
+        let mut pools: Vec<_> = self
+            .shared
+            .pools
+            .lock()
+            .unwrap()
+            .iter()
+            .filter_map(Weak::upgrade)
+            .collect();
+        if !pools.iter().any(|pool| Arc::ptr_eq(pool, self)) {
+            pools.push(self.clone());
+        }
+        for pool in pools {
+            pool.idle_timeout.send_if_modified(|current| {
+                if *current == duration {
+                    return false;
+                }
+                *current = duration;
+                true
+            });
+            pool.schedule_local_idle_reap();
+        }
+    }
+
     /// 新增暖进程后同步各版回收计划，备用保留期限按账号共用。
     fn schedule_idle_reap(self: &Arc<Self>) {
         let pools: Vec<_> = self
@@ -2179,8 +2214,10 @@ impl NativePool {
             state.reaper_running = true;
         }
         let weak = Arc::downgrade(self);
+        let mut policy = self.idle_timeout.subscribe();
         tokio::spawn(async move {
             loop {
+                let idle_timeout = *policy.borrow_and_update();
                 let deadline = {
                     let Some(pool) = weak.upgrade() else {
                         return;
@@ -2194,12 +2231,18 @@ impl NativePool {
                     state
                         .idle
                         .iter()
-                        .map(|worker| worker.idle_since + pool.idle_timeout)
+                        .map(|worker| worker.idle_since + idle_timeout)
                         .min()
                         .unwrap()
                 };
                 // 等待期间只持有Weak，后台回收不能延长账号池的生命周期。
-                sleep_until(deadline).await;
+                tokio::select! {
+                    _ = sleep_until(deadline) => {},
+                    changed = policy.changed() => {
+                        if changed.is_err() { return; }
+                        continue;
+                    }
+                }
                 let Some(pool) = weak.upgrade() else {
                     return;
                 };
@@ -2211,7 +2254,7 @@ impl NativePool {
                         let Some(index) = state
                             .idle
                             .iter()
-                            .position(|worker| worker.idle_since.elapsed() >= pool.idle_timeout)
+                            .position(|worker| worker.idle_since.elapsed() >= *policy.borrow())
                         else {
                             break;
                         };
@@ -2719,14 +2762,21 @@ mod tests {
         assert_eq!(root.shared.live.load(Ordering::SeqCst), 0);
     }
 
-    /// 额外暖进程跨过旧窗口继续保留，到新阈值后只留一个。@return 无。
+    /// 默认阈值、热更新唤醒及延长均保留一个暖进程和共享映像。@return 无。
     #[tokio::test]
-    async fn default_idle_reaper_keeps_spare_until_five_minutes() {
-        for (idle_seconds, expected_idle) in [(120, 2), (301, 1)] {
+    async fn default_idle_reaper_keeps_spare_until_two_minutes() {
+        for (idle_seconds, updated, expected_idle) in [
+            (60, None, 2),
+            (121, None, 1),
+            (60, Some(30), 1),
+            (121, Some(300), 2),
+        ] {
             let pool = Arc::new(NativePool::default());
+            let image = Arc::new(File::open("/dev/null").unwrap());
+            *pool.image.lock().await = Some(("synthetic-image".into(), image.clone()));
             let key = "synthetic-idle-retention".to_owned();
             let mut workers = Vec::new();
-            for _ in 0..2 {
+            for _ in 0..3 {
                 let mut child = Command::new("python3")
                     .args(["-c", "import sys;sys.stdin.buffer.read(1)"])
                     .stdin(Stdio::piped())
@@ -2747,7 +2797,7 @@ mod tests {
                     root: None,
                     _image: File::open("/dev/null").unwrap(),
                     execution_image: None,
-                    // 使用真实空闲年龄触发生产回收逻辑，避免回归测试等待五分钟。
+                    // 使用真实空闲年龄触发生产回收逻辑，避免回归测试等待两分钟。
                     idle_since: Instant::now() - Duration::from_secs(idle_seconds),
                     _lease: Some(WorkerLease {
                         _capacity: None,
@@ -2764,19 +2814,29 @@ mod tests {
                     startup_ms: 0,
                 });
             }
+            let mut active = workers.pop().unwrap();
+            let active_pid = active.pid().unwrap();
             {
                 let mut state = pool.state.lock().unwrap();
                 state.key = key.clone();
-                state.live = workers.len();
-                state.live_by_key.insert(key.clone(), workers.len());
+                state.live = workers.len() + 1;
+                state.live_by_key.insert(key.clone(), workers.len() + 1);
                 state.idle = workers;
             }
             pool.schedule_idle_reap();
+            if let Some(seconds) = updated {
+                if seconds == 30 {
+                    // 等待旧计时器进入睡眠，热更新必须主动唤醒它。
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                    assert_eq!(pool.state.lock().unwrap().idle.len(), 2);
+                }
+                pool.set_idle_timeout(seconds);
+            }
             if expected_idle == 2 {
                 tokio::time::sleep(Duration::from_millis(100)).await;
             } else {
                 timeout(Duration::from_secs(2), async {
-                    while pool.state.lock().unwrap().live != expected_idle {
+                    while pool.state.lock().unwrap().live != expected_idle + 1 {
                         tokio::task::yield_now().await;
                     }
                 })
@@ -2786,9 +2846,17 @@ mod tests {
             {
                 let mut state = pool.state.lock().unwrap();
                 assert_eq!(state.idle.len(), expected_idle);
-                assert_eq!(state.live, expected_idle);
+                assert_eq!(state.live, expected_idle + 1);
                 assert!(state.idle.iter_mut().all(Worker::reusable));
+                assert_eq!(state.key, key);
             }
+            assert!(Arc::ptr_eq(
+                &pool.image.lock().await.as_ref().unwrap().1,
+                &image
+            ));
+            assert!(Path::new(&format!("/proc/{active_pid}/exe")).exists());
+            assert!(active.reusable());
+            active.retire().await;
             let workers = std::mem::take(&mut pool.state.lock().unwrap().idle);
             for worker in workers {
                 worker.retire().await;
@@ -2796,6 +2864,21 @@ mod tests {
             assert_eq!(pool.state.lock().unwrap().live, 0);
             assert!(pool.state.lock().unwrap().live_by_key.is_empty());
         }
+    }
+
+    /// 策略覆盖已有及后建版本池，更新本身保持零进程启动。@return 无。
+    #[tokio::test]
+    async fn idle_policy_updates_all_versions_without_replacing_pool_identity() {
+        let pool = Arc::new(NativePool::default());
+        pool.set_idle_timeout(300);
+        let alternate = pool.for_version(NativeSourceVersion::Cc280);
+        assert_eq!(*alternate.idle_timeout.borrow(), Duration::from_secs(300));
+        alternate.state.lock().unwrap().key = "synthetic-280".into();
+        pool.set_idle_timeout(60);
+        assert_eq!(*pool.idle_timeout.borrow(), Duration::from_secs(60));
+        assert_eq!(*alternate.idle_timeout.borrow(), Duration::from_secs(60));
+        assert_eq!(alternate.state.lock().unwrap().key, "synthetic-280");
+        assert_eq!(pool.shared.live.load(Ordering::SeqCst), 0);
     }
 
     /// 真实恢复句柄的EOF日志区分管道断开与物理退出，保留外部PID。
@@ -3687,7 +3770,7 @@ mod tests {
             }
         };
         let pool = Arc::new(NativePool {
-            idle_timeout: Duration::from_secs(2),
+            idle_timeout: watch::channel(Duration::from_secs(2)).0,
             ..Default::default()
         });
         if var("CCRB_TEST_TLS_ONLY").as_deref() == Ok("1") {

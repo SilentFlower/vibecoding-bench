@@ -13,6 +13,26 @@ pub const POOL_MEMORY_MIB: u64 = 256;
 /// 每个独立进程的堆和缓冲预算；共享代码计入池基础份额。
 pub const WORKER_MEMORY_MIB: u64 = 192;
 
+/// 管理端同步的账号级空闲回收策略，独立于进程身份和业务正文。
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct NativeIdlePolicy {
+    pub account_id: i64,
+    pub environment_id: String,
+    pub generation: u64,
+    pub idle_timeout_secs: u64,
+}
+
+/// 核验额外空闲进程的回收秒数。@param seconds 管理端配置值。@return 合法值或参数错误。
+pub(crate) fn validate_idle_timeout(seconds: u64) -> Result<u64, AppError> {
+    if !(30..=3600).contains(&seconds) {
+        return Err(AppError::BadRequest(
+            "额外空闲进程回收时间必须是30到3600秒的整数".into(),
+        ));
+    }
+    Ok(seconds)
+}
+
 /// 已独立适配的官方源版本，历史私有报文缺省为293。
 #[derive(
     Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq, Hash, PartialOrd, Ord,

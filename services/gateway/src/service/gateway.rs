@@ -44,6 +44,7 @@ use crate::service::account::{
 };
 use crate::service::diagnostics::{self, CURRENT_TRACE, RequestTraceGuard, TraceContext};
 use crate::service::native_contract::NativeSourceVersion;
+use crate::service::native_contract::validate_idle_timeout;
 use crate::service::native_prewarm::NativePrewarmer;
 use crate::service::native_runtime::NativeSubmission;
 use crate::service::request_body_codec::{
@@ -76,6 +77,7 @@ use crate::service::version_profile::{
 };
 use crate::store::cache::CacheStore;
 use crate::store::diagnostics_store::DiagnosticsStore;
+use crate::store::settings_store::DEFAULT_NATIVE_IDLE_TIMEOUT_SECS;
 use crate::store::settings_store::{
     DEFAULT_ALLOW_SYSTEM_ROLE_MODELS, DEFAULT_BOOTSTRAP_ADDITIONAL_MODEL_OPTIONS,
     DEFAULT_BOOTSTRAP_MODEL_OPTIONS_MODE, DEFAULT_CACHE_CONTROL_TTL_REWRITE,
@@ -620,6 +622,32 @@ pub struct GatewayService {
 }
 
 impl GatewayService {
+    /// 返回当前原生池回收配置。@return 已加载的空闲秒数。
+    pub fn native_idle_timeout(&self) -> u64 {
+        self.native_prewarmer.idle_timeout()
+    }
+
+    /// 补齐历史默认值并热更新原生账号的空闲回收配置。
+    /// @return 后续后台巡检采用新值，持久化或读取失败返回错误。
+    pub async fn reload_native_idle_timeout(&self) -> Result<(), AppError> {
+        self.settings_store.ensure_native_idle_timeout().await?;
+        let raw = self
+            .settings_store
+            .get_value("native_idle_timeout_secs", DEFAULT_NATIVE_IDLE_TIMEOUT_SECS)
+            .await?;
+        let seconds = raw
+            .parse::<u64>()
+            .ok()
+            .and_then(|value| validate_idle_timeout(value).ok())
+            .unwrap_or_else(|| {
+                DEFAULT_NATIVE_IDLE_TIMEOUT_SECS
+                    .parse()
+                    .expect("默认空闲秒数合法")
+            });
+        self.native_prewarmer.set_idle_timeout(seconds);
+        Ok(())
+    }
+
     /// 构造 Gateway 服务及其 Session Hello 探测依赖。
     ///
     /// @param account_svc 账号调度服务。

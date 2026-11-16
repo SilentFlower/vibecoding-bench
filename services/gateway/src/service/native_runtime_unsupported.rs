@@ -26,6 +26,9 @@ pub(crate) fn verify_distribution(_config: &NativeSenderConfig) -> Result<File, 
 pub struct NativePool;
 
 impl NativePool {
+    /// 兼容其它平台的管理策略同步。@param seconds 已校验秒数。@return 无返回值。
+    pub(crate) fn set_idle_timeout(self: &Arc<Self>, _seconds: u64) {}
+
     /// 在实时检查阶段明确拒绝不支持的平台。
     /// @param config sender 配置。
     /// @param identity 当前账号身份。

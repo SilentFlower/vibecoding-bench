@@ -610,7 +610,7 @@ AccountStore::update_cli_process(account: &Account, process: &Value) -> Result<(
 - `canonical_process.observation` 固定 `source="v3:procfs:cli"`、32 位小写 hex `environment_id`、精确 `cli_version`、UTC 秒 `observed_at/sampled_at`、整数 `sample_count`、字节 `rss_bytes/rss_min_bytes/rss_max_bytes`。内存/样本计数必须非负且小于 2^53；时间有限且不超当前 60 秒，采样时刻不晚于观察时刻。count=0 时采样时间及三个 RSS 都为 null；count>0 时它们必须齐全且 `0 < min <= rss <= max < 2^53`。
 - 容器上限可独立导入；RSS 没样本显示“未采集”，有样本显示真实时间。v3 observation 不填旧兼容默认堆/CPU/RSS 范围，上游只发送有依据的 constrainedMemory 和可选 rss，内部来源元数据不进入遥测。普通旧账号画像沿用既有兼容，已有 v3 账号通过独立按钮补齐，不批量迁移设备或凭据。
 - 完整转发验收使用真实调度器、空 SQLite、随机部署、两账号发送器、HTTP CONNECT/SOCKS 与本地 HTTPS 上游；来源 IP、合成标记、发送器 request_id 和响应哈希须可关联。正式 messages JSON/SSE、实际 CLI/API 并行、取消收口和失败关闭分别验收，不能以 ClientHello/502 或 runs-stream 代替成功业务响应。
-- 原生池验收探针显式以 `user='1001:1001'` 执行并校验 `geteuid()==1001`，避免 root 启动的 TLS broker 与降权 worker 的 procfs 权限混淆。保留六 worker、一个封存映像、内存预算和300秒空闲回收断言，不能因探针权限失败放宽数量要求。
+- 原生池验收探针显式以 `user='1001:1001'` 执行并校验 `geteuid()==1001`，避免 root 启动的 TLS broker 与降权 worker 的 procfs 权限混淆。保留六 worker、一个封存映像、内存预算和默认120秒空闲回收断言，不能因探针权限失败放宽数量要求。
 - 隔离构建仅显式启用 Cargo `v3-verification` 与 Docker `verification-control/verification-account`，临时根位于 `/run/v3/verification-ca.der`，仍验证签名与主机名。正式 control/account 不依赖这些阶段，不含该读取路径，不新增运行时 CA/跳过校验开关。测试镜像/清单不发布；生产非模型 HTTPS 与真实模型推理分别报告，受限账号不用于模型探测。
 
 ### 4. Validation & Error Matrix
@@ -1289,7 +1289,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 每次新进程先核验固定分发体，通过FD启动，握手验证PID/版本/raw_input_protocol，再核实际执行体SHA。首个实际映像要求 WRITE/GROW/SHRINK/SEAL 四项封存，池缓存只读FD；后续重新exec共享同一dev/inode。分发/执行体固定摘要由消费者代码及桥接运行时合同登记，外部manifest不授信。
 - CRIU恢复同样要求实际exe与池缓存共享dev/inode，并继续核验SHA、大小和四项封存；控制器持有root归属0555的封存映像，各实例独立打开FD，exe及目标VMA复用同一背板。独立进程、会话、私有页、绑定代次及唯一投递保持原合同，详细准入与生命周期见[原生CRIU热模板恢复协议](../../runtime/backend/runtime-contract.md#scenario-原生进程池-criu-热模板恢复协议-1)。共享上线初期保持保守恢复预算 `256+max_workers*(192+108)` MiB；旧画像缺 `shared_memfd_restore=1` 或恢复准入失败沿受限普通exec回退。
 - 每个进程独立HOME/config/cwd、当前bearer及worker_id，每轮独立原生根。账号/身份/代理/凭据/并发摘要改变产生新代次，旧活动自然收口，空闲旧进程退役。单进程一次作业，唯一终态及匹配idle后复用；取消、迟到/损坏帧和状态不明均退役。
-- 单个弱引用回收任务在额外进程空闲300秒（5分钟）后保留1个暖进程；忙进程保持当前归属。映像缓存可在所有原进程退出后支持重建，池销毁释放FD。
+- 单个弱引用回收任务在额外进程默认空闲120秒后保留1个基础暖进程；忙进程保持当前归属。映像缓存可在所有原进程退出后支持重建，池销毁释放FD。全局`native_idle_timeout_secs`支持30–3600秒，后台巡检同步并唤醒旧计时器；完整接口和兼容合同见[空闲回收时间热配置](../../gateway/backend/settings-database.md#scenario-原生额外空闲进程回收时间热配置)。
 - 运行中原生账号由网关每20秒零模型巡检并按需恢复，具体身份、退避和计时合同见[原生持续预热](../../gateway/backend/service-architecture.md#scenario-原生持续预热实时就绪与请求进程诊断)。普通巡检只查询已有绑定，不唤醒休眠环境。显式保存原生选择与重试由网关在门禁释放后允许唤醒。
 - 批量客户端仅精确GET /admin/native-preparations接受最多4096项对象数组，其余路由继续要求对象。快照返回本次映射及read_failed；缺账号快照为snapshot_missing。页面按实际配置展示adaptive_prewarm，读取保持零模型操作。
 - `native_preparation.state=maintenance` 仅保留已知 `system_maintenance|maintenance` 原因，分别表示平台更新与账号维护；其它原因回到账号维护固定说明，PID 和进程数保持未观测。平台维护与真实失败恢复调度遵循网关原生持续预热合同，页面读取继续零写入。
@@ -1340,7 +1340,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 - 正常：无限账号 N=2、max_workers=4，三个角色与派生评审的 cgroup `memory.max/memory.swap.max` 均为 max，CPU/PID 保留。
 - 正常：有限账号总4g、N=3、原生sender1536m时，network256m、CLI2304m；3普通/6Haiku实际TLS与加权准入保持。
-- 边界：同账号同版的六个进程共享一个封存映像，各worker堆及请求缓冲独立，各账号分别持有池；额外进程空闲300秒后剩一个暖进程，下次并发按需重建。既有293隔离合成小请求的V3实测六路峰值约646 MiB、空闲约189 MiB，OOM计数为0；280/293混合、大正文和长流峰值按实际负载另验。
+- 边界：同账号同版的六个进程共享一个封存映像，各worker堆及请求缓冲独立，各账号分别持有池；额外进程默认空闲120秒后剩一个暖进程，下次并发按需重建。既有293隔离合成小请求的V3实测六路峰值约646 MiB、空闲约189 MiB，OOM计数为0；280/293混合、大正文和长流峰值按实际负载另验。
 - 错误用法：把分发或执行映像大小当作进程RAM，或将合法低额度配置准入视为实际负载容量保证。正确处理：分别登记分发/展开/实际cgroup数据，按实际负载验证容量。
 - 错误用法：布局检查查询已被配置事务停止的HTTP sender。正确处理：核验归属后按停止状态处理；运行中仍查询真实活动。
 - 正常：配置试点后服务启动先准备一个 worker；首条占用后才补位，回收超期额外进程时仍保留一个。
@@ -1368,8 +1368,8 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 预启动回归：`test_account_runtime.py` 验证仅启用绑定、满容量时不腾挪、sender 开关先写后通知；`native_real_binary` 验证首个预热 PID、第二个唯一补位、回收到一个以及零模型计数。
 - `test_account_runtime.py` 核验批量读取、绑定/内核代次、新鲜度、非法数字、legacy/休眠及秘密过滤；合成环境页断言读取零写入且准备失败/过期明确显示。
 - `test_native_readiness_distinguishes_pending_checks_without_trusting_old_workers` 覆盖首次缺身份、严格布尔进度、真实失败、旧环境/内核及过期快照不投影 PID；`verify_environment_ui.py` 使用实际20秒轮询确认检查中到就绪，失败/冲突原因和零业务写入保持。
-- `default_idle_reaper_keeps_spare_until_five_minutes` 使用真实子进程及空闲年龄：120秒保留两个，301秒回收到一个，实际退出后物理许可归零。
-- `deploy/flower2api/verify_forwarding.py --native`：真实两账号三角色、HTTP/SOCKS、3普通/6Haiku、同映像/秘密隔离、cgroup峰值与OOM0、300秒回收及按账号回退；N4等待上限315秒，验证镜像的额外CA仅限本地夹具。
+- `default_idle_reaper_keeps_spare_until_two_minutes`使用真实子进程及空闲年龄：60秒保留两个，121秒回收到一个；缩短30秒唤醒旧等待，延长300秒继续保留，忙进程、映像缓存及原池身份保持。
+- `deploy/flower2api/verify_forwarding.py --native`：真实两账号三角色、HTTP/SOCKS、3普通/6Haiku、同映像/秘密隔离、cgroup峰值与OOM0、默认120秒回收及按账号回退；N4等待上限135秒，验证镜像的额外CA仅限本地夹具。
 - 发布验收从实际Release下载附件，核SHA/大小、冻结构建输入并运行真实消费者；合成回环与真实付费推理分开记录。
 
 ## Scenario: 单账号原生内核在线切换与回滚

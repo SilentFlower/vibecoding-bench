@@ -25,15 +25,17 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use futures_util::StreamExt;
 use futures_util::stream::unfold;
-use reqwest::Client;
 use reqwest::redirect::Policy;
+use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
 use crate::error::AppError;
 use crate::model::account::Account;
 use crate::model::request_diagnostics::RequestLogMode;
+use crate::service::native_contract::{NativeIdlePolicy, validate_idle_timeout};
 use crate::service::native_contract::{
     NativeKernelPreparation, NativeKernelTarget, NativePreparation, NativePreparationControl,
     NativePreparationStatus, NativeReadinessStatus, NativeSourceVersion,
@@ -412,6 +414,45 @@ async fn prepare_from_runtime(
 }
 
 impl PreparedTransport {
+    /// 经已验证运行绑定同步空闲策略，兼容尚在切换的旧sender。
+    /// @param seconds 已验证的全局回收秒数。
+    /// @return 支持该接口时返回true，旧sender返回false，传输故障返回错误。
+    pub(crate) async fn sync_native_idle_timeout(&self, seconds: u64) -> Result<bool, AppError> {
+        validate_idle_timeout(seconds)?;
+        let PreparedRoute::V3 { client, binding } = &self.route else {
+            return Err(AppError::ServiceUnavailable("空闲策略需要V3 sender".into()));
+        };
+        let response = client
+            .post(format!(
+                "{}/internal/native/idle-policy",
+                binding.endpoint.trim_end_matches('/')
+            ))
+            .bearer_auth(&binding.secret)
+            .json(&NativeIdlePolicy {
+                account_id: self.account_id,
+                environment_id: binding.environment_id.clone(),
+                generation: binding.generation,
+                idle_timeout_secs: seconds,
+            })
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await
+            .map_err(|_| AppError::ServiceUnavailable("空闲策略同步通道不可用".into()))?;
+        if response.status() == StatusCode::NOT_FOUND {
+            return Ok(false);
+        }
+        let value: Value = response
+            .error_for_status()
+            .map_err(|_| AppError::ServiceUnavailable("空闲策略同步失败".into()))?
+            .json()
+            .await
+            .map_err(|_| AppError::ServiceUnavailable("空闲策略回执无效".into()))?;
+        if value["ok"] != true || value["idle_timeout_secs"] != seconds {
+            return Err(AppError::ServiceUnavailable("空闲策略回执不符".into()));
+        }
+        Ok(true)
+    }
+
     /// 核对两次只读解析是否仍指向同一受信任 sender。
     /// @param other 当前重新读取的传输绑定。
     /// @return 账号、代次、服务与鉴权配置完全一致时为 true。
@@ -949,7 +990,7 @@ fn validate_request_at(
 async fn status(
     State(state): State<SenderState>,
     headers: HeaderMap,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<Value>, AppError> {
     let config = read_config(&state.config_path)?;
     authenticate(&headers, &config)?;
     Ok(Json(
@@ -1031,7 +1072,7 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
 async fn native_status(
     State(state): State<SenderState>,
     headers: HeaderMap,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<Value>, AppError> {
     let config = read_config(&state.config_path)?;
     authenticate(&headers, &config)?;
     config
@@ -1110,6 +1151,32 @@ async fn native_readiness(
         ));
     }
     Ok(Json(status))
+}
+
+/// 管理端在运行绑定内同步回收策略，保持账号身份和活动请求的原生命周期。
+/// @param state 当前sender。@param headers 私有鉴权。@param policy 账号及代次绑定。
+/// @return 已应用的秒数，错误绑定或非法值拒绝。
+async fn native_idle_policy(
+    State(state): State<SenderState>,
+    headers: HeaderMap,
+    Json(policy): Json<NativeIdlePolicy>,
+) -> Result<Json<Value>, AppError> {
+    let config = read_config(&state.config_path)?;
+    authenticate(&headers, &config)?;
+    if config.native.is_none()
+        || policy.account_id != config.binding.account_id
+        || policy.environment_id != config.binding.environment_id
+        || policy.generation != config.binding.generation
+    {
+        return Err(AppError::ServiceUnavailable(
+            "空闲策略环境归属已变化".into(),
+        ));
+    }
+    validate_idle_timeout(policy.idle_timeout_secs)?;
+    state.native_pool.set_idle_timeout(policy.idle_timeout_secs);
+    Ok(Json(
+        json!({"ok":true,"idle_timeout_secs":policy.idle_timeout_secs}),
+    ))
 }
 
 /// 专用切换预热在 sender 内排除已入场流和迟到的普通准备。
@@ -1220,7 +1287,7 @@ async fn native_prepare_cancel(
     State(state): State<SenderState>,
     headers: HeaderMap,
     Json(control): Json<NativePreparationControl>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<Value>, AppError> {
     let config = read_config(&state.config_path)?;
     authenticate(&headers, &config)?;
     if control.account_id != config.binding.account_id
@@ -1334,6 +1401,7 @@ pub fn sender_router(config_path: String) -> Router {
         .route("/internal/native/status", get(native_status))
         .route("/internal/native/prepare", post(native_prepare))
         .route("/internal/native/readiness", post(native_readiness))
+        .route("/internal/native/idle-policy", post(native_idle_policy))
         .route(
             "/internal/native/prepare-switch",
             post(native_prepare_switch),
@@ -1368,6 +1436,71 @@ mod tests {
     use std::path::PathBuf;
     use std::process::{Child, Command, Stdio};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    /// 真实HTTP策略同步检查鉴权、账号代次、范围及旧sender兼容。@return 无。
+    #[tokio::test]
+    async fn native_idle_policy_requires_authentication_and_exact_binding() {
+        let path = temp_dir().join(format!("native-idle-policy-{}.json", Uuid::new_v4()));
+        let secret = "synthetic-idle-policy-private-service-secret";
+        let config: SenderConfig = serde_json::from_value(json!({
+            "native":{"binary_path":"/unused","work_root":"/unused","memory_mib":0,"max_workers":8},
+            "binding":{"account_id":7,"environment_id":"synthetic","generation":1,
+                "endpoint":"http://localhost:8091","secret":secret,"release_id":"synthetic"},
+            "proxy_url":"","allowed_origin":"https://api.anthropic.com"
+        }))
+        .unwrap();
+        fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(
+            axum::serve(listener, sender_router(path.to_string_lossy().into_owned())).into_future(),
+        );
+        let transport = PreparedTransport {
+            account_id: 7,
+            route: PreparedRoute::V3 {
+                client: Client::new(),
+                binding: TransportBinding {
+                    endpoint: endpoint.clone(),
+                    ..config.binding.clone()
+                },
+            },
+        };
+        assert!(transport.sync_native_idle_timeout(60).await.unwrap());
+        assert!(transport.sync_native_idle_timeout(300).await.unwrap());
+        for (token, account_id, generation, seconds, expected) in [
+            ("wrong", 7, 1, 120, StatusCode::UNAUTHORIZED),
+            (secret, 8, 1, 120, StatusCode::SERVICE_UNAVAILABLE),
+            (secret, 7, 2, 120, StatusCode::SERVICE_UNAVAILABLE),
+            (secret, 7, 1, 0, StatusCode::BAD_REQUEST),
+            (secret, 7, 1, 3601, StatusCode::BAD_REQUEST),
+        ] {
+            let response = Client::new().post(format!("{endpoint}/internal/native/idle-policy"))
+                .bearer_auth(token).json(&json!({"account_id":account_id,"environment_id":"synthetic","generation":generation,"idle_timeout_secs":seconds}))
+                .send().await.unwrap();
+            assert_eq!(response.status(), expected);
+        }
+        server.abort();
+        let _ = server.await;
+        fs::remove_file(path).unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let old = tokio::spawn(async move {
+            axum::serve(listener, Router::new()).await.unwrap();
+        });
+        let transport = PreparedTransport {
+            account_id: 7,
+            route: PreparedRoute::V3 {
+                client: Client::new(),
+                binding: TransportBinding {
+                    endpoint,
+                    ..config.binding
+                },
+            },
+        };
+        assert!(!transport.sync_native_idle_timeout(120).await.unwrap());
+        old.abort();
+        let _ = old.await;
+    }
 
     /// 双版按安装表选择并保留真实额度，旧单版继续限定已安装版本。@return 无。
     #[test]
