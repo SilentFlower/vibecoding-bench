@@ -107,6 +107,12 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - 头部处理保留动作文字：删除行浅红底（当前`#fff4f5`）与红色标签，保留绿色、运行时处理紫色、提取上下文蓝色。筛选动作时高亮继续生效，不能只靠颜色传达含义。
 - 采集按发生时模式和capture_status判断，模式切换只影响后续请求；组装中间值与最终TLS证据分开。空字段展示未观测，0毫秒/0Token保留真实零值。
 
+### 会话封禁列表
+
+- `SessionPolicyBlocks.vue` 的每5秒轮询沿用已提交的会话前缀；搜索框草稿仅在显式查询时提交。后台读取使用独立请求状态防止重叠，保持刷新按钮文字、分页可用状态和已有空态；手动查询可取消后台读取，迟到回包沿代次丢弃。
+- 空态使用单层 `TableRow > TableCell`，居中显示图标、标题、说明与重置查询。`TableEmpty` 自带表格行，不能再包进 `TableRow`。表格排版通过页面容器的 `:deep(table/th/td)` 作用到组件内部，避免将父级 scoped 选择器绑定到内部 class 导致样式失效。
+- 验证入口 `python3 deploy/flower2api/verify_session_policy_blocks_ui.py`：覆盖390/1440/1920/2560px，慢读取期间按钮与面板尺寸稳定、轮询跳过未完成读取、搜索草稿保持、空态与重置、解除确认、分页及设置字符串保存。
+
 ### 系统设置表单与草稿
 
 - 以现有 `Settings.vue::saveSettings` 的真实键集合核对完整性，按用途分组。新增分组或换肤不能删除字段、访问预设或预热记录入口。

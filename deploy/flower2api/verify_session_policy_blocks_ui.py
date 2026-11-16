@@ -28,6 +28,8 @@ class BlockFixture(Fixture):
         self.settings = {'session_policy_block_enabled':'true', 'session_policy_block_duration_minutes':'1440'}
         self.release_fail = False
         self.read_fail = False
+        self.read_delay = 0
+        self.reads = []
         self.releases = 0
         self.saves = []
 
@@ -39,6 +41,9 @@ class BlockFixture(Fixture):
         payload = None
         status = 200
         if path == '/admin/session-policy-blocks':
+            self.reads.append(parse_qs(parsed.query, keep_blank_values=True))
+            if self.read_delay:
+                await asyncio.sleep(self.read_delay)
             if self.read_fail:
                 status, payload = 503, {'error':'合成读取失败'}
             else:
@@ -82,13 +87,14 @@ async def run(output: Path, gateway: Path) -> dict:
     checks = []
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch()
-        for width in (1440, 390):
+        for width in (1440, 1920, 2560, 390):
             fixture = BlockFixture(gateway)
             context = await browser.new_context(viewport={'width':width, 'height':1000}, timezone_id='Asia/Shanghai')
             await context.route('**/*', fixture.route)
             await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-admin')")
             await context.add_init_script("{const actual=Date.now;Date.now=()=>actual()+172800000;}")
             page = await context.new_page()
+            await page.clock.install()
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
             await page.goto(BASE+'/session-blocks')
@@ -114,9 +120,30 @@ async def run(output: Path, gateway: Path) -> dict:
             search = page.get_by_role('searchbox', name='搜索会话')
             await search.fill('ffffffff')
             await search.press('Enter')
-            await expect(page.get_by_text('当前没有封禁中的会话', exact=True)).to_be_visible()
-            await search.fill('')
-            await search.press('Enter')
+            empty = page.get_by_text('暂无匹配的封禁记录', exact=True)
+            await expect(empty).to_be_visible()
+            await page.screenshot(path=str(output/f'blocks-empty-{width}.png'), full_page=True)
+            assert await page.locator('tbody > tr').count() == 1
+            assert await page.locator('tr tr').count() == 0
+            assert await page.locator('.session-block-empty').evaluate("el=>getComputedStyle(el).textAlign") == 'center'
+            bounds = await page.locator('.session-block-panel').bounding_box()
+            fixture.read_delay = 0.3
+            await search.fill('a')
+            async with page.expect_response('**/admin/session-policy-blocks?*'):
+                async with page.expect_request('**/admin/session-policy-blocks?*'):
+                    await page.clock.fast_forward(5000)
+                await expect(page.get_by_role('button', name='刷新', exact=True)).to_be_enabled()
+                await expect(page.locator('.session-block-records')).to_have_attribute('aria-busy', 'false')
+                await expect(empty).to_be_visible()
+                assert await page.locator('.session-block-panel').bounding_box() == bounds
+                read_count = len(fixture.reads)
+                await page.clock.fast_forward(5000)
+                assert len(fixture.reads) == read_count
+            assert fixture.reads[-1]['session_prefix'] == ['ffffffff']
+            await expect(empty).to_be_visible()
+            fixture.read_delay = 0
+            await page.get_by_role('button', name='重置查询', exact=True).click()
+            await expect(search).to_have_value('')
             await expect(page.locator('tr[data-block-id]')).to_have_count(20)
             picker = page.get_by_role('combobox', name='封禁状态', exact=True)
             await picker.click()
@@ -144,6 +171,10 @@ async def run(output: Path, gateway: Path) -> dict:
             await expect(page.locator('#session-policy-block')).to_be_visible()
             duration = page.get_by_role('spinbutton', name='封禁时长（分钟）', exact=True)
             await expect(duration).to_have_value('1440')
+            help_text = page.locator('[data-settings-field="session_policy_block_duration_minutes"] .setting-help')
+            await expect(help_text).to_contain_text('默认 24 小时（1440 分钟）。')
+            assert await help_text.evaluate("el=>getComputedStyle(el).textDecorationLine") == 'none'
+            assert await help_text.evaluate("el=>getComputedStyle(el).whiteSpace") == 'pre-line'
             await duration.fill('60')
             await page.get_by_role('button', name='保存配置', exact=True).click()
             await expect(duration).to_have_value('60')
@@ -154,7 +185,7 @@ async def run(output: Path, gateway: Path) -> dict:
             assert not errors, errors
             assert not fixture.external, fixture.external
             assert not fixture.unexpected, fixture.unexpected
-            checks.append({'width':width, 'checks':['服务器时间基准','分页','状态筛选','取消解除','解除失败重试','搜索空态','读取失败保留','设置直达','字符串设置保存','窄屏无溢出'], 'passed':True})
+            checks.append({'width':width, 'checks':['服务器时间基准','分页','状态筛选','取消解除','解除失败重试','居中空态与重置','静默刷新布局稳定','未提交搜索保持','读取失败保留','设置直达','默认时长分行说明','字符串设置保存','窄屏无溢出'], 'passed':True})
             await context.close()
         await browser.close()
     return {'passed':True, 'scenes':checks, 'real_model_requests':0}

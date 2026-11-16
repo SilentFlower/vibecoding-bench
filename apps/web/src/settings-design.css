@@ -43,6 +43,7 @@
 .setting-field textarea:focus { outline: none; border-color: rgb(173, 155, 196); box-shadow: rgba(162, 142, 180, 0.08) 0px 0px 0px 3px; background: rgb(255, 255, 255); }
 .setting-field textarea[name="bootstrap_additional_model_options"] { font-family: "JetBrains Mono Variable", monospace; font-size: var(--ui-font-body); }
 .setting-help { font-size: var(--ui-font-small); line-height: 1.7; color: rgb(117, 135, 158); margin: 7px 0px 0px; }
+.setting-field[data-settings-field="session_policy_block_duration_minutes"] .setting-help { white-space: pre-line; line-height: 1.8; }
 .setting-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 25px; position: relative; min-height: 43px; cursor: pointer; padding-right: 48px; }
 .setting-switch-row > span { flex: 1 1 0%; min-width: 0px; }
 .setting-switch-row strong { display: block; font-size: var(--ui-font-small); color: rgb(78, 101, 129); font-weight: 500; }
