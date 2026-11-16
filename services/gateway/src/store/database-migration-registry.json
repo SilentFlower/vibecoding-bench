@@ -28,6 +28,15 @@
       "predecessor": 2,
       "rollback_mode": "compatible",
       "version": 3
+    },
+    {
+      "checksum": "02ef9a77941fbf8049327838369110d1527d811a266d995075bb5aa274711713",
+      "engine": "sqlite",
+      "id": "gateway.session-policy-blocks.4",
+      "kind": "schema",
+      "predecessor": 3,
+      "rollback_mode": "compatible",
+      "version": 4
     }
   ]
 }

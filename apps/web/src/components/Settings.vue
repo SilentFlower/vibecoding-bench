@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick } from 'vue';
+import { ref, onMounted, computed, nextTick, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { api, type PrimeLogEntry } from '../api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +41,10 @@ const isValidV3 = computed(() => {
     && weights.reduce((a, b) => a + b, 0) > 0;
 });
 
+const route = useRoute();
+const sessionPolicyBlockEnabled = ref(true);
+const sessionPolicyBlockMinutes = ref<string | number>('1440');
+const isValidSessionPolicyBlockMinutes = computed(() => /^\d+$/.test(String(sessionPolicyBlockMinutes.value)) && Number.isSafeInteger(Number(sessionPolicyBlockMinutes.value)) && Number(sessionPolicyBlockMinutes.value) > 0);
 const fableStickyQuotaFallbackEnabled = ref(true);
 const fableWeeklyUsageLimitPercent = ref('50');
 
@@ -502,6 +507,8 @@ const isValidBootstrapAdditionalModelOptions = computed(() => {
 async function loadSettings() {
   try {
     const data = await api.getSettings();
+    sessionPolicyBlockEnabled.value = data.session_policy_block_enabled !== 'false';
+    sessionPolicyBlockMinutes.value = data.session_policy_block_duration_minutes ?? '1440';
     w7d.value = data.score_weight_7d ?? '0.5';
     w5h.value = data.score_weight_5h ?? '0.3';
     wconc.value = data.score_weight_concurrency ?? '0.2';
@@ -757,6 +764,8 @@ const fieldBindings: Record<string, {get: () => string;set: (value: string) => v
   intercept_cli_bg_status_classifier_mode: { get: () => formString(interceptCliBgStatusClassifierMode.value), set: value => { interceptCliBgStatusClassifierMode.value = value as typeof interceptCliBgStatusClassifierMode.value; } },
   intercept_cli_bg_status_classifier_models: { get: () => formString(trimFormString(interceptCliBgStatusClassifierModels.value)), set: value => { interceptCliBgStatusClassifierModels.value = value as typeof interceptCliBgStatusClassifierModels.value; } },
   intercept_cli_bg_status_classifier_identity_injection_enabled: { get: () => formString(interceptCliBgStatusClassifierIdentityInjectionEnabled.value ? 'true' : 'false'), set: value => { interceptCliBgStatusClassifierIdentityInjectionEnabled.value = value === 'true'; } },
+  session_policy_block_enabled: {get: () => sessionPolicyBlockEnabled.value ? 'true' : 'false', set: value => {sessionPolicyBlockEnabled.value = value==='true';}},
+  session_policy_block_duration_minutes: {get: () => formString(sessionPolicyBlockMinutes.value), set: value => {sessionPolicyBlockMinutes.value=value;}},
   request_diagnostics_log_mode: {get: () => requestDiagnosticsMode.value, set: value => {requestDiagnosticsMode.value = value;}},
 };
 const savedValues = ref<Record<string,string>>({});
@@ -781,6 +790,7 @@ function revertChanges(): void {for(const [key,value] of Object.entries(savedVal
 function chooseCategory(id:string):void {settingsCategory.value=id;settingsQuery.value='';}
 /** 根据真实依赖禁用编辑并保留原值。@param field 配置。@return 是否禁用。 */
 function disabledField(field:SettingField):boolean {
+ if(field.key==='session_policy_block_duration_minutes')return !sessionPolicyBlockEnabled.value;
  if(field.key.startsWith('session_hello_probe_') && field.key!=='session_hello_probe_enabled')return !sessionHelloProbeEnabled.value;
  if(field.key==='intercept_cli_bg_status_classifier_identity_injection_enabled')return interceptCliBgStatusClassifierMode.value==='mock';
  return false;
@@ -800,7 +810,7 @@ function applyPreset(preset:string):void {
 }
 /** 先定位实际错误，再执行原有业务校验与保存。@return 保存结束。 */
 async function submitSettings():Promise<void> {
- const checks:Record<string,boolean>={score_weight_7d:allValid.value,score_weight_5h:allValid.value,score_weight_concurrency:allValid.value,v3_admission_wait_seconds:isValidV3.value,v3_smart_weight_load:isValidV3.value,fable_weekly_usage_limit_percent:isValidFableWeeklyUsageLimitPercent.value,peak_prime_hours:isValidHours.value,peak_prime_model:isValidModel.value,allow_system_role_models:isValidSystemRoleModels.value,allowed_claude_code_versions:isValidClaudeCodeVersions.value,blocked_claude_code_versions:isValidBlockedClaudeCodeVersions.value,allowed_user_agents:isValidAllowedUserAgents.value,rewrite_disabled_thinking_models:isValidRewriteDisabledThinkingModels.value,intercept_assistant_prefill_models:isValidInterceptAssistantPrefillModels.value,intercept_cli_bg_status_classifier_models:isValidInterceptCliBgStatusClassifierModels.value,log_429_request_body_limit:isValidLog429RequestBodyLimit.value,stream_keepalive_interval_secs:isValidStreamKeepaliveIntervalSecs.value,stream_upstream_idle_timeout_secs:isValidStreamUpstreamIdleTimeoutSecs.value,session_hello_probe_timeout_secs:isValidSessionHelloProbeTimeoutSecs.value,session_hello_probe_success_ttl_secs:isValidSessionHelloProbeSuccessTtlSecs.value,session_hello_probe_failure_cooldown_secs:isValidSessionHelloProbeFailureCooldownSecs.value,bootstrap_additional_model_options:isValidBootstrapAdditionalModelOptions.value};
+ const checks:Record<string,boolean>={session_policy_block_duration_minutes:isValidSessionPolicyBlockMinutes.value,score_weight_7d:allValid.value,score_weight_5h:allValid.value,score_weight_concurrency:allValid.value,v3_admission_wait_seconds:isValidV3.value,v3_smart_weight_load:isValidV3.value,fable_weekly_usage_limit_percent:isValidFableWeeklyUsageLimitPercent.value,peak_prime_hours:isValidHours.value,peak_prime_model:isValidModel.value,allow_system_role_models:isValidSystemRoleModels.value,allowed_claude_code_versions:isValidClaudeCodeVersions.value,blocked_claude_code_versions:isValidBlockedClaudeCodeVersions.value,allowed_user_agents:isValidAllowedUserAgents.value,rewrite_disabled_thinking_models:isValidRewriteDisabledThinkingModels.value,intercept_assistant_prefill_models:isValidInterceptAssistantPrefillModels.value,intercept_cli_bg_status_classifier_models:isValidInterceptCliBgStatusClassifierModels.value,log_429_request_body_limit:isValidLog429RequestBodyLimit.value,stream_keepalive_interval_secs:isValidStreamKeepaliveIntervalSecs.value,stream_upstream_idle_timeout_secs:isValidStreamUpstreamIdleTimeoutSecs.value,session_hello_probe_timeout_secs:isValidSessionHelloProbeTimeoutSecs.value,session_hello_probe_success_ttl_secs:isValidSessionHelloProbeSuccessTtlSecs.value,session_hello_probe_failure_cooldown_secs:isValidSessionHelloProbeFailureCooldownSecs.value,bootstrap_additional_model_options:isValidBootstrapAdditionalModelOptions.value};
  fieldErrors.value={};
  for(const field of allFields){const value=fieldBindings[field.key]!.get();if(checks[field.key]===false || (field.kind==='number' && (!value.trim() || !Number.isFinite(Number(value)) || (field.min!=null && Number(value)<field.min) || (field.max!=null && Number(value)>field.max))) || (field.kind==='select' && !fieldOptions(field).some(option=>option.value===value)))fieldErrors.value[field.key]='请检查此配置的格式或范围';}
  const key=Object.keys(fieldErrors.value)[0];
@@ -808,8 +818,16 @@ async function submitSettings():Promise<void> {
  await saveSettings();
 }
 
+/** 从封禁列表直达设置分区。@return 完成定位。 */
+async function focusPolicySettings(): Promise<void> {
+  if (route.query.section !== 'session-policy-block') return;
+  settingsCategory.value='scheduling';settingsQuery.value='';await nextTick();
+  document.getElementById('session-policy-block')?.scrollIntoView({block:'center'});
+}
+watch(() => route.query.section, () => { void focusPolicySettings(); });
 onMounted(async () => {
   await loadSettings();
+  await focusPolicySettings();
   await loadPrimeLogs();
 });
 </script>
@@ -823,7 +841,7 @@ onMounted(async () => {
    <div class="settings-workspace"><header class="settings-workspace-heading"><h2>{{ settingsQuery ? '搜索结果' : currentGroup.label }}</h2><p>{{ settingsQuery ? '跨分类查找，直接修改对应配置。' : currentGroup.description }}</p></header>
     <form @submit.prevent="submitSettings" novalidate><div id="settings-content">
      <p v-if="settingsQuery" class="settings-search-result">找到 {{ visibleGroups.reduce((sum,group)=>sum+group.sections.reduce((n,section)=>n+section.fields.length,0),0) }} 项配置</p>
-     <template v-for="group in visibleGroups" :key="group.id"><section v-for="section in group.sections" :key="section.title" class="settings-section-card"><header><div><span v-if="settingsQuery" class="settings-result-category">{{ group.label }}</span><h3>{{ section.title }}</h3><p>{{ section.description }}</p></div><span class="settings-section-icon"><component :is="groupIcons[group.id as keyof typeof groupIcons]" :size="18" /></span></header>
+     <template v-for="group in visibleGroups" :key="group.id"><section v-for="section in group.sections" :key="section.title" :id="section.summary==='session-policy-block' ? 'session-policy-block' : undefined" class="settings-section-card"><header><div><span v-if="settingsQuery" class="settings-result-category">{{ group.label }}</span><h3>{{ section.title }}</h3><p>{{ section.description }}</p></div><span class="settings-section-icon"><component :is="groupIcons[group.id as keyof typeof groupIcons]" :size="18" /></span></header>
       <div class="settings-field-grid"><div v-for="field in section.fields" :key="field.key" class="setting-field" :class="{wide:field.wide || field.kind==='boolean','has-error':fieldErrors[field.key]}" :data-settings-field="field.key">
        <label v-if="field.kind==='boolean'" class="setting-switch-row" :class="{'is-disabled':disabledField(field)}"><span><strong>{{ field.label }}</strong><small>{{ field.help }}</small></span><input type="checkbox" role="switch" :name="field.key" :aria-label="field.label" :checked="fieldBindings[field.key]!.get()==='true'" :disabled="disabledField(field)" @change="updateField(field.key,($event.target as HTMLInputElement).checked)"><i aria-hidden="true" /></label>
        <ChoiceSelect v-else-if="field.kind==='select'" :model-value="fieldBindings[field.key]!.get()" :name="field.key" :label="field.label" :options="fieldOptions(field)" :disabled="disabledField(field)" :invalid="!!fieldErrors[field.key]" @update:model-value="value=>updateField(field.key,value)" />
@@ -833,6 +851,7 @@ onMounted(async () => {
        <div v-if="field.preset" class="setting-presets"><template v-if="field.preset==='system'"><button type="button" @click="applyPreset('system-default')">推荐模型</button><button type="button" @click="applyPreset('system-clear')">清空模型</button></template><template v-if="field.preset==='agents'"><button type="button" @click="applyPreset('agents-default')">默认 UA 白名单</button><button type="button" @click="applyPreset('agents-clear')">关闭 UA 限制</button></template><button v-if="field.preset==='access'" type="button" @click="applyPreset('access')">仅允许 280 / 293</button></div>
        <p v-if="fieldErrors[field.key]" role="alert" class="setting-error">{{ fieldErrors[field.key] }}</p>
       </div></div>
+      <router-link v-if="section.summary==='session-policy-block'" :to="{name:'session-blocks'}" class="settings-inline-note">查看会话封禁及历史记录 →</router-link>
       <p v-if="section.summary==='legacy-weight'" class="settings-inline-note">当前权重总和 {{ totalWeight.toFixed(2) }} · {{ isValidTotal ? '已归一化' : '建议为 1.00' }}</p>
       <template v-if="section.summary==='profile'"><p v-for="profile in claudeCodeVersionProfiles.filter(item=>item.key===claudeCodeVersionProfile)" :key="profile.key" class="settings-inline-note">画像准入 {{ profile.allowed_claude_code_versions }} · {{ profile.growthbook_user_agent }} · {{ profile.build_time }} · {{ formatTelemetryShape(profile.telemetry_shape) }}</p></template>
      </section></template>

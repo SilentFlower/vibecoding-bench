@@ -24,6 +24,7 @@ GATEWAY_SCHEMA_SOURCES = {
     'gateway.baseline.1': 'cc2api/src/store/database_schema.rs',
     'gateway.proxies.2': 'cc2api/src/store/proxy_schema.rs',
     'gateway.proxy-sync.3': 'cc2api/src/store/proxy_sync_schema.rs',
+    'gateway.session-policy-blocks.4': 'cc2api/src/store/session_policy_block_schema.rs',
 }
 
 

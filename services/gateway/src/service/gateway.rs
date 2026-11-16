@@ -1,3 +1,4 @@
+use crate::service::session_policy_block::{self, SessionPolicyBlockService};
 use axum::Error as AxumError;
 use axum::body::Body;
 use axum::extract::Request;
@@ -585,6 +586,7 @@ struct AccessProfileConfig {
 
 pub struct GatewayService {
     native_prewarmer: NativePrewarmer,
+    pub(crate) session_policy_block_svc: Arc<SessionPolicyBlockService>,
     account_svc: Arc<AccountService>,
     rewriter: Arc<Rewriter>,
     telemetry_svc: Arc<TelemetryService>,
@@ -635,6 +637,7 @@ impl GatewayService {
         usage_store: Arc<UsageStore>,
     ) -> Self {
         Self {
+            session_policy_block_svc: Arc::new(SessionPolicyBlockService::new(&settings_store)),
             native_prewarmer: NativePrewarmer::new(account_svc.clone()),
             account_svc,
             rewriter,
@@ -686,6 +689,14 @@ impl GatewayService {
             session_hello_probe_svc: SessionHelloProbeService::new(cache),
             session_hello_probe_config: RwLock::new(SessionHelloProbeConfig::default()),
         }
+    }
+
+    /// 重新载入会话封禁配置。
+    /// @return 已验证配置的刷新结果。
+    pub async fn reload_session_policy_block_config(&self) -> Result<(), AppError> {
+        self.session_policy_block_svc
+            .reload(&self.settings_store)
+            .await
     }
 
     /// 接入独立请求诊断，保留原构造函数的兼容性。
@@ -1630,7 +1641,10 @@ impl GatewayService {
     pub async fn handle_request(&self, req: Request, api_token: Option<&ApiToken>) -> Response {
         let mode = *self.request_log_mode.read().await;
         diagnostics::CURRENT_LOG_MODE
-            .scope(mode, self.handle_request_with_diagnostics(req, api_token))
+            .scope(
+                mode,
+                session_policy_block::scope(self.handle_request_with_diagnostics(req, api_token)),
+            )
             .await
     }
 
@@ -1691,7 +1705,9 @@ impl GatewayService {
         req: Request,
         api_token: Option<&ApiToken>,
     ) -> Response {
-        match self.handle_count_tokens_request_inner(req, api_token).await {
+        match session_policy_block::scope(self.handle_count_tokens_request_inner(req, api_token))
+            .await
+        {
             Ok(resp) => resp,
             Err(e) => count_tokens_app_error_response(e),
         }
@@ -1783,6 +1799,14 @@ impl GatewayService {
                 ));
             }
         };
+
+        if let Some(response) = self
+            .session_policy_block_svc
+            .begin(api_token.map_or(0, |token| token.id), &body_map)
+            .await?
+        {
+            return Ok(response);
+        }
 
         let mut model_id = match body_map.get("model").and_then(|model| model.as_str()) {
             Some(model) if !model.trim().is_empty() => model.to_string(),
@@ -2015,6 +2039,16 @@ impl GatewayService {
         } else {
             serde_json::from_slice(&body_bytes).unwrap_or(serde_json::json!({}))
         };
+
+        if path == "/v1/messages" {
+            if let Some(response) = self
+                .session_policy_block_svc
+                .begin(api_token.map_or(0, |token| token.id), &body_map)
+                .await?
+            {
+                return Ok(response);
+            }
+        }
 
         if path.starts_with("/v1/messages") && has_system_role_message(&body_map) {
             let allowed_models = self.system_role_models.read().await;
@@ -2448,6 +2482,9 @@ impl GatewayService {
                 extract_session_id_from_body(&body_map).as_deref(),
                 upstream_session_rewrite.message.as_ref(),
             );
+            if let Some(response) = session_policy_block::check_current().await? {
+                return Ok(response);
+            }
             if let Some(real_session_id) =
                 session_hello_probe_session_id(&path, client_type, &body_map)
             {
@@ -2717,6 +2754,9 @@ impl GatewayService {
                 }
             }
 
+            if let Some(response) = session_policy_block::check_current().await? {
+                return Ok(response);
+            }
             if account.auto_telemetry && path.starts_with("/v1/messages") {
                 // 遥测会话会启动后台上游请求，必须等 RPM/槽位/改写/Token 全部成功后再激活，
                 // 避免被 RPM 跳过的账号产生额外上游副作用。
@@ -3037,6 +3077,13 @@ impl GatewayService {
         scheduling_request: Option<&SchedulingRequest>,
         resp: Response,
     ) -> Result<(Response, Option<SignatureRetryStage>), AppError> {
+        if resp
+            .extensions()
+            .get::<session_policy_block::PolicyRefusal>()
+            .is_some()
+        {
+            return Ok((resp, None));
+        }
         if path != "/v1/messages" || resp.status() != StatusCode::BAD_REQUEST {
             return Ok((resp, None));
         }
@@ -3197,6 +3244,10 @@ impl GatewayService {
         } else {
             None
         };
+        // 等待期间可能新增封禁，必须先复查再发布真实发送尝试。
+        if let Some(response) = session_policy_block::check_current().await? {
+            return Ok(response);
+        }
         if let Some(trace) = diagnostic.as_mut() {
             if let Some(request) = scheduling_request {
                 trace.with_feedback(request.clone());
@@ -3240,6 +3291,10 @@ impl GatewayService {
             scheduling_request,
         )
         .await
+        .map(|response| {
+            let codings = response_content_codings(response.headers());
+            session_policy_block::observe_response(response, account.id, codings)
+        })
     }
 
     /// 共用被动额度观察与响应字节处理，业务重试由各自调用方决定。
@@ -3393,28 +3448,6 @@ impl GatewayService {
             return Ok(response);
         }
 
-        // 处理认证失败：403 永久停用（但如果账号已处于 429 限流中则跳过，避免误判）
-        if status_code == 403 {
-            let is_rate_limited = account
-                .rate_limit_reset_at
-                .map(|reset| Utc::now() < reset)
-                .unwrap_or(false);
-            if is_rate_limited {
-                warn!(
-                    "account {} got 403 while rate-limited, skipping permanent disable",
-                    account.id
-                );
-            } else if let Err(e) = self
-                .account_svc
-                .disable_account(account.id, AccountStatus::Disabled, "403 认证失败", None)
-                .await
-            {
-                warn!("failed to disable account {} for 403: {}", account.id, e);
-            } else {
-                warn!("account {} permanently disabled for 403", account.id);
-            }
-        }
-
         // 成功响应只做被动采集，不触发 usage API；429 已在上方按拒绝样本持久化。
         if resp.status().is_success() {
             if let Some(usage_json) = extract_passive_usage(resp.headers()) {
@@ -3445,6 +3478,43 @@ impl GatewayService {
             let body_result = resp.bytes().await;
             let complete = body_result.is_ok();
             let upstream_body_bytes = body_result.unwrap_or_default();
+            let policy_reason = if status_code != 401 && status_code != 429 {
+                serde_json::from_slice::<serde_json::Value>(&decode_upstream_error_body(
+                    &upstream_body_bytes,
+                    &response_headers,
+                ))
+                .ok()
+                .as_ref()
+                .and_then(session_policy_block::classify)
+            } else {
+                None
+            };
+            if let Some(reason) = policy_reason {
+                session_policy_block::remember_current(account.id, reason).await?;
+            }
+            if policy_reason.is_none() {
+                // 处理认证失败：403 永久停用（但如果账号已处于 429 限流中则跳过，避免误判）
+                if status_code == 403 {
+                    let is_rate_limited = account
+                        .rate_limit_reset_at
+                        .map(|reset| Utc::now() < reset)
+                        .unwrap_or(false);
+                    if is_rate_limited {
+                        warn!(
+                            "account {} got 403 while rate-limited, skipping permanent disable",
+                            account.id
+                        );
+                    } else if let Err(e) = self
+                        .account_svc
+                        .disable_account(account.id, AccountStatus::Disabled, "403 认证失败", None)
+                        .await
+                    {
+                        warn!("failed to disable account {} for 403: {}", account.id, e);
+                    } else {
+                        warn!("account {} permanently disabled for 403", account.id);
+                    }
+                }
+            }
             if let Some(trace) = diagnostic.as_mut() {
                 trace.buffered(&upstream_body_bytes, complete);
             }
@@ -3471,12 +3541,18 @@ impl GatewayService {
                     )
                 );
             }
-            return rebuild_buffered_upstream_response(
+            let mut response = rebuild_buffered_upstream_response(
                 status_code,
                 &response_headers,
                 body_bytes,
                 remove_transport_headers,
-            );
+            )?;
+            if policy_reason.is_some() {
+                response
+                    .extensions_mut()
+                    .insert(session_policy_block::PolicyRefusal);
+            }
+            return Ok(response);
         }
 
         if path.starts_with("/api/claude_cli/bootstrap") {
@@ -3710,6 +3786,9 @@ impl GatewayService {
                 .bind_selected_session(session_hash, account.id)
                 .await;
         }
+        if let Some(response) = session_policy_block::check_current().await? {
+            return Ok(response);
+        }
         if let Some(permit) = permit {
             permit.submitted();
         }
@@ -3769,6 +3848,10 @@ impl GatewayService {
             scheduling,
         )
         .await
+        .map(|response| {
+            let codings = response_content_codings(response.headers());
+            session_policy_block::observe_response(response, account.id, codings)
+        })
     }
 
     /// 发送独立 count_tokens 请求，在传输边界恢复入站编码。
@@ -3806,6 +3889,9 @@ impl GatewayService {
             headers: ordered_anthropic_headers(COUNT_TOKENS_PATH, &wire_headers),
             preserve_header_casing: true,
         };
+        if let Some(response) = session_policy_block::check_current().await? {
+            return Ok(response);
+        }
         let resp =
             runtime_transport::send(account, prepared, wire_body.as_ref(), UPSTREAM_TTFB_TIMEOUT)
                 .await?;
@@ -8766,6 +8852,295 @@ mod tests {
             },
             "cwk_cfg_key": null
         })
+    }
+
+    /// 真实HTTP拒答后直接拦截，覆盖SSE、403账号保持及原生入口提前返回。
+    #[tokio::test]
+    async fn session_policy_block_gateway_stops_upstream_requests() {
+        for streaming in [false, true] {
+            let calls = Arc::new(AtomicUsize::new(0));
+            let counter = calls.clone();
+            let app=Router::new().fallback(move || {
+                let counter=counter.clone();
+                async move {
+                    counter.fetch_add(1,Ordering::SeqCst);
+                    let error=json!({"type":"error","error":{"type":"invalid_request_error","message":"safeguards flagged this message [reasoning_extraction]"}});
+                    if streaming {
+                        Response::builder().header("content-type","text/event-stream").body(Body::from(format!("event: error\ndata: {error}\n\n"))).unwrap()
+                    } else {
+                        (StatusCode::FORBIDDEN,axum::Json(error)).into_response()
+                    }
+                }
+            });
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let url = format!("http://{}", listener.local_addr().unwrap());
+            let server = tokio::spawn(async move {
+                axum::serve(listener, app).await.unwrap();
+            });
+            let service =
+                test_gateway_service_with_urls(url.clone(), format!("{url}/oauth/token")).await;
+            let mut account = create_gateway_account(&service, "policy@example.test", 1, 0).await;
+            account.upstream_session_pool_enabled = true;
+            account.upstream_session_pool_size = 1;
+            service.account_svc.update_account(&account).await.unwrap();
+            let sid = "123e4567-e89b-12d3-a456-426614174801";
+            let response = service
+                .handle_request(claude_code_messages_request(sid), None)
+                .await;
+            assert_eq!(
+                response.status(),
+                if streaming {
+                    StatusCode::OK
+                } else {
+                    StatusCode::FORBIDDEN
+                }
+            );
+            body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            let list = service
+                .session_policy_block_svc
+                .store
+                .list("active", "", 1, 20, Utc::now().timestamp_millis())
+                .await
+                .unwrap();
+            assert_eq!(list.total, 1);
+            assert_eq!(list.items[0].reason, "reasoning_extraction");
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            assert_eq!(
+                service
+                    .account_svc
+                    .get_account(account.id)
+                    .await
+                    .unwrap()
+                    .status,
+                AccountStatus::Active
+            );
+            for backend in ["legacy", "native293"] {
+                account.request_backend = backend.into();
+                service.account_svc.update_account(&account).await.unwrap();
+                let response = service
+                    .handle_request(claude_code_messages_request(sid), None)
+                    .await;
+                assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+                let value: Value = serde_json::from_slice(
+                    &body::to_bytes(response.into_body(), 8192).await.unwrap(),
+                )
+                .unwrap();
+                assert_eq!(value["error"]["code"], "session_policy_blocked");
+            }
+            let request=Request::builder().method("POST").uri(COUNT_TOKENS_PATH).header("user-agent","claude-code/2.1.220")
+                .body(Body::from(json!({"model":"claude-opus-4-8","metadata":{"user_id":json!({"session_id":sid}).to_string()},"messages":[{"role":"user","content":"继续"}]}).to_string())).unwrap();
+            assert_eq!(
+                service
+                    .handle_count_tokens_request(request, None)
+                    .await
+                    .status(),
+                StatusCode::BAD_REQUEST
+            );
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            account.request_backend = "legacy".into();
+            service.account_svc.update_account(&account).await.unwrap();
+            let response = service
+                .handle_request(
+                    claude_code_messages_request("123e4567-e89b-12d3-a456-426614174803"),
+                    None,
+                )
+                .await;
+            body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            assert_eq!(calls.load(Ordering::SeqCst), 2);
+            let released = service
+                .session_policy_block_svc
+                .store
+                .release(&list.items[0].id, Utc::now().timestamp_millis())
+                .await
+                .unwrap();
+            assert_eq!(released.state, "released");
+            account.request_backend = "legacy".into();
+            service.account_svc.update_account(&account).await.unwrap();
+            let response = service
+                .handle_request(claude_code_messages_request(sid), None)
+                .await;
+            body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            assert_eq!(calls.load(Ordering::SeqCst), 3);
+            assert_eq!(
+                service
+                    .session_policy_block_svc
+                    .store
+                    .list("all", "", 1, 20, Utc::now().timestamp_millis())
+                    .await
+                    .unwrap()
+                    .total,
+                3
+            );
+            server.abort();
+        }
+    }
+
+    /// 排队期间被标记的会话在释放并发槽后仍由本地结束。
+    #[tokio::test]
+    async fn session_policy_block_queued_request_rechecks_before_send() {
+        let service = Arc::new(
+            test_gateway_service_with_urls(
+                "http://127.0.0.1:9".into(),
+                "http://127.0.0.1:9".into(),
+            )
+            .await,
+        );
+        let account = create_gateway_account(&service, "queued-policy@example.test", 1, 0).await;
+        let queue = service.account_svc.get_or_create_queue(account.id, 1).await;
+        let permit = queue
+            .acquire(Duration::from_secs(1), DEFAULT_REQUEST_SLOT_UNITS)
+            .await
+            .unwrap();
+        let pending = service.clone();
+        let sid = "123e4567-e89b-12d3-a456-426614174804";
+        let task = tokio::spawn(async move {
+            pending
+                .handle_request(claude_code_messages_request(sid), None)
+                .await
+        });
+        wait_until_queue_waiting(&service, &account, 1).await;
+        crate::service::session_policy_block::scope(async {
+            let raw=json!({"model":"claude-opus-4-8","metadata":{"user_id":json!({"session_id":sid}).to_string()}});
+            assert!(service.session_policy_block_svc.begin(0,&raw).await.unwrap().is_none());
+            crate::service::session_policy_block::remember_current(account.id,"reasoning_extraction").await.unwrap();
+        }).await;
+        drop(permit);
+        let response = tokio::time::timeout(Duration::from_secs(3), task)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            service
+                .session_policy_block_svc
+                .store
+                .list("active", "", 1, 20, Utc::now().timestamp_millis())
+                .await
+                .unwrap()
+                .items[0]
+                .blocked_request_count,
+            1
+        );
+    }
+
+    /// v3 发送队首等待期间被封禁时，保持零上游调用和零诊断尝试。
+    #[tokio::test]
+    async fn session_policy_block_v3_send_wait_has_no_attempt() {
+        use crate::service::v3_scheduling::RequestPhase;
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        let counter = calls.clone();
+        let app = Router::new().fallback(move || {
+            let counter = counter.clone();
+            async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                axum::Json(json!({"type":"message","content":[]}))
+            }
+        });
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let upstream = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        let (service, _) = test_gateway_service_with_scheduling(
+            Arc::new(MemoryStore::new()),
+            upstream,
+            String::new(),
+            true,
+        )
+        .await;
+        let service = Arc::new(service);
+        let account = create_gateway_account(&service, "send-wait-policy@example.test", 1, 0).await;
+        let scheduler = service.account_svc.scheduler().unwrap();
+        let sid = "123e4567-e89b-12d3-a456-426614174805";
+        let seed = scheduler.begin(0, Some(sid));
+        seed.selected(&account, None);
+        // 持有发送队首，确定复查发生在 forward_request 的准入等待之后。
+        let held = seed.admit(&account).await.unwrap();
+        let pending = service.clone();
+        let task = tokio::spawn(async move {
+            pending
+                .handle_request(claude_code_messages_request(sid), None)
+                .await
+        });
+        timeout(Duration::from_secs(3), async {
+            while scheduler
+                .snapshot(account.id)
+                .requests
+                .iter()
+                .filter(|request| request.phase == RequestPhase::WaitingSend)
+                .count()
+                < 2
+            {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("请求没有进入发送队首等待");
+        crate::service::session_policy_block::scope(async {
+            let raw = json!({"model":"claude-opus-4-8","metadata":{"user_id":json!({"session_id":sid}).to_string()}});
+            assert!(service.session_policy_block_svc.begin(0, &raw).await.unwrap().is_none());
+            crate::service::session_policy_block::remember_current(account.id, "reasoning_extraction").await.unwrap();
+        }).await;
+        drop(held);
+        drop(seed);
+        let response = timeout(Duration::from_secs(3), task)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let root = response.headers()["x-cc2api-request-id"]
+            .to_str()
+            .unwrap()
+            .to_owned();
+        let value: Value =
+            serde_json::from_slice(&body::to_bytes(response.into_body(), 8192).await.unwrap())
+                .unwrap();
+        assert_eq!(value["error"]["code"], "session_policy_blocked");
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        assert!(scheduler.snapshot(account.id).events.is_empty());
+        let diagnostics = service.diagnostics_store().unwrap();
+        diagnostics.flush().await.unwrap();
+        let detail = diagnostics.detail(&root).await.unwrap();
+        assert!(detail.attempts.is_empty());
+        assert_eq!(detail.request.attempt_count, 0);
+        let blocks = service
+            .session_policy_block_svc
+            .store
+            .list("active", "", 1, 20, Utc::now().timestamp_millis())
+            .await
+            .unwrap();
+        assert_eq!(blocks.items[0].blocked_request_count, 1);
+        assert!(scheduler.snapshot(account.id).requests.is_empty());
+        assert_eq!(
+            service
+                .account_svc
+                .get_or_create_queue(account.id, 1)
+                .await
+                .active_request_count(),
+            0
+        );
+        server.abort();
+    }
+
+    /// 封禁状态未知时在本地返回503，原生准备与上游提交均在其后。
+    #[tokio::test]
+    async fn session_policy_block_query_failure_is_local_503() {
+        let service = test_gateway_service().await;
+        service.settings_store.database_pool().close().await;
+        let response = service
+            .handle_request(
+                claude_code_messages_request("123e4567-e89b-12d3-a456-426614174802"),
+                None,
+            )
+            .await;
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 
     fn test_account() -> Account {

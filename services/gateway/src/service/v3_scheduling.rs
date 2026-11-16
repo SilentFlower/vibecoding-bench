@@ -1099,7 +1099,8 @@ impl SchedulingRequest {
                 latency_ms.map(|ms| ms as f64),
                 &self.0.latency_class,
             );
-        } else if !matches!(outcome, "cancelled" | "transport_error")
+        } else if error_type != Some("session_policy_refusal")
+            && !matches!(outcome, "cancelled" | "transport_error")
             && (status.is_some_and(|s| s >= 500)
                 || (matches!(outcome, "upstream_error" | "body_error")
                     && !error_type.is_some_and(|kind| {

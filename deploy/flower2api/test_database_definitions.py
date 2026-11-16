@@ -30,7 +30,7 @@ class DatabaseDefinitionTests(unittest.TestCase):
 
     def test_incremental_definitions_require_unchanged_checksums(self) -> None:
         """目录及同步定义均绑定登记摘要，签发入口也拒绝漂移。@return None。"""
-        for name in ('proxy_schema.rs', 'proxy_sync_schema.rs'):
+        for name in ('proxy_schema.rs', 'proxy_sync_schema.rs', 'session_policy_block_schema.rs'):
             with self.subTest(name=name):
                 path = self.root / 'cc2api/src/store' / name
                 original = path.read_text()
@@ -56,7 +56,8 @@ class DatabaseDefinitionTests(unittest.TestCase):
         registry = self.root / 'cc2api/src/store/database-migration-registry.json'
         original = registry.read_text()
         value = json.loads(original)
-        value['steps'].append({**value['steps'][-1], 'id': 'gateway.future.4', 'version': 4, 'predecessor': 3})
+        latest = value['steps'][-1]['version']
+        value['steps'].append({**value['steps'][-1], 'id': f'gateway.future.{latest + 1}', 'version': latest + 1, 'predecessor': latest})
         registry.write_text(json.dumps(value))
         with self.assertRaisesRegex(ValueError, '定义来源'):
             verify(self.root)

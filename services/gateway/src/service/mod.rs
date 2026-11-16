@@ -42,3 +42,5 @@ pub mod v3_scheduling;
 pub mod version_profile;
 
 pub mod proxy;
+
+pub(crate) mod session_policy_block;

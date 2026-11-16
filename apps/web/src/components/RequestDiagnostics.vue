@@ -30,7 +30,7 @@ const activeTab = ref<typeof tabs[number]['id']>('overview');
 const route = useRoute();
 const linkedAccount = Number(route.query.account);
 const account = ref(Number.isSafeInteger(linkedAccount) && linkedAccount > 0 ? String(linkedAccount) : '');
-const correlation = ref('');
+const correlation = ref(typeof route.query.correlation_id==='string' ? route.query.correlation_id : '');
 const page = ref(1);
 const pageSize = ref(20);
 watch(pageSize, () => { page.value=1;void load(1); });

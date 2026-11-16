@@ -77,6 +77,13 @@ export const settingsGroups:SettingsGroup[] = [
         ]
       },
       {
+        title: '会话策略封禁', description: '会话触发明确策略拒答后，在指定时间内由本地拦截后续请求。', summary: 'session-policy-block',
+        fields: [
+          { key:'session_policy_block_enabled', label:'自动封禁', kind:'boolean', help:'开启后按真实客户端会话隔离，封禁及历史记录可在会话封禁页面查看。' },
+          { key:'session_policy_block_duration_minutes', label:'封禁时长（分钟）', kind:'number', min:1, step:1, help:'默认 1440 分钟，即 24 小时。修改仅影响新封禁，重复拦截保持原到期时间。' },
+        ],
+      },
+      {
         "title": "兼容排序权重",
         "description": "旧评分越低越优先，权重总和建议为 1。",
         "fields": [

@@ -43,6 +43,7 @@ const router = createRouter({
         { path: '', name: 'accounts', component: () => import('./components/Accounts.vue') },
         { path: 'proxies', name: 'proxies', component: () => import('./components/Proxies.vue') },
         { path: 'requests', name: 'requests', component: () => import('./components/RequestDiagnostics.vue') },
+        { path: 'session-blocks', name: 'session-blocks', component: () => import('./components/SessionPolicyBlocks.vue') },
         { path: 'tokens', name: 'tokens', component: () => import('./components/Tokens.vue') },
         { path: 'settings', name: 'settings', component: () => import('./components/Settings.vue') },
         { path: 'updates', name: 'updates', component: () => import('./components/SystemUpdates.vue') },

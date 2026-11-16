@@ -1,9 +1,14 @@
 use crate::handler::proxies;
+use crate::handler::session_policy_blocks;
 use crate::model::proxy::ProxyConnection;
 use crate::service::account::AccountQueue;
 use crate::service::oauth_flow::GenerateAuthUrlRequest;
 use crate::service::proxy::ProxyService;
 use crate::service::runtime_lease::RuntimeLease;
+use crate::service::session_policy_block::SessionPolicyBlockConfig;
+use crate::store::settings_store::{
+    DEFAULT_SESSION_POLICY_BLOCK_DURATION_MINUTES, DEFAULT_SESSION_POLICY_BLOCK_ENABLED,
+};
 use axum::extract::{Path, Query, Request, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::middleware::{self, Next};
@@ -138,6 +143,7 @@ pub fn build_router(
         .route("/login", get(spa_handler))
         .route("/tokens", get(spa_handler))
         .route("/requests", get(spa_handler))
+        .route("/session-blocks", get(spa_handler))
         .route("/tasks", get(spa_handler))
         .route("/settings", get(spa_handler))
         .route("/proxies", get(spa_handler))
@@ -256,6 +262,14 @@ pub fn build_router(
             post(oauth_exchange_setup_token_code),
         )
         .route("/admin/settings", get(get_settings).put(update_settings))
+        .route(
+            "/admin/session-policy-blocks",
+            get(session_policy_blocks::list),
+        )
+        .route(
+            "/admin/session-policy-blocks/:id/release",
+            post(session_policy_blocks::release),
+        )
         .route("/admin/prime-logs", get(get_prime_logs))
         .route("/admin/request-diagnostics", get(list_request_diagnostics))
         .route(
@@ -1960,6 +1974,12 @@ async fn account_scheduling_sessions(
 /// 获取所有设置项。
 async fn get_settings(State(state): State<AppState>) -> Result<Json<serde_json::Value>, AppError> {
     let mut settings = state.settings_store.get_all().await?;
+    settings
+        .entry("session_policy_block_enabled".into())
+        .or_insert_with(|| DEFAULT_SESSION_POLICY_BLOCK_ENABLED.into());
+    settings
+        .entry("session_policy_block_duration_minutes".into())
+        .or_insert_with(|| DEFAULT_SESSION_POLICY_BLOCK_DURATION_MINUTES.into());
     for (key, value) in V3_SCHEDULING_DEFAULTS {
         settings
             .entry((*key).to_string())
@@ -2151,6 +2171,14 @@ async fn update_settings(
     } else {
         None
     };
+    if body
+        .keys()
+        .any(|key| key.starts_with("session_policy_block_"))
+    {
+        let mut merged = state.settings_store.get_all().await?;
+        merged.extend(body.clone());
+        SessionPolicyBlockConfig::parse(&merged)?;
+    }
     // 校验权重值必须是合法的非负数
     for key in &[
         "score_weight_7d",
@@ -2463,6 +2491,15 @@ async fn update_settings(
         state
             .gateway_svc
             .reload_session_hello_probe_config()
+            .await?;
+    }
+    if body
+        .keys()
+        .any(|key| key.starts_with("session_policy_block_"))
+    {
+        state
+            .gateway_svc
+            .reload_session_policy_block_config()
             .await?;
     }
     // 通知 AccountService 刷新缓存
@@ -2885,6 +2922,122 @@ mod tests {
                 .unwrap();
             assert_eq!(response.status(), expected);
         }
+    }
+
+    /// 管理封禁列表沿用鉴权，设置校验失败保持原值，解除保留历史。
+    #[tokio::test]
+    async fn session_policy_block_admin_contract() {
+        let (app, _, settings, pool) = test_router_with_gateway_and_settings().await;
+        let page = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/session-blocks")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(page.status(), StatusCode::OK);
+        assert!(
+            page.headers()[header::CONTENT_TYPE]
+                .to_str()
+                .unwrap()
+                .contains("text/html")
+        );
+        let denied = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/session-policy-blocks")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(denied.status(), StatusCode::UNAUTHORIZED);
+        let (status, value) =
+            account_admin_json(&app, Method::GET, "/admin/settings", json!({})).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(value["session_policy_block_duration_minutes"], "1440");
+        for raw in ["0", "-1", "1.5", "", "9223372036854775807"] {
+            let (status, _) = account_admin_json(
+                &app,
+                Method::PUT,
+                "/admin/settings",
+                json!({"session_policy_block_duration_minutes":raw}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+        }
+        assert_eq!(
+            settings
+                .get_value("session_policy_block_duration_minutes", "missing")
+                .await
+                .unwrap(),
+            "1440"
+        );
+        let (status, _) = account_admin_json(
+            &app,
+            Method::PUT,
+            "/admin/settings",
+            json!({"session_policy_block_duration_minutes":"60"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let id = Uuid::new_v4().to_string();
+        let key = "a".repeat(64);
+        let now = Utc::now().timestamp_millis();
+        sqlx::query("INSERT INTO session_policy_block_keys(session_key) VALUES($1)")
+            .bind(&key)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO session_policy_blocks(id,session_key,api_token_id,account_id,model,reason,blocked_at_ms,expires_at_ms) VALUES($1,$2,21,7,'synthetic-model','usage_policy',$3,$4)")
+            .bind(&id).bind(&key).bind(now).bind(now+86_400_000).execute(&pool).await.unwrap();
+        let (status, page) = account_admin_json(
+            &app,
+            Method::GET,
+            "/admin/session-policy-blocks?state=active&page=1&page_size=20",
+            json!({}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(page["total"], 1);
+        assert_eq!(page["items"][0]["session_key"], key);
+        for query in [
+            "state=unknown",
+            "page=0",
+            "page_size=101",
+            "session_prefix=%25",
+            "page=9223372036854775807",
+        ] {
+            let (status, _) = account_admin_json(
+                &app,
+                Method::GET,
+                &format!("/admin/session-policy-blocks?{query}"),
+                json!({}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+        }
+        let (status, released) = account_admin_json(
+            &app,
+            Method::POST,
+            &format!("/admin/session-policy-blocks/{id}/release"),
+            json!({}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(released["state"], "released");
+        let (_, page) = account_admin_json(
+            &app,
+            Method::GET,
+            "/admin/session-policy-blocks?state=released",
+            json!({}),
+        )
+        .await;
+        assert_eq!(page["total"], 1);
     }
 
     /// 授权从目录解析连接并保护未完成会话，公开回执不泄露账密。

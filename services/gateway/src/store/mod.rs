@@ -15,3 +15,6 @@ pub mod token_store;
 pub mod usage_store;
 
 pub mod proxy_sync_schema;
+
+pub mod session_policy_block_schema;
+pub mod session_policy_block_store;

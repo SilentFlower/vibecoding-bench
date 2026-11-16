@@ -159,6 +159,10 @@ async fn main() {
         .await
         .expect("load system role models failed");
     gateway_svc
+        .reload_session_policy_block_config()
+        .await
+        .expect("会话封禁配置加载失败");
+    gateway_svc
         .reload_access_profile_config()
         .await
         .expect("load access/profile config failed");

@@ -158,7 +158,7 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 - 两库登记为 `{schema_version:1,database,steps}`；每步固定 `id,version,predecessor,checksum,engine,kind,rollback_mode`，要求连续前驱、`engine=sqlite`、`kind=schema|data`、`rollback_mode=compatible`。首版仅登记各自 `baseline.1`。增加版本需同时实现对应执行分支及演练。
 - 合同为按 key 排序、紧凑 UTF-8 JSON 登记的 SHA256。Python 冻结定义使用忽略文档/注释的 AST 摘要，Rust 使用测试段之前的纯定义原字节摘要。冻结 SQL、默认值、历史画像及命名空间依赖归纯迁移模块所有，普通业务查询和页面改动保持合同。
-- 发布校验与DDL扫描共用步骤ID到精确源路径的映射：gateway.baseline.1→database_schema.rs、gateway.proxies.2→proxy_schema.rs、gateway.proxy-sync.3→proxy_sync_schema.rs，均位于网关src/store。仅当前登记中的对应路径拥有DDL定义；同名业务文件不豁免。每个网关步骤都核对源码摘要，未知步骤、缺失来源和摘要漂移在签发前拒绝。
+- 发布校验与DDL扫描共用步骤ID到精确源路径的映射：gateway.baseline.1→database_schema.rs、gateway.proxies.2→proxy_schema.rs、gateway.proxy-sync.3→proxy_sync_schema.rs、gateway.session-policy-blocks.4→session_policy_block_schema.rs，均位于网关src/store。仅当前登记中的对应路径拥有DDL定义；同名业务文件不豁免。每个网关步骤都核对源码摘要，未知步骤、缺失来源和摘要漂移在签发前拒绝。
 - 自哈希Rust模块使用 `concat!("#[cfg(", "test)]")` 构造测试分隔标记，保证迁移执行和结构校验也进入摘要。源码内直接写完整分隔字符串会使字节切分提前停止。首次发布前修正新增定义需同步登记摘要；已发布步骤继续冻结。
 - CLI 返回 `database,contract,current_version,target_version,steps,state,reason`；执行完成保留原台账 operation_id。已知台账摘要冲突或版本断链拒绝；旧程序读取兼容新增版本返回 `compatible_newer`。
 - 旧库迁移前核验稳定账号核心字段。迁移完成且写入成功台账之前、以及已登记库 plan/apply 时，复核冻结基线的最低表/列、SQLite 亲和、主键及完整性。允许兼容新增表/列；非主键数字亲和支持历史兼容。空库沿相同初始化建立基线。

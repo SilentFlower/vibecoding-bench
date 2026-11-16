@@ -1523,3 +1523,55 @@ transport.submit(prepared, body, ttfb_timeout).await
 - `account_queue_hot_shrink_*`：缩容前已排队请求不能抢跑、再次扩容无残留、门禁等待取消也正确归还；原加权 FIFO 与活动计数回归保持。
 - `account_store_timestamp_test` 的 SQLite／独立 PostgreSQL 共享合同：选列保存保留并行状态、凭据和指标，未知字段整次拒绝，可空套餐文本／清除反复切换。
 - `node --experimental-strip-types --test web/tests/accountUpdate.test.mjs` 验证增量载荷、凭据空值和清除；前端 build 与完整 Rust 回归通过。
+
+## Scenario: Claude 会话策略封禁
+
+### 1. Scope / Trigger
+
+- 修改消息或计数入口、上游策略拒答识别、提交边界、会话封禁存储、管理接口及设置时适用。Rust 与 native293 使用同一封禁合同。
+
+### 2. Signatures
+
+- `SessionPolicyBlockService::begin(self: &Arc<Self>, token_id: i64, body: &Value) -> Result<Option<Response>, AppError>`：异步，绑定原始会话身份并执行首次检查。
+- `session_policy_block::check_current() -> Result<Option<Response>, AppError>`：异步，复查有效封禁并累计实际拦截。
+- `session_policy_block::remember_current(account_id: i64, reason: &str) -> Result<(), AppError>`：异步，持久登记实际拒答。
+- `GET /admin/session-policy-blocks?state=active&session_prefix=&page=1&page_size=20`；`POST /admin/session-policy-blocks/:id/release`，均使用管理员鉴权。
+- SQLite 版本 4：`gateway.session-policy-blocks.4`；新增 `session_policy_block_keys(session_key,revision)` 与历史表 `session_policy_blocks`，定义位于 `store/session_policy_block_schema.rs`。迁移登记、校验摘要及发行来源同步；PostgreSQL 初始化应用同等增量结构。
+
+### 3. Contracts
+
+- 匿名键采用独立域 `flower2api:session-policy-block:v1`、Token ID 大端字节与改写前显式 SID 的 SHA256。上游池映射、诊断开关及换账号不能改变封禁身份；无可靠 SID 沿用原入口行为。新封禁表只保存摘要、模型字段、原因分类和可选诊断关联。
+- 开关 `session_policy_block_enabled` 默认字符串 `true`；时长 `session_policy_block_duration_minutes` 默认字符串 `1440`，必须是可安全换算并加到当前时间的正整数分钟。设置保存后热刷新，时长在实际拒答识别时读取；修改不延长已有轮次。
+- 关闭功能停止新封禁与本地拦截，历史保留；重新开启后未到期记录继续有效。到期或解除后再次拒答新增一轮。有效期内并发拒答通过数据库事务锁合并，重复拦截仅增加计数和最近命中时间。
+- 入口检查在账号选择、Hello、排队及遥测激活之前；排队后与真正提交前复查。最终复查必须先于 `AttemptTrace::commit` 和 `SendPermit::submitted`，本地拦截保持零上游调用、零真实 attempt。许可在复查期间保持持有；已有在途调用沿原生命周期结束。
+- 仅识别结构化错误、SSE error、refusal 内容块及 `stop_reason=refusal`；`reasoning_extraction`、safeguards flagged、Usage Policy 等匹配限定错误字段，普通回答引用保持正常处理。HTTP 401/429 保留原分类，明确策略拒答不进入账号停用或签名修复重试。
+- 响应观察独立于诊断，复用有界解码与增量解析。SSE 拒答在当前帧交付前等待持久写入，原协议字节及 trailers 保留；完整 JSON 在结束观察时登记。观察上下文由响应流持有，不能依赖请求 task-local 在流读取时仍存在。
+- 有效封禁返回 HTTP 400 Anthropic error，`error.type=invalid_request_error`、`error.code=session_policy_blocked`，`error.details` 含 `retryable=false`、RFC3339 `expires_at` 与向上取整的 `remaining_seconds`；封禁查询失败返回本地 503。`count_tokens` 只查已有封禁。
+- 列表返回 `items,total,page,page_size,observed_at_ms`；条目包含匿名会话、令牌/账号摘要、模型、原因、诊断关联、起止及解除时间、本地拦截次数/最近命中与 `active|expired|released`。时间字段为 UTC 毫秒。`state` 接受 `all|active|expired|released`，默认 active；前缀最多 64 位十六进制，page≥1，page_size 为 1–100，默认20。列表仅读取，解除幂等并保留首次解除时间。
+- 页面 `/session-blocks` 位于“网关 → 请求记录”下方，设置位于“系统设置 → 会话与调度 → 会话策略封禁”。复用共享控件、确认与反馈；错误保留上次记录，离页取消并丢弃旧回包。可见且未读取、未打开解除确认时每5秒刷新；倒计时以 `observed_at_ms` 加本地单调耗时计算，避免浏览器时钟偏差。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 同会话同 Token 有效封禁 | 本地400，计数增加一次，上游调用零增量 |
+| 不同 SID/Token，共用上游池槽位 | 各自隔离判断 |
+| 发送等待期间新增封禁 | 释放等待资源，零真实 attempt 与提交事件 |
+| 普通正文引用政策词、认证或限流错误 | 原分类保持 |
+| 查询故障 / 拒答写入故障 | 本地503 / 明确错误或响应体错误，不能宣称封禁成功 |
+| 管理未鉴权 / 非法筛选、页码、时长 | 401 / 400，非法设置整次拒绝 |
+| 关闭后重开 / 重复解除 / 到期后再次拒答 | 恢复未过期封禁 / 首次解除时间保持 / 新一轮历史 |
+
+### 5. Scenarios and Examples
+
+- 正常：首次拒答创建默认24小时封禁，再次“继续”本地400；管理员从列表解除后可再次请求。
+- 边界：请求等待发送期间管理员将时长改为30分钟，随后上游拒答按30分钟新建；已有24小时轮次保持原截止。
+- 错误做法：使用映射后的上游 SID 建键，或先调用 `trace.commit()` 再检查封禁。正确处理：入口冻结真实会话身份，所有本地复查通过后才记录真实发送。
+
+### 6. Tests Required
+
+- `session_policy_block_lifecycle_and_history`、`session_policy_block_concurrency_and_restart`：固定到期、计数、解除幂等、自然到期、新轮次、跨连接合并及重开持久。
+- `session_policy_block_duration_reload_preserves_existing_expiry` 与配置/识别测试：默认值、非法值、进行中请求取最新时长、隔离、关闭、正文与认证排除。
+- `session_policy_block_gateway_stops_upstream_requests`、`session_policy_block_queued_request_rechecks_before_send`、`session_policy_block_v3_send_wait_has_no_attempt`、`session_policy_block_query_failure_is_local_503`：真实本地HTTP/SSE拒答、两后端前置拦截、计数入口、队列/发送复查、零上游调用和零attempt、许可回收及查询故障。
+- 响应观察测试覆盖压缩/分块SSE及完整JSON拒答，断言原字节保留、诊断关闭仍登记。`session_policy_block_admin_contract` 验证鉴权、参数、设置热刷新、历史及SPA入口；版本3迁移用例保留自定义值。
+- `verify_session_policy_blocks_ui.py` 使用真实前端构建的离线fixture，覆盖1440px/390px、服务器时钟、筛选分页、搜索空态、解除取消/失败重试、读取失败保留、设置直达及字符串保存；完整Rust回归、前端build及数据库定义/发行测试通过。

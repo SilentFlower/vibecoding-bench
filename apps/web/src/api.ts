@@ -388,6 +388,27 @@ function normalizeSettingsMap(data: RawSettingsMap): SettingsMap {
   )
 }
 
+/** 一轮会话封禁的安全摘要。 */
+export interface SessionPolicyBlock {
+  id: string
+  session_key: string
+  api_token_id: number
+  token_name: string | null
+  account_id: number
+  account_name: string | null
+  model: string
+  reason: string
+  source_request_id: string | null
+  blocked_at_ms: number
+  expires_at_ms: number
+  released_at_ms: number | null
+  blocked_request_count: number
+  last_blocked_at_ms: number | null
+  state: 'active' | 'expired' | 'released'
+}
+/** 会话封禁分页与服务器观察时刻。 */
+export interface SessionPolicyBlockPage { items: SessionPolicyBlock[]; total: number; page: number; page_size: number; observed_at_ms: number }
+
 /** 管理端请求诊断列表行。 */
 export interface DiagnosticRequest {
   account_name?: string | null
@@ -581,6 +602,10 @@ export const api = {
   systemUpdateInstall: (action: 'install' | 'rollback', body: SystemUpdateRequest) => request<SystemUpdateOperation>('POST', `/runtime/api/system-updates/${action}`, body),
   /** 原操作取消或恢复。@param id 原操作。@param action 受控动作。@param revision 当前现场版本。@return 操作状态。 */
   systemUpdateControl: (id: string, action: 'cancel' | 'recover', revision: string) => request<SystemUpdateOperation>('POST', `/runtime/api/system-updates/operations/${encodeURIComponent(id)}/${action}`, { expected_revision: revision }),
+  /** 查询会话封禁。@param query 已编码条件。@param signal 取消信号。@return 安全分页。 */
+  sessionPolicyBlocks: (query: string, signal?: AbortSignal) => request<SessionPolicyBlockPage>('GET', `/admin/session-policy-blocks?${query}`, undefined, signal),
+  /** 提前解除单轮封禁。@param id 记录标识。@return 最新摘要。 */
+  releaseSessionPolicyBlock: (id: string) => request<SessionPolicyBlock>('POST', `/admin/session-policy-blocks/${encodeURIComponent(id)}/release`),
   /** 分页读取请求诊断。@param query 已编码筛选。@return 请求列表与采集健康。 */
   requestDiagnostics: (query: string, signal?: AbortSignal) => request<{ items: DiagnosticRequest[]; total: number; health: Record<string, number>; counts?: {all: number; errors: number; processing: number} }>('GET', `/admin/request-diagnostics?${query}`, undefined, signal),
   /** 读取请求尝试详情。@param id 请求 UUID。@return 摘要与尝试列表。 */

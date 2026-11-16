@@ -542,13 +542,21 @@ impl AttemptTrace {
             if observed.observation_error.is_some() {
                 self.trace.store.observation_failed();
             }
-            record.error_type = observed
-                .error_type
-                .or_else(|| observed.observation_error.map(str::to_owned));
+            record.error_type = if observed.policy_reason.is_some()
+                && !matches!(record.status_code, Some(401 | 429))
+            {
+                Some("session_policy_refusal".into())
+            } else {
+                observed
+                    .error_type
+                    .or_else(|| observed.observation_error.map(str::to_owned))
+            };
         }
         record.outcome = if end != "complete" {
             end.into()
-        } else if record.status_code.is_some_and(|value| value >= 400) {
+        } else if record.error_type.as_deref() == Some("session_policy_refusal")
+            || record.status_code.is_some_and(|value| value >= 400)
+        {
             "upstream_rejected".into()
         } else if record.error_type.as_deref().is_some_and(|kind| {
             !["sampling_limit", "decode_error", "invalid_payload"].contains(&kind)

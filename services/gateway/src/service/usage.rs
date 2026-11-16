@@ -9,6 +9,7 @@ use tokio::runtime::Handle;
 use tracing::warn;
 use uuid::Uuid;
 
+use crate::model::session_policy_block::classify_policy_refusal;
 use crate::service::response_body_codec::{ResponseBodyDecoder, ResponseDecodeError};
 use crate::service::telemetry::{MessageTelemetryUsage, merge_message_usage};
 use crate::service::usage_pricing::calculate_cost;
@@ -46,6 +47,7 @@ struct UsageParser {
     message_id: Option<String>,
     stop_reason: Option<String>,
     error_type: Option<String>,
+    policy_reason: Option<&'static str>,
     observation_error: Option<&'static str>,
     tokens: [Option<u64>; 6],
     first_output_at: Option<Instant>,
@@ -58,6 +60,7 @@ pub(crate) struct MessageObservation {
     pub message_id: Option<String>,
     pub stop_reason: Option<String>,
     pub error_type: Option<String>,
+    pub policy_reason: Option<&'static str>,
     pub observation_error: Option<&'static str>,
     pub tokens: [Option<u64>; 6],
     pub partial: bool,
@@ -157,6 +160,12 @@ impl UsageCapture {
         self.completed_parser(complete).record
     }
 
+    /// 取出本轮新观察到的策略拒答原因。
+    /// @return 已完整派发事件的有限原因分类。
+    pub(crate) fn take_policy_reason(&mut self) -> Option<&'static str> {
+        self.decoder.sink_mut()?.policy_reason.take()
+    }
+
     /// 结束诊断旁路解析，不触发费用写入。
     /// @param complete 是否读到正常的传输结束。
     /// @return 已观察到的元信息与部分数据标记。
@@ -168,6 +177,7 @@ impl UsageCapture {
             message_id: parser.message_id,
             stop_reason: parser.stop_reason,
             error_type: parser.error_type,
+            policy_reason: parser.policy_reason,
             observation_error: parser.observation_error,
             tokens: parser.tokens,
             partial: parser.record.partial,
@@ -233,6 +243,7 @@ impl UsageParser {
             message_id: None,
             stop_reason: None,
             error_type: None,
+            policy_reason: None,
             observation_error: None,
             tokens: [None; 6],
             first_output_at: None,
@@ -383,6 +394,9 @@ impl UsageParser {
     }
 
     fn observe_value(&mut self, value: &Value) {
+        if self.policy_reason.is_none() {
+            self.policy_reason = classify_policy_refusal(value);
+        }
         // 只在原有解码和事件派发成功后记点，响应头、心跳与空块不能奖励低延迟。
         if self.first_output_at.is_none() && has_effective_output(value) {
             self.first_output_at = Some(Instant::now());

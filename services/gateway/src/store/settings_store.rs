@@ -12,6 +12,11 @@ use crate::service::version_profile::{
     DEFAULT_CLAUDE_CODE_VERSION_PROFILE,
 };
 
+/// 自动会话策略封禁默认开启。
+pub const DEFAULT_SESSION_POLICY_BLOCK_ENABLED: &str = "true";
+/// 默认封禁 1440 分钟，即 24 小时。
+pub const DEFAULT_SESSION_POLICY_BLOCK_DURATION_MINUTES: &str = "1440";
+
 /// 允许 `messages[].role=system` 的默认模型列表。
 pub const DEFAULT_ALLOW_SYSTEM_ROLE_MODELS: &str =
     "claude-opus-5-5,claude-opus-5,claude-fable-5,claude-fable-5-1,claude-opus-4-8";
