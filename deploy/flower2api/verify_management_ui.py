@@ -248,7 +248,7 @@ async def run(output):
             page = await context.new_page()
             page.on('pageerror', lambda error: errors.append(str(error)))
             await page.goto(BASE + '/updates')
-            await page.locator('details.approved-maintenance > summary').click()
+            await page.locator('details.update-history > summary').click()
             await expect(page.locator('[data-release-card]')).to_have_count(2)
             assert await page.locator('[data-release-details]').count() == 0
             cards = page.locator('[data-release-card]')
@@ -261,7 +261,7 @@ async def run(output):
             assert 'system-ci-' not in await page.locator('[data-release-card]').first.inner_text()
             await page.get_by_role('button', name='安装更新', exact=True).click()
             await expect(page.locator('.update-page > dialog')).to_be_visible()
-            assert not fixture.writes
+            assert all(write['path']=='/runtime/api/system-updates/check' for write in fixture.writes),fixture.writes
             await page.locator('.update-page > dialog').get_by_role('button', name='取消', exact=True).click()
             await page.get_by_role('button', name='查看历史版本与回退', exact=False).click()
             await expect(cards).to_have_count(4)

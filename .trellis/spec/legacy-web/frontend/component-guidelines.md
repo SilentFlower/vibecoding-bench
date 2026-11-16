@@ -157,7 +157,7 @@ elem.classList.add('pill-running');     // CSS 里 .pill-running { color: var(--
 elem.style.color = '#5fd7d7';
 ```
 
-主题切换只需要改 `<html data-theme="light|dark">`,所有 `var(--xxx)` 自动跟随。
+任务工作区及独立兼容入口固定 `<html data-theme="light">`；移除切换按钮、主题偏好读写及暗色专用覆盖。终端与源码保留深色阅读表面，布局和加载合同见[控制台工作区规范](../../web/frontend/ui-guidelines.md#scenario-工作区分区加载与阅读布局)。
 
 ### class 命名(从代码现状归纳)
 

@@ -71,7 +71,7 @@ async def main():
             browser = await playwright.chromium.launch()
             context = await browser.new_context(viewport={'width': 1440, 'height': 1000})
             await context.route('**/*', fixture.route)
-            await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','light')")
+            await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','dark')")
             page = await context.new_page()
             page.on('pageerror', lambda error: errors.append(error.stack))
             await page.goto(BASE + '/tasks')
@@ -135,14 +135,13 @@ async def main():
                 await page.set_viewport_size({'width': width, 'height': 1000})
                 assert await modal.locator('.modal-card').evaluate('e=>e.scrollWidth<=e.clientWidth')
                 await page.screenshot(path=str(output / f'config-{width}.png'))
-            await root.evaluate("e=>e.dataset.theme='dark'")
-            dark_colors = await modal.evaluate("""e=>['.field','.work-note','summary','.work-account-links button','input'].map(selector=>{
+            assert await root.get_attribute('data-theme') == 'light'
+            colors = await modal.evaluate("""e=>['.field','.work-note','summary','.work-account-links button','input'].map(selector=>{
                 const node=e.querySelector(selector),s=getComputedStyle(node);
                 return {selector,color:s.color,background:selector==='input'?s.backgroundColor:getComputedStyle(e.querySelector('.modal-card')).backgroundColor};
             })""")
-            assert all(contrast(item['color'], item['background']) >= 4.5 for item in dark_colors), dark_colors
-            await page.screenshot(path=str(output / 'config-dark.png'))
-            await root.evaluate("e=>e.dataset.theme='light'")
+            assert all(contrast(item['color'], item['background']) >= 4.5 for item in colors), colors
+            await page.screenshot(path=str(output / 'config-saved-dark.png'))
             await modal.locator('#cli-settings-environment').click()
             await expect(page.locator('.runtime-environment-dialog')).to_be_visible()
             await expect(modal).to_be_hidden()
@@ -151,7 +150,7 @@ async def main():
             await root.locator('[data-cli-settings]').click()
             await expect(save).to_be_enabled()
             await modal.locator('#cli-settings-gateway').click()
-            await expect(page.get_by_role('dialog', name='正式账号 11', exact=True)).to_be_visible()
+            await expect(page.get_by_role('dialog', name='切换代理 · 团队账号 <安全显示>', exact=True)).to_be_visible()
             assert page.url == BASE + '/tasks'
             await page.keyboard.press('Escape')
             fixture.config_gate = asyncio.Event()

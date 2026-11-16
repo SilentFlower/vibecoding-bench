@@ -1661,3 +1661,38 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 ### 6. Tests Required
 
 `test_task_proxy.py`覆盖SQLite版本/绑定/删除、直连、停止失败、锁释放、实际main入口、票据领取前登记及跨代次引用。`verify_task_proxy_api.py`覆盖真实HTTP公开投影、私有字段隔离及45秒超时。全量`PYTHONPATH=services/orchestrator:deploy/flower2api .venv/bin/python -m unittest discover -s services/orchestrator`；真实Docker恢复由发布阶段验证。
+
+
+## Scenario: 环境列表有界并发只读汇总
+
+### 1. Scope / Trigger
+
+修改`main.v3_environments`及环境状态汇总性能时适用。
+
+### 2. Signatures
+
+- `GET /api/environments`、浏览器桥`GET /runtime/api/environments`继续返回按名称排序的公开环境列表。
+- `v3_environments() -> list[dict]`；`_v3_environment_summary(row, ownerships, native_preparations, native_preparation_error) -> dict`负责单环境投影。
+
+### 3. Contracts
+
+- 协调器先读取有资格的环境行，并各一次读取凭据归属摘要及原生准备快照；每轮最多三个ThreadPoolExecutor工作者，按输入顺序收集结果。空列表直接返回空数组。
+- 每个工作者使用独立`copy_context()`保留请求上下文，数据库连接在工作者内创建并finally关闭；共享的本轮摘要只读使用。
+- 保留owner→profile→environment的非阻塞核对、只读Docker状态、代次归属和原异常合同。列表不能唤醒容器、刷新凭据或等待维护锁；无跨请求状态缓存。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 期望 |
+| --- | --- |
+| 四环境完成顺序不同 | 最大并发3，返回顺序沿SQL名称排序 |
+| 空列表 | 空数组，单环境汇总调用零次 |
+| 维护锁占用/快照缺失 | 沿原维护提示与未知状态合同 |
+| 单环境原异常 | 沿原异常传播，不伪造成功投影 |
+
+### 5. Scenarios and Examples
+
+正常：四环境分成最多三路读取，先完成的环境也按输入位置返回。边界：请求上下文中的身份在每个工作者内保持。错误用法：把SQLite连接或同一个Context对象并发交给全部工作者；正确处理是工作者独立连接，每次提交复制上下文。
+
+### 6. Tests Required
+
+`test_environment_summary`断言并发上限、排序、ContextVar、空列表与异常；`test_account_runtime`继续覆盖只读身份、维护锁、删除/草稿过滤与公开字段。`verify_native_environments.py`及`verify_environment_cpu_summary.py`保持列表、CPU换代和编辑草稿回归。

@@ -1,7 +1,7 @@
 /** 新 Projects：围绕账号 Pi、真实终端与工作记录组织界面。 */
 window.ProjectsUI = (() => {
   let api, prefix, source, accountId = null, agents = [], catalog = [], accounts = [], cursor = 0;
-  let deliveryRevision = 0, researchRevision = 0;
+  let deliveryRevision = 0, researchRevision = 0, modelLoaded = false, catalogLoaded = false;
   let revision = 0, selection = 0, scheduleClock = null, recordPages = {};
   let namespace = 'projects', servicePath = '/projects';
   let configureCli, showCapture, closePanels, onAccountChange;
@@ -50,7 +50,7 @@ window.ProjectsUI = (() => {
     const current = revision;
     const accountControl = $('#projects-account');
     // 初始模型与快照尚在读取时，避免用户选择被迟到的路由预选覆盖。
-    accountControl.disabled = true;
+    accountControl.disabled = true;modelLoaded=false;catalogLoaded=false;agents=[];catalog=[];accounts=[];
     namespace = options.namespace === 'warmup' ? 'warmup' : 'projects';
     servicePath = namespace === 'warmup' ? '/accounts/warmup/pi' : '/projects';
     const endpoint = servicePath;
@@ -59,6 +59,10 @@ window.ProjectsUI = (() => {
       ? endpoint + path.slice('/projects'.length) : path, settings);
     prefix = options.prefix;
     $('#projects-title').textContent = namespace === 'warmup' ? '养号空间' : '项目空间';
+    document.querySelectorAll('[data-delivery-view]').forEach(button=>{button.onclick=()=>{
+      document.querySelectorAll('[data-delivery-view]').forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',String(active));});
+      document.querySelectorAll('[data-delivery-panel]').forEach(panel=>{panel.hidden=panel.dataset.deliveryPanel!==button.dataset.deliveryView;});
+    };});
     $('#projects-refresh').onclick=()=>perform(refreshView);
     document.querySelectorAll('[data-show-project-pane]').forEach(button=>{button.onclick=()=>document.querySelector(`[data-project-pane="${button.dataset.showProjectPane}"]`).click();});
     document.querySelectorAll('[data-work-discard]').forEach(button=>{button.onclick=()=>perform(async()=>{const group=button.dataset.workDiscard;if(group==='model'){await loadModel();return;}if(group==='schedule'){fillSchedule();return;}const agent=agents.find(item=>item.account_id===accountId),form=$('#projects-agent-form');form.elements.instructions.value=agent?.instructions||'';form.elements.budget_minutes.value=(agent?.budget_sec||3600)/60;paintCatalog(agent?.project_keys||[]);});});
@@ -126,27 +130,43 @@ window.ProjectsUI = (() => {
     document.querySelectorAll('[data-pi-action]').forEach(button => {
       button.onclick = () => runAction(button.dataset.piAction);
     });
-    try {
-      const values = await Promise.all([api('/projects'), api('/projects/catalog'), api('/accounts')]);
-      if (current !== revision) return;
-      agents = values[0].agents; catalog = values[1].projects; accounts = values[2];
-      $('#projects-runtime').textContent = values[0].pi_available ? 'Pi 运行时已就绪' : '当前镜像尚未包含 Pi 运行时';
-      $('#projects-research-count').textContent = `${catalog.length} 个研究项目 · ${catalog.filter(item => item.ready).length} 个具备工程验收`;
-      const usable = accounts.filter(item => item.enabled && !item.deleted_at);
-      $('#projects-account').innerHTML = '<option value="">选择运行账号</option>' + usable.map(item =>
-        `<option value="${item.id}">${escape(item.display_name || item.name)}</option>`).join('');
-      paintCatalog();
-      await loadModel();
-      if (current !== revision) return;
-      const requested = options.accountId;
-      const first = requested != null ? usable.find(item => item.id === requested)
-        : agents.find(item => usable.some(account => account.id === item.account_id));
-      const selected = requested != null ? first?.id : first?.account_id;
-      // 账号页的入口仅恢复选择与现场，不借导航隐式创建配置或启动控制者。
-      if (selected) { $('#projects-account').value = selected; await selectAccount(selected); }
-      else if (requested != null) feedback('该账号当前不可用，请选择其他运行账号', 'error');
-    } catch (error) { if (current === revision) feedback(error.message); }
-    finally { if (current === revision) { accountControl.disabled = false; window.enhanceRuntimeControls?.(); } }
+    void loadModel();
+    void loadCatalog();
+    let initialization=0;
+    /** 只重试主状态与账号选择，独立配置表单保留当前内容。@return {Promise<void>} 主区域初始化结束。 */
+    const initialize=async()=>{
+      const request=++initialization,owns=()=>current===revision&&request===initialization;
+      let failed=false;
+      $('#projects-initial-retry')?.remove();accountControl.disabled=true;
+      try {
+        const values = await Promise.all([api('/projects').then(value=>{
+          if(owns()&&!failed){updateAgents(value);$('#projects-runtime').textContent=value.pi_available?'Pi 运行时已就绪':'当前镜像尚未包含 Pi 运行时';paintState();}
+          return value;
+        }), api('/accounts')]);
+        if (!owns()) return;
+        agents = values[0].agents; accounts = values[1];
+        $('#projects-runtime').textContent = values[0].pi_available ? 'Pi 运行时已就绪' : '当前镜像尚未包含 Pi 运行时';
+        const usable = accounts.filter(item => item.enabled && !item.deleted_at);
+        $('#projects-account').innerHTML = '<option value="">选择运行账号</option>' + usable.map(item =>
+          `<option value="${item.id}">${escape(item.display_name || item.name)}</option>`).join('');
+        paintCatalog();
+        if (!owns()) return;
+        const requested = options.accountId;
+        const first = requested != null ? usable.find(item => item.id === requested)
+          : agents.find(item => usable.some(account => account.id === item.account_id));
+        const selected = requested != null ? first?.id : first?.account_id;
+        // 账号页的入口仅恢复选择与现场，不借导航隐式创建配置或启动控制者。
+        if (selected) { $('#projects-account').value = selected; await selectAccount(selected); }
+        else if (requested != null) feedback('该账号当前不可用，请选择其他运行账号', 'error');
+      } catch (error) {
+        failed=true;
+        if(!owns())return;
+        $('#projects-runtime').textContent='工作区读取失败：'+error.message;
+        const retry=document.createElement('button');retry.id='projects-initial-retry';retry.type='button';retry.className='btn btn-sm';retry.textContent='重试工作区';retry.onclick=initialize;$('#projects-refresh').after(retry);
+      }
+      finally { if (owns()) { accountControl.disabled = false;$('#projects-agent-form').inert=!catalogLoaded; window.enhanceRuntimeControls?.(); } }
+    };
+    await initialize();
   }
 
   /**
@@ -218,6 +238,7 @@ window.ProjectsUI = (() => {
    */
   async function runAction(action) {
     if (!accountId) { feedback('请先选择并保存账号项目池'); return; }
+    if (action==='start'&&!modelLoaded) { feedback('模型配置仍在读取，请稍后重试');return; }
     const selected = accountId, current = revision, chosen = selection;
     if (pendingActions.has(selected)) return;
     const pending = {action};
@@ -249,6 +270,7 @@ window.ProjectsUI = (() => {
    */
   async function selectAccount(id) {
     closePanels?.();
+    $('#projects-history-retry')?.remove();
     const request = ++selection;
     source?.close(); source = null;
     accountId = id || null; cursor = 0; resetRecords();
@@ -263,15 +285,25 @@ window.ProjectsUI = (() => {
     paintScreen();
     if (!accountId) return;
     const selected = accountId, current = revision;
-    const eventsRecord=recordPages.events, historyRecord=recordPages.history;
+    const eventsRecord=recordPages.events;
     try {
-      const [snapshot, history, events] = await Promise.all([api(`/projects/agents/${selected}/snapshot`),
-        api(`/projects/agents/${selected}/work/page?limit=${historyRecord.size}`),
-        eventsRecord.size === 20 ? null : api(`/projects/agents/${selected}/events/page?limit=${eventsRecord.size}`), loadReconciliation()]);
+      /** 重试仅读取历史区域，保留当前账号的配置草稿。@return {Promise<void>} 本轮历史读取结束。 */
+      const loadHistory=async()=>{
+        $('#projects-history-retry')?.remove();
+        try { await loadPage('history','latest'); }
+        catch(error){
+          if(current!==revision||selected!==accountId||request!==selection)return;
+          const retry=document.createElement('button');retry.id='projects-history-retry';retry.type='button';retry.className='btn btn-sm';retry.textContent='交付历史读取失败，点击重试';retry.title=error.message;retry.onclick=loadHistory;$('#projects-history').before(retry);
+          feedback('交付历史读取失败：'+error.message);
+        }
+      };
+      void loadHistory();
+      void loadReconciliation().catch(error=>{if(current===revision&&selected===accountId&&request===selection)feedback('操作状态读取失败：'+error.message);});
+      const [snapshot, events] = await Promise.all([api(`/projects/agents/${selected}/snapshot`),
+        eventsRecord.size === 20 ? null : api(`/projects/agents/${selected}/events/page?limit=${eventsRecord.size}`)]);
       if (current !== revision || selected !== accountId || request !== selection) return;
       updateAgents(snapshot.state); cursor = snapshot.cursor;
       if(recordPages.events===eventsRecord)eventsRecord.pages=[events || snapshot.events];
-      if(recordPages.history===historyRecord)historyRecord.pages=[history];
       paintState(); paintRecords('events'); paintRecords('history');
       paintScreen(snapshot.observation);
       source = new EventSource(`${prefix}/api${servicePath}/stream?account_id=${selected}&after=${cursor}`);
@@ -363,12 +395,29 @@ window.ProjectsUI = (() => {
     $('#projects-selected-count').textContent = `已选 ${keys.size} 个 · ${executable} 个可执行`;
   }
 
+  /** 独立读取项目池，配置未就绪时保护已有表单。@return {Promise<void>} 本区域读取结束。 */
+  async function loadCatalog() {
+    const current=revision,form=$('#projects-agent-form'),status=$('#projects-research-count');
+    form.inert=true;status.textContent='正在读取项目池…';$('#projects-catalog-retry')?.remove();
+    try {
+      const value=await api('/projects/catalog');if(current!==revision)return;
+      catalog=value.projects;catalogLoaded=true;
+      status.textContent=`${catalog.length} 个研究项目 · ${catalog.filter(item=>item.ready).length} 个具备工程验收`;
+      paintCatalog(agents.find(item=>item.account_id===accountId)?.project_keys||[]);
+      form.inert=$('#projects-account').disabled;
+    }catch(error){
+      if(current!==revision)return;status.textContent='项目池读取失败：'+error.message;
+      const retry=document.createElement('button');retry.id='projects-catalog-retry';retry.type='button';retry.className='btn btn-sm';retry.textContent='重试项目池';retry.onclick=()=>loadCatalog();form.after(retry);
+    }
+  }
+
   /**
    * 保存账号项目池，保存本身不启动真实模型。
    * @return {Promise<void>} 配置已保存。
    */
   async function saveAgent() {
     if (!accountId) throw new Error('请先选择运行账号');
+    if (!catalogLoaded) throw new Error('项目池仍在读取，请稍后重试');
     const selected = accountId, current = revision, chosen = selection;
     const form = $('#projects-agent-form');
     const keys = Array.from(document.querySelectorAll('[name=project_key]:checked')).map(item => item.value);
@@ -585,7 +634,9 @@ window.ProjectsUI = (() => {
     patchRuntimeContent($('#projects-elapsed'), typeof elapsed==='number'&&Number.isFinite(elapsed)&&elapsed>=0?`${Math.floor(elapsed/60)}<small> 分 </small>${Math.floor(elapsed%60)}<small> 秒</small>`:'未采集');
     patchRuntimeContent($('#projects-turn-budget'), typeof agent?.budget_sec==='number'&&Number.isFinite(agent.budget_sec)?`${agent.budget_sec/60}<small> 分钟</small>`:'未采集');
 
-    $('#projects-target-label').textContent = !work || unfinished ? '当前目标' : work.status === 'passed' ? '最近完成目标' : work.status === 'deferred' ? '待复验目标' : '最近停止目标';
+    $('#projects-target-label').textContent = !work || unfinished ? '当前目标' : work.status === 'passed' ? '最近完成目标' : work.status === 'deferred' ? '待复验目标' : work.status === 'stopped' ? '最近停止目标' : `目标状态：${work.status}`;
+    $('#projects-target-label').dataset.state=work?.status||'empty';
+    const delivery=$('#projects-target-delivery');delivery.dataset.work=work?.id||'';delivery.classList.toggle('hidden',!work);
     // 当前、通过和等待来自后端快照，目录排序不能冒充实际完成或可执行状态。
     const objectives=[],seen=new Set();
     const add=(item,kind,label)=>{const key=`${item.project_key}/${item.objective_id}`;if(seen.has(key))return;seen.add(key);objectives.push({item,kind,label,key});};
@@ -671,13 +722,13 @@ window.ProjectsUI = (() => {
     const nativeUsage = `Claude${native?.complete === false ? '（已知小计）' : ''}：未缓存输入 ${count(native?.input_tokens)} · 缓存写入 ${count(native?.cache_creation_input_tokens)} · 缓存读取 ${count(native?.cache_read_input_tokens)} · 输出 ${count(native?.output_tokens)}`;
     $('#projects-usage').textContent = usage ? `账号累计｜${piUsage}；${nativeUsage}` : '尚无模型调用';
     document.querySelectorAll('[data-pi-action]').forEach(button => {
-      button.disabled = !agent || !!pending || (button.dataset.piAction === 'start' && agent.controller_active === true);
+      button.disabled = !agent || !!pending || (button.dataset.piAction === 'start' && (agent.controller_active === true || !modelLoaded));
       button.setAttribute('aria-busy', String(!!pending));
       button.textContent = pending?.action === button.dataset.piAction
         ? {start: '正在启动…', pause: '正在暂停…', stop: '正在停止…'}[pending.action]
         : {start: '启动 / 恢复 Pi', pause: '暂停', stop: '停止当前目标'}[button.dataset.piAction];
     });
-    paintSchedule(); paintScreen(); paintVerification();
+    paintSchedule(); paintScreen(); paintVerification();bindDeliveryActions();
   }
 
   /**
@@ -876,9 +927,15 @@ window.ProjectsUI = (() => {
     document.querySelectorAll('[data-work-capture]').forEach(button => {
       button.onclick = () => showCapture?.(button.dataset.workCapture, namespace);
     });
+    bindDeliveryActions();
+  }
+
+  /** 让当前目标与历史记录共用冻结交付入口，历史请求可独立完成。@return {void} */
+  function bindDeliveryActions() {
     document.querySelectorAll('[data-work]').forEach(button => {
       button.onclick = () => perform(async () => {
         const current = revision, selected = accountId, delivery = ++deliveryRevision;
+        $('[data-delivery-view=source]').click();
         openModal('#projects-delivery');$('#projects-delivery-title').textContent='正在读取冻结交付';$('#projects-delivery-files').innerHTML='';$('#projects-delivery-preview').textContent='正在读取…';
         $('#projects-submission').innerHTML='';$('#projects-delivery-report').textContent='读取中…';$('#projects-delivery-summary').textContent='';$('#projects-delivery-file-count').textContent='';
         let detail;try{detail=await api('/projects/work/'+encodeURIComponent(button.dataset.work));}catch(error){if(current===revision&&delivery===deliveryRevision&&!$('#projects-delivery').classList.contains('hidden'))$('#projects-delivery-preview').textContent='读取交付失败：'+error.message;return;}
@@ -899,7 +956,7 @@ window.ProjectsUI = (() => {
           $('#projects-delivery-files').replaceChildren();$('#projects-delivery-preview').textContent='正在读取候选提交…';$('#projects-delivery-report').textContent='正在读取验收报告…';$('#projects-delivery-summary').textContent='';
           let value;try{value=await api('/projects/submissions/'+encodeURIComponent(chooser.value));}catch(error){if(active()&&chosen===previewSequence)$('#projects-delivery-preview').textContent='读取候选失败：'+error.message;return;}
           if(!active()||chosen!==previewSequence)return;
-          $('#projects-delivery-summary').innerHTML=`<span class="work-badge ${value.status==='passed'?'good':'warning'}">${escape(submissionNames[value.status]||value.status)}</span><strong>${escape(submissionNames[value.status]||value.status)}</strong><span>提交 ${escape(value.id)}</span>`;
+          $('#projects-delivery-summary').innerHTML=`<span class="work-badge ${value.status==='passed'?'good':'warning'}">${escape(submissionNames[value.status]||value.status)}</span><span>提交 ${escape(value.id)}</span>`;
           $('#projects-delivery-file-count').textContent=value.files.length+' 个';
           const feedback=value.report?.feedback;
           $('#projects-delivery-report').innerHTML=`<div class="upgrade-report-state ${value.status==='passed'?'':'warning'}">${escape(Array.isArray(feedback)?feedback.join('\n'):feedback||'验收结果见完整报告')}</div><details class="work-report-details"><summary>完整验收报告</summary><pre>${escape(JSON.stringify(value.report,null,2))}</pre></details>`;
@@ -907,6 +964,7 @@ window.ProjectsUI = (() => {
           $('#projects-delivery-files').innerHTML=value.files.map(file=>`<button type="button" class="upgrade-file-choice" data-candidate-path="${escape(file.path)}"${file.deleted?' disabled':''}><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-task"></use></svg><span>${escape(file.path)}</span><small>${file.deleted?'已删除':'查看'}</small></button>`).join('');
           document.querySelectorAll('[data-candidate-path]').forEach(file=>{file.onclick=()=>perform(async()=>{
             const chosen=++previewSequence;
+            $('[data-delivery-view=source]').click();
             $('#projects-delivery-preview').textContent='正在读取冻结文件…';$('#projects-delivery-path').textContent=file.dataset.candidatePath;
             let preview;try{preview=await api(`/projects/submissions/${encodeURIComponent(value.id)}?path=${encodeURIComponent(file.dataset.candidatePath)}`);}catch(error){if(active()&&chosen===previewSequence)$('#projects-delivery-preview').textContent='读取文件失败：'+error.message;return;}
             if(active()&&chosen===previewSequence){$('#projects-delivery-preview').textContent=preview.text??preview.message;$('#projects-delivery-path').textContent=file.dataset.candidatePath;document.querySelectorAll('[data-candidate-path]').forEach(node=>node.classList.toggle('active',node===file));}
@@ -944,15 +1002,23 @@ window.ProjectsUI = (() => {
    * @return {Promise<void>} 脱敏配置加载完成。
    */
   async function loadModel() {
-    const current = revision;
-    const value = await api('/settings/project-requester');
-    if (current !== revision) return;
-    const form = $('#projects-model-form');
-    form.elements.base_url.value = value.base_url;
-    form.elements.models.value = value.models.join('\n');
-    form.elements.compaction_threshold_tokens.value = value.compaction_threshold_tokens ?? 350000;
-    form.elements.api_key.value = '';
-    $('#projects-model-status').textContent = value.ready ? `配置已就绪 · ${value.api_key_configured ? '密钥已配置' : '无密钥'}；启动或恢复的 Pi 使用该配置。` : value.error || '请配置支持流式响应和工具调用的外接模型。';
+    const current=revision,form=$('#projects-model-form'),status=$('#projects-model-status');
+    form.inert=true;status.textContent='正在读取模型配置…';
+    $('#projects-model-retry')?.remove();
+    try {
+      const value=await api('/settings/project-requester');
+      if(current!==revision)return;
+      form.elements.base_url.value=value.base_url;
+      form.elements.models.value=value.models.join('\n');
+      form.elements.compaction_threshold_tokens.value=value.compaction_threshold_tokens??350000;
+      form.elements.api_key.value='';modelLoaded=true;
+      status.textContent=value.ready?`配置已就绪 · ${value.api_key_configured?'密钥已配置':'无密钥'}；启动或恢复的 Pi 使用该配置。`:value.error||'请配置支持流式响应和工具调用的外接模型。';
+      form.inert=false;paintState();
+    }catch(error){
+      if(current!==revision)return;
+      status.textContent='模型配置读取失败：'+error.message;
+      const retry=document.createElement('button');retry.id='projects-model-retry';retry.className='btn btn-sm';retry.type='button';retry.textContent='重新读取模型配置';retry.onclick=()=>loadModel();form.after(retry);
+    }
   }
 
   /**

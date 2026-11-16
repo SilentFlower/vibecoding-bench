@@ -35,7 +35,7 @@ const loginHost=shallowRef<HTMLElement|null>(null),loginProxy=ref<ProxyRoute|nul
 const captureHost=shallowRef<HTMLElement|null>(null),capture=ref<RunCapture|null>(null),captureUrl=ref('');
 const pagers=shallowRef<{host:HTMLElement;state:RuntimePagination}[]>([]);
 const paginationStates=new Map<string,RuntimePagination>();
-let scope:ReturnType<typeof createRuntimeScope>|undefined,controller:ReturnType<typeof mount>|undefined,observer:MutationObserver|undefined,alive=true,capturePayload='';
+let scope:ReturnType<typeof createRuntimeScope>|undefined,controller:ReturnType<typeof mount>|undefined,observer:MutationObserver|undefined,alive=true,connecting=false,capturePayload='';
 /** 目录选择仅提交稳定ID及版本，私有连接留在Rust桥。@param value 当前线路。@return 无。 */
 function chooseProxy(value:ProxyRoute|null):void{loginProxy.value=value;if(loginHost.value)loginHost.value.dataset.proxyChoice=JSON.stringify(value?{id:value.id,revision:value.revision}:null);}
 /** 将控制器事件交给同一路由或Vue工作区。@param message 模块事件。@return 无。 */
@@ -75,13 +75,27 @@ function closeProxy(refresh=false):void{proxyTaskId.value=null;if(refresh){scope
 /** 关闭运行详情并恢复对应列表入口焦点。@return 无。 */
 function closeRun():void{const id=runDetails.value?.id;runDetails.value=null;void nextTick(()=>{if(id)root.value?.querySelector<HTMLElement>(`[data-detail="${CSS.escape(id)}"]`)?.focus({preventScroll:true});});}
 /** 交换原管理会话后挂载同份模块，静态模板随构建分发。@return 连接结束。 */
-async function connect():Promise<void>{error.value='';try{await api.openRuntime();if(!alive||!root.value)return;const host=root.value;const body=host.ownerDocument.createElement('div');body.className='runtime-body work-console';body.innerHTML=template;host.replaceChildren(body);host.dataset.theme=localStorage.getItem('vibebench-theme')||'light';scope=createRuntimeScope(host,body,hash.value,receive,{notify:(message,type)=>showFeedback(message,(['success','error','warning','info'].includes(type)?type:'info') as FeedbackType),confirm:(message,signal)=>askConfirmation({title:'确认操作',message,danger:true},signal)});observer=new MutationObserver(records=>{if(records.some(record=>record.type==='childList'||record.attributeName==='class'||record.attributeName==='data-capture-payload'||record.attributeName==='data-proxy-label'||record.attributeName==='data-proxy-url'))synchronizeHosts();});observer.observe(host,{subtree:true,childList:true,attributes:true,attributeFilter:['class','data-capture-payload','data-proxy-label','data-proxy-url']});controller=mount(scope.scope);synchronizeHosts();}catch(cause){if(alive)error.value=(cause as Error).message;}}
+async function connect():Promise<void>{
+  if(connecting||!alive||!root.value)return;
+  connecting=true;ready.value=false;error.value='';
+  const host=root.value;
+  controller?.dispose();scope?.dispose();observer?.disconnect();
+  const body=host.ownerDocument.createElement('div');body.className='runtime-body work-console';body.innerHTML=template;
+  host.replaceChildren(body);host.dataset.theme='light';host.inert=true;
+  try{
+    await api.openRuntime();
+    if(!alive)return;
+    host.inert=false;
+    scope=createRuntimeScope(host,body,hash.value,receive,{notify:(message,type)=>showFeedback(message,(['success','error','warning','info'].includes(type)?type:'info') as FeedbackType),confirm:(message,signal)=>askConfirmation({title:'确认操作',message,danger:true},signal)});observer=new MutationObserver(records=>{if(records.some(record=>record.type==='childList'||record.attributeName==='class'||record.attributeName==='data-capture-payload'||record.attributeName==='data-proxy-label'||record.attributeName==='data-proxy-url'))synchronizeHosts();});observer.observe(host,{subtree:true,childList:true,attributes:true,attributeFilter:['class','data-capture-payload','data-proxy-label','data-proxy-url']});controller=mount(scope.scope);synchronizeHosts();
+  }catch(cause){if(alive){host.inert=true;error.value=(cause as Error).message;}}
+  finally{connecting=false;}
+}
 watch(hash,value=>{environmentAccountId.value=null;workspaceAccountId.value=null;proxyTaskId.value=null;runDetails.value=null;scope?.setRoute(value);});
 onMounted(()=>{void connect();});
 onUnmounted(()=>{alive=false;observer?.disconnect();controller?.dispose();scope?.dispose();});
 </script>
 <template>
-  <section class="tasks-native-route" :class="{'runtime-connecting':!ready}" data-native-run-details><p v-if="error" class="task-connect-error" role="alert">{{ error }} <Button variant="outline" @click="connect">重新连接</Button></p><p v-else-if="!ready" class="task-connect-loading" role="status">正在加载工作区…</p><div ref="root" class="task-runtime console-design embedded-tasks" :aria-busy="!ready" />
+  <section class="tasks-native-route" :class="{'runtime-connecting':!ready}" data-native-run-details><p v-if="error" class="task-connect-error" role="alert">{{ error }} <Button variant="outline" @click="connect">重新连接</Button></p><p v-else-if="!ready" class="task-connect-loading" role="status">正在建立工作区连接…</p><div ref="root" class="task-runtime console-design embedded-tasks" :aria-busy="!ready" />
     <Teleport v-for="tip in proxyTips" :key="tip.host.dataset.taskProxyId" :to="tip.host"><InfoTooltip :label="`查看代理：${tip.label}`" :title="tip.label"><template #trigger><Globe :size="14" /><span class="work-proxy-name">{{ tip.label }}</span></template><p>{{ tip.url || (tip.label==='直连'?'使用直接网络连接':'代理信息待核对') }}</p></InfoTooltip></Teleport>
     <Teleport v-if="loginHost" :to="loginHost"><ProxyPicker :model-value="loginProxy" :current-label="loginLabel" :disabled="loginDisabled" :portal-target="loginHost.closest<HTMLElement>('#acc-modal')??loginHost" help="从代理管理选择线路，开始授权后应用" @update:model-value="chooseProxy" /></Teleport>
     <Teleport v-if="captureHost&&capture" :to="captureHost"><CaptureWorkspace :key="captureUrl" :capture="capture" :file-url="captureUrl" /></Teleport>
@@ -93,6 +107,6 @@ onUnmounted(()=>{alive=false;observer?.disconnect();controller?.dispose();scope?
   </section>
 </template>
 <style>
-.console-native-tasks .console-content{padding:0;max-width:none}.task-runtime{min-width:0;width:100%}.runtime-connecting>.task-runtime{visibility:hidden}.task-connect-loading,.task-connect-error{padding:38px 40px}.task-runtime [data-vue-pagination=true]>:not(.native-pagination-host){display:none!important}.task-runtime .native-pagination-host{width:100%;min-width:0}.task-runtime .projects-pagination{padding-block:16px}.task-runtime .fui-pagination-controls [data-slot=button][aria-current=page]{background:#77648f;border-color:#77648f;color:white}.task-runtime .runtime-body{min-height:calc(100dvh - 24px)}
+.console-native-tasks .console-content{padding:0;max-width:none}.task-runtime{min-width:0;width:100%}.runtime-connecting>.task-runtime{min-height:320px}.task-connect-loading,.task-connect-error{padding:12px 40px;background:#f6f4fb;border-bottom:1px solid #e8e4ef;font-size:var(--ui-font-small)}.task-runtime [data-vue-pagination=true]>:not(.native-pagination-host){display:none!important}.task-runtime .native-pagination-host{width:100%;min-width:0}.task-runtime .projects-pagination{padding-block:16px}.task-runtime .fui-pagination-controls [data-slot=button][aria-current=page]{background:#77648f;border-color:#77648f;color:white}.task-runtime .runtime-body{min-height:calc(100dvh - 24px)}
 .task-runtime .work-proxy-compact>.fui-info-trigger{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%;font-size:var(--ui-font-small)}
 </style>

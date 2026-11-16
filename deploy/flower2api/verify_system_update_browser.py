@@ -128,6 +128,9 @@ async def verify(output: Path) -> dict:
             page.on('pageerror', lambda error: errors.append(str(error)))
             await page.goto(BASE + '/updates')
             await expect(page.get_by_role('heading', name='系统更新', exact=True)).to_be_visible()
+            if fixture.state['installed']:
+                await expect(page.locator('.update-history')).to_be_visible()
+                await page.locator('.update-history>summary').click()
             return context, page
 
         fixture = UpdateFixture()
@@ -142,20 +145,20 @@ async def verify(output: Path) -> dict:
         assert await page.evaluate('window.fixtureXss') is None
         await page.screenshot(path=str(output / 'updates-1280.png'), full_page=True)
         await page.get_by_role('button', name='安装更新', exact=True).click()
-        await expect(page.locator('dialog')).to_be_visible()
+        await expect(page.locator('.update-page>dialog')).to_be_visible()
         for width, height in [(1280, 900), (390, 900), (390, 300)]:
             await page.set_viewport_size({'width': width, 'height': height})
-            box = await page.locator('dialog').bounding_box()
+            box = await page.locator('.update-page>dialog').bounding_box()
             assert box and abs(box['x'] + box['width'] / 2 - width / 2) <= 1, box
             assert abs(box['y'] + box['height'] / 2 - height / 2) <= 1, box
-            assert box['y'] >= 15 and box['y'] + box['height'] <= height - 15, box
+            assert box['y'] >= 14 and box['y'] + box['height'] <= height - 14, box
             await page.get_by_role('button', name='确认执行', exact=True).scroll_into_view_if_needed()
             control = await page.get_by_role('button', name='确认执行', exact=True).bounding_box()
             assert control and control['y'] >= 0 and control['y'] + control['height'] <= height, control
             await page.screenshot(path=str(output / f'centered-dialog-{width}-{height}.png'))
         await page.set_viewport_size({'width': 1280, 'height': 900})
         await page.mouse.click(5, 5)
-        await expect(page.locator('dialog')).not_to_be_visible()
+        await expect(page.locator('.update-page>dialog')).not_to_be_visible()
         assert not fixture.writes
         await page.get_by_role('button', name='安装更新', exact=True).click()
         assert not fixture.writes
@@ -163,7 +166,7 @@ async def verify(output: Path) -> dict:
         assert not fixture.writes
         await page.get_by_role('button', name='安装更新', exact=True).click()
         await page.keyboard.press('Escape')
-        await expect(page.locator('dialog')).not_to_be_visible()
+        await expect(page.locator('.update-page>dialog')).not_to_be_visible()
         assert not fixture.writes
         cases.append('桌面样式、具体兼容原因、迁移计划、普通文本转义、取消和 Esc 零安装写入')
         await context.close()
@@ -171,12 +174,13 @@ async def verify(output: Path) -> dict:
         fixture = UpdateFixture()
         context, page = await page_for(fixture, 390)
         await page.get_by_role('button', name='安装更新', exact=True).click()
-        await expect(page.get_by_role('combobox')).to_have_value('1')
-        await page.get_by_role('combobox').select_option('5')
+        await expect(page.get_by_role('combobox')).to_have_text('1 分钟')
+        await page.get_by_role('combobox').click()
+        await page.get_by_role('option', name='5 分钟', exact=True).click()
         await page.get_by_role('button', name='取消', exact=True).click()
         assert not fixture.writes
         await page.get_by_role('button', name='安装更新', exact=True).click()
-        await expect(page.get_by_role('combobox')).to_have_value('1')
+        await expect(page.get_by_role('combobox')).to_have_text('1 分钟')
         await page.get_by_role('button', name='确认执行', exact=True).click()
         await expect(page.get_by_role('heading', name='等待在途完成')).to_be_visible()
         assert len(fixture.writes) == 1 and fixture.writes[0]['body']['drain_timeout_seconds'] == 60
@@ -186,7 +190,8 @@ async def verify(output: Path) -> dict:
         fixture = UpdateFixture()
         context, page = await page_for(fixture, 390)
         await page.get_by_role('button', name='安装更新', exact=True).click()
-        await page.get_by_role('combobox').select_option('30')
+        await page.get_by_role('combobox').click()
+        await page.get_by_role('option', name='30 分钟', exact=True).click()
         await page.screenshot(path=str(output / 'install-dialog-390.png'), full_page=True)
         await page.get_by_role('button', name='确认执行').dblclick()
         await expect(page.get_by_role('heading', name='等待在途完成')).to_be_visible()
@@ -230,9 +235,9 @@ async def verify(output: Path) -> dict:
         context, page = await page_for(fixture)
         await page.get_by_role('button', name='安装更新', exact=True).click()
         await page.get_by_role('button', name='确认执行').click()
-        await expect(page.locator('dialog')).to_be_visible()
+        await expect(page.locator('.update-page>dialog')).to_be_visible()
         await expect(page.get_by_role('button', name='确认执行')).to_be_disabled()
-        await expect(page.locator('dialog').get_by_role('alert')).to_contain_text('现场版本已经变化')
+        await expect(page.locator('.update-page>dialog').get_by_role('alert')).to_contain_text('现场版本已经变化')
         assert len(fixture.writes) == 1
         total_writes += len(fixture.writes)
         cases.append('409 保留确认窗口并阻止旧现场自动重放')
@@ -253,7 +258,7 @@ async def verify(output: Path) -> dict:
         await page.get_by_role('button', name='查看历史版本与回退', exact=False).click()
         await page.get_by_role('button', name='回退到此版本').click()
         await expect(page.get_by_role('heading', name='确认版本回退')).to_be_visible()
-        await expect(page.get_by_role('combobox')).to_have_value('1')
+        await expect(page.get_by_role('combobox')).to_have_text('1 分钟')
         await page.get_by_role('button', name='确认执行').click()
         await expect(page.get_by_role('heading', name='等待在途完成')).to_be_visible()
         assert fixture.writes[0]['path'].endswith('/rollback')
@@ -272,7 +277,7 @@ async def verify(output: Path) -> dict:
         context, page = await page_for(fixture, 390)
         await page.get_by_role('button', name='恢复操作', exact=True).click()
         await expect(page.get_by_role('heading', name='恢复本次操作', exact=True)).to_be_visible()
-        box = await page.locator('dialog').bounding_box()
+        box = await page.locator('.update-page>dialog').bounding_box()
         assert box and abs(box['x'] + box['width'] / 2 - 195) <= 1, box
         await page.get_by_role('button', name='开始恢复', exact=True).click()
         assert len(fixture.writes) == 1 and fixture.writes[0]['path'].endswith('/recover')

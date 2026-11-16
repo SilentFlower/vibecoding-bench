@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { ApiError, api, type SystemUpdateCatalog, type SystemUpdateRequest, type SystemUpdateStatus, type SystemUpdateRelease } from '../api';
-import { Download, ChevronDown, ChevronRight, RefreshCw, Layers, Cpu, Check, ArrowRight, Shield } from 'lucide-vue-next';
+import { Download, ChevronDown, ChevronRight, RefreshCw, Layers, Cpu, Check, ArrowRight } from 'lucide-vue-next';
 import { formatLocalTime } from '../lib/time';
 import { platformVersion, releaseNotes, releaseVersion } from '../lib/platformVersion';
 import { Card } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import { useToast } from '../composables/useToast';
 
 const toast = useToast();
 const historyOpen = ref(false);
+const notesOpen = ref(false);
 const expanded = ref('');
 const status = ref<SystemUpdateStatus | null>(null);
 const catalog = ref<SystemUpdateCatalog | null>(null);
@@ -63,7 +64,8 @@ const latestRelease = computed(() => catalog.value?.releases[0]);
 /** 从真实发布文本提取前三段概览，完整原文由版本详情继续展示。 */
 const releaseHighlights = computed(() => releaseNotes(latestRelease.value?.changes ?? '').split(/\n\s*\n/).filter(part => part.trim()).slice(0, 3).map(part => {
   const lines = part.trim().split('\n');
-  return { title: (lines[0] ?? '').replace(/^#{1,6}\s+/, ''), description: lines.slice(1).join('\n') };
+  const heading = lines.length > 1 && (lines[0]?.length ?? 0) < 64;
+  return { title: heading ? (lines[0] ?? '').replace(/^#{1,6}\s+/, '') : '', description: heading ? lines.slice(1).join('\n') : part.trim() };
 }));
 const updateSummary = computed(() => {
   if (status.value?.busy) return '正在执行维护';
@@ -71,7 +73,7 @@ const updateSummary = computed(() => {
   if (catalog.value?.check_error || status.value?.check_error) return '检查遇到问题';
   if (!catalog.value?.fresh) return '等待检查版本';
   if (!latestRelease.value) return '暂无可用发行';
-  return latestRelease.value.release === status.value?.current_release ? '当前为目录最新版本' : '发现可用版本';
+  return latestRelease.value.release === status.value?.current_release ? '当前已是最新版本' : '发现可用版本';
 });
 
 /** 使用受信版本标题；旧来源保留历史构建语义。@param id 原发行身份。@return 人类可读版本。 */
@@ -84,13 +86,8 @@ function releaseLabel(id: string): string {
 /** 版本列表只保留一个详情展开。@param id 当前条目标识。@return 无返回值。 */
 function toggleDetails(id: string): void { expanded.value = expanded.value === id ? '' : id; }
 
-/** 展开或收起完整发行说明。@param event 当前操作事件。@return 无。 */
-function toggleLatestNotes(event: MouseEvent): void {
-  if (!latestRelease.value) return;
-  toggleDetails(latestRelease.value.release);
-  const maintenance = (event.currentTarget as HTMLElement).closest('section.update-page')?.querySelector('details.approved-maintenance');
-  maintenance?.toggleAttribute('open', expanded.value === latestRelease.value.release);
-}
+/** 独立展开完整发行说明，维护与历史保持各自的阅读位置。@return 无。 */
+function toggleLatestNotes(): void { notesOpen.value = !notesOpen.value; }
 
 /** 显示受信发布说明的首段摘要。@param release 完整发行摘要。@return 短说明。 */
 function summary(release: SystemUpdateRelease): string { return releaseNotes(release.changes).split('\n')[0] ?? ''; }
@@ -238,31 +235,32 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); dia
 </script>
 
 <template>
-  <section class="update-page space-y-6 text-foreground" aria-label="系统更新">
-    <header v-if="!embedded" class="page-heading"><div><h1 class="text-2xl font-bold tracking-tight">系统更新</h1><p class="mt-1 text-sm text-muted-foreground">查看当前版本与变更，选择合适的时间安装</p></div><Button variant="outline" class="h-9 shadow-none" :disabled="checking || catalog?.checking || !status?.installed" @click="check"><RefreshCw class="size-4" :class="checking || catalog?.checking ? 'animate-spin motion-reduce:animate-none' : ''" />{{ checking || catalog?.checking ? '正在检查…' : '检查更新' }}</Button></header>
+  <section class="update-page text-foreground" aria-label="系统更新">
+    <header v-if="!embedded" class="page-heading"><div><h1 class="text-2xl font-bold tracking-tight">系统更新</h1><p class="mt-1 text-sm text-muted-foreground">查看当前版本与变更，选择合适的时间安装</p></div></header>
     <p v-if="error" role="alert" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{{ error }}</p>
     <p v-if="loading" class="py-10 text-center text-muted-foreground">正在读取系统版本…</p>
     <Card v-else-if="status && !status.installed" class="gap-3 p-5 shadow-none"><h2 class="font-semibold">首次接入系统更新</h2><p class="text-sm text-muted-foreground">{{ status.message }}</p><p class="text-sm text-muted-foreground">接入独立更新服务及维护底座后，即可安装后续版本。</p></Card>
     <template v-if="status?.installed">
       <div class="approved-update-banner">
-        <div><p class="eyebrow" role="status">{{ updateSummary }}</p><div class="approved-version">{{ latestRelease ? releaseLabel(latestRelease.release) : currentVersion }}</div><h2>{{ latestRelease && latestRelease.release !== status.current_release ? '查看新版本与变更' : '你的平台，保持井然有序。' }}</h2><p>{{ latestRelease ? summary(latestRelease) : '检查受信发行目录，获取可用更新与发布说明。' }}</p></div>
-        <div class="approved-update-orbit" aria-hidden="true"><img src="/favicon.svg?v=flower2api-pink-04" alt=""><span /></div>
+        <div><p class="eyebrow" role="status">{{ updateSummary }}</p><div class="approved-version">{{ latestRelease ? releaseLabel(latestRelease.release) : currentVersion }}</div><h2>{{ !catalog?.fresh ? '等待检查版本' : !latestRelease ? '暂无可用发行' : latestRelease.release !== status.current_release ? '新版本已就绪' : '当前已是最新版本' }}</h2><p>{{ latestRelease && latestRelease.release !== status.current_release ? '阅读发布说明，选择合适的时间安装。' : '查看本次发布说明与平台维护记录。' }}</p></div>
+        <div class="update-status-actions"><Button variant="outline" :disabled="checking || catalog?.checking" @click="check"><RefreshCw :size="14" :class="checking || catalog?.checking ? 'animate-spin motion-reduce:animate-none' : ''" />{{ checking || catalog?.checking ? '正在检查…' : '重新检查' }}</Button><Button v-if="latestRelease && latestRelease.release !== status.current_release" :disabled="status.busy || writing || !catalog?.fresh || !latestRelease.data_compatible" @click="confirm('install', latestRelease.release, latestRelease.manifest_sha256, latestRelease.account_changed)">查看更新计划<ArrowRight :size="14" /></Button></div>
       </div>
       <div class="approved-update-columns">
-        <section><h3 class="approved-section-title">这次更新带来了什么</h3><div v-if="latestRelease" class="approved-release-notes"><article v-for="(highlight, index) in releaseHighlights" :key="index" class="approved-change-item"><span class="approved-change-icon"><component :is="[Users, FileText, ShieldCheck][index]" :size="14" /></span><div><h3>{{ highlight.title }}</h3><p v-if="highlight.description">{{ highlight.description }}</p></div></article><p v-if="!releaseHighlights.length">该发行未提供额外说明。</p></div><p v-else class="text-sm text-muted-foreground">等待检查可用版本</p><button v-if="latestRelease" type="button" class="approved-text-action" @click="toggleLatestNotes">{{ expanded === latestRelease.release ? '收起完整发布说明' : '查看完整发布说明' }} <ArrowRight :size="13" /></button></section>
-        <aside><div class="approved-platform"><h3 class="approved-section-title">你的平台</h3><dl><div><dt>当前版本</dt><dd>{{ currentVersion }}</dd></div><div><dt>目标版本</dt><dd>{{ latestRelease ? releaseLabel(latestRelease.release) : '等待检查' }}</dd></div><div><dt>发布于</dt><dd>{{ latestRelease ? formatLocalTime(latestRelease.published_at) : '—' }}</dd></div><div><dt>最近检查</dt><dd>{{ catalog?.checked_at ? formatLocalTime(catalog.checked_at) : '尚未检查' }}</dd></div></dl><Button variant="outline" :disabled="checking || catalog?.checking" @click="check"><RefreshCw :size="13" />{{ checking || catalog?.checking ? '正在检查…' : '重新检查' }}</Button></div><div class="approved-platform approved-compatibility"><p>{{ !catalog?.fresh ? '版本目录待刷新' : latestRelease?.data_compatible ? '兼容性检查通过' : '兼容性待核对' }}</p><small>{{ latestRelease?.account_changed ? `预计更新 ${runningEnvironments} 个运行环境` : '兼容的运行环境可以继续复用' }}<br>安装前自动保存数据快照</small></div></aside>
+        <section class="update-notes-card"><h3 class="approved-section-title">这次更新带来了什么</h3><div v-if="latestRelease" class="approved-release-notes"><article v-for="(highlight, index) in releaseHighlights" :key="index" class="approved-change-item"><span class="approved-change-icon"><component :is="[Users, FileText, ShieldCheck][index]" :size="14" /></span><div><h3 v-if="highlight.title">{{ highlight.title }}</h3><p v-if="highlight.description">{{ highlight.description }}</p></div></article><p v-if="!releaseHighlights.length">该发行未提供额外说明。</p></div><p v-else class="text-sm text-muted-foreground">等待检查可用版本</p><button v-if="latestRelease" type="button" class="approved-text-action" :aria-expanded="notesOpen" aria-controls="latest-release-notes" @click="toggleLatestNotes">{{ notesOpen ? '收起完整发布说明' : '查看完整发布说明' }} <ArrowRight :size="13" /></button><div v-if="notesOpen && latestRelease" id="latest-release-notes" class="update-full-notes" data-release-details>{{ releaseNotes(latestRelease.changes) }}</div></section>
+        <aside class="update-platform-stack"><div class="approved-platform"><h3 class="approved-section-title">你的平台</h3><dl><div><dt>当前版本</dt><dd>{{ currentVersion }}</dd></div><div><dt>最新版本</dt><dd>{{ latestRelease ? releaseLabel(latestRelease.release) : '等待检查' }}</dd></div><div><dt>发布于</dt><dd>{{ latestRelease ? formatLocalTime(latestRelease.published_at) : '—' }}</dd></div><div><dt>最近检查</dt><dd>{{ catalog?.checked_at ? formatLocalTime(catalog.checked_at) : '尚未检查' }}</dd></div></dl></div><div class="approved-platform approved-compatibility"><p>{{ !catalog?.fresh ? '版本目录待刷新' : latestRelease?.data_compatible ? '兼容性检查通过' : '兼容性待核对' }}</p><small>{{ latestRelease?.account_changed ? `预计更新 ${runningEnvironments} 个运行环境` : '兼容的运行环境可以继续复用' }}<br>安装前自动保存数据快照</small></div></aside>
       </div>
-      <div class="approved-update-footer"><Shield :size="18" /><p>更新时将等待在途工作结束<br>你会在下一步确认影响与等待时间</p><Button :disabled="!latestRelease || latestRelease.release === status.current_release || status.busy || writing || !catalog?.fresh || !latestRelease.data_compatible" @click="latestRelease && confirm('install', latestRelease.release, latestRelease.manifest_sha256, latestRelease.account_changed)">查看更新计划<ArrowRight :size="14" /></Button></div>
-      <details class="approved-maintenance" :open="status.busy || recoveryAllowed || !!progress?.error"><summary>历史版本、回退与维护详情</summary>
-      <div class="update-context-grid">
-        <Card class="min-w-0 gap-0 p-5 shadow-none"><div class="flex items-center gap-2 text-xs text-muted-foreground"><Layers class="size-4" /><h2>账号运行环境</h2></div><p class="mt-4 text-3xl font-semibold tabular-nums">{{ runningEnvironments }}<span class="ml-2 text-sm font-normal text-muted-foreground">个运行中</span></p><router-link :to="{name: 'environments'}" class="mt-3 w-fit text-xs text-primary">管理环境 →</router-link><details class="mt-3 text-xs text-muted-foreground"><summary class="cursor-pointer">镜像来源</summary><p class="mt-2 break-all font-mono">所选：{{ status.components?.account.release }}</p><p v-for="source in environmentSources" :key="source.release" class="mt-2 break-all">{{ source.release }} · {{ source.count }} 个</p></details></Card>
-        <Card class="min-w-0 gap-0 p-5 shadow-none"><div class="flex items-center gap-2 text-xs text-muted-foreground"><Cpu class="size-4" /><h2>CLI 与请求内核</h2></div><p class="mt-4 text-xl font-semibold">按账号独立管理</p><p class="mt-2 text-xs text-muted-foreground">各账号显示实际 CLI 版本和内核选择</p><router-link :to="{name: 'environments'}" class="mt-3 w-fit text-xs text-primary">查看版本与切换入口 →</router-link></Card>
-      </div>
-      <section v-if="progress" class="rounded-xl border bg-card" aria-live="polite">
+      <section v-if="progress" class="update-operation rounded-xl border bg-card" :class="{'update-operation-priority': status.busy || progress.error || progress.blockers?.length}" aria-live="polite">
         <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div class="flex min-w-0 items-center gap-3"><span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Check v-if="progress.phase === 'succeeded'" class="size-4" /><RefreshCw v-else class="size-4" :class="status.busy ? 'animate-spin motion-reduce:animate-none' : ''" /></span><div><h2 class="text-sm font-semibold">{{ phases[progress.phase] ?? progress.phase }}</h2><p class="mt-1 text-xs text-muted-foreground">{{ releaseLabel(progress.target_release) }}</p></div></div><div class="flex gap-2"><Button v-if="cancelAllowed" variant="outline" size="sm" :disabled="writing || progress.cancel_requested" @click="cancel">{{ progress.cancel_requested ? '正在取消…' : '取消等待' }}</Button><Button v-if="recoveryAllowed" variant="outline" size="sm" :disabled="writing" @click="confirm('recover', progress.target_release, '', true)">恢复操作</Button></div></div>
         <div v-if="status.busy || progress.error || progress.blockers?.length" class="space-y-3 border-t px-5 py-4 text-sm"><p v-if="status.busy" class="text-muted-foreground">维护期间新工作暂缓，在途工作自然结束后继续。</p><ul v-if="progress.blockers?.length" class="space-y-1 rounded-lg bg-muted p-3"><li v-for="blocker in progress.blockers" :key="blocker" class="break-words">{{ blocker }}</li></ul><p v-if="progress.error" role="alert" class="text-amber-800">{{ progress.error }}</p></div>
         <details class="border-t px-5 py-3 text-xs text-muted-foreground"><summary class="cursor-pointer">操作详情与数据库快照</summary><div class="mt-3 space-y-2"><p class="break-all">目标发行：<code>{{ progress.target_release }}</code></p><p class="break-all">操作 ID：<code>{{ progress.operation_id }}</code></p><p :title="progress.updated_at">更新时间：{{ formatLocalTime(progress.updated_at) }}</p><p v-if="progress.database_snapshot">数据库快照{{ progress.database_snapshot.state === 'verified' ? '已校验' : '状态：' + progress.database_snapshot.state }} · {{ (progress.database_snapshot.bytes / 1024 / 1024).toFixed(1) }} MiB</p><p v-for="(migration, database) in progress.database_migrations ?? {}" :key="database">{{ database === 'bench' ? '平台数据库' : '网关数据库' }} · 目标版本 {{ migration.target_version }} · {{ migration.state === 'completed' ? '迁移完成' : migration.state === 'running' ? '正在迁移' : migration.state }}</p></div></details>
       </section>
+      <details class="approved-maintenance update-disclosure"><summary>运行组件与维护详情</summary>
+      <div class="update-context-grid">
+        <Card class="min-w-0 gap-0 p-5 shadow-none"><div class="flex items-center gap-2 text-xs text-muted-foreground"><Layers class="size-4" /><h2>账号运行环境</h2></div><p class="mt-4 text-3xl font-semibold tabular-nums">{{ runningEnvironments }}<span class="ml-2 text-sm font-normal text-muted-foreground">个运行中</span></p><router-link :to="{name: 'environments'}" class="mt-3 w-fit text-xs text-primary">管理环境 →</router-link><details class="mt-3 text-xs text-muted-foreground"><summary class="cursor-pointer">镜像来源</summary><p class="mt-2 break-all font-mono">所选：{{ status.components?.account.release }}</p><p v-for="source in environmentSources" :key="source.release" class="mt-2 break-all">{{ source.release }} · {{ source.count }} 个</p></details></Card>
+        <Card class="min-w-0 gap-0 p-5 shadow-none"><div class="flex items-center gap-2 text-xs text-muted-foreground"><Cpu class="size-4" /><h2>CLI 与请求内核</h2></div><p class="mt-4 text-xl font-semibold">按账号独立管理</p><p class="mt-2 text-xs text-muted-foreground">各账号显示实际 CLI 版本和内核选择</p><router-link :to="{name: 'environments'}" class="mt-3 w-fit text-xs text-primary">查看版本与切换入口 →</router-link></Card>
+      </div>
+      </details>
+      <details class="update-history update-disclosure"><summary>版本记录与回退</summary>
       <section id="available-releases" class="space-y-3" aria-label="可用版本">
         <div class="flex flex-wrap items-center justify-between gap-2"><h2 class="text-sm font-semibold">可用版本</h2><time class="text-xs text-muted-foreground" :title="catalog?.checked_at ?? undefined">最近检查：{{ catalog?.checked_at ? formatLocalTime(catalog.checked_at) : '等待首次检查' }}</time></div>
         <p v-if="catalog?.check_error" role="status" class="text-sm text-amber-800">{{ catalog.check_error }}</p>

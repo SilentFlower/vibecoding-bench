@@ -39,7 +39,7 @@ const state = {
 | **UI 临时态** | `state.<feature>` | `state.topicFilter`(搜索框文字)、`state.accLogin`(登录两步流上下文) |
 | **副作用句柄** | `state.<feature>(EventSource\|.ws\|.term\|...)` | `state.runsEventSource`、`state.accLogin.ws` 等 |
 | **路由状态** | URL hash | `location.hash`(`#accounts / #topics / #tasks / #runs`),不复制到 `state` |
-| **持久化偏好** | `localStorage` | `vibebench-theme` 主题选择;不复制到 `state`,每次读 |
+| **主题** | 根节点 `data-theme="light"` | 任务及独立兼容入口固定亮色，旧主题偏好不再读取或写入 |
 | **数据派生** | 局部变量 | render 内 `const accMap = Object.fromEntries(state.accounts.map(a => [a.id, a.name]))`;**不缓存进 state** |
 
 **禁止**:
@@ -112,7 +112,7 @@ onAccountChange(accountId: number | null) -> void
 - node --check apps/legacy-web/app.js、apps/legacy-web/projects.js；真实浏览器入口为 verify_stack.py --manifest <联合清单> --browser --project-iteration。
 - Chrome + HTTP + SQLite + SSE：单一顶层入口、Enter 键、账号 A/B、实际新 Document 刷新、浏览历史、旧链接与账号页直达；非法/重复/停用/删除账号不换号。
 - 两空间配置/计划/终端/记录/分页分别读取；导航阶段只有 GET，前后持久业务表一致。延迟旧快照并连续切换20次，最多一个当前 SSE、时钟不累积，卸载全部释放。
-- CLI 配置与工作抓包路径按本空间，切换关闭旧窗口；1280/720/390px 明暗主题无横向溢出。合成持久工作保持不等于真实模型已执行，部署后另核对现有工作事实。
+- CLI 配置与工作抓包路径按本空间，切换关闭旧窗口；1280/720/390px 亮色无横向溢出。合成持久工作保持不等于真实模型已执行，部署后另核对现有工作事实。
 
 ## Server State
 

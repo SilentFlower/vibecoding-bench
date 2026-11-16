@@ -33,6 +33,8 @@ import urllib.parse
 import urllib.request
 import uuid
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 from contextlib import ExitStack, asynccontextmanager, contextmanager
 from datetime import datetime, timezone
 from functools import partial
@@ -12683,6 +12685,86 @@ def v3_transport(account_id: int, wake: bool = True):
         raise HTTPException(503, "账号环境未就绪或需要维护")
 
 
+def _v3_environment_summary(row: dict, ownerships: dict, native_preparations: dict,
+                            native_preparation_error: str | None) -> dict:
+    """汇总单个环境的只读状态，数据库连接和维护锁保持独立。
+
+    :param row: 本轮环境行。
+    :param ownerships: 本轮凭据归属摘要。
+    :param native_preparations: 本轮原生准备快照。
+    :param native_preparation_error: 快照读取错误。
+    :return: 原合同的公开环境投影。
+    """
+    account = None
+    row['credential_ownership'] = ownerships.get(row['account_id'])
+    row["role_status"] = account_runtime.role_status(row)
+    blocker = account_runtime.reprofile_blocker(row)
+    row["fingerprint"] = json.loads(row.pop("fingerprint_json"))
+    if row["account_id"] is not None:
+        connection = get_db()
+        try:
+            account = connection.execute("SELECT * FROM accounts WHERE id=?", (row["account_id"],)).fetchone()
+        finally:
+            connection.close()
+        row["run_window"] = _account_run_window(dict(account), public=True, zone=row["fingerprint"]["tz"]) if account else None
+        row['gateway_account_id'] = account['cc2api_account_id'] if account else None
+    else:
+        row["run_window"] = None
+    target = native_preparations.get(row.get('gateway_account_id'), {}).get('request_backend')
+    row['request_backend'] = target if target in ('legacy', 'native293') else None
+    row['native_preparation'] = account_runtime.native_preparation_summary(row, dict(account) if account else None, native_preparations, native_preparation_error)
+    row["physical_features"] = physical_features_summary(row,
+        account_runtime._root(row) / "runtime/physical-features.json", time.time())
+    with account_runtime.lock:
+        row["busy"] = bool(account_runtime.environment_jobs(row["environment_id"]))
+    try:
+        with ExitStack() as locks:
+            # 列表只取可立即获得的一致快照，不能等待登录或同步持有的维护锁。
+            for guard in (_oauth_owner_lock(row["name"]), _profile_lock(row["name"]),
+                    account_runtime.environment_lock(row["environment_id"])):
+                if not guard.acquire(blocking=False):
+                    raise RuntimeBusy("账号正在维护，设备身份待核对")
+                locks.callback(guard.release)
+            identity = account_runtime.read_cli_identity(row, effective_claude_code_version())
+        row["identity_status"] = ("已确认 CLI 本地设备身份" if ":config.userID" in identity["source"]
+            else "已观测 CLI 设备身份")
+    except ValueError as error:
+        row["identity_status"] = str(error)
+    row["can_reprofile"] = blocker is None
+    row["reprofile_message"] = blocker
+    try:
+        row["native_kernel"] = native_kernel_status(account_runtime, row)
+    except (OSError, ValueError, TypeError):
+        row["native_kernel"] = None
+    row["platform_release"] = account_runtime.release_id
+    row['content_capture'] = None
+    row['criu'] = None
+    if account and account['cc2api_account_id'] is not None:
+        guard = account_runtime.environment_lock(row['environment_id'])
+        if guard.acquire(blocking=False):
+            try:
+                current, _ = _content_capture_account(row['environment_id'])
+                row['content_capture'] = read_content_capture(account_runtime, current,
+                    native_preparations.get(current.get('gateway_account_id')))
+                try:
+                    row['criu'] = read_criu(account_runtime, current,
+                        native_preparations.get(current.get('gateway_account_id')))
+                except (DockerException, OSError, ValueError, RuntimeError, TypeError):
+                    row['criu'] = {'schema_version': 1, 'state': 'unknown', 'reason': 'read_failed'}
+            except (HTTPException, OSError, ValueError, RuntimeError):
+                pass
+            finally:
+                guard.release()
+    try:
+        row["runtime_release"] = role_release(account_runtime, row)
+        row["runtime_release_error"] = None
+    except (OSError, ValueError):
+        row["runtime_release"] = None
+        row["runtime_release_error"] = "账号镜像来源待对账"
+    row["cli_versions"] = sorted(path.name for path in (account_runtime._root(row) / "cli").glob("*/.ready") for path in [path.parent])
+    return row
+
+
 @app.get("/api/environments")
 def v3_environments() -> list[dict]:
     """列出未删除账号和登录草稿的环境，排除服务秘密和凭据。
@@ -12704,75 +12786,13 @@ def v3_environments() -> list[dict]:
         connection.close()
     ownerships = credential_ownership.summaries() if credential_ownership else {}
     native_preparations, native_preparation_error = account_runtime.native_preparation_snapshots()
-    for row in rows:
-        account = None
-        row['credential_ownership'] = ownerships.get(row['account_id'])
-        row["role_status"] = account_runtime.role_status(row)
-        blocker = account_runtime.reprofile_blocker(row)
-        row["fingerprint"] = json.loads(row.pop("fingerprint_json"))
-        if row["account_id"] is not None:
-            connection = get_db()
-            try:
-                account = connection.execute("SELECT * FROM accounts WHERE id=?", (row["account_id"],)).fetchone()
-            finally:
-                connection.close()
-            row["run_window"] = _account_run_window(dict(account), public=True, zone=row["fingerprint"]["tz"]) if account else None
-            row['gateway_account_id'] = account['cc2api_account_id'] if account else None
-        else:
-            row["run_window"] = None
-        target = native_preparations.get(row.get('gateway_account_id'), {}).get('request_backend')
-        row['request_backend'] = target if target in ('legacy', 'native293') else None
-        row['native_preparation'] = account_runtime.native_preparation_summary(row, dict(account) if account else None, native_preparations, native_preparation_error)
-        row["physical_features"] = physical_features_summary(row,
-            account_runtime._root(row) / "runtime/physical-features.json", time.time())
-        with account_runtime.lock:
-            row["busy"] = bool(account_runtime.environment_jobs(row["environment_id"]))
-        try:
-            with ExitStack() as locks:
-                # 列表只取可立即获得的一致快照，不能等待登录或同步持有的维护锁。
-                for guard in (_oauth_owner_lock(row["name"]), _profile_lock(row["name"]),
-                        account_runtime.environment_lock(row["environment_id"])):
-                    if not guard.acquire(blocking=False):
-                        raise RuntimeBusy("账号正在维护，设备身份待核对")
-                    locks.callback(guard.release)
-                identity = account_runtime.read_cli_identity(row, effective_claude_code_version())
-            row["identity_status"] = ("已确认 CLI 本地设备身份" if ":config.userID" in identity["source"]
-                else "已观测 CLI 设备身份")
-        except ValueError as error:
-            row["identity_status"] = str(error)
-        row["can_reprofile"] = blocker is None
-        row["reprofile_message"] = blocker
-        try:
-            row["native_kernel"] = native_kernel_status(account_runtime, row)
-        except (OSError, ValueError, TypeError):
-            row["native_kernel"] = None
-        row["platform_release"] = account_runtime.release_id
-        row['content_capture'] = None
-        row['criu'] = None
-        if account and account['cc2api_account_id'] is not None:
-            guard = account_runtime.environment_lock(row['environment_id'])
-            if guard.acquire(blocking=False):
-                try:
-                    current, _ = _content_capture_account(row['environment_id'])
-                    row['content_capture'] = read_content_capture(account_runtime, current,
-                        native_preparations.get(current.get('gateway_account_id')))
-                    try:
-                        row['criu'] = read_criu(account_runtime, current,
-                            native_preparations.get(current.get('gateway_account_id')))
-                    except (DockerException, OSError, ValueError, RuntimeError, TypeError):
-                        row['criu'] = {'schema_version': 1, 'state': 'unknown', 'reason': 'read_failed'}
-                except (HTTPException, OSError, ValueError, RuntimeError):
-                    pass
-                finally:
-                    guard.release()
-        try:
-            row["runtime_release"] = role_release(account_runtime, row)
-            row["runtime_release_error"] = None
-        except (OSError, ValueError):
-            row["runtime_release"] = None
-            row["runtime_release_error"] = "账号镜像来源待对账"
-        row["cli_versions"] = sorted(path.name for path in (account_runtime._root(row) / "cli").glob("*/.ready") for path in [path.parent])
-    return rows
+    if not rows:
+        return []
+    # Docker读取可跨环境并行；按输入顺序收集结果，保持列表顺序和错误合同。
+    with ThreadPoolExecutor(max_workers=min(3, len(rows)), thread_name_prefix='environment-summary') as pool:
+        futures = [pool.submit(copy_context().run, _v3_environment_summary, row, ownerships,
+            native_preparations, native_preparation_error) for row in rows]
+        return [future.result() for future in futures]
 
 
 @app.post("/api/environments/{environment_id}/physical-features/refresh")

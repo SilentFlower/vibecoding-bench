@@ -1272,30 +1272,6 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   border-color: var(--amber-deep);
 }
 
-/* ===== theme toggle button (顶栏右侧) ===== */
-.theme-toggle {
-  background: transparent;
-  border: 1px solid var(--border-bright);
-  color: var(--text-dim);
-  font-family: var(--mono);
-  font-size: var(--ui-font-body);
-  line-height: 1;
-  padding: 3px 9px 4px;
-  cursor: pointer;
-  transition: color 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
-  position: relative;
-}
-.theme-toggle::before { content: '['; color: var(--text-faint); margin-right: 4px; }
-.theme-toggle::after  { content: ']'; color: var(--text-faint); margin-left:  4px; }
-.theme-toggle:hover {
-  color: var(--amber);
-  border-color: var(--amber);
-  background: rgba(255, 182, 73, 0.06);
-  box-shadow: 0 0 12px var(--amber-glow);
-}
-.theme-toggle:hover::before, .theme-toggle:hover::after { color: var(--amber); }
-.theme-toggle:active { transform: translateY(1px); }
-
 /* ============================================================
    LIGHT THEME · 实验室纸感（不是普通白底，保留终端字距 / ASCII / 琥珀色性格）
    - 暖米纸底 + 深墨字 + 烧赭石琥珀 + 深青蓝运行态

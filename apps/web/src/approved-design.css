@@ -264,3 +264,56 @@ button[data-slot=button]:disabled{pointer-events:auto;cursor:not-allowed}
 .sidebar-identity small{white-space:nowrap}
 @media(min-width:1920px){.console-shell{--navigation-width:264px}.console-shell.sidebar-collapsed{--navigation-width:76px}}
 @media(min-width:2560px){.console-shell{--navigation-width:280px}.console-shell.sidebar-collapsed{--navigation-width:76px}}
+
+/* 更新状态、说明、平台与记录各自成区，展开动作保持独立。 */
+.approved-update-dialog{width:min(1080px,calc(100vw - 32px))}
+.approved-update-scroll{padding:28px;scrollbar-gutter:stable}
+.update-page{display:grid;gap:24px;min-width:0}
+.update-page>.approved-update-banner{margin:0;padding:24px 28px;background:#f1edf8;border-color:#e3dcef;align-items:center;gap:24px}
+.update-page .approved-update-banner>div:first-child{flex:1}
+.update-page .approved-update-banner .eyebrow{margin:0 0 8px;font-size:var(--ui-font-small);letter-spacing:0}
+.update-page .approved-version{font-size:32px;line-height:1.2;letter-spacing:-1px;margin:0 0 10px}
+.update-page .approved-update-banner h2{margin:0 0 6px;font-size:var(--ui-font-card);line-height:1.5}
+.update-page .approved-update-banner p:last-child{max-width:none;margin:0;font-size:var(--ui-font-small);line-height:1.7}
+.update-status-actions{display:flex;flex-direction:column;gap:10px;flex:none;align-items:stretch}
+.update-status-actions [data-slot=button]{min-height:38px}
+.update-page>.approved-update-columns{margin:0;grid-template-columns:minmax(0,1fr) 280px;gap:24px;align-items:start}
+.update-notes-card{padding:24px;border:1px solid #e8e6ee;border-radius:12px;background:#fff;min-width:0}
+.update-page .approved-section-title{margin:0 0 20px;line-height:1.5}
+.update-page .approved-release-notes{white-space:normal}
+.update-page .approved-change-item{display:flex;gap:14px;margin:0;padding:18px 0;border-bottom:1px solid #efedf3;align-items:start}
+.update-page .approved-change-item:first-child{padding-top:0}
+.update-page .approved-change-item:last-child{padding-bottom:0;border-bottom:0}
+.update-page .approved-change-item h3{margin:0 0 6px;line-height:1.6}
+.update-page .approved-change-item p{margin:0;font-size:var(--ui-font-body);line-height:1.85;font-weight:400;color:#58667d;white-space:pre-line}
+.update-page .approved-text-action{margin-top:20px;line-height:1.5}
+.update-platform-stack{display:grid;gap:16px;min-width:0}
+.update-page .approved-platform{padding:20px;background:#faf9fc}
+.update-page .approved-platform dl>div{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;padding:12px 0;border-top:1px solid #eeebf3;align-items:start;line-height:1.7}
+.update-page .approved-platform dd{text-align:right;white-space:normal;overflow-wrap:anywhere;margin:0;font-weight:500}
+.update-page .approved-compatibility p{margin:0 0 8px;line-height:1.6}
+.update-page .approved-compatibility small{line-height:1.8;display:block}
+.update-full-notes{margin-top:16px;padding:18px;background:#f8f7fb;border-radius:8px;line-height:1.85;white-space:pre-wrap;overflow-wrap:anywhere;font-size:var(--ui-font-body)}
+.update-disclosure{border:1px solid #e6e4ed;border-radius:12px;background:#fff;padding:0;min-width:0}
+.update-disclosure>summary{padding:18px 22px;cursor:pointer;font-size:var(--ui-font-body);font-weight:600;color:#62718a}
+.update-disclosure[open]>summary{border-bottom:1px solid #eeebf3}
+.update-disclosure>.update-context-grid,.update-disclosure>#available-releases{padding:22px;margin:0}
+.update-page>.approved-maintenance{margin:0;padding:0}
+.update-page .update-context-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.update-page .update-operation{overflow:hidden}
+.update-page>.approved-update-columns{order:1}
+.update-page>.update-operation{order:2}
+.update-page>.update-operation-priority{order:0}
+.update-page>.update-disclosure{order:3}
+@media(max-width:760px){
+ .approved-update-dialog{width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}
+ .approved-update-scroll{padding:18px}
+ .update-page{gap:18px}
+ .update-page>.approved-update-banner{padding:20px;gap:16px;align-items:start;flex-wrap:wrap}
+ .update-status-actions{flex-direction:row;flex-wrap:wrap;width:100%}
+ .update-page>.approved-update-columns{grid-template-columns:minmax(0,1fr);gap:18px}
+ .update-notes-card,.update-page .approved-platform{padding:20px}
+ .update-page .update-context-grid{grid-template-columns:minmax(0,1fr)}
+ .update-disclosure>summary{padding:16px 18px}
+ .update-disclosure>.update-context-grid,.update-disclosure>#available-releases{padding:18px}
+}

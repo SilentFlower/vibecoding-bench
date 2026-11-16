@@ -178,7 +178,7 @@ const source = fs.readFileSync(process.argv[1], 'utf8');
 const start = source.indexOf('function renderCaptureTls(');
 const end = source.indexOf('/**\\n * 按当前详情请求', start);
 const utilsStart = source.indexOf('function escapeHTML(');
-const utilsEnd = source.indexOf('// ===================== chrome', utilsStart);
+const utilsEnd = source.indexOf('function startClock(', utilsStart);
 if ([start, end, utilsStart, utilsEnd].some(position => position < 0)) throw new Error('渲染入口未找到');
 const context = {};
 vm.runInNewContext(source.slice(utilsStart, utilsEnd) + source.slice(start, end), context);

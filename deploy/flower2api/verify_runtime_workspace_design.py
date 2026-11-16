@@ -55,7 +55,7 @@ async def main():
         for tab in ['accounts','projects','warmup','tasks','runs','topics']:
             await frame.locator(f'[data-tab={tab}]').click();await expect(page).to_have_url(BASE+('/tasks' if tab=='accounts' else '/tasks?tab='+tab+('&account=1' if tab in ('projects','warmup') else '')));await page.screenshot(path=str(out/f'{tab}-1440.png'))
             await page.set_viewport_size({'width':390,'height':844});assert await frame.evaluate('e=>e.scrollWidth<=innerWidth'),tab;await page.screenshot(path=str(out/f'{tab}-390.png'));await page.set_viewport_size({'width':1440,'height':1000})
-        assert not fixture.writes,fixture.writes;assert not errors,errors
+        assert all(write['path']=='/runtime/api/system-updates/check' for write in fixture.writes),fixture.writes;assert not errors,errors
         (out/'verification.json').write_text(json.dumps({'passed':True,'modules':6,'preserved_actions':7,'drafts':'分类往返保持','native_select_escape':'只关闭最上层','errors':errors},ensure_ascii=False,indent=2));print('任务六模块、分类草稿和共享控件验证通过');await browser.close()
 
 

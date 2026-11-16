@@ -1,6 +1,7 @@
 const BASE = ''
 
 let authToken = ''
+let runtimeSessionRequest: Promise<{ ok: boolean }> | undefined
 
 /** 管理请求错误，保留冲突状态供操作确认窗口处理。 */
 export class ApiError extends Error {
@@ -13,7 +14,9 @@ export class ApiError extends Error {
   }
 }
 
+/** 更新管理凭据并释放旧凭据的会话交换引用。@param token 管理凭据。@return 无。 */
 export function setAuth(token: string) {
+  if (token !== authToken) runtimeSessionRequest = undefined
   authToken = token
 }
 
@@ -35,6 +38,16 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
     throw new ApiError(res.status, detail)
   }
   return res.json()
+}
+
+/** 合并当前进行中的会话交换，结束后由后续入口重新核验。@return 同批会话签发结果。 */
+function openRuntimeSession(): Promise<{ ok: boolean }> {
+  if (runtimeSessionRequest) return runtimeSessionRequest
+  const pending = request<{ ok: boolean }>('POST', '/admin/runtime/session').finally(() => {
+    if (runtimeSessionRequest === pending) runtimeSessionRequest = undefined
+  })
+  runtimeSessionRequest = pending
+  return pending
 }
 
 /** 账号持久信息，以及账号管理页使用的运行状态摘要。 */
@@ -576,7 +589,7 @@ export const api = {
   nativeCapture: (requestId: string, attemptId: string, signal?: AbortSignal) => request<NativeCapture>('GET', `/admin/request-diagnostics/${encodeURIComponent(requestId)}/captures/${encodeURIComponent(attemptId)}`, undefined, signal),
 
   /** 换取 v3 的独立浏览器会话。@return 会话签发结果。 */
-  openRuntime: () => request<{ ok: boolean }>('POST', '/admin/runtime/session'),
+  openRuntime: openRuntimeSession,
   /** 撤销当前 v3 会话。@return 撤销成功结果，未启用 v3 时兼容旧部署。 */
   closeRuntime: () => request<{ ok: boolean }>('POST', '/runtime/logout'),
   /**
