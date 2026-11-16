@@ -430,6 +430,7 @@ mod tests {
     fn request(at: DateTime<Utc>) -> RequestDiagnostic {
         let request_id = Uuid::new_v4().to_string();
         RequestDiagnostic {
+            original_session_id: None,
             last_attempt: None,
             log_mode: None,
             request_id: request_id.clone(),
@@ -504,7 +505,8 @@ mod tests {
         let mut boundary = request(now - ChronoDuration::days(7));
         boundary.account_id = None;
         boundary.attempt_count = 0;
-        let current = request(now);
+        let mut current = request(now);
+        current.original_session_id = Some("synthetic-original-session".into());
         let attempted = attempt(&current);
         let event = DiagnosticEvent {
             request: current.clone(),
@@ -655,6 +657,10 @@ mod tests {
             .unwrap();
         let reopened = DiagnosticsStore::new(reader.clone());
         let detail = reopened.detail(&current.request_id).await.unwrap();
+        assert_eq!(
+            detail.request.original_session_id,
+            current.original_session_id
+        );
         assert_eq!(detail.attempts.len(), 1);
         assert_eq!(detail.attempts[0].attempt_id, attempted.attempt_id);
         assert!(detail.request.account_name.is_none());
@@ -712,6 +718,10 @@ mod tests {
             .unwrap();
         assert_eq!(page.total, 1);
         assert_eq!(page.items[0].account_id, Some(8));
+        assert_eq!(
+            page.items[0].original_session_id,
+            current.original_session_id
+        );
         assert_eq!(page.items[0].account_name, detail.request.account_name);
         assert_eq!(page.counts.all, 1);
         assert_eq!(page.counts.errors, 0);
@@ -820,6 +830,7 @@ mod tests {
                 .all(|item| item.account_name.is_none() && item.account_email.is_none())
         );
         let unknown = reopened.detail(&boundary.request_id).await.unwrap();
+        assert!(unknown.request.original_session_id.is_none());
         assert!(unknown.request.account_id.is_none() && unknown.request.account_name.is_none());
         drop(reopened);
         reader.close().await;

@@ -180,7 +180,7 @@ const isValidLimit = computed(() => {
 
 ### 2. Signatures
 
-- `formatLocalTime(value?: string | null): string` 按浏览者时区显示日期、秒与 IANA 时区，空值及非法值显示“未观测”。原始 UTC 值仍用于查询与追溯。
+- `formatLocalTime(value?: string | null, includeTimeZone = true): string` 按浏览者时区显示日期、秒，默认附加 IANA 时区。请求列表传入 false 省略后缀；详情及其它消费者沿默认展示。空值及非法值显示“未观测”，原始 UTC 值仍用于查询与追溯。
 - `RequestDiagnostics.copy(value: string, event: MouseEvent): Promise<void>` 复制按钮对应的完整请求 ID，事件提供当前焦点域。
 - 顶层 `/environments` 为环境列表，`/tasks` 默认内部 accounts；`/tasks?tab=topics|tasks|runs|projects|warmup` 显式选择其它内部页面，兼容 `tab=accounts`。
 - 主路由使用Vue环境组件与任务ES模块宿主；独立兼容地址`/runtime/?view=environments|tasks#<tab>?account=...&environment=...&gateway_account=...`保留受控参数。
@@ -198,7 +198,7 @@ const isValidLimit = computed(() => {
 - 点击内部链接先阻止内部 hash 入栈；数字键、搜索、账号直达及创建后的程序化跳转统一走 `navigateTo(hash)`，嵌入时由 `runtime:navigate` 创建唯一顶层历史项，独立页面继续 hash 导航。账号筛选以 replace 同步，刷新和前进后退均以 URL 为准。
 - 切页递增 viewGeneration，账号/题库/任务/运行的迟到列表、运行流和首屏 GET 不写入新页面。关闭普通详情、关联、养号配置、题目和任务弹窗，使运行详情刷新失效；专用环境及项目窗口沿原收口入口。交互登录与续聊继续由各自显式关闭流程管理。
 - `gateway_account` 表示网关账号 ID，环境列表按公开 `gateway_account_id` 精确筛选。bench 账号 ID 与网关 ID 分开处理。提供“显示全部环境”清除直达筛选。
-- 请求列表紧凑显示时间、短 ID、账号、持久终态和实际总耗时；390px 保留时间、账号、结果及详情入口，其它列按宽度折叠。状态使用 outcome，空计时保持未知，实际零 token 显示 0。
+- 请求列表紧凑显示时间、短 ID、账号、持久终态和实际总耗时；增加原始 Session ID 列与完整复制，在模型/转发列补实际版本，在 Token 列补平均 TPS，具体口径见[请求列表与诊断详情](./ui-guidelines.md#请求列表与诊断详情)。390px 保留时间、账号、结果及详情入口，其它列按宽度折叠。状态使用 outcome，空计时保持未知，实际零 token 显示 0。
 - 请求账号统一显示当前名称和邮箱，覆盖桌面/390px列表、概览、链路、性能及尝试选择器。名称为空时使用邮箱，两者相同去重；缺资料显示“账号信息缺失（ID n）”，未选账号显示“未知账号”。列表、详情按各自实际账号字段展示，ID继续用于筛选及环境直达；长文本换行、选择器限制在容器内。查询安全字段与持久匿名合同见[请求级诊断](../../gateway/backend/settings-database.md#scenario-请求级诊断与发送尝试关联)。
 - 请求详情四页签为概览、请求链路、性能、原始数据。固定标题与页签、内部滚动，支持方向键、Esc 和焦点返回。响应头耗时、首次有效输出、本地准备分别显示；本地准备包含等待与 checkout。
 - 请求 ID 复制在安全上下文优先调用 Clipboard API；接口缺失或拒绝时用临时只读 textarea 和 `execCommand('copy')` 降级。临时节点属于触发按钮所在的活动 dialog，结束后清理并恢复焦点及选择。只有写入 Promise 成功或复制命令返回 true 才显示成功；全部失败保留手动选择提示。
@@ -210,6 +210,10 @@ const isValidLimit = computed(() => {
 | 条件 | 结果 |
 | --- | --- |
 | 旧记录缺时间、模式或性能 | 保持未观测或历史未知 |
+| 原始会话有值 / 旧记录缺原始字段 | 列表与详情可复制完整值 / 显示未提供 |
+| 实际版本 280/293 / 缺实际尝试版本 | 现有转发列显示实际版本 / 显示未观测 |
+| 完整成功 100 输出 token、2000ms / 真实零输出 / 不完整或无有效耗时 | 平均 TPS 50.0 token/s / 0.0 token/s / 未观测 |
+| 上海与洛杉矶请求列表 / 详情时间 | 以浏览者时区转换并省略后缀 / 保留时区与原始时间 |
 | 账号资料缺失 / 账号为空 / 跨账号重试 | 明确提示及 ID / 未知账号 / 分别展示各次实际资料 |
 | 修改等待期限后取消重开 / 直接确认 | 恢复默认一分钟 / 提交60秒 |
 | disabled 或 info | 阶段文件读取为零，说明后续请求生效条件 |
@@ -228,6 +232,7 @@ const isValidLimit = computed(() => {
 
 - 正常：debug 请求显示“当时采集已关闭”→直达账号环境→空闲切换→后续请求使用新配置。
 - 边界：上海与洛杉矶显示同一 UTC 时间的对应本地时间；历史零值与空值保持区别。
+- 正常：Token 列显示输出 100、平均 TPS 50.0 token/s，提示包含该次首输出等待。错误用法：用根请求总耗时搭配末次尝试 token，或把缺失 token 填成 0。正确处理：复用同次完整成功尝试的输出与 duration_ms，未知值独立展示。
 - 错误用法：把 bench 账号 ID 直接当作网关 ID。正确处理：按公开绑定字段筛选。
 - 错误用法：仅凭 debug 提供采集读取按钮。正确处理：同时使用发生时采集状态。
 - 错误用法：把降级 textarea 放到弹窗外，或仅凭点击显示复制成功。正确处理：保持弹窗焦点域，以真实复制结果决定提示。
@@ -240,7 +245,7 @@ const isValidLimit = computed(() => {
 
 - `npm --prefix apps/web run build`；通过 Vue/TypeScript 和生产构建。
 - `.venv/bin/python deploy/flower2api/verify_dashboard_update.py`：实际产物与合成接口覆盖首次检查、已有检查、未接入、维护、失败、当前发行退出目录、已最新及卸载；断言检查次数、轮询停止、路由复用和桌面/移动提示。
-- `python deploy/flower2api/verify_management_ui.py --output .deploy/management-ui/combined`：实际产物、合成 API、两个时区、390px、版本单展开、导航历史、采集开关及异步关闭；覆盖长名称邮箱、跨账号尝试、资料缺失与空账号及原 ID 直达。
+- `python deploy/flower2api/verify_management_ui.py --output .deploy/management-ui/combined`：实际产物、合成 API、两个时区、390px、版本单展开、导航历史、采集开关及异步关闭；覆盖长名称邮箱、跨账号尝试、资料缺失与空账号及原 ID 直达；追加原始会话完整复制、256 字节长值、旧记录缺字段、实际 280/293/原有转发版本、平均 TPS 正常/零值/未知/不完整和列表时区后缀省略断言。
 - 同一浏览器验证覆盖默认 accounts、六个内部页面、真实模块/DOM根身份、深链接参数、刷新/连续后退/前进、快捷键/搜索/账号直达、独立页面兼容、已打开弹窗与迟到详情收口，以及实际构建模块和独立兼容入口资源。
 - 原 `verify_environment_ui.py` 继续覆盖内核、时段、焦点、乱序和物理实测；所有浏览器模型调用为零。
 - `verify_management_polish.py` 使用实际构建产物，覆盖 HTTPS、HTTP、权限拒绝和全部失败的列表/弹窗复制；独立安全页回读实际剪贴板，核对完整 ID 或失败时原值，断言临时节点清理及焦点恢复。品牌验收覆盖三个入口、24/40px 和深浅背景。

@@ -221,18 +221,20 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - `/admin/settings` 的 `request_diagnostics_log_mode` 为字符串，默认 `info`；GET 返回实际生效缓存，PUT 在全部写入前校验 `info|debug`。迁移只补缺键，保留显式 debug。
 
 - `RequestDiagnostic`、`AttemptDiagnostic` 管理投影可选字段 `account_name:Option<String>`、`account_email:Option<String>`；None 在响应中省略。
+- `RequestDiagnostic.original_session_id:Option<String>`：原始入站会话，serde default 兼容旧记录，None 在响应中省略；`diagnostics::original_session(&HeaderMap, &Value) -> ()` 在请求作用域冻结一次。
 
 ### 3. Contracts
 
-- 账号展示字段兼容旧 JSON 缺失。列表根请求与详情各次尝试分别按实际 account_id LEFT JOIN 当前账号，仅查询 name/email 安全列；空资料为 None。字段只在查询时填充，持久摘要保持匿名及原表结构，账号改名按当前资料展示。
+- 账号展示字段兼容旧 JSON 缺失。列表根请求与详情各次尝试分别按实际 account_id LEFT JOIN 当前账号，仅查询 name/email 安全列；空资料为 None。账号资料只在查询时填充，沿用原持久表结构，账号改名按当前资料展示。
 
 - 仅在网关 Token 鉴权后的精确 `/v1/messages` 入口建立根请求 UUID；每次真实提交建立独立尝试 UUID。`count_tokens`、Hello、后台遥测不混入此请求尝试链。
 - 下游新增 `X-CC2API-Request-Id` 根 UUID；保留已有 `X-Request-Id`，缺失时补根 UUID。根 UUID、最终响应 ID、上游 `request-id/x-request-id` 可用于列表反查；标准 UUID 和 `req_` 字母数字 ID 保留，其它头值先 SHA256。诊断 ID 不增加到发往上游的业务 headers/body。
 - 尝试记录实际冻结画像 key/选择方式、最终模型/max_tokens/thinking 类型与预算/effort/stream/工具数量、匿名 session/thread、响应模型与消息、stop_reason、六类 token、partial、状态、耗时、重试原因和受控错误阶段/类型。未知字段保留 `null`；累计 usage 使用每字段最大值，5m/1h 缓存写明细不重复加入总量。
-- 根记录包含起止时间、下游状态、最终选中账号、结果和尝试数。根状态与尝试实际上游状态分开；中间认证或签名错误不得覆盖后续尝试结果。首字节字段 `ttft_ms` 测量响应头到达耗时，不解释为首个模型文本 token。
+- 根记录包含起止时间、下游状态、最终选中账号、结果、尝试数和可选的 `original_session_id`。根状态与尝试实际上游状态分开；中间认证或签名错误不得覆盖后续尝试结果。首字节字段 `ttft_ms` 测量响应头到达耗时，不解释为首个模型文本 token。
 - 本地拒绝、模拟和缓存命中有根记录，但无虚构的上游尝试。EOF、末帧、读取错误和 Drop 只终结一次；HTTP 200 内的错误事件与成功区分，缺用量或采样失败标记 `incomplete/partial`。发送错误不伪造上游 HTTP 状态或断言未提交。
-- session/thread/响应消息仅存带账号及标识类型域的 SHA256 前 128 位；线程前驱和响应消息使用同一消息域。只观察既有池解析结果，不能额外 resolve 或刷新 TTL；上游 session 摘要以实际最终 body 为准。
-- 默认诊断摘要不持久化正文、工具参数、完整 headers、凭据、Cookie、邮箱、设备 ID、账号 UUID、完整 session 或任意 error.message。按账号显式开启的私有组装快照遵循[CC 组装后私有采集](#scenario-cc-组装后私有采集)。响应模型、参数枚举及错误类型执行白名单；非标准关联头只保存散列。
+- 尝试中的 session/thread/响应消息仅存带账号及标识类型域的 SHA256 前 128 位；线程前驱和响应消息使用同一消息域。只观察既有池解析结果，不能额外 resolve 或刷新 TTL；上游 session 摘要以实际最终 body 为准。
+- 根字段 `original_session_id` 是管理员关联客户端日志的明确明文例外：在入站正文解码后、会话封禁与正文策略前冻结一次，正文通过既有 JSON-string/legacy 提取器优先解析；缺省时读取原始 HeaderMap 中唯一的 `X-Claude-Code-Session-Id`。仅保存非空白、无控制字符、UTF-8 不超过 256 字节的完整值，不 trim 或截断；正文提取值异常时保持未知，不用头值替代。info/debug 均保存，重试、换号和上游映射不改写该值。无客户端会话时保持未知，SDK 生成会话不充当原始值。新增字段以 serde default 兼容旧 JSON，沿用根记录 summary_json、管理鉴权与七天保留期，不新增业务转发头或表结构。
+- 除上述原始会话字段外，默认诊断摘要不持久化正文、工具参数、完整 headers、凭据、Cookie、邮箱、设备 ID、账号 UUID、完整 session 或任意 error.message。按账号显式开启的私有组装快照遵循[CC 组装后私有采集](#scenario-cc-组装后私有采集)。响应模型、参数枚举及错误类型执行白名单；非标准关联头只保存散列。
 - 有界异步队列容量 1024，热路径不等待数据库；每个摘要上限 16 KiB。响应观察按完整 JSON／单行／单事件各限 1 MiB，压缩 SSE 增量解码，不限制整流累计长度；编码层数、窗口及失败边界见[有界响应观察](#scenario-messages-响应的有界事件观察)。`health.dropped_records` 统计丢弃写入事件，`write_failures` 统计写入/清理失败，`observation_failures` 统计采样/解码/解析失败尝试；均为进程内计数，重启清零，日志只输出固定文案、计数及内部 UUID。
 - 模式在入口冻结，独立于诊断存储可用性；排队/在途切换沿原模式。info 在完整内容克隆与写入前关闭私有采集，429/非流式专项全文日志也受同次模式门控；上游错误普通日志只保留长度。debug 继续受账号采集资格和原专项开关限制。设置读取失败保留已生效缓存，首次装配沿 info。
 - 按请求开始时间保留七天，启动及每小时后台清理；严格早于 UTC `now-7 days` 删除，等于边界保留。列表与详情只读过滤过期记录。当前进程的真实请求许可保护在途记录，终结/取消/Drop 释放；重启遗留 `in_progress` 按时间清理。已提交记录跨重启可查，进程崩溃前未提交缓冲不承诺恢复。追加表支持回滚旧程序后保留，不影响原费用表。
@@ -245,6 +247,8 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 | --- | --- |
 | 401 恢复、签名修复或换号 | 同一根请求，独立尝试与实际账号/状态/重试原因 |
 | 模拟、缓存、本地拒绝 | 根结果明确，未发送时尝试数为零 |
+| 原始会话映射、重试、换号 / info 或 debug | 根 original_session_id 保持入站完整值 / 两种模式均记录 |
+| 原始会话缺失、空白、控制字符、超过 256 字节 / 重复会话头且正文缺省 / 旧 JSON 缺字段 | 原始值未知，沿原业务处理 / 原始值未知 / 兼容读取 None |
 | 账号改名 / 删除 / 旧记录缺展示字段 | 查询当前名称邮箱 / LEFT JOIN 保留诊断及 ID，资料为空 / 兼容读取 |
 | 流内错误、读取异常、取消 | 保留部分 token，受控终态，响应原始字节继续透传 |
 | 损坏压缩、采样超限、非法 JSON | `partial=true`，受控错误类型与观察失败计数，不阻断业务 |
@@ -259,6 +263,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 
 - 正常：new-api 留下响应 ID，管理员以 `correlation_id` 查到根 UUID，再读取两次 401→200 尝试；sender evidence 的 request_id 对应尝试 UUID。
 - 边界：两个真实 session 借用同一上游成员时，真实散列不同、上游散列相同；目标过期后可观察新目标，诊断不能延长旧目标 TTL。
+- 正常：客户端发送原始 session A，上游池映射成 B；根 original_session_id 保存 A，尝试保留 A/B 的账号域散列。错误用法：以 sender 生成的 B 填充原始字段。正确处理：入站解码后冻结 A，所有后续映射只补充原有尝试摘要。
 - 错误用法：HTTP 200 且没有完整 usage 就填零并标成功，或把缓存/中间重试写入原费用表。正确处理：未知值为 `null`，结果与完整性分开判定，费用保持原语义。
 - PostgreSQL 可空正整数示例：`.bind(request.account_id.unwrap_or(0))` 配合 `NULLIF($7,0)`；不能直接复用先绑定 `None::<i64>`、再绑定实值的 Any 缓存语句，也不能把未知账号持久化为真实 0。
 - 正常：info 请求排队后切换 debug，该次仍保存 info 摘要且完整内容零落盘；后续请求采用 debug。错误用法是发送时重读模式或用当前设置填补历史模式。正确处理是入口冻结并读取各记录的可选字段。
@@ -270,6 +275,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - `sqlite_diagnostics_storage_contract` 与显式执行 `postgres_diagnostics_storage_contract`：开始→终态、重复写入、迟到快照、NULL、分页/账号/关联过滤、重开连接、七天精确边界；追加跨账号名称邮箱、改名、空资料、删除后保留记录及 ID、持久摘要无邮箱与凭据的断言。PG 使用 `CC2API_DIAGNOSTICS_TEST_POSTGRES_DSN` 指向独立临时库，ignored 不等于通过。
 - `retention_protects_live_requests_and_expires_stale_unfinished_records`、`migrate_request_log_mode_preserves_explicit_debug`、`log_mode_setting_validates_atomically_and_defaults_to_info`、`request_log_mode_reload_preserves_effective_cache_on_failure`：真实在途保护、结束回收、默认迁移/幂等、校验原子性与实际缓存。
 - `diagnostics_preserve_bytes_and_correlate_anonymous_sessions`：最终参数、stop_reason、null token、匿名标识、头值保留/散列反查及合成秘密不泄露。
+- `original_session_diagnostics_freeze_ingress_and_validate_boundaries`、`original_session_diagnostics_survive_local_policy_rejection`：正文/单头来源、重复头、两种日志模式、本地响应和正文拒绝、冻结一次、UTF-8 256 字节边界、控制字符、列表与详情一致；存储合同追加重开连接保留原始值、换号保持原值及旧 JSON 缺字段断言。
 - `diagnostics_record_stream_errors_and_cancellation_once`、`diagnostics_report_observation_failures_without_changing_bytes`、`diagnostics_cover_early_cancellation_and_unavailable_storage`：流内错误、读取失败、取消、超限/解码/解析、数据库故障与响应保真。
 - `diagnostics_overload_and_write_failures_are_observable` 与 `diagnostics_routes_require_admin_and_expose_committed_requests`：队列立即返回、健康计数、管理员鉴权、分页错误和详情查询。
 - Gateway 现有真实 HTTP 回归：`gateway_usage_records_real_responses_once_without_telemetry` 验证 JSON/SSE/gzip/取消、缓存/count_tokens 与费用次数；签名重试、OAuth 恢复、setup 换号及 `gateway_hello_probe_reuses_resolved_upstream_session` 核对独立尝试、实际画像和会话归属。

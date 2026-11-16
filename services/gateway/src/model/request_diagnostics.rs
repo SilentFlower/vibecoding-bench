@@ -42,6 +42,9 @@ pub struct RequestDiagnostic {
     #[serde(default)]
     pub log_mode: Option<RequestLogMode>,
     pub request_id: String,
+    /// 客户端入站、映射前的完整会话；历史记录保持未知。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_session_id: Option<String>,
     pub started_at: String,
     pub finished_at: Option<String>,
     pub status_code: Option<u16>,

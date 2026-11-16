@@ -2041,6 +2041,8 @@ impl GatewayService {
             serde_json::from_slice(&body_bytes).unwrap_or(serde_json::json!({}))
         };
 
+        diagnostics::original_session(&native_header_map, &body_map);
+
         if path == "/v1/messages" {
             if let Some(response) = self
                 .session_policy_block_svc
@@ -10577,6 +10579,11 @@ mod tests {
             let mut warm_hits = HashMap::new();
             for item in page.items {
                 let detail = diagnostics.detail(&item.request_id).await.unwrap();
+                assert!(
+                    item.original_session_id.is_none(),
+                    "普通 API 缺省会话保持未知"
+                );
+                assert_eq!(detail.request.original_session_id, item.original_session_id);
                 let attempt = &detail.attempts[0];
                 assert!(matches!(
                     attempt.profile_version.as_str(),
@@ -10672,9 +10679,20 @@ mod tests {
                 )
                 .await;
             assert_eq!(response.status(), StatusCode::OK);
+            let native_id = response.headers()["x-cc2api-request-id"]
+                .to_str()
+                .unwrap()
+                .to_owned();
             axum::body::to_bytes(response.into_body(), 1024 * 1024)
                 .await
                 .unwrap();
+            diagnostics.flush().await.unwrap();
+            let native_detail = diagnostics.detail(&native_id).await.unwrap();
+            assert_eq!(
+                native_detail.request.original_session_id.as_deref(),
+                Some("22222222-2222-4222-8222-222222222222")
+            );
+            assert_eq!(native_detail.attempts[0].profile_version, "2.1.280");
             let mut conflict = make("2.1.280", "gateway-dual-conflict", true, false);
             conflict.headers_mut().insert(
                 "user-agent",
@@ -10922,9 +10940,21 @@ mod tests {
             "system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.293.abc; cc_entrypoint=cli; cch=12345; cc_prompt_id=55555555-5555-4555-8555-555555555555; cc_turn_origin=human;"}],
             "metadata":{"user_id":serde_json::json!({"device_id":"c".repeat(64),"account_uuid":"44444444-4444-4444-8444-444444444444","session_id":"33333333-3333-4333-8333-333333333333"}).to_string()}})), None).await;
         assert_eq!(response.status(), StatusCode::OK);
+        let mapped_id = response.headers()["x-cc2api-request-id"]
+            .to_str()
+            .unwrap()
+            .to_owned();
         axum::body::to_bytes(response.into_body(), 1024 * 1024)
             .await
             .unwrap();
+        let native_diagnostics = service.diagnostics_store().unwrap();
+        native_diagnostics.flush().await.unwrap();
+        let mapped_detail = native_diagnostics.detail(&mapped_id).await.unwrap();
+        assert_eq!(
+            mapped_detail.request.original_session_id.as_deref(),
+            Some("33333333-3333-4333-8333-333333333333")
+        );
+        assert_eq!(mapped_detail.attempts[0].profile_version, "2.1.293");
         let mut agent = request(
             serde_json::json!({"model":"claude-sonnet-4-6","stream":true,"max_tokens":64,
             "messages":[{"role":"user","content":"gateway-agent"},
@@ -13144,6 +13174,10 @@ mod tests {
                 diagnostics.flush().await.unwrap();
                 let detail = diagnostics.detail(&diagnostic_id).await.unwrap();
                 assert_eq!(detail.attempts.len(), 1);
+                assert_eq!(
+                    detail.request.original_session_id.as_deref(),
+                    Some(real_session)
+                );
                 let sessions = &detail.attempts[0].sessions;
                 assert_eq!(
                     sessions.mapping_action.as_deref(),
@@ -20055,12 +20089,13 @@ data: {"type":"message_delta","delta":{"safeguard_results":[{"type":"dangerous_t
             ..default_cli_bg_status_classifier_config()
         };
 
-        let response = service
-            .handle_request(
-                cli_bg_status_classifier_request("working", "API Error: No response from API"),
-                None,
-            )
-            .await;
+        let mut request =
+            cli_bg_status_classifier_request("working", "API Error: No response from API");
+        request.headers_mut().insert(
+            "x-claude-code-session-id",
+            HeaderValue::from_static("synthetic-mock-session"),
+        );
+        let response = service.handle_request(request, None).await;
 
         assert_eq!(response.status(), StatusCode::OK);
         let diagnostic_id = response.headers()["x-cc2api-request-id"]
@@ -20077,6 +20112,10 @@ data: {"type":"message_delta","delta":{"safeguard_results":[{"type":"dangerous_t
         diagnostics.flush().await.unwrap();
         let detail = diagnostics.detail(&diagnostic_id).await.unwrap();
         assert_eq!(detail.request.outcome, "mock");
+        assert_eq!(
+            detail.request.original_session_id.as_deref(),
+            Some("123e4567-e89b-12d3-a456-426614174003")
+        );
         assert_eq!(detail.request.attempt_count, 0);
         assert!(detail.attempts.is_empty());
         assert!(detail.request.account_id.is_none());
@@ -21497,6 +21536,59 @@ data: {"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":{"out
             "system prompt body".len()
         );
         assert_eq!(context.client_type, "api");
+    }
+
+    /// 正文策略在选择账号前拒绝时，两个日志模式仍记录原始会话。
+    #[tokio::test]
+    async fn original_session_diagnostics_survive_local_policy_rejection() {
+        let service = test_gateway_service().await;
+        service.system_role_models.write().await.clear();
+        for mode in ["info", "debug"] {
+            service
+                .settings_store
+                .upsert_many(&HashMap::from([(
+                    "request_diagnostics_log_mode".into(),
+                    mode.into(),
+                )]))
+                .await
+                .unwrap();
+            service.reload_request_log_mode().await.unwrap();
+            let response = service
+                .handle_request(
+                    profile_request(
+                        "/v1/messages",
+                        Some("claude-code/2.1.293"),
+                        json!({
+                            "model":"claude-sonnet-5-5", "max_tokens":32,
+                            "messages":[{"role":"system","content":"合成策略测试"}],
+                            "metadata":{"user_id":"user_synthetic_session_original-policy-session"}
+                        }),
+                    ),
+                    None,
+                )
+                .await;
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+            let id = response.headers()["x-cc2api-request-id"]
+                .to_str()
+                .unwrap()
+                .to_owned();
+            body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            let diagnostics = service.diagnostics_store().unwrap();
+            diagnostics.flush().await.unwrap();
+            let detail = diagnostics.detail(&id).await.unwrap();
+            assert_eq!(
+                detail.request.original_session_id.as_deref(),
+                Some("original-policy-session")
+            );
+            assert_eq!(detail.request.log_mode.unwrap().as_str(), mode);
+            assert_eq!(
+                detail.request.error_stage.as_deref(),
+                Some("request_policy")
+            );
+            assert!(detail.attempts.is_empty());
+        }
     }
 
     #[test]

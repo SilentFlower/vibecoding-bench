@@ -28,6 +28,9 @@ class ManagementFixture(Fixture):
         self.diagnostic_account = {'account_name': '主用演示账号', 'account_email': 'primary@example.test'}
         self.diagnostic_account_id = 11
         self.extra_attempt = False
+        self.original_session = '55555555-5555-4555-8555-555555555555'
+        self.diagnostic_metrics = {'profile_version': '2.1.293', 'partial': False,
+            'tokens': {'input_tokens': 0, 'output_tokens': 100}, 'duration_ms': 2000}
         self.task_accounts = [{'id': 1, 'name': '合成任务账号', 'enabled': 1, 'cc2api_account_id': 11,
             'profile_path': 'profiles/synthetic', 'passive_quota': {'account_error': 'invalid_grant',
                 'blocked': True, 'message': 'invalid_grant：账号异常，需重新授权或人工核实'}}]
@@ -131,6 +134,8 @@ class ManagementFixture(Fixture):
                 'finished_at': '2026-11-12T05:31:51.455Z', 'status_code': 200, 'account_id': 11,
                 'outcome': 'success', 'attempt_count': 1, 'log_mode': 'debug', 'response_request_id': 'synthetic-response'}
             root.update(account_id=self.diagnostic_account_id, **self.diagnostic_account)
+            if self.original_session is not None:
+                root['original_session_id'] = self.original_session
             if self.diagnostic_account_id is None:
                 root['attempt_count'] = 0
             if '/captures/' in path:
@@ -142,8 +147,6 @@ class ManagementFixture(Fixture):
                     'snapshot': {'headers': [], 'body': '{"synthetic":true}', 'body_truncated': False,
                         'headers_truncated': False, 'original_body_bytes': 18, 'original_body_sha256': 'a' * 64}
                         if self.capture_state == 'available' else None})
-            if path == '/admin/request-diagnostics':
-                return await self.respond(route, {'items': [root], 'total': 1, 'health': {}})
             attempt = {'attempt_id': '22222222-2222-4222-8222-222222222222', 'account_id': 11,
                 'ordinal': 1, 'profile_selection': 'native293_cc_prepared', 'status_code': 200,
                 'outcome': 'success', 'log_mode': 'debug', 'capture_status': self.capture_status,
@@ -151,14 +154,74 @@ class ManagementFixture(Fixture):
                 'runtime': {'worker_id': 'synthetic-worker', 'worker_pid': 16, 'kernel_generation': 'synthetic',
                     'warm_hit': True, 'preparation_wait_ms': 0, 'checkout_ms': 0, 'worker_start_ms': None, 'prepared_ms': 222}}
             attempt.update(account_id=self.diagnostic_account_id, **self.diagnostic_account)
+            attempt.update(self.diagnostic_metrics)
             attempts = [attempt] if self.diagnostic_account_id is not None else []
             if self.extra_attempt:
                 attempt['ordinal'] = 2
                 attempts.insert(0, {**attempt, 'attempt_id': '33333333-3333-4333-8333-333333333333',
                     'ordinal': 1, 'account_id': 12, 'account_name': '备用演示账号', 'account_email': 'backup@example.test'})
                 root['attempt_count'] = 2
+            if path == '/admin/request-diagnostics':
+                if attempts:
+                    root['last_attempt'] = attempt
+                return await self.respond(route, {'items': [root], 'total': 1, 'health': {}})
             return await self.respond(route, {'request': root, 'attempts': attempts})
         return await super().route(route)
+
+
+async def verify_request_metadata(page, fixture, expect):
+    """验证会话复制、末次版本、平均 TPS 和历史缺字段。@param page 页面。@param fixture 合成接口。@param expect 断言入口。@return None。"""
+    session, metrics = fixture.original_session, copy.deepcopy(fixture.diagnostic_metrics)
+    await page.set_viewport_size({'width': 1280, 'height': 1000})
+    await page.evaluate("""() => Object.defineProperty(navigator, 'clipboard', {configurable:true,
+        value:{writeText:async value=>{window.__copiedSession=value}}})""")
+    await page.evaluate("""() => {window.__originalCopyCommand=document.execCommand;
+        document.execCommand=command=>{window.__copiedSession=document.activeElement?.value;return command==='copy'}}""")
+    await expect(page.locator('.request-records th')).to_have_count(9)
+    await expect(page.locator('.request-records')).to_contain_text('原始 Session ID')
+    for version, selection in [('2.1.280', 'native280_cc_prepared'), ('2.1.293', 'native293_cc_prepared'),
+            ('2.1.280', 'client_version')]:
+        fixture.diagnostic_metrics.update(profile_version=version, profile_selection=selection)
+        await page.get_by_role('button', name='刷新', exact=True).click()
+        label = '原生运行时' if selection.startswith('native') else '原有转发'
+        await expect(page.locator('tbody')).to_contain_text(label + ' · ' + version)
+    for tokens, duration, partial, outcome, expected in [
+            (100, 2000, False, 'success', '50.0 token/s'), (0, 2000, False, 'success', '0.0 token/s'),
+            (None, 2000, False, 'success', '未观测'), (100, 0, False, 'success', '未观测'),
+            (100, None, False, 'in_progress', '未观测'), (100, 2000, True, 'cancelled', '未观测')]:
+        fixture.diagnostic_metrics.update(tokens={'output_tokens': tokens}, duration_ms=duration, partial=partial, outcome=outcome)
+        await page.get_by_role('button', name='刷新', exact=True).click()
+        await expect(page.locator('tbody [data-average-tps]')).to_have_text('平均 TPS ' + expected)
+        await page.get_by_role('button', name='详情', exact=True).click()
+        await page.get_by_role('tab', name='性能', exact=True).click()
+        await expect(page.get_by_role('tabpanel').locator('[data-average-tps]')).to_have_text(expected)
+        await page.keyboard.press('Escape')
+    fixture.diagnostic_metrics = copy.deepcopy(metrics)
+    fixture.original_session = 's' * 256
+    await page.get_by_role('button', name='刷新', exact=True).click()
+    await page.get_by_role('button', name='复制原始 Session ID ' + fixture.original_session, exact=True).click()
+    assert await page.evaluate('window.__copiedSession') == fixture.original_session
+    for width in [1280, 390]:
+        await page.set_viewport_size({'width': width, 'height': 1000})
+        await page.get_by_role('button', name='详情', exact=True).click()
+        await expect(page.get_by_role('tabpanel')).to_contain_text(fixture.original_session)
+        await page.get_by_role('button', name='复制原始 Session ID ' + fixture.original_session, exact=True).click()
+        assert await page.evaluate('window.__copiedSession') == fixture.original_session
+        assert await page.get_by_role('tabpanel').evaluate('node=>node.scrollWidth<=node.clientWidth')
+        assert await page.locator('html').evaluate('node=>node.scrollWidth<=innerWidth')
+        await page.keyboard.press('Escape')
+    await page.set_viewport_size({'width': 1280, 'height': 1000})
+    fixture.original_session = None
+    fixture.diagnostic_metrics = {'tokens': {}, 'partial': None}
+    await page.get_by_role('button', name='刷新', exact=True).click()
+    await expect(page.locator('tbody')).to_contain_text('原生运行时 · 未观测')
+    await expect(page.locator('tbody .request-extra').nth(4)).to_contain_text('未提供')
+    await page.get_by_role('button', name='详情', exact=True).click()
+    await expect(page.get_by_role('tabpanel')).to_contain_text('未提供')
+    await page.keyboard.press('Escape')
+    fixture.original_session, fixture.diagnostic_metrics = session, metrics
+    await page.get_by_role('button', name='刷新', exact=True).click()
+    await page.evaluate('() => {document.execCommand=window.__originalCopyCommand}')
 
 
 async def verify_navigation_edges(page, fixture, expect):
@@ -385,10 +448,12 @@ async def run(output):
             await page.get_by_role('link', name='请求记录', exact=True).click()
             expected_time = '2026/11/12 13:31:49' if zone == 'Asia/Shanghai' else '2026/11/11 21:31:49'
             await expect(page.locator('tbody')).to_contain_text(expected_time)
-            await expect(page.locator('tbody')).to_contain_text(zone)
+            await expect(page.locator('tbody time')).not_to_contain_text(zone)
+            await verify_request_metadata(page, fixture, expect)
             await expect(page.locator('tbody')).to_contain_text('主用演示账号')
             await expect(page.locator('tbody')).to_contain_text('primary@example.test')
             await page.get_by_role('button', name='详情', exact=True).click()
+            await expect(page.get_by_role('tabpanel')).to_contain_text(zone)
             await expect(page.locator('.request-attempt-summary')).to_contain_text('采集已关闭')
             await page.get_by_role('tab', name='原始数据', exact=True).click()
             assert fixture.capture_reads == 0

@@ -411,6 +411,7 @@ export interface SessionPolicyBlockPage { items: SessionPolicyBlock[]; total: nu
 
 /** 管理端请求诊断列表行。 */
 export interface DiagnosticRequest {
+  original_session_id?: string | null
   account_name?: string | null
   account_email?: string | null
   log_mode?: 'info' | 'debug' | null
