@@ -185,6 +185,18 @@ async def verify_request_metadata(page, fixture, expect):
         await page.get_by_role('button', name='刷新', exact=True).click()
         label = '原生运行时' if selection.startswith('native') else '原有转发'
         await expect(page.locator('tbody')).to_contain_text(label + ' · ' + version)
+    for value, expected in [(2400, '2,400'), (0, '0'), (None, '—'), ('missing', '—')]:
+        tokens = {'input_tokens': 0, 'output_tokens': 100, 'cache_read_tokens': 1200}
+        if value != 'missing':
+            tokens['cache_write_tokens'] = value
+        fixture.diagnostic_metrics.update(tokens=tokens)
+        await page.get_by_role('button', name='刷新', exact=True).click()
+        await expect(page.locator('tbody [data-cache-write]')).to_have_text('缓存写 ' + expected)
+        await page.get_by_role('button', name='详情', exact=True).click()
+        await page.get_by_role('tab', name='性能', exact=True).click()
+        metric = page.locator('.request-token-metrics > div').filter(has_text='缓存写入')
+        await expect(metric.locator('strong')).to_have_text('未观测' if expected == '—' else expected)
+        await page.keyboard.press('Escape')
     for tokens, duration, partial, outcome, expected in [
             (100, 2000, False, 'success', '50.0 token/s'), (0, 2000, False, 'success', '0.0 token/s'),
             (None, 2000, False, 'success', '未观测'), (100, 0, False, 'success', '未观测'),

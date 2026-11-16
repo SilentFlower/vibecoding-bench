@@ -104,6 +104,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - 增加“原始 Session ID”列，直接读取根记录 `original_session_id`，支持完整值复制，详情概览同步展示。缺失和旧记录显示“未提供”，长值可省略并通过详情查看完整值；复制始终使用原始完整字符串。
 - “模型 / 转发方式”沿现有列显示“原生运行时 · 2.1.280”或“原有转发 · 2.1.293”，版本取 `last_attempt.profile_version`，缺失显示“未观测”。账号基础版本、客户端 UA 或配置默认值不作为实际尝试版本的替代来源。
 - “Token（末次）”列下方及性能详情展示平均 TPS：`output_tokens * 1000 / duration_ms`，包含该次尝试首输出等待，一位小数并注明 token/s。仅 success、partial=false、有效非负安全整数输出 token 和有限正耗时时展示；真实零输出保留 0.0，缺失、处理中或不完整记录为“未观测”。列表与详情共用计算入口。
+- “Token（末次）”列同步展示缓存读与缓存写，分别读取`last_attempt.tokens.cache_read_tokens/cache_write_tokens`；真实0显示0，null或历史缺失显示“—”，性能详情沿同次尝试显示“未观测”。`verify_management_ui.py::verify_request_metadata`覆盖2400、0、null及缺失四种缓存写值，并保留Session ID、版本和TPS回归。
 - 时间列按浏览者时区显示日期时间，省略 IANA 时区后缀；详情保留时区与原始时间。窄屏继续保留核心列，其余信息由详情查看。
 - 使用“全部/错误/处理中”带图标的快捷选择，保留账号、时间与关联ID条件；具体结果与快捷结果属于同一维度，避免相互叠加成无意的空集合。
 - 账号匹配覆盖请求账号与各次尝试账号；完整关联ID匹配请求、响应及上游ID。实际诊断接口支持 `outcome=errors` 六类错误集合；分页返回独立于当前结果维度的 `counts.all/errors/processing`，保留其余查询条件。每条记录的 `last_attempt` 由存储查询投影；不得在单页数据上伪造全量统计或制造逐行详情请求。
