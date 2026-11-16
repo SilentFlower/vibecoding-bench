@@ -307,6 +307,7 @@ html根字号与原型共用`--ui-font-body`的14/15/16px三档规则，font-fam
 ### 原生工作区生命周期
 
 - `/environments`使用`RuntimeEnvironments.vue`，资源/内核/时段为独立Vue编辑组件。访问过的分区保持挂载，CPU输入和时段草稿不随轮询或切区重建。CAS失败禁止重放原版本，提供重新读取；页签/关闭在提交中受控。
+- 环境列表每轮成功读取后，隔离布局2的卡片自动通过既有`GET /runtime/api/environments/{id}/cpu-resources`补齐三角色实际CPU配额，每轮最多并行3个环境。缓存按环境ID和generation核对；换代或移除时清理，旧页面/旧请求/代次不符回执拒绝覆盖，编辑器读取或保存的新回执优先于并发摘要。列表轮询只刷新卡片，不覆盖表单草稿。配额显示真实核数，首读为“读取中”，单环境错误为“读取失败”并保留错误提示，历史布局为“未提供”；工具栏刷新和后续轮询可重试，离页取消请求。合同与CAS规则沿用[三角色在线CPU](../../orchestrator/backend/account-runtime-v3.md#scenario-三角色在线cpu与重建恢复)。
 - `/tasks`使用`TasksWorkspace.vue`。构建插件`runtimeModule.ts`从单份原任务模板/控制器编译ES模块；主路由直接挂载DOM，运行时不创建iframe、不执行脚本字符串。CSS选择器通过AST限定在任务根，禁止正则替换误伤属性和类名；逗号组前导空格不能改变根类组合。
 - `createRuntimeScope`拥有局部查询根、路由、事件、计时器、请求、DOM观察、SSE、WebSocket、终端。同路由子页共享实例；离开路由统一释放。全局应用DOM和主题不归任务控制器修改。原生路由仍使用网关交换的同源会话。
 - 控制器的 `history.replaceState`只更新作用域地址快照，真实浏览历史由Vue Router统一写入。顶层工程/养号入口保留当前账号；重复、空白、非法及不可用account继续拒绝，不能静默选择首个账号。初始快照和模型读取期间禁用账号选择，避免迟到预选覆盖用户输入。
@@ -317,6 +318,8 @@ html根字号与原型共用`--ui-font-body`的14/15/16px三档规则，font-fam
 - `TimeControl`保存当地`HH:mm`，确认才写入。时段关闭保留原已保存星期和区间，不把未提交草稿写回。
 
 验证入口：`verify_shared_pagination.py`、`verify_page_sizes.py`、`verify_native_environments.py`、`verify_runtime_workspace_design.py`、`verify_task_login_design.py`、`verify_project_workspace_design.py`；使用合成接口、真实构建和隔离SQLite交付。
+
+CPU首屏摘要回归：`verify_environment_cpu_summary.py`覆盖自动读取、并发上限、单环境失败恢复、编辑器回填优先、保存同步、换代与迟到响应、代次不符、历史布局及离页；`verify_native_environments.py`继续覆盖CPU草稿和CAS失败重读。
 
 ### 任务深层弹窗与工程现场一致性
 
