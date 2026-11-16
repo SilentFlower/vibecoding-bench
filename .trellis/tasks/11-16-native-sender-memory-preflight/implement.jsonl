@@ -1,0 +1,2 @@
+{"file":".trellis/spec/orchestrator/backend/account-runtime-v3.md","reason":"账号资源真实性、共享映像池及普通启动与CRIU独立政策"}
+{"file":".trellis/spec/runtime/backend/runtime-contract.md","reason":"双版物理容量、配置兼容及恢复独立预算"}

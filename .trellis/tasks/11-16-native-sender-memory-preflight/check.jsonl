@@ -1,0 +1,2 @@
+{"file":".trellis/spec/orchestrator/backend/account-runtime-v3.md","reason":"核对有限真实预算、unlimited及账号生命周期兼容"}
+{"file":".trellis/spec/runtime/backend/runtime-contract.md","reason":"核对跨版总容量、身份及CRIU独立规则"}
