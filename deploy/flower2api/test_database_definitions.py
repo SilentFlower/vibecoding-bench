@@ -1,11 +1,12 @@
 """校验数据库定义所有权及业务查询变化的合同稳定性。"""
+import json
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
 from source_layout import source_path
 
-from system_release import REPO, data_contracts
+from system_release import GATEWAY_SCHEMA_SOURCES, REPO, data_contracts
 from verify_database_definitions import source_ownership, verify
 
 
@@ -18,10 +19,51 @@ class DatabaseDefinitionTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         for name in ('orchestrator/database_schema.py', 'orchestrator/database-migration-registry.json',
-                'cc2api/src/store/database_schema.rs', 'cc2api/src/store/database-migration-registry.json'):
+                'cc2api/src/store/database-migration-registry.json', *GATEWAY_SCHEMA_SOURCES.values()):
             target = self.root / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source_path(REPO, name), target)
+
+    def test_current_repository_has_complete_registered_definitions(self) -> None:
+        """真实仓库必须通过CI入口，避免最小夹具遗漏新增定义。@return None。"""
+        self.assertEqual('passed', verify(REPO)['status'])
+
+    def test_incremental_definitions_require_unchanged_checksums(self) -> None:
+        """目录及同步定义均绑定登记摘要，签发入口也拒绝漂移。@return None。"""
+        for name in ('proxy_schema.rs', 'proxy_sync_schema.rs'):
+            with self.subTest(name=name):
+                path = self.root / 'cc2api/src/store' / name
+                original = path.read_text()
+                path.write_text(original + '\nconst EXTRA: &str = "CREATE TABLE unexpected(id INT)";\n')
+                with self.assertRaisesRegex(ValueError, '版本登记'):
+                    verify(self.root)
+                with self.assertRaisesRegex(ValueError, '版本登记'):
+                    data_contracts(self.root)
+                path.write_text(original)
+
+    def test_incremental_owners_are_exact_paths_and_pure_definitions(self) -> None:
+        """同名业务文件不能冒充所有者，增量定义不能依赖业务模块。@return None。"""
+        path = self.root / 'cc2api/src/proxy_schema.rs'
+        path.write_text('const Q: &str = "CREATE TABLE unexpected(id INT)";\n')
+        self.assertEqual(['cc2api/src/proxy_schema.rs:1'], source_ownership(self.root))
+        path.unlink()
+        path = self.root / 'cc2api/src/store/proxy_schema.rs'
+        path.write_text(path.read_text() + '\nuse crate::business::mutable_defaults;\n')
+        self.assertEqual(['cc2api/src/store/proxy_schema.rs:1'], source_ownership(self.root))
+
+    def test_unknown_registered_step_and_missing_source_are_rejected(self) -> None:
+        """未知步骤与缺失定义都在发布材料生成前拒绝。@return None。"""
+        registry = self.root / 'cc2api/src/store/database-migration-registry.json'
+        original = registry.read_text()
+        value = json.loads(original)
+        value['steps'].append({**value['steps'][-1], 'id': 'gateway.future.4', 'version': 4, 'predecessor': 3})
+        registry.write_text(json.dumps(value))
+        with self.assertRaisesRegex(ValueError, '定义来源'):
+            verify(self.root)
+        registry.write_text(original)
+        (self.root / 'cc2api/src/store/proxy_sync_schema.rs').unlink()
+        with self.assertRaisesRegex(ValueError, '来源缺失'):
+            verify(self.root)
 
     def test_business_queries_and_comments_preserve_contract(self) -> None:
         """普通查询、说明及测试代码保持合同稳定。@return None。"""

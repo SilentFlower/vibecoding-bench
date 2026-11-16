@@ -13,8 +13,9 @@ const CREATE: &str = "CREATE TABLE IF NOT EXISTS proxy_route_sync (
 
 /// 返回同步台账迁移的固定摘要。@return SHA256。
 pub fn checksum() -> String {
+    // 拆开测试标记，确保后续迁移执行及结构校验代码也进入摘要。
     let source = include_str!("proxy_sync_schema.rs")
-        .split("#[cfg(test)]")
+        .split(concat!("#[cfg(", "test)]"))
         .next()
         .unwrap_or_default();
     format!("{:x}", Sha256::digest(source.as_bytes()))

@@ -19,6 +19,14 @@ from database_migration_contract import load_registry, registry_contract
 from system_update_contract import INDEX_LIMIT, MANIFEST_LIMIT, ROLES, strict_json, utc_now, validate_index, validate_release, validate_migration_evidence, validate_migration_plan
 
 
+# 与实际迁移执行器的步骤ID绑定，定义扫描与签发校验共用精确来源。
+GATEWAY_SCHEMA_SOURCES = {
+    'gateway.baseline.1': 'cc2api/src/store/database_schema.rs',
+    'gateway.proxies.2': 'cc2api/src/store/proxy_schema.rs',
+    'gateway.proxy-sync.3': 'cc2api/src/store/proxy_sync_schema.rs',
+}
+
+
 def data_contracts(root: Path) -> dict:
     """从实际迁移源码生成保守数据合同，变更后需显式兼容证明。
 
@@ -30,13 +38,21 @@ def data_contracts(root: Path) -> dict:
 
 
 def migration_registries(root: Path) -> dict:
-    """读取源码登记并核对首版纯迁移定义。:param root: 冻结源码根。:return: 两库登记。"""
+    """读取源码登记并核对每项已知迁移定义。:param root: 冻结源码根。:return: 两库登记。"""
     values = {'bench': load_registry(source_path(root, 'orchestrator/database-migration-registry.json'), 'bench'),
         'gateway': load_registry(source_path(root, 'cc2api/src/store/database-migration-registry.json'), 'gateway')}
-    actual = {'bench': schema_checksum(source_path(root, 'orchestrator/database_schema.py')),
-        'gateway': hashlib.sha256((source_path(root, 'cc2api/src/store/database_schema.rs')).read_bytes().split(b'#[cfg(test)]', 1)[0]).hexdigest()}
-    if any(value['steps'][0]['checksum'] != actual[name] for name, value in values.items()):
+    if values['bench']['steps'][0]['checksum'] != schema_checksum(source_path(root, 'orchestrator/database_schema.py')):
         raise ValueError('迁移定义与版本登记不符')
+    for step in values['gateway']['steps']:
+        logical = GATEWAY_SCHEMA_SOURCES.get(step['id'])
+        if logical is None:
+            raise ValueError('网关迁移缺少已登记定义来源：' + step['id'])
+        path = source_path(root, logical)
+        if path.is_symlink() or not path.is_file():
+            raise ValueError('迁移定义来源缺失或无效：' + step['id'])
+        actual = hashlib.sha256(path.read_bytes().split(b'#[cfg(test)]', 1)[0]).hexdigest()
+        if step['checksum'] != actual:
+            raise ValueError('迁移定义与版本登记不符：' + step['id'])
     return values
 
 

@@ -19,8 +19,9 @@ const CREATE: &str = "CREATE TABLE IF NOT EXISTS proxy_routes (
 /// 返回独立迁移源码摘要，测试代码不进入持久合同。
 /// @return SHA256摘要。
 pub fn checksum() -> String {
+    // 拆开测试标记，避免摘要在本函数的字符串字面量处提前截断。
     let source = include_str!("proxy_schema.rs")
-        .split("#[cfg(test)]")
+        .split(concat!("#[cfg(", "test)]"))
         .next()
         .unwrap_or_default();
     format!("{:x}", Sha256::digest(source.as_bytes()))

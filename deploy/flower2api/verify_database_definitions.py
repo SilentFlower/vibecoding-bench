@@ -7,7 +7,8 @@ import re
 from pathlib import Path
 from source_layout import source_path
 
-from system_release import REPO, migration_registries
+from system_release import GATEWAY_SCHEMA_SOURCES, REPO, migration_registries
+from database_migration_contract import load_registry
 
 
 DDL = re.compile(r'(?:^|;)\s*(?:CREATE\s+(?:(?:TEMP|TEMPORARY)\s+)?(?:TABLE|INDEX|UNIQUE\s+INDEX|TRIGGER|VIEW)|ALTER\s+TABLE|DROP\s+(?:TABLE|INDEX|TRIGGER|VIEW))\b', re.I | re.M)
@@ -26,10 +27,15 @@ def source_ownership(root: Path) -> list[str]:
         if ((isinstance(node, ast.ImportFrom) and node.module != '__future__')
                 or (isinstance(node, ast.Import) and any(item.name not in ('re', 'sqlite3') for item in node.names))):
             findings.append(str(schema.relative_to(root)) + ':' + str(node.lineno))
-    rust_schema = source_path(root, 'cc2api/src/store/database_schema.rs')
-    definitions = rust_schema.read_text().split('#[cfg(test)]', 1)[0]
-    if re.search(r'\b(?:crate|super)::', RUST_LITERAL.sub(' ', definitions)):
-        findings.append(str(rust_schema.relative_to(root)) + ':1')
+    registry = load_registry(source_path(root, 'cc2api/src/store/database-migration-registry.json'), 'gateway')
+    registered = {step['id'] for step in registry['steps']}
+    rust_schemas = {source_path(root, logical) for key, logical in GATEWAY_SCHEMA_SOURCES.items() if key in registered}
+    for rust_schema in sorted(rust_schemas):
+        if not rust_schema.is_file():
+            continue
+        definitions = rust_schema.read_text().split('#[cfg(test)]', 1)[0]
+        if re.search(r'\b(?:crate|super)::', RUST_LITERAL.sub(' ', definitions)):
+            findings.append(str(rust_schema.relative_to(root)) + ':1')
     for path in (source_path(root, 'orchestrator')).glob('*.py'):
         if path.name.startswith('test_') or path.name == 'database_schema.py':
             continue
@@ -47,7 +53,7 @@ def source_ownership(root: Path) -> list[str]:
                 continue
             findings.append(str(path.relative_to(root)) + ':' + str(node.lineno))
     for path in (source_path(root, 'cc2api/src')).rglob('*.rs'):
-        if path.name == 'database_schema.rs':
+        if path in rust_schemas:
             continue
         source = path.read_text().split('#[cfg(test)]', 1)[0]
         for match in RUST_LITERAL.finditer(source):

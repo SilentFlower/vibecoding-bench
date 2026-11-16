@@ -148,6 +148,8 @@ python3 deploy/flower2api/upgrade_system_updater.py --policy <绝对路径> --so
 python3 deploy/flower2api/upgrade_system_updater.py --policy <原策略> --service <原服务> --recover <原UUID> [--apply]
 system_schema_migrations(migration_id TEXT PRIMARY KEY, version INTEGER NOT NULL UNIQUE,
   checksum TEXT NOT NULL, applied_at TEXT NOT NULL, operation_id TEXT NOT NULL)
+system_release.migration_registries(root: Path) -> dict
+system_release.GATEWAY_SCHEMA_SOURCES: dict[str, str]
 ```
 
 bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。gateway 从原配置读取连接。宿主固定入口、参数、精确候选镜像和单库挂载，关闭维护容器网络并采用只读程序层；发行附件只提供版本声明。
@@ -156,6 +158,8 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 - 两库登记为 `{schema_version:1,database,steps}`；每步固定 `id,version,predecessor,checksum,engine,kind,rollback_mode`，要求连续前驱、`engine=sqlite`、`kind=schema|data`、`rollback_mode=compatible`。首版仅登记各自 `baseline.1`。增加版本需同时实现对应执行分支及演练。
 - 合同为按 key 排序、紧凑 UTF-8 JSON 登记的 SHA256。Python 冻结定义使用忽略文档/注释的 AST 摘要，Rust 使用测试段之前的纯定义原字节摘要。冻结 SQL、默认值、历史画像及命名空间依赖归纯迁移模块所有，普通业务查询和页面改动保持合同。
+- 发布校验与DDL扫描共用步骤ID到精确源路径的映射：gateway.baseline.1→database_schema.rs、gateway.proxies.2→proxy_schema.rs、gateway.proxy-sync.3→proxy_sync_schema.rs，均位于网关src/store。仅当前登记中的对应路径拥有DDL定义；同名业务文件不豁免。每个网关步骤都核对源码摘要，未知步骤、缺失来源和摘要漂移在签发前拒绝。
+- 自哈希Rust模块使用 `concat!("#[cfg(", "test)]")` 构造测试分隔标记，保证迁移执行和结构校验也进入摘要。源码内直接写完整分隔字符串会使字节切分提前停止。首次发布前修正新增定义需同步登记摘要；已发布步骤继续冻结。
 - CLI 返回 `database,contract,current_version,target_version,steps,state,reason`；执行完成保留原台账 operation_id。已知台账摘要冲突或版本断链拒绝；旧程序读取兼容新增版本返回 `compatible_newer`。
 - 旧库迁移前核验稳定账号核心字段。迁移完成且写入成功台账之前、以及已登记库 plan/apply 时，复核冻结基线的最低表/列、SQLite 亲和、主键及完整性。允许兼容新增表/列；非主键数字亲和支持历史兼容。空库沿相同初始化建立基线。
 - v2 清单保留原字段，设置 `schema_version=2,compatibility.updater=2`，新增 `migrations:{protocol:1,plan,evidence}`。两个资产精确名为 `database-migrations.json`、`database-compatibility.json`，按大小和原字节 SHA256 绑定签名。计划包含两库版本、合同和完整步骤链；证据绑定候选源码、两类镜像配置摘要、旧版清单/镜像/合同及 upgrade/candidate_read_write/previous_read_write/idempotent 四项成功断言。
@@ -171,6 +175,7 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 | --- | --- |
 | 缺稳定核心字段、已登记库缺必要字段、类型/主键异常 | CLI 非零，拒绝登记成功 |
 | 重复 ID、前驱断链、校验和改变、未登记结构定义 | 构建或维护验证失败 |
+| 迁移步骤无对应源码、来源缺失、同名文件冒充所有者、增量定义依赖业务模块 | 来源或所有权校验失败，禁止签发 |
 | 同合同仅历史许可列表变化 | 允许常规兼容安装 |
 | v2 附件、来源清单或实际镜像证据不符 | 阻止准备/安装及兼容发布 |
 | 快照空间不足、写入者未退出、损坏或外来快照 | 停止迁移并保持原操作恢复权 |
@@ -191,9 +196,12 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 错误用法：CI 测试依赖终端额外设置 PYTHONPATH。正确处理：脚本自举所属项目路径，并以 `env -u PYTHONPATH` 验证 workflow 默认入口及独立 discover。
 
+错误用法：只复制基线源码的夹具通过后，直接把新迁移加入发行；或仅按文件名跳过DDL扫描。正确处理：真实仓库执行所有权检查，夹具覆盖全部已登记定义，并同时验证来源路径、纯定义及每步摘要。
+
 ### 6. Tests Required
 
 - `verify_database_definitions.py`：DDL 所有权和冻结摘要；业务模块 DDL、触发器/视图及纯定义外部依赖必须被拒绝。
+- `test_database_definitions.py`：真实仓库入口通过；修改任一增量文件的后续DDL使扫描验收及data_contracts都失败；同名文件、业务依赖、未知步骤和缺失来源分别拒绝。历史发行已经登记的步骤须与发布附件逐字段一致。
 - 两库迁移测试：空库、旧库、重复执行、台账冲突、兼容新增；缺列/类型/主键异常拒绝登记。Python 增量事务失败保持数据与台账。
 - `test_system_database.py`、`test_system_migrations.py`：WAL、空间、损坏/外来快照、部分复制/替换恢复、保留轮换、同合同准入及开放后的数据保护。
 - `test_system_upgrade.py`：来源/服务归属、失败恢复、源码/策略/状态替换真实进程终止、按 UUID 预览、恢复再次中断、重复恢复及后来状态保护。
