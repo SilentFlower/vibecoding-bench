@@ -62,3 +62,41 @@ OAuth及Setup Token的generate接口增加proxy_id/proxy_revision；保留proxy_
 - 部署门禁在后台目标执行时登记活动。编排端`POST /internal/v3/proxy-sync`沿内部证明和UPDATE_GATE，按owner→profile→environment非阻塞取锁，活动登录/CLI/API保持待重试；空闲停止并移除旧实例，保留持久资料后更新私有代理。已提交草稿转task，已绑定task转gateway。
 - 回执丢失按当前连接幂等确认；用户已切至第三条连接时保留当前选择。同步错误不返回私有连接或数据库原始错误。删除继续使用完整引用保护。
 - 验证：`used_proxy_edit_queues_until_idle_and_synchronizes`覆盖真实路由/SQLite/工作协程、忙碌延期及空闲回读；`proxy_sync`存储与`test_proxy_sync.py`覆盖恢复、CAS单列、锁/停止失败、草稿转换及凭据保护。
+
+## Scenario: 任务账号选择与超时事务保护
+
+### 1. Scope / Trigger
+
+修改任务选线、运行时代理桥、内部提交或目录引用保护时适用。浏览器只提交目录身份，私有连接由Rust解析。
+
+### 2. Signatures
+
+- `GET /runtime/api/accounts/:id/proxy-selection`返回`account_id/name/gateway_account_id/selection_revision/current`。
+- `PUT`同一路径仅接受`selection_revision:string`、`proxy_id:string|null`、可选`proxy_revision:string`；直连不接受线路版本，额外字段拒绝。
+- 内部运行时PUT接收`selection_revision/connection/operation_id`三个严格字符串。operation_id为32位hex票据，不向浏览器返回。
+- 内部`POST /admin/runtime/task-proxy-operations/:operation/claim`接收`account_id/gateway_account_id/selection_revision/connection`，返回`claimed:true`。
+- 内部`POST /admin/runtime/accounts/:id/proxy-selection`接收`operation_id/expected_connection/connection`，返回`ok:true`；两条内部路由均要求原管理员认证及`x-v3-service-token`。
+
+### 3. Contracts
+
+- public current区分directory/custom/direct/unknown，仅含目录名称、ID、revision、脱敏地址、检测及到期。列表一次批量匹配私有连接和待同步旧别名；绑定任务取网关权威，读取异常保持unknown。新增投影与选择接口不公开私有认证和源摘要，原任务列表字段保持兼容。
+- selection_revision由编排使用V3_INTERNAL_TOKEN的HMAC-SHA256计算，绑定任务、当前绑定与实际连接；64位hex仅作版本校验，原会话/来源保护继续生效。响应读取最多4MiB，内部网络等待45秒；错误正文使用固定公开说明。
+- `ProxyService.mutations`为共享Arc互斥锁。解析目录及版本后创建弱登记票据，票据强引用持有目录许可。任务身份、版本及目标逐项匹配，领取仅一次；绑定记录冻结到领取时刻。原等待退出后，已失效票据无法再次领取。
+- 编排先登记活动再领取，活动期间引用complete=false；读取跨越活动代次也为false。未决目标尚未进入账号记录时，目录删除/连接修改仍失败关闭。名称与到期维持原独立编辑语义。
+- 绑定回调持有已领取票据的强引用，并核对绑定与目标，目录许可覆盖最终CAS；外层超时或断连不会撤销已进入回调的许可。其后复用config_permit(...,true)、凭据门禁及代理单字段CAS，保持限额、状态、凭据和原生准备失效通知。
+- 原Gateway进程重启使票据失效；独立任务仍由编排活动保护。编排重启会终止本地执行，已进入网关的回调继续持有自身许可。与现有单进程编排维护锁边界一致；扩多进程前须重新设计共享活动与票据所有权。
+
+### 4. Validation & Error Matrix
+
+- 非法身份/目录缺失：404；载荷或目录版本不符：受控400。
+- 任务原版本/绑定变化、忙碌、停用：409；服务未知或超时：503，界面先回读结果再决定重试。
+- 未领取、重复领取、过期或目标/绑定不符的内部票据：受控400；公开桥不返回内部错误正文。
+- 未决操作/跨代次引用读取：complete=false，目录删改503；实际事务完成后重新读取正常引用。
+
+### 5. Scenarios and Examples
+
+正常：`{selection_revision:"64位hex",proxy_id:"目录ID",proxy_revision:"原版本"}`由桥解析并受控提交。边界：直连使用proxy_id:null。错误：HTTP超时后仅释放锁并允许目录删除；正确处理是已领取操作持续登记引用保护，未领取迟到请求被票据拒绝。单纯增加HTTP超时不能替代事务保护。
+
+### 6. Tests Required
+
+Rust票据测试覆盖过期、重复领取、身份/绑定核对、回调强引用及目录锁释放；`test_task_proxy.py`覆盖实际入口、活动及引用代次。`verify_task_proxy_api.py`用真实Rust HTTP、Python产品保存和两份SQLite验证关联/独立/直连、45秒超时删改503、提交后恢复及过期请求拒绝。全量`cargo test --locked --manifest-path services/gateway/Cargo.toml`和fmt必须通过。

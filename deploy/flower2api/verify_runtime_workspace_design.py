@@ -11,6 +11,17 @@ class WorkspaceFixture(RemainingPagesFixture):
     async def route(self,route):
         """回传合成工作区快照。@param route 请求。@return 无。"""
         request=route.request;path=urlsplit(request.url).path
+        proxy_match=re.fullmatch(r'/runtime/api/accounts/(\d+)/proxy-selection',path)
+        if proxy_match:
+            task=next((item for item in self.task_accounts if item['id']==int(proxy_match[1])),None)
+            if task is None:return await self.respond(route,{'error':'任务账号不可用'},404)
+            gateway=next((item for item in self.accounts if item['id']==task.get('cc2api_account_id')),None)
+            owner=gateway if gateway is not None else task
+            if request.method=='PUT':
+                body=request.post_data_json;self.writes.append({'path':path,'body':body});owner['proxy_id']=body['proxy_id']
+            proxy=next((item for item in self.proxies if item['id']==owner.get('proxy_id')),None)
+            current={**proxy,'kind':'directory'} if proxy else {'kind':'direct','name':'直连','public_url':'','status':'unknown','observation':None}
+            return await self.respond(route,{'account_id':task['id'],'name':task['name'],'gateway_account_id':task.get('cc2api_account_id'),'selection_revision':'a'*64,'current':current})
         if path=='/runtime/api/topics':return await self.respond(route,[{'id':1,'no':1,'title':'输入校验与异常处理','category':'工程质量','description':'完善输入校验，提供清楚的错误反馈。','followups':['覆盖边界场景']}])
         if path=='/runtime/api/task-batches':return await self.respond(route,[{'id':1,'account_id':1,'status':'paused','done_count':2,'item_count':8,'concurrency':2,'interval_min_sec':10,'interval_max_sec':30}])
         match=re.match(r'^/runtime/api/(projects|accounts/warmup/pi)(/.*)?$',path)

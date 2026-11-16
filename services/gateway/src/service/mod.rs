@@ -33,6 +33,7 @@ pub mod runtime_transport;
 pub mod session_hello_probe;
 pub(crate) mod stream_error;
 pub mod system_update;
+pub(crate) mod task_proxy_ticket;
 pub mod telemetry;
 pub mod usage;
 pub mod usage_poller;

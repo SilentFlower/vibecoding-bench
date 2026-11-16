@@ -1,0 +1,82 @@
+/* 全站阅读尺寸：按 CSS 视口适配，浏览器缩放继续由用户控制。 */
+:root {
+  --ui-font-small: 12px;
+  --ui-font-body: 14px;
+  font-size: var(--ui-font-body);
+  --ui-font-card: 16px;
+  --ui-font-heading: 18px;
+  --ui-font-page: 28px;
+  --ui-control-height: 40px;
+  --ui-control-compact: 34px;
+  --ui-control-space: 12px;
+  --ui-feedback-surface: #272537;
+  --ui-feedback-text: #fff;
+}
+@media (min-width: 1920px) {
+  :root {
+    --ui-font-small: 13px;
+    --ui-font-body: 15px;
+    --ui-font-card: 17px;
+    --ui-font-heading: 20px;
+    --ui-font-page: 30px;
+    --ui-control-height: 42px;
+    --ui-control-compact: 36px;
+    --ui-control-space: 13px;
+  }
+}
+@media (min-width: 2560px) {
+  :root {
+    --ui-font-small: 14px;
+    --ui-font-body: 16px;
+    --ui-font-card: 18px;
+    --ui-font-heading: 22px;
+    --ui-font-page: 32px;
+    --ui-control-height: 44px;
+    --ui-control-compact: 38px;
+    --ui-control-space: 14px;
+  }
+}
+
+/* Vue 与独立文档共享反馈表面；正文按文本渲染，消息容器不阻挡其它区域。 */
+.fui-toast-stack { position: fixed; z-index: 2200; left: 50%; bottom: 24px; transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); display: grid; gap: 10px; pointer-events: none; }
+.fui-toast-stack[popover] { top: auto; right: auto; margin: 0; padding: 0; border: 0; background: transparent; overflow: visible; }
+.fui-toast-stack[popover]:not(:popover-open) { display: none; }
+.fui-notice, :root.console-design .runtime-toast {
+  display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px;
+  border: 1px solid #ffffff1f; border-radius: 12px; background: var(--ui-feedback-surface); color: var(--ui-feedback-text);
+  box-shadow: 0 12px 36px #17122626; font-size: var(--ui-font-body); line-height: 1.65; pointer-events: auto; overflow-wrap: anywhere;
+}
+.fui-notice-icon { flex: none; margin-top: 3px; color: #cbbbe8; }
+.fui-notice[data-type=success] .fui-notice-icon { color: #92dfbd; }
+.fui-notice[data-type=error] .fui-notice-icon { color: #ffb8c7; }
+.fui-notice[data-type=warning] .fui-notice-icon { color: #f5d194; }
+.fui-notice-copy { flex: 1; min-width: 0; }
+.fui-notice-copy strong { font-size: var(--ui-font-body); font-weight: 600; }
+.fui-notice-copy p { margin: 3px 0 0; color: #ece9f4; white-space: pre-wrap; max-height: 220px; overflow: auto; }
+.fui-notice-close, :root.console-design .runtime-toast button { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: #dad4e7; cursor: pointer; }
+.fui-notice-close:hover { background: #ffffff18; color: #fff; }
+.fui-notice-close:focus-visible { outline: 2px solid #cebaf4; outline-offset: 2px; }
+:root.console-design .runtime-toast { left: 50%; right: auto; bottom: 24px; transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); max-width: none; }
+:root.console-design .runtime-toast.hidden { display: none; }
+.fui-toast-enter-active, .fui-toast-leave-active { transition: opacity .16s ease, transform .16s ease; }
+.fui-toast-enter-from, .fui-toast-leave-to { opacity: 0; transform: translateY(8px); }
+.fui-confirm-dialog[data-slot=dialog-content] { width: min(500px, calc(100vw - 32px)); max-width: none; display: flex; flex-direction: column; padding: 0; gap: 0; border-radius: 16px; background: #fff; max-height: calc(100dvh - 32px); }
+.fui-confirm-dialog>[data-slot=dialog-header] { padding: 26px 28px 20px; text-align: left; gap: 12px; }
+.fui-confirm-dialog [data-slot=dialog-title] { font-size: var(--ui-font-heading); font-weight: 650; line-height: 1.5; padding-right: 24px; }
+.fui-confirm-dialog [data-slot=dialog-description] { font-size: var(--ui-font-body); color: #637087; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fui-confirm-content { padding: 0 28px 20px; overflow: auto; min-height: 0; }
+.fui-confirm-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; padding: 18px 28px; border-top: 1px solid #ecebf2; }
+.fui-action-error { display: flex; align-items: flex-start; gap: 8px; margin: 0 28px 20px; color: #ac4761; font-size: var(--ui-font-body); line-height: 1.7; overflow-wrap: anywhere; }
+.fui-action-error svg { flex: none; margin-top: 3px; }
+.fui-operation-trigger { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 5.5em; min-height: var(--ui-control-compact); white-space: nowrap; }
+.fui-operation-trigger[data-status=success],.fui-operation-trigger[data-status=success]:hover { color: #258269; }
+.fui-operation-trigger[data-status=error],.fui-operation-trigger[data-status=error]:hover { color: #ad4d65; }
+.fui-operation-result { z-index: 150; width: min(360px, calc(100vw - 32px)); padding: 20px; background: #fff; border: 1px solid #e3dfed; border-radius: 12px; box-shadow: 0 12px 36px #24203420; font-size: var(--ui-font-body); line-height: 1.7; color: #46546b; }
+.fui-operation-result header { display: grid; gap: 4px; }
+.fui-operation-result strong { font-size: var(--ui-font-card); color: #27374f; }
+.fui-operation-result small { font-size: var(--ui-font-small); color: #7d879a; overflow-wrap: anywhere; }
+.fui-operation-result p { margin: 14px 0; max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fui-spinning { animation: fui-spin 1s linear infinite; }
+@keyframes fui-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .fui-toast-enter-active,.fui-toast-leave-active { transition: none; }.fui-spinning { animation: none; } }
+@media (forced-colors: active) { .fui-notice,.fui-confirm-dialog[data-slot=dialog-content],.fui-operation-result { border: 1px solid CanvasText; background: Canvas; color: CanvasText; }.fui-notice-copy p,.fui-notice-close { color: CanvasText; } }

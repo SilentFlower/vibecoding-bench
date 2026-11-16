@@ -881,7 +881,7 @@ onMounted(async () => {
                 </Badge>
                 <span
                   v-if="!log.success && log.error_message"
-                  class="ml-2 text-[11px] text-muted-foreground truncate inline-block max-w-[260px] align-middle"
+                  class="ml-2 text-[length:var(--ui-font-small)] text-muted-foreground truncate inline-block max-w-[260px] align-middle"
                   :title="log.error_message"
                 >
                   {{ log.error_message }}

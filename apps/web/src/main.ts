@@ -1,4 +1,5 @@
 import { createApp } from 'vue';
+import '../../legacy-web/ui-foundation.css';
 import './style.css';
 import './approved-design.css';
 import './proxy-design.css';

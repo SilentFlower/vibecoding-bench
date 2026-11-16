@@ -172,7 +172,7 @@ onUnmounted(() => { stop(); document.removeEventListener('visibilitychange', syn
         <div class="scheduling-metrics grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div class="rounded-xl border border-border p-3"><p class="text-xs text-muted-foreground">已绑定／活跃会话</p><p class="text-xl mt-1">{{ summary.bound_sessions }} / {{ summary.active_sessions }}</p></div>
           <div class="rounded-xl border border-border p-3"><p class="text-xs text-muted-foreground">正在执行的请求</p><p class="text-xl mt-1">{{ summary.phases.running }}</p></div>
-          <div class="rounded-xl border border-border p-3"><p class="text-xs text-muted-foreground">最近 60 秒提交</p><p class="text-xl mt-1">{{ summary.submissions_last_60s }}</p><p v-if="summary.observed_at_ms - summary.history_available_from_ms < 60000" class="text-[10px] text-amber-700">采集不足 60 秒</p></div>
+          <div class="rounded-xl border border-border p-3"><p class="text-xs text-muted-foreground">最近 60 秒提交</p><p class="text-xl mt-1">{{ summary.submissions_last_60s }}</p><p v-if="summary.observed_at_ms - summary.history_available_from_ms < 60000" class="text-[length:var(--ui-font-small)] text-amber-700">采集不足 60 秒</p></div>
           <div class="rounded-xl border border-border p-3"><p class="text-xs text-muted-foreground">按上次快照最早可发</p><p class="text-sm mt-2">{{ nextLabel }}</p></div>
         </div>
         <div class="rounded-xl bg-muted p-3 flex flex-wrap gap-x-5 gap-y-2 text-xs">
@@ -193,14 +193,14 @@ onUnmounted(() => { stop(); document.removeEventListener('visibilitychange', syn
             </template>
             <text x="30" y="100" fill="#8290a5" font-size="12">{{ rangeMs / 60000 }} 分钟前</text><text :x="x(detail.snapshot.observed_at_ms)" y="100" fill="#8290a5" font-size="12" text-anchor="middle">快照时刻</text><text x="970" y="100" fill="#8290a5" font-size="12" text-anchor="end">未来许可参考</text>
           </svg></div>
-          <p class="text-[11px] text-muted-foreground">实心点＝Gateway 向 sender 发起提交；空心点＝预计最早许可，不是未来预订。历史从 {{ timeLabel(detail.snapshot.history_available_from_ms) }} 起采集，重启后留空。</p>
+          <p class="text-[length:var(--ui-font-small)] text-muted-foreground">实心点＝Gateway 向 sender 发起提交；空心点＝预计最早许可，不是未来预订。历史从 {{ timeLabel(detail.snapshot.history_available_from_ms) }} 起采集，重启后留空。</p>
           <p v-if="detail.snapshot.history_truncated" class="text-xs text-amber-700">事件缓冲已截断 {{ detail.snapshot.dropped_events }} 条，时间轴不是完整历史；60 秒统计使用独立时间桶。</p>
           <p v-if="events.length === 0" class="text-xs text-muted-foreground">当前采集窗口内没有记录到提交点。</p>
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div v-for="factor in factors" :key="factor[0]" class="text-xs"><div class="flex justify-between mb-1"><span>{{ factor[0] }}</span><span>{{ (factor[1] * 100).toFixed(0) }}</span></div><div class="h-1.5 rounded bg-border"><div class="h-full rounded bg-primary" :style="{ width: Math.max(0, Math.min(100, factor[1] * 100)) + '%' }" /></div></div>
         </div>
-        <p class="text-[11px] text-muted-foreground">归一化偏好越高越优，仅影响新会话。延迟取成功请求的首个有效文字、思考或工具输出；图中为账号汇总，实际选号按模型、思考参数和流式方式分别比较。未知额度或反馈保持中性。</p>
+        <p class="text-[length:var(--ui-font-small)] text-muted-foreground">归一化偏好越高越优，仅影响新会话。延迟取成功请求的首个有效文字、思考或工具输出；图中为账号汇总，实际选号按模型、思考参数和流式方式分别比较。未知额度或反馈保持中性。</p>
         <div class="space-y-3 border-t border-border pt-4">
           <h3 class="text-sm font-semibold">网关绑定会话</h3>
           <div class="scheduling-filters">
@@ -215,7 +215,7 @@ onUnmounted(() => { stop(); document.removeEventListener('visibilitychange', syn
             </tbody></table>
           </div>
           <Pagination v-model:page-size="pageSize" :page="page" :total="sessions?.total ?? 0" :disabled="loading" unit="个绑定" label="绑定会话分页" @update:page="changePage" />
-          <p class="text-[11px] text-muted-foreground">摘要按 API Token 隔离；一个会话可有多个请求。无 ID、尚未绑定或已换绑定但仍在旧账号执行的请求计入无当前绑定请求；此处不展示官方聊天内容。</p>
+          <p class="text-[length:var(--ui-font-small)] text-muted-foreground">摘要按 API Token 隔离；一个会话可有多个请求。无 ID、尚未绑定或已换绑定但仍在旧账号执行的请求计入无当前绑定请求；此处不展示官方聊天内容。</p>
         </div>
       </template>
       </div>

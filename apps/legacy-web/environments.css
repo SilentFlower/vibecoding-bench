@@ -36,7 +36,7 @@
 .environment-page body {
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.6 var(--env-font);
+  font: var(--ui-font-body)/1.6 var(--env-font);
   font-feature-settings: normal;
 }
 
@@ -67,7 +67,7 @@
   padding: 15px 0;
   border: 0;
   border-bottom: 2px solid transparent;
-  font: 13px var(--env-font);
+  font: var(--ui-font-body) var(--env-font);
   color: var(--text-faint);
   text-shadow: none;
   background: transparent;
@@ -94,8 +94,8 @@
 .environment-page h3,
 .environment-page h4 { font-family: var(--env-font); letter-spacing: normal; }
 .environment-page .env-page h2 { margin: 0; font-size: 24px; font-weight: 650; }
-.environment-page .env-page h3 { margin: 0; font-size: 18px; font-weight: 650; }
-.environment-page .env-page h4 { margin: 0; font-size: 13px; font-weight: 600; }
+.environment-page .env-page h3 { margin: 0; font-size: var(--ui-font-heading); font-weight: 650; }
+.environment-page .env-page h4 { margin: 0; font-size: var(--ui-font-body); font-weight: 600; }
 .environment-page .env-page p { margin: 4px 0; }
 .environment-page .env-page-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
 .environment-page .env-page-head p { color: var(--text-faint); }
@@ -114,7 +114,7 @@
   color: var(--text-dim);
   border: 1px solid var(--border);
   padding: 8px 14px;
-  font: 13px var(--env-font);
+  font: var(--ui-font-body) var(--env-font);
   letter-spacing: normal;
   text-transform: none;
   box-shadow: none;
@@ -125,13 +125,13 @@
 .environment-page .btn-primary { background: var(--amber); color: var(--surface); border-color: var(--amber); }
 .environment-page .btn-primary:hover { background: var(--amber-soft); color: var(--surface); border-color: var(--amber-soft); }
 .environment-page .btn-danger { color: var(--failed); }
-.environment-page .btn-sm { font-size: 12px; padding: 6px 11px; }
+.environment-page .btn-sm { font-size: var(--ui-font-small); padding: 6px 11px; }
 .environment-page .btn:disabled { opacity: .45; cursor: not-allowed; }
 .environment-page :is(button, input, select, summary, a):focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; box-shadow: none; }
 
 .environment-page .env-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 22px; }
 .environment-page .env-metric { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border: 1px solid var(--border); border-radius: 12px !important; background: var(--surface); }
-.environment-page .env-metric span { font-size: 13px; color: var(--text-faint); }
+.environment-page .env-metric span { font-size: var(--ui-font-body); color: var(--text-faint); }
 .environment-page .env-metric strong { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .environment-page .env-metric:nth-child(2) strong { color: var(--success); }
 .environment-page .env-metric:nth-child(3) strong { color: var(--text-faint); }
@@ -140,41 +140,41 @@
 .environment-page .env-toolbar label { min-width: 0; }
 .environment-page .env-toolbar input { width: 320px; max-width: 100%; }
 .environment-page .env-toolbar :is(input, select) { padding: 9px 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); font: inherit; }
-.environment-page .env-toolbar > span { margin-left: auto; font-size: 12px; }
+.environment-page .env-toolbar > span { margin-left: auto; font-size: var(--ui-font-small); }
 .environment-page .env-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
 .environment-page .env-card { min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 14px !important; overflow: hidden; }
 .environment-page .env-card-head { padding: 19px 22px 14px; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
 .environment-page .env-card-head > div { min-width: 0; }
-.environment-page .env-card-head p { font-size: 12px; color: var(--text-faint); overflow-wrap: anywhere; }
+.environment-page .env-card-head p { font-size: var(--ui-font-small); color: var(--text-faint); overflow-wrap: anywhere; }
 .environment-page .env-card h3 { overflow-wrap: anywhere; }
-.environment-page .env-badge { white-space: nowrap; font-size: 11px; border-radius: 20px !important; padding: 3px 9px; border: 1px solid var(--border); background: var(--env-muted-bg); }
+.environment-page .env-badge { white-space: nowrap; font-size: var(--ui-font-small); border-radius: 20px !important; padding: 3px 9px; border: 1px solid var(--border); background: var(--env-muted-bg); }
 .environment-page .env-badge.env-good { background: var(--env-good-bg); border-color: var(--env-good-border); }
 .environment-page .env-badge.env-warning { background: var(--env-warning-bg); }
-.environment-page .env-roles { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 0 22px 15px; font-size: 12px; }
+.environment-page .env-roles { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 0 22px 15px; font-size: var(--ui-font-small); }
 .environment-page .env-role i { display: inline-block; width: 6px; height: 6px; margin-right: 6px; background: currentColor; border-radius: 50% !important; }
 .environment-page .env-resources { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0 22px; padding: 13px 0; border-block: 1px solid var(--border); }
-.environment-page :is(.env-resources, .env-versions) span { display: block; margin-bottom: 4px; font-size: 11px; color: var(--text-faint); }
-.environment-page :is(.env-resources, .env-versions) strong { font-size: 13px; font-weight: 550; overflow-wrap: anywhere; }
-.environment-page .env-notice { margin: 14px 22px !important; padding: 10px 12px; background: var(--env-warning-bg); border-radius: 9px !important; color: var(--text-dim); font-size: 12px; overflow-wrap: anywhere; }
+.environment-page :is(.env-resources, .env-versions) span { display: block; margin-bottom: 4px; font-size: var(--ui-font-small); color: var(--text-faint); }
+.environment-page :is(.env-resources, .env-versions) strong { font-size: var(--ui-font-body); font-weight: 550; overflow-wrap: anywhere; }
+.environment-page .env-notice { margin: 14px 22px !important; padding: 10px 12px; background: var(--env-warning-bg); border-radius: 9px !important; color: var(--text-dim); font-size: var(--ui-font-small); overflow-wrap: anywhere; }
 .environment-page .env-notice .btn { margin: 8px 4px 0 0; }
 .environment-page :is(.env-kernel, .env-preparation) { margin: 18px 22px; padding: 16px; background: var(--env-kernel-bg); border: 1px solid var(--env-kernel-border); border-radius: 10px !important; }
 .environment-page .env-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.environment-page .env-tag { font-size: 10px; color: var(--amber-deep); background: var(--env-accent-bg); padding: 2px 8px; border-radius: 4px !important; }
+.environment-page .env-tag { font-size: var(--ui-font-small); color: var(--amber-deep); background: var(--env-accent-bg); padding: 2px 8px; border-radius: 4px !important; }
 .environment-page .env-kernel-version { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 12px; }
-.environment-page .env-kernel-version strong { font-size: 20px; font-weight: 650; overflow-wrap: anywhere; }
-.environment-page .env-kernel-version span { font-size: 11px; color: var(--text-dim); }
+.environment-page .env-kernel-version strong { font-size: var(--ui-font-heading); font-weight: 650; overflow-wrap: anywhere; }
+.environment-page .env-kernel-version span { font-size: var(--ui-font-small); color: var(--text-dim); }
 .environment-page .env-versions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding-bottom: 14px; }
 .environment-page .env-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.environment-page .env-kernel-unavailable { background: var(--surface); border-style: dashed; color: var(--text-faint); font-size: 12px; }
+.environment-page .env-kernel-unavailable { background: var(--surface); border-style: dashed; color: var(--text-faint); font-size: var(--ui-font-small); }
 .environment-page .env-kernel-unavailable h4 { color: var(--text-dim); margin-bottom: 6px; }
-.environment-page .env-kernel-details { margin-top: 14px; font-size: 11px; }
+.environment-page .env-kernel-details { margin-top: 14px; font-size: var(--ui-font-small); }
 .environment-page summary { cursor: pointer; color: var(--text-faint); }
-.environment-page .env-window { margin: 0 22px; padding: 14px 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border); font-size: 12px; }
+.environment-page .env-window { margin: 0 22px; padding: 14px 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border); font-size: var(--ui-font-small); }
 .environment-page .env-window > div { min-width: 0; }
 .environment-page .env-window .run-window-display { min-width: 0; margin-top: 5px; overflow-wrap: anywhere; }
 .environment-page .env-window > .btn { flex-shrink: 0; }
-.environment-page .env-window h4 { color: var(--text-faint); font-size: 11px; font-weight: 400; }
-.environment-page .env-details { border-top: 1px solid var(--border); padding: 13px 22px; font-size: 12px; }
+.environment-page .env-window h4 { color: var(--text-faint); font-size: var(--ui-font-small); font-weight: 400; }
+.environment-page .env-details { border-top: 1px solid var(--border); padding: 13px 22px; font-size: var(--ui-font-small); }
 .environment-page .env-details-body { padding-top: 12px; }
 .environment-page .env-details-body > .env-actions { margin: 12px 0; }
 .environment-page :is(.env-details, .env-kernel-details, .env-operation-summary) dl,
@@ -183,25 +183,25 @@
 .environment-page dt { color: var(--text-faint); }
 .environment-page code { color: var(--text-dim); background: var(--surface-3); border: 0; padding: 1px 4px; font-family: var(--mono); overflow-wrap: anywhere; }
 .environment-page .env-empty { grid-column: 1 / -1; padding: 34px 20px; text-align: center; color: var(--text-faint); border: 1px dashed var(--border); border-radius: 12px !important; }
-.environment-page .env-error { color: var(--failed); font-size: 12px; overflow-wrap: anywhere; }
+.environment-page .env-error { color: var(--failed); font-size: var(--ui-font-small); overflow-wrap: anywhere; }
 .environment-page .env-error:empty { display: none; }
 .environment-page #environment-feedback { margin: 0 0 16px; }
 .environment-page .env-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .environment-page .physical-features { margin-top: 14px; }
 .environment-page .physical-table-wrap { max-width: 100%; overflow-x: auto; }
-.environment-page .physical-features table.data { font: 12px var(--env-font); }
+.environment-page .physical-features table.data { font: var(--ui-font-small) var(--env-font); }
 
 .environment-page .modal { background: var(--env-modal-overlay); padding: 48px 16px 24px; }
 .environment-page .modal-card { border: 1px solid var(--border); border-radius: 14px !important; box-shadow: var(--env-shadow); max-height: calc(100dvh - 72px); overflow-y: auto; }
 .environment-page .modal-frame { display: none; }
-.environment-page .modal-titlebar { background: var(--surface); color: var(--text); border-bottom: 1px solid var(--border); font: 600 16px var(--env-font); padding: 16px 20px; text-transform: none; letter-spacing: normal; }
+.environment-page .modal-titlebar { background: var(--surface); color: var(--text); border-bottom: 1px solid var(--border); font: 600 var(--ui-font-card) var(--env-font); padding: 16px 20px; text-transform: none; letter-spacing: normal; }
 .environment-page .modal-close { color: var(--text-faint); border: 0; border-radius: 6px !important; font: 22px var(--env-font); }
 .environment-page .modal-close:hover { background: var(--surface-3); color: var(--text); }
 .environment-page .modal-card > .form { padding: 20px; }
-.environment-page .form { font: 13px/1.6 var(--env-font); }
+.environment-page .form { font: var(--ui-font-body)/1.6 var(--env-font); }
 .environment-page .form :is(input, select, textarea) { color: var(--text); background: var(--surface); font-family: var(--env-font); }
 .environment-page .form :is(input, select, textarea):focus { background: var(--surface); box-shadow: 0 0 0 2px var(--border-amber); }
-.environment-page .form .lbl { font-size: 12px; letter-spacing: normal; text-transform: none; }
+.environment-page .form .lbl { font-size: var(--ui-font-small); letter-spacing: normal; text-transform: none; }
 .environment-page .form fieldset { min-width: 0; border-color: var(--border); }
 .environment-page .run-window-days label { border-radius: 6px !important; }
 .environment-page .run-window-days label:has(input:checked) { background: var(--env-accent-bg); color: var(--amber-deep); }
@@ -224,7 +224,7 @@
   .environment-page .env-roles { padding-inline: 18px; }
   .environment-page :is(.env-resources, .env-window) { margin-inline: 18px; }
   .environment-page :is(.env-kernel, .env-preparation) { margin: 16px 18px; padding: 14px; }
-  .environment-page .env-kernel-version strong { font-size: 18px; }
+  .environment-page .env-kernel-version strong { font-size: var(--ui-font-heading); }
   .environment-page .env-details { padding: 12px 18px; }
   .environment-page .env-badge { white-space: normal; max-width: 110px; }
   .environment-page .modal { padding: 20px 10px; }

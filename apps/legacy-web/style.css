@@ -53,7 +53,7 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--ui-font-body);
   line-height: 1.55;
   font-feature-settings: 'ss02' on, 'ss01' on, 'cv11' on;
   -webkit-font-smoothing: antialiased;
@@ -117,7 +117,7 @@ input, textarea, select { font-variant-numeric: tabular-nums; }
   backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--border);
   box-shadow: 0 1px 0 rgba(255, 182, 73, 0.08);
-  font-size: 12.5px;
+  font-size: var(--ui-font-body);
 }
 
 .brand {
@@ -142,7 +142,7 @@ input, textarea, select { font-variant-numeric: tabular-nums; }
 .brand-sub {
   color: var(--text-faint);
   font-weight: 400;
-  font-size: 11.5px;
+  font-size: var(--ui-font-small);
   letter-spacing: 0;
 }
 @keyframes blink { 50% { opacity: 0; } }
@@ -177,7 +177,7 @@ input, textarea, select { font-variant-numeric: tabular-nums; }
 /* 组间细线沿用导航高度，手机换行时仍保留功能边界。 */
 .tabs a.nav-group-start { border-left: 1px solid var(--border-bright); margin-left: 6px; }
 .tabs a .tab-en { font-weight: 500; }
-.tabs a .tab-cn { color: var(--text-faint); font-size: 11px; }
+.tabs a .tab-cn { color: var(--text-faint); font-size: var(--ui-font-small); }
 .tabs a:hover { color: var(--text); background: rgba(255, 182, 73, 0.05); }
 .tabs a:hover::before, .tabs a:hover::after { color: var(--amber-deep); }
 .tabs a.active {
@@ -199,7 +199,7 @@ input, textarea, select { font-variant-numeric: tabular-nums; }
   justify-self: end;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
-  font-size: 11.5px;
+  font-size: var(--ui-font-small);
 }
 .statline-text { color: var(--success); letter-spacing: 1px; font-weight: 500; }
 .statline-sep  { color: var(--text-faint); }
@@ -257,7 +257,7 @@ main {
   margin: 0 0 4px;
   font-family: var(--display);
   font-weight: 900;
-  font-size: 28px;
+  font-size: var(--ui-font-page);
   letter-spacing: -0.5px;
   color: var(--text);
   display: flex;
@@ -271,7 +271,7 @@ main {
 }
 .view-title .muted {
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: var(--ui-font-body);
   font-weight: 400;
   letter-spacing: 0;
 }
@@ -279,9 +279,9 @@ main {
 .hint {
   margin: 0;
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: var(--ui-font-small);
 }
-.hint.inline { display: block; margin: 0 0 4px; font-size: 11px; color: var(--text-faint); }
+.hint.inline { display: block; margin: 0 0 4px; font-size: var(--ui-font-small); color: var(--text-faint); }
 
 code {
   background: rgba(255, 182, 73, 0.08);
@@ -310,7 +310,7 @@ code {
   color: var(--text);
   border: 1px solid var(--border-bright);
   padding: 7px 14px;
-  font-size: 12px;
+  font-size: var(--ui-font-small);
   font-weight: 500;
   font-family: var(--mono);
   cursor: pointer;
@@ -348,7 +348,7 @@ code {
 }
 .btn-primary:hover::before, .btn-primary:hover::after { color: rgba(13, 14, 12, 0.6); }
 
-.btn-sm  { padding: 4px 10px; font-size: 11.5px; }
+.btn-sm  { padding: 4px 10px; font-size: var(--ui-font-small); }
 .btn-sm::before, .btn-sm::after { margin-left: 4px; margin-right: 4px; }
 
 .btn-danger { color: var(--failed); border-color: rgba(255, 107, 88, 0.4); }
@@ -395,7 +395,7 @@ table.data td {
   padding: 9px 14px;
   text-align: left;
   border-bottom: 1px dashed var(--border);
-  font-size: 12.5px;
+  font-size: var(--ui-font-body);
   vertical-align: middle;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -411,7 +411,7 @@ table.data thead th {
   background: rgba(255, 182, 73, 0.04);
   font-weight: 600;
   color: var(--amber-deep);
-  font-size: 11px;
+  font-size: var(--ui-font-small);
   text-transform: uppercase;
   letter-spacing: 1.1px;
   border-bottom: 1px solid var(--border-bright);
@@ -435,7 +435,7 @@ table.data td code {
   border: none;
   color: var(--text-dim);
   padding: 0;
-  font-size: 12px;
+  font-size: var(--ui-font-small);
 }
 table.data tbody tr:hover td code { color: var(--text); }
 .hidden { display: none !important; }
@@ -522,14 +522,14 @@ table.data tbody tr:hover td code { color: var(--text); }
 .form { display: flex; flex-direction: column; gap: 14px; }
 .form label {
   display: flex; flex-direction: column; gap: 5px;
-  font-size: 12px;
+  font-size: var(--ui-font-small);
   color: var(--text-dim);
 }
 .form .lbl {
   color: var(--amber);
   font-weight: 500;
   letter-spacing: 0.4px;
-  font-size: 11.5px;
+  font-size: var(--ui-font-small);
 }
 .form input,
 .form select,
@@ -537,7 +537,7 @@ table.data tbody tr:hover td code { color: var(--text); }
   background: var(--bg);
   border: 1px solid var(--border-bright);
   padding: 9px 12px;
-  font-size: 13px;
+  font-size: var(--ui-font-body);
   color: var(--text);
   font-family: var(--mono);
   caret-color: var(--amber);
@@ -639,7 +639,7 @@ table.data tbody tr:hover td code { color: var(--text); }
 .filter-prefix {
   color: var(--amber);
   padding: 6px 4px 6px 10px;
-  font-size: 12px;
+  font-size: var(--ui-font-small);
   letter-spacing: 0.4px;
   user-select: none;
 }
@@ -647,7 +647,7 @@ input[type=search] {
   background: transparent;
   border: none;
   padding: 7px 12px 7px 6px;
-  font-size: 12.5px;
+  font-size: var(--ui-font-body);
   min-width: 260px;
   font-family: var(--mono);
   color: var(--text);
@@ -691,7 +691,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .topic-card:hover .topic-no { color: var(--amber); text-shadow: 0 0 6px var(--amber-glow); }
 
 .topic-no {
-  font-size: 11px;
+  font-size: var(--ui-font-small);
   color: var(--text-faint);
   letter-spacing: 0.5px;
   font-weight: 500;
@@ -700,13 +700,13 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .topic-no::before  { content: ''; }            /* keep '#' in text from JS */
 .topic-title {
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: var(--ui-font-body);
   color: var(--text);
   line-height: 1.35;
   font-family: var(--mono);
 }
 .topic-desc {
-  font-size: 11.5px;
+  font-size: var(--ui-font-small);
   color: var(--text-dim);
   line-height: 1.5;
   flex: 1;
@@ -716,7 +716,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 10.5px;
+  font-size: var(--ui-font-small);
   color: var(--amber);
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -730,7 +730,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   align-items: center;
   gap: 4px;
   padding: 1px 7px 2px;
-  font-size: 10.5px;
+  font-size: var(--ui-font-small);
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: lowercase;
@@ -750,7 +750,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .pill-auth_failed { color: var(--failed); }
 .pill-timeout { color: var(--timeout); }
 .pill-quota_wait { color: var(--timeout); }
-.passive-quota { margin-top: 0.4rem; font-size: 0.75rem; max-width: 24rem; white-space: normal; overflow-wrap: anywhere; }
+.passive-quota { margin-top: 0.4rem; font-size: var(--ui-font-small); max-width: 24rem; white-space: normal; overflow-wrap: anywhere; }
 .pill-stopped { color: var(--failed); }
 .pill-paused  { color: var(--timeout); }
 .pill-done    { color: var(--success); }
@@ -811,7 +811,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   position: absolute;
   font-family: var(--mono);
   color: var(--amber);
-  font-size: 18px;
+  font-size: var(--ui-font-heading);
   line-height: 1;
   text-shadow: 0 0 8px var(--amber-glow);
 }
@@ -828,7 +828,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   background: var(--amber);
   color: var(--bg);
   font-weight: 700;
-  font-size: 12px;
+  font-size: var(--ui-font-small);
   letter-spacing: 0.8px;
   text-transform: lowercase;
   border-bottom: 1px solid var(--amber-deep);
@@ -840,7 +840,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   background: transparent;
   border: 1px solid rgba(13, 14, 12, 0.4);
   color: var(--bg);
-  font-size: 16px;
+  font-size: var(--ui-font-card);
   line-height: 1;
   cursor: pointer;
   padding: 1px 8px 3px;
@@ -882,7 +882,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   margin: 0 0 18px;
   font-family: var(--display);
   font-weight: 800;
-  font-size: 18px;
+  font-size: var(--ui-font-heading);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -890,7 +890,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 }
 #modal-content h3 code {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--ui-font-body);
   background: transparent;
   border: none;
   padding: 0;
@@ -900,7 +900,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .detail-section { margin-bottom: 22px; }
 .detail-section h4 {
   margin: 0 0 10px;
-  font-size: 10.5px;
+  font-size: var(--ui-font-small);
   color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 1.4px;
@@ -929,7 +929,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   max-height: 380px;
   min-height: 140px;
   overflow: auto;
-  font-size: 12px;
+  font-size: var(--ui-font-small);
   font-family: var(--mono);
   line-height: 1.6;
   white-space: pre-wrap;
@@ -949,7 +949,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 /* file tree */
 .file-tree {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--ui-font-small);
   line-height: 1.85;
   background: #050606;
   border: 1px solid var(--border);
@@ -959,7 +959,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .file-tree .file::before { content: '·  '; color: var(--text-faint); }
 .file-tree .dir  { color: var(--amber); font-weight: 600; }
 .file-tree .dir::before  { content: '▸  '; color: var(--amber); }
-.file-tree .size { color: var(--text-faint); margin-left: 10px; font-size: 11px; }
+.file-tree .size { color: var(--text-faint); margin-left: 10px; font-size: var(--ui-font-small); }
 
 /* stats grid */
 .stats-grid {
@@ -987,7 +987,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   opacity: 0.35;
 }
 .stat-label {
-  font-size: 10px;
+  font-size: var(--ui-font-small);
   color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 1.4px;
@@ -996,7 +996,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .stat-value {
   font-family: var(--display);
   font-weight: 900;
-  font-size: 28px;
+  font-size: var(--ui-font-page);
   line-height: 1.1;
   color: var(--text);
   font-variant-numeric: tabular-nums;
@@ -1004,13 +1004,13 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 }
 .stat-value-sm {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--ui-font-small);
   line-height: 1.7;
   color: var(--text);
 }
 .stat-waiting {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--ui-font-small);
   line-height: 1.4;
   color: var(--text-faint);
   font-weight: 600;
@@ -1032,7 +1032,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 }
 .capture-table th,
 .capture-table td {
-  font-size: 11px;
+  font-size: var(--ui-font-small);
   vertical-align: top;
 }
 
@@ -1071,7 +1071,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 }
 .runtime-model-status strong {
   color: var(--amber);
-  font-size: 16px;
+  font-size: var(--ui-font-card);
   word-break: break-all;
 }
 .batch-toolbar {
@@ -1104,7 +1104,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .batch-topic input { margin-top: 2px; accent-color: var(--amber); }
 .batch-topic-title {
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--ui-font-small);
   line-height: 1.4;
 }
 .batch-topic .topic-cat {
@@ -1124,7 +1124,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   backdrop-filter: blur(6px);
   border-top: 1px solid var(--border);
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: var(--ui-font-small);
   letter-spacing: 0.4px;
   z-index: 80;
 }
@@ -1135,7 +1135,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   background: var(--surface-2);
   color: var(--amber);
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: var(--ui-font-small);
   margin-right: 4px;
 }
 .hintbar-sep { color: var(--border-bright); }
@@ -1195,7 +1195,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: var(--ui-font-small);
   color: var(--text-dim);
   letter-spacing: 0.3px;
   margin-bottom: 10px;
@@ -1205,11 +1205,11 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   color: var(--amber-soft);
   padding: 1px 5px;
   border: 1px solid rgba(255, 182, 73, 0.18);
-  font-size: 11.5px;
+  font-size: var(--ui-font-small);
 }
 
 .login-hint {
-  font-size: 11.5px;
+  font-size: var(--ui-font-small);
   color: var(--text-dim);
   background: rgba(255, 182, 73, 0.05);
   border-left: 2px solid var(--amber);
@@ -1226,14 +1226,14 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 10px;
-  font-size: 12px;
+  font-size: var(--ui-font-small);
   color: var(--text-dim);
 }
 .login-connection { justify-content: space-between; }
 .login-link { margin-bottom: 12px; min-width: 0; }
 .login-code { margin-bottom: 12px; min-width: 0; gap: 6px; }
 .login-code input { box-sizing: border-box; width: 100%; margin: 6px 0; }
-.login-code p { margin: 4px 0; color: var(--text-dim); font-size: 12px; overflow-wrap: anywhere; }
+.login-code p { margin: 4px 0; color: var(--text-dim); font-size: var(--ui-font-small); overflow-wrap: anywhere; }
 .login-link textarea {
   display: block;
   box-sizing: border-box;
@@ -1243,14 +1243,14 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   margin: 6px 0;
   padding: 8px;
   resize: vertical;
-  font: 11px/1.5 var(--mono);
+  font: var(--ui-font-small)/1.5 var(--mono);
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border-bright);
   overflow-wrap: anywhere;
 }
 .login-hint code {
-  font-size: 11px;
+  font-size: var(--ui-font-small);
   padding: 0 4px;
 }
 
@@ -1278,7 +1278,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   border: 1px solid var(--border-bright);
   color: var(--text-dim);
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--ui-font-body);
   line-height: 1;
   padding: 3px 9px 4px;
   cursor: pointer;
@@ -1443,7 +1443,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 /* shell prompt 风格 banner,与 topbar `~/vibebench_` 同语言 */
 .auth-prompt {
   font-family: var(--mono);
-  font-size: 14px;
+  font-size: var(--ui-font-body);
   margin: 4px 0 14px;
   letter-spacing: 0.2px;
   white-space: nowrap;
@@ -1463,7 +1463,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 }
 
 .auth-banner-meta {
-  font-size: 10.5px;
+  font-size: var(--ui-font-small);
   color: var(--text-dim);
   letter-spacing: 0.3px;
   display: inline-flex;
@@ -1479,7 +1479,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 
 .auth-error {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: var(--ui-font-small);
   color: var(--failed);
   background: rgba(255, 107, 88, 0.08);
   border: 1px solid rgba(255, 107, 88, 0.35);
@@ -1501,7 +1501,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   align-items: center;
   gap: 4px;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--ui-font-small);
   color: var(--amber);
   letter-spacing: 0.4px;
   padding: 2px 4px 2px 6px;
@@ -1518,7 +1518,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
   color: var(--text-dim);
   cursor: pointer;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--ui-font-body);
   line-height: 1;
   padding: 0 2px;
   margin-left: 4px;
@@ -1532,18 +1532,18 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .paste-helper input {
   border-color: var(--border-amber) !important;
   background: rgba(255, 182, 73, 0.04) !important;
-  font-size: 12.5px;
+  font-size: var(--ui-font-body);
 }
 .paste-helper input::placeholder { color: var(--text-faint); font-style: italic; }
 .paste-helper .lbl .muted {
   color: var(--text-faint);
   font-weight: 400;
   letter-spacing: 0.3px;
-  font-size: 10.5px;
+  font-size: var(--ui-font-small);
   margin-left: 4px;
 }
 .paste-helper .hint code {
-  font-size: 10.5px;
+  font-size: var(--ui-font-small);
   background: var(--bg);
   padding: 0 4px;
   color: var(--amber);
@@ -1601,7 +1601,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .project-create, .project-panel { min-width: 0; border: 1px solid var(--border); padding: 16px; background: var(--surface); }
 .project-create summary, .project-panel summary { cursor: pointer; color: var(--amber); }
 .project-create > summary { flex-wrap: wrap; }
-.project-create > summary::after { content: '展开'; margin-left: auto; font-size: 11px; color: var(--text-faint); }
+.project-create > summary::after { content: '展开'; margin-left: auto; font-size: var(--ui-font-small); color: var(--text-faint); }
 .project-create[open] > summary::after { content: '收起'; }
 .project-panel { scroll-margin-top: 100px; }
 #project-batch-form { margin-top: 16px; }
@@ -1621,7 +1621,7 @@ table.project-batches-table { min-width: 880px; }
 .project-batches-table th:last-child { width: 140px; }
 .project-batches-table td.project-name { white-space: normal; overflow-wrap: anywhere; }
 table.data tr.project-selected-row { background: var(--surface-3); }
-.project-panel h3 { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
+.project-panel h3 { margin: 0; font-size: var(--ui-font-card); overflow-wrap: anywhere; }
 .project-description { margin-top: 12px; }
 .project-catalog-item { display: flex; flex-direction: column; gap: 6px; text-align: left; width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); padding: 12px; cursor: pointer; font: inherit; overflow-wrap: anywhere; }
 .project-catalog-item:hover { border-color: var(--amber); }
@@ -1666,7 +1666,7 @@ table.data tr.project-selected-row { background: var(--surface-3); }
 /* Pi 项目页先展示执行事实，配置与大型项目池收起保留编辑位置。 */
 .projects-header { align-items: center; }
 .projects-account-picker { display: grid; gap: 5px; width: min(100%, 300px); color: var(--text-dim); }
-.projects-account-picker .lbl, .projects-summary-card > .lbl, .projects-overview-head > div > .lbl { color: var(--text-dim); font-size: 11px; letter-spacing: .08em; }
+.projects-account-picker .lbl, .projects-summary-card > .lbl, .projects-overview-head > div > .lbl { color: var(--text-dim); font-size: var(--ui-font-small); letter-spacing: .08em; }
 .projects-account-picker select { width: 100%; min-width: 0; padding: 9px 12px; border: 1px solid var(--border-bright); background: var(--surface-2); color: var(--text); font: inherit; }
 .projects-feedback { margin: 14px 0; padding: 10px 14px; border-left: 3px solid var(--amber); background: var(--surface-2); }
 .projects-feedback[data-kind="error"] { border-left-color: var(--failed); color: var(--failed); font-weight: 600; }
@@ -1685,8 +1685,8 @@ table.data tr.project-selected-row { background: var(--surface-3); }
 .projects-summary-card { padding: 16px; border-right: 1px solid var(--border); }
 .projects-summary-card:first-child { padding-left: 0; }
 .projects-summary-card:last-child { padding-right: 0; border-right: 0; }
-.projects-target-state { margin: 9px 0 6px; color: var(--running); font-size: 11px; }
-.projects-target strong { display: block; font-size: 15px; line-height: 1.6; }
+.projects-target-state { margin: 9px 0 6px; color: var(--running); font-size: var(--ui-font-small); }
+.projects-target strong { display: block; font-size: var(--ui-font-card); line-height: 1.6; }
 /* 总览只保留三行摘要，避免长报告挤占运行信息；全文仍在 Pi 交互中查看。 */
 #projects-activity { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 .projects-metric { display: block; margin: 12px 0; color: var(--text); font-size: 22px; line-height: 1.4; }
@@ -1695,7 +1695,7 @@ table.data tr.project-selected-row { background: var(--surface-3); }
 .projects-progress::-webkit-progress-value { background: var(--success); }
 .projects-progress::-moz-progress-bar { background: var(--success); }
 .projects-quota-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; margin-top: 16px; }
-.projects-quota-head { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+.projects-quota-head { display: flex; justify-content: space-between; gap: 12px; font-size: var(--ui-font-small); }
 .projects-quota-head strong { color: var(--running); }
 .projects-quota[data-known="false"] .projects-quota-head strong { color: var(--text-faint); }
 .projects-quota[data-hit="true"] .projects-quota-head strong { color: var(--timeout); }
@@ -1703,7 +1703,7 @@ table.data tr.project-selected-row { background: var(--surface-3); }
 .projects-quota-fill { display: block; height: 100%; background: var(--running); }
 .projects-quota[data-hit="true"] .projects-quota-fill { background: var(--timeout); }
 .projects-quota-limit { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--amber); transform: translateX(-1px); }
-.projects-usage-detail { margin-top: 12px; color: var(--text-dim); font-size: 11px; }
+.projects-usage-detail { margin-top: 12px; color: var(--text-dim); font-size: var(--ui-font-small); }
 .projects-workspace { margin-bottom: 18px; padding-top: 0; }
 .projects-verification { margin-top: 14px; padding: 12px 14px; border-left: 3px solid var(--amber); background: var(--surface-2); overflow-wrap: anywhere; }
 .projects-verification > strong { display: block; color: var(--amber); line-height: 1.6; }
@@ -1714,8 +1714,8 @@ table.data tr.project-selected-row { background: var(--surface-3); }
 .projects-verification[data-state="failed"], .projects-verification[data-state="error"] { border-left-color: var(--failed); }
 .projects-verification[data-state="failed"] > strong, .projects-verification[data-state="error"] > strong { color: var(--failed); }
 .projects-verification .hint { margin: 6px 0; }
-.projects-verification summary { cursor: pointer; color: var(--text-dim); font-size: 11px; }
-.projects-verification ol { display: grid; gap: 7px; margin: 10px 0 0; padding-left: 22px; font-size: 11px; }
+.projects-verification summary { cursor: pointer; color: var(--text-dim); font-size: var(--ui-font-small); }
+.projects-verification ol { display: grid; gap: 7px; margin: 10px 0 0; padding-left: 22px; font-size: var(--ui-font-small); }
 .projects-verification li > span:first-child { margin-right: 12px; }
 .projects-verification li > span:last-child { color: var(--text-dim); white-space: nowrap; }
 .projects-verification li[data-active="true"] { color: var(--running); }
@@ -1739,7 +1739,7 @@ table.data tr.project-selected-row { background: var(--surface-3); }
 .projects-choice input { width: auto; }
 .projects-choice small { display: block; margin-top: 4px; }
 .projects-screen, .projects-document { white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; padding: 14px; max-height: 520px; }
-.projects-screen { min-height: 280px; max-height: 440px; margin: 0; background: var(--bg); font: 12px/1.6 'JetBrains Mono', monospace; }
+.projects-screen { min-height: 280px; max-height: 440px; margin: 0; background: var(--bg); font: var(--ui-font-small)/1.6 'JetBrains Mono', monospace; }
 .projects-events { list-style: none; padding: 0; margin: 0; min-height: 280px; max-height: 440px; overflow: auto; }
 .projects-events li { padding: 10px 0; border-bottom: 1px solid var(--border); }
 .projects-events pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
@@ -1768,5 +1768,5 @@ table.data tr.project-selected-row { background: var(--surface-3); }
   .projects-choices { max-height: 260px; }
   #projects-model-form > .row { flex-direction: column; align-items: stretch; }
   .projects-tabs { gap: 16px; }
-  .projects-tabs button { font-size: 12px; text-align: left; }
+  .projects-tabs button { font-size: var(--ui-font-small); text-align: left; }
 }

@@ -1,8 +1,16 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { FeedbackHost, OperationFeedback } from '../components/ui/feedback';
+import { useToast } from '../composables/useToast';
+import { useConfirmation } from '../composables/useConfirmation';
 import { NumberInput, ChoiceSelect, InfoTooltip, SearchInput } from '@/components/ui/controls';
 import type { ChoiceOption } from '@/components/ui/controls';
 
+const { show: notify } = useToast();
+const { ask } = useConfirmation();
+const demoResult = ref<'idle' | 'success'>('idle');
+/** 本地演示确认，结果只进入示例通知。@return 完成。 */
+async function confirmExample(): Promise<void> { if (await ask({ title: '确认操作', message: '这是本地组件演示。确认后显示成功反馈。', confirmLabel: '确认示例' })) notify('示例操作已完成', 'success'); }
 const concurrency = ref<number | string>(3);
 const limit = ref<number | string>(90);
 const precision = ref<number | string>(0.5);
@@ -57,6 +65,8 @@ function save(event: Event): void {
       </InfoTooltip>
     </section>
     <section class="preview-card"><div class="preview-section-title"><h2>浮层中的组件</h2><span>保持菜单与气泡的正确层级</span></div><p class="preview-help">同一组组件可放入编辑窗口，支持键盘关闭及焦点返回。</p><button class="preview-button" type="button" @click="dialog?.showModal()">打开窗口示例</button></section>
+    <section class="preview-card"><div class="preview-section-title"><h2>操作反馈</h2><span>通知、确认与固定位置结果</span></div><div class="preview-footer"><button class="preview-button" type="button" @click="notify('本地示例已保存','success')">成功通知</button><button class="preview-button" type="button" @click="notify('示例操作失败，请核对输入后重试','error')">错误通知</button><button class="preview-button" type="button" @click="confirmExample">确认弹窗</button><OperationFeedback :status="demoResult" message="本地合成连接正常" @action="demoResult='success'" /></div></section>
+    <FeedbackHost />
     <dialog ref="dialog" class="preview-dialog" aria-labelledby="preview-dialog-title">
       <header><h2 id="preview-dialog-title">授权登录 · 组件示例</h2><button class="preview-button" aria-label="关闭窗口" type="button" @click="dialog?.close()">关闭</button></header>
       <div class="preview-dialog-body">
@@ -71,29 +81,29 @@ function save(event: Event): void {
 <style scoped>
 .ui-preview { max-width: 960px; margin: 0 auto; padding: 52px 26px; font-family: var(--ui-font); color: var(--ui-text); }
 .preview-heading { margin-bottom: 30px; }
-.preview-heading>span { font-size: 11px; color: var(--ui-accent); letter-spacing: 1.2px; }
-.preview-heading h1 { font-size: 28px; font-weight: 650; margin: 12px 0 8px; }
-.preview-heading p { font-size: 13px; color: var(--ui-muted); }
+.preview-heading>span { font-size: var(--ui-font-small); color: var(--ui-accent); letter-spacing: 1.2px; }
+.preview-heading h1 { font-size: var(--ui-font-page); font-weight: 650; margin: 12px 0 8px; }
+.preview-heading p { font-size: var(--ui-font-body); color: var(--ui-muted); }
 .preview-card { border: 1px solid var(--ui-border); border-radius: 14px; background: var(--ui-surface); padding: 26px; margin-bottom: 20px; }
 .preview-section-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
-.preview-section-title h2 { font-size: 15px; font-weight: 600; margin: 0; }
-.preview-section-title>span { color: var(--ui-muted); font-size: 11px; }
+.preview-section-title h2 { font-size: var(--ui-font-card); font-weight: 600; margin: 0; }
+.preview-section-title>span { color: var(--ui-muted); font-size: var(--ui-font-small); }
 .preview-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 22px 18px; margin-bottom: 24px; }
 .preview-grid.three { grid-template-columns: repeat(3,minmax(0,1fr)); }
 .preview-footer { border-top: 1px solid var(--ui-border); padding-top: 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-.preview-footer p, .preview-help { font-size: 11px; color: var(--ui-muted); line-height: 1.8; }
+.preview-footer p, .preview-help { font-size: var(--ui-font-small); color: var(--ui-muted); line-height: 1.8; }
 .preview-help { margin: 12px 0; }
-.preview-button { border: 1px solid var(--ui-border); border-radius: 7px; padding: 8px 13px; background: #fff; font-size: 12px; cursor: pointer; }
+.preview-button { border: 1px solid var(--ui-border); border-radius: 7px; padding: 8px 13px; background: #fff; font-size: var(--ui-font-small); cursor: pointer; }
 .preview-button.primary { background: #303747; color: #fff; border-color: #303747; }
-pre { font-size: 11px; color: var(--ui-muted); padding: 12px; border-radius: 7px; background: var(--ui-field-surface); white-space: pre-wrap; margin-top: 18px; }
+pre { font-size: var(--ui-font-small); color: var(--ui-muted); padding: 12px; border-radius: 7px; background: var(--ui-field-surface); white-space: pre-wrap; margin-top: 18px; }
 .preview-summary { display: block; max-width: min(320px,70vw); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .preview-tooltip-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.preview-tooltip-grid dt { font-size: 11px; color: var(--ui-muted); }
-.preview-tooltip-grid dd { margin: 3px 0 0; font-size: 13px; }
+.preview-tooltip-grid dt { font-size: var(--ui-font-small); color: var(--ui-muted); }
+.preview-tooltip-grid dd { margin: 3px 0 0; font-size: var(--ui-font-body); }
 .preview-dialog { margin: auto; padding: 0; width: min(480px,calc(100vw - 32px)); max-height: calc(100dvh - 32px); border: 1px solid var(--ui-border); border-radius: 16px; overflow: visible; color: var(--ui-text); }
 .preview-dialog::backdrop { background: #25273355; backdrop-filter: blur(3px); }
 .preview-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px; border-bottom: 1px solid var(--ui-border); }
-.preview-dialog h2 { font-size: 16px; font-weight: 600; }
+.preview-dialog h2 { font-size: var(--ui-font-card); font-weight: 600; }
 .preview-dialog-body { display: grid; gap: 22px; padding: 24px; }
 @media(max-width:600px) { .ui-preview { padding: 28px 16px; }.preview-heading h1 { font-size: 23px; }.preview-card { padding: 20px; }.preview-grid,.preview-grid.three { grid-template-columns: 1fr; }.preview-section-title>span { display: none; }.preview-footer { align-items: flex-start; flex-direction: column; } }
 </style>

@@ -71,6 +71,7 @@ from capture_artifacts import _capture_files, _read_capture_index, _redact_captu
 from login_terminal import authorization_url
 from login_drafts import LoginDraftStore
 from proxy_references import collect_references
+from task_proxy import TaskProxyActivity, ProxySelectionConflict, read_account as read_proxy_account, snapshot as task_proxy_snapshot, save_selection as save_task_proxy_selection
 from proxy_sync import synchronize_proxy
 from physical_features import physical_features_summary
 from run_windows import normalize_run_window, run_window_snapshot
@@ -765,7 +766,8 @@ class Cc2ApiClient:
                 **({"x-v3-service-token": os.environ.get("V3_INTERNAL_TOKEN", "")} if
                     (path == "/admin/accounts" and body and body.get("cli_identity"))
                     or path == '/admin/runtime/credential-capabilities'
-                    or re.fullmatch(r'/admin/runtime/accounts/[0-9]+/native-kernel-probe', path)
+                    or re.fullmatch(r'/admin/runtime/accounts/[0-9]+/(?:native-kernel-probe|proxy-selection)', path)
+                    or re.fullmatch(r'/admin/runtime/task-proxy-operations/[a-f0-9]{32}/claim', path)
                     or re.fullmatch(r"/admin/accounts/[0-9]+/(?:oauth-ownership|oauth-credentials/import(?:/[a-f0-9]{32})?|cli-process/import)", path) else {}),
             },
         )
@@ -8960,6 +8962,56 @@ def create_account(body: AccountIn):
             conn.close()
 
 
+task_proxy_activity = TaskProxyActivity()
+
+
+class TaskProxySelectionIn(BaseModel):
+    """仅由受信任桥提供的比较版本与连接。"""
+    model_config = ConfigDict(extra='forbid')
+    selection_revision: StrictStr
+    connection: StrictStr
+    operation_id: StrictStr
+
+
+@app.get("/api/accounts/{aid}/proxy-selection")
+def get_task_proxy_selection(aid: int):
+    """返回受信任桥使用的选择快照，桥负责公开字段投影。@param aid 任务ID。@return 私有内部快照。"""
+    if not V3_ENABLED:
+        raise HTTPException(404)
+    try:
+        return task_proxy_snapshot(read_proxy_account(get_db, aid), cc2api_client._request, os.environ.get('V3_INTERNAL_TOKEN', ''))
+    except LookupError:
+        raise HTTPException(404, '任务账号已不可用') from None
+    except (ValueError, ConnectionError, OSError, RuntimeError):
+        raise HTTPException(503, '代理配置暂不可读取，请稍后重试') from None
+
+
+@app.put("/api/accounts/{aid}/proxy-selection")
+def put_task_proxy_selection(aid: int, body: TaskProxySelectionIn):
+    """沿原维护锁保存桥解析后的代理选择。@param aid 任务ID。@param body 私有选择。@return 内部快照。"""
+    if not V3_ENABLED or not account_runtime or not login_manager:
+        raise HTTPException(503, '代理配置服务尚未就绪')
+    try:
+        with UPDATE_GATE.admission('task-proxy-selection'), task_proxy_activity.track(body.operation_id):
+            def authorize(account):
+                """在身份锁内领取已登记的切线。@param account 当前账号。@return 操作ID。"""
+                result = cc2api_client._request('POST', f'/admin/runtime/task-proxy-operations/{body.operation_id}/claim',
+                    {'account_id': aid, 'gateway_account_id': account.get('cc2api_account_id'),
+                     'selection_revision': body.selection_revision, 'connection': body.connection})
+                if result.get('claimed') is not True:
+                    raise ProxySelectionConflict('代理切换授权已失效，请重新读取')
+                return body.operation_id
+            return save_task_proxy_selection(aid, body.model_dump(exclude={'operation_id'}), get_db, _db_lock, account_runtime,
+                _oauth_owner_lock, _profile_lock, login_manager.has_active_name, cc2api_client._request,
+                os.environ.get('V3_INTERNAL_TOKEN', ''), credential_ownership.guard if credential_ownership else None, authorize)
+    except LookupError:
+        raise HTTPException(404, '任务账号已不可用') from None
+    except ProxySelectionConflict as error:
+        raise HTTPException(409, {'code': error.code}) from None
+    except (ValueError, KeyError, TypeError, OSError, RuntimeError, ConnectionError, DockerException):
+        raise HTTPException(409, '代理切换未完成，请核对账号空闲状态并重新读取配置') from None
+
+
 @app.get("/api/accounts")
 def list_accounts():
     """返回账号列表，并补充 OAuth token 状态。"""
@@ -12518,7 +12570,8 @@ def v3_proxy_references():
     """
     if not V3_ENABLED:
         raise HTTPException(404)
-    result = collect_references(get_db, _login_drafts() if account_runtime else None)
+    # 读取期间完成的切线也使旧引用快照失效，不能仅检查读取结束时是否忙碌。
+    result = task_proxy_activity.references(lambda: collect_references(get_db, _login_drafts() if account_runtime else None))
     if not account_runtime:
         result["complete"] = False
     return result

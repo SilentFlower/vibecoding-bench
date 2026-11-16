@@ -204,6 +204,14 @@ pub fn build_router(
             get(runtime_account_config),
         )
         .route(
+            "/admin/runtime/accounts/:id/proxy-selection",
+            post(commit_task_proxy_selection),
+        )
+        .route(
+            "/admin/runtime/task-proxy-operations/:operation/claim",
+            post(claim_task_proxy_selection),
+        )
+        .route(
             "/admin/accounts/:id/oauth-credentials/resolve",
             post(resolve_oauth_credentials),
         )
@@ -721,6 +729,94 @@ async fn runtime_account_config(
         "credential_ownership_protocol":1,
         "credential_ownership":state.account_svc.credential_ownership(id).await?}),
     ))
+}
+
+/// 编排持有任务身份锁，外层管理桥持有目录锁的内部选线回调。
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TaskProxyCommit {
+    operation_id: String,
+    expected_connection: String,
+    connection: String,
+}
+
+/// 运行时在登记活动后请求领取固定任务的选择。字段只用于内部核对。
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TaskProxyClaim {
+    account_id: i64,
+    gateway_account_id: Option<i64>,
+    selection_revision: String,
+    connection: String,
+}
+
+/// 拒绝超时后才到达或重复领取的请求。@param state 服务。@param operation 票据。@param headers 内部证明。@param input 冻结选择。@return 领取结果。
+async fn claim_task_proxy_selection(
+    State(state): State<AppState>,
+    Path(operation): Path<String>,
+    headers: HeaderMap,
+    Json(input): Json<TaskProxyClaim>,
+) -> Result<Json<Value>, AppError> {
+    require_v3_credential_service(&headers)?;
+    state.proxy_svc.task_selections.claim(
+        &operation,
+        input.account_id,
+        input.gateway_account_id,
+        &input.selection_revision,
+        &input.connection,
+    )?;
+    Ok(Json(json!({"claimed":true})))
+}
+
+/// 在原配置许可内按原连接比较更新，禁止将账号凭据快照整行写回。
+/// @param state 应用状态。@param id 网关身份。@param headers 内部服务证明。@param input 原连接和目标。
+/// @return 明确的单字段写入回执。
+async fn commit_task_proxy_selection(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    headers: HeaderMap,
+    Json(input): Json<TaskProxyCommit>,
+) -> Result<Json<Value>, AppError> {
+    require_v3_credential_service(&headers)?;
+    let _ticket = state.proxy_svc.task_selections.gateway_commit(
+        &input.operation_id,
+        id,
+        &input.connection,
+    )?;
+    if !input.connection.is_empty() {
+        ProxyConnection::parse(&input.connection)?;
+    }
+    let account = state.account_svc.get_account(id).await?;
+    if account.proxy_url != input.expected_connection {
+        return Err(AppError::BadRequest("账号代理已变化，请重新读取".into()));
+    }
+    if account.proxy_url == input.connection {
+        return Ok(Json(json!({"ok":true})));
+    }
+    if state
+        .account_svc
+        .credential_ownership(id)
+        .await?
+        .is_some_and(|ownership| !ownership.gateway_ready())
+    {
+        return Err(AppError::BadRequest(
+            "账号凭据正在维护，请完成后再切换代理".into(),
+        ));
+    }
+    let _permit = config_permit(&state, &account, true).await?;
+    let current = state.account_svc.get_account(id).await?;
+    if current.proxy_url != input.expected_connection {
+        return Err(AppError::BadRequest("账号代理已变化，请重新读取".into()));
+    }
+    if current.proxy_url != input.connection
+        && !state
+            .account_svc
+            .synchronize_proxy_connection(&current, &input.connection)
+            .await?
+    {
+        return Err(AppError::BadRequest("账号代理保存冲突，请重新读取".into()));
+    }
+    Ok(Json(json!({"ok":true})))
 }
 
 /// 管理共享 CLI 租约与排他维护；只有维护原子关闭 API 入场。

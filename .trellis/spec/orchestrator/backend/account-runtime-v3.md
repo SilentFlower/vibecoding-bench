@@ -1619,7 +1619,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 ## 代理引用与有界日志读取补充
 
-`GET /internal/v3/proxy-references`沿用内部服务鉴权，返回任务账号及登录草稿的规范连接摘要、公开身份与complete。绑定任务由网关权威配置去重；未初始化运行时、损坏草稿或未知连接使complete=false。摘要不转发浏览器；目录公开及删除保护见[代理目录合同](../../gateway/backend/proxy-directory.md)。
+`GET /internal/v3/proxy-references`沿用内部服务鉴权，返回任务账号及登录草稿的规范连接摘要、公开身份与complete。绑定任务由网关权威配置去重；未初始化运行时、损坏草稿、未知连接、未决选线或读取跨越选线活动代次使complete=false。摘要不转发浏览器；目录公开及删除保护见[代理目录合同](../../gateway/backend/proxy-directory.md)。
 
 `GET /api/runs/{rid}/transcript?tail_bytes=131072`沿用可见运行与原artifact路径校验，可选范围1024～1048576。仅seek读取尾部，丢弃首个不完整行，以`X-Log-Truncated`标记截断；省略参数继续完整FileResponse，支持原独立页面。`test_run_log_tail.py`使用合成文件验证边界与兼容入口。
 
@@ -1629,3 +1629,35 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 工程运行复用现有冻结 `artifact_file` 读取器；场景运行选择与文件列表一致的最新冻结评测。历史预览不能回落到当前活动工作目录。
 - `GET /api/runs/{rid}/capture?path=...` 继续经过可见性、run_kind和抓包目录归属检查，复用 `capture_file_preview` 的公开元数据白名单。路径最长512字符，拒绝原始请求/响应正文；错误返回受控400/404。
 - 浏览器文件读取拥有独立取消信号及代次。切文件、关闭详情和换运行后，旧读取不能覆盖当前内容，也不能重新打开窗口。
+
+## Scenario: 交互式任务代理保存
+
+### 1. Scope / Trigger
+
+适用于`task_proxy.py`、任务proxy-selection接口与引用完整性；后台`proxy_sync.py`继续保持原幂等同步语义。
+
+### 2. Signatures
+
+- 内部`GET/PUT /api/accounts/{aid}/proxy-selection`由Rust公开桥调用。PUT模型`TaskProxySelectionIn`只允许StrictStr的selection_revision、connection和operation_id。
+- `save_selection(..., ownership_guard=None, authorize=None)`：既有身份/环境上下文中比较并保存；生产入口传入凭据guard与票据领取回调。
+- `TaskProxyActivity.track(operation_id)`为完整请求上下文；`references(read)`核对读取前后活动与代次。
+
+### 3. Contracts
+
+- 版本以服务密钥HMAC绑定`['task-proxy-v1',task_id,binding_id,connection]`。绑定账号从网关config读取实际连接；独立账号恢复原五个分列字段，支持HTTP80、SOCKS1080、IPv6及转义认证。直连为空连接。
+- PUT在UPDATE_GATE内先登记活动，再取owner→profile非阻塞锁，重新读取可见账号、核对凭据归属和版本。忙碌登录或停用账号拒绝；同配置只回读。副作用前领取网关一次性票据，绑定回调携带相同operation_id。
+- 独立任务再取得environment锁，确认无jobs及sender活动，停止并移除旧实例，保留持久资料。DB锁仅包围SQL；WHERE比较任务ID、绑定及五个旧代理字段，只更新代理字段。
+- 绑定任务持owner/profile调用网关许可，禁止先持environment锁再反向等待quiesce；网关代理始终是权威。内部私有响应必须经Rust白名单投影。
+- 活动集合与原编排锁共同归单进程。异常退出清理活动，重复operation拒绝且保留原登记。读取引用前后的活动及generation必须一起核对，避免提交刚完成后把旧引用当作完整快照。跨服务超时所有权见[任务选线合同](../../gateway/backend/proxy-directory.md#scenario-任务账号选择与超时事务保护)。
+
+### 4. Validation & Error Matrix
+
+身份缺失404；ProxySelectionConflict按changed/busy/disabled返回409；其它维护错误为固定409说明，读取不可用503。取消在前端保持零PUT。提交前失败保留原数据库代理；提交后回读失败或回执不确定时重新读取权威配置，不宣称已经撤销。
+
+### 5. Scenarios and Examples
+
+正常：独立任务选目录后五个代理字段更新，凭据与限额保持。边界：直连清空主机/认证并将端口置null。错误：把后台同步的“源已变化则完成”用于交互保存；正确处理为明确版本冲突。错误：只在引用读取结束检查active；正确处理还要拒绝跨活动代次的旧快照。
+
+### 6. Tests Required
+
+`test_task_proxy.py`覆盖SQLite版本/绑定/删除、直连、停止失败、锁释放、实际main入口、票据领取前登记及跨代次引用。`verify_task_proxy_api.py`覆盖真实HTTP公开投影、私有字段隔离及45秒超时。全量`PYTHONPATH=services/orchestrator:deploy/flower2api .venv/bin/python -m unittest discover -s services/orchestrator`；真实Docker恢复由发布阶段验证。

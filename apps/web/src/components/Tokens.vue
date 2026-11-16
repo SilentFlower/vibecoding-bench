@@ -6,9 +6,10 @@ import { api, type ApiToken, type Account } from '../api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { useToast } from '../composables/useToast';
+import { ConfirmationDialog } from './ui/feedback';
 
 const { show: toast } = useToast();
 
@@ -20,6 +21,8 @@ const allAccounts = ref<Account[]>([]);
 const showForm = ref(false);
 /** 删除确认弹窗 */
 const showDeleteConfirm = ref(false);
+const deletingAccount = ref(false);
+const deleteError = ref('');
 /** 待删除令牌 ID */
 const deleteTargetId = ref<number | null>(null);
 /** 当前编辑的令牌 */
@@ -107,20 +110,22 @@ async function save() {
 /** 确认删除 */
 function confirmDelete(id: number) {
   deleteTargetId.value = id;
+  deleteError.value = '';
   showDeleteConfirm.value = true;
 }
 
 /** 执行删除 */
 async function executeDelete() {
-  if (deleteTargetId.value === null) return;
+  if (deleteTargetId.value === null || deletingAccount.value) return;
+  deletingAccount.value = true; deleteError.value = '';
   try {
     await api.deleteToken(deleteTargetId.value);
     showDeleteConfirm.value = false;
     deleteTargetId.value = null;
     await load();
   } catch (e: unknown) {
-    toast((e as Error).message || '删除失败');
-  }
+    deleteError.value = (e as Error).message || '删除失败';
+  } finally { deletingAccount.value = false; }
 }
 
 /** 切换令牌状态 */
@@ -193,31 +198,6 @@ function formatAccountIds(ids: string): string {
       </div><footer class="token-editor-footer"><span>保存后应用到此令牌</span><Button type="button" variant="outline" @click="showForm = false">取消</Button><Button type="submit">{{ editing ? '保存权限' : '创建令牌' }}</Button></footer></form>
     </DialogContent></Dialog>
 
-    <!-- 删除确认弹窗 -->
-    <Dialog v-model:open="showDeleteConfirm">
-      <DialogContent class="bg-white border-border rounded-2xl text-foreground sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle class="text-foreground">确认删除</DialogTitle>
-          <DialogDescription class="text-muted-foreground">
-            此操作不可撤销，删除后使用该令牌的客户端将无法访问。
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter class="gap-2 pt-4">
-          <Button
-            variant="ghost"
-            @click="showDeleteConfirm = false"
-            class="text-muted-foreground hover:text-foreground hover:bg-muted"
-          >
-            取消
-          </Button>
-          <Button
-            @click="executeDelete" variant="destructive"
-            class="bg-red-500 hover:bg-red-600 text-white font-medium rounded-xl transition-all duration-200"
-          >
-            删除
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmationDialog :open="showDeleteConfirm" title="确认删除令牌" message="此操作不可撤销，删除后使用该令牌的客户端将无法访问。" confirm-label="删除" danger :busy="deletingAccount" :error="deleteError" @confirm="executeDelete" @cancel="showDeleteConfirm=false" />
   </div>
 </template>

@@ -348,16 +348,16 @@ onUnmounted(() => { mounted = false; listGeneration++; detailGeneration++; listC
 </template>
 
 <style scoped>
-.diagnostic-badge { display: inline-flex; align-items: center; gap: .35rem; border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.diagnostic-badge { display: inline-flex; align-items: center; gap: .35rem; border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; font-size: var(--ui-font-small); font-weight: 500; white-space: nowrap; }
 button.diagnostic-badge { cursor: pointer; }
 .diagnostic-badge:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .diagnostic-success { background: #effaf3; border-color: #d5eedf; color: #237348; }
 .diagnostic-pending { background: #eff6ff; border-color: #dbeafe; color: #2563eb; }
 .diagnostic-error { background: #fff4f2; border-color: #fee0d8; color: #b4533e; }
 .diagnostic-metric { min-width: 0; border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--card); }
-.diagnostic-metric span { display: block; color: var(--muted-foreground); font-size: 11px; }
-.diagnostic-metric strong { display: block; margin-top: 6px; font: 600 16px var(--font-mono); overflow-wrap: anywhere; }
-.diagnostic-definition { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 12px 20px; font-size: 12px; }
+.diagnostic-metric span { display: block; color: var(--muted-foreground); font-size: var(--ui-font-small); }
+.diagnostic-metric strong { display: block; margin-top: 6px; font: 600 var(--ui-font-card) var(--font-mono); overflow-wrap: anywhere; }
+.diagnostic-definition { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 12px 20px; font-size: var(--ui-font-small); }
 .diagnostic-definition dt { color: var(--muted-foreground); }
 .diagnostic-definition dd { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 480px) { .diagnostic-definition { grid-template-columns: 1fr; gap: 4px; } .diagnostic-definition dd { margin-bottom: 8px; } }

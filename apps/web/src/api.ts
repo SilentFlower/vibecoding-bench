@@ -601,7 +601,7 @@ export const api = {
   createAccount: (a: Partial<Account>) => request<Account>('POST', '/admin/accounts', a),
   updateAccount: (id: number, a: Partial<Account>) => request<Account>('PUT', `/admin/accounts/${id}`, a),
   deleteAccount: (id: number) => request<void>('DELETE', `/admin/accounts/${id}`),
-  testAccount: (id: number) => request<{ status: string; message?: string }>('POST', `/admin/accounts/${id}/test`),
+  testAccount: (id: number, signal?: AbortSignal) => request<{ status: string; message?: string }>('POST', `/admin/accounts/${id}/test`, undefined, signal),
   refreshUsage: (id: number) => request<{ status: string; usage?: UsageData; message?: string }>('POST', `/admin/accounts/${id}/usage`),
   listTokens: (page = 1, pageSize = 20) =>
     request<PagedResult<ApiToken>>('GET', `/admin/tokens?page=${page}&page_size=${pageSize}`),

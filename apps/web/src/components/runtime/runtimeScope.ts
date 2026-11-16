@@ -6,8 +6,11 @@ export interface RuntimePagination { kind:'events'|'history';page:number;size:nu
 /** 运行控制器发给Vue宿主的受控导航或详情事件。 */
 export interface RuntimeMessage { type: string; tab?: string; replace?: boolean; id?: string | number; title?: string; accountName?: string; account?: string | null; environment?: string | null; gateway_account?: string | null; section?: string | null; pagination?:RuntimePagination }
 
+/** 宿主反馈由统一Vue组件展示，独立入口使用原控制器适配。 */
+export interface RuntimeFeedback { notify: (message: string, type: string) => void; confirm: (message: string, signal: AbortSignal) => Promise<boolean> }
+
 /** 为原执行控制器提供局部DOM根和可统一释放的浏览器资源。@param root 任务根。@param body 内容根。@param initialHash 原内部地址。@param receive Vue路由及弹窗回调。@return 作用域、地址同步和清理函数。 */
-export function createRuntimeScope(root: HTMLElement, body: HTMLElement, initialHash: string, receive: (message: RuntimeMessage) => void) {
+export function createRuntimeScope(root: HTMLElement, body: HTMLElement, initialHash: string, receive: (message: RuntimeMessage) => void, feedback?: RuntimeFeedback) {
   const owner = root.ownerDocument;
   const localEvents = new EventTarget();
   const locationValue = new URL(`/runtime/?view=tasks${initialHash}`, location.origin);
@@ -51,13 +54,22 @@ export function createRuntimeScope(root: HTMLElement, body: HTMLElement, initial
   }});
   let terminalClass:typeof Terminal,fitClass:typeof FitAddon;
   let vendor:Promise<void>|undefined;
-  const localValues:Record<PropertyKey,unknown>={loadRuntimeTerminal:()=>vendor??=(async()=>{const [terminal,fit]=await Promise.all([import('xterm'),import('xterm-addon-fit')]);terminalClass=terminal.Terminal;fitClass=fit.FitAddon;})(),nativeEnvironmentWorkspace:(id:number)=>{if(!disposed)receive({type:'runtime:environment-details',id});},nativePagination:(pagination:RuntimePagination)=>{if(!disposed)receive({type:'runtime:pagination',pagination});}};
+  const localValues:Record<PropertyKey,unknown>={nativeTaskProxySelection:(id:number,title:string)=>{if(!disposed)receive({type:'runtime:task-proxy',id,title});},loadRuntimeTerminal:()=>vendor??=(async()=>{const [terminal,fit]=await Promise.all([import('xterm'),import('xterm-addon-fit')]);terminalClass=terminal.Terminal;fitClass=fit.FitAddon;})(),nativeEnvironmentWorkspace:(id:number)=>{if(!disposed)receive({type:'runtime:environment-details',id});},nativePagination:(pagination:RuntimePagination)=>{if(!disposed)receive({type:'runtime:pagination',pagination});}};
+  if (feedback) {
+    localValues.nativeNotify = (message: string, type = 'info') => { if (!disposed) feedback.notify(message, type); };
+    localValues.nativeConfirm = async (message: string) => {
+      if (disposed) return false;
+      const controller = new AbortController(); requests.add(controller);
+      try { return await feedback.confirm(message, controller.signal); }
+      finally { requests.delete(controller); }
+    };
+  }
   const scopedWindow = new Proxy(window, {get(target,key){
     if(key in localValues)return localValues[key];
     if(key==='parent')return {location:window.location,document:owner,postMessage:(message:RuntimeMessage)=>{if(!disposed)receive(message);}};
     if(key==='location')return scopedLocation;
     if(key==='history')return scopedHistory;
-    if(key==='addEventListener')return (type:string,listener:EventListenerOrEventListenerObject,options?:boolean|AddEventListenerOptions)=>listen(['hashchange','pagehide'].includes(type)?localEvents:window,type,listener,options);
+    if(key==='addEventListener')return (type:string,listener:EventListenerOrEventListenerObject,options?:boolean|AddEventListenerOptions)=>listen((['hashchange','pagehide'].includes(type)||type==='runtime:accounts-refresh')?localEvents:window,type,listener,options);
     if(key==='removeEventListener')return unlisten;
     const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
   },set(_target,key,value){localValues[key]=value;return true;}});
@@ -101,6 +113,8 @@ export function createRuntimeScope(root: HTMLElement, body: HTMLElement, initial
   // 同一页签的锚点也由宿主处理，避免浏览器额外写入顶层hash。
   listen(root,'click',((event:MouseEvent)=>{const link=(event.target as Element).closest<HTMLAnchorElement>('a[href^="#"]');if(!link||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey||event.button!==0)return;event.preventDefault();navigate(link.getAttribute('href')!);}) as EventListener,true);
   return {scope,
+    /** 只回读账号数据，保持现有卡片和焦点。@return 无。 */
+    refreshAccounts():void{if(!disposed)localEvents.dispatchEvent(new Event('runtime:accounts-refresh'));},
     /** 在保留路由和模块实例的情况下回读当前分区。@return 无。 */
     refresh():void{if(!disposed)localEvents.dispatchEvent(new Event('hashchange'));},
     /** 将Vue地址同步到模块，不创建第二份浏览器历史。@param hash 内部地址。@return 无。 */

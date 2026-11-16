@@ -24,6 +24,8 @@ use crate::model::proxy::ProxySyncTarget;
 use crate::service::runtime_lease::RuntimeLease;
 use crate::store::proxy_store::ProxyRecord;
 
+mod task_proxy;
+
 const SESSION_TIMEOUT: Duration = Duration::from_secs(5);
 const STATUS_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -333,6 +335,7 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
                 | "/environments.css"
                 | "/projects.js"
                 | "/style.css"
+                | "/ui-foundation.css"
                 | "/console.css"
                 | "/approved-design.css"
                 | "/work-design.css"
@@ -485,6 +488,14 @@ async fn http_bridge(
         return Err(AppError::NotFound);
     }
     authenticated(&headers).await?;
+    if browser_path.ends_with("/proxy-selection") {
+        let id = task_proxy::identity(browser_path).ok_or(AppError::NotFound)?;
+        // 用户关闭页面后已经受理的保存继续持有目录锁，直到受控事务收口。
+        return tokio::spawn(task_proxy::selection(state, id, method, body, headers))
+            .await
+            .map_err(|_| AppError::ServiceUnavailable("代理选择操作中断，请重新读取".into()))?;
+    }
+    let project_accounts = method == Method::GET && browser_path == "/api/accounts";
     let login = if method == Method::POST && browser_path == "/api/accounts/login/start" {
         Some(
             serde_json::from_slice::<Value>(&body)
@@ -571,6 +582,9 @@ async fn http_bridge(
             }
         }
         return Ok(Json(output).into_response());
+    }
+    if project_accounts {
+        return task_proxy::accounts(&state, upstream).await;
     }
     Ok(response(upstream))
 }
@@ -826,6 +840,7 @@ mod tests {
     fn design_assets_remain_available_through_runtime_bridge() {
         for path in [
             "/console.css",
+            "/ui-foundation.css",
             "/approved-design.css",
             "/work-design.css",
             "/environment-design.css",

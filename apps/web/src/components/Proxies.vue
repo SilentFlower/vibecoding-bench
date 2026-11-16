@@ -4,6 +4,7 @@ import { Globe, Plus, Download, Activity, Pencil, Trash2, ArrowUpRight, ShieldCh
 import { ChevronDown, LoaderCircle } from 'lucide-vue-next';
 import { api, type ProxyRoute, type ProxyInput } from '../api';
 import { useToast } from '../composables/useToast';
+import { ConfirmationDialog } from './ui/feedback';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -155,7 +156,7 @@ async function probeAll(): Promise<void> {
 }
 /** 重新核对版本及引用后删除。@return 完成。 */
 async function remove(): Promise<void> {
-  if (!deleting.value) return;
+  if (!deleting.value || saving.value) return;
   saving.value = true; formError.value = '';
   try { await api.deleteProxy(deleting.value.id, deleting.value.revision); deleting.value = null; await load(); }
   catch (cause) { formError.value = (cause as Error).message; } finally { saving.value = false; }
@@ -211,7 +212,7 @@ onUnmounted(() => { alive = false; cancelBatch.value = true; generation++; reque
       <footer class="proxy-form-footer"><span>{{ editing ? '保存前会重新核对配置版本' : '支持 HTTP / SOCKS5 / SOCKS5H' }}</span><Button type="button" variant="outline" :disabled="saving" @click="editor = false">取消</Button><Button type="submit" :disabled="saving || recognizing">{{ saving ? '保存中…' : '保存代理' }}</Button></footer></div></form>
     </DialogContent></Dialog>
     <Dialog v-model:open="importOpen"><DialogContent class="proxy-import-dialog"><DialogHeader><DialogTitle>批量导入代理</DialogTitle><DialogDescription>每行一条，最多 200 条。格式全部通过后统一保存。</DialogDescription></DialogHeader><form @submit.prevent="importRows"><Textarea v-model="importText" aria-label="代理连接列表" rows="9" placeholder="http://user:password@host:port" autocomplete="off" spellcheck="false" /><p v-if="formError" class="proxy-error" role="alert">{{ formError }}</p><footer class="proxy-form-footer"><Button type="button" variant="outline" :disabled="saving" @click="importOpen = false">取消</Button><Button type="submit" :disabled="saving || !importText.trim()">导入代理</Button></footer></form></DialogContent></Dialog>
-    <Dialog :open="!!deleting" @update:open="value => { if (!value) deleting = null; }"><DialogContent><DialogHeader><DialogTitle>删除代理</DialogTitle><DialogDescription>确认删除「{{ deleting?.name }}」？账号和登录草稿正在使用的线路会保留。</DialogDescription></DialogHeader><p v-if="formError" class="proxy-error" role="alert">{{ formError }}</p><div class="flex justify-end gap-2"><Button variant="outline" :disabled="saving" @click="deleting = null">取消</Button><Button variant="destructive" :disabled="saving" @click="remove">确认删除</Button></div></DialogContent></Dialog>
+    <ConfirmationDialog :open="!!deleting" title="删除代理" :message="`确认删除「${deleting?.name || ''}」？账号和登录草稿正在使用的线路会保留。`" confirm-label="确认删除" danger :busy="saving" :error="formError" @confirm="remove" @cancel="deleting=null" />
     <AccountWorkspace v-if="workspaceAccountId" :key="workspaceAccountId" :workspace-account-id="workspaceAccountId" @close="closeUserAccount" @refresh="load" />
   </div>
 </template>

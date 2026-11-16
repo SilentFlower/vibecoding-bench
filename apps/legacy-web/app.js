@@ -40,7 +40,7 @@ function patchRuntimeContent(target, html) {
   const template = document.createElement('template');
   template.innerHTML = html;
   const key = node => node.nodeType === Node.ELEMENT_NODE
-    ? node.getAttribute('id') || node.getAttribute('data-runtime-key') || node.getAttribute('data-env-details') || node.getAttribute('data-workspace-section') : null;
+    ? node.getAttribute('id') || node.getAttribute('data-runtime-key') || node.getAttribute('data-work-account-card') || node.getAttribute('data-env-details') || node.getAttribute('data-workspace-section') : null;
   const compatible = (left, right) => left.nodeType === right.nodeType && left.nodeName === right.nodeName && key(left) === key(right);
   const patchChildren = (parent, desired) => {
     let cursor = parent.firstChild;
@@ -58,12 +58,12 @@ function patchRuntimeContent(target, html) {
         if (node.nodeValue !== next.nodeValue) node.nodeValue = next.nodeValue;
       } else if (!node.hasAttribute('data-runtime-preserve')) {
         for (const attribute of [...node.attributes]) {
-          if (!next.hasAttribute(attribute.name) && !['data-active-scroll', 'open'].includes(attribute.name)) node.removeAttribute(attribute.name);
+          if (!next.hasAttribute(attribute.name) && !['data-active-scroll', 'open', 'data-vue-managed'].includes(attribute.name)) node.removeAttribute(attribute.name);
         }
         for (const attribute of [...next.attributes]) {
           if (node.getAttribute(attribute.name) !== attribute.value) node.setAttribute(attribute.name, attribute.value);
         }
-        patchChildren(node, next);
+        if (!node.hasAttribute('data-vue-managed')) patchChildren(node, next);
       }
       cursor = node.nextSibling;
     }
@@ -243,7 +243,7 @@ async function navigate() {
   try {
     await Promise.all([ROUTES[tab](), document.fonts.ready]);
   } catch (error) {
-    if (generation === state.viewGeneration) notifyRuntime('工作区读取失败：' + error.message);
+    if (generation === state.viewGeneration) notifyRuntime('工作区读取失败：' + error.message, 'error');
   } finally {
     // 首屏与字体一起就绪后显示嵌入文档，避免依次展示空模板和字体回退。
     if (generation === state.viewGeneration && window.parent !== window) window.parent.postMessage({type:'runtime:ready'},location.origin);
@@ -251,6 +251,7 @@ async function navigate() {
 }
 
 window.addEventListener('hashchange', navigate);
+window.addEventListener('runtime:accounts-refresh',()=>{if(currentTab()==='accounts')void renderAccounts();});
 
 // ===================== Accounts =====================
 function formatDuration(sec) {
@@ -378,6 +379,7 @@ function renderWarmupStatus(account) {
 /** 代理归属仍由关联的网关账号管理；独立账号沿原授权配置流程处理。@param {number} id 任务账号。@return {void} */
 function openAccountProxyConfig(id) {
  const account=state.accounts.find(item=>item.id===id);if(!account)return;
+ if(window.nativeTaskProxySelection){window.nativeTaskProxySelection(id,accountDisplayName(account));return;}
  if(account.cc2api_account_id!=null && RUNTIME_BASE){
   if(window.parent!==window)window.parent.postMessage({type:'runtime:account-edit',id:account.cc2api_account_id},location.origin);
   else location.href='/?account='+encodeURIComponent(account.cc2api_account_id);
@@ -409,7 +411,7 @@ async function renderAccounts() {
     if (currentTab() !== 'accounts' || generation !== state.viewGeneration) return;
     [state.accounts, state.loginDrafts] = [accounts, loginDrafts];
   } catch (e) {
-    if (currentTab() === 'accounts' && generation === state.viewGeneration) notifyRuntime('加载账号失败: ' + e.message);
+    if (currentTab() === 'accounts' && generation === state.viewGeneration) notifyRuntime('加载账号失败: ' + e.message, 'error');
     return;
   }
 
@@ -418,13 +420,13 @@ async function renderAccounts() {
   const loginResult = $('#account-login-result');
   loginResult.textContent = state.accountLoginMessage;
   loginResult.classList.toggle('hidden', !state.accountLoginMessage);
-  body.innerHTML = state.accounts.map(a => {
+  patchRuntimeContent(body, state.accounts.map(a => {
     const bound=a.cc2api_account_id!=null,worker=a.warmup_engine!=='projects';
     const workerAction=Number(a.warmup_enabled||0)===1?`<button type="button" data-warmup-now="${a.id}">立即运行养号 ${runtimeIcon('play')}</button>`:(bound||a.warmup_last_status==='paused')?`<button type="button" data-warmup-resume="${a.id}">恢复养号 ${runtimeIcon('play')}</button>`:`<button type="button" data-warmup-config="${a.id}">配置养号 ${runtimeIcon('arrow')}</button>`;
     const message=a.passive_quota?.account_error?a.passive_quota.message:a.passive_quota?.source==='manual'?'额度已手动更新。':bound?'重新授权提交后，同步更新关联账号的凭据。':'从已有网关账号关联，或创建新的网关账号。';
     return `<article class="work-panel work-account" data-work-account-card="${a.id}">
       <header><span class="initial">${runtimeIcon('users')}</span><div><h3><button type="button" class="work-title-button" data-account-details="${a.id}">${escapeHTML(accountDisplayName(a))}</button></h3><small>任务账号 #${a.id}</small></div><span class="work-badge ${a.enabled?'good':''}">${a.enabled?'已启用':'已停用'}</span></header>
-      <div class="work-proxy-row"><span class="work-proxy-compact">${runtimeIcon('globe')}<span class="work-proxy-name">${a.upstream_socks5_host?renderProxyEndpoint(a):'直连'}</span></span><button type="button" class="work-proxy-switch" data-proxy-config="${a.id}">${bound?'切换代理':'配置代理与授权'}</button></div>
+      <div class="work-proxy-row"><span class="work-proxy-compact" data-task-proxy-id="${a.id}" data-proxy-label="${escapeHTML(a.proxy_selection?.name||(a.upstream_socks5_host?'自定义线路':'直连'))}" data-proxy-url="${escapeHTML(a.proxy_selection?.public_url||'')}">${runtimeIcon('globe')}<span class="work-proxy-name">${escapeHTML(a.proxy_selection?.name||(a.upstream_socks5_host?'自定义线路':'直连'))}</span></span><button type="button" class="work-proxy-switch" data-proxy-config="${a.id}">切换代理</button></div>
       <div class="work-condition"><span>网关关联</span><strong>${bound?'网关账号 #'+escapeHTML(a.cc2api_account_id):'尚未关联'}</strong></div>
       <div class="work-condition"><span>环境时区</span><strong>${escapeHTML(a.effective_timezone||a.timezone||'未提供')}</strong></div>
       <div class="work-condition"><span>Claude Code</span><strong>${escapeHTML(a.claude_code_version||'继承全局')}</strong></div>
@@ -432,7 +434,7 @@ async function renderAccounts() {
       <section class="work-gateway-actions" aria-label="${escapeHTML(accountDisplayName(a))}的网关账号操作"><div class="work-gateway-heading"><span>${runtimeIcon('key')}网关账号</span><strong>${bound?'#'+escapeHTML(a.cc2api_account_id):'尚未关联'}</strong></div><div class="work-gateway-buttons">${!bound?`<button type="button" class="btn btn-sm" data-cc2-create="${a.id}">${runtimeIcon('plus')}创建网关账号</button><button type="button" class="btn btn-sm" data-cc2-bind="${a.id}">关联已有账号</button>`:''}${!bound||RUNTIME_BASE?`<button type="button" class="btn btn-sm" data-relogin="${a.id}">${runtimeIcon('key')}${bound?'重新授权并同步':'重新授权'}</button>`:''}${bound?`<button type="button" class="btn btn-sm btn-danger danger" data-cc2-unbind="${a.id}">解绑</button>`:''}${a.credential_ownership?.phase&&a.credential_ownership.phase!=='ready'?'<a class="btn btn-sm" href="#environments">凭据交接对账</a>':''}</div><p role="status">${escapeHTML(message||'')}</p></section>
       <footer><button type="button" class="btn btn-sm" data-cli-settings="${a.id}">CLI 配置</button><button type="button" class="btn btn-sm" data-quota="${a.id}">额度</button><button type="button" class="btn btn-sm" data-warmup-config="${a.id}">养号 / 额度设置</button>${RUNTIME_BASE?`<button type="button" class="btn btn-sm" data-run-window-config="${a.id}">运行时段</button>`:''}<button type="button" class="btn btn-sm btn-danger danger" data-del="${a.id}">删除</button></footer>
     </article>`;
-  }).join('') || '<div class="work-empty"><h3>暂无任务账号</h3><p>添加账号后可以授权并开始任务。</p></div>';
+  }).join('') || '<div class="work-empty"><h3>暂无任务账号</h3><p>添加账号后可以授权并开始任务。</p></div>');
   const drafts=$('#work-login-drafts');drafts.hidden=!state.loginDrafts.length;
   drafts.innerHTML='<header><h3>未完成的登录</h3><span>'+state.loginDrafts.length+' 个草稿</span></header>'+(state.loginDrafts || []).map(draft => {
     const phase = { preparing: '准备登录', authorizing: '登录中 · 未提交', ready_to_submit: '认证通过 · 待提交', ended: '终端已结束',
@@ -452,7 +454,8 @@ async function renderAccounts() {
 
   drafts.onclick = body.onclick = async (e) => {
     if(e.target.dataset.accountDetails){const account=state.accounts.find(item=>String(item.id)===e.target.dataset.accountDetails);if(account){endRunDetail();$('#modal .modal-titlebar-name').textContent='账号详情';$('#modal-content').innerHTML=`<div class="work-dialog-content"><h2>账号详情 · ${escapeHTML(accountDisplayName(account))}</h2><p class="work-note">配置目录 ${escapeHTML(account.profile_path)}</p>${renderOauthTokenStatus(account)}${renderPassiveQuota(account.passive_quota)}${renderAccountTimezone(account)}${renderWarmupStatus(account)}${account.credential_ownership?`<p>${escapeHTML(account.credential_ownership.message)}</p>`:''}</div>`;$('#modal-content').onclick=body.onclick;openModal('#modal');}return;}
-    if (e.target.dataset.proxyConfig) { await openAccountProxyConfig(Number(e.target.dataset.proxyConfig));return; }
+    const proxyAction=e.target.closest('[data-proxy-config]');
+    if (proxyAction) { openAccountProxyConfig(Number(proxyAction.dataset.proxyConfig));return; }
     if (e.target.dataset.cliSettings) {
       await openCliSettingsConfig(Number(e.target.dataset.cliSettings));
       return;
@@ -473,7 +476,7 @@ async function renderAccounts() {
         } else {
           await openLoginDraft(draft, e.target.dataset.draftRestart ? 'restart' : 'resume');
         }
-      } catch (error) { notifyRuntime('草稿操作未完成：' + error.message); }
+      } catch (error) { notifyRuntime('草稿操作未完成：' + error.message, 'error'); }
       finally { await renderAccounts(); }
       return;
     }
@@ -485,7 +488,7 @@ async function renderAccounts() {
     const processId = e.target.dataset.cc2Process;
     if (e.target.dataset.runWindowConfig) {
       try { await openRunWindowConfig(e.target.dataset.runWindowConfig); }
-      catch (error) { notifyRuntime('载入运行时段失败：' + error.message); }
+      catch (error) { notifyRuntime('载入运行时段失败：' + error.message, 'error'); }
       return;
     }
     const warmupConfigId = e.target.dataset.warmupConfig;
@@ -503,7 +506,7 @@ async function renderAccounts() {
         if (currentTab() !== 'accounts' || generation !== state.viewGeneration) return;
         openQuotaDetail(quotaId, quota);
       } catch (err) {
-        if (currentTab() === 'accounts' && generation === state.viewGeneration) notifyRuntime('查询额度失败: ' + err.message);
+        if (currentTab() === 'accounts' && generation === state.viewGeneration) notifyRuntime('查询额度失败: ' + err.message, 'error');
       } finally {
         e.target.disabled = false;
       }
@@ -519,7 +522,7 @@ async function renderAccounts() {
       if (!account) return;
       e.target.disabled = true;
       try { await openCc2apiBindingModal(account); }
-      catch (error) { notifyRuntime('加载可关联账号失败：' + error.message); }
+      catch (error) { notifyRuntime('加载可关联账号失败：' + error.message, 'error'); }
       finally { e.target.disabled = false; }
       return;
     }
@@ -536,7 +539,7 @@ async function renderAccounts() {
           $('#cli-settings-feedback').textContent = state.accountLoginMessage;
         }
       } catch (err) {
-        notifyRuntime((createId ? '创建 网关账号失败：' : '更新进程指标失败：') + err.message);
+        notifyRuntime((createId ? '创建 网关账号失败：' : '更新进程指标失败：') + err.message, 'error');
       } finally {
         e.target.disabled = false;
       }
@@ -556,11 +559,11 @@ async function renderAccounts() {
       try {
         const result = await API(`/accounts/${warmupNowId}/warmup/run`, { method: 'POST' });
         if (!result.started) {
-          notifyRuntime(result.warmup_last_error || `未启动：${result.warmup_last_status || '账号当前不可认领'}`);
+          notifyRuntime(result.warmup_last_error || `未启动：${result.warmup_last_status || '账号当前不可认领'}`, 'warning');
         }
         await renderAccounts();
       } catch (err) {
-        notifyRuntime('立即运行失败: ' + err.message);
+        notifyRuntime('立即运行失败: ' + err.message, 'error');
       } finally {
         e.target.disabled = false;
       }
@@ -572,7 +575,7 @@ async function renderAccounts() {
         await API(`/accounts/${warmupResumeId}/warmup/resume`, { method: 'POST' });
         await renderAccounts();
       } catch (err) {
-        notifyRuntime('恢复养号失败: ' + err.message);
+        notifyRuntime('恢复养号失败: ' + err.message, 'error');
       } finally {
         e.target.disabled = false;
       }
@@ -584,7 +587,7 @@ async function renderAccounts() {
         await API(`/accounts/${unbindId}/cc2api-binding`, { method: 'DELETE' });
         await renderAccounts();
       } catch (err) {
-        notifyRuntime('解绑失败: ' + err.message);
+        notifyRuntime('解绑失败: ' + err.message, 'error');
       } finally {
         e.target.disabled = false;
       }
@@ -677,7 +680,7 @@ async function saveCc2apiBinding(event) {
     state.accountLoginMessage = `已关联现有 网关账号 #${result.cc2api_account.id}，保留该账号原配置`;
     closeModal('#cc2api-binding-modal');
     await renderAccounts();
-  } catch (error) { notifyRuntime('关联已有账号失败：' + error.message); }
+  } catch (error) { notifyRuntime('关联已有账号失败：' + error.message, 'error'); }
   finally { button.disabled = false; }
 }
 
@@ -788,7 +791,7 @@ async function saveWarmupConfig(e) {
     closeModal('#warmup-modal');
     await renderAccounts();
   } catch (err) {
-    notifyRuntime('保存养号与额度配置失败: ' + err.message);
+    notifyRuntime('保存养号与额度配置失败: ' + err.message, 'error');
   } finally {
     button.disabled = false;
   }
@@ -973,11 +976,11 @@ async function saveRunWindowConfig(event) {
     if (currentTab() === 'environments') await renderEnvironments();
     else if (currentTab() === 'accounts') await renderAccounts();
     if (state.runWindowConfig === request) {
-      if(request.inline){form.dataset.savedWindowConfig=JSON.stringify({enabled,days:config.days,intervals:config.intervals});notifyRuntime('运行时段已保存');}
+      if(request.inline){form.dataset.savedWindowConfig=JSON.stringify({enabled,days:config.days,intervals:config.intervals});notifyRuntime('运行时段已保存', 'success');}
       else {request.sending=false;closeModal('#run-window-modal');}
     }
   } catch (error) {
-    if (state.runWindowConfig === request) notifyRuntime('保存运行时段失败：' + error.message);
+    if (state.runWindowConfig === request) notifyRuntime('保存运行时段失败：' + error.message, 'error');
   } finally {
     if (state.runWindowConfig === request) {request.sending=false;submit.disabled=false;}
   }
@@ -1172,7 +1175,7 @@ async function startAccLogin(body) {
       await endAccLogin({ alsoCloseModal: true, skipServerCancel: true });
       return;
     }
-    return notifyRuntime('启动登录会话失败: ' + e.message);
+    return notifyRuntime('启动登录会话失败: ' + e.message, 'error');
   }
   loginState.starting = false;
   startButton.disabled = false;
@@ -1288,7 +1291,7 @@ async function restartAccLogin() {
   try {
     if (draft.environment_id) await openLoginDraft(draft, 'restart');
     else openAccLoginModal(account || null);
-  } catch (error) { notifyRuntime('重新登录失败：' + error.message); }
+  } catch (error) { notifyRuntime('重新登录失败：' + error.message, 'error'); }
   await renderAccounts();
 }
 
@@ -1686,7 +1689,7 @@ async function commitAccLogin() {
   } catch (e) {
     if (state.accLogin === al) {
       btn.disabled = false;
-      notifyRuntime('提交失败: ' + e.message + '\n\n如果还没登录成功，请先在终端完成 OAuth。');
+      notifyRuntime('提交失败: ' + e.message + '\n\n如果还没登录成功，请先在终端完成 OAuth。', 'error');
     }
   } finally {
     al.committing = false;
@@ -1750,7 +1753,7 @@ async function renderTopics() {
       if (currentTab() !== 'topics' || generation !== state.viewGeneration) return;
       state.topics = topics;
     } catch (e) {
-      if (currentTab() === 'topics' && generation === state.viewGeneration) notifyRuntime('加载题库失败: ' + e.message);
+      if (currentTab() === 'topics' && generation === state.viewGeneration) notifyRuntime('加载题库失败: ' + e.message, 'error');
       return;
     }
   }
@@ -1804,7 +1807,7 @@ function openTopicModal(topicId) {
     const fd = new FormData(form);
     const first = String(fd.get('followup_1') || '').trim();
     const second = String(fd.get('followup_2') || '').trim();
-    if (second && !first) return notifyRuntime('请先填写第一条补充需求');
+    if (second && !first) return notifyRuntime('请先填写第一条补充需求', 'warning');
     const body = {
       no: Number(fd.get('no')),
       title: fd.get('title'),
@@ -1825,7 +1828,7 @@ function openTopicModal(topicId) {
       state.topics = [];
       await renderTopics();
     } catch (err) {
-      notifyRuntime('保存题目失败: ' + err.message);
+      notifyRuntime('保存题目失败: ' + err.message, 'error');
     } finally {
       submit.disabled = false;
     }
@@ -1839,7 +1842,7 @@ function openTopicModal(topicId) {
       state.topics = [];
       await renderTopics();
     } catch (err) {
-      notifyRuntime('删除题目失败: ' + err.message);
+      notifyRuntime('删除题目失败: ' + err.message, 'error');
     }
   };
 }
@@ -1850,7 +1853,7 @@ function nextTopicNo() {
 
 function openTaskModal(topicNo) {
   if (state.accounts.length === 0) {
-    return notifyRuntime('请先添加账号');
+    return notifyRuntime('请先添加账号', 'warning');
   }
   const topic = state.topics.find(t => t.no === topicNo);
   $('#task-modal-title').textContent = `#${topic.no} ${topic.title}`;
@@ -1881,7 +1884,7 @@ function openTaskModal(topicNo) {
       await API('/tasks', { method: 'POST', body: JSON.stringify(body) });
       closeModal('#task-modal');
       navigateTo('#tasks');
-    } catch (err) { notifyRuntime('创建任务失败: ' + err.message); }
+    } catch (err) { notifyRuntime('创建任务失败: ' + err.message, 'error'); }
   };
 }
 
@@ -1894,7 +1897,7 @@ async function renderTasks() {
     if (currentTab() !== 'tasks' || generation !== state.viewGeneration) return;
     [state.batches, state.accounts, state.topics] = values;
   } catch (e) {
-    if (currentTab() === 'tasks' && generation === state.viewGeneration) notifyRuntime('加载任务失败: ' + e.message);
+    if (currentTab() === 'tasks' && generation === state.viewGeneration) notifyRuntime('加载任务失败: ' + e.message, 'error');
     return;
   }
 
@@ -1925,7 +1928,7 @@ async function renderTasks() {
         await API(`/task-batches/${pauseBatchId}/pause`, { method: 'POST' });
         renderTasks();
       } catch (err) {
-        notifyRuntime('暂停批次失败: ' + err.message);
+        notifyRuntime('暂停批次失败: ' + err.message, 'error');
         e.target.disabled = false;
       }
       return;
@@ -1937,7 +1940,7 @@ async function renderTasks() {
         await API(`/task-batches/${resumeBatchId}/resume`, { method: 'POST' });
         renderTasks();
       } catch (err) {
-        notifyRuntime('继续批次失败: ' + err.message);
+        notifyRuntime('继续批次失败: ' + err.message, 'error');
         e.target.disabled = false;
       }
       return;
@@ -1947,7 +1950,7 @@ async function renderTasks() {
       try {
         await API(`/task-batches/${batchId}`, { method: 'DELETE' });
         renderTasks();
-      } catch (err) { notifyRuntime('删除批次失败: ' + err.message); }
+      } catch (err) { notifyRuntime('删除批次失败: ' + err.message, 'error'); }
     }
   };
 
@@ -1965,7 +1968,7 @@ async function renderTasks() {
     const fd = new FormData(form);
     const topicIds = $$('#batch-topic-list input[type=checkbox]:checked')
       .map(i => Number(i.value));
-    if (topicIds.length === 0) return notifyRuntime('请至少选择一个 topic');
+    if (topicIds.length === 0) return notifyRuntime('请至少选择一个 topic', 'warning');
     const body = {
       account_id: Number(fd.get('account_id')),
       topic_ids: topicIds,
@@ -1978,10 +1981,10 @@ async function renderTasks() {
     };
     try {
       const res = await API('/task-batches', { method: 'POST', body: JSON.stringify(body) });
-      notifyRuntime(`已启动批次 #${res.id}`);
+      notifyRuntime(`已启动批次 #${res.id}`, 'success');
       closeModal('#batch-create-modal');await renderTasks();
     } catch (err) {
-      notifyRuntime('启动批次失败: ' + err.message);
+      notifyRuntime('启动批次失败: ' + err.message, 'error');
     }
   };
 }
@@ -2312,7 +2315,7 @@ async function renderRuns() {
     if (!current()) return;
     [state.accounts, state.tasks, state.topics, state.runtimeModel, state.runtimeEffort, state.claudeCodeVersion] = values;
   } catch (e) {
-    if (current()) notifyRuntime('加载运行依赖失败: ' + e.message);
+    if (current()) notifyRuntime('加载运行依赖失败: ' + e.message, 'error');
     return;
   }
   bindRuntimeModelForm();
@@ -2345,7 +2348,7 @@ async function saveRuntimeSettings(){
   try{
     const results=await Promise.all(changed.map(({form})=>form.onsubmit(new Event('submit',{cancelable:true}))));
     if(state.runtimeSettingsSaving!==request||request.generation!==state.viewGeneration)return;
-    if(results.every(Boolean)){state.runtimeSettingsSaving=null;closeModal('#runtime-settings-modal');notifyRuntime('后续运行配置已保存');}
+    if(results.every(Boolean)){state.runtimeSettingsSaving=null;closeModal('#runtime-settings-modal');notifyRuntime('后续运行配置已保存', 'success');}
     else $('#runtime-settings-feedback').textContent='部分配置保存失败。已保存的配置保留，请检查失败项后重试。';
   }finally{
     if(state.runtimeSettingsSaving===request)state.runtimeSettingsSaving=null;
@@ -2394,7 +2397,7 @@ function bindRuntimeModelForm() {
       if(generation===state.viewGeneration)paintRuntimeModelSetting();
       return true;
     } catch (err) {
-      notifyRuntime('保存默认模型失败: ' + err.message);return false;
+      notifyRuntime('保存默认模型失败: ' + err.message, 'error');return false;
     } finally {
       btn.disabled = false;
       if (resetBtn) resetBtn.disabled = false;
@@ -2448,7 +2451,7 @@ function bindRuntimeEffortForm() {
       if(generation===state.viewGeneration)paintRuntimeEffortSetting();
       return true;
     } catch (err) {
-      notifyRuntime('保存思考预算失败: ' + err.message);return false;
+      notifyRuntime('保存思考预算失败: ' + err.message, 'error');return false;
     } finally {
       btn.disabled = false;
       if (resetBtn) resetBtn.disabled = false;
@@ -2497,7 +2500,7 @@ function bindClaudeCodeVersionForm() {
       if(generation===state.viewGeneration)paintClaudeCodeVersionSetting();
       return true;
     } catch (err) {
-      notifyRuntime('保存 Claude Code 版本失败: ' + err.message);return false;
+      notifyRuntime('保存 Claude Code 版本失败: ' + err.message, 'error');return false;
     } finally {
       btn.disabled = false;
       if (resetBtn) resetBtn.disabled = false;
@@ -2521,8 +2524,8 @@ function bindCaptureForm() {
   form.effort_level.value = '';
   form.onsubmit = async (e) => {
     e.preventDefault();
-    if (state.accounts.length === 0) return notifyRuntime('请先添加账号');
-    if (state.topics.length === 0) return notifyRuntime('请先添加题目');
+    if (state.accounts.length === 0) return notifyRuntime('请先添加账号', 'warning');
+    if (state.topics.length === 0) return notifyRuntime('请先添加题目', 'warning');
     const btn = form.querySelector('button[type=submit]');
     const fd = new FormData(form);
     const body = {
@@ -2555,7 +2558,7 @@ function bindCaptureForm() {
       closeModal('#runtime-capture-modal');
       openRunDetail(res.run_id);
     } catch (err) {
-      notifyRuntime('启动抓包失败: ' + err.message);
+      notifyRuntime('启动抓包失败: ' + err.message, 'error');
     } finally {
       btn.disabled = false;
     }
@@ -2602,21 +2605,21 @@ function paintRuns(runs) {
     if (stopId && await confirmRuntimeAction(`停止 run ${stopId}?`)) {
       e.target.disabled = true;
       try { await API(`/runs/${stopId}/stop`, { method: 'POST' }); }
-      catch (err) { notifyRuntime('停止失败: ' + err.message); e.target.disabled = false; }
+      catch (err) { notifyRuntime('停止失败: ' + err.message, 'error'); e.target.disabled = false; }
       return;
     }
     const contId = e.target.dataset.continue;
     if (contId) {
       e.target.disabled = true;
       try { await startContinueRun(contId); }
-      catch (err) { notifyRuntime('继续对话失败: ' + err.message); }
+      catch (err) { notifyRuntime('继续对话失败: ' + err.message, 'error'); }
       finally { e.target.disabled = false; }
       return;
     }
     const delId = e.target.dataset.delRun;
     if (delId && await confirmRuntimeAction(`删除 run ${delId}?`)) {
       try { await API(`/runs/${delId}`, { method: 'DELETE' }); }
-      catch (err) { notifyRuntime('删除运行失败: ' + err.message); }
+      catch (err) { notifyRuntime('删除运行失败: ' + err.message, 'error'); }
     }
   };
 }
@@ -2805,6 +2808,7 @@ function closeModal(sel) {
 let runtimeConfirmation=null, runtimeToastTimer;
 /** 展示与确认稿一致的异步确认，取消及离页返回false。@param {string} message 操作影响。@return {Promise<boolean>} 明确选择。 */
 function confirmRuntimeAction(message) {
+  if (window.nativeConfirm) return window.nativeConfirm(String(message));
   closeModal('#runtime-confirm-modal');
   return new Promise(resolve=>{
     runtimeConfirmation={resolve};$('#runtime-confirm-message').textContent=message;
@@ -2813,7 +2817,9 @@ function confirmRuntimeAction(message) {
   });
 }
 /** 反馈操作结果，正文以文本呈现。@param {string} message 消息。@return {void} */
-function notifyRuntime(message) {
+function notifyRuntime(message, type = 'info') {
+  if (window.nativeNotify) return window.nativeNotify(String(message), type);
+  $('#runtime-toast').dataset.type = type;
   clearTimeout(runtimeToastTimer);$('#runtime-toast-message').textContent=String(message);$('#runtime-toast').classList.remove('hidden');
   const close=()=>{clearTimeout(runtimeToastTimer);$('#runtime-toast').classList.add('hidden');};$('#runtime-toast-close').onclick=close;runtimeToastTimer=setTimeout(close,6000);
 }
@@ -2888,7 +2894,7 @@ async function openCliSettingsConfig(accountId, namespace = null) {
       if (namespace == null) {
         closeModal('#cli-settings-modal');
         await renderAccounts();
-        if (request.generation === state.viewGeneration) notifyRuntime('账号配置已保存');
+        if (request.generation === state.viewGeneration) notifyRuntime('账号配置已保存', 'success');
       } else $('#cli-settings-feedback').textContent = '配置已保存，后续新执行生效。';
     } catch (error) {
       if (current()) {

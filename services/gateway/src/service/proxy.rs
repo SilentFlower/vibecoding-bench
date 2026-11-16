@@ -1,5 +1,6 @@
 //! 代理目录并发边界与有界出口探测。
 use std::net::IpAddr;
+use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::time::{Duration, Instant};
 
@@ -11,13 +12,15 @@ use tokio::sync::{Mutex, Semaphore};
 
 use crate::error::AppError;
 use crate::model::proxy::ProxyObservation;
+use crate::service::task_proxy_ticket::TaskProxyTickets;
 use crate::store::proxy_store::{ProxyRecord, ProxyStore};
 use crate::tlsfp::make_request_client_builder;
 
 /// 目录写入与账号选线共用配置锁；探测拥有独立并发限制。
 pub struct ProxyService {
     pub store: ProxyStore,
-    pub mutations: Mutex<()>,
+    pub mutations: Arc<Mutex<()>>,
+    pub(crate) task_selections: TaskProxyTickets,
     pub(crate) sync_running: AtomicBool,
     probes: Semaphore,
 }
@@ -27,7 +30,8 @@ impl ProxyService {
     pub fn new(pool: AnyPool) -> Self {
         Self {
             store: ProxyStore::new(pool),
-            mutations: Mutex::new(()),
+            mutations: Arc::new(Mutex::new(())),
+            task_selections: TaskProxyTickets::default(),
             sync_running: AtomicBool::new(false),
             probes: Semaphore::new(4),
         }

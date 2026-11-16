@@ -34,7 +34,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 ### 视觉 Token 与层次
 
-控件 token 的唯一代码源是 `apps/web/src/components/ui/controls/controls.css`。`--ui-*` 前缀隔离存量主题，页面不逐个写死控件颜色。
+控件颜色 token 的唯一代码源是 `apps/web/src/components/ui/controls/controls.css`。阅读尺寸与反馈表面来自 `apps/legacy-web/ui-foundation.css`，Vue、独立文档及原型共同引用。`--ui-*` 前缀隔离存量主题，页面不逐个写死控件颜色。
 
 | Token | 当前值 | 用途 |
 | --- | --- | --- |
@@ -50,7 +50,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 | `--ui-selected` | `#f5f2fa` | 选项高亮背景 |
 | `--ui-danger` | `#b45b67` | 错误边界 |
 
-- 控件高40px、圆角8px；菜单圆角9px、气泡12px。输入标签12px，选项12px。页面正文建议13–14px，辅助说明11–12px，页标题20–24px；10px只用于低优先级标注。
+- 按CSS视口采用三档阅读尺寸：小于1920px、1920～2559px、2560px及以上。正文/输入/主要按钮14/15/16px，辅助文字12/13/14px，卡片标题16/17/18px，分区标题18/20/22px，页标题28/30/32px；标准控件高40/42/44px，紧凑控件34/36/38px。控件圆角8px、菜单9px、气泡12px。禁止整页zoom或按物理像素缩放。
 - 常用间距采用4/8/12/16/24px，页面容器24–40px；窄屏16–20px。页面主内容使用柔和浅底，内容卡片使用白色和轻边框。
 - 字体采用 Inter Variable 与明确的中文系统回退；关键数字使用等宽数字或 JetBrains Mono Variable。字体资源本地托管，许可证参考 `doc/design/font-licenses.txt`。控件当前通过 `--ui-font` 使用字体栈，实际字体资产接入由页面迁移完成。
 - 成功/执行状态用绿色，等待/临近到期用琥珀色，失败/已过期用红色，紫色用于选中与偏好。颜色同时配文字含义。
@@ -244,9 +244,9 @@ python3 deploy/flower2api/verify_ui_controls.py --url http://127.0.0.1:4187/ui-p
 
 ### 定稿响应式及字体根合同
 
-应用最大1920px、内容区最大1510px（包含水平padding），账号卡片最小320px、间隔18px；760px及以下强制单列。超宽视口侧栏与居中应用保持对齐。验证需包含列数切换附近1340/1680px与1920/2560/3440px，不能只验1440/390px。
+应用与内容区铺满视口，账号卡片最小320px、间隔18px；760px及以下强制单列，1680px及以上四列。侧栏在1920px/2560px断点为264px/280px，折叠宽度仍76px。验证需包含列数切换附近1340/1680px与1920/2560/3440px，不能只验1440/390px。
 
-html根字号与设计稿一致为14px，font-family为同一字体栈、font-synthesis:none。仅body字体相同不能保证rem控件一致。字体验收需核对浏览器实际平台字体，不能只看CSS声明。费用气泡专用class使用足够的选择器优先级，避免异步加载的通用控件样式覆盖。
+html根字号与原型共用`--ui-font-body`的14/15/16px三档规则，font-family为同一字体栈、font-synthesis:none。仅body字体相同不能保证rem控件一致。字体验收需核对浏览器实际平台字体，不能只看CSS声明。费用气泡专用class使用足够的选择器优先级，避免异步加载的通用控件样式覆盖。
 
 授权登录选择代理与账号编辑共用ProxyPicker；代理选择在生成链接时冻结，成功后账号草稿沿用同一目录ID与revision。服务端处理目录凭据，浏览器只接触公开投影。
 
@@ -276,9 +276,9 @@ html根字号与设计稿一致为14px，font-family为同一字体栈、font-sy
 
 ### 深层弹窗排版约束
 
-通用原生工作区标题按原型使用17px/650、正常行高与-0.4px字距；运行详情标题为18px/650/27px，令牌编辑保留18px独立规格。代理编辑宽度680px，表单提示位于控件之后，同排输入保持共同基线。关闭图标使用同一SVG；原生委托事件通过closest定位按钮，沿原清理入口退出。共享输入框焦点采用#AD9BC4边框及浅紫外圈，避免残留默认黑色焦点框。
+通用原生工作区、运行详情与令牌编辑标题共用`--ui-font-heading`的18/20/22px，沿原650字重、行高及字距。代理编辑宽度680px，表单提示位于控件之后，同排输入保持共同基线。关闭图标使用同一SVG；原生委托事件通过closest定位按钮，沿原清理入口退出。共享输入框焦点采用#AD9BC4边框及浅紫外圈，避免残留默认黑色焦点框。
 
-系统更新正文13px，头部22×28px、内容27×28px；真实发布说明按段落呈现摘要，完整原文、安装计划、取消、历史回退及维护信息保持可达。样式回归使用verify_dialog_typography.py与verify_update_design.py逐控件读取原型实际计算样式，并覆盖说明收起、文本转义和取消零写入。
+系统更新正文共用`--ui-font-body`，头部22×28px、内容27×28px；真实发布说明按段落呈现摘要，完整原文、安装计划、取消、历史回退及维护信息保持可达。样式回归使用verify_dialog_typography.py与verify_update_design.py逐控件读取原型实际计算样式，并覆盖说明收起、文本转义和取消零写入。
 
 ### 代理局部账号工作区与刷新稳定性
 
@@ -324,7 +324,43 @@ html根字号与设计稿一致为14px，font-family为同一字体栈、font-sy
 - `verify_task_account_config.py`直接比对原型的窗口、标题、字段、按钮、页脚等十组计算样式，并覆盖1440/720/390px。暗色配置继承主题文字和表面变量，正文、标签和操作文字对比度至少4.5；成功状态与错误状态分别着色。
 - 额度详情复用原型`work-quota-*`结构：600px宽、身份栏、5小时/7天双卡38px主值、横跨的Fable25px主值、剩余值与北京时间重置、底部查询时间和显式刷新。真实0、窗口缺失和重置未提供分别表达；关闭、重开、导航使旧刷新回执失效。
 - 任务账号的运行时段使用`RuntimeEnvironments`局部环境工作区，自动选择时段分区并保持任务路由；按任务账号ID定位真实环境。养号额度及独立旧入口的时段表单使用920px表单、固定标题/操作栏与可滚动正文。switch-field显式横向排版，避免旧form label的列布局覆盖。星期、最多8区间、环境时区及关闭时保留原配置沿用原合同。工程养号仅提交阈值；worker分支保留开关与小时区间。
-- 任务账号的关联代理编辑复用局部Accounts工作区，主URL和任务根保持，保存后回读摘要。目录选择仍提交ID/revision，沿原服务端更新门禁；只有明确点击其他模块链接才切换主路由。
+- 任务账号切换代理使用专用`TaskProxyDialog`，复用`ProxyPicker`；关联与独立任务均可选目录或直连。主URL、任务根、卡片节点及焦点保持；保存后发送`runtime:accounts-refresh`局部回读，禁止触发整个navigate。目录选择提交ID/revision及任务快照版本，沿原服务端维护门禁。完整账号编辑继续使用局部Accounts工作区。
 - 工程/养号的交互记录共用work-events/upgrade-events结构，分页位于记录后；独立验收的阶段取agent.verification，空态呈现三步待开始。计时仅替换文本并保留节点。
 - 运行条件按真实admission展示状态；缺少CLI占用投影时显示未采集。目标列表读取当前work、passed、available_objectives和waiting_objectives，按项目与目标去重；禁止从目录排序推断完成/可执行状态。空交付记录采用带图标、标题与说明的居中空态。
 - 验证：verify_task_feedback.py覆盖保存与取消、0/未知值、刷新迟到、局部代理、两空间及390/720px；verify_task_feedback_styles.py直接比对原型关键节点计算样式。
+
+## Scenario: 共享操作反馈与任务选线
+
+### 1. Scope / Trigger
+
+修改通知、确认、账号测试结果、任务卡片目录摘要或代理窗口时适用。
+
+### 2. Signatures
+
+- `useToast().show(message, type='error', duration?) -> number`；type为success/error/info/warning，返回独立消息ID；dismiss/pause/resume按ID操作。
+- `ConfirmationDialog`接受open/title/message/confirmLabel/danger/busy/error；发confirm/cancel，业务组件拥有请求。`useConfirmation().ask(options, signal?) -> Promise<boolean>`仅明确执行返回true。
+- `OperationFeedback`接受status/message/label/identity，status为idle/loading/success/error；action仅由初次点击或明确重试发出。
+- `TaskProxyDialog(accountId, accountName?)`发close/saved；API合同见[任务代理选择](../../gateway/backend/proxy-directory.md#scenario-任务账号选择与超时事务保护)。
+- `createRuntimeScope(..., feedback?)`注入nativeNotify/nativeConfirm，离页取消未决确认；refreshAccounts发局部事件。
+
+### 3. Contracts
+
+- 全局单个FeedbackHost，底部居中最多显示3条、最多保留12条；相同类型和文本去重。success/info默认4000ms，error/warning默认手动关闭；悬停、键盘阅读及隐藏排队暂停计时。
+- 通知DOM进入当前模态焦点范围，通过手动Popover顶层保持视口定位。父窗关闭、隐藏、移除和路由切换都要重新选宿主；观察器不能只匹配open状态。F8进入消息，通知内Esc只关闭消息并返回原控件。
+- 账号测试以账号ID和请求身份隔离，同账号在途去重，离页撤销并丢弃迟到回执。结果显示在固定操作区，完整文本进入气泡；测试结束不改变卡片高度。
+- 代理卡片名称及费用摘要单行省略，InfoTooltip展示完整信息。旧DOM增量刷新保留data-vue-managed属性及子树，Vue负责组件内部节点。
+- 通知与错误以文本渲染；确认busy阻止关闭和重复执行，错误保留窗口。关闭和取消零业务写入。
+
+### 4. Validation & Error Matrix
+
+- 选线读取失败/版本冲突：保留候选并提供重新读取；重新读取成功后以服务端快照重置草稿。
+- 测试业务失败/HTTP失败：独立错误状态及完整文本；一个账号结果不清除另一个账号结果。
+- 父窗关闭/离页：持久通知保持可见；原生未决确认按取消收口。
+
+### 5. Scenarios and Examples
+
+正确：`show('已保存','success')`；失败使用error并保留阅读时间。错误：共享三秒计时器清除所有账号结果；正确处理是每个账号独立请求和状态。错误：把通知留在已移除的dialog中；正确处理是迁到当前有效宿主。
+
+### 6. Tests Required
+
+`verify_console_ui.py`覆盖七页七档、四列、过期代理、选线取消/冲突、独立账号测试、父窗取消/Esc/离页通知与焦点；`verify_ui_controls.py`验证组件预览。`verify_dialog_typography.py`及`verify_task_feedback_styles.py`与同步原型对比关键计算样式；`npm --prefix apps/web run build`验证类型与产物。

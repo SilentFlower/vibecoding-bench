@@ -18,6 +18,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { useToast } from '../composables/useToast';
+import { OperationFeedback, ConfirmationDialog } from './ui/feedback';
 
 const route = useRoute();
 const props = defineProps<{ workspaceAccountId?: number }>();
@@ -90,6 +91,8 @@ const showForm = ref(false);
 const editBaseline = ref<Record<string, unknown>>({});
 /** 删除确认弹窗是否可见 */
 const showDeleteConfirm = ref(false);
+const deletingAccount = ref(false);
+const deleteError = ref('');
 /** 待删除账号 ID */
 const deleteTargetId = ref<number | null>(null);
 
@@ -184,10 +187,11 @@ function applyNumberDrafts(): void {
   }
   for (const key of Object.keys(values) as (keyof typeof values)[]) form.value[key] = Number(values[key]);
 }
-/** 正在测试的账号 ID */
-const testing = ref<number | null>(null);
-/** 测试结果 */
-const testResult = ref<{ status: string; message?: string } | null>(null);
+/** 各账号测试状态独立；列表和详情读取同一结果。 */
+const testStates = ref(new Map<number, { status: 'loading' | 'success' | 'error'; message: string }>());
+const testRequests = new Map<number, AbortController>();
+let testAlive = true;
+onUnmounted(() => { testAlive = false; for (const controller of testRequests.values()) controller.abort(); testRequests.clear(); });
 /** 正在刷新用量的账号 ID */
 const refreshingUsage = ref<number | null>(null);
 type UsageWindowKey = 'five_hour' | 'seven_day' | 'seven_day_sonnet' | 'seven_day_fable';
@@ -456,12 +460,14 @@ async function save() {
  */
 function confirmDelete(id: number) {
   deleteTargetId.value = id;
+  deleteError.value = '';
   showDeleteConfirm.value = true;
 }
 
 /** 执行删除账号 */
 async function executeDelete() {
-  if (deleteTargetId.value === null) return;
+  if (deleteTargetId.value === null || deletingAccount.value) return;
+  deletingAccount.value = true; deleteError.value = '';
   try {
     await api.deleteAccount(deleteTargetId.value);
     showDeleteConfirm.value = false;
@@ -469,8 +475,8 @@ async function executeDelete() {
     await load();
     emit('refresh');
   } catch (e: unknown) {
-    toast((e as Error).message || '删除失败');
-  }
+    deleteError.value = (e as Error).message || '删除失败';
+  } finally { deletingAccount.value = false; }
 }
 
 /**
@@ -478,17 +484,20 @@ async function executeDelete() {
  * @param id 账号 ID
  */
 async function test(id: number) {
-  testing.value = id;
-  testResult.value = null;
+  if (testRequests.has(id)) return;
+  const controller = new AbortController();
+  testRequests.set(id, controller);
+  testStates.value.set(id, { status: 'loading', message: '' });
   try {
-    testResult.value = await api.testAccount(id);
-    if (testResult.value.status === 'error') {
-      toast(testResult.value.message || '测试失败');
-    }
-  } catch (e: unknown) {
-    toast((e as Error).message || '测试请求失败');
+    const result = await api.testAccount(id, controller.signal);
+    if (!testAlive || testRequests.get(id) !== controller) return;
+    testStates.value.set(id, { status: result.status === 'ok' ? 'success' : 'error', message: result.message || (result.status === 'ok' ? '账号连接正常。' : '测试失败，请重试。') });
+  } catch (cause) {
+    if (!testAlive || controller.signal.aborted || testRequests.get(id) !== controller) return;
+    testStates.value.set(id, { status: 'error', message: (cause as Error).message || '测试请求失败' });
+  } finally {
+    if (testRequests.get(id) === controller) testRequests.delete(id);
   }
-  setTimeout(() => { testing.value = null; testResult.value = null; }, 3000);
 }
 
 /**
@@ -935,7 +944,7 @@ async function copyText(text: string) {
   if (navigator.clipboard && window.isSecureContext) {
     try {
       await navigator.clipboard.writeText(text);
-      toast('已复制');
+      toast('已复制', 'success');
       return;
     } catch {
       // 失败则继续走降级方案
@@ -956,7 +965,7 @@ async function copyText(text: string) {
     ta.setSelectionRange(0, text.length);
     const ok = document.execCommand('copy');
     document.body.removeChild(ta);
-    toast(ok ? '已复制' : '复制失败');
+    toast(ok ? '已复制' : '复制失败', ok ? 'success' : 'error');
   } catch {
     toast('复制失败');
   }
@@ -1055,20 +1064,12 @@ async function copyText(text: string) {
             </span>
           </div>
 
-          <!-- 测试结果 -->
-          <div
-            v-if="testing === a.id && testResult"
-            class="text-xs font-medium px-2 py-1 rounded-lg text-center"
-            :class="testResult.status === 'ok' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'"
-          >
-            {{ testResult.status === 'ok' ? '连接正常' : testResult.message }}
-          </div>
 
         </div>
         <footer class="account-card-actions">
           <button type="button" @click="openEdit(a)"><Pencil :size="13" />编辑</button>
           <button type="button" @click="refreshUsage(a.id)" :disabled="refreshingUsage === a.id"><RefreshCw :size="13" />{{ refreshingUsage === a.id ? '刷新中' : '用量' }}</button>
-          <button type="button" @click="test(a.id)" :disabled="testing === a.id"><Activity :size="13" />{{ testing === a.id ? '测试中' : '测试' }}</button>
+          <OperationFeedback :status="testStates.get(a.id)?.status" :message="testStates.get(a.id)?.message" :identity="a.name" @action="test(a.id)" />
           <button type="button" @click="openAccountDetails(a)"><ArrowRight :size="13" />详情</button>
           <button type="button" @click="confirmDelete(a.id)" class="danger"><Trash2 :size="13" />删除</button>
         </footer>
@@ -1109,7 +1110,7 @@ async function copyText(text: string) {
             <div v-for="window in usageWindows" :key="window.key" class="account-usage-window"><UsageWindowStats v-if="window.key!=='seven_day_fable'" :stats="detailAccount.request_usage?.[window.key]" :label="window.key==='five_hour'?'5h':'7d'" /><div class="usage-window-label"><span>{{ window.label }}</span><strong>{{ usagePercentLabel(usageWindow(detailAccount.usage_data,window.key)) }}</strong></div><div class="usage-window-bar"><i :class="usageBarColor(effectiveUtil(usageWindow(detailAccount.usage_data,window.key)))" :style="{width:Math.min(100,effectiveUtil(usageWindow(detailAccount.usage_data,window.key)))+'%'}" /></div><p v-if="hasFutureReset(usageWindow(detailAccount.usage_data,window.key))" class="usage-window-reset">{{ formatTimeLeft(usageWindow(detailAccount.usage_data,window.key)?.resets_at) }} 后重置</p></div>
           </section>
           <dl class="account-overview-settings"><div><dt>订阅方案</dt><dd>{{ subscriptionLabel(detailAccount.subscription_type,detailAccount.rate_limit_tier) }}</dd></div><div><dt>并发上限</dt><dd>{{ detailAccount.concurrency }}</dd></div><div><dt>RPM 上限</dt><dd>{{ detailAccount.rpm_limit || '不限' }}</dd></div><div><dt>调度优先级</dt><dd>{{ detailAccount.priority }}</dd></div></dl>
-          <div class="account-overview-actions"><Button variant="outline" @click="refreshUsage(detailAccount.id)" :disabled="refreshingUsage===detailAccount.id"><RefreshCw :size="14" />刷新用量</Button><Button variant="outline" @click="test(detailAccount.id)" :disabled="testing===detailAccount.id"><Activity :size="14" />测试连接</Button><Button variant="outline" @click="changeWorkspaceTab('scheduling')"><ArrowRight :size="14" />调度详情</Button><Button variant="outline" @click="toggleScheduling(detailAccount)">{{ detailAccount.status==='disabled'?'启用账号':'停用账号' }}</Button></div>
+          <div class="account-overview-actions"><Button variant="outline" @click="refreshUsage(detailAccount.id)" :disabled="refreshingUsage===detailAccount.id"><RefreshCw :size="14" />刷新用量</Button><OperationFeedback label="测试连接" :status="testStates.get(detailAccount.id)?.status" :message="testStates.get(detailAccount.id)?.message" :identity="detailAccount.name" @action="test(detailAccount.id)" /><Button variant="outline" @click="changeWorkspaceTab('scheduling')"><ArrowRight :size="14" />调度详情</Button><Button variant="outline" @click="toggleScheduling(detailAccount)">{{ detailAccount.status==='disabled'?'启用账号':'停用账号' }}</Button></div>
         </div>
         <form v-show="workspaceTab === 'configuration'" @submit.prevent="save" class="account-editor-form">
           <div class="account-editor-scroll complete-account-form">
@@ -1139,22 +1140,22 @@ async function copyText(text: string) {
           <details class="account-diagnostic-technical"><summary>技术与调度详情</summary>
         <div v-if="detailAccount" class="account-detail-scroll space-y-5">
             <div class="grid grid-cols-5 gap-2">
-              <InfoTooltip label="查看评分计算" title="调度评分计算"><template #trigger><span class="text-center block"><span class="block text-[10px] text-muted-foreground">{{ detailAccount.v3_scheduling ? '旧评分' : '评分' }}</span><strong class="text-sm font-medium">{{ detailAccount.scheduling_score?.toFixed(2) ?? '0.00' }}</strong></span></template><div v-if="detailAccount.scheduling_detail" class="account-score-explanation"><p>7 天：{{ detailAccount.scheduling_detail.detail_7d?.utilization?.toFixed(2) ?? '0' }}% × {{ detailAccount.scheduling_detail.detail_7d?.decay?.toFixed(2) ?? '1' }} = {{ detailAccount.scheduling_detail.eff_7d.toFixed(2) }} × {{ detailAccount.scheduling_detail.weights?.w7d ?? 0.5 }} = {{ (detailAccount.scheduling_detail.eff_7d * (detailAccount.scheduling_detail.weights?.w7d ?? 0.5)).toFixed(2) }}</p><p>5 小时：{{ detailAccount.scheduling_detail.detail_5h?.utilization?.toFixed(2) ?? '0' }}% × {{ detailAccount.scheduling_detail.detail_5h?.decay?.toFixed(2) ?? '1' }} = {{ detailAccount.scheduling_detail.eff_5h.toFixed(2) }} × {{ detailAccount.scheduling_detail.weights?.w5h ?? 0.3 }} = {{ (detailAccount.scheduling_detail.eff_5h * (detailAccount.scheduling_detail.weights?.w5h ?? 0.3)).toFixed(2) }}</p><p>负载：{{ detailAccount.scheduling_detail.concurrency_pct.toFixed(2) }}% × {{ detailAccount.scheduling_detail.weights?.wconc ?? 0.2 }}</p><p>合计 {{ detailAccount.scheduling_score?.toFixed(2) }} · 越小越优先</p><small>负载包含活跃标准槽位与排队预计槽位。</small></div><p v-else>评分详情尚未观测。</p></InfoTooltip>
-              <InfoTooltip label="查看并发详情" title="并发与排队"><template #trigger><span class="block text-center"><span class="block text-[10px] text-muted-foreground">并发</span><strong class="text-sm font-medium" :class="concurrencyClass(detailAccount)">{{ concurrencyLabel(detailAccount) }}</strong></span></template><div class="account-score-explanation"><p>标准槽位 {{ formatConcurrencySlots(detailAccount.current_concurrency) }} / {{ formatConcurrencySlots(detailAccount.concurrency) }}</p><p>内部单位 {{ formatConcurrencyUnits(detailAccount.current_concurrency_units) }} / {{ formatConcurrencyUnits(detailAccount.max_concurrency_units) }}</p><p>活跃请求 {{ detailAccount.active_requests ?? 0 }} · 排队请求 {{ detailAccount.queued_requests ?? 0 }}</p><p>排队单位 {{ formatConcurrencyUnits(detailAccount.queued_request_units) }}</p><small>普通请求占用 1 并发，Haiku 占用 0.5 并发。</small></div></InfoTooltip>
+              <InfoTooltip label="查看评分计算" title="调度评分计算"><template #trigger><span class="text-center block"><span class="block text-[length:var(--ui-font-small)] text-muted-foreground">{{ detailAccount.v3_scheduling ? '旧评分' : '评分' }}</span><strong class="text-sm font-medium">{{ detailAccount.scheduling_score?.toFixed(2) ?? '0.00' }}</strong></span></template><div v-if="detailAccount.scheduling_detail" class="account-score-explanation"><p>7 天：{{ detailAccount.scheduling_detail.detail_7d?.utilization?.toFixed(2) ?? '0' }}% × {{ detailAccount.scheduling_detail.detail_7d?.decay?.toFixed(2) ?? '1' }} = {{ detailAccount.scheduling_detail.eff_7d.toFixed(2) }} × {{ detailAccount.scheduling_detail.weights?.w7d ?? 0.5 }} = {{ (detailAccount.scheduling_detail.eff_7d * (detailAccount.scheduling_detail.weights?.w7d ?? 0.5)).toFixed(2) }}</p><p>5 小时：{{ detailAccount.scheduling_detail.detail_5h?.utilization?.toFixed(2) ?? '0' }}% × {{ detailAccount.scheduling_detail.detail_5h?.decay?.toFixed(2) ?? '1' }} = {{ detailAccount.scheduling_detail.eff_5h.toFixed(2) }} × {{ detailAccount.scheduling_detail.weights?.w5h ?? 0.3 }} = {{ (detailAccount.scheduling_detail.eff_5h * (detailAccount.scheduling_detail.weights?.w5h ?? 0.3)).toFixed(2) }}</p><p>负载：{{ detailAccount.scheduling_detail.concurrency_pct.toFixed(2) }}% × {{ detailAccount.scheduling_detail.weights?.wconc ?? 0.2 }}</p><p>合计 {{ detailAccount.scheduling_score?.toFixed(2) }} · 越小越优先</p><small>负载包含活跃标准槽位与排队预计槽位。</small></div><p v-else>评分详情尚未观测。</p></InfoTooltip>
+              <InfoTooltip label="查看并发详情" title="并发与排队"><template #trigger><span class="block text-center"><span class="block text-[length:var(--ui-font-small)] text-muted-foreground">并发</span><strong class="text-sm font-medium" :class="concurrencyClass(detailAccount)">{{ concurrencyLabel(detailAccount) }}</strong></span></template><div class="account-score-explanation"><p>标准槽位 {{ formatConcurrencySlots(detailAccount.current_concurrency) }} / {{ formatConcurrencySlots(detailAccount.concurrency) }}</p><p>内部单位 {{ formatConcurrencyUnits(detailAccount.current_concurrency_units) }} / {{ formatConcurrencyUnits(detailAccount.max_concurrency_units) }}</p><p>活跃请求 {{ detailAccount.active_requests ?? 0 }} · 排队请求 {{ detailAccount.queued_requests ?? 0 }}</p><p>排队单位 {{ formatConcurrencyUnits(detailAccount.queued_request_units) }}</p><small>普通请求占用 1 并发，Haiku 占用 0.5 并发。</small></div></InfoTooltip>
               <div class="text-center">
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider">排队</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider">排队</p>
                 <p class="text-sm font-medium" :class="(detailAccount.queued_requests ?? 0) > 0 ? 'text-amber-600' : 'text-foreground'">
                   {{ detailAccount.queued_requests ?? 0 }}
                 </p>
               </div>
               <div class="text-center">
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider">429 等待</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider">429 等待</p>
                 <p class="text-sm font-medium" :class="transientBackoffClass(detailAccount)">
                   {{ transientBackoffLabel(detailAccount) }}
                 </p>
               </div>
               <div class="text-center">
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider">{{ detailAccount.v3_scheduling ? '60秒提交 / RPM' : 'RPM' }}</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider">{{ detailAccount.v3_scheduling ? '60秒提交 / RPM' : 'RPM' }}</p>
                 <p class="text-sm font-medium" :class="rpmClass(detailAccount)">
                   {{ rpmLabel(detailAccount) }}
                 </p>
@@ -1163,24 +1164,24 @@ async function copyText(text: string) {
             <div v-if="detailAccount.v3_scheduling" class="rounded-lg border border-border bg-muted p-3 space-y-2">
               <div class="flex justify-between items-center gap-2 text-xs"><span class="font-medium text-foreground">{{ detailAccount.v3_scheduling.config.mode === 'smart' ? '智能调度' : '旧评分排序' }}</span><span :class="detailAccount.v3_scheduling.capacity.immediate ? 'text-emerald-700' : 'text-amber-700'">{{ schedulingReasonLabel(detailAccount.v3_scheduling.capacity.reason) }}</span></div>
               <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>绑定 {{ detailAccount.v3_scheduling.bound_sessions }} 个会话</span><span>活跃 {{ detailAccount.v3_scheduling.active_sessions }} 个</span><span>执行 {{ detailAccount.v3_scheduling.phases.running }} 个请求</span></div>
-              <p class="text-[11px] text-muted-foreground">等槽 {{ detailAccount.v3_scheduling.phases.waiting_concurrency }} · 准备 {{ detailAccount.v3_scheduling.phases.preparing }} · 等发 {{ detailAccount.v3_scheduling.phases.waiting_send }} · 退避 {{ detailAccount.v3_scheduling.phases.backoff }}</p>
-              <div class="flex justify-between items-center"><span class="text-[10px] text-muted-foreground">{{ detailAccount.v3_scheduling.config.mode === 'smart' ? '智能偏好 ' + (detailAccount.v3_scheduling.factors.score * 100).toFixed(1) + '（高优）' : '旧评分低分优先' }}</span><Button variant="outline" size="sm" class="text-xs h-7" @click="changeWorkspaceTab('scheduling')">调度详情</Button></div>
+              <p class="text-[length:var(--ui-font-small)] text-muted-foreground">等槽 {{ detailAccount.v3_scheduling.phases.waiting_concurrency }} · 准备 {{ detailAccount.v3_scheduling.phases.preparing }} · 等发 {{ detailAccount.v3_scheduling.phases.waiting_send }} · 退避 {{ detailAccount.v3_scheduling.phases.backoff }}</p>
+              <div class="flex justify-between items-center"><span class="text-[length:var(--ui-font-small)] text-muted-foreground">{{ detailAccount.v3_scheduling.config.mode === 'smart' ? '智能偏好 ' + (detailAccount.v3_scheduling.factors.score * 100).toFixed(1) + '（高优）' : '旧评分低分优先' }}</span><Button variant="outline" size="sm" class="text-xs h-7" @click="changeWorkspaceTab('scheduling')">调度详情</Button></div>
             </div>
             <div v-else-if="detailAccount.v3_scheduling_error" class="rounded-lg bg-amber-50 p-3 text-xs text-amber-700">{{ detailAccount.v3_scheduling_error }}，不代表零负载。<button class="underline ml-2" @click="changeWorkspaceTab('scheduling')">查看详情</button></div>
             <p class="text-xs text-muted-foreground">转发方式：{{ detailAccount.request_backend === 'native293' ? '原生运行时 2.1.293' : '原有转发' }}</p>
             <div class="grid grid-cols-3 gap-3">
               <div class="text-center">
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider">优先级</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider">优先级</p>
                 <p class="text-sm font-medium text-foreground">{{ detailAccount.priority }}</p>
               </div>
               <div class="text-center">
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider">Billing</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider">Billing</p>
                 <p class="text-sm font-medium" :class="detailAccount.billing_mode === 'rewrite' ? 'text-amber-600' : 'text-foreground'">
                   {{ detailAccount.billing_mode === 'rewrite' ? '重写' : '清除' }}
                 </p>
               </div>
               <div class="text-center">
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider">上游池槽位</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider">上游池槽位</p>
                 <p class="text-sm font-medium" :class="upstreamSessionPoolClass(detailAccount)">
                   {{ upstreamSessionPoolLabel(detailAccount) }}
                 </p>
@@ -1188,15 +1189,15 @@ async function copyText(text: string) {
             </div>
             <div class="account-detail-fields">
               <div>
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">代理</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">代理</p>
                 <p class="text-sm text-muted-foreground truncate">{{ publicProxy(detailAccount.proxy_url) }}</p>
               </div>
               <div>
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">认证方式</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">认证方式</p>
                 <p class="text-sm text-muted-foreground truncate">{{ authTypeLabel(detailAccount.auth_type) }}</p>
               </div>
               <div>
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">自动遥测</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">自动遥测</p>
                 <p class="text-sm" :class="detailAccount.auto_telemetry ? 'text-emerald-600' : 'text-muted-foreground'">
                   {{ detailAccount.auto_telemetry ? '已开启' : '关闭' }}
                   <span v-if="detailAccount.telemetry_count > 0" class="text-muted-foreground text-xs">· 已发送 {{ detailAccount.telemetry_count }} 次</span>
@@ -1206,40 +1207,40 @@ async function copyText(text: string) {
                 </p>
               </div>
               <div v-if="detailAccount.upstream_session_pool_enabled && detailAccount.upstream_session_pool_size > 0">
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">上游 Session 池</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">上游 Session 池</p>
                 <p class="text-sm text-muted-foreground truncate">
                   TTL {{ detailAccount.upstream_session_ttl_minutes }} 分钟 · {{ upstreamSessionPolicyLabel(detailAccount.upstream_session_refresh_policy) }}
                 </p>
               </div>
               <div v-if="detailAccount.auth_type === 'oauth'">
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">自动轮询用量</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">自动轮询用量</p>
                 <p class="text-sm" :class="detailAccount.auto_poll_usage ? 'text-emerald-600' : 'text-muted-foreground'">
                   {{ detailAccount.auto_poll_usage ? '已开启' : '关闭' }}
                 </p>
               </div>
               <div>
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">
                   {{ detailAccount.auth_type === 'oauth' ? 'Refresh Token' : 'Setup Token' }}
                 </p>
-                <p class="font-mono text-[11px] text-muted-foreground truncate">{{ authSecretPreview(detailAccount) }}</p>
+                <p class="font-mono text-[length:var(--ui-font-small)] text-muted-foreground truncate">{{ authSecretPreview(detailAccount) }}</p>
               </div>
               <div v-if="detailAccount.auth_type === 'oauth'">
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">过期时间</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">过期时间</p>
                 <p class="text-sm text-muted-foreground truncate">{{ formatExpiresAt(detailAccount.expires_at) }}</p>
               </div>
               <div v-if="detailAccount.auth_type === 'oauth' && detailAccount.auth_error">
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">认证错误</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">认证错误</p>
                 <p class="text-xs text-red-500 line-clamp-2">{{ detailAccount.auth_error }}</p>
               </div>
               <div>
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">环境指纹</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">环境指纹</p>
                 <p class="text-xs text-muted-foreground truncate">
                   {{ detailAccount.canonical_env?.platform || '—' }} / {{ detailAccount.canonical_env?.arch || '—' }}
                 </p>
                 <p class="text-xs text-muted-foreground mt-0.5">账号基础版本：v{{ detailAccount.canonical_env?.version || '—' }}</p>
               </div>
               <div>
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">画像选择方式</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">画像选择方式</p>
                 <p class="text-xs text-muted-foreground">
                   {{ profileSelectionMode === 'client_version' ? '按客户端 UA 适配' : profileSelectionMode === 'account' ? '使用账号画像' : '未提供画像配置' }}
                 </p>
@@ -1248,13 +1249,13 @@ async function copyText(text: string) {
                 </p>
               </div>
               <div>
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">提示词环境</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">提示词环境</p>
                 <p class="text-xs text-muted-foreground truncate">
                   {{ detailAccount.canonical_prompt_env?.platform || '—' }} · {{ detailAccount.canonical_prompt_env?.shell || '—' }} · {{ detailAccount.canonical_prompt_env?.working_dir || '—' }}
                 </p>
               </div>
               <div>
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">进程指纹</p>
+                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">进程指纹</p>
                 <template v-if="detailAccount.canonical_process?.observation?.source === 'v3:procfs:cli'">
                   <p class="text-xs text-muted-foreground">
                     容器内存上限 {{ detailAccount.canonical_process.constrained_memory === 0 ? '不限' : formatBytes(detailAccount.canonical_process.constrained_memory, 2) }}
@@ -1262,7 +1263,7 @@ async function copyText(text: string) {
                   <p class="text-xs text-muted-foreground">
                     CLI RSS {{ detailAccount.canonical_process.observation.sample_count ? formatBytes(detailAccount.canonical_process.observation.rss_bytes ?? undefined, 2) : '未采集' }}
                   </p>
-                  <p v-if="detailAccount.canonical_process.observation.sampled_at" class="text-[10px] text-muted-foreground">
+                  <p v-if="detailAccount.canonical_process.observation.sampled_at" class="text-[length:var(--ui-font-small)] text-muted-foreground">
                     官方 CLI 进程采样 · {{ new Date(detailAccount.canonical_process.observation.sampled_at * 1000).toLocaleString('zh-CN') }}
                   </p>
                 </template>
@@ -1275,32 +1276,7 @@ async function copyText(text: string) {
       </DialogContent>
     </Dialog>
 
-    <!-- 删除确认弹窗 -->
-    <Dialog v-model:open="showDeleteConfirm">
-      <DialogContent class="bg-white border-border rounded-2xl text-foreground sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle class="text-foreground">确认删除</DialogTitle>
-          <DialogDescription class="text-muted-foreground">
-            此操作不可撤销，确认要删除此账号吗？
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter class="gap-2 pt-4">
-          <Button
-            variant="ghost"
-            @click="showDeleteConfirm = false"
-            class="text-muted-foreground hover:text-foreground hover:bg-muted"
-          >
-            取消
-          </Button>
-          <Button
-            @click="executeDelete"
-            variant="destructive"
-          >
-            删除
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmationDialog :open="showDeleteConfirm" title="确认删除账号" message="此操作不可撤销，确认要删除此账号吗？" confirm-label="删除" danger :busy="deletingAccount" :error="deleteError" @confirm="executeDelete" @cancel="showDeleteConfirm=false" />
 
     <!-- 授权登录沿用定稿的紧凑表单，真实会话与凭据交接保持原接口。 -->
     <Dialog v-model:open="showOAuthFlow">
