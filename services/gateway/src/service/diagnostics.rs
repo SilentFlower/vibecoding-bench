@@ -611,6 +611,7 @@ impl AttemptTrace {
             "upstream_rejected" => Some("upstream_headers".into()),
             _ => Some("upstream_body".into()),
         };
+        record.duration_ms = Some(self.start.elapsed().as_millis().min(u64::MAX as u128) as u64);
         if let Some(feedback) = self.feedback.take() {
             feedback.finish_observed_attempt(
                 record.account_id,
@@ -618,10 +619,10 @@ impl AttemptTrace {
                 &record.outcome,
                 record.error_type.as_deref(),
                 record.first_output_ms,
+                record.duration_ms,
             );
         }
         record.finished_at = Some(now());
-        record.duration_ms = Some(self.start.elapsed().as_millis() as u64);
         {
             let mut state = self.trace.lock();
             if state
@@ -985,7 +986,7 @@ mod tests {
             max_units: 8,
             queued: 0,
             queued_units: 0,
-            legacy_score: 0.0,
+
             next_send_ms: 0,
         };
         let factor = scheduler

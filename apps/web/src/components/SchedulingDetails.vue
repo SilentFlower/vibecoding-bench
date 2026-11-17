@@ -42,7 +42,10 @@ const events = computed(() => detail.value?.snapshot.events.filter(event => even
 const factors = computed(() => summary.value ? [
   ['负载', summary.value.factors.load], ['额度', summary.value.factors.quota],
   ['健康', summary.value.factors.health], ['首输出延迟（汇总）', summary.value.factors.latency],
+  ...(summary.value.config.reset_weight && summary.value.factors.reset != null ? [['重置偏好', summary.value.factors.reset] as const] : []),
+  ...(summary.value.config.queue_weight && summary.value.factors.queue != null ? [['排队偏好', summary.value.factors.queue] as const] : []),
 ] as const : []);
+const waitBasisLabel = computed(() => ({ pacing: '按发送间隔估算', sampled: '按成功请求总耗时估算（账号汇总）', pressure: '按队列压力比较，预计时长未知' }[summary.value?.factors.wait_basis ?? 'pressure']));
 
 /** 将绝对提交时间映射到同一时间轴。@param time UTC 毫秒。@return SVG 横坐标。 */
 function x(time: number): number {
@@ -166,7 +169,7 @@ onUnmounted(() => { stop(); document.removeEventListener('visibilitychange', syn
       <p v-if="!detail && loading" class="text-sm text-muted-foreground">正在读取调度快照…</p>
       <template v-if="detail && summary">
         <div class="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
-          <span>{{ summary.config.mode === 'smart' ? '智能排序' : '旧评分排序' }} · {{ schedulingReasonLabel(summary.capacity.reason) }} · 常规请求容量快照</span>
+          <span>智能排序 · {{ schedulingReasonLabel(summary.capacity.reason) }} · 常规请求容量快照</span>
           <span>{{ stale ? '快照已陈旧' : '观测于 ' + timeLabel(summary.observed_at_ms) }}</span>
         </div>
         <div class="scheduling-metrics grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -201,6 +204,9 @@ onUnmounted(() => { stop(); document.removeEventListener('visibilitychange', syn
           <div v-for="factor in factors" :key="factor[0]" class="text-xs"><div class="flex justify-between mb-1"><span>{{ factor[0] }}</span><span>{{ (factor[1] * 100).toFixed(0) }}</span></div><div class="h-1.5 rounded bg-border"><div class="h-full rounded bg-primary" :style="{ width: Math.max(0, Math.min(100, factor[1] * 100)) + '%' }" /></div></div>
         </div>
         <p class="text-[length:var(--ui-font-small)] text-muted-foreground">归一化偏好越高越优，仅影响新会话。延迟取成功请求的首个有效文字、思考或工具输出；图中为账号汇总，实际选号按模型、思考参数和流式方式分别比较。未知额度或反馈保持中性。</p>
+        <p v-if="summary.config.queue_weight && summary.factors.wait_score != null" class="text-xs text-muted-foreground">基础偏好 {{ (summary.factors.score * 100).toFixed(1) }} · 等待排序偏好 {{ (summary.factors.wait_score * 100).toFixed(1) }} · {{ waitBasisLabel }}<span v-if="summary.factors.estimated_wait_ms != null"> · 预计等待 {{ (summary.factors.estimated_wait_ms / 1000).toFixed(1) }} 秒</span>。等待排序单独计算运行负载和等待代价。</p>
+        <p v-if="summary.factors.quota_state === 'reset_pending'" class="text-xs text-amber-700">旧额度周期已结束，等待自动刷新用量。</p>
+        <p v-else-if="summary.factors.quota_state === 'unknown'" class="text-xs text-muted-foreground">尚无有效额度观测，额度分暂按中性计算。</p>
         <div class="space-y-3 border-t border-border pt-4">
           <h3 class="text-sm font-semibold">网关绑定会话</h3>
           <div class="scheduling-filters">

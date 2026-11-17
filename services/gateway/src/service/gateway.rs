@@ -21900,7 +21900,10 @@ data: {"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":{"out
         assert_eq!(response.status(), StatusCode::OK);
         let body = body::to_bytes(response.into_body(), 65536).await.unwrap();
         assert_eq!(body.as_ref(), wire);
-        let score = service.account_svc.get_account_score_info(&account).await;
+        let score = service
+            .account_svc
+            .get_account_capacity_info(&account)
+            .await;
         let summary = service
             .account_svc
             .v3_summary(&account, &score, 0)

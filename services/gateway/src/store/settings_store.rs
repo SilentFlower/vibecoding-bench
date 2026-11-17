@@ -134,11 +134,23 @@ pub const DEFAULT_V3_SMART_WEIGHT_LOAD: &str = "1";
 pub const DEFAULT_V3_SMART_WEIGHT_QUOTA: &str = "0.8";
 /// 智能健康权重默认值。
 pub const DEFAULT_V3_SMART_WEIGHT_HEALTH: &str = "1";
-/// 智能响应头延迟权重默认值。
+/// 智能首输出延迟权重默认值。
 pub const DEFAULT_V3_SMART_WEIGHT_LATENCY: &str = "0.5";
+/// 默认关闭重置偏好，保持已有账号排序。
+pub const DEFAULT_V3_SMART_WEIGHT_RESET: &str = "0";
+/// 默认关闭独立排队偏好，保留原负载排序。
+pub const DEFAULT_V3_SMART_WEIGHT_QUEUE: &str = "0";
+/// 开启重置偏好后，两个普通窗口默认等权。
+pub const DEFAULT_V3_SMART_RESET_WINDOW_WEIGHT: &str = "1";
+/// 已退役的旧评分设置，读取、保存与启动补齐共用该集合。
+pub const OBSOLETE_SCHEDULING_KEYS: &[&str] = &[
+    "v3_scheduling_mode",
+    "score_weight_7d",
+    "score_weight_5h",
+    "score_weight_concurrency",
+];
 /// 迁移、设置展示与解析共用的 v3 默认值。
 pub const V3_SCHEDULING_DEFAULTS: &[(&str, &str)] = &[
-    ("v3_scheduling_mode", DEFAULT_V3_SCHEDULING_MODE),
     (
         "v3_admission_wait_seconds",
         DEFAULT_V3_ADMISSION_WAIT_SECONDS,
@@ -147,6 +159,16 @@ pub const V3_SCHEDULING_DEFAULTS: &[(&str, &str)] = &[
     ("v3_smart_weight_quota", DEFAULT_V3_SMART_WEIGHT_QUOTA),
     ("v3_smart_weight_health", DEFAULT_V3_SMART_WEIGHT_HEALTH),
     ("v3_smart_weight_latency", DEFAULT_V3_SMART_WEIGHT_LATENCY),
+    ("v3_smart_weight_reset", DEFAULT_V3_SMART_WEIGHT_RESET),
+    ("v3_smart_weight_queue", DEFAULT_V3_SMART_WEIGHT_QUEUE),
+    (
+        "v3_smart_reset_weight_5h",
+        DEFAULT_V3_SMART_RESET_WINDOW_WEIGHT,
+    ),
+    (
+        "v3_smart_reset_weight_7d",
+        DEFAULT_V3_SMART_RESET_WINDOW_WEIGHT,
+    ),
 ];
 
 /// 全局设置存储，key-value 结构。
@@ -189,6 +211,29 @@ impl SettingsStore {
         .execute(&self.pool)
         .await
         .map_err(|error| AppError::Internal(format!("补齐原生空闲配置失败: {}", error)))?;
+        Ok(())
+    }
+
+    /// 为历史数据库补齐调度配置，已保存的管理员值保持原状。
+    /// @return 同一事务内补齐成功或数据库错误。
+    pub async fn ensure_scheduling_defaults(&self) -> Result<(), AppError> {
+        let mut transaction = self.pool.begin().await?;
+        for (key, value) in V3_SCHEDULING_DEFAULTS {
+            sqlx::query(
+                "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING",
+            )
+            .bind(*key)
+            .bind(*value)
+            .execute(&mut *transaction)
+            .await?;
+        }
+        for key in OBSOLETE_SCHEDULING_KEYS {
+            sqlx::query("DELETE FROM settings WHERE key=$1")
+                .bind(*key)
+                .execute(&mut *transaction)
+                .await?;
+        }
+        transaction.commit().await?;
         Ok(())
     }
 

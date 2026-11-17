@@ -4,18 +4,22 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tokio::sync::{Mutex as AsyncMutex, Notify, OwnedMutexGuard};
 use tokio::time::{Instant, sleep, timeout, timeout_at};
 use uuid::Uuid;
 
 use crate::error::AppError;
-use crate::model::account::Account;
+use crate::model::account::{Account, UsageQuotaState};
 use crate::model::request_diagnostics::DiagnosticParameters;
+use crate::service::account::DEFAULT_REQUEST_SLOT_UNITS;
 use crate::service::diagnostics;
 pub use crate::store::scheduling_store::send_interval_ms;
 use crate::store::scheduling_store::{SchedulingStore, SendClaim, SessionBinding};
-use crate::store::settings_store::{SettingsStore, V3_SCHEDULING_DEFAULTS};
+use crate::store::settings_store::{
+    DEFAULT_V3_SCHEDULING_MODE, SettingsStore, V3_SCHEDULING_DEFAULTS,
+};
 
 const HISTORY_MS: i64 = 5 * 60 * 1000;
 const PER_ACCOUNT_EVENTS: usize = 500;
@@ -29,6 +33,9 @@ pub struct SchedulingConfig {
     pub mode: String,
     pub wait_seconds: u64,
     pub weights: [f64; 4],
+    pub reset_weight: f64,
+    pub queue_weight: f64,
+    pub reset_window_weights: [f64; 2],
 }
 
 impl SchedulingConfig {
@@ -45,23 +52,21 @@ impl SchedulingConfig {
                     .unwrap_or("")
             })
         };
-        let mode = value("v3_scheduling_mode");
-        if !matches!(mode, "smart" | "legacy_score") {
-            return Err(AppError::BadRequest(
-                "v3 调度模式必须为 smart 或 legacy_score".into(),
-            ));
-        }
         let wait_seconds = value("v3_admission_wait_seconds")
             .parse::<u64>()
             .ok()
             .filter(|n| (1..=120).contains(n))
             .ok_or_else(|| AppError::BadRequest("v3 准入等待必须为 1–120 秒整数".into()))?;
-        let mut weights = [0.0; 4];
+        let mut parsed_weights = [0.0; 8];
         for (i, key) in [
             "v3_smart_weight_load",
             "v3_smart_weight_quota",
             "v3_smart_weight_health",
             "v3_smart_weight_latency",
+            "v3_smart_weight_reset",
+            "v3_smart_weight_queue",
+            "v3_smart_reset_weight_5h",
+            "v3_smart_reset_weight_7d",
         ]
         .iter()
         .enumerate()
@@ -71,17 +76,77 @@ impl SchedulingConfig {
                     && (0.0..=10.0).contains(n)
                     && (n * 10.0 - (n * 10.0).round()).abs() < 1e-8
             });
-            weights[i] = parsed
+            parsed_weights[i] = parsed
                 .ok_or_else(|| AppError::BadRequest(format!("{key} 必须为 0–10、最多一位小数")))?;
         }
-        if weights.iter().sum::<f64>() == 0.0 {
+        let [
+            load,
+            quota,
+            health,
+            latency,
+            reset_weight,
+            queue_weight,
+            five_hour,
+            weekly,
+        ] = parsed_weights;
+        let weights = [load, quota, health, latency];
+        let effective_reset_weight = if five_hour + weekly > 0.0 {
+            reset_weight
+        } else {
+            0.0
+        };
+        if weights.iter().sum::<f64>() + effective_reset_weight + queue_weight == 0.0 {
             return Err(AppError::BadRequest("智能调度权重不能全部为零".into()));
         }
         Ok(Self {
-            mode: mode.into(),
+            mode: DEFAULT_V3_SCHEDULING_MODE.into(),
             wait_seconds,
             weights,
+            reset_weight,
+            queue_weight,
+            reset_window_weights: [five_hour, weekly],
         })
+    }
+
+    fn effective_reset_weight(&self) -> f64 {
+        if self.reset_window_weights.iter().sum::<f64>() > 0.0 {
+            self.reset_weight
+        } else {
+            0.0
+        }
+    }
+
+    fn reset_factor(&self, account: &Account, now: i64) -> f64 {
+        if self.effective_reset_weight() == 0.0 {
+            return 0.0;
+        }
+        let windows = [("five_hour", 18000.0), ("seven_day", 604800.0)];
+        let mut score = 0.0;
+        for ((name, period), weight) in windows.into_iter().zip(self.reset_window_weights) {
+            let Some(window) = account.usage_data.get(name) else {
+                continue;
+            };
+            if !window
+                .get("utilization")
+                .and_then(Value::as_f64)
+                .is_some_and(|value| value.is_finite() && value >= 0.0)
+            {
+                continue;
+            }
+            let Some(reset) = window
+                .get("resets_at")
+                .and_then(Value::as_str)
+                .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+            else {
+                continue;
+            };
+            let remaining = reset.timestamp_millis().saturating_sub(now);
+            if remaining > 0 {
+                let half = period / 7.0;
+                score += weight * half / (half + remaining as f64 / 1000.0);
+            }
+        }
+        score / self.reset_window_weights.iter().sum::<f64>()
     }
 }
 
@@ -100,7 +165,6 @@ pub struct SchedulingCandidate {
     pub max_units: i64,
     pub queued: i64,
     pub queued_units: i64,
-    pub legacy_score: f64,
     pub next_send_ms: i64,
 }
 
@@ -109,9 +173,15 @@ pub struct SchedulingCandidate {
 pub struct SmartFactors {
     pub load: f64,
     pub quota: f64,
+    pub quota_state: UsageQuotaState,
     pub health: f64,
     pub latency: f64,
     pub score: f64,
+    pub reset: f64,
+    pub queue: f64,
+    pub wait_score: f64,
+    pub estimated_wait_ms: Option<u64>,
+    pub wait_basis: &'static str,
 }
 
 /// 常规请求的容量快照；不代表通过任意 Token／模型的权限判断。
@@ -244,6 +314,7 @@ impl From<&DiagnosticParameters> for LatencyClass {
 /// 一个分组的首输出平滑值和最近成功采样时间。
 struct LatencySample {
     ewma_ms: f64,
+    service_ms: Option<f64>,
     sampled_at_ms: i64,
 }
 
@@ -253,6 +324,7 @@ struct Feedback {
     failure: f64,
     sampled_at_ms: i64,
     latency_ms: Option<f64>,
+    service_ms: Option<f64>,
     latencies: HashMap<LatencyClass, LatencySample>,
     observed: bool,
 }
@@ -554,11 +626,23 @@ impl V3Scheduler {
         now_ms: i64,
         class: Option<&LatencyClass>,
     ) -> SmartFactors {
+        self.factors_for_units(candidate, config, now_ms, class, DEFAULT_REQUEST_SLOT_UNITS)
+    }
+
+    fn factors_for_units(
+        &self,
+        candidate: &SchedulingCandidate,
+        config: &SchedulingConfig,
+        now_ms: i64,
+        class: Option<&LatencyClass>,
+        slot_units: u32,
+    ) -> SmartFactors {
         let pressure = (candidate.active_units + candidate.queued_units).max(0) as f64
             / candidate.max_units.max(1) as f64;
         let wait = (candidate.next_send_ms - now_ms).max(0) as f64;
         let load = 1.0 / (1.0 + pressure + wait / 1000.0);
-        let quota = remaining_quota(&candidate.account, now_ms);
+        let quota_observation = candidate.account.usage_quota(now_ms);
+        let quota = quota_observation.remaining;
         let state = self.runtime();
         let feedback = state.feedback.get(&candidate.account.id);
         let health = feedback
@@ -572,26 +656,79 @@ impl V3Scheduler {
             })
             .unwrap_or(0.5);
         // 只有管理页使用账号汇总；实际选号缺少同类样本时保持中性，不能借用其它模型。
-        let latency_ms = feedback.and_then(|f| match class {
-            Some(class) => f.latencies.get(class).map(|sample| sample.ewma_ms),
-            None => f.latency_ms,
-        });
+        let sample = feedback.and_then(|f| class.and_then(|class| f.latencies.get(class)));
+        let latency_ms = if class.is_some() {
+            sample.map(|sample| sample.ewma_ms)
+        } else {
+            feedback.and_then(|f| f.latency_ms)
+        };
+        let service_ms = if class.is_some() {
+            sample.and_then(|sample| sample.service_ms)
+        } else {
+            feedback.and_then(|f| f.service_ms)
+        };
+        drop(state);
         let latency = latency_ms
             .map(|ms| 1.0 / (1.0 + ms / 10000.0))
             .unwrap_or(0.5);
         let values = [load, quota, health, latency];
-        let score = values
+        let reset = config.reset_factor(&candidate.account, now_ms);
+        let base_weight = config.weights.iter().sum::<f64>() + config.effective_reset_weight();
+        let weighted = values
             .iter()
             .zip(config.weights)
             .map(|(v, w)| v * w)
             .sum::<f64>()
-            / config.weights.iter().sum::<f64>();
+            + reset * config.effective_reset_weight();
+        let score = if base_weight > 0.0 {
+            weighted / base_weight
+        } else {
+            0.5
+        };
+        let capacity = self.capacity(candidate, slot_units, i64::MAX, now_ms);
+        let pacing_ms = capacity.earliest_submit_at_ms.saturating_sub(now_ms).max(0) as f64;
+        let excess = (candidate.active_units + candidate.queued_units + i64::from(slot_units)
+            - candidate.max_units)
+            .max(0) as f64;
+        let concurrency_wait = excess / candidate.max_units.max(1) as f64;
+        let estimated_wait = if concurrency_wait == 0.0 {
+            Some(pacing_ms)
+        } else {
+            service_ms.map(|ms| (concurrency_wait * ms).max(pacing_ms))
+        };
+        let queue = estimated_wait
+            .map(|ms| 1.0 / (1.0 + ms / 10000.0))
+            .unwrap_or_else(|| 1.0 / (1.0 + pressure + pacing_ms / 10000.0));
+        // 独立排队偏好启用后，队列和发送等待只在等待因素中计一次。
+        let running_load =
+            1.0 / (1.0 + candidate.active_units.max(0) as f64 / candidate.max_units.max(1) as f64);
+        let wait_weight = base_weight + config.queue_weight;
+        let wait_score = if config.queue_weight > 0.0 {
+            (weighted + (running_load - load) * config.weights[0] + queue * config.queue_weight)
+                / wait_weight
+        } else {
+            score
+        };
         SmartFactors {
             load,
             quota,
+            quota_state: quota_observation.state,
             health,
             latency,
             score,
+            reset,
+            queue,
+            wait_score,
+            estimated_wait_ms: estimated_wait.map(|ms| ms.round().min(u64::MAX as f64) as u64),
+            wait_basis: if estimated_wait.is_some() {
+                if concurrency_wait == 0.0 {
+                    "pacing"
+                } else {
+                    "sampled"
+                }
+            } else {
+                "pressure"
+            },
         }
     }
 
@@ -683,16 +820,17 @@ impl V3Scheduler {
         let mut scored: Vec<(Account, f64)> = candidates
             .into_iter()
             .map(|c| {
-                let score = if request.0.config.mode == "legacy_score" {
-                    -c.legacy_score
+                let factors = self.factors_for_units(
+                    &c,
+                    &request.0.config,
+                    now,
+                    Some(&request.0.latency_class),
+                    slot_units,
+                );
+                let score = if immediate {
+                    factors.score
                 } else {
-                    self.factors_for_class(
-                        &c,
-                        &request.0.config,
-                        now,
-                        Some(&request.0.latency_class),
-                    )
-                    .score
+                    factors.wait_score
                 };
                 (c.account, score)
             })
@@ -701,12 +839,7 @@ impl V3Scheduler {
             .iter()
             .map(|(_, s)| *s)
             .fold(f64::NEG_INFINITY, f64::max);
-        let tolerance = if request.0.config.mode == "smart" {
-            0.05
-        } else {
-            0.01
-        };
-        scored.retain(|(_, score)| best - score <= tolerance);
+        scored.retain(|(_, score)| best - score <= 0.05);
         scored.sort_by_key(|(a, _)| a.id);
         let mut state = self.runtime();
         let previous = state.rotations.get(&priority).copied().unwrap_or(0);
@@ -824,6 +957,7 @@ impl V3Scheduler {
         failure: bool,
         capacity: bool,
         latency_ms: Option<f64>,
+        service_ms: Option<f64>,
         class: &LatencyClass,
     ) {
         let now = now_ms();
@@ -853,10 +987,24 @@ impl V3Scheduler {
             }
             let sample = f.latencies.entry(class.clone()).or_insert(LatencySample {
                 ewma_ms: ms,
+                service_ms: None,
                 sampled_at_ms: now,
             });
             sample.ewma_ms = sample.ewma_ms * 0.8 + ms * 0.2;
             sample.sampled_at_ms = now;
+            if let Some(duration) =
+                service_ms.filter(|duration| duration.is_finite() && *duration >= ms)
+            {
+                sample.service_ms = Some(
+                    sample
+                        .service_ms
+                        .map_or(duration, |old| old * 0.8 + duration * 0.2),
+                );
+                f.service_ms = Some(
+                    f.service_ms
+                        .map_or(duration, |old| old * 0.8 + duration * 0.2),
+                );
+            }
         }
         if state.feedback.len() > MAX_OBSERVED_ACCOUNTS {
             if let Some(oldest) = state
@@ -1070,6 +1218,7 @@ impl SchedulingRequest {
                     status >= 500,
                     false,
                     None,
+                    None,
                     &self.0.latency_class,
                 );
             }
@@ -1082,6 +1231,7 @@ impl SchedulingRequest {
     /// @param outcome 已有观察器判定的终态。
     /// @param error_type 白名单错误类型。
     /// @param latency_ms 已观察到的首个有效输出耗时；未采到时为空。
+    /// @param duration_ms 完整尝试的总耗时，用于估算并发等待。
     /// @return 无；本地取消、采样失败和用户输入错误不惩罚账号。
     pub(crate) fn finish_observed_attempt(
         &self,
@@ -1090,6 +1240,7 @@ impl SchedulingRequest {
         outcome: &str,
         error_type: Option<&str>,
         latency_ms: Option<u64>,
+        duration_ms: Option<u64>,
     ) {
         if outcome == "success" {
             self.0.scheduler.feedback(
@@ -1097,6 +1248,7 @@ impl SchedulingRequest {
                 false,
                 false,
                 latency_ms.map(|ms| ms as f64),
+                duration_ms.map(|ms| ms as f64),
                 &self.0.latency_class,
             );
         } else if error_type != Some("session_policy_refusal")
@@ -1115,7 +1267,7 @@ impl SchedulingRequest {
         {
             self.0
                 .scheduler
-                .feedback(account_id, true, false, None, &self.0.latency_class);
+                .feedback(account_id, true, false, None, None, &self.0.latency_class);
         }
     }
 
@@ -1133,7 +1285,7 @@ impl SchedulingRequest {
         {
             self.0
                 .scheduler
-                .feedback(account_id, true, false, None, &self.0.latency_class);
+                .feedback(account_id, true, false, None, None, &self.0.latency_class);
         }
     }
 
@@ -1143,7 +1295,7 @@ impl SchedulingRequest {
     pub fn capacity_rejected(&self, account_id: i64) {
         self.0
             .scheduler
-            .feedback(account_id, true, true, None, &self.0.latency_class);
+            .feedback(account_id, true, true, None, None, &self.0.latency_class);
     }
 }
 
@@ -1157,27 +1309,13 @@ fn limited() -> AppError {
     AppError::AdmissionLimited { retry_after: 1 }
 }
 
-fn remaining_quota(account: &Account, now: i64) -> f64 {
-    let windows = ["five_hour", "seven_day"]
-        .into_iter()
-        .filter_map(|name| {
-            let window = account.usage_data.get(name)?;
-            let usage = window
-                .get("utilization")?
-                .as_f64()
-                .filter(|v| v.is_finite() && *v >= 0.0)?;
-            let reset = DateTime::parse_from_rfc3339(window.get("resets_at")?.as_str()?).ok()?;
-            (reset.timestamp_millis() > now).then_some(1.0 - (usage / 100.0).clamp(0.0, 1.0))
-        })
-        .collect::<Vec<_>>();
-    windows.into_iter().reduce(f64::min).unwrap_or(0.5)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Duration as ChronoDuration;
     use serde_json::json;
     use sqlx::any::AnyPoolOptions;
+    use std::hint::black_box;
 
     fn scheduler() -> Arc<V3Scheduler> {
         sqlx::any::install_default_drivers();
@@ -1204,9 +1342,317 @@ mod tests {
             max_units: 8,
             queued: 0,
             queued_units: 0,
-            legacy_score: 0.0,
+
             next_send_ms: 0,
         }
+    }
+
+    /// 新权重兼容历史配置，非法值拒绝；仅排队权重也形成有效策略。
+    #[test]
+    fn scheduling_preferences_validate_and_ignore_retired_mode() {
+        let defaults = SchedulingConfig::default();
+        assert_eq!(defaults.reset_weight, 0.0);
+        assert_eq!(defaults.queue_weight, 0.0);
+        assert_eq!(defaults.reset_window_weights, [1.0, 1.0]);
+        for key in [
+            "v3_smart_weight_reset",
+            "v3_smart_weight_queue",
+            "v3_smart_reset_weight_5h",
+            "v3_smart_reset_weight_7d",
+        ] {
+            for value in ["", "NaN", "-1", "11", "0.01"] {
+                assert!(
+                    SchedulingConfig::parse(&HashMap::from([(key.into(), value.into())])).is_err()
+                );
+            }
+        }
+        let mut values = HashMap::from([
+            ("v3_smart_weight_load".into(), "0".into()),
+            ("v3_smart_weight_quota".into(), "0".into()),
+            ("v3_smart_weight_health".into(), "0".into()),
+            ("v3_smart_weight_latency".into(), "0".into()),
+        ]);
+        assert!(SchedulingConfig::parse(&values).is_err());
+        values.insert("v3_smart_weight_queue".into(), "0.5".into());
+        values.insert("v3_scheduling_mode".into(), "legacy_score".into());
+        assert_eq!(SchedulingConfig::parse(&values).unwrap().mode, "smart");
+    }
+
+    /// 重置奖励仅使用未来真实窗口，实际选择服从更近的重置时间。
+    #[tokio::test]
+    async fn scheduling_preferences_reset_changes_selection_and_excludes_expired_windows() {
+        let scheduler = scheduler();
+        let config = SchedulingConfig {
+            weights: [0.0; 4],
+            reset_weight: 1.0,
+            reset_window_weights: [1.0, 0.0],
+            ..Default::default()
+        };
+        scheduler.apply_config(config.clone());
+        let mut near = candidate(10);
+        near.account.usage_data =
+            json!({"five_hour":{"utilization":40,"resets_at":Utc::now()+ChronoDuration::hours(1)}});
+        let mut far = candidate(12);
+        far.account.usage_data =
+            json!({"five_hour":{"utilization":40,"resets_at":Utc::now()+ChronoDuration::hours(3)}});
+        let request = scheduler.begin(0, None);
+        assert_eq!(
+            scheduler.choose(vec![near, far], &request, 2).unwrap().id,
+            10
+        );
+        let mut expired = candidate(10);
+        for window in [
+            json!({"utilization":40,"resets_at":Utc::now()-ChronoDuration::seconds(1)}),
+            json!({"utilization":40,"resets_at":null}),
+            json!({"utilization":-1,"resets_at":Utc::now()+ChronoDuration::hours(1)}),
+        ] {
+            expired.account.usage_data = json!({"five_hour":window});
+            assert_eq!(scheduler.factors(&expired, &config, now_ms()).reset, 0.0);
+        }
+        expired.account.usage_data =
+            json!({"five_hour":{"utilization":0,"resets_at":Utc::now()+ChronoDuration::hours(1)}});
+        let mut disabled = config.clone();
+        disabled.reset_window_weights = [0.0; 2];
+        assert_eq!(scheduler.factors(&expired, &disabled, now_ms()).reset, 0.0);
+        let mut mixed = config.clone();
+        mixed.reset_window_weights = [1.0; 2];
+        assert!(
+            (scheduler.factors(&expired, &mixed, now_ms()).reset * 2.0
+                - scheduler.factors(&expired, &config, now_ms()).reset)
+                .abs()
+                < 1e-6
+        );
+    }
+
+    /// 排队采用完整请求耗时；即时容量优先，缺少同组样本时明确回退。
+    #[tokio::test]
+    async fn scheduling_preferences_queue_uses_service_duration_and_preserves_immediate_selection()
+    {
+        let scheduler = scheduler();
+        scheduler.apply_config(SchedulingConfig {
+            weights: [0.0; 4],
+            queue_weight: 1.0,
+            ..Default::default()
+        });
+        let parameters =
+            DiagnosticParameters::from_request(&json!({"model":"claude-sonnet-5","stream":true}));
+        let request = scheduler.begin_with_parameters(0, None, &parameters);
+        request.finish_observed_attempt(10, Some(200), "success", None, Some(100), Some(120000));
+        request.finish_observed_attempt(12, Some(200), "success", None, Some(200), Some(2000));
+        let mut slow = candidate(10);
+        slow.active_units = 8;
+        let mut fast = candidate(12);
+        fast.active_units = 8;
+        fast.queued = 2;
+        fast.queued_units = 4;
+        let factors = scheduler.factors_for_units(
+            &slow,
+            &scheduler.config(),
+            now_ms(),
+            Some(&request.0.latency_class),
+            2,
+        );
+        assert_eq!(factors.estimated_wait_ms, Some(30000));
+        assert_eq!(factors.wait_basis, "sampled");
+        assert_eq!(
+            scheduler.choose(vec![slow, fast], &request, 2).unwrap().id,
+            12
+        );
+        assert_eq!(
+            scheduler
+                .choose(vec![candidate(10), candidate(12)], &request, 2)
+                .unwrap()
+                .id,
+            10
+        );
+        let other = scheduler.begin_with_parameters(
+            0,
+            None,
+            &DiagnosticParameters::from_request(&json!({"model":"claude-opus-5"})),
+        );
+        let mut busy = candidate(10);
+        busy.active_units = 8;
+        let unknown = scheduler.factors_for_units(
+            &busy,
+            &scheduler.config(),
+            now_ms(),
+            Some(&other.0.latency_class),
+            2,
+        );
+        assert_eq!(unknown.estimated_wait_ms, None);
+        assert_eq!(unknown.wait_basis, "pressure");
+        request.finish_observed_attempt(10, Some(500), "upstream_error", None, Some(1), Some(1));
+        assert_eq!(
+            scheduler
+                .factors_for_units(
+                    &busy,
+                    &scheduler.config(),
+                    now_ms(),
+                    Some(&request.0.latency_class),
+                    2
+                )
+                .estimated_wait_ms,
+            Some(30000)
+        );
+        let mut ordinary = SchedulingConfig::default();
+        ordinary.queue_weight = 0.0;
+        ordinary.reset_weight = 0.0;
+        let original = scheduler.factors(&busy, &ordinary, now_ms());
+        let expected = (original.load * ordinary.weights[0]
+            + original.quota * ordinary.weights[1]
+            + original.health * ordinary.weights[2]
+            + original.latency * ordinary.weights[3])
+            / ordinary.weights.iter().sum::<f64>();
+        assert!((original.score - expected).abs() < 1e-9);
+        assert_eq!(original.wait_score, original.score);
+    }
+
+    /// 离线测量分组数量与候选数量的评分开销，计时结果仅作本机观测。
+    #[tokio::test]
+    #[ignore = "本地分组性能观测，按需显式执行"]
+    async fn scheduling_group_lookup_benchmark() {
+        for groups in [1, 8, 32, 64] {
+            for count in [1, 10, 100] {
+                let scheduler = scheduler();
+                let config = SchedulingConfig {
+                    reset_weight: 0.5,
+                    queue_weight: 0.5,
+                    ..Default::default()
+                };
+                let class = LatencyClass::from(&DiagnosticParameters::from_request(
+                    &json!({"model":"benchmark-0"}),
+                ));
+                let candidates = (1..=count).map(candidate).collect::<Vec<_>>();
+                for candidate in &candidates {
+                    for group in 0..groups {
+                        let sample = LatencyClass::from(&DiagnosticParameters::from_request(
+                            &json!({"model":format!("benchmark-{group}")}),
+                        ));
+                        scheduler.feedback(
+                            candidate.account.id,
+                            false,
+                            false,
+                            Some(2000.0),
+                            Some(3000.0),
+                            &sample,
+                        );
+                    }
+                }
+                let started = Instant::now();
+                for _ in 0..1000 {
+                    for candidate in &candidates {
+                        black_box(scheduler.factors_for_class(
+                            candidate,
+                            &config,
+                            now_ms(),
+                            Some(&class),
+                        ));
+                    }
+                }
+                println!(
+                    "分组性能 groups={groups} candidates={count} 每轮微秒={:.3}",
+                    started.elapsed().as_secs_f64() * 1000.0
+                );
+            }
+        }
+    }
+
+    /// 到期窗口、缺失观察和真实零占用保持不同状态，评分继续使用有效窗口。
+    #[tokio::test]
+    async fn quota_observation_distinguishes_reset_unknown_and_zero_usage() {
+        let scheduler = scheduler();
+        let now = now_ms();
+        let past = Utc::now() - ChronoDuration::seconds(1);
+        let future = Utc::now() + ChronoDuration::hours(1);
+        let mut candidate = candidate(10);
+        let config = SchedulingConfig {
+            weights: [0.0, 1.0, 0.0, 0.0],
+            ..Default::default()
+        };
+        for (usage, state, remaining) in [
+            (json!({}), UsageQuotaState::Unknown, 0.5),
+            (
+                json!({"five_hour":{"utilization":99,"resets_at":past}}),
+                UsageQuotaState::ResetPending,
+                0.5,
+            ),
+            (
+                json!({"five_hour":{"utilization":0,"resets_at":null}}),
+                UsageQuotaState::Observed,
+                1.0,
+            ),
+            (
+                json!({"five_hour":{"utilization":0}}),
+                UsageQuotaState::Observed,
+                1.0,
+            ),
+            (
+                json!({"five_hour":{"utilization":20,"resets_at":null}}),
+                UsageQuotaState::Unknown,
+                0.5,
+            ),
+            (
+                json!({"five_hour":{"utilization":0,"resets_at":"invalid"}}),
+                UsageQuotaState::Unknown,
+                0.5,
+            ),
+            (
+                json!({"five_hour":{"utilization":-1,"resets_at":future}}),
+                UsageQuotaState::Unknown,
+                0.5,
+            ),
+            (
+                json!({"five_hour":{"utilization":80,"resets_at":past},"seven_day":{"utilization":4,"resets_at":future}}),
+                UsageQuotaState::ResetPending,
+                0.96,
+            ),
+            (
+                json!({"five_hour":{"utilization":0,"resets_at":null},"seven_day":{"utilization":4,"resets_at":future}}),
+                UsageQuotaState::Observed,
+                0.96,
+            ),
+        ] {
+            candidate.account.usage_data = usage;
+            let factors = scheduler.factors(&candidate, &config, now);
+            assert_eq!(factors.quota_state, state);
+            assert!((factors.quota - remaining).abs() < 1e-9);
+            assert!((factors.score - remaining).abs() < 1e-9);
+        }
+    }
+
+    /// 刷新后的真实零用量进入实际选号，避免无重置时间时继续停留在中性分。
+    #[tokio::test]
+    async fn refreshed_quota_changes_actual_selection() {
+        let scheduler = scheduler();
+        scheduler.apply_config(SchedulingConfig {
+            weights: [0.0, 1.0, 0.0, 0.0],
+            ..Default::default()
+        });
+        let mut reset = candidate(10);
+        reset.account.usage_data = json!({"five_hour":{"utilization":99,"resets_at":Utc::now()-ChronoDuration::seconds(1)}});
+        let mut current = candidate(12);
+        current.account.usage_data =
+            json!({"seven_day":{"utilization":35,"resets_at":Utc::now()+ChronoDuration::hours(1)}});
+        let request = scheduler.begin(0, None);
+        assert_eq!(
+            scheduler
+                .choose(vec![reset, current], &request, 2)
+                .unwrap()
+                .id,
+            12
+        );
+        let mut refreshed = candidate(10);
+        refreshed.account.usage_data = json!({"five_hour":{"utilization":0,"resets_at":null}});
+        let mut current = candidate(12);
+        current.account.usage_data =
+            json!({"seven_day":{"utilization":35,"resets_at":Utc::now()+ChronoDuration::hours(1)}});
+        assert_eq!(
+            scheduler
+                .choose(vec![refreshed, current], &request, 2)
+                .unwrap()
+                .id,
+            10
+        );
     }
 
     /// 同类成功样本更新 EWMA，其他模型、思考与流式分组保持未知，健康仍按账号共享。
@@ -1217,7 +1663,7 @@ mod tests {
         let request =
             scheduler.begin_with_parameters(0, None, &DiagnosticParameters::from_request(&params));
         let candidate = candidate(7);
-        request.finish_observed_attempt(7, Some(200), "success", None, Some(2000));
+        request.finish_observed_attempt(7, Some(200), "success", None, Some(2000), None);
         let factors = || {
             scheduler.factors_for_class(
                 &candidate,
@@ -1234,10 +1680,10 @@ mod tests {
             ("upstream_error", Some(200), Some("overloaded_error")),
             ("upstream_rejected", Some(500), None),
         ] {
-            request.finish_observed_attempt(7, status, outcome, error, Some(1));
+            request.finish_observed_attempt(7, status, outcome, error, Some(1), None);
             assert!((factors().latency - 1.0 / 1.2).abs() < 1e-9);
         }
-        request.finish_observed_attempt(7, Some(200), "success", None, None);
+        request.finish_observed_attempt(7, Some(200), "success", None, None, None);
         request.submitted(7);
         request.response_headers(7, 200);
         assert!((factors().latency - 1.0 / 1.2).abs() < 1e-9);
@@ -1260,7 +1706,7 @@ mod tests {
             assert_eq!(other.latency, 0.5);
             assert!(other.health > 0.0);
         }
-        request.finish_observed_attempt(7, Some(200), "success", None, Some(4000));
+        request.finish_observed_attempt(7, Some(200), "success", None, Some(4000), None);
         assert!((factors().latency - 1.0 / 1.24).abs() < 1e-9);
         assert!(
             (scheduler
@@ -1286,10 +1732,10 @@ mod tests {
             None,
             &DiagnosticParameters::from_request(&json!({"model":"claude-opus-5"})),
         );
-        fast_sonnet.finish_observed_attempt(7, Some(200), "success", None, Some(100));
-        fast_sonnet.finish_observed_attempt(8, Some(200), "success", None, Some(30000));
-        fast_opus.finish_observed_attempt(7, Some(200), "success", None, Some(30000));
-        fast_opus.finish_observed_attempt(8, Some(200), "success", None, Some(100));
+        fast_sonnet.finish_observed_attempt(7, Some(200), "success", None, Some(100), None);
+        fast_sonnet.finish_observed_attempt(8, Some(200), "success", None, Some(30000), None);
+        fast_opus.finish_observed_attempt(7, Some(200), "success", None, Some(30000), None);
+        fast_opus.finish_observed_attempt(8, Some(200), "success", None, Some(100), None);
         assert_eq!(
             scheduler
                 .choose(vec![candidate(7), candidate(8)], &fast_sonnet, 2)
@@ -1327,7 +1773,7 @@ mod tests {
                     "model":"claude-sonnet-5","thinking":{"type":"enabled","budget_tokens":budget}
                 })),
             );
-            request.finish_observed_attempt(7, Some(200), "success", None, Some(20000));
+            request.finish_observed_attempt(7, Some(200), "success", None, Some(20000), None);
         }
         let state = scheduler.runtime();
         let feedback = state.feedback.get(&7).unwrap();

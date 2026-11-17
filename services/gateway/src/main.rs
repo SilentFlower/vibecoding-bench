@@ -1,6 +1,7 @@
 use claude_code_gateway::config;
 use claude_code_gateway::handler;
 use claude_code_gateway::service;
+use claude_code_gateway::service::usage_poller::UsagePollerService;
 use claude_code_gateway::service::v3_scheduling::V3Scheduler;
 use claude_code_gateway::store;
 use claude_code_gateway::store::diagnostics_store::DiagnosticsStore;
@@ -93,6 +94,10 @@ async fn main() {
         pool.clone(),
         driver.clone(),
     ));
+    settings_store
+        .ensure_scheduling_defaults()
+        .await
+        .expect("补齐调度默认配置失败");
     let prime_log_store = Arc::new(store::prime_log_store::PrimeLogStore::new(pool.clone()));
     let usage_store = Arc::new(store::usage_store::UsageStore::new(pool.clone()));
     let diagnostics_store = Arc::new(DiagnosticsStore::new(pool.clone()));
@@ -135,8 +140,11 @@ async fn main() {
         account_service = account_service.with_scheduler(scheduler);
     }
     let account_svc = Arc::new(account_service);
-    // 启动时加载评分权重到内存缓存
-    account_svc.reload_score_weights().await;
+    // 启动时为全部选号入口加载同一智能配置
+    account_svc
+        .reload_scheduling_config()
+        .await
+        .expect("加载智能调度配置失败");
     let rewriter = Arc::new(service::rewriter::Rewriter::new());
     let telemetry_svc = Arc::new(service::telemetry::TelemetryService::new(
         account_store.clone(),
@@ -244,15 +252,18 @@ async fn main() {
     let token_tester = Arc::new(service::oauth::TokenTester::new());
     let oauth_flow_svc = Arc::new(service::oauth_flow::OAuthFlowService::new());
 
-    // v3 只从业务响应被动更新；旧实例仍按账号开关定时查询。
-    let usage_poller = Arc::new(service::usage_poller::UsagePollerService::new(
-        account_svc.clone(),
-        cfg.usage_poll_interval,
-        env::var("V3_RUNTIME_URL")
+    // v3 仅在旧额度周期结束后补充观测；旧实例沿用账号轮询开关。
+    let usage_poller = Arc::new(
+        if env::var("V3_RUNTIME_URL")
             .unwrap_or_default()
             .trim()
-            .is_empty(),
-    ));
+            .is_empty()
+        {
+            UsagePollerService::new(account_svc.clone(), cfg.usage_poll_interval, true)
+        } else {
+            UsagePollerService::for_resets(account_svc.clone())
+        },
+    );
     tokio::spawn({
         let poller = usage_poller.clone();
         async move { poller.run().await }

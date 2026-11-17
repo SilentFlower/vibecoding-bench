@@ -289,7 +289,67 @@ fn default_upstream_session_refresh_policy() -> String {
     DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY.to_string()
 }
 
+/// 调度额度的观测状态，区分未知资料与已结束的旧周期。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UsageQuotaState {
+    Unknown,
+    ResetPending,
+    Observed,
+}
+
+/// 普通额度窗口的共享投影，供调度评分和重置刷新使用。
+pub struct UsageQuota {
+    pub remaining: f64,
+    pub state: UsageQuotaState,
+}
+
 impl Account {
+    /// 投影已观测的普通额度；过期窗口等待刷新，明确零用量允许缺少重置时间。
+    /// @param now 当前 UTC 毫秒，用于判断旧周期是否结束。
+    /// @return 剩余额度与观测状态；没有有效观测时剩余值保持中性。
+    pub fn usage_quota(&self, now: i64) -> UsageQuota {
+        let mut remaining: Option<f64> = None;
+        let mut reset_pending = false;
+        for name in ["five_hour", "seven_day"] {
+            let Some(window) = self.usage_data.get(name) else {
+                continue;
+            };
+            let Some(usage) = window
+                .get("utilization")
+                .and_then(Value::as_f64)
+                .filter(|value| value.is_finite() && *value >= 0.0)
+            else {
+                continue;
+            };
+            match window.get("resets_at") {
+                None | Some(Value::Null) if usage == 0.0 => {}
+                Some(Value::String(value)) => {
+                    let Ok(reset) = DateTime::parse_from_rfc3339(value) else {
+                        continue;
+                    };
+                    if reset.timestamp_millis() <= now {
+                        reset_pending = true;
+                        continue;
+                    }
+                }
+                _ => continue,
+            }
+            let value = 1.0 - (usage / 100.0).clamp(0.0, 1.0);
+            remaining = Some(remaining.map_or(value, |previous| previous.min(value)));
+        }
+        UsageQuota {
+            remaining: remaining.unwrap_or(0.5),
+            state: if reset_pending {
+                UsageQuotaState::ResetPending
+            } else if remaining.is_some() {
+                UsageQuotaState::Observed
+            } else {
+                UsageQuotaState::Unknown
+            },
+        }
+    }
+
     pub fn is_schedulable(&self) -> bool {
         if self.status != AccountStatus::Active {
             return false;

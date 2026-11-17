@@ -669,7 +669,7 @@ async fn real_failures_reduce_health_and_user_errors_do_not_reward_latency() {
         max_units: 2,
         queued: 0,
         queued_units: 0,
-        legacy_score: 0.0,
+
         next_send_ms: 0,
     };
     let request = f.scheduler.begin(1, None);
@@ -882,7 +882,7 @@ async fn capacity_reason_matches_pending_work_and_wait_budget() {
         max_units: 8,
         queued: 0,
         queued_units: 0,
-        legacy_score: 0.0,
+
         next_send_ms: 0,
     };
     let view = f.scheduler.capacity(&candidate, 2, 5000, now_ms());
@@ -895,4 +895,30 @@ async fn capacity_reason_matches_pending_work_and_wait_budget() {
     let view = f.scheduler.capacity(&candidate, 2, 5000, now_ms());
     assert!(view.immediate && view.can_queue);
     assert_eq!(view.reason, "ready");
+}
+
+/// 历史库补齐新偏好并清理旧键，管理员保存值在重复初始化后保留。
+#[tokio::test]
+async fn scheduling_preferences_defaults_retire_legacy_and_preserve_saved_values() {
+    let fixture = Fixture::new(None).await;
+    fixture
+        .settings
+        .upsert_many(&HashMap::from([
+            ("v3_scheduling_mode".into(), "legacy_score".into()),
+            ("score_weight_7d".into(), "9".into()),
+            ("v3_smart_weight_reset".into(), "0.7".into()),
+        ]))
+        .await
+        .unwrap();
+    fixture.settings.ensure_scheduling_defaults().await.unwrap();
+    fixture.settings.ensure_scheduling_defaults().await.unwrap();
+    let values = fixture.settings.get_all().await.unwrap();
+    assert!(!values.contains_key("v3_scheduling_mode"));
+    assert!(!values.contains_key("score_weight_7d"));
+    assert_eq!(values["v3_smart_weight_reset"], "0.7");
+    assert_eq!(values["v3_smart_weight_queue"], "0");
+    assert_eq!(values["v3_smart_reset_weight_5h"], "1");
+    assert_eq!(values["v3_smart_reset_weight_7d"], "1");
+    fixture.accounts.reload_scheduling_config().await.unwrap();
+    assert_eq!(fixture.scheduler.config().reset_weight, 0.7);
 }

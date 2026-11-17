@@ -64,7 +64,6 @@ use crate::service::version_profile::{
     ClaudeCodeProfileSelectionMode, all_profiles, profile_for_key,
 };
 use crate::store::prime_log_store::PrimeLogStore;
-use crate::store::settings_store::V3_SCHEDULING_DEFAULTS;
 use crate::store::settings_store::{
     DEFAULT_BOOTSTRAP_ADDITIONAL_MODEL_OPTIONS, DEFAULT_BOOTSTRAP_MODEL_OPTIONS_MODE,
     DEFAULT_CACHE_CONTROL_TTL_REWRITE, DEFAULT_CLAUDE_CODE_CONTEXT_SANITIZER_MODE,
@@ -89,6 +88,7 @@ use crate::store::settings_store::{
     DEFAULT_STREAM_UPSTREAM_IDLE_TIMEOUT_SECS, SettingsStore,
     normalize_message_top_field_filter_enabled,
 };
+use crate::store::settings_store::{OBSOLETE_SCHEDULING_KEYS, V3_SCHEDULING_DEFAULTS};
 use crate::store::token_store::TokenStore;
 
 const OBSOLETE_SETTINGS_KEYS: &[&str] = &[
@@ -485,7 +485,7 @@ async fn list_accounts(
             obj["telemetry_expires_at"] = serde_json::json!(expires.to_rfc3339());
         }
         // 附加实时调度评分和并发/排队状态
-        let si = state.account_svc.get_account_score_info(a).await;
+        let si = state.account_svc.get_account_capacity_info(a).await;
         if state.account_svc.scheduler().is_some() {
             match binding_counts.as_ref() {
                 Some(counts) => match state
@@ -501,25 +501,6 @@ async fn list_accounts(
                 None => obj["v3_scheduling_error"] = serde_json::json!("调度观测不可用"),
             }
         }
-        obj["scheduling_score"] = serde_json::json!((si.score * 100.0).round() / 100.0);
-        obj["scheduling_detail"] = serde_json::json!({
-            "eff_7d": (si.eff_7d * 100.0).round() / 100.0,
-            "eff_5h": (si.eff_5h * 100.0).round() / 100.0,
-            "concurrency_pct": (si.concurrency_pct * 100.0).round() / 100.0,
-            "detail_7d": {
-                "utilization": (si.detail_7d.utilization * 100.0).round() / 100.0,
-                "decay": (si.detail_7d.decay * 100.0).round() / 100.0
-            },
-            "detail_5h": {
-                "utilization": (si.detail_5h.utilization * 100.0).round() / 100.0,
-                "decay": (si.detail_5h.decay * 100.0).round() / 100.0
-            },
-            "weights": {
-                "w7d": si.weights.0,
-                "w5h": si.weights.1,
-                "wconc": si.weights.2
-            },
-        });
         obj["current_concurrency"] = serde_json::json!(si.current_concurrency);
         obj["current_concurrency_units"] = serde_json::json!(si.current_concurrency_units);
         obj["max_concurrency_units"] = serde_json::json!(si.max_concurrency_units);
@@ -1903,7 +1884,7 @@ async fn account_scheduling(
         .account_svc
         .scheduler()
         .ok_or_else(|| AppError::ServiceUnavailable("当前部署未启用 v3 调度".into()))?;
-    let score = state.account_svc.get_account_score_info(&account).await;
+    let score = state.account_svc.get_account_capacity_info(&account).await;
     let counts = scheduler.store.counts(&[id], now_ms()).await?;
     let summary = state
         .account_svc
@@ -1986,7 +1967,10 @@ async fn get_settings(State(state): State<AppState>) -> Result<Json<serde_json::
             .entry((*key).to_string())
             .or_insert_with(|| (*value).to_string());
     }
-    for key in OBSOLETE_SETTINGS_KEYS {
+    for key in OBSOLETE_SETTINGS_KEYS
+        .iter()
+        .chain(OBSOLETE_SCHEDULING_KEYS)
+    {
         settings.remove(*key);
     }
     settings
@@ -2168,7 +2152,10 @@ async fn update_settings(
     State(state): State<AppState>,
     Json(mut body): Json<std::collections::HashMap<String, String>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    for key in OBSOLETE_SETTINGS_KEYS {
+    for key in OBSOLETE_SETTINGS_KEYS
+        .iter()
+        .chain(OBSOLETE_SCHEDULING_KEYS)
+    {
         body.remove(*key);
     }
     let _v3_settings_guard = if body.keys().any(|key| key.starts_with("v3_")) {
@@ -2183,21 +2170,6 @@ async fn update_settings(
         let mut merged = state.settings_store.get_all().await?;
         merged.extend(body.clone());
         SessionPolicyBlockConfig::parse(&merged)?;
-    }
-    // 校验权重值必须是合法的非负数
-    for key in &[
-        "score_weight_7d",
-        "score_weight_5h",
-        "score_weight_concurrency",
-    ] {
-        if let Some(val) = body.get(*key) {
-            match val.parse::<f64>() {
-                Ok(v) if v.is_finite() && v >= 0.0 => {}
-                _ => {
-                    return Err(AppError::BadRequest(format!("'{}' 必须是非负数", key)));
-                }
-            }
-        }
     }
     // 峰值预热开关:仅允许 "true" / "false"
     if let Some(val) = body.get("peak_prime_enabled") {
@@ -2374,8 +2346,8 @@ async fn update_settings(
         .settings_store
         .upsert_many_with_profile(&body, selected_profile)
         .await?;
-    if let (Some(config), Some(scheduler)) = (v3_config_update, state.account_svc.scheduler()) {
-        scheduler.apply_config(config);
+    if let Some(config) = v3_config_update {
+        state.account_svc.apply_scheduling_config(config);
     }
 
     if selected_profile.is_some()
@@ -2517,7 +2489,6 @@ async fn update_settings(
     if body.contains_key("native_idle_timeout_secs") {
         state.gateway_svc.reload_native_idle_timeout().await?;
     }
-    state.account_svc.reload_score_weights().await;
     Ok(Json(serde_json::json!({"ok": true})))
 }
 
@@ -2726,6 +2697,7 @@ mod tests {
     use crate::store::memory::MemoryStore;
     use crate::store::prime_log_store::PrimeLogStore;
     use crate::store::scheduling_store::SchedulingStore;
+    use crate::store::settings_store::OBSOLETE_SCHEDULING_KEYS;
     use crate::store::settings_store::SettingsStore;
     use crate::store::token_store::TokenStore;
     use crate::store::usage_store::UsageStore;
@@ -4660,6 +4632,54 @@ mod tests {
         assert_eq!(list["data"][0]["v3_scheduling"]["bound_sessions"], 1);
     }
 
+    /// 新偏好经管理接口原子生效，旧评分键和分数退出公开合同。
+    #[tokio::test]
+    async fn scheduling_preferences_hot_reload_and_retired_scores_are_removed() {
+        let (app, _, _, _, accounts) = test_router_with_scheduling(true).await;
+        let (status, _) = account_admin_json(
+            &app,
+            Method::PUT,
+            "/admin/settings",
+            json!({
+                "v3_smart_weight_reset":"1.2", "v3_smart_weight_queue":"0.8",
+                "v3_smart_reset_weight_5h":"1", "v3_smart_reset_weight_7d":"0"
+            }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let config = accounts.scheduler().unwrap().config();
+        assert_eq!(config.reset_weight, 1.2);
+        assert_eq!(config.queue_weight, 0.8);
+        assert_eq!(config.reset_window_weights, [1.0, 0.0]);
+        let (status, _) = account_admin_json(
+            &app,
+            Method::PUT,
+            "/admin/settings",
+            json!({"v3_smart_weight_queue":"0.01"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(accounts.scheduler().unwrap().config().queue_weight, 0.8);
+        let (status, _) = account_admin_json(
+            &app,
+            Method::PUT,
+            "/admin/settings",
+            json!({"v3_scheduling_mode":"legacy_score","score_weight_7d":"10"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let (_, settings) =
+            account_admin_json(&app, Method::GET, "/admin/settings", Value::Null).await;
+        for key in OBSOLETE_SCHEDULING_KEYS {
+            assert!(settings.get(*key).is_none());
+        }
+        let (_, list) = account_admin_json(&app, Method::GET, "/admin/accounts", Value::Null).await;
+        for account in list["data"].as_array().unwrap() {
+            assert!(account.get("scheduling_score").is_none());
+            assert!(account.get("scheduling_detail").is_none());
+        }
+    }
+
     /// 并发局部设置更新不能共同持久化出全零权重。
     #[tokio::test]
     async fn scheduling_settings_merge_validate_and_apply_atomically() {
@@ -4695,7 +4715,7 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::OK);
-        assert_eq!(accounts.scheduler().unwrap().config().mode, "legacy_score");
+        assert_eq!(accounts.scheduler().unwrap().config().mode, "smart");
         let (status, _) = account_admin_json(
             &app,
             Method::PUT,

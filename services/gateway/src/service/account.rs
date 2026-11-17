@@ -1,5 +1,4 @@
 use chrono::Utc;
-use rand::Rng;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -24,13 +23,14 @@ use crate::model::credential_ownership::CredentialOwnershipInput;
 use crate::service::rewriter::ClientType;
 use crate::service::runtime_lease::RuntimeGate;
 use crate::service::v3_scheduling::{
-    PhaseCounts, SchedulingAccountSummary, SchedulingCandidate, SchedulingRequest, V3Scheduler,
-    now_ms, send_interval_ms,
+    PhaseCounts, SchedulingAccountSummary, SchedulingCandidate, SchedulingConfig,
+    SchedulingRequest, V3Scheduler, now_ms, send_interval_ms,
 };
 use crate::service::version_profile::{
     apply_identity_to_env_json, default_profile, profile_for_key,
 };
 use crate::store::account_store::AccountStore;
+use crate::store::scheduling_store::SchedulingStore;
 
 #[path = "credential_ownership.rs"]
 mod credential_ownership;
@@ -66,32 +66,8 @@ const PURE_RATE_LIMIT_RETRY_DELAY: Duration = Duration::from_secs(10);
 /// retry-after 冷却时长上限（秒）,防御上游给出异常大的值把账号长期下线。
 const MAX_RETRY_AFTER_SECS: i64 = 5 * 60 * 60;
 
-/// 单个窗口的用量详情，用于前端展示计算过程。
-pub struct WindowDetail {
-    /// 原始利用率（0~100）。
-    pub utilization: f64,
-    /// 时间衰减因子（阶梯档位 0.4~1.0，距重置越近越小）。
-    pub decay: f64,
-    /// 有效用量 = utilization × 阶梯衰减。
-    pub effective: f64,
-}
-
-/// 账号调度评分详情，用于前端展示。
-pub struct AccountScoreInfo {
-    /// 综合得分（越低越优先）。
-    pub score: f64,
-    /// 7 天窗口有效用量（utilization × 阶梯衰减）。
-    pub eff_7d: f64,
-    /// 5 小时窗口有效用量（utilization × 阶梯衰减）。
-    pub eff_5h: f64,
-    /// 7 天窗口计算详情。
-    pub detail_7d: WindowDetail,
-    /// 5 小时窗口计算详情。
-    pub detail_5h: WindowDetail,
-    /// 并发负载百分比（当前内部单位 + 排队预计内部单位）/ 最大内部单位 × 100。
-    pub concurrency_pct: f64,
-    /// 当前使用的权重 (w7d, w5h, w_concurrency)。
-    pub weights: (f64, f64, f64),
+/// 账号实时容量与软退避快照，供选择器和管理端共用。
+pub struct AccountCapacityInfo {
     /// 当前占用的标准并发槽位数。
     pub current_concurrency: f64,
     /// 当前占用的内部单位数。
@@ -239,11 +215,6 @@ enum RateLimitWindowDecision {
     RequestBackoff(Duration),
     PassThrough,
 }
-
-/// 评分权重默认值。
-const DEFAULT_W7D: f64 = 0.5;
-const DEFAULT_W5H: f64 = 0.3;
-const DEFAULT_WCONC: f64 = 0.2;
 
 fn standard_concurrency_to_slot_units(concurrency: i32) -> i32 {
     concurrency.max(1).saturating_mul(SLOT_UNIT_SCALE)
@@ -628,8 +599,8 @@ pub struct AccountService {
     store: Arc<AccountStore>,
     cache: Arc<dyn CacheStore>,
     oauth_token_url: String,
-    /// 评分权重缓存 (w7d, w5h, w_concurrency)，更新设置后刷新。
-    score_weights: RwLock<(f64, f64, f64)>,
+    /// 独立部署只使用内存选号，v3 与完整准入调度器共享同一实例。
+    selection_scheduler: Arc<V3Scheduler>,
     settings_store: Arc<crate::store::settings_store::SettingsStore>,
     /// 账号级 FIFO 排队器缓存：account_id → queue。
     ///
@@ -729,7 +700,7 @@ fn build_oauth_credential_snapshot(
 }
 
 impl AccountService {
-    /// 创建保持旧行为的账号服务，v3 通过显式 builder 接入。
+    /// 创建统一使用智能选号的账号服务，v3 通过显式 builder 接入完整准入。
     /// @param store 账号存储。
     /// @param cache 既有缓存。
     /// @param settings_store 全局设置。
@@ -768,7 +739,9 @@ impl AccountService {
             credential_gates: Mutex::new(HashMap::new()),
             scheduler: None,
             v3_settings_lock: AsyncMutex::new(()),
-            score_weights: RwLock::new((DEFAULT_W7D, DEFAULT_W5H, DEFAULT_WCONC)),
+            selection_scheduler: Arc::new(V3Scheduler::new(Arc::new(SchedulingStore::new(
+                settings_store.database_pool(),
+            )))),
             settings_store,
             queues: RwLock::new(HashMap::new()),
             transient_rate_limit_backoffs: RwLock::new(HashMap::new()),
@@ -779,6 +752,7 @@ impl AccountService {
     /// @param scheduler 共享调度器。
     /// @return 已装配服务。
     pub fn with_scheduler(mut self, scheduler: Arc<V3Scheduler>) -> Self {
+        self.selection_scheduler = scheduler.clone();
         self.scheduler = Some(scheduler);
         self
     }
@@ -816,28 +790,17 @@ impl AccountService {
         let _ = self.native_changes.send((id, false, true));
     }
 
-    /// 从数据库加载评分权重到内存缓存，启动时和更新设置后调用。
-    pub async fn reload_score_weights(&self) {
-        if let Ok(settings) = self.settings_store.get_all().await {
-            let w7d = settings
-                .get("score_weight_7d")
-                .and_then(|v| v.parse::<f64>().ok())
-                .unwrap_or(DEFAULT_W7D);
-            let w5h = settings
-                .get("score_weight_5h")
-                .and_then(|v| v.parse::<f64>().ok())
-                .unwrap_or(DEFAULT_W5H);
-            let wconc = settings
-                .get("score_weight_concurrency")
-                .and_then(|v| v.parse::<f64>().ok())
-                .unwrap_or(DEFAULT_WCONC);
-            *self.score_weights.write().await = (w7d, w5h, wconc);
-        }
+    /// 从数据库原子加载智能调度配置，供独立部署和 v3 共用。
+    /// @return 配置已生效或解析／存储错误。
+    pub async fn reload_scheduling_config(&self) -> Result<(), AppError> {
+        self.selection_scheduler.reload(&self.settings_store).await
     }
 
-    /// 获取当前评分权重。
-    async fn get_weights(&self) -> (f64, f64, f64) {
-        *self.score_weights.read().await
+    /// 应用已经事务保存并校验的智能调度快照。
+    /// @param config 本次更新的完整配置。
+    /// @return 无。
+    pub fn apply_scheduling_config(&self, config: SchedulingConfig) {
+        self.selection_scheduler.apply_config(config);
     }
 
     /// 创建新账号并自动生成身份信息。
@@ -1500,8 +1463,8 @@ impl AccountService {
             return Err(AppError::ServiceUnavailable("no available accounts".into()));
         }
 
-        // 按优先级分组，同优先级内按综合评分选择（5h 用量 + 并发负载）
-        let selected = self.select_by_score(&candidates).await;
+        // 统一复用智能评分与近优轮转，原会话与准入入口继续负责生命周期。
+        let selected = self.select_smart_account(&candidates).await?;
 
         Ok(SelectedAccount {
             account: selected,
@@ -1671,7 +1634,7 @@ impl AccountService {
         }
         let mut snapshots = Vec::with_capacity(candidates.len());
         for account in candidates {
-            let score = self.get_account_score_info(&account).await;
+            let score = self.get_account_capacity_info(&account).await;
             let next_send_ms = scheduler
                 .store
                 .next_send(account.id, send_interval_ms(account.rpm_limit))
@@ -1682,7 +1645,6 @@ impl AccountService {
                 max_units: score.max_concurrency_units,
                 queued: score.queued,
                 queued_units: score.queued_request_units,
-                legacy_score: score.score,
                 next_send_ms,
             });
         }
@@ -1697,13 +1659,13 @@ impl AccountService {
 
     /// 从真实选择器的共享计算构成账号管理摘要。
     /// @param account 当前持久账号。
-    /// @param score 已读取的加权容量和旧评分。
+    /// @param score 已读取的加权容量快照。
     /// @param bound_sessions 批量读取的有效绑定数。
     /// @return v3 管理摘要或观测不可用。
     pub async fn v3_summary(
         &self,
         account: &Account,
-        score: &AccountScoreInfo,
+        score: &AccountCapacityInfo,
         bound_sessions: i64,
     ) -> Result<SchedulingAccountSummary, AppError> {
         let scheduler = self
@@ -1721,7 +1683,6 @@ impl AccountService {
             max_units: score.max_concurrency_units,
             queued: score.queued,
             queued_units: score.queued_request_units,
-            legacy_score: score.score,
             next_send_ms: next,
         };
         let config = scheduler.config();
@@ -2843,93 +2804,29 @@ impl AccountService {
         RateLimitWindowDecision::RequestBackoff(PURE_RATE_LIMIT_RETRY_DELAY)
     }
 
-    /// 综合评分选择账号：同优先级内按 7d/5h 有效用量和并发负载加权评分，分数越低越优先。
-    ///
-    /// 评分公式：`score = eff_7d * w7d + eff_5h * w5h + concurrency_load_pct * wconc`（权重可在设置页面配置）
-    /// - `eff_Xd = utilization × 阶梯衰减`，快重置的窗口衰减更大（分 3 档：1.0/0.8/0.6）
-    /// - 无 resets_at 数据时衰减因子为 1.0（最保守）
-    /// - `concurrency_load_pct = (活跃内部单位 + 排队预计内部单位) / 最大内部单位 × 100`
-    /// - 并发已满的账号优先排除，仅在所有账号都满时才参与评分
-    /// - 得分相同时随机选择
-    async fn select_by_score(&self, accounts: &[Account]) -> Account {
-        if accounts.len() == 1 {
-            return accounts[0].clone();
+    /// 为独立部署复用智能选择规则，原有会话和准入状态由调用方管理。
+    async fn select_smart_account(&self, accounts: &[Account]) -> Result<Account, AppError> {
+        let mut candidates = Vec::with_capacity(accounts.len());
+        for account in accounts {
+            let capacity = self.get_account_capacity_info(account).await;
+            candidates.push(SchedulingCandidate {
+                account: account.clone(),
+                active_units: capacity.current_concurrency_units,
+                max_units: capacity.max_concurrency_units,
+                queued: capacity.queued,
+                queued_units: capacity.queued_request_units,
+                next_send_ms: 0,
+            });
         }
-
-        // 找到最高优先级（最小数值）
-        let best_priority = accounts.iter().map(|a| a.priority).min().unwrap_or(50);
-        let best: Vec<&Account> = accounts
-            .iter()
-            .filter(|a| a.priority == best_priority)
-            .collect();
-
-        if best.len() == 1 {
-            return best[0].clone();
-        }
-
-        let now = Utc::now();
-        let (w7d, w5h, wconc) = self.get_weights().await;
-
-        // 计算每个候选的综合得分，同时记录并发是否已满
-        let mut scored: Vec<(&Account, f64, bool)> = Vec::with_capacity(best.len());
-        for acc in &best {
-            let eff_5h =
-                effective_utilization_detail(acc, "five_hour", 5.0 * 3600.0, now).effective;
-            let eff_7d =
-                effective_utilization_detail(acc, "seven_day", 7.0 * 24.0 * 3600.0, now).effective;
-            // 从 FIFO 排队器读取实时活跃/等待数
-            let queue = self.get_or_create_queue(acc.id, acc.concurrency).await;
-            let current_units = queue.active_units();
-            let waiting_units = queue.waiting_units();
-            let max_units = queue.max_units();
-            let full = max_units > 0 && current_units >= max_units;
-            // 把"排队中"的请求也作为负载计入评分：单位统一为内部槽位单位,
-            // 两个账号都活跃满时,排队少的负载百分比更低,优先被选中。
-            let conc_pct = if max_units > 0 {
-                ((current_units + waiting_units) as f64) / (max_units as f64) * 100.0
-            } else {
-                0.0
-            };
-            let score = eff_7d * w7d + eff_5h * w5h + conc_pct * wconc;
-            scored.push((acc, score, full));
-        }
-
-        // 优先从未满的账号中选择；全都满了才回退到全部候选
-        let pool: Vec<(&Account, f64)> = {
-            let not_full: Vec<_> = scored
-                .iter()
-                .filter(|(_, _, full)| !full)
-                .map(|(a, s, _)| (*a, *s))
-                .collect();
-            if not_full.is_empty() {
-                scored.iter().map(|(a, s, _)| (*a, *s)).collect()
-            } else {
-                not_full
-            }
-        };
-
-        // 找到最低分
-        let min_score = pool.iter().map(|(_, s)| *s).fold(f64::MAX, f64::min);
-
-        // 收集得分最低的候选（容差 0.01 处理浮点误差）
-        let winners: Vec<&Account> = pool
-            .iter()
-            .filter(|(_, s)| (*s - min_score).abs() < 0.01)
-            .map(|(a, _)| *a)
-            .collect();
-
-        // 同分随机选择
-        let idx = rand::thread_rng().gen_range(0..winners.len());
-        winners[idx].clone()
+        let request = self.selection_scheduler.begin(0, None);
+        self.selection_scheduler
+            .choose(candidates, &request, DEFAULT_REQUEST_SLOT_UNITS)
     }
 
-    /// 计算单个账号的调度评分及实时状态（供 API 展示用）。
-    pub async fn get_account_score_info(&self, account: &Account) -> AccountScoreInfo {
-        let now = Utc::now();
-        let (w7d, w5h, wconc) = self.get_weights().await;
-        let d5h = effective_utilization_detail(account, "five_hour", 5.0 * 3600.0, now);
-        let d7d = effective_utilization_detail(account, "seven_day", 7.0 * 24.0 * 3600.0, now);
-
+    /// 读取单个账号实时容量，不额外计算评分。
+    /// @param account 当前账号。
+    /// @return 并发、排队和软退避快照。
+    pub async fn get_account_capacity_info(&self, account: &Account) -> AccountCapacityInfo {
         // 从 FIFO 排队器读取实时活跃/等待数(替代原 cache.get_slot_count 查询)
         let queue = self
             .get_or_create_queue(account.id, account.concurrency)
@@ -2942,25 +2839,7 @@ impl AccountService {
         let queued_request_units = queue.waiting_units();
         let (transient_backoff_waiting, transient_backoff_remaining_ms) =
             self.transient_rate_limit_backoff_status(account.id).await;
-        // 负载 % = (活跃内部单位 + 排队预计内部单位) / 最大内部单位 × 100,与 select_by_score 保持一致。
-        let concurrency_pct = if max_concurrency_units > 0 {
-            ((current_concurrency_units + queued_request_units) as f64)
-                / (max_concurrency_units as f64)
-                * 100.0
-        } else {
-            0.0
-        };
-
-        let score = d7d.effective * w7d + d5h.effective * w5h + concurrency_pct * wconc;
-
-        AccountScoreInfo {
-            score,
-            eff_7d: d7d.effective,
-            eff_5h: d5h.effective,
-            detail_7d: d7d,
-            detail_5h: d5h,
-            concurrency_pct,
-            weights: (w7d, w5h, wconc),
+        AccountCapacityInfo {
             current_concurrency,
             current_concurrency_units,
             max_concurrency_units,
@@ -3060,77 +2939,7 @@ fn short_session_hash(session_hash: &str) -> String {
     session_hash.chars().take(8).collect()
 }
 
-/// 计算指定窗口的有效用量详情：utilization × 阶梯衰减因子。
-/// 使用固定阶梯而非线性比例，避免时间衰减过度影响评分：
-///   剩余比例 > 50% → 1.0 | 20%~50% → 0.8 | ≤ 20% → 0.6
-/// 无 resets_at 或无用量数据时衰减因子为 1.0（最保守）。
-/// 当 resets_at 已过期时，说明窗口已重置，直接视为用量清零。
-fn effective_utilization_detail(
-    account: &Account,
-    window: &str,
-    max_window_secs: f64,
-    now: chrono::DateTime<Utc>,
-) -> WindowDetail {
-    let util = account
-        .usage_data
-        .get(window)
-        .and_then(|w| w.get("utilization"))
-        .and_then(|v| v.as_f64())
-        .unwrap_or(0.0);
-
-    if util == 0.0 {
-        return WindowDetail {
-            utilization: 0.0,
-            decay: 1.0,
-            effective: 0.0,
-        };
-    }
-
-    // 解析 resets_at，计算剩余时间占窗口总时长的比例，再映射到阶梯档位
-    let decay = account
-        .usage_data
-        .get(window)
-        .and_then(|w| w.get("resets_at"))
-        .and_then(|v| v.as_str())
-        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-        .map(|reset| {
-            let remaining = (reset.with_timezone(&Utc) - now).num_seconds().max(0) as f64;
-            if remaining == 0.0 {
-                // resets_at 已过期 → 窗口已重置，用量归零
-                return 0.0;
-            }
-            let ratio = (remaining / max_window_secs).clamp(0.0, 1.0);
-            // 固定阶梯：将连续比例映射为离散档位，防止线性衰减过度压低高用量账号
-            tiered_decay(ratio)
-        })
-        .unwrap_or(1.0); // 无数据按最保守处理
-
-    // resets_at 已过期 → 窗口已重置，用量归零
-    if decay == 0.0 {
-        return WindowDetail {
-            utilization: 0.0,
-            decay: 1.0,
-            effective: 0.0,
-        };
-    }
-
-    WindowDetail {
-        utilization: util,
-        decay,
-        effective: util * decay,
-    }
-}
-
-/// 将剩余时间比例映射为阶梯衰减系数。
-/// 比例越低（越接近重置），衰减系数越小，有效用量越低（越优先选中）。
-/// 仅分 3 档，最低 0.6，避免时间因素过度影响评分。
-fn tiered_decay(ratio: f64) -> f64 {
-    match () {
-        _ if ratio > 0.5 => 1.0,
-        _ if ratio > 0.2 => 0.8,
-        _ => 0.6,
-    }
-}
+/// 真实上游限流对应的普通额度窗口。
 enum RateLimitWindow {
     /// 7 天窗口命中，携带其 resets_at。
     SevenDay(chrono::DateTime<Utc>),
@@ -4129,14 +3938,13 @@ mod tests {
             .await
             .expect("haiku permit");
 
-        let info = svc.get_account_score_info(&account).await;
+        let info = svc.get_account_capacity_info(&account).await;
         assert_eq!(info.current_concurrency, 0.5);
         assert_eq!(info.current_concurrency_units, 1);
         assert_eq!(info.max_concurrency_units, 4);
         assert_eq!(info.active_requests, 1);
         assert_eq!(info.queued, 0);
         assert_eq!(info.queued_request_units, 0);
-        assert_eq!(info.concurrency_pct, 25.0);
     }
 
     #[tokio::test]
@@ -5594,31 +5402,6 @@ mod tests {
         assert!(error.to_string().contains("无法满足 600 秒最小有效期"));
     }
 
-    // ---- tiered_decay ----
-
-    #[test]
-    fn tiered_decay_high_ratio() {
-        assert_eq!(tiered_decay(0.9), 1.0);
-        assert_eq!(tiered_decay(0.51), 1.0);
-    }
-
-    #[test]
-    fn tiered_decay_boundary_values() {
-        assert_eq!(tiered_decay(0.5), 0.8); // 不满足 >0.5，落入中档
-        assert_eq!(tiered_decay(0.2), 0.6); // 不满足 >0.2，落入最低档
-    }
-
-    #[test]
-    fn tiered_decay_low_ratio() {
-        assert_eq!(tiered_decay(0.1), 0.6);
-        assert_eq!(tiered_decay(0.0), 0.6);
-    }
-
-    #[test]
-    fn tiered_decay_mid_range() {
-        assert_eq!(tiered_decay(0.4), 0.8);
-        assert_eq!(tiered_decay(0.21), 0.8);
-    }
     /// 新元数据与凭据原子导入，旧字段缺省不改变原有回执序列化合同。
     /// @return 无；元数据丢失、旧摘要变化或重复导入不幂等时失败。
     #[tokio::test]

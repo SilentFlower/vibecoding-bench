@@ -174,12 +174,8 @@ const detailAccount = computed(() => accounts.value.find(account => account.id =
 /** 格式化当前调度模式的评分。@param account 账号调度快照。@return 带模式的紧凑评分文字。 */
 function activeSchedulingScore(account: Account): string {
   const summary = account.v3_scheduling;
-  if (summary?.config.mode === 'smart') {
+  if (summary) {
     return `智能评分 ${(summary.factors.score * 100).toFixed(1)}`;
-  }
-  // v3 观测失败仍可能返回旧评分，此时当前生效的模式未知。
-  if ((summary?.config.mode === 'legacy_score' || (!summary && !account.v3_scheduling_error)) && account.scheduling_score != null) {
-    return `旧评分 ${account.scheduling_score.toFixed(2)}`;
   }
   return '评分待更新';
 }
@@ -1165,7 +1161,7 @@ async function copyText(text: string) {
           <details class="account-diagnostic-technical"><summary>技术与调度详情</summary>
         <div v-if="detailAccount" class="account-detail-scroll space-y-5">
             <div class="grid grid-cols-5 gap-2">
-              <InfoTooltip label="查看评分计算" title="调度评分计算"><template #trigger><span class="text-center block"><span class="block text-[length:var(--ui-font-small)] text-muted-foreground">{{ detailAccount.v3_scheduling ? '旧评分' : '评分' }}</span><strong class="text-sm font-medium">{{ detailAccount.scheduling_score?.toFixed(2) ?? '0.00' }}</strong></span></template><div v-if="detailAccount.scheduling_detail" class="account-score-explanation"><p>7 天：{{ detailAccount.scheduling_detail.detail_7d?.utilization?.toFixed(2) ?? '0' }}% × {{ detailAccount.scheduling_detail.detail_7d?.decay?.toFixed(2) ?? '1' }} = {{ detailAccount.scheduling_detail.eff_7d.toFixed(2) }} × {{ detailAccount.scheduling_detail.weights?.w7d ?? 0.5 }} = {{ (detailAccount.scheduling_detail.eff_7d * (detailAccount.scheduling_detail.weights?.w7d ?? 0.5)).toFixed(2) }}</p><p>5 小时：{{ detailAccount.scheduling_detail.detail_5h?.utilization?.toFixed(2) ?? '0' }}% × {{ detailAccount.scheduling_detail.detail_5h?.decay?.toFixed(2) ?? '1' }} = {{ detailAccount.scheduling_detail.eff_5h.toFixed(2) }} × {{ detailAccount.scheduling_detail.weights?.w5h ?? 0.3 }} = {{ (detailAccount.scheduling_detail.eff_5h * (detailAccount.scheduling_detail.weights?.w5h ?? 0.3)).toFixed(2) }}</p><p>负载：{{ detailAccount.scheduling_detail.concurrency_pct.toFixed(2) }}% × {{ detailAccount.scheduling_detail.weights?.wconc ?? 0.2 }}</p><p>合计 {{ detailAccount.scheduling_score?.toFixed(2) }} · 越小越优先</p><small>负载包含活跃标准槽位与排队预计槽位。</small></div><p v-else>评分详情尚未观测。</p></InfoTooltip>
+              <div class="text-center"><span class="block text-[length:var(--ui-font-small)] text-muted-foreground">智能评分</span><strong class="text-sm font-medium">{{ detailAccount.v3_scheduling ? (detailAccount.v3_scheduling.factors.score * 100).toFixed(1) : '待更新' }}</strong></div>
               <InfoTooltip label="查看并发详情" title="并发与排队"><template #trigger><span class="block text-center"><span class="block text-[length:var(--ui-font-small)] text-muted-foreground">并发</span><strong class="text-sm font-medium" :class="concurrencyClass(detailAccount)">{{ concurrencyLabel(detailAccount) }}</strong></span></template><div class="account-score-explanation"><p>标准槽位 {{ formatConcurrencySlots(detailAccount.current_concurrency) }} / {{ formatConcurrencySlots(detailAccount.concurrency) }}</p><p>内部单位 {{ formatConcurrencyUnits(detailAccount.current_concurrency_units) }} / {{ formatConcurrencyUnits(detailAccount.max_concurrency_units) }}</p><p>活跃请求 {{ detailAccount.active_requests ?? 0 }} · 排队请求 {{ detailAccount.queued_requests ?? 0 }}</p><p>排队单位 {{ formatConcurrencyUnits(detailAccount.queued_request_units) }}</p><small>普通请求占用 1 并发，Haiku 占用 0.5 并发。</small></div></InfoTooltip>
               <div class="text-center">
                 <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider">排队</p>
@@ -1187,10 +1183,10 @@ async function copyText(text: string) {
               </div>
             </div>
             <div v-if="detailAccount.v3_scheduling" class="rounded-lg border border-border bg-muted p-3 space-y-2">
-              <div class="flex justify-between items-center gap-2 text-xs"><span class="font-medium text-foreground">{{ detailAccount.v3_scheduling.config.mode === 'smart' ? '智能调度' : '旧评分排序' }}</span><span :class="detailAccount.v3_scheduling.capacity.immediate ? 'text-emerald-700' : 'text-amber-700'">{{ schedulingReasonLabel(detailAccount.v3_scheduling.capacity.reason) }}</span></div>
+              <div class="flex justify-between items-center gap-2 text-xs"><span class="font-medium text-foreground">智能调度</span><span :class="detailAccount.v3_scheduling.capacity.immediate ? 'text-emerald-700' : 'text-amber-700'">{{ schedulingReasonLabel(detailAccount.v3_scheduling.capacity.reason) }}</span></div>
               <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>绑定 {{ detailAccount.v3_scheduling.bound_sessions }} 个会话</span><span>活跃 {{ detailAccount.v3_scheduling.active_sessions }} 个</span><span>执行 {{ detailAccount.v3_scheduling.phases.running }} 个请求</span></div>
               <p class="text-[length:var(--ui-font-small)] text-muted-foreground">等槽 {{ detailAccount.v3_scheduling.phases.waiting_concurrency }} · 准备 {{ detailAccount.v3_scheduling.phases.preparing }} · 等发 {{ detailAccount.v3_scheduling.phases.waiting_send }} · 退避 {{ detailAccount.v3_scheduling.phases.backoff }}</p>
-              <div class="flex justify-between items-center"><span class="text-[length:var(--ui-font-small)] text-muted-foreground">{{ detailAccount.v3_scheduling.config.mode === 'smart' ? '智能偏好 ' + (detailAccount.v3_scheduling.factors.score * 100).toFixed(1) + '（高优）' : '旧评分低分优先' }}</span><Button variant="outline" size="sm" class="text-xs h-7" @click="changeWorkspaceTab('scheduling')">调度详情</Button></div>
+              <div class="flex justify-between items-center"><span class="text-[length:var(--ui-font-small)] text-muted-foreground">{{ '智能偏好 ' + (detailAccount.v3_scheduling.factors.score * 100).toFixed(1) + '（高优）' }}</span><Button variant="outline" size="sm" class="text-xs h-7" @click="changeWorkspaceTab('scheduling')">调度详情</Button></div>
             </div>
             <div v-else-if="detailAccount.v3_scheduling_error" class="rounded-lg bg-amber-50 p-3 text-xs text-amber-700">{{ detailAccount.v3_scheduling_error }}，不代表零负载。<button class="underline ml-2" @click="changeWorkspaceTab('scheduling')">查看详情</button></div>
             <p class="text-xs text-muted-foreground">转发方式：{{ detailAccount.request_backend === 'native293' ? '原生运行时（280 / 293 自动匹配）' : '原有转发' }}</p>

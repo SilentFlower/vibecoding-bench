@@ -565,7 +565,7 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 - 上游接口：`GET https://api.anthropic.com/api/oauth/usage`
 - 后端入口：`service::oauth::fetch_usage(token, proxy_url).await -> Result<serde_json::Value, AppError>`
 - 账号刷新：`AccountService::refresh_usage(id).await -> Result<serde_json::Value, AppError>`
-- 后台服务：`UsagePollerService::new(account_svc, interval: Duration, enabled: bool)`；`run()` 在 disabled 时直接返回
+- 后台服务：`UsagePollerService::new(account_svc, interval: Duration, enabled: bool)`；`run()` 在 disabled 时直接返回。v3 使用 `UsagePollerService::for_resets(account_svc)`，仅补充已结束周期的观测。
 - 被动解析：`gateway::extract_passive_usage(headers) -> Option<serde_json::Value>`
 - 被动写入：`AccountService::update_passive_usage(id, partial, UsageObservationKind).await -> Result<(), AppError>`
 - 管理端接口：`POST /admin/accounts/:id/usage -> { status: "ok", usage }`
@@ -582,7 +582,8 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 - 后端归一化只能补稳定字段，不得删除 `limits`、`spend`、`extra_usage` 等原始字段，方便排查上游变化。
 - 前端展示应优先读取稳定字段；为了兼容旧缓存，也可从 `usage_data.limits` 回退提取 Fable。
 - Gateway 必须从 Anthropic unified 响应头被动解析 `5h`、`7d` 与 Fable 专属 `7d_oi`；`7d_oi` 归一化为稳定字段 `seven_day_fable`。窗口必须同时具备合法 `utilization` 与未来合理范围内的 `reset`，缺失或异常时不得覆盖已有数据。
-- 普通业务请求无论成功或 429 都不得调用 usage API。v3（`V3_RUNTIME_URL.trim()` 非空）关闭 `UsagePollerService`，历史 `auto_poll_usage=true` 也不触发查询，不改账号原开关；管理员手动 `/admin/accounts/:id/usage` 仍可查询。非 v3 保留 active OAuth＋`auto_poll_usage=true` 的定时刷新。
+- 普通业务请求无论成功或 429 都不得调用 usage API。v3（`V3_RUNTIME_URL.trim()` 非空）后台每 15 秒扫描 active OAuth 账号，仅对普通 5h／7d 旧窗口已到期的账号调用既有 `refresh_usage`，独立于历史 `auto_poll_usage` 开关；从未获取或只有非法额度资料的账号不自动补查。非 v3 保留 active OAuth＋`auto_poll_usage=true` 的定时刷新；管理员手动接口继续可用。
+- 重置刷新串行发送，账号间隔 500ms，同账号尝试至少间隔 5 分钟，成功但仍返回旧窗口时也遵守此间隔。发送前重新读取账号状态与窗口，沿用更新维护和凭据归属门禁；被动或手动观测已推进周期后跳过刷新。重试记录仅在进程内保存，删除账号后清理。
 - 成功响应、PrimePoller 成功和显式 usage 查询使用 `UsageObservationKind::Allowed`；429 使用按窗口构造的 `RejectedWindows`。窗口 `status=rejected` 时视为拒绝，`status=allowed` 时明确视为允许；缺少明确状态时才用 `surpassed-threshold=true/正数` 或 `utilization >= 1.0` 兜底。旧 reset 已到期、新 reset 已推进，且窗口本身未被拒绝时，若旧值和新值仍处于 97% 以上高位，必须保存新 reset 并把首次新周期 utilization 归零；只有真实拒绝窗口保留高位值。
 - 被动与主动写入都必须保留本次观察未包含的窗口和扩展字段，包括 `seven_day_sonnet`、`limits`、`spend`、`extra_usage`。
 
@@ -600,8 +601,10 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 | 5h 触发 429，7d/Fable 窗口为 `status=allowed` 且携带跨周期高位值 | 仅 5h 参与限流；7d/Fable 保存新 reset 并将首次 utilization 归零 |
 | 旧 99%/100% reset 已到期，成功样本给出新 reset 但仍是高位 | 新 reset 保留，首次 utilization 写 0 |
 | 同一新 reset 的后续完整样本 | 按响应头真实值正常更新 |
-| `auto_poll_usage=false` | 后台 poller 不查询该账号 usage |
-| v3 且历史 `auto_poll_usage=true` | poller 不运行，不访问 usage；业务响应被动合并保持 |
+| 非 v3 且 `auto_poll_usage=false` | 后台 poller 不查询该账号 usage |
+| v3 普通窗口有效／从未获取／非法数据，历史开关任意 | 重置扫描不查询 usage |
+| v3 active OAuth 普通旧窗口已到期，历史开关任意 | 后台刷新；同账号 5 分钟内跳过重复尝试 |
+| 账号已停用／非 OAuth／凭据由本地管理或正在交接 | 跳过目标或由既有归属门禁拒绝上游访问 |
 | 管理员手动刷新 / 非 v3 且 `auto_poll_usage=true` | 允许主动查询 usage，结果仍经过 rollover 合并 |
 | 上游返回 401/403/429 | 维持现有 `AppError` 分类，不吞错误体 |
 
@@ -610,7 +613,8 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 - Good：usage 先返回 session/weekly all 两个 `scope: null` limit，后返回 Fable scoped limit；解析器跳过前两项并补出 `seven_day_fable`。
 - Good：Fable 成功响应带 `7d_oi utilization/reset`，Gateway 收到响应头后异步写入 `seven_day_fable`，整个请求生命周期不访问 usage API。
 - Good：旧 7d 为 99% 且 reset 已过期，下一次成功响应把 reset 推到下周但仍回 99%；合并层保存新 reset 并返回 0%，后续同 reset 的真实样本可继续更新。
-- Base：非 v3 沿用账号开关轮询；v3 即使开关为 true 仍禁用 poller，手动查询可用。
+- Base：非 v3 沿用账号开关轮询；v3 只在普通旧窗口结束后补查，手动查询可用。
+- Good：5h 旧窗口到期，后台刷新取得 `utilization: 0, resets_at: null` 后停止补查；调度按真实零用量计算。错误做法是让未知资料触发每轮查询；正确处理是仅刷新 `reset_pending`，失败后等待重试间隔。
 - Base：只返回传统 `five_hour` / `seven_day`；保留已有 Fable 数据，不主动补查。
 - Bad：直接假设 `limits[0]` 就是 Fable，或遇到第一个 `scope: null` 用 `?` 提前返回，导致真实 Fable 项被漏掉。
 - Bad：在 Fable body EOF 或 429 后自动调用 usage API，绕过 `auto_poll_usage` 显式开关。
@@ -623,6 +627,7 @@ let permit = slots.acquire_many_owned(slot_units).await?;
 - `service::account` 单测覆盖：Allowed rollover 高位清零、已下降值采用、同周期后续更新、RejectedWindows 仅保留明确拒绝窗口高位及未观察字段不丢失。
 - `service::gateway` 单测覆盖：429 按窗口 `status` 判定拒绝，显式 `allowed` 优先于高位 utilization，缺少 status 时兼容数值型 `surpassed-threshold`。
 - `UsagePollerService` 使用真实 SQLite 账号与本地 TCP 代理，验证 disabled 零连接、enabled 保留轮询；账号 auto_poll_usage 不被改写。
+- `reset_refresh_targets_expired_windows_and_throttles_retries`：仅到期的活动 OAuth 账号产生连接，覆盖开关关闭、未知资料、有效窗口、零用量无 reset、停用与非 OAuth、失败冷却和新观测后停止。
 - 静态搜索必须确认 `refresh_usage` 只由 usage poller 和管理端手动接口等显式入口调用，不存在 Gateway 请求后刷新链路。
 - `services/gateway/web` 构建必须通过 `npm run build`，确保 `UsageData` 类型与 `Accounts.vue` 展示同步。
 - 改动 `fetch_usage` 后至少跑 `cargo test`，确认账号调度和 usage 相关共享测试不回归。
@@ -1403,6 +1408,7 @@ SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expect
 - `SchedulingStore::claim(account_id, interval_ms, now_ms, key, expected)` 是受控时钟验证入口；生产使用 `claim_current`，不能从选号快照传入旧 RPM／旧时间。
 - 持久表：`gateway_session_bindings(session_key PK, account_id FK, revision, created_at_ms, last_seen_at_ms, expires_at_ms)`；`gateway_account_send_state(account_id PK/FK, last_admitted_at_ms)`。时间为非空 BIGINT UTC 毫秒，账号删除与两表清理同事务。
 - 管理接口：`GET /admin/accounts/:id/scheduling` 返回 `{summary,snapshot}`；`GET /admin/accounts/:id/scheduling/sessions?page=1&page_size=20&state=all&prefix=` 返回 `{items,total,page,page_size,observed_at_ms}`。复用管理员认证。
+- `AccountService::get_account_capacity_info(&Account) -> AccountCapacityInfo`（异步）只读取并发、队列与退避；`apply_scheduling_config(SchedulingConfig)` 替换统一选择器配置，`reload_scheduling_config()` 在启动时加载。独立部署只复用选择器的内存评分，v3 装配后与完整准入共享同一实例。
 
 ### 3. Contracts
 
@@ -1417,27 +1423,36 @@ SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expect
 - `AccountService::update_account`／`update_account_options` 成功保存后通知对应发送队首；等待者重新读取 RPM，支持调低和调高，但原截止时间、协议身份快照不变。仅重新传入旧 `Account` 不能覆盖当前 RPM。
 - SQLx Any 读取这些整数时使用 `CAST(... AS TEXT)` 再严格解析 i64，表中仍保存 BIGINT；SQLite 的运行时 INTEGER 可能经 Any 按 i32 映射，不能仅用 Rust `get::<i64>` 假定完整毫秒。分页排序使用底层数值列，不能按文本投影排序。
 - 绑定闲置 TTL 为 60 分钟。独立维护循环每分钟按当前 revision 批量续租活动绑定，不推进最近活动；读取不续租。过期清理批次上限 200、每轮最多 50 批；旧版本不能续租或覆盖新版本，重建 revision 不复用。
-- 智能因素为可用负载、有效剩余额度、真实健康、首输出延迟，均高分优先。未知额度／反馈为 0.5；只读未来有效的 5h／7d 窗口，不把未知当零用量优惠。真实请求终态反馈复用现有观察器，HTTP 200 SSE 错误不算成功，用户输入错误、取消、本地拒绝和采样缺失不污染健康，不主动探测模型。
+- 智能因素为可用负载、有效剩余额度、真实健康、首输出延迟，均高分优先。`Account::usage_quota(now: i64) -> UsageQuota` 为评分和后台重置扫描共用投影；`remaining` 取有效普通 5h／7d 剩余额度的最小值，缺少有效观测时为 0.5。合法未来 reset 或明确 `utilization=0` 且 reset 缺失／null 的窗口参与评分；非法资料保持未知，过期窗口等待新观测，不直接推算满额。
+- `factors.quota_state` 为 `unknown/reset_pending/observed`：存在合法已到期窗口即为 `reset_pending`，其余有效窗口仍可参与评分；没有到期窗口且存在有效观测为 `observed`，否则为 `unknown`。管理页区分待自动刷新与尚无有效观测，前端以可选字段兼容旧响应。健康未知为 0.5；真实终态反馈复用现有观察器，HTTP 200 SSE 错误不算成功，用户输入错误、取消、本地拒绝和采样缺失不污染健康，不主动探测模型。
 - 首输出从准入后真正提交的 `AttemptTrace::commit` 开始计时，取已有有界解码观察器第一次看到的非空文字／思考 delta、工具参数 delta、有效文本／思考块或带有效 id/name 的 tool_use／server_tool_use；忽略头部、心跳、元数据、空白和签名。非流式 message JSON 在完整解析后记点。仅成功且完整并观察到有效输出时更新延迟；失败、取消、不完整、无输出或无诊断不能用响应头补值。
 - 请求开始时冻结 `model/thinking_type/thinking_budget/effort/stream` 白名单事实，缺失保持未知；每账号最多 64 组成功延迟 EWMA，淘汰最近采样最旧组只恢复中性。实际选号只读取同组，管理页 `factors.latency` 为全部成功首输出的账号汇总，文案必须说明区别。健康继续按账号共享，5 分近优轮换不变。
 - `AttemptDiagnostic.first_output_ms: Option<u64>` 为新增可选 JSON 摘要；历史缺失为 None，不迁移、不回填。原 `ttft_ms` 保留响应头耗时语义，不改变历史与上游遥测载荷。
-- 默认权重 `1/0.8/1/0.5`；健康普通 EWMA 0.2、容量拒绝 0.4、失败半衰期 15 分钟、延迟尺度 10 秒。智能近优差值 0.05 内按稳定账号 ID 轮转；`legacy_score` 只替换排序，旧低分优先字段不被智能高分覆盖，绑定与发送闸门继续生效。
+- 默认四项权重 `1/0.8/1/0.5`；健康普通 EWMA 0.2、容量拒绝 0.4、失败半衰期 15 分钟、延迟尺度 10 秒。智能近优差值 0.05 内按稳定账号 ID 轮转；所有选号统一智能评分，响应 `config.mode` 固定为 `smart`。旧排序、阶梯评分、旧权重缓存及 `scheduling_score/scheduling_detail` 已退役，容量统计独立保留。
+- 重置偏好仅采用合法未来普通窗口，单窗口 `h/(h+remaining_seconds)`，`h=周期秒数/7`；按 5h／7d 窗口权重平均，缺失周期贡献 0。重置主权重或窗口权重全零时关闭，基础分按原四因素加有效重置权重归一化。
+- 排队主权重仅在候选都需要等待时参与选择，即时候选只用基础分。启用时运行负载使用 `1/(1+active_units/max_units)`，排队与发送等待独立计分；关闭时复用原负载公式。并发等待按 `max(active_units+queued_units+request_units-max_units,0)/max_units*service_ms` 估算，和容量快照中的发送等待取最大值，等待偏好为 `1/(1+wait_ms/10000)`。
+- `service_ms` 来自同组完整成功终态的总耗时 EWMA，与首输出独立；总耗时小于首输出或样本不完整时不更新。无同组服务耗时且确有并发等待时，按运行／排队压力与已知发送等待回退，估计毫秒为 null。服务耗时复用每账号最多 64 组的现有表；查分读取内存，缺样本不等待。
+- 新摘要包含 `reset/queue/wait_score/estimated_wait_ms/wait_basis`；`score` 为基础分，`wait_score` 为等待排序分，`wait_basis` 为 `pacing/sampled/pressure`。管理端等待估算为账号汇总，实际选号限定请求参数分组；未知时长与压力回退明确展示。
 
 | 字符串 setting | 默认 | 校验 |
 | --- | --- | --- |
-| `v3_scheduling_mode` | `smart` | `smart`／`legacy_score` |
 | `v3_admission_wait_seconds` | `120` | 整数 1–120 |
 | `v3_smart_weight_load` | `1` | 有限数 0–10，至多一位小数 |
 | `v3_smart_weight_quota` | `0.8` | 同上 |
 | `v3_smart_weight_health` | `1` | 同上 |
-| `v3_smart_weight_latency` | `0.5` | 同上；四项不得全零 |
+| `v3_smart_weight_latency` | `0.5` | 同上 |
+| `v3_smart_weight_reset` | `0` | 同上；重置偏好主权重 |
+| `v3_smart_weight_queue` | `0` | 同上；仅等待选择生效 |
+| `v3_smart_reset_weight_5h` | `1` | 同上；5h 重置窗口贡献 |
+| `v3_smart_reset_weight_7d` | `1` | 同上；周重置窗口贡献 |
 
-- 默认值由 `V3_SCHEDULING_DEFAULTS` 共用；更新在设置锁内合并、整体校验、事务保存，再原子替换已校验快照，不能二次读库使并发更新回退。旧三项评分权重保留。
+- 默认值由 `V3_SCHEDULING_DEFAULTS` 共用；更新在设置锁内合并、整体校验、事务保存，再原子替换已校验快照，不能二次读库使并发更新回退。有效主权重总和必须大于 0；仅排队权重启用时即时候选等偏好轮转。
+- `SettingsStore::ensure_scheduling_defaults()` 在启动时事务补齐缺失键，保留管理员新配置，并清理 `OBSOLETE_SCHEDULING_KEYS` 中的旧模式与三个旧权重。管理 GET 隐藏、PUT 忽略废弃键；冻结迁移基线保持原定义。
 - 账号列表新增可选 `v3_scheduling`／`v3_scheduling_error`，详情 `summary` 包含 config、factors、capacity、绑定／活跃会话、无当前绑定请求、各阶段及下一许可。`capacity.reason` 为 `ready/concurrency/pacing/queue_full/wait_budget/pending_submissions/account_unavailable`；无准入容量或前方有准备请求时不得显示 ready。
 - `snapshot` 含 observed/history_available_from、截断／丢失标记、独立 60 秒提交统计、当前请求与真实提交事件。事件最多 5 分钟、每账号 500、全局 10000；重启有历史缺口，不补造过去或未来点。实心点是 Gateway 发起 sender 提交，空心点是预计最早许可，不能宣称供应商已接收或未来已预订。
 - 会话分页 page≥1、page_size 默认 20／最大 100，state 为 all／active／idle，prefix 为最多 64 位十六进制。只返回匿名摘要及时间、阶段，不返回正文／原 SID／revision／凭据。绑定会话、不同活跃会话、请求及上游 Session 池槽位分别统计；同一会话可同时有多个阶段请求。
 - 管理读取无调度副作用，不续租、消费许可或唤醒环境。详情沿用 5 秒刷新，仅打开且页面可见时读取；关闭／隐藏取消，防重叠和旧响应覆盖。失败保留原快照并标记陈旧，倒计时在浏览器递减且标为预计。会话总数缩小致页码越界时，同轮最多回读一次第一页，成功后一起更新页码与数据；归零保持第一页。
-- 不改官方缓存参数、正文前缀、上游池、TLS／身份冻结或原始压缩／流字节；既有实际重试均过发送闸门，不新增重试次数／迁移条件。排序可退 `legacy_score`；完整回退使用旧构建并保留增量表。此合同不等于官方账号安全阈值或缓存命中保证，也不包含多实例全局并发调度。
+- 不改官方缓存参数、正文前缀、上游池、TLS／身份冻结或原始压缩／流字节；既有实际重试均过发送闸门，不新增重试次数／迁移条件。两个新增主权重归零可回到基础智能排序；完整回退使用旧构建并保留增量表。此合同不等于官方账号安全阈值或缓存命中保证，也不包含多实例全局并发调度。
 
 ### 4. Validation & Error Matrix
 
@@ -1452,6 +1467,9 @@ SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expect
 | 本地 mock／缓存命中或提交前取消 | 不造实际提交事件／attempt，不污染上游健康 |
 | HTTP 200 内 SSE 错误 | 原字节透传，现有完整终态进入失败反馈 |
 | 只有头部／心跳、无有效输出或仅有其它分组样本 | 首输出未知，不把头部或其它模型用作低延迟奖励 |
+| 普通旧窗口已到期／没有有效观测／零用量且 reset 为 null | `reset_pending`／`unknown`／`observed`；零用量剩余额度为 1 |
+| 即时容量／全部需等待／无同组耗时 | 基础分／等待排序分／压力回退并标记时长未知 |
+| 到期或缺失重置时间／历史旧模式 | 重置奖励 0／统一智能评分，废弃设置隐藏 |
 | 管理未认证／参数越界 | 401／400，读取不改变绑定或发送状态 |
 | 页面隐藏／关闭、读取失败、会话骤减 | 停止刷新／保留陈旧快照／有界回读第一页 |
 
@@ -1459,6 +1477,8 @@ SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expect
 
 - 正常：A 已绑定且繁忙、B 空闲时，老会话留 A，新会话可进 B；50 RPM 的发送间隔至少 1200ms。
 - 基础：无显式 SID 只按新请求准入；网关重启恢复有效绑定与许可时间，时间轴从新进程采集起点开始。
+- 正常：同等条件下 1 小时后重置的窗口获得高于 3 小时窗口的偏好；等待模式中，较快账号即使排队单位更多，也可因较短的成功总耗时估计获选。错误用法是用首输出替代并发槽释放耗时；正确处理是分别保存成功总耗时与首输出。
+- 边界：旧 5h 到期且 7d 已用 4% 时，状态为 `reset_pending`，额度分沿用有效 7d 的 0.96。刷新取得 5h 零用量且无 reset 后，状态为 `observed`，额度分仍为 0.96；错误做法是把明确零用量也当未知，正确处理是接受该官方观测。
 - 边界：头部 100ms、首个有效思考 3000ms 时，调度使用 3000ms；错误做法是沿用 `ttft_ms=100`，正确处理是读取成功终态的 `first_output_ms` 并写入请求冻结分组。
 - 错误用法：在数据库等待前采样时间、用选号快照 RPM，或取得许可后立即丢弃再准备提交，会在写锁释放／限额调整时误放行。正确处理：生产调用 `claim_current`，并将许可持有到提交边界：
 
@@ -1479,6 +1499,9 @@ transport.submit(prepared, body, ttfb_timeout).await
 - `capacity_reason_matches_pending_work_and_wait_budget`：无容量时非 ready，前方请求和超期各有原因；原有绑定、Token 隔离、近优轮转、取消、状态故障与只读查询回归保持。
 - Gateway 的 `v3_real_http_disconnect_releases_waiting_request`／`v3_real_http_stream_disconnect_releases_execution`、`v3_pacing_timeout_preserves_binding_and_has_no_attempt`、`v3_sse_error_feedback_uses_existing_body_observation`；真实本地 HTTP 验证资源与原始字节。
 - `first_output_*` 覆盖有效内容／空白、完整 JSON、先头部后内容、旧诊断、成功 EWMA、失败和取消不更新、跨模型／思考／stream 隔离、实际选号和 64 组上限；`long_initial_blank_lines_preserve_usage_across_codings_and_chunks` 同时断言全部受支持编码与分块的首输出。
+- `quota_observation_distinguishes_reset_unknown_and_zero_usage`／`refreshed_quota_changes_actual_selection`：覆盖到期、未知、非法值、零用量无 reset、多窗口约束与刷新后的实际选号；前端以合成接口验证两种状态文案及旧响应兼容。
+- `scheduling_preferences_*`：新权重校验、有效窗口奖励、等待实际选号与即时优先、失败样本排除、历史默认补齐与旧键退役、原子热更新；`scheduling_group_lookup_benchmark` 显式执行 1／8／32／64 组与 1／10／100 候选微基准，观测环境单独记录。
+- `deploy/flower2api/verify_scheduling_preferences.py`：真实构建与合成 API 验证字符串保存／撤销、精度错误定位、失败草稿、旧评分移除、估算／回退、旧响应和 1440／390px。
 - `cold_environment_ready_cohort_still_submits_smoothly` 保留正式归属校验，以本地 sender 验证同批就绪后的真实提交间隔与压缩字节。
 - 管理路由覆盖鉴权、有界分页、读取不续租、设置合并校验与热刷新；前端构建之外验证单会话多请求、原因文案、三页缩为一页／归零、失败陈旧和隐藏／关闭暂停。完整 Rust 回归通过；本地合成数据不得描述为真实账号或生产验收。
 

@@ -15,22 +15,6 @@ export const settingsGroups:SettingsGroup[] = [
         "description": "老会话保持有效绑定，新会话根据资格与容量选择账号。",
         "fields": [
           {
-            "key": "v3_scheduling_mode",
-            "label": "新会话排序",
-            "kind": "select",
-            "help": "两种排序都按账号 RPM 平滑提交。",
-            "options": [
-              [
-                "smart",
-                "智能排序"
-              ],
-              [
-                "legacy_score",
-                "旧评分排序"
-              ]
-            ]
-          },
-          {
             "key": "v3_admission_wait_seconds",
             "label": "准入等待上限（秒）",
             "kind": "number",
@@ -73,6 +57,42 @@ export const settingsGroups:SettingsGroup[] = [
             "min": 0,
             "max": 10,
             "step": 0.1
+          },
+          {
+            "key": "v3_smart_weight_reset",
+            "label": "额度重置系数",
+            "kind": "number",
+            "help": "0 关闭。其他条件相近时优先利用即将重置的额度。",
+            "min": 0,
+            "max": 10,
+            "step": 0.1
+          },
+          {
+            "key": "v3_smart_weight_queue",
+            "label": "排队等待系数",
+            "kind": "number",
+            "help": "0 关闭。账号都需要等待时，优先选择预计等待较短的队列。",
+            "min": 0,
+            "max": 10,
+            "step": 0.1
+          },
+          {
+            "key": "v3_smart_reset_weight_5h",
+            "label": "5 小时重置窗口权重",
+            "kind": "number",
+            "help": "设置 5 小时窗口在重置偏好中的贡献，0 忽略此窗口。",
+            "min": 0,
+            "max": 10,
+            "step": 0.1
+          },
+          {
+            "key": "v3_smart_reset_weight_7d",
+            "label": "周重置窗口权重",
+            "kind": "number",
+            "help": "设置周窗口在重置偏好中的贡献，0 忽略此窗口。",
+            "min": 0,
+            "max": 10,
+            "step": 0.1
           }
         ]
       },
@@ -82,40 +102,6 @@ export const settingsGroups:SettingsGroup[] = [
           { key:'session_policy_block_enabled', label:'自动封禁', kind:'boolean', help:'开启后按真实客户端会话隔离，封禁及历史记录可在会话封禁页面查看。' },
           { key:'session_policy_block_duration_minutes', label:'封禁时长（分钟）', kind:'number', min:1, step:1, help:'默认 24 小时（1440 分钟）。\n修改仅影响新封禁，重复拦截保持原到期时间。' },
         ],
-      },
-      {
-        "title": "兼容排序权重",
-        "description": "旧评分越低越优先，权重总和建议为 1。",
-        "fields": [
-          {
-            "key": "score_weight_7d",
-            "label": "7 天窗口权重",
-            "kind": "number",
-            "help": "",
-            "min": 0,
-            "step": 0.05,
-            "nonnegative": true
-          },
-          {
-            "key": "score_weight_5h",
-            "label": "5 小时窗口权重",
-            "kind": "number",
-            "help": "",
-            "min": 0,
-            "step": 0.05,
-            "nonnegative": true
-          },
-          {
-            "key": "score_weight_concurrency",
-            "label": "并发负载权重",
-            "kind": "number",
-            "help": "",
-            "min": 0,
-            "step": 0.05,
-            "nonnegative": true
-          }
-        ],
-        "summary": "legacy-weight"
       },
       {
         "title": "Fable 配额切换",

@@ -14,6 +14,7 @@
 
 - SQLite 原初始化冻结为 `gateway.baseline.1`，由 `database_migrations` 与固定登记核验后执行。已登记库仍检查最低实际结构。新增版本同时实现执行分支并完成新旧程序兼容验收；已登记摘要保持。PostgreSQL 继续原迁移语义。基线中的历史 ADD COLUMN 幂等容忍保持，登记成功前核验实际完成结构。
 - settings 默认值通过 `settings` 表插入 key/value；新增 setting 必须有默认值、老值迁移策略和非法值兜底。
+- 已冻结基线之后的智能调度设置由启动阶段 `SettingsStore::ensure_scheduling_defaults()` 在现有表中事务补齐；使用 `ON CONFLICT DO NOTHING` 保留显式新权重，并清理统一废弃键集合。该兼容补齐不改冻结迁移摘要；真实结构变更继续走登记迁移。
 - `claude_code_profile_selection_mode` 缺失时幂等插入 `client_version`，SQLite 使用 `INSERT OR IGNORE`、PostgreSQL 使用 `ON CONFLICT (key) DO NOTHING`；不得覆盖显式模式值。仅补齐选择模式不批量修改账号 env。
 - 版本画像相关迁移必须更新已有账号的 `canonical_env.version/version_base/build_time/node_version`，不能只改新账号默认值。
 - 多个 setting 共同表达一个默认画像时，旧默认组合必须成对迁移。293 升级只在 `claude_code_profile_selection_mode=client_version` 且 profile/允许范围精确匹配 `PREVIOUS_DEFAULT_CLAUDE_CODE_PROFILE_SETTINGS` 中旧出厂组合时升级为默认 293 与 `2.1.89-2.1.293`；账号模式即使使用旧出厂 260/280 组合也保留，管理员自定义任一值同样保留。

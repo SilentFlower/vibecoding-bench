@@ -118,15 +118,6 @@ export interface Account {
   telemetry_expires_at?: string
   v3_scheduling?: SchedulingSummary
   v3_scheduling_error?: string
-  scheduling_score?: number
-  scheduling_detail?: {
-    eff_7d: number
-    eff_5h: number
-    concurrency_pct: number
-    detail_7d?: { utilization: number; decay: number }
-    detail_5h?: { utilization: number; decay: number }
-    weights?: { w7d: number; w5h: number; wconc: number }
-  }
   current_concurrency?: number
   current_concurrency_units?: number
   max_concurrency_units?: number
@@ -156,8 +147,8 @@ export interface SchedulingPhases {
 
 /** v3 调度器的真实生效配置和可解释容量摘要。 */
 export interface SchedulingSummary {
-  config: { mode: 'smart' | 'legacy_score'; wait_seconds: number; weights: [number, number, number, number] }
-  factors: { load: number; quota: number; health: number; latency: number; score: number }
+  config: { mode: 'smart'; reset_weight?: number; queue_weight?: number; reset_window_weights?: [number, number]; wait_seconds: number; weights: [number, number, number, number] }
+  factors: { load: number; quota: number; quota_state?: 'unknown' | 'reset_pending' | 'observed'; health: number; latency: number; score: number; reset?: number; queue?: number; wait_score?: number; estimated_wait_ms?: number | null; wait_basis?: 'pacing' | 'sampled' | 'pressure' }
   capacity: { immediate: boolean; can_queue: boolean; reason: string; earliest_submit_at_ms: number }
   observed_at_ms: number
   bound_sessions: number

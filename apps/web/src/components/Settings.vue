@@ -23,22 +23,23 @@ import { useToast } from '../composables/useToast';
 
 const { show: toast } = useToast();
 
-/** 权重表单 */
-const w7d = ref('0.5');
-const w5h = ref('0.3');
-const wconc = ref('0.2');
 /** v3 配置只影响新会话排序，稳定绑定和平滑发送持续生效。 */
-const v3Mode = ref('smart');
 const v3WaitSeconds = ref<string | number>('120');
-const v3Weights = ref<Array<string | number>>(['1', '0.8', '1', '0.5']);
+const v3Weights = ref<Array<string | number>>(['1', '0.8', '1', '0.5', '0', '0']);
+const v3ResetWindows = ref<Array<string | number>>(['1', '1']);
+/** 校验一个智能调度权重。@param value 当前字符串或数字草稿。@return 范围和小数精度合法。 */
+function isValidSmartWeight(value: unknown): boolean {
+  const raw = String(value).trim();
+  const number = Number(raw);
+  return raw !== '' && Number.isFinite(number) && number >= 0 && number <= 10 && Math.abs(number * 10 - Math.round(number * 10)) < 1e-8;
+}
+const isValidV3Wait = computed(() => /^\d+$/.test(String(v3WaitSeconds.value).trim()) && Number(v3WaitSeconds.value) >= 1 && Number(v3WaitSeconds.value) <= 120);
 const isValidV3 = computed(() => {
-  const wait = String(v3WaitSeconds.value).trim();
-  const weights = v3Weights.value.map(value => Number(String(value).trim()));
-  return ['smart', 'legacy_score'].includes(v3Mode.value)
-    && /^\d+$/.test(wait) && Number(wait) >= 1 && Number(wait) <= 120
-    && v3Weights.value.every(value => String(value).trim() !== '')
-    && weights.every(value => Number.isFinite(value) && value >= 0 && value <= 10 && Math.abs(value * 10 - Math.round(value * 10)) < 1e-8)
-    && weights.reduce((a, b) => a + b, 0) > 0;
+  const fields = [...v3Weights.value, ...v3ResetWindows.value];
+  const values = fields.map(value => Number(String(value).trim()));
+  const [load, quota, health, latency, reset, queue, fiveHour, weekly] = values;
+  return isValidV3Wait.value && fields.every(isValidSmartWeight)
+    && load + quota + health + latency + (fiveHour + weekly > 0 ? reset : 0) + queue > 0;
 });
 
 const route = useRoute();
@@ -253,33 +254,12 @@ const claudeCodeVersionProfiles = ref<ClaudeCodeVersionProfileOption[]>([
   },
 ]);
 
-/** 权重总和 */
-const totalWeight = computed(() => {
-  return parseFloat(formString(w7d.value) || '0') + parseFloat(formString(w5h.value) || '0') + parseFloat(formString(wconc.value) || '0');
-});
-
-/** 单个权重是否合法（非负有限数） */
-function isValidWeight(v: unknown): boolean {
-  const n = parseFloat(formString(v));
-  return !isNaN(n) && isFinite(n) && n >= 0;
-}
-
-/** 所有权重是否合法 */
-const allValid = computed(() => {
-  return isValidWeight(w7d.value) && isValidWeight(w5h.value) && isValidWeight(wconc.value);
-});
-
 /** Fable 周用量百分比上限是否合法 */
 const isValidFableWeeklyUsageLimitPercent = computed(() => {
   const raw = trimFormString(fableWeeklyUsageLimitPercent.value);
   if (!/^\d+$/.test(raw)) return false;
   const value = Number(raw);
   return Number.isSafeInteger(value) && value >= 1 && value <= 100;
-});
-
-/** 总和是否为 1.0 */
-const isValidTotal = computed(() => {
-  return Math.abs(totalWeight.value - 1.0) < 0.001;
 });
 
 /** 解析 Auto Mode classifier 本地处理模式 */
@@ -518,12 +498,9 @@ async function loadSettings() {
     const data = await api.getSettings();
     sessionPolicyBlockEnabled.value = data.session_policy_block_enabled !== 'false';
     sessionPolicyBlockMinutes.value = data.session_policy_block_duration_minutes ?? '1440';
-    w7d.value = data.score_weight_7d ?? '0.5';
-    w5h.value = data.score_weight_5h ?? '0.3';
-    wconc.value = data.score_weight_concurrency ?? '0.2';
-    v3Mode.value = data.v3_scheduling_mode ?? 'smart';
     v3WaitSeconds.value = data.v3_admission_wait_seconds ?? '120';
-    v3Weights.value = [data.v3_smart_weight_load ?? '1', data.v3_smart_weight_quota ?? '0.8', data.v3_smart_weight_health ?? '1', data.v3_smart_weight_latency ?? '0.5'];
+    v3Weights.value = [data.v3_smart_weight_load ?? '1', data.v3_smart_weight_quota ?? '0.8', data.v3_smart_weight_health ?? '1', data.v3_smart_weight_latency ?? '0.5', data.v3_smart_weight_reset ?? '0', data.v3_smart_weight_queue ?? '0'];
+    v3ResetWindows.value = [data.v3_smart_reset_weight_5h ?? '1', data.v3_smart_reset_weight_7d ?? '1'];
 
     fableStickyQuotaFallbackEnabled.value = (data.fable_sticky_quota_fallback_enabled ?? 'true') === 'true';
     fableWeeklyUsageLimitPercent.value = data.fable_weekly_usage_limit_percent ?? '50';
@@ -606,10 +583,6 @@ async function loadPrimeLogs() {
 
 /** 保存设置 */
 async function saveSettings() {
-  if (!allValid.value) {
-    toast('权重必须为非负数');
-    return;
-  }
   if (!isValidFableWeeklyUsageLimitPercent.value) {
     toast('Fable 周用量上限必须是 1 到 100 之间的整数');
     return;
@@ -723,15 +696,15 @@ function isSkipped(log: PrimeLogEntry): boolean {
 
 /** 表单字段直接关联既有状态；所有提交值保持字符串。 */
 const fieldBindings: Record<string, {get: () => string;set: (value: string) => void}> = {
-  score_weight_7d: { get: () => formString(String(w7d.value)), set: value => { w7d.value = value as typeof w7d.value; } },
-  score_weight_5h: { get: () => formString(String(w5h.value)), set: value => { w5h.value = value as typeof w5h.value; } },
-  score_weight_concurrency: { get: () => formString(String(wconc.value)), set: value => { wconc.value = value as typeof wconc.value; } },
-  v3_scheduling_mode: { get: () => formString(v3Mode.value), set: value => { v3Mode.value = value as typeof v3Mode.value; } },
   v3_admission_wait_seconds: { get: () => formString(String(v3WaitSeconds.value).trim()), set: value => { v3WaitSeconds.value = value as typeof v3WaitSeconds.value; } },
   v3_smart_weight_load: { get: () => formString(String(v3Weights.value[0]).trim()), set: value => { v3Weights.value[0] = value as typeof v3Weights.value[0]; } },
   v3_smart_weight_quota: { get: () => formString(String(v3Weights.value[1]).trim()), set: value => { v3Weights.value[1] = value as typeof v3Weights.value[1]; } },
   v3_smart_weight_health: { get: () => formString(String(v3Weights.value[2]).trim()), set: value => { v3Weights.value[2] = value as typeof v3Weights.value[2]; } },
   v3_smart_weight_latency: { get: () => formString(String(v3Weights.value[3]).trim()), set: value => { v3Weights.value[3] = value as typeof v3Weights.value[3]; } },
+  v3_smart_weight_reset: { get: () => formString(String(v3Weights.value[4]).trim()), set: value => { v3Weights.value[4] = value; } },
+  v3_smart_weight_queue: { get: () => formString(String(v3Weights.value[5]).trim()), set: value => { v3Weights.value[5] = value; } },
+  v3_smart_reset_weight_5h: { get: () => formString(String(v3ResetWindows.value[0]).trim()), set: value => { v3ResetWindows.value[0] = value; } },
+  v3_smart_reset_weight_7d: { get: () => formString(String(v3ResetWindows.value[1]).trim()), set: value => { v3ResetWindows.value[1] = value; } },
   fable_sticky_quota_fallback_enabled: { get: () => formString(fableStickyQuotaFallbackEnabled.value ? 'true' : 'false'), set: value => { fableStickyQuotaFallbackEnabled.value = value === 'true'; } },
   fable_weekly_usage_limit_percent: { get: () => formString(trimFormString(fableWeeklyUsageLimitPercent.value)), set: value => { fableWeeklyUsageLimitPercent.value = value as typeof fableWeeklyUsageLimitPercent.value; } },
   peak_prime_enabled: { get: () => formString(primeEnabled.value ? 'true' : 'false'), set: value => { primeEnabled.value = value === 'true'; } },
@@ -825,9 +798,9 @@ function applyPreset(preset:string):void {
 }
 /** 先定位实际错误，再执行原有业务校验与保存。@return 保存结束。 */
 async function submitSettings():Promise<void> {
- const checks:Record<string,boolean>={session_policy_block_duration_minutes:isValidSessionPolicyBlockMinutes.value,score_weight_7d:allValid.value,score_weight_5h:allValid.value,score_weight_concurrency:allValid.value,v3_admission_wait_seconds:isValidV3.value,v3_smart_weight_load:isValidV3.value,fable_weekly_usage_limit_percent:isValidFableWeeklyUsageLimitPercent.value,peak_prime_hours:isValidHours.value,peak_prime_model:isValidModel.value,allow_system_role_models:isValidSystemRoleModels.value,allowed_claude_code_versions:isValidClaudeCodeVersions.value,blocked_claude_code_versions:isValidBlockedClaudeCodeVersions.value,allowed_user_agents:isValidAllowedUserAgents.value,rewrite_disabled_thinking_models:isValidRewriteDisabledThinkingModels.value,intercept_assistant_prefill_models:isValidInterceptAssistantPrefillModels.value,intercept_cli_bg_status_classifier_models:isValidInterceptCliBgStatusClassifierModels.value,log_429_request_body_limit:isValidLog429RequestBodyLimit.value,stream_keepalive_interval_secs:isValidStreamKeepaliveIntervalSecs.value,stream_upstream_idle_timeout_secs:isValidStreamUpstreamIdleTimeoutSecs.value,native_idle_timeout_secs:isValidNativeIdleTimeoutSecs.value,session_hello_probe_timeout_secs:isValidSessionHelloProbeTimeoutSecs.value,session_hello_probe_success_ttl_secs:isValidSessionHelloProbeSuccessTtlSecs.value,session_hello_probe_failure_cooldown_secs:isValidSessionHelloProbeFailureCooldownSecs.value,bootstrap_additional_model_options:isValidBootstrapAdditionalModelOptions.value};
+ const checks:Record<string,boolean>={session_policy_block_duration_minutes:isValidSessionPolicyBlockMinutes.value,v3_admission_wait_seconds:isValidV3Wait.value,v3_smart_weight_load:![...v3Weights.value,...v3ResetWindows.value].every(isValidSmartWeight)||isValidV3.value,fable_weekly_usage_limit_percent:isValidFableWeeklyUsageLimitPercent.value,peak_prime_hours:isValidHours.value,peak_prime_model:isValidModel.value,allow_system_role_models:isValidSystemRoleModels.value,allowed_claude_code_versions:isValidClaudeCodeVersions.value,blocked_claude_code_versions:isValidBlockedClaudeCodeVersions.value,allowed_user_agents:isValidAllowedUserAgents.value,rewrite_disabled_thinking_models:isValidRewriteDisabledThinkingModels.value,intercept_assistant_prefill_models:isValidInterceptAssistantPrefillModels.value,intercept_cli_bg_status_classifier_models:isValidInterceptCliBgStatusClassifierModels.value,log_429_request_body_limit:isValidLog429RequestBodyLimit.value,stream_keepalive_interval_secs:isValidStreamKeepaliveIntervalSecs.value,stream_upstream_idle_timeout_secs:isValidStreamUpstreamIdleTimeoutSecs.value,native_idle_timeout_secs:isValidNativeIdleTimeoutSecs.value,session_hello_probe_timeout_secs:isValidSessionHelloProbeTimeoutSecs.value,session_hello_probe_success_ttl_secs:isValidSessionHelloProbeSuccessTtlSecs.value,session_hello_probe_failure_cooldown_secs:isValidSessionHelloProbeFailureCooldownSecs.value,bootstrap_additional_model_options:isValidBootstrapAdditionalModelOptions.value};
  fieldErrors.value={};
- for(const field of allFields){const value=fieldBindings[field.key]!.get();if(checks[field.key]===false || (field.kind==='number' && (!value.trim() || !Number.isFinite(Number(value)) || (field.min!=null && Number(value)<field.min) || (field.max!=null && Number(value)>field.max))) || (field.kind==='select' && !fieldOptions(field).some(option=>option.value===value)))fieldErrors.value[field.key]='请检查此配置的格式或范围';}
+ for(const field of allFields){const value=fieldBindings[field.key]!.get();if(checks[field.key]===false || (field.key.startsWith('v3_smart_') && !isValidSmartWeight(value)) || (field.kind==='number' && (!value.trim() || !Number.isFinite(Number(value)) || (field.min!=null && Number(value)<field.min) || (field.max!=null && Number(value)>field.max))) || (field.kind==='select' && !fieldOptions(field).some(option=>option.value===value)))fieldErrors.value[field.key]='请检查此配置的格式或范围';}
  const key=Object.keys(fieldErrors.value)[0];
  if(key){settingsCategory.value=settingsGroups.find(group=>group.sections.some(section=>section.fields.some(field=>field.key===key)))!.id;settingsQuery.value='';await nextTick();document.querySelector<HTMLElement>(`[data-settings-field="${key}"] input,[data-settings-field="${key}"] textarea,[data-settings-field="${key}"] button`)?.focus();toast('请修正标出的配置项');return;}
  await saveSettings();
@@ -867,7 +840,6 @@ onMounted(async () => {
        <p v-if="fieldErrors[field.key]" role="alert" class="setting-error">{{ fieldErrors[field.key] }}</p>
       </div></div>
       <router-link v-if="section.summary==='session-policy-block'" :to="{name:'session-blocks'}" class="settings-inline-note">查看会话封禁及历史记录 →</router-link>
-      <p v-if="section.summary==='legacy-weight'" class="settings-inline-note">当前权重总和 {{ totalWeight.toFixed(2) }} · {{ isValidTotal ? '已归一化' : '建议为 1.00' }}</p>
       <template v-if="section.summary==='profile'"><p v-for="profile in claudeCodeVersionProfiles.filter(item=>item.key===claudeCodeVersionProfile)" :key="profile.key" class="settings-inline-note">画像准入 {{ profile.allowed_claude_code_versions }} · {{ profile.growthbook_user_agent }} · {{ profile.build_time }} · {{ formatTelemetryShape(profile.telemetry_shape) }}</p></template>
      </section></template>
      <section v-if="settingsCategory==='history' && !settingsQuery" class="settings-section-card"><header><div><h3>最近预热记录</h3><p>按触发时间倒序 · 最多保留 200 条</p></div><Button type="button" variant="outline" :disabled="logsLoading" @click="loadPrimeLogs">{{ logsLoading ? '加载中…' : '刷新' }}</Button></header>
