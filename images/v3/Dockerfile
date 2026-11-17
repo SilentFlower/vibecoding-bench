@@ -143,9 +143,9 @@ COPY --from=criu-build /opt/ccrb-criu/ /opt/ccrb-criu/
 RUN python3 -c "import ctypes,hashlib,json,subprocess;from pathlib import Path;ctypes.CDLL('libbpf.so.1');p=Path('/opt/ccrb-criu');m=json.loads((p/'profile.json').read_text());assert all(hashlib.sha256((p/n).read_bytes()).hexdigest()==s for n,s in m['files'].items());assert subprocess.check_output([str(p/'criu'),'--version'],text=True).strip()=='Version: 4.2'"
 COPY native-runtime/ccrb-runtime /usr/local/bin/ccrb-runtime
 COPY native-runtime/ccrb-runtime-280 /usr/local/bin/ccrb-runtime-280
-RUN echo 'fce50a30d739dbc614e450d4d1913208fa35c6373c4f07a3986657393a99261e  /usr/local/bin/ccrb-runtime' | sha256sum -c - \
+RUN echo 'a885ac62ee14888b1f637f00bdb98d07fa43dab0f62735ceb731c7116396431b  /usr/local/bin/ccrb-runtime' | sha256sum -c - \
     && chmod 755 /usr/local/bin/ccrb-runtime
-RUN echo '3666887daafb75290597be37b84a1c5cfd92ab664de8bb862c79a501ea75deed  /usr/local/bin/ccrb-runtime-280' | sha256sum -c - \
+RUN echo 'db7848ddd74a9d618c8e3d45ad0e54f71705f3e6ae25bbaccf5b83abf27534cb  /usr/local/bin/ccrb-runtime-280' | sha256sum -c - \
     && chmod 755 /usr/local/bin/ccrb-runtime-280
 RUN chmod 700 /usr/local/bin/v3-account-init /usr/local/bin/v3-network-context \
     /usr/local/bin/v3-cli-version /usr/local/bin/v3-passthrough /usr/local/bin/process_metrics.py \

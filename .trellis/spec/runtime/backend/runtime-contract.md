@@ -31,7 +31,7 @@
 - 签名清单的source_version/source_sha256按目标版本核验，分发摘要、执行体及实际握手须同时一致。记录分别为`native-kernel-upgrade-280.json`和历史293记录。升级/回滚只改所选子状态，共用账号维护门禁；公共身份失效仍统一排空。
 - 准备投影按每版独立核对环境/代次、内核代次及45秒新鲜度。293失败或过期时保留280独立观察，错误版本和旧回执不能授予ready。诊断来源为`native280_cc_prepared|native293_cc_prepared`，完整快照入口接纳两者。
 - 280尚未接纳CRIU模板，固定293恢复画像不借用；280使用同版受限exec。293独立TLS模拟verifier拒绝280。真实TLS采集按执行体摘要选SSL_write偏移：280为0x2308523，293为0x232d5b3；ABI与接受字节核对沿采集器合同。
-- CI使用固定官方npm归档SHA512和源文件SHA256，隔离构建后严格核对上述分发SHA，缓存命中同样核验。正式采集束沿canonical提交干净后export的原有顺序生成，开发清单显式development=true。
+- CI使用固定官方npm归档SHA512和源文件SHA256，隔离构建后严格核对上述分发SHA，缓存命中同样核验。更新分发身份时，`images/v3/Dockerfile`两版`sha256sum`固定值必须与`services/orchestrator/native_sender.py`同步，防止镜像组装在完整性校验处失败。正式采集束沿canonical提交干净后export的原有顺序生成，开发清单显式development=true。
 
 ### 4. Validation & Error Matrix
 
