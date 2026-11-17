@@ -443,13 +443,15 @@ body { font-size: var(--ui-font-body); -webkit-font-smoothing: antialiased; }
 .account-overview-identity { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
 .account-overview-identity strong { font-size: var(--ui-font-heading); font-weight: 650; }
 .account-overview-identity p { font-size: var(--ui-font-small); color: #75849a; margin-top: 5px; }
-.account-overview-status { color: #348b73; font-size: var(--ui-font-body); margin-bottom: 20px; }
+.account-overview-status { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; color: #348b73; font-size: var(--ui-font-body); margin-bottom: 20px; }
+.account-score { width: fit-content; padding: 2px 7px; border-radius: 5px; background: #f0eaf7; color: #6d5686; font-size: var(--ui-font-small); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .account-overview-settings { margin: 25px 0; }
 .account-overview-settings > div { display: flex; justify-content: space-between; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border); font-size: var(--ui-font-body); }
 .account-overview-settings dt { color: #75849a; }
 .account-overview-settings dd { font-weight: 550; }
-.account-overview-actions { display: flex; gap: 9px; flex-wrap: wrap; }
-.account-overview-actions a { display: inline-flex; align-items: center; gap: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: var(--ui-font-small); }
+.account-overview-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.account-overview-actions .account-stop-action { border: 1px solid #f3d5dd; background: #fff4f6; color: #a93d56; }
+.account-overview-actions .account-stop-action:hover { border-color: #eab6c3; background: #ffe9ee; }
 .embedded-scheduling { min-height: 0; flex: 1; display: flex; flex-direction: column; }
 .embedded-scheduling-content { max-width: none !important; width: 100%; max-height: none; height: 100%; border: 0; border-radius: 0; }
 @media(max-width:600px) { .account-workspace-tabs { padding: 10px 16px; gap: 2px; } .account-workspace-tabs button { padding: 8px; font-size: var(--ui-font-small); } .account-workspace-scroll, .account-workspace .account-editor-scroll { padding: 20px; } }

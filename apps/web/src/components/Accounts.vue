@@ -170,6 +170,19 @@ function changeWorkspaceTab(tab: typeof workspaceTab.value): void {
 }
 
 const detailAccount = computed(() => accounts.value.find(account => account.id === detailAccountId.value) ?? null);
+
+/** 格式化当前调度模式的评分。@param account 账号调度快照。@return 带模式的紧凑评分文字。 */
+function activeSchedulingScore(account: Account): string {
+  const summary = account.v3_scheduling;
+  if (summary?.config.mode === 'smart') {
+    return `智能评分 ${(summary.factors.score * 100).toFixed(1)}`;
+  }
+  // v3 观测失败仍可能返回旧评分，此时当前生效的模式未知。
+  if ((summary?.config.mode === 'legacy_score' || (!summary && !account.v3_scheduling_error)) && account.scheduling_score != null) {
+    return `旧评分 ${account.scheduling_score.toFixed(2)}`;
+  }
+  return '评分待更新';
+}
 /** 打开账号完整信息。@param account 账号。@return 无。 */
 function openAccountDetails(account: Account): void { detailAccountId.value = account.id; showAccountDetails.value = true; workspaceTab.value = 'overview'; }
 /** 公开代理摘要只显示协议与主机，认证信息仅在配置中编辑。@param value 原始地址。@return 脱敏摘要。 */
@@ -1030,7 +1043,10 @@ async function copyText(text: string) {
           <p v-if="a.credential_ownership" class="text-xs text-muted-foreground" role="status">{{ a.credential_ownership.phase === 'ready' ? (a.credential_ownership.owner === 'local' ? '本地管理凭据 · 网关已暂停' : '网关管理凭据') : (a.credential_ownership.phase === 'reauth' ? '重新授权中 · 上游活动暂停' : '凭据交接待确认 · 请在账号环境页对账') }}</p>
           <div class="account-routing">
             <div><span>转发方式</span><strong><template v-if="a.request_backend === 'native293'">原生运行时 <small>280 / 293 自动匹配</small></template><template v-else>原有转发</template></strong></div>
-            <button type="button" @click="openScheduling(a)"><span>调度优先级</span><strong>{{ a.priority }}<ArrowRight :size="13" /></strong></button>
+            <button type="button" @click="openScheduling(a)">
+              <span>调度优先级</span><strong>{{ a.priority }}<ArrowRight :size="13" /></strong>
+              <small class="account-score">{{ activeSchedulingScore(a) }}</small>
+            </button>
           </div>
 
           <section class="account-usage-windows">
@@ -1105,12 +1121,21 @@ async function copyText(text: string) {
         <nav v-if="detailAccount" class="account-workspace-tabs" aria-label="账号工作区"><button v-for="tab in workspaceTabs" :key="tab.value" type="button" :class="{active:workspaceTab===tab.value}" :aria-pressed="workspaceTab===tab.value" @click="changeWorkspaceTab(tab.value)">{{ tab.label }}</button></nav>
         <div v-if="detailAccount" v-show="workspaceTab === 'overview'" class="account-workspace-scroll">
           <div class="account-overview-identity"><span class="account-avatar">{{ (detailAccount.name || detailAccount.email)[0] }}</span><div><strong>{{ detailAccount.name || detailAccount.email }}</strong><p>{{ detailAccount.email }}</p></div></div>
-          <p class="account-overview-status">{{ statusStyle(detailAccount).label }}</p>
+          <div class="account-overview-status">
+            <span>{{ statusStyle(detailAccount).label }}</span>
+            <small class="account-score">{{ activeSchedulingScore(detailAccount) }}</small>
+          </div>
           <section class="account-usage-windows"><header><span>用量</span><small>{{ detailAccount.usage_fetched_at ? new Date(detailAccount.usage_fetched_at).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}) + ' 更新' : '未刷新' }}</small></header>
             <div v-for="window in usageWindows" :key="window.key" class="account-usage-window"><UsageWindowStats v-if="window.key!=='seven_day_fable'" :stats="detailAccount.request_usage?.[window.key]" :label="window.key==='five_hour'?'5h':'7d'" /><div class="usage-window-label"><span>{{ window.label }}</span><strong>{{ usagePercentLabel(usageWindow(detailAccount.usage_data,window.key)) }}</strong></div><div class="usage-window-bar"><i :class="usageBarColor(effectiveUtil(usageWindow(detailAccount.usage_data,window.key)))" :style="{width:Math.min(100,effectiveUtil(usageWindow(detailAccount.usage_data,window.key)))+'%'}" /></div><p v-if="hasFutureReset(usageWindow(detailAccount.usage_data,window.key))" class="usage-window-reset">{{ formatTimeLeft(usageWindow(detailAccount.usage_data,window.key)?.resets_at) }} 后重置</p></div>
           </section>
           <dl class="account-overview-settings"><div><dt>订阅方案</dt><dd>{{ subscriptionLabel(detailAccount.subscription_type,detailAccount.rate_limit_tier) }}</dd></div><div><dt>并发上限</dt><dd>{{ detailAccount.concurrency }}</dd></div><div><dt>RPM 上限</dt><dd>{{ detailAccount.rpm_limit || '不限' }}</dd></div><div><dt>调度优先级</dt><dd>{{ detailAccount.priority }}</dd></div></dl>
-          <div class="account-overview-actions"><Button variant="outline" @click="refreshUsage(detailAccount.id)" :disabled="refreshingUsage===detailAccount.id"><RefreshCw :size="14" />刷新用量</Button><OperationFeedback label="测试连接" :status="testStates.get(detailAccount.id)?.status" :message="testStates.get(detailAccount.id)?.message" :identity="detailAccount.name" @action="test(detailAccount.id)" /><Button variant="outline" @click="changeWorkspaceTab('scheduling')"><ArrowRight :size="14" />调度详情</Button><Button variant="outline" @click="toggleScheduling(detailAccount)">{{ detailAccount.status==='disabled'?'启用账号':'停用账号' }}</Button></div>
+          <div class="account-overview-actions">
+            <OperationFeedback label="测试连接" button-variant="default" :status="testStates.get(detailAccount.id)?.status" :message="testStates.get(detailAccount.id)?.message" :identity="detailAccount.name || detailAccount.email" @action="test(detailAccount.id)" />
+            <Button type="button" variant="outline" @click="refreshUsage(detailAccount.id)" :disabled="refreshingUsage === detailAccount.id"><RefreshCw :size="14" />{{ refreshingUsage === detailAccount.id ? '刷新中' : '刷新用量' }}</Button>
+            <Button type="button" variant="ghost" @click="changeWorkspaceTab('scheduling')"><ArrowRight :size="14" />调度详情</Button>
+            <Button v-if="detailAccount.status === 'disabled' || isRateLimited(detailAccount)" type="button" variant="outline" @click="toggleScheduling(detailAccount)">启用账号</Button>
+            <Button v-else type="button" variant="destructive" class="account-stop-action" @click="toggleScheduling(detailAccount)">停用账号</Button>
+          </div>
         </div>
         <form v-show="workspaceTab === 'configuration'" @submit.prevent="save" class="account-editor-form">
           <div class="account-editor-scroll complete-account-form">

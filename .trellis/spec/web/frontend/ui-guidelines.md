@@ -356,7 +356,7 @@ CPU首屏摘要回归：`verify_environment_cpu_summary.py`覆盖自动读取、
 
 - `useToast().show(message, type='error', duration?) -> number`；type为success/error/info/warning，返回独立消息ID；dismiss/pause/resume按ID操作。
 - `ConfirmationDialog`接受open/title/message/confirmLabel/danger/busy/error；发confirm/cancel，业务组件拥有请求。`useConfirmation().ask(options, signal?) -> Promise<boolean>`仅明确执行返回true。
-- `OperationFeedback`接受status/message/label/identity，status为idle/loading/success/error；action仅由初次点击或明确重试发出。
+- `OperationFeedback`接受status/message/label/identity及可选`buttonVariant`（共享Button变体），status为idle/loading/success/error；action仅由初次点击或明确重试发出。
 - `TaskProxyDialog(accountId, accountName?)`发close/saved；API合同见[任务代理选择](../../gateway/backend/proxy-directory.md#scenario-任务账号选择与超时事务保护)。
 - `createRuntimeScope(..., feedback?)`注入nativeNotify/nativeConfirm，离页取消未决确认；refreshAccounts发局部事件。
 
@@ -365,6 +365,8 @@ CPU首屏摘要回归：`verify_environment_cpu_summary.py`覆盖自动读取、
 - 全局单个FeedbackHost，底部居中最多显示3条、最多保留12条；相同类型和文本去重。success/info默认4000ms，error/warning默认手动关闭；悬停、键盘阅读及隐藏排队暂停计时。
 - 通知DOM进入当前模态焦点范围，通过手动Popover顶层保持视口定位。父窗关闭、隐藏、移除和路由切换都要重新选宿主；观察器不能只匹配open状态。F8进入消息，通知内Esc只关闭消息并返回原控件。
 - 账号测试以账号ID和请求身份隔离，同账号在途去重，离页撤销并丢弃迟到回执。结果显示在固定操作区，完整文本进入气泡；测试结束不改变卡片高度。
+- 账号概览使用共享Button呈现操作层级：测试连接为主按钮，刷新用量为描边按钮，调度详情为轻量入口，停用为危险操作。测试结果气泡挂载在触发按钮所在的弹窗内，重试可通过键盘操作，Esc只关闭气泡并将焦点还给触发按钮。
+- 账号卡片和概览以紧凑标签展示生效评分：`v3_scheduling.config.mode`为`smart`时显示`factors.score × 100`（一位小数），旧评分模式显示`scheduling_score`（两位小数）。缺少v3摘要且无观测错误时可显示已有旧评分；观测失败且模式未知或当前分数缺失时显示「评分待更新」。
 - 代理卡片名称及费用摘要单行省略，InfoTooltip展示完整信息。旧DOM增量刷新保留data-vue-managed属性及子树，Vue负责组件内部节点。
 - 通知与错误以文本渲染；确认busy阻止关闭和重复执行，错误保留窗口。关闭和取消零业务写入。
 
@@ -376,11 +378,12 @@ CPU首屏摘要回归：`verify_environment_cpu_summary.py`覆盖自动读取、
 
 ### 5. Scenarios and Examples
 
-正确：`show('已保存','success')`；失败使用error并保留阅读时间。错误：共享三秒计时器清除所有账号结果；正确处理是每个账号独立请求和状态。错误：把通知留在已移除的dialog中；正确处理是迁到当前有效宿主。
+正确：`show('已保存','success')`；失败使用error并保留阅读时间。错误：共享三秒计时器清除所有账号结果；正确处理是每个账号独立请求和状态。错误：把通知留在已移除的dialog中；正确处理是迁到当前有效宿主。智能模式的0.675显示「智能评分 67.5」；旧模式的0显示「旧评分 0.00」。v3观测失败时，接口同时返回的旧评分不能代替当前评分。
 
 ### 6. Tests Required
 
 `verify_console_ui.py`覆盖七页七档、四列、过期代理、选线取消/冲突、独立账号测试、父窗取消/Esc/离页通知与焦点；`verify_ui_controls.py`验证组件预览。`verify_dialog_typography.py`及`verify_task_feedback_styles.py`与同步原型对比关键计算样式；`npm --prefix apps/web run build`验证类型与产物。
+账号概览定向浏览器验证覆盖桌面与390px：四个操作尺寸一致且体现层级，测试中禁用，结果可查看及重试，Esc关闭气泡并恢复焦点；卡片和概览按当前模式展示评分，并区分零分与未观测。
 
 
 ## Scenario: 工作区分区加载与阅读布局
