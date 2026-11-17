@@ -23,7 +23,7 @@ assert.equal(Bun.spawnSync(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-
 const senderHost = 'v3-' + createHash('sha256').update('native-offline').digest('hex').slice(0, 12) + '-account-' + 'a'.repeat(32);
 await writeFile(join(root, 'hosts'), await readFile('/etc/hosts', 'utf8') + '\n127.0.0.1 ' + senderHost + '\n');
 assert.equal(Bun.spawnSync(['mount', '--bind', join(root, 'hosts'), '/etc/hosts']).exitCode, 0);
-const messages: { label: string; device: string; account: string; bearer: string; cache_ttls: unknown[]; cache_message_positions: number[][]; source_version: string }[] = [];
+const messages: { label: string; device: string; account: string; bearer: string; cache_ttls: unknown[]; cache_message_positions: number[][]; source_version: string; thinking?: unknown }[] = [];
 const tlsBodies = new Map<string, { bytes: number; sha256: string }>();
 let parallel = 0, parallelPeak = 0;
 let gatewayIdentity: { device_id: string; account_uuid: string } | undefined;
@@ -60,7 +60,11 @@ const upstream = Bun.serve({ hostname: '127.0.0.1', port: 0, tls: { key: Bun.fil
     const content = body.messages[message].content;
     if (Array.isArray(content)) for (let block = 0; block < content.length; block++) if (content[block].cache_control !== undefined) cacheMessagePositions.push([message, block]);
   }
-  messages.push({ label, cache_message_positions: cacheMessagePositions, device: metadata.device_id, account: metadata.account_uuid, bearer, cache_ttls: cacheTtls, source_version: /claude-cli\/(2\.1\.(?:280|293))/.exec(request.headers.get('user-agent') ?? '')?.[1] ?? '' });
+  messages.push({ label, cache_message_positions: cacheMessagePositions, device: metadata.device_id, account: metadata.account_uuid, bearer, cache_ttls: cacheTtls, source_version: /claude-cli\/(2\.1\.(?:280|293))/.exec(request.headers.get('user-agent') ?? '')?.[1] ?? '', ...(process.env.CCRB_TEST_THINKING_ONLY === '1' ? { thinking: body.thinking ?? null } : {}) });
+  if (process.env.CCRB_TEST_THINKING_ONLY === '1') {
+    if (label === 'gateway-dual-thinking-freeze' && messages.filter(message => message.label === label).length === 1) return Response.json({ type: 'error', error: { type: 'rate_limit_error', message: 'synthetic capacity rejection' } }, { status: 429 });
+    if (label.startsWith('gateway-dual-thinking-signature-') && body.messages.some((message: { content: unknown }) => Array.isArray(message.content) && message.content.some(block => block.type === 'thinking'))) return Response.json({ type: 'error', error: { type: 'invalid_request_error', message: 'Invalid signature in thinking block' } }, { status: 400 });
+  }
   if (process.env.CCRB_TEST_PRIME_ONLY === '1' && label === 'hi') {
     assert.equal(body.model, 'claude-haiku-4-5-20251001'); assert.equal(body.max_tokens, 512); assert.equal(body.stream, true);
     if (primeStatus === -1) { await Bun.sleep(31000); return Response.json({ synthetic: true }); }
@@ -205,7 +209,8 @@ try {
   const rateLimitOnly = process.env.CCRB_TEST_RATE_LIMIT_ONLY === '1';
   const cacheOnly = process.env.CCRB_TEST_CACHE_POLICY_ONLY === '1';
   const primeOnly = process.env.CCRB_TEST_PRIME_ONLY === '1';
-  const phases = tlsOnly ? ['native_real_binary'] : benchmarkOnly ? ['native_real_binary'] : (primeOnly || cacheOnly || rateLimitOnly || process.env.CCRB_TEST_GATEWAY_ONLY === '1' || process.env.CCRB_TEST_MULTI_VERSION === '1') ? ['native_real_gateway'] : ['native_real_binary', 'native_real_gateway'];
+  const thinkingOnly = process.env.CCRB_TEST_THINKING_ONLY === '1';
+  const phases = tlsOnly ? ['native_real_binary'] : benchmarkOnly ? ['native_real_binary'] : (thinkingOnly || primeOnly || cacheOnly || rateLimitOnly || process.env.CCRB_TEST_GATEWAY_ONLY === '1' || process.env.CCRB_TEST_MULTI_VERSION === '1') ? ['native_real_gateway'] : ['native_real_binary', 'native_real_gateway'];
   let code = 0;
   for (const phase of phases) {
     const child = Bun.spawn(['cargo', 'test', '--locked', '--lib', phase, '--', '--ignored', '--nocapture'], { cwd: resolve(consumer), env: { ...process.env, CCRB_TEST_BINARY: resolve(binary), CCRB_TEST_CAPTURE_DIR: join(root, 'environment/flows/api/cc-prepared'), CCRB_TEST_CA_FILE: ca, CCRB_TEST_PROXY: proxyUrl, CCRB_TEST_CONTROL: control.url.toString(), CCRB_TEST_SENDER_HOST: senderHost, V3_RUNTIME_URL: control.url.toString(), V3_INTERNAL_TOKEN: 'synthetic-private-management-key'.repeat(2), V3_DEPLOYMENT_ID: 'native-offline', V3_RELEASE: 'native-offline' }, stdout: 'inherit', stderr: 'inherit' });
@@ -216,8 +221,8 @@ try {
     assert.equal(code, 0);
   }
   assert.equal(code, 0);
-  assert.equal(messages.length, (primeOnly ? 10 : cacheOnly ? 15 : rateLimitOnly ? 4 : process.env.CCRB_TEST_MULTI_VERSION === '1' ? 18 : tlsOnly ? 9 : benchmarkOnly ? 9 : phases.length === 2 ? (process.env.CCRB_TEST_UNLIMITED === '1' ? 25 : 28) : 6) + (process.env.CCRB_TEST_SWITCH_DIGEST ? 3 : 0));
-  if (!primeOnly && !cacheOnly && !rateLimitOnly && !benchmarkOnly && !tlsOnly && process.env.CCRB_TEST_MULTI_VERSION !== '1') assert.ok(runningBindingReads >= 3, '启动补偿与凭据轮换均重新核对只读运行绑定');
+  assert.equal(messages.length, (thinkingOnly ? 33 : primeOnly ? 10 : cacheOnly ? 15 : rateLimitOnly ? 4 : process.env.CCRB_TEST_MULTI_VERSION === '1' ? 18 : tlsOnly ? 9 : benchmarkOnly ? 9 : phases.length === 2 ? (process.env.CCRB_TEST_UNLIMITED === '1' ? 25 : 28) : 6) + (process.env.CCRB_TEST_SWITCH_DIGEST ? 3 : 0));
+  if (!thinkingOnly && !primeOnly && !cacheOnly && !rateLimitOnly && !benchmarkOnly && !tlsOnly && process.env.CCRB_TEST_MULTI_VERSION !== '1') assert.ok(runningBindingReads >= 3, '启动补偿与凭据轮换均重新核对只读运行绑定');
   if (phases.length === 2) assert.equal(messages.find(message => message.label === 'rotated')?.bearer, 'Bearer synthetic-bearer-b');
   console.log(JSON.stringify({ messages: messages.length, parallelPeak, processTreePeakRssKiB: peakRssKiB }));
 } finally { upstream.stop(true); control.stop(true); proxy.closeAllConnections(); proxy.close(); socks.close(); await rm(root, { recursive: true, force: true }); }

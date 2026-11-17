@@ -1745,3 +1745,49 @@ transport.submit(prepared, body, ttfb_timeout).await
 - native_error、native_runtime、diagnostics单测：原因私有头、输入错误状态、零attempt持久化、成功清除及历史兼容。
 - native_capture与orchestrator/test_native_capture.py：脱敏入口/原始hash、info门控、账号隔离、伪造出站阶段拒绝和有界读取。
 - `verify_rejected_request_ui.py`：400/422×1280/390视口，无attempt时可读取入口、具体原因可见、空组装阶段明确缺口，真实模型请求为0。
+
+## Scenario: Native 顶层 disabled thinking 兼容
+
+### 1. Scope / Trigger
+
+修改 `rewrite_disabled_thinking_enabled/models`、native Messages 正文副本或相关重试时适用。该兼容沿原有显式设置执行。
+
+### 2. Signatures
+
+- `DisabledThinkingRewrite { enabled: bool, models: Vec<String> }`；`should_rewrite(&self, &Value) -> bool` 共用开启条件与精确匹配规则。
+- `rewrite_disabled_thinking_to_adaptive(&mut Value, &DisabledThinkingRewrite)` 为 crate 内共用的最小改写入口。
+- `forward_native_messages` 与 `forward_native_messages_once` 接收原请求冻结的 `&DisabledThinkingRewrite`。
+- `GET/PUT /admin/settings` 沿既有字符串键 `rewrite_disabled_thinking_enabled`、`rewrite_disabled_thinking_models`，保存后调用 `reload_disabled_thinking_rewrite`。
+
+### 3. Contracts
+
+- 出厂开关为false，默认名单为 `claude-fable-5`，管理员已有选择保持。模型按完整字符串相等匹配；后缀、大小写及别名不做隐式扩展。
+- 根请求在账号选择循环前冻结开关与模型名单，首次发送、429退避/换号及签名修复共享该配置；后续根请求使用热加载后的配置。
+- 仅开启、名单命中且顶层 `thinking.type=disabled` 时改为 `adaptive`，允许模型自适应思考。其他子字段与历史 signed thinking 块沿原合同保持。
+- native沿既有会话映射取得业务副本，仅命中时取得可变所有权；原始body/header、真实会话与ingress诊断保持调用方来源。改写后的副本进入原生构造、cc_prepared和最终CCH，原始入站与实际出站分别核对。
+- 既有签名修复可以删除顶层thinking及相关依赖，兼容规则只处理仍存在的disabled；不得因启用兼容而恢复被签名修复删除的字段。
+- 普通API的原生disabled保留适配继续按运行时合同执行。该兼容在网关修改业务正文，复用既有私有协议与固定280/293执行体。
+- 实际上游拒绝原因与兼容效果后续观测；本轮按原生构造和隔离TLS发送验收。模拟拒绝不得标成真实上游复现。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 开关关闭、名单为空或完整模型名未命中 | 保持既有输入语义 |
+| 命中且顶层type为disabled | 仅改为adaptive |
+| thinking省略、其他类型或形状 | 沿既有构造与校验规则处理 |
+| 发送期间管理员切换开关或名单 | 当前根请求各次发送继续使用冻结配置 |
+| 签名修复已删除顶层thinking | 保持修复结果 |
+| 原生无法表达显式参数组合 | 沿既有明确错误返回合同处理，不静默删字段 |
+
+### 5. Scenarios and Examples
+
+- 正常：管理员开启并配置完整模型名，调用方提交disabled，ingress记录disabled，cc_prepared及TLS实收为adaptive。
+- 边界：名单为 `claude-fable-5`、请求为 `claude-fable-5[1m]`，完整字符串未命中，保持原输入；一次请求收到429后关闭开关，该请求重试仍沿原配置，下一请求采用关闭状态。
+- 错误用法：修改原始入站对象、模糊匹配模型，或在签名修复后补回thinking。正确处理：仅修改业务副本、精确匹配，并保持签名修复的字段删除结果。
+
+### 6. Tests Required
+
+- `service::rewriter::tests` 的disabled_thinking用例覆盖开关、精确模型含后缀、字段形状、附加子字段、历史签名、缓存与CCH。
+- `CCRB_TEST_THINKING_ONLY=1` 的 `native_real_gateway` 使用280/293实际执行体，共33次模型发送：普通API与完整原生输入、开启/关闭/未命中/再次关闭、ingress与cc_prepared、缓存和TTL、签名修复及学习后首发、429期间配置冻结；逐次核对TLS实收CCH及源版本。
+- `cargo test --locked`、`cargo fmt --check`、运行时类型及单元/隔离联调验证；制品必须匹配当前固定清单，实际验证副本与交付补丁分别核对。

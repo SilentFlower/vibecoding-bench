@@ -1243,6 +1243,21 @@ pub struct DisabledThinkingRewrite {
 }
 
 impl DisabledThinkingRewrite {
+    /// 判断请求是否需要执行顶层兼容改写，供各发送路径共用精确匹配规则。
+    /// @param body 本次实际业务正文。
+    /// @return 开关开启、完整模型名命中且顶层类型为disabled时返回true。
+    pub(crate) fn should_rewrite(&self, body: &Value) -> bool {
+        self.enabled
+            && body
+                .get("model")
+                .and_then(|value| value.as_str())
+                .is_some_and(|model| disabled_thinking_model_matches(model, &self.models))
+            && body
+                .pointer("/thinking/type")
+                .and_then(|value| value.as_str())
+                == Some("disabled")
+    }
+
     /// 构造关闭状态的配置。
     ///
     /// @return 不改写任何请求的配置。
@@ -6083,18 +6098,14 @@ fn rewrite_block_cache_control_ttl(
 ///
 /// 这个改写只碰顶层请求参数,用于兼容上游已不接受 disabled thinking 的模型。
 /// 历史消息里的 signed thinking block 不在这里处理,避免破坏 Anthropic 签名校验。
-fn rewrite_disabled_thinking_to_adaptive(
+/// @param body 本次实际业务正文。
+/// @param config 请求冻结的开关和精确模型名单。
+/// @return 无；只原地替换命中的顶层类型。
+pub(crate) fn rewrite_disabled_thinking_to_adaptive(
     body: &mut serde_json::Value,
     config: &DisabledThinkingRewrite,
 ) {
-    if !config.enabled {
-        return;
-    }
-    let model = body
-        .get("model")
-        .and_then(|value| value.as_str())
-        .unwrap_or("");
-    if !disabled_thinking_model_matches(model, &config.models) {
+    if !config.should_rewrite(body) {
         return;
     }
     let Some(thinking) = body
@@ -6103,9 +6114,6 @@ fn rewrite_disabled_thinking_to_adaptive(
     else {
         return;
     };
-    if thinking.get("type").and_then(|value| value.as_str()) != Some("disabled") {
-        return;
-    }
     thinking.insert("type".into(), serde_json::Value::String("adaptive".into()));
 }
 
@@ -6838,7 +6846,7 @@ mod tests {
         MessageCacheControlRewrite, Rewriter, UpstreamSessionRewrite, cch_attestation_input,
         cch_attestation_seed, compute_cc_version_suffix, compute_cch_attestation,
         extract_first_user_message, matches_1m_whitelist, ordered_anthropic_headers,
-        scrub_git_user_in_reminders, strip_beta_token,
+        rewrite_disabled_thinking_to_adaptive, scrub_git_user_in_reminders, strip_beta_token,
     };
     use crate::model::account::{
         Account, AccountAuthType, AccountStatus, BillingMode, CanonicalEnvData,
@@ -7818,6 +7826,73 @@ mod tests {
         let err = CacheControlTtlRewrite::parse("30m").unwrap_err();
 
         assert!(err.to_string().contains("cache_control_ttl_rewrite"));
+    }
+
+    #[test]
+    fn disabled_thinking_rewrite_only_changes_top_level_type() {
+        let original = json!({
+            "model": "claude-fable-5[1m]",
+            "thinking": {"type": "disabled", "display": "updates", "budget_tokens": 1024},
+            "system": [{"type": "text", "text": "合成系统", "cache_control": {"type": "ephemeral", "ttl": "1h"}}],
+            "tools": [{"name": "lookup", "input_schema": {"type": "object"}}],
+            "messages": [{"role": "assistant", "content": [
+                {"type": "thinking", "thinking": "合成历史", "signature": "synthetic-signature"},
+                {"type": "text", "text": "合成回答", "cache_control": {"type": "ephemeral", "ttl": "5m"}}
+            ]}]
+        });
+        let config = DisabledThinkingRewrite {
+            enabled: true,
+            models: vec!["claude-fable-5[1m]".into()],
+        };
+        let mut actual = original.clone();
+        rewrite_disabled_thinking_to_adaptive(&mut actual, &config);
+        let mut expected = original;
+        expected["thinking"]["type"] = json!("adaptive");
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn disabled_thinking_rewrite_respects_switch_exact_model_and_shape() {
+        for enabled in [false, true] {
+            for model in ["claude-fable-5", "claude-fable-5[1m]", "claude-opus-5"] {
+                for thinking in [
+                    Value::Null,
+                    json!({}),
+                    json!({"type":"disabled"}),
+                    json!({"type":"enabled"}),
+                    json!({"type":"adaptive"}),
+                    json!("disabled"),
+                ] {
+                    let mut input = json!({"model":model,"thinking":thinking});
+                    let mut expected = input.clone();
+                    let applies = enabled
+                        && model == "claude-fable-5"
+                        && thinking == json!({"type":"disabled"});
+                    if applies {
+                        expected["thinking"]["type"] = json!("adaptive");
+                    }
+                    let config = DisabledThinkingRewrite {
+                        enabled,
+                        models: vec!["claude-fable-5".into()],
+                    };
+                    assert_eq!(config.should_rewrite(&input), applies);
+                    rewrite_disabled_thinking_to_adaptive(&mut input, &config);
+                    assert_eq!(input, expected);
+                }
+            }
+        }
+        let config = DisabledThinkingRewrite {
+            enabled: true,
+            models: vec!["claude-fable-5".into()],
+        };
+        for mut input in [
+            json!({"model":"claude-fable-5"}),
+            json!({"thinking":{"type":"disabled"}}),
+        ] {
+            let expected = input.clone();
+            rewrite_disabled_thinking_to_adaptive(&mut input, &config);
+            assert_eq!(input, expected);
+        }
     }
 
     #[test]

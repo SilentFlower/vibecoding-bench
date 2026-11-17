@@ -65,7 +65,7 @@ use crate::service::rewriter::{
     extract_session_id_from_body, filter_account_beta_tokens, is_claude_code_billing_system_block,
     is_claude_code_identity_system_block, is_structured_haiku_title_request_for_profile,
     merge_anthropic_beta, order_context_1m_after_oauth, ordered_anthropic_headers,
-    strip_empty_text_blocks,
+    rewrite_disabled_thinking_to_adaptive, strip_empty_text_blocks,
 };
 use crate::service::runtime_transport::{self, PreparedRequest};
 use crate::service::session_hello_probe::{
@@ -2214,6 +2214,7 @@ impl GatewayService {
 
         // 每个请求只冻结一次；保留原始 body_map/body_bytes，换号和重试复用相同清理正文。
         let native_message_cache = *self.message_cache_control_rewrite.read().await;
+        let native_disabled_thinking = self.disabled_thinking_rewrite.read().await.clone();
         let message_top_field_filter_enabled = *self.message_top_field_filter_enabled.read().await;
         let filtered_message_body =
             Rewriter::filter_message_top_fields(&body_map, &path, message_top_field_filter_enabled);
@@ -2496,6 +2497,7 @@ impl GatewayService {
                         scheduling_request.as_ref(),
                         should_bind_session,
                         native_message_cache,
+                        &native_disabled_thinking,
                     )
                     .await
                 {
@@ -3789,6 +3791,7 @@ impl GatewayService {
     /// @param scheduling 原请求准入和截止时间。
     /// @param bind_session 首次发送是否建立会话绑定。
     /// @param message_cache 原请求冻结的消息断点策略。
+    /// @param disabled_thinking 原请求冻结的顶层thinking兼容配置。
     /// @return 最多一次修复重试后的原生响应。
     async fn forward_native_messages(
         &self,
@@ -3803,6 +3806,7 @@ impl GatewayService {
         scheduling: Option<&SchedulingRequest>,
         bind_session: bool,
         message_cache: MessageCacheControlRewrite,
+        disabled_thinking: &DisabledThinkingRewrite,
     ) -> Result<Response, AppError> {
         let deadline = scheduling
             .map(SchedulingRequest::deadline)
@@ -3837,6 +3841,7 @@ impl GatewayService {
                 scheduling,
                 bind_session,
                 message_cache,
+                disabled_thinking,
             )
             .await?;
         if response.extensions().get::<SignatureRejection>().is_none() {
@@ -3871,6 +3876,7 @@ impl GatewayService {
                 scheduling,
                 false,
                 message_cache,
+                disabled_thinking,
             ),
         )
         .await
@@ -3895,6 +3901,7 @@ impl GatewayService {
     /// @param scheduling 当前调度准入。
     /// @param bind_session 是否提交新会话绑定。
     /// @param message_cache 原请求冻结的消息断点策略。
+    /// @param disabled_thinking 原请求冻结的顶层thinking兼容配置。
     /// @return 单次原生模型提交的响应。
     async fn forward_native_messages_once(
         &self,
@@ -3910,6 +3917,7 @@ impl GatewayService {
         scheduling: Option<&SchedulingRequest>,
         bind_session: bool,
         message_cache: MessageCacheControlRewrite,
+        disabled_thinking: &DisabledThinkingRewrite,
     ) -> Result<Response, AppError> {
         validate_native_account_features(account, headers, body_map)?;
         let log_mode = diagnostics::current_log_mode();
@@ -3951,8 +3959,12 @@ impl GatewayService {
             original_session.as_deref(),
             rewrite.message.as_ref(),
         );
-        let (native_body, native_headers, mut context) =
+        let (mut native_body, native_headers, mut context) =
             map_native_session(body_map, headers, &rewrite)?;
+        // 仅命中时取得业务副本，复用已有会话映射分配；原始诊断与历史签名保持各自归属。
+        if disabled_thinking.should_rewrite(native_body.as_ref()) {
+            rewrite_disabled_thinking_to_adaptive(native_body.to_mut(), disabled_thinking);
+        }
         let body_map = native_body.as_ref();
         let headers = native_headers.as_ref();
         let bearer = await_preparation(
@@ -8763,7 +8775,7 @@ mod tests {
     include!("gateway_rate_limit_tests.rs");
 
     use super::{map_native_session, native_pool_session, validate_native_account_features};
-    use crate::service::rewriter::MessageCacheControlRewrite;
+    use crate::service::rewriter::{DisabledThinkingRewrite, MessageCacheControlRewrite};
 
     use super::{
         AssistantPrefillInterceptConfig, AutoModeClassifierMode, AutoModeClassifierProtocol,
@@ -10888,6 +10900,7 @@ mod tests {
                     None,
                     false,
                     MessageCacheControlRewrite::Off,
+                    &DisabledThinkingRewrite::off(),
                 )
                 .await
                 .unwrap();
@@ -11063,6 +11076,288 @@ mod tests {
         };
         let control = var("CCRB_TEST_CONTROL").unwrap();
         let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        if var("CCRB_TEST_THINKING_ONLY").as_deref() == Ok("1") {
+            let diagnostics = service.diagnostics_store().unwrap();
+            assert!(!service.disabled_thinking_rewrite.read().await.enabled);
+            for version in ["2.1.280", "2.1.293"] {
+                for native in [false, true] {
+                    for index in 0..6 {
+                        let enabled = index != 0 && index != 5;
+                        let matched = index != 2;
+                        service
+                            .settings_store
+                            .upsert_many(&HashMap::from([
+                                (
+                                    "rewrite_disabled_thinking_enabled".into(),
+                                    enabled.to_string(),
+                                ),
+                                (
+                                    "rewrite_disabled_thinking_models".into(),
+                                    if matched {
+                                        "claude-sonnet-4-6"
+                                    } else {
+                                        "claude-fable-5"
+                                    }
+                                    .into(),
+                                ),
+                                ("message_cache_control_rewrite".into(), "sub2api".into()),
+                                ("cache_control_ttl_rewrite".into(), "1h".into()),
+                            ]))
+                            .await
+                            .unwrap();
+                        service.reload_disabled_thinking_rewrite().await.unwrap();
+                        service
+                            .reload_message_cache_control_rewrite()
+                            .await
+                            .unwrap();
+                        service.reload_cache_control_ttl_rewrite().await.unwrap();
+                        let label = format!(
+                            "gateway-dual-thinking-{}-{native}-{index}",
+                            version.replace('.', "")
+                        );
+                        let mut input = json!({"model":"claude-sonnet-4-6","max_tokens":128,"stream":false,
+                            "thinking":{"type":if index == 3 {"adaptive"} else {"disabled"}},
+                            "messages":[{"role":"user","content":label}]});
+                        if index == 4 {
+                            input.as_object_mut().unwrap().remove("thinking");
+                        }
+                        if native {
+                            input["system"] = json!([{"type":"text","text":format!("x-anthropic-billing-header: cc_version={version}.abc; cc_entrypoint=cli; cch=12345;")}]);
+                            input["metadata"] = json!({"user_id":json!({"device_id":"c".repeat(64),"account_uuid":"","session_id":Uuid::new_v4().to_string()}).to_string()});
+                            if index == 1 {
+                                input["thinking"]["display"] = json!("updates");
+                            }
+                        }
+                        let original = input.clone();
+                        let mut value = request(input);
+                        value.headers_mut().insert(
+                            "user-agent",
+                            HeaderValue::from_str(&format!("claude-cli/{version} (external, cli)"))
+                                .unwrap(),
+                        );
+                        let response = service.handle_request(value, None).await;
+                        let status = response.status();
+                        let id = response.headers()["x-cc2api-request-id"]
+                            .to_str()
+                            .unwrap()
+                            .to_string();
+                        let bytes = body::to_bytes(response.into_body(), 1024 * 1024)
+                            .await
+                            .unwrap();
+                        assert_eq!(
+                            status,
+                            StatusCode::OK,
+                            "{label}: {}",
+                            String::from_utf8_lossy(&bytes)
+                        );
+                        timeout(Duration::from_secs(30), async {
+                            while diagnostics.flush().await.is_err() {
+                                tokio_sleep(Duration::from_millis(20)).await;
+                            }
+                        })
+                        .await
+                        .unwrap();
+                        let detail = diagnostics.detail(&id).await.unwrap();
+                        assert_eq!(detail.request.attempt_count, 1);
+                        assert_eq!(detail.attempts[0].profile_version, version);
+                        let path =
+                            format!("{capture_directory}/{}.json", detail.attempts[0].attempt_id);
+                        let snapshot: Value = timeout(Duration::from_secs(4), async {
+                            loop {
+                                if let Ok(bytes) = fs::read(&path) {
+                                    if let Ok(snapshot) = serde_json::from_slice::<Value>(&bytes) {
+                                        break snapshot;
+                                    }
+                                }
+                                tokio_sleep(Duration::from_millis(10)).await;
+                            }
+                        })
+                        .await
+                        .unwrap();
+                        let ingress: Value =
+                            serde_json::from_str(snapshot["ingress"]["body"].as_str().unwrap())
+                                .unwrap();
+                        assert_eq!(
+                            ingress["thinking"], original["thinking"],
+                            "原始入站保持调用方值"
+                        );
+                        let prepared: Value =
+                            serde_json::from_str(snapshot["body"].as_str().unwrap()).unwrap();
+                        let expected = if index == 4 && native {
+                            Value::Null
+                        } else if index == 3 || index == 4 || (enabled && matched) {
+                            json!("adaptive")
+                        } else {
+                            json!("disabled")
+                        };
+                        assert_eq!(prepared["thinking"]["type"], expected, "{label}");
+                        if native && index == 1 {
+                            assert_eq!(prepared["thinking"]["display"], "updates");
+                        }
+                        let observed: Value = client
+                            .get(&control)
+                            .send()
+                            .await
+                            .unwrap()
+                            .json()
+                            .await
+                            .unwrap();
+                        let actual = observed["messages"].as_array().unwrap().last().unwrap();
+                        assert_eq!(actual["label"], label);
+                        assert_eq!(actual["source_version"], version);
+                        assert_eq!(actual["thinking"], prepared["thinking"]);
+                        assert!(
+                            actual["cache_ttls"]
+                                .as_array()
+                                .unwrap()
+                                .iter()
+                                .all(|ttl| ttl == "1h")
+                        );
+                        assert_eq!(snapshot["cache_policy"]["mode"], "sub2api");
+                    }
+                }
+                service
+                    .settings_store
+                    .upsert_many(&HashMap::from([
+                        ("rewrite_disabled_thinking_enabled".into(), "true".into()),
+                        (
+                            "rewrite_disabled_thinking_models".into(),
+                            "claude-sonnet-4-6".into(),
+                        ),
+                    ]))
+                    .await
+                    .unwrap();
+                service.reload_disabled_thinking_rewrite().await.unwrap();
+                let label = format!(
+                    "gateway-dual-thinking-signature-{}",
+                    version.replace('.', "")
+                );
+                let input = json!({"model":"claude-sonnet-4-6","max_tokens":128,"stream":false,"thinking":{"type":"disabled"},
+                    "system":[{"type":"text","text":format!("x-anthropic-billing-header: cc_version={version}.abc; cc_entrypoint=cli; cch=12345;")}],
+                    "metadata":{"user_id":json!({"device_id":"c".repeat(64),"account_uuid":"","session_id":Uuid::new_v4().to_string()}).to_string()},
+                    "messages":[{"role":"user","content":label},{"role":"assistant","content":[{"type":"thinking","thinking":"合成历史","signature":"synthetic-invalid"},{"type":"text","text":"合成回答"}]},{"role":"user","content":"继续"}]});
+                for _ in 0..2 {
+                    let mut value = request(input.clone());
+                    value.headers_mut().insert(
+                        "user-agent",
+                        HeaderValue::from_str(&format!("claude-cli/{version} (external, cli)"))
+                            .unwrap(),
+                    );
+                    let response = service.handle_request(value, None).await;
+                    let status = response.status();
+                    let bytes = body::to_bytes(response.into_body(), 1024 * 1024)
+                        .await
+                        .unwrap();
+                    assert_eq!(
+                        status,
+                        StatusCode::OK,
+                        "签名兼容：{}",
+                        String::from_utf8_lossy(&bytes)
+                    );
+                }
+                let observed: Value = client
+                    .get(&control)
+                    .send()
+                    .await
+                    .unwrap()
+                    .json()
+                    .await
+                    .unwrap();
+                let attempts: Vec<&Value> = observed["messages"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter(|item| item["label"] == label)
+                    .collect();
+                assert_eq!(attempts.len(), 3);
+                assert_eq!(attempts[0]["thinking"]["type"], "adaptive");
+                assert!(attempts[1]["thinking"].is_null());
+                assert!(attempts[2]["thinking"].is_null());
+            }
+            let make = |label: &str| {
+                request(
+                    json!({"model":"claude-sonnet-4-6","max_tokens":128,"stream":false,"thinking":{"type":"disabled"},"messages":[{"role":"user","content":label}]}),
+                )
+            };
+            let (response, ()) = tokio::join!(
+                service.handle_request(make("gateway-dual-thinking-freeze"), None),
+                async {
+                    timeout(Duration::from_secs(10), async {
+                        loop {
+                            let observed: Value = client
+                                .get(&control)
+                                .send()
+                                .await
+                                .unwrap()
+                                .json()
+                                .await
+                                .unwrap();
+                            if observed["messages"]
+                                .as_array()
+                                .unwrap()
+                                .iter()
+                                .any(|item| item["label"] == "gateway-dual-thinking-freeze")
+                            {
+                                break;
+                            }
+                            tokio_sleep(Duration::from_millis(10)).await;
+                        }
+                    })
+                    .await
+                    .unwrap();
+                    service
+                        .settings_store
+                        .upsert_many(&HashMap::from([
+                            ("rewrite_disabled_thinking_enabled".into(), "false".into()),
+                            (
+                                "rewrite_disabled_thinking_models".into(),
+                                "claude-fable-5".into(),
+                            ),
+                        ]))
+                        .await
+                        .unwrap();
+                    service.reload_disabled_thinking_rewrite().await.unwrap();
+                }
+            );
+            assert_eq!(response.status(), StatusCode::OK);
+            body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            let response = service
+                .handle_request(make("gateway-dual-thinking-after-freeze"), None)
+                .await;
+            assert_eq!(response.status(), StatusCode::OK);
+            body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            let observed: Value = client
+                .get(&control)
+                .send()
+                .await
+                .unwrap()
+                .json()
+                .await
+                .unwrap();
+            let frozen: Vec<&Value> = observed["messages"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|item| item["label"] == "gateway-dual-thinking-freeze")
+                .collect();
+            assert_eq!(frozen.len(), 2);
+            assert!(
+                frozen
+                    .iter()
+                    .all(|item| item["thinking"]["type"] == "adaptive")
+            );
+            assert_eq!(
+                observed["messages"].as_array().unwrap().last().unwrap()["thinking"]["type"],
+                "disabled"
+            );
+            sender.abort();
+            let _ = fs::remove_dir_all(root);
+            return;
+        }
         if var("CCRB_TEST_PRIME_ONLY").as_deref() == Ok("1") {
             use crate::service::native_contract::NativePreparation;
             use crate::service::prime_poller::PrimePollerService;
