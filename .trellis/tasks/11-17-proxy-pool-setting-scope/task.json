@@ -1,0 +1,42 @@
+{
+  "id": "proxy-pool-setting-scope",
+  "name": "proxy-pool-setting-scope",
+  "title": "代理连接池设置适用范围说明",
+  "description": "第五项：在系统设置页标注 Rust 代理连接池开关适用范围，native 继续由原生 SDK 管理连接复用。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "web",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-17",
+  "completedAt": "2026-11-17",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-17T09:31:30Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-17-native-settings-compatibility",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-17T09:31:30.649559+00:00",
+    "completedSteps": [
+      "更新Rust代理HTTP连接池标签及native连接复用说明",
+      "完成Web构建、390/1440px页面、草稿撤销、字符串保存及刷新回读验证",
+      "轻量Check-All通过，规范评估为no-op"
+    ],
+    "partialStep": null,
+    "nextStep": "五项子任务交付汇总与集成验收核对",
+    "notes": "实际业务diff仅为settingsSchema.ts的两处文案。浏览器合成接口验证通过，控制台错误、意外请求、外网请求及真实模型调用均为0。"
+  }
+}
