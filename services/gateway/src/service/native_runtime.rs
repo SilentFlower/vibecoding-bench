@@ -54,9 +54,9 @@ use crate::service::runtime_transport::{
 };
 use crate::store::settings_store::DEFAULT_NATIVE_IDLE_TIMEOUT_SECS;
 
-const LAUNCHER_SHA256: &str = "fce50a30d739dbc614e450d4d1913208fa35c6373c4f07a3986657393a99261e";
-const IMAGE_SHA256: &str = "564019c9560e960e96875c9663975491534b27c789ea3d23e5c13309ff293c79";
-const IMAGE_BYTES: u64 = 112_843_960;
+const LAUNCHER_SHA256: &str = "a885ac62ee14888b1f637f00bdb98d07fa43dab0f62735ceb731c7116396431b";
+const IMAGE_SHA256: &str = "6296aa4f164b8018f6f614915befd347a0dbd73f674ace20534e91947eba4434";
+const IMAGE_BYTES: u64 = 112_848_056;
 const PREVIOUS_IMAGE_SHA256: &str =
     "af4cea9e21aa959c5e39c389173ba30ebb19b354b67acfe99164946450e9776d";
 const FRAME_LIMIT: usize = 32 * 1024 * 1024;
@@ -127,16 +127,16 @@ fn artifact(config: &NativeSenderConfig) -> Result<ReleaseArtifact, AppError> {
         Some(reference) => ReleaseArtifact::signed(reference, config.source_version),
         None if config.source_version == NativeSourceVersion::Cc280 => Ok(ReleaseArtifact {
             path: PathBuf::from(&config.binary_path),
-            launcher_sha256: "3666887daafb75290597be37b84a1c5cfd92ab664de8bb862c79a501ea75deed"
+            launcher_sha256: "db7848ddd74a9d618c8e3d45ad0e54f71705f3e6ae25bbaccf5b83abf27534cb"
                 .into(),
             launcher_bytes: 27_097_232,
-            image_sha256: "2b64ee7d8f0863a37bce90800226bda102387e5cff082f947b2b71e66d9a38e7".into(),
-            image_bytes: 111_595_592,
+            image_sha256: "431aede03d82d6d300da7343f0fb04f983cba2fac83474a6e532f721b0d7a61e".into(),
+            image_bytes: 111_599_688,
         }),
         None => Ok(ReleaseArtifact {
             path: PathBuf::from(&config.binary_path),
             launcher_sha256: LAUNCHER_SHA256.into(),
-            launcher_bytes: 27_388_048,
+            launcher_bytes: 27_392_144,
             image_sha256: IMAGE_SHA256.into(),
             image_bytes: IMAGE_BYTES,
         }),
@@ -1728,6 +1728,10 @@ impl NativePool {
                 result["reason"] = json!(reason);
                 result["image_admitted"] = json!(
                     worker.image_sha256 == IMAGE_SHA256
+                        || worker.image_sha256
+                            == "564019c9560e960e96875c9663975491534b27c789ea3d23e5c13309ff293c79"
+                        || worker.image_sha256
+                            == "431aede03d82d6d300da7343f0fb04f983cba2fac83474a6e532f721b0d7a61e"
                         || worker.image_sha256 == PREVIOUS_IMAGE_SHA256
                         || worker.image_sha256
                             == "2b64ee7d8f0863a37bce90800226bda102387e5cff082f947b2b71e66d9a38e7"

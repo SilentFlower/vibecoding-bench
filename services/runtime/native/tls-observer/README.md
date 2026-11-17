@@ -6,6 +6,8 @@
 
 同ABI已接纳293 beta.6映像 `564019c9560e960e96875c9663975491534b27c789ea3d23e5c13309ff293c79`。280映像 `2b64ee7d8f0863a37bce90800226bda102387e5cff082f947b2b71e66d9a38e7` 使用独立偏移 `0x2308523`，已通过真实探针与独立实收对照。验收入口可传 `--source-version 2.1.280 --image-sha256 <对应映像SHA>`；开发态 `--observer-source <源码文件>` 显式覆盖镜像观察器，结果中记录overlay。正式候选验收使用镜像实际文件。
 
+本次293 beta.7映像为 `6296aa4f164b8018f6f614915befd347a0dbd73f674ace20534e91947eba4434`；新版280映像为 `431aede03d82d6d300da7343f0fb04f983cba2fac83474a6e532f721b0d7a61e`。两版继续使用各自已核验的SSL_write偏移及ABI。
+
 ## 构建与启用
 
 ```bash

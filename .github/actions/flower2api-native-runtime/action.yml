@@ -13,7 +13,7 @@ runs:
         path: |
           ${{ runner.temp }}/native280/ccrb-runtime
           ${{ runner.temp }}/native280/ccrb-runtime.manifest.json
-        key: native280-linux-x64-3666887daafb75290597be37b84a1c5cfd92ab664de8bb862c79a501ea75deed
+        key: native280-linux-x64-db7848ddd74a9d618c8e3d45ad0e54f71705f3e6ae25bbaccf5b83abf27534cb
     - name: 核验缓存或隔离构建官方280
       shell: bash
       run: |

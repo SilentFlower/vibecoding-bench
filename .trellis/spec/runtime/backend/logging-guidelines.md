@@ -17,7 +17,7 @@
 
 ### 3. Contracts
 
-- 当前只准入执行体SHA`af4cea9e21aa959c5e39c389173ba30ebb19b354b67acfe99164946450e9776d`，文件偏移`0x232d5b3`，指令`4883c4185b415c415d415e415f5dc3`；RBX=SSL对象、R14=明文指针、R15d=提交长度、EAX=实际接受长度。核验直属PPID、完整执行体SHA、指令及PID命名空间dev/inode。新映像独立重新准入。
+- 准入集合由 `native/tls-observer/observer.py::IMAGE_WRITE_OFFSETS` 固定登记；当前280/293制品身份见[双版本来源准入](runtime-contract.md#scenario-双版本自动选择与独立来源准入)，历史已接纳身份继续保留。文件偏移280为`0x2308523`、293为`0x232d5b3`，指令`4883c4185b415c415d415e415f5dc3`；RBX=SSL对象、R14=明文指针、R15d=提交长度、EAX=实际接受长度。核验直属PPID、完整执行体SHA、指令及PID命名空间dev/inode。新映像独立重新准入。
 - 探针在原生返回边界同步作一次有界副本，后续解析、收口、脱敏和持久化在后台。每事件按16KiB/64KiB/256KiB/1MiB/4MiB/8MiB六档固定容量预留，非阻塞ring16MiB，最多8条SSL连接，头128KiB、每连接正文预览2MiB。Python只复制32字节事件头和实际accepted范围。满载丢副本并累计计数，业务沿原请求继续。
 - 平台加载器初始仅SYS_ADMIN/SETUID/SETGID，业务sender、worker及C监督进程为UID1001、P/E/I/A能力全零、NoNewPrivs=1；观察器附着后在ready前清零能力。Unix peer、sender直属关系、固定执行体及目标pidfd/启动时刻共同隔离归属。每worker最多一个采集器，账号至多min(max_workers,64)份诊断实例，业务并发沿原配置。
 - 观察器由同UID零能力的C监督进程响应stdin挂断并回收；清理不再分配帮助进程pidfd。broker关闭stdin后最多等待2秒，socket尾部最多等待250ms，超时放弃缓冲。sender停止沿固定降权入口及既有pidfd收口，不增加KILL能力。固定seccomp按Moby profiles `6049e40058759e8a1673ac1090ec6a7e36b9c9bd`的原零能力画像展开，只补bpf/perf_event_open；制品保留其许可。

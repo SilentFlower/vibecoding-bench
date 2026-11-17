@@ -8,14 +8,14 @@ from pathlib import Path
 
 from resource_budget import isolated_account_limits, memory_bytes
 
-VERSION = 'v0.1.0-beta.6'
+VERSION = 'v0.1.0-beta.7'
 ASSET = 'ccrb-runtime-linux-x64'
-SHA256 = 'fce50a30d739dbc614e450d4d1913208fa35c6373c4f07a3986657393a99261e'
+SHA256 = 'a885ac62ee14888b1f637f00bdb98d07fa43dab0f62735ceb731c7116396431b'
 POOL_MIB = 256
 WORKER_MIB = 192
 RESTORE_IMAGE_MIB = 108
 VERSION_280 = 'builtin-2.1.280'
-SHA256_280 = '3666887daafb75290597be37b84a1c5cfd92ab664de8bb862c79a501ea75deed'
+SHA256_280 = 'db7848ddd74a9d618c8e3d45ad0e54f71705f3e6ae25bbaccf5b83abf27534cb'
 BYTES_280 = 27097232
 
 
@@ -145,8 +145,8 @@ def stage_asset(destination: Path, source: str | None = None, version: str = '2.
         url = f'https://github.com/SilentFlower/cc-runtime-bridge/releases/download/{VERSION}/{ASSET}'
         with urllib.request.urlopen(url, timeout=60) as response, destination.open('xb') as output:
             shutil.copyfileobj(response, output)
-    if destination.stat().st_size != 27388048 or hashlib.sha256(destination.read_bytes()).hexdigest() != SHA256:
+    if destination.stat().st_size != 27392144 or hashlib.sha256(destination.read_bytes()).hexdigest() != SHA256:
         destination.unlink()
         raise ValueError('原生运行时附件身份不匹配')
     destination.chmod(0o755)
-    return {'version': VERSION, 'asset': ASSET, 'sha256': SHA256, 'bytes': 27388048}
+    return {'version': VERSION, 'asset': ASSET, 'sha256': SHA256, 'bytes': 27392144}

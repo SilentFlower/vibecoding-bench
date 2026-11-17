@@ -7,7 +7,7 @@
   "entry.py": "9a3cf6a7022c7456866e6ab7f6cd6fa601f54e7d9414ea757fc4387a675cfe21",
   "launch.c": "4d5e78780ada01414c20016eb995e7d41ba70fac6b64b68f6f132f516ee8da82",
   "memfd-executable.patch": "fb92f5ec7bd5b3260ac3e720535cfabbe65cef47aaf8867ef8e7f638b9b597ae",
-  "package.py": "d88749713d25be7a71ebd6f2ee65197a5ff643abb4a7392c8ee4d45b45d3b89a",
+  "package.py": "5064d4f99e77a1b788246e5148e446dd18d91cd760ee3699ec29270bb4f534ff",
   "protocol.py": "075bd26642ecfb292cb8c1d8766664ad9ffc8cc401c2857f779e3a0574353010",
   "seccomp.json": "7fe525474af2ca78ee9f2e6158c6d0672d161488b3816e1ead14d4d8b9f257a1",
   "shared_image.py": "713cf7ca3ea2388c0fda24ac0161fc9d85ee31c7b6e3bedd673e04694fcfe7b3",

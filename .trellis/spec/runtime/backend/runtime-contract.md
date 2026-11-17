@@ -16,13 +16,13 @@
 - `PreparedTransport::native_ready_for_version(version)`检查冻结目标。`NativePool::for_version(version)`只分配版本子状态；调用本身不启动进程。
 - `readNativeInput(body,policy='strict',sourceVersion='2.1.293')`、`parseInput(raw,headers=[],policy='strict',sourceVersion='2.1.293')`、`prepareInput(input,sourceVersion='2.1.293')`及`prepareNativeBody`最后一个版本参数只由已核验运行时提供。
 - 管理发行查询的query和内核操作JSON增加`source_version`，省略293。环境摘要保留`native_kernel`为293别名，增加`native_kernels`及`native_preparation.versions`。
-- `python3 services/runtime/scripts/prepare-ci-runtime.py --directory <目录>`从固定npm来源准备280；本地联合构建输入为`V3_NATIVE_RUNTIME_280_ASSET`，293继续使用`V3_NATIVE_RUNTIME_ASSET`或固定beta.6附件。
+- `python3 services/runtime/scripts/prepare-ci-runtime.py --directory <目录>`从固定npm来源准备280；本地联合构建输入为`V3_NATIVE_RUNTIME_280_ASSET`，293继续使用`V3_NATIVE_RUNTIME_ASSET`或固定beta.7附件。
 
 ### 3. Contracts
 
 - 历史账号后端键`native293`表示原生自动匹配。客户端模式精确匹配原始Claude UA；其它已准入版本的普通API沿已冻结默认画像，出厂293。账号模式沿最终账号画像。版本冻结在原生投递之前；账号并发、RPM及凭据仍由原账号所有者管理。
 - 280官方源SHA为`1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b`，Bun1.4.3 revision为`f08e57bec002878c0281e86fbf9c76f53c20a117`。Bun节144806548字节、2196模块、记录52字节、entry5、flags0x1bff；节摘要和ICU偏移按280独立断言。
-- 280分发体27097232字节/SHA`3666887daafb75290597be37b84a1c5cfd92ab664de8bb862c79a501ea75deed`；执行体111595592字节/SHA`2b64ee7d8f0863a37bce90800226bda102387e5cff082f947b2b71e66d9a38e7`。293现用beta.6分发体27388048字节/SHA`fce50a30d739dbc614e450d4d1913208fa35c6373c4f07a3986657393a99261e`，执行体112843960字节/SHA`564019c9560e960e96875c9663975491534b27c789ea3d23e5c13309ff293c79`。
+- 280分发体27097232字节/SHA`db7848ddd74a9d618c8e3d45ad0e54f71705f3e6ae25bbaccf5b83abf27534cb`；执行体111599688字节/SHA`431aede03d82d6d300da7343f0fb04f983cba2fac83474a6e532f721b0d7a61e`。293现用beta.7分发体27392144字节/SHA`a885ac62ee14888b1f637f00bdb98d07fa43dab0f62735ceb731c7116396431b`，执行体112848056字节/SHA`6296aa4f164b8018f6f614915befd347a0dbd73f674ace20534e91947eba4434`。
 - 280原生SDK默认global fetch，映射到共享发送槽；turnOrigin/turnPosition沿280省略语义。280工具工厂create保留初始化权限声明，仅封闭返回对象的call执行入口。280保持原生正文工厂；293静态正文复用沿原配方。
 - 完整原生billing的版本必须匹配冻结运行时。普通API仍由所选原生版本构造，保持CCH、上下文、工具/thinking、原始响应及唯一发送合同。
 - 每账号只有一个物理容量所有者，各版本共享live/starting许可，合计遵守max_workers。版本子状态隔离映像FD、暖进程、补位、模板及核验缓存；凭据/代理/环境公共身份变化统一撤销两版旧空闲状态。取消其它版本补位或退役空闲进程后，必须等待真实退出归还许可。
