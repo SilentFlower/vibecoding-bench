@@ -30,6 +30,7 @@ export interface MessageBody extends JsonObject {
   thinking?: JsonObject;
   temperature?: number;
   output_config?: JsonObject;
+  context_management?: JsonObject;
   stream?: boolean;
 }
 

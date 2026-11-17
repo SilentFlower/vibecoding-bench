@@ -65,12 +65,16 @@ TLS 接收端实收并独立核验后，第二段仅将根 model 映射为 deeps
 | thinking | 交给实际原生构造；完整对象恰为 {"type":"disabled"} 且被原生省略时补齐原值，再做保留检查；不在入口添加枚举或最小预算政策 |
 | output_config | effort、format；模型或原生能力不能表达时返回 422 |
 | stream | true 返回原始 SSE；false 或省略返回原始 JSON |
+| metadata | 对象；可选 user_id 必须为字符串。提取 JSON session_id 或旧 user_…_session_… 中的会话，再移除调用方 metadata，由同次原生构造重新生成当前账号身份。会话与显式 context 或头部冲突返回 400 |
+| context_management | 支持 edits 中的 clear_thinking_20251015 和 clear_tool_uses_20250919；同次 SDK 须提供 context-management-2025-06-27 能力头。显式对象覆盖原生默认对象，参数原值保留；能力不足返回 422 |
 
 工具调用、工具结果、thinking 及签名等历史通过内部消息实体输入。发送前对显式字段做保留检查；文本字符串与等价文本块按相同语义比较，原生添加的缓存等字段允许保留。业务内容、角色或内容块顺序无法保留时明确拒绝，不宣称完整兼容任意 Messages 历史。
 
 普通主请求使用固定 293 交互终端 CLI 的原生身份、提示词、权限、环境和技能等提醒，工具仅来自调用方显式列表；默认正文及提醒根据实际工具集生成。业务 system 替换默认正文，身份及 billing 仍由原生链路装配。原生补充消息逐项关联，不能以忽略全部 system-reminder 代替业务保留校验。自定义工具 schema 是桥接的结构化接口能力，不表示终端 --tools 接受任意 schema。
 
-普通 API 的显式 system cache_control、top_p、metadata、stop_sequences 和未登记正文/消息字段当前不支持，返回明确错误。未知 JSON 字段采用拒绝策略；未登记请求头采用删除并记录原因的白名单策略。完整原生 billing 由上一节的独立分支处理。
+历史管理的 thinking 指令只能位于 edits 首项且最多一次；keep 支持 all 或 {type:"thinking_turns",value:正整数}，同次请求须启用 enabled/adaptive thinking。工具清理支持 trigger（input_tokens/tool_uses）、keep（tool_uses）、clear_at_least（input_tokens），计数为非负安全整数；exclude_tools 为非空工具名字符串数组，clear_tool_inputs 为布尔值。未知策略或字段返回 422，结构不合法返回 400。
+
+普通 API 的显式 system cache_control、top_p、stop_sequences 和未登记正文/消息字段当前不支持，返回明确错误。未知 JSON 字段采用拒绝策略；未登记请求头采用删除并记录原因的白名单策略。完整原生 billing 由上一节的独立分支处理。
 
 省略模型可选参数时，采用 CLI 根据当前模型与配置计算的 thinking、effort 和输出预算；不再固定关闭 thinking。普通 API 的显式 {"type":"disabled"} 被原生省略时由桥接补齐，额外字段及原生已有不同值不能套用这项适配。显式 enabled thinking 若被模型原生规则转换成 adaptive，也会因无法原样表达而返回 422。完整原生 CC 正文仍保持原值；最终发送该字段不保证自定义池遵守关闭，响应原样返回。
 

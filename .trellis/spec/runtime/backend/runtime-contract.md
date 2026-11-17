@@ -72,6 +72,7 @@
 
 - parseInput(raw: unknown, incomingHeaders: HeaderPair[] = []): BridgeInput。
 - prepareInput(input: BridgeInput): PreparedInput。
+- `normalizeApiMetadata(body: JsonObject, context: ContextInput): void` 提取普通 API 会话并清理调用方身份；`validateContextManagement(value: unknown): void` 校验显式历史管理；`applyContextManagement(requested: JsonObject, generated: JsonObject, headers: Headers): JsonObject` 在同次原生构造后保留参数。
 - NativeEngine.run(prepared: PreparedInput, signal: AbortSignal, emit: (event: RuntimeEvent) => Promise<void>): Promise<void>。
 - Engine.close(): Promise<void>；workerPid: number | null 是只读状态，读取不启动进程。
 - verifyRuntime(path: string): Promise<VerifiedRuntime> 保留核验 FD；runtimeFileStamp(path: string): Promise<string> 用于暖复用；verifyExecutionImage(pid: number, identity: RuntimeIdentity): Promise<void> 独立核对内存执行体。
@@ -94,6 +95,8 @@
 - 控制配置中的显式 API key 使用官方本地规则只记录使用确认标识，不保存完整密钥；已有 rejected 决定返回 native_configuration/503，不改写拒绝状态。初始化、预热及测试不能因此触发真实账号登录或付费推理。
 - worker_ready 晚于原生绑定、Nst 与本地构造依赖初始化；本地初始化使用独立根，发送前中止，不发模型请求或业务事件，成本计入总启动时间。每轮经 nEr 创建全新原生根，AsyncLocalStorage/yLs 绑定作用域，再调用 t_；同 sessionId 也不能复用上一轮账本、请求日志及取消状态。
 - 普通 API 只支持 docs/api.md 登记的正文键。内部 Re/Kc 负责消息实体；原生规范化后的显式消息、工具、thinking 等必须保留，不可表达时拒绝。原生入站的扩展正文及必要改写另见后文合同。
+- 普通 API 的 metadata 必须为对象，user_id 若提供必须为字符串。先从 JSON session_id 或旧 user_…_session_… 提取明确会话，写入独立 context，再删除调用方 metadata，由同次 CLI 构造当前账号身份；会话与显式 context/头冲突返回400。完整原生分支仍仅替换 device_id/account_uuid并保留会话及扩展 metadata。
+- 普通 API 的 context_management 支持 edits 中 clear_thinking_20251015（仅首项一次，keep省略/all/thinking_turns正安全整数）和 clear_tool_uses_20250919（trigger=input_tokens/tool_uses、keep=tool_uses、clear_at_least=input_tokens，非负安全整数；exclude_tools为非空工具名数组，clear_tool_inputs为布尔值）。同次 SDK 生成 context-management-2025-06-27 beta 后才覆盖生成正文；thinking清理还要求同次 enabled/adaptive。显式省略沿用原生默认；构造快照、发送正文和最终 CCH使用同一覆盖结果。能力不足或未知策略/字段422，畸形结构400。
 - 普通 API 的 business 构造仅对完整对象恰为 thinking={type:'disabled'} 且原生结果缺失 thinking 的情况补齐原值，同步 result 与 init.body 后再做完整保留校验。省略保持原生默认；额外字段和原生已有不同值不适用补齐，不能静默删改。transport_context 种子与完整原生业务不应用此适配。cc_prepared、同次 Ree 实际发送及 TLS 哈希必须反映相同正文；上游仍返回 thinking 时原样保留，不过滤或重发。
 - OM 的 deps.callModel 仅进入一次 K_t；其 fetchOverride 取得同一官方 SDK 的正文、头及发送上下文，在显式字段核验后由 Ree 唯一发送。stream 仅按调用方明确值映射；SDK 不取得 Response，桥接独占原始逻辑响应，读取收口后立即取消原生解析。调用次数守卫禁止模型重试，不创建第二个 SDK，不替换全局 fetch；本地工具、代理循环及自动辅助压缩禁用，显式 compaction 保留。
 - 只在精简构建复用固定摘要的六个纯正文格式化函数 KLo、XLo、QLo、nNo、sNo、pNo。每次仍求值原生条件与外层钩子，每个工厂仅保留最近一次原始条件及字符串；UTF-8 键和值每项 ≤64 KiB、六项 ≤384 KiB，不代表堆或 RSS 上限。失败和超限不入缓存；整份提示词、权限/工具选择、会话段落表、memory 读取及请求正文不跨作业缓存。
@@ -118,6 +121,7 @@
 | --- | --- |
 | 普通 API 不支持的正文键、system 缓存参数、beta 或原生无法保留的显式值 | 422，发送前拒绝 |
 | 上下文冲突、非法头、无效 promptId | 400 |
+| 普通 API metadata结构或历史管理结构错误 | 400；未知历史管理策略/字段、同次能力不足422，零业务发送 |
 | 普通 API 历史无可归属用户轮次 | unsupported_parameter/422，零业务发送 |
 | 明确且仅含 type=disabled 的 thinking 被原生省略 | 补齐明确值并同步实际发送正文，再校验；带额外字段或原生已有不同值且无法保留时 unsupported_parameter/422、零发送 |
 | 合法透传头与 SDK 默认值重名 | 保持调用方完整头值，合法多值按序保留；不拼入 SDK 默认值 |
@@ -136,6 +140,7 @@
 ### 5. Scenarios and Examples
 
 - 正常：普通正文无来源上下文，生成 main，source=bridge-default；原生 metadata.user_id 内的 session_id、请求头和 billing 的 cc_prompt_id 关联一致。
+- 正常：普通API携带旧设备身份及有效session，先保留session再由当前账号生成身份；显式 clear_thinking 的 keep={type:"thinking_turns",value:2}覆盖SDK默认all。错误用法是直接把调用方metadata当作当前账号身份，或丢弃context_management后宣称支持；正确处理是按上述边界提取关联并原值保留已支持参数。
 - 边界：子代理发生压缩，requestClass=compaction，仍保持子代理 agentContext 和父子关系。
 - 边界：26 MiB 请求和超过 50 秒的首响应等待保持可转发，日志可截断预览但保留原始字节数及哈希。不能把有限验收的预算或日志容量当作业务准入政策。
 - 错误用法：子代理只强行声明 requestClass=main；这样会使身份与 billing 矛盾。正确做法是保留 subagent 和真实关联，冲突明确拒绝。
@@ -156,6 +161,7 @@
 ### 6. Tests Required
 
 - tests/unit/header-policy.test.ts：未知头保留、动态 Connection 删除、凭据/原生请求 ID 归属、冲突与默认来源。
+- tests/unit/api-compat.test.ts：普通身份清理、JSON/旧格式会话、冲突、两类历史管理字段及畸形类型/能力拒绝；tests/native/native.test.ts在280/293原版回环核对显式历史管理、当前身份、原会话和最终CCH。桥接源码摘要包含api-compat.ts；发布新能力仍按既有构建、签署及精确制品准入流程。
 - tests/unit/profile.test.ts：错误二进制不执行、不回退。
 - tests/unit/engine.test.ts、worker-protocol.test.ts：同 PID 与哈希次数、文件替换、错归属/载荷覆盖、双终态/缺 idle、迟到帧、取消、背压和关闭；错误作业不得重放。
 - tests/native/native.test.ts：无外网 TLS 上游独立核对 CCH、metadata/session/prompt、六类请求、thinking/工具历史、非流式、HTTP/SSE 错误及取消后下一请求；实际模型发送次数必须符合 attempt=1。

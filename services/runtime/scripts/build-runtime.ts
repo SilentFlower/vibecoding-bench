@@ -54,7 +54,7 @@ export async function buildRuntime(args: string[]): Promise<void> {
   if (await Bun.file(output).exists() || await Bun.file(output + '.manifest.json').exists()) throw new Error('输出已存在，不能覆盖原版或其它产物');
   const root = await mkdtemp(join(tmpdir(), 'ccrb-build-'));
   try {
-    const bridgePaths = [...BRIDGE_SOURCES, 'src/runtime/280/source-profile.ts', 'src/runtime/280/native.ts', 'src/runtime/280/preload.ts'];
+    const bridgePaths = [...BRIDGE_SOURCES, 'src/shared/api-compat.ts', 'src/runtime/280/source-profile.ts', 'src/runtime/280/native.ts', 'src/runtime/280/preload.ts'];
     const bridgeSources = Object.fromEntries(await Promise.all(bridgePaths.map(async path => [path, await digest(join(project, path))])));
     const home = join(root, 'home');
     await mkdir(home);

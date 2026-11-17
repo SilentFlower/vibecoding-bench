@@ -23,6 +23,7 @@ use std::io::Read;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
+use tokio::time::{Instant as TokioInstant, timeout_at};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -47,6 +48,12 @@ use crate::service::native_contract::NativeSourceVersion;
 use crate::service::native_contract::validate_idle_timeout;
 use crate::service::native_prewarm::NativePrewarmer;
 use crate::service::native_runtime::NativeSubmission;
+#[path = "native_signature_repair.rs"]
+mod native_signature_repair;
+
+use self::native_signature_repair::{
+    NativeSignatureRepairs, SignatureRejection, is_signature_rejection,
+};
 use crate::service::request_body_codec::{
     REQUEST_BODY_LIMIT, RequestBodyCodecError, RequestBodyEncoding,
 };
@@ -588,6 +595,7 @@ struct AccessProfileConfig {
 }
 
 pub struct GatewayService {
+    native_signature_repairs: NativeSignatureRepairs,
     native_prewarmer: NativePrewarmer,
     pub(crate) session_policy_block_svc: Arc<SessionPolicyBlockService>,
     account_svc: Arc<AccountService>,
@@ -666,6 +674,7 @@ impl GatewayService {
         usage_store: Arc<UsageStore>,
     ) -> Self {
         Self {
+            native_signature_repairs: NativeSignatureRepairs::default(),
             session_policy_block_svc: Arc::new(SessionPolicyBlockService::new(&settings_store)),
             native_prewarmer: NativePrewarmer::new(account_svc.clone()),
             account_svc,
@@ -3595,6 +3604,16 @@ impl GatewayService {
                 response
                     .extensions_mut()
                     .insert(session_policy_block::PolicyRefusal);
+            } else if status_code == 400
+                && complete
+                && upstream_body_bytes.len() <= SIGNATURE_ERROR_BODY_LIMIT
+                && is_signature_rejection(&decode_upstream_error_body(
+                    &upstream_body_bytes,
+                    &response_headers,
+                ))
+            {
+                // 只交付已完整收到的明确签名拒绝；普通400和不完整响应沿原路径返回。
+                response.extensions_mut().insert(SignatureRejection);
             }
             return Ok(response);
         }
@@ -3688,10 +3707,111 @@ impl GatewayService {
         })
     }
 
-    /// 原始 Messages 在任何 Rust 协议改写之前交给固定 293，单次提交后直接返回。
+    /// 原生消息仅对明确签名400同账号降级一次，已确认历史在后续发送前降级。
+    /// @param account 已选定账号，重试保持归属。
+    /// @param source_version 本请求冻结的原生版本。
+    /// @param headers 原始调用方头。
+    /// @param body 原始HTTP逻辑正文，用于入站证据。
+    /// @param body_map 原始消息历史。
+    /// @param client_type 已识别的客户端类型。
+    /// @param session_hash 真实会话作用域。
+    /// @param selection 当前账号选择条件。
+    /// @param scheduling 原请求准入和截止时间。
+    /// @param bind_session 首次发送是否建立会话绑定。
+    /// @return 最多一次修复重试后的原生响应。
+    async fn forward_native_messages(
+        &self,
+        account: &Account,
+        source_version: NativeSourceVersion,
+        headers: &[(String, String)],
+        body: &[u8],
+        body_map: &JsonValue,
+        client_type: ClientType,
+        session_hash: &str,
+        selection: &AccountSelectionContext,
+        scheduling: Option<&SchedulingRequest>,
+        bind_session: bool,
+    ) -> Result<Response, AppError> {
+        let deadline = scheduling
+            .map(SchedulingRequest::deadline)
+            .unwrap_or_else(|| TokioInstant::now() + UPSTREAM_TTFB_TIMEOUT)
+            .min(TokioInstant::now() + UPSTREAM_TTFB_TIMEOUT);
+        let scope = format!(
+            "{}:{}:{}",
+            account.id,
+            source_version.as_str(),
+            session_hash
+        );
+        let cached = if self.native_signature_repairs.contains(&scope, body_map) {
+            serde_json::to_vec(body_map)
+                .ok()
+                .and_then(|body| strip_thinking_from_messages_request(&body))
+                .and_then(|body| serde_json::from_slice::<JsonValue>(&body).ok())
+        } else {
+            None
+        };
+        let sending = cached.as_ref().unwrap_or(body_map);
+        let response = self
+            .forward_native_messages_once(
+                account,
+                source_version,
+                headers,
+                body,
+                body_map,
+                sending,
+                client_type,
+                session_hash,
+                selection,
+                scheduling,
+                bind_session,
+            )
+            .await?;
+        if response.extensions().get::<SignatureRejection>().is_none() {
+            return Ok(response);
+        }
+        let repair = serde_json::to_vec(sending)
+            .ok()
+            .and_then(|body| strip_thinking_from_messages_request(&body))
+            .and_then(|body| serde_json::from_slice::<JsonValue>(&body).ok());
+        let Some(repair) = repair else {
+            return Ok(response);
+        };
+        if TokioInstant::now() >= deadline {
+            return Ok(response);
+        }
+        // 第一次错误已经完整读取且尝试已收口；同一准入对象为第二次发送重新取得许可。
+        drop(response);
+        diagnostics::retry_reason("signature_repair");
+        // 修复沿用第一次调用开始时的总预算，准备和发送都不能重置超时。
+        let response = timeout_at(
+            deadline,
+            self.forward_native_messages_once(
+                account,
+                source_version,
+                headers,
+                body,
+                body_map,
+                &repair,
+                client_type,
+                session_hash,
+                selection,
+                scheduling,
+                false,
+            ),
+        )
+        .await
+        .map_err(|_| AppError::BadGateway("原生签名修复超时，提交结果未知".into()))??;
+        if response.status().is_success() {
+            self.native_signature_repairs.remember(&scope, body_map);
+        }
+        Ok(response)
+    }
+
+    /// 原始 Messages 交给固定源版本，每个作业只提交一次模型调用。
     /// @param account 准入已冻结的账号。
     /// @param headers 保留重复值的调用方请求头。
     /// @param body 原始逻辑正文。
+    /// @param ingress_body_map 映射和签名修复前的原始入站正文。
     /// @param body_map 原始 JSON，用于会话及用量观察。
     /// @param client_type 原始客户端类别，只对已识别 CC 会话应用既有池。
     /// @param session_hash 现有网关稳定会话标识。
@@ -3699,12 +3819,13 @@ impl GatewayService {
     /// @param scheduling 当前调度准入。
     /// @param bind_session 是否提交新会话绑定。
     /// @return 单次原生模型提交的响应。
-    async fn forward_native_messages(
+    async fn forward_native_messages_once(
         &self,
         account: &Account,
         source_version: NativeSourceVersion,
         headers: &[(String, String)],
         body: &[u8],
+        ingress_body_map: &JsonValue,
         body_map: &serde_json::Value,
         client_type: ClientType,
         session_hash: &str,
@@ -3715,7 +3836,7 @@ impl GatewayService {
         validate_native_account_features(account, headers, body_map)?;
         let log_mode = diagnostics::current_log_mode();
         let ingress_headers = headers;
-        let ingress_body = body_map;
+        let ingress_body = ingress_body_map;
         let pool_session = native_pool_session(headers, body_map);
         let original_session =
             extract_session_id_from_body(body_map).or_else(|| pool_session.clone());
@@ -10432,6 +10553,162 @@ mod tests {
         assert!(validate_native_account_features(&account, &betas, &fast).is_ok());
         assert_eq!(fast["speed"], "fast");
         assert_eq!(betas[0].1, "oauth-2025-04-20,context-1m-2025-08-07");
+    }
+
+    /// 真实网关经回环sender完成首次400修复、续轮预处理和错误隔离，诊断记录实际发送次数。
+    /// @return 无；多发、换号、错误缓存或重试归属异常时失败。
+    #[tokio::test]
+    #[ignore = "由 tests/native_signature_fixture.py 提供隔离进程及回环sender"]
+    async fn native_signature_repair_gateway_roundtrip() {
+        assert_eq!(std::env::var("FLOWER_SIGNATURE_FIXTURE").unwrap(), "1");
+        let (service, store) = test_gateway_service_with_scheduling(
+            Arc::new(MemoryStore::new()),
+            "https://api.anthropic.com".into(),
+            "http://127.0.0.1:1".into(),
+            true,
+        )
+        .await;
+        let mut account =
+            create_gateway_account(&service, "native-repair@example.invalid", 3, 0).await;
+        account.request_backend = "native293".into();
+        store.update(&account).await.unwrap();
+        let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        let observations = format!("{}/observations", std::env::var("V3_RUNTIME_URL").unwrap());
+        let snapshot = || async {
+            client
+                .get(&observations)
+                .send()
+                .await
+                .unwrap()
+                .json::<Vec<Value>>()
+                .await
+                .unwrap()
+        };
+        for version in ["2.1.280", "2.1.293"] {
+            let session = Uuid::new_v4().to_string();
+            let original = json!({"model":"claude-opus-5-5","max_tokens":128,"stream":false,"thinking":{"type":"adaptive"},
+                "metadata":{"user_id":json!({"session_id":session}).to_string()},
+                "messages":[{"role":"user","content":"合成问题"},{"role":"assistant","content":[{"type":"thinking","thinking":"保留合成思考文本","signature":"synthetic-invalid"},{"type":"text","text":"合成回答"}]},{"role":"user","content":"继续"}]});
+            let make = |body: &Value| {
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/messages")
+                    .header(
+                        "user-agent",
+                        format!("claude-cli/{version} (external, cli)"),
+                    )
+                    .header("content-type", "application/json")
+                    .body(Body::from(body.to_string()))
+                    .unwrap()
+            };
+            for (mut body, expected, attempts) in
+                [(original.clone(), 200, 2), (original.clone(), 200, 1)]
+            {
+                body["messages"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!({"role":"user","content":"新增普通轮次"}));
+                let before = snapshot().await.len();
+                let response = service.handle_request(make(&body), None).await;
+                assert_eq!(response.status(), expected);
+                let id = response.headers()["x-cc2api-request-id"]
+                    .to_str()
+                    .unwrap()
+                    .to_string();
+                body::to_bytes(response.into_body(), 1024 * 1024)
+                    .await
+                    .unwrap();
+                let sent = snapshot().await;
+                assert_eq!(sent.len() - before, attempts);
+                assert!(
+                    sent[before..]
+                        .iter()
+                        .all(|request| request["account_id"] == account.id
+                            && request["version"] == version)
+                );
+                assert!(
+                    sent.last().unwrap()["body"]["messages"]
+                        .to_string()
+                        .contains("保留合成思考文本")
+                );
+                assert!(
+                    !sent.last().unwrap()["body"]["messages"]
+                        .to_string()
+                        .contains("synthetic-invalid")
+                );
+                let diagnostics = service.diagnostics_store().unwrap();
+                diagnostics.flush().await.unwrap();
+                let detail = diagnostics.detail(&id).await.unwrap();
+                assert_eq!(detail.request.attempt_count as usize, attempts);
+                if attempts == 2 {
+                    assert_eq!(detail.attempts[0].status_code, Some(400));
+                    assert_eq!(
+                        detail.attempts[1].retry_reason.as_deref(),
+                        Some("signature_repair")
+                    );
+                    assert_ne!(detail.attempts[0].attempt_id, detail.attempts[1].attempt_id);
+                }
+            }
+            let rejected_session = Uuid::new_v4().to_string();
+            for (label, expected, attempts) in [
+                ("ordinary-400", 400, 1),
+                ("always-signature", 400, 2),
+                ("always-signature", 400, 2),
+                ("transport-failure", 502, 1),
+                ("rate-limit", 429, 1),
+            ] {
+                let mut body = original.clone();
+                body["metadata"]["user_id"] =
+                    json!(json!({"session_id":rejected_session}).to_string());
+                body["messages"][0]["content"] = json!(label);
+                let before = snapshot().await.len();
+                let response = service.handle_request(make(&body), None).await;
+                assert_eq!(response.status(), expected, "{label}");
+                body::to_bytes(response.into_body(), 1024 * 1024)
+                    .await
+                    .unwrap();
+                assert_eq!(snapshot().await.len() - before, attempts, "{label}");
+            }
+        }
+        service
+            .settings_store
+            .upsert_many(&HashMap::from([(
+                "v3_admission_wait_seconds".into(),
+                "1".into(),
+            )]))
+            .await
+            .unwrap();
+        service
+            .account_svc
+            .scheduler()
+            .unwrap()
+            .reload(&service.settings_store)
+            .await
+            .unwrap();
+        let body = json!({"model":"claude-opus-5-5","max_tokens":128,
+            "metadata":{"user_id":json!({"session_id":Uuid::new_v4().to_string()}).to_string()},
+            "messages":[{"role":"user","content":"budget-exhausted"},{"role":"assistant","content":[{"type":"thinking","thinking":"合成历史","signature":"synthetic-invalid"}]},{"role":"user","content":"继续"}]});
+        let before = snapshot().await.len();
+        let response = service
+            .handle_request(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/messages")
+                    .header("user-agent", "claude-cli/2.1.293 (external, cli)")
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+                None,
+            )
+            .await;
+        assert_eq!(response.status(), 400);
+        body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        assert_eq!(
+            snapshot().await.len() - before,
+            1,
+            "原预算已耗尽时保持首次拒绝"
+        );
     }
 
     /// 独立网络夹具通过真实 Gateway、私有 HTTP sender 和实际二进制执行单次模型提交。

@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 import type { ApiMessage, BridgeInput, ContextInput, HeaderPair, MessageBody, NativeIngressPolicy } from './contracts';
 import { BridgeError, isObject } from './errors';
 import { readNativeInput, mergeNativeContext } from './native-input';
+import { normalizeApiMetadata, validateContextManagement } from './api-compat';
 
-const BODY_KEYS = new Set(['model', 'messages', 'system', 'tools', 'tool_choice', 'max_tokens', 'thinking', 'temperature', 'output_config', 'stream']);
+const BODY_KEYS = new Set(['model', 'messages', 'system', 'tools', 'tool_choice', 'max_tokens', 'thinking', 'temperature', 'output_config', 'stream', 'context_management']);
 const CLIENT_SETTINGS_KEYS = ['settings', 'claude_settings', 'env'] as const;
 const CONTEXT_KEYS = new Set(['requestClass', 'sessionId', 'promptId', 'agentId', 'parentAgentId', 'agentType', 'agentKind', 'workflowRunId']);
 export const REQUEST_CLASSES = ['main', 'subagent', 'workflow', 'compaction', 'auxiliary', 'side_reply'] as const;
@@ -31,7 +32,13 @@ export function parseInput(raw: unknown, incomingHeaders: HeaderPair[] = [], nat
   // 本机设置由账号运行时管理；只清理正文根字段，保留原始入站及嵌套业务数据。
   for (const key of CLIENT_SETTINGS_KEYS) delete body[key];
   const native = readNativeInput(body, nativeIngressPolicy, sourceVersion);
-  if (!native) validateKeys(body, BODY_KEYS, '正文');
+  if (!isObject(envelope.context ?? {})) throw new BridgeError('invalid_context', 'context 必须是对象');
+  const context = { ...(envelope.context ?? {}) } as ContextInput;
+  if (!native) {
+    normalizeApiMetadata(body, context);
+    validateKeys(body, BODY_KEYS, '正文');
+    if (body.context_management !== undefined) validateContextManagement(body.context_management);
+  }
   if (typeof body.model !== 'string' || !body.model.trim()) throw new BridgeError('invalid_model', 'model 必须是非空字符串');
   if (!Array.isArray(body.messages) || body.messages.length === 0) throw new BridgeError('invalid_messages', 'messages 必须是非空数组');
   const messages: ApiMessage[] = body.messages.map((message: unknown) => {
@@ -48,9 +55,7 @@ export function parseInput(raw: unknown, incomingHeaders: HeaderPair[] = [], nat
   if (body.max_tokens !== undefined && (typeof body.max_tokens !== 'number' || !Number.isFinite(body.max_tokens))) throw new BridgeError('invalid_max_tokens', 'max_tokens 必须是有限数值');
   if (body.temperature !== undefined && (typeof body.temperature !== 'number' || !Number.isFinite(body.temperature))) throw new BridgeError('invalid_temperature', 'temperature 必须是有限数值');
   if (body.stream !== undefined && typeof body.stream !== 'boolean') throw new BridgeError('invalid_stream', 'stream 必须为布尔值');
-  const context = envelope.context ?? {};
-  if (!isObject(context)) throw new BridgeError('invalid_context', 'context 必须是对象');
-  validateKeys(context, CONTEXT_KEYS, '上下文');
+  validateKeys(context as Record<string, unknown>, CONTEXT_KEYS, '上下文');
   for (const [key, value] of Object.entries(context)) {
     if (typeof value !== 'string' || !value.trim() || value.length > 512 || /[\0-\x1f\x7f]/.test(value) || [...value].some(char => char.charCodeAt(0) > 255)) throw new BridgeError('invalid_context', '上下文字段不合法：' + key);
   }

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { HeaderPair, JsonObject, PreparedInput, RuntimePayload } from '../../shared/contracts';
 import { BridgeError, isObject } from '../../shared/errors';
+import { applyContextManagement } from '../../shared/api-compat';
 import { Redactor } from '../../control/redaction';
 import type { NativeBindings, NativeMessage, NativeRecord } from './native';
 import { isNativeModelCall, prepareCli } from './cli';
@@ -281,6 +282,10 @@ export async function runNativeJob(prepared: PreparedInput, bindings: NativeBind
         init.body = JSON.stringify(generated.body);
         const beta = prepared.headers.filter(([name]) => name.toLowerCase() === 'anthropic-beta').map(([, value]) => value).join(',');
         if (beta) headers.set('anthropic-beta', beta);
+      } else {
+        // 官方 SDK 决定能力头；显式历史管理只在同次能力允许时进入最终正文。
+        generated.body = applyContextManagement(prepared.input.body, generated.body, headers);
+        init.body = JSON.stringify(generated.body);
       }
       for (const name of ['content-length', 'host']) headers.delete(name);
       const forwarded = new Headers();

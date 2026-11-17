@@ -366,6 +366,23 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
     assertCch(request.raw);
   });
 
+  test('普通API身份重新生成并保留显式历史管理，最终正文与会话关联一致', async () => {
+    mode = 'normal';
+    const sessionId = randomUUID();
+    const context_management = { edits: [{ type: 'clear_thinking_20251015', keep: { type: 'thinking_turns', value: 2 } }] };
+    const before = requests.length;
+    const result = await send({ model: 'claude-sonnet-4-6', messages: [{ role: 'user', content: '验证合成身份和历史管理' }],
+      metadata: { user_id: JSON.stringify({ session_id: sessionId, device_id: 'b'.repeat(64), account_uuid: randomUUID() }), client_extension: 'remove' }, context_management, stream: true });
+    expect(result.response.status).toBe(200);
+    expect(requests.length - before).toBe(1);
+    const request = requests.at(-1)!;
+    const metadata = request.body.metadata as { user_id: string; client_extension?: string };
+    expect(JSON.parse(metadata.user_id)).toMatchObject({ session_id: sessionId, device_id: 'a'.repeat(64) });
+    expect(metadata.client_extension).toBeUndefined();
+    expect(request.body.context_management).toEqual(context_management);
+    assertCch(request.raw);
+  });
+
   test('同一进程交替省略、空工具与自定义列表，每轮只声明实际工具', async () => {
     mode = 'normal'; let pid = nativeEngine.workerPid;
     const custom = [{ name: 'lookup_status', description: '只查询合成状态', input_schema: { type: 'object', properties: { project: { type: 'string' } }, required: ['project'], additionalProperties: false } }];
