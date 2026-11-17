@@ -1,0 +1,43 @@
+{
+  "id": "native-peak-prime-routing",
+  "name": "native-peak-prime-routing",
+  "title": "Native 按账号后端执行峰值预热",
+  "description": "逐项讨论第三项：按实际账号后端执行模型预热，分别展示进程准备和配额窗口预热。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "gateway",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-17",
+  "completedAt": "2026-11-17",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-17T08:36:09Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-17-native-settings-compatibility",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-17T08:36:09.674325+00:00",
+    "completedSteps": [
+      "原生峰值预热接入目标账号实际后端与280/293版本",
+      "统一设置页预热记录UI及进程准备展示归属",
+      "完成Rust、双版真实TLS、四档浏览器及构建类型验证",
+      "Check-All通过并同步发送与UI规范"
+    ],
+    "partialStep": null,
+    "nextStep": "讨论 disabled thinking 最小范围适配",
+    "notes": "实际原生回环10次模型请求、12条正式日志；最终预热模块7项及四档UI通过。上线后按既有release.md流程核对正常时段预热记录、native来源及实际配额窗口变化。"
+  }
+}
