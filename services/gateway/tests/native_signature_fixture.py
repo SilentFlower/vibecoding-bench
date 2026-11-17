@@ -1,4 +1,4 @@
-"""以回环私有HTTP模拟sender，验证真实Rust网关的签名修复编排。"""
+"""以回环私有 HTTP 模拟 sender，验证网关的签名修复及凭据重试。"""
 import base64
 import hashlib
 import json
@@ -13,6 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 class Handler(BaseHTTPRequestHandler):
     """提供受控的绑定、能力和原生提交响应。"""
     records = []
+    oauth_releases = {}
 
     def log_message(self, *_args):
         """保持合成请求正文私有。@param _args 默认日志参数。@return None。"""
@@ -43,6 +44,13 @@ class Handler(BaseHTTPRequestHandler):
                 'versions': {version: {'available': True} for version in ['2.1.280', '2.1.293']}})
         elif self.path == '/observations':
             self.reply(200, self.records)
+        elif self.path.startswith('/oauth-release/'):
+            release = self.oauth_releases.get(self.path.rsplit('/', 1)[1])
+            if release is None:
+                self.reply(404, {})
+            else:
+                release.set()
+                self.reply(200, {})
         else:
             self.reply(404, {})
 
@@ -53,8 +61,14 @@ class Handler(BaseHTTPRequestHandler):
         labels = [message.get('content') for message in body['messages'] if isinstance(message.get('content'), str)]
         signed = any(block.get('type') in ('thinking', 'redacted_thinking') for message in body['messages']
             if isinstance(message.get('content'), list) for block in message['content'])
-        self.records.append({'account_id': submission['request']['account_id'], 'id': submission['request']['request_id'],
-            'version': submission.get('source_version', '2.1.293'), 'body': body})
+        request_id = submission['request']['request_id']
+        oauth_case = next((label for label in labels if label.startswith('oauth-')), None)
+        bearer_kind = {'synthetic-oauth-old': 'old', 'synthetic-oauth-new': 'new'}.get(submission['bearer'])
+        release = None
+        if oauth_case and oauth_case != 'oauth-unchanged' and bearer_kind == 'old':
+            release = self.oauth_releases[request_id] = threading.Event()
+        self.records.append({'account_id': submission['request']['account_id'], 'id': request_id,
+            'version': submission.get('source_version', '2.1.293'), 'body': body, 'bearer_kind': bearer_kind})
         observation = {'schema_version': 1, 'source_version': submission.get('source_version', '2.1.293'),
             'parameters': {'model': body['model'], 'stream': body.get('stream'), 'max_tokens': body.get('max_tokens')},
             'session_id': json.loads(body.get('metadata', {}).get('user_id', '{}')).get('session_id')
@@ -62,9 +76,20 @@ class Handler(BaseHTTPRequestHandler):
             'previous_message_id': None, 'body_sha256': hashlib.sha256(json.dumps(body).encode()).hexdigest()}
         headers = {'x-v3-native-observation': base64.b64encode(json.dumps(observation).encode()).decode(),
             'request-id': f'req_fixture_{len(self.records)}'}
-        if 'budget-exhausted' in labels:
+        if release is not None and not release.wait(5):
+            self.reply(500, {'error': {'message': '测试未释放首发'}}, headers)
+            return
+        if 'budget-exhausted' in labels or oauth_case == 'oauth-budget':
             time.sleep(1.2)
-        if 'transport-failure' in labels:
+        if oauth_case == 'oauth-unobserved':
+            self.reply(401, {'error': {'type': 'authentication_error'}}, {'request-id': headers['request-id']})
+        elif oauth_case == 'oauth-bare':
+            self.reply(401, {}, headers)
+        elif oauth_case == 'oauth-other':
+            self.reply(401, {'error': {'type': 'invalid_request_error'}}, headers)
+        elif oauth_case and (bearer_kind != 'new' or oauth_case == 'oauth-repeated'):
+            self.reply(401, {'error': {'type': 'authentication_error', 'message': '合成凭据失效'}}, headers)
+        elif 'transport-failure' in labels:
             self.reply(502, {}, {'x-v3-transport-error': 'unknown'})
         elif 'ordinary-400' in labels:
             self.reply(400, {'error': {'type': 'invalid_request_error', 'message': 'max_tokens invalid'}}, headers)

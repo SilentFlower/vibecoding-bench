@@ -11,7 +11,7 @@ use axum::response::{IntoResponse, Response};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use bytes::Bytes;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use http_body_util::LengthLimitError;
 use serde_json::Value as JsonValue;
 use sha2::{Digest, Sha256};
@@ -148,6 +148,7 @@ const UPSTREAM_STREAM_IDLE_TIMEOUT: std::time::Duration = std::time::Duration::f
 const STREAM_KEEPALIVE_BYTES: &[u8] = b": cc2api-keepalive\n\n";
 /// signature 错误体只用于识别上游错误类型，限制读取大小避免异常响应占用内存。
 const SIGNATURE_ERROR_BODY_LIMIT: usize = 1024 * 1024;
+const NATIVE_AUTH_ERROR_BODY_LIMIT: usize = 4096;
 /// 上游错误响应日志最多输出的字符数，避免异常错误体刷屏。
 const UPSTREAM_ERROR_LOG_BODY_LIMIT: usize = 4096;
 /// stateful usage SSE 解析保留的最大未完成行长度。
@@ -287,6 +288,26 @@ fn upstream_request_client(account: &Account) -> Result<reqwest::Client, AppErro
 /// 保存完整分类，确保业务透传决定也能到达外层重试循环。
 #[derive(Clone)]
 struct RateLimitResponseDecision(Arc<RateLimitDecision>);
+
+/// 私有标记：已完整收到真实原生上游的认证拒绝。
+#[derive(Clone)]
+struct NativeOAuthRejection;
+
+/// 只在同一调用中比较首发凭据并复用原有的出站映射。
+struct RejectedNativeOAuthAttempt {
+    bearer_digest: [u8; 32],
+    session_rewrite: UpstreamSessionRewrite,
+    cache_ttl: CacheControlTtlRewrite,
+}
+
+/// 绑定到同账号和原截止的单次凭据重放。
+struct NativeOAuthRetry<'a> {
+    first: &'a RejectedNativeOAuthAttempt,
+    bearer: String,
+    expires_at: DateTime<Utc>,
+    deadline: TokioInstant,
+    submitted: &'a mut bool,
+}
 
 struct GatewayAccountAdmission {
     permit: AccountSlotPermit,
@@ -2225,6 +2246,7 @@ impl GatewayService {
         let mut backoff_retry_ids: Vec<i64> = Vec::new();
         let mut last_resp: Option<Response> = None;
         let mut auth_failure_excluded = false;
+        let mut native_oauth_retry_used = false;
         let mut permanent_credential_excluded = false;
 
         loop {
@@ -2498,6 +2520,7 @@ impl GatewayService {
                         should_bind_session,
                         native_message_cache,
                         &native_disabled_thinking,
+                        &mut native_oauth_retry_used,
                     )
                     .await
                 {
@@ -3406,6 +3429,7 @@ impl GatewayService {
         self.finish_forward_response(
             resp,
             diagnostic,
+            false,
             path,
             query,
             headers,
@@ -3425,6 +3449,7 @@ impl GatewayService {
     /// 共用被动额度观察与响应字节处理，业务重试由各自调用方决定。
     /// @param resp 实际提交取得的原始 HTTP 响应。
     /// @param diagnostic 当前真实构造的诊断观察器。
+    /// @param native_upstream 本次原生 OAuth 发送已取得受信 sender 的上游证据。
     /// @param path 上游路径。
     /// @param query 上游查询串。
     /// @param headers 当前观察来源的请求头。
@@ -3438,6 +3463,7 @@ impl GatewayService {
         &self,
         resp: reqwest::Response,
         mut diagnostic: Option<diagnostics::AttemptTrace>,
+        native_upstream: bool,
         path: &str,
         query: &str,
         headers: &HashMap<String, String>,
@@ -3643,6 +3669,14 @@ impl GatewayService {
             if let Some(trace) = diagnostic.as_mut() {
                 trace.buffered(&upstream_body_bytes, complete);
             }
+            // sender 已去除压缩头并返回逻辑字节；仅识别完整的有界 JSON 认证拒绝。
+            let native_oauth_rejected = native_upstream
+                && status_code == 401
+                && complete
+                && upstream_body_bytes.len() <= NATIVE_AUTH_ERROR_BODY_LIMIT
+                && response_content_codings(&response_headers).is_empty()
+                && serde_json::from_slice::<JsonValue>(&upstream_body_bytes)
+                    .is_ok_and(|error| error["error"]["type"] == "authentication_error");
             warn!(
                 "上游错误响应: account={} path={} status={} body={}",
                 account.id,
@@ -3676,6 +3710,8 @@ impl GatewayService {
                 response
                     .extensions_mut()
                     .insert(session_policy_block::PolicyRefusal);
+            } else if native_oauth_rejected {
+                response.extensions_mut().insert(NativeOAuthRejection);
             } else if status_code == 400
                 && complete
                 && upstream_body_bytes.len() <= SIGNATURE_ERROR_BODY_LIMIT
@@ -3792,7 +3828,8 @@ impl GatewayService {
     /// @param bind_session 首次发送是否建立会话绑定。
     /// @param message_cache 原请求冻结的消息断点策略。
     /// @param disabled_thinking 原请求冻结的顶层thinking兼容配置。
-    /// @return 最多一次修复重试后的原生响应。
+    /// @param oauth_retry_used 本请求是否已实际提交过认证重试。
+    /// @return 最多一次修复或认证重试后的原生响应。
     async fn forward_native_messages(
         &self,
         account: &Account,
@@ -3807,6 +3844,7 @@ impl GatewayService {
         bind_session: bool,
         message_cache: MessageCacheControlRewrite,
         disabled_thinking: &DisabledThinkingRewrite,
+        oauth_retry_used: &mut bool,
     ) -> Result<Response, AppError> {
         let deadline = scheduling
             .map(SchedulingRequest::deadline)
@@ -3827,7 +3865,7 @@ impl GatewayService {
             None
         };
         let sending = cached.as_ref().unwrap_or(body_map);
-        let response = self
+        let (response, rejected_oauth) = self
             .forward_native_messages_once(
                 account,
                 source_version,
@@ -3842,8 +3880,70 @@ impl GatewayService {
                 bind_session,
                 message_cache,
                 disabled_thinking,
+                None,
             )
             .await?;
+        if let Some(first) = rejected_oauth
+            && !*oauth_retry_used
+            && TokioInstant::now() < deadline
+        {
+            // 这里只接受已提交的新凭据，避免因一个 401 发起新的换票。
+            let current = timeout_at(deadline, async {
+                let _activity = self.account_svc.upstream_activity(account.id).await?;
+                self.account_svc.get_account(account.id).await
+            })
+            .await;
+            let Ok(Ok(current)) = current else {
+                return Ok(response);
+            };
+            let Some(expires_at) = current.expires_at else {
+                return Ok(response);
+            };
+            if current.status != AccountStatus::Active
+                || !current.has_valid_oauth_access_token(0)
+                || first.bearer_digest == <[u8; 32]>::from(Sha256::digest(&current.access_token))
+                || TokioInstant::now() >= deadline
+            {
+                return Ok(response);
+            }
+            let mut submitted = false;
+            let replay = NativeOAuthRetry {
+                first: &first,
+                bearer: current.access_token,
+                expires_at,
+                deadline,
+                submitted: &mut submitted,
+            };
+            let retried = timeout_at(
+                deadline,
+                self.forward_native_messages_once(
+                    account,
+                    source_version,
+                    headers,
+                    body,
+                    body_map,
+                    sending,
+                    client_type,
+                    session_hash,
+                    selection,
+                    scheduling,
+                    false,
+                    message_cache,
+                    disabled_thinking,
+                    Some(replay),
+                ),
+            )
+            .await;
+            // 尚未提交时保持原 401；提交状态不明时不得再次发送。
+            return if submitted {
+                *oauth_retry_used = true;
+                retried
+                    .map_err(|_| AppError::BadGateway("原生认证恢复超时，提交状态未知".into()))?
+                    .map(|(response, _)| response)
+            } else {
+                Ok(response)
+            };
+        }
         if response.extensions().get::<SignatureRejection>().is_none() {
             return Ok(response);
         }
@@ -3861,7 +3961,7 @@ impl GatewayService {
         drop(response);
         diagnostics::retry_reason("signature_repair");
         // 修复沿用第一次调用开始时的总预算，准备和发送都不能重置超时。
-        let response = timeout_at(
+        let (response, _) = timeout_at(
             deadline,
             self.forward_native_messages_once(
                 account,
@@ -3877,6 +3977,7 @@ impl GatewayService {
                 false,
                 message_cache,
                 disabled_thinking,
+                None,
             ),
         )
         .await
@@ -3902,7 +4003,8 @@ impl GatewayService {
     /// @param bind_session 是否提交新会话绑定。
     /// @param message_cache 原请求冻结的消息断点策略。
     /// @param disabled_thinking 原请求冻结的顶层thinking兼容配置。
-    /// @return 单次原生模型提交的响应。
+    /// @param oauth_retry 已核验可复用的新凭据及首发映射。
+    /// @return 单次响应及仅供本请求比较的首发认证拒绝快照。
     async fn forward_native_messages_once(
         &self,
         account: &Account,
@@ -3918,7 +4020,8 @@ impl GatewayService {
         bind_session: bool,
         message_cache: MessageCacheControlRewrite,
         disabled_thinking: &DisabledThinkingRewrite,
-    ) -> Result<Response, AppError> {
+        mut oauth_retry: Option<NativeOAuthRetry<'_>>,
+    ) -> Result<(Response, Option<RejectedNativeOAuthAttempt>), AppError> {
         validate_native_account_features(account, headers, body_map)?;
         let log_mode = diagnostics::current_log_mode();
         let ingress_headers = headers;
@@ -3927,7 +4030,9 @@ impl GatewayService {
         let original_session =
             extract_session_id_from_body(body_map).or_else(|| pool_session.clone());
         // 冲突或重复 session 头交给原二进制拒绝，不能先映射而抹去错误证据。
-        let mut rewrite = if client_type == ClientType::ClaudeCode && pool_session.is_some() {
+        let mut rewrite = if let Some(retry) = oauth_retry.as_ref() {
+            retry.first.session_rewrite.clone()
+        } else if client_type == ClientType::ClaudeCode && pool_session.is_some() {
             await_preparation(
                 scheduling,
                 self.build_upstream_session_rewrite(
@@ -3967,12 +4072,18 @@ impl GatewayService {
         }
         let body_map = native_body.as_ref();
         let headers = native_headers.as_ref();
-        let bearer = await_preparation(
-            scheduling,
-            self.account_svc.resolve_upstream_token(account.id),
-        )
-        .await?
-        .inspect_err(|_| diagnostics::error_stage("credentials"))?;
+        let bearer = if let Some(retry) = oauth_retry.as_mut() {
+            std::mem::take(&mut retry.bearer)
+        } else {
+            await_preparation(
+                scheduling,
+                self.account_svc.resolve_upstream_token(account.id),
+            )
+            .await?
+            .inspect_err(|_| diagnostics::error_stage("credentials"))?
+        };
+        let bearer_digest = (oauth_retry.is_none() && account.auth_type == AccountAuthType::Oauth)
+            .then(|| Sha256::digest(&bearer).into());
         let ingress_capture =
             super::native_capture::ingress(log_mode, ingress_headers, body, ingress_body, &bearer);
         let transport = await_preparation(
@@ -4008,18 +4119,17 @@ impl GatewayService {
         let mut input = serde_json::json!({"schema_version":1,"request_id":id,"headers":headers,"context":context});
         // 映射副本直接移入信封，大正文无需在 json! 中再次完整序列化和复制。
         input["body"] = native_body.into_owned();
+        let cache_ttl = if let Some(retry) = oauth_retry.as_ref() {
+            retry.first.cache_ttl
+        } else {
+            *self.cache_control_ttl_rewrite.read().await
+        };
         let submission = NativeSubmission {
             source_version,
             // 关闭时省略外层新增字段，既有sender继续沿保留布局的默认合同执行。
             message_cache_policy: (message_cache == MessageCacheControlRewrite::Sub2api)
                 .then(|| "sub2api".into()),
-            cache_ttl_rewrite: Some(
-                self.cache_control_ttl_rewrite
-                    .read()
-                    .await
-                    .as_str()
-                    .to_string(),
-            ),
+            cache_ttl_rewrite: Some(cache_ttl.as_str().to_string()),
             ingress_capture,
             log_mode,
             request: PreparedRequest {
@@ -4054,8 +4164,21 @@ impl GatewayService {
                 .await;
         }
         if let Some(response) = session_policy_block::check_current().await? {
-            return Ok(response);
+            return Ok((response, None));
         }
+        let submit_budget = if let Some(retry) = oauth_retry {
+            let remaining = retry
+                .deadline
+                .saturating_duration_since(TokioInstant::now());
+            if remaining.as_millis() == 0 || retry.expires_at <= Utc::now() {
+                return Err(AppError::ServiceUnavailable("原生认证重试期限已到".into()));
+            }
+            diagnostics::retry_reason("oauth_recovery");
+            *retry.submitted = true;
+            remaining
+        } else {
+            UPSTREAM_TTFB_TIMEOUT
+        };
         if let Some(permit) = permit {
             permit.submitted();
         }
@@ -4063,10 +4186,7 @@ impl GatewayService {
             account_id = account.id, layer = "gateway", reason = "native_submission",
             "已提交本次原生作业");
         let native_started = Instant::now();
-        let mut response = match transport
-            .submit_native(submission, UPSTREAM_TTFB_TIMEOUT)
-            .await
-        {
+        let mut response = match transport.submit_native(submission, submit_budget).await {
             Ok(response) => response,
             Err(error) => {
                 if matches!(error, AppError::ServiceUnavailable(_)) {
@@ -4112,6 +4232,14 @@ impl GatewayService {
             })
             .and_then(|bytes| serde_json::from_slice::<NativeRequestObservation>(&bytes).ok())
             .filter(|observation| observation.source_version == source_version);
+        let native_upstream = observation.as_ref().is_some_and(|observation| {
+            observation.schema_version == 1
+                && observation.body_sha256.len() == 64
+                && observation
+                    .body_sha256
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit())
+        });
         let mut diagnostic = observation
             .and_then(|observation| diagnostics::prepare_native_attempt(account, observation, &id));
         if let Some(trace) = diagnostic.as_mut() {
@@ -4133,6 +4261,7 @@ impl GatewayService {
         self.finish_forward_response(
             response,
             diagnostic,
+            native_upstream && bearer_digest.is_some(),
             "/v1/messages",
             "",
             &HashMap::new(),
@@ -4143,9 +4272,21 @@ impl GatewayService {
             scheduling,
         )
         .await
-        .map(|response| {
+        .map(|mut response| {
+            let rejected_oauth = response
+                .extensions_mut()
+                .remove::<NativeOAuthRejection>()
+                .and(bearer_digest)
+                .map(|bearer_digest| RejectedNativeOAuthAttempt {
+                    bearer_digest,
+                    session_rewrite: rewrite,
+                    cache_ttl,
+                });
             let codings = response_content_codings(response.headers());
-            session_policy_block::observe_response(response, account.id, codings)
+            (
+                session_policy_block::observe_response(response, account.id, codings),
+                rejected_oauth,
+            )
         })
     }
 
@@ -10901,6 +11042,7 @@ mod tests {
                     false,
                     MessageCacheControlRewrite::Off,
                     &DisabledThinkingRewrite::off(),
+                    &mut false,
                 )
                 .await
                 .unwrap();
@@ -10959,6 +11101,174 @@ mod tests {
             1,
             "原预算已耗尽时保持首次拒绝"
         );
+        assert_native_oauth_recovery().await;
+    }
+
+    /// 用首发屏障精确模拟在上游返回 401 前已有另一路完成换票。
+    /// @return 无；验证实际凭据顺序、回包、诊断和原预算。
+    async fn assert_native_oauth_recovery() {
+        let base = std::env::var("V3_RUNTIME_URL").unwrap();
+        let (service, store) = test_gateway_service_with_scheduling(
+            Arc::new(MemoryStore::new()),
+            "https://api.anthropic.com".into(),
+            "http://127.0.0.1:1".into(),
+            true,
+        )
+        .await;
+        let mut account = create_oauth_gateway_account(
+            &service,
+            "native-oauth@example.invalid",
+            "synthetic-oauth-old",
+        )
+        .await;
+        account.request_backend = "native293".into();
+        store.update(&account).await.unwrap();
+        let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        let snapshot = || async {
+            client
+                .get(format!("{base}/observations"))
+                .send()
+                .await
+                .unwrap()
+                .json::<Vec<Value>>()
+                .await
+                .unwrap()
+        };
+        for (label, version, expected, attempts) in [
+            ("oauth-rotated", "2.1.280", 200, 2),
+            ("oauth-rotated", "2.1.293", 200, 2),
+            ("oauth-unchanged", "2.1.293", 401, 1),
+            ("oauth-bare", "2.1.293", 401, 1),
+            ("oauth-other", "2.1.293", 401, 1),
+            ("oauth-unobserved", "2.1.293", 401, 1),
+            ("oauth-repeated", "2.1.293", 401, 2),
+            ("oauth-budget", "2.1.293", 401, 1),
+        ] {
+            if label == "oauth-budget" {
+                service
+                    .settings_store
+                    .upsert_many(&HashMap::from([(
+                        "v3_admission_wait_seconds".into(),
+                        "1".into(),
+                    )]))
+                    .await
+                    .unwrap();
+                service
+                    .account_svc
+                    .scheduler()
+                    .unwrap()
+                    .reload(&service.settings_store)
+                    .await
+                    .unwrap();
+            }
+            let expiry = Utc::now() + chrono::Duration::hours(1);
+            store
+                .update_oauth_tokens(
+                    account.id,
+                    "synthetic-oauth-old",
+                    "synthetic-rt-old",
+                    expiry,
+                )
+                .await
+                .unwrap();
+            let payload = json!({
+                "model":"claude-opus-5-5","max_tokens":128,"stream":false,
+                "messages":[{"role":"user","content":label}]
+            });
+            let request = Request::builder()
+                .method("POST")
+                .uri("/v1/messages")
+                .header(
+                    "user-agent",
+                    format!("claude-cli/{version} (external, cli)"),
+                )
+                .header("content-type", "application/json")
+                .body(Body::from(payload.to_string()))
+                .unwrap();
+            let before = snapshot().await.len();
+            let rotate = async {
+                if label == "oauth-unchanged" {
+                    return;
+                }
+                let first_id = timeout(std::time::Duration::from_secs(4), async {
+                    loop {
+                        if let Some(first) = snapshot().await.get(before) {
+                            assert_eq!(first["bearer_kind"], "old");
+                            break first["id"].as_str().unwrap().to_owned();
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                    }
+                })
+                .await
+                .expect("首发未到达回环上游");
+                store
+                    .update_oauth_tokens(
+                        account.id,
+                        "synthetic-oauth-new",
+                        "synthetic-rt-new",
+                        expiry,
+                    )
+                    .await
+                    .unwrap();
+                client
+                    .get(format!("{base}/oauth-release/{first_id}"))
+                    .send()
+                    .await
+                    .unwrap()
+                    .error_for_status()
+                    .unwrap();
+            };
+            let (response, ()) = tokio::join!(service.handle_request(request, None), rotate);
+            assert_eq!(response.status(), expected, "{label}");
+            let root_id = response.headers()["x-cc2api-request-id"]
+                .to_str()
+                .unwrap()
+                .to_owned();
+            if expected == 401 {
+                assert_eq!(
+                    response.headers()["request-id"].to_str().unwrap(),
+                    format!("req_fixture_{}", before + attempts),
+                    "{label}：保留最后实际返回的上游关联 ID"
+                );
+            }
+            let bytes = body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            if label == "oauth-unchanged" {
+                let error = serde_json::from_slice::<Value>(&bytes).unwrap();
+                assert_eq!(error["error"]["message"], "合成凭据失效");
+            }
+            let sent = snapshot().await;
+            assert_eq!(sent.len() - before, attempts, "{label}");
+            assert_eq!(sent[before]["bearer_kind"], "old", "{label}");
+            assert!(sent[before..].iter().all(
+                |request| request["account_id"] == account.id && request["version"] == version
+            ));
+            let diagnostics = service.diagnostics_store().unwrap();
+            diagnostics.flush().await.unwrap();
+            let detail = diagnostics.detail(&root_id).await.unwrap();
+            if attempts == 2 {
+                assert_eq!(sent[before + 1]["bearer_kind"], "new");
+                assert_eq!(sent[before]["body"], sent[before + 1]["body"]);
+                assert_eq!(detail.request.attempt_count, 2);
+                assert_eq!(detail.attempts[0].status_code, Some(401));
+                assert_eq!(detail.attempts[1].status_code, Some(expected));
+                assert_eq!(
+                    detail.attempts[1].retry_reason.as_deref(),
+                    Some("oauth_recovery")
+                );
+                assert_ne!(detail.attempts[0].attempt_id, detail.attempts[1].attempt_id);
+            }
+            assert_eq!(
+                service
+                    .account_svc
+                    .get_account(account.id)
+                    .await
+                    .unwrap()
+                    .status,
+                AccountStatus::Active
+            );
+        }
     }
 
     /// 独立网络夹具通过真实 Gateway、私有 HTTP sender 和实际二进制执行单次模型提交。
