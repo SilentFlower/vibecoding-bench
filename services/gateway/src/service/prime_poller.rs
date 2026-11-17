@@ -1,15 +1,21 @@
 use crate::service::version_profile::tls_profile_for_account;
 use crate::tlsfp::configured_default_tls_profile;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use chrono::{NaiveDate, Timelike, Utc};
-use tokio::time::sleep;
+use chrono::{DateTime, Local, NaiveDate, Timelike, Utc};
+use serde_json::Value;
+use tokio::time::{sleep, timeout};
 use tracing::{debug, info, warn};
+use uuid::Uuid;
 
 use crate::model::account::{Account, AccountAuthType, AccountStatus};
+use crate::model::identity::device_profile;
+use crate::model::request_diagnostics::RequestLogMode;
 use crate::service::account::{AccountService, RateLimitDecision, UsageObservationKind};
 use crate::service::gateway::{extract_passive_usage, extract_rejected_passive_usage_windows};
+use crate::service::native_contract::{NativeSourceVersion, NativeSubmission};
 use crate::service::rewriter::{
     CacheControlTtlRewrite, ClientType, EnvPassthrough, MessageCacheControlRewrite, Rewriter,
     ordered_anthropic_headers,
@@ -120,6 +126,14 @@ impl PrimePollerService {
         // 使用服务器本地时间(chrono::Local)。部署时需要确保容器 TZ 正确,
         // 否则 4/5/6 点会错位到 UTC 对应小时。
         let now = chrono::Local::now();
+        self.check_at(now, last_fired).await;
+    }
+
+    /// 根据本地触发时刻执行扫描，便于固定时间验证调度去重。
+    /// @param now 服务器本地当前时刻。
+    /// @param last_fired 上次成功领取的日期与小时。
+    /// @return 无；结果进入原预热日志。
+    async fn check_at(&self, now: DateTime<Local>, last_fired: &mut Option<(NaiveDate, u32)>) {
         if now.minute() != TRIGGER_MINUTE {
             return;
         }
@@ -513,7 +527,8 @@ impl PrimePollerService {
                 "role": "user",
                 "content": [{ "type": "text", "text": "hi" }]
             }],
-            "max_tokens": 512
+            "max_tokens": 512,
+            "stream": true
         });
         let minimal_bytes = match serde_json::to_vec(&minimal_body) {
             Ok(b) => b,
@@ -534,29 +549,39 @@ impl PrimePollerService {
         };
         // 预热请求走注入模式(ClientType::API),不触发系统提示词环境改写,
         // 故环境透传开关在此无影响,传默认值即可。
-        let rewritten_bytes = self.rewriter.rewrite_body(
-            &minimal_bytes,
-            "/v1/messages",
-            account,
-            ClientType::API,
-            EnvPassthrough::default(),
-            CacheControlTtlRewrite::Off,
-            MessageCacheControlRewrite::Off,
-            message_body_order_fingerprint_enabled,
-        );
+        let native = account.request_backend == "native293";
+        // 原生账号由CLI装配普通API输入，避免先经旧改写器注入另一套system与身份。
+        let rewritten_bytes = if native {
+            minimal_bytes
+        } else {
+            self.rewriter.rewrite_body(
+                &minimal_bytes,
+                "/v1/messages",
+                account,
+                ClientType::API,
+                EnvPassthrough::default(),
+                CacheControlTtlRewrite::Off,
+                MessageCacheControlRewrite::Off,
+                message_body_order_fingerprint_enabled,
+            )
+        };
         // rewriter 已把 metadata.user_id 写成最终上游 body；header 直接从同一字段提取 session_id。
         let body_value: serde_json::Value =
             serde_json::from_slice(&rewritten_bytes).unwrap_or(serde_json::Value::Null);
 
         let empty_in: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-        let mut headers = self.rewriter.rewrite_headers(
-            &empty_in,
-            "/v1/messages",
-            account,
-            ClientType::API,
-            model,
-            &body_value,
-        );
+        let mut headers = if native {
+            HashMap::new()
+        } else {
+            self.rewriter.rewrite_headers(
+                &empty_in,
+                "/v1/messages",
+                account,
+                ClientType::API,
+                model,
+                &body_value,
+            )
+        };
         headers.insert("authorization".into(), format!("Bearer {}", token));
 
         let mut resp = match self
@@ -718,12 +743,89 @@ impl PrimePollerService {
         }
     }
 
+    /// 按目标账号后端发送一次预热，保留原账号的凭据与故障归属。
+    /// @param account 本轮目标账号。
+    /// @param headers 本次授权及旧转发所需请求头。
+    /// @param body 按后端选定的普通API输入或已改写字节。
+    /// @return 上游响应或有界发送错误。
     async fn send_prime_upstream(
         &self,
         account: &Account,
         headers: &std::collections::HashMap<String, String>,
         body: &[u8],
     ) -> Result<reqwest::Response, String> {
+        if account.request_backend == "native293" {
+            // 外层约束准备与首响应，sender总截止另含耗流预算，避免首包后提前截断。
+            let started = Instant::now();
+            let operation = async {
+                let transport = runtime_transport::prepare(account, PRIME_TTFB_TIMEOUT)
+                    .await
+                    .map_err(|_| "原生运行环境准备不可用".to_string())?;
+                let source_version = if device_profile(account).env.version == "2.1.280" {
+                    NativeSourceVersion::Cc280
+                } else {
+                    NativeSourceVersion::Cc293
+                };
+                transport
+                    .native_ready_for_version(source_version)
+                    .await
+                    .map_err(|_| "原生运行时能力不可用".to_string())?;
+                let bearer = headers
+                    .get("authorization")
+                    .and_then(|value| value.strip_prefix("Bearer "))
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| "原生预热授权不可用".to_string())?;
+                let id = Uuid::new_v4().to_string();
+                let body_value: Value =
+                    serde_json::from_slice(body).map_err(|_| "原生预热输入无效".to_string())?;
+                // beta查询参数由原生SDK负责，私有信封仅接纳固定Messages入口。
+                let target_url = self
+                    .upstream_url
+                    .strip_suffix("?beta=true")
+                    .unwrap_or(&self.upstream_url)
+                    .to_string();
+                let submission = NativeSubmission {
+                    source_version,
+                    cache_ttl_rewrite: None,
+                    message_cache_policy: None,
+                    ingress_capture: None,
+                    log_mode: RequestLogMode::Info,
+                    request: PreparedRequest {
+                        tls_profile: tls_profile_for_account(
+                            account,
+                            configured_default_tls_profile(),
+                        ),
+                        account_id: account.id,
+                        environment_id: String::new(),
+                        generation: 0,
+                        request_id: id.clone(),
+                        deadline_unix_ms: 0,
+                        method: "POST".into(),
+                        target_url,
+                        headers: Vec::new(),
+                        preserve_header_casing: false,
+                    },
+                    input: serde_json::json!({"schema_version":1,"request_id":id,"body":body_value}),
+                    bearer: bearer.into(),
+                    device_id: account.device_id.clone(),
+                    account_uuid: account.account_uuid.clone(),
+                    organization_uuid: account.organization_uuid.clone(),
+                    email: account.email.clone(),
+                    concurrency: account.concurrency,
+                };
+                transport
+                    .submit_native(
+                        submission,
+                        (PRIME_TTFB_TIMEOUT + PRIME_DRAIN_TIMEOUT)
+                            .saturating_sub(started.elapsed()),
+                    )
+                    .await
+                    .map_err(|_| "原生预热提交状态未知".to_string())
+            };
+            return timeout(PRIME_TTFB_TIMEOUT, operation)
+                .await
+                .map_err(|_| "原生预热首响应超时".to_string())?;
+        }
         let prepared = PreparedRequest {
             tls_profile: tls_profile_for_account(account, configured_default_tls_profile()),
             account_id: account.id,
@@ -745,6 +847,15 @@ impl PrimePollerService {
                     "upstream submission status unknown".into()
                 }
             })
+    }
+
+    /// 驱动隔离原生回环中的完整预热轮次。
+    /// @param hour 合成触发小时。
+    /// @param model 本轮预热模型。
+    /// @return 无；结果沿正式日志存储核验。
+    #[cfg(test)]
+    pub(crate) async fn test_run_round(&self, hour: u32, model: &str) {
+        self.run_round(hour, model, true).await;
     }
 }
 
@@ -818,6 +929,64 @@ mod tests {
         accept_refreshed: bool,
         authorization_headers: Arc<tokio::sync::Mutex<Vec<String>>>,
         refresh_calls: Arc<AtomicUsize>,
+    }
+
+    /// 定时扫描遵守开关、小时、日期去重及活跃与冷却范围。
+    /// @return 无；错误触发、重复记录或漏记跳过时失败。
+    #[tokio::test]
+    async fn prime_schedule_preserves_switch_hours_dedup_and_cooldown() {
+        let (base_url, state, server) = spawn_prime_auth_mock_server(true).await;
+        let (service, accounts) = setup_prime_poller_with_urls(
+            format!("{base_url}/v1/messages"),
+            format!("{base_url}/oauth/token"),
+        )
+        .await;
+        let mut target = setup_token_account("prime-schedule@example.test");
+        accounts.create_account(&mut target).await.unwrap();
+        accounts
+            .set_rate_limit(target.id, Utc::now() + chrono::Duration::hours(1))
+            .await
+            .unwrap();
+        let mut disabled = setup_token_account("prime-disabled@example.test");
+        disabled.status = AccountStatus::Disabled;
+        accounts.create_account(&mut disabled).await.unwrap();
+        let now = Local::now().with_hour(4).unwrap().with_minute(10).unwrap();
+        let mut last = None;
+        for (enabled, hours) in [("false", "4"), ("true", "5")] {
+            service
+                .settings_store
+                .upsert_many(&HashMap::from([
+                    ("peak_prime_enabled".into(), enabled.into()),
+                    ("peak_prime_hours".into(), hours.into()),
+                ]))
+                .await
+                .unwrap();
+            service.check_at(now, &mut last).await;
+            assert!(last.is_none());
+            assert!(service.log_store.list_recent(200).await.unwrap().is_empty());
+        }
+        service
+            .settings_store
+            .upsert_many(&HashMap::from([("peak_prime_hours".into(), "4".into())]))
+            .await
+            .unwrap();
+        service
+            .check_at(now.with_minute(9).unwrap(), &mut last)
+            .await;
+        assert!(last.is_none());
+        service.check_at(now, &mut last).await;
+        service.check_at(now, &mut last).await;
+        let entries = service.log_store.list_recent(200).await.unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].account_id, target.id);
+        assert!(entries[0].error_message.starts_with("skipped:"));
+        assert_eq!(entries[0].duration_ms, 0);
+        service
+            .check_at(now + chrono::Duration::days(1), &mut last)
+            .await;
+        assert_eq!(service.log_store.list_recent(200).await.unwrap().len(), 2);
+        assert!(state.authorization_headers.lock().await.is_empty());
+        server.abort();
     }
 
     async fn mock_prime_response(
@@ -974,6 +1143,30 @@ mod tests {
         let stored = account_svc.get_account(account.id).await.unwrap();
         assert_eq!(stored.status, AccountStatus::Active);
         assert_eq!(stored.access_token, "access-refreshed");
+        server.abort();
+    }
+
+    /// 原生能力缺失时保持目标账号归属，禁止回落到旧请求发送。
+    /// @return 无；发生旧路径模型发送或错误归属丢失时失败。
+    #[tokio::test]
+    async fn native_prime_requires_sender_without_legacy_fallback() {
+        let (base_url, state, server) = spawn_prime_auth_mock_server(true).await;
+        let (service, account_svc) = setup_prime_poller_with_urls(
+            format!("{base_url}/v1/messages?beta=true"),
+            format!("{base_url}/oauth/token"),
+        )
+        .await;
+        let mut account = setup_token_account("prime-native@example.test");
+        account.request_backend = "native293".into();
+        account_svc.create_account(&mut account).await.unwrap();
+        let outcome = service
+            .prime_one(&account, "claude-haiku-4-5-20251001", true)
+            .await;
+        assert!(!outcome.success);
+        assert_eq!(outcome.status, None);
+        assert!(outcome.error_message.contains("原生运行"));
+        assert!(state.authorization_headers.lock().await.is_empty());
+        assert_eq!(state.refresh_calls.load(Ordering::SeqCst), 0);
         server.abort();
     }
 

@@ -83,6 +83,39 @@
 .settings-log-state.success { color: rgb(65, 134, 106); background: rgb(237, 247, 241); }
 .settings-log-state.skipped { color: rgb(167, 138, 73); background: rgb(251, 246, 233); }
 .settings-log-state.failed { color: rgb(181, 105, 127); background: rgb(253, 240, 244); }
+.settings-prime-history > header { align-items: center; }
+.settings-prime-history > header [data-slot="button"] { min-width: 86px; font-size: var(--ui-font-small); }
+.prime-preparation-link { display: inline-block; margin-top: 5px; color: var(--ui-accent); font-size: var(--ui-font-small); }
+.settings-prime-records table { table-layout: fixed; }
+.settings-prime-records th { color: var(--ui-muted); font-weight: 500; border-bottom: 1px solid var(--ui-border); }
+.settings-prime-records td { color: var(--ui-text); vertical-align: middle; overflow-wrap: anywhere; }
+.settings-prime-records th:first-child { width: 23%; }
+.settings-prime-records th:nth-child(2) { width: 20%; }
+.settings-prime-records .prime-hour-column { width: 10%; }
+.settings-prime-records .prime-model-column { width: 20%; }
+.settings-prime-records .prime-duration-column { width: 10%; }
+.settings-prime-records td small { color: var(--ui-muted); }
+.prime-time { font-variant-numeric: tabular-nums; }
+.prime-account-name { font-weight: 500; }
+.prime-model-value { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-prime-records .fui-info-trigger { max-width: 100%; color: var(--ui-text); cursor: pointer; }
+.prime-result { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.settings-prime-records .settings-log-state { border-color: transparent; font-weight: 500; }
+.prime-reason-link { color: var(--ui-accent); white-space: nowrap; }
+.prime-reason-content { max-height: 45vh; overflow: auto; white-space: pre-wrap; }
+.settings-prime-records .prime-mobile-detail { display: none; }
+.prime-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 38px 12px; text-align: center; color: var(--ui-muted); }
+.prime-empty svg { color: var(--ui-accent); }
+.prime-empty strong { color: var(--ui-text); font-size: var(--ui-font-body); font-weight: 500; }
+.prime-empty p { font-size: var(--ui-font-small); line-height: 1.7; }
+@media (max-width: 760px) {
+  .settings-prime-records .prime-hour-column, .settings-prime-records .prime-model-column, .settings-prime-records .prime-duration-column { display: none; }
+  .settings-prime-records th:first-child { width: 32%; }
+  .settings-prime-records th:nth-child(2) { width: 38%; }
+  .settings-prime-records th:last-child { width: 30%; }
+  .settings-prime-records th, .settings-prime-records td { padding: 13px 6px; white-space: normal; }
+  .settings-prime-records .prime-mobile-detail { display: block; margin-top: 6px; }
+}
 @media (max-width: 1000px) {.system-settings-layout { grid-template-columns: 165px minmax(0px, 1fr); gap: 18px; }
 .settings-section-card { padding: 20px; }
 .settings-field-grid { gap: 20px 15px; }}

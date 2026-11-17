@@ -11042,6 +11042,174 @@ mod tests {
         };
         let control = var("CCRB_TEST_CONTROL").unwrap();
         let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        if var("CCRB_TEST_PRIME_ONLY").as_deref() == Ok("1") {
+            use crate::service::native_contract::NativePreparation;
+            use crate::service::prime_poller::PrimePollerService;
+            use crate::service::runtime_transport;
+            use crate::service::version_profile::profile_for_key;
+            let logs = Arc::new(PrimeLogStore::new(service.settings_store.database_pool()));
+            let prime = PrimePollerService::new(
+                service.account_svc.clone(),
+                service.settings_store.clone(),
+                logs.clone(),
+                service.rewriter.clone(),
+            );
+            for version in ["2.1.280", "2.1.293"] {
+                store
+                    .update_all_canonical_env_identity(&profile_for_key(version).unwrap().identity)
+                    .await
+                    .unwrap();
+                account = service.account_svc.get_account(account.id).await.unwrap();
+                assert_eq!(account.canonical_env["version"], version);
+                account.status = AccountStatus::Active;
+                account.rate_limit_reset_at = None;
+                account.rate_limited_at = None;
+                store.update(&account).await.unwrap();
+                store.clear_rate_limit(account.id).await.unwrap();
+                let source_version = if version == "2.1.280" {
+                    NativeSourceVersion::Cc280
+                } else {
+                    NativeSourceVersion::Cc293
+                };
+                let transport = runtime_transport::prepare(&account, Duration::from_secs(30))
+                    .await
+                    .unwrap();
+                let ready = transport
+                    .prepare_native(NativePreparation {
+                        source_version,
+                        account_id: account.id,
+                        environment_id: String::new(),
+                        generation: 0,
+                        preparation_id: Uuid::new_v4().to_string(),
+                        deadline_unix_ms: chrono::Utc::now().timestamp_millis() as u64 + 30000,
+                        bearer: account.setup_token.clone(),
+                        device_id: account.device_id.clone(),
+                        account_uuid: account.account_uuid.clone(),
+                        organization_uuid: account.organization_uuid.clone(),
+                        email: account.email.clone(),
+                        concurrency: account.concurrency,
+                    })
+                    .await
+                    .unwrap();
+                assert!(ready.pid.is_some());
+                let before: Value = client
+                    .get(&control)
+                    .send()
+                    .await
+                    .unwrap()
+                    .json()
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    before["messages"].as_array().unwrap().len(),
+                    if version == "2.1.280" { 0 } else { 4 },
+                    "进程准备保持零模型调用"
+                );
+                for status in [200, 429, 403, 401] {
+                    account.status = AccountStatus::Active;
+                    account.rate_limit_reset_at = None;
+                    account.rate_limited_at = None;
+                    store.update(&account).await.unwrap();
+                    store.clear_rate_limit(account.id).await.unwrap();
+                    client
+                        .post(format!(
+                            "{}/prime-status/{status}",
+                            control.trim_end_matches('/')
+                        ))
+                        .send()
+                        .await
+                        .unwrap()
+                        .error_for_status()
+                        .unwrap();
+                    prime.test_run_round(4, "claude-haiku-4-5-20251001").await;
+                    let entry = logs.list_recent(1).await.unwrap().remove(0);
+                    assert_eq!(entry.account_id, account.id);
+                    assert_eq!(entry.hour, 4);
+                    assert_eq!(entry.model, "claude-haiku-4-5-20251001");
+                    assert_eq!(entry.success, status == 200, "{}", entry.error_message);
+                    if status != 200 {
+                        assert!(
+                            entry.error_message.contains(&format!("http {status}")),
+                            "{}",
+                            entry.error_message
+                        );
+                    }
+                    let observed: Value = client
+                        .get(&control)
+                        .send()
+                        .await
+                        .unwrap()
+                        .json()
+                        .await
+                        .unwrap();
+                    let actual = observed["messages"].as_array().unwrap().last().unwrap();
+                    assert_eq!(actual["label"], "hi");
+                    assert_eq!(actual["source_version"], version);
+                    if status == 200 {
+                        assert_eq!(
+                            observed["prime_drains"],
+                            if version == "2.1.280" { 1 } else { 2 },
+                            "成功响应须耗尽真实SSE"
+                        );
+                    }
+                    if status == 401 || status == 403 {
+                        assert_eq!(
+                            service
+                                .account_svc
+                                .get_account(account.id)
+                                .await
+                                .unwrap()
+                                .status,
+                            AccountStatus::Disabled
+                        );
+                    }
+                }
+                account.status = AccountStatus::Active;
+                account.rate_limit_reset_at = Some(chrono::Utc::now() + chrono::Duration::hours(1));
+                store.update(&account).await.unwrap();
+                store
+                    .set_rate_limit(account.id, account.rate_limit_reset_at.unwrap())
+                    .await
+                    .unwrap();
+                prime.test_run_round(4, "claude-haiku-4-5-20251001").await;
+                assert!(
+                    logs.list_recent(1).await.unwrap()[0]
+                        .error_message
+                        .starts_with("skipped:")
+                );
+            }
+            // 首响应超时与200后的流中断分别沿原预热结果口径记录。
+            account.status = AccountStatus::Active;
+            store.update(&account).await.unwrap();
+            store.clear_rate_limit(account.id).await.unwrap();
+            for (mode, success, reason) in [(-1, false, "首响应超时"), (-2, true, "")] {
+                client
+                    .post(format!(
+                        "{}/prime-status/{mode}",
+                        control.trim_end_matches('/')
+                    ))
+                    .send()
+                    .await
+                    .unwrap()
+                    .error_for_status()
+                    .unwrap();
+                prime.test_run_round(4, "claude-haiku-4-5-20251001").await;
+                let entry = logs.list_recent(1).await.unwrap().remove(0);
+                assert_eq!(entry.success, success, "{}", entry.error_message);
+                assert!(
+                    entry.error_message.contains(reason),
+                    "{}",
+                    entry.error_message
+                );
+                if mode == -1 {
+                    assert!(entry.duration_ms >= 29000, "首响应期限须由30秒预算触发");
+                }
+            }
+            assert_eq!(logs.list_recent(200).await.unwrap().len(), 12);
+            sender.abort();
+            let _ = fs::remove_dir_all(root);
+            return;
+        }
         if var("CCRB_TEST_CACHE_POLICY_ONLY").as_deref() == Ok("1") {
             /// 等待异步诊断落盘，并区分队列延迟与实际写入失败。
             /// @param store 当前验证实例的诊断存储。

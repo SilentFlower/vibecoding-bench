@@ -28,6 +28,7 @@ const tlsBodies = new Map<string, { bytes: number; sha256: string }>();
 let parallel = 0, parallelPeak = 0;
 let gatewayIdentity: { device_id: string; account_uuid: string } | undefined;
 let runningBindingReads = 0;
+let primeStatus = 200, primeDrains = 0;
 let finishKernelStream: (() => void) | undefined;
 let bindingGate: { skip: number; mode: string; entered: boolean; release?: () => void } | undefined;
 const groups = new Map<string, { count: number; release: () => void; promise: Promise<void> }>();
@@ -37,12 +38,12 @@ const upstream = Bun.serve({ hostname: '127.0.0.1', port: 0, tls: { key: Bun.fil
   tlsBodies.set(request.headers.get('x-client-request-id')!, { bytes: Buffer.byteLength(raw), sha256: createHash('sha256').update(raw).digest('hex') });
   for (const name of ['cf-ray', 'new-api-user', 'x-unregistered']) assert.equal(request.headers.has(name), false);
   const body = JSON.parse(raw);
-  const label = body.messages.flatMap((message: { content: string | { type: string; text?: string }[] }) => typeof message.content === 'string' ? [message.content] : message.content.filter(block => block.type === 'text').map(block => block.text)).find((text: string | undefined) => text && /^(parallel-[2346]|slow|rotated|http-error|second-account|readiness-latency|gateway-normal|gateway-error|gateway-info|gateway-native|gateway-mapped-main|gateway-agent|gateway-kernel-long|gateway-kernel-next|gateway-dual-[a-z0-9-]+)$/.test(text));
+  const label = body.messages.flatMap((message: { content: string | { type: string; text?: string }[] }) => typeof message.content === 'string' ? [message.content] : message.content.filter(block => block.type === 'text').map(block => block.text)).find((text: string | undefined) => text && (/^(parallel-[2346]|slow|rotated|http-error|second-account|readiness-latency|gateway-normal|gateway-error|gateway-info|gateway-native|gateway-mapped-main|gateway-agent|gateway-kernel-long|gateway-kernel-next|gateway-dual-[a-z0-9-]+)$/.test(text) || (process.env.CCRB_TEST_PRIME_ONLY === '1' && text === 'hi')));
   assert.ok(label, '必须从真实用户文本取得场景标识');
   const metadata = JSON.parse(body.metadata.user_id);
   const bearer = request.headers.get('authorization')!;
   assert.ok(bearer.startsWith('Bearer synthetic-bearer-'));
-  assert.equal(metadata.device_id, label.startsWith('gateway-') ? gatewayIdentity?.device_id : (label === 'second-account' ? 'b' : 'a').repeat(64));
+  assert.equal(metadata.device_id, (label.startsWith('gateway-') || (process.env.CCRB_TEST_PRIME_ONLY === '1' && label === 'hi')) ? gatewayIdentity?.device_id : (label === 'second-account' ? 'b' : 'a').repeat(64));
   assert.equal(metadata.account_uuid, label === 'second-account' ? '33333333-3333-4333-8333-333333333333' : '11111111-1111-4111-8111-111111111111');
   const cacheTtls: unknown[] = [];
   const pending: unknown[] = [body];
@@ -60,6 +61,21 @@ const upstream = Bun.serve({ hostname: '127.0.0.1', port: 0, tls: { key: Bun.fil
     if (Array.isArray(content)) for (let block = 0; block < content.length; block++) if (content[block].cache_control !== undefined) cacheMessagePositions.push([message, block]);
   }
   messages.push({ label, cache_message_positions: cacheMessagePositions, device: metadata.device_id, account: metadata.account_uuid, bearer, cache_ttls: cacheTtls, source_version: /claude-cli\/(2\.1\.(?:280|293))/.exec(request.headers.get('user-agent') ?? '')?.[1] ?? '' });
+  if (process.env.CCRB_TEST_PRIME_ONLY === '1' && label === 'hi') {
+    assert.equal(body.model, 'claude-haiku-4-5-20251001'); assert.equal(body.max_tokens, 512); assert.equal(body.stream, true);
+    if (primeStatus === -1) { await Bun.sleep(31000); return Response.json({ synthetic: true }); }
+    if (primeStatus === -2) return new Response(new ReadableStream({ async start(controller) {
+      controller.enqueue(new TextEncoder().encode('event: message_start\ndata: {"type":"message_start"}\n\n'));
+      await Bun.sleep(30); controller.error(new Error('synthetic interrupted stream'));
+    } }), { headers: { 'content-type': 'text/event-stream' } });
+    if (primeStatus !== 200) return Response.json({ type: 'error', error: { type: 'synthetic_prime_error', message: 'synthetic prime rejection' } }, { status: primeStatus });
+    const stream = new ReadableStream({ async start(controller) {
+      controller.enqueue(new TextEncoder().encode('event: message_start\ndata: {"type":"message_start"}\n\n'));
+      await Bun.sleep(30);
+      controller.enqueue(new TextEncoder().encode('event: message_stop\ndata: {"type":"message_stop"}\n\n')); primeDrains++; controller.close();
+    } });
+    return new Response(stream, { headers: { 'content-type': 'text/event-stream' } });
+  }
   if (label === 'gateway-dual-cache-freeze' && messages.filter(message => message.label === label).length === 1) return Response.json({ type: 'error', error: { type: 'rate_limit_error', message: 'synthetic capacity rejection' } }, { status: 429 });
   if (label.startsWith('gateway-dual-business-')) return Response.json({ type: 'error', error: { type: 'rate_limit_error', message: 'long context requires usage credits' } }, { status: 429, headers: { 'request-id': 'req_real_rate_limit' } });
   if (label?.startsWith('parallel-') || label?.startsWith('gateway-dual-parallel-')) {
@@ -115,6 +131,7 @@ const control = Bun.serve({ hostname: '127.0.0.1', port: 0, async fetch(request)
   if (url.pathname === '/kernel/release') { assert.ok(finishKernelStream); finishKernelStream(); return Response.json({ ok: true }); }
   if (url.pathname === '/binding/arm') { const input = await request.json() as { skip: number; mode: string }; bindingGate = { ...input, entered: false }; return Response.json({ ok: true }); }
   if (url.pathname === '/binding/release') { bindingGate?.release?.(); return Response.json({ ok: true }); }
+  if (url.pathname.startsWith('/prime-status/')) { primeStatus = Number(url.pathname.split('/').at(-1)); assert.ok([200,429,403,401,-1,-2].includes(primeStatus)); return Response.json({ ok: true }); }
   if (url.pathname === '/identity') { gatewayIdentity = await request.json() as typeof gatewayIdentity; return Response.json({ ok: true }); } if (url.pathname.startsWith('/internal/v3/native-captures/')) {
   assert.equal(request.headers.get('authorization'), 'Bearer ' + 'synthetic-private-management-key'.repeat(2));
   const id = new URL(request.url).pathname.split('/').at(-1)!;
@@ -149,7 +166,7 @@ const control = Bun.serve({ hostname: '127.0.0.1', port: 0, async fetch(request)
     }
   }
   return Response.json({ account_id: 1, environment_id: 'a'.repeat(32), generation, endpoint: `http://${senderHost}:8091`, secret: 'synthetic-private-key'.repeat(3), release_id: 'native-offline' });
-} return Response.json({ messages, tls_bodies: Object.fromEntries(tlsBodies), parallel_peak: parallelPeak, running_binding_reads: runningBindingReads, binding_waiting: bindingGate?.entered ?? false }); } });
+} return Response.json({ messages, prime_drains: primeDrains, tls_bodies: Object.fromEntries(tlsBodies), parallel_peak: parallelPeak, running_binding_reads: runningBindingReads, binding_waiting: bindingGate?.entered ?? false }); } });
 const proxy = createServer();
 proxy.on('connect', (request, socket, head) => {
   assert.equal(request.url, 'api.anthropic.com:443');
@@ -187,7 +204,8 @@ try {
   const benchmarkOnly = process.env.CCRB_TEST_READINESS_BENCH_ONLY === '1';
   const rateLimitOnly = process.env.CCRB_TEST_RATE_LIMIT_ONLY === '1';
   const cacheOnly = process.env.CCRB_TEST_CACHE_POLICY_ONLY === '1';
-  const phases = tlsOnly ? ['native_real_binary'] : benchmarkOnly ? ['native_real_binary'] : (cacheOnly || rateLimitOnly || process.env.CCRB_TEST_GATEWAY_ONLY === '1' || process.env.CCRB_TEST_MULTI_VERSION === '1') ? ['native_real_gateway'] : ['native_real_binary', 'native_real_gateway'];
+  const primeOnly = process.env.CCRB_TEST_PRIME_ONLY === '1';
+  const phases = tlsOnly ? ['native_real_binary'] : benchmarkOnly ? ['native_real_binary'] : (primeOnly || cacheOnly || rateLimitOnly || process.env.CCRB_TEST_GATEWAY_ONLY === '1' || process.env.CCRB_TEST_MULTI_VERSION === '1') ? ['native_real_gateway'] : ['native_real_binary', 'native_real_gateway'];
   let code = 0;
   for (const phase of phases) {
     const child = Bun.spawn(['cargo', 'test', '--locked', '--lib', phase, '--', '--ignored', '--nocapture'], { cwd: resolve(consumer), env: { ...process.env, CCRB_TEST_BINARY: resolve(binary), CCRB_TEST_CAPTURE_DIR: join(root, 'environment/flows/api/cc-prepared'), CCRB_TEST_CA_FILE: ca, CCRB_TEST_PROXY: proxyUrl, CCRB_TEST_CONTROL: control.url.toString(), CCRB_TEST_SENDER_HOST: senderHost, V3_RUNTIME_URL: control.url.toString(), V3_INTERNAL_TOKEN: 'synthetic-private-management-key'.repeat(2), V3_DEPLOYMENT_ID: 'native-offline', V3_RELEASE: 'native-offline' }, stdout: 'inherit', stderr: 'inherit' });
@@ -198,8 +216,8 @@ try {
     assert.equal(code, 0);
   }
   assert.equal(code, 0);
-  assert.equal(messages.length, (cacheOnly ? 15 : rateLimitOnly ? 4 : process.env.CCRB_TEST_MULTI_VERSION === '1' ? 18 : tlsOnly ? 9 : benchmarkOnly ? 9 : phases.length === 2 ? (process.env.CCRB_TEST_UNLIMITED === '1' ? 25 : 28) : 6) + (process.env.CCRB_TEST_SWITCH_DIGEST ? 3 : 0));
-  if (!cacheOnly && !rateLimitOnly && !benchmarkOnly && !tlsOnly && process.env.CCRB_TEST_MULTI_VERSION !== '1') assert.ok(runningBindingReads >= 3, '启动补偿与凭据轮换均重新核对只读运行绑定');
+  assert.equal(messages.length, (primeOnly ? 10 : cacheOnly ? 15 : rateLimitOnly ? 4 : process.env.CCRB_TEST_MULTI_VERSION === '1' ? 18 : tlsOnly ? 9 : benchmarkOnly ? 9 : phases.length === 2 ? (process.env.CCRB_TEST_UNLIMITED === '1' ? 25 : 28) : 6) + (process.env.CCRB_TEST_SWITCH_DIGEST ? 3 : 0));
+  if (!primeOnly && !cacheOnly && !rateLimitOnly && !benchmarkOnly && !tlsOnly && process.env.CCRB_TEST_MULTI_VERSION !== '1') assert.ok(runningBindingReads >= 3, '启动补偿与凭据轮换均重新核对只读运行绑定');
   if (phases.length === 2) assert.equal(messages.find(message => message.label === 'rotated')?.bearer, 'Bearer synthetic-bearer-b');
   console.log(JSON.stringify({ messages: messages.length, parallelPeak, processTreePeakRssKiB: peakRssKiB }));
 } finally { upstream.stop(true); control.stop(true); proxy.closeAllConnections(); proxy.close(); socks.close(); await rm(root, { recursive: true, force: true }); }

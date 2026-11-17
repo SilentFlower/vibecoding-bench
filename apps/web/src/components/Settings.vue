@@ -13,9 +13,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TableEmpty,
 } from '@/components/ui/table';
-import { NumberInput, ChoiceSelect, SearchInput } from './ui/controls';
+import { NumberInput, ChoiceSelect, SearchInput, InfoTooltip } from './ui/controls';
 import { Activity, Box, ShieldCheck, Globe, Clock, Settings2, FileText } from './ui/icon';
 import { settingsGroups, type SettingField } from '../lib/settingsSchema';
 import '../settings-design.css';
@@ -836,63 +835,24 @@ onMounted(async () => {
       <router-link v-if="section.summary==='session-policy-block'" :to="{name:'session-blocks'}" class="settings-inline-note">查看会话封禁及历史记录 →</router-link>
       <template v-if="section.summary==='profile'"><p v-for="profile in claudeCodeVersionProfiles.filter(item=>item.key===claudeCodeVersionProfile)" :key="profile.key" class="settings-inline-note">画像准入 {{ profile.allowed_claude_code_versions }} · {{ profile.growthbook_user_agent }} · {{ profile.build_time }} · {{ formatTelemetryShape(profile.telemetry_shape) }}</p></template>
      </section></template>
-     <section v-if="settingsCategory==='history' && !settingsQuery" class="settings-section-card"><header><div><h3>最近预热记录</h3><p>按触发时间倒序 · 最多保留 200 条</p></div><Button type="button" variant="outline" :disabled="logsLoading" @click="loadPrimeLogs">{{ logsLoading ? '加载中…' : '刷新' }}</Button></header>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead class="text-muted-foreground">时间</TableHead>
-              <TableHead class="text-muted-foreground">账号</TableHead>
-              <TableHead class="text-muted-foreground">小时</TableHead>
-              <TableHead class="text-muted-foreground">模型</TableHead>
-              <TableHead class="text-muted-foreground">耗时</TableHead>
-              <TableHead class="text-muted-foreground">结果</TableHead>
-            </TableRow>
-          </TableHeader>
+     <section v-if="settingsCategory==='history' && !settingsQuery" class="settings-section-card settings-prime-history">
+      <header><div><h3>最近模型预热记录</h3><p>配额窗口的模型调用 · 按触发时间倒序 · 最近 200 条</p><router-link :to="{name:'environments'}" class="prime-preparation-link">进程准备状态见环境页面 →</router-link></div><Button type="button" variant="outline" :disabled="logsLoading" @click="loadPrimeLogs">{{ logsLoading ? '加载中…' : '刷新' }}</Button></header>
+      <div class="settings-prime-records" :aria-busy="logsLoading">
+        <Table class="settings-log-table">
+          <TableHeader><TableRow><TableHead>时间</TableHead><TableHead>账号</TableHead><TableHead class="prime-hour-column">触发时点</TableHead><TableHead class="prime-model-column">模型</TableHead><TableHead class="prime-duration-column">耗时</TableHead><TableHead>结果</TableHead></TableRow></TableHeader>
           <TableBody>
             <TableRow v-for="log in primeLogs" :key="log.id">
-              <TableCell class="text-foreground text-xs whitespace-nowrap">{{ formatTime(log.triggered_at) }}</TableCell>
-              <TableCell class="text-foreground text-xs">
-                <span class="font-medium">{{ log.account_name || `#${log.account_id}` }}</span>
-                <span class="text-muted-foreground ml-1">#{{ log.account_id }}</span>
-              </TableCell>
-              <TableCell class="text-foreground text-xs">{{ String(log.hour).padStart(2, '0') }}:10</TableCell>
-              <TableCell class="text-foreground text-xs">{{ log.model }}</TableCell>
-              <TableCell class="text-foreground text-xs">{{ log.duration_ms }}ms</TableCell>
-              <TableCell>
-                <Badge
-                  v-if="log.success"
-                  class="bg-emerald-50 text-emerald-700 border-emerald-200"
-                >
-                  成功
-                </Badge>
-                <Badge
-                  v-else-if="isSkipped(log)"
-                  class="bg-amber-50 text-amber-700 border-amber-200"
-                  :title="log.error_message"
-                >
-                  跳过
-                </Badge>
-                <Badge
-                  v-else
-                  class="bg-red-50 text-red-700 border-red-200"
-                  :title="log.error_message"
-                >
-                  失败
-                </Badge>
-                <span
-                  v-if="!log.success && log.error_message"
-                  class="ml-2 text-[length:var(--ui-font-small)] text-muted-foreground truncate inline-block max-w-[260px] align-middle"
-                  :title="log.error_message"
-                >
-                  {{ log.error_message }}
-                </span>
-              </TableCell>
+              <TableCell class="prime-time"><span>{{ formatTime(log.triggered_at) }}</span><small class="prime-mobile-detail">{{ String(log.hour).padStart(2,'0') }}:10 触发</small></TableCell>
+              <TableCell><span class="prime-account-name">{{ log.account_name || `账号 #${log.account_id}` }}</span><small>账号 #{{ log.account_id }}</small><div class="prime-mobile-detail"><InfoTooltip :label="`查看模型 ${log.id}`" title="预热模型"><template #trigger><span class="prime-model-value">{{ log.model }}</span></template>{{ log.model }}</InfoTooltip></div></TableCell>
+              <TableCell class="prime-hour-column">{{ String(log.hour).padStart(2,'0') }}:10</TableCell>
+              <TableCell class="prime-model-column"><InfoTooltip :label="`查看模型 ${log.id}`" title="预热模型"><template #trigger><span class="prime-model-value">{{ log.model }}</span></template>{{ log.model }}</InfoTooltip></TableCell>
+              <TableCell class="prime-duration-column">{{ log.duration_ms }}ms</TableCell>
+              <TableCell><div class="prime-result"><Badge variant="outline" class="settings-log-state" :class="log.success?'success':isSkipped(log)?'skipped':'failed'">{{ log.success?'成功':isSkipped(log)?'跳过':'失败' }}</Badge><InfoTooltip v-if="!log.success && log.error_message" :label="`查看预热原因 ${log.id}`" title="预热原因"><template #trigger><span class="prime-reason-link">查看原因</span></template><p class="prime-reason-content">{{ log.error_message }}</p></InfoTooltip></div><small class="prime-mobile-detail">{{ log.duration_ms }}ms</small></TableCell>
             </TableRow>
-            <TableEmpty v-if="primeLogs.length === 0" :colspan="6">
-              暂无预热记录
-            </TableEmpty>
+            <TableRow v-if="!primeLogs.length"><TableCell :colspan="6"><div class="prime-empty" role="status"><Clock :size="28" /><strong>{{ logsLoading?'正在读取预热记录…':'暂无模型预热记录' }}</strong><p>{{ logsLoading?'请稍候。':'启用峰值预热后，模型调用结果会显示在这里。' }}</p></div></TableCell></TableRow>
           </TableBody>
         </Table>
+      </div>
      </section>
      <section v-if="!visibleGroups.length && (settingsCategory!=='history' || settingsQuery)" class="settings-empty"><h3>没有匹配的配置</h3><p>试试功能名称、模型或配置关键词。</p><Button type="button" variant="outline" @click="settingsQuery=''">清空搜索</Button></section>
     </div>

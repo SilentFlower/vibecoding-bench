@@ -1342,6 +1342,52 @@ apps/web/src/components/Settings.vue 控件和文案
 - `PrimePollerService` 负责峰值预热调度，发出的请求也可能命中网关治理规则；新增拦截规则时必须说明是否影响预热。
 - Telemetry 自动代发必须遵守隐私边界，不发送 prompt、tool input、响应正文、token 或 cookie。
 
+## Scenario: 按账号后端执行峰值模型预热
+
+### 1. Scope / Trigger
+
+修改 `PrimePollerService` 的调度、原生发送、故障处理或预热记录时适用。峰值模型调用与原生进程准备分别核验。
+
+### 2. Signatures
+
+- `peak_prime_enabled/hours/model` 沿原字符串设置；`check_once` 使用服务器本地时钟，`check_at(DateTime<Local>, &mut Option<(NaiveDate,u32)>)` 承担同一调度判断。
+- `send_prime_upstream(&Account, &HashMap<String,String>, &[u8]) -> Result<reqwest::Response,String>` 为 async，按目标账号 `request_backend` 分流。
+- native 复用 `runtime_transport::prepare`、`native_ready_for_version` 和 `submit_native(NativeSubmission, Duration)`。
+- `GET /admin/prime-logs` 返回原 `PrimeLogEntry` 数组，沿 `prime_logs` 最近200条倒序与原字段合同。
+
+### 3. Contracts
+
+- 服务器本地 `HH:10` 触发，30秒扫描，进程内同日同小时只领取一次。沿原启用开关、小时、模型、活跃账号范围、冷却跳过及500ms账号间隔。
+- 每次预热绑定本次目标账号，使用 hi、max_tokens=512、stream=true。`native293` 账号直接向 native 发送普通API形状输入，由CLI完成装配；账号有效画像为280时选280，其余沿既有原生分流进入293。已有旧后端继续原发送合同。
+- native私有信封的目标必须为无查询参数的 `/v1/messages`；旧固定地址末尾的 `?beta=true` 由原生SDK处理。不得将旧完整URL直接复用到拒绝query的私有原生入口。
+- 保持维护、凭据活动和账号占用许可至响应耗尽。native准备与首响应由外层30秒期限约束，sender取得剩余总预算（首响应加读流最多90秒），收到响应后仍按原60秒读流期限处理。
+- OAuth首次401恢复凭据后原账号重试一次，最终401、429、403沿原后台状态联动及失败AT条件写入。后台预热沿原重试、槽位和RPM口径，真实提交不经过 `handle_request` 的重新选号或客户端预热拦截。
+- 结果沿原HTTP状态口径：HTTP成功后耗尽响应；读流错误或超时继续记录原成功语义并写警告，HTTP状态与流终态分别核验。进程准备保持零模型调用，状态归环境页；模型调用结果进入设置页预热记录。
+- 日志错误片段保持原200字符预算；UI完整呈现已有error_message，真实0耗时保留。发送错误使用受控原因，原生能力缺失保持原生失败归属。
+
+### 4. Validation & Error Matrix
+
+| 场景 | 结果 |
+| --- | --- |
+| 关闭、未选小时、非:10、同日同小时重复tick | 本轮零新增模型调用 |
+| 活跃但处于冷却 | 记录skipped及0ms |
+| native能力缺失 | 记录本账号失败，模型发送为零 |
+| OAuth401、最终401/403、429 | 原账号恢复一次或原后台状态联动 |
+| 首响应超时 | 按30秒预算终止等待，记录本次失败 |
+| HTTP200后断流 | 按原成功口径记录，流故障保持可观测 |
+
+### 5. Scenarios and Examples
+
+- 正常：账号画像280，通过280实际CLI发出配置模型的hi请求，日志保留该账号与触发小时。
+- 边界：先准备进程，模型计数保持0；到点后才出现真实模型调用。冷却账号只增加跳过记录。
+- 错误用法：向native信封传旧 `?beta=true` 地址，或只改内存画像便断言测试使用280。正确处理：使用无查询参数的固定私有目标，通过专用画像写入接口准备账号，并从实际TLS请求核对版本。
+
+### 6. Tests Required
+
+- `service::prime_poller::tests`：开关、时点、小时、日期去重、活跃与冷却范围、原401恢复与迟到凭据保护、429/403联动，native能力不足时旧路径发送为0。
+- `scripts/testing/cc2api-native.ts` 的 `CCRB_TEST_PRIME_ONLY=1`：280/293各验证零模型准备、200实际SSE、429/403/401及冷却跳过；额外验证30秒首响应超时与HTTP200后断流，共10次模型请求和12条正式日志。独立核对TLS实收CCH、来源版本、身份、模型、512及stream。
+- `verify_prime_history_ui.py`、Web构建、`cargo fmt --check` 与 `cargo test --locked`；界面呈现见[系统设置记录合同](../../web/frontend/ui-guidelines.md#系统设置表单与草稿)。
+
 ## Common Mistakes
 
 | 反模式 | 风险 | 正确做法 |

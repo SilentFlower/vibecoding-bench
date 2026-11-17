@@ -130,7 +130,9 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - 请求日志模式与请求记录页共享同一设置语义，历史请求的发生时模式保持冻结。
 - messages 缓存断点只显示 off/sub2api；默认“关闭（保留原生布局）”，说明额外改写可按需启用、保存后续请求生效及 TTL 独立。历史非法值在页面归为 off，提交保持字符串；一次性重置及请求冻结沿[原生消息缓存设置](../../gateway/backend/settings-database.md#scenario-原生消息缓存设置与一次性关闭)。
 - 本地保存只提交点击时的快照；保存期间新增编辑继续作为草稿。撤销恢复当前已保存值，原生页面和Vue迁移均应验证相同行为。
-- 预热记录读取原 `PrimeLogEntry`；`success=false`且`error_message`以`skipped:`开头时显示跳过，区别于失败。
+- 预热记录读取原 `PrimeLogEntry`；模型预热展示在设置页，零模型进程准备状态由环境页承接。`success=false`且`error_message`以`skipped:`开头时显示跳过，成功、跳过、失败分别以文字和语义色表达，沿原HTTP成功口径。
+- 预热记录复用Table/Button/Badge/InfoTooltip与`--ui-*`阅读尺寸，完整展示已有error_message与长模型名。桌面保留六列，窄屏将触发时点、模型和耗时并入核心列；0ms保持真实值，刷新保持当前记录，加载与空态分别显示。原生title由可点击及键盘可关闭的信息气泡承接。
+- `verify_prime_history_ui.py`使用真实产物与合成接口，覆盖390/1440/1920/2560px、状态、长字段、完整原因、键盘/触屏、刷新加载、单行空态及零保存；浏览器模型调用为0。
 
 ### 宽屏与操作指针（2026-11-15用户补充）
 
