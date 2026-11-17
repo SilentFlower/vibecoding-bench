@@ -69,7 +69,7 @@ class Handler(BaseHTTPRequestHandler):
         elif 'ordinary-400' in labels:
             self.reply(400, {'error': {'type': 'invalid_request_error', 'message': 'max_tokens invalid'}}, headers)
         elif 'rate-limit' in labels:
-            self.reply(429, {'error': {'type': 'rate_limit_error', 'message': 'synthetic rejection'}}, headers)
+            self.reply(429, {'error': {'type': 'rate_limit_error', 'message': 'synthetic credit rejection'}}, headers)
         elif signed or 'always-signature' in labels:
             self.reply(400, {'error': {'type': 'invalid_request_error', 'message': 'Invalid signature in thinking block'}}, headers)
         else:

@@ -55,6 +55,7 @@ const upstream = Bun.serve({ hostname: '127.0.0.1', port: 0, tls: { key: Bun.fil
     } else if (Array.isArray(node)) pending.push(...node);
   }
   messages.push({ label, device: metadata.device_id, account: metadata.account_uuid, bearer, cache_ttls: cacheTtls, source_version: /claude-cli\/(2\.1\.(?:280|293))/.exec(request.headers.get('user-agent') ?? '')?.[1] ?? '' });
+  if (label.startsWith('gateway-dual-business-')) return Response.json({ type: 'error', error: { type: 'rate_limit_error', message: 'long context requires usage credits' } }, { status: 429, headers: { 'request-id': 'req_real_rate_limit' } });
   if (label?.startsWith('parallel-') || label?.startsWith('gateway-dual-parallel-')) {
     const target = label.startsWith('gateway-dual-parallel-') ? 6 : Number(label.split('-')[1]);
     const key = label.startsWith('gateway-dual-parallel-') ? 'gateway-dual-parallel' : label;
@@ -178,7 +179,8 @@ try {
   };
   const tlsOnly = process.env.CCRB_TEST_TLS_ONLY === '1';
   const benchmarkOnly = process.env.CCRB_TEST_READINESS_BENCH_ONLY === '1';
-  const phases = tlsOnly ? ['native_real_binary'] : benchmarkOnly ? ['native_real_binary'] : (process.env.CCRB_TEST_GATEWAY_ONLY === '1' || process.env.CCRB_TEST_MULTI_VERSION === '1') ? ['native_real_gateway'] : ['native_real_binary', 'native_real_gateway'];
+  const rateLimitOnly = process.env.CCRB_TEST_RATE_LIMIT_ONLY === '1';
+  const phases = tlsOnly ? ['native_real_binary'] : benchmarkOnly ? ['native_real_binary'] : (rateLimitOnly || process.env.CCRB_TEST_GATEWAY_ONLY === '1' || process.env.CCRB_TEST_MULTI_VERSION === '1') ? ['native_real_gateway'] : ['native_real_binary', 'native_real_gateway'];
   let code = 0;
   for (const phase of phases) {
     const child = Bun.spawn(['cargo', 'test', '--locked', '--lib', phase, '--', '--ignored', '--nocapture'], { cwd: resolve(consumer), env: { ...process.env, CCRB_TEST_BINARY: resolve(binary), CCRB_TEST_CAPTURE_DIR: join(root, 'environment/flows/api/cc-prepared'), CCRB_TEST_CA_FILE: ca, CCRB_TEST_PROXY: proxyUrl, CCRB_TEST_CONTROL: control.url.toString(), CCRB_TEST_SENDER_HOST: senderHost, V3_RUNTIME_URL: control.url.toString(), V3_INTERNAL_TOKEN: 'synthetic-private-management-key'.repeat(2), V3_DEPLOYMENT_ID: 'native-offline', V3_RELEASE: 'native-offline' }, stdout: 'inherit', stderr: 'inherit' });
@@ -189,8 +191,8 @@ try {
     assert.equal(code, 0);
   }
   assert.equal(code, 0);
-  assert.equal(messages.length, (process.env.CCRB_TEST_MULTI_VERSION === '1' ? 18 : tlsOnly ? 9 : benchmarkOnly ? 9 : phases.length === 2 ? (process.env.CCRB_TEST_UNLIMITED === '1' ? 25 : 28) : 6) + (process.env.CCRB_TEST_SWITCH_DIGEST ? 3 : 0));
-  if (!benchmarkOnly && !tlsOnly && process.env.CCRB_TEST_MULTI_VERSION !== '1') assert.ok(runningBindingReads >= 3, '启动补偿与凭据轮换均重新核对只读运行绑定');
+  assert.equal(messages.length, (rateLimitOnly ? 4 : process.env.CCRB_TEST_MULTI_VERSION === '1' ? 18 : tlsOnly ? 9 : benchmarkOnly ? 9 : phases.length === 2 ? (process.env.CCRB_TEST_UNLIMITED === '1' ? 25 : 28) : 6) + (process.env.CCRB_TEST_SWITCH_DIGEST ? 3 : 0));
+  if (!rateLimitOnly && !benchmarkOnly && !tlsOnly && process.env.CCRB_TEST_MULTI_VERSION !== '1') assert.ok(runningBindingReads >= 3, '启动补偿与凭据轮换均重新核对只读运行绑定');
   if (phases.length === 2) assert.equal(messages.find(message => message.label === 'rotated')?.bearer, 'Bearer synthetic-bearer-b');
   console.log(JSON.stringify({ messages: messages.length, parallelPeak, processTreePeakRssKiB: peakRssKiB }));
 } finally { upstream.stop(true); control.stop(true); proxy.closeAllConnections(); proxy.close(); socks.close(); await rm(root, { recursive: true, force: true }); }

@@ -48,7 +48,7 @@ src/tlsfp/
 - 创建、编辑、列表、OAuth 默认与表单重置同步后端值。切换进入现有排空门禁；非 V3 同样检查本地活动。状态快捷操作单独保存该字段，避免用旧 Account 快照覆盖凭据。
 - 普通准入、账号选择、凭据解析及加权许可仍由 Gateway 所有。原生分支在 Rust 正文/头部/CCH 重写前接管精确 Messages；保留逻辑 JSON 与 HeaderMap 多值，头值在私有信封中按 Latin-1 字节串传递。
 - 账号 Fast/1M 权限先明确拒绝越权申请；允许时保持原始输入交给二进制。当前 bearer 和受控身份进入工作进程，RT 留在既有凭据所有者。原生池的 Linux x64、身份、封存、预算及回收规则由 [V3 原生 sender](../../orchestrator/backend/account-runtime-v3.md#scenario-v3-原生-sender-共享映像池与资源预算)所有。
-- 每个原生作业最多一次模型提交；Gateway仅在完整收到明确invalid_request_error签名400后，同账号/冻结版本追加一次thinking降级作业。复用legacy既有thinking转text、移除redacted_thinking及根thinking/依赖清理策略；工具历史保持。两次准备与发送共享首次冻结的剩余预算，已耗尽则返回首次400。普通400、429、传输失败及状态不明保持原响应路径；legacy的两阶段signature等既有重试沿原路径。调度submitted记录每次实际内部POST，两次作业各有独立UUID和诊断尝试。
+- 每个原生作业最多一次模型提交；Gateway仅在完整收到明确invalid_request_error签名400后，同账号/冻结版本追加一次thinking降级作业。复用legacy既有thinking转text、移除redacted_thinking及根thinking/依赖清理策略；工具历史保持。两次准备与发送共享首次冻结的剩余预算，已耗尽则返回首次400。普通400、传输失败及状态不明保持原响应路径；明确429由Gateway共用分类决定透传、有限退避或换号，详见下文“Gateway 明确429的共用决策”。legacy的两阶段signature等既有重试沿原路径。调度submitted记录每次实际内部POST，每个作业各有独立UUID和诊断尝试。
 - Gateway仅在上述修复获2xx后学习失效历史；仅按改写前真实会话ID和完整thinking文本/签名前缀做SHA256隔离，新增普通消息或新thinking块仍匹配旧前缀，首发前应用同样降级。同一实际会话更换账号、源版本或模型仍复用该记录，当前请求的修复重试继续限定同账号。会话取正文metadata或合法session头；缺少明确实际会话时只处理本次修复，保持跨请求独立判断。进程内至多4096项、有效期7天，满时淘汰最早到期项；不保存正文或签名原文，失败修复不学习。重启、过期、淘汰、新失效历史或并发首次学习可能重新触发首次400。
 - Gateway逐请求冻结当前cache_control_ttl_rewrite（off/5m/1h），私有TTL策略在checkout前校验。worker_ready能力cache_ttl_rewrite_protocol=1才发送该字段；强制模式遇旧内核返回503且零模型提交，off兼容旧版。策略不参与池身份，修改设置继续复用暖PID；配套内核先激活，再更新平台。旧内核回滚前先关闭强制TTL。
 - 响应流日志按网关根request_id、原生job/attempt UUID、worker/PID关联。本层EOF、body_error、静默超时、下游Drop及IPC/运行时错误分别记录，含持续时间、片段/字节及最后收包间隔。错误链最多八层，仅投影reqwest/hyper/io类型标志及OS代码；运行时原错误只保存SHA与受控code。代理隧道仅记录worker/tunnel UUID及密文流量数字，不能据双向复制收口断言首个关闭方。普通日志禁止异常原文、URL、代理凭据及正文。
@@ -71,7 +71,8 @@ src/tlsfp/
 | 私有期限已过期或剩余超过125秒 | sender在提交前拒绝；原生网关映射为503准备失败，模型零发送 |
 | 固定 293 无法接纳正文版本或参数 | 二进制受控错误，模型零发送 |
 | 提交后断线或状态不明 | 502，保持单次提交语义 |
-| 原生上游状态错误 | 返回本次状态及响应，管理员空闲时显式切回 legacy |
+| 原生上游状态错误（429除外） | 返回本次状态及响应，管理员空闲时显式切回 legacy |
+| 原生明确429 | 依共用分类透传、有限退避或排除当前账号后重新选号 |
 | 明确签名400且正文可修复、预算尚余 | 同账号追加最多一次修复；获2xx后记录历史摘要，续轮命中则首发前修复 |
 | 后台环境缺失/休眠或首次控制面未就绪 | sleeping 或 failed 状态，保持零模型；由后续通知或有界启动补偿恢复 |
 | 准备后账号/凭据/运行代次变化 | 回执失效并取消本次准备，下一轮重新读取当前身份 |
@@ -91,7 +92,7 @@ src/tlsfp/
 
 - `account_backend_defaults_validate_and_obey_busy_gate`、`historical_backend_migration_and_account_updates_are_independent`：默认/非法值/忙门禁/两账号和回退。
 - `native_backend_preserves_account_feature_authorization_without_rewriting`：Fast/1M 权限拒绝且正文保持；前端 `npm run build` 及创建/编辑/reset 链路核对。
-- `tests/native_signature_fixture.py`经真实Gateway及回环sender覆盖280/293首次400→2xx、续轮单发、同一实际会话跨账号/版本/模型复用、正文与头部会话关联、不同/缺失实际会话独立判断、失败不学习、独立诊断尝试、普通400/429/提交未知不重放和预算耗尽；`native_signature_repair`单测覆盖完整思考前缀、不同会话及变更历史隔离、跨模型复用、新建实例重新学习、7天过期及4096项上限。
+- `tests/native_signature_fixture.py`经真实Gateway及回环sender覆盖280/293首次400→2xx、续轮单发、同一实际会话跨账号/版本/模型复用、正文与头部会话关联、不同/缺失实际会话独立判断、失败不学习、独立诊断尝试、普通400/业务透传429/提交未知保持单发和预算耗尽；`native_signature_repair`单测覆盖完整思考前缀、不同会话及变更历史隔离、跨模型复用、新建实例重新学习、7天过期及4096项上限。
 - `native_real_binary`、`native_real_gateway`：实际附件、独立 TLS/CCH、HTTP/SOCKS、多值白名单、工具/thinking、主子会话、单次发送、取消/代次和诊断来源。跨平台备用实现编译验证明确 503。
 - `rejects_wrong_environment_and_arbitrary_target`覆盖回拨1275毫秒、5秒偏差边界/超界、过期及临近截止的剩余预算；`native_real_binary`覆盖暖进程到期后的零业务投递。离线驱动在子阶段断言前保存可选实收摘要，失败报告由合成缺失二进制故障注入核验。
 - `native_real_gateway`：首次只读绑定503后的启动补偿、零模型预热、首次同PID、在途提示后绑定故障仍继续准备、准备完成时换代拒绝、凭据轮换旧PID退出、真实主/子会话映射与观察对应。使用隔离网络及合成 TLS，不触发真实账号模型。
@@ -733,7 +734,7 @@ let Some(model) = item.get("scope").and_then(|scope| scope.get("model")) else {
 ### 3. Contracts
 
 - Gateway 只有在 `path == "/v1/messages"` 时才允许启用 Fable fallback；`count_tokens`、bootstrap、usage poller、PrimePoller 和其它入口必须保持 disabled 语义。
-- Fable 模型只匹配 `claude-fable-5` 或 `claude-fable-5[...]`。不要用包含匹配覆盖其他模型名。
+- Fable 模型按小写化后的 `claude-fable-5`、`claude-fable-5-1` 及各自的 `[...]` 后缀匹配。不要用包含匹配覆盖其他模型名。
 - Fable 周用量达到上限必须同时满足：账号为 `AccountAuthType::Oauth`、`usage_data.seven_day_fable.utilization >= context.fable_weekly_usage_limit_percent`、`resets_at` 是未来 RFC3339 时间。不要复用普通 usage 的 `USAGE_HIT_THRESHOLD = 97.0`。
 - `utilization` 缺失或不是数字、`resets_at` 缺失/非法/已过期时视为未达到上限，避免脏缓存误伤账号。
 - SetupToken 即使缓存里有脏的 `seven_day_fable`，也必须保持旧 sticky 行为。
@@ -1607,3 +1608,51 @@ transport.submit(prepared, body, ttfb_timeout).await
 - `session_policy_block_gateway_stops_upstream_requests`、`session_policy_block_queued_request_rechecks_before_send`、`session_policy_block_v3_send_wait_has_no_attempt`、`session_policy_block_query_failure_is_local_503`：真实本地HTTP/SSE拒答、两后端前置拦截、计数入口、队列/发送复查、零上游调用和零attempt、许可回收及查询故障。
 - 响应观察测试覆盖压缩/分块SSE及完整JSON拒答，断言原字节保留、诊断关闭仍登记。`session_policy_block_admin_contract` 验证鉴权、参数、设置热刷新、历史及SPA入口；版本3迁移用例保留自定义值。
 - `verify_session_policy_blocks_ui.py` 使用真实前端构建的离线fixture，覆盖1440px/390px、服务器时钟、筛选分页、搜索空态、解除取消/失败重试、读取失败保留、设置直达及字符串保存；完整Rust回归、前端build及数据库定义/发行测试通过。
+
+
+## Scenario: Gateway 明确429的共用决策
+
+### 1. Scope / Trigger
+
+- 修改Messages的native分流、429分类、账号切换、临时退避、并发许可或准入截止时适用。所有模型实际收到的上游HTTP429使用相同执行路径，模型范围及分类优先级继续由AccountSelectionContext和AccountService所有。
+
+### 2. Signatures
+
+- AccountService::handle_rate_limit_with_context返回RateLimitDecision::{Quarantined,RetryOtherAccount,RequestBackoff(Duration),PassThrough}。
+- Gateway私有响应扩展RateLimitResponseDecision(Arc<RateLimitDecision>)保留完整决定；该扩展只在进程内使用。
+- GatewayService::prepare_rate_limit_retry(response,account,scheduling,slot_guard,exclude_ids,backoff_retry_ids,last_response) -> Result<Option<Response>,AppError>：Some为立即交付的业务拒绝，None为继续原选号循环，原准入到期返回AdmissionLimited。
+
+### 3. Contracts
+
+- finish_forward_response完成被动额度观察、响应缓冲和分类后，保存完整决定。原有转发与native分支共同执行，不能只传递退避时长而丢失PassThrough。
+- PassThrough返回当前429正文及必要响应头，本次请求结束。该分支不新增容量拒绝反馈，账号全局冷却保持原分类合同。
+- Quarantined与RetryOtherAccount排除本次账号，释放槽位/凭据活动，保留末次429后重新选号。前者已写入账号冷却，后者保持模型级范围；实际绑定、Token allow/block、Fable门禁及容量规则继续由原选择器与claim/admit裁决。
+- RequestBackoff复用原账号软退避，默认10秒，同账号每请求最多一次该类退避重试；再次命中按原规则进入排除分支。等待前释放槽位和凭据活动，V3等待受原SchedulingRequest绝对截止限制，重试不延长预算。
+- 选号失败时，已有末次429按原有优先级返回；准入超时和已存在认证排除等分支保持原优先级。分类调用失败仍使用原有排除/末次响应兜底，不伪造业务分类。
+- 每次实际提交建立独立job/attempt，身份按当次目标账号重建。签名修复返回的429同样进入共用执行；绑定CAS竞争按原循环重新选号。未知提交、断线、普通400及已交付输出各自保持原错误边界。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 明确429且分类为PassThrough | 返回该次429及正文，本次拒绝之后追加提交为0 |
+| 账号容量拒绝 | 原分类写入冷却，排除后尝试合格候选 |
+| Fable模型级拒绝 | 换本次账号，保持模型级状态边界 |
+| 临时拒绝 | 同号有限退避重试，等待期间槽位为0 |
+| 原1秒准入预算遇10秒退避 | 原期限到达后返回本地429，模型仅提交首次 |
+| 退避期间下游取消 | 等待计数及槽位归还，停止后续提交 |
+| 候选耗尽或Token仅允许原账号 | 保留并返回末次429，范围外账号发送为0 |
+| 提交状态未知 | 原502路径，保持本次提交边界 |
+
+### 5. Scenarios and Examples
+
+- 正常：native A明确容量429后选择B成功，两次attempt的账号身份、源版本和请求UUID分别对应。后续相同会话继续由B承载。
+- 边界：Fable周用量已达到设置阈值，首次选号直接使用合格备选；原账号未被本轮发送。
+- 错误用法：只把RequestBackoff写入扩展，其余429一律换号。正确处理是传递完整分类，并让PassThrough立即返回。
+- 错误用法：先持有并发槽位等待10秒，或为重试创建新准入期限。正确处理是先归还许可，再用原SchedulingRequest等待。
+
+### 6. Tests Required
+
+- business_rate_limit_passthrough_preserves_response_without_switching：原有直连和V3调度入口均只发送一次，保留429正文/request-id，账号冷却和槽位符合原规则。
+- tests/native_rate_limit_fixture.py驱动native_rate_limit_gateway_roundtrip：280/293两版、21组场景覆盖容量/Fable/业务429、额度预过滤、Token范围、候选耗尽、签名修复后429、未知提交、1秒期限、退避取消与10秒同号重试；核对实际提交顺序、目标身份、诊断、绑定与槽位。
+- CCRB_TEST_RATE_LIMIT_ONLY=1运行scripts/testing/cc2api-native.ts：使用登记的280/293实际执行体，普通API与完整原生输入各一次业务429，共四次TLS实收；独立核验CCH，保留request-id及正文，单次attempt且无账号冷却。

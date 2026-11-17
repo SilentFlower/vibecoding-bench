@@ -283,10 +283,9 @@ fn upstream_request_client(account: &Account) -> Result<reqwest::Client, AppErro
     })
 }
 
-#[derive(Clone, Copy)]
-struct RateLimitResponseDecision {
-    delay: std::time::Duration,
-}
+/// 保存完整分类，确保业务透传决定也能到达外层重试循环。
+#[derive(Clone)]
+struct RateLimitResponseDecision(Arc<RateLimitDecision>);
 
 struct GatewayAccountAdmission {
     permit: AccountSlotPermit,
@@ -2474,7 +2473,7 @@ impl GatewayService {
                     .collect();
                 let usage_started_at = Utc::now();
                 let started = std::time::Instant::now();
-                let response = self
+                let response = match self
                     .forward_native_messages(
                         &account,
                         source_version,
@@ -2487,7 +2486,29 @@ impl GatewayService {
                         scheduling_request.as_ref(),
                         should_bind_session,
                     )
-                    .await?;
+                    .await
+                {
+                    Ok(response) => response,
+                    Err(AppError::SchedulingConflict) => continue,
+                    Err(error) => return Err(error),
+                };
+                if response.status() == StatusCode::TOO_MANY_REQUESTS {
+                    if let Some(response) = self
+                        .prepare_rate_limit_retry(
+                            response,
+                            &account,
+                            scheduling_request.as_ref(),
+                            slot_guard,
+                            &mut exclude_ids,
+                            &mut backoff_retry_ids,
+                            &mut last_resp,
+                        )
+                        .await?
+                    {
+                        return Ok(response);
+                    }
+                    continue;
+                }
                 let status = response.status().as_u16();
                 let usage = response.status().is_success().then(|| {
                     UsageCapture::new(
@@ -3065,37 +3086,75 @@ impl GatewayService {
                     .await;
             }
 
-            if let Some(decision) = resp.extensions().get::<RateLimitResponseDecision>() {
-                self.account_svc
-                    .set_transient_rate_limit_backoff(account.id, decision.delay)
-                    .await;
-                if !backoff_retry_ids.contains(&account.id) {
-                    warn!(
-                        "account {} returned transient 429, applying {}s soft backoff before retrying request",
-                        account.id,
-                        decision.delay.as_secs()
-                    );
-                    backoff_retry_ids.push(account.id);
-                    diagnostics::retry_reason("transient_rate_limit");
-                    drop(slot_guard); // 等待期间不占用账号并发槽位
-                    self.account_svc
-                        .wait_transient_rate_limit_backoff(&account)
-                        .await;
-                    continue;
-                }
+            if let Some(response) = self
+                .prepare_rate_limit_retry(
+                    resp,
+                    &account,
+                    scheduling_request.as_ref(),
+                    slot_guard,
+                    &mut exclude_ids,
+                    &mut backoff_retry_ids,
+                    &mut last_resp,
+                )
+                .await?
+            {
+                return Ok(response);
             }
-
-            // 429：guard drop 会归还槽位 permit，排除该账号，尝试下一个
-            warn!(
-                "account {} returned 429, excluding and retrying (attempt {})",
-                account.id,
-                attempt + 1,
-            );
-            exclude_ids.push(account.id);
-            drop(slot_guard); // 显式 drop → permit drop → 归还槽位
-            diagnostics::retry_reason("account_rate_limit");
-            last_resp = Some(resp);
         }
+    }
+
+    /// 两种发送路径共用明确429的后续动作，保留原请求期限及末次拒绝。
+    /// @param response 已缓冲并完成分类的上游429。
+    /// @param account 本次实际发送账号。
+    /// @param scheduling 原请求的准入及绑定上下文。
+    /// @param slot_guard 当前槽位及凭据活动，等待或换号前释放。
+    /// @param exclude_ids 本轮已经排除的账号。
+    /// @param backoff_retry_ids 已经执行过一次临时退避重试的账号。
+    /// @param last_response 换号后候选耗尽时保留的末次429。
+    /// @return 业务类拒绝返回响应；完成重试准备返回None；超出原期限返回错误。
+    async fn prepare_rate_limit_retry(
+        &self,
+        response: Response,
+        account: &Account,
+        scheduling: Option<&SchedulingRequest>,
+        slot_guard: SlotReleaseGuard,
+        exclude_ids: &mut Vec<i64>,
+        backoff_retry_ids: &mut Vec<i64>,
+        last_response: &mut Option<Response>,
+    ) -> Result<Option<Response>, AppError> {
+        let decision = response
+            .extensions()
+            .get::<RateLimitResponseDecision>()
+            .map(|decision| decision.0.as_ref());
+        if matches!(decision, Some(RateLimitDecision::PassThrough)) {
+            return Ok(Some(response));
+        }
+        if let Some(RateLimitDecision::RequestBackoff(delay)) = decision {
+            self.account_svc
+                .set_transient_rate_limit_backoff(account.id, *delay)
+                .await;
+            if !backoff_retry_ids.contains(&account.id) {
+                backoff_retry_ids.push(account.id);
+                diagnostics::retry_reason("transient_rate_limit");
+                // 退避与下一轮准备共用原截止，等待期间归还槽位及凭据活动。
+                drop(slot_guard);
+                await_preparation(
+                    scheduling,
+                    self.account_svc.wait_transient_rate_limit_backoff(account),
+                )
+                .await?;
+                return Ok(None);
+            }
+        }
+        warn!(
+            "account {} returned 429, excluding and retrying",
+            account.id,
+        );
+        exclude_ids.push(account.id);
+        drop(slot_guard);
+        diagnostics::retry_reason("account_rate_limit");
+        *last_response = Some(response);
+        Ok(None)
     }
 
     /// 对 `/v1/messages` 的 signature 相关 400 执行两阶段降级重试。
@@ -3493,10 +3552,10 @@ impl GatewayService {
             let mut response = rb
                 .body(Body::from(downstream_body))
                 .map_err(|e| AppError::Internal(format!("build 429 response: {}", e)))?;
-            if let Some(RateLimitDecision::RequestBackoff(delay)) = rate_limit_decision {
+            if let Some(decision) = rate_limit_decision {
                 response
                     .extensions_mut()
-                    .insert(RateLimitResponseDecision { delay });
+                    .insert(RateLimitResponseDecision(Arc::new(decision)));
             }
             return Ok(response);
         }
@@ -8661,6 +8720,8 @@ impl Drop for SlotGuardBody {
 
 #[cfg(test)]
 mod tests {
+    include!("gateway_rate_limit_tests.rs");
+
     use super::{map_native_session, native_pool_session, validate_native_account_features};
 
     use super::{
@@ -9960,6 +10021,14 @@ mod tests {
             )
                 .into_response();
         }
+        if authorization == "Bearer setup-business-rejection" {
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                [("request-id", "req_business_rejection")],
+                Json(json!({"type":"error","error":{"type":"rate_limit_error","message":"long context requires usage credits"}})),
+            )
+                .into_response();
+        }
 
         (
             StatusCode::OK,
@@ -10557,6 +10626,68 @@ mod tests {
         assert_eq!(betas[0].1, "oauth-2025-04-20,context-1m-2025-08-07");
     }
 
+    /// 业务类429直接返回本次拒绝，两个调度入口均保持单次发送及原响应。
+    /// @return 无；换号、响应丢失或并发槽未归还时失败。
+    #[tokio::test]
+    async fn business_rate_limit_passthrough_preserves_response_without_switching() {
+        for scheduling in [false, true] {
+            let (base, state, server) = spawn_auth_mock_server().await;
+            let (service, _) = test_gateway_service_with_scheduling(
+                Arc::new(MemoryStore::new()),
+                base,
+                String::new(),
+                scheduling,
+            )
+            .await;
+            let account = create_setup_gateway_account(
+                &service,
+                "business-rejection@example.invalid",
+                "setup-business-rejection",
+                10,
+            )
+            .await;
+            create_setup_gateway_account(
+                &service,
+                "business-backup@example.invalid",
+                "setup-good",
+                20,
+            )
+            .await;
+            let response = service.handle_request(messages_request(), None).await;
+            assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+            assert_eq!(response.headers()["request-id"], "req_business_rejection");
+            let body = body::to_bytes(response.into_body(), 8192).await.unwrap();
+            let value: Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(
+                value["error"]["message"],
+                "long context requires usage credits"
+            );
+            assert_eq!(state.requests.lock().await.len(), 1);
+            assert_eq!(
+                state.authorization_headers.lock().await.as_slice(),
+                ["Bearer setup-business-rejection"]
+            );
+            assert_eq!(
+                service
+                    .account_svc
+                    .get_account_capacity_info(&account)
+                    .await
+                    .current_concurrency_units,
+                0
+            );
+            assert!(
+                service
+                    .account_svc
+                    .get_account(account.id)
+                    .await
+                    .unwrap()
+                    .rate_limit_reset_at
+                    .is_none()
+            );
+            server.abort();
+        }
+    }
+
     /// 真实网关经回环sender完成首次400修复、续轮预处理和错误隔离，诊断记录实际发送次数。
     /// @return 无；多发、换号、错误缓存或重试归属异常时失败。
     #[tokio::test]
@@ -10888,6 +11019,67 @@ mod tests {
         };
         let control = var("CCRB_TEST_CONTROL").unwrap();
         let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        if var("CCRB_TEST_RATE_LIMIT_ONLY").as_deref() == Ok("1") {
+            for version in ["2.1.280", "2.1.293"] {
+                for native in [false, true] {
+                    let label = format!(
+                        "gateway-dual-business-{}-{native}",
+                        version.replace('.', "")
+                    );
+                    let mut body = json!({"model":"claude-sonnet-4-6","max_tokens":128,"stream":false,
+                        "messages":[{"role":"user","content":label}]});
+                    if native {
+                        body["system"] = json!([{"type":"text","text":format!("x-anthropic-billing-header: cc_version={version}.abc; cc_entrypoint=cli; cch=12345;")}]);
+                        body["metadata"] = json!({"user_id":json!({"device_id":"c".repeat(64),"account_uuid":"",
+                            "session_id":Uuid::new_v4().to_string()}).to_string()});
+                    }
+                    let mut value = request(body);
+                    value.headers_mut().insert(
+                        "user-agent",
+                        HeaderValue::from_str(&format!("claude-cli/{version} (external, cli)"))
+                            .unwrap(),
+                    );
+                    let response = service.handle_request(value, None).await;
+                    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+                    assert_eq!(response.headers()["request-id"], "req_real_rate_limit");
+                    let id = response.headers()["x-cc2api-request-id"]
+                        .to_str()
+                        .unwrap()
+                        .to_string();
+                    let bytes = body::to_bytes(response.into_body(), 8192).await.unwrap();
+                    let body: Value = serde_json::from_slice(&bytes).unwrap();
+                    assert_eq!(
+                        body["error"]["message"],
+                        "long context requires usage credits"
+                    );
+                    let diagnostics = service.diagnostics_store().unwrap();
+                    diagnostics.flush().await.unwrap();
+                    let detail = diagnostics.detail(&id).await.unwrap();
+                    assert_eq!(detail.request.attempt_count, 1);
+                    assert_eq!(detail.attempts[0].profile_version, version);
+                    assert_eq!(detail.attempts[0].status_code, Some(429));
+                    assert!(
+                        store
+                            .get_by_id(account.id)
+                            .await
+                            .unwrap()
+                            .rate_limit_reset_at
+                            .is_none()
+                    );
+                    assert_eq!(
+                        service
+                            .account_svc
+                            .get_account_capacity_info(&account)
+                            .await
+                            .current_concurrency_units,
+                        0
+                    );
+                }
+            }
+            sender.abort();
+            let _ = fs::remove_dir_all(root);
+            return;
+        }
         if var("CCRB_TEST_MULTI_VERSION").as_deref() == Ok("1") {
             use futures_util::future::join_all;
             let make = |version: &str, label: &str, native: bool, haiku: bool| {
