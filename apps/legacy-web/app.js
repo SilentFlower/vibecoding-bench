@@ -99,8 +99,7 @@ const state = {
   cliSettings: null,
   workCapture: null,
   environmentUI: {rows: [], query: '', status: 'all', expanded: new Set(), pending: new Set(),
-    feedback: new Map(), kernelReleases: new Map(), checkingReleases: new Set(), request: 0, timer: null, loaded: false},
-  kernelDialog: null,
+    feedback: new Map(), request: 0, timer: null, loaded: false},
   captureDialog: null,
 };
 
@@ -2832,7 +2831,6 @@ function openModal(sel) { const modal=$(sel);if(modal.classList.contains('hidden
 function closeModal(sel) {
   if(sel==='#runtime-confirm-modal'&&runtimeConfirmation){const pending=runtimeConfirmation;runtimeConfirmation=null;pending.resolve(false);}
   if (sel === '#environment-workspace') return closeEnvironmentWorkspace();
-  if (sel === '#native-kernel-modal') return closeNativeKernelDialog();
   if (sel === '#cpu-resource-modal') return closeCpuResourceDialog();
   if (sel === '#content-capture-modal') return closeContentCaptureDialog();
   if(sel==='#runtime-settings-modal'&&state.runtimeSettingsSaving?.generation===state.viewGeneration)return false;

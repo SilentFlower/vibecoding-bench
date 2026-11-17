@@ -13,7 +13,7 @@ from cpu_resources import default_cpu_limits, read_policy as read_cpu_policy
 
 from account_update_identity import configured_release, image_origin, role_release, save_image_origin
 
-from native_kernel_upgrade import applied_kernel, release_key
+from native_kernel_upgrade import migrate_records
 from native_capture_policy import capture_enabled
 from native_criu_policy import restore_policy
 from resource_budget import isolated_account_limits, scenario_account_limits
@@ -84,22 +84,8 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     root = runtime._root(row)
     fingerprint = json.loads(row['fingerprint_json'])
     native = account.get('native_sender')
-    kernel_key = release_key() if native else ''
     if native:
-        for source_version in ('2.1.293', '2.1.280'):
-            saved = applied_kernel(root, int(account.get('cc2api_account_id') or 0), source_version)
-            if not saved:
-                continue
-            if saved.get('current') and not kernel_key:
-                raise ValueError('已生效内核仍依赖发行信任根，请先回滚')
-            update = {'release': saved.get('current'), 'kernel_generation': saved.get('kernel_generation')}
-            selected = native.get('runtimes', {}).get(source_version)
-            if selected is not None:
-                native = {**native, 'runtimes': {**native['runtimes'], source_version: {**selected, **update}}}
-            elif source_version == '2.1.293':
-                native = {**native, **update}
-            else:
-                raise ValueError('当前镜像缺少已生效280内核的安装合同')
+        migrate_records(root, int(account.get('cc2api_account_id') or 0), reconciled=account.get('native_migration') is True)
     limits = isolated_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'),
         ('unlimited' if native['memory_mib'] == 0 else str(native['memory_mib']) + 'm') if native else None)
     layout_path = root / 'runtime/project-review-layout.json'
@@ -258,10 +244,6 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
         sender_mounts = mounts([*common_files, ('runtime/sender', '/run/v3', 'ro'), ('flows/api', '/flows/api', 'rw'), ('runtime/native', '/native', 'rw')])
         sender_env = {'V3_SENDER_CONFIG': '/run/v3/sender.json', 'TOKIO_WORKER_THREADS': '2'}
         sender_env['CCRB_CRIU_REASON'] = restore['reason'] or ''
-        if kernel_key:
-            _directory(runtime.data / 'native-releases', mode=0o755)
-            sender_mounts[str(runtime.host_data / 'native-releases')] = {'bind': '/runtime-releases', 'mode': 'ro'}
-            sender_env['V3_NATIVE_RELEASE_PUBLIC_KEY'] = kernel_key
         verification = root / 'runtime/verification-ca.der'
         if verification.is_file():
             # 父目录按只读挂载，runc 不能在其中创建嵌套 bind 的目标文件。

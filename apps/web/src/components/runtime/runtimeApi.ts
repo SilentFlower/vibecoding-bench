@@ -21,15 +21,14 @@ export interface EnvironmentFeature {
 }
 /** 签名内核分发的公开身份。 */
 export interface KernelReference { release: string; launcher_sha256: string }
-/** 持久内核操作状态。 */
+/** 平台配套内核的只读身份；实际进程沿准备观察展示。 */
 export interface EnvironmentKernel {
+  management?: 'platform'; platform_release?: string | null;
   source_version?: '2.1.280' | '2.1.293';
   state: string; revision: string; current?: KernelReference | null; prepared?: KernelReference | null;
   previous?: KernelReference | null; builtin?: KernelReference | null; error?: string | null; pid?: number;
   image_sha256?: string; warmup?: unknown;
 }
-/** 内核版本发现结果。 */
-export interface KernelReleases { state: string; latest?: string; versions?: { release: string }[] }
 /** 某一源版本的实际准备观察，版本集合保持独立归属。 */
 export interface NativePreparationSnapshot {
   state: string; reason?: string; checking?: boolean; idle_workers?: number; live_workers?: number;

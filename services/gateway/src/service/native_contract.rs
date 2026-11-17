@@ -59,7 +59,7 @@ impl NativeSourceVersion {
     }
 }
 
-/// 受信编排端为单版冻结的安装与发行身份。
+/// 编排端为单版冻结的安装路径及历史兼容字段。
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct NativeRuntimeConfig {
@@ -70,7 +70,7 @@ pub struct NativeRuntimeConfig {
     pub kernel_generation: Option<String>,
 }
 
-/// 只读发布目录中的精确制品引用。
+/// 兼容历史发行引用；执行身份统一由平台内置清单决定。
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct NativeReleaseRef {
@@ -203,24 +203,6 @@ pub struct NativeReadinessStatus {
     pub restore: Option<Value>,
 }
 
-/// 仅由受信切换协调器指定的预期版本和操作代次。
-#[derive(Clone, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct NativeKernelTarget {
-    #[serde(default, skip_serializing_if = "NativeSourceVersion::is_default")]
-    pub source_version: NativeSourceVersion,
-    pub release: Option<NativeReleaseRef>,
-    pub kernel_generation: String,
-}
-
-/// sender 的专用零模型切换预热信封。
-#[derive(Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct NativeKernelPreparation {
-    pub target: NativeKernelTarget,
-    pub identity: NativePreparation,
-}
-
 impl NativeSenderConfig {
     /// 校验当前平台、资源模式及已登记分发体。
     /// @return 保持打开的精确执行文件，或明确的准备错误。
@@ -237,19 +219,16 @@ mod tests {
     /// 293历史合同保持原报文，280显式携带版本，未知值拒绝。@return 无。
     #[test]
     fn native_source_version_preserves_legacy_wire_contract() {
-        let original = json!({"release": null, "kernel_generation": "synthetic"});
-        let mut target: NativeKernelTarget = serde_json::from_value(original.clone()).unwrap();
-        assert_eq!(target.source_version, NativeSourceVersion::Cc293);
-        assert_eq!(serde_json::to_value(&target).unwrap(), original);
-        target.source_version = NativeSourceVersion::Cc280;
+        let original = json!({"binary_path":"/usr/local/bin/ccrb-runtime","work_root":"/native",
+            "memory_mib":0,"max_workers":6});
+        let mut config: NativeSenderConfig = serde_json::from_value(original.clone()).unwrap();
+        assert_eq!(config.source_version, NativeSourceVersion::Cc293);
+        assert_eq!(serde_json::to_value(&config).unwrap(), original);
+        config.source_version = NativeSourceVersion::Cc280;
         assert_eq!(
-            serde_json::to_value(&target).unwrap()["source_version"],
+            serde_json::to_value(&config).unwrap()["source_version"],
             "2.1.280"
         );
-        assert!(
-            serde_json::from_value::<NativeKernelTarget>(json!({"release":null,
-            "kernel_generation":"synthetic","source_version":"2.1.281"}))
-            .is_err()
-        );
+        assert!(serde_json::from_value::<NativeSourceVersion>(json!("2.1.281")).is_err());
     }
 }

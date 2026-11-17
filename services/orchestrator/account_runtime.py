@@ -36,9 +36,9 @@ from process_metrics import PROCESS_SOURCE, merge_process_metrics, validate_proc
 from physical_features import MAX_SNAPSHOT_BYTES, PHYSICAL_FEATURES_PROBE, validate_features
 from project_runtime_policy import ProjectRuntimeError, check_python_runtime
 from resource_budget import account_limits, default_account_memory, isolated_account_limits
-from native_kernel_upgrade import pending_upgrade, recover_interrupted
+from native_kernel_upgrade import archive_binding_records, migrate_records, migration_context, pending_upgrade, recover_interrupted, reconcile_legacy, validate_records
 from native_criu_policy import restore_policy
-from native_sender import installed_versions, native_resource_layout, prewarm_account_id, sender_config
+from native_sender import builtin_config, installed_versions, native_resource_layout, prewarm_account_id, sender_config
 from native_capture import cleanup_captures
 from native_capture_policy import capture_enabled
 from runtime_diagnostics import NetworkContextError, network_failure
@@ -631,7 +631,7 @@ class AccountRuntime:
                allow_login_recovery: bool = False, preserve_proxy: bool = False,
                scenario_resources: bool = False, ownership_source: str | None = None,
                require_quota_mount: bool = True, startup_prewarm: bool = False,
-               prepare_sender: bool = True) -> tuple[dict, object]:
+               prepare_sender: bool = True, native_migration: bool = False) -> tuple[dict, object]:
         """创建或唤醒固定环境，沿用首次固化参数。
 
         :param account: bench 账号或登录草稿
@@ -644,6 +644,7 @@ class AccountRuntime:
         :param require_quota_mount: 是否要求补齐额度挂载；仅独立 API 传输准备可跳过明确缺失
         :param startup_prewarm: 后台启动只使用空余容量，且不重建现有容器
         :param prepare_sender: API 准备目标发送器；CLI/管理操作只使用已生效布局
+        :param native_migration: 仅环境对账在原维护租约中恢复内置布局。
         :return: 环境记录与 Docker container
         """
         with self._account_lock(account):
@@ -675,8 +676,14 @@ class AccountRuntime:
             root = self._root(row)
             if (root / "runtime/credential-handoff.json").exists():
                 raise ValueError("解绑凭据交接尚未完成，请再次解绑完成交接")
-            if startup_prewarm and pending_upgrade(root):
-                raise RuntimeBusy("账号内核维护中，跳过后台预启动")
+            if native_migration and not migration_context(root, row, account.get('cc2api_account_id')):
+                raise ValueError('内置内核迁移上下文已变化')
+            if pending_upgrade(root) and not native_migration:
+                if startup_prewarm:
+                    raise RuntimeBusy("账号内核维护中，跳过后台预启动")
+                raise ValueError('历史内核维护待环境对账')
+            if account.get('cc2api_account_id') and gateway_configuration.get('request_backend') == 'native293':
+                validate_records(root, account['cc2api_account_id'], reconciled=native_migration)
             if self.reviews.serial_state(row):
                 # 发送器仍可服务 API；任何 CLI 准备均须等原评审完成资源交接。
                 if version is not None:
@@ -702,10 +709,10 @@ class AccountRuntime:
             self._apply_unlimited_memory(row, image, startup_prewarm=startup_prewarm)
             fingerprint = json.loads(row["fingerprint_json"])
             native = (sender_config(gateway_configuration, fingerprint["mem"], fingerprint.get("swap", "0"), versions=installed_versions(image_labels))
-                if prepare_sender else self._applied_native_sender(row))
+                if prepare_sender else builtin_config(self._applied_native_sender(row), installed_versions(image_labels)))
             if startup_prewarm and (not native or self.stopping.is_set() or row["state"] not in ("ready", "stopped")):
                 raise RuntimeBusy("账号环境当前不接受预启动")
-            account = {**account, "native_sender": native}
+            account = {**account, "native_sender": native, "native_migration": native_migration}
             if native and image_labels.get("vibebench.native-runtime") != "293-raw-1":
                 raise ValueError("账号镜像缺少固定 293 原生能力")
             configuration = None
@@ -739,7 +746,7 @@ class AccountRuntime:
                         # 内核选择属于 sender 进程代次；只有部署预算及路径变化才要求重建角色。
                         actual_native = native_resource_layout(actual_native)
                     restore = restore_policy(native, fingerprint, image_labels.get('vibebench.native-criu') == '1')
-                    if prepare_sender and (actual_native != native
+                    if (prepare_sender or not any(current.status == 'running' for current in containers.values())) and (actual_native != native
                             or bool(configuration.get('native_criu_enabled')) != restore['eligible']
                             or configuration.get("native_capture_dir") != ("/flows/api/cc-prepared" if native and capture_enabled(fingerprint) else None)):
                         if startup_prewarm:
@@ -815,10 +822,12 @@ class AccountRuntime:
                             self._update(row, state="reconcile")
                             raise ValueError("账号发送器尚未就绪") from None
                         time.sleep(0.1)
+                if configuration is None:
+                    if native and image_labels.get('vibebench.native-platform-managed') == '1':
+                        self.verify_native_installations(row, installed_versions(image_labels))
+                    configuration = _read_json(self._sender_config(row))
                 if row["state"] != "cli_reconcile":
                     self._update(row, state="ready")
-                if configuration is None:
-                    configuration = _read_json(self._sender_config(row))
                 adaptive = bool(native and account.get("cc2api_account_id") == self.native_prewarm_account_id)
                 if prepare_sender and configuration.get("native_adaptive_prewarm", False) != adaptive:
                     configuration["native_adaptive_prewarm"] = adaptive
@@ -1298,6 +1307,29 @@ class AccountRuntime:
             raise ValueError("API 证据写入异常，账号环境需要维护")
         return int(value["active"])
 
+    def verify_native_installations(self, row: dict, versions: tuple[str, ...]) -> None:
+        """在维护重建结束前核验完整安装表及发送器的固定制品。
+
+        :param row: 当前已启动的环境身份与代次。
+        :param versions: 目标镜像声明的官方版本集合。
+        :return: None；任一版缺失或固定摘要核验失败时拒绝完成重建。
+        """
+        config = _read_json(self._sender_config(row))
+        if config.get('native') != builtin_config(config.get('native'), versions):
+            raise ValueError('目标内核安装登记尚未完整迁移')
+        binding = config['binding']
+        request = urllib.request.Request(binding['endpoint'] + '/internal/native/status',
+            headers={'Authorization': 'Bearer ' + binding['secret']})
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(request, timeout=30) as response:
+            value = json.loads(response.read(65537))
+        if value.get('environment_id') != row['environment_id'] or value.get('generation') != row['generation']:
+            raise ValueError('内核安装核验回执代次不一致')
+        installed = value.get('versions', {})
+        if any(not isinstance(installed.get(version), dict) or installed[version].get('available') is not True
+                or installed[version].get('version') != version for version in versions):
+            raise ValueError('目标镜像内核制品尚未通过发送器固定身份核验')
+
     def _running_sender_active(self, row: dict) -> int:
         if not row.get("sender_container_id" if row.get("isolation_version") == ISOLATION_VERSION else "container_id"):
             return 0
@@ -1321,6 +1353,9 @@ class AccountRuntime:
             row = self._row(account["name"], account["id"])
             if self.environment_jobs(row["environment_id"]):
                 raise ValueError("账号环境正在执行工作，不能切换绑定")
+            if pending_upgrade(self._root(row)):
+                raise ValueError('历史内核维护待环境对账')
+            validate_records(self._root(row), account.get('cc2api_account_id'))
             handoff = self._root(row) / "runtime/credential-handoff.json"
             profile = self.data / "profiles" / account["name"] / ".credentials.json"
             take_ownership = handoff_credentials and account.get("cc2api_account_id") is not None and target_id is None
@@ -1367,6 +1402,7 @@ class AccountRuntime:
                 self._stop_environment(row)
                 # 已解析的旧 API 请求只能遇到停止的实例；下一唤醒轮换秘密和代次。
                 self._update(row, state="stopped")
+                archive_binding_records(self._root(row), account.get('cc2api_account_id'))
                 if local_credentials is not None and not handoff.exists():
                     # 先持久化无令牌意图，再提交 DB；跨文件失败可由重复解绑接着完成。
                     atomic_json(handoff, {"schema": 1, "account_id": account["id"],
@@ -3034,7 +3070,12 @@ class AccountRuntime:
             finally:
                 connection.close()
             if pending_upgrade(self._root(row)):
-                raise ValueError("请求内核升级待对账，请在内核面板恢复")
+                if operation != 'reconcile' or not account:
+                    raise ValueError('历史内核维护待环境对账')
+                reconcile_legacy(self, row, dict(account))
+                return
+            if account and account['cc2api_account_id']:
+                validate_records(self._root(row), account['cc2api_account_id'])
             account = dict(account) if account else {"name": row["name"]}
             if operation == "reprofile":
                 blocker = self.reprofile_blocker(row)
@@ -3294,6 +3335,40 @@ class AccountRuntime:
             "email": email.strip(), "environment_id": row["environment_id"], "cli_version": version,
             "canonical_process": process}
 
+    def _migrate_stopped_native(self, row: dict) -> None:
+        # 停止环境只收口文件选择；下次唤醒时按目标镜像补齐安装表。
+        if row['state'] != 'stopped' or self.environment_jobs(row['environment_id']) or self._execution_records(row):
+            return
+        root = self._root(row)
+        if (root / 'runtime/execution.json').exists():
+            return
+        with self.database() as connection:
+            account = connection.execute('SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL', (row['account_id'],)).fetchone()
+            if not account or not account['cc2api_account_id']:
+                return
+            account_id = account['cc2api_account_id']
+            count = connection.execute('SELECT COUNT(*) FROM accounts WHERE cc2api_account_id=? AND deleted_at IS NULL', (account_id,)).fetchone()[0]
+        if count != 1:
+            raise ValueError('停止环境的历史内核选择缺少唯一账号绑定')
+        for role, column in ROLE_COLUMNS.items():
+            if row.get(column):
+                container = role_container(self, row, role, allow_old_release=True)
+                container.reload()
+                if container.status == 'running':
+                    return
+        snapshot = self.gateway._request('GET', f'/admin/runtime/accounts/{account_id}/lease')
+        if any(snapshot.get(key) for key in ('active', 'waiting', 'lease', 'holders')):
+            return
+        migrate_records(root, account_id)
+        path = self._sender_config(row)
+        if path.is_file():
+            config = _read_json(path)
+            native = config.get('native')
+            if isinstance(native, dict):
+                config['native'] = native_resource_layout(native)
+                if config['native'] != native:
+                    self._write_sender_config(row, config)
+
     def reconcile(self, environment_id: str | None = None) -> None:
         """启动时按持久模式收口遗留执行，共享 CLI 保留独立 API。
 
@@ -3312,6 +3387,11 @@ class AccountRuntime:
                 if environment_id is None and recover_interrupted(self._root(row)):
                     continue
                 if pending_upgrade(self._root(row)):
+                    continue
+                try:
+                    self._migrate_stopped_native(row)
+                except (OSError, ValueError, DockerException):
+                    self._update(row, state='reconcile')
                     continue
             record = self._root(row) / "runtime" / "execution.json"
             shared = row["state"] == "cli_reconcile"

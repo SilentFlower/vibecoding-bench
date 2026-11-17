@@ -320,22 +320,6 @@
     </div>
   </div>
 
-  <div class="modal hidden" id="native-kernel-modal" role="dialog" aria-modal="true" aria-labelledby="native-kernel-title">
-    <div class="modal-card modal-card-sm">
-      <div class="modal-titlebar">
-        <span class="modal-titlebar-name" id="native-kernel-title">请求内核</span>
-        <button type="button" class="modal-close" data-close="#native-kernel-modal" aria-label="关闭内核操作"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button>
-      </div>
-      <form id="native-kernel-form" class="form">
-        <p id="native-kernel-description"></p>
-        <dl class="env-operation-summary"><dt>账号</dt><dd id="native-kernel-account"></dd><dt>当前版本</dt><dd id="native-kernel-current"></dd><dt>操作目标</dt><dd id="native-kernel-target"></dd></dl>
-        <label id="native-kernel-release-field"><span class="lbl">已发布版本</span><select name="release" required aria-label="选择已发布的请求内核版本"><option value="">正在读取版本…</option></select></label>
-        <p id="native-kernel-feedback" class="env-error" role="status" aria-live="polite"></p>
-        <div class="row-end"><button type="button" class="btn" data-close="#native-kernel-modal">取消</button><button type="submit" class="btn btn-primary">确认操作</button></div>
-      </form>
-    </div>
-  </div>
-
   <div class="modal hidden" id="content-capture-modal" role="dialog" aria-modal="true" aria-labelledby="content-capture-title">
     <div class="modal-card modal-card-sm">
       <div class="modal-titlebar"><span class="modal-titlebar-name" id="content-capture-title">请求内容采集</span><button type="button" class="modal-close" data-close="#content-capture-modal" aria-label="关闭采集配置"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button></div>
@@ -630,7 +614,7 @@
   <div id="runtime-toast" class="runtime-toast hidden" role="status" aria-live="polite"><span id="runtime-toast-message"></span><button type="button" id="runtime-toast-close" aria-label="关闭消息">×</button></div>
   <script src="ui-controls.js?v=20261116-workspace-experience"></script>
   <script src="projects.js?v=20261116-workspace-experience"></script>
-  <script src="environments.js?v=20261116-workspace-experience"></script>
-  <script src="app.js?v=20261116-workspace-experience"></script>
+  <script src="environments.js?v=20261117-platform-native"></script>
+  <script src="app.js?v=20261117-platform-native"></script>
 </body>
 </html>

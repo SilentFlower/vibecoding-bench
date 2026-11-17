@@ -221,7 +221,7 @@ try {
     assert.equal(code, 0);
   }
   assert.equal(code, 0);
-  assert.equal(messages.length, (thinkingOnly ? 33 : primeOnly ? 10 : cacheOnly ? 15 : rateLimitOnly ? 4 : process.env.CCRB_TEST_MULTI_VERSION === '1' ? 18 : tlsOnly ? 9 : benchmarkOnly ? 9 : phases.length === 2 ? (process.env.CCRB_TEST_UNLIMITED === '1' ? 25 : 28) : 6) + (process.env.CCRB_TEST_SWITCH_DIGEST ? 3 : 0));
+  assert.equal(messages.length, (thinkingOnly ? 33 : primeOnly ? 10 : cacheOnly ? 15 : rateLimitOnly ? 4 : process.env.CCRB_TEST_MULTI_VERSION === '1' ? 18 : tlsOnly ? 9 : benchmarkOnly ? 9 : phases.length === 2 ? (process.env.CCRB_TEST_UNLIMITED === '1' ? 25 : 28) : 6));
   if (!thinkingOnly && !primeOnly && !cacheOnly && !rateLimitOnly && !benchmarkOnly && !tlsOnly && process.env.CCRB_TEST_MULTI_VERSION !== '1') assert.ok(runningBindingReads >= 3, '启动补偿与凭据轮换均重新核对只读运行绑定');
   if (phases.length === 2) assert.equal(messages.find(message => message.label === 'rotated')?.bearer, 'Bearer synthetic-bearer-b');
   console.log(JSON.stringify({ messages: messages.length, parallelPeak, processTreePeakRssKiB: peakRssKiB }));

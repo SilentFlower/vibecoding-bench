@@ -112,6 +112,17 @@ class CriuSettingsTests(unittest.TestCase):
         self.assertTrue(self.apply(True)['applied'])
         self.runtime.ensure.assert_called_once()
 
+    def test_retired_download_allows_criu_and_real_maintenance_still_blocks(self):
+        """两版旧下载标记释放设置门禁，未完成切换仍保护租约。@return None。"""
+        for name in ('native-kernel-upgrade.json', 'native-kernel-upgrade-280.json'):
+            atomic_json(self.root / 'runtime' / name, {'state': 'active', 'preparing_release': 'v0.1.0-beta.7'})
+        self.assertTrue(self.apply(True)['applied'])
+        atomic_json(self.root / 'runtime/native-kernel-upgrade-280.json', {'state': 'switching'})
+        self.runtime.gateway._request.reset_mock()
+        with self.assertRaisesRegex(ValueError, '内核正在维护'):
+            self.apply(False)
+        self.runtime.gateway._request.assert_not_called()
+
     def test_stale_busy_and_failed_rebuild_keep_ownership(self):
         """过期或忙碌拒绝，失败重建恢复原指纹。@return 无。"""
         before = read_settings(self.runtime, self.row)
@@ -160,7 +171,6 @@ class CriuSettingsTests(unittest.TestCase):
         with patch.multiple(main, account_runtime=self.runtime, V3_ENABLED=False, _AUTH_ENABLED=True,
                 WEBUI_USER='fixture', WEBUI_PASS='fixture'), patch('main._content_capture_account', side_effect=binding), \
                 patch('main.native_kernel_status', return_value={'state': 'idle'}), \
-                patch('main.discover_releases', return_value={'state': 'ready', 'versions': []}) as discover, \
                 patch.dict('os.environ', {'V3_UPDATE_GATE_DIR': ''}):
             client = TestClient(main.app)
             path = '/api/environments/' + self.row['environment_id']
@@ -176,6 +186,5 @@ class CriuSettingsTests(unittest.TestCase):
             self.assertEqual(result.status_code, 200, result.text)
             self.assertTrue(result.json()['applied'])
             self.assertEqual(client.post(path + '/criu', json=command).status_code, 409)
-            self.assertEqual(client.get(path + '/native-kernel/releases?refresh=true').status_code, 200)
-            discover.assert_called_once_with(True)
+            self.assertEqual(client.get(path + '/native-kernel/releases?refresh=true').status_code, 410)
             self.assertEqual(self.runtime.ensure.call_count, 1)

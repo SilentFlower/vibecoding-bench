@@ -74,7 +74,9 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 
 - `V3_RELEASE` 表示平台来源；`V3_ACCOUNT_RELEASE` 表示选定账号镜像来源。共享只读门禁通过 `V3_UPDATE_GATE_DIR` 接入；调度器通过 `V3_UPDATE_SOCKET_DIR` 连接更新服务。
 - 账号私有 `runtime/account-image.json` 固定 `schema_version`、`environment_id`、`release`、`reference`、`image_id`、`protocol`，与真实 Docker image ID、标签及原角色归属共同核验。首次旧角色通过受控生命周期重建建立来源。
-- 仅平台变化且账号内容摘要与仓库族均相同时，保留原账号镜像、三角色容器 ID、环境代次及内核选择。账号内容或仓库族变化时逐项重建原本运行的环境；原本停止或退休的环境保留状态。
+- 仅平台变化且账号内容摘要与仓库族均相同时，保留原账号镜像、三角色容器 ID、环境代次及原生布局。账号内容或仓库族变化时逐项重建原本运行的环境；原本停止或退休的环境保留状态。
+- 原生环境的升级重建使用目标镜像完整安装表；prepare_sender=False同时归一旧独立选择。带native-platform-managed标签的目标在升级完成前核对双版或历史单版登记、固定制品、发送器身份及代次。首笔请求沿已迁移布局发送，养号作业继续沿原活动保护。
+- 历史平台回退由新解析器先retire并将原生配置收口为兼容293根配置，目标旧生命周期随后按实际镜像能力重建；停止环境也收口文件且保持停止。历史选择读取为内置，迁移归属与租约合同见[平台内核迁移](../../orchestrator/backend/account-runtime-v3.md#scenario-请求内核随平台版本交付与历史迁移)。
 - 门禁 `admission.json` 固定 `schema_version`、`deployment`、`operation_id`、`epoch`、`phase`、`target_release`、`revision`、`created_at`；phase 为 `idle|blocked`。目录 0700、私有文件 0600，拒绝符号链接等不安全读取。接入后缺失或损坏门禁进入拒绝准入和对账路径。
 - 两端活动计数覆盖响应正文 EOF、错误及断连。批次排队等待属于待认领工作；有限分派事务和实际执行计入活动。维护期间保留待认领项，释放门禁或控制重启后继续调度。
 - 原工程或登录只能凭实际仍登记的有限作业续接。续接继续检查身份、时间窗口与配额；作业撤销后证明失效。

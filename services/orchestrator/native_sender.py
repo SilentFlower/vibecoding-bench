@@ -3,7 +3,6 @@ import hashlib
 import os
 import re
 import shutil
-import urllib.request
 from pathlib import Path
 
 from resource_budget import isolated_account_limits, memory_bytes
@@ -23,7 +22,7 @@ BYTES = 27392144
 def installed_versions(labels: dict) -> tuple[str, ...]:
     """读取镜像明确提供的固定源版本。@param labels 已核验镜像标签。@return 支持版本集合。"""
     value = labels.get('vibebench.native-runtime-versions')
-    if value is None:
+    if value in (None, '2.1.293'):
         return ('2.1.293',)
     if value != '2.1.280,2.1.293':
         raise ValueError('账号镜像的原生运行时版本集合无效')
@@ -48,6 +47,27 @@ def native_resource_layout(configuration: dict | None) -> dict | None:
                 raise ValueError('原生运行时安装路径或字段无效')
         result['runtimes'] = {version: {key: value for key, value in runtime.items()
             if key not in ('release', 'kernel_generation')} for version, runtime in runtimes.items()}
+    return result
+
+
+def builtin_config(configuration: dict | None, versions: tuple[str, ...]) -> dict | None:
+    """按目标镜像归一化内核安装表，保留已经冻结的资源和账号布局。
+
+    :param configuration: 已校验的目标或历史原生配置。
+    :param versions: 目标镜像明确声明的官方源版本集合。
+    :return: 仅引用镜像内置程序的配置；基础后端保持None。
+    """
+    if versions not in (('2.1.293',), ('2.1.280', '2.1.293')):
+        raise ValueError('原生运行时版本集合无效')
+    result = native_resource_layout(configuration)
+    if result is None:
+        return None
+    # 安装表属于目标镜像；沿用旧表会使升级后的首笔API再次要求重建整个环境。
+    result['binary_path'] = '/usr/local/bin/ccrb-runtime'
+    result.pop('source_version', None)
+    result.pop('runtimes', None)
+    if '2.1.280' in versions:
+        result['runtimes'] = {'2.1.280': {'binary_path': '/usr/local/bin/ccrb-runtime-280'}}
     return result
 
 
@@ -119,10 +139,10 @@ def sender_config(configuration: dict, memory: str, swap: str = '0', budget: str
 
 
 def stage_asset(destination: Path, source: str | None = None, version: str = '2.1.293') -> dict:
-    """把实际发布附件或显式本地候选冻结到本次镜像构建上下文。
+    """将本仓库已验收制品冻结到本次镜像构建上下文。
 
     :param destination: 新构建快照内的文件路径。
-    :param source: 本地候选文件；省略时读取 V3_NATIVE_RUNTIME_ASSET 或固定发布附件。
+    :param source: 本仓库准备的本地制品；省略时读取对应构建环境变量。
     :param version: 明确的官方源版本，历史入口为293。
     :return: 已校验的版本、大小及 SHA256 记录。
     """
@@ -140,14 +160,11 @@ def stage_asset(destination: Path, source: str | None = None, version: str = '2.
         destination.chmod(0o755)
         return {'version': VERSION_280, 'source_version': version, 'asset': ASSET, 'sha256': SHA256_280, 'bytes': BYTES_280}
     source = source or os.environ.get('V3_NATIVE_RUNTIME_ASSET')
-    if source:
-        shutil.copyfile(source, destination)
-    else:
-        url = f'https://github.com/SilentFlower/cc-runtime-bridge/releases/download/{VERSION}/{ASSET}'
-        with urllib.request.urlopen(url, timeout=60) as response, destination.open('xb') as output:
-            shutil.copyfileobj(response, output)
-    if destination.stat().st_size != 27392144 or hashlib.sha256(destination.read_bytes()).hexdigest() != SHA256:
+    if not source:
+        raise ValueError('请先在本仓库准备293制品，并设置 V3_NATIVE_RUNTIME_ASSET')
+    shutil.copyfile(source, destination)
+    if destination.stat().st_size != BYTES or hashlib.sha256(destination.read_bytes()).hexdigest() != SHA256:
         destination.unlink()
         raise ValueError('原生运行时附件身份不匹配')
     destination.chmod(0o755)
-    return {'version': VERSION, 'asset': ASSET, 'sha256': SHA256, 'bytes': 27392144}
+    return {'version': VERSION, 'source_version': version, 'asset': ASSET, 'sha256': SHA256, 'bytes': BYTES}

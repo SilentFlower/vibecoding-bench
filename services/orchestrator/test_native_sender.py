@@ -1,14 +1,29 @@
 """原生 sender 的显式预算、加权容量及旧布局回归。"""
 import unittest
+import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
-from native_sender import NativePreparationBlocked, sender_config, installed_versions, native_resource_layout
+from native_sender import NativePreparationBlocked, sender_config, installed_versions, native_resource_layout, stage_asset
 from native_criu_policy import restore_policy
 from resource_budget import account_limits, memory_bytes, isolated_account_limits, scenario_account_limits, serial_review_limits
 
 
 class NativeSenderTests(unittest.TestCase):
     """使用合成配置核对有限资源与可回退的后端选择。"""
+
+    def test_293_staging_requires_local_input_and_rejects_corruption(self):
+        """缺失输入直接提示本仓库准备，损坏附件在staging阶段拒绝。@return None。"""
+        with tempfile.TemporaryDirectory() as directory, patch.dict('os.environ', {'V3_NATIVE_RUNTIME_ASSET': ''}):
+            root = Path(directory)
+            with self.assertRaisesRegex(ValueError, '本仓库准备293'):
+                stage_asset(root / 'output')
+            source = root / 'input'
+            source.write_bytes(b'corrupted synthetic launcher')
+            with self.assertRaisesRegex(ValueError, '身份不匹配'):
+                stage_asset(root / 'output', str(source))
+            self.assertFalse((root / 'output').exists())
+        self.assertEqual(installed_versions({'vibebench.native-runtime-versions':'2.1.293'}), ('2.1.293',))
 
     def test_dual_version_budget_and_resource_identity(self):
         """两版低额度配置保留共享六槽及发行切换资源身份。@return None。"""

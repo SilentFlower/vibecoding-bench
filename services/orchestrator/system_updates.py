@@ -19,7 +19,8 @@ from pydantic import BaseModel, ConfigDict, StrictInt, StrictStr
 
 from account_isolation import ROLE_COLUMNS, ROLE_LABELS, role_container
 from account_update_identity import image_origin
-from native_kernel_upgrade import pending_upgrade
+from native_kernel_upgrade import migrate_records, pending_upgrade, validate_records
+from native_sender import builtin_config
 from system_update_contract import MANIFEST_LIMIT, safe_read, strict_json, validate_operation
 from system_update_gate import UPDATE_GATE
 
@@ -448,9 +449,20 @@ def system_updates_router(runtime_provider) -> APIRouter:
                 except (OSError, ValueError) as error:
                     raise HTTPException(409, '部分角色恢复证据尚未完整核验') from error
             if body.action != 'inspect':
+                if account and dict(account).get('cc2api_account_id'):
+                    validate_records(runtime._root(row), account['cc2api_account_id'])
                 # 历史回退先由新解析器收口角色；retire 保留账号行及 HOME，随后由旧生命周期重建。
                 runtime._stop_environment(row, remove=body.action in ('rebuild', 'restore', 'retire'))
                 runtime._update(row, state='stopped')
+                if account and dict(account).get('cc2api_account_id'):
+                    migrate_records(runtime._root(row), account['cc2api_account_id'])
+                    if body.action == 'retire':
+                        # 历史解析器只认识293根配置；目标生命周期随后按镜像能力补齐安装表。
+                        path = runtime._sender_config(row)
+                        if path.is_file():
+                            config = json.loads(path.read_text())
+                            config['native'] = builtin_config(config.get('native'), ('2.1.293',))
+                            runtime._write_sender_config(row, config)
                 if body.action in ('rebuild', 'restore'):
                     if not account:
                         raise HTTPException(409, '环境缺少原始账号归属')

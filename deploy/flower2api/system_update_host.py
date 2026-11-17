@@ -568,8 +568,7 @@ class HostDeployment:
             return
         for original in operation['before']['environments']:
             identifier = original['environment_id']
-            if (not any(item['state'] == 'running' for item in original.get('roles', {}).values())
-                    or identifier in operation.get('environment_retired', {})):
+            if identifier in operation.get('environment_retired', {}):
                 continue
             evidence = self._settled(operation)
             if not evidence['ready']:
@@ -577,11 +576,12 @@ class HostDeployment:
             current = next(item for item in evidence['environments'] if item['environment_id'] == identifier)
             if current['generation'] != original['generation'] or current.get('roles') != original.get('roles'):
                 raise ValueError('历史回退前环境身份已变化')
-            frozen = self.environment_cpu(current)
-            if all(value >= 10_000_000 for value in frozen.values()):
-                operation.setdefault('environment_cpu_before', {})[identifier] = frozen
-            elif (self.data / 'bench/environments' / identifier / 'runtime/cpu-resources.json').exists():
-                raise ValueError('历史回退前的CPU策略需要对账')
+            if current.get('roles'):
+                frozen = self.environment_cpu(current)
+                if all(value >= 10_000_000 for value in frozen.values()):
+                    operation.setdefault('environment_cpu_before', {})[identifier] = frozen
+                elif (self.data / 'bench/environments' / identifier / 'runtime/cpu-resources.json').exists():
+                    raise ValueError('历史回退前的CPU策略需要对账')
             operation.setdefault('environment_intents', {})[identifier] = {
                 'generation': current['generation'], 'allowed_image_ids': list({
                     *[item['image_id'] for item in original['roles'].values()],

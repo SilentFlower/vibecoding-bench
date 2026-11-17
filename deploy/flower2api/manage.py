@@ -216,9 +216,6 @@ def preflight(values: dict) -> Path:
     cli_telemetry_mode(values.get("V3_CLI_TELEMETRY", ""))
     if values.get("V3_NATIVE_CRIU", "1") not in ("", "0", "1"):
         raise ValueError("原生 CRIU 开关必须为 0 或 1")
-    public_key = values.get("V3_NATIVE_RELEASE_PUBLIC_KEY", "")
-    if public_key and not re.fullmatch(r"[a-f0-9]{64}", public_key):
-        raise ValueError("原生内核在线升级需要有效发布公钥")
     database = root / "bench/db.sqlite"
     if database.is_file():
         if not database.resolve().is_relative_to(root):

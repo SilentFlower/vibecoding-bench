@@ -1274,7 +1274,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 ### 3. Contracts
 
 - API transport、显式原生准备、启动预热及原生设置切换继续使用严格默认，按权威后端、并发和部署sender预算生成目标布局。CLI、额度查询、本地OAuth刷新、身份/指标读取、独立评审及系统更新rebuild/restore显式传 `prepare_sender=False`，沿已生效布局准备基础环境。
-- CLI准备核验私有sender配置、固定binary/work路径、整数memory_mib/max_workers与指纹的native_sender_memory；已登记角色缺配置、链接、损坏或预算矛盾均拒绝。原生内核release/kernel_generation由原生命周期处理。CLI不因新的目标预算、并发、CRIU或采集差异改写现有布局、补位开关或通知目标预热。
+- CLI准备核验私有sender配置、固定binary/work路径、整数memory_mib/max_workers与指纹的native_sender_memory；已登记角色缺配置、链接、损坏或预算矛盾均拒绝。历史release/kernel_generation退出执行选择。运行中的CLI准备沿用已冻结资源与能力；停止唤醒按目标镜像补齐完整内置安装表并核对CRIU／采集策略，沿原空闲重建门禁执行。CLI保持原资源预算及按需预热边界。
 - 首次环境没有已生效native时使用原基础三角色布局。目标native293保持，API原生准备仍在取得投递绑定前拒绝有限预算缺失、格式错误或账号总量不足；基础布局不授权目标原生请求转用legacy业务发送。已有native沿冻结实际预算重建和恢复，CLI不会将其改回基础布局。
 
 - `/api/environments` 的 `request_backend` 表示权威目标，实际 sender 布局独立判断。目标原生而本地 native 为空时，只投影白名单等待、维护或失败摘要，PID 与进程数保持未观测；预算失败也可显示在 stopped 环境。真实 ready 继续核验当前身份、环境/内核代次和新鲜度。
@@ -1372,63 +1372,61 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - `deploy/flower2api/verify_forwarding.py --native`：真实两账号三角色、HTTP/SOCKS、3普通/6Haiku、同映像/秘密隔离、cgroup峰值与OOM0、默认120秒回收及按账号回退；N4等待上限135秒，验证镜像的额外CA仅限本地夹具。
 - 发布验收从实际Release下载附件，核SHA/大小、冻结构建输入并运行真实消费者；合成回环与真实付费推理分开记录。
 
-## Scenario: 单账号原生内核在线切换与回滚
+## Scenario: 请求内核随平台版本交付与历史迁移
 
 ### 1. Scope / Trigger
 
-- 固定官方293的内核修订；bench分发和状态、cc2api维护鉴权与sender进程生命周期共同生效。
+- 平台镜像固定配套280／293内核，账号创建、升级、唤醒、恢复和平台回退按目标账号镜像建立安装表。独立发行、下载及切换入口退役。
+- 实现依据：native_sender、native_kernel_upgrade、account_runtime、account_isolation、system_updates及Rust固定制品加载器。
 
 ### 2. Signatures
 
-- POST /api/environments/{environment_id}/native-kernel：{operation:prepare|activate|rollback|recover,operation_id:UUID,release?:string,expected_sha256?:string,expected_revision:string}。
-- 环境列表native_kernel：state、revision、current、builtin、previous、prepared、pid、image_sha256、error、operation_id、binding_generation。builtin展示当前镜像内置身份。未配置有效发行公钥、缺少sender或非原生环境返回null。
-- GET `/api/environments/{environment_id}/native-kernel/releases?refresh=bool`：沿管理鉴权及唯一账号绑定，只读返回 `{state:ready|stale|unavailable,reason,versions:[{release,published_at}],latest,checked_at_ms,builtin}`。
-- POST /admin/runtime/accounts/:id/native-kernel-probe：owner、lease_generation、binding、target{release:NativeReleaseRef|null,kernel_generation:UUID}；私有 sender /internal/native/prepare-switch 包含 target、identity。
-- NativeSenderConfig可选release{release,launcher_sha256}、kernel_generation；省略时使用当前镜像固定的内置beta.6。历史镜像内置版本按其实际分发身份判定。NativePreparationStatus增加release、kernel_generation、image_sha256。
+- GET `/api/environments/{environment_id}/native-kernel/releases`及POST `/api/environments/{environment_id}/native-kernel`保持原管理鉴权，统一返回410与“请求内核由平台版本统一管理，请通过系统更新升级或回退平台”。历史query／body退出解析和执行。
+- `native_kernel`保留293别名；`native_kernels`按源版本提供`management=platform,source_version,state,revision,current,builtin,platform_release,error`。实际PID／进程数从`native_preparation.versions`独立投影。
+- `builtin_config(configuration,versions)`生成目标内置安装表；`validate_records(root,account_id,reconciled=False)`先核对全部旧记录；`migrate_records`原子归一；`archive_binding_records(root,account_id)`在原绑定交接门禁内归档终态。
+- `AccountRuntime.ensure(...,prepare_sender=False,native_migration=False)`管理调用沿目标镜像补齐已有原生布局；受控迁移参数只供持久上下文核验后的环境对账使用。
+- 网关`native-kernel-probe`和sender`/internal/native/prepare-switch`退出活动路由；普通准备、readiness、status和空闲回收保持。
 
 ### 3. Contracts
 
-- V3_NATIVE_RELEASE_PUBLIC_KEY为部署固定Ed25519原始32字节公钥的小写hex，`release_key() -> str`仅返回有效公钥；配置有效公钥后覆盖部署内全部native293账号。旧V3_NATIVE_RELEASE_PILOT_ENVIRONMENT停止参与准入，部署预检只校验可选发行公钥格式。
-- 创建原生sender时只读挂载bench/native-releases至/runtime-releases并传公钥，CLI及network角色不取得该挂载或发行公钥。已有sender首次取得该挂载需要空闲重建；各账号独立保存版本选择与操作记录。
-- 下载固定SilentFlower/cc-runtime-bridge的精确标签，HTTPS跳转只接受github.com、release-assets.githubusercontent.com、objects.githubusercontent.com。清单≤4096B、签名64B、分发≤27933052B；使用签名原字节及独立SHA核验。版本目录按标签/分发SHA寻址，原子写入，已有候选可离线复核。
-- 版本发现固定GitHub发行API的前100条，响应最多2MiB，连接/读取超时5秒并逐块检查10秒预算；只取合法beta标签、draft=false且固定分发/清单/签名三附件各唯一的版本，按beta数字降序。进程内缓存五分钟，refresh=true主动刷新；403/429投影release_rate_limited，其余失败release_fetch_failed。有缓存返回stale及旧采样时刻，无缓存unavailable；任意发布正文和下载URL不进入投影。列表轮询不发起发行查询，发现不替代准备验签。
-- 持久选择在平台升级后成为内置版本时，已下载版本仍按原签名/SHA独立复核；相同内置分发可以准备，页面禁用与当前SHA相同的激活。
-- 管理请求绑定唯一账号与环境。expected_revision同时含环境代次和持久操作版本；新准备、激活及对账消费原版本。同操作ID只接受完全相同参数，之后操作消费版本后旧请求拒绝。
-- 环境私有runtime/native-kernel-upgrade.json保存准备、draining、switching、restoring、finishing、active/restored/failed/reconcile及原/候选/上一版。准备不占账号API门禁；激活和回滚使用现有排他租约，CLI忙时延后。排空≤120秒，等待原流收齐，未知活动不得视为空闲。
-- 专用预热由管理员服务证明与对应kernel:UUID维护租约触发；账号凭据所有权保护保持，AT由网关读取，RT不传sender。普通准备遇维护主动取消。
-- sender专用切换锁排除业务和普通准备；在warmup写锁内等待live==idle.len，退役旧空闲集合后等待live=0才启动候选。物理退出等待最多8秒且受本轮截止约束，失败保持明确恢复路径。
-- 分发体仍通过完整SHA和精确FD启动；真实PID/worker_ready、memfd执行体SHA、四项封存逐次核验。共享映像按分发SHA隔离，即使执行体相同也先实际运行新的加载器。
-- 成功预热后持久提交选择及实际PID/映像SHA，再释放门禁；候选失败恢复原版后开放，无法确认则reconcile。启动时识别中断，原账号门禁保持到显式恢复。排空中断且选择仍是原版时按原所有权释放，finishing中断按提交结果补收口。
-- 内核选择与容器布局比较分开；同合同切换只换worker，下一业务不因release/kernel_generation差异重建角色。现有预算、代理、设备及环境身份保持。当前/上一版/操作引用的制品保留，移除信任根前先回到内置版。
-- 基础ready仅证明原生进程完成握手；启用强制1h/5m策略前还须核验cache_ttl_rewrite_protocol=1，并以该策略验证真实消费者。旧beta.3缺少该能力，强制策略下在模型投递前拒绝。显式在线内核选择独立于镜像默认值，升级镜像继续保留账号选择；回滚旧内核前先检查并关闭其不支持的强制策略。
+- 镜像`vibebench.native-runtime-versions`缺省或精确`2.1.293`表示历史单版；精确`2.1.280,2.1.293`表示双版，其余拒绝。根配置代表293，双版另登记280的固定路径。
+- 根及每版`release/kernel_generation`兼容解码后清除；Rust仅加载当前源版本的固定内置分发和执行映像，继续核验摘要、大小、精确FD、封存及实际握手。缓存能力继续按`cache_ttl_rewrite_protocol/message_cache_policy_protocol`核验。
+- 目标镜像声明`vibebench.native-platform-managed=1`时，重建就绪前核对安装表归一、sender身份和代次，以及`/internal/native/status.versions`中每个目标版本的`available=true`和精确version。此核验沿按需预热及原容量策略执行。
+- sender退出`/runtime-releases`挂载及独立发行公钥依赖；旧部署字段兼容保留。平台签名信任根继续生效。
+- 两份旧记录分别为`runtime/native-kernel-upgrade.json`和`native-kernel-upgrade-280.json`。拒绝符号链接、非对象及超过65536字节的记录；全部归属和阶段通过后才写入。
+- 终态idle/active/restored/failed归一为`management=platform,state=restored`，current、kernel_generation、previous、prepared、preparing_release归空，previous_available=false；保留有界migrated_from审计。旧平台读取为内置选择，重复执行一致。
+- draining/switching/restoring/finishing/reconcile及未知状态继续阻挡普通维护。中断对账核对唯一账号、环境／代次、真实活动、旧操作和租约；外来owner／代次继续拒绝。
+- `runtime/native-kernel-platform-migration.json`先于重建副作用持久化原记录、账号、环境、代次、停止意图及阶段。恢复核对当前／下一代次；发送器就绪并确认释放本owner租约后删除日志，失败保留reconcile及门禁。停止环境保持停止。
+- 绑定切换先检查旧归属与未完成迁移，再在原双端绑定门禁内停止发送器，将终态记录持久归档为`native-kernel-upgrade[-280].account-<旧网关账号ID>.json`后移除活动记录，随后交接DB与凭据。归档写失败保留原记录；提交前中断可重试；新绑定采用内置选择。首次绑定只接纳空历史。
+- preparing_release表示已退役下载。它退出维护门禁；启动恢复写空并保留cancelled_preparing_release审计。真实未完成操作、迁移日志及维护租约继续保护。
+- API列表及页面保持只读，版本发现、候选、激活、独立回滚／恢复及快速操作轮询退出；TLS、CRIU、资源维护和平台更新操作沿既有合同。
 
 ### 4. Validation & Error Matrix
 
 | 条件 | 结果 |
 | --- | --- |
-| 签名/来源/平台/协议/摘要不符 | 准备失败，原内核运行 |
-| expected_revision或目标摘要过期 | 冲突，版本保持 |
-| 已持CLI租约、排空超时 | 保持原版，释放本操作门禁或明确待对账 |
-| HTTP取消后旧worker尚未退出 | 候选启动等待物理许可；超时恢复/待对账 |
-| 候选预热失败 | 原版真实预热后再开放 |
-| 操作中断或释放结果未知 | 可见reconcile，禁止复跑模型请求 |
-| 下一请求重新读取环境 | 内核选择不触发容器布局重建 |
-| 版本发现限流或读取失败 | stale/unavailable，保留当前内核与已准备候选 |
+| 匿名调用旧管理入口／已鉴权旧调用 | 原鉴权拒绝／410；下载、切换及租约副作用为0 |
+| 旧终态选择与当前唯一绑定一致 | 受控边界归一为目标内置选择 |
+| 外来账号、未完成迁移或未知阶段 | 副作用前拒绝，明确待环境对账 |
+| 外来租约、活动API／CLI或发送连接 | 保留原现场与其他owner门禁 |
+| 安装表缺版、固定制品或回执代次不符 | 重建就绪失败，升级沿原恢复流程处理 |
+| 退役下载标记／真实未完成操作 | 设置维护可继续／继续阻挡 |
+| 原停止环境 | 归一文件并保持停止，下次唤醒按目标镜像补齐 |
 
 ### 5. Scenarios and Examples
 
-- 历史回归（强制TTL关闭）：从内置beta.3准备beta.4，目标账号长流自然结束，切换预热零模型，下一请求复用新PID；回滚恢复beta.3，所有容器ID和对照账号PID保持。
-- 边界：先激活再回滚，迟到首次激活的相同ID和旧revision必须冲突。
-- 错误用法：HTTP active=0就假定物理进程全部退出。正确处理：等待物理许可并收口旧池后再启动候选。
-- 正常：检查更新后从select选择已发布版本，准备验签后显式激活。错误用法：将发现列表当成已授信制品。正确处理：准备时继续独立验证固定签名和精确摘要。
+- 正常：旧sender仅登记293且保存beta选择；平台升级维护阶段登记双版并核验，首笔293／280请求复用同代次、同三角色容器。
+- 边界：停止环境迁移保持停止；历史单版目标只登记293；合法换绑归档旧记录，新账号通过同一归属校验。
+- 错误用法：延后至首笔API补齐双版布局，遇养号作业后要求重建。正确处理：升级维护阶段先完成目标安装表及就绪核验。
+- 错误用法：将HTTP active=0或过期租约当作可接管证明。正确处理：联合核对jobs、执行登记、sender及原owner／generation。
 
 ### 6. Tests Required
 
-- services/orchestrator/test_native_kernel_upgrade.py：两个不同环境在同一发行公钥下开放管理，旧试点字段忽略，缺失/非法公钥与非原生环境保持关闭；签名及摘要拒绝、准备与接单独立、排空/回滚、旧请求重放、超时、恢复及候选摘要漂移。
-- test_native_kernel_releases覆盖元数据过滤、数字排序、有界数组JSON、固定来源、缓存副本与限流降级；test_native_kernel_upgrade覆盖已选版本成为内置后的离线复核。
-- services/orchestrator/test_account_runtime.py核对两个原生sender均有只读版本挂载及发行公钥，其他角色保持隔离；deploy/flower2api/test_manage.py核对仅公钥即可配置，非法公钥拒绝，旧试点配置兼容忽略。
-- Rust native_real_binary：模拟一个退出未收口许可和一个空闲worker，归还前零启动，归还后换PID；native_real_gateway验证维护归属、长流、实际新PID和零模型切换。
-- deploy/flower2api/verify_forwarding.py --native --kernel-release <测试签名目录> --kernel-public-key <公钥>：双账号真实三角色、管理端准备/激活/回滚、长流只发送一次、下一业务复用、对照账号PID与所有容器ID/StartedAt保持、管理端公网发送计数为0。
+- test_native_kernel_upgrade：双记录归一及幂等、旧平台重写后的再次归一、旧程序可读、归档与写入中断、候选取消、外来归属／租约、真实维护、持久迁移重启及停止状态。
+- test_account_runtime：换绑后真实ensure→transport、解绑／再绑定及交接中断；升级前完整登记，养号占用下首笔两版请求保持代次及容器；停止唤醒和单版目标。
+- test_native_kernel_api：旧请求及过时payload已鉴权410、匿名拒绝、零下载／切换／租约副作用。采集／CRIU回归分别核对旧候选与真实维护门禁。
+- verify_native_runtime_versions及verify_native_environments：两套页面只读、零退役请求、实际观察未知态、明暗390／1280px及原资源维护。
+- verify_system_update.py：Bookworm兼容且启用v3-verification的隔离二进制、同批固定两版制品，核对长流排空、CLI阻断、旧单版登记升级后的真实双版API、停止保留、回退、失败及进程恢复；真实模型调用为0。
 
 
 ## Scenario: 三角色在线CPU与重建恢复

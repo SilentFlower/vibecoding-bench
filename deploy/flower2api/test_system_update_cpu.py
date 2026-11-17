@@ -2,7 +2,7 @@
 import copy
 import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from system_update_host import HostDeployment
 
@@ -84,6 +84,23 @@ class SystemUpdateCpuTests(unittest.TestCase):
         self.assertEqual(saved[0]['environment_cpu_before'][current['environment_id']],expected)
         self.assertEqual([self.objects['new-'+role]['HostConfig']['NanoCpus'] for role in expected],list(expected.values()))
         self.assertEqual(calls,['/internal/v3/system-updates/environment','/internal/v3/system-updates/snapshot'])
+
+    def test_historical_rollback_normalizes_stopped_environment_without_waking(self):
+        """历史回退同样迁移停止环境的文件选择，缺角色时沿用停止状态。@return None。"""
+        current = {'environment_id':'a'*32,'generation':3,'state':'stopped','roles':{}}
+        old = {'release':'ci-1-1','reference':'ghcr.io/silentflower/flower2api-account:v3-ci-1-1'}
+        target = {'release':'ci-0-1','reference':'ghcr.io/silentflower/vibebench-v3-account:v3-ci-0-1'}
+        operation = {'original':{'selection':{'account':old}},'before':{'environments':[copy.deepcopy(current)]},
+            'operation_id':'synthetic','epoch':'synthetic-epoch'}
+        selected = {'selection':{'account':target}}
+        self.host._settled = Mock(return_value={'ready':True,'environments':[current]})
+        self.host.verify_images = Mock(return_value={'account':{'Id':'target-image'}})
+        self.host._environment_request = Mock(return_value={'state':'stopped'})
+        self.host.environment_cpu = Mock(side_effect=AssertionError('停止环境缺少角色时保持CPU文件'))
+        self.host._retire_rollback_environments(operation, selected, Mock())
+        self.assertEqual(self.host._environment_request.call_args.args[0]['action'], 'retire')
+        self.assertEqual(operation['environment_retired'][current['environment_id']]['state'], 'stopped')
+        self.host.environment_cpu.assert_not_called()
 
     def test_wrong_ownership_and_incomplete_evidence_fail_before_any_update(self):
         """归属冲突与缺少CPU证据都拒绝更新。@return None。"""

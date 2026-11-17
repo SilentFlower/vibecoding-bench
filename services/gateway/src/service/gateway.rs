@@ -11887,10 +11887,16 @@ mod tests {
                 let service = &service;
                 async move {
                     let response = service.handle_request(request, None).await;
-                    assert_eq!(response.status(), StatusCode::OK);
-                    axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                    let status = response.status();
+                    let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024)
                         .await
                         .unwrap();
+                    assert_eq!(
+                        status,
+                        StatusCode::OK,
+                        "双版并发索引{index}：{}",
+                        String::from_utf8_lossy(&bytes)
+                    );
                 }
             });
             timeout(Duration::from_secs(90), join_all(parallel))
@@ -12572,178 +12578,6 @@ mod tests {
             fs::metadata(format!("/proc/{rotated_pid}/exe")).is_ok(),
             "日志模式切换复用当前暖进程"
         );
-        if let Ok(digest) = var("CCRB_TEST_SWITCH_DIGEST") {
-            use crate::handler::router::{AppState, native_kernel_probe};
-            use axum::Json;
-            use axum::extract::{Path, State};
-            let pool = AnyPoolOptions::new()
-                .max_connections(1)
-                .connect("sqlite::memory:")
-                .await
-                .unwrap();
-            let service = Arc::new(service);
-            use crate::service::proxy::ProxyService;
-            let app = AppState {
-                proxy_svc: Arc::new(ProxyService::new(pool.clone())),
-                gateway_svc: service.clone(),
-                account_svc: service.account_svc.clone(),
-                token_tester: Arc::new(TokenTester::new()),
-                token_store: Arc::new(TokenStore::new(pool.clone(), "sqlite".into())),
-                settings_store: service.settings_store.clone(),
-                prime_log_store: Arc::new(PrimeLogStore::new(pool)),
-                oauth_flow_svc: Arc::new(OAuthFlowService::new()),
-                telemetry_svc: service.telemetry_svc.clone(),
-                admin_password: "synthetic".into(),
-            };
-            let flow = service
-                .handle_request(
-                    request(json!({"model":"claude-sonnet-4-6","stream":true,
-                "max_tokens":64,"messages":[{"role":"user","content":"gateway-kernel-long"}]})),
-                    None,
-                )
-                .await;
-            assert_eq!(flow.status(), StatusCode::OK);
-            let owner = format!("kernel:{}", Uuid::new_v4());
-            let lease = queue.runtime_gate.prepare(&owner).unwrap();
-            assert_eq!(queue.runtime_gate.snapshot()["active"], 1);
-            assert!(
-                queue
-                    .runtime_gate
-                    .update(&owner, &lease.generation, "claim")
-                    .is_err()
-            );
-            assert!(!queue.runtime_gate.enter(Duration::from_millis(20)).await);
-            client
-                .post(format!("{control}kernel/release"))
-                .send()
-                .await
-                .unwrap()
-                .error_for_status()
-                .unwrap();
-            let output = axum::body::to_bytes(flow.into_body(), 1024 * 1024)
-                .await
-                .unwrap();
-            assert!(String::from_utf8_lossy(&output).contains("fixture-complete"));
-            let config_path = root.join("sender.json");
-            let mut config = config.clone();
-            let target = Some(super::super::native_contract::NativeReleaseRef {
-                release: var("CCRB_TEST_SWITCH_RELEASE").unwrap(),
-                launcher_sha256: digest,
-            });
-            let mut previous_pid = rotated_pid as u32;
-            for (index, selection) in [target, None].into_iter().enumerate() {
-                let lease = if index == 0 {
-                    lease.clone()
-                } else {
-                    queue.runtime_gate.prepare(&owner).unwrap()
-                };
-                queue
-                    .runtime_gate
-                    .update(&owner, &lease.generation, "claim")
-                    .unwrap();
-                let generation = Uuid::new_v4().to_string();
-                let native = config.native.as_mut().unwrap();
-                native.release = selection.clone();
-                native.kernel_generation = Some(generation.clone());
-                let temporary = root.join("sender-next.json");
-                fs::write(&temporary, serde_json::to_vec(&config).unwrap()).unwrap();
-                fs::rename(temporary, &config_path).unwrap();
-                let before: Value = client
-                    .get(&control)
-                    .send()
-                    .await
-                    .unwrap()
-                    .json()
-                    .await
-                    .unwrap();
-                let mut headers = HeaderMap::new();
-                headers.insert(
-                    "x-v3-service-token",
-                    var("V3_INTERNAL_TOKEN").unwrap().parse().unwrap(),
-                );
-                let result = native_kernel_probe(State(app.clone()), Path(account.id), headers, Json(
-                    serde_json::from_value(json!({"owner":owner,"lease_generation":lease.generation,
-                        "binding":config.binding,"target":{"release":selection,"kernel_generation":generation}})).unwrap(),
-                )).await.unwrap().0;
-                assert_eq!(result.release, selection);
-                let pid = result.pid.unwrap();
-                assert_ne!(pid, previous_pid);
-                assert!(fs::metadata(format!("/proc/{previous_pid}/exe")).is_err());
-                assert!(fs::metadata(format!("/proc/{pid}/exe")).is_ok());
-                previous_pid = pid;
-                let after: Value = client
-                    .get(&control)
-                    .send()
-                    .await
-                    .unwrap()
-                    .json()
-                    .await
-                    .unwrap();
-                assert_eq!(before["messages"], after["messages"], "切换预热零模型");
-                queue
-                    .runtime_gate
-                    .update(&owner, &lease.generation, "release")
-                    .unwrap();
-                // 激活和回滚的真实预热之后，再补写观察配置，首条业务仍须命中该PID。
-                config.quota_identity = format!("synthetic-after-switch-{index}");
-                let temporary = root.join("sender-next.json");
-                fs::write(&temporary, serde_json::to_vec(&config).unwrap()).unwrap();
-                fs::rename(temporary, &config_path).unwrap();
-                if var("CCRB_TEST_SWITCH_TTL_REWRITE").as_deref() == Ok("1") {
-                    service
-                        .settings_store
-                        .upsert_many(&HashMap::from([(
-                            "cache_control_ttl_rewrite".into(),
-                            if index == 0 { "1h" } else { "off" }.into(),
-                        )]))
-                        .await
-                        .unwrap();
-                    service.reload_cache_control_ttl_rewrite().await.unwrap();
-                }
-                let response = service
-                    .handle_request(
-                        request(json!({"model":"claude-sonnet-4-6","stream":false,
-                    "max_tokens":64,"messages":[{"role":"user","content":"gateway-kernel-next"}]})),
-                        None,
-                    )
-                    .await;
-                assert_eq!(response.status(), StatusCode::OK);
-                let request_id = response.headers()["x-cc2api-request-id"]
-                    .to_str()
-                    .unwrap()
-                    .to_owned();
-                axum::body::to_bytes(response.into_body(), 1024 * 1024)
-                    .await
-                    .unwrap();
-                let diagnostics = service.diagnostics_store().unwrap();
-                diagnostics.flush().await.unwrap();
-                let detail = diagnostics.detail(&request_id).await.unwrap();
-                let runtime = detail.attempts[0].runtime.as_ref().unwrap();
-                assert!(runtime.warm_hit);
-                assert_eq!(runtime.worker_pid, pid);
-                assert!(runtime.worker_start_ms.is_none());
-                if index == 0 && var("CCRB_TEST_SWITCH_TTL_REWRITE").as_deref() == Ok("1") {
-                    let observed: Value = client
-                        .get(&control)
-                        .send()
-                        .await
-                        .unwrap()
-                        .json()
-                        .await
-                        .unwrap();
-                    let ttls =
-                        observed["messages"].as_array().unwrap().last().unwrap()["cache_ttls"]
-                            .as_array()
-                            .unwrap();
-                    assert!(!ttls.is_empty());
-                    assert!(
-                        ttls.iter().all(|ttl| ttl == "1h"),
-                        "现有设置必须到达实际原生出站"
-                    );
-                }
-                assert!(fs::metadata(format!("/proc/{pid}/exe")).is_ok());
-            }
-        }
         sender.abort();
         let _ = sender.await;
         fs::remove_dir_all(root).unwrap();

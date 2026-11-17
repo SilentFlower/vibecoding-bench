@@ -226,13 +226,18 @@ def worker(policy_path: Path, fault: str | None) -> None:
     server.serve_forever(poll_interval=0.2)
 
 
-def verify(output: Path, gateway_binary: Path, sender_binary: Path, migration_manifest: Path | None = None) -> dict:
+def verify(output: Path, gateway_binary: Path, sender_binary: Path, migration_manifest: Path | None = None,
+           native_root: Path | None = None, control_base: str = 'vibebench-v3-control:v3-verify-kernel-online-final',
+           account_base: str = 'vibebench-v3-account:v3-verify-kernel-online-final') -> dict:
     """运行实际底座、控制复用、账号重建、回退及进程恢复并清理专属资源。
 
     :param output: 脱敏证据目录。
-    :param gateway_binary: 当前已编译测试网关。
-    :param sender_binary: 当前已编译发送器。
+    :param gateway_binary: 启用v3-verification且匹配测试底座glibc的网关。
+    :param sender_binary: 启用v3-verification且匹配测试底座glibc的发送器。
     :param migration_manifest: 可选真实迁移候选镜像清单，开启 v1→v2 接入验收。
+    :param native_root: 可选已验收的280-a／293-a制品根目录。
+    :param control_base: 已准备的隔离控制底座。
+    :param account_base: 已准备的隔离账号底座。
     :return: 场景结果。
     """
     output.mkdir(parents=True, exist_ok=True)
@@ -252,11 +257,16 @@ def verify(output: Path, gateway_binary: Path, sender_binary: Path, migration_ma
         for path in (source_path(REPO, 'orchestrator')).glob('*.py'):
             shutil.copy2(path, context / 'orchestrator' / path.name)
         shutil.copy2(source_path(REPO, 'orchestrator/database-migration-registry.json'), context / 'orchestrator/database-migration-registry.json')
+        shutil.copy2(source_path(REPO, 'orchestrator/requirements.txt'), context / 'requirements.txt')
         shutil.copy2(gateway_binary, context / 'gateway')
         shutil.copy2(sender_binary, context / 'sender')
         shutil.copytree(source_path(REPO, 'cc2api/web/dist'), context / 'dist')
         # 使用现有隔离测试底座提供系统依赖，实际业务程序均由本次源码替换。
-        (context / 'Dockerfile').write_text('''FROM vibebench-v3-control:v3-verify-kernel-online-final AS control
+        (context / 'Dockerfile').write_text('''ARG CONTROL_BASE
+ARG ACCOUNT_BASE
+FROM ${CONTROL_BASE} AS control
+COPY requirements.txt /tmp/verify-requirements.txt
+RUN pip install --no-cache-dir -r /tmp/verify-requirements.txt
 COPY orchestrator/ /app/
 COPY gateway /app/claude-code-gateway
 COPY dist /app/web/dist
@@ -265,12 +275,27 @@ ENV PROJECT_LIBRARY_DIR=/isolated-empty-library
 ARG RELEASE
 ARG REVISION
 LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.system-update-protocol="1" vibebench.verification="platform-update"
-FROM vibebench-v3-account:v3-verify-kernel-online-final AS account
+FROM ${ACCOUNT_BASE} AS account
 COPY sender /usr/local/bin/account-sender
 ARG RELEASE
 ARG REVISION
 ARG CONTENT
 LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.system-update-protocol="1" vibebench.account-runtime-protocol="1" vibebench.verification="platform-update" vibebench.test-content=$CONTENT
+''')
+        if gateway_binary.parent.name == 'debug':
+            # RustEmbed调试模式按编译期绝对路径读取资源；生产发行仍使用嵌入资源。
+            dockerfile = context / 'Dockerfile'
+            dockerfile.write_text(dockerfile.read_text().replace('COPY dist /app/web/dist',
+                'COPY dist /app/web/dist\nCOPY dist ' + str(source_path(REPO, 'cc2api/web/dist'))
+                + '\nRUN mkdir -p ' + str(source_path(REPO, 'cc2api'))))
+        if native_root:
+            shutil.copy2(native_root / '293-a/ccrb-runtime', context / 'ccrb-runtime')
+            shutil.copy2(native_root / '280-a/ccrb-runtime', context / 'ccrb-runtime-280')
+            dockerfile = context / 'Dockerfile'
+            dockerfile.write_text(dockerfile.read_text() + '''COPY ccrb-runtime /usr/local/bin/ccrb-runtime
+COPY ccrb-runtime-280 /usr/local/bin/ccrb-runtime-280
+ARG NATIVE_VERSIONS
+LABEL vibebench.native-runtime-versions=$NATIVE_VERSIONS vibebench.native-platform-managed="1"
 ''')
         candidate = strict_json(migration_manifest.read_bytes()) if migration_manifest else None
         if candidate:
@@ -386,10 +411,12 @@ LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.v
             address = client.networks.get('vibebench-v3-' + deployment).attrs['IPAM']['Config'][0]['Gateway']
             proxy_port = int(proxy.attrs['NetworkSettings']['Ports']['1081/tcp'][0]['HostPort'])
             # 经本地宿主端口访问合成代理，使账号网络切换后仍使用同一冻结代理配置。
+            # 原生账号的旧端点继续走HTTPS转发；保持权威后端，避免长流准备提前改变待迁移布局。
             response = request('POST', '/admin/accounts', json={'name': 'synthetic-running', 'email': 'update@example.invalid',
                 'auth_type': 'oauth', 'access_token': 'synthetic-access', 'refresh_token': 'synthetic-refresh',
                 'expires_at': int((time.time() + 7200) * 1000), 'proxy_url': f'http://{address}:{proxy_port}',
-                'auto_poll_usage': False, 'auto_telemetry': False})
+                'auto_poll_usage': False, 'auto_telemetry': False,
+                'request_backend': 'native293' if native_root else 'legacy'})
             assert response.status_code == 201, response.text[:512]
             gateway_account_id = response.json()['id']
             response = request('POST', '/admin/tokens', json={'name': 'synthetic-update', 'allowed_accounts': str(gateway_account_id)})
@@ -409,11 +436,18 @@ try:
    row=r._row(name,aid,'Asia/Tokyo')
    import pathlib,base64
    ca=r._root(row)/'runtime/verification-ca.der';ca.parent.mkdir(parents=True,exist_ok=True);ca.write_bytes(base64.b64decode(CERTIFICATE))
-   r.ensure(account)
+   row,_=r.ensure(account)
+   if NATIVE and name.endswith('running'):
+    import json
+    from runtime_files import atomic_json
+    reference={'release':'v0.1.0-beta.6','launcher_sha256':'a'*64}
+    config=json.loads(r._sender_config(row).read_text());config['native'].update(release=reference,kernel_generation='historical')
+    r._write_sender_config(row,config)
+    atomic_json(r._root(row)/'runtime/native-kernel-upgrade.json',{'state':'active','account_id':REMOTE,'current':reference,'binding_generation':row['generation']})
   else:
    row=r._row(name,aid,'Asia/Tokyo');r._update(row,state='stopped')
 finally:r.heartbeat_pool.shutdown()
-'''.replace('PROXY_PORT', str(proxy_port)).replace('PROXY', repr(address)).replace('REMOTE', str(gateway_account_id)).replace('CERTIFICATE', repr(base64.b64encode((proxy_data / 'ca.der').read_bytes()).decode()))
+'''.replace('NATIVE', repr(bool(native_root))).replace('PROXY_PORT', str(proxy_port)).replace('PROXY', repr(address)).replace('REMOTE', str(gateway_account_id)).replace('CERTIFICATE', repr(base64.b64encode((proxy_data / 'ca.der').read_bytes()).decode()))
             result = runtime.exec_run(['python', '-c', code])
             assert result.exit_code == 0, result.output.decode(errors='replace')[-2000:]
             rows = account_rows()
@@ -424,7 +458,9 @@ finally:r.heartbeat_pool.shutdown()
             for index in range(4):
                 release = f'ci-{counter + index}-1'
                 images = {}
-                extra_arguments = []
+                extra_arguments = ['--build-arg', 'CONTROL_BASE=' + control_base, '--build-arg', 'ACCOUNT_BASE=' + account_base]
+                if native_root:
+                    extra_arguments += ['--build-arg', 'NATIVE_VERSIONS=' + ('2.1.293' if index == 0 else '2.1.280,2.1.293')]
                 if candidate:
                     bases = ({'control': 'vibebench-v3-control:v3-verify-native-warm-20261112',
                         'account': 'vibebench-v3-account:v3-verify-native-warm-20261112'} if index == 0
@@ -488,7 +524,7 @@ finally:r.heartbeat_pool.shutdown()
                 'V3_RELEASE': releases[0]['control']['release'],
                 'V3_CONTROL_IMAGE': releases[0]['control']['reference'], 'V3_ACCOUNT_IMAGE': releases[0]['account']['reference'],
                 'V3_ADMIN_PASSWORD': uuid.uuid4().hex * 2, 'V3_INTERNAL_TOKEN': uuid.uuid4().hex * 2,
-                'V3_SESSION_SECRET': uuid.uuid4().hex * 2, 'V3_ACCOUNT_MEMORY': '1536m', 'V3_MAX_ACTIVE_ACCOUNTS': '2'}
+                'V3_SESSION_SECRET': uuid.uuid4().hex * 2, 'V3_ACCOUNT_MEMORY': 'unlimited' if native_root else '1536m', 'V3_MAX_ACTIVE_ACCOUNTS': '2'}
             atomic_text(env, ''.join(key + '=' + value + '\n' for key, value in values.items()))
             for directory in (data, data / 'gateway', data / 'bench'):
                 directory.mkdir(mode=0o700, exist_ok=True)
@@ -507,7 +543,7 @@ finally:r.heartbeat_pool.shutdown()
                     labels={'vibebench.product': 'v3', 'vibebench.deployment': deployment,
                         'com.docker.compose.project': prefix + deployment, 'com.docker.compose.network': 'v3'})
             subprocess.run(['docker', 'compose', '--env-file', str(env), '-f', str(compose), 'up', '-d'], check=True,
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
             wait_for(runtime_ready, '初始隔离控制服务未就绪')
             assert prepare_installation(env, folders[0], update_root, public)['status'] == 'planned'
             prepare_installation(env, folders[0], update_root, public, apply=True)
@@ -611,12 +647,34 @@ assert engine.status()['migration_capability'] is True
             assert all(controls()[role].id != identity for role, identity in old_controls.items())
             assert all(controls()[role].name.startswith('flower2api-' + deployment + '-') for role in ('gateway', 'orchestrator'))
             migrated = account_rows()
-            assert all(row['generation'] > before['generation'] and row['fingerprint_json'] == before['fingerprint_json']
-                for row, before in zip(migrated[:-1], before_accounts[:-1]))
+            for row, before in zip(migrated[:-1], before_accounts[:-1]):
+                old_fingerprint, new_fingerprint = json.loads(before['fingerprint_json']), json.loads(row['fingerprint_json'])
+                assert row['generation'] > before['generation'] and row['fingerprint_json'] == before['fingerprint_json'], {
+                    'name': row['name'], 'generations': [before['generation'], row['generation']],
+                    'changed_fingerprint_fields': sorted(key for key in old_fingerprint.keys() | new_fingerprint.keys()
+                        if old_fingerprint.get(key) != new_fingerprint.get(key))}
             assert migrated[-1] == before_accounts[-1]
             assert all(client.containers.get(row[key]).name.startswith('flower2api-') for row in migrated[:-1]
                 for key in ('container_id', 'sender_container_id', 'network_container_id'))
             passed('真实旧命名部署迁入 flower2api 正式基线', operation=result)
+            if native_root:
+                running = next(row for row in migrated if row['name'] == 'synthetic-running')
+                private = data / 'bench/environments' / running['environment_id']
+                config = json.loads((private / 'runtime/sender/sender.json').read_text())
+                assert config['native']['runtimes'] == {'2.1.280': {'binary_path': '/usr/local/bin/ccrb-runtime-280'}}
+                assert 'release' not in config['native'] and 'kernel_generation' not in config['native']
+                record = json.loads((private / 'runtime/native-kernel-upgrade.json').read_text())
+                assert record['management'] == 'platform' and record['current'] is None
+                for version in ('2.1.293','2.1.280'):
+                    response = request('POST', '/v1/messages', headers={'Authorization':'Bearer ' + business_token,
+                        'User-Agent':f'claude-cli/{version} (external, cli)'}, json={'model':'claude-sonnet-4-6',
+                        'max_tokens':32,'messages':[{'role':'user','content':'platform-native-' + version}]})
+                    assert response.status_code == 200, response.text[:512]
+                latest = next(row for row in account_rows() if row['name'] == 'synthetic-running')
+                assert latest['generation'] == running['generation']
+                assert all(latest[key] == running[key] for key in ('container_id','sender_container_id','network_container_id'))
+                passed('旧293登记升级后真实双版API沿原容器发送，历史独立选择归一', generation=running['generation'])
+
             before_accounts = migrated
             submit(2)
             result = wait_for(finished, '账号组件重建未结束')
@@ -697,18 +755,28 @@ assert engine.status()['migration_capability'] is True
             report = {'deployment': deployment, 'scenes': results, 'real_model_calls': 0}
             atomic_json(output / 'results.json', report)
             return report
-        except BaseException:
+        except BaseException as failure:
             facts = []
-            for role, container in controls().items():
+            # 多账号具有同名角色；逐容器保留证据，避免角色字典覆盖实际失败的发送器。
+            for container in client.containers.list(all=True, filters={'label': [
+                    'vibebench.product=v3', 'vibebench.deployment=' + deployment]}):
                 logs = container.logs(tail=70).decode(errors='replace')
                 for key_name in ('V3_ADMIN_PASSWORD', 'V3_INTERNAL_TOKEN', 'V3_SESSION_SECRET'):
                     if values.get(key_name):
                         logs = logs.replace(values[key_name], '[已脱敏]')
-                facts.append({'role': role, 'logs': logs})
+                facts.append({'role': container.labels.get('vibebench.role'),
+                    'environment_id': container.labels.get('vibebench.environment'),
+                    'logs': logs, 'state': container.attrs.get('State')})
             diagnostic = root / 'updates/worker-error.json'
             state = strict_json(safe_read(update_root / 'state.json')) if (update_root / 'state.json').exists() else {}
             last = update_root / 'operations' / state['last_operation'] / 'operation.json' if state.get('last_operation') else None
+            launch_error = getattr(failure, 'stderr', b'') or b''
+            launch_error = launch_error.decode(errors='replace') if isinstance(launch_error, bytes) else launch_error
+            for key_name in ('V3_ADMIN_PASSWORD', 'V3_INTERNAL_TOKEN', 'V3_SESSION_SECRET'):
+                if values.get(key_name):
+                    launch_error = launch_error.replace(values[key_name], '[已脱敏]')
             atomic_json(output / 'failure.json', {'scenes': results, 'containers': facts,
+                'launch_error': launch_error[-8000:],
                 'worker_error': strict_json(diagnostic.read_bytes()) if diagnostic.exists() else None,
                 'operation': strict_json(safe_read(last)) if last and last.exists() else None,
                 'active_operation': state.get('active_operation'),
@@ -739,8 +807,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description='隔离 Docker 验证平台在线安装、回退和进程恢复')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--retention-only', action='store_true', help='只执行独立真实镜像保留与回收场景')
-    parser.add_argument('--gateway-binary', type=Path, default=source_path(REPO, 'cc2api/target/release/claude-code-gateway'))
-    parser.add_argument('--sender-binary', type=Path, default=source_path(REPO, 'cc2api/target/release/account-sender'))
+    parser.add_argument('--gateway-binary', type=Path, default=source_path(REPO, 'cc2api/target/release/claude-code-gateway'),
+        help='启用v3-verification并兼容测试底座glibc的隔离网关二进制')
+    parser.add_argument('--sender-binary', type=Path, default=source_path(REPO, 'cc2api/target/release/account-sender'),
+        help='启用v3-verification并兼容测试底座glibc的隔离发送器二进制')
+    parser.add_argument('--native-runtime-root', type=Path, help='已验收280-a／293-a制品目录')
+    parser.add_argument('--control-base', default='vibebench-v3-control:v3-verify-kernel-online-final')
+    parser.add_argument('--account-base', default='vibebench-v3-account:v3-verify-kernel-online-final')
     parser.add_argument('--migration-manifest', type=Path, help='使用真实旧/新镜像验收迁移底座接入及故障恢复')
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
     parser.add_argument('--policy', type=Path, help=argparse.SUPPRESS)
@@ -755,7 +828,7 @@ def main() -> None:
         report = verify_retention(args.output)
         print(json.dumps({'passed': report['passed'], 'real_model_calls': 0}, ensure_ascii=False))
         return
-    report = verify(args.output, args.gateway_binary, args.sender_binary, args.migration_manifest)
+    report = verify(args.output, args.gateway_binary, args.sender_binary, args.migration_manifest, args.native_runtime_root, args.control_base, args.account_base)
     print(json.dumps({'passed': len(report['scenes']), 'real_model_calls': 0}, ensure_ascii=False))
 
 

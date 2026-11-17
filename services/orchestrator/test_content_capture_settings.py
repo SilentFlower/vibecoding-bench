@@ -155,16 +155,20 @@ class ContentCaptureTests(unittest.TestCase):
         self.assertIsNone(self.lease)
         self.assertFalse(read_settings(self.runtime, self.row)['enabled'])
 
-    def test_kernel_download_blocks_capture_before_lease_and_rebuild(self):
-        """真实下载标记保持原代次；采集维护零租约写入、零重建。@return None。"""
-        original = dict(self.row)
+    def test_retired_download_allows_capture_and_pending_operation_still_blocks(self):
+        """退役下载释放设置门禁，未完成维护继续在申请租约前拒绝。@return None。"""
         atomic_json(self.root / 'runtime/native-kernel-upgrade.json',
             {'state': 'active', 'preparing_release': 'v0.1.0-beta.6'})
         self.assertFalse(pending_upgrade(self.root))
-        self.assertTrue(pending_upgrade(self.root, include_preparing=True))
+        self.assertFalse(pending_upgrade(self.root, include_preparing=True))
+        self.assertTrue(self.apply(True)['enabled'])
+        self.runtime.ensure.assert_called_once()
+        atomic_json(self.root / 'runtime/native-kernel-upgrade.json', {'state': 'switching'})
+        self.runtime.gateway._request.reset_mock()
+        self.runtime._stop_environment.reset_mock()
+        self.runtime.ensure.reset_mock()
         with self.assertRaisesRegex(ValueError, '内核正在维护'):
-            self.apply(True)
-        self.assertEqual(self.row, original)
+            self.apply(False)
         self.runtime.gateway._request.assert_not_called()
         self.runtime._stop_environment.assert_not_called()
         self.runtime.ensure.assert_not_called()

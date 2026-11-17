@@ -47,7 +47,7 @@ import docker
 from docker.errors import DockerException, NotFound
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from native_capture import CaptureExpired, read_capture
-from native_kernel_upgrade import run_upgrade, status as native_kernel_status
+from native_kernel_upgrade import status as native_kernel_status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -57,7 +57,6 @@ from pydantic import BaseModel, ConfigDict, StrictBool, StrictFloat, StrictInt, 
 from cpu_resources import read_resources as read_cpu_resources, set_resources as set_cpu_resources
 from content_capture_settings import read_settings as read_content_capture, set_settings as set_content_capture
 from native_criu_settings import read_settings as read_criu, set_settings as set_criu
-from native_kernel_releases import discover_releases
 from native_sender import NativePreparationBlocked
 from requests.exceptions import RequestException
 from sse_starlette.sse import EventSourceResponse
@@ -768,7 +767,7 @@ class Cc2ApiClient:
                 **({"x-v3-service-token": os.environ.get("V3_INTERNAL_TOKEN", "")} if
                     (path == "/admin/accounts" and body and body.get("cli_identity"))
                     or path == '/admin/runtime/credential-capabilities'
-                    or re.fullmatch(r'/admin/runtime/accounts/[0-9]+/(?:native-kernel-probe|proxy-selection)', path)
+                    or re.fullmatch(r'/admin/runtime/accounts/[0-9]+/proxy-selection', path)
                     or re.fullmatch(r'/admin/runtime/task-proxy-operations/[a-f0-9]{32}/claim', path)
                     or re.fullmatch(r"/admin/accounts/[0-9]+/(?:oauth-ownership|oauth-credentials/import(?:/[a-f0-9]{32})?|cli-process/import)", path) else {}),
             },
@@ -12933,22 +12932,13 @@ def v3_set_content_capture(environment_id: str, body: ContentCaptureOperation) -
 
 
 @app.get('/api/environments/{environment_id}/native-kernel/releases')
-def v3_native_kernel_releases(environment_id: str, refresh: bool = False,
-                             source_version: Literal['2.1.280', '2.1.293'] = '2.1.293') -> dict:
-    """检查固定发行源的内核版本。
+def v3_native_kernel_releases(environment_id: str) -> dict:
+    """返回独立内核版本发现入口的退役说明。
 
-    :param environment_id: 唯一环境标识。
-    :param refresh: 是否显式刷新发行缓存。
-    :param source_version: 核对管理能力的官方源版本，省略时为293。
-    :return: 版本发现结果；准备和激活继续沿签名与源版本核验入口。
+    :param environment_id: 历史客户端传入的环境标识。
+    :return: HTTP410及平台统一管理说明。
     """
-    if not account_runtime:
-        raise HTTPException(404)
-    with account_runtime.environment_lock(environment_id):
-        row, _ = _content_capture_account(environment_id)
-        if native_kernel_status(account_runtime, row, source_version) is None:
-            raise HTTPException(409, '当前环境尚未提供原生内核管理')
-    return discover_releases(refresh)
+    raise HTTPException(410, '请求内核由平台版本统一管理，请通过系统更新升级或回退平台')
 
 
 class CriuOperation(ContentCaptureOperation):
@@ -13053,47 +13043,16 @@ def v3_set_cpu_resources(environment_id: str, body: CpuResourceOperation) -> dic
         raise HTTPException(503, "CPU调整暂时未完成，请重新读取实际额度") from None
 
 
-class NativeKernelOperation(BaseModel):
-    """管理页面提交的单环境内核操作。"""
-
-    model_config = ConfigDict(extra='forbid')
-    source_version: Literal['2.1.280', '2.1.293'] = '2.1.293'
-    operation: Literal['prepare', 'activate', 'rollback', 'recover']
-    operation_id: str
-    release: str | None = None
-    expected_sha256: str | None = None
-    expected_revision: str
 
 
 @app.post("/api/environments/{environment_id}/native-kernel")
-def v3_native_kernel(environment_id: str, body: NativeKernelOperation) -> dict:
-    """校验唯一账号绑定后执行本环境的内核操作。
+def v3_native_kernel(environment_id: str) -> dict:
+    """返回独立内核操作入口的退役说明。
 
-    :param environment_id: 固定环境标识。
-    :param body: 准备、激活、回滚或对账。
-    :return: 不含凭据的操作及版本状态。
+    :param environment_id: 历史客户端传入的环境标识。
+    :return: HTTP410及平台统一管理说明。
     """
-    if not account_runtime:
-        raise HTTPException(404)
-    connection = get_db()
-    try:
-        entry = connection.execute("SELECT e.*, a.cc2api_account_id AS gateway_account "
-            "FROM account_environments e JOIN accounts a ON e.account_id=a.id "
-            "WHERE e.environment_id=? AND a.deleted_at IS NULL AND a.cc2api_account_id IS NOT NULL "
-            "AND (SELECT COUNT(*) FROM accounts b WHERE b.cc2api_account_id=a.cc2api_account_id "
-            "AND b.deleted_at IS NULL)=1", (environment_id,)).fetchone()
-    finally:
-        connection.close()
-    if not entry:
-        raise HTTPException(404, "账号没有唯一的 V3 环境绑定")
-    try:
-        return run_upgrade(account_runtime, dict(entry), entry['gateway_account'],
-            body.operation, body.operation_id, body.release, body.expected_sha256, body.expected_revision,
-            source_version=body.source_version)
-    except ValueError as exc:
-        raise HTTPException(409, str(exc)) from None
-    except (OSError, DockerException, RequestException):
-        raise HTTPException(503, "内核操作未完成，请查看状态并对账") from None
+    raise HTTPException(410, '请求内核由平台版本统一管理，请通过系统更新升级或回退平台')
 
 
 @app.post("/api/environments/{environment_id}/maintenance")

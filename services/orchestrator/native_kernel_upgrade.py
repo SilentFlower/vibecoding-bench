@@ -1,548 +1,269 @@
-"""按官方源版本隔离请求内核的签名分发及账号在线切换。"""
+"""平台内置内核的只读信息和历史独立选择迁移。"""
 from __future__ import annotations
 
-import hashlib
 import json
-import os
-import re
-import shutil
-import subprocess
-import tempfile
-import time
-import urllib.request
-import uuid
 from pathlib import Path
-from urllib.parse import urlsplit
 
-from native_sender import ASSET, SHA256, SHA256_280, VERSION, VERSION_280
+from native_sender import SHA256, SHA256_280, VERSION, VERSION_280, builtin_config, installed_versions
 from runtime_files import atomic_json
 
-TAG = re.compile(r'v0\.1\.0-beta\.[1-9][0-9]{0,8}')
-DIGEST = re.compile(r'[a-f0-9]{64}')
-PUBLIC_KEY = re.compile(r'[a-f0-9]{64}')
-SOURCE = '8968405e26db478af44eabc4635ab5ca557057b702a54460a59c13e1b253e978'
-REPOSITORY = 'https://github.com/SilentFlower/cc-runtime-bridge/releases/download'
-DOWNLOAD_HOSTS = {'github.com', 'release-assets.githubusercontent.com', 'objects.githubusercontent.com'}
 PENDING = {'draining', 'switching', 'restoring', 'finishing', 'reconcile'}
-
-
-class ReleaseRedirect(urllib.request.HTTPRedirectHandler):
-    """只跟随固定发布源的 HTTPS 附件跳转。"""
-
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        """核对下一跳地址并保留 urllib 的跳转次数限制。"""
-        target = urlsplit(newurl)
-        if target.scheme != 'https' or target.netloc not in DOWNLOAD_HOSTS:
-            raise ValueError('内核下载跳转不在发布来源白名单')
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
-
-
-def _download(url: str, path: Path, limit: int) -> None:
-    deadline = time.monotonic() + 90
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), ReleaseRedirect())
-    with opener.open(url, timeout=10) as response, path.open('xb') as output:
-        total = 0
-        while chunk := response.read1(65536):
-            total += len(chunk)
-            if total > limit or time.monotonic() >= deadline:
-                raise ValueError('内核下载超过大小或时间限制')
-            output.write(chunk)
-        output.flush()
-        os.fsync(output.fileno())
-
-
-def _verify_manifest(folder: Path, release: str, key: str, source_version: str = '2.1.293') -> dict:
-    source = _source_identity(source_version)
-    manifest = folder / 'runtime-release.json'
-    signature = folder / 'runtime-release.sig'
-    if manifest.stat().st_size > 4096 or signature.stat().st_size != 64:
-        raise ValueError('内核发布清单或签名大小不符')
-    with tempfile.TemporaryDirectory(prefix='v3-kernel-key-') as directory:
-        public = Path(directory) / 'ed25519.der'
-        # 原始 32 字节公钥转为 OpenSSL 所需的 Ed25519 SPKI。
-        public.write_bytes(bytes.fromhex('302a300506032b6570032100' + key))
-        checked = subprocess.run(['openssl', 'pkeyutl', '-verify', '-pubin', '-keyform', 'DER',
-            '-inkey', str(public), '-rawin', '-in', str(manifest), '-sigfile', str(signature)],
-            capture_output=True, timeout=5)
-    if checked.returncode:
-        raise ValueError('内核发布签名无效')
-    def unique_fields(items):
-        result = dict(items)
-        if len(result) != len(items):
-            raise ValueError('内核发布清单存在重复字段')
-        return result
-    value = json.loads(manifest.read_bytes(), object_pairs_hook=unique_fields)
-    exact = {'schema_version': 1, 'release': release, 'platform': 'linux-x64', 'asset': ASSET,
-        'source_version': source_version, 'source_sha256': source, 'worker_schema': 2,
-        'raw_input_protocol': 1, 'resource_contract': 1}
-    fields = set(exact) | {'launcher_sha256', 'launcher_bytes', 'image_sha256', 'image_bytes'}
-    if not isinstance(value, dict) or set(value) != fields or any(
-            type(value[k]) is not type(v) or value[k] != v for k, v in exact.items()):
-        raise ValueError('内核发布平台、来源或协议不兼容')
-    for name, limit in (('launcher', 27_933_052), ('image', 134_217_728)):
-        sha, size = value[f'{name}_sha256'], value[f'{name}_bytes']
-        if not isinstance(sha, str) or not DIGEST.fullmatch(sha) or type(size) is not int or not 0 < size <= limit:
-            raise ValueError('内核制品身份字段无效')
-    return value
-
-
-def _verify_binary(path: Path, manifest: dict) -> None:
-    with path.open('rb') as artifact:
-        if os.fstat(artifact.fileno()).st_size != manifest['launcher_bytes'] or (
-                hashlib.file_digest(artifact, 'sha256').hexdigest() != manifest['launcher_sha256']):
-            raise ValueError('内核分发文件摘要或大小不符')
-
-
-def stage_release(store: Path, release: str, key: str, source_version: str = '2.1.293') -> dict:
-    """下载并验证固定标签的制品，原子发布到 sender 只读目录。
-
-    :param store: 部署私有制品目录。
-    :param release: 精确 beta 标签。
-    :param key: 部署固定 Ed25519 公钥。
-    :param source_version: 本次目标官方源版本。
-    :return: 已验证的精确制品引用。
-    """
-    if not isinstance(release, str) or not TAG.fullmatch(release) or not PUBLIC_KEY.fullmatch(key):
-        raise ValueError('内核版本或发布公钥无效')
-    store.mkdir(mode=0o755, parents=True, exist_ok=True)
-    # 已准备的标签也可离线核验；同标签出现多个摘要时保留现状。
-    release_dir = store / release
-    if release_dir.is_dir():
-        candidates = [path for path in release_dir.iterdir() if DIGEST.fullmatch(path.name)]
-        if len(candidates) > 1:
-            raise ValueError('内核发布标签有多个摘要，需对账')
-        if candidates:
-            cached = candidates[0]
-            manifest = _verify_manifest(cached, release, key, source_version)
-            if manifest['launcher_sha256'] != cached.name:
-                raise ValueError('已准备内核的精确身份不一致')
-            _verify_binary(cached / ASSET, manifest)
-            return {'release': release, 'launcher_sha256': cached.name}
-    if shutil.disk_usage(store).free < 64 * 1024 * 1024:
-        raise ValueError('准备内核需要至少 64 MiB 可用空间')
-    with tempfile.TemporaryDirectory(dir=store, prefix='.download-') as temporary:
-        folder = Path(temporary) / 'files'
-        folder.mkdir(mode=0o700)
-        for name, limit in (('runtime-release.json', 4096), ('runtime-release.sig', 64)):
-            _download(f'{REPOSITORY}/{release}/{name}', folder / name, limit)
-        manifest = _verify_manifest(folder, release, key, source_version)
-        sha = manifest['launcher_sha256']
-        reference = {'release': release, 'launcher_sha256': sha}
-        # 已选发行在平台升级后可能成为内置版本；仍按签名来源准备，保留持久选择。
-        target = store / release / sha
-        target.parent.mkdir(mode=0o755, exist_ok=True)
-        if not target.exists():
-            _download(f'{REPOSITORY}/{release}/{ASSET}', folder / ASSET, manifest['launcher_bytes'])
-            _verify_binary(folder / ASSET, manifest)
-            (folder / ASSET).chmod(0o555)
-            for name in ('runtime-release.json', 'runtime-release.sig'):
-                (folder / name).chmod(0o444)
-            folder.chmod(0o755)
-            try:
-                folder.rename(target)
-            except OSError:
-                if not target.is_dir():
-                    raise
-            directory = os.open(target.parent, os.O_DIRECTORY)
-            try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
-        if _verify_manifest(target, release, key, source_version) != manifest:
-            raise ValueError('已发布目录与候选清单不一致')
-        _verify_binary(target / ASSET, manifest)
-        return reference
-
-
-def _source_identity(source_version: str) -> str:
-    if source_version == '2.1.280':
-        return '1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b'
-    if source_version == '2.1.293':
-        return SOURCE
-    raise ValueError('未知官方原生运行时版本')
-
-
-def _selected_config(config: dict, source_version: str) -> dict:
-    _source_identity(source_version)
-    native = config['native']
-    selected = native.get('runtimes', {}).get(source_version)
-    if selected is None and source_version == '2.1.293':
-        return native
-    expected = '/usr/local/bin/ccrb-runtime-280' if source_version == '2.1.280' else '/usr/local/bin/ccrb-runtime'
-    if not isinstance(selected, dict) or selected.get('binary_path') != expected:
-        raise ValueError('当前账号镜像尚未安装指定原生运行时')
-    return selected
+TERMINAL = {'idle', 'active', 'restored', 'failed'}
+VERSIONS = ('2.1.280', '2.1.293')
 
 
 def _record(root: Path, source_version: str = '2.1.293') -> Path:
-    _source_identity(source_version)
+    if source_version not in VERSIONS:
+        raise ValueError('未知官方原生运行时版本')
     return root / ('runtime/native-kernel-upgrade-280.json' if source_version == '2.1.280' else 'runtime/native-kernel-upgrade.json')
 
 
-def _load(root: Path, source_version: str = '2.1.293') -> dict:
-    path = _record(root, source_version)
+def _read(path: Path) -> dict:
+    if path.is_symlink():
+        raise ValueError('历史内核记录不能是符号链接')
     try:
-        return json.loads(path.read_text())
+        if path.stat().st_size > 65536:
+            raise ValueError('历史内核记录超过大小预算')
+        value = json.loads(path.read_text())
     except FileNotFoundError:
         return {}
+    if not isinstance(value, dict):
+        raise ValueError('历史内核记录格式无效')
+    return value
+
+
+def _load(root: Path, source_version: str = '2.1.293') -> dict:
+    return _read(_record(root, source_version))
+
+
+def _migration(root: Path) -> Path:
+    return root / 'runtime/native-kernel-platform-migration.json'
+
+
+def migration_context(root: Path, row: dict, account_id: int) -> bool:
+    """校验受控重建的持久上下文。@param root 私有目录。@param row 当前环境。@param account_id 唯一账号。@return 是否属于本次迁移。"""
+    value = _read(_migration(root))
+    return (value.get('account_id') == account_id and value.get('environment_id') == row['environment_id']
+        and type(value.get('generation')) is int and row['generation'] in (value['generation'], value['generation'] + 1))
 
 
 def pending_upgrade(root: Path, *, include_preparing: bool = False) -> bool:
-    """查询固定环境有无待处理的内核操作。
+    """保护历史未完成维护。@param root 环境私有根。@param include_preparing 兼容历史调用，退役候选退出门禁。@return 是否需要对账。"""
+    migration = _migration(root)
+    if migration.exists() or migration.is_symlink():
+        _read(migration)
+        return True
+    records = [_load(root, version) for version in VERSIONS]
+    return any(record and record.get('state', 'idle') not in TERMINAL for record in records)
 
-    :param root: 当前账号私有目录。
-    :param include_preparing: 重建类维护同时排除候选下载，保护下载完成时的原代次上下文。
-    :return: 当前操作是否阻止调用方继续。
+
+def validate_records(root: Path, account_id: int | None, *, reconciled: bool = False) -> list[tuple[str, dict]]:
+    """在环境副作用之前核对全部历史记录。
+
+    :param root: 持有生命周期锁的环境私有目录。
+    :param account_id: 当前绑定网关账号；未绑定环境只允许空记录。
+    :param reconciled: 调用者已在原租约中完成中断对账。
+    :return: 全部通过归属和维护状态核验的记录。
     """
-    records = [_load(root, version) for version in ('2.1.280', '2.1.293')]
-    return any(record.get('state') in PENDING or (include_preparing and bool(record.get('preparing_release'))) for record in records)
+    records = [(version, _load(root, version)) for version in VERSIONS]
+    for _, record in records:
+        if not record:
+            continue
+        if account_id is None or record.get('account_id') != account_id:
+            raise ValueError('历史内核选择与当前账号归属不符')
+        if record.get('state', 'idle') not in TERMINAL and not reconciled:
+            raise ValueError('历史内核维护待环境对账')
+    return records
 
 
-def applied_kernel(root: Path, account_id: int, source_version: str = '2.1.293') -> dict:
-    """读取已提交的版本选择，供同账号sender重建时恢复。
+def migrate_records(root: Path, account_id: int, *, reconciled: bool = False) -> None:
+    """在受控重建边界将历史选择写为旧平台可读的内置状态。
 
-    :param root: 账号私有根目录。
-    :param account_id: 当前绑定的网关账号ID。
-    :param source_version: 目标官方源版本，省略时沿历史293合同。
-    :return: 已提交的发行选择与内核代次；缺少同账号记录时为空字典。
+    :param root: 已持有生命周期锁的环境目录。
+    :param account_id: 当前唯一绑定的网关账号。
+    :param reconciled: 调用者已经核对活动、代次和旧租约。
+    :return: None；全部记录通过归属检查后才开始原子写入。
     """
-    record = _load(root, source_version)
-    if not record or record.get('account_id') != account_id:
-        return {}
-    if record.get('state') in PENDING:
-        raise ValueError('请求内核升级尚待对账')
-    return {key: record[key] for key in ('current', 'kernel_generation') if key in record}
+    records = validate_records(root, account_id, reconciled=reconciled)
+    for version, record in records:
+        if not record:
+            continue
+        if (record.get('management') == 'platform' and record.get('state') == 'restored'
+                and all(record.get(key) is None for key in ('current','kernel_generation','previous','prepared','preparing_release'))
+                and not record.get('previous_available')):
+            continue
+        # 保留一份有界摘要。旧平台读取current为空，回退时自然采用目标镜像内置版本。
+        atomic_json(_record(root, version), {'account_id': account_id, 'state': 'restored',
+            'management': 'platform', 'current': None, 'kernel_generation': None,
+            'previous': None, 'previous_available': False, 'prepared': None, 'preparing_release': None,
+            'migrated_from': {key: record[key] for key in
+                ('state', 'current', 'operation_id', 'binding_generation') if key in record}})
 
 
-def release_key() -> str:
-    """读取部署内原生账号共用的发行信任根。
+def archive_binding_records(root: Path, account_id: int | None) -> None:
+    """在原绑定门禁内归档终态记录，使下一绑定采用平台内置选择。
 
-    :return: 有效发行公钥；未配置或格式错误时为空字符串。
+    :param root: 已持有环境锁且旧发送器已停止的私有目录。
+    :param account_id: 交接前的网关绑定；首次绑定为None。
+    :return: None；未知归属和未完成迁移保持拒绝。
     """
-    value = os.environ.get('V3_NATIVE_RELEASE_PUBLIC_KEY', '')
-    return value if PUBLIC_KEY.fullmatch(value) else ''
-
-
-def _shown(reference: dict | None, source_version: str = '2.1.293') -> dict:
-    _source_identity(source_version)
-    return reference if reference is not None else {'release': VERSION_280, 'launcher_sha256': SHA256_280} if source_version == '2.1.280' else {'release': VERSION, 'launcher_sha256': SHA256}
-
-
-def _revision(record: dict, row: dict) -> str:
-    return f"{row['generation']}:{record.get('revision', 'initial')}"
+    if pending_upgrade(root):
+        raise ValueError('历史内核维护待环境对账')
+    records = validate_records(root, account_id)
+    for version, record in records:
+        if not record:
+            continue
+        path = _record(root, version)
+        # 先持久化审计再移除活动记录；中断重试可覆盖同一账号的归档，DB提交前后均采用内置选择。
+        atomic_json(path.with_name(f'{path.stem}.account-{account_id}.json'), record)
+        path.unlink()
 
 
 def status(runtime, row: dict, source_version: str = '2.1.293') -> dict | None:
-    """显示所选源版本的在线内核状态。
+    """投影目标内置身份；实际进程状态沿原生准备观察单独显示。
 
-    :param runtime: 当前运行时协调器。
-    :param row: 环境身份与代次记录。
-    :param source_version: 目标官方源版本，省略时沿历史293合同。
-    :return: 对应版本的安全状态；管理能力尚未接入时为None。
+    :param runtime: 环境协调器。
+    :param row: 环境身份和代次。
+    :param source_version: 官方源版本。
+    :return: 已安装版本的只读信息，基础后端或缺失安装返回None。
     """
-    if not release_key() or not row.get('sender_container_id'):
-        return None
-    value = _load(runtime._root(row), source_version)
+    _record(runtime._root(row), source_version)
     try:
         config = json.loads(runtime._sender_config(row).read_text())
-        if not config.get('native') or (value and value.get('account_id') != config['binding']['account_id']):
+        native = config.get('native')
+        if not isinstance(native, dict):
             return None
-        _selected_config(config, source_version)
-    except (OSError, KeyError, ValueError):
+        selected = native.get('runtimes', {}).get(source_version)
+        if selected is None and source_version == '2.1.293':
+            selected = native
+        if not isinstance(selected, dict):
+            return None
+        try:
+            validate_records(runtime._root(row), config['binding']['account_id'])
+            pending = pending_upgrade(runtime._root(row))
+        except ValueError:
+            # 归属或日志异常只投影维护提示，避免把旧记录误当作当前运行身份。
+            pending = True
+        legacy = bool(selected.get('release') or selected.get('kernel_generation'))
+        builtin = {'release': VERSION_280, 'launcher_sha256': SHA256_280} if source_version == '2.1.280' else {
+            'release': VERSION, 'launcher_sha256': SHA256}
+        return {'management': 'platform', 'source_version': source_version,
+            'state': 'reconcile' if pending else 'migration_required' if legacy else 'builtin',
+            'revision': str(row['generation']), 'current': selected.get('release') if legacy else builtin,
+            'builtin': builtin, 'platform_release': config['binding'].get('release_id'),
+            'error': '历史内核维护需要环境对账' if pending else None}
+    except FileNotFoundError:
         return None
-    same_generation = value.get('binding_generation') == row['generation']
-    return {'state': 'preparing' if value.get('preparing_release') else value.get('state', 'idle'),
-        'source_version': source_version,
-        'preparing_release': value.get('preparing_release'), 'operation_id': value.get('operation_id'),
-        'revision': _revision(value, row),
-        'current': _shown(value.get('current'), source_version), 'builtin': _shown(None, source_version),
-        'previous': _shown(value.get('previous'), source_version) if value.get('previous_available') else None,
-        'prepared': value.get('prepared'), 'pid': value.get('pid') if same_generation else None,
-        'image_sha256': value.get('image_sha256') if same_generation else None, 'error': value.get('prepare_error') or value.get('error'),
-        'binding_generation': value.get('binding_generation')}
-
-
-def _context(runtime, row: dict, account_id: int, source_version: str = '2.1.293') -> dict:
-    from account_isolation import role_container
-    if row.get('state') not in ('ready', 'cli_reconcile'):
-        raise ValueError('原生账号环境尚未就绪')
-    sender = role_container(runtime, row, 'sender')
-    sender.reload()
-    if sender.status != 'running' or not any(m.get('Destination') == '/runtime-releases'
-            and not m.get('RW') for m in sender.attrs.get('Mounts', [])):
-        raise ValueError('发送器尚未启用只读内核版本目录')
-    config = json.loads(runtime._sender_config(row).read_text())
-    binding = config['binding']
-    if (binding['account_id'] != account_id or binding['environment_id'] != row['environment_id']
-            or binding['generation'] != row['generation'] or not config.get('native')):
-        raise ValueError('原生发送器归属或配置已变化')
-    _selected_config(config, source_version)
-    return config
-
-
-def run_upgrade(runtime, row: dict, account_id: int, operation: str,
-                operation_id: str, release: str | None, expected_sha256: str | None, expected_revision: str,
-                source_version: str = '2.1.293') -> dict:
-    """为固定账号执行准备、切换、回滚或中断对账。
-
-    :param runtime: 当前 V3 运行时协调器。
-    :param row: 环境与角色身份快照。
-    :param account_id: 该环境唯一绑定的网关账号。
-    :param operation: prepare、activate、rollback、recover。
-    :param operation_id: 幂等请求 UUID。
-    :param release: 准备或激活的精确标签。
-    :param expected_sha256: 激活或回滚时，管理员确认的目标分发摘要。
-    :param expected_revision: 管理端读取并确认的不可复用操作版本。
-    :param source_version: 独立准备、激活和回退的官方源版本。
-    :return: 操作完成后可显示的受限状态。
-    """
-    environment_id = row['environment_id']
-    key = release_key()
-    if not key or not isinstance(operation_id, str) or str(uuid.UUID(operation_id)) != operation_id:
-        raise ValueError('未配置有效内核发行公钥或操作标识无效')
-    root = runtime._root(row)
-    record_path = _record(root, source_version)
-    lock = runtime.environment_lock(environment_id)
-    lease_path = f'/admin/runtime/accounts/{account_id}/lease'
-    request = runtime.gateway._request
-
-    def save(**changes):
-        record.update(changes)
-        atomic_json(record_path, record)
-
-    def owned(snapshot):
-        lease = snapshot.get('lease')
-        if not lease or lease.get('owner') != 'kernel:' + record['operation_id']:
-            return None
-        generation = record.get('lease_generation')
-        if generation and lease.get('generation') != generation:
-            return None
-        return lease
-
-    def check_revision():
-        if expected_revision != _revision(record, row):
-            raise ValueError('内核操作状态已变化，请刷新后确认')
-
-    def lease_action(action):
-        return request('POST', lease_path, {'operation': action, 'owner': 'kernel:' + record['operation_id'],
-            'generation': record.get('lease_generation')})
-
-    def probe(config, target, generation):
-        _selected_config(config, source_version)['release'] = target
-        _selected_config(config, source_version)['kernel_generation'] = generation
-        runtime._write_sender_config(row, config)
-        result = request('POST', f'/admin/runtime/accounts/{account_id}/native-kernel-probe',
-            {'owner': 'kernel:' + record['operation_id'], 'lease_generation': record['lease_generation'],
-             'binding': config['binding'], 'target': {'release': target, 'kernel_generation': generation, 'source_version': source_version}},
-            timeout=115)
-        if (result.get('state') != 'ready' or not result.get('pid') or result.get('release') != target
-                or result.get('kernel_generation') != generation or result.get('account_id') != account_id
-                or result.get('environment_id') != environment_id or result.get('generation') != row['generation']):
-            raise ValueError('内核预热回执身份不一致')
-        if source_version == '2.1.280' and result.get('version') != source_version:
-            raise ValueError('内核预热回执源版本不一致')
-        if not DIGEST.fullmatch(result.get('image_sha256') or ''):
-            raise ValueError('缺少实际执行体核验回执')
-        return {'pid': result['pid'], 'image_sha256': result['image_sha256']}
-
-    if operation == 'prepare':
-        if not isinstance(release, str) or not TAG.fullmatch(release):
-            raise ValueError('内核版本标签无效')
-        with lock:
-            _context(runtime, row, account_id, source_version)
-            record = _load(root, source_version)
-            if record.get('prepare_operation_id') == operation_id:
-                if record.get('prepare_requested') != release or record.get('prepare_revision') != expected_revision:
-                    raise ValueError('重复准备标识与原请求不一致')
-                return status(runtime, row, source_version)
-            check_revision()
-            if record.get('preparing_release') or record.get('state') in PENDING or record.get('account_id', account_id) != account_id:
-                raise ValueError('已有内核操作待处理')
-            save(account_id=account_id, prepare_operation_id=operation_id, preparing_release=release,
-                prepare_requested=release, prepare_revision=expected_revision, revision=str(uuid.uuid4()), prepare_error=None)
-        try:
-            reference = stage_release(runtime.data / 'native-releases', release, key, source_version)
-            with lock:
-                _context(runtime, row, account_id, source_version)
-                record = _load(root, source_version)
-                if record.get('prepare_operation_id') != operation_id or record.get('preparing_release') != release:
-                    raise ValueError('准备操作已改变，请刷新后重试')
-                save(prepared=reference, preparing_release=None)
-        except Exception:
-            with lock:
-                record = _load(root, source_version)
-                if record.get('prepare_operation_id') == operation_id:
-                    save(preparing_release=None, prepare_error='候选下载、校验或归属检查失败')
-            raise
-        return status(runtime, row, source_version)
-
-    with lock:
-        config = _context(runtime, row, account_id, source_version)
-        record = _load(root, source_version)
-        if record.get('account_id', account_id) != account_id:
-            raise ValueError('内核操作绑定已变化')
-        if operation == 'recover':
-            check_revision()
-            if record.get('state') not in PENDING:
-                return status(runtime, row, source_version)
-            if record.get('binding_generation') != row['generation']:
-                raise ValueError('待对账操作与当前发送器代次不一致')
-            if record.get('state') != 'reconcile':
-                raise ValueError('操作正在执行或需重启对账')
-            snapshot = request('GET', lease_path)
-            lease = owned(snapshot)
-            if snapshot.get('lease') and not lease:
-                raise ValueError('门禁已由其他操作持有')
-            if not lease and record.get('reconcile_from') == 'finishing':
-                if (_selected_config(config, source_version).get('release') != record.get('current')
-                        or _selected_config(config, source_version).get('kernel_generation') != record.get('kernel_generation')):
-                    raise ValueError('提交记录和实际发送器选择不一致')
-                save(state=record['finish_state'], revision=str(uuid.uuid4()))
-                return status(runtime, row, source_version)
-            if record.get('reconcile_from') == 'draining':
-                if _selected_config(config, source_version).get('release') != record.get('original'):
-                    raise ValueError('排空阶段的内核选择已变化')
-                # 排空阶段还没有写入候选，原租约即使过期也可按所有权直接释放。
-                if lease:
-                    save(lease_generation=lease['generation'])
-                    lease_action('release')
-                save(state='failed', revision=str(uuid.uuid4()), error='切换在排空阶段结束')
-                return status(runtime, row, source_version)
-            if not lease or snapshot.get('active') != 0 or runtime._sender_active(row) != 0:
-                raise ValueError('账号门禁或请求状态待核对')
-            save(state='restoring', revision=str(uuid.uuid4()), lease_generation=lease['generation'])
-        else:
-            if record.get('operation_id') == operation_id:
-                if (record.get('operation') != operation or record.get('operation_revision') != expected_revision
-                        or record.get('operation_release') != release
-                        or _shown(record.get('target'), source_version)['launcher_sha256'] != expected_sha256):
-                    raise ValueError('重复操作标识与原请求不一致')
-                return status(runtime, row, source_version)
-            check_revision()
-            if record.get('preparing_release') or record.get('state') in PENDING:
-                raise ValueError('已有内核操作待处理')
-            if operation == 'activate':
-                target = record.get('prepared')
-                if not target or target['release'] != release:
-                    raise ValueError('已准备的内核候选变化，请刷新后确认')
-            elif operation == 'rollback' and record.get('previous_available'):
-                target = record.get('previous')
-            else:
-                raise ValueError('内核操作不可用')
-            if _shown(target, source_version)['launcher_sha256'] != expected_sha256:
-                raise ValueError('目标内核摘要已变化，请刷新后确认')
-            current = _selected_config(config, source_version).get('release')
-            if target == current or current != record.get('current'):
-                raise ValueError('候选已生效或当前内核状态漂移')
-            if target is not None:
-                folder = runtime.data / 'native-releases' / target['release'] / target['launcher_sha256']
-                manifest = _verify_manifest(folder, target['release'], key, source_version)
-                if manifest['launcher_sha256'] != target['launcher_sha256']:
-                    raise ValueError('内核候选已变化')
-                _verify_binary(folder / ASSET, manifest)
-            save(state='draining', operation_id=operation_id, operation=operation, account_id=account_id,
-                operation_release=release, operation_revision=expected_revision, revision=str(uuid.uuid4()),
-                binding_generation=row['generation'], original=current, target=target,
-                prior_previous=record.get('previous'), prior_previous_available=record.get('previous_available', False),
-                lease_generation=None, error=None)
-            try:
-                lease = owned(lease_action('prepare'))
-                if not lease:
-                    raise ValueError('未取得账号维护门禁')
-                save(lease_generation=lease['generation'])
-            except Exception:
-                save(state='reconcile', reconcile_from='draining', error='维护门禁结果待核对')
-                raise
-
-    if operation != 'recover':
-        try:
-            deadline = time.monotonic() + 120
-            while True:
-                snapshot = request('GET', lease_path)
-                if not owned(snapshot):
-                    raise ValueError('账号维护门禁已变化')
-                if snapshot.get('active') == 0 and runtime._sender_active(row) == 0:
-                    lease_action('claim')
-                    break
-                if time.monotonic() >= deadline:
-                    raise TimeoutError('账号长流排空超时')
-                if owned(snapshot)['expires_at'] < time.time() + 10:
-                    lease_action('heartbeat')
-                time.sleep(0.5)
-        except Exception:
-            with lock:
-                try:
-                    snapshot = request('GET', lease_path)
-                    if owned(snapshot):
-                        lease_action('release')
-                    save(state='failed', error='排空失败，保留原内核')
-                except Exception:
-                    save(state='reconcile', reconcile_from='draining', error='排空门禁待核对')
-            return status(runtime, row, source_version)
-
-    with lock:
-        original, target = record['original'], record['target']
-        try:
-            config = _context(runtime, row, account_id, source_version)
-            if not owned(request('GET', lease_path)):
-                raise ValueError('账号维护门禁已变化')
-            if operation == 'recover':
-                current_lease = owned(request('GET', lease_path))
-                if not current_lease:
-                    raise ValueError('账号维护门禁已变化')
-                if current_lease.get('phase') == 'draining':
-                    lease_action('claim')
-                if record.get('reconcile_from') != 'finishing':
-                    raise ValueError('执行中断，恢复原内核')
-                # 先前已实际预热并提交选择，只补核执行体并完成释放。
-                generation = record['kernel_generation']
-                evidence = probe(config, record['current'], generation)
-                finish = {'state': record['finish_state'], **evidence}
-            else:
-                save(state='switching')
-                generation = record['operation_id']
-                evidence = probe(config, target, generation)
-                finish = {'state': 'active', 'current': target, 'previous': original,
-                    'previous_available': True, 'kernel_generation': generation, 'error': None, **evidence}
-        except Exception:
-            try:
-                if not owned(request('GET', lease_path)):
-                    raise ValueError('账号维护门禁已变化')
-                save(state='restoring')
-                config = _context(runtime, row, account_id, source_version)
-                generation = str(uuid.uuid4())
-                evidence = probe(config, original, generation)
-                finish = {'state': 'restored', 'current': original, 'kernel_generation': generation,
-                    'previous': record.get('prior_previous'), 'previous_available': record.get('prior_previous_available', False),
-                    'error': '候选未生效，已恢复原内核', **evidence}
-            except Exception:
-                save(state='reconcile', reconcile_from='restoring', error='恢复结果待核对，账号仍在维护')
-                return status(runtime, row, source_version)
-        # 先记下实测回执，再开放入场。中断后按门禁和回执决定收尾。
-        final_state = finish.pop('state')
-        save(**finish, state='finishing', finish_state=final_state)
-        try:
-            lease_action('release')
-            save(state=final_state)
-        except Exception:
-            save(state='reconcile', reconcile_from='finishing', error='内核已就绪，门禁释放结果待核对')
-        return status(runtime, row, source_version)
-
-
-def _recover_version(root: Path, source_version: str) -> bool:
-    """启动时识别未完成的操作，保留原门禁供明确对账。"""
-    record = _load(root, source_version)
-    phase = record.get('state')
-    if record.get('preparing_release'):
-        record.update(preparing_release=None, prepare_error='下载中断，可重新准备候选')
-        atomic_json(_record(root, source_version), record)
-    if phase in PENDING and phase != 'reconcile':
-        atomic_json(_record(root, source_version), {**record, 'state': 'reconcile', 'reconcile_from': phase,
-            'error': '内核升级中断，等待对账'})
-    return phase in PENDING
 
 
 def recover_interrupted(root: Path) -> bool:
-    """逐版恢复中断记录，保持账号共同维护门禁。@param root 账号私有根。@return 任一版本尚待对账。"""
-    results = [_recover_version(root, version) for version in ('2.1.280', '2.1.293')]
-    return any(results)
+    """将历史中断显式标为环境对账。@param root 环境根目录。@return 是否仍需对账。"""
+    for version in VERSIONS:
+        record = _load(root, version)
+        if record.get('preparing_release'):
+            # 下载入口已退役；保留中断审计，避免陈旧候选占用采集和CRIU设置的维护门禁。
+            record = {**record, 'preparing_release': None, 'cancelled_preparing_release': record['preparing_release']}
+            atomic_json(_record(root, version), record)
+        if record and record.get('state', 'idle') not in TERMINAL and record.get('state') != 'reconcile':
+            atomic_json(_record(root, version), {**record, 'state': 'reconcile',
+                'reconcile_from': record.get('state'), 'error': '历史内核维护中断，请执行环境对账'})
+    return pending_upgrade(root)
+
+
+def reconcile_legacy(runtime, row: dict, account: dict) -> None:
+    """在环境对账入口核对原租约，重建内置布局后收口历史维护。
+
+    :param runtime: 已持有环境锁的协调器。
+    :param row: 当前环境行。
+    :param account: 数据库当前账号。
+    :return: None；异常保留维护门禁和对账状态。
+    """
+    root = runtime._root(row)
+    journal_path = _migration(root)
+    journal = _read(journal_path)
+    if journal_path.exists() and not journal:
+        raise ValueError('内置内核迁移日志缺少归属信息，请核对原记录')
+    account_id = account.get('cc2api_account_id')
+    if journal and not migration_context(root, row, account_id):
+        raise ValueError('内置内核迁移归属或代次待核对')
+    records = journal.get('records') if journal else {version: _load(root, version) for version in VERSIONS}
+    if not isinstance(records, dict) or set(records) != set(VERSIONS) or any(not isinstance(value, dict) for value in records.values()):
+        raise ValueError('历史内核迁移记录格式无效')
+    pending = [record for record in records.values() if record and record.get('state', 'idle') not in TERMINAL]
+    if len(pending) != 1 or not account_id:
+        raise ValueError('历史内核维护缺少唯一操作和账号归属')
+    if runtime.environment_jobs(row['environment_id']) or runtime._execution_records(row):
+        raise ValueError('环境仍有活动作业，历史内核维护待对账')
+    with runtime.database() as connection:
+        count = connection.execute('SELECT COUNT(*) FROM accounts WHERE cc2api_account_id=? AND deleted_at IS NULL', (account_id,)).fetchone()[0]
+    if count != 1 or any(record and record.get('account_id') != account_id for record in records.values()):
+        raise ValueError('历史内核维护缺少唯一账号绑定')
+    record = pending[0]
+    phase = record.get('reconcile_from', record.get('state'))
+    if phase not in PENDING - {'reconcile'} or not record.get('operation_id'):
+        raise ValueError('历史内核维护阶段或操作身份未知，请核对原始记录')
+    if not journal and record.get('binding_generation') != row['generation']:
+        raise ValueError('历史内核维护代次待核对')
+    config = json.loads(runtime._sender_config(row).read_text())
+    binding = config['binding']
+    if binding.get('account_id') != account_id or binding.get('environment_id') != row['environment_id']:
+        raise ValueError('历史发送器绑定与环境不一致')
+    if binding.get('generation') != row['generation'] and not (
+            journal and not row.get('sender_container_id') and binding.get('generation') == journal['generation']):
+        raise ValueError('历史发送器绑定代次与环境不一致')
+    labels = runtime.client.images.get(runtime.image).attrs['Config'].get('Labels') or {}
+    versions = installed_versions(labels)
+    config['native'] = builtin_config(config.get('native'), versions)
+    if config['native'] is None:
+        raise ValueError('历史内核维护缺少原生发送器配置')
+    path = f'/admin/runtime/accounts/{account_id}/lease'
+    snapshot = runtime.gateway._request('GET', path)
+    lease = snapshot.get('lease')
+    if snapshot.get('active') != 0 or snapshot.get('waiting', 0) != 0 or snapshot.get('holders') or runtime._running_sender_active(row):
+        raise ValueError('账号仍有活动请求，历史内核维护待对账')
+    owner = 'kernel:' + record['operation_id']
+    if lease:
+        if lease.get('owner') != owner or not record.get('lease_generation') or lease.get('generation') != record['lease_generation']:
+            raise ValueError('维护租约属于其他操作或代次')
+        if lease.get('phase') not in ('draining', 'claimed', 'reconcile') or lease.get('exclusive') is not True:
+            raise ValueError('历史内核维护租约阶段未知')
+    elif phase != 'draining' and journal.get('phase') != 'finishing':
+        raise ValueError('历史内核切换缺少原维护租约，请核对归属')
+    stopped = journal.get('stopped', row['state'] == 'stopped')
+    journal = {'account_id': account_id, 'environment_id': row['environment_id'], 'generation': row['generation'],
+        'phase': 'rebuilding', 'stopped': stopped, 'records': records}
+    # 日志先于副作用持久化。即使旧选择已经归一或新容器只创建了一部分，也能恢复原操作租约。
+    atomic_json(journal_path, journal)
+    if not lease:
+        prepared = runtime.gateway._request('POST', path, {'operation': 'prepare', 'owner': owner})
+        lease = prepared.get('lease')
+        if (not lease or lease.get('owner') != owner or not lease.get('generation')
+                or lease.get('phase') not in ('draining', 'claimed', 'reconcile') or lease.get('exclusive') is not True):
+            raise ValueError('未取得历史内核维护门禁')
+        record['lease_generation'] = lease['generation']
+        atomic_json(journal_path, journal)
+        if prepared.get('active') != 0 or prepared.get('waiting', 0) != 0 or prepared.get('holders') or runtime._running_sender_active(row):
+            raise ValueError('重建门禁已关闭，等待原请求结束后再次对账')
+    if lease.get('phase') == 'draining':
+        claimed = runtime.gateway._request('POST', path, {'operation': 'claim', 'owner': owner, 'generation': lease['generation']})
+        current = claimed.get('lease')
+        if not current or current.get('owner') != owner or current.get('generation') != lease['generation'] or current.get('phase') != 'claimed':
+            raise ValueError('历史内核维护门禁领取结果待核对')
+        lease = current
+    try:
+        runtime._stop_environment(row, remove=True)
+        runtime._write_sender_config(row, config)
+        migrate_records(root, account_id, reconciled=True)
+        runtime._update(row, state='stopped')
+        if not stopped:
+            ready, _ = runtime.ensure(account, prepare_sender=False, native_migration=True)
+            row.update(ready)
+        journal.update(generation=row['generation'], phase='finishing')
+        atomic_json(journal_path, journal)
+        released = runtime.gateway._request('POST', path, {'operation': 'release', 'owner': owner, 'generation': lease['generation']})
+        if released.get('lease') is not None:
+            raise ValueError('历史内核维护门禁释放结果待核对')
+        journal_path.unlink()
+    except Exception:
+        runtime._update(row, state='reconcile')
+        raise

@@ -37,8 +37,8 @@ use crate::model::account::Account;
 use crate::model::request_diagnostics::RequestLogMode;
 use crate::service::native_contract::{NativeIdlePolicy, validate_idle_timeout};
 use crate::service::native_contract::{
-    NativeKernelPreparation, NativeKernelTarget, NativePreparation, NativePreparationControl,
-    NativePreparationStatus, NativeReadinessStatus, NativeSourceVersion,
+    NativePreparation, NativePreparationControl, NativePreparationStatus, NativeReadinessStatus,
+    NativeSourceVersion,
 };
 use crate::service::native_runtime::{NativePool, NativeSenderConfig, NativeSubmission};
 use crate::tlsfp::{TlsProfileId, get_request_client_for_profile};
@@ -478,7 +478,7 @@ impl PreparedTransport {
         &self,
         preparation: NativePreparation,
     ) -> Result<NativePreparationStatus, AppError> {
-        self.prepare_native_target(preparation, None).await
+        self.prepare_native_target(preparation).await
     }
 
     /// 只读取已绑定 sender 的当前身份就绪状态。
@@ -526,40 +526,9 @@ impl PreparedTransport {
         Ok(status)
     }
 
-    /// 以已核验的同部署绑定预热精确候选，不向上游提交业务。
-    /// @param binding 调度器持锁读取的 sender 绑定。
-    /// @param preparation 当前账号身份。
-    /// @param target 候选发布及操作代次。
-    /// @return 真实握手回执。
-    pub(crate) async fn probe_native_kernel(
-        binding: TransportBinding,
-        preparation: NativePreparation,
-        target: NativeKernelTarget,
-    ) -> Result<NativePreparationStatus, AppError> {
-        validate_binding(
-            &binding,
-            preparation.account_id,
-            &std::env::var("V3_DEPLOYMENT_ID").unwrap_or_default(),
-            &std::env::var("V3_RELEASE").unwrap_or_default(),
-        )?;
-        let client = Client::builder()
-            .no_proxy()
-            .redirect(Policy::none())
-            .connect_timeout(Duration::from_secs(5))
-            .build()
-            .map_err(|_| AppError::ServiceUnavailable("切换准备通道不可用".into()))?;
-        Self {
-            account_id: binding.account_id,
-            route: PreparedRoute::V3 { client, binding },
-        }
-        .prepare_native_target(preparation, Some(target))
-        .await
-    }
-
     async fn prepare_native_target(
         &self,
         mut preparation: NativePreparation,
-        target: Option<NativeKernelTarget>,
     ) -> Result<NativePreparationStatus, AppError> {
         let PreparedRoute::V3 { client, binding } = &self.route else {
             return Err(AppError::ServiceUnavailable(
@@ -569,25 +538,13 @@ impl PreparedTransport {
         preparation.account_id = self.account_id;
         preparation.environment_id = binding.environment_id.clone();
         preparation.generation = binding.generation;
-        let path = if target.is_some() {
-            "prepare-switch"
-        } else {
-            "prepare"
-        };
         let request = client
             .post(format!(
-                "{}/internal/native/{path}",
+                "{}/internal/native/prepare",
                 binding.endpoint.trim_end_matches('/')
             ))
-            .bearer_auth(&binding.secret);
-        let request = if let Some(target) = &target {
-            request.json(&NativeKernelPreparation {
-                target: target.clone(),
-                identity: preparation.clone(),
-            })
-        } else {
-            request.json(&preparation)
-        };
+            .bearer_auth(&binding.secret)
+            .json(&preparation);
         let response = request
             .timeout(Duration::from_secs(110))
             .send()
@@ -606,12 +563,6 @@ impl PreparedTransport {
             || status.version != preparation.source_version.as_str()
             || status.raw_input_protocol != 1
             || !matches!(status.state.as_str(), "ready" | "busy")
-            || target.as_ref().is_some_and(|target| {
-                status.release != target.release
-                    || status.kernel_generation.as_deref()
-                        != Some(target.kernel_generation.as_str())
-                    || status.state != "ready"
-            })
             || (status.state == "ready" && (status.pid.is_none() || status.idle_workers == 0))
         {
             return Err(AppError::ServiceUnavailable("原生准备回执归属不符".into()));
@@ -913,8 +864,18 @@ impl Drop for ActiveRequest {
 fn read_config(path: &str) -> Result<SenderConfig, AppError> {
     let bytes = std::fs::read(path)
         .map_err(|_| AppError::ServiceUnavailable("sender configuration unavailable".into()))?;
-    serde_json::from_slice(&bytes)
-        .map_err(|_| AppError::ServiceUnavailable("invalid sender configuration".into()))
+    let mut config: SenderConfig = serde_json::from_slice(&bytes)
+        .map_err(|_| AppError::ServiceUnavailable("invalid sender configuration".into()))?;
+    if let Some(native) = &mut config.native {
+        // 历史字段兼容解码，执行身份统一由本平台固定清单决定。
+        native.release = None;
+        native.kernel_generation = None;
+        for runtime in native.runtimes.values_mut() {
+            runtime.release = None;
+            runtime.kernel_generation = None;
+        }
+    }
+    Ok(config)
 }
 
 fn authenticate(headers: &HeaderMap, config: &SenderConfig) -> Result<(), AppError> {
@@ -1118,7 +1079,7 @@ async fn native_prepare(
     Json(preparation): Json<NativePreparation>,
 ) -> Result<Json<NativePreparationStatus>, AppError> {
     let _guard = state.native_transition.read().await;
-    prepare_sender(&state, &headers, preparation, None).await
+    prepare_sender(&state, &headers, preparation).await
 }
 
 /// 在私有鉴权和精确绑定内只检查原生池，页面检查不触发进程启动。
@@ -1179,29 +1140,10 @@ async fn native_idle_policy(
     ))
 }
 
-/// 专用切换预热在 sender 内排除已入场流和迟到的普通准备。
-/// @param state sender 状态。
-/// @param headers 私有服务鉴权。
-/// @param input 精确操作代次、内核引用和账号身份。
-/// @return 候选真实预热结果。
-async fn native_prepare_switch(
-    State(state): State<SenderState>,
-    headers: HeaderMap,
-    Json(input): Json<NativeKernelPreparation>,
-) -> Result<Json<NativePreparationStatus>, AppError> {
-    let config = read_config(&state.config_path)?;
-    authenticate(&headers, &config)?;
-    let _transition = timeout(Duration::from_secs(10), state.native_transition.write())
-        .await
-        .map_err(|_| AppError::ServiceUnavailable("发送器仍有原生请求或准备".into()))?;
-    prepare_sender(&state, &headers, input.identity, Some(input.target)).await
-}
-
 async fn prepare_sender(
     state: &SenderState,
     headers: &HeaderMap,
     preparation: NativePreparation,
-    target: Option<NativeKernelTarget>,
 ) -> Result<Json<NativePreparationStatus>, AppError> {
     let original_config = read_config(&state.config_path)?;
     authenticate(headers, &original_config)?;
@@ -1209,21 +1151,6 @@ async fn prepare_sender(
     let pool = state.native_pool.for_version(preparation.source_version);
     if state.evidence_error.load(Ordering::SeqCst) {
         return Err(AppError::ServiceUnavailable("账号证据写入异常".into()));
-    }
-    if let Some(target) = &target {
-        let native = config
-            .native
-            .as_ref()
-            .ok_or_else(|| AppError::ServiceUnavailable("未配置原生运行时".into()))?;
-        if target.source_version != preparation.source_version
-            || state.active.load(Ordering::SeqCst) != 0
-            || native.release != target.release
-            || native.kernel_generation.as_deref() != Some(target.kernel_generation.as_str())
-        {
-            return Err(AppError::ServiceUnavailable(
-                "候选内核或发送器活动状态已变化".into(),
-            ));
-        }
     }
     pool.verify(
         config
@@ -1234,12 +1161,7 @@ async fn prepare_sender(
     // 这里只借用既有绑定与截止校验结构；input 没有业务正文，也不会进入 execute。
     let identity = preparation_identity(preparation, &config);
     let deadline = validate_request(&identity.request, &config)?;
-    let status = if target.is_some() {
-        pool.prepare_switch(config.clone(), identity, deadline)
-            .await?
-    } else {
-        pool.prepare(config.clone(), identity, deadline).await?
-    };
+    let status = pool.prepare(config.clone(), identity, deadline).await?;
     let current = read_config(&state.config_path)?;
     if serde_json::to_vec(&current).ok() != serde_json::to_vec(&original_config).ok() {
         return Err(AppError::ServiceUnavailable(
@@ -1404,10 +1326,6 @@ pub fn sender_router(config_path: String) -> Router {
         .route("/internal/native/readiness", post(native_readiness))
         .route("/internal/native/idle-policy", post(native_idle_policy))
         .route(
-            "/internal/native/prepare-switch",
-            post(native_prepare_switch),
-        )
-        .route(
             "/internal/native/prepare/cancel",
             post(native_prepare_cancel),
         )
@@ -1437,6 +1355,35 @@ mod tests {
     use std::path::PathBuf;
     use std::process::{Child, Command, Stdio};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    /// 历史root和每版发行选择兼容解码，执行配置收敛为平台内置。@return 无。
+    #[test]
+    fn legacy_release_selections_are_normalized_before_sender_execution() {
+        let path = temp_dir().join(format!("builtin-sender-{}.json", Uuid::new_v4()));
+        let reference = json!({"release":"v0.1.0-beta.6","launcher_sha256":"a".repeat(64)});
+        let value = json!({"binding":{"account_id":7,"environment_id":"synthetic","generation":3,
+            "endpoint":"http://localhost:8091","secret":"synthetic-private-secret","release_id":"synthetic"},
+            "proxy_url":"socks5://127.0.0.1:1080","allowed_origin":"https://api.anthropic.com",
+            "native":{"binary_path":"/usr/local/bin/ccrb-runtime","work_root":"/native","memory_mib":0,
+                "max_workers":6,"release":reference,"kernel_generation":"old-root",
+                "runtimes":{"2.1.280":{"binary_path":"/usr/local/bin/ccrb-runtime-280",
+                    "release":reference,"kernel_generation":"old-280"}}}});
+        fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+        let config = read_config(path.to_str().unwrap()).unwrap();
+        let native = config.native.as_ref().unwrap();
+        assert!(native.release.is_none());
+        assert!(native.kernel_generation.is_none());
+        let old_version = &native.runtimes[&NativeSourceVersion::Cc280];
+        assert!(old_version.release.is_none());
+        assert!(old_version.kernel_generation.is_none());
+        assert_eq!(native.max_workers, 6);
+        let selected = native_version_config(&config, NativeSourceVersion::Cc280).unwrap();
+        assert_eq!(
+            selected.native.unwrap().binary_path,
+            "/usr/local/bin/ccrb-runtime-280"
+        );
+        fs::remove_file(path).unwrap();
+    }
 
     /// 真实HTTP策略同步检查鉴权、账号代次、范围及旧sender兼容。@return 无。
     #[tokio::test]

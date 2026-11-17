@@ -2,9 +2,6 @@
 const ENVIRONMENT_STATES = {ready: '就绪', stopped: '已停止', starting: '启动中',
   reconcile: '待对账', cli_reconcile: 'CLI 待对账', profile_reauth: '画像授权中',
   profile_reauth_reconcile: '画像待对账'};
-const KERNEL_STATES = {idle: '可准备', preparing: '正在下载并校验', draining: '等待在途请求结束',
-  switching: '预热候选', restoring: '恢复原版', finishing: '核对并开放接单', active: '已生效',
-  failed: '保持原版', restored: '已恢复原版', reconcile: '待对账'};
 const KERNEL_BUSY_STATES = ['preparing', 'draining', 'switching', 'restoring', 'finishing'];
 
 /** 汇总各版内核状态，保护账号共享维护门禁。@param {object} row 环境快照。@return {string[]} 状态集合。 */
@@ -30,7 +27,6 @@ function leaveEnvironments() {
   ui.timer = null;
   ui.openedLocation = null;
   closeEnvironmentWorkspace(true);
-  closeNativeKernelDialog(true);
   closeCpuResourceDialog(true);
   closeContentCaptureDialog(true);
 }
@@ -80,8 +76,7 @@ async function renderEnvironments() {
     if (current()) {
       refresh.disabled = false;
       // 操作期间只串行读取状态；离页立即释放定时器，避免迟到回执污染下一页。
-      if (ui.pending.size || ui.rows.some(row => kernelStates(row).some(value => KERNEL_BUSY_STATES.includes(value))
-          || row.native_preparation?.checking === true || row.native_preparation?.state === 'preparing'
+      if (ui.pending.size || ui.rows.some(row => row.native_preparation?.checking === true || row.native_preparation?.state === 'preparing'
           || row.native_preparation?.reason === 'backend_pending')) {
         ui.timer = setTimeout(renderEnvironments, 2000);
       } else if (ui.rows.some(row => row.native_preparation)) {
@@ -180,7 +175,7 @@ function renderEnvironmentCard(row) {
   <div class="environment-id"><code>${id}</code><span>第 ${escapeHTML(row.generation??'未知')} 代</span></div>
   <div class="environment-role-strip">${[['cli','CLI'],['sender','发送器'],['network','网络']].map(([role,label])=>`<div class="${row.role_status?.[role]==='running'?'running':''}"><i></i><span>${label}</span><strong>${escapeHTML(roleLabels[row.role_status?.[role]]||'未知')}</strong></div>`).join('')}</div>
   <div class="environment-resources-grid"><div><span>内存配置</span><strong>${escapeHTML(fp.mem==='unlimited'?'未限制':fp.mem||'未提供')}</strong></div><div><span>CLI CPU</span><strong>${escapeHTML(cpu?.cli??'未采集')}<small>${cpu?.cli!=null?' 核':''}</small></strong></div><div><span>发送器 CPU</span><strong>${escapeHTML(cpu?.sender??'未采集')}<small>${cpu?.sender!=null?' 核':''}</small></strong></div><div><span>网络 CPU</span><strong>${escapeHTML(cpu?.network??'未采集')}<small>${cpu?.network!=null?' 核':''}</small></strong></div></div>
-  <div class="environment-version-line"><span>CLI <strong>${escapeHTML((row.cli_versions||[]).join(' / ')||'未安装')}</strong></span>${open('kernel','内核 <strong>'+escapeHTML(row.native_kernel?.current?.release||'未提供')+'</strong> ›')}</div>
+  <div class="environment-version-line"><span>CLI <strong>${escapeHTML((row.cli_versions||[]).join(' / ')||'未安装')}</strong></span>${open('kernel','内核 <strong>'+escapeHTML(row.native_kernel?.management==='platform'?'平台配套':row.native_kernel?.current?.release||'未提供')+'</strong> ›')}</div>
   <section class="environment-readiness ${tone==='healthy'?'':tone}"><div><strong>${escapeHTML(({ready:'热进程就绪',busy:'进程使用中',preparing:'正在准备',unprepared:'等待准备',sleeping:'环境休眠',disabled:'常规请求通道',failed:'准备失败'})[prep?.state]||'准备状态待核对')}</strong><span class="environment-job">${row.busy?'CLI 作业执行中':'CLI 作业空闲'}</span></div><p>293 空闲暖进程 <b>${escapeHTML(prep?.idle_workers??'—')}</b> / 存活 <b>${escapeHTML(prep?.live_workers??'—')}</b> · 空闲 PID ${escapeHTML(prep?.pid??'未观测')}</p></section>
   <div class="environment-feature-row">${open('resources','<span>CRIU 加速</span><strong>'+escapeHTML(CRIU_STATES[row.criu?.state]||'待核对')+'</strong>')}${open('resources','<span>内容采集</span><strong>'+(row.content_capture?.applied?(row.content_capture.enabled?'已开启':'已关闭'):'待核对')+'</strong>')}</div>
   ${open('schedule','<span>'+escapeHTML(row.run_window?.message||'运行时段尚未提供')+' <small>'+escapeHTML(fp.tz||'')+'</small></span> ›','class="environment-schedule-summary"')}
@@ -226,7 +221,7 @@ function paintEnvironmentWorkspace() {
  const scheduleForm=state.runWindowConfig?.inline?$('#run-window-form'):null;
  const context=$('#environment-workspace-context'),status=ENVIRONMENT_STATES[row.state]||'未知状态：'+(row.state||'未提供');
  patchRuntimeContent(context,`<span class="initial">${runtimeIcon('box')}</span><div><strong>${escapeHTML(row.name||'未命名环境')}</strong><p>${row.gateway_account_id!=null?'网关账号 #'+escapeHTML(row.gateway_account_id):row.account_id!=null?'任务账号 #'+escapeHTML(row.account_id):'待提交的授权环境'} · 第 ${escapeHTML(row.generation??'未知')} 代</p></div><span class="status-dot ${row.state==='ready'?'':'off'}">${escapeHTML(status)}</span>`);
- const labels={overview:['运行概览','当前环境状态与运行组件'],resources:['资源与采集','在这里调整额度、内容采集与加速设置'],kernel:['请求内核','检查版本、准备候选并选择维护动作'],schedule:['运行时段','按账号当地时间安排工作窗口'],maintenance:['维护操作','选择操作后确认影响，当前环境信息持续保留']};
+ const labels={overview:['运行概览','当前环境状态与运行组件'],resources:['资源与采集','在这里调整额度、内容采集与加速设置'],kernel:['请求内核','查看平台配套版本与实际准备状态'],schedule:['运行时段','按账号当地时间安排工作窗口'],maintenance:['维护操作','选择操作后确认影响，当前环境信息持续保留']};
  content.innerHTML=Object.entries(labels).map(([key,[title,note]])=>`<section id="environment-section-${key}" data-workspace-section="${key}" role="tabpanel"><div class="workspace-section-heading"><h3>${title}</h3><p>${note}</p></div><div data-section-body="${key}"></div></section>`).join('');
  const scratch=document.createElement('div');scratch.innerHTML=renderEnvironmentDetailCard(row);
  for(const node of [...scratch.firstElementChild.children]){
@@ -247,7 +242,7 @@ function paintEnvironmentWorkspace() {
  const prepLabel=({ready:'原生准备就绪',busy:'暖进程使用中',preparing:'原生准备中',failed:'原生准备失败',unknown:'准备状态待检查',disabled:'使用原有转发'})[row.native_preparation?.state]||'状态待核对';
  const feature=value=>value?.applied===true?(value.enabled?'已生效':'已关闭'):value?.applied===false?'待应用':'状态未知';
  const metrics=`<div class="environment-dialog-stats"><div><span>CPU 额度</span><strong>${cpu?.cli!=null?escapeHTML(cpu.cli)+' 核':'未采集'}</strong></div><div><span>CRIU 加速</span><strong>${feature(row.criu)}</strong></div><div><span>内容采集</span><strong>${feature(row.content_capture)}</strong></div></div>`;
- const fields=[['CLI 版本',(row.cli_versions||[]).join(' / ')||'未安装'],['请求内核',row.native_kernel?.current?.release||'未提供'],['环境状态',status+' · '+(row.busy?'CLI 作业执行中':'CLI 作业空闲')],['原生准备',prepLabel]];
+ const fields=[['CLI 版本',(row.cli_versions||[]).join(' / ')||'未安装'],['请求内核',row.native_kernel?.management==='platform'?'平台配套':row.native_kernel?.current?.release||'未提供'],['环境状态',status+' · '+(row.busy?'CLI 作业执行中':'CLI 作业空闲')],['原生准备',prepLabel]];
  const properties='<div class="workspace-properties">'+fields.map(([label,value])=>`<div class="kv"><span>${label}</span><strong>${escapeHTML(value)}</strong></div>`).join('')+'</div>';
  const disabled=row.busy||state.environmentUI.pending.has(row.environment_id)||row.role_status?.cli!=='running';
  overview.insertAdjacentHTML('afterbegin',metrics+properties+`<div class="workspace-inline-actions"><button type="button" class="btn" data-physical-refresh="${escapeHTML(row.environment_id)}" data-environment="${escapeHTML(row.environment_id)}" ${disabled?'disabled':''}>${runtimeIcon('refresh')}刷新物理实测</button><button type="button" class="btn" data-env-tab="resources">调整资源与采集 ${runtimeIcon('arrow')}</button></div>`);
@@ -380,7 +375,7 @@ async function applyEnvironmentCriu(button) {
 }
 
 /**
- * 渲染服务器提供的内核版本、进度和在线管理能力。
+ * 渲染服务器提供的配套内核与实际准备观察。
  * @param {object} row 含 native_kernel 的环境摘要。
  * @return {string} 内核管理面板。
  */
@@ -389,35 +384,25 @@ function renderNativeKernel(row) {
   return renderNativeKernelVersion(row, '2.1.293', row.native_kernel);
 }
 
-/** 渲染单版内核管理，动作固定归属于对应源版本。
+/** 渲染单版内核只读信息，进程观察按源版本归属。
  * @param {object} row 当前环境。
  * @param {string} sourceVersion 固定280或293。
  * @param {object|null} kernel 对应版本状态。
  * @return {string} 安全转义的管理面板。
  */
 function renderNativeKernelVersion(row, sourceVersion, kernel) {
-  const id = row.environment_id, key = sourceVersion === '2.1.293' ? id : id + ':280';
-  if (!kernel && nativeRuntimePending(row)) return `<section class="env-kernel env-kernel-unavailable"><h4>请求内核 · ${sourceVersion}</h4><p>已选择原生运行时，等待环境准备。</p></section>`;
-  if (!kernel) return `<section class="env-kernel env-kernel-unavailable"><h4>请求内核 · ${sourceVersion}</h4><p>此环境当前未提供在线内核管理。</p></section>`;
-  const busy = kernelStates(row).some(value => KERNEL_BUSY_STATES.includes(value)) || state.environmentUI.pending.has(id);
-  const available = !busy && !row.busy && Object.hasOwn(KERNEL_STATES, kernel.state) && !kernelStates(row).includes('reconcile');
-  const version = reference => escapeHTML(reference?.release || '无');
-  const discovery = state.environmentUI.kernelReleases?.get(key), checking = state.environmentUI.checkingReleases?.has(key);
-  const currentNumber = kernel.current?.release?.match(/^v0\.1\.0-beta\.([1-9][0-9]{0,8})$/)?.[1];
-  const latestNumber = discovery?.latest?.match(/^v0\.1\.0-beta\.([1-9][0-9]{0,8})$/)?.[1];
-  const newer = currentNumber && latestNumber && Number(latestNumber) > Number(currentNumber);
-  const discoveryText = discovery?.state === 'stale' ? '版本检查失败，显示上次发现结果。准备时将重新验签。'
-    : discovery?.state === 'unavailable' ? '版本列表暂不可用，当前内核运行保持原状态。'
-    : discovery?.state === 'ready' ? (discovery.latest ? `${newer ? '发现新版' : '最新发现版本'}：${discovery.latest}` : '当前发行源暂无配套版本') : '可检查已发布的配套内核版本';
-  const button = (operation, label, enabled, digest = '') => `<button type="button" class="btn btn-sm ${operation === 'activate' ? 'btn-primary' : ''}" data-kernel-action="${operation}" data-kernel-source-version="${sourceVersion}" data-environment="${escapeHTML(id)}" data-kernel-revision="${escapeHTML(kernel.revision)}" data-kernel-release="${escapeHTML(kernel.prepared?.release || '')}" data-kernel-digest="${escapeHTML(digest)}" data-env-focus="${escapeHTML(key + ':' + operation)}" ${enabled ? '' : 'disabled'}>${label}</button>`;
-  return `<section class="env-kernel"><div class="env-section-head"><h4>请求内核 · ${sourceVersion}</h4><span class="env-tag">在线内核管理</span></div>
-    <div class="env-kernel-version"><strong>${version(kernel.current)}</strong><span role="status">${escapeHTML(KERNEL_STATES[kernel.state] || '状态待核对')}</span></div>
-    <div class="env-versions"><div><span>已准备候选</span><strong>${version(kernel.prepared)}</strong></div><div><span>上一版本</span><strong>${version(kernel.previous)}</strong></div></div>
-    <p class="env-muted" role="status">${escapeHTML(discoveryText)} · 镜像内置 ${version(kernel.builtin)}</p>
-    ${kernel.error ? `<p class="env-error" role="alert">${escapeHTML(kernel.error)}</p>` : ''}
-    ${row.busy ? '<p class="env-muted">CLI 作业执行中，请在空闲后操作内核。</p>' : ''}
-    <div class="env-actions"><button type="button" class="btn btn-sm" data-kernel-check data-kernel-source-version="${sourceVersion}" data-environment="${escapeHTML(id)}" data-env-focus="${escapeHTML(key + ':updates')}" ${busy || checking ? 'disabled' : ''}>${checking ? '检查中…' : '检查更新'}</button>${button('prepare', '选择版本', available)}${button('activate', '激活候选', available && kernel.prepared && kernel.prepared.launcher_sha256 !== kernel.current?.launcher_sha256, kernel.prepared?.launcher_sha256)}${button('rollback', '回滚内核', available && kernel.previous, kernel.previous?.launcher_sha256)}${kernel.state === 'reconcile' ? button('recover', '恢复对账', !busy && !row.busy) : ''}</div>
-    <details class="env-kernel-details" data-env-details="${escapeHTML(key + ':kernel')}"><summary>版本摘要与预热回执</summary><dl><dt>当前分发 SHA256</dt><dd><code>${escapeHTML(kernel.current?.launcher_sha256 || '未提供')}</code></dd><dt>候选分发 SHA256</dt><dd><code>${escapeHTML(kernel.prepared?.launcher_sha256 || '未准备')}</code></dd><dt>上一版分发 SHA256</dt><dd><code>${escapeHTML(kernel.previous?.launcher_sha256 || '无')}</code></dd><dt>上次预热回执 PID</dt><dd>${escapeHTML(kernel.pid ?? '未采集')}</dd><dt>实际映像 SHA256</dt><dd><code>${escapeHTML(kernel.image_sha256 || '未采集')}</code></dd></dl></details>
+  if (!kernel) return `<section class="env-kernel env-kernel-unavailable"><h4>请求内核 · ${escapeHTML(sourceVersion)}</h4><p>安装信息未提供，等待环境准备。</p></section>`;
+  const observation = row.native_preparation?.versions?.[sourceVersion]
+    || (sourceVersion === '2.1.293' ? row.native_preparation : null);
+  const states = {ready:'暖进程就绪',busy:'暖进程使用中',preparing:'准备中',unprepared:'等待按需准备',
+    sleeping:'环境休眠',maintenance:'环境维护中',failed:'准备失败',disabled:'原生方式已关闭',unknown:'运行状态待核对'};
+  return `<section class="env-kernel"><div class="env-section-head"><h4>请求内核 · ${escapeHTML(sourceVersion)}</h4><span class="env-tag">随平台版本交付</span></div>
+    <div class="env-kernel-version"><strong>${escapeHTML(kernel.builtin?.release || '未提供')}</strong><span role="status">${escapeHTML(states[observation?.state] || '运行状态待核对')}</span></div>
+    <p class="env-muted">升级或回退 flower2api 时，账号自动采用目标镜像配套的请求内核。</p>
+    <div class="env-versions"><div><span>环境平台批次</span><strong>${escapeHTML(kernel.platform_release || '未提供')}</strong></div><div><span>实际空闲 PID</span><strong>${escapeHTML(observation?.pid ?? '未观测')}</strong></div></div>
+    ${kernel.state === 'migration_required' ? '<p class="env-muted">历史独立选择等待空闲重建，平台升级将在维护阶段完成迁移。</p>' : ''}
+    ${kernel.state === 'reconcile' || kernel.error ? `<p class="env-error" role="alert">${escapeHTML(kernel.error || '历史内核维护待核对，请在环境维护中执行对账。')}</p>` : ''}
+    <details class="env-kernel-details"><summary>配套制品摘要</summary><dl><dt>镜像内置分发 SHA256</dt><dd><code>${escapeHTML(kernel.builtin?.launcher_sha256 || '未提供')}</code></dd></dl></details>
   </section>`;
 }
 
@@ -431,8 +416,6 @@ async function handleEnvironmentAction(button) {
   const ui = state.environmentUI, id = button.dataset.environment, generation = state.viewGeneration;
   if (!id || ui.pending.has(id)) return;
   if (button.hasAttribute('data-native-prepare')) return retryNativePreparation(button);
-  if (button.dataset.kernelAction) return openNativeKernelDialog(button);
-  if (button.hasAttribute('data-kernel-check')) return checkKernelUpdates(button);
   if (button.hasAttribute('data-criu-enabled')) return applyEnvironmentCriu(button);
   if (button.hasAttribute('data-cpu-resources')) return openCpuResourceDialog(button);
   if (button.hasAttribute('data-content-capture')) return openContentCaptureDialog(button);
@@ -465,158 +448,6 @@ async function handleEnvironmentAction(button) {
   }
 }
 
-/** 只读检查发行列表，迟到回包按页面代次丢弃。@param {HTMLButtonElement} button 检查按钮。@return {Promise<void>} 发现结果与页面刷新。 */
-async function checkKernelUpdates(button) {
-  const ui = state.environmentUI, id = button.dataset.environment, generation = state.viewGeneration;
-  const sourceVersion = button.dataset.kernelSourceVersion || '2.1.293';
-  const key = sourceVersion === '2.1.293' ? id : id + ':280';
-  if (!id || !['2.1.280', '2.1.293'].includes(sourceVersion) || ui.checkingReleases.has(key)) return;
-  ui.checkingReleases.add(key); paintEnvironments();
-  try {
-    const value = await API(`/environments/${encodeURIComponent(id)}/native-kernel/releases?refresh=true&source_version=${sourceVersion}`);
-    if (generation === state.viewGeneration && currentTab() === 'environments') ui.kernelReleases.set(key, value);
-  } catch (error) {
-    if (generation === state.viewGeneration) ui.feedback.set(id, '检查内核更新失败：' + error.message);
-  } finally {
-    ui.checkingReleases.delete(key);
-    if (generation === state.viewGeneration && currentTab() === 'environments') paintEnvironments();
-  }
-}
-
-/**
- * 打开内核操作窗口，冻结用户看到的版本和前置状态。
- * @param {HTMLButtonElement} button 已显示的内核动作。
- * @return {Promise<void>} 窗口与已发布版本列表加载完成。
- */
-async function openNativeKernelDialog(button) {
-  if (state.kernelDialog) return;
-  const id = button.dataset.environment;
-  const row = state.environmentUI.rows.find(item => item.environment_id === id);
-  const operation = button.dataset.kernelAction;
-  const sourceVersion = button.dataset.kernelSourceVersion || '2.1.293';
-  if (!row || !['2.1.280', '2.1.293'].includes(sourceVersion) || !['prepare', 'activate', 'rollback', 'recover'].includes(operation)) return;
-  const labels = {prepare: '准备内核', activate: '激活候选', rollback: '回滚内核', recover: '恢复对账'};
-  const kernel = row.native_kernels?.[sourceVersion] || (sourceVersion === '2.1.293' ? row.native_kernel : null);
-  if (!kernel) return;
-  const target = operation === 'activate' ? kernel.prepared : operation === 'rollback' ? kernel.previous : null;
-  const request = {id, operation, sourceVersion, revision: button.dataset.kernelRevision, digest: button.dataset.kernelDigest || null,
-    release: operation === 'activate' ? button.dataset.kernelRelease : null, generation: state.viewGeneration,
-    focus: button.dataset.envFocus, sending: false, loading: operation === 'prepare', versions: []};
-  state.kernelDialog = request;
-  const form = $('#native-kernel-form'), modal = $('#native-kernel-modal');
-  form.reset();
-  form.elements.release.disabled = operation !== 'prepare';
-  $('#native-kernel-release-field').classList.toggle('hidden', operation !== 'prepare');
-  $('#native-kernel-title').textContent = labels[operation];
-  $('#native-kernel-account').textContent = row.name + ' · ' + sourceVersion;
-  $('#native-kernel-current').textContent = kernel.current?.release || '待核对';
-  $('#native-kernel-target').textContent = operation === 'prepare' ? '选择已发布版本后下载并验签' : target?.release || '按服务器持久状态恢复';
-  $('#native-kernel-description').textContent = operation === 'prepare'
-    ? '准备期间当前内核继续接单。准备完成后可单独激活候选。'
-    : '将等待该账号在途请求结束，完成目标内核的预热与身份核验后继续接单。';
-  $('#native-kernel-feedback').textContent = '';
-  const submit = $('button[type="submit"]', form);
-  submit.textContent = labels[operation];
-  submit.disabled = request.loading;
-  form.onsubmit = submitNativeKernel;
-  modal.onkeydown = event => {
-    if (event.key !== 'Tab') return;
-    const nodes = $$('button:not(:disabled), input:not(:disabled), select:not(:disabled)', modal).filter(node => node.getClientRects().length);
-    const index = nodes.indexOf(document.activeElement);
-    if (event.shiftKey && index <= 0) { event.preventDefault(); nodes.at(-1)?.focus(); }
-    else if (!event.shiftKey && index === nodes.length - 1) { event.preventDefault(); nodes[0]?.focus(); }
-  };
-  openModal('#native-kernel-modal');
-  (operation === 'prepare' ? form.elements.release : $('button[type="submit"]', form)).focus();
-  if (operation === 'prepare') {
-    form.elements.release.replaceChildren(new Option('正在读取已发布版本…', ''));
-    form.elements.release.disabled = true;
-    try {
-      const value = await API(`/environments/${encodeURIComponent(id)}/native-kernel/releases?source_version=${sourceVersion}`);
-      if (state.kernelDialog !== request || request.generation !== state.viewGeneration) return;
-      state.environmentUI.kernelReleases.set(sourceVersion === '2.1.293' ? id : id + ':280', value);
-      const versions = Array.isArray(value.versions) ? value.versions.filter(item => typeof item?.release === 'string' && /^v0\.1\.0-beta\.[1-9][0-9]{0,8}$/.test(item.release)) : [];
-      request.versions = versions.map(item => item.release);
-      form.elements.release.replaceChildren(...versions.map(item => new Option(item.release, item.release)));
-      request.loading = false;
-      form.elements.release.disabled = !versions.length;
-      submit.disabled = !versions.length;
-      $('#native-kernel-feedback').textContent = !versions.length ? '暂无可选择版本，请关闭窗口后检查更新。'
-        : value.state === 'stale' ? '显示上次发现的版本。准备时仍会校验签名和精确摘要。' : '';
-      if (versions.length) form.elements.release.focus();
-    } catch (error) {
-      if (state.kernelDialog === request) {
-        request.failed = true;
-        $('#native-kernel-feedback').textContent = '读取版本失败：' + error.message + '。请关闭窗口后重新检查。';
-      }
-    }
-  }
-}
-
-/**
- * 关闭窗口并收口当前表单归属；导航强制失效，提交中的普通关窗保持等待。
- * @param {boolean} force 是否由导航强制关闭。
- * @return {boolean} 窗口是否已关闭。
- */
-function closeNativeKernelDialog(force = false) {
-  const request = state.kernelDialog, modal = $('#native-kernel-modal');
-  if (!modal || (request?.sending && !force)) return false;
-  state.kernelDialog = null;
-  modal.classList.add('hidden');
-  modal.onkeydown = null;
-  $$('[data-close]', modal).forEach(button => { button.disabled = false; });
-  if (request && !force) {
-    const trigger = $$('[data-env-focus]').find(node => node.dataset.envFocus === request.focus && !node.disabled);
-    (trigger || $('#environment-refresh'))?.focus({preventScroll: true});
-  }
-  return true;
-}
-
-/**
- * 提交冻结的单次内核操作，错误保留在原窗口并要求重新读取状态。
- * @param {SubmitEvent} event 真实表单提交事件。
- * @return {Promise<void>} 操作回执及状态读取完成。
- */
-async function submitNativeKernel(event) {
-  event.preventDefault();
-  const request = state.kernelDialog, ui = state.environmentUI, form = event.currentTarget;
-  if (!request || request.sending || request.loading || request.failed || request.generation !== state.viewGeneration) return;
-  const release = request.operation === 'prepare' ? form.elements.release.value.trim() : request.release;
-  if (request.operation === 'prepare' && !request.versions.includes(release)) return;
-  const random = crypto.getRandomValues(new Uint8Array(16));
-  random[6] = (random[6] & 15) | 64;
-  random[8] = (random[8] & 63) | 128;
-  const hex = Array.from(random, value => value.toString(16).padStart(2, '0')).join('');
-  const operation_id = [hex.slice(0,8), hex.slice(8,12), hex.slice(12,16), hex.slice(16,20), hex.slice(20)].join('-');
-  request.sending = true;
-  form.elements.release.disabled = true;
-  $$('[data-close]', $('#native-kernel-modal')).forEach(button => { button.disabled = true; });
-  const submit = $('button[type="submit"]', form);
-  submit.disabled = true;
-  $('#native-kernel-feedback').textContent = '操作已提交，正在等待服务器回执。';
-  ui.pending.add(request.id);
-  paintEnvironments();
-  // 弹窗保存冻结版本，列表的进度刷新只读，不更新已经打开的提交上下文。
-  renderEnvironments();
-  try {
-    await API(`/environments/${encodeURIComponent(request.id)}/native-kernel`, {method: 'POST', body: JSON.stringify({
-      operation: request.operation, source_version: request.sourceVersion, operation_id, release, expected_sha256: request.digest, expected_revision: request.revision
-    })});
-    if (state.kernelDialog !== request) return;
-    request.sending = false;
-    closeModal('#native-kernel-modal');
-    ui.feedback.set(request.id, '内核操作已完成，版本以最新读取状态为准。');
-  } catch (error) {
-    if (state.kernelDialog !== request) return;
-    request.failed = true;
-    $('#native-kernel-feedback').textContent = '内核操作失败：' + error.message + '。请关闭窗口并刷新环境状态后重新操作。';
-  } finally {
-    request.sending = false;
-    if (state.kernelDialog === request) $$('[data-close]', $('#native-kernel-modal')).forEach(button => { button.disabled = false; });
-    ui.pending.delete(request.id);
-    if (request.generation === state.viewGeneration && currentTab() === 'environments') await renderEnvironments();
-  }
-}
 /**
  * 按字段实际口径显示配置与观察值，零 RAM 仅表示明确无限制。
  * @param {string} key 字段名

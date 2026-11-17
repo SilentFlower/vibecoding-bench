@@ -126,9 +126,8 @@ pub(crate) fn verify_distribution(config: &NativeSenderConfig) -> Result<File, A
 }
 
 fn artifact(config: &NativeSenderConfig) -> Result<ReleaseArtifact, AppError> {
-    match &config.release {
-        Some(reference) => ReleaseArtifact::signed(reference, config.source_version),
-        None if config.source_version == NativeSourceVersion::Cc280 => Ok(ReleaseArtifact {
+    match config.source_version {
+        NativeSourceVersion::Cc280 => Ok(ReleaseArtifact {
             path: PathBuf::from(&config.binary_path),
             launcher_sha256: "21e7c3f85c698138c027622e1abc1f20b4f684847cce000d5f3ba9ecd9654229"
                 .into(),
@@ -136,7 +135,7 @@ fn artifact(config: &NativeSenderConfig) -> Result<ReleaseArtifact, AppError> {
             image_sha256: "b5ffd54de383a71681043e554156451e3ce277e67e2a4bf04da815a029caee63".into(),
             image_bytes: 111_603_784,
         }),
-        None => Ok(ReleaseArtifact {
+        NativeSourceVersion::Cc293 => Ok(ReleaseArtifact {
             path: PathBuf::from(&config.binary_path),
             launcher_sha256: LAUNCHER_SHA256.into(),
             launcher_bytes: 27_392_144,
@@ -2024,6 +2023,7 @@ impl NativePool {
     /// @param identity 当前账号和绑定。
     /// @param deadline 本轮预热截止。
     /// @return 真实新代回执，旧进程未收口时返回准备错误。
+    #[cfg(test)]
     pub(crate) async fn prepare_switch(
         self: &Arc<Self>,
         config: SenderConfig,

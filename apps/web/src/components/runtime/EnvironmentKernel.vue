@@ -1,39 +1,39 @@
 <script setup lang="ts">
-import { computed, ref, onUnmounted, watch } from 'vue';
-import { Button } from '../ui/button';
-import { ChoiceSelect } from '../ui/controls';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
-import { runtimeRequest, type RuntimeEnvironment, type KernelReleases } from './runtimeApi';
+import { computed } from 'vue';
+import type { RuntimeEnvironment } from './runtimeApi';
 
-/** 请求内核管理，提交版本独立于列表轮询。 */
-const props=defineProps<{environment:RuntimeEnvironment}>();
-const emit=defineEmits<{refresh:[];busy:[value:boolean]}>();
-type Operation='prepare'|'activate'|'rollback'|'recover';
-const labels:Record<Operation,string>={prepare:'准备内核',activate:'激活候选',rollback:'回滚内核',recover:'恢复对账'};
-const states:Record<string,string>={idle:'可准备',preparing:'正在下载并校验',draining:'等待在途请求结束',switching:'预热候选',restoring:'恢复原版',finishing:'核对并开放接单',active:'已生效',failed:'保持原版',restored:'已恢复原版',reconcile:'待对账'};
-const sourceVersion=ref<'2.1.280'|'2.1.293'>('2.1.293');
-const sourceOptions=[{value:'2.1.280',label:'Claude Code 2.1.280'},{value:'2.1.293',label:'Claude Code 2.1.293'}];
-const kernel=computed(()=>props.environment.native_kernels?.[sourceVersion.value]??(sourceVersion.value==='2.1.293'?props.environment.native_kernel:null));
-const busy=computed(()=>Object.values(props.environment.native_kernels??{'2.1.293':props.environment.native_kernel}).some(value=>['preparing','draining','switching','restoring','finishing'].includes(value?.state??'')));
-const otherBlocked=computed(()=>Object.entries(props.environment.native_kernels??{}).some(([version,value])=>version!==sourceVersion.value&&value?.state==='reconcile'));
-const available=computed(()=>!busy.value&&!otherBlocked.value&&!props.environment.busy&&!!states[kernel.value?.state??'']&&kernel.value?.state!=='reconcile');
-const discovery=ref<KernelReleases|null>(null),checking=ref(false),error=ref(''),feedback=ref('');
-const action=ref<{operation:Operation;sourceVersion:'2.1.280'|'2.1.293';revision:string;digest:string|null;release:string|null;current:string;target:string}|null>(null),release=ref(''),loading=ref(false),sending=ref(false),failed=ref(false),operationError=ref('');
-let alive=true,controller:AbortController|undefined,request=0;
-const options=computed(()=>(discovery.value?.versions??[]).filter(value=>/^v0\.1\.0-beta\.[1-9][0-9]{0,8}$/.test(value.release)).map(value=>({value:value.release,label:value.release})));
-/** 只读发现实际发行版本。@param refresh 强制检查发行源。@return 读取结束。 */
-async function check(refresh=true):Promise<void>{const version=++request;controller?.abort();controller=new AbortController();checking.value=true;error.value='';try{const result=await runtimeRequest<KernelReleases>(`/environments/${props.environment.environment_id}/native-kernel/releases?source_version=${sourceVersion.value}${refresh?'&refresh=true':''}`,{signal:controller.signal});if(alive&&version===request)discovery.value=result;}catch(cause){if(alive&&version===request&&(cause as Error).name!=='AbortError')error.value=(cause as Error).message;}finally{if(alive&&version===request)checking.value=false;}}
-/** 冻结按钮对应版本，候选列表读取失败保持可取消。@param operation 内核动作。@return 打开结束。 */
-async function open(operation:Operation):Promise<void>{const value=kernel.value;if(!value)return;const target=operation==='activate'?value.prepared:operation==='rollback'?value.previous:null;action.value={operation,sourceVersion:sourceVersion.value,revision:value.revision,digest:target?.launcher_sha256??null,release:operation==='activate'?target?.release??null:null,current:value.current?.release||'待核对',target:target?.release||(operation==='prepare'?'选择已发布版本后下载并验签':'按服务器持久状态恢复')};failed.value=false;operationError.value='';if(operation==='prepare'){loading.value=true;const original=action.value;await check(false);if(action.value!==original)return;loading.value=false;release.value=options.value[0]?.value??'';if(error.value){failed.value=true;operationError.value=error.value;}}}
-/** 提交唯一操作ID和冻结CAS，失联后通过持久状态恢复。@return 操作结束。 */
-async function submit():Promise<void>{const value=action.value;if(!value||loading.value||sending.value||failed.value)return;if(value.operation==='prepare'&&!options.value.some(option=>option.value===release.value))return;const bytes=crypto.getRandomValues(new Uint8Array(16));bytes[6]=(bytes[6]!&15)|64;bytes[8]=(bytes[8]!&63)|128;const hex=Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join('');const operation_id=[hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-');sending.value=true;emit('busy',true);emit('refresh');try{await runtimeRequest(`/environments/${props.environment.environment_id}/native-kernel`,{method:'POST',body:{operation:value.operation,source_version:value.sourceVersion,operation_id,expected_revision:value.revision,expected_sha256:value.digest,release:value.operation==='prepare'?release.value:value.release}});if(!alive)return;action.value=null;feedback.value='内核操作已完成，版本以最新读取状态为准。';}catch(cause){if(alive){failed.value=true;operationError.value=(cause as Error).message+'。请关闭窗口并刷新状态后重新操作。';}}finally{if(alive){sending.value=false;emit('busy',false);emit('refresh');}}}
-watch(sourceVersion,()=>{request++;controller?.abort();discovery.value=null;checking.value=false;error.value='';feedback.value='';});
-onUnmounted(()=>{alive=false;request++;controller?.abort();});
+/** 平台配套内核的只读信息，运行观察继续核对实际环境代次。 */
+const props = defineProps<{ environment: RuntimeEnvironment }>();
+const versions = ['2.1.280', '2.1.293'] as const;
+const states: Record<string, string> = {
+  ready: '暖进程就绪', busy: '暖进程使用中', preparing: '准备中', unprepared: '等待按需准备',
+  sleeping: '环境休眠', maintenance: '环境维护中', failed: '准备失败', disabled: '原生方式已关闭', unknown: '运行状态待核对',
+};
+const kernels = computed(() => versions.map(version => ({
+  version,
+  kernel: props.environment.native_kernels?.[version] ?? (version === '2.1.293' ? props.environment.native_kernel : null),
+  observation: props.environment.native_preparation?.versions?.[version]
+    ?? (version === '2.1.293' ? props.environment.native_preparation : null),
+})));
 </script>
 <template>
   <section class="environment-kernel">
-    <ChoiceSelect v-if="environment.native_kernels" v-model="sourceVersion" label="原生运行时版本" :options="sourceOptions" :disabled="!!action||sending" />
-    <template v-if="kernel"><div class="kernel-version"><span>当前内核</span><strong>{{ kernel.current?.release||'未提供' }}</strong><span class="environment-state-label">{{ states[kernel.state]||'状态待核对' }}</span></div><div class="workspace-properties"><div class="kv"><span>已准备候选</span><strong>{{ kernel.prepared?.release||'未准备' }}</strong></div><div class="kv"><span>上一版本</span><strong>{{ kernel.previous?.release||'无' }}</strong></div><div class="kv"><span>镜像内置</span><strong>{{ kernel.builtin?.release||'未提供' }}</strong></div></div><p>{{ discovery?.state==='stale'?'版本检查失败，显示上次发现结果。准备时将重新验签。':discovery?.state==='unavailable'?'版本列表暂不可用，当前内核运行保持原状态。':discovery?.latest?`最新发现版本：${discovery.latest}`:'可检查已发布的配套内核版本' }}</p><p v-if="kernel.error||error" role="alert" class="runtime-error">{{ kernel.error||error }}</p><p v-if="environment.busy">CLI 作业执行中，请在空闲后操作内核。</p><div class="workspace-inline-actions"><Button variant="outline" :disabled="busy||checking||sending" @click="check()">{{ checking?'检查中…':'检查更新' }}</Button><Button variant="outline" :disabled="!available||sending" @click="open('prepare')">选择版本</Button><Button :disabled="!available||sending||!kernel.prepared||kernel.prepared.launcher_sha256===kernel.current?.launcher_sha256" @click="open('activate')">激活候选</Button><Button variant="outline" :disabled="!available||sending||!kernel.previous" @click="open('rollback')">回滚内核</Button><Button v-if="kernel.state==='reconcile'" variant="outline" :disabled="busy||environment.busy||sending" @click="open('recover')">恢复对账</Button></div><p v-if="feedback" role="status">{{ feedback }}</p><details class="runtime-technical"><summary>版本摘要与预热回执</summary><dl><dt>当前分发 SHA256</dt><dd><code>{{ kernel.current?.launcher_sha256||'未提供' }}</code></dd><dt>候选分发 SHA256</dt><dd><code>{{ kernel.prepared?.launcher_sha256||'未准备' }}</code></dd><dt>上一版分发 SHA256</dt><dd><code>{{ kernel.previous?.launcher_sha256||'无' }}</code></dd><dt>上次预热回执 PID</dt><dd>{{ kernel.pid??'未采集' }}</dd><dt>实际映像 SHA256</dt><dd><code>{{ kernel.image_sha256||'未采集' }}</code></dd></dl></details></template><p v-else>{{ sourceVersion==='2.1.280'?'当前环境尚未提供280内核管理。':environment.request_backend==='native293'?'已选择原生运行时，等待环境准备。':'此环境当前未提供在线内核管理。' }}</p>
-    <Dialog :open="!!action" @update:open="value=>{if(!value&&!sending)action=null;}"><DialogContent @escape-key-down="event=>{if(sending)event.preventDefault();}" @pointer-down-outside="event=>{if(sending)event.preventDefault();}"><DialogHeader><DialogTitle>{{ action?labels[action.operation]:'' }}</DialogTitle><DialogDescription>{{ environment.name }} · {{ action?.sourceVersion }} · {{ action?.operation==='prepare'?'准备期间当前内核继续接单。准备完成后可单独激活候选。':'等待在途请求结束，完成目标内核预热与身份核验后继续接单。' }}</DialogDescription></DialogHeader><p>当前版本：{{ action?.current }}</p><p>目标版本：{{ action?.target }}</p><ChoiceSelect v-if="action?.operation==='prepare'" v-model="release" label="已发布版本" :options="options" :disabled="loading||sending||failed" /><p v-if="loading" role="status">正在读取已发布版本…</p><p v-else-if="action?.operation==='prepare'&&!options.length">暂无可选择版本，请关闭后检查更新。</p><p v-if="operationError" role="alert" class="runtime-error">{{ operationError }}</p><div class="runtime-dialog-actions"><Button variant="outline" :disabled="sending" @click="action=null">取消</Button><Button :disabled="sending||loading||failed||(action?.operation==='prepare'&&!release)" @click="submit">{{ sending?'操作进行中…':action?labels[action.operation]:'确认操作' }}</Button></div></DialogContent></Dialog>
+    <div class="kernel-version"><span>管理方式</span><strong>随 flower2api 版本统一交付</strong></div>
+    <p>升级或回退平台时，账号自动采用目标镜像配套的请求内核。280 / 293 继续按请求画像自动匹配。</p>
+    <section v-for="item in kernels" :key="item.version" :aria-label="`Claude Code ${item.version} 内核`">
+      <div class="kernel-version"><strong>Claude Code {{ item.version }}</strong><span class="environment-state-label">{{ item.kernel ? states[item.observation?.state ?? 'unknown'] || '运行状态待核对' : '安装信息未提供' }}</span></div>
+      <template v-if="item.kernel">
+        <div class="workspace-properties">
+          <div class="kv"><span>平台配套发行</span><strong>{{ item.kernel.builtin?.release || '未提供' }}</strong></div>
+          <div class="kv"><span>环境平台批次</span><strong>{{ item.kernel.platform_release || '未提供' }}</strong></div>
+          <div class="kv"><span>空闲 / 存活进程</span><strong>{{ item.observation?.idle_workers ?? '—' }} / {{ item.observation?.live_workers ?? '—' }}</strong></div>
+          <div class="kv"><span>实际空闲 PID</span><strong>{{ item.observation?.pid ?? '未观测' }}</strong></div>
+        </div>
+        <p v-if="item.kernel.state === 'migration_required'">历史独立选择等待空闲环境重建，平台升级将在维护阶段完成迁移。</p>
+        <p v-if="item.kernel.state === 'reconcile' || item.kernel.error" role="alert" class="runtime-error">{{ item.kernel.error || '历史内核维护待核对，请在环境维护中执行对账。' }}</p>
+        <details class="runtime-technical"><summary>配套制品摘要</summary><dl><dt>镜像内置分发 SHA256</dt><dd><code>{{ item.kernel.builtin?.launcher_sha256 || '未提供' }}</code></dd></dl></details>
+      </template>
+    </section>
+    <p v-if="environment.request_backend !== 'native293'">此环境当前使用基础转发方式。</p>
   </section>
 </template>
