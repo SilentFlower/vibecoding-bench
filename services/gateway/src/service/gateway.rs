@@ -2235,7 +2235,11 @@ impl GatewayService {
                     )
                     .await
             };
-            let selected = match selection {
+            let selected = match selection.inspect_err(|error| {
+                if matches!(error, AppError::ServiceUnavailable(_)) {
+                    diagnostics::error_stage("account_selection");
+                }
+            }) {
                 Ok(selected) => {
                     info!(
                         "[耗时] 账号选择: {:.0}ms → {}",
@@ -2723,6 +2727,7 @@ impl GatewayService {
                     }
                     Err(e) => {
                         // SlotReleaseGuard drop 会自动释放槽位
+                        diagnostics::error_stage("credentials");
                         return Err(e);
                     }
                 }
@@ -3276,7 +3281,8 @@ impl GatewayService {
                 runtime_transport::prepare(account, request.remaining()?),
             )
             .await
-            .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })??;
+            .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })?
+            .inspect_err(|_| diagnostics::error_stage("runtime_prepare"))?;
             let permit = request.admit(account).await?;
             Some((transport, permit))
         } else {
@@ -3754,7 +3760,8 @@ impl GatewayService {
             scheduling,
             self.account_svc.resolve_upstream_token(account.id),
         )
-        .await??;
+        .await?
+        .inspect_err(|_| diagnostics::error_stage("credentials"))?;
         let ingress_capture =
             super::native_capture::ingress(log_mode, ingress_headers, body, ingress_body, &bearer);
         let transport = await_preparation(
@@ -3767,12 +3774,14 @@ impl GatewayService {
                     .unwrap_or(std::time::Duration::from_secs(120)),
             ),
         )
-        .await??;
+        .await?
+        .inspect_err(|_| diagnostics::error_stage("runtime_prepare"))?;
         await_preparation(
             scheduling,
             transport.native_ready_for_version(source_version),
         )
-        .await??;
+        .await?
+        .inspect_err(|_| diagnostics::error_stage("native_prepare"))?;
         if extract_session_id_from_body(body_map).is_none()
             && !headers
                 .iter()
@@ -3846,6 +3855,9 @@ impl GatewayService {
         {
             Ok(response) => response,
             Err(error) => {
+                if matches!(error, AppError::ServiceUnavailable(_)) {
+                    diagnostics::error_stage("native_prepare");
+                }
                 if matches!(error, AppError::BadGateway(_)) {
                     if let Some(request) = scheduling {
                         request.submission_failed(account.id);

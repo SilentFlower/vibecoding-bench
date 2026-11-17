@@ -233,6 +233,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - 尝试记录实际冻结画像 key/选择方式、最终模型/max_tokens/thinking 类型与预算/effort/stream/工具数量、匿名 session/thread、响应模型与消息、stop_reason、六类 token、partial、状态、耗时、重试原因和受控错误阶段/类型。未知字段保留 `null`；累计 usage 使用每字段最大值，5m/1h 缓存写明细不重复加入总量。
 - 根记录包含起止时间、下游状态、最终选中账号、结果、尝试数和可选的 `original_session_id`。根状态与尝试实际上游状态分开；中间认证或签名错误不得覆盖后续尝试结果。首字节字段 `ttft_ms` 测量响应头到达耗时，不解释为首个模型文本 token。
 - 本地拒绝、模拟和缓存命中有根记录，但无虚构的上游尝试。EOF、末帧、读取错误和 Drop 只终结一次；HTTP 200 内的错误事件与成功区分，缺用量或采样失败标记 `incomplete/partial`。发送错误不伪造上游 HTTP 状态或断言未提交。
+- 本地 503 的 `error_stage` 由实际失败边界写入：选号为 `account_selection`，凭据解析为 `credentials`，V3 环境/传输绑定准备为 `runtime_prepare`，原生能力检查及原生准备拒绝为 `native_prepare`。`RequestTraceGuard::error` 保留已记录阶段；通用 `AppError::ServiceUnavailable` 缺少边界信息时回退 `gateway`，不能仅凭错误类型归为选号失败。诊断标记不改变响应、准入超时或重试行为。
 - 尝试中的 session/thread/响应消息仅存带账号及标识类型域的 SHA256 前 128 位；线程前驱和响应消息使用同一消息域。只观察既有池解析结果，不能额外 resolve 或刷新 TTL；上游 session 摘要以实际最终 body 为准。
 - 根字段 `original_session_id` 是管理员关联客户端日志的明确明文例外：在入站正文解码后、会话封禁与正文策略前冻结一次，正文通过既有 JSON-string/legacy 提取器优先解析；缺省时读取原始 HeaderMap 中唯一的 `X-Claude-Code-Session-Id`。仅保存非空白、无控制字符、UTF-8 不超过 256 字节的完整值，不 trim 或截断；正文提取值异常时保持未知，不用头值替代。info/debug 均保存，重试、换号和上游映射不改写该值。无客户端会话时保持未知，SDK 生成会话不充当原始值。新增字段以 serde default 兼容旧 JSON，沿用根记录 summary_json、管理鉴权与七天保留期，不新增业务转发头或表结构。
 - 除上述原始会话字段外，默认诊断摘要不持久化正文、工具参数、完整 headers、凭据、Cookie、邮箱、设备 ID、账号 UUID、完整 session 或任意 error.message。按账号显式开启的私有组装快照遵循[CC 组装后私有采集](#scenario-cc-组装后私有采集)。响应模型、参数枚举及错误类型执行白名单；非标准关联头只保存散列。
@@ -248,6 +249,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 | --- | --- |
 | 401 恢复、签名修复或换号 | 同一根请求，独立尝试与实际账号/状态/重试原因 |
 | 模拟、缓存、本地拒绝 | 根结果明确，未发送时尝试数为零 |
+| 选号 / 凭据 / 环境绑定 / 原生准备失败，均返回本地 503 | 分别记录 `account_selection` / `credentials` / `runtime_prepare` / `native_prepare`，保留原 HTTP 响应；无边界的通用 503 为 `gateway` |
 | 原始会话映射、重试、换号 / info 或 debug | 根 original_session_id 保持入站完整值 / 两种模式均记录 |
 | 原始会话缺失、空白、控制字符、超过 256 字节 / 重复会话头且正文缺省 / 旧 JSON 缺字段 | 原始值未知，沿原业务处理 / 原始值未知 / 兼容读取 None |
 | 账号改名 / 删除 / 旧记录缺展示字段 | 查询当前名称邮箱 / LEFT JOIN 保留诊断及 ID，资料为空 / 兼容读取 |
@@ -263,6 +265,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 ### 5. Scenarios and Examples
 
 - 正常：new-api 留下响应 ID，管理员以 `correlation_id` 查到根 UUID，再读取两次 401→200 尝试；sender evidence 的 request_id 对应尝试 UUID。
+- 边界：账号已选中，内部 `/internal/v3/transport/:id` 返回 503，根结果为 `local_rejected/runtime_prepare` 且尝试数为零。错误用法是将所有 `ServiceUnavailable` 归为 `account_selection`；正确处理是在失败出口记录阶段，并由终结保护保留该阶段。
 - 边界：两个真实 session 借用同一上游成员时，真实散列不同、上游散列相同；目标过期后可观察新目标，诊断不能延长旧目标 TTL。
 - 正常：客户端发送原始 session A，上游池映射成 B；根 original_session_id 保存 A，尝试保留 A/B 的账号域散列。错误用法：以 sender 生成的 B 填充原始字段。正确处理：入站解码后冻结 A，所有后续映射只补充原有尝试摘要。
 - 错误用法：HTTP 200 且没有完整 usage 就填零并标成功，或把缓存/中间重试写入原费用表。正确处理：未知值为 `null`，结果与完整性分开判定，费用保持原语义。
@@ -276,6 +279,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - `sqlite_diagnostics_storage_contract` 与显式执行 `postgres_diagnostics_storage_contract`：开始→终态、重复写入、迟到快照、NULL、分页/账号/关联过滤、重开连接、七天精确边界；追加跨账号名称邮箱、改名、空资料、删除后保留记录及 ID、持久摘要无邮箱与凭据的断言。PG 使用 `CC2API_DIAGNOSTICS_TEST_POSTGRES_DSN` 指向独立临时库，ignored 不等于通过。
 - `retention_protects_live_requests_and_expires_stale_unfinished_records`、`migrate_request_log_mode_preserves_explicit_debug`、`log_mode_setting_validates_atomically_and_defaults_to_info`、`request_log_mode_reload_preserves_effective_cache_on_failure`：真实在途保护、结束回收、默认迁移/幂等、校验原子性与实际缓存。
 - `diagnostics_preserve_bytes_and_correlate_anonymous_sessions`：最终参数、stop_reason、null token、匿名标识、头值保留/散列反查及合成秘密不泄露。
+- `diagnostics_local_503_preserves_failure_stage_and_uses_generic_fallback`：四类明确阶段及无阶段的通用 503，经响应消费和实际持久化后保留正确阶段、503 状态和 `local_rejected`；响应正文保持原样，摘要不包含任意错误文本且尝试数为零。
 - `original_session_diagnostics_freeze_ingress_and_validate_boundaries`、`original_session_diagnostics_survive_local_policy_rejection`：正文/单头来源、重复头、两种日志模式、本地响应和正文拒绝、冻结一次、UTF-8 256 字节边界、控制字符、列表与详情一致；存储合同追加重开连接保留原始值、换号保持原值及旧 JSON 缺字段断言。
 - `diagnostics_record_stream_errors_and_cancellation_once`、`diagnostics_report_observation_failures_without_changing_bytes`、`diagnostics_cover_early_cancellation_and_unavailable_storage`：流内错误、读取失败、取消、超限/解码/解析、数据库故障与响应保真。
 - `diagnostics_overload_and_write_failures_are_observable` 与 `diagnostics_routes_require_admin_and_expose_committed_requests`：队列立即返回、健康计数、管理员鉴权、分页错误和详情查询。

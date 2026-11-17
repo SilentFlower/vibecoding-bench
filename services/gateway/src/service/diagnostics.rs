@@ -674,7 +674,8 @@ impl RequestTraceGuard {
             AppError::Unauthorized | AppError::PermanentCredential(_) => "credentials",
             AppError::TooManyRequests(_) => "admission",
             AppError::BadGateway(_) => "transport",
-            AppError::ServiceUnavailable(_) => "account_selection",
+            // 503 可来自凭据、环境或原生准备，具体阶段由失败边界记录。
+            AppError::ServiceUnavailable(_) => "gateway",
             AppError::Internal(_) | AppError::NotFound => "gateway",
         };
         let mut state = self.trace.lock();
@@ -804,8 +805,10 @@ fn identity_hash(account: i64, kind: &str, value: &str) -> String {
 mod tests {
     use super::{
         CURRENT_LOG_MODE, CURRENT_TRACE, RequestTraceGuard, TraceContext, begin_attempt,
-        local_outcome, now, original_session, profile_selection, selected_account, session_context,
+        error_stage, local_outcome, now, original_session, profile_selection, selected_account,
+        session_context,
     };
+    use crate::error::AppError;
     use crate::model::account::Account;
     use crate::model::request_diagnostics::{AttemptDiagnostic, DiagnosticQuery, RequestLogMode};
     use crate::service::usage::USAGE_BUFFER_LIMIT;
@@ -816,7 +819,7 @@ mod tests {
     use crate::store::scheduling_store::SchedulingStore;
     use axum::body::{Body, Bytes, to_bytes};
     use axum::http::{HeaderMap, HeaderValue};
-    use axum::response::Response;
+    use axum::response::{IntoResponse, Response};
     use flate2::Compression;
     use flate2::write::GzEncoder;
     use http_body_util::BodyExt;
@@ -845,6 +848,59 @@ mod tests {
             "canonical_env":{"version":"2.1.293"},"canonical_prompt_env":{},"canonical_process":{},"billing_mode":"strip",
             "created_at":now(),"updated_at":now()
         })).unwrap()
+    }
+
+    /// 本地 503 保留失败边界，通用错误使用兜底阶段，响应和持久摘要保持一致。
+    /// @return 无；阶段被覆盖、凭据泄露或虚构尝试时失败。
+    #[tokio::test]
+    async fn diagnostics_local_503_preserves_failure_stage_and_uses_generic_fallback() {
+        let store = store().await;
+        for stage in [
+            None,
+            Some("account_selection"),
+            Some("credentials"),
+            Some("runtime_prepare"),
+            Some("native_prepare"),
+        ] {
+            let trace = TraceContext::new(store.clone());
+            let guard = RequestTraceGuard::new(trace.clone());
+            let error = AppError::ServiceUnavailable("合成环境故障".into());
+            let response = CURRENT_TRACE
+                .scope(trace, async {
+                    selected_account(7);
+                    if let Some(stage) = stage {
+                        error_stage(stage);
+                    }
+                    guard.error(&error);
+                    guard.wrap(error.into_response())
+                })
+                .await;
+            let id = response.headers()["x-cc2api-request-id"]
+                .to_str()
+                .unwrap()
+                .to_owned();
+            assert_eq!(response.status(), 503);
+            let body = to_bytes(response.into_body(), 1024).await.unwrap();
+            assert_eq!(
+                serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+                json!({"error":"service unavailable: 合成环境故障"})
+            );
+            store.flush().await.unwrap();
+            let detail = store.detail(&id).await.unwrap();
+            assert_eq!(
+                detail.request.error_stage.as_deref(),
+                Some(stage.unwrap_or("gateway"))
+            );
+            assert_eq!(detail.request.status_code, Some(503));
+            assert_eq!(detail.request.outcome, "local_rejected");
+            assert_eq!(detail.request.attempt_count, 0);
+            assert!(detail.attempts.is_empty());
+            assert!(
+                !serde_json::to_string(&detail)
+                    .unwrap()
+                    .contains("合成环境故障")
+            );
+        }
     }
 
     /// 入站会话按原值冻结，异常值及重复头保持未知，两种日志模式均可查询。
