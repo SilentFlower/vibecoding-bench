@@ -1,0 +1,43 @@
+{
+  "id": "native-disabled-thinking-compat",
+  "name": "native-disabled-thinking-compat",
+  "title": "Native thinking disabled 最小兼容",
+  "description": "接入默认关闭、按精确模型名单控制的thinking.type=disabled到adaptive兼容；双版本原生回环验收，真实上游效果后续核对。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "gateway",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-17",
+  "completedAt": "2026-11-17",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-17T09:18:08Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-17-native-settings-compatibility",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-17T09:18:08.609305+00:00",
+    "completedSteps": [
+      "接入native顶层disabled到adaptive兼容，默认关闭并按完整模型名匹配",
+      "实现单请求配置冻结及原始入站与业务副本分离",
+      "完成双版33次实际TLS发送、Rust949项及最终6项定向、运行时200项单元和50项联调验证",
+      "Check-All通过并同步规范与父子任务规划"
+    ],
+    "partialStep": null,
+    "nextStep": "Rust代理连接池开关适用范围说明",
+    "notes": "采用与当前固定清单匹配的280/293正式执行体，覆盖热生效、429期间配置冻结、签名修复、缓存和TTL。真实上游兼容效果由发布负责人在实际启用指定模型时按既有release.md流程核对。"
+  }
+}

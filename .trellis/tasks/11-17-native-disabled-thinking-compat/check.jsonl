@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/gateway/protocol/claude-code-profile-upgrade.md", "reason": "本任务的现有行为、兼容边界及验收合同"}
+{"file": ".trellis/spec/runtime/backend/runtime-contract.md", "reason": "本任务的现有行为、兼容边界及验收合同"}
+{"file": ".trellis/spec/gateway/backend/service-architecture.md", "reason": "native发送、原始诊断、429与签名修复的调用合同"}
+{"file": ".trellis/spec/gateway/backend/settings-database.md", "reason": "既有开关、精确模型名单与热刷新入口"}
