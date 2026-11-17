@@ -421,9 +421,9 @@ export const settingsGroups:SettingsGroup[] = [
         "fields": [
           {
             "key": "proxy_client_pool_enabled",
-            "label": "启用代理连接池",
+            "label": "Rust 代理 HTTP 连接池",
             "kind": "boolean",
-            "help": "复用代理 HTTP 客户端连接池。"
+            "help": "复用 Rust HTTP 客户端连接。native 模型请求的连接复用由原生 SDK 管理。"
           },
           {
             "key": "session_hello_probe_enabled",
