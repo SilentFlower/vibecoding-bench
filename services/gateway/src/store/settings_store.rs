@@ -45,6 +45,8 @@ pub const DEFAULT_PASSTHROUGH_WORKING_DIR: &str = "true";
 pub const DEFAULT_CACHE_CONTROL_TTL_REWRITE: &str = "off";
 /// Claude Code messages 缓存断点稳定化默认关闭,保持旧请求体行为。
 pub const DEFAULT_MESSAGE_CACHE_CONTROL_REWRITE: &str = "off";
+/// 首次接入原生消息缓存策略的一次性标记，仅供存储内部使用。
+const NATIVE_MESSAGE_CACHE_MIGRATION_KEY: &str = "_internal_native_message_cache_v1";
 /// API mimicry `/v1/messages` 顶层字段顺序指纹对齐默认开启,用于贴近 2.1.195 抓包。
 pub const DEFAULT_MESSAGE_BODY_ORDER_FINGERPRINT_ENABLED: &str = "true";
 /// Messages 固定 56 个根级附带字段的清理默认开启。
@@ -214,6 +216,31 @@ impl SettingsStore {
         Ok(())
     }
 
+    /// 首次接入时恢复原生缓存布局，后续保留管理员主动开启的策略。
+    /// @return 标记与重置在同一事务内成功，或返回数据库错误。
+    pub async fn ensure_native_message_cache_defaults(&self) -> Result<(), AppError> {
+        let mut transaction = self.pool.begin().await?;
+        // 唯一键竞争与事务共同保证多进程启动只重置一次，失败可整体重试。
+        let inserted = sqlx::query(
+            "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING",
+        )
+        .bind(NATIVE_MESSAGE_CACHE_MIGRATION_KEY)
+        .bind("1")
+        .execute(&mut *transaction)
+        .await?;
+        if inserted.rows_affected() == 1 {
+            sqlx::query(
+                "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value=excluded.value",
+            )
+            .bind("message_cache_control_rewrite")
+            .bind(DEFAULT_MESSAGE_CACHE_CONTROL_REWRITE)
+            .execute(&mut *transaction)
+            .await?;
+        }
+        transaction.commit().await?;
+        Ok(())
+    }
+
     /// 为历史数据库补齐调度配置，已保存的管理员值保持原状。
     /// @return 同一事务内补齐成功或数据库错误。
     pub async fn ensure_scheduling_defaults(&self) -> Result<(), AppError> {
@@ -248,6 +275,9 @@ impl SettingsStore {
         for row in rows {
             let key: String = row.try_get("key").unwrap_or_default();
             let value: String = row.try_get("value").unwrap_or_default();
+            if key == NATIVE_MESSAGE_CACHE_MIGRATION_KEY {
+                continue;
+            }
             map.insert(key, value);
         }
         Ok(map)
@@ -313,6 +343,9 @@ impl SettingsStore {
         items: &HashMap<String, String>,
         profile: Option<&'static ClaudeCodeProfile>,
     ) -> Result<(), AppError> {
+        if items.contains_key(NATIVE_MESSAGE_CACHE_MIGRATION_KEY) {
+            return Err(AppError::BadRequest("内部迁移标记由系统维护".into()));
+        }
         let mut items = items.clone();
         let mut tx = self
             .pool

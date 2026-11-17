@@ -73,7 +73,7 @@ try {
     let failure: unknown;
     try { await engine.run(prepared(1), noCancel, async () => {}); } catch (error) { rejected = true; failure = error; }
     if (!rejected || engine.workerPid !== null) throw new Error('故障未被拒绝或进程仍在使用');
-    if (['cache_legacy', 'cache_mismatch', 'telemetry_legacy', 'telemetry_mismatch'].includes(scenario)) {
+    if (['cache_legacy', 'cache_old_strategy', 'cache_mismatch', 'telemetry_legacy', 'telemetry_mismatch'].includes(scenario)) {
       if (!(failure instanceof BridgeError) || failure.code !== 'native_configuration' || failure.status !== 503) throw new Error('旧产物未明确拒绝缓存配置');
     }
     if (['startup_exit', 'startup_error', 'startup_error_wrong_worker', 'startup_error_after_ready'].includes(scenario)) {
@@ -91,8 +91,8 @@ try {
   const ids = calls.trim().split('\n').filter(Boolean).map(line => line.split(':')[1]);
   if (new Set(ids).size !== ids.length) throw new Error('故障导致请求重放');
   if (scenario === 'reuse' && ids.length !== 2) throw new Error('正常串行轮数不匹配');
-  if (!['startup_exit', 'startup_wait', 'duplicate_ready', 'cache_legacy', 'cache_mismatch', 'telemetry_legacy', 'telemetry_mismatch'].includes(scenario) && ids.length === 0) throw new Error('夹具未进入作业，故障验证无效');
-  if (['cache_legacy', 'cache_mismatch', 'telemetry_legacy', 'telemetry_mismatch'].includes(scenario) && ids.length !== 0) throw new Error('配置能力不匹配时仍发送了作业');
+  if (!['startup_exit', 'startup_wait', 'duplicate_ready', 'cache_legacy', 'cache_old_strategy', 'cache_mismatch', 'telemetry_legacy', 'telemetry_mismatch'].includes(scenario) && ids.length === 0) throw new Error('夹具未进入作业，故障验证无效');
+  if (['cache_legacy', 'cache_old_strategy', 'cache_mismatch', 'telemetry_legacy', 'telemetry_mismatch'].includes(scenario) && ids.length !== 0) throw new Error('配置能力不匹配时仍发送了作业');
   if (pid && await Bun.file('/proc/' + pid + '/status').exists()) throw new Error('存在孤儿进程');
   process.stdout.write(JSON.stringify({ scenario, calls: ids.length, hashes, rejected }) + '\n');
 } finally {

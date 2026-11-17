@@ -85,25 +85,21 @@ function candidate(message: JsonObject): number | null {
   return null;
 }
 
-/** 在原生封口前应用保守缓存选点，调用方持有的消息断点优先。
- * @param original 调用方业务正文，用于判断断点所有权。
+/** 在原生封口前按显式策略重新布置消息断点。
+ * @param original 调用方业务正文，用于保护独立根缓存机制。
  * @param outgoing 已完成原生构造与业务字段校验的待发送正文。
- * @param mode 本机固定的缓存策略。
+ * @param mode 已校验的本轮缓存策略。
  * @return 未修改输入的正文及可审计诊断。
  */
 export function applyCachePolicy(original: JsonObject, outgoing: JsonObject, mode: CachePolicy): CachePolicyResult {
   const decision: CachePolicyDecision = { mode, action: mode === 'preserve' ? 'preserved' : 'skipped', reason: 'policy_preserve', selected: [], breakpoints: null, ttl: null };
   const skip = (reason: CachePolicyDecision['reason'], count: number | null = null): CachePolicyResult => ({ body: outgoing, decision: { ...decision, reason, breakpoints: count } });
   if (mode === 'preserve') return { body: outgoing, decision };
-  const owned = messageMarkers(original);
-  if (owned.top || owned.nested) return skip('caller_message_breakpoints');
   if (Object.hasOwn(original, 'cache_control') || Object.hasOwn(outgoing, 'cache_control')) return skip('root_cache_control_present');
   const markers = messageMarkers(outgoing);
   const prefix = prefixBudget(outgoing);
   const messages = outgoing.messages;
   if (!prefix || markers.nested || !Array.isArray(messages) || messages.some(message => !isObject(message) || (typeof message.content !== 'string' && (!Array.isArray(message.content) || message.content.some(block => !isObject(block)))))) return skip('unsupported_cache_control');
-  const count = prefix.count + markers.top;
-  if (prefix.count >= 4) return skip('no_available_slots', count);
   const selected: CachePolicyDecision['selected'] = [];
   const indexes = messages.length ? [messages.length - 1] : [];
   if (messages.length >= 4) {
@@ -116,17 +112,18 @@ export function applyCachePolicy(original: JsonObject, outgoing: JsonObject, mod
     const block = candidate(messages[message]);
     if (block !== null && selected.length < 4 - prefix.count && !selected.some(position => position.message === message && position.block === block)) selected.push({ message, block });
   }
-  if (!selected.length) return skip('no_cacheable_blocks', count);
   selected.sort((a, b) => a.message - b.message || a.block - b.block);
   const rewritten = messages.map((message: JsonObject, index: number) => {
     const position = selected.find(item => item.message === index);
     if (typeof message.content === 'string') return position ? { ...message, content: [{ type: 'text', text: message.content, cache_control: { type: 'ephemeral', ttl: prefix.ttl } }] } : message;
     const content = message.content as JsonObject[];
     return { ...message, content: content.map((block, blockIndex) => {
-      // 走到此处已证明调用方没有消息标记，待删除的仅为本轮 SDK 自动生成的断点。
+      // 管理员显式开启重排后，调用方与SDK生成的顶层消息断点采用同一规则。
       const { cache_control: unused, ...plain } = block;
       return position?.block === blockIndex ? { ...plain, cache_control: { type: 'ephemeral', ttl: prefix.ttl } } : plain;
     }) };
   });
-  return { body: { ...outgoing, messages: rewritten }, decision: { ...decision, action: 'applied', reason: 'sub2api_tail', selected, breakpoints: prefix.count + selected.length, ttl: prefix.ttl } };
+  const body = selected.length || markers.top ? { ...outgoing, messages: rewritten } : outgoing;
+  if (!selected.length) return { body, decision: { ...decision, reason: prefix.count >= 4 ? 'no_available_slots' : 'no_cacheable_blocks', breakpoints: prefix.count } };
+  return { body, decision: { ...decision, action: 'applied', reason: 'sub2api_tail', selected, breakpoints: prefix.count + selected.length, ttl: prefix.ttl } };
 }

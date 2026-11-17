@@ -77,7 +77,7 @@ const passthroughWorkingDir = ref(true);
 const cacheControlTtlRewrite = ref<'off' | '5m' | '1h'>('off');
 
 /** Claude Code messages 缓存断点改写模式 */
-const messageCacheControlRewrite = ref<'off' | 'auto' | 'rolling' | 'stateful' | 'sub2api'>('off');
+const messageCacheControlRewrite = ref<'off' | 'sub2api'>('off');
 
 /** API mimicry /v1/messages 顶层字段顺序指纹对齐开关 */
 const messageBodyOrderFingerprintEnabled = ref(true);
@@ -522,13 +522,7 @@ async function loadSettings() {
     const ttlRewrite = data.cache_control_ttl_rewrite ?? 'off';
     cacheControlTtlRewrite.value = ttlRewrite === '5m' || ttlRewrite === '1h' ? ttlRewrite : 'off';
     const messageCacheRewrite = data.message_cache_control_rewrite ?? 'off';
-    if (messageCacheRewrite === 'auto' || messageCacheRewrite === 'rolling' || messageCacheRewrite === 'stateful' || messageCacheRewrite === 'sub2api') {
-      messageCacheControlRewrite.value = messageCacheRewrite;
-    } else if (messageCacheRewrite === 'stable' || messageCacheRewrite === 'anchored') {
-      messageCacheControlRewrite.value = 'auto';
-    } else {
-      messageCacheControlRewrite.value = 'off';
-    }
+    messageCacheControlRewrite.value = messageCacheRewrite === 'sub2api' ? 'sub2api' : 'off';
     messageBodyOrderFingerprintEnabled.value = (data.message_body_order_fingerprint_enabled ?? 'true') === 'true';
     messageTopFieldFilterEnabled.value = data.message_top_field_filter_enabled !== 'false';
     proxyClientPoolEnabled.value = (data.proxy_client_pool_enabled ?? 'true') === 'true';

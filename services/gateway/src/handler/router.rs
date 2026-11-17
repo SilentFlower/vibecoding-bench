@@ -2017,9 +2017,13 @@ async fn get_settings(State(state): State<AppState>) -> Result<Json<serde_json::
     settings
         .entry("cache_control_ttl_rewrite".into())
         .or_insert_with(|| DEFAULT_CACHE_CONTROL_TTL_REWRITE.to_string());
-    settings
+    let message_cache = settings
         .entry("message_cache_control_rewrite".into())
         .or_insert_with(|| DEFAULT_MESSAGE_CACHE_CONTROL_REWRITE.to_string());
+    *message_cache = MessageCacheControlRewrite::parse_setting(message_cache)
+        .unwrap_or(MessageCacheControlRewrite::Off)
+        .as_str()
+        .into();
     settings
         .entry("message_body_order_fingerprint_enabled".into())
         .or_insert_with(|| DEFAULT_MESSAGE_BODY_ORDER_FINGERPRINT_ENABLED.to_string());
@@ -2246,7 +2250,7 @@ async fn update_settings(
         }
     }
     if let Some(val) = body.get("message_cache_control_rewrite") {
-        MessageCacheControlRewrite::parse(val)?;
+        MessageCacheControlRewrite::parse_setting(val)?;
     }
     if let Some(val) = body.get("claude_code_context_sanitizer_mode") {
         ClaudeCodeContextSanitizerMode::parse(val)?;
@@ -4305,6 +4309,75 @@ mod tests {
                 expected == "true"
             );
         }
+    }
+
+    /// 消息缓存模式经管理接口校验并热加载，旧模式和内部标记均受控。
+    /// @return 无；非法批次写入、标记泄露或运行期失配时失败。
+    #[tokio::test]
+    async fn native_message_cache_settings_validate_and_hot_reload() {
+        let (app, gateway, settings, _) = test_router_with_gateway_and_settings().await;
+        settings
+            .ensure_native_message_cache_defaults()
+            .await
+            .unwrap();
+        for mode in ["sub2api", "off"] {
+            let (status, _) = account_admin_json(
+                &app,
+                Method::PUT,
+                "/admin/settings",
+                json!({"message_cache_control_rewrite":mode}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(gateway.message_cache_mode_for_test().await.as_str(), mode);
+            let (_, response) =
+                account_admin_json(&app, Method::GET, "/admin/settings", Value::Null).await;
+            assert_eq!(response["message_cache_control_rewrite"], mode);
+            assert!(response.get("_internal_native_message_cache_v1").is_none());
+        }
+        for value in [
+            "auto", "rolling", "stateful", "stable", "anchored", "invalid",
+        ] {
+            let (status, _) = account_admin_json(
+                &app,
+                Method::PUT,
+                "/admin/settings",
+                json!({"message_cache_control_rewrite":value,"synthetic_cache_atomic":"changed"}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+            assert!(
+                !settings
+                    .get_all()
+                    .await
+                    .unwrap()
+                    .contains_key("synthetic_cache_atomic")
+            );
+            assert_eq!(gateway.message_cache_mode_for_test().await.as_str(), "off");
+        }
+        let (status, _) = account_admin_json(
+            &app,
+            Method::PUT,
+            "/admin/settings",
+            json!({"_internal_native_message_cache_v1":"reset"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        settings
+            .upsert_many(&HashMap::from([(
+                "message_cache_control_rewrite".into(),
+                "invalid".into(),
+            )]))
+            .await
+            .unwrap();
+        gateway
+            .reload_message_cache_control_rewrite()
+            .await
+            .unwrap();
+        let (_, response) =
+            account_admin_json(&app, Method::GET, "/admin/settings", Value::Null).await;
+        assert_eq!(response["message_cache_control_rewrite"], "off");
+        assert_eq!(gateway.message_cache_mode_for_test().await.as_str(), "off");
     }
 
     #[tokio::test]

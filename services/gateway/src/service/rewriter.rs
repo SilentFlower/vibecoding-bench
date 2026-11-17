@@ -1395,6 +1395,19 @@ pub enum MessageCacheControlRewrite {
 }
 
 impl MessageCacheControlRewrite {
+    /// 解析当前系统设置公开支持的原生消息断点模式。
+    /// @param raw 管理接口或存储提供的设置字符串。
+    /// @return off或sub2api；废弃及非法模式返回参数错误。
+    pub fn parse_setting(raw: &str) -> Result<Self, AppError> {
+        match raw {
+            "off" => Ok(Self::Off),
+            "sub2api" => Ok(Self::Sub2api),
+            _ => Err(AppError::BadRequest(
+                "message_cache_control_rewrite 必须是 off 或 sub2api".into(),
+            )),
+        }
+    }
+
     /// 返回日志中使用的稳定设置名。
     pub(crate) fn as_str(self) -> &'static str {
         match self {

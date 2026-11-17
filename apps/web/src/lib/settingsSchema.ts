@@ -179,23 +179,11 @@ export const settingsGroups:SettingsGroup[] = [
             "key": "message_cache_control_rewrite",
             "label": "messages 缓存断点",
             "kind": "select",
-            "help": "选择需要应用的缓存改写策略。",
+            "help": "默认关闭额外改写，保留原生缓存布局。遇到缓存问题时可开启 sub2api 重新布置消息断点，保存后对后续请求生效。TTL 独立配置。",
             "options": [
               [
                 "off",
-                "关闭"
-              ],
-              [
-                "auto",
-                "自动"
-              ],
-              [
-                "rolling",
-                "滚动"
-              ],
-              [
-                "stateful",
-                "有状态"
+                "关闭（保留原生布局）"
               ],
               [
                 "sub2api",

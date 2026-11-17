@@ -218,6 +218,12 @@ fn validate_worker_identity(
     submission: &NativeSubmission,
 ) -> Result<usize, AppError> {
     CacheControlTtlRewrite::parse(submission.cache_ttl_rewrite.as_deref().unwrap_or("off"))?;
+    if !matches!(
+        submission.message_cache_policy.as_deref(),
+        None | Some("preserve" | "sub2api")
+    ) {
+        return Err(AppError::BadRequest("原生消息缓存策略无效".into()));
+    }
     if config.allowed_origin != "https://api.anthropic.com" {
         return Err(unavailable());
     }
@@ -449,6 +455,7 @@ struct Worker {
     tls_observer: Option<super::native_tls_observer::NativeTlsSlot>,
     id: String,
     cache_ttl_rewrite_supported: bool,
+    message_cache_policy_supported: bool,
     restore_supported: bool,
     child: Option<Child>,
     restored: Option<super::native_criu::Process>,
@@ -737,6 +744,7 @@ impl Worker {
         request_id: Option<&str>,
         input: Option<&Value>,
         cache_ttl_rewrite: Option<&str>,
+        message_cache_policy: Option<&str>,
     ) -> Result<(), AppError> {
         let mut frame = json!({"schema_version":2,"worker_id":self.id,"type":kind});
         if let Some(id) = request_id {
@@ -747,6 +755,9 @@ impl Worker {
         }
         if let Some(mode) = cache_ttl_rewrite {
             frame["cache_ttl_rewrite"] = json!(mode);
+        }
+        if let Some(mode) = message_cache_policy {
+            frame["message_cache_policy"] = json!(mode);
         }
         let mut bytes = serde_json::to_vec(&frame).map_err(|_| protocol_error())?;
         bytes.push(b'\n');
@@ -935,6 +946,7 @@ impl Worker {
             tls_observer: None,
             id,
             cache_ttl_rewrite_supported: false,
+            message_cache_policy_supported: false,
             restore_supported: false,
             child: Some(child),
             restored: None,
@@ -964,6 +976,8 @@ impl Worker {
             || ready["version"] != native.source_version.as_str()
             || ready["raw_input_protocol"] != 1
             || ready["pid"].as_u64() != Some(pid as u64)
+            || (ready.get("message_cache_policy_protocol").is_some()
+                && ready["message_cache_policy_protocol"] != 1)
             || (ready.get("cache_ttl_rewrite_protocol").is_some()
                 && ready["cache_ttl_rewrite_protocol"] != 1)
             || template
@@ -971,6 +985,7 @@ impl Worker {
         {
             return Err(unavailable());
         }
+        worker.message_cache_policy_supported = ready["message_cache_policy_protocol"] == 1;
         worker.cache_ttl_rewrite_supported = ready["cache_ttl_rewrite_protocol"] == 1;
         worker.restore_supported = ready["restore_protocol"] == 1;
         let mut executable = File::open(format!("/proc/{pid}/exe")).map_err(|_| unavailable())?;
@@ -1048,11 +1063,14 @@ impl Worker {
             || ready["restore_binding"]
                 != json!({"template_id":template,"nonce":nonce,
                 "entropy_profile":super::native_criu::ENTROPY_PROFILE})
+            || (ready.get("message_cache_policy_protocol").is_some()
+                && ready["message_cache_policy_protocol"] != 1)
             || (ready.get("cache_ttl_rewrite_protocol").is_some()
                 && ready["cache_ttl_rewrite_protocol"] != 1)
         {
             return Err(unavailable());
         }
+        self.message_cache_policy_supported = ready["message_cache_policy_protocol"] == 1;
         self.cache_ttl_rewrite_supported = ready["cache_ttl_rewrite_protocol"] == 1;
         Ok(())
     }
@@ -1175,6 +1193,7 @@ impl Worker {
                 tls_observer: None,
                 id,
                 cache_ttl_rewrite_supported: false,
+                message_cache_policy_supported: false,
                 restore_supported: true,
                 child: None,
                 restored: None,
@@ -1297,6 +1316,11 @@ impl Worker {
                 stream_log.reason = "cache_ttl_capability_missing";
                 return Err(AppError::ServiceUnavailable("当前内核缺少缓存TTL策略能力，请先激活配套候选内核".into()));
             }
+            let message_cache = submission.message_cache_policy.as_deref().unwrap_or("preserve");
+            if message_cache == "sub2api" && !self.message_cache_policy_supported {
+                stream_log.reason = "message_cache_capability_missing";
+                return Err(AppError::ServiceUnavailable("当前内核缺少消息缓存策略能力，请先激活配套候选内核".into()));
+            }
             if submission.log_mode == RequestLogMode::Debug {
                 if let Some(directory) = capture_dir {
                     tls_capture = Some(super::native_tls_observer::NativeTlsCapture::take(directory, submission, &self.id, self.tls_observer.as_ref()));
@@ -1306,7 +1330,8 @@ impl Worker {
             }
             if Instant::now() >= deadline { return Err(unavailable()); }
             self.send("request_input", Some(id), Some(&submission.input),
-                self.cache_ttl_rewrite_supported.then_some(cache_ttl.as_str()))
+                self.cache_ttl_rewrite_supported.then_some(cache_ttl.as_str()),
+                self.message_cache_policy_supported.then_some(message_cache))
                 .await?;
             let mut policy = false;
             let mut header_policy = None;
@@ -1379,6 +1404,14 @@ impl Worker {
                     }
                     Some("cc_prepared") if policy && !prepared && !headers_seen => {
                         runtime.prepared_ms = received.elapsed().as_millis() as u64;
+                        if let Some(cache) = payload.get("cache_policy") {
+                            let cache = super::native_capture::message_cache_policy(cache).ok_or_else(protocol_error)?;
+                            if self.message_cache_policy_supported && cache["mode"] != message_cache {
+                                return Err(protocol_error());
+                            }
+                        } else if self.message_cache_policy_supported {
+                            return Err(protocol_error());
+                        }
                         let body = payload["body"].as_str().ok_or_else(protocol_error)?;
                         if payload["body_bytes"].as_u64() != Some(body.len() as u64)
                             || payload["body_sha256"]
@@ -2666,7 +2699,7 @@ impl NativePool {
                 let result = tokio::select! {
                     result = worker.execute(&submission, config.native_capture_dir.as_deref(), &mut reply, &chunks, deadline, received, runtime) => result,
                     _ = chunks.closed() => {
-                        let _ = timeout(Duration::from_millis(200), worker.send("request_cancel", Some(&submission.request.request_id), None, None)).await;
+                        let _ = timeout(Duration::from_millis(200), worker.send("request_cancel", Some(&submission.request.request_id), None, None, None)).await;
                         Err(protocol_error())
                     }
                 };
@@ -2792,6 +2825,7 @@ mod tests {
                     tls_observer: None,
                     id: Uuid::new_v4().to_string(),
                     cache_ttl_rewrite_supported: false,
+                    message_cache_policy_supported: false,
                     restore_supported: false,
                     stdin: child.stdin.take().unwrap(),
                     stdout: BufReader::new(child.stdout.take().unwrap()),
@@ -2909,6 +2943,7 @@ mod tests {
             tls_observer: None,
             id: Uuid::new_v4().to_string(),
             cache_ttl_rewrite_supported: false,
+            message_cache_policy_supported: false,
             restore_supported: true,
             child: None,
             restored: Some(super::super::native_criu::Process::test_worker(
@@ -3154,6 +3189,8 @@ mod tests {
             "deadline",
             "ttl",
             "unsupported-ttl",
+            "cache",
+            "unsupported-cache",
         ] {
             let worker_id = Uuid::new_v4().to_string();
             let job_id = Uuid::new_v4().to_string();
@@ -3174,7 +3211,7 @@ mod tests {
             let idle = json!({"schema_version":2,"worker_id":worker_id,"request_id":job_id,"type":"worker_idle"});
             // 直接驱动私有事件读取路径，合成进程只写受控帧，不启动任何模型或原生构造。
             let mut child = Command::new("python3").args(["-u", "-c",
-                "import sys,time,json; command=json.loads(sys.stdin.readline()); mode=sys.argv[1]; assert mode!='ttl' or command['cache_ttl_rewrite']=='1h'; time.sleep(2) if mode=='deadline' else None; print(sys.argv[2],flush=True) if mode in ('error','ttl','diagnostic','invalid-diagnostic','wrong-request') else None; print(sys.argv[3],flush=True) if mode in ('error','ttl','diagnostic','invalid-diagnostic','wrong-request') else None"])
+                "import sys,time,json; command=json.loads(sys.stdin.readline()); mode=sys.argv[1]; assert mode!='ttl' or command['cache_ttl_rewrite']=='1h'; assert mode!='cache' or command['message_cache_policy']=='sub2api'; time.sleep(2) if mode=='deadline' else None; print(sys.argv[2],flush=True) if mode in ('error','ttl','cache','diagnostic','invalid-diagnostic','wrong-request') else None; print(sys.argv[3],flush=True) if mode in ('error','ttl','cache','diagnostic','invalid-diagnostic','wrong-request') else None"])
                 .arg(scenario).arg(frame.to_string()).arg(idle.to_string())
                 .stdin(Stdio::piped()).stdout(Stdio::piped()).kill_on_drop(true).spawn().unwrap();
             let root = temp_dir().join(format!("native-log-test-{}", Uuid::new_v4()));
@@ -3183,6 +3220,7 @@ mod tests {
             let mut worker = Worker {
                 tls_observer: None,
                 cache_ttl_rewrite_supported: scenario == "ttl",
+                message_cache_policy_supported: scenario == "cache",
                 restore_supported: false,
                 id: worker_id.clone(),
                 stdin: child.stdin.take().unwrap(),
@@ -3207,6 +3245,7 @@ mod tests {
             let submission = NativeSubmission {
                 source_version: Default::default(),
                 cache_ttl_rewrite: scenario.contains("ttl").then(|| "1h".into()),
+                message_cache_policy: scenario.contains("cache").then(|| "sub2api".into()),
                 ingress_capture: None,
                 log_mode: RequestLogMode::Info,
                 request: PreparedRequest {
@@ -3255,7 +3294,7 @@ mod tests {
                 .await;
             if matches!(
                 scenario,
-                "error" | "ttl" | "diagnostic" | "invalid-diagnostic"
+                "error" | "ttl" | "cache" | "diagnostic" | "invalid-diagnostic"
             ) {
                 assert!(result.unwrap());
                 assert_eq!(receive.await.unwrap().unwrap().status(), 502);
@@ -3270,6 +3309,7 @@ mod tests {
             "ipc_eof",
             "native_response_deadline",
             "cache_ttl_capability_missing",
+            "message_cache_capability_missing",
         ] {
             assert!(logs.contains(reason), "缺少结束原因 {reason}");
         }
@@ -3400,6 +3440,7 @@ mod tests {
         let identity = NativeSubmission {
             source_version: Default::default(),
             cache_ttl_rewrite: None,
+            message_cache_policy: None,
             ingress_capture: None,
             log_mode: RequestLogMode::Info,
             request: PreparedRequest {
@@ -3750,6 +3791,7 @@ mod tests {
             NativeSubmission {
                 source_version: Default::default(),
                 cache_ttl_rewrite: None,
+                message_cache_policy: None,
                 ingress_capture: None,
                 log_mode: RequestLogMode::Debug,
                 request: PreparedRequest {

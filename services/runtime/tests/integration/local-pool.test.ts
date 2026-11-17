@@ -11,4 +11,5 @@ test.skipIf(!binary)('常驻池联调使用真实 293 客户端与无外网模�
   await writeFile('artifacts/local-pool-offline-proof.json', JSON.stringify({ passed: code === 0, realUpstreamRequests: 0, isolated: true, exitCode: code, output: logs.join('\n') }, null, 2) + '\n', { mode: 0o600 });
   if (code !== 0) throw new Error('离线常驻池联调失败：\n' + logs.join('\n'));
   expect(code).toBe(0);
-}, 300000);
+// 整组包含66秒长流、多次冷启动及25次连续调用，覆盖各子场景的等待预算。
+}, 420000);

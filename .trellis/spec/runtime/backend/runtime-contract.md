@@ -363,25 +363,27 @@ bun scripts/benchmark-runtime.ts --binary /绝对路径/新产物 --reference /r
 
 ### 1. Scope / Trigger
 
-- 本机缓存配置贯穿控制层、私有握手、原生单次发送和日志；共享类型及校验位于 src/shared/runtime-policy.ts，纯处理器位于 src/shared/cache-policy.ts。
+- 启动配置及受信私有请求的缓存策略贯穿控制层、私有握手、原生单次发送和日志；共享类型及校验位于 src/shared/runtime-policy.ts，纯处理器位于 src/shared/cache-policy.ts。
 
 ### 2. Signatures
 
 - readCachePolicy(value: unknown): CachePolicy，CachePolicy 为 preserve/sub2api。
+- readRequestCachePolicy(value: unknown, fallback: CachePolicy = 'preserve'): CachePolicy，省略时沿用启动策略，非法私有值返回 runtime_protocol/502。
 - applyCachePolicy(original: JsonObject, outgoing: JsonObject, mode: CachePolicy): CachePolicyResult，返回 body 和 CachePolicyDecision。
 - runNativeJob(..., cachePolicy: CachePolicy = 'preserve') 仅在真实发送回调应用策略；generateNativeRequest 的本地 bootstrap 不应用策略。
-- worker_ready.cache_policy?: CachePolicy；cc_prepared.cache_policy?: CachePolicyDecision。HTTP/事件 schema 1 和 worker schema 2 保持原版号，可选字段由统一协议解码器校验。
+- request_input.message_cache_policy?: CachePolicy；worker_ready.message_cache_policy_protocol?:1，启动及恢复绑定握手共用该能力声明。worker_ready.cache_policy?: CachePolicy；cc_prepared.cache_policy?: CachePolicyDecision。HTTP/事件 schema 1 和 worker schema 2 保持原版号，可选字段由统一协议解码器校验。
 
 ### 3. Contracts
 
-- CCRB_CACHE_POLICY 默认 preserve，显式值仅接受 preserve/sub2api。readConfig、直接 NativeEngine/createEngine 和 worker 边界均校验，配置固定到引擎/物理进程，修改后重建，不从请求头或正文取得策略。
-- preserve 不规范化消息或新增标记。sub2api 遇到调用方已有顶层或嵌套协议消息标记、任一根 cache_control、未知缓存结构或没有候选时整体保留。工具 input/schema 等业务对象中的同名字段不解释为控制指令。
-- 可优化时只移除本轮 SDK 自动消息标记，保留 system/tools 的原标记；先完整评估候选及预算，再克隆应用，跳过分支不改变原文。
+- CCRB_CACHE_POLICY 默认 preserve，显式值仅接受 preserve/sub2api。readConfig、直接 NativeEngine/createEngine 和 worker 边界均校验；启动配置固定到引擎/物理进程，修改后重建。受信任前置服务通过私有 request_input.message_cache_policy 覆盖本轮策略，省略沿用启动值；每轮独立取值，HTTP 请求头及业务正文沿原控制边界处理。
+- preserve 不规范化消息或新增标记；独立 cache_ttl_rewrite 仍可覆盖已有 TTL。显式 sub2api 清理协议 messages 内容块的顶层标记，再重新选点，调用方与 SDK 标记使用同一规则；system/tools 原标记继续保留。工具 input/schema 等业务对象中的同名字段保持业务含义。
+- 任一根 cache_control、嵌套协议消息标记或未知缓存结构使用整体保留分支。其它可处理输入先评估候选及预算，再克隆处理，输入原对象保持；预算耗尽或没有候选时仍清理旧顶层消息标记，skipped 表示本轮未新增断点。
 - 候选先为末条消息的最后一个可缓存块，消息至少四条时再选倒数第二个 user；总显式预算四减去 tools/system 的既有数量，尾部优先。仅 assistant text、user text/tool_result 可选，thinking、redacted_thinking、图片和 tool_use 不选。仅实际选中的字符串 content 转成 text 数组。
-- 新标记为 ephemeral，不添加 scope；默认 1h，若前置 tools/system 标记存在 5m 或省略 TTL，则新标记用 5m。未知类型/TTL/结构及既有反向 TTL 顺序触发保留，不修补调用方原值。
-- 所有改动在 cc_prepared 快照及 Ree 之前完成；原生 transport 继续生成最终 CCH。只读诊断包含 mode/action/reason/selected/breakpoints/ttl，不保存业务文本或宣称上游命中。
-- 旧握手缺少 cache_policy 时仅兼容 preserve；显式 sub2api 缺能力或回显不符返回配置错误，业务作业不发送。握手后故障与发送竞争时保留首个故障，不能把原配置/协议错误覆盖成通用 runtime_exit。
+- 新标记为 ephemeral，不添加 scope；默认 1h，若前置 tools/system 标记存在 5m 或省略 TTL，则新标记用 5m。前置 tools/system 的未知类型/TTL/结构及既有反向 TTL 顺序触发整体保留。
+- 所有改动在 cc_prepared 快照及 Ree 之前完成；选点后的独立 TTL 覆盖同步到新增断点诊断。原生 transport 继续生成最终 CCH。只读诊断包含 mode/action/reason/selected/breakpoints/ttl，不保存业务文本或宣称上游命中。
+- 旧握手缺少 cache_policy 时仅兼容 preserve；显式 sub2api 要求 message_cache_policy_protocol=1，独立 NativeEngine 入口同样核验新版语义能力。缺能力或启动回显不符返回配置错误，业务作业发送为零。Rust sender 向具备能力的 worker 显式传入本轮 preserve/sub2api，核对同次 cc_prepared 诊断模式；恢复绑定重新核验能力版本。握手后故障与发送竞争时保留首个故障，不能把原配置/协议错误覆盖成通用 runtime_exit。
 - /api/health.runtimePolicy.cachePolicy 只表示已配置策略。精简新能力须对确定哈希完成独立重复构建及原生回归后登记，外部 manifest 不授信。
+- flower2api 的 off/sub2api、一次性重置及热生效合同由[原生消息缓存设置](../../gateway/backend/settings-database.md#scenario-原生消息缓存设置与一次性关闭)所有。配套候选构建与本地验证完成后，发行、部署和激活继续由发布 SOP 承接。
 
 ### 4. Validation & Error Matrix
 
@@ -390,21 +392,23 @@ bun scripts/benchmark-runtime.ts --binary /绝对路径/新产物 --reference /r
 | 非法配置值 | native_configuration/503，启动/配置阶段失败 |
 | 旧 worker 或策略回显不符 | native_configuration/503，隔离进程且业务发送为零 |
 | 畸形私有握手或诊断 | runtime_protocol/502，隔离进程 |
-| 调用方消息已有标记或根缓存 | 保留，分别记录 caller_message_breakpoints/root_cache_control_present |
-| 预算耗尽、无候选或不支持结构 | 保留，记录确定跳过原因，不猜测修复 |
+| 调用方消息已有顶层标记 | 显式 sub2api 清理后重排；preserve 保留 |
+| 根缓存、嵌套协议标记或不支持结构 | 整体保留，记录 root_cache_control_present/unsupported_cache_control |
+| 预算耗尽或无候选 | 清理旧顶层消息标记，记录 no_available_slots/no_cacheable_blocks |
 
 ### 5. Scenarios and Examples
 
-- 正常：显式 sub2api，五条交替消息且无调用方消息标记，选择第三条 user 和第五条 user 的末尾可缓存块。
+- 正常：显式 sub2api，五条交替消息的第一条已有调用方标记，清理后选择第三条 user 和第五条 user 的末尾可缓存块。
 - 边界：三个 tools/system 标记仅剩一格，尾部优先；四格已满时不转换候选字符串。已有 system/5m 时新标记用 5m。
-- 错误用法：把调用方 5m/scope 标记清除后强制全部 1h。正确做法是保留调用方锚点，整体跳过并说明；实际缓存命中以上游 usage 为准。
+- 错误用法：通过 HTTP 正文伪造私有模式，或将 skipped 理解为所有正文均保持。正确处理：模式来自启动配置或受信私有指令，按 mode/reason/selected 核对本轮实际清理与新增；实际缓存命中以上游 usage 为准。
 - 错误用法：给旧产物传新环境变量便宣称策略已应用。正确做法是核验 worker 能力及回显，显式能力不足明确失败。
 
 ### 6. Tests Required
 
 - tests/unit/cache-policy.test.ts：默认值与非法配置、不可变输入、短长历史、助手尾部、string/tool_result、thinking/图片、预算、TTL、原有标记及未知格式。
-- tests/unit/{engine,worker-protocol}.test.ts：旧握手与不匹配配置在作业发送前失败，畸形诊断拒绝，握手后故障保持原始状态。
-- tests/native/native.test.ts：API/原生两路径的策略应用及 caller/root/budget 跳过，最终接收正文与 CCH、日志说明及单次模型请求；原版和精简都执行。
+- tests/unit/{engine,worker-protocol}.test.ts：旧握手、旧 sub2api 语义与不匹配配置在作业发送前失败，私有模式及能力版本非法值拒绝，畸形诊断拒绝，握手后故障保持原始状态。
+- tests/native/native.test.ts：API/原生两路径的策略应用、调用方断点重排及 root/budget 分支，同 PID preserve/sub2api/preserve 切换，最终接收正文与 CCH、日志说明及单次模型请求；280/293 的原版和配套精简候选都执行。
+- scripts/testing/cc2api-native.ts 的 CCRB_TEST_CACHE_POLICY_ONLY=1：双版 API/原生输入与 off/sub2api/off 热切换、独立 TTL、暖 PID，429 中途保存新设置后重试冻结及下一请求生效，共15次实际TLS请求；异步诊断验收最多等待30秒，同时断言写入失败和丢弃为0。
 - tests/browser/logs.spec.ts：历史详情、原生来源和中间值标签继续正确；生产 wire_final 不因离线接收样本变成已采集。
 
 ## Scenario: 默认关闭的官方第一方遥测

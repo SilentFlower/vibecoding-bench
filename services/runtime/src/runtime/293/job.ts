@@ -310,6 +310,8 @@ export async function runNativeJob(prepared: PreparedInput, bindings: NativeBind
       const sendingBody = !native && generated.body.stream !== stream ? { ...generated.body, stream } : generated.body;
       const cache = applyCachePolicy(prepared.input.body, sendingBody, cachePolicy);
       const finalBody = rewriteCacheTtl(cache.body, cacheTtlRewrite);
+      // 独立TTL覆盖在选点后执行，诊断应记录本轮新增断点的最终TTL。
+      if (cache.decision.action === 'applied' && cacheTtlRewrite !== 'off') cache.decision.ttl = cacheTtlRewrite;
       if (finalBody !== generated.body) init.body = JSON.stringify(finalBody);
       if (typeof init.body !== 'string') throw new Error('原生 SDK 发送正文不是字符串');
       init.headers = headers;

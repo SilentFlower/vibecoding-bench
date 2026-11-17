@@ -13,6 +13,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 #[cfg(unix)]
 use libc::{O_NOFOLLOW, O_NONBLOCK};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use tokio::sync::Semaphore;
@@ -28,6 +29,64 @@ const FILE_LIMIT: usize = 50;
 const STORAGE_LIMIT: u64 = 100 * 1024 * 1024;
 static WRITERS: Semaphore = Semaphore::const_new(2);
 static STORAGE: Mutex<()> = Mutex::new(());
+
+/// 私有缓存诊断仅接受控制枚举、位置和计数。
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct MessageCacheDecision {
+    mode: String,
+    action: String,
+    reason: String,
+    selected: Vec<MessageCachePosition>,
+    breakpoints: Option<u64>,
+    ttl: Option<String>,
+}
+
+/// 单个协议消息块的位置。
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct MessageCachePosition {
+    message: u32,
+    block: u32,
+}
+
+/// 校验并投影原生返回的缓存决策，保持诊断有界且无业务文本。
+/// @param value 私有事件中的缓存决策。
+/// @return 已知合同的安全快照，畸形决策返回None。
+pub(crate) fn message_cache_policy(value: &Value) -> Option<Value> {
+    if value.as_object()?.len() != 6 || value["selected"].as_array()?.len() > 2 {
+        return None;
+    }
+    let decision: MessageCacheDecision = serde_json::from_value(value.clone()).ok()?;
+    if decision.selected.len() > 2 {
+        return None;
+    }
+    let valid = match (
+        decision.mode.as_str(),
+        decision.action.as_str(),
+        decision.reason.as_str(),
+    ) {
+        ("preserve", "preserved", "policy_preserve") => {
+            decision.selected.is_empty() && decision.ttl.is_none()
+        }
+        ("sub2api", "applied", "sub2api_tail") => {
+            !decision.selected.is_empty()
+                && decision.breakpoints.is_some_and(|count| count <= 4)
+                && matches!(decision.ttl.as_deref(), Some("5m" | "1h"))
+        }
+        (
+            "sub2api",
+            "skipped",
+            "caller_message_breakpoints"
+            | "root_cache_control_present"
+            | "unsupported_cache_control"
+            | "no_available_slots"
+            | "no_cacheable_blocks",
+        ) => decision.selected.is_empty() && decision.ttl.is_none(),
+        _ => false,
+    };
+    valid.then(|| serde_json::to_value(decision).ok()).flatten()
+}
 static TOKEN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"sk-ant-[A-Za-z0-9_-]+").unwrap());
 static SECRET_STRING: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
@@ -323,6 +382,9 @@ fn snapshot(submission: &NativeSubmission, payload: &Value) -> io::Result<Value>
         "attempt_id":submission.request.request_id,"captured_at_ms":SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
         "headers":headers,"body":body,"body_truncated":truncated,"headers_truncated":headers_truncated,
         "original_body_bytes":payload["body_bytes"],"original_body_sha256":payload["body_sha256"]});
+    if let Some(policy) = payload.get("cache_policy") {
+        value["cache_policy"] = message_cache_policy(policy).ok_or(io::ErrorKind::InvalidData)?;
+    }
     let mut ingress_status = "unavailable";
     if let Some(ingress) = submission.ingress_capture.as_ref() {
         let input = ingress["body"].as_str().ok_or(io::ErrorKind::InvalidData)?;
@@ -433,6 +495,15 @@ fn snapshot(submission: &NativeSubmission, payload: &Value) -> io::Result<Value>
         {"stage":"cc_prepared","source":"native_cc_prepared","representation":"json_before_native_transport","status":if truncated || headers_truncated {"truncated"} else {"complete"},"note":"原生最终传输前的中间值"},
         {"stage":"wire_final","source":"unavailable","representation":"unavailable","status":"unavailable","note":"平台本次未取得独立最终TLS写出采集"}
     ]);
+    if let Some(policy) = value.get("cache_policy") {
+        let note = format!(
+            "原生最终传输前的中间值；消息缓存策略 {} / {}，新增断点 {} 个",
+            policy["mode"].as_str().unwrap_or_default(),
+            policy["reason"].as_str().unwrap_or_default(),
+            policy["selected"].as_array().map_or(0, Vec::len)
+        );
+        value["stages"][2]["note"] = json!(note);
+    }
     if let Some(wire) = payload.get("_wire_final") {
         append_wire(&mut value, wire, &secrets)?;
         if wire["complete"] == true && wire["body_truncated"] == false {
@@ -882,6 +953,39 @@ pub(crate) async fn record(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 缓存诊断只持久化已知枚举与有界位置，私有扩展和畸形结构受控拒绝。
+    /// @return 无；秘密扩展可进入快照或诊断丢失时失败。
+    #[test]
+    fn message_cache_policy_snapshot_is_bounded_and_explicit() {
+        let policy = json!({"mode":"sub2api","action":"applied","reason":"sub2api_tail",
+            "selected":[{"message":2,"block":0},{"message":4,"block":0}],"breakpoints":2,"ttl":"1h"});
+        assert_eq!(message_cache_policy(&policy), Some(policy.clone()));
+        for (key, bad) in [
+            ("reason", json!("synthetic-private-secret")),
+            ("selected", json!([{"message":-1,"block":0}])),
+            (
+                "selected",
+                json!([{"message":0,"block":0,"secret":"synthetic"}]),
+            ),
+            ("breakpoints", json!(5)),
+            ("ttl", json!(["1h"])),
+            ("secret", json!("synthetic-private-secret")),
+        ] {
+            let mut invalid = policy.clone();
+            invalid[key] = bad;
+            assert!(message_cache_policy(&invalid).is_none());
+        }
+        let payload = json!({"headers":[],"body":"{\"messages\":[]}","cache_policy":policy});
+        let stored = snapshot(&submission(), &payload).unwrap();
+        assert_eq!(stored["cache_policy"], policy);
+        assert!(
+            stored["stages"][2]["note"]
+                .as_str()
+                .unwrap()
+                .contains("sub2api")
+        );
+    }
 
     #[tokio::test]
     async fn info_short_circuits_before_creating_capture_files() {

@@ -116,3 +116,13 @@ test('逐请求TTL仅通过受信私有指令传递，旧握手保持兼容', ()
   expect(decodeWorkerFrame(JSON.stringify({ ...ready, cache_ttl_rewrite_protocol: 1 }), workerId).type).toBe('worker_ready');
   expect(() => decodeWorkerFrame(JSON.stringify({ ...ready, cache_ttl_rewrite_protocol: 2 }), workerId)).toThrow();
 });
+
+
+test('本轮消息缓存策略只接受私有枚举，握手能力版本精确校验', () => {
+  const command = { schema_version: 2, type: 'request_input', worker_id: workerId, request_id: 'cache-job', input: { schema_version: 1, request_id: 'cache-job' } } as const;
+  for (const message_cache_policy of ['preserve', 'sub2api'] as const) expect(decodeWorkerCommand({ ...command, message_cache_policy }, workerId)).toEqual({ ...command, message_cache_policy });
+  for (const message_cache_policy of ['off', 'auto', '', null, true, {}]) expect(() => decodeWorkerCommand({ ...command, message_cache_policy }, workerId)).toThrow('缓存策略');
+  const ready = { schema_version: 2, type: 'worker_ready', worker_id: workerId, version: '2.1.293', pid: 1, message_cache_policy_protocol: 1 } as const;
+  expect(decodeWorkerFrame(JSON.stringify(ready), workerId)).toEqual(ready);
+  for (const message_cache_policy_protocol of [0, 2, '1', true, null]) expect(() => decodeWorkerFrame(JSON.stringify({ ...ready, message_cache_policy_protocol }), workerId)).toThrow();
+});

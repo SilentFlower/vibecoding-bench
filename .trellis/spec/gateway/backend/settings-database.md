@@ -43,6 +43,52 @@ Setting value 应以字符串存储，进入 service 前解析成 enum/bool/numb
 
 保存 mode/profile/允许范围/禁止版本/其它 UA 后调用 `GatewayService::reload_access_profile_config`。准入与选择必须从同一次 `get_all` 构成同一个 `AccessProfileConfig`，在一把 `RwLock` 中原子替换；写锁覆盖读取和替换，解析失败保持旧快照，请求在同一读锁内先准入、后冻结画像。完整契约见 [按客户端 UA 选择请求画像](../protocol/claude-code-profile-upgrade.md#scenario-按客户端-ua-选择请求画像) 与 [293 画像和准入预设](../protocol/claude-code-profile-upgrade.md#scenario-claude-code-21293-画像与-280293-准入预设)。
 
+## Scenario: 原生消息缓存设置与一次性关闭
+
+### 1. Scope / Trigger
+
+修改 `message_cache_control_rewrite` 的管理入口、存量兼容或 native 逐请求传递时适用。该设置控制额外消息断点重排，默认保留原生布局。
+
+### 2. Signatures
+
+- `SettingsStore::ensure_native_message_cache_defaults(&self) -> Result<(), AppError>` 为 async，启动时在 GatewayService 装配前调用。
+- `MessageCacheControlRewrite::parse_setting(&str) -> Result<Self, AppError>` 精确接纳 `off|sub2api`。
+- `GET/PUT /admin/settings` 使用字符串 `message_cache_control_rewrite`；默认 `off`。
+- `NativeSubmission.message_cache_policy: Option<String>`：省略表示 preserve，显式开启传 sub2api。运行时私有字段及选点算法见[缓存策略合同](../../runtime/backend/runtime-contract.md#scenario-可选-sub2api-消息缓存策略)。
+
+### 3. Contracts
+
+- 首次接入在现有 settings 表内同事务插入 `_internal_native_message_cache_v1=1` 并将模式设为 off；唯一键 `ON CONFLICT DO NOTHING` 仅允许首次取得标记的事务执行重置。SQLite/PostgreSQL共用该原子合同，冻结数据库基线和登记摘要保持。
+- 存量 sub2api、auto/rolling/stateful、stable/anchored、非法值及缺失值首次均落为 off，显式 off 保持。后续管理员保存 sub2api，重复初始化及重启持续保留；重置失败连同标记整体回滚，下一次可重试。
+- 内部标记从 `get_all` 过滤；公开批量保存只要包含该键即在写入前拒绝。无关设置保持原值。
+- PUT 在任何写入前校验公开枚举，废弃及非法值返回 BadRequest；GET与运行期加载将非法或缺失值解释为 off。
+- 保存后热加载，根请求在外层选号与重试循环前冻结模式，换号、429退避及签名修复重试沿同一快照。后续根请求采用新模式；同一暖进程按私有指令逐次取值。
+- off省略外层新增字段以兼容既有sender；新版sender将其解释为preserve，并向有能力的worker显式传preserve，保证开启后关闭仍即时作用于后续作业。显式sub2api缺少worker能力时发送前受控503。
+- 独立 `cache_control_ttl_rewrite` 继续按自身设置执行；off表示关闭额外断点改写。缓存命中及费用以上游实际usage为准。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 首次启动、缺键或任一历史模式 | 同事务补标记并设off |
+| 兼容完成后手动开启并重启 | 保持sub2api |
+| 并发初始化或重置写失败 | 唯一成功重置；失败整体回滚并可重试 |
+| PUT废弃值、非法值或内部标记 | HTTP400，整批零写入 |
+| 运行期非法存量值 | GET与实际模式均为off |
+| 显式开启且旧worker缺能力 | 业务发送前503 |
+
+### 5. Scenarios and Examples
+
+- 正常：升级前sub2api首次转off；管理员保存sub2api后重启，设置与实际模式仍为sub2api。
+- 边界：请求首次返回429后管理员保存sub2api，该请求重试仍用冻结的off，下一根请求采用sub2api。
+- 错误用法：每次启动无条件重置，或通过公开设置重写内部标记。正确处理：同事务的一次性标记与存储层写保护共同维护管理员后续选择。
+
+### 6. Tests Required
+
+- `tests/native_message_cache_settings_test.rs`：SQLite多连接及独立PostgreSQL库覆盖全部旧值、缺键、并发、迁移后选择、标记隐藏/保护、无关键和触发器注入失败回滚。
+- `native_message_cache_settings_validate_and_hot_reload`：GET/PUT枚举一致、非法批次原子拒绝、运行期热加载与非法存量off兜底。
+- `native_real_gateway` 的缓存场景：双版实际TLS选点、暖PID、TTL及429重试冻结；浏览器390/1440px验证两项选择、默认说明、草稿/撤销、字符串保存、刷新持久化和切回off。
+
 ## Account 字段同步
 
 账号字段跨越多层：

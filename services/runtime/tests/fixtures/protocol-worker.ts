@@ -16,7 +16,7 @@ export async function fixtureWorker(scenario: string): Promise<void> {
     process.exit(111);
   }
   frame('worker_ready', { version: '2.1.293', pid: process.pid,
-    ...(scenario === 'cache_match' ? { cache_policy: 'sub2api' } : scenario === 'cache_mismatch' ? { cache_policy: 'preserve' } : {}),
+    ...(scenario === 'cache_match' ? { cache_policy: 'sub2api', message_cache_policy_protocol: 1 } : scenario === 'cache_old_strategy' ? { cache_policy: 'sub2api' } : scenario === 'cache_mismatch' ? { cache_policy: 'preserve' } : {}),
     ...(scenario === 'telemetry_match' ? { telemetry: { policy: 'on', state: 'initialized' } } : scenario === 'telemetry_suppressed' ? { telemetry: { policy: 'on', state: 'suppressed' } } : scenario === 'telemetry_mismatch' ? { telemetry: { policy: 'off', state: 'off' } } : {}),
   });
   if (scenario === 'duplicate_ready') frame('worker_ready', { version: '2.1.293', pid: process.pid });

@@ -143,11 +143,13 @@ verify 的辅助程序将原版 CC 已生成的请求行、有序头及正文原
 
 ### 可选缓存策略
 
-`CCRB_CACHE_POLICY=preserve` 为默认值，保持当前布局。显式设为 `sub2api` 并重启服务后，对没有调用方消息断点的请求选取尾部可缓存块；消息至少四条时，再选倒数第二条 user 消息的末尾可缓存块。已有 system/tools 标记保留，总预算最多四个，预算不足时尾部优先。普通 API 的 SDK 自动消息标记仅在调用方未声明消息标记时由此策略替换。
+`CCRB_CACHE_POLICY=preserve` 为独立运行时默认值，保持当前原生缓存布局。显式设为 `sub2api` 后，清理协议 messages 内容块已有的顶层断点，再在尾部可缓存块选点；消息至少四条时，再选倒数第二条 user 消息的末尾可缓存块。调用方与 SDK 生成的消息断点采用相同重排规则。已有 system/tools 标记保留，总预算最多四个，预算不足时尾部优先。预算耗尽或没有候选时，旧顶层消息断点仍按显式策略清理，诊断的 skipped 表示本轮未新增断点。
 
-调用方已有消息断点、根级 cache_control、未知缓存结构、预算耗尽或没有候选时保留原文，日志说明原因。新标记默认 ephemeral/1h；已有前置标记为 5m 或省略 TTL 时，新标记用 5m，已有 TTL/scope 不改。thinking、图片及 tool_use 不作为选点，工具结果可选。此策略不保证上游实际命中，实际缓存读写量仍以上游 usage 为准。
+根级 cache_control、嵌套协议消息标记及未知缓存结构使用保留分支并记录原因。工具 input/schema 等业务对象中的同名字段保持业务含义。新标记默认 ephemeral/1h；已有前置标记为 5m 或省略 TTL 时，新标记用 5m。thinking、图片及 tool_use 不作为选点，工具结果可选。实际缓存读写量以上游 usage 为准。
 
-策略仅来自启动配置，不接受请求头或正文覆盖。旧精简产物若不支持显式 sub2api，返回受控配置错误，需重新构建和接纳产物。`/api/health` 的 runtimePolicy.cachePolicy 是已配置策略，日志的中间阶段说明是当次处理结果。
+独立运行时的启动策略修改后重启，显式 sub2api 同样要求新版消息缓存能力。受信任前置服务可通过私有 `request_input.message_cache_policy=preserve|sub2api` 冻结本轮策略，省略时沿用启动策略；worker 以 `message_cache_policy_protocol=1` 在启动及恢复握手声明能力。HTTP 请求头和业务正文沿原控制边界处理。前置服务仅向具备能力的内核传递该字段，显式 sub2api 缺能力时在发送前返回受控 503，preserve 兼容旧内核。`cc_prepared.cache_policy` 记录实际模式、处理原因、选点和预算。
+
+flower2api 系统设置使用 `message_cache_control_rewrite=off|sub2api`，默认 off 对应 preserve。首次接入将存量 sub2api 及废弃模式一次性重置 off；之后管理员手动开启的选择跨重启保留。保存对后续请求热生效，已冻结的请求及其重试沿用原模式。独立 TTL 改写继续按自身设置执行。使用新版策略前先按平台 SOP 配套激活具备能力的内核。
 
 ### 第一方遥测
 

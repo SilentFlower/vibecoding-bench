@@ -267,7 +267,8 @@ describe('本地常驻 Base URL 的原生闭环', () => {
       const ledger = await Bun.file(join(unlimited.directory, 'ledger.json')).json();
       expect(ledger.reservations).toHaveLength(25); expect(ledger.reservations.every((row: { attempted: boolean }) => row.attempted)).toBe(true);
     } finally { await unlimited.close(); }
-  }, 20000);
+  // 验收次数及参数透传需包含真实进程准备和25次调用，单次假池网络期限仍为500毫秒。
+  }, 60000);
 
   test('薄桥接保留原生分类和参数，26 MiB 正文及 66 秒长请求均可完成', async () => {
     const thin = await startLocalPool({ binary, pool: { baseUrl: fixture.baseUrl, apiKey: secret, mode: 'manual', live: false, maxRequests: null, timeoutMs: 0 }, runId: 'thin-manual', directory: join(root, 'thin-manual'), port: 0 });

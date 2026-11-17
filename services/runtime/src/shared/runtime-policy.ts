@@ -16,6 +16,17 @@ export function readCacheTtlRewrite(value: unknown): CacheTtlRewrite {
   throw new BridgeError('runtime_protocol', '私有缓存TTL策略无效', 502);
 }
 
+/** 校验受信任前置服务冻结的本轮消息断点策略。
+ * @param value 私有管道提供的策略，省略时使用启动配置。
+ * @param fallback 当前运行时启动策略。
+ * @return 本轮策略；非法值返回私有协议错误。
+ */
+export function readRequestCachePolicy(value: unknown, fallback: CachePolicy = 'preserve'): CachePolicy {
+  if (value === undefined) return fallback;
+  if (value === 'preserve' || value === 'sub2api') return value;
+  throw new BridgeError('runtime_protocol', '私有消息缓存策略无效', 502);
+}
+
 /** 本机第一方遥测开关，开启仍服从官方策略。 */
 export type TelemetryPolicy = 'off' | 'on';
 

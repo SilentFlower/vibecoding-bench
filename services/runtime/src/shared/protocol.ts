@@ -1,6 +1,6 @@
 import type { HeaderPair, RuntimeEvent, RuntimeJob, RuntimePayload, WorkerCommand, WorkerFrame } from './contracts';
 import { BridgeError, isObject } from './errors';
-import { isCachePolicyDecision, isTelemetryHandshake, readCacheTtlRewrite } from './runtime-policy';
+import { isCachePolicyDecision, isTelemetryHandshake, readCacheTtlRewrite, readRequestCachePolicy } from './runtime-policy';
 import { isNativeClassificationContext } from './request-attribution';
 import { isModelSelection } from './upstream';
 import { isNativeErrorDiagnostics } from './native-error-diagnostics';
@@ -33,7 +33,7 @@ export function validateRuntimeEvent(value: unknown, requestId: string): Runtime
     case 'ready': valid = typeof value.version === 'string'; break;
     case 'header_policy': valid = value.attempt === 1 && Array.isArray(value.decisions) && value.decisions.every(item => isObject(item) && typeof item.name === 'string' && ['keep', 'drop', 'runtime', 'context'].includes(String(item.action)) && typeof item.reason === 'string' && Object.keys(item).every(key => ['name', 'action', 'reason'].includes(key))); break;
     case 'final_capture_ready': valid = value.attempt === 1; break;
-    case 'cc_prepared': valid = value.attempt === 1 && typeof value.body === 'string' && headerPairs(value.headers) && Number.isSafeInteger(value.body_bytes) && Number(value.body_bytes) >= 0 && typeof value.body_sha256 === 'string' && /^[a-f0-9]{64}$/.test(value.body_sha256) && (value.cache_policy === undefined || isCachePolicyDecision(value.cache_policy)); break;
+    case 'cc_prepared': valid = value.attempt === 1 && typeof value.body === 'string' && headerPairs(value.headers) && Number.isSafeInteger(value.body_bytes) && Number(value.body_bytes) >= 0 && typeof value.body_sha256 === 'string' && /^[a-f0-9]{64}$/.test(value.body_sha256) && (value.message_cache_policy_protocol === undefined || value.message_cache_policy_protocol === 1) && (value.cache_policy === undefined || isCachePolicyDecision(value.cache_policy)); break;
     case 'response_headers': valid = value.attempt === 1 && Number.isInteger(value.status) && Number(value.status) >= 200 && Number(value.status) <= 599 && headerPairs(value.headers); break;
     case 'response_chunk': valid = value.attempt === 1 && typeof value.data_b64 === 'string' && value.data_b64.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(value.data_b64); break;
     case 'completed': valid = value.attempt === 1 && ['success', 'http_error', 'stream_error', 'incomplete', 'canceled', 'error'].includes(String(value.state)) && (value.error === undefined || typeof value.error === 'string'); break;
@@ -94,6 +94,7 @@ export function decodeWorkerCommand(value: unknown, workerId: string): WorkerCom
   if (value.type === 'request_input') {
     if (!isObject(value.input) || value.input.schema_version !== 1 || value.input.request_id !== value.request_id) throw new BridgeError('runtime_protocol', '原始输入与请求归属不匹配', 502);
     readCacheTtlRewrite(value.cache_ttl_rewrite);
+    readRequestCachePolicy(value.message_cache_policy);
     return value as unknown as WorkerCommand;
   }
   if (value.type !== 'request_start') throw new BridgeError('runtime_protocol', '未知工作进程指令', 502);
@@ -122,7 +123,7 @@ export function decodeWorkerFrame(line: string, workerId: string): WorkerFrame {
       if (value.restore_protocol !== 1 || value.restore_template !== undefined || !isObject(binding) || typeof binding.template_id !== 'string' || !RESTORE_UUID.test(binding.template_id) || typeof binding.nonce !== 'string' || !RESTORE_NONCE.test(binding.nonce) || binding.entropy_profile !== 'bun143-wipeonfork-v1' || Object.keys(binding).some(key => !['template_id', 'nonce', 'entropy_profile'].includes(key))) throw new BridgeError('runtime_protocol', '恢复握手归属错误', 502);
     }
   }
-  if (value.type === 'worker_ready' && typeof value.version === 'string' && Number.isSafeInteger(value.pid) && Number(value.pid) > 0 && (value.raw_input_protocol === undefined || value.raw_input_protocol === 1) && (value.cache_ttl_rewrite_protocol === undefined || value.cache_ttl_rewrite_protocol === 1) && (value.cache_policy === undefined || value.cache_policy === 'preserve' || value.cache_policy === 'sub2api') && (value.telemetry === undefined || isTelemetryHandshake(value.telemetry))) return value as unknown as WorkerFrame;
+  if (value.type === 'worker_ready' && typeof value.version === 'string' && Number.isSafeInteger(value.pid) && Number(value.pid) > 0 && (value.raw_input_protocol === undefined || value.raw_input_protocol === 1) && (value.cache_ttl_rewrite_protocol === undefined || value.cache_ttl_rewrite_protocol === 1) && (value.message_cache_policy_protocol === undefined || value.message_cache_policy_protocol === 1) && (value.cache_policy === undefined || value.cache_policy === 'preserve' || value.cache_policy === 'sub2api') && (value.telemetry === undefined || isTelemetryHandshake(value.telemetry))) return value as unknown as WorkerFrame;
   if (typeof value.request_id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(value.request_id)) throw new BridgeError('runtime_protocol', '工作进程事件缺少有效请求归属', 502);
   if (value.type === 'worker_idle') return value as unknown as WorkerFrame;
   if (value.type === 'request_event' && isObject(value.payload)) {

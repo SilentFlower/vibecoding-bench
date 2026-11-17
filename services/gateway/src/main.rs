@@ -98,6 +98,10 @@ async fn main() {
         .ensure_scheduling_defaults()
         .await
         .expect("补齐调度默认配置失败");
+    settings_store
+        .ensure_native_message_cache_defaults()
+        .await
+        .expect("初始化原生消息缓存默认配置失败");
     let prime_log_store = Arc::new(store::prime_log_store::PrimeLogStore::new(pool.clone()));
     let usage_store = Arc::new(store::usage_store::UsageStore::new(pool.clone()));
     let diagnostics_store = Arc::new(DiagnosticsStore::new(pool.clone()));

@@ -231,6 +231,7 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
       if (ready.type !== 'worker_ready') throw new Error('缺少工作进程握手');
       expect(ready.raw_input_protocol).toBe(1);
       expect(ready.cache_ttl_rewrite_protocol).toBe(1);
+      expect(ready.message_cache_policy_protocol).toBe(1);
       expect(ready.pid).toBe(worker.child.pid);
       const count = requests.length;
       const body = { model: 'claude-sonnet-4-6', messages: [{ role: 'user', content: '原始输入回环' }], stream: false };
@@ -273,6 +274,33 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
         assertCch(actual.raw);
       }
       expect(requests.length - count).toBe(5);
+      const marked = nativeBody({ messages: [
+        { role: 'user', content: [{ type: 'text', text: 'u1', cache_control: { type: 'ephemeral', ttl: '5m' } }] },
+        { role: 'assistant', content: 'a1' }, { role: 'user', content: 'u2' },
+        { role: 'assistant', content: 'a2' }, { role: 'user', content: 'u3' },
+      ] });
+      let policyIndex = 0;
+      for (const message_cache_policy of ['preserve', 'sub2api', 'preserve'] as const) {
+        const id = 'raw-cache-' + policyIndex++;
+        await worker.send({ type: 'request_input', schema_version: 2, worker_id: workerId, request_id: id,
+          message_cache_policy, input: { schema_version: 1, request_id: id, body: marked } });
+        const events = await collect(id);
+        expect(events.at(-1)).toEqual(expect.objectContaining({ type: 'completed', state: 'success' }));
+        const prepared = events.find(event => event.type === 'cc_prepared');
+        if (prepared?.type !== 'cc_prepared') throw new Error('缺少消息缓存组装快照');
+        expect(prepared.cache_policy?.mode).toBe(message_cache_policy);
+        const actual = requests.at(-1)!;
+        if (message_cache_policy === 'preserve') expect(actual.body.messages).toEqual(marked.messages);
+        else {
+          expect(prepared.cache_policy?.selected).toEqual([{ message: 2, block: 0 }, { message: 4, block: 0 }]);
+          const messages = actual.body.messages as { content: unknown }[];
+          expect(messages[0]!.content).toEqual([{ type: 'text', text: 'u1' }]);
+          expect(messages[2]!.content).toEqual([{ type: 'text', text: 'u2', cache_control: { type: 'ephemeral', ttl: '5m' } }]);
+        }
+        assertCch(actual.raw);
+        expect(ready.pid).toBe(worker.child.pid);
+      }
+      expect(requests.length - count).toBe(8);
       await worker.send({ type: 'worker_shutdown', schema_version: 2, worker_id: workerId });
       expect(await worker.child.exited).toBe(0);
     } finally { await verified.handle.close(); await worker.close(); }
@@ -722,7 +750,7 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
     const scenarios: [string, Record<string, unknown>, string][] = [
       ['api', { model: 'claude-sonnet-4-6', system: '缓存测试', messages, max_tokens: 128, stream: false }, '已应用 sub2api'],
       ['native', nativeBody({ messages }), '已应用 sub2api'],
-      ['caller-marked', nativeBody(), '调用方已有消息缓存断点'],
+      ['caller-marked', nativeBody(), '已应用 sub2api'],
       ['automatic', nativeBody({ messages, cache_control: { type: 'ephemeral' } }), '保留根级缓存机制'],
       ['budget', nativeBody({ messages, tools: Array.from({ length: 4 }, (_, index) => ({ name: 't' + index, input_schema: { type: 'object' }, cache_control: { type: 'ephemeral', ttl: '1h' } })), system: (nativeBody().system as unknown[]).slice(0, 1) }), '预算已用完'],
     ];
@@ -748,7 +776,7 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
           expect((wire.body.messages as { content: unknown }[])[2]!.content).toEqual([{ type: 'text', text: 'u2', cache_control: { type: 'ephemeral', ttl: '5m' } }]);
           expect((wire.body.messages as { content: unknown }[])[4]!.content).toEqual([{ type: 'text', text: 'u3', cache_control: { type: 'ephemeral', ttl: '5m' } }]);
         }
-        if (name === 'caller-marked' || name === 'automatic' || name === 'budget') expect(wire.body.messages).toEqual(body.messages);
+        if (name === 'automatic' || name === 'budget') expect(wire.body.messages).toEqual(body.messages);
         expect(body).toEqual(before);
         policyCases.push({ name, body, raw: wire.raw, detail });
       }

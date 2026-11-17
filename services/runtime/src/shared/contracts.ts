@@ -227,13 +227,13 @@ export interface RuntimeJob {
 export type WorkerCommand =
   | { type: 'worker_restore_bind'; schema_version: 2; worker_id: string; template_id: string; new_worker_id: string; nonce: string }
   | { type: 'request_start'; schema_version: 2; worker_id: string; request_id: string; prepared: PreparedInput }
-  | { type: 'request_input'; schema_version: 2; worker_id: string; request_id: string; input: unknown; cache_ttl_rewrite?: CacheTtlRewrite }
+  | { type: 'request_input'; schema_version: 2; worker_id: string; request_id: string; input: unknown; cache_ttl_rewrite?: CacheTtlRewrite; message_cache_policy?: CachePolicy }
   | { type: 'request_cancel'; schema_version: 2; worker_id: string; request_id: string }
   | { type: 'worker_shutdown'; schema_version: 2; worker_id: string };
 
 /** 常驻进程输出；请求载荷解包后继续使用外部 schema 1。 */
 export type WorkerFrame =
-  | { type: 'worker_ready'; schema_version: 2; worker_id: string; version: string; pid: number; cache_policy?: CachePolicy; telemetry?: TelemetryHandshake; raw_input_protocol?: 1; cache_ttl_rewrite_protocol?: 1; restore_protocol?: 1; restore_template?: string; restore_binding?: { template_id: string; nonce: string; entropy_profile: 'bun143-wipeonfork-v1' } }
+  | { type: 'worker_ready'; schema_version: 2; worker_id: string; version: string; pid: number; cache_policy?: CachePolicy; telemetry?: TelemetryHandshake; raw_input_protocol?: 1; cache_ttl_rewrite_protocol?: 1; message_cache_policy_protocol?: 1; restore_protocol?: 1; restore_template?: string; restore_binding?: { template_id: string; nonce: string; entropy_profile: 'bun143-wipeonfork-v1' } }
   | { type: 'worker_error'; schema_version: 2; worker_id: string; code: 'native_configuration'; status: 503; error: string }
   | { type: 'request_event'; schema_version: 2; worker_id: string; request_id: string; payload: RuntimePayload }
   | { type: 'worker_idle'; schema_version: 2; worker_id: string; request_id: string };

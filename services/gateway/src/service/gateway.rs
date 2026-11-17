@@ -1025,7 +1025,8 @@ impl GatewayService {
             )
             .await?;
         *self.message_cache_control_rewrite.write().await =
-            MessageCacheControlRewrite::parse(&raw)?;
+            MessageCacheControlRewrite::parse_setting(&raw)
+                .unwrap_or(MessageCacheControlRewrite::Off);
         Ok(())
     }
 
@@ -1475,6 +1476,13 @@ impl GatewayService {
     #[cfg(test)]
     pub(crate) async fn message_top_field_filter_enabled_for_test(&self) -> bool {
         *self.message_top_field_filter_enabled.read().await
+    }
+
+    /// 读取测试使用的消息断点设置快照。
+    /// @return 当前热加载模式。
+    #[cfg(test)]
+    pub(crate) async fn message_cache_mode_for_test(&self) -> MessageCacheControlRewrite {
+        *self.message_cache_control_rewrite.read().await
     }
 
     /// 返回测试使用的后台状态分类请求处理模式。
@@ -2204,6 +2212,7 @@ impl GatewayService {
         };
 
         // 每个请求只冻结一次；保留原始 body_map/body_bytes，换号和重试复用相同清理正文。
+        let native_message_cache = *self.message_cache_control_rewrite.read().await;
         let message_top_field_filter_enabled = *self.message_top_field_filter_enabled.read().await;
         let filtered_message_body =
             Rewriter::filter_message_top_fields(&body_map, &path, message_top_field_filter_enabled);
@@ -2485,6 +2494,7 @@ impl GatewayService {
                         &account_selection_context,
                         scheduling_request.as_ref(),
                         should_bind_session,
+                        native_message_cache,
                     )
                     .await
                 {
@@ -3777,6 +3787,7 @@ impl GatewayService {
     /// @param selection 当前账号选择条件。
     /// @param scheduling 原请求准入和截止时间。
     /// @param bind_session 首次发送是否建立会话绑定。
+    /// @param message_cache 原请求冻结的消息断点策略。
     /// @return 最多一次修复重试后的原生响应。
     async fn forward_native_messages(
         &self,
@@ -3790,6 +3801,7 @@ impl GatewayService {
         selection: &AccountSelectionContext,
         scheduling: Option<&SchedulingRequest>,
         bind_session: bool,
+        message_cache: MessageCacheControlRewrite,
     ) -> Result<Response, AppError> {
         let deadline = scheduling
             .map(SchedulingRequest::deadline)
@@ -3823,6 +3835,7 @@ impl GatewayService {
                 selection,
                 scheduling,
                 bind_session,
+                message_cache,
             )
             .await?;
         if response.extensions().get::<SignatureRejection>().is_none() {
@@ -3856,6 +3869,7 @@ impl GatewayService {
                 selection,
                 scheduling,
                 false,
+                message_cache,
             ),
         )
         .await
@@ -3879,6 +3893,7 @@ impl GatewayService {
     /// @param selection 账号限额决策上下文。
     /// @param scheduling 当前调度准入。
     /// @param bind_session 是否提交新会话绑定。
+    /// @param message_cache 原请求冻结的消息断点策略。
     /// @return 单次原生模型提交的响应。
     async fn forward_native_messages_once(
         &self,
@@ -3893,6 +3908,7 @@ impl GatewayService {
         selection: &AccountSelectionContext,
         scheduling: Option<&SchedulingRequest>,
         bind_session: bool,
+        message_cache: MessageCacheControlRewrite,
     ) -> Result<Response, AppError> {
         validate_native_account_features(account, headers, body_map)?;
         let log_mode = diagnostics::current_log_mode();
@@ -3981,6 +3997,9 @@ impl GatewayService {
         input["body"] = native_body.into_owned();
         let submission = NativeSubmission {
             source_version,
+            // 关闭时省略外层新增字段，既有sender继续沿保留布局的默认合同执行。
+            message_cache_policy: (message_cache == MessageCacheControlRewrite::Sub2api)
+                .then(|| "sub2api".into()),
             cache_ttl_rewrite: Some(
                 self.cache_control_ttl_rewrite
                     .read()
@@ -8723,6 +8742,7 @@ mod tests {
     include!("gateway_rate_limit_tests.rs");
 
     use super::{map_native_session, native_pool_session, validate_native_account_features};
+    use crate::service::rewriter::MessageCacheControlRewrite;
 
     use super::{
         AssistantPrefillInterceptConfig, AutoModeClassifierMode, AutoModeClassifierProtocol,
@@ -10353,6 +10373,8 @@ mod tests {
         ] {
             let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
             let base = format!("http://{}", listener.local_addr().unwrap());
+            // 依赖初始化先收口，网络接收的10秒预算只覆盖本次转发。
+            let service = test_gateway_service_with_urls(base, String::new()).await;
             let received = tokio::spawn(async move {
                 timeout(Duration::from_secs(10), async move {
                     let (mut socket, _) = listener.accept().await.unwrap();
@@ -10387,7 +10409,6 @@ mod tests {
                 .await
                 .expect("业务请求原始字节接收超时")
             });
-            let service = test_gateway_service_with_urls(base, String::new()).await;
             let account = account_for_request_profile(
                 &test_account(),
                 Some(profile_for_key(version).unwrap()),
@@ -10845,6 +10866,7 @@ mod tests {
                     &AccountSelectionContext::disabled(),
                     None,
                     false,
+                    MessageCacheControlRewrite::Off,
                 )
                 .await
                 .unwrap();
@@ -10914,6 +10936,7 @@ mod tests {
         use crate::service::native_runtime::NativeSenderConfig;
         use crate::service::runtime_bridge;
         use crate::service::runtime_transport::{SenderConfig, TransportBinding, sender_router};
+        use crate::store::diagnostics_store::DiagnosticsStore;
         use std::collections::HashSet;
         use std::env::{temp_dir, var, var_os};
         use std::fs;
@@ -11019,6 +11042,263 @@ mod tests {
         };
         let control = var("CCRB_TEST_CONTROL").unwrap();
         let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        if var("CCRB_TEST_CACHE_POLICY_ONLY").as_deref() == Ok("1") {
+            /// 等待异步诊断落盘，并区分队列延迟与实际写入失败。
+            /// @param store 当前验证实例的诊断存储。
+            /// @return 无；超时、写入失败或丢弃时失败。
+            async fn wait_cache_diagnostics(store: &DiagnosticsStore) {
+                let mut retries = 0;
+                timeout(Duration::from_secs(30), async {
+                    while store.flush().await.is_err() {
+                        retries += 1;
+                        tokio_sleep(Duration::from_millis(20)).await;
+                    }
+                })
+                .await
+                .expect("诊断队列须在验证预算内完成");
+                let page = store.list(DiagnosticQuery::default()).await.unwrap();
+                assert_eq!(page.health.write_failures, 0, "诊断写入失败须显式暴露");
+                assert_eq!(page.health.dropped_records, 0, "全部验证请求须进入诊断");
+                if retries > 0 {
+                    println!("NATIVE_CACHE_DIAGNOSTIC_WAIT retries={retries}");
+                }
+            }
+            service
+                .settings_store
+                .ensure_native_message_cache_defaults()
+                .await
+                .unwrap();
+            let diagnostics = service.diagnostics_store().unwrap();
+            for version in ["2.1.280", "2.1.293"] {
+                let mut pid = None;
+                for native in [false, true] {
+                    for (index, (mode, ttl)) in [("off", "off"), ("sub2api", "1h"), ("off", "5m")]
+                        .into_iter()
+                        .enumerate()
+                    {
+                        service
+                            .settings_store
+                            .upsert_many(&HashMap::from([
+                                ("message_cache_control_rewrite".into(), mode.into()),
+                                ("cache_control_ttl_rewrite".into(), ttl.into()),
+                            ]))
+                            .await
+                            .unwrap();
+                        service
+                            .reload_message_cache_control_rewrite()
+                            .await
+                            .unwrap();
+                        service.reload_cache_control_ttl_rewrite().await.unwrap();
+                        let label = format!(
+                            "gateway-dual-cache-{}-{native}-{index}",
+                            version.replace('.', "")
+                        );
+                        let mut input = json!({"model":"claude-sonnet-4-6","max_tokens":128,"stream":false,"messages":[
+                            {"role":"user","content":[{"type":"text","text":label,"cache_control":{"type":"ephemeral","ttl":"5m"}}]},
+                            {"role":"assistant","content":"a1"},{"role":"user","content":"u2"},
+                            {"role":"assistant","content":"a2"},{"role":"user","content":"u3"}]});
+                        if native {
+                            input["system"] = json!([{"type":"text","text":format!("x-anthropic-billing-header: cc_version={version}.abc; cc_entrypoint=cli; cch=12345;")}]);
+                            input["metadata"] = json!({"user_id":json!({"device_id":"c".repeat(64),"account_uuid":"","session_id":Uuid::new_v4().to_string()}).to_string()});
+                        }
+                        let mut value = request(input);
+                        value.headers_mut().insert(
+                            "user-agent",
+                            HeaderValue::from_str(&format!("claude-cli/{version} (external, cli)"))
+                                .unwrap(),
+                        );
+                        let response = service.handle_request(value, None).await;
+                        let status = response.status();
+                        let id = response
+                            .headers()
+                            .get("x-cc2api-request-id")
+                            .and_then(|value| value.to_str().ok())
+                            .unwrap_or_default()
+                            .to_string();
+                        let bytes = body::to_bytes(response.into_body(), 1024 * 1024)
+                            .await
+                            .unwrap();
+                        assert_eq!(
+                            status,
+                            StatusCode::OK,
+                            "缓存场景{label}：{}",
+                            String::from_utf8_lossy(&bytes)
+                        );
+                        wait_cache_diagnostics(diagnostics).await;
+                        let detail = diagnostics.detail(&id).await.unwrap();
+                        assert_eq!(detail.request.attempt_count, 1);
+                        assert_eq!(detail.attempts[0].profile_version, version);
+                        let runtime = detail.attempts[0].runtime.as_ref().unwrap();
+                        assert_eq!(
+                            *pid.get_or_insert(runtime.worker_pid),
+                            runtime.worker_pid,
+                            "策略切换继续复用同版暖进程"
+                        );
+                        let path =
+                            format!("{capture_directory}/{}.json", detail.attempts[0].attempt_id);
+                        let snapshot: Value = timeout(Duration::from_secs(4), async {
+                            loop {
+                                if let Ok(bytes) = fs::read(&path) {
+                                    if let Ok(value) = serde_json::from_slice::<Value>(&bytes) {
+                                        break value;
+                                    }
+                                }
+                                tokio_sleep(Duration::from_millis(10)).await;
+                            }
+                        })
+                        .await
+                        .unwrap();
+                        assert_eq!(
+                            snapshot["cache_policy"]["mode"],
+                            if mode == "off" { "preserve" } else { "sub2api" }
+                        );
+                        let observed: Value = client
+                            .get(&control)
+                            .send()
+                            .await
+                            .unwrap()
+                            .json()
+                            .await
+                            .unwrap();
+                        let actual = observed["messages"].as_array().unwrap().last().unwrap();
+                        assert_eq!(actual["label"], label);
+                        if mode == "sub2api" {
+                            let prepared: Value =
+                                serde_json::from_str(snapshot["body"].as_str().unwrap()).unwrap();
+                            let tail = prepared["messages"][4]["content"].as_array().unwrap();
+                            assert_eq!(tail.last().unwrap()["type"], "text");
+                            let expected = json!([[2, 0], [4, tail.len() - 1]]);
+                            assert_eq!(actual["cache_message_positions"], expected);
+                            let selected: Vec<Value> = snapshot["cache_policy"]["selected"]
+                                .as_array()
+                                .unwrap()
+                                .iter()
+                                .map(|position| json!([position["message"], position["block"]]))
+                                .collect();
+                            assert_eq!(json!(selected), expected);
+                            assert_eq!(snapshot["cache_policy"]["ttl"], "1h");
+                        } else if native {
+                            assert_eq!(actual["cache_message_positions"], json!([[0, 0]]));
+                        }
+                        if ttl != "off" {
+                            assert!(
+                                actual["cache_ttls"]
+                                    .as_array()
+                                    .unwrap()
+                                    .iter()
+                                    .all(|value| value == ttl)
+                            );
+                        }
+                    }
+                }
+            }
+            let make_cache_request = |label: &str| {
+                request(
+                    json!({"model":"claude-sonnet-4-6","max_tokens":128,"stream":false,
+                "system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.293.abc; cc_entrypoint=cli; cch=12345;"}],
+                "metadata":{"user_id":json!({"device_id":"c".repeat(64),"account_uuid":"","session_id":Uuid::new_v4().to_string()}).to_string()},
+                "messages":[{"role":"user","content":[{"type":"text","text":label,"cache_control":{"type":"ephemeral","ttl":"5m"}}]},
+                    {"role":"assistant","content":"a1"},{"role":"user","content":"u2"},
+                    {"role":"assistant","content":"a2"},{"role":"user","content":"u3"}]}),
+                )
+            };
+            // 首次429之后切换设置，已冻结请求的退避重试继续使用off；下一请求使用新值。
+            let (response, ()) = tokio::join!(
+                service.handle_request(make_cache_request("gateway-dual-cache-freeze"), None),
+                async {
+                    timeout(Duration::from_secs(5), async {
+                        loop {
+                            let observed: Value = client
+                                .get(&control)
+                                .send()
+                                .await
+                                .unwrap()
+                                .json()
+                                .await
+                                .unwrap();
+                            if observed["messages"]
+                                .as_array()
+                                .unwrap()
+                                .iter()
+                                .any(|value| value["label"] == "gateway-dual-cache-freeze")
+                            {
+                                break;
+                            }
+                            tokio_sleep(Duration::from_millis(10)).await;
+                        }
+                    })
+                    .await
+                    .unwrap();
+                    service
+                        .settings_store
+                        .upsert_many(&HashMap::from([(
+                            "message_cache_control_rewrite".into(),
+                            "sub2api".into(),
+                        )]))
+                        .await
+                        .unwrap();
+                    service
+                        .reload_message_cache_control_rewrite()
+                        .await
+                        .unwrap();
+                }
+            );
+            assert_eq!(response.status(), StatusCode::OK);
+            let id = response.headers()["x-cc2api-request-id"]
+                .to_str()
+                .unwrap()
+                .to_string();
+            body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            wait_cache_diagnostics(diagnostics).await;
+            assert_eq!(
+                diagnostics.detail(&id).await.unwrap().request.attempt_count,
+                2
+            );
+            let observed: Value = client
+                .get(&control)
+                .send()
+                .await
+                .unwrap()
+                .json()
+                .await
+                .unwrap();
+            let frozen: Vec<&Value> = observed["messages"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|value| value["label"] == "gateway-dual-cache-freeze")
+                .collect();
+            assert_eq!(frozen.len(), 2);
+            assert!(
+                frozen
+                    .iter()
+                    .all(|value| value["cache_message_positions"] == json!([[0, 0]]))
+            );
+            let response = service
+                .handle_request(make_cache_request("gateway-dual-cache-after-freeze"), None)
+                .await;
+            assert_eq!(response.status(), StatusCode::OK);
+            body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            let observed: Value = client
+                .get(&control)
+                .send()
+                .await
+                .unwrap()
+                .json()
+                .await
+                .unwrap();
+            assert_eq!(
+                observed["messages"].as_array().unwrap().last().unwrap()["cache_message_positions"],
+                json!([[2, 0], [4, 0]])
+            );
+            sender.abort();
+            let _ = fs::remove_dir_all(root);
+            return;
+        }
         if var("CCRB_TEST_RATE_LIMIT_ONLY").as_deref() == Ok("1") {
             for version in ["2.1.280", "2.1.293"] {
                 for native in [false, true] {

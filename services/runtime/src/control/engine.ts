@@ -193,6 +193,7 @@ export class NativeEngine implements Engine {
           if (frame.type === 'worker_ready') {
             if (worker.initialized || frame.version !== (worker.verified.identity.sourceVersion ?? PROFILE_293.version) || frame.pid !== worker.child.pid) throw new BridgeError('runtime_protocol', '工作进程握手不匹配或重复', 502);
             if ((frame.cache_policy ?? 'preserve') !== this.config.cachePolicy) throw new BridgeError('native_configuration', '运行时不支持或未应用所选缓存策略，需要更新精简产物', 503);
+            if (this.config.cachePolicy === 'sub2api' && frame.message_cache_policy_protocol !== 1) throw new BridgeError('native_configuration', '运行时缺少新版消息缓存策略能力，需要更新精简产物', 503);
             if ((frame.telemetry?.policy ?? 'off') !== this.config.telemetryPolicy) throw new BridgeError('native_configuration', '运行时不支持或未应用所选遥测开关，需要更新精简产物', 503);
             worker.telemetry = frame.telemetry;
             await Promise.race([verifyExecutionImage(worker.child.pid, worker.verified.identity), worker.stopped.promise]);

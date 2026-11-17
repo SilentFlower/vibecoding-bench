@@ -12,7 +12,7 @@ import type { NativeBindings, NativeSession } from './native';
 import { NATIVE_EXPORTS_293, PROFILE_293 } from './source-profile';
 import { generateNativeRequest, runNativeJob } from './job';
 import { initializeCli } from './cli';
-import { readCachePolicy, readTelemetryPolicy, readCacheTtlRewrite } from '../../shared/runtime-policy';
+import { readCachePolicy, readTelemetryPolicy, readCacheTtlRewrite, readRequestCachePolicy } from '../../shared/runtime-policy';
 import { createNativeTelemetry } from './telemetry';
 import { readNativeIngressPolicy } from '../../shared/upstream';
 import { resetRestoredRandomState } from './restore';
@@ -88,7 +88,7 @@ export async function startWorker(bindings: NativeBindings): Promise<void> {
   };
   const ready = (receipt?: { template_id: string; nonce: string; entropy_profile: 'bun143-wipeonfork-v1' }): WorkerFrame => ({
     type: 'worker_ready', schema_version: 2, worker_id: workerId, version: sourceVersion, pid: process.pid,
-    cache_policy: cachePolicy, telemetry: telemetryState, raw_input_protocol: 1, cache_ttl_rewrite_protocol: 1,
+    cache_policy: cachePolicy, telemetry: telemetryState, raw_input_protocol: 1, cache_ttl_rewrite_protocol: 1, message_cache_policy_protocol: 1,
     ...(sourceVersion === PROFILE_293.version ? { restore_protocol: 1 as const } : {}), ...(templateId && !receipt ? { restore_template: templateId } : {}),
     ...(receipt ? { restore_binding: receipt } : {}),
   });
@@ -158,7 +158,7 @@ export async function startWorker(bindings: NativeBindings): Promise<void> {
           try {
             await storage.run(scope, async () => {
               bindings.state.t_(job.context.sessionId, 'resume');
-              await runNativeJob(job, bindings, abort.signal, redactor, emit, cachePolicy,
+              await runNativeJob(job, bindings, abort.signal, redactor, emit, readRequestCachePolicy(command.type === 'request_input' ? command.message_cache_policy : undefined, cachePolicy),
                 readCacheTtlRewrite(command.type === 'request_input' ? command.cache_ttl_rewrite : undefined), stage => { failureStage = stage; });
             });
           } finally { scope.telemetry = false; }

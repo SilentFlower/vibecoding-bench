@@ -63,16 +63,29 @@ test('短历史只选尾部，tool_result 可选且业务对象中的同名键�
   expect((result.body.messages as JsonObject[])[0]!.content).toEqual([{ ...input.messages[0]!.content[0], cache_control: { type: 'ephemeral', ttl: '1h' } }]);
 });
 
-test('调用方已有消息断点及嵌套协议标记均完整保留', () => {
-  for (const content of [
-    [{ type: 'text', text: 'caller', cache_control: { type: 'ephemeral', ttl: '5m', scope: 'global' } }],
-    [{ type: 'tool_result', tool_use_id: 'tool_1', content: [{ type: 'text', text: 'nested', cache_control: { type: 'ephemeral' } }] }],
-  ]) {
-    const input = { messages: [{ role: 'user', content }] };
-    const result = applyCachePolicy(input, input, 'sub2api');
-    expect(result.body).toBe(input);
-    expect(result.decision.reason).toBe('caller_message_breakpoints');
-  }
+test('显式开启时清理调用方断点并重排，嵌套协议标记保持受控保留', () => {
+  const input = history();
+  (input.messages as JsonObject[])[0] = { role: 'user', content: [{ type: 'text', text: 'caller', cache_control: { type: 'ephemeral', ttl: '5m', scope: 'global' } }] };
+  const before = structuredClone(input);
+  const result = applyCachePolicy(input, input, 'sub2api');
+  expect(result.decision.selected).toEqual([{ message: 2, block: 0 }, { message: 4, block: 0 }]);
+  expect(((result.body.messages as JsonObject[])[0]!.content as JsonObject[])[0]!.cache_control).toBeUndefined();
+  expect(input).toEqual(before);
+  expect(applyCachePolicy(input, input, 'preserve').body).toBe(input);
+  const nested = { messages: [{ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tool_1', content: [{ type: 'text', text: 'nested', cache_control: { type: 'ephemeral' } }] }] }] };
+  expect(applyCachePolicy(nested, nested, 'sub2api').body).toBe(nested);
+  expect(applyCachePolicy(nested, nested, 'sub2api').decision.reason).toBe('unsupported_cache_control');
+});
+
+test('预算耗尽时仍清理旧消息断点，业务嵌套字段保留', () => {
+  const business = { cache_control: { type: 'business' } };
+  const input = { tools: Array.from({ length: 4 }, (_, i) => ({ name: 't' + i, cache_control: { type: 'ephemeral' }, input_schema: business })), messages: [{ role: 'user', content: [{ type: 'text', text: 'tail', cache_control: { type: 'ephemeral' }, extension: business }] }] };
+  const result = applyCachePolicy(input, input, 'sub2api');
+  expect(result.decision.reason).toBe('no_available_slots');
+  expect(result.decision.breakpoints).toBe(4);
+  expect(((result.body.messages as JsonObject[])[0]!.content as JsonObject[])[0]).toEqual({ type: 'text', text: 'tail', extension: business });
+  expect(result.body.tools).toEqual(input.tools);
+  expect(input.messages[0]!.content[0]!.cache_control).toEqual({ type: 'ephemeral' });
 });
 
 test('调用方或原生构造的根缓存机制优先', () => {

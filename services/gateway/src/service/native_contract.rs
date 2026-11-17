@@ -106,6 +106,9 @@ pub struct NativeSubmission {
     /// 网关按本次全局设置冻结的已有缓存TTL策略；省略表示 off。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cache_ttl_rewrite: Option<String>,
+    /// 受信任网关冻结的消息断点策略，preserve或sub2api；省略沿用保留布局。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message_cache_policy: Option<String>,
     /// 网关在映射前冻结的有界脱敏入口预览；缺失表示本次未采集。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ingress_capture: Option<Value>,

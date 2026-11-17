@@ -1254,6 +1254,7 @@ fn preparation_identity(preparation: NativePreparation, config: &SenderConfig) -
     NativeSubmission {
         source_version: preparation.source_version,
         cache_ttl_rewrite: None,
+        message_cache_policy: None,
         ingress_capture: None,
         log_mode: RequestLogMode::Info,
         request: PreparedRequest {
