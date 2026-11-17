@@ -1,0 +1,42 @@
+{
+  "id": "native-fable-429-fallback",
+  "name": "native-fable-429-fallback",
+  "title": "Native Fable 配额切换与 429 重试",
+  "description": "逐项讨论第一项：补齐 native 明确 429 后的重试与账号切换，确认 Fable 配额和重试边界。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "gateway",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-17",
+  "completedAt": "2026-11-17",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-17T06:14:17Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-17-native-settings-compatibility",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-17T06:14:17.842425+00:00",
+    "completedSteps": [
+      "native明确429接入共用分类，完成Fable与容量拒绝换号、临时退避和业务拒绝透传",
+      "完成945项Rust测试、21组native场景及280/293实际执行体4次隔离TLS验证",
+      "完成Check-All与规范更新"
+    ],
+    "partialStep": null,
+    "nextStep": "第二项messages缓存兼容的开工交接",
+    "notes": "第一项按确认范围完成交付。"
+  }
+}
