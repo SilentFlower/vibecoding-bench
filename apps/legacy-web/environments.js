@@ -175,7 +175,7 @@ function renderEnvironmentCard(row) {
   <div class="environment-id"><code>${id}</code><span>第 ${escapeHTML(row.generation??'未知')} 代</span></div>
   <div class="environment-role-strip">${[['cli','CLI'],['sender','发送器'],['network','网络']].map(([role,label])=>`<div class="${row.role_status?.[role]==='running'?'running':''}"><i></i><span>${label}</span><strong>${escapeHTML(roleLabels[row.role_status?.[role]]||'未知')}</strong></div>`).join('')}</div>
   <div class="environment-resources-grid"><div><span>内存配置</span><strong>${escapeHTML(fp.mem==='unlimited'?'未限制':fp.mem||'未提供')}</strong></div><div><span>CLI CPU</span><strong>${escapeHTML(cpu?.cli??'未采集')}<small>${cpu?.cli!=null?' 核':''}</small></strong></div><div><span>发送器 CPU</span><strong>${escapeHTML(cpu?.sender??'未采集')}<small>${cpu?.sender!=null?' 核':''}</small></strong></div><div><span>网络 CPU</span><strong>${escapeHTML(cpu?.network??'未采集')}<small>${cpu?.network!=null?' 核':''}</small></strong></div></div>
-  <div class="environment-version-line"><span>CLI <strong>${escapeHTML((row.cli_versions||[]).join(' / ')||'未安装')}</strong></span>${open('kernel','内核 <strong>'+escapeHTML(row.native_kernel?.management==='platform'?'平台配套':row.native_kernel?.current?.release||'未提供')+'</strong> ›')}</div>
+  <div class="environment-version-line"><span>CLI <strong>${escapeHTML((row.cli_versions||[]).join(' / ')||'未安装')}</strong></span>${open('kernel','内核 <strong>'+escapeHTML(row.native_kernel?.management==='platform'?'平台内置':row.native_kernel?.current?.release||'未提供')+'</strong> ›')}</div>
   <section class="environment-readiness ${tone==='healthy'?'':tone}"><div><strong>${escapeHTML(({ready:'热进程就绪',busy:'进程使用中',preparing:'正在准备',unprepared:'等待准备',sleeping:'环境休眠',disabled:'常规请求通道',failed:'准备失败'})[prep?.state]||'准备状态待核对')}</strong><span class="environment-job">${row.busy?'CLI 作业执行中':'CLI 作业空闲'}</span></div><p>293 空闲暖进程 <b>${escapeHTML(prep?.idle_workers??'—')}</b> / 存活 <b>${escapeHTML(prep?.live_workers??'—')}</b> · 空闲 PID ${escapeHTML(prep?.pid??'未观测')}</p></section>
   <div class="environment-feature-row">${open('resources','<span>CRIU 加速</span><strong>'+escapeHTML(CRIU_STATES[row.criu?.state]||'待核对')+'</strong>')}${open('resources','<span>内容采集</span><strong>'+(row.content_capture?.applied?(row.content_capture.enabled?'已开启':'已关闭'):'待核对')+'</strong>')}</div>
   ${open('schedule','<span>'+escapeHTML(row.run_window?.message||'运行时段尚未提供')+' <small>'+escapeHTML(fp.tz||'')+'</small></span> ›','class="environment-schedule-summary"')}
@@ -221,7 +221,7 @@ function paintEnvironmentWorkspace() {
  const scheduleForm=state.runWindowConfig?.inline?$('#run-window-form'):null;
  const context=$('#environment-workspace-context'),status=ENVIRONMENT_STATES[row.state]||'未知状态：'+(row.state||'未提供');
  patchRuntimeContent(context,`<span class="initial">${runtimeIcon('box')}</span><div><strong>${escapeHTML(row.name||'未命名环境')}</strong><p>${row.gateway_account_id!=null?'网关账号 #'+escapeHTML(row.gateway_account_id):row.account_id!=null?'任务账号 #'+escapeHTML(row.account_id):'待提交的授权环境'} · 第 ${escapeHTML(row.generation??'未知')} 代</p></div><span class="status-dot ${row.state==='ready'?'':'off'}">${escapeHTML(status)}</span>`);
- const labels={overview:['运行概览','当前环境状态与运行组件'],resources:['资源与采集','在这里调整额度、内容采集与加速设置'],kernel:['请求内核','查看平台配套版本与实际准备状态'],schedule:['运行时段','按账号当地时间安排工作窗口'],maintenance:['维护操作','选择操作后确认影响，当前环境信息持续保留']};
+ const labels={overview:['运行概览','当前环境状态与运行组件'],resources:['资源与采集','在这里调整额度、内容采集与加速设置'],kernel:['请求内核','查看平台内置内核版本与运行状态'],schedule:['运行时段','按账号当地时间安排工作窗口'],maintenance:['维护操作','选择操作后确认影响，当前环境信息持续保留']};
  content.innerHTML=Object.entries(labels).map(([key,[title,note]])=>`<section id="environment-section-${key}" data-workspace-section="${key}" role="tabpanel"><div class="workspace-section-heading"><h3>${title}</h3><p>${note}</p></div><div data-section-body="${key}"></div></section>`).join('');
  const scratch=document.createElement('div');scratch.innerHTML=renderEnvironmentDetailCard(row);
  for(const node of [...scratch.firstElementChild.children]){
@@ -242,7 +242,7 @@ function paintEnvironmentWorkspace() {
  const prepLabel=({ready:'原生准备就绪',busy:'暖进程使用中',preparing:'原生准备中',failed:'原生准备失败',unknown:'准备状态待检查',disabled:'使用原有转发'})[row.native_preparation?.state]||'状态待核对';
  const feature=value=>value?.applied===true?(value.enabled?'已生效':'已关闭'):value?.applied===false?'待应用':'状态未知';
  const metrics=`<div class="environment-dialog-stats"><div><span>CPU 额度</span><strong>${cpu?.cli!=null?escapeHTML(cpu.cli)+' 核':'未采集'}</strong></div><div><span>CRIU 加速</span><strong>${feature(row.criu)}</strong></div><div><span>内容采集</span><strong>${feature(row.content_capture)}</strong></div></div>`;
- const fields=[['CLI 版本',(row.cli_versions||[]).join(' / ')||'未安装'],['请求内核',row.native_kernel?.management==='platform'?'平台配套':row.native_kernel?.current?.release||'未提供'],['环境状态',status+' · '+(row.busy?'CLI 作业执行中':'CLI 作业空闲')],['原生准备',prepLabel]];
+ const fields=[['CLI 版本',(row.cli_versions||[]).join(' / ')||'未安装'],['请求内核',row.native_kernel?.management==='platform'?'平台内置':row.native_kernel?.current?.release||'未提供'],['环境状态',status+' · '+(row.busy?'CLI 作业执行中':'CLI 作业空闲')],['原生准备',prepLabel]];
  const properties='<div class="workspace-properties">'+fields.map(([label,value])=>`<div class="kv"><span>${label}</span><strong>${escapeHTML(value)}</strong></div>`).join('')+'</div>';
  const disabled=row.busy||state.environmentUI.pending.has(row.environment_id)||row.role_status?.cli!=='running';
  overview.insertAdjacentHTML('afterbegin',metrics+properties+`<div class="workspace-inline-actions"><button type="button" class="btn" data-physical-refresh="${escapeHTML(row.environment_id)}" data-environment="${escapeHTML(row.environment_id)}" ${disabled?'disabled':''}>${runtimeIcon('refresh')}刷新物理实测</button><button type="button" class="btn" data-env-tab="resources">调整资源与采集 ${runtimeIcon('arrow')}</button></div>`);
@@ -397,12 +397,12 @@ function renderNativeKernelVersion(row, sourceVersion, kernel) {
   const states = {ready:'暖进程就绪',busy:'暖进程使用中',preparing:'准备中',unprepared:'等待按需准备',
     sleeping:'环境休眠',maintenance:'环境维护中',failed:'准备失败',disabled:'原生方式已关闭',unknown:'运行状态待核对'};
   return `<section class="env-kernel"><div class="env-section-head"><h4>请求内核 · ${escapeHTML(sourceVersion)}</h4><span class="env-tag">随平台版本交付</span></div>
-    <div class="env-kernel-version"><strong>${escapeHTML(kernel.builtin?.release || '未提供')}</strong><span role="status">${escapeHTML(states[observation?.state] || '运行状态待核对')}</span></div>
+    <div class="env-kernel-version"><strong>Claude Code ${escapeHTML(sourceVersion)}（平台内置）</strong><span role="status">${escapeHTML(states[observation?.state] || '运行状态待核对')}</span></div>
     <p class="env-muted">升级或回退 flower2api 时，账号自动采用目标镜像配套的请求内核。</p>
-    <div class="env-versions"><div><span>环境平台批次</span><strong>${escapeHTML(kernel.platform_release || '未提供')}</strong></div><div><span>实际空闲 PID</span><strong>${escapeHTML(observation?.pid ?? '未观测')}</strong></div></div>
+    <div class="env-versions"><div><span>制品摘要</span><strong><code>${escapeHTML(kernel.builtin?.launcher_sha256?.slice(0, 12) || '未提供')}</code></strong></div><div><span>所属平台批次</span><strong>${escapeHTML(kernel.platform_release || '未提供')}</strong></div><div><span>实际空闲 PID</span><strong>${escapeHTML(observation?.pid ?? '未观测')}</strong></div></div>
     ${kernel.state === 'migration_required' ? '<p class="env-muted">历史独立选择等待空闲重建，平台升级将在维护阶段完成迁移。</p>' : ''}
     ${kernel.state === 'reconcile' || kernel.error ? `<p class="env-error" role="alert">${escapeHTML(kernel.error || '历史内核维护待核对，请在环境维护中执行对账。')}</p>` : ''}
-    <details class="env-kernel-details"><summary>配套制品摘要</summary><dl><dt>镜像内置分发 SHA256</dt><dd><code>${escapeHTML(kernel.builtin?.launcher_sha256 || '未提供')}</code></dd></dl></details>
+    <details class="env-kernel-details"><summary>完整制品摘要</summary><dl><dt>镜像内置分发 SHA256</dt><dd><code>${escapeHTML(kernel.builtin?.launcher_sha256 || '未提供')}</code></dd></dl></details>
   </section>`;
 }
 
