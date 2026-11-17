@@ -11,12 +11,12 @@
 
 | 制品 | 分发字节 / SHA256 | 执行映像字节 / SHA256 |
 | --- | --- | --- |
-| 280内置 | 27097232 / `db7848ddd74a9d618c8e3d45ad0e54f71705f3e6ae25bbaccf5b83abf27534cb` | 111599688 / `431aede03d82d6d300da7343f0fb04f983cba2fac83474a6e532f721b0d7a61e` |
-| 293 beta.7 | 27392144 / `a885ac62ee14888b1f637f00bdb98d07fa43dab0f62735ceb731c7116396431b` | 112848056 / `6296aa4f164b8018f6f614915befd347a0dbd73f674ace20534e91947eba4434` |
+| 280内置 | 27097232 / `21e7c3f85c698138c027622e1abc1f20b4f684847cce000d5f3ba9ecd9654229` | 111603784 / `b5ffd54de383a71681043e554156451e3ce277e67e2a4bf04da815a029caee63` |
+| 293 beta.7 | 27392144 / `9a5eb46175762bbcc84ad069601c9626b35a9bbf41aa53f08e96d32fdcf3198a` | 112852152 / `0404cca64e0e08ffe347379c543bb83dcc4b36d46cea1c1b6c570c8af14ccb56` |
 
 两份分发体合计54489376字节。每个执行体独立保持单文件部署合同。来源、Bun revision和资源布局按版本核验，外部manifest不能授信未知制品。
 
-CI沿 `.github/actions/flower2api-native-runtime` 从固定npm 280归档核对SHA512，再核对官方文件SHA256，调用已有隔离构建器，最后核对固定分发SHA256。缓存命中也执行最终校验。构建工作流使用Ubuntu24.04及固定Bun1.3.14。新构建内容造成摘要变化时须重新完成验收并更新消费身份和缓存键。
+CI沿 `.github/actions/flower2api-native-runtime` 分别从固定npm 280/293归档核对SHA512，再核对官方文件SHA256，调用已有隔离构建器，最后核对固定分发SHA256及当前桥接源码摘要。缓存命中也执行最终校验。构建工作流使用Ubuntu24.04及固定Bun1.3.14。新构建内容造成摘要变化时须重新完成验收并更新消费身份和缓存键。
 
 本地可在仓库根准备同一制品：
 
@@ -25,7 +25,7 @@ python3 services/runtime/scripts/prepare-ci-runtime.py --directory /绝对路径
 export V3_NATIVE_RUNTIME_280_ASSET=/绝对路径/native280/ccrb-runtime
 ```
 
-准备脚本需要Linux x64、Bun依赖、GCC和创建网络命名空间的权限。已有产物也可直接通过上述环境变量传给联合构建。293沿原固定beta.7下载路径，`V3_NATIVE_RUNTIME_ASSET`可提供同摘要本地文件。280公共独立发行沿后续发行流程处理。
+准备脚本需要Linux x64、Bun依赖、GCC和创建网络命名空间的权限。已有产物也可直接通过上述环境变量传给联合构建。293使用同一脚本的`--source-version 2.1.293`，`V3_NATIVE_RUNTIME_ASSET`可提供同摘要本地文件。发行号与完整摘要分别校验，旧下载文件须通过当前固定身份核验。公共独立发行沿后续发行流程处理。
 
 ## 共享容量与隔离
 

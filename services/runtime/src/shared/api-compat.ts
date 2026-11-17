@@ -47,7 +47,7 @@ export function validateContextManagement(value: unknown): void {
  */
 export function normalizeApiMetadata(body: JsonObject, context: ContextInput): void {
   if (body.metadata === undefined) return;
-  if (!isObject(body.metadata) || (body.metadata.user_id !== undefined && typeof body.metadata.user_id !== 'string')) throw new BridgeError('invalid_metadata', 'metadata 必须为对象且 user_id 必须为字符串', 400);
+  if (!isObject(body.metadata) || (body.metadata.user_id !== undefined && typeof body.metadata.user_id !== 'string')) throw new BridgeError('invalid_metadata', 'metadata 必须为对象且 user_id 必须为字符串', 400, 'native_metadata_invalid');
   const user = body.metadata.user_id;
   let session: unknown;
   if (typeof user === 'string') {

@@ -38,6 +38,9 @@ impl RequestLogMode {
 /// 一次已鉴权 messages 请求的诊断摘要；不包含请求或响应正文。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequestDiagnostic {
+    /// 原生发送前拒绝的原因与入口采集归属；不增加上游尝试数。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_rejection: Option<NativeRejection>,
     /// 本次实际模式；旧记录保持未知。
     #[serde(default)]
     pub log_mode: Option<RequestLogMode>,
@@ -61,6 +64,14 @@ pub struct RequestDiagnostic {
     /// 管理列表投影的末次尝试；记录入口保持为空。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_attempt: Option<Box<AttemptDiagnostic>>,
+}
+
+/// 本地原生拒绝的受控摘要，正文仍保存于账号私有采集文件。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NativeRejection {
+    pub reason: Option<String>,
+    pub capture_id: String,
+    pub capture_status: String,
 }
 
 /// 实际提交给上游的白名单参数，未知字段保留为空。

@@ -47,6 +47,9 @@ use crate::service::native_contract::{
 pub use crate::service::native_contract::{
     NativeSenderConfig, NativeSubmission, POOL_MEMORY_MIB, WORKER_MEMORY_MIB,
 };
+use crate::service::native_error::{
+    REJECTION_CAPTURE_HEADER, REJECTION_HEADER, project as project_native_error,
+};
 use crate::service::native_release::ReleaseArtifact;
 use crate::service::rewriter::{CacheControlTtlRewrite, extract_session_id_from_body};
 use crate::service::runtime_transport::{
@@ -54,9 +57,9 @@ use crate::service::runtime_transport::{
 };
 use crate::store::settings_store::DEFAULT_NATIVE_IDLE_TIMEOUT_SECS;
 
-const LAUNCHER_SHA256: &str = "a885ac62ee14888b1f637f00bdb98d07fa43dab0f62735ceb731c7116396431b";
-const IMAGE_SHA256: &str = "6296aa4f164b8018f6f614915befd347a0dbd73f674ace20534e91947eba4434";
-const IMAGE_BYTES: u64 = 112_848_056;
+const LAUNCHER_SHA256: &str = "9a5eb46175762bbcc84ad069601c9626b35a9bbf41aa53f08e96d32fdcf3198a";
+const IMAGE_SHA256: &str = "0404cca64e0e08ffe347379c543bb83dcc4b36d46cea1c1b6c570c8af14ccb56";
+const IMAGE_BYTES: u64 = 112_852_152;
 const PREVIOUS_IMAGE_SHA256: &str =
     "af4cea9e21aa959c5e39c389173ba30ebb19b354b67acfe99164946450e9776d";
 const FRAME_LIMIT: usize = 32 * 1024 * 1024;
@@ -127,11 +130,11 @@ fn artifact(config: &NativeSenderConfig) -> Result<ReleaseArtifact, AppError> {
         Some(reference) => ReleaseArtifact::signed(reference, config.source_version),
         None if config.source_version == NativeSourceVersion::Cc280 => Ok(ReleaseArtifact {
             path: PathBuf::from(&config.binary_path),
-            launcher_sha256: "db7848ddd74a9d618c8e3d45ad0e54f71705f3e6ae25bbaccf5b83abf27534cb"
+            launcher_sha256: "21e7c3f85c698138c027622e1abc1f20b4f684847cce000d5f3ba9ecd9654229"
                 .into(),
             launcher_bytes: 27_097_232,
-            image_sha256: "431aede03d82d6d300da7343f0fb04f983cba2fac83474a6e532f721b0d7a61e".into(),
-            image_bytes: 111_599_688,
+            image_sha256: "b5ffd54de383a71681043e554156451e3ce277e67e2a4bf04da815a029caee63".into(),
+            image_bytes: 111_603_784,
         }),
         None => Ok(ReleaseArtifact {
             path: PathBuf::from(&config.binary_path),
@@ -1481,6 +1484,8 @@ impl Worker {
                                     | "upgrade"
                                     | "x-v3-transport-error"
                                     | NATIVE_OBSERVATION_HEADER
+                                    | REJECTION_HEADER
+                                    | REJECTION_CAPTURE_HEADER
                             ) {
                                 continue;
                             }
@@ -1525,13 +1530,15 @@ impl Worker {
                     Some("error") => {
                         if let Some(capture) = tls_capture.take() { capture.background(); }
                         stream_log.reason = "native_error_event";
-                        let diagnostics = super::native_error::project(payload);
+                        let diagnostics = project_native_error(payload);
+                        let rejection = diagnostics.details.as_ref().and_then(|details| details.rejection_reason());
                         tracing::warn!(native_job_id = %id, worker_id = %self.id,
                             worker_pid = runtime.worker_pid, account_id = submission.request.account_id,
                             generation = submission.request.generation,
                             layer = "native_sender", reason = "native_error_event",
                             headers_seen, previous_event_gap_ms, error_code = native_error_code(payload),
                             diagnostics_state = diagnostics.state,
+                            rejection_reason = rejection,
                             error_stage = diagnostics.details.as_ref().map(|details| details.stage.as_str()).unwrap_or("unknown"),
                             error_summary = ?diagnostics.details,
                             error_sha256 = %format!("{:x}", Sha256::digest(payload["error"].as_str().unwrap_or("").as_bytes())),
@@ -1548,6 +1555,17 @@ impl Worker {
                             result
                                 .headers_mut()
                                 .insert("content-type", HeaderValue::from_static("application/json"));
+                            if !prepared {
+                                // 本次尚未组装或发送，入口证据独立保存，不创建上游尝试。
+                                let capture_status = super::native_capture::record_queued(
+                                    capture_dir, submission, payload, header_policy.as_ref(),
+                                );
+                                result.headers_mut().insert(REJECTION_CAPTURE_HEADER,
+                                    HeaderValue::from_str(&capture_status).map_err(|_| protocol_error())?);
+                                if let Some(reason) = rejection {
+                                    result.headers_mut().insert(REJECTION_HEADER, HeaderValue::from_static(reason));
+                                }
+                            }
                             if let Some(observation) = &observation {
                                 let value = STANDARD.encode(
                                     serde_json::to_vec(observation).map_err(|_| protocol_error())?,
@@ -1761,6 +1779,10 @@ impl NativePool {
                 result["reason"] = json!(reason);
                 result["image_admitted"] = json!(
                     worker.image_sha256 == IMAGE_SHA256
+                        || worker.image_sha256
+                            == "6296aa4f164b8018f6f614915befd347a0dbd73f674ace20534e91947eba4434"
+                        || worker.image_sha256
+                            == "b5ffd54de383a71681043e554156451e3ce277e67e2a4bf04da815a029caee63"
                         || worker.image_sha256
                             == "564019c9560e960e96875c9663975491534b27c789ea3d23e5c13309ff293c79"
                         || worker.image_sha256
@@ -3183,6 +3205,7 @@ mod tests {
         for scenario in [
             "error",
             "diagnostic",
+            "rejection",
             "invalid-diagnostic",
             "wrong-request",
             "eof",
@@ -3197,12 +3220,19 @@ mod tests {
             let mut frame = json!({"schema_version":2,"worker_id":worker_id,"request_id":job_id,
                 "type":"request_event","payload":{"type":"error","error":"synthetic-private-error-secret",
                 "code":"request_timeout","status":502}});
-            if scenario == "diagnostic" {
+            if matches!(scenario, "diagnostic" | "rejection") {
                 let fixture: Value = serde_json::from_str(include_str!(
                     "../../tests/fixtures/native-error-diagnostics.json"
                 ))
                 .unwrap();
                 frame["payload"]["diagnostics"] = fixture["diagnostics"].clone();
+                if scenario == "rejection" {
+                    frame["payload"]["diagnostics"]["stage"] = json!("input");
+                    frame["payload"]["diagnostics"]["causes"] =
+                        json!([{"name":"BridgeError","code":"native_entrypoint_unsupported"}]);
+                    frame["payload"]["code"] = json!("invalid_native_request");
+                    frame["payload"]["status"] = json!(422);
+                }
             } else if scenario == "invalid-diagnostic" {
                 frame["payload"]["diagnostics"] = json!({"stage":"synthetic-private-error-secret"});
             } else if scenario == "wrong-request" {
@@ -3211,7 +3241,7 @@ mod tests {
             let idle = json!({"schema_version":2,"worker_id":worker_id,"request_id":job_id,"type":"worker_idle"});
             // 直接驱动私有事件读取路径，合成进程只写受控帧，不启动任何模型或原生构造。
             let mut child = Command::new("python3").args(["-u", "-c",
-                "import sys,time,json; command=json.loads(sys.stdin.readline()); mode=sys.argv[1]; assert mode!='ttl' or command['cache_ttl_rewrite']=='1h'; assert mode!='cache' or command['message_cache_policy']=='sub2api'; time.sleep(2) if mode=='deadline' else None; print(sys.argv[2],flush=True) if mode in ('error','ttl','cache','diagnostic','invalid-diagnostic','wrong-request') else None; print(sys.argv[3],flush=True) if mode in ('error','ttl','cache','diagnostic','invalid-diagnostic','wrong-request') else None"])
+                "import sys,time,json; command=json.loads(sys.stdin.readline()); mode=sys.argv[1]; assert mode!='ttl' or command['cache_ttl_rewrite']=='1h'; assert mode!='cache' or command['message_cache_policy']=='sub2api'; time.sleep(2) if mode=='deadline' else None; print(sys.argv[2],flush=True) if mode in ('error','ttl','cache','diagnostic','invalid-diagnostic','wrong-request','rejection') else None; print(sys.argv[3],flush=True) if mode in ('error','ttl','cache','diagnostic','invalid-diagnostic','wrong-request','rejection') else None"])
                 .arg(scenario).arg(frame.to_string()).arg(idle.to_string())
                 .stdin(Stdio::piped()).stdout(Stdio::piped()).kill_on_drop(true).spawn().unwrap();
             let root = temp_dir().join(format!("native-log-test-{}", Uuid::new_v4()));
@@ -3294,10 +3324,21 @@ mod tests {
                 .await;
             if matches!(
                 scenario,
-                "error" | "ttl" | "cache" | "diagnostic" | "invalid-diagnostic"
+                "error" | "ttl" | "cache" | "diagnostic" | "invalid-diagnostic" | "rejection"
             ) {
                 assert!(result.unwrap());
-                assert_eq!(receive.await.unwrap().unwrap().status(), 502);
+                let response = receive.await.unwrap().unwrap();
+                assert_eq!(
+                    response.status(),
+                    if scenario == "rejection" { 422 } else { 502 }
+                );
+                if scenario == "rejection" {
+                    assert_eq!(
+                        response.headers()[REJECTION_HEADER],
+                        "native_entrypoint_unsupported"
+                    );
+                    assert_eq!(response.headers()[REJECTION_CAPTURE_HEADER], "disabled");
+                }
             } else {
                 assert!(result.is_err());
             }

@@ -139,8 +139,16 @@ def _read(directory: int, account_id: int, attempt_id: str, now_ms: int) -> tupl
     value = json.loads(data)
     if (not isinstance(value, dict) or type(value.get('schema_version')) is not int or value.get('schema_version') != 1
             or type(value.get('account_id')) is not int or value.get('account_id') != account_id or value.get('attempt_id') != attempt_id
-            or value.get('stage') != 'cc_prepared'):
+            or value.get('stage') not in {'cc_prepared', 'ingress_rejected'}):
         raise ValueError('采集文件归属或阶段无效')
+    if value['stage'] == 'ingress_rejected':
+        # 拒绝证据只允许入口原文；空的组装预览不能被当作实际出站内容。
+        stages = value.get('stages', [])
+        if (value.get('body') != '' or value.get('headers') != [] or 'wire_final' in value
+                or value.get('original_body_bytes') is not None or value.get('original_body_sha256') is not None
+                or any(stage.get('status') != 'unavailable' for stage in stages
+                       if isinstance(stage, dict) and stage.get('stage') in {'cc_prepared', 'wire_final'})):
+            raise ValueError('拒绝采集包含无效的出站证据')
     captured = value.get('captured_at_ms')
     if type(captured) is not int or captured <= 0 or captured > now_ms + 300_000:
         raise ValueError('采集文件时间无效')

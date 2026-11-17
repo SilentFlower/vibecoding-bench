@@ -10,13 +10,14 @@ from resource_budget import isolated_account_limits, memory_bytes
 
 VERSION = 'v0.1.0-beta.7'
 ASSET = 'ccrb-runtime-linux-x64'
-SHA256 = 'a885ac62ee14888b1f637f00bdb98d07fa43dab0f62735ceb731c7116396431b'
+SHA256 = '9a5eb46175762bbcc84ad069601c9626b35a9bbf41aa53f08e96d32fdcf3198a'
 POOL_MIB = 256
 WORKER_MIB = 192
 RESTORE_IMAGE_MIB = 108
 VERSION_280 = 'builtin-2.1.280'
-SHA256_280 = 'db7848ddd74a9d618c8e3d45ad0e54f71705f3e6ae25bbaccf5b83abf27534cb'
+SHA256_280 = '21e7c3f85c698138c027622e1abc1f20b4f684847cce000d5f3ba9ecd9654229'
 BYTES_280 = 27097232
+BYTES = 27392144
 
 
 def installed_versions(labels: dict) -> tuple[str, ...]:

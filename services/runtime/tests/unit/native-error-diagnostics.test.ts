@@ -21,6 +21,18 @@ test('类型化 cause 只保留阶段和受控字段，忽略任意异常正文'
   expect(nativeErrorDiagnostics(new BridgeError('unsupported_parameter', secret, 422), 'construction').causes[0]).toEqual({ name: 'BridgeError', code: 'unsupported_parameter' });
 });
 
+test('细分拒绝原因沿既有事件传递，业务错误码保持且任意值被过滤', () => {
+  const error = new BridgeError('invalid_native_request', secret, 422, 'native_entrypoint_unsupported');
+  const diagnostics = nativeErrorDiagnostics(error, 'input');
+  expect(diagnostics.causes[0]).toEqual({ name: 'BridgeError', code: 'native_entrypoint_unsupported' });
+  const event = runtimeEvent('rejected-input', { type: 'error', error: '输入拒绝', code: error.code, status: error.status, diagnostics });
+  expect(decodeRuntimeEvent(JSON.stringify(event), 'rejected-input')).toEqual(event);
+  expect(event).toMatchObject({ code: 'invalid_native_request', status: 422 });
+  const unknown = Object.assign(new BridgeError('unsupported_parameter', secret, 422), { diagnosticCode: secret });
+  expect(nativeErrorDiagnostics(unknown, 'input').causes[0]?.code).toBe('unsupported_parameter');
+  expect(JSON.stringify(diagnostics)).not.toContain(secret);
+});
+
 test('未知抛出值、恶意 getter 和撤销代理保持安全且有界', () => {
   const hostile = Object.defineProperties({}, Object.fromEntries(['name', 'code', 'cause'].map(key => [key, { get() { throw new Error(secret); } }])));
   const revoked = Proxy.revocable({}, {}); revoked.revoke();

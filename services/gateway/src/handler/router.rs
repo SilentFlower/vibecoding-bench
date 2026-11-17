@@ -2646,6 +2646,26 @@ async fn request_native_capture(
         .diagnostics_store()
         .ok_or_else(|| AppError::ServiceUnavailable("请求诊断尚未装配".into()))?;
     let detail = store.detail(&request_id).await?;
+    if let Some(rejected) = detail
+        .request
+        .native_rejection
+        .as_ref()
+        .filter(|rejected| rejected.capture_id == attempt_id)
+    {
+        let value = if detail.request.log_mode == Some(RequestLogMode::Info) {
+            serde_json::json!({"state":"summary", "message":"本次请求仅保存摘要"})
+        } else if rejected.capture_status == "disabled" {
+            serde_json::json!({"state":"disabled", "message":"本次请求发生时内容采集已关闭"})
+        } else {
+            let account_id = detail.request.account_id.ok_or(AppError::NotFound)?;
+            runtime_bridge::native_capture(account_id, &rejected.capture_id).await?
+        };
+        let mut response = Json(value).into_response();
+        response
+            .headers_mut()
+            .insert("cache-control", HeaderValue::from_static("no-store"));
+        return Ok(response);
+    }
     let attempt = detail
         .attempts
         .iter()

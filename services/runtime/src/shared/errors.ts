@@ -1,11 +1,18 @@
+/** 输入拒绝的固定诊断目录；字段值和任意异常正文不进入公开原因。 */
+export const NATIVE_REJECTION_REASONS = ['native_entrypoint_unsupported', 'native_version_mismatch', 'native_billing_invalid', 'native_metadata_invalid', 'unsupported_body_field', 'unsupported_message_field', 'unsupported_system_block', 'invalid_message_role'] as const;
+
+/** 可跨进程记录的固定输入拒绝原因。 */
+export type NativeRejectionReason = typeof NATIVE_REJECTION_REASONS[number];
+
 /** 可向调用方说明的本地合同错误，不暴露凭据或底层环境。 */
 export class BridgeError extends Error {
   /** 创建带状态码的合同错误。
    * @param code 稳定错误代码。
    * @param message 中文说明。
    * @param status HTTP 状态。
+   * @param diagnosticCode 可选的固定细分原因，保留原有业务错误码。
    */
-  constructor(public readonly code: string, message: string, public readonly status = 400) {
+  constructor(public readonly code: string, message: string, public readonly status = 400, public readonly diagnosticCode?: NativeRejectionReason) {
     super(message);
     this.name = 'BridgeError';
   }

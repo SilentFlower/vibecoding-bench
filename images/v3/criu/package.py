@@ -84,8 +84,8 @@ def main() -> None:
                     str(source / 'launch.c'), '-o', str(output / 'launch')], check=True)
     export_filter(source / 'seccomp.json', output / 'business-seccomp.bpf')
     profile = {'protocol': 1, 'entropy_profile': 'bun143-wipeonfork-v1',
-        'image_sha256': '6296aa4f164b8018f6f614915befd347a0dbd73f674ace20534e91947eba4434',
-        'image_bytes': 112848056, 'criu': json.loads((output / 'build/manifest.json').read_text()),
+        'image_sha256': '0404cca64e0e08ffe347379c543bb83dcc4b36d46cea1c1b6c570c8af14ccb56',
+        'image_bytes': 112852152, 'criu': json.loads((output / 'build/manifest.json').read_text()),
         'files': {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in output.iterdir() if path.is_file()}}
     (output / 'profile.json').write_text(json.dumps(profile, sort_keys=True, indent=2) + '\n')
     shutil.rmtree(output / 'build')

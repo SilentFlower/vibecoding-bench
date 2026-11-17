@@ -1,5 +1,5 @@
 name: flower2api 固定原生运行时
-description: 从已核验官方来源构建280并按最终摘要验证缓存
+description: 从已核验官方来源构建280／293并核对制品与构建输入
 runs:
   using: composite
   steps:
@@ -13,10 +13,22 @@ runs:
         path: |
           ${{ runner.temp }}/native280/ccrb-runtime
           ${{ runner.temp }}/native280/ccrb-runtime.manifest.json
-        key: native280-linux-x64-db7848ddd74a9d618c8e3d45ad0e54f71705f3e6ae25bbaccf5b83abf27534cb
+        key: native280-linux-x64-21e7c3f85c698138c027622e1abc1f20b4f684847cce000d5f3ba9ecd9654229-${{ hashFiles('services/runtime/src/**', 'services/runtime/scripts/**') }}
     - name: 核验缓存或隔离构建官方280
       shell: bash
       run: |
         (cd services/runtime && bun install --frozen-lockfile)
         sudo env "PATH=$PATH" python3 services/runtime/scripts/prepare-ci-runtime.py --directory "$RUNNER_TEMP/native280"
         printf 'V3_NATIVE_RUNTIME_280_ASSET=%s\n' "$RUNNER_TEMP/native280/ccrb-runtime" >> "$GITHUB_ENV"
+    - name: 恢复固定293分发体
+      uses: actions/cache@v5
+      with:
+        path: |
+          ${{ runner.temp }}/native293/ccrb-runtime
+          ${{ runner.temp }}/native293/ccrb-runtime.manifest.json
+        key: native293-linux-x64-9a5eb46175762bbcc84ad069601c9626b35a9bbf41aa53f08e96d32fdcf3198a-${{ hashFiles('services/runtime/src/**', 'services/runtime/scripts/**') }}
+    - name: 核验缓存或隔离构建官方293
+      shell: bash
+      run: |
+        sudo env "PATH=$PATH" python3 services/runtime/scripts/prepare-ci-runtime.py --source-version 2.1.293 --directory "$RUNNER_TEMP/native293"
+        printf 'V3_NATIVE_RUNTIME_ASSET=%s\n' "$RUNNER_TEMP/native293/ccrb-runtime" >> "$GITHUB_ENV"

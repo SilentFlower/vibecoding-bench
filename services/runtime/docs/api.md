@@ -42,7 +42,11 @@ request_id 可省略，使用 1–128 位字母、数字、连字符、下划线
 
 ### 本地 Base URL 联调模式
 
-显式 `bun run start:pool` 启动的实例允许固定 293 的 `cli` 和 `sdk-cli` 入站，billing 可以省略 CCH；存在时仍须唯一且有效。该策略只来自启动配置，不能用 HTTP 正文、信封或头部打开。普通启动继续使用上述严格合同。
+服务端显式启用 `local_base_url` 的实例允许与本次运行时精确匹配的 280／293，以及 `cli`、`sdk-cli`、`claude-vscode` 入站。billing 可以省略 CCH；存在时仍须唯一且有效。该策略只来自启动配置，不能用 HTTP 正文、信封或头部打开。普通启动继续使用上述严格合同。
+
+完全缺少 billing 时，兼容识别还要求唯一原始 `User-Agent` 为同版本的 `claude-cli/<version> (external, cli|sdk-cli|claude-vscode)`（可带 agent-sdk 版本）、system 首段为精确官方 CLI 身份文本，以及完整合法的 `metadata.user_id` JSON 身份。UA 只用于接入格式归因，不替代入口鉴权。通过后保留对话内 system、空 content 数组、消息级 output_config 和缓存标记。只携带 UA 的普通 API 继续走普通合同。
+
+缺失的 billing 从同次 SDK 上下文生成基础归因，后缀以首条用户文本构造并由回环独立复算；不复制种子的轮次计数。原有 system 段保持相对顺序。消息断点策略与强制 1h／5m TTL 覆盖继续在发送前统一执行，最终 CCH 基于改写后正文生成。
 
 兼容分支保留原始入站表示及业务正文，发送入口取同次 SDK 实际生成的 CLI 上下文，缺失 CCH 先准备原生占位，再由原生传输完成。该模式使用已校验原版及当前预加载入口，现有内嵌旧桥接代码的轻量产物暂不接纳。
 

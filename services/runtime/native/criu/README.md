@@ -53,7 +53,7 @@ python3 /全新目录/criu/package.py --source /全新目录/criu --out /全新�
 
 账号 Dockerfile 在目标 ABI 内构建工具，并保留完整来源、二进制摘要和许可。`images/v3/criu` 是对应镜像输入。TLS 采集束按其既有导出流程同步。
 
-部署开关缺省及空值为开启，显式 `V3_NATIVE_CRIU=0` 关闭；账号指纹 `native_criu_enabled` 缺省为true，显式false持久关闭。镜像标签 `vibebench.native-criu=1` 与独立恢复内存额度共同决定恢复入口。有限额度不足时保持普通exec。恢复内核需要协议1，默认配套beta.7，当前准入映像为 `6296aa4f164b8018f6f614915befd347a0dbd73f674ace20534e91947eba4434`、112848056字节；持久选择沿现有内核激活流程保持。旧内核继续正常exec。环境卡片按实际入口与同代遥测展示模板状态。
+部署开关缺省及空值为开启，显式 `V3_NATIVE_CRIU=0` 关闭；账号指纹 `native_criu_enabled` 缺省为true，显式false持久关闭。镜像标签 `vibebench.native-criu=1` 与独立恢复内存额度共同决定恢复入口。有限额度不足时保持普通exec。恢复内核需要协议1，默认配套beta.7，当前准入映像为 `0404cca64e0e08ffe347379c543bb83dcc4b36d46cea1c1b6c570c8af14ccb56`、112852152字节；持久选择沿现有内核激活流程保持。旧内核继续正常exec。环境卡片按实际入口与同代遥测展示模板状态。
 
 共享版本第一阶段继续保留每个恢复副本108MiB的预算余量。有限账号最低 sender RAM 仍为 `256 + max_workers × (192 + 108)` MiB；无限账号受显式 worker 上限约束。实际映像分配按唯一 inode 计量，预算调整以完整负载的峰值和切代重叠结果为依据。
 

@@ -22,7 +22,7 @@
 
 - 历史账号后端键`native293`表示原生自动匹配。客户端模式精确匹配原始Claude UA；其它已准入版本的普通API沿已冻结默认画像，出厂293。账号模式沿最终账号画像。版本冻结在原生投递之前；账号并发、RPM及凭据仍由原账号所有者管理。
 - 280官方源SHA为`1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b`，Bun1.4.3 revision为`f08e57bec002878c0281e86fbf9c76f53c20a117`。Bun节144806548字节、2196模块、记录52字节、entry5、flags0x1bff；节摘要和ICU偏移按280独立断言。
-- 280分发体27097232字节/SHA`db7848ddd74a9d618c8e3d45ad0e54f71705f3e6ae25bbaccf5b83abf27534cb`；执行体111599688字节/SHA`431aede03d82d6d300da7343f0fb04f983cba2fac83474a6e532f721b0d7a61e`。293现用beta.7分发体27392144字节/SHA`a885ac62ee14888b1f637f00bdb98d07fa43dab0f62735ceb731c7116396431b`，执行体112848056字节/SHA`6296aa4f164b8018f6f614915befd347a0dbd73f674ace20534e91947eba4434`。
+- 280分发体27097232字节/SHA`21e7c3f85c698138c027622e1abc1f20b4f684847cce000d5f3ba9ecd9654229`；执行体111603784字节/SHA`b5ffd54de383a71681043e554156451e3ce277e67e2a4bf04da815a029caee63`。293现用beta.7分发体27392144字节/SHA`9a5eb46175762bbcc84ad069601c9626b35a9bbf41aa53f08e96d32fdcf3198a`，执行体112852152字节/SHA`0404cca64e0e08ffe347379c543bb83dcc4b36d46cea1c1b6c570c8af14ccb56`。
 - 280原生SDK默认global fetch，映射到共享发送槽；turnOrigin/turnPosition沿280省略语义。280工具工厂create保留初始化权限声明，仅封闭返回对象的call执行入口。280保持原生正文工厂；293静态正文复用沿原配方。
 - 完整原生billing的版本必须匹配冻结运行时。普通API仍由所选原生版本构造，保持CCH、上下文、工具/thinking、原始响应及唯一发送合同。
 - 每账号只有一个物理容量所有者，各版本共享live/starting许可，合计遵守max_workers。版本子状态隔离映像FD、暖进程、补位、模板及核验缓存；凭据/代理/环境公共身份变化统一撤销两版旧空闲状态。取消其它版本补位或退役空闲进程后，必须等待真实退出归还许可。
@@ -463,24 +463,29 @@ bun scripts/benchmark-runtime.ts --binary /绝对路径/新产物 --reference /r
 - tests/native/native.test.ts：原版和最终精简均执行 preserve/sub2api × off/on，真实 TLS 模型正文/CCH、响应、业务会话及 cli 入口一致；off 零上传、on 实收原生事件，无 bootstrap/其他 API/明文 HTTP forward。
 - 同一原生套件覆盖遥测 500、慢响应、有界关闭、开启后取消/退役/重建及下一业务归属；每作业只有一次模型发送，真实上游为零。使用独立合成 HOME/config，不触发真实账号或付费推理。
 
-## Scenario: 本地 Base URL 的固定 293 原生入站兼容
+## Scenario: 服务端 Base URL 的固定 280/293 原生入站兼容
 
 ### 1. Scope / Trigger
 
-- 固定 293 的客户端使用自定义 Base URL 时会省略 billing CCH，--print 使用 sdk-cli；常驻本地池入口需要接纳这些实际形状，默认严格入口保持原合同。
-- 仅适用于显式本地联调，不授权真实 Anthropic、不同版本、账号接管或工具执行。
+- 固定280/293的CLI、SDK和VS Code客户端使用自定义Base URL时可省略CCH；已观察293请求完全省略billing，仍含对话内system及消息级output_config。服务端兼容入口接纳这些形状，默认严格入口保持原合同。
+- `local_base_url`只由服务端启动配置启用，平台sender沿现有配置使用；UA属于格式归因，不授予鉴权、账号接管或本机工具执行。验证使用合成身份与隔离回环。
 
 ### 2. Signatures
 
-- NativeIngressPolicy = 'strict' | 'local_base_url'；parseInput(raw, incomingHeaders = [], nativeIngressPolicy = 'strict'): BridgeInput。
+- `NativeIngressPolicy='strict'|'local_base_url'`；`parseInput(raw,incomingHeaders=[],nativeIngressPolicy='strict',sourceVersion='2.1.293'):BridgeInput`。
+- `readNativeInput(body,policy,sourceVersion,incomingHeaders=[])`；`prepareNativeBody(body,generatedMetadata,policy,generatedSystem,sourceVersion,incomingHeaders=[])`。版本来自已核验运行时；缺billing的`NativeInput.billingIndex=-1`。
 - BridgeInput.nativeIngressPolicy 可选，只有控制层对已识别原生输入写入；decodeRuntimeJob/decodeWorkerCommand 验证已知枚举且 inputFormat 必须为 claude_code。
 - prepareNativeBody 的 policy/generatedSystem 参数来自内部作业与同次 SDK 生成值，不从外部 JSON 授权。
 
 ### 3. Contracts
 
-- local_base_url 接纳固定 2.1.293.<三位十六进制>、cc_entrypoint=cli|sdk-cli；CCH 可以缺失，存在时必须恰好一个独立五位十六进制字段。扩展值内伪装 cch= 同样按歧义拒绝。
+- local_base_url接纳与本次冻结版本一致的2.1.280/2.1.293.<三位十六进制>、cc_entrypoint=cli|sdk-cli|claude-vscode；CCH可以缺失，存在时必须恰好一个独立五位十六进制字段。扩展值内伪装cch=同样按歧义拒绝。
+- 完全缺少billing时联合核对：唯一原始UA为同版`claude-cli/<version> (external, cli|sdk-cli|claude-vscode)`，允许附带agent-sdk版本；system数组首段为精确`You are Claude Code, Anthropic's official CLI for Claude.`身份文本；metadata.user_id继续满足完整设备、账号及会话结构。仅UA不能改变普通API合同；版本冲突422。两版共享识别逻辑，各自使用同版SDK。
+- 联合识别通过后，对话内system、空content数组和消息级output_config保持原位。空system可以承载轮次控制，不应删除或统一上提为根system；模型是否允许system角色仍由网关原白名单决定。
+- 缺billing时以首条用户文本的文本块构造同次SDK归因上下文，基础cc_version后缀由实际SDK生成；不复制种子的cc_turn_index/cc_prompt_index等轮次计数。没有可用首条用户文本时明确422。新增billing位于根system首段，原system相对顺序保持；账号身份、会话和真实传输沿原路径。
 - 其他 billing、metadata、tools、thinking、上下文与本机控制字段规则不变。原始 HTTP 入站仍按原表示保存，不在日志前改写后声称是原文。
 - 兼容分支读取同次 SDK 实际生成、经验证的 CLI billing，形成发送入口；仅在同次上下文实际生成 CCH 时准备原生占位，自定义目标省略时不补回。账号归属仍取同次 metadata。业务正文、缓存位置、会话、轮次及父子扩展保留，最终 CCH 由原生传输生成。
+- preserve/sub2api消息断点策略和独立cache_ttl_rewrite继续在原生正文准备之后统一执行；强制1h覆盖已有协议标记，最终CCH基于TTL覆盖后的正文。入站原文与该发送副本分开保存。
 - 本地模式只接纳已登记原版与当前 dist/preload.mjs。已发布轻量文件内嵌旧代码，源码更新不能使其取得新合同；重新构建并独立验证前不得混用。旧轻量严格路径继续使用原产物。
 - 常驻入口及 TLS 映射的启动与预算规则由 logging-guidelines.md 的本地常驻池场景所有，不增加可由请求控制的运行时目标配置。
 
@@ -489,7 +494,9 @@ bun scripts/benchmark-runtime.ts --binary /绝对路径/新产物 --reference /r
 | 条件 | 必须行为 |
 | --- | --- |
 | 默认严格入口收到无 CCH 或 sdk-cli | invalid_native_request/422，不回落普通 API |
-| 显式本地模式收到合法固定 293、缺少 CCH | 保留业务进入原生发送，最终必须在 TLS 实收独立核验 |
+| 显式兼容模式收到合法固定280/293、VS Code或缺少CCH | 保留业务进入同版原生发送，最终在TLS实收独立核验 |
+| 缺billing、同版UA＋官方身份＋合法metadata | 原生保真，补齐基础归因，保留空system及消息级output_config |
+| 缺billing但只有UA、普通system、损坏metadata或版本冲突 | 普通API继续窄合同；疑似原生证据损坏明确拒绝 |
 | 重复、损坏或位于扩展值的歧义 CCH | 入站 422，不发送模型 |
 | HTTP 信封企图指定内部兼容策略 | 不支持字段；不能自行启用策略 |
 | 私有作业未知策略或普通 API 携带原生策略 | runtime_protocol/502 |
@@ -498,13 +505,15 @@ bun scripts/benchmark-runtime.ts --binary /绝对路径/新产物 --reference /r
 
 ### 5. Scenarios and Examples
 
-- 正常：启动侧调用 parseInput(body, headers, 'local_base_url')；原生输入内部标记策略，--print 的 sdk-cli/无 CCH 正文保留后交给真实 CLI 发送上下文处理。
+- 正常：服务端调用parseInput(body,headers,'local_base_url',sourceVersion)，280/293分别接纳其真实CLI形状，VS Code和SDK出站均取同次CLI发送入口。
+- 正常：`{role:"system",content:[],output_config:{effort:"high"}}`表示原位轮次控制；缺billing的完整CLI联合证据经原生保真后保留该对象，强制1h继续生效。
 - 边界：原生 tools 省略保持无工具；有效已有 CCH 同样准备占位，子代理上下文仍须提供 agentId，冲突继续拒绝。
 - 错误用法：给 HTTP body 添加 nativeIngressPolicy 以绕过严格校验，或从预览重算 CCH 冒充最终值。正确做法：由独立启动入口启用兼容，保存实际原文，从 TLS 接收端验证最终值。
 
 ### 6. Tests Required
 
-- tests/unit/native-input.test.ts：默认严格行为、cli/sdk-cli、CCH 缺失/有效/重复/损坏/扩展值歧义、实际生成上下文缺失、业务与缓存保持。
+- tests/unit/native-input.test.ts：280/293×cli/sdk-cli/claude-vscode；缺billing联合证据、默认严格拒绝、版本冲突、metadata损坏、空system/output_config保留及1h覆盖；CCH缺失/有效/重复/损坏/扩展值歧义。
+- tests/native/native.test.ts的“原始输入由同一进程”分别以两版官方执行体及重建精简制品运行：VS Code有/无CCH及CLI缺billing，组装与TLS实收一致、system轮次原位、TTL=1h、首用户文本归因后缀独立复算、最终非零CCH正确且每请求只发送一次。
 - tests/unit/worker-protocol.test.ts：内部枚举、原生格式限定，不能靠包装改变策略。
 - tests/local-pool/gateway.test.ts：实际 --print、真实伪终端交互 CLI、Read 工具续轮、有效/缺失 CCH、子代理与 TLS 非零 CCH；测试在无外网空间运行。
 

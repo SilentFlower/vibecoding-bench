@@ -273,7 +273,10 @@ pub async fn native_capture(
         .map_err(|_| AppError::ServiceUnavailable("采集文件格式无效".into()))?;
     if snapshot["account_id"] != account_id
         || snapshot["attempt_id"] != attempt_id
-        || snapshot["stage"] != "cc_prepared"
+        || !matches!(
+            snapshot["stage"].as_str(),
+            Some("cc_prepared" | "ingress_rejected")
+        )
     {
         return Err(AppError::ServiceUnavailable("采集文件归属无效".into()));
     }

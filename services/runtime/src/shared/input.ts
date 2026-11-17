@@ -11,7 +11,7 @@ export const REQUEST_CLASSES = ['main', 'subagent', 'workflow', 'compaction', 'a
 
 function validateKeys(value: Record<string, unknown>, allowed: Set<string>, owner: string): void {
   for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) throw new BridgeError('unsupported_parameter', owner + ' 暂不支持字段：' + key, 422);
+    if (!allowed.has(key)) throw new BridgeError('unsupported_parameter', owner + ' 暂不支持字段：' + key, 422, owner === '正文' ? 'unsupported_body_field' : owner === '消息' ? 'unsupported_message_field' : undefined);
   }
 }
 
@@ -31,7 +31,9 @@ export function parseInput(raw: unknown, incomingHeaders: HeaderPair[] = [], nat
   const body = { ...envelope.body };
   // 本机设置由账号运行时管理；只清理正文根字段，保留原始入站及嵌套业务数据。
   for (const key of CLIENT_SETTINGS_KEYS) delete body[key];
-  const native = readNativeInput(body, nativeIngressPolicy, sourceVersion);
+  const rawHeaders = envelope.headers ?? incomingHeaders;
+  if (!Array.isArray(rawHeaders) || !rawHeaders.every(pair => Array.isArray(pair) && pair.length === 2 && pair.every(x => typeof x === 'string'))) throw new BridgeError('invalid_headers', 'headers 必须是二元字符串数组');
+  const native = readNativeInput(body, nativeIngressPolicy, sourceVersion, rawHeaders as HeaderPair[]);
   if (!isObject(envelope.context ?? {})) throw new BridgeError('invalid_context', 'context 必须是对象');
   const context = { ...(envelope.context ?? {}) } as ContextInput;
   if (!native) {
@@ -42,7 +44,7 @@ export function parseInput(raw: unknown, incomingHeaders: HeaderPair[] = [], nat
   if (typeof body.model !== 'string' || !body.model.trim()) throw new BridgeError('invalid_model', 'model 必须是非空字符串');
   if (!Array.isArray(body.messages) || body.messages.length === 0) throw new BridgeError('invalid_messages', 'messages 必须是非空数组');
   const messages: ApiMessage[] = body.messages.map((message: unknown) => {
-    if (!isObject(message) || !(native ? ['user', 'assistant', 'system'] : ['user', 'assistant']).includes(String(message.role))) throw new BridgeError('invalid_message', '消息 role 不属于当前接入类型支持的角色');
+    if (!isObject(message) || !(native ? ['user', 'assistant', 'system'] : ['user', 'assistant']).includes(String(message.role))) throw new BridgeError('invalid_message', '消息 role 不属于当前接入类型支持的角色', 400, 'invalid_message_role');
     if (!native) validateKeys(message, new Set(['role', 'content']), '消息');
     if (typeof message.content !== 'string' && (!Array.isArray(message.content) || !message.content.every(isObject))) throw new BridgeError('invalid_content', '消息 content 必须是文本或内容块数组');
     return { ...message, role: message.role as ApiMessage['role'], content: message.content as ApiMessage['content'] };
@@ -61,8 +63,6 @@ export function parseInput(raw: unknown, incomingHeaders: HeaderPair[] = [], nat
   }
   if (context.requestClass !== undefined && !REQUEST_CLASSES.includes(context.requestClass as typeof REQUEST_CLASSES[number])) throw new BridgeError('unsupported_context', '当前版本不支持该请求类别', 422);
   if (context.agentKind !== undefined && !['main', 'subagent', 'teammate'].includes(String(context.agentKind))) throw new BridgeError('invalid_context', '不支持的 agentKind');
-  const rawHeaders = envelope.headers ?? incomingHeaders;
-  if (!Array.isArray(rawHeaders) || !rawHeaders.every(pair => Array.isArray(pair) && pair.length === 2 && pair.every(x => typeof x === 'string'))) throw new BridgeError('invalid_headers', 'headers 必须是二元字符串数组');
   const id = envelope.request_id ?? randomUUID();
   if (typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(id)) throw new BridgeError('invalid_request_id', 'request_id 格式不合法');
   return {

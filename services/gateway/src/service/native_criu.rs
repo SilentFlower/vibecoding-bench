@@ -17,7 +17,7 @@ use uuid::Uuid;
 const SOCKET: &str = "/run/ccrb-criu/control.sock";
 pub(super) const ENTROPY_PROFILE: &str = "bun143-wipeonfork-v1";
 pub(super) const IMAGE_SHA256: &str =
-    "6296aa4f164b8018f6f614915befd347a0dbd73f674ace20534e91947eba4434";
+    "0404cca64e0e08ffe347379c543bb83dcc4b36d46cea1c1b6c570c8af14ccb56";
 
 /// 查询部署入口显式启用的恢复能力。@return 是否允许尝试私有恢复器。
 pub(super) fn enabled() -> bool {

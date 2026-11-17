@@ -430,6 +430,7 @@ mod tests {
     fn request(at: DateTime<Utc>) -> RequestDiagnostic {
         let request_id = Uuid::new_v4().to_string();
         RequestDiagnostic {
+            native_rejection: None,
             original_session_id: None,
             last_attempt: None,
             log_mode: None,

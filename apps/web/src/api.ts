@@ -402,6 +402,7 @@ export interface SessionPolicyBlockPage { items: SessionPolicyBlock[]; total: nu
 
 /** 管理端请求诊断列表行。 */
 export interface DiagnosticRequest {
+  native_rejection?: { reason: string | null; capture_id: string; capture_status: string } | null
   original_session_id?: string | null
   account_name?: string | null
   account_email?: string | null
@@ -510,7 +511,7 @@ export interface NativeCapture {
   state: string
   message?: string
   snapshot?: {
-    stage: 'cc_prepared'
+    stage: 'cc_prepared' | 'ingress_rejected'
     ingress?: NativeCapturePreview
     wire_final?: NativeTlsCapture
     final_body_changes?: {
@@ -542,8 +543,8 @@ export interface NativeCapture {
     body: string
     body_truncated: boolean
     headers_truncated: boolean
-    original_body_bytes: number
-    original_body_sha256: string
+    original_body_bytes: number | null
+    original_body_sha256: string | null
   }
 }
 

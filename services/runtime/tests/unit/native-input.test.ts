@@ -3,6 +3,8 @@ import type { MessageBody } from '../../src/shared/contracts';
 import { parseInput } from '../../src/shared/input';
 import { prepareInput } from '../../src/control/header-policy';
 import { readNativeInput, prepareNativeBody } from '../../src/shared/native-input';
+import { nativeErrorDiagnostics } from '../../src/shared/native-error-diagnostics';
+import { rewriteCacheTtl } from '../../src/shared/cache-policy';
 
 const session = '22222222-2222-4222-8222-222222222222';
 const prompt = '11111111-1111-4111-8111-111111111111';
@@ -13,6 +15,66 @@ function fixture(): MessageBody {
 }
 
 describe('固定官方源版本的原生入站合同', () => {
+  test('无billing的280/293 CLI经联合证据识别，空system轮次控制及缓存保持', () => {
+    for (const version of ['2.1.280', '2.1.293'] as const) for (const entry of ['cli', 'sdk-cli', 'claude-vscode']) {
+      const body = fixture();
+      body.system = [{ type: 'text', text: "You are Claude Code, Anthropic's official CLI for Claude.", cache_control: marker }, ...(body.system as Record<string, unknown>[]).slice(1)];
+      body.messages[1] = { role: 'system', content: [], output_config: { effort: 'high' } };
+      const headers: [string, string][] = [['user-agent', 'claude-cli/' + version + ' (external, ' + entry + ')']];
+      const before = structuredClone(body);
+      expect(() => parseInput(body, headers, 'strict', version)).toThrow();
+      expect(() => parseInput(body, [], 'local_base_url', version)).toThrow();
+      expect(() => parseInput({ ...body, metadata: { user_id: '{}' } }, headers, 'local_base_url', version)).toThrow('结构不合法');
+      expect(() => parseInput({ ...body, system: [{ type: 'text', text: '普通业务system' }] }, headers, 'local_base_url', version)).toThrow();
+      expect(() => parseInput(body, headers, 'local_base_url', version === '2.1.280' ? '2.1.293' : '2.1.280')).toThrow('版本不一致');
+      const input = parseInput(body, headers, 'local_base_url', version);
+      expect(input.inputFormat).toBe('claude_code');
+      expect(input.body).toEqual(before);
+      const generated = fixture();
+      (generated.system as { text: string }[])[0]!.text = (generated.system as { text: string }[])[0]!.text.replace('2.1.293', version);
+      const result = prepareNativeBody(input.body, generated.metadata, input.nativeIngressPolicy, generated.system, version, input.headers);
+      expect((result.system as unknown[]).slice(1)).toEqual(before.system as unknown[]);
+      expect(result.messages).toEqual(before.messages);
+      expect(readNativeInput(result, 'local_base_url', version)?.fields.cc_version).toBe(version + '.abc');
+      expect(readNativeInput(result, 'local_base_url', version)?.fields.cc_turn_index).toBeUndefined();
+      expect(body).toEqual(before);
+      expect(() => prepareNativeBody(input.body, generated.metadata, input.nativeIngressPolicy, undefined, version, input.headers)).toThrow();
+      try { prepareNativeBody(input.body, generated.metadata, input.nativeIngressPolicy, [{ type: 'text', text: 'x-anthropic-billing-header: cc_version=2.1.303.abc; cc_entrypoint=cli;' }], version, input.headers); throw new Error('应拒绝损坏的SDK上下文'); }
+      catch (error) { expect(error).toMatchObject({ code: 'native_identity', status: 503 }); }
+    }
+  });
+  test('VS Code两版原生入口保持扩展业务及强制1h，严格入口与损坏证据继续拒绝', () => {
+    for (const version of ['2.1.280', '2.1.293'] as const) for (const cch of [true, false]) {
+      const body = fixture();
+      const billing = body.system as { text: string }[];
+      billing[0]!.text = billing[0]!.text.replace('2.1.293', version).replace('cc_entrypoint=cli', 'cc_entrypoint=claude-vscode');
+      if (!cch) billing[0]!.text = billing[0]!.text.replace('cch=12345;', '');
+      body.messages[1]!.output_config = { effort: 'high' };
+      const before = structuredClone(body);
+      expect(() => parseInput(body, [], 'strict', version)).toThrow();
+      const input = parseInput(body, [], 'local_base_url', version);
+      expect(input.inputFormat).toBe('claude_code');
+      const generated = fixture();
+      (generated.system as { text: string }[])[0]!.text = (generated.system as { text: string }[])[0]!.text.replace('2.1.293', version);
+      const prepared = prepareNativeBody(input.body, generated.metadata, input.nativeIngressPolicy, generated.system, version);
+      expect(prepared.messages).toEqual(before.messages);
+      expect(prepared.thread).toEqual(before.thread);
+      const final = rewriteCacheTtl(prepared, '1h');
+      expect((final.system as { cache_control?: unknown }[])[1]!.cache_control).toEqual({ ...marker, ttl: '1h' });
+      expect(((final.messages as { content: { cache_control: unknown }[] }[])[0]!.content)[0]!.cache_control).toEqual({ ...marker, ttl: '1h' });
+      expect((final.messages as Record<string, unknown>[])[1]!.output_config).toEqual({ effort: 'high' });
+      expect(readNativeInput(final, 'local_base_url', version)?.fields.cc_entrypoint).toBe('cli');
+      expect(body).toEqual(before);
+      for (const [text, reason] of [
+        [billing[0]!.text.replace('claude-vscode', 'unknown'), 'native_entrypoint_unsupported'],
+        [billing[0]!.text.replace(version, '2.1.303'), 'native_version_mismatch'],
+        [billing[0]!.text + ' cch=xyz;', 'native_billing_invalid'],
+      ] as const) {
+        try { parseInput({ ...body, system: [{ type: 'text', text }] }, [], 'local_base_url', version); throw new Error('应拒绝损坏输入'); }
+        catch (error) { expect(nativeErrorDiagnostics(error, 'input').causes[0]?.code).toBe(reason); }
+      }
+    }
+  });
   test('280必须由受信运行时选择，入站控制字段不能覆盖冻结版本', () => {
     const body = fixture();
     (body.system as { text: string }[])[0]!.text = (body.system as { text: string }[])[0]!.text.replace('2.1.293', '2.1.280');

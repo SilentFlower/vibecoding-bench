@@ -46,6 +46,7 @@ use crate::service::account::{
 use crate::service::diagnostics::{self, CURRENT_TRACE, RequestTraceGuard, TraceContext};
 use crate::service::native_contract::NativeSourceVersion;
 use crate::service::native_contract::validate_idle_timeout;
+use crate::service::native_error::{REJECTION_CAPTURE_HEADER, REJECTION_HEADER, rejection_reason};
 use crate::service::native_prewarm::NativePrewarmer;
 use crate::service::native_runtime::NativeSubmission;
 #[path = "native_signature_repair.rs"]
@@ -4067,6 +4068,26 @@ impl GatewayService {
                 return Err(error);
             }
         };
+        // 仅消费受信 sender 的固定诊断；私有头在返回调用方之前移除。
+        let rejection = response
+            .headers_mut()
+            .remove(REJECTION_HEADER)
+            .and_then(|value| value.to_str().ok().and_then(rejection_reason));
+        let rejection_capture = response
+            .headers_mut()
+            .remove(REJECTION_CAPTURE_HEADER)
+            .and_then(|value| {
+                value
+                    .to_str()
+                    .ok()
+                    .filter(|value| matches!(*value, "queued" | "disabled" | "dropped"))
+                    .map(str::to_owned)
+            });
+        if response.status().is_client_error()
+            && let Some(status) = rejection_capture
+        {
+            diagnostics::native_rejection(rejection, &id, &status);
+        }
         let observation = response
             .headers_mut()
             .remove(NATIVE_OBSERVATION_HEADER)

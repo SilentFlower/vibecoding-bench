@@ -210,6 +210,7 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
     const env: Record<string, string> = {
       HOME: config.engine.home!, CLAUDE_CONFIG_DIR: config.engine.configDir!, PATH: process.env.PATH ?? '/usr/bin:/bin', LANG: 'C.UTF-8',
       CCRB_WORKER_ID: workerId, CCRB_TELEMETRY: 'off', CLAUDE_CODE_ENTRYPOINT: 'cli', DISABLE_AUTO_COMPACT: '1',
+      CCRB_NATIVE_INGRESS_POLICY: 'local_base_url',
       CLAUDE_CODE_GATEWAY_HINT_HEADERS: '1', CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1', DISABLE_AUTOUPDATER: '1', DISABLE_TELEMETRY: '1', DISABLE_ERROR_REPORTING: '1',
       ANTHROPIC_API_KEY: upstreamSecret, HTTPS_PROXY: config.engine.proxyUrl!, HTTP_PROXY: config.engine.proxyUrl!, NODE_EXTRA_CA_CERTS: config.engine.caFile!,
     };
@@ -301,6 +302,60 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
         expect(ready.pid).toBe(worker.child.pid);
       }
       expect(requests.length - count).toBe(8);
+      for (const cch of [true, false]) {
+        const body = nativeBody({ messages: [{ role: 'user', content: [{ type: 'text', text: 'VS Code强制1h验证', cache_control: { type: 'ephemeral', ttl: '5m' } }] }, { role: 'system', content: '本轮原生指令', output_config: { effort: 'high' } }] });
+        const system = body.system as { text: string }[];
+        system[0]!.text = system[0]!.text.replace('cc_entrypoint=cli', 'cc_entrypoint=claude-vscode');
+        if (!cch) system[0]!.text = system[0]!.text.replace('cch=12345;', '');
+        const before = structuredClone(body);
+        const id = 'raw-vscode-1h-' + cch;
+        await worker.send({ type: 'request_input', schema_version: 2, worker_id: workerId, request_id: id,
+          cache_ttl_rewrite: '1h', input: { schema_version: 1, request_id: id, body } });
+        const events = await collect(id);
+        expect(events.at(-1)).toEqual(expect.objectContaining({ type: 'completed', state: 'success' }));
+        const prepared = events.find(event => event.type === 'cc_prepared');
+        if (prepared?.type !== 'cc_prepared') throw new Error('缺少VS Code组装快照');
+        const actual = requests.at(-1)!;
+        const expected = structuredClone(body);
+        (expected.system as { cache_control?: { ttl: string } }[])[1]!.cache_control!.ttl = '1h';
+        ((expected.messages as { content: { cache_control: { ttl: string } }[] }[])[0]!.content)[0]!.cache_control.ttl = '1h';
+        expect(actual.body.messages).toEqual(expected.messages);
+        expect((actual.body.system as unknown[]).slice(1)).toEqual((expected.system as unknown[]).slice(1));
+        expect(actual.raw).toContain('cc_entrypoint=cli;');
+        expect(new Headers(actual.headers).get('user-agent')).toContain('claude-cli/' + sourceVersion);
+        expect(JSON.parse(prepared.body.replace(/cch=[0-9a-f]{5}/g, 'cch=00000'))).toEqual(JSON.parse(actual.raw.replace(/cch=[0-9a-f]{5}/g, 'cch=00000')));
+        assertCch(actual.raw);
+        expect(body).toEqual(before);
+      }
+      expect(requests.length - count).toBe(10);
+      const noBilling = nativeBody({ messages: [{ role: 'user', content: '缺少billing的首条用户文本保持原值😀' },
+        { role: 'system', content: [], output_config: { effort: 'high' } },
+        { role: 'assistant', content: '原有回答' }, { role: 'system', content: '对话内系统消息' },
+        { role: 'user', content: [{ type: 'text', text: '继续', cache_control: { type: 'ephemeral', ttl: '5m' } }] }] });
+      noBilling.system = [{ type: 'text', text: "You are Claude Code, Anthropic's official CLI for Claude.", cache_control: { type: 'ephemeral', ttl: '5m' } }, ...(noBilling.system as unknown[]).slice(1)];
+      const incoming = structuredClone(noBilling);
+      const id = 'raw-cli-no-billing';
+      await worker.send({ type: 'request_input', schema_version: 2, worker_id: workerId, request_id: id, cache_ttl_rewrite: '1h',
+        input: { schema_version: 1, request_id: id, body: noBilling, headers: [['user-agent', 'claude-cli/' + sourceVersion + ' (external, cli)']] } });
+      const events = await collect(id);
+      expect(events.at(-1)).toEqual(expect.objectContaining({ type: 'completed', state: 'success' }));
+      const actual = requests.at(-1)!;
+      const expected = structuredClone(noBilling);
+      for (const block of expected.system as { cache_control: { ttl: string } }[]) block.cache_control.ttl = '1h';
+      ((expected.messages as { content: { cache_control: { ttl: string } }[] }[])[4]!.content)[0]!.cache_control.ttl = '1h';
+      expect(actual.body.messages).toEqual(expected.messages);
+      expect((actual.body.system as unknown[]).slice(1)).toEqual(expected.system as unknown[]);
+      expect(actual.raw).not.toContain('cc_turn_index=');
+      const firstText = (incoming.messages as { content: string }[])[0]!.content;
+      const picked = [4, 7, 20].map(index => firstText[index] ?? '0').join('');
+      const suffix = new Bun.CryptoHasher('sha256').update('59cf53e54c78' + picked + sourceVersion).digest('hex').slice(0, 3);
+      expect((actual.body.system as { text: string }[])[0]!.text).toContain('cc_version=' + sourceVersion + '.' + suffix + ';');
+      assertCch(actual.raw);
+      const prepared = events.find(event => event.type === 'cc_prepared');
+      if (prepared?.type !== 'cc_prepared') throw new Error('缺少无billing兼容组装快照');
+      expect(JSON.parse(prepared.body.replace(/cch=[0-9a-f]{5}/g, 'cch=00000'))).toEqual(JSON.parse(actual.raw.replace(/cch=[0-9a-f]{5}/g, 'cch=00000')));
+      expect(noBilling).toEqual(incoming);
+      expect(requests.length - count).toBe(11);
       await worker.send({ type: 'worker_shutdown', schema_version: 2, worker_id: workerId });
       expect(await worker.child.exited).toBe(0);
     } finally { await verified.handle.close(); await worker.close(); }

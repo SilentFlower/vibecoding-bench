@@ -63,8 +63,38 @@ const CODES: &[&str] = &[
     "native_identity",
     "unsupported_parameter",
     "context_conflict",
+    "native_entrypoint_unsupported",
+    "native_version_mismatch",
+    "native_billing_invalid",
+    "native_metadata_invalid",
+    "unsupported_body_field",
+    "unsupported_message_field",
+    "unsupported_system_block",
+    "invalid_message_role",
     "unknown",
 ];
+
+/// 仅在受信 sender 与网关之间传递的拒绝诊断，消费后移除。
+pub(crate) const REJECTION_HEADER: &str = "x-v3-native-rejection";
+/// 拒绝时入口采集的即时状态，不代表发生过上游发送。
+pub(crate) const REJECTION_CAPTURE_HEADER: &str = "x-v3-native-rejection-capture";
+
+/// 将固定原因码投影为公开诊断，未知值不保存。
+/// @param value 原生诊断原因码。
+/// @return 已知的静态原因或空值。
+pub(crate) fn rejection_reason(value: &str) -> Option<&'static str> {
+    match value {
+        "native_entrypoint_unsupported" => Some("native_entrypoint_unsupported"),
+        "native_version_mismatch" => Some("native_version_mismatch"),
+        "native_billing_invalid" => Some("native_billing_invalid"),
+        "native_metadata_invalid" => Some("native_metadata_invalid"),
+        "unsupported_body_field" => Some("unsupported_body_field"),
+        "unsupported_message_field" => Some("unsupported_message_field"),
+        "unsupported_system_block" => Some("unsupported_system_block"),
+        "invalid_message_role" => Some("invalid_message_role"),
+        _ => None,
+    }
+}
 
 /// 跨进程传来的单层白名单异常类型与错误码。
 #[derive(Debug, Deserialize, Serialize)]
@@ -84,6 +114,17 @@ pub(crate) struct NativeErrorDiagnostics {
     chain_truncated: bool,
     cycle_detected: bool,
     inspection_failed: bool,
+}
+
+impl NativeErrorDiagnostics {
+    /// 仅从顶层合同异常取得细分原因，避免把内层原因误归为输入拒绝。
+    /// @return 已知的静态拒绝原因或空值。
+    pub(crate) fn rejection_reason(&self) -> Option<&'static str> {
+        self.causes
+            .first()
+            .filter(|cause| cause.name == "BridgeError")
+            .and_then(|cause| rejection_reason(&cause.code))
+    }
 }
 
 /// 诊断可用性与安全投影，缺口不改变本次业务响应。
@@ -151,6 +192,32 @@ pub(crate) fn project(payload: &Value) -> NativeErrorProjection {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn rejection_reasons_only_accept_fixed_top_level_contract_codes() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/native-error-diagnostics.json"
+        ))
+        .unwrap();
+        let mut diagnostics = fixture["diagnostics"].clone();
+        diagnostics["stage"] = json!("input");
+        diagnostics["causes"] =
+            json!([{"name":"BridgeError","code":"native_entrypoint_unsupported"}]);
+        let accepted = project(&json!({"diagnostics":diagnostics}));
+        assert_eq!(
+            accepted.details.unwrap().rejection_reason(),
+            Some("native_entrypoint_unsupported")
+        );
+        diagnostics["causes"][0]["name"] = json!("Error");
+        assert!(
+            project(&json!({"diagnostics":diagnostics}))
+                .details
+                .unwrap()
+                .rejection_reason()
+                .is_none()
+        );
+        assert!(rejection_reason("synthetic-private-secret").is_none());
+    }
 
     #[test]
     fn shared_contract_and_secret_fields_are_checked_before_logging() {

@@ -350,13 +350,21 @@ fn body_changes(before: &Value, after: &Value) -> Value {
 }
 
 fn snapshot(submission: &NativeSubmission, payload: &Value) -> io::Result<Value> {
-    let pairs: Vec<(String, String)> = serde_json::from_value(payload["headers"].clone())?;
-    let body_value: Value =
-        serde_json::from_str(payload["body"].as_str().ok_or(io::ErrorKind::InvalidData)?)?;
+    let rejected = payload["type"] == "error";
+    let pairs: Vec<(String, String)> = if rejected {
+        Vec::new()
+    } else {
+        serde_json::from_value(payload["headers"].clone())?
+    };
+    let body_value: Value = if rejected {
+        Value::Null
+    } else {
+        serde_json::from_str(payload["body"].as_str().ok_or(io::ErrorKind::InvalidData)?)?
+    };
     let mut secrets = vec![submission.bearer.clone()];
     collect(&submission.input, &mut secrets);
     collect(&body_value, &mut secrets);
-    if let Some(wire) = payload.get("_wire_final") {
+    if let Some(wire) = payload.get("_wire_final").filter(|_| !rejected) {
         collect(&wire["headers"], &mut secrets);
         if let Some(body) = wire["body"]
             .as_str()
@@ -374,15 +382,19 @@ fn snapshot(submission: &NativeSubmission, payload: &Value) -> io::Result<Value>
     secrets.sort_by_key(|value| Reverse(value.len()));
     secrets.dedup();
     // 保留组装正文的顺序和空白，仅替换秘密，避免把重新序列化的结果称为原始快照。
-    let original = payload["body"].as_str().ok_or(io::ErrorKind::InvalidData)?;
+    let original = if rejected {
+        ""
+    } else {
+        payload["body"].as_str().ok_or(io::ErrorKind::InvalidData)?
+    };
     let redacted = redact_body(original, &secrets)?;
     let (body, truncated) = prefix(&redacted, BODY_LIMIT);
     let (headers, headers_truncated) = redact_headers(&pairs, &secrets);
-    let mut value = json!({"schema_version":1,"stage":"cc_prepared", "account_id":submission.request.account_id,
+    let mut value = json!({"schema_version":1,"stage":if rejected {"ingress_rejected"} else {"cc_prepared"}, "account_id":submission.request.account_id,
         "attempt_id":submission.request.request_id,"captured_at_ms":SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
         "headers":headers,"body":body,"body_truncated":truncated,"headers_truncated":headers_truncated,
-        "original_body_bytes":payload["body_bytes"],"original_body_sha256":payload["body_sha256"]});
-    if let Some(policy) = payload.get("cache_policy") {
+        "original_body_bytes":if rejected {Value::Null} else {payload["body_bytes"].clone()},"original_body_sha256":if rejected {Value::Null} else {payload["body_sha256"].clone()}});
+    if let Some(policy) = payload.get("cache_policy").filter(|_| !rejected) {
         value["cache_policy"] = message_cache_policy(policy).ok_or(io::ErrorKind::InvalidData)?;
     }
     let mut ingress_status = "unavailable";
@@ -416,7 +428,7 @@ fn snapshot(submission: &NativeSubmission, payload: &Value) -> io::Result<Value>
             "captured_at_ms":ingress["captured_at_ms"],"original_body_bytes":ingress["original_body_bytes"],
             "original_body_sha256":digest});
         let cleaned = redact_body(input, &secrets)?;
-        let changes = if ingress["body_truncated"] == false {
+        let changes = if !rejected && ingress["body_truncated"] == false {
             serde_json::from_str::<Value>(&cleaned)
                 .ok()
                 .and_then(|before| {
@@ -447,7 +459,7 @@ fn snapshot(submission: &NativeSubmission, payload: &Value) -> io::Result<Value>
             };
         preview["status"] = json!(ingress_status);
         value["ingress"] = preview;
-        value["body_changes"] = changes.unwrap_or_else(|| json!({"source":"observed_diff","status":"unavailable","items":[],"note":"入口预览截断或缺少可解析JSON"}));
+        value["body_changes"] = changes.unwrap_or_else(|| json!({"source":"observed_diff","status":"unavailable","items":[],"note":if rejected {"本次在原生组装前拒绝，仅保存入站证据"} else {"入口预览截断或缺少可解析JSON"}}));
     } else {
         value["body_changes"] = json!({"source":"observed_diff","status":"unavailable","items":[],"note":"本次未采集入口正文"});
     }
@@ -492,7 +504,7 @@ fn snapshot(submission: &NativeSubmission, payload: &Value) -> io::Result<Value>
     value["stages"] = json!([
         {"stage":"ingress","source":"gateway_http_ingress","representation":"http_logical_bytes","status":ingress_status,"note":"网关会话映射前的入站逻辑正文"},
         {"stage":"header_policy","source":"native_header_policy","representation":"json","status":value["header_policy"]["status"],"note":"内核实际返回的逐字段处理决策"},
-        {"stage":"cc_prepared","source":"native_cc_prepared","representation":"json_before_native_transport","status":if truncated || headers_truncated {"truncated"} else {"complete"},"note":"原生最终传输前的中间值"},
+        {"stage":"cc_prepared","source":"native_cc_prepared","representation":"json_before_native_transport","status":if rejected {"unavailable"} else if truncated || headers_truncated {"truncated"} else {"complete"},"note":if rejected {"本次在原生组装前拒绝"} else {"原生最终传输前的中间值"}},
         {"stage":"wire_final","source":"unavailable","representation":"unavailable","status":"unavailable","note":"平台本次未取得独立最终TLS写出采集"}
     ]);
     if let Some(policy) = value.get("cache_policy") {
@@ -504,7 +516,7 @@ fn snapshot(submission: &NativeSubmission, payload: &Value) -> io::Result<Value>
         );
         value["stages"][2]["note"] = json!(note);
     }
-    if let Some(wire) = payload.get("_wire_final") {
+    if let Some(wire) = payload.get("_wire_final").filter(|_| !rejected) {
         append_wire(&mut value, wire, &secrets)?;
         if wire["complete"] == true && wire["body_truncated"] == false {
             if let Some(after) = wire["body"]
@@ -953,6 +965,56 @@ pub(crate) async fn record(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 发送前拒绝仍保存脱敏入站，明确标记组装与TLS尚未发生。
+    /// @return 无；原始哈希、秘密脱敏或阶段归属变化时失败。
+    #[tokio::test]
+    async fn rejected_input_keeps_private_ingress_without_fabricated_outbound() {
+        let mut submission = submission();
+        let raw = "{ \"metadata\": {\"api_key\":\"synthetic-bearer\"}, \"messages\": [] }";
+        submission.ingress_capture = ingress(
+            RequestLogMode::Debug,
+            &[("Authorization".into(), "Bearer synthetic-bearer".into())],
+            raw.as_bytes(),
+            &serde_json::from_str(raw).unwrap(),
+            &submission.bearer,
+        );
+        let payload = json!({"type":"error","error":"private-runtime-error", "body":"untrusted-error-body", "body_bytes":99});
+        let directory = std::env::temp_dir().join(format!("native-rejected-{}", Uuid::new_v4()));
+        let result = record(directory.to_str(), &submission, &payload, None).await;
+        assert!(matches!(result.as_str(), "saved" | "timeout"));
+        let path = directory.join(format!("{}.json", submission.request.request_id));
+        for _ in 0..100 {
+            if path.exists() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        let stored = fs::read_to_string(path).unwrap();
+        assert!(!stored.contains("synthetic-bearer"));
+        assert!(!stored.contains("private-runtime-error"));
+        assert!(!stored.contains("untrusted-error-body"));
+        let value: Value = serde_json::from_str(&stored).unwrap();
+        assert_eq!(value["stage"], "ingress_rejected");
+        assert_eq!(
+            value["ingress"]["original_body_sha256"],
+            format!("{:x}", Sha256::digest(raw.as_bytes()))
+        );
+        assert_eq!(
+            value["ingress"]["body"],
+            raw.replace("synthetic-bearer", "[REDACTED]")
+        );
+        assert_eq!(value["stages"][2]["status"], "unavailable");
+        assert_eq!(value["stages"][3]["status"], "unavailable");
+        assert_eq!(value["body"], "");
+        assert!(value["original_body_sha256"].is_null());
+        submission.log_mode = RequestLogMode::Info;
+        assert_eq!(
+            record(directory.to_str(), &submission, &payload, None).await,
+            "disabled"
+        );
+        fs::remove_dir_all(directory).unwrap();
+    }
 
     /// 缓存诊断只持久化已知枚举与有界位置，私有扩展和畸形结构受控拒绝。
     /// @return 无；秘密扩展可进入快照或诊断丢失时失败。

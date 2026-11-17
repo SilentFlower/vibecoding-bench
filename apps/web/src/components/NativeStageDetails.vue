@@ -5,9 +5,9 @@ import type { NativeCapture, NativeCaptureStage } from '../api';
 
 const props = defineProps<{ snapshot: NonNullable<NativeCapture['snapshot']> }>();
 const action = ref('all');
-const rawStage = ref<'ingress' | 'cc_prepared' | 'wire_final'>(props.snapshot.wire_final ? 'wire_final' : 'cc_prepared');
+const rawStage = ref<'ingress' | 'cc_prepared' | 'wire_final'>(props.snapshot.stage === 'ingress_rejected' ? 'ingress' : props.snapshot.wire_final ? 'wire_final' : 'cc_prepared');
 const decisions = computed(() => (props.snapshot.header_policy?.decisions ?? []).filter(item => action.value === 'all' || item.action === action.value));
-const preview = computed(() => rawStage.value === 'ingress' ? props.snapshot.ingress : rawStage.value === 'wire_final' ? props.snapshot.wire_final : props.snapshot);
+const preview = computed(() => rawStage.value === 'ingress' ? props.snapshot.ingress : rawStage.value === 'wire_final' ? props.snapshot.wire_final : props.snapshot.stage === 'ingress_rejected' ? undefined : props.snapshot);
 const finalReason = computed(() => {
   const reason = props.snapshot.wire_final?.reason;
   if (!reason) return '';

@@ -18,7 +18,7 @@ use crate::error::AppError;
 use crate::model::account::Account;
 use crate::model::identity::device_profile;
 use crate::model::request_diagnostics::{
-    AttemptDiagnostic, DiagnosticParameters, DiagnosticSessions, DiagnosticTokens,
+    AttemptDiagnostic, DiagnosticParameters, DiagnosticSessions, DiagnosticTokens, NativeRejection,
     NativeRequestObservation, RequestDiagnostic, RequestLogMode, normalize_correlation_id,
     safe_model,
 };
@@ -80,6 +80,7 @@ impl TraceContext {
             state: Arc::new(Mutex::new(TraceState {
                 retention: Some(retention),
                 request: RequestDiagnostic {
+                    native_rejection: None,
                     last_attempt: None,
                     log_mode: Some(current_log_mode()),
                     request_id,
@@ -145,8 +146,12 @@ impl TraceContext {
             if !success && state.request.outcome == "success" {
                 state.request.outcome = "local_rejected".into();
             }
+            if success {
+                state.request.native_rejection = None;
+            }
             if ["success", "mock", "cache_hit"].contains(&state.request.outcome.as_str()) {
                 state.request.error_stage = None;
+                state.request.native_rejection = None;
             }
             if state.request.error_stage.is_none()
                 && !["success", "mock", "cache_hit"].contains(&state.request.outcome.as_str())
@@ -228,7 +233,12 @@ pub(crate) fn profile_selection(client_version: bool) {
 /// @param account_id 本轮调度实际选中的账号。
 /// @return 无返回值。
 pub(crate) fn selected_account(account_id: i64) {
-    let _ = CURRENT_TRACE.try_with(|trace| trace.lock().request.account_id = Some(account_id));
+    let _ = CURRENT_TRACE.try_with(|trace| {
+        let mut state = trace.lock();
+        state.request.account_id = Some(account_id);
+        // 换号后的错误必须归属新一次选择，不能沿用前一账号的拒绝采集。
+        state.request.native_rejection = None;
+    });
 }
 
 /// 标记本地响应的来源，避免把模拟或缓存命中记为上游推理。
@@ -250,6 +260,25 @@ pub(crate) fn retry_reason(reason: &'static str) {
 /// @return 无返回值。
 pub(crate) fn error_stage(stage: &'static str) {
     let _ = CURRENT_TRACE.try_with(|trace| trace.lock().request.error_stage = Some(stage.into()));
+}
+
+/// 记录 sender 已验证的本地拒绝及采集归属，保持零上游尝试。
+/// @param reason 固定原因码，未知时为空。
+/// @param capture_id 当前已提交的原生作业 UUID。
+/// @param capture_status 私有采集队列的即时状态。
+/// @return 无返回值。
+pub(crate) fn native_rejection(
+    reason: Option<&'static str>,
+    capture_id: &str,
+    capture_status: &str,
+) {
+    let _ = CURRENT_TRACE.try_with(|trace| {
+        trace.lock().request.native_rejection = Some(NativeRejection {
+            reason: reason.map(str::to_owned),
+            capture_id: capture_id.to_owned(),
+            capture_status: capture_status.to_owned(),
+        });
+    });
 }
 
 /// 记录既有 session 解析结果，绝不额外解析或刷新池 TTL。
@@ -805,8 +834,8 @@ fn identity_hash(account: i64, kind: &str, value: &str) -> String {
 mod tests {
     use super::{
         CURRENT_LOG_MODE, CURRENT_TRACE, RequestTraceGuard, TraceContext, begin_attempt,
-        error_stage, local_outcome, now, original_session, profile_selection, selected_account,
-        session_context,
+        error_stage, local_outcome, native_rejection, now, original_session, profile_selection,
+        selected_account, session_context,
     };
     use crate::error::AppError;
     use crate::model::account::Account;
@@ -830,6 +859,7 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
     use tokio_stream::StreamExt;
+    use uuid::Uuid;
 
     async fn store() -> Arc<DiagnosticsStore> {
         sqlx::any::install_default_drivers();
@@ -848,6 +878,49 @@ mod tests {
             "canonical_env":{"version":"2.1.293"},"canonical_prompt_env":{},"canonical_process":{},"billing_mode":"strip",
             "created_at":now(),"updated_at":now()
         })).unwrap()
+    }
+
+    /// 输入拒绝的采集归属随请求持久化，成功收口清除旧失败摘要。
+    /// @return 无；零尝试、历史兼容或收口行为改变时失败。
+    #[tokio::test]
+    async fn rejected_input_is_persisted_without_creating_upstream_attempts() {
+        let store = store().await;
+        for success in [false, true] {
+            let capture_id = Uuid::new_v4().to_string();
+            let trace = TraceContext::new(store.clone());
+            let guard = RequestTraceGuard::new(trace.clone());
+            let response = CURRENT_TRACE
+                .scope(trace, async {
+                    native_rejection(Some("native_entrypoint_unsupported"), &capture_id, "queued");
+                    error_stage("native_prepare");
+                    guard.wrap(
+                        Response::builder()
+                            .status(if success { 200 } else { 422 })
+                            .body(Body::empty())
+                            .unwrap(),
+                    )
+                })
+                .await;
+            let id = response.headers()["x-cc2api-request-id"]
+                .to_str()
+                .unwrap()
+                .to_owned();
+            let _ = to_bytes(response.into_body(), 1024).await.unwrap();
+            store.flush().await.unwrap();
+            let detail = store.detail(&id).await.unwrap();
+            assert_eq!(detail.request.attempt_count, 0);
+            assert!(detail.attempts.is_empty());
+            if success {
+                assert!(detail.request.native_rejection.is_none());
+            } else {
+                let rejection = detail.request.native_rejection.unwrap();
+                assert_eq!(
+                    rejection.reason.as_deref(),
+                    Some("native_entrypoint_unsupported")
+                );
+                assert_eq!(rejection.capture_id, capture_id);
+            }
+        }
     }
 
     /// 本地 503 保留失败边界，通用错误使用兜底阶段，响应和持久摘要保持一致。

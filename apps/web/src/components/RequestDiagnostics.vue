@@ -67,6 +67,13 @@ function accountLabel(value: Pick<DiagnosticRequest, 'account_id' | 'account_nam
 }
 
 const tpsDescription = '平均 TPS = 输出 token 数 ÷ 本次尝试耗时（秒），包含首输出等待，仅展示完整成功记录。';
+/** 展示固定拒绝原因及其所属字段，未知历史值保持明确缺口。@param reason 原因码。@return 中文说明。 */
+function rejectionLabel(reason?: string | null): string {
+  return ({ native_entrypoint_unsupported: '调用入口不支持（billing.cc_entrypoint）', native_version_mismatch: '原生版本冲突（billing.cc_version）',
+    native_billing_invalid: 'billing 结构错误（system 首段）', native_metadata_invalid: '身份结构错误（metadata）',
+    unsupported_body_field: '正文根字段暂不支持', unsupported_message_field: '消息扩展字段暂不支持（messages）',
+    unsupported_system_block: 'system 内容块暂不支持', invalid_message_role: '消息角色不符合当前接入格式（messages.role）' } as Record<string, string>)[reason ?? ''] ?? '具体拒绝原因未记录';
+}
 /** 计算完整成功尝试的平均输出速率。@param attempt 实际尝试摘要。@return 一位小数的 token/s 或未观测。 */
 function averageTps(attempt?: DiagnosticAttempt | null): string {
   const tokens = attempt?.tokens?.output_tokens;
@@ -129,21 +136,23 @@ async function open(row: DiagnosticRequest, event: MouseEvent): Promise<void> {
   } finally { if (version === detailGeneration) detailLoading.value = false; }
 }
 
-/** 按需读取完整组装内容。@param attempt 当前请求的尝试。@return 快照读取结束。 */
-async function inspect(attempt: DiagnosticAttempt): Promise<void> {
-  if (!selected.value || !canInspect(attempt)) return;
+/** 按需读取组装内容或发送前拒绝的入口证据。@param attempt 可选的上游尝试，省略时读取拒绝证据。@return 快照读取结束。 */
+async function inspect(attempt?: DiagnosticAttempt): Promise<void> {
+  const rejection = selected.value?.native_rejection;
+  const captureId = attempt?.attempt_id ?? rejection?.capture_id;
+  if (!selected.value || !captureId || (attempt && !canInspect(attempt))) return;
   activeTab.value = 'raw';
   const requestId = selected.value.request_id;
   const { version, signal } = begin();
-  capture.value = null; selectedAttempt.value = attempt.attempt_id;
+  capture.value = null; selectedAttempt.value = captureId;
   try {
     // 后台副本允许晚于业务响应；只重读同次私有证据，沿原取消代次阻止迟到覆盖。
     for (let poll = 0; poll < 6; poll++) {
-      const result = await api.nativeCapture(requestId, attempt.attempt_id, signal);
+      const result = await api.nativeCapture(requestId, captureId, signal);
       if (version !== detailGeneration || !dialogOpen.value || signal.aborted) return;
       capture.value = result;
       const pending = result.snapshot?.wire_final?.reason === 'CAPTURE_PENDING'
-        || (attempt.capture_status === 'queued' && result.state === 'missing');
+        || ((attempt?.capture_status ?? rejection?.capture_status) === 'queued' && result.state === 'missing');
       if (!pending || poll === 5) break;
       await new Promise(resolve => setTimeout(resolve, 500));
       if (version !== detailGeneration || !dialogOpen.value || signal.aborted) return;
@@ -326,6 +335,7 @@ onUnmounted(() => { mounted = false; listGeneration++; detailGeneration++; listC
             <template v-if="activeTab === 'overview'">
               <div class="request-detail-hero"><div><span class="request-status" :class="outcomeTone(selected.outcome).replace('diagnostic-','is-')"><i></i>{{ outcomeLabel(selected.outcome) }}<small>{{ selected.status_code ?? '待终结' }}</small></span><h3>{{ selected.account_name || selected.account_email || accountLabel(selected) }}</h3><p>{{ selected.account_email || '暂无账号邮箱' }}</p></div><div><span>请求总耗时</span><strong>{{ milliseconds(elapsed(selected)) }}</strong></div></div>
               <div v-if="selected.error_stage" class="request-error-explanation"><AlertCircle /><div><strong>{{ outcomeLabel(selected.outcome) }}</strong><p>错误阶段：{{ selected.error_stage }}{{ selected.status_code===200?' · HTTP 200，响应未完整结束':'' }}</p></div></div>
+              <div v-if="selected.native_rejection" class="request-error-explanation"><AlertCircle /><div><strong>{{ rejectionLabel(selected.native_rejection.reason) }}</strong><p>本次在上游发送前拒绝。入口采集状态：{{ captureLabel(selected.native_rejection.capture_status) }}</p><button type="button" class="btn small" :disabled="detailLoading" @click="inspect()">查看入站请求</button></div></div>
               <dl class="request-definitions"><dt>开始时间</dt><dd :title="selected.started_at">{{ formatLocalTime(selected.started_at) }}</dd><dt>结束时间</dt><dd :title="selected.finished_at ?? undefined">{{ formatLocalTime(selected.finished_at) }}</dd><dt>原始 Session ID</dt><dd><div v-if="selected.original_session_id" class="request-session request-session-full"><code>{{ selected.original_session_id }}</code><button type="button" :aria-label="`复制原始 Session ID ${selected.original_session_id}`" @click="copy(selected.original_session_id,$event)"><Copy :size="12" /></button></div><span v-else>未提供</span></dd><dt>响应关联 ID</dt><dd><code>{{ selected.response_request_id ?? '未观测' }}</code></dd><dt>发生时日志</dt><dd>{{ selected.log_mode || '历史模式未知' }}</dd><dt>尝试次数</dt><dd>{{ selected.attempt_count }}</dd><dt>显示时区</dt><dd>{{ Intl.DateTimeFormat().resolvedOptions().timeZone }}</dd></dl>
               <section class="request-section"><div class="request-section-head"><h3>上游尝试</h3><span>{{ attempts.length }} 次</span></div>
                 <article v-for="attempt in attempts" :key="attempt.attempt_id" class="request-attempt-summary"><div class="request-attempt-icon">{{ attempt.ordinal }}</div><div><strong>{{ attempt.account_name || attempt.account_email || accountLabel(attempt) }}</strong><small>{{ attempt.account_email || '暂无账号邮箱' }} · {{ attempt.parameters?.model || attempt.response_model || '模型未观测' }}</small><span>{{ captureLabel(attempt.capture_status) }} · {{ modeLabel(attempt.log_mode) }}</span></div><div class="request-attempt-actions"><button type="button" class="btn small" @click="activeTab='chain'">查看链路<ArrowRight :size="13" /></button><button v-if="canInspect(attempt)" type="button" class="btn small" :disabled="detailLoading" @click="inspect(attempt)">阶段证据</button><router-link :to="{name:'environments',query:{gateway_account:String(attempt.account_id)}}" class="request-text-button">内容采集设置</router-link></div></article>
@@ -345,6 +355,7 @@ onUnmounted(() => { mounted = false; listGeneration++; detailGeneration++; listC
               <div v-if="!attempts.length && !detailLoading" class="request-empty-capture">没有已记录的性能数据。</div>
             </template>
             <template v-else>
+              <div v-if="selected.native_rejection" class="request-raw-controls"><button type="button" class="btn" :disabled="detailLoading" @click="inspect()"><RefreshCw :size="14" />{{ detailLoading ? '读取中…' : '读取拒绝请求的入站证据' }}</button><span>{{ rejectionLabel(selected.native_rejection.reason) }}</span></div>
               <div class="request-raw-controls"><ChoiceSelect :model-value="currentAttempt?.attempt_id" label="当前尝试" :options="attempts.map(attempt=>({value:attempt.attempt_id,label:`尝试 ${attempt.ordinal} · ${accountLabel(attempt)}`}))" @update:model-value="value=>{selectedAttempt=value;changeAttempt()}" /><button v-if="currentAttempt && canInspect(currentAttempt)" type="button" class="btn" :disabled="detailLoading" @click="inspect(currentAttempt)"><RefreshCw :size="14" />{{ detailLoading ? '读取中…' : capture ? '刷新阶段证据' : '读取阶段证据' }}</button></div>
               <div v-if="currentAttempt && !canInspect(currentAttempt)" class="request-empty-capture"><ShieldCheck :size="20" /><strong>{{ currentAttempt.log_mode === 'info' ? '本次仅保存摘要' : captureLabel(currentAttempt.capture_status) }}</strong><p>完整阶段原文需要账号内容采集开启及 debug 日志模式。设置对后续请求生效。</p><router-link :to="{name:'environments',query:{gateway_account:String(currentAttempt.account_id)}}" class="btn small">前往该账号环境配置<ArrowRight :size="13" /></router-link></div>
               <section v-else-if="capture"><p v-if="capture.state!=='available' || capture.message" role="status" class="form-help">阶段证据 · {{ capture.state === 'missing' ? '文件缺失或已清理' : capture.state === 'expired' ? '已超过保留期' : capture.state === 'available' ? '已读取' : capture.state }}{{ capture.message ? ' · '+capture.message : '' }}</p><NativeStageDetails v-if="capture.snapshot" :key="selectedAttempt" :snapshot="capture.snapshot" /></section>

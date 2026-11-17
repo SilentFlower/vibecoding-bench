@@ -1702,3 +1702,46 @@ transport.submit(prepared, body, ttfb_timeout).await
 - business_rate_limit_passthrough_preserves_response_without_switching：原有直连和V3调度入口均只发送一次，保留429正文/request-id，账号冷却和槽位符合原规则。
 - tests/native_rate_limit_fixture.py驱动native_rate_limit_gateway_roundtrip：280/293两版、21组场景覆盖容量/Fable/业务429、额度预过滤、Token范围、候选耗尽、签名修复后429、未知提交、1秒期限、退避取消与10秒同号重试；核对实际提交顺序、目标身份、诊断、绑定与槽位。
 - CCRB_TEST_RATE_LIMIT_ONLY=1运行scripts/testing/cc2api-native.ts：使用登记的280/293实际执行体，普通API与完整原生输入各一次业务429，共四次TLS实收；独立核验CCH，保留request-id及正文，单次attempt且无账号冷却。
+
+## Scenario: 原生发送前拒绝原因与入站正文采集
+
+### 1. Scope / Trigger
+
+- 修改固定280/293输入拒绝、sender错误投影、请求级诊断及管理员证据读取时适用。输入400/422可在attempt_count=0发生，不能只依赖尝试记录保存原因或正文。
+
+### 2. Signatures
+
+- `BridgeError(code,message,status,diagnosticCode?:NativeRejectionReason)`保留既有业务code/status；`nativeErrorDiagnostics`将固定细分原因投影到既有causes首项code，JSON六字段结构保持兼容。
+- `RequestDiagnostic.native_rejection?:{reason:Option<String>,capture_id:String,capture_status:String}`沿summary_json保存，历史缺字段为空；不新增数据库列。
+- sender私有头`x-v3-native-rejection`和`x-v3-native-rejection-capture`仅携带固定原因与queued/disabled/dropped。网关消费后移除；真实上游返回的同名头在sender过滤，不能伪造本地拒绝。
+- 复用`GET /admin/request-diagnostics/:request_id/captures/:attempt_id`，路径末段可匹配该请求native_rejection.capture_id；读取前仍核对请求、账号及采集UUID归属。
+
+### 3. Contracts
+
+- 固定原因目录包括native_entrypoint_unsupported、native_version_mismatch、native_billing_invalid、native_metadata_invalid、unsupported_body_field、unsupported_message_field、unsupported_system_block、invalid_message_role。TS、Rust与共享fixture同步；未知原因保持缺失，不复制任意异常文本。
+- sender在cc_prepared之前收到error事件时，经既有有界后台队列保存`stage=ingress_rejected`快照。复用会话映射前已冻结的脱敏HTTP逻辑正文及原始长度/SHA256，入口上限1MiB，超限标记截断。debug及账号内容采集目录共同门控；info在复制前返回disabled，沿原50份/100MiB和七天读取期限。
+- 拒绝快照的body为空字符串、headers为空数组、original_body_bytes/original_body_sha256为null；实际入口只位于ingress。cc_prepared与wire_final阶段为unavailable，不创建上游attempt，不保存运行时错误全文。Python读取器和runtime_bridge同时识别该阶段并保持账号归属验证。
+- 请求级摘要保留当前选择对应的拒绝归属；重新选择账号和最终成功时清除过期拒绝摘要。管理员页面显示固定原因、采集状态和“查看入站请求”；默认展示入口，未发生的组装阶段保持缺口。旧记录缺字段继续可读。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| debug、采集开启、原生输入400/422且尚未组装 | 请求级原因及入口证据可读，attempt_count=0 |
+| info或账号采集关闭 | 原因可读，正文disabled/summary |
+| 后台队列繁忙、文件缺失或过期 | 独立显示dropped/missing/expired，业务响应保持 |
+| 错请求、错账号、任意采集UUID或未鉴权读取 | 拒绝访问 |
+| ingress_rejected携带非空出站正文或完整组装/TLS声明 | 读取校验拒绝 |
+
+### 5. Scenarios and Examples
+
+- 正常：消息角色在输入层返回400，详情显示“消息角色不符合当前接入格式”，零尝试记录通过capture_id读取脱敏入站；凭据替换为[REDACTED]。
+- 基础：旧内核省略细分原因时保持原错误码和状态；旧记录缺native_rejection仍按原详情渲染。
+- 错误用法：为了读取失败正文补造一次上游attempt，或把入站正文标记为cc_prepared。正确处理是请求级关联ingress_rejected，并明确标记组装和TLS未发生。
+
+### 6. Tests Required
+
+- runtime的native-error-diagnostics及共享fixture：固定原因沿事件传递，原code/status保持，任意文本及未知扩展被过滤。
+- native_error、native_runtime、diagnostics单测：原因私有头、输入错误状态、零attempt持久化、成功清除及历史兼容。
+- native_capture与orchestrator/test_native_capture.py：脱敏入口/原始hash、info门控、账号隔离、伪造出站阶段拒绝和有界读取。
+- `verify_rejected_request_ui.py`：400/422×1280/390视口，无attempt时可读取入口、具体原因可见、空组装阶段明确缺口，真实模型请求为0。

@@ -1,3 +1,5 @@
+import { NATIVE_REJECTION_REASONS } from './errors';
+
 /** 原生失败发生的实际边界，不能由异常文案推断。 */
 export const NATIVE_ERROR_STAGES = ['input', 'context', 'construction', 'dispatch', 'response_headers', 'response_body', 'unknown'] as const;
 
@@ -15,7 +17,7 @@ export const NATIVE_ERROR_CODES = [
   'ConnectionRefused', 'ConnectionClosed', 'ConnectionReset', 'SocketClosed',
   'ERR_STREAM_PREMATURE_CLOSE', 'ABORT_ERR', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_SOCKET',
   'request_timeout', 'runtime_protocol', 'native_configuration', 'native_construction',
-  'native_identity', 'unsupported_parameter', 'context_conflict', 'unknown',
+  'native_identity', 'unsupported_parameter', 'context_conflict', ...NATIVE_REJECTION_REASONS, 'unknown',
 ] as const;
 
 /** 单次原生作业的失败阶段。 */
@@ -49,7 +51,8 @@ export function nativeErrorDiagnostics(error: unknown, stage: NativeErrorStage):
     if (seen.has(current)) { result.cycle_detected = true; break; }
     if (result.causes.length === 8) { result.chain_truncated = true; break; }
     seen.add(current);
-    const name = read(current, 'name'), code = read(current, 'code');
+    const name = read(current, 'name'), diagnosticCode = read(current, 'diagnosticCode');
+    const code = NATIVE_REJECTION_REASONS.find(known => known === diagnosticCode) ?? read(current, 'code');
     result.causes.push({
       name: NATIVE_ERROR_NAMES.find(known => known === name) ?? 'unknown',
       code: NATIVE_ERROR_CODES.find(known => known === code) ?? 'unknown',

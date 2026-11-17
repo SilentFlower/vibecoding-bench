@@ -13,6 +13,29 @@ from unittest.mock import patch
 class NativeCaptureTests(unittest.TestCase):
     """用合成快照验证归属、链接和读取边界。"""
 
+    def test_rejected_ingress_is_readable_and_cannot_claim_outbound_evidence(self):
+        """拒绝快照保持账号归属，并拒绝伪造的组装和TLS正文。@return None。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            directory = root / 'flows/api/cc-prepared'
+            directory.mkdir(parents=True)
+            capture_id = str(uuid.uuid4())
+            path = directory / (capture_id + '.json')
+            value = {'schema_version': 1, 'stage': 'ingress_rejected', 'account_id': 7,
+                'attempt_id': capture_id, 'captured_at_ms': int(time.time()*1000), 'headers': [], 'body': '',
+                'original_body_bytes': None, 'original_body_sha256': None,
+                'stages': [{'stage': 'cc_prepared', 'source': 'unavailable', 'representation': 'unavailable', 'status': 'unavailable'}]}
+            path.write_text(json.dumps(value))
+            self.assertEqual(read_capture(root, 7, capture_id), value)
+            with self.assertRaises(ValueError):
+                read_capture(root, 8, capture_id)
+            for key, bad in [('body', '{}'), ('headers', [['x-test', 'untrusted']]),
+                    ('original_body_bytes', 2), ('wire_final', {}),
+                    ('stages', [{'stage': 'cc_prepared', 'source': 'native', 'representation': 'json', 'status': 'complete'}])]:
+                path.write_text(json.dumps({**value, key: bad}))
+                with self.assertRaises(ValueError):
+                    read_capture(root, 7, capture_id)
+
     def test_read_only_capture_and_account_ownership(self):
         """重复读取保持文件内容和修改时间，错账号明确拒绝。@return None。"""
         with tempfile.TemporaryDirectory() as temporary:

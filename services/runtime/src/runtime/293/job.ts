@@ -1,23 +1,23 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { HeaderPair, JsonObject, PreparedInput, RuntimePayload } from '../../shared/contracts';
-import { BridgeError, isObject } from '../../shared/errors';
+import { BridgeError, isObject, type NativeRejectionReason } from '../../shared/errors';
 import { applyContextManagement } from '../../shared/api-compat';
 import { Redactor } from '../../control/redaction';
 import type { NativeBindings, NativeMessage, NativeRecord } from './native';
 import { isNativeModelCall, prepareCli } from './cli';
-import { prepareNativeBody } from '../../shared/native-input';
+import { prepareNativeBody, readNativeInput } from '../../shared/native-input';
 import { applyCachePolicy, rewriteCacheTtl } from '../../shared/cache-policy';
 import type { CachePolicy, CacheTtlRewrite } from '../../shared/runtime-policy';
 import type { NativeErrorStage } from '../../shared/native-error-diagnostics';
 
-function unsupported(message: string): never {
-  throw new BridgeError('unsupported_parameter', message, 422);
+function unsupported(message: string, reason?: NativeRejectionReason): never {
+  throw new BridgeError('unsupported_parameter', message, 422, reason);
 }
 
 function systemTexts(value: PreparedInput['input']['body']['system']): string[] | undefined {
   if (value === undefined) return undefined;
   const values = typeof value === 'string' ? [value] : value.map(block => {
-    if (block.type !== 'text' || typeof block.text !== 'string' || Object.keys(block).some(key => !['type', 'text'].includes(key))) unsupported('首版 system 内容块只支持 type/text；显式缓存边界不能静默丢弃');
+    if (block.type !== 'text' || typeof block.text !== 'string' || Object.keys(block).some(key => !['type', 'text'].includes(key))) unsupported('首版 system 内容块只支持 type/text；显式缓存边界不能静默丢弃', 'unsupported_system_block');
     return block.text as string;
   });
   if (values.some(text => /^\s*x-anthropic-billing-header:/.test(text))) unsupported('首版接收业务 system，不接收已经归因封口的 CC system 前缀');
@@ -265,8 +265,15 @@ export async function runNativeJob(prepared: PreparedInput, bindings: NativeBind
   redactor.register({ api_key: process.env.ANTHROPIC_API_KEY, token: process.env.CLAUDE_CODE_OAUTH_TOKEN });
   const { api } = bindings;
   const native = prepared.input.inputFormat === 'claude_code';
+  const attribution = native ? readNativeInput(prepared.input.body, prepared.input.nativeIngressPolicy, bindings.sourceVersion, prepared.input.headers) : null;
+  let seedContent: string | JsonObject[] = '初始化本次原生发送上下文';
+  if (attribution?.billingIndex === -1) {
+    const firstUser = prepared.input.body.messages.find(message => message.role === 'user');
+    seedContent = typeof firstUser?.content === 'string' ? firstUser.content : (firstUser?.content ?? []).filter(block => block.type === 'text' && typeof block.text === 'string').map(block => ({ type: 'text', text: block.text }));
+    if (!seedContent.length) throw new BridgeError('invalid_native_request', '缺少billing的CLI请求需要首条用户文本以生成归因后缀', 422, 'native_billing_invalid');
+  }
   // 原生正文已经包含业务提示词和历史。种子仅取得同一账号的发送上下文，其正文不会进入上游。
-  const construction: PreparedInput = native ? { ...prepared, input: { ...prepared.input, inputFormat: 'api', body: { model: prepared.input.body.model, messages: [{ role: 'user', content: '初始化本次原生发送上下文' }], stream: prepared.input.body.stream === true } } } : prepared;
+  const construction: PreparedInput = native ? { ...prepared, input: { ...prepared.input, inputFormat: 'api', body: { model: prepared.input.body.model, messages: [{ role: 'user', content: seedContent }], stream: prepared.input.body.stream === true } } } : prepared;
   let resolveResponse!: (response: Response) => void;
   let rejectResponse!: (error: unknown) => void;
   const responseReady = new Promise<Response>((resolve, reject) => { resolveResponse = resolve; rejectResponse = reject; });
@@ -278,7 +285,7 @@ export async function runNativeJob(prepared: PreparedInput, bindings: NativeBind
       if (++calls !== 1) throw new Error('首版禁止隐式模型重试');
       const headers = generated.headers;
       if (native) {
-        generated.body = prepareNativeBody(prepared.input.body, generated.body.metadata, prepared.input.nativeIngressPolicy, generated.body.system, bindings.sourceVersion);
+        generated.body = prepareNativeBody(prepared.input.body, generated.body.metadata, prepared.input.nativeIngressPolicy, generated.body.system, bindings.sourceVersion, prepared.input.headers);
         init.body = JSON.stringify(generated.body);
         const beta = prepared.headers.filter(([name]) => name.toLowerCase() === 'anthropic-beta').map(([, value]) => value).join(',');
         if (beta) headers.set('anthropic-beta', beta);

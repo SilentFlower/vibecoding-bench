@@ -59,6 +59,14 @@
     "native_identity",
     "unsupported_parameter",
     "context_conflict",
+    "native_entrypoint_unsupported",
+    "native_version_mismatch",
+    "native_billing_invalid",
+    "native_metadata_invalid",
+    "unsupported_body_field",
+    "unsupported_message_field",
+    "unsupported_system_block",
+    "invalid_message_role",
     "unknown"
   ],
   "diagnostics": {
