@@ -164,9 +164,10 @@ impl UsageStore {
             })
             .collect();
         // 在数据库内聚合，分页轮询不把整周原始记录拉回进程，也不逐账号查询。
+        // SQLite 的 SQLx Any 会按 32 位解码整数聚合结果，改用文本传回完整精度。
         let sql = format!("WITH windows(account_id,kind,starts_at,ends_at) AS (VALUES {})
             SELECT w.account_id,w.kind,COUNT(r.record_id) AS requests,
-                CAST(COALESCE(SUM(r.input_tokens+r.output_tokens+r.cache_read_tokens+r.cache_write_tokens),0) AS BIGINT) AS tokens,
+                CAST(COALESCE(SUM(r.input_tokens+r.output_tokens+r.cache_read_tokens+r.cache_write_tokens),0) AS TEXT) AS tokens,
                 COALESCE(SUM(r.cost_usd),CAST(0 AS DOUBLE PRECISION)) AS cost,
                 CAST(SUM(CASE WHEN r.record_id IS NOT NULL AND r.cost_usd IS NULL THEN 1 ELSE 0 END) AS BIGINT) AS unpriced,
                 CAST(COALESCE(SUM(r.partial),0) AS BIGINT) AS partial
@@ -187,7 +188,11 @@ impl UsageStore {
             let id: i64 = row.try_get("account_id").map_err(storage_error)?;
             let kind: String = row.try_get("kind").map_err(storage_error)?;
             let requests: i64 = row.try_get("requests").map_err(storage_error)?;
-            let tokens: i64 = row.try_get("tokens").map_err(storage_error)?;
+            let tokens: i64 = row
+                .try_get::<String, _>("tokens")
+                .map_err(storage_error)?
+                .parse()
+                .map_err(|_| AppError::Internal("窗口 Token 总数超出范围".into()))?;
             let cost_usd: f64 = row.try_get("cost").map_err(storage_error)?;
             let unpriced_requests: i64 = row.try_get("unpriced").map_err(storage_error)?;
             let partial_requests: i64 = row.try_get("partial").map_err(storage_error)?;
@@ -424,6 +429,25 @@ mod tests {
                 .unwrap(),
             6
         );
+    }
+
+    #[tokio::test]
+    async fn weekly_tokens_keep_precision_above_i32_max() {
+        let (_, store, account) = fixture().await;
+        let now = Utc::now();
+        for age in [Duration::hours(1), Duration::days(1)] {
+            let mut item = record(account.id, now - age, Some(1.0), false);
+            item.usage.cache_read_input_tokens = 1_200_000_000;
+            store.record(&item).await.unwrap();
+        }
+        let stats = store
+            .summaries(std::slice::from_ref(&account), now)
+            .await
+            .unwrap()
+            .remove(&account.id)
+            .unwrap();
+        assert_eq!(stats.five_hour.tokens, 1_200_000_140);
+        assert_eq!(stats.seven_day.tokens, 2_400_000_280);
     }
 
     #[tokio::test]

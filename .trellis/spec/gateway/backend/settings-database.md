@@ -214,6 +214,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - `usage_records` 只保存数值摘要，不保存正文、凭据和会话明文。时间统一为 UTC RFC3339 毫秒字符串；按时间至少保留完整周窗口，当前为八天，禁止按固定条数裁剪。已成功落库的记录重启后可读，异步尚未落盘的调用不承诺崩溃恢复。
 - 两个窗口分别采用有效未来 reset 减去 5h／7d 作为开始时间，且 reset 不得超过该窗口长度；按请求开始时间的左闭右开区间汇总，查询上限不超过本次 now。reset 缺失、非法或到期时返回明确标为 `rolling` 的最近窗口。
 - `request_usage` 包含 `recorded_since`、`five_hour`、`seven_day`。各窗口字段为 `requests`、`tokens`、`cost_usd`、`unpriced_requests`、`partial_requests`、`starts_at`、`ends_at`、`basis: "quota" | "rolling"`、`coverage_complete`、`estimated_total_cost_usd`。
+- Token 在数据库内聚合，通过 `CAST(COALESCE(SUM(...), 0) AS TEXT)` 经 SQLx Any 传回，再解析为 `i64`。SQLite 的聚合整数即使显式转为 `BIGINT`，SQLx Any 仍可能按 32 位解码。API 继续用数字返回 `tokens`。
 - `cost_usd` 是已知部分的标准 API 折算费用，不是 A／U 用户结算。费用未确定的请求计入 `unpriced_requests`；不完整响应计入 `partial_requests`。读取数据库失败时 API 保留账号列表并返回空统计，前端不得填成零请求／零费用。
 - 总额预估与本机 sub2api 一致：有效官方周期内，只要官方百分比和已记录费用为有限正数，就使用 `cost_usd * 100 / utilization`；启用、重启、采集间断、未定价或部分响应均不作为隐藏已有正费用预估的门槛。完整性字段保留为元数据，卡片不显示“部分记录”标签，金额标为“预计总费用”，不称为官方配额或余额。
 - 列表刷新只读，不删除记录；5h 重置只切换自身周期，7d 按自己的 reset 切换。手动额度刷新成功后立即重读列表，正常页面维持既有 5 秒轮询，不新增自动 usage POST。
@@ -230,6 +231,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 | 真实已知 0% | 允许显示 0%，不做除零外推 |
 | 普通刷新／重启 | 已落库金额保留；不因重启重新等待完整周期才显示预估 |
 | 5h reset 推进，7d 未推进 | 5h 只计新周期，7d 保留仍属于其周期的请求 |
+| 窗口 Token 总数超过 `i32::MAX` | 返回完整的 64 位总数；超出 `i64` 范围时按读取失败处理 |
 | 数据库读写失败 | 记录脱敏诊断，统计不可用或覆盖不完整；不阻断业务转发，不伪造零值 |
 
 ### 5. Scenarios and Examples
@@ -242,6 +244,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 ### 6. Tests Required
 
 - `refresh_keeps_records_and_each_reset_selects_its_own_cycle`：重复读取与重复 finalize、两个周期独立推进、请求边界和 Token／费用汇总。
+- `weekly_tokens_keep_precision_above_i32_max`：SQLite 统计 5 小时 1,200,000,140 Token、7 天 2,400,000,280 Token，校验两个窗口的精确值。
 - `committed_records_survive_independent_connection_and_reopening`：幂等迁移、独立连接可见、重启保留金额与总额预估。
 - `unpriced_data_without_positive_cost_never_produces_total_estimate`：缺失／非法／到期 reset、零比例及无已知正费用。
 - `partial_window_estimates_use_known_cost_like_sub2api`：重启及混合未定价／部分响应时，两个窗口仍按已有正费用预估。
