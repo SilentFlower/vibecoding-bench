@@ -260,7 +260,7 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 ### 1. Scope / Trigger
 
-修改 v3-build.yml、v3-release.yml、两个 Python 发布入口、发行序号或固定宿主源码包时适用。v3/Flower2API 按小版本沿原部署演进。
+准备正式发行，或修改 v3-build.yml、v3-release.yml、两个 Python 发布入口、发行序号或固定宿主源码包时适用。v3/Flower2API 按小版本沿原部署演进。
 
 ### 2. Signatures
 
@@ -271,6 +271,9 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 ### 3. Contracts
 
+- 发版先预览、再执行。读取签名更新目录中的最新发行及其源码 SHA，并读取目标远端分支当前 SHA。按两者的实际提交和文件差异拟定版本及更新说明，区分用户可见改动、维护改动和候选之外的本地提交。预览应注明目标分支、候选 SHA、更新说明、数据库迁移或安装注意事项、验证状态及待确认范围。先展示完整说明，等待发起人确认本次版本和范围。
+- 经确认后，将预览的版本与说明写入并校验 `deploy/flower2api/platform-release.json`。若另建发版准备提交，推送前核实候选到最终发行 SHA 的新增差异仅为已确认的发行元数据和文档。触发发布前重新读取目标远端引用，确认它指向最终发行 SHA。候选内容、版本或说明变化时重新展示并确认。触发后核对 Action 的 `headSha`，偏离时立即尝试取消并核对实际远端发行状态。
+- 正式发行使用原签名流程。成功后核对 GitHub Release、受信目录、签名清单、版本说明和来源 SHA 对应一致。生产实例安装沿独立授权流程。
 - v3-build 的 push/目标 PR 分支为 v3、flower2api，另有手动构建。权限 contents:read，checkout 关闭持久凭据；仅测试、构建两镜像并上传本地清单，发布副作用为零。
 - v3-release 仅 workflow_dispatch；布尔 input `publish` 默认 false，必须明确选中。本仓 v3/flower2api 分支可发布，同一 runner 冻结实际 SHA 并重新验证构建，真实旧库兼容演练通过后才推镜像。只有发布 job 取得 contents/packages 写权限。
 - 两个 Python 发布入口共用来源校验：`GITHUB_ACTIONS=true`、`GITHUB_EVENT_NAME=workflow_dispatch`、`V3_PUBLISH_CONFIRMED=true`、精确 repo/ref，以及 `GITHUB_WORKFLOW_REF=<repo>/.github/workflows/v3-release.yml@<ref>`。run/attempt 为正整数串、SHA 为40位小写hex；清单批次、revision和clean标记必须匹配。
@@ -284,6 +287,8 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 | 场景 | 结果 |
 | --- | --- |
+| 更新说明尚未确认，或预览后的候选内容、版本、说明发生变化 | 停在预览阶段，重新核对范围后再确认 |
+| 本地存在未纳入候选的改动，或发布前远端引用偏离确认的 SHA | 本地改动单列说明；远端引用偏离时停止触发 |
 | push/PR/构建入口调用发布脚本 | ValueError，Docker/GitHub发布副作用为零 |
 | 错误分支、仓库、SHA、工作流或缺确认标记 | 发布前拒绝 |
 | 缺私钥、密钥非Ed25519 | 预检失败 |
@@ -294,14 +299,17 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 ### 5. Scenarios and Examples
 
-正常：push flower2api→构建通过→手动发布→原v3管理员检查并安装后继版本。
+正常：读取签名基线和目标远端候选→展示补丁版本与说明→确认→校验并推送发行元数据→核对远端 SHA 后手动发布→核验发行与签名目录→原 v3 管理员按独立授权检查并安装。
 
 边界：迁移通道首发承接原v1签名历史，并在原序号之后生成新序号。
 
 错误用法：仅修改flower2api中的工作流就宣称v3/main远端自动发布已关闭。正确处理：将精确修复同步至各目标分支并分别验证实际触发规则。
 
+错误用法：把本地 HEAD 当作远端发行范围，或在说明审核后接受新的业务提交。正确处理：以实际远端候选为准，并对变化后的内容重新确认。
+
 ### 6. Tests Required
 
+- 发版预检：核对上一份已签名发行及其源码、实际远端候选、版本递增与完整说明；使用 `platform_version.read_version` 和 `signed_changes` 检查预览与元数据投影一致。发布后核对同批发行、运行源码及受信目录。
 - test_publication：两分支手动来源通过，自动/未确认/错误入口零Docker副作用，原批次与digest保护成立。
 - test_system_publish：真实临时签名、高历史序号、迁移通道首发继承、签名损坏、目录竞争和安全整数上限。
 - test_system_workflow：实际YAML事件、权限、零发布步骤、签名预检/兼容演练顺序，以及固定源码包仓库外独立导入。CI测试依赖固定PyYAML 6.0.3。
