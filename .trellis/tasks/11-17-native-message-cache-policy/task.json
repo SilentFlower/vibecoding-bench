@@ -1,0 +1,42 @@
+{
+  "id": "native-message-cache-policy",
+  "name": "native-message-cache-policy",
+  "title": "Native messages 缓存断点 off 与 sub2api",
+  "description": "逐项讨论第二项：让 native messages 缓存断点受系统设置 off/sub2api 控制。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "gateway",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-17",
+  "completedAt": "2026-11-17",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-17T07:32:06Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-17-native-settings-compatibility",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "接入off/sub2api系统设置、请求冻结、worker能力及缓存断点重排",
+      "完成SQLite/PostgreSQL一次性关闭兼容、热生效和管理员选择持久化",
+      "通过Rust全量、运行时单元及集成、双版本原生与实际TLS验证，完成规范同步"
+    ],
+    "partialStep": null,
+    "nextStep": "下一子任务：峰值预热，继续逐项讨论。",
+    "notes": "默认off；首次接入将全部存量模式一次性重置off，后续手动开启跨重启保留。配套内核发行、部署及激活由独立SOP承接。",
+    "updatedAt": "2026-11-17T07:32:06Z"
+  }
+}
