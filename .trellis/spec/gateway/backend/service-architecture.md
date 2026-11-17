@@ -49,7 +49,7 @@ src/tlsfp/
 - 普通准入、账号选择、凭据解析及加权许可仍由 Gateway 所有。原生分支在 Rust 正文/头部/CCH 重写前接管精确 Messages；保留逻辑 JSON 与 HeaderMap 多值，头值在私有信封中按 Latin-1 字节串传递。
 - 账号 Fast/1M 权限先明确拒绝越权申请；允许时保持原始输入交给二进制。当前 bearer 和受控身份进入工作进程，RT 留在既有凭据所有者。原生池的 Linux x64、身份、封存、预算及回收规则由 [V3 原生 sender](../../orchestrator/backend/account-runtime-v3.md#scenario-v3-原生-sender-共享映像池与资源预算)所有。
 - 每个原生作业最多一次模型提交；Gateway仅在完整收到明确invalid_request_error签名400后，同账号/冻结版本追加一次thinking降级作业。复用legacy既有thinking转text、移除redacted_thinking及根thinking/依赖清理策略；工具历史保持。两次准备与发送共享首次冻结的剩余预算，已耗尽则返回首次400。普通400、429、传输失败及状态不明保持原响应路径；legacy的两阶段signature等既有重试沿原路径。调度submitted记录每次实际内部POST，两次作业各有独立UUID和诊断尝试。
-- Gateway仅在上述修复获2xx后学习失效历史；按账号、源版本、模型、真实会话和完整thinking文本/签名前缀做SHA256隔离，新增普通消息或新thinking块仍匹配旧前缀，首发前应用同样降级。进程内至多4096项、有效期7天，满时淘汰最早到期项；不保存正文或签名原文，失败修复不学习。重启、过期、淘汰、新失效历史或并发首次学习可能重新触发首次400。
+- Gateway仅在上述修复获2xx后学习失效历史；仅按改写前真实会话ID和完整thinking文本/签名前缀做SHA256隔离，新增普通消息或新thinking块仍匹配旧前缀，首发前应用同样降级。同一实际会话更换账号、源版本或模型仍复用该记录，当前请求的修复重试继续限定同账号。会话取正文metadata或合法session头；缺少明确实际会话时只处理本次修复，保持跨请求独立判断。进程内至多4096项、有效期7天，满时淘汰最早到期项；不保存正文或签名原文，失败修复不学习。重启、过期、淘汰、新失效历史或并发首次学习可能重新触发首次400。
 - Gateway逐请求冻结当前cache_control_ttl_rewrite（off/5m/1h），私有TTL策略在checkout前校验。worker_ready能力cache_ttl_rewrite_protocol=1才发送该字段；强制模式遇旧内核返回503且零模型提交，off兼容旧版。策略不参与池身份，修改设置继续复用暖PID；配套内核先激活，再更新平台。旧内核回滚前先关闭强制TTL。
 - 响应流日志按网关根request_id、原生job/attempt UUID、worker/PID关联。本层EOF、body_error、静默超时、下游Drop及IPC/运行时错误分别记录，含持续时间、片段/字节及最后收包间隔。错误链最多八层，仅投影reqwest/hyper/io类型标志及OS代码；运行时原错误只保存SHA与受控code。代理隧道仅记录worker/tunnel UUID及密文流量数字，不能据双向复制收口断言首个关闭方。普通日志禁止异常原文、URL、代理凭据及正文。
 - account-sender 启动时初始化 JSON tracing 日志，默认 info，支持 RUST_LOG，关闭 ANSI。原生 error 事件的可选 diagnostics 经 native_error::project 独立有界校验后，记录实际阶段、最多八层白名单 name/code 及截断/循环/读取失败标记；保留原错误 SHA。日志包含 job、worker/PID、account_id、generation。缺省摘要记 unavailable，畸形记 invalid，均保持原业务响应。TS/Rust 目录及实际事件结构由 tests/fixtures/native-error-diagnostics.json 交叉验证；进程退役前记录，保留期沿 Docker 日志轮转。
@@ -91,7 +91,7 @@ src/tlsfp/
 
 - `account_backend_defaults_validate_and_obey_busy_gate`、`historical_backend_migration_and_account_updates_are_independent`：默认/非法值/忙门禁/两账号和回退。
 - `native_backend_preserves_account_feature_authorization_without_rewriting`：Fast/1M 权限拒绝且正文保持；前端 `npm run build` 及创建/编辑/reset 链路核对。
-- `tests/native_signature_fixture.py`经真实Gateway及回环sender覆盖280/293首次400→2xx、续轮单发、失败不学习、同账号/版本、独立诊断尝试、普通400/429/提交未知不重放和预算耗尽；`native_signature_repair`单测覆盖完整思考前缀、账号/版本/模型/会话隔离、7天过期及4096项上限。
+- `tests/native_signature_fixture.py`经真实Gateway及回环sender覆盖280/293首次400→2xx、续轮单发、同一实际会话跨账号/版本/模型复用、正文与头部会话关联、不同/缺失实际会话独立判断、失败不学习、独立诊断尝试、普通400/429/提交未知不重放和预算耗尽；`native_signature_repair`单测覆盖完整思考前缀、不同会话及变更历史隔离、跨模型复用、新建实例重新学习、7天过期及4096项上限。
 - `native_real_binary`、`native_real_gateway`：实际附件、独立 TLS/CCH、HTTP/SOCKS、多值白名单、工具/thinking、主子会话、单次发送、取消/代次和诊断来源。跨平台备用实现编译验证明确 503。
 - `rejects_wrong_environment_and_arbitrary_target`覆盖回拨1275毫秒、5秒偏差边界/超界、过期及临近截止的剩余预算；`native_real_binary`覆盖暖进程到期后的零业务投递。离线驱动在子阶段断言前保存可选实收摘要，失败报告由合成缺失二进制故障注入核验。
 - `native_real_gateway`：首次只读绑定503后的启动补偿、零模型预热、首次同PID、在途提示后绑定故障仍继续准备、准备完成时换代拒绝、凭据轮换旧PID退出、真实主/子会话映射与观察对应。使用隔离网络及合成 TLS，不触发真实账号模型。

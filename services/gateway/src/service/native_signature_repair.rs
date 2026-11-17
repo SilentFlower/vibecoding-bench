@@ -13,7 +13,7 @@ const TTL: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 #[derive(Clone)]
 pub(crate) struct SignatureRejection;
 
-/// 账号、版本、模型和真实会话隔离的有界修复提示，进程重启后重新学习。
+/// 仅按真实会话和失效历史隔离的有界内存提示，进程重启后重新学习。
 #[derive(Default)]
 pub(crate) struct NativeSignatureRepairs {
     entries: Mutex<HashMap<[u8; 32], Instant>>,
@@ -21,11 +21,11 @@ pub(crate) struct NativeSignatureRepairs {
 
 impl NativeSignatureRepairs {
     /// 查询当前历史是否仍含已确认失效的完整 thinking 前缀。
-    /// @param scope 账号、源版本与真实会话作用域。
+    /// @param session_id 改写前的真实会话标识。
     /// @param body 当前尚未映射的请求正文。
     /// @return 命中时应在首次发送前应用相同降级。
-    pub(crate) fn contains(&self, scope: &str, body: &Value) -> bool {
-        let keys = history_keys(scope, body);
+    pub(crate) fn contains(&self, session_id: &str, body: &Value) -> bool {
+        let keys = history_keys(session_id, body);
         let now = Instant::now();
         let mut entries = self
             .entries
@@ -36,11 +36,11 @@ impl NativeSignatureRepairs {
     }
 
     /// 仅在同账号修复取得2xx后记住被拒绝历史的最后一个前缀摘要。
-    /// @param scope 与查询相同的隔离作用域。
+    /// @param session_id 与查询相同的真实会话标识。
     /// @param body 首次收到明确签名拒绝的原始正文。
     /// @return 无；没有 thinking 历史时不新增提示。
-    pub(crate) fn remember(&self, scope: &str, body: &Value) {
-        let Some(key) = history_keys(scope, body).pop() else {
+    pub(crate) fn remember(&self, session_id: &str, body: &Value) {
+        let Some(key) = history_keys(session_id, body).pop() else {
             return;
         };
         self.remember_at(key, Instant::now());
@@ -65,17 +65,13 @@ impl NativeSignatureRepairs {
     }
 }
 
-fn history_keys(scope: &str, body: &Value) -> Vec<[u8; 32]> {
-    let mut digest = Sha256::new();
-    for value in [
-        scope,
-        body.get("model")
-            .and_then(Value::as_str)
-            .unwrap_or_default(),
-    ] {
-        digest.update((value.len() as u64).to_le_bytes());
-        digest.update(value.as_bytes());
+fn history_keys(session_id: &str, body: &Value) -> Vec<[u8; 32]> {
+    if session_id.trim().is_empty() {
+        return Vec::new();
     }
+    let mut digest = Sha256::new();
+    digest.update((session_id.len() as u64).to_le_bytes());
+    digest.update(session_id.as_bytes());
     let mut keys = Vec::new();
     for message in body
         .get("messages")
@@ -136,27 +132,31 @@ mod tests {
     use serde_json::json;
     use std::time::Instant;
 
-    /// 已确认历史命中续轮，相邻新签名、账号、会话、模型和文本均隔离。
+    /// 同会话跨模型复用已确认历史，新增轮次仍命中，其他会话和变更历史独立判断。
     #[test]
     fn history_hints_match_prefix_and_isolate_changed_content() {
         let cache = NativeSignatureRepairs::default();
         let body = json!({"model":"claude-opus-5-5","messages":[{"role":"user","content":"合成问题"},{"role":"assistant","content":[{"type":"thinking","thinking":"合成思考","signature":"synthetic-signature"}]}]});
-        assert!(!cache.contains("7/280/session-a", &body));
-        cache.remember("7/280/session-a", &body);
+        assert!(!cache.contains("session-a", &body));
+        cache.remember("session-a", &body);
         let mut continuation = body.clone();
         continuation["messages"].as_array_mut().unwrap().extend([json!({"role":"user","content":"继续"}),json!({"role":"assistant","content":[{"type":"thinking","thinking":"新的思考","signature":"new-signature"}]})]);
-        assert!(cache.contains("7/280/session-a", &continuation));
-        for scope in ["8/280/session-a", "7/293/session-a", "7/280/session-b"] {
-            assert!(!cache.contains(scope, &body));
-        }
+        assert!(cache.contains("session-a", &continuation));
+        assert!(!cache.contains("session-b", &body));
+        let mut different_model = body.clone();
+        different_model["model"] = json!("claude-sonnet-4-6");
+        assert!(cache.contains("session-a", &different_model));
+        assert!(!cache.contains("session-a", &json!({"messages":[]})));
+        cache.remember("", &body);
+        assert!(!cache.contains("", &body));
+        assert!(!NativeSignatureRepairs::default().contains("session-a", &body));
         for (path, value) in [
-            ("/model", "claude-sonnet-5-5"),
             ("/messages/1/content/0/thinking", "改变的思考"),
             ("/messages/1/content/0/signature", "different-signature"),
         ] {
             let mut changed = body.clone();
             *changed.pointer_mut(path).unwrap() = json!(value);
-            assert!(!cache.contains("7/280/session-a", &changed));
+            assert!(!cache.contains("session-a", &changed));
         }
     }
 

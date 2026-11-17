@@ -57,7 +57,8 @@ class Handler(BaseHTTPRequestHandler):
             'version': submission.get('source_version', '2.1.293'), 'body': body})
         observation = {'schema_version': 1, 'source_version': submission.get('source_version', '2.1.293'),
             'parameters': {'model': body['model'], 'stream': body.get('stream'), 'max_tokens': body.get('max_tokens')},
-            'session_id': json.loads(body['metadata']['user_id']).get('session_id'),
+            'session_id': json.loads(body.get('metadata', {}).get('user_id', '{}')).get('session_id')
+                or submission['input'].get('context', {}).get('sessionId'),
             'previous_message_id': None, 'body_sha256': hashlib.sha256(json.dumps(body).encode()).hexdigest()}
         headers = {'x-v3-native-observation': base64.b64encode(json.dumps(observation).encode()).decode(),
             'request-id': f'req_fixture_{len(self.records)}'}

@@ -3736,13 +3736,13 @@ impl GatewayService {
             .map(SchedulingRequest::deadline)
             .unwrap_or_else(|| TokioInstant::now() + UPSTREAM_TTFB_TIMEOUT)
             .min(TokioInstant::now() + UPSTREAM_TTFB_TIMEOUT);
-        let scope = format!(
-            "{}:{}:{}",
-            account.id,
-            source_version.as_str(),
-            session_hash
-        );
-        let cached = if self.native_signature_repairs.contains(&scope, body_map) {
+        // 修复记录跟随改写前真实会话；缺少明确会话时只做本次修复，避免启发式会话哈希误合并。
+        let real_session = extract_session_id_from_body(body_map)
+            .or_else(|| native_pool_session(headers, body_map));
+        let cached = if real_session
+            .as_deref()
+            .is_some_and(|session| self.native_signature_repairs.contains(session, body_map))
+        {
             serde_json::to_vec(body_map)
                 .ok()
                 .and_then(|body| strip_thinking_from_messages_request(&body))
@@ -3801,8 +3801,10 @@ impl GatewayService {
         )
         .await
         .map_err(|_| AppError::BadGateway("原生签名修复超时，提交结果未知".into()))??;
-        if response.status().is_success() {
-            self.native_signature_repairs.remember(&scope, body_map);
+        if response.status().is_success()
+            && let Some(session) = real_session.as_deref()
+        {
+            self.native_signature_repairs.remember(session, body_map);
         }
         Ok(response)
     }
@@ -10560,6 +10562,8 @@ mod tests {
     #[tokio::test]
     #[ignore = "由 tests/native_signature_fixture.py 提供隔离进程及回环sender"]
     async fn native_signature_repair_gateway_roundtrip() {
+        use crate::service::native_contract::NativeSourceVersion;
+
         assert_eq!(std::env::var("FLOWER_SIGNATURE_FIXTURE").unwrap(), "1");
         let (service, store) = test_gateway_service_with_scheduling(
             Arc::new(MemoryStore::new()),
@@ -10584,11 +10588,11 @@ mod tests {
                 .await
                 .unwrap()
         };
-        for version in ["2.1.280", "2.1.293"] {
-            let session = Uuid::new_v4().to_string();
-            let original = json!({"model":"claude-opus-5-5","max_tokens":128,"stream":false,"thinking":{"type":"adaptive"},
-                "metadata":{"user_id":json!({"session_id":session}).to_string()},
-                "messages":[{"role":"user","content":"合成问题"},{"role":"assistant","content":[{"type":"thinking","thinking":"保留合成思考文本","signature":"synthetic-invalid"},{"type":"text","text":"合成回答"}]},{"role":"user","content":"继续"}]});
+        let session = Uuid::new_v4().to_string();
+        let original = json!({"model":"claude-opus-5-5","max_tokens":128,"stream":false,"thinking":{"type":"adaptive"},
+            "metadata":{"user_id":json!({"session_id":session}).to_string()},
+            "messages":[{"role":"user","content":"合成问题"},{"role":"assistant","content":[{"type":"thinking","thinking":"保留合成思考文本","signature":"synthetic-invalid"},{"type":"text","text":"合成回答"}]},{"role":"user","content":"继续"}]});
+        for (version, initial_attempts) in [("2.1.280", 2), ("2.1.293", 1)] {
             let make = |body: &Value| {
                 Request::builder()
                     .method("POST")
@@ -10601,9 +10605,12 @@ mod tests {
                     .body(Body::from(body.to_string()))
                     .unwrap()
             };
-            for (mut body, expected, attempts) in
-                [(original.clone(), 200, 2), (original.clone(), 200, 1)]
-            {
+            let mut switched_model = original.clone();
+            switched_model["model"] = json!("claude-sonnet-4-6");
+            for (mut body, expected, attempts) in [
+                (original.clone(), 200, initial_attempts),
+                (switched_model, 200, 1),
+            ] {
                 body["messages"]
                     .as_array_mut()
                     .unwrap()
@@ -10669,6 +10676,62 @@ mod tests {
                     .unwrap();
                 assert_eq!(snapshot().await.len() - before, attempts, "{label}");
             }
+        }
+        let mut other_account =
+            create_gateway_account(&service, "native-repair-other@example.invalid", 3, 0).await;
+        other_account.request_backend = "native293".into();
+        store.update(&other_account).await.unwrap();
+        let mut without_session = original.clone();
+        without_session.as_object_mut().unwrap().remove("metadata");
+        let mut different_session = original.clone();
+        different_session["metadata"]["user_id"] =
+            json!(json!({"session_id":Uuid::new_v4().to_string()}).to_string());
+        for (candidate, header_session, attempts) in [
+            (original.clone(), None, 1),
+            (without_session.clone(), Some(session.as_str()), 1),
+            (different_session, None, 2),
+            (without_session.clone(), None, 2),
+            (without_session, None, 2),
+        ] {
+            let before = snapshot().await.len();
+            let bytes = serde_json::to_vec(&candidate).unwrap();
+            let mut headers = vec![(
+                "user-agent".into(),
+                "claude-cli/2.1.293 (external, cli)".into(),
+            )];
+            if let Some(session) = header_session {
+                headers.push(("x-claude-code-session-id".into(), session.into()));
+            }
+            let response = service
+                .forward_native_messages(
+                    &other_account,
+                    NativeSourceVersion::Cc293,
+                    &headers,
+                    &bytes,
+                    &candidate,
+                    ClientType::ClaudeCode,
+                    &session,
+                    &AccountSelectionContext::disabled(),
+                    None,
+                    false,
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), 200);
+            body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            let sent = snapshot().await;
+            assert_eq!(
+                sent.len() - before,
+                attempts,
+                "同会话跨账号及头部复用；不同会话或缺少实际会话独立确认"
+            );
+            assert!(
+                sent[before..]
+                    .iter()
+                    .all(|request| request["account_id"] == other_account.id)
+            );
         }
         service
             .settings_store
