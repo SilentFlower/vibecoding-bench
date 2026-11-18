@@ -13,6 +13,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from database_schema import initialize_bench_schema
+from agy_environment_schema import initialize_agy_environment_schema, verify_agy_environment_schema
 from database_migration_contract import load_registry, registry_contract
 
 
@@ -107,6 +108,8 @@ def migration_plan(connection: sqlite3.Connection, target: int | None = None, *,
         if version <= len(steps) and (identity, actual_version, checksum) != (steps[version-1]['id'], version, steps[version-1]['checksum']):
             raise ValueError('数据库迁移台账版本或摘要与当前程序不符')
     current = len(rows)
+    if any(row[0]=='bench.agy-environments.2' for row in rows):
+        verify_agy_environment_schema(connection)
     validate_structure(connection, completed=current > 0)
     return {'database': 'bench', 'contract': registry_contract(registry), 'current_version': current, 'target_version': target,
         'steps': [{**step, 'state': 'completed' if step['version'] <= current else 'pending'} for step in steps[:target]],
@@ -128,7 +131,9 @@ def apply_migrations(connection: sqlite3.Connection, operation_id: str | None = 
     if str(uuid.UUID(operation_id)) != operation_id:
         raise ValueError('数据库迁移操作身份无效')
     registry = registry or load_registry(Path(__file__).with_name('database-migration-registry.json'), 'bench')
-    runners = runners or {'bench.baseline.1': (initialize_bench_schema, schema_checksum)}
+    runners = runners or {'bench.baseline.1': (initialize_bench_schema, schema_checksum),
+        'bench.agy-environments.2': (initialize_agy_environment_schema,
+            lambda: schema_checksum(Path(__file__).with_name('agy_environment_schema.py')))}
     plan = migration_plan(connection, target, registry=registry)
     for step in registry['steps'][:plan['target_version']]:
         runner = runners.get(step['id'])

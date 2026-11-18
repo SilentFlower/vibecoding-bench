@@ -1294,6 +1294,10 @@ class AccountRuntime:
             self._write_sender_config(row, config)
         return binding
 
+    def read_sender_configuration(self, row: dict) -> dict:
+        """读取现有私有发送配置。@param row 当前环境。@return 已校验文件形状的配置。"""
+        return _read_json(self._sender_config(row))
+
     def _sender_active(self, row: dict) -> int:
         binding = _read_json(self._sender_config(row))["binding"]
         request = urllib.request.Request(binding["endpoint"] + "/internal/status",
@@ -2662,6 +2666,14 @@ class AccountRuntime:
                         busy = self.environment_jobs(row["environment_id"])
                     if busy or row["environment_id"] not in active_environments:
                         continue
+                    from agy_environment import lookup_environment, maintenance as agy_maintenance
+                    agy = lookup_environment(self, row['environment_id'])
+                    if agy:
+                        try:
+                            agy_maintenance(self, agy, 'stop')
+                            return
+                        except (ValueError, RuntimeError, OSError):
+                            continue
                     account = connection.execute("SELECT * FROM accounts WHERE id=?", (row["account_id"],)).fetchone()
                     account = dict(account) if account else {"name": row["name"]}
                     try:
@@ -3050,11 +3062,12 @@ class AccountRuntime:
                 pass
         return None
 
-    def maintenance(self, environment_id: str, operation: str) -> None:
+    def maintenance(self, environment_id: str, operation: str, expected_generation: int | None = None) -> None:
         """空闲维护本部署环境，保留 HOME 和已确认身份。
 
         :param environment_id: 不可变环境 ID
         :param operation: stop、rebuild、reprofile 或 reconcile
+        :param expected_generation: 页面冻结代次；省略兼容既有内部调用。
         :return: None；活动作业和 API 请求拒绝维护
         """
         if operation not in ("stop", "rebuild", "reprofile", "reconcile"):
@@ -3066,9 +3079,16 @@ class AccountRuntime:
                 if not record:
                     raise ValueError("环境不存在")
                 row = dict(record)
+                if expected_generation is not None and (type(expected_generation) is not int or expected_generation!=row['generation']):
+                    raise ValueError('环境代次已经变化，请重新读取')
                 account = connection.execute("SELECT * FROM accounts WHERE id=?", (row["account_id"],)).fetchone()
             finally:
                 connection.close()
+            from agy_environment import lookup_environment, maintenance as agy_maintenance
+            agy = lookup_environment(self, environment_id)
+            if agy:
+                agy_maintenance(self, agy, operation)
+                return
             if pending_upgrade(self._root(row)):
                 if operation != 'reconcile' or not account:
                     raise ValueError('历史内核维护待环境对账')

@@ -3,11 +3,17 @@ use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use super::{AccountService, build_oauth_credential_snapshot, validate_account_usage_limits};
+use super::{
+    AccountService, OAUTH_LOCK_TTL, OAUTH_WAIT_ATTEMPTS, OAUTH_WAIT_RETRY,
+    build_oauth_credential_snapshot, validate_account_usage_limits,
+};
 use crate::error::AppError;
-use crate::model::account::{Account, AccountAuthType};
+use crate::model::account::{Account, AccountAuthType, AccountStatus};
+use crate::model::api_token::ApiToken;
 use crate::model::proxy::ProxyConnection;
+use crate::service::agy_contract::{AgyAccessSnapshot, AgyModelId};
 use crate::service::runtime_bridge::agy_request;
+use tokio::time::sleep;
 
 /// 将权威账号转换为原生私有输入。@param account 原账号。@return 严格原生凭据对象。
 pub(super) fn native_document(account: &Account) -> Result<Value, AppError> {
@@ -98,6 +104,103 @@ fn verify_retirement(
 }
 
 impl AccountService {
+    /// 在原刷新锁内读取同代AT与代次，业务侧仅取得AT。@param id 原账号。@param force 是否请求一次认证恢复。@return AT-only快照。
+    pub async fn resolve_agy_access(
+        &self,
+        id: i64,
+        force: bool,
+    ) -> Result<AgyAccessSnapshot, AppError> {
+        let _activity = self.upstream_activity(id).await?;
+        let initial = self.store.agy_credential_state(id).await?;
+        let key = format!("oauth:refresh:account:{id}");
+        let owner = Uuid::new_v4().to_string();
+        for attempt in 0..=OAUTH_WAIT_ATTEMPTS {
+            if self
+                .cache
+                .acquire_lock(&key, &owner, OAUTH_LOCK_TTL)
+                .await?
+            {
+                let result = async {
+                    let account = self.store.get_by_id(id).await?;
+                    if !account.is_antigravity() || account.status != AccountStatus::Active {
+                        return Err(AppError::ServiceUnavailable("AGY账号当前不可用".into()));
+                    }
+                    let current = self.store.agy_credential_state(id).await?;
+                    self.resolve_agy_credentials(
+                        &account,
+                        10,
+                        force && initial.generation == current.generation,
+                    )
+                    .await?;
+                    let state = self.store.agy_credential_state(id).await?;
+                    let resolved = self.store.get_by_id(id).await?;
+                    if state.phase != "ready" {
+                        return Err(AppError::ServiceUnavailable("AGY凭据待对账".into()));
+                    }
+                    let snapshot = AgyAccessSnapshot {
+                        account_id: id,
+                        credential_generation: state.generation,
+                        access_token: resolved.access_token,
+                        expires_at: resolved
+                            .expires_at
+                            .map(|expiry| expiry.timestamp_millis())
+                            .unwrap_or(0),
+                        email: resolved.email,
+                    };
+                    snapshot.validate(Utc::now().timestamp_millis() as u64)?;
+                    Ok(snapshot)
+                }
+                .await;
+                self.cache.release_lock(&key, &owner).await;
+                return result;
+            }
+            if attempt < OAUTH_WAIT_ATTEMPTS {
+                sleep(OAUTH_WAIT_RETRY).await;
+            }
+        }
+        Err(AppError::ServiceUnavailable("AGY凭据解析等待超时".into()))
+    }
+
+    /// 按平台、令牌权限和真实模型映射读取候选。@param token 当前令牌。@param model 可选公开模型。@return 合资格AGY账号。
+    pub async fn agy_candidates(
+        &self,
+        token: &ApiToken,
+        model: Option<&str>,
+    ) -> Result<Vec<Account>, AppError> {
+        let allowed = token.allowed_account_ids();
+        let blocked = token.blocked_account_ids();
+        let mut result = Vec::new();
+        for account in self.store.list_all_platforms().await? {
+            if !account.is_antigravity()
+                || account.status != AccountStatus::Active
+                || blocked.contains(&account.id)
+                || (!allowed.is_empty() && !allowed.contains(&account.id))
+                || account
+                    .rate_limit_reset_at
+                    .is_some_and(|until| until > Utc::now())
+                || model.is_some_and(|name| Self::agy_model(&account, name).is_none())
+            {
+                continue;
+            }
+            if self.store.agy_credential_state(account.id).await?.phase == "ready" {
+                result.push(account);
+            }
+        }
+        let counts = self.active_request_counts().await;
+        result.sort_by_key(|account| (counts.get(&account.id).copied().unwrap_or(0), account.id));
+        Ok(result)
+    }
+
+    /// 读取已观测的公开模型和原生枚举对应。@param account 原账号。@param model 公开名。@return 经结构校验的原生ID。
+    pub fn agy_model(account: &Account, model: &str) -> Option<AgyModelId> {
+        let value = account
+            .usage_data
+            .get("capabilities")?
+            .get("model_mappings")?
+            .get(model)?;
+        let identifier: AgyModelId = serde_json::from_value(value.clone()).ok()?;
+        identifier.is_valid().then_some(identifier)
+    }
     /// 查询不含令牌的 AGY 管理状态。@param id 账号。@return 持久代次与阶段。
     pub async fn agy_state(&self, id: i64) -> Result<Value, AppError> {
         if !self.store.get_by_id(id).await?.is_antigravity() {
@@ -288,7 +391,10 @@ impl AccountService {
         if !candidate.proxy_url.is_empty() {
             candidate.proxy_url = ProxyConnection::parse(&candidate.proxy_url)?.private_url;
         }
-        if candidate.concurrency < 1 || candidate.rpm_limit < 0 || candidate.priority < 0 {
+        if !(1..=64).contains(&candidate.concurrency)
+            || candidate.rpm_limit < 0
+            || candidate.priority < 0
+        {
             return Err(AppError::BadRequest("AGY 账号容量配置无效".into()));
         }
         validate_account_usage_limits(&candidate)?;

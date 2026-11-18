@@ -283,6 +283,9 @@ def source_snapshot_ignore(directory: str, names: list[str]) -> set[str]:
     :return: 仍应排除的名称集合。
     """
     ignored = set(shutil.ignore_patterns('.git','target','node_modules','__pycache__','.env','.env.*','*.log')(directory,names))
+    if Path(directory).as_posix().endswith('/agy_runtime/resources'):
+        # 构建器从固定源码生成资源，宿主临时编译产物不进入交付身份。
+        ignored.update(set(names) & {'observer-c', 'relocation_reclaim.so', 'admission.json'})
     if not ignored:
         return ignored
     resolved_directory = Path(directory).resolve()

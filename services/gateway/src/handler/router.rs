@@ -48,6 +48,7 @@ use crate::service::gateway::{
     AutoModeClassifierMode, BootstrapModelOptionsMode, CliBgStatusClassifierMode, GatewayService,
     parse_bootstrap_additional_model_options,
 };
+use crate::service::gemini::{self, GeminiService};
 use crate::service::native_contract::validate_idle_timeout;
 use crate::service::oauth::TokenTester;
 use crate::service::oauth_flow::OAuthFlowService;
@@ -96,6 +97,7 @@ const OBSOLETE_SETTINGS_KEYS: &[&str] = &[
 
 #[derive(Clone)]
 pub struct AppState {
+    pub gemini_svc: Arc<GeminiService>,
     pub gateway_svc: Arc<GatewayService>,
     pub account_svc: Arc<AccountService>,
     pub token_tester: Arc<TokenTester>,
@@ -121,6 +123,7 @@ pub fn build_router(
 ) -> Router {
     let proxy_svc = Arc::new(ProxyService::new(settings_store.database_pool()));
     let state = AppState {
+        gemini_svc: Arc::new(GeminiService::default()),
         proxy_svc,
         gateway_svc,
         account_svc,
@@ -309,6 +312,8 @@ pub fn build_router(
             },
         )
         .route("/api/hello", get(hello_get).head(hello_head))
+        .route("/v1beta/models", get(gemini::models))
+        .route("/v1beta/models/:action", post(gemini::generate))
         .route("/v1/messages/count_tokens", post(gateway_count_tokens))
         .fallback(gateway_fallback)
         .layer(middleware::from_fn(system_update::middleware))
@@ -722,11 +727,6 @@ async fn runtime_lease_status(
     Path(id): Path<i64>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let account = state.account_svc.get_account(id).await?;
-    if !account.is_claude_code() {
-        return Err(AppError::BadRequest(
-            "此运行接口仅适用于 Claude Code".into(),
-        ));
-    }
     let queue = state
         .account_svc
         .get_or_create_queue(id, account.concurrency)
@@ -744,9 +744,11 @@ async fn runtime_account_config(
     Path(id): Path<i64>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let account = state.account_svc.get_account(id).await?;
-    if !account.is_claude_code() {
-        return Err(AppError::BadRequest(
-            "此运行接口仅适用于 Claude Code".into(),
+    if account.is_antigravity() {
+        return Ok(Json(
+            json!({"account_id":account.id,"platform":account.platform,"proxy_url":account.proxy_url,
+            "auth_type":account.auth_type,"status":account.status,"email":account.email,"concurrency":account.concurrency,
+            "request_backend":"agy159","credential_state":state.account_svc.agy_state(id).await?}),
         ));
     }
     Ok(Json(
@@ -877,10 +879,14 @@ async fn runtime_lease_update(
         None
     };
     let account = state.account_svc.get_account(id).await?;
-    if !account.is_claude_code() {
-        return Err(AppError::BadRequest(
-            "此运行接口仅适用于 Claude Code".into(),
-        ));
+    if account.is_antigravity()
+        && (!input.owner.starts_with("maintenance:")
+            || !matches!(
+                input.operation.as_str(),
+                "prepare" | "claim" | "heartbeat" | "release"
+            ))
+    {
+        return Err(AppError::BadRequest("AGY账号仅开放环境维护许可".into()));
     }
     if matches!(
         input.operation.as_str(),
@@ -1204,7 +1210,6 @@ pub(super) async fn config_permit(
         if state.account_svc.agy_state(account.id).await?["phase"] != "ready" {
             return Err(AppError::BadRequest("AGY 原凭据操作待核对".into()));
         }
-        return Ok(None);
     }
     if !force
         && state.account_svc.scheduler().is_none()
@@ -1310,6 +1315,17 @@ async fn update_account(
         return Err(AppError::BadRequest("未知账号平台，请核对原记录".into()));
     }
     if existing.is_antigravity() {
+        let runtime_changed = updates
+            .get("proxy_url")
+            .is_some_and(|value| value.as_str() != Some(existing.proxy_url.as_str()))
+            || updates
+                .get("concurrency")
+                .is_some_and(|value| value.as_i64() != Some(existing.concurrency as i64));
+        let _runtime_permit = if runtime_changed {
+            config_permit(&state, &existing, false).await?
+        } else {
+            None
+        };
         return Ok(Json(
             state.account_svc.update_agy_fields(id, &updates).await?,
         ));

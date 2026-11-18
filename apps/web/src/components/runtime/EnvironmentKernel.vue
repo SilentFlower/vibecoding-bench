@@ -18,6 +18,18 @@ const kernels = computed(() => versions.map(version => ({
 </script>
 <template>
   <section class="environment-kernel">
+    <template v-if="environment.platform === 'antigravity'">
+      <div class="kernel-version"><strong>Antigravity {{ environment.agy_runtime?.version || '1.5.9' }}</strong><span>{{ states[environment.agy_runtime?.state ?? 'unknown'] || '运行状态待核对' }}</span></div>
+      <p>请求内核随平台镜像统一交付。模型使用该账号已观测的 Gemini 与 Claude 能力。</p>
+      <div class="workspace-properties">
+        <div class="kv"><span>运行进程 / 上限</span><strong>{{ environment.agy_runtime?.workers ?? '未观测' }} / {{ environment.agy_runtime?.max_workers ?? '未观测' }}</strong></div>
+        <div class="kv"><span>等待工具结果</span><strong>{{ environment.agy_runtime?.tool_waiting ?? '未观测' }}</strong></div>
+        <div class="kv"><span>共享完整映像</span><strong>{{ environment.agy_runtime?.image_bytes == null ? '未观测' : `${Math.round(environment.agy_runtime.image_bytes / 1024 ** 2)} MiB` }}</strong></div>
+        <div class="kv"><span>监督进程实际驻留</span><strong>{{ environment.agy_runtime?.controller?.Rss == null ? '未观测' : `${Math.round(environment.agy_runtime.controller.Rss / 1024)} MiB` }}</strong></div>
+      </div>
+      <details class="runtime-technical"><summary>固定原版身份</summary><code>{{ environment.agy_runtime?.source_sha256 || '未提供' }}</code></details>
+    </template>
+    <template v-else>
     <div class="kernel-version"><span>管理方式</span><strong>随 flower2api 版本统一交付</strong></div>
     <p>升级或回退平台时，账号自动采用目标镜像配套的请求内核。280 / 293 继续按请求画像自动匹配。</p>
     <section v-for="item in kernels" :key="item.version" :aria-label="`Claude Code ${item.version} 内核`">
@@ -36,5 +48,6 @@ const kernels = computed(() => versions.map(version => ({
       </template>
     </section>
     <p v-if="environment.request_backend !== 'native293'">此环境当前使用基础转发方式。</p>
+    </template>
   </section>
 </template>

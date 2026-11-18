@@ -28,6 +28,7 @@ GATEWAY_SCHEMA_SOURCES = {
     'gateway.proxy-sync.3': 'cc2api/src/store/proxy_sync_schema.rs',
     'gateway.session-policy-blocks.4': 'cc2api/src/store/session_policy_block_schema.rs',
 }
+BENCH_SCHEMA_SOURCES = {'bench.agy-environments.2': 'orchestrator/agy_environment_schema.py'}
 
 
 def data_contracts(root: Path) -> dict:
@@ -46,6 +47,10 @@ def migration_registries(root: Path) -> dict:
         'gateway': load_registry(source_path(root, 'cc2api/src/store/database-migration-registry.json'), 'gateway')}
     if values['bench']['steps'][0]['checksum'] != schema_checksum(source_path(root, 'orchestrator/database_schema.py')):
         raise ValueError('迁移定义与版本登记不符')
+    for step in values['bench']['steps'][1:]:
+        logical = BENCH_SCHEMA_SOURCES.get(step['id'])
+        if logical is None or step['checksum'] != schema_checksum(source_path(root, logical)):
+            raise ValueError('迁移定义与版本登记不符：' + step['id'])
     for step in values['gateway']['steps']:
         logical = GATEWAY_SCHEMA_SOURCES.get(step['id'])
         if logical is None:
@@ -89,7 +94,7 @@ def component_content(root: Path, role: str) -> str:
         else common + ['images/account', 'images/sidecar', 'images/worker/task_followups.py',
             'images/v3/criu', 'images/v3/tls-observer',
             'orchestrator/runtime_files.py', 'orchestrator/runtime_diagnostics.py',
-            'orchestrator/cli_quota.py', 'orchestrator/process_metrics.py', 'orchestrator/native_sender.py', 'orchestrator/agy_auth.py'])
+            'orchestrator/cli_quota.py', 'orchestrator/process_metrics.py', 'orchestrator/native_sender.py', 'orchestrator/agy_auth.py', 'orchestrator/agy_runtime'])
     digest = hashlib.sha256()
     for name in names:
         source = source_path(root, name)
@@ -97,6 +102,8 @@ def component_content(root: Path, role: str) -> str:
             raise ValueError('组件源码依赖缺失')
         paths = sorted(source.rglob('*')) if source.is_dir() else [source]
         for path in paths:
+            if 'agy_runtime/resources' in path.as_posix() and path.name in ('observer-c', 'relocation_reclaim.so', 'admission.json'):
+                continue
             if path.is_file() and not any(part in ('__pycache__', 'target', 'node_modules', '.git') for part in path.relative_to(root).parts):
                 if path.is_symlink():
                     raise ValueError('组件源码不能是符号链接')

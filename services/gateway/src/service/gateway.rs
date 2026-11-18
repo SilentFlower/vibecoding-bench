@@ -11324,6 +11324,7 @@ mod tests {
             release_id: "native-offline".into(),
         };
         let config = SenderConfig {
+            agy: None,
             native: Some(NativeSenderConfig {
                 source_version: Default::default(),
                 runtimes: Default::default(),

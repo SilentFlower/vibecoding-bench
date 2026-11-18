@@ -12665,6 +12665,14 @@ def v3_quiesce(account_id: int, body: dict):
     """
     if not account_runtime:
         raise HTTPException(404)
+    from agy_environment import lookup as agy_lookup, quiesce as agy_quiesce
+    agy=agy_lookup(account_runtime,account_id)
+    if agy:
+        try:
+            agy_quiesce(account_runtime,agy,body)
+        except (ValueError,RuntimeError,OSError):
+            raise HTTPException(409,'AGY环境仍有原生工作或配置许可已变化') from None
+        return {'ok':True}
     connection = get_db()
     try:
         account = connection.execute("SELECT * FROM accounts WHERE cc2api_account_id=? AND deleted_at IS NULL", (account_id,)).fetchone()
@@ -12725,6 +12733,13 @@ def v3_transport(account_id: int, wake: bool = True):
     """解析唯一绑定账号并返回受限发送实例，浏览器无法直接调用。"""
     if not account_runtime:
         raise HTTPException(404)
+    configuration = account_runtime.gateway._request('GET', f'/admin/runtime/accounts/{account_id}/config')
+    if configuration.get('platform') == 'antigravity':
+        from agy_environment import transport as agy_transport
+        try:
+            return agy_transport(account_runtime, account_id, wake=wake)
+        except (ValueError, RuntimeError, OSError):
+            raise HTTPException(503, 'AGY账号环境未就绪或需要维护') from None
     connection = get_db()
     try:
         rows = connection.execute("SELECT * FROM accounts WHERE cc2api_account_id=? AND deleted_at IS NULL",
@@ -12754,6 +12769,10 @@ def _v3_environment_summary(row: dict, ownerships: dict, native_preparations: di
     :param native_preparation_error: 快照读取错误。
     :return: 原合同的公开环境投影。
     """
+    from agy_environment import lookup_environment, summary as agy_summary
+    agy = lookup_environment(account_runtime, row['environment_id'])
+    if agy:
+        return agy_summary(account_runtime, agy)
     account = None
     row['credential_ownership'] = ownerships.get(row['account_id'])
     row["role_status"] = account_runtime.role_status(row)
@@ -12954,6 +12973,11 @@ def v3_content_capture(environment_id: str) -> dict:
     """
     if not account_runtime:
         raise HTTPException(404)
+    from agy_environment import capture as agy_capture, lookup_environment
+    with account_runtime.environment_lock(environment_id):
+        agy = lookup_environment(account_runtime, environment_id)
+        if agy:
+            return agy_capture(account_runtime, agy)
     snapshots, _ = account_runtime.native_preparation_snapshots()
     try:
         with account_runtime.environment_lock(environment_id):
@@ -12975,6 +12999,15 @@ def v3_set_content_capture(environment_id: str, body: ContentCaptureOperation) -
     """
     if not account_runtime:
         raise HTTPException(404)
+    from agy_environment import capture as agy_capture, lookup_environment
+    with account_runtime.environment_lock(environment_id):
+        agy = lookup_environment(account_runtime, environment_id)
+        if agy:
+            try:
+                with UPDATE_GATE.admission('agy-content-capture'):
+                    return agy_capture(account_runtime, agy, body.model_dump())
+            except ValueError as error:
+                raise HTTPException(409, str(error)) from None
     _, original = _content_capture_account(environment_id)
     try:
         with UPDATE_GATE.admission('environment-content-capture'):
@@ -13125,6 +13158,16 @@ def v3_environment_maintenance(environment_id: str, body: dict):
     """
     if not account_runtime:
         raise HTTPException(404)
+    from agy_environment import lookup_environment
+    if lookup_environment(account_runtime, environment_id):
+        try:
+            if type(body.get('expected_generation')) is not int:
+                raise ValueError('AGY维护请求缺少冻结环境代次')
+            with UPDATE_GATE.admission('agy-environment-maintenance'):
+                account_runtime.maintenance(environment_id, body.get('operation',''), body.get('expected_generation'))
+            return {'ok':True}
+        except (ValueError,RuntimeError,OSError):
+            raise HTTPException(409,'AGY环境有活动请求或需要对账') from None
     connection = get_db()
     try:
         environment = connection.execute("SELECT COALESCE(a.name,e.name) AS name,e.account_id FROM account_environments e "
@@ -13145,7 +13188,7 @@ def v3_environment_maintenance(environment_id: str, body: dict):
                 credential_ownership.cancel_return(credential_ownership._account(environment['account_id']))
                 return {'ok': True}
             with _profile_lock(environment["name"]):
-                account_runtime.maintenance(environment_id, body.get("operation", ""))
+                account_runtime.maintenance(environment_id, body.get("operation", ""), body.get('expected_generation'))
         # 该方法自行领取 owner 锁；不可在上面的非重入锁内调用。
         if body.get("operation") == "reconcile" and login_manager:
             login_manager.cleanup_reconciled(environment_id)

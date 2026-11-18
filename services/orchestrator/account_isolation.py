@@ -84,10 +84,14 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     root = runtime._root(row)
     fingerprint = json.loads(row['fingerprint_json'])
     native = account.get('native_sender')
+    agy = account.get('agy_sender')
+    if native and agy:
+        raise ValueError('同一账号环境只能采用一个平台内核')
     if native:
         migrate_records(root, int(account.get('cc2api_account_id') or 0), reconciled=account.get('native_migration') is True)
+    execution = agy or native
     limits = isolated_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'),
-        ('unlimited' if native['memory_mib'] == 0 else str(native['memory_mib']) + 'm') if native else None)
+        ('unlimited' if execution['memory_mib'] == 0 else str(execution['memory_mib']) + 'm') if execution else None)
     layout_path = root / 'runtime/project-review-layout.json'
     review_layout = json.loads(layout_path.read_text()) if layout_path.is_file() else None
     if review_layout:
@@ -146,11 +150,11 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     restore = restore_policy(native, fingerprint, image_labels.get('vibebench.native-criu') == '1')
     sender_file = paths['sender'] / 'sender.json'
     write_json(sender_file, {'binding': binding, 'proxy_url': resolved_proxy, 'proxy_source': proxy,
-        'native': native, 'native_capture_dir': '/flows/api/cc-prepared' if native and capture_enabled(fingerprint) else None,
+        'native': native, 'agy': agy, 'native_capture_dir': ('/flows/api/agy-prepared' if agy else '/flows/api/cc-prepared') if execution and capture_enabled(fingerprint) else None,
         'native_tls_observer_protocol': observer_protocol,
         'native_criu_enabled': restore['eligible'], 'native_criu_reason': restore['reason'],
         'native_criu_protocol': 1 if native and image_labels.get('vibebench.native-criu') == '1' else None,
-        'allowed_origin': 'https://api.anthropic.com', 'evidence_file': '/flows/api/observations.jsonl', 'quota_identity': ''}, 0o640)
+        'allowed_origin': 'https://cloudcode-pa.googleapis.com' if agy else 'https://api.anthropic.com', 'evidence_file': '/flows/api/observations.jsonl', 'quota_identity': ''}, 0o640)
     os.chown(sender_file, 0, 1001)
     write_json(paths['network'] / 'context.json', {'NETWORK_INSPECTION_MODE': 'passthrough', 'QUOTA_SOURCE': ''})
     (paths['network'] / 'ready').unlink(missing_ok=True)
@@ -168,7 +172,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
 
     def launch(role, **options):
         memory, total = limits[role]
-        role_pids = 128 + 32 * native['max_workers'] if role == 'sender' and native else 512 if role == 'cli' else 128
+        role_pids = 128 + (64 if agy else 32) * execution['max_workers'] if role == 'sender' and execution else 512 if role == 'cli' else 128
         options.update(name=name if role == 'network' else name + '-' + role,
             labels=role_labels(runtime, row, role), detach=True, auto_remove=False, read_only=True,
             mem_limit=memory, memswap_limit=total, nano_cpus=default_cpus[role],

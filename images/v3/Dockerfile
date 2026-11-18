@@ -51,6 +51,13 @@ COPY images/v3/criu/ /source/criu/
 RUN python3 /source/criu/package.py --source /source/criu --out /opt/ccrb-criu \
     && chmod -R go-w /opt/ccrb-criu
 
+FROM python:3.12-slim-bookworm AS agy-runtime-build
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+COPY orchestrator/agy_runtime/ /opt/v3/python/agy_runtime/
+RUN PYTHONPATH=/opt/v3/python python3 -m agy_runtime.build --root /opt/v3/python/agy_runtime \
+    && chmod -R go-w /opt/v3/python/agy_runtime
+
 FROM python:3.12-slim-bookworm AS control
 RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates openssl \
     && rm -rf /var/lib/apt/lists/*
@@ -65,6 +72,7 @@ COPY orchestrator/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 RUN python -c "from zoneinfo import ZoneInfo; [ZoneInfo(name) for name in ('UTC','Asia/Tokyo','Asia/Singapore','Asia/Seoul','Australia/Sydney','Europe/London','Europe/Berlin','Europe/Paris','America/Los_Angeles','America/New_York','America/Chicago')]"
 COPY orchestrator/*.py ./
+COPY orchestrator/agy_runtime/ ./agy_runtime/
 COPY orchestrator/native_tls_seccomp.json ./
 COPY orchestrator/database-migration-registry.json ./
 COPY topics.md /repo/topics.md
@@ -89,6 +97,7 @@ ARG V3_RELEASE
 ARG V3_PARENT_REV
 ARG V3_GATEWAY_REV
 LABEL vibebench.product="v3" vibebench.role="control" vibebench.release=$V3_RELEASE \
+    vibebench.agy-runtime-protocol="1" \
     vibebench.account-platforms="1" \
     vibebench.system-update-protocol="1" \
     vibebench.credential-ownership-protocol="1" \
@@ -146,6 +155,7 @@ COPY orchestrator/cli_quota.py /usr/local/bin/v3-cli-quota
 COPY orchestrator/process_metrics.py /usr/local/bin/process_metrics.py
 COPY orchestrator/process_metrics.py /usr/local/bin/v3-process-metrics
 COPY --from=backend /out/account-sender /usr/local/bin/account-sender
+COPY --from=agy-runtime-build /opt/v3/python/agy_runtime/ /opt/v3/python/agy_runtime/
 COPY --from=tls-observer-build /opt/ccrb-tls-observer/ /opt/ccrb-tls-observer/
 COPY --from=criu-build /opt/ccrb-criu/ /opt/ccrb-criu/
 # iproute2已有libbpf运行依赖；在镜像内验证真实动态库，避免重复刷新整层系统依赖。
@@ -166,6 +176,7 @@ ARG V3_RELEASE
 ARG V3_PARENT_REV
 ARG V3_GATEWAY_REV
 LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELEASE \
+    vibebench.agy-runtime-protocol="1" vibebench.agy-runtime-source-sha256=$V3_AGY_AUTH_SHA256 \
     vibebench.account-platforms="1" vibebench.agy-auth-source-sha256=$V3_AGY_AUTH_SHA256 \
     vibebench.system-update-protocol="1" vibebench.account-runtime-protocol="1" \
     vibebench.credential-ownership-protocol="1" \

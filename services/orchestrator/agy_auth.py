@@ -415,8 +415,21 @@ print(b.decode())
             if models.exit_code != 0:
                 raise ValueError('AGY 原生模型目录读取失败')
             names = sorted(set(re.findall(r'\b(?:gemini|claude|gpt)-[A-Za-z0-9_.-]+', models.output.decode(errors='replace'))))
+            # CLI名称和原生枚举分别观测，运行层只使用两者已核对的交集。
+            catalog_code = code.replace('GetUserStatus', 'GetAvailableModels')
+            catalog = container.exec_run(['python3', '-c', catalog_code], user='1001:1001')
+            mapping = {}
+            if catalog.exit_code == 0:
+                try:
+                    from agy_runtime.models import decode_catalog
+                    observed = decode_catalog(json.loads(catalog.output))
+                    mapping = {name: observed[name] for name in names if name in observed}
+                except (ValueError, TypeError, KeyError):
+                    # 身份核验仍独立成立；未知模型映射保持未就绪，不猜测枚举发送业务。
+                    mapping = {}
             return {'email_address': email.strip(), 'capabilities': {'source': 'agy:1.5.9:native',
                 'observed_at_ms': int(time.time() * 1000), 'models': names,
+                'model_mappings': mapping, 'model_mapping_status': 'observed' if mapping else 'unavailable',
                 'provider': {key: status[key] for key in ('planStatus', 'userTier') if key in status}}}
         finally:
             self._stop(state)

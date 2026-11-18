@@ -190,6 +190,14 @@ def runtime_snapshot(runtime) -> dict:
                 if pending_upgrade(root):
                     reasons.append('请求内核维护尚未完成')
                 account = accounts.get(row.get('account_id'))
+                from agy_environment import lookup_environment
+                agy=lookup_environment(runtime,row['environment_id'])
+                if agy:
+                    item.update(platform='antigravity',gateway_account_id=agy['gateway_account_id'])
+                    lease=runtime.gateway._request('GET',f"/admin/runtime/accounts/{agy['gateway_account_id']}/lease")
+                    configuration=runtime.gateway._request('GET',f"/admin/runtime/accounts/{agy['gateway_account_id']}/config")
+                    if lease.get('active') or lease.get('waiting') or lease.get('lease') or configuration.get('credential_state',{}).get('phase')!='ready':
+                        reasons.append('AGY账号许可或凭据操作尚未收口')
                 ownership = getattr(runtime, 'credential_ownership', None)
                 if ownership and account:
                     record = ownership.state(account['id'])
@@ -464,6 +472,12 @@ def system_updates_router(runtime_provider) -> APIRouter:
                             config['native'] = builtin_config(config.get('native'), ('2.1.293',))
                             runtime._write_sender_config(row, config)
                 if body.action in ('rebuild', 'restore'):
+                    from agy_environment import lookup_environment, transport as agy_transport
+                    agy=lookup_environment(runtime,row['environment_id'])
+                    if agy:
+                        agy_transport(runtime,agy['gateway_account_id'],system_maintenance=True)
+                        row=lookup_environment(runtime,row['environment_id'])
+                        return {'environment_id':row['environment_id'],'generation':row['generation'],'state':row['state'],'origin':image_origin(runtime,row)}
                     if not account:
                         raise HTTPException(409, '环境缺少原始账号归属')
                     row, _ = runtime.ensure(dict(account), prepare_sender=False)

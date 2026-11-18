@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from source_layout import source_path
 
-from system_release import GATEWAY_SCHEMA_SOURCES, REPO, migration_registries
+from system_release import BENCH_SCHEMA_SOURCES, GATEWAY_SCHEMA_SOURCES, REPO, migration_registries
 from database_migration_contract import load_registry
 
 
@@ -37,7 +37,7 @@ def source_ownership(root: Path) -> list[str]:
         if re.search(r'\b(?:crate|super)::', RUST_LITERAL.sub(' ', definitions)):
             findings.append(str(rust_schema.relative_to(root)) + ':1')
     for path in (source_path(root, 'orchestrator')).glob('*.py'):
-        if path.name.startswith('test_') or path.name == 'database_schema.py':
+        if path.name.startswith('test_') or path.name == 'database_schema.py' or path in {source_path(root, logical) for logical in BENCH_SCHEMA_SOURCES.values()}:
             continue
         tree = ast.parse(path.read_text())
         docstrings = set()

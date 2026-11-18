@@ -1,7 +1,14 @@
 pub mod access_policy;
 pub mod account;
+pub mod agy_contract;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub mod agy_runtime;
+#[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
+#[path = "agy_runtime_unsupported.rs"]
+pub mod agy_runtime;
 pub mod diagnostics;
 pub mod gateway;
+pub mod gemini;
 mod native_capture;
 pub(crate) mod native_contract;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]

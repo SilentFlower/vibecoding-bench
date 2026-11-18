@@ -25,16 +25,17 @@ class DatabaseMigrationTests(unittest.TestCase):
             self.database.execute("INSERT INTO accounts(name,profile_path) VALUES('synthetic','profiles/synthetic')")
         second = apply_migrations(self.database)
         self.assertEqual(first['contract'], second['contract'])
-        self.assertEqual(second['current_version'], 1)
-        self.assertEqual(self.database.execute('SELECT COUNT(*) FROM system_schema_migrations').fetchone()[0], 1)
+        self.assertEqual(second['current_version'], 2)
+        self.assertEqual(self.database.execute('SELECT COUNT(*) FROM system_schema_migrations').fetchone()[0], 2)
         self.assertEqual(self.database.execute('SELECT profile_path FROM accounts').fetchone()[0], 'profiles/synthetic')
 
     def test_add_table_column_index_and_backfill_with_version_two(self) -> None:
         """新增登记可真实建表、补列、索引并回填，旧程序保留后来的数据。@return None。"""
-        apply_migrations(self.database)
+        apply_migrations(self.database,target=1)
         with self.database:
             self.database.execute("INSERT INTO accounts(name,profile_path) VALUES('synthetic','profiles/synthetic')")
         registry = copy.deepcopy(self.registry)
+        registry['steps']=registry['steps'][:1]
         registry['steps'].append({'id': 'bench.synthetic.2', 'version': 2, 'predecessor': 1, 'checksum': 'a' * 64,
             'engine': 'sqlite', 'kind': 'schema', 'rollback_mode': 'compatible'})
         validate_registry(registry, 'bench')
@@ -49,15 +50,16 @@ class DatabaseMigrationTests(unittest.TestCase):
         self.assertEqual(result['current_version'], 2)
         self.assertEqual(result['contract'], registry_contract(registry))
         self.assertEqual(apply_migrations(self.database, registry=registry, runners=runners)['current_version'], 2)
-        self.assertEqual(apply_migrations(self.database)['state'], 'compatible_newer')
+        self.assertEqual(migration_plan(self.database,target=1,registry={'database':'bench','schema_version':1,'steps':self.registry['steps'][:1]})['state'], 'compatible_newer')
         self.assertEqual(self.database.execute('SELECT synthetic_note FROM accounts').fetchone()[0], 'retained')
 
     def test_failed_backfill_rolls_back_data_and_step_marker(self) -> None:
         """失败的数据回填事务保持原记录与原版本。@return None。"""
-        apply_migrations(self.database)
+        apply_migrations(self.database,target=1)
         with self.database:
             self.database.execute("INSERT INTO accounts(name,profile_path) VALUES('synthetic','profiles/before')")
         registry = copy.deepcopy(self.registry)
+        registry['steps']=registry['steps'][:1]
         registry['steps'].append({'id': 'bench.synthetic.2', 'version': 2, 'predecessor': 1, 'checksum': 'b' * 64,
             'engine': 'sqlite', 'kind': 'data', 'rollback_mode': 'compatible'})
         def fail(connection):
