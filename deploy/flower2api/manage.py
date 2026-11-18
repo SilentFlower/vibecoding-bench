@@ -1035,13 +1035,14 @@ def _prune_previous_backups(target: Path, deployment: str, root: Path) -> int:
 
 
 def backup(values: dict, destination: Path, *, full: bool = False,
-           configuration_path: Path | None = None) -> None:
+           configuration_path: Path | None = None, cluster_epoch: str | None = None) -> None:
     """停机后默认精简备份，并在独立目录验证恢复后轮换旧副本。
 
     :param values: 当前部署配置
     :param destination: 全新且与数据根分离的绝对备份目录
     :param full: 显式保留完整可重建程序与下载缓存。
     :param configuration_path: 可选的部署环境配置，命令行入口始终传入。
+    :param cluster_epoch: 已全部停机的中央和Node共用备份批次。
     :return: None；新备份校验成功后只保留同目录、同部署及同数据根的本次备份。
     """
     deployment = values["V3_DEPLOYMENT_ID"]
@@ -1076,7 +1077,7 @@ def backup(values: dict, destination: Path, *, full: bool = False,
                     if candidate.exists():
                         configuration[name] = candidate
             summary = create_backup_data(root, target, excluded=excluded,
-                mode='full' if full else 'essential', configuration=configuration)
+                mode='full' if full else 'essential', configuration=configuration,cluster_epoch=cluster_epoch)
             verified = verify_backup_data(target)
             _owned_root(values, stopped=True)
             _write_new_json(target / 'release.json', manifest)
@@ -1175,6 +1176,7 @@ def main() -> None:
     parser.add_argument("--namespace", default="ghcr.io/silentflower")
     parser.add_argument("--backup-dir", type=Path)
     parser.add_argument("--full", action="store_true", help="显式完整备份；默认只保留可验证恢复的关键状态")
+    parser.add_argument('--cluster-epoch',help='全部节点停机后共用的32位集群备份批次')
     parser.add_argument("--source", type=Path)
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
@@ -1220,7 +1222,7 @@ def main() -> None:
     if args.action == "backup":
         if not args.backup_dir:
             parser.error("backup 需要 --backup-dir")
-        backup(values, args.backup_dir, full=args.full, configuration_path=args.env)
+        backup(values, args.backup_dir, full=args.full, configuration_path=args.env,cluster_epoch=args.cluster_epoch)
         return
     environment = dict(os.environ, **values)
     compose = ["docker", "compose", "--env-file", str(args.env.resolve()), "-f", str(COMPOSE)]

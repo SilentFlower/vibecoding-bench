@@ -60,14 +60,20 @@ def deployment_network_names(deployment: str) -> tuple[str, str]:
     return f'flower2api-{deployment}', f'vibebench-v3-{deployment}'
 
 
-def account_container_prefix(deployment: str, *, legacy: bool = False) -> str:
+def account_container_prefix(deployment: str, *, legacy: bool = False, node_key: str | None = None) -> str:
     """生成账号角色共用的容器前缀。
 
     :param deployment: 持久部署标识。
     :param legacy: 仅用于核对历史容器的名称占用。
+    :param node_key: 远程节点完整身份；默认节点沿用原命名。
     :return: 后续拼接原环境 ID 的固定前缀。
     """
     deployment_network_names(deployment)
     digest = hashlib.sha256(deployment.encode()).hexdigest()[:12]
+    if node_key is not None:
+        if legacy or not re.fullmatch('[a-f0-9]{32}', node_key):
+            raise ValueError('远程账号容器节点身份无效')
+        # 完整环境UUID及最长sender后缀保留在63字节内；完整节点身份仍由标签核验。
+        return f'f2a-{digest[:6]}-{node_key[:12]}-'
     # 新品牌较长；省略中间 account 段，使完整环境 ID 加 sender 后缀仍处于 63 字节内。
     return f'v3-{digest}-account-' if legacy else f'flower2api-{digest}-'

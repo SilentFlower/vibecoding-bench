@@ -13,6 +13,9 @@ from functools import lru_cache
 from pathlib import Path
 
 from database_schema import initialize_bench_schema
+from cluster_schema import initialize_cluster_schema
+from node_execution_schema import initialize_node_execution_schema
+from node_login_draft_schema import initialize_node_login_draft_schema
 from database_migration_contract import load_registry, registry_contract
 
 
@@ -42,6 +45,91 @@ def _baseline_structure() -> dict:
         connection.row_factory = sqlite3.Row
         initialize_bench_schema(connection)
         return _structure(connection)
+
+
+@lru_cache(maxsize=1)
+def _cluster_structure() -> tuple[dict, set[tuple]]:
+    with closing(sqlite3.connect(':memory:')) as connection:
+        connection.row_factory = sqlite3.Row
+        initialize_bench_schema(connection)
+        initialize_cluster_schema(connection)
+        tables = _structure(connection)
+        names = ('cluster_nodes', 'account_node_assignments', 'node_migrations')
+        objects = {tuple(row) for row in connection.execute("SELECT type,name,tbl_name FROM sqlite_master "
+            "WHERE (type IN ('index','trigger')) AND (name LIKE 'idx_node_migrations_%' "
+            "OR name LIKE 'idx_account_node_assignments_%' OR name LIKE 'cluster_%')")}
+        return {name: tables[name] for name in names}, objects
+
+
+def _validate_cluster_structure(connection: sqlite3.Connection) -> None:
+    expected, objects = _cluster_structure()
+    actual = _structure(connection)
+    for table, columns in expected.items():
+        for name, declaration in columns.items():
+            if actual.get(table, {}).get(name) != declaration:
+                raise ValueError('数据库结构不符合节点迁移：' + table + '.' + name)
+    observed = {tuple(row) for row in connection.execute("SELECT type,name,tbl_name FROM sqlite_master")}
+    if not objects <= observed:
+        raise ValueError('数据库结构不符合节点迁移：缺少归属触发器或索引')
+
+
+@lru_cache(maxsize=1)
+def _node_execution_structure() -> tuple[dict, set[tuple]]:
+    with closing(sqlite3.connect(':memory:')) as connection:
+        connection.row_factory = sqlite3.Row
+        initialize_bench_schema(connection)
+        initialize_cluster_schema(connection)
+        initialize_node_execution_schema(connection)
+        columns = _structure(connection)['node_executions']
+        objects = {tuple(row) for row in connection.execute("SELECT type,name,tbl_name FROM sqlite_master "
+            "WHERE type='index' AND tbl_name='node_executions'")}
+        return columns, objects
+
+
+def _validate_node_execution_structure(connection: sqlite3.Connection) -> None:
+    columns, objects = _node_execution_structure()
+    actual = _structure(connection).get('node_executions', {})
+    if any(actual.get(name) != declaration for name, declaration in columns.items()):
+        raise ValueError('数据库结构不符合远程执行会话迁移')
+    observed = {tuple(row) for row in connection.execute("SELECT type,name,tbl_name FROM sqlite_master")}
+    if not objects <= observed:
+        raise ValueError('数据库远程执行会话缺少活动或唯一来源索引')
+
+
+@lru_cache(maxsize=1)
+def _node_login_draft_structure() -> tuple[dict, set[tuple]]:
+    with closing(sqlite3.connect(':memory:')) as connection:
+        connection.row_factory = sqlite3.Row
+        initialize_bench_schema(connection)
+        initialize_cluster_schema(connection)
+        initialize_node_login_draft_schema(connection)
+        columns = _structure(connection)['node_login_drafts']
+        objects = {tuple(row) for row in connection.execute("SELECT type,name,tbl_name FROM sqlite_master "
+            "WHERE type='index' AND tbl_name='node_login_drafts'")}
+        return columns, objects
+
+
+def _validate_node_login_draft_structure(connection: sqlite3.Connection) -> None:
+    columns, objects = _node_login_draft_structure()
+    actual = _structure(connection).get('node_login_drafts', {})
+    if any(actual.get(name) != declaration for name, declaration in columns.items()):
+        raise ValueError('数据库结构不符合节点登录草稿迁移')
+    observed = {tuple(row) for row in connection.execute('SELECT type,name,tbl_name FROM sqlite_master')}
+    if not objects <= observed:
+        raise ValueError('数据库节点登录草稿缺少归属或恢复索引')
+    nullable = {row[1]: row[3] for row in connection.execute('PRAGMA table_info(node_login_drafts)')}
+    if (any(nullable.get(name) != 1 for name in columns if name != 'saved_account_id')
+            or nullable.get('saved_account_id') != 0):
+        raise ValueError('数据库节点登录草稿的NULL账号或必填定位约束异常')
+    references = {(row[3], row[2], row[4], row[5], row[6]) for row in connection.execute('PRAGMA foreign_key_list(node_login_drafts)')}
+    if not {('environment_id','account_environments','environment_id','NO ACTION','NO ACTION'),
+            ('node_id','cluster_nodes','id','NO ACTION','NO ACTION'),
+            ('saved_account_id','accounts','id','NO ACTION','NO ACTION')} <= references:
+        raise ValueError('数据库节点登录草稿缺少原环境、节点或账号外键')
+    unique = {tuple(column[2] for column in connection.execute('SELECT * FROM pragma_index_info(?)', (row[1],)))
+        for row in connection.execute('PRAGMA index_list(node_login_drafts)') if row[2] == 1}
+    if not {('environment_id',), ('operation_id',), ('sid',)} <= unique:
+        raise ValueError('数据库节点登录草稿的环境、操作或SID唯一约束异常')
 
 
 def validate_structure(connection: sqlite3.Connection, *, completed: bool) -> None:
@@ -108,6 +196,12 @@ def migration_plan(connection: sqlite3.Connection, target: int | None = None, *,
             raise ValueError('数据库迁移台账版本或摘要与当前程序不符')
     current = len(rows)
     validate_structure(connection, completed=current > 0)
+    if any(step['id'] == 'bench.cluster.2' and step['version'] <= current for step in steps):
+        _validate_cluster_structure(connection)
+    if any(step['id'] == 'bench.node-executions.3' and step['version'] <= current for step in steps):
+        _validate_node_execution_structure(connection)
+    if any(step['id'] == 'bench.node-login-drafts.4' and step['version'] <= current for step in steps):
+        _validate_node_login_draft_structure(connection)
     return {'database': 'bench', 'contract': registry_contract(registry), 'current_version': current, 'target_version': target,
         'steps': [{**step, 'state': 'completed' if step['version'] <= current else 'pending'} for step in steps[:target]],
         'state': 'compatible_newer' if current > target else 'ready', 'reason': None}
@@ -128,7 +222,13 @@ def apply_migrations(connection: sqlite3.Connection, operation_id: str | None = 
     if str(uuid.UUID(operation_id)) != operation_id:
         raise ValueError('数据库迁移操作身份无效')
     registry = registry or load_registry(Path(__file__).with_name('database-migration-registry.json'), 'bench')
-    runners = runners or {'bench.baseline.1': (initialize_bench_schema, schema_checksum)}
+    runners = runners or {'bench.baseline.1': (initialize_bench_schema, schema_checksum),
+        'bench.cluster.2': (initialize_cluster_schema,
+            lambda: schema_checksum(Path(__file__).with_name('cluster_schema.py'))),
+        'bench.node-executions.3': (initialize_node_execution_schema,
+            lambda: schema_checksum(Path(__file__).with_name('node_execution_schema.py'))),
+        'bench.node-login-drafts.4': (initialize_node_login_draft_schema,
+            lambda: schema_checksum(Path(__file__).with_name('node_login_draft_schema.py')))}
     plan = migration_plan(connection, target, registry=registry)
     for step in registry['steps'][:plan['target_version']]:
         runner = runners.get(step['id'])
@@ -155,6 +255,12 @@ def apply_migrations(connection: sqlite3.Connection, operation_id: str | None = 
             if step['id'] != 'bench.baseline.1':
                 runner[0](connection)
             validate_structure(connection, completed=True)
+            if step['id'] == 'bench.cluster.2':
+                _validate_cluster_structure(connection)
+            if step['id'] == 'bench.node-executions.3':
+                _validate_node_execution_structure(connection)
+            if step['id'] == 'bench.node-login-drafts.4':
+                _validate_node_login_draft_structure(connection)
             connection.execute('INSERT INTO system_schema_migrations VALUES(?,?,?,?,?)',
                 (step['id'], step['version'], step['checksum'], datetime.now(timezone.utc).isoformat(), operation_id))
     return migration_plan(connection, target, registry=registry)

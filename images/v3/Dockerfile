@@ -52,7 +52,7 @@ RUN python3 /source/criu/package.py --source /source/criu --out /opt/ccrb-criu \
     && chmod -R go-w /opt/ccrb-criu
 
 FROM python:3.12-slim-bookworm AS control
-RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates openssl \
+RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates openssl openssh-client \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=frontend /usr/local/bin/node /usr/local/bin/node
@@ -124,6 +124,7 @@ COPY images/account/cli-version.sh /usr/local/bin/v3-cli-version
 COPY images/account/passthrough.py /usr/local/bin/v3-passthrough
 COPY images/account/network-guard.py /usr/local/bin/v3-network-guard
 COPY images/account/cli-control.py /usr/local/bin/v3-cli-control
+COPY images/account/node-input.py /usr/local/bin/v3-node-input
 COPY images/worker/task_followups.py /usr/local/bin/task_followups.py
 COPY images/account/project_plan.py /usr/local/bin/v3-project-plan
 COPY images/account/projects_cli.py /usr/local/bin/v3-projects-cli
@@ -150,7 +151,7 @@ RUN echo '186b1e9a77738d11584e5fb9da293634a8a6ab68df146666ce81c16ab596de88  /usr
 RUN chmod 700 /usr/local/bin/v3-account-init /usr/local/bin/v3-network-context \
     /usr/local/bin/v3-cli-version /usr/local/bin/v3-passthrough /usr/local/bin/process_metrics.py \
     /usr/local/bin/v3-process-metrics /usr/local/bin/v3-network-guard /sidecar \
-    && chmod 755 /usr/local/bin/v3-cli-quota /usr/local/bin/v3-cli-control /usr/local/bin/process_metrics.py \
+    && chmod 755 /usr/local/bin/v3-cli-quota /usr/local/bin/v3-cli-control /usr/local/bin/v3-node-input /usr/local/bin/process_metrics.py \
     && mkdir -p /workspaces /run/v3 /etc/mitm /var/lib/dbus
 WORKDIR /home/node
 ARG V3_RELEASE

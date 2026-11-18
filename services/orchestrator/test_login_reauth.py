@@ -433,7 +433,7 @@ class LoginWebSocketTests(unittest.TestCase):
                 output.append(message)
 
             websocket = WebSocket({"type": "websocket", "path": "/api/accounts/login/ws/abcdef123456", "headers": []}, receive, send)
-            session = SimpleNamespace(worker_id="synthetic", home="/home/node", sidecar_id=None, phase="authorizing", created_at=time.time())
+            session = SimpleNamespace(worker_id="synthetic", home="/home/node", sidecar_id=None, phase="authorizing", created_at=time.time(), remote_operation=None)
             manager = Mock()
             manager.get.return_value = session
             manager.client.api.exec_create.return_value = {"Id": "synthetic-exec"}
@@ -474,7 +474,7 @@ class LoginWebSocketTests(unittest.TestCase):
                 output.append(message)
 
             websocket = WebSocket({"type": "websocket", "path": "/api/accounts/login/ws/abcdef123456", "headers": []}, receive, send)
-            session = SimpleNamespace(worker_id="synthetic", home="/home/node", sidecar_id=None, phase="authorizing", created_at=time.time())
+            session = SimpleNamespace(worker_id="synthetic", home="/home/node", sidecar_id=None, phase="authorizing", created_at=time.time(), remote_operation=None)
             manager = Mock()
             manager.get.return_value = session
             manager.client.api.exec_create.return_value = {"Id": "synthetic-exec"}

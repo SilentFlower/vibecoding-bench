@@ -531,9 +531,22 @@ class ProjectVerifier:
     :param image: 同批 account 镜像。
     """
 
-    def __init__(self, client, data: Path, host_data: Path, image: str) -> None:
-        """保存运行时依赖；参数契约见类说明。@return None。"""
+    def __init__(self, client, data: Path, host_data: Path, image: str, *, execution_labels: dict | None = None) -> None:
+        """保存运行时依赖及节点验收范围。
+
+        :param client: 原Docker客户端。
+        :param data: 原控制数据根。
+        :param host_data: 原宿主数据根。
+        :param image: 同批账号镜像。
+        :param execution_labels: 节点内部生成的精确执行标签。
+        :return: None。
+        """
+        labels = dict(execution_labels or {})
+        allowed = {'vibebench.node-key', 'vibebench.environment-id', 'vibebench.execution-id', 'vibebench.verification-id'}
+        if set(labels) - allowed or any(not isinstance(value, str) or not re.fullmatch('[a-f0-9]{32}', value) for value in labels.values()):
+            raise ValueError('节点验收执行标签无效')
         self.client, self.data, self.host_data, self.image = client, data, host_data, image
+        self.execution_labels = labels
         self._slots = threading.Semaphore(2)
         self._native_fence_lock = threading.RLock()
 
@@ -773,7 +786,8 @@ class ProjectVerifier:
                     environment={'HOME': '/tmp', 'PYTHONDONTWRITEBYTECODE': '1', 'PIP_CONFIG_FILE': '/dev/null'},
                     log_config=LogConfig(type='json-file', config={
                         'max-size': str(output_limit * 2 + 65536) if regression else '2m', 'max-file': '1'}),
-                    labels={'vibebench.project-verifier': 'native','vibebench.verifier-root':digest_json(str(self.host_data))})
+                    labels={'vibebench.project-verifier': 'native','vibebench.verifier-root':digest_json(str(self.host_data)),
+                        **self.execution_labels})
                 container.start()
                 deadline=time.monotonic()+60
                 while b'VIBEBENCH_NATIVE_READY_V1\n' not in container.logs(stdout=True,stderr=False):

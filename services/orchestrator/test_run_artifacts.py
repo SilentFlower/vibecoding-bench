@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 from fastapi import HTTPException
 import main
-from run_artifacts import PREVIEW_BYTES, read_workspace_file
+from run_artifacts import PREVIEW_BYTES, list_workspace_files, read_workspace_file
 
 
 class RunArtifactTests(unittest.TestCase):
@@ -35,6 +35,26 @@ class RunArtifactTests(unittest.TestCase):
                 with self.subTest(path=path),self.assertRaises(ValueError):read_workspace_file(root,'run',path)
             for path in ['link','linked-dir/outside','pipe']:
                 with self.subTest(path=path),self.assertRaises((ValueError,OSError)):read_workspace_file(root,'run',path)
+
+    def test_listing_hides_private_links_and_special_files_and_enforces_limits(self):
+        """实际目录遍历隔离私有根、链接、FIFO并明确报告条目超限。:return: None。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'src').mkdir()
+            (root / 'src/a.py').write_text('中文产物')
+            for name in ('.bench-control', '.claude-home'):
+                (root / name).mkdir()
+                (root / name / 'secret').write_text('私有')
+            (root / 'link').symlink_to(root / 'src', target_is_directory=True)
+            os.mkfifo(root / 'pipe')
+            self.assertEqual([{'path': 'src', 'type': 'dir'}, {'path': 'src/a.py', 'type': 'file', 'size': 12}],
+                list_workspace_files(root))
+            with patch('run_artifacts.MAX_WORKSPACE_ENTRIES', 1), self.assertRaisesRegex(ValueError, '条目'):
+                list_workspace_files(root)
+            os.link(root / 'src/a.py', root / 'hardlink')
+            self.assertEqual([{'path': 'src', 'type': 'dir'}], list_workspace_files(root))
+            with self.assertRaisesRegex(ValueError, '普通产物'):
+                read_workspace_file(root.parent, root.name, 'hardlink')
 
     def test_route_checks_visibility_and_uses_frozen_project_reader(self):
         """工程预览读取历史对象，隐藏运行在文件读取前被拒绝。@return 无。"""

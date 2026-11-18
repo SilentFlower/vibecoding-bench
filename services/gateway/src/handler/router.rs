@@ -1594,11 +1594,7 @@ async fn test_account(
             ));
         }
     };
-    match state
-        .token_tester
-        .test_token(&token, &account.proxy_url, &account.canonical_env)
-        .await
-    {
+    match state.token_tester.test_token(&token, &account).await {
         Ok(()) => Ok(Json(serde_json::json!({"status": "ok"}))),
         Err(e) => Ok(Json(
             serde_json::json!({"status": "error", "message": e.to_string()}),

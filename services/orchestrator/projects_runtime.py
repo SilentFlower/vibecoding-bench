@@ -13,6 +13,7 @@ from tempfile import TemporaryDirectory
 
 from account_isolation import ISOLATION_VERSION, role_container
 from account_runtime import AccountRuntime, atomic_json
+from capture_artifacts import capture_file_preview, capture_summary
 from pi_terminal import KEYS, PiTerminal
 from project_library import PROJECT_KEY, digest_json, materialize_snapshot, read_document, safe_relative, snapshot_tree
 from project_runtime_policy import ProjectRuntimeError, check_python_runtime
@@ -45,6 +46,44 @@ class ProjectsTerminal(PiTerminal):
         super().__init__(runtime, settings, quota_context, quota_release, credentials, driver,
             quota_observation=quota_observation, namespace=namespace, scenario_resources=True)
         self.catalog = catalog
+
+    def capture(self, work: dict, relative: str | None = None) -> dict:
+        """读取原工作所属账号的脱敏抓包，不准备或启动环境。
+
+        :param work: 中央已登记的工作。
+        :param relative: 原抓包白名单文件。
+        :return: 脱敏摘要或受限预览。
+        """
+        connection = self.runtime.database()
+        try:
+            account = connection.execute('SELECT * FROM accounts WHERE id=?', (work['account_id'],)).fetchone()
+            environment = connection.execute('SELECT * FROM account_environments WHERE account_id=?', (work['account_id'],)).fetchone()
+        finally:
+            connection.close()
+        if account is None or environment is None:
+            if relative is not None:
+                raise ValueError('抓包文件不存在')
+            return {**capture_summary(self.runtime.data / 'flows/_missing' / work['id']), 'work_id': work['id'],
+                'namespace': self.namespace, 'claude_code_version': json.loads(work['settings_json']).get('claude_code_version')}
+        if safe_relative(account['name']) != Path(account['name']).name:
+            raise ValueError('账号目录不合法')
+        root = self.runtime._root(dict(environment))
+        group_key = self.namespace + '/' + work['id']
+        base = root / 'flows' / ('group-' + hashlib.sha256(group_key.encode()).hexdigest()[:20])
+        if base.is_symlink() or root.is_symlink() or (root / 'flows').is_symlink():
+            raise ValueError('抓包目录归属异常')
+        if relative is not None:
+            return capture_file_preview(base, relative)
+        return {**capture_summary(base, running=work['status'] == 'running'), 'work_id': work['id'],
+            'namespace': self.namespace, 'mode': 'full_http', **json.loads(work['settings_json'])}
+
+    def recover_work(self, work: dict) -> None:
+        """本机启动时已由原AccountRuntime完成进程对账。
+
+        :param work: 原持久工作。
+        :return: None。
+        """
+        return None
 
     def prepare_startup_recovery(self, account: dict, work: dict) -> None:
         """明确人工恢复时只准备环境，原会话及输入现场留给独立证明核验。
@@ -209,7 +248,8 @@ class ProjectsTerminal(PiTerminal):
                 raise ValueError('未登记的项目工作区需要先核对，不能覆盖')
         if len(existing) > 1:
             raise ValueError('同一工程有多份工作区注册，请先核对')
-        if not existing and (work.get('baseline_json') or work.get('resume_required')):
+        has_baseline = bool(work.get('baseline_json')) or work.get('baseline_registered') is True
+        if not existing and (has_baseline or work.get('resume_required')):
             raise ValueError('原工程工作区证明缺失，不能用新目录重建原源码')
         # 旧目录承载原 Claude 会话与输入凭据，接续时不能因升级静默换名。
         alias, identity = existing[0] if existing else candidates[-1]
@@ -243,7 +283,7 @@ class ProjectsTerminal(PiTerminal):
             if {key: value for key, value in saved.items() if key != 'legacy_existing_work'} != receipt:
                 raise ValueError('原工程目标输入凭据不符')
             return workspace
-        if work.get('baseline_json'):
+        if has_baseline:
             # 已开始的旧工作沿用原冻结基线；恢复时补文件会把控制端输入误记为候选改动。
             atomic_json(input_marker, {**receipt, 'legacy_existing_work': True})
             return workspace

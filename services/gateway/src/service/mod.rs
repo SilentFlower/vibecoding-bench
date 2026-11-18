@@ -27,6 +27,7 @@ pub mod prime_poller;
 pub(crate) mod request_body_codec;
 pub(crate) mod response_body_codec;
 pub mod rewriter;
+pub(crate) mod runtime_background;
 pub mod runtime_bridge;
 pub mod runtime_lease;
 pub mod runtime_transport;

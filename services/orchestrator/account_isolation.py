@@ -51,6 +51,8 @@ def role_container(runtime, row: dict, role: str, allow_old_release: bool = Fals
     if not identifier:
         raise ValueError('账号隔离角色尚未登记，需要先对账')
     container = runtime.client.containers.get(identifier)
+    if container.labels.get('vibebench.cluster-node') != getattr(runtime, 'node_key', None):
+        raise ValueError('账号角色属于其他执行节点')
     expected = {**runtime._labels(row), 'vibebench.role': ROLE_LABELS[role],
         'vibebench.isolation-version': str(ISOLATION_VERSION)}
     if not allow_old_release:
@@ -110,7 +112,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
             managers.append(str(ipaddress.IPv4Address(configuration['Gateway'])))
     for container in runtime.client.containers.list(filters={'label': [
             'vibebench.product=v3', f'vibebench.deployment={runtime.deployment}']}):
-        if container.labels.get('vibebench.role') not in ('orchestrator', 'gateway'):
+        if container.labels.get('vibebench.role') not in ('orchestrator', 'gateway', 'node-control'):
             continue
         manager = container.attrs.get('NetworkSettings', {}).get('Networks', {}).get(runtime.network, {}).get('IPAddress')
         if manager:

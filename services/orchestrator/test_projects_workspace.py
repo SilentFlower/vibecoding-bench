@@ -96,6 +96,21 @@ class ProjectsWorkspaceTests(unittest.TestCase):
         self.assertFalse((workspace / 'materials/LEGACY/contract.md').exists())
         self.assertEqual('VALUE = 3\n', (workspace / 'library/example.py').read_text())
 
+    def test_node_baseline_boolean_preserves_registered_workspace_without_full_json(self):
+        """节点只持有基线已登记事实，旧工程源码与材料仍沿原保护。:return: None。"""
+        workspace = self.prepare('FIRST', {})
+        (workspace / 'library/example.py').write_text('VALUE = 4\n')
+        material = self.project_root / 'materials/NODE/contract.md'
+        material.parent.mkdir(parents=True)
+        material.write_text('已冻结的旧目标输入')
+        work = {'project_key': 'example', 'objective_id': 'NODE', 'library_digest': 'a' * 64,
+            'baseline_registered': True}
+        actual = self.terminal._prepare_workspace(self.account_root, self.row, self.account, work,
+            self.project, {'materials': ['materials/NODE/contract.md']})
+        self.assertEqual(workspace, actual)
+        self.assertEqual('VALUE = 4\n', (workspace / 'library/example.py').read_text())
+        self.assertFalse((workspace / 'materials/NODE/contract.md').exists())
+
     def test_directory_link_cannot_receive_next_objective_inputs(self):
         """使用目录 fd 拒绝材料父目录链接，外部目录保持未写入。:return: None。"""
         workspace = self.prepare('FIRST', {})

@@ -172,9 +172,15 @@ def runtime_snapshot(runtime) -> dict:
         connection.close()
     blockers = ['管理端仍有在途活动'] if gate['active'] else []
     environments = []
+    locality = getattr(runtime, 'locality', None)
     for row in rows:
         reasons = []
         item = {key: row.get(key) for key in ('environment_id', 'generation', 'state', 'name', 'account_id')}
+        if locality is not None and not locality(row):
+            item.update(roles={}, origin=None, node_kind='ssh', blockers=['远程环境请按集群停机升级操作单维护'])
+            environments.append(item)
+            blockers.append(row['name'] + ': 远程环境请按集群停机升级操作单维护')
+            continue
         try:
             with ExitStack() as locks:
                 guard = runtime.environment_lock(row['environment_id'])
@@ -249,6 +255,11 @@ def environment_sources(runtime) -> list[dict]:
     for row in rows:
         item = {'environment_id': row['environment_id'], 'name': row['name'], 'release': None,
             'running': False, 'verified': True}
+        locality = getattr(runtime, 'locality', None)
+        if locality is not None and not locality(row):
+            item.update(verified=False, node_kind='ssh', maintenance='集群停机升级')
+            result.append(item)
+            continue
         guard = runtime.environment_lock(row['environment_id'])
         if not guard.acquire(blocking=False):
             item['verified'] = False

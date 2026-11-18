@@ -16,6 +16,7 @@ from typing import Callable
 
 from project_library import (ProjectLibrary, canonical_json, digest_json, materialize_snapshot,
     read_document, safe_relative, snapshot_tree, write_document)
+from project_workspace import publish_project_workspace
 from project_plans import PLAN_DEFAULTS, ProjectPlans, initialize_plan_schema, normalized_policy
 from project_scenarios import ProjectScenarios, SCENARIO_DEFAULTS, normalized_scenario_policy
 from project_dialogue import ProjectDialogueClient
@@ -58,6 +59,7 @@ class ProjectIterationManager:
         self.submit, self.settings, self.identity, self.stop_run = submit, settings, identity, stop_run
         self.verifier, self.is_executing = verifier, is_executing
         self.admission = admission
+        self.execution_io = None
         self.review_admission = None
         self.review_refresh = None
         self.dialogue = dialogue
@@ -338,40 +340,12 @@ class ProjectIterationManager:
         target = environment_root/'projects'/alias
         relative = str(target.relative_to(self.data))
         marker = self.data/'project-artifacts/instances'/str(context['id'])/'materialized.json'
-        if context['workspace_relative']:
-            if context['workspace_relative']!=relative or not target.is_dir() or target.is_symlink():
-                raise ValueError('已开始项目的工作目录缺失或被替换')
-            return alias,target
-        if marker.exists():
-            previous = read_document(marker)
-            if previous!={'instance_id':context['id'],'seed_digest':context['seed_digest'],'workspace_relative':relative}:
-                raise ValueError('项目发布标记不一致')
-            if not target.is_dir() or target.is_symlink():
-                raise ValueError('项目发布后目录缺失')
-        elif target.exists() or target.is_symlink():
-            raise ValueError('项目目录已存在但没有可核对的发布标记')
-        else:
-            library = self._release(context['catalog_release_id'])
-            project = library.projects[context['project_key']]
-            baseline = snapshot_tree(project.root/'seed',self.objects)
-            write_document(self.manifests/(baseline['digest']+'.json'),baseline)
-            staging = self.data/'project-staging'/uuid.uuid4().hex
-            materialize_snapshot(baseline,self.objects,staging)
-            try:
-                for path in [staging,*staging.rglob('*')]:
-                    os.chown(path,1000,1000,follow_symlinks=False)
-                    path.chmod(0o755 if path.is_dir() else 0o644)
-                target.parent.mkdir(parents=True,exist_ok=True)
-                os.chown(target.parent,1000,1000,follow_symlinks=False)
-                # 先持久化归属，发布中断时恢复也不能凭未知目录覆盖数据。
-                write_document(marker,{'instance_id':context['id'],'seed_digest':context['seed_digest'],'workspace_relative':relative})
-                if not self.can_start(run_id):
-                    marker.unlink(missing_ok=True)
-                    raise ValueError('项目发布前批次已暂停或停止')
-                os.rename(staging,target)
-            finally:
-                if staging.exists():
-                    shutil.rmtree(staging)
+        if context['workspace_relative'] and context['workspace_relative']!=relative:
+            raise ValueError('已开始项目的工作目录归属不符')
+        publish_project_workspace(self.data,target,marker,context['id'],context['seed_digest'],
+            lambda:self._release(context['catalog_release_id']).projects[context['project_key']].root/'seed',
+            bool(context['workspace_relative']),
+            lambda:self.can_start(run_id))
         now = time.time()
         with self.write_lock:
             connection = self.database()
@@ -463,6 +437,10 @@ class ProjectIterationManager:
         :param directory: 原生主会话目录。
         :return: None。
         """
+        if self.execution_io is not None:
+            remote = self.execution_io.native_directory(run_id)
+            if remote is not None:
+                return
         write_document(self.data/'project-artifacts/runs'/run_id/'native-end.json',
             {p.name:p.stat().st_size for p in directory.glob('*.jsonl') if p.is_file() and not p.is_symlink()})
 
@@ -473,6 +451,10 @@ class ProjectIterationManager:
         :param directory: 原生主会话目录。
         :return: 本轮会话 ID 或 None。
         """
+        if self.execution_io is not None:
+            remote = self.execution_io.native_directory(run_id)
+            if remote is not None:
+                directory = remote
         context = self.plans.context(run_id)
         if context:
             path = directory/(context['session_id']+'.jsonl')
@@ -494,6 +476,10 @@ class ProjectIterationManager:
         :param boundaries: 单步骤自己的字节起止；省略时统计整个 Run。
         :return: 用量与可用性；证据缺失时不会回退为整个项目的历史。
         """
+        if self.execution_io is not None:
+            remote = self.execution_io.native_directory(run_id)
+            if remote is not None:
+                directory = remote
         if boundaries is None and self.scenarios.context(run_id):
             usage = self.scenarios.run_usage(run_id)
             known = [usage[key] for key in ('input_tokens','cache_read_input_tokens','cache_creation_input_tokens') if usage[key] is not None]
@@ -517,10 +503,13 @@ class ProjectIterationManager:
                     return empty
                 offset = start.get(name,0)
                 path = directory/name
-                if type(offset) is not int or offset<0 or limit<offset or path.is_symlink() or path.stat().st_size<limit:
+                if type(offset) is not int or offset<0 or limit<offset:
                     return empty
+                # 未新增字节的旧文件只提供边界事实，本轮用量无须读取其正文。
                 if limit==offset:
                     continue
+                if path.is_symlink() or path.stat().st_size<limit:
+                    return empty
                 with path.open('rb') as stream:
                     stream.seek(offset)
                     while stream.tell()<limit:
@@ -825,7 +814,9 @@ class ProjectIterationManager:
         if not instance['workspace_relative']:
             raise ValueError('项目没有已发布的工作目录')
         workspace = self.data/safe_relative(instance['workspace_relative'])
-        snapshot = snapshot_tree(workspace,self.objects)
+        snapshot = self.execution_io.capture(instance) if self.execution_io is not None else None
+        if snapshot is None:
+            snapshot = snapshot_tree(workspace,self.objects)
         write_document(self.manifests/(snapshot['digest']+'.json'),snapshot)
         candidate = self.data/'project-verification'/snapshot['digest']
         if candidate.exists():

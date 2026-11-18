@@ -8,7 +8,7 @@ import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from docker.errors import APIError
 
@@ -47,6 +47,7 @@ class PrivateReviewTests(unittest.TestCase):
         environment.start()
         self.addCleanup(environment.stop)
         client=Mock()
+        client.images.get.return_value.attrs={'Config':{'Labels':{}}}
         client.containers.list.return_value=[]
         fingerprint=Mock(return_value={'profile_version':2,'hostname':'fixed','machine_id':'a'*32,
             'mac':'02:00:00:00:00:01','tz':'UTC','lang':'en_US.UTF-8'})
@@ -62,6 +63,39 @@ class PrivateReviewTests(unittest.TestCase):
         write_document(self.root/'profiles/synthetic/.credentials.json',self.credentials)
         write_document(self.root/'project-review-private/test/access/.credentials.json',self.credentials)
         self.path=self.root/'project-review-owner-refresh/1.json'
+
+    def test_owner_refresh_exit_observes_only_original_worker_and_requires_exact_exit(self) -> None:
+        """原401停止前等待实际exec结束，缺失退出事实继续拒绝交接。:return: None。"""
+        job={**self.job,'execution_role':'project-review','exec':'original-review-exec'}
+        api=self.runtime.client.api
+        api.exec_inspect.side_effect=[{'Running':True},{'Running':False,'ExitCode':42}]
+        with patch.object(self.runtime,'_owns_job',return_value=True),patch('project_review_runtime.time.sleep'):
+            self.review.wait_owner_refresh_exit(job)
+        self.assertEqual([call('original-review-exec'),call('original-review-exec')],api.exec_inspect.call_args_list)
+        api.exec_inspect.side_effect=None
+        api.exec_inspect.return_value={'Running':False,'ExitCode':None}
+        with patch.object(self.runtime,'_owns_job',return_value=True),self.assertRaisesRegex(ValueError,'退出回执'):
+            self.review.wait_owner_refresh_exit(job)
+        api.exec_inspect.return_value={'Running':True}
+        with patch.object(self.runtime,'_owns_job',return_value=True),patch('project_review_runtime.time.monotonic',side_effect=[0,9]),self.assertRaisesRegex(RuntimeBusy,'退出边界'):
+            self.review.wait_owner_refresh_exit(job)
+
+    def test_node_refresh_pending_uses_current_home_and_explicit_identity_after_restart(self) -> None:
+        """Node原HOME仍为被拒AT时保留待办，中央明确身份可用于只读恢复检查。@return None。"""
+        self.review.defer_owner_refresh(self.job)
+        home=self.runtime._root(self.row)/'home/.claude/.credentials.json'
+        write_document(home,self.credentials)
+        newer={'claudeAiOauth':{**self.credentials['claudeAiOauth'],'accessToken':'synthetic-new-owner-at'}}
+        write_document(self.root/'profiles/synthetic/.credentials.json',newer)
+        with patch.object(self.runtime,'node_key','b'*32),patch.object(self.runtime,'quota_identity',Mock(
+                side_effect=AssertionError('只读检查必须使用中央明确身份'))):
+            state=self.review.owner_refresh_state(self.account,identity='identity-None')
+            self.assertEqual('waiting',state['status'])
+            self.assertFalse(self.review.admission(self.account,identity='identity-None')['allowed'])
+            home.unlink()
+            self.assertIsNotNone(self.review.owner_refresh_state(self.account,identity='identity-None'))
+            write_document(home,newer)
+            self.assertIsNone(self.review.owner_refresh_state(self.account,identity='identity-None'))
 
     def _serial_fixture(self, legacy: bool = False, memory: str = '1536m') -> SimpleNamespace:
         """创建带状态变化的容器替身，核真实持久交接和恢复。@param legacy 旧布局。@return 夹具。"""

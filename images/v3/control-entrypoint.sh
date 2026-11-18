@@ -4,5 +4,6 @@ set -euo pipefail
 case "${V3_ROLE:?需要 V3_ROLE}" in
   gateway) exec /app/claude-code-gateway ;;
   orchestrator) exec uvicorn main:app --host 0.0.0.0 --port 8000 ;;
+  node-control) exec python3 /app/cluster_agent.py ;;
   *) exit 2 ;;
 esac

@@ -36,10 +36,13 @@ SOURCE_FILES = ('deploy/v3/manage.py', 'deploy/v3/system_release.py', 'deploy/v3
 
 SOURCE_FILES += ('deploy/v3/system_update_database.py', 'deploy/v3/upgrade_system_updater.py',
     'orchestrator/database_migrations.py', 'orchestrator/database_migration_contract.py',
-    'orchestrator/database_schema.py', 'orchestrator/database-migration-registry.json', 'orchestrator/projects_store.py')
+    'orchestrator/database_schema.py', 'orchestrator/cluster_schema.py', 'orchestrator/node_execution_schema.py',
+    'orchestrator/node_login_draft_schema.py',
+    'orchestrator/database-migration-registry.json', 'orchestrator/projects_store.py')
 SOURCE_FILES += ('orchestrator/system_update_connection.py',)
 SOURCE_FILES += ('deploy/v3/platform_version.py', 'deploy/v3/release_ci.py', 'deploy/v3/source_layout.py')
 SOURCE_FILES += ('orchestrator/runtime_names.py',)
+SOURCE_FILES += ('orchestrator/cluster_backup_index.py',)
 SOURCE_FILES += ('orchestrator/cli_telemetry_policy.py',)
 
 

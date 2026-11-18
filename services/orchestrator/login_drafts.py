@@ -9,6 +9,8 @@ from urllib.parse import unquote, urlsplit
 
 from docker.errors import NotFound
 from account_runtime import atomic_json
+from cluster_draft_login_store import NodeLoginDrafts
+from cluster_store import ClusterStore
 
 
 class LoginDraftStore:
@@ -52,7 +54,12 @@ class LoginDraftStore:
             if not isinstance(value.get("generation"), str) or not value["generation"] or value.get("phase") not in (
                 "preparing", "authorizing", "ready_to_submit", "committed", "cancelled", "ended", "interrupted", "reconcile", "deleting", "submitting"):
                 raise ValueError("草稿记录结构无效")
-            self.profile(row, value)
+            if value.get('node_id') is not None:
+                if type(value['node_id']) is not int or value['node_id']<=0:
+                    raise ValueError('草稿所属节点无效')
+                self._home(value)
+            else:
+                self.profile(row, value)
             return value
         return {"environment_id": row["environment_id"], "name": row["name"],
             "generation": "legacy-" + str(row["generation"]), "phase": "interrupted"}
@@ -78,6 +85,10 @@ class LoginDraftStore:
         try:
             rows = {row["environment_id"]: dict(row) for row in connection.execute(
                 "SELECT * FROM account_environments WHERE account_id IS NULL")}
+            if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='node_login_drafts'").fetchone():
+                for row in connection.execute("SELECT e.* FROM account_environments e JOIN node_login_drafts d "
+                        "ON d.environment_id=e.environment_id WHERE d.phase<>'closed' AND d.saved_account_id IS NOT NULL"):
+                    rows[row['environment_id']]=dict(row)
         finally:
             connection.close()
         if self.directory.is_symlink():
@@ -130,6 +141,8 @@ class LoginDraftStore:
         :return: 通过校验的元数据；冲突时抛 ValueError
         """
         record = self.record(row)
+        if record.get('node_id') is not None:
+            raise ValueError('节点草稿请通过原节点协调器处理')
         pending = allow_submitting and record["phase"] == "submitting" and re.fullmatch(r"[a-f0-9]{12}", record.get("sid", ""))
         if (row["account_id"] is not None and not pending) or not re.fullmatch(r"[A-Za-z0-9_-]+", row["name"]):
             raise ValueError("已保存账号不能作为登录草稿处理")
@@ -155,6 +168,95 @@ class LoginDraftStore:
             or (not allow_reconcile and row["state"] in ("reconcile", "cli_reconcile"))):
             raise ValueError("环境仍需对账，不能删除或重新登录")
         return record
+
+    def unregistered(self, row: dict) -> bool:
+        """核对首次登记失败且明确尚未进入节点准备的中央草稿。
+
+        :param row: 原环境或最终清理遗留标记对应的行。
+        :return: 仅明确无节点准备意图、无草稿账本和资源引用时为True。
+        """
+        record = self.record(row)
+        if (record.get('node_id') is None or record.get('node_prepare_intent') is not False
+            or record['phase'] not in ('preparing', 'interrupted', 'deleting')
+            or not re.fullmatch(r'[a-f0-9]{32}', record['generation'])
+            or not re.fullmatch(r'[a-f0-9]{32}', str(record.get('node_key', '')))
+            or not re.fullmatch(r'[a-f0-9]{12}', str(record.get('sid', '')))
+            or record.get('home') != '/home/node/.v3-login/' + record['sid']
+            or not re.fullmatch(r'[A-Za-z0-9_-]+', row['name'])):
+            return False
+        connection = self.database()
+        try:
+            if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='node_login_drafts'").fetchone():
+                if connection.execute('SELECT 1 FROM node_login_drafts WHERE environment_id=?',
+                        (row['environment_id'],)).fetchone():
+                    return False
+            current = connection.execute('SELECT * FROM account_environments WHERE environment_id=?',
+                (row['environment_id'],)).fetchone()
+            if current is None:
+                # 删除数据库行发生在专属目录清理之后；遗留尾段只能清原标记。
+                return record['phase'] == 'deleting'
+            if (current['name'] != row['name'] or current['account_id'] is not None or current['generation'] != 0
+                or any(current[key] for key in ('container_id', 'network_container_id', 'sender_container_id'))):
+                return False
+            if connection.execute('SELECT 1 FROM account_environments WHERE name=? AND environment_id<>?',
+                    (row['name'], row['environment_id'])).fetchone():
+                return False
+            if connection.execute('SELECT 1 FROM accounts WHERE name=? OR profile_path=?',
+                    (row['name'], 'profiles/' + row['name'])).fetchone():
+                return False
+            prefix = str(self.runtime.data / 'flows' / row['name']) + '/'
+            return connection.execute('SELECT 1 FROM runs WHERE environment_id=? OR substr(flows_dir,1,?)=? LIMIT 1',
+                (row['environment_id'], len(prefix), prefix)).fetchone() is None
+        finally:
+            connection.close()
+
+    def delete_unregistered(self, row: dict, generation: str) -> None:
+        """在原owner/profile锁内清理明确未进入节点准备的首次登记残留。
+
+        :param row: 原中央环境行或清理遗留标记。
+        :param generation: 页面冻结的逻辑代次。
+        :return: None；部分失败继续保留原deleting标记。
+        """
+        with self.runtime.environment_lock(row['environment_id']):
+            record = self.record(row)
+            if record['generation'] != generation or not self.unregistered(row):
+                raise ValueError('原草稿登记和准备意图需要核对')
+            connection = self.database()
+            try:
+                current = connection.execute('SELECT 1 FROM account_environments WHERE environment_id=?',
+                    (row['environment_id'],)).fetchone()
+            finally:
+                connection.close()
+            if current is None:
+                self._path(row['environment_id']).unlink(missing_ok=True)
+                return
+            root = self.runtime.data / 'environments' / row['environment_id']
+            profile = self.runtime.data / 'profiles' / row['name']
+            private = self.runtime.data / 'node-draft-logins' / row['environment_id']
+            for path, parent in ((root, self.runtime.data / 'environments'),
+                    (profile, self.runtime.data / 'profiles'), (private, self.runtime.data / 'node-draft-logins')):
+                self._safe_tree(path, parent)
+            runtime = root / 'runtime'
+            if (self.runtime.environment_jobs(row['environment_id'])
+                or any((runtime / name).exists() for name in ('execution.json', 'login-commit.json',
+                    'credential-handoff.json', 'node-fence.json', 'node-assignment.json'))
+                or any((runtime / 'executions').glob('*.json'))):
+                raise ValueError('原中央环境仍有执行或归属记录')
+            self.save(row, phase='deleting', deleting_at=time.time())
+            for path in (root, profile, private):
+                if path.exists():
+                    shutil.rmtree(path)
+            with self.db_lock:
+                connection = self.database()
+                try:
+                    with connection:
+                        if not self.unregistered(row):
+                            raise ValueError('原草稿登记归属已经变化')
+                        connection.execute('DELETE FROM account_environments WHERE environment_id=? AND name=? '
+                            'AND account_id IS NULL AND generation=0', (row['environment_id'], row['name']))
+                finally:
+                    connection.close()
+            self._path(row['environment_id']).unlink(missing_ok=True)
 
     def recovery_record(self, row: dict, generation: str | None = None) -> dict:
         """只允许原归属明确、无活动工作的草稿恢复检查。
@@ -209,6 +311,14 @@ class LoginDraftStore:
         :param row: 已验证的未关联环境
         :return: 仅供恢复 CLI 的账号配置
         """
+        marker=self.record(row)
+        if marker.get('node_id') is not None:
+            ledger=NodeLoginDrafts(ClusterStore(self.database,self.db_lock),self.runtime.release_id,self.runtime.data)
+            operation=ledger.find(row['environment_id'])
+            if (operation is None or operation['node_id']!=marker['node_id'] or operation['generation']!=marker['generation']
+                    or operation['sid']!=marker.get('sid')):
+                raise ValueError('原节点草稿配置尚需核对')
+            return ledger.preparation(operation).settings.model_dump()
         path = self.runtime._sender_config(row)
         if not path.exists():
             raise ValueError("登录准备未完成，请删除草稿后重新配置")
@@ -227,6 +337,13 @@ class LoginDraftStore:
             "upstream_socks5_port": parsed.port or (80 if parsed.scheme == "http" else 1080),
             "upstream_socks5_user": unquote(parsed.username or ""), "upstream_socks5_pass": unquote(parsed.password or "")}
 
+    @staticmethod
+    def _home(record: dict) -> str:
+        home=record.get('home','/home/node')
+        if not isinstance(home,str) or (home!='/home/node' and not re.fullmatch(r'/home/node/\.v3-login/[a-f0-9]{12}',home)):
+            raise ValueError('登录HOME归属无效')
+        return home
+
     def profile(self, row: dict, record: dict) -> tuple[Path, str]:
         """恢复登录 HOME，禁止记录引入任意目录。
 
@@ -234,9 +351,9 @@ class LoginDraftStore:
         :param record: 私有登录元数据
         :return: 本地 profile 和容器内 HOME
         """
-        home = record.get("home", "/home/node")
-        if not isinstance(home, str) or (home != "/home/node" and not re.fullmatch(r"/home/node/\.v3-login/[a-f0-9]{12}", home)):
-            raise ValueError("登录 HOME 归属无效")
+        if record.get('node_id') is not None:
+            raise ValueError('节点草稿HOME请通过原节点读取')
+        home = self._home(record)
         relative = home.removeprefix("/home/node").lstrip("/")
         return self.runtime._root(row) / "home" / relative / ".claude", home
 

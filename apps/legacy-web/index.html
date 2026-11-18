@@ -432,6 +432,10 @@
           <span class="hint inline">本地账号标签（独一无二即可）</span>
           <input name="name" required="" pattern="[A-Za-z0-9_\-]+" placeholder="main">
         </label>
+        <label id="acc-node-field"><span class="lbl">执行节点</span>
+          <select name="node_id" aria-describedby="acc-node-note"><option value="">默认本机</option></select>
+          <span id="acc-node-note" class="hint inline" role="status">新账号的登录与后续任务均在所选节点执行。</span>
+        </label>
         <label><span class="lbl">环境时区</span>
           <span class="hint inline">auto = flower2api 新环境默认洛杉矶时区＋美国英语 UTF-8；已有环境沿用保存值</span>
           <select name="timezone">
@@ -614,7 +618,7 @@
   <div id="runtime-toast" class="runtime-toast hidden" role="status" aria-live="polite"><span id="runtime-toast-message"></span><button type="button" id="runtime-toast-close" aria-label="关闭消息">×</button></div>
   <script src="ui-controls.js?v=20261116-workspace-experience"></script>
   <script src="projects.js?v=20261116-workspace-experience"></script>
-  <script src="environments.js?v=20261117-platform-kernel-identity"></script>
-  <script src="app.js?v=20261117-platform-native"></script>
+  <script src="environments.js?v=20261118-platform-kernel-node-drafts"></script>
+  <script src="app.js?v=20261118-node-login-drafts"></script>
 </body>
 </html>

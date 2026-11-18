@@ -4,7 +4,6 @@ from __future__ import annotations
 from database_schema import PLAN_SCHEMA, initialize_plan_schema
 
 import json
-import hashlib
 import os
 import random
 import re
@@ -15,7 +14,7 @@ from pathlib import Path
 from stat import S_IMODE, S_ISREG
 from typing import TYPE_CHECKING, Callable
 
-from project_library import canonical_json, digest_json, read_document, safe_relative, write_document
+from project_library import canonical_json, digest_json, read_checkpoint, read_document, safe_relative, write_document
 
 if TYPE_CHECKING:
     from project_iteration import ProjectIterationManager
@@ -172,34 +171,9 @@ class ProjectPlans:
             os.close(descriptor)
 
     def _checkpoint(self, context: dict) -> None:
-        checksum = context['checkpoint_digest']
-        if not re.fullmatch(r'[a-f0-9]{64}',checksum):
-            raise ValueError('原计划检查点摘要无效')
-        path = self.owner.manifests/(checksum+'.json')
-        self._relative(path)
-        manifest = read_document(path)
-        if (not isinstance(manifest,dict) or manifest.get('schema')!=1 or manifest.get('digest')!=checksum
-                or not isinstance(manifest.get('files'),dict) or digest_json(manifest['files'])!=checksum):
-            raise ValueError('原计划检查点清单缺失或损坏')
-        for name,item in manifest['files'].items():
-            safe_relative(name)
-            if (not isinstance(item,dict) or not isinstance(item.get('digest'),str)
-                    or not re.fullmatch(r'[a-f0-9]{64}',item['digest'])
-                    or type(item.get('size')) is not int or not 0<=item['size']<=128*1024*1024):
-                raise ValueError('原计划检查点对象清单无效')
-            source = self.owner.objects/item['digest'][:2]/item['digest']
-            self._relative(source)
-            descriptor = os.open(source,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
-            try:
-                metadata = os.fstat(descriptor)
-                if not S_ISREG(metadata.st_mode) or metadata.st_size!=item['size']:
-                    raise ValueError('原计划检查点对象类型或大小无效')
-                with os.fdopen(descriptor,'rb',closefd=False) as stream:
-                    content = stream.read(item['size']+1)
-                if hashlib.sha256(content).hexdigest()!=item['digest']:
-                    raise ValueError('原计划检查点对象已损坏')
-            finally:
-                os.close(descriptor)
+        self._relative(self.owner.manifests)
+        self._relative(self.owner.objects)
+        read_checkpoint(self.owner.objects,self.owner.manifests,context['checkpoint_digest'])
 
     def execution_configuration(self, run_id: str, source: str, quota_attempt: int,
                                 native_directory: Path, request_path: Path, decision_path: Path, cwd: str) -> dict | None:
@@ -447,10 +421,14 @@ class ProjectPlans:
             if (metadata.st_uid==0 and metadata.st_gid==1000 and S_IMODE(metadata.st_mode)==0o640
                     and current==document):
                 # 调度会重放已持久化决定，内容未变时不制造新的读取替换窗口。
+                if self.owner.execution_io is not None:
+                    self.owner.execution_io.publish_decision(execution,document)
                 return
         except FileNotFoundError:
             pass
         write_document(path,document,mode=0o640,owner=(0,1000))
+        if self.owner.execution_io is not None:
+            self.owner.execution_io.publish_decision(execution,document)
 
     def _evidence(self, execution: dict, attempt: dict, plan: dict, request: dict) -> dict:
         expected = {'schema':1,'plan_id':plan['id'],'run_id':execution['run_id'],
@@ -515,6 +493,10 @@ class ProjectPlans:
             if not proof.get('frozen') or proof.get('source')!=execution['source']:
                 raise ValueError('当前执行完整暂停的证明无效')
             frozen = True
+            if self.owner.execution_io is not None:
+                # 通知与原生输出可能在初次镜像间发布，冻结后重取同一阶段避免跨时点证据。
+                self.owner.execution_io.sync_plan(execution['run_id'])
+                request = self._request(path)
             boundaries = self._evidence(execution,attempt,plan,request)
             snapshot,candidate = self.owner._capture(instance)
             manifest = json.loads(instance['manifest_json'])
@@ -699,6 +681,10 @@ class ProjectPlans:
 
     def _inspect(self, batch: dict, account: dict | None, execution: dict) -> None:
         status = execution['run_status']
+        if self.owner.execution_io is not None and execution.get('source'):
+            if status=='running' and not self.owner.execution_io.plan_running(execution):
+                return
+            self.owner.execution_io.sync_plan(execution['run_id'])
         if status in RUN_TERMINAL:
             self._settle(batch,execution)
             return

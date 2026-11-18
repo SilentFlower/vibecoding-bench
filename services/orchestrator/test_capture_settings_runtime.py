@@ -17,6 +17,7 @@ from pi_terminal import PiTerminal
 from projects import ProjectsService
 from projects_api import projects_router
 from projects_store import ProjectsDatabase
+from projects_runtime import ProjectsTerminal
 from project_runtime_policy import ProjectRuntimeError
 from runtime_diagnostics import NETWORK_FAILURE_PREFIX, NetworkContextError, runtime_failure
 from test_tls_capture_artifacts import clienthello_record
@@ -371,7 +372,7 @@ class CaptureSettingsRuntimeTests(unittest.TestCase):
             service = object.__new__(ProjectsService)
             service.database = ProjectsDatabase(self.fixture.database, namespace)
             service.data, service.namespace = self.fixture.root, namespace
-            service.terminal = SimpleNamespace(runtime=self.runtime)
+            service.terminal = ProjectsTerminal(self.runtime,None,None,lambda *args:{},namespace=namespace)
             application.include_router(projects_router(lambda value=service: value, prefix=prefix))
         client = TestClient(application)
         for namespace, prefix in [('projects', '/api/projects'), ('warmup', '/api/accounts/warmup/pi')]:

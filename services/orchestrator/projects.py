@@ -14,9 +14,8 @@ import time
 import uuid
 from pathlib import Path
 
-from project_library import canonical_json, digest_json, read_document, safe_relative, snapshot_tree, write_document
+from project_library import canonical_json, digest_json, read_document, safe_relative, write_document
 from account_runtime import RuntimeBusy
-from capture_artifacts import capture_file_preview, capture_summary
 from projects_catalog import ProjectsCatalog
 from projects_pi import PI_FAILURE_MESSAGES, ProjectsPi, diagnose_stream_failure
 from projects_store import ProjectsDatabase
@@ -1039,29 +1038,7 @@ class ProjectsService:
         work = self._one('SELECT * FROM projects_work WHERE id=?', (work_id,))
         if not work or safe_relative(work_id) != Path(work_id).name:
             raise ValueError('工作不存在')
-        connection = self.database()
-        try:
-            account = connection.execute('SELECT * FROM accounts WHERE id=?', (work['account_id'],)).fetchone()
-            environment = connection.execute('SELECT * FROM account_environments WHERE account_id=?', (work['account_id'],)).fetchone()
-        finally:
-            connection.close()
-        if account is None or environment is None:
-            if relative is not None:
-                raise ValueError('抓包文件不存在')
-            return {**capture_summary(self.data / 'flows/_missing' / work_id), 'work_id': work_id,
-                'namespace': self.namespace, 'claude_code_version': json.loads(work['settings_json']).get('claude_code_version')}
-        account = dict(account)
-        if safe_relative(account['name']) != Path(account['name']).name:
-            raise ValueError('账号目录不合法')
-        group_key = self.namespace + '/' + work_id
-        root = self.terminal.runtime._root(dict(environment))
-        base = root / 'flows' / ('group-' + hashlib.sha256(group_key.encode()).hexdigest()[:20])
-        if base.is_symlink() or root.is_symlink() or (root / 'flows').is_symlink():
-            raise ValueError('抓包目录归属异常')
-        if relative is not None:
-            return capture_file_preview(base, relative)
-        return {**capture_summary(base, running=work['status'] == 'running'), 'work_id': work_id,
-            'namespace': self.namespace, 'mode': 'full_http', **json.loads(work['settings_json'])}
+        return self.terminal.capture(work, relative)
 
     def submission(self, submission_id: str, relative: str | None = None) -> dict:
         """读取冻结源码清单或其白名单文件，私有审查包不在可读范围内。
@@ -1122,6 +1099,14 @@ class ProjectsService:
                 "WHERE a.id=? AND w.account_id=? AND a.status IN ('intent','unknown')", (operation_id, account_id))
             if not operation or type(sent) is not bool:
                 raise ValueError('待核对操作或核对结论不合法')
+            work = self._one('SELECT * FROM projects_work WHERE id=?', (operation['work_id'],))
+            key = 'input-resolution:' + operation_id
+            previous = self._one('SELECT payload_json FROM projects_events WHERE event_key=?', (key,))
+            decision = {'operation_id': operation_id, 'sent': sent}
+            if previous and json.loads(previous['payload_json']) != decision:
+                raise ValueError('原输入已经登记另一人工核对结论，请先核对原节点收据')
+            self._event(account_id, 'input_resolution_intent', decision, operation['work_id'], key)
+            self.terminal.resolve_input(work, operation_id, sent)
             self._write('UPDATE projects_actions SET status=?,ended_at=? WHERE id=?',
                 ('sent' if sent else 'not_sent', time.time(), operation_id))
             remaining = self.actions(account_id)
@@ -1666,11 +1651,21 @@ class ProjectsService:
             cooling = cooling or bool(failure and failure['retryable'] and agent['schedule_enabled']
                 and agent['schedule_next_at'] is not None)
             uncertain = False
+            recovery_failed = False
             if work and work['status'] not in ('passed', 'stopped', 'deferred'):
+                try:
+                    self.terminal.recover_work(work)
+                except Exception as error:
+                    recovery_failed = True
+                    self._event(agent['account_id'], 'runtime_recovery_pending',
+                        {'message': '原执行停止尚未确认，请核对所属节点后恢复', 'exception_type': type(error).__name__}, work['id'],
+                        f"runtime-recovery:{work['id']}:{work['generation']}")
                 uncertain = self._one("SELECT id FROM projects_actions WHERE work_id=? AND status IN ('intent','unknown') LIMIT 1", (work['id'],))
+                uncertain = bool(uncertain or recovery_failed)
                 reserved = max(0, time.time() - work['segment_started_at']) if work['segment_started_at'] else 0
-                self._write('UPDATE projects_work SET status=?,runtime_json=NULL,segment_started_at=NULL,work_sec=work_sec+?,message=? WHERE id=?',
-                    ('blocked' if uncertain or work['status'] == 'blocked' else 'paused', min(reserved, agent['budget_sec']),
+                self._write('UPDATE projects_work SET status=?,runtime_json=?,segment_started_at=NULL,work_sec=work_sec+?,message=? WHERE id=?',
+                    ('blocked' if uncertain or work['status'] == 'blocked' else 'paused', work['runtime_json'] if recovery_failed else None,
+                        min(reserved, agent['budget_sec']), '原执行停止尚未确认，请核对所属节点后恢复' if recovery_failed else
                         failure['message'] if failure else '服务已重启，原工作及会话保留，请核对后恢复', work['id']))
             self._write('UPDATE projects_agents SET generation=generation+1,status=?,message=?,updated_at=? WHERE account_id=?',
                 ('blocked' if agent['status'] == 'blocked' or uncertain else 'waiting' if cooling else 'paused',
@@ -2182,7 +2177,7 @@ class ProjectsService:
                 'controller_yield': True, 'failure': failure}
         try:
             work['runtime_json'] = json.dumps(info)
-            baseline = work['baseline_json'] or canonical_json(snapshot_tree(self.terminal.workspace(work))).decode()
+            baseline = work['baseline_json'] or canonical_json(self.terminal.snapshot(work)).decode()
             with self.lock:
                 self._current(account_id, generation)
                 if stop and stop.is_set():
@@ -2343,7 +2338,7 @@ class ProjectsService:
         try:
             directory = self.data / 'projects/submissions' / submission
             objects = self.data / 'projects/objects'
-            snapshot = snapshot_tree(self.terminal.workspace(work), objects)
+            snapshot = self.terminal.snapshot(work, objects, snapshot_id=submission)
             write_document(directory / 'snapshot.json', snapshot)
             self._write('INSERT INTO projects_submissions(id,work_id,generation,digest,status,created_at) VALUES(?,?,?,?,?,?)',
                 (submission, work['id'], generation, snapshot['digest'], 'verifying', time.time()))

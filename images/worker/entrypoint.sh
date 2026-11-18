@@ -162,6 +162,17 @@ patch_top_config_gates() {
   ' "$path" > "$path.tmp" && mv "$path.tmp" "$path"
 }
 
+node_terminal_input() {
+  local text="$1"
+  shift
+  # 正文只走stdin。失去回执后停止driver，原root意图保留供中央查询。
+  if ! printf '%s' "$text" | python3 /usr/local/bin/v3-node-input \
+      --socket "$V3_NODE_INPUT_SOCKET" "$@" >/dev/null; then
+    write_bench_status "failed" "节点终端输入回执待核对，已保留原作业"
+    exit 45
+  fi
+}
+
 handle_claude_startup_gates() {
   # Claude 2.x 的主题、目录信任和 bypassPermissions 菜单都可能拦在首屏。
   # prompt 注入前只检测当前可见 pane；不能用 scrollback，否则菜单清掉后
@@ -180,7 +191,11 @@ handle_claude_startup_gates() {
     if printf '%s' "$pane" | grep -q "Choose the text style that looks best with your terminal"; then
       if [ "$theme_sent" -eq 0 ]; then
         log "Detected Claude first-run theme menu; accepting default dark theme"
-        tmux send-keys -t "$SESSION" Enter
+        if [ -n "${V3_NODE_INPUT_SOCKET:-}" ]; then
+          node_terminal_input '' --keys Enter
+        else
+          tmux send-keys -t "$SESSION" Enter
+        fi
         theme_sent=1
       fi
       clear_ticks=0
@@ -190,7 +205,11 @@ handle_claude_startup_gates() {
     if printf '%s' "$pane" | grep -q "Quick safety check: Is this a project you created or one you trust?"; then
       if [ "$trust_sent" -eq 0 ]; then
         log "Detected Claude workspace trust menu; trusting /workspace"
-        tmux send-keys -t "$SESSION" Down Enter
+        if [ -n "${V3_NODE_INPUT_SOCKET:-}" ]; then
+          node_terminal_input '' --keys Down Enter
+        else
+          tmux send-keys -t "$SESSION" Down Enter
+        fi
         trust_sent=1
       fi
       clear_ticks=0
@@ -200,7 +219,11 @@ handle_claude_startup_gates() {
     if printf '%s' "$pane" | grep -q "Claude Code running in Bypass Permissions mode"; then
       if [ "$bypass_sent" -eq 0 ]; then
         log "Detected Claude bypassPermissions disclaimer; accepting bypass permissions mode"
-        tmux send-keys -t "$SESSION" Down Enter
+        if [ -n "${V3_NODE_INPUT_SOCKET:-}" ]; then
+          node_terminal_input '' --keys Down Enter
+        else
+          tmux send-keys -t "$SESSION" Down Enter
+        fi
         bypass_sent=1
       fi
       clear_ticks=0
@@ -211,7 +234,11 @@ handle_claude_startup_gates() {
       if [ "$auto_default_sent" -eq 0 ]; then
         # 该菜单默认接受 Auto；取消回调明确保留当前模式，避免吞掉题目的回车。
         log "检测到 Auto 默认权限推荐；取消推荐并保留本次权限模式"
-        tmux send-keys -t "$SESSION" Escape
+        if [ -n "${V3_NODE_INPUT_SOCKET:-}" ]; then
+          node_terminal_input '' --keys Escape
+        else
+          tmux send-keys -t "$SESSION" Escape
+        fi
         auto_default_sent=1
       fi
       clear_ticks=0
@@ -1066,12 +1093,12 @@ PY
 detect_claude_auth_error() {
   # 认证错误可能出现在最终 assistant 文本、tool_result 或 TUI transcript 中。
   # 只匹配明确 OAuth/401 标记，避免把普通失败误判为账号失效。
-  # 发生过一次恢复后只扫描恢复时间之后的新 JSONL 事件，避免旧 transcript
-  # 中残留的 401 文本让下一轮立刻误判为再次失败。
+  # 既有会话按本轮字节基线扫描；轮内恢复继续使用时间边界，避免历史401重触发刷新。
   local since_epoch="${1:-0}"
   local transcript_offset="${2:-0}"
   python3 - "$CLAUDE_DIR/projects/-workspace" "/workspace/.bench-transcript.log" "$since_epoch" "$transcript_offset" <<'PY'
 import json
+import os
 import sys
 import datetime as dt
 from pathlib import Path
@@ -1080,6 +1107,10 @@ project_dir = Path(sys.argv[1])
 transcript_path = Path(sys.argv[2])
 since_epoch = float(sys.argv[3] or 0)
 transcript_offset = max(0, int(float(sys.argv[4] or 0)))
+baseline_path = os.environ.get('COMPLETION_BASELINE')
+baseline = json.loads(Path(baseline_path).read_text()) if baseline_path else {}
+if not isinstance(baseline, dict):
+    raise ValueError('认证观察的本轮会话字节基线无效')
 markers = (
     "Please run /login",
     "API Error: 401",
@@ -1122,7 +1153,12 @@ if project_dir.exists():
     files = sorted(project_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
     for path in files[:2]:
         try:
-            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()[-80:]
+            offset = baseline.get(str(path), 0)
+            if type(offset) is not int or offset < 0 or path.stat().st_size < offset:
+                raise ValueError('认证观察的原生会话字节边界需要核对')
+            with path.open('rb') as stream:
+                stream.seek(offset)
+                lines = stream.read().decode('utf-8', errors='replace').splitlines()[-80:]
         except OSError:
             continue
         for line in lines:
@@ -1433,6 +1469,10 @@ inject_tmux_prompt() {
   local buffer="$1"
   local text="$2"
   local line
+  if [ -n "${V3_NODE_INPUT_SOCKET:-}" ]; then
+    node_terminal_input "$text" --submit
+    return 0
+  fi
   tmux has-session -t "$SESSION" 2>/dev/null || return 1
   if [[ "$text" == *$'\t'* || "$text" == *$'\r'* ]]; then
     # Tab/CR 作为按键可能补全或提前提交，兼容既有自定义正文时仍按完整粘贴传输。
@@ -1488,7 +1528,11 @@ interrupt_and_inject_tmux_prompt() {
   esac
   tmux has-session -t "$SESSION" 2>/dev/null || return 1
   log "中断 Claude TUI 后注入 ${kind} 提示"
-  tmux send-keys -t "$SESSION" C-c
+  if [ -n "${V3_NODE_INPUT_SOCKET:-}" ]; then
+    node_terminal_input '' --keys C-c
+  else
+    tmux send-keys -t "$SESSION" C-c
+  fi
   for _ in $(seq 1 "$grace"); do
     capture_transcript_snapshot
     sleep 1
@@ -1751,8 +1795,12 @@ fi
 tmux new-session -d -s "$SESSION" -x 220 -y 60
 # 暂停整个作业树后，交互 shell 的作业控制会恢复行规程，导致下一步输入被回显或截断。
 # 自动 driver 自行拥有 CLI 生命周期，禁用 shell 的作业控制后再启动原生 TUI。
-tmux send-keys -t "$SESSION" \
-  "set +m; ${TLS_SHELL_EXPORT}export HOME='$CLAUDE_HOME' && cd /workspace && runuser -u '$CLAUDE_USER' -- env HOME='$CLAUDE_HOME' ${TLS_EXEC_ENV} $(printf '%q ' "${claude_args[@]}"); code=\$?; echo; echo \"[entrypoint] claude exited with code \$code\"; echo \$code >/tmp/claude-exit-code; touch /tmp/claude-exited; sleep 3600" Enter
+launch_command="set +m; ${TLS_SHELL_EXPORT}export HOME='$CLAUDE_HOME' && cd /workspace && runuser -u '$CLAUDE_USER' -- env HOME='$CLAUDE_HOME' ${TLS_EXEC_ENV} $(printf '%q ' "${claude_args[@]}"); code=\$?; echo; echo \"[entrypoint] claude exited with code \$code\"; echo \$code >/tmp/claude-exit-code; touch /tmp/claude-exited; sleep 3600"
+if [ -n "${V3_NODE_INPUT_SOCKET:-}" ]; then
+  node_terminal_input "$launch_command" --submit
+else
+  tmux send-keys -t "$SESSION" "$launch_command" Enter
+fi
 
 # 等 claude TUI 就绪
 sleep 6
@@ -1868,6 +1916,12 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
       refresh_result="$(force_refresh_profile_credentials_once "worker_401" 2>/tmp/oauth-refresh-stderr.log)" || refresh_status=$?
       if [ "$refresh_status" -ne 0 ]; then
         log "OAuth force refresh failed after auth error: ${refresh_result:-$(cat /tmp/oauth-refresh-stderr.log 2>/dev/null || true)}"
+        if [ -f /tmp/claude-owner-refresh-required ]; then
+          # 原所有者需要独占账号；先正常退出并让EXIT写完driver计时尾段，再交接资源。
+          echo "auth_error" > /tmp/claude-fatal-error
+          write_bench_status "auth_failed" "私有评审等待原凭据所有者刷新，保留当前会话与工作预算"
+          break
+        fi
         if [ "$CC2API_MANAGED_OAUTH" = "1" ]; then
           echo "auth_error" > /tmp/claude-fatal-error
           write_bench_status "auth_failed" "OAuth 认证失败: ${auth_marker}；cc2api 刷新失败：${refresh_result}"

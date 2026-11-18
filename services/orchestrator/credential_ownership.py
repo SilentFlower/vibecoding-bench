@@ -31,19 +31,44 @@ class CredentialOwnership:
     :param available: 核对远端账号唯一绑定。
     :param creation_payload: 构造原有创建配置。
     :param refresh: 当前本地所有者的按需刷新。
+    :param read_material: 可选当前执行节点材料读取；明确本机返回None，读取失败保持原门禁。
+    :param read_bound_identity: 可选原绑定Node设备读取；None保持原本机来源。
+    :param reauth_idle: 可选原远程重授权停止核验；None保持原本机收口检查。
+    :param reauth_publish: 已通过远程停止核验后发布Gateway当前AT的回调。
     """
 
     def __init__(self, runtime, gateway, database: Callable, db_lock, *, read_profile: Callable,
                  mirror: Callable, mirror_locked: Callable, profile_lock: Callable,
                  identity: Callable, read_identity: Callable, validate: Callable, find: Callable,
-                 idle: Callable, available: Callable, creation_payload: Callable, refresh: Callable) -> None:
-        """初始化无令牌归属表。@return None。"""
+                 idle: Callable, available: Callable, creation_payload: Callable, refresh: Callable,
+                 read_material: Callable | None = None, read_bound_identity: Callable | None = None,
+                 reauth_idle: Callable | None = None, reauth_publish: Callable | None = None,
+                 transition: Callable | None = None, sync_bound: Callable | None = None,
+                 matched_identity: Callable | None = None, prepare_initial: Callable | None = None) -> None:
+        """初始化无令牌归属表。
+
+        :param read_material: 原所有者材料读取器；其它依赖含义沿类契约。
+        :param read_bound_identity: 可选原绑定Node设备读取；返回None沿用原本机路径。
+        :param reauth_idle: 原远程登录实际停止核验，明确本机返回None。
+        :param reauth_publish: 同来源远程AT-only发布及原导入回执核对。
+        :param transition: 按所属节点选择原绑定事务，None沿用本机运行时。
+        :param sync_bound: 已绑定同所有者的凭据发布，None沿用本机同步。
+        :param matched_identity: 已有目标仅核对设备的读取器，缺省沿用原身份导出。
+        :param prepare_initial: 首次远程归属的布局准备，目标核验之后才调用。
+        :return: None。
+        """
         self.runtime, self.gateway, self.database, self.db_lock = runtime, gateway, database, db_lock
         self.read_profile, self.mirror, self.identity = read_profile, mirror, identity
         self.read_identity = read_identity
         self.mirror_locked, self.profile_lock = mirror_locked, profile_lock
         self.validate, self.find, self.idle, self.available = validate, find, idle, available
         self.creation_payload, self.refresh = creation_payload, refresh
+        self.read_material=read_material
+        self.read_bound_identity=read_bound_identity
+        self.reauth_idle,self.reauth_publish=reauth_idle,reauth_publish
+        self.transition,self.sync_bound=transition,sync_bound
+        self.matched_identity=matched_identity or identity
+        self.prepare_initial=prepare_initial
         with db_lock:
             connection = database()
             try:
@@ -322,6 +347,10 @@ class CredentialOwnership:
         return value
 
     def _material(self, account: dict) -> dict:
+        if self.read_material is not None:
+            material=self.read_material(account)
+            if material is not None:
+                return material
         row = self.runtime._row(account['name'], account['id'])
         current = self.runtime._local_credentials(row, account)
         if current is None:
@@ -332,10 +361,14 @@ class CredentialOwnership:
 
     def _bound_identity(self, account: dict) -> tuple[dict, dict]:
         configuration = self.gateway._request('GET', f"/admin/runtime/accounts/{account['cc2api_account_id']}/config")
+        profile={key:configuration.get(key) for key in ('email','account_uuid','organization_uuid')}
+        if self.read_bound_identity is not None:
+            observed=self.read_bound_identity(account,configuration)
+            if observed is not None:
+                return profile,observed
         row = self.runtime._row(account['name'], account['id'])
         top = json.loads((self.runtime._root(row) / 'home/.claude.json').read_text())
-        return ({key: configuration.get(key) for key in ('email', 'account_uuid', 'organization_uuid')},
-            {'device_id': top.get('userID'), 'environment_id': row['environment_id']})
+        return profile,{'device_id': top.get('userID'), 'environment_id': row['environment_id']}
 
     def _refresh_local(self, account: dict) -> None:
         material = self._material(account)
@@ -419,7 +452,10 @@ class CredentialOwnership:
             self.guard(account)
             snapshot = self.gateway.resolve_credentials(binding, 2400)
             self.mirror(account['name'], snapshot)
-            self.runtime.sync_credentials(self.runtime._row(account['name'], account['id']), account)
+            if self.sync_bound is not None:
+                self.sync_bound(account)
+            else:
+                self.runtime.sync_credentials(self.runtime._row(account['name'], account['id']), account)
             remote = next((item for item in self.gateway.list_accounts() if item['id'] == binding), None)
             if not remote:
                 raise ValueError('原关联网关账号不存在')
@@ -436,6 +472,8 @@ class CredentialOwnership:
             capability = self.gateway._request('GET', '/admin/runtime/credential-capabilities')
             if capability.get('credential_ownership_protocol') != 1:
                 raise ValueError('网关需要同批更新以支持凭据交接')
+            if self.prepare_initial is not None:
+                self.prepare_initial(account)
             self._refresh_local(account)
             profile = self.read_profile(account['name'])
             observed = self.identity(account)
@@ -444,9 +482,11 @@ class CredentialOwnership:
             self.validate(profile, matched)
             self.available(account['id'], matched['id'])
             remote = self._remote(matched['id'])
+            if self.prepare_initial is not None:
+                self.prepare_initial(account)
             direction = 'return' if remote and remote.get('owner') == 'local' else 'attach'
             authorized = self._authorized_profile(account, profile) if direction == 'attach' else None
-            observed = self.read_identity(account, authorized.get('cli_version')) if authorized else self.identity(account)
+            observed = self.read_identity(account, authorized.get('cli_version')) if authorized else self.matched_identity(account)
             if matched.get('device_id') != observed['device_id']:
                 raise ValueError('已有网关设备身份与 CLI 观测不一致，保留已有身份并阻止绑定')
             if direction == 'attach':
@@ -560,7 +600,7 @@ class CredentialOwnership:
                 # owner_transition 的显式 RT 交接必须读取远端排空后的最终快照。
                 self.mirror(current['name'], self._snapshot(value, record))
             with self.profile_lock(current['name']):
-                with self.runtime.owner_transition(current, target, handoff_credentials=direction != 'retire'):
+                with self._transition(current,target,record=record,handoff_credentials=direction!='retire'):
                     if direction not in ('detach', 'retire'):
                         if receipt.get('stage') == 'prepared':
                             record['stage'] = 'importing'
@@ -673,7 +713,7 @@ class CredentialOwnership:
     def _clear_missing_binding(self, account: dict, *, handoff: bool) -> None:
         # 只有显式旧绑定且远端完整缺失证明成立才进入；新关联目标缺失不能走此收口。
         with self.profile_lock(account['name']):
-            with self.runtime.owner_transition(account, None, handoff_credentials=handoff):
+            with self._transition(account,None,record=self.state(account['id']),handoff_credentials=handoff):
                 with self.db_lock:
                     connection = self.database()
                     try:
@@ -684,6 +724,11 @@ class CredentialOwnership:
                             connection.execute('DELETE FROM account_credential_ownerships WHERE account_id=?', (account['id'],))
                     finally:
                         connection.close()
+
+    def _transition(self, account, target, *, record, handoff_credentials):
+        if self.transition is not None:
+            return self.transition(account,target,record=record,handoff_credentials=handoff_credentials)
+        return self.runtime.owner_transition(account,target,handoff_credentials=handoff_credentials)
 
     def begin_reauth(self, account: dict, sid: str) -> None:
         """在创建原登录终端前暂停全部网关活动。
@@ -716,15 +761,24 @@ class CredentialOwnership:
                 or (sid is not None and record['input']['lease_owner'] != 'login:' + sid)):
             raise ValueError('凭据维护不是原登录会话，不能解除')
         account = self._account(account_id)
-        row = self.runtime._row(account['name'], account_id)
-        if self.runtime.environment_jobs(row['environment_id']) or (self.runtime._root(row) / 'runtime/login-commit.json').exists():
-            raise ValueError('原登录提交或终端仍需收口，不能解除凭据维护')
+        remote_idle=self.reauth_idle(account,record) if self.reauth_idle is not None else None
+        row=None
+        if remote_idle is None:
+            row = self.runtime._row(account['name'], account_id)
+            if self.runtime.environment_jobs(row['environment_id']) or (self.runtime._root(row) / 'runtime/login-commit.json').exists():
+                raise ValueError('原登录提交或终端仍需收口，不能解除凭据维护')
+        elif remote_idle is not True:
+            raise ValueError('原节点登录实际停止与暂存清理仍需核对')
         value = self._rpc(record, 'status')
         stage = (value.get('receipt') or {}).get('stage')
         if stage == 'imported':
             snapshot = self._snapshot(value, record)
             self.mirror(account['name'], snapshot)
-            self.runtime.sync_credentials(row, account)
+            if remote_idle is True:
+                if self.reauth_publish is None or self.reauth_publish(account,snapshot,record,value) is not True:
+                    raise ValueError('原节点AT-only发布仍需核对')
+            else:
+                self.runtime.sync_credentials(row, account)
             record['stage'] = 'mirrored'
             self._save(record)
             value = self._rpc(record, 'finish')

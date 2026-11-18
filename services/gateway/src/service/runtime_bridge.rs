@@ -365,6 +365,60 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
     let Some(api_path) = path.strip_prefix("/api/") else {
         return false;
     };
+    if let Some(account) = api_path.strip_prefix("accounts/") {
+        let mut parts = account.split('/');
+        let id = parts.next().unwrap_or_default();
+        let resource = parts.next();
+        if matches!(resource, Some("node" | "node-migrations")) {
+            if id.is_empty()
+                || !id.bytes().all(|value| value.is_ascii_digit())
+                || !id.parse::<i64>().is_ok_and(|value| value > 0)
+            {
+                return false;
+            }
+            if resource == Some("node") {
+                return parts.next().is_none() && matches!(*method, Method::GET | Method::PUT);
+            }
+            let Some(operation) = parts.next() else {
+                return matches!(*method, Method::GET | Method::POST);
+            };
+            if operation.len() != 32
+                || !operation
+                    .bytes()
+                    .all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(&value))
+            {
+                return false;
+            }
+            return match parts.next() {
+                None => *method == Method::GET,
+                Some("resume" | "cancel") => *method == Method::POST && parts.next().is_none(),
+                _ => false,
+            };
+        }
+    }
+    if api_path == "nodes" {
+        return matches!(*method, Method::GET | Method::POST);
+    }
+    if api_path == "nodes/host-keys" {
+        return *method == Method::POST;
+    }
+    if let Some(node) = api_path.strip_prefix("nodes/") {
+        let mut parts = node.split('/');
+        let id = parts.next().unwrap_or_default();
+        if id.is_empty() || id.len() > 19 || !id.bytes().all(|value| value.is_ascii_digit()) {
+            return false;
+        }
+        let action = parts.next();
+        if parts.next().is_some() {
+            return false;
+        }
+        return match action {
+            None => *method == Method::DELETE,
+            Some("check" | "prepare") => *method == Method::POST,
+            Some("enabled") => *method == Method::PUT,
+            _ => false,
+        };
+    }
     if let Some(environment) = api_path
         .strip_prefix("environments/")
         .and_then(|value| value.strip_suffix("/content-capture"))
@@ -423,7 +477,11 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
 /// @param path 不含查询字符串的管理路径。
 /// @return 普通状态读取的期限，其它请求沿用既有生命周期。
 fn status_timeout(method: &Method, path: &str) -> Option<Duration> {
-    if *method == Method::GET && path.starts_with("/api/system-updates/") {
+    let account_node_status = path.strip_prefix("/api/accounts/").is_some_and(|value| {
+        matches!(value.split('/').nth(1), Some("node" | "node-migrations"))
+            && browser_path_allowed(method, path)
+    });
+    if *method == Method::GET && (path.starts_with("/api/system-updates/") || account_node_status) {
         return Some(STATUS_TIMEOUT);
     }
     (*method == Method::GET
@@ -561,6 +619,11 @@ async fn http_bridge(
     if selected {
         // 下游校验错误可能回显请求内容，目录账密一律不随原始响应返回浏览器。
         if !upstream.status().is_success() {
+            if upstream.status().is_server_error() {
+                return Err(AppError::ServiceUnavailable(
+                    "登录准备尚未确认，请刷新草稿并恢复检查".into(),
+                ));
+            }
             return Err(AppError::BadRequest(
                 "登录启动失败，请核对账号状态和所选代理后重试".into(),
             ));
@@ -579,6 +642,8 @@ async fn http_bridge(
             "cc2api_account_id",
             "environment_id",
             "draft_generation",
+            "node_id",
+            "node_name",
         ] {
             if let Some(item) = value.get(key) {
                 output[key] = item.clone();
@@ -708,6 +773,31 @@ mod tests {
     use axum::http::Method;
     use std::time::Duration;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[test]
+    fn node_management_paths_require_exact_actions() {
+        for (method, path) in [
+            (Method::GET, "/api/nodes"),
+            (Method::POST, "/api/nodes"),
+            (Method::POST, "/api/nodes/host-keys"),
+            (Method::POST, "/api/nodes/2/check"),
+            (Method::POST, "/api/nodes/2/prepare"),
+            (Method::PUT, "/api/nodes/2/enabled"),
+            (Method::DELETE, "/api/nodes/2"),
+        ] {
+            assert!(browser_path_allowed(&method, path), "{path}");
+        }
+        for (method, path) in [
+            (Method::GET, "/api/nodes/2/private-key"),
+            (Method::POST, "/api/nodes/2/shell"),
+            (Method::GET, "/api/nodes/host-keys"),
+            (Method::POST, "/api/nodes/2/check/extra"),
+            (Method::POST, "/api/nodes/../check"),
+            (Method::POST, "/api/nodes/2%2fcheck"),
+        ] {
+            assert!(!browser_path_allowed(&method, path), "{path}");
+        }
+    }
     use tokio::net::TcpListener;
     use tokio::time::timeout;
 
@@ -732,7 +822,8 @@ mod tests {
             created_at: String::new(),
             updated_at: String::new(),
         };
-        let value=super::translate_login_proxy(json!({"name":"test","force_reauth":false,"proxy_id":"route-1","proxy_revision":"revision-1"}),Some(&proxy)).unwrap();
+        let value=super::translate_login_proxy(json!({"name":"test","force_reauth":false,"node_id":2,"proxy_id":"route-1","proxy_revision":"revision-1"}),Some(&proxy)).unwrap();
+        assert_eq!(value["node_id"], 2);
         assert_eq!(value["upstream_socks5_pass"], "private-password");
         assert_eq!(value["upstream_socks5_port"], 1080);
         assert!(value.get("proxy_id").is_none());
@@ -758,6 +849,9 @@ mod tests {
             "/api/projects/catalog",
             "/api/accounts/warmup/pi",
             "/api/accounts",
+            "/api/accounts/1/node",
+            "/api/accounts/1/node-migrations",
+            "/api/accounts/1/node-migrations/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         ] {
             assert_eq!(status_timeout(&Method::GET, path), Some(STATUS_TIMEOUT));
             assert_eq!(status_timeout(&Method::POST, path), None);
@@ -768,6 +862,7 @@ mod tests {
             "/api/projects/stream",
             "/api/projects/agents/1/events",
             "/api/projects/catalogue",
+            "/api/accounts/1/node-migrations/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/resume",
         ] {
             assert_eq!(status_timeout(&Method::GET, path), None);
         }
@@ -836,6 +931,47 @@ mod tests {
         assert!(browser_path_allowed(&Method::GET, "/projects.js"));
         assert!(!browser_path_allowed(&Method::POST, "/projects.js"));
         assert!(!browser_path_allowed(&Method::POST, "/app.js"));
+    }
+
+    /// 节点归属与人工迁移只开放精确管理动作，操作ID及层级保持规范。
+    #[test]
+    fn account_node_migration_routes_require_exact_scope_and_method() {
+        let operation = "a".repeat(32);
+        let path = format!("/api/accounts/1/node-migrations/{operation}");
+        assert!(browser_path_allowed(&Method::GET, "/api/accounts/1/node"));
+        assert!(browser_path_allowed(&Method::PUT, "/api/accounts/1/node"));
+        assert!(browser_path_allowed(
+            &Method::POST,
+            "/api/accounts/1/node-migrations"
+        ));
+        assert!(browser_path_allowed(&Method::GET, &path));
+        assert!(browser_path_allowed(
+            &Method::POST,
+            &format!("{path}/resume")
+        ));
+        assert!(browser_path_allowed(
+            &Method::POST,
+            &format!("{path}/cancel")
+        ));
+        for (method, invalid) in [
+            (Method::POST, "/api/accounts/1/node".to_owned()),
+            (Method::DELETE, "/api/accounts/1/node-migrations".to_owned()),
+            (Method::POST, path.clone()),
+            (Method::GET, format!("{path}/resume")),
+            (Method::POST, format!("{path}/force")),
+            (Method::POST, format!("{path}/cancel/extra")),
+            (Method::GET, "/api/accounts/0/node".to_owned()),
+            (
+                Method::GET,
+                "/api/accounts/9223372036854775808/node".to_owned(),
+            ),
+            (
+                Method::GET,
+                "/api/accounts/1/node-migrations/ABC".to_owned(),
+            ),
+        ] {
+            assert!(!browser_path_allowed(&method, &invalid), "{invalid}");
+        }
     }
 
     /// 新界面依赖的精确资源仅允许只读，不扩展为任意目录访问。

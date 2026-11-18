@@ -413,7 +413,7 @@ function paintLoginDrafts() {
     const phase = { preparing: '准备登录', authorizing: '登录中 · 未提交', ready_to_submit: '认证通过 · 待提交', ended: '终端已结束',
       interrupted: '登录已中断', cancelled: '已取消 · 环境保留', submitting: '保存未完成 · 请继续提交', reconcile: '需检查 / 对账', deleting: '清理未完成 · 可重试' }[draft.state] || '未完成登录';
     const id = escapeHTML(draft.environment_id);
-    return `<article class="work-history-row account-draft-row"><span class="initial">${runtimeIcon('key')}</span><div><strong>${escapeHTML(draft.name)}</strong><small>${escapeHTML(phase)}</small><small>${escapeHTML(draft.message || (draft.credentials_present && !draft.credentials_ready ? '保留授权产物；继续后检查认证状态' : '尚未保存账号'))}</small><small class="work-draft-network">${escapeHTML(draft.proxy_known ? (draft.proxy_summary || '未配置代理') : '配置待检查')} · 不参与任务与养号</small></div><div class="buttons account-actions">
+    return `<article class="work-history-row account-draft-row"><span class="initial">${runtimeIcon('key')}</span><div><strong>${escapeHTML(draft.name)}</strong><small>${escapeHTML(phase)}</small><small>${escapeHTML(draft.message || (draft.credentials_present && !draft.credentials_ready ? '保留授权产物；继续后检查认证状态' : '尚未保存账号'))}</small><small>${escapeHTML(draft.node_name ? '执行节点：'+draft.node_name : draft.node_id != null ? '执行节点：#'+draft.node_id : '执行节点：默认本机')}</small><small class="work-draft-network">${escapeHTML(draft.proxy_known ? (draft.proxy_summary || '未配置代理') : '配置待检查')} · 不参与任务与养号</small></div><div class="buttons account-actions">
         <button type="button" class="btn btn-sm" data-draft-resume="${id}" ${draft.can_resume ? '' : 'disabled'}>继续登录</button>
         <button type="button" class="btn btn-sm" data-draft-restart="${id}" ${draft.can_restart ? '' : 'disabled'}>重新登录</button>
         ${draft.session_id ? `<button type="button" class="btn btn-sm" data-draft-cancel="${id}" ${draft.can_restart ? '' : 'disabled'}>取消登录</button>` : ''}
@@ -595,11 +595,12 @@ function bindAccountActions() {
   $('#add-account').onclick = () => openAccLoginModal();
   $('#acc-form').onsubmit = (e) => {
     e.preventDefault();
+    if (state.accLogin?.nodesLoading) return notifyRuntime('正在读取执行节点，请稍候再启动登录。', 'info');
     const fd = new FormData(e.target);
     const body = {};
     for (const [k, v] of fd) {
       if (!v) continue;
-      if (k.endsWith('_port')) body[k] = Number(v);
+      if (k.endsWith('_port') || k === 'node_id') body[k] = Number(v);
       else if (k === 'force_reauth') body[k] = v === 'true';
       else body[k] = v;
     }
@@ -1150,6 +1151,11 @@ function openAccLoginModal(account = null) {
   showAccStep('config');
   form.reset();
   state.accLogin = account ? { mode: 'relogin', accountId: account.id } : { mode: 'new' };
+  $('#acc-node-field').hidden = Boolean(account);
+  form.elements.node_id.disabled = Boolean(account);
+  form.elements.node_id.innerHTML = '<option value="">默认本机</option>';
+  $('#acc-node-note').textContent = '新账号的登录与后续任务均在所选节点执行。';
+  if (!account) loadAccLoginNodes(state.accLogin);
   form.elements.upstream_proxy_scheme.value = account?.upstream_proxy_scheme || 'socks5';
   form.elements.timezone.value = account?.timezone || '';
   if (account) {
@@ -1177,6 +1183,29 @@ function openAccLoginModal(account = null) {
   $('.modal-titlebar-name', $('#acc-modal')).firstChild.textContent = account ? '重新授权 ' : '添加任务账号 ';
   $('#acc-modal-stage').textContent = '配置账号与代理';
   openModal('#acc-modal');
+}
+
+/** 只为当前新建窗口读取节点，迟到响应不能覆盖另一窗口。@param {object} login 当前窗口归属。@return {Promise<void>} 读取结束。 */
+async function loadAccLoginNodes(login) {
+  login.nodesLoading = true;
+  const select = $('#acc-form').elements.node_id;
+  select.disabled = true;
+  $('#acc-node-note').textContent = '正在读取可用执行节点…';
+  try {
+    const response = await API('/nodes');
+    if (state.accLogin !== login) return;
+    const nodes = response.items || [];
+    select.innerHTML = '<option value="">默认本机</option>' + nodes.filter(node => node.kind === 'ssh' && Number.isSafeInteger(node.id) && node.id > 0).map(node => {
+      const available = node.enabled && node.preparation?.state === 'prepared';
+      return `<option value="${node.id}" ${available ? '' : 'disabled'}>${escapeHTML(node.name)}${available ? '' : '（待启用或准备）'}</option>`;
+    }).join('');
+    $('#acc-node-note').textContent = '按需选择服务器。草稿恢复和重新登录沿用首次选择。';
+  } catch (error) {
+    if (state.accLogin === login) $('#acc-node-note').textContent = '节点列表读取失败。当前使用默认本机，重新打开可重试。';
+  } finally {
+    login.nodesLoading = false;
+    if (state.accLogin === login) select.disabled = false;
+  }
 }
 
 /** 切换授权配置与终端布局，保留原会话及终端节点。@param {string} which 配置或终端阶段。@return {void} */
@@ -1298,7 +1327,7 @@ async function showAccLoginSession(resp, body, loginState) {
 
   $('#acc-login-sid').textContent = resp.session_id;
   $('#acc-login-sidecar').textContent = resp.has_sidecar ? 'yes' : 'no (direct)';
-  $('#acc-login-name').textContent = resp.name;
+  $('#acc-login-name').textContent = resp.name + (resp.node_name ? ' · '+resp.node_name : '');
   $('#acc-modal-stage').textContent = '完成授权并提交';
 
   showAccStep('terminal');
@@ -1335,7 +1364,7 @@ async function attachAccLoginTerminal(wsPath) {
   const login = state.accLogin;
   let termState;
   try { termState = await attachTerminal('#acc-login-xterm', wsPath, 'running', {
-    autoReconnect: login.reconnectable,
+    autoReconnect: login.codeMode || login.reconnectable,
     startStopped: !login.reconnectable && Boolean(login.environmentId || RUNTIME_BASE),
     isActive: () => state.accLogin === login && !login.closing,
     onSocket: socket => { if (state.accLogin === login) login.ws = socket; },
@@ -1369,6 +1398,10 @@ async function attachAccLoginTerminal(wsPath) {
         if (state.accLogin !== login || login.closing) return;
         login.authorizationURL = status.authorization_url || null;
         login.loginPhase = status.phase;
+        login.reconnectable = status.reconnectable === true;
+        // Node准备阶段继续只读轮询；实际终端就绪后仅连接原会话一次。
+        if (login.reconnectable) termState.start?.();
+        $('#acc-login-reconnect').disabled = !login.reconnectable || typeof termState.reconnect !== 'function';
         const ready=status.credentials_ready===true;const steps=$$('#acc-modal .upgrade-steps li');steps[1]?.classList.toggle('done',ready);steps[1]?.classList.toggle('active',!ready);steps[2]?.classList.toggle('active',ready);
         updateAccCodeControls();
         $('#acc-auth-url').value = login.authorizationURL || '';
@@ -1376,7 +1409,7 @@ async function attachAccLoginTerminal(wsPath) {
         $('#acc-login-open').disabled = !login.authorizationURL;
         $('#acc-login-link-status').textContent = status.credentials_ready ? 'CLI 认证检查通过，可以提交保存' : (login.authorizationURL ? '授权链接已就绪，请在下方输入完整授权码并发送' : (status.reconnectable ? '等待 CLI 输出授权链接' : status.message || '登录已结束'));
         $('#acc-login-restart').classList.toggle('hidden', !status.restartable);
-        if (!status.reconnectable) {
+        if (!status.reconnectable && status.phase !== 'preparing') {
           login.pollStopped = true;
           termState.stop(status.message || (status.phase === 'committed' ? '登录已完成' : '凭据同步待确认，可重试提交或在环境页对账'));
           $('#acc-login-reconnect').disabled = true;
@@ -1547,6 +1580,7 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', o
   let inputAllowed = false;
   let disposed = false;
   let stopped = false;
+  let deferredStart = Boolean(options.startStopped);
   let generation = 0;
   let retries = 0;
   let retryTimer = null;
@@ -1555,6 +1589,7 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', o
   const notify = message => { if (active()) options.onState?.(message); };
   const stop = message => {
     stopped = true;
+    deferredStart = false;
     inputAllowed = false;
     clearTimeout(retryTimer);
     clearInterval(heartbeatTimer);
@@ -1672,6 +1707,12 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', o
   if (options.startStopped) stopped = true;
   else await connect();
   return { term, fit, get ws() { return ws; }, onResize, stop,
+    start: () => {
+      if (!active() || !deferredStart) return;
+      deferredStart = false;
+      stopped = false;
+      connect();
+    },
     reconnect: () => {
       if (!active() || stopped) return;
       retries = 0;

@@ -13,7 +13,9 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from project_library import (canonical_json, digest_json, materialize_snapshot, read_document,
+from project_workspace import publish_project_workspace
+from project_input_files import bind_code_input_files, materialize_input_files, prepare_scenario_input_files
+from project_library import (canonical_json, digest_json, read_document,
     safe_relative, snapshot_tree, write_document)
 from project_evaluation import check_change_scope, load_rubric, parse_review, review_package, review_prompt, source_evidence
 from project_scenario_usage import aggregate_usage, observed_model, source_usage
@@ -108,38 +110,14 @@ class ProjectScenarios:
         target = environment_root / 'projects' / alias
         relative = str(target.relative_to(self.owner.data))
         marker = self.owner.data / 'project-artifacts/scenarios' / str(context['scenario_instance_id']) / 'materialized.json'
-        expected = {'scenario_id': context['scenario_instance_id'], 'seed_digest': context['seed_digest'], 'workspace_relative': relative}
+        if context['workspace_relative'] and context['workspace_relative']!=relative:
+            raise ValueError('原场景工作区定位发生变化，保留现场')
+        def seed() -> Path:
+            return self.owner._release(context['catalog_release_id']).projects[context['project_key']].root/'seed'
+        publish_project_workspace(self.owner.data,target,marker,context['scenario_instance_id'],context['seed_digest'],
+            seed,bool(context['workspace_relative']),lambda:self.owner.can_start(run_id),identity_key='scenario_id')
         if context['workspace_relative']:
-            if context['workspace_relative'] != relative or not target.is_dir() or target.is_symlink():
-                raise ValueError('原场景工作区缺失或被替换，保留现场')
-            if not marker.exists() or read_document(marker) != expected:
-                raise ValueError('场景工作区发布证明缺失或冲突')
-            return alias, target
-        if marker.exists():
-            if read_document(marker) != expected or not target.is_dir() or target.is_symlink():
-                raise ValueError('场景工作区发布中断，需要核对归属')
-        elif target.exists() or target.is_symlink():
-            raise ValueError('场景目录存在但归属不明，拒绝覆盖')
-        else:
-            project = self.owner._release(context['catalog_release_id']).projects[context['project_key']]
-            baseline = snapshot_tree(project.root / 'seed', self.owner.objects)
-            write_document(self.owner.manifests / (baseline['digest'] + '.json'), baseline)
-            staging = self.owner.data / 'project-staging' / uuid.uuid4().hex
-            materialize_snapshot(baseline, self.owner.objects, staging)
-            try:
-                for path in [staging, *staging.rglob('*')]:
-                    os.chown(path, 1000, 1000, follow_symlinks=False)
-                target.parent.mkdir(parents=True, exist_ok=True)
-                os.chown(target.parent, 1000, 1000, follow_symlinks=False)
-                write_document(marker, expected)
-                if not self.owner.can_start(run_id):
-                    marker.unlink(missing_ok=True)
-                    raise ValueError('发布前场景父状态已经改变')
-                os.rename(staging, target)
-            finally:
-                if staging.exists():
-                    import shutil
-                    shutil.rmtree(staging)
+            return alias,target
         self.owner.plans._write('UPDATE project_scenario_instances SET workspace_relative=?,updated_at=? WHERE id=? AND workspace_relative IS NULL',
             (relative, time.time(), context['scenario_instance_id']))
         self._prepare_inputs(self.task(context['scenario_task_id']))
@@ -147,25 +125,39 @@ class ProjectScenarios:
 
     def _prepare_inputs(self, task: dict) -> None:
         definition = json.loads(task['definition_json'])
-        self._bind_code_dependencies(task,definition)
         scenario = self.owner._one('SELECT definition_json FROM project_scenario_instances WHERE id=?',(task['scenario_instance_id'],))
-        entry = next(item for item in json.loads(scenario['definition_json'])['entries'] if item['id']==task['entry_key'])
-        self._materialize_inputs(task,entry.get('setup',[]),
-            self.owner.data/'project-artifacts/scenarios'/str(task['scenario_instance_id'])/'entry-inputs.json',
-            {'scenario_id':task['scenario_instance_id'],'entry_key':task['entry_key']})
-        marker = self.owner.data/'project-artifacts/task-inputs'/str(task['id'])/'prepared.json'
-        checksum = self._materialize_inputs(task,definition.get('setup',[]),marker,{'task_id':task['id']})
-        disclosures = self.owner._rows("SELECT phase_key FROM project_task_deliveries WHERE task_id=? AND phase_key LIKE 'disclosure:%' ORDER BY id",(task['id'],))
-        for delivery in disclosures:
-            branch_id = delivery['phase_key'].removeprefix('disclosure:')
-            branch = next(item for item in definition.get('branches',[]) if item['id']==branch_id)
-            if branch.get('setup'):
-                checksum = self._materialize_inputs(task,branch['setup'],marker.with_name('branch-'+branch_id+'.json'),
-                    {'task_id':task['id'],'branch_id':branch_id})
-        self.owner.plans._checkpoint({'checkpoint_digest':checksum})
-        self.owner.plans._write('UPDATE project_scenario_tasks SET input_checkpoint_digest=? WHERE id=?', (checksum,task['id']))
+        project=self.owner._release(task['catalog_release_id']).projects[task['project_key']]
+        result=prepare_scenario_input_files(self.owner.data,self.owner.data/safe_relative(task['workspace_relative']),
+            project.root,json.loads(scenario['definition_json']),definition,self.input_selection(task),self.owner.objects,
+            self.owner.manifests,lambda checksum:self.owner.plans._checkpoint({'checkpoint_digest':checksum}))
+        self.owner.plans._write('UPDATE project_scenario_tasks SET input_checkpoint_digest=? WHERE id=?',
+            (result['input_checkpoint_digest'],task['id']))
+
+    def input_selection(self, task: dict) -> dict:
+        """冻结中央已接受代码来源及已披露阶段，供本机或节点准备文件。
+
+        :param task: 原中央任务联合视图。
+        :return: 原任务/场景、入口、代码来源和有序披露键。
+        """
+        disclosures=self.owner._rows("SELECT phase_key FROM project_task_deliveries WHERE task_id=? AND phase_key LIKE 'disclosure:%' ORDER BY id",(task['id'],))
+        return {'scenario_id':task['scenario_instance_id'],'task_id':task['id'],'entry_key':task['entry_key'],
+            'code':self.code_input_selection(task,json.loads(task['definition_json'])),
+            'disclosures':[delivery['phase_key'].removeprefix('disclosure:') for delivery in disclosures]}
 
     def _bind_code_dependencies(self, task: dict, definition: dict) -> None:
+        identity=self.code_input_selection(task,definition)
+        marker=self.owner.data/'project-artifacts/task-inputs'/str(task['id'])/'code-dependency.json'
+        workspace=self.owner.data/safe_relative(task['workspace_relative'])
+        bind_code_input_files(self.owner.data,workspace,marker,identity,self.owner.objects,self.owner.manifests,
+            lambda checksum:self.owner.plans._checkpoint({'checkpoint_digest':checksum}))
+
+    def code_input_selection(self, task: dict, definition: dict) -> dict:
+        """沿原已接受作业父链选定代码输入，保留已发布任务的原基线。
+
+        :param task: 原中央任务联合视图。
+        :param definition: 同批冻结任务定义。
+        :return: task、依赖作业和固定基线身份；仅选择，不发布文件。
+        """
         marker=self.owner.data/'project-artifacts/task-inputs'/str(task['id'])/'code-dependency.json'
         dependencies=[]
         for dependency in definition['requires']:
@@ -185,7 +177,7 @@ class ProjectScenarios:
             previous=read_document(marker)
             if previous.get('task_id')!=task['id'] or previous.get('dependencies')!=expected or previous.get('state')!='ready':
                 raise ValueError('代码输入交接中断或依赖冲突，保留现场等待对账')
-            return
+            return {key:previous[key] for key in ('task_id','dependencies','base_checkpoint_digest','base_checkpoint_job_id')}
         base=task['checkpoint_digest']
         accepted=self.owner._one("SELECT j.id FROM project_evaluation_jobs j JOIN project_scenario_tasks t ON t.id=j.task_id "
             "WHERE t.scenario_instance_id=? AND t.kind='modify' AND t.status='passed' AND j.status='passed' "
@@ -212,59 +204,16 @@ class ProjectScenarios:
                 current=parents.get(current)
             if any(job['id'] not in chain for job in dependencies):
                 raise ValueError('多个代码依赖没有同一已接受继承链，不能猜测合并')
-        identity={'task_id':task['id'],'dependencies':expected,'base_checkpoint_digest':base,'base_checkpoint_job_id':base_job}
-        workspace=self.owner.data/safe_relative(task['workspace_relative'])
-        if snapshot_tree(workspace)['digest']!=base:
-            previous=snapshot_tree(workspace,self.owner.objects)
-            write_document(self.owner.manifests/(previous['digest']+'.json'),previous)
-            self.owner.plans._checkpoint({'checkpoint_digest':base})
-            snapshot=read_document(self.owner.manifests/(base+'.json'))
-            staging=self.owner.data/'project-staging'/('code-input-'+uuid.uuid4().hex)
-            saved=self.owner.data/'project-staging'/('previous-workspace-'+uuid.uuid4().hex)
-            materialize_snapshot(snapshot,self.owner.objects,staging)
-            for path in [staging,*staging.rglob('*')]:
-                os.chown(path,1000,1000,follow_symlinks=False)
-            # 交接意图先落盘；崩溃后宁可受阻，也不能把新目录错认成原半成品。
-            write_document(marker,{**identity,'state':'replacing','previous_digest':previous['digest'],
-                'saved_relative':str(saved.relative_to(self.owner.data)),'staging_relative':str(staging.relative_to(self.owner.data))})
-            os.rename(workspace,saved)
-            os.rename(staging,workspace)
-            identity.update(previous_digest=previous['digest'],saved_relative=str(saved.relative_to(self.owner.data)))
-        write_document(marker,{**identity,'state':'ready'})
+        return {'task_id':task['id'],'dependencies':expected,'base_checkpoint_digest':base,'base_checkpoint_job_id':base_job}
 
     def _materialize_inputs(self, task: dict, setup: list[dict], marker: Path, identity: dict) -> str:
         project = self.owner._release(task['catalog_release_id']).projects[task['project_key']]
         workspace = self.owner.data / safe_relative(task['workspace_relative'])
-        intended = {**identity,'setup_digest':digest_json(setup)}
-        if marker.exists():
-            existing = read_document(marker)
-            if any(existing.get(key) != value for key,value in intended.items()):
-                raise ValueError('业务材料物化归属冲突')
-            checksum = existing['input_checkpoint_digest']
-        else:
-            for item in setup:
-                target = workspace / safe_relative(item['target'])
-                path = target
-                while path != workspace:
-                    if path.is_symlink():
-                        raise ValueError('业务输入目标包含链接，拒绝覆盖')
-                    path = path.parent
-                target.parent.mkdir(parents=True,exist_ok=True)
-                content = (project.root / safe_relative(item['source'])).read_bytes()
-                if target.exists() and target.read_bytes() != content:
-                    raise ValueError('业务输入目标已有不同内容，保留现场等待对账')
-                target.write_bytes(content)
-                os.chown(target,1000,1000)
-                target.chmod(0o644)
-                os.chown(target.parent,1000,1000)
-            snapshot = snapshot_tree(workspace,self.owner.objects)
-            checksum = snapshot['digest']
-            write_document(self.owner.manifests / (checksum+'.json'),snapshot)
-            write_document(marker,{**intended,'input_checkpoint_digest':checksum})
-        return checksum
+        result=materialize_input_files(project.root,workspace,setup,marker,identity,self.owner.objects,self.owner.manifests)
+        return result['input_checkpoint_digest']
 
     def execution_configuration(self, run_id: str, source: str, quota_attempt: int, native_directory: Path,
-                                request_path: Path, decision_path: Path, cwd: str) -> dict:
+                                request_path: Path, decision_path: Path, cwd: str, *, execution_files: dict | None = None) -> dict:
         """绑定逐代来源和真实会话，为现有 driver 提供公开交接配置。
 
         :param run_id: 当前 Run。
@@ -274,17 +223,22 @@ class ProjectScenarios:
         :param request_path: 候选通知。
         :param decision_path: 控制端只读决定。
         :param cwd: 容器真实目录。
+        :param execution_files: 远程文件所有者已核对的本次真实文件/计时回执，本机为None。
         :return: 不含隐藏评测的候选配置或私有评审配置。
         """
         context = self.context(run_id)
         if not context or not self.owner.execution_allowed(run_id):
             raise ValueError('场景执行已停止或父代次不符')
         execution = context['scenario_execution']
-        if execution['role'] == 'candidate':
+        if execution_files is not None and (execution_files['scope']['source']!=source
+                or execution_files['run_id']!=run_id or execution_files['work']['inputs']['task_id']!=context['scenario_task_id']):
+            raise ValueError('场景配置与实际节点文件回执来源不一致')
+        if execution['role'] == 'candidate' and execution_files is None:
             self._prepare_inputs(self.task(context['scenario_task_id']))
         native_directory.mkdir(parents=True, exist_ok=True)
-        os.chown(native_directory,1000,1000,follow_symlinks=False)
-        os.chown(native_directory.parent,1000,1000,follow_symlinks=False)
+        if execution_files is None:
+            os.chown(native_directory,1000,1000,follow_symlinks=False)
+            os.chown(native_directory.parent,1000,1000,follow_symlinks=False)
         native = native_directory / (context['session_id'] + '.jsonl')
         previous_sources = self.owner._rows('SELECT x.* FROM project_execution_sources x JOIN project_task_executions e '
             'ON e.id=x.execution_id WHERE e.session_id=? ORDER BY x.id', (context['session_id'],))
@@ -332,7 +286,9 @@ class ProjectScenarios:
                             (time.time(), context['scenario_task_id']))
             finally:
                 connection.close()
-        segment = self.reserve_segment(source_id, 1, Path('/proc/sys/kernel/random/boot_id').read_text().strip(), time.monotonic())
+        clock=(execution_files['clock'] if execution_files is not None else
+            {'boot_id':Path('/proc/sys/kernel/random/boot_id').read_text().strip(),'start_mono':time.monotonic()})
+        segment = self.reserve_segment(source_id, 1, clock['boot_id'], clock['start_mono'])
         request_path.unlink(missing_ok=True)
         work_path.unlink(missing_ok=True)
         payload = {'schema': 1, 'workflow_schema': 3, 'plan_id': context['scenario_instance_id'], 'run_id': run_id,
@@ -661,6 +617,10 @@ class ProjectScenarios:
         """
         if not source['request_relative'] or not self.owner.plans.control:
             return
+        if self.owner.execution_io is not None:
+            if not self.owner.execution_io.plan_running({**execution,'source':source['source']}):
+                return
+            self.owner.execution_io.sync_plan(execution['run_id'])
         request_path = self.owner.data / safe_relative(source['request_relative'])
         if not request_path.exists():
             return
@@ -684,6 +644,9 @@ class ProjectScenarios:
             if not proof.get('frozen') or proof.get('source') != source['source']:
                 raise ValueError('候选完整作业树暂停证明不符')
             frozen = True
+            if self.owner.execution_io is not None:
+                self.owner.execution_io.sync_plan(execution['run_id'])
+                request=self.owner.plans._request(request_path)
             boundaries = self.owner.plans._evidence(adapted_source, adapted_attempt, plan, request)
             path = self.owner.data / safe_relative(source['native_relative']) / (execution['session_id'] + '.jsonl')
             dialogue = self.owner.plans.dialogue.read_dialogue(path)
@@ -728,7 +691,8 @@ class ProjectScenarios:
                             (time.time(), task['id']))
                 finally:
                     connection.close()
-            write_document(self.owner.data / safe_relative(source['decision_relative']), decision, mode=0o640, owner=(0, 1000))
+            self.owner.plans._decision({'source':source['source'],'decision_relative':source['decision_relative'],
+                'decision_json':canonical_json(decision).decode()})
         finally:
             if frozen:
                 self.owner.plans.control(execution['run_id'], source['quota_attempt'], 'resume')
@@ -774,6 +738,8 @@ class ProjectScenarios:
         boundaries = source['evidence_end_json']
         if not error:
             try:
+                if self.owner.execution_io is not None:
+                    self.owner.execution_io.sync_plan(run_id)
                 self._observe_input(execution,source)
                 if boundaries is None:
                     boundaries = canonical_json(self.owner.plans._sizes(self.owner.data / safe_relative(source['native_relative']))).decode()
@@ -929,6 +895,10 @@ class ProjectScenarios:
                     'quota_attempt':run['quota_attempt'],'claude_code_version':run['claude_code_version'],
                     'claude_effort_level':run['claude_effort_level'],'model_override':run['execution_model']})
             if execution['run_status'] == 'running' and source and batch['status'] in ('active', 'pausing'):
+                if self.owner.execution_io is not None:
+                    if not self.owner.execution_io.plan_running({**execution,'source':source['source']}):
+                        continue
+                    self.owner.execution_io.sync_plan(execution['run_id'])
                 self._observe_input(execution,source)
                 self._collect_work(source)
                 if execution['role'] == 'candidate':
@@ -1266,17 +1236,22 @@ class ProjectScenarios:
                 spec = read_document(project.root / safe_relative(definition['evaluation']['native']))
                 profile = library.environments[project.manifest['environment']]
                 answer = read_document(self.owner.data / safe_relative(job['answer_relative']))['text']
-                native = self.owner.verifier.verify_native(candidate, project.root, spec,
-                    library.root / 'environments' / project.manifest['environment'], profile, answer=answer)
+                def verify(*,regression:bool=False,retry:bool=False) -> dict:
+                    """沿原执行位置验证冻结候选。:param regression: 完整回归。:param retry: 有限复验。:return: 原报告。"""
+                    if self.owner.execution_io is not None:
+                        report=self.owner.execution_io.verify_scenario(job,task,source,execution,regression=regression,retry=retry)
+                        if report is not None:
+                            return report
+                    return self.owner.verifier.verify_native(candidate,project.root,spec,
+                        library.root/'environments'/project.manifest['environment'],profile,
+                        answer='' if regression else answer,regression=regression)
+                native = verify()
                 if native['status'] == 'error':
-                    native = self.owner.verifier.verify_native(candidate, project.root, spec,
-                        library.root / 'environments' / project.manifest['environment'], profile, answer=answer)
+                    native = verify(retry=True)
                 if native['status'] == 'passed' and spec.get('regression'):
-                    regression = self.owner.verifier.verify_native(candidate, project.root, spec,
-                        library.root / 'environments' / project.manifest['environment'], profile, regression=True)
+                    regression = verify(regression=True)
                     if regression['status'] == 'error':
-                        regression = self.owner.verifier.verify_native(candidate, project.root, spec,
-                            library.root / 'environments' / project.manifest['environment'], profile, regression=True)
+                        regression = verify(regression=True,retry=True)
                     native = {'status':regression['status'], 'business':native, 'regression':regression}
                 report.update(native=native, status=native['status'])
             self.owner.plans._write('UPDATE project_evaluation_jobs SET native_result_json=? WHERE id=?', (canonical_json(report).decode(), job_id))
@@ -1368,6 +1343,10 @@ class ProjectScenarios:
         return self._reserve_run(batch, account, task, 'review', review_prompt(package,input_file='/input/package.json'), job, attempt)
 
     def _capture_review(self, execution: dict, source: dict) -> None:
+        if self.owner.execution_io is not None:
+            if not self.owner.execution_io.plan_running({**execution,'source':source['source']}):
+                return
+            self.owner.execution_io.sync_plan(execution['run_id'])
         path = self.owner.data / safe_relative(source['request_relative'])
         if not path.exists() or not self.owner.plans.control:
             return
@@ -1388,6 +1367,9 @@ class ProjectScenarios:
             if not proof.get('frozen') or proof.get('source') != source['source']:
                 raise ValueError('评审作业完整暂停证明不符')
             frozen = True
+            if self.owner.execution_io is not None:
+                self.owner.execution_io.sync_plan(execution['run_id'])
+                request=self.owner.plans._request(path)
             boundaries = self.owner.plans._evidence({**source, 'run_id': execution['run_id'], 'phase_seq': execution['turn_no']},
                 {'step_id': task['task_key'], 'expected_prompt': delivery['prompt']},
                 {'id': task['scenario_instance_id'], 'generation': execution['generation'], 'session_id': execution['session_id']}, request)
@@ -1408,7 +1390,8 @@ class ProjectScenarios:
                 (canonical_json(result).decode(),execution['id']))
             self.owner.plans._write('UPDATE project_execution_sources SET evidence_end_json=? WHERE id=?', (canonical_json(boundaries).decode(), source['id']))
             decision = {key: request[key] for key in ('schema', 'plan_id', 'run_id', 'source', 'generation', 'session_id', 'phase_seq', 'step_id', 'response_key')}
-            write_document(self.owner.data / safe_relative(source['decision_relative']), {**decision, 'action': 'complete'}, mode=0o640, owner=(0, 1000))
+            self.owner.plans._decision({'source':source['source'],'decision_relative':source['decision_relative'],
+                'decision_json':canonical_json({**decision,'action':'complete'}).decode()})
         finally:
             if frozen:
                 self.owner.plans.control(execution['run_id'], source['quota_attempt'], 'resume')
