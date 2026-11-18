@@ -1,0 +1,43 @@
+{
+  "id": "database-proof-workers-four",
+  "name": "database-proof-workers-four",
+  "title": "历史数据库四路演练与资源测量",
+  "description": "扩展既有来源演练为受限四路并发，保留完整八来源检查、失败收口与原子证据，测量双路及四路耗时和资源峰值。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-18",
+  "completedAt": "2026-11-18",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-18T13:50:29Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-18-release-speed-runtime-version",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "完成1/2/4并发参数及四路调度、排序和失败收口回归",
+      "完成主机资源采样和GitHub环境标记",
+      "完成相同八条合成历史的双路/四路真实Docker对照及启动故障注入",
+      "完成243项单测、工作流、数据库合同及规范同步"
+    ],
+    "partialStep": null,
+    "nextStep": "进入运行时平台版本与编译缓存解耦子任务的Brief评审",
+    "notes": "本地16核环境、三份控制镜像组成八条合成签名历史：双路174.172秒，四路91.254秒；GitHub runner真实八发行性能由后续明确发行验收。",
+    "updatedAt": "2026-11-18T13:50:29Z"
+  }
+}
