@@ -414,9 +414,10 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 
 - `manage.build(release: str, manifest_path: Path) -> None` 保留原调用方式；`_build_arguments(role: str) -> list[str]` 为两个角色生成受限命令前缀。
 - `verify_database_compatibility.verify(manifest: Path, public_key: str, output: Path, *, history_root: Path | None = None, workers: int = 1) -> dict`。
-- `python3 deploy/flower2api/verify_database_compatibility.py --manifest <候选清单> --output <新证据> --workers {1,2}`。
+- `python3 deploy/flower2api/verify_database_compatibility.py --manifest <候选清单> --output <新证据> --workers {1,2,4}`。
 - `python3 deploy/flower2api/build_cache_key.py images/v3/Dockerfile` 输出 backend 阶段及全局前言的 SHA256。
 - `python3 deploy/flower2api/verify_release_tests.py --python <已安装依赖的解释器>` 并行运行三组原发行校验，失败以非零状态退出。
+- `verification_resources.VerificationResources(workers: int, *, proc_root: Path = Path('/proc'), interval: float = 1.0)` 为历史演练提供独立的主机资源观测上下文。
 
 ### 3. Contracts
 
@@ -430,9 +431,10 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 - 联合镜像包继续采用流式 gzip，mtime=0、compresslevel=1，完整摘要和离线加载校验沿原合同。压缩收益与包大小变化使用实际样本测量，整体收益由下一次 CI 记录。
 - composite 内先注册 Actions cache 保存，再注册 cache-dance 挂载提取，post 按相反顺序提取、保存及回收 builder。只在所有准备成功后向 GITHUB_ENV 激活三个缓存选项；调用方仅容忍缓存准备错误，实际构建与验收错误继续阻断。
 - 两镜像继续来自同一受控源码快照，读取实际加载的镜像生成原联合清单，保留来源标签、run／attempt／SHA 与摘要检查。
-- workers 严格为整数1或2，bool 拒绝；默认串行，发行工作流显式2。协调器先核验候选、迁移合同及全部签名来源，再分发最多两路单来源演练。
+- workers 严格为整数1、2或4，bool 拒绝；默认串行，发行工作流显式4。协调器先核验候选、迁移合同及全部签名来源，再分发最多四路单来源演练；每容器保留768MiB、128PIDs及原隔离参数。
 - 各来源使用独立临时根、双库、UUID及容器，保留原安全参数和期限，完整执行两次迁移、新旧程序读写和快照恢复。首次失败通知共享停止状态，排队项停止，已启动项先执行原 finally 收口，再传播附来源 note 的原异常。
 - 全部来源成功后才原子写入证据，来源顺序沿受信目录，schema与checks字段维持原合同。每角色、每来源及总体耗时分别用 flower2api 性能事件记录。
+- `VerificationResources(workers, *, proc_root=Path('/proc'), interval=1.0)` 在工作线程执行期间采样，并在上下文退出时停止及回收采样线程，输出 `flower2api-database-resources`。事件固定 `scope=host`，包含 `github_actions,workers,available,samples,cpu_count,cpu_peak_percent,memory_total_bytes,memory_used_start_bytes,memory_used_peak_bytes,memory_used_peak_delta_bytes,memory_available_min_bytes,oom_kill_delta`；不可用附受控 `error=host_resources_unavailable`，未知值为null。CPU只计前八项并排除guest重复累计，内存以MemTotal-MemAvailable计量。主机指标包含Docker及其它进程，日志不进入原签名证据；采样缺失保持原演练错误和验证门禁。
 - 对外展示名为小写 `flower2api`；既有部署路径、CLI／API、浏览器存储键及签名身份按原升级合同保留；镜像及容器名称遵循下方名称切换合同。默认 main 注册手动构建入口；其 build job 只允许本仓 v3／flower2api，main自身跳过。实际工作使用所选目标分支源码。
 
 ### 4. Validation & Error Matrix
@@ -445,6 +447,8 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 | 缓存导入服务不可达 | BuildKit报告缓存错误，完整构建继续；实际编译失败仍阻断 |
 | PR、外仓、其它 ref／事件 | 无 GHA 缓存导出 |
 | workers为bool、0、3或字符串 | 文件和Docker读取前 ValueError |
+| 主机资源文件缺失、计数损坏或累计CPU/OOM回退 | 资源日志available=false，原演练成功/失败门禁及原异常保持 |
+| sudo运行正式兼容演练 | 显式保留GITHUB_ACTIONS供性能日志标注CI来源，签名私钥沿原限定环境传递 |
 | 首项晚完成、不同来源乱序完成 | 最终证据仍按原目录顺序排列 |
 | 任一来源失败 | 等待已启动项收口后抛原异常，零成功证据写入 |
 | main手动选择构建 | job跳过，目标分支由分支选择器明确指定 |
@@ -456,19 +460,20 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 - 正常：push flower2api完成只构建CI及缓存保存，再对同SHA手动构建；核对跨runner命中和含恢复／保存开销的完整耗时。
 - 基础：本地普通build保留原行为；显式builder使用load生成实际可检查的镜像；workers=1保留串行。
 - 错误用法：把构建步骤设为continue-on-error以隐藏缓存故障。正确方式：仅缓存准备可回退，编译、迁移、签名与发布失败继续阻断。
-- 错误用法：将四个真实历史镜像组成的八条合成历史测量写成正式八版本CI结果。正确方式：记录夹具构成；正式最近八个发行的双路演练由下一次明确发行独立验收。
+- 错误用法：将多个真实历史镜像组成的八条合成历史测量写成正式八版本CI结果。正确方式：记录夹具构成、CPU数量和主机指标范围；正式最近八个发行的四路演练由下一次明确发行独立验收。
 - 正常：只给 control 增加 sshpass，backend 配方和 Cargo 依赖恢复前缀保持一致；修改 Rust 基础镜像或编译参数则更换配方摘要。
 
 ### 6. Tests Required
 
 - `test_system_build_cache`：本地默认、角色scope、可信写入、非法配置零副作用、精确mount映射、恢复与提取顺序、仅缓存准备可容错。
 - `test_system_release_speed`：控制层与 Rust 配方隔离、全局参数失效、唯一阶段约束、三进程真实屏障、失败及启动异常收口、完整校验组与宿主权限；`test_publication` 继续验证 gzip 包原字节恢复及摘要。
-- `test_database_compatibility`：真实线程上限2、默认串行、乱序结果归位、待运行取消、运行项收口、原错误和来源note、非法workers。
+- `test_database_compatibility`：真实线程上限2及4、四路屏障、默认串行、乱序结果归位、待运行取消、运行项收口、原错误和来源note、失败保留原证据、CLI四路及非法workers。
+- `test_system_verification_resources`：guest CPU去重、内存计量、峰值保留、OOM增量、不可用指标null及受控错误、实际线程异常收口、无效计数拒绝；`test_system_workflow`核对sudo保留CI标记。
 - 原 `test_system_workflow`、`test_publication` 及系统更新回归覆盖手动发布门禁、固定包仓库外独立导入和摘要身份；actionlint核验实际两个分支工作流。
-- 真实隔离Docker对同一八来源做串行／双路对照及迁移启动故障注入，核对完整证据等价、成功证据边界和全部自有容器收口。使用合成密钥及测试数据。
+- 真实隔离Docker对同一八来源做双路／四路对照及迁移启动故障注入，核对完整检查、CPU与内存观测、成功证据边界和全部自有容器收口。使用合成密钥及测试数据，记录真实镜像与合成历史构成。
 - 实际Buildx缓存导入故障与真实构建失败分别验证；实际两轮同源构建后用 `manage.inspect_images` 核对两镜像的标签、平台和摘要。
 - Vue与运行时页面构建、原浏览器验收覆盖展示名称所在页面及原交互；README的本地链接与历史来源正文保留核对。
-- GitHub缓存命中、恢复／保存和完整冷热耗时依赖批准推送后的外部CI验收。正式八发行的双路证据由下一次明确发行承接。两类结果分别记录。
+- GitHub缓存命中、恢复／保存和完整冷热耗时依赖批准推送后的外部CI验收。正式八发行的四路证据及runner资源由下一次明确发行承接。两类结果分别记录。
 
 
 ## Scenario: Flower2API 单部署名称切换与完整快照

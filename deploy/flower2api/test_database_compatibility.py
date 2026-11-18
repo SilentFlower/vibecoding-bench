@@ -8,7 +8,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-from threading import Event, Lock
+from threading import Barrier, Event, Lock
 from urllib.error import HTTPError
 from unittest.mock import patch
 
@@ -115,6 +115,99 @@ class CompatibilityConcurrencyTests(unittest.TestCase):
             self.run_verification(Path(folder), worker)
         self.assertEqual(sequence, list(map(str, range(8))))
 
+    def test_four_workers_reach_barrier_keep_bound_and_restore_source_order(self) -> None:
+        """八来源分两批进入真实四路屏障，完成乱序仍保留完整且有序证据。:return: None。"""
+        barrier = Barrier(4)
+        first_finished = Event()
+        lock = Lock()
+        active = 0
+        maximum = 0
+        completed = []
+
+        def worker(release, *arguments):
+            """四个实际线程同时就绪，并强制来源0晚于来源1完成。"""
+            nonlocal active, maximum
+            with lock:
+                active += 1
+                maximum = max(maximum, active)
+            try:
+                barrier.wait(timeout=5)
+                if release['release'] == '0':
+                    self.assertTrue(first_finished.wait(5))
+                with lock:
+                    completed.append(release['release'])
+                if release['release'] == '1':
+                    first_finished.set()
+                return release, 0.01
+            finally:
+                with lock:
+                    active -= 1
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            result = self.run_verification(root, worker, workers=4)
+            self.assertEqual(result['sources'], [{'release': str(index)} for index in range(8)])
+            self.assertEqual(json.loads((root / 'proof.json').read_text()), result)
+        self.assertLess(completed.index('1'), completed.index('0'))
+        self.assertEqual(maximum, 4)
+        self.assertEqual(active, 0)
+
+    def test_four_worker_failure_waits_for_all_started_sources_and_keeps_existing_proof(self) -> None:
+        """首批四路失败后全部收口，排队来源停止，原证据文件保持原字节。:return: None。"""
+        barrier = Barrier(4)
+        lock = Lock()
+        started = []
+        cleaned = []
+        error = RuntimeError('合成四路来源失败')
+
+        def worker(release, raw, candidate, registries, contracts, history, stopped):
+            """通过首批屏障保证四路真实启动，失败意图先于线程领取下一项。"""
+            if stopped.is_set():
+                raise CancelledError()
+            with lock:
+                started.append(release['release'])
+            try:
+                barrier.wait(timeout=5)
+                if release['release'] == '0':
+                    stopped.set()
+                    raise error
+                self.assertTrue(stopped.wait(5))
+                return release, 0.01
+            finally:
+                with lock:
+                    cleaned.append(release['release'])
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            proof = root / 'proof.json'
+            proof.write_bytes(b'original-proof')
+            with self.assertRaises(RuntimeError) as caught:
+                self.run_verification(root, worker, workers=4)
+            self.assertIs(caught.exception, error)
+            self.assertEqual(proof.read_bytes(), b'original-proof')
+        self.assertEqual(set(started), set(map(str, range(4))))
+        self.assertEqual(set(cleaned), set(started))
+
+    def test_cli_accepts_four_and_rejects_three_before_verification(self) -> None:
+        """实际命令行解析接受4路，非法3路在验证函数调用之前拒绝。:return: None。"""
+        arguments = ['verify', '--manifest', '/synthetic/build', '--output', '/synthetic/proof',
+            '--public-key', 'a' * 64, '--workers']
+        with patch.object(sys, 'argv', [*arguments, '4']), patch.object(verifier, 'verify', return_value={'sources': []}) as verify:
+            verifier.main()
+            self.assertEqual(verify.call_args.kwargs['workers'], 4)
+        with patch.object(sys, 'argv', [*arguments, '3']), patch.object(verifier, 'verify') as verify:
+            with self.assertRaises(SystemExit):
+                verifier.main()
+            verify.assert_not_called()
+
+    def test_source_container_safety_limits_remain_bounded(self) -> None:
+        """并发扩展继续使用原容器隔离和单容器资源限制。:return: None。"""
+        arguments = verifier._container_arguments(Path('/synthetic/data'))
+        for option, value in (('--network', 'none'), ('--cap-drop', 'ALL'),
+                ('--security-opt', 'no-new-privileges'), ('--pids-limit', '128'), ('--memory', '768m')):
+            self.assertEqual(arguments[arguments.index(option) + 1], value)
+        self.assertIn('--read-only', arguments)
+
     def test_failure_waits_cleanup_cancels_pending_and_preserves_error(self) -> None:
         """来源失败后排队项停止，运行项收口完成后传播原异常。@return None。"""
         second = Event()
@@ -169,7 +262,7 @@ class CompatibilityConcurrencyTests(unittest.TestCase):
 
     def test_invalid_workers_stop_before_external_work(self) -> None:
         """非法并发输入在读取文件和Docker之前拒绝。@return None。"""
-        for workers in (True, False, 0, 3, '2'):
+        for workers in (True, False, 0, 3, 5, 8, '2', '4'):
             with self.subTest(workers=workers), patch.object(verifier, 'image_identity') as identity:
                 with self.assertRaises(ValueError):
                     verifier.verify(Path('/synthetic/missing'), '', Path('/synthetic/proof'), workers=workers)

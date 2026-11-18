@@ -110,7 +110,7 @@ class BuildCacheTests(unittest.TestCase):
             self.assertLess(steps.index(optional[0]), steps.index(build))
             if filename == 'v3-release.yml':
                 verify = next(step for step in steps if 'verify_database_compatibility.py --manifest' in step.get('run', ''))
-                self.assertIn('--workers 2', verify['run'])
+                self.assertIn('--workers 4', verify['run'])
 
 
 if __name__ == '__main__':

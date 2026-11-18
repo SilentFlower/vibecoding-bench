@@ -24,6 +24,7 @@ from system_release import REPO, data_contracts, migration_registries
 from system_update_contract import (DOWNLOAD_ROOT, INDEX_LIMIT, MANIFEST_LIMIT, REPOSITORY, fetch_bytes,
     fetch_repository_file, strict_json, validate_index, validate_release, verify_signed)
 from system_update_database import create_snapshot, restore_snapshot
+from verification_resources import VerificationResources
 
 
 BENCH_PROBE = '''
@@ -278,11 +279,11 @@ def verify(manifest: Path, public_key: str, output: Path, *, history_root: Path 
     :param public_key: 已配置的发行公钥。
     :param output: 完整证据输出路径。
     :param history_root: 可选本地合成签名历史，生产CI从固定受信目录读取。
-    :param workers: 同时验证的来源数，限定1或2，默认沿用串行。
+    :param workers: 同时验证的来源数，限定1、2或4，默认沿用串行。
     :return: 按原来源顺序排列、绑定来源及镜像摘要的完整证据。
     """
-    if type(workers) is not int or workers not in (1, 2):
-        raise ValueError('兼容演练并发数只能为1或2')
+    if type(workers) is not int or workers not in (1, 2, 4):
+        raise ValueError('兼容演练并发数只能为1、2或4')
     started = time.monotonic()
     build = strict_json(manifest.read_bytes())
     if history_root is None and (build.get('dirty_worktree') is not False or build.get('verification_only')):
@@ -295,7 +296,7 @@ def verify(manifest: Path, public_key: str, output: Path, *, history_root: Path 
     proofs = [None] * len(sources)
     stopped = Event()
     failure = None
-    with ThreadPoolExecutor(max_workers=workers) as executor:
+    with VerificationResources(workers), ThreadPoolExecutor(max_workers=workers) as executor:
         futures = {executor.submit(_verify_source, release, raw, candidate, registries,
             contracts, history_root, stopped): index for index, (release, raw) in enumerate(sources)}
         try:
@@ -342,7 +343,7 @@ def main() -> None:
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--public-key')
     parser.add_argument('--history-root', type=Path)
-    parser.add_argument('--workers', type=int, choices=(1, 2), default=1, help='同时验证的历史来源数，默认串行')
+    parser.add_argument('--workers', type=int, choices=(1, 2, 4), default=1, help='同时验证的历史来源数，默认串行')
     args = parser.parse_args()
     public_key = args.public_key
     if not public_key:
