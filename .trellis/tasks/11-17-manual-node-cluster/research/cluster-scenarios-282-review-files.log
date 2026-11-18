@@ -1,0 +1,22 @@
+...E
+======================================================================
+ERROR: test_review_original_run_stages_complete_package_and_reads_private_quota_before_unsubmitted_stop (test_cluster_scenario_review.ScenarioNodeReviewTests.test_review_original_run_stages_complete_package_and_reads_private_quota_before_unsubmitted_stop)
+原非共享Run核对完整包和私有额度路径，exec前停止保留原私有现场。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_scenario_review.py", line 127, in test_review_original_run_stages_complete_package_and_reads_private_quota_before_unsubmitted_stop
+    staged=self.node.runs.stage_review_input(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_runs.py", line 824, in stage_review_input
+    path=self._directory(scope,create=True)/'execution.json'
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_runs.py", line 237, in _directory
+    private_directory(path)
+  File "/root/project/vibecoding-bench/services/orchestrator/runtime_files.py", line 53, in private_directory
+    raise ValueError('私有目录权限或归属无效')
+ValueError: 私有目录权限或归属无效
+
+----------------------------------------------------------------------
+Ran 4 tests in 6.007s
+
+FAILED (errors=1)

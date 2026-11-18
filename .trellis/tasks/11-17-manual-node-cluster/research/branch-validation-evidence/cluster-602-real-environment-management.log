@@ -1,0 +1,62 @@
+合成环境管理开始：environment-state
+合成环境管理结束：environment-state 0.185
+合成环境管理开始：environment-cpu-read
+合成环境管理结束：environment-cpu-read 0.211
+合成环境管理开始：environment-state
+合成环境管理结束：environment-state 0.175
+合成环境管理开始：environment-cpu-set
+合成环境管理结束：environment-cpu-set 0.275
+合成环境管理开始：environment-state
+合成环境管理结束：environment-state 0.171
+合成环境管理开始：environment-cpu-set
+合成环境管理失败类型：ValueError
+合成环境管理结束：environment-cpu-set 0.213
+合成环境管理开始：environment-state
+合成环境管理结束：environment-state 0.198
+合成环境管理开始：environment-physical-refresh
+合成环境管理结束：environment-physical-refresh 0.303
+合成环境管理开始：environment-state
+合成环境管理结束：environment-state 0.165
+合成环境管理开始：environment-capture-read
+合成环境管理结束：environment-capture-read 0.194
+合成环境管理开始：environment-state
+合成环境管理结束：environment-state 0.199
+合成环境管理开始：environment-capture-settings
+合成环境管理结束：environment-capture-settings 0.195
+合成环境管理开始：environment-state
+合成环境管理结束：environment-state 0.174
+合成环境管理开始：environment-capture-set
+合成环境管理结束：environment-capture-set 12.154
+合成环境管理开始：environment-state
+合成环境管理结束：environment-state 0.202
+合成环境管理开始：environment-criu-settings
+合成环境管理结束：environment-criu-settings 0.202
+合成环境管理开始：environment-state
+合成环境管理结束：environment-state 0.195
+合成环境管理开始：environment-criu-set
+合成环境管理结束：environment-criu-set 12.008
+合成环境管理开始：environment-state
+合成环境管理结束：environment-state 0.192
+合成环境管理开始：environment-maintenance
+合成环境管理结束：environment-maintenance 5.98
+合成环境管理开始：environment-state
+合成环境管理结束：environment-state 0.219
+合成环境管理开始：environment-cpu-read
+合成环境管理结束：environment-cpu-read 0.231
+合成环境管理开始：environment-state
+合成环境管理结束：environment-state 0.209
+合成环境管理开始：environment-maintenance
+合成环境管理结束：environment-maintenance 0.52
+合成环境管理开始：environment-state
+合成环境管理结束：environment-state 0.2
+合成环境管理开始：environment-cpu-read
+合成环境管理结束：environment-cpu-read 0.206
+合成环境管理开始：environment-state
+合成环境管理结束：environment-state 0.217
+合成环境管理开始：environment-maintenance
+合成环境管理结束：environment-maintenance 6.378
+.
+----------------------------------------------------------------------
+Ran 1 test in 76.881s
+
+OK

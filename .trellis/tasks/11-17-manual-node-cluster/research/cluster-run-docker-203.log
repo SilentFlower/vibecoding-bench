@@ -1,0 +1,25 @@
+E
+======================================================================
+ERROR: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 100, in test_remote_account_preparation_and_sender_json_sse
+    prepared = service.prepare_node(node['id'], node['revision'])
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_service.py", line 382, in prepare_node
+    result = installer.prepare(node_id, revision)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_deployment.py", line 144, in prepare
+    node.observe()
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_ssh.py", line 301, in observe
+    raw = _run(self._arguments() + ['--', self.config.host, command], timeout=25)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_ssh.py", line 191, in _run
+    raise NodeSshError('remote_command_failed')
+cluster_ssh.NodeSshError: 节点检查命令失败，请核对 Python 3、Docker 和对应权限
+
+----------------------------------------------------------------------
+Ran 1 test in 17.575s
+
+FAILED (errors=1)

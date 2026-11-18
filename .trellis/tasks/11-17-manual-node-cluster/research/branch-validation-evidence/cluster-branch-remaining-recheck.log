@@ -1,0 +1,29 @@
+test_new_api_doctest_is_filtered_after_real_duplicate_collection (test_project_duplicate_adapter.DuplicateAdapterTests.test_new_api_doctest_is_filtered_after_real_duplicate_collection)
+原算法误报4对2，适配后原两节点真实执行且身份完全相等。@return None。 ... ok
+test_original_node_removal_rename_failure_and_extra_occurrence_are_rejected (test_project_duplicate_adapter.DuplicateAdapterTests.test_original_node_removal_rename_failure_and_extra_occurrence_are_rejected)
+原节点少、身份改、结果坏或重复次数增都不能被新范围规则隐藏。@return None。 ... ok
+test_product_stages_actual_runner_outside_readonly_verification_mount (test_project_duplicate_adapter.DuplicateAdapterTests.test_product_stages_actual_runner_outside_readonly_verification_mount)
+真实产品入口执行input根可信副本，并继续主机核完整重复身份。@return None。 ... ok
+test_public_failure_facts_keep_counts_and_reasons_with_bounded_structure (test_project_duplicate_adapter.DuplicateAdapterTests.test_public_failure_facts_keep_counts_and_reasons_with_bounded_structure)
+先保留失败计数，再裁剪大业务值，绝不透传原数组或日志。@return None。 ... ok
+test_unknown_runner_and_nonunique_known_fragment_are_rejected (test_project_duplicate_adapter.DuplicateAdapterTests.test_unknown_runner_and_nonunique_known_fragment_are_rejected)
+未知源码不凭片段猜测，已知版本也要求唯一精确片段。@return None。 ... ok
+test_retired_generated_content_is_not_a_production_catalog (test_project_iterations.ProjectIterationTests.test_retired_generated_content_is_not_a_production_catalog)
+正式库只接入就绪真实内容，临时调度夹具不计真实项目。@return None。 ... ERROR
+
+======================================================================
+ERROR: test_retired_generated_content_is_not_a_production_catalog (test_project_iterations.ProjectIterationTests.test_retired_generated_content_is_not_a_production_catalog)
+正式库只接入就绪真实内容，临时调度夹具不计真实项目。@return None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench-manual-node-cluster/services/orchestrator/test_project_iterations.py", line 470, in test_retired_generated_content_is_not_a_production_catalog
+    ready = ProjectLibrary(root)
+            ^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench-manual-node-cluster/services/orchestrator/project_library.py", line 311, in __init__
+    raise ValueError(f"项目 {key} 初始版本摘要不一致")
+ValueError: 项目 python-dateutil 初始版本摘要不一致
+
+----------------------------------------------------------------------
+Ran 6 tests in 8.401s
+
+FAILED (errors=1)

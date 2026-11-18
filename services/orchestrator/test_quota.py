@@ -440,6 +440,32 @@ class QuotaGuardTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.guard.recover()
 
+    def test_remote_unclosed_source_keeps_original_attempt_before_automatic_resume(self) -> None:
+        """节点原执行待核对时保持attempt，closed后继续原额度恢复流程。:return: None。"""
+        self._run(status='quota_wait')
+        self._state(quota_headers(time.time(), 600))
+        self.scheduler.submit = Mock()
+        remote = Mock()
+        remote.for_run.return_value = {'phase': 'reconcile'}
+        with patch.object(main, 'cluster_runner', remote):
+            self.guard.tick()
+            self.scheduler.submit.assert_not_called()
+            with main.get_db() as connection:
+                self.assertEqual(0, connection.execute("SELECT quota_attempt FROM runs WHERE id='original'").fetchone()[0])
+            remote.for_run.return_value = {'phase': 'closed'}
+            self.guard.tick()
+        self.scheduler.submit.assert_called_once()
+        self.assertEqual(1, self.scheduler.submit.call_args.args[2]['quota_attempt'])
+
+    def test_remote_recovery_completion_reuses_original_run_and_batch_quota_owner(self) -> None:
+        """节点实际停止之后，终态和额度等待沿原Scheduler维护批次。:return: None。"""
+        self._run(status='running', batch=True)
+        self._state(quota_headers(time.time(), 600, rejected=True))
+        main._complete_remote_run_recovery('original', 0, self.account)
+        self.assertEqual('quota_wait', main.get_run('original')['status'])
+        self.assertEqual('quota_wait', main.list_task_batches()[0]['status'])
+        self.assertEqual(0, main.list_task_batches()[0]['done_count'])
+
     def test_restart_recovers_control_when_observation_log_was_not_written(self) -> None:
         """日志未落盘即崩溃时，控制补证仍让原 run 等待而不提前投放。"""
         self._run(status="running")

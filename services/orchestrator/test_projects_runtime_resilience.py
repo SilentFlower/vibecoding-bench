@@ -376,7 +376,7 @@ class StartupFailureTests(unittest.TestCase):
     def test_failure_after_terminal_creation_is_visible_and_does_not_leak_private_exception(self):
         """进程创建后基线失败同样留证，原执行收口且错误不泄露路径。:return: None。"""
         self.activate()
-        with patch('projects.snapshot_tree', side_effect=OSError('/private/secret')):
+        with patch.object(self.terminal, 'snapshot', side_effect=OSError('/private/secret')):
             result = self.start_work()
         self.assertTrue(result['controller_yield'])
         self.assertEqual('startup_unknown', result['failure']['code'])

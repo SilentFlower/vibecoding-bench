@@ -75,7 +75,7 @@ def read_settings(runtime, row: dict, observation: dict | None = None) -> dict:
 
 
 def set_settings(runtime, row: dict, account: dict, enabled: bool,
-                 expected_generation: int, expected_revision: str) -> dict:
+                 expected_generation: int, expected_revision: str, *, lease_gateway=None, lease_owner: str | None = None) -> dict:
     """按冻结版本切换后续请求采集；失败恢复原策略。
 
     :param runtime: 已进入更新准入及账号锁的运行时。
@@ -84,6 +84,8 @@ def set_settings(runtime, row: dict, account: dict, enabled: bool,
     :param enabled: 管理员选择的目标状态。
     :param expected_generation: 页面冻结代次。
     :param expected_revision: 页面冻结配置摘要。
+    :param lease_gateway: 本次Node配置消费的原中央门禁。
+    :param lease_owner: 原中央唯一维护来源。
     :return: 实际生效状态；恢复失败保留待对账状态。
     """
     before = read_settings(runtime, row)
@@ -100,4 +102,4 @@ def set_settings(runtime, row: dict, account: dict, enabled: bool,
     if enabled and before['tls_observer']['protocol_version'] != 1:
         raise ValueError('当前镜像需要先通过系统更新安装原生TLS采集能力')
     return apply_settings(runtime, row, account, enabled, before, read_settings,
-        field='native_capture_enabled', label='采集', prefix='capture', audit_name='content-capture-operation.json')
+        field='native_capture_enabled', label='采集', prefix='capture', audit_name='content-capture-operation.json', lease_gateway=lease_gateway, lease_owner=lease_owner)

@@ -1,0 +1,16 @@
+test_dynaconf_public_env_keeps_exact_bytes_and_rejects_adjacent_private_files (test_manage.PublicSourceSnapshotTests.test_dynaconf_public_env_keeps_exact_bytes_and_rejects_adjacent_private_files)
+公开测试原件按路径和SHA放行，未知.env、改字节或换链接均不能进入。@return None。 ... ok
+test_public_log_exception_does_not_allow_other_logs_or_env (test_manage.PublicSourceSnapshotTests.test_public_log_exception_does_not_allow_other_logs_or_env)
+只允许精确路径和原始字节，改内容或换链接必须拒绝。@return None。 ... ok
+test_restore_exact_upstream_checkout_bytes (test_manage.PublicSourceSnapshotTests.test_restore_exact_upstream_checkout_bytes)
+已核CRLF转换可恢复，执行位不变；未知修改或父链接不能借恢复路径进入。@return None。 ... ok
+test_tracked_target_requires_whole_original_tree (test_manage.PublicSourceSnapshotTests.test_tracked_target_requires_whole_original_tree)
+保留真实期望夹具，但额外文件或字节变化不能借目录例外进入。@return None。 ... ok
+test_retired_generated_content_is_not_a_production_catalog (test_project_iterations.ProjectIterationTests.test_retired_generated_content_is_not_a_production_catalog)
+正式库只接入就绪真实内容，临时调度夹具不计真实项目。@return None。 ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 27.065s
+
+OK
+{"fallback_count": 1, "passed": true}

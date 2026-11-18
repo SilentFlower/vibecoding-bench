@@ -1,0 +1,15 @@
+............................/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+  warnings.warn(  # deprecated in 14.0 - 2024-11-09
+/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/uvicorn/protocols/websockets/websockets_impl.py:16: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+  from websockets.server import WebSocketServerProtocol
+节点执行失败 operation=api-quota-read error_type=ValueError frames=cluster_agent.py:116:dispatch,cluster_quota.py:118:read_api_quota
+.节点执行失败 operation=arbitrary-command error_type=ValueError frames=cluster_agent.py:156:dispatch,cluster_execution.py:907:execute_operation
+节点执行失败 operation=health error_type=ValueError frames=cluster_agent.py:92:dispatch,system_update_contract.py:57:strict_json,__init__.py:359:loads,decoder.py:337:decode,decoder.py:353:raw_decode,system_update_contract.py:48:unique
+节点执行失败 operation=prepare error_type=ValidationError frames=cluster_agent.py:156:dispatch,cluster_execution.py:909:execute_operation,main.py:596:model_validate
+.节点执行失败 operation=grant-renew error_type=ValueError frames=cluster_agent.py:106:dispatch,cluster_execution_grants.py:225:renew
+节点执行失败 operation=grant-get error_type=ValueError frames=cluster_agent.py:106:dispatch,cluster_execution_grants.py:276:get,cluster_execution_grants.py:150:_load
+....................
+----------------------------------------------------------------------
+Ran 50 tests in 44.543s
+
+OK

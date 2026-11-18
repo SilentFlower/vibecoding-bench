@@ -10,6 +10,7 @@ use serde_json::json;
 use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
 
+use crate::error::AppError;
 use crate::model::account::Account;
 use crate::model::identity::{
     DeviceProfile, RunProfile, build_full_env_json, device_profile, process_snapshot,
@@ -17,12 +18,15 @@ use crate::model::identity::{
 };
 use crate::service::account::AccountService;
 use crate::service::rewriter::ordered_anthropic_headers;
+use crate::service::runtime_background::{
+    self, BackgroundPurpose, GROWTHBOOK_CLIENT_KEY, TELEMETRY_BASE as UPSTREAM_BASE,
+};
 use crate::service::version_profile::{
     ClaudeCodeProfile, EVENT_LOGGING_V2_PATH, OAUTH_BETA_TOKEN, TelemetryShape,
     claude_code_user_agent, is_event_logging_path, profile_for_version, tls_profile_for_account,
 };
 use crate::store::account_store::AccountStore;
-use crate::tlsfp::{configured_default_tls_profile, get_request_client_for_profile};
+use crate::tlsfp::{TlsProfileId, configured_default_tls_profile, get_request_client_for_profile};
 
 // ---------------------------------------------------------------------------
 // 常量
@@ -38,9 +42,6 @@ const EVENT_QUEUE_MAX: usize = 200;
 const SLOW_FIRST_BYTE_MS: u64 = 10_000;
 const ADDITIONAL_METADATA_LONG_TEXT_LIMIT: usize = 1024;
 const EVENT_DATA_LONG_TEXT_LIMIT: usize = 4096;
-
-const UPSTREAM_BASE: &str = "https://api.anthropic.com";
-const GROWTHBOOK_CLIENT_KEY: &str = "sdk-zAZezfDKGoZuXXKe";
 
 // ---------------------------------------------------------------------------
 // 遥测路径判断
@@ -644,6 +645,7 @@ async fn telemetry_loop(
             let scan_summary = sanitize_telemetry_payload(&mut payload);
             let user_agent = session_ua(&session.account);
             let c = client.clone();
+            let transport_account = session.account.clone();
             session.last_event_batch_at = now;
             session.send_count += 1;
             let event_count = events.len();
@@ -660,6 +662,8 @@ async fn telemetry_loop(
             };
             send_telemetry(
                 &c,
+                &transport_account,
+                tls_profile,
                 &format!("{}{}", UPSTREAM_BASE, EVENT_LOGGING_V2_PATH),
                 &token,
                 &payload,
@@ -688,6 +692,7 @@ async fn telemetry_loop(
             let payload = build_growthbook_eval(&session.account, &session.run_profile);
             let user_agent = growthbook_user_agent_for_account(&session.account);
             let c = client.clone();
+            let transport_account = session.account.clone();
             session.last_growthbook_at = Some(now);
             session.send_count += 1;
             drop(map);
@@ -701,6 +706,8 @@ async fn telemetry_loop(
             };
             send_telemetry(
                 &c,
+                &transport_account,
+                tls_profile,
                 &format!("{}/api/eval/{}", UPSTREAM_BASE, GROWTHBOOK_CLIENT_KEY),
                 &token,
                 &payload,
@@ -739,6 +746,8 @@ fn growthbook_user_agent_for_account(account: &Account) -> &'static str {
 
 async fn send_telemetry(
     client: &reqwest::Client,
+    account: &Account,
+    tls_profile: TlsProfileId,
     url: &str,
     token: &str,
     body: &serde_json::Value,
@@ -755,7 +764,18 @@ async fn send_telemetry(
     }
     let req = req.json(body);
 
-    let result = req.send().await;
+    let purpose = if service_header {
+        BackgroundPurpose::TelemetryBatch
+    } else {
+        BackgroundPurpose::TelemetryEval
+    };
+    let result = match req.build() {
+        Ok(request) => {
+            runtime_background::execute(account, client.clone(), request, purpose, tls_profile)
+                .await
+        }
+        Err(_) => Err(AppError::BadRequest("遥测请求构造失败".into())),
+    };
 
     match result {
         Ok(resp) => {

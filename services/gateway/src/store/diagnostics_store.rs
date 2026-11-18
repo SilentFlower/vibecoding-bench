@@ -450,6 +450,7 @@ mod tests {
 
     fn attempt(request: &RequestDiagnostic) -> AttemptDiagnostic {
         AttemptDiagnostic {
+            execution_location: None,
             runtime: None,
             log_mode: None,
             capture_status: None,

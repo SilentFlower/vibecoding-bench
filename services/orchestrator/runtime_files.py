@@ -34,6 +34,29 @@ def directory_fd(path: Path, create: bool = False) -> int:
         raise
 
 
+def private_directory(path: Path) -> None:
+    """创建当前服务私有目录，已有目录只核对权限和归属。
+
+    :param path: 受控的精确目录，父级逐层拒绝链接。
+    :return: None；未知权限或归属保持原状并拒绝使用。
+    """
+    parent = directory_fd(path.parent, create=True)
+    try:
+        try:
+            os.mkdir(path.name, mode=0o700, dir_fd=parent)
+        except FileExistsError:
+            pass
+        descriptor = os.open(path.name, os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
+        try:
+            metadata = os.fstat(descriptor)
+            if metadata.st_uid != os.geteuid() or metadata.st_mode & 0o077:
+                raise ValueError('私有目录权限或归属无效')
+        finally:
+            os.close(descriptor)
+    finally:
+        os.close(parent)
+
+
 def atomic_json(path: Path, value: dict, mode: int = 0o600) -> None:
     """原子保存受限 JSON。
 

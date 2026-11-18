@@ -1,0 +1,10 @@
+....../root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+  warnings.warn(  # deprecated in 14.0 - 2024-11-09
+/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/uvicorn/protocols/websockets/websockets_impl.py:16: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+  from websockets.server import WebSocketServerProtocol
+...............请求快照清理 scanned=0 deleted=0 failed=1
+...................................................................................................................
+----------------------------------------------------------------------
+Ran 136 tests in 22.629s
+
+OK

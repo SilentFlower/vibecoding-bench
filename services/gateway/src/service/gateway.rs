@@ -3400,6 +3400,11 @@ impl GatewayService {
             if let Some(request) = scheduling_request {
                 trace.with_feedback(request.clone());
             }
+            trace.with_execution_location(
+                transport
+                    .as_ref()
+                    .and_then(|(transport, _)| transport.execution_location()),
+            );
             trace.commit();
         }
         let response_result = if let Some((transport, permit)) = transport {
@@ -4185,6 +4190,7 @@ impl GatewayService {
         info!(request_id = ?diagnostics::current_request_id(), native_job_id = %id,
             account_id = account.id, layer = "gateway", reason = "native_submission",
             "已提交本次原生作业");
+        let execution_location = transport.execution_location();
         let native_started = Instant::now();
         let mut response = match transport.submit_native(submission, submit_budget).await {
             Ok(response) => response,
@@ -4246,6 +4252,7 @@ impl GatewayService {
             if let Some(request) = scheduling {
                 trace.with_feedback(request.clone());
             }
+            trace.with_execution_location(execution_location);
             trace.commit_native(native_started);
         } else if response.status().is_success() || response.status().is_server_error() {
             diagnostics::local_outcome(if source_version == NativeSourceVersion::Cc280 {
@@ -16423,7 +16430,7 @@ mod tests {
         let handler_calls = calls.clone();
         let app = Router::new().route(
             "/v1/messages",
-            post(move || {
+            post(move |_: Bytes| {
                 let case = cases[handler_calls.fetch_add(1, Ordering::SeqCst)].clone();
                 async move {
                     let mut response = Response::builder()
@@ -16519,7 +16526,7 @@ mod tests {
                 .to_owned();
             let bytes = body::to_bytes(response.into_body(), 8 * 1024 * 1024)
                 .await
-                .unwrap();
+                .unwrap_or_else(|error| panic!("完整读取合成响应失败：{}：{error}", case.label));
             assert_eq!(bytes, case.wire, "原始响应必须不变：{}", case.label);
             wait_for_usage_count(&service, &account, index as i64 + 1).await;
             let diagnostics = service.diagnostics_store().unwrap();

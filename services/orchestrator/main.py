@@ -49,7 +49,7 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from native_capture import CaptureExpired, read_capture
 from native_kernel_upgrade import status as native_kernel_status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
@@ -64,7 +64,36 @@ from starlette.websockets import WebSocketState
 
 from quota_protocol import merge_quota_observation, passive_recovery_decision, quota_decision, quota_observation, quota_timestamp, warmup_quota_decision, warmup_sample_used
 from account_runtime import AccountRuntime, RuntimeBusy, V3_DEFAULT_TIMEZONE, atomic_json, derive_v3_fingerprint
+from oauth_refresh_probe import OAUTH_REFRESH_SCRIPT, execute_oauth_refresh_probe
 from account_update_identity import role_release
+from cluster_api import cluster_router
+from cluster_service import ClusterService
+from cluster_environment_control import RemoteEnvironmentControl
+from cluster_execution_store import NodeExecutions
+from cluster_projects_terminal import ClusterProjectsTerminal
+from cluster_quota import RemoteApiQuota, RemoteTerminalQuota
+from cluster_runner import ClusterRunner
+from cluster_credential_refresh import RemoteCredentialRefresh
+from cluster_login_runner import ClusterAccountLogins
+from cluster_draft_login_runner import ClusterDraftLogins
+from cluster_draft_login_contract import DraftLoginPreparation, DraftLoginSettings, DraftLoginWork, draft_preparation_sha256
+from cluster_bound_login_runner import ClusterBoundAccountLogins
+from cluster_quiesce import quiesce_remote
+from cluster_owner_runner import RemoteOwnerTransitions
+from oauth_status import read_oauth_status, oauth_expiry_status
+from quota_probe import QUOTA_PROBE_SCRIPT
+from cluster_legacy_project_io import ClusterLegacyProjectIO
+from cluster_run_programs import RemoteRunPrograms
+from cluster_continue_contract import ContinueTask, ContinueWork
+from cluster_continue_runner import ClusterContinues
+from continue_pty import open_continue_pty
+from cluster_store import ClusterStore
+from cluster_terminal_sessions import TerminalSessions
+from cluster_execution_grants import ExecutionScope
+from cluster_transport import node_transport_router
+from cluster_nodes import AccountNodeChange
+from cluster_migration_api import MigrationOperations, migration_router
+from cluster_migration_runner import MigrationCoordinator
 from credential_ownership import CredentialOwnership
 from cli_quota import statusline_quota_observation
 from cli_telemetry_policy import cli_telemetry_environment, cli_telemetry_mode
@@ -77,7 +106,8 @@ from proxy_sync import synchronize_proxy
 from physical_features import physical_features_summary
 from run_windows import normalize_run_window, run_window_snapshot
 from project_library import ProjectLibrary, safe_relative
-from run_artifacts import read_workspace_file
+from run_artifacts import list_workspace_files, read_workspace_file
+from run_usage import native_session_usage, run_usage, usage_input_tokens
 from project_requester_settings import ProjectRequesterSettings
 from project_scenarios import initialize_scenario_schema
 from project_iteration import PROJECT_RUN_KIND, PROJECT_RUN_KINDS, PROJECT_SCHEMA, ProjectIterationManager, initialize_plan_schema
@@ -371,11 +401,7 @@ def _usage_input_tokens(usage: dict) -> int:
     :param usage: Claude usage 对象
     :return: 普通输入 + cache 写入 + cache 读取 token
     """
-    return (
-        int(usage.get("input_tokens") or 0)
-        + int(usage.get("cache_creation_input_tokens") or 0)
-        + int(usage.get("cache_read_input_tokens") or 0)
-    )
+    return usage_input_tokens(usage)
 
 
 def _merge_claude_settings(existing: object, defaults: dict[str, object]) -> dict[str, object]:
@@ -585,50 +611,134 @@ def _read_account_oauth_status(account_name: str) -> dict[str, object]:
     :param account_name: accounts.name 字段
     :return: 仅包含过期时间和状态的安全对象，不返回 token 明文
     """
-    credentials_path = PROFILES_DIR / account_name / ".credentials.json"
-    result: dict[str, object] = {
-        "oauth_expires_at_ms": None,
-        "oauth_expires_at_iso": None,
-        "oauth_expires_in_sec": None,
-        "oauth_token_state": "missing",
-    }
-    if not credentials_path.exists():
-        return result
+    return read_oauth_status(PROFILES_DIR / account_name / ".credentials.json")
+
+
+def _remote_credential_owner(account: dict):
+    """定位独立SSH账号的原当前所有者，明确本机返回None。"""
+    if account_runtime and cluster_service and account.get('cc2api_account_id') is None:
+        assignment=cluster_service.store.assignment(account['id'])
+        if assignment['kind']=='ssh':
+            if not cluster_runner or not cluster_runner.credentials:
+                raise ValueError('所属节点的当前凭据所有者尚未准备')
+            return cluster_runner.credentials
+    return None
+
+
+def _read_current_owner_material(account: dict) -> dict | None:
+    """只供原受信所有权流程读取Node当前HOME材料。
+
+    :param account: 已在owner锁内重读的账号。
+    :return: 当前Node完整材料；明确本机返回None使用原读取器。
+    """
+    owner=_remote_credential_owner(account)
+    return owner.read_material(account) if owner is not None else None
+
+
+def _remote_account_logins(account: dict):
+    """按当前人工归属选择已有账号的具体登录协调器。
+
+    :param account: 当前已有账号。
+    :return: SSH登录协调器；本机返回None。
+    """
+    if account_runtime and cluster_service and cluster_service.store.assignment(account['id'])['kind']=='ssh':
+        coordinator=cluster_bound_logins if account.get('cc2api_account_id') is not None else cluster_logins
+        if coordinator is None or not coordinator.routes(account):
+            raise ValueError('所属节点的登录协调器尚未就绪')
+        return coordinator
+    return None
+
+
+def _remote_draft_record(row: dict) -> Optional[dict]:
+    """按中央持久记录识别节点草稿，服务或初始化缺口继续关闭本机回退。
+
+    :param row: 原账号环境行。
+    :return: 当前节点草稿记录；明确本机时为None。
+    """
+    if account_runtime is None:
+        return None
+    connection=get_db()
     try:
-        data = json.loads(credentials_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        result["oauth_token_state"] = "invalid"
-        return result
-    oauth = data.get("claudeAiOauth") if isinstance(data, dict) else None
-    if not isinstance(oauth, dict):
-        result["oauth_token_state"] = "invalid"
-        return result
-    token = oauth.get("accessToken")
-    expires_at = oauth.get("expiresAt")
-    if not isinstance(token, str) or not token:
-        result["oauth_token_state"] = "missing"
-        return result
-    if not isinstance(expires_at, (int, float)):
-        result["oauth_token_state"] = "invalid"
-        return result
-    expires_at_ms = int(expires_at)
-    expires_in_sec = int((expires_at_ms - int(time.time() * 1000)) / 1000)
-    if expires_in_sec <= 0:
-        state = "expired"
-    elif expires_in_sec <= 10 * 60:
-        state = "expiring"
-    else:
-        state = "valid"
-    result.update({
-        "oauth_expires_at_ms": expires_at_ms,
-        "oauth_expires_at_iso": time.strftime(
-            "%Y-%m-%dT%H:%M:%SZ",
-            time.gmtime(expires_at_ms / 1000),
-        ),
-        "oauth_expires_in_sec": expires_in_sec,
-        "oauth_token_state": state,
-    })
-    return result
+        table=connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='node_login_drafts'").fetchone()
+        registered=(connection.execute('SELECT 1 FROM node_login_drafts WHERE environment_id=?',
+            (row['environment_id'],)).fetchone() if table else None)
+    finally:
+        connection.close()
+    if registered:
+        if cluster_draft_logins is None:
+            raise ValueError('原节点草稿登录服务尚未就绪')
+        return cluster_draft_logins.ledger.find(row['environment_id'])
+    marker_path=BENCH_DATA/'login-drafts'/(row['environment_id']+'.json')
+    if not marker_path.exists() and not marker_path.is_symlink():
+        return None
+    marker=LoginDraftStore(account_runtime,get_db,_db_lock).record(row)
+    if marker.get('node_id') is not None:
+        raise ValueError('原节点草稿初始化尚需核对，请保留原资料')
+    return None
+
+
+def _remote_session_logins(session):
+    """按会话冻结绑定定位原协调器，后续账号改绑仍保留历史结果。
+
+    :param session: 已冻结的节点登录会话。
+    :return: 原具体登录协调器。
+    """
+    coordinator=(cluster_draft_logins if session.draft_generation is not None else
+        cluster_bound_logins if session.binding_id is not None else cluster_logins)
+    if coordinator is None:
+        raise ValueError('原节点登录协调器尚未就绪')
+    return coordinator
+
+
+def _read_remote_bound_identity(account: dict, configuration: dict) -> dict | None:
+    """原Owner通过所属Node读取当前设备，明确本机沿用原来源。
+
+    :param account: 原绑定账号。
+    :param configuration: 原Gateway当前配置。
+    :return: 无令牌设备身份；本机返回None。
+    """
+    coordinator=_remote_account_logins(account)
+    return coordinator.identity_reader.read(account,configuration) if coordinator is not None else None
+
+
+def _remote_reauth_idle(account: dict, record: dict) -> bool | None:
+    """由原具体节点登录核验实际停止与租约释放。
+
+    :param account: 原绑定账号。
+    :param record: 原长期重授权记录。
+    :return: 原Node核验结果；本机返回None。
+    """
+    coordinator=_remote_account_logins(account)
+    return coordinator.owner_idle(account,record) if coordinator is not None else None
+
+
+def _remote_reauth_publish(account: dict, snapshot: dict, record: dict, value: dict) -> bool | None:
+    """原Owner收口时发布Gateway当前AT并核对原导入关联。
+
+    :param account: 原绑定账号。
+    :param snapshot: 原Gateway权威快照。
+    :param record: 原长期重授权记录。
+    :param value: 原所有权回执。
+    :return: 原Node发布结果；本机返回None。
+    """
+    coordinator=_remote_account_logins(account)
+    return coordinator.owner_publish(account,snapshot,record,value) if coordinator is not None else None
+
+
+def _account_oauth_status(account: dict, *, observe: bool = False) -> dict:
+    """按实际独立账号归属选择当前所有者状态。
+
+    :param account: 当前账号行。
+    :param observe: 后台或手动入口是否读取当前Node。
+    :return: 无凭据状态；节点观察未知时保留unknown。
+    """
+    try:
+        owner=_remote_credential_owner(account)
+        if owner is not None:
+            return owner.status(account,observe=observe)
+    except Exception:
+        return oauth_expiry_status(None,token_state='unknown')
+    return _read_account_oauth_status(account['name'])
 
 
 # ============== cc2api 集成 ==============
@@ -1254,7 +1364,7 @@ def _sync_bound_account_credentials_locked(
         if credential_ownership:
             credential_ownership.observe_gateway_failure(account)
         raise
-    if account_runtime:
+    if account_runtime and (not cluster_service or cluster_service.store.assignment(account['id'])['kind'] == 'local'):
         row = account_runtime._row(account["name"], account["id"])
         account_runtime.sync_credentials(row, account)
     return snapshot
@@ -1506,6 +1616,14 @@ def _account_reference_counts(conn: sqlite3.Connection, account_id: int) -> dict
         warmup = conn.execute('SELECT COUNT(*) AS n FROM warmup_pi_agents WHERE account_id=?', (account_id,)).fetchone()['n']
         if warmup:
             counts['warmup_pi_agents'] = warmup
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='node_migrations'").fetchone():
+        migrations = conn.execute('SELECT COUNT(*) FROM node_migrations WHERE account_id=?', (account_id,)).fetchone()[0]
+        if migrations:
+            counts['node_migrations'] = migrations
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='node_executions'").fetchone():
+        executions = conn.execute('SELECT COUNT(*) FROM node_executions WHERE account_id=?', (account_id,)).fetchone()[0]
+        if executions:
+            counts['node_executions'] = executions
     return counts
 
 
@@ -1519,17 +1637,18 @@ def _account_is_available(account: dict) -> bool:
     return int(account.get("enabled") or 0) == 1 and account.get("deleted_at") is None
 
 
-def _get_available_account(conn: sqlite3.Connection, account_id: int) -> Optional[sqlite3.Row]:
+def _get_available_account(conn: sqlite3.Connection, account_id: int, *, include_disabled: bool = False) -> Optional[sqlite3.Row]:
     """
     读取允许参与新运行和凭据刷新的账号。
 
     :param conn: 当前数据库连接
     :param account_id: accounts.id
-    :return: 可用账号行；不存在、停用或软删除时返回 None
+    :param include_disabled: 管理迁移可读取停用账号，保持原启用值。
+    :return: 已确认账号行；普通读取继续排除停用账号。
     """
     row = conn.execute(
-        "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL",
-        (account_id,),
+        "SELECT * FROM accounts WHERE id=? AND (enabled=1 OR ?=1) AND deleted_at IS NULL",
+        (account_id, int(include_disabled)),
     ).fetchone()
     return row if row and not _login_save_pending(conn, row["name"]) else None
 
@@ -2780,6 +2899,7 @@ class QuotaGuard:
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
+        self.remote_api = None
 
     def snapshot(self, account: dict) -> dict:
         """
@@ -3036,8 +3156,8 @@ class QuotaGuard:
         :return: 是否可以创建正式 worker
         """
         effective_workload = workload or ("warmup" if warmup else None)
+        self.consume(account)
         with self._lock:
-            self.consume(account)
             snapshot = self.snapshot(account)
             if snapshot["blocked"]:
                 self._publish(account)
@@ -3191,9 +3311,12 @@ class QuotaGuard:
         :param account: 当前账号行
         :return: None
         """
+        if self.remote_api:
+            self.remote_api.pull(account)
         with self._lock:
             identity = _quota_identity(account)
-            if account_runtime and account.get("cc2api_account_id") is not None:
+            if (account_runtime and account.get("cc2api_account_id") is not None
+                    and (not cluster_service or cluster_service.owns_local({'account_id': account['id']}))):
                 connection = get_db()
                 try:
                     environment = connection.execute("SELECT * FROM account_environments WHERE account_id=?", (account["id"],)).fetchone()
@@ -3289,7 +3412,7 @@ class QuotaGuard:
                 conn.close()
             try:
                 # workspace 的状态文件可写；只有 Recorder 私有控制补证才可跳过整体耗尽分类。
-                control = json.loads((_quota_control(source.split(":")[1], source) / "pause.json").read_text())
+                control = _read_quota_control(source.split(':')[1], source) or {}
                 warmup_wait = bool(run and run["run_kind"] == "warmup" and run["account_id"] == account["id"]
                                    and source == _quota_source(source.split(":")[1], run["quota_attempt"])
                                    and control.get("source") == source and control.get("warmup_wait") is True
@@ -3436,6 +3559,15 @@ class QuotaGuard:
             if PROJECTS_AGENT_ENABLED and run['run_kind'] in PROJECT_RUN_KINDS:
                 # 旧 Projects 已进入只读历史；重启恢复不能重新认领或改写旧执行。
                 continue
+            if cluster_runner:
+                try:
+                    remote = cluster_runner.for_run(run['id'])
+                except ValueError:
+                    # 原账本损坏由节点恢复入口保留该账号占用，其他账号继续初始化。
+                    continue
+                if remote is not None and remote['record']['work']['task']['quota_attempt'] == run['quota_attempt']:
+                    # 远程恢复由原操作后台核对真实停止；单节点离线不阻塞中央启动。
+                    continue
             account = by_id.get(run["account_id"])
             if (run["status"] == "queued" and run.get("window_wait_until") is not None
                     and run.get("started_at") is None and not run.get("worker_container") and not run.get("stop_requested_at")):
@@ -3498,11 +3630,10 @@ class QuotaGuard:
         if run.get("quota_identity") and run["quota_identity"] != _quota_identity(account):
             return None
         source = _quota_source(run["id"], int(run["quota_attempt"]))
-        path = _quota_control(run["id"], source) / "pause.json"
-        if not path.exists():
-            return None
         try:
-            payload = json.loads(path.read_text())
+            payload = _read_quota_control(run['id'], source)
+            if payload is None:
+                return None
             if not isinstance(payload, dict) or payload.get("source") != source:
                 return "failed"
             if payload.get("status") == "quota_wait":
@@ -3565,6 +3696,14 @@ class QuotaGuard:
                 continue
             if scheduler.is_executing(run["id"], int(run["quota_attempt"])):
                 continue
+            if cluster_runner:
+                try:
+                    remote = cluster_runner.for_run(run['id'])
+                except ValueError:
+                    continue
+                if remote is not None and remote['phase'] != 'closed':
+                    # 原节点未确认停止时保留旧attempt，恢复不能越过未知执行另建来源。
+                    continue
             if run['run_kind'] in PROJECT_RUN_KINDS and project_iterations.scenarios.finish_captured_quota(run['id']):
                 continue
             if run["run_kind"] == "capture" and run["quota_resume_at"] is not None and run["quota_resume_at"] > time.time():
@@ -3733,6 +3872,28 @@ def _quota_control(run_id: str, source: str) -> Path:
     return BENCH_DATA / "quota-controls" / run_id / hashlib.sha256(source.encode()).hexdigest()[:20]
 
 
+def _read_quota_control(run_id: str, source: str) -> dict | None:
+    """只读原本机或节点root额度补证，保持原source与attempt归属。
+
+    :param run_id: 原Run。
+    :param source: 原执行来源。
+    :return: 原补证；该次未产生控制文件时为None。
+    """
+    if cluster_continues:
+        original = cluster_continues.for_source(run_id, source)
+        if original is not None:
+            return cluster_continues.quota_control(original)
+    if cluster_runner:
+        row = cluster_runner.for_run(run_id)
+        if row is not None:
+            if row['source'] != source:
+                return None
+            raw = cluster_runner.artifact(run_id, 'quota-control.json')
+            return json.loads(raw) if raw is not None else None
+    path = _quota_control(run_id, source) / 'pause.json'
+    return json.loads(path.read_text()) if path.exists() else None
+
+
 class Runner:
     """封装 sidecar + worker 的生命周期"""
 
@@ -3766,6 +3927,9 @@ class Runner:
         :param run_id: 原 run ID
         :return: None
         """
+        if cluster_runner and cluster_runner.for_run(run_id) is not None:
+            cluster_runner.cleanup_run(run_id)
+            return
         if account_runtime:
             with account_runtime.lock:
                 jobs = [job for job in account_runtime.jobs.values() if job.get("run_id") == run_id]
@@ -3796,25 +3960,6 @@ class Runner:
         fp = derive_fingerprint(acc_name)
         tz = _effective_account_timezone(account)
 
-        # 容器内创建运行目录（docker 会按宿主路径挂载到子容器）
-        if not (project_iterations and project_iterations.run_context(run_id)):
-            (BENCH_DATA / "workspaces" / run_id).mkdir(parents=True, exist_ok=True)
-        if not account_runtime:
-            (BENCH_DATA / "workspaces" / run_id / ".claude-home").mkdir(parents=True, exist_ok=True)
-        review = bool(account_runtime and account_runtime.reviews.is_review(run_id))
-        if not review:
-            (BENCH_DATA / "flows" / acc_name / str(task["id"]) / run_id).mkdir(parents=True, exist_ok=True)
-        CA_DIR.mkdir(parents=True, exist_ok=True)
-        if not review:
-            _persist_default_claude_settings(BENCH_DATA / "profiles" / acc_name)
-            _persist_default_claude_top_config(BENCH_DATA / "profiles" / acc_name)
-            _make_worker_owned(BENCH_DATA / "workspaces" / run_id)
-
-        host_workspace = HOST_BENCH_DATA / "workspaces" / run_id
-        host_claude_home = HOST_BENCH_DATA / "workspaces" / run_id / ".claude-home"
-        host_flows = HOST_BENCH_DATA / "flows" / acc_name / str(task["id"]) / run_id
-        host_profile = HOST_BENCH_DATA / "profiles" / acc_name
-        host_ca = HOST_BENCH_DATA / "ca"
         capture_full_http = bool(task.get("capture_full_http"))
         managed_oauth = account.get("cc2api_account_id") is not None
         claude_code_version = _resolve_run_claude_code_version(
@@ -3826,20 +3971,6 @@ class Runner:
         permission_mode = _resolve_capture_permission_mode(
             task.get("capture_permission_mode")
         )
-        sidecar_env = _sidecar_proxy_env(account)
-        sidecar_env.update({
-            "DNS_READY_HOST": DNS_READY_HOST,
-            # 抓包 run 是诊断模式，必须独立于全局默认值保存完整 flow。
-            "SAVE_FULL_FLOWS": "1" if capture_full_http else SAVE_FULL_FLOWS,
-        })
-        if capture_full_http:
-            sidecar_env.update({
-                "CAPTURE_FULL_HTTP": "1",
-                "CAPTURE_MODE": str(task.get("capture_mode") or "full_http"),
-                "CAPTURE_SCOPE": "all",
-                "CAPTURE_TARGETS": "anthropic.com,claude.com",
-                "CAPTURE_MAX_BODY_BYTES": "0",
-            })
         timing = decode_followup_timing(task.get("followup_timing_json"),
             len(decode_followups(task.get("followup_plan_json"))))
         worker_env = cli_telemetry_environment({
@@ -3867,6 +3998,59 @@ class Runner:
             "LC_ALL": fp["lang"],
         })
         source = _quota_source(run_id, int(task.get("quota_attempt") or 0))
+        worker_env.update(QUOTA_SOURCE=source, QUOTA_WARMUP="1" if task.get("warmup") else "0")
+        if task.get("resume_session_id"):
+            worker_env["RESUME_SESSION_ID"] = task["resume_session_id"]
+        if managed_oauth:
+            worker_env["CC2API_MANAGED_OAUTH"] = "1"
+        model_override = task.get("model_override")
+        if isinstance(model_override, str) and model_override:
+            # 只给当前 worker 进程传一次性模型覆盖，避免污染账号 profile settings。
+            worker_env["CLAUDE_MODEL_OVERRIDE"] = model_override
+        elif not capture_full_http and "model_override" not in task:
+            # 普通 / 批量 run 复用抓包的 --model 一次性覆盖链路；
+            # 抓包 run 留空时必须沿用自身默认模型，不能被页面或环境全局配置带偏。
+            worker_env["CLAUDE_MODEL_OVERRIDE"] = effective_runtime_model()
+
+        if cluster_runner and cluster_runner.routes(account):
+            try:
+                return cluster_runner.start(run_id, account, task, worker_env)
+            except ValidationError:
+                raise RuntimeBusy('所属节点执行配置需要核对，请查看节点和原任务状态') from None
+
+        # 容器内创建运行目录（docker 会按宿主路径挂载到子容器）
+        if not (project_iterations and project_iterations.run_context(run_id)):
+            (BENCH_DATA / "workspaces" / run_id).mkdir(parents=True, exist_ok=True)
+        if not account_runtime:
+            (BENCH_DATA / "workspaces" / run_id / ".claude-home").mkdir(parents=True, exist_ok=True)
+        review = bool(account_runtime and account_runtime.reviews.is_review(run_id))
+        if not review:
+            (BENCH_DATA / "flows" / acc_name / str(task["id"]) / run_id).mkdir(parents=True, exist_ok=True)
+        CA_DIR.mkdir(parents=True, exist_ok=True)
+        if not review:
+            _persist_default_claude_settings(BENCH_DATA / "profiles" / acc_name)
+            _persist_default_claude_top_config(BENCH_DATA / "profiles" / acc_name)
+            _make_worker_owned(BENCH_DATA / "workspaces" / run_id)
+
+        host_workspace = HOST_BENCH_DATA / "workspaces" / run_id
+        host_claude_home = HOST_BENCH_DATA / "workspaces" / run_id / ".claude-home"
+        host_flows = HOST_BENCH_DATA / "flows" / acc_name / str(task["id"]) / run_id
+        host_profile = HOST_BENCH_DATA / "profiles" / acc_name
+        host_ca = HOST_BENCH_DATA / "ca"
+        sidecar_env = _sidecar_proxy_env(account)
+        sidecar_env.update({
+            "DNS_READY_HOST": DNS_READY_HOST,
+            # 抓包 run 是诊断模式，必须独立于全局默认值保存完整 flow。
+            "SAVE_FULL_FLOWS": "1" if capture_full_http else SAVE_FULL_FLOWS,
+        })
+        if capture_full_http:
+            sidecar_env.update({
+                "CAPTURE_FULL_HTTP": "1",
+                "CAPTURE_MODE": str(task.get("capture_mode") or "full_http"),
+                "CAPTURE_SCOPE": "all",
+                "CAPTURE_TARGETS": "anthropic.com,claude.com",
+                "CAPTURE_MAX_BODY_BYTES": "0",
+            })
         quota_env, quota_sidecar_volumes, quota_worker_volumes = self._quota_mounts(
             account, run_id, source, FLOWS_DIR / acc_name / str(task["id"]) / run_id, warmup=bool(task.get("warmup")))
         sidecar_env.update(quota_env)
@@ -3874,8 +4058,6 @@ class Runner:
             sidecar_env['CAPTURE_CONTEXT'] = capture_context_json(source, claude_code_version,
                 run_id=run_id, version_source=task.get('claude_code_version_source'))
         worker_env.update({key: value for key, value in quota_env.items() if key in ("QUOTA_SOURCE", "QUOTA_SIGNAL_FILE", "QUOTA_WARMUP")})
-        if task.get("resume_session_id"):
-            worker_env["RESUME_SESSION_ID"] = task["resume_session_id"]
         if managed_oauth:
             worker_env["CC2API_MANAGED_OAUTH"] = "1"
             for marker_name in (
@@ -3886,14 +4068,6 @@ class Runner:
                     (WORKSPACES_DIR / run_id / marker_name).unlink()
                 except FileNotFoundError:
                     pass
-        model_override = task.get("model_override")
-        if isinstance(model_override, str) and model_override:
-            # 只给当前 worker 进程传一次性模型覆盖，避免污染账号 profile settings。
-            worker_env["CLAUDE_MODEL_OVERRIDE"] = model_override
-        elif not capture_full_http and "model_override" not in task:
-            # 普通 / 批量 run 复用抓包的 --model 一次性覆盖链路；
-            # 抓包 run 留空时必须沿用自身默认模型，不能被页面或环境全局配置带偏。
-            worker_env["CLAUDE_MODEL_OVERRIDE"] = effective_runtime_model()
 
         if account_runtime:
             return account_runtime.start_run(account, task, run_id, worker_env, sidecar_env)
@@ -4015,6 +4189,8 @@ class Runner:
         :param worker_id: 本代完整执行标识。
         :return: 实际进程退出码。
         """
+        if cluster_runner and cluster_runner.handles(worker_id):
+            return cluster_runner.wait_worker(worker_id)
         if account_runtime:
             return account_runtime.wait_worker(worker_id)
         worker = self.client.containers.get(worker_id)
@@ -4028,6 +4204,8 @@ class Runner:
         :param run_id: runs.id
         :return: 状态字典；文件缺失或格式异常时返回空 dict
         """
+        if cluster_runner and cluster_runner.for_run(run_id) is not None:
+            return cluster_runner.status(run_id)
         path = account_runtime.run_artifact_path(run_id, "status.json") if account_runtime else (
             WORKSPACES_DIR / run_id / ".bench-status.json"
         )
@@ -4040,6 +4218,12 @@ class Runner:
         return data if isinstance(data, dict) else {}
 
     def cleanup(self, sidecar_id: Optional[str], worker_id: Optional[str]) -> None:
+        if cluster_continues and cluster_continues.handles(worker_id or sidecar_id):
+            cluster_continues.cleanup(worker_id or sidecar_id)
+            return
+        if cluster_runner and cluster_runner.handles(worker_id or sidecar_id):
+            cluster_runner.cleanup(worker_id or sidecar_id)
+            return
         if account_runtime:
             if worker_id or sidecar_id:
                 account_runtime.cleanup(worker_id or sidecar_id)
@@ -4074,6 +4258,11 @@ class Runner:
         :param worker_id: v3 当前执行 token，阻止旧刷新回调覆盖新执行
         :return: None
         """
+        if cluster_runner and cluster_runner.handles(worker_id):
+            cluster_runner.watch_managed_oauth_refresh(worker_id, account, stop_event,
+                lambda: _sync_bound_account_credentials_locked(account, 600, force_refresh=True),
+                _oauth_owner_lock(account['name']))
+            return
         if account_runtime:
             request_path = account_runtime.run_artifact_path(run_id, "oauth-refresh-request.json")
             result_path = account_runtime.run_artifact_path(run_id, "oauth-refresh-result.json")
@@ -4091,6 +4280,7 @@ class Runner:
                         return
                     # 本地刷新需要排他owner；必须先严格释放评审shared holder，避免自锁。
                     account_runtime.reviews.defer_owner_refresh(job)
+                    account_runtime.reviews.wait_owner_refresh_exit(job)
                     account_runtime.cleanup(worker_id)
                     account_runtime.reviews.retry_owner_refresh(account,_refresh_project_review_owner)
                     return
@@ -4134,6 +4324,9 @@ class Runner:
         :param worker_id: continue worker 容器 ID
         :return: None
         """
+        if cluster_continues and cluster_continues.handles(worker_id):
+            cluster_continues.sync_credentials(worker_id)
+            return
         if account_runtime:
             job = account_runtime.job_for_container(worker_id)
             account_runtime.sync_credentials(job["row"], job["account"])
@@ -4179,6 +4372,16 @@ fs.renameSync(tmp, dst);
         :param session_id: Claude session id
         :return: (sidecar_id, worker_id)
         """
+        if cluster_continues and cluster_continues.routes(account):
+            current = continue_manager.get(sid) if continue_manager else None
+            work = ContinueWork(id=run['id'], account_id=account['id'], task=ContinueTask(id=run['task_id']), sid=sid,
+                generation=current.generation if current else int(run.get('continue_generation') or 0), session_id=session_id,
+                version=_resolve_run_claude_code_version(run.get('claude_code_version')),
+                version_source=run.get('claude_code_version_source'),
+                permission_mode=_resolve_capture_permission_mode(run.get('capture_permission_mode')),
+                model=run.get('execution_model') or run.get('capture_model_override') or '',
+                capture_full_http=bool(run.get('capture_full_http') or run.get('run_kind') == 'capture'))
+            return cluster_continues.start(work, account)
         if account_runtime:
             flows = FLOWS_DIR / account["name"] / str(run["task_id"]) / run["id"] / f"continue-{sid}"
             current = continue_manager.get(sid) if continue_manager else None
@@ -4323,6 +4526,18 @@ fs.renameSync(tmp, dst);
         """
         if not account.get("upstream_socks5_host"):
             raise ValueError("account has no upstream proxy configured")
+        if (account_runtime and cluster_service and account.get('cc2api_account_id') is None
+                and cluster_service.store.assignment(account['id'])['kind'] == 'ssh'):
+            if not cluster_runner or not cluster_runner.credentials:
+                raise ValueError('所属节点的额度查询尚未准备')
+            return _format_quota_result(cluster_runner.credentials.query_usage(account,owner_locked=True))
+        if (account_runtime and cluster_service and account.get('cc2api_account_id') is not None
+                and cluster_service.store.assignment(account['id'])['kind'] == 'ssh'):
+            _sync_bound_account_credentials_locked(account, 600)
+            usage = cc2api_client.refresh_usage(int(account['cc2api_account_id']))
+            if usage.get('status') != 'ok':
+                raise ValueError('所属节点额度查询未完成，请核对节点状态与账号凭据')
+            return _format_quota_result(usage)
         if account_runtime:
             if account.get("cc2api_account_id") is None and _read_account_oauth_status(account["name"])["oauth_token_state"] in ("expiring", "expired"):
                 self.refresh_account_oauth_token(account)
@@ -4431,119 +4646,7 @@ fs.renameSync(tmp, dst);
         :param version: 本次启动时已冻结的 CLI 版本。
         :return: usage API 原始 JSON，失败时返回 raw/error
         """
-        script = r'''
-set -eu
-if [ -f /workspace/.claude.json ]; then
-  cp /workspace/.claude.json "$HOME/.claude.json"
-fi
-DNS_READY_HOST="${DNS_READY_HOST:-example.com}"
-for i in $(seq 1 45); do
-  if grep -q '^nameserver 127[.]0[.]0[.]1' /etc/resolv.conf \
-    && DNS_READY_HOST="$DNS_READY_HOST" node -e "require('dns').resolve4(process.env.DNS_READY_HOST || 'example.com', (err, addresses) => process.exit(!err && addresses && addresses.length ? 0 : 1))" >/dev/null 2>&1; then
-    break
-  fi
-  sleep 1
-done
-node - <<'JS'
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-
-const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
-const credentialsPath = path.join(os.homedir(), '.claude', '.credentials.json');
-const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.293';
-
-function emit(value) {
-  process.stdout.write(`${JSON.stringify(value)}\n`);
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function loadCredentials() {
-  if (!fs.existsSync(credentialsPath)) {
-    throw new Error('.credentials.json 不存在，请先登录账号');
-  }
-  try {
-    return JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
-  } catch (error) {
-    throw new Error(`.credentials.json 解析失败: ${error.message}`);
-  }
-}
-
-function oauthSection(data) {
-  const oauth = data && data.claudeAiOauth;
-  if (!oauth || typeof oauth !== 'object') {
-    throw new Error('.credentials.json 缺少 claudeAiOauth，无法查询 OAuth usage');
-  }
-  return oauth;
-}
-
-async function requestUsage(url, options) {
-  let lastError = '';
-  for (let attempt = 1; attempt <= 5; attempt += 1) {
-    try {
-      const response = await fetch(url, {...options, signal: AbortSignal.timeout(15000)});
-      const text = await response.text();
-      if (!response.ok) {
-        const retryAfter = Number.parseInt(response.headers.get('retry-after') || '', 10);
-        return {
-          error: `HTTP ${response.status}: ${text.slice(0, 1000)}`,
-          status: response.status,
-          retry_after_sec: Number.isFinite(retryAfter) ? retryAfter : null,
-        };
-      }
-      let payload;
-      try {
-        payload = JSON.parse(text);
-      } catch (error) {
-        return {error: `usage parse failed: ${error.message}`, raw: text.slice(0, 1000)};
-      }
-      return payload;
-    } catch (error) {
-      lastError = error && error.message ? error.message : String(error);
-      // 已经拿到 HTTP 响应时不能重试，尤其 429 会被一次点击放大成多次上游请求。
-      if (process.env.V3_NATIVE_USAGE === '1' || attempt === 5) break;
-      await sleep(attempt * 1000);
-    }
-  }
-  return {error: lastError || 'request failed after retries'};
-}
-
-async function currentAccessToken(data) {
-  const oauth = oauthSection(data);
-  if (typeof oauth.accessToken !== 'string' || !oauth.accessToken) {
-    throw new Error('OAuth accessToken 为空，等待后台刷新器刷新或重新登录账号');
-  }
-  return oauth.accessToken;
-}
-
-(async () => {
-  try {
-    let credentials = loadCredentials();
-    let token = await currentAccessToken(credentials);
-    const usage = await requestUsage(USAGE_URL, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'anthropic-beta': 'oauth-2025-04-20',
-        'User-Agent': `claude-code/${claudeCodeVersion}`,
-      },
-    });
-    emit(usage);
-    if (usage && usage.error) {
-      process.exit(1);
-    }
-  } catch (error) {
-    emit({error: error && error.message ? error.message : String(error)});
-    process.exit(1);
-  }
-})();
-JS
-'''
+        script = QUOTA_PROBE_SCRIPT
         api = self.client.api
         ex = api.exec_create(
             account_runtime.job_for_container(worker_id)["row"]["container_id"] if account_runtime else worker_id,
@@ -4580,6 +4683,11 @@ JS
             return False
         if not account.get("upstream_socks5_host"):
             raise ValueError("account has no upstream proxy configured")
+        if account_runtime and cluster_runner and account.get('cc2api_account_id') is None and cluster_runner.routes(account):
+            if cluster_runner.credentials is None:
+                raise ValueError('所属节点的凭据维护所有者尚未就绪')
+            return cluster_runner.credentials.refresh(account,force_refresh=force_refresh,
+                refresh_buffer_sec=OAUTH_REFRESH_BUFFER_SEC,owner_locked=True)
         acc_name = account["name"]
         with _profile_lock(acc_name):
             status = _read_account_oauth_status(acc_name)
@@ -4705,164 +4813,7 @@ JS
         :param version: 本次维护启动时冻结的版本。
         :return: 刷新结果对象
         """
-        script = r'''
-set -eu
-if [ -f /workspace/.claude.json ]; then
-  cp /workspace/.claude.json "$HOME/.claude.json"
-fi
-DNS_READY_HOST="${DNS_READY_HOST:-example.com}"
-for i in $(seq 1 45); do
-  if grep -q '^nameserver 127[.]0[.]0[.]1' /etc/resolv.conf \
-    && DNS_READY_HOST="$DNS_READY_HOST" node -e "require('dns').resolve4(process.env.DNS_READY_HOST || 'example.com', (err, addresses) => process.exit(!err && addresses && addresses.length ? 0 : 1))" >/dev/null 2>&1; then
-    break
-  fi
-  sleep 1
-done
-node - <<'JS'
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-
-const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
-const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
-const credentialsPath = path.join(os.homedir(), '.claude', '.credentials.json');
-const refreshBufferMs = Number(process.env.OAUTH_REFRESH_BUFFER_SEC || '600') * 1000;
-const claudeCodeVersion = process.env.CLAUDE_CODE_VERSION || '2.1.293';
-
-function emit(value) {
-  process.stdout.write(`${JSON.stringify(value)}\n`);
-}
-
-function normalizeScopes(value) {
-  const items = Array.isArray(value)
-    ? value
-    : (typeof value === 'string' ? value.split(/\s+/) : []);
-  const seen = new Set();
-  const scopes = [];
-  for (const item of items) {
-    if (typeof item !== 'string') {
-      continue;
-    }
-    const scope = item.trim();
-    if (!scope || seen.has(scope)) {
-      continue;
-    }
-    seen.add(scope);
-    scopes.push(scope);
-  }
-  return scopes;
-}
-
-function oauthErrorCode(text) {
-  try {
-    const payload = JSON.parse(text);
-    const code = payload && typeof payload.error === 'string'
-      ? payload.error.trim()
-      : '';
-    return /^[A-Za-z0-9_.:-]{1,80}$/.test(code) ? code : '';
-  } catch {
-    return '';
-  }
-}
-
-function oauthErrorSummary(status, text, retryAfter) {
-  const parts = [`OAuth token 刷新失败: HTTP ${status}`];
-  const code = oauthErrorCode(text);
-  if (code) {
-    parts.push(code);
-  }
-  if (Number.isFinite(retryAfter)) {
-    parts.push(`retry_after_sec=${retryAfter}`);
-  }
-  return parts.join('; ');
-}
-
-async function main() {
-  let data;
-  try {
-    data = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
-  } catch (error) {
-    throw new Error(`.credentials.json 读取失败: ${error.message}`);
-  }
-  const oauth = data && data.claudeAiOauth;
-  if (!oauth || typeof oauth !== 'object') {
-    throw new Error('.credentials.json 缺少 claudeAiOauth');
-  }
-  if (
-    process.env.OAUTH_FORCE_REFRESH !== '1' &&
-    typeof oauth.accessToken === 'string' &&
-    oauth.accessToken &&
-    typeof oauth.expiresAt === 'number' &&
-    oauth.expiresAt > Date.now() + refreshBufferMs
-  ) {
-    emit({skipped: true});
-    return;
-  }
-  if (typeof oauth.refreshToken !== 'string' || !oauth.refreshToken) {
-    throw new Error('OAuth refreshToken 为空，请重新登录账号');
-  }
-  const requestBody = {
-    grant_type: 'refresh_token',
-    refresh_token: oauth.refreshToken,
-    client_id: CLIENT_ID,
-  };
-  const scopes = normalizeScopes(oauth.scopes);
-  if (scopes.length) {
-    // OAuth refresh 只能沿用现有授权，不能借刷新请求扩大 scope。
-    requestBody.scope = scopes.join(' ');
-  }
-  const response = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    body: JSON.stringify(requestBody),
-  });
-  const text = await response.text();
-  if (!response.ok) {
-    const retryAfter = Number.parseInt(response.headers.get('retry-after') || '', 10);
-    emit({
-      error: oauthErrorSummary(response.status, text, retryAfter),
-      status: response.status,
-      retry_after_sec: Number.isFinite(retryAfter) ? retryAfter : null,
-      oauth_error: oauthErrorCode(text) || null,
-    });
-    process.exit(1);
-  }
-  let payload;
-  try {
-    payload = JSON.parse(text);
-  } catch (error) {
-    throw new Error(`OAuth token 刷新响应不是 JSON: ${error.message}`);
-  }
-  if (typeof payload.access_token !== 'string' || !payload.access_token) {
-    throw new Error('OAuth token 刷新响应缺少 access_token');
-  }
-  oauth.accessToken = payload.access_token;
-  oauth.refreshToken = typeof payload.refresh_token === 'string' && payload.refresh_token
-    ? payload.refresh_token
-    : oauth.refreshToken;
-  const responseScopes = normalizeScopes(payload.scope);
-  if (responseScopes.length) {
-    oauth.scopes = responseScopes;
-  }
-  const expiresIn = Number.isFinite(Number(payload.expires_in))
-    ? Number(payload.expires_in)
-    : 3600;
-  oauth.expiresAt = Date.now() + Math.max(expiresIn, 60) * 1000;
-  const tmp = `${credentialsPath}.tmp`;
-  fs.writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
-  fs.renameSync(tmp, credentialsPath);
-  emit({refreshed: true, expiresAt: oauth.expiresAt});
-}
-
-main().catch((error) => {
-  emit({error: error && error.message ? error.message : String(error)});
-  process.exit(1);
-});
-JS
-'''
+        script = OAUTH_REFRESH_SCRIPT
         api = self.client.api
         if account_runtime:
             job = account_runtime.job_for_container(worker_id)
@@ -4885,25 +4836,8 @@ JS
                 "OAUTH_FORCE_REFRESH": "1" if force_refresh else "0",
             })
             workdir = WORKER_HOME
-        ex = api.exec_create(
-            actual_worker,
-            command,
-            stdout=True,
-            stderr=True,
-            user="1000" if account_runtime else WORKER_USER,
-            environment=environment,
-            workdir=workdir,
-        )
-        raw = api.exec_start(ex["Id"])
-        inspected = api.exec_inspect(ex["Id"])
-        text = raw.decode("utf-8", errors="ignore").strip()
-        try:
-            parsed = json.loads(text)
-        except json.JSONDecodeError:
-            return {"error": "oauth refresh probe returned non-json output", "raw": text}
-        if inspected.get("ExitCode") not in (0, None) and not parsed.get("error"):
-            parsed["error"] = f"oauth refresh probe failed with exit {inspected.get('ExitCode')}"
-        return parsed
+        return execute_oauth_refresh_probe(api,actual_worker,command,environment,
+            user="1000" if account_runtime else WORKER_USER,workdir=workdir)
 
 
 # ============== Login 会话管理 ==============
@@ -4918,7 +4852,7 @@ class LoginSession:
 
     __slots__ = ("sid", "name", "sidecar_id", "worker_id", "created_at",
                  "proxy", "profile_dir", "force_reauth", "committed", "home", "version",
-                 "account_id", "binding_id", "identity", "commit_context", "phase", "import_payload", "authorization_url", "auth_method", "environment_id", "draft_generation", "code_receipts")
+                 "account_id", "binding_id", "identity", "commit_context", "phase", "import_payload", "authorization_url", "auth_method", "environment_id", "draft_generation", "code_receipts", "remote_operation", "remote_expires_at")
 
     def __init__(self, sid: str, name: str, sidecar_id: Optional[str],
                  worker_id: str, proxy: dict, profile_dir: Path,
@@ -4957,6 +4891,8 @@ class LoginSession:
         self.environment_id = None
         self.draft_generation = None
         self.code_receipts: dict[str, dict] = {}
+        self.remote_operation = None
+        self.remote_expires_at = None
 
 
 class ContinueSession:
@@ -5023,7 +4959,8 @@ class LoginManager:
             return
         with self._lock:
             expired = [sid for sid, session in self.sessions.items()
-                if session.phase in ("authorizing", "ended", "ready_to_submit") and time.time() - session.created_at >= int(os.environ.get("V3_LOGIN_TTL_SECONDS", "1800"))]
+                if session.phase in ("preparing", "authorizing", "ended", "ready_to_submit")
+                and time.time() >= (session.remote_expires_at or session.created_at + int(os.environ.get("V3_LOGIN_TTL_SECONDS", "1800")))]
             self.completed = {sid: value for sid, value in self.completed.items() if value["expires_at"] > time.time()}
         for sid in expired:
             try:
@@ -5058,7 +4995,23 @@ class LoginManager:
         :return: 存在活跃登录会话时返回 True
         """
         with self._lock:
-            return name in self._name_locks
+            sid=self._name_locks.get(name)
+            session=self.sessions.get(sid)
+        if sid is None:
+            return False
+        if session is not None and session.remote_operation:
+            try:
+                row=_remote_session_logins(session).find(sid)
+            except Exception:
+                return True
+            if (row is not None and row['operation_id']==session.remote_operation
+                    and row['environment_id']==session.environment_id and row['phase']=='closed'):
+                # 后台已完成原停止时，旧浏览器会话缓存不能长期占住名称；仅消费持久关闭事实。
+                with self._lock:
+                    if self._name_locks.get(name)==sid and self.sessions.get(sid) is session:
+                        self._name_locks.pop(name)
+                    return name in self._name_locks
+        return True
 
     def start(
         self,
@@ -5067,6 +5020,7 @@ class LoginManager:
         force_reauth: bool = False,
         timezone: Optional[str] = None,
         version: Optional[str] = None,
+        node_id: Optional[int] = None,
     ) -> LoginSession:
         """
         启动账号 OAuth 登录容器。
@@ -5076,6 +5030,7 @@ class LoginManager:
         :param force_reauth: 是否使用一次性 profile 副本强制重授权
         :param timezone: 登录 worker 显式时区；None 表示使用安全回退
         :param version: 恢复草稿时沿用首次选择的 CLI 版本
+        :param node_id: 仅首次新建可选节点，省略保持原本机路径。
         :return: 登录会话对象
         """
         if not _ACC_NAME_RE.match(name):
@@ -5102,11 +5057,33 @@ class LoginManager:
                     environment = connection.execute("SELECT * FROM account_environments WHERE name=?", (name,)).fetchone()
                 finally:
                     connection.close()
+                account = dict(existing) if existing else {"name": name}
+                _guard_remote_draft_name(name)
+                remote_draft=_remote_draft_record(dict(environment)) if environment else None
+                if remote_draft is not None and not (existing and remote_draft['phase']=='closed'
+                        and remote_draft['saved_account_id']==existing['id']):
+                    raise ValueError('该名称已有节点登录草稿，请使用继续登录或重新登录')
+                if node_id is not None:
+                    if type(node_id) is not int or node_id<=0 or cluster_service is None:
+                        raise ValueError('所选登录节点无效或节点服务尚未就绪')
+                    selected=cluster_service.store.get(node_id)
+                    if existing:
+                        raise ValueError('已有账号请使用原节点登录或节点迁移入口')
+                    if selected['kind']=='ssh':
+                        if environment:
+                            raise ValueError('该名称已有本机登录草稿，请先继续或删除原草稿')
+                        return self._start_remote_draft(node_id,name,sid,proxy,tz,version)
+                remote_logins=_remote_account_logins(account) if existing else None
+                if remote_logins is not None:
+                    if not force_reauth:
+                        raise ValueError('已有节点账号需要使用明确重授权入口')
+                    version,_=_resolve_account_cli_version(account,version)
+                    row=remote_logins.start(account,sid,version,ttl=int(os.environ.get('V3_LOGIN_TTL_SECONDS','1800')),owner_locked=True)
+                    return self._remote_session(row)
                 if environment:
                     pending = _login_drafts().record(dict(environment))
                     if pending["phase"] in ("deleting", "submitting"):
                         raise ValueError("原登录仍在清理或保存，请先完成原草稿操作")
-                account = dict(existing) if existing else {"name": name}
                 binding_id = account.get("cc2api_account_id")
                 configuration = cc2api_client._request("GET", f"/admin/runtime/accounts/{binding_id}/config") if binding_id is not None else None
                 account.update(upstream_proxy_scheme=proxy.get("scheme"),
@@ -5256,13 +5233,145 @@ class LoginManager:
                 shutil.rmtree(BENCH_DATA / "login-sessions" / sid, ignore_errors=True)
             raise
 
+    def _start_remote_draft(self, node_id, name, sid, proxy, timezone, version):
+        """首次新建先冻结节点与NULL环境，再沿具体协调器准备原登录。"""
+        if cluster_draft_logins is None or cluster_draft_logins.prepare_admission is None:
+            raise ValueError('节点草稿登录服务尚未就绪')
+        node=cluster_service.store.get(node_id)
+        prepared=json.loads(node['preparation_json'] or '{}')
+        if (not node['enabled'] or prepared.get('state')!='prepared'
+                or prepared.get('release')!=cluster_draft_logins.ledger.release):
+            raise ValueError('所选节点需要先启用并完成同批组件准备')
+        with _profile_lock(name):
+            drafts=_login_drafts()
+            row=account_runtime._row(name,timezone=timezone)
+            drafts.guard(row)
+            profile=PROFILES_DIR/name
+            drafts._safe_tree(profile,PROFILES_DIR)
+            _persist_default_claude_settings(profile)
+            _persist_default_claude_top_config(profile)
+            version,_=_resolve_account_cli_version({},version)
+            files={filename:(profile/filename).read_text(encoding='utf-8') for filename in ('.claude.json','settings.json')
+                if (profile/filename).is_file()}
+            try:
+                settings=DraftLoginSettings(name=name,timezone=json.loads(row['fingerprint_json'])['tz'],upstream_proxy_scheme=proxy.get('scheme') or 'socks5',
+                    upstream_socks5_host=proxy.get('host') or '',upstream_socks5_port=proxy.get('port') or 1080,
+                    upstream_socks5_user=proxy.get('user') or '',upstream_socks5_pass=proxy.get('pass') or '')
+                work=DraftLoginWork(id=uuid.uuid4().hex,sid=sid,environment_id=row['environment_id'],name=name,
+                    draft_generation=uuid.uuid4().hex,version=version,home='/home/node/.v3-login/'+sid,
+                    preparation_sha256=draft_preparation_sha256(settings,row['fingerprint_json'],files),
+                    expires_at=int(time.time())+int(os.environ.get('V3_LOGIN_TTL_SECONDS','1800')))
+                preparation=DraftLoginPreparation(node_key=node['node_key'],work=work,settings=settings,
+                    fingerprint_json=row['fingerprint_json'],profile_files=files)
+            except (ValueError,TypeError):
+                raise ValueError('节点草稿配置无效，请检查名称、代理、时区和版本') from None
+            drafts.save(row,sid=sid,generation=work.draft_generation,phase='preparing',version=version,
+                home=work.home,created_at=time.time(),node_id=node_id,node_key=node['node_key'],
+                node_name=node['name'],node_prepare_intent=False)
+        try:
+            operation=cluster_draft_logins.start(node_id,preparation,owner_locked=True)
+        except Exception:
+            drafts.save(row,phase='interrupted')
+            raise
+        drafts.save(row,phase='authorizing')
+        return self._remote_draft_session(operation)
+
     def get(self, sid: str) -> Optional[LoginSession]:
-        return self.sessions.get(sid)
+        """读取当前会话，重启后按持久SID恢复具体节点操作。
+
+        :param sid: 原登录标识。
+        :return: 原会话或None。
+        """
+        session=self.sessions.get(sid)
+        if session is not None or re.fullmatch('[a-f0-9]{12}',sid) is None:
+            return session
+        rows=[row for coordinator in (cluster_logins,cluster_bound_logins,cluster_draft_logins) if coordinator is not None
+            for row in [coordinator.find(sid)] if row is not None]
+        if len(rows)>1:
+            raise ValueError('原登录SID关联了冲突的节点操作')
+        row=rows[0] if rows else None
+        if row is None:
+            return None
+        commit=(row['record'].get('node_receipt') or {}).get('commit') or {}
+        if row['phase']=='closed' and (commit.get('stage')!='accepted' or commit.get('cleanup_pending') is not False):
+            return None
+        return self._remote_session(row)
+
+    def _remote_session(self, row: dict) -> LoginSession:
+        """按冻结操作恢复管理会话，历史完成结果保留原绑定身份。
+
+        :param row: 原具体登录账本。
+        :return: 原SID对应的管理会话。
+        """
+        work=row['record']['work']
+        if work.get('kind')=='draft-login':
+            return self._remote_draft_session(row)
+        scope=ExecutionScope.model_validate(row['record']['scope'])
+        coordinator=cluster_bound_logins if scope.gateway_account_id is not None else cluster_logins
+        if coordinator is None:
+            raise ValueError('原节点登录协调器尚未就绪')
+        if row['phase']=='closed':
+            connection=get_db()
+            try:
+                current=connection.execute('SELECT * FROM accounts WHERE id=?',(scope.account_id,)).fetchone()
+            finally:
+                connection.close()
+            if current is None:
+                raise ValueError('原登录账号记录暂不可读')
+            account=dict(current)
+        else:
+            account=coordinator.sessions._account(scope,available=False)
+        proxy={key:account.get(source) for key,source in (('scheme','upstream_proxy_scheme'),('host','upstream_socks5_host'),
+            ('port','upstream_socks5_port'),('user','upstream_socks5_user'),('pass','upstream_socks5_pass'))}
+        operation=row['operation_id']
+        session=LoginSession(work['sid'],account['name'],None,'remote-account-login:'+operation,proxy,
+            BENCH_DATA/'remote-login-sessions'/operation/'unavailable',True,work['version'])
+        session.account_id=account['id']
+        session.environment_id=scope.environment_id
+        session.binding_id=scope.gateway_account_id
+        session.identity=work.get('expected_identity',{})
+        session.remote_operation,session.remote_expires_at=operation,work['expires_at']
+        if (row['record'].get('node_receipt') or {}).get('commit'):
+            session.phase='committed' if row['phase']=='closed' else 'submitting'
+        elif row['phase'] in ('reconcile','stopping','closed'):
+            session.phase='ended'
+        with self._lock:
+            previous=self.sessions.setdefault(session.sid,session)
+            if row['phase']!='closed':
+                self._name_locks[account['name']]=session.sid
+            return previous
+
+    def _remote_draft_session(self, row: dict) -> LoginSession:
+        """原草稿SID直接恢复为远程管理会话，原实际HOME始终留在Node。"""
+        if cluster_draft_logins is None:
+            raise ValueError('原节点草稿协调器尚未就绪')
+        preparation=cluster_draft_logins.preparation(row)
+        work,settings=preparation.work,preparation.settings
+        proxy={'scheme':settings.upstream_proxy_scheme,'host':settings.upstream_socks5_host,
+            'port':settings.upstream_socks5_port,'user':settings.upstream_socks5_user,'pass':settings.upstream_socks5_pass}
+        session=LoginSession(work.sid,work.name,None,'remote-draft-login:'+work.id,proxy,
+            BENCH_DATA/'remote-login-sessions'/work.id/'unavailable',True,work.version)
+        session.remote_operation,session.remote_expires_at=work.id,work.expires_at
+        session.environment_id,session.draft_generation=work.environment_id,work.draft_generation
+        session.account_id,session.home=row['saved_account_id'],work.home
+        if (row['record'].get('node_receipt') or {}).get('commit'):
+            session.phase='committed' if row['phase']=='closed' else 'submitting'
+        else:
+            session.phase='ended' if row['phase'] in ('closed','reconcile','stopping','deleting') else (
+                'preparing' if row['phase']=='preparing' else 'authorizing')
+        with self._lock:
+            previous=self.sessions.setdefault(work.sid,session)
+            if row['phase']!='closed':
+                self._name_locks[work.name]=work.sid
+            return previous
 
     def auth_status(self, sid: str) -> dict:
         s = self.get(sid)
         if not s:
             raise KeyError(sid)
+        if s.remote_operation:
+            status=_remote_session_logins(s).status(s.remote_operation)
+            return {'loggedIn':status.get('credentials_ready') is True,'authMethod':status.get('auth_method')}
         if account_runtime:
             result = account_runtime.exec_cli(account_runtime.execution_token(s.worker_id, f"login:{s.sid}"),
                 ["claude", "auth", "status"], s.home, s.version)
@@ -5349,6 +5458,14 @@ class LoginManager:
         with self._lock:
             s = self.sessions.get(sid)
         if not s:
+            return
+        if s.remote_operation:
+            _remote_session_logins(s).cancel(s.remote_operation,owner_locked=True)
+            with self._lock:
+                s.phase='cancelled'
+                self.sessions.pop(sid,None)
+                if self._name_locks.get(s.name)==sid:
+                    self._name_locks.pop(s.name)
             return
         if account_runtime:
             account_runtime.cleanup(account_runtime.execution_token(s.worker_id, f"login:{sid}"))
@@ -5619,15 +5736,28 @@ class ContinueManager:
     def cleanup(self, sid: str) -> None:
         """停止并清理继续对话容器，同时尽量回写本地配置。"""
         with self._lock:
-            s = self.sessions.pop(sid, None)
+            s = self.sessions.get(sid)
+            remote = bool(s and cluster_continues and cluster_continues.handles(s.worker_id))
+            if not remote:
+                s = self.sessions.pop(sid, None)
         if not s:
             return
         with s.guard_lock:
             s.status = "closed"
             s.connected = False
             self.runner.persist_worker_profile(s.worker_id)
-            self.runner.cleanup(s.sidecar_id, s.worker_id)
-            if quota_guard:
+            try:
+                self.runner.cleanup(s.sidecar_id, s.worker_id)
+            except Exception:
+                if remote:
+                    s.status = 'reconcile'
+                    s.quota = {'message': '原节点续聊实际停止等待核对'}
+                raise
+            if remote:
+                with self._lock:
+                    if self.sessions.get(sid) is s:
+                        self.sessions.pop(sid)
+            if quota_guard and not remote:
                 conn = get_db()
                 try:
                     account_row = conn.execute("SELECT * FROM accounts WHERE id=?", (s.account_id,)).fetchone()
@@ -5686,13 +5816,12 @@ class ContinueManager:
 
     def _apply_control(self, session: ContinueSession, account: dict) -> bool:
         source = f"continue:{session.sid}:{session.generation}"
-        path = _quota_control(session.run_id, source) / "pause.json"
-        if not path.exists():
-            return False
         try:
-            payload = json.loads(path.read_text())
+            payload = _read_quota_control(session.run_id, source)
         except (OSError, ValueError):
             payload = {}
+        if payload is None:
+            return False
         if isinstance(payload, dict) and payload.get("source") == source and payload.get("status") == "quota_wait":
             quota_guard.record_control_state(account, source, payload)
             if quota_guard.snapshot(account).get("account_error"):
@@ -5989,7 +6118,7 @@ class OAuthRefreshScheduler:
                         pass
                     continue
                 try:
-                    needs_refresh = self._needs_refresh(current["name"])
+                    needs_refresh = self._needs_refresh(current["name"], account=current)
                 except Exception:
                     continue
                 if not needs_refresh:
@@ -6014,14 +6143,15 @@ class OAuthRefreshScheduler:
                     except Exception:
                         pass
 
-    def _needs_refresh(self, account_name: str) -> bool:
+    def _needs_refresh(self, account_name: str, *, account: dict | None = None) -> bool:
         """
         判断账号 access token 是否缺失、已过期或 10 分钟内过期。
 
         :param account_name: accounts.name 字段
+        :param account: 已重读的账号行，远程账号从Node只读观察判断。
         :return: 需要刷新时返回 True
         """
-        status = _read_account_oauth_status(account_name)
+        status = _account_oauth_status(account, observe=True) if account is not None else _read_account_oauth_status(account_name)
         if status["oauth_token_state"] in {"missing", "expired", "expiring", "invalid"}:
             return True
         expires_in = status.get("oauth_expires_in_sec")
@@ -6035,6 +6165,10 @@ def _find_latest_claude_session_id(run_id: str) -> Optional[str]:
     :param run_id: runs.id
     :return: session id，找不到则 None
     """
+    if cluster_runner and cluster_runner.for_run(run_id) is not None:
+        if project_iterations and project_iterations.run_context(run_id):
+            return project_iterations.latest_native_session(run_id,BENCH_DATA/'missing-run-session'/run_id)
+        return cluster_runner.latest_session(run_id)
     base = account_runtime.run_session_path(run_id) if account_runtime else (
         WORKSPACES_DIR / run_id / ".claude-home" / "projects"
     )
@@ -6065,49 +6199,16 @@ def _aggregate_claude_session_usage(run_id: str) -> dict[str, int | bool]:
     :param run_id: runs.id
     :return: token / 请求数 / 可用性聚合结果
     """
+    if cluster_runner and cluster_runner.for_run(run_id) is not None:
+        if project_iterations and project_iterations.run_context(run_id):
+            return project_iterations.native_usage(run_id,BENCH_DATA/'missing-native'/run_id,_usage_input_tokens)
+        return cluster_runner.stats(run_id)
     base = account_runtime.run_session_path(run_id) if account_runtime else (
         WORKSPACES_DIR / run_id / ".claude-home" / "projects"
     )
     if project_iterations and project_iterations.run_context(run_id):
         return project_iterations.native_usage(run_id, base, _usage_input_tokens)
-    if not base.exists():
-        return {
-            "tokens_in": 0,
-            "tokens_out": 0,
-            "requests": 0,
-            "usage_available": False,
-        }
-    tokens_in = tokens_out = requests = 0
-    seen_requests: set[str] = set()
-    for path in sorted((p for p in base.rglob("*.jsonl") if p.is_file()), key=lambda p: p.stat().st_mtime):
-        for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
-            try:
-                rec = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            message = rec.get("message")
-            if not isinstance(message, dict) or message.get("role") != "assistant":
-                continue
-            if rec.get("type") not in (None, "assistant"):
-                continue
-            usage = message.get("usage")
-            if not isinstance(usage, dict):
-                continue
-            request_key = rec.get("requestId")
-            if not isinstance(request_key, str) or not request_key:
-                request_key = json.dumps(usage, sort_keys=True, ensure_ascii=False)
-            if request_key in seen_requests:
-                continue
-            seen_requests.add(request_key)
-            tokens_in += _usage_input_tokens(usage)
-            tokens_out += int(usage.get("output_tokens") or 0)
-            requests += 1
-    return {
-        "tokens_in": tokens_in,
-        "tokens_out": tokens_out,
-        "requests": requests,
-        "usage_available": requests > 0,
-    }
+    return native_session_usage(base)
 
 
 # ============== 调度器：每账号 Semaphore(2) ==============
@@ -6879,7 +6980,9 @@ class Scheduler:
                 self.runner.cleanup(sid, wid)
                 if wid and quota_guard:
                     quota_guard.consume(account)
-                if (self._get_run_state(run_id) or {}).get("status") == "quota_wait":
+                # 节点停止回执已经冻结本次产物；本机路径继续沿原额度归档合同。
+                if (self._get_run_state(run_id) or {}).get("status") == "quota_wait" and not (
+                        cluster_runner and cluster_runner.for_run(run_id) is not None):
                     archive = (account_runtime.run_artifact_path(run_id, "status.json").parent / "quota"
                         if account_runtime else WORKSPACES_DIR / run_id / ".quota") / f"attempt-{attempt}"
                     archive.mkdir(parents=True, exist_ok=True)
@@ -6907,7 +7010,10 @@ class Scheduler:
                     try:
                         self.runner.cleanup_quota_run(run_id)
                         if account_runtime and project_iterations.run_context(run_id).get("workspace_relative"):
-                            project_iterations.record_native_end(run_id, account_runtime.run_session_path(run_id))
+                            remote = cluster_runner.for_run(run_id) if cluster_runner else None
+                            directory = (BENCH_DATA/'missing-run-session'/run_id if remote is not None
+                                else account_runtime.run_session_path(run_id))
+                            project_iterations.record_native_end(run_id,directory)
                     except Exception as error:
                         cleanup_error = "原执行未能严格收口：" + type(error).__name__
                     project_iterations.execution_released(run_id, attempt, cleanup_error)
@@ -7634,6 +7740,21 @@ class WarmupScheduler:
 
 
 # ============== FastAPI ==============
+def _project_review_refresh(account: dict) -> bool:
+    """沿实际归属处理原所有者评审刷新，保持原异步维护合同。
+
+    :param account: 原当前账号。
+    :return: 是否仍在等待原所有者维护。
+    """
+    if account_runtime is None:
+        return False
+    if cluster_runner and account.get('cc2api_account_id') is None and cluster_runner.routes(account):
+        if cluster_runner.credentials is None:
+            return True
+        return cluster_runner.credentials.retry_review(account)
+    return account_runtime.reviews.retry_owner_refresh(account,_refresh_project_review_owner)
+
+
 def _refresh_project_review_owner(account: dict, request: dict) -> None:
     """复用原owner锁重读身份后，处理私有评审401的强制刷新。
 
@@ -7688,6 +7809,50 @@ def _project_admission(account: dict, run_id: str) -> bool:
     return not state.get("blocked") and not state.get("account_error") and not policy.get("blocked")
 
 
+def _project_review_admission(account: dict) -> dict:
+    """评审只读准入在账号所属节点核对实际资源和原所有者待办。
+
+    :param account: 原可用账号。
+    :return: 原allowed/blocked/message。
+    """
+    if account_runtime is None:
+        return {'allowed':False,'blocked':False,'message':'账号运行时正在准备'}
+    if cluster_service and cluster_service.store.assignment(account['id'])['kind']=='ssh':
+        if cluster_terminal_sessions is None or cluster_terminal_sessions.ledger.active(account['id']):
+            return {'allowed':False,'blocked':False,'message':'等待原节点CLI及恢复作业严格释放'}
+        connection=get_db()
+        try:
+            row=connection.execute('SELECT * FROM account_environments WHERE account_id=?',(account['id'],)).fetchone()
+        finally:
+            connection.close()
+        if row is None:
+            return {'allowed':False,'blocked':False,'message':'等待原节点账号环境准备'}
+        version,_=_resolve_account_cli_version(account)
+        return cluster_service.review_admission(dict(row),account_runtime,version,_quota_identity(account))
+    return account_runtime.reviews.admission(account)
+
+
+def _remote_cli_admission(account: dict, scope: ExecutionScope) -> None:
+    """原待评审优先级在新Scope落账前核对，避免排队被误写成关闭尝试。
+
+    :param account: 原可用账号。
+    :param scope: 即将登记的新CLI来源。
+    :return: None；原评审等待时拒绝新普通CLI。
+    """
+    if account_runtime is None or not account_runtime.reviews.pending(account['id']):
+        return
+    source=re.fullmatch(r'run:([a-f0-9]{12}):([0-9]+)',scope.source)
+    if source:
+        connection=get_db()
+        try:
+            run=connection.execute('SELECT account_id,quota_attempt,run_kind FROM runs WHERE id=?',(source[1],)).fetchone()
+        finally:
+            connection.close()
+        if (run and run['account_id']==account['id'] and run['quota_attempt']==int(source[2]) and run['run_kind']=='project_review'):
+            return
+    raise RuntimeBusy('账号已有有效待评审，请先排空原CLI并执行私有评审')
+
+
 def _project_execution_settings(account: Optional[dict] = None) -> dict:
     """冻结新项目尝试的 CLI、思考等级和模型。
 
@@ -7739,6 +7904,12 @@ def _project_execution_control(run_id: str, quota_attempt: int, operation: str) 
     :return: 内核核对后的进程证明。
     """
     source = _quota_source(run_id, quota_attempt)
+    if cluster_runner:
+        row=cluster_runner.for_run(run_id)
+        if row is not None:
+            if row['source']!=source or row['record']['work']['id']!=run_id:
+                raise ValueError('原节点项目控制代次已经变化')
+            return cluster_runner.sessions.control(row['operation_id'],operation)
     jobs = []
     if account_runtime:
         with account_runtime.lock:
@@ -7756,6 +7927,14 @@ oauth_refresh_scheduler: Optional[OAuthRefreshScheduler] = None
 warmup_scheduler: Optional[WarmupScheduler] = None
 quota_guard: Optional[QuotaGuard] = None
 account_runtime: Optional[AccountRuntime] = None
+cluster_service: Optional[ClusterService] = None
+cluster_terminal_sessions: Optional[TerminalSessions] = None
+cluster_runner: Optional[ClusterRunner] = None
+cluster_logins: Optional[ClusterAccountLogins] = None
+cluster_bound_logins: Optional[ClusterBoundAccountLogins] = None
+cluster_draft_logins: Optional[ClusterDraftLogins] = None
+cluster_continues: Optional[ClusterContinues] = None
+migration_operations: Optional[MigrationOperations] = None
 credential_ownership: Optional[CredentialOwnership] = None
 project_iterations: Optional[ProjectIterationManager] = None
 project_iteration_error: Optional[str] = None
@@ -7919,6 +8098,25 @@ def _engineering_pi_admission(account: dict, work: dict | None, namespace: str, 
             other_job = any(job['source'] != source for job in jobs)
         finally:
             account_runtime.lock.release()
+    if cluster_terminal_sessions:
+        try:
+            remote_jobs = cluster_terminal_sessions.ledger.active(account['id'])
+        except ValueError:
+            return {'allowed': False, 'reason': 'environment', 'retryable': False, 'retry_at': None,
+                'message': '账号节点执行记录需要核对', 'cli_capacity': cli_capacity}
+        if cli_capacity is not None:
+            cli_capacity['active'] += len(remote_jobs)
+        own_remote = [row for row in remote_jobs if row['source'] in (source, preparing_source)]
+        if own_remote:
+            original = own_remote[0]
+            proof = original['record']['grant']
+            if original['phase'] == 'reconcile' or original['phase'] == 'stopping' or proof and proof['not_after'] <= time.time():
+                return {'allowed': False, 'reason': 'environment', 'retryable': False, 'retry_at': None,
+                    'message': '原节点执行停止或输入许可需要先核对', 'cli_capacity': cli_capacity}
+            source = original['source']
+            if original['record']['grant'] is not None:
+                quota_work = {**work, 'runtime_json': json.dumps({'source': source})}
+        other_job = other_job or any(row['source'] != source for row in remote_jobs)
     gate = _pi_admission(account, quota_work, snapshot_only=snapshot_only)
     gate['cli_capacity'] = cli_capacity
     if not gate['allowed']:
@@ -7941,10 +8139,10 @@ def _merge_native_quota(current: dict, identity: str, facts: dict, observed: flo
     :param identity: 已核对的当前账号身份。
     :param facts: 原生结构化错误。
     :param observed: 原始可信观察时间。
-    :return: None，不产生网络请求。
+    :return: None；只读取原额度证据。
     """
+    quota_guard.consume(current)
     with quota_guard._lock:
-        quota_guard.consume(current)
         state = quota_guard.snapshot(current)
         error = facts.get('account_error')
         if error in ('account_on_hold', 'invalid_grant'):
@@ -8069,9 +8267,126 @@ def _projects_credentials(account: dict) -> None:
             _sync_bound_account_credentials_locked(account, OAUTH_REFRESH_BUFFER_SEC)
 
 
+def _remote_projects_quota_admit(account: dict, source: str) -> str:
+    """从原中央额度所有者认领节点工程执行，保留原身份和恢复机会。
+
+    :param account: 原已登记执行账号。
+    :param source: 原projects或warmup工作和代次。
+    :return: 本次真实额度认领的中央身份。
+    """
+    with _oauth_owner_lock(account['name']):
+        return _remote_execution_quota_admit_locked(account, source)
+
+
+def _remote_execution_quota_admit_locked(account: dict, source: str) -> str:
+    """在原owner锁内认领节点执行，原Runner保持已有锁序。
+
+    :param account: 原冻结账号。
+    :param source: 原工程或Run尝试来源。
+    :return: 原中央额度身份。
+    """
+    run_source = re.fullmatch(r'run:([a-f0-9]{12}):([0-9]+)', source)
+    continue_source = re.fullmatch(r'continue:([a-f0-9]{12}):([0-9]+)', source)
+    if (not re.fullmatch(r'(projects|warmup):[a-f0-9]{32}:[1-9][0-9]*', source) and run_source is None and continue_source is None
+            or quota_guard is None):
+        raise ValueError('原远程工程额度来源或所有者无效')
+    current = _projects_account(account['id'])
+    if current is None or current['name'] != account['name'] or current.get('cc2api_account_id') != account.get('cc2api_account_id'):
+        raise ValueError('远程工程认领前账号或网关绑定已变化')
+    if credential_ownership:
+        credential_ownership.guard(current, source)
+    workload = 'warmup'
+    if continue_source is not None:
+        if continue_manager is None:
+            raise ValueError('原续聊所有者尚未就绪')
+        with continue_manager._lock:
+            matches = [run_id for run_id, sid in continue_manager._run_locks.items() if sid == continue_source[1]]
+            session = continue_manager.sessions.get(continue_source[1])
+            if (len(matches) != 1 or session is None and int(continue_source[2]) != 0
+                    or session is not None and (session.account_id != current['id'] or session.generation != int(continue_source[2])
+                        or session.status not in ('running', 'quota_wait'))):
+                raise ValueError('原续聊控制代次或持有者已变化')
+        connection = get_db()
+        try:
+            run = connection.execute('SELECT account_id FROM runs WHERE id=? AND deleted_at IS NULL', (matches[0],)).fetchone()
+        finally:
+            connection.close()
+        if run is None or run['account_id'] != current['id'] or not _account_run_window(current)['allowed']:
+            raise ValueError('原续聊账号、运行或允许窗口已变化')
+        workload = None
+    if run_source is not None:
+        connection = get_db()
+        try:
+            run = connection.execute('SELECT account_id,quota_attempt,run_kind,status FROM runs WHERE id=?', (run_source[1],)).fetchone()
+        finally:
+            connection.close()
+        if (run is None or run['account_id'] != current['id'] or run['quota_attempt'] != int(run_source[2])
+                or run['status'] != 'running'):
+            raise ValueError('原远程Run尝试在额度认领前发生变化')
+        workload = _execution_workload(run['run_kind'])
+        if run['run_kind'] in PROJECT_RUN_KINDS and (project_iterations is None or not project_iterations.can_start(run_source[1])):
+            raise RuntimeBusy('原节点项目的批次或准入状态已经变化')
+    if not quota_guard.admit(current, source, warmup=workload == 'warmup', workload=workload):
+        raise RuntimeBusy('正式执行的额度恢复机会尚不可领取')
+    return _quota_identity(current)
+
+
+def _complete_remote_run_recovery(run_id: str, attempt: int, account: dict) -> None:
+    """实际节点与许可均收口后，由原Scheduler保存运行和批次结果。
+
+    :param run_id: 原Run。
+    :param attempt: 原额度尝试。
+    :param account: 原账号。
+    :return: None；新尝试已替换旧指针时保持当前状态。
+    """
+    current = scheduler._get_run_state(run_id)
+    if current is None or current['quota_attempt'] != attempt:
+        return
+    if quota_guard._cancel_changed_identity(current, account):
+        current = scheduler._get_run_state(run_id)
+        if current is None:
+            return
+    if current['status'] in ('queued', 'running', 'stopping'):
+        state = quota_guard.snapshot(account)
+        workload = _execution_workload(current['run_kind'])
+        threshold = (quota_guard.warmup_snapshot(account)['enabled'] if workload == 'warmup'
+            else quota_guard.policy_snapshot(account, 'normal')['blocked'] if workload == 'normal' else False)
+        if current.get('stop_requested_at') is not None or current['status'] == 'stopping':
+            scheduler._update_attempt(run_id, attempt, status='stopped', ended_at=time.time())
+        elif state.get('exhausted') or state.get('account_error') or attempt or threshold:
+            scheduler._mark_quota_wait(run_id, account, attempt)
+        else:
+            scheduler._update_attempt(run_id, attempt, status='failed',
+                error='服务重启前节点执行已中断，原作业已实际收口', ended_at=time.time())
+        current = scheduler._get_run_state(run_id)
+    if current is None or current['quota_attempt'] != attempt:
+        return
+    if project_iterations and current['run_kind'] in PROJECT_RUN_KINDS:
+        cleanup_error=None
+        try:
+            runner.cleanup_quota_run(run_id)
+        except Exception as error:
+            cleanup_error='原项目执行证据需要核对：'+type(error).__name__
+        project_iterations.execution_released(run_id,attempt,cleanup_error)
+    scheduler._update_batch_item_for_run(run_id, current['status'])
+    if warmup_scheduler:
+        warmup_scheduler.handle_run_terminal(run_id, account.get('cc2api_account_id'))
+
+
+def _complete_remote_continue_recovery(operation_id: str) -> None:
+    """实际停止确认后清理仍登记的原续聊。:param operation_id: 原执行。:return: None。"""
+    if continue_manager is None:
+        return
+    with continue_manager._lock:
+        sessions = [session for session in continue_manager.sessions.values()
+            if session.worker_id == 'remote-continue:' + operation_id]
+    for session in sessions:
+        continue_manager.cleanup(session.sid)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler, quota_guard, account_runtime, credential_ownership, project_iterations, project_iteration_error, project_requester_settings, projects_service, warmup_pi_service, pi_owners
+    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler, quota_guard, account_runtime, cluster_service, cluster_terminal_sessions, cluster_runner, cluster_logins, cluster_bound_logins, cluster_draft_logins, cluster_continues, migration_operations, credential_ownership, project_iterations, project_iteration_error, project_requester_settings, projects_service, warmup_pi_service, pi_owners
     if V3_ENABLED and os.environ.get('V3_UPDATE_GATE_DIR') and UPDATE_GATE.state()['phase'] not in ('idle', 'blocked'):
         raise RuntimeError('平台维护状态需要先对账，暂停初始化')
     init_db()
@@ -8080,16 +8395,32 @@ async def lifespan(app: FastAPI):
     WORKSPACES_DIR.mkdir(parents=True, exist_ok=True)
     CA_DIR.mkdir(parents=True, exist_ok=True)
     runner = Runner()
+    cluster_service = (ClusterService(ClusterStore(get_db, _db_lock), BENCH_DATA, runner.client,
+        Path(os.environ.get('V3_CLUSTER_TRANSPORT_DIR', str(BENCH_DATA / 'cluster-transport')))) if V3_ENABLED else None)
+    cluster_terminal_sessions = None
+    cluster_runner = None
+    cluster_logins = None
+    cluster_bound_logins = None
+    cluster_draft_logins = None
+    cluster_continues = None
+    migration_operations = None
     if V3_ENABLED:
-        account_runtime = AccountRuntime(runner.client, BENCH_DATA, HOST_BENCH_DATA, get_db, derive_v3_fingerprint, cc2api_client, _quota_identity)
+        account_runtime = AccountRuntime(runner.client, BENCH_DATA, HOST_BENCH_DATA, get_db, derive_v3_fingerprint, cc2api_client,
+            _quota_identity, placement=cluster_service.admit_local, locality=cluster_service.owns_local)
         credential_ownership = CredentialOwnership(account_runtime, cc2api_client, get_db, _db_lock,
             read_profile=_read_bench_profile_identity, mirror=_sync_cc2api_credentials_to_profile,
             mirror_locked=_sync_cc2api_credentials_to_profile_locked, profile_lock=_profile_lock,
             identity=_v3_cli_identity, read_identity=_v3_cli_identity_readonly,
             validate=_validate_cc2api_identity, find=_find_cc2api_account_for_profile,
             idle=_require_oauth_owner_transition_idle, available=_require_cc2api_binding_available,
-            creation_payload=_cc2api_creation_payload, refresh=runner.refresh_account_oauth_token)
+            creation_payload=_cc2api_creation_payload, refresh=runner.refresh_account_oauth_token,
+            read_material=_read_current_owner_material,read_bound_identity=_read_remote_bound_identity,
+            reauth_idle=_remote_reauth_idle,reauth_publish=_remote_reauth_publish,
+            transition=_account_owner_transition,sync_bound=_sync_owner_credentials,matched_identity=_v3_matched_cli_identity,
+            prepare_initial=_prepare_initial_remote_owner)
         account_runtime.credential_ownership = credential_ownership
+        migration_operations = MigrationOperations(MigrationCoordinator(cluster_service, account_runtime,
+            cc2api_client, _quota_identity, _node_migration_guard))
         account_runtime.reconcile()
         account_runtime.start()
     scheduler = Scheduler(runner)
@@ -8119,11 +8450,46 @@ async def lifespan(app: FastAPI):
                 schedule_admission=_project_schedule_admission, concurrency_limit=PER_ACCOUNT_CONCURRENCY)
             project_iterations.dialogue = project_requester_settings.client()
             account_runtime.set_project_iterations(project_iterations)
-            project_iterations.review_refresh = lambda account: account_runtime.reviews.retry_owner_refresh(account,_refresh_project_review_owner)
+            project_iterations.review_admission=_project_review_admission
+            project_iterations.review_refresh = _project_review_refresh
         except (ValueError, OSError) as error:
             # 新内容损坏只隔离新入口，原题库执行仍可使用。
             project_iteration_error = "项目内容库不可用：" + str(error)[:300]
+    if account_runtime and cluster_service:
+        cluster_terminal_sessions = TerminalSessions(NodeExecutions(cluster_service.store, account_runtime.release_id),
+            cluster_service, account_runtime, cc2api_client, _remote_projects_quota_admit, _projects_quota_release,
+            run_quota_admit=_remote_execution_quota_admit_locked,admission=_remote_cli_admission)
+        remote_quota = RemoteTerminalQuota(cluster_terminal_sessions, quota_guard, _quota_identity)
+        cluster_terminal_sessions.quota_refresh = remote_quota.refresh
+        cluster_terminal_sessions.quota_finalize = remote_quota.finalize
+        cluster_terminal_sessions.recover()
+        cluster_runner = ClusterRunner(cluster_terminal_sessions, _quota_identity)
+        cluster_runner.owners=RemoteOwnerTransitions(cluster_terminal_sessions,credential_ownership,_read_bench_profile_identity)
+        cluster_runner.credentials=RemoteCredentialRefresh(cluster_terminal_sessions,credential_ownership,
+            _oauth_owner_lock,_quota_identity,lambda account:_resolve_account_cli_version(account)[0])
+        cluster_logins=ClusterAccountLogins(cluster_terminal_sessions,cluster_runner.credentials,_oauth_owner_lock,
+            _save_remote_login_authorization,_remote_login_admission)
+        cluster_runner.logins=cluster_logins
+        cluster_bound_logins=ClusterBoundAccountLogins(cluster_terminal_sessions,cluster_runner.credentials,_oauth_owner_lock,
+            _save_remote_bound_login_authorization,_remote_login_admission)
+        cluster_runner.bound_logins=cluster_bound_logins
+        cluster_draft_logins=ClusterDraftLogins(cluster_terminal_sessions,_oauth_owner_lock,
+            _save_remote_draft_profile,_record_remote_draft_authorization,
+            _DEFAULT_FIVE_HOUR_USAGE_LIMIT_PERCENT,_DEFAULT_SEVEN_DAY_USAGE_LIMIT_PERCENT,profile_lock=_profile_lock,
+            prepare_admission=_mark_remote_draft_node_prepare)
+        cluster_runner.draft_logins=cluster_draft_logins
+        if project_iterations:
+            cluster_runner.project_io = ClusterLegacyProjectIO(cluster_runner,project_iterations)
+            cluster_runner.project_io.programs=RemoteRunPrograms(cluster_runner.project_io,_oauth_owner_lock)
+            cluster_runner.project_io.programs.recover()
+            project_iterations.execution_io = cluster_runner.project_io
+            cluster_terminal_sessions.run_prepare = cluster_runner.project_io.prepare
+        cluster_continues = ClusterContinues(cluster_terminal_sessions, _quota_identity)
     quota_guard.recover()
+    if account_runtime and cluster_service:
+        quota_guard.remote_api = RemoteApiQuota(cluster_service, account_runtime, _quota_identity)
+        cluster_runner.start_recovery(_complete_remote_run_recovery)
+        cluster_continues.start_recovery(_complete_remote_continue_recovery)
     if project_iterations and not PROJECTS_AGENT_ENABLED:
         project_iterations.recover(runner.cleanup_quota_run)
     if account_runtime and (PROJECTS_AGENT_ENABLED or WARMUP_PI_ENABLED):
@@ -8133,9 +8499,10 @@ async def lifespan(app: FastAPI):
         if PROJECTS_AGENT_ENABLED:
             terminal = ProjectsTerminal(account_runtime, catalog, _project_execution_settings, _projects_quota_context,
                 _projects_quota_release, _projects_credentials, quota_observation=_projects_native_quota)
+            terminal = ClusterProjectsTerminal(terminal, cluster_terminal_sessions, _quota_identity)
             verification = ProjectsVerification(catalog, terminal,
                 ProjectVerifier(runner.client, BENCH_DATA, HOST_BENCH_DATA, account_runtime.image),
-                pi, project_requester_settings.agent_configuration)
+                pi, project_requester_settings.agent_configuration, program=terminal.verify_program)
             projects_service = ProjectsService(BENCH_DATA, get_db, _db_lock, catalog, terminal, _projects_account,
                 _projects_admission, project_requester_settings.agent_configuration, verification, pi, _quota_identity,
                 owners=pi_owners, view_admission=partial(_projects_admission, snapshot_only=True))
@@ -8145,9 +8512,10 @@ async def lifespan(app: FastAPI):
         if WARMUP_PI_ENABLED:
             warmup_terminal = ProjectsTerminal(account_runtime, catalog, _project_execution_settings, _projects_quota_context,
                 _projects_quota_release, _projects_credentials, quota_observation=_warmup_projects_native_quota, namespace='warmup')
+            warmup_terminal = ClusterProjectsTerminal(warmup_terminal, cluster_terminal_sessions, _quota_identity)
             warmup_verification = ProjectsVerification(catalog, warmup_terminal,
                 ProjectVerifier(runner.client, BENCH_DATA, HOST_BENCH_DATA, account_runtime.image),
-                pi, project_requester_settings.agent_configuration)
+                pi, project_requester_settings.agent_configuration, program=warmup_terminal.verify_program)
             warmup_pi_service = ProjectsService(BENCH_DATA, get_db, _db_lock, catalog, warmup_terminal, _projects_account,
                 _warmup_projects_admission, project_requester_settings.agent_configuration, warmup_verification, pi, _quota_identity,
                 owners=pi_owners, namespace='warmup', auto_cycle=True,
@@ -8176,6 +8544,8 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        if migration_operations:
+            migration_operations.close()
         warmup_scheduler.stop()
         if warmup_pi_service:
             warmup_pi_service.close()
@@ -8187,13 +8557,26 @@ async def lifespan(app: FastAPI):
         quota_guard.stop()
         oauth_refresh_scheduler.stop()
         if account_runtime:
+            if cluster_terminal_sessions:
+                if cluster_runner:
+                    if cluster_runner.project_io and cluster_runner.project_io.programs:
+                        cluster_runner.project_io.programs.close()
+                    cluster_runner.close()
+                if cluster_continues:
+                    cluster_continues.close()
+                cluster_terminal_sessions.close()
             account_runtime.stop()
+        if cluster_service:
+            cluster_service.close()
 
 
 app = FastAPI(title="vibecoding-bench", lifespan=lifespan)
 app.include_router(system_updates_router(lambda: account_runtime))
 app.include_router(projects_router(lambda: projects_service))
 app.include_router(warmup_pi_router(lambda: warmup_pi_service))
+app.include_router(cluster_router(lambda: cluster_service))
+app.include_router(migration_router(lambda: migration_operations))
+app.include_router(node_transport_router(lambda: cluster_service.transports if cluster_service else None))
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -8290,7 +8673,8 @@ async def session_auth_middleware(request, call_next):
     """
     if V3_ENABLED:
         expected = os.environ.get("V3_INTERNAL_TOKEN", "")
-        actual = request.headers.get("authorization", "").removeprefix("Bearer ")
+        actual = (request.headers.get('x-v3-relay-token', '') if request.url.path.startswith('/cluster-transports/v2/')
+            else request.headers.get("authorization", "").removeprefix("Bearer "))
         if len(expected) < 32 or not secrets.compare_digest(actual, expected):
             return JSONResponse(status_code=401, content={"detail": "内部服务鉴权失败"})
         if request.url.path == "/api/auth/login":
@@ -8795,17 +9179,24 @@ class WarmupProjectsResumeIn(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
 
-def _oauth_owner_transition_blocker(account: dict, login_sid: Optional[str] = None) -> Optional[str]:
+def _oauth_owner_transition_blocker(account: dict, login_sid: Optional[str] = None, *, refresh_operation_id: Optional[str] = None) -> Optional[str]:
     """
     查找会让 AT/RT 所有权切换不安全的活跃工作。
 
     :param account: accounts 表行
     :param login_sid: 提交时允许的当前登录会话；其他登录仍阻塞
+    :param refresh_operation_id: 已由具体登录协调器核对实际停止的原RT父操作。
     :return: 阻塞原因；账号空闲时返回 None
     """
     owner = pi_owners.owner(int(account['id'])) if pi_owners else None
     if owner:
         return f"账号正在由 {owner['kind']} Pi 指挥（代次 {owner['generation']}）"
+    if cluster_runner and cluster_runner.project_io and cluster_runner.project_io.programs:
+        try:
+            if cluster_runner.project_io.programs.active(account['id']):
+                return '账号存在未收口的节点独立程序，请先停止原验收'
+        except (OSError,ValueError):
+            return '账号节点独立程序记录需要核对'
     conn = get_db()
     try:
         active_run = conn.execute(
@@ -8813,17 +9204,171 @@ def _oauth_owner_transition_blocker(account: dict, login_sid: Optional[str] = No
             "AND status IN ('queued','running','stopping','quota_wait') ORDER BY created_at LIMIT 1",
             (account["id"],),
         ).fetchone()
+        remote = None
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='node_executions'").fetchone():
+            remote = conn.execute("SELECT source,phase FROM node_executions WHERE account_id=? "
+                "AND phase<>'closed' AND source<>? AND operation_id<>? ORDER BY created_at LIMIT 1",
+                (account['id'], 'login:' + login_sid if login_sid else '', refresh_operation_id or '')).fetchone()
     finally:
         conn.close()
     if active_run:
         return f"run {active_run['id']} 当前为 {active_run['status']}"
+    if remote:
+        return '账号存在未收口的节点执行，需先核对原作业'
     if continue_manager and continue_manager.has_active_account(int(account["id"])):
         return "账号存在活跃的继续对话会话"
     if login_manager and login_manager.has_active_name(str(account["name"])):
         own_login = login_manager.get(login_sid) if login_sid else None
         if not own_login or own_login.name != account["name"]:
-            return "账号存在活跃的登录或重授权会话"
+            with login_manager._lock:
+                reserved=bool(login_sid and login_manager._name_locks.get(account['name'])==login_sid)
+            if not reserved:
+                return "账号存在活跃的登录或重授权会话"
     return None
+
+
+def _remote_login_admission(account: dict, sid: str, refresh_scope: ExecutionScope | None) -> None:
+    """沿原业务活动门禁检查明确登录，原RT父来源由协调器先核对。
+
+    :param account: 当前独立账号。
+    :param sid: 原登录标识。
+    :param refresh_scope: 已确认原Node实际停止的RT维护。
+    :return: None；其它活动继续阻塞。
+    """
+    blocker=_oauth_owner_transition_blocker(account,sid,
+        refresh_operation_id=refresh_scope.operation_id if refresh_scope else None)
+    if blocker:
+        raise ValueError('账号仍有活动工作：'+blocker)
+
+
+def _save_remote_login_authorization(account: dict, snapshot: dict, version: str) -> None:
+    """在原owner锁内保存Node新授权镜像、来源证明和原独立登录状态。
+
+    :param account: 原已有独立账号。
+    :param snapshot: 已核对Scope和摘要的受信Node快照。
+    :param version: 本次实际冻结CLI版本。
+    :return: None；任一阶段失败继续保留节点材料和中央维护。
+    """
+    if credential_ownership is None:
+        raise ValueError('原凭据所有权服务尚未就绪')
+    profile=PROFILES_DIR/account['name']
+    identity=snapshot['identity']
+    with _profile_lock(account['name']):
+        try:
+            top=json.loads((profile/'.claude.json').read_text(encoding='utf-8'))
+        except (OSError,ValueError):
+            raise ValueError('原管理镜像身份文件需要核对') from None
+        if not isinstance(top,dict):
+            raise ValueError('原管理镜像身份文件需要核对')
+        _sync_cc2api_credentials_to_profile_locked(account['name'],snapshot['material'])
+        tiers={target:snapshot['material'][source] for source,target in
+            (('subscription_type','subscriptionType'),('rate_limit_tier','rateLimitTier'))
+            if snapshot['material'].get(source) is not None}
+        if tiers:
+            credentials=json.loads((profile/'.credentials.json').read_text(encoding='utf-8'))
+            credentials['claudeAiOauth'].update(tiers)
+            atomic_json(profile/'.credentials.json',credentials)
+            _make_worker_owned(profile/'.credentials.json')
+        top['oauthAccount']={'emailAddress':identity['email'],'accountUuid':identity['account_uuid']}
+        if identity.get('organization_uuid') is not None:
+            top['oauthAccount']['organizationUuid']=identity['organization_uuid']
+        if identity.get('user_id') is not None:
+            top['userID']=identity['user_id']
+        else:
+            top.pop('userID',None)
+        atomic_json(profile/'.claude.json',top)
+        _make_worker_owned(profile/'.claude.json')
+    # 原只读设备核验自行取得profile锁；在此先释放不可重入的短文件锁。
+    credential_ownership.record_local_authorization(account['id'],version)
+    with _db_lock:
+        connection=get_db()
+        try:
+            with connection:
+                row=connection.execute('SELECT * FROM accounts WHERE id=?',(account['id'],)).fetchone()
+                if (row is None or row['name']!=account['name'] or row['cc2api_account_id'] is not None
+                        or row['deleted_at'] is not None):
+                    raise ValueError('原登录账号归属已经变化')
+                connection.execute('DELETE FROM account_quota_states WHERE account_id=?',(account['id'],))
+                connection.execute('DELETE FROM quota_observation_cursors WHERE account_id=?',(account['id'],))
+                connection.execute('UPDATE accounts SET enabled=1 WHERE id=?',(account['id'],))
+        finally:
+            connection.close()
+
+
+def _save_remote_draft_profile(name: str, documents: dict) -> None:
+    """在原profile锁内镜像已核对的完整草稿授权，未知配置字段完整保留。
+
+    :param name: 原冻结名称。
+    :param documents: 具体草稿协调器已验证的固定文件集合。
+    :return: None；文件失败保留中央提交记录及Node授权。
+    """
+    if cluster_draft_logins is None or account_runtime is None:
+        raise ValueError('原节点草稿服务尚未就绪')
+    connection=get_db()
+    try:
+        environment=connection.execute('SELECT * FROM account_environments WHERE name=?',(name,)).fetchone()
+    finally:
+        connection.close()
+    if environment is None:
+        raise ValueError('原节点草稿环境需要核对')
+    row=_remote_draft_record(dict(environment))
+    if row is None:
+        raise ValueError('原节点草稿范围需要核对')
+    cluster_draft_logins.ledger.admit(row['operation_id'])
+    allowed={'.claude.json','.claude/.credentials.json','.claude/settings.json'}
+    if set(documents)-allowed or not {'.claude.json','.claude/.credentials.json'}<=set(documents):
+        raise ValueError('原节点草稿授权文件尚未完整')
+    AccountRuntime._local_oauth(documents['.claude/.credentials.json'])
+    with _profile_lock(name):
+        profile=PROFILES_DIR/name
+        drafts=_login_drafts()
+        drafts._safe_tree(profile,PROFILES_DIR)
+        drafts.save(dict(environment),phase='submitting')
+        for source,target in (('.claude.json','.claude.json'),('.claude/.credentials.json','.credentials.json'),
+                ('.claude/settings.json','settings.json')):
+            if source in documents:
+                atomic_json(profile/target,documents[source])
+                _make_worker_owned(profile/target)
+        _make_worker_owned(profile)
+
+
+def _record_remote_draft_authorization(account_id: int, version: str) -> None:
+    """按原Owner当前Node资料登记首次独立授权。:param account_id: 真实账号。:param version: 原版本。:return: None。"""
+    if credential_ownership is None:
+        raise ValueError('原凭据所有权服务尚未就绪')
+    credential_ownership.record_local_authorization(account_id,version)
+
+
+def _save_remote_bound_login_authorization(account: dict, snapshot: dict, version: str) -> None:
+    """镜像原Gateway当前凭据，绑定账号继续保持原设备、策略与额度。
+
+    :param account: 原绑定账号。
+    :param snapshot: 协调器核验的权威快照及本次身份。
+    :param version: 本次冻结CLI版本。
+    :return: None；文件发布失败保留原登录维护。
+    """
+    scope=ExecutionScope.model_validate(snapshot['scope'])
+    if (scope.account_id!=account['id'] or scope.gateway_account_id!=account.get('cc2api_account_id')
+            or scope.gateway_account_id is None or snapshot['version']!=version):
+        raise ValueError('原绑定新授权的镜像来源已经变化')
+    profile=PROFILES_DIR/account['name']
+    identity=snapshot['identity']
+    with _profile_lock(account['name']):
+        try:
+            top=json.loads((profile/'.claude.json').read_text(encoding='utf-8'))
+        except (OSError,ValueError):
+            raise ValueError('原管理镜像身份文件需要核对') from None
+        if not isinstance(top,dict) or top.get('userID')!=identity['user_id']:
+            raise ValueError('原绑定设备与新授权身份不一致')
+        oauth=top.get('oauthAccount')
+        if not isinstance(oauth,dict):
+            raise ValueError('原绑定账号身份文件需要核对')
+        _sync_cc2api_credentials_to_profile_locked(account['name'],snapshot['material'])
+        oauth.update(emailAddress=identity['email'],accountUuid=identity['account_uuid'])
+        if identity.get('organization_uuid') is not None:
+            oauth['organizationUuid']=identity['organization_uuid']
+        atomic_json(profile/'.claude.json',top)
+        _make_worker_owned(profile/'.claude.json')
 
 
 def _require_oauth_owner_transition_idle(account: dict) -> None:
@@ -8836,6 +9381,24 @@ def _require_oauth_owner_transition_idle(account: dict) -> None:
     blocker = _oauth_owner_transition_blocker(account)
     if blocker:
         raise HTTPException(409, f"账号凭据所有权暂不能切换：{blocker}，请先停止并收口")
+
+
+def _account_owner_transition(account, target_id, *, handoff_credentials=True, record=None):
+    """按原人工归属选择凭据交接的实际执行位置。"""
+    if cluster_service and cluster_service.store.assignment(account['id'])['kind']=='ssh':
+        if cluster_runner is None or cluster_runner.owners is None:
+            raise ValueError('所属节点凭据交接服务尚未就绪')
+        return cluster_runner.owners.transition(account,target_id,handoff_credentials=handoff_credentials,record=record)
+    return account_runtime.owner_transition(account,target_id,handoff_credentials=handoff_credentials)
+
+
+def _sync_owner_credentials(account):
+    """原owner锁内向实际所有者发布已镜像的当前凭据。"""
+    if cluster_service and cluster_service.store.assignment(account['id'])['kind']=='ssh':
+        with _account_owner_transition(account,account['cc2api_account_id']):
+            pass
+        return
+    account_runtime.sync_credentials(account_runtime._row(account['name'],account['id']),account)
 
 
 @contextmanager
@@ -8854,7 +9417,7 @@ def _runtime_owner_transition(account: dict, target_id: Optional[int], needed: b
         return
     try:
         with _profile_lock(account["name"]):
-            with account_runtime.owner_transition(account, target_id, handoff_credentials=handoff_credentials):
+            with _account_owner_transition(account, target_id, handoff_credentials=handoff_credentials):
                 yield
     except (ValueError, ConnectionError) as exc:
         raise HTTPException(409, _redact_cc2api_error(exc))
@@ -8884,8 +9447,39 @@ def _require_cc2api_binding_available(
         raise HTTPException(409, "该 cc2api 账号已绑定其他 bench 账号")
 
 
+def _guard_remote_draft_name(name: str) -> None:
+    """在原名称锁内保护节点草稿与尾段标记，创建和新登录共用同一边界。"""
+    connection=get_db()
+    try:
+        table=connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='node_login_drafts'").fetchone()
+        pending=(connection.execute("SELECT 1 FROM node_login_drafts d JOIN account_environments e ON e.environment_id=d.environment_id "
+            "WHERE e.name=? AND (d.phase<>'closed' OR d.saved_account_id IS NULL)",(name,)).fetchone() if table else None)
+    finally:
+        connection.close()
+    if pending:
+        raise ValueError('该名称属于节点登录草稿，请继续原登录并提交保存')
+    if account_runtime and login_manager and (BENCH_DATA/'login-drafts').exists():
+        drafts=_login_drafts()
+        if any(row['name']==name and drafts.record(row).get('node_id') is not None for row in drafts.rows()):
+            raise ValueError('原节点登录草稿仍在保存或清理，请先收口原操作')
+
+
 @app.post("/api/accounts")
 def create_account(body: AccountIn):
+    """在原名称锁内保护节点草稿，只通过完整登录提交创建其正式账号。
+
+    :param body: 原账号导入配置。
+    :return: 原导入结果；节点草稿继续使用独立提交入口。
+    """
+    with _oauth_owner_lock(body.name):
+        try:
+            _guard_remote_draft_name(body.name)
+        except (ValueError,OSError,TypeError):
+            raise HTTPException(409,'原登录草稿归属需要核对，请先继续或收口原操作') from None
+        return _create_account_locked(body)
+
+
+def _create_account_locked(body: AccountIn):
     """创建已有 profile 对应的账号记录并初始化工程额度闸线。
 
     :param body: 账号名、代理配置、时区及启用状态。
@@ -9013,6 +9607,77 @@ def put_task_proxy_selection(aid: int, body: TaskProxySelectionIn):
         raise HTTPException(409, '代理切换未完成，请核对账号空闲状态并重新读取配置') from None
 
 
+@app.get('/api/accounts/{aid}/node')
+def account_node_assignment(aid: int) -> dict:
+    """读取账号的权威执行节点。:param aid: 账号ID。:return: 公开归属及版本。"""
+    if not cluster_service:
+        raise HTTPException(503, '节点管理服务尚未就绪')
+    try:
+        return cluster_service.store.assignment(aid)
+    except ValueError as error:
+        raise HTTPException(404, str(error)) from None
+
+
+@contextmanager
+def _node_migration_guard(aid: int):
+    """在owner/profile顺序中冻结账号并核对中央作业，环境锁由排空后的协调器取得。
+
+    :param aid: 原中央账号。
+    :return: 当前账号与权威环境的互斥上下文。
+    """
+    if not account_runtime:
+        raise ValueError('账号运行时尚未就绪')
+    connection = get_db()
+    try:
+        original = _get_available_account(connection, aid, include_disabled=True)
+    finally:
+        connection.close()
+    if original is None:
+        raise ValueError('账号不存在')
+    original = dict(original)
+    with ExitStack() as locks:
+        for guard in (_oauth_owner_lock(original['name']), _profile_lock(original['name'])):
+            if not guard.acquire(blocking=False):
+                raise RuntimeBusy('账号身份或配置正在操作，请先等待原操作完成')
+            locks.callback(guard.release)
+        connection = get_db()
+        try:
+            current = _get_available_account(connection, aid, include_disabled=True)
+            row = connection.execute('SELECT * FROM account_environments WHERE account_id=?', (aid,)).fetchone()
+        finally:
+            connection.close()
+        if (current is None or current['name'] != original['name'] or current['profile_path'] != original['profile_path']
+                or row is None):
+            raise ValueError('账号或环境已变化，请重新读取归属')
+        account, environment = dict(current), dict(row)
+        _require_oauth_owner_transition_idle(account)
+        if credential_ownership:
+            credential_ownership.guard(account)
+        if account_runtime.environment_jobs(environment['environment_id']):
+            raise RuntimeBusy('账号仍有实际CLI作业，请先收口')
+        yield account, environment
+
+
+@app.put('/api/accounts/{aid}/node')
+def set_initial_account_node(aid: int, body: AccountNodeChange) -> dict:
+    """人工选择首次执行节点。:param aid: 账号。:param body: 目标及原版本。:return: 持久归属。"""
+    if not cluster_service or not account_runtime:
+        raise HTTPException(503, '节点管理服务尚未就绪')
+    connection = get_db()
+    try:
+        account = _get_available_account(connection, aid, include_disabled=True)
+    finally:
+        connection.close()
+    if account is None:
+        raise HTTPException(404, '账号不存在')
+    account = dict(account)
+    try:
+        with UPDATE_GATE.admission('account-node-placement'), _oauth_owner_lock(account['name']), _profile_lock(account['name']):
+            return cluster_service.assign_initial(account, account_runtime, body.node_id, body.revision)
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(409, str(error)) from None
+
+
 @app.get("/api/accounts")
 def list_accounts():
     """返回账号列表，并补充 OAuth token 状态。"""
@@ -9048,7 +9713,7 @@ def list_accounts():
             )
             account["timezone_mode"] = "manual" if timezone else "auto"
             account["run_window"] = _account_run_window(account, public=True, zone=account["effective_timezone"])
-            account.update(_read_account_oauth_status(account["name"]))
+            account.update(_account_oauth_status(account))
             account["passive_quota"] = _public_quota(account)
             policies = quota_guard.policy_snapshots(account) if quota_guard else {}
             quota_policy = policies.get("normal", {})
@@ -9095,7 +9760,30 @@ def _v3_cli_identity(account: dict) -> dict:
     :return: 已核验的无凭据 CLI 身份载荷
     """
     with _profile_lock(account["name"]):
+        owner=_remote_credential_owner(account)
+        if owner is not None:
+            return owner.identity_import(account)
         return account_runtime.identity_import(account, _resolve_account_cli_version(account)[0])
+
+
+def _v3_matched_cli_identity(account: dict) -> dict:
+    """已有Gateway目标只核对Node设备，保留本机原首次环境准备。"""
+    owner=_remote_credential_owner(account)
+    return _v3_cli_identity_readonly(account) if owner is not None else _v3_cli_identity(account)
+
+
+def _prepare_initial_remote_owner(account: dict) -> None:
+    """显式关联的目标核对后准备首次Node布局，纯材料读取保持只读。
+
+    :param account: 原owner锁内的正式账号。
+    :return: None；已有实际代次沿原Node HOME读取。
+    """
+    owner=_remote_credential_owner(account)
+    if owner is not None:
+        with _profile_lock(account['name']):
+            row=account_runtime._row(account['name'],account['id'])
+            if row['generation']==0:
+                cluster_service.prepare_remote_cli(account,account_runtime,cc2api_client,_quota_identity(account))
 
 
 def _v3_cli_identity_readonly(account: dict, version: str | None = None) -> dict:
@@ -9106,6 +9794,9 @@ def _v3_cli_identity_readonly(account: dict, version: str | None = None) -> dict
     :return: 已核验设备身份及固定环境 ID。
     """
     with _profile_lock(account['name']):
+        owner=_remote_credential_owner(account)
+        if owner is not None:
+            return owner.read_identity(account,version)
         row = account_runtime._row(account['name'], account['id'])
         identity = account_runtime.read_cli_identity(row, version or _resolve_account_cli_version(account)[0])
         return {**identity, 'environment_id': row['environment_id']}
@@ -9182,7 +9873,13 @@ def update_account_process(aid: int) -> dict:
         _require_oauth_owner_transition_idle(account)
         try:
             with _profile_lock(account["name"]):
-                payload = account_runtime.process_identity_import(account, _resolve_account_cli_version(account)[0])
+                remote = _remote_account_logins(account)
+                if remote is not None:
+                    cluster_service.prepare_remote_cli(account, account_runtime, cc2api_client, _quota_identity(account))
+                    configuration = cc2api_client._request('GET', f"/admin/runtime/accounts/{int(account['cc2api_account_id'])}/config")
+                    payload = remote.identity_reader.process(account, configuration)
+                else:
+                    payload = account_runtime.process_identity_import(account, _resolve_account_cli_version(account)[0])
             result = cc2api_client._request("POST",
                 f"/admin/accounts/{int(account['cc2api_account_id'])}/cli-process/import", payload)
         except ConnectionError as exc:
@@ -9823,6 +10520,7 @@ class LoginStartIn(BaseModel):
     upstream_socks5_user: Optional[str] = None
     upstream_socks5_pass: Optional[str] = None
     force_reauth: bool = False
+    node_id: Optional[StrictInt] = None
 
 
 class LoginDraftActionIn(BaseModel):
@@ -9859,11 +10557,16 @@ def _draft_session(row: dict) -> Optional[LoginSession]:
 
 
 def _login_response(session: LoginSession) -> dict:
-    return {"session_id": session.sid, "ws_path": f"/api/accounts/login/ws/{session.sid}",
+    value={"session_id": session.sid, "ws_path": f"/api/accounts/login/ws/{session.sid}",
         "has_sidecar": session.sidecar_id is not None, "name": session.name,
         "reconnectable": bool(account_runtime) and session.phase == "authorizing",
         "cc2api_account_id": session.binding_id, "environment_id": session.environment_id,
         "draft_generation": session.draft_generation}
+    if session.remote_operation and session.draft_generation is not None:
+        row=cluster_draft_logins.ledger.get(session.remote_operation)
+        node=cluster_draft_logins.service.store.get(row['node_id'])
+        value.update(node_id=node['id'],node_name=node['name'])
+    return value
 
 
 def _unverified_login_draft(row: dict) -> dict:
@@ -9874,6 +10577,185 @@ def _unverified_login_draft(row: dict) -> dict:
         "message": "草稿记录损坏或归属不一致，请检查环境；自动操作已禁用",
         "can_resume": False, "can_restart": False, "can_delete": False,
         "can_reconcile": False, "proxy_known": False, "proxy_summary": None}
+
+
+def _remote_login_draft_summary(current: dict, operation: dict, acquired: bool) -> dict:
+    """按冻结节点投影草稿，所有产物与容器状态均读取原Node。"""
+    work=operation['record']['work']
+    node=cluster_draft_logins.service.store.get(operation['node_id'])
+    value={**_unverified_login_draft(current),'generation':work['draft_generation'],
+        'node_id':node['id'],'node_name':node['name'],'state':operation['phase']}
+    if not acquired:
+        value['message']='登录操作进行中，请稍候刷新'
+        return value
+    if operation['phase']=='deleting':
+        value.update(can_delete=True,message='节点草稿完整清理尚未收口，请重试删除')
+        return value
+    try:
+        preparation=cluster_draft_logins.preparation(operation)
+    except Exception:
+        value.update(state='reconcile',can_delete=operation['saved_account_id'] is None and
+            (operation['record'].get('node_receipt') or {}).get('commit') is None,
+            message='原草稿私有准备记录需要核对，可检查原资料或完整删除')
+        return value
+    try:
+        settings=preparation.settings
+        host=settings.upstream_socks5_host
+        address='['+host+']' if ':' in host else host
+        value.update(proxy_known=True,proxy_summary=(settings.upstream_proxy_scheme+'://'+address+':'+
+            str(settings.upstream_socks5_port) if host else None))
+        status=cluster_draft_logins.status(operation['operation_id'])
+        pending=(operation['record'].get('node_receipt') or {}).get('commit') is not None
+        # 半保存或已激活的账号仍沿原提交收口，NULL摘要不用于正式账号。
+        if pending or operation['saved_account_id'] is not None:
+            value.update(state='submitting',session_id=work['sid'],can_resume=True,
+                credentials_ready=True,can_reconcile=operation['phase']=='reconcile',
+                message='账号保存尚未完成，请继续登录并重试原提交')
+            return value
+        summary=cluster_draft_logins.summary(operation['operation_id'])
+        phase=('reconcile' if operation['phase']=='reconcile' else
+            'cancelled' if operation['phase']=='closed' else status['phase'])
+        active=operation['phase'] in ('preparing','active') and status['phase'] in ('preparing','authorizing','ready_to_submit')
+        value.update(state=phase,session_id=work['sid'] if active else None,
+            reconnectable=active and status.get('reconnectable') is True,
+            credentials_ready=active and status.get('credentials_ready') is True,
+            credentials_present=summary['credentials_present'],container_status=summary['container_status'],
+            can_resume=(active or operation['phase']=='closed' and summary['credentials_present']),
+            can_restart=operation['phase'] in ('active','closed'),
+            can_delete=operation['phase'] in ('active','closed'),
+            can_reconcile=operation['phase']=='reconcile',message='原节点草稿已保留' if not active else '节点登录进行中')
+    except Exception:
+        value.update(state='reconcile',can_reconcile=True,can_delete=operation['record']['scope'] is None,
+            message='原节点草稿状态待核对，请恢复检查或检查节点')
+    return value
+
+
+def _sync_remote_draft_marker(operation: dict) -> None:
+    """以当前账本和明确前代Scope修复原标记写入中断，禁止接管其它代次。"""
+    work=operation['record']['work']
+    drafts=_login_drafts()
+    with _profile_lock(work['name']):
+        row=drafts.row(work['environment_id'])
+        if row is None:
+            raise ValueError('原节点草稿环境需要核对')
+        marker=drafts.record(row)
+        if marker.get('node_id')!=operation['node_id']:
+            raise ValueError('原草稿节点标记已经变化')
+        if marker['generation']!=work['draft_generation']:
+            previous=operation['record']['previous']
+            if (previous is None or previous['draft_generation']!=marker['generation']
+                    or previous['source']!='login:'+str(marker.get('sid')) or marker['phase'] in ('submitting','deleting')):
+                raise ValueError('原草稿代次标记需要核对')
+            phase='submitting' if (operation['record'].get('node_receipt') or {}).get('commit') else 'authorizing'
+            drafts.save(row,sid=work['sid'],generation=work['draft_generation'],version=work['version'],
+                home=work['home'],phase=phase,created_at=operation['updated_at'])
+        elif marker.get('sid')!=work['sid'] or marker.get('home')!=work['home'] or marker.get('version')!=work['version']:
+            raise ValueError('原节点草稿冻结标记需要核对')
+    previous=operation['record']['previous']
+    if previous is not None:
+        with login_manager._lock:
+            old=login_manager.sessions.get(previous['source'].removeprefix('login:'))
+            if old is not None and old.remote_operation==previous['operation_id'] and old.environment_id==work['environment_id']:
+                login_manager.sessions.pop(old.sid)
+                if login_manager._name_locks.get(old.name)==old.sid:
+                    login_manager._name_locks.pop(old.name)
+
+
+def _mark_remote_draft_node_prepare(operation: dict) -> None:
+    """在实际节点准备前持久意图，跨代次保持已进入准备的事实。
+
+    :param operation: owner锁内冻结的当前节点草稿账本。
+    :return: None；标记失败时停止本次节点RPC。
+    """
+    _sync_remote_draft_marker(operation)
+    work=operation['record']['work']
+    drafts=_login_drafts()
+    with _profile_lock(work['name']):
+        row=drafts.row(work['environment_id'])
+        marker=drafts.record(row)
+        if (marker.get('node_id')!=operation['node_id'] or marker['generation']!=work['draft_generation']
+                or marker.get('sid')!=work['sid'] or marker.get('node_key') not in (None,operation['record']['node_key'])):
+            raise ValueError('原节点草稿准备意图归属已经变化')
+        drafts.save(row,node_prepare_intent=True,node_key=operation['record']['node_key'])
+
+
+def _remote_login_draft_action(row: dict, generation: str, action: str) -> Optional[dict]:
+    """在原名称锁内分流节点草稿操作，节点记录始终先于本机运行时。"""
+    with _oauth_owner_lock(row['name']):
+        try:
+            deletion=cluster_draft_logins.deletion(row['environment_id']) if cluster_draft_logins else None
+            if action=='delete' and deletion is not None:
+                if deletion.scope.name!=row['name'] or deletion.scope.draft_generation!=generation:
+                    raise ValueError('原草稿删除归属已经变化')
+                operation=cluster_draft_logins.ledger.find(row['environment_id'])
+            else:
+                drafts=_login_drafts()
+                if drafts.unregistered(row):
+                    if action!='delete':
+                        raise ValueError('草稿准备登记尚未完成，请删除后重新配置')
+                    with _profile_lock(row['name']):
+                        marker=drafts.record(row)
+                        drafts.delete_unregistered(row,generation)
+                    with login_manager._lock:
+                        login_manager.sessions.pop(marker['sid'],None)
+                        if login_manager._name_locks.get(row['name'])==marker['sid']:
+                            login_manager._name_locks.pop(row['name'])
+                    return {'ok':True}
+                operation=_remote_draft_record(row)
+            if operation is None and deletion is None:
+                return None
+            work=operation['record']['work'] if operation else {'id':deletion.scope.operation_id,
+                'sid':deletion.scope.source.removeprefix('login:'),'draft_generation':deletion.scope.draft_generation}
+            if work['draft_generation']!=generation:
+                raise ValueError('草稿已换代，请刷新账号列表')
+            if operation is not None:
+                _sync_remote_draft_marker(operation)
+            if action=='delete':
+                if operation is not None and (operation['saved_account_id'] is not None
+                        or (operation['record'].get('node_receipt') or {}).get('commit') is not None):
+                    raise ValueError('草稿已进入保存，请继续原提交')
+                drafts=_login_drafts()
+                with _profile_lock(row['name']):
+                    drafts.save(row,phase='deleting')
+                cluster_draft_logins.delete(row['environment_id'],generation,owner_locked=True)
+                with _profile_lock(row['name']):
+                    drafts._path(row['environment_id']).unlink(missing_ok=True)
+                with login_manager._lock:
+                    login_manager.sessions.pop(work['sid'],None)
+                    if login_manager._name_locks.get(row['name'])==work['sid']:
+                        login_manager._name_locks.pop(row['name'])
+                return {'ok':True}
+            if action=='reconcile':
+                completed=cluster_draft_logins.reconcile(work['id'],owner_locked=True)
+                if completed['saved_account_id'] is not None:
+                    session=login_manager._remote_draft_session(completed)
+                    _login_commit_locked(session.sid,LoginStartIn(name=row['name']))
+                return {'ok':True}
+            if action=='resume':
+                status=cluster_draft_logins.status(work['id'])
+                if status['phase'] in ('preparing','authorizing','ready_to_submit','submitting','committed'):
+                    session=login_manager._remote_draft_session(operation)
+                    session.phase=status['phase']
+                    return _login_response(session)
+            # 恢复和重登只从原私有配置派生，页面不能改变代理、版本或执行节点。
+            try:
+                updated=cluster_draft_logins.retry(work['id'],'recover' if action=='resume' else 'authorize',
+                    int(time.time())+int(os.environ.get('V3_LOGIN_TTL_SECONDS','1800')),owner_locked=True)
+            finally:
+                latest=cluster_draft_logins.ledger.find(row['environment_id'])
+                if latest and latest['operation_id']!=work['id']:
+                    _sync_remote_draft_marker(latest)
+                    with login_manager._lock:
+                        login_manager.sessions.pop(work['sid'],None)
+                        if login_manager._name_locks.get(row['name'])==work['sid']:
+                            login_manager._name_locks.pop(row['name'])
+            return _login_response(login_manager._remote_draft_session(updated))
+        except ValueError:
+            raise HTTPException(409,'草稿代次、阶段或归属需要核对，请刷新列表并继续原操作') from None
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(503,'原节点草稿操作尚未完成，资料已保留，请重试或检查节点') from None
 
 
 @app.get("/api/accounts/login-drafts")
@@ -9898,6 +10780,29 @@ def list_login_drafts() -> list[dict]:
             except (ValueError, KeyError, TypeError, OSError):
                 # 单条私有记录损坏不能遮住其它账号；未知归属只展示，不开放清理。
                 result.append(_unverified_login_draft(row))
+                continue
+            try:
+                operation=_remote_draft_record(current)
+            except Exception:
+                value=_unverified_login_draft(current)
+                try:
+                    deleted=cluster_draft_logins.deletion(current['environment_id']) if cluster_draft_logins else None
+                    if (deleted and deleted.scope.name==current['name'] and initial_record['phase']=='deleting'
+                            and deleted.scope.draft_generation==initial_record['generation']):
+                        value.update(generation=deleted.scope.draft_generation,state='deleting',can_delete=acquired,
+                            node_id=initial_record.get('node_id'),message='节点清理已完成，请重试删除以收口中央记录')
+                    elif drafts.unregistered(current):
+                        value.update(generation=initial_record['generation'],state=initial_record['phase'],can_delete=acquired,
+                            node_id=initial_record['node_id'],node_name=initial_record.get('node_name'),
+                            message='准备登记尚未完成，可以删除草稿后重新配置')
+                except Exception:
+                    pass
+                result.append(value)
+                continue
+            if operation is not None:
+                if operation['phase']=='closed' and operation['saved_account_id'] is not None and initial_record['phase']!='submitting':
+                    continue
+                result.append(_remote_login_draft_summary(current,operation,acquired))
                 continue
             pending = initial_record["phase"] == "submitting"
             if current["account_id"] is not None and not pending:
@@ -9989,6 +10894,9 @@ def reconcile_login_draft(environment_id: str, body: LoginDraftActionIn) -> dict
     row = drafts.row(environment_id)
     if not row:
         raise HTTPException(404, "草稿已不存在")
+    remote=_remote_login_draft_action(row,body.generation,'reconcile')
+    if remote is not None:
+        return remote
     try:
         with _oauth_owner_lock(row["name"]), _profile_lock(row["name"]), account_runtime.environment_lock(environment_id):
             row = drafts.row(environment_id)
@@ -10017,6 +10925,9 @@ def resume_login_draft(environment_id: str, body: LoginDraftActionIn) -> dict:
     row = drafts.row(environment_id)
     if not row:
         raise HTTPException(404, "登录草稿已不存在")
+    remote=_remote_login_draft_action(row,body.generation,'resume')
+    if remote is not None:
+        return remote
     with _oauth_owner_lock(row["name"]), _profile_lock(row["name"]):
         try:
             row = drafts.row(environment_id)
@@ -10081,6 +10992,9 @@ def restart_login_draft(environment_id: str, body: LoginDraftActionIn) -> dict:
     row = drafts.row(environment_id)
     if not row:
         raise HTTPException(404, "登录草稿已不存在")
+    remote=_remote_login_draft_action(row,body.generation,'restart')
+    if remote is not None:
+        return remote
     with _oauth_owner_lock(row["name"]), _profile_lock(row["name"]):
         try:
             drafts, row, record = _require_login_draft(environment_id, body.generation)
@@ -10112,11 +11026,16 @@ def delete_login_draft(environment_id: str, generation: str) -> dict:
     try:
         row = drafts.row(environment_id)
         if row:
+            remote=_remote_login_draft_action(row,generation,'delete')
+            if remote is not None:
+                return remote
             with _oauth_owner_lock(row["name"]), _profile_lock(row["name"]):
                 drafts.delete(row, generation, login_manager)
         return {"ok": True}
     except ValueError as error:
         raise HTTPException(409, str(error)) from None
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(503, "清理未完成，草稿已保留，请刷新列表后重试删除") from None
 
@@ -10135,13 +11054,18 @@ def login_start(body: LoginStartIn):
             ).fetchone()
         finally:
             conn.close()
-        if bound and bound["cc2api_account_id"] is not None:
+        remote=bool(bound and _remote_account_logins(dict(bound)) is not None)
+        if bound and body.node_id is not None:
+            raise HTTPException(409,'已有账号请使用原节点登录或节点迁移入口')
+        if remote and not body.force_reauth:
+            raise HTTPException(409,'已有节点账号需要使用明确重授权入口')
+        if bound and (bound["cc2api_account_id"] is not None or remote):
             if not account_runtime or not body.force_reauth:
                 raise HTTPException(409, "已绑定账号须使用 v3 的显式重授权入口")
             # 关联重授权不接受顺便改代理/时区，继续沿用权威关联配置。
             body = LoginStartIn(name=body.name, force_reauth=True, timezone=bound["timezone"],
                 **{key: bound[key] for key in ("upstream_proxy_scheme", "upstream_socks5_host", "upstream_socks5_port", "upstream_socks5_user", "upstream_socks5_pass")})
-        if bound:
+        if bound and not remote:
             _require_oauth_owner_transition_idle(dict(bound))
         try:
             proxy_scheme = _normalize_upstream_proxy_scheme(body.upstream_proxy_scheme)
@@ -10157,10 +11081,13 @@ def login_start(body: LoginStartIn):
                 },
                 body.force_reauth,
                 timezone,
+                **({'node_id':body.node_id} if body.node_id is not None else {}),
             )
         except ValueError as e:
             raise HTTPException(400, str(e))
         except Exception as e:
+            if body.node_id is not None:
+                raise HTTPException(503,'节点登录准备尚未确认，草稿已保留，请刷新列表并恢复检查') from None
             raise HTTPException(500, f"启动登录会话失败：{e}")
     return _login_response(session)
 
@@ -10172,6 +11099,14 @@ def _send_login_code(sid: str, body: LoginCodeIn) -> dict:
     with _oauth_owner_lock(session.name):
         if login_manager.get(sid) is not session:
             raise HTTPException(404, "原登录会话已结束，发送结果不能确认")
+        if session.remote_operation:
+            try:
+                return _remote_session_logins(session).code(session.remote_operation,body.request_id,body.code)
+            except Exception:
+                try:
+                    return _remote_session_logins(session).code_receipt(session.remote_operation,body.request_id)
+                except Exception:
+                    return {'request_id':body.request_id,'status':'uncertain','message':'发送结果未知，请查询原回执并检查CLI'}
         if body.request_id in session.code_receipts:
             return dict(session.code_receipts[body.request_id])
         if session.phase != "authorizing" or time.time() >= session.created_at + int(os.environ.get("V3_LOGIN_TTL_SECONDS", "1800")):
@@ -10240,6 +11175,11 @@ def login_code_receipt(sid: str, request_id: str, response: Response) -> dict:
     if not session or not re.fullmatch(r"[a-f0-9]{32}", request_id):
         raise HTTPException(404, "原回执不可查，发送结果未知，请检查 CLI 状态")
     with _oauth_owner_lock(session.name):
+        if session.remote_operation:
+            try:
+                return _remote_session_logins(session).code_receipt(session.remote_operation,request_id)
+            except Exception:
+                raise HTTPException(503,'原回执暂不可查，发送结果未知，请检查CLI状态') from None
         receipt = session.code_receipts.get(request_id) if login_manager.get(sid) is session else None
         if receipt is None:
             raise HTTPException(404, "原回执不可查，发送结果未知，请检查 CLI 状态")
@@ -10268,6 +11208,27 @@ def login_status(sid: str, response: Response) -> dict:
 
 
 def _login_status_snapshot(session: LoginSession) -> dict:
+    if session.remote_operation:
+        try:
+            value=_remote_session_logins(session).status(session.remote_operation)
+        except Exception:
+            raise HTTPException(503,'暂时无法读取原节点登录状态，请稍后重试') from None
+        if session.draft_generation is not None and value['phase']=='committed':
+            drafts=_login_drafts()
+            if drafts._path(session.environment_id).exists():
+                row=drafts.row(session.environment_id)
+                marker=drafts.record(row)
+                if marker.get('sid')!=session.sid or marker['generation']!=session.draft_generation or marker['phase']!='submitting':
+                    raise HTTPException(409,'原草稿保存标记需要核对，请保留原资料')
+                # Node和中央首次事务已完成；尾段标记清理仍由同一提交重试，页面继续保留保存入口。
+                value={**value,'phase':'submitting','credentials_ready':True,'reconnectable':False}
+        session.phase=value['phase']
+        session.authorization_url=value.get('authorization_url')
+        value['restartable']=value['phase']=='ended'
+        value['message']={'preparing':'节点正在准备原登录','authorizing':'终端正在等待授权',
+            'ready_to_submit':'CLI认证检查通过，可以提交保存','submitting':'新授权保存待确认，请重试原提交',
+            'committed':'登录已完成','ended':'原登录已结束，请重新登录'}.get(value['phase'],'原登录需要核对')
+        return value
     expires_at = session.created_at + int(os.environ.get("V3_LOGIN_TTL_SECONDS", "1800"))
     if session.phase in ("authorizing", "ended", "ready_to_submit") and time.time() >= expires_at:
         raise HTTPException(410, "登录会话已过期，请从账号列表继续或重新授权")
@@ -10307,6 +11268,107 @@ def _login_status_snapshot(session: LoginSession) -> dict:
         "restartable": session.phase == "ended"}
 
 
+async def _remote_login_ws(websocket: WebSocket, session: LoginSession) -> None:
+    """经独立SSH连接原登录PTY，输入未知沿原回执核对。
+
+    :param websocket: 已通过原管理鉴权的浏览器连接。
+    :param session: 具体持久Node登录会话。
+    :return: None；浏览器断线只关闭attach。
+    """
+    raw=None
+    tasks=[]
+    loop=asyncio.get_running_loop()
+    opening_lock=threading.Lock()
+    opening_handles={}
+    detached=threading.Event()
+
+    def open_original():
+        handle=_remote_session_logins(session).open(session.remote_operation)
+        with opening_lock:
+            abandoned=detached.is_set()
+            if not abandoned:
+                opening_handles['handle']=handle
+        if abandoned:
+            handle.close()
+            return None
+        return handle
+
+    async def output():
+        while session.phase in ('preparing','authorizing') and time.time()<session.remote_expires_at:
+            try:
+                data=await asyncio.wait_for(loop.sock_recv(raw,4096),timeout=1)
+            except asyncio.TimeoutError:
+                continue
+            if not data:
+                return
+            await websocket.send_bytes(data)
+
+    async def incoming():
+        while time.time()<session.remote_expires_at:
+            message=await websocket.receive()
+            if message['type']=='websocket.disconnect':
+                return
+            if session.phase not in ('preparing','authorizing'):
+                return
+            text=message.get('text')
+            if not text:
+                continue
+            if len(text.encode())>32768:
+                raise ValueError('登录终端输入帧超过上限')
+            try:
+                event=json.loads(text)
+            except ValueError:
+                continue
+            if not isinstance(event,dict):
+                continue
+            if event.get('type')=='ping':
+                await websocket.send_json({'type':'pong'})
+            elif event.get('type')=='resize':
+                await asyncio.to_thread(raw.resize,int(event.get('rows') or 36),int(event.get('cols') or 120))
+            elif event.get('type')=='input':
+                data=event.get('data')
+                if isinstance(data,str) and data:
+                    encoded=data.encode()
+                    if len(encoded)>16384:
+                        raise ValueError('登录终端单次输入超过上限')
+                    await asyncio.to_thread(raw.send,encoded)
+
+    try:
+        raw=await asyncio.to_thread(open_original)
+        if raw is None:
+            return
+        session.phase='authorizing'
+        tasks=[asyncio.create_task(output()),asyncio.create_task(incoming())]
+        done,_=await asyncio.wait(tasks,return_when=asyncio.FIRST_COMPLETED)
+        for task in done:
+            task.result()
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        if websocket.client_state==WebSocketState.CONNECTED:
+            try:
+                await websocket.send_json({'type':'error','msg':'原节点登录终端连接已结束，请查询状态后重连'})
+            except Exception:
+                pass
+    finally:
+        for task in tasks:
+            task.cancel()
+        try:
+            await asyncio.gather(*tasks,return_exceptions=True)
+        finally:
+            # ASGI取消可能发生在等待开连接或等待pump收口时，持久保存清理责任。
+            with opening_lock:
+                detached.set()
+                handle=opening_handles.pop('handle',None)
+            if handle is not None:
+                handle.close()
+        if websocket.client_state==WebSocketState.CONNECTED:
+            try:
+                await websocket.close()
+            except Exception:
+                pass
+
+
 @app.websocket("/api/accounts/login/ws/{sid}")
 async def login_ws(websocket: WebSocket, sid: str):
     """PTY 桥：把 worker 里 `claude auth login` 的 PTY 双向接到浏览器 xterm"""
@@ -10322,6 +11384,9 @@ async def login_ws(websocket: WebSocket, sid: str):
         await websocket.send_text(json.dumps(
             {"type": "error", "msg": "session not found"}))
         await websocket.close(code=4004)
+        return
+    if session.remote_operation:
+        await _remote_login_ws(websocket,session)
         return
     if session.phase != "authorizing" or time.time() >= session.created_at + int(os.environ.get("V3_LOGIN_TTL_SECONDS", "1800")):
         await websocket.close(code=4404)
@@ -10474,6 +11539,28 @@ def _login_commit_locked(sid: str, body: LoginStartIn):
         raise HTTPException(404, "session not found")
     if session.name != body.name:
         raise HTTPException(400, "name mismatch with session")
+    if session.remote_operation:
+        try:
+            result=_remote_session_logins(session).commit(session.remote_operation,owner_locked=True)
+            if session.draft_generation is not None:
+                drafts=_login_drafts()
+                path=drafts._path(session.environment_id)
+                if path.exists():
+                    row=drafts.row(session.environment_id)
+                    marker=drafts.record(row)
+                    if marker.get('sid')!=session.sid or marker['generation']!=session.draft_generation:
+                        raise ValueError('原节点草稿保存标记归属已经变化')
+                    path.unlink()
+            session.phase,session.committed='committed',True
+            with login_manager._lock:
+                login_manager.completed[sid]={'result':result,'expires_at':time.time()+1800}
+                if login_manager._name_locks.get(session.name)==sid:
+                    login_manager._name_locks.pop(session.name)
+            return result
+        except ValueError:
+            raise HTTPException(409,'原节点重授权需要核对，请检查状态后重试原提交') from None
+        except Exception:
+            raise HTTPException(503,'原节点新授权保存尚未确认，暂存和维护已保留，请重试原提交') from None
     if account_runtime and session.binding_id is not None:
         try:
             return login_manager.commit_bound(session)
@@ -10688,6 +11775,12 @@ def login_cancel(sid: str):
         session = login_manager.get(sid)
         if session:
             with _oauth_owner_lock(session.name):
+                if session.remote_operation:
+                    try:
+                        login_manager.cleanup(sid)
+                    except Exception:
+                        raise HTTPException(503,'原节点登录清理仍需核对，材料和维护门禁已保留') from None
+                    return {"ok": True}
                 if session.binding_id is not None and session.commit_context["path"].exists():
                     account_runtime.reconcile(session.commit_context["environment_id"])
                     if session.commit_context["path"].exists():
@@ -11709,16 +12802,22 @@ def _public_followup_progress(run: dict) -> dict:
             delivered=0, consumed=0, items=["scheduled"] * len(messages))
     if not messages:
         return result
-    path = account_runtime.run_artifact_path(run["id"], "followups.json") if account_runtime else (
-        WORKSPACES_DIR / run["id"] / ".bench-followups.json")
     descriptor = None
     try:
-        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-        info = os.fstat(descriptor)
-        if not S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_size > 65536 or info.st_mode & 0o077:
-            raise ValueError("阶段文件无效")
-        with os.fdopen(descriptor, "rb", closefd=False) as stream:
-            state = json.loads(stream.read(65537))
+        if cluster_runner and cluster_runner.for_run(run['id']) is not None:
+            raw_state = cluster_runner.artifact(run['id'], 'followups.json')
+            if raw_state is None:
+                raise FileNotFoundError('原节点阶段文件尚未生成')
+            state = json.loads(raw_state)
+        else:
+            path = account_runtime.run_artifact_path(run["id"], "followups.json") if account_runtime else (
+                WORKSPACES_DIR / run["id"] / ".bench-followups.json")
+            descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            info = os.fstat(descriptor)
+            if not S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_size > 65536 or info.st_mode & 0o077:
+                raise ValueError("阶段文件无效")
+            with os.fdopen(descriptor, "rb", closefd=False) as stream:
+                state = json.loads(stream.read(65537))
         raw = json.dumps({"run_id": run["id"], "followups": messages}, ensure_ascii=False,
             sort_keys=True, separators=(",", ":")).encode()
         if timing is not None:
@@ -11775,6 +12874,22 @@ def _public_followup_progress(run: dict) -> dict:
     return result
 
 
+def _public_run_node(rid: str) -> dict | None:
+    """从原执行账本投影本次运行的冻结位置。
+
+    :param rid: 原运行ID。
+    :return: 公开节点及环境定位；未登记执行位置时为None。
+    """
+    original = cluster_runner.for_run(rid) if cluster_runner else None
+    if original is None:
+        return None
+    scope = original['record']['scope']
+    node = cluster_runner.sessions.service.store.get(original['node_id'])
+    return {'id': original['node_id'], 'key': scope['node_key'], 'name': node['name'],
+        'environment_id': scope['environment_id'], 'assignment_revision': scope['assignment_revision'],
+        'generation': scope['generation']}
+
+
 @app.get("/api/runs/{rid}")
 def get_run(rid: str):
     """读取一条运行的原始记录与公开进度。
@@ -11795,6 +12910,7 @@ def get_run(rid: str):
             result['read_only'] = True
         task = conn.execute("SELECT prompt FROM tasks WHERE id=?", (result["task_id"],)).fetchone()
         result["prompt"] = task["prompt"] if task else None
+        result["execution_node"] = _public_run_node(rid)
         result["followups"] = _public_followup_progress(result)
         account = conn.execute("SELECT * FROM accounts WHERE id=?", (result["account_id"],)).fetchone()
         result["passive_quota"] = _public_quota(dict(account)) if account else {}
@@ -11815,6 +12931,21 @@ def get_transcript(rid: str, tail_bytes: Optional[int] = None):
     :return: 当前运行 transcript 文本响应
     """
     _require_visible_run(rid)
+    if cluster_runner:
+        remote = cluster_runner.for_run(rid)
+        if remote is not None:
+            if tail_bytes is not None and not 1024 <= tail_bytes <= 1048576:
+                raise HTTPException(400, '日志读取范围无效')
+            chunk = cluster_runner.artifact_chunk(remote, 'transcript.log')
+            if chunk.file_identity is None:
+                raise HTTPException(404, 'transcript not yet available')
+            if tail_bytes is None:
+                return StreamingResponse(cluster_runner.iter_artifact(remote, 'transcript.log', first=chunk), media_type='text/plain')
+            offset = max(0, chunk.size - tail_bytes)
+            content = b''.join(cluster_runner.iter_artifact(remote, 'transcript.log', first=chunk, offset=offset))
+            if offset and b'\n' in content:
+                content = content.split(b'\n', 1)[1]
+            return PlainTextResponse(content.decode(errors='replace'), headers={'X-Log-Truncated': str(offset > 0).lower()})
     p = account_runtime.run_artifact_path(rid, "transcript.log") if account_runtime else (
         WORKSPACES_DIR / rid / ".bench-transcript.log"
     )
@@ -11860,20 +12991,15 @@ def list_workspace(rid: str):
         else:
             artifact = project_iterations.artifacts(context["attempt_id"]) if context else {"files": []}
         return [{"path": item["path"], "size": item["size"], "type": "file"} for item in artifact["files"]]
-    base = WORKSPACES_DIR / rid
-    if not base.exists():
-        raise HTTPException(404)
-    out: list[dict] = []
-    for p in sorted(base.rglob("*")):
-        rel = p.relative_to(base)
-        if str(rel).startswith(".bench-") or (account_runtime and rel.parts[0] in {
-                ".claude-home", ".cc2api-oauth-refresh-request.json", ".cc2api-oauth-refresh-result.json"}):
-            continue
-        if p.is_dir():
-            out.append({"path": str(rel), "type": "dir"})
-        else:
-            out.append({"path": str(rel), "type": "file", "size": p.stat().st_size})
-    return out
+    try:
+        if cluster_runner and cluster_runner.for_run(rid) is not None:
+            return cluster_runner.files(rid)
+        base = account_runtime.run_workspace_path(rid) if account_runtime else WORKSPACES_DIR / rid
+        return list_workspace_files(base)
+    except FileNotFoundError:
+        raise HTTPException(404, "运行产物目录尚未提供") from None
+    except (OSError, ValueError, RuntimeBusy):
+        raise HTTPException(409, "运行产物目录暂时不可读取或超过读取上限") from None
 
 
 @app.get("/api/runs/{rid}/file")
@@ -11907,6 +13033,13 @@ def preview_run_file(rid: str, path: str) -> dict:
                     raise HTTPException(404, "运行的冻结产物尚未提供")
                 return project_iterations.scenarios.artifact_file(context['id'], context['scenario_task_id'], relative, job['id'])
             return project_iterations.artifact_file(context['attempt_id'], relative)
+        if cluster_runner and cluster_runner.for_run(rid) is not None:
+            try:
+                return cluster_runner.file(rid, relative)
+            except FileNotFoundError:
+                raise HTTPException(404, "原节点产物文件已移除或尚未提供") from None
+            except (OSError, ValueError, RuntimeBusy):
+                raise HTTPException(503, "原节点产物文件读取失败，请稍后查询") from None
         workspace = account_runtime.run_workspace_path(rid) if account_runtime else WORKSPACES_DIR / rid
         return read_workspace_file(workspace.parent, workspace.name, relative)
     except ValueError as error:
@@ -11924,6 +13057,11 @@ def get_stats(rid: str):
     :return: token / request 聚合结果及 available / usage_available 状态
     """
     _require_visible_run(rid)
+    if cluster_runner and cluster_runner.for_run(rid) is not None:
+        try:
+            return cluster_runner.stats(rid)
+        except (OSError, ValueError, RuntimeBusy):
+            raise HTTPException(503, "原节点用量统计读取失败，请稍后查询") from None
     base = FLOWS_DIR
     # flows 目录按 account/task/run 分层，扫描所有匹配
     matches = list(base.rglob(f"{rid}/stats.jsonl"))
@@ -11933,70 +13071,7 @@ def get_stats(rid: str):
             matches.append(directory / "stats.jsonl")
         matches.extend(sorted((directory / "executions").glob("*/stats.jsonl")))
     matches = list({path.resolve(): path for path in matches}.values())
-    if not matches:
-        session_stats = _aggregate_claude_session_usage(rid)
-        return {
-            "tokens_in": session_stats["tokens_in"],
-            "tokens_out": session_stats["tokens_out"],
-            "requests": session_stats["requests"],
-            "errors": 0,
-            "available": bool(session_stats["usage_available"]),
-            "usage_available": bool(session_stats["usage_available"]),
-            "source": "claude_session" if session_stats["usage_available"] else "none",
-        }
-    tokens_in = tokens_out = errors = 0
-    request_ids: set[str] = set()
-    response_ids: set[str] = set()
-    fallback_requests = 0
-    usage_available = False
-    for f in matches:
-        for line in f.read_text(encoding="utf-8", errors="ignore").splitlines():
-            try:
-                rec = json.loads(line)
-            except Exception:
-                continue
-            if "error" in rec:
-                errors += 1
-                continue
-            if rec.get("phase") == "request":
-                flow_id = rec.get("flow_id")
-                if flow_id:
-                    request_ids.add(str(flow_id))
-                else:
-                    fallback_requests += 1
-                continue
-            if rec.get("phase") and rec.get("phase") != "response":
-                continue
-            flow_id = rec.get("flow_id")
-            if flow_id:
-                response_ids.add(str(flow_id))
-            else:
-                fallback_requests += 1
-            u = rec.get("usage") or {}
-            if not isinstance(u, dict):
-                u = {}
-            if isinstance(u, dict) and ("input_tokens" in u or "output_tokens" in u):
-                usage_available = True
-            tokens_in += _usage_input_tokens(u)
-            tokens_out += int(u.get("output_tokens") or 0)
-    requests = len(request_ids | response_ids) + fallback_requests
-    source = "sidecar"
-    if not usage_available:
-        session_stats = _aggregate_claude_session_usage(rid)
-        if session_stats["usage_available"]:
-            tokens_in = int(session_stats["tokens_in"])
-            tokens_out = int(session_stats["tokens_out"])
-            usage_available = True
-            source = "claude_session"
-    return {
-        "tokens_in": tokens_in,
-        "tokens_out": tokens_out,
-        "requests": requests,
-        "errors": errors,
-        "available": requests > 0 or usage_available,
-        "usage_available": usage_available,
-        "source": source,
-    }
+    return run_usage([path.resolve() for path in matches], lambda: _aggregate_claude_session_usage(rid))
 
 
 @app.get("/api/runs/{rid}/capture")
@@ -12022,6 +13097,31 @@ def get_capture(rid: str, path: Optional[str] = None):
         conn.close()
     if (run.get("run_kind") or "normal") != "capture":
         raise HTTPException(404, "capture data not available for this run")
+
+    if path is not None and not 1 <= len(path) <= 512:
+        raise HTTPException(400, "抓包文件路径无效")
+    if path is not None:
+        try:
+            safe_relative(path)
+            if Path(path).name not in ('capture_index.json', 'capture-status.json', 'tls_clienthello.jsonl'):
+                raise ValueError('抓包公开预览路径无效')
+        except ValueError:
+            raise HTTPException(404, "文件不存在或不支持公开预览") from None
+    if cluster_runner and (execution := cluster_runner.for_run(rid)) is not None:
+        try:
+            summary = cluster_runner.capture(rid, running=run.get('status') in ('running', 'stopping'), relative=path)
+        except (OSError, ValueError, RuntimeBusy):
+            raise HTTPException(503, "原节点抓包读取失败，请核对公开路径或稍后查询") from None
+        if path is not None:
+            return summary
+        location = f"node:{execution['node_key']}/run:{rid}"
+        return {**summary, 'run_id': rid, 'mode': run.get('capture_mode') or 'full_http',
+            'model_override': run.get('capture_model_override'),
+            'permission_mode': _resolve_capture_permission_mode(run.get('capture_permission_mode')),
+            'claude_code_version': run.get('claude_code_version'),
+            'claude_code_version_source': run.get('claude_code_version_source'),
+            'claude_effort_level': run.get('claude_effort_level'), 'flows_dir': location,
+            'index_path': location + '/capture_index.json'}
 
     try:
         capture_dirs = _resolve_capture_flows_dirs(run)
@@ -12228,11 +13328,17 @@ def continue_run_start(rid: str):
         policy = _account_run_window(account)
         if not policy["allowed"]:
             raise HTTPException(409, _window_message(policy))
+        remote_continue = False
         try:
+            remote_continue = bool(cluster_continues and cluster_continues.routes(account))
             session = continue_manager.start(run, account)
+        except ValidationError:
+            raise HTTPException(409, '续聊执行配置需要核对，请查看原运行和节点状态') from None
         except ValueError as e:
             raise HTTPException(400, str(e))
         except Exception as e:
+            if remote_continue:
+                raise HTTPException(503, '所属节点续聊准备失败，请核对连接和原执行状态') from None
             raise HTTPException(500, f"启动继续对话会话失败：{e}")
     return {
         "session_id": session.sid,
@@ -12286,39 +13392,31 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
                 pass
 
     def open_bridge() -> None:
-        """锁内为当前代次恢复 Claude exec；返回 None。"""
+        """锁内为当前代次连接原PTY；原执行范围保持冻结。:return: None。"""
         with session.guard_lock:
             if session.status != "running" or continue_manager.get(sid) is not session:
                 return
-            cwd = "/workspace"
+            if cluster_continues and cluster_continues.handles(session.worker_id):
+                raw = cluster_continues.open(session.worker_id)
+                bridge.update(raw=raw, exec_id=session.worker_id, generation=session.generation)
+                return
+            if account_runtime:
+                exec_id, raw = open_continue_pty(account_runtime, session.worker_id, session.session_id,
+                    session.permission_mode, session.run.get('execution_model') or session.run.get('capture_model_override') or '')
+                bridge.update(raw=raw, exec_id=exec_id, generation=session.generation)
+                return
             command = ["sh", "-lc", "if [ -f /workspace/.claude.json ] && [ ! -f \"$HOME/.claude.json\" ]; then "
                  "cp /workspace/.claude.json \"$HOME/.claude.json\"; fi; "
                  "if [ -n \"${CLAUDE_MODEL_OVERRIDE:-}\" ]; then "
                  "claude --permission-mode \"$CLAUDE_PERMISSION_MODE\" --resume \"$CONTINUE_SESSION_ID\" --model \"$CLAUDE_MODEL_OVERRIDE\"; "
                  "else claude --permission-mode \"$CLAUDE_PERMISSION_MODE\" --resume \"$CONTINUE_SESSION_ID\"; fi"]
-            actual_worker = session.worker_id
-            if account_runtime:
-                job = account_runtime.job_for_container(session.worker_id)
-                cwd = job["cwd"]
-                actual_worker = job["row"]["container_id"]
-                command[2] = command[2].replace("/workspace", cwd)
-                command = ["setsid", "--wait", "sh", "-c", f"echo $$ > /run/v3/jobs/{job['handle']}/group.pid; exec " + shlex.join(account_runtime.cli_command(["sh", "-c", command[2]]))]
-            exec_id = api.exec_create(
-                actual_worker,
-                command,
-                stdin=True, tty=True, user="1000" if account_runtime else WORKER_USER,
-                environment=_claude_exec_env(not account_runtime or job["network_inspection_mode"] != "passthrough", {
-                    "TERM": "xterm-256color", "COLUMNS": "120", "LINES": "36",
-                    **({"PATH": f"/cli/{job['version']}/node_modules/.bin:/usr/local/bin:/usr/bin:/bin"} if account_runtime else {}),
-                    **({"NETWORK_INSPECTION_MODE": job["network_inspection_mode"]} if account_runtime else {}),
-                    **(account_runtime.execution_environment(job["row"]) if account_runtime else {}),
-                    "CONTINUE_SESSION_ID": session.session_id, "CLAUDE_PERMISSION_MODE": session.permission_mode,
-                    **({"CLAUDE_MODEL_OVERRIDE": session.run.get("execution_model") or session.run.get("capture_model_override")}
-                       if session.run.get("execution_model") or session.run.get("capture_model_override") else {}),
-                }), workdir=cwd,
-            )["Id"]
-            if account_runtime:
-                account_runtime.register_exec(session.worker_id, exec_id)
+            environment = {"TERM": "xterm-256color", "COLUMNS": "120", "LINES": "36",
+                "CONTINUE_SESSION_ID": session.session_id, "CLAUDE_PERMISSION_MODE": session.permission_mode}
+            model = session.run.get("execution_model") or session.run.get("capture_model_override")
+            if model:
+                environment['CLAUDE_MODEL_OVERRIDE'] = model
+            exec_id = api.exec_create(session.worker_id, command, stdin=True, tty=True, user=WORKER_USER,
+                environment=_claude_exec_env(True, environment), workdir='/workspace')["Id"]
             sock = api.exec_start(exec_id, detach=False, tty=True, stream=False, socket=True, demux=False)
             raw = getattr(sock, "_sock", None) or sock
             raw.setblocking(False)
@@ -12368,7 +13466,7 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
                         await websocket.send_text(json.dumps({"type": "error", "msg": session.quota["message"]}))
                     break
                 if session.status == "running" and bridge["generation"] != session.generation:
-                    close_bridge()
+                    await asyncio.to_thread(close_bridge)
                     auth_tail = ""
                     if auth_refresh_task and not auth_refresh_task.done():
                         auth_refresh_task.cancel()
@@ -12383,7 +13481,7 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
                     await websocket.send_text(signature)
                     last_state = signature
                 if session.status == "quota_wait":
-                    close_bridge()
+                    await asyncio.to_thread(close_bridge)
                     await asyncio.sleep(0.2)
                     continue
                 raw = bridge["raw"]
@@ -12433,7 +13531,10 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
                     if event.get("type") == "resize":
                         if bridge["exec_id"] and session.status == "running":
                             try:
-                                api.exec_resize(bridge["exec_id"], height=int(event.get("rows") or 36), width=int(event.get("cols") or 120))
+                                if cluster_continues and cluster_continues.handles(bridge["exec_id"]):
+                                    await asyncio.to_thread(bridge["raw"].resize, int(event.get("rows") or 36), int(event.get("cols") or 120))
+                                else:
+                                    api.exec_resize(bridge["exec_id"], height=int(event.get("rows") or 36), width=int(event.get("cols") or 120))
                             except Exception:
                                 pass
                         continue
@@ -12446,6 +13547,9 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
                             "message": _window_message(session.run_window)}))
         except WebSocketDisconnect:
             pass
+        except Exception:
+            if websocket.client_state == WebSocketState.CONNECTED:
+                await websocket.send_text(json.dumps({"type": "error", "msg": "续聊输入处理失败，请核对原会话与节点状态"}))
         finally:
             closed.set()
 
@@ -12460,7 +13564,7 @@ async def continue_run_ws(websocket: WebSocket, sid: str):
             if task and not task.done():
                 task.cancel()
         await asyncio.gather(output, incoming, return_exceptions=True)
-        close_bridge()
+        await asyncio.to_thread(close_bridge)
         await asyncio.to_thread(continue_manager.cleanup, sid)
         if websocket.client_state == WebSocketState.CONNECTED:
             await websocket.close()
@@ -12618,6 +13722,16 @@ def v3_quiesce(account_id: int, body: dict):
         lease = snapshot.get("lease")
         if not lease or not lease.get("exclusive", True) or lease["owner"] != body.get("owner") or lease["generation"] != body.get("generation") or snapshot["active"]:
             raise HTTPException(409, "配置门禁证明无效")
+        if cluster_service and cluster_service.store.assignment(account['id'])['kind']=='ssh':
+            if login_manager and login_manager.has_active_name(account['name']):
+                raise HTTPException(409,'原节点登录已预留账号，配置事务继续等待')
+            try:
+                quiesce_remote(cluster_service,account_runtime,account,lease)
+            except (ValueError,RuntimeError,KeyError):
+                raise HTTPException(409,'所属节点仍有工作或配置收口需要核对') from None
+            except Exception:
+                raise HTTPException(503,'所属节点实际停止暂未确认，请稍后核对') from None
+            return {"ok": True}
         row = account_runtime._row(account["name"], account["id"])
         with account_runtime.lock:
             busy = bool(account_runtime.environment_jobs(row["environment_id"]))
@@ -12651,6 +13765,15 @@ def v3_native_capture(account_id: int, attempt_id: str):
     if len(rows) != 1:
         raise HTTPException(409, "账号没有唯一的 v3 环境绑定")
     try:
+        remote=_remote_environment_result(dict(rows[0]),'environment-capture-read',{'attempt_id':attempt_id})
+        if remote is not None:
+            if remote.get('state')=='expired':
+                raise CaptureExpired('原Node采集已过保留期')
+            if remote.get('state')=='missing':
+                raise FileNotFoundError('原Node采集尚未生成或已清理')
+            if remote.get('state')!='available' or not isinstance(remote.get('snapshot'),dict):
+                raise ValueError('原Node采集回执需要核对')
+            return remote['snapshot']
         return read_capture(account_runtime._root(dict(rows[0])), account_id, attempt_id)
     except CaptureExpired:
         raise HTTPException(410, "采集文件已超过七天保留期")
@@ -12674,6 +13797,13 @@ def v3_transport(account_id: int, wake: bool = True):
     if len(rows) != 1:
         raise HTTPException(409, "账号没有唯一的 v3 环境绑定")
     try:
+        if cluster_service and cluster_service.store.assignment(rows[0]['id'])['kind'] == 'ssh':
+            if not wake:
+                return None
+            account = dict(rows[0])
+            if credential_ownership:
+                credential_ownership.guard(account)
+            return cluster_service.prepare_remote(account, account_runtime, cc2api_client, _quota_identity(account))
         if not wake:
             return account_runtime.existing_transport(dict(rows[0]))
         return account_runtime.transport(dict(rows[0]), effective_claude_code_version())
@@ -12696,6 +13826,47 @@ def _v3_environment_summary(row: dict, ownerships: dict, native_preparations: di
     """
     account = None
     row['credential_ownership'] = ownerships.get(row['account_id'])
+    if cluster_service and row['account_id'] is None:
+        try:
+            placement=cluster_service.draft_node(environment_id=row['environment_id'])
+        except Exception:
+            placement={'phase':'reconcile'}
+        if placement is not None:
+            row.update(login_draft=True,node_observed=False,node_message='登录草稿由原节点管理，请在任务账号页继续登录或完整清理',
+                role_status={'cli':'unknown','sender':'unknown','network':'unknown'},busy=False,
+                can_reprofile=False,reprofile_message='请通过原登录草稿入口操作',identity_status='原节点登录草稿',
+                cli_versions=[],run_window=None,gateway_account_id=None,request_backend=None,native_preparation=None,
+                native_kernel=None,criu=None,content_capture=None)
+            if placement.get('node_id') is not None:
+                row['node']={key:placement[key] for key in ('node_id','node_key','node_name','kind','enabled')}
+            try:
+                operation=_remote_draft_record(row)
+                if operation is None or operation['record']['scope'] is None:
+                    raise ValueError('原草稿资源准备结果需要核对')
+                observed=cluster_draft_logins.summary(operation['operation_id'])
+                row.update(state=observed['state'],node_observed=True)
+                row['role_status']['cli']=observed['container_status']
+            except Exception:
+                row['state']='reconcile'
+            row['fingerprint']=json.loads(row.pop('fingerprint_json'))
+            return row
+    if cluster_service and row['account_id'] is not None:
+        row['node'] = cluster_service.store.assignment(row['account_id'])
+        if row['node']['kind'] == 'ssh':
+            connection = get_db()
+            try:
+                account = connection.execute('SELECT * FROM accounts WHERE id=?', (row['account_id'],)).fetchone()
+            finally:
+                connection.close()
+            row.update(cluster_service.remote_summary(row, account_runtime, effective_claude_code_version(),
+                native_preparations.get(account['cc2api_account_id']) if account else None))
+            row['fingerprint'] = json.loads(row.pop('fingerprint_json'))
+            row['run_window'] = _account_run_window(dict(account), public=True, zone=row['fingerprint']['tz']) if account else None
+            row['gateway_account_id'] = account['cc2api_account_id'] if account else None
+            target = native_preparations.get(row.get('gateway_account_id'), {}).get('request_backend')
+            row['request_backend'] = target if target in ('legacy', 'native293') else None
+            row['native_preparation'] = None
+            return row
     row["role_status"] = account_runtime.role_status(row)
     blocker = account_runtime.reprofile_blocker(row)
     row["fingerprint"] = json.loads(row.pop("fingerprint_json"))
@@ -12834,7 +14005,9 @@ def refresh_v3_physical_features(environment_id: str) -> dict:
                 connection.close()
             if current is None:
                 raise HTTPException(404, "环境不存在")
-            account_runtime.refresh_physical_features(dict(current))
+            remote=_remote_environment_result(dict(current),'environment-physical-refresh')
+            if remote is None:
+                account_runtime.refresh_physical_features(dict(current))
     except (ValueError, RuntimeError) as error:
         raise HTTPException(409, str(error)) from None
     except (DockerException, RequestException, OSError):
@@ -12898,6 +14071,9 @@ def v3_content_capture(environment_id: str) -> dict:
     try:
         with account_runtime.environment_lock(environment_id):
             row, _ = _content_capture_account(environment_id)
+            remote=_remote_environment_result(row,'environment-capture-settings',{'observation':snapshots.get(row.get('gateway_account_id'))})
+            if remote is not None:
+                return remote
             return read_content_capture(account_runtime, row, snapshots.get(row.get('gateway_account_id')))
     except (ValueError, RuntimeError) as error:
         raise HTTPException(409, str(error)) from None
@@ -12923,6 +14099,9 @@ def v3_set_content_capture(environment_id: str, body: ContentCaptureOperation) -
                     row, account = _content_capture_account(environment_id)
                     if account['id'] != original['id'] or account['name'] != original['name']:
                         raise ValueError('账号环境归属已变化，请重新读取')
+                    remote=_remote_environment_result(row,'environment-capture-set',body.model_dump())
+                    if remote is not None:
+                        return remote
                     return set_content_capture(account_runtime, row, account, body.enabled,
                         body.expected_generation, body.expected_revision)
     except (ValueError, RuntimeError) as error:
@@ -12954,6 +14133,9 @@ def v3_criu(environment_id: str) -> dict:
     try:
         with account_runtime.environment_lock(environment_id):
             row, _ = _content_capture_account(environment_id)
+            remote=_remote_environment_result(row,'environment-criu-settings',{'observation':snapshots.get(row.get('gateway_account_id'))})
+            if remote is not None:
+                return remote
             return read_criu(account_runtime, row, snapshots.get(row.get('gateway_account_id')))
     except (ValueError, RuntimeError) as error:
         raise HTTPException(409, str(error)) from None
@@ -12974,6 +14156,9 @@ def v3_set_criu(environment_id: str, body: CriuOperation) -> dict:
                     row, account = _content_capture_account(environment_id)
                     if account['id'] != original['id'] or account['name'] != original['name']:
                         raise ValueError('账号环境归属已变化，请重新读取')
+                    remote=_remote_environment_result(row,'environment-criu-set',body.model_dump())
+                    if remote is not None:
+                        return remote
                     return set_criu(account_runtime, row, account, body.enabled,
                         body.expected_generation, body.expected_revision)
     except (ValueError, RuntimeError) as error:
@@ -12989,6 +14174,22 @@ class CpuResourceOperation(BaseModel):
     expected_generation: StrictInt
     expected_revision: StrictStr
     cpus: dict[Literal['cli', 'sender', 'network'], StrictFloat | StrictInt]
+
+
+def _remote_environment_result(row: dict, operation: str, body: dict | None = None) -> dict | None:
+    """按原人工归属路由管理操作，独立账号和暂停节点保持原管理能力。
+
+    :param row: 已解析的正式账号环境。
+    :param operation: 固定Node管理操作。
+    :param body: 原公共接口的冻结参数。
+    :return: 所属Node结果；本机和原NULL草稿返回None。
+    """
+    if (cluster_service and account_runtime and row.get('account_id') is not None
+            and cluster_service.store.assignment(row['account_id'])['kind']=='ssh'):
+        if operation in ('environment-capture-set','environment-criu-set') and credential_ownership:
+            credential_ownership.guard(credential_ownership._account(row['account_id']))
+        return RemoteEnvironmentControl(cluster_service,account_runtime,cc2api_client,_quota_identity).call(row,operation,body)
+    return None
 
 
 def _cpu_environment(environment_id: str) -> dict:
@@ -13015,7 +14216,11 @@ def v3_cpu_resources(environment_id: str) -> dict:
         raise HTTPException(404)
     try:
         with account_runtime.environment_lock(environment_id):
-            return read_cpu_resources(account_runtime, _cpu_environment(environment_id))
+            row=_cpu_environment(environment_id)
+            remote=_remote_environment_result(row,'environment-cpu-read')
+            if remote is not None:
+                return remote
+            return read_cpu_resources(account_runtime, row)
     except (ValueError, RuntimeError) as error:
         raise HTTPException(409, str(error)) from None
     except (DockerException, OSError):
@@ -13035,14 +14240,16 @@ def v3_set_cpu_resources(environment_id: str, body: CpuResourceOperation) -> dic
     try:
         with UPDATE_GATE.admission('environment-cpu'):
             with account_runtime.environment_lock(environment_id):
-                return set_cpu_resources(account_runtime, _cpu_environment(environment_id),
+                row=_cpu_environment(environment_id)
+                remote=_remote_environment_result(row,'environment-cpu-set',body.model_dump())
+                if remote is not None:
+                    return remote
+                return set_cpu_resources(account_runtime, row,
                     body.expected_generation, body.expected_revision, body.cpus)
     except (ValueError, RuntimeError) as error:
         raise HTTPException(409, str(error)) from None
     except (DockerException, OSError):
         raise HTTPException(503, "CPU调整暂时未完成，请重新读取实际额度") from None
-
-
 
 
 @app.post("/api/environments/{environment_id}/native-kernel")
@@ -13085,9 +14292,12 @@ def v3_environment_maintenance(environment_id: str, body: dict):
                 credential_ownership.cancel_return(credential_ownership._account(environment['account_id']))
                 return {'ok': True}
             with _profile_lock(environment["name"]):
-                account_runtime.maintenance(environment_id, body.get("operation", ""))
+                row=_cpu_environment(environment_id)
+                remote=_remote_environment_result(row,'environment-maintenance',{'operation':body.get('operation','')})
+                if remote is None:
+                    account_runtime.maintenance(environment_id, body.get("operation", ""))
         # 该方法自行领取 owner 锁；不可在上面的非重入锁内调用。
-        if body.get("operation") == "reconcile" and login_manager:
+        if body.get("operation") == "reconcile" and login_manager and remote is None:
             login_manager.cleanup_reconciled(environment_id)
         if body.get('operation') == 'reconcile' and credential_ownership and environment['account_id']:
             with _oauth_owner_lock(environment['name']):

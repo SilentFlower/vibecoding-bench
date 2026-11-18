@@ -433,6 +433,7 @@ export interface NativeRuntimeObservation {
 
 /** 单次实际提交及私有采集状态。 */
 export interface DiagnosticAttempt {
+  execution_location?: { node_key: string; environment_id: string; generation: number; assignment_revision: number | null } | null
   account_name?: string | null
   account_email?: string | null
   runtime?: NativeRuntimeObservation | null

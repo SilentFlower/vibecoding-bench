@@ -6,7 +6,7 @@ import re
 
 from runtime_files import atomic_json
 from runtime_names import matches_image_reference
-from system_update_contract import BUILD_RE, strict_json, safe_read
+from system_update_contract import strict_json, safe_read
 
 
 def configured_release(runtime) -> str:
@@ -33,9 +33,10 @@ def image_origin(runtime, row: dict) -> dict | None:
             or type(value['schema_version']) is not int or value['schema_version'] != 1
             or type(value['protocol']) is not int or value['protocol'] != 1
             or value['environment_id'] != row['environment_id']
-            or not isinstance(value['release'], str) or not BUILD_RE.fullmatch(value['release'])
+            or not isinstance(value['release'], str)
             or not isinstance(value['image_id'], str) or not re.fullmatch(r'sha256:[0-9a-f]{64}', value['image_id'])
-            or not matches_image_reference(value['reference'], 'account', value['release'])):
+            or not any(matches_image_reference(value['reference'], 'account', value['release'], namespace=namespace)
+                for namespace in ('', 'ghcr.io/silentflower'))):
         raise ValueError('账号镜像来源证明无效，需要先对账')
     return value
 

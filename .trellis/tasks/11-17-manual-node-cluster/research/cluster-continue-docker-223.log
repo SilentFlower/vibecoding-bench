@@ -1,0 +1,31 @@
+E
+======================================================================
+ERROR: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_continue.py", line 107, in verify_node_continue
+    manager.quota_tick(active_account)
+AssertionError: 'running' != 'closed'
+- running
++ closed
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 165, in test_remote_account_preparation_and_sender_json_sse
+    verify_node_run(self, service, runtime, node, account, unused_gateway)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_run.py", line 189, in verify_node_run
+    verify_node_continue(testcase, service, runtime, node, account, gateway, local, sessions, quota,
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_continue.py", line 152, in verify_node_continue
+    testcase.assertIsNone(manager.get(session.sid))
+                                   ^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_continue_runner.py", line 204, in _row
+    raise ValueError('原远程续聊定位无效')
+ValueError: 原远程续聊定位无效
+
+----------------------------------------------------------------------
+Ran 1 test in 121.881s
+
+FAILED (errors=1)

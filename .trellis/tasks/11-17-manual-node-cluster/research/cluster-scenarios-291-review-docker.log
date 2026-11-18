@@ -1,0 +1,44 @@
+E
+======================================================================
+ERROR: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_scenario.py", line 91, in verify_cluster_scenario
+    manager.scenarios.capture_submission(execution,source)
+  File "/root/project/vibecoding-bench/services/orchestrator/project_scenarios.py", line 623, in capture_submission
+    self.owner.execution_io.sync_plan(execution['run_id'])
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_legacy_project_io.py", line 290, in sync_plan
+    raw=self.runner.artifact(run_id,name)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_runner.py", line 237, in artifact
+    row = self.for_run(run_id)
+          ^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_runner.py", line 66, in for_run
+    run = connection.execute('SELECT account_id,quota_attempt,execution_source FROM runs WHERE id=?', (run_id,)).fetchone()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.OperationalError: database is locked
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 165, in test_remote_account_preparation_and_sender_json_sse
+    verify_node_run(self, service, runtime, node, account, unused_gateway)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_run.py", line 72, in verify_node_run
+    verify_cluster_scenario(testcase,service,runtime,node,account,local,remote)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_scenario.py", line 124, in verify_cluster_scenario
+    local.cleanup(token,token)
+  File "/root/project/vibecoding-bench/services/orchestrator/main.py", line 4127, in cleanup
+    cluster_runner.cleanup(worker_id or sidecar_id)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_runner.py", line 388, in cleanup
+    self.sessions.stop(row['operation_id'])
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_terminal_sessions.py", line 465, in stop
+    self._stop_heartbeat(operation_id)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_terminal_sessions.py", line 423, in _stop_heartbeat
+    raise ValueError('原远程租约续接仍在收口，请等待并查询原操作')
+ValueError: 原远程租约续接仍在收口，请等待并查询原操作
+
+----------------------------------------------------------------------
+Ran 1 test in 193.884s
+
+FAILED (errors=1)

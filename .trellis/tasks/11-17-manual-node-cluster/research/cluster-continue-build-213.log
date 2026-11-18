@@ -1,0 +1,56 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 196B done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/flower2api-control:cluster-background-local
+#2 DONE 0.1s
+
+#3 [internal] load .dockerignore
+#3 transferring context:
+#3 transferring context: 2B done
+#3 DONE 0.1s
+
+#4 [internal] load build context
+#4 transferring context: 2.97MB 0.0s done
+#4 DONE 0.2s
+
+#5 [1/4] FROM docker.io/library/flower2api-control:cluster-background-local@sha256:bcbf7d7f16cd39c1d4d750ef4fecffea0c74a181033af24edc70356437ca70ab
+#5 resolve docker.io/library/flower2api-control:cluster-background-local@sha256:bcbf7d7f16cd39c1d4d750ef4fecffea0c74a181033af24edc70356437ca70ab 0.1s done
+#5 CACHED
+
+#6 [2/4] RUN python3 -m pip install --no-cache-dir websockets==17.3
+#6 3.926 Collecting websockets==17.3
+#6 6.278   Downloading websockets-17.3-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (6.3 kB)
+#6 6.851 Downloading websockets-17.3-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (225 kB)
+#6 7.914 Installing collected packages: websockets
+#6 7.914   Attempting uninstall: websockets
+#6 7.918     Found existing installation: websockets 17.4
+#6 7.933     Uninstalling websockets-17.4:
+#6 8.049       Successfully uninstalled websockets-17.4
+#6 8.206 Successfully installed websockets-17.3
+#6 8.207 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#6 9.137 
+#6 9.137 [notice] A new release of pip is available: 25.0.1 -> 26.3
+#6 9.137 [notice] To update, run: pip install --upgrade pip
+#6 DONE 9.4s
+
+#7 [3/4] COPY app/ /app/
+#7 DONE 0.1s
+
+#8 [4/4] COPY worker.sh /opt/v3/worker.sh
+#8 DONE 0.1s
+
+#9 exporting to image
+#9 exporting layers
+#9 exporting layers 0.2s done
+#9 exporting manifest sha256:ada320ad778cf03b485b3cc7b31bafcf0a0dbb8446c224f22f634de06f05c16c 0.0s done
+#9 exporting config sha256:eaeda3982338709286b14f2544c68a5362eda899a3084557f4d2f569d98ae2f3 0.0s done
+#9 exporting attestation manifest sha256:57321cf795dc0380632a5949f5c6b2339ff99f8511c5f5cdfcbc1783a7186a86 0.0s done
+#9 exporting manifest list sha256:6884b19bdd539ef74b4c310c376b44ef453fbbee10c60d144cab1f35abb9eef1 0.0s done
+#9 naming to docker.io/library/flower2api-control:cluster-background-local
+#9 naming to docker.io/library/flower2api-control:cluster-background-local done
+#9 unpacking to docker.io/library/flower2api-control:cluster-background-local
+#9 unpacking to docker.io/library/flower2api-control:cluster-background-local 0.2s done
+#9 DONE 0.6s

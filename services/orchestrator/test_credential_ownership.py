@@ -117,6 +117,41 @@ class CredentialOwnershipTests(unittest.TestCase):
         return json.loads(json.dumps({'protocol': 1, 'ownership': self.remote_owner, 'receipt': self.receipt,
             'credentials': self.tokens if self.receipt and self.receipt['stage'] in ('prepared', 'imported') else None}))
 
+    def test_remote_reauth_finishes_only_after_node_idle_and_authoritative_at_publication(self) -> None:
+        """原重授权收口通过远程实际停止及AT发布钩子后才finish长期暂停。:return: None。"""
+        sid='a'*12
+        self.ownership.begin_reauth(self.account(),sid)
+        self.receipt['stage']='imported'
+        self.ownership.reauth_idle=Mock(return_value=True)
+        self.ownership.reauth_publish=Mock(return_value=True)
+        with patch.object(self.runtime,'_row',side_effect=AssertionError('远程收口不能读取中央HOME')):
+            self.ownership.close_reauth(1,sid)
+        self.ownership.reauth_idle.assert_called_once()
+        self.ownership.reauth_publish.assert_called_once()
+        self.assertEqual('imported',self.ownership.reauth_publish.call_args.args[3]['receipt']['stage'])
+        self.assertEqual('ready',self.ownership.state(1)['phase'])
+        self.assertEqual('committed',self.receipt['stage'])
+
+    def test_remote_reauth_unknown_idle_or_publication_keeps_long_lived_gate(self) -> None:
+        """Node停止或发布未知时保留原重授权，失败不会回退中央HOME或finish。:return: None。"""
+        sid='a'*12
+        self.ownership.begin_reauth(self.account(),sid)
+        self.receipt['stage']='imported'
+        calls=list(self.calls)
+        self.ownership.reauth_idle=Mock(return_value=False)
+        self.ownership.reauth_publish=Mock(return_value=True)
+        with self.assertRaisesRegex(ValueError,'实际停止'):
+            self.ownership.close_reauth(1,sid)
+        self.assertEqual(calls,self.calls)
+        self.ownership.reauth_publish.assert_not_called()
+        self.ownership.reauth_idle.return_value=True
+        self.ownership.reauth_publish.side_effect=ConnectionError('合成节点发布响应未知')
+        with patch.object(self.runtime,'_row',side_effect=AssertionError('远程失败不能回退中央HOME')):
+            with self.assertRaises(ConnectionError):
+                self.ownership.close_reauth(1,sid)
+        self.assertEqual('reauth',self.ownership.state(1)['phase'])
+        self.assertEqual('imported',self.receipt['stage'])
+
     def test_detach_rotate_and_return_original_id(self) -> None:
         """本地连续轮换后回交当前 HOME，保留 ID 并恢复 AT-only。@return None。"""
         self.ownership.detach(self.account())
@@ -201,6 +236,31 @@ class CredentialOwnershipTests(unittest.TestCase):
         recovered.record_local_authorization(1)
         recovered.guard(self.account())
         self.assertFalse(recovered.state(1)['refresh_pending'])
+
+    def test_authorization_uses_actual_node_material_instead_of_stale_local_home(self) -> None:
+        """原授权证明核对当前Node RT，中央旧HOME保持原副本也能严格确认。:return: None。"""
+        self.ownership.detach(self.account())
+        self.ownership.begin_local_refresh(1,'original-node-refresh')
+        fresh={**self.tokens,'access_token':'new-node-at','refresh_token':'new-node-rt'}
+        self.ownership.mirror('fixture',fresh)
+        self.ownership.read_material=Mock(return_value={key:fresh[key] for key in ('access_token','refresh_token','expires_at')})
+        with patch.object(self.runtime,'_local_credentials',side_effect=AssertionError('不能读取中央旧HOME')):
+            self.ownership.record_local_authorization(1,'2.1.293')
+        self.assertFalse(self.ownership.state(1)['refresh_pending'])
+        with closing(main.get_db()) as connection:
+            proof=json.loads(connection.execute('SELECT record_json FROM local_credential_authorizations WHERE account_id=1').fetchone()[0])
+        self.assertEqual(hashlib.sha256(b'new-node-rt').hexdigest(),proof['refresh_sha256'])
+        self.assertNotIn('new-node-rt',json.dumps(proof))
+
+    def test_node_material_failure_keeps_unknown_refresh_owner_isolated(self) -> None:
+        """Node读取失败时原pending保持，授权证明不会退回中央旧RT。:return: None。"""
+        self.ownership.detach(self.account())
+        self.ownership.begin_local_refresh(1,'original-node-refresh')
+        self.ownership.read_material=Mock(side_effect=ConnectionError('合成Node失联'))
+        with patch.object(self.runtime,'_local_credentials',side_effect=AssertionError('不能降级中央副本')):
+            with self.assertRaises(ConnectionError):
+                self.ownership.record_local_authorization(1,'2.1.293')
+        self.assertTrue(self.ownership.state(1)['refresh_pending'])
 
     def test_independent_login_with_unknown_cli_clears_proof_without_blocking_save(self) -> None:
         """独立登录无需同步设备证明，旧证明不能用于后续关联。@return None。"""

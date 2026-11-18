@@ -5,6 +5,7 @@ pub use profile::TlsProfileId;
 pub(crate) use tlsfp::{parse_test_clienthello, test_request_client};
 
 pub use tlsfp::configured_default_tls_profile;
+pub(crate) use tlsfp::get_background_request_client_for_profile;
 pub use tlsfp::get_request_client;
 pub use tlsfp::get_request_client_for_profile;
 pub use tlsfp::make_request_client;

@@ -1,0 +1,16 @@
+............................................................................................E
+======================================================================
+ERROR: test_capture_artifacts (unittest.loader._FailedTest.test_capture_artifacts)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_capture_artifacts
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/unittest/loader.py", line 137, in loadTestsFromName
+    module = __import__(module_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'test_capture_artifacts'
+
+
+----------------------------------------------------------------------
+Ran 93 tests in 28.363s
+
+FAILED (errors=1)

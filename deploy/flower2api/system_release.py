@@ -20,6 +20,12 @@ from system_update_contract import INDEX_LIMIT, MANIFEST_LIMIT, ROLES, strict_js
 
 
 # 与实际迁移执行器的步骤ID绑定，定义扫描与签发校验共用精确来源。
+BENCH_SCHEMA_SOURCES = {
+    'bench.baseline.1': 'orchestrator/database_schema.py',
+    'bench.cluster.2': 'orchestrator/cluster_schema.py',
+    'bench.node-executions.3': 'orchestrator/node_execution_schema.py',
+    'bench.node-login-drafts.4': 'orchestrator/node_login_draft_schema.py',
+}
 GATEWAY_SCHEMA_SOURCES = {
     'gateway.baseline.1': 'cc2api/src/store/database_schema.rs',
     'gateway.proxies.2': 'cc2api/src/store/proxy_schema.rs',
@@ -42,8 +48,13 @@ def migration_registries(root: Path) -> dict:
     """读取源码登记并核对每项已知迁移定义。:param root: 冻结源码根。:return: 两库登记。"""
     values = {'bench': load_registry(source_path(root, 'orchestrator/database-migration-registry.json'), 'bench'),
         'gateway': load_registry(source_path(root, 'cc2api/src/store/database-migration-registry.json'), 'gateway')}
-    if values['bench']['steps'][0]['checksum'] != schema_checksum(source_path(root, 'orchestrator/database_schema.py')):
-        raise ValueError('迁移定义与版本登记不符')
+    for step in values['bench']['steps']:
+        logical = BENCH_SCHEMA_SOURCES.get(step['id'])
+        if logical is None:
+            raise ValueError('编排迁移缺少已登记定义来源：' + step['id'])
+        path = source_path(root, logical)
+        if path.is_symlink() or not path.is_file() or step['checksum'] != schema_checksum(path):
+            raise ValueError('迁移定义与版本登记不符：' + step['id'])
     for step in values['gateway']['steps']:
         logical = GATEWAY_SCHEMA_SOURCES.get(step['id'])
         if logical is None:
@@ -83,7 +94,8 @@ def component_content(root: Path, role: str) -> str:
     """
     common = ['images/v3/Dockerfile', 'cc2api/src', 'cc2api/Cargo.toml', 'cc2api/Cargo.lock',
         'cc2api/vendor', 'cc2api/craftls']
-    names = (common + ['orchestrator', 'webui', 'cc2api/web/src', 'cc2api/web/package-lock.json'] if role == 'control'
+    names = (common + ['orchestrator', 'webui', 'cc2api/web/src', 'cc2api/web/package-lock.json',
+        'images/worker/entrypoint.sh', 'images/worker/task_followups.py', 'images/account/projects_cli.py'] if role == 'control'
         else common + ['images/account', 'images/sidecar', 'images/worker/task_followups.py',
             'images/v3/criu', 'images/v3/tls-observer',
             'orchestrator/runtime_files.py', 'orchestrator/runtime_diagnostics.py',

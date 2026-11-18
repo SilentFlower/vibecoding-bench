@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from source_layout import source_path
 
-from system_release import GATEWAY_SCHEMA_SOURCES, REPO, data_contracts
+from system_release import BENCH_SCHEMA_SOURCES, GATEWAY_SCHEMA_SOURCES, REPO, data_contracts
 from verify_database_definitions import source_ownership, verify
 
 
@@ -18,7 +18,7 @@ class DatabaseDefinitionTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
-        for name in ('orchestrator/database_schema.py', 'orchestrator/database-migration-registry.json',
+        for name in (*BENCH_SCHEMA_SOURCES.values(), 'orchestrator/database-migration-registry.json',
                 'cc2api/src/store/database-migration-registry.json', *GATEWAY_SCHEMA_SOURCES.values()):
             target = self.root / name
             target.parent.mkdir(parents=True, exist_ok=True)

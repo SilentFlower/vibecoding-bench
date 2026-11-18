@@ -1,0 +1,87 @@
+F
+======================================================================
+FAIL: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_run.py", line 127, in verify_node_run
+    testcase.assertEqual('complete' if not revoked else 'awaiting', phase['phase'])
+AssertionError: 'awaiting' != 'pending'
+- awaiting
++ pending
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 165, in test_remote_account_preparation_and_sender_json_sse
+    verify_node_run(self, service, runtime, node, account, unused_gateway)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_run.py", line 137, in verify_node_run
+    raise AssertionError('隔离Run失败；节点调用位置：' + control.logs(tail=15).decode(errors='replace')
+AssertionError: 隔离Run失败；节点调用位置：节点执行失败 operation=grant-renew error_type=ValueError frames=cluster_agent.py:95:dispatch,cluster_execution_grants.py:225:renew
+；原worker转录：node@66050ed3f9e6:~/projects/project-1651e6dec76f$ set +m; export HOME='/home/node' && cd /home/node/projects/project-1651e6dec76f && env PATH='/cli/2.1.303/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr
+/bin:/sbin:/bin' HOME='/home/node'  claude --permission-mode bypassPermissions --settings /run/v3/jobs/a4ecc47dd6053a5cef29/settings.json --model offline-model ; code=$?; echo; echo "[entrypoint] claude exited with code
+$code"; echo $code >/run/v3/jobs/a4ecc47dd6053a5cef29/claude-exit-code; touch /run/v3/jobs/a4ecc47dd6053a5cef29/claude-exited; sleep 3600
+Synthetic task pane
+Fixture initial work busy
+                         Fixture busy queue consumed
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+----------------------------------------------------------------------
+Ran 1 test in 134.688s
+
+FAILED (failures=1)

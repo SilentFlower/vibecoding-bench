@@ -18,9 +18,9 @@ use crate::error::AppError;
 use crate::model::account::Account;
 use crate::model::identity::device_profile;
 use crate::model::request_diagnostics::{
-    AttemptDiagnostic, DiagnosticParameters, DiagnosticSessions, DiagnosticTokens, NativeRejection,
-    NativeRequestObservation, RequestDiagnostic, RequestLogMode, normalize_correlation_id,
-    safe_model,
+    AttemptDiagnostic, DiagnosticParameters, DiagnosticSessions, DiagnosticTokens,
+    ExecutionLocation, NativeRejection, NativeRequestObservation, RequestDiagnostic,
+    RequestLogMode, normalize_correlation_id, safe_model,
 };
 use crate::service::rewriter::extract_session_id_from_body;
 use crate::service::usage::UsageCapture;
@@ -342,6 +342,7 @@ fn prepare_observation(account: &Account, body: Value) -> Option<AttemptTrace> {
                 .and_then(Value::as_str)
                 .map(|value| identity_hash(account.id, "message", value));
             let record = AttemptDiagnostic {
+                execution_location: None,
                 runtime: None,
                 log_mode: state.request.log_mode,
                 capture_status: None,
@@ -473,6 +474,15 @@ fn begin_attempt(account: &Account, body: &[u8]) -> Option<AttemptTrace> {
 }
 
 impl AttemptTrace {
+    /// 记录同一次实际提交的冻结定位，保留诊断的旁路语义。
+    /// @param location 原已核验发送通道提供的非秘密定位。
+    /// @return 无。
+    pub(crate) fn with_execution_location(&mut self, location: Option<ExecutionLocation>) {
+        if let Some(record) = self.record.as_mut() {
+            record.execution_location = location;
+        }
+    }
+
     /// 在真正提交边界发布一次 attempt；大正文解析已在准入前完成。
     /// @return 无，重复调用不重复计数。
     pub(crate) fn commit(&mut self) {

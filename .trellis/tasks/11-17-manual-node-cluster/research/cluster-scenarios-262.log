@@ -1,0 +1,16 @@
+.E
+======================================================================
+ERROR: test_real_base_import_and_preparation_publish_all_stage_objects_without_hidden_files (test_cluster_scenario_files.ScenarioNodeFileTests.test_real_base_import_and_preparation_publish_all_stage_objects_without_hidden_files)
+真实包导入后准备原场景，中央逐阶段下载可还原原材料且同意图幂等。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_scenario_files.py", line 77, in test_real_base_import_and_preparation_publish_all_stage_objects_without_hidden_files
+    self.node.grants.close(self.scope,'合成原执行已停止')
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution_grants.py", line 286, in close
+    raise ValueError('节点执行关闭原因无效')
+ValueError: 节点执行关闭原因无效
+
+----------------------------------------------------------------------
+Ran 2 tests in 1.632s
+
+FAILED (errors=1)

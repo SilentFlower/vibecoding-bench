@@ -1,0 +1,31 @@
+F
+======================================================================
+FAIL: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 149, in test_remote_account_preparation_and_sender_json_sse
+    binding = service.prepare_remote(account, runtime, gateway, 'synthetic-quota')
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_service.py", line 203, in prepare_remote
+    peer = node.prepare_environment(node_container_name(runtime.deployment, node_row['node_key']), request.model_dump())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_ssh.py", line 344, in prepare_environment
+    return self._execute_environment(container, payload, 'inspect' if inspect else 'prepare')
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_ssh.py", line 412, in _execute_environment
+    raise ValueError('节点环境准备失败，请检查执行组件、环境归属与资源')
+ValueError: 节点环境准备失败，请检查执行组件、环境归属与资源
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 152, in test_remote_account_preparation_and_sender_json_sse
+    self.fail('合成节点准备失败；受限调用位置：' + control.logs(tail=12).decode(errors='replace'))
+AssertionError: 合成节点准备失败；受限调用位置：节点执行失败 operation=prepare error_type=ValidationError frames=cluster_agent.py:117:dispatch,cluster_execution.py:860:execute_operation,main.py:596:model_validate
+
+
+----------------------------------------------------------------------
+Ran 1 test in 12.528s
+
+FAILED (failures=1)

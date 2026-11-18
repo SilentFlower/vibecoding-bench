@@ -8,7 +8,7 @@ const emit = defineEmits<{ navigate: [] }>();
 const route = useRoute();
 const groups = [
   { label: '网关', items: [{ name: 'accounts', label: '账号', icon: Users }, { name: 'requests', label: '请求记录', icon: Activity }, { name: 'session-blocks', label: '会话封禁', icon: ShieldCheck }, { name: 'tokens', label: '访问令牌', icon: KeyRound }] },
-  { label: '资源', items: [{ name: 'proxies', label: '代理管理', icon: Globe }, { name: 'environments', label: '运行环境', icon: Boxes }] },
+  { label: '资源', items: [{ name: 'proxies', label: '代理管理', icon: Globe }, { name: 'environments', label: '运行环境', icon: Boxes }, { name: 'nodes', label: '节点管理', icon: Boxes }] },
   { label: '工作区', items: [{ name: 'tasks', label: '任务与工程', icon: ListTodo }] },
   { label: '', items: [{ name: 'settings', label: '系统设置', icon: Settings2 }] },
 ];

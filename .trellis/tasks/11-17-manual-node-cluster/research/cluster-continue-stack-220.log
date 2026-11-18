@@ -1,0 +1,16 @@
+[New LWP 1164228]
+
+This GDB supports auto-downloading debuginfo from the following URLs:
+  <https://debuginfod.ubuntu.com>
+Enable debuginfod for this session? (y or [n]) [answered N; input not from terminal]
+Debuginfod has been disabled.
+To make this setting permanent, add 'set debuginfod enabled off' to .gdbinit.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+0x00007c5adb92a292 in epoll_wait (epfd=13, events=0x7c5ad84aaab0, maxevents=2, timeout=120000) at ../sysdeps/unix/sysv/linux/epoll_wait.c:30
+
+warning: 30	../sysdeps/unix/sysv/linux/epoll_wait.c: No such file or directory
+
+Thread 2 (Thread 0x7c5ad82d56c0 (LWP 1164228) "python"):
+Undefined command: "py-bt".  Try "help".
+[Inferior 1 (process 1149360) detached]

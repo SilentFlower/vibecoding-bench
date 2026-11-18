@@ -1,0 +1,18 @@
+....E................................/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+  warnings.warn(  # deprecated in 14.0 - 2024-11-09
+/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/uvicorn/protocols/websockets/websockets_impl.py:16: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+  from websockets.server import WebSocketServerProtocol
+.............................................................................
+======================================================================
+ERROR: test_node_execution_increment_preserves_previous_ledger_and_old_program_writes (test_database_migrations.DatabaseMigrationTests.test_node_execution_increment_preserves_previous_ledger_and_old_program_writes)
+第三步独立追加，前两步台账及旧程序账号读写继续保留。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_database_migrations.py", line 47, in test_node_execution_increment_preserves_previous_ledger_and_old_program_writes
+    self.database.execute("UPDATE accounts SET note='old-compatible' WHERE name='old-node'")
+sqlite3.OperationalError: no such column: note
+
+----------------------------------------------------------------------
+Ran 114 tests in 42.253s
+
+FAILED (errors=1)

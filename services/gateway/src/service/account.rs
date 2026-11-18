@@ -1958,7 +1958,7 @@ impl AccountService {
             ));
         }
         let token = self.resolve_upstream_token(id).await?;
-        let usage = crate::service::oauth::fetch_usage(&token, &account.proxy_url).await?;
+        let usage = crate::service::oauth::fetch_account_usage(&account, &token).await?;
         self.persist_usage_observation(id, usage, UsageObservationKind::Allowed)
             .await
     }
@@ -2481,12 +2481,8 @@ impl AccountService {
 
         let ownership_restore = self.begin_owned_refresh(id).await?;
 
-        match crate::service::oauth::refresh_oauth_token_at(
-            &latest.refresh_token,
-            &latest.proxy_url,
-            &self.oauth_token_url,
-        )
-        .await
+        match crate::service::oauth::refresh_account_oauth_token_at(&latest, &self.oauth_token_url)
+            .await
         {
             Ok(tokens) => {
                 self.store

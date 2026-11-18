@@ -18,7 +18,7 @@ use axum::Json;
 use axum::Router;
 use axum::body::{Body, Bytes};
 use axum::extract::{DefaultBodyLimit, State};
-use axum::http::{HeaderMap, Method};
+use axum::http::{HeaderMap, HeaderValue, Method};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use base64::Engine;
@@ -34,17 +34,21 @@ use subtle::ConstantTimeEq;
 
 use crate::error::AppError;
 use crate::model::account::Account;
-use crate::model::request_diagnostics::RequestLogMode;
+use crate::model::request_diagnostics::{ExecutionLocation, RequestLogMode};
 use crate::service::native_contract::{NativeIdlePolicy, validate_idle_timeout};
 use crate::service::native_contract::{
     NativePreparation, NativePreparationControl, NativePreparationStatus, NativeReadinessStatus,
     NativeSourceVersion,
 };
 use crate::service::native_runtime::{NativePool, NativeSenderConfig, NativeSubmission};
-use crate::tlsfp::{TlsProfileId, get_request_client_for_profile};
+use crate::service::runtime_background::{BACKGROUND_HEADER, BackgroundPurpose};
+use crate::tlsfp::{
+    TlsProfileId, get_background_request_client_for_profile, get_request_client_for_profile,
+};
 
 const META_HEADER: &str = "x-v3-request";
 const ERROR_HEADER: &str = "x-v3-transport-error";
+const NODE_RELAY_PREFIX: &str = "/cluster-transports/v2/";
 /// 私有请求最多持有的单调执行预算。
 pub(crate) const REQUEST_BUDGET_MS: u64 = 120_000;
 /// 绑定校验允许的跨进程墙钟偏差。
@@ -331,7 +335,7 @@ pub(crate) async fn prepare_existing(
             base.trim_end_matches('/'),
             account.id
         ))
-        .bearer_auth(secret)
+        .bearer_auth(&secret)
         .timeout(Duration::from_secs(10))
         .send()
         .await
@@ -350,6 +354,7 @@ pub(crate) async fn prepare_existing(
         &std::env::var("V3_DEPLOYMENT_ID").unwrap_or_default(),
         &configured_account_release(),
     )?;
+    let client = binding_client(client, &binding, &secret)?;
     Ok(Some(PreparedTransport {
         account_id: account.id,
         route: PreparedRoute::V3 { client, binding },
@@ -407,6 +412,7 @@ async fn prepare_from_runtime(
         .await
         .map_err(|_| AppError::ServiceUnavailable("invalid runtime binding".into()))?;
     validate_binding(&binding, account.id, deployment, release)?;
+    let client = binding_client(client, &binding, secret)?;
     Ok(PreparedTransport {
         account_id: account.id,
         route: PreparedRoute::V3 { client, binding },
@@ -414,6 +420,28 @@ async fn prepare_from_runtime(
 }
 
 impl PreparedTransport {
+    /// 从已经验证的绑定提取本次实际发送位置，不公开地址或认证材料。
+    /// @return 原节点、环境和代次；直连兼容通道为空。
+    pub(crate) fn execution_location(&self) -> Option<ExecutionLocation> {
+        let PreparedRoute::V3 { binding, .. } = &self.route else {
+            return None;
+        };
+        let endpoint = reqwest::Url::parse(&binding.endpoint).ok()?;
+        let (node_key, assignment_revision) =
+            if let Some(rest) = endpoint.path().strip_prefix(NODE_RELAY_PREFIX) {
+                let parts: Vec<_> = rest.split('/').collect();
+                (parts.get(1)?.to_string(), Some(parts.get(3)?.parse().ok()?))
+            } else {
+                ("local".into(), None)
+            };
+        Some(ExecutionLocation {
+            node_key,
+            environment_id: binding.environment_id.clone(),
+            generation: binding.generation,
+            assignment_revision,
+        })
+    }
+
     /// 经已验证运行绑定同步空闲策略，兼容尚在切换的旧sender。
     /// @param seconds 已验证的全局回收秒数。
     /// @return 支持该接口时返回true，旧sender返回false，传输故障返回错误。
@@ -707,9 +735,37 @@ impl PreparedTransport {
     /// @return 上游响应或提交未知错误；不会自动重放。
     pub async fn submit(
         self,
+        prepared: PreparedRequest,
+        body: &[u8],
+        ttfb_timeout: Duration,
+    ) -> Result<reqwest::Response, AppError> {
+        self.submit_inner(prepared, body, ttfb_timeout, None).await
+    }
+
+    /// 提交固定后台动作，并为整个后台响应保留有界期限。
+    /// @param prepared 原冻结请求。
+    /// @param body 原字节。
+    /// @param ttfb_timeout 原后台期限。
+    /// @param purpose 服务端固定动作。
+    /// @return 原响应及明确提交边界。
+    pub(crate) async fn submit_background(
+        self,
+        prepared: PreparedRequest,
+        body: &[u8],
+        ttfb_timeout: Duration,
+        purpose: BackgroundPurpose,
+    ) -> Result<reqwest::Response, AppError> {
+        purpose.validate(&prepared.method, &prepared.target_url)?;
+        self.submit_inner(prepared, body, ttfb_timeout, Some(purpose))
+            .await
+    }
+
+    async fn submit_inner(
+        self,
         mut prepared: PreparedRequest,
         body: &[u8],
         ttfb_timeout: Duration,
+        purpose: Option<BackgroundPurpose>,
     ) -> Result<reqwest::Response, AppError> {
         let PreparedRoute::V3 { client, binding } = self.route else {
             let PreparedRoute::Direct(proxy_url) = self.route else {
@@ -735,21 +791,23 @@ impl PreparedTransport {
             serde_json::to_vec(&prepared)
                 .map_err(|_| AppError::Internal("serialize runtime request".into()))?,
         );
-        let response = timeout(
-            ttfb_timeout,
-            client
-                .post(format!(
-                    "{}/internal/send",
-                    binding.endpoint.trim_end_matches('/')
-                ))
-                .bearer_auth(binding.secret)
-                .header(META_HEADER, meta)
-                .body(body.to_vec())
-                .send(),
-        )
-        .await
-        .map_err(|_| AppError::BadGateway("account submission status unknown".into()))?
-        .map_err(|_| AppError::BadGateway("account submission status unknown".into()))?;
+        let mut request = client
+            .post(format!(
+                "{}/internal/send",
+                binding.endpoint.trim_end_matches('/')
+            ))
+            .bearer_auth(binding.secret)
+            .header(META_HEADER, meta)
+            .body(body.to_vec());
+        if let Some(purpose) = purpose {
+            request = request
+                .header(BACKGROUND_HEADER, purpose.as_str())
+                .timeout(ttfb_timeout);
+        }
+        let response = timeout(ttfb_timeout, request.send())
+            .await
+            .map_err(|_| AppError::BadGateway("account submission status unknown".into()))?
+            .map_err(|_| AppError::BadGateway("account submission status unknown".into()))?;
         if let Some(error) = response.headers().get(ERROR_HEADER) {
             return Err(if error == "before-send" {
                 AppError::ServiceUnavailable("account request rejected before submission".into())
@@ -814,6 +872,23 @@ fn validate_binding(
             binding.environment_id
         ),
     ];
+    let local_endpoint = hosts
+        .iter()
+        .any(|host| endpoint.host_str() == Some(host.as_str()))
+        && endpoint.scheme() == "http"
+        && endpoint.port() == Some(8091)
+        && endpoint.path() == "/";
+    let remote_endpoint = std::env::var("V3_RUNTIME_URL")
+        .ok()
+        .and_then(|value| reqwest::Url::parse(&value).ok())
+        .is_some_and(|base| {
+            remote_endpoint_matches(
+                &endpoint,
+                &base,
+                &binding.environment_id,
+                &deployment_key[..12],
+            )
+        });
     if deployment.is_empty()
         || release.is_empty()
         || binding.release_id != release
@@ -822,16 +897,11 @@ fn validate_binding(
             .environment_id
             .bytes()
             .all(|byte| byte.is_ascii_hexdigit())
-        || !hosts
-            .iter()
-            .any(|host| endpoint.host_str() == Some(host.as_str()))
+        || !(local_endpoint || remote_endpoint)
         || binding.account_id != account_id
         || binding.secret.len() < 32
-        || endpoint.scheme() != "http"
-        || endpoint.port() != Some(8091)
         || !endpoint.username().is_empty()
         || endpoint.password().is_some()
-        || endpoint.path() != "/"
         || endpoint.query().is_some()
         || endpoint.fragment().is_some()
     {
@@ -840,6 +910,65 @@ fn validate_binding(
         ));
     }
     Ok(())
+}
+
+fn remote_endpoint_matches(
+    endpoint: &reqwest::Url,
+    base: &reqwest::Url,
+    environment_id: &str,
+    deployment_key: &str,
+) -> bool {
+    if endpoint.origin() != base.origin()
+        || !matches!(base.scheme(), "http" | "https")
+        || base.path() != "/"
+        || !base.username().is_empty()
+        || base.password().is_some()
+        || base.query().is_some()
+        || base.fragment().is_some()
+    {
+        return false;
+    }
+    let Some(rest) = endpoint.path().strip_prefix(NODE_RELAY_PREFIX) else {
+        return false;
+    };
+    let parts: Vec<_> = rest.split('/').collect();
+    parts.len() == 4
+        && parts[0] == deployment_key
+        && parts[1].len() == 32
+        && parts[1].bytes().all(|value| value.is_ascii_hexdigit())
+        && parts[2] == environment_id
+        && parts[3]
+            .parse::<u64>()
+            .is_ok_and(|revision| revision > 0 && revision.to_string() == parts[3])
+}
+
+fn binding_client(
+    client: Client,
+    binding: &TransportBinding,
+    secret: &str,
+) -> Result<Client, AppError> {
+    let endpoint = reqwest::Url::parse(&binding.endpoint)
+        .map_err(|_| AppError::ServiceUnavailable("invalid sender endpoint".into()))?;
+    if !endpoint.path().starts_with(NODE_RELAY_PREFIX) {
+        return Ok(client);
+    }
+    // 中央认证只发送给已核对 origin 的内部转接；账号 bearer 继续由 sender 独立核验。
+    let mut headers = HeaderMap::new();
+    let mut value = HeaderValue::from_str(secret).map_err(|_| {
+        AppError::ServiceUnavailable("node relay authentication unavailable".into())
+    })?;
+    value.set_sensitive(true);
+    headers.insert("x-v3-relay-token", value);
+    Client::builder()
+        .no_proxy()
+        .redirect(Policy::none())
+        .no_gzip()
+        .no_brotli()
+        .no_deflate()
+        .default_headers(headers)
+        .connect_timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|_| AppError::ServiceUnavailable("node relay unavailable".into()))
 }
 
 /// 账号发送器运行状态；活跃计数覆盖响应流生命周期。
@@ -965,7 +1094,7 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
     let mut submitted = false;
     let result =
         async {
-            let config = read_config(&state.config_path)?;
+            let mut config = read_config(&state.config_path)?;
             authenticate(&headers, &config)?;
             if state.evidence_error.load(Ordering::SeqCst) {
                 return Err(AppError::ServiceUnavailable(
@@ -981,20 +1110,46 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
                 .map_err(|_| AppError::BadRequest("invalid runtime request".into()))?;
             let prepared: PreparedRequest = serde_json::from_slice(&bytes)
                 .map_err(|_| AppError::BadRequest("invalid runtime request".into()))?;
+            let purpose = headers
+                .get(BACKGROUND_HEADER)
+                .map(|value| {
+                    if headers.get_all(BACKGROUND_HEADER).iter().count() != 1 {
+                        return Err(AppError::BadRequest("后台发送动作头重复".into()));
+                    }
+                    let value = value
+                        .to_str()
+                        .map_err(|_| AppError::BadRequest("后台发送动作头无效".into()))?;
+                    BackgroundPurpose::parse(value)
+                })
+                .transpose()?;
+            if let Some(purpose) = purpose {
+                config.allowed_origin = purpose.validate(&prepared.method, &prepared.target_url)?;
+            }
             let deadline = validate_request(&prepared, &config)?;
             state.active.fetch_add(1, Ordering::SeqCst);
             let guard = ActiveRequest(state.active.clone());
             submitted = true;
-            let upstream = timeout_at(
-                deadline,
-                send_direct(&config.proxy_url, &prepared, body.to_vec()),
-            )
+            let upstream = timeout_at(deadline, async {
+                if purpose.is_some() {
+                    let client = get_background_request_client_for_profile(
+                        &config.proxy_url,
+                        prepared.tls_profile,
+                    )
+                    .map_err(|_| AppError::BadGateway("后台账号客户端不可用".into()))?;
+                    send_with_client(&client, &prepared, body.to_vec()).await
+                } else {
+                    send_direct(&config.proxy_url, &prepared, body.to_vec()).await
+                }
+            })
             .await
             .map_err(|_| AppError::BadGateway("upstream submission status unknown".into()))??;
             let code = upstream.status();
             {
                 let _lock = state.evidence_lock.lock().unwrap();
-                if record_headers(&config, &prepared, &upstream).is_err() {
+                // 遥测、usage和刷新成功不能充当模型额度恢复证据。
+                if (purpose.is_none() || purpose == Some(BackgroundPurpose::TokenTest))
+                    && record_headers(&config, &prepared, &upstream).is_err()
+                {
                     // 当前 API 响应仍保持原样，故障通过健康状态阻止下一作业或新提交。
                     state.evidence_error.store(true, Ordering::SeqCst);
                 }
@@ -1385,6 +1540,142 @@ mod tests {
         fs::remove_file(path).unwrap();
     }
 
+    /// 固定后台动作的方法、目标、认证及旧分配在发送前被核对。@return 无。
+    #[tokio::test]
+    async fn background_sender_rejects_wrong_purpose_target_and_binding_before_upstream() {
+        let path = temp_dir().join(format!("background-sender-{}.json", Uuid::new_v4()));
+        let secret = "synthetic-background-private-service-secret";
+        let proxy = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let config: SenderConfig = serde_json::from_value(json!({
+            "binding":{"account_id":7,"environment_id":"synthetic","generation":3,
+                "endpoint":"http://localhost:8091","secret":secret,"release_id":"synthetic"},
+            "proxy_url":format!("http://{}",proxy.local_addr().unwrap()),"allowed_origin":"https://api.anthropic.com"
+        })).unwrap();
+        fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(
+            axum::serve(listener, sender_router(path.to_string_lossy().into_owned())).into_future(),
+        );
+        let prepared = PreparedRequest {
+            account_id: 7,
+            environment_id: "synthetic".into(),
+            generation: 3,
+            request_id: Uuid::new_v4().to_string(),
+            deadline_unix_ms: now_ms() + 5000,
+            method: "GET".into(),
+            target_url: crate::service::runtime_background::USAGE_URL.into(),
+            headers: vec![],
+            preserve_header_casing: false,
+            tls_profile: TlsProfileId::ClaudeCode293,
+        };
+        for (purpose, token, change) in [
+            ("arbitrary-url", secret, ""),
+            ("usage", secret, "url"),
+            ("usage", secret, "generation"),
+            ("oauth-refresh", secret, ""),
+            ("usage", "wrong", ""),
+        ] {
+            let mut request = prepared.clone();
+            if change == "url" {
+                request.target_url = "https://api.anthropic.com/v1/messages".into();
+            }
+            if change == "generation" {
+                request.generation = 2;
+            }
+            let meta = STANDARD.encode(serde_json::to_vec(&request).unwrap());
+            let response = Client::new()
+                .post(format!("{endpoint}/internal/send"))
+                .bearer_auth(token)
+                .header(META_HEADER, meta)
+                .header(BACKGROUND_HEADER, purpose)
+                .send()
+                .await
+                .unwrap();
+            assert!(!response.status().is_success());
+            assert_eq!(response.headers().get(ERROR_HEADER).unwrap(), "before-send");
+        }
+        assert!(
+            timeout(Duration::from_millis(50), proxy.accept())
+                .await
+                .is_err()
+        );
+        server.abort();
+        let _ = server.await;
+        fs::remove_file(path).unwrap();
+    }
+
+    /// 实际HTTP桥收到原后台purpose和绑定，正文及原TLS画像保持同一次冻结。@return 无。
+    #[tokio::test]
+    async fn background_transport_preserves_original_scope_and_fixed_purpose() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let router = Router::new().route(
+            "/internal/send",
+            post(|headers: HeaderMap, body: Bytes| async move {
+                assert_eq!(headers.get(BACKGROUND_HEADER).unwrap(), "usage");
+                assert_eq!(
+                    headers.get("authorization").unwrap(),
+                    "Bearer synthetic-background-secret"
+                );
+                let decoded = STANDARD.decode(headers.get(META_HEADER).unwrap()).unwrap();
+                let request: PreparedRequest = serde_json::from_slice(&decoded).unwrap();
+                assert_eq!(request.account_id, 7);
+                assert_eq!(request.environment_id, "original-environment");
+                assert_eq!(request.generation, 9);
+                assert_eq!(request.tls_profile, TlsProfileId::ClaudeCode293);
+                assert_eq!(
+                    request.target_url,
+                    crate::service::runtime_background::USAGE_URL
+                );
+                assert_eq!(body, Bytes::new());
+                Json(json!({"window":"original-usage"}))
+            }),
+        );
+        let server = tokio::spawn(axum::serve(listener, router).into_future());
+        let transport = PreparedTransport {
+            account_id: 7,
+            route: PreparedRoute::V3 {
+                client: Client::new(),
+                binding: TransportBinding {
+                    account_id: 7,
+                    environment_id: "original-environment".into(),
+                    generation: 9,
+                    endpoint,
+                    secret: "synthetic-background-secret".into(),
+                    release_id: "synthetic".into(),
+                },
+            },
+        };
+        let request = PreparedRequest {
+            account_id: 0,
+            environment_id: String::new(),
+            generation: 0,
+            request_id: String::new(),
+            deadline_unix_ms: 0,
+            method: "GET".into(),
+            target_url: crate::service::runtime_background::USAGE_URL.into(),
+            headers: vec![],
+            preserve_header_casing: false,
+            tls_profile: TlsProfileId::ClaudeCode293,
+        };
+        let response = transport
+            .submit_background(
+                request,
+                &[],
+                Duration::from_secs(5),
+                BackgroundPurpose::Usage,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response.json::<Value>().await.unwrap()["window"],
+            "original-usage"
+        );
+        server.abort();
+        let _ = server.await;
+    }
+
     /// 真实HTTP策略同步检查鉴权、账号代次、范围及旧sender兼容。@return 无。
     #[tokio::test]
     async fn native_idle_policy_requires_authentication_and_exact_binding() {
@@ -1618,6 +1909,92 @@ mod tests {
         assert_eq!(status["active"], 0);
         sender.abort();
         fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn execution_location_freezes_remote_identity_and_omits_secrets() {
+        let environment_id = "e".repeat(32);
+        let node_key = "a".repeat(32);
+        let binding = TransportBinding {
+            account_id: 7,
+            environment_id: environment_id.clone(),
+            generation: 5,
+            endpoint: format!(
+                "http://orchestrator:8000/cluster-transports/v2/0123456789ab/{node_key}/{environment_id}/3"
+            ),
+            secret: "synthetic-private-transport-secret".into(),
+            release_id: "synthetic-release".into(),
+        };
+        let mut transport = PreparedTransport {
+            account_id: 7,
+            route: PreparedRoute::V3 {
+                client: Client::new(),
+                binding,
+            },
+        };
+        let frozen = transport.execution_location().unwrap();
+        assert_eq!(
+            frozen,
+            ExecutionLocation {
+                node_key,
+                environment_id,
+                generation: 5,
+                assignment_revision: Some(3)
+            }
+        );
+        let public = serde_json::to_string(&frozen).unwrap();
+        assert!(!public.contains("secret"));
+        assert!(!public.contains("orchestrator"));
+        if let PreparedRoute::V3 { binding, .. } = &mut transport.route {
+            binding.endpoint = "http://flower2api-local:8091".into();
+            binding.generation = 6;
+        }
+        let local = transport.execution_location().unwrap();
+        assert_eq!(local.node_key, "local");
+        assert_eq!(local.assignment_revision, None);
+        assert_eq!(frozen.generation, 5);
+        assert!(
+            PreparedTransport {
+                account_id: 7,
+                route: PreparedRoute::Direct(String::new())
+            }
+            .execution_location()
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn node_relay_endpoint_requires_fixed_origin_and_full_identity() {
+        let base = reqwest::Url::parse("http://orchestrator:8000").unwrap();
+        let environment_id = "e".repeat(32);
+        let node_key = "a".repeat(32);
+        let deployment_key = "0123456789ab";
+        let endpoint = format!(
+            "http://orchestrator:8000/cluster-transports/v2/{deployment_key}/{node_key}/{environment_id}/3"
+        );
+        let matches = |value: &str| {
+            remote_endpoint_matches(
+                &reqwest::Url::parse(value).unwrap(),
+                &base,
+                &environment_id,
+                deployment_key,
+            )
+        };
+        assert!(matches(&endpoint));
+        for invalid in [
+            endpoint.replace("orchestrator", "foreign-node"),
+            endpoint.replace(":8000", ":8001"),
+            endpoint.replace("http:", "https:"),
+            endpoint.replace(deployment_key, "other-release"),
+            endpoint.replace(&node_key, "short-node"),
+            endpoint.replace(&environment_id, &"f".repeat(32)),
+            endpoint.replace("/3", "/03"),
+            endpoint.replace("/3", "/0"),
+            endpoint.replace("/3", "/-1"),
+            format!("{endpoint}/internal/send"),
+        ] {
+            assert!(!matches(&invalid), "accepted {invalid}");
+        }
     }
 
     #[test]

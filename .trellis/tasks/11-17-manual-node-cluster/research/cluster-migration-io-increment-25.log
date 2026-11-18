@@ -1,0 +1,23 @@
+E
+======================================================================
+ERROR: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 173, in test_remote_account_preparation_and_sender_json_sse
+    self.verify_migration_files(service, runtime, node, account, secondary_fixtures)
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 228, in verify_migration_files
+    self.assertEqual('a' * 64, json.loads((imported / 'home/.claude.json').read_text())['userID'])
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1029, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1015, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/tmp7e6dy7jw/remote/node-migrations/1d0fdd6ea77343bb9d7d3c31ddd526dc/imports/bbfa03979c494b4cb92c5ac64c2e3350/environment/home/.claude.json'
+
+----------------------------------------------------------------------
+Ran 1 test in 34.804s
+
+FAILED (errors=1)

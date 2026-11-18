@@ -22,6 +22,16 @@ def read_gate(directory: Path, deployment: str) -> dict:
     :return: 完整门禁。
     """
     value = strict_json(safe_read(directory / 'admission.json', 8192, private=True), 8192)
+    return validate_gate(value, deployment)
+
+
+def validate_gate(value: dict, deployment: str) -> dict:
+    """复用同一维护合同核对已固定读取的记录。
+
+    :param value: 完整有界读取的JSON对象。
+    :param deployment: 固定部署身份。
+    :return: 核对后的原记录，维护阶段保持原值。
+    """
     if (set(value) != {'schema_version', 'deployment', 'operation_id', 'epoch', 'phase', 'target_release', 'revision', 'created_at'}
             or type(value['schema_version']) is not int or value['schema_version'] != 1
             or value['deployment'] != deployment or not DEPLOYMENT_RE.fullmatch(deployment)
@@ -116,6 +126,21 @@ class DeploymentGate:
                 return None
             if state['phase'] != 'idle' and not self.continuing():
                 raise RuntimeError('平台维护中，新的作业等待更新完成')
+            identifier = uuid.uuid4().hex
+            self.active[identifier] = 'job:' + source
+            return identifier
+
+    def restore_reserved(self, source: str) -> str | None:
+        """重启后登记已由持久账本核对的旧作业占用。
+
+        :param source: 已存在作业的固定脱敏来源。
+        :return: 旧作业活动标识；此登记不授予维护期新工作许可。
+        """
+        if not isinstance(source, str) or not 1 <= len(source) <= 256:
+            raise ValueError('恢复作业来源无效')
+        with self.lock:
+            if not self.state()['enabled']:
+                return None
             identifier = uuid.uuid4().hex
             self.active[identifier] = 'job:' + source
             return identifier

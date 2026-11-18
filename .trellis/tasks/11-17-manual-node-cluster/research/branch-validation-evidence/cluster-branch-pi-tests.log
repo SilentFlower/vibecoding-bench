@@ -1,0 +1,15 @@
+test_cancelled_ready_exit_never_schedules_recovery (test_projects_pi_round.PiRoundPipeTests.test_cancelled_ready_exit_never_schedules_recovery)
+取消优先于同时到达的退出事件，不能自行重启用户已停止的控制者。:return: None。 ... ok
+test_parent_delivers_success_and_receives_normal_completion (test_projects_pi_round.PiRoundPipeTests.test_parent_delivers_success_and_receives_normal_completion)
+通过结果沿真实管道进入原生会话，父进程按 settled 正常退出。:return: None。 ... ok
+test_startup_failure_is_persisted_before_handing_back_without_more_model_requests (test_projects_pi_round.PiRoundPipeTests.test_startup_failure_is_persisted_before_handing_back_without_more_model_requests)
+真实 Python／Node 管道保存故障回执后结束，不追加一次模型解释。:return: None。 ... ok
+test_unexpected_exit_is_recoverable_only_after_valid_ready (test_projects_pi_round.PiRoundPipeTests.test_unexpected_exit_is_recoverable_only_after_valid_ready)
+真实子进程退出可恢复，坏协议和未就绪退出不伪装成模型断流。:return: None。 ... ok
+test_diagnosis_reads_bounded_tail_and_rejects_mismatched_evidence (test_projects_pi_round.PiSessionDiagnosisTests.test_diagnosis_reads_bounded_tail_and_rejects_mismatched_evidence)
+大历史不会全量载入，成功尾消息、坏时间、错误目录及残缺行不能解锁。:return: None。 ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 3.377s
+
+OK

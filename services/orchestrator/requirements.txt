@@ -3,3 +3,6 @@ uvicorn[standard]==0.32.0
 docker==7.1.0
 sse-starlette==2.1.3
 pydantic==2.9.2
+httpx==0.28.1
+# 续聊私有PTY使用原SSH转发的UDS，客户端API与有界背压保持固定版本。
+websockets==17.3

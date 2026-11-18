@@ -41,6 +41,30 @@ class WorkerStartupTests(unittest.TestCase):
             definitions.append(match.group(0))
         return "\n".join(definitions).replace("/tmp/", f"{self.base}/")
 
+    def test_auth_detector_respects_existing_session_byte_baseline(self) -> None:
+        """同会话恢复只识别本轮追加401，旧错误记录保持为历史证据。:return: None。"""
+        directory=self.base/'home/.claude/projects/-workspace'
+        directory.mkdir(parents=True)
+        native=directory/'session.jsonl'
+        def message(text):
+            """构造含中文的完整原生字节。:param text: 受控正文。:return: JSONL。"""
+            return json.dumps({'timestamp':'2026-11-17T00:00:00Z','message':{'content':[{'type':'text','text':text}]}},ensure_ascii=False)+'\n'
+        native.write_text(message('旧会话：API Error: 401'))
+        baseline=self.base/'baseline.json'
+        baseline.write_text(json.dumps({str(native):native.stat().st_size}))
+        with native.open('a') as output:
+            output.write(message('原会话已恢复，当前响应正常'))
+        transcript=self.base/'transcript.log'
+        transcript.write_text('当前终端正常')
+        script=self._functions('detect_claude_auth_error').replace('"/workspace/.bench-transcript.log"','"'+str(transcript)+'"')
+        environment={**os.environ,'CLAUDE_DIR':str(self.base/'home/.claude'),'COMPLETION_BASELINE':str(baseline)}
+        result=subprocess.run(['bash','-c',script+'\ndetect_claude_auth_error 0 0'],env=environment,capture_output=True,text=True,timeout=5)
+        self.assertEqual(1,result.returncode,result.stdout+result.stderr)
+        with native.open('a') as output:
+            output.write(message('本轮新错误：API Error: 401'))
+        result=subprocess.run(['bash','-c',script+'\ndetect_claude_auth_error 0 0'],env=environment,capture_output=True,text=True,timeout=5)
+        self.assertEqual((0,'API Error: 401'),(result.returncode,result.stdout.strip()))
+
     def _submit_after_auto_offer(self, mode: str, stuck: bool = False,
             prompt: str = "题目：保持原始内容\n不要替换题目。") -> subprocess.CompletedProcess:
         """

@@ -1,0 +1,31 @@
+E
+======================================================================
+ERROR: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 165, in test_remote_account_preparation_and_sender_json_sse
+    verify_node_run(self, service, runtime, node, account, unused_gateway)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_run.py", line 71, in verify_node_run
+    verify_legacy_project(testcase,service,runtime,node,account,local,remote,configuration)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_legacy_project.py", line 59, in verify_legacy_project
+    _verify_plan(testcase,service,account,local,remote,manager,library,submitted,root)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_legacy_project.py", line 168, in _verify_plan
+    remote.sessions.quota_refresh(remote._row(token))
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_quota.py", line 327, in refresh
+    response = self.sessions._call(row, 'terminal-quota-state', request.model_dump())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_terminal_sessions.py", line 122, in _call
+    result = self.service.connection(node['id']).execution_environment(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_ssh.py", line 375, in execution_environment
+    return self._execute_environment(container, payload, operation)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_ssh.py", line 412, in _execute_environment
+    raise ValueError('节点环境准备失败，请检查执行组件、环境归属与资源')
+ValueError: 节点环境准备失败，请检查执行组件、环境归属与资源
+
+----------------------------------------------------------------------
+Ran 1 test in 61.103s
+
+FAILED (errors=1)

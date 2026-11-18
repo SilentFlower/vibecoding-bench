@@ -35,6 +35,36 @@ class Upstream(BaseHTTPRequestHandler):
 
     protocol_version = 'HTTP/1.1'
 
+    def do_GET(self):
+        """提供固定usage的合成窗口。:return: None。"""
+        if self.path != '/api/oauth/usage':
+            self.send_error(404)
+            return
+        record('oauth-usage', path=self.path, host=self.headers.get('Host'),
+            authorization_sha256=hashlib.sha256(self.headers.get('Authorization','').encode()).hexdigest(),
+            tls_version=self.connection.version())
+        if (ROOT/'oauth-usage-hold-response').exists():
+            deadline=time.monotonic()+60
+            while (ROOT/'oauth-usage-hold-response').exists() and time.monotonic()<deadline:
+                time.sleep(.05)
+        if (ROOT/'oauth-usage-drop-response').exists():
+            self.connection.shutdown(socket.SHUT_RDWR)
+            self.connection.close()
+            return
+        windows=ROOT/'oauth-usage-windows.json'
+        payload=json.loads(windows.read_text()) if windows.exists() else {
+            'five_hour': {'utilization': 12, 'resets_at': '2099-01-01T00:00:00Z'}}
+        status=ROOT/'oauth-usage-status.json'
+        failure=json.loads(status.read_text()) if status.exists() else None
+        response = json.dumps(failure['body'] if failure else payload).encode()
+        self.send_response(failure['status'] if failure else 200)
+        self.send_header('Content-Type', 'application/json')
+        if failure and failure.get('retry_after'):
+            self.send_header('Retry-After',str(failure['retry_after']))
+        self.send_header('Content-Length', str(len(response)))
+        self.end_headers()
+        self.wfile.write(response)
+
     def do_POST(self):
         """处理合成请求，不保存凭据或完整请求体。
 
@@ -46,7 +76,15 @@ class Upstream(BaseHTTPRequestHandler):
         payload = json.loads(body)
         if self.path.startswith('/v1/oauth/token'):
             # 真实 Rust 刷新客户端仍经账号代理；这里只提供合成响应，不保存 AT/RT。
-            record('oauth-refresh', path=self.path, body_sha256=hashlib.sha256(body).hexdigest())
+            record('oauth-refresh', path=self.path, host=self.headers.get('Host'), body_sha256=hashlib.sha256(body).hexdigest())
+            if (ROOT / 'oauth-hold-response').exists():
+                # 仅合成故障夹具等待实际Node重启/收口，避免用发送前失败冒充未知RT提交。
+                deadline=time.monotonic()+60
+                while (ROOT / 'oauth-hold-response').exists() and time.monotonic()<deadline:
+                    time.sleep(.05)
+            if (ROOT / 'oauth-drop-response').exists():
+                self.close_connection = True
+                return
             response = json.dumps({'access_token':'synthetic-refreshed-' + hashlib.sha256(body).hexdigest()[:12],
                 'refresh_token':payload['refresh_token'], 'expires_in':3600, 'token_type':'Bearer'}).encode()
             self.send_response(200)
@@ -54,6 +92,14 @@ class Upstream(BaseHTTPRequestHandler):
             self.send_header('Content-Length',str(len(response)))
             self.end_headers()
             self.wfile.write(response)
+            return
+        if self.path.startswith(('/api/event_logging/', '/api/eval/')):
+            record('telemetry', path=self.path, host=self.headers.get('Host'), body_sha256=hashlib.sha256(body).hexdigest())
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', '2')
+            self.end_headers()
+            self.wfile.write(b'{}')
             return
         marker = payload.get('marker') or payload.get('messages', [{}])[-1].get('content', '')
         if isinstance(marker, list):
@@ -77,6 +123,7 @@ class Upstream(BaseHTTPRequestHandler):
         self.send_header('anthropic-ratelimit-unified-verify-marker', str(marker))
         self.send_header('anthropic-ratelimit-unified-status', 'allowed')
         self.send_header('anthropic-ratelimit-unified-5h-utilization', '0.12')
+        self.send_header('anthropic-ratelimit-unified-5h-reset', str(int(time.time()) + 5 * 3600))
         if not payload.get('stream'):
             value = {'marker': marker, 'ok': True}
             if self.path.startswith('/v1/messages'):

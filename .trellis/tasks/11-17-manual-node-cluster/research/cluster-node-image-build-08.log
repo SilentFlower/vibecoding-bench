@@ -1,0 +1,43 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 249B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/flower2api-control:v3-verify-ui-native-20261116-10
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [1/5] FROM docker.io/library/flower2api-control:v3-verify-ui-native-20261116-10@sha256:771a97656c8053e7cd60caa7ef62fe8f67518f2aede1e35d1fe88a4e140dbc45
+#4 resolve docker.io/library/flower2api-control:v3-verify-ui-native-20261116-10@sha256:771a97656c8053e7cd60caa7ef62fe8f67518f2aede1e35d1fe88a4e140dbc45 0.0s done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 2.52MB 0.0s done
+#5 DONE 0.1s
+
+#6 [2/5] RUN pip install --no-cache-dir httpx==0.28.1
+#6 CACHED
+
+#7 [3/5] COPY orchestrator/ /app/
+#7 DONE 0.1s
+
+#8 [4/5] COPY entrypoint.sh /usr/local/bin/v3-control
+#8 DONE 0.1s
+
+#9 [5/5] RUN chmod +x /usr/local/bin/v3-control
+#9 DONE 0.5s
+
+#10 exporting to image
+#10 exporting layers
+#10 exporting layers 0.2s done
+#10 exporting manifest sha256:8dc72d3d8e3e4188c51ef4ddded79daebf2eb216f2bfa7316383e24d93048dd5 0.0s done
+#10 exporting config sha256:888760d4b01f291d2d01cf8817c756af319e73c9ca6f00304f3ab2fa7ab0cb8c 0.0s done
+#10 exporting attestation manifest sha256:c0f5ae313a16bad0261a90182ff217b6c5db1b08f40f2dc9dda305037f132933 0.0s done
+#10 exporting manifest list sha256:7fb241ff93fcada743c690feb6163e13ba40af54a74b3b841fe8d5ce8a26cbcc 0.0s done
+#10 naming to docker.io/library/flower2api-control:cluster-test-local done
+#10 unpacking to docker.io/library/flower2api-control:cluster-test-local 0.1s done
+#10 DONE 0.5s

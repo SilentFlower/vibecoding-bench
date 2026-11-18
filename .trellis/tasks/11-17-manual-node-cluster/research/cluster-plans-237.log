@@ -1,0 +1,62 @@
+EEE
+======================================================================
+ERROR: test_configuration_rejects_wrong_service_paths_and_altered_frozen_phase (test_cluster_legacy_projects.ProjectPlanNodeTests.test_configuration_rejects_wrong_service_paths_and_altered_frozen_phase)
+固定路径和初始阶段在实际exec之前核对。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_legacy_projects.py", line 72, in setUp
+    self.work=work.model_copy(update={'project':self.io.binding(rid)})
+                                                ^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_legacy_project_io.py", line 51, in binding
+    plan=LegacyProjectPlan(id=context['plan_id'],execution_id=context['plan_execution_id'],phase_seq=context['phase_seq'],
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/pydantic/main.py", line 212, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for LegacyProjectPlan
+phase_seq
+  Input should be greater than or equal to 1 [type=greater_than_equal, input_value=0, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.9/v/greater_than_equal
+
+======================================================================
+ERROR: test_file_preparation_cancels_without_touching_other_actual_jobs (test_cluster_legacy_projects.ProjectPlanNodeTests.test_file_preparation_cancels_without_touching_other_actual_jobs)
+尚未进入exec意图的准备可收口，另一个原作业保持原身份。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_legacy_projects.py", line 72, in setUp
+    self.work=work.model_copy(update={'project':self.io.binding(rid)})
+                                                ^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_legacy_project_io.py", line 51, in binding
+    plan=LegacyProjectPlan(id=context['plan_id'],execution_id=context['plan_execution_id'],phase_seq=context['phase_seq'],
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/pydantic/main.py", line 212, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for LegacyProjectPlan
+phase_seq
+  Input should be greater than or equal to 1 [type=greater_than_equal, input_value=0, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.9/v/greater_than_equal
+
+======================================================================
+ERROR: test_original_configuration_is_committed_before_single_actual_start_and_decisions (test_cluster_legacy_projects.ProjectPlanNodeTests.test_original_configuration_is_committed_before_single_actual_start_and_decisions)
+原中央保存source/证据后配置Node，实际启动一次，决定按原阶段推进。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_legacy_projects.py", line 72, in setUp
+    self.work=work.model_copy(update={'project':self.io.binding(rid)})
+                                                ^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_legacy_project_io.py", line 51, in binding
+    plan=LegacyProjectPlan(id=context['plan_id'],execution_id=context['plan_execution_id'],phase_seq=context['phase_seq'],
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/pydantic/main.py", line 212, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for LegacyProjectPlan
+phase_seq
+  Input should be greater than or equal to 1 [type=greater_than_equal, input_value=0, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.9/v/greater_than_equal
+
+----------------------------------------------------------------------
+Ran 3 tests in 10.124s
+
+FAILED (errors=3)

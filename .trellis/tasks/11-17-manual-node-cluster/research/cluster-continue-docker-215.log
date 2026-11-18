@@ -1,0 +1,24 @@
+E
+======================================================================
+ERROR: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 165, in test_remote_account_preparation_and_sender_json_sse
+    verify_node_run(self, service, runtime, node, account, unused_gateway)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_run.py", line 186, in verify_node_run
+    verify_node_continue(testcase, service, runtime, node, account, gateway, local, sessions,
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_continue.py", line 63, in verify_node_continue
+    alias = main.account_runtime.run_workspace_path(run_id).name
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/account_runtime.py", line 2781, in run_workspace_path
+    return self._root(dict(row)) / "projects" / alias
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/account_runtime.py", line 415, in _root
+    raise RuntimeBusy('该环境的资料位于远程节点，请通过所属节点操作')
+account_runtime.RuntimeBusy: 该环境的资料位于远程节点，请通过所属节点操作
+
+----------------------------------------------------------------------
+Ran 1 test in 115.796s
+
+FAILED (errors=1)

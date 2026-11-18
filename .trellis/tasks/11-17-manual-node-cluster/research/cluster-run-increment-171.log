@@ -1,0 +1,47 @@
+test_run_uses_original_shared_lease_and_node_stop_before_central_release (test_cluster_runs.CentralRunSessionTests.test_run_uses_original_shared_lease_and_node_stop_before_central_release)
+具体Run正常认领、续约与真实停止收口复用原账本。:return: None。 ... ok
+test_unknown_run_start_retains_central_lease_and_original_operation (test_cluster_runs.CentralRunSessionTests.test_unknown_run_start_retains_central_lease_and_original_operation)
+响应丢失保持reconcile，后续启动只查原账本。:return: None。 ... FAIL
+test_environment_and_scope_cannot_override_service_owned_targets (test_cluster_runs.NodeRunTests.test_environment_and_scope_cannot_override_service_owned_targets)
+拒绝任意环境变量、变更source和错误账号。:return: None。 ... ok
+test_original_driver_starts_once_and_only_this_run_is_projected (test_cluster_runs.NodeRunTests.test_original_driver_starts_once_and_only_this_run_is_projected)
+重复提交和重建actor只查原回执，启动保持原任务与原worker字节。:return: None。 ... FAIL
+test_unknown_start_remains_original_operation_after_actor_restart (test_cluster_runs.NodeRunTests.test_unknown_start_remains_original_operation_after_actor_restart)
+启动结果未知保存脱敏类型，新的actor继续读取原工作。:return: None。 ... FAIL
+
+======================================================================
+FAIL: test_unknown_run_start_retains_central_lease_and_original_operation (test_cluster_runs.CentralRunSessionTests.test_unknown_run_start_retains_central_lease_and_original_operation)
+响应丢失保持reconcile，后续启动只查原账本。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_runs.py", line 148, in test_unknown_run_start_retains_central_lease_and_original_operation
+    self.assertEqual(1, self.peer.calls.count('run-start'))
+AssertionError: 1 != 0
+
+======================================================================
+FAIL: test_original_driver_starts_once_and_only_this_run_is_projected (test_cluster_runs.NodeRunTests.test_original_driver_starts_once_and_only_this_run_is_projected)
+重复提交和重建actor只查原回执，启动保持原任务与原worker字节。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_runs.py", line 59, in test_original_driver_starts_once_and_only_this_run_is_projected
+    self.assertEqual('ready', result['phase'])
+AssertionError: 'ready' != 'reconcile'
+- ready
++ reconcile
+
+
+======================================================================
+FAIL: test_unknown_start_remains_original_operation_after_actor_restart (test_cluster_runs.NodeRunTests.test_unknown_start_remains_original_operation_after_actor_restart)
+启动结果未知保存脱敏类型，新的actor继续读取原工作。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_runs.py", line 82, in test_unknown_start_remains_original_operation_after_actor_restart
+    self.host.runtime.start_run.assert_called_once()
+  File "/usr/lib/python3.12/unittest/mock.py", line 923, in assert_called_once
+    raise AssertionError(msg)
+AssertionError: Expected 'mock' to have been called once. Called 0 times.
+
+----------------------------------------------------------------------
+Ran 5 tests in 2.274s
+
+FAILED (failures=3)

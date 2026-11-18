@@ -1,0 +1,14 @@
+F
+======================================================================
+FAIL: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 140, in test_remote_account_preparation_and_sender_json_sse
+    self.assertEqual(200, response.status_code, response.text[:300])
+AssertionError: 200 != 502 : {"error":"bad gateway: upstream submission status unknown"}
+
+----------------------------------------------------------------------
+Ran 1 test in 14.307s
+
+FAILED (failures=1)

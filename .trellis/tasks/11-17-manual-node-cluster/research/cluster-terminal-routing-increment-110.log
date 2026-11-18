@@ -1,0 +1,26 @@
+E.................................................................................................E
+======================================================================
+ERROR: test_input_unknown_raises_and_candidate_snapshot_requires_original_submission_id (test_cluster_projects_terminal.ClusterProjectsTerminalTests.test_input_unknown_raises_and_candidate_snapshot_requires_original_submission_id)
+未知节点输入进入原中央阻塞，候选不创建无归属的快照操作。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_projects_terminal.py", line 113, in test_input_unknown_raises_and_candidate_snapshot_requires_original_submission_id
+    self.terminal.snapshot(work, self.fixture.fixture.fixture.root / 'objects')
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NodeMigrationTests' object has no attribute 'root'
+
+======================================================================
+ERROR: test_capture_artifacts (unittest.loader._FailedTest.test_capture_artifacts)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_capture_artifacts
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/unittest/loader.py", line 137, in loadTestsFromName
+    module = __import__(module_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'test_capture_artifacts'
+
+
+----------------------------------------------------------------------
+Ran 99 tests in 31.701s
+
+FAILED (errors=2)

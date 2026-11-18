@@ -1,5 +1,6 @@
 use crate::error::AppError;
-use crate::model::account::CanonicalEnvData;
+use crate::model::account::{Account, CanonicalEnvData};
+use crate::service::runtime_background::{self, BackgroundPurpose, TOKEN_TEST_URL, USAGE_URL};
 use crate::service::version_profile::{
     OAUTH_BETA_TOKEN, claude_cli_user_agent, claude_code_user_agent, normalize_version,
     profile_for_version, tls_profile_for_version,
@@ -22,10 +23,6 @@ const OAUTH_SCOPES: &[&str] = &[
     "user:mcp_servers",
     "user:file_upload",
 ];
-
-fn oauth_request_client(proxy_url: &str) -> Result<reqwest::Client, AppError> {
-    oauth_request_client_for_profile(proxy_url, configured_default_tls_profile())
-}
 
 /// 版本探针和默认 OAuth 共用同一代理保护。@param proxy_url 代理。@param profile TLS 标识。@return 客户端或错误。
 fn oauth_request_client_for_profile(
@@ -140,26 +137,33 @@ impl TokenTester {
 
     /// 通过发送最小消息请求验证 Setup Token 有效性。
     /// @param token 待验证的令牌。
-    /// @param proxy_url 账号上游代理。
-    /// @param canonical_env 账号持久环境，用于 HTTP 画像及 TLS 绑定。
+    /// @param account 原绑定账号及持久HTTP/TLS画像。
     /// @return 上游接受令牌时返回 Ok，否则返回请求或验证错误。
-    pub async fn test_token(
-        &self,
-        token: &str,
-        proxy_url: &str,
-        canonical_env: &Value,
-    ) -> Result<(), AppError> {
+    pub async fn test_token(&self, token: &str, account: &Account) -> Result<(), AppError> {
+        let default_tls = configured_default_tls_profile();
+        let tls_profile = tls_profile_for_version(
+            account
+                .canonical_env
+                .get("version")
+                .and_then(Value::as_str)
+                .unwrap_or(""),
+            default_tls,
+        );
         let (client, request) = build_test_token_request(
             token,
-            proxy_url,
-            canonical_env,
-            configured_default_tls_profile(),
+            &account.proxy_url,
+            &account.canonical_env,
+            default_tls,
         )?;
 
-        let resp = client
-            .execute(request)
-            .await
-            .map_err(|e| AppError::Internal(format!("request failed: {:?}", e)))?;
+        let resp = runtime_background::execute(
+            account,
+            client,
+            request,
+            BackgroundPurpose::TokenTest,
+            tls_profile,
+        )
+        .await?;
 
         if resp.status() != 200 {
             let status = resp.status();
@@ -207,7 +211,7 @@ fn build_test_token_request(
     });
 
     let request = client
-        .post("https://api.anthropic.com/v1/messages?beta=true")
+        .post(TOKEN_TEST_URL)
         .header("Authorization", format!("Bearer {}", token))
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
@@ -259,7 +263,34 @@ pub(crate) async fn refresh_oauth_token_at(
     proxy_url: &str,
     token_url: &str,
 ) -> Result<RefreshedOAuthTokens, AppError> {
-    let client = oauth_request_client(proxy_url)?;
+    refresh_oauth_token_with_account(refresh_token, proxy_url, token_url, None).await
+}
+
+/// 由原唯一刷新所有者通过账号所属节点发送原RT。
+/// @param account 锁内最新原账号。
+/// @param token_url 原冻结OAuth端点。
+/// @return 原确定刷新结果或保留提交未知的错误。
+pub(crate) async fn refresh_account_oauth_token_at(
+    account: &Account,
+    token_url: &str,
+) -> Result<RefreshedOAuthTokens, AppError> {
+    refresh_oauth_token_with_account(
+        &account.refresh_token,
+        &account.proxy_url,
+        token_url,
+        Some(account),
+    )
+    .await
+}
+
+async fn refresh_oauth_token_with_account(
+    refresh_token: &str,
+    proxy_url: &str,
+    token_url: &str,
+    account: Option<&Account>,
+) -> Result<RefreshedOAuthTokens, AppError> {
+    let profile = configured_default_tls_profile();
+    let client = oauth_request_client_for_profile(proxy_url, profile)?;
     let body = serde_json::json!({
         "grant_type": "refresh_token",
         "refresh_token": refresh_token,
@@ -267,13 +298,33 @@ pub(crate) async fn refresh_oauth_token_at(
         "scope": OAUTH_SCOPES.join(" "),
     });
 
-    let resp = client
+    let request = client
         .post(token_url)
         .header("Content-Type", "application/json")
         .json(&body)
-        .send()
+        .build()
+        .map_err(|_| AppError::Internal("OAuth 刷新请求构造失败".into()))?;
+    let resp = if let Some(account) = account {
+        runtime_background::execute(
+            account,
+            client,
+            request,
+            BackgroundPurpose::OAuthRefresh,
+            profile,
+        )
         .await
-        .map_err(|e| AppError::Internal(format!("oauth refresh request failed: {}", e)))?;
+        .map_err(|error| match error {
+            // 原唯一所有者用Internal保留刷新维护，RT的未知提交不能降级为可重试拒绝。
+            AppError::BadGateway(_) => {
+                AppError::Internal("oauth refresh request failed: 刷新提交或响应结果未知".into())
+            }
+            other => other,
+        })?
+    } else {
+        client.execute(request).await.map_err(|_| {
+            AppError::Internal("oauth refresh request failed: 刷新提交结果未知".into())
+        })?
+    };
 
     if resp.status() != 200 {
         let status = resp.status();
@@ -306,18 +357,43 @@ pub(crate) async fn refresh_oauth_token_at(
 
 /// 从 Anthropic OAuth API 获取账号用量数据。
 pub async fn fetch_usage(token: &str, proxy_url: &str) -> Result<Value, AppError> {
-    let client = oauth_request_client(proxy_url)?;
+    fetch_usage_with_account(token, proxy_url, None).await
+}
 
-    let resp = client
-        .get("https://api.anthropic.com/api/oauth/usage")
+/// 经原绑定账号通道读取usage，继续使用原完整窗口解析。
+/// @param account 原账号与代理。
+/// @param token 原所有者解析的AT。
+/// @return 原规范化usage对象。
+pub(crate) async fn fetch_account_usage(account: &Account, token: &str) -> Result<Value, AppError> {
+    fetch_usage_with_account(token, &account.proxy_url, Some(account)).await
+}
+
+async fn fetch_usage_with_account(
+    token: &str,
+    proxy_url: &str,
+    account: Option<&Account>,
+) -> Result<Value, AppError> {
+    let profile = configured_default_tls_profile();
+    let client = oauth_request_client_for_profile(proxy_url, profile)?;
+
+    let request = client
+        .get(USAGE_URL)
         .header("Authorization", format!("Bearer {}", token))
         .header("Accept", "application/json")
         .header("Content-Type", "application/json")
         .header("anthropic-beta", OAUTH_BETA_TOKEN)
         .header("User-Agent", claude_code_user_agent(""))
-        .send()
-        .await
-        .map_err(|e| AppError::Internal(format!("usage request failed: {}", e)))?;
+        .build()
+        .map_err(|_| AppError::Internal("usage 请求构造失败".into()))?;
+    let resp = if let Some(account) = account {
+        runtime_background::execute(account, client, request, BackgroundPurpose::Usage, profile)
+            .await?
+    } else {
+        client
+            .execute(request)
+            .await
+            .map_err(|_| AppError::Internal("usage 请求失败".into()))?
+    };
 
     let status = resp.status();
     if status != 200 {

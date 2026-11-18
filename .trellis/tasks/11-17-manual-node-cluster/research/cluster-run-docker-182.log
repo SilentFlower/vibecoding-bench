@@ -1,0 +1,84 @@
+F
+======================================================================
+FAIL: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_run.py", line 126, in verify_node_run
+    testcase.assertEqual(25, guard.snapshot(account)['windows']['five_hour']['utilization'])
+                             ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+KeyError: 'windows'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 165, in test_remote_account_preparation_and_sender_json_sse
+    verify_node_run(self, service, runtime, node, account, unused_gateway)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_run.py", line 131, in verify_node_run
+    raise AssertionError('隔离Run失败；节点调用位置：' + control.logs(tail=15).decode(errors='replace')
+AssertionError: 隔离Run失败；节点调用位置：；原worker转录：node@2eadaac2d483:~/projects/project-90644c8360e5$ set +m; export HOME='/home/node' && cd /home/node/projects/project-90644c8360e5 && env PATH='/cli/2.1.303/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr
+/bin:/sbin:/bin' HOME='/home/node'  claude --permission-mode bypassPermissions --settings /run/v3/jobs/54fb36f280bd9dbe4bb0/settings.json --model offline-model ; code=$?; echo; echo "[entrypoint] claude exited with code
+$code"; echo $code >/run/v3/jobs/54fb36f280bd9dbe4bb0/claude-exit-code; touch /run/v3/jobs/54fb36f280bd9dbe4bb0/claude-exited; sleep 3600
+Synthetic task pane
+Fixture stage complete
+                      Fixture stage complete
+                                            Fixture stage complete
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+----------------------------------------------------------------------
+Ran 1 test in 90.029s
+
+FAILED (failures=1)

@@ -25,16 +25,42 @@ class DatabaseMigrationTests(unittest.TestCase):
             self.database.execute("INSERT INTO accounts(name,profile_path) VALUES('synthetic','profiles/synthetic')")
         second = apply_migrations(self.database)
         self.assertEqual(first['contract'], second['contract'])
-        self.assertEqual(second['current_version'], 1)
-        self.assertEqual(self.database.execute('SELECT COUNT(*) FROM system_schema_migrations').fetchone()[0], 1)
+        self.assertEqual(second['current_version'], len(self.registry['steps']))
+        self.assertEqual(self.database.execute('SELECT COUNT(*) FROM system_schema_migrations').fetchone()[0], len(self.registry['steps']))
         self.assertEqual(self.database.execute('SELECT profile_path FROM accounts').fetchone()[0], 'profiles/synthetic')
+
+    def test_node_execution_increment_preserves_previous_ledger_and_old_program_writes(self) -> None:
+        """节点增量独立追加，前两步台账及旧程序账号读写继续保留。:return: None。"""
+        previous = {**self.registry, 'steps': self.registry['steps'][:2]}
+        apply_migrations(self.database, registry=previous)
+        markers = [tuple(row) for row in self.database.execute('SELECT * FROM system_schema_migrations ORDER BY version')]
+        with self.database:
+            self.database.execute("INSERT INTO accounts(name,profile_path) VALUES('old-node','profiles/old-node')")
+        result = apply_migrations(self.database)
+        self.assertEqual(len(self.registry['steps']), result['current_version'])
+        self.assertEqual(markers, [tuple(row) for row in self.database.execute('SELECT * FROM system_schema_migrations WHERE version<=2 ORDER BY version')])
+        current = [tuple(row) for row in self.database.execute('SELECT * FROM system_schema_migrations ORDER BY version')]
+        apply_migrations(self.database)
+        self.assertEqual(current, [tuple(row) for row in self.database.execute('SELECT * FROM system_schema_migrations ORDER BY version')])
+        self.assertEqual('compatible_newer', apply_migrations(self.database, registry=previous)['state'])
+        with self.database:
+            self.database.execute("UPDATE accounts SET timezone='Europe/Paris' WHERE name='old-node'")
+        self.assertEqual('Europe/Paris', self.database.execute("SELECT timezone FROM accounts WHERE name='old-node'").fetchone()[0])
+
+    def test_registered_node_execution_index_damage_is_rejected(self) -> None:
+        """迁移台账存在时仍检查会话活动索引，结构损坏阻止成功。:return: None。"""
+        apply_migrations(self.database)
+        self.database.execute('DROP INDEX idx_node_executions_active')
+        with self.assertRaisesRegex(ValueError, '执行会话'):
+            migration_plan(self.database)
 
     def test_add_table_column_index_and_backfill_with_version_two(self) -> None:
         """新增登记可真实建表、补列、索引并回填，旧程序保留后来的数据。@return None。"""
-        apply_migrations(self.database)
+        baseline = {**self.registry, 'steps': self.registry['steps'][:1]}
+        apply_migrations(self.database, registry=baseline)
         with self.database:
             self.database.execute("INSERT INTO accounts(name,profile_path) VALUES('synthetic','profiles/synthetic')")
-        registry = copy.deepcopy(self.registry)
+        registry = copy.deepcopy(baseline)
         registry['steps'].append({'id': 'bench.synthetic.2', 'version': 2, 'predecessor': 1, 'checksum': 'a' * 64,
             'engine': 'sqlite', 'kind': 'schema', 'rollback_mode': 'compatible'})
         validate_registry(registry, 'bench')
@@ -49,15 +75,16 @@ class DatabaseMigrationTests(unittest.TestCase):
         self.assertEqual(result['current_version'], 2)
         self.assertEqual(result['contract'], registry_contract(registry))
         self.assertEqual(apply_migrations(self.database, registry=registry, runners=runners)['current_version'], 2)
-        self.assertEqual(apply_migrations(self.database)['state'], 'compatible_newer')
+        self.assertEqual(apply_migrations(self.database, registry=baseline)['state'], 'compatible_newer')
         self.assertEqual(self.database.execute('SELECT synthetic_note FROM accounts').fetchone()[0], 'retained')
 
     def test_failed_backfill_rolls_back_data_and_step_marker(self) -> None:
         """失败的数据回填事务保持原记录与原版本。@return None。"""
-        apply_migrations(self.database)
+        baseline = {**self.registry, 'steps': self.registry['steps'][:1]}
+        apply_migrations(self.database, registry=baseline)
         with self.database:
             self.database.execute("INSERT INTO accounts(name,profile_path) VALUES('synthetic','profiles/before')")
-        registry = copy.deepcopy(self.registry)
+        registry = copy.deepcopy(baseline)
         registry['steps'].append({'id': 'bench.synthetic.2', 'version': 2, 'predecessor': 1, 'checksum': 'b' * 64,
             'engine': 'sqlite', 'kind': 'data', 'rollback_mode': 'compatible'})
         def fail(connection):
@@ -70,7 +97,7 @@ class DatabaseMigrationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'synthetic-failure'):
             apply_migrations(self.database, registry=registry, runners=runners)
         self.assertEqual(self.database.execute('SELECT profile_path FROM accounts').fetchone()[0], 'profiles/before')
-        self.assertEqual(migration_plan(self.database)['current_version'], 1)
+        self.assertEqual(migration_plan(self.database, registry=baseline)['current_version'], 1)
         self.assertNotIn('synthetic_failed', {row['name'] for row in self.database.execute('PRAGMA table_info(accounts)')})
         self.assertIsNone(self.database.execute("SELECT name FROM sqlite_master WHERE name='synthetic_failed_table'").fetchone())
 

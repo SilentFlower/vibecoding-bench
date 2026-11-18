@@ -120,7 +120,6 @@ class PreflightTests(unittest.TestCase):
                 with self.subTest(key=key):
                     self.assertEqual(self.root,manage.preflight(self.values))
 
-
     def test_native_criu_flag_requires_explicit_binary_value(self) -> None:
         """防止恢复权限开关被拼写错误静默关闭。@return None。"""
         self.values['V3_ACCOUNT_MEMORY'] = '1536m'
@@ -580,17 +579,20 @@ class PublicSourceSnapshotTests(unittest.TestCase):
         """已核CRLF转换可恢复，执行位不变；未知修改或父链接不能借恢复路径进入。@return None。"""
         names = ['project_library/projects/python-dateutil/seed/library/NEWS',
             'project_library/projects/python-dateutil/seed/library/docs/make.bat']
+        # 上游属性可能已转换工作树行尾；夹具先取固定原件表示，避免再次转换生成 CRCRLF。
+        originals = {relative: source_path(manage.REPO, relative).read_bytes().replace(b'\r\n', b'\n')
+            for relative in names}
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for relative in names:
                 target = root / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes((source_path(manage.REPO, relative)).read_bytes().replace(b'\n', b'\r\n'))
+                target.write_bytes(originals[relative].replace(b'\n', b'\r\n'))
                 target.chmod(0o755)
             self.assertEqual(names, manage.restore_upstream_checkout_bytes(root))
             self.assertEqual([], manage.restore_upstream_checkout_bytes(root))
             for relative in names:
-                self.assertEqual((source_path(manage.REPO, relative)).read_bytes(), (root / relative).read_bytes())
+                self.assertEqual(originals[relative], (root / relative).read_bytes())
                 self.assertEqual(0o755, (root / relative).stat().st_mode & 0o777)
             first, second = [root / relative for relative in names]
             first.write_bytes(first.read_bytes().replace(b'\n', b'\r\n'))

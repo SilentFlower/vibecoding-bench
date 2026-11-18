@@ -209,9 +209,25 @@ impl From<[Option<u64>; 6]> for DiagnosticTokens {
     }
 }
 
+/// 实际发送时已核验的节点与环境定位；沿原诊断 JSON 保存。
+/// @param node_key 原节点稳定身份，本机为 local。
+/// @param environment_id 原账号环境。
+/// @param generation 原发送器实际代次。
+/// @param assignment_revision 远程分配版本，本机为空。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExecutionLocation {
+    pub node_key: String,
+    pub environment_id: String,
+    pub generation: u64,
+    pub assignment_revision: Option<u64>,
+}
+
 /// 一次真实发送尝试，包括重试和未完整返回的流。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttemptDiagnostic {
+    /// 历史缺失保持未知，不能按账号当前归属回填。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_location: Option<ExecutionLocation>,
     /// 历史缺失表示未观测，不能使用当前运行时状态补写。
     #[serde(default)]
     pub runtime: Option<NativeRuntimeObservation>,

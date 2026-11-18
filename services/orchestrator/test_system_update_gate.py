@@ -57,6 +57,21 @@ class UpdateGateTests(unittest.TestCase):
             with restored.admission('after-restart'):
                 self.fail('重启不能放开维护门禁')
 
+    def test_restored_persistent_job_counts_during_maintenance_without_new_admission(self) -> None:
+        """恢复旧占用只增加排空事实，新作业与调用链继续遵守原维护门禁。:return: None。"""
+        self.value.update(phase='blocked', operation_id=str(uuid.uuid4()), target_release='system-ci-1-1')
+        atomic_json(self.root / 'admission.json', self.value)
+        identifier = self.gate.restore_reserved('remote-cli:original-operation')
+        self.assertEqual(1, self.gate.state()['active'])
+        self.assertFalse(self.gate.continuing())
+        with self.assertRaises(RuntimeError):
+            self.gate.reserve('remote-cli:new-operation')
+        with self.assertRaises(RuntimeError):
+            with self.gate.admission('new-request'):
+                self.fail('恢复旧作业不能开放维护期准入')
+        self.gate.release_reserved(identifier)
+        self.assertEqual(0, self.gate.state()['active'])
+
     def test_missing_corrupt_or_wrong_deployment_is_not_idle(self) -> None:
         """缺失、损坏和跨部署事实均进入对账。
 

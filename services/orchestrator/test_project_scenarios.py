@@ -624,6 +624,12 @@ class ScenarioStateTests(ProjectIterationFixture):
             (str(workspace.relative_to(self.data)),task['scenario_instance_id']))
         self.sql('UPDATE project_evaluation_jobs SET evidence_json=? WHERE id=?',
             (json.dumps({'parent_code_digest':snapshots[0],'parent_code_job_id':jobs[0]}),jobs[1]))
+        selection=self.states.code_input_selection(self.states.task(task['id']),definition)
+        self.assertEqual(snapshots[1],selection['base_checkpoint_digest'])
+        self.assertEqual(jobs[1],selection['base_checkpoint_job_id'])
+        self.assertEqual({str(job):digest for job,digest in zip(jobs,snapshots)},selection['dependencies'])
+        self.assertEqual('VALUE = 999\n',(workspace/'example.py').read_text())
+        self.assertFalse((self.data/'project-artifacts/task-inputs'/str(task['id'])/'code-dependency.json').exists())
         self.states._bind_code_dependencies(self.states.task(task['id']),definition)
         self.assertEqual('VALUE = 2\n',(workspace/'example.py').read_text())
 

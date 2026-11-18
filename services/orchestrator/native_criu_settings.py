@@ -76,8 +76,8 @@ def read_settings(runtime, row: dict, observation: dict | None = None) -> dict:
     return result
 
 
-def set_settings(runtime, row: dict, account: dict, enabled: bool, expected_generation: int, expected_revision: str) -> dict:
-    """在原维护门禁内应用账号选择。@param runtime 锁内运行时。@param row 当前环境。@param account 唯一账号。@param enabled 目标选择。@param expected_generation 页面代次。@param expected_revision 页面摘要。@return 经重建核对的实际配置。"""
+def set_settings(runtime, row: dict, account: dict, enabled: bool, expected_generation: int, expected_revision: str, *, lease_gateway=None, lease_owner: str | None = None) -> dict:
+    """在原维护门禁内应用账号选择。@param runtime 锁内运行时。@param row 当前环境。@param account 唯一账号。@param enabled 目标选择。@param expected_generation 页面代次。@param expected_revision 页面摘要。@param lease_gateway 本次Node消费的中央原门禁。@param lease_owner 原中央唯一维护来源。@return 经重建核对的实际配置。"""
     before = read_settings(runtime, row)
     if (type(enabled) is not bool or account.get('cc2api_account_id') != row.get('gateway_account_id')
             or expected_generation != before['generation'] or expected_revision != before['revision']):
@@ -93,4 +93,4 @@ def set_settings(runtime, row: dict, account: dict, enabled: bool, expected_gene
     if before['enabled'] == enabled and before['applied']:
         return before
     return apply_settings(runtime, row, account, enabled, before, read_settings,
-        field='native_criu_enabled', label='CRIU', prefix='criu', audit_name='criu-operation.json')
+        field='native_criu_enabled', label='CRIU', prefix='criu', audit_name='criu-operation.json', lease_gateway=lease_gateway, lease_owner=lease_owner)

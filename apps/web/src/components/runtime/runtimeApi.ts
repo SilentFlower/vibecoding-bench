@@ -1,3 +1,5 @@
+import type { AccountNodeAssignment } from './nodeApi';
+
 /** 在网关交换的同源管理会话内访问编排服务。@param path 受控API路径。@param options 请求参数。@return 实际JSON回执。 */
 export async function runtimeRequest<T>(path: string, options: { method?: string; body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
   const response = await fetch(`/runtime/api${path}`, { method: options.method ?? 'GET', credentials: 'same-origin', cache: 'no-store', signal: options.signal,
@@ -37,6 +39,8 @@ export interface NativePreparationSnapshot {
 }
 /** 环境列表的真实公开投影，所有身份继续由服务端解释。 */
 export interface RuntimeEnvironment {
+  node?: Pick<AccountNodeAssignment, 'node_id' | 'node_key' | 'node_name' | 'kind' | 'enabled'>; node_observed?: boolean; node_message?: string;
+  login_draft?: boolean;
   environment_id: string; name: string; account_id: number | null; gateway_account_id?: number | null;
   generation: number; state: string; busy: boolean; isolation_version?: number; identity_status?: string;
   fingerprint?: { tz?: string; mem?: string; hostname?: string; lang?: string; profile_version?: number };

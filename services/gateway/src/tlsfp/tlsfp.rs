@@ -136,7 +136,7 @@ impl ActiveKeyExchange for X25519Mlkem768ActiveKx {
 
 static X25519MLKEM768_KX: X25519Mlkem768KxGroup = X25519Mlkem768KxGroup;
 static REQUEST_CLIENT_POOL_ENABLED: AtomicBool = AtomicBool::new(true);
-static REQUEST_CLIENT_CACHE: Lazy<RwLock<HashMap<(String, TlsProfileId), reqwest::Client>>> =
+static REQUEST_CLIENT_CACHE: Lazy<RwLock<HashMap<(String, TlsProfileId, bool), reqwest::Client>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 static CONFIGURED_DEFAULT_TLS_PROFILE: Lazy<RwLock<TlsProfileId>> =
     Lazy::new(|| RwLock::new(TlsProfileId::default()));
@@ -354,11 +354,30 @@ pub fn get_request_client_for_profile(
     proxy_url: &str,
     profile: TlsProfileId,
 ) -> Result<reqwest::Client, reqwest::Error> {
+    get_request_client_with_redirects(proxy_url, profile, true)
+}
+
+/// 复用同一代理和TLS画像的受限后台客户端，固定关闭重定向。
+/// @param proxy_url 原账号代理。
+/// @param profile 原冻结TLS画像。
+/// @return 独立连接池客户端或构建错误。
+pub(crate) fn get_background_request_client_for_profile(
+    proxy_url: &str,
+    profile: TlsProfileId,
+) -> Result<reqwest::Client, reqwest::Error> {
+    get_request_client_with_redirects(proxy_url, profile, false)
+}
+
+fn get_request_client_with_redirects(
+    proxy_url: &str,
+    profile: TlsProfileId,
+    follow_redirects: bool,
+) -> Result<reqwest::Client, reqwest::Error> {
     if !request_client_pool_enabled() {
-        return make_request_client_for_profile(proxy_url, profile);
+        return make_request_client_with_redirects(proxy_url, profile, follow_redirects);
     }
 
-    let cache_key = (proxy_url.to_string(), profile);
+    let cache_key = (proxy_url.to_string(), profile, follow_redirects);
     {
         let cache = REQUEST_CLIENT_CACHE
             .read()
@@ -368,7 +387,7 @@ pub fn get_request_client_for_profile(
         }
     }
 
-    let client = make_request_client_for_profile(proxy_url, profile)?;
+    let client = make_request_client_with_redirects(proxy_url, profile, follow_redirects)?;
     let mut cache = REQUEST_CLIENT_CACHE
         .write()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -397,6 +416,14 @@ fn make_request_client_for_profile(
     proxy_url: &str,
     profile: TlsProfileId,
 ) -> Result<reqwest::Client, reqwest::Error> {
+    make_request_client_with_redirects(proxy_url, profile, true)
+}
+
+fn make_request_client_with_redirects(
+    proxy_url: &str,
+    profile: TlsProfileId,
+    follow_redirects: bool,
+) -> Result<reqwest::Client, reqwest::Error> {
     let tls_config = build_tls_config(profile);
 
     // 不设整体 timeout，也不用 read_timeout（reqwest 0.12.4 不支持该 API）：
@@ -406,6 +433,9 @@ fn make_request_client_for_profile(
     // 保活: tcp_keepalive OS 层 SO_KEEPALIVE + KEEPIDLE=30s,idle 30s 后发 TCP 探测包。
     // HTTP/2 PING 因 craftls 指纹 ALPN 只声明 http/1.1,永远协商不出 h2,故不配置。
     let mut builder = request_client_builder(tls_config);
+    if !follow_redirects {
+        builder = builder.redirect(reqwest::redirect::Policy::none());
+    }
 
     if !proxy_url.is_empty() {
         // 非空代理必须成功解析并真正挂到客户端上，不能因配置错误退回直连。
@@ -543,6 +573,68 @@ mod tests {
         assert_eq!(request_client_cache_len_for_test(), 1);
     }
 
+    /// 固定后台池沿原代理/TLS分桶，重定向策略独立于普通长流池。@return 无。
+    #[test]
+    fn background_pool_keeps_same_profile_and_separate_redirect_policy() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let _state_guard = RequestClientPoolStateGuard::new();
+        let proxy = "socks5h://127.0.0.1:65530";
+        let profile = TlsProfileId::ClaudeCode293;
+        get_request_client_for_profile(proxy, profile).unwrap();
+        get_background_request_client_for_profile(proxy, profile).unwrap();
+        get_background_request_client_for_profile(proxy, profile).unwrap();
+        let cache = REQUEST_CLIENT_CACHE.read().unwrap();
+        assert_eq!(2, cache.len());
+        assert!(cache.contains_key(&(proxy.to_owned(), profile, true)));
+        assert!(cache.contains_key(&(proxy.to_owned(), profile, false)));
+    }
+
+    /// 固定后台目标返回重定向时保持原响应，防止秘密越过受限目标。@return 无。
+    #[test]
+    fn background_client_does_not_follow_actual_redirect() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let _state_guard = RequestClientPoolStateGuard::new();
+        let origin = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let redirected = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        redirected.set_nonblocking(true).unwrap();
+        let target = format!("http://{}/secret", redirected.local_addr().unwrap());
+        let url = format!("http://{}/usage", origin.local_addr().unwrap());
+        let server = thread::spawn(move || {
+            let (mut stream, _) = origin.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut request = Vec::new();
+            while !request.ends_with(b"\r\n\r\n") {
+                let mut byte = [0];
+                stream.read_exact(&mut byte).unwrap();
+                request.extend_from_slice(&byte);
+                assert!(request.len() < 8192);
+            }
+            write!(stream, "HTTP/1.1 302 Found\r\nLocation: {target}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+        });
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let client =
+                get_background_request_client_for_profile("", TlsProfileId::ClaudeCode293).unwrap();
+            let response = client
+                .get(url)
+                .bearer_auth("synthetic-private-token")
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(response.status(), reqwest::StatusCode::FOUND);
+        });
+        server.join().unwrap();
+        assert_eq!(
+            redirected.accept().unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+    }
+
     #[test]
     fn different_proxy_uses_different_cached_client_entry() {
         let _guard = TEST_LOCK.lock().unwrap();
@@ -643,8 +735,8 @@ mod tests {
         assert_eq!(reordered["cipher_suites"], json!(expected));
         assert_ne!(native["ja3"], reordered["ja3"]);
         let cache = REQUEST_CLIENT_CACHE.read().unwrap();
-        assert!(cache.contains_key(&(proxy.clone(), TlsProfileId::ClaudeCode293)));
-        assert!(cache.contains_key(&(proxy, TlsProfileId::TestReordered)));
+        assert!(cache.contains_key(&(proxy.clone(), TlsProfileId::ClaudeCode293, true)));
+        assert!(cache.contains_key(&(proxy, TlsProfileId::TestReordered, true)));
     }
 
     #[test]

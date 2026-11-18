@@ -1746,3 +1746,80 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - `test_cli_scratchpad`覆盖原路径、权限、硬链接/符号链接、三会话、源启动变化、同次启动继续写入、未恢复快照保护、旧回执、磁盘满、发布/恢复中断、跨账号及节点归属、完整/精简备份；集群迁移文件工具由集群交付追加验收。
 - 登录草稿夹具提供实际镜像Config/Labels结构，`test_login_drafts`继续验证旧布局删除、重试和对账；账号及评审运行环境回归核对原门禁与停止顺序。
 - `deploy/flower2api/verify_scratchpad_storage.py`在无外网隔离Docker中使用真实官方CLI和模拟上游，验证原会话续跑、两账号内容归属、安全挂载、重启前后快照保护、能力不足回退及3×8MiB退出tmpfs。性能配对模式覆盖真实sender、并发、吞吐、TTFT、分位延迟、冷启动和CPU。
+
+## Scenario: 人工节点集群、所属执行与停机迁移
+
+### 1. Scope / Trigger
+
+- 人工分配改变Docker、HOME、工作区和出站执行位置，中央继续持有账号策略、唯一Gateway凭据所有权、任务和准入权威。默认`local`节点保留原单机路径。
+- 首版使用中央可达的Linux x64服务器、同批control/account镜像、专用SSH密钥及已核对主机公钥。控制、业务和PTY通道各自保持原生命周期；操作规范见`deploy/flower2api/CLUSTER.md`。
+
+### 2. Signatures
+
+```text
+GET/POST /api/nodes
+POST /api/nodes/host-keys
+POST /api/nodes/{node_id}/check
+POST /api/nodes/{node_id}/prepare
+PUT /api/nodes/{node_id}/enabled
+DELETE /api/nodes/{node_id}
+GET/PUT /api/accounts/{aid}/node
+GET/POST /api/accounts/{account_id}/node-migrations
+GET /api/accounts/{account_id}/node-migrations/{operation_id}
+POST /api/accounts/{account_id}/node-migrations/{operation_id}/{resume|cancel}
+cluster_node_ops.py check|status|stop|up --data-root PATH --host-data-root PATH
+cluster_backup.py backup --data-root PATH --backup-dir PATH --epoch HEX32
+node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-backup PATH]
+```
+
+- bench追加`bench.cluster.2`、`bench.node-executions.3`、`bench.node-login-drafts.4`，定义分别归`cluster_schema.py`、`node_execution_schema.py`、`node_login_draft_schema.py`所有。新增`cluster_nodes/account_node_assignments/node_migrations/node_executions/node_login_drafts`；旧账号默认归属local，保留冻结基线摘要。
+- Node持有`node-execution.sqlite`受限投影，默认本机迁移目标使用`node-execution-local.sqlite`。完整中央可写库和管理员凭据保持中央所有。
+
+### 3. Contracts
+
+- `NodeLocation={node_key,account_id,environment_id,assignment_revision}`核对安装、正式账号和分配标记；具体工作另冻结实际环境`generation`、原source、操作和内容摘要。分配版本、环境代次、草稿身份及租约代次分别使用各自模型。
+- Node私有UDS由同批control的长驻`cluster_agent`持有真实runtime/jobs。SSH只调用`cluster_agent_client`固定操作；轻量入口、Actor和SSH共用具体操作白名单，控制查询/续接保留独立槽位。
+- 中央持有真实Gateway租约与原QuotaGuard许可。`ExecutionLeaseProof`只传`owner/generation/expires_at/exclusive/shared_cli`，从Gateway回执投影时保留其原`phase`在中央核对，claim后使用更新的截止时间。证明过期关闭新启动和输入；原Scope可恢复停止能力，实际停止确认后才释放原许可。
+- 原Pi/Projects、Run、续聊、场景、私有评审和独立程序沿冻结工作调用Node原执行器。中央保留调度、预算、业务接受及最终验收；文件、日志、统计和快照从原执行位置读取。未知输入只查询同操作收据，已提交模型和未知RT交换保持单发。
+- `TransportBinding`沿原字段，远程endpoint固定为中央`V3_RUNTIME_URL`的`/cluster-transports/v2/{deployment_digest}/{node_key}/{environment_id}/{assignment_revision}`。中央剥离服务认证后经独立SSH业务socket转发，核对账号/环境/实际代次与认证，保留原请求字节、SSE、取消和用量路径。
+- legacy/native293及账号count_tokens、usage、遥测、预热和受管OAuth出站遵守同一节点归属及原代理。后台固定目标继续关闭自动重定向；独立账号使用当前Node HOME，绑定账号保持Gateway唯一刷新权和Node AT-only。
+- 原`CredentialOwnership`继续管理关联、解绑、归还、重授权和退休。Node先持久原操作意图并确认真实角色停止，再发布原绑定结果和完整材料；迟到普通prepare不得写回旧绑定。published回执仅能重读原结果。原账号解绑后，配置缓存按实际Node SQL绑定允许新正式所有者接管原Gateway ID。
+- generation=0的未准备独立正式账号退休仅建立无凭据停用投影，核对原账号/环境/分配、未知资料和实际角色，不为删除创建CLI或OAuth。投影中断按同一分配标记接续。
+- 人工停用bench账号可迁移，保留enabled原值。独立迁移沿原owner/profile锁、持久maintenance归属、实际源fence和完整校验执行，保持lease=null；绑定迁移沿原真实排他租约。提交前取消先确认目标停止再恢复源；CAS后继续原目标激活。
+- 暂停节点关闭普通新工作。不启动CLI的设备纯读、原操作停止及凭据交接收尾继续核对原Scope。节点容量或连接未知保持可见，其他节点独立准入。
+- CPU、物理采样、私有请求快照、采集/CRIU和环境维护按人工归属落到Node原方法；中央先发现实际代次，前后核对归属及SSH配置，再CAS镜像环境。CPU保留原在线调整语义；采集/CRIU以每调用`lease_gateway/lease_owner`消费真实中央租约，避免替换共享runtime.gateway。
+- 配置/维护SSH结果未知时，中央保留关闭的原租约；显式环境对账确认实际停止后释放。原Node配置审计和实际状态用于重读，不以TTL单独认定停止。原授权/凭据待确认继续由原协调器收口。
+- 环境管理私有输入沿Actor的2MiB预算；响应预算由共用`response_limit`决定：请求快照8MiB，其余4MiB，服务端、轻量客户端和SSH一致。快照仍由原`read_capture`执行6MiB文件、UUID、账号和保留期校验；模型业务流不经该JSON预算。
+- 环境摘要从Node原读取器取得采集/CRIU设置，Gateway观察仍核对环境、代次、内核及采样时效。缺失或失联显示未知。请求诊断的可选`execution_location={node_key,environment_id,generation,assignment_revision?}`来自同次已验证传输并沿原JSON持久化；历史缺字段保持未观测。Run详情使用原执行账本定位。
+- Node从首次安装保存自己的更新目录与实际镜像来源。来源校验沿原`image_reference`命名合同支持自定义批次；正式签名发行仍使用原独立规则。跨批升级按集群停机SOP，旧控制及账号/独立验收全部停止后才替换，保持原HOME和身份。
+- 全局完整备份收齐同部署、同epoch的中央及全部登记Node快照。SQLite复制使用原backup API；离线固定副本读取使用immutable，避免生成WAL辅助文件改变清单。组合恢复核对安装身份、归属/分配和实际环境，保留pending/reconcile事实。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 期望 |
+| --- | --- |
+| Node参数或私钥格式非法 | 固定校验错误，不回显输入材料 |
+| 主机公钥、Scope、绑定、分配或实际代次变化 | 拒绝原提交，保留原归属及恢复定位 |
+| malformed Node结果携带较新代次 | 结果校验失败，中央镜像保持原代次 |
+| 旧证明、未知输入、未收口执行或RT未知 | 新业务保持关闭，查询/原停止继续按原范围 |
+| Node暂停或bench人工停用 | 普通准入沿原门禁；允许合同中明确的管理或迁移操作 |
+| 原快照缺失/过期/损坏 | 分别返回原404/410/503合同 |
+| 配置准备回包丢失且尚未提交Node | 按本次唯一owner回查并收口原租约 |
+| Node配置/维护提交后回包未知 | 保留原租约，实际停止对账后释放 |
+| 源离线、资料不全或目标校验失败 | 保留原迁移阶段与维护状态 |
+| 组合备份缺Node、错epoch或错安装归属 | 完整性校验拒绝，保留已生成快照 |
+
+### 5. Scenarios and Examples
+
+- 正常：准备SSH节点2后，为尚无执行资料的账号1发送`PUT /api/accounts/1/node`，body为`{"node_id":2,"revision":1}`；原统一网关继续使用该账号原令牌。
+- 边界：人工停用的独立账号迁移仍保留enabled=0，当前HOME/RT及未知字段随完整包保存；后续普通执行沿原准入。
+- 错误用法：对已有环境直接PUT换节点。正确处理是`POST /api/accounts/1/node-migrations`，冻结`{"operation_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","node_id":2,"revision":1,"version":"2.1.293"}`并按原操作查询/恢复。
+- 错误用法：SSH断连后重新发送模型、OAuth或另起输入。正确处理是先查询原Scope/回执，未知状态保持隔离，明确实际停止后再按原业务恢复。
+
+### 6. Tests Required
+
+- `test_cluster*`覆盖真实双SQLite、私有UDS/SSH、错误Scope/认证、有限证明、未知输入、各执行消费者、迁移CAS和恢复；Node关闭后仅恢复实际停止能力。
+- `test_cluster_environment_management`覆盖原HTTP路由、暂停节点管理、大快照、claim延期字段、未知提交保留门禁、实际对账释放及坏回执不推进中央代次；原本机CPU/采集/CRIU测试继续执行。
+- `test_cluster_node_docker`按开关运行随机隔离部署：同一真实Rust网关的双账号双Node JSON/SSE及并发、冻结诊断、原管理HTTP/WS、完整所有权、零代删除、独立迁移故障隔离、Node停机换批及HOME身份保留。上游及凭据均使用合成夹具。
+- `test_cluster_backup`及原备份测试核对真实SQLite隔离复制、清单/逻辑摘要、同批组合对应和pending恢复事实。`verify_database_definitions.py`核对bench4/gateway4及冻结来源。
+- 前端生产构建及`verify_cluster_ui.py`、`verify_cluster_draft_ui.py`、`verify_cluster_request_ui.py`覆盖冻结确认、迟到响应、独立/停用账号、原草稿/WS、历史未观测及390/1440布局；Rust执行fmt与全量测试。
