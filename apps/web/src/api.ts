@@ -53,6 +53,9 @@ function openRuntimeSession(): Promise<{ ok: boolean }> {
 /** 账号持久信息，以及账号管理页使用的运行状态摘要。 */
 export interface Account {
   id: number
+  platform?: string
+  agy_system_prompt_homoglyph_enabled?: boolean
+  credential_state?: {generation:number; phase:string; operation_id?:string | null}
   name: string
   email: string
   status: string
@@ -242,6 +245,8 @@ export interface UsageLimit {
 }
 
 export interface UsageData {
+  platform?: string
+  capabilities?: {source:string; observed_at_ms:number; models:string[]; provider?:Record<string,unknown>}
   five_hour?: UsageWindow | null
   seven_day?: UsageWindow
   seven_day_sonnet?: UsageWindow
@@ -618,11 +623,12 @@ export const api = {
    */
   /** 按身份读取账号供跨页直达。@param id 账号身份。@return 账号。 */
   accountById: (id: number) => request<Account>('GET', `/admin/accounts/${id}`),
-  listAccounts: (page = 1, pageSize = 12, query = '', status = '', signal?: AbortSignal) =>
+  listAccounts: (page = 1, pageSize = 12, query = '', status = '', signal?: AbortSignal, platform?: string) =>
     request<PagedResult<Account> & {
+      account_counts?: {total:number;active:number;error:number;disabled:number}
       claude_code_profile_selection_mode?: 'client_version' | 'account'
       claude_code_version_profile?: string
-    }>('GET', `/admin/accounts?page=${page}&page_size=${pageSize}&q=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}`, undefined, signal),
+    }>('GET', `/admin/accounts?page=${page}&page_size=${pageSize}&q=${encodeURIComponent(query)}&status=${encodeURIComponent(status)}${platform ? `&platform=${encodeURIComponent(platform)}` : ''}`, undefined, signal),
   /** 获取只读调度快照。@param id 账号 ID。@param signal 关闭详情时取消读取。@return 当前状态与真实提交点。 */
   accountScheduling: (id: number, signal?: AbortSignal) =>
     request<SchedulingDetail>('GET', `/admin/accounts/${id}/scheduling`, undefined, signal),
@@ -641,8 +647,12 @@ export const api = {
   deleteToken: (id: number) => request<void>('DELETE', `/admin/tokens/${id}`),
   getDashboard: () => request<Dashboard>('GET', '/admin/dashboard'),
 
-  generateAuthUrl: (proxy?: { proxy_id?: string; proxy_revision?: string; proxy_url?: string }, signal?: AbortSignal) =>
+  generateAuthUrl: (proxy?: { proxy_id?: string; proxy_revision?: string; proxy_url?: string; platform?:string; account_id?:number }, signal?: AbortSignal) =>
     request<OAuthGenerateResult>('POST', '/admin/oauth/generate-auth-url', proxy ?? {}, signal),
+  /** 结束原授权进程。@param sessionId 原会话。@param platform 冻结平台。@return 脱敏阶段。 */
+  cancelOAuth: (sessionId: string, platform: string) => request<{phase:string}>('POST', `/admin/oauth/${encodeURIComponent(sessionId)}/cancel?platform=${encodeURIComponent(platform)}`),
+  /** 读取已有私有回执并对账。@param id 原账号。@return 管理状态。 */
+  recoverAgyCredentials: (id:number) => request<{phase:string}>('POST', `/admin/accounts/${id}/agy-credentials/recover`),
   generateSetupTokenUrl: (proxy?: { proxy_id?: string; proxy_revision?: string; proxy_url?: string }, signal?: AbortSignal) =>
     request<OAuthGenerateResult>('POST', '/admin/oauth/generate-setup-token-url', proxy ?? {}, signal),
   exchangeCode: (sessionId: string, code: string, signal?: AbortSignal) =>

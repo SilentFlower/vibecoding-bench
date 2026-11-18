@@ -13,6 +13,10 @@ use crate::model::account::{
 use crate::model::credential_ownership::CredentialOwnershipChange;
 use crate::service::version_profile::IdentityProfile;
 
+#[path = "agy_credentials.rs"]
+mod agy_credentials;
+pub use agy_credentials::AgyCredentialState;
+
 #[path = "credential_ownership.rs"]
 mod credential_ownership;
 
@@ -23,6 +27,19 @@ pub struct AccountStore {
 }
 
 impl AccountStore {
+    /// 按平台统计账号状态。@param platform 平台或 all。@return 状态计数。
+    pub async fn platform_counts(&self, platform: &str) -> Result<Value, AppError> {
+        let rows = sqlx::query("SELECT status,COUNT(*) AS count FROM accounts WHERE $1='all' OR platform=$1 GROUP BY status")
+            .bind(platform).fetch_all(&self.pool).await?;
+        let mut counts = serde_json::json!({"total":0,"active":0,"error":0,"disabled":0});
+        for row in rows {
+            let status: String = row.try_get("status")?;
+            let count: i64 = row.try_get("count")?;
+            counts["total"] = Value::from(counts["total"].as_i64().unwrap_or(0) + count);
+            counts[status] = Value::from(count);
+        }
+        Ok(counts)
+    }
     /// 仅同步代理列，保留期间变化的凭据、限额和状态。
     /// @param id 账号。@param expected 原连接。@param replacement 新连接。@return CAS是否成功。
     pub async fn replace_proxy_connection(
@@ -150,6 +167,13 @@ impl AccountStore {
 
     fn row_to_account(row: &AnyRow) -> Account {
         Account {
+            platform: row
+                .try_get::<String, _>("platform")
+                .unwrap_or_else(|_| "claude_code".into()),
+            agy_system_prompt_homoglyph_enabled: row
+                .try_get::<i32, _>("agy_system_prompt_homoglyph_enabled")
+                .unwrap_or(0)
+                != 0,
             id: row.try_get::<i64, _>("id").unwrap_or_default(),
             name: row.try_get::<String, _>("name").unwrap_or_default(),
             email: row.try_get::<String, _>("email").unwrap_or_default(),
@@ -248,11 +272,14 @@ impl AccountStore {
         a: &mut Account,
         ownership: Option<CredentialOwnershipChange>,
     ) -> Result<(), AppError> {
-        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) as cnt FROM accounts WHERE email=$1")
-            .bind(&a.email)
-            .fetch_one(&self.pool)
-            .await
-            .unwrap_or(0);
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) as cnt FROM accounts WHERE email=$1 AND platform=$2",
+        )
+        .bind(&a.email)
+        .bind(&a.platform)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or(0);
 
         if count > 0 {
             return Err(AppError::BadRequest(format!(
@@ -283,8 +310,8 @@ impl AccountStore {
                 billing_mode, account_uuid, organization_uuid, subscription_type,
                 concurrency, priority, rpm_limit, auto_telemetry, auto_poll_usage, allow_1m_models,
                 allow_fast_mode, upstream_session_pool_enabled, upstream_session_pool_size, upstream_session_ttl_minutes,
-                upstream_session_refresh_policy, five_hour_usage_limit_percent, seven_day_usage_limit_percent, rate_limit_tier, request_backend)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,{},{},{},$12,{},{},{},$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34)
+                upstream_session_refresh_policy, five_hour_usage_limit_percent, seven_day_usage_limit_percent, rate_limit_tier, request_backend, platform, agy_system_prompt_homoglyph_enabled)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,{},{},{},$12,{},{},{},$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36)
             RETURNING id, CAST(created_at AS TEXT) AS created_at, CAST(updated_at AS TEXT) AS updated_at"#,
             self.ts(9),
             self.ts(10),
@@ -331,6 +358,8 @@ impl AccountStore {
             .bind(a.seven_day_usage_limit_percent)
             .bind(&a.rate_limit_tier)
             .bind(&a.request_backend)
+            .bind(&a.platform)
+            .bind(i32::from(a.agy_system_prompt_homoglyph_enabled))
             .fetch_all(&mut *transaction)
             .await?;
         let row = rows.first().ok_or(AppError::NotFound)?;
@@ -338,6 +367,18 @@ impl AccountStore {
         a.id = row.try_get::<i64, _>("id").unwrap_or_default();
         a.created_at = Self::parse_time(row, "created_at");
         a.updated_at = Self::parse_time(row, "updated_at");
+        if a.is_antigravity() {
+            a.usage_fetched_at = Some(Utc::now());
+            // 两种数据库的能力观测时间均为TEXT，沿用原始UTC文本写入。
+            sqlx::query("UPDATE accounts SET usage_data=$1,usage_fetched_at=$2 WHERE id=$3")
+                .bind(a.usage_data.to_string())
+                .bind(self.fmt_time(a.usage_fetched_at.unwrap()))
+                .bind(a.id)
+                .execute(&mut *transaction)
+                .await?;
+            sqlx::query("INSERT INTO account_credential_states(account_id,generation,phase,updated_at_ms) VALUES($1,1,'ready',$2)")
+                .bind(a.id).bind(Utc::now().timestamp_millis()).execute(&mut *transaction).await?;
+        }
         if let Some(mut change) = ownership {
             change.next.account_id = a.id;
             change.receipt.account_id = a.id;
@@ -370,7 +411,7 @@ impl AccountStore {
                 allow_1m_models=$21, allow_fast_mode=$22, upstream_session_pool_enabled=$23,
                 upstream_session_pool_size=$24, upstream_session_ttl_minutes=$25,
                 upstream_session_refresh_policy=$26, five_hour_usage_limit_percent=$27,
-                seven_day_usage_limit_percent=$28, rate_limit_tier=$29, request_backend=$30, updated_at={}
+                seven_day_usage_limit_percent=$28, rate_limit_tier=$29, request_backend=$30, agy_system_prompt_homoglyph_enabled=$32, updated_at={}
             WHERE id=$31"#,
             self.ts(8),
             self.ts(9),
@@ -409,6 +450,7 @@ impl AccountStore {
             .bind(&a.rate_limit_tier)
             .bind(&a.request_backend)
             .bind(a.id)
+            .bind(i32::from(a.agy_system_prompt_homoglyph_enabled))
             .execute(&self.pool)
             .await?;
         Ok(())
@@ -424,6 +466,7 @@ impl AccountStore {
         for field in fields {
             let text = match *field {
                 "name" => Some(Some(account.name.clone())),
+                "proxy_url" => Some(Some(account.proxy_url.clone())),
                 "billing_mode" => Some(Some(account.billing_mode.to_string())),
                 "request_backend" => Some(Some(account.request_backend.clone())),
                 "subscription_type" => Some(account.subscription_type.clone()),
@@ -450,6 +493,9 @@ impl AccountStore {
                 "concurrency" => account.concurrency,
                 "priority" => account.priority,
                 "rpm_limit" => account.rpm_limit,
+                "agy_system_prompt_homoglyph_enabled" => {
+                    i32::from(account.agy_system_prompt_homoglyph_enabled)
+                }
                 "auto_telemetry" => i32::from(account.auto_telemetry),
                 "auto_poll_usage" => i32::from(account.auto_poll_usage),
                 "allow_fast_mode" => i32::from(account.allow_fast_mode),
@@ -970,6 +1016,10 @@ impl AccountStore {
 
     pub async fn delete(&self, id: i64) -> Result<(), AppError> {
         let mut transaction = self.pool.begin().await?;
+        sqlx::query("DELETE FROM account_credential_states WHERE account_id=$1")
+            .bind(id)
+            .execute(&mut *transaction)
+            .await?;
         sqlx::query("DELETE FROM oauth_handoff_operations WHERE account_id=$1")
             .bind(id)
             .execute(&mut *transaction)
@@ -997,9 +1047,20 @@ impl AccountStore {
         Ok(Self::row_to_account(&row))
     }
 
+    /// 读取管理目录的全部平台引用。@return 全部账号。
+    pub async fn list_all_platforms(&self) -> Result<Vec<Account>, AppError> {
+        let rows = sqlx::query(&format!(
+            "SELECT {} FROM accounts ORDER BY id",
+            ACCOUNT_COLS
+        ))
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.iter().map(Self::row_to_account).collect())
+    }
+
     pub async fn list(&self) -> Result<Vec<Account>, AppError> {
         let rows: Vec<AnyRow> = sqlx::query(&format!(
-            "SELECT {} FROM accounts ORDER BY priority ASC, id ASC",
+            "SELECT {} FROM accounts WHERE platform='claude_code' ORDER BY priority ASC, id ASC",
             ACCOUNT_COLS
         ))
         .fetch_all(&self.pool)
@@ -1008,17 +1069,18 @@ impl AccountStore {
     }
 
     pub async fn count(&self) -> Result<i64, AppError> {
-        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM accounts")
-            .fetch_one(&self.pool)
-            .await
-            .unwrap_or(0);
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM accounts WHERE platform='claude_code'")
+                .fetch_one(&self.pool)
+                .await
+                .unwrap_or(0);
         Ok(count)
     }
 
     pub async fn list_paged(&self, page: i64, page_size: i64) -> Result<Vec<Account>, AppError> {
         let offset = (page - 1) * page_size;
         let q = format!(
-            "SELECT {} FROM accounts ORDER BY priority ASC, id ASC LIMIT $1 OFFSET $2",
+            "SELECT {} FROM accounts WHERE platform='claude_code' ORDER BY priority ASC, id ASC LIMIT $1 OFFSET $2",
             ACCOUNT_COLS
         );
         let rows: Vec<AnyRow> = sqlx::query(&q)
@@ -1041,6 +1103,7 @@ impl AccountStore {
         page_size: i64,
         search: &str,
         status: &str,
+        platform: &str,
     ) -> Result<(Vec<Account>, i64), AppError> {
         // 使用显式转义字符，让百分号与下划线按用户输入原样搜索。
         let pattern = format!(
@@ -1050,19 +1113,21 @@ impl AccountStore {
                 .replace('%', "!%")
                 .replace('_', "!_")
         );
-        let filter = "($2 = '' OR status = $2) AND (LOWER(name) LIKE LOWER($1) ESCAPE '!' OR LOWER(email) LIKE LOWER($1) ESCAPE '!')";
+        let filter = "($3 = 'all' OR platform = $3) AND ($2 = '' OR status = $2) AND (LOWER(name) LIKE LOWER($1) ESCAPE '!' OR LOWER(email) LIKE LOWER($1) ESCAPE '!')";
         let total: i64 =
             sqlx::query_scalar(&format!("SELECT COUNT(*) FROM accounts WHERE {filter}"))
                 .bind(&pattern)
                 .bind(status)
+                .bind(platform)
                 .fetch_one(&self.pool)
                 .await?;
         let rows: Vec<AnyRow> = sqlx::query(&format!(
-            "SELECT {} FROM accounts WHERE {filter} ORDER BY priority ASC, id ASC LIMIT $3 OFFSET $4",
+            "SELECT {} FROM accounts WHERE {filter} ORDER BY priority ASC, id ASC LIMIT $4 OFFSET $5",
             ACCOUNT_COLS
         ))
         .bind(&pattern)
         .bind(status)
+        .bind(platform)
         .bind(page_size)
         .bind((page - 1).saturating_mul(page_size))
         .fetch_all(&self.pool)
@@ -1101,7 +1166,7 @@ impl AccountStore {
     pub async fn list_schedulable(&self) -> Result<Vec<Account>, AppError> {
         let q = format!(
             r#"SELECT {} FROM accounts
-            WHERE status='active'
+            WHERE platform='claude_code' AND status='active'
               AND (rate_limit_reset_at IS NULL OR rate_limit_reset_at < {})
             ORDER BY priority ASC, id ASC"#,
             ACCOUNT_COLS,
@@ -1113,7 +1178,7 @@ impl AccountStore {
 }
 
 // 将原生 JSON/时间列统一投影为文本，避免 SQLx Any 无法解码 PostgreSQL 类型。
-const ACCOUNT_COLS: &str = r#"id, name, email, status, token, auth_type, access_token, refresh_token,
+const ACCOUNT_COLS: &str = r#"id, platform, agy_system_prompt_homoglyph_enabled, name, email, status, token, auth_type, access_token, refresh_token,
     CAST(oauth_expires_at AS TEXT) AS oauth_expires_at,
     CAST(oauth_refreshed_at AS TEXT) AS oauth_refreshed_at, auth_error, proxy_url, device_id,
     CAST(canonical_env AS TEXT) AS canonical_env,
@@ -1133,7 +1198,8 @@ const ACCOUNT_COLS: &str = r#"id, name, email, status, token, auth_type, access_
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store::database_schema::migrate_legacy;
+    use crate::model::account::AccountAuthType;
+    use crate::store::database_migrations::migrate as migrate_legacy;
     use sqlx::any::AnyPoolOptions;
 
     async fn make_store(driver: &str) -> AccountStore {
@@ -1193,19 +1259,34 @@ mod tests {
             sqlx::query("INSERT INTO accounts(name,email,status,token,device_id,canonical_env,canonical_prompt_env,canonical_process) VALUES($1,$2,$3,'synthetic','device','{}','{}','{}')")
                 .bind(name).bind(email).bind(status).execute(&store.pool).await.unwrap();
         }
-        let (rows, total) = store.list_filtered(1, 1, "", "").await.unwrap();
+        let (rows, total) = store
+            .list_filtered(1, 1, "", "", "claude_code")
+            .await
+            .unwrap();
         assert_eq!(total, 3);
         assert_eq!(rows.len(), 1);
-        let (rows, total) = store.list_filtered(1, 1, "GAMMA", "error").await.unwrap();
+        let (rows, total) = store
+            .list_filtered(1, 1, "GAMMA", "error", "claude_code")
+            .await
+            .unwrap();
         assert_eq!(total, 1);
         assert_eq!(rows[0].email, "gamma@example.test");
-        let (rows, total) = store.list_filtered(1, 12, "_%!", "").await.unwrap();
+        let (rows, total) = store
+            .list_filtered(1, 12, "_%!", "", "claude_code")
+            .await
+            .unwrap();
         assert_eq!(total, 1);
         assert_eq!(rows[0].name, "研发_%!");
-        let (rows, total) = store.list_filtered(2, 1, "", "disabled").await.unwrap();
+        let (rows, total) = store
+            .list_filtered(2, 1, "", "disabled", "claude_code")
+            .await
+            .unwrap();
         assert_eq!(total, 1);
         assert!(rows.is_empty());
-        let (rows, total) = store.list_filtered(1, 12, "no-match", "").await.unwrap();
+        let (rows, total) = store
+            .list_filtered(1, 12, "no-match", "", "claude_code")
+            .await
+            .unwrap();
         assert_eq!(total, 0);
         assert!(rows.is_empty());
     }
@@ -1214,7 +1295,9 @@ mod tests {
     async fn historical_backend_migration_and_account_updates_are_independent() {
         let store = make_store("sqlite").await;
         // 历史夹具模拟引入版本台账前的数据库，后续再由正式入口登记基线。
-        migrate_legacy(&store.pool, "sqlite").await.unwrap();
+        crate::store::database_schema::migrate_legacy(&store.pool, "sqlite")
+            .await
+            .unwrap();
         sqlx::query("ALTER TABLE accounts DROP COLUMN request_backend")
             .execute(&store.pool)
             .await
@@ -1380,6 +1463,48 @@ mod tests {
         assert_eq!(
             store.get_by_id(old.id).await.unwrap().request_backend,
             "legacy"
+        );
+        // 同邮箱跨平台仍独立，PG 同时验证代次条件更新和毫秒合同转换。
+        let mut agy = old.clone();
+        agy.id = 0;
+        agy.platform = "antigravity".into();
+        agy.auth_type = AccountAuthType::Oauth;
+        agy.access_token = "synthetic-agy-at".into();
+        agy.refresh_token = "synthetic-agy-rt".into();
+        agy.expires_at = Some(timestamp);
+        agy.usage_data = serde_json::json!({"platform":"antigravity","capabilities":{"source":"synthetic-pg","observed_at_ms":1000,"models":["gemini-first"]}});
+        store.create(&mut agy).await.unwrap();
+        let created = store.get_by_id(agy.id).await.unwrap();
+        assert_eq!(created.usage_data, agy.usage_data);
+        assert!(created.usage_fetched_at.is_some());
+        assert_eq!(
+            store.agy_credential_state(agy.id).await.unwrap().phase,
+            "ready"
+        );
+        store
+            .begin_agy_credentials(&agy, "synthetic-pg-operation", "refresh_pending")
+            .await
+            .unwrap();
+        let mut observed = agy.clone();
+        observed.access_token = "synthetic-next-at".into();
+        observed.refresh_token = "synthetic-next-rt".into();
+        observed.proxy_url = "http://synthetic-proxy.example.test:8080".into();
+        observed.usage_data["capabilities"]["models"] = serde_json::json!(["gemini-next"]);
+        store
+            .complete_agy_observation(&agy, "synthetic-pg-operation", 1, &observed)
+            .await
+            .unwrap();
+        assert_eq!(
+            store.get_by_id(agy.id).await.unwrap().refresh_token,
+            "synthetic-next-rt"
+        );
+        let saved = store.get_by_id(agy.id).await.unwrap();
+        assert_eq!(saved.proxy_url, observed.proxy_url);
+        assert_eq!(saved.usage_data, observed.usage_data);
+        assert!(saved.usage_fetched_at.is_some());
+        assert_eq!(
+            store.agy_credential_state(agy.id).await.unwrap().generation,
+            2
         );
     }
 

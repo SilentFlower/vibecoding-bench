@@ -35,12 +35,16 @@ class AccountDesignFixture(PreviewFixture):
                 self.accounts[0]['request_usage'][key]['ends_at'] = (current + duration).isoformat()
         self.scheduling_reads = []
         self.account_reads = []
+        self.background_checks = 0
 
     async def route(self, route):
         """仅截获账号新增调用，其余沿用已有合成页面。@param route 浏览器请求。@return 无。"""
         request = route.request
         url = urlsplit(request.url)
         path = url.path
+        if path == '/runtime/api/system-updates/check':
+            self.background_checks += 1
+            return await self.respond(route, {'checking': False})
         if path == '/admin/dashboard':
             return await self.respond(route, {'accounts': {'total':len(self.accounts),**{key:sum(a['status']==key for a in self.accounts) for key in ['active','error','disabled']}}, 'tokens':1})
         if path == '/admin/accounts':
@@ -48,7 +52,8 @@ class AccountDesignFixture(PreviewFixture):
                 page = int(parse_qs(url.query).get('page', ['1'])[0])
                 self.account_reads.append(page)
                 query=parse_qs(url.query); size=int(query.get('page_size',['12'])[0]); search=query.get('q',[''])[0].lower(); status=query.get('status',[''])[0]
-                rows=[a for a in self.accounts if (not status or a['status']==status) and search in (a['name']+' '+a['email']).lower()]
+                platform=query.get('platform',['claude_code'])[0]
+                rows=[a for a in self.accounts if (platform=='all' or a.get('platform','claude_code')==platform) and (not status or a['status']==status) and search in (a['name']+' '+a['email']).lower()]
                 return await self.respond(route, dict(data=rows[(page-1)*size:page*size], total=len(rows), page=page, page_size=size, total_pages=(len(rows)+size-1)//size))
             body = request.post_data_json
             self.writes.append(dict(path=path, method=request.method, body=body))
@@ -143,7 +148,7 @@ async def main():
         await card.get_by_role('button', name='用量', exact=True).click()
         assert fixture.writes[-1]['path'].endswith('/usage')
         await card.get_by_role('button', name='测试', exact=True).click()
-        await expect(card).to_contain_text('连接正常')
+        await expect(card.get_by_role('button',name='测试结果：连接正常')).to_be_visible()
         await card.get_by_role('button', name='删除', exact=True).click()
         await dialog.get_by_role('button', name='取消', exact=True).click()
         assert all(write['method'] != 'DELETE' for write in fixture.writes)

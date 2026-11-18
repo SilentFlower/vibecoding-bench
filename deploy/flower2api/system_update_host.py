@@ -21,7 +21,7 @@ from runtime_files import atomic_json, atomic_text
 from runtime_names import account_container_prefix, account_rebuild_required, deployment_network_names, image_reference
 from system_update_contract import DOWNLOAD_ROOT, ROLES, ReleaseRedirect, fetch_bytes, safe_read, strict_json, validate_migration_plan
 from system_update_gate import read_gate
-from system_update_database import assert_quiescent, create_snapshot, restore_snapshot, rotate_snapshots
+from system_update_database import assert_quiescent, create_snapshot, restore_snapshot, rotate_snapshots, assert_gateway_platform_support
 
 SOFTWARE_FIELDS = ('version', 'version_base', 'build_time', 'node_version')
 ENVIRONMENT_IDENTITY = ('environment_id', 'name', 'account_id', 'fingerprint_json')
@@ -506,6 +506,8 @@ class HostDeployment:
         atomic_text(folder / 'candidate.env', candidate)
     def switch(self, operation: dict, selected: dict) -> None:
         """按冻结来源切换两个控制服务。:param operation: 持久操作。:param selected: 目标组合。:return: None。"""
+        image = json.loads(docker('image', 'inspect', selected['selection']['control']['reference']))[0]
+        assert_gateway_platform_support(self.data, image['Config'].get('Labels') or {})
         self._stage_selection(operation, selected)
         folder = self.root / 'operations' / operation['operation_id']
         candidate = safe_read(folder / 'candidate.env', private=True).decode()

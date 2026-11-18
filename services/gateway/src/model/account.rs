@@ -169,6 +169,12 @@ impl From<String> for AccountAuthType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Account {
     pub id: i64,
+    /// 账号平台；旧账号缺省归属 Claude Code。
+    #[serde(default = "default_account_platform")]
+    pub platform: String,
+    /// AGY 账号的系统文本同形体策略，缺省关闭。
+    #[serde(default)]
+    pub agy_system_prompt_homoglyph_enabled: bool,
     pub name: String,
     pub email: String,
     pub status: AccountStatus,
@@ -304,7 +310,21 @@ pub struct UsageQuota {
     pub state: UsageQuotaState,
 }
 
+/// 兼容缺少平台字段的旧管理载荷。@return Claude Code 平台标识。
+fn default_account_platform() -> String {
+    "claude_code".into()
+}
+
 impl Account {
+    /// 判断是否属于现有 Claude Code 平台。@return 精确匹配已知平台时为真。
+    pub fn is_claude_code(&self) -> bool {
+        self.platform == "claude_code"
+    }
+
+    /// 判断是否属于 Antigravity 平台。@return 精确匹配已知平台时为真。
+    pub fn is_antigravity(&self) -> bool {
+        self.platform == "antigravity"
+    }
     /// 投影已观测的普通额度；过期窗口等待刷新，明确零用量允许缺少重置时间。
     /// @param now 当前 UTC 毫秒，用于判断旧周期是否结束。
     /// @return 剩余额度与观测状态；没有有效观测时剩余值保持中性。
@@ -351,7 +371,7 @@ impl Account {
     }
 
     pub fn is_schedulable(&self) -> bool {
-        if self.status != AccountStatus::Active {
+        if !self.is_claude_code() || self.status != AccountStatus::Active {
             return false;
         }
         if let Some(reset) = self.rate_limit_reset_at {

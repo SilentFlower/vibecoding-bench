@@ -70,6 +70,9 @@ const pageSize = ref(12);
 watch(pageSize, () => { currentPage.value=1;void load(); });
 const accountQuery = ref('');
 const accountFilter = ref('all');
+const platformFilter = ref('all');
+const platformOptions = [{value:'claude_code',label:'Claude Code'},{value:'antigravity',label:'Antigravity'}];
+const isAgyForm = computed(() => form.value.platform === 'antigravity');
 const accountCounts = ref<{total: number; active: number; error: number; disabled: number} | null>(null);
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 /** 筛选先重置分页，服务端负责全量匹配。@return 无。 */
@@ -77,6 +80,8 @@ function applyAccountFilter(): void { clearTimeout(searchTimer); currentPage.val
 watch(accountQuery, () => { clearTimeout(searchTimer); searchTimer = setTimeout(applyAccountFilter, 250); });
 /** 选择状态后立即查询。@param value 状态。@return 无。 */
 function chooseAccountFilter(value: string): void { accountFilter.value = value; applyAccountFilter(); }
+/** 先更新平台，再使用当前状态与搜索条件查询。@param value 已选平台。@return 无。 */
+function choosePlatformFilter(value: string): void { platformFilter.value = value; applyAccountFilter(); }
 
 /** 只读调度详情，保留已有账号卡片布局。 */
 const schedulingAccount = ref<Account | null>(null);
@@ -98,8 +103,12 @@ const deleteTargetId = ref<number | null>(null);
 
 /** 当前编辑的账号（null 表示新建） */
 const editing = ref<Account | null>(null);
+let editorGeneration = 0;
+const savingAccount = ref(false);
 /** 表单数据 */
 const form = ref({
+  platform: 'claude_code',
+  agy_system_prompt_homoglyph_enabled: false,
   name: '',
   email: '',
   auth_type: 'setup_token',
@@ -128,6 +137,15 @@ const form = ref({
   upstream_session_ttl_minutes: DEFAULT_UPSTREAM_SESSION_TTL_MINUTES,
   upstream_session_refresh_policy: DEFAULT_UPSTREAM_SESSION_REFRESH_POLICY,
 });
+/** 手动切换新建平台时清空原平台凭据。@param value 新平台。@return 无。 */
+function selectAccountPlatform(value:string): void {
+  if (editing.value || savingAccount.value || value === form.value.platform || !platformOptions.some(item=>item.value===value)) return;
+  editorGeneration++;
+  form.value.platform=value;
+  form.value.auth_type=value==='antigravity'?'oauth':'setup_token';
+  form.value.setup_token=''; form.value.access_token=''; form.value.refresh_token=''; form.value.expires_at='';
+  form.value.agy_system_prompt_homoglyph_enabled=false;
+}
 /** 详情始终读取当前列表快照，列表刷新后不保留过期对象。 */
 const detailAccountId = ref<number | null>(null);
 const showAccountDetails = ref(false);
@@ -223,11 +241,11 @@ async function load() {
       if (generation === accountLoadGeneration) { accounts.value = [account]; accountLoadFailed.value = false; }
       return;
     }
-    const [res, overview] = await Promise.all([api.listAccounts(currentPage.value, pageSize.value, accountQuery.value.trim(), accountFilter.value === 'all' ? '' : accountFilter.value), api.getDashboard().catch(() => null)]);
+    const [res, overview] = await Promise.all([api.listAccounts(currentPage.value, pageSize.value, accountQuery.value.trim(), accountFilter.value === 'all' ? '' : accountFilter.value, undefined, platformFilter.value), api.getDashboard().catch(() => null)]);
     if (generation !== accountLoadGeneration) return;
     accountLoadFailed.value = false;
     accounts.value = res.data ?? [];
-    if (overview) accountCounts.value = overview.accounts;
+    accountCounts.value = res.account_counts ?? overview?.accounts ?? null;
     profileSelectionMode.value = res.claude_code_profile_selection_mode ?? null;
     defaultVersionProfile.value = res.claude_code_version_profile ?? null;
     totalPages.value = res.total_pages;
@@ -286,9 +304,12 @@ onUnmounted(() => {
 
 /** 打开新建账号弹窗 */
 function openCreate() {
+  editorGeneration++;
   proxyChoice.value = undefined;
   editing.value = null;
   form.value = {
+    platform: 'claude_code',
+    agy_system_prompt_homoglyph_enabled: false,
     name: '',
     email: '',
     auth_type: 'setup_token',
@@ -328,9 +349,12 @@ function openCreate() {
  * @param a 要编辑的账号对象
  */
 function openEdit(a: Account) {
+  editorGeneration++;
   proxyChoice.value = undefined;
   editing.value = a;
   form.value = {
+    platform: a.platform ?? 'claude_code',
+    agy_system_prompt_homoglyph_enabled: a.agy_system_prompt_homoglyph_enabled ?? false,
     name: a.name,
     email: a.email,
     auth_type: a.auth_type || 'setup_token',
@@ -381,8 +405,13 @@ function usageLimitInput(value: unknown, label: string): number {
   return number;
 }
 
+const agyFormKeys = ['platform','agy_system_prompt_homoglyph_enabled','name','email','auth_type','access_token','refresh_token','expires_at','proxy_url','proxy_id','proxy_revision','concurrency','priority','rpm_limit'];
+
 /** 保存账号（新建或更新）。@return 保存完成后的空结果。 */
 async function save() {
+  if (savingAccount.value) return;
+  const generation = editorGeneration;
+  savingAccount.value = true;
   try {
     applyNumberDrafts();
     const expiresAt = form.value.expires_at.trim();
@@ -410,6 +439,7 @@ async function save() {
       }
       const updates = accountUpdateDelta(form.value, editBaseline.value);
       applyProxyChoice(updates);
+      if (isAgyForm.value) for (const key of Object.keys(updates)) if (!agyFormKeys.includes(key)) delete updates[key];
       await api.updateAccount(editing.value.id, updates);
     } else {
       if (form.value.auth_type === 'setup_token' && !form.value.setup_token.trim()) {
@@ -419,6 +449,8 @@ async function save() {
         throw new Error('Refresh Token 不能为空');
       }
       const payload: Record<string, unknown> = {
+        platform: form.value.platform,
+        agy_system_prompt_homoglyph_enabled: form.value.agy_system_prompt_homoglyph_enabled,
         name: form.value.name,
         email: form.value.email,
         auth_type: form.value.auth_type,
@@ -448,8 +480,10 @@ async function save() {
       };
       if (expiresAt) payload.expires_at = Number(expiresAt);
       applyProxyChoice(payload);
+      if (isAgyForm.value) for (const key of Object.keys(payload)) if (!agyFormKeys.includes(key)) delete payload[key];
       await api.createAccount(payload);
     }
+    if (generation !== editorGeneration) return;
     if (props.workspaceAccountId) {
       emit('refresh');
       workspaceOpen.value = false;
@@ -459,8 +493,8 @@ async function save() {
       emit('refresh');
     }
   } catch (e: unknown) {
-    toast((e as Error).message || '保存失败');
-  }
+    if (generation === editorGeneration) toast((e as Error).message || '保存失败');
+  } finally { savingAccount.value = false; }
 }
 
 /**
@@ -838,6 +872,8 @@ function formatBytes(bytes?: number, precision = 0): string {
 
 // --- OAuth 授权流程 ---
 const showOAuthFlow = ref(false);
+const oauthPlatform = ref('claude_code');
+const oauthTarget = ref<Account | null>(null);
 const oauthMode = ref<'oauth' | 'setup_token'>('oauth');
 const oauthProxy = ref<ProxyRoute | null>(null);
 const oauthSessionProxy = ref<ProxyRoute | null>(null);
@@ -850,14 +886,38 @@ const oauthStep = ref<'generate' | 'exchange' | 'done'>('generate');
 const oauthError = ref('');
 let oauthGeneration = 0;
 let oauthController: AbortController | undefined;
+/** 使原回执失效；原生链接生成保留连接，收到会话后立即结束原进程。@return 无。 */
+function invalidateOAuthRequest(): void {
+  oauthGeneration++;
+  // 生成阶段尚无会话ID，保留有界请求才能在迟到回执后精确取消原生进程。
+  if (!(oauthPlatform.value === 'antigravity' && oauthStep.value === 'generate' && oauthLoading.value)) oauthController?.abort();
+  oauthController = undefined;
+}
 watch(showOAuthFlow, value => {
-  if (!value) { oauthGeneration++; oauthController?.abort(); oauthLoading.value = false; }
+  if (!value) { invalidateOAuthRequest(); oauthLoading.value = false; cancelOAuthSession(); }
 }, { flush:'sync' });
-onUnmounted(() => { oauthGeneration++; oauthController?.abort(); });
+onUnmounted(() => { invalidateOAuthRequest(); cancelOAuthSession(); });
 
-/** 打开 OAuth 授权流程弹窗 */
-function openOAuthFlow() {
-  oauthGeneration++; oauthController?.abort(); oauthError.value = "";
+/** 结束已知的原生授权会话。@return 无。 */
+function cancelOAuthSession(): void {
+  const id = oauthSessionId.value;
+  const platform = oauthPlatform.value;
+  oauthSessionId.value = '';
+  if (id && platform === 'antigravity') void api.cancelOAuth(id, platform).catch(() => toast('原授权操作待核对，请读取账号状态'));
+}
+
+/** 返回授权选择并结束原会话。@return 无。 */
+function restartOAuthFlow(): void {
+  cancelOAuthSession(); invalidateOAuthRequest();
+  oauthStep.value = 'generate'; oauthError.value = ''; oauthCode.value = '';
+}
+
+/** 打开授权窗口并冻结原账号。@param target 重新授权的目标。@return 无。 */
+function openOAuthFlow(target?: Account) {
+  invalidateOAuthRequest(); oauthError.value = "";
+  cancelOAuthSession();
+  oauthTarget.value = target?.platform === 'antigravity' ? target : null;
+  oauthPlatform.value = oauthTarget.value ? 'antigravity' : 'claude_code';
   oauthMode.value = 'oauth';
   oauthProxy.value = null; oauthSessionProxy.value = null;
   oauthSessionId.value = '';
@@ -876,9 +936,10 @@ async function generateOAuthUrl(): Promise<void> {
   const current = ++oauthGeneration; const signal = oauthController.signal;
   oauthLoading.value = true; oauthError.value = '';
   try {
-    const proxy = oauthProxy.value ? { proxy_id:oauthProxy.value.id, proxy_revision:oauthProxy.value.revision } : {};
-    const result = oauthMode.value === 'oauth' ? await api.generateAuthUrl(proxy, signal) : await api.generateSetupTokenUrl(proxy, signal);
-    if (current !== oauthGeneration || !showOAuthFlow.value) return;
+    const proxy = oauthTarget.value ? {proxy_url:oauthTarget.value.proxy_url} : oauthProxy.value ? { proxy_id:oauthProxy.value.id, proxy_revision:oauthProxy.value.revision } : {};
+    const platform = oauthPlatform.value;
+    const result = oauthMode.value === 'oauth' ? await api.generateAuthUrl({...proxy, platform, account_id:oauthTarget.value?.id}, signal) : await api.generateSetupTokenUrl(proxy, signal);
+    if (current !== oauthGeneration || !showOAuthFlow.value) { if (platform === 'antigravity') void api.cancelOAuth(result.session_id, platform).catch(() => {}); return; }
     oauthSessionProxy.value = oauthProxy.value;
     oauthSessionId.value = result.session_id; oauthAuthUrl.value = result.auth_url; oauthCode.value = ''; oauthStep.value = 'exchange';
   } catch (cause) { if (current === oauthGeneration && !signal.aborted) oauthError.value = (cause as Error).message || '生成授权链接失败'; }
@@ -894,13 +955,36 @@ async function exchangeOAuthCode(): Promise<void> {
   try {
     const result = oauthMode.value === 'oauth' ? await api.exchangeCode(oauthSessionId.value, oauthCode.value.trim(), signal) : await api.exchangeSetupTokenCode(oauthSessionId.value, oauthCode.value.trim(), signal);
     if (current !== oauthGeneration || !showOAuthFlow.value) return;
-    oauthResult.value = result; oauthStep.value = 'done';
+    oauthResult.value = result; oauthCode.value = ''; oauthStep.value = 'done';
+    if (oauthTarget.value) await load();
   } catch (cause) { if (current === oauthGeneration && !signal.aborted) oauthError.value = (cause as Error).message || '授权失败，请检查授权码'; }
   finally { if (current === oauthGeneration) oauthLoading.value = false; }
 }
 
+/** 结束当前账号尚待提交的授权。@param account 原账号。@return 无。 */
+async function cancelAgyReauth(account:Account): Promise<void> {
+  const operation = account.credential_state?.operation_id;
+  if (!operation) return;
+  try { await api.cancelOAuth(operation,'antigravity'); await load(); toast('原授权已结束','success'); }
+  catch (cause) { toast((cause as Error).message); }
+}
+
+/** 展示账号凭据的业务状态。@param account 当前账号。@return 中文状态。 */
+function agyPhaseLabel(account:Account): string {
+  const labels:Record<string,string>={ready:'凭据就绪',refresh_pending:'刷新待确认',reauth:'重新授权中',reconcile:'凭据待核对'};
+  return labels[account.credential_state?.phase ?? ''] ?? '状态待更新';
+}
+
+/** 对账当前账号的原凭据操作。@param id 冻结账号。@return 无。 */
+async function recoverAgy(id:number): Promise<void> {
+  try { await api.recoverAgyCredentials(id); await load(); toast('原凭据操作已核对', 'success'); }
+  catch (cause) { toast((cause as Error).message); }
+}
+
 /** 将授权结果填入新建账号表单 */
 function applyOAuthResult() {
+  editorGeneration++;
+  if (oauthTarget.value) { showOAuthFlow.value = false; return; }
   proxyChoice.value = oauthSessionProxy.value;
   const r = oauthResult.value;
   if (!r) return;
@@ -908,6 +992,8 @@ function applyOAuthResult() {
   editing.value = null;
   const isSetupToken = oauthMode.value === 'setup_token';
   form.value = {
+    platform: oauthPlatform.value,
+    agy_system_prompt_homoglyph_enabled: false,
     name: '',
     email: r.email_address || '',
     auth_type: isSetupToken ? 'setup_token' : 'oauth',
@@ -989,7 +1075,7 @@ async function copyText(text: string) {
       <div><p class="page-eyebrow">连接与调度</p><h2>账号管理</h2><p class="page-description">状态、用量和调度集中展示，常用操作直接可达。</p></div>
       <div class="flex gap-2">
         <Button
-          @click="openOAuthFlow"
+          @click="openOAuthFlow()"
           variant="outline"
           class="account-authorize-button"
         >
@@ -1005,7 +1091,8 @@ async function copyText(text: string) {
     </div>
 
     <div class="account-toolbar">
-      <div class="account-filter-tabs" aria-label="账号筛选"><button v-for="item in [{value:'all', label:'全部账号', count:accountCounts?.total},{value:'active',label:'正常',count:accountCounts?.active},{value:'error',label:'需要关注',count:accountCounts?.error},{value:'disabled',label:'已停用',count:accountCounts?.disabled}]" :key="item.value" type="button" :class="{active:accountFilter===item.value}" :aria-pressed="accountFilter===item.value" @click="chooseAccountFilter(item.value)">{{ item.label }}<span>{{ item.count ?? '—' }}</span></button></div>
+      <ChoiceSelect class="account-platform-filter" :model-value="platformFilter" label="平台筛选" :options="[{value:'all',label:'全部平台'},...platformOptions]" @update:model-value="choosePlatformFilter" />
+      <div class="account-filter-tabs" role="group" aria-label="账号状态筛选"><button v-for="item in [{value:'all', label:'全部账号', count:accountCounts?.total},{value:'active',label:'正常',count:accountCounts?.active},{value:'error',label:'需要关注',count:accountCounts?.error},{value:'disabled',label:'已停用',count:accountCounts?.disabled}]" :key="item.value" type="button" :class="{active:accountFilter===item.value}" :aria-pressed="accountFilter===item.value" @click="chooseAccountFilter(item.value)">{{ item.label }}<span>{{ item.count ?? '—' }}</span></button></div>
       <SearchInput v-model="accountQuery" label="搜索账号" placeholder="搜索名称或邮箱" :maxlength="256" @search="applyAccountFilter" />
     </div>
 
@@ -1021,14 +1108,14 @@ async function copyText(text: string) {
           <div class="account-identity">
             <span class="account-avatar">{{ (a.name || a.email || '?')[0]?.toUpperCase() }}<i class="account-avatar-state" :class="a.status" /></span>
             <button type="button" class="account-identity-text" @click="openAccountDetails(a)">
-              <div><h3>{{ a.name || a.email }}<span class="account-plan">{{ subscriptionLabel(a.subscription_type, a.rate_limit_tier) }}</span></h3></div>
+              <div><h3>{{ a.name || a.email }}<span class="account-plan">{{ a.platform === 'antigravity' ? 'Antigravity' : a.platform && a.platform !== 'claude_code' ? a.platform : subscriptionLabel(a.subscription_type, a.rate_limit_tier) }}</span></h3></div>
               <p>{{ a.email }}</p>
             </button>
             <button type="button" role="switch" class="account-status-switch" :aria-checked="!(a.status === 'disabled' || isRateLimited(a))" :aria-label="`${(a.status === 'disabled' || isRateLimited(a)) ? '启用' : '停用'} ${a.name || a.email}`" @click="toggleScheduling(a)"><span /></button>
           </div>
           <div class="account-network">
             <button type="button" @click="openEdit(a)"><Globe :size="13" /><span>{{ a.proxy_name || publicProxy(a.proxy_url) }}</span></button>
-            <router-link :to="{ name: 'environments', query: { gateway_account: String(a.id) } }"><Box :size="13" />运行环境</router-link>
+            <router-link v-if="!a.platform || a.platform === 'claude_code'" :to="{ name: 'environments', query: { gateway_account: String(a.id) } }"><Box :size="13" />运行环境</router-link>
           </div>
           <div class="account-health" :class="a.status === 'disabled' ? 'is-disabled' : (isRateLimited(a) || a.auth_error || a.v3_scheduling_error) ? 'is-warning' : ''">
             <Check v-if="a.status !== 'disabled' && !isRateLimited(a) && !a.auth_error && !a.v3_scheduling_error" :size="13" /><i v-else />{{ a.status === 'disabled' ? '已停用' : a.v3_scheduling ? schedulingReasonLabel(a.v3_scheduling.capacity.reason) : statusStyle(a).label }}
@@ -1037,7 +1124,7 @@ async function copyText(text: string) {
           <p v-if="a.auth_error" role="alert" class="rounded-lg bg-red-50 p-3 text-xs text-red-700 break-words">{{ a.auth_error }}</p>
           <p v-if="a.v3_scheduling_error" class="text-xs text-amber-700">{{ a.v3_scheduling_error }}，调度观测待更新。</p>
           <p v-if="a.credential_ownership" class="text-xs text-muted-foreground" role="status">{{ a.credential_ownership.phase === 'ready' ? (a.credential_ownership.owner === 'local' ? '本地管理凭据 · 网关已暂停' : '网关管理凭据') : (a.credential_ownership.phase === 'reauth' ? '重新授权中 · 上游活动暂停' : '凭据交接待确认 · 请在账号环境页对账') }}</p>
-          <div class="account-routing">
+          <p v-if="a.platform === 'antigravity'" class="form-help">凭据{{ a.credential_state?.phase === 'ready' ? '已就绪' : '待核对' }} · 模型服务待接入 · 额度未观测</p><div v-if="!a.platform || a.platform === 'claude_code'" class="account-routing">
             <div><span>转发方式</span><strong><template v-if="a.request_backend === 'native293'">原生运行时 <small>280 / 293 自动匹配</small></template><template v-else>原有转发</template></strong></div>
             <button type="button" @click="openScheduling(a)">
               <span>调度优先级</span><strong>{{ a.priority }}<ArrowRight :size="13" /></strong>
@@ -1045,7 +1132,7 @@ async function copyText(text: string) {
             </button>
           </div>
 
-          <section class="account-usage-windows">
+          <section v-if="a.platform !== 'antigravity'" class="account-usage-windows">
             <header><span>用量</span><small>{{ a.usage_fetched_at ? new Date(a.usage_fetched_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' 更新' : '未刷新' }}</small><button type="button" @click="refreshUsage(a.id)" :disabled="refreshingUsage === a.id" aria-label="刷新用量"><RefreshCw :size="12" />刷新</button></header>
             <p v-if="a.request_usage" class="usage-record-start">网关记录始于 {{ new Date(a.request_usage.recorded_since).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) }}</p>
             <div v-for="window in usageWindows" :key="window.key" class="account-usage-window">
@@ -1055,7 +1142,7 @@ async function copyText(text: string) {
               <div v-if="hasFutureReset(usageWindow(a.usage_data, window.key))" class="usage-window-reset"><span>{{ formatTimeLeft(usageWindow(a.usage_data, window.key)?.resets_at) }} 后重置</span><span>{{ new Date(usageWindow(a.usage_data, window.key)!.resets_at!).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) }}</span></div>
             </div>
           </section>
-          <div class="account-live-metrics">
+          <div v-if="!a.platform || a.platform === 'claude_code'" class="account-live-metrics">
             <button type="button" @click="openScheduling(a)"><span>并发</span><strong :class="concurrencyClass(a)">{{ formatConcurrencySlots(a.current_concurrency) }}<small>/ {{ formatConcurrencySlots(a.concurrency) }}</small></strong><i class="metric-track"><i :style="{width:Math.min(100,(a.current_concurrency??0)/Math.max(1,a.concurrency)*100)+'%'}" /></i></button>
             <button type="button" @click="openScheduling(a)"><span>RPM</span><strong :class="rpmClass(a)">{{ a.v3_scheduling?.submissions_last_60s ?? a.rpm_current ?? 0 }}<small>/ {{ a.rpm_limit>0?a.rpm_limit:'∞' }}</small></strong><i class="metric-track"><i :style="{width:a.rpm_limit>0?Math.min(100,(a.v3_scheduling?.submissions_last_60s??a.rpm_current??0)/a.rpm_limit*100)+'%':'0%'}" /></i></button>
             <button type="button" @click="openScheduling(a)"><span>排队 <ChevronRight :size="12" /></span><strong :class="(a.queued_requests ?? 0) > 0 ? 'text-amber-600' : ''">{{ a.queued_requests ?? 0 }}</strong></button>
@@ -1114,37 +1201,46 @@ async function copyText(text: string) {
     <Dialog v-model:open="workspaceOpen">
       <DialogContent class="account-workspace translate-x-0 translate-y-0" :class="{'account-workspace-wide': workspaceTab === 'configuration' || workspaceTab === 'scheduling'}">
         <DialogHeader><DialogTitle>{{ detailAccount?.name || detailAccount?.email || '添加账号' }}</DialogTitle><DialogDescription>{{ detailAccount?.email || '填写账号配置与认证信息' }}</DialogDescription></DialogHeader>
-        <nav v-if="detailAccount" class="account-workspace-tabs" aria-label="账号工作区"><button v-for="tab in workspaceTabs" :key="tab.value" type="button" :class="{active:workspaceTab===tab.value}" :aria-pressed="workspaceTab===tab.value" @click="changeWorkspaceTab(tab.value)">{{ tab.label }}</button></nav>
+        <nav v-if="detailAccount" class="account-workspace-tabs" aria-label="账号工作区"><button v-for="tab in workspaceTabs.filter(item => detailAccount?.platform !== 'antigravity' || ['overview','configuration'].includes(item.value))" :key="tab.value" type="button" :class="{active:workspaceTab===tab.value}" :aria-pressed="workspaceTab===tab.value" @click="changeWorkspaceTab(tab.value)">{{ tab.label }}</button></nav>
         <div v-if="detailAccount" v-show="workspaceTab === 'overview'" class="account-workspace-scroll">
           <div class="account-overview-identity"><span class="account-avatar">{{ (detailAccount.name || detailAccount.email)[0] }}</span><div><strong>{{ detailAccount.name || detailAccount.email }}</strong><p>{{ detailAccount.email }}</p></div></div>
           <div class="account-overview-status">
             <span>{{ statusStyle(detailAccount).label }}</span>
-            <small class="account-score">{{ activeSchedulingScore(detailAccount) }}</small>
+            <small v-if="detailAccount.platform !== 'antigravity'" class="account-score">{{ activeSchedulingScore(detailAccount) }}</small>
           </div>
-          <section class="account-usage-windows"><header><span>用量</span><small>{{ detailAccount.usage_fetched_at ? new Date(detailAccount.usage_fetched_at).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}) + ' 更新' : '未刷新' }}</small></header>
+          <section v-if="detailAccount.platform !== 'antigravity'" class="account-usage-windows"><header><span>用量</span><small>{{ detailAccount.usage_fetched_at ? new Date(detailAccount.usage_fetched_at).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}) + ' 更新' : '未刷新' }}</small></header>
             <div v-for="window in usageWindows" :key="window.key" class="account-usage-window"><UsageWindowStats v-if="window.key!=='seven_day_fable'" :stats="detailAccount.request_usage?.[window.key]" :label="window.key==='five_hour'?'5h':'7d'" /><div class="usage-window-label"><span>{{ window.label }}</span><strong>{{ usagePercentLabel(usageWindow(detailAccount.usage_data,window.key)) }}</strong></div><div class="usage-window-bar"><i :class="usageBarColor(effectiveUtil(usageWindow(detailAccount.usage_data,window.key)))" :style="{width:Math.min(100,effectiveUtil(usageWindow(detailAccount.usage_data,window.key)))+'%'}" /></div><p v-if="hasFutureReset(usageWindow(detailAccount.usage_data,window.key))" class="usage-window-reset">{{ formatTimeLeft(usageWindow(detailAccount.usage_data,window.key)?.resets_at) }} 后重置</p></div>
           </section>
-          <dl class="account-overview-settings"><div><dt>订阅方案</dt><dd>{{ subscriptionLabel(detailAccount.subscription_type,detailAccount.rate_limit_tier) }}</dd></div><div><dt>并发上限</dt><dd>{{ detailAccount.concurrency }}</dd></div><div><dt>RPM 上限</dt><dd>{{ detailAccount.rpm_limit || '不限' }}</dd></div><div><dt>调度优先级</dt><dd>{{ detailAccount.priority }}</dd></div></dl>
+          <section v-if="detailAccount.platform === 'antigravity'" class="account-form-section"><h3>Antigravity 能力</h3><Button v-if="detailAccount.credential_state?.phase === 'reauth'" variant="outline" @click="cancelAgyReauth(detailAccount)">结束原授权</Button><p>{{ agyPhaseLabel(detailAccount) }} · 额度未观测</p><p v-if="detailAccount.usage_data?.capabilities">{{ Date.now() - detailAccount.usage_data.capabilities.observed_at_ms > 300000 ? '观测已过期，请刷新能力' : '最近已观测' }}</p><p>{{ detailAccount.usage_data?.capabilities?.source || '能力未观测' }}</p><p>{{ detailAccount.usage_data?.capabilities?.observed_at_ms ? new Date(detailAccount.usage_data.capabilities.observed_at_ms).toLocaleString('zh-CN') : '观测时间未提供' }}</p><p>{{ detailAccount.usage_data?.capabilities?.models?.join('、') || '模型目录未观测' }}</p><details><summary>上游套餐与分级</summary><pre>{{ JSON.stringify(detailAccount.usage_data?.capabilities?.provider ?? {}, null, 2) }}</pre></details><Button v-if="detailAccount.credential_state?.phase !== 'ready'" variant="outline" @click="recoverAgy(detailAccount.id)">核对原凭据操作</Button></section>
+          <dl class="account-overview-settings"><div v-if="detailAccount.platform !== 'antigravity'"><dt>订阅方案</dt><dd>{{ subscriptionLabel(detailAccount.subscription_type,detailAccount.rate_limit_tier) }}</dd></div><div><dt>并发上限</dt><dd>{{ detailAccount.concurrency }}</dd></div><div><dt>RPM 上限</dt><dd>{{ detailAccount.rpm_limit || '不限' }}</dd></div><div><dt>调度优先级</dt><dd>{{ detailAccount.priority }}</dd></div></dl>
           <div class="account-overview-actions">
             <OperationFeedback label="测试连接" button-variant="default" :status="testStates.get(detailAccount.id)?.status" :message="testStates.get(detailAccount.id)?.message" :identity="detailAccount.name || detailAccount.email" @action="test(detailAccount.id)" />
             <Button type="button" variant="outline" @click="refreshUsage(detailAccount.id)" :disabled="refreshingUsage === detailAccount.id"><RefreshCw :size="14" />{{ refreshingUsage === detailAccount.id ? '刷新中' : '刷新用量' }}</Button>
-            <Button type="button" variant="ghost" @click="changeWorkspaceTab('scheduling')"><ArrowRight :size="14" />调度详情</Button>
+            <Button v-if="detailAccount.platform !== 'antigravity'" type="button" variant="ghost" @click="changeWorkspaceTab('scheduling')"><ArrowRight :size="14" />调度详情</Button>
             <Button v-if="detailAccount.status === 'disabled' || isRateLimited(detailAccount)" type="button" variant="outline" @click="toggleScheduling(detailAccount)">启用账号</Button>
             <Button v-else type="button" variant="destructive" class="account-stop-action" @click="toggleScheduling(detailAccount)">停用账号</Button>
           </div>
         </div>
         <form v-show="workspaceTab === 'configuration'" @submit.prevent="save" class="account-editor-form">
           <div class="account-editor-scroll complete-account-form">
-            <section class="account-form-section"><h3>基础配置</h3><div class="account-edit-grid"><label class="approved-field"><span>备注名（选填）</span><Input v-model="form.name"  /></label><label class="approved-field"><span>邮箱</span><Input v-model="form.email" type="email" required /></label></div>
-              <fieldset class="forwarding-field"><legend>转发方式</legend><div class="forwarding-options"><label><input type="radio" v-model="form.request_backend" value="native293"><span><strong>原生运行时</strong><small>280 / 293 自动匹配</small></span></label><label><input type="radio" v-model="form.request_backend" value="legacy"><span><strong>原有转发</strong><small>现有转发通道</small></span></label></div><p class="form-help">请在账号空闲时切换转发方式。</p></fieldset>
+            <section class="account-form-section"><h3>基础配置</h3><ChoiceSelect :model-value="form.platform" @update:model-value="selectAccountPlatform" label="账号平台" :disabled="!!editing || savingAccount" :options="platformOptions" /><div class="account-edit-grid"><label class="approved-field"><span>备注名（选填）</span><Input v-model="form.name"  /></label><label class="approved-field"><span>邮箱</span><Input v-model="form.email" type="email" :readonly="!!editing && isAgyForm" required /></label></div>
+              <fieldset v-if="!isAgyForm" class="forwarding-field"><legend>转发方式</legend><div class="forwarding-options"><label><input type="radio" v-model="form.request_backend" value="native293"><span><strong>原生运行时</strong><small>280 / 293 自动匹配</small></span></label><label><input type="radio" v-model="form.request_backend" value="legacy"><span><strong>原有转发</strong><small>现有转发通道</small></span></label></div><p class="form-help">请在账号空闲时切换转发方式。</p></fieldset>
               <ProxyPicker v-model="proxyChoice" :current-label="editing?.proxy_name || publicProxy(form.proxy_url)" /></section>
-            <section class="account-form-section"><h3>用量与调度</h3><div class="account-edit-grid three"><NumberInput v-model="numberDrafts.concurrency" label="并发上限" :min="1" required /><NumberInput v-model="numberDrafts.rpm_limit" label="RPM 上限" :min="0" required /><NumberInput v-model="numberDrafts.priority" label="调度优先级" :min="1" required /></div><div class="account-edit-grid"><NumberInput v-model="numberDrafts.five_hour_usage_limit_percent" label="5 小时用量上限（%）" :min="0" :max="100" required /><NumberInput v-model="numberDrafts.seven_day_usage_limit_percent" label="7 天用量上限（%）" :min="0" :max="100" required /></div><p class="form-help">RPM 和用量上限填 0 表示不限。达到任一用量上限后停止分配新消息，窗口重置后恢复。未知用量保持可用，单次或并发请求可能越线。</p></section>
-            <section class="account-form-section"><h3>请求与模型</h3><div class="account-edit-grid"><ChoiceSelect v-model="form.billing_mode" label="Billing 模式" :options="[{value:'strip',label:'清除（Strip）'},{value:'rewrite',label:'重写（Rewrite）'}]" /><label class="approved-field"><span>允许 1M 上下文的模型</span><Input v-model="form.allow_1m_models"  /></label></div><div class="model-presets"><span>模型预设</span><button type="button" @click="form.allow_1m_models = 'opus'">仅 Opus</button><button type="button" @click="form.allow_1m_models = DEFAULT_ALLOW_1M_MODELS">Opus + Sonnet 5</button><button type="button" @click="form.allow_1m_models = ''">全部关闭</button></div><p class="form-help">模型以逗号分隔，按子串匹配。留空关闭 1M 上下文。Sonnet 5 使用完整名称以区分 Sonnet 4.6。</p>
+            <section v-if="!isAgyForm" class="account-form-section"><h3>用量与调度</h3><div class="account-edit-grid three"><NumberInput v-model="numberDrafts.concurrency" label="并发上限" :min="1" required /><NumberInput v-model="numberDrafts.rpm_limit" label="RPM 上限" :min="0" required /><NumberInput v-model="numberDrafts.priority" label="调度优先级" :min="1" required /></div><div class="account-edit-grid"><NumberInput v-model="numberDrafts.five_hour_usage_limit_percent" label="5 小时用量上限（%）" :min="0" :max="100" required /><NumberInput v-model="numberDrafts.seven_day_usage_limit_percent" label="7 天用量上限（%）" :min="0" :max="100" required /></div><p class="form-help">RPM 和用量上限填 0 表示不限。达到任一用量上限后停止分配新消息，窗口重置后恢复。未知用量保持可用，单次或并发请求可能越线。</p></section>
+            <section v-if="!isAgyForm" class="account-form-section"><h3>请求与模型</h3><div class="account-edit-grid"><ChoiceSelect v-model="form.billing_mode" label="Billing 模式" :options="[{value:'strip',label:'清除（Strip）'},{value:'rewrite',label:'重写（Rewrite）'}]" /><label class="approved-field"><span>允许 1M 上下文的模型</span><Input v-model="form.allow_1m_models"  /></label></div><div class="model-presets"><span>模型预设</span><button type="button" @click="form.allow_1m_models = 'opus'">仅 Opus</button><button type="button" @click="form.allow_1m_models = DEFAULT_ALLOW_1M_MODELS">Opus + Sonnet 5</button><button type="button" @click="form.allow_1m_models = ''">全部关闭</button></div><p class="form-help">模型以逗号分隔，按子串匹配。留空关闭 1M 上下文。Sonnet 5 使用完整名称以区分 Sonnet 4.6。</p>
               <label class="account-check"><span><strong>允许客户端 Fast Mode</strong><small>允许后保留客户端申请，可能增加计费和限流风险。</small></span><input type="checkbox" v-model="form.allow_fast_mode"></label><label class="account-check"><span><strong>自动遥测</strong><small>由网关代替客户端发送遥测请求。</small></span><input type="checkbox" v-model="form.auto_telemetry"></label><div v-if="form.auth_type==='oauth'"><label class="account-check"><span><strong>自动轮询用量</strong><small>后台定时拉取 OAuth 账号的用量数据。</small></span><input type="checkbox" v-model="form.auto_poll_usage"></label></div></section>
-            <section class="account-form-section"><h3>上游 Session 池</h3><label class="account-check"><span><strong>启用 Session 池</strong><small>仅改写发往上游的会话；内部绑定、RPM 与本地缓存仍按真实会话隔离。</small></span><input type="checkbox" v-model="form.upstream_session_pool_enabled"></label><div class="account-edit-grid"><NumberInput v-model="numberDrafts.upstream_session_pool_size" label="池容量（0 表示关闭）" :min="0" :max="20" required /><NumberInput v-model="numberDrafts.upstream_session_ttl_minutes" label="活跃 TTL（分钟）" :min="5" :max="1440" required /></div><ChoiceSelect v-model="form.upstream_session_refresh_policy" label="TTL 刷新策略" :options="[{value:'mapped_request',label:'映射请求刷新'},{value:'owner_only',label:'仅属主刷新'}]" /></section>
-            <details class="account-auth-fields account-advanced account-form-section" :open="!editing"><summary>认证与高级配置</summary><p class="form-help">认证通常由任务或工程创建流程提供。凭证留空保持原值；切换认证方式需要填写对应凭证。</p><ChoiceSelect v-model="form.auth_type" label="认证方式" :options="[{value:'oauth',label:'OAuth'},{value:'setup_token',label:'Setup Token'}]" /><div v-if="form.auth_type==='setup_token'"><label class="approved-field"><span>Setup Token</span><Input v-model="form.setup_token" type="password" autocomplete="new-password" :required="!editing" :placeholder="editing ? '留空保持不变' : 'sk-ant-oat01-...'" /></label></div><div v-else><div class="account-edit-grid"><label class="approved-field"><span>Access Token（选填）</span><Input v-model="form.access_token" type="password" autocomplete="new-password" placeholder="留空保持不变" /></label><label class="approved-field"><span>Refresh Token</span><Input v-model="form.refresh_token" type="password" autocomplete="new-password" :required="!editing" placeholder="留空保持不变" /></label></div><label class="approved-field"><span>过期时间（毫秒时间戳）</span><Input v-model="form.expires_at" inputmode="numeric" placeholder="留空清除到期时间" /></label><p v-if="editing?.expires_at" class="form-help">当前过期时间：{{ formatExpiresAt(editing.expires_at) }}</p><p v-if="editing?.auth_error" class="form-help text-red-600">最近认证错误：{{ editing.auth_error }}</p></div><div class="account-edit-grid"><ChoiceSelect :model-value="form.subscription_type" @update:model-value="selectSubscription" label="订阅类型" :options="[{value:'',label:'未设置'},{value:'max',label:'Max'},{value:'ultra',label:'Ultra'},{value:'pro',label:'Pro'},{value:'team',label:'Team'},{value:'enterprise',label:'Enterprise'}]" /><label class="approved-field"><span>官方分级</span><Input v-model="form.rate_limit_tier"  /></label></div><div class="account-edit-grid"><label class="approved-field"><span>Account UUID</span><Input v-model="form.account_uuid"  /></label><label class="approved-field"><span>Organization UUID</span><Input v-model="form.organization_uuid"  /></label></div><p class="form-help">修改订阅类型时清除旧分级，可填写新类型的官方分级。</p><Button type="button" variant="outline" @click="openOAuthFlow">重新授权</Button></details>
+            <section v-if="!isAgyForm" class="account-form-section"><h3>上游 Session 池</h3><label class="account-check"><span><strong>启用 Session 池</strong><small>仅改写发往上游的会话；内部绑定、RPM 与本地缓存仍按真实会话隔离。</small></span><input type="checkbox" v-model="form.upstream_session_pool_enabled"></label><div class="account-edit-grid"><NumberInput v-model="numberDrafts.upstream_session_pool_size" label="池容量（0 表示关闭）" :min="0" :max="20" required /><NumberInput v-model="numberDrafts.upstream_session_ttl_minutes" label="活跃 TTL（分钟）" :min="5" :max="1440" required /></div><ChoiceSelect v-model="form.upstream_session_refresh_policy" label="TTL 刷新策略" :options="[{value:'mapped_request',label:'映射请求刷新'},{value:'owner_only',label:'仅属主刷新'}]" /></section>
+            <details v-if="!isAgyForm" class="account-auth-fields account-advanced account-form-section" :open="!editing"><summary>认证与高级配置</summary><p class="form-help">认证通常由任务或工程创建流程提供。凭证留空保持原值；切换认证方式需要填写对应凭证。</p><ChoiceSelect v-model="form.auth_type" label="认证方式" :options="[{value:'oauth',label:'OAuth'},{value:'setup_token',label:'Setup Token'}]" /><div v-if="form.auth_type==='setup_token'"><label class="approved-field"><span>Setup Token</span><Input v-model="form.setup_token" type="password" autocomplete="new-password" :required="!editing" :placeholder="editing ? '留空保持不变' : 'sk-ant-oat01-...'" /></label></div><div v-else><div class="account-edit-grid"><label class="approved-field"><span>Access Token（选填）</span><Input v-model="form.access_token" type="password" autocomplete="new-password" placeholder="留空保持不变" /></label><label class="approved-field"><span>Refresh Token</span><Input v-model="form.refresh_token" type="password" autocomplete="new-password" :required="!editing" placeholder="留空保持不变" /></label></div><label class="approved-field"><span>过期时间（毫秒时间戳）</span><Input v-model="form.expires_at" inputmode="numeric" placeholder="留空清除到期时间" /></label><p v-if="editing?.expires_at" class="form-help">当前过期时间：{{ formatExpiresAt(editing.expires_at) }}</p><p v-if="editing?.auth_error" class="form-help text-red-600">最近认证错误：{{ editing.auth_error }}</p></div><div class="account-edit-grid"><ChoiceSelect :model-value="form.subscription_type" @update:model-value="selectSubscription" label="订阅类型" :options="[{value:'',label:'未设置'},{value:'max',label:'Max'},{value:'ultra',label:'Ultra'},{value:'pro',label:'Pro'},{value:'team',label:'Team'},{value:'enterprise',label:'Enterprise'}]" /><label class="approved-field"><span>官方分级</span><Input v-model="form.rate_limit_tier"  /></label></div><div class="account-edit-grid"><label class="approved-field"><span>Account UUID</span><Input v-model="form.account_uuid"  /></label><label class="approved-field"><span>Organization UUID</span><Input v-model="form.organization_uuid"  /></label></div><p class="form-help">修改订阅类型时清除旧分级，可填写新类型的官方分级。</p><Button type="button" variant="outline" @click="openOAuthFlow()">重新授权</Button></details>
+            <section v-if="isAgyForm" class="account-form-section">
+              <h3>Antigravity 配置</h3><p class="form-help">账号能力来自最近的原生观测。模型服务等待运行环境接入。</p>
+              <label class="account-check"><span><strong>系统提示词同形体转换</strong><small>按当前账号保存，将在模型服务接入后生效。</small></span><input v-model="form.agy_system_prompt_homoglyph_enabled" type="checkbox"></label>
+              <div class="account-edit-grid three"><NumberInput v-model="numberDrafts.concurrency" label="并发上限" :min="1" required /><NumberInput v-model="numberDrafts.rpm_limit" label="RPM 上限" :min="0" required /><NumberInput v-model="numberDrafts.priority" label="调度优先级" :min="1" required /></div>
+              <Button v-if="editing" type="button" variant="outline" @click="openOAuthFlow(editing)">重新授权</Button>
+              <Button v-if="editing?.credential_state && editing.credential_state.phase !== 'ready'" type="button" variant="outline" @click="recoverAgy(editing.id)">核对原凭据操作</Button>
+              <details class="account-advanced" :open="!editing"><summary>OAuth 凭据</summary><p class="form-help">新账号需要有效的原生 OAuth 凭据。编辑时留空保持当前值。</p><label class="approved-field"><span>Access Token</span><Input v-model="form.access_token" type="password" autocomplete="new-password" :required="!editing" /></label><label class="approved-field"><span>Refresh Token</span><Input v-model="form.refresh_token" type="password" autocomplete="new-password" :required="!editing" /></label><label class="approved-field"><span>过期时间（毫秒时间戳）</span><Input v-model="form.expires_at" inputmode="numeric" :required="!editing" /></label></details>
+            </section>
           </div>
-          <DialogFooter class="account-save-footer"><span>修改后统一保存</span><Button type="button" variant="outline" @click="workspaceOpen = false">取消</Button><Button type="submit">保存修改</Button></DialogFooter>
+          <DialogFooter class="account-save-footer"><span>修改后统一保存</span><Button type="button" variant="outline" @click="workspaceOpen = false">取消</Button><Button type="submit" :disabled="savingAccount">{{ savingAccount ? '保存中…' : '保存修改' }}</Button></DialogFooter>
         </form>
         <SchedulingDetails v-show="workspaceTab === 'scheduling'" embedded :open="workspaceOpen && workspaceTab === 'scheduling'" :account-id="detailAccount?.id ?? 0" :account-name="detailAccount?.name || detailAccount?.email || ''" />
         <div v-show="workspaceTab === 'diagnostics'" class="account-workspace-scroll account-diagnostics">
@@ -1306,8 +1402,8 @@ async function copyText(text: string) {
         <div class="approved-oauth-body">
           <form v-if="oauthStep === 'generate'" @submit.prevent="generateOAuthUrl">
             <p class="oauth-context">将账号接入工作空间</p>
-            <ChoiceSelect :model-value="oauthMode" @update:model-value="value => { if (value === 'oauth' || value === 'setup_token') oauthMode = value; }" label="授权方式" :disabled="oauthLoading" :options="[{value:'oauth',label:'OAuth'},{value:'setup_token',label:'Setup Token'}]" />
-            <ProxyPicker v-model="oauthProxy" current-label="直连" :disabled="oauthLoading" help="选择本次授权使用的代理，后续账号配置沿用此线路。" />
+            <ChoiceSelect v-model="oauthPlatform" label="授权平台" :options="platformOptions" :disabled="oauthLoading || !!oauthTarget" @update:model-value="oauthMode = 'oauth'" /><ChoiceSelect v-if="oauthPlatform === 'claude_code'" :model-value="oauthMode" @update:model-value="value => { if (value === 'oauth' || value === 'setup_token') oauthMode = value; }" label="授权方式" :disabled="oauthLoading" :options="[{value:'oauth',label:'OAuth'},{value:'setup_token',label:'Setup Token'}]" />
+            <ProxyPicker v-model="oauthProxy" current-label="直连" :disabled="oauthLoading || !!oauthTarget" help="选择本次授权使用的代理，后续账号配置沿用此线路。" />
             <p class="oauth-help">{{ oauthMode === 'oauth' ? '授权后支持账号信息与用量查询。' : 'Setup Token 仅用于推理，有效期 1 年。' }}</p>
             <p v-if="oauthError" class="oauth-error" role="alert">{{ oauthError }}</p>
             <footer class="oauth-actions"><Button type="submit" :disabled="oauthLoading">{{ oauthLoading ? '生成中…' : '生成授权链接' }}</Button></footer>
@@ -1317,15 +1413,15 @@ async function copyText(text: string) {
             <section class="oauth-link-panel"><a :href="oauthAuthUrl" target="_blank" rel="noopener noreferrer">点击打开授权页面 ↗</a><Button type="button" variant="outline" size="sm" @click="copyText(oauthAuthUrl)">复制链接</Button></section>
             <details class="oauth-link-details"><summary>查看完整授权链接</summary><Textarea :model-value="oauthAuthUrl" readonly :rows="3" aria-label="完整授权链接" /></details>
             <label class="approved-field"><span>授权码</span><Textarea v-model="oauthCode" :rows="3" autocomplete="off" spellcheck="false" :disabled="oauthLoading" placeholder="粘贴回调页面提供的授权码" /></label>
-            <p class="oauth-help">在新页面完成 Claude 登录授权，再将回调页面的授权码粘贴到这里。</p>
+            <p class="oauth-help">在新页面完成 {{ oauthPlatform === 'antigravity' ? 'Google' : 'Claude' }} 登录授权，再将回调页面的授权码粘贴到这里。</p>
             <p v-if="oauthError" class="oauth-error" role="alert">{{ oauthError }}</p>
-            <footer class="oauth-actions"><Button type="button" variant="outline" :disabled="oauthLoading" @click="oauthStep = 'generate'; oauthError = ''">返回</Button><Button type="submit" :disabled="oauthLoading || !oauthCode.trim()">{{ oauthLoading ? '授权中…' : '完成授权' }}</Button></footer>
+            <footer class="oauth-actions"><Button type="button" variant="outline" :disabled="oauthLoading" @click="restartOAuthFlow">返回</Button><Button type="submit" :disabled="oauthLoading || !oauthCode.trim()">{{ oauthLoading ? '授权中…' : '完成授权' }}</Button></footer>
           </form>
           <section v-else-if="oauthResult" class="oauth-result">
-            <p class="oauth-success">授权成功</p><p class="oauth-context">{{ oauthResult.email_address || '账号信息已获取' }} · 继续填写账号配置</p>
+            <p class="oauth-success">授权成功</p><p class="oauth-context">{{ oauthResult.email_address || '账号信息已获取' }} · {{ oauthTarget ? '已保存到原账号' : '继续填写账号配置' }}</p>
             <dl class="oauth-result-fields"><dt>授权方式</dt><dd>{{ oauthMode === 'oauth' ? 'OAuth' : 'Setup Token' }}</dd><dt>过期时间</dt><dd>{{ oauthResult.expires_at ? new Date(oauthResult.expires_at * 1000).toLocaleString('zh-CN') : '未提供' }}</dd></dl>
-            <details class="oauth-result-details"><summary>查看授权详情</summary><dl class="oauth-result-fields"><dt>Account UUID</dt><dd>{{ oauthResult.account_uuid || '未提供' }}</dd><dt>Organization UUID</dt><dd>{{ oauthResult.organization_uuid || '未提供' }}</dd><dt>Scope</dt><dd>{{ oauthResult.scope || '未提供' }}</dd><dt>Access Token</dt><dd>已获取 <Button type="button" variant="outline" size="sm" aria-label="复制 Access Token" @click="copyText(oauthResult.access_token)">复制</Button></dd><template v-if="oauthResult.refresh_token"><dt>Refresh Token</dt><dd>已获取 <Button type="button" variant="outline" size="sm" aria-label="复制 Refresh Token" @click="copyText(oauthResult.refresh_token)">复制</Button></dd></template></dl></details>
-            <footer class="oauth-actions"><Button type="button" variant="outline" @click="showOAuthFlow = false">关闭</Button><Button type="button" @click="applyOAuthResult">填入账号配置</Button></footer>
+            <details v-if="oauthPlatform === 'claude_code'" class="oauth-result-details"><summary>查看授权详情</summary><dl class="oauth-result-fields"><dt>Account UUID</dt><dd>{{ oauthResult.account_uuid || '未提供' }}</dd><dt>Organization UUID</dt><dd>{{ oauthResult.organization_uuid || '未提供' }}</dd><dt>Scope</dt><dd>{{ oauthResult.scope || '未提供' }}</dd><dt>Access Token</dt><dd>已获取 <Button type="button" variant="outline" size="sm" aria-label="复制 Access Token" @click="copyText(oauthResult.access_token)">复制</Button></dd><template v-if="oauthResult.refresh_token"><dt>Refresh Token</dt><dd>已获取 <Button type="button" variant="outline" size="sm" aria-label="复制 Refresh Token" @click="copyText(oauthResult.refresh_token)">复制</Button></dd></template></dl></details>
+            <footer class="oauth-actions"><Button type="button" variant="outline" @click="showOAuthFlow = false">关闭</Button><Button type="button" @click="applyOAuthResult">{{ oauthTarget ? '完成' : '填入账号配置' }}</Button></footer>
           </section>
         </div>
       </DialogContent>

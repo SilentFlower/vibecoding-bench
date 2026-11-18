@@ -37,6 +37,15 @@
       "predecessor": 3,
       "rollback_mode": "compatible",
       "version": 4
+    },
+    {
+      "checksum": "0baaf4c4b555941e1cc4015bf30fc4c40de32924c59495b362ea87322201a2ea",
+      "engine": "sqlite",
+      "id": "gateway.account-platforms.5",
+      "kind": "schema",
+      "predecessor": 4,
+      "rollback_mode": "compatible",
+      "version": 5
     }
   ]
 }

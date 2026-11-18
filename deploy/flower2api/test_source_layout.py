@@ -25,7 +25,7 @@ class SourceLayoutTests(unittest.TestCase):
                 'cc2api/Cargo.lock', 'cc2api/vendor/dependency.rs', 'cc2api/craftls/lib.rs',
                 'orchestrator/runtime_files.py', 'orchestrator/runtime_diagnostics.py',
                 'orchestrator/cli_quota.py', 'orchestrator/process_metrics.py',
-                'orchestrator/native_sender.py', 'webui/index.html', 'cc2api/web/src/main.ts',
+                'orchestrator/native_sender.py', 'orchestrator/agy_auth.py', 'webui/index.html', 'cc2api/web/src/main.ts',
                 'cc2api/web/package-lock.json', 'images/account/init.py',
                 'images/sidecar/start.sh', 'images/worker/task_followups.py')
             for name in names:

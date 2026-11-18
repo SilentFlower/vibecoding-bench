@@ -89,6 +89,7 @@ ARG V3_RELEASE
 ARG V3_PARENT_REV
 ARG V3_GATEWAY_REV
 LABEL vibebench.product="v3" vibebench.role="control" vibebench.release=$V3_RELEASE \
+    vibebench.account-platforms="1" \
     vibebench.system-update-protocol="1" \
     vibebench.credential-ownership-protocol="1" \
     vibebench.isolation-version="2" \
@@ -99,6 +100,7 @@ ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/v3-control"]
 
 FROM python:3.12-slim-bookworm AS account
 ARG HEV_VERSION=2.15.0
+ARG V3_AGY_AUTH_SHA256=""
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential pkg-config git curl wget unzip \
@@ -111,6 +113,13 @@ COPY --from=frontend /usr/local/lib/node_modules/npm /usr/local/lib/node_modules
 RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
     && groupadd --gid 1000 node && useradd --uid 1000 --gid node --create-home --shell /bin/bash node
+RUN groupadd --gid 1001 agy && useradd --uid 1001 --gid agy --create-home --shell /bin/bash agy
+COPY agy-auth/ /usr/local/bin/
+RUN if [ -n "$V3_AGY_AUTH_SHA256" ]; then \
+      test "$V3_AGY_AUTH_SHA256" = '39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43' \
+      && echo "$V3_AGY_AUTH_SHA256  /usr/local/bin/agy-1.5.9" | sha256sum -c - \
+      && chmod 755 /usr/local/bin/agy-1.5.9; \
+    else test -f /usr/local/bin/agy-auth-unavailable; fi
 RUN python3 -m venv /opt/mitm && /opt/mitm/bin/pip install --no-cache-dir mitmproxy==11.1.3
 ENV PATH="/opt/mitm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 RUN case "$(uname -m)" in x86_64) arch=x86_64;; aarch64) arch=arm64;; *) exit 1;; esac \
@@ -157,6 +166,7 @@ ARG V3_RELEASE
 ARG V3_PARENT_REV
 ARG V3_GATEWAY_REV
 LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELEASE \
+    vibebench.account-platforms="1" vibebench.agy-auth-source-sha256=$V3_AGY_AUTH_SHA256 \
     vibebench.system-update-protocol="1" vibebench.account-runtime-protocol="1" \
     vibebench.credential-ownership-protocol="1" \
     vibebench.isolation-version="2" \

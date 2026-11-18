@@ -38,6 +38,8 @@ async fn setup() -> (Arc<AccountStore>, Arc<AccountService>) {
 /// 创建一个基础测试账号
 async fn create_test_account(svc: &AccountService, email: &str) -> Account {
     let mut account = Account {
+        platform: "claude_code".into(),
+        agy_system_prompt_homoglyph_enabled: false,
         id: 0,
         name: "test".into(),
         email: email.into(),

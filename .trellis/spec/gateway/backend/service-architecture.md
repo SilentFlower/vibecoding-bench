@@ -1796,3 +1796,61 @@ transport.submit(prepared, body, ttfb_timeout).await
 - `service::rewriter::tests` 的disabled_thinking用例覆盖开关、精确模型含后缀、字段形状、附加子字段、历史签名、缓存与CCH。
 - `CCRB_TEST_THINKING_ONLY=1` 的 `native_real_gateway` 使用280/293实际执行体，共33次模型发送：普通API与完整原生输入、开启/关闭/未命中/再次关闭、ingress与cc_prepared、缓存和TTL、签名修复及学习后首发、429期间配置冻结；逐次核对TLS实收CCH及源版本。
 - `cargo test --locked`、`cargo fmt --check`、运行时类型及单元/隔离联调验证；制品必须匹配当前固定清单，实际验证副本与交付补丁分别核对。
+
+
+## Scenario: 多平台账号与AGY原生凭据管理
+
+### 1. Scope / Trigger
+
+- 修改账号平台、AGY授权/刷新、能力保存或授权制品交付时适用。权威实现为AccountService、OAuthFlowService、AccountStore及services/orchestrator/agy_auth.py。
+- CC既有管理接口和凭据返回保持兼容。AGY业务worker、Gemini路由及同形体转换由后续任务承接。AGY与工程/养号的交互属于范围外。
+
+### 2. Signatures
+
+- Account.platform：claude_code / antigravity，省略为claude_code。agy_system_prompt_homoglyph_enabled：bool，默认false，按账号独立保存。
+- GET /admin/accounts：platform缺省claude_code；all显式查询全部平台，指定平台参与SQL过滤、计数及分页；返回当前平台范围account_counts。
+- POST /admin/oauth/generate-auth-url：扩展platform、account_id，沿用proxy_url或proxy_id/proxy_revision；exchange-code沿session_id/code分派。AGY重授权目标及代理在会话内冻结。
+- POST /admin/oauth/:session_id/cancel?platform=antigravity；GET /admin/accounts/:id/agy-credentials；POST /admin/accounts/:id/agy-credentials/recover。
+- 内部POST /internal/v3/agy-auth/{action}：start/exchange/cancel/verify/refresh/prepare/recover/retire。refresh、prepare输入operation_id/account_id/generation/document/proxy_url；recover、retire输入前三项，拒绝额外字段。
+- gateway.account-platforms.5追加accounts.platform、INTEGER开关、UNIQUE(platform,email)及account_credential_states(account_id,generation,phase,operation_id,updated_at_ms)。阶段为ready/refresh_pending/reauth/reconcile；元数据表不存令牌。
+
+### 3. Contracts
+
+- 迁移追加独立定义和登记摘要，冻结旧步骤。历史行按CC读取，同邮箱跨平台可并存，同平台重复迁移失败；保留账号ID、绑定、凭据及配置。未知输入拒绝，未知存量仅可见并隔离平台操作。
+- AGY使用完整OAuth凭据及带时区expiry，通过AT-only原生已认证状态核对邮箱，不能信任文件id_token_email作为认证证明。CC专用调度、绑定、额度、遥测和预热均按平台守卫。
+- 复用账号刷新锁，锁内重读权威账号，先以原AT/RT/邮箱条件持久关闭门禁再调用唯一RT所有者。驱动按账号文件锁串行，原操作请求摘要冻结账号、代次、凭据及代理；结果未知保留同操作材料进入reconcile，不重放RT。
+- complete_agy_observation按原身份、原AT/RT、操作和代次CAS，在同一事务保存新AT、RT、expiry、代理、能力和新代次。失败整体回滚。同操作已提交仅确认当前同结果，禁止回写覆盖后续编辑。
+- 创建能力同事务保存；重授权和刷新传递同次capabilities并持久到usage_data.capabilities，保留source/observed_at_ms；usage_fetched_at为UTC观测时间。SQLite和历史PG的usage_data及usage_fetched_at均为TEXT，OAuth专用PG时间列沿TIMESTAMPTZ转换。
+- prepare先持久保存手工候选。有效AT采用AT-only核验；到期AT在同操作内用候选代理执行一次原生models刷新，再核验身份。恢复停止原RT进程，优先采用当前私有文件的新RT，原生省略RT时沿用同操作input，代理和能力取同操作回执。
+- 缺失操作的recover在账号锁→操作锁内先保存not_started终止记录。显式retire核对同账号、代次和操作，停止原进程并持久retired记录，网关取得完整终止证明后才以CAS解除旧门禁。终止记录跨重启保留，迟到refresh/prepare/exchange拒绝。重新授权替代reconcile之前先走retire。
+- AGY固定1.5.9、私有HOME、OOB与PKCE白名单；制品身份沿[AGY凭据研究合同](../../platform/deploy/agy-credential-contract.md)。内部操作沿Bearer及UPDATE_GATE认证准入，公开错误脱敏，完整材料不进入日志或浏览器持久缓存。
+- 可选构建输入V3_AGY_AUTH_ASSET通过固定大小及完整SHA校验后冻结，省略时声明未就绪。经auth_asset_identity校验的可用制品身份进入account.content_sha256；旧清单缺省及显式未提供等价，制品双向启停均触发account_rebuild_required。control的vibebench.account-platforms=1与宿主旧版兼容门禁共同阻止旧程序误读新平台记录。
+- UI在既有账号页显式选择平台，保持草稿及焦点；平台/账号切换、关闭和旧回执按generation隔离。平台筛选保留读屏标签，桌面与状态组同高，390px平台/搜索首行、状态组次行。能力目录、套餐及额度按真实来源展示，未知、过期和零分别表达。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 未知平台、修改平台、AGY Setup Token、错账号身份 | 400且保持权威账号归属 |
+| 重复同平台邮箱或历史迁移冲突 | 拒绝创建/迁移，保留原行 |
+| 非ready发起刷新、未知回执、驱动未就绪 | 阻止新RT消费，保持可恢复阶段 |
+| 驱动尚未落盘即失败 | 保存同归属终止记录后允许恢复或新重授权 |
+| 代理刷新已轮换RT后核验/回执失败 | 保留同操作新RT，恢复核验后原子提交 |
+| 旧操作、错误代次、跨账号终止证明 | 拒绝解除门禁或提交 |
+| 制品字段、版本、大小或摘要不匹配 | 签发前拒绝；缺省未提供兼容读取 |
+
+### 5. Scenarios and Examples
+
+- 正常：CC旧客户端不传platform沿旧路径；新账号页显式请求all。AGY完成OOB后按已认证身份保存，再按账号保存同形体开关。
+- 边界：旧AT到期且旧代理不可用，候选新代理在唯一操作内刷新。回执丢失后recover读取已轮换材料，代理、凭据和能力同代保存。
+- 错误使用：只清数据库pending后重发旧RT，或把新代理单独先保存再提交凭据。正确处理：先取得持久终止证明，或按同操作恢复，并以原子CAS发布一致结果。
+- 错误使用：源码相同就复用未携带AGY的旧账号镜像。正确处理：签发时纳入已校验制品身份，由既有内容身份比较选择镜像。
+
+### 6. Tests Required
+
+- cargo fmt --check与cargo test --locked；SQLite/PG历史迁移、跨平台同邮箱、重复冲突、原代次CAS、能力创建与事务回滚、终止归属和迟到回执。
+- test_agy_auth*.py：真实私有文件/跨进程锁，原码单次投递、RT轮换及省略、终止记录跨重启、到期新代理刷新与已落盘RT恢复；ASGI鉴权与错误脱敏。
+- test_system_release.py：固定源码下制品启停双向账号重建、历史缺省、错误声明拒绝、实际签名校验；数据库定义与宿主兼容门禁回归。
+- verify_agy_accounts_api.py：真实HTTP/SQLite配合合成原生服务，断连、重启、错账号、未落盘恢复及重授权、能力回读、新代理到期刷新和丢回执。
+- 前端构建与verify_accounts_design.py、verify_agy_accounts_ui.py、verify_account_filters_ui.py：旧CC载荷、两账号开关、草稿/焦点、取消与迟到结果、组合筛选及390/720/1440/1920px。
+- 原生OOB启动/取消与合成身份回执分别记证据。真实Google登录、身份及刷新由具备授权测试账号的外部验收独立记录，不能用合成通过冒充真实验收，模型提交预算为0。

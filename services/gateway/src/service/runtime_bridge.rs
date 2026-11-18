@@ -169,6 +169,51 @@ fn config() -> Result<(String, String, reqwest::Client), AppError> {
     Ok((base.trim_end_matches('/').into(), token, client))
 }
 
+/// 调用受信管理侧的 AGY 原生适配。@param action 固定操作名。@param input 私有请求。@return 有界原生结果或脱敏错误。
+pub async fn agy_request(action: &str, input: &Value) -> Result<Value, AppError> {
+    if ![
+        "start", "exchange", "cancel", "verify", "refresh", "recover", "prepare", "retire",
+    ]
+    .contains(&action)
+    {
+        return Err(AppError::BadRequest("AGY 管理操作无效".into()));
+    }
+    let (base, token, client) = config()?;
+    let response = client
+        .post(format!("{base}/internal/v3/agy-auth/{action}"))
+        .bearer_auth(token)
+        .json(input)
+        .timeout(Duration::from_secs(90))
+        .send()
+        .await
+        .map_err(|_| AppError::ServiceUnavailable("AGY 管理结果待核对".into()))?;
+    if !response.status().is_success() {
+        return Err(AppError::ServiceUnavailable(
+            "AGY 原生授权或凭据操作未完成，请查询原会话".into(),
+        ));
+    }
+    if response
+        .content_length()
+        .is_some_and(|length| length > 2 * 1024 * 1024)
+    {
+        return Err(AppError::ServiceUnavailable("AGY 管理响应超限".into()));
+    }
+    let mut response = response;
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| AppError::ServiceUnavailable("AGY 管理响应未完整接收".into()))?
+    {
+        if bytes.len() + chunk.len() > 2 * 1024 * 1024 {
+            return Err(AppError::ServiceUnavailable("AGY 管理响应超限".into()));
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    serde_json::from_slice(&bytes)
+        .map_err(|_| AppError::ServiceUnavailable("AGY 管理响应格式无效".into()))
+}
+
 fn cookie(headers: &HeaderMap) -> &str {
     headers
         .get(header::COOKIE)

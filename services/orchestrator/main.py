@@ -8173,9 +8173,16 @@ async def lifespan(app: FastAPI):
         scheduler.recover_active_batches()
     if project_iterations and not PROJECTS_AGENT_ENABLED:
         project_iterations.start()
+    agy_cleanup_task = asyncio.create_task(_agy_auth_cleanup_loop()) if V3_ENABLED else None
     try:
         yield
     finally:
+        if agy_cleanup_task:
+            agy_cleanup_task.cancel()
+            try:
+                await agy_cleanup_task
+            except asyncio.CancelledError:
+                pass
         warmup_scheduler.stop()
         if warmup_pi_service:
             warmup_pi_service.close()
@@ -12528,6 +12535,59 @@ def _v3_websocket_authorized(websocket: WebSocket) -> bool:
             and secrets.compare_digest(signature, expected))
     except (ValueError, UnicodeError):
         return False
+
+
+_agy_auth_manager = None
+_agy_auth_manager_lock = threading.Lock()
+
+
+async def _agy_auth_cleanup_loop():
+    """重启及运行期间回收到期原生授权，清理失败保留原操作等待重试。@return 无。"""
+    while True:
+        try:
+            def cleanup():
+                """在现有部署门禁内读取同操作资源。"""
+                global _agy_auth_manager
+                from agy_auth import AgyAuthManager
+                with UPDATE_GATE.admission('agy-auth:cleanup'):
+                    with _agy_auth_manager_lock:
+                        if _agy_auth_manager is None and account_runtime and (BENCH_DATA / 'agy-auth').exists():
+                            _agy_auth_manager = AgyAuthManager(account_runtime.client, BENCH_DATA, HOST_BENCH_DATA,
+                                account_runtime.image, account_runtime.network)
+                        manager = _agy_auth_manager
+                    if manager:
+                        manager.cleanup()
+            await asyncio.to_thread(cleanup)
+        except Exception:
+            # 失败保留私有材料，下一周期按原归属重试。
+            pass
+        await asyncio.sleep(30)
+
+
+@app.post("/internal/v3/agy-auth/{action}")
+async def v3_agy_auth(action: str, request: Request):
+    """在受信管理通道执行 AGY 原生账号操作。@param action 操作。@param request 私有输入。@return 有界原生结果。"""
+    if not V3_ENABLED or not account_runtime:
+        raise HTTPException(503, "AGY 管理能力尚未就绪")
+    try:
+        payload = await request.body()
+        if len(payload) > 65536:
+            raise ValueError("输入超限")
+        value = json.loads(payload)
+        def execute():
+            """复用部署门禁，私有参数只在本操作内传递。"""
+            global _agy_auth_manager
+            from agy_auth import AgyAuthManager
+            with UPDATE_GATE.admission('agy-auth:' + action):
+                with _agy_auth_manager_lock:
+                    if _agy_auth_manager is None:
+                        _agy_auth_manager = AgyAuthManager(account_runtime.client, BENCH_DATA, HOST_BENCH_DATA,
+                            account_runtime.image, account_runtime.network)
+                return _agy_auth_manager.handle(action, value)
+        return await asyncio.to_thread(execute)
+    except Exception:
+        # 解析及下游错误正文可能含授权码或代理账密，公开响应只给固定状态。
+        raise HTTPException(503, "AGY 原生操作未完成，请核对原会话或凭据操作") from None
 
 
 @app.post("/internal/v3/session")

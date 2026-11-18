@@ -1,3 +1,4 @@
+pub mod account_platform_schema;
 pub mod account_store;
 pub mod cache;
 pub mod database_migrations;
