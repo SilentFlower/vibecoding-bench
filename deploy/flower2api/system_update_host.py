@@ -19,7 +19,7 @@ from urllib.request import ProxyHandler, Request, build_opener
 from manage import _check_local_reference, _local_image_matches, _container_image_matches, load_bundle, load_environment
 from runtime_files import atomic_json, atomic_text
 from runtime_names import account_container_prefix, account_rebuild_required, deployment_network_names, image_reference
-from system_update_contract import DOWNLOAD_ROOT, ROLES, ReleaseRedirect, fetch_bytes, safe_read, strict_json, validate_migration_plan
+from system_update_contract import DOWNLOAD_ROOT, ROLES, ReleaseRedirect, compatible_scratchpad, fetch_bytes, safe_read, strict_json, validate_migration_plan
 from system_update_gate import read_gate
 from system_update_database import assert_quiescent, create_snapshot, restore_snapshot, rotate_snapshots
 
@@ -929,6 +929,10 @@ class HostDeployment:
             operation['release_started'] = True
             save()
         self.block(operation)
+        if (operation.get('environment_intents')
+                and not compatible_scratchpad(operation['selected']['release'], original['release'])):
+            # 首次兼容阶段沿用原账号，激活阶段的原版必须已经能恢复磁盘布局。
+            raise ValueError('原版本缺少CLI临时文件恢复能力，保留维护现场并要求兼容版本恢复')
         if released:
             runtime = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
             gateway = self.request('gateway', '/admin/runtime/system-update/status')

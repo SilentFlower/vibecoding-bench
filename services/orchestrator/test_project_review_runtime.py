@@ -47,6 +47,7 @@ class PrivateReviewTests(unittest.TestCase):
         environment.start()
         self.addCleanup(environment.stop)
         client=Mock()
+        client.images.get.return_value.attrs={'Config':{'Labels':{}}}
         client.containers.list.return_value=[]
         fingerprint=Mock(return_value={'profile_version':2,'hostname':'fixed','machine_id':'a'*32,
             'mac':'02:00:00:00:00:01','tz':'UTC','lang':'en_US.UTF-8'})

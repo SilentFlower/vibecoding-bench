@@ -14,6 +14,7 @@ from docker.errors import DockerException, NotFound
 from account_isolation import ISOLATION_VERSION, role_container
 from account_runtime import RuntimeBusy, _read_json, atomic_json
 from cpu_resources import default_cpu_limits, read_policy as read_cpu_policy
+from cli_scratchpad import preserve_cli_scratchpad, restore_cli_scratchpad
 from project_library import read_document, safe_relative, write_document
 from resource_budget import isolated_account_limits, scenario_account_limits, serial_review_limits
 from system_profile import SYSTEM_PROFILE_DIRECTORY
@@ -340,6 +341,7 @@ class ProjectReviewRuntime:
             'review_limits':{'Memory':memory,'MemorySwap':total}}
         atomic_json(self.serial_path(job['row']),state)
         self._serial_phase(job,'cli_stopping')
+        preserve_cli_scratchpad(self.runtime, job['row'], cli)
         cli.stop(timeout=5)
         cli.reload()
         if cli.status not in STOPPED_STATES:
@@ -379,6 +381,7 @@ class ProjectReviewRuntime:
             cli.reload()
         if cli.status != 'running':
             raise ValueError('固定 CLI 恢复结果未确认')
+        restore_cli_scratchpad(self.runtime, job['row'], cli)
         self.runtime._wait_network(job['row'])
         self.runtime._sender_active(job['row'])
         self.runtime.check_system_profile(job['row'],cli)

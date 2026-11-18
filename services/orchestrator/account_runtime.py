@@ -32,6 +32,7 @@ from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, ROLE_LABELS, crea
 from account_update_identity import configured_release, image_origin, role_release
 from capture_artifacts import capture_context_json
 from cli_telemetry_policy import cli_telemetry_environment
+from cli_scratchpad import preserve_cli_scratchpad, remove_scratchpad_volume, restore_cli_scratchpad
 from process_metrics import PROCESS_SOURCE, merge_process_metrics, validate_process_metrics
 from physical_features import MAX_SNAPSHOT_BYTES, PHYSICAL_FEATURES_PROBE, validate_features
 from project_runtime_policy import ProjectRuntimeError, check_python_runtime
@@ -621,10 +622,14 @@ class AccountRuntime:
             order['project-review'] = -1
             containers.sort(key=lambda current: order[current.labels["vibebench.role"]])
         for container in containers:
+            if container.labels.get('vibebench.role') == ROLE_LABELS['cli']:
+                preserve_cli_scratchpad(self, row, container)
+        for container in containers:
             container.stop(timeout=5)
         if remove:
             for container in containers:
                 container.remove()
+            remove_scratchpad_volume(self, row)
             self._update(row, container_id=None, sender_container_id=None, network_container_id=None)
 
     def ensure(self, account: dict, version: str | None = None, allow_inactive_login: bool = False,
@@ -779,6 +784,7 @@ class AccountRuntime:
                             containers["network"].start()
                             self._wait_network(row)
                             containers["cli"].start()
+                            restore_cli_scratchpad(self, row, containers["cli"])
                             containers["sender"].start()
                         except Exception:
                             self._update(row, state="reconcile")
@@ -3190,6 +3196,7 @@ class AccountRuntime:
         self._wait_network(row)
         if roles["cli"].status != "running":
             roles["cli"].start()
+        restore_cli_scratchpad(self, row, roles["cli"])
         self.check_system_profile(row, roles["cli"])
         result = roles["cli"].exec_run(["python3", "-I", "/usr/local/bin/v3-cli-control", "stop"])
         if result.exit_code:

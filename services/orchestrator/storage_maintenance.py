@@ -91,15 +91,19 @@ def read_storage_json(path: Path, *, maximum_bytes: int = 64 * 1024**2, private:
     return json.loads(content)
 
 
-def tree_inventory(root: Path, excluded: set[str] | None = None, *, durable: bool = False) -> dict[str, dict]:
+def tree_inventory(root: Path, excluded: set[str] | None = None, *, durable: bool = False,
+                   entry_limit: int | None = None) -> dict[str, dict]:
     """盘点普通文件、目录与链接，不跟随链接或复制运行 socket。
 
     :param root: 可信父目录下的非链接目录。
     :param excluded: 精确排除的相对路径，目录同时排除其子树。
     :param durable: 备份完成前将已读取文件及目录同步到持久存储。
+    :param entry_limit: 可选的条目上限，避免迁移清单耗尽控制面内存。
     :return: 包含字节摘要、权限与归属的逻辑文件清单。
     """
     ignored = excluded or set()
+    if entry_limit is not None and (type(entry_limit) is not int or entry_limit < 1):
+        raise ValueError('存储盘点条目上限无效')
     for value in ignored:
         _relative(value)
     descriptor = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
@@ -108,6 +112,8 @@ def tree_inventory(root: Path, excluded: set[str] | None = None, *, durable: boo
         for directory, folders, names, parent in os.fwalk('.', dir_fd=descriptor, follow_symlinks=False):
             relative_directory = str(PurePosixPath(directory))
             metadata = os.fstat(parent)
+            if entry_limit is not None and len(entries) >= entry_limit:
+                raise ValueError('存储盘点超过条目上限')
             entries[relative_directory] = {'kind': 'directory', 'mode': S_IMODE(metadata.st_mode),
                 'uid': metadata.st_uid, 'gid': metadata.st_gid}
             for name in sorted(folders + names):
@@ -141,6 +147,8 @@ def tree_inventory(root: Path, excluded: set[str] | None = None, *, durable: boo
                         os.close(file_fd)
                 else:
                     raise ValueError('持久目录包含无法备份的特殊文件')
+                if entry_limit is not None and len(entries) >= entry_limit:
+                    raise ValueError('存储盘点超过条目上限')
                 entries[relative] = item
             if durable:
                 os.fsync(parent)

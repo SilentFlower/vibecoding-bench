@@ -12,6 +12,7 @@ from docker.types import Mount
 from cpu_resources import default_cpu_limits, read_policy as read_cpu_policy
 
 from account_update_identity import configured_release, image_origin, role_release, save_image_origin
+from cli_scratchpad import SCRATCHPAD_STORE, prepare_scratchpad_mount, restore_cli_scratchpad
 
 from native_kernel_upgrade import migrate_records
 from native_capture_policy import capture_enabled
@@ -173,7 +174,8 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
             labels=role_labels(runtime, row, role), detach=True, auto_remove=False, read_only=True,
             mem_limit=memory, memswap_limit=total, nano_cpus=default_cpus[role],
             pids_limit=role_pids, security_opt=options.pop('security_opt', ['no-new-privileges:true']),
-            log_config={'type': 'json-file', 'config': {'max-size': '10m', 'max-file': '3'}}, mounts=[machine_mount])
+            log_config={'type': 'json-file', 'config': {'max-size': '10m', 'max-file': '3'}},
+            mounts=[machine_mount, *options.pop('mounts', [])])
         if role == 'cli' and review_layout:
             options.update(nano_cpus=review_layout['cli_nano_cpus'], pids_limit=384)
             options['labels']['vibebench.review-layout'] = '1'
@@ -226,6 +228,12 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
             time.sleep(0.25)
         runtime.prepare_system_profile(row, network)
         base = {'network_mode': 'container:' + network.id, 'cap_drop': ['ALL']}
+        scratchpad = []
+        if (image_labels.get('vibebench.cli-scratchpad-protocol') == '1'
+                or (root / SCRATCHPAD_STORE).exists() or (root / SCRATCHPAD_STORE).is_symlink()):
+            scratchpad_mount = prepare_scratchpad_mount(runtime, row)
+            if scratchpad_mount is not None:
+                scratchpad.append(scratchpad_mount)
         cli = launch('cli', **base, user='1000:1000', entrypoint=['python3', '-I', '/usr/local/bin/v3-cli-control'], command=['idle'],
             environment={'HOME': '/home/node', 'TZ': fingerprint['tz'],
                 'LANG': fingerprint['lang'], 'LC_ALL': fingerprint['lang'], 'SHELL': '/bin/bash'},
@@ -238,7 +246,8 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
                 ('runtime/drivers', '/run/v3/drivers', 'ro'), ('runtime/runs', '/run/v3/runs', 'rw'),
                 ('runtime/jobs', '/run/v3/jobs', 'rw'), ('runtime/access', '/run/v3/access', 'ro'),
                 ('flows', '/flows', 'rw'), ('runtime/empty', '/flows/api', 'ro'), ('controls', '/controls', 'ro')]),
-            tmpfs={'/tmp': 'rw,noexec,nosuid,nodev,size=128m,mode=1777'})
+            tmpfs={'/tmp': 'rw,noexec,nosuid,nodev,size=128m,mode=1777'}, mounts=scratchpad)
+        restore_cli_scratchpad(runtime, row, cli, fresh=True)
         runtime.check_system_profile(row, cli)
         _directory(root / 'runtime/native', 1001, 1001, 0o700)
         sender_mounts = mounts([*common_files, ('runtime/sender', '/run/v3', 'ro'), ('flows/api', '/flows/api', 'rw'), ('runtime/native', '/native', 'rw')])

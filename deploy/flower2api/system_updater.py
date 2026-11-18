@@ -28,7 +28,7 @@ from runtime_files import atomic_json, atomic_text, directory_fd
 from runtime_names import account_rebuild_required
 from storage_maintenance import acquire_storage_lock
 from system_update_contract import (DEPLOYMENT_RE, DOWNLOAD_ROOT, INDEX_LIMIT, MANIFEST_LIMIT,
-    RELEASE_RE, REPOSITORY, SHA_RE, TERMINAL, compatible_data, fetch_bytes, fetch_repository_file, safe_read, strict_json,
+    RELEASE_RE, REPOSITORY, SHA_RE, TERMINAL, compatible_data, compatible_scratchpad, fetch_bytes, fetch_repository_file, safe_read, strict_json,
     utc_now, validate_index, validate_operation, validate_release, verify_signed, validate_migration_plan, validate_migration_evidence)
 from system_update_host import HostDeployment
 
@@ -159,6 +159,7 @@ class SystemUpdater:
                 try:
                     value = self.load_release(entry['release'], entry['manifest']['sha256'])
                     compatible = compatible_data(self.state['current']['release']['data_compatibility'], value['data_compatibility'])
+                    compatible = compatible and compatible_scratchpad(self.state['current']['release'], value)
                     reason = None if compatible else 'data_contract_unverified'
                     migrations = []
                     if value['schema_version'] == 2:
@@ -217,7 +218,8 @@ class SystemUpdater:
             history = [{'release': item['release']['release'],
                 'manifest_sha256': hashlib.sha256(safe_read(self.root / 'releases' / item['release']['release'] / 'system-release.json')).hexdigest(),
                 'installed_at': item.get('installed_at'),
-                'rollback_available': compatible_data(item['release']['data_compatibility'], current['release']['data_compatibility'])}
+                'rollback_available': compatible_data(item['release']['data_compatibility'], current['release']['data_compatibility'])
+                    and compatible_scratchpad(current['release'], item['release'])}
                 for item in self.state['history'][:8]]
             return {'installed': True, 'revision': self.state['revision'],
                 'deployment': self.policy['deployment'], 'current_release': current['release']['release'],
@@ -341,6 +343,8 @@ class SystemUpdater:
                     raise ValueError('目标版本不在当前受信目录中，请重新检查版本')
             target = self.load_release(body['target_release'], body['target_manifest_sha256'])
             original = copy.deepcopy(self.state['current'])
+            if not compatible_scratchpad(original['release'], target):
+                raise ValueError('CLI临时文件布局不兼容，请先安装兼容版本并选择具备恢复能力的回退目标')
             selected = {'release': target, 'selection': {role: copy.deepcopy(target[role]) for role in ('control', 'account')}}
             if action == 'rollback':
                 stored = next((item for item in self.state['history'] if item['release']['release'] == target['release']), None)

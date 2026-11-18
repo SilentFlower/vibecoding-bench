@@ -134,6 +134,17 @@ def create_release(manifest_path: Path, policy_path: Path, output: Path, key: Pa
         'compatibility': {'updater': version, 'gate': 1, 'bridge': 1, 'layout': 2, 'cli_install': 2,
             'credential_ownership': 1, 'account_protocols': [1]},
         'data_compatibility': {}, 'bundle': build['bundle']}
+    recovery = build['images']['control'].get('cli_scratchpad_storage', 0)
+    activation = build['images']['account'].get('cli_scratchpad_protocol', 0)
+    if (type(recovery) is not int or recovery not in (0, 1)
+            or type(activation) is not int or activation not in (0, 1)):
+        raise ValueError('CLI临时文件镜像能力声明无效')
+    if activation and not recovery:
+        raise ValueError('CLI临时文件启用镜像缺少管理端恢复能力')
+    if recovery:
+        value['compatibility']['scratchpad_storage'] = 1
+    if activation:
+        value['compatibility']['scratchpad_activation'] = 1
     for name, digest in contracts.items():
         allowed = policy['rollback_compatible'][name]
         if not isinstance(allowed, list):

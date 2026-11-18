@@ -184,7 +184,13 @@ def validate_release(value: dict) -> dict:
         _digest(entry['content_sha256'], '组件内容')
         _integer(entry['unpacked_bytes'], 1, 64 * 1024 ** 3, '镜像空间')
     capabilities = value['compatibility']
-    _fields(capabilities, {'updater', 'gate', 'bridge', 'layout', 'cli_install', 'credential_ownership', 'account_protocols'}, '兼容协议')
+    optional = {'scratchpad_storage', 'scratchpad_activation'} & set(capabilities) if isinstance(capabilities, dict) else set()
+    _fields(capabilities, {'updater', 'gate', 'bridge', 'layout', 'cli_install', 'credential_ownership', 'account_protocols'} | optional, '兼容协议')
+    for key in optional:
+        if type(capabilities[key]) is not int or capabilities[key] != 1:
+            raise ValueError('CLI临时文件布局协议不受支持')
+    if 'scratchpad_activation' in optional and capabilities.get('scratchpad_storage') != 1:
+        raise ValueError('CLI临时文件启用声明缺少恢复能力')
     for key, expected in {'updater': version, 'gate': 1, 'bridge': 1, 'layout': 2, 'cli_install': 2, 'credential_ownership': 1}.items():
         if type(capabilities[key]) is not int or capabilities[key] != expected:
             raise ValueError(f'更新所需{key}协议不受支持')
@@ -348,6 +354,19 @@ def compatible_data(original: dict, target: dict) -> bool:
     :return: 两库均具备向原版恢复的声明。
     """
     return all(original[name]['contract'] in target[name]['rollback_compatible'] for name in ('bench', 'gateway'))
+
+
+def compatible_scratchpad(original: dict, target: dict) -> bool:
+    """核对新布局接管能力及首次激活所需的兼容来源。
+
+    :param original: 当前已验证发行。
+    :param target: 待切换的已验证发行。
+    :return: 原布局可继续恢复且激活来源具备恢复能力时返回True。
+    """
+    current, selected = original['compatibility'], target['compatibility']
+    if selected.get('scratchpad_activation') == 1 and current.get('scratchpad_storage') != 1:
+        return False
+    return current.get('scratchpad_storage') != 1 or selected.get('scratchpad_storage') == 1
 
 
 class ReleaseRedirect(HTTPRedirectHandler):

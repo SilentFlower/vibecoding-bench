@@ -522,7 +522,9 @@ def build(release: str, manifest_path: Path) -> None:
             if subprocess.run(["docker", "image", "inspect", reference], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
                 raise ValueError("批次镜像标签已经存在，禁止覆盖")
             started = time.monotonic()
-            command(*build_commands[role], "-f", str(snapshot / "images/v3/Dockerfile"), "--target", role,
+            control_labels = (['--label', 'vibebench.cli-scratchpad-storage=1']
+                if role == 'control' and (snapshot / 'orchestrator/cli_scratchpad.py').is_file() else [])
+            command(*build_commands[role], *control_labels, "-f", str(snapshot / "images/v3/Dockerfile"), "--target", role,
                 "--build-arg", f"V3_RELEASE={release}", "--build-arg", f"V3_PARENT_REV={parent}",
                 "--build-arg", f"V3_GATEWAY_REV={gateway}", "--build-arg", f"VITE_PLATFORM_VERSION={platform_version}",
                 "-t", reference, str(snapshot))
@@ -533,6 +535,11 @@ def build(release: str, manifest_path: Path) -> None:
                 "config_digest": _image_config_digest(reference),
                 "unpacked_bytes": info.get("Size", 0),
                 "platform": info["Os"] + "/" + info["Architecture"]}
+            labels = info.get('Config', {}).get('Labels') or {}
+            if role == 'control':
+                images[role]['cli_scratchpad_storage'] = 1 if labels.get('vibebench.cli-scratchpad-storage') == '1' else 0
+            elif role == 'account':
+                images[role]['cli_scratchpad_protocol'] = 1 if labels.get('vibebench.cli-scratchpad-protocol') == '1' else 0
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     with manifest_path.open("x") as output:
         json.dump({"schema": 3, "bridge_protocol": 1, "credential_ownership_protocol": 1, "system_update_protocol": 1, "layout_version": 2, "default_cli_version": "2.1.293",

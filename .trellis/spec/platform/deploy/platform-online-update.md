@@ -497,3 +497,50 @@ runtime_names.account_container_prefix(deployment: str, *, legacy: bool = False)
 - `test_system_host`：受信网络唯一性、冻结角色删除、已接网/停止角色、精确管理白名单、完整 capture、限定409重试、意图先持久及重复收口。
 - `test_system_update_snapshot_lock`：真实线程短锁释放后 ready；持续锁仍 blocked。`test_system_update_retirement` 与既有恢复测试：token/epoch/代次、未知角色/镜像/活动和部分恢复边界。
 - `verify_system_update.py --migration-manifest <候选清单>`：真实旧名部署进入新基线、两个运行环境和一个停止环境、真实 CLI 孤儿及取消、基线内升级/回退、控制验收失败、部分角色/进程中断恢复、镜像引用保护与精确回收。固定源码刷新另验成功、部分替换、导入失败及重启失败恢复，使用合成身份且真实模型调用为零。
+
+
+## Scenario: CLI 临时文件持久化的两阶段发行兼容
+
+### 1. Scope / Trigger
+
+首次将账号 CLI scratchpad 从内存盘切到磁盘时，先安装具备恢复能力的管理端，再发布启用布局的账号镜像。该顺序使失败恢复保全迁盘后的最新文件。
+
+### 2. Signatures
+
+```python
+validate_release(value: dict) -> dict
+compatible_scratchpad(original: dict, target: dict) -> bool
+```
+
+签名清单沿原 `compatibility` 对象增加可选字段。发行器从已检查的镜像元数据生成字段。
+
+### 3. Contracts
+
+- `scratchpad_storage`、`scratchpad_activation` 出现时必须为整数 `1`。激活声明同时要求恢复声明。历史清单缺少字段时保持原格式。
+- 控制镜像标签 `vibebench.cli-scratchpad-storage=1` 对应构建元数据 `cli_scratchpad_storage=1`。账号标签 `vibebench.cli-scratchpad-protocol=1` 对应 `cli_scratchpad_protocol=1`。元数据缺省为 `0`，发行器仅接受严格整数 `0/1`。
+- 兼容阶段仅声明 storage，账号组件内容摘要与原正式发行完全一致。启用阶段增加 activation。目标 activation 为1时，当前发行必须已有 storage 为1。当前 storage 为1时，目标也必须具备 storage 为1。
+- 版本列表、回退可用性、prepare/install/rollback 共用兼容判断。宿主失败恢复在已有环境重建意图且原版不兼容时保留维护门禁并拒绝切换。
+- 已有宿主更新器 v2 先沿同协议源码维护 SOP 刷新固定源码。冻结来源和原文件摘要，备份并校验服务与状态，失败按原文件恢复。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 能力字段为 bool、字符串、0或2 | 清单校验拒绝 |
+| activation 存在且 storage 缺少 | 清单校验拒绝 |
+| 旧版直接安装激活版 | 宿主操作前拒绝 |
+| 兼容版或激活版回退到无恢复能力旧版 | 列表及回退投影标记不兼容，提交入口拒绝 |
+| 激活版恢复兼容版 | 保留新布局和最新文件，沿原恢复链执行 |
+| 已有环境重建意图且恢复版本不兼容 | 控制切换前拒绝，维护门禁保留 |
+
+### 5. Scenarios and Examples
+
+- 正常：原版 → 兼容版（账号内容摘要一致）→ 激活版。激活失败恢复兼容版，并在原 `/tmp/claude-1000` 读取原会话文件。
+- 基础：无新增能力字段的历史签名清单继续校验。兼容阶段账号容器沿原组件复用规则处理。
+- 错误用法：仅凭数据库可回退就恢复到旧管理端。正确处理：同时检查 scratchpad 恢复能力，并保留磁盘布局和新增数据。
+
+### 6. Tests Required
+
+- `test_scratchpad_update_compatibility`：严格类型、全兼容矩阵、真实签名清单、跳过兼容阶段在宿主副作用前拒绝、旧回退隐藏及提交防绕过、健康检查失败恢复兼容版、部分恢复保留门禁、发行能力源自真实镜像元数据。
+- `verify_scratchpad_storage.py`：实际原账号镜像与兼容管理代码挂载磁盘并恢复同一真实 CLI 会话，校验账号和兄弟 session 归属。
+- 发布前校验兼容阶段账号 `content_sha256` 与线上签名清单相等；正式发行后核对签名、能力声明、来源 SHA 及实际安装耗时。

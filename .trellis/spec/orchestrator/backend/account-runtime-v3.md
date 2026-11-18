@@ -1696,3 +1696,53 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 ### 6. Tests Required
 
 `test_environment_summary`断言并发上限、排序、ContextVar、空列表与异常；`test_account_runtime`继续覆盖只读身份、维护锁、删除/草稿过滤与公开字段。`verify_native_environments.py`及`verify_environment_cpu_summary.py`保持列表、CPU换代和编辑草稿回归。
+
+## Scenario: CLI scratchpad 私有磁盘与启动恢复
+
+### 1. Scope / Trigger
+
+- 修改账号CLI的`/tmp/claude-1000`挂载、停止转存、重建、评审交接、备份或节点迁移时适用。实现归`cli_scratchpad.py`，调用入口沿用账号运行环境的原锁、空闲门禁和维护租约。
+
+### 2. Signatures
+
+- `preserve_cli_scratchpad(runtime, row: dict, container) -> None`：在停止原CLI前保全可读取的内存盘。
+- `prepare_scratchpad_mount(runtime, row: dict) -> Mount | None`：准备账号独立磁盘卷，返回原容器路径的挂载。
+- `restore_cli_scratchpad(runtime, row: dict, container, *, fresh: bool = False) -> None`：恢复原临时路径，或核验磁盘挂载。`fresh=True`只由已创建新空CLI的角色入口传入。
+- `scratchpad_runtime_registered(root: Path, environment_id: str) -> bool`：核验允许在目标节点重建的工作目录协议。
+- `remove_scratchpad_volume(runtime, row: dict) -> None`：全部角色移除后核验并清理卷元数据，持久文件继续独立保存。
+
+### 3. Contracts
+
+- 镜像标签`vibebench.cli-scratchpad-protocol=1`启用候选布局；已有`cli-scratchpad`资料继续进入保护逻辑。目录按不可变environment_id持有，HOME、原session路径、执行source和账号身份沿原映射。
+- 持久根为`cli-scratchpad/data`，UID1000。Docker local overlay使用私有空lower、磁盘upper及work，目标固定`/tmp/claude-1000`，参数含`noexec,nosuid,nodev`。CLI继续UID1000、能力清零、只读根和no-new-privileges。普通`/tmp`沿原tmpfs。
+- 管理记录属于root私有目录，协议身份为`{protocol:1,environment_id}`。`legacy.json`另绑定`container_id/generation/node_key/started_at/archive/sha256`；`restore.json`和`restored.json`绑定目标`container_id/started_at/archive_sha256`。转存流最多512MiB、清单最多100000条，拒绝路径逃逸、设备及链接父目录，核对文件内容与元数据并持久化后发布。
+- Docker归档接口对隔离tmpfs的视图不作为转存依据。可信标准库程序通过原CLI的exec流导出，并在CLI实际挂载命名空间中恢复。导出结束复核源StartedAt，启动身份变化阻挡发布并保留上次快照。
+- 同容器、同StartedAt且没有待恢复记录时，当前文件是权威状态，恢复入口直接沿用。启动身份改变或旧回执缺少started_at时，须先取得匹配本次启动与快照摘要的恢复完成证明，再允许新转存，避免空tmpfs覆盖唯一旧快照。恢复失败保留待恢复门禁及原包。
+- 卷名称、真实宿主路径、driver、选项和标签绑定部署、节点及环境。管理容器路径使用data，Docker挂载源使用host_data。实际能力探针核验UID和挂载标志；新布局尚未发布时，能力不足可沿用tmpfs，已有磁盘资料要求兼容节点继续恢复。
+- `runtime/scratchpad-mount/mount.json`与持久`layout.json`共同证明目录归属；已登记目录只含mount.json、lower、work，lower必须为空，目录保持管理端私有。创建归属标记先于lower/work，部分创建按同一身份续接。未知同名内容保留并阻挡挂载接管。
+- 本机完整及精简备份保全真实数据。节点集群接线由集群任务持有：节点导出须在`scratchpad_runtime_registered`通过后动态排除工作目录，未知同名目录随迁移包保全。回退候选须识别并保护磁盘资料与最新HOME。
+- 内存收益按退出tmpfs的shmem独立报告，普通页缓存、cgroup、进程内存及磁盘成本分别解释。接纳性能以固定sender、同宿主交错配对和明确负载的证据为准，实际发行镜像另做节点灰度。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 转存失败、磁盘满、内容变化或源启动身份改变 | 保留原实例及上次快照，阻挡后续停止移除 |
+| 本次启动尚未恢复旧快照 | 拒绝新转存，保留原包及恢复定位 |
+| 恢复失败或目标有未知内容 | 保留待恢复门禁及原文件，按同一恢复身份重试 |
+| 外来环境、卷标签或挂载选项不符 | 拒绝复用与清理 |
+| 已登记工作目录出现未知内容或外来标记 | 拒绝挂载及迁移排除，保留现场 |
+| 未登记的同名历史目录 | 迁移保全；挂载接管要求先对账 |
+
+### 5. Scenarios and Examples
+
+- 正常：空闲旧CLI完成转存后重建，新CLI在原路径读取同一session文件，真实历史会话继续执行。
+- 边界：转存后停止失败，源仍在同次启动中继续写入；对账沿用最新文件，下次转存保存新内容。
+- 错误用法：CLI重启后先对空tmpfs转存。正确处理是先按旧快照恢复并保存本次启动证明，再允许新的转存。
+- 错误用法：仅根据目录名称排除历史文件。正确处理是核验双份协议和私有目录，未知目录随迁移包保留。
+
+### 6. Tests Required
+
+- `test_cli_scratchpad`覆盖原路径、权限、硬链接/符号链接、三会话、源启动变化、同次启动继续写入、未恢复快照保护、旧回执、磁盘满、发布/恢复中断、跨账号及节点归属、完整/精简备份；集群迁移文件工具由集群交付追加验收。
+- 登录草稿夹具提供实际镜像Config/Labels结构，`test_login_drafts`继续验证旧布局删除、重试和对账；账号及评审运行环境回归核对原门禁与停止顺序。
+- `deploy/flower2api/verify_scratchpad_storage.py`在无外网隔离Docker中使用真实官方CLI和模拟上游，验证原会话续跑、两账号内容归属、安全挂载、重启前后快照保护、能力不足回退及3×8MiB退出tmpfs。性能配对模式覆盖真实sender、并发、吞吐、TTFT、分位延迟、冷启动和CPU。

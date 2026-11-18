@@ -18,6 +18,7 @@ from unittest.mock import Mock, call, patch
 from content_capture_settings import read_settings as read_content_capture, set_settings as set_content_capture
 
 from docker import APIClient
+from docker.types import Mount
 
 from account_runtime import AccountRuntime, RuntimeBusy, atomic_json, derive_v3_fingerprint, locale_for_timezone
 from account_isolation import ROLE_COLUMNS, role_labels
@@ -51,6 +52,7 @@ class AccountRuntimeTests(unittest.TestCase):
             connection.execute("CREATE TABLE app_settings(key TEXT PRIMARY KEY, value TEXT)")
             connection.execute("INSERT INTO accounts(id,name,cc2api_account_id) VALUES(1,'synthetic',7)")
         self.client = Mock()
+        self.client.images.get.return_value.attrs = {'Config': {'Labels': {}}}
         self.client.containers.list.return_value = []
         self.gateway = Mock()
         self.fingerprint = Mock(return_value={"profile_version": 2, "hostname": "fixed", "machine_id": "a" * 32,
@@ -2270,6 +2272,28 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertNotIn("mac_address", network)
         self.assertEqual(json.loads(row["fingerprint_json"])["mac"],
             network["networking_config"][self.runtime.network]["MacAddress"])
+
+    def test_scratchpad_mount_and_copy_failure_protect_all_original_roles(self) -> None:
+        """新CLI接收专有挂载，转存失败时三个原角色都保留。:return: None。"""
+        containers = self._isolated_docker()
+        self.client.images.get.return_value.attrs['Config']['Labels']['vibebench.cli-scratchpad-protocol'] = '1'
+        account = {'id': 1, 'name': 'synthetic', 'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        mount = Mount('/tmp/claude-1000', 'owned-scratchpad', no_copy=True)
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sender_active', return_value=0), \
+                patch('account_isolation.prepare_scratchpad_mount', return_value=mount), \
+                patch('account_isolation.restore_cli_scratchpad') as restore:
+            row, cli = self.runtime.ensure(account)
+        options = next(item.kwargs for item in self.client.containers.run.call_args_list
+            if item.kwargs['labels']['vibebench.role'] == 'account')
+        self.assertIn(mount, options['mounts'])
+        self.assertEqual(2, len(options['mounts']))
+        restore.assert_called_once_with(self.runtime, row, cli, fresh=True)
+        with patch('account_runtime.preserve_cli_scratchpad', side_effect=ValueError('合成转存失败')), \
+                self.assertRaisesRegex(ValueError, '合成转存失败'):
+            self.runtime._stop_environment(row, remove=True)
+        for container in containers.values():
+            container.stop.assert_not_called()
+            container.remove.assert_not_called()
 
     def test_existing_api_evidence_keeps_content_and_moves_to_sender(self) -> None:
         """旧 root 证据交接给普通发送器，历史和轮换文件均保留。@return None。"""
