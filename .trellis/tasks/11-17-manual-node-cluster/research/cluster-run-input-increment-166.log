@@ -1,0 +1,16 @@
+..........................E
+======================================================================
+ERROR: test_projects (unittest.loader._FailedTest.test_projects)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_projects
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/unittest/loader.py", line 137, in loadTestsFromName
+    module = __import__(module_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'test_projects'
+
+
+----------------------------------------------------------------------
+Ran 27 tests in 10.615s
+
+FAILED (errors=1)

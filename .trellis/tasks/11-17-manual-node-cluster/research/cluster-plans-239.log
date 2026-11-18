@@ -1,0 +1,31 @@
+.EE
+======================================================================
+ERROR: test_file_preparation_cancels_without_touching_other_actual_jobs (test_cluster_legacy_projects.ProjectPlanNodeTests.test_file_preparation_cancels_without_touching_other_actual_jobs)
+尚未进入exec意图的准备可收口，另一个原作业保持原身份。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_legacy_projects.py", line 220, in test_file_preparation_cancels_without_touching_other_actual_jobs
+    self.node.host.runtime.jobs['other-original']=object()
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: '_HostedRuntime' object has no attribute 'jobs'
+
+======================================================================
+ERROR: test_original_configuration_is_committed_before_single_actual_start_and_decisions (test_cluster_legacy_projects.ProjectPlanNodeTests.test_original_configuration_is_committed_before_single_actual_start_and_decisions)
+原中央保存source/证据后配置Node，实际启动一次，决定按原阶段推进。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_legacy_projects.py", line 205, in test_original_configuration_is_committed_before_single_actual_start_and_decisions
+    self.assertEqual(document,json.loads(destination.read_text()))
+                                         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1029, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1015, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/tmpn98ysejb/environments/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee/controls/4eee48308fde44275bc2/project-plan-decision.json'
+
+----------------------------------------------------------------------
+Ran 3 tests in 8.484s
+
+FAILED (errors=2)

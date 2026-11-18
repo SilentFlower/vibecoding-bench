@@ -1,0 +1,17 @@
+.....F
+======================================================================
+FAIL: test_closed_cli_scope_runs_only_original_program_and_keeps_grant_closed (test_cluster_run_verification.ReleasedRunProgramTests.test_closed_cli_scope_runs_only_original_program_and_keeps_grant_closed)
+独立程序只读取原冻结候选，重复请求不创建CLI或第二程序。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_run_verification.py", line 79, in test_closed_cli_scope_runs_only_original_program_and_keeps_grant_closed
+    state=self.wait()
+          ^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_run_verification.py", line 73, in wait
+    self.assertLess(time.monotonic(),deadline)
+AssertionError: 183487.676364416 not less than 183487.671457253
+
+----------------------------------------------------------------------
+Ran 6 tests in 40.182s
+
+FAILED (failures=1)

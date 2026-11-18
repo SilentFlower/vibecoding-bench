@@ -1,0 +1,108 @@
+......EEEEEE...............
+======================================================================
+ERROR: test_actual_unregistered_cli_process_blocks_fencing (test_cluster_environment.EnvironmentFenceTests.test_actual_unregistered_cli_process_blocks_fencing)
+真实进程探针返回孤儿时保持原角色，不能只依据空jobs认定空闲。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_environment.py", line 121, in test_actual_unregistered_cli_process_blocks_fencing
+    fence_environment(self.runtime, self.row, self.request)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_environment.py", line 72, in fence_environment
+    cli = runtime._container(row)
+          ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/account_runtime.py", line 534, in _container
+    return role_container(self, row, "cli")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/account_isolation.py", line 64, in role_container
+    raise ValueError('账号隔离角色归属、代次或镜像批次不匹配')
+ValueError: 账号隔离角色归属、代次或镜像批次不匹配
+
+======================================================================
+ERROR: test_execution_record_and_active_sender_refuse_stopping (test_cluster_environment.EnvironmentFenceTests.test_execution_record_and_active_sender_refuse_stopping)
+活动CLI证据和发送器计数分别阻止源停止。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_environment.py", line 74, in test_execution_record_and_active_sender_refuse_stopping
+    fence_environment(self.runtime, self.row, self.request)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_environment.py", line 72, in fence_environment
+    cli = runtime._container(row)
+          ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/account_runtime.py", line 534, in _container
+    return role_container(self, row, "cli")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/account_isolation.py", line 64, in role_container
+    raise ValueError('账号隔离角色归属、代次或镜像批次不匹配')
+ValueError: 账号隔离角色归属、代次或镜像批次不匹配
+
+======================================================================
+ERROR: test_fence_stops_three_roles_and_durably_blocks_old_source (test_cluster_environment.EnvironmentFenceTests.test_fence_stops_three_roles_and_durably_blocks_old_source)
+停止按原运行时执行，隔离记录和代次跨恢复保留。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_environment.py", line 52, in test_fence_stops_three_roles_and_durably_blocks_old_source
+    receipt = fence_environment(self.runtime, self.row, self.request)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_environment.py", line 72, in fence_environment
+    cli = runtime._container(row)
+          ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/account_runtime.py", line 534, in _container
+    return role_container(self, row, "cli")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/account_isolation.py", line 64, in role_container
+    raise ValueError('账号隔离角色归属、代次或镜像批次不匹配')
+ValueError: 账号隔离角色归属、代次或镜像批次不匹配
+
+======================================================================
+ERROR: test_partial_stop_keeps_fencing_intent_and_retries_same_operation (test_cluster_environment.EnvironmentFenceTests.test_partial_stop_keeps_fencing_intent_and_retries_same_operation)
+Docker停止中断后保留隔离意图，同操作核对后可继续停止。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_environment.py", line 85, in test_partial_stop_keeps_fencing_intent_and_retries_same_operation
+    fence_environment(self.runtime, self.row, self.request)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_environment.py", line 72, in fence_environment
+    cli = runtime._container(row)
+          ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/account_runtime.py", line 534, in _container
+    return role_container(self, row, "cli")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/account_isolation.py", line 64, in role_container
+    raise ValueError('账号隔离角色归属、代次或镜像批次不匹配')
+ValueError: 账号隔离角色归属、代次或镜像批次不匹配
+
+======================================================================
+ERROR: test_remote_assignment_is_fenced_with_the_same_operation (test_cluster_environment.EnvironmentFenceTests.test_remote_assignment_is_fenced_with_the_same_operation)
+SSH节点的本地归属记录随真实停止进入fenced并拒绝其他版本。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_environment.py", line 113, in test_remote_assignment_is_fenced_with_the_same_operation
+    fence_environment(self.runtime, self.row, request)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_environment.py", line 72, in fence_environment
+    cli = runtime._container(row)
+          ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/account_runtime.py", line 534, in _container
+    return role_container(self, row, "cli")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/account_isolation.py", line 64, in role_container
+    raise ValueError('账号隔离角色归属、代次或镜像批次不匹配')
+ValueError: 账号隔离角色归属、代次或镜像批次不匹配
+
+======================================================================
+ERROR: test_wrong_generation_or_other_operation_cannot_reuse_fence (test_cluster_environment.EnvironmentFenceTests.test_wrong_generation_or_other_operation_cannot_reuse_fence)
+源代次与操作边界分别校验，错误请求保持原环境。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_environment.py", line 96, in test_wrong_generation_or_other_operation_cannot_reuse_fence
+    fence_environment(self.runtime, self.row, self.request)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_environment.py", line 72, in fence_environment
+    cli = runtime._container(row)
+          ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/account_runtime.py", line 534, in _container
+    return role_container(self, row, "cli")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/account_isolation.py", line 64, in role_container
+    raise ValueError('账号隔离角色归属、代次或镜像批次不匹配')
+ValueError: 账号隔离角色归属、代次或镜像批次不匹配
+
+----------------------------------------------------------------------
+Ran 27 tests in 6.812s
+
+FAILED (errors=6)

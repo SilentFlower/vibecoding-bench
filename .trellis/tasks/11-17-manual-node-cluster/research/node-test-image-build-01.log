@@ -1,0 +1,62 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 248B done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/flower2api-control:v3-verify-ui-native-20261116-10
+#2 DONE 0.1s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [1/4] FROM docker.io/library/flower2api-control:v3-verify-ui-native-20261116-10@sha256:771a97656c8053e7cd60caa7ef62fe8f67518f2aede1e35d1fe88a4e140dbc45
+#4 resolve docker.io/library/flower2api-control:v3-verify-ui-native-20261116-10@sha256:771a97656c8053e7cd60caa7ef62fe8f67518f2aede1e35d1fe88a4e140dbc45 0.0s done
+#4 ...
+
+#5 [internal] load build context
+#5 transferring context: 2.32MB 0.0s done
+#5 DONE 0.1s
+
+#4 [1/4] FROM docker.io/library/flower2api-control:v3-verify-ui-native-20261116-10@sha256:771a97656c8053e7cd60caa7ef62fe8f67518f2aede1e35d1fe88a4e140dbc45
+#4 DONE 0.4s
+
+#6 [2/4] COPY orchestrator/ /app/
+#6 DONE 0.2s
+
+#7 [3/4] COPY entrypoint.sh /usr/local/bin/v3-control
+#7 DONE 0.1s
+
+#8 [4/4] RUN chmod +x /usr/local/bin/v3-control && pip install --no-cache-dir httpx==0.28.1
+#8 1.916 Collecting httpx==0.28.1
+#8 2.349   Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+#8 2.356 Requirement already satisfied: anyio in /usr/local/lib/python3.12/site-packages (from httpx==0.28.1) (4.16.0)
+#8 2.356 Requirement already satisfied: certifi in /usr/local/lib/python3.12/site-packages (from httpx==0.28.1) (2026.10.23)
+#8 2.441 Collecting httpcore==1.* (from httpx==0.28.1)
+#8 2.505   Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+#8 2.528 Requirement already satisfied: idna in /usr/local/lib/python3.12/site-packages (from httpx==0.28.1) (3.20)
+#8 2.530 Requirement already satisfied: h11>=0.16 in /usr/local/lib/python3.12/site-packages (from httpcore==1.*->httpx==0.28.1) (0.16.0)
+#8 2.532 Requirement already satisfied: typing_extensions>=4.16.0 in /usr/local/lib/python3.12/site-packages (from anyio->httpx==0.28.1) (4.16.0)
+#8 2.600 Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+#8 2.738 Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+#8 2.800 Installing collected packages: httpcore, httpx
+#8 2.962 Successfully installed httpcore-1.0.9 httpx-0.28.1
+#8 2.962 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#8 3.393 
+#8 3.393 [notice] A new release of pip is available: 25.0.1 -> 26.3
+#8 3.393 [notice] To update, run: pip install --upgrade pip
+#8 DONE 3.5s
+
+#9 exporting to image
+#9 exporting layers
+#9 exporting layers 0.3s done
+#9 exporting manifest sha256:91c979fabe4591226ca47d01726f6e3982c3b3ffef83ddcda1d742ddba56a604 0.0s done
+#9 exporting config sha256:232383c068f56854e7be28d20a35ea15e970506fbcb0aa402bdbd2af9daebe03 0.0s done
+#9 exporting attestation manifest sha256:f868dc0ac66a78d99bd60109eee8f9597262f4d75d20f7b326fa06259bae3414 0.0s done
+#9 exporting manifest list sha256:0a114fd1d84bcd0263d97a913d15ec05b6c1510bbdce96bad0bcc8aee0031449
+#9 exporting manifest list sha256:0a114fd1d84bcd0263d97a913d15ec05b6c1510bbdce96bad0bcc8aee0031449 0.0s done
+#9 naming to docker.io/library/flower2api-control:cluster-test-local done
+#9 unpacking to docker.io/library/flower2api-control:cluster-test-local
+#9 unpacking to docker.io/library/flower2api-control:cluster-test-local 0.2s done
+#9 DONE 0.7s

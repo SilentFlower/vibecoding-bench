@@ -1,0 +1,15 @@
+.................................
+----------------------------------------------------------------------
+Ran 33 tests in 1.127s
+
+OK
+v3 essential 备份及隔离恢复验证完成：/tmp/tmp09zyaze3/backups/first；文件字节 21；保留最近 1 份，已移除旧备份 0 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmp09zyaze3/backups/second；文件字节 21；保留最近 1 份，已移除旧备份 1 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmp09zyaze3/backups/third；文件字节 429；保留最近 1 份，已移除旧备份 1 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmp585nxzfl/backup；文件字节 115；保留最近 1 份，已移除旧备份 0 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmpmz0afq5u/backup；文件字节 140；保留最近 1 份，已移除旧备份 0 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmptkbf36qp/backup；文件字节 115；保留最近 1 份，已移除旧备份 0 份
+v3 full 备份及隔离恢复验证完成：/tmp/tmp7h0wz46t/backup；文件字节 8307；保留最近 1 份，已移除旧备份 0 份
+v3 full 备份及隔离恢复验证完成：/tmp/tmpv86qrv8j/first；文件字节 8307；保留最近 1 份，已移除旧备份 0 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmppmprz6_y/backup；文件字节 115；保留最近 1 份，已移除旧备份 0 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmpaby5ijbj/backup；文件字节 115；保留最近 1 份，已移除旧备份 0 份

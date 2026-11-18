@@ -1,0 +1,530 @@
+.E.EE...........EEEEEEEEEEEEEEEEEEE/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+  warnings.warn(  # deprecated in 14.0 - 2024-11-09
+/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/uvicorn/protocols/websockets/websockets_impl.py:16: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+  from websockets.server import WebSocketServerProtocol
+.FF..
+======================================================================
+ERROR: test_empty_database_baseline_and_repeat_preserve_records (test_database_migrations.DatabaseMigrationTests.test_empty_database_baseline_and_repeat_preserve_records)
+空库建立基线后重复执行保留账号与台账。@return None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_database_migrations.py", line 23, in test_empty_database_baseline_and_repeat_preserve_records
+    first = apply_migrations(self.database)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_modified_marker_or_definition_rejected (test_database_migrations.DatabaseMigrationTests.test_modified_marker_or_definition_rejected)
+历史登记与程序语义被改写时拒绝继续执行。@return None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_database_migrations.py", line 81, in test_modified_marker_or_definition_rejected
+    apply_migrations(self.database)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_registered_database_checks_actual_columns (test_database_migrations.DatabaseMigrationTests.test_registered_database_checks_actual_columns)
+已登记数据库的缺列仍须明确拒绝。@return None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_database_migrations.py", line 104, in test_registered_database_checks_actual_columns
+    apply_migrations(self.database)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_corrupt_node_configuration_does_not_hide_other_nodes (test_cluster_nodes.ClusterNodeTests.test_corrupt_node_configuration_does_not_hide_other_nodes)
+单个节点记录损坏时本机与其他节点仍能正常展示。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_nodes.py", line 36, in setUp
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_host_key_fingerprint_matches_openssh (test_cluster_nodes.ClusterNodeTests.test_host_key_fingerprint_matches_openssh)
+主机指纹与实际OpenSSH解析一致。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_nodes.py", line 36, in setUp
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_initial_assignment_persists_and_existing_environment_requires_migration (test_cluster_nodes.ClusterNodeTests.test_initial_assignment_persists_and_existing_environment_requires_migration)
+首次分配落库并校验CAS，已有代次拒绝直接换节点。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_nodes.py", line 36, in setUp
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_invalid_inputs_do_not_reach_shell_or_echo_private_material (test_cluster_nodes.ClusterNodeTests.test_invalid_inputs_do_not_reach_shell_or_echo_private_material)
+非法地址、路径及私钥错误经过公开接口时保持固定错误。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_nodes.py", line 36, in setUp
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_missing_registered_cluster_structure_is_rejected (test_cluster_nodes.ClusterNodeTests.test_missing_registered_cluster_structure_is_rejected)
+已登记库损坏时拒绝伪装成功。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_nodes.py", line 36, in setUp
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_old_accounts_backfill_and_new_accounts_receive_local_assignment (test_cluster_nodes.ClusterNodeTests.test_old_accounts_backfill_and_new_accounts_receive_local_assignment)
+旧库回填与新账号触发器保持唯一默认归属。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_nodes.py", line 36, in setUp
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_pause_during_installation_requires_capability_recheck (test_cluster_nodes.ClusterNodeTests.test_pause_during_installation_requires_capability_recheck)
+暂停不被迟到安装回执覆盖，安装中状态收口为待核对。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_nodes.py", line 36, in setUp
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_pausing_node_blocks_new_local_admission (test_cluster_nodes.ClusterNodeTests.test_pausing_node_blocks_new_local_admission)
+暂停本机节点后正式账号与新登录草稿都不能新准入。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_nodes.py", line 36, in setUp
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_referenced_node_and_local_node_cannot_be_removed (test_cluster_nodes.ClusterNodeTests.test_referenced_node_and_local_node_cannot_be_removed)
+实际账号引用和本机默认节点受到保护。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_nodes.py", line 36, in setUp
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_registration_keeps_private_key_out_of_database_and_responses (test_cluster_nodes.ClusterNodeTests.test_registration_keeps_private_key_out_of_database_and_responses)
+只写密钥进入0700/0600私有文件，公开及数据库保持脱敏。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_nodes.py", line 36, in setUp
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_stale_observation_cannot_overwrite_new_node_configuration (test_cluster_nodes.ClusterNodeTests.test_stale_observation_cannot_overwrite_new_node_configuration)
+失效配置的迟到观测保持丢弃。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_nodes.py", line 36, in setUp
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_confirmed_input_repairs_pending_pointer_without_replaying (test_cluster_terminal.NodeTerminalTests.test_confirmed_input_repairs_pending_pointer_without_replaying)
+确认回执落盘后崩溃的未决指针可按原sent事实收口。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_terminal.py", line 30, in setUp
+    self.executor.prepare(fixture.request)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 271, in prepare
+    return self._prepare_locked(request, account_id, name, environment_id, remote_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 772, in _prepare_locked
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_expiry_or_fence_closes_new_input_and_keeps_original_observation (test_cluster_terminal.NodeTerminalTests.test_expiry_or_fence_closes_new_input_and_keeps_original_observation)
+过期关闭新投递，观察仍读取节点保存的原token与路径。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_terminal.py", line 30, in setUp
+    self.executor.prepare(fixture.request)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 271, in prepare
+    return self._prepare_locked(request, account_id, name, environment_id, remote_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 772, in _prepare_locked
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_manual_resolution_keeps_original_input_as_receipt_and_allows_next (test_cluster_terminal.NodeTerminalTests.test_manual_resolution_keeps_original_input_as_receipt_and_allows_next)
+人工核对结论幂等，原输入仍只查询，下一独立动作重新核对许可。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_terminal.py", line 30, in setUp
+    self.executor.prepare(fixture.request)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 271, in prepare
+    return self._prepare_locked(request, account_id, name, environment_id, remote_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 772, in _prepare_locked
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_sent_receipt_allows_next_operation_and_does_not_repeat_old_input (test_cluster_terminal.NodeTerminalTests.test_sent_receipt_allows_next_operation_and_does_not_repeat_old_input)
+已确认投递后解除原未决指针，重试仍返回原sent回执。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_terminal.py", line 30, in setUp
+    self.executor.prepare(fixture.request)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 271, in prepare
+    return self._prepare_locked(request, account_id, name, environment_id, remote_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 772, in _prepare_locked
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_start_retries_only_return_original_receipt_and_node_owned_paths (test_cluster_terminal.NodeTerminalTests.test_start_retries_only_return_original_receipt_and_node_owned_paths)
+同一操作仅启动一次，节点按冻结摘要计算资产根和运行定位。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_terminal.py", line 30, in setUp
+    self.executor.prepare(fixture.request)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 271, in prepare
+    return self._prepare_locked(request, account_id, name, environment_id, remote_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 772, in _prepare_locked
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_starting_receipt_can_be_read_while_original_start_holds_lock (test_cluster_terminal.NodeTerminalTests.test_starting_receipt_can_be_read_while_original_start_holds_lock)
+长准备持锁时仍可查询原starting收据，重复查询不启动第二次。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_terminal.py", line 30, in setUp
+    self.executor.prepare(fixture.request)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 271, in prepare
+    return self._prepare_locked(request, account_id, name, environment_id, remote_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 772, in _prepare_locked
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_unknown_input_preserves_intent_and_blocks_following_input (test_cluster_terminal.NodeTerminalTests.test_unknown_input_preserves_intent_and_blocks_following_input)
+未知投递保持原回执，重复请求与后续不同输入均不会再次投递。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_terminal.py", line 30, in setUp
+    self.executor.prepare(fixture.request)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 271, in prepare
+    return self._prepare_locked(request, account_id, name, environment_id, remote_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 772, in _prepare_locked
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+ERROR: test_unknown_start_is_durable_and_restart_never_launches_again (test_cluster_terminal.NodeTerminalTests.test_unknown_start_is_durable_and_restart_never_launches_again)
+启动异常只记录类型，重建节点操作对象后继续查询原未知结果。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_terminal.py", line 30, in setUp
+    self.executor.prepare(fixture.request)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 271, in prepare
+    return self._prepare_locked(request, account_id, name, environment_id, remote_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 772, in _prepare_locked
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 219, in apply_migrations
+    _validate_node_execution_structure(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 88, in _validate_node_execution_structure
+    columns, objects = _node_execution_structure()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 78, in _node_execution_structure
+    initialize_bench_schema(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+======================================================================
+FAIL: test_grant_rpc_persists_original_scope_and_closed_tombstone (test_cluster_agent.NodeAgentTests.test_grant_rpc_persists_original_scope_and_closed_tombstone)
+证明经真实UDS写入，关闭后保留原记录并拒绝重开。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_agent.py", line 98, in test_grant_rpc_persists_original_scope_and_closed_tombstone
+    self.assertTrue(self.call('prepare', self.fixture.request.model_dump())['ok'])
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_private_socket_and_repeated_prepare_share_actual_runtime (test_cluster_agent.NodeAgentTests.test_private_socket_and_repeated_prepare_share_actual_runtime)
+多次SSH等价请求共享同一pool，服务关闭时收口一次。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_agent.py", line 67, in test_private_socket_and_repeated_prepare_share_actual_runtime
+    self.assertTrue(first['ok'])
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 40 tests in 14.267s
+
+FAILED (failures=2, errors=22)

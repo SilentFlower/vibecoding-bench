@@ -1,0 +1,28 @@
+..../root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+  warnings.warn(  # deprecated in 14.0 - 2024-11-09
+/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/uvicorn/protocols/websockets/websockets_impl.py:16: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+  from websockets.server import WebSocketServerProtocol
+/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/websockets/legacy/server.py:1168: DeprecationWarning: remove second argument of ws_handler
+  warnings.warn("remove second argument of ws_handler", DeprecationWarning)
+..........................节点执行失败 operation=api-quota-read error_type=ValueError frames=cluster_agent.py:111:dispatch,cluster_quota.py:118:read_api_quota
+.节点执行失败 operation=arbitrary-command error_type=ValueError frames=cluster_agent.py:140:dispatch,cluster_execution.py:865:execute_operation
+节点执行失败 operation=health error_type=ValueError frames=cluster_agent.py:87:dispatch,system_update_contract.py:57:strict_json,__init__.py:359:loads,decoder.py:337:decode,decoder.py:353:raw_decode,system_update_contract.py:48:unique
+节点执行失败 operation=prepare error_type=ValidationError frames=cluster_agent.py:140:dispatch,cluster_execution.py:867:execute_operation,main.py:596:model_validate
+.节点执行失败 operation=grant-renew error_type=ValueError frames=cluster_agent.py:101:dispatch,cluster_execution_grants.py:225:renew
+节点执行失败 operation=grant-get error_type=ValueError frames=cluster_agent.py:101:dispatch,cluster_execution_grants.py:276:get,cluster_execution_grants.py:150:_load
+.....E
+======================================================================
+ERROR: test_cluster_agent_client (unittest.loader._FailedTest.test_cluster_agent_client)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_cluster_agent_client
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/unittest/loader.py", line 137, in loadTestsFromName
+    module = __import__(module_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'test_cluster_agent_client'
+
+
+----------------------------------------------------------------------
+Ran 38 tests in 30.434s
+
+FAILED (errors=1)

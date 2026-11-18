@@ -1,0 +1,51 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile:
+#1 transferring dockerfile: 249B 0.0s done
+#1 DONE 3.8s
+
+#2 [internal] load metadata for docker.io/library/flower2api-control:v3-verify-ui-native-20261116-10
+#2 DONE 5.6s
+
+#3 [internal] load .dockerignore
+#3 transferring context:
+#3 transferring context: 2B done
+#3 DONE 3.3s
+
+#4 [internal] load build context
+#4 DONE 0.0s
+
+#5 [1/5] FROM docker.io/library/flower2api-control:v3-verify-ui-native-20261116-10@sha256:771a97656c8053e7cd60caa7ef62fe8f67518f2aede1e35d1fe88a4e140dbc45
+#5 resolve docker.io/library/flower2api-control:v3-verify-ui-native-20261116-10@sha256:771a97656c8053e7cd60caa7ef62fe8f67518f2aede1e35d1fe88a4e140dbc45
+#5 resolve docker.io/library/flower2api-control:v3-verify-ui-native-20261116-10@sha256:771a97656c8053e7cd60caa7ef62fe8f67518f2aede1e35d1fe88a4e140dbc45 0.6s done
+#5 DONE 1.2s
+
+#4 [internal] load build context
+#4 transferring context:
+#4 transferring context: 2.48MB 0.0s done
+#4 DONE 3.3s
+
+#6 [2/5] RUN pip install --no-cache-dir httpx==0.28.1
+#6 CACHED
+
+#7 [3/5] COPY orchestrator/ /app/
+#7 DONE 20.3s
+
+#8 [4/5] COPY entrypoint.sh /usr/local/bin/v3-control
+#8 DONE 0.1s
+
+#9 [5/5] RUN chmod +x /usr/local/bin/v3-control
+#9 DONE 0.7s
+
+#10 exporting to image
+#10 exporting layers
+#10 exporting layers 0.6s done
+#10 exporting manifest sha256:52a28bdad1dab38ace5bfb7bde6e06b053e17db7837c4309d6d1490565c8db4b 0.0s done
+#10 exporting config sha256:b1f042a50982c3b5401e9308b667951e6f1d56b25e22631a0d88d8f4c5787a1c 0.0s done
+#10 exporting attestation manifest sha256:f6684647c73e61bb16744507c9c586068bbb5444223324bc302351c51e11ed74
+#10 exporting attestation manifest sha256:f6684647c73e61bb16744507c9c586068bbb5444223324bc302351c51e11ed74 0.0s done
+#10 exporting manifest list sha256:043a780e85602109188ed43aef9ec1868e59f6260cc49b7322dc63689210bc3d 0.0s done
+#10 naming to docker.io/library/flower2api-control:cluster-test-local done
+#10 unpacking to docker.io/library/flower2api-control:cluster-test-local 0.1s done
+#10 DONE 1.3s

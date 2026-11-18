@@ -1,0 +1,8 @@
+{"file":".trellis/tasks/11-17-manual-node-cluster/research/current-architecture.md","reason":"当前账号环境、网关传输、本地状态耦合与用户确认范围"}
+{"file":".trellis/spec/orchestrator/backend/index.md","reason":"按实施阶段读取账号运行合同与数据库规则的相关完整章节，避免大文件注入截断"}
+{"file":".trellis/spec/gateway/backend/index.md","reason":"按实施阶段读取转发、请求后端、流式响应及防重放的相关完整章节"}
+{"file":".trellis/spec/web/frontend/index.md","reason":"界面实施前加载控件与交互规范的相关完整章节"}
+{"file":".trellis/spec/platform/deploy/index.md","reason":"节点部署、镜像、快照和发行兼容的规范入口"}
+{"file":".trellis/tasks/11-17-manual-node-cluster/research/ssh-execution-boundaries.md","reason":"SSH私有执行、迁移协调与最新增量证据和剩余边界"}
+{"file":".trellis/tasks/11-17-manual-node-cluster/research/remote-execution-boundaries.md","reason":"持久节点、有限证明、具体终端协议与中央工程消费者的最新实现和剩余边界"}
+{"file": ".trellis/tasks/11-17-manual-node-cluster/research/credential-owner-transition-boundaries.md", "reason": "NULL草稿完成后，原所有权入口、本机运行时耦合、Node实际停止/完整身份载荷及下一交接边界"}

@@ -1,0 +1,17 @@
+E
+======================================================================
+ERROR: test_active_program_blocks_source_fence_until_actual_cancel (test_cluster_run_verification.ReleasedRunProgramTests.test_active_program_blocks_source_fence_until_actual_cancel)
+独立程序占用参与源隔离，取消后核对原容器再撤销占用。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_run_verification.py", line 50, in setUp
+    receipt=write_workspace_bundle(snapshots._parent(self.scope,create=True)/(request.snapshot_id+'.tar'),
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_workspace.py", line 237, in write_workspace_bundle
+    raise ValueError('原源码包用途与内容对象目录不一致')
+ValueError: 原源码包用途与内容对象目录不一致
+
+----------------------------------------------------------------------
+Ran 1 test in 0.634s
+
+FAILED (errors=1)

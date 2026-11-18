@@ -1,0 +1,15 @@
+.............E
+======================================================================
+ERROR: test_owner_refresh_exit_observes_only_original_worker_and_requires_exact_exit (test_project_review_runtime.PrivateReviewTests.test_owner_refresh_exit_observes_only_original_worker_and_requires_exact_exit)
+原401停止前等待实际exec结束，缺失退出事实继续拒绝交接。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_project_review_runtime.py", line 73, in test_owner_refresh_exit_observes_only_original_worker_and_requires_exact_exit
+    self.assertEqual([call('original-review-exec'),call('original-review-exec')],api.exec_inspect.call_args_list)
+                      ^^^^
+NameError: name 'call' is not defined. Did you mean: 'all'?
+
+----------------------------------------------------------------------
+Ran 14 tests in 1.220s
+
+FAILED (errors=1)

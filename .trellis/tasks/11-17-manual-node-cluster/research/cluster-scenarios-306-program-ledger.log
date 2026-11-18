@@ -1,0 +1,20 @@
+..E
+======================================================================
+ERROR: test_unknown_start_ack_queries_same_attempt_and_replay_reads_verified_cache (test_cluster_run_programs.CentralRunProgramTests.test_unknown_start_ack_queries_same_attempt_and_replay_reads_verified_cache)
+丢失启动ACK保持同一程序，重放读取完整缓存且原CLI始终关闭。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_run_programs.py", line 103, in test_unknown_start_ack_queries_same_attempt_and_replay_reads_verified_cache
+    result=self.verify()
+           ^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_run_programs.py", line 92, in verify
+    return self.programs.verify(self.job,self.task,self.source,self.execution)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_run_programs.py", line 231, in verify
+    raise ValueError('原独立程序结果需要核对，实际取消已确认')
+ValueError: 原独立程序结果需要核对，实际取消已确认
+
+----------------------------------------------------------------------
+Ran 3 tests in 2.357s
+
+FAILED (errors=1)

@@ -1,0 +1,43 @@
+.E..E/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+  warnings.warn(  # deprecated in 14.0 - 2024-11-09
+/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/uvicorn/protocols/websockets/websockets_impl.py:16: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+  from websockets.server import WebSocketServerProtocol
+.................................
+======================================================================
+ERROR: test_half_lines_wrong_source_and_wrong_identity_preserve_original_consumer_rules (test_cluster_quota.RemoteQuotaTests.test_half_lines_wrong_source_and_wrong_identity_preserve_original_consumer_rules)
+半行等待追加，其他来源和身份的样本不改变中央额度。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_quota.py", line 86, in test_half_lines_wrong_source_and_wrong_identity_preserve_original_consumer_rules
+    self.remote.refresh(self.row)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_quota.py", line 164, in refresh
+    response = self.sessions._call(row, 'terminal-quota-state', request.model_dump())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_quota.py", line 44, in call
+    return (self.quota.publish(TerminalQuotaState.model_validate(payload)) if operation == 'terminal-quota-state'
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_quota.py", line 92, in publish
+    raise ValueError('迟到节点额度投影拒绝覆盖新采样')
+ValueError: 迟到节点额度投影拒绝覆盖新采样
+
+======================================================================
+ERROR: test_rotation_and_crash_after_copy_before_metadata_do_not_skip_new_observation (test_cluster_quota.RemoteQuotaTests.test_rotation_and_crash_after_copy_before_metadata_do_not_skip_new_observation)
+镜像游标保存失败可重读，节点轮转后较新的真实样本继续被消费。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_quota.py", line 99, in test_rotation_and_crash_after_copy_before_metadata_do_not_skip_new_observation
+    self.remote.refresh(self.row)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_quota.py", line 164, in refresh
+    response = self.sessions._call(row, 'terminal-quota-state', request.model_dump())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_quota.py", line 44, in call
+    return (self.quota.publish(TerminalQuotaState.model_validate(payload)) if operation == 'terminal-quota-state'
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_quota.py", line 92, in publish
+    raise ValueError('迟到节点额度投影拒绝覆盖新采样')
+ValueError: 迟到节点额度投影拒绝覆盖新采样
+
+----------------------------------------------------------------------
+Ran 38 tests in 19.306s
+
+FAILED (errors=2)

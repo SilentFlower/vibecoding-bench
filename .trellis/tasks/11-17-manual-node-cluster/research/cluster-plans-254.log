@@ -1,0 +1,20 @@
+F
+======================================================================
+FAIL: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 165, in test_remote_account_preparation_and_sender_json_sse
+    verify_node_run(self, service, runtime, node, account, unused_gateway)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_run.py", line 71, in verify_node_run
+    verify_legacy_project(testcase,service,runtime,node,account,local,remote,configuration)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_legacy_project.py", line 59, in verify_legacy_project
+    _verify_plan(testcase,service,account,local,remote,manager,library,submitted,root)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_legacy_project.py", line 165, in _verify_plan
+    testcase.assertLess(time.monotonic(),deadline,'原同会话计划尚未收口')
+AssertionError: 174490.452580348 not less than 174488.998299449 : 原同会话计划尚未收口
+
+----------------------------------------------------------------------
+Ran 1 test in 181.920s
+
+FAILED (failures=1)

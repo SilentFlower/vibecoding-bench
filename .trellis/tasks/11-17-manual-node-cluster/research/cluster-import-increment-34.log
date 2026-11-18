@@ -1,0 +1,23 @@
+..E........................
+======================================================================
+ERROR: test_import_refuses_missing_source_proof_changed_identity_and_unknown_existing_home (test_cluster_execution.NodeExecutionTests.test_import_refuses_missing_source_proof_changed_identity_and_unknown_existing_home)
+冻结证明、私有HOME和既有目录分别保护，错误发布保持原资料。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_execution.py", line 203, in test_import_refuses_missing_source_proof_changed_identity_and_unknown_existing_home
+    self.executor.prepare_import(request)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution.py", line 388, in prepare_import
+    value = _read_json(marker)
+            ^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/account_runtime.py", line 148, in _read_json
+    directory = _directory_fd(path.parent)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/runtime_files.py", line 28, in directory_fd
+    following = os.open(part, os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'runtime'
+
+----------------------------------------------------------------------
+Ran 27 tests in 6.754s
+
+FAILED (errors=1)

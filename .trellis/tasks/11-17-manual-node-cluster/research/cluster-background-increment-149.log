@@ -1,0 +1,18 @@
+F
+======================================================================
+FAIL: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 203, in test_remote_account_preparation_and_sender_json_sse
+    self.verify_gateway(client, service, runtime, account, upstream_root, network, configuration, backend, after=after)
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 605, in verify_gateway
+    verify_node_background(self, http, admin, service, runtime, account, upstream_root)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_background.py", line 76, in verify_node_background
+    testcase.assertTrue(any(item['kind'] == 'proxy' and item['target'] == 'platform.claude.com' for item in records))
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 1 test in 34.006s
+
+FAILED (failures=1)

@@ -1,0 +1,16 @@
+F
+======================================================================
+FAIL: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 143, in test_remote_account_preparation_and_sender_json_sse
+    self.fail(f'节点sender返回{response.status_code}: {response.text[:300]}；隔离代理证据：{details}；夹具日志：'
+AssertionError: 节点sender返回502: {"error":"bad gateway: upstream submission status unknown"}；隔离代理证据：{"kind": "proxy", "at": 1794856516.3123527, "peer": "192.168.16.4", "target": "8.8.8.8", "port": 53, "protocol": "socks5"}
+{"kind": "proxy", "at": 1794856518.3378336, "peer": "192.168.16.4", "target": "198.18.0.10", "port": 443, "protocol": "socks5"}
+；夹具日志：
+
+----------------------------------------------------------------------
+Ran 1 test in 13.729s
+
+FAILED (failures=1)

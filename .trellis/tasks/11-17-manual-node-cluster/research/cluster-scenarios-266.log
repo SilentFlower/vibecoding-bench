@@ -1,0 +1,15 @@
+.E
+======================================================================
+ERROR: test_original_run_protocol_stages_base_prepares_files_and_stops_before_exec (test_cluster_scenario_files.ScenarioNodeFileTests.test_original_run_protocol_stages_base_prepares_files_and_stops_before_exec)
+原Run先核对真实基线和场景文件，实际exec前可定向收口原意图。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_scenario_files.py", line 173, in test_original_run_protocol_stages_base_prepares_files_and_stops_before_exec
+    self.assertEqual('closed',result['phase'])
+                              ~~~~~~^^^^^^^^^
+KeyError: 'phase'
+
+----------------------------------------------------------------------
+Ran 2 tests in 3.025s
+
+FAILED (errors=1)

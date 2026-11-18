@@ -1,0 +1,16 @@
+.......请求快照清理 scanned=0 deleted=0 failed=1
+............................................E
+======================================================================
+ERROR: test_native_release_mount_is_available_for_two_account_environments (test_account_runtime.AccountRuntimeTests.test_native_release_mount_is_available_for_two_account_environments)
+两个原生环境均取得只读版本目录及发行公钥，CLI保持隔离。@return None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_account_runtime.py", line 2300, in test_native_release_mount_is_available_for_two_account_environments
+    self.assertNotIn('V3_NATIVE_RELEASE_PUBLIC_KEY', sender['environment'])
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'V3_NATIVE_RELEASE_PUBLIC_KEY'
+
+----------------------------------------------------------------------
+Ran 52 tests in 6.722s
+
+FAILED (errors=1)

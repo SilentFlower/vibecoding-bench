@@ -1,0 +1,23 @@
+.E
+======================================================================
+ERROR: test_original_run_protocol_stages_base_prepares_files_and_stops_before_exec (test_cluster_scenario_files.ScenarioNodeFileTests.test_original_run_protocol_stages_base_prepares_files_and_stops_before_exec)
+原Run先核对真实基线和场景文件，实际exec前可定向收口原意图。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_scenario_files.py", line 165, in test_original_run_protocol_stages_base_prepares_files_and_stops_before_exec
+    self.assertEqual({'scope':request.scope.model_dump(),'prepared':True},runs.prepare_project(request))
+                                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_runs.py", line 817, in prepare_project
+    project.prepare_workspace(dict(row),work.id,project.root)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_scenario_project.py", line 83, in prepare_workspace
+    self.files.prepare()
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_scenario_files.py", line 159, in prepare
+    private_directory(self.operation)
+  File "/root/project/vibecoding-bench/services/orchestrator/runtime_files.py", line 53, in private_directory
+    raise ValueError('私有目录权限或归属无效')
+ValueError: 私有目录权限或归属无效
+
+----------------------------------------------------------------------
+Ran 2 tests in 4.903s
+
+FAILED (errors=1)

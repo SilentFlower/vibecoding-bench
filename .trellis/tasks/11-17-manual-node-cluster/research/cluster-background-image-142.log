@@ -1,0 +1,35 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 111B done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/flower2api-control:cluster-background-local
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context:
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 2.73MB 0.0s done
+#4 DONE 0.1s
+
+#5 [1/2] FROM docker.io/library/flower2api-control:cluster-background-local@sha256:8b1687cde682a2352c330d07853926904fcb78c2e720ba48defc9bab949bfbee
+#5 resolve docker.io/library/flower2api-control:cluster-background-local@sha256:8b1687cde682a2352c330d07853926904fcb78c2e720ba48defc9bab949bfbee 0.0s done
+#5 DONE 0.3s
+
+#6 [2/2] COPY orchestrator/ /app/
+#6 DONE 0.1s
+
+#7 exporting to image
+#7 exporting layers
+#7 exporting layers 0.2s done
+#7 exporting manifest sha256:990dc881df9059c4e7ad4998c652b7fb8e35d8d060d9b5a12c2ba6ddac88fd08 0.0s done
+#7 exporting config sha256:b3a00bdc123bfc43c173aac4734e73bb66735fb7f9b9b2b098fa7e65a506aaf6 0.0s done
+#7 exporting attestation manifest sha256:41b00c85eb47694146c5b9dac2ccec31a3f5eb87ddf77943b18cc949e2e6d587 0.0s done
+#7 exporting manifest list sha256:0235a412b67d408bb90718d59a49791b4cc5006057609c310c8bca26f585e159 0.0s done
+#7 naming to docker.io/library/flower2api-control:cluster-background-local done
+#7 unpacking to docker.io/library/flower2api-control:cluster-background-local 0.1s done
+#7 DONE 0.5s

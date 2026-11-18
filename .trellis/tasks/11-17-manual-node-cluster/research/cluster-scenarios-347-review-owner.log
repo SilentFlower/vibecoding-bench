@@ -1,0 +1,18 @@
+.................E
+======================================================================
+ERROR: test_independent_owner_defer_checks_original_request_and_persists_once (test_cluster_scenario_review.ScenarioNodeReviewTests.test_independent_owner_defer_checks_original_request_and_persists_once)
+具体401请求与实际私有作业一致后创建待办，重复及变更摘要按原回执核对。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_scenario_review.py", line 63, in test_independent_owner_defer_checks_original_request_and_persists_once
+    self.node.grants.create(grant)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution_grants.py", line 198, in create
+    self._check_environment(scope)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution_grants.py", line 171, in _check_environment
+    raise ValueError('节点执行实际账号、网关绑定或代次已变化')
+ValueError: 节点执行实际账号、网关绑定或代次已变化
+
+----------------------------------------------------------------------
+Ran 18 tests in 10.724s
+
+FAILED (errors=1)

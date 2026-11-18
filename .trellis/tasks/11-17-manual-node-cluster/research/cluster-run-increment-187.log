@@ -1,0 +1,14 @@
+........................F....................................................................................................................................................................
+======================================================================
+FAIL: test_unknown_gateway_prepare_before_node_grant_can_cancel_original_admission (test_cluster_terminal_sessions.TerminalSessionTests.test_unknown_gateway_prepare_before_node_grant_can_cancel_original_admission)
+网关prepare已完成但响应丢失时，节点提交前仍能核对并撤销原许可。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_terminal_sessions.py", line 185, in test_unknown_gateway_prepare_before_node_grant_can_cancel_original_admission
+    self.assertIsNone(self.gateway.lease)
+AssertionError: {'owner': 'projects:cccccccccccccccccccccccccccccccc:2', 'generation': 'original-real-lease', 'expires_at': 1794881738, 'exclusive': False, 'shared_cli': True, 'phase': 'prepared'} is not None
+
+----------------------------------------------------------------------
+Ran 189 tests in 74.798s
+
+FAILED (failures=1)
