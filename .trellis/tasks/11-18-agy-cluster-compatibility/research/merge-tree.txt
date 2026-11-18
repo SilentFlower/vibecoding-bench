@@ -1,0 +1,75 @@
+7d8f6bf539d198be1c8bc384de2b256ec43ab541
+.trellis/spec/orchestrator/backend/account-runtime-v3.md
+.trellis/spec/platform/deploy/platform-online-update.md
+apps/web/src/api.ts
+apps/web/src/components/RequestDiagnostics.vue
+apps/web/src/components/RuntimeEnvironments.vue
+apps/web/src/components/runtime/runtimeApi.ts
+deploy/flower2api/install_system_updater.py
+deploy/flower2api/manage.py
+deploy/flower2api/system_release.py
+deploy/flower2api/test_database_definitions.py
+deploy/flower2api/test_manage.py
+deploy/flower2api/verify_database_definitions.py
+services/gateway/src/model/request_diagnostics.rs
+services/gateway/src/service/diagnostics.rs
+services/gateway/src/service/runtime_transport.rs
+services/gateway/src/store/diagnostics_store.rs
+services/orchestrator/database-migration-registry.json
+services/orchestrator/database_migrations.py
+services/orchestrator/main.py
+services/orchestrator/test_database_migrations.py
+
+Auto-merging .trellis/spec/orchestrator/backend/account-runtime-v3.md
+CONFLICT (content): Merge conflict in .trellis/spec/orchestrator/backend/account-runtime-v3.md
+Auto-merging .trellis/spec/platform/deploy/platform-online-update.md
+CONFLICT (content): Merge conflict in .trellis/spec/platform/deploy/platform-online-update.md
+Auto-merging .trellis/spec/web/frontend/ui-guidelines.md
+Auto-merging apps/web/src/api.ts
+CONFLICT (content): Merge conflict in apps/web/src/api.ts
+Auto-merging apps/web/src/components/RequestDiagnostics.vue
+CONFLICT (content): Merge conflict in apps/web/src/components/RequestDiagnostics.vue
+Auto-merging apps/web/src/components/RuntimeEnvironments.vue
+CONFLICT (content): Merge conflict in apps/web/src/components/RuntimeEnvironments.vue
+Auto-merging apps/web/src/components/runtime/runtimeApi.ts
+CONFLICT (content): Merge conflict in apps/web/src/components/runtime/runtimeApi.ts
+Auto-merging deploy/flower2api/install_system_updater.py
+CONFLICT (content): Merge conflict in deploy/flower2api/install_system_updater.py
+Auto-merging deploy/flower2api/manage.py
+CONFLICT (content): Merge conflict in deploy/flower2api/manage.py
+Auto-merging deploy/flower2api/system_release.py
+CONFLICT (content): Merge conflict in deploy/flower2api/system_release.py
+Auto-merging deploy/flower2api/system_update_host.py
+Auto-merging deploy/flower2api/test_database_definitions.py
+CONFLICT (content): Merge conflict in deploy/flower2api/test_database_definitions.py
+Auto-merging deploy/flower2api/test_manage.py
+CONFLICT (content): Merge conflict in deploy/flower2api/test_manage.py
+Auto-merging deploy/flower2api/test_source_layout.py
+Auto-merging deploy/flower2api/verify_database_definitions.py
+CONFLICT (content): Merge conflict in deploy/flower2api/verify_database_definitions.py
+Auto-merging images/v3/Dockerfile
+Auto-merging services/gateway/src/handler/router.rs
+Auto-merging services/gateway/src/model/request_diagnostics.rs
+CONFLICT (content): Merge conflict in services/gateway/src/model/request_diagnostics.rs
+Auto-merging services/gateway/src/service/account.rs
+Auto-merging services/gateway/src/service/diagnostics.rs
+CONFLICT (content): Merge conflict in services/gateway/src/service/diagnostics.rs
+Auto-merging services/gateway/src/service/gateway.rs
+Auto-merging services/gateway/src/service/mod.rs
+Auto-merging services/gateway/src/service/runtime_bridge.rs
+Auto-merging services/gateway/src/service/runtime_transport.rs
+CONFLICT (content): Merge conflict in services/gateway/src/service/runtime_transport.rs
+Auto-merging services/gateway/src/service/telemetry.rs
+Auto-merging services/gateway/src/store/diagnostics_store.rs
+CONFLICT (content): Merge conflict in services/gateway/src/store/diagnostics_store.rs
+Auto-merging services/orchestrator/account_isolation.py
+Auto-merging services/orchestrator/account_runtime.py
+Auto-merging services/orchestrator/database-migration-registry.json
+CONFLICT (content): Merge conflict in services/orchestrator/database-migration-registry.json
+Auto-merging services/orchestrator/database_migrations.py
+CONFLICT (content): Merge conflict in services/orchestrator/database_migrations.py
+Auto-merging services/orchestrator/main.py
+CONFLICT (content): Merge conflict in services/orchestrator/main.py
+Auto-merging services/orchestrator/system_updates.py
+Auto-merging services/orchestrator/test_database_migrations.py
+CONFLICT (content): Merge conflict in services/orchestrator/test_database_migrations.py
