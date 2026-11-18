@@ -1,0 +1,7 @@
+{
+  "deployment": "verify-c61624bad742",
+  "runner_id": "bd103a207054f67d0f300c7f0ef03d03e789ed873f78160f7241607aca6fbbdf",
+  "network": "vibebench-v3-verify-c61624bad742",
+  "root": "/root/project/vibecoding-bench/.trellis/tasks/11-18-session-scratchpad-memory/research/activation-warmup-chain-v2/vibebench-v3-verify-7fa6kcb1",
+  "release": "manual-cluster-20261118"
+}

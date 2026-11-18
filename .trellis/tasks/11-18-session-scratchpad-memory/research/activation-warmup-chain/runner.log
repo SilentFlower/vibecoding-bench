@@ -1,0 +1,88 @@
+通过：真实系统画像、文件 API、Node/子进程及直接 syscall/CPUID 边界：{"schema": 1, "kernel_template": "debian-6.1.0-32", "cpu_template": "amd-cezanne-5800h", "computer_template": "cezanne-rog-g513-v1", "dynamic_files_threads_node_children": "passed", "dmi_content_metadata_access": "passed", "libc_statx_and_syscall_passthrough": "passed", "raw_syscall_static_cpuid": "\u771f\u5b9e\u503c\uff0c\u672a\u8986\u76d6", "readonly": true, "elapsed_seconds": 0.497}
+通过：真实 Docker 三角色权限/只读根/秘密隔离/内置 DNS 拒绝/本地构建/非 root 收口：{"cli": {"uid": 1000, "caps": {"CapInh": "0000000000000000", "CapPrm": "0000000000000000", "CapEff": "0000000000000000", "CapBnd": "0000000000000000", "CapAmb": "0000000000000000", "NoNewPrivs": "1"}, "hostname": "synthetic-fixed", "machine_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "memory": 1207959552, "memory_swap": 3355443200, "oom_killed": false, "memory_peak": 454742016}, "sender": {"uid": 1001, "caps": {"CapInh": "0000000000000000", "CapPrm": "0000000000000000", "CapEff": "0000000000000000", "CapBnd": "0000000000000000", "CapAmb": "0000000000000000", "NoNewPrivs": "1"}, "hostname": "synthetic-fixed", "machine_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "memory": 134217728, "memory_swap": 134217728, "oom_killed": false, "memory_peak": 6848512}, "network": {"mac_matches": true, "oom_killed": false, "memory_peak": 39501824}, "pressure": {"allocated": 301989888, "tmp_written": 131571712, "tmp_full_rejected": true}}
+{"timestamp":"2026-11-18T07:34:10.542552Z","level":"INFO","fields":{"message":"账号发送器已启动","layer":"native_sender","reason":"sender_started"},"target":"account_sender"}
+
+thread 'tokio-rt-worker' (8) panicked at src/tlsfp/tlsfp.rs:255:49:
+隔离验证构建需要专用 CA 文件: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+[sidecar 23:34:06] Creating tun0
+[sidecar 23:34:06] Starting hev-socks5-tunnel
+[sidecar 23:34:08] Default route stable via tun0 (after attempt 1)
+[sidecar 23:34:08] Starting unbound (DNS UDP→TCP bridge)
+[sidecar 23:34:08] Sidecar DNS ready via generic resolver (example.com, after 1s)
+[sidecar 23:34:08] Sidecar up: mitmproxy=managed hev=51 unbound=108 stats=/flows/stats.jsonl
+
+tail: cannot open '/var/log/mitmdump.log' for reading: No such file or directory
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/urllib3/connectionpool.py", line 793, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/urllib3/connectionpool.py", line 540, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/urllib3/connection.py", line 638, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/http/client.py", line 1478, in getresponse
+    response.begin()
+  File "/usr/local/lib/python3.12/http/client.py", line 343, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/http/client.py", line 312, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+http.client.RemoteDisconnected: Remote end closed connection without response
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/site-packages/requests/adapters.py", line 696, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/urllib3/connectionpool.py", line 847, in urlopen
+    retries = retries.increment(
+              ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/urllib3/util/retry.py", line 510, in increment
+    raise reraise(type(error), error, _stacktrace)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/urllib3/util/util.py", line 38, in reraise
+    raise value.with_traceback(tb)
+  File "/usr/local/lib/python3.12/site-packages/urllib3/connectionpool.py", line 793, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/urllib3/connectionpool.py", line 540, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/urllib3/connection.py", line 638, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/http/client.py", line 1478, in getresponse
+    response.begin()
+  File "/usr/local/lib/python3.12/http/client.py", line 343, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/http/client.py", line 312, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+urllib3.exceptions.ProtocolError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/source/deploy/flower2api/verify_local.py", line 694, in <module>
+    verify()
+  File "/source/deploy/flower2api/verify_local.py", line 337, in verify
+    response = session.post(binding["endpoint"] + "/internal/send", headers={"Authorization": "Bearer " + binding["secret"], "x-v3-request": base64.b64encode(json.dumps(prepared).encode()).decode()}, data=b'{ "synthetic": true }', timeout=10)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/requests/sessions.py", line 712, in post
+    return self.request("POST", url, data=data, json=json, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/requests/sessions.py", line 651, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/requests/sessions.py", line 784, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/requests/adapters.py", line 711, in send
+    raise ConnectionError(err, request=request)
+requests.exceptions.ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))

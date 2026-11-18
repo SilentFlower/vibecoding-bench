@@ -1,0 +1,35 @@
+{
+  "root": "/tmp/scratchpad-storage-verify-4mt3uaff",
+  "checks": [
+    "实际安全挂载",
+    "三会话文件转存",
+    "同次启动新增文件及转存重试",
+    "重启后先恢复再允许转存",
+    "旧CLI停止后恢复",
+    "真实CLI原会话迁盘续跑",
+    "两账号内容归属",
+    "tmpfs刚性占用减量",
+    "删除重建容器及卷后的原会话续跑",
+    "兼容管理端配原账号镜像回退续跑",
+    "能力不足沿用tmpfs并在新CLI续跑原会话"
+  ],
+  "image": "ghcr.io/silentflower/flower2api-account@sha256:67495b2c0f1d09d030b8ed506a68e049c22fa1ae003e6690ab53001aa0b2942f",
+  "before": {
+    "anon": 8093696,
+    "file": 25178112,
+    "shmem": 25178112
+  },
+  "after": {
+    "anon": 8089600,
+    "file": 0,
+    "shmem": 0
+  },
+  "tmpfs_reduction_bytes": 25178112,
+  "cli_sessions": [
+    "e72b93a1-4ae8-4af9-9494-807e37d6d229",
+    "ec0877e4-f204-4079-b31e-a390ea0f9592"
+  ],
+  "rollback_image": "sha256:67495b2c0f1d09d030b8ed506a68e049c22fa1ae003e6690ab53001aa0b2942f",
+  "passed": true,
+  "cleanup_errors": []
+}
