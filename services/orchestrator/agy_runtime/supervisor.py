@@ -23,6 +23,7 @@ from .image_pool import Broker, ImagePool
 from .models import native_identifier
 from .process_memory import cgroup_memory, memory
 from .storage import Output, private_dir, verify_resources
+from .system_prompt import decode_policy, default_policy
 
 
 def deadline(value: int) -> float:
@@ -38,7 +39,7 @@ def validate_submission(value: dict, config: dict) -> dict:
     expected = {'schema_version', 'type', 'request_id', 'account_id', 'environment_id',
         'environment_generation', 'api_token_id', 'credential_snapshot', 'model', 'native_model',
         'body', 'deadline_unix_ms'}
-    if not isinstance(value, dict) or set(value)-{'capture_enabled'} != expected or type(value['schema_version']) is not int or value['schema_version'] != 1 or value['type'] not in ['submit', 'prepare']:
+    if not isinstance(value, dict) or set(value)-{'capture_enabled','system_prompt_policy'} != expected or type(value['schema_version']) is not int or value['schema_version'] != 1 or value['type'] not in ['submit', 'prepare']:
         raise InputError('invalid_submission')
     for key in ['account_id', 'environment_id', 'environment_generation']:
         if type(value[key]) is not type(config[key]) or value[key] != config[key]:
@@ -64,6 +65,7 @@ def validate_submission(value: dict, config: dict) -> dict:
     deadline(value['deadline_unix_ms'])
     result=copy.deepcopy(value)
     result.setdefault('capture_enabled',False)
+    result['system_prompt_policy']=decode_policy(value.get('system_prompt_policy',default_policy()))
     return result
 
 
@@ -423,7 +425,7 @@ class Supervisor:
                 self.emit('prepared', value['request_id'], native=worker.ready)
                 return
             worker.send({'schema_version': 1, 'type': 'gemini_request', 'request_id': value['request_id'],
-                'model': value['model'], 'body': value['body']})
+                'model': value['model'], 'body': value['body'], 'system_prompt_policy':value['system_prompt_policy']})
             while True:
                 event = worker.next(until)
                 kind = event.get('type')

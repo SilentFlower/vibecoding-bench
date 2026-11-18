@@ -36,7 +36,8 @@ use crate::error::AppError;
 use crate::model::account::Account;
 use crate::model::request_diagnostics::RequestLogMode;
 use crate::service::agy_contract::{
-    AgyAccessSnapshot, AgyModelId, AgySenderConfig, AgySubmission, AgyToolCompletion,
+    AgyAccessSnapshot, AgyModelId, AgySenderConfig, AgySubmission, AgySystemPromptPolicy,
+    AgyToolCompletion,
 };
 use crate::service::agy_runtime::AgyPool;
 use crate::service::native_contract::{NativeIdlePolicy, validate_idle_timeout};
@@ -311,7 +312,7 @@ impl PreparedTransport {
         }
         Ok(())
     }
-    /// 在既有受信绑定中提交AGY请求。@param request_id 公共请求身份。@param api_token_id 调用方。@param snapshot AT-only快照。@param model 公开模型。@param native_model 观测枚举。@param body Gemini正文。@param deadline 原单调截止。@param capture 采集策略。@return 持续到原生作业收口的私有事件流。
+    /// 在既有受信绑定中提交AGY请求。@param request_id 公共请求身份。@param api_token_id 调用方。@param snapshot AT-only快照。@param model 公开模型。@param native_model 观测枚举。@param body Gemini正文。@param system_prompt_policy 本HTTP冻结的账号策略。@param deadline 原单调截止。@param capture 采集策略。@return 持续到原生作业收口的私有事件流。
     pub async fn send_agy(
         &self,
         request_id: &str,
@@ -320,6 +321,7 @@ impl PreparedTransport {
         model: &str,
         native_model: AgyModelId,
         body: Value,
+        system_prompt_policy: AgySystemPromptPolicy,
         deadline: Instant,
         capture: bool,
     ) -> Result<reqwest::Response, AppError> {
@@ -351,6 +353,7 @@ impl PreparedTransport {
             model: model.into(),
             native_model,
             body,
+            system_prompt_policy,
             capture_enabled: capture,
         };
         timeout_at(

@@ -395,12 +395,16 @@ impl AgyPool {
             api_token_id: submission.api_token_id,
             complete,
         };
-        let value = json!({"schema_version":1,"type":if prepare {"prepare"} else {"submit"},
+        let mut value = json!({"schema_version":1,"type":if prepare {"prepare"} else {"submit"},
             "request_id":request_id,"account_id":submission.request.account_id,
             "environment_id":submission.request.environment_id,"environment_generation":submission.request.generation,
             "api_token_id":submission.api_token_id,"credential_snapshot":submission.credential_snapshot,
             "model":submission.model,"native_model":submission.native_model,"body":submission.body,
             "deadline_unix_ms":submission.request.deadline_unix_ms,"capture_enabled":submission.capture_enabled});
+        if submission.system_prompt_policy.enabled {
+            value["system_prompt_policy"] = serde_json::to_value(&submission.system_prompt_policy)
+                .map_err(|_| unavailable())?;
+        }
         if let Err(error) = controller.send(&value).await {
             controller.requests.lock().await.remove(&request_id);
             return Err(error);

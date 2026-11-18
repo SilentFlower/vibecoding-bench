@@ -245,7 +245,7 @@ class Kernel:
             if _queued:self.queued=None
             self.seq+=1;sequence_temp=self.sequence_file.with_suffix('.new');sequence_temp.write_text(json.dumps(self.seq));sequence_temp.replace(self.sequence_file)
             scope=Scope(value,self.seq,self.worker);self.active=scope
-            self.emit('request_accepted',**scope.identity(),parameter_policy=value.get('compatibility_notes',[]))
+            self.emit('request_accepted',**scope.identity(),parameter_policy=value.get('compatibility_notes',[]),system_prompt_policy=value.get('system_prompt_policy'))
             threading.Thread(target=self.execute,args=(scope,),daemon=True).start()
 
     def resume(self, previous, results):
@@ -321,7 +321,7 @@ class Kernel:
         try:
             if scope.value.get('gemini_body') is not None:(folder/'gemini-input.json').write_text(json.dumps(scope.value['gemini_body'],ensure_ascii=False))
             steps=copy.deepcopy(scope.value['native_steps']) if 'native_steps' in scope.value else history_steps(scope.value['messages']);cfg=copy.deepcopy(self.base_config)
-            (folder/'input-mapping.json').write_text(json.dumps({'schema_changes':scope.value.get('schema_changes',[]),'completion':scope.value.get('native_completion',{}),'history_steps':len(steps),'compatibility_notes':scope.value.get('compatibility_notes',[])},ensure_ascii=False))
+            (folder/'input-mapping.json').write_text(json.dumps({'schema_changes':scope.value.get('schema_changes',[]),'completion':scope.value.get('native_completion',{}),'history_steps':len(steps),'compatibility_notes':scope.value.get('compatibility_notes',[]),'system_prompt_policy':scope.value.get('system_prompt_policy'),'input_view':'decoded_gemini_input','submission_view':'native_cascade_prompt_sections'},ensure_ascii=False))
             cfg['plannerConfig']['planModel']=MODEL
             cfg['plannerConfig']['declarativeMixinConfig']['promptSections']=[{'custom':{'content':scope.value['system']}}]
             if scope.value.get('request_format')=='gemini':cfg['plannerConfig']['retryConfig']['modelOutputRetry']={'maxRetries':0}

@@ -26,7 +26,9 @@ use crate::model::api_token::{ApiToken, ApiTokenStatus};
 use crate::service::account::{
     AccountService, AccountSlotPermit, CredentialActivity, DEFAULT_REQUEST_SLOT_UNITS,
 };
-use crate::service::agy_contract::{AGY_SOURCE_SHA256, AgyAccessSnapshot, AgyModelId};
+use crate::service::agy_contract::{
+    AGY_SOURCE_SHA256, AgyAccessSnapshot, AgyModelId, AgySystemPromptPolicy,
+};
 use crate::service::runtime_transport::{self, PreparedTransport};
 use crate::service::system_update::{self, UpdateActivity};
 
@@ -466,6 +468,8 @@ async fn generate_inner(
     .await
     .map_err(|_| AppError::ServiceUnavailable("AGY凭据等待超时".into()))??;
     let current = state.account_svc.get_account(account.id).await?;
+    let system_prompt_policy =
+        AgySystemPromptPolicy::new(current.agy_system_prompt_homoglyph_enabled);
     let native_model = AccountService::agy_model(&current, model).ok_or(AppError::NotFound)?;
     let transport = Arc::new(
         timeout_at(
@@ -493,6 +497,7 @@ async fn generate_inner(
             model,
             native_model.clone(),
             body.clone(),
+            system_prompt_policy.clone(),
             deadline,
             false,
         )
@@ -527,6 +532,7 @@ async fn generate_inner(
             state.account_svc.clone(),
             snapshot,
             native_model,
+            system_prompt_policy,
             &mut sender,
         )
         .await;
@@ -624,6 +630,7 @@ async fn drive(
     account_service: Arc<AccountService>,
     mut snapshot: AgyAccessSnapshot,
     native_model: AgyModelId,
+    system_prompt_policy: AgySystemPromptPolicy,
     sender: &mut Option<mpsc::Sender<Result<Value, AppError>>>,
 ) -> Result<(), AppError> {
     let mut reader = EventReader {
@@ -636,6 +643,7 @@ async fn drive(
     let mut attempt_id = request_id.to_string();
     let mut attempted_recovery = false;
     let mut forwarded = 0;
+    let mut policy_acknowledged = !system_prompt_policy.enabled;
     loop {
         let event = if let Some(channel) = sender.as_ref() {
             tokio::select! {event=reader.next()=>event?, _=channel.closed()=>return Err(AppError::BadGateway("客户端已取消".into()))}
@@ -688,10 +696,32 @@ async fn drive(
             tool_execution_id = native["tool_execution_id"].as_str(),
             event_type = native["type"].as_str(),
             native_model_calls = native["native_model_calls"].as_u64(),
+            system_prompt_requested = system_prompt_policy.enabled,
+            system_prompt_rule = system_prompt_policy.rule_version.as_str(),
+            system_prompt_source = native["system_prompt_policy"]["source"].as_str(),
+            system_prompt_changed = native["system_prompt_policy"]["changed"].as_bool(),
+            system_prompt_replaced = native["system_prompt_policy"]["replaced_codepoints"].as_u64(),
+            system_prompt_rule_sha256 = native["system_prompt_policy"]["rule_sha256"].as_str(),
             "AGY原生事件"
         );
         match native["type"].as_str() {
+            Some("request_accepted") => {
+                if let Some(report) = native
+                    .get("system_prompt_policy")
+                    .filter(|value| !value.is_null())
+                {
+                    if !system_prompt_policy.matches_report(report) {
+                        return Err(AppError::BadGateway("AGY系统文本策略回执不符".into()));
+                    }
+                    policy_acknowledged = true;
+                } else if system_prompt_policy.enabled {
+                    return Err(AppError::BadGateway("AGY执行端缺少系统文本策略支持".into()));
+                }
+            }
             Some("gemini_response") => {
+                if !policy_acknowledged {
+                    return Err(AppError::BadGateway("AGY系统文本策略尚未确认".into()));
+                }
                 let raw = STANDARD
                     .decode(
                         native["data"]["data_base64"]
@@ -761,6 +791,7 @@ async fn drive(
                             &model,
                             native_model.clone(),
                             body.clone(),
+                            system_prompt_policy.clone(),
                             deadline,
                             false,
                         )
@@ -769,6 +800,7 @@ async fn drive(
                         return Err(AppError::ServiceUnavailable("AGY认证恢复提交失败".into()));
                     }
                     snapshot = refreshed;
+                    policy_acknowledged = !system_prompt_policy.enabled;
                     reader = EventReader {
                         stream: Box::pin(retry.bytes_stream()),
                         pending: Vec::new(),

@@ -33,15 +33,17 @@ class Fixture(BaseHTTPRequestHandler):
     tool_drained=threading.Event()
     refreshes=0
     cancelled=threading.Event()
+    policy_failed=False
 
     def log_message(self,*args):
         """避免把查询密钥和私有正文打印到测试日志。@param args HTTP日志参数。@return 无。"""
 
     def do_GET(self):
         """返回唯一合成账号的受信运行绑定。@return 无。"""
-        require(self.path=='/internal/v3/transport/1','请求偏离合成运行时')
-        host='flower2api-'+hashlib.sha256(b'synthetic').hexdigest()[:12]+'-'+ENVIRONMENT
-        value={'account_id':1,'environment_id':ENVIRONMENT,'generation':1,'endpoint':f'http://{host}:8091',
+        require(self.path in ['/internal/v3/transport/1','/internal/v3/transport/2'],'请求偏离合成运行时')
+        account=int(self.path.rsplit('/',1)[1]);environment=ENVIRONMENT if account==1 else 'b'*32
+        host='flower2api-'+hashlib.sha256(b'synthetic').hexdigest()[:12]+'-'+environment
+        value={'account_id':account,'environment_id':environment,'generation':1,'endpoint':f'http://{host}:8091',
             'secret':SECRET,'release_id':'synthetic-release'}
         self.send_response(200);self.send_header('content-type','application/json');self.end_headers()
         self.wfile.write(json.dumps(value).encode())
@@ -68,12 +70,13 @@ class Fixture(BaseHTTPRequestHandler):
         require(self.headers.get('Authorization')=='Bearer '+SECRET,'内部证明错误')
         value=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
         require('refresh_token' not in value['credential_snapshot'],'业务副本包含RT')
-        require(value['request']['account_id']==1 and value['request']['environment_id']==ENVIRONMENT,'私有归属错误')
+        account=value['request']['account_id'];environment=ENVIRONMENT if account==1 else 'b'*32
+        require(account in [1,2] and value['request']['environment_id']==environment,'私有归属错误')
         Fixture.calls.append(copy.deepcopy(value))
         request=value['request']['request_id']
         def emit(kind,**fields):
             event={'protocol':'agy-account-supervisor','schema_version':1,'type':kind,'request_id':request,
-                'account_id':1,'environment_id':ENVIRONMENT,'environment_generation':1,**fields}
+                'account_id':account,'environment_id':environment,'environment_generation':1,**fields}
             self.wfile.write((json.dumps(event)+'\n').encode());self.wfile.flush()
         def native(kind,**fields):
             emit('native_event',credential_generation=value['credential_snapshot']['credential_generation'],
@@ -82,8 +85,20 @@ class Fixture(BaseHTTPRequestHandler):
         results=any('functionResponse' in part for part in contents[-1]['parts'])
         tools=body.get('tools') and not results
         self.send_response(200);self.send_header('content-type','application/x-ndjson');self.end_headers()
-        native('request_accepted',parameter_policy=[{'field':'generationConfig.temperature','policy':'native_default'}])
         mode=contents[0]['parts'][0].get('text','')
+        policy=value.get('system_prompt_policy',{'schema_version':1,'enabled':False,'rule_version':'new-api-homoglyph-v1'})
+        report={**policy,'source':'cortex_custom_system','rule_sha256':'c'*64,'changed':False,
+            'replaced_codepoints':0,'system_codepoints':len('\n'.join(part.get('text','') for part in body.get('systemInstruction',{}).get('parts',[])))}
+        if mode=='policy-wrong-receipt':report['rule_version']='unknown'
+        native('request_accepted',parameter_policy=[{'field':'generationConfig.temperature','policy':'native_default'}],
+            **({} if mode=='policy-no-receipt' else {'system_prompt_policy':report}))
+        if mode in ['policy-no-receipt','policy-wrong-receipt']:
+            emit('job_finalized',status='error');return
+        policy_auth=mode=='policy-auth-recover' and not Fixture.policy_failed
+        if policy_auth:
+            Fixture.policy_failed=True
+            with sqlite3.connect('/state/gateway.sqlite') as database:
+                database.execute('UPDATE accounts SET agy_system_prompt_homoglyph_enabled=0 WHERE id=1')
         if mode=='cancel-stream':
             frame={'candidates':[{'content':{'role':'model','parts':[{'text':'合成首帧'}]}}]}
             native('gemini_response',data={'data_base64':base64.b64encode(json.dumps(frame).encode()).decode()})
@@ -94,7 +109,7 @@ class Fixture(BaseHTTPRequestHandler):
             except OSError:
                 Fixture.cancelled.set()
             return
-        auth_error=mode=='auth-always' or mode=='auth-recover' and value['credential_snapshot']['credential_generation']==2 or mode=='auth-after-frame'
+        auth_error=policy_auth or mode=='auth-always' or mode=='auth-recover' and value['credential_snapshot']['credential_generation']==2 or mode=='auth-after-frame'
         if auth_error or mode=='capacity-error':
             if mode=='auth-after-frame':
                 frame={'candidates':[{'content':{'role':'model','parts':[{'text':'已经交付的合成片段'}]}}]}
@@ -186,11 +201,33 @@ def inside() -> dict:
         require(request(base+'generateContent',body)[0]==200,'取消后原账号许可没有释放')
         with database:database.execute("UPDATE api_tokens SET status='disabled' WHERE token='synthetic-other'")
         require(request('/v1beta/models',key='synthetic-other')[0]==401,'禁用令牌被接纳')
+        with database:
+            database.execute("INSERT INTO accounts(id,name,email,platform,token,device_id,auth_type,access_token,refresh_token,oauth_expires_at,concurrency,auto_telemetry,auto_poll_usage,usage_data) VALUES(2,'synthetic-two','two@example.test','antigravity','','','oauth','synthetic-two-at','synthetic-two-rt','2099-01-01T00:00:00Z',1,0,0,?)",
+                (json.dumps({'capabilities':{'model_mappings':{'gemini-synthetic':'MODEL_PLACEHOLDER_M36'}}}),))
+            database.execute("INSERT INTO account_credential_states(account_id,generation,phase,updated_at_ms) VALUES(2,1,'ready',1)")
+            database.execute("INSERT INTO api_tokens(name,token,allowed_accounts,status) VALUES('two','synthetic-two-key','2','active')")
+            database.execute('UPDATE accounts SET agy_system_prompt_homoglyph_enabled=1 WHERE id=1')
+        candidate=copy.deepcopy(body);candidate['systemInstruction']={'parts':[{'text':'ABC system 中文'}]}
+        for key,account,enabled in [('synthetic-key',1,True),('synthetic-two-key',2,False)]:
+            require(request(base+'generateContent',candidate,key=key)[0]==200,'账号独立策略请求失败')
+            sent=Fixture.calls[-1]
+            require(sent['request']['account_id']==account and sent.get('system_prompt_policy',{}).get('enabled',False)==enabled,'账号策略快照串用')
+            require(sent['body']==candidate,'网关改变了原始Gemini入站视图')
+        before=len(Fixture.calls);current=copy.deepcopy(candidate);current['contents'][0]['parts'][0]['text']='policy-auth-recover'
+        require(request(base+'generateContent',current)[0]==200,'策略认证恢复失败')
+        require(len(Fixture.calls)==before+2 and all(value['system_prompt_policy']['enabled'] for value in Fixture.calls[before:]),'认证恢复重新读取了变化后的开关')
+        require(database.execute('SELECT agy_system_prompt_homoglyph_enabled FROM accounts WHERE id=1').fetchone()[0]==0,'并发开关变化未进入真实存储')
+        require(request(base+'generateContent',candidate)[0]==200 and 'system_prompt_policy' not in Fixture.calls[-1],'后续HTTP没有读取关闭策略')
+        with database:database.execute('UPDATE accounts SET agy_system_prompt_homoglyph_enabled=1 WHERE id=1')
+        for mode in ['policy-no-receipt','policy-wrong-receipt']:
+            current=copy.deepcopy(candidate);current['contents'][0]['parts'][0]['text']=mode
+            require(request(base+'generateContent',current)[0]==503,'缺失或不匹配的策略回执被接纳')
         database.close()
         return {'passed':True,'evidence':'real_http_sqlite_synthetic_sender','network':'none','real_model_submissions':0,
             'synthetic_submissions':len(Fixture.calls),'checks':['真实Gemini目录与令牌','非流式源usage','SSE','函数签名和结果','错调用方和ID拒绝',
                 '待对账期间旧工具独立收口和新模型拒绝','concurrency=1原许可接续','新AT代次','重复结果拒绝','禁用令牌',
-                '明确401仅恢复一次','容量错误零恢复','SSE首帧后零重放','SSE断连关闭原发送和释放许可']}
+                '明确401仅恢复一次','容量错误零恢复','SSE首帧后零重放','SSE断连关闭原发送和释放许可',
+                '两账号策略隔离','认证恢复冻结策略','后续HTTP采用新开关','缺失和错误策略回执拒绝','原始入站视图保持']}
     finally:
         child.terminate()
         try:child.wait(timeout=5)
@@ -212,7 +249,7 @@ def main() -> None:
         host='flower2api-'+hashlib.sha256(b'synthetic').hexdigest()[:12]+'-'+ENVIRONMENT
         container=client.containers.run(args.image,['/opt/probe.py','--inside'],entrypoint=['python3'],detach=True,network_mode='none',
             read_only=True,cap_drop=['ALL'],security_opt=['no-new-privileges:true'],mem_limit='768m',pids_limit=256,
-            extra_hosts={host:'127.0.0.1'},tmpfs={'/tmp':'rw,nosuid,nodev,size=64m'},
+            extra_hosts={host:'127.0.0.1',host.replace(ENVIRONMENT,'b'*32):'127.0.0.1'},tmpfs={'/tmp':'rw,nosuid,nodev,size=64m'},
             volumes={str(root/'services/gateway/target/debug/claude-code-gateway'):{'bind':'/opt/gateway','mode':'ro'},
                 str(Path(__file__).resolve()):{'bind':'/opt/probe.py','mode':'ro'},str(folder):{'bind':'/state','mode':'rw'}},
             environment={'DATABASE_DRIVER':'sqlite','DATABASE_DSN':'/state/gateway.sqlite','ADMIN_PASSWORD':'synthetic-admin',

@@ -1747,3 +1747,50 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - Rust的runtime_transport单测覆盖精确AGY目标及CC路径隔离；agy_sender_test、gemini_account_test、gemini_contract_test、runtime_transport_test覆盖鉴权、绑定、权限、源聚合与取消。
 - `verify_agy_native_loopback.py --image <明确测试镜像> [--loader-root <显式glibc目录>]`使用真实网关/SQLite/account-sender/监督器/原版和本地TLS/MCP；容器network=none、UID1001、根只读、零真实外部生成。一次性CA只挂验证容器系统信任根，正式配置无测试CA或跳过校验开关。断言参数实际出站、源usage、两代AT、并发1工具回填、重复拒绝、64重复帧与SIGURG、截断/容量失败、断连取消、实际许可释放和共享映像。
 - `verify_agy_runtime.py --native-image <明确镜像> [--crash]`保持零模型准备、两代、单次映像解码及正常/异常物理退出；`verify_agy_gemini.py`继续单独标记发送器替身证据；`verify_agy_environment_ui.py`覆盖1440/720/390px及实际控件边界、草稿、焦点和离页清理。制品资源须从当前受管理源码构建。
+
+## Scenario: AGY账号系统文本同形体策略
+
+### 1. Scope / Trigger
+
+- 修改账号字段`agy_system_prompt_homoglyph_enabled`、Gemini准入/恢复、AGY私有提交、系统文本解码或策略记录时适用。开关按账号独立保存，缺省false；CC、工程任务和养号保持各自合同。
+
+### 2. Signatures
+
+- Rust `AgySubmission.system_prompt_policy: AgySystemPromptPolicy`：`schema_version=1`、`enabled:boolean`、`rule_version="new-api-homoglyph-v1"`。历史信封缺省关闭，关闭时省略扩展序列化；显式策略拒绝未知字段和版本。
+- Python监督信封和`gemini_request`携带同名快照；公开Gemini正文无策略覆盖字段。`transform_system(system, policy)`返回提交文本及策略回执。
+- `verify_agy_native_loopback.py --image <明确镜像> [--loader-root <显式glibc目录>] --homoglyph`验证真实固定原版系统段；`--capture-off`独立验证采集关闭。
+
+### 3. Contracts
+
+- 账号准入读取当前账号后冻结策略。同HTTP的有界OAuth恢复复用该快照；新HTTP工具续轮先收口原工具，再采用新请求的账号配置。策略排除在worker key之外，单独切换开关复用暖worker。
+- 唯一字符表位于`agy_runtime/resources/system-prompt-homoglyph-v1.json`，固定26个ASCII到同形Unicode映射，构建纳入`admission.json.resource_hashes`。镜像及组件内容身份包含受管理规则资源，运行不依赖外部Worker目录。
+- 只处理解码后的独立`system`，经Cortex自定义prompt section提交。多Part按既有换行合并；未命中码点原样，输出确定、幂等、Unicode码点数量保持一致。UTF-8字节数可改变。用户/模型历史、工具、参数、结果、ID和签名继续既有映射；原始`gemini_body`深拷贝保持转换前数据。
+- `request_accepted.system_prompt_policy`含`schema_version/enabled/rule_version/rule_sha256/source/changed/replaced_codepoints/system_codepoints`。source固定`cortex_custom_system`，描述独立系统段处理来源；该事件产生于原生RPC提交前。`rule_sha256`标识规则资源字节，计数表示Unicode码点，均不换算token。开启但空文本或已转换文本可有`changed=false`。
+- 网关按本HTTP和实际attempt身份核对回执的开关、版本、来源、摘要形状及计数一致性。启用请求收到匹配回执后才交付Gemini源帧；每次认证恢复重新等待回执。历史关闭请求兼容缺失回执。
+- 采集开启时，`gemini-input.json`为转换前已解码Gemini视图；`input-mapping.json`记录策略，`input_view=decoded_gemini_input`、`submission_view=native_cascade_prompt_sections`；`rpc.ndjson`包含提交的系统段。该视图不冒充原始HTTP线字节。采集关闭沿匿名暂存与收口清理，公共日志仅记录策略元数据。
+- 上游`usageMetadata`、缓存及思考扩展沿源帧交付。真实分词、缓存命中和计费效果使用授权账号及独立预算验收；本地TLS合成usage只验证来源保真。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 缺省关闭、显式关闭 | 目标文本原样处理；旧默认私有发送兼容 |
+| 启用、空系统文本、已经转换 | 确定性处理；无替换时changed=false |
+| 畸形策略、未知规则或资源摘要失配 | 在模型发送前拒绝；旧严格消费者拒绝未知启用扩展 |
+| 启用请求缺失或错误回执 | 公共请求受控失败，拒绝交付源帧 |
+| 超出固定原版上下文预算 | 保留原生失败边界；本地验收503且零模型提交，后续预算内请求可用 |
+| 关闭账号开关 | 后续HTTP恢复原文；同HTTP恢复和旧工具归属继续冻结合同 |
+
+### 5. Scenarios and Examples
+
+- 正常：开启账号将系统`ABC system 中文 {x: 3}`转换为`ΑΒС ѕуѕtеm 中文 {х: 3}`。同样内容作为用户文本仍按原历史映射；再次经过保持同一系统文本。
+- 边界：请求开启后收到明确401，此时管理员关闭账号开关；该HTTP认证恢复仍开启，下个HTTP采用关闭配置。
+- 错误用法：对完整Gemini JSON做字符替换，或以替换字符数宣称真实缓存收益。正确处理：只转换独立system，保留原始入站与结构字段，缓存及计费单独用供应商来源验收。
+
+### 6. Tests Required
+
+- `test_agy_system_prompt`核对26字符参考向量、幂等、Unicode/空文本/大文本、原始正文与历史/工具/签名保护、严格策略及公开覆盖拒绝。
+- Rust `gemini_contract_test`、`agy_sender_test`核对缺省关闭省略、错误规则在启动前拒绝及回执计数/版本/来源；完整`cargo test --locked`继续覆盖CC回归。
+- `verify_agy_gemini.py`单独标记真实HTTP/SQLite与合成发送器证据，覆盖两账号隔离、认证恢复策略冻结、下一HTTP读取新开关及缺失/错误回执。
+- 本地TLS的`--homoglyph`覆盖普通/SSE、工具新HTTP、实际系统文本及用户历史对照、幂等、预算内大文本/超限零提交、暖PID、源usage/cache和策略账本；`--capture-off`核对转换生效且收口后无请求正文归档。容器保持断网、UID1001、零真实外部模型费用。
+- 前端构建及`verify_agy_accounts_ui.py`覆盖原账号控件默认值、两账号差异载荷、草稿、授权回执归属及390px；迟到保存反馈继续受editorGeneration约束。

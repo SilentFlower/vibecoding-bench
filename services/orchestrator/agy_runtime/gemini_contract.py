@@ -4,6 +4,7 @@ import copy
 import json
 from .contract import InputError, MODEL, text, tools
 from .tool_schema import normalize
+from .system_prompt import decode_policy, default_policy, transform_system
 
 GEMINI_MODEL=None
 BYPASS_SIGNATURE='context_engineering_is_the_way_to_go'
@@ -121,7 +122,7 @@ def native_history(contents):
 
 def decode_request(raw):
     """校验 Gemini 业务正文并给出原生执行参数。@param raw 控制信封。@return 内部请求。"""
-    checked_fields(raw,{'schema_version','type','request_id','model','body'},'')
+    checked_fields(raw,{'schema_version','type','request_id','model','body','system_prompt_policy'},'')
     if type(raw.get('schema_version')) is not int or raw['schema_version']!=1 or raw.get('type')!='gemini_request':raise InputError('invalid_schema')
     ident=text(raw.get('request_id'))
     if not ident or len(ident)>128:raise InputError('invalid_request_id')
@@ -164,7 +165,9 @@ def decode_request(raw):
         # 现有 new-api 会丢弃历史函数 ID；请求单工具生成可避免同名并发结果错配。
         completion['disableParallelToolCalls']=True
         notices.append({'field':'parallel_tool_calls','policy':'native_disable_requested;duplicate_names_rejected','reason':'new-api removes function IDs'})
-    return {'request_id':ident,'prompt':'','messages':[],'history_id':None,'system':'\n'.join(system),'model':MODEL,'tools':declared,'max_generations':1,
+    policy=decode_policy(raw.get('system_prompt_policy',default_policy()))
+    submitted,report=transform_system('\n'.join(system),policy)
+    return {'request_id':ident,'prompt':'','messages':[],'history_id':None,'system':submitted,'system_prompt_policy':report,'model':MODEL,'tools':declared,'max_generations':1,
         'request_format':'gemini','gemini_body':copy.deepcopy(body),'native_completion':completion,'native_steps':steps,'schema_changes':changes,'compatibility_notes':notices}
 def continuation_results(previous, calls, incoming):
     """把续轮结果绑定到本 worker 唯一待回填工具轮。@param previous 原始入站正文。@param calls 实际模型调用。@param incoming 新正文。@return 按函数名索引的真实结果。"""

@@ -93,7 +93,7 @@ class Upstream(BaseHTTPRequestHandler):
             if capacity:frames=[{'error':{'code':429,'status':'RESOURCE_EXHAUSTED'}}]
             if not cancel and not truncated and not capacity:
                 frames.append({'candidates':[{'index':0,'content':{'role':'model','parts':[{'text':''}]},'finishReason':'STOP'}],
-                    'usageMetadata':{'promptTokenCount':3,'candidatesTokenCount':4,'totalTokenCount':7}})
+                    'usageMetadata':{'promptTokenCount':3,'candidatesTokenCount':4,'totalTokenCount':7,'cachedContentTokenCount':2,'thoughtsTokenCount':1}})
             elif cancel:
                 frames*=200
             try:
@@ -172,8 +172,75 @@ class Binding(BaseHTTPRequestHandler):
         self.wfile.write(raw)
 
 
-def inside():
-    """在无外网容器中执行真实公共Gemini业务与原生工具轮。@return 脱敏验证摘要。"""
+def homoglyph_cases(database, request, base, wait_idle):
+    """对照真实TLS系统段、历史及策略账本，覆盖暖worker和工具下一HTTP。@param database 合成库。@param request 公共调用。@param base Gemini路径。@param wait_idle 实际收口等待。@return 场景名称。"""
+    original='ABC system 中文 {x: 3}\nSYSTEM 漢字 😀'
+    converted='ΑΒС ѕуѕtеm 中文 {х: 3}\nЅΥЅΤЕΜ 漢字 😀'
+    body={'systemInstruction':{'parts':[{'text':'ABC system 中文 {x: 3}'},{'text':'SYSTEM 漢字 😀'}]},
+        'contents':[{'role':'user','parts':[{'text':'ABC system 用户'}]},
+            {'role':'model','parts':[{'text':'ABC model 历史'}]},
+            {'role':'user','parts':[{'text':'ABC next 用户'}]}],
+        'generationConfig':{'maxOutputTokens':128}}
+    def enabled(value):
+        """修改合成账号的真实持久字段。@param value 新开关。@return 无。"""
+        with database:
+            database.execute('UPDATE accounts SET agy_system_prompt_homoglyph_enabled=? WHERE id=1',(int(value),))
+    def check(value,expected,streaming=False,pending=False):
+        """验证一次实际提交及其系统段。@param value 输入。@param expected 预期系统文本。@param streaming 是否SSE。@param pending 是否保留工具许可。@return 公共正文和实际请求。"""
+        before=len(Upstream.calls)
+        status,raw=request(base+('streamGenerateContent?alt=sse' if streaming else 'generateContent'),value)
+        require(status==200,'同形体原生场景失败：'+str(status)+' '+raw.decode()[:250])
+        if not pending:wait_idle()
+        require(len(Upstream.calls)==before+1,'同形体场景实际入口数不符')
+        wire=Upstream.calls[-1]['body']['request']
+        require(''.join(part.get('text','') for part in wire['systemInstruction']['parts'])==expected,'实际TLS系统文本转换边界错误')
+        return raw,wire
+    def native_pid():
+        """读取现有worker的实际PID，证明开关变化保持暖进程。@return 原生PID。"""
+        value=Request('http://127.0.0.1:8091/internal/status',headers={'authorization':'Bearer '+SECRET})
+        with urlopen(value,timeout=5) as response:state=json.load(response)
+        return state['agy']['processes'][0]['native']['pid']
+    enabled(False)
+    _,off=check(body,original);pid=native_pid()
+    enabled(True)
+    raw,on=check(body,converted)
+    require(off['contents']==on['contents'],'系统策略改写了用户或模型历史')
+    require(native_pid()==pid,'切换策略重建了暖worker')
+    usage=json.loads(raw)['usageMetadata']
+    require(usage['cachedContentTokenCount']==2 and usage['thoughtsTokenCount']==1,'策略改写了源缓存或思考用量')
+    _,stream=check(body,converted,True)
+    require(stream['contents']==off['contents'],'SSE策略改写了历史')
+    already=copy.deepcopy(body);already['systemInstruction']={'parts':[{'text':converted}]}
+    check(already,converted)
+    enabled(False);check(body,original)
+    require(native_pid()==pid,'关闭策略改变原生进程归属')
+    large=copy.deepcopy(body);large['systemInstruction']={'parts':[{'text':'ABC 中文 😀\n'*65536}]}
+    enabled(True)
+    before=len(Upstream.calls)
+    require(request(base+'generateContent',large)[0]==503,'超过原生上下文预算的系统文本被接纳')
+    wait_idle()
+    require(len(Upstream.calls)==before,'超过原生上下文预算仍产生模型提交')
+    large['systemInstruction']={'parts':[{'text':'ABC 中文 😀\n'*4096}]}
+    check(large,'ΑΒС 中文 😀\n'*4096)
+    tool=copy.deepcopy(body);tool['contents']=[{'role':'user','parts':[{'text':'TLS_SYNTHETIC_TOOL'}]}]
+    tool['tools']=[{'functionDeclarations':[{'name':'synthetic_tool','parameters':{'type':'OBJECT','properties':{'x':{'type':'INTEGER'}}}}]}]
+    raw,wire=check(tool,converted,pending=True)
+    continuation=copy.deepcopy(tool)
+    continuation['contents'] += [json.loads(raw)['candidates'][0]['content'],{'role':'user','parts':[
+        {'functionResponse':{'id':'synthetic-call','name':'synthetic_tool','response':{'value':'TLS_SYNTHETIC_RESULT'}}}]}]
+    # 原工具已向调用方返回时仍占用许可，关闭开关只影响新的HTTP模型轮。
+    enabled(False)
+    raw,wire=check(continuation,original)
+    require('TLS_SYNTHETIC_RESULT' in json.dumps(wire['contents']) and 'synthetic_tool' in json.dumps(wire['contents']),'工具结果或函数名被替换')
+    ledgers=[json.loads(path.read_text()) for path in Path('/state/capture').rglob('input-mapping.json')]
+    require(any(row.get('system_prompt_policy',{}).get('changed') is True and row['input_view']=='decoded_gemini_input' and row['submission_view']=='native_cascade_prompt_sections' for row in ledgers),'缺少区分原始与提交视图的策略账本')
+    inputs=[json.loads(path.read_text()) for path in Path('/state/capture').rglob('gemini-input.json')]
+    require(any(value.get('systemInstruction')==body['systemInstruction'] for value in inputs),'转换前入站视图丢失')
+    return ['固定同形映射实际出站','普通和SSE一致','用户及历史保护','重复经过幂等','预算内大文本及超限零提交','暖worker复用','工具下一HTTP策略','源缓存及思考用量','策略账本与入站视图']
+
+
+def inside(homoglyph=False,capture_off=False):
+    """执行真实公共业务。@param homoglyph 检验系统策略。@param capture_off 验证关闭采集。@return 脱敏验证摘要。"""
     require(os.geteuid()==1001,'原生业务探针必须使用UID1001')
     os.umask(0o077)
     context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -188,6 +255,7 @@ def inside():
         'allowed_origin':'https://cloudcode-pa.googleapis.com','native_capture_dir':'/state/capture',
         'agy':{'protocol_version':1,'source_sha256':SOURCE_SHA,'module_root':'/opt/orchestrator',
             'binary_path':'/usr/local/bin/agy-1.5.9','work_root':'/state/native','max_workers':1,'memory_mib':768}}
+    if capture_off:config.pop('native_capture_dir')
     Path('/state/sender.json').write_text(json.dumps(config))
     outputs=[];children=[]
     for executable,name in [('/opt/sender','sender'),('/opt/gateway','gateway')]:
@@ -231,6 +299,19 @@ def inside():
         base='/v1beta/models/'+MODEL+':'
         body={'contents':[{'role':'user','parts':[{'text':'TLS_SYNTHETIC_TEXT'}]}],
             'generationConfig':{'temperature':.2,'topP':.8,'maxOutputTokens':128}}
+        if capture_off:
+            with database:database.execute('UPDATE accounts SET agy_system_prompt_homoglyph_enabled=1 WHERE id=1')
+            body['systemInstruction']={'parts':[{'text':'ABC system 中文'}]}
+            require(request(base+'generateContent',body)[0]==200,'关闭采集的真实系统策略执行失败')
+            wait_idle()
+            require(len(Upstream.calls)==1,'关闭采集场景实际提交次数错误')
+            wire=Upstream.calls[0]['body']['request']
+            require(''.join(part.get('text','') for part in wire['systemInstruction']['parts'])=='ΑΒС ѕуѕtеm 中文','关闭采集时系统转换失效')
+            for name in ['gemini-input.json','input-mapping.json','rpc.ndjson','native-stream.ndjson','protocol-output.ndjson']:
+                require(not list(Path('/state').rglob(name)),'关闭采集仍保留请求正文归档：'+name)
+            database.close()
+            return {'passed':True,'evidence':'real_gateway_sender_native_tls_capture_off','network':'none',
+                'real_model_submissions':0,'synthetic_native_model_submissions':1,'checks':['采集关闭仍实际转换','收口后无请求正文归档']}
         status,raw=request(base+'generateContent',body)
         require(status==200,'固定原版非流式生成失败：'+str(status)+' '+raw.decode()[:500])
         result=json.loads(raw)
@@ -280,8 +361,10 @@ def inside():
         value=Request('http://127.0.0.1:8091/internal/status',headers={'authorization':'Bearer '+SECRET})
         with urlopen(value,timeout=5) as response:state=json.load(response)
         require(state['agy']['image_decode_calls']==1 and state['agy']['workers']==1,'原生回归破坏共享映像或物理并发上限')
+        policy_checks=homoglyph_cases(database,request,base,wait_idle) if homoglyph else []
+        require(len(Upstream.calls)==(17 if homoglyph else 9),'原生策略回归入口数不符')
         database.close()
-        return {'passed':True,'evidence':'real_gateway_sender_native_tls','network':'none','real_model_submissions':0,
+        return {'policy_checks':policy_checks,'passed':True,'evidence':'real_gateway_sender_native_tls','network':'none','real_model_submissions':0,
             'synthetic_native_model_submissions':len(Upstream.calls),'credential_generations':[1,2],
             'cgroup_memory':state['agy']['cgroup_memory'],
             'checks':['公共Gemini非流式与SSE','原版TLS与证书校验','源响应及usage','实际出站参数','原生MCP结果回填',
@@ -302,9 +385,11 @@ def main():
     parser.add_argument('--image')
     parser.add_argument('--loader-root',type=Path)
     parser.add_argument('--inside',action='store_true')
+    parser.add_argument('--homoglyph',action='store_true')
+    parser.add_argument('--capture-off',action='store_true')
     args=parser.parse_args()
     if args.inside:
-        print(json.dumps(inside(),ensure_ascii=False));return
+        print(json.dumps(inside(args.homoglyph,args.capture_off),ensure_ascii=False));return
     require(bool(args.image),'需要明确的固定原版测试镜像')
     import docker
     root=Path(__file__).resolve().parents[2]
@@ -337,7 +422,7 @@ def main():
             for name in ['ld-linux-x86-64.so.2','libc.so.6','libm.so.6','libgcc_s.so.1']:
                 library=(args.loader_root/name).resolve(strict=True)
                 volumes[str(library)]={'bind':'/opt/verify-lib/'+name,'mode':'ro'}
-        container=client.containers.run(args.image,['/opt/probe.py','--inside'],entrypoint=['python3'],detach=True,
+        container=client.containers.run(args.image,['/opt/probe.py','--inside']+(['--homoglyph'] if args.homoglyph else [])+(['--capture-off'] if args.capture_off else []),entrypoint=['python3'],detach=True,
             user='1001:1001',network_mode='none',read_only=True,cap_drop=['ALL'],security_opt=['no-new-privileges:true'],
             mem_limit='768m',pids_limit=512,extra_hosts={host:'127.0.0.1'},tmpfs={'/tmp':'rw,nosuid,nodev,size=128m'},
             volumes=volumes,environment={'PYTHONPATH':'/opt/orchestrator','DATABASE_DRIVER':'sqlite',
@@ -347,7 +432,7 @@ def main():
             labels={'vibebench.test-task':'agy-account-runtime'})
         result=container.wait(timeout=540)
         logs=container.logs().decode(errors='replace')
-        evidence=root/'.trellis/.runtime/agy-runtime-loopback-private'
+        evidence=root/('.trellis/.runtime/agy-homoglyph-capture-off-private' if args.capture_off else '.trellis/.runtime/agy-homoglyph-loopback-private' if args.homoglyph else '.trellis/.runtime/agy-runtime-loopback-private')
         if evidence.exists():shutil.rmtree(evidence)
         shutil.copytree(folder,evidence,ignore=lambda directory,names:[name for name in names
             if not (Path(directory)/name).is_file() and not (Path(directory)/name).is_dir()])

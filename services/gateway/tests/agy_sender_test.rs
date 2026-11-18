@@ -4,7 +4,9 @@ use std::path::PathBuf;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use claude_code_gateway::service::agy_contract::{AGY_SOURCE_SHA256, AgyAccessSnapshot};
+use claude_code_gateway::service::agy_contract::{
+    AGY_SOURCE_SHA256, AgyAccessSnapshot, AgySubmission,
+};
 use claude_code_gateway::service::runtime_transport::sender_router;
 use serde_json::{Value, json};
 use tower::ServiceExt;
@@ -114,5 +116,40 @@ fn runtime_snapshot_never_accepts_refresh_tokens() {
         serde_json::from_value(original["credential_snapshot"].clone()).unwrap();
     snapshot.credential_generation = 0;
     assert!(snapshot.validate(1).is_err());
+    fs::remove_dir_all(root).unwrap();
+}
+
+/// 历史默认信封保持关闭，未知规则在创建原生目录之前拒绝。@return 无。
+#[tokio::test]
+async fn system_prompt_extension_defaults_off_and_rejects_unknown_rules() {
+    let (path, root, original) = fixture();
+    let submission: AgySubmission = serde_json::from_value(original.clone()).unwrap();
+    assert!(!submission.system_prompt_policy.enabled);
+    assert!(
+        serde_json::to_value(&submission)
+            .unwrap()
+            .get("system_prompt_policy")
+            .is_none()
+    );
+    let mut invalid = original;
+    invalid["system_prompt_policy"] =
+        json!({"schema_version":1,"enabled":true,"rule_version":"unknown"});
+    let response = sender_router(path.to_string_lossy().into_owned())
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/internal/agy/prepare")
+                .header(
+                    "authorization",
+                    "Bearer synthetic-service-secret-at-least-32-bytes",
+                )
+                .header("content-type", "application/json")
+                .body(Body::from(invalid.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert!(!root.join("native").exists());
     fs::remove_dir_all(root).unwrap();
 }

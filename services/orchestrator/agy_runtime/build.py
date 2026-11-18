@@ -16,7 +16,7 @@ def build_resources(root: Path) -> dict:
         str(root / 'source/observer.c'), '-lcrypto', '-o', str(resources / 'observer-c')], check=True)
     subprocess.run(['gcc', '-shared', '-fPIC', '-O2', '-Wall', '-Wextra', '-Werror',
         str(root / 'source/relocation_reclaim.c'), '-ldl', '-o', str(resources / 'relocation_reclaim.so')], check=True)
-    names = ['observer-c', 'relocation_reclaim.so', 'cascade-config.json', 'telemetry-itabs.json']
+    names = ['observer-c', 'relocation_reclaim.so', 'cascade-config.json', 'telemetry-itabs.json', 'system-prompt-homoglyph-v1.json']
     manifest = {'source_sha256': SOURCE_SHA, 'resource_hashes': {
         'resources/' + name: hashlib.sha256((resources / name).read_bytes()).hexdigest() for name in names}}
     (resources / 'admission.json').write_text(json.dumps(manifest, sort_keys=True))

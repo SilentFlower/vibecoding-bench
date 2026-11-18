@@ -1,7 +1,37 @@
 //! Gemini入口认证、源帧聚合与认证恢复判定的合成回归。
 use axum::http::{HeaderMap, HeaderValue};
+use claude_code_gateway::service::agy_contract::AgySystemPromptPolicy;
 use claude_code_gateway::service::gemini::{aggregate, api_key, verified_auth_failure};
 use serde_json::json;
+
+/// 回执必须证明冻结开关、已知规则、实际来源及替换计数一致。@return 无。
+#[test]
+fn system_prompt_receipt_is_bound_to_frozen_policy() {
+    let policy = AgySystemPromptPolicy::new(true);
+    let report = json!({"schema_version":1,"enabled":true,"rule_version":"new-api-homoglyph-v1",
+        "source":"cortex_custom_system","rule_sha256":"a".repeat(64),
+        "changed":true,"replaced_codepoints":3,"system_codepoints":10});
+    assert!(policy.matches_report(&report));
+    assert!(!AgySystemPromptPolicy::new(false).matches_report(&report));
+    for (field, value) in [
+        ("enabled", json!(false)),
+        ("rule_version", json!("unknown")),
+        ("source", json!("unverified")),
+        ("changed", json!(false)),
+        ("system_codepoints", json!(2)),
+        ("rule_sha256", json!("invalid")),
+    ] {
+        let mut changed = report.clone();
+        changed[field] = value;
+        assert!(!policy.matches_report(&changed));
+    }
+    assert!(
+        serde_json::from_value::<AgySystemPromptPolicy>(
+            json!({"schema_version":1,"enabled":"false","rule_version":"new-api-homoglyph-v1"})
+        )
+        .is_err()
+    );
+}
 
 /// 四种令牌来源兼容，冲突和重复查询密钥受控拒绝。@return 无。
 #[test]

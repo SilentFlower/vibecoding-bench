@@ -10,6 +10,71 @@ use crate::service::runtime_transport::PreparedRequest;
 pub const AGY_SOURCE_SHA256: &str =
     "39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43";
 
+/// 首版固定映射标识，字符表由原生适配的受管理资源持有。
+pub const AGY_SYSTEM_PROMPT_RULE: &str = "new-api-homoglyph-v1";
+
+/// 同一HTTP请求及认证恢复共用的账号系统文本策略。
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AgySystemPromptPolicy {
+    pub schema_version: u8,
+    pub enabled: bool,
+    pub rule_version: String,
+}
+
+impl Default for AgySystemPromptPolicy {
+    /// 历史信封缺省关闭。@return 首版关闭策略。
+    fn default() -> Self {
+        Self::new(false)
+    }
+}
+
+impl AgySystemPromptPolicy {
+    /// 从已准入账号冻结开关。@param enabled 当前账号配置。@return 独立策略快照。
+    pub fn new(enabled: bool) -> Self {
+        Self {
+            schema_version: 1,
+            enabled,
+            rule_version: AGY_SYSTEM_PROMPT_RULE.into(),
+        }
+    }
+
+    /// 关闭策略省略私有扩展以保持历史默认发送兼容。@return 是否关闭。
+    pub fn is_disabled(&self) -> bool {
+        !self.enabled
+    }
+
+    /// 拒绝未知规则并保持发送前失败。@return 合同校验结果。
+    pub fn validate(&self) -> Result<(), AppError> {
+        if self.schema_version != 1 || self.rule_version != AGY_SYSTEM_PROMPT_RULE {
+            return Err(AppError::BadRequest("AGY系统文本策略版本无效".into()));
+        }
+        Ok(())
+    }
+
+    /// 核对内核实际处理回执及计数一致性。@param report 私有原生回执。@return 是否对应冻结策略。
+    pub fn matches_report(&self, report: &Value) -> bool {
+        let Some(replaced) = report["replaced_codepoints"].as_u64() else {
+            return false;
+        };
+        report["schema_version"].as_u64() == Some(u64::from(self.schema_version))
+            && report["enabled"].as_bool() == Some(self.enabled)
+            && report["rule_version"].as_str() == Some(self.rule_version.as_str())
+            && report["source"].as_str() == Some("cortex_custom_system")
+            && report["changed"].as_bool() == Some(replaced > 0)
+            && (self.enabled || replaced == 0)
+            && report["system_codepoints"]
+                .as_u64()
+                .is_some_and(|count| count >= replaced)
+            && report["rule_sha256"].as_str().is_some_and(|hash| {
+                hash.len() == 64
+                    && hash
+                        .bytes()
+                        .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+            })
+    }
+}
+
 /// 回填原工具轮的私有信封，沿原许可执行并且不发布新凭据。
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -116,6 +181,8 @@ pub struct AgySubmission {
     pub model: String,
     pub native_model: AgyModelId,
     pub body: Value,
+    #[serde(default, skip_serializing_if = "AgySystemPromptPolicy::is_disabled")]
+    pub system_prompt_policy: AgySystemPromptPolicy,
     #[serde(default)]
     pub capture_enabled: bool,
 }
@@ -124,6 +191,7 @@ impl AgySubmission {
     /// 核对调用方、模型和同账号快照。@param now 当前UTC毫秒。@return 业务信封校验结果。
     pub fn validate(&self, now: u64) -> Result<(), AppError> {
         self.credential_snapshot.validate(now)?;
+        self.system_prompt_policy.validate()?;
         if self.api_token_id < 1
             || self.request.account_id != self.credential_snapshot.account_id
             || !self.native_model.is_valid()
