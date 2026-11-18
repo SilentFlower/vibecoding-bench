@@ -3,7 +3,7 @@
   "name": "runtime-platform-version",
   "title": "运行时平台版本与编译缓存解耦",
   "description": "将当前平台版本改为控制端运行时提供，移除版本号到前端及Rust编译的依赖，并验证纯版本变更缓存复用。",
-  "status": "planning",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": "platform",
@@ -11,10 +11,10 @@
   "creator": "silentflower",
   "assignee": "silentflower",
   "createdAt": "2026-11-18",
-  "completedAt": null,
+  "completedAt": "2026-11-18",
   "closeout": {
-    "status": "pending",
-    "closedAt": null,
+    "status": "closed",
+    "closedAt": "2026-11-18T14:44:39Z",
     "blockers": []
   },
   "branch": null,
@@ -27,5 +27,17 @@
   "parent": "11-18-release-speed-runtime-version",
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "运行时平台版本文件及已鉴权只读API",
+      "首页与系统更新页运行时展示、旧端兼容及会话顺序修复",
+      "Docker编译输入与Cargo缓存键解耦，真实两版本缓存对照通过",
+      "适用回归、Check-All重检和规范同步通过"
+    ],
+    "partialStep": null,
+    "nextStep": "父任务集成复核",
+    "notes": "纯版本控制镜像构建5.657秒。GitHub Actions全链路耗时和四路资源事件由后续正式发行验收承接。",
+    "updatedAt": "2026-11-18T14:44:39.431908+00:00"
+  }
 }
