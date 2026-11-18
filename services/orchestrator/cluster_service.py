@@ -16,6 +16,7 @@ from pathlib import Path
 from docker import DockerClient
 from docker.errors import DockerException
 
+from account_isolation import ROLE_COLUMNS
 from account_runtime import RuntimeBusy, _read_json
 from account_update_identity import configured_release
 from cluster_nodes import NodeConfiguration, NodeCreate
@@ -158,17 +159,43 @@ class ClusterService:
         """为本机恢复与文件访问判定环境归属。
 
         :param row: 环境数据库行。
-        :return: 默认本机环境和本机登录草稿为 True，异常归属为 False。
+        :return: 已登记本机环境、本机草稿及已核验的旧孤立停止环境为 True，异常归属为 False。
         """
         if row.get('account_id') is None:
             try:
                 return self.draft_node(environment_id=row['environment_id']) is None
             except Exception:
                 return False
+        connection = self.store.database()
         try:
-            return self.store.assignment(row['account_id'])['kind'] == 'local'
-        except ValueError:
+            # 维护归属沿持久分配读取，软删除账号仍须核验原环境；新工作准入继续使用有效账号查询。
+            assignment = connection.execute('SELECT n.kind,n.node_key,n.deleted_at FROM account_node_assignments b '
+                'LEFT JOIN cluster_nodes n ON n.id=b.node_id WHERE b.account_id=?', (row['account_id'],)).fetchone()
+            if assignment is not None:
+                return assignment['kind'] == 'local' and assignment['node_key'] == 'local' and assignment['deleted_at'] is None
+            if connection.execute('SELECT 1 FROM accounts WHERE id=?', (row['account_id'],)).fetchone():
+                return False
+            identifier = row['environment_id']
+            if not re.fullmatch('[a-f0-9]{32}', identifier):
+                return False
+            stored = connection.execute('SELECT * FROM account_environments WHERE environment_id=?', (identifier,)).fetchone()
+            if (stored is None or stored['account_id'] != row['account_id'] or stored['state'] not in ('stopped', 'retired')
+                    or any(stored[column] for column in ROLE_COLUMNS.values())):
+                return False
+            # 集群前已删除账号的空环境可以维护；任何节点历史都要求沿原归属对账。
+            if (connection.execute('SELECT 1 FROM node_executions WHERE account_id=? OR environment_id=? LIMIT 1',
+                    (row['account_id'], identifier)).fetchone()
+                    or connection.execute('SELECT 1 FROM node_migrations WHERE account_id=? LIMIT 1', (row['account_id'],)).fetchone()
+                    or connection.execute('SELECT 1 FROM node_login_drafts WHERE environment_id=? LIMIT 1', (identifier,)).fetchone()
+                    or not connection.execute("SELECT 1 FROM cluster_nodes WHERE node_key='local' AND kind='local' AND deleted_at IS NULL").fetchone()):
+                return False
+        finally:
+            connection.close()
+        root = self.data / 'environments' / identifier
+        if root.is_symlink() or (root / 'runtime').is_symlink():
             return False
+        return not any(path.exists() or path.is_symlink() for path in
+            (root / 'runtime' / name for name in ('node-assignment.json', 'node-fence.json', 'node-migration-target.json')))
 
     def docker(self, node_id: int) -> DockerClient:
         """通过 SSH Unix 隧道取得对应节点的 Docker SDK 客户端。

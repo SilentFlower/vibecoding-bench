@@ -789,7 +789,10 @@ class HostDeployment:
                     self.environment_cpu(current, frozen)
                 continue
             if not evidence['ready']:
-                raise ValueError('账号更新期间出现新的阻塞活动')
+                operation['blockers'] = evidence.get('blockers', [])[:256]
+                save()
+                detail = '；'.join(operation['blockers'][:3])
+                raise ValueError('账号更新期间出现新的阻塞活动' + ('：' + detail if detail else ''))
             if (current['environment_id'] not in operation.setdefault('environment_cpu_before', {})
                     and current['environment_id'] not in operation.get('environment_retired', {})):
                 frozen = self.environment_cpu(current)
