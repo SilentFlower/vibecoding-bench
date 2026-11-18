@@ -8,6 +8,7 @@ from fastapi.routing import APIRoute
 from docker.errors import DockerException
 
 from cluster_nodes import NodeAddress, NodeCreate, NodeEnabled, NodeRevision
+from cluster_deployment import NodeInstallationConfigurationError
 from cluster_ssh import probe_host_keys
 
 
@@ -26,7 +27,7 @@ class NodeRoute(APIRoute):
             try:
                 return await handler(request)
             except RequestValidationError:
-                return JSONResponse({'detail': '节点参数无效，请核对地址、身份、密钥和配置版本'}, status_code=422)
+                return JSONResponse({'detail': '节点参数无效，请核对地址、身份、认证材料和配置版本'}, status_code=422)
         return safe_handler
 
 
@@ -60,11 +61,11 @@ def cluster_router(service) -> APIRouter:
 
     @router.post('', status_code=201)
     def create_node(body: NodeCreate) -> dict:
-        """登记已确认身份的节点。:param body: 节点配置与只写私钥。:return: 公开节点。"""
+        """登记已确认身份的节点。:param body: 节点配置与只写认证材料。:return: 公开节点。"""
         try:
             return current().register(body)
         except (ValueError, OSError):
-            raise HTTPException(400, '节点登记失败，请核对专用私钥、主机身份和重复节点') from None
+            raise HTTPException(400, '节点登记失败，请核对认证材料、主机身份和重复节点') from None
 
     @router.post('/{node_id}/check')
     def check_node(node_id: int, body: NodeRevision) -> dict:
@@ -87,6 +88,8 @@ def cluster_router(service) -> APIRouter:
         """安装节点执行组件。:param node_id: 节点。:param body: 版本。:return: 公开状态。"""
         try:
             return current().prepare_node(node_id, body.revision)
+        except NodeInstallationConfigurationError as error:
+            raise HTTPException(409, str(error)) from None
         except (ValueError, OSError, RuntimeError, DockerException):
             raise HTTPException(409, '节点组件安装未完成，请核对配置、镜像、SSH 身份及远程数据归属') from None
 

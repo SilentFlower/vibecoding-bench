@@ -53,7 +53,9 @@ class ClusterStore:
         :param config: 通过严格校验的节点配置。
         :return: 新节点公开投影。
         """
-        encoded = json.dumps(config.model_dump(), ensure_ascii=False, separators=(',', ':'))
+        # 密钥节点保持已发布的持久格式，旧版严格读取器仍可接管原认证方式。
+        fields = config.model_dump(exclude={'auth_method'} if config.auth_method == 'private_key' else set())
+        encoded = json.dumps(fields, ensure_ascii=False, separators=(',', ':'))
         endpoint = json.dumps([config.host, config.port, config.username], separators=(',', ':'))
         with self.lock:
             connection = self.database()
@@ -238,5 +240,6 @@ class ClusterStore:
             'revision': row['revision'], 'enabled': bool(row['enabled']), 'account_count': account_count,
             'host': config.get('host'), 'port': config.get('port'), 'username': config.get('username'),
             'data_root': config.get('data_root'),
+            'auth_method': config.get('auth_method'),
             'host_key_sha256': fingerprint,
             'observation': observation, 'preparation': preparation}

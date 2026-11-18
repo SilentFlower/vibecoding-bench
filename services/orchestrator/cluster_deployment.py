@@ -105,6 +105,17 @@ def node_network_name(deployment: str, node_key: str) -> str:
     return 'flower2api-' + deployment + '-node-' + node_key[:12]
 
 
+class NodeInstallationConfigurationError(ValueError):
+    """节点安装所需的中央配置缺失，公开消息仅包含配置名。
+
+    :param missing: 服务内部判定缺失的配置项名称。
+    """
+
+    def __init__(self, missing: list[str]) -> None:
+        """构造可供管理员修复的固定提示。:param missing: 缺失配置名。:return: None。"""
+        super().__init__('管理中心缺少节点安装配置：' + '、'.join(missing) + '；请按维护流程更新宿主部署模板并重建控制端')
+
+
 class NodeDeployment:
     """同批镜像的节点安装器，不持有或分发中央管理员口令。
 
@@ -125,7 +136,11 @@ class NodeDeployment:
         :param account_image: 账号镜像。
         :return: None。
         """
-        if not re.fullmatch('[a-z0-9][a-z0-9-]{0,35}', deployment) or not release or not control_image or not account_image:
+        missing = [name for name, value in (('V3_DEPLOYMENT_ID', deployment), ('V3_RELEASE', release),
+            ('V3_CONTROL_IMAGE', control_image), ('V3_ACCOUNT_IMAGE', account_image)) if not value]
+        if missing:
+            raise NodeInstallationConfigurationError(missing)
+        if not re.fullmatch('[a-z0-9][a-z0-9-]{0,35}', deployment):
             raise ValueError('节点安装需要完整的当前平台镜像配置')
         self.service, self.deployment, self.release = service, deployment, release
         self.control_image, self.account_image = control_image, account_image

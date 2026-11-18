@@ -18,6 +18,8 @@ const pending = reactive(new Set<number>());
 const editor = ref(false), saving = ref(false), probing = ref(false), formError = ref('');
 const name = ref(''), host = ref(''), port = ref<number | string>(22), username = ref('root');
 const dataRoot = ref('/srv/flower2api-node'), privateKey = ref(''), selectedKey = ref(''), verified = ref(false);
+const authMethod = ref<'private_key' | 'password'>('private_key'), password = ref('');
+const authenticationOptions = [{ value: 'private_key', label: 'SSH 私钥' }, { value: 'password', label: 'SSH 密码' }];
 const keys = ref<NodeHostKey[]>([]), deleting = ref<ExecutionNode | null>(null), deleteError = ref('');
 const installing = ref<ExecutionNode | null>(null), installError = ref('');
 const options = computed(() => keys.value.map(key => ({ value: key.key, label: `${key.algorithm} · ${key.sha256}` })));
@@ -45,11 +47,12 @@ function resetProbe(): void {
 }
 watch([host, port], resetProbe);
 watch(selectedKey, () => { verified.value = false; });
-/** 清理离开的登记表单，私钥不跨页面或弹窗保留。@param open 新状态。@return 无。 */
+watch(authMethod, () => { privateKey.value = ''; password.value = ''; });
+/** 清理离开的登记表单，认证材料随弹窗生命周期释放。@param open 新状态。@return 无。 */
 function setEditor(open: boolean): void {
   if (saving.value) return;
   editor.value = open; formError.value = '';
-  if (!open) { privateKey.value = ''; resetProbe(); }
+  if (!open) { privateKey.value = ''; password.value = ''; resetProbe(); }
 }
 /** 仅探测当前目标的公钥，显式核对由管理员完成。@return 探测完成。 */
 async function probe(): Promise<void> {
@@ -62,15 +65,18 @@ async function probe(): Promise<void> {
     if (alive && generation === probeGeneration && !probeRequest.signal.aborted) formError.value = (cause as Error).message;
   } finally { if (generation === probeGeneration) probing.value = false; }
 }
-/** 保存已核对身份的节点，密钥随本次提交后清空。@return 登记完成。 */
+/** 保存已核对身份的节点，认证材料随本次成功提交清空。@return 登记完成。 */
 async function save(): Promise<void> {
   if (saving.value) return;
   if (!verified.value || !selectedFingerprint.value) { formError.value = '请先选择主机公钥并核对指纹'; return; }
   saving.value = true; formError.value = '';
   try {
+    const authentication = authMethod.value === 'password'
+      ? { auth_method: 'password' as const, password: password.value }
+      : { auth_method: 'private_key' as const, private_key: privateKey.value };
     await nodeApi.register({ name: name.value.trim(), host: host.value.trim(), port: Number(port.value),
-      username: username.value.trim(), data_root: dataRoot.value, host_key: selectedKey.value, private_key: privateKey.value });
-    privateKey.value = ''; editor.value = false; resetProbe();
+      username: username.value.trim(), data_root: dataRoot.value, host_key: selectedKey.value, ...authentication });
+    privateKey.value = ''; password.value = ''; editor.value = false; resetProbe();
     if (alive) { toast('节点已登记，可以检查连接与资源', 'success'); await load(); }
   } catch (cause) { if (alive) formError.value = (cause as Error).message; }
   finally { saving.value = false; }
@@ -118,7 +124,7 @@ function state(node: ExecutionNode): string {
   return node.observation.state === 'reachable' ? '连接正常' : '连接异常';
 }
 onMounted(() => { void load(); });
-onUnmounted(() => { alive = false; loadGeneration++; listRequest?.abort(); resetProbe(); privateKey.value = ''; });
+onUnmounted(() => { alive = false; loadGeneration++; listRequest?.abort(); resetProbe(); privateKey.value = ''; password.value = ''; });
 </script>
 
 <template>
@@ -134,14 +140,16 @@ onUnmounted(() => { alive = false; loadGeneration++; listRequest?.abort(); reset
         <p v-if="node.observation?.reason" class="nodes-error" role="status">{{ node.observation.reason }}</p>
         <div class="node-meta"><span>最近检查</span><time>{{ node.observation && node.observation.observed_at > 0 ? new Date(node.observation.observed_at * 1000).toLocaleString('zh-CN') : '尚未检查' }}</time><span>Docker</span><span>{{ node.observation?.docker_version ?? '未采集' }}</span><template v-if="node.kind === 'ssh'"><span>运行组件</span><span>{{ node.preparation ? ({ preparing: '正在安装', prepared: '已就绪', failed: '安装失败', needs_check: '待核对' }[node.preparation.state]) : '待安装' }}</span><span v-if="node.preparation?.release">组件版本</span><span v-if="node.preparation?.release">{{ node.preparation.release }}</span></template></div>
         <p v-if="node.preparation?.reason" class="nodes-error" role="status">{{ node.preparation.reason }}</p>
-        <details v-if="node.kind === 'ssh'" class="node-identity"><summary><ShieldCheck :size="14" />已确认的主机身份</summary><p><code>{{ node.host_key_sha256 }}</code></p><p>节点数据目录：<code>{{ node.data_root }}</code></p></details>
+        <details v-if="node.kind === 'ssh'" class="node-identity"><summary><ShieldCheck :size="14" />已确认的主机身份</summary><p><code>{{ node.host_key_sha256 }}</code></p><p>认证方式：{{ node.auth_method === 'password' ? 'SSH 密码' : 'SSH 私钥' }}</p><p>节点数据目录：<code>{{ node.data_root }}</code></p></details>
         <footer><Button variant="outline" :disabled="pending.has(node.id)" @click="operate(node, 'check')"><RefreshCw :size="14" />{{ pending.has(node.id) ? '处理中…' : '检查连接' }}</Button><Button v-if="node.kind === 'ssh'" variant="outline" :disabled="pending.has(node.id) || !node.enabled" @click="installError = ''; installing = node">准备运行组件</Button><Button variant="outline" :disabled="pending.has(node.id)" @click="operate(node, 'enable')">{{ node.enabled ? '暂停接单' : '恢复接单' }}</Button><Button v-if="node.kind === 'ssh'" variant="ghost" :disabled="pending.has(node.id) || node.account_count > 0" @click="deleteError = ''; deleting = node"><Trash2 :size="14" />移除</Button></footer>
       </article>
     </div>
     <Dialog :open="editor" @update:open="setEditor"><DialogContent class="node-editor" :show-close-button="!saving" @escape-key-down="event => { if (saving) event.preventDefault(); }" @interact-outside="event => { if (saving) event.preventDefault(); }"><DialogHeader><DialogTitle>添加 SSH 节点</DialogTitle><DialogDescription>服务器需要具备 SSH、Python 3 和 Docker。使用具有对应 Docker 权限的专用账号。</DialogDescription></DialogHeader>
       <form class="node-form" @submit.prevent="save"><div class="node-form-grid"><label>节点名称<Input v-model="name" required maxlength="80" :disabled="saving" /></label><label>服务器地址<Input v-model="host" required placeholder="IP 或主机名" :disabled="saving" /></label><NumberInput v-model="port" label="SSH 端口" :min="1" :max="65535" required :disabled="saving" /><label>SSH 用户<Input v-model="username" required autocomplete="off" :disabled="saving" /></label></div><label>独立数据目录<Input v-model="dataRoot" required :disabled="saving" /></label>
         <div class="node-fingerprint"><Button type="button" variant="outline" :disabled="saving || probing || !host.trim() || !port" @click="probe">{{ probing ? '正在探测…' : '探测主机公钥' }}</Button><ChoiceSelect v-if="keys.length" v-model="selectedKey" label="服务器主机公钥" :options="options" :disabled="saving" placeholder="选择已核对的公钥" /><code v-if="selectedFingerprint">{{ selectedFingerprint }}</code><label v-if="selectedFingerprint" class="node-verify"><input v-model="verified" type="checkbox" :disabled="saving" />我已通过可信渠道核对这个主机指纹</label></div>
-        <label>专用 SSH 私钥<Textarea v-model="privateKey" required autocomplete="off" :spellcheck="false" :disabled="saving" rows="5" placeholder="粘贴专用无口令私钥" /></label><p class="node-note">私钥由管理中心以受保护文件保存，关闭此窗口后清空输入。</p><p v-if="formError" class="nodes-error" role="alert">{{ formError }}</p><footer><Button type="button" variant="outline" :disabled="saving" @click="setEditor(false)">取消</Button><Button type="submit" :disabled="saving || !verified">{{ saving ? '正在登记…' : '登记节点' }}</Button></footer>
+        <ChoiceSelect v-model="authMethod" label="SSH 认证方式" :options="authenticationOptions" :disabled="saving" />
+        <label v-if="authMethod === 'private_key'">专用 SSH 私钥<Textarea v-model="privateKey" required autocomplete="off" :spellcheck="false" :disabled="saving" rows="5" placeholder="粘贴专用无口令私钥" /></label>
+        <label v-else>SSH 密码<Input v-model="password" type="password" required maxlength="4096" autocomplete="new-password" :disabled="saving" /></label><p class="node-note">认证材料由管理中心以受保护文件保存，关闭此窗口后清空输入。</p><p v-if="formError" class="nodes-error" role="alert">{{ formError }}</p><footer><Button type="button" variant="outline" :disabled="saving" @click="setEditor(false)">取消</Button><Button type="submit" :disabled="saving || !verified">{{ saving ? '正在登记…' : '登记节点' }}</Button></footer>
       </form>
     </DialogContent></Dialog>
     <ConfirmationDialog :open="!!deleting" title="移除节点" :message="`确认移除「${deleting?.name ?? ''}」？该操作归档节点登记并断开管理连接。远程容器与持久数据保留。`" confirm-label="移除节点" danger :busy="!!deleting && pending.has(deleting.id)" :error="deleteError" @confirm="remove" @cancel="deleting = null" />

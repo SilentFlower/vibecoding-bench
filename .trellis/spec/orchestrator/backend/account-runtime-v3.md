@@ -1823,3 +1823,50 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - `test_cluster_node_docker`按开关运行随机隔离部署：同一真实Rust网关的双账号双Node JSON/SSE及并发、冻结诊断、原管理HTTP/WS、完整所有权、零代删除、独立迁移故障隔离、Node停机换批及HOME身份保留。上游及凭据均使用合成夹具。
 - `test_cluster_backup`及原备份测试核对真实SQLite隔离复制、清单/逻辑摘要、同批组合对应和pending恢复事实。`verify_database_definitions.py`核对bench4/gateway4及冻结来源。
 - 前端生产构建及`verify_cluster_ui.py`、`verify_cluster_draft_ui.py`、`verify_cluster_request_ui.py`覆盖冻结确认、迟到响应、独立/停用账号、原草稿/WS、历史未观测及390/1440布局；Rust执行fmt与全量测试。
+
+## Scenario: SSH 节点密码认证与旧密钥配置兼容
+
+### 1. Scope / Trigger
+
+修改节点登记 DTO、私有认证存储、OpenSSH 命令与隧道、管理表单或节点安装配置诊断时适用。节点用户名沿原配置，认证方式支持私钥和 SSH password。
+
+### 2. Signatures
+
+- `POST /api/nodes`：在原配置上增加 `auth_method: private_key|password`，缺省为 private_key；只写 `private_key?:string|null`、`password?:string|null`。
+- `GET /api/nodes` 的 SSH 投影增加 `auth_method`；本机为 null。NodeConfiguration 继续作为公开配置的严格模型。
+- `SshNode.save_password(password)` 保存私有密码；命令由 `_command` 统一认证，Docker、sender、PTY 继续建立独立连接。
+- `NodeInstallationConfigurationError` 仅公开缺失的 `V3_DEPLOYMENT_ID/V3_RELEASE/V3_CONTROL_IMAGE/V3_ACCOUNT_IMAGE` 名称，准备接口返回 409。
+
+### 3. Contracts
+
+- 所选认证方式必须对应唯一非空材料。私钥长度 64～32768 字符；密码长度 1～4096 字符，拒绝 NUL、CR、LF。密码保留前后空格、中文及 Shell 特殊字符。
+- 私钥与密码排除 model_dump 和 repr，秘密仅进入中央节点专属私有文件；目录 0700、文件 0600。公开 config_json 仅保存配置。密钥节点省略默认 auth_method，保持已发布严格读取器的字段集合；密码节点显式保存 auth_method=password。
+- 密码文件通过无链接目录访问及 O_NOFOLLOW 打开，fstat 核对当前 UID、常规文件和私有权限。sshpass 通过单独继承的文件描述符读取密码，业务 stdin、argv 和环境继续排除密码。
+- 密码认证限制为 password 和一次密码提交，关闭公钥及键盘交互回退。两种方式继续固定主机公钥、known_hosts/HostKeyAlias、StrictHostKeyChecking，禁用用户 SSH 配置、代理及 agent。
+- 命令、独立 Docker/业务/PTY 隧道共享认证构造。超时、失败和关闭按原归属回收进程及 socket；sshpass/OpenSSH 错误仅映射固定公开原因。
+- 表单只提交所选材料；切换、成功、关闭和卸载清理秘密。既有节点在线换密和二次认证属于独立范围。
+- 固定宿主模板与应用镜像分别维护。旧模板需按 SYSTEM-UPDATES.md 校验原字节、策略摘要及资源设置，通过原服务锁/存储锁同步，再沿维护门禁重建控制端。V3_RUNTIME_URL 沿模板采用中央回连地址。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 空密码、冲突材料、非法方式或控制字符 | 422 固定参数说明，排除原输入 |
+| 错误密码 | 检查记录 unreachable，reason_code=authentication_failed |
+| 主机公钥不符 | 拒绝连接，固定 host_key_mismatch 原因 |
+| 密码文件为链接、公开权限或错误 UID | 拒绝使用该凭据 |
+| 缺少中央安装配置 | 409 列出配置名，保留原准备状态 |
+| 旧节点缺 auth_method | 默认私钥；新密钥节点继续可由旧版配置模型读取 |
+
+### 5. Scenarios and Examples
+
+- 正常：原主机配置加 `{"auth_method":"password","password":" 合成密码! "}`，保存原值并完成检查；连接复用及服务重启后重连均读取本节点私有文件。
+- 边界：原请求只含 private_key，继续以密钥登记；公开列表显示 private_key，数据库保持原字段集合。
+- 错误用法：同时提交 password 和 private_key，或把密码拼进 sshpass 参数、Shell、环境或业务 stdin。正确处理是唯一材料校验与独立文件描述符传递。
+- 回退：密码节点要求包含 sshpass 的新控制程序；回退旧程序前先完成密码节点账号迁移和引用收口。私钥节点保留旧格式。
+
+### 6. Tests Required
+
+- `test_cluster_password` 核对严格 DTO、原值保存、只写/repr、目录权限、符号链接拒绝、重复登记清理、默认密钥持久字段和安装配置诊断。
+- `CLUSTER_SSH_PASSWORD_TEST=1 ... -m unittest test_cluster_ssh_password` 使用合成密码与隔离回环 Docker sshd，核对正确/错误密码、主机指纹拒绝、特殊字符和大 stdin、实际 Docker SDK、三类隧道、重连及进程清理。夹具构建见 `deploy/flower2api/fixtures/ssh-password/Dockerfile`。
+- 原 `test_cluster_nodes/test_cluster_ssh/test_cluster_backup` 回归，实际已发布 NodeConfiguration 重读新密钥配置；前端构建及 `verify_node_password_ui.py` 核对认证切换、掩码、唯一凭据、清理和 1440/390 布局。

@@ -59,14 +59,17 @@ class ClusterService:
     def register(self, request: NodeCreate) -> dict:
         """保存管理员已确认主机公钥的 SSH 节点。
 
-        :param request: 配置与只写私钥。
+        :param request: 配置与只写认证材料。
         :return: 新节点公开投影。
         """
         config = NodeConfiguration.model_validate(request.model_dump())
         node_key = uuid.uuid4().hex
         node = SshNode(node_key, config, self.private_root, self.transport_root)
         try:
-            node.save_identity(request.private_key)
+            if request.auth_method == 'password':
+                node.save_password(request.password)
+            else:
+                node.save_identity(request.private_key)
             result = self.store.create(node_key, config)
         except Exception:
             # 登记失败只清理本次随机身份，不能触碰已有节点或远程环境。

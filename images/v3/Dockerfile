@@ -52,7 +52,7 @@ RUN python3 /source/criu/package.py --source /source/criu --out /opt/ccrb-criu \
     && chmod -R go-w /opt/ccrb-criu
 
 FROM python:3.12-slim-bookworm AS control
-RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates openssl openssh-client \
+RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates openssl openssh-client sshpass \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=frontend /usr/local/bin/node /usr/local/bin/node

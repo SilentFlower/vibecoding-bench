@@ -6,8 +6,9 @@ import hashlib
 import ipaddress
 import re
 from pathlib import PurePosixPath
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, field_validator, model_validator
 
 
 def host_key_identity(value: str) -> dict[str, str]:
@@ -68,13 +69,14 @@ class NodeAddress(BaseModel):
 
 
 class NodeConfiguration(NodeAddress):
-    """节点持久配置，包含公开主机身份，不包含 SSH 私钥。
+    """节点持久配置，包含公开主机身份与认证方式，排除私有认证材料。
 
     :param name: 管理员可读名称。
     :param username: 具有对应 Docker 权限的专用 SSH 用户。
     :param host_key: 管理员已确认的服务器公钥。
     :param data_root: 节点宿主的独立绝对数据目录。
     :param enabled: 是否允许新工作。
+    :param auth_method: SSH 私钥或密码认证方式，历史配置默认为私钥。
     """
 
     name: StrictStr = Field(min_length=1, max_length=80)
@@ -82,6 +84,7 @@ class NodeConfiguration(NodeAddress):
     host_key: StrictStr = Field(min_length=1, max_length=24 * 1024)
     data_root: StrictStr = Field(default='/srv/flower2api-node', min_length=2, max_length=512)
     enabled: StrictBool = True
+    auth_method: Literal['private_key', 'password'] = 'private_key'
 
     @field_validator('host_key')
     @classmethod
@@ -111,12 +114,26 @@ class NodeConfiguration(NodeAddress):
 
 
 class NodeCreate(NodeConfiguration):
-    """新节点登记请求，私钥只在写入时使用。
+    """新节点登记请求，认证材料只在写入时使用。
 
     :param private_key: OpenSSH 支持的专用无口令私钥。
+    :param password: SSH 密码，按原值使用。
     """
 
-    private_key: StrictStr = Field(min_length=64, max_length=32 * 1024, exclude=True)
+    private_key: StrictStr | None = Field(default=None, min_length=64, max_length=32 * 1024, exclude=True, repr=False)
+    password: StrictStr | None = Field(default=None, min_length=1, max_length=4096, exclude=True, repr=False)
+
+    @model_validator(mode='after')
+    def validate_authentication(self) -> NodeCreate:
+        """限定唯一认证材料并保护密码的单行传递语义。:return: 已验证请求。"""
+        if self.auth_method == 'private_key':
+            if self.private_key is None or self.password is not None:
+                raise ValueError('请仅提供所选方式的 SSH 私钥')
+        elif self.password is None or self.private_key is not None:
+            raise ValueError('请仅提供所选方式的 SSH 密码')
+        if self.password is not None and any(character in self.password for character in ('\x00', '\r', '\n')):
+            raise ValueError('SSH 密码不能包含空字符或换行')
+        return self
 
 
 class NodeRevision(BaseModel):

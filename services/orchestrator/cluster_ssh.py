@@ -123,7 +123,7 @@ class NodeSshError(ValueError):
         messages = {'client_unavailable': '管理中心缺少可用的 SSH 客户端',
             'timeout': 'SSH 检查超时，请核对节点网络',
             'host_key_mismatch': '节点主机指纹不匹配，请通过可信渠道核对服务器身份',
-            'authentication_failed': 'SSH 专用密钥认证失败，请核对用户与授权公钥',
+            'authentication_failed': 'SSH 认证失败，请核对用户名和所选认证材料',
             'connection_failed': 'SSH 连接失败，请核对地址、端口和网络',
             'remote_command_failed': '节点检查命令失败，请核对 Python 3、Docker 和对应权限',
             'response_too_large': '节点检查结果超出允许大小'}
@@ -131,12 +131,13 @@ class NodeSshError(ValueError):
         super().__init__(messages[self.reason])
 
 
-def _run(arguments: list[str], *, data: bytes | None = None, timeout: float = 15, maximum_output: int = 256 * 1024) -> bytes:
+def _run(arguments: list[str], *, data: bytes | None = None, timeout: float = 15,
+        maximum_output: int = 256 * 1024, pass_fds: tuple[int, ...] = ()) -> bytes:
     process, failed = None, True
     output, errors = bytearray(), bytearray()
     try:
         process = subprocess.Popen(arguments, stdin=subprocess.PIPE if data is not None else subprocess.DEVNULL,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True, pass_fds=pass_fds,
             env={**os.environ, 'SSH_AUTH_SOCK': '', 'SSH_ASKPASS_REQUIRE': 'never'})
         deadline = time.monotonic() + timeout
         with selectors.DefaultSelector() as ready:
@@ -181,10 +182,11 @@ def _run(arguments: list[str], *, data: bytes | None = None, timeout: float = 15
                         if len(output) + len(errors) > maximum_output:
                             raise NodeSshError('response_too_large')
         code = process.wait(timeout=max(0.001, deadline - time.monotonic()))
-        failed = False
         if code:
             # OpenSSH错误可能含远端横幅与命令内容，只返回固定脱敏说明。
             message = bytes(errors).lower()
+            if arguments[0] == 'sshpass' and code in (5, 6, 7):
+                raise NodeSshError('authentication_failed' if code == 5 else 'host_key_mismatch')
             if code == 255:
                 if b'host key verification failed' in message or b'remote host identification has changed' in message:
                     raise NodeSshError('host_key_mismatch')
@@ -192,6 +194,7 @@ def _run(arguments: list[str], *, data: bytes | None = None, timeout: float = 15
                     raise NodeSshError('authentication_failed')
                 raise NodeSshError('connection_failed')
             raise NodeSshError('remote_command_failed')
+        failed = False
         return bytes(output)
     except OSError as error:
         raise NodeSshError('client_unavailable') from error
@@ -280,20 +283,81 @@ class SshNode:
         atomic_text(self.private / 'known_hosts', 'node-' + self.node_key + ' ' + self.config.host_key + '\n')
         _run(['ssh-keygen', '-l', '-E', 'sha256', '-f', str(self.private / 'known_hosts')], timeout=5)
 
-    def _arguments(self, reuse_control: bool = True) -> list[str]:
-        for name in ('identity', 'known_hosts'):
+    def save_password(self, password: str) -> None:
+        """原子保存节点密码及已确认的主机身份。
+
+        :param password: 原值单行密码。
+        :return: None。
+        """
+        if not isinstance(password, str) or not 1 <= len(password) <= 4096 or any(
+                character in password for character in ('\x00', '\r', '\n')):
+            raise ValueError('SSH 密码格式无效')
+        descriptor = directory_fd(self.private, create=True)
+        try:
+            os.fchmod(descriptor, 0o700)
+        finally:
+            os.close(descriptor)
+        atomic_text(self.private / 'password', password + '\n')
+        atomic_text(self.private / 'known_hosts', 'node-' + self.node_key + ' ' + self.config.host_key + '\n')
+        _run(['ssh-keygen', '-l', '-E', 'sha256', '-f', str(self.private / 'known_hosts')], timeout=5)
+
+    def _password_descriptor(self) -> int | None:
+        if self.config.auth_method != 'password':
+            return None
+        directory = directory_fd(self.private)
+        descriptor = None
+        try:
+            metadata = os.fstat(directory)
+            if metadata.st_uid != os.geteuid() or metadata.st_mode & 0o077:
+                raise ValueError('SSH 身份目录权限或归属无效')
+            descriptor = os.open('password', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+            metadata = os.fstat(descriptor)
+            if not S_ISREG(metadata.st_mode) or metadata.st_mode & 0o077 or metadata.st_uid != os.geteuid():
+                raise ValueError('SSH 密码文件权限或归属无效')
+            return descriptor
+        except Exception:
+            if descriptor is not None:
+                os.close(descriptor)
+            raise
+        finally:
+            os.close(directory)
+
+    def _arguments(self, reuse_control: bool = True, password_descriptor: int | None = None) -> list[str]:
+        for name in (('identity', 'known_hosts') if self.config.auth_method == 'private_key' else ('known_hosts',)):
             metadata = (self.private / name).lstat()
             if not S_ISREG(metadata.st_mode) or metadata.st_mode & 0o077 or metadata.st_uid != os.geteuid():
                 raise ValueError('SSH 身份文件权限或归属无效')
-        return ['ssh', '-F', '/dev/null', '-T', '-S', str(self.sockets / 'control.sock') if reuse_control else 'none',
+        if self.config.auth_method == 'password':
+            if password_descriptor is None:
+                raise ValueError('SSH 密码描述符尚未准备')
+            prefix = ['sshpass', '-d', str(password_descriptor)]
+            authentication = ['-o', 'BatchMode=no', '-o', 'PasswordAuthentication=yes',
+                '-o', 'PreferredAuthentications=password', '-o', 'PubkeyAuthentication=no',
+                '-o', 'NumberOfPasswordPrompts=1']
+        else:
+            prefix = []
+            authentication = ['-i', str(self.private / 'identity'), '-o', 'BatchMode=yes',
+                '-o', 'PasswordAuthentication=no']
+        return prefix + ['ssh', '-F', '/dev/null', '-T', '-S', str(self.sockets / 'control.sock') if reuse_control else 'none',
             '-p', str(self.config.port), '-l', self.config.username,
-            '-i', str(self.private / 'identity'), '-o', 'IdentitiesOnly=yes', '-o', 'IdentityAgent=none',
-            '-o', 'BatchMode=yes', '-o', 'PasswordAuthentication=no', '-o', 'KbdInteractiveAuthentication=no',
+            *authentication, '-o', 'IdentitiesOnly=yes', '-o', 'IdentityAgent=none',
+            '-o', 'KbdInteractiveAuthentication=no',
             '-o', 'StrictHostKeyChecking=yes', '-o', 'UserKnownHostsFile=' + str(self.private / 'known_hosts'),
             '-o', 'GlobalKnownHostsFile=/dev/null', '-o', 'HostKeyAlias=node-' + self.node_key,
             '-o', 'ProxyCommand=none', '-o', 'ProxyJump=none', '-o', 'ForwardAgent=no',
             '-o', 'ConnectTimeout=8', '-o', 'ConnectionAttempts=1', '-o', 'ServerAliveInterval=10',
             '-o', 'ServerAliveCountMax=3', '-o', 'LogLevel=ERROR']
+
+    def _command(self, command: str, *, data: bytes | None = None, timeout: float = 15,
+            maximum_output: int = 256 * 1024) -> bytes:
+        descriptor = self._password_descriptor()
+        try:
+            return _run(self._arguments(password_descriptor=descriptor) + ['--', self.config.host, command],
+                data=data, timeout=timeout, maximum_output=maximum_output,
+                pass_fds=() if descriptor is None else (descriptor,))
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)
 
     def observe(self) -> dict:
         """实际登录并读取无模型调用的宿主及 Docker 信息。
@@ -301,7 +365,7 @@ class SshNode:
         :return: 带采样时刻的受限资源投影。
         """
         command = 'python3 -c ' + shlex.quote(_OBSERVE_SCRIPT) + ' ' + shlex.quote(self.config.data_root)
-        raw = _run(self._arguments() + ['--', self.config.host, command], timeout=25)
+        raw = self._command(command, timeout=25)
         try:
             value = json.loads(raw)
             if (set(value) != {'platform', 'architecture', 'host_cpus', 'memory', 'disk_available_bytes',
@@ -332,7 +396,7 @@ class SshNode:
         body = json.dumps({'data_root': self.config.data_root, 'node_key': self.node_key,
             'deployment_id': deployment}).encode()
         command = 'python3 -c ' + shlex.quote(_BOOTSTRAP_SCRIPT)
-        result = json.loads(_run(self._arguments() + ['--', self.config.host, command], data=body))
+        result = json.loads(self._command(command, data=body))
         if result != {'ok': True, 'node_key': self.node_key}:
             raise ValueError('节点数据根归属初始化未确认')
 
@@ -408,7 +472,7 @@ class SshNode:
             'terminal-get', 'terminal-observe', 'terminal-send', 'terminal-input', 'terminal-conversation',
             'terminal-usage', 'terminal-passive', 'terminal-passive-ack', 'terminal-quota-state', 'terminal-quota-read', 'api-quota-read',
             'terminal-capture', 'terminal-reconcile', 'terminal-verification-get', 'run-verification-get', 'run-project-facts', 'run-project-native', 'run-get', 'run-poll', 'run-quota-state', 'run-quota-read', 'run-artifact', 'run-files', 'run-file', 'run-stats', 'run-capture', 'run-session', 'run-refresh', 'run-refresh-get', 'run-owner-refresh-defer', 'continue-get', 'continue-input', 'continue-quota-state', 'continue-quota-read', 'continue-quota-control', 'continue-credentials') else 120
-        result = json.loads(_run(self._arguments() + ['--', self.config.host, command], data=body, timeout=timeout, maximum_output=response_limit(operation)))
+        result = json.loads(self._command(command, data=body, timeout=timeout, maximum_output=response_limit(operation)))
         if not isinstance(result, dict) or result.get('ok') is not True or not isinstance(result.get('result'), dict):
             raise ValueError('节点环境准备失败，请检查执行组件、环境归属与资源')
         value = result['result']
@@ -465,12 +529,20 @@ class SshNode:
                 if not S_ISSOCK(metadata.st_mode) or metadata.st_uid != os.geteuid():
                     raise ValueError('节点隧道路径存在未知文件')
                 path.unlink()
-            arguments = self._arguments(False)
-            if name == 'docker':
-                arguments += ['-M', '-S', str(self.sockets / 'control.sock')]
-            arguments += ['-N', '-o', 'ExitOnForwardFailure=yes',
-                '-o', 'StreamLocalBindMask=0177', '-L', str(path) + ':' + target, '--', self.config.host]
-            process = subprocess.Popen(arguments, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            descriptor = self._password_descriptor()
+            try:
+                arguments = self._arguments(False, descriptor)
+                if name == 'docker':
+                    arguments += ['-M', '-S', str(self.sockets / 'control.sock')]
+                arguments += ['-N', '-o', 'ExitOnForwardFailure=yes',
+                    '-o', 'StreamLocalBindMask=0177', '-L', str(path) + ':' + target, '--', self.config.host]
+                process = subprocess.Popen(arguments, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL, start_new_session=True,
+                    pass_fds=() if descriptor is None else (descriptor,),
+                    env={**os.environ, 'SSH_AUTH_SOCK': '', 'SSH_ASKPASS_REQUIRE': 'never'})
+            finally:
+                if descriptor is not None:
+                    os.close(descriptor)
             self.processes[name] = process
             self.targets[name] = target
             deadline = time.monotonic() + 10
@@ -484,12 +556,21 @@ class SshNode:
     def _stop(self, name: str) -> None:
         self.targets.pop(name, None)
         process = self.processes.pop(name, None)
-        if process and process.poll() is None:
-            process.terminate()
+        if process:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
             try:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                process.kill()
+                pass
+            finally:
+                # sshpass 与 ssh 分属父子进程，父进程退出后仍收口整个原会话。
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
                 process.wait(timeout=5)
         path = self.sockets / (name + '.sock')
         try:
@@ -514,7 +595,7 @@ class SshNode:
     def remove_identity(self) -> None:
         """收口未登记成功的精确身份文件。:return: None。"""
         self.close()
-        for name in ('identity', 'known_hosts'):
+        for name in ('identity', 'password', 'known_hosts'):
             try:
                 (self.private / name).unlink()
             except FileNotFoundError:

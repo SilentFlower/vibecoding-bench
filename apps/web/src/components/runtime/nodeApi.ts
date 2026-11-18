@@ -7,11 +7,12 @@ export interface NodeObservation {
   memory?: { MemTotal: number; MemAvailable: number; SwapTotal: number; SwapFree: number };
   disk_available_bytes?: number; architecture?: string;
 }
-/** 中央提供的节点公开投影，SSH 私钥仅存在于写入请求。 */
+/** 中央提供的节点公开投影，SSH 认证材料仅存在于写入请求。 */
 export interface ExecutionNode {
   id: number; node_key: string; name: string; kind: 'local' | 'ssh'; revision: number; enabled: boolean;
   account_count: number; host: string | null; port: number | null; username: string | null;
   data_root: string | null; host_key_sha256: string | null; observation: NodeObservation | null;
+  auth_method?: 'private_key' | 'password' | null;
   preparation: { state: 'preparing' | 'prepared' | 'failed' | 'needs_check'; release?: string; protocol?: number; updated_at: number; reason?: string } | null;
 }
 /** 主机公钥候选，管理员通过可信渠道核对后选择。 */
@@ -36,10 +37,11 @@ export interface NodeMigration {
 /** 点击确认时冻结的唯一迁移范围。 */
 export interface NodeMigrationStart { operation_id: string; node_id: number; revision: number; version: string }
 /** 新节点登记的只写认证材料。 */
-export interface NodeRegistration {
+export type NodeRegistration = {
   name: string; host: string; port: number; username: string; data_root: string;
-  host_key: string; private_key: string;
-}
+  host_key: string;
+} & ({ auth_method?: 'private_key'; private_key: string; password?: never }
+  | { auth_method: 'password'; password: string; private_key?: never });
 /** 节点接口统一经过同源运行时会话桥。 */
 export const nodeApi = {
   /** 读取账号迁移历史。@param id 任务账号。@param signal 取消读取。@return 公开列表。 */
