@@ -1,0 +1,65 @@
+{
+  "base": "b26e5454bc695611966de8be44d182e3dacdc807",
+  "source_root": "/tmp/scratchpad-release-candidate-p162_dho",
+  "files": [
+    ".trellis/spec/orchestrator/backend/account-runtime-v3.md",
+    "deploy/flower2api/scratchpad_cli_fixture.py",
+    "deploy/flower2api/scratchpad_sender_benchmark.py",
+    "deploy/flower2api/verify_scratchpad_storage.py",
+    "images/v3/Dockerfile",
+    "services/orchestrator/account_isolation.py",
+    "services/orchestrator/account_runtime.py",
+    "services/orchestrator/cli_scratchpad.py",
+    "services/orchestrator/project_review_runtime.py",
+    "services/orchestrator/runtime_files.py",
+    "services/orchestrator/storage_maintenance.py",
+    "services/orchestrator/test_account_runtime.py",
+    "services/orchestrator/test_cli_scratchpad.py",
+    "services/orchestrator/test_login_drafts.py",
+    "services/orchestrator/test_project_review_runtime.py"
+  ],
+  "sha256": {
+    ".trellis/spec/orchestrator/backend/account-runtime-v3.md": "379614ba136add7c45bdad36bc4ada81e7599343f3a521b7fbd83ff7c4e8650c",
+    "deploy/flower2api/scratchpad_cli_fixture.py": "879b7a88f39860c84910a7cfbc87698e5da2392f5728148c6241d2d0615f67c5",
+    "deploy/flower2api/scratchpad_sender_benchmark.py": "fc71678dc59e63fac9612f6bceb27e246b57f8ccf7d8702759577d291b9ccf6e",
+    "deploy/flower2api/verify_scratchpad_storage.py": "c91a93b22d3511d0d1bab731fa0b82c52dce47a1d3f6b2068bc95ca5f1cbbb49",
+    "images/v3/Dockerfile": "d1241a9cafaf6ab921dd9347476aef64c7bb824982382eb0dec3d8a512a731b3",
+    "services/orchestrator/account_isolation.py": "ada68d93d53f085f0ab395fac0c9201cb7462cad06bb59565da487838cb8366f",
+    "services/orchestrator/account_runtime.py": "e835c31db45c4100b8183c8c210af0683c7db736a810815db1a0c3737750e736",
+    "services/orchestrator/cli_scratchpad.py": "656908f1c5748e74e05461ee631f8eefc8115fcc93f3a57edf6b5da4167d4d44",
+    "services/orchestrator/project_review_runtime.py": "1262c9a8ac9773a1996a84b111c83f8a479cac2401f11b9dff11b2d1971761d1",
+    "services/orchestrator/runtime_files.py": "9ed799124e9315d18490daa3508bc8b62ae1dfa0c173670862d73d0b7489f3cf",
+    "services/orchestrator/storage_maintenance.py": "20b93153aaf15a0d0bc2432a60f4da2f53824376218d8643ed2e85fae720a98e",
+    "services/orchestrator/test_account_runtime.py": "0b446370d73f9cdfb730a89e1db03d9a32a997a4b058256aa24a6f5e3b0c6465",
+    "services/orchestrator/test_cli_scratchpad.py": "0fdbab36a3018c6d2601e3e7d1b007ccad7eddaf308ec220e7134ead0e606bed",
+    "services/orchestrator/test_login_drafts.py": "fa6fa7f0c317dce9b29720657b804618fe2212d0ed4db49ed959be03fc5937a2",
+    "services/orchestrator/test_project_review_runtime.py": "34ca2422f1170f8046abbb25ca4338ef90f62993779bf7c9a222fe27c0fb0009"
+  },
+  "focused": {
+    "tests": 208,
+    "seconds": 35.269,
+    "exit_code": 0
+  },
+  "full": {
+    "tests": 1347,
+    "skipped": 5,
+    "seconds": 712.518,
+    "exit_code": 0
+  },
+  "docker": "research/release-candidate-docker.json",
+  "database_contracts": {
+    "bench": 1,
+    "gateway": 4
+  },
+  "signature_verified": {
+    "catalog_commit": "743625a497232f416b889368a721d12486dc739a",
+    "latest_release": "system-ci-44230274956-1",
+    "source": "b26e5454bc695611966de8be44d182e3dacdc807"
+  },
+  "syntax_files": 13,
+  "scope_exact": true,
+  "diff_check": 0,
+  "finding": "FBK-003",
+  "reproduction": "research/release-rollback-reproduction.json",
+  "publication_state": "preflight"
+}

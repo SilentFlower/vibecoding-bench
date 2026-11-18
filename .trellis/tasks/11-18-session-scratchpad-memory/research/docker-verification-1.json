@@ -1,0 +1,6 @@
+{
+  "root": "/tmp/scratchpad-storage-verify-woxdgf7z",
+  "checks": [],
+  "image": "flower2api-account:cluster-background-local",
+  "cleanup_errors": []
+}

@@ -1,0 +1,9 @@
+{
+  "root": "/tmp/scratchpad-rollback-repro-7xydnr1k",
+  "published_disk_layout": true,
+  "disk_content": "latest-session-file",
+  "old_tmpfs_path_exists": false,
+  "old_release_has_scratchpad_restore_hook": false,
+  "data_rollback_gate_allows_old_release": true,
+  "old_release": "system-ci-44230274956-1"
+}

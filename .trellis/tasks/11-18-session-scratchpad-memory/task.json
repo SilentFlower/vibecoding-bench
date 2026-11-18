@@ -1,0 +1,42 @@
+{
+  "id": "session-scratchpad-memory",
+  "name": "session-scratchpad-memory",
+  "title": "会话临时数据保留与内存盘治理",
+  "description": "核定会话scratchpad生命周期，在完整保全确认范围内数据和续跑功能的前提下降低tmpfs占用。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "orchestrator",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-18",
+  "completedAt": null,
+  "closeout": {
+    "status": "pending",
+    "closedAt": null,
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-18-runtime-memory-isolation",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "账号私有存储、会话恢复与回退兼容保护实现完成",
+      "Check-All及隔离功能验证通过",
+      "v1.15.4兼容版本代码推送完成"
+    ],
+    "partialStep": "首次两阶段发行与线上验收",
+    "nextStep": "正式签名构建并安装兼容版，再验收新增账号和养号迭代后启用磁盘布局",
+    "notes": "本阶段账号组件摘要与线上v1.15.3一致；任务保持in_progress。",
+    "updatedAt": "2026-11-18T06:47:20Z"
+  }
+}
