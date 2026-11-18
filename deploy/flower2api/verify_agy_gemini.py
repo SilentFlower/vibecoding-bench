@@ -192,7 +192,8 @@ def inside() -> dict:
             before=len(Fixture.calls);before_refresh=Fixture.refreshes
             action='streamGenerateContent?alt=sse' if mode=='auth-after-frame' else 'generateContent'
             status,raw=request(base+action,current)
-            require(status==expected and len(Fixture.calls)-before==attempts and Fixture.refreshes-before_refresh==refreshes,'认证恢复预算或首帧门禁错误：'+mode)
+            require(status==expected and len(Fixture.calls)-before==attempts and Fixture.refreshes-before_refresh==refreshes,
+                '认证恢复预算或首帧门禁错误：'+mode+' '+str((status,len(Fixture.calls)-before,Fixture.refreshes-before_refresh)))
         current=copy.deepcopy(body);current['contents'][0]['parts'][0]['text']='cancel-stream'
         stream=Request('http://127.0.0.1:5674'+base+'streamGenerateContent?alt=sse',data=json.dumps(current).encode(),
             headers={'x-api-key':'synthetic-key','content-type':'application/json'})
@@ -222,12 +223,35 @@ def inside() -> dict:
         for mode in ['policy-no-receipt','policy-wrong-receipt']:
             current=copy.deepcopy(candidate);current['contents'][0]['parts'][0]['text']=mode
             require(request(base+'generateContent',current)[0]==503,'缺失或不匹配的策略回执被接纳')
+        require(request('/v1beta/models/claude-synthetic:generateContent',body)[0]==200,'AGY上Claude模型请求失败')
+        # 从真实持久摘要按私有attempt关联，避免用当前账号资料替代历史事实。
+        until=time.monotonic()+10
+        while time.monotonic()<until:
+            attempts=[json.loads(row[0]) for row in database.execute('SELECT summary_json FROM request_diagnostic_attempts')]
+            if len(attempts)==len(Fixture.calls) and all(a.get('finished_at') for a in attempts):break
+            time.sleep(.02)
+        require(len(attempts)==len(Fixture.calls),'真实发送和持久尝试计数不一致')
+        by_id={value['request']['request_id']:value for value in Fixture.calls}
+        for attempt in attempts:
+            source=by_id[attempt['attempt_id']];context=attempt.get('context',{})
+            require(context.get('platform')=='antigravity' and context.get('entry_protocol')=='gemini','持久平台或协议被模型名覆盖')
+            require(context.get('credential_generation')==source['credential_snapshot']['credential_generation'],'尝试凭据代次漂移')
+            require(attempt['account_id']==source['request']['account_id'],'持久尝试跨账号')
+        require(any(a.get('context',{}).get('requested_model')=='claude-synthetic' for a in attempts),'Claude模型记录缺失')
+        recovered=[a for a in attempts if a.get('retry_reason')=='oauth_recovery']
+        require(len(recovered)>=3,'401恢复尝试原因缺失')
+        roots={row[0]:json.loads(row[1]) for row in database.execute('SELECT request_id,summary_json FROM request_diagnostics')}
+        for attempt in recovered:
+            same=[a for a in attempts if a['request_id']==attempt['request_id']]
+            require(len(same)==2 and roots[attempt['request_id']]['attempt_count']==2,'401恢复未保留同根两尝试')
+            require(same[0]['context']['credential_generation']!=same[1]['context']['credential_generation'],'401恢复代次未分别记录')
         database.close()
         return {'passed':True,'evidence':'real_http_sqlite_synthetic_sender','network':'none','real_model_submissions':0,
             'synthetic_submissions':len(Fixture.calls),'checks':['真实Gemini目录与令牌','非流式源usage','SSE','函数签名和结果','错调用方和ID拒绝',
                 '待对账期间旧工具独立收口和新模型拒绝','concurrency=1原许可接续','新AT代次','重复结果拒绝','禁用令牌',
                 '明确401仅恢复一次','容量错误零恢复','SSE首帧后零重放','SSE断连关闭原发送和释放许可',
-                '两账号策略隔离','认证恢复冻结策略','后续HTTP采用新开关','缺失和错误策略回执拒绝','原始入站视图保持']}
+                '两账号策略隔离','认证恢复冻结策略','后续HTTP采用新开关','缺失和错误策略回执拒绝','原始入站视图保持',
+                '真实SQLite尝试计数和凭据代次','401同根两尝试及恢复原因','AGY调用Claude平台保持']}
     finally:
         child.terminate()
         try:child.wait(timeout=5)

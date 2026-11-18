@@ -38,6 +38,9 @@ impl RequestLogMode {
 /// 一次已鉴权 messages 请求的诊断摘要；不包含请求或响应正文。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequestDiagnostic {
+    /// 入口冻结的跨平台事实，旧记录保持未知。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<DiagnosticContext>,
     /// 原生发送前拒绝的原因与入口采集归属；不增加上游尝试数。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native_rejection: Option<NativeRejection>,
@@ -212,6 +215,9 @@ impl From<[Option<u64>; 6]> for DiagnosticTokens {
 /// 一次真实发送尝试，包括重试和未完整返回的流。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttemptDiagnostic {
+    /// 本次真实提交及源事件的跨平台事实。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<DiagnosticContext>,
     /// 历史缺失表示未观测，不能使用当前运行时状态补写。
     #[serde(default)]
     pub runtime: Option<NativeRuntimeObservation>,
@@ -258,6 +264,11 @@ pub struct AttemptDiagnostic {
 /// 管理员列表查询；原始时间在入口规范化为 UTC 毫秒。
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct DiagnosticQuery {
+    pub platform: Option<String>,
+    pub entry_protocol: Option<String>,
+    pub kernel_version: Option<String>,
+    pub requested_model: Option<String>,
+    pub actual_model: Option<String>,
     pub page: Option<u32>,
     pub page_size: Option<u32>,
     pub account_id: Option<i64>,
@@ -265,6 +276,66 @@ pub struct DiagnosticQuery {
     pub outcome: Option<String>,
     pub since: Option<String>,
     pub until: Option<String>,
+}
+
+/// 跨平台入口、执行身份及源事实；不保存正文、凭据或任意原生事件。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DiagnosticContext {
+    pub platform: Option<String>,
+    pub entry_protocol: Option<String>,
+    pub requested_model: Option<String>,
+    pub kernel: Option<String>,
+    pub kernel_version: Option<String>,
+    pub source_sha256: Option<String>,
+    pub submitted_model: Option<String>,
+    pub response_model_version: Option<String>,
+    pub credential_generation: Option<i64>,
+    pub environment_id: Option<String>,
+    pub environment_generation: Option<u64>,
+    pub worker_id: Option<String>,
+    pub worker_generation: Option<String>,
+    pub conversation_id: Option<String>,
+    pub trajectory_id: Option<String>,
+    pub native_model_calls: Option<u64>,
+    pub control_state: Option<String>,
+    pub control_observed_at: Option<String>,
+    pub usage: Option<GeminiDiagnosticUsage>,
+    pub system_prompt_policy: Option<SystemPromptDiagnostic>,
+    pub tool_turn: Option<ToolTurnDiagnostic>,
+    pub response_headers_source: Option<String>,
+}
+
+/// Gemini用量来源，计数不转换为价格，原字段受有界白名单保护。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct GeminiDiagnosticUsage {
+    pub source: String,
+    pub usage_metadata: Value,
+    pub total_tokens: Option<u64>,
+    pub thoughts_tokens: Option<u64>,
+    pub complete: bool,
+}
+
+/// 本次冻结策略与内核处理回执，正文保持在受控内容视图。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemPromptDiagnostic {
+    pub enabled: bool,
+    pub rule_version: String,
+    pub rule_sha256: Option<String>,
+    pub source: Option<String>,
+    pub changed: Option<bool>,
+    pub replaced_codepoints: Option<u64>,
+    pub system_codepoints: Option<u64>,
+}
+
+/// 原生工具最近观测及跨HTTP前驱；与HTTP完成状态独立。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ToolTurnDiagnostic {
+    pub continuation_of_request_id: Option<String>,
+    pub previous_attempt_id: Option<String>,
+    pub state: String,
+    pub observed_at: String,
+    pub call_hashes: Vec<String>,
 }
 
 /// 单个请求及按提交顺序排列的尝试。

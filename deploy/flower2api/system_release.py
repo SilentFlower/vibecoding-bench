@@ -22,6 +22,7 @@ from system_update_contract import INDEX_LIMIT, MANIFEST_LIMIT, ROLES, strict_js
 
 # 与实际迁移执行器的步骤ID绑定，定义扫描与签发校验共用精确来源。
 GATEWAY_SCHEMA_SOURCES = {
+    'gateway.request-records.6': 'cc2api/src/store/request_records_schema.rs',
     'gateway.account-platforms.5': 'cc2api/src/store/account_platform_schema.rs',
     'gateway.baseline.1': 'cc2api/src/store/database_schema.rs',
     'gateway.proxies.2': 'cc2api/src/store/proxy_schema.rs',

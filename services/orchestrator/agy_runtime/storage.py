@@ -62,7 +62,7 @@ def config(path):
     from .credentials import read_private, read_access_document
     value = read_private(Path(path))
     allowed = {'home','public_model','native_model','binary_path','proxy_url','rotate_after',
-        'startup_timeout','retire_timeout','cancel_timeout','runtime_env','capture_enabled','account_id','credential_generation'}
+        'startup_timeout','retire_timeout','cancel_timeout','runtime_env','capture_enabled','capture_root','account_id','credential_generation'}
     if set(value) - allowed:
         raise ValueError('AGY启动配置字段无效')
     for name in ['home','public_model','binary_path']:
@@ -93,6 +93,8 @@ def config(path):
     if type(value.get('capture_enabled',False)) is not bool:
         raise ValueError('AGY采集设置无效')
     value.setdefault('capture_enabled',False)
+    if value.get('capture_root') is not None:
+        value['capture_root']=str(private_dir(value['capture_root']))
     return value
 
 

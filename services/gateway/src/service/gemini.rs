@@ -23,14 +23,20 @@ use crate::error::AppError;
 use crate::handler::router::AppState;
 use crate::model::account::Account;
 use crate::model::api_token::{ApiToken, ApiTokenStatus};
+use crate::model::request_diagnostics::RequestLogMode;
 use crate::service::account::{
     AccountService, AccountSlotPermit, CredentialActivity, DEFAULT_REQUEST_SLOT_UNITS,
 };
 use crate::service::agy_contract::{
     AGY_SOURCE_SHA256, AgyAccessSnapshot, AgyModelId, AgySystemPromptPolicy,
 };
+use crate::service::diagnostics::agy::AgyAttemptTrace;
+use crate::service::diagnostics::{
+    self, CURRENT_LOG_MODE, CURRENT_TRACE, RequestTraceGuard, TraceContext,
+};
 use crate::service::runtime_transport::{self, PreparedTransport};
 use crate::service::system_update::{self, UpdateActivity};
+use crate::service::{native_capture, runtime_bridge};
 
 const BODY_LIMIT: usize = 16 * 1024 * 1024;
 const FRAME_LIMIT: usize = 64 * 1024 * 1024;
@@ -376,18 +382,52 @@ pub async fn generate(
     Path(action): Path<String>,
     request: Request,
 ) -> Response {
-    generate_inner(state, action, request)
+    let token = match authenticate(&state, request.headers(), request.uri().query()).await {
+        Ok(token) => token,
+        Err(error) => return gemini_error(error),
+    };
+    let mode = state.gateway_svc.request_log_mode().await;
+    CURRENT_LOG_MODE
+        .scope(mode, async move {
+            let trace = state
+                .gateway_svc
+                .diagnostics_store()
+                .map(|store| TraceContext::for_protocol(store.clone(), "antigravity", "gemini"));
+            let guard = trace
+                .as_ref()
+                .map(|trace| RequestTraceGuard::new(trace.clone()));
+            let future = generate_inner(state, action, request, token);
+            let result = if let Some(trace) = trace {
+                CURRENT_TRACE.scope(trace, future).await
+            } else {
+                future.await
+            };
+            let response = match result {
+                Ok(response) => response,
+                Err(error) => {
+                    if let Some(guard) = guard.as_ref() {
+                        guard.error(&error);
+                    }
+                    gemini_error(error)
+                }
+            };
+            if let Some(guard) = guard {
+                guard.wrap(response)
+            } else {
+                response
+            }
+        })
         .await
-        .unwrap_or_else(gemini_error)
 }
 
 async fn generate_inner(
     state: AppState,
     action: String,
     request: Request,
+    token: ApiToken,
 ) -> Result<Response, AppError> {
     let started = Instant::now();
-    let token = authenticate(&state, request.headers(), request.uri().query()).await?;
+    diagnostics::request_context("antigravity", "gemini", None);
     let (model, action) = action
         .rsplit_once(':')
         .ok_or_else(|| invalid("Gemini动作无效"))?;
@@ -404,6 +444,17 @@ async fn generate_inner(
         "streamGenerateContent" => true,
         _ => return Err(AppError::NotFound),
     };
+    diagnostics::request_context("antigravity", "gemini", Some(model));
+    let ingress_headers = request
+        .headers()
+        .iter()
+        .filter_map(|(name, value)| {
+            value
+                .to_str()
+                .ok()
+                .map(|value| (name.as_str().to_string(), value.to_string()))
+        })
+        .collect::<Vec<_>>();
     let raw = axum::body::to_bytes(request.into_body(), BODY_LIMIT)
         .await
         .map_err(|_| invalid("Gemini正文超过上限"))?;
@@ -411,6 +462,7 @@ async fn generate_inner(
     if !body.is_object() || !body["contents"].is_array() {
         return Err(invalid("Gemini contents无效"));
     }
+    diagnostics::error_stage("account_selection");
     let continuation = state.gemini_svc.continuation(&token, model, &body)?;
     let deadline = continuation
         .as_ref()
@@ -457,10 +509,12 @@ async fn generate_inner(
         });
         (account, admission, None)
     };
+    diagnostics::selected_account(account.id);
     // 原工具收尾复用原许可和原进程；新AT发布单独检查ready，待对账期间也能完成旧工具。
     if let Some(claim) = &claim {
         claim.finish(token.id, &body, deadline).await?;
     }
+    diagnostics::error_stage("credentials");
     let snapshot = timeout_at(
         deadline,
         state.account_svc.resolve_agy_access(account.id, false),
@@ -468,9 +522,18 @@ async fn generate_inner(
     .await
     .map_err(|_| AppError::ServiceUnavailable("AGY凭据等待超时".into()))??;
     let current = state.account_svc.get_account(account.id).await?;
+    let capture_requested = diagnostics::current_log_mode() == RequestLogMode::Debug;
+    let ingress = native_capture::ingress(
+        diagnostics::current_log_mode(),
+        &ingress_headers,
+        &raw,
+        &body,
+        &snapshot.access_token,
+    );
     let system_prompt_policy =
         AgySystemPromptPolicy::new(current.agy_system_prompt_homoglyph_enabled);
     let native_model = AccountService::agy_model(&current, model).ok_or(AppError::NotFound)?;
+    diagnostics::error_stage("runtime_prepare");
     let transport = Arc::new(
         timeout_at(
             deadline,
@@ -487,6 +550,35 @@ async fn generate_inner(
         .acquire_account_rpm(&current, false, "")
         .await?;
     let request_id = Uuid::new_v4().to_string();
+    let http_request_id =
+        diagnostics::current_request_id().unwrap_or_else(|| Uuid::new_v4().to_string());
+    let trace = diagnostics::current_trace();
+    let previous_turn = claim
+        .as_ref()
+        .and_then(|claim| claim.key.as_ref())
+        .and_then(|key| {
+            state
+                .gemini_svc
+                .turns
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .get(key)
+                .map(|turn| (key.clone(), turn.previous_request_id.clone()))
+        });
+    let mut observation = AgyAttemptTrace::begin(
+        trace.as_ref(),
+        &current,
+        model,
+        &native_model,
+        snapshot.credential_generation,
+        &system_prompt_policy,
+        &request_id,
+        &body,
+        streaming,
+    );
+    if let (Some(observer), Some((root, attempt))) = (observation.as_mut(), previous_turn) {
+        observer.continuation(&root, &attempt);
+    }
     // 从此刻起提交状态可能未知；只允许原监督器确认结果，禁止自动重新领取工具回填。
     let completed_turn = claim.as_mut().and_then(|claim| claim.key.take());
     let upstream = transport
@@ -499,10 +591,25 @@ async fn generate_inner(
             body.clone(),
             system_prompt_policy.clone(),
             deadline,
-            false,
+            capture_requested,
         )
-        .await?;
+        .await;
+    let upstream = match upstream {
+        Ok(response) => response,
+        Err(error) => {
+            if let Some(observer) = observation.as_mut() {
+                observer.finish("transport_error", Some("transport"));
+            }
+            return Err(error);
+        }
+    };
+    if let Some(observer) = observation.as_mut() {
+        observer.headers(upstream.status().as_u16());
+    }
     if !upstream.status().is_success() {
+        if let Some(observer) = observation.as_mut() {
+            observer.finish("upstream_error", Some("sender_rejection"));
+        }
         return Err(AppError::ServiceUnavailable("AGY账号发送器拒绝请求".into()));
     }
     if let Some(key) = completed_turn {
@@ -521,7 +628,13 @@ async fn generate_inner(
         let result = drive(
             upstream,
             service.clone(),
-            &request_id,
+            &http_request_id,
+            request_id.clone(),
+            trace,
+            observation,
+            streaming,
+            capture_requested,
+            ingress,
             token.id,
             current,
             model,
@@ -545,8 +658,11 @@ async fn generate_inner(
             .turns
             .lock()
             .unwrap_or_else(|error| error.into_inner());
-        if turns.get(&request_id).is_none_or(|turn| !turn.retained) {
-            turns.remove(&request_id);
+        if turns
+            .get(&http_request_id)
+            .is_none_or(|turn| !turn.retained)
+        {
+            turns.remove(&http_request_id);
         }
     });
     let first = timeout_at(deadline, receiver.recv())
@@ -620,6 +736,12 @@ async fn drive(
     upstream: reqwest::Response,
     service: Arc<GeminiService>,
     request_id: &str,
+    initial_attempt_id: String,
+    trace: Option<TraceContext>,
+    mut observation: Option<AgyAttemptTrace>,
+    streaming: bool,
+    capture_requested: bool,
+    ingress: Option<Value>,
     token_id: i64,
     account: Account,
     model: String,
@@ -640,13 +762,14 @@ async fn drive(
     };
     let mut calls = Vec::new();
     let mut completed = false;
-    let mut attempt_id = request_id.to_string();
+    let mut attempt_id = initial_attempt_id;
     let mut attempted_recovery = false;
     let mut forwarded = 0;
     let mut policy_acknowledged = !system_prompt_policy.enabled;
+    let mut ingress_sent = false;
     loop {
         let event = if let Some(channel) = sender.as_ref() {
-            tokio::select! {event=reader.next()=>event?, _=channel.closed()=>return Err(AppError::BadGateway("客户端已取消".into()))}
+            tokio::select! {event=reader.next()=>event?, _=channel.closed()=>{if let Some(observer)=observation.as_mut(){observer.finish("cancelled",Some("downstream_body"));}return Err(AppError::BadGateway("客户端已取消".into()));}}
         } else {
             reader.next().await?
         };
@@ -657,6 +780,9 @@ async fn drive(
             return Err(AppError::BadGateway("AGY事件归属错误".into()));
         }
         if event["type"] == "job_finalized" {
+            if let Some(observer) = observation.as_mut() {
+                observer.finalized(event["status"].as_str().unwrap_or("error"));
+            }
             if !completed {
                 return Err(AppError::BadGateway("AGY缺少原生终态".into()));
             }
@@ -677,6 +803,22 @@ async fn drive(
             continue;
         }
         let native = &event["event"];
+        if let Some(observer) = observation.as_mut() {
+            observer.native(native, &event);
+        }
+        if !ingress_sent && native["capture_status"] == "queued" {
+            if let (Some(ingress), Some(generation)) =
+                (ingress.as_ref(), event["environment_generation"].as_u64())
+            {
+                runtime_bridge::publish_agy_ingress(
+                    account.id,
+                    &attempt_id,
+                    generation,
+                    ingress.clone(),
+                );
+                ingress_sent = true;
+            }
+        }
         tracing::info!(
             platform = "antigravity",
             account_id = account.id,
@@ -731,6 +873,9 @@ async fn drive(
                     .map_err(|_| invalid("AGY帧编码错误"))?;
                 let frame: Value =
                     serde_json::from_slice(&raw).map_err(|_| invalid("AGY帧格式错误"))?;
+                if let Some(observer) = observation.as_mut() {
+                    observer.frame(&frame);
+                }
                 if frame.get("error").is_some() {
                     if !verified_auth_failure(&frame)
                         || attempted_recovery
@@ -742,6 +887,9 @@ async fn drive(
                         return Err(AppError::BadGateway("AGY上游返回错误".into()));
                     }
                     attempted_recovery = true;
+                    if let Some(observer) = observation.as_mut() {
+                        observer.recovery();
+                    }
                     // 只有源Gemini帧的明确401可恢复；先观察原作业物理收口，再换同账号新AT。
                     let mut finalized = false;
                     while let Some(ending) = reader.next().await? {
@@ -751,6 +899,9 @@ async fn drive(
                             return Err(AppError::BadGateway("AGY恢复归属错误".into()));
                         }
                         if ending["type"] == "job_finalized" {
+                            if let Some(observer) = observation.as_mut() {
+                                observer.finalized(ending["status"].as_str().unwrap_or("error"));
+                            }
                             finalized = true;
                             break;
                         }
@@ -775,6 +926,17 @@ async fn drive(
                         .acquire_account_rpm(&account, false, "")
                         .await?;
                     attempt_id = Uuid::new_v4().to_string();
+                    observation = AgyAttemptTrace::begin(
+                        trace.as_ref(),
+                        &account,
+                        &model,
+                        &native_model,
+                        refreshed.credential_generation,
+                        &system_prompt_policy,
+                        &attempt_id,
+                        &body,
+                        streaming,
+                    );
                     tracing::info!(
                         platform = "antigravity",
                         account_id = account.id,
@@ -793,14 +955,21 @@ async fn drive(
                             body.clone(),
                             system_prompt_policy.clone(),
                             deadline,
-                            false,
+                            capture_requested,
                         )
                         .await?;
+                    if let Some(observer) = observation.as_mut() {
+                        observer.headers(retry.status().as_u16());
+                    }
                     if !retry.status().is_success() {
+                        if let Some(observer) = observation.as_mut() {
+                            observer.finish("upstream_error", Some("sender_rejection"));
+                        }
                         return Err(AppError::ServiceUnavailable("AGY认证恢复提交失败".into()));
                     }
                     snapshot = refreshed;
                     policy_acknowledged = !system_prompt_policy.enabled;
+                    ingress_sent = false;
                     reader = EventReader {
                         stream: Box::pin(retry.bytes_stream()),
                         pending: Vec::new(),
@@ -828,6 +997,9 @@ async fn drive(
                 }
             }
             Some("completed") => {
+                if let Some(observer) = observation.as_mut() {
+                    observer.completed(native["native_tool_pending"] == true, &calls);
+                }
                 if native["native_tool_pending"] == true {
                     if calls.is_empty() {
                         return Err(AppError::BadGateway("工具调用归属缺失".into()));
@@ -870,7 +1042,22 @@ async fn drive(
                 sender.take();
             }
             Some("rejected") => return Err(invalid("AGY请求包含当前内核不支持的结构")),
+            Some("tool_turn_finalized") => {
+                if let Some(observer) = observation.as_mut() {
+                    observer.tool_finalized(native["status"].as_str().unwrap_or("error"));
+                }
+            }
             Some("error" | "cancelled") => {
+                if let Some(observer) = observation.as_mut() {
+                    observer.finish(
+                        if native["type"] == "cancelled" {
+                            "cancelled"
+                        } else {
+                            "upstream_error"
+                        },
+                        Some("native_control"),
+                    );
+                }
                 return Err(AppError::BadGateway("AGY原生请求失败".into()));
             }
             _ => {}

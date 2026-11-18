@@ -407,6 +407,7 @@ export interface SessionPolicyBlockPage { items: SessionPolicyBlock[]; total: nu
 
 /** 管理端请求诊断列表行。 */
 export interface DiagnosticRequest {
+  context?: DiagnosticContext | null
   native_rejection?: { reason: string | null; capture_id: string; capture_status: string } | null
   original_session_id?: string | null
   account_name?: string | null
@@ -438,6 +439,7 @@ export interface NativeRuntimeObservation {
 
 /** 单次实际提交及私有采集状态。 */
 export interface DiagnosticAttempt {
+  context?: DiagnosticContext | null
   account_name?: string | null
   account_email?: string | null
   runtime?: NativeRuntimeObservation | null
@@ -469,6 +471,34 @@ export interface DiagnosticAttempt {
     mapping_action: string | null; previous_message_hash: string | null }
   tokens?: { input_tokens: number | null; output_tokens: number | null; cache_read_tokens: number | null;
     cache_write_tokens: number | null; cache_write_5m_tokens: number | null; cache_write_1h_tokens: number | null }
+}
+
+/** 入口冻结与本次源事件的跨平台诊断事实。 */
+export interface DiagnosticContext {
+  platform?: string | null
+  entry_protocol?: string | null
+  requested_model?: string | null
+  kernel?: string | null
+  kernel_version?: string | null
+  submitted_model?: string | null
+  response_model_version?: string | null
+  source_sha256?: string | null
+  credential_generation?: number | null
+  environment_id?: string | null
+  environment_generation?: number | null
+  worker_id?: string | null
+  worker_generation?: string | null
+  conversation_id?: string | null
+  trajectory_id?: string | null
+  native_model_calls?: number | null
+  control_state?: string | null
+  control_observed_at?: string | null
+  response_headers_source?: string | null
+  usage?: { source: string; usage_metadata: unknown; total_tokens: number | null; thoughts_tokens: number | null; complete: boolean } | null
+  system_prompt_policy?: { enabled: boolean; rule_version: string; rule_sha256: string | null; source: string | null;
+    changed: boolean | null; replaced_codepoints: number | null; system_codepoints: number | null } | null
+  tool_turn?: { continuation_of_request_id: string | null; previous_attempt_id: string | null; state: string;
+    observed_at: string; call_hashes: string[] } | null
 }
 
 /** 阶段证据的来源与完整性。 */
@@ -516,7 +546,8 @@ export interface NativeCapture {
   state: string
   message?: string
   snapshot?: {
-    stage: 'cc_prepared' | 'ingress_rejected'
+    stage: 'cc_prepared' | 'ingress_rejected' | 'agy_prepared'
+    decoded_gemini?: NativeCapturePreview
     ingress?: NativeCapturePreview
     wire_final?: NativeTlsCapture
     final_body_changes?: {

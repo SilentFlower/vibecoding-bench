@@ -2899,6 +2899,8 @@ async fn request_native_capture(
         serde_json::json!({"state":"disabled", "message":"本次请求发生时账号内容采集已关闭，设置对后续请求生效"})
     } else if attempt.log_mode == Some(RequestLogMode::Info) {
         serde_json::json!({"state":"summary", "message":"本次请求仅保存摘要"})
+    } else if attempt.context.as_ref().and_then(|c| c.platform.as_deref()) == Some("antigravity") {
+        runtime_bridge::agy_capture(attempt.account_id, &attempt.attempt_id).await?
     } else if matches!(
         attempt.profile_selection.as_str(),
         "native280_cc_prepared" | "native293_cc_prepared"

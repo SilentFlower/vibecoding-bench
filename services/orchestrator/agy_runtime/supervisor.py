@@ -76,7 +76,8 @@ class Worker:
         """冻结进程身份及独立HOME。@param owner 账号监督器。@param value 已核验提交。@return 无。"""
         self.owner = owner
         self.key = owner.worker_key(value)
-        base=owner.capture_root if value.get('capture_enabled',False) else owner.root/'workers'
+        # 管理采集只发布有界脱敏快照；完整原生调试材料使用原作业临时目录。
+        base=owner.root/'workers'
         if base is None:
             raise InputError('capture_storage_unavailable')
         self.folder = private_dir(base / uuid.uuid4().hex)
@@ -86,9 +87,12 @@ class Worker:
             credential_generation=value['credential_snapshot']['credential_generation'],
             public_model=value['model'], native_model=value['native_model'],
             binary_path=owner.config['binary_path'], proxy_url=owner.config['proxy_url'],
-            capture_enabled=value.get('capture_enabled', False), startup_timeout=90,
+            capture_enabled=False, startup_timeout=90,
             retire_timeout=60, cancel_timeout=10)
         atomic_json(self.folder / 'config.json', self.config)
+        if value.get('capture_enabled', False):
+            self.config['capture_root']=str(owner.capture_root)
+            atomic_json(self.folder / 'config.json', self.config)
         self.process = None
         self.events = queue.Queue(maxsize=128)
         self.write_lock = threading.Lock()

@@ -1404,7 +1404,8 @@ async fn agy_operation(
         }
         state.active.fetch_add(1, Ordering::SeqCst);
         let guard = ActiveRequest(state.active.clone());
-        submission.capture_enabled = config.native_capture_dir.is_some();
+        submission.capture_enabled =
+            submission.capture_enabled && config.native_capture_dir.is_some();
         started = true;
         let response = state
             .agy_pool

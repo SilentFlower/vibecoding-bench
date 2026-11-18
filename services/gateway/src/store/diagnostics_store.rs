@@ -13,7 +13,7 @@ use tracing::warn;
 use crate::error::AppError;
 use crate::model::request_diagnostics::{
     AttemptDiagnostic, DiagnosticCounts, DiagnosticDetail, DiagnosticHealth, DiagnosticPage,
-    DiagnosticQuery, RequestDiagnostic, normalize_correlation_id,
+    DiagnosticQuery, RequestDiagnostic, ToolTurnDiagnostic, normalize_correlation_id,
 };
 
 const QUEUE_CAPACITY: usize = 1024;
@@ -21,7 +21,12 @@ const MAX_RECORD_BYTES: usize = 16 * 1024;
 const FILTER: &str = "WHERE ($1=0 OR r.account_id=$1 OR EXISTS(SELECT 1 FROM request_diagnostic_attempts a WHERE a.request_id=r.request_id AND a.account_id=$1))
  AND ($2='' OR r.request_id=$2 OR r.response_request_id=$2 OR EXISTS(SELECT 1 FROM request_diagnostic_attempts a WHERE a.request_id=r.request_id AND a.upstream_request_id=$2))
  AND ($3='' OR r.outcome=$3 OR ($3='errors' AND r.outcome IN ('incomplete','upstream_error','upstream_rejected','local_rejected','transport_error','body_error'))) AND ($4='' OR r.started_at >= $4) AND ($5='' OR r.started_at < $5)
- AND (r.started_at >= $6 OR $7 LIKE '%\"' || r.request_id || '\"%')";
+ AND (r.started_at >= $6 OR $7 LIKE '%\"' || r.request_id || '\"%')
+ AND ($8='' OR COALESCE(r.platform,'history_unknown')=$8)
+ AND ($9='' OR COALESCE(r.entry_protocol,'history_unknown')=$9)
+ AND ($10='' OR EXISTS(SELECT 1 FROM request_diagnostic_attempts k WHERE k.request_id=r.request_id AND COALESCE(k.kernel_version,'history_unknown')=$10) OR ($10='history_unknown' AND NOT EXISTS(SELECT 1 FROM request_diagnostic_attempts k WHERE k.request_id=r.request_id)))
+ AND ($11='' OR COALESCE(r.requested_model,'history_unknown')=$11)
+ AND ($12='' OR EXISTS(SELECT 1 FROM request_diagnostic_attempts m WHERE m.request_id=r.request_id AND COALESCE(m.actual_model,'history_unknown')=$12) OR ($12='history_unknown' AND NOT EXISTS(SELECT 1 FROM request_diagnostic_attempts m WHERE m.request_id=r.request_id)))";
 
 /// 当前进程真实请求的保留许可，终结与异常 Drop 均释放。
 pub(crate) struct ActiveDiagnostic {
@@ -46,6 +51,22 @@ pub(crate) struct DiagnosticEvent {
 
 enum WriteCommand {
     Record(DiagnosticEvent),
+    ToolTurn {
+        attempt_id: String,
+        account_id: i64,
+        turn: ToolTurnDiagnostic,
+    },
+    CaptureStatus {
+        attempt_id: String,
+        account_id: i64,
+        status: String,
+    },
+    ControlState {
+        attempt_id: String,
+        account_id: i64,
+        status: String,
+        observed_at: String,
+    },
     Flush(oneshot::Sender<()>),
 }
 
@@ -81,6 +102,18 @@ impl DiagnosticsStore {
                                 writer_failures.fetch_add(1, Ordering::Relaxed);
                                 warn!(request_id = %event.request.request_id, "请求诊断写入失败");
                             }
+                        }
+                        Some(WriteCommand::ToolTurn {attempt_id, account_id, turn}) => {
+                            if update_attempt_fact(&writer_pool, &attempt_id, account_id, Some(&turn),None,None).await.is_err() {
+                                writer_failures.fetch_add(1, Ordering::Relaxed);
+                                warn!("原生工具诊断更新失败");
+                            }
+                        }
+                        Some(WriteCommand::CaptureStatus {attempt_id,account_id,status}) => {
+                            if update_attempt_fact(&writer_pool,&attempt_id,account_id,None,Some(&status),None).await.is_err() {writer_failures.fetch_add(1,Ordering::Relaxed);}
+                        }
+                        Some(WriteCommand::ControlState {attempt_id,account_id,status,observed_at}) => {
+                            if update_attempt_fact(&writer_pool,&attempt_id,account_id,None,None,Some((&status,&observed_at))).await.is_err() {writer_failures.fetch_add(1,Ordering::Relaxed);}
                         }
                         Some(WriteCommand::Flush(done)) => { let _ = done.send(()); }
                         None => break,
@@ -122,7 +155,15 @@ impl DiagnosticsStore {
     /// @param pool 数据库连接池。
     /// @return 迁移结果。
     pub async fn migrate(pool: &AnyPool) -> Result<(), sqlx::Error> {
-        super::database_schema::migrate_diagnostics(pool).await
+        super::database_schema::migrate_diagnostics(pool).await?;
+        let mut tx = pool.begin().await?;
+        let driver = if pool.connect_options().database_url.scheme() == "sqlite" {
+            "sqlite"
+        } else {
+            "postgres"
+        };
+        super::request_records_schema::apply(&mut tx, driver).await?;
+        tx.commit().await
     }
 
     /// 尝试入队，队列饱和时只记录失败计数，不阻塞转发。
@@ -134,6 +175,58 @@ impl DiagnosticsStore {
             if count == 1 || count % 100 == 0 {
                 warn!(dropped_records = count, "请求诊断队列不可用或已满");
             }
+        }
+    }
+
+    /// 按原attempt和账号更新工具最近观测，保留HTTP终态。@param attempt_id 原尝试。@param account_id 原账号。@param turn 受控工具事实。@return 无。
+    pub(crate) fn tool_turn(&self, attempt_id: &str, account_id: i64, turn: ToolTurnDiagnostic) {
+        if self
+            .sender
+            .try_send(WriteCommand::ToolTurn {
+                attempt_id: attempt_id.into(),
+                account_id,
+                turn,
+            })
+            .is_err()
+        {
+            self.dropped.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    /// 仅补同次采集结果，保留原业务终态。@param attempt_id 尝试。@param account_id 账号。@param status 受控采集状态。@return 无。
+    pub(crate) fn capture_status(&self, attempt_id: &str, account_id: i64, status: &str) {
+        if self
+            .sender
+            .try_send(WriteCommand::CaptureStatus {
+                attempt_id: attempt_id.into(),
+                account_id,
+                status: status.into(),
+            })
+            .is_err()
+        {
+            self.dropped.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    /// 独立记录原生物理控制收口，保留HTTP与模型结果。@param attempt_id 尝试。@param account_id 账号。@param status 控制终态。@param observed_at 实际观测时刻。@return 无。
+    pub(crate) fn control_state(
+        &self,
+        attempt_id: &str,
+        account_id: i64,
+        status: &str,
+        observed_at: &str,
+    ) {
+        if self
+            .sender
+            .try_send(WriteCommand::ControlState {
+                attempt_id: attempt_id.into(),
+                account_id,
+                status: status.into(),
+                observed_at: observed_at.into(),
+            })
+            .is_err()
+        {
+            self.dropped.fetch_add(1, Ordering::Relaxed);
         }
     }
 
@@ -171,6 +264,17 @@ impl DiagnosticsStore {
         {
             return Err(AppError::BadRequest("无效的诊断分页或账号参数".into()));
         }
+        let platform = query_filter(
+            query.platform,
+            &["claude_code", "antigravity", "history_unknown"],
+        )?;
+        let protocol = query_filter(
+            query.entry_protocol,
+            &["anthropic_messages", "gemini", "history_unknown"],
+        )?;
+        let kernel = query_filter(query.kernel_version, &[])?;
+        let requested_model = query_filter(query.requested_model, &[])?;
+        let actual_model = query_filter(query.actual_model, &[])?;
         let id = query.correlation_id.unwrap_or_default();
         if id.len() > 128 {
             return Err(AppError::BadRequest("关联标识过长".into()));
@@ -218,13 +322,18 @@ impl DiagnosticsStore {
             .bind(&until)
             .bind(&cutoff)
             .bind(&active)
+            .bind(&platform)
+            .bind(&protocol)
+            .bind(&kernel)
+            .bind(&requested_model)
+            .bind(&actual_model)
             .fetch_one(&self.pool)
             .await
             .map_err(|_| unavailable())?;
         let sql = format!(
             "SELECT r.summary_json,COALESCE((SELECT latest.summary_json FROM request_diagnostic_attempts latest WHERE latest.request_id=r.request_id ORDER BY latest.ordinal DESC LIMIT 1),'') AS last_attempt,COALESCE(a.name,'') AS account_name,COALESCE(a.email,'') AS account_email
              FROM request_diagnostics r LEFT JOIN accounts a ON a.id=r.account_id
-             {FILTER} ORDER BY r.started_at DESC,r.request_id DESC LIMIT $8 OFFSET $9"
+             {FILTER} ORDER BY r.started_at DESC,r.request_id DESC LIMIT $13 OFFSET $14"
         );
         let rows = sqlx::query(&sql)
             .bind(account)
@@ -234,6 +343,11 @@ impl DiagnosticsStore {
             .bind(&until)
             .bind(&cutoff)
             .bind(&active)
+            .bind(&platform)
+            .bind(&protocol)
+            .bind(&kernel)
+            .bind(&requested_model)
+            .bind(&actual_model)
             .bind(i64::from(page_size))
             .bind(i64::from(page - 1) * i64::from(page_size))
             .fetch_all(&self.pool)
@@ -256,6 +370,7 @@ impl DiagnosticsStore {
             .collect::<Result<_, AppError>>()?;
         let counts = sqlx::query(&format!("SELECT CAST(COUNT(*) AS BIGINT) AS total,CAST(COALESCE(SUM(CASE WHEN r.outcome IN ('incomplete','upstream_error','upstream_rejected','local_rejected','transport_error','body_error') THEN 1 ELSE 0 END),0) AS BIGINT) AS errors,CAST(COALESCE(SUM(CASE WHEN r.outcome='in_progress' THEN 1 ELSE 0 END),0) AS BIGINT) AS processing FROM request_diagnostics r {FILTER}"))
             .bind(account).bind(&id).bind("").bind(&since).bind(&until).bind(&cutoff).bind(&active)
+            .bind(&platform).bind(&protocol).bind(&kernel).bind(&requested_model).bind(&actual_model)
             .fetch_one(&self.pool).await.map_err(|_| unavailable())?;
         Ok(DiagnosticPage {
             items,
@@ -343,6 +458,76 @@ fn query_time(value: Option<String>) -> Result<String, AppError> {
         .map(|v| v.unwrap_or_default())
 }
 
+fn query_filter(value: Option<String>, choices: &[&str]) -> Result<String, AppError> {
+    let value = value.unwrap_or_default();
+    if value.is_empty() {
+        return Ok(value);
+    }
+    if value.len() > 128
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+        || (!choices.is_empty() && !choices.contains(&value.as_str()))
+    {
+        return Err(AppError::BadRequest("诊断筛选值无效".into()));
+    }
+    Ok(value)
+}
+
+async fn update_attempt_fact(
+    pool: &AnyPool,
+    attempt_id: &str,
+    account_id: i64,
+    turn: Option<&ToolTurnDiagnostic>,
+    capture: Option<&str>,
+    control: Option<(&str, &str)>,
+) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    if pool.connect_options().database_url.scheme() == "sqlite" {
+        // 与凭据提交共享SQLite写权限，防止限定字段补写使用过期读快照。
+        sqlx::query("UPDATE request_diagnostic_attempts SET ordinal=ordinal WHERE 1=0")
+            .execute(&mut *tx)
+            .await?;
+    }
+    let row = sqlx::query("SELECT summary_json FROM request_diagnostic_attempts WHERE attempt_id=$1 AND account_id=$2")
+        .bind(attempt_id).bind(account_id).fetch_optional(&mut *tx).await?;
+    if let Some(row) = row {
+        let raw: String = row.try_get("summary_json")?;
+        let mut attempt: AttemptDiagnostic = serde_json::from_str(&raw)
+            .map_err(|_| sqlx::Error::Protocol("工具诊断摘要损坏".into()))?;
+        let mut changed = false;
+        if let Some(status) = capture {
+            attempt.capture_status = Some(status.into());
+            changed = true;
+        }
+        if let (Some(context), Some(turn)) = (attempt.context.as_mut(), turn) {
+            let previous = context.tool_turn.as_ref();
+            // 终态不可被晚到的waiting覆盖，重复收口保持原观测时刻。
+            if previous.is_none_or(|old| old.state == "waiting" || old.state == "continuation") {
+                context.tool_turn = Some(turn.clone());
+                changed = true;
+            }
+        }
+        if let (Some(context), Some((status, observed_at))) = (attempt.context.as_mut(), control) {
+            if context.control_state.is_none() {
+                context.control_state = Some(status.into());
+                context.control_observed_at = Some(observed_at.into());
+                changed = true;
+            }
+        }
+        if changed {
+            let raw = serde_json::to_string(&attempt)
+                .map_err(|_| sqlx::Error::Protocol("工具诊断编码失败".into()))?;
+            if raw.len() > MAX_RECORD_BYTES {
+                return Err(sqlx::Error::Protocol("工具诊断超限".into()));
+            }
+            sqlx::query("UPDATE request_diagnostic_attempts SET summary_json=$1 WHERE attempt_id=$2 AND account_id=$3")
+                    .bind(raw).bind(attempt_id).bind(account_id).execute(&mut *tx).await?;
+        }
+    }
+    tx.commit().await
+}
+
 async fn write_event(pool: &AnyPool, event: &DiagnosticEvent) -> Result<(), sqlx::Error> {
     let request = &event.request;
     let json = serde_json::to_string(request)
@@ -362,24 +547,32 @@ async fn write_event(pool: &AnyPool, event: &DiagnosticEvent) -> Result<(), sqlx
     }
     let mut tx = pool.begin().await?;
     // 迟到的尝试不能把已经终结的请求重新写成进行中。
-    sqlx::query("INSERT INTO request_diagnostics(request_id,started_at,finished_at,response_request_id,outcome,summary_json,account_id)
-        VALUES($1,$2,NULLIF($3,''),NULLIF($4,''),$5,$6,NULLIF($7,0)) ON CONFLICT(request_id) DO UPDATE SET
+    sqlx::query("INSERT INTO request_diagnostics(request_id,started_at,finished_at,response_request_id,outcome,summary_json,account_id,platform,entry_protocol,requested_model)
+        VALUES($1,$2,NULLIF($3,''),NULLIF($4,''),$5,$6,NULLIF($7,0),NULLIF($8,''),NULLIF($9,''),NULLIF($10,'')) ON CONFLICT(request_id) DO UPDATE SET
         finished_at=COALESCE(excluded.finished_at,request_diagnostics.finished_at),
         response_request_id=COALESCE(excluded.response_request_id,request_diagnostics.response_request_id),
         account_id=COALESCE(excluded.account_id,request_diagnostics.account_id),
+        platform=COALESCE(request_diagnostics.platform,excluded.platform),entry_protocol=COALESCE(request_diagnostics.entry_protocol,excluded.entry_protocol),requested_model=COALESCE(request_diagnostics.requested_model,excluded.requested_model),
         outcome=CASE WHEN excluded.finished_at IS NOT NULL THEN excluded.outcome ELSE request_diagnostics.outcome END,
         summary_json=CASE WHEN excluded.finished_at IS NOT NULL OR request_diagnostics.finished_at IS NULL THEN excluded.summary_json ELSE request_diagnostics.summary_json END")
         // SQLx Any 的空值使用 i32 编码；绑定类型固定，再用 NULLIF 还原未知值，避免 PG 缓存参数类型漂移。
         .bind(&request.request_id).bind(&request.started_at).bind(request.finished_at.as_deref().unwrap_or_default()).bind(request.response_request_id.as_deref().unwrap_or_default())
-        .bind(&request.outcome).bind(json).bind(request.account_id.unwrap_or(0)).execute(&mut *tx).await?;
+        .bind(&request.outcome).bind(json).bind(request.account_id.unwrap_or(0))
+        .bind(request.context.as_ref().and_then(|c|c.platform.as_deref()).unwrap_or_default())
+        .bind(request.context.as_ref().and_then(|c|c.entry_protocol.as_deref()).unwrap_or_default())
+        .bind(request.context.as_ref().and_then(|c|c.requested_model.as_deref()).unwrap_or_default()).execute(&mut *tx).await?;
     if let Some(attempt) = &event.attempt {
-        sqlx::query("INSERT INTO request_diagnostic_attempts(attempt_id,request_id,ordinal,account_id,started_at,upstream_request_id,summary_json,finished_at)
-            VALUES($1,$2,$3,$4,$5,NULLIF($6,''),$7,NULLIF($8,'')) ON CONFLICT(attempt_id) DO UPDATE SET
+        sqlx::query("INSERT INTO request_diagnostic_attempts(attempt_id,request_id,ordinal,account_id,started_at,upstream_request_id,summary_json,finished_at,platform,kernel_version,actual_model)
+            VALUES($1,$2,$3,$4,$5,NULLIF($6,''),$7,NULLIF($8,''),NULLIF($9,''),NULLIF($10,''),NULLIF($11,'')) ON CONFLICT(attempt_id) DO UPDATE SET
             finished_at=COALESCE(excluded.finished_at,request_diagnostic_attempts.finished_at),
+            platform=COALESCE(request_diagnostic_attempts.platform,excluded.platform),kernel_version=COALESCE(request_diagnostic_attempts.kernel_version,excluded.kernel_version),actual_model=COALESCE(request_diagnostic_attempts.actual_model,excluded.actual_model),
             upstream_request_id=COALESCE(excluded.upstream_request_id,request_diagnostic_attempts.upstream_request_id),
             summary_json=CASE WHEN excluded.finished_at IS NOT NULL OR request_diagnostic_attempts.finished_at IS NULL THEN excluded.summary_json ELSE request_diagnostic_attempts.summary_json END")
             .bind(&attempt.attempt_id).bind(&attempt.request_id).bind(i64::from(attempt.ordinal)).bind(attempt.account_id)
             .bind(&attempt.started_at).bind(attempt.upstream_request_id.as_deref().unwrap_or_default()).bind(attempt_json.unwrap_or_default()).bind(attempt.finished_at.as_deref().unwrap_or_default())
+            .bind(attempt.context.as_ref().and_then(|c|c.platform.as_deref()).unwrap_or_default())
+            .bind(attempt.context.as_ref().and_then(|c|c.kernel_version.as_deref()).unwrap_or_default())
+            .bind(attempt.context.as_ref().and_then(|c|c.submitted_model.as_deref()).unwrap_or_default())
             .execute(&mut *tx).await?;
     }
     tx.commit().await
@@ -415,11 +608,13 @@ async fn prune(
 
 #[cfg(test)]
 mod tests {
-    use super::{DiagnosticEvent, DiagnosticsStore, QUEUE_CAPACITY, prune, write_event};
+    use super::{
+        DiagnosticEvent, DiagnosticsStore, QUEUE_CAPACITY, prune, update_attempt_fact, write_event,
+    };
     use crate::error::AppError;
     use crate::model::request_diagnostics::{
-        AttemptDiagnostic, DiagnosticParameters, DiagnosticQuery, DiagnosticSessions,
-        DiagnosticTokens, RequestDiagnostic,
+        AttemptDiagnostic, DiagnosticContext, DiagnosticParameters, DiagnosticQuery,
+        DiagnosticSessions, DiagnosticTokens, RequestDiagnostic, ToolTurnDiagnostic,
     };
     use crate::store::db::migrate;
     use chrono::{DateTime, Duration as ChronoDuration, SecondsFormat, Utc};
@@ -430,6 +625,7 @@ mod tests {
     fn request(at: DateTime<Utc>) -> RequestDiagnostic {
         let request_id = Uuid::new_v4().to_string();
         RequestDiagnostic {
+            context: None,
             native_rejection: None,
             original_session_id: None,
             last_attempt: None,
@@ -450,6 +646,7 @@ mod tests {
 
     fn attempt(request: &RequestDiagnostic) -> AttemptDiagnostic {
         AttemptDiagnostic {
+            context: None,
             runtime: None,
             log_mode: None,
             capture_status: None,
@@ -831,6 +1028,133 @@ mod tests {
                 .all(|item| item.account_name.is_none() && item.account_email.is_none())
         );
         let unknown = reopened.detail(&boundary.request_id).await.unwrap();
+        let mut agy = request(Utc::now());
+        agy.context = Some(DiagnosticContext {
+            platform: Some("antigravity".into()),
+            entry_protocol: Some("gemini".into()),
+            requested_model: Some("claude-synthetic".into()),
+            ..Default::default()
+        });
+        let mut sent = attempt(&agy);
+        sent.context = Some(DiagnosticContext {
+            platform: Some("antigravity".into()),
+            kernel_version: Some("1.5.9".into()),
+            submitted_model: Some("MODEL_SYNTHETIC".into()),
+            tool_turn: Some(ToolTurnDiagnostic {
+                state: "waiting".into(),
+                observed_at: agy.started_at.clone(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+        write_event(
+            &reader,
+            &DiagnosticEvent {
+                request: agy.clone(),
+                attempt: Some(sent.clone()),
+            },
+        )
+        .await
+        .unwrap();
+        let filtered = reopened
+            .list(DiagnosticQuery {
+                platform: Some("antigravity".into()),
+                entry_protocol: Some("gemini".into()),
+                kernel_version: Some("1.5.9".into()),
+                requested_model: Some("claude-synthetic".into()),
+                actual_model: Some("MODEL_SYNTHETIC".into()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(filtered.total, 1);
+        assert_eq!(filtered.counts.all, 1);
+        assert_eq!(filtered.items[0].request_id, agy.request_id);
+        let hidden = reopened
+            .list(DiagnosticQuery {
+                platform: Some("antigravity".into()),
+                actual_model: Some("wrong-model".into()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(hidden.total, 0);
+        let turn = ToolTurnDiagnostic {
+            state: "completed".into(),
+            observed_at: agy.finished_at.clone().unwrap(),
+            ..Default::default()
+        };
+        update_attempt_fact(&reader, &sent.attempt_id, 7, Some(&turn), None, None)
+            .await
+            .unwrap();
+        update_attempt_fact(&reader, &sent.attempt_id, 7, None, Some("saved"), None)
+            .await
+            .unwrap();
+        update_attempt_fact(
+            &reader,
+            &sent.attempt_id,
+            7,
+            None,
+            None,
+            Some(("completed", &turn.observed_at)),
+        )
+        .await
+        .unwrap();
+        update_attempt_fact(
+            &reader,
+            &sent.attempt_id,
+            7,
+            None,
+            None,
+            Some(("error", &turn.observed_at)),
+        )
+        .await
+        .unwrap();
+        let late = ToolTurnDiagnostic {
+            state: "waiting".into(),
+            ..turn.clone()
+        };
+        update_attempt_fact(&reader, &sent.attempt_id, 7, Some(&late), None, None)
+            .await
+            .unwrap();
+        let finalized = reopened.detail(&agy.request_id).await.unwrap();
+        assert_eq!(finalized.request.finished_at, agy.finished_at);
+        assert_eq!(finalized.request.outcome, "success");
+        assert_eq!(finalized.request.attempt_count, 1);
+        assert_eq!(
+            finalized.attempts[0]
+                .context
+                .as_ref()
+                .unwrap()
+                .control_state
+                .as_deref(),
+            Some("completed")
+        );
+        assert_eq!(
+            finalized.attempts[0]
+                .context
+                .as_ref()
+                .unwrap()
+                .control_observed_at
+                .as_deref(),
+            Some(turn.observed_at.as_str())
+        );
+        assert_eq!(
+            finalized.attempts[0]
+                .context
+                .as_ref()
+                .unwrap()
+                .tool_turn
+                .as_ref()
+                .unwrap()
+                .state,
+            "completed"
+        );
+        assert_eq!(finalized.attempts[0].duration_ms, sent.duration_ms);
+        assert_eq!(
+            finalized.attempts[0].capture_status.as_deref(),
+            Some("saved")
+        );
         assert!(unknown.request.original_session_id.is_none());
         assert!(unknown.request.account_id.is_none() && unknown.request.account_name.is_none());
         drop(reopened);

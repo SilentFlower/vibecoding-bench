@@ -18,9 +18,9 @@ use crate::error::AppError;
 use crate::model::account::Account;
 use crate::model::identity::device_profile;
 use crate::model::request_diagnostics::{
-    AttemptDiagnostic, DiagnosticParameters, DiagnosticSessions, DiagnosticTokens, NativeRejection,
-    NativeRequestObservation, RequestDiagnostic, RequestLogMode, normalize_correlation_id,
-    safe_model,
+    AttemptDiagnostic, DiagnosticContext, DiagnosticParameters, DiagnosticSessions,
+    DiagnosticTokens, NativeRejection, NativeRequestObservation, RequestDiagnostic, RequestLogMode,
+    normalize_correlation_id, safe_model,
 };
 use crate::service::rewriter::extract_session_id_from_body;
 use crate::service::usage::UsageCapture;
@@ -28,6 +28,8 @@ use crate::service::v3_scheduling::SchedulingRequest;
 use crate::service::version_profile::profile_for_version;
 use crate::store::cache::UpstreamSessionPoolResolve;
 use crate::store::diagnostics_store::{ActiveDiagnostic, DiagnosticEvent, DiagnosticsStore};
+
+pub(crate) mod agy;
 
 tokio::task_local! {
     /// 独立于诊断存储的请求模式，保证旁路故障时内容策略仍生效。
@@ -73,6 +75,15 @@ impl TraceContext {
     /// @param store 独立诊断存储。
     /// @return 当前请求的观测上下文。
     pub(crate) fn new(store: Arc<DiagnosticsStore>) -> Self {
+        Self::for_protocol(store, "claude_code", "anthropic_messages")
+    }
+
+    /// 在首次入队前冻结真实入口，保持筛选投影一致。@param store 诊断存储。@param platform 已知平台。@param protocol 已知入口。@return 根上下文。
+    pub(crate) fn for_protocol(
+        store: Arc<DiagnosticsStore>,
+        platform: &str,
+        protocol: &str,
+    ) -> Self {
         let request_id = Uuid::new_v4().to_string();
         let retention = store.track_request(&request_id);
         let trace = Self {
@@ -80,6 +91,11 @@ impl TraceContext {
             state: Arc::new(Mutex::new(TraceState {
                 retention: Some(retention),
                 request: RequestDiagnostic {
+                    context: Some(DiagnosticContext {
+                        platform: Some(platform.into()),
+                        entry_protocol: Some(protocol.into()),
+                        ..Default::default()
+                    }),
                     native_rejection: None,
                     last_attempt: None,
                     log_mode: Some(current_log_mode()),
@@ -183,11 +199,39 @@ impl TraceContext {
     }
 }
 
+/// 获取显式后台传递的根上下文。@return 当前HTTP的诊断上下文，旁路未装配时为空。
+pub(crate) fn current_trace() -> Option<TraceContext> {
+    CURRENT_TRACE.try_with(Clone::clone).ok()
+}
+
+/// 冻结入口的平台、协议和原请求模型。@param platform 实际入口平台。@param protocol 实际协议。@param model 已校验原模型。@return 无。
+pub(crate) fn request_context(platform: &str, protocol: &str, model: Option<&str>) {
+    let _ = CURRENT_TRACE.try_with(|trace| {
+        let mut state = trace.lock();
+        let context = state.request.context.get_or_insert_with(Default::default);
+        context.platform = Some(platform.into());
+        context.entry_protocol = Some(protocol.into());
+        if context.requested_model.is_none() {
+            context.requested_model = model.map(str::to_owned);
+        }
+        drop(state);
+        trace.emit(None);
+    });
+}
+
 /// 冻结客户端入站会话，正文优先，缺省时读取唯一会话头。
 /// @param headers 原始多值请求头。
 /// @param body 已解码且尚未映射的请求正文。
 /// @return 无返回值；异常标识保持未知，业务转发沿原链路。
 pub(crate) fn original_session(headers: &HeaderMap, body: &Value) {
+    request_context(
+        "claude_code",
+        "anthropic_messages",
+        body.get("model")
+            .and_then(Value::as_str)
+            .and_then(safe_model)
+            .as_deref(),
+    );
     let _ = CURRENT_TRACE.try_with(|trace| {
         let mut state = trace.lock();
         if state.original_session_recorded {
@@ -342,6 +386,23 @@ fn prepare_observation(account: &Account, body: Value) -> Option<AttemptTrace> {
                 .and_then(Value::as_str)
                 .map(|value| identity_hash(account.id, "message", value));
             let record = AttemptDiagnostic {
+                context: Some(DiagnosticContext {
+                    submitted_model: DiagnosticParameters::from_request(&body).model,
+                    kernel: Some(
+                        if account.request_backend == "native" {
+                            "cc"
+                        } else {
+                            "legacy"
+                        }
+                        .into(),
+                    ),
+                    kernel_version: Some(
+                        profile_for_version(&device_profile(account).env.version)
+                            .key
+                            .into(),
+                    ),
+                    ..state.request.context.clone().unwrap_or_default()
+                }),
                 runtime: None,
                 log_mode: state.request.log_mode,
                 capture_status: None,
@@ -451,6 +512,10 @@ pub(crate) fn prepare_native_attempt(
     let record = attempt.record.as_mut()?;
     record.attempt_id = attempt_id.to_owned();
     record.profile_version = observation.source_version.as_str().into();
+    if let Some(context) = record.context.as_mut() {
+        context.kernel = Some("cc".into());
+        context.kernel_version = Some(record.profile_version.clone());
+    }
     record.profile_selection = format!(
         "native{}_cc_prepared",
         observation.source_version.as_str().rsplit('.').next()?

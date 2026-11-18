@@ -1720,7 +1720,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 仅源错误code=401/status=UNAUTHENTICATED且没有候选及usage时参与有界恢复；须尚未交付、无工具结果历史、原作业实际收口、同账号ready新代且AT改变，最多一次。容量/控制失败、SSE首帧后、取消或过期均不重放。
 - 账号内共享完整265700040字节封存映像，核对SHA和四封存，decode计数、分发大小、控制/内核/观察器/原生RSS/PSS/USS与cgroup独立展示。max_workers等于账号concurrency，范围1..64，跨模型和凭据代次共用物理上限。有限sender RAM为512+256×workers MiB，network 256MiB、CLI至少512MiB，总量受原预算约束；零沿明确无限策略。
 - cgroup v2读取memory.max、memory.current、memory.peak和memory.swap.current；v1支持memory子目录或挂载根的memory.limit_in_bytes、memory.usage_in_bytes、memory.max_usage_in_bytes，memory.memsw.usage_in_bytes减RAM占用才是swap。v1限制大于等于2^60沿既有规则按无限处理；缺失/损坏为未知，监督器与冻结RAM不一致时拒绝，不能把未知当作无限。
-- 正式模块根为/opt/v3/python，共享runtime_files位于/usr/local/bin。监督器和worker都冻结这两个搜索路径。AT HOME随worker私有发布，退役删除；采集复用账号开关，原始记录位于flows/api/agy-prepared，已退役采集保留七天。普通输出采用有界匿名暂存，私有事件读取按帧及总字节控制背压。
+- 正式模块根为/opt/v3/python，共享runtime_files位于/usr/local/bin。监督器和worker都冻结这两个搜索路径。AT HOME随worker私有发布，退役删除；采集复用账号开关与HTTP日志模式，长期有界脱敏快照位于flows/api/agy-prepared，原始执行材料沿临时worker目录和关闭清理。历史已退役采集保留七天；统一容量、内部旁路及读取合同由网关settings-database的AGY请求记录场景持有。普通输出采用有界匿名暂存，私有事件读取按帧及总字节控制背压。
 - 旧工具和实际Root active纳入维护/升级排空。未知退出阻止新准备，显式对账停止本环境三角色后只清派生缓存和AT副本，保留权威凭据及身份。环境维护回执核对expected_generation；读取不唤醒，UI轮询保留草稿和焦点。存在AGY映射时目标control/account都须声明agy-runtime-protocol=1。
 
 ### 4. Validation & Error Matrix
@@ -1767,7 +1767,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 只处理解码后的独立`system`，经Cortex自定义prompt section提交。多Part按既有换行合并；未命中码点原样，输出确定、幂等、Unicode码点数量保持一致。UTF-8字节数可改变。用户/模型历史、工具、参数、结果、ID和签名继续既有映射；原始`gemini_body`深拷贝保持转换前数据。
 - `request_accepted.system_prompt_policy`含`schema_version/enabled/rule_version/rule_sha256/source/changed/replaced_codepoints/system_codepoints`。source固定`cortex_custom_system`，描述独立系统段处理来源；该事件产生于原生RPC提交前。`rule_sha256`标识规则资源字节，计数表示Unicode码点，均不换算token。开启但空文本或已转换文本可有`changed=false`。
 - 网关按本HTTP和实际attempt身份核对回执的开关、版本、来源、摘要形状及计数一致性。启用请求收到匹配回执后才交付Gemini源帧；每次认证恢复重新等待回执。历史关闭请求兼容缺失回执。
-- 采集开启时，`gemini-input.json`为转换前已解码Gemini视图；`input-mapping.json`记录策略，`input_view=decoded_gemini_input`、`submission_view=native_cascade_prompt_sections`；`rpc.ndjson`包含提交的系统段。该视图不冒充原始HTTP线字节。采集关闭沿匿名暂存与收口清理，公共日志仅记录策略元数据。
+- 临时执行材料中，`gemini-input.json`为转换前已解码Gemini视图，`input-mapping.json`记录策略，`rpc.ndjson`包含提交的系统段。长期采集使用独立有界脱敏快照，区分decoded_gemini_input及native_cascade_prompt_sections；原始HTTP由独立入站旁路保存。采集关闭沿匿名暂存与收口清理，公共日志仅记录策略元数据。
 - 上游`usageMetadata`、缓存及思考扩展沿源帧交付。真实分词、缓存命中和计费效果使用授权账号及独立预算验收；本地TLS合成usage只验证来源保真。
 
 ### 4. Validation & Error Matrix

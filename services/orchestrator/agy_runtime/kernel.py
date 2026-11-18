@@ -22,6 +22,10 @@ from .layer_reader import LayerReader
 from .tool_broker import Broker
 from .gemini_frames import Frames
 from .models import configure_model
+from .capture import save_submission
+from .credentials import read_access_document
+
+SNAPSHOT_WRITERS=threading.BoundedSemaphore(2)
 
 
 class RPC:
@@ -245,7 +249,7 @@ class Kernel:
             if _queued:self.queued=None
             self.seq+=1;sequence_temp=self.sequence_file.with_suffix('.new');sequence_temp.write_text(json.dumps(self.seq));sequence_temp.replace(self.sequence_file)
             scope=Scope(value,self.seq,self.worker);self.active=scope
-            self.emit('request_accepted',**scope.identity(),parameter_policy=value.get('compatibility_notes',[]),system_prompt_policy=value.get('system_prompt_policy'))
+            self.emit('request_accepted',**scope.identity(),parameter_policy=value.get('compatibility_notes',[]),system_prompt_policy=value.get('system_prompt_policy'),capture_status='queued' if self.cfg.get('capture_root') else 'disabled')
             threading.Thread(target=self.execute,args=(scope,),daemon=True).start()
 
     def resume(self, previous, results):
@@ -343,6 +347,8 @@ class Kernel:
             elif scope.history_count:
                 steps.append({'type':'CORTEX_STEP_TYPE_USER_INPUT','status':'CORTEX_STEP_STATUS_DONE','metadata':{},'userInput':{'userResponse':scope.value['prompt']}});items=[]
             body={'cascadeId':scope.root,'items':items,'additionalSteps':steps,'cascadeConfig':cfg,'blocking':True,'propagateError':True}
+            if self.cfg.get('capture_root'):
+                self.capture_submission(scope,body)
             future=RPC(worker,'SendUserCascadeMessage',body,scope)
             while not future.done.wait(.05):
                 if scope.value.get('request_format')=='gemini' and scope.job.ended.is_set() and not scope.frames.terminal:
@@ -412,6 +418,23 @@ class Kernel:
                 with self.lock:
                     self.emit('idle',**scope.identity(),next_generation=self.worker.bridge.generation if self.worker and self.worker.ready and not self.closing else None)
                     self.active=None;scope.finished.set()
+
+    def capture_submission(self, scope, submitted):
+        """有界后台保存脱敏副本，失败仅产生采集状态。@param scope 原请求。@param submitted 实际RPC对象。@return 无。"""
+        if not SNAPSHOT_WRITERS.acquire(blocking=False):
+            self.emit('capture_status',**scope.identity(),capture_status='dropped');return
+        def save():
+            """只读取当前worker的AT进行重复秘密脱敏。@return 无。"""
+            status='failed'
+            try:
+                token=read_access_document(self.cfg['home'])['token']['access_token']
+                save_submission(self.cfg['capture_root'],self.cfg['account_id'],scope.value['request_id'],scope.value['gemini_body'],submitted,token,scope.value.get('system_prompt_policy'))
+                status='saved'
+            except Exception:pass
+            finally:
+                SNAPSHOT_WRITERS.release()
+                self.emit('capture_status',**scope.identity(),capture_status=status)
+        threading.Thread(target=save,daemon=True).start()
 
     def shutdown(self):
         """停止准入并等待当前请求和物理进程退出。@return 无返回值。"""

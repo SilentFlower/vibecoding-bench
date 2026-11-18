@@ -22,6 +22,9 @@ mod tests {
     use crate::store::db;
     use serde_json::json;
     use sqlx::any::AnyPoolOptions;
+    use std::env::temp_dir;
+    use std::fs::remove_file;
+    use uuid::Uuid;
 
     async fn fixture() -> (AccountStore, Account) {
         sqlx::any::install_default_drivers();
@@ -42,6 +45,49 @@ mod tests {
         account.expires_at = Some(Utc::now() + chrono::Duration::hours(1));
         store.create(&mut account).await.unwrap();
         (store, account)
+    }
+
+    #[tokio::test]
+    async fn credential_commit_keeps_cas_with_concurrent_diagnostic_writes() {
+        let (_, mut candidate) = fixture().await;
+        let path = temp_dir().join(format!("agy-diagnostic-write-{}.sqlite", Uuid::new_v4()));
+        let pool = db::init_db("sqlite", path.to_str().unwrap()).await.unwrap();
+        db::migrate(&pool, "sqlite").await.unwrap();
+        let store = AccountStore::new(pool.clone(), "sqlite".into());
+        candidate.id = 0;
+        store.create(&mut candidate).await.unwrap();
+        for iteration in 0..8 {
+            let current = store.get_by_id(candidate.id).await.unwrap();
+            let operation = format!("diagnostic-overlap-{iteration}");
+            let generation = store
+                .begin_agy_credentials(&current, &operation, "refresh_pending")
+                .await
+                .unwrap();
+            let mut next = current.clone();
+            next.access_token = format!("synthetic-at-{iteration}");
+            let writer = async {
+                for _ in 0..32 {
+                    sqlx::query(
+                        "UPDATE settings SET value=value WHERE key='request_diagnostics_log_mode'",
+                    )
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+                    tokio::task::yield_now().await;
+                }
+            };
+            let (result, _) = tokio::join!(
+                store.complete_agy_observation(&current, &operation, generation, &next),
+                writer
+            );
+            result.unwrap();
+            assert_eq!(
+                store.get_by_id(candidate.id).await.unwrap().access_token,
+                next.access_token
+            );
+        }
+        pool.close().await;
+        remove_file(path).unwrap();
     }
 
     #[tokio::test]
@@ -437,6 +483,13 @@ impl AccountStore {
     ) -> Result<(), AppError> {
         let mut transaction = self.pool.begin().await?;
         // 提交确认丢失后只认可同操作、同新代和完全相同的当前结果。
+        if self.driver == "sqlite" {
+            // 先取得写事务权限，避免诊断并发提交后把旧读快照升级为写事务时触发BUSY_SNAPSHOT。
+            // 空集合更新不更改任何凭据或代次，原操作的CAS仍由下方事务一次完成。
+            sqlx::query("UPDATE account_credential_states SET generation=generation WHERE 1=0")
+                .execute(&mut *transaction)
+                .await?;
+        }
         let committed_query = format!(
             "SELECT COUNT(*) FROM accounts a JOIN account_credential_states s ON s.account_id=a.id WHERE a.id=$1 AND a.platform='antigravity' AND a.email=$2 AND a.access_token=$3 AND a.refresh_token=$4 AND s.operation_id=$5 AND s.generation=$6 AND s.phase='ready' AND a.oauth_expires_at={}",
             self.ts(7)

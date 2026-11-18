@@ -40,6 +40,7 @@ from native_kernel_upgrade import archive_binding_records, migrate_records, migr
 from native_criu_policy import restore_policy
 from native_sender import builtin_config, installed_versions, native_resource_layout, prewarm_account_id, sender_config
 from native_capture import cleanup_captures
+from agy_runtime.capture import cleanup_environment_steps as cleanup_agy_capture_steps
 from native_capture_policy import capture_enabled
 from runtime_diagnostics import NetworkContextError, network_failure
 from runtime_files import atomic_json, atomic_text, directory_fd as _directory_fd
@@ -1636,6 +1637,7 @@ class AccountRuntime:
 
         :return: 当前步骤的受控计数。
         """
+        yield from cleanup_agy_capture_steps(self)
         after = ""
         while not self.stopping.is_set():
             connection = self.database()

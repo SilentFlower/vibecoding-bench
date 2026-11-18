@@ -13,7 +13,8 @@ use crate::config::Config;
 use crate::store::database_schema::migrate_legacy;
 use crate::store::db::init_db;
 use crate::store::{
-    account_platform_schema, proxy_schema, proxy_sync_schema, session_policy_block_schema,
+    account_platform_schema, proxy_schema, proxy_sync_schema, request_records_schema,
+    session_policy_block_schema,
 };
 
 /// 返回初始迁移源码摘要，测试代码不进入持久合同。
@@ -40,6 +41,11 @@ fn registry() -> Result<Value, sqlx::Error> {
         return Err(sqlx::Error::Protocol("迁移定义与登记不符".into()));
     }
     for (index, step) in steps.iter().enumerate() {
+        if step["id"] == "gateway.request-records.6"
+            && step["checksum"] != request_records_schema::checksum()
+        {
+            return Err(sqlx::Error::Protocol("请求记录迁移定义与登记不符".into()));
+        }
         if step["id"] == "gateway.account-platforms.5"
             && step["checksum"] != account_platform_schema::checksum()
         {
@@ -249,6 +255,9 @@ pub async fn plan(pool: &AnyPool, target: Option<usize>) -> Result<Value, sqlx::
     if rows.len() >= 5 {
         account_platform_schema::verify(pool).await?;
     }
+    if rows.len() >= 6 {
+        request_records_schema::verify(pool).await?;
+    }
     for step in &mut steps {
         step["state"] = json!(
             if step["version"].as_u64().unwrap_or(u64::MAX) <= rows.len() as u64 {
@@ -277,6 +286,7 @@ pub async fn migrate(pool: &AnyPool, driver: &str) -> Result<(), sqlx::Error> {
         proxy_sync_schema::apply(&mut transaction).await?;
         session_policy_block_schema::apply(&mut transaction).await?;
         account_platform_schema::apply(&mut transaction, driver).await?;
+        request_records_schema::apply(&mut transaction, driver).await?;
         transaction.commit().await?;
         return Ok(());
     }
@@ -315,7 +325,8 @@ pub async fn apply(
                 "gateway.proxies.2"
                 | "gateway.proxy-sync.3"
                 | "gateway.session-policy-blocks.4"
-                | "gateway.account-platforms.5",
+                | "gateway.account-platforms.5"
+                | "gateway.request-records.6",
             ) => {}
             _ => return Err(sqlx::Error::Protocol("迁移实现尚未登记".into())),
         }
@@ -334,6 +345,9 @@ pub async fn apply(
         }
         if step["id"] == "gateway.account-platforms.5" {
             account_platform_schema::apply(&mut transaction, "sqlite").await?;
+        }
+        if step["id"] == "gateway.request-records.6" {
+            request_records_schema::apply(&mut transaction, "sqlite").await?;
         }
         sqlx::query("CREATE TABLE IF NOT EXISTS system_schema_migrations (migration_id TEXT PRIMARY KEY,version INTEGER NOT NULL UNIQUE,checksum TEXT NOT NULL,applied_at TEXT NOT NULL,operation_id TEXT NOT NULL)")
             .execute(&mut *transaction).await?;
@@ -426,7 +440,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 5);
+        assert_eq!(result["current_version"], 6);
         let duration: String = sqlx::query_scalar(
             "SELECT value FROM settings WHERE key='session_policy_block_duration_minutes'",
         )
@@ -464,7 +478,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 5);
+        assert_eq!(result["current_version"], 6);
         let original: String =
             sqlx::query_scalar("SELECT operation_id FROM system_schema_migrations")
                 .fetch_one(&database)
@@ -538,13 +552,13 @@ mod tests {
             .execute(&database)
             .await
             .unwrap();
-        sqlx::query("INSERT INTO system_schema_migrations VALUES('gateway.synthetic.6',6,$1,'synthetic-time',$2)")
+        sqlx::query("INSERT INTO system_schema_migrations VALUES('gateway.synthetic.7',7,$1,'synthetic-time',$2)")
             .bind("a".repeat(64)).bind(Uuid::new_v4().to_string()).execute(&database).await.unwrap();
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
         assert_eq!(result["state"], "compatible_newer");
-        assert_eq!(result["current_version"], 6);
+        assert_eq!(result["current_version"], 7);
         assert!(plan(&database, Some(0)).await.is_err());
     }
 

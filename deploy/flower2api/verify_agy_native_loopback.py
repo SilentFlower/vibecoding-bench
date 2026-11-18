@@ -99,11 +99,9 @@ class Upstream(BaseHTTPRequestHandler):
             try:
                 native=None
                 if repeated:
-                    for path in Path('/state/capture').rglob('protocol-output.ndjson'):
-                        for line in path.read_text().splitlines():
-                            event=json.loads(line)
-                            if event.get('type')=='worker_ready' and Path('/proc/'+str(event['native_pid'])).exists():
-                                native=event['native_pid']
+                    value=Request('http://127.0.0.1:8091/internal/status',headers={'authorization':'Bearer '+SECRET})
+                    with urlopen(value,timeout=5) as response:state=json.load(response)
+                    native=next((process['native']['pid'] for process in state['agy']['processes'] if process.get('native')),None)
                     require(native is not None,'重复帧实验缺少真实原生PID')
                 for frame in frames:
                     if native:os.kill(native,signal.SIGURG)
@@ -171,6 +169,17 @@ class Binding(BaseHTTPRequestHandler):
         self.send_response(200);self.send_header('Content-Length',str(len(raw)));self.end_headers()
         self.wfile.write(raw)
 
+    def do_POST(self):
+        """通过产品写入器核对独立入口旁路，不触发模型。@return 无。"""
+        from agy_runtime.capture import save_ingress
+        require(self.headers.get('authorization')=='Bearer '+SECRET,'入口旁路鉴权错误')
+        parts=self.path.split('/')
+        require(len(parts)==6 and parts[1:5]==['internal','v3','agy-ingress','1'],'入口旁路路径错误')
+        value=json.loads(self.rfile.read(int(self.headers['content-length'])))
+        require(value['environment_generation']==1,'入口旁路代次错误')
+        save_ingress(Path('/state/capture/api/agy-prepared'),1,parts[5],value['ingress'])
+        raw=b'{"state":"saved"}';self.send_response(200);self.send_header('content-length',str(len(raw)));self.end_headers();self.wfile.write(raw)
+
 
 def homoglyph_cases(database, request, base, wait_idle):
     """对照真实TLS系统段、历史及策略账本，覆盖暖worker和工具下一HTTP。@param database 合成库。@param request 公共调用。@param base Gemini路径。@param wait_idle 实际收口等待。@return 场景名称。"""
@@ -232,10 +241,9 @@ def homoglyph_cases(database, request, base, wait_idle):
     enabled(False)
     raw,wire=check(continuation,original)
     require('TLS_SYNTHETIC_RESULT' in json.dumps(wire['contents']) and 'synthetic_tool' in json.dumps(wire['contents']),'工具结果或函数名被替换')
-    ledgers=[json.loads(path.read_text()) for path in Path('/state/capture').rglob('input-mapping.json')]
-    require(any(row.get('system_prompt_policy',{}).get('changed') is True and row['input_view']=='decoded_gemini_input' and row['submission_view']=='native_cascade_prompt_sections' for row in ledgers),'缺少区分原始与提交视图的策略账本')
-    inputs=[json.loads(path.read_text()) for path in Path('/state/capture').rglob('gemini-input.json')]
-    require(any(value.get('systemInstruction')==body['systemInstruction'] for value in inputs),'转换前入站视图丢失')
+    previews=[json.loads(path.read_text()) for path in Path('/state/capture').rglob('snapshots/*.json')]
+    require(any(row.get('system_prompt_policy',{}).get('changed') is True and row.get('representation')=='native_cascade_prompt_sections' for row in previews),'缺少实际处理策略及提交视图来源')
+    require(any(json.loads(row['decoded_gemini']['body']).get('systemInstruction')==body['systemInstruction'] for row in previews),'转换前已解码视图丢失')
     return ['固定同形映射实际出站','普通和SSE一致','用户及历史保护','重复经过幂等','预算内大文本及超限零提交','暖worker复用','工具下一HTTP策略','源缓存及思考用量','策略账本与入站视图']
 
 
@@ -264,14 +272,18 @@ def inside(homoglyph=False,capture_off=False):
         if Path('/opt/verify-lib/ld-linux-x86-64.so.2').is_file():
             command=['/opt/verify-lib/ld-linux-x86-64.so.2','--library-path','/opt/verify-lib',executable]
         children.append(subprocess.Popen(command,stdout=output,stderr=subprocess.STDOUT))
-    def request(path,body=None):
+    request_ids=[]
+    def request(path,body=None,admin=False):
         """通过真实公共HTTP执行一次请求。@param path 路径。@param body Gemini正文。@return 状态与正文。"""
-        headers={'x-api-key':'synthetic-key','content-type':'application/json'}
-        value=Request('http://127.0.0.1:5674'+path,data=json.dumps(body).encode() if body is not None else None,headers=headers)
+        headers={'x-api-key':'synthetic-admin' if admin else 'synthetic-key','content-type':'application/json'}
+        value=Request('http://127.0.0.1:5674'+path,data=json.dumps(body).encode() if body is not None else None,headers=headers,
+            method='PUT' if path=='/admin/settings' and body is not None else None)
         try:
             with urlopen(value,timeout=125) as response:
+                if response.headers.get('x-cc2api-request-id'):request_ids.append(response.headers['x-cc2api-request-id'])
                 return response.status,response.read()
         except HTTPError as error:
+            if error.headers.get('x-cc2api-request-id'):request_ids.append(error.headers['x-cc2api-request-id'])
             return error.code,error.read()
     def wait_idle():
         """等待原生退役及许可实际释放。@return 无。"""
@@ -296,6 +308,7 @@ def inside(homoglyph=False,capture_off=False):
                 (json.dumps({'capabilities':{'model_mappings':{MODEL:'MODEL_PLACEHOLDER_M36'}}}),))
             database.execute("INSERT INTO account_credential_states(account_id,generation,phase,updated_at_ms) VALUES(1,1,'ready',1)")
             database.execute("INSERT INTO api_tokens(name,token,allowed_accounts,status) VALUES('synthetic','synthetic-key','1','active')")
+        require(request('/admin/settings',{'request_diagnostics_log_mode':'debug'},admin=True)[0]==200,'测试日志模式设置失败')
         base='/v1beta/models/'+MODEL+':'
         body={'contents':[{'role':'user','parts':[{'text':'TLS_SYNTHETIC_TEXT'}]}],
             'generationConfig':{'temperature':.2,'topP':.8,'maxOutputTokens':128}}
@@ -338,8 +351,7 @@ def inside(homoglyph=False,capture_off=False):
         for call in Upstream.calls:
             generation=call['body'].get('request',call['body']).get('generationConfig',{})
             require('temperature' not in generation and 'topP' not in generation and generation.get('maxOutputTokens')==128,'实际出站参数策略错误')
-        mcp=[json.loads(line) for path in Path('/state/capture').rglob('mcp.ndjson') for line in path.read_text().splitlines()]
-        require(any(row.get('response',{}).get('result',{}).get('structuredContent')=={'value':'TLS_SYNTHETIC_RESULT'} for row in mcp),'工具结果未返回真实原生MCP调用')
+        require(any('TLS_SYNTHETIC_RESULT' in json.dumps(call['body']) for call in Upstream.calls),'工具结果没有进入真实原生提交')
         repeat=copy.deepcopy(body);repeat['contents'][0]['parts'][0]['text']='TLS_SYNTHETIC_REPEAT'
         status,raw=request(base+'generateContent',repeat)
         require(status==200 and ''.join(part.get('text','') for part in json.loads(raw)['candidates'][0]['content']['parts'])=='本地TLS回复'*64,'原生重复源帧丢失或重复')
@@ -363,8 +375,30 @@ def inside(homoglyph=False,capture_off=False):
         require(state['agy']['image_decode_calls']==1 and state['agy']['workers']==1,'原生回归破坏共享映像或物理并发上限')
         policy_checks=homoglyph_cases(database,request,base,wait_idle) if homoglyph else []
         require(len(Upstream.calls)==(17 if homoglyph else 9),'原生策略回归入口数不符')
+        until=time.monotonic()+10
+        while True:
+            status,raw=request('/admin/request-diagnostics?platform=antigravity&entry_protocol=gemini&page_size=200',admin=True)
+            require(status==200,'真实原生诊断查询失败')
+            records=json.loads(raw)
+            if records['total']>=len(set(request_ids)):break
+            require(time.monotonic()<until,'真实原生根记录没有持久化');time.sleep(.1)
+        require(len(request_ids)==len(set(request_ids)),'HTTP根关联ID重复')
+        require(records['total']==len(request_ids)+1,'目录、控制操作或后台任务混入HTTP根记录')
+        require(all(row['context']['platform']=='antigravity' and row['context']['entry_protocol']=='gemini' for row in records['items']),'原生诊断平台或协议错误')
+        require(records['health']['write_failures']==0 and records['health']['dropped_records']==0,'正常原生诊断存在写入缺口')
+        attempts=[]
+        for row in records['items']:
+            status,raw=request('/admin/request-diagnostics/'+row['request_id'],admin=True)
+            detail=json.loads(raw);attempts.extend(detail['attempts'])
+            require(len(detail['attempts'])==row['attempt_count'],'实际尝试计数与详情不符')
+        require(any(a['context']['tool_turn']['state']=='completed' for a in attempts if a['context'].get('tool_turn')),'原工具实际收口未记录')
+        require(any(a['context']['tool_turn'].get('continuation_of_request_id') for a in attempts if a['context'].get('tool_turn')),'工具跨HTTP关联缺失')
+        require(any(a['context']['usage']['usage_metadata'].get('cachedContentTokenCount')==2 for a in attempts if a['context'].get('usage')),'源缓存用量未记录')
+        require(any(a['context'].get('control_state')=='completed' for a in attempts),'实际原生控制收口未记录')
+        ingress=list(Path('/state/capture/api/agy-prepared/ingress/snapshots').glob('*.json'))
+        require(bool(ingress),'实际HTTP入口独立旁路缺失')
         database.close()
-        return {'policy_checks':policy_checks,'passed':True,'evidence':'real_gateway_sender_native_tls','network':'none','real_model_submissions':0,
+        return {'policy_checks':policy_checks,'diagnostic_requests':records['total'],'diagnostic_attempts':len(attempts),'passed':True,'evidence':'real_gateway_sender_native_tls','network':'none','real_model_submissions':0,
             'synthetic_native_model_submissions':len(Upstream.calls),'credential_generations':[1,2],
             'cgroup_memory':state['agy']['cgroup_memory'],
             'checks':['公共Gemini非流式与SSE','原版TLS与证书校验','源响应及usage','实际出站参数','原生MCP结果回填',
@@ -395,7 +429,7 @@ def main():
     root=Path(__file__).resolve().parents[2]
     package=source_path(root,'orchestrator')
     folder=Path(tempfile.mkdtemp(prefix='agy-native-tls-'))
-    client=docker.from_env(timeout=15);container=None
+    client=docker.from_env(timeout=60);container=None
     try:
         subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=AGY local verification',
             '-addext','subjectAltName=DNS:*.googleapis.com','-keyout',str(folder/'server.key'),'-out',str(folder/'server.crt')],
@@ -425,11 +459,11 @@ def main():
         container=client.containers.run(args.image,['/opt/probe.py','--inside']+(['--homoglyph'] if args.homoglyph else [])+(['--capture-off'] if args.capture_off else []),entrypoint=['python3'],detach=True,
             user='1001:1001',network_mode='none',read_only=True,cap_drop=['ALL'],security_opt=['no-new-privileges:true'],
             mem_limit='768m',pids_limit=512,extra_hosts={host:'127.0.0.1'},tmpfs={'/tmp':'rw,nosuid,nodev,size=128m'},
-            volumes=volumes,environment={'PYTHONPATH':'/opt/orchestrator','DATABASE_DRIVER':'sqlite',
+            volumes=volumes,environment={'PYTHONPATH':'/opt/orchestrator:/usr/local/bin','DATABASE_DRIVER':'sqlite',
                 'DATABASE_DSN':'/state/gateway.sqlite','ADMIN_PASSWORD':'synthetic-admin','V3_SENDER_CONFIG':'/state/sender.json',
                 'V3_RUNTIME_URL':'http://127.0.0.1:8765','V3_INTERNAL_TOKEN':SECRET,'V3_DEPLOYMENT_ID':'synthetic',
                 'V3_RELEASE':'synthetic-release','LOG_LEVEL':'warn','TOKIO_WORKER_THREADS':'2'},
-            labels={'vibebench.test-task':'agy-account-runtime'})
+            labels={'vibebench.test-task':'agy-request-records'})
         result=container.wait(timeout=540)
         logs=container.logs().decode(errors='replace')
         evidence=root/('.trellis/.runtime/agy-homoglyph-capture-off-private' if args.capture_off else '.trellis/.runtime/agy-homoglyph-loopback-private' if args.homoglyph else '.trellis/.runtime/agy-runtime-loopback-private')
