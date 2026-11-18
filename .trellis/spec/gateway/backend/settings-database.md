@@ -481,7 +481,7 @@ let observed = capture.observation(complete);
 - stages分别标记ingress、header_policy、cc_prepared、wire_final的来源、表示和完整性；cc_prepared明确为中间值。旧记录缺独立TLS证据时wire_final保持unavailable。实际PID限定旁路证据使用可选wire_final，source=native_tls_uprobe、representation=http_entity_from_tls_accepted_write；complete/status/reason、可空实体字节及SHA、flushed=null单独核对。采集UUID与业务request_id分别记录，并由同次实际客户端请求头绑定；worker/PID、连接及binding_generation保留实际归属。
 - 可选final_header_changes/final_body_changes分别保存组装到TLS的头及JSON Pointer差异，source=observed_diff，items只保存字段名/路径、动作及固定原因，status区分complete/truncated。页面显示两类分析状态；一致提示只用于complete空列表。头名差异最多128项及128KiB，正文差异沿既有预算。
 - 连续性或范围未知时实体字节和全量SHA为null；非HTTP_PARTIAL的不完整证据在持久化前清空头和正文预览并标截断。连续部分前缀裁剪末尾未闭合字符串后脱敏。采集器的固定映像、ABI、事件计数及复用边界由cc-runtime-bridge的backend/logging-guidelines.md“Linux x64原生TLS接受边界旁路采集”所有。
-- 保存 `<attempt_id>.json`，目录 0700、文件 0600，原子重命名发布；每账号最多 50 份、100 MiB，正文 2 MiB、请求头 128 KiB。写入前按最旧文件轮转并回收中断临时文件。
+- 正常快照保存`<attempt_id>.json`，发送前拒绝入站保存`<attempt_id>.rejected.json`；目录0700、文件0600，原子重命名发布。取消份数限制，每账号共同容量1GiB（1073741824字节），正文2MiB、请求头128KiB。容量不足优先按时间回收正常快照；正常写入不能删除拒绝证据，拒绝证据占满容量时放弃正常副本。新拒绝写入可在回收正常快照后轮转最旧拒绝证据，不能突破总量。后台仍按七天期限清理，两类文件都沿原账号/UUID归属核验，兼容历史拒绝的普通文件名。
 - 有界阻塞线程写入最多2个许可，同进程串行轮转。初始快照即时返回queued，CAPTURE_PENDING表示最终证据后台待收口；CAPTURE_PREPARING表示本次到达时的探针准备缺口。后台record最多等待250ms，timeout后继续持有许可。固定原因及作业标识进入安全日志。按同请求原子合并，已有完整TLS证据优先于迟到初始或缺证写入。失败或丢弃只改变采集状态，保持模型单次提交语义。
 - 调度器按网关账号找到唯一未删除账号环境，逐级无链接目录 FD 固定路径，校验标准 UUID、普通文件、6 MiB 读取上限及文件内账号/尝试/阶段归属。`captured_at_ms` 为正整数 UTC 毫秒，超过当前时间五分钟视为异常；严格早于七天边界返回410，管理桥映射为 expired。查询保持环境休眠状态。管理桥也限制 6 MiB 并核对归属。
 - AccountRuntime 在启动及每小时使用独立清理线程，按持久环境32条分页、每批最多512步及2秒预算继续游标，覆盖停止/休眠环境。只处理 `flows/api/cc-prepared` 下标准 UUID 普通 JSON；复核账号/阶段/时间及删除前文件身份，保留临时文件、链接、损坏、未来异常及错归属记录。停止前核对取消标记，故障只记受控 scanned/deleted/failed 计数；租约续期资源独立。Rust 容量轮转容忍后台已删除旧文件的 NotFound。
@@ -516,7 +516,7 @@ let observed = capture.observation(complete);
 ### 6. Tests Required
 
 - `incoming_header_credentials_are_redacted_across_persisted_content`：落盘全文没有客户端 Authorization/Cookie/API Key 和上游 bearer，普通多值头与正文顺序保持，原始转发对象保持。
-- `snapshot_preserves_duplicate_headers_and_masks_credentials_before_clipping`、`retention_is_bounded_and_storage_failure_is_visible`：UTF-8 边界、原始摘要、50 份/100 MiB、权限、关闭及失败状态。
+- `snapshot_preserves_duplicate_headers_and_masks_credentials_before_clipping`、`retention_is_bounded_and_storage_failure_is_visible`及`normal_snapshots_cannot_evict_rejected_ingress`：UTF-8边界、原始摘要、超过50份保留、1GiB共同预算、拒绝证据优先、权限、关闭及失败状态；Python覆盖新文件名读取、错账号、链接、七天边界和实际清理。
 - Python `test_native_capture.py`：只读、错账号、UUID、链接、缺失和超限；账号运行时冻结开关；管理路由鉴权和跨请求尝试拒绝。
 - `native_real_gateway`：独立模拟 TLS 核对实际账号凭据、输入客户端密钥重复出现、快照及管理读取链脱敏、请求一次提交；完整 `cargo test --locked`、包级格式检查与前端构建。
 - `scripts/testing/cc2api-native.ts`通过实际Python read_capture读取Rust落盘；`verify_native_diagnostics_cpu.py`覆盖三块诊断、动作筛选、历史兼容、HTML安全文本及390像素。

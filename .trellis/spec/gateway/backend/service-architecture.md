@@ -1724,7 +1724,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 ### 3. Contracts
 
 - 固定原因目录包括native_entrypoint_unsupported、native_version_mismatch、native_billing_invalid、native_metadata_invalid、unsupported_body_field、unsupported_message_field、unsupported_system_block、invalid_message_role。TS、Rust与共享fixture同步；未知原因保持缺失，不复制任意异常文本。
-- sender在cc_prepared之前收到error事件时，经既有有界后台队列保存`stage=ingress_rejected`快照。复用会话映射前已冻结的脱敏HTTP逻辑正文及原始长度/SHA256，入口上限1MiB，超限标记截断。debug及账号内容采集目录共同门控；info在复制前返回disabled，沿原50份/100MiB和七天读取期限。
+- sender在cc_prepared之前收到error事件时，经既有有界后台队列保存`stage=ingress_rejected`快照。复用会话映射前已冻结的脱敏HTTP逻辑正文及原始长度/SHA256，入口上限1MiB，超限标记截断。debug及账号内容采集目录共同门控；info在复制前返回disabled。取消份数限制；拒绝证据使用`.rejected.json`标识，正常快照容量轮转不得删除它，沿共同1GiB预算和七天读取期限，容量政策由settings-database.md所有。
 - 拒绝快照的body为空字符串、headers为空数组、original_body_bytes/original_body_sha256为null；实际入口只位于ingress。cc_prepared与wire_final阶段为unavailable，不创建上游attempt，不保存运行时错误全文。Python读取器和runtime_bridge同时识别该阶段并保持账号归属验证。
 - 请求级摘要保留当前选择对应的拒绝归属；重新选择账号和最终成功时清除过期拒绝摘要。管理员页面显示固定原因、采集状态和“查看入站请求”；默认展示入口，未发生的组装阶段保持缺口。旧记录缺字段继续可读。
 

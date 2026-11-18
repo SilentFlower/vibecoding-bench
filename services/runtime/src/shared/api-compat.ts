@@ -1,5 +1,23 @@
-import type { ContextInput, JsonObject } from './contracts';
+import type { ContextInput, JsonObject, MessageBody } from './contracts';
 import { BridgeError, isObject } from './errors';
+import { prepareNativeBody, readNativeInput } from './native-input';
+
+/** 将普通API的消息级system原位交给上游，身份和billing取自同次SDK。
+ * @param requested 已通过普通API结构校验的请求。
+ * @param generated 同次SDK生成的发送上下文。
+ * @param sourceVersion 当前固定源版本。
+ * @return 保留消息顺序、轮次配置和缓存位置的发送正文。
+ */
+export function prepareApiSystemMessages(requested: MessageBody, generated: JsonObject, sourceVersion: '2.1.280' | '2.1.293' = '2.1.293'): JsonObject {
+  const attribution = readNativeInput(generated, 'local_base_url', sourceVersion);
+  if (!attribution || attribution.billingIndex < 0 || !Array.isArray(generated.system)) throw new BridgeError('native_identity', '无法取得同次SDK归因上下文', 503);
+  const body = structuredClone(requested);
+  // CLI的历史构造器只接受user/assistant；借用发送上下文后原位保留API的system，避免降级为user或提前生效。
+  const system = body.system === undefined ? generated.system : [generated.system[attribution.billingIndex], ...(typeof body.system === 'string' ? [{ type: 'text', text: body.system }] : body.system)];
+  const result: MessageBody = { ...(typeof generated.max_tokens === 'number' ? { max_tokens: generated.max_tokens } : {}), ...body, metadata: generated.metadata, system, tools: body.tools ?? [] };
+  // 复用同次上下文的CCH占位处理，不能把种子正文的已计算值带到真实API正文。
+  return prepareNativeBody(result, generated.metadata, 'local_base_url', generated.system, sourceVersion);
+}
 
 function keys(value: JsonObject, allowed: string[]): void {
   if (Object.keys(value).some(key => !allowed.includes(key))) throw new BridgeError('unsupported_parameter', 'context_management 包含当前版本未支持的字段', 422);

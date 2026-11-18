@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { HeaderPair, JsonObject, PreparedInput, RuntimePayload } from '../../shared/contracts';
 import { BridgeError, isObject, type NativeRejectionReason } from '../../shared/errors';
-import { applyContextManagement } from '../../shared/api-compat';
+import { applyContextManagement, prepareApiSystemMessages } from '../../shared/api-compat';
 import { Redactor } from '../../control/redaction';
 import type { NativeBindings, NativeMessage, NativeRecord } from './native';
 import { isNativeModelCall, prepareCli } from './cli';
@@ -265,6 +265,8 @@ export async function runNativeJob(prepared: PreparedInput, bindings: NativeBind
   redactor.register({ api_key: process.env.ANTHROPIC_API_KEY, token: process.env.CLAUDE_CODE_OAUTH_TOKEN });
   const { api } = bindings;
   const native = prepared.input.inputFormat === 'claude_code';
+  const apiSystemMessages = !native && prepared.input.body.messages.some(message => message.role === 'system');
+  const preserveMessages = native || apiSystemMessages;
   const attribution = native ? readNativeInput(prepared.input.body, prepared.input.nativeIngressPolicy, bindings.sourceVersion, prepared.input.headers) : null;
   let seedContent: string | JsonObject[] = '初始化本次原生发送上下文';
   if (attribution?.billingIndex === -1) {
@@ -273,7 +275,7 @@ export async function runNativeJob(prepared: PreparedInput, bindings: NativeBind
     if (!seedContent.length) throw new BridgeError('invalid_native_request', '缺少billing的CLI请求需要首条用户文本以生成归因后缀', 422, 'native_billing_invalid');
   }
   // 原生正文已经包含业务提示词和历史。种子仅取得同一账号的发送上下文，其正文不会进入上游。
-  const construction: PreparedInput = native ? { ...prepared, input: { ...prepared.input, inputFormat: 'api', body: { model: prepared.input.body.model, messages: [{ role: 'user', content: seedContent }], stream: prepared.input.body.stream === true } } } : prepared;
+  const construction: PreparedInput = preserveMessages ? { ...prepared, input: { ...prepared.input, inputFormat: 'api', body: { model: prepared.input.body.model, messages: [{ role: 'user', content: seedContent }], stream: prepared.input.body.stream === true } } } : prepared;
   let resolveResponse!: (response: Response) => void;
   let rejectResponse!: (error: unknown) => void;
   const responseReady = new Promise<Response>((resolve, reject) => { resolveResponse = resolve; rejectResponse = reject; });
@@ -284,12 +286,15 @@ export async function runNativeJob(prepared: PreparedInput, bindings: NativeBind
     try {
       if (++calls !== 1) throw new Error('首版禁止隐式模型重试');
       const headers = generated.headers;
+      if (preserveMessages) {
+        const beta = prepared.headers.filter(([name]) => name.toLowerCase() === 'anthropic-beta').map(([, value]) => value).join(',');
+        if (beta) headers.set('anthropic-beta', beta);
+      }
       if (native) {
         generated.body = prepareNativeBody(prepared.input.body, generated.body.metadata, prepared.input.nativeIngressPolicy, generated.body.system, bindings.sourceVersion, prepared.input.headers);
         init.body = JSON.stringify(generated.body);
-        const beta = prepared.headers.filter(([name]) => name.toLowerCase() === 'anthropic-beta').map(([, value]) => value).join(',');
-        if (beta) headers.set('anthropic-beta', beta);
       } else {
+        if (apiSystemMessages) generated.body = prepareApiSystemMessages(prepared.input.body, generated.body, bindings.sourceVersion);
         // 官方 SDK 决定能力头；显式历史管理只在同次能力允许时进入最终正文。
         generated.body = applyContextManagement(prepared.input.body, generated.body, headers);
         init.body = JSON.stringify(generated.body);
@@ -299,7 +304,7 @@ export async function runNativeJob(prepared: PreparedInput, bindings: NativeBind
       for (const [name, value] of prepared.headers) {
         const lower = name.toLowerCase();
         if (lower === 'anthropic-beta') {
-          if (native) continue;
+          if (preserveMessages) continue;
           const nativeTokens = new Set((headers.get(name) ?? '').split(','));
           if (value.split(',').map(x => x.trim()).some(token => !nativeTokens.has(token))) unsupported('当前原生参数无法表达请求携带的 anthropic-beta');
           continue;
@@ -350,7 +355,7 @@ export async function runNativeJob(prepared: PreparedInput, bindings: NativeBind
       rejectResponse(error);
       throw error;
     }
-  }, native ? 'transport_context' : 'business').catch(error => { rejectResponse(error); });
+  }, preserveMessages ? 'transport_context' : 'business').catch(error => { rejectResponse(error); });
   let status = 0;
   let finalState: 'success' | 'http_error' | 'canceled' = 'success';
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;

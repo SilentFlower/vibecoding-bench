@@ -16,14 +16,16 @@ function fixture(): MessageBody {
 
 describe('固定官方源版本的原生入站合同', () => {
   test('无billing的280/293 CLI经联合证据识别，空system轮次控制及缓存保持', () => {
-    for (const version of ['2.1.280', '2.1.293'] as const) for (const entry of ['cli', 'sdk-cli', 'claude-vscode']) {
+    for (const version of ['2.1.280', '2.1.293'] as const) for (const entry of ['cli', 'sdk-cli', 'claude-vscode']) for (const identity of ["You are Claude Code, Anthropic's official CLI for Claude.", "You are a Claude agent, built on Anthropic's Claude Agent SDK."]) {
       const body = fixture();
-      body.system = [{ type: 'text', text: "You are Claude Code, Anthropic's official CLI for Claude.", cache_control: marker }, ...(body.system as Record<string, unknown>[]).slice(1)];
+      body.system = [{ type: 'text', text: identity, cache_control: marker }, ...(body.system as Record<string, unknown>[]).slice(1)];
       body.messages[1] = { role: 'system', content: [], output_config: { effort: 'high' } };
       const headers: [string, string][] = [['user-agent', 'claude-cli/' + version + ' (external, ' + entry + ')']];
       const before = structuredClone(body);
       expect(() => parseInput(body, headers, 'strict', version)).toThrow();
       expect(() => parseInput(body, [], 'local_base_url', version)).toThrow();
+      expect(() => parseInput(body, [...headers, ...headers], 'local_base_url', version)).toThrow();
+      expect(() => parseInput({ ...body, system: [{ type: 'text', text: identity + ' altered' }] }, headers, 'local_base_url', version)).toThrow();
       expect(() => parseInput({ ...body, metadata: { user_id: '{}' } }, headers, 'local_base_url', version)).toThrow('结构不合法');
       expect(() => parseInput({ ...body, system: [{ type: 'text', text: '普通业务system' }] }, headers, 'local_base_url', version)).toThrow();
       expect(() => parseInput(body, headers, 'local_base_url', version === '2.1.280' ? '2.1.293' : '2.1.280')).toThrow('版本不一致');

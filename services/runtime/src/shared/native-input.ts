@@ -3,6 +3,7 @@ import { BridgeError, isObject, type NativeRejectionReason } from './errors';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const BILLING = /^\s*x-anthropic-billing-header:/;
+const NATIVE_IDENTITIES = new Set(["You are Claude Code, Anthropic's official CLI for Claude.", "You are a Claude agent, built on Anthropic's Claude Agent SDK."]);
 const CONTROL_FIELDS = new Set(['settings', 'claude_settings', 'env', 'extra_headers', 'extra_body', 'headers', 'proxy_url', 'api_key', 'oauth_token', 'claude_binary', 'claude_home', 'claude_config_dir', 'workdir']);
 
 /** 已选官方源版本的原生正文归因证据。
@@ -35,7 +36,7 @@ export function readNativeInput(body: JsonObject, policy: NativeIngressPolicy = 
     const first = Array.isArray(system) ? system[0] : undefined;
     const agents = incomingHeaders.filter(([name]) => name.toLowerCase() === 'user-agent').map(([, value]) => value);
     const cli = agents.length === 1 ? /^claude-cli\/(2\.1\.(?:280|293)) \(external, (?:cli|sdk-cli|claude-vscode)(?:, agent-sdk\/[0-9A-Za-z.+-]+)?\)$/.exec(agents[0]!) : null;
-    if (policy !== 'local_base_url' || !cli || !isObject(first) || first.type !== 'text' || first.text !== "You are Claude Code, Anthropic's official CLI for Claude.") return null;
+    if (policy !== 'local_base_url' || !cli || !isObject(first) || first.type !== 'text' || typeof first.text !== 'string' || !NATIVE_IDENTITIES.has(first.text)) return null;
     if (cli[1] !== sourceVersion) invalid('CLI来源与本次固定运行时版本不一致', 'native_version_mismatch');
   } else if (!Array.isArray(system) || candidates.length !== 1 || candidates[0]!.index !== 0) invalid('原生 system 必须包含唯一且位于首段的 billing 文本块');
   const { block, index } = candidates[0] ?? { block: undefined, index: -1 };

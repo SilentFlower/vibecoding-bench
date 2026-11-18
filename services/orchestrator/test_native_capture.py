@@ -13,6 +13,31 @@ from unittest.mock import patch
 class NativeCaptureTests(unittest.TestCase):
     """用合成快照验证归属、链接和读取边界。"""
 
+    def test_protected_rejected_capture_is_readable_and_expires(self):
+        """拒绝证据沿原归属与七天期限读取，后台清理识别独立文件名。@return None。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            directory = root / 'flows/api/cc-prepared'
+            directory.mkdir(parents=True)
+            capture_id, now = str(uuid.uuid4()), int(time.time() * 1000)
+            path = directory / (capture_id + '.rejected.json')
+            value = {'schema_version': 1, 'stage': 'ingress_rejected', 'account_id': 7,
+                'attempt_id': capture_id, 'captured_at_ms': now, 'headers': [], 'body': '',
+                'original_body_bytes': None, 'original_body_sha256': None}
+            path.write_text(json.dumps(value))
+            self.assertEqual(read_capture(root, 7, capture_id, now_ms=now), value)
+            with self.assertRaises(ValueError):
+                read_capture(root, 8, capture_id, now_ms=now)
+            with self.assertRaises(CaptureExpired):
+                read_capture(root, 7, capture_id, now_ms=now + RETENTION_MS + 1)
+            self.assertTrue(path.exists())
+            self.assertEqual(sum(row['deleted'] for row in cleanup_captures(root, 7,
+                now_ms=now + RETENTION_MS + 1)), 1)
+            self.assertFalse(path.exists())
+            path.symlink_to(root / 'outside')
+            with self.assertRaises(OSError):
+                read_capture(root, 7, capture_id)
+
     def test_rejected_ingress_is_readable_and_cannot_claim_outbound_evidence(self):
         """拒绝快照保持账号归属，并拒绝伪造的组装和TLS正文。@return None。"""
         with tempfile.TemporaryDirectory() as temporary:

@@ -44,7 +44,7 @@ request_id 可省略，使用 1–128 位字母、数字、连字符、下划线
 
 服务端显式启用 `local_base_url` 的实例允许与本次运行时精确匹配的 280／293，以及 `cli`、`sdk-cli`、`claude-vscode` 入站。billing 可以省略 CCH；存在时仍须唯一且有效。该策略只来自启动配置，不能用 HTTP 正文、信封或头部打开。普通启动继续使用上述严格合同。
 
-完全缺少 billing 时，兼容识别还要求唯一原始 `User-Agent` 为同版本的 `claude-cli/<version> (external, cli|sdk-cli|claude-vscode)`（可带 agent-sdk 版本）、system 首段为精确官方 CLI 身份文本，以及完整合法的 `metadata.user_id` JSON 身份。UA 只用于接入格式归因，不替代入口鉴权。通过后保留对话内 system、空 content 数组、消息级 output_config 和缓存标记。只携带 UA 的普通 API 继续走普通合同。
+完全缺少 billing 时，兼容识别还要求唯一原始 `User-Agent` 为同版本的 `claude-cli/<version> (external, cli|sdk-cli|claude-vscode)`（可带 agent-sdk 版本）、system 首段为精确官方 CLI 或 Agent SDK 身份文本，以及完整合法的 `metadata.user_id` JSON 身份。SDK 身份为 `You are a Claude agent, built on Anthropic's Claude Agent SDK.`。UA 只用于接入格式归因，不替代入口鉴权。通过后保留对话内 system、空 content 数组、消息级 output_config 和缓存标记。只携带 UA 的普通 API 继续走普通合同。
 
 缺失的 billing 从同次 SDK 上下文生成基础归因，后缀以首条用户文本构造并由回环独立复算；不复制种子的轮次计数。原有 system 段保持相对顺序。消息断点策略与强制 1h／5m TTL 覆盖继续在发送前统一执行，最终 CCH 基于改写后正文生成。
 
@@ -61,7 +61,7 @@ TLS 接收端实收并独立核验后，第二段仅将根 model 映射为 deeps
 | 字段 | 首版行为 |
 | --- | --- |
 | model | 必填；由实际官方构造器处理 |
-| messages | 必填；user / assistant，文本或内容块数组 |
+| messages | 必填；user / assistant / system，文本或内容块数组；system 可携带 output_config 和 clear_at |
 | system | 省略使用 CLI 默认正文；显式文本或仅含 type/text 的文本块完整替换正文，对应 --system-prompt；空文本与空数组同样是替换 |
 | tools | 省略或 [] 均无工具；非空数组为完整列表，不加入 CC 内置、延迟或搜索工具；schema 经原生 extraToolSchemas 输入 |
 | tool_choice | 交给实际原生构造，不在入口根据工具列表或 thinking 组合提前拒绝 |
@@ -78,7 +78,9 @@ TLS 接收端实收并独立核验后，第二段仅将根 model 映射为 deeps
 
 历史管理的 thinking 指令只能位于 edits 首项且最多一次；keep 支持 all 或 {type:"thinking_turns",value:正整数}，同次请求须启用 enabled/adaptive thinking。工具清理支持 trigger（input_tokens/tool_uses）、keep（tool_uses）、clear_at_least（input_tokens），计数为非负安全整数；exclude_tools 为非空工具名字符串数组，clear_tool_inputs 为布尔值。未知策略或字段返回 422，结构不合法返回 400。
 
-普通 API 的显式 system cache_control、top_p、stop_sequences 和未登记正文/消息字段当前不支持，返回明确错误。未知 JSON 字段采用拒绝策略；未登记请求头采用删除并记录原因的白名单策略。完整原生 billing 由上一节的独立分支处理。
+普通 API 包含消息级 system 时，保留 messages 的原始顺序、空内容、消息级 output_config、clear_at 和缓存位置。复用同次 SDK 发送上下文及身份，显式根 system 保留文本块和 cache_control；种子消息不会外发，CCH 经原生传输按最终正文生成。入站 anthropic-beta 原样保留；模型与 beta 能力由上游判断。平台网关的 allow_system_role_models 仍在运行时之前控制模型准入。消息级 effort 需要 mid-conversation-output-config-2026-07-01，clear_at 需要 mid-conversation-system-clear-at-2026-08-21，不自动添加 beta。
+
+普通 API 不含消息级 system 时，显式 system cache_control 仍沿原构造限制。top_p、stop_sequences 和未登记正文/消息字段当前不支持，返回明确错误。未知 JSON 字段采用拒绝策略；未登记请求头采用删除并记录原因的白名单策略。完整原生 billing 由上一节的独立分支处理。
 
 省略模型可选参数时，采用 CLI 根据当前模型与配置计算的 thinking、effort 和输出预算；不再固定关闭 thinking。普通 API 的显式 {"type":"disabled"} 被原生省略时由桥接补齐，额外字段及原生已有不同值不能套用这项适配。显式 enabled thinking 若被模型原生规则转换成 adaptive，也会因无法原样表达而返回 422。完整原生 CC 正文仍保持原值；最终发送该字段不保证自定义池遵守关闭，响应原样返回。
 

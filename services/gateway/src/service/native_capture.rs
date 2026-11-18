@@ -25,8 +25,7 @@ use crate::service::native_contract::NativeSubmission;
 
 const BODY_LIMIT: usize = 2 * 1024 * 1024;
 const HEADER_LIMIT: usize = 128 * 1024;
-const FILE_LIMIT: usize = 50;
-const STORAGE_LIMIT: u64 = 100 * 1024 * 1024;
+const STORAGE_LIMIT: u64 = 1024 * 1024 * 1024;
 static WRITERS: Semaphore = Semaphore::const_new(2);
 static STORAGE: Mutex<()> = Mutex::new(());
 
@@ -775,7 +774,10 @@ fn append_wire(value: &mut Value, wire: &Value, secrets: &[String]) -> io::Resul
 fn save(directory: &Path, submission: &NativeSubmission, payload: &Value) -> io::Result<()> {
     let id =
         Uuid::parse_str(&submission.request.request_id).map_err(|_| io::ErrorKind::InvalidInput)?;
-    let bytes = serde_json::to_vec(&snapshot(submission, payload)?)?;
+    let value = snapshot(submission, payload)?;
+    let rejected = value["stage"] == "ingress_rejected";
+    let suffix = if rejected { ".rejected.json" } else { ".json" };
+    let bytes = serde_json::to_vec(&value)?;
     if bytes.len() > 6 * 1024 * 1024 {
         return Err(io::ErrorKind::InvalidData.into());
     }
@@ -787,7 +789,7 @@ fn save(directory: &Path, submission: &NativeSubmission, payload: &Value) -> io:
     #[cfg(unix)]
     fs::set_permissions(directory, fs::Permissions::from_mode(0o700))?;
     // 初始250ms慢写可能晚于最终采集完成；同一把锁内保留更完整的同请求证据。
-    let destination = directory.join(format!("{id}.json"));
+    let destination = directory.join(format!("{id}{suffix}"));
     {
         let mut options = OpenOptions::new();
         options.read(true);
@@ -839,7 +841,7 @@ fn save(directory: &Path, submission: &NativeSubmission, payload: &Value) -> io:
             && path
                 .file_stem()
                 .and_then(|name| name.to_str())
-                .is_some_and(|name| Uuid::parse_str(name).is_ok())
+                .is_some_and(|name| Uuid::parse_str(name.trim_end_matches(".rejected")).is_ok())
         {
             let metadata = match fs::symlink_metadata(&path) {
                 Ok(metadata) => metadata,
@@ -849,16 +851,22 @@ fn save(directory: &Path, submission: &NativeSubmission, payload: &Value) -> io:
             if !metadata.is_file() {
                 return Err(io::ErrorKind::InvalidData.into());
             }
-            files.push((metadata.modified()?, path, metadata.len()));
+            let protected = path
+                .file_stem()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.ends_with(".rejected"));
+            files.push((protected, metadata.modified()?, path, metadata.len()));
         }
     }
-    files.sort_by_key(|(modified, _, _)| *modified);
-    let mut total: u64 = files.iter().map(|(_, _, length)| length).sum();
-    let mut count = files.len();
-    // 写入前腾出空间，保证并发快照共享同一数量及字节上限。
-    for (_, path, length) in files {
-        if count < FILE_LIMIT && total + bytes.len() as u64 <= STORAGE_LIMIT {
+    // 拒绝证据优先于正常快照；正常请求不能通过容量轮转清掉失败入站。
+    files.sort_by_key(|(protected, modified, _, _)| (*protected, *modified));
+    let mut total: u64 = files.iter().map(|(_, _, _, length)| length).sum();
+    for (protected, _, path, length) in files {
+        if total + bytes.len() as u64 <= STORAGE_LIMIT {
             break;
+        }
+        if protected && !rejected {
+            continue;
         }
         // 独立的按天清理可能已回收该旧文件，缺失仍代表空间已释放。
         match fs::remove_file(path) {
@@ -866,8 +874,10 @@ fn save(directory: &Path, submission: &NativeSubmission, payload: &Value) -> io:
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => return Err(error),
         }
-        count -= 1;
         total -= length;
+    }
+    if total + bytes.len() as u64 > STORAGE_LIMIT {
+        return Err(io::ErrorKind::Other.into());
     }
     let temporary = directory.join(format!("{id}.tmp"));
     let mut options = OpenOptions::new();
@@ -877,7 +887,7 @@ fn save(directory: &Path, submission: &NativeSubmission, payload: &Value) -> io:
     let result = (|| {
         let mut file = options.open(&temporary)?;
         file.write_all(&bytes)?;
-        fs::rename(&temporary, directory.join(format!("{id}.json")))
+        fs::rename(&temporary, destination)
     })();
     if result.is_err() {
         let _ = fs::remove_file(temporary);
@@ -983,7 +993,7 @@ mod tests {
         let directory = std::env::temp_dir().join(format!("native-rejected-{}", Uuid::new_v4()));
         let result = record(directory.to_str(), &submission, &payload, None).await;
         assert!(matches!(result.as_str(), "saved" | "timeout"));
-        let path = directory.join(format!("{}.json", submission.request.request_id));
+        let path = directory.join(format!("{}.rejected.json", submission.request.request_id));
         for _ in 0..100 {
             if path.exists() {
                 break;
@@ -1418,7 +1428,7 @@ mod tests {
             submission.request.request_id = Uuid::new_v4().to_string();
             save(&directory, &submission, &payload).unwrap();
         }
-        assert_eq!(fs::read_dir(&directory).unwrap().count(), FILE_LIMIT);
+        assert_eq!(fs::read_dir(&directory).unwrap().count(), 51);
         let metadata =
             fs::metadata(directory.join(format!("{}.json", submission.request.request_id)))
                 .unwrap();
@@ -1429,7 +1439,7 @@ mod tests {
             let path = directory.join(format!("{}.json", Uuid::new_v4()));
             fs::File::create(path)
                 .unwrap()
-                .set_len(60 * 1024 * 1024)
+                .set_len(STORAGE_LIMIT / 2 + 1)
                 .unwrap();
         }
         submission.request.request_id = Uuid::new_v4().to_string();
@@ -1445,6 +1455,51 @@ mod tests {
             record(invalid.to_str(), &submission, &payload, None).await,
             "failed"
         );
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// 正常请求容量轮转只回收正常快照，拒绝入站优先保留且总量仍有界。
+    /// @return 无；正常流量挤掉拒绝证据或超出总量时失败。
+    #[test]
+    fn normal_snapshots_cannot_evict_rejected_ingress() {
+        let directory = std::env::temp_dir().join(format!("native-capture-{}", Uuid::new_v4()));
+        let mut submission = submission();
+        let rejected = json!({"type":"error","error":"private-error"});
+        save(&directory, &submission, &rejected).unwrap();
+        let protected = directory.join(format!("{}.rejected.json", submission.request.request_id));
+        let payload = json!({"headers":[],"body":"{}"});
+        for _ in 0..2 {
+            let path = directory.join(format!("{}.json", Uuid::new_v4()));
+            fs::File::create(path)
+                .unwrap()
+                .set_len(STORAGE_LIMIT / 2 + 1)
+                .unwrap();
+        }
+        submission.request.request_id = Uuid::new_v4().to_string();
+        save(&directory, &submission, &payload).unwrap();
+        assert!(protected.exists());
+        // 拒绝证据占满预算时放弃正常副本，不影响业务也不删除失败证据。
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&protected)
+            .unwrap()
+            .set_len(STORAGE_LIMIT)
+            .unwrap();
+        submission.request.request_id = Uuid::new_v4().to_string();
+        assert!(save(&directory, &submission, &payload).is_err());
+        assert!(protected.exists());
+        save(&directory, &submission, &rejected).unwrap();
+        assert!(!protected.exists());
+        assert!(
+            directory
+                .join(format!("{}.rejected.json", submission.request.request_id))
+                .exists()
+        );
+        let total: u64 = fs::read_dir(&directory)
+            .unwrap()
+            .map(|entry| entry.unwrap().metadata().unwrap().len())
+            .sum();
+        assert!(total <= STORAGE_LIMIT);
         fs::remove_dir_all(directory).unwrap();
     }
 }

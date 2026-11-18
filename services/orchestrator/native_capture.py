@@ -128,7 +128,10 @@ def _validate_stage_details(value: dict) -> None:
 
 
 def _read(directory: int, account_id: int, attempt_id: str, now_ms: int) -> tuple[dict, os.stat_result]:
-    descriptor = os.open(attempt_id + '.json', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+    try:
+        descriptor = os.open(attempt_id + '.rejected.json', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+    except FileNotFoundError:
+        descriptor = os.open(attempt_id + '.json', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
     with os.fdopen(descriptor, 'rb') as source:
         metadata = os.fstat(source.fileno())
         if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > MAX_CAPTURE_BYTES:
@@ -194,7 +197,7 @@ def cleanup_captures(root: Path, account_id: int, *, now_ms: int | None = None,
             for entry in entries:
                 result = {'scanned': 1, 'deleted': 0, 'failed': 0}
                 try:
-                    attempt_id = entry.name.removesuffix('.json')
+                    attempt_id = entry.name.removesuffix('.json').removesuffix('.rejected')
                     if not entry.name.endswith('.json') or str(uuid.UUID(attempt_id)) != attempt_id:
                         yield result
                         continue

@@ -1501,7 +1501,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 环境锁阻止其它本地工作进入，更新 admission 覆盖整个操作。重建复用原 ensure，保留 HOME、画像、资源策略及已保存内核。原停止环境在核对后恢复停止状态，过程模型调用为零。
 - 指纹 `native_capture_enabled` 与实际 `native_capture_dir` 一致后返回成功。失败恢复原指纹并重新准备；恢复失败或租约释放不确定时置 reconcile，使用原环境维护对账。私有 `runtime/content-capture-operation.json` 保存操作与恢复状态。
 - prepare 回执丢失时按唯一 owner 重读并释放本次租约。占用/旧版本返回 409；文件、Docker 或连接故障返回受控 503；明确恢复/对账错误保持可见。
-- 开关只影响后续请求，与 request_diagnostics_log_mode 独立。既有脱敏、7 天、50 份、100 MiB、2 MiB 预览及最终 TLS 证据合同沿用。
+- 开关只影响后续请求，与 request_diagnostics_log_mode 独立。沿用脱敏、7天和2MiB预览；每账号共同容量1GiB，取消份数上限，拒绝入站优先保留。具体容量轮转及最终TLS证据合同由网关settings-database.md所有。
 
 ### 4. Validation & Error Matrix
 

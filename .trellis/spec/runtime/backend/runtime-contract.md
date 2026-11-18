@@ -73,6 +73,7 @@
 - parseInput(raw: unknown, incomingHeaders: HeaderPair[] = []): BridgeInput。
 - prepareInput(input: BridgeInput): PreparedInput。
 - `normalizeApiMetadata(body: JsonObject, context: ContextInput): void` 提取普通 API 会话并清理调用方身份；`validateContextManagement(value: unknown): void` 校验显式历史管理；`applyContextManagement(requested: JsonObject, generated: JsonObject, headers: Headers): JsonObject` 在同次原生构造后保留参数。
+- `prepareApiSystemMessages(requested: MessageBody, generated: JsonObject, sourceVersion='2.1.293'): JsonObject`为含消息级system的普通API保留原位消息，复用同次SDK身份、billing和默认max_tokens。
 - NativeEngine.run(prepared: PreparedInput, signal: AbortSignal, emit: (event: RuntimeEvent) => Promise<void>): Promise<void>。
 - Engine.close(): Promise<void>；workerPid: number | null 是只读状态，读取不启动进程。
 - verifyRuntime(path: string): Promise<VerifiedRuntime> 保留核验 FD；runtimeFileStamp(path: string): Promise<string> 用于暖复用；verifyExecutionImage(pid: number, identity: RuntimeIdentity): Promise<void> 独立核对内存执行体。
@@ -95,6 +96,7 @@
 - 控制配置中的显式 API key 使用官方本地规则只记录使用确认标识，不保存完整密钥；已有 rejected 决定返回 native_configuration/503，不改写拒绝状态。初始化、预热及测试不能因此触发真实账号登录或付费推理。
 - worker_ready 晚于原生绑定、Nst 与本地构造依赖初始化；本地初始化使用独立根，发送前中止，不发模型请求或业务事件，成本计入总启动时间。每轮经 nEr 创建全新原生根，AsyncLocalStorage/yLs 绑定作用域，再调用 t_；同 sessionId 也不能复用上一轮账本、请求日志及取消状态。
 - 普通 API 只支持 docs/api.md 登记的正文键。内部 Re/Kc 负责消息实体；原生规范化后的显式消息、工具、thinking 等必须保留，不可表达时拒绝。原生入站的扩展正文及必要改写另见后文合同。
+- 普通API的messages角色允许user/assistant/system；system可携带output_config对象或null、clear_at=next_user_message|never|null。含system时仅用SDK种子取得发送上下文，真实messages及根system缓存块保持原位，不经Re降级为user，不上提中途指令；inputFormat仍为api。只采用同次metadata、billing和缺省max_tokens，其他种子参数、fallback、工具和消息不进入业务正文。复用prepareNativeBody的CCH占位与真实传输封口，1h/5m覆盖仍在最终正文生效；入站beta原样保留，不自动添加。allow_system_role_models仍由前置网关控制模型准入。
 - 普通 API 的 metadata 必须为对象，user_id 若提供必须为字符串。先从 JSON session_id 或旧 user_…_session_… 提取明确会话，写入独立 context，再删除调用方 metadata，由同次 CLI 构造当前账号身份；会话与显式 context/头冲突返回400。完整原生分支仍仅替换 device_id/account_uuid并保留会话及扩展 metadata。
 - 普通 API 的 context_management 支持 edits 中 clear_thinking_20251015（仅首项一次，keep省略/all/thinking_turns正安全整数）和 clear_tool_uses_20250919（trigger=input_tokens/tool_uses、keep=tool_uses、clear_at_least=input_tokens，非负安全整数；exclude_tools为非空工具名数组，clear_tool_inputs为布尔值）。同次 SDK 生成 context-management-2025-06-27 beta 后才覆盖生成正文；thinking清理还要求同次 enabled/adaptive。显式省略沿用原生默认；构造快照、发送正文和最终 CCH使用同一覆盖结果。能力不足或未知策略/字段422，畸形结构400。
 - 普通 API 的 business 构造仅对完整对象恰为 thinking={type:'disabled'} 且原生结果缺失 thinking 的情况补齐原值，同步 result 与 init.body 后再做完整保留校验。省略保持原生默认；额外字段和原生已有不同值不适用补齐，不能静默删改。transport_context 种子与完整原生业务不应用此适配。cc_prepared、同次 Ree 实际发送及 TLS 哈希必须反映相同正文；上游仍返回 thinking 时原样保留，不过滤或重发。
@@ -119,7 +121,8 @@
 
 | 条件 | 行为 |
 | --- | --- |
-| 普通 API 不支持的正文键、system 缓存参数、beta 或原生无法保留的显式值 | 422，发送前拒绝 |
+| 普通 API 不支持的正文键，或不含消息级system时原构造无法保留的system缓存、beta、显式值 | 422，发送前拒绝 |
+| 普通API含消息级system及合法结构的effort/clear_at | 原位转发；模型和beta能力由上游判断，同次SDK身份缺失503 |
 | 上下文冲突、非法头、无效 promptId | 400 |
 | 普通 API metadata结构或历史管理结构错误 | 400；未知历史管理策略/字段、同次能力不足422，零业务发送 |
 | 普通 API 历史无可归属用户轮次 | unsupported_parameter/422，零业务发送 |
@@ -141,6 +144,7 @@
 
 - 正常：普通正文无来源上下文，生成 main，source=bridge-default；原生 metadata.user_id 内的 session_id、请求头和 billing 的 cc_prompt_id 关联一致。
 - 正常：普通API携带旧设备身份及有效session，先保留session再由当前账号生成身份；显式 clear_thinking 的 keep={type:"thinking_turns",value:2}覆盖SDK默认all。错误用法是直接把调用方metadata当作当前账号身份，或丢弃context_management后宣称支持；正确处理是按上述边界提取关联并原值保留已支持参数。
+- 正常：普通API的`{role:"system",content:[],output_config:{effort:"high"}}`保留原位并透传`mid-conversation-output-config-2026-07-01`；clear_at使用对应`mid-conversation-system-clear-at-2026-08-21`。错误用法是按CLI身份决定普通API能否使用system，或把中途system提前；正确处理是独立支持消息合同并保留生效位置。协议依据：[官方中途system](https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages)、[消息级effort](https://platform.claude.com/docs/en/build-with-claude/effort-per-message)。
 - 边界：子代理发生压缩，requestClass=compaction，仍保持子代理 agentContext 和父子关系。
 - 边界：26 MiB 请求和超过 50 秒的首响应等待保持可转发，日志可截断预览但保留原始字节数及哈希。不能把有限验收的预算或日志容量当作业务准入政策。
 - 错误用法：子代理只强行声明 requestClass=main；这样会使身份与 billing 矛盾。正确做法是保留 subagent 和真实关联，冲突明确拒绝。
@@ -162,6 +166,7 @@
 
 - tests/unit/header-policy.test.ts：未知头保留、动态 Connection 删除、凭据/原生请求 ID 归属、冲突与默认来源。
 - tests/unit/api-compat.test.ts：普通身份清理、JSON/旧格式会话、冲突、两类历史管理字段及畸形类型/能力拒绝；tests/native/native.test.ts在280/293原版回环核对显式历史管理、当前身份、原会话和最终CCH。桥接源码摘要包含api-compat.ts；发布新能力仍按既有构建、签署及精确制品准入流程。
+- 同两套测试覆盖普通API的system/空content/effort/clear_at与缓存原位保留、两版同次身份、种子字段不外发、已有CCH重置及TLS实收独立复算；未知角色、非system携带消息级配置及畸形结构继续拒绝。
 - tests/unit/profile.test.ts：错误二进制不执行、不回退。
 - tests/unit/engine.test.ts、worker-protocol.test.ts：同 PID 与哈希次数、文件替换、错归属/载荷覆盖、双终态/缺 idle、迟到帧、取消、背压和关闭；错误作业不得重放。
 - tests/native/native.test.ts：无外网 TLS 上游独立核对 CCH、metadata/session/prompt、六类请求、thinking/工具历史、非流式、HTTP/SSE 错误及取消后下一请求；实际模型发送次数必须符合 attempt=1。
@@ -480,7 +485,7 @@ bun scripts/benchmark-runtime.ts --binary /绝对路径/新产物 --reference /r
 ### 3. Contracts
 
 - local_base_url接纳与本次冻结版本一致的2.1.280/2.1.293.<三位十六进制>、cc_entrypoint=cli|sdk-cli|claude-vscode；CCH可以缺失，存在时必须恰好一个独立五位十六进制字段。扩展值内伪装cch=同样按歧义拒绝。
-- 完全缺少billing时联合核对：唯一原始UA为同版`claude-cli/<version> (external, cli|sdk-cli|claude-vscode)`，允许附带agent-sdk版本；system数组首段为精确`You are Claude Code, Anthropic's official CLI for Claude.`身份文本；metadata.user_id继续满足完整设备、账号及会话结构。仅UA不能改变普通API合同；版本冲突422。两版共享识别逻辑，各自使用同版SDK。
+- 完全缺少billing时联合核对：唯一原始UA为同版`claude-cli/<version> (external, cli|sdk-cli|claude-vscode)`，允许附带agent-sdk版本；system数组首段为精确CLI身份`You are Claude Code, Anthropic's official CLI for Claude.`或SDK身份`You are a Claude agent, built on Anthropic's Claude Agent SDK.`；metadata.user_id继续满足完整设备、账号及会话结构。仅UA不能改变接入归因；版本冲突422。两版共享识别逻辑，各自使用同版SDK。缺billing本身不代表子代理。
 - 联合识别通过后，对话内system、空content数组和消息级output_config保持原位。空system可以承载轮次控制，不应删除或统一上提为根system；模型是否允许system角色仍由网关原白名单决定。
 - 缺billing时以首条用户文本的文本块构造同次SDK归因上下文，基础cc_version后缀由实际SDK生成；不复制种子的cc_turn_index/cc_prompt_index等轮次计数。没有可用首条用户文本时明确422。新增billing位于根system首段，原system相对顺序保持；账号身份、会话和真实传输沿原路径。
 - 其他 billing、metadata、tools、thinking、上下文与本机控制字段规则不变。原始 HTTP 入站仍按原表示保存，不在日志前改写后声称是原文。

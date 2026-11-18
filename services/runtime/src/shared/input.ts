@@ -44,8 +44,12 @@ export function parseInput(raw: unknown, incomingHeaders: HeaderPair[] = [], nat
   if (typeof body.model !== 'string' || !body.model.trim()) throw new BridgeError('invalid_model', 'model 必须是非空字符串');
   if (!Array.isArray(body.messages) || body.messages.length === 0) throw new BridgeError('invalid_messages', 'messages 必须是非空数组');
   const messages: ApiMessage[] = body.messages.map((message: unknown) => {
-    if (!isObject(message) || !(native ? ['user', 'assistant', 'system'] : ['user', 'assistant']).includes(String(message.role))) throw new BridgeError('invalid_message', '消息 role 不属于当前接入类型支持的角色', 400, 'invalid_message_role');
-    if (!native) validateKeys(message, new Set(['role', 'content']), '消息');
+    if (!isObject(message) || !['user', 'assistant', 'system'].includes(String(message.role))) throw new BridgeError('invalid_message', '消息 role 不属于当前接入类型支持的角色', 400, 'invalid_message_role');
+    if (!native) {
+      validateKeys(message, new Set(message.role === 'system' ? ['role', 'content', 'output_config', 'clear_at'] : ['role', 'content']), '消息');
+      if (message.output_config !== undefined && message.output_config !== null && !isObject(message.output_config)) throw new BridgeError('invalid_parameter', '消息 output_config 必须是对象');
+      if (message.clear_at !== undefined && message.clear_at !== null && (typeof message.clear_at !== 'string' || !['next_user_message', 'never'].includes(message.clear_at))) throw new BridgeError('invalid_parameter', '消息 clear_at 不合法');
+    }
     if (typeof message.content !== 'string' && (!Array.isArray(message.content) || !message.content.every(isObject))) throw new BridgeError('invalid_content', '消息 content 必须是文本或内容块数组');
     return { ...message, role: message.role as ApiMessage['role'], content: message.content as ApiMessage['content'] };
   });

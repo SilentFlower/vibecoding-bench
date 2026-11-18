@@ -356,6 +356,30 @@ native('官方 ' + sourceVersion + ' 的无外网回环链路', () => {
       expect(JSON.parse(prepared.body.replace(/cch=[0-9a-f]{5}/g, 'cch=00000'))).toEqual(JSON.parse(actual.raw.replace(/cch=[0-9a-f]{5}/g, 'cch=00000')));
       expect(noBilling).toEqual(incoming);
       expect(requests.length - count).toBe(11);
+      for (const sdk of [true, false]) {
+        const body = nativeBody({ model: 'claude-opus-5-5', messages: [
+          { role: 'user', content: [{ type: 'text', text: '首轮问题' }] },
+          { role: 'system', content: '本轮系统指令', clear_at: 'next_user_message' },
+          { role: 'system', content: [], output_config: { effort: 'high' } },
+        ] });
+        body.system = [{ type: 'text', text: sdk ? "You are a Claude agent, built on Anthropic's Claude Agent SDK." : '普通API业务指令', cache_control: { type: 'ephemeral', ttl: '5m' } }];
+        if (!sdk) delete body.metadata;
+        const before = structuredClone(body);
+        const id = 'raw-system-messages-' + sdk;
+        const betas = 'mid-conversation-output-config-2026-07-01,mid-conversation-system-clear-at-2026-08-21';
+        await worker.send({ type: 'request_input', schema_version: 2, worker_id: workerId, request_id: id, cache_ttl_rewrite: '1h',
+          input: { schema_version: 1, request_id: id, body, headers: [['user-agent', 'claude-cli/' + sourceVersion + ' (external, sdk-cli, agent-sdk/0.2.0)'], ['anthropic-beta', betas]] } });
+        const events = await collect(id);
+        expect(events.at(-1)).toEqual(expect.objectContaining({ type: 'completed', state: 'success' }));
+        const actual = requests.at(-1)!;
+        expect(actual.body.messages).toEqual(before.messages);
+        expect((actual.body.system as unknown[]).slice(1)).toEqual([{ ...(before.system as Record<string, unknown>[])[0], cache_control: { type: 'ephemeral', ttl: '1h' } }]);
+        expect(new Headers(actual.headers).get('anthropic-beta')).toBe(betas);
+        expect(actual.body.metadata).toHaveProperty('user_id');
+        assertCch(actual.raw);
+        expect(body).toEqual(before);
+      }
+      expect(requests.length - count).toBe(13);
       await worker.send({ type: 'worker_shutdown', schema_version: 2, worker_id: workerId });
       expect(await worker.child.exited).toBe(0);
     } finally { await verified.handle.close(); await worker.close(); }
