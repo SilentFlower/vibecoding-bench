@@ -66,8 +66,39 @@ class WorkflowTests(unittest.TestCase):
         build_runs = [step.get('run', '') for step in self.workflow('v3-build.yml')['jobs']['build']['steps']]
         self.assertIn(runs[build], build_runs)
         validation = next(run for run in runs if 'verify_release_tests.py --python' in run)
-        self.assertIn(validation, build_runs)
+        self.assertTrue(any(validation in run for run in build_runs))
         self.assertIn('verify_database_definitions.py', validation)
+
+    def test_candidate_reuse_keeps_trusted_build_and_manual_publish_boundaries(self) -> None:
+        """候选仅由受信构建导出，复用跳过重复构建但兼容与签名继续阻断。:return: None。"""
+        build = self.workflow('v3-build.yml')['jobs']['build']['steps']
+        export = next(step for step in build if 'candidate_artifacts.py export' in step.get('run', ''))
+        upload = next(step for step in build if step['name'] == '上传可信候选产物')
+        for step in (export, upload):
+            for expected in ('SilentFlower/vibecoding-bench', 'refs/heads/v3', 'refs/heads/flower2api',
+                    "github.event_name == 'push'", "github.event_name == 'workflow_dispatch'"):
+                self.assertIn(expected, step['if'])
+            self.assertNotIn('pull_request', step['if'])
+        self.assertEqual(upload['with']['compression-level'], '0')
+        self.assertEqual(upload['with']['retention-days'], '1')
+        release = self.workflow('v3-release.yml')['jobs']['release']
+        full_build = self.workflow('v3-release.yml')['on']['workflow_dispatch']['inputs']['full_build']
+        self.assertEqual(full_build['type'], 'boolean')
+        self.assertEqual(full_build['default'], 'false')
+        self.assertEqual(release['permissions']['actions'], 'read')
+        steps = release['steps']
+        candidate = next(step for step in steps if step.get('id') == 'candidate')
+        self.assertEqual(candidate['if'], 'inputs.full_build != true')
+        self.assertNotIn('continue-on-error', candidate)
+        for step in steps:
+            run = step.get('run', '')
+            if 'verify_release_tests.py' in run or 'manage.py build' in run:
+                self.assertEqual(step['if'], "steps.candidate.outputs.reused != 'true'")
+                self.assertLess(steps.index(candidate), steps.index(step))
+            if 'verify_database_compatibility.py' in run or 'manage.py publish' in run or run.endswith('publish_system_release.py'):
+                self.assertNotIn('if', step)
+        diagnostic = next(step for step in steps if step.get('uses') == 'actions/upload-artifact@v4')
+        self.assertNotIn('v3-images.tar.gz', diagnostic['with']['path'])
 
     def test_legacy_main_publish_is_manual(self) -> None:
         """历史入口保留明确退役说明，写权限和镜像发布步骤归零。@return None。"""

@@ -269,14 +269,22 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 - `publish_system_release.check_signing_key() -> None`、`python3 deploy/flower2api/publish_system_release.py --check-signing`：核对实际手动入口和 Ed25519 签名配置。
 - `gh workflow run v3-build.yml --ref flower2api`：只构建验证。
 - `gh workflow run v3-release.yml --ref flower2api -f publish=true`：明确发布。
+- `gh workflow run v3-release.yml --ref flower2api -f publish=true -f full_build=true`：明确选择原完整验证和构建路径，`full_build:boolean`默认false。
+- `candidate_artifacts.py export --manifest PATH --output DIR`导出受信候选；`resolve --manifest PATH [--wait-seconds 1200]`核对并换批，输出`GITHUB_OUTPUT.reused=true|false`；等待参数为0至3600的整数。
+- `candidate.json`严格字段：`schema_version:1,repository,ref,revision,run_id,run_attempt,manifest,bundle`；两份文件描述均为`{name,size,sha256}`，名称固定为`v3-local.json`、`candidate-images.tar.gz`。
 
 ### 3. Contracts
 
 - 发版先预览、再执行。读取签名更新目录中的最新发行及其源码 SHA，并读取目标远端分支当前 SHA。按两者的实际提交和文件差异拟定版本及更新说明，区分用户可见改动、维护改动和候选之外的本地提交。预览应注明目标分支、候选 SHA、更新说明、数据库迁移或安装注意事项、验证状态及待确认范围。先展示完整说明，等待发起人确认本次版本和范围。
 - 经确认后，将预览的版本与说明写入并校验 `deploy/flower2api/platform-release.json`。若另建发版准备提交，推送前核实候选到最终发行 SHA 的新增差异仅为已确认的发行元数据和文档。触发发布前重新读取目标远端引用，确认它指向最终发行 SHA。候选内容、版本或说明变化时重新展示并确认。触发后核对 Action 的 `headSha`，偏离时立即尝试取消并核对实际远端发行状态。
 - 正式发行使用原签名流程。成功后核对 GitHub Release、受信目录、签名清单、版本说明和来源 SHA 对应一致。生产实例安装沿独立授权流程。
-- v3-build 的 push/目标 PR 分支为 v3、flower2api，另有手动构建。权限 contents:read，checkout 关闭持久凭据；仅测试、构建两镜像并上传本地清单，发布副作用为零。
-- v3-release 仅 workflow_dispatch；布尔 input `publish` 默认 false，必须明确选中。本仓 v3/flower2api 分支可发布，同一 runner 冻结实际 SHA 并重新验证构建，真实旧库兼容演练通过后才推镜像。只有发布 job 取得 contents/packages 写权限。
+- v3-build 的 push/目标 PR 分支为 v3、flower2api，另有手动构建。权限 contents:read，checkout 关闭持久凭据；测试、构建两镜像并上传本地清单，发布副作用为零。本仓受信分支的push/手动构建另保存`v3-candidate-<run_id>-<attempt>`，包含严格元数据、原清单和完整归档，保留一天、上传压缩级别为0；PR只保存原清单。
+- v3-release 仅 workflow_dispatch；布尔 input `publish` 默认 false，必须明确选中。本仓 v3/flower2api 分支可发布，同一runner冻结实际SHA；优先复用同源码候选，缺失、过期、失败或旧构建无候选时重新完整验证构建。真实旧库兼容演练通过后才推镜像。只有发布job取得contents/packages写权限，并通过actions:read核对候选。
+- 候选复用前核对干净checkout的HEAD、GitHub运行的仓库/原仓库ID、分支、SHA、工作流路径、run/attempt和归档来源。原`build`作业的合同校验、镜像构建、候选导出及上传四步均成功后即可复用，允许其缓存post继续执行。选定后来源/attempt变化、归档来源或摘要异常直接失败；API读取失败保持失败。未选中受信来源视为候选缺失，进入完整构建路径。
+- 下载先核对GitHub原始ZIP的SHA256，仅解包三份固定普通文件；重复成员、链接、路径穿越、未知成员、加密及超预算成员均拒绝。JSON读取沿原131072字节预算，镜像包沿原16GiB预算，文件名称、真实大小和SHA256逐项核对。产物读取API限60秒，归档下载限900秒，在途构建轮询默认预算1200秒。
+- 候选加载后沿原`inspect_images`核对两角色身份，再只重写`vibebench.release`为当前手动Action批次；完整Config除该标签外必须一致，RootFS及平台必须一致，ONBUILD非空拒绝构建。原镜像及正式目标标签均核对禁止覆盖，正式清单通过原批次校验和镜像核验后才独占发布；兼容演练绑定换批后的真实镜像。
+- 复用成功跳过重复合同测试、缓存恢复、原生资产下载和二进制构建。`full_build=true`跳过候选解析，并重新执行原完整链路。签名预检、真实兼容演练、发布命名空间和原手动run/attempt门禁对两条路径都保持强制。
+- 两路推送与离线gzip归档在全部标签预检并创建原started标记后并行执行；上下文等待全部作业退出，全部成功才原子交付最终包及完整清单。失败保留原attempt标记，最终交付路径不暴露临时包。大包只上传正式Release，Actions发行artifact保存诊断清单及兼容证据；签名发行与原子目录完成即具备安装条件，构建缓存post独立收尾。
 - 两个 Python 发布入口共用来源校验：`GITHUB_ACTIONS=true`、`GITHUB_EVENT_NAME=workflow_dispatch`、`V3_PUBLISH_CONFIRMED=true`、精确 repo/ref，以及 `GITHUB_WORKFLOW_REF=<repo>/.github/workflows/v3-release.yml@<ref>`。run/attempt 为正整数串、SHA 为40位小写hex；清单批次、revision和clean标记必须匹配。
 - 发布预检要求有效 `V3_SYSTEM_RELEASE_PRIVATE_KEY`，用实际 DER 格式确认 Ed25519。缺配置/错误类型在构建及推送前失败。签名私钥仅供手动发布侧使用。
 - 工作流拆分后的 run_number 不用作发行序号；从同信任根已验签目录主序号最大值加1，第二项使用实际 attempt。历史目录按签发时刻校验原合同，主序号达到2^53-1时拒绝新发行。完整附件后才普通 fast-forward 推进目录，保留原版本递增与批次不可覆盖规则。
@@ -297,12 +305,21 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 | 历史签名损坏或序号达到上限 | 正式发行写入前失败 |
 | 附件上传或目录并发推送失败 | 原目录受保护，已完成事实保留，无force覆盖 |
 | 更新器源码包缺直接依赖 | 独立导入回归失败 |
+| 无候选、候选过期、旧构建或已失败构建 | 原完整校验和构建；继续执行全部兼容、发布与签名门禁 |
+| 必要步骤未完成、候选仍在构建 | 轮询等待；超过预算以非零状态退出 |
+| 候选来源/attempt漂移、GitHub ZIP或文件摘要不符、非法成员 | 失败，拒绝加载或发布；显式full_build可重新运行完整链路 |
+| 候选包含ONBUILD、换批改变运行配置或文件层、正式标签已占用 | 失败，完整正式清单保持未发布 |
+| 任一路推送或打包失败 | 等待其余作业收口，保留started标记，换新attempt重跑 |
 
 ### 5. Scenarios and Examples
 
 正常：读取签名基线和目标远端候选→展示补丁版本与说明→确认→校验并推送发行元数据→核对远端 SHA 后手动发布→核验发行与签名目录→原 v3 管理员按独立授权检查并安装。
 
 边界：迁移通道首发承接原v1签名历史，并在原序号之后生成新序号。
+
+正常：构建run123/attempt1产生同SHA候选，核心步骤成功后发布run456/attempt2可在原缓存post期间读取；只把镜像批次改为`ci-456-2`，沿原校验、兼容及签名发布。
+
+错误用法：仅凭产物名称或同SHA就直接加载，或复用原构建的批次绕开手动发布校验。正确处理：核对GitHub来源、步骤和原始归档摘要，再换为当前发布批次并运行真实兼容演练。
 
 错误用法：仅修改flower2api中的工作流就宣称v3/main远端自动发布已关闭。正确处理：将精确修复同步至各目标分支并分别验证实际触发规则。
 
@@ -312,6 +329,8 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 - 发版预检：核对上一份已签名发行及其源码、实际远端候选、版本递增与完整说明；使用 `platform_version.read_version` 和 `signed_changes` 检查预览与元数据投影一致。发布后核对同批发行、运行源码及受信目录。
 - test_publication：两分支手动来源通过，自动/未确认/错误入口零Docker副作用，原批次与digest保护成立。
+- `test_system_candidate_build`覆盖PR/外仓/错分支/脏源码拒绝，步骤未完成、来源变化、重复/过期产物、归档摘要及ZIP路径/类型/大小、完整构建回退和发布错误脱敏。真实Docker开关`FLOWER2API_CANDIDATE_DOCKER=1`核对导出、移除原镜像、API选择、ZIP加载和换批后的RootFS、Config及原标签保留。
+- `test_publication`三方屏障证明两路推送与归档并行，原失败/半批次保护继续通过；`test_system_workflow`覆盖复用和full_build两条路径的门禁及条件，真实GitHub小归档核对API摘要合同，actionlint检查两个实际workflow。
 - test_system_publish：真实临时签名、高历史序号、迁移通道首发继承、签名损坏、目录竞争和安全整数上限。
 - test_system_workflow：实际YAML事件、权限、零发布步骤、签名预检/兼容演练顺序，以及固定源码包仓库外独立导入。CI测试依赖固定PyYAML 6.0.3。
 - actionlint覆盖三个工作流；原系统更新、双库合同及宿主恢复回归继续通过。

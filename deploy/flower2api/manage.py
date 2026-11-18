@@ -19,6 +19,7 @@ import uuid
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from source_layout import source_path
 from stat import S_ISREG, S_ISSOCK
@@ -671,6 +672,50 @@ def _check_local_reference(reference: str, expected: dict) -> None:
         raise ValueError("无法核对本地镜像，拒绝继续")
 
 
+def save_image_bundle(references: list[str], bundle_path: Path) -> dict:
+    """独占生成同批镜像归档，复用候选交付与正式发布的相同格式。
+
+    :param references: 已核对且固定的镜像引用。
+    :param bundle_path: 全新归档路径。
+    :return: 归档名称、大小和原始字节摘要。
+    """
+    bundle_path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=bundle_path.name + ".", dir=bundle_path.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as output:
+            process = subprocess.Popen(["docker", "save", *references], cwd=REPO, stdout=subprocess.PIPE)
+            try:
+                with gzip.GzipFile(fileobj=output, mode="wb", compresslevel=1, mtime=0) as archive:
+                    shutil.copyfileobj(process.stdout, archive, length=1024 * 1024)
+                if process.wait() != 0:
+                    raise ValueError("同批镜像包生成失败")
+                output.flush()
+                os.fsync(output.fileno())
+            finally:
+                process.stdout.close()
+                if process.poll() is None:
+                    process.terminate()
+                    process.wait()
+        os.link(temporary, bundle_path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+    return {"name": bundle_path.name, "sha256": _file_sha256(bundle_path), "size": bundle_path.stat().st_size}
+
+
+def _push_image(entry: dict, reference: str) -> dict:
+    """推送一个已固定角色并核对真实仓库摘要。"""
+    command("docker", "push", reference)
+    info = json.loads(command("docker", "image", "inspect", reference, capture=True))[0]
+    repository = reference.rsplit(":", 1)[0]
+    digests = {value[len(repository) + 1:] for value in info.get("RepoDigests", [])
+        if value.startswith(repository + "@")}
+    if info["Id"] != entry["digest"] or len(digests) != 1 or not re.fullmatch(r"sha256:[0-9a-f]{64}", next(iter(digests), "")):
+        raise ValueError("推送后镜像配置 ID 或仓库 digest 无法核对")
+    return {**entry, "reference": reference,
+        "config_digest": entry.get("config_digest") or _image_config_digest(entry["reference"]),
+        "registry_digest": next(iter(digests))}
+
+
 def publish(manifest_path: Path, output_path: Path, bundle_path: Path,
             namespace: str = "ghcr.io/silentflower") -> dict:
     """将当前 v3 Action 的同批镜像发布到 GHCR，最后才生成完整交付清单。
@@ -702,41 +747,18 @@ def publish(manifest_path: Path, output_path: Path, bundle_path: Path,
         {"release": manifest["release"], "parent_revision": manifest["parent_revision"]})
     published = {**manifest, "images": {}}
     for role, reference in references.items():
-        entry = manifest["images"][role]
-        command("docker", "tag", entry["reference"], reference)
-        command("docker", "push", reference)
-        info = json.loads(command("docker", "image", "inspect", reference, capture=True))[0]
-        repository = reference.rsplit(":", 1)[0]
-        digests = {value[len(repository) + 1:] for value in info.get("RepoDigests", [])
-            if value.startswith(repository + "@")}
-        if info["Id"] != entry["digest"] or len(digests) != 1 or not re.fullmatch(r"sha256:[0-9a-f]{64}", next(iter(digests), "")):
-            raise ValueError("推送后镜像配置 ID 或仓库 digest 无法核对")
-        config_digest = entry.get("config_digest") or _image_config_digest(entry["reference"])
-        published["images"][role] = {**entry, "reference": reference,
-            "config_digest": config_digest, "registry_digest": next(iter(digests))}
+        command("docker", "tag", manifest["images"][role]["reference"], reference)
     bundle_path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=bundle_path.name + ".", dir=bundle_path.parent)
-    process = None
-    try:
-        with os.fdopen(descriptor, "wb") as output:
-            process = subprocess.Popen(["docker", "save", *references.values()], cwd=REPO, stdout=subprocess.PIPE)
-            try:
-                # 联合包优先流式交付速度；低压缩级别保留原 gzip、摘要和离线恢复合同。
-                with gzip.GzipFile(fileobj=output, mode="wb", compresslevel=1, mtime=0) as archive:
-                    shutil.copyfileobj(process.stdout, archive, length=1024 * 1024)
-                if process.wait() != 0:
-                    raise ValueError("同批镜像包生成失败")
-                output.flush()
-                os.fsync(output.fileno())
-            finally:
-                process.stdout.close()
-                if process.poll() is None:
-                    process.terminate()
-                    process.wait()
-        os.link(temporary, bundle_path)
-    finally:
-        Path(temporary).unlink(missing_ok=True)
-    published["bundle"] = {"name": bundle_path.name, "sha256": _file_sha256(bundle_path), "size": bundle_path.stat().st_size}
+    # 归档只读已固定的本地镜像，可与两路推送独立执行；全部成功才发布交付文件。
+    with tempfile.TemporaryDirectory(prefix=bundle_path.name + ".stage-", dir=bundle_path.parent) as temporary:
+        staged = Path(temporary) / bundle_path.name
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            pushes = {role: executor.submit(_push_image, manifest["images"][role], reference)
+                for role, reference in references.items()}
+            package = executor.submit(save_image_bundle, list(references.values()), staged)
+            published["images"] = {role: future.result() for role, future in pushes.items()}
+            published["bundle"] = package.result()
+        os.link(staged, bundle_path)
     _write_new_json(output_path, published)
     return published
 

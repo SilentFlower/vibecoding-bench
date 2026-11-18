@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -89,6 +90,22 @@ class PublicationTests(unittest.TestCase):
                 "GITHUB_WORKFLOW_REF": "SilentFlower/vibecoding-bench/.github/workflows/v3-release.yml@refs/heads/flower2api"}):
             result = self._publish()
         self.assertTrue(all('/flower2api-' in entry['reference'] for entry in result['images'].values()))
+
+    def test_two_pushes_and_bundle_reach_the_same_barrier(self) -> None:
+        """两路推送与归档必须同时进入屏障，串行交付会超时失败。:return: None。"""
+        barrier = threading.Barrier(3, timeout=3)
+        original = manage.save_image_bundle
+        def save(references, path):
+            barrier.wait()
+            return original(references, path)
+        def command(*args, **kwargs):
+            if args[:2] == ('docker', 'push'):
+                barrier.wait()
+            return self._command(*args, **kwargs)
+        with patch.object(manage, 'save_image_bundle', side_effect=save):
+            result = self._publish(command)
+        self.assertEqual({'control', 'account'}, set(result['images']))
+        self.assertTrue(self.bundle.exists())
 
     def test_automatic_or_unconfirmed_publication_refuses_before_docker(self) -> None:
         """构建及其它入口在 Docker 副作用前拒绝发布。@return None。"""

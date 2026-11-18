@@ -41,6 +41,24 @@ jobs:
         uses: ./.github/actions/flower2api-native-runtime
       - name: 构建两个镜像并生成版本清单
         run: python3 deploy/flower2api/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3-local.json
+      - name: 导出可信候选镜像
+        if: >-
+          github.repository == 'SilentFlower/vibecoding-bench' &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+          (github.ref == 'refs/heads/v3' || github.ref == 'refs/heads/flower2api')
+        run: python3 deploy/flower2api/candidate_artifacts.py export --manifest releases/v3-local.json --output releases/candidate
+      - name: 上传可信候选产物
+        if: >-
+          github.repository == 'SilentFlower/vibecoding-bench' &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+          (github.ref == 'refs/heads/v3' || github.ref == 'refs/heads/flower2api')
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+          path: releases/candidate/
       - name: 保存本地构建清单
         uses: actions/upload-artifact@v4
         with:

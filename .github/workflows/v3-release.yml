@@ -7,6 +7,11 @@ on:
         required: true
         default: false
         type: boolean
+      full_build:
+        description: 强制沿原完整校验和构建路径发布
+        required: false
+        default: false
+        type: boolean
 permissions:
   contents: read
 jobs:
@@ -16,6 +21,7 @@ jobs:
       github.repository == 'SilentFlower/vibecoding-bench' &&
       (github.ref == 'refs/heads/v3' || github.ref == 'refs/heads/flower2api')
     permissions:
+      actions: read
       contents: write
       packages: write
     concurrency:
@@ -36,23 +42,35 @@ jobs:
         env:
           V3_SYSTEM_RELEASE_PRIVATE_KEY: ${{ secrets.V3_SYSTEM_RELEASE_PRIVATE_KEY }}
         run: python3 deploy/flower2api/publish_system_release.py --check-signing
-      - name: 验证系统更新合同与恢复状态机
+      - name: 准备发布验证工具
         run: |
           python3 -m venv "$RUNNER_TEMP/v3-update-venv"
           "$RUNNER_TEMP/v3-update-venv/bin/pip" install -r services/orchestrator/requirements.txt PyYAML==6.0.3
+      - name: 复用同源码可信候选
+        id: candidate
+        if: inputs.full_build != true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 deploy/flower2api/candidate_artifacts.py resolve --manifest releases/v3-local.json
+      - name: 验证系统更新合同与恢复状态机
+        if: steps.candidate.outputs.reused != 'true'
+        run: |
           python3 deploy/flower2api/verify_database_definitions.py
           # 三组独立测试并行收口；宿主快照仍由入口以 root 权限验证。
           python3 deploy/flower2api/verify_release_tests.py --python "$RUNNER_TEMP/v3-update-venv/bin/python"
       - name: 准备共享构建缓存
         id: flower2api-cache
+        if: steps.candidate.outputs.reused != 'true'
         continue-on-error: true
         uses: ./.github/actions/flower2api-build-cache
       - name: 记录缓存准备回退
         if: steps.flower2api-cache.outcome == 'failure'
         run: printf '%s\n' '::warning::CI缓存准备失败，本次沿普通Docker构建路径执行。'
       - name: 准备双版本原生运行时
+        if: steps.candidate.outputs.reused != 'true'
         uses: ./.github/actions/flower2api-native-runtime
       - name: 构建两个镜像并生成版本清单
+        if: steps.candidate.outputs.reused != 'true'
         run: python3 deploy/flower2api/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3-local.json
       - name: 登录 GHCR
         uses: docker/login-action@v4
@@ -69,17 +87,15 @@ jobs:
           sudo chown -- "$(id -u):$(id -g)" releases/database-compatibility.json
       - name: 发布同批镜像并保存交付包
         run: python3 deploy/flower2api/manage.py publish --manifest releases/v3-local.json --output releases/v3.json --bundle releases/v3-images.tar.gz
-      - name: 保存联合清单与同批镜像包
+      - name: 保存发行诊断清单
         uses: actions/upload-artifact@v4
         with:
           name: v3-release-${{ github.run_id }}-${{ github.run_attempt }}
           retention-days: 14
-          compression-level: 0
           if-no-files-found: error
           path: |
             releases/v3.json
             releases/database-compatibility.json
-            releases/v3-images.tar.gz
       - name: 发布受信系统版本与原子目录
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
