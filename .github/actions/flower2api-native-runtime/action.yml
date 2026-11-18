@@ -13,7 +13,7 @@ runs:
         path: |
           ${{ runner.temp }}/native280/ccrb-runtime
           ${{ runner.temp }}/native280/ccrb-runtime.manifest.json
-        key: native280-linux-x64-21e7c3f85c698138c027622e1abc1f20b4f684847cce000d5f3ba9ecd9654229-${{ hashFiles('services/runtime/src/**', 'services/runtime/scripts/**') }}
+        key: native280-linux-x64-186b1e9a77738d11584e5fb9da293634a8a6ab68df146666ce81c16ab596de88-${{ hashFiles('services/runtime/src/**', 'services/runtime/scripts/**') }}
     - name: 核验缓存或隔离构建官方280
       shell: bash
       run: |
@@ -26,7 +26,7 @@ runs:
         path: |
           ${{ runner.temp }}/native293/ccrb-runtime
           ${{ runner.temp }}/native293/ccrb-runtime.manifest.json
-        key: native293-linux-x64-9a5eb46175762bbcc84ad069601c9626b35a9bbf41aa53f08e96d32fdcf3198a-${{ hashFiles('services/runtime/src/**', 'services/runtime/scripts/**') }}
+        key: native293-linux-x64-017ec892b9dfbf08bf4cb2e5bf59048cb41a0ecfc21b1ad518751a23a911b9b7-${{ hashFiles('services/runtime/src/**', 'services/runtime/scripts/**') }}
     - name: 核验缓存或隔离构建官方293
       shell: bash
       run: |

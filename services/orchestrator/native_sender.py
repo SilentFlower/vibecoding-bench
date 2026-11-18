@@ -9,12 +9,12 @@ from resource_budget import isolated_account_limits, memory_bytes
 
 VERSION = 'v0.1.0-beta.7'
 ASSET = 'ccrb-runtime-linux-x64'
-SHA256 = '9a5eb46175762bbcc84ad069601c9626b35a9bbf41aa53f08e96d32fdcf3198a'
+SHA256 = '017ec892b9dfbf08bf4cb2e5bf59048cb41a0ecfc21b1ad518751a23a911b9b7'
 POOL_MIB = 256
 WORKER_MIB = 192
 RESTORE_IMAGE_MIB = 108
 VERSION_280 = 'builtin-2.1.280'
-SHA256_280 = '21e7c3f85c698138c027622e1abc1f20b4f684847cce000d5f3ba9ecd9654229'
+SHA256_280 = '186b1e9a77738d11584e5fb9da293634a8a6ab68df146666ce81c16ab596de88'
 BYTES_280 = 27097232
 BYTES = 27392144
 

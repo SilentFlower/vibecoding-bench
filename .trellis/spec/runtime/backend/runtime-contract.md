@@ -22,7 +22,7 @@
 
 - 历史账号后端键`native293`表示原生自动匹配。客户端模式精确匹配原始Claude UA；其它已准入版本的普通API沿已冻结默认画像，出厂293。账号模式沿最终账号画像。版本冻结在原生投递之前；账号并发、RPM及凭据仍由原账号所有者管理。
 - 280官方源SHA为`1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b`，Bun1.4.3 revision为`f08e57bec002878c0281e86fbf9c76f53c20a117`。Bun节144806548字节、2196模块、记录52字节、entry5、flags0x1bff；节摘要和ICU偏移按280独立断言。
-- 280分发体27097232字节/SHA`21e7c3f85c698138c027622e1abc1f20b4f684847cce000d5f3ba9ecd9654229`；执行体111603784字节/SHA`b5ffd54de383a71681043e554156451e3ce277e67e2a4bf04da815a029caee63`。293现用beta.7分发体27392144字节/SHA`9a5eb46175762bbcc84ad069601c9626b35a9bbf41aa53f08e96d32fdcf3198a`，执行体112852152字节/SHA`0404cca64e0e08ffe347379c543bb83dcc4b36d46cea1c1b6c570c8af14ccb56`。
+- 280分发体27097232字节/SHA`186b1e9a77738d11584e5fb9da293634a8a6ab68df146666ce81c16ab596de88`；执行体111603784字节/SHA`4f70823748fe2a64d4c346877b59b31383d3cbca76bf6f9519dd4d5d8128d8e4`。293现用beta.7分发体27392144字节/SHA`017ec892b9dfbf08bf4cb2e5bf59048cb41a0ecfc21b1ad518751a23a911b9b7`，执行体112852152字节/SHA`eec33dc1466f4180f0448b2524c67b10656764603592aad73e26b0389d3c26eb`。
 - 280原生SDK默认global fetch，映射到共享发送槽；turnOrigin/turnPosition沿280省略语义。280工具工厂create保留初始化权限声明，仅封闭返回对象的call执行入口。280保持原生正文工厂；293静态正文复用沿原配方。
 - 完整原生billing的版本必须匹配冻结运行时。普通API仍由所选原生版本构造，保持CCH、上下文、工具/thinking、原始响应及唯一发送合同。
 - 每账号只有一个物理容量所有者，各版本共享live/starting许可，合计遵守max_workers。版本子状态隔离映像FD、暖进程、补位、模板及核验缓存；凭据/代理/环境公共身份变化统一撤销两版旧空闲状态。取消其它版本补位或退役空闲进程后，必须等待真实退出归还许可。
@@ -31,7 +31,7 @@
 - 两版随平台版本及账号镜像固定，分发摘要、执行体及实际握手须同时一致。旧root／每版独立选择退出执行；历史记录、升级完整登记、维护租约和回退沿[平台内核迁移](../../orchestrator/backend/account-runtime-v3.md#scenario-请求内核随平台版本交付与历史迁移)，公共身份失效继续统一排空。
 - 准备投影按每版独立核对环境/代次、内核代次及45秒新鲜度。293失败或过期时保留280独立观察，错误版本和旧回执不能授予ready。诊断来源为`native280_cc_prepared|native293_cc_prepared`，完整快照入口接纳两者。
 - 280尚未接纳CRIU模板，固定293恢复画像不借用；280使用同版受限exec。293独立TLS模拟verifier拒绝280。真实TLS采集按执行体摘要选SSL_write偏移：280为0x2308523，293为0x232d5b3；ABI与接受字节核对沿采集器合同。
-- CI使用固定官方npm归档SHA512和源文件SHA256，隔离构建后严格核对上述分发及映像身份；缓存命中同时核对来源、构建报告和当前bridge_sources，损坏、缺报告及输入漂移明确失败。更新分发身份时，`images/v3/Dockerfile`两版`sha256sum`固定值必须与`services/orchestrator/native_sender.py`同步，防止镜像组装在完整性校验处失败。正式采集束沿canonical提交干净后export的原有顺序生成，开发清单显式development=true。
+- CI使用固定官方npm归档SHA512和源文件SHA256，隔离构建后严格核对上述分发及映像身份；缓存命中同时核对来源、构建报告和当前bridge_sources，损坏、缺报告及输入漂移明确失败。桥接构建输入变化后，两版均须重新构建并验收。分发和执行体身份同步覆盖`native_sender.py`、Rust `native_runtime/native_criu`、`compact-profile.ts`、CI准备脚本与缓存键、Docker两版校验、TLS采集映像表及CRIU构建画像；源码提交后按原顺序正式导出两个镜像输入束。`test_prepare_ci_runtime`的跨消费者回归核对当前两版身份一致，防止构建及运行准入仍引用旧摘要。正式采集束沿canonical提交干净后export的原有顺序生成，开发清单显式development=true。
 
 ### 4. Validation & Error Matrix
 

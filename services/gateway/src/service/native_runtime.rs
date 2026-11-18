@@ -57,8 +57,8 @@ use crate::service::runtime_transport::{
 };
 use crate::store::settings_store::DEFAULT_NATIVE_IDLE_TIMEOUT_SECS;
 
-const LAUNCHER_SHA256: &str = "9a5eb46175762bbcc84ad069601c9626b35a9bbf41aa53f08e96d32fdcf3198a";
-const IMAGE_SHA256: &str = "0404cca64e0e08ffe347379c543bb83dcc4b36d46cea1c1b6c570c8af14ccb56";
+const LAUNCHER_SHA256: &str = "017ec892b9dfbf08bf4cb2e5bf59048cb41a0ecfc21b1ad518751a23a911b9b7";
+const IMAGE_SHA256: &str = "eec33dc1466f4180f0448b2524c67b10656764603592aad73e26b0389d3c26eb";
 const IMAGE_BYTES: u64 = 112_852_152;
 const PREVIOUS_IMAGE_SHA256: &str =
     "af4cea9e21aa959c5e39c389173ba30ebb19b354b67acfe99164946450e9776d";
@@ -129,10 +129,10 @@ fn artifact(config: &NativeSenderConfig) -> Result<ReleaseArtifact, AppError> {
     match config.source_version {
         NativeSourceVersion::Cc280 => Ok(ReleaseArtifact {
             path: PathBuf::from(&config.binary_path),
-            launcher_sha256: "21e7c3f85c698138c027622e1abc1f20b4f684847cce000d5f3ba9ecd9654229"
+            launcher_sha256: "186b1e9a77738d11584e5fb9da293634a8a6ab68df146666ce81c16ab596de88"
                 .into(),
             launcher_bytes: 27_097_232,
-            image_sha256: "b5ffd54de383a71681043e554156451e3ce277e67e2a4bf04da815a029caee63".into(),
+            image_sha256: "4f70823748fe2a64d4c346877b59b31383d3cbca76bf6f9519dd4d5d8128d8e4".into(),
             image_bytes: 111_603_784,
         }),
         NativeSourceVersion::Cc293 => Ok(ReleaseArtifact {
@@ -1779,9 +1779,13 @@ impl NativePool {
                 result["image_admitted"] = json!(
                     worker.image_sha256 == IMAGE_SHA256
                         || worker.image_sha256
-                            == "6296aa4f164b8018f6f614915befd347a0dbd73f674ace20534e91947eba4434"
+                            == "0404cca64e0e08ffe347379c543bb83dcc4b36d46cea1c1b6c570c8af14ccb56"
                         || worker.image_sha256
                             == "b5ffd54de383a71681043e554156451e3ce277e67e2a4bf04da815a029caee63"
+                        || worker.image_sha256
+                            == "6296aa4f164b8018f6f614915befd347a0dbd73f674ace20534e91947eba4434"
+                        || worker.image_sha256
+                            == "4f70823748fe2a64d4c346877b59b31383d3cbca76bf6f9519dd4d5d8128d8e4"
                         || worker.image_sha256
                             == "564019c9560e960e96875c9663975491534b27c789ea3d23e5c13309ff293c79"
                         || worker.image_sha256

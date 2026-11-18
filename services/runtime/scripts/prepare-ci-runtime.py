@@ -20,11 +20,11 @@ SOURCES = {
     '2.1.280': {'integrity': 'dJHWFrDSIZ26hdLucnK3ehLmzdzYl3MsPC1RzUctAUaYnZlH5kfAZxnK8qYRAQ89GX3OPrLsnFdt/QnP+0Ck6Q==',
         'source_sha256': '1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b', 'source_bytes': 233709640,
         'sha256': SHA256_280, 'bytes': BYTES_280,
-        'image_sha256': 'b5ffd54de383a71681043e554156451e3ce277e67e2a4bf04da815a029caee63', 'image_bytes': 111603784},
+        'image_sha256': '4f70823748fe2a64d4c346877b59b31383d3cbca76bf6f9519dd4d5d8128d8e4', 'image_bytes': 111603784},
     '2.1.293': {'integrity': 'tYTbeVuhqD0TW2WJs90Tq+JaKLLnrX5JuxYTLG3pxf4Vr3QMonqsMLu4hZkgVSfEDPZhneFuDDgULQ3/FZzAIw==',
         'source_sha256': '8968405e26db478af44eabc4635ab5ca557057b702a54460a59c13e1b253e978', 'source_bytes': 252755128,
         'sha256': SHA256, 'bytes': BYTES,
-        'image_sha256': '0404cca64e0e08ffe347379c543bb83dcc4b36d46cea1c1b6c570c8af14ccb56', 'image_bytes': 112852152},
+        'image_sha256': 'eec33dc1466f4180f0448b2524c67b10656764603592aad73e26b0389d3c26eb', 'image_bytes': 112852152},
 }
 
 
