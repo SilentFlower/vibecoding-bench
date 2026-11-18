@@ -15,6 +15,7 @@ from source_layout import source_path
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(source_path(REPO, 'orchestrator')))
 from database_migrations import schema_checksum
+from agy_auth import auth_asset_identity
 from database_migration_contract import load_registry, registry_contract
 from system_update_contract import INDEX_LIMIT, MANIFEST_LIMIT, ROLES, strict_json, utc_now, validate_index, validate_release, validate_migration_evidence, validate_migration_plan
 
@@ -25,8 +26,11 @@ BENCH_SCHEMA_SOURCES = {
     'bench.cluster.2': 'orchestrator/cluster_schema.py',
     'bench.node-executions.3': 'orchestrator/node_execution_schema.py',
     'bench.node-login-drafts.4': 'orchestrator/node_login_draft_schema.py',
+    'bench.agy-environments.5': 'orchestrator/agy_environment_schema.py',
 }
 GATEWAY_SCHEMA_SOURCES = {
+    'gateway.request-records.6': 'cc2api/src/store/request_records_schema.rs',
+    'gateway.account-platforms.5': 'cc2api/src/store/account_platform_schema.rs',
     'gateway.baseline.1': 'cc2api/src/store/database_schema.rs',
     'gateway.proxies.2': 'cc2api/src/store/proxy_schema.rs',
     'gateway.proxy-sync.3': 'cc2api/src/store/proxy_sync_schema.rs',
@@ -99,7 +103,7 @@ def component_content(root: Path, role: str) -> str:
         else common + ['images/account', 'images/sidecar', 'images/worker/task_followups.py',
             'images/v3/criu', 'images/v3/tls-observer',
             'orchestrator/runtime_files.py', 'orchestrator/runtime_diagnostics.py',
-            'orchestrator/cli_quota.py', 'orchestrator/process_metrics.py', 'orchestrator/native_sender.py'])
+            'orchestrator/cli_quota.py', 'orchestrator/process_metrics.py', 'orchestrator/native_sender.py', 'orchestrator/agy_auth.py', 'orchestrator/agy_runtime'])
     digest = hashlib.sha256()
     for name in names:
         source = source_path(root, name)
@@ -107,6 +111,8 @@ def component_content(root: Path, role: str) -> str:
             raise ValueError('组件源码依赖缺失')
         paths = sorted(source.rglob('*')) if source.is_dir() else [source]
         for path in paths:
+            if 'agy_runtime/resources' in path.as_posix() and path.name in ('observer-c', 'relocation_reclaim.so', 'admission.json'):
+                continue
             if path.is_file() and not any(part in ('__pycache__', 'target', 'node_modules', '.git') for part in path.relative_to(root).parts):
                 if path.is_symlink():
                     raise ValueError('组件源码不能是符号链接')
@@ -139,6 +145,7 @@ def create_release(manifest_path: Path, policy_path: Path, output: Path, key: Pa
     if set(policy) != {'schema_version', 'rollback_compatible'} or policy['schema_version'] != 1 or set(policy['rollback_compatible']) != {'bench', 'gateway'}:
         raise ValueError('数据兼容证明格式无效')
     contracts = data_contracts(root)
+    agy_asset = auth_asset_identity(build.get('agy_auth'))
     version = 2 if migration_evidence is not None else 1
     value = {'schema_version': version, 'release': 'system-' + build['release'], 'sequence': sequence,
         'published_at': utc_now(), 'platform': 'linux/amd64', 'changes': changes,
@@ -169,6 +176,10 @@ def create_release(manifest_path: Path, policy_path: Path, output: Path, key: Pa
         value[role] = {field: entry[field] for field in ('reference', 'registry_digest', 'config_digest', 'unpacked_bytes')}
         value[role].update(release=build['release'], revision=build['parent_revision'])
         value[role]['content_sha256'] = component_content(root, role)
+        if role == 'account' and agy_asset is not None:
+            # 外部制品输入变化也必须切换账号镜像，不能只按源码相同复用旧能力。
+            identity = {'source': value[role]['content_sha256'], 'agy_auth': agy_asset}
+            value[role]['content_sha256'] = hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     evidence = None
     if migration_evidence is not None:
         evidence = strict_json(migration_evidence.read_bytes())

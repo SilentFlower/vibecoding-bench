@@ -5,6 +5,8 @@ import unittest
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
+from fastapi import HTTPException
+
 import main
 import test_cluster_owner_runner as owner_fixture
 from cluster_environment_control import RemoteEnvironmentControl
@@ -114,6 +116,17 @@ class RemoteEnvironmentTests(unittest.TestCase):
                 self.control.call(self.root.row, 'environment-cpu-set',
                     {'expected_generation': self.node.row['generation'] - 1, 'expected_revision': 'a' * 64, 'cpus': {'cli': 1}})
             setter.assert_not_called()
+
+    def test_original_maintenance_rejects_stale_generation_before_node_stop(self) -> None:
+        """原公共入口透传页面代次，过期请求在租约与实际停止前被拒绝。@return 无。"""
+        with patch.object(self.node.runtime, '_stop_environment') as stop:
+            with self.assertRaises(HTTPException) as error:
+                main.v3_environment_maintenance(self.node.row['environment_id'],
+                    {'operation': 'stop', 'expected_generation': self.node.row['generation'] - 1})
+            self.assertEqual(409, error.exception.status_code)
+            stop.assert_not_called()
+        self.assertNotIn('environment-maintenance', self.fixture.calls)
+        self.assertIsNone(self.fixture.gateway_lease)
 
     def test_wrong_binding_rejected_before_node_read(self) -> None:
         """实际Node的绑定变化使原位置请求失效。:return: None。"""

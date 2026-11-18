@@ -47,6 +47,9 @@ import docker
 from docker.errors import DockerException, NotFound
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from native_capture import CaptureExpired, read_capture
+from agy_runtime.capture import read_snapshot as read_agy_snapshot, save_ingress as save_agy_ingress
+from native_capture_policy import capture_enabled as native_capture_enabled
+from agy_environment import lookup as lookup_agy_environment
 from native_kernel_upgrade import status as native_kernel_status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response, StreamingResponse
@@ -8541,9 +8544,16 @@ async def lifespan(app: FastAPI):
         scheduler.recover_active_batches()
     if project_iterations and not PROJECTS_AGENT_ENABLED:
         project_iterations.start()
+    agy_cleanup_task = asyncio.create_task(_agy_auth_cleanup_loop()) if V3_ENABLED else None
     try:
         yield
     finally:
+        if agy_cleanup_task:
+            agy_cleanup_task.cancel()
+            try:
+                await agy_cleanup_task
+            except asyncio.CancelledError:
+                pass
         if migration_operations:
             migration_operations.close()
         warmup_scheduler.stop()
@@ -13635,6 +13645,59 @@ def _v3_websocket_authorized(websocket: WebSocket) -> bool:
         return False
 
 
+_agy_auth_manager = None
+_agy_auth_manager_lock = threading.Lock()
+
+
+async def _agy_auth_cleanup_loop():
+    """重启及运行期间回收到期原生授权，清理失败保留原操作等待重试。@return 无。"""
+    while True:
+        try:
+            def cleanup():
+                """在现有部署门禁内读取同操作资源。"""
+                global _agy_auth_manager
+                from agy_auth import AgyAuthManager
+                with UPDATE_GATE.admission('agy-auth:cleanup'):
+                    with _agy_auth_manager_lock:
+                        if _agy_auth_manager is None and account_runtime and (BENCH_DATA / 'agy-auth').exists():
+                            _agy_auth_manager = AgyAuthManager(account_runtime.client, BENCH_DATA, HOST_BENCH_DATA,
+                                account_runtime.image, account_runtime.network)
+                        manager = _agy_auth_manager
+                    if manager:
+                        manager.cleanup()
+            await asyncio.to_thread(cleanup)
+        except Exception:
+            # 失败保留私有材料，下一周期按原归属重试。
+            pass
+        await asyncio.sleep(30)
+
+
+@app.post("/internal/v3/agy-auth/{action}")
+async def v3_agy_auth(action: str, request: Request):
+    """在受信管理通道执行 AGY 原生账号操作。@param action 操作。@param request 私有输入。@return 有界原生结果。"""
+    if not V3_ENABLED or not account_runtime:
+        raise HTTPException(503, "AGY 管理能力尚未就绪")
+    try:
+        payload = await request.body()
+        if len(payload) > 65536:
+            raise ValueError("输入超限")
+        value = json.loads(payload)
+        def execute():
+            """复用部署门禁，私有参数只在本操作内传递。"""
+            global _agy_auth_manager
+            from agy_auth import AgyAuthManager
+            with UPDATE_GATE.admission('agy-auth:' + action):
+                with _agy_auth_manager_lock:
+                    if _agy_auth_manager is None:
+                        _agy_auth_manager = AgyAuthManager(account_runtime.client, BENCH_DATA, HOST_BENCH_DATA,
+                            account_runtime.image, account_runtime.network)
+                return _agy_auth_manager.handle(action, value)
+        return await asyncio.to_thread(execute)
+    except Exception:
+        # 解析及下游错误正文可能含授权码或代理账密，公开响应只给固定状态。
+        raise HTTPException(503, "AGY 原生操作未完成，请核对原会话或凭据操作") from None
+
+
 @app.post("/internal/v3/session")
 def v3_session_grant():
     """受控管理桥交换独立 HttpOnly 会话，不返回管理密码。"""
@@ -13710,6 +13773,14 @@ def v3_quiesce(account_id: int, body: dict):
     """
     if not account_runtime:
         raise HTTPException(404)
+    from agy_environment import lookup as agy_lookup, quiesce as agy_quiesce
+    agy=agy_lookup(account_runtime,account_id)
+    if agy:
+        try:
+            agy_quiesce(account_runtime,agy,body)
+        except (ValueError,RuntimeError,OSError):
+            raise HTTPException(409,'AGY环境仍有原生工作或配置许可已变化') from None
+        return {'ok':True}
     connection = get_db()
     try:
         account = connection.execute("SELECT * FROM accounts WHERE cc2api_account_id=? AND deleted_at IS NULL", (account_id,)).fetchone()
@@ -13748,15 +13819,26 @@ def v3_quiesce(account_id: int, body: dict):
 
 
 @app.get("/internal/v3/native-captures/{account_id}/{attempt_id}")
-def v3_native_capture(account_id: int, attempt_id: str):
+def v3_native_capture(account_id: int, attempt_id: str, platform: str = 'claude_code'):
     """按唯一账号绑定读取私有组装快照，保持环境休眠状态。
 
     :param account_id: 网关账号 ID。
     :param attempt_id: 当前诊断尝试 UUID。
+    :param platform: 已保存诊断所属账号平台。
     :return: 已脱敏快照；缺失 404，损坏或读取失败 503。
     """
     if not V3_ENABLED or not account_runtime:
         raise HTTPException(404)
+    if platform not in {'claude_code','antigravity'}:
+        raise HTTPException(400,'采集平台无效')
+    if platform=='antigravity':
+        try:
+            row=lookup_agy_environment(account_runtime,account_id)
+            if not row:raise HTTPException(404,'AGY账号环境未登记')
+            return read_agy_snapshot(account_runtime._root(row),account_id,attempt_id)
+        except TimeoutError:raise HTTPException(410,'采集文件已超过七天保留期')
+        except FileNotFoundError:raise HTTPException(404,'采集文件缺失、尚未生成或已清理')
+        except (ValueError,OSError):raise HTTPException(503,'采集文件读取失败')
     connection = get_db()
     try:
         rows = connection.execute("SELECT e.* FROM account_environments e JOIN accounts a ON a.id=e.account_id "
@@ -13776,7 +13858,7 @@ def v3_native_capture(account_id: int, attempt_id: str):
                 raise ValueError('原Node采集回执需要核对')
             return remote['snapshot']
         return read_capture(account_runtime._root(dict(rows[0])), account_id, attempt_id)
-    except CaptureExpired:
+    except (CaptureExpired,TimeoutError):
         raise HTTPException(410, "采集文件已超过七天保留期")
     except FileNotFoundError:
         raise HTTPException(404, "采集文件缺失、尚未生成或已清理")
@@ -13784,11 +13866,40 @@ def v3_native_capture(account_id: int, attempt_id: str):
         raise HTTPException(503, "采集文件读取失败")
 
 
+class AgyIngressIn(BaseModel):
+    """受信网关独立入站旁路，代次与内容均在写入前核对。"""
+    model_config=ConfigDict(extra='forbid')
+    environment_generation: StrictInt
+    ingress: dict
+
+
+@app.post('/internal/v3/agy-ingress/{account_id}/{attempt_id}')
+def v3_agy_ingress(account_id: int, attempt_id: str, body: AgyIngressIn):
+    """只发布已绑定账号的有界脱敏入口，不启动环境。@param account_id 网关账号。@param attempt_id 原尝试。@param body 冻结代次及预览。@return 保存状态。"""
+    if not V3_ENABLED or not account_runtime:raise HTTPException(404)
+    try:
+        row=lookup_agy_environment(account_runtime,account_id)
+        if not row:raise HTTPException(404,'AGY账号环境未登记')
+        if row['generation']!=body.environment_generation:raise HTTPException(409,'采集环境代次已改变')
+        fingerprint=json.loads(row['fingerprint_json'])
+        if not native_capture_enabled(fingerprint):raise HTTPException(409,'账号内容采集已关闭')
+        save_agy_ingress(account_runtime._root(row)/'flows/api/agy-prepared',account_id,attempt_id,body.ingress)
+    except (ValueError,OSError,TypeError):raise HTTPException(503,'AGY入口快照保存失败')
+    return {'state':'saved'}
+
+
 @app.get("/internal/v3/transport/{account_id}")
 def v3_transport(account_id: int, wake: bool = True):
     """解析唯一绑定账号并返回受限发送实例，浏览器无法直接调用。"""
     if not account_runtime:
         raise HTTPException(404)
+    configuration = account_runtime.gateway._request('GET', f'/admin/runtime/accounts/{account_id}/config')
+    if configuration.get('platform') == 'antigravity':
+        from agy_environment import transport as agy_transport
+        try:
+            return agy_transport(account_runtime, account_id, wake=wake)
+        except (ValueError, RuntimeError, OSError):
+            raise HTTPException(503, 'AGY账号环境未就绪或需要维护') from None
     connection = get_db()
     try:
         rows = connection.execute("SELECT * FROM accounts WHERE cc2api_account_id=? AND deleted_at IS NULL",
@@ -13825,6 +13936,10 @@ def _v3_environment_summary(row: dict, ownerships: dict, native_preparations: di
     :param native_preparation_error: 快照读取错误。
     :return: 原合同的公开环境投影。
     """
+    from agy_environment import lookup_environment, summary as agy_summary
+    agy = lookup_environment(account_runtime, row['environment_id'])
+    if agy:
+        return agy_summary(account_runtime, agy)
     account = None
     row['credential_ownership'] = ownerships.get(row['account_id'])
     if cluster_service and row['account_id'] is None:
@@ -14068,6 +14183,11 @@ def v3_content_capture(environment_id: str) -> dict:
     """
     if not account_runtime:
         raise HTTPException(404)
+    from agy_environment import capture as agy_capture, lookup_environment
+    with account_runtime.environment_lock(environment_id):
+        agy = lookup_environment(account_runtime, environment_id)
+        if agy:
+            return agy_capture(account_runtime, agy)
     snapshots, _ = account_runtime.native_preparation_snapshots()
     try:
         with account_runtime.environment_lock(environment_id):
@@ -14092,6 +14212,15 @@ def v3_set_content_capture(environment_id: str, body: ContentCaptureOperation) -
     """
     if not account_runtime:
         raise HTTPException(404)
+    from agy_environment import capture as agy_capture, lookup_environment
+    with account_runtime.environment_lock(environment_id):
+        agy = lookup_environment(account_runtime, environment_id)
+        if agy:
+            try:
+                with UPDATE_GATE.admission('agy-content-capture'):
+                    return agy_capture(account_runtime, agy, body.model_dump())
+            except ValueError as error:
+                raise HTTPException(409, str(error)) from None
     _, original = _content_capture_account(environment_id)
     try:
         with UPDATE_GATE.admission('environment-content-capture'):
@@ -14273,6 +14402,16 @@ def v3_environment_maintenance(environment_id: str, body: dict):
     """
     if not account_runtime:
         raise HTTPException(404)
+    from agy_environment import lookup_environment
+    if lookup_environment(account_runtime, environment_id):
+        try:
+            if type(body.get('expected_generation')) is not int:
+                raise ValueError('AGY维护请求缺少冻结环境代次')
+            with UPDATE_GATE.admission('agy-environment-maintenance'):
+                account_runtime.maintenance(environment_id, body.get('operation',''), body.get('expected_generation'))
+            return {'ok':True}
+        except (ValueError,RuntimeError,OSError):
+            raise HTTPException(409,'AGY环境有活动请求或需要对账') from None
     connection = get_db()
     try:
         environment = connection.execute("SELECT COALESCE(a.name,e.name) AS name,e.account_id FROM account_environments e "
@@ -14294,9 +14433,9 @@ def v3_environment_maintenance(environment_id: str, body: dict):
                 return {'ok': True}
             with _profile_lock(environment["name"]):
                 row=_cpu_environment(environment_id)
-                remote=_remote_environment_result(row,'environment-maintenance',{'operation':body.get('operation','')})
+                remote=_remote_environment_result(row,'environment-maintenance',body)
                 if remote is None:
-                    account_runtime.maintenance(environment_id, body.get("operation", ""))
+                    account_runtime.maintenance(environment_id, body.get("operation", ""), body.get('expected_generation'))
         # 该方法自行领取 owner 锁；不可在上面的非重入锁内调用。
         if body.get("operation") == "reconcile" and login_manager and remote is None:
             login_manager.cleanup_reconciled(environment_id)

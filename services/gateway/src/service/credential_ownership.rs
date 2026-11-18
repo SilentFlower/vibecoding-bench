@@ -139,6 +139,11 @@ fn request_hash(input: &CredentialOwnershipInput) -> Result<String, AppError> {
 }
 
 fn validate_input(input: &CredentialOwnershipInput, account: &Account) -> Result<(), AppError> {
+    if !account.is_claude_code() {
+        return Err(AppError::BadRequest(
+            "此交接入口仅适用于 Claude Code 账号".into(),
+        ));
+    }
     let identity = &input.identity;
     let same = |left: &str, right: &str| left.trim().eq_ignore_ascii_case(right.trim());
     if input.protocol != 1

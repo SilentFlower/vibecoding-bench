@@ -21,7 +21,7 @@ from runtime_files import atomic_json, atomic_text
 from runtime_names import account_container_prefix, account_rebuild_required, deployment_network_names, image_reference
 from system_update_contract import DOWNLOAD_ROOT, ROLES, ReleaseRedirect, compatible_scratchpad, fetch_bytes, safe_read, strict_json, validate_migration_plan
 from system_update_gate import read_gate
-from system_update_database import assert_quiescent, create_snapshot, restore_snapshot, rotate_snapshots
+from system_update_database import assert_quiescent, create_snapshot, restore_snapshot, rotate_snapshots, assert_gateway_platform_support
 
 SOFTWARE_FIELDS = ('version', 'version_base', 'build_time', 'node_version')
 ENVIRONMENT_IDENTITY = ('environment_id', 'name', 'account_id', 'fingerprint_json')
@@ -136,6 +136,10 @@ class HostDeployment:
             bench_accounts = connection.execute('SELECT id,name,profile_path,cc2api_account_id FROM accounts ORDER BY id').fetchall()
             ownership = {'bench': connection.execute('SELECT account_id,record_json FROM account_credential_ownerships ORDER BY account_id').fetchall(),
                 'local': connection.execute('SELECT account_id,record_json FROM local_credential_authorizations ORDER BY account_id').fetchall()}
+            if connection.execute("SELECT 1 FROM sqlite_master WHERE name='platform_api_environments'").fetchone():
+                mapping=connection.execute('SELECT gateway_account_id,environment_id,platform FROM platform_api_environments ORDER BY gateway_account_id').fetchall()
+                if mapping:
+                    ownership['platform_api_environments']=mapping
             bench_schema = connection.execute("SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type,name").fetchall()
         gateway = []
         software = {}
@@ -210,6 +214,13 @@ class HostDeployment:
                         or labels.get('vibebench.cli-install-version') != '2'))):
                 raise ValueError('更新镜像的真实内容或来源不符')
             result[role] = image
+        database=self.data/'bench/db.sqlite'
+        if database.is_file():
+            with closing(sqlite3.connect(database.as_uri()+'?mode=ro',uri=True)) as connection:
+                mapped=connection.execute("SELECT 1 FROM sqlite_master WHERE name='platform_api_environments'").fetchone()
+                if mapped and connection.execute('SELECT 1 FROM platform_api_environments LIMIT 1').fetchone():
+                    if any(image['Config'].get('Labels',{}).get('vibebench.agy-runtime-protocol')!='1' for image in result.values()):
+                        raise ValueError('已有AGY环境，目标镜像需要支持同一平台运行协议')
         return result
 
     def prepare(self, release: dict, selection: dict, folder: Path) -> None:
@@ -506,6 +517,8 @@ class HostDeployment:
         atomic_text(folder / 'candidate.env', candidate)
     def switch(self, operation: dict, selected: dict) -> None:
         """按冻结来源切换两个控制服务。:param operation: 持久操作。:param selected: 目标组合。:return: None。"""
+        image = json.loads(docker('image', 'inspect', selected['selection']['control']['reference']))[0]
+        assert_gateway_platform_support(self.data, image['Config'].get('Labels') or {})
         self._stage_selection(operation, selected)
         folder = self.root / 'operations' / operation['operation_id']
         candidate = safe_read(folder / 'candidate.env', private=True).decode()

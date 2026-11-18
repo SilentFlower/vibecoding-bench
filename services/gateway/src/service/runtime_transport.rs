@@ -35,6 +35,11 @@ use subtle::ConstantTimeEq;
 use crate::error::AppError;
 use crate::model::account::Account;
 use crate::model::request_diagnostics::{ExecutionLocation, RequestLogMode};
+use crate::service::agy_contract::{
+    AgyAccessSnapshot, AgyModelId, AgySenderConfig, AgySubmission, AgySystemPromptPolicy,
+    AgyToolCompletion,
+};
+use crate::service::agy_runtime::AgyPool;
 use crate::service::native_contract::{NativeIdlePolicy, validate_idle_timeout};
 use crate::service::native_contract::{
     NativePreparation, NativePreparationControl, NativePreparationStatus, NativeReadinessStatus,
@@ -86,6 +91,8 @@ pub struct PreparedRequest {
 /// 账号进程的受限配置；由管理进程原子写入，CLI 用户不可读取。
 #[derive(Clone, Deserialize, Serialize)]
 pub struct SenderConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agy: Option<AgySenderConfig>,
     #[serde(default)]
     pub native: Option<NativeSenderConfig>,
     #[serde(default)]
@@ -246,6 +253,125 @@ async fn send_with_client(
 pub struct PreparedTransport {
     account_id: i64,
     route: PreparedRoute,
+}
+
+impl PreparedTransport {
+    /// 无新凭据地回填原工具轮，并等待真实收口。@param previous 原私有请求。@param api_token_id 原调用方。@param body 真实工具结果。@param deadline 原冻结截止。@return 原工具已结束。
+    pub async fn finish_agy_tools(
+        &self,
+        previous: &str,
+        api_token_id: i64,
+        body: Value,
+        deadline: Instant,
+    ) -> Result<(), AppError> {
+        let PreparedRoute::V3 { client, binding } = &self.route else {
+            return Err(AppError::ServiceUnavailable("原AGY环境不可用".into()));
+        };
+        let id = Uuid::new_v4().to_string();
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(AppError::BadRequest("原工具轮已到期".into()));
+        }
+        let input = AgyToolCompletion {
+            request: PreparedRequest {
+                account_id: self.account_id,
+                environment_id: binding.environment_id.clone(),
+                generation: binding.generation,
+                request_id: id.clone(),
+                deadline_unix_ms: now_ms() + remaining.as_millis() as u64,
+                method: "POST".into(),
+                target_url: "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent"
+                    .into(),
+                headers: vec![],
+                preserve_header_casing: false,
+                tls_profile: TlsProfileId::default(),
+            },
+            api_token_id,
+            previous_request_id: previous.into(),
+            body,
+        };
+        let response = timeout_at(
+            deadline,
+            client
+                .post(format!("{}/internal/agy/tools", binding.endpoint))
+                .bearer_auth(&binding.secret)
+                .json(&input)
+                .send(),
+        )
+        .await
+        .map_err(|_| AppError::ServiceUnavailable("AGY工具回填结果待对账".into()))?
+        .map_err(|_| AppError::ServiceUnavailable("AGY工具回填结果待对账".into()))?;
+        if !response.status().is_success() {
+            return Err(AppError::BadRequest("AGY原工具轮拒绝回填".into()));
+        }
+        let result: Value = timeout_at(deadline, response.json())
+            .await
+            .map_err(|_| AppError::ServiceUnavailable("AGY工具收口超时".into()))?
+            .map_err(|_| AppError::ServiceUnavailable("AGY工具收口回执无效".into()))?;
+        if result["finished"] != true
+            || result["request_id"] != id
+            || result["previous_request_id"] != previous
+        {
+            return Err(AppError::ServiceUnavailable("AGY工具收口归属无效".into()));
+        }
+        Ok(())
+    }
+    /// 在既有受信绑定中提交AGY请求。@param request_id 公共请求身份。@param api_token_id 调用方。@param snapshot AT-only快照。@param model 公开模型。@param native_model 观测枚举。@param body Gemini正文。@param system_prompt_policy 本HTTP冻结的账号策略。@param deadline 原单调截止。@param capture 采集策略。@return 持续到原生作业收口的私有事件流。
+    pub async fn send_agy(
+        &self,
+        request_id: &str,
+        api_token_id: i64,
+        snapshot: AgyAccessSnapshot,
+        model: &str,
+        native_model: AgyModelId,
+        body: Value,
+        system_prompt_policy: AgySystemPromptPolicy,
+        deadline: Instant,
+        capture: bool,
+    ) -> Result<reqwest::Response, AppError> {
+        let PreparedRoute::V3 { client, binding } = &self.route else {
+            return Err(AppError::ServiceUnavailable(
+                "AGY需要受管账号运行环境".into(),
+            ));
+        };
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(AppError::ServiceUnavailable("AGY请求已到截止时间".into()));
+        }
+        let submission = AgySubmission {
+            request: PreparedRequest {
+                account_id: self.account_id,
+                environment_id: binding.environment_id.clone(),
+                generation: binding.generation,
+                request_id: request_id.into(),
+                deadline_unix_ms: now_ms() + remaining.as_millis() as u64,
+                method: "POST".into(),
+                target_url: "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent"
+                    .into(),
+                headers: vec![],
+                preserve_header_casing: false,
+                tls_profile: TlsProfileId::default(),
+            },
+            api_token_id,
+            credential_snapshot: snapshot,
+            model: model.into(),
+            native_model,
+            body,
+            system_prompt_policy,
+            capture_enabled: capture,
+        };
+        timeout_at(
+            deadline,
+            client
+                .post(format!("{}/internal/agy/generate", binding.endpoint))
+                .bearer_auth(&binding.secret)
+                .json(&submission)
+                .send(),
+        )
+        .await
+        .map_err(|_| AppError::ServiceUnavailable("AGY发送等待超时".into()))?
+        .map_err(|_| AppError::BadGateway("AGY提交状态待对账".into()))
+    }
 }
 
 /// 已确认归属的内部通道或原有直连兼容通道。
@@ -976,6 +1102,7 @@ fn binding_client(
 struct SenderState {
     config_path: String,
     native_pool: Arc<NativePool>,
+    agy_pool: Arc<AgyPool>,
     native_transition: Arc<RwLock<()>>,
     active: Arc<AtomicU64>,
     evidence_error: Arc<AtomicBool>,
@@ -995,6 +1122,14 @@ fn read_config(path: &str) -> Result<SenderConfig, AppError> {
         .map_err(|_| AppError::ServiceUnavailable("sender configuration unavailable".into()))?;
     let mut config: SenderConfig = serde_json::from_slice(&bytes)
         .map_err(|_| AppError::ServiceUnavailable("invalid sender configuration".into()))?;
+    if let Some(agy) = &config.agy {
+        agy.validate()?;
+        if config.native.is_some() {
+            return Err(AppError::ServiceUnavailable(
+                "账号发送器平台配置冲突".into(),
+            ));
+        }
+    }
     if let Some(native) = &mut config.native {
         // 历史字段兼容解码，执行身份统一由本平台固定清单决定。
         native.release = None;
@@ -1050,6 +1185,14 @@ fn validate_request_at(
         .map_err(|_| AppError::BadRequest("invalid upstream URL".into()))?;
     let allowed = reqwest::Url::parse(&config.allowed_origin)
         .map_err(|_| AppError::ServiceUnavailable("invalid allowed origin".into()))?;
+    // AGY官方路径使用冒号动作，必须在原归属校验内按平台放行精确目标。
+    let allowed_path = if config.agy.is_some() {
+        url.path() == "/v1internal:streamGenerateContent"
+    } else {
+        ["/v1/", "/api/"]
+            .iter()
+            .any(|prefix| url.path().starts_with(prefix))
+    };
     if Uuid::parse_str(&prepared.request_id).is_err()
         || prepared.deadline_unix_ms <= wall_now_ms
         || prepared.deadline_unix_ms > wall_now_ms.saturating_add(REQUEST_BUDGET_MS + CLOCK_SKEW_MS)
@@ -1060,9 +1203,7 @@ fn validate_request_at(
         || !url.username().is_empty()
         || url.password().is_some()
         || url.fragment().is_some()
-        || !["/v1/", "/api/"]
-            .iter()
-            .any(|prefix| url.path().starts_with(prefix))
+        || !allowed_path
     {
         return Err(AppError::BadRequest(
             "runtime request binding or target mismatch".into(),
@@ -1084,9 +1225,10 @@ async fn status(
     let config = read_config(&state.config_path)?;
     authenticate(&headers, &config)?;
     Ok(Json(
-        serde_json::json!({"active": state.active.load(Ordering::SeqCst),
+        serde_json::json!({"active": state.active.load(Ordering::SeqCst).max(state.agy_pool.active().await),
         "environment_id": config.binding.environment_id, "generation": config.binding.generation,
-        "evidence_ok": !state.evidence_error.load(Ordering::SeqCst)}),
+        "evidence_ok": !state.evidence_error.load(Ordering::SeqCst),
+        "agy":if config.agy.is_some() {Some(state.agy_pool.status(&config).await)} else {None}}),
     ))
 }
 
@@ -1096,6 +1238,9 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
         async {
             let mut config = read_config(&state.config_path)?;
             authenticate(&headers, &config)?;
+            if config.agy.is_some() {
+                return Err(AppError::BadRequest("AGY账号只接受对应原生执行协议".into()));
+            }
             if state.evidence_error.load(Ordering::SeqCst) {
                 return Err(AppError::ServiceUnavailable(
                     "API evidence requires maintenance".into(),
@@ -1385,6 +1530,111 @@ async fn native_prepare_cancel(
     Ok(Json(serde_json::json!({"cancelled":true})))
 }
 
+/// 沿现有账号鉴权和环境准入分派AGY私有请求。@param state 发送器。@param headers 服务证明。@param submission 冻结信封。@param prepare 是否仅准备。@return 原生私有事件流。
+async fn agy_operation(
+    state: SenderState,
+    headers: HeaderMap,
+    mut submission: AgySubmission,
+    prepare: bool,
+) -> Response {
+    let mut started = false;
+    let result = async {
+        let transition = state.native_transition.clone().read_owned().await;
+        let config = read_config(&state.config_path)?;
+        authenticate(&headers, &config)?;
+        if config.agy.is_none() {
+            return Err(AppError::ServiceUnavailable(
+                "该账号环境未配置AGY内核".into(),
+            ));
+        }
+        let deadline = validate_request(&submission.request, &config)?;
+        submission.validate(now_ms())?;
+        let target = reqwest::Url::parse(&submission.request.target_url)
+            .map_err(|_| AppError::BadRequest("AGY目标无效".into()))?;
+        if submission.request.method != "POST"
+            || target.path() != "/v1internal:streamGenerateContent"
+            || target.query().is_some()
+        {
+            return Err(AppError::BadRequest("AGY目标与冻结业务协议不符".into()));
+        }
+        state.active.fetch_add(1, Ordering::SeqCst);
+        let guard = ActiveRequest(state.active.clone());
+        submission.capture_enabled =
+            submission.capture_enabled && config.native_capture_dir.is_some();
+        started = true;
+        let response = state
+            .agy_pool
+            .submit(&config, submission, deadline, prepare)
+            .await?;
+        let (parts, body) = response.into_parts();
+        let stream = unfold(
+            (body.into_data_stream(), guard, transition),
+            |(mut stream, guard, transition)| async move {
+                stream
+                    .next()
+                    .await
+                    .map(|item| (item, (stream, guard, transition)))
+            },
+        );
+        Ok::<Response, AppError>(Response::from_parts(parts, Body::from_stream(stream)))
+    }
+    .await;
+    result.unwrap_or_else(|error| {
+        let mut response = error.into_response();
+        response.headers_mut().insert(
+            ERROR_HEADER,
+            if started { "uncertain" } else { "before-send" }
+                .parse()
+                .unwrap(),
+        );
+        response
+    })
+}
+
+/// 只准备AGY进程，模型提交为零。@param state 发送器。@param headers 服务证明。@param submission 准备身份。@return 准备事件流。
+async fn agy_prepare(
+    State(state): State<SenderState>,
+    headers: HeaderMap,
+    Json(submission): Json<AgySubmission>,
+) -> Response {
+    agy_operation(state, headers, submission, true).await
+}
+
+/// 验证原环境并完成工具回填，独立于新凭据发布。@param state 发送器。@param headers 受信证明。@param input 原工具归属。@return 真实收口回执。
+async fn agy_tools(
+    State(state): State<SenderState>,
+    headers: HeaderMap,
+    Json(input): Json<AgyToolCompletion>,
+) -> Result<Json<Value>, AppError> {
+    let _transition = state.native_transition.clone().read_owned().await;
+    let config = read_config(&state.config_path)?;
+    authenticate(&headers, &config)?;
+    if config.agy.is_none() {
+        return Err(AppError::ServiceUnavailable("原AGY环境不可用".into()));
+    }
+    let deadline = validate_request(&input.request, &config)?;
+    let target = reqwest::Url::parse(&input.request.target_url)
+        .map_err(|_| AppError::BadRequest("AGY工具目标无效".into()))?;
+    if input.request.method != "POST"
+        || target.path() != "/v1internal:streamGenerateContent"
+        || target.query().is_some()
+    {
+        return Err(AppError::BadRequest("AGY工具目标与原协议不符".into()));
+    }
+    state.active.fetch_add(1, Ordering::SeqCst);
+    let _guard = ActiveRequest(state.active.clone());
+    state.agy_pool.finish_tools(input, deadline).await.map(Json)
+}
+
+/// 投递AGY模型业务。@param state 发送器。@param headers 服务证明。@param submission 冻结请求。@return 私有原生事件流。
+async fn agy_generate(
+    State(state): State<SenderState>,
+    headers: HeaderMap,
+    Json(submission): Json<AgySubmission>,
+) -> Response {
+    agy_operation(state, headers, submission, false).await
+}
+
 async fn native_forward(
     State(state): State<SenderState>,
     headers: HeaderMap,
@@ -1476,6 +1726,9 @@ async fn native_forward(
 pub fn sender_router(config_path: String) -> Router {
     Router::new()
         .route("/internal/send", post(forward))
+        .route("/internal/agy/prepare", post(agy_prepare))
+        .route("/internal/agy/generate", post(agy_generate))
+        .route("/internal/agy/tools", post(agy_tools))
         .route("/internal/native/status", get(native_status))
         .route("/internal/native/prepare", post(native_prepare))
         .route("/internal/native/readiness", post(native_readiness))
@@ -1490,6 +1743,7 @@ pub fn sender_router(config_path: String) -> Router {
         .with_state(SenderState {
             config_path,
             native_pool: Arc::new(NativePool::default()),
+            agy_pool: Arc::new(AgyPool::default()),
             native_transition: Arc::new(RwLock::new(())),
             active: Arc::new(AtomicU64::new(0)),
             evidence_error: Arc::new(AtomicBool::new(false)),
@@ -1501,6 +1755,7 @@ pub fn sender_router(config_path: String) -> Router {
 mod tests {
     use super::*;
 
+    use crate::service::agy_contract::AGY_SOURCE_SHA256;
     use crate::tlsfp::{parse_test_clienthello, test_request_client};
     use rustls_pki_types::CertificateDer;
     use serde_json::{Value, json};
@@ -1510,6 +1765,38 @@ mod tests {
     use std::path::PathBuf;
     use std::process::{Child, Command, Stdio};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    /// 精确AGY动作通过共享准入，跨平台路径和不同上游继续拒绝。@return 无。
+    #[test]
+    fn agy_action_uses_platform_specific_target_admission() {
+        let mut config: SenderConfig = serde_json::from_value(json!({
+            "binding":{"account_id":17,"environment_id":"synthetic-env","generation":2,
+                "endpoint":"http://localhost:8091","secret":"synthetic-private-secret","release_id":"synthetic"},
+            "proxy_url":"","allowed_origin":"https://cloudcode-pa.googleapis.com",
+            "agy":{"protocol_version":1,"source_sha256":AGY_SOURCE_SHA256,
+                "module_root":"/synthetic/modules","binary_path":"/synthetic/binary","work_root":"/synthetic/work",
+                "max_workers":1,"memory_mib":0}
+        })).unwrap();
+        let mut prepared: PreparedRequest = serde_json::from_value(json!({
+            "account_id":17,"environment_id":"synthetic-env","generation":2,
+            "request_id":Uuid::new_v4().to_string(),"deadline_unix_ms":now_ms()+60000,
+            "method":"POST","target_url":"https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent",
+            "headers":[],"preserve_header_casing":false
+        })).unwrap();
+        assert!(validate_request(&prepared, &config).is_ok());
+        for target in [
+            "https://cloudcode-pa.googleapis.com/v1/messages",
+            "https://cloudcode-pa.googleapis.com/v1internal:generateContent",
+            "https://other.example.test/v1internal:streamGenerateContent",
+        ] {
+            prepared.target_url = target.into();
+            assert!(validate_request(&prepared, &config).is_err());
+        }
+        prepared.target_url =
+            "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent".into();
+        config.agy = None;
+        assert!(validate_request(&prepared, &config).is_err());
+    }
 
     /// 历史root和每版发行选择兼容解码，执行配置收敛为平台内置。@return 无。
     #[test]
@@ -1811,6 +2098,7 @@ mod tests {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let endpoint = format!("http://{}", listener.local_addr().unwrap());
         let config = SenderConfig {
+            agy: None,
             native: None,
             binding: TransportBinding {
                 account_id: 7,
@@ -2247,6 +2535,7 @@ mod tests {
             release_id: "test".into(),
         };
         let config = SenderConfig {
+            agy: None,
             native: None,
             binding,
             proxy_url: String::new(),

@@ -6,6 +6,8 @@ import unittest
 from database_migration_contract import load_registry, registry_contract, validate_registry
 from database_migrations import apply_migrations, migration_plan, schema_checksum
 from pathlib import Path
+from agy_environment_schema import initialize_agy_environment_schema
+from database_schema import initialize_bench_schema
 
 
 class DatabaseMigrationTests(unittest.TestCase):
@@ -108,6 +110,47 @@ class DatabaseMigrationTests(unittest.TestCase):
             self.database.execute("UPDATE system_schema_migrations SET checksum=?", ('c' * 64,))
         with self.assertRaisesRegex(ValueError, '摘要'):
             apply_migrations(self.database)
+
+    def test_cluster_four_upgrade_keeps_assignments_and_adds_independent_agy_environment(self) -> None:
+        """集群正式库追加 AGY 后保持原账号归属与旧程序兼容。@return 无。"""
+        previous = {**self.registry, 'steps': self.registry['steps'][:4]}
+        apply_migrations(self.database, registry=previous)
+        with self.database:
+            self.database.execute("INSERT INTO accounts(id,name,profile_path) VALUES(7,'cluster-old','profiles/old')")
+            self.database.execute("INSERT INTO account_environments(environment_id,name,account_id,fingerprint_json) "
+                "VALUES('cluster-environment','cluster-old',7,'{}')")
+        markers = [tuple(row) for row in self.database.execute('SELECT * FROM system_schema_migrations ORDER BY version')]
+        assignments = [tuple(row) for row in self.database.execute('SELECT * FROM account_node_assignments')]
+        self.assertEqual(5, apply_migrations(self.database)['current_version'])
+        with self.database:
+            self.database.execute("INSERT INTO account_environments(environment_id,name,fingerprint_json) "
+                "VALUES('agy-environment','agy:7','{}')")
+            self.database.execute("INSERT INTO platform_api_environments(gateway_account_id,environment_id,platform) "
+                "VALUES(7,'agy-environment','antigravity')")
+        self.assertEqual(markers, [tuple(row) for row in self.database.execute(
+            'SELECT * FROM system_schema_migrations WHERE version<=4 ORDER BY version')])
+        self.assertEqual(assignments, [tuple(row) for row in self.database.execute('SELECT * FROM account_node_assignments')])
+        self.assertEqual('compatible_newer', apply_migrations(self.database, registry=previous)['state'])
+        self.database.execute("UPDATE accounts SET timezone='Europe/Paris' WHERE id=7")
+        self.database.commit()
+        apply_migrations(self.database)
+        self.assertEqual('Europe/Paris', self.database.execute('SELECT timezone FROM accounts WHERE id=7').fetchone()[0])
+        self.assertIsNone(self.database.execute("SELECT account_id FROM account_environments WHERE environment_id='agy-environment'").fetchone()[0])
+
+    def test_divergent_agy_two_ledger_is_rejected_without_rewriting_data(self) -> None:
+        """旧开发分支同号异身份台账保持失败关闭及完整原始数据。@return 无。"""
+        legacy_step = {**self.registry['steps'][4], 'id': 'bench.agy-environments.2', 'version': 2, 'predecessor': 1}
+        legacy = {**self.registry, 'steps': [self.registry['steps'][0], legacy_step]}
+        runners = {'bench.baseline.1': (initialize_bench_schema, schema_checksum),
+            'bench.agy-environments.2': (initialize_agy_environment_schema,
+                lambda: schema_checksum(Path(__file__).with_name('agy_environment_schema.py')))}
+        apply_migrations(self.database, registry=legacy, runners=runners)
+        self.database.execute("INSERT INTO accounts(name,profile_path) VALUES('retained','profiles/retained')")
+        self.database.commit()
+        before = tuple(self.database.iterdump())
+        with self.assertRaisesRegex(ValueError, '台账版本或摘要'):
+            apply_migrations(self.database)
+        self.assertEqual(before, tuple(self.database.iterdump()))
 
     def test_registry_chain_and_contract_are_explicit(self) -> None:
         """缺前驱、重复ID与破坏性模式不能进入登记。@return None。"""

@@ -48,6 +48,7 @@ use crate::service::gateway::{
     AutoModeClassifierMode, BootstrapModelOptionsMode, CliBgStatusClassifierMode, GatewayService,
     parse_bootstrap_additional_model_options,
 };
+use crate::service::gemini::{self, GeminiService};
 use crate::service::native_contract::validate_idle_timeout;
 use crate::service::oauth::TokenTester;
 use crate::service::oauth_flow::OAuthFlowService;
@@ -96,6 +97,7 @@ const OBSOLETE_SETTINGS_KEYS: &[&str] = &[
 
 #[derive(Clone)]
 pub struct AppState {
+    pub gemini_svc: Arc<GeminiService>,
     pub gateway_svc: Arc<GatewayService>,
     pub account_svc: Arc<AccountService>,
     pub token_tester: Arc<TokenTester>,
@@ -121,6 +123,7 @@ pub fn build_router(
 ) -> Router {
     let proxy_svc = Arc::new(ProxyService::new(settings_store.database_pool()));
     let state = AppState {
+        gemini_svc: Arc::new(GeminiService::default()),
         proxy_svc,
         gateway_svc,
         account_svc,
@@ -260,6 +263,18 @@ pub fn build_router(
         )
         .route("/admin/oauth/exchange-code", post(oauth_exchange_code))
         .route(
+            "/admin/oauth/:session_id/cancel",
+            post(oauth_cancel_session),
+        )
+        .route(
+            "/admin/accounts/:id/agy-credentials",
+            get(agy_credential_status),
+        )
+        .route(
+            "/admin/accounts/:id/agy-credentials/recover",
+            post(agy_credential_recover),
+        )
+        .route(
             "/admin/oauth/exchange-setup-token-code",
             post(oauth_exchange_setup_token_code),
         )
@@ -304,6 +319,8 @@ pub fn build_router(
             },
         )
         .route("/api/hello", get(hello_get).head(hello_head))
+        .route("/v1beta/models", get(gemini::models))
+        .route("/v1beta/models/:action", post(gemini::generate))
         .route("/v1/messages/count_tokens", post(gateway_count_tokens))
         .fallback(gateway_fallback)
         .layer(middleware::from_fn(system_update::middleware))
@@ -398,6 +415,7 @@ struct PageQuery {
 /// 管理账号筛选参数，旧分页请求仍可省略新增字段。
 #[derive(Deserialize)]
 struct AccountListQuery {
+    platform: Option<String>,
     page: Option<i64>,
     page_size: Option<i64>,
     q: Option<String>,
@@ -417,12 +435,16 @@ async fn list_accounts(
     let page_size = query.page_size.unwrap_or(12).clamp(1, 100);
     let search = query.q.as_deref().unwrap_or("").trim();
     let status = query.status.as_deref().unwrap_or("");
+    let platform = query.platform.as_deref().unwrap_or("claude_code");
+    if !["claude_code", "antigravity", "all"].contains(&platform) {
+        return Err(AppError::BadRequest("账号平台筛选无效".into()));
+    }
     if search.chars().count() > 256 || !["", "active", "error", "disabled"].contains(&status) {
         return Err(AppError::BadRequest("账号搜索或状态参数无效".into()));
     }
     let (accounts, total) = state
         .account_svc
-        .list_accounts_filtered(page, page_size, search, status)
+        .list_accounts_filtered(page, page_size, search, status, platform)
         .await?;
     let total_pages = (total + page_size - 1) / page_size;
     let profile_config = state.gateway_svc.profile_selection_config().await;
@@ -471,6 +493,14 @@ async fn list_accounts(
                 obj["proxy_id"] = json!(proxy.id);
                 obj["proxy_name"] = json!(proxy.name);
             }
+        }
+
+        if !a.is_claude_code() {
+            if a.is_antigravity() {
+                obj["credential_state"] = state.account_svc.agy_state(a.id).await?;
+            }
+            data.push(obj);
+            continue;
         }
 
         obj["credential_ownership"] = credential_ownerships
@@ -541,6 +571,7 @@ async fn list_accounts(
     }
 
     Ok(Json(serde_json::json!({
+        "account_counts": state.account_svc.platform_counts(platform).await?,
         "data": data,
         "total": total,
         "page": page,
@@ -554,6 +585,8 @@ async fn list_accounts(
 /// 管理端创建账号载荷，省略账号用量控制线时默认关闭。
 #[derive(Deserialize)]
 struct CreateAccountRequest {
+    platform: Option<String>,
+    agy_system_prompt_homoglyph_enabled: Option<bool>,
     cli_identity: Option<CliIdentityImport>,
     credential_ownership: Option<CredentialOwnershipInput>,
     name: Option<String>,
@@ -718,6 +751,13 @@ async fn runtime_account_config(
     Path(id): Path<i64>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let account = state.account_svc.get_account(id).await?;
+    if account.is_antigravity() {
+        return Ok(Json(
+            json!({"account_id":account.id,"platform":account.platform,"proxy_url":account.proxy_url,
+            "auth_type":account.auth_type,"status":account.status,"email":account.email,"concurrency":account.concurrency,
+            "request_backend":"agy159","credential_state":state.account_svc.agy_state(id).await?}),
+        ));
+    }
     Ok(Json(
         serde_json::json!({"account_id": account.id, "proxy_url": account.proxy_url,
         "auth_type": account.auth_type, "status": account.status, "email": account.email,
@@ -784,6 +824,11 @@ async fn commit_task_proxy_selection(
         ProxyConnection::parse(&input.connection)?;
     }
     let account = state.account_svc.get_account(id).await?;
+    if !account.is_claude_code() {
+        return Err(AppError::BadRequest(
+            "此运行接口仅适用于 Claude Code".into(),
+        ));
+    }
     if account.proxy_url != input.expected_connection {
         return Err(AppError::BadRequest("账号代理已变化，请重新读取".into()));
     }
@@ -841,6 +886,15 @@ async fn runtime_lease_update(
         None
     };
     let account = state.account_svc.get_account(id).await?;
+    if account.is_antigravity()
+        && (!input.owner.starts_with("maintenance:")
+            || !matches!(
+                input.operation.as_str(),
+                "prepare" | "claim" | "heartbeat" | "release"
+            ))
+    {
+        return Err(AppError::BadRequest("AGY账号仅开放环境维护许可".into()));
+    }
     if matches!(
         input.operation.as_str(),
         "prepare" | "prepare-cli" | "prepare-cli-shared" | "claim"
@@ -923,8 +977,13 @@ fn validate_request_backend(value: &str) -> Result<String, AppError> {
 async fn get_account(
     State(state): State<AppState>,
     Path(id): Path<i64>,
-) -> Result<Json<Account>, AppError> {
-    Ok(Json(state.account_svc.get_account(id).await?))
+) -> Result<Json<Value>, AppError> {
+    let account = state.account_svc.get_account(id).await?;
+    let mut value = json!(account);
+    if account.is_antigravity() {
+        value["credential_state"] = state.account_svc.agy_state(id).await?;
+    }
+    Ok(Json(value))
 }
 
 async fn create_account(
@@ -953,9 +1012,39 @@ async fn create_account(
     if req.email.is_empty() {
         return Err(AppError::BadRequest("email is required".into()));
     }
+    let platform = req.platform.as_deref().unwrap_or("claude_code");
+    if !["claude_code", "antigravity"].contains(&platform) {
+        return Err(AppError::BadRequest("账号平台无效".into()));
+    }
+    if platform == "antigravity" && req.auth_type.as_deref() != Some("oauth") {
+        return Err(AppError::BadRequest("AGY 账号仅支持原生 OAuth".into()));
+    }
+    if platform == "claude_code" && req.agy_system_prompt_homoglyph_enabled == Some(true) {
+        return Err(AppError::BadRequest("同形体开关仅适用于 AGY 账号".into()));
+    }
+    if platform == "antigravity"
+        && (req.cli_identity.is_some()
+            || req.credential_ownership.is_some()
+            || req
+                .request_backend
+                .as_deref()
+                .is_some_and(|value| value != "legacy")
+            || req.auto_telemetry == Some(true)
+            || req.auto_poll_usage == Some(true)
+            || req.five_hour_usage_limit_percent != 0
+            || req.seven_day_usage_limit_percent != 0)
+    {
+        return Err(AppError::BadRequest(
+            "AGY 账号配置包含 Claude Code 专用字段".into(),
+        ));
+    }
     let auth_type = req.auth_type.unwrap_or_else(|| "setup_token".into()).into();
     let setup_token = req.setup_token.or(req.token).unwrap_or_default();
     let mut account = Account {
+        platform: platform.into(),
+        agy_system_prompt_homoglyph_enabled: req
+            .agy_system_prompt_homoglyph_enabled
+            .unwrap_or(false),
         id: 0,
         name: req.name.unwrap_or_default(),
         email: req.email,
@@ -1124,6 +1213,11 @@ pub(super) async fn config_permit(
     account: &Account,
     force: bool,
 ) -> Result<Option<RuntimeConfigPermit>, AppError> {
+    if account.is_antigravity() {
+        if state.account_svc.agy_state(account.id).await?["phase"] != "ready" {
+            return Err(AppError::BadRequest("AGY 原凭据操作待核对".into()));
+        }
+    }
     if !force
         && state.account_svc.scheduler().is_none()
         && std::env::var("V3_RUNTIME_URL")
@@ -1224,6 +1318,43 @@ async fn update_account(
         object.insert("proxy_url".into(), json!(url));
     }
     let mut existing = state.account_svc.get_account(id).await?;
+    if !existing.is_claude_code() && !existing.is_antigravity() {
+        return Err(AppError::BadRequest("未知账号平台，请核对原记录".into()));
+    }
+    if existing.is_antigravity() {
+        let runtime_changed = updates
+            .get("proxy_url")
+            .is_some_and(|value| value.as_str() != Some(existing.proxy_url.as_str()))
+            || updates
+                .get("concurrency")
+                .is_some_and(|value| value.as_i64() != Some(existing.concurrency as i64));
+        let _runtime_permit = if runtime_changed {
+            config_permit(&state, &existing, false).await?
+        } else {
+            None
+        };
+        return Ok(Json(
+            state.account_svc.update_agy_fields(id, &updates).await?,
+        ));
+    }
+
+    if updates
+        .get("platform")
+        .is_some_and(|value| value.as_str() != Some(existing.platform.as_str()))
+    {
+        return Err(AppError::BadRequest("账号平台在创建后保持固定".into()));
+    }
+    if let Some(fields) = updates.as_object_mut() {
+        fields.remove("platform");
+    }
+    if let Some(value) = updates.get("agy_system_prompt_homoglyph_enabled") {
+        if !existing.is_antigravity() {
+            return Err(AppError::BadRequest("同形体策略仅用于 AGY 账号".into()));
+        }
+        existing.agy_system_prompt_homoglyph_enabled = value
+            .as_bool()
+            .ok_or_else(|| AppError::BadRequest("同形体开关必须为布尔值".into()))?;
+    }
     let mut option_fields: Vec<&str> = updates
         .as_object()
         .ok_or_else(|| AppError::BadRequest("账号更新必须是对象".into()))?
@@ -1593,6 +1724,10 @@ async fn test_account(
 ) -> Result<Json<serde_json::Value>, AppError> {
     let _credential_activity = state.account_svc.upstream_activity(id).await?;
     let account = state.account_svc.get_account(id).await?;
+    if account.is_antigravity() {
+        let usage = state.account_svc.refresh_usage(id).await?;
+        return Ok(Json(json!({"status":"ok","usage":usage})));
+    }
     let token = match state.account_svc.resolve_upstream_token(id).await {
         Ok(token) => token,
         Err(e) => {
@@ -1764,8 +1899,62 @@ async fn oauth_generate_auth_url(
     Json(req): Json<crate::service::oauth_flow::GenerateAuthUrlRequest>,
 ) -> Result<Json<crate::service::oauth_flow::GenerateAuthUrlResponse>, AppError> {
     let _guard = state.proxy_svc.mutations.lock().await;
-    let req = resolve_oauth_proxy(&state, req).await?;
-    Ok(Json(state.oauth_flow_svc.generate_auth_url(&req)))
+    let mut req = resolve_oauth_proxy(&state, req).await?;
+    if req.platform.as_deref() == Some("antigravity") {
+        if let Some(proxy) = req.proxy_url.as_mut().filter(|value| !value.is_empty()) {
+            *proxy = ProxyConnection::parse(proxy)?.private_url;
+        }
+    }
+    let generation = if req.platform.as_deref() == Some("antigravity") {
+        if let Some(id) = req.account_id {
+            let account = state.account_svc.get_account(id).await?;
+            if !account.is_antigravity()
+                || account.proxy_url != req.proxy_url.as_deref().unwrap_or("")
+            {
+                return Err(AppError::BadRequest("AGY 重授权须保持原账号及代理".into()));
+            }
+            let status = state.account_svc.agy_state(id).await?;
+            if status["phase"] == "reconcile" {
+                state.account_svc.retire_agy_operation(id).await?;
+            } else if status["phase"] != "ready" {
+                return Err(AppError::BadRequest("请先结束或核对原凭据操作".into()));
+            }
+            status["generation"].as_i64()
+        } else {
+            None
+        }
+    } else {
+        if req.account_id.is_some() {
+            return Err(AppError::BadRequest("此目标参数仅适用于 AGY 授权".into()));
+        }
+        None
+    };
+    let result = state
+        .oauth_flow_svc
+        .generate_platform_auth_url(&req, generation)
+        .await?;
+    if let Some(id) = req.account_id {
+        match state
+            .account_svc
+            .begin_agy_reauth(id, &result.session_id)
+            .await
+        {
+            Ok(actual) if Some(actual) == generation => {}
+            other => {
+                let phase = state
+                    .oauth_flow_svc
+                    .cancel_session(&result.session_id)
+                    .await?;
+                state
+                    .account_svc
+                    .cancel_agy_operation(&result.session_id, &phase)
+                    .await?;
+                other?;
+                return Err(AppError::BadRequest("AGY 原账号代次已变化，请重试".into()));
+            }
+        }
+    }
+    Ok(Json(result))
 }
 
 async fn oauth_generate_setup_token_url(
@@ -1774,6 +1963,12 @@ async fn oauth_generate_setup_token_url(
 ) -> Result<Json<crate::service::oauth_flow::GenerateAuthUrlResponse>, AppError> {
     let _guard = state.proxy_svc.mutations.lock().await;
     let req = resolve_oauth_proxy(&state, req).await?;
+    if req.platform.as_deref().unwrap_or("claude_code") != "claude_code" || req.account_id.is_some()
+    {
+        return Err(AppError::BadRequest(
+            "Setup Token 仅适用于 Claude Code".into(),
+        ));
+    }
     Ok(Json(state.oauth_flow_svc.generate_setup_token_url(&req)))
 }
 
@@ -1782,8 +1977,59 @@ async fn oauth_exchange_code(
     Json(req): Json<crate::service::oauth_flow::ExchangeCodeRequest>,
 ) -> Result<Json<crate::service::oauth_flow::ExchangeCodeResponse>, AppError> {
     let _guard = state.proxy_svc.mutations.lock().await;
+    let target = state.oauth_flow_svc.native_target(&req.session_id);
     let resp = state.oauth_flow_svc.exchange_code(&req).await?;
+    if let Some(id) = target {
+        let expiry = chrono::DateTime::from_timestamp(resp.expires_at, 0)
+            .ok_or_else(|| AppError::ServiceUnavailable("AGY 授权有效期无效".into()))?;
+        state.account_svc.finish_agy_operation(id, &req.session_id, &json!({
+            "email_address":resp.email_address,"capabilities":resp.capabilities,"document":{"token":{"access_token":resp.access_token,
+            "refresh_token":resp.refresh_token,"expiry":expiry.to_rfc3339()}}})).await?;
+    }
     Ok(Json(resp))
+}
+
+/// 授权取消的冻结平台。
+#[derive(Deserialize)]
+struct OAuthCancelQuery {
+    platform: Option<String>,
+}
+
+/// 关闭原授权会话及其原生进程。@param state 服务。@param session_id 原会话。@return 终态。
+async fn oauth_cancel_session(
+    State(state): State<AppState>,
+    Path(session_id): Path<String>,
+    Query(query): Query<OAuthCancelQuery>,
+) -> Result<Json<Value>, AppError> {
+    let phase = if query.platform.as_deref() == Some("antigravity") {
+        state
+            .oauth_flow_svc
+            .cancel_native_session(&session_id)
+            .await?
+    } else {
+        state.oauth_flow_svc.cancel_session(&session_id).await?
+    };
+    state
+        .account_svc
+        .cancel_agy_operation(&session_id, &phase)
+        .await?;
+    Ok(Json(json!({"phase":phase})))
+}
+
+/// 读取 AGY 管理操作。@param state 服务。@param id 账号。@return 脱敏状态。
+async fn agy_credential_status(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Json<Value>, AppError> {
+    Ok(Json(state.account_svc.agy_state(id).await?))
+}
+
+/// 恢复原操作已产生的结果。@param state 服务。@param id 账号。@return 脱敏终态。
+async fn agy_credential_recover(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Json<Value>, AppError> {
+    Ok(Json(state.account_svc.recover_agy_operation(id).await?))
 }
 
 async fn oauth_exchange_setup_token_code(
@@ -2656,6 +2902,8 @@ async fn request_native_capture(
         serde_json::json!({"state":"disabled", "message":"本次请求发生时账号内容采集已关闭，设置对后续请求生效"})
     } else if attempt.log_mode == Some(RequestLogMode::Info) {
         serde_json::json!({"state":"summary", "message":"本次请求仅保存摘要"})
+    } else if attempt.context.as_ref().and_then(|c| c.platform.as_deref()) == Some("antigravity") {
+        runtime_bridge::agy_capture(attempt.account_id, &attempt.attempt_id).await?
     } else if matches!(
         attempt.profile_selection.as_str(),
         "native280_cc_prepared" | "native293_cc_prepared"

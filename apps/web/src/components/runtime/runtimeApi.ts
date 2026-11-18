@@ -39,6 +39,10 @@ export interface NativePreparationSnapshot {
 }
 /** 环境列表的真实公开投影，所有身份继续由服务端解释。 */
 export interface RuntimeEnvironment {
+  platform?: 'claude_code' | 'antigravity';
+  agy_runtime?: { version: string; source_sha256: string; state: string; workers?: number; active?: number;
+    tool_waiting?: number; max_workers?: number; image_bytes?: number; image_decode_calls?: number;
+    controller?: { Rss?: number; Pss?: number; USS?: number }; processes?: unknown[] };
   node?: Pick<AccountNodeAssignment, 'node_id' | 'node_key' | 'node_name' | 'kind' | 'enabled'>; node_observed?: boolean; node_message?: string;
   login_draft?: boolean;
   environment_id: string; name: string; account_id: number | null; gateway_account_id?: number | null;
@@ -46,6 +50,7 @@ export interface RuntimeEnvironment {
   fingerprint?: { tz?: string; mem?: string; hostname?: string; lang?: string; profile_version?: number };
   role_status?: Partial<Record<'cli' | 'sender' | 'network', string>>; cli_versions?: string[];
   can_reprofile?: boolean; reprofile_message?: string; run_window?: RunWindow | null;
+  reconcile_allowed?: boolean;
   request_backend?: string; content_capture?: EnvironmentFeature | null; criu?: EnvironmentFeature | null;
   native_kernel?: EnvironmentKernel | null;
   native_kernels?: Partial<Record<'2.1.280' | '2.1.293', EnvironmentKernel | null>>;

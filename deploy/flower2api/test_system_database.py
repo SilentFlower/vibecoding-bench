@@ -8,12 +8,24 @@ import uuid
 from pathlib import Path
 from unittest.mock import patch
 
-from system_update_database import DATABASES, create_snapshot, restore_snapshot, rotate_snapshots, verify_snapshot
+from system_update_database import DATABASES, create_snapshot, restore_snapshot, rotate_snapshots, verify_snapshot, assert_gateway_platform_support
 from runtime_files import atomic_json
 
 
 class DatabaseSnapshotTests(unittest.TestCase):
     """验证实际数据库内容及中断边界，全部使用合成数据。"""
+
+    def test_old_control_is_blocked_when_new_platform_accounts_exist(self) -> None:
+        """受控回退按当前数据阻止旧程序误用AGY账号。@return 无。"""
+        database = self.root / DATABASES['gateway']
+        with sqlite3.connect(database) as connection:
+            connection.execute("CREATE TABLE accounts(id INTEGER PRIMARY KEY,platform TEXT DEFAULT 'claude_code')")
+            connection.execute("INSERT INTO accounts(id) VALUES(1)")
+        assert_gateway_platform_support(self.root, {})
+        with sqlite3.connect(database) as connection:
+            connection.execute("INSERT INTO accounts VALUES(2,'antigravity')")
+        with self.assertRaises(ValueError): assert_gateway_platform_support(self.root, {})
+        assert_gateway_platform_support(self.root, {'vibebench.account-platforms': '1'})
 
     def setUp(self) -> None:
         """创建独立部署与合成双库。@return None。"""

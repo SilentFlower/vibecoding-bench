@@ -1769,6 +1769,7 @@ GET/PUT /api/accounts/{aid}/node
 GET/POST /api/accounts/{account_id}/node-migrations
 GET /api/accounts/{account_id}/node-migrations/{operation_id}
 POST /api/accounts/{account_id}/node-migrations/{operation_id}/{resume|cancel}
+POST /api/environments/{environment_id}/maintenance {operation,expected_generation?}
 cluster_node_ops.py check|status|stop|up --data-root PATH --host-data-root PATH
 cluster_backup.py backup --data-root PATH --backup-dir PATH --epoch HEX32
 node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-backup PATH]
@@ -1795,9 +1796,11 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - 人工停用bench账号可迁移，保留enabled原值。独立迁移沿原owner/profile锁、持久maintenance归属、实际源fence和完整校验执行，保持lease=null；绑定迁移沿原真实排他租约。提交前取消先确认目标停止再恢复源；CAS后继续原目标激活。
 - 暂停节点关闭普通新工作。不启动CLI的设备纯读、原操作停止及凭据交接收尾继续核对原Scope。节点容量或连接未知保持可见，其他节点独立准入。
 - CPU、物理采样、私有请求快照、采集/CRIU和环境维护按人工归属落到Node原方法；中央先发现实际代次，前后核对归属及SSH配置，再CAS镜像环境。CPU保留原在线调整语义；采集/CRIU以每调用`lease_gateway/lease_owner`消费真实中央租约，避免替换共享runtime.gateway。
+- 维护页面冻结`expected_generation`并原样交给所属执行路径。远程CC携带该字段时须为严格整数并匹配重读后的实际代次，在租约及停止前拒绝旧页面；Node再核对原Scope的generation。历史CC调用允许省略字段，本机CC的null沿原可选调用；AGY维护按其独立合同必填严格整数。
 - 配置/维护SSH结果未知时，中央保留关闭的原租约；显式环境对账确认实际停止后释放。原Node配置审计和实际状态用于重读，不以TTL单独认定停止。原授权/凭据待确认继续由原协调器收口。
 - 环境管理私有输入沿Actor的2MiB预算；响应预算由共用`response_limit`决定：请求快照8MiB，其余4MiB，服务端、轻量客户端和SSH一致。快照仍由原`read_capture`执行6MiB文件、UUID、账号和保留期校验；模型业务流不经该JSON预算。
 - 环境摘要从Node原读取器取得采集/CRIU设置，Gateway观察仍核对环境、代次、内核及采样时效。缺失或失联显示未知。请求诊断的可选`execution_location={node_key,environment_id,generation,assignment_revision?}`来自同次已验证传输并沿原JSON持久化；历史缺字段保持未观测。Run详情使用原执行账本定位。
+- AGY尝试同样从已核验TransportBinding冻结execution_location；当前本机执行的node_key为local、assignment_revision为空，与平台/凭据/工具轮的context独立共存。字段缺失保持未知，禁止根据当前账号归属补写历史位置。
 - Node从首次安装保存自己的更新目录与实际镜像来源。来源校验沿原`image_reference`命名合同支持自定义批次；正式签名发行仍使用原独立规则。跨批升级按集群停机SOP，旧控制及账号/独立验收全部停止后才替换，保持原HOME和身份。
 - 全局完整备份收齐同部署、同epoch的中央及全部登记Node快照。SQLite复制使用原backup API；离线固定副本读取使用immutable，避免生成WAL辅助文件改变清单。组合恢复核对安装身份、归属/分配和实际环境，保留pending/reconcile事实。
 
@@ -1813,6 +1816,7 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 | 已登记页面直达、刷新或尾斜杠 | 返回HTML；原管理API与未知网关路径继续鉴权 |
 | 主机公钥、Scope、绑定、分配或实际代次变化 | 拒绝原提交，保留原归属及恢复定位 |
 | malformed Node结果携带较新代次 | 结果校验失败，中央镜像保持原代次 |
+| 远程维护携带过期或非整数expected_generation | 原公共入口返回409，在租约与实际停止前拒绝 |
 | 旧证明、未知输入、未收口执行或RT未知 | 新业务保持关闭，查询/原停止继续按原范围 |
 | Node暂停或bench人工停用 | 普通准入沿原门禁；允许合同中明确的管理或迁移操作 |
 | 原快照缺失/过期/损坏 | 分别返回原404/410/503合同 |
@@ -1830,6 +1834,7 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - 边界：人工停用的独立账号迁移仍保留enabled=0，当前HOME/RT及未知字段随完整包保存；后续普通执行沿原准入。
 - 错误用法：对已有环境直接PUT换节点。正确处理是`POST /api/accounts/1/node-migrations`，冻结`{"operation_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","node_id":2,"revision":1,"version":"2.1.293"}`并按原操作查询/恢复。
 - 错误用法：SSH断连后重新发送模型、OAuth或另起输入。正确处理是先查询原Scope/回执，未知状态保持隔离，明确实际停止后再按原业务恢复。
+- 错误用法：合并诊断时用AGY context替换执行位置字段。正确处理是保留两个可选字段，并在同一真实尝试上分别记录平台上下文和冻结的执行位置。
 
 ### 6. Tests Required
 
@@ -1837,8 +1842,9 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - `test_account_cli_settings`通过真实HTTP账号列表核对全局继承、账号覆盖与设置接口一致，软删除隐藏且读取保持账号数据和执行记录；`test_cluster_nodes`核对删除过滤、停用计数、空节点为0、历史归属保留及恢复后的计数。
 - `test_cluster_node_installation`覆盖202、同节点去重、版本竞争、安装中移除、作业跨请求门禁、失败重试、线程启动失败及重启中断；`verify_cluster_ui.py`覆盖提交关闭、刷新恢复、自动收口与提交响应中断只读核对。Rust真实组合路由测试覆盖全部管理页面、尾斜杠、公开hello及未知路径鉴权。
 - `test_cluster_environment_management`覆盖原HTTP路由、暂停节点管理、大快照、claim延期字段、未知提交保留门禁、实际对账释放及坏回执不推进中央代次；原本机CPU/采集/CRIU测试继续执行。
+- 远程维护过期代次用例经原公共入口验证409、零实际停止和零维护租约；AGY诊断单测与`verify_cluster_request_ui.py`验证context与本机execution_location共存、历史未知以及1440/390布局。
 - `test_cluster_node_docker`按开关运行随机隔离部署：同一真实Rust网关的双账号双Node JSON/SSE及并发、冻结诊断、原管理HTTP/WS、完整所有权、零代删除、独立迁移故障隔离、Node停机换批及HOME身份保留。上游及凭据均使用合成夹具。
-- `test_cluster_backup`及原备份测试核对真实SQLite隔离复制、清单/逻辑摘要、同批组合对应和pending恢复事实。`verify_database_definitions.py`核对bench4/gateway4及冻结来源。
+- `test_cluster_backup`及原备份测试核对真实SQLite隔离复制、清单/逻辑摘要、同批组合对应和pending恢复事实。`verify_database_definitions.py`核对当前bench5/gateway6及原步骤1—4冻结来源。
 - 前端生产构建及`verify_cluster_ui.py`、`verify_cluster_draft_ui.py`、`verify_cluster_request_ui.py`覆盖冻结确认、迟到响应、独立/停用账号、原草稿/WS、历史未观测及390/1440布局；Rust执行fmt与全量测试。
 
 ## Scenario: SSH 节点密码认证与旧密钥配置兼容
@@ -1887,3 +1893,101 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - `test_cluster_password` 核对严格 DTO、原值保存、只写/repr、目录权限、符号链接拒绝、重复登记清理、默认密钥持久字段和安装配置诊断。
 - `CLUSTER_SSH_PASSWORD_TEST=1 ... -m unittest test_cluster_ssh_password` 使用合成密码与隔离回环 Docker sshd，核对正确/错误密码、主机指纹拒绝、特殊字符和大 stdin、实际 Docker SDK、三类隧道、重连及进程清理。夹具构建见 `deploy/flower2api/fixtures/ssh-password/Dockerfile`。
 - 原 `test_cluster_nodes/test_cluster_ssh/test_cluster_backup` 回归，实际已发布 NodeConfiguration 重读新密钥配置；前端构建及 `verify_node_password_ui.py` 核对认证切换、掩码、唯一凭据、清理和 1440/390 布局。
+
+## Scenario: AGY账号运行环境与Gemini业务接入
+
+### 1. Scope / Trigger
+
+修改AGY公共Gemini路由、账号发送器、原生适配、环境维护、资源或交付时适用。实现入口为gateway的gemini/runtime_transport/agy_runtime、orchestrator的agy_environment及agy_runtime包。管理凭据的唯一所有者继续遵循[AGY凭据合同](../../platform/deploy/agy-credential-contract.md)。
+
+### 2. Signatures
+
+- 公共GET `/v1beta/models`，POST `/v1beta/models/:model:generateContent`及`:streamGenerateContent?alt=sse`。令牌接受x-api-key、x-goog-api-key、Bearer或query key；不同来源冲突及重复query key拒绝。
+- 账号发送器POST `/internal/agy/prepare`、`/internal/agy/generate`、`/internal/agy/tools`，复用Bearer、TransportBinding、原请求ID和截止校验；只接受冻结的POST `https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent`目标。
+- `AgyAccessSnapshot`为account_id、credential_generation、access_token、expires_at、email，拒绝refresh_token。`AgyToolCompletion`为request、api_token_id、previous_request_id、body；旧工具控制不携带凭据。
+- `AgySenderConfig`包含protocol_version=1、完整source_sha256、module_root、binary_path、work_root、max_workers和memory_mib。内部监督协议schema_version=1，命令submit/prepare/finish_tools/status/cancel/shutdown，事件持续到job_finalized。
+- 追加`bench.agy-environments.5`：platform_api_environments以唯一gateway_account_id及唯一environment_id绑定现有account_environments，platform固定antigravity。AGY环境account_id为空，名称采用`agy:<gateway-id>`；历史基线保持冻结。
+
+### 3. Contracts
+
+- 候选复用API令牌账号白黑名单、平台、active、凭据ready、已观测model_mappings、冷却、原队列/RPM/并发许可和维护门禁。AGY账号的Gemini/Claude模型都进入固定AGY 1.5.9；公开名与原生MODEL_*或整数ID由受信目录映射，不能按名称猜测。
+- temperature/topP兼容接收后忽略，记录字段及policy=native_default；maxOutputTokens映射原生maxTokens。工具、签名及其他输入继续按实际能力校验。SSE交付源JSON逻辑帧，非流式沿同一执行路径聚合Parts、未知扩展及usage；禁止伪造STOP、[DONE]或成功用量。
+- 正式OAuth观察器核对完整原版SHA、映像身份及四个指令指纹。原生路由为0xa098532，channelModelResponseStream.Receive接收返回位置0x95d1e90，遥测0x89ed91f，codeassist Scanner栈检查后0x95f3212。Receive在AL给出接收结果、RCX给出已核对的GetChatMessageResponse；Scanner原块先私有归档，再解开SSE及response信封。EOF保留错误未知标记，业务成功同时要求源finishReason/安全拦截终态及真实控制RPC成功。部分文本、usage或通道关闭单独出现均不算成功。
+- 管理侧锁内冻结ready状态和AT-only快照。新代采用新worker，最高代次单调，同代不同AT拒绝；旧在途及原工具轮保留归属。工具结果匹配调用方、账号、原历史和函数身份，先回填原MCP并收口，再读当前ready快照开始下一模型轮。concurrency=1复用原许可；pending/reconcile期间可独立收口旧工具，普通发布继续关闭。同结果回执仅在原截止内幂等，副作用只回填一次。
+- 仅源错误code=401/status=UNAUTHENTICATED且没有候选及usage时参与有界恢复；须尚未交付、无工具结果历史、原作业实际收口、同账号ready新代且AT改变，最多一次。容量/控制失败、SSE首帧后、取消或过期均不重放。
+- 账号内共享完整265700040字节封存映像，核对SHA和四封存，decode计数、分发大小、控制/内核/观察器/原生RSS/PSS/USS与cgroup独立展示。max_workers等于账号concurrency，范围1..64，跨模型和凭据代次共用物理上限。有限sender RAM为512+256×workers MiB，network 256MiB、CLI至少512MiB，总量受原预算约束；零沿明确无限策略。
+- cgroup v2读取memory.max、memory.current、memory.peak和memory.swap.current；v1支持memory子目录或挂载根的memory.limit_in_bytes、memory.usage_in_bytes、memory.max_usage_in_bytes，memory.memsw.usage_in_bytes减RAM占用才是swap。v1限制大于等于2^60沿既有规则按无限处理；缺失/损坏为未知，监督器与冻结RAM不一致时拒绝，不能把未知当作无限。
+- 正式模块根为/opt/v3/python，共享runtime_files位于/usr/local/bin。监督器和worker都冻结这两个搜索路径。AT HOME随worker私有发布，退役删除；采集复用账号开关与HTTP日志模式，长期有界脱敏快照位于flows/api/agy-prepared，原始执行材料沿临时worker目录和关闭清理。历史已退役采集保留七天；统一容量、内部旁路及读取合同由网关settings-database的AGY请求记录场景持有。普通输出采用有界匿名暂存，私有事件读取按帧及总字节控制背压。
+- 旧工具和实际Root active纳入维护/升级排空。未知退出阻止新准备，显式对账停止本环境三角色后只清派生缓存和AT副本，保留权威凭据及身份。环境维护回执核对expected_generation；读取不唤醒，UI轮询保留草稿和焦点。存在AGY映射时目标control/account都须声明agy-runtime-protocol=1。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 缺失/禁用令牌 | 401，账号许可不进入业务 |
+| 冲突key、未知输入、错工具调用方/ID或重复续轮 | 受控400，拒绝发送或回填 |
+| pending/reconcile、旧凭据代次、容量或原生失败 | 受控503，保留原请求归属及实际入口计数 |
+| 源只有文本或usage、缺少源终态 | 原生流不完整；非流式503，已开始SSE按失败收尾 |
+| v1/v2合法有限或明确无限预算 | 按冻结值准入；未知/不匹配拒绝 |
+| 公共断连、原截止到期 | 精确取消原作业，活动保持到实际收口后释放 |
+| 监督器异常或旧镜像缺协议 | 待对账或拒绝升级，不自动重放未知请求 |
+
+### 5. Scenarios and Examples
+
+正常：Gemini工具首轮返回真实functionCall并保留原许可；管理侧发布AT2后，调用方带原历史和functionResponse续轮，原AT1 worker完成真实MCP回填，下一模型由AT2 worker执行。边界：管理侧reconcile时先完成旧工具并保留原截止内回执，恢复ready后继续；资源无限必须有真实cgroup依据。
+
+错误用法：以HTTP 200、Go RPC返回或EOF认定部分文本成功；正确处理是同时验证源终态和控制终态。错误用法：用发送器替身的通过结果宣称原生OAuth业务已验证；正确处理是独立运行固定原版、本地TLS及真实MCP闭环。真实Google身份、目录接受性及跨实际到期仍由具备授权账号和独立预算的后续验收承接。
+
+### 6. Tests Required
+
+- `test_agy_runtime`、`test_agy_supervisor`、`test_agy_environment`覆盖AT-only、参数、目录、帧/签名、终态、代次/工具、v1/v2有限/无限/未知预算、环境归属与维护。
+- Rust的runtime_transport单测覆盖精确AGY目标及CC路径隔离；agy_sender_test、gemini_account_test、gemini_contract_test、runtime_transport_test覆盖鉴权、绑定、权限、源聚合与取消。
+- `verify_agy_native_loopback.py --image <明确测试镜像> [--loader-root <显式glibc目录>]`使用真实网关/SQLite/account-sender/监督器/原版和本地TLS/MCP；容器network=none、UID1001、根只读、零真实外部生成。一次性CA只挂验证容器系统信任根，正式配置无测试CA或跳过校验开关。断言参数实际出站、源usage、两代AT、并发1工具回填、重复拒绝、64重复帧与SIGURG、截断/容量失败、断连取消、实际许可释放和共享映像。
+- `verify_agy_runtime.py --native-image <明确镜像> [--crash]`保持零模型准备、两代、单次映像解码及正常/异常物理退出；`verify_agy_gemini.py`继续单独标记发送器替身证据；`verify_agy_environment_ui.py`覆盖1440/720/390px及实际控件边界、草稿、焦点和离页清理。制品资源须从当前受管理源码构建。
+
+## Scenario: AGY账号系统文本同形体策略
+
+### 1. Scope / Trigger
+
+- 修改账号字段`agy_system_prompt_homoglyph_enabled`、Gemini准入/恢复、AGY私有提交、系统文本解码或策略记录时适用。开关按账号独立保存，缺省false；CC、工程任务和养号保持各自合同。
+
+### 2. Signatures
+
+- Rust `AgySubmission.system_prompt_policy: AgySystemPromptPolicy`：`schema_version=1`、`enabled:boolean`、`rule_version="new-api-homoglyph-v1"`。历史信封缺省关闭，关闭时省略扩展序列化；显式策略拒绝未知字段和版本。
+- Python监督信封和`gemini_request`携带同名快照；公开Gemini正文无策略覆盖字段。`transform_system(system, policy)`返回提交文本及策略回执。
+- `verify_agy_native_loopback.py --image <明确镜像> [--loader-root <显式glibc目录>] --homoglyph`验证真实固定原版系统段；`--capture-off`独立验证采集关闭。
+
+### 3. Contracts
+
+- 账号准入读取当前账号后冻结策略。同HTTP的有界OAuth恢复复用该快照；新HTTP工具续轮先收口原工具，再采用新请求的账号配置。策略排除在worker key之外，单独切换开关复用暖worker。
+- 唯一字符表位于`agy_runtime/resources/system-prompt-homoglyph-v1.json`，固定26个ASCII到同形Unicode映射，构建纳入`admission.json.resource_hashes`。镜像及组件内容身份包含受管理规则资源，运行不依赖外部Worker目录。
+- 只处理解码后的独立`system`，经Cortex自定义prompt section提交。多Part按既有换行合并；未命中码点原样，输出确定、幂等、Unicode码点数量保持一致。UTF-8字节数可改变。用户/模型历史、工具、参数、结果、ID和签名继续既有映射；原始`gemini_body`深拷贝保持转换前数据。
+- `request_accepted.system_prompt_policy`含`schema_version/enabled/rule_version/rule_sha256/source/changed/replaced_codepoints/system_codepoints`。source固定`cortex_custom_system`，描述独立系统段处理来源；该事件产生于原生RPC提交前。`rule_sha256`标识规则资源字节，计数表示Unicode码点，均不换算token。开启但空文本或已转换文本可有`changed=false`。
+- 网关按本HTTP和实际attempt身份核对回执的开关、版本、来源、摘要形状及计数一致性。启用请求收到匹配回执后才交付Gemini源帧；每次认证恢复重新等待回执。历史关闭请求兼容缺失回执。
+- 临时执行材料中，`gemini-input.json`为转换前已解码Gemini视图，`input-mapping.json`记录策略，`rpc.ndjson`包含提交的系统段。长期采集使用独立有界脱敏快照，区分decoded_gemini_input及native_cascade_prompt_sections；原始HTTP由独立入站旁路保存。采集关闭沿匿名暂存与收口清理，公共日志仅记录策略元数据。
+- 上游`usageMetadata`、缓存及思考扩展沿源帧交付。真实分词、缓存命中和计费效果使用授权账号及独立预算验收；本地TLS合成usage只验证来源保真。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 缺省关闭、显式关闭 | 目标文本原样处理；旧默认私有发送兼容 |
+| 启用、空系统文本、已经转换 | 确定性处理；无替换时changed=false |
+| 畸形策略、未知规则或资源摘要失配 | 在模型发送前拒绝；旧严格消费者拒绝未知启用扩展 |
+| 启用请求缺失或错误回执 | 公共请求受控失败，拒绝交付源帧 |
+| 超出固定原版上下文预算 | 保留原生失败边界；本地验收503且零模型提交，后续预算内请求可用 |
+| 关闭账号开关 | 后续HTTP恢复原文；同HTTP恢复和旧工具归属继续冻结合同 |
+
+### 5. Scenarios and Examples
+
+- 正常：开启账号将系统`ABC system 中文 {x: 3}`转换为`ΑΒС ѕуѕtеm 中文 {х: 3}`。同样内容作为用户文本仍按原历史映射；再次经过保持同一系统文本。
+- 边界：请求开启后收到明确401，此时管理员关闭账号开关；该HTTP认证恢复仍开启，下个HTTP采用关闭配置。
+- 错误用法：对完整Gemini JSON做字符替换，或以替换字符数宣称真实缓存收益。正确处理：只转换独立system，保留原始入站与结构字段，缓存及计费单独用供应商来源验收。
+
+### 6. Tests Required
+
+- `test_agy_system_prompt`核对26字符参考向量、幂等、Unicode/空文本/大文本、原始正文与历史/工具/签名保护、严格策略及公开覆盖拒绝。
+- Rust `gemini_contract_test`、`agy_sender_test`核对缺省关闭省略、错误规则在启动前拒绝及回执计数/版本/来源；完整`cargo test --locked`继续覆盖CC回归。
+- `verify_agy_gemini.py`单独标记真实HTTP/SQLite与合成发送器证据，覆盖两账号隔离、认证恢复策略冻结、下一HTTP读取新开关及缺失/错误回执。
+- 本地TLS的`--homoglyph`覆盖普通/SSE、工具新HTTP、实际系统文本及用户历史对照、幂等、预算内大文本/超限零提交、暖PID、源usage/cache和策略账本；`--capture-off`核对转换生效且收口后无请求正文归档。容器保持断网、UID1001、零真实外部模型费用。
+- 前端构建及`verify_agy_accounts_ui.py`覆盖原账号控件默认值、两账号差异载荷、草稿、授权回执归属及390px；迟到保存反馈继续受editorGeneration约束。

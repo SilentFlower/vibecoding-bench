@@ -56,7 +56,7 @@ async fn references(state: &AppState) -> Result<References, AppError> {
         complete: true,
     };
     let (accounts, runtime, pending) = tokio::join!(
-        state.account_svc.list_accounts(),
+        state.account_svc.list_platform_accounts(),
         runtime_bridge::proxy_references(),
         state.proxy_svc.store.pending_sync()
     );

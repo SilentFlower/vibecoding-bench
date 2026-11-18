@@ -1,0 +1,225 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "experiment": "rpc-00b57e0c8ed8",
+      "result": {
+        "evidence": "native_oauth",
+        "scope": "at_only_text_medium",
+        "start_status": 200,
+        "requested_model": "MODEL_PLACEHOLDER_M319",
+        "reserved_generations": 1,
+        "send_status": 500,
+        "trajectory_status": 200,
+        "step_types": [
+          "CORTEX_STEP_TYPE_USER_INPUT",
+          "CORTEX_STEP_TYPE_PLANNER_RESPONSE",
+          "CORTEX_STEP_TYPE_ERROR_MESSAGE"
+        ],
+        "planner_statuses": [
+          "CORTEX_STEP_STATUS_DONE"
+        ],
+        "observed_planner_steps": 1,
+        "marker_observed": false,
+        "generator_models": [
+          "MODEL_PLACEHOLDER_M319"
+        ]
+      }
+    },
+    {
+      "experiment": "rpc-191c8459a0fe",
+      "result": {
+        "evidence": "native_oauth",
+        "scope": "at_only_text",
+        "start_status": 200,
+        "requested_model": "MODEL_PLACEHOLDER_M320",
+        "reserved_generations": 1,
+        "send_status": 503,
+        "trajectory_status": 200,
+        "step_types": [
+          "CORTEX_STEP_TYPE_USER_INPUT",
+          "CORTEX_STEP_TYPE_PLANNER_RESPONSE",
+          "CORTEX_STEP_TYPE_ERROR_MESSAGE"
+        ],
+        "planner_statuses": [
+          "CORTEX_STEP_STATUS_DONE"
+        ],
+        "observed_planner_steps": 1,
+        "marker_observed": true,
+        "generator_models": [
+          "MODEL_PLACEHOLDER_M320"
+        ]
+      }
+    },
+    {
+      "experiment": "rpc-433c2d4d76b1",
+      "result": {
+        "evidence": "native_oauth",
+        "scope": "at_only_text_observed",
+        "start_status": 200,
+        "requested_model": "MODEL_PLACEHOLDER_M320",
+        "reserved_generations": 1,
+        "send_status": 200,
+        "trajectory_status": 200,
+        "step_types": [
+          "CORTEX_STEP_TYPE_USER_INPUT",
+          "CORTEX_STEP_TYPE_PLANNER_RESPONSE"
+        ],
+        "planner_statuses": [
+          "CORTEX_STEP_STATUS_DONE"
+        ],
+        "observed_planner_steps": 1,
+        "marker_observed": true,
+        "generator_models": [
+          "MODEL_PLACEHOLDER_M320"
+        ]
+      },
+      "events": {
+        "observer_ready": 1,
+        "model_start": 1,
+        "telemetry_upload_sample": 29
+      },
+      "observed_credential_generations": {},
+      "token_callers": [],
+      "native_json_callers": [],
+      "native_exits": []
+    },
+    {
+      "experiment": "rpc-efd57b8bd309",
+      "result": {
+        "evidence": "native_oauth",
+        "scope": "tool_wait_credential_swap",
+        "reserved_generations": 2,
+        "tool_effect_count": 1,
+        "file_published_generation_2": true,
+        "start_status": 200,
+        "different_access_token": true,
+        "send_status": 200,
+        "trajectory_status": 200,
+        "step_types": [
+          "CORTEX_STEP_TYPE_USER_INPUT",
+          "CORTEX_STEP_TYPE_PLANNER_RESPONSE",
+          "CORTEX_STEP_TYPE_GENERIC",
+          "CORTEX_STEP_TYPE_PLANNER_RESPONSE"
+        ],
+        "observed_planner_steps": 2,
+        "marker_observed": true,
+        "tool_calls": [
+          {
+            "conversation_matches": true,
+            "trajectory_matches": true,
+            "arguments_match": true,
+            "new_call": true,
+            "matched": true
+          }
+        ]
+      },
+      "events": {
+        "observer_ready": 1,
+        "oauth_token_read": 29,
+        "model_start": 2,
+        "telemetry_upload_sample": 42,
+        "native_exit": 1
+      },
+      "observed_credential_generations": {
+        "1": 29
+      },
+      "token_callers": [
+        130798262,
+        157103650,
+        169899433
+      ],
+      "native_json_callers": [],
+      "lifecycle": {
+        "observer_exit_code": 0,
+        "events_closed": true,
+        "drain": {
+          "state": "business_queues_empty",
+          "clients": 3,
+          "layers": 1
+        }
+      },
+      "native_exits": [
+        {
+          "code": 0,
+          "signal": 0
+        }
+      ]
+    },
+    {
+      "experiment": "rpc-cc2b923cf193",
+      "result": {
+        "evidence": "native_oauth",
+        "scope": "native_scanner_sse_blocks",
+        "send_status": 200,
+        "observed_planner_steps": 1,
+        "marker_observed": true
+      },
+      "events": {
+        "observer_ready": 1,
+        "model_start": 1,
+        "oauth_token_read": 26,
+        "telemetry_upload_sample": 6,
+        "native_sse_block": 2,
+        "native_exit": 1
+      },
+      "native_exits": [
+        {
+          "code": 0,
+          "signal": 0
+        }
+      ],
+      "lifecycle": {
+        "observer_exit_code": 0,
+        "events_closed": true,
+        "drain": {
+          "state": "business_queues_empty",
+          "clients": 3,
+          "layers": 1
+        }
+      },
+      "sse_summary": "native-sse-summary.json",
+      "observed_credential_generations": {
+        "2": 26
+      }
+    }
+  ],
+  "budget": {
+    "limit": 8,
+    "reserved": 8,
+    "experiments": [
+      {
+        "experiment": "rpc-191c8459a0fe",
+        "reserved": 1
+      },
+      {
+        "experiment": "rpc-00b57e0c8ed8",
+        "reserved": 1
+      },
+      {
+        "experiment": "rpc-433c2d4d76b1",
+        "reserved": 1,
+        "initial_reserved": 2,
+        "verified_model_calls": 1
+      },
+      {
+        "experiment": "rpc-efd57b8bd309",
+        "reserved": 2
+      },
+      {
+        "experiment": "rpc-cc2b923cf193",
+        "reserved": 1
+      }
+    ],
+    "uncertain_attempt_reservation": 2,
+    "completed_case_releases": [
+      {
+        "experiment": "rpc-433c2d4d76b1",
+        "released": 1,
+        "basis": "native_model_start_1_planner_1_http_200"
+      }
+    ]
+  },
+  "original_running": true,
+  "remaining_experiment_containers": []
+}

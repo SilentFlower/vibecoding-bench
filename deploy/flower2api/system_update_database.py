@@ -23,6 +23,17 @@ from system_update_contract import safe_read, strict_json, utc_now
 DATABASES = {'bench': 'bench/db.sqlite', 'gateway': 'gateway/gateway.sqlite'}
 
 
+def assert_gateway_platform_support(data: Path, labels: dict) -> None:
+    """按当前账号数据阻止平台能力降级。:param data: 固定数据根。:param labels: 目标控制镜像标签。:return: None。"""
+    if labels.get('vibebench.account-platforms') == '1':
+        return
+    database = data / DATABASES['gateway']
+    with closing(sqlite3.connect(database.as_uri() + '?mode=ro', uri=True)) as connection:
+        columns = {row[1] for row in connection.execute('PRAGMA table_info(accounts)')}
+        if 'platform' in columns and connection.execute("SELECT 1 FROM accounts WHERE platform<>'claude_code' LIMIT 1").fetchone():
+            raise ValueError('当前账号包含新平台记录，目标旧版缺少平台隔离能力，请使用兼容版本')
+
+
 def assert_quiescent(data: Path) -> None:
     """在停止控制服务后拒绝仍持有本部署数据库的本机进程。
 

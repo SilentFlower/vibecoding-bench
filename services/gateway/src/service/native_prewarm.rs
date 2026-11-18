@@ -360,7 +360,10 @@ async fn check_one(
     };
     let deadline = Instant::now() + Duration::from_secs(120);
     let account = accounts.get_account(id).await?;
-    if account.status != AccountStatus::Active || account.request_backend != "native293" {
+    if !account.is_claude_code()
+        || account.status != AccountStatus::Active
+        || account.request_backend != "native293"
+    {
         return Ok(json!({"state":"disabled"}));
     }
     let queue = accounts.get_or_create_queue(id, account.concurrency).await;
@@ -402,7 +405,10 @@ async fn check_one(
     // 凭据刷新由现有所有者完整完成；取消不能打断 RT 的持久归属事务。
     let bearer = accounts.resolve_upstream_token(id).await?;
     let account = accounts.get_account(id).await?;
-    if account.status != AccountStatus::Active || account.request_backend != "native293" {
+    if !account.is_claude_code()
+        || account.status != AccountStatus::Active
+        || account.request_backend != "native293"
+    {
         return Ok(json!({"state":"disabled"}));
     }
     let preparation = NativePreparation {
