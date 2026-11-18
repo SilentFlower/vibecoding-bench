@@ -11,6 +11,7 @@ deploy/、images/ 与 .github/workflows/；跨模块升级和发行合同。
 | [Auth Design (Cookie Session)](./auth-design.md) | 当前合同与验证要求 |
 | [Image Build & GHCR Push](./image-build-push.md) | 当前合同与验证要求 |
 | [Claude Code 官方协议抓包](./official-protocol-capture.md) | 当前合同与验证要求 |
+| [AGY 固定原版凭据研究](./agy-credential-contract.md) | AT-only、接管锁、缓存及原生证据边界 |
 | [v3 平台在线更新合同](./platform-online-update.md) | 当前合同与验证要求 |
 | [Remote Deploy](./remote-deploy.md) | 当前合同与验证要求 |
 | [账号环境共同合同](../../orchestrator/backend/account-runtime-v3.md) | 数据身份与生命周期的权威位置 |

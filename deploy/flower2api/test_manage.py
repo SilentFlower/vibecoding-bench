@@ -106,19 +106,20 @@ class PreflightTests(unittest.TestCase):
                 patch.object(manage.Path, "read_text", return_value="MemAvailable: 2097152 kB\nSwapFree: 0 kB\n"):
             self.assertEqual(self.root, manage.preflight(self.values))
 
-    def test_native_release_key_enables_all_environments_without_pilot(self) -> None:
-        """发行公钥独立启用管理，旧环境选择字段作为历史配置忽略。@return None。"""
-        self.values.update(V3_ACCOUNT_MEMORY='1536m', V3_NATIVE_RELEASE_PUBLIC_KEY='b' * 64)
+    def test_historical_native_release_fields_keep_configuration_compatibility(self) -> None:
+        """历史独立内核字段按兼容配置读取，平台镜像负责内核交付。@return None。"""
+        self.values['V3_ACCOUNT_MEMORY'] = '1536m'
         with patch.object(manage, 'command', return_value=''), \
                 patch.object(manage, 'inspect_images', return_value={}), \
                 patch.object(manage.Path, 'read_text', return_value='MemAvailable: 2097152 kB\nSwapFree: 0 kB\n'):
             self.assertEqual(manage.preflight(self.values), self.root)
             self.values['V3_NATIVE_RELEASE_PILOT_ENVIRONMENT'] = 'obsolete'
-            self.assertEqual(manage.preflight(self.values), self.root)
-            for key in ('b' * 63, 'z' * 64):
+            for key in ('', 'b' * 64, 'b' * 63, 'z' * 64):
                 self.values['V3_NATIVE_RELEASE_PUBLIC_KEY'] = key
-                with self.subTest(key=key), self.assertRaisesRegex(ValueError, '有效发布公钥'):
-                    manage.preflight(self.values)
+                with self.subTest(key=key):
+                    self.assertEqual(manage.preflight(self.values), self.root)
+                    self.assertEqual(key, self.values['V3_NATIVE_RELEASE_PUBLIC_KEY'])
+                    self.assertEqual('obsolete', self.values['V3_NATIVE_RELEASE_PILOT_ENVIRONMENT'])
 
     def test_native_criu_flag_requires_explicit_binary_value(self) -> None:
         """防止恢复权限开关被拼写错误静默关闭。@return None。"""
@@ -579,17 +580,20 @@ class PublicSourceSnapshotTests(unittest.TestCase):
         """已核CRLF转换可恢复，执行位不变；未知修改或父链接不能借恢复路径进入。@return None。"""
         names = ['project_library/projects/python-dateutil/seed/library/NEWS',
             'project_library/projects/python-dateutil/seed/library/docs/make.bat']
+        # Git 属性可将上游 LF 原件检出为 CRLF；先还原固定原件再构造测试副本。
+        originals = {relative: source_path(manage.REPO, relative).read_bytes().replace(b'\r\n', b'\n')
+            for relative in names}
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for relative in names:
                 target = root / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes((source_path(manage.REPO, relative)).read_bytes().replace(b'\n', b'\r\n'))
+                target.write_bytes(originals[relative].replace(b'\n', b'\r\n'))
                 target.chmod(0o755)
             self.assertEqual(names, manage.restore_upstream_checkout_bytes(root))
             self.assertEqual([], manage.restore_upstream_checkout_bytes(root))
             for relative in names:
-                self.assertEqual((source_path(manage.REPO, relative)).read_bytes(), (root / relative).read_bytes())
+                self.assertEqual(originals[relative], (root / relative).read_bytes())
                 self.assertEqual(0o755, (root / relative).stat().st_mode & 0o777)
             first, second = [root / relative for relative in names]
             first.write_bytes(first.read_bytes().replace(b'\n', b'\r\n'))
