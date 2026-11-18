@@ -9680,7 +9680,7 @@ def set_initial_account_node(aid: int, body: AccountNodeChange) -> dict:
 
 @app.get("/api/accounts")
 def list_accounts():
-    """返回账号列表，并补充 OAuth token 状态。"""
+    """返回账号列表，并补充有效 CLI 版本及 OAuth 状态。:return: 未删除账号的公开列表。"""
     ownerships = credential_ownership.summaries() if credential_ownership else {}
     conn = get_db()
     try:
@@ -9693,6 +9693,7 @@ def list_accounts():
             if _login_save_pending(conn, row["name"]):
                 continue
             account = dict(row)
+            account["effective_claude_code_version"], account["claude_code_version_source"] = _resolve_account_cli_version(account)
             account['credential_ownership'] = ownerships.get(account['id'])
             account['warmup_engine'] = 'projects' if isinstance(warmup_pi_service, ProjectsService) else 'worker'
             account['project_pi'] = None

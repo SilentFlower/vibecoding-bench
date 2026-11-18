@@ -1758,6 +1758,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 ```text
 GET/POST /api/nodes
+GET /api/accounts -> effective_claude_code_version:string, claude_code_version_source:account|global
 POST /api/nodes/host-keys
 POST /api/nodes/{node_id}/check
 POST /api/nodes/{node_id}/prepare
@@ -1777,6 +1778,8 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 
 ### 3. Contracts
 
+- 节点迁移选择器从`GET /api/accounts`读取有效CLI版本；列表与`GET /api/accounts/{aid}/cli-settings`共用`_resolve_account_cli_version`，账号版本优先、全局版本兜底，并返回`claude_code_version_source`。读取列表只生成投影。
+- `GET /api/nodes`的`account_count`只统计关联到`accounts.deleted_at IS NULL`的归属，包含人工停用账号；软删除的历史归属继续保留，零账号节点返回0。
 - `NodeLocation={node_key,account_id,environment_id,assignment_revision}`核对安装、正式账号和分配标记；具体工作另冻结实际环境`generation`、原source、操作和内容摘要。分配版本、环境代次、草稿身份及租约代次分别使用各自模型。
 - Node私有UDS由同批control的长驻`cluster_agent`持有真实runtime/jobs。SSH只调用`cluster_agent_client`固定操作；轻量入口、Actor和SSH共用具体操作白名单，控制查询/续接保留独立槽位。
 - 中央持有真实Gateway租约与原QuotaGuard许可。`ExecutionLeaseProof`只传`owner/generation/expires_at/exclusive/shared_cli`，从Gateway回执投影时保留其原`phase`在中央核对，claim后使用更新的截止时间。证明过期关闭新启动和输入；原Scope可恢复停止能力，实际停止确认后才释放原许可。
@@ -1799,6 +1802,8 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 | 条件 | 期望 |
 | --- | --- |
 | Node参数或私钥格式非法 | 固定校验错误，不回显输入材料 |
+| 账号版本继承全局或人工停用 | 列表仍返回有效CLI版本；停用账号仍计入节点归属 |
+| 账号软删除 | 账号列表隐藏且节点计数排除，原历史归属保留 |
 | 主机公钥、Scope、绑定、分配或实际代次变化 | 拒绝原提交，保留原归属及恢复定位 |
 | malformed Node结果携带较新代次 | 结果校验失败，中央镜像保持原代次 |
 | 旧证明、未知输入、未收口执行或RT未知 | 新业务保持关闭，查询/原停止继续按原范围 |
@@ -1812,6 +1817,8 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 ### 5. Scenarios and Examples
 
 - 正常：准备SSH节点2后，为尚无执行资料的账号1发送`PUT /api/accounts/1/node`，body为`{"node_id":2,"revision":1}`；原统一网关继续使用该账号原令牌。
+- 正常：全局CLI为`2.1.293`且账号继承时，账号列表返回该有效版本供迁移确认冻结；本机14条归属中10个账号已软删除，页面`account_count`为4。
+- 错误用法：直接把数据库内可空的`claude_code_version`作为迁移按钮准入版本。正确处理是返回解析后的`effective_claude_code_version`。
 - 边界：人工停用的独立账号迁移仍保留enabled=0，当前HOME/RT及未知字段随完整包保存；后续普通执行沿原准入。
 - 错误用法：对已有环境直接PUT换节点。正确处理是`POST /api/accounts/1/node-migrations`，冻结`{"operation_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","node_id":2,"revision":1,"version":"2.1.293"}`并按原操作查询/恢复。
 - 错误用法：SSH断连后重新发送模型、OAuth或另起输入。正确处理是先查询原Scope/回执，未知状态保持隔离，明确实际停止后再按原业务恢复。
@@ -1819,6 +1826,7 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 ### 6. Tests Required
 
 - `test_cluster*`覆盖真实双SQLite、私有UDS/SSH、错误Scope/认证、有限证明、未知输入、各执行消费者、迁移CAS和恢复；Node关闭后仅恢复实际停止能力。
+- `test_account_cli_settings`通过真实HTTP账号列表核对全局继承、账号覆盖与设置接口一致，软删除隐藏且读取保持账号数据和执行记录；`test_cluster_nodes`核对删除过滤、停用计数、空节点为0、历史归属保留及恢复后的计数。
 - `test_cluster_environment_management`覆盖原HTTP路由、暂停节点管理、大快照、claim延期字段、未知提交保留门禁、实际对账释放及坏回执不推进中央代次；原本机CPU/采集/CRIU测试继续执行。
 - `test_cluster_node_docker`按开关运行随机隔离部署：同一真实Rust网关的双账号双Node JSON/SSE及并发、冻结诊断、原管理HTTP/WS、完整所有权、零代删除、独立迁移故障隔离、Node停机换批及HOME身份保留。上游及凭据均使用合成夹具。
 - `test_cluster_backup`及原备份测试核对真实SQLite隔离复制、清单/逻辑摘要、同批组合对应和pending恢复事实。`verify_database_definitions.py`核对bench4/gateway4及冻结来源。

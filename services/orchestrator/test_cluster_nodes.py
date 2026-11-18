@@ -68,6 +68,24 @@ class ClusterNodeTests(unittest.TestCase):
         self.assertEqual([('old', 'local'), ('new', 'local')], [tuple(row) for row in rows])
         self.assertEqual(1, connection.execute('SELECT COUNT(*) FROM cluster_nodes').fetchone()[0])
 
+    def test_account_count_excludes_deleted_and_keeps_disabled_and_historical_assignments(self) -> None:
+        """公开计数排除软删除，停用账号继续计入，历史归属保留并支持恢复。:return: None。"""
+        node = self.service.register(NodeCreate(**self.config, private_key=self.key.read_text()))
+        connection = self.database()
+        self.addCleanup(connection.close)
+        with connection:
+            connection.execute("INSERT INTO accounts(name,profile_path) VALUES('active','profiles/active')")
+            connection.execute("INSERT INTO accounts(name,profile_path,enabled) VALUES('disabled','profiles/disabled',0)")
+            deleted = connection.execute("INSERT INTO accounts(name,profile_path,deleted_at) "
+                "VALUES('deleted','profiles/deleted',1)").lastrowid
+        assignments = [tuple(row) for row in connection.execute('SELECT * FROM account_node_assignments ORDER BY account_id')]
+        counts = {row['node_key']: row['account_count'] for row in self.store.list()}
+        self.assertEqual({'local': 2, node['node_key']: 0}, counts)
+        self.assertEqual(assignments, [tuple(row) for row in connection.execute('SELECT * FROM account_node_assignments ORDER BY account_id')])
+        with connection:
+            connection.execute('UPDATE accounts SET deleted_at=NULL WHERE id=?', (deleted,))
+        self.assertEqual(3, next(row['account_count'] for row in self.store.list() if row['node_key'] == 'local'))
+
     def test_missing_registered_cluster_structure_is_rejected(self) -> None:
         """已登记库损坏时拒绝伪装成功。:return: None。"""
         connection = self.database()

@@ -26,7 +26,8 @@ class ClusterStore:
         try:
             rows = connection.execute('SELECT * FROM cluster_nodes WHERE deleted_at IS NULL ORDER BY id').fetchall()
             counts = {row[0]: row[1] for row in connection.execute(
-                'SELECT node_id,COUNT(*) FROM account_node_assignments GROUP BY node_id')}
+                'SELECT b.node_id,COUNT(*) FROM account_node_assignments b JOIN accounts a ON a.id=b.account_id '
+                'WHERE a.deleted_at IS NULL GROUP BY b.node_id')}
             return [self._public(dict(row), counts.get(row['id'], 0)) for row in rows]
         finally:
             connection.close()
