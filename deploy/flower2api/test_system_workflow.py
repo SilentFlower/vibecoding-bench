@@ -65,10 +65,9 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotIn('if [', runs[verify])
         build_runs = [step.get('run', '') for step in self.workflow('v3-build.yml')['jobs']['build']['steps']]
         self.assertIn(runs[build], build_runs)
-        validation = next(run for run in runs if 'unittest discover' in run)
+        validation = next(run for run in runs if 'verify_release_tests.py --python' in run)
         self.assertIn(validation, build_runs)
-        for required in ('test_publication', 'test_system_workflow', 'test_database_compatibility'):
-            self.assertIn(required, validation)
+        self.assertIn('verify_database_definitions.py', validation)
 
     def test_legacy_main_publish_is_manual(self) -> None:
         """历史入口保留明确退役说明，写权限和镜像发布步骤归零。@return None。"""

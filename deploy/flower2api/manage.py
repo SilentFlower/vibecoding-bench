@@ -721,7 +721,8 @@ def publish(manifest_path: Path, output_path: Path, bundle_path: Path,
         with os.fdopen(descriptor, "wb") as output:
             process = subprocess.Popen(["docker", "save", *references.values()], cwd=REPO, stdout=subprocess.PIPE)
             try:
-                with gzip.GzipFile(fileobj=output, mode="wb", mtime=0) as archive:
+                # 联合包优先流式交付速度；低压缩级别保留原 gzip、摘要和离线恢复合同。
+                with gzip.GzipFile(fileobj=output, mode="wb", compresslevel=1, mtime=0) as archive:
                     shutil.copyfileobj(process.stdout, archive, length=1024 * 1024)
                 if process.wait() != 0:
                     raise ValueError("同批镜像包生成失败")

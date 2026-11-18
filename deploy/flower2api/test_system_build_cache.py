@@ -87,8 +87,14 @@ class BuildCacheTests(unittest.TestCase):
         reader = next(step for step in steps if step.get('uses') == 'actions/cache/restore@v5')
         self.assertIn("write != 'true'", reader['if'])
         config = next(step for step in steps if step.get('id') == 'config')['env']
-        for path in ('Cargo.toml', 'Cargo.lock', 'vendor/**', 'craftls/**', 'Dockerfile'):
+        for path in ('Cargo.toml', 'Cargo.lock', 'vendor/**', 'craftls/**'):
             self.assertIn(path, config['DEPENDENCIES'])
+        self.assertNotIn('Dockerfile', config['DEPENDENCIES'])
+        self.assertIn('Dockerfile', config['LEGACY_DEPENDENCIES'])
+        configuration = next(step for step in steps if step.get('id') == 'config')['run']
+        self.assertIn('build_cache_key.py images/v3/Dockerfile', configuration)
+        self.assertIn('flower2api-cargo-v2-', configuration)
+        self.assertIn('flower2api-cargo-v1-', configuration)
         for path in ('services/gateway/src/**', 'apps/web/**', 'platform-release.json'):
             self.assertIn(path, config['SOURCES'])
 

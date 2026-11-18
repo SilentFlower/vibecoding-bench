@@ -396,6 +396,8 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 - `manage.build(release: str, manifest_path: Path) -> None` 保留原调用方式；`_build_arguments(role: str) -> list[str]` 为两个角色生成受限命令前缀。
 - `verify_database_compatibility.verify(manifest: Path, public_key: str, output: Path, *, history_root: Path | None = None, workers: int = 1) -> dict`。
 - `python3 deploy/flower2api/verify_database_compatibility.py --manifest <候选清单> --output <新证据> --workers {1,2}`。
+- `python3 deploy/flower2api/build_cache_key.py images/v3/Dockerfile` 输出 backend 阶段及全局前言的 SHA256。
+- `python3 deploy/flower2api/verify_release_tests.py --python <已安装依赖的解释器>` 并行运行三组原发行校验，失败以非零状态退出。
 
 ### 3. Contracts
 
@@ -404,6 +406,9 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 - 无 builder 使用原 `docker build`；有 builder 使用 `docker buildx build --builder ... --load --progress plain`。scope 为空或缺少 runtime token／results URL 时使用本地缓存。缓存凭据通过 job runtime 提供。
 - GHA 层缓存为 API v2，control／account 分 scope，导入与导出分别限两分钟。导出使用 `mode=max,ignore-error=true`。写入同时要求显式 write=true、GitHub Actions、本仓、v3／flower2api ref 及 push／workflow_dispatch 事件。
 - 共享 action 位于 `.github/actions/flower2api-build-cache/action.yml`。Cargo registry／git／target 沿 Dockerfile 的三个具名 mount id 和 target 恢复；key 包含平台、依赖配方与源码，restore 前缀限定兼容依赖配方。可信分支注册保存动作，PR使用只读恢复。
+- Cargo v2 配方只包含完整 backend 构建阶段和全局前言，依赖摘要继续覆盖 Cargo.toml/lock、vendor、craftls。control/account 阶段的软件包变化不清空 Rust 编译缓存；Rust 基础镜像、编译命令或全局参数变化继续失效。过渡只允许按同一完整旧 Dockerfile 配方回读 v1 前缀。
+- 三组校验分别在独立进程执行宿主 test_system*、编排 test_system_update* 和原额外模块；宿主测试保留 sudo。模块 test_system_workflow 由宿主发现覆盖一次。任一非零退出或进程启动失败均等待其余组收口后整体失败，记录每组耗时及退出码。
+- 联合镜像包继续采用流式 gzip，mtime=0、compresslevel=1，完整摘要和离线加载校验沿原合同。压缩收益与包大小变化使用实际样本测量，整体收益由下一次 CI 记录。
 - composite 内先注册 Actions cache 保存，再注册 cache-dance 挂载提取，post 按相反顺序提取、保存及回收 builder。只在所有准备成功后向 GITHUB_ENV 激活三个缓存选项；调用方仅容忍缓存准备错误，实际构建与验收错误继续阻断。
 - 两镜像继续来自同一受控源码快照，读取实际加载的镜像生成原联合清单，保留来源标签、run／attempt／SHA 与摘要检查。
 - workers 严格为整数1或2，bool 拒绝；默认串行，发行工作流显式2。协调器先核验候选、迁移合同及全部签名来源，再分发最多两路单来源演练。
@@ -424,6 +429,8 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 | 首项晚完成、不同来源乱序完成 | 最终证据仍按原目录顺序排列 |
 | 任一来源失败 | 等待已启动项收口后抛原异常，零成功证据写入 |
 | main手动选择构建 | job跳过，目标分支由分支选择器明确指定 |
+| backend阶段缺失或重复 | 配方摘要拒绝计算，缓存准备沿原完整构建回退 |
+| 任一校验组失败或解释器无法启动 | 其余组收口后入口非零退出，后续构建受阻 |
 
 ### 5. Scenarios and Examples
 
@@ -431,10 +438,12 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 - 基础：本地普通build保留原行为；显式builder使用load生成实际可检查的镜像；workers=1保留串行。
 - 错误用法：把构建步骤设为continue-on-error以隐藏缓存故障。正确方式：仅缓存准备可回退，编译、迁移、签名与发布失败继续阻断。
 - 错误用法：将四个真实历史镜像组成的八条合成历史测量写成正式八版本CI结果。正确方式：记录夹具构成；正式最近八个发行的双路演练由下一次明确发行独立验收。
+- 正常：只给 control 增加 sshpass，backend 配方和 Cargo 依赖恢复前缀保持一致；修改 Rust 基础镜像或编译参数则更换配方摘要。
 
 ### 6. Tests Required
 
 - `test_system_build_cache`：本地默认、角色scope、可信写入、非法配置零副作用、精确mount映射、恢复与提取顺序、仅缓存准备可容错。
+- `test_system_release_speed`：控制层与 Rust 配方隔离、全局参数失效、唯一阶段约束、三进程真实屏障、失败及启动异常收口、完整校验组与宿主权限；`test_publication` 继续验证 gzip 包原字节恢复及摘要。
 - `test_database_compatibility`：真实线程上限2、默认串行、乱序结果归位、待运行取消、运行项收口、原错误和来源note、非法workers。
 - 原 `test_system_workflow`、`test_publication` 及系统更新回归覆盖手动发布门禁、固定包仓库外独立导入和摘要身份；actionlint核验实际两个分支工作流。
 - 真实隔离Docker对同一八来源做串行／双路对照及迁移启动故障注入，核对完整证据等价、成功证据边界和全部自有容器收口。使用合成密钥及测试数据。
