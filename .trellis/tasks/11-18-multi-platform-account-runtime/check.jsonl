@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/gateway/backend/settings-database.md", "reason": "多平台请求记录、私有采集、双库及迁移合同"}
+{"file": ".trellis/spec/gateway/backend/service-architecture.md", "reason": "账号平台、凭据唯一所有者和公共接入合同"}
+{"file": ".trellis/spec/orchestrator/backend/account-runtime-v3.md", "reason": "AGY环境、工具/凭据代次、同形体及工程边界"}
+{"file": ".trellis/spec/platform/deploy/platform-online-update.md", "reason": "冻结迁移身份、旧程序兼容及后续生产授权边界"}
+{"file": ".trellis/spec/platform/deploy/agy-credential-contract.md", "reason": "固定原版、历史原生研究、合成证据和预算口径"}
+{"file": ".trellis/spec/web/frontend/ui-guidelines.md", "reason": "既有账号/环境/请求页面及交互兼容"}
+{"file": ".trellis/tasks/11-18-multi-platform-account-runtime/research/acceptance-inventory.md", "reason": "五子项完成态、提交、AC候选映射及现有证据来源"}
