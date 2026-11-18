@@ -298,6 +298,7 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 - 两路推送与离线gzip归档在全部标签预检并创建原started标记后并行执行；上下文等待全部作业退出，全部成功才原子交付最终包及完整清单。失败保留原attempt标记，最终交付路径不暴露临时包。大包只上传正式Release，Actions发行artifact保存诊断清单及兼容证据；签名发行与原子目录完成即具备安装条件，构建缓存post独立收尾。
 - 两个 Python 发布入口共用来源校验：`GITHUB_ACTIONS=true`、`GITHUB_EVENT_NAME=workflow_dispatch`、`V3_PUBLISH_CONFIRMED=true`、精确 repo/ref，以及 `GITHUB_WORKFLOW_REF=<repo>/.github/workflows/v3-release.yml@<ref>`。run/attempt 为正整数串、SHA 为40位小写hex；清单批次、revision和clean标记必须匹配。
 - 发布预检要求有效 `V3_SYSTEM_RELEASE_PRIVATE_KEY`，用实际 DER 格式确认 Ed25519。缺配置/错误类型在构建及推送前失败。签名私钥仅供手动发布侧使用。
+- CI历史目录读取显式使用发布任务的`GH_TOKEN`，sudo仅追加保留该现有临时令牌。`fetch_bytes(...,github_token=None)`及`fetch_repository_file(...,github_token=None)`默认公开读取；显式认证只发往`https://api.github.com/repos/SilentFlower/vibecoding-bench/`，拒绝编码/相对路径绕过及全部认证重定向。分支引用、Contents元数据及Git blob均传递同一令牌；发行附件沿原公开下载，原大小、blob身份、摘要、签名和历史兼容校验保持。
 - 工作流拆分后的 run_number 不用作发行序号；从同信任根已验签目录主序号最大值加1，第二项使用实际 attempt。历史目录按签发时刻校验原合同，主序号达到2^53-1时拒绝新发行。完整附件后才普通 fast-forward 推进目录，保留原版本递增与批次不可覆盖规则。
 - 原仓库、v3镜像名、system-ci/v3-ci身份、updates/v3-migrations及updates/v3语义、信任根与双库兼容合同保持。管理员从原系统更新页准备/安装；旧底座按既有SOP原地补齐能力。
 - `install_system_updater.SOURCE_FILES` 含 manage 的直接依赖 platform_version.py、release_ci.py；固定源码复制后必须能在仓库外独立导入。
@@ -312,6 +313,8 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 | push/PR/构建入口调用发布脚本 | ValueError，Docker/GitHub发布副作用为零 |
 | 错误分支、仓库、SHA、工作流或缺确认标记 | 发布前拒绝 |
 | 缺私钥、密钥非Ed25519 | 预检失败 |
+| CI读取固定历史目录 | 显式传递当前job临时令牌，避免匿名API配额 |
+| 带认证访问附件/外仓/编码路径或发生跳转 | 读取前拒绝，认证材料保持在原固定仓库API |
 | 历史目录主序号700，新工作流run_number=1 | 发行主序号701，原发行继续可读 |
 | 历史签名损坏或序号达到上限 | 正式发行写入前失败 |
 | 附件上传或目录并发推送失败 | 原目录受保护，已完成事实保留，无force覆盖 |

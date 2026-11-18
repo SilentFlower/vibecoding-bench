@@ -37,6 +37,17 @@ class CompatibilitySourceTests(unittest.TestCase):
         self.assertEqual(fetch.call_count, 2)
         self.assertTrue(fetch.call_args.args[0].endswith('/updates/v3'))
 
+    def test_ci_token_reaches_reference_and_both_directory_files(self) -> None:
+        """CI现有临时令牌沿固定目录读取链路传递。:return: None。"""
+        with patch.dict(os.environ, {'GITHUB_ACTIONS': 'true', 'GH_TOKEN': 'synthetic-ci-token'}), \
+                patch.object(verifier, 'fetch_bytes', return_value=b'{"object":{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}') as fetch, \
+                patch.object(verifier, 'fetch_repository_file', side_effect=[b'synthetic-index', ValueError('合成停止点')]) as files:
+            with self.assertRaisesRegex(ValueError, '合成停止点'):
+                verifier._sources('a' * 64, None)
+        self.assertEqual('synthetic-ci-token', fetch.call_args.kwargs['github_token'])
+        self.assertEqual(2, files.call_count)
+        self.assertTrue(all(call.kwargs['github_token'] == 'synthetic-ci-token' for call in files.call_args_list))
+
     def test_standalone_entry_and_discovery_work_without_pythonpath(self) -> None:
         """CI 默认环境可直接加载演练入口及独立快照测试。@return None。"""
         environment = dict(os.environ)

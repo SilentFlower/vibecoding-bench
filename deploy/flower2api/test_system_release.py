@@ -8,10 +8,11 @@ import tempfile
 import unittest
 import uuid
 from pathlib import Path
+from urllib.request import Request
 from unittest.mock import patch
 
-from system_release import REPO, create_index, create_release, data_contracts, sign_file
-from system_update_contract import compatible_data, fetch_repository_file, safe_read, strict_json, validate_index, validate_operation, validate_release, verify_signed
+from system_release import REPO, create_index, create_release, data_contracts
+from system_update_contract import REPOSITORY, ReleaseRedirect, compatible_data, fetch_bytes, fetch_repository_file, safe_read, strict_json, validate_index, validate_operation, validate_release, verify_signed
 from runtime_names import image_reference
 
 
@@ -183,6 +184,59 @@ class SystemReleaseTests(unittest.TestCase):
         link.symlink_to(self.key)
         with self.assertRaises(OSError):
             safe_read(link)
+
+
+class CiReleaseReadTests(unittest.TestCase):
+    """CI显式认证的固定仓库读取及零跨域令牌投递回归。"""
+
+    def test_explicit_token_is_sent_only_to_original_repository_api(self) -> None:
+        """实际构造的HTTP请求携带临时令牌，读取继续执行完整预算。:return: None。"""
+        with patch('system_update_contract.build_opener') as factory:
+            response = factory.return_value.open.return_value.__enter__.return_value
+            response.read1.side_effect = [b'synthetic-json', b'']
+            self.assertEqual(b'synthetic-json', fetch_bytes(
+                f'https://api.github.com/repos/{REPOSITORY}/git/ref/heads/updates/v3', 1024,
+                github_token='synthetic-ci-token'))
+            request = factory.return_value.open.call_args.args[0]
+            self.assertEqual('Bearer synthetic-ci-token', request.get_header('Authorization'))
+
+    def test_token_is_rejected_for_assets_other_repositories_and_redirects(self) -> None:
+        """认证材料不进入附件、外来仓库、编码绕过或下一跳请求。:return: None。"""
+        targets = ['https://github.com/' + REPOSITORY + '/releases/download/synthetic/file',
+            'https://api.github.com/repos/other/project/contents/index.json',
+            'https://api.github.com/repos/' + REPOSITORY + '-other/contents/index.json',
+            'https://api.github.com/repos/' + REPOSITORY + '/../../other/project',
+            'https://api.github.com/repos/' + REPOSITORY + '/%2e%2e/other']
+        with patch('system_update_contract.build_opener') as factory:
+            for target in targets:
+                with self.subTest(target=target), self.assertRaises(ValueError):
+                    fetch_bytes(target, 1024, github_token='synthetic-ci-token')
+            factory.assert_not_called()
+        request = Request('https://api.github.com/repos/' + REPOSITORY + '/contents/index.json',
+            headers={'Authorization': 'Bearer synthetic-ci-token'})
+        for target in ['https://api.github.com/repos/' + REPOSITORY + '/other',
+                'https://release-assets.githubusercontent.com/synthetic']:
+            with self.subTest(target=target), self.assertRaisesRegex(ValueError, '不允许重定向'):
+                ReleaseRedirect().redirect_request(request, None, 302, 'synthetic', {}, target)
+
+    def test_public_read_ignores_process_token(self) -> None:
+        """普通宿主读取保持公开请求，进程中已有令牌不会自动进入下载。:return: None。"""
+        with patch.dict('os.environ', {'GH_TOKEN': 'synthetic-process-token'}), patch('system_update_contract.build_opener') as factory:
+            response = factory.return_value.open.return_value.__enter__.return_value
+            response.read1.return_value = b''
+            fetch_bytes('https://api.github.com/repos/' + REPOSITORY + '/contents/index.json', 1024)
+            self.assertIsNone(factory.return_value.open.call_args.args[0].get_header('Authorization'))
+
+    def test_directory_metadata_and_blob_both_keep_explicit_authentication(self) -> None:
+        """目录元数据和二进制blob均消费同一显式认证，同时保留原摘要核验。:return: None。"""
+        raw = b'synthetic-signature'
+        sha = hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
+        metadata = {'type': 'file', 'path': 'index.sig', 'size': len(raw), 'sha': sha}
+        blob = {'encoding': 'base64', 'size': len(raw), 'content': base64.b64encode(raw).decode()}
+        with patch('system_update_contract.fetch_bytes', side_effect=[json.dumps(metadata).encode(), json.dumps(blob).encode()]) as fetch:
+            self.assertEqual(raw, fetch_repository_file('index.sig', 'a' * 40, 64, github_token='synthetic-ci-token'))
+        self.assertEqual(2, fetch.call_count)
+        self.assertTrue(all(call.kwargs['github_token'] == 'synthetic-ci-token' for call in fetch.call_args_list))
 
 
 if __name__ == '__main__':

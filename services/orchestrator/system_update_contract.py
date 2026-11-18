@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from stat import S_ISREG
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from runtime_files import directory_fd
@@ -383,18 +383,21 @@ class ReleaseRedirect(HTTPRedirectHandler):
         :param newurl: 下一跳。
         :return: 新请求。
         """
+        if req.get_header('Authorization') is not None:
+            raise ValueError('认证发行请求不允许重定向')
         target = urlsplit(newurl)
         if target.scheme != 'https' or target.netloc not in {'github.com', 'api.github.com', 'release-assets.githubusercontent.com', 'objects.githubusercontent.com'}:
             raise ValueError('发行下载跳转来源无效')
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-def fetch_repository_file(name: str, commit: str, limit: int) -> bytes:
+def fetch_repository_file(name: str, commit: str, limit: int, *, github_token: str | None = None) -> bytes:
     """按固定提交读取目录文件，保持二进制签名原始字节。
 
     :param name: index.json 或 index.sig。
     :param commit: 已取得的完整目录提交 SHA。
     :param limit: 解码后的字节上限。
+    :param github_token: CI显式传入的固定仓库临时令牌。
     :return: 校核大小及 Git blob 身份后的原始内容。
     """
     if name not in {'index.json', 'index.sig'} or not isinstance(commit, str) or not REV_RE.fullmatch(commit):
@@ -403,14 +406,15 @@ def fetch_repository_file(name: str, commit: str, limit: int) -> bytes:
         raise ValueError('版本目录文件大小限制无效')
     # Contents 的文本及 content 载荷都会转换部分二进制字节，只读取其固定提交下的 blob 身份。
     envelope_limit = 4 * ((limit + 2) // 3) + 8192
+    authentication = {'github_token': github_token} if github_token is not None else {}
     metadata = strict_json(fetch_bytes(f'https://api.github.com/repos/{REPOSITORY}/contents/{name}?ref={commit}',
-        envelope_limit, accept='application/vnd.github+json'), envelope_limit)
+        envelope_limit, accept='application/vnd.github+json', **authentication), envelope_limit)
     if (metadata.get('type') != 'file' or metadata.get('path') != name
             or type(metadata.get('size')) is not int or not 0 <= metadata['size'] <= limit
             or not isinstance(metadata.get('sha'), str) or not REV_RE.fullmatch(metadata['sha'])):
         raise ValueError('版本目录文件元数据无效')
     blob = strict_json(fetch_bytes(f'https://api.github.com/repos/{REPOSITORY}/git/blobs/{metadata["sha"]}',
-        envelope_limit, accept='application/vnd.github+json'), envelope_limit)
+        envelope_limit, accept='application/vnd.github+json', **authentication), envelope_limit)
     if (blob.get('encoding') != 'base64' or type(blob.get('size')) is not int
             or blob['size'] != metadata['size'] or not isinstance(blob.get('content'), str)):
         raise ValueError('版本目录 Git blob 元数据无效')
@@ -423,20 +427,30 @@ def fetch_repository_file(name: str, commit: str, limit: int) -> bytes:
     return raw
 
 
-def fetch_bytes(url: str, limit: int, *, timeout: int = 90, accept: str = 'application/vnd.github.raw+json') -> bytes:
+def fetch_bytes(url: str, limit: int, *, timeout: int = 90, accept: str = 'application/vnd.github.raw+json',
+                github_token: str | None = None) -> bytes:
     """读取受信 GitHub 小型资源的完整字节。
 
     :param url: 固定仓库产生的 HTTPS 地址。
     :param limit: 完整内容字节上限。
     :param timeout: 总期限秒数。
     :param accept: 固定调用点选择的 GitHub 响应格式。
+    :param github_token: 仅发送至固定仓库API的显式CI临时令牌。
     :return: 完整字节。
     """
     target = urlsplit(url)
     if target.scheme != 'https' or target.netloc not in {'github.com', 'api.github.com'}:
         raise ValueError('发行下载起始来源无效')
+    headers = {'Accept': accept, 'User-Agent': 'vibebench-system-updater/1'}
+    if github_token is not None:
+        if (not isinstance(github_token, str) or not github_token or any(character.isspace() for character in github_token)
+                or target.netloc != 'api.github.com' or not target.path.startswith('/repos/' + REPOSITORY + '/')
+                or target.path != unquote(target.path) or any(part in ('.', '..') for part in target.path.split('/'))):
+            raise ValueError('CI发行认证仅允许固定仓库API')
+        # 普通宿主读取保持原公开通路；CI显式使用现有令牌，认证请求拒绝跳转以保护材料。
+        headers['Authorization'] = 'Bearer ' + github_token
     opener = build_opener(ProxyHandler({}), ReleaseRedirect())
-    request = Request(url, headers={'Accept': accept, 'User-Agent': 'vibebench-system-updater/1'})
+    request = Request(url, headers=headers)
     deadline = time.monotonic() + timeout
     with opener.open(request, timeout=10) as response:
         chunks, total = [], 0

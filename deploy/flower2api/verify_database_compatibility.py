@@ -6,9 +6,7 @@ import argparse
 import hashlib
 import json
 import os
-import shutil
 import sys
-import sqlite3
 import subprocess
 import tempfile
 import time
@@ -164,16 +162,18 @@ def _sources(public_key: str, history_root: Path | None) -> list[tuple[dict, byt
         raw = (history_root / 'index.json').read_bytes()
         signature = (history_root / 'index.sig').read_bytes()
     else:
+        token = os.environ.get('GH_TOKEN') if os.environ.get('GITHUB_ACTIONS') == 'true' else None
+        authentication = {'github_token': token} if token else {}
         for channel in ('updates/v3-migrations', 'updates/v3'):
             try:
-                ref = strict_json(fetch_bytes(f'https://api.github.com/repos/{REPOSITORY}/git/ref/heads/{channel}', 65536))
+                ref = strict_json(fetch_bytes(f'https://api.github.com/repos/{REPOSITORY}/git/ref/heads/{channel}', 65536, **authentication))
             except HTTPError as error:
                 if error.code != 404 or channel == 'updates/v3':
                     raise
                 continue
             commit = ref['object']['sha']
-            raw = fetch_repository_file('index.json', commit, INDEX_LIMIT)
-            signature = fetch_repository_file('index.sig', commit, 64)
+            raw = fetch_repository_file('index.json', commit, INDEX_LIMIT, **authentication)
+            signature = fetch_repository_file('index.sig', commit, 64, **authentication)
             break
     index = validate_index(verify_signed(raw, signature, public_key, INDEX_LIMIT))
     sources = []

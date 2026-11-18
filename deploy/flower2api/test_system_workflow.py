@@ -64,7 +64,8 @@ class WorkflowTests(unittest.TestCase):
         self.assertLess(verify, publish)
         self.assertNotIn('if [', runs[verify])
         self.assertIn('--workers 4', runs[verify])
-        self.assertIn('--preserve-env=V3_SYSTEM_RELEASE_PRIVATE_KEY,GITHUB_ACTIONS', runs[verify])
+        self.assertIn('--preserve-env=V3_SYSTEM_RELEASE_PRIVATE_KEY,GITHUB_ACTIONS,GH_TOKEN', runs[verify])
+        self.assertEqual(job['steps'][verify]['env']['GH_TOKEN'], '${{ github.token }}')
         build_runs = [step.get('run', '') for step in self.workflow('v3-build.yml')['jobs']['build']['steps']]
         self.assertIn(runs[build], build_runs)
         validation = next(run for run in runs if 'verify_release_tests.py --python' in run)
