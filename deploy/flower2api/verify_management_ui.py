@@ -114,6 +114,8 @@ class ManagementFixture(Fixture):
                         'installed_at': '2026-11-11T05:31:49Z', 'rollback_available': True}]}
             elif action == 'releases':
                 payload = {'fresh': True, 'releases': self.releases, 'checking': False, 'checked_at': '2026-11-12T05:31:49.455Z'}
+            elif action == 'version':
+                payload = {'version': 'v1.0.0'}
             else:
                 self.writes.append({'path': path, 'body': json.loads(request.post_data or '{}')})
                 payload = {'checking': True}

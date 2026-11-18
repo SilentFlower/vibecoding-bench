@@ -3,7 +3,8 @@ import { computed, ref, watch, nextTick, defineAsyncComponent, onMounted, onUnmo
 import { Menu, PanelLeftClose, PanelLeftOpen, ChevronRight, LogOut, X } from '@/components/ui/icon';
 import AppNavigation from './AppNavigation.vue';
 import { api } from '../api';
-import { platformVersion, releaseVersion } from '../lib/platformVersion';
+import { releaseVersion } from '../lib/platformVersion';
+import { usePlatformVersion } from '../composables/usePlatformVersion';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { useRoute } from 'vue-router';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,9 @@ function savedCollapsed(): boolean { try { return localStorage.getItem('flower2a
 const collapsed = ref(savedCollapsed());
 watch(collapsed, value => { try { localStorage.setItem('flower2api-sidebar-collapsed', String(value)); } catch { /* 隐私模式仍保持本次会话选择。 */ } });
 const mobileOpen = ref(false);
-const currentVersion = ref<string | null>(platformVersion);
+const { version: runtimeVersion, refresh: refreshPlatformVersion } = usePlatformVersion();
+const installedVersion = ref<string | null>(null);
+const currentVersion = computed(() => runtimeVersion.value ?? installedVersion.value);
 const updateAvailable = ref(false);
 const accountCount = ref<number | null>(null);
 const runningCount = ref<number | null>(null);
@@ -33,11 +36,12 @@ async function refreshUpdateMetadata(checkUpdates=false): Promise<void> {
  clearTimeout(updateTimer);
  try {
   const status=await api.systemUpdateStatus(metadataController.signal);
-  if(metadataController.signal.aborted || !status.installed)return;
+  if(metadataController.signal.aborted)return;
+  if(!status.installed){installedVersion.value=null;updateAvailable.value=false;return;}
   const catalog=await api.systemUpdateReleases(metadataController.signal);
   if(metadataController.signal.aborted)return;
   const installed=catalog.releases.find(item=>item.release===status.current_release);
-  currentVersion.value=platformVersion ?? (installed ? releaseVersion(installed.changes) : null);
+  installedVersion.value=installed ? releaseVersion(installed.changes) : null;
   updateAvailable.value=!!catalog.releases[0] && catalog.releases[0].release!==status.current_release;
   // 检查异步执行，短暂轮询才能让首页角标及时反映新目录。
   if(checkUpdates && !catalog.checking && !status.busy)await api.systemUpdateCheck();
@@ -51,7 +55,9 @@ async function refreshUpdateMetadata(checkUpdates=false): Promise<void> {
 async function refreshMetadata(force=false,checkUpdates=false): Promise<void> {
  if(metadataLoading || metadataController.signal.aborted || (!force && Date.now()-metadataAt<30000))return;
  metadataLoading=true;metadataAt=Date.now();
- const results=await Promise.allSettled([api.getDashboard(),refreshUpdateMetadata(checkUpdates),api.runtimeSummary(metadataController.signal)]);
+ // 管理桥校验独立Cookie；共享签发完成后读取，首次登录也遵守同一鉴权顺序。
+ const session=api.openRuntime();
+ const results=await Promise.allSettled([api.getDashboard(),session.then(()=>refreshUpdateMetadata(checkUpdates)),session.then(()=>api.runtimeSummary(metadataController.signal)),session.then(()=>refreshPlatformVersion(metadataController.signal))]);
  if(!metadataController.signal.aborted){
   if(results[0].status==='fulfilled')accountCount.value=results[0].value.accounts.total;
   if(results[2].status==='fulfilled')runningCount.value=results[2].value.active_runs;

@@ -223,14 +223,15 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 - `deploy/flower2api/platform-release.json` 精确字段为 `schema_version:1`、`version:string`、`changes:string`。
 - `read_version(path)` 校验规范 `v<major>.<minor>.<patch>` 及说明；`signed_changes(metadata)` 生成受控首行 `平台版本：v1.0.0` 与正文。
-- `ensure_forward_version(current,previous)` 检查受信前后发行；前端使用 `VITE_PLATFORM_VERSION` 构建输入。
+- `ensure_forward_version(current,previous)` 检查受信前后发行；`GET /api/system-updates/version` 精确返回 `{version:string|null}`，响应设置 `Cache-Control:no-store`。
 
 ### 3. Contracts
 
-- 新发行首版 v1.0.0；修复递增补丁，功能递增次版本。元数据为唯一维护源，build 将版本传入 frontend Docker 阶段，且将元数据纳入源快照摘要。
+- 新发行首版 v1.0.0；修复递增补丁，功能递增次版本。元数据为唯一维护源，build 派生只含version的 `runtime-build/platform-version.json`，两者均纳入源快照摘要。control最终阶段将派生文件复制到 `/app/platform-version.json`；frontend/backend编译输入及Cargo源码缓存键排除版本元数据。account沿原组件复用合同，更新器始终选择目标control。
 - 发布端从同一元数据生成现有签名 changes，GitHub 标题使用可读版本。原 release/sequence/镜像/清单摘要及 v1/v2 字段集合保持原合同。
 - 发布前从原已签目录取得最新完整清单并核对大小、摘要及格式；旧目录按签发时刻验证，允许正式发布刷新过期通道。不同源码使用相同或更低语义版本拒绝；同源重跑允许相同版本。
-- 当前平台版本来自控制镜像中构建的前端；可用版本从已验签说明首行提取。独立构建缺输入时使用已有受信信息或历史构建语义。
+- 当前平台版本从控制镜像固定文件读取，独立于宿主更新器。按1024字节上限、普通文件、禁止跟随链接及严格JSON校验，只接受唯一version字段及规范ASCII语义版本；缺失或损坏返回null。浏览器通过原管理鉴权桥的精确GET白名单 `/runtime/api/system-updates/version` 读取；其它方法及子路径沿原拒绝规则。
+- Dashboard与SystemUpdates优先显示运行时版本。读取失败、旧端404或null时，只按已验签目录中的current_release精确匹配回退；缺当前项时使用既有未知/历史文案。最新可用版本始终属于可用发行展示。视图独立取消旧读，卸载及迟到回执失效。
 - 旧发行字节保持可追溯，缺元数据展示历史构建日期及技术详情；CLI 和内核按账号分别展示实际来源。
 - 更新列表默认突出当前与最新可用项，历史折叠，同一列表只保留一个详情展开。安装确认冻结真实 release、摘要、revision 及显示标题，轮询保持原参数。
 - 时间按浏览者时区显示，技术详情保留原始标识；UTC 存储及安装参数沿用。
@@ -242,6 +243,9 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 | 非规范版本、空说明、未知元数据字段 | 构建/发布拒绝 |
 | 不同源码复用版本、版本倒退 | 发布拒绝 |
 | 原清单大小或摘要不符 | 发布拒绝 |
+| 版本文件缺失、超限、特殊文件、链接、JSON或版本非法 | 返回version:null；前端按当前发行回退 |
+| 更新器未接入、不可达、目录缺当前发行 | 运行时版本独立可读并展示 |
+| 管理会话缺失或错误 / 写方法或子路径 | 沿原鉴权拒绝 / 沿原白名单拒绝 |
 | 历史发行缺可读版本 | 日期及技术详情 |
 | 目录不新鲜或安装现场变化 | 原更新合同要求重新检查/确认 |
 
@@ -249,11 +253,14 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 - 正常：v1.0.0 → 修复 v1.0.1 → 功能 v1.1.0；同一源码 Action 重跑保留原版本。
 - 边界：原系统仍使用严格 v1/v2 清单，版本信息沿受信 changes 兼容展示。
+- 正常：同一代码从v1.17.2递增到v1.17.3，frontend/backend复用缓存，control内版本文件与API变为v1.17.3。边界：宿主更新器离线时版本仍显示当前控制版本。错误用法：当前项退出目录后显示目录最新版本。正确处理：使用运行时版本，缺失时保留未知语义。
 - 错误用法：把 ci 编号直接改名后作为安装参数。正确处理：语义版本用于展示，安装使用原受信身份。
 
 ### 6. Tests Required
 
 - `test_system_platform_version` 覆盖实际元数据、历史说明、递增和不同源码拒绝；`test_system_release` 验证原签名与字段合同。
+- `test_system_update_version` 覆盖真实ASGI只读响应、鉴权、no-store、大小及文件/JSON边界；网关测试覆盖精确GET白名单。实际manage快照测试核对版本派生、源码摘要及编译输入边界；真实Docker两版本对照核对frontend/backend命中缓存与最终文件变化。
+- `verify_runtime_platform_version.py` 覆盖两个实际入口的运行时优先、旧端404、null、非法值、目录缺当前项及更新器未接入/不可达，并用实际组合函数验证乱序、取消及卸载。
 - Vue/TypeScript 生产构建和 `verify_management_ui.py` 覆盖当前/最新/历史、单展开、取消零写入及两个浏览器时区。
 
 

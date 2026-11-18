@@ -156,7 +156,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 ### 正式控制台与账号首批迁移
 
 - `apps/web/src/style.css` 保留现有主题变量名，采用已确认紫色强调、深色侧栏与浅色内容区。字体来自 `src/assets/fonts/` 中的本地 WOFF2，许可一并保留；离线导出须把同源字体内嵌，不能依赖构建目录外链。
-- `Dashboard.vue` 在品牌旁保留 `/updates` 入口，版本使用 `platformVersion` 的真实构建值；缺省显示“更新”。桌面折叠位于管理员区域，偏好键为 `flower2api-sidebar-collapsed`，存储失败仍保持本次会话选择。移动导航保留原七个模块。
+- `Dashboard.vue` 在品牌旁保留 `/updates` 入口，版本优先使用 `usePlatformVersion` 读取的当前控制镜像版本；旧端回退到已验签目录精确匹配的current_release，缺省显示“版本”。移动入口缺省显示“系统更新”。桌面折叠位于管理员区域，偏好键为 `flower2api-sidebar-collapsed`，存储失败仍保持本次会话选择。移动导航保留原七个模块。
 - 正式账号仍使用既有分页及每5秒读取。卡片显示三种额度窗口，7天Sonnet数据类型继续兼容；完整旧配置/画像/评分等信息位于详情。代理公共摘要仅含protocol/host，编辑及OAuth代理输入默认遮蔽认证信息。
 - 账号数字草稿由 `numberDrafts` 保存 `number|string`，`applyNumberDrafts()` 在提交边界检查非空整数再写入原数字字段；原范围校验与 `accountUpdateDelta` 继续生效。认证编辑默认收起，新建默认展开，全部旧字段保留。
 - `useActiveScrollbars()` 由应用根调用一次，通过捕获真实scroll标记容器，800ms后清理；卸载清理监听器及全部计时器。窗口标题/页脚固定，正文独立滚动。

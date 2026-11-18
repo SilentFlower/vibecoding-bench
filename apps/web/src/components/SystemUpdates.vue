@@ -3,7 +3,8 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { ApiError, api, type SystemUpdateCatalog, type SystemUpdateRequest, type SystemUpdateStatus, type SystemUpdateRelease } from '../api';
 import { Download, ChevronDown, ChevronRight, RefreshCw, Layers, Cpu, Check, ArrowRight } from 'lucide-vue-next';
 import { formatLocalTime } from '../lib/time';
-import { platformVersion, releaseNotes, releaseVersion } from '../lib/platformVersion';
+import { releaseNotes, releaseVersion } from '../lib/platformVersion';
+import { usePlatformVersion } from '../composables/usePlatformVersion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChoiceSelect } from '@/components/ui/controls';
@@ -18,6 +19,8 @@ const notesOpen = ref(false);
 const expanded = ref('');
 const status = ref<SystemUpdateStatus | null>(null);
 const catalog = ref<SystemUpdateCatalog | null>(null);
+const { version: runtimeVersion, refresh: refreshPlatformVersion } = usePlatformVersion();
+const versionController = new AbortController();
 const error = ref('');
 const loading = ref(true);
 const writing = ref(false);
@@ -56,7 +59,7 @@ const environmentSources = computed(() => {
 const prominent = computed(() => (catalog.value?.releases ?? []).filter((release, index) => index === 0 || release.release === status.value?.current_release));
 const older = computed(() => (catalog.value?.releases ?? []).filter(release => !prominent.value.includes(release)));
 const displayed = computed(() => historyOpen.value ? [...prominent.value, ...older.value] : prominent.value);
-const currentVersion = computed(() => platformVersion ?? (catalog.value?.releases.find(item => item.release === status.value?.current_release)
+const currentVersion = computed(() => runtimeVersion.value ?? (catalog.value?.releases.find(item => item.release === status.value?.current_release)
   ? releaseVersion(catalog.value.releases.find(item => item.release === status.value?.current_release)!.changes) : null) ?? '历史构建');
 
 /** 根据现有目录和现场显示检查结果，不用构建序号推断升级关系。 */
@@ -108,6 +111,7 @@ async function refresh(): Promise<void> {
   if (controller) return;
   controller = new AbortController();
   const signal = controller.signal;
+  void refreshPlatformVersion(versionController.signal);
   try {
     const current = await api.systemUpdateStatus(signal);
     const available = current.installed ? await api.systemUpdateReleases(signal) : null;
@@ -231,7 +235,7 @@ async function connect(): Promise<void> {
 }
 
 onMounted(connect);
-onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); dialog.value?.close(); });
+onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); versionController.abort(); dialog.value?.close(); });
 </script>
 
 <template>
@@ -239,7 +243,8 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); dia
     <header v-if="!embedded" class="page-heading"><div><h1 class="text-2xl font-bold tracking-tight">系统更新</h1><p class="mt-1 text-sm text-muted-foreground">查看当前版本与变更，选择合适的时间安装</p></div></header>
     <p v-if="error" role="alert" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{{ error }}</p>
     <p v-if="loading" class="py-10 text-center text-muted-foreground">正在读取系统版本…</p>
-    <Card v-else-if="status && !status.installed" class="gap-3 p-5 shadow-none"><h2 class="font-semibold">首次接入系统更新</h2><p class="text-sm text-muted-foreground">{{ status.message }}</p><p class="text-sm text-muted-foreground">接入独立更新服务及维护底座后，即可安装后续版本。</p></Card>
+    <p v-if="!loading && !status?.installed" class="text-sm text-muted-foreground">当前版本：{{ currentVersion }}</p>
+    <Card v-if="!loading && status && !status.installed" class="gap-3 p-5 shadow-none"><h2 class="font-semibold">首次接入系统更新</h2><p class="text-sm text-muted-foreground">{{ status.message }}</p><p class="text-sm text-muted-foreground">接入独立更新服务及维护底座后，即可安装后续版本。</p></Card>
     <template v-if="status?.installed">
       <div class="approved-update-banner">
         <div><p class="eyebrow" role="status">{{ updateSummary }}</p><div class="approved-version">{{ latestRelease ? releaseLabel(latestRelease.release) : currentVersion }}</div><h2>{{ !catalog?.fresh ? '等待检查版本' : !latestRelease ? '暂无可用发行' : latestRelease.release !== status.current_release ? '新版本已就绪' : '当前已是最新版本' }}</h2><p>{{ latestRelease && latestRelease.release !== status.current_release ? '阅读发布说明，选择合适的时间安装。' : '查看本次发布说明与平台维护记录。' }}</p></div>

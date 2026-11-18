@@ -100,6 +100,8 @@ class Fixture:
             payload = {'active_runs':0}
         elif path == '/runtime/api/system-updates/status':
             payload = {'installed':False}
+        elif path == '/runtime/api/system-updates/version':
+            payload = {'version':None}
         elif path == '/admin/runtime/session':
             assert request.method == 'POST'
             self.sessions += 1

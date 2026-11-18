@@ -1,9 +1,11 @@
 const versionPattern = /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/;
 const prefix = '平台版本：';
-const buildVersion: unknown = import.meta.env.VITE_PLATFORM_VERSION;
 
-/** 当前前端随控制镜像构建的正式平台版本；独立构建缺省保持未知。 */
-export const platformVersion = typeof buildVersion === 'string' && versionPattern.test(buildVersion) ? buildVersion : null;
+/** 校验运行时提供的规范平台版本。@param value 实际接口字段。@return 规范版本或未知值。 */
+export function parsePlatformVersion(value: unknown): string | null {
+  // JavaScript的结束锚点也匹配末尾换行之前，须核对匹配范围覆盖完整字符串。
+  return typeof value === 'string' && versionPattern.exec(value)?.[0] === value ? value : null;
+}
 
 /**
  * 从已验签说明首行提取展示版本。
@@ -13,7 +15,7 @@ export const platformVersion = typeof buildVersion === 'string' && versionPatter
 export function releaseVersion(changes: string): string | null {
   const first = changes.split('\n')[0] ?? '';
   const version = first.startsWith(prefix) ? first.slice(prefix.length) : '';
-  return versionPattern.test(version) ? version : null;
+  return parsePlatformVersion(version);
 }
 
 /**

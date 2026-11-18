@@ -95,8 +95,9 @@ class BuildCacheTests(unittest.TestCase):
         self.assertIn('build_cache_key.py images/v3/Dockerfile', configuration)
         self.assertIn('flower2api-cargo-v2-', configuration)
         self.assertIn('flower2api-cargo-v1-', configuration)
-        for path in ('services/gateway/src/**', 'apps/web/**', 'platform-release.json'):
+        for path in ('services/gateway/src/**', 'apps/web/**'):
             self.assertIn(path, config['SOURCES'])
+        self.assertNotIn('platform-release.json', config['SOURCES'])
 
     def test_only_cache_preparation_is_optional_in_both_workflows(self) -> None:
         """缓存准备可回退，实际构建与全部来源的演练错误阻断流程。@return None。"""

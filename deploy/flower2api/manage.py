@@ -506,6 +506,10 @@ def build(release: str, manifest_path: Path) -> None:
         for relative in ("cc2api/Cargo.toml", "cc2api/Cargo.lock", "topics.md", "deploy/v3/platform-release.json"):
             (snapshot / relative).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source_path(REPO, relative), snapshot / relative)
+        # 版本文件单独进入控制镜像，源摘要仍绑定它，编译输入保持只依赖实际代码。
+        version_file = snapshot / 'runtime-build/platform-version.json'
+        version_file.parent.mkdir()
+        version_file.write_text(json.dumps({'version': platform_version}) + '\n')
         native_runtime = stage_asset(snapshot / "native-runtime/ccrb-runtime")
         native_runtime['runtimes'] = {'2.1.280': stage_asset(snapshot / 'native-runtime/ccrb-runtime-280', version='2.1.280')}
         restore_upstream_checkout_bytes(snapshot)
@@ -527,7 +531,7 @@ def build(release: str, manifest_path: Path) -> None:
                 if role == 'control' and (snapshot / 'orchestrator/cli_scratchpad.py').is_file() else [])
             command(*build_commands[role], *control_labels, "-f", str(snapshot / "images/v3/Dockerfile"), "--target", role,
                 "--build-arg", f"V3_RELEASE={release}", "--build-arg", f"V3_PARENT_REV={parent}",
-                "--build-arg", f"V3_GATEWAY_REV={gateway}", "--build-arg", f"VITE_PLATFORM_VERSION={platform_version}",
+                "--build-arg", f"V3_GATEWAY_REV={gateway}",
                 "-t", reference, str(snapshot))
             print(json.dumps({'event': 'flower2api-build-role', 'role': role,
                 'seconds': round(time.monotonic() - started, 3)}, ensure_ascii=False), flush=True)

@@ -1,4 +1,6 @@
 *
+!runtime-build
+!runtime-build/platform-version.json
 !native-runtime
 !native-runtime/ccrb-runtime
 !native-runtime/ccrb-runtime-280

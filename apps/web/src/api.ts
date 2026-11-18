@@ -314,6 +314,11 @@ export interface SystemUpdateOperation {
   cleanup?: { status: string; removed: string[]; retained?: string[] } | null
 }
 
+/** 当前控制镜像提供的独立平台版本。 */
+export interface SystemPlatformVersion {
+  version: string | null
+}
+
 /** 已安装底座的实际组件及恢复入口。 */
 export interface SystemUpdateStatus {
   installed: boolean
@@ -587,6 +592,8 @@ export const api = {
   runtimeSummary: (signal?: AbortSignal) => request<{active_runs:number}>('GET','/runtime/api/summary',undefined,signal),
   /** 读取账号诊断摘要。@param signal 取消信号。@return 环境公开列表。 */
   runtimeEnvironments: (signal: AbortSignal) => request<RuntimeEnvironmentSummary[]>('GET', '/runtime/api/environments', undefined, signal),
+  /** 读取当前控制端版本，独立于宿主更新器。@param signal 取消信号。@return 版本或未知值。 */
+  systemPlatformVersion: (signal?: AbortSignal) => request<SystemPlatformVersion>('GET', '/runtime/api/system-updates/version', undefined, signal),
   systemUpdateStatus: (signal?: AbortSignal) => request<SystemUpdateStatus>('GET', '/runtime/api/system-updates/status', undefined, signal),
   /** 读取已验证目录。@param signal 取消信号。@return 版本缓存。 */
   systemUpdateReleases: (signal?: AbortSignal) => request<SystemUpdateCatalog>('GET', '/runtime/api/system-updates/releases', undefined, signal),

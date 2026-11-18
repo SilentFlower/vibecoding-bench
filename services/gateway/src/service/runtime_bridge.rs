@@ -430,7 +430,7 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
     if let Some(rest) = api_path.strip_prefix("system-updates/") {
         return match *method {
             Method::GET => {
-                matches!(rest, "status" | "releases")
+                matches!(rest, "status" | "releases" | "version")
                     || rest
                         .strip_prefix("operations/")
                         .is_some_and(|value| Uuid::parse_str(value).is_ok())
@@ -800,6 +800,24 @@ mod tests {
     }
     use tokio::net::TcpListener;
     use tokio::time::timeout;
+
+    /// 平台版本只开放精确只读入口，沿既有管理会话验证与有限读取期限。
+    #[test]
+    fn platform_version_route_is_read_only_and_exact() {
+        let path = "/api/system-updates/version";
+        assert!(browser_path_allowed(&Method::GET, path));
+        assert_eq!(status_timeout(&Method::GET, path), Some(STATUS_TIMEOUT));
+        for method in [Method::POST, Method::PUT, Method::DELETE, Method::HEAD] {
+            assert!(!browser_path_allowed(&method, path));
+        }
+        for invalid in [
+            "/api/system-updates/version/",
+            "/api/system-updates/version/private",
+            "/api/system-updates/versions",
+        ] {
+            assert!(!browser_path_allowed(&Method::GET, invalid));
+        }
+    }
 
     /// 目录代理在服务端展开，冲突和手动混用均在发送前拒绝。
     #[test]

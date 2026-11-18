@@ -12,7 +12,7 @@ from http.client import HTTPConnection
 from pathlib import Path
 from socket import AF_UNIX, SOCK_STREAM, socket
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from docker.errors import NotFound
 from starlette.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, StrictInt, StrictStr
@@ -23,6 +23,9 @@ from native_kernel_upgrade import migrate_records, pending_upgrade, validate_rec
 from native_sender import builtin_config
 from system_update_contract import MANIFEST_LIMIT, safe_read, strict_json, validate_operation
 from system_update_gate import UPDATE_GATE
+
+
+_PLATFORM_VERSION_FILE = Path(__file__).with_name('platform-version.json')
 
 
 class SystemUpdateAdmissionMiddleware:
@@ -335,6 +338,24 @@ def system_updates_router(runtime_provider) -> APIRouter:
     :return: FastAPI 路由。
     """
     router = APIRouter()
+
+    @router.get('/api/system-updates/version')
+    def version(response: Response) -> dict:
+        """读取当前控制镜像中的独立版本文件。
+
+        :param response: 管理响应，禁止跨控制镜像缓存版本。
+        :return: 规范平台版本或未知值。
+        """
+        response.headers['Cache-Control'] = 'no-store'
+        try:
+            value = strict_json(safe_read(_PLATFORM_VERSION_FILE, 1024), 1024)
+        except (OSError, ValueError):
+            # 独立启动和旧控制端可能缺少版本文件，保持未知值以兼容原管理入口。
+            return {'version': None}
+        current = value.get('version')
+        valid = (set(value) == {'version'} and isinstance(current, str)
+            and re.fullmatch(r'v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)', current))
+        return {'version': current if valid else None}
 
     @router.post('/internal/v3/system-updates/admitted-control')
     async def admitted_control(body: dict):
