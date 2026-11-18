@@ -26,19 +26,28 @@ const options = computed(() => keys.value.map(key => ({ value: key.key, label: `
 const selectedFingerprint = computed(() => keys.value.find(key => key.key === selectedKey.value)?.sha256);
 let alive = true, loadGeneration = 0, probeGeneration = 0;
 let listRequest: AbortController | undefined, probeRequest: AbortController | undefined;
+let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
-/** 保留已有列表并拒绝旧请求覆盖。@return 刷新完成。 */
-async function load(): Promise<void> {
+/** 保留已有列表并拒绝旧请求覆盖。@param background 沿已建立的会话轮询安装状态。@return 刷新完成。 */
+async function load(background = false): Promise<void> {
+  if (refreshTimer) clearTimeout(refreshTimer);
   const generation = ++loadGeneration;
   listRequest?.abort(); listRequest = new AbortController(); loading.value = true; error.value = '';
   try {
-    await api.openRuntime();
+    if (!background) await api.openRuntime();
     if (!alive || generation !== loadGeneration) return;
     const result = await nodeApi.list(listRequest.signal);
     if (alive && generation === loadGeneration) rows.value = result.items;
   } catch (cause) {
     if (alive && generation === loadGeneration && !listRequest.signal.aborted) error.value = (cause as Error).message;
-  } finally { if (alive && generation === loadGeneration) loading.value = false; }
+  } finally {
+    if (alive && generation === loadGeneration) {
+      loading.value = false;
+      if (rows.value.some(node => node.preparation?.state === 'preparing')) {
+        refreshTimer = setTimeout(() => { void load(true); }, 3000);
+      }
+    }
+  }
 }
 /** 地址变化使旧公钥确认失效。@return 无。 */
 function resetProbe(): void {
@@ -107,8 +116,14 @@ async function install(): Promise<void> {
   pending.add(node.id); installError.value = '';
   try {
     const result = await nodeApi.prepare(node);
-    if (alive) { rows.value = rows.value.map(row => row.id === result.id ? result : row); installing.value = null; toast('节点执行组件已就绪', 'success'); }
-  } catch (cause) { if (alive) installError.value = (cause as Error).message; }
+    if (alive) {
+      rows.value = rows.value.map(row => row.id === result.id ? result : row); installing.value = null;
+      toast(result.preparation?.state === 'prepared' ? '节点执行组件已就绪' : '已提交后台安装，可离开页面后查看状态', 'success');
+      void load(true);
+    }
+  } catch (cause) {
+    if (alive) { installError.value = (cause as Error).message; void load(true); }
+  }
   finally { pending.delete(node.id); }
 }
 /** 保留未知资源与真实零值的区别。@param value 字节数。@return 可读容量。 */
@@ -124,12 +139,12 @@ function state(node: ExecutionNode): string {
   return node.observation.state === 'reachable' ? '连接正常' : '连接异常';
 }
 onMounted(() => { void load(); });
-onUnmounted(() => { alive = false; loadGeneration++; listRequest?.abort(); resetProbe(); privateKey.value = ''; password.value = ''; });
+onUnmounted(() => { alive = false; loadGeneration++; if (refreshTimer) clearTimeout(refreshTimer); listRequest?.abort(); resetProbe(); privateKey.value = ''; password.value = ''; });
 </script>
 
 <template>
   <section class="nodes-page">
-    <header class="nodes-heading"><div><p class="nodes-eyebrow">执行资源</p><h1>节点管理</h1><p>集中查看服务器，由你决定账号环境的执行位置。</p></div><div class="nodes-actions"><Button variant="outline" :disabled="loading" @click="load"><RefreshCw :size="16" />刷新列表</Button><Button @click="setEditor(true)"><Plus :size="16" />添加节点</Button></div></header>
+    <header class="nodes-heading"><div><p class="nodes-eyebrow">执行资源</p><h1>节点管理</h1><p>集中查看服务器，由你决定账号环境的执行位置。</p></div><div class="nodes-actions"><Button variant="outline" :disabled="loading" @click="load()"><RefreshCw :size="16" />刷新列表</Button><Button @click="setEditor(true)"><Plus :size="16" />添加节点</Button></div></header>
     <p v-if="error" class="nodes-error" role="alert">{{ error }}</p>
     <p v-if="loading && !rows.length" role="status">正在读取节点…</p>
     <AccountNodeSelector v-if="rows.length" :nodes="rows" @changed="load" />
@@ -141,7 +156,7 @@ onUnmounted(() => { alive = false; loadGeneration++; listRequest?.abort(); reset
         <div class="node-meta"><span>最近检查</span><time>{{ node.observation && node.observation.observed_at > 0 ? new Date(node.observation.observed_at * 1000).toLocaleString('zh-CN') : '尚未检查' }}</time><span>Docker</span><span>{{ node.observation?.docker_version ?? '未采集' }}</span><template v-if="node.kind === 'ssh'"><span>运行组件</span><span>{{ node.preparation ? ({ preparing: '正在安装', prepared: '已就绪', failed: '安装失败', needs_check: '待核对' }[node.preparation.state]) : '待安装' }}</span><span v-if="node.preparation?.release">组件版本</span><span v-if="node.preparation?.release">{{ node.preparation.release }}</span></template></div>
         <p v-if="node.preparation?.reason" class="nodes-error" role="status">{{ node.preparation.reason }}</p>
         <details v-if="node.kind === 'ssh'" class="node-identity"><summary><ShieldCheck :size="14" />已确认的主机身份</summary><p><code>{{ node.host_key_sha256 }}</code></p><p>认证方式：{{ node.auth_method === 'password' ? 'SSH 密码' : 'SSH 私钥' }}</p><p>节点数据目录：<code>{{ node.data_root }}</code></p></details>
-        <footer><Button variant="outline" :disabled="pending.has(node.id)" @click="operate(node, 'check')"><RefreshCw :size="14" />{{ pending.has(node.id) ? '处理中…' : '检查连接' }}</Button><Button v-if="node.kind === 'ssh'" variant="outline" :disabled="pending.has(node.id) || !node.enabled" @click="installError = ''; installing = node">准备运行组件</Button><Button variant="outline" :disabled="pending.has(node.id)" @click="operate(node, 'enable')">{{ node.enabled ? '暂停接单' : '恢复接单' }}</Button><Button v-if="node.kind === 'ssh'" variant="ghost" :disabled="pending.has(node.id) || node.account_count > 0" @click="deleteError = ''; deleting = node"><Trash2 :size="14" />移除</Button></footer>
+        <footer><Button variant="outline" :disabled="pending.has(node.id)" @click="operate(node, 'check')"><RefreshCw :size="14" />{{ pending.has(node.id) ? '处理中…' : '检查连接' }}</Button><Button v-if="node.kind === 'ssh'" variant="outline" :disabled="pending.has(node.id) || !node.enabled || node.preparation?.state === 'preparing'" @click="installError = ''; installing = node">{{ node.preparation?.state === 'preparing' ? '后台安装中…' : '准备运行组件' }}</Button><Button variant="outline" :disabled="pending.has(node.id)" @click="operate(node, 'enable')">{{ node.enabled ? '暂停接单' : '恢复接单' }}</Button><Button v-if="node.kind === 'ssh'" variant="ghost" :disabled="pending.has(node.id) || node.account_count > 0 || node.preparation?.state === 'preparing'" @click="deleteError = ''; deleting = node"><Trash2 :size="14" />移除</Button></footer>
       </article>
     </div>
     <Dialog :open="editor" @update:open="setEditor"><DialogContent class="node-editor" :show-close-button="!saving" @escape-key-down="event => { if (saving) event.preventDefault(); }" @interact-outside="event => { if (saving) event.preventDefault(); }"><DialogHeader><DialogTitle>添加 SSH 节点</DialogTitle><DialogDescription>服务器需要具备 SSH、Python 3 和 Docker。使用具有对应 Docker 权限的专用账号。</DialogDescription></DialogHeader>
@@ -153,7 +168,7 @@ onUnmounted(() => { alive = false; loadGeneration++; listRequest?.abort(); reset
       </form>
     </DialogContent></Dialog>
     <ConfirmationDialog :open="!!deleting" title="移除节点" :message="`确认移除「${deleting?.name ?? ''}」？该操作归档节点登记并断开管理连接。远程容器与持久数据保留。`" confirm-label="移除节点" danger :busy="!!deleting && pending.has(deleting.id)" :error="deleteError" @confirm="remove" @cancel="deleting = null" />
-    <ConfirmationDialog :open="!!installing" title="准备节点运行组件" :message="`将在「${installing?.name ?? ''}」创建独立数据目录、平台 Docker 网络和同批运行组件。镜像通过 SSH 通道传输，首次安装可能需要几分钟。`" confirm-label="开始准备" :busy="!!installing && pending.has(installing.id)" :error="installError" @confirm="install" @cancel="installing = null" />
+    <ConfirmationDialog :open="!!installing" title="准备节点运行组件" :message="`将在「${installing?.name ?? ''}」创建独立数据目录、平台 Docker 网络和同批运行组件。确认后在后台安装，可离开页面后查看状态。镜像通过 SSH 通道传输，首次安装可能需要几分钟。`" confirm-label="开始准备" :busy="!!installing && pending.has(installing.id)" :error="installError" @confirm="install" @cancel="installing = null" />
   </section>
 </template>
 

@@ -83,9 +83,9 @@ def cluster_router(service) -> APIRouter:
         except ValueError as error:
             raise HTTPException(409, str(error)) from None
 
-    @router.post('/{node_id}/prepare')
+    @router.post('/{node_id}/prepare', status_code=202)
     def prepare_node(node_id: int, body: NodeRevision) -> dict:
-        """安装节点执行组件。:param node_id: 节点。:param body: 版本。:return: 公开状态。"""
+        """提交后台组件安装。:param node_id: 节点。:param body: 版本。:return: 可轮询的公开状态。"""
         try:
             return current().prepare_node(node_id, body.revision)
         except NodeInstallationConfigurationError as error:

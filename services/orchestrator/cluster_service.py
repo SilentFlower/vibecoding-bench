@@ -11,6 +11,7 @@ import shutil
 import threading
 import time
 import uuid
+from contextlib import nullcontext
 from pathlib import Path
 
 from docker import DockerClient
@@ -54,7 +55,14 @@ class ClusterService:
         self.nodes: dict[int, SshNode] = {}
         self.docker_clients: dict[int, DockerClient] = {}
         self.operation_locks: dict[int, threading.Lock] = {}
+        self.install_workers: dict[int, threading.Thread] = {}
+        self.closing = False
         self.transports = NodeTransports(store)
+        # 进程退出后原线程已失效，保留中断事实，交由管理员重新核对同一节点。
+        for row in self.store.list():
+            if (row.get('preparation') or {}).get('state') == 'preparing':
+                self.store.save_preparation(row['id'], row['revision'], {'state': 'needs_check',
+                    'reason': '节点安装被服务重启中断，请重新准备并核对节点组件'})
 
     def register(self, request: NodeCreate) -> dict:
         """保存管理员已确认主机公钥的 SSH 节点。
@@ -515,7 +523,7 @@ class ClusterService:
         return next(item for item in self.store.list() if item['id'] == node_id)
 
     def prepare_node(self, node_id: int, revision: int) -> dict:
-        """由管理员明确发起安装同批执行组件，持续参与平台排空。
+        """登记后台安装并立即返回，原作业持续参与平台排空。
 
         :param node_id: 节点。
         :param revision: 原版本。
@@ -525,26 +533,58 @@ class ClusterService:
         if row['kind'] != 'ssh' or row['revision'] != revision or not row['enabled']:
             raise ValueError('请指定已启用且配置版本一致的远程节点')
         with self.lock:
+            if self.closing:
+                raise ValueError('节点服务正在关闭')
             lock = self.operation_locks.setdefault(node_id, threading.Lock())
         if not lock.acquire(blocking=False):
-            raise ValueError('该节点已有安装操作，请等待当前操作完成')
+            return next(item for item in self.store.list() if item['id'] == node_id)
+        activity, saved = None, False
         try:
             installer = NodeDeployment(self, os.environ.get('V3_DEPLOYMENT_ID', ''), os.environ.get('V3_RELEASE', ''),
                 os.environ.get('V3_CONTROL_IMAGE', ''), os.environ.get('V3_ACCOUNT_IMAGE', ''))
-            with UPDATE_GATE.admission('cluster-node-install:' + str(node_id)):
-                if not self.store.save_preparation(node_id, revision, {'state': 'preparing'}):
-                    raise ValueError('节点配置已变化，请刷新后重试')
+            # 在返回202之前登记活动，避免HTTP结束与后台启动之间被更新器误判为空闲。
+            activity = UPDATE_GATE.reserve('cluster-node-install:' + str(node_id))
+            if not self.store.save_preparation(node_id, revision, {'state': 'preparing'}):
+                raise ValueError('节点配置已变化，请刷新后重试')
+            saved = True
+            result = next(item for item in self.store.list() if item['id'] == node_id)
+            worker = threading.Thread(target=self._install_node, args=(installer, node_id, revision, lock, activity),
+                name='cluster-node-install', daemon=True)
+            with self.lock:
+                if self.closing:
+                    raise ValueError('节点服务正在关闭')
+                self.install_workers[node_id] = worker
                 try:
-                    result = installer.prepare(node_id, revision)
-                except Exception:
-                    self.store.save_preparation(node_id, revision, {'state': 'failed',
-                        'reason': '节点组件安装失败，请检查 SSH、镜像、数据归属与资源'})
+                    worker.start()
+                except BaseException:
+                    self.install_workers.pop(node_id, None)
                     raise
+            return result
+        except BaseException:
+            try:
+                if saved:
+                    self.store.save_preparation(node_id, revision, {'state': 'failed', 'reason': '后台安装启动失败，请重新准备'})
+            finally:
+                UPDATE_GATE.release_reserved(activity)
+                lock.release()
+            raise
+
+    def _install_node(self, installer, node_id: int, revision: int, lock, activity: str | None) -> None:
+        """在原节点版本内执行安装，持久保存结果并定向释放活动。"""
+        try:
+            context = UPDATE_GATE.continue_reserved(activity) if activity is not None else nullcontext()
+            with context:
+                result = installer.prepare(node_id, revision)
                 if not self.store.save_preparation(node_id, revision, result):
                     raise ValueError('安装期间节点配置已变化，请重新检查节点能力')
+        except Exception:
+            self.store.save_preparation(node_id, revision, {'state': 'failed',
+                'reason': '节点组件安装失败，请检查 SSH、镜像、数据归属与资源'})
         finally:
-            lock.release()
-        return next(item for item in self.store.list() if item['id'] == node_id)
+            UPDATE_GATE.release_reserved(activity)
+            with self.lock:
+                self.install_workers.pop(node_id, None)
+                lock.release()
 
     def _local_observation(self) -> dict:
         info = self.local_client.info()
@@ -579,6 +619,11 @@ class ClusterService:
 
     def close(self) -> None:
         """服务退出时释放本对象持有的所有 SSH 进程。:return: None。"""
+        with self.lock:
+            self.closing = True
+            workers = list(self.install_workers.values())
+        for worker in workers:
+            worker.join(timeout=1)
         with self.lock:
             for client in self.docker_clients.values():
                 client.close()

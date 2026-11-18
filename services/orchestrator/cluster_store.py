@@ -202,6 +202,8 @@ class ClusterStore:
                         (node_id, revision)).fetchone()
                     if row is None or row['kind'] == 'local':
                         raise ValueError('本机节点不可移除，或节点配置已变化')
+                    if row['preparation_json'] and json.loads(row['preparation_json']).get('state') == 'preparing':
+                        raise ValueError('节点组件正在后台安装，请等待安装结束后再移除')
                     if connection.execute('SELECT 1 FROM account_node_assignments WHERE node_id=?', (node_id,)).fetchone():
                         raise ValueError('节点仍有关联账号，请先迁移账号')
                     if connection.execute('SELECT 1 FROM node_migrations WHERE source_node_id=? OR target_node_id=?',

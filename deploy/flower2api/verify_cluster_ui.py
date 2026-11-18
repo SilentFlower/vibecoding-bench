@@ -34,6 +34,9 @@ class ClusterUiFixture(Fixture):
         self.start_entered = asyncio.Event()
         self.fail_start = False
         self.operation_reads = 0
+        self.install_posts = 0
+        self.install_complete = False
+        self.fail_install_response = False
 
     async def route(self, route) -> None:
         """截获当前节点管理的全部业务路径。:param route: 浏览器请求。:return: None。"""
@@ -42,7 +45,19 @@ class ClusterUiFixture(Fixture):
             await route.fulfill(path=str(self.gateway / 'index.html'), content_type='text/html')
             return
         if path == '/runtime/api/nodes':
+            if self.install_complete:
+                self.nodes[1]['preparation'] = {'state': 'prepared', 'updated_at': time.time()}
             payload = {'items': self.nodes}
+        elif path == '/runtime/api/nodes/2/prepare' and request.method == 'POST':
+            assert json.loads(request.post_data)['revision'] == self.nodes[1]['revision']
+            self.install_posts += 1
+            self.nodes[1]['preparation'] = {'state': 'preparing', 'updated_at': time.time()}
+            if self.fail_install_response:
+                self.fail_install_response = False
+                await route.fulfill(status=503, content_type='application/json', body=json.dumps({'detail': '安装提交响应中断'}))
+                return
+            await route.fulfill(status=202, content_type='application/json', body=json.dumps(self.nodes[1]))
+            return
         elif path == '/runtime/api/accounts':
             payload = [{'id': number, 'name': '合成账号 ' + str(number), 'enabled': 1 if number == 1 else 0,
                 'cc2api_account_id': 7 if number == 1 else None, 'effective_claude_code_version': '2.1.293'} for number in (1, 2)]
@@ -121,6 +136,28 @@ async def run(output: Path, gateway: Path) -> dict:
         page = await context.new_page()
         page.on('pageerror', lambda error: errors.append(str(error)))
         await page.goto(BASE + '/nodes')
+        node_card = page.locator('.node-card').filter(has=page.get_by_role('heading', name='上海执行节点', exact=True))
+        await node_card.get_by_role('button', name='准备运行组件', exact=True).click()
+        installation = page.get_by_role('dialog', name='准备节点运行组件', exact=True)
+        await installation.get_by_role('button', name='开始准备', exact=True).click()
+        await expect(installation).to_have_count(0)
+        await expect(node_card.get_by_role('button', name='后台安装中…', exact=True)).to_be_disabled()
+        assert fixture.install_posts == 1
+        await page.reload()
+        await expect(node_card.get_by_role('button', name='后台安装中…', exact=True)).to_be_disabled()
+        fixture.install_complete = True
+        await expect(node_card.get_by_role('button', name='准备运行组件', exact=True)).to_be_enabled(timeout=10000)
+        assert fixture.install_posts == 1
+        fixture.install_complete = False
+        fixture.fail_install_response = True
+        await node_card.get_by_role('button', name='准备运行组件', exact=True).click()
+        await installation.get_by_role('button', name='开始准备', exact=True).click()
+        await expect(installation.get_by_role('alert')).to_contain_text('安装提交响应中断')
+        await installation.get_by_role('button', name='取消', exact=True).click()
+        await expect(node_card.get_by_role('button', name='后台安装中…', exact=True)).to_be_disabled()
+        fixture.install_complete = True
+        await expect(node_card.get_by_role('button', name='准备运行组件', exact=True)).to_be_enabled(timeout=10000)
+        assert fixture.install_posts == 2
         await select(page, '任务账号', '合成账号 1')
         await select(page, '执行节点', '上海执行节点')
         start = page.get_by_role('button', name='迁移到所选节点', exact=True)
@@ -176,7 +213,7 @@ async def run(output: Path, gateway: Path) -> dict:
         await confirmation.get_by_role('button', name='取消', exact=True).click()
         assert not errors and not fixture.unexpected and not fixture.external, (errors, fixture.unexpected, fixture.external)
         await browser.close()
-    return {'passed': True, 'scenes': ['冻结确认与取消零写入', '提交未知只核对原操作', '提交后继续目标激活',
+    return {'passed': True, 'scenes': ['后台安装提交后关闭弹窗', '刷新页面恢复安装状态及轮询完成', '安装提交响应中断后只读核对', '冻结确认与取消零写入', '提交未知只核对原操作', '提交后继续目标激活',
         '提交前取消保持源分配版本', '账号切换隔离', '停用独立账号迁移入口', '1440和390视口'], 'errors': errors, 'real_model_requests': 0}
 
 

@@ -137,17 +137,24 @@ pub fn build_router(
     super::proxy_sync::start(state.clone());
 
     // 前端页面（显式注册 SPA 路由）
-    let frontend_routes = Router::new()
-        .route("/", get(spa_handler))
-        .route("/login", get(spa_handler))
-        .route("/tokens", get(spa_handler))
-        .route("/requests", get(spa_handler))
-        .route("/session-blocks", get(spa_handler))
-        .route("/tasks", get(spa_handler))
-        .route("/settings", get(spa_handler))
-        .route("/proxies", get(spa_handler))
-        .route("/updates", get(spa_handler))
-        .route("/environments", get(spa_handler));
+    let mut frontend_routes = Router::new().route("/", get(spa_handler));
+    for path in [
+        "/login",
+        "/tokens",
+        "/requests",
+        "/session-blocks",
+        "/tasks",
+        "/settings",
+        "/proxies",
+        "/updates",
+        "/environments",
+        "/nodes",
+    ] {
+        // 只为实际页面登记尾斜杠别名，API与未知路径继续沿原网关鉴权。
+        frontend_routes = frontend_routes
+            .route(path, get(spa_handler))
+            .route(&format!("{path}/"), get(spa_handler));
+    }
 
     // 前端静态资源
     let asset_routes = Router::new()
@@ -3857,11 +3864,17 @@ mod tests {
             "/login",
             "/tokens",
             "/requests",
+            "/session-blocks",
             "/tasks",
             "/settings",
             "/proxies",
             "/updates",
             "/environments",
+            "/nodes",
+            "/nodes/",
+            "/tasks/",
+            "/environments/",
+            "/settings/",
             "/tasks?tab=warmup&account=42",
         ] {
             let response = app
