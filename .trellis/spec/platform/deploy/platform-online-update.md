@@ -513,6 +513,8 @@ validate_release(value: dict) -> dict
 compatible_scratchpad(original: dict, target: dict) -> bool
 ```
 
+隔离验收：`python deploy/flower2api/run_local_verification.py --manifest <本地测试清单> --warmup-pi-only --evidence-dir <全新证据目录>`。项目模式使用既有 `--pi-projects-only`。
+
 签名清单沿原 `compatibility` 对象增加可选字段。发行器从已检查的镜像元数据生成字段。
 
 ### 3. Contracts
@@ -523,6 +525,8 @@ compatible_scratchpad(original: dict, target: dict) -> bool
 - 版本列表、回退可用性、prepare/install/rollback 共用兼容判断。宿主失败恢复在已有环境重建意图且原版不兼容时保留维护门禁并拒绝切换。
 - 已有宿主更新器 v2 先沿同协议源码维护 SOP 刷新固定源码。冻结来源和原文件摘要，备份并校验服务与状态，失败按原文件恢复。
 
+- `--warmup-pi-only` 通过验证进程内的 `VERIFY_PI_PROJECTS_NAMESPACE=warmup` 选择养号空间；项目模式为 `projects`。验收函数仅接受这两个空间。该参数只作用于合成账号和私有测试数据。
+
 ### 4. Validation & Error Matrix
 
 | 条件 | 行为 |
@@ -532,6 +536,7 @@ compatible_scratchpad(original: dict, target: dict) -> bool
 | 旧版直接安装激活版 | 宿主操作前拒绝 |
 | 兼容版或激活版回退到无恢复能力旧版 | 列表及回退投影标记不兼容，提交入口拒绝 |
 | 激活版恢复兼容版 | 保留新布局和最新文件，沿原恢复链执行 |
+| 验收函数收到其他 namespace | 准备账号和启动工作前 ValueError |
 | 已有环境重建意图且恢复版本不兼容 | 控制切换前拒绝，维护门禁保留 |
 
 ### 5. Scenarios and Examples
@@ -540,8 +545,12 @@ compatible_scratchpad(original: dict, target: dict) -> bool
 - 基础：无新增能力字段的历史签名清单继续校验。兼容阶段账号容器沿原组件复用规则处理。
 - 错误用法：仅凭数据库可回退就恢复到旧管理端。正确处理：同时检查 scratchpad 恢复能力，并保留磁盘布局和新增数据。
 
+- 验收正常路径：新环境合成登录、两个依赖目标分别正常启动交付，中间执行原停止/唤醒；核对同一工作区、历史成果复验、UID1000和原路径磁盘文件保留。错误用法是沿旧夹具期待单次指挥交付两个目标；应分别启动两次正常指挥。
+
 ### 6. Tests Required
 
 - `test_scratchpad_update_compatibility`：严格类型、全兼容矩阵、真实签名清单、跳过兼容阶段在宿主副作用前拒绝、旧回退隐藏及提交防绕过、健康检查失败恢复兼容版、部分恢复保留门禁、发行能力源自真实镜像元数据。
 - `verify_scratchpad_storage.py`：实际原账号镜像与兼容管理代码挂载磁盘并恢复同一真实 CLI 会话，校验账号和兄弟 session 归属。
 - 发布前校验兼容阶段账号 `content_sha256` 与线上签名清单相等；正式发行后核对签名、能力声明、来源 SHA 及实际安装耗时。
+
+- 启用验收同时运行养号与项目模式，断言实际挂载的noexec/nosuid/nodev、宿主持久目录文件、双目标交付、21次工具调用、6次TTY输入与零真实模型调用。验证专用镜像按已有只读入口提供测试CA，收尾按随机部署标签删除临时容器、卷和网络。

@@ -274,6 +274,14 @@ def verify() -> None:
     shutil.copy2("/fixtures/mock_cli.py", binary)
     binary.chmod(0o755)
     (cached / ".ready").touch()
+    verification_labels = client.images.get(runtime.image).attrs['Config'].get('Labels') or {}
+    if verification_labels.get('vibebench.verification') == 'extra-ca':
+        # 验证构建要求显式提供专用测试根，避免把缺失测试材料误判为业务连接失败。
+        verification_ca = runtime._root(row) / 'runtime/verification-ca.der'
+        verification_ca.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run(['openssl', 'x509', '-in', '/verify/native-usage.crt', '-outform', 'DER',
+            '-out', str(verification_ca)], check=True)
+        verification_ca.chmod(0o644)
     evidence_root = runtime._root(row) / 'flows/api'
     evidence_root.mkdir(parents=True)
     legacy_evidence = b'{"source":"synthetic-old-layout"}\n'
@@ -375,7 +383,8 @@ def verify() -> None:
         verify_physical_observation(runtime, row)
         if os.environ.get('VERIFY_PI_PROJECTS_ONLY') == '1':
             from verify_pi_projects_execution import verify_pi_projects_execution
-            verify_pi_projects_execution(runtime, client, account, row)
+            verify_pi_projects_execution(runtime, client, account, row,
+                namespace=os.environ.get('VERIFY_PI_PROJECTS_NAMESPACE', 'projects'))
             return
         if os.environ.get("VERIFY_PROJECT_SCHEDULING_ONLY") == "1" or os.environ.get("VERIFY_PROJECT_CATALOG_ONLY") == "1":
             from verify_project_scheduling import verify_project_scheduling

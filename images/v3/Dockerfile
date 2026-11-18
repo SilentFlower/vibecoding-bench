@@ -162,6 +162,7 @@ LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELE
     vibebench.credential-ownership-protocol="1" \
     vibebench.isolation-version="2" \
     vibebench.cli-install-version="2" \
+    vibebench.cli-scratchpad-protocol="1" \
     vibebench.native-runtime="293-raw-1" \
     vibebench.native-runtime-versions="2.1.280,2.1.293" \
     vibebench.native-platform-managed="1" \

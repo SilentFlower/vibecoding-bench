@@ -65,15 +65,18 @@ while True:
 '''
 
 
-def verify_pi_projects_execution(runtime, client, account: dict, row: dict) -> None:
+def verify_pi_projects_execution(runtime, client, account: dict, row: dict, *, namespace: str = 'projects') -> None:
     """在合成账号中验证真实 Pi 连续交付、工作区复用及历史成果重验。
 
     :param runtime: 已完成合成登录的账号环境。
     :param client: 当前 Docker 客户端。
     :param account: 当前测试账号。
     :param row: 已登记环境。
+    :param namespace: 本次验收的项目或养号空间。
     :return: None，任一控制、输入、验收或清理证据错误时失败。
     """
+    if namespace not in ('projects', 'warmup'):
+        raise ValueError('验证空间必须为项目或养号')
     data = runtime.data
     with ExitStack() as stack:
         paths = {'BENCH_DATA': data, 'HOST_BENCH_DATA': runtime.host_data, 'DB_PATH': data / 'pi-projects.sqlite',
@@ -123,7 +126,8 @@ def verify_pi_projects_execution(runtime, client, account: dict, row: dict) -> N
         library = ProjectLibrary(source).install(data)
         catalog = ProjectsCatalog(data / 'research', library)
         terminal = ProjectsTerminal(current, catalog,
-            lambda: {'claude_code_version': '9.9.9', 'claude_effort_level': 'high', 'execution_model': None}, lambda *_: {})
+            lambda _: {'claude_code_version': '9.9.9', 'claude_effort_level': 'high', 'execution_model': None}, lambda *_: {},
+            namespace=namespace)
         calls = []
 
         class Provider(BaseHTTPRequestHandler):
@@ -182,34 +186,57 @@ def verify_pi_projects_execution(runtime, client, account: dict, row: dict) -> N
         verifier = ProjectsVerification(catalog, terminal, ProjectVerifier(client, data, runtime.host_data, current.image), pi, provider)
         service = ProjectsService(data, main.get_db, main._db_lock, catalog, terminal,
             main._projects_account,
-            lambda *_: {'allowed': True}, provider, verifier, pi)
+            lambda *_: {'allowed': True}, provider, verifier, pi, namespace=namespace)
         verifier.accepted = service.accepted_work
         stack.callback(service.close)
         service.configure(1, ['fixture-one'], budget_sec=120)
-        service.start(1)
-        deadline = time.monotonic() + 120
-        while service.controllers and time.monotonic() < deadline:
-            time.sleep(0.2)
+        storage_probe = '''import json,os,pathlib
+assert os.getuid()==1000
+rows=[line.split() for line in pathlib.Path('/proc/self/mountinfo').read_text().splitlines()]
+mounts=[item for item in rows if item[4]=='/tmp/claude-1000']
+assert len(mounts)==1 and {'noexec','nosuid','nodev'}<=set(mounts[0][5].split(','))
+path=pathlib.Path('/tmp/claude-1000/iteration-marker')
+if path.exists():assert path.read_text()=='private-iteration-data'
+else:path.write_text('private-iteration-data')
+print(json.dumps({'uid':os.getuid(),'mounted':True}))
+'''
+        disk_enabled = client.images.get(current.image).attrs['Config'].get('Labels', {}).get('vibebench.cli-scratchpad-protocol') == '1'
+        # 每次指挥只交付一个目标；用第二次正常启动验证后续迭代，而非放宽单目标边界。
+        for iteration in range(2):
+            if disk_enabled:
+                observed = current._container(row).exec_run(['python3', '-I', '-c', storage_probe])
+                assert observed.exit_code == 0, observed.output.decode(errors='replace')
+            service.start(1)
+            deadline = time.monotonic() + 120
+            while service.controllers and time.monotonic() < deadline:
+                time.sleep(0.2)
+            observed = service.state(1)['agents'][0]
+            assert len(observed['passed']) == iteration + 1, {'state': observed, 'calls': calls}
+            assert not current.jobs
+            if iteration == 0:
+                current.maintenance(row['environment_id'], 'stop')
+                restored, _ = current.ensure(account, '9.9.9')
+                assert restored['environment_id'] == row['environment_id']
         state = service.state(1)['agents'][0]
         write_document(Path('/verify/pi-projects-result.json'), {'state': state, 'calls': calls})
         assert state['work'] and state['work']['status'] == 'passed', {'state': state, 'calls': calls}
         assert len(state['passed']) == 2
-        assert len(calls) == 22, calls
-        assert calls[-1]['previous_result']['status'] == 'passed'
+        assert len(calls) == 21, calls
+        assert calls[-1]['name'] == 'project_submit'
         initial = calls[1]['previous_result']['agents'][0]
         assert [item['objective_id'] for item in initial['available_objectives']] == ['Q4'], initial
         assert [item['objective_id'] for item in initial['waiting_objectives']] == ['Q5'], initial
         after_first = calls[12]['previous_result']['agents'][0]
         assert [item['objective_id'] for item in after_first['available_objectives']] == ['Q5'], after_first
         assert after_first['waiting_objectives'] == [], after_first
-        with main.get_db() as connection:
+        with service.database() as connection:
             submission = connection.execute('SELECT s.id FROM projects_submissions s JOIN projects_work w ON w.id=s.work_id '
                 'WHERE w.objective_id=? AND s.status=?', ('Q5', 'passed')).fetchone()
         program = read_document(data / 'projects/submissions' / submission['id'] / 'program.json')
         assert len(program['previous_objectives']) == 1, program
         assert program['previous_objectives'][0]['objective_id'] == 'Q4'
         assert program['previous_objectives'][0]['report']['status'] == 'passed'
-        workspaces = list((current._root(row) / 'projects').glob('workspace-*'))
+        workspaces = [path.parent.parent for path in (current._root(row) / 'projects').glob('*/library/example.py')]
         assert len(workspaces) == 1, workspaces
         assert (workspaces[0] / 'library/example.py').read_text() == 'VALUE = 2\n'
         assert (workspaces[0] / 'library/extra.py').read_text() == 'EXTRA = 3\n'
@@ -217,6 +244,9 @@ def verify_pi_projects_execution(runtime, client, account: dict, row: dict) -> N
         assert len([item for item in events if item['kind'] == 'input']) == 6
         assert len(current.jobs) == 0
         assert state['claude_usage']['output_tokens'] == 16, state['claude_usage']
-        print(json.dumps({'pi_projects': 'passed', 'real_model_calls': 0, 'tool_calls': 21,
+        if disk_enabled:
+            assert (current._root(row) / 'cli-scratchpad/data/iteration-marker').read_text() == 'private-iteration-data'
+        print(json.dumps({'pi_projects': 'passed', 'namespace': namespace, 'disk_enabled': disk_enabled,
+            'stop_wake_between_objectives': True, 'real_model_calls': 0, 'tool_calls': 21,
             'native_tty_inputs': 6, 'independent_docker_verification': 'passed',
             'dependent_objectives': 2, 'shared_workspace': True, 'previous_objectives_reverified': 1}, ensure_ascii=False))
