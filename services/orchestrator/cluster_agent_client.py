@@ -18,7 +18,7 @@ from system_update_contract import strict_json
 class _NodeConnection(HTTPConnection):
     """固定UDS连接，建连失败也立即关闭实际文件描述符。"""
 
-    def __init__(self, path: Path, timeout: float) -> None:
+    def __init__(self, path: Path, timeout: float | None) -> None:
         """固定原socket及有界读写期限。:param path: 本容器UDS。:param timeout: 读写秒数。:return: None。"""
         super().__init__('node.internal', timeout=timeout)
         self.path = path
@@ -46,7 +46,7 @@ def node_agent_request(data: Path, token: str, operation: str, raw: bytes) -> di
     :return: 有界私有协议回执。
     """
     allowed = {'health', 'prepare', 'inspect', 'account-quiesce', 'review-admission', 'fence', 'export', 'stage-import', 'verify-import',
-        'prepare-import', 'activate-import', 'restore-source', 'revoke-import',
+        'prepare-import', 'activate-import', 'restore-source', 'revoke-import', 'restart-preserved', 'stage-preparation-files', 'prepare-files',
         'grant-create', 'grant-renew', 'grant-get', 'grant-close', 'credential-refresh-start', 'credential-refresh-get', 'credential-status', 'credential-material', 'credential-identity', 'credential-usage-get', 'account-login-get', 'account-login-observe', 'account-login-code-receipt', 'account-login-snapshot', 'account-login-input', 'account-bound-identity', 'account-bound-login-start', 'account-bound-login-get', 'account-bound-login-stop', 'account-bound-login-observe', 'account-bound-login-code', 'account-bound-login-code-receipt', 'account-bound-login-commit', 'account-bound-login-snapshot', 'account-bound-login-accept', 'account-bound-login-discard', 'account-bound-login-input', 'account-bound-login-publish', 'account-bound-login-abort', 'credential-refresh-stop', 'account-login-start', 'account-login-stop', 'account-login-code', 'account-login-commit', 'account-login-accept', 'account-login-discard', 'credential-usage-start', 'credential-usage-stop', 'terminal-assets', 'terminal-start',
         'terminal-get', 'terminal-observe', 'terminal-send', 'terminal-input', 'terminal-control',
         'terminal-conversation', 'terminal-usage', 'terminal-passive', 'terminal-passive-ack', 'terminal-quota-state', 'terminal-quota-read', 'api-quota-read', 'terminal-capture', 'terminal-maintenance', 'terminal-recover', 'terminal-reconcile', 'terminal-snapshot', 'terminal-snapshot-get', 'terminal-verification-start', 'terminal-verification-get', 'terminal-verification-cancel', 'run-verification-start', 'run-verification-get', 'run-verification-cancel', 'run-review-input-stage', 'run-review-input-commit', 'run-review-input-facts', 'run-scenario-input-stage', 'run-scenario-input-commit', 'run-scenario-input-facts', 'run-scenario-input-archive', 'run-project-prepare', 'run-project-configure', 'run-project-decision', 'run-project-facts', 'run-project-native', 'run-project-permit', 'run-snapshot', 'run-snapshot-get', 'run-start', 'run-get', 'run-poll', 'run-control', 'run-recover', 'run-quota-state', 'run-quota-read', 'run-artifact', 'run-files', 'run-file', 'run-stats', 'run-capture', 'run-session', 'run-refresh', 'run-refresh-get', 'run-owner-refresh-defer', 'continue-start', 'continue-get', 'continue-input', 'continue-control', 'continue-recover', 'continue-quota-state', 'continue-quota-read', 'continue-quota-control', 'continue-credentials'}
@@ -60,6 +60,8 @@ def node_agent_request(data: Path, token: str, operation: str, raw: bytes) -> di
         'terminal-get', 'terminal-observe', 'terminal-send', 'terminal-input', 'terminal-conversation',
         'terminal-usage', 'terminal-passive', 'terminal-passive-ack', 'terminal-quota-state', 'terminal-quota-read', 'api-quota-read',
         'terminal-capture', 'terminal-reconcile', 'terminal-verification-get', 'run-verification-get', 'run-project-facts', 'run-project-native', 'run-get', 'run-poll', 'run-quota-state', 'run-quota-read', 'run-artifact', 'run-files', 'run-file', 'run-stats', 'run-capture', 'run-session', 'run-refresh', 'run-refresh-get', 'run-owner-refresh-defer', 'continue-get', 'continue-input', 'continue-quota-state', 'continue-quota-read', 'continue-quota-control', 'continue-credentials') else 115
+    if operation in ('export', 'verify-import', 'prepare-import', 'prepare-files'):
+        timeout = None
     connection = _NodeConnection(data / 'node-agent/control.sock', timeout)
     try:
         connection.request('POST', '/operations/' + operation, body=raw,

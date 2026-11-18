@@ -25,6 +25,8 @@ def source_ownership(root: Path) -> list[str]:
     bench_registry = load_registry(source_path(root, 'orchestrator/database-migration-registry.json'), 'bench')
     bench_registered = {step['id'] for step in bench_registry['steps']}
     python_schemas = {source_path(root, logical) for key, logical in BENCH_SCHEMA_SOURCES.items() if key in bench_registered}
+    # 临时清单在每次迁移的私有目录创建并删除，不进入业务数据库版本台账；纯定义仍由此入口核验。
+    python_schemas.add(source_path(root, 'orchestrator/cluster_archive_schema.py'))
     for schema in sorted(python_schemas):
         if not schema.is_file():
             continue

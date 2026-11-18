@@ -15,7 +15,8 @@ from socket import AF_UNIX, SOCK_STREAM, socket
 from fastapi import APIRouter, HTTPException, Request, Response
 from docker.errors import NotFound
 from starlette.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, StrictInt, StrictStr
+from pydantic import BaseModel, ConfigDict, StrictBool, StrictInt, StrictStr
+from typing import Literal
 
 from account_isolation import ROLE_COLUMNS, ROLE_LABELS, role_container
 from account_update_identity import image_origin
@@ -96,6 +97,21 @@ class UpdateControl(BaseModel):
     """
     model_config = ConfigDict(extra='forbid')
     expected_revision: StrictStr
+
+
+class ClusterUpdate(BaseModel):
+    """已认证宿主的固定节点维护输入。:param operation_id: 原操作。:param epoch: 原代次。:param action: 固定动作。"""
+
+    model_config = ConfigDict(extra='forbid')
+    operation_id: StrictStr
+    epoch: StrictStr
+    action: Literal['prepare', 'status', 'rollback', 'resume', 'restore', 'cancel-preparation']
+    target_release: StrictStr | None = None
+    control_release: StrictStr | None = None
+    control_image: StrictStr | None = None
+    account_image: StrictStr | None = None
+    account_release: StrictStr | None = None
+    preserve_data: StrictBool = False
 
 
 class EnvironmentUpdate(BaseModel):
@@ -180,9 +196,15 @@ def runtime_snapshot(runtime) -> dict:
         reasons = []
         item = {key: row.get(key) for key in ('environment_id', 'generation', 'state', 'name', 'account_id')}
         if locality is not None and not locality(row):
-            item.update(roles={}, origin=None, node_kind='ssh', blockers=['远程环境请按集群停机升级操作单维护'])
+            service = getattr(runtime, 'cluster_service', None)
+            try:
+                if service is None or service.synchronization is None or accounts.get(row['account_id']) is None:
+                    raise ValueError('远程维护尚未接入')
+                item = service.synchronization.environment_snapshot(row, accounts[row['account_id']])
+            except Exception:
+                item.update(roles={}, origin=None, node_kind='ssh', blockers=['节点工作、连接或同步状态仍需核对'])
+                blockers.append(row['name'] + ': 节点工作、连接或同步状态仍需核对')
             environments.append(item)
-            blockers.append(row['name'] + ': 远程环境请按集群停机升级操作单维护')
             continue
         try:
             with ExitStack() as locks:
@@ -237,8 +259,11 @@ def runtime_snapshot(runtime) -> dict:
         item['blockers'] = reasons
         blockers.extend(f'{row["name"]}: {reason}' for reason in reasons)
         environments.append(item)
+    service = getattr(runtime, 'cluster_service', None)
+    nodes = [row for row in service.store.list() if row['kind'] == 'ssh'
+        and ((row.get('preparation') or {}).get('release') or (row.get('preparation') or {}).get('current_release'))] if service else []
     return {**gate, 'ready': gate['phase'] == 'blocked' and not blockers,
-        'environments': environments, 'blockers': blockers[:256]}
+        'environments': environments, 'nodes': nodes, 'blockers': blockers[:256]}
 
 
 def environment_sources(runtime) -> list[dict]:
@@ -260,7 +285,20 @@ def environment_sources(runtime) -> list[dict]:
             'running': False, 'verified': True}
         locality = getattr(runtime, 'locality', None)
         if locality is not None and not locality(row):
-            item.update(verified=False, node_kind='ssh', maintenance='集群停机升级')
+            item.update(verified=False, node_kind='ssh', maintenance='节点自动同步')
+            service = getattr(runtime, 'cluster_service', None)
+            if service is not None and service.synchronization is not None:
+                connection = runtime.database()
+                try:
+                    account = connection.execute('SELECT * FROM accounts WHERE id=?', (row['account_id'],)).fetchone()
+                finally:
+                    connection.close()
+                try:
+                    actual = service.synchronization.environment_snapshot(row, dict(account), quiescent=False)
+                    item.update(verified=True, release=(actual.get('origin') or {}).get('release'),
+                        running=any(role['state'] == 'running' for role in actual['roles'].values()), maintenance=None)
+                except Exception:
+                    item['maintenance'] = '节点同步状态需要核对'
             result.append(item)
             continue
         guard = runtime.environment_lock(row['environment_id'])
@@ -444,6 +482,21 @@ def system_updates_router(runtime_provider) -> APIRouter:
         """读取真实排空快照。:param request: 内部证明。@return 快照。"""
         internal_proof(request)
         return runtime_snapshot(runtime_provider())
+
+    @router.post('/internal/v3/system-updates/nodes')
+    def nodes(request: Request, body: ClusterUpdate) -> dict:
+        """沿原内部认证协调同代节点备份与恢复。:param request: 原宿主证明。:param body: 固定范围。:return: 节点进度。"""
+        gate = internal_proof(request)
+        if gate.get('operation_id') != body.operation_id or gate.get('epoch') != body.epoch or gate.get('phase') != 'blocked':
+            raise HTTPException(409, '节点平台维护操作或代次已变化')
+        runtime = runtime_provider()
+        service = getattr(runtime, 'cluster_service', None)
+        if service is None:
+            return {'nodes': []}
+        try:
+            return service.platform_nodes(body.model_dump())
+        except (ValueError, RuntimeError):
+            raise HTTPException(409, '节点平台维护仍需核对原任务') from None
 
     @router.post('/internal/v3/system-updates/environment')
     def environment(request: Request, body: EnvironmentUpdate):

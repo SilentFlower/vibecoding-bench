@@ -73,7 +73,7 @@ class ArchiveDescriptor(BaseModel):
     attempt_id: StrictStr = Field(pattern=r'^[a-f0-9]{32}$')
     sha256: StrictStr = Field(pattern=r'^[a-f0-9]{64}$')
     bytes: StrictInt = Field(ge=0)
-    files: StrictInt = Field(ge=1, le=100000)
+    files: StrictInt = Field(ge=1)
     data_bytes: StrictInt = Field(ge=0)
     cli_version: StrictStr | None = Field(default=None, pattern=r'^2\.1\.[0-9]{1,6}$')
     cli_identity: MigrationCliIdentity | None = None

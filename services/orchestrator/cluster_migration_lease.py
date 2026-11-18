@@ -42,18 +42,18 @@ class IndependentMigrationPermit:
                 or assignment['phase'] not in ('maintenance','reconcile') or account is None or account['cc2api_account_id'] is not None):
             raise ValueError('原独立账号迁移许可或持久维护已经变化')
 
-    def drain(self, timeout: float=120) -> None:
+    def drain(self, timeout: float | None=None) -> None:
         """等待原实际流收口，CLI停止继续使用原Node源隔离。
 
-        :param timeout: 本次排空期限，秒。
+        :param timeout: 可选单次等待期限；默认沿原操作后台等待。
         :return: None。
         """
-        deadline=time.monotonic()+timeout
+        deadline=None if timeout is None else time.monotonic()+timeout
         while True:
             self.check()
             if self.transports.account_streams(self.account_id)==0:
                 return
-            if time.monotonic()>=deadline:
+            if deadline is not None and time.monotonic()>=deadline:
                 raise ValueError('独立账号仍有原节点连接待收口')
             if self.abort is not None:
                 self.abort.wait(.2)
@@ -164,13 +164,13 @@ class MigrationLease:
         if self.failed.is_set():
             raise ValueError('迁移网关续约失效，请核对原操作')
 
-    def drain(self, timeout: float = 120) -> None:
+    def drain(self, timeout: float | None = None) -> None:
         """等待实际API与节点流收口后认领排他操作。
 
-        :param timeout: 本次有限排空期限，秒。
+        :param timeout: 可选单次等待期限；默认沿原操作后台等待。
         :return: None；到期保留原维护状态。
         """
-        deadline = time.monotonic() + timeout
+        deadline = None if timeout is None else time.monotonic() + timeout
         while True:
             self.check()
             snapshot = self.gateway._request('GET', self.path)
@@ -182,7 +182,7 @@ class MigrationLease:
             if active == 0 and self.transports.account_streams(self.account_id) == 0:
                 self._update('claim')
                 return
-            if time.monotonic() >= deadline:
+            if deadline is not None and time.monotonic() >= deadline:
                 raise ValueError('迁移原有工作尚未完成，请等待并继续原操作')
             self.stopping.wait(0.2)
 

@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 from stat import S_ISREG, S_ISSOCK
 
+from cluster_migration_errors import MigrationFailure, public_failure
 from cluster_nodes import NodeAddress, NodeConfiguration, host_key_identity
 from cluster_draft_login_operations import DRAFT_LOGIN_OPERATIONS, DRAFT_LOGIN_SHORT_OPERATIONS
 from cluster_owner_operations import OWNER_OPERATIONS
@@ -131,7 +132,7 @@ class NodeSshError(ValueError):
         super().__init__(messages[self.reason])
 
 
-def _run(arguments: list[str], *, data: bytes | None = None, timeout: float = 15,
+def _run(arguments: list[str], *, data: bytes | None = None, timeout: float | None = 15,
         maximum_output: int = 256 * 1024, pass_fds: tuple[int, ...] = ()) -> bytes:
     process, failed = None, True
     output, errors = bytearray(), bytearray()
@@ -139,7 +140,7 @@ def _run(arguments: list[str], *, data: bytes | None = None, timeout: float = 15
         process = subprocess.Popen(arguments, stdin=subprocess.PIPE if data is not None else subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True, pass_fds=pass_fds,
             env={**os.environ, 'SSH_AUTH_SOCK': '', 'SSH_ASKPASS_REQUIRE': 'never'})
-        deadline = time.monotonic() + timeout
+        deadline = None if timeout is None else time.monotonic() + timeout
         with selectors.DefaultSelector() as ready:
             for stream, name in ((process.stdout, 'stdout'), (process.stderr, 'stderr')):
                 os.set_blocking(stream.fileno(), False)
@@ -153,8 +154,8 @@ def _run(arguments: list[str], *, data: bytes | None = None, timeout: float = 15
                     process.stdin.close()
             # 同时消费stderr和提交有界输入，避免远端横幅或大JSON导致管道互相等待。
             while ready.get_map():
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
+                remaining = None if deadline is None else deadline - time.monotonic()
+                if remaining is not None and remaining <= 0:
                     raise NodeSshError('timeout')
                 for key, _ in ready.select(remaining):
                     stream = key.fileobj
@@ -181,7 +182,7 @@ def _run(arguments: list[str], *, data: bytes | None = None, timeout: float = 15
                         target.extend(chunk)
                         if len(output) + len(errors) > maximum_output:
                             raise NodeSshError('response_too_large')
-        code = process.wait(timeout=max(0.001, deadline - time.monotonic()))
+        code = process.wait(timeout=None if deadline is None else max(0.001, deadline - time.monotonic()))
         if code:
             # OpenSSH错误可能含远端横幅与命令内容，只返回固定脱敏说明。
             message = bytes(errors).lower()
@@ -348,7 +349,7 @@ class SshNode:
             '-o', 'ConnectTimeout=8', '-o', 'ConnectionAttempts=1', '-o', 'ServerAliveInterval=10',
             '-o', 'ServerAliveCountMax=3', '-o', 'LogLevel=ERROR']
 
-    def _command(self, command: str, *, data: bytes | None = None, timeout: float = 15,
+    def _command(self, command: str, *, data: bytes | None = None, timeout: float | None = 15,
             maximum_output: int = 256 * 1024) -> bytes:
         descriptor = self._password_descriptor()
         try:
@@ -449,13 +450,13 @@ class SshNode:
         :param operation: 固定导出、暂存、核验、准备或激活操作。
         :return: 固定协议回执。
         """
-        if operation not in ('export', 'stage-import', 'verify-import', 'prepare-import', 'activate-import', 'restore-source', 'revoke-import'):
+        if operation not in ('export', 'stage-import', 'verify-import', 'prepare-import', 'activate-import', 'restore-source', 'revoke-import', 'restart-preserved', 'stage-preparation-files', 'prepare-files'):
             raise ValueError('节点迁移文件操作无效')
         return self._execute_environment(container, payload, operation)
 
     def _execute_environment(self, container: str, payload: dict, operation: str) -> dict:
         if operation not in ('health', 'prepare', 'inspect', 'account-quiesce', 'review-admission', 'fence', 'export', 'stage-import', 'verify-import',
-                'prepare-import', 'activate-import', 'restore-source', 'revoke-import', 'grant-create', 'grant-renew',
+                'prepare-import', 'activate-import', 'restore-source', 'revoke-import', 'restart-preserved', 'stage-preparation-files', 'prepare-files', 'grant-create', 'grant-renew',
                 'grant-get', 'grant-close', 'credential-refresh-start', 'credential-refresh-get', 'credential-status', 'credential-material', 'credential-identity', 'credential-usage-get', 'account-login-get', 'account-login-observe', 'account-login-code-receipt', 'account-login-snapshot', 'account-login-input', 'account-bound-identity', 'account-bound-login-start', 'account-bound-login-get', 'account-bound-login-stop', 'account-bound-login-observe', 'account-bound-login-code', 'account-bound-login-code-receipt', 'account-bound-login-commit', 'account-bound-login-snapshot', 'account-bound-login-accept', 'account-bound-login-discard', 'account-bound-login-input', 'account-bound-login-publish', 'account-bound-login-abort', 'credential-refresh-stop', 'account-login-start', 'account-login-stop', 'account-login-code', 'account-login-commit', 'account-login-accept', 'account-login-discard', 'credential-usage-start', 'credential-usage-stop', 'terminal-assets', 'terminal-start', 'terminal-get', 'terminal-observe',
                 'terminal-send', 'terminal-input', 'terminal-control', 'terminal-conversation', 'terminal-usage',
                 'terminal-passive', 'terminal-passive-ack', 'terminal-quota-state', 'terminal-quota-read', 'api-quota-read', 'terminal-capture', 'terminal-maintenance', 'terminal-recover', 'terminal-reconcile', 'terminal-snapshot', 'terminal-snapshot-get', 'terminal-verification-start', 'terminal-verification-get', 'terminal-verification-cancel', 'run-verification-start', 'run-verification-get', 'run-verification-cancel', 'run-review-input-stage', 'run-review-input-commit', 'run-review-input-facts', 'run-scenario-input-stage', 'run-scenario-input-commit', 'run-scenario-input-facts', 'run-scenario-input-archive', 'run-project-prepare', 'run-project-configure', 'run-project-decision', 'run-project-facts', 'run-project-native', 'run-project-permit', 'run-snapshot', 'run-snapshot-get', 'run-start', 'run-get', 'run-poll', 'run-control', 'run-recover', 'run-quota-state', 'run-quota-read', 'run-artifact', 'run-files', 'run-file', 'run-stats', 'run-capture', 'run-session', 'run-refresh', 'run-refresh-get', 'run-owner-refresh-defer', 'continue-start', 'continue-get', 'continue-input', 'continue-control', 'continue-recover', 'continue-quota-state', 'continue-quota-read', 'continue-quota-control', 'continue-credentials') and operation not in DRAFT_LOGIN_OPERATIONS and operation not in OWNER_OPERATIONS and operation not in ENVIRONMENT_OPERATIONS:
@@ -472,8 +473,14 @@ class SshNode:
             'terminal-get', 'terminal-observe', 'terminal-send', 'terminal-input', 'terminal-conversation',
             'terminal-usage', 'terminal-passive', 'terminal-passive-ack', 'terminal-quota-state', 'terminal-quota-read', 'api-quota-read',
             'terminal-capture', 'terminal-reconcile', 'terminal-verification-get', 'run-verification-get', 'run-project-facts', 'run-project-native', 'run-get', 'run-poll', 'run-quota-state', 'run-quota-read', 'run-artifact', 'run-files', 'run-file', 'run-stats', 'run-capture', 'run-session', 'run-refresh', 'run-refresh-get', 'run-owner-refresh-defer', 'continue-get', 'continue-input', 'continue-quota-state', 'continue-quota-read', 'continue-quota-control', 'continue-credentials') else 120
+        # 迁移本来由中央后台线程持有；SSH保活检测失联，不按环境规模限制总运行时间。
+        if operation in ('export', 'verify-import', 'prepare-import', 'prepare-files'):
+            timeout = None
         result = json.loads(self._command(command, data=body, timeout=timeout, maximum_output=response_limit(operation)))
         if not isinstance(result, dict) or result.get('ok') is not True or not isinstance(result.get('result'), dict):
+            failure = public_failure(result.get('failure')) if isinstance(result, dict) else None
+            if failure is not None:
+                raise MigrationFailure(failure['code'], failure['stage'])
             raise ValueError('节点环境准备失败，请检查执行组件、环境归属与资源')
         value = result['result']
         if value.get('protocol') != 1 or value.get('node_key') != self.node_key:

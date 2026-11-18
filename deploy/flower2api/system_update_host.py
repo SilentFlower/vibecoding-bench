@@ -312,7 +312,7 @@ class HostDeployment:
             evidence = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
         return {'controls': {role: {'id': item['Id'], 'image_id': item['Image']} for role, item in controls.items()},
             'env_sha256': hashlib.sha256(safe_read(self.env, private=True)).hexdigest(),
-            'metadata': self.metadata(), 'environments': evidence['environments']}
+            'metadata': self.metadata(), 'environments': evidence['environments'], 'nodes': evidence.get('nodes', [])}
 
     def block(self, operation: dict) -> None:
         """原子发布本次维护门禁。
@@ -340,6 +340,106 @@ class HostDeployment:
         return {'ready': gateway.get('active') == 0 and runtime.get('ready') is True,
             'blockers': (['网关仍有在途活动'] if gateway.get('active') else []) + runtime.get('blockers', []),
             'environments': runtime['environments']}
+
+    def prepare_nodes(self, operation: dict, selected: dict, save, cancelled) -> None:
+        """冻结并收齐同代Node备份，长备份在原后台操作中等待。
+
+        :param operation: 原宿主维护操作。
+        :param selected: 已验证目标来源。
+        :param save: 原持久回调。
+        :param cancelled: 原取消读取器。
+        :return: None；取消后由原abandon恢复已停止节点。
+        """
+        expected = {row['id'] for row in operation['before'].get('nodes', [])}
+        if not expected:
+            return
+        body = {'operation_id': operation['operation_id'], 'epoch': operation['epoch'], 'action': 'prepare',
+            'target_release': selected['release']['release'], 'control_release': selected['selection']['control']['release'], 'control_image': selected['selection']['control']['reference'],
+            'account_image': selected['selection']['account']['reference'], 'account_release': selected['selection']['account']['release']}
+        self.request('orchestrator', '/internal/v3/system-updates/nodes', body, timeout=30)
+        cancel_sent = False
+        while True:
+            if cancelled() and not cancel_sent:
+                self.request('orchestrator', '/internal/v3/system-updates/nodes',
+                    {'operation_id': operation['operation_id'], 'epoch': operation['epoch'], 'action': 'cancel-preparation'})
+                cancel_sent = True
+            status = self.request('orchestrator', '/internal/v3/system-updates/nodes',
+                {'operation_id': operation['operation_id'], 'epoch': operation['epoch'], 'action': 'status'})
+            nodes = [row for row in status['nodes'] if row['node_id'] in expected]
+            operation['cluster_nodes'] = {'phase': 'backing_up', 'nodes': nodes}
+            save()
+            if any(row.get('preparation', {}).get('state') == 'failed' and not row['running'] for row in nodes):
+                raise ValueError('节点完整备份未完成，原节点维护记录已保留')
+            if cancelled() and not any(row['running'] for row in nodes):
+                return
+            if expected == {row['node_id'] for row in nodes if row['phase'] == 'backed_up' and not row['running']}:
+                operation['cluster_nodes']['phase'] = 'backed_up'
+                operation['cluster_backups'] = nodes
+                save()
+                return
+            if (not cancelled() and any(not row['running'] and row.get('preparation', {}).get('phase') == 'waiting'
+                    and row.get('preparation', {}).get('retry_at', 0) <= time.time() for row in nodes)):
+                self.request('orchestrator', '/internal/v3/system-updates/nodes', body, timeout=30)
+            time.sleep(1)
+
+    def resume_nodes(self, operation: dict, selected: dict, save) -> None:
+        """等待新中央沿同一操作恢复托管Node。
+
+        :param operation: 原维护及Node备份引用。
+        :param selected: 当前已验证组合。
+        :param save: 持久回调。
+        :return: None；明确失败进入原组合恢复。
+        """
+        expected = {row['id'] for row in operation['before'].get('nodes', [])}
+        if not expected:
+            return
+        while True:
+            status = self.request('orchestrator', '/internal/v3/system-updates/nodes',
+                {'operation_id': operation['operation_id'], 'epoch': operation['epoch'], 'action': 'resume',
+                    'target_release': selected['release']['release'], 'control_release': selected['selection']['control']['release']})
+            nodes = [row for row in status['nodes'] if row['node_id'] in expected]
+            operation['cluster_nodes'] = {'phase': 'synchronizing', 'nodes': nodes}
+            save()
+            if any((row.get('preparation', {}).get('state') == 'failed' or row['phase'] == 'rolled_back')
+                    and not row['running'] for row in nodes):
+                raise ValueError('节点换批未通过核验，正在保留原恢复范围')
+            if expected == {row['node_id'] for row in nodes if row['phase'] == 'completed' and not row['running']
+                    and row.get('preparation', {}).get('state') == 'prepared'
+                    and row.get('preparation', {}).get('release') == selected['selection']['control']['release']}:
+                operation['cluster_nodes']['phase'] = 'completed'
+                save()
+                return
+            time.sleep(1)
+
+    def restore_nodes(self, operation: dict, save) -> None:
+        """恢复原Node范围；已重新接单的操作保留当前资料。
+
+        :param operation: 原宿主操作及冻结Node引用。
+        :param save: 持久回调。
+        :return: None；未知结果保留原平台维护。
+        """
+        expected = {row['id'] for row in operation['before'].get('nodes', [])}
+        if not expected:
+            return
+        body = {'operation_id': operation['operation_id'], 'epoch': operation['epoch'], 'action': 'restore',
+            'preserve_data': bool(operation.get('release_started'))}
+        self.request('orchestrator', '/internal/v3/system-updates/nodes', body)
+        while True:
+            status = self.request('orchestrator', '/internal/v3/system-updates/nodes',
+                {'operation_id': operation['operation_id'], 'epoch': operation['epoch'], 'action': 'status'})
+            nodes = [row for row in status['nodes'] if row['node_id'] in expected]
+            operation['cluster_nodes'] = {'phase': 'restoring', 'nodes': nodes}
+            save()
+            if expected == {row['node_id'] for row in nodes if row['phase'] == 'platform_restored' and not row['running']}:
+                operation['cluster_nodes']['phase'] = 'restored'
+                save()
+                return
+            if any(row.get('preparation', {}).get('state') == 'failed' and not row['running'] for row in nodes):
+                raise ValueError('节点恢复尚未完整核验，原快照和后来资料继续保留')
+            if any(not row['running'] and row.get('preparation', {}).get('retry_at', 0) <= time.time() for row in nodes
+                    if row['phase'] != 'platform_restored'):
+                self.request('orchestrator', '/internal/v3/system-updates/nodes', body)
+            time.sleep(1)
 
     def _compose(self, *arguments: str) -> None:
         for name in ('compose_file', 'override_file'):
@@ -439,7 +539,7 @@ class HostDeployment:
             rows = connection.execute('SELECT environment_id,network_container_id FROM account_environments').fetchall()
         candidate = self.verify_images(operation['selected']['selection'])['account']['Id']
         for environment_id, identifier in rows:
-            if environment_id not in frozen or not identifier:
+            if environment_id not in frozen or not identifier or frozen[environment_id].get('node_kind') == 'ssh':
                 continue
             # 部分角色重建可能已移除原网络，恢复路径继续由既有环境意图核对其余角色。
             present = docker('ps', '-aq', '--filter', 'id=' + identifier).split()
@@ -567,6 +667,8 @@ class HostDeployment:
                 or target['reference'] != image_reference('account', target['release'], namespace='ghcr.io/silentflower', legacy=True)):
             return
         for original in operation['before']['environments']:
+            if original.get('node_kind') == 'ssh':
+                continue
             identifier = original['environment_id']
             if identifier in operation.get('environment_retired', {}):
                 continue
@@ -779,6 +881,8 @@ class HostDeployment:
         if not account_rebuild_required(operation['original']['selection']['account'], selected['selection']['account']):
             return
         for original in operation['before']['environments']:
+            if original.get('node_kind') == 'ssh':
+                continue
             if not any(item['state'] == 'running' for item in original.get('roles', {}).values()):
                 continue
             evidence = self._settled(operation)
@@ -830,7 +934,7 @@ class HostDeployment:
                     {**selected['selection']['control'], 'digest': selected['selection']['control']['config_digest']}):
                 raise ValueError('真实控制服务镜像或状态验收失败')
         after = self.metadata()
-        before = operation['before']['metadata']
+        before = (operation.get('restore_metadata') if restoring else None) or operation['before']['metadata']
         if selected['release']['schema_version'] == 2:
             asset = selected['release']['migrations']['plan']
             raw = safe_read(self.root / 'releases' / selected['release']['release'] / asset['name'])
@@ -862,11 +966,18 @@ class HostDeployment:
         evidence = self._settled(operation)
         if not evidence['ready']:
             raise ValueError('更新验收存在未收口工作或未知证据')
+        for item in evidence['environments']:
+            if item.get('node_kind') == 'ssh' and item.get('roles'):
+                origin = item.get('origin') or {}
+                if (origin.get('verified') is not True or origin.get('release') != selected['selection']['account']['release']
+                        or origin.get('reference') != selected['selection']['account']['reference']):
+                    raise ValueError('远程账号的实际镜像来源未通过同批验收')
         for environment_id, expected_cpu in operation.get('environment_cpu_before', {}).items():
             current = next(item for item in evidence['environments'] if item['environment_id'] == environment_id)
             if self.environment_cpu(current) != expected_cpu:
                 raise ValueError('更新或恢复后的CPU额度与维护前不符')
-        if not account_rebuild_required(operation['original']['selection']['account'], operation['selected']['selection']['account']):
+        if (not account_rebuild_required(operation['original']['selection']['account'], operation['selected']['selection']['account'])
+                and not (restoring and operation.get('release_started'))):
             for original in operation['before']['environments']:
                 current = next(item for item in evidence['environments'] if item['environment_id'] == original['environment_id'])
                 if current['generation'] != original['generation'] or current.get('roles') != original.get('roles'):
@@ -896,6 +1007,9 @@ class HostDeployment:
             actual = controls[role]
             if actual['Id'] != original['id'] or actual['Image'] != original['image_id'] or actual['State']['Status'] != 'running':
                 raise ValueError('取消维护时原控制服务状态已经变化')
+        if operation['before'].get('nodes'):
+            self.request('orchestrator', '/internal/v3/system-updates/nodes',
+                {'operation_id': operation['operation_id'], 'epoch': operation['epoch'], 'action': 'rollback'}, timeout=180)
         self.release(operation)
 
     def committed(self, operation: dict) -> bool:
@@ -932,6 +1046,9 @@ class HostDeployment:
             operation['release_started'] = True
             save()
         self.block(operation)
+        if operation.get('release_started') and 'restore_metadata' not in operation:
+            operation['restore_metadata'] = self.metadata()
+            save()
         if (operation.get('environment_intents')
                 and not compatible_scratchpad(operation['selected']['release'], original['release'])):
             # 首次兼容阶段沿用原账号，激活阶段的原版必须已经能恢复磁盘布局。
@@ -975,6 +1092,7 @@ class HostDeployment:
         self._compose('up', '-d', '--no-deps', 'gateway', 'orchestrator')
         self._connect_legacy_environments(operation)
         self.wait_controls(time.monotonic() + 180)
+        self.restore_nodes(operation, save)
         if account_rebuild_required(original['selection']['account'], operation['selected']['selection']['account']):
             # 已持久登记的重建意图允许收口本操作造成的部分角色，未知活动仍拒绝。
             for environment_id, intent in operation.get('environment_intents', {}).items():

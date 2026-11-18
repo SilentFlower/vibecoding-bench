@@ -232,7 +232,7 @@ class SystemUpdater:
 
     def _public_operation(self, operation: dict) -> dict:
         return {key: copy.deepcopy(operation.get(key)) for key in ('operation_id', 'action', 'phase', 'created_at',
-            'updated_at', 'target_release', 'error', 'blockers', 'cancel_requested', 'cleanup', 'environment_results', 'database_snapshot', 'database_migrations')}
+            'updated_at', 'target_release', 'error', 'blockers', 'cancel_requested', 'cleanup', 'environment_results', 'database_snapshot', 'database_migrations', 'cluster_nodes')}
 
     def operation(self, identifier: str) -> dict:
         """读取指定操作的脱敏进度。
@@ -419,6 +419,9 @@ class SystemUpdater:
                 time.sleep(0.5)
             # 以在途自然结束后的身份和环境为切换基线，接纳原工作合法完成的变化。
             operation['before'] = self.backend.capture(operation['original'])
+            prepare_nodes = getattr(self.backend, 'prepare_nodes', None)
+            if prepare_nodes is not None and operation['before'].get('nodes'):
+                prepare_nodes(operation, selected, lambda: self._record(operation), lambda: self._cancelled(operation))
             # 与取消接口共用锁，使最后一次取消核对和进入切换成为同一个边界。
             with self.lock:
                 cancelled = self._cancelled(operation)
@@ -439,6 +442,9 @@ class SystemUpdater:
             self.backend.switch(operation, selected)
             self._phase(operation, 'verifying')
             self.backend.wait_controls(time.monotonic() + 180)
+            resume_nodes = getattr(self.backend, 'resume_nodes', None)
+            if resume_nodes is not None and operation['before'].get('nodes'):
+                resume_nodes(operation, selected, lambda: self._record(operation))
             self.backend.update_environments(operation, selected, lambda: self._record(operation))
             self.backend.health(operation, selected)
             self._phase(operation, 'committing')

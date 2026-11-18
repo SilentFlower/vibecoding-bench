@@ -17,6 +17,8 @@ from cluster_migration_files import ArchiveDescriptor, ArchiveExport, ImportStag
 from cluster_migration_io import MigrationIO
 from cluster_migration_lease import IndependentMigrationPermit, MigrationLease
 from cluster_migrations import NodeMigrations
+from cluster_migration_errors import migration_failure
+from cluster_migration_profiles import MigrationProfiles
 
 
 class MigrationStart(BaseModel):
@@ -169,14 +171,17 @@ class MigrationCoordinator:
         migration = self.ledger.get(operation_id)
         if migration['phase'] in ('completed', 'cancelled'):
             return migration
+        step = 'context'
         try:
-            with self.guard(migration['account_id']) as (account, row):
+            with self.service.migration_nodes(migration), self.guard(migration['account_id']) as (account, row):
                 migration, execution, identity, fence = self._context(operation_id, account)
                 if migration['phase'] in ('completed', 'cancelled'):
                     return migration
                 if 'cancellation' in migration['record'].get('checkpoints', {}):
                     raise ValueError('迁移已经开始取消，请继续原取消操作')
                 with self._lease(operation_id, execution, account['id']) as lease:
+                    step = 'draining'
+                    self.ledger.progress(operation_id, step)
                     lease.drain()
                     # 先排空，再取环境锁，允许排空中的既有transport完成原准备。
                     with self.runtime.environment_lock(fence.environment_id):
@@ -184,16 +189,22 @@ class MigrationCoordinator:
                         if migration['phase'] == 'reconcile':
                             migration = self.ledger.resume(operation_id)
                         target_id, source_id = migration['target_node_id'], migration['source_node_id']
+                        if migration['phase'] in ('requested', 'draining', 'source_fenced', 'exporting', 'importing', 'verified'):
+                            self._ready(self.service.store.get(target_id))
                         if migration['phase'] == 'requested':
                             migration = self.ledger.advance(operation_id, 'draining', {'active': 0, 'node_streams': 0})
                         if migration['phase'] == 'draining':
                             lease.check()
+                            step = 'fence'
+                            self.ledger.progress(operation_id, step)
                             receipt = self.io.command(source_id, 'fence', fence.model_dump())
                             self._receipt(receipt, {'protocol': 1, **fence.model_dump(), 'phase': 'fenced'})
                             migration = self.ledger.advance(operation_id, 'source_fenced', receipt)
                         if migration['phase'] == 'source_fenced':
                             lease.check()
                             request = ArchiveExport(**fence.model_dump(), attempt_id=execution['attempt_id'], version=execution['version'])
+                            step = 'export'
+                            self.ledger.progress(operation_id, step)
                             archive = ArchiveDescriptor.model_validate(self.io.command(source_id, 'export', request.model_dump())['archive'])
                             if (archive.identity != identity or archive.environment_generation != fence.generation
                                     or archive.cli_version != execution['version'] or archive.cli_identity is None):
@@ -206,6 +217,8 @@ class MigrationCoordinator:
                                 target_revision=fence.assignment_revision + 1, archive=archive)
                             if migration['phase'] == 'exporting':
                                 lease.check()
+                                step = 'transfer'
+                                self.ledger.progress(operation_id, step)
                                 bundle = self.io.download(source_id, archive)
                                 self.io.upload(target_id, stage, bundle)
                                 migration = self.ledger.advance(operation_id, 'importing', {'transfer_id': stage.transfer_id})
@@ -213,14 +226,22 @@ class MigrationCoordinator:
                                 lease.check()
                                 checkpoints = migration['record'].get('checkpoints', {})
                                 if 'target' not in checkpoints:
+                                    step = 'verify-import'
+                                    self.ledger.progress(operation_id, step)
                                     verified = self.io.command(target_id, 'verify-import', stage.model_dump())
                                     self._receipt(verified, {'protocol': 1, 'node_key': stage.node_key, 'operation_id': operation_id,
                                         'transfer_id': stage.transfer_id, 'phase': 'verified', 'sha256': archive.sha256})
                                 frozen = {**row, 'generation': fence.generation, 'state': migration['record']['source_state']}
+                                profiles = MigrationProfiles(self.service.data, operation_id)
                                 preparation = self.service.build_preparation(account, frozen, stage.node_key, stage.target_revision,
-                                    self.runtime, self.gateway, self.quota_identity(account),
+                                    self.runtime, self.gateway, self.quota_identity(account), profile_sink=profiles.save,
                                     **({'cli_only':True} if account['cc2api_account_id'] is None else {}))
-                                peer = self.io.command(target_id, 'prepare-import', ImportPreparation(stage=stage, preparation=preparation).model_dump())
+                                step = 'prepare-import'
+                                self.ledger.progress(operation_id, step)
+                                if profiles.references:
+                                    self.io.upload_profiles(target_id, stage, profiles)
+                                peer = self.io.command(target_id, 'prepare-import', ImportPreparation(stage=stage, preparation=preparation,
+                                    profile_references=profiles.references).model_dump())
                                 self._prepared(peer, account, stage)
                                 self.ledger.checkpoint(operation_id, 'target', {'environment': peer['environment']})
                                 migration = self.ledger.advance(operation_id, 'verified', {'transfer_id': stage.transfer_id,
@@ -235,14 +256,16 @@ class MigrationCoordinator:
                             request = ImportActivation(node_key=execution['target_node_key'], operation_id=operation_id,
                                 transfer_id=execution['transfer_id'], account_id=account['id'], environment_id=record['environment_id'],
                                 revision=record['target_revision'], generation=record['target_generation'])
+                            step = 'activate-import'
+                            self.ledger.progress(operation_id, step)
                             activated = self.io.command(target_id, 'activate-import', request.model_dump())
                             self._receipt(activated, {'protocol': 1, **request.model_dump(), 'phase': 'activated'})
                             lease.release()
                             return self.ledger.finish(operation_id, self._central_receipt(activated, target_id, 'activated'))
                         raise ValueError('迁移当前阶段需要核对')
-        except Exception:
+        except Exception as error:
             if self.ledger.get(operation_id)['phase'] not in ('completed', 'cancelled'):
-                self.ledger.isolate(operation_id, 'migration_step_unconfirmed')
+                self.ledger.isolate(operation_id, 'migration_step_unconfirmed', failure=migration_failure(error, step))
             raise
 
     def cancel(self, operation_id: str) -> dict:
@@ -256,8 +279,9 @@ class MigrationCoordinator:
             return migration
         if migration['phase'] == 'completed' or migration['record']['last_confirmed_phase'] == 'committed':
             raise ValueError('迁移归属已提交，请继续目标激活')
+        step = 'context'
         try:
-            with self.guard(migration['account_id']) as (account, row):
+            with self.service.migration_nodes(migration), self.guard(migration['account_id']) as (account, row):
                 migration, execution, identity, fence = self._context(operation_id, account)
                 if migration['phase'] == 'cancelled':
                     return migration
@@ -265,26 +289,32 @@ class MigrationCoordinator:
                     raise ValueError('迁移归属已提交，请继续目标激活')
                 self.ledger.checkpoint(operation_id, 'cancellation', {'requested': True})
                 with self._lease(operation_id, execution, account['id']) as lease:
+                    step = 'draining'
+                    self.ledger.progress(operation_id, step)
                     lease.drain()
                     if migration['phase'] == 'reconcile':
                         migration = self.ledger.resume(operation_id)
                     with self.runtime.environment_lock(fence.environment_id):
                         revoke = ImportRevocation(node_key=execution['target_node_key'], target_revision=fence.assignment_revision + 1,
                             identity=identity)
+                        step = 'revoke-import'
+                        self.ledger.progress(operation_id, step)
                         target = self.io.command(migration['target_node_id'], 'revoke-import', revoke.model_dump())
                         self._receipt(target, {'protocol': 1, 'node_key': revoke.node_key, 'operation_id': operation_id,
                             'account_id': account['id'], 'environment_id': identity.environment_id, 'revision': revoke.target_revision, 'phase': 'revoked'})
                         self.ledger.checkpoint(operation_id, 'target_revoked', target)
                         lease.check()
+                        step = 'restore-source'
+                        self.ledger.progress(operation_id, step)
                         source = self.io.command(migration['source_node_id'], 'restore-source', fence.model_dump())
                         self._receipt(source, {'protocol': 1, **fence.model_dump(), 'phase': 'restored'})
                         self.ledger.checkpoint(operation_id, 'source_restored', source)
                         lease.release()
                         return self.ledger.cancel(operation_id, self._central_receipt(source, migration['source_node_id'], 'restored'),
                             self._central_receipt(target, migration['target_node_id'], 'revoked'))
-        except Exception:
+        except Exception as error:
             if self.ledger.get(operation_id)['phase'] not in ('completed', 'cancelled'):
-                self.ledger.isolate(operation_id, 'migration_cancellation_unconfirmed')
+                self.ledger.isolate(operation_id, 'migration_cancellation_unconfirmed', failure=migration_failure(error, step))
             raise
 
     def _prepared(self, peer: dict, account: dict, stage: ImportStage) -> None:

@@ -2,24 +2,22 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import re
 import shutil
 import tarfile
-from io import BytesIO
+from codecs import getreader
 from pathlib import Path, PurePosixPath
+from tempfile import TemporaryDirectory
+from collections.abc import Mapping
 from stat import S_ISREG
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 
-from storage_maintenance import preserve_metadata, tree_inventory
-from system_update_contract import strict_json
+from storage_maintenance import preserve_metadata, iter_tree_inventory
+from cluster_archive_index import ArchiveIndex
 
-
-_MANIFEST_LIMIT = 16 * 1024 * 1024
-_ENTRY_LIMIT = 100000
 
 
 class ArchiveIdentity(BaseModel):
@@ -47,6 +45,7 @@ class ArchiveIdentity(BaseModel):
 class _HashReader:
     """对实际读取的字节计算摘要，并限制不可信包的总读取量。"""
     def __init__(self, source, maximum: int | None = None) -> None:
+        """保存流及实际冻结大小。:param source: 包文件。:param maximum: 实际字节边界。:return: None。"""
         self.source, self.digest = source, hashlib.sha256()
         self.maximum, self.count = maximum, 0
 
@@ -68,7 +67,7 @@ def _relative(value: str) -> None:
 
 
 def _inventory(entries: dict) -> int:
-    if not isinstance(entries, dict) or not 1 <= len(entries) <= _ENTRY_LIMIT:
+    if not isinstance(entries, Mapping) or not entries:
         raise ValueError('迁移文件清单大小无效')
     total = 0
     for name, item in entries.items():
@@ -136,19 +135,30 @@ def create_environment_archive(root: Path, target: Path, identity: ArchiveIdenti
     if target.resolve().is_relative_to(root.resolve()):
         raise ValueError('迁移包必须保存在源环境之外')
     _exclusions(excluded)
-    entries = tree_inventory(root, set(excluded), entry_limit=_ENTRY_LIMIT)
+    with TemporaryDirectory(prefix='.migration-index-', dir=target.parent) as temporary:
+        entries = ArchiveIndex(Path(temporary) / 'index.sqlite')
+        try:
+            return _create(root, target, identity, excluded, entries, Path(temporary) / 'manifest.json')
+        finally:
+            entries.close()
+
+
+def _create(root, target, identity, excluded, entries, manifest_path):
+    for name, item in iter_tree_inventory(root, set(excluded)):
+        entries.add(name, item)
     total = _inventory(entries)
-    manifest = {'identity': identity.model_dump(), 'entries': entries, 'excluded': excluded}
-    raw = json.dumps(manifest, ensure_ascii=True, sort_keys=True, separators=(',', ':')).encode()
-    if len(raw) > _MANIFEST_LIMIT:
-        raise ValueError('迁移清单超过大小上限')
+    with manifest_path.open('wb') as manifest:
+        manifest_size = entries.write(manifest, identity.model_dump(), excluded)
     descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
     try:
         with os.fdopen(descriptor, 'wb') as output, tarfile.open(fileobj=output, mode='w|') as archive:
             header = tarfile.TarInfo('manifest.json')
-            header.mode, header.size = 0o600, len(raw)
-            archive.addfile(header, BytesIO(raw))
-            for name, item in sorted(entries.items()):
+            header.mode, header.size = 0o600, manifest_size
+            with manifest_path.open('rb') as manifest:
+                archive.addfile(header, manifest)
+            for name, item in entries.items():
+                # tarfile会保留已处理成员，迁移仅顺序访问，及时释放以免内存随文件数增长。
+                archive.members.clear()
                 if name == '.':
                     continue
                 member = tarfile.TarInfo('content/' + name)
@@ -169,7 +179,7 @@ def create_environment_archive(root: Path, target: Path, identity: ArchiveIdenti
                         archive.addfile(member, reader)
                         if reader.digest.hexdigest() != item['sha256']:
                             raise ValueError('迁移期间源文件内容发生变化')
-            if tree_inventory(root, set(excluded), entry_limit=_ENTRY_LIMIT) != entries:
+            if not entries.compare(iter_tree_inventory(root, set(excluded))):
                 raise ValueError('迁移期间源环境发生变化')
         with target.open('rb') as output:
             os.fsync(output.fileno())
@@ -200,16 +210,23 @@ def restore_environment_archive(source: Path, target: Path, identity: ArchiveIde
     with os.fdopen(descriptor, 'rb') as input_file:
         if not S_ISREG(os.fstat(input_file.fileno()).st_mode):
             raise ValueError('迁移包必须为普通文件')
-        reader = _HashReader(input_file, maximum_bytes + _MANIFEST_LIMIT * 5 + _ENTRY_LIMIT * 1024 + 1024 * 1024)
-        return _restore(reader, target, identity, checksum, maximum_bytes)
+        # 整包来自冻结的实际文件，读取边界取真实大小，不用全局条目数推算容量。
+        reader = _HashReader(input_file, os.fstat(input_file.fileno()).st_size)
+        with TemporaryDirectory(prefix='.migration-index-', dir=target.parent) as temporary:
+            entries = ArchiveIndex(Path(temporary) / 'index.sqlite')
+            try:
+                return _restore(reader, target, identity, checksum, maximum_bytes, entries)
+            finally:
+                entries.close()
 
 
-def _restore(reader: _HashReader, target: Path, identity: ArchiveIdentity, checksum: str, maximum_bytes: int) -> dict:
+def _restore(reader: _HashReader, target: Path, identity: ArchiveIdentity, checksum: str, maximum_bytes: int, entries: ArchiveIndex) -> dict:
     with tarfile.open(fileobj=reader, mode='r|') as archive:
         header = archive.next()
-        if header is None or header.name != 'manifest.json' or not header.isfile() or header.size > _MANIFEST_LIMIT:
+        if header is None or header.name != 'manifest.json' or not header.isfile():
             raise ValueError('迁移包首项清单无效')
-        manifest = strict_json(archive.extractfile(header).read(), _MANIFEST_LIMIT)
+        with getreader('utf-8')(archive.extractfile(header)) as source:
+            manifest = entries.load(source)
         if set(manifest) != {'identity', 'entries', 'excluded'} or manifest['identity'] != identity.model_dump():
             raise ValueError('迁移包与本次源隔离身份不一致')
         _exclusions(manifest['excluded'])
@@ -220,19 +237,19 @@ def _restore(reader: _HashReader, target: Path, identity: ArchiveIdentity, check
         target.mkdir(mode=0o700)
         try:
             # 先建完整目录骨架，所有链接最后创建，杜绝解包路径经过包内链接。
-            for name, item in sorted(entries.items(), key=lambda value: value[0].count('/')):
+            for name, item in entries.ordered():
                 if name != '.' and item['kind'] == 'directory':
                     (target / name).mkdir(mode=0o700)
-            seen = set()
             while member := archive.next():
+                archive.members.clear()
                 if not member.name.startswith('content/'):
                     raise ValueError('迁移包包含清单之外的路径')
                 name = member.name[len('content/'):]
                 _relative(name)
                 item = entries.get(name)
-                if name in seen or item is None:
+                if item is None:
                     raise ValueError('迁移包包含重复或未登记的文件')
-                seen.add(name)
+                entries.mark(name)
                 if item['kind'] == 'directory':
                     if not member.isdir():
                         raise ValueError('迁移目录类型不一致')
@@ -252,7 +269,7 @@ def _restore(reader: _HashReader, target: Path, identity: ArchiveIdentity, check
                         os.fsync(output.fileno())
                     if digest.hexdigest() != item['sha256']:
                         raise ValueError('迁移文件摘要不一致')
-            if seen != set(entries) - {'.'}:
+            if not entries.complete():
                 raise ValueError('迁移包缺少已登记文件')
             # 摘要覆盖实际解包读取的同一描述符与剩余填充，避免先验哈希后换包的时间窗口。
             while reader.read(1024 * 1024):
@@ -263,7 +280,7 @@ def _restore(reader: _HashReader, target: Path, identity: ArchiveIdentity, check
                 if item['kind'] == 'symlink':
                     (target / name).symlink_to(item['target'])
             preserve_metadata(target, entries)
-            if tree_inventory(target, durable=True, entry_limit=_ENTRY_LIMIT) != entries:
+            if not entries.compare(iter_tree_inventory(target, durable=True)):
                 raise ValueError('迁移暂存数据核验失败')
             return {'identity': identity.model_dump(), 'files': len(entries), 'data_bytes': total}
         except BaseException:

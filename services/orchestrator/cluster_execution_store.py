@@ -388,7 +388,11 @@ class NodeExecutions:
                     or hashlib.sha256(current['config_json'].encode()).hexdigest() != value['record']['node_config_sha256']):
                 raise ValueError('原节点执行的中央归属、配置或实际代次已变化')
             preparation = strict_json((current['preparation_json'] or '{}').encode(), 65536)
-            if preparation.get('state') != 'prepared' or preparation.get('release') != value['record']['runtime_release']:
+            continuing = (preparation.get('state') == 'preparing'
+                and preparation.get('phase') in ('checking', 'draining', 'waiting')
+                and preparation.get('current_release') == value['record']['runtime_release'])
+            if not continuing and (preparation.get('state') != 'prepared'
+                    or preparation.get('release') != value['record']['runtime_release']):
                 raise ValueError('原节点执行的控制发布需要先核对')
         finally:
             connection.close()

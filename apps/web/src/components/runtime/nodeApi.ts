@@ -13,7 +13,7 @@ export interface ExecutionNode {
   account_count: number; host: string | null; port: number | null; username: string | null;
   data_root: string | null; host_key_sha256: string | null; observation: NodeObservation | null;
   auth_method?: 'private_key' | 'password' | null;
-  preparation: { state: 'preparing' | 'prepared' | 'failed' | 'needs_check'; release?: string; protocol?: number; updated_at: number; reason?: string } | null;
+  preparation: { state: 'preparing' | 'prepared' | 'failed' | 'needs_check'; release?: string; protocol?: number; updated_at: number; reason?: string; phase?: string; current_release?: string | null; target_release?: string; retry_at?: number } | null;
 }
 /** 主机公钥候选，管理员通过可信渠道核对后选择。 */
 export interface NodeHostKey { key: string; algorithm: string; sha256: string }
@@ -31,6 +31,7 @@ export interface NodeTaskAccount {
 export interface NodeMigration {
   operation_id: string; account_id: number; source: { id: number; name: string }; target: { id: number; name: string };
   phase: 'requested' | 'draining' | 'source_fenced' | 'exporting' | 'importing' | 'verified' | 'committed' | 'completed' | 'cancelled' | 'reconcile';
+  failure?: { code: string; stage: string; message: string; action: string } | null;
   last_confirmed_phase: string; message: string; running: boolean; can_resume: boolean; can_cancel: boolean;
   source_revision: number; target_revision: number | null; cancelling: boolean; created_at: number; updated_at: number;
 }
@@ -64,6 +65,8 @@ export const nodeApi = {
   register: (body: NodeRegistration) => runtimeRequest<ExecutionNode>('/nodes', { method: 'POST', body }),
   /** 检查原配置。@param node 节点版本。@return 最新观测。 */
   check: (node: ExecutionNode) => runtimeRequest<ExecutionNode>(`/nodes/${node.id}/check`, { method: 'POST', body: { revision: node.revision } }),
+  /** 后台同步全部节点到当前可信批次。@return 节点公开状态。 */
+  synchronize: () => runtimeRequest<{ items: ExecutionNode[] }>('/nodes/synchronize', { method: 'POST', body: {} }),
   /** 安装同批执行组件。@param node 当前节点版本。@return 公开安装状态。 */
   prepare: (node: ExecutionNode) => runtimeRequest<ExecutionNode>(`/nodes/${node.id}/prepare`, { method: 'POST', body: { revision: node.revision } }),
   /** 更新新工作接纳。@param node 原节点。@param enabled 新状态。@return 新版本。 */

@@ -88,8 +88,9 @@ class ClusterStore:
                     preparation = previous['preparation_json'] if previous else None
                     try:
                         if preparation and json.loads(preparation).get('state') == 'preparing':
-                            preparation = json.dumps({'state': 'needs_check', 'updated_at': time.time(),
-                                'reason': '安装期间接单配置已变化，请重新核对节点组件'})
+                            preparation = json.dumps({**json.loads(preparation), 'state': 'needs_check',
+                                'phase': 'waiting', 'retry_at': time.time(), 'updated_at': time.time(),
+                                'reason': '接单偏好已保存，节点同步将沿原任务继续核对'})
                     except (ValueError, TypeError):
                         preparation = None
                     result = connection.execute('UPDATE cluster_nodes SET enabled=?,revision=revision+1,preparation_json=? '
@@ -229,7 +230,7 @@ class ClusterStore:
                 record = json.loads(row['preparation_json'])
                 if record.get('state') not in ('preparing', 'prepared', 'failed', 'needs_check'):
                     raise ValueError('节点安装记录无效')
-                preparation = {key: record[key] for key in ('state', 'release', 'protocol', 'updated_at', 'reason') if key in record}
+                preparation = {key: record[key] for key in ('state', 'release', 'protocol', 'updated_at', 'reason', 'phase', 'current_release', 'target_release', 'reason_code', 'retry_at') if key in record}
             if observation is not None:
                 timestamp = observation['observed_at']
                 if (observation['state'] not in ('reachable', 'unreachable') or type(timestamp) not in (int, float)

@@ -399,7 +399,7 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
     if api_path == "nodes" {
         return matches!(*method, Method::GET | Method::POST);
     }
-    if api_path == "nodes/host-keys" {
+    if matches!(api_path, "nodes/host-keys" | "nodes/synchronize") {
         return *method == Method::POST;
     }
     if let Some(node) = api_path.strip_prefix("nodes/") {
@@ -780,6 +780,7 @@ mod tests {
             (Method::GET, "/api/nodes"),
             (Method::POST, "/api/nodes"),
             (Method::POST, "/api/nodes/host-keys"),
+            (Method::POST, "/api/nodes/synchronize"),
             (Method::POST, "/api/nodes/2/check"),
             (Method::POST, "/api/nodes/2/prepare"),
             (Method::PUT, "/api/nodes/2/enabled"),
@@ -791,6 +792,7 @@ mod tests {
             (Method::GET, "/api/nodes/2/private-key"),
             (Method::POST, "/api/nodes/2/shell"),
             (Method::GET, "/api/nodes/host-keys"),
+            (Method::GET, "/api/nodes/synchronize"),
             (Method::POST, "/api/nodes/2/check/extra"),
             (Method::POST, "/api/nodes/../check"),
             (Method::POST, "/api/nodes/2%2fcheck"),

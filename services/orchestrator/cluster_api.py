@@ -50,6 +50,14 @@ def cluster_router(service) -> APIRouter:
         """列出节点公开状态。:return: 节点列表。"""
         return {'items': current().store.list()}
 
+    @router.post('/synchronize', status_code=202)
+    def synchronize_nodes() -> dict:
+        """提交当前批次的统一节点后台同步。:return: 可轮询节点状态。"""
+        try:
+            return current().synchronize_nodes()
+        except (ValueError, RuntimeError):
+            raise HTTPException(409, '节点同步服务正在维护，请稍后查看原任务') from None
+
     @router.post('/host-keys')
     def host_keys(body: NodeAddress) -> dict:
         """探测候选公钥供管理员核对。:param body: SSH 地址。:return: 主机公钥与指纹。"""

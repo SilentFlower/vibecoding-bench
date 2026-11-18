@@ -5,7 +5,7 @@ import threading
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from system_updates import runtime_snapshot
 
@@ -55,13 +55,13 @@ class SnapshotLockTests(unittest.TestCase):
         self.addCleanup(self.release.set)
         return thread
 
-    def test_remote_environment_is_explicit_offline_scope_without_local_docker_access(self) -> None:
-        """中央更新器对远程归属显示受控停机范围，避免检查本机同名容器。:return: None。"""
+    def test_unconnected_remote_environment_keeps_explicit_blocker_without_local_docker_access(self) -> None:
+        """节点维护尚未接入时保留明确阻塞，避免检查本机同名容器。:return: None。"""
         self.runtime.locality=lambda row:False
         self.runtime._root=lambda row:self.fail('远程环境不能读取中央HOME')
         snapshot=runtime_snapshot(self.runtime)
         self.assertFalse(snapshot['ready'])
-        self.assertIn('集群停机升级',snapshot['blockers'][0])
+        self.assertIn('节点工作、连接或同步状态仍需核对',snapshot['blockers'][0])
         self.assertEqual('ssh',snapshot['environments'][0]['node_kind'])
 
     def test_short_read_only_lock_releases_before_snapshot_verification(self) -> None:
@@ -78,3 +78,26 @@ class SnapshotLockTests(unittest.TestCase):
         snapshot = runtime_snapshot(self.runtime)
         self.assertFalse(snapshot['ready'])
         self.assertTrue(snapshot['blockers'])
+
+    def test_connected_remote_snapshot_uses_node_evidence(self) -> None:
+        """已接入节点维护后，原平台快照消费远程真实事实。:return: None。"""
+        self.runtime.locality = lambda row: False
+        self.runtime._root = lambda row: self.fail('远程环境保持在原节点')
+        connection = sqlite3.connect(self.root / 'bench.sqlite')
+        try:
+            with connection:
+                connection.execute('INSERT INTO accounts VALUES(1,NULL)')
+                connection.execute('UPDATE account_environments SET account_id=1')
+        finally:
+            connection.close()
+        synchronization = Mock()
+        synchronization.environment_snapshot.return_value = {'environment_id': 'synthetic', 'node_kind': 'ssh',
+            'generation': 7, 'roles': {}, 'blockers': []}
+        store = Mock()
+        store.list.return_value = [{'kind': 'ssh', 'id': 2, 'preparation': {'release': 'synthetic'}}]
+        self.runtime.cluster_service = SimpleNamespace(synchronization=synchronization, store=store)
+        snapshot = runtime_snapshot(self.runtime)
+        self.assertTrue(snapshot['ready'])
+        self.assertEqual(7, snapshot['environments'][0]['generation'])
+        self.assertEqual(2, snapshot['nodes'][0]['id'])
+        synchronization.environment_snapshot.assert_called_once()

@@ -25,6 +25,7 @@ from cluster_environment import EnvironmentFence, fence_environment, restore_fen
 from cluster_deployment import node_network_name
 from cluster_owner_state import validate_owner_preparation
 from cluster_archive import ArchiveIdentity
+from cluster_migration_profiles import PROFILE_NAMES, ProfileReference, read_profile
 from cluster_migration_files import ArchiveExport, ImportStage, MigrationCliIdentity, MigrationFiles
 from cluster_verification import pending_run_programs
 from account_update_identity import role_release
@@ -113,11 +114,13 @@ class ImportPreparation(BaseModel):
 
     :param stage: 原上传与核验范围。
     :param preparation: 中央冻结的目标节点准备输入。
+    :param profile_references: 原操作私有文件中的大profile引用。
     """
 
     model_config = ConfigDict(extra='forbid')
     stage: ImportStage
     preparation: NodePreparation
+    profile_references: dict[str, ProfileReference] = Field(default_factory=dict)
 
 
 class NodeReviewAdmission(NodeInspection):
@@ -300,7 +303,7 @@ class NodeExecution:
             return self._prepare_locked(request, account_id, name, environment_id, remote_id)
 
 
-    def _validate_preparation(self, request: NodePreparation) -> tuple[int, str, str, int | None]:
+    def _validate_preparation(self, request: NodePreparation, *, migration: bool = False) -> tuple[int, str, str, int | None]:
         account, environment = request.account, request.environment
         name, account_id = account.get('name'), account.get('id')
         environment_id = environment.get('environment_id')
@@ -316,7 +319,7 @@ class NodeExecution:
             raise ValueError('节点准备账号、环境或归属不一致')
         if set(request.profile_files) - {'.credentials.json', '.claude.json', 'settings.json'}:
             raise ValueError('节点 profile 文件超出允许范围')
-        if sum(len(value.encode()) for value in request.profile_files.values()) > 1024 * 1024:
+        if not migration and sum(len(value.encode()) for value in request.profile_files.values()) > 1024 * 1024:
             raise ValueError('节点 profile 文件超过允许大小')
         return account_id, name, environment_id, remote_id
 
@@ -590,7 +593,14 @@ class NodeExecution:
         :return: 私有目标环境和发送器绑定，归属切换由中央CAS提交。
         """
         stage, preparation = request.stage, request.preparation
-        account_id, name, environment_id, remote_id = self._validate_preparation(preparation)
+        if request.profile_references:
+            if preparation.profile_files or set(request.profile_references) - set(PROFILE_NAMES):
+                raise ValueError('迁移profile引用范围无效')
+            path = self.data / 'node-migrations' / stage.archive.identity.operation_id / 'imports' / stage.transfer_id
+            profiles = {name: read_profile(path / ('profile-' + ref.sha256 + '.json'), ref)
+                for name, ref in request.profile_references.items()}
+            preparation = preparation.model_copy(update={'profile_files': profiles})
+        account_id, name, environment_id, remote_id = self._validate_preparation(preparation, migration=True)
         archive = stage.archive
         if (stage.node_key != self.node_key or preparation.node_key != self.node_key
                 or preparation.assignment_revision != stage.target_revision

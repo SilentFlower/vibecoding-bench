@@ -7,6 +7,7 @@ import re
 import time
 
 from cluster_store import ClusterStore
+from cluster_migration_errors import public_failure
 
 
 _NEXT = {'requested': 'draining', 'draining': 'source_fenced', 'source_fenced': 'exporting',
@@ -68,6 +69,13 @@ class NodeMigrations:
                         target = connection.execute('SELECT * FROM cluster_nodes WHERE id=? AND enabled=1 AND deleted_at IS NULL', (target_id,)).fetchone()
                         if target is None:
                             raise ValueError('目标节点不存在或已暂停接单')
+                        source = connection.execute('SELECT * FROM cluster_nodes WHERE id=? AND deleted_at IS NULL',
+                            (assignment['node_id'],)).fetchone()
+                        for side, node in (('原', source), ('目标', target)):
+                            if node is None:
+                                raise ValueError(side + '节点归属需要核对')
+                            if node['kind'] == 'ssh' and json.loads(node['preparation_json'] or '{}').get('state') != 'prepared':
+                                raise ValueError(side + '节点正在同步组件，请完成后再开始迁移')
                         environment = connection.execute('SELECT * FROM account_environments WHERE account_id=?', (account_id,)).fetchone()
                         if environment is None:
                             raise ValueError('账号尚无环境，请选择首次执行节点')
@@ -116,11 +124,29 @@ class NodeMigrations:
                 connection.close()
         return self.get(operation_id)
 
-    def isolate(self, operation_id: str, reason: str) -> dict:
+    def progress(self, operation_id: str, stage: str) -> None:
+        """保存实际执行步骤，确认游标仍只由回执推进。:param operation_id: 原操作。:param stage: 固定步骤。:return: None。"""
+        from cluster_migration_errors import MigrationFailure
+        MigrationFailure('unconfirmed', stage)
+        with self.store.lock:
+            connection = self.store.database()
+            try:
+                with connection:
+                    row = connection.execute('SELECT phase,record_json FROM node_migrations WHERE operation_id=?', (operation_id,)).fetchone()
+                    if row is None or row['phase'] in _TERMINAL:
+                        return
+                    record = json.loads(row['record_json'])
+                    record['progress'] = {'stage': stage, 'updated_at': time.time()}
+                    self._save(connection, operation_id, row['phase'], record)
+            finally:
+                connection.close()
+
+    def isolate(self, operation_id: str, reason: str, *, failure: dict | None = None) -> dict:
         """将未知结果保留在原归属的维护状态。
 
         :param operation_id: 原操作。
         :param reason: 固定脱敏原因代码。
+        :param failure: 可选受控失败原因。
         :return: 待核对记录，账号保持关闭新准入。
         """
         if not re.fullmatch('[a-z][a-z0-9_]{0,79}', reason):
@@ -134,6 +160,8 @@ class NodeMigrations:
                         raise ValueError('迁移操作已结束或不存在')
                     record = json.loads(row['record_json'])
                     record['reason'] = reason
+                    if failure is not None:
+                        record['failure'] = public_failure(failure)
                     self._save(connection, operation_id, 'reconcile', record)
                     connection.execute("UPDATE account_node_assignments SET phase='reconcile' WHERE account_id=?", (row['account_id'],))
             finally:
@@ -329,3 +357,19 @@ class NodeMigrations:
     def _save(self, connection, operation_id: str, phase: str, record: dict) -> None:
         connection.execute('UPDATE node_migrations SET phase=?,record_json=?,updated_at=? WHERE operation_id=?',
             (phase, json.dumps(record, ensure_ascii=False, allow_nan=False), time.time(), operation_id))
+
+
+def pristine_target_migration(migration: dict, node_id: int) -> bool:
+    """识别尚未建立目标副本的原迁移，允许先更新空目标组件。
+
+    :param migration: 原持久迁移行。
+    :param node_id: 正在同步的目标节点。
+    :return: 原源已隔离且目标尚无传输检查点时为True。
+    """
+    record = json.loads(migration['record_json'])
+    return (migration['target_node_id'] == node_id and migration['source_node_id'] != node_id
+        and migration['phase'] in ('source_fenced', 'reconcile')
+        and record.get('last_confirmed_phase') == 'source_fenced'
+        and set(record.get('receipts', {})) <= {'draining', 'source_fenced'}
+        and 'archive' not in record.get('checkpoints', {})
+        and 'cancellation' not in record.get('checkpoints', {}))

@@ -148,17 +148,27 @@ def derive_v3_fingerprint(timezone: str | None = None) -> dict[str, object]:
     }
 
 
-def _read_json(path: Path):
+def _read_json(path: Path, maximum_bytes: int | None = 16 * 1024 ** 2):
+    """读取不跟随链接的JSON配置，业务profile沿实际文件大小读取。
+
+    :param path: 已限定归属的配置文件。
+    :param maximum_bytes: 小型协议记录的可选读取预算。
+    :return: 已解码配置；读取期间变化继续拒绝。
+    """
+    if path.name in ('.claude.json', '.credentials.json', 'settings.json'):
+        maximum_bytes = None
     directory = _directory_fd(path.parent)
     try:
         descriptor = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
         with os.fdopen(descriptor, 'rb') as source:
             metadata = os.fstat(source.fileno())
-            if not S_ISREG(metadata.st_mode) or metadata.st_size > 16 * 1024 ** 2:
-                raise ValueError('账号配置必须为大小受限的普通 JSON 文件')
-            raw = source.read(16 * 1024 ** 2 + 1)
-            if len(raw) > 16 * 1024 ** 2:
-                raise ValueError('账号配置超过 JSON 大小上限')
+            if not S_ISREG(metadata.st_mode) or maximum_bytes is not None and metadata.st_size > maximum_bytes:
+                raise ValueError('账号配置文件类型或协议记录大小无效')
+            raw = source.read(metadata.st_size + 1)
+            current = os.fstat(source.fileno())
+            if (len(raw) != metadata.st_size or current.st_size != metadata.st_size
+                    or current.st_mtime_ns != metadata.st_mtime_ns or current.st_ctime_ns != metadata.st_ctime_ns):
+                raise ValueError('读取期间账号配置发生变化')
             return json.loads(raw)
     finally:
         os.close(directory)

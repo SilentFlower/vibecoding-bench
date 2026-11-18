@@ -131,7 +131,7 @@ class NodeOwnerTests(unittest.TestCase):
         """持久交接关闭新输入，原Scope和回执继续可读以完成恢复。:return: None。"""
         grant=ExecutionGrant(operation_id='e'*32,node_key=self.executor.node_key,account_id=1,gateway_account_id=7,
             environment_id=self.row['environment_id'],assignment_revision=1,generation=self.row['generation'],
-            source='projects:'+'f'*32+':1',role='projects',not_after=int(time.time())+30,
+            source='projects:'+'f'*32+':1',role='projects',not_after=self.request.leases[0].lease.expires_at,
             lease={**self.request.leases[0].lease.model_dump(),'owner':'projects:'+'f'*32+':1'})
         grants=ExecutionGrants(self.executor.data,self.executor.node_key,self.executor.deployment,self.executor.database)
         grants.create(grant)

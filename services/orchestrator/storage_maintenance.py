@@ -101,20 +101,33 @@ def tree_inventory(root: Path, excluded: set[str] | None = None, *, durable: boo
     :param entry_limit: 可选的条目上限，避免迁移清单耗尽控制面内存。
     :return: 包含字节摘要、权限与归属的逻辑文件清单。
     """
-    ignored = excluded or set()
     if entry_limit is not None and (type(entry_limit) is not int or entry_limit < 1):
         raise ValueError('存储盘点条目上限无效')
+    entries = {}
+    for name, item in iter_tree_inventory(root, excluded, durable=durable):
+        if entry_limit is not None and len(entries) >= entry_limit:
+            raise ValueError('存储盘点超过条目上限')
+        entries[name] = item
+    return entries
+
+
+def iter_tree_inventory(root: Path, excluded: set[str] | None = None, *, durable: bool = False):
+    """逐条盘点原树，供迁移落磁盘索引以控制内存。
+
+    :param root: 非链接环境根。
+    :param excluded: 精确排除项。
+    :param durable: 是否同步已核验资料。
+    :return: 与原盘点相同的路径和元数据迭代器。
+    """
+    ignored = excluded or set()
     for value in ignored:
         _relative(value)
     descriptor = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-    entries = {}
     try:
         for directory, folders, names, parent in os.fwalk('.', dir_fd=descriptor, follow_symlinks=False):
             relative_directory = str(PurePosixPath(directory))
             metadata = os.fstat(parent)
-            if entry_limit is not None and len(entries) >= entry_limit:
-                raise ValueError('存储盘点超过条目上限')
-            entries[relative_directory] = {'kind': 'directory', 'mode': S_IMODE(metadata.st_mode),
+            yield relative_directory, {'kind': 'directory', 'mode': S_IMODE(metadata.st_mode),
                 'uid': metadata.st_uid, 'gid': metadata.st_gid}
             for name in sorted(folders + names):
                 relative = str(PurePosixPath(directory) / name)
@@ -147,14 +160,11 @@ def tree_inventory(root: Path, excluded: set[str] | None = None, *, durable: boo
                         os.close(file_fd)
                 else:
                     raise ValueError('持久目录包含无法备份的特殊文件')
-                if entry_limit is not None and len(entries) >= entry_limit:
-                    raise ValueError('存储盘点超过条目上限')
-                entries[relative] = item
+                yield relative, item
             if durable:
                 os.fsync(parent)
     finally:
         os.close(descriptor)
-    return entries
 
 
 def preserve_metadata(root: Path, inventory: dict[str, dict]) -> None:
@@ -166,7 +176,9 @@ def preserve_metadata(root: Path, inventory: dict[str, dict]) -> None:
     """
     descriptor = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     try:
-        for relative, item in sorted(inventory.items(), key=lambda value: value[0].count('/'), reverse=True):
+        ordered = inventory.ordered(reverse=True) if hasattr(inventory, 'ordered') else sorted(
+            inventory.items(), key=lambda value: value[0].count('/'), reverse=True)
+        for relative, item in ordered:
             if relative == '.':
                 os.fchown(descriptor, item['uid'], item['gid'])
                 os.fchmod(descriptor, item['mode'])

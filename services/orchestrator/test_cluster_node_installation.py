@@ -27,6 +27,7 @@ class NodeInstallationTests(unittest.TestCase):
         self.service = self.fixture.service
         self.node = self.service.register(NodeCreate(**self.fixture.config, private_key=self.fixture.key.read_text()))
         self.installer = Mock()
+        self.installer.release = 'synthetic'
         self.installer.prepare.return_value = {'state': 'prepared', 'release': 'synthetic', 'protocol': 1}
         self.gate = DeploymentGate(self.fixture.root / 'gate', 'synthetic')
         self.gate_path = self.fixture.root / 'gate' / 'admission.json'
@@ -116,3 +117,30 @@ class NodeInstallationTests(unittest.TestCase):
         recovered.close()
         with self.assertRaisesRegex(ValueError, '关闭'):
             recovered.prepare_node(self.node['id'], 1)
+
+    def test_pending_migration_keeps_original_component_ready_until_completion(self) -> None:
+        """原迁移先登记时保留旧组件可用，迁移收口后同一目标自动进入安装。:return: None。"""
+        self.service.store.save_preparation(self.node['id'], 1, {'state': 'prepared', 'release': 'old'})
+        with self.fixture.database() as connection:
+            connection.execute("INSERT INTO accounts(id,name,profile_path) VALUES(1,'synthetic','profiles/synthetic')")
+            connection.execute("INSERT INTO node_migrations(operation_id,account_id,source_node_id,target_node_id,phase,record_json,created_at,updated_at) VALUES(?,1,1,?,'reconcile','{}',0,0)", ('a' * 32, self.node['id']))
+        response = self.client.post(self.path, json={'revision': 1})
+        self.assertEqual(202, response.status_code)
+        self.assertEqual('prepared', response.json()['preparation']['state'])
+        self.assertEqual('waiting', response.json()['preparation']['phase'])
+        self.installer.prepare.assert_not_called()
+        self.assertEqual(0, self.gate.state()['active'])
+        with self.fixture.database() as connection:
+            connection.execute("UPDATE node_migrations SET phase='completed'")
+        self.assertEqual(202, self.client.post(self.path, json={'revision': 1}).status_code)
+        self.assertEqual('synthetic', self.settled()['preparation']['release'])
+
+    def test_unified_node_sync_returns_202_and_uses_server_selected_target(self) -> None:
+        """浏览器只提交同步意图，当前可信目标由服务端选择。:return: None。"""
+        synchronization = Mock()
+        synchronization.synchronize.return_value = self.service.store.list()
+        self.service.synchronization = synchronization
+        response = self.client.post('/api/nodes/synchronize', json={})
+        self.assertEqual(202, response.status_code)
+        self.assertEqual(self.node['id'], response.json()['items'][1]['id'])
+        synchronization.synchronize.assert_called_once_with(explicit=True)

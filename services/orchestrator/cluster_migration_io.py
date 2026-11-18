@@ -13,6 +13,8 @@ from cluster_environment import EnvironmentFence, fence_environment, restore_fen
 from cluster_execution import ImportActivation, ImportPreparation, ImportRevocation, NodeExecution
 from cluster_migration_files import ArchiveDescriptor, ArchiveExport, ImportStage, MigrationFiles
 from cluster_transfer import NodeArchiveTransfer
+from cluster_migration_profiles import MigrationProfiles, read_profile
+from runtime_files import atomic_text
 
 
 class MigrationIO:
@@ -82,6 +84,28 @@ class MigrationIO:
             'prepare-import': self.local_target.prepare_import, 'activate-import': self.local_target.activate_import,
             'revoke-import': self.local_target.revoke_import}
         return actions[operation](request)
+
+    def upload_profiles(self, node_id: int, stage: ImportStage, profiles: MigrationProfiles) -> None:
+        """沿原暂存范围传输profile文件，复用摘要路径确保重试幂等。
+
+        :param node_id: 固定目标。
+        :param stage: 已建立的原暂存。
+        :param profiles: 中央已过滤凭据的私有文件。
+        :return: None。
+        """
+        node = self.service.store.get(node_id)
+        for reference in profiles.references.values():
+            source = profiles.path(reference)
+            filename = source.name
+            if node['kind'] == 'ssh':
+                connection = self.service.connection(node_id)
+                transfer = NodeArchiveTransfer(connection.docker_socket(), self.service.docker(node_id).api._version,
+                    node_container_name(self.runtime.deployment, node['node_key']))
+                transfer.upload_profile(stage.archive.identity.operation_id, stage.transfer_id,
+                    source, reference.sha256, reference.bytes)
+            else:
+                target = self.runtime.data / 'node-migrations' / stage.archive.identity.operation_id / 'imports' / stage.transfer_id / filename
+                atomic_text(target, read_profile(source, reference))
 
     def download(self, node_id: int, archive: ArchiveDescriptor) -> Path:
         """取得中央可访问的完整校验包，远程下载中断保留独立现场。

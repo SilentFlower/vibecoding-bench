@@ -8,14 +8,16 @@ import os
 import platform
 import re
 import shutil
+import shlex
 import threading
 import time
 import uuid
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 
 from docker import DockerClient
 from docker.errors import DockerException
+from requests.exceptions import ConnectionError as RequestConnectionError, Timeout as RequestTimeout
 
 from account_isolation import ROLE_COLUMNS
 from account_runtime import RuntimeBusy, _read_json
@@ -24,8 +26,15 @@ from cluster_nodes import NodeConfiguration, NodeCreate
 from cluster_ssh import NodeSshError, SshNode
 from cluster_store import ClusterStore
 from cluster_deployment import NodeDeployment, node_container_name
+from cluster_synchronization import NodeSynchronization, NodeSynchronizationWait
+from cluster_preparation_files import PreparationFiles, PreparationFileScope
+from cluster_migration_profiles import MigrationProfiles
+from cluster_migrations import pristine_target_migration
+from cluster_transfer import NodeArchiveTransfer
+from cluster_profile_reader import profile_reader_source
 from cluster_execution import NodeInspection, NodePreparation, NodeReviewAdmission
 from cluster_transport import NodeTransport, NodeTransports
+from runtime_files import atomic_json
 from system_update_gate import UPDATE_GATE
 from system_update_contract import safe_read, strict_json
 
@@ -57,12 +66,182 @@ class ClusterService:
         self.operation_locks: dict[int, threading.Lock] = {}
         self.install_workers: dict[int, threading.Thread] = {}
         self.closing = False
+        self.synchronization = None
         self.transports = NodeTransports(store)
-        # 进程退出后原线程已失效，保留中断事实，交由管理员重新核对同一节点。
+        # 线程索引只属于原进程；目标和维护日志保留，后台接入运行时后继续核对。
         for row in self.store.list():
             if (row.get('preparation') or {}).get('state') == 'preparing':
-                self.store.save_preparation(row['id'], row['revision'], {'state': 'needs_check',
-                    'reason': '节点安装被服务重启中断，请重新准备并核对节点组件'})
+                self.store.save_preparation(row['id'], row['revision'], {**row['preparation'], 'state': 'needs_check',
+                    'phase': 'waiting', 'retry_at': time.time(),
+                    'target_release': row['preparation'].get('target_release') or os.environ.get('V3_RELEASE'),
+                    'reason': '节点同步被重启中断，正在核对原任务'})
+
+    def start_synchronization(self, runtime, gateway, quota, version=None) -> None:
+        """接入原运行时后自动核对已托管节点。:param runtime: 原运行时。:param gateway: 原网关。:param quota: 额度身份。:return: None。"""
+        self.synchronization = NodeSynchronization(self, runtime, gateway, quota, version)
+        self.synchronization.start()
+
+    def synchronize_nodes(self) -> dict:
+        """统一提交当前可信批次的节点同步。:return: 可轮询公开列表。"""
+        if self.synchronization is None:
+            raise ValueError('节点自动同步尚未初始化')
+        return {'items': self.synchronization.synchronize(explicit=True)}
+
+    @contextmanager
+    def migration_nodes(self, migration: dict):
+        """让原迁移与两端组件切换共享操作锁。
+
+        :param migration: 已冻结的原迁移行。
+        :return: 两端组件在本次IO期间保持原程序。
+        """
+        acquired = []
+        try:
+            with self.lock:
+                locks = [self.operation_locks.setdefault(node_id, threading.Lock())
+                    for node_id in sorted({migration['source_node_id'], migration['target_node_id']})]
+            for lock in locks:
+                if not lock.acquire(blocking=False):
+                    raise RuntimeBusy('节点组件正在同步，完成后继续原迁移')
+                acquired.append(lock)
+            yield
+        finally:
+            for lock in reversed(acquired):
+                lock.release()
+
+    def platform_nodes(self, body: dict) -> dict:
+        """执行已认证宿主的同代节点备份或恢复动作。
+
+        :param body: 内部路由已核验的原操作、代次和可信目标。
+        :return: 节点维护进度。
+        """
+        if self.synchronization is None:
+            raise ValueError('节点平台维护尚未初始化')
+        gate = UPDATE_GATE.state()
+        if (gate.get('phase') != 'blocked' or gate.get('operation_id') != body['operation_id']
+                or gate.get('epoch') != body['epoch']):
+            raise ValueError('节点平台维护归属已变化')
+        if body['action'] == 'prepare':
+            if gate.get('target_release') != body['target_release']:
+                raise ValueError('节点平台目标与原维护不一致')
+            for row in self.store.list():
+                saved = row.get('preparation') or {}
+                if row['kind'] != 'ssh' or not (saved.get('release') or saved.get('current_release')):
+                    continue
+                path = self.connection(row['id']).private / 'maintenance/current.json'
+                if path.exists():
+                    job = json.loads(path.read_text())
+                    if (job.get('platform_operation') == body['operation_id'] and job.get('platform_epoch') == body['epoch']
+                            and job.get('phase') == 'backed_up'):
+                        continue
+                installer = NodeDeployment(self, os.environ.get('V3_DEPLOYMENT_ID', ''), body['control_release'] or body['target_release'],
+                    body['control_image'], body['account_image'], account_release=body['account_release'])
+                self.prepare_node(row['id'], row['revision'], automatic=True, installer_override=installer,
+                    maintenance={'operation_id': body['operation_id'], 'epoch': body['epoch']}, stage_only=True)
+        elif body['action'] == 'cancel-preparation':
+            self.synchronization.cancelled_platforms.add((body['operation_id'], body['epoch']))
+        elif body['action'] == 'resume':
+            if (gate.get('target_release') != body['target_release']
+                    or os.environ.get('V3_RELEASE') != body['control_release']):
+                raise ValueError('节点恢复中央来源与原宿主选择不一致')
+            for row in self.store.list():
+                if row['kind'] != 'ssh':
+                    continue
+                path = self.connection(row['id']).private / 'maintenance/current.json'
+                if not path.exists():
+                    continue
+                job = json.loads(path.read_text())
+                if job.get('platform_operation') == body['operation_id'] and job.get('platform_epoch') == body['epoch']:
+                    job['resume_boot_id'] = self.synchronization.boot_id
+                    atomic_json(path, job)
+            self.synchronization.synchronize()
+        elif body['action'] == 'restore':
+            status = self.synchronization.platform_status(body['operation_id'], body['epoch'])
+            for item in status['nodes']:
+                if item['phase'] != 'registering':
+                    self._start_platform_restore(item['node_id'], body)
+        elif body['action'] == 'rollback':
+            status = self.synchronization.platform_status(body['operation_id'], body['epoch'])
+            if any(item['running'] for item in status['nodes']):
+                raise ValueError('节点备份仍在收口，请等待原作业结束')
+            for item in status['nodes']:
+                if item['phase'] == 'registering':
+                    row = self.store.get(item['node_id'])
+                    current = json.loads(row['preparation_json']) if row['preparation_json'] else {}
+                    original = current.get('original_preparation') or {'state': 'needs_check', 'reason': '准备已取消，请核对原组件'}
+                    self.store.save_preparation(item['node_id'], row['revision'], original)
+                    continue
+                self.synchronization.recover_original(item['node_id'])
+                row = self.store.get(item['node_id'])
+                job = json.loads((self.connection(item['node_id']).private / 'maintenance/current.json').read_text())
+                self.store.save_preparation(item['node_id'], row['revision'], {'state': 'prepared',
+                    'release': job['old_release'], 'phase': 'ready'})
+        elif body['action'] != 'status':
+            raise ValueError('节点平台维护动作无效')
+        return self.synchronization.platform_status(body['operation_id'], body['epoch'])
+
+    def _start_platform_restore(self, node_id: int, body: dict) -> None:
+        row = self.store.get(node_id)
+        node = self.connection(node_id)
+        job = json.loads((node.private / 'maintenance/current.json').read_text())
+        if job.get('platform_operation') != body['operation_id'] or job.get('platform_epoch') != body['epoch']:
+            raise ValueError('节点恢复不属于原宿主操作')
+        if job['phase'] == 'platform_restored':
+            return
+        with self.lock:
+            if self.closing:
+                raise RuntimeError('节点服务正在关闭')
+            lock = self.operation_locks.setdefault(node_id, threading.Lock())
+            if not lock.acquire(blocking=False):
+                return
+        activity = None
+        try:
+            activity = UPDATE_GATE.reserve_maintenance('cluster-node-restore:' + str(node_id), body['operation_id'], body['epoch'])
+            self.store.save_preparation(node_id, row['revision'], {'state': 'preparing', 'phase': 'restoring',
+                'target_release': os.environ.get('V3_RELEASE')})
+            worker = threading.Thread(target=self._restore_platform_node, args=(row, dict(body), lock, activity),
+                name='cluster-node-restore', daemon=True)
+            with self.lock:
+                self.install_workers[node_id] = worker
+                worker.start()
+        except BaseException:
+            with self.lock:
+                self.install_workers.pop(node_id, None)
+            UPDATE_GATE.release_reserved(activity)
+            lock.release()
+            raise
+
+    def _restore_platform_node(self, row: dict, body: dict, lock, activity) -> None:
+        try:
+            with UPDATE_GATE.continue_reserved(activity):
+                if body.get('preserve_data'):
+                    node = self.connection(row['id'])
+                    path = node.private / 'maintenance/current.json'
+                    job = json.loads(path.read_text())
+                    if not job.get('late_restore'):
+                        atomic_json(node.private / 'maintenance' / (job['job_id'] + '-previous.json'), job)
+                        path.unlink()
+                    installer = NodeDeployment(self, os.environ['V3_DEPLOYMENT_ID'], os.environ['V3_RELEASE'],
+                        os.environ['V3_CONTROL_IMAGE'], os.environ['V3_ACCOUNT_IMAGE'], account_release=os.environ.get('V3_ACCOUNT_RELEASE'))
+                    result = self.synchronization.install(installer, row['id'], row['revision'],
+                        maintenance={'operation_id': body['operation_id'], 'epoch': body['epoch']}, late_restore=True)
+                    job = json.loads(path.read_text())
+                    job['phase'] = 'platform_restored'
+                    atomic_json(path, job)
+                else:
+                    result = self.synchronization.restore_platform_snapshot(row['id'])
+                if not self.store.save_preparation(row['id'], row['revision'], result):
+                    raise ValueError('节点恢复期间配置已变化')
+        except (NodeSshError, RequestConnectionError, RequestTimeout):
+            self.store.save_preparation(row['id'], row['revision'], {'state': 'preparing', 'phase': 'waiting',
+                'retry_at': time.time() + 15, 'reason': '节点恢复连接中断，正在等待原连接恢复'})
+        except Exception:
+            self.store.save_preparation(row['id'], row['revision'], {'state': 'failed', 'phase': 'needs_check',
+                'reason': '节点恢复尚未完整核验，原快照及后来资料已保留，请恢复原平台操作'})
+        finally:
+            UPDATE_GATE.release_reserved(activity)
+            with self.lock:
+                self.install_workers.pop(row['id'], None)
+            lock.release()
 
     def register(self, request: NodeCreate) -> dict:
         """保存管理员已确认主机公钥的 SSH 节点。
@@ -225,7 +404,7 @@ class ClusterService:
             return self.docker_clients[node_id]
 
     def build_preparation(self, account: dict, row: dict, node_key: str, revision: int,
-                          runtime, gateway, quota_identity: str, *, cli_only: bool = False, login_sid: str | None = None) -> NodePreparation:
+                          runtime, gateway, quota_identity: str, *, cli_only: bool = False, login_sid: str | None = None, profile_sink=None) -> NodePreparation:
         """为当前账号构造有限节点准备投影，保留原凭据所有权。
 
         :param account: 中央身份锁内的账号。
@@ -237,6 +416,7 @@ class ClusterService:
         :param quota_identity: 冻结额度身份。
         :param cli_only: 独立账号只准备原CLI布局。
         :param login_sid: 原已有账号明确登录SID；只准备CLI且保留原绑定。
+        :param profile_sink: 迁移专用私有文件接收器。
         :return: 可经私有SSH入口传递的准备输入。
         """
         name = account.get('name')
@@ -260,11 +440,79 @@ class ClusterService:
                     if isinstance(oauth, dict):
                         # 中央拥有刷新权，准备节点只需当前AT，避免将RT带入跨机执行投影。
                         oauth.pop('refreshToken', None)
-                files[filename] = json.dumps(value, ensure_ascii=False)
-        if sum(len(value.encode()) for value in files.values()) > 1024 * 1024:
-            raise ValueError('节点profile投影超过大小上限')
+                content = json.dumps(value, ensure_ascii=False)
+                if profile_sink is not None:
+                    profile_sink(filename, content)
+                else:
+                    files[filename] = content
         return NodePreparation(node_key=node_key, assignment_revision=revision, account=account, environment=row,
             gateway_config=configuration, quota_identity=quota_identity, profile_files=files, cli_only=cli_only,login_sid=login_sid)
+
+    def deliver_preparation(self, node_id: int, container: str, preparation: NodePreparation, *, operation_id: str | None = None) -> dict:
+        """为大profile选择私有文件通路，小控制投影保留原快速入口。
+
+        :param node_id: 固定节点。
+        :param container: 原控制组件。
+        :param preparation: 已按凭据所有权过滤的原投影。
+        :param operation_id: 可选的原维护操作。
+        :return: 原节点准备回执。
+        """
+        node = self.connection(node_id)
+        if sum(len(value.encode()) for value in preparation.profile_files.values()) <= 1024 * 1024:
+            return node.prepare_environment(container, preparation.model_dump())
+        operation_id = operation_id or uuid.uuid4().hex
+        profiles = MigrationProfiles(self.data, operation_id)
+        for name, content in preparation.profile_files.items():
+            profiles.save(name, content)
+        scope = PreparationFileScope(operation_id=operation_id, node_key=preparation.node_key,
+            account_id=preparation.account['id'], environment_id=preparation.environment['environment_id'],
+            assignment_revision=preparation.assignment_revision, generation=preparation.environment['generation'])
+        request = PreparationFiles(scope=scope, preparation=preparation.model_copy(update={'profile_files': {}}), profiles=profiles.references)
+        capability = self.preparation_capabilities(node_id, container)
+        if capability['files']:
+            node.migration_environment(container, request.model_dump(), 'stage-preparation-files')
+        else:
+            self._legacy_file_preparation(node, container, request, stage=True)
+        transfer = NodeArchiveTransfer(node.docker_socket(), self.docker(node_id).api._version, container)
+        for reference in profiles.references.values():
+            transfer.upload_preparation_profile(operation_id, scope.account_id, profiles.path(reference), reference.sha256, reference.bytes)
+        if capability['files']:
+            return node.migration_environment(container, request.model_dump(), 'prepare-files')
+        return self._legacy_file_preparation(node, container, request, stage=False)
+
+    def preparation_capabilities(self, node_id: int, container: str) -> dict:
+        """只读识别已核对控制镜像中的维护能力。:param node_id: 原节点。:param container: 精确组件。:return: 固定能力。"""
+        script = ('import importlib.util,json;print(json.dumps({'
+            '"files":importlib.util.find_spec("cluster_preparation_files") is not None,'
+            '"restart":importlib.util.find_spec("cluster_restart") is not None}))')
+        result = json.loads(self.connection(node_id)._command(shlex.join(['docker', 'exec', container, 'python3', '-c', script]),
+            timeout=15, maximum_output=1024))
+        if set(result) != {'files', 'restart'} or any(type(value) is not bool for value in result.values()):
+            raise ValueError('节点维护能力回执无效')
+        return result
+
+    def _legacy_file_preparation(self, node, container, request: PreparationFiles, *, stage: bool) -> dict:
+        # 历史端沿其原类型、锁和准备方法执行；固定适配只替代文件承载，不放宽归属或生命周期核验。
+        modules = [(name, Path(__file__).with_name(name + '.py').read_text())
+            for name in ('cluster_migration_profiles', 'cluster_preparation_files')]
+        source = profile_reader_source() + 'import sys,types\n'
+        for name, code in modules:
+            source += ('m=types.ModuleType(' + repr(name) + ');sys.modules[m.__name__]=m;exec(' + repr(code) + ',m.__dict__)\n')
+        footer = ('\nimport json,os,sys;from pathlib import Path;from docker import DockerClient;'
+            'from cluster_execution import NodeExecution;'
+            'from cluster_preparation_files import PreparationFiles,stage_preparation_files,prepare_from_files;'
+            'assert os.environ["V3_ROLE"]=="node-control";'
+            'client=DockerClient.from_env();'
+            'executor=NodeExecution(Path(os.environ["BENCH_DATA"]),Path(os.environ["HOST_BENCH_DATA"]),'
+            'os.environ["V3_NODE_KEY"],os.environ["V3_DEPLOYMENT_ID"],client);'
+            'request=PreparationFiles.model_validate(json.load(sys.stdin));'
+            'result=' + ('stage_preparation_files' if stage else 'prepare_from_files') + '(executor,request);'
+            'print(json.dumps(result));client.close()')
+        result = json.loads(node._command(shlex.join(['docker', 'exec', '-i', container, 'python3', '-c', source + footer]),
+            data=request.model_dump_json().encode(), timeout=20 if stage else None, maximum_output=4 * 1024 * 1024))
+        if result.get('protocol') != 1 or result.get('node_key') != request.scope.node_key:
+            raise ValueError('历史节点准备回执身份不一致')
+        return result
 
     def prepare_remote(self, account: dict, runtime, gateway, quota_identity: str) -> dict:
         """准备人工归属的远程环境并发布受限中央转发绑定。
@@ -324,62 +572,68 @@ class ClusterService:
                 cli_only=cli_only,login_sid=login_sid)
             node = self.connection(node_row['id'])
             node.docker_socket()
-            peer = node.prepare_environment(node_container_name(runtime.deployment, node_row['node_key']), request.model_dump())
-            actual, binding = peer.get('environment'), peer.get('binding')
-            if (not isinstance(actual, dict)
-                    or peer.get('assignment_revision') != assignment['revision']
-                    or actual.get('environment_id') != row['environment_id'] or actual.get('account_id') != account['id']
-                    or actual.get('name') != account['name'] or actual.get('state') not in ('ready', 'cli_reconcile')
-                    or type(actual.get('generation')) is not int or actual['generation'] < row['generation']
-                    or actual.get('isolation_version') != 2):
-                raise ValueError('远程环境回执与中央身份不一致')
-            if not cli_only and (not isinstance(binding, dict) or binding.get('environment_id') != row['environment_id']
-                    or binding.get('account_id') != account['cc2api_account_id']
-                    or binding.get('generation') != actual['generation']
-                    or binding.get('release_id') != configured_release(runtime)
-                    or not isinstance(binding.get('secret'), str) or not 32 <= len(binding['secret']) <= 256):
-                raise ValueError('远程环境或发送器回执与中央身份不一致')
-            if cli_only and binding is not None:
-                raise ValueError('独立CLI准备返回了额外传输绑定')
-            address = str(ipaddress.ip_address(peer.get('sender_address', '')))
-            before, after = json.loads(row['fingerprint_json']), json.loads(actual['fingerprint_json'])
-            if any(before.get(key) != after.get(key) for key in ('hostname', 'machine_id', 'mac', 'tz', 'lang')):
-                raise ValueError('远程环境的持久身份发生不匹配')
-            fields = ('fingerprint_json', 'generation', 'container_id', 'state', 'network_container_id',
-                'sender_container_id', 'isolation_version')
-            with self.store.lock:
-                connection = self.store.database()
+            peer = self.deliver_preparation(node_row['id'], node_container_name(runtime.deployment, node_row['node_key']), request)
+            return self._adopt_remote(account, row, assignment, node_row, peer, runtime, gateway, cli_only=cli_only)
+
+    def _adopt_remote(self, account: dict, row: dict, assignment: dict, node_row: dict, peer: dict,
+                      runtime, gateway, *, cli_only: bool, maintenance: bool = False, expected_release: str | None = None) -> dict:
+        """核对实际回执并按同一归属镜像环境及传输，维护恢复保留管理员暂停偏好。"""
+        node = self.connection(node_row['id'])
+        actual, binding = peer.get('environment'), peer.get('binding')
+        if (not isinstance(actual, dict)
+                or peer.get('assignment_revision') != assignment['revision']
+                or actual.get('environment_id') != row['environment_id'] or actual.get('account_id') != account['id']
+                or actual.get('name') != account['name'] or actual.get('state') not in ('ready', 'cli_reconcile')
+                or type(actual.get('generation')) is not int or actual['generation'] < row['generation']
+                or actual.get('isolation_version') != 2):
+            raise ValueError('远程环境回执与中央身份不一致')
+        if not cli_only and (not isinstance(binding, dict) or binding.get('environment_id') != row['environment_id']
+                or binding.get('account_id') != account['cc2api_account_id']
+                or binding.get('generation') != actual['generation']
+                or binding.get('release_id') != (expected_release or configured_release(runtime))
+                or not isinstance(binding.get('secret'), str) or not 32 <= len(binding['secret']) <= 256):
+            raise ValueError('远程环境或发送器回执与中央身份不一致')
+        if cli_only and binding is not None:
+            raise ValueError('独立CLI准备返回了额外传输绑定')
+        address = str(ipaddress.ip_address(peer.get('sender_address', '')))
+        before, after = json.loads(row['fingerprint_json']), json.loads(actual['fingerprint_json'])
+        if any(before.get(key) != after.get(key) for key in ('hostname', 'machine_id', 'mac', 'tz', 'lang')):
+            raise ValueError('远程环境的持久身份发生不匹配')
+        fields = ('fingerprint_json', 'generation', 'container_id', 'state', 'network_container_id',
+            'sender_container_id', 'isolation_version')
+        with self.store.lock:
+            connection = self.store.database()
+            try:
+                with connection:
+                    current = connection.execute('SELECT b.node_id,b.revision,b.phase FROM account_node_assignments b '
+                        'JOIN cluster_nodes n ON n.id=b.node_id WHERE b.account_id=? AND (n.enabled=1 OR ?=1) AND n.deleted_at IS NULL',
+                        (account['id'], int(maintenance))).fetchone()
+                    if current is None or tuple(current) != (assignment['node_id'], assignment['revision'], 'ready'):
+                        raise ValueError('环境准备期间账号节点归属已变化')
+                    result = connection.execute('UPDATE account_environments SET '
+                        + ','.join(key + '=?' for key in fields)
+                        + ' WHERE environment_id=? AND account_id=? AND generation<=?',
+                        (*(actual[key] for key in fields), row['environment_id'], account['id'], actual['generation']))
+                    if result.rowcount != 1:
+                        raise ValueError('中央环境代次已变化，请重新读取')
+            finally:
+                connection.close()
+        if cli_only:
+            return {'environment': actual, 'assignment_revision': assignment['revision'], 'node_key': node_row['node_key']}
+        path = node.sender_socket(row['environment_id'], address)
+        self.transports.register(NodeTransport(node_row['id'], node_row['node_key'], account['id'], row['environment_id'],
+            assignment['revision'], actual['generation'], path, binding['secret']))
+        endpoint = os.environ.get('V3_RUNTIME_URL', 'http://orchestrator:8000').rstrip('/')
+        deployment_key = hashlib.sha256(runtime.deployment.encode()).hexdigest()[:12]
+        endpoint += f"/cluster-transports/v2/{deployment_key}/{node_row['node_key']}/{row['environment_id']}/{assignment['revision']}"
+        for notification in peer.get('native_notifications', []):
+            if notification == account['cc2api_account_id']:
                 try:
-                    with connection:
-                        current = connection.execute('SELECT b.node_id,b.revision,b.phase FROM account_node_assignments b '
-                            'JOIN cluster_nodes n ON n.id=b.node_id WHERE b.account_id=? AND n.enabled=1 AND n.deleted_at IS NULL',
-                            (account['id'],)).fetchone()
-                        if current is None or tuple(current) != (assignment['node_id'], assignment['revision'], 'ready'):
-                            raise ValueError('环境准备期间账号节点归属已变化')
-                        result = connection.execute('UPDATE account_environments SET '
-                            + ','.join(key + '=?' for key in fields)
-                            + ' WHERE environment_id=? AND account_id=? AND generation<=?',
-                            (*(actual[key] for key in fields), row['environment_id'], account['id'], actual['generation']))
-                        if result.rowcount != 1:
-                            raise ValueError('中央环境代次已变化，请重新读取')
-                finally:
-                    connection.close()
-            if cli_only:
-                return {'environment': actual, 'assignment_revision': assignment['revision'], 'node_key': node_row['node_key']}
-            path = node.sender_socket(row['environment_id'], address)
-            self.transports.register(NodeTransport(node_row['id'], node_row['node_key'], account['id'], row['environment_id'],
-                assignment['revision'], actual['generation'], path, binding['secret']))
-            endpoint = os.environ.get('V3_RUNTIME_URL', 'http://orchestrator:8000').rstrip('/')
-            deployment_key = hashlib.sha256(runtime.deployment.encode()).hexdigest()[:12]
-            endpoint += f"/cluster-transports/v2/{deployment_key}/{node_row['node_key']}/{row['environment_id']}/{assignment['revision']}"
-            for notification in peer.get('native_notifications', []):
-                if notification == account['cc2api_account_id']:
-                    try:
-                        gateway._request('POST', f'/admin/accounts/{notification}/native-preparation', {})
-                    except Exception:
-                        # 与原运行时相同，通知失败保留业务惰性准备路径，后续请求可补偿。
-                        pass
-            return {**binding, 'endpoint': endpoint}
+                    gateway._request('POST', f'/admin/accounts/{notification}/native-preparation', {})
+                except Exception:
+                    # 与原运行时相同，通知失败保留业务惰性准备路径，后续请求可补偿。
+                    pass
+        return {**binding, 'endpoint': endpoint}
 
     def remote_summary(self, row: dict, runtime, version: str, observation: dict | None = None) -> dict:
         """核对所属节点返回的真实只读环境摘要。
@@ -522,7 +776,8 @@ class ClusterService:
             raise ValueError('检查期间节点配置已变化，请刷新后重试')
         return next(item for item in self.store.list() if item['id'] == node_id)
 
-    def prepare_node(self, node_id: int, revision: int) -> dict:
+    def prepare_node(self, node_id: int, revision: int, *, automatic: bool = False, installer_override=None,
+                     maintenance: dict | None = None, stage_only: bool = False) -> dict:
         """登记后台安装并立即返回，原作业持续参与平台排空。
 
         :param node_id: 节点。
@@ -530,7 +785,7 @@ class ClusterService:
         :return: 当前公开节点状态。
         """
         row = self.store.get(node_id)
-        if row['kind'] != 'ssh' or row['revision'] != revision or not row['enabled']:
+        if row['kind'] != 'ssh' or row['revision'] != revision or not automatic and not row['enabled']:
             raise ValueError('请指定已启用且配置版本一致的远程节点')
         with self.lock:
             if self.closing:
@@ -540,15 +795,45 @@ class ClusterService:
             return next(item for item in self.store.list() if item['id'] == node_id)
         activity, saved = None, False
         try:
-            installer = NodeDeployment(self, os.environ.get('V3_DEPLOYMENT_ID', ''), os.environ.get('V3_RELEASE', ''),
+            installer = installer_override or NodeDeployment(self, os.environ.get('V3_DEPLOYMENT_ID', ''), os.environ.get('V3_RELEASE', ''),
                 os.environ.get('V3_CONTROL_IMAGE', ''), os.environ.get('V3_ACCOUNT_IMAGE', ''))
+            # 与迁移登记共用存储锁，原迁移先完成时继续保持原组件可用。
+            with self.store.lock:
+                connection = self.store.database()
+                try:
+                    migrations = connection.execute("SELECT * FROM node_migrations WHERE (source_node_id=? OR target_node_id=?) "
+                        "AND phase NOT IN ('completed','cancelled')", (node_id, node_id)).fetchall()
+                    previous = json.loads(row['preparation_json']) if row['preparation_json'] else {}
+                    original = previous.get('original_preparation') or previous
+                    if any(not pristine_target_migration(dict(migration), node_id) for migration in migrations) and original.get('state') == 'prepared':
+                        waiting = {**original, 'phase': 'waiting', 'target_release': installer.release,
+                            'retry_at': time.time() + 15, 'reason': '原迁移正在进行，完成后自动同步节点组件'}
+                        with connection:
+                            result = connection.execute('UPDATE cluster_nodes SET preparation_json=? WHERE id=? AND revision=? AND deleted_at IS NULL',
+                                (json.dumps(waiting, ensure_ascii=False), node_id, revision))
+                            if result.rowcount != 1:
+                                raise ValueError('节点配置已变化，请刷新后重试')
+                        lock.release()
+                        return next(item for item in self.store.list() if item['id'] == node_id)
+                    pending = {'state': 'preparing', 'phase': 'checking', 'target_release': installer.release,
+                        'current_release': previous.get('release') or previous.get('current_release'),
+                        'original_preparation': original}
+                    with connection:
+                        result = connection.execute('UPDATE cluster_nodes SET preparation_json=? WHERE id=? AND revision=? AND deleted_at IS NULL',
+                            (json.dumps(pending, ensure_ascii=False), node_id, revision))
+                        if result.rowcount != 1:
+                            raise ValueError('节点配置已变化，请刷新后重试')
+                    saved = True
+                finally:
+                    connection.close()
             # 在返回202之前登记活动，避免HTTP结束与后台启动之间被更新器误判为空闲。
-            activity = UPDATE_GATE.reserve('cluster-node-install:' + str(node_id))
-            if not self.store.save_preparation(node_id, revision, {'state': 'preparing'}):
-                raise ValueError('节点配置已变化，请刷新后重试')
-            saved = True
+            if maintenance is not None:
+                activity = UPDATE_GATE.reserve_maintenance('cluster-node-install:' + str(node_id),
+                    maintenance['operation_id'], maintenance['epoch'])
+            else:
+                activity = UPDATE_GATE.reserve('cluster-node-install:' + str(node_id))
             result = next(item for item in self.store.list() if item['id'] == node_id)
-            worker = threading.Thread(target=self._install_node, args=(installer, node_id, revision, lock, activity),
+            worker = threading.Thread(target=self._install_node, args=(installer, node_id, revision, lock, activity, maintenance, stage_only),
                 name='cluster-node-install', daemon=True)
             with self.lock:
                 if self.closing:
@@ -563,23 +848,47 @@ class ClusterService:
         except BaseException:
             try:
                 if saved:
-                    self.store.save_preparation(node_id, revision, {'state': 'failed', 'reason': '后台安装启动失败，请重新准备'})
+                    restored = previous if activity is None else {**pending, 'state': 'failed', 'phase': 'needs_check',
+                        'reason': '后台安装启动失败，请重新准备'}
+                    self.store.save_preparation(node_id, revision, restored)
             finally:
                 UPDATE_GATE.release_reserved(activity)
                 lock.release()
             raise
 
-    def _install_node(self, installer, node_id: int, revision: int, lock, activity: str | None) -> None:
+    def _install_node(self, installer, node_id: int, revision: int, lock, activity: str | None,
+                      maintenance: dict | None = None, stage_only: bool = False) -> None:
         """在原节点版本内执行安装，持久保存结果并定向释放活动。"""
         try:
             context = UPDATE_GATE.continue_reserved(activity) if activity is not None else nullcontext()
             with context:
-                result = installer.prepare(node_id, revision)
+                result = (self.synchronization.install(installer, node_id, revision, maintenance=maintenance, stage_only=stage_only) if self.synchronization
+                    else installer.prepare(node_id, revision))
                 if not self.store.save_preparation(node_id, revision, result):
                     raise ValueError('安装期间节点配置已变化，请重新检查节点能力')
+        except NodeSynchronizationWait as error:
+            row = self.store.get(node_id)
+            previous = json.loads(row['preparation_json']) if row['preparation_json'] else {}
+            self.store.save_preparation(node_id, revision, {**previous, 'state': 'preparing', 'phase': 'waiting',
+                'reason': str(error), 'retry_at': time.time() + 15})
+        except NodeSshError as error:
+            previous = self.store.get(node_id)
+            previous = json.loads(previous['preparation_json']) if previous['preparation_json'] else {}
+            self.store.save_preparation(node_id, revision, {**previous, 'state': 'preparing', 'phase': 'waiting',
+                'target_release': previous.get('target_release') or os.environ.get('V3_RELEASE'), 'retry_at': time.time() + 30,
+                'reason': str(error), 'reason_code': error.reason})
         except Exception:
-            self.store.save_preparation(node_id, revision, {'state': 'failed',
-                'reason': '节点组件安装失败，请检查 SSH、镜像、数据归属与资源'})
+            if self.synchronization is not None:
+                try:
+                    self.synchronization.recover_original(node_id)
+                except Exception:
+                    # 恢复未知时继续保护原任务，不以第二次异常覆盖公开状态。
+                    pass
+            previous = self.store.get(node_id)
+            previous = json.loads(previous['preparation_json']) if previous['preparation_json'] else {}
+            self.store.save_preparation(node_id, revision, {**previous, 'state': 'failed', 'phase': 'needs_check',
+                'target_release': previous.get('target_release') or os.environ.get('V3_RELEASE'), 'retry_at': time.time() + 60,
+                'reason': '节点同步未完成，原维护与备份已保留，请重试核对原任务'})
         finally:
             UPDATE_GATE.release_reserved(activity)
             with self.lock:
@@ -622,6 +931,8 @@ class ClusterService:
         with self.lock:
             self.closing = True
             workers = list(self.install_workers.values())
+        if self.synchronization is not None:
+            self.synchronization.close()
         for worker in workers:
             worker.join(timeout=1)
         with self.lock:

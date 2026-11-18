@@ -145,6 +145,23 @@ class DeploymentGate:
             self.active[identifier] = 'job:' + source
             return identifier
 
+    def reserve_maintenance(self, source: str, operation_id: str, epoch: str) -> str:
+        """为已认证宿主的同一维护操作登记内部节点工作。
+
+        :param source: 固定维护来源。
+        :param operation_id: 已认证的原宿主操作。
+        :param epoch: 原维护代次。
+        :return: 只供原内部工作使用的活动证明。
+        """
+        with self.lock:
+            state = self.state()
+            if (state.get('phase') != 'blocked' or state.get('operation_id') != operation_id
+                    or state.get('epoch') != epoch):
+                raise RuntimeError('节点维护操作或代次已变化')
+            identifier = uuid.uuid4().hex
+            self.active[identifier] = 'maintenance:' + source
+            return identifier
+
     def release_reserved(self, identifier: str | None) -> None:
         """按真实作业身份定向释放登记。
 

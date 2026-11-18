@@ -162,6 +162,7 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 - 合同为按 key 排序、紧凑 UTF-8 JSON 登记的 SHA256。Python 冻结定义使用忽略文档/注释的 AST 摘要，Rust 使用测试段之前的纯定义原字节摘要。冻结 SQL、默认值、历史画像及命名空间依赖归纯迁移模块所有，普通业务查询和页面改动保持合同。
 - 发布校验与DDL扫描共用步骤ID到精确源路径的映射：gateway.baseline.1→database_schema.rs、gateway.proxies.2→proxy_schema.rs、gateway.proxy-sync.3→proxy_sync_schema.rs、gateway.session-policy-blocks.4→session_policy_block_schema.rs，均位于网关src/store。仅当前登记中的对应路径拥有DDL定义；同名业务文件不豁免。每个网关步骤都核对源码摘要，未知步骤、缺失来源和摘要漂移在签发前拒绝。
 - bench映射为`bench.baseline.1→database_schema.py`、`bench.cluster.2→cluster_schema.py`、`bench.node-executions.3→node_execution_schema.py`、`bench.node-login-drafts.4→node_login_draft_schema.py`，均位于编排服务根。`system_release.BENCH_SCHEMA_SOURCES`与定义扫描共用该来源，每个已登记步骤均核对摘要；集群离线备份/换批沿[账号环境共同合同](../../orchestrator/backend/account-runtime-v3.md)及`deploy/flower2api/CLUSTER.md`。
+- 临时迁移磁盘清单定义限`services/orchestrator/cluster_archive_schema.py`纯模块，由定义扫描核验；它在每次迁移私有临时目录建立和删除，不进入bench业务版本链。同名业务文件及业务模块中的DDL继续拒绝。
 - 自哈希Rust模块使用 `concat!("#[cfg(", "test)]")` 构造测试分隔标记，保证迁移执行和结构校验也进入摘要。源码内直接写完整分隔字符串会使字节切分提前停止。首次发布前修正新增定义需同步登记摘要；已发布步骤继续冻结。
 - CLI 返回 `database,contract,current_version,target_version,steps,state,reason`；执行完成保留原台账 operation_id。已知台账摘要冲突或版本断链拒绝；旧程序读取兼容新增版本返回 `compatible_newer`。
 - 旧库迁移前核验稳定账号核心字段。迁移完成且写入成功台账之前、以及已登记库 plan/apply 时，复核冻结基线的最低表/列、SQLite 亲和、主键及完整性。允许兼容新增表/列；非主键数字亲和支持历史兼容。空库沿相同初始化建立基线。
@@ -169,6 +170,9 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 - v2 使用独立 `updates/v3-migrations` 通道，首发继承旧受信发行。`updates/v3` 保留 v1 及原最高序号，仅刷新时间和签名。受信新通道 ref 404 才允许读取旧通道；已有通道资产缺失直接失败。正式证据要求干净同批镜像。
 - 从空闲现场关闭门禁并排空，停止双端并确认数据库 FD 退出后，保存同操作私有双库快照。回执绑定 deployment、operation_id、epoch、原发行、权限/归属及每库文件/逻辑摘要；空间预算先于迁移。默认保留最近两组完成快照，另外保护活动恢复引用，异常目录保留并报告。
 - `database_snapshot` 仅公开 `state,completed_at,bytes`；`database_migrations` 按库公开 state 和 target_version。页面显示快照、迁移、数据恢复及具体阻断原因，未知值保留可见。
+- 托管Node加入原维护范围：最终排空快照冻结节点集合，`prepare_nodes`在中央切换和双库快照前收齐同epoch完整Node备份；`resume_nodes`在新控制就绪后恢复同一作业，最终健康核验后才开放接单。内部`POST /internal/v3/system-updates/nodes`沿原更新凭据、operation_id和epoch，仅接受prepare/status/resume/restore/rollback/cancel-preparation。普通管理准入继续遵守全局门禁；内部活动由`reserve_maintenance`按原维护身份登记。
+- `cluster_nodes={phase,nodes}`公开逐节点名称、阶段、运行标记和受控preparation；备份及控制配置秘密保留在节点私有日志。取消先等待原辅助进程收口，再恢复原组件；新中央重启须由原宿主明确resume授予本次boot身份，防止备份后提前切换。后台断线沿同一操作重试。
+- `release_started`前的失败恢复成组Node快照与原中央数据，原数据先隔离再原子切换，持久完成边界先于程序恢复。后来资料保留在独立隔离目录。已重新接单后的恢复沿当前资料反向切换组件。历史中央缺少内部节点维护接口时首次接入按集群离线SOP执行；后续同能力版本可统一维护。
 - `release_started` 先于实际释放准入持久化。此前失败按原 UUID 恢复同组两库和原程序；恢复意图先于暂存复制和替换，支持部分两库完成。账号重建后的六项生命周期登记以原身份和 CAS 续接，再恢复原环境。`database_restored` 先于原程序启动落盘，重启收口保护原程序后来写入。重新接单后的显式回退保留当前数据。
 - 底座首次能力接入默认预览，持有独立接入锁；完整备份后发布 `updater-upgrades/<UUID>/upgrade.json`。未完成日志阻止新接入。`--recover` 默认预览，允许服务 inactive，按精确原/新源码 SHA、原策略/状态副本摘要、空闲门禁及服务归属验收，持有服务锁和存储锁后恢复原版并验证 socket。恢复再次中断继续原 UUID；后来状态、外来源码及后续接入日志触发现场保护。
 

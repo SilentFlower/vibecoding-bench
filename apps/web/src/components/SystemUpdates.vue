@@ -44,6 +44,8 @@ const phases: Record<string, string> = {
   failed: '本次更新失败', cancelled: '本次更新已取消', reconcile: '等待恢复与对账',
 };
 const progress = computed(() => status.value?.operation);
+const nodePhases: Record<string, string> = { registering: '等待同步', checking: '核对组件', draining: '等待原工作完成', fenced: '原环境已停止', backing_up: '备份资料', backed_up: '备份完成', switching: '切换组件', restoring: '恢复账号', completed: '同步完成', rolled_back: '已恢复原组件', rolling_back_control: '恢复原组件', platform_restoring: '恢复原资料', platform_restored: '恢复完成', waiting: '等待重试', needs_check: '等待核对' };
+
 const cancelAllowed = computed(() => status.value?.busy && ['preparing', 'draining'].includes(progress.value?.phase ?? ''));
 const recoveryAllowed = computed(() => ['reconcile', 'succeeded_cleanup_pending'].includes(progress.value?.phase ?? ''));
 const runningEnvironments = computed(() => status.value?.environments?.filter(item => item.running).length ?? 0);
@@ -257,6 +259,12 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); ver
       <section v-if="progress" class="update-operation rounded-xl border bg-card" :class="{'update-operation-priority': status.busy || progress.error || progress.blockers?.length}" aria-live="polite">
         <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div class="flex min-w-0 items-center gap-3"><span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Check v-if="progress.phase === 'succeeded'" class="size-4" /><RefreshCw v-else class="size-4" :class="status.busy ? 'animate-spin motion-reduce:animate-none' : ''" /></span><div><h2 class="text-sm font-semibold">{{ phases[progress.phase] ?? progress.phase }}</h2><p class="mt-1 text-xs text-muted-foreground">{{ releaseLabel(progress.target_release) }}</p></div></div><div class="flex gap-2"><Button v-if="cancelAllowed" variant="outline" size="sm" :disabled="writing || progress.cancel_requested" @click="cancel">{{ progress.cancel_requested ? '正在取消…' : '取消等待' }}</Button><Button v-if="recoveryAllowed" variant="outline" size="sm" :disabled="writing" @click="confirm('recover', progress.target_release, '', true)">恢复操作</Button></div></div>
         <div v-if="status.busy || progress.error || progress.blockers?.length" class="space-y-3 border-t px-5 py-4 text-sm"><p v-if="status.busy" class="text-muted-foreground">维护期间新工作暂缓，在途工作自然结束后继续。</p><ul v-if="progress.blockers?.length" class="space-y-1 rounded-lg bg-muted p-3"><li v-for="blocker in progress.blockers" :key="blocker" class="break-words">{{ blocker }}</li></ul><p v-if="progress.error" role="alert" class="text-amber-800">{{ progress.error }}</p></div>
+        <ul v-if="progress.cluster_nodes?.nodes.length" class="space-y-2 border-t px-5 py-4 text-sm" aria-label="节点同步进度">
+          <li v-for="node in progress.cluster_nodes.nodes" :key="node.node_id" class="rounded-lg bg-muted p-3">
+            <div class="flex justify-between gap-3"><span class="min-w-0 break-words font-medium">{{ node.name ?? `节点 ${node.node_id}` }}</span><span class="shrink-0">{{ nodePhases[node.preparation?.phase ?? node.phase] ?? nodePhases[node.phase] ?? '正在核对' }}</span></div>
+            <p v-if="node.preparation?.reason" class="mt-1 text-xs text-muted-foreground">{{ node.preparation.reason }}</p>
+          </li>
+        </ul>
         <details class="border-t px-5 py-3 text-xs text-muted-foreground"><summary class="cursor-pointer">操作详情与数据库快照</summary><div class="mt-3 space-y-2"><p class="break-all">目标发行：<code>{{ progress.target_release }}</code></p><p class="break-all">操作 ID：<code>{{ progress.operation_id }}</code></p><p :title="progress.updated_at">更新时间：{{ formatLocalTime(progress.updated_at) }}</p><p v-if="progress.database_snapshot">数据库快照{{ progress.database_snapshot.state === 'verified' ? '已校验' : '状态：' + progress.database_snapshot.state }} · {{ (progress.database_snapshot.bytes / 1024 / 1024).toFixed(1) }} MiB</p><p v-for="(migration, database) in progress.database_migrations ?? {}" :key="database">{{ database === 'bench' ? '平台数据库' : '网关数据库' }} · 目标版本 {{ migration.target_version }} · {{ migration.state === 'completed' ? '迁移完成' : migration.state === 'running' ? '正在迁移' : migration.state }}</p></div></details>
       </section>
       <details class="approved-maintenance update-disclosure"><summary>运行组件与维护详情</summary>

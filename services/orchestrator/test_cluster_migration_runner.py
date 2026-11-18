@@ -5,7 +5,7 @@ import json
 import threading
 import time
 import unittest
-from contextlib import contextmanager
+from contextlib import nullcontext, contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -72,8 +72,9 @@ class MigrationCoordinatorTests(unittest.TestCase):
         finally:
             connection.close()
         self.owner_lock = threading.RLock()
-        service = SimpleNamespace(store=self.store, data=self.root, local_client=Mock(), transports=NodeTransports(self.store))
-        service.build_preparation = lambda account, row, node_key, revision, runtime, gateway, quota, **options: NodePreparation(
+        service = SimpleNamespace(store=self.store, data=self.root, local_client=Mock(), transports=NodeTransports(self.store),
+            migration_nodes=lambda migration: nullcontext())
+        service.build_preparation = lambda account, row, node_key, revision, runtime, gateway, quota, profile_sink=None, **options: NodePreparation(
             account=account, environment=row, node_key=node_key, assignment_revision=revision,
             gateway_config={}, quota_identity=quota, profile_files={},**options)
         runtime = SimpleNamespace(deployment='synthetic', release_id='synthetic-release', environment_lock=lambda identity: threading.RLock(),

@@ -8419,6 +8419,7 @@ async def lifespan(app: FastAPI):
             transition=_account_owner_transition,sync_bound=_sync_owner_credentials,matched_identity=_v3_matched_cli_identity,
             prepare_initial=_prepare_initial_remote_owner)
         account_runtime.credential_ownership = credential_ownership
+        account_runtime.cluster_service = cluster_service
         migration_operations = MigrationOperations(MigrationCoordinator(cluster_service, account_runtime,
             cc2api_client, _quota_identity, _node_migration_guard))
         account_runtime.reconcile()
@@ -8541,6 +8542,9 @@ async def lifespan(app: FastAPI):
         scheduler.recover_active_batches()
     if project_iterations and not PROJECTS_AGENT_ENABLED:
         project_iterations.start()
+    if account_runtime and cluster_service:
+        cluster_service.start_synchronization(account_runtime, cc2api_client, _quota_identity,
+            lambda account: _resolve_account_cli_version(account)[0])
     try:
         yield
     finally:

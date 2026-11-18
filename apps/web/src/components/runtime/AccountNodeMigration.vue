@@ -11,6 +11,7 @@ const error = ref(''), failed = ref(false);
 type Confirmation = { action: 'start' | 'cancel'; accountId: number; accountName: string; targetName: string; operation: string; body?: NodeMigrationStart };
 const frozen = ref<Confirmation | null>(null);
 const latest = computed(() => history.value[0]);
+const failureStages: Record<string, string> = { draining: '等待原工作完成', fence: '隔离源环境', export: '导出资料', transfer: '传输资料', 'verify-import': '核验目标资料', 'prepare-import': '准备目标环境', commit: '保存新归属', 'activate-import': '激活目标环境', 'revoke-import': '撤销目标副本', 'restore-source': '恢复源环境', context: '核对原操作' };
 const unfinished = computed(() => !!latest.value && !['completed', 'cancelled'].includes(latest.value.phase));
 const canStart = computed(() => loaded.value && !unfinished.value && props.assignment.phase === 'ready'
   && !!props.account?.effective_claude_code_version && !!props.target?.enabled
@@ -99,7 +100,8 @@ onUnmounted(() => { alive = false; generation++; controller?.abort(); if (timer)
     <div v-if="latest" class="migration-status" aria-live="polite">
       <strong>{{ latest.source.name }} → {{ latest.target.name }}</strong>
       <p>{{ latest.message }}<span v-if="latest.running"> · 后台处理中</span><span v-else-if="latest.cancelling && unfinished"> · 取消操作待继续</span></p>
-      <p v-if="latest.phase === 'reconcile'">已保留原操作和维护状态，请继续核对。归属切换后继续目标激活。</p>
+      <p v-if="latest.failure" role="alert">{{ latest.failure.message }} · {{ latest.failure.action }}（{{ failureStages[latest.failure.stage] ?? '核对当前步骤' }}）</p>
+      <p v-else-if="latest.phase === 'reconcile'">已保留原操作和维护状态，请继续核对。归属切换后继续目标激活。</p>
       <div class="migration-actions"><Button v-if="latest.can_resume" :disabled="sending || !!frozen" @click="submit(true)">{{ latest.cancelling ? '继续取消' : '继续原迁移' }}</Button><Button v-if="latest.can_cancel" variant="outline" :disabled="sending || !!frozen" @click="openCancel">取消迁移</Button><Button variant="outline" :disabled="reading || sending" @click="refresh">刷新迁移状态</Button></div>
     </div>
     <p v-else-if="loaded">当前账号还没有迁移记录。</p>

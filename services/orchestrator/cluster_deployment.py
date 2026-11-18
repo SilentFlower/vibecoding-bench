@@ -126,7 +126,7 @@ class NodeDeployment:
     :param account_image: 本机固定账号镜像引用。
     """
 
-    def __init__(self, service, deployment: str, release: str, control_image: str, account_image: str) -> None:
+    def __init__(self, service, deployment: str, release: str, control_image: str, account_image: str, *, account_release: str | None = None) -> None:
         """保存当前平台的固定交付引用。
 
         :param service: 节点服务。
@@ -144,6 +144,7 @@ class NodeDeployment:
             raise ValueError('节点安装需要完整的当前平台镜像配置')
         self.service, self.deployment, self.release = service, deployment, release
         self.control_image, self.account_image = control_image, account_image
+        self.account_release = account_release
 
     def prepare(self, node_id: int, revision: int) -> dict:
         """检查平台后流式交付镜像并创建私有控制容器。
@@ -153,13 +154,13 @@ class NodeDeployment:
         :return: 本次安装回执。
         """
         row = self.service.store.get(node_id)
-        if row['kind'] != 'ssh' or row['revision'] != revision or not row['enabled']:
+        if row['kind'] != 'ssh' or row['revision'] != revision:
             raise ValueError('节点配置已变化或当前不接受安装')
         node = self.service.connection(node_id)
         config = NodeConfiguration.model_validate(json.loads(row['config_json']))
         node.observe()
         node.bootstrap(self.deployment)
-        account_release = os.environ.get('V3_ACCOUNT_RELEASE') or self.release
+        account_release = self.account_release or os.environ.get('V3_ACCOUNT_RELEASE') or self.release
         # 镜像导入可能在最后一块之后长时间解包，使用独立长等待客户端，保持日常控制请求的短期限。
         transfer = DockerClient(base_url='unix://' + str(node.docker_socket()), version='auto', timeout=600)
         try:
@@ -254,7 +255,8 @@ class NodeDeployment:
             raise ValueError('节点控制进程的部署、发布或协议不一致')
         return {'node_id': row['id'], 'node_key': row['node_key'], 'revision': row['revision'],
             'container_name': name, 'container_id': container.id, 'protocol': 1, 'release': self.release,
-            'state': 'prepared'}
+            'state': 'prepared', 'account_reference': self.account_image, 'account_release': account_release,
+            'account_image_id': remote.images.get(self.account_image).attrs['Id']}
 
     def _ensure_image(self, remote, reference: str, role: str, release: str):
         original = self.service.local_client.images.get(reference)

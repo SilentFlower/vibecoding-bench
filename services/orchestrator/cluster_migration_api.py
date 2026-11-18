@@ -9,7 +9,12 @@ from fastapi import APIRouter, HTTPException, Path
 from cluster_api import NodeRoute
 from cluster_migration_runner import MigrationCoordinator, MigrationStart
 from system_update_gate import UPDATE_GATE
+from cluster_migration_errors import public_failure
 
+
+_STAGES = {'draining': '等待原工作完成', 'fence': '停止并隔离源环境', 'export': '导出源环境资料',
+    'transfer': '传输迁移资料', 'verify-import': '核验目标资料', 'prepare-import': '准备目标运行环境',
+    'activate-import': '激活目标环境', 'revoke-import': '撤销目标副本', 'restore-source': '恢复原源环境'}
 
 _PHASES = {'requested': '等待迁移', 'draining': '排空原有工作', 'source_fenced': '源环境已停止隔离',
     'exporting': '导出和传输资料', 'importing': '核验并准备目标', 'verified': '目标已核对',
@@ -129,7 +134,9 @@ class MigrationOperations:
             nodes[side] = {'id': node['id'], 'name': node['name']}
         return {'operation_id': operation_id, 'account_id': account_id, **nodes,
             'phase': migration['phase'], 'last_confirmed_phase': record['last_confirmed_phase'],
-            'message': _PHASES.get(migration['phase'], '迁移状态需要核对'), 'running': running,
+            'message': (_STAGES.get(record.get('progress', {}).get('stage')) if running else None)
+                or _PHASES.get(migration['phase'], '迁移状态需要核对'), 'running': running,
+            'failure': public_failure(record.get('failure')) if migration['phase'] == 'reconcile' else None,
             'can_resume': not running and not terminal, 'can_cancel': not running and not terminal and not committed,
             'source_revision': record['source_revision'], 'target_revision': record.get('target_revision'),
             'cancelling': 'cancellation' in record.get('checkpoints', {}),

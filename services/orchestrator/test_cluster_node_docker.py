@@ -52,7 +52,7 @@ from verify_cluster_background import verify_node_background
 from verify_cluster_credentials import verify_node_credentials
 from verify_cluster_bound_login import verify_bound_node_login, verify_product_bound_login
 from verify_cluster_independent_migration import verify_independent_migration
-from verify_cluster_node_upgrade import verify_node_upgrade
+from verify_cluster_node_upgrade import verify_node_upgrade, wait_node_preparation
 from verify_cluster_two_node_gateway import verify_two_node_gateway
 from verify_cluster_environment_management import verify_environment_management
 from verify_cluster_draft_login import verify_node_draft_login, verify_draft_login_coordinator, verify_product_draft_login
@@ -109,7 +109,8 @@ class ClusterNodeDockerTests(unittest.TestCase):
             'private_key': fixture.identity.read_text()})
         node = service.register(request)
         self.prepare_network(client, deployment, node)
-        prepared = service.prepare_node(node['id'], node['revision'])
+        service.prepare_node(node['id'], node['revision'])
+        prepared = wait_node_preparation(self, service, node)
         self.assertEqual('prepared', prepared['preparation']['state'])
         if os.environ.get('CLUSTER_TEST_TERMINAL_ASSETS') == '1' or os.environ.get('CLUSTER_TEST_TERMINAL_EXECUTION') == '1':
             library = ProjectLibrary(Path(__file__).resolve().parents[2] / 'resources/project-library')

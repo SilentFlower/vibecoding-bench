@@ -35,6 +35,7 @@ class ClusterUiFixture(Fixture):
         self.fail_start = False
         self.operation_reads = 0
         self.install_posts = 0
+        self.synchronize_posts = 0
         self.install_complete = False
         self.fail_install_response = False
 
@@ -47,6 +48,10 @@ class ClusterUiFixture(Fixture):
         if path == '/runtime/api/nodes':
             if self.install_complete:
                 self.nodes[1]['preparation'] = {'state': 'prepared', 'updated_at': time.time()}
+            payload = {'items': self.nodes}
+        elif path == '/runtime/api/nodes/synchronize' and request.method == 'POST':
+            self.synchronize_posts += 1
+            self.nodes[1]['preparation'] = {'state': 'preparing', 'phase': 'backing_up', 'current_release': 'old', 'target_release': 'new'}
             payload = {'items': self.nodes}
         elif path == '/runtime/api/nodes/2/prepare' and request.method == 'POST':
             assert json.loads(request.post_data)['revision'] == self.nodes[1]['revision']
@@ -83,6 +88,7 @@ class ClusterUiFixture(Fixture):
                     payload = {'operation_id': body['operation_id'], 'account_id': account_id,
                         'source': {'id': source['id'], 'name': source['name']}, 'target': {'id': target['id'], 'name': target['name']},
                         'phase': 'reconcile', 'last_confirmed_phase': 'importing', 'message': '迁移需要核对',
+                        'failure': {'code': 'disk_space', 'stage': 'transfer', 'message': '迁移暂存磁盘空间不足', 'action': '释放对应节点空间后继续原迁移'},
                         'running': False, 'can_resume': True, 'can_cancel': True, 'source_revision': body['revision'],
                         'target_revision': None, 'cancelling': False, 'created_at': time.time(), 'updated_at': time.time()}
                     history.insert(0, payload)
@@ -102,11 +108,11 @@ class ClusterUiFixture(Fixture):
                             can_resume=False, can_cancel=False, cancelling=True)
                         self.assignments[account_id]['phase'] = 'ready'
                     elif payload['phase'] == 'reconcile':
-                        payload.update(phase='committed', last_confirmed_phase='committed', message='归属已切换，正在激活目标', can_cancel=False)
+                        payload.update(failure=None, phase='committed', last_confirmed_phase='committed', message='归属已切换，正在激活目标', can_cancel=False)
                         self.assignments[account_id].update(node_id=payload['target']['id'], node_name=payload['target']['name'],
                             revision=payload['source_revision'] + 1, node_key='a' * 32, kind='ssh')
                     else:
-                        payload.update(phase='completed', last_confirmed_phase='completed', message='迁移完成', can_resume=False)
+                        payload.update(failure=None, phase='completed', last_confirmed_phase='completed', message='迁移完成', can_resume=False)
                         self.assignments[account_id]['phase'] = 'ready'
         else:
             await super().route(route)
@@ -137,26 +143,26 @@ async def run(output: Path, gateway: Path) -> dict:
         page.on('pageerror', lambda error: errors.append(str(error)))
         await page.goto(BASE + '/nodes')
         node_card = page.locator('.node-card').filter(has=page.get_by_role('heading', name='上海执行节点', exact=True))
-        await node_card.get_by_role('button', name='准备运行组件', exact=True).click()
+        await node_card.get_by_role('button', name='检查并同步组件', exact=True).click()
         installation = page.get_by_role('dialog', name='准备节点运行组件', exact=True)
         await installation.get_by_role('button', name='开始准备', exact=True).click()
         await expect(installation).to_have_count(0)
-        await expect(node_card.get_by_role('button', name='后台安装中…', exact=True)).to_be_disabled()
+        await expect(node_card.get_by_role('button', name='后台同步中…', exact=True)).to_be_disabled()
         assert fixture.install_posts == 1
         await page.reload()
-        await expect(node_card.get_by_role('button', name='后台安装中…', exact=True)).to_be_disabled()
+        await expect(node_card.get_by_role('button', name='后台同步中…', exact=True)).to_be_disabled()
         fixture.install_complete = True
-        await expect(node_card.get_by_role('button', name='准备运行组件', exact=True)).to_be_enabled(timeout=10000)
+        await expect(node_card.get_by_role('button', name='检查并同步组件', exact=True)).to_be_enabled(timeout=10000)
         assert fixture.install_posts == 1
         fixture.install_complete = False
         fixture.fail_install_response = True
-        await node_card.get_by_role('button', name='准备运行组件', exact=True).click()
+        await node_card.get_by_role('button', name='检查并同步组件', exact=True).click()
         await installation.get_by_role('button', name='开始准备', exact=True).click()
         await expect(installation.get_by_role('alert')).to_contain_text('安装提交响应中断')
         await installation.get_by_role('button', name='取消', exact=True).click()
-        await expect(node_card.get_by_role('button', name='后台安装中…', exact=True)).to_be_disabled()
+        await expect(node_card.get_by_role('button', name='后台同步中…', exact=True)).to_be_disabled()
         fixture.install_complete = True
-        await expect(node_card.get_by_role('button', name='准备运行组件', exact=True)).to_be_enabled(timeout=10000)
+        await expect(node_card.get_by_role('button', name='检查并同步组件', exact=True)).to_be_enabled(timeout=10000)
         assert fixture.install_posts == 2
         await select(page, '任务账号', '合成账号 1')
         await select(page, '执行节点', '上海执行节点')
@@ -176,6 +182,8 @@ async def run(output: Path, gateway: Path) -> dict:
         await confirmation.get_by_role('button', name='核对原操作', exact=True).click()
         await expect(confirmation).to_have_count(0)
         assert len(fixture.writes) == 1 and fixture.operation_reads == 1
+        await expect(page.locator('.migration-status')).to_contain_text('释放对应节点空间后继续原迁移')
+        await expect(page.locator('.migration-status')).to_contain_text('传输资料')
         await page.get_by_role('button', name='继续原迁移', exact=True).click()
         await expect(page.locator('.migration-status')).to_contain_text('归属已切换')
         await expect(page.get_by_role('button', name='取消迁移', exact=True)).to_have_count(0)
@@ -211,10 +219,16 @@ async def run(output: Path, gateway: Path) -> dict:
         await start.click()
         await expect(confirmation).to_contain_text('合成账号 2')
         await confirmation.get_by_role('button', name='取消', exact=True).click()
+        fixture.install_complete = False
+        await page.get_by_role('button', name='同步全部节点', exact=True).click()
+        await expect(node_card).to_contain_text('备份节点资料')
+        await expect(node_card).to_contain_text('old → new')
+        assert fixture.synchronize_posts == 1
+        await page.screenshot(path=str(output / 'node-synchronization-390.png'), full_page=True)
         assert not errors and not fixture.unexpected and not fixture.external, (errors, fixture.unexpected, fixture.external)
         await browser.close()
     return {'passed': True, 'scenes': ['后台安装提交后关闭弹窗', '刷新页面恢复安装状态及轮询完成', '安装提交响应中断后只读核对', '冻结确认与取消零写入', '提交未知只核对原操作', '提交后继续目标激活',
-        '提交前取消保持源分配版本', '账号切换隔离', '停用独立账号迁移入口', '1440和390视口'], 'errors': errors, 'real_model_requests': 0}
+        '提交前取消保持源分配版本', '账号切换隔离', '停用独立账号迁移入口', '1440和390视口', '统一同步后台受理与阶段显示', '迁移固定原因与恢复动作'], 'errors': errors, 'real_model_requests': 0}
 
 
 def main() -> None:

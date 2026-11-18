@@ -50,7 +50,7 @@ class NodeArchiveTransfer:
         """
         self._identity(operation_id, attempt_id, checksum, size)
         path = f'/data/node-migrations/{operation_id}/exports/{attempt_id}.tar'
-        return self._download(path, attempt_id + '.tar', target, checksum, size)
+        return self._download(path, attempt_id + '.tar', target, checksum, size, migration=True)
 
     def download_snapshot(self, environment_id: str, operation_id: str, snapshot_id: str,
                           target: Path, checksum: str, size: int, *, run: bool = False) -> dict:
@@ -92,7 +92,7 @@ class NodeArchiveTransfer:
         path = f'/data/{namespace}/{environment_id}/{operation_id}/verifications/{attempt_id}/report.json'
         return self._download(path, 'report.json', target, checksum, size)
 
-    def _download(self, path: str, name: str, target: Path, checksum: str, size: int) -> dict:
+    def _download(self, path: str, name: str, target: Path, checksum: str, size: int, *, migration: bool = False) -> dict:
         parent = target.parent.lstat()
         if target.parent.is_symlink() or parent.st_uid != os.geteuid() or parent.st_mode & 0o077:
             raise ValueError('中央迁移中转目录必须为操作私有目录')
@@ -101,13 +101,13 @@ class NodeArchiveTransfer:
             with os.fdopen(descriptor, 'wb') as output, self._client() as client, client.stream('GET', self.url,
                     params={'path': path}, headers={'accept-encoding': 'identity'}) as response:
                 response.raise_for_status()
-                deadline = time.monotonic() + 600
+                deadline = None if migration else time.monotonic() + 600
 
                 def bounded():
                     count = 0
                     for chunk in response.iter_raw(chunk_size=64 * 1024):
                         count += len(chunk)
-                        if count > size + 1024 * 1024 or time.monotonic() > deadline:
+                        if count > size + 1024 * 1024 or (deadline is not None and time.monotonic() > deadline):
                             raise ValueError('节点导出包超出传输大小或时间上限')
                         yield chunk
 
@@ -164,7 +164,37 @@ class NodeArchiveTransfer:
         """
         self._identity(operation_id, transfer_id, checksum, size)
         path = f'/data/node-migrations/{operation_id}/imports/{transfer_id}'
-        return self._upload(path,'environment.tar',source,checksum,size)
+        return self._upload(path,'environment.tar',source,checksum,size,migration=True)
+
+    def upload_preparation_profile(self, operation_id: str, account_id: int, source: Path, checksum: str, size: int) -> dict:
+        """向原节点准备目录上传一个profile。
+
+        :param operation_id: 原准备操作。
+        :param account_id: 固定账号。
+        :param source: 已过滤私有文件。
+        :param checksum: 实际摘要。
+        :param size: 实际大小。
+        :return: 上传回执。
+        """
+        self._identity(operation_id, operation_id, checksum, size)
+        if type(account_id) is not int or account_id < 1:
+            raise ValueError('节点准备账号无效')
+        return self._upload(f'/data/node-preparations/{operation_id}/{account_id}', 'profile-' + checksum + '.json',
+            source, checksum, size, migration=True)
+
+    def upload_profile(self, operation_id: str, transfer_id: str, source: Path, checksum: str, size: int) -> dict:
+        """向原迁移暂存上传固定摘要profile文件。
+
+        :param operation_id: 原迁移。
+        :param transfer_id: 原暂存尝试。
+        :param source: 私有已投影文件。
+        :param checksum: 精确摘要。
+        :param size: 实际字节。
+        :return: 上传回执。
+        """
+        self._identity(operation_id, transfer_id, checksum, size)
+        return self._upload(f'/data/node-migrations/{operation_id}/imports/{transfer_id}',
+            'profile-' + checksum + '.json', source, checksum, size, migration=True)
 
     def upload_scenario_input(self, environment_id: str, operation_id: str, snapshot_id: str,
                               source: Path, checksum: str, size: int) -> dict:
@@ -202,14 +232,14 @@ class NodeArchiveTransfer:
         path=f'/data/node-runs/{environment_id}/{operation_id}/scenario-inputs/exports/{snapshot_id}.tar'
         return self._download(path,snapshot_id+'.tar',target,checksum,size)
 
-    def _upload(self, path: str, name: str, source: Path, checksum: str, size: int) -> dict:
+    def _upload(self, path: str, name: str, source: Path, checksum: str, size: int, *, migration: bool = False) -> dict:
         descriptor = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
         with os.fdopen(descriptor, 'rb') as input_file:
             metadata = os.fstat(input_file.fileno())
             if (not S_ISREG(metadata.st_mode) or metadata.st_size != size or metadata.st_mode & 0o077
                     or metadata.st_uid != os.geteuid() or metadata.st_nlink != 1):
                 raise ValueError('中央迁移包的类型、大小或权限无效')
-            deadline = time.monotonic() + 600
+            deadline = None if migration else time.monotonic() + 600
 
             def chunks():
                 member = tarfile.TarInfo(name)
@@ -218,7 +248,7 @@ class NodeArchiveTransfer:
                 digest, count = hashlib.sha256(), 0
                 while chunk := input_file.read(1024 * 1024):
                     count += len(chunk)
-                    if count > size or time.monotonic() > deadline:
+                    if count > size or (deadline is not None and time.monotonic() > deadline):
                         raise ValueError('中央迁移包发生变化或超出传输时间')
                     digest.update(chunk)
                     yield chunk

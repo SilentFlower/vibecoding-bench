@@ -52,6 +52,9 @@ from cluster_workspace import NodeWorkspaceSnapshots, WorkspaceSnapshotReference
 from cluster_verification import NodeVerifications, RunVerificationStart, VerificationReference, VerificationStart
 from runtime_files import directory_fd, private_directory
 from system_update_contract import strict_json
+from cluster_restart import PreservedRestart, restart_preserved
+from cluster_preparation_files import PreparationFiles, prepare_from_files, stage_preparation_files
+from cluster_migration_errors import migration_failure
 
 
 class _GrantClosure(ExecutionScope):
@@ -121,6 +124,11 @@ def create_node_app(executor: NodeExecution, host: NodeRuntimeHost, token: str, 
                     raise ValueError('节点健康检查输入无效')
                 value = {'protocol': 1, 'node_key': executor.node_key, 'deployment': executor.deployment,
                     'release': release, 'state': 'ready'}
+            elif operation in ('stage-preparation-files', 'prepare-files'):
+                request = PreparationFiles.model_validate(strict_json(raw, 2 * 1024 * 1024))
+                value = (stage_preparation_files if operation == 'stage-preparation-files' else prepare_from_files)(executor, request)
+            elif operation == 'restart-preserved':
+                value = restart_preserved(executor, PreservedRestart.model_validate(strict_json(raw, 16384)))
             elif operation in ('grant-create', 'grant-renew', 'grant-get', 'grant-close'):
                 model = ExecutionGrant if operation in ('grant-create', 'grant-renew') else (
                     _GrantClosure if operation == 'grant-close' else ExecutionScope)
@@ -279,7 +287,10 @@ def create_node_app(executor: NodeExecution, host: NodeRuntimeHost, token: str, 
                 for frame in extract_tb(error.__traceback__)[-8:])
             logging.getLogger(__name__).error('节点执行失败 operation=%s error_type=%s frames=%s',
                 operation if re.fullmatch('[a-z-]{1,80}', operation) else 'invalid', type(error).__name__, frames)
-            return {'ok': False, 'reason': 'node_preparation_failed', 'error_type': type(error).__name__}
+            result = {'ok': False, 'reason': 'node_preparation_failed', 'error_type': type(error).__name__}
+            if operation in ('fence', 'export', 'verify-import', 'prepare-import', 'revoke-import', 'restore-source', 'stage-import'):
+                result['failure'] = migration_failure(error, operation)
+            return result
 
     @app.post('/operations/{operation}')
     async def operation_request(operation: str, request: Request):

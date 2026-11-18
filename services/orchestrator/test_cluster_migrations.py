@@ -32,6 +32,8 @@ class NodeMigrationTests(unittest.TestCase):
                     "VALUES(?,'synthetic',1,?,4,'ready',2)", ('e' * 32, fingerprint))
                 self.target = connection.execute("INSERT INTO cluster_nodes(node_key,name,kind,config_json,created_at) VALUES(?,'目标','ssh','{}',0)",
                     ('b' * 32,)).lastrowid
+                connection.execute('UPDATE cluster_nodes SET preparation_json=? WHERE id=?',
+                    (json.dumps({'state': 'prepared', 'release': 'synthetic-release'}), self.target))
                 self.environment = dict(connection.execute('SELECT * FROM account_environments').fetchone())
         finally:
             connection.close()
