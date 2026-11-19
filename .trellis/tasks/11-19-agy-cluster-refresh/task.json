@@ -1,0 +1,67 @@
+{
+  "id": "agy-cluster-refresh",
+  "name": "agy-cluster-refresh",
+  "title": "AGY 集成分支适配最新 Flower2API 集群改动",
+  "description": "保留最新节点自动同步与暂停迁移能力，修复AGY合并冲突并完成共存回归。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": "platform",
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-19",
+  "completedAt": "2026-11-19",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-19T04:04:24Z",
+    "blockers": []
+  },
+  "branch": "merge/agy-flower2api-refresh",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-11-19T03:37:51Z",
+      "contextKey": "claude_64cf216a-c5d1-4c58-8cc2-e9f075aca396",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "48f6029e19bebfa89a541d3703801f6c861678c0",
+        "status": [],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "48f6029e19bebfa89a541d3703801f6c861678c0",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "1da4a00c0d2b609fbff8df95dbbaa78da849defc9117e7e23735f5d97cc56573"
+          }
+        ],
+        "fingerprint": "9f8d2e705a044bdb753be9e1578cf0e2f4845f51af504eb4228fe7be4251a8ab"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "兼容合并最新 Flower2API 集群与 AGY 并推送集成分支",
+      "完成共存回归、冻结定义与旧库兼容证据核对",
+      "通过 Check-All 与 Spec 复核"
+    ],
+    "partialStep": null,
+    "nextStep": "任务完成",
+    "notes": "编排覆盖2074项，网关983项通过，部署274项通过，页面42场景通过。首轮1项失败经单项与同模块31项复验通过，首次失败原因仍待确认。",
+    "updatedAt": "2026-11-19T04:04:24Z"
+  }
+}
