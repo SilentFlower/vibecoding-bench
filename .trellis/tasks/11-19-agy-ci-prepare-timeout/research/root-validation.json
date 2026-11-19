@@ -203,5 +203,509 @@
         }
       }
     }
+  },
+  "shutdown_validation": {
+    "scope": "探针物理退出观察窗口；运行时停止预算保持",
+    "source_sha256": {
+      "deploy/flower2api/verify_agy_runtime.py": "bde4f0ffc0298895df4343c33f721871da1525a81e286ce003e45fd86eaf0b75",
+      "deploy/flower2api/test_system_agy_probe.py": "5897bec966030be782401c5329657ffe510efa12df01834d190d20907a065bda",
+      ".trellis/tasks/11-19-agy-ci-prepare-timeout/research/verify_budget_alignment.py": "78b68c105aca5aa3a494ec5e214580aa11f5643b46f8bd98380062a4675e070f"
+    },
+    "regression": {
+      "old_window_failed": true,
+      "new_window_passed": true,
+      "isolated_tests": 7
+    },
+    "release_entry": {
+      "host": 143,
+      "host_skipped": 1,
+      "orchestrator": 25,
+      "publication": 86,
+      "passed": true
+    },
+    "fixture": {
+      "passed": true,
+      "scope": "源码挂载的受控慢退出夹具",
+      "results": {
+        "baseline_15s": {
+          "retire_seconds": null,
+          "passed": false,
+          "error": "AGY物理进程收口未完成",
+          "evidence": {
+            "event": "agy-probe-failure",
+            "phase": "status",
+            "credential_generation": 2,
+            "capture_failed": [],
+            "state": {
+              "Running": true,
+              "OOMKilled": false,
+              "ExitCode": 0
+            },
+            "event_counts": {
+              "supervisor_ready": 1,
+              "prepared": 2,
+              "job_finalized": 2,
+              "status": 1
+            },
+            "error_codes": {},
+            "runtime": {
+              "processes": {
+                "other": 2,
+                "supervisor": 1,
+                "kernel": 1,
+                "observer": 1,
+                "native": 1
+              },
+              "memory_events": {
+                "max": 0,
+                "oom": 0,
+                "oom_kill": 0
+              },
+              "stages": {
+                "worker_config": 1,
+                "kernel_lock": 1,
+                "kernel_error": 0,
+                "input_pipe": 1,
+                "listener_identity": 1
+              },
+              "startup_errors": {}
+            }
+          },
+          "seconds": 38.326
+        },
+        "aligned_90s": {
+          "retire_seconds": 45.438225076999515,
+          "passed": true,
+          "credential_generations": [
+            1,
+            2
+          ],
+          "image_decode_calls": 1,
+          "terminated": true,
+          "model_submissions": 0,
+          "prepare_seconds": [
+            8.888,
+            8.73
+          ],
+          "shutdown_seconds": 45.795,
+          "shutdown_deadline_seconds": 90,
+          "seconds": 64.5
+        }
+      }
+    },
+    "images": {
+      "normal": {
+        "passed": true,
+        "evidence": "native_offline",
+        "package_source": "image",
+        "network": "none",
+        "model_submissions": 0,
+        "source_sha256": "39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43",
+        "credential_generations": [
+          1,
+          2
+        ],
+        "image_scope": "account_workers",
+        "prepare_seconds": [
+          12.368,
+          9.548
+        ],
+        "prepare_deadline_seconds": 120,
+        "shutdown_seconds": 0.727,
+        "shutdown_deadline_seconds": 90,
+        "image_bytes": 265700040,
+        "image_decode_calls": 1,
+        "controller": {
+          "Rss": 22208,
+          "Pss": 13541,
+          "Pss_Anon": 11760,
+          "Pss_File": 1781,
+          "Pss_Shmem": 0,
+          "Shared_Clean": 10436,
+          "Shared_Dirty": 0,
+          "Private_Clean": 12,
+          "Private_Dirty": 11760,
+          "Anonymous": 11760,
+          "Swap": 0,
+          "USS": 11772,
+          "threads": 5
+        },
+        "worker": [
+          {
+            "controller": {
+              "Rss": 24740,
+              "Pss": 15717,
+              "Pss_Anon": 13676,
+              "Pss_File": 2041,
+              "Pss_Shmem": 0,
+              "Shared_Clean": 11064,
+              "Shared_Dirty": 0,
+              "Private_Clean": 0,
+              "Private_Dirty": 13676,
+              "Anonymous": 13676,
+              "Swap": 0,
+              "USS": 13676,
+              "threads": 5
+            },
+            "native": {
+              "Rss": 192188,
+              "Pss": 190467,
+              "Pss_Anon": 96828,
+              "Pss_File": 311,
+              "Pss_Shmem": 93328,
+              "Shared_Clean": 1968,
+              "Shared_Dirty": 0,
+              "Private_Clean": 32,
+              "Private_Dirty": 190188,
+              "Anonymous": 96828,
+              "Swap": 0,
+              "USS": 190220,
+              "threads": 17
+            },
+            "observer": {
+              "Rss": 5316,
+              "Pss": 1462,
+              "Pss_Anon": 728,
+              "Pss_File": 734,
+              "Pss_Shmem": 0,
+              "Shared_Clean": 4588,
+              "Shared_Dirty": 0,
+              "Private_Clean": 0,
+              "Private_Dirty": 728,
+              "Anonymous": 728,
+              "Swap": 0,
+              "USS": 728,
+              "threads": 1
+            }
+          }
+        ],
+        "cgroup_memory": {
+          "source": "cgroup_v2",
+          "current_bytes": 429535232,
+          "max_bytes": 805306368,
+          "peak_bytes": 435589120,
+          "swap_bytes": 0
+        },
+        "crash": false,
+        "terminated": true
+      },
+      "crash": {
+        "passed": true,
+        "evidence": "native_offline",
+        "package_source": "image",
+        "network": "none",
+        "model_submissions": 0,
+        "source_sha256": "39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43",
+        "credential_generations": [
+          1,
+          2
+        ],
+        "image_scope": "account_workers",
+        "prepare_seconds": [
+          12.372,
+          9.548
+        ],
+        "prepare_deadline_seconds": 120,
+        "shutdown_seconds": 0.405,
+        "shutdown_deadline_seconds": 90,
+        "image_bytes": 265700040,
+        "image_decode_calls": 1,
+        "controller": {
+          "Rss": 22232,
+          "Pss": 13536,
+          "Pss_Anon": 11764,
+          "Pss_File": 1772,
+          "Pss_Shmem": 0,
+          "Shared_Clean": 10468,
+          "Shared_Dirty": 0,
+          "Private_Clean": 0,
+          "Private_Dirty": 11764,
+          "Anonymous": 11764,
+          "Swap": 0,
+          "USS": 11764,
+          "threads": 5
+        },
+        "worker": [
+          {
+            "controller": {
+              "Rss": 24832,
+              "Pss": 15768,
+              "Pss_Anon": 13676,
+              "Pss_File": 2092,
+              "Pss_Shmem": 0,
+              "Shared_Clean": 11128,
+              "Shared_Dirty": 0,
+              "Private_Clean": 28,
+              "Private_Dirty": 13676,
+              "Anonymous": 13676,
+              "Swap": 0,
+              "USS": 13704,
+              "threads": 5
+            },
+            "native": {
+              "Rss": 197192,
+              "Pss": 195491,
+              "Pss_Anon": 101728,
+              "Pss_File": 307,
+              "Pss_Shmem": 93456,
+              "Shared_Clean": 1944,
+              "Shared_Dirty": 0,
+              "Private_Clean": 0,
+              "Private_Dirty": 195248,
+              "Anonymous": 101728,
+              "Swap": 0,
+              "USS": 195248,
+              "threads": 17
+            },
+            "observer": {
+              "Rss": 5320,
+              "Pss": 1466,
+              "Pss_Anon": 732,
+              "Pss_File": 734,
+              "Pss_Shmem": 0,
+              "Shared_Clean": 4588,
+              "Shared_Dirty": 0,
+              "Private_Clean": 0,
+              "Private_Dirty": 732,
+              "Anonymous": 732,
+              "Swap": 0,
+              "USS": 732,
+              "threads": 1
+            }
+          }
+        ],
+        "cgroup_memory": {
+          "source": "cgroup_v2",
+          "current_bytes": 442470400,
+          "max_bytes": 805306368,
+          "peak_bytes": 443285504,
+          "swap_bytes": 0
+        },
+        "crash": true,
+        "terminated": true
+      }
+    },
+    "formal_ci": {
+      "state": "success",
+      "run": 44479235691,
+      "source": "166ccdc1ed1258aa277e21a84470b4bdd9f5599a",
+      "url": "https://github.com/SilentFlower/vibecoding-bench/actions/runs/44479235691",
+      "native": {
+        "passed": true,
+        "normal": {
+          "passed": true,
+          "evidence": "native_offline",
+          "package_source": "image",
+          "network": "none",
+          "model_submissions": 0,
+          "source_sha256": "39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43",
+          "credential_generations": [
+            1,
+            2
+          ],
+          "image_scope": "account_workers",
+          "prepare_seconds": [
+            8.004,
+            52.822
+          ],
+          "prepare_deadline_seconds": 120,
+          "shutdown_seconds": 45.198,
+          "shutdown_deadline_seconds": 90,
+          "image_bytes": 265700040,
+          "image_decode_calls": 1,
+          "controller": {
+            "Rss": 22952,
+            "Pss": 15826,
+            "Pss_Anon": 11876,
+            "Pss_File": 3950,
+            "Pss_Shmem": 0,
+            "Shared_Clean": 10804,
+            "Shared_Dirty": 0,
+            "Private_Clean": 272,
+            "Private_Dirty": 11876,
+            "Anonymous": 11876,
+            "Swap": 0,
+            "USS": 12148,
+            "threads": 5
+          },
+          "worker": [
+            {
+              "controller": {
+                "Rss": 25128,
+                "Pss": 17905,
+                "Pss_Anon": 13688,
+                "Pss_File": 4217,
+                "Pss_Shmem": 0,
+                "Shared_Clean": 10964,
+                "Shared_Dirty": 0,
+                "Private_Clean": 476,
+                "Private_Dirty": 13688,
+                "Anonymous": 13688,
+                "Swap": 0,
+                "USS": 14164,
+                "threads": 5
+              },
+              "native": {
+                "Rss": 193672,
+                "Pss": 192215,
+                "Pss_Anon": 98592,
+                "Pss_File": 555,
+                "Pss_Shmem": 93068,
+                "Shared_Clean": 1880,
+                "Shared_Dirty": 0,
+                "Private_Clean": 68,
+                "Private_Dirty": 191724,
+                "Anonymous": 98592,
+                "Swap": 0,
+                "USS": 191792,
+                "threads": 10
+              },
+              "observer": {
+                "Rss": 5488,
+                "Pss": 2216,
+                "Pss_Anon": 732,
+                "Pss_File": 1484,
+                "Pss_Shmem": 0,
+                "Shared_Clean": 4696,
+                "Shared_Dirty": 0,
+                "Private_Clean": 60,
+                "Private_Dirty": 732,
+                "Anonymous": 732,
+                "Swap": 0,
+                "USS": 792,
+                "threads": 1
+              }
+            }
+          ],
+          "cgroup_memory": {
+            "source": "cgroup_v2",
+            "current_bytes": 404402176,
+            "max_bytes": 805306368,
+            "peak_bytes": 405377024,
+            "swap_bytes": 0
+          },
+          "crash": false,
+          "terminated": true
+        },
+        "crash": {
+          "passed": true,
+          "evidence": "native_offline",
+          "package_source": "image",
+          "network": "none",
+          "model_submissions": 0,
+          "source_sha256": "39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43",
+          "credential_generations": [
+            1,
+            2
+          ],
+          "image_scope": "account_workers",
+          "prepare_seconds": [
+            8.005,
+            52.852
+          ],
+          "prepare_deadline_seconds": 120,
+          "shutdown_seconds": 0.277,
+          "shutdown_deadline_seconds": 90,
+          "image_bytes": 265700040,
+          "image_decode_calls": 1,
+          "controller": {
+            "Rss": 22892,
+            "Pss": 15642,
+            "Pss_Anon": 11876,
+            "Pss_File": 3766,
+            "Pss_Shmem": 0,
+            "Shared_Clean": 10968,
+            "Shared_Dirty": 0,
+            "Private_Clean": 48,
+            "Private_Dirty": 11876,
+            "Anonymous": 11876,
+            "Swap": 0,
+            "USS": 11924,
+            "threads": 5
+          },
+          "worker": [
+            {
+              "controller": {
+                "Rss": 25140,
+                "Pss": 17916,
+                "Pss_Anon": 13684,
+                "Pss_File": 4232,
+                "Pss_Shmem": 0,
+                "Shared_Clean": 10904,
+                "Shared_Dirty": 0,
+                "Private_Clean": 552,
+                "Private_Dirty": 13684,
+                "Anonymous": 13684,
+                "Swap": 0,
+                "USS": 14236,
+                "threads": 5
+              },
+              "native": {
+                "Rss": 193000,
+                "Pss": 191447,
+                "Pss_Anon": 97824,
+                "Pss_File": 615,
+                "Pss_Shmem": 93008,
+                "Shared_Clean": 2000,
+                "Shared_Dirty": 0,
+                "Private_Clean": 104,
+                "Private_Dirty": 190896,
+                "Anonymous": 97824,
+                "Swap": 0,
+                "USS": 191000,
+                "threads": 9
+              },
+              "observer": {
+                "Rss": 5488,
+                "Pss": 2189,
+                "Pss_Anon": 732,
+                "Pss_File": 1457,
+                "Pss_Shmem": 0,
+                "Shared_Clean": 4732,
+                "Shared_Dirty": 0,
+                "Private_Clean": 24,
+                "Private_Dirty": 732,
+                "Anonymous": 732,
+                "Swap": 0,
+                "USS": 756,
+                "threads": 1
+              }
+            }
+          ],
+          "cgroup_memory": {
+            "source": "cgroup_v2",
+            "current_bytes": 402878464,
+            "max_bytes": 805306368,
+            "peak_bytes": 405778432,
+            "swap_bytes": 0
+          },
+          "crash": true,
+          "terminated": true
+        },
+        "real_model_requests": 0
+      },
+      "candidate": {
+        "id": 14508780167,
+        "node_id": "MDg6QXJ0aWZhY3QxNDUwODc4MDE2Nw==",
+        "name": "v3-candidate-44479235691-1",
+        "size_in_bytes": 1352610731,
+        "url": "https://api.github.com/repos/SilentFlower/vibecoding-bench/actions/artifacts/14508780167",
+        "archive_download_url": "https://api.github.com/repos/SilentFlower/vibecoding-bench/actions/artifacts/14508780167/zip",
+        "expired": false,
+        "digest": "sha256:ae7c94e17fcdc44badbe5ec69627407ed96e989c6d1955a2cdd300a34a8b2e9e",
+        "created_at": "2026-11-19T07:32:57Z",
+        "updated_at": "2026-11-19T07:32:57Z",
+        "expires_at": "2026-11-20T07:32:19Z",
+        "workflow_run": {
+          "id": 44479235691,
+          "repository_id": 1248116880,
+          "head_repository_id": 1248116880,
+          "head_branch": "flower2api",
+          "head_sha": "166ccdc1ed1258aa277e21a84470b4bdd9f5599a"
+        }
+      },
+      "manifest_sha256": "aad6cdaff4b395abbb994e221fcbf0b1a0b4ae296140d2d06ed8cfdc1964a47f",
+      "manifest_source_verified": true
+    }
   }
 }

@@ -1,4 +1,4 @@
-"""在独立源码夹具中延迟首代退役，对照既有与运行时上限对齐的探针预算。"""
+"""在独立源码夹具中延迟换代或shutdown退役，对照探针与生命周期预算。"""
 import argparse
 import io
 import json
@@ -19,6 +19,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--image', required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--shutdown', action='store_true', help='对照物理退出观察窗口')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='agy-budget-fixture-') as temporary:
         package = Path(temporary)
@@ -33,24 +34,29 @@ def main() -> None:
         source = path.read_text()
         marker = '        self.ready=False\n'
         assert source.count(marker) == 1
-        source = source.replace(marker, "        fixture_begin=time.monotonic()\n        if self.owner.cfg['credential_generation']==1:time.sleep(45)\n" + marker)
+        condition = "reason=='shutdown' and self.owner.cfg['credential_generation']==2" if args.shutdown else "self.owner.cfg['credential_generation']==1"
+        source = source.replace(marker, "        fixture_begin=time.monotonic()\n        if " + condition + ":time.sleep(45)\n" + marker)
         marker = '        return evidence\n'
         assert source.count(marker) == 1
-        source = source.replace(marker, "        if self.owner.cfg['credential_generation']==1:Path('/state/fixture-retire-seconds.json').write_text(str(time.monotonic()-fixture_begin))\n" + marker)
+        source = source.replace(marker, "        if " + condition + ":Path('/state/fixture-retire-seconds.json').write_text(str(time.monotonic()-fixture_begin))\n" + marker)
         path.write_text(source)
         # 固定原失败版本，后续修复完成后仍可重跑同一个预算对照。
-        source = subprocess.check_output(['git', 'show',
-            '1435bb2a1c263430d5854f93fff598d3c0e95532:deploy/flower2api/verify_agy_runtime.py'], text=True)
+        revision = 'c462479a9800f71b1badd14b1f3832482608a09b' if args.shutdown else '1435bb2a1c263430d5854f93fff598d3c0e95532'
+        source = subprocess.check_output(['git', 'show', revision + ':deploy/flower2api/verify_agy_runtime.py'], text=True)
         baseline_path = package / 'baseline_probe.py'
         baseline_path.write_text(source)
         spec = spec_from_file_location('agy_budget_baseline_probe', baseline_path)
         baseline = module_from_spec(spec)
         spec.loader.exec_module(baseline)
-        assert source.count('time.time()+45') == source.count('time.monotonic()+50') == 1
+        if args.shutdown:
+            assert source.count('time.monotonic()+15') == 1 and current.SHUTDOWN_SECONDS == 90
+        else:
+            assert source.count('time.time()+45') == source.count('time.monotonic()+50') == 1
         assert current.PREPARE_SECONDS == 120
         original = ContainerCollection.run
         results = {}
-        for name, module in [('baseline_45s', baseline), ('aligned_120s', current)]:
+        baseline_name, aligned_name = ('baseline_15s', 'aligned_90s') if args.shutdown else ('baseline_45s', 'aligned_120s')
+        for name, module in [(baseline_name, baseline), (aligned_name, current)]:
             facts = {}
 
             def run(manager, *items, **options):
@@ -77,19 +83,27 @@ def main() -> None:
                     facts.update(passed=value['passed'], credential_generations=value['credential_generations'],
                         image_decode_calls=value['image_decode_calls'], terminated=value['terminated'], model_submissions=value['model_submissions'])
                     facts['prepare_seconds'] = value.get('prepare_seconds')
+                    if args.shutdown:
+                        facts['shutdown_seconds'] = value['shutdown_seconds']
+                        facts['shutdown_deadline_seconds'] = value['shutdown_deadline_seconds']
                 except ValueError as failure:
                     facts.update(passed=False, error=str(failure))
                     facts['evidence'] = json.loads(error.getvalue().splitlines()[0])
             facts['seconds'] = round(time.monotonic() - started, 3)
             results[name] = facts
             print(json.dumps({'mode': name, **facts}, ensure_ascii=False), flush=True)
-        assert results['baseline_45s']['passed'] is False
-        assert results['baseline_45s']['evidence']['credential_generation'] == 2
-        assert results['aligned_120s']['passed'] is True
-        assert 45 <= results['aligned_120s']['retire_seconds'] <= 60
-        assert results['aligned_120s']['model_submissions'] == 0
+        assert results[baseline_name]['passed'] is False
+        assert results[baseline_name]['evidence']['credential_generation'] == 2
+        assert results[aligned_name]['passed'] is True
+        assert 45 <= results[aligned_name]['retire_seconds'] <= 60
+        assert results[aligned_name]['model_submissions'] == 0
+        if args.shutdown:
+            assert 45 <= results[aligned_name]['shutdown_seconds'] <= 90
+            assert results[baseline_name]['evidence']['phase'] == 'status'
+            recorded = json.loads(Path(__file__).with_name('root-validation.json').read_text())
+            assert results[baseline_name]['evidence'] == recorded['import_fix_validation']['formal_ci']['diagnostic']
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(json.dumps({'passed': True, 'scope': '源码挂载的受控慢退役夹具', 'results': results}, ensure_ascii=False, indent=2) + '\n')
+        args.output.write_text(json.dumps({'passed': True, 'scope': '源码挂载的受控慢退出夹具' if args.shutdown else '源码挂载的受控慢退役夹具', 'results': results}, ensure_ascii=False, indent=2) + '\n')
 
 
 if __name__ == '__main__':
