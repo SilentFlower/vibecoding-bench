@@ -54,6 +54,7 @@ class Fixture(BaseHTTPRequestHandler):
             require(self.headers.get('Authorization')=='Bearer '+SECRET,'管理证明错误')
             value=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
             document=value['document'];document['token']['access_token']='synthetic-refreshed-'+str(value['generation'])
+            document['token']['expiry']='2099-01-01T00:00:00Z'
             Fixture.refreshes+=1
             self.send_response(200);self.send_header('content-type','application/json');self.end_headers()
             self.wfile.write(json.dumps({'email_address':'synthetic@example.test','document':document}).encode());return
@@ -163,6 +164,22 @@ def inside() -> dict:
         base='/v1beta/models/gemini-synthetic:'
         body={'contents':[{'role':'user','parts':[{'text':'合成问题'}]}],'generationConfig':{'temperature':.2,'topP':.8,'maxOutputTokens':128}}
         status,raw=request('/v1beta/models');require(status==200 and len(json.loads(raw)['models'])==2,'真实模型目录失败')
+        before=len(Fixture.calls)
+        for action in ('generateContent','streamGenerateContent?alt=sse'):
+            status,raw=request('/v1beta/models/gemini-unknown:'+action,body)
+            require(status==404 and json.loads(raw)['error']['status']=='NOT_FOUND','未知模型错误码错误')
+        require(len(Fixture.calls)==before,'未知模型进入发送边界')
+        catalog=database.execute('SELECT usage_data FROM accounts WHERE id=1').fetchone()[0]
+        with database:
+            database.execute("UPDATE accounts SET usage_data='{}' WHERE id=1")
+        require(request(base+'generateContent',body)[0]==503,'目录未观测时应保留503')
+        with database:
+            database.execute('UPDATE accounts SET usage_data=? WHERE id=1',(catalog,))
+            database.execute("UPDATE account_credential_states SET phase='reconcile' WHERE account_id=1")
+        require(request(base+'generateContent',body)[0]==503,'目录已知模型暂不可用时应返回503')
+        require(len(Fixture.calls)==before,'待对账模型进入发送边界')
+        with database:
+            database.execute("UPDATE account_credential_states SET phase='ready' WHERE account_id=1")
         status,raw=request(base+'generateContent',body);require(status==200 and json.loads(raw)['usageMetadata']['totalTokenCount']==7,'真实非流式聚合失败')
         status,raw=request(base+'streamGenerateContent?alt=sse',body);require(status==200 and raw.startswith(b'data: ') and b'[DONE]' not in raw,'真实SSE协议失败')
         tool=copy.deepcopy(body);tool['tools']=[{'functionDeclarations':[{'name':'synthetic_tool','parameters':{'type':'OBJECT','properties':{'x':{'type':'INTEGER'}}}}]}]
@@ -208,6 +225,10 @@ def inside() -> dict:
             database.execute("INSERT INTO account_credential_states(account_id,generation,phase,updated_at_ms) VALUES(2,1,'ready',1)")
             database.execute("INSERT INTO api_tokens(name,token,allowed_accounts,status) VALUES('two','synthetic-two-key','2','active')")
             database.execute('UPDATE accounts SET agy_system_prompt_homoglyph_enabled=1 WHERE id=1')
+        before=len(Fixture.calls)
+        require(request('/v1beta/models/claude-synthetic:generateContent',body,key='synthetic-two-key')[0]==404,
+            '其他账号的模型目录进入当前令牌范围')
+        require(len(Fixture.calls)==before,'令牌范围外的模型进入发送边界')
         candidate=copy.deepcopy(body);candidate['systemInstruction']={'parts':[{'text':'ABC system 中文'}]}
         for key,account,enabled in [('synthetic-key',1,True),('synthetic-two-key',2,False)]:
             require(request(base+'generateContent',candidate,key=key)[0]==200,'账号独立策略请求失败')
@@ -224,6 +245,18 @@ def inside() -> dict:
             current=copy.deepcopy(candidate);current['contents'][0]['parts'][0]['text']=mode
             require(request(base+'generateContent',current)[0]==503,'缺失或不匹配的策略回执被接纳')
         require(request('/v1beta/models/claude-synthetic:generateContent',body)[0]==200,'AGY上Claude模型请求失败')
+        generation=database.execute('SELECT generation FROM account_credential_states WHERE account_id=1').fetchone()[0]
+        refreshes,before=Fixture.refreshes,len(Fixture.calls)
+        # 310 秒足够立即启动原生，但需要为后续的请求预算留余量。
+        with database:
+            database.execute("UPDATE accounts SET oauth_expires_at=strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '+310 seconds') WHERE id=1")
+        require(request(base+'generateContent',body)[0]==200,'临近到期的凭据未完成请求')
+        require(Fixture.refreshes==refreshes+1 and len(Fixture.calls)==before+1,'凭据预刷新次数或提交次数不符')
+        require(Fixture.calls[-1]['credential_snapshot']['credential_generation']==generation+1,'原生业务仍收到临近到期的凭据代次')
+        with database:
+            database.execute("UPDATE accounts SET oauth_expires_at=strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '+650 seconds') WHERE id=1")
+        require(request(base+'generateContent',body)[0]==200 and Fixture.refreshes==refreshes+1,
+            '有效期充足的凭据被重复刷新')
         # 从真实持久摘要按私有attempt关联，避免用当前账号资料替代历史事实。
         until=time.monotonic()+10
         while time.monotonic()<until:

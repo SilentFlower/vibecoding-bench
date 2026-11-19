@@ -28,7 +28,7 @@ use crate::service::account::{
     AccountService, AccountSlotPermit, CredentialActivity, DEFAULT_REQUEST_SLOT_UNITS,
 };
 use crate::service::agy_contract::{
-    AGY_SOURCE_SHA256, AgyAccessSnapshot, AgyModelId, AgySystemPromptPolicy,
+    AGY_REQUEST_SECONDS, AGY_SOURCE_SHA256, AgyAccessSnapshot, AgyModelId, AgySystemPromptPolicy,
 };
 use crate::service::diagnostics::agy::AgyAttemptTrace;
 use crate::service::diagnostics::{
@@ -139,7 +139,11 @@ fn gemini_error(error: AppError) -> Response {
             "API令牌无效".to_string(),
         ),
         AppError::BadRequest(message) => (StatusCode::BAD_REQUEST, "INVALID_ARGUMENT", message),
-        AppError::NotFound => (StatusCode::NOT_FOUND, "NOT_FOUND", "模型不存在".into()),
+        AppError::NotFound => (
+            StatusCode::NOT_FOUND,
+            "NOT_FOUND",
+            "模型不存在。请通过 GET /v1beta/models 查看可用模型".into(),
+        ),
         AppError::TooManyRequests(_) | AppError::AdmissionLimited { .. } => (
             StatusCode::TOO_MANY_REQUESTS,
             "RESOURCE_EXHAUSTED",
@@ -467,7 +471,7 @@ async fn generate_inner(
     let deadline = continuation
         .as_ref()
         .map(|(_, _, deadline, _)| *deadline)
-        .unwrap_or(started + Duration::from_secs(120));
+        .unwrap_or(started + Duration::from_secs(AGY_REQUEST_SECONDS as u64));
     let (account, admission, mut claim) = if let Some((account, admission, _, claim)) = continuation
     {
         (account, admission, Some(claim))

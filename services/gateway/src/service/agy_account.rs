@@ -11,9 +11,13 @@ use crate::error::AppError;
 use crate::model::account::{Account, AccountAuthType, AccountStatus};
 use crate::model::api_token::ApiToken;
 use crate::model::proxy::ProxyConnection;
-use crate::service::agy_contract::{AgyAccessSnapshot, AgyModelId};
+use crate::service::agy_contract::{AGY_REQUEST_SECONDS, AgyAccessSnapshot, AgyModelId};
 use crate::service::runtime_bridge::agy_request;
 use tokio::time::sleep;
+
+// AGY 1.5.9 离线启动实测在剩余 299 秒时要求登录，310 秒时可就绪。
+// 预留原请求预算，避免无刷新令牌的业务进程在准备或执行时触及该窗口。
+const AGY_ACCESS_VALIDITY_SECONDS: i64 = 310 + AGY_REQUEST_SECONDS;
 
 /// 将权威账号转换为原生私有输入。@param account 原账号。@return 严格原生凭据对象。
 pub(super) fn native_document(account: &Account) -> Result<Value, AppError> {
@@ -128,7 +132,7 @@ impl AccountService {
                     let current = self.store.agy_credential_state(id).await?;
                     self.resolve_agy_credentials(
                         &account,
-                        10,
+                        AGY_ACCESS_VALIDITY_SECONDS,
                         force && initial.generation == current.generation,
                     )
                     .await?;
@@ -161,7 +165,7 @@ impl AccountService {
         Err(AppError::ServiceUnavailable("AGY凭据解析等待超时".into()))
     }
 
-    /// 按平台、令牌权限和真实模型映射读取候选。@param token 当前令牌。@param model 可选公开模型。@return 合资格AGY账号。
+    /// 按令牌权限和真实模型映射读取候选；已观测目录中缺少指定模型时返回未找到。@param token 当前令牌。@param model 可选公开模型。@return 合资格AGY账号或目录错误。
     pub async fn agy_candidates(
         &self,
         token: &ApiToken,
@@ -170,21 +174,38 @@ impl AccountService {
         let allowed = token.allowed_account_ids();
         let blocked = token.blocked_account_ids();
         let mut result = Vec::new();
+        let mut has_catalog = false;
+        let mut has_model = false;
         for account in self.store.list_all_platforms().await? {
             if !account.is_antigravity()
-                || account.status != AccountStatus::Active
                 || blocked.contains(&account.id)
                 || (!allowed.is_empty() && !allowed.contains(&account.id))
+            {
+                continue;
+            }
+            if let Some(name) = model {
+                // 先核对令牌可见目录，停用或冷却中的已知模型仍走原可用性判断。
+                if Self::agy_model(&account, name).is_none() {
+                    has_catalog |= account.usage_data["capabilities"]["model_mappings"]
+                        .as_object()
+                        .is_some_and(|mapping| !mapping.is_empty());
+                    continue;
+                }
+                has_model = true;
+            }
+            if account.status != AccountStatus::Active
                 || account
                     .rate_limit_reset_at
                     .is_some_and(|until| until > Utc::now())
-                || model.is_some_and(|name| Self::agy_model(&account, name).is_none())
             {
                 continue;
             }
             if self.store.agy_credential_state(account.id).await?.phase == "ready" {
                 result.push(account);
             }
+        }
+        if has_catalog && !has_model {
+            return Err(AppError::NotFound);
         }
         let counts = self.active_request_counts().await;
         result.sort_by_key(|account| (counts.get(&account.id).copied().unwrap_or(0), account.id));

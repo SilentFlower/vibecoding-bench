@@ -10,6 +10,9 @@ use crate::service::runtime_transport::PreparedRequest;
 pub const AGY_SOURCE_SHA256: &str =
     "39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43";
 
+/// 公共生成请求共用的原生执行预算。
+pub(super) const AGY_REQUEST_SECONDS: i64 = 120;
+
 /// 首版固定映射标识，字符表由原生适配的受管理资源持有。
 pub const AGY_SYSTEM_PROMPT_RULE: &str = "new-api-homoglyph-v1";
 
