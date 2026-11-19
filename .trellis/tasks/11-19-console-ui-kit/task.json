@@ -1,0 +1,46 @@
+{
+  "id": "console-ui-kit",
+  "name": "console-ui-kit",
+  "title": "控制台组件库与主题运行时",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "web",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-19",
+  "completedAt": "2026-11-19",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-19T15:58:00Z",
+    "blockers": []
+  },
+  "branch": "feat/console-ui-revamp",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-19-console-ui-revamp",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-19T23:58:00+08:00",
+    "completedSteps": [
+      "规划评审",
+      "主题运行时与 token",
+      "组件改写与新增组件",
+      "演示页与 verify_ui_kit",
+      "回归分诊",
+      "规范同步",
+      "Check-All 通过"
+    ],
+    "partialStep": null,
+    "nextStep": "子任务 2（外壳与通用业务组件）规划评审",
+    "notes": ""
+  }
+}

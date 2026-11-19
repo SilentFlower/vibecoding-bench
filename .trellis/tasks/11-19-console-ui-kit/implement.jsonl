@@ -1,0 +1,8 @@
+{"file": ".trellis/spec/web/frontend/ui-guidelines.md", "reason": "控件签名、视觉 token、原生资源白名单与测试命令的现行合同，本任务要改写其 token 与组件章节"}
+{"file": ".trellis/spec/web/frontend/frontend-guidelines.md", "reason": "apps/web 技术栈与通用前端约定"}
+{"file": ".trellis/spec/legacy-web/frontend/component-guidelines.md", "reason": "原生页样式走 CSS 变量、固定亮色等约定；共享 ui-foundation.css / pagination.css / sprite 会影响原生页"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "组件原地演进、避免重复实现"}
+{"file": ".trellis/tasks/11-19-console-ui-revamp/prd.md", "reason": "父任务需求 R1 与跨子任务验收"}
+{"file": ".trellis/tasks/11-19-console-ui-revamp/design.md", "reason": "父任务跨子任务边界：分层、持久化、层叠、验证策略、发布过渡态"}
+{"file": ".trellis/tasks/11-19-console-ui-revamp/research/frontend-architecture.md", "reason": "样式入口、token 家族、组件现状、原生页加载、图标、验证脚本的代码证据"}
+{"file": ".trellis/tasks/11-19-console-ui-revamp/research/reference-and-design.md", "reason": "参考组件库形态与第二版设计稿画面清单"}
