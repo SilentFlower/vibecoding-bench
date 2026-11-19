@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 
 import manage
+from agy_auth import require_auth_asset
 from release_ci import validate_publish_source
 from runtime_names import image_reference
 from system_update_contract import MANIFEST_LIMIT, MAX_BUNDLE_BYTES, REPOSITORY, safe_read, strict_json
@@ -45,6 +46,7 @@ def validate_candidate_manifest(manifest: dict, identity: dict) -> None:
     :param identity: 从当前构建环境或GitHub元数据核对的身份。
     :return: None；来源、角色或批次不匹配时拒绝。
     """
+    require_auth_asset(manifest.get('agy_auth'))
     release = f"ci-{identity['run_id']}-{identity['run_attempt']}"
     if (manifest.get('schema') != 3 or manifest.get('dirty_worktree') is not False
             or manifest.get('parent_revision') != identity['revision']

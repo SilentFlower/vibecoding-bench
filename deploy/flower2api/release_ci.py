@@ -3,6 +3,7 @@ import os
 import re
 
 from system_update_contract import REPOSITORY
+from agy_auth import require_auth_asset
 
 
 def validate_publish_source(build: dict | None = None) -> str:
@@ -30,4 +31,5 @@ def validate_publish_source(build: dict | None = None) -> str:
             raise ValueError('发布批次必须匹配当前 Action 的提交和 run/attempt')
         if build.get('dirty_worktree') is not False:
             raise ValueError('不能发布含未提交修改或来源未知的批次')
+        require_auth_asset(build.get('agy_auth'))
     return expected

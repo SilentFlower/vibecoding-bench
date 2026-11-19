@@ -31,7 +31,7 @@ COMPOSE = Path(__file__).with_name("compose.yml")
 sys.path.insert(0, str(source_path(REPO, "orchestrator")))
 from resource_budget import account_limits, default_account_memory, isolated_account_limits
 from native_sender import prewarm_account_id, stage_asset
-from agy_auth import stage_auth_asset
+from agy_auth import auth_asset_identity, stage_auth_asset
 from cpu_resources import default_cpu_limits
 from cli_telemetry_policy import cli_telemetry_mode
 from platform_version import read_version
@@ -92,6 +92,7 @@ def inspect_images(values: dict) -> dict:
     if values.get("V3_RELEASE", manifest["release"]) != manifest["release"]:
         raise ValueError("配置批次与清单不一致")
     values["V3_RELEASE"] = manifest["release"]
+    agy_asset = auth_asset_identity(manifest.get('agy_auth'))
     for role in ("control", "account"):
         name = values[f"V3_{role.upper()}_IMAGE"]
         if name.endswith(":latest") or ":v3-" not in name:
@@ -105,6 +106,12 @@ def inspect_images(values: dict) -> dict:
             raise ValueError("镜像平台与清单不匹配")
         if labels.get("vibebench.product") != "v3" or labels.get("vibebench.role") != role:
             raise ValueError("镜像产品或角色不匹配")
+        if agy_asset is not None:
+            if labels.get('vibebench.agy-runtime-protocol') != '1':
+                raise ValueError('镜像缺少已声明的AGY协议能力')
+            if role == 'account' and any(labels.get(key) != agy_asset['sha256'] for key in
+                    ('vibebench.agy-auth-source-sha256', 'vibebench.agy-runtime-source-sha256')):
+                raise ValueError('账号镜像AGY制品身份与清单不符')
         if manifest["layout_version"] == 2 and labels.get("vibebench.isolation-version") != "2":
             raise ValueError("联合镜像缺少三角色隔离能力")
         if manifest.get('credential_ownership_protocol') == 1 and labels.get('vibebench.credential-ownership-protocol') != '1':

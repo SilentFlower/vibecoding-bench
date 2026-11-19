@@ -18,7 +18,7 @@ from system_update_contract import MANIFEST_LIMIT, MAX_BUNDLE_BYTES, REPOSITORY,
 
 WORKFLOW = '.github/workflows/v3-build.yml'
 REQUIRED_STEPS = ('验证系统更新合同与恢复状态机', '构建两个镜像并生成版本清单',
-    '导出可信候选镜像', '上传可信候选产物')
+    '验收镜像内AGY能力', '导出可信候选镜像', '上传可信候选产物')
 MAX_ARCHIVE = MAX_BUNDLE_BYTES + 8 * 1024 * 1024
 
 

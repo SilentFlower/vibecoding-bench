@@ -39,8 +39,15 @@ jobs:
         run: printf '%s\n' '::warning::CI缓存准备失败，本次沿普通Docker构建路径执行。'
       - name: 准备双版本原生运行时
         uses: ./.github/actions/flower2api-native-runtime
+      - name: 准备AGY处理产物
+        # 固定执行映像复用本仓处理产物，源码适配层由当前快照构建。
+        uses: ./.github/actions/flower2api-agy-artifact
       - name: 构建两个镜像并生成版本清单
         run: python3 deploy/flower2api/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3-local.json
+      - name: 验收镜像内AGY能力
+        run: |
+          # 合成状态目录须归属容器UID 1001，沿宿主验证权限调用同一虚拟环境。
+          sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_images.py --manifest releases/v3-local.json
       - name: 导出可信候选镜像
         if: >-
           github.repository == 'SilentFlower/vibecoding-bench' &&

@@ -650,3 +650,55 @@ compatible_scratchpad(original: dict, target: dict) -> bool
 
 - `test_cluster_historical_locality` 使用真实迁移、存储和维护快照，覆盖软删除空环境及停止三角色、孤立旧空环境、业务准入拒绝、有效账号缺分配、远程及已删除节点、未知角色和生命周期、节点执行/迁移/登录历史、断开标记链接及持久活动。
 - `test_system_host.HostNetworkNamesTests.test_environment_update_preserves_blockers_before_any_rebuild` 核对阻塞先持久化、错误摘要可定位、角色和CPU操作保持关闭。账号运行及集群草稿、迁移、管理和转发回归继续通过。
+
+## Scenario: AGY处理产物随镜像交付与发行前验收
+
+### 1. Scope / Trigger
+
+修改AGY固定执行映像的CI输入、Docker上下文、候选复用及正式发布完整性检查时适用。固定映像复用已处理产物，适配源码与观察资源沿当前仓库构建。
+
+### 2. Signatures
+
+```bash
+python3 deploy/flower2api/agy_artifact.py export --source <现有agy.xz> --output <全新附件目录>
+python3 deploy/flower2api/agy_artifact.py prepare --directory <构建私有目录> [--source <现有agy.xz>]
+sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_images.py --manifest releases/v3-local.json
+```
+
+- `export` 独占交付 `agy-execution-linux-x64.xz` 与 `agy-artifact.json`。清单含 `schema_version=1`、`source_version=1.5.9`、`archive{name,bytes,sha256}` 和 `image{bytes,sha256}`。
+- `prepare` 返回已核验的 `agy-1.5.9`，CI通过现有 `GITHUB_ENV` 写入 `V3_AGY_AUTH_ASSET`；显式输入优先，缓存身份每次核验。
+- `verify_agy_runtime.native_probe(image, *, crash=False, image_package=False)` 默认研究模式；正式验收显式设置 `image_package=True`，只挂合成状态。
+
+### 3. Contracts
+
+- 压缩附件固定为80922084字节、SHA256 `22ade718c0914d0a7ea14cac1e1575a78e0c8a7b337f49f3ff5c729291f7cfea`。解码执行体固定为265700040字节、SHA256 `39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43`。
+- 冷缓存仅从本仓 `SilentFlower/vibecoding-bench` 的 `agy-runtime-1.5.9-v1` Release读取固定附件。缓存键绑定完整压缩摘要。辅助制品为预发布且 `latest=false`，与系统签名目录分开；附件交付与远端身份复验先于依赖它的源码推送。
+- XZ流式解码使用1MiB输出块及512MiB解码内存上限，拒绝截断、拼接、尾随、超预算及两层摘要失配。全部核验成功后原子发布构建输入，二进制保持在Git源码之外。
+- Dockerfile专属白名单显式允许 `agy-auth/agy-1.5.9`、缺省标记与 `orchestrator/agy_runtime/**`。control内包位于 `/app`，account内包位于 `/opt/v3/python`；公共 `runtime_files` 位于 `/usr/local/bin`。
+- 自动构建及完整手动构建共用只读附件准备action；候选复用跳过准备和构建。两条发布路径均在交付前执行镜像验收，可信候选的必需成功步骤包含“验收镜像内AGY能力”。
+- 正式候选、镜像发布及系统签发使用 `require_auth_asset` 要求 `agy_auth.available=true` 及固定身份。`inspect_images` 对声明可用能力的两个角色核对 `agy-runtime-protocol=1`，account的auth/runtime源摘要须与清单一致。历史读取及通用本地可选构建沿原边界处理缺省能力。
+- CI宿主通过sudo调用同一虚拟环境解释器，以改属私有合成状态目录和配置。实际容器继续UID1001、断网、只读根、cap-drop及有限内存；只使用镜像自带包，验收两代凭据、单次共享解码和正常/异常物理退出。外部模型调用预算为0。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 已核验缓存再次准备 | 核对完整身份并幂等复用 |
+| 缓存链接、长度/摘要不符、XZ边界或预算失配 | 非零退出；新输入保持未发布 |
+| 下载中断或解码失败 | 临时目录清理，原已核验输入保持 |
+| 正式清单缺失能力或实际镜像标签失配 | 在镜像推送和签发前拒绝 |
+| 镜像模块、资源或零模型退出验收失败 | 阻止候选交付及正式发布 |
+| 普通runner直接调用需改属状态的探针 | PermissionError；工作流必须通过sudo调用同一解释器 |
+
+### 5. Scenarios and Examples
+
+- 正常：核验并交付本仓处理产物附件 → CI恢复或下载XZ并验证两层身份 → 构建当前适配资源与镜像 → 验收镜像自身 → 导出候选或进入原兼容、签名流程。
+- 边界：同源码候选复用通过来源与归档检查、换批后，仍执行实际镜像验收；历史已签发行读取保持原合同。
+- 错误用法：仅挂当前源码做探针就认定镜像完整，或在root本地验证后直接让普通runner执行改属。正确处理：正式探针使用 `image_package=True`，工作流以sudo调用原虚拟环境，容器身份及权限约束继续核对。
+
+### 6. Tests Required
+
+- `test_agy_artifact`：现有处理产物导出、冷热缓存、双层身份、截断/尾随/拼接、解码预算、链接及中断原子交付。
+- `test_agy_images`、`test_publication`、`test_system_candidate_build`、`test_system_publish`：能力缺失在副作用前拒绝、实际标签匹配、候选换批与历史兼容。
+- `test_system_workflow`：真实YAML准备→构建→镜像验收→交付顺序、候选复用条件、两个验收步骤的sudo及同一解释器。全部run步骤执行 `bash -n`。
+- 真实Docker复现旧白名单COPY缺失；修正版镜像只读导入、资源身份及断网正常/异常退出均通过。隔离夹具与正式完整镜像CI结果分别记录。

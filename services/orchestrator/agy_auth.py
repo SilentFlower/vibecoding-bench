@@ -45,6 +45,14 @@ def auth_asset_identity(value: dict | None) -> dict | None:
     return None
 
 
+def require_auth_asset(value: dict | None) -> dict:
+    """要求正式交付具备固定AGY能力。@param value 构建制品声明。@return 已核验的完整能力身份。"""
+    identity = auth_asset_identity(value)
+    if identity is None:
+        raise ValueError('正式交付缺少固定AGY处理产物')
+    return identity
+
+
 def stage_auth_asset(destination: Path, source: str | None = None) -> dict:
     """冻结可选原生授权制品。@param destination 本次快照目录。@param source 私有固定原版。@return 已核验能力记录。"""
     destination.mkdir(mode=0o700, parents=True, exist_ok=True)

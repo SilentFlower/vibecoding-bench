@@ -11,8 +11,8 @@ from pathlib import Path
 from source_layout import source_path
 
 
-def native_probe(image: str, *, crash: bool = False) -> dict:
-    """在明确镜像中执行零模型探针。@param image 已有测试镜像。@param crash 是否杀监督器。@return 分项证据。"""
+def native_probe(image: str, *, crash: bool = False, image_package: bool = False) -> dict:
+    """在明确镜像中执行零模型探针。@param image 已有测试镜像。@param crash 是否杀监督器。@param image_package 是否只使用镜像内包。@return 分项证据。"""
     import docker
     root=Path(__file__).resolve().parents[2]
     package=source_path(root,'orchestrator')
@@ -28,13 +28,15 @@ def native_probe(image: str, *, crash: bool = False) -> dict:
         path.write_text(json.dumps(config));path.chmod(0o600);os.chown(path,1001,1001)
         # PID1保留在容器内，监督器异常退出后仍能独立观察worker及Go进程的终止。
         wrapper="import subprocess,time; subprocess.Popen(['python3','-m','agy_runtime.supervisor','--config','/state/supervisor.json']); time.sleep(180)"
+        mounts={str(temporary):{'bind':'/state','mode':'rw'}}
+        if not image_package:
+            mounts.update({str(package/'agy_runtime'):{'bind':'/opt/orchestrator/agy_runtime','mode':'ro'},
+                str(package/'runtime_files.py'):{'bind':'/usr/local/bin/runtime_files.py','mode':'ro'}})
         container=client.containers.run(image,['-c',wrapper],entrypoint=['python3'],detach=True,stdin_open=True,
             user='1001:1001',network_mode='none',read_only=True,cap_drop=['ALL'],security_opt=['no-new-privileges:true'],
             mem_limit='768m',pids_limit=256,tmpfs={'/tmp':'rw,nosuid,nodev,noexec,size=128m'},
-            environment={'PYTHONPATH':'/opt/orchestrator:/usr/local/bin'},
-            volumes={str(package/'agy_runtime'):{'bind':'/opt/orchestrator/agy_runtime','mode':'ro'},
-                str(package/'runtime_files.py'):{'bind':'/usr/local/bin/runtime_files.py','mode':'ro'},
-                str(temporary):{'bind':'/state','mode':'rw'}},labels={'vibebench.test-task':'agy-account-runtime'})
+            environment={'PYTHONPATH':'/opt/v3/python:/usr/local/bin' if image_package else '/opt/orchestrator:/usr/local/bin'},
+            volumes=mounts,labels={'vibebench.test-task':'agy-account-runtime'})
         connection=container.attach_socket(params={'stdin':True,'stream':True});connection._sock.settimeout(3)
         def send(value):
             connection._sock.sendall((json.dumps(value)+'\n').encode())
@@ -87,7 +89,8 @@ print(json.dumps({'terminated':not any(running(pid) for pid in pids)}))
         if not terminated:raise ValueError('AGY物理进程收口未完成')
         count=sum(event.get('event',{}).get('type')=='model_start' for event in events())
         if count:raise ValueError('零模型准备出现模型入口')
-        return {'passed':True,'evidence':'native_offline','network':'none','model_submissions':count,
+        return {'passed':True,'evidence':'native_offline','package_source':'image' if image_package else 'source_mount',
+            'network':'none','model_submissions':count,
             'source_sha256':ready[-1]['source_sha256'],'credential_generations':[1,2], 'image_scope':status['image_scope'],
             'image_bytes':status['image_bytes'],'image_decode_calls':status['image_decode_calls'],
             'controller':{key:value for key,value in status['controller'].items() if key!='pid'},
@@ -106,8 +109,9 @@ def main() -> None:
     parser=argparse.ArgumentParser()
     parser.add_argument('--native-image',required=True)
     parser.add_argument('--crash',action='store_true')
+    parser.add_argument('--image-package',action='store_true')
     args=parser.parse_args()
-    print(json.dumps(native_probe(args.native_image,crash=args.crash),ensure_ascii=False))
+    print(json.dumps(native_probe(args.native_image,crash=args.crash,image_package=args.image_package),ensure_ascii=False))
 
 
 if __name__=='__main__':main()

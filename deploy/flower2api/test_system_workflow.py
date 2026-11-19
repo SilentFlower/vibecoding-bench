@@ -72,6 +72,27 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(any(validation in run for run in build_runs))
         self.assertIn('verify_database_definitions.py', validation)
 
+    def test_agy_processed_input_and_image_verification_precede_delivery(self) -> None:
+        """真实工作流先准备自有处理产物，再核对实际镜像后交付。@return 无。"""
+        for filename in ('v3-build.yml', 'v3-release.yml'):
+            steps = self.workflow(filename)['jobs']['build' if filename == 'v3-build.yml' else 'release']['steps']
+            prepare = next(i for i, step in enumerate(steps) if step.get('uses') == './.github/actions/flower2api-agy-artifact')
+            build = next(i for i, step in enumerate(steps) if 'manage.py build' in step.get('run', ''))
+            verify = next(i for i, step in enumerate(steps) if 'verify_agy_images.py' in step.get('run', ''))
+            delivery = next(i for i, step in enumerate(steps) if
+                ('candidate_artifacts.py export' if filename == 'v3-build.yml' else 'manage.py publish') in step.get('run', ''))
+            self.assertLess(prepare, build)
+            self.assertLess(build, verify)
+            self.assertLess(verify, delivery)
+            # 宿主负责私有状态改属，容器身份继续由探针固定为1001。
+            command = next(line.strip() for line in steps[verify]['run'].splitlines()
+                if 'verify_agy_images.py' in line)
+            self.assertEqual(command, 'sudo "$RUNNER_TEMP/v3-update-venv/bin/python" '
+                'deploy/flower2api/verify_agy_images.py --manifest releases/v3-local.json')
+            if filename == 'v3-release.yml':
+                self.assertEqual("steps.candidate.outputs.reused != 'true'", steps[prepare]['if'])
+                self.assertNotIn('if', steps[verify])
+
     def test_candidate_reuse_keeps_trusted_build_and_manual_publish_boundaries(self) -> None:
         """候选仅由受信构建导出，复用跳过重复构建但兼容与签名继续阻断。:return: None。"""
         build = self.workflow('v3-build.yml')['jobs']['build']['steps']

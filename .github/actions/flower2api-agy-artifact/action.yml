@@ -1,0 +1,13 @@
+name: flower2api AGY 固定处理产物
+description: 复用本仓已验收的AGY执行映像，核对压缩与解码双层身份
+runs:
+  using: composite
+  steps:
+    - name: 恢复AGY处理产物
+      uses: actions/cache@v5
+      with:
+        path: ${{ runner.temp }}/agy159/agy-execution-linux-x64.xz
+        key: agy159-linux-x64-22ade718c0914d0a7ea14cac1e1575a78e0c8a7b337f49f3ff5c729291f7cfea
+    - name: 核验处理产物并准备镜像输入
+      shell: bash
+      run: python3 deploy/flower2api/agy_artifact.py prepare --directory "$RUNNER_TEMP/agy159"

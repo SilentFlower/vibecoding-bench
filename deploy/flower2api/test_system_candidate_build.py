@@ -37,7 +37,9 @@ class CandidateBuildTests(unittest.TestCase):
         context = patch.dict(os.environ, self.environment, clear=True)
         context.start()
         self.addCleanup(context.stop)
+        from agy_auth import SOURCE_BYTES, SOURCE_SHA256
         self.manifest = {'schema': 3, 'layout_version': 2, 'release': 'ci-123-1',
+            'agy_auth': {'available': True, 'source_version': '1.5.9', 'bytes': SOURCE_BYTES, 'sha256': SOURCE_SHA256},
             'parent_revision': 'a' * 40, 'gateway_revision': 'a' * 40,
             'dirty_worktree': False, 'source_content_sha256': 'b' * 64,
             'images': {role: {'reference': f'flower2api-{role}:v3-ci-123-1',
