@@ -680,6 +680,7 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - 正式候选、镜像发布及系统签发使用 `require_auth_asset` 要求 `agy_auth.available=true` 及固定身份。`inspect_images` 对声明可用能力的两个角色核对 `agy-runtime-protocol=1`，account的auth/runtime源摘要须与清单一致。历史读取及通用本地可选构建沿原边界处理缺省能力。
 - CI宿主通过sudo调用同一虚拟环境解释器，以改属私有合成状态目录和配置。实际容器继续UID1001、断网、只读根、cap-drop及有限内存；只使用镜像自带包，验收两代凭据、单次共享解码和正常/异常物理退出。外部模型调用预算为0。
 - 每代准备请求使用既有120秒截止，prepared等待125秒，其他控制事件保持50秒；PID1观察窗口600秒覆盖两代准备与退出验证。成功结果增加两项 `prepare_seconds` 和 `prepare_deadline_seconds=120`，退役耗时计入该代准备。
+- 正常及异常退出使用90秒物理观察窗口，覆盖监督器原85秒停止窗口；逐项核对监督器、kernel、observer和native的实际PID终止。成功结果含 `shutdown_seconds` 及 `shutdown_deadline_seconds=90`；退出失败标记 `phase=shutdown`，继续原首错和清理合同。运行时退役与停止预算保持。
 - 失败诊断只投影固定协议分类、Running/OOMKilled/ExitCode、进程角色、阶段及资源计数。日志最多取末32行并在解析前截为末32768字节；固定容器诊断输出上限8192字节，宿主再次按字段白名单和非负整数投影。私有启动错误仅提取固定异常类型及已登记原因；worker提前回收后的文件阶段计数按实际为0，字段缺省表示未知。
 - 连接、容器、临时状态及Docker客户端独立尝试清理；诊断或清理异常保留原验证错误。原验证成功而清理失败时返回非零状态。诊断中间提交保留后续根因验收和实际CI运行记录。
 
@@ -695,6 +696,7 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 | 普通runner直接调用需改属状态的探针 | PermissionError；工作流必须通过sudo调用同一解释器 |
 | 探针启动/准备超时，或诊断采集失败 | 输出有界分类及采集失败步骤，原异常继续抛出 |
 | 旧代退役后原请求截止已过 | `request_deadline_exceeded`，停止新代创建及原生启动 |
+| 退出观察窗口内仍有目标PID存活 | 原物理收口错误，诊断标记shutdown，候选交付拒绝 |
 | 单项清理失败 | 后续清理继续；保留首错，原成功路径转为清理失败 |
 
 ### 5. Scenarios and Examples
@@ -704,6 +706,7 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - 错误用法：仅挂当前源码做探针就认定镜像完整，或在root本地验证后直接让普通runner执行改属。正确处理：正式探针使用 `image_package=True`，工作流以sudo调用原虚拟环境，容器身份及权限约束继续核对。
 - 故障定位：正式CI准备失败时先保留受控阶段与资源摘要，再删除临时根。错误用法是把完整HOME或原生日志直接打印；正确处理是先做白名单投影，再依据正式CI证据定位根因。
 - 预算边界：旧代退役45秒、新代启动约8秒仍可处于原有生命周期预算内。错误用法是给整代准备45秒截止；正确处理是使用现有120秒请求上限，并在退役后及Popen前复核原截止。
+- 退出边界：45秒退役处于现有60秒预算内。错误用法是15秒仍存活即判定收口失败；正确处理是90秒有界观察全部实际PID，超过窗口继续拒绝交付。
 
 ### 6. Tests Required
 
@@ -714,4 +717,5 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - `test_system_agy_probe`核对实际提交信封覆盖90秒启动窗口且不超过120秒，并断言两项准备耗时。`verify_release_tests.py`的publication组包含 `test_agy_supervisor`、`test_agy_artifact`、`test_agy_images`，`test_system_release_speed`同步核对模块集合。
 - 宿主测试经sudo运行会清除外部PYTHONPATH。探针测试在导入编排模块前沿 `source_layout.source_path`初始化搜索路径；独立执行 `env -u PYTHONPATH <项目Python> -m unittest discover -s deploy/flower2api -p test_system_agy_probe.py`，再以相同环境执行 `verify_release_tests.py --python <项目Python>`。错误用法是仅凭预设PYTHONPATH的测试结果认定正式入口通过。
 - 慢退役受控对照显式标记源码挂载夹具，核对45秒旧截止失败、120秒准备通过和零模型调用；正式完整镜像由独立CI验收，两类证据分别记录。
+- 探针测试执行真实物理观察脚本，以虚拟时钟覆盖25秒退出；受控慢退出对照覆盖旧15秒失败摘要、新90秒窗口内全部PID终止及零模型。正常和异常退出另外验收镜像自带源码，并分别记录实际耗时。
 - 真实Docker复现旧白名单COPY缺失；修正版镜像只读导入、资源身份及断网正常/异常退出均通过。隔离夹具与正式完整镜像CI结果分别记录。

@@ -13,6 +13,8 @@ from source_layout import source_path
 
 # 使用监督器既有请求上限，覆盖换代时的旧进程收尾和新进程准备。
 PREPARE_SECONDS = 120
+# 监督器原停止窗口为85秒，另留5秒核对实际PID收口。
+SHUTDOWN_SECONDS = 90
 
 
 def _failure_evidence(container, phase: str, generation: int) -> dict:
@@ -169,6 +171,7 @@ def native_probe(image: str, *, crash: bool = False, image_package: bool = False
         status=wait('status',request)['status']
         if status['image_decode_calls']!=1 or status['workers']!=1 or status['active']!=0:
             raise ValueError('AGY共享映像或物理并发不符合冻结配置')
+        phase='shutdown';shutdown_started=time.monotonic()
         processes=[status['controller']['pid'],status['processes'][0]['controller']['pid'],ready[-1]['observer_pid'],ready[-1]['native_pid']]
         if crash:
             result=container.exec_run(['kill','-KILL',str(processes[0])],user='1001:1001')
@@ -178,13 +181,13 @@ def native_probe(image: str, *, crash: bool = False, image_package: bool = False
         code="""import json,time
 from pathlib import Path
 pids=PIDS
-until=time.monotonic()+15
+until=time.monotonic()+SHUTDOWN_SECONDS
 def running(pid):
     try:return Path('/proc/'+str(pid)+'/stat').read_text().split(') ',1)[1][0]!='Z'
     except FileNotFoundError:return False
 while time.monotonic()<until and any(running(pid) for pid in pids):time.sleep(.1)
 print(json.dumps({'terminated':not any(running(pid) for pid in pids)}))
-""".replace('PIDS',repr(processes))
+""".replace('PIDS',repr(processes)).replace('SHUTDOWN_SECONDS',str(SHUTDOWN_SECONDS))
         result=container.exec_run(['python3','-c',code],user='1001:1001')
         terminated=result.exit_code==0 and json.loads(result.output)['terminated']
         if not terminated:raise ValueError('AGY物理进程收口未完成')
@@ -194,6 +197,7 @@ print(json.dumps({'terminated':not any(running(pid) for pid in pids)}))
             'network':'none','model_submissions':count,
             'source_sha256':ready[-1]['source_sha256'],'credential_generations':[1,2], 'image_scope':status['image_scope'],
             'prepare_seconds':prepare_seconds,'prepare_deadline_seconds':PREPARE_SECONDS,
+            'shutdown_seconds':round(time.monotonic()-shutdown_started,3),'shutdown_deadline_seconds':SHUTDOWN_SECONDS,
             'image_bytes':status['image_bytes'],'image_decode_calls':status['image_decode_calls'],
             'controller':{key:value for key,value in status['controller'].items() if key!='pid'},
             'worker':[{name:{key:value for key,value in values.items() if key!='pid'} for name,values in process.items()

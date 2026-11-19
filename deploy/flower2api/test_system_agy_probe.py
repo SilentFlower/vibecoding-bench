@@ -118,8 +118,8 @@ class ProbeFailureTests(unittest.TestCase):
         cleanup.assert_called_once()
         self.assertFalse(cleanup.call_args.args[0].exists())
 
-    def test_prepare_envelopes_fit_runtime_deadline_and_startup_budget(self) -> None:
-        """实际探针信封通过真实运行时校验，预算覆盖既有启动窗口。@return 无。"""
+    def test_probe_covers_prepare_and_physical_shutdown_budgets(self) -> None:
+        """实际信封沿真实合同校验，物理观察覆盖慢退出。@return 无。"""
         import docker
         client, container, connection = Mock(), Mock(), Mock()
         client.containers.run.return_value = container
@@ -147,10 +147,32 @@ class ProbeFailureTests(unittest.TestCase):
 
         connection._sock.sendall.side_effect = transmit
         container.logs.side_effect = lambda **kwargs: b'\n'.join(json.dumps(event).encode() for event in events)
-        container.exec_run.return_value = SimpleNamespace(exit_code=0, output=b'{"terminated":true}')
+        observed = {'seconds': 0}
+
+        def observe(arguments, **kwargs):
+            """执行真实观察脚本，以虚拟进程复现25秒退出。@param arguments 容器命令。@param kwargs 原权限。@return 退出证据。"""
+            def advance(seconds):
+                """推进模拟时钟。@param seconds 等待秒数。@return 无。"""
+                observed['seconds'] += seconds
+
+            def stat():
+                """按模拟进程生命周期返回实际stat格式。@return stat内容；退出后抛出缺失。"""
+                if observed['seconds'] >= 25:
+                    raise FileNotFoundError
+                return '1 (synthetic) S 0'
+
+            output = io.StringIO()
+            with patch.object(probe.time, 'monotonic', side_effect=lambda: observed['seconds']), \
+                    patch.object(probe.time, 'sleep', side_effect=advance), \
+                    patch.object(Path, 'read_text', side_effect=stat), patch('sys.stdout', output):
+                exec(compile(arguments[-1], '<真实物理退出观察>', 'exec'), {})
+            return SimpleNamespace(exit_code=0, output=output.getvalue().encode())
+
+        container.exec_run.side_effect = observe
         with patch.object(docker, 'from_env', return_value=client), patch.object(probe.os, 'chown'):
             result = probe.native_probe('synthetic-image', image_package=True)
         self.assertEqual([1, 2], [value['credential_snapshot']['credential_generation'] for value in submissions])
         self.assertEqual(2, len(result['prepare_seconds']))
         self.assertTrue(result['passed'])
         self.assertTrue(result['terminated'])
+        self.assertGreaterEqual(observed['seconds'], 25)
