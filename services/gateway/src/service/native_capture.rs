@@ -1,4 +1,4 @@
-//! 按账号保存有界的 CC 组装后快照，完整内容只通过管理员接口读取。
+//! 保存有界的 CC 组装与网关拒绝快照，预览只通过管理员接口读取。
 
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
@@ -6,7 +6,7 @@ use std::fs::{self, OpenOptions};
 use std::io::{self, Read, Write};
 #[cfg(unix)]
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -22,10 +22,13 @@ use uuid::Uuid;
 
 use crate::model::request_diagnostics::RequestLogMode;
 use crate::service::native_contract::NativeSubmission;
+use axum::body::Bytes;
+use axum::http::HeaderMap;
 
 const BODY_LIMIT: usize = 2 * 1024 * 1024;
 const HEADER_LIMIT: usize = 128 * 1024;
 const STORAGE_LIMIT: u64 = 1024 * 1024 * 1024;
+const GATEWAY_RETENTION: Duration = Duration::from_secs(7 * 86400);
 static WRITERS: Semaphore = Semaphore::const_new(2);
 static STORAGE: Mutex<()> = Mutex::new(());
 
@@ -775,6 +778,10 @@ fn save(directory: &Path, submission: &NativeSubmission, payload: &Value) -> io:
     let id =
         Uuid::parse_str(&submission.request.request_id).map_err(|_| io::ErrorKind::InvalidInput)?;
     let value = snapshot(submission, payload)?;
+    save_snapshot(directory, id, &value)
+}
+
+fn save_snapshot(directory: &Path, id: Uuid, value: &Value) -> io::Result<()> {
     let rejected = value["stage"] == "ingress_rejected";
     let suffix = if rejected { ".rejected.json" } else { ".json" };
     let bytes = serde_json::to_vec(&value)?;
@@ -810,9 +817,9 @@ fn save(directory: &Path, submission: &NativeSubmission, payload: &Value) -> io:
                             Some("unavailable") => 1,
                             _ => 0,
                         };
-                        if previous["account_id"] == submission.request.account_id
-                            && previous["attempt_id"] == submission.request.request_id
-                            && rank(&previous["wire_final"]) > rank(&payload["_wire_final"])
+                        if previous["account_id"] == value["account_id"]
+                            && previous["attempt_id"] == value["attempt_id"]
+                            && rank(&previous["wire_final"]) > rank(&value["wire_final"])
                         {
                             return Ok(());
                         }
@@ -893,6 +900,156 @@ fn save(directory: &Path, submission: &NativeSubmission, payload: &Value) -> io:
         let _ = fs::remove_file(temporary);
     }
     result
+}
+
+/// 后台保存已鉴权的网关本地拒绝入站。@param directory 私有网关目录。@param id 根请求。@param headers 原始头。@param raw 已读取的正文。@param token 需要脱敏的入口密钥。@return 采集队列状态。
+pub(crate) fn record_gateway_rejection(
+    directory: &Path,
+    id: &str,
+    headers: HeaderMap,
+    raw: Option<Bytes>,
+    token: String,
+) -> &'static str {
+    let Ok(id) = Uuid::parse_str(id) else {
+        return "dropped";
+    };
+    let Ok(permit) = WRITERS.try_acquire() else {
+        return "dropped";
+    };
+    let directory = directory.to_path_buf();
+    spawn_blocking(move || {
+        let _permit = permit;
+        let headers: Vec<(String, String)> = headers
+            .iter()
+            .filter_map(|(name, value)| Some((name.as_str().into(), value.to_str().ok()?.into())))
+            .collect();
+        let json_body = raw
+            .as_ref()
+            .and_then(|raw| serde_json::from_slice::<Value>(raw).ok());
+        let (body, parsed) = json_body
+            .as_ref()
+            .map_or((&[][..], &Value::Null), |parsed| {
+                (raw.as_deref().unwrap_or_default(), parsed)
+            });
+        let Some(mut preview) = ingress(RequestLogMode::Debug, &headers, body, parsed, &token)
+        else {
+            return;
+        };
+        let available = json_body.is_some();
+        if !available {
+            preview["original_body_bytes"] = json!(raw.as_ref().map(Bytes::len));
+            preview["original_body_sha256"] =
+                json!(raw.as_ref().map(|raw| format!("{:x}", Sha256::digest(raw))));
+        }
+        let status = if !available {
+            "unavailable"
+        } else if preview["body_truncated"] == true {
+            "truncated"
+        } else {
+            "complete"
+        };
+        let mut stage = json!({"stage":"ingress","source":"gateway_http_ingress","representation":"http_logical_bytes","status":status});
+        if !available {
+            stage["note"] = json!("已保存入站头部，正文读取、解码或 JSON 解析未完成");
+        }
+        let mut snapshot = preview.clone();
+        snapshot["schema_version"] = json!(1);
+        snapshot["stage"] = json!("ingress_rejected");
+        snapshot["attempt_id"] = json!(id.to_string());
+        snapshot["ingress"] = preview;
+        snapshot["stages"] = json!([stage]);
+        if let Err(error) = save_snapshot(&directory, id, &snapshot) {
+            tracing::warn!(request_id=%id, reason=?error.kind(), "网关拒绝的入站采集保存失败");
+        }
+    });
+    "queued"
+}
+
+/// 读取有界且匹配根请求的网关拒绝快照。@param directory 私有网关目录。@param id 根请求。@return 状态及脱敏证据。
+pub(crate) async fn read_gateway_rejection(directory: &Path, id: &str) -> Value {
+    let Ok(id) = Uuid::parse_str(id) else {
+        return json!({"state":"missing"});
+    };
+    let path = directory.join(format!("{id}.rejected.json"));
+    spawn_blocking(move || {
+        let mut options = OpenOptions::new();
+        options.read(true);
+        #[cfg(unix)]
+        options.custom_flags(O_NOFOLLOW | O_NONBLOCK);
+        let Ok(file) = options.open(path) else {
+            return json!({"state":"missing"});
+        };
+        let Ok(metadata) = file.metadata() else {
+            return json!({"state":"missing"});
+        };
+        if !metadata.is_file() || metadata.len() > 6 * 1024 * 1024 {
+            return json!({"state":"missing"});
+        }
+        if metadata
+            .modified()
+            .ok()
+            .and_then(|at| at.elapsed().ok())
+            .is_some_and(|age| age >= GATEWAY_RETENTION)
+        {
+            return json!({"state":"expired"});
+        }
+        let mut bytes = Vec::new();
+        if file
+            .take(6 * 1024 * 1024 + 1)
+            .read_to_end(&mut bytes)
+            .is_err()
+            || bytes.len() > 6 * 1024 * 1024
+        {
+            return json!({"state":"missing"});
+        }
+        let Ok(value) = serde_json::from_slice::<Value>(&bytes) else {
+            return json!({"state":"missing"});
+        };
+        if value["stage"] != "ingress_rejected" || value["attempt_id"] != id.to_string() {
+            return json!({"state":"missing"});
+        }
+        json!({"state":"saved","snapshot":value})
+    })
+    .await
+    .unwrap_or_else(|_| json!({"state":"missing"}))
+}
+
+/// 随诊断保留周期清理过期正文。@param directory 网关私有目录。
+pub(crate) fn prune_gateway_rejections(directory: PathBuf) {
+    spawn_blocking(move || {
+        let Ok(_guard) = STORAGE.lock() else { return };
+        let Ok(info) = fs::symlink_metadata(&directory) else {
+            return;
+        };
+        if !info.is_dir() {
+            return;
+        }
+        let Ok(entries) = fs::read_dir(&directory) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            if !name
+                .to_str()
+                .and_then(|name| name.strip_suffix(".rejected.json"))
+                .is_some_and(|id| Uuid::parse_str(id).is_ok())
+            {
+                continue;
+            }
+            let path = entry.path();
+            if fs::symlink_metadata(&path).is_ok_and(|info| {
+                info.is_file()
+                    && info
+                        .modified()
+                        .ok()
+                        .and_then(|at| at.elapsed().ok())
+                        .is_some_and(|age| age >= GATEWAY_RETENTION)
+            }) && let Err(error) = fs::remove_file(path)
+            {
+                tracing::warn!(reason=?error.kind(), "过期入站快照清理失败");
+            }
+        }
+    });
 }
 
 /// 有界保存已验证事件；失败只影响采集状态。

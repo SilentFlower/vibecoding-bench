@@ -10,7 +10,7 @@ pub mod agy_runtime;
 pub mod diagnostics;
 pub mod gateway;
 pub mod gemini;
-mod native_capture;
+pub(crate) mod native_capture;
 pub(crate) mod native_contract;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod native_criu;

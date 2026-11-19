@@ -365,7 +365,10 @@ async fn read_native_capture(
     if snapshot["account_id"] != account_id
         || snapshot["attempt_id"] != attempt_id
         || !(if agy {
-            snapshot["stage"] == "agy_prepared"
+            matches!(
+                snapshot["stage"].as_str(),
+                Some("agy_prepared" | "agy_ingress")
+            )
         } else {
             matches!(
                 snapshot["stage"].as_str(),

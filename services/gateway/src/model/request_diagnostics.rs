@@ -41,7 +41,7 @@ pub struct RequestDiagnostic {
     /// 入口冻结的跨平台事实，旧记录保持未知。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<DiagnosticContext>,
-    /// 原生发送前拒绝的原因与入口采集归属；不增加上游尝试数。
+    /// 发送前本地拒绝的原因与入站采集归属；不增加上游尝试数。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native_rejection: Option<NativeRejection>,
     /// 本次实际模式；旧记录保持未知。
@@ -69,7 +69,7 @@ pub struct RequestDiagnostic {
     pub last_attempt: Option<Box<AttemptDiagnostic>>,
 }
 
-/// 本地原生拒绝的受控摘要，正文仍保存于账号私有采集文件。
+/// 本地拒绝的受控摘要，正文存于独立的私有采集文件。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NativeRejection {
     pub reason: Option<String>,

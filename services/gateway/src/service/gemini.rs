@@ -601,6 +601,9 @@ pub async fn generate(
                 .gateway_svc
                 .diagnostics_store()
                 .map(|store| TraceContext::for_protocol(store.clone(), "antigravity", "gemini"));
+            if let Some(trace) = trace.as_ref() {
+                trace.remember_ingress(request.headers(), &token.token);
+            }
             let guard = trace
                 .as_ref()
                 .map(|trace| RequestTraceGuard::new(trace.clone()));
@@ -666,6 +669,7 @@ async fn generate_inner(
     let raw = axum::body::to_bytes(request.into_body(), BODY_LIMIT)
         .await
         .map_err(|_| invalid("Gemini正文超过上限"))?;
+    diagnostics::remember_ingress_body(&raw);
     let mut body: Value =
         serde_json::from_slice(&raw).map_err(|_| invalid("Gemini正文必须为JSON"))?;
     if !body.is_object() || !body["contents"].is_array() {
@@ -1368,7 +1372,7 @@ pub(crate) fn agy_input_rejection(code: &str) -> AppError {
         _ => ("AGY_UNSUPPORTED_INPUT", "AGY请求包含当前内核不支持的结构"),
     };
     // 私有异常可能含调用方自定义字段，公开路径仅投影固定前缀和数组位置。
-    let field = field.strip_prefix("/body/contents/").and_then(|rest| {
+    let content_field = field.strip_prefix("/body/contents/").and_then(|rest| {
         let mut parts = rest.split('/');
         let index = parts.next()?.parse::<usize>().ok()?;
         let mut field = format!("contents[{index}]");
@@ -1384,6 +1388,60 @@ pub(crate) fn agy_input_rejection(code: &str) -> AppError {
             }
         }
         Some(field)
+    });
+    let field = content_field.or_else(|| {
+        let mut parts = field.strip_prefix("/body/").unwrap_or_default().split('/');
+        let known = match parts.next().unwrap_or_default() {
+            "generationConfig" => match parts.next() {
+                Some(
+                    key @ ("candidateCount"
+                    | "enableEnhancedCivicAnswers"
+                    | "frequencyPenalty"
+                    | "imageConfig"
+                    | "logprobs"
+                    | "maxOutputTokens"
+                    | "mediaResolution"
+                    | "presencePenalty"
+                    | "responseJsonSchema"
+                    | "responseLogprobs"
+                    | "responseMimeType"
+                    | "responseModalities"
+                    | "responseSchema"
+                    | "seed"
+                    | "speechConfig"
+                    | "stopSequences"
+                    | "temperature"
+                    | "thinkingConfig"
+                    | "thinking_config"
+                    | "topK"
+                    | "topP"),
+                ) => {
+                    return Some(format!("generationConfig.{key}"));
+                }
+                _ => "generationConfig",
+            },
+            "cachedContent" => "cachedContent",
+            "contents" => "contents",
+            "requests" => "requests",
+            "safetySettings" => "safetySettings",
+            "systemInstruction" => "systemInstruction",
+            "toolConfig" => "toolConfig",
+            "tools" => "tools",
+            _ => match kind {
+                "invalid_gemini_max_output_tokens" => "generationConfig.maxOutputTokens",
+                "invalid_gemini_safety_settings"
+                | "unsupported_gemini_safety_settings"
+                | "unsupported_partial_safety_settings" => "safetySettings",
+                "unsupported_gemini_tool_mode" => "toolConfig.functionCallingConfig.mode",
+                "invalid_system_parts" | "unsupported_system_role" => "systemInstruction",
+                "invalid_gemini_tools" => "tools",
+                "invalid_gemini_contents"
+                | "invalid_gemini_thought_signature"
+                | "unsupported_gemini_last_role" => "contents",
+                _ => return None,
+            },
+        };
+        Some(known.into())
     });
     AppError::AgyInput {
         reason,

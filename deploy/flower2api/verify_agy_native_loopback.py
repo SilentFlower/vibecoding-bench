@@ -169,11 +169,22 @@ class Binding(BaseHTTPRequestHandler):
         """保持私有证明不进入日志。@param args 日志参数。@return 无。"""
 
     def do_GET(self):
-        """返回真实发送器的固定绑定。@return 无。"""
-        require(self.path=='/internal/v3/transport/1','运行绑定路径错误')
-        host='flower2api-'+hashlib.sha256(b'synthetic').hexdigest()[:12]+'-'+ENVIRONMENT
-        value={'account_id':1,'environment_id':ENVIRONMENT,'generation':1,'endpoint':f'http://{host}:8091',
-            'secret':SECRET,'release_id':'synthetic-release'}
+        """返回真实发送器的固定绑定或合成请求快照。@return 无。"""
+        if self.path=='/internal/v3/transport/1':
+            host='flower2api-'+hashlib.sha256(b'synthetic').hexdigest()[:12]+'-'+ENVIRONMENT
+            value={'account_id':1,'environment_id':ENVIRONMENT,'generation':1,'endpoint':f'http://{host}:8091',
+                'secret':SECRET,'release_id':'synthetic-release'}
+        else:
+            from agy_runtime.capture import read_snapshot
+            require(self.headers.get('authorization')=='Bearer '+SECRET,'合成快照鉴权错误')
+            route,_,query=self.path.partition('?')
+            parts=route.split('/')
+            require(len(parts)==6 and parts[1:5]==['internal','v3','native-captures','1']
+                and query=='platform=antigravity','合成快照路径错误')
+            try:
+                value=read_snapshot(Path('/'),1,parts[5])
+            except FileNotFoundError:
+                self.send_response(404);self.send_header('Content-Length','0');self.end_headers();return
         raw=json.dumps(value).encode()
         self.send_response(200);self.send_header('Content-Length',str(len(raw)));self.end_headers()
         self.wfile.write(raw)
@@ -395,19 +406,75 @@ def verify_png(request, wait_idle, database, base):
     require(native_media()==sent[1:3] and len(Upstream.calls)==8,'工具续轮的 GIF 转换结果错误')
     require(request(base+'generateContent',valid_live)[0]==400 and len(Upstream.calls)==8,'重复 GIF 工具结果产生额外模型提交')
 
+    invalid_config={'contents':[{'parts':[{'text':'合成拒绝诊断'}]}],'generationConfig':{'topK':10}}
+    status,raw=request(base+'generateContent',invalid_config)
+    error=json.loads(raw)['error']
+    require(status==400 and error['details'][0]['reason']=='AGY_UNSUPPORTED_INPUT'
+        and error['details'][1]['fieldViolations'][0]['field']=='generationConfig.topK',
+        '原生拒绝未返回生成配置字段')
+    require(len(Upstream.calls)==8,'无效生成配置触发了额外模型提交')
+
     until=time.monotonic()+10
     while True:
         status,raw=request('/admin/request-diagnostics?platform=antigravity&entry_protocol=gemini&page_size=50',admin=True)
         require(status==200,'请求诊断查询失败')
         rows=json.loads(raw)['items']
-        if len(rows)>=10:break
+        rejected=next((row for row in rows if row['context'].get('input_rejection_reason')=='AGY_UNSUPPORTED_INPUT'
+            and row['finished_at']),None)
+        if rejected:break
         require(time.monotonic()<until,'请求诊断落账条数不足');time.sleep(.1)
     reasons={row['context'].get('input_rejection_reason') for row in rows}
     require({'AGY_INVALID_PNG','AGY_TOOL_RESULT_MISMATCH','AGY_PNG_CAPABILITY_UNKNOWN','AGY_PNG_UNSUPPORTED'}<=reasons,
         '根请求缺少受控输入拒绝分类')
+    require(rejected['context']['input_rejection_field']=='generationConfig.topK','根诊断缺少生成配置字段')
+    verify_rejected_snapshot(request,rejected['request_id'],rejected['last_attempt']['attempt_id'],
+        'agy_ingress',invalid_config)
     return {'passed':True,'network':'none','real_model_submissions':0,'synthetic_native_model_submissions':len(Upstream.calls),
         'legacy_tool_results_per_request':76,'outbound_pngs_per_history_request':2,'live_tool_retry':True,
-        'diagnostic_requests':len(rows),'account_gif_switch':True,'original_jpeg_and_wav':True,'live_gif_retry':True}
+        'diagnostic_requests':len(rows),'account_gif_switch':True,'original_jpeg_and_wav':True,'live_gif_retry':True,
+        'agy_rejected_ingress':True}
+
+
+def verify_rejected_snapshot(request, request_id, attempt_id, stage, body):
+    """从管理 API 校验实际入站证据。@param request HTTP 入口。@param request_id 根请求。@param attempt_id 快照绑定。@param stage 预期阶段。@param body 原始合成正文。@return 无。"""
+    until=time.monotonic()+10
+    while True:
+        status,raw=request(f'/admin/request-diagnostics/{request_id}/captures/{attempt_id}',admin=True)
+        require(status==200,'拒绝入站管理接口返回 '+str(status))
+        value=json.loads(raw)
+        if value['state']=='saved':break
+        require(time.monotonic()<until,'拒绝入站快照尚未保存：'+value['state']);time.sleep(.1)
+    snapshot=value['snapshot']
+    require(snapshot['stage']==stage and [item['stage'] for item in snapshot['stages']]==['ingress'],
+        '拒绝快照包含未实际发生的阶段')
+    require(json.loads(snapshot['ingress']['body'])==body and 'synthetic-key' not in json.dumps(snapshot),
+        '拒绝快照未保存原始逻辑正文或入口密钥未脱敏')
+
+
+def verify_gateway_rejections(request):
+    """校验 Claude Code 及其准入策略的本地拒绝。@param request HTTP 入口。@return 已验证状态码。"""
+    body={'model':'claude-sonnet-4-6','max_tokens':32,'messages':[
+        {'role':'user','content':'合成请求'},{'role':'assistant','content':'合成预填'}]}
+    require(request('/admin/settings',{'intercept_assistant_prefill_enabled':'true',
+        'intercept_assistant_prefill_models':body['model'],'allowed_user_agents':''},admin=True)[0]==200,
+        '测试预填拦截设置失败')
+    for expected,stage in ((400,'request_policy'),(403,'access_policy')):
+        if expected==403:
+            require(request('/admin/settings',{'allowed_user_agents':'synthetic-only*'},admin=True)[0]==200,
+                '测试准入策略设置失败')
+        status,_=request('/v1/messages',body)
+        require(status==expected,'本地拒绝状态错误：'+str(status))
+        until=time.monotonic()+10
+        while True:
+            status,raw=request('/admin/request-diagnostics?page_size=50',admin=True)
+            require(status==200,'本地拒绝诊断查询失败')
+            row=next((row for row in json.loads(raw)['items'] if row['error_stage']==stage and row['finished_at']),None)
+            if row:break
+            require(time.monotonic()<until,'本地拒绝尚未入账：'+stage);time.sleep(.1)
+        require(row['attempt_count']==0 and row['native_rejection']['capture_id']==row['request_id'],
+            '本地拒绝未绑定到根请求')
+        verify_rejected_snapshot(request,row['request_id'],row['request_id'],'ingress_rejected',body)
+    return [400,403]
 
 
 def verify_kernel_selection(request, wait_idle, base):
@@ -523,6 +590,7 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
             return result
         if png:
             result=verify_png(request,wait_idle,database,base)
+            result['claude_gateway_rejected_ingress']=verify_gateway_rejections(request)
             database.close()
             return result
         body={'contents':[{'role':'user','parts':[{'text':'TLS_SYNTHETIC_TEXT'}]}],

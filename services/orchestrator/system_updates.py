@@ -564,11 +564,17 @@ def system_updates_router(runtime_provider) -> APIRouter:
                 except (OSError, ValueError) as error:
                     raise HTTPException(409, '部分角色恢复证据尚未完整核验') from error
             if body.action != 'inspect':
+                from agy_environment import lookup_environment, stop_environment as stop_agy_environment, transport as agy_transport
+                agy=lookup_environment(runtime,row['environment_id'])
                 if account and dict(account).get('cc2api_account_id'):
                     validate_records(runtime._root(row), account['cc2api_account_id'])
                 # 历史回退先由新解析器收口角色；retire 保留账号行及 HOME，随后由旧生命周期重建。
-                runtime._stop_environment(row, remove=body.action in ('rebuild', 'restore', 'retire'))
-                runtime._update(row, state='stopped')
+                remove=body.action in ('rebuild', 'restore', 'retire')
+                if agy:
+                    stop_agy_environment(runtime,row,remove=remove)
+                else:
+                    runtime._stop_environment(row, remove=remove)
+                    runtime._update(row, state='stopped')
                 if account and dict(account).get('cc2api_account_id'):
                     migrate_records(runtime._root(row), account['cc2api_account_id'])
                     if body.action == 'retire':
@@ -579,8 +585,6 @@ def system_updates_router(runtime_provider) -> APIRouter:
                             config['native'] = builtin_config(config.get('native'), ('2.1.293',))
                             runtime._write_sender_config(row, config)
                 if body.action in ('rebuild', 'restore'):
-                    from agy_environment import lookup_environment, transport as agy_transport
-                    agy=lookup_environment(runtime,row['environment_id'])
                     if agy:
                         agy_transport(runtime,agy['gateway_account_id'],system_maintenance=True)
                         row=lookup_environment(runtime,row['environment_id'])

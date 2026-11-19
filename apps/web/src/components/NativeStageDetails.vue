@@ -5,7 +5,16 @@ import type { NativeCapture, NativeCaptureStage } from '../api';
 
 const props = defineProps<{ snapshot: NonNullable<NativeCapture['snapshot']> }>();
 const action = ref('all');
-const rawStage = ref<'ingress' | 'decoded_gemini' | 'cc_prepared' | 'wire_final'>(props.snapshot.stage === 'ingress_rejected' ? 'ingress' : props.snapshot.wire_final ? 'wire_final' : 'cc_prepared');
+type RawStage = 'ingress' | 'decoded_gemini' | 'cc_prepared' | 'wire_final';
+const ingressOnly = computed(() => props.snapshot.stage === 'agy_ingress'
+  || (props.snapshot.stage === 'ingress_rejected' && props.snapshot.stages?.length === 1
+    && props.snapshot.stages[0]?.stage === 'ingress'));
+const rawStage = ref<RawStage>(ingressOnly.value || props.snapshot.stage === 'ingress_rejected' ? 'ingress' : props.snapshot.wire_final ? 'wire_final' : 'cc_prepared');
+const rawStages = computed<RawStage[]>(() => {
+  if (ingressOnly.value) return ['ingress'];
+  if (props.snapshot.stage !== 'agy_prepared') return ['ingress', 'cc_prepared', 'wire_final'];
+  return props.snapshot.wire_final ? ['ingress', 'decoded_gemini', 'cc_prepared', 'wire_final'] : ['ingress', 'decoded_gemini', 'cc_prepared'];
+});
 const decisions = computed(() => (props.snapshot.header_policy?.decisions ?? []).filter(item => action.value === 'all' || item.action === action.value));
 const preview = computed(() => rawStage.value === 'ingress' ? props.snapshot.ingress : rawStage.value === 'decoded_gemini' ? props.snapshot.decoded_gemini : rawStage.value === 'wire_final' ? props.snapshot.wire_final : props.snapshot.stage === 'ingress_rejected' ? undefined : props.snapshot);
 const finalReason = computed(() => {
@@ -47,13 +56,13 @@ function bodyText(): string {
 <template>
   <div data-native-stages>
     <div class="request-stages"><article v-for="stage in stages" :key="stage.stage"><span>{{ label(stage.stage) }}</span><strong :class="{ready:stage.status==='complete'}">{{ label(stage.status) }}</strong><small>{{ stage.source }} · {{ stage.representation }}</small><small v-if="stage.note">{{ stage.note }}</small></article></div>
-    <section class="request-section"><div class="request-section-head"><h3>头部处理</h3><ChoiceSelect v-model="action" label="筛选头部处理动作" :options="[{value:'all',label:'全部动作'},{value:'drop',label:'只看删除'},{value:'runtime',label:'运行时处理'},{value:'context',label:'提取上下文'},{value:'keep',label:'保留'}]" /></div>
+    <section v-if="!ingressOnly" class="request-section"><div class="request-section-head"><h3>头部处理</h3><ChoiceSelect v-model="action" label="筛选头部处理动作" :options="[{value:'all',label:'全部动作'},{value:'drop',label:'只看删除'},{value:'runtime',label:'运行时处理'},{value:'context',label:'提取上下文'},{value:'keep',label:'保留'}]" /></div>
       <template v-if="snapshot.header_policy && snapshot.header_policy.status!=='unavailable'">
         <p class="request-header-summary">{{ label(snapshot.header_policy.status) }} · 保存 {{ snapshot.header_policy.stored_count ?? '未观测' }} / 实际 {{ snapshot.header_policy.observed_count ?? '未观测' }} 项<span>删除 {{ snapshot.header_policy.decisions.filter(item=>item.action==='drop').length }} 项</span></p>
         <div class="request-evidence-table"><table><thead><tr><th>字段</th><th>动作</th><th>原因</th></tr></thead><tbody><tr v-for="(item,index) in decisions" :key="index" :class="['keep','drop','runtime','context'].includes(item.action)?'request-header-'+item.action:''"><td><code>{{ item.name }}</code></td><td><span class="request-header-badge">{{ actionLabel(item.action) }}</span></td><td>{{ item.reason }}</td></tr><tr v-if="!decisions.length"><td colspan="3">当前筛选下没有已保存的处理项。</td></tr></tbody></table></div>
       </template><p v-else class="form-help">{{ snapshot.header_policy?.note ?? '历史记录未保存逐字段处理明细。' }}</p>
     </section>
-    <section class="request-section"><h3>正文变化</h3>
+    <section v-if="!ingressOnly" class="request-section"><h3>正文变化</h3>
       <template v-if="snapshot.body_changes && snapshot.body_changes.status!=='unavailable'"><p class="form-help">{{ label(snapshot.body_changes.status) }} · 来源：入口与组装结果的观察差异。路径使用 JSON Pointer。</p><dl class="request-definitions"><template v-for="(item,index) in snapshot.body_changes.items" :key="index"><dt><code>{{ item.path || '/' }}</code></dt><dd>{{ actionLabel(item.action) }} · {{ item.reason }}</dd></template></dl><p v-if="!snapshot.body_changes.items.length" class="form-help">本次观察到的正文内容保持一致。</p></template><p v-else class="form-help">{{ snapshot.body_changes?.note ?? '历史记录未保存正文变化证据。' }}</p>
     </section>
     <details v-if="snapshot.wire_final" class="request-code-block request-wire-evidence" data-native-wire-final><summary>原生TLS接受证据</summary><div class="request-wire-content">
@@ -78,7 +87,7 @@ function bodyText(): string {
         <p v-if="snapshot.final_body_changes.status === 'complete' && !snapshot.final_body_changes.items.length" class="text-muted-foreground">同次观察到的JSON字段保持一致。</p>
       </div>
     </div></details>
-    <section class="request-section"><div class="request-section-head"><h3>脱敏原文</h3><div class="request-stage-tabs" role="group" aria-label="原文阶段"><button v-for="stage in (snapshot.stage==='agy_prepared' ? (['ingress','decoded_gemini','cc_prepared','wire_final'] as const) : (['ingress','cc_prepared','wire_final'] as const))" :key="stage" type="button" :class="{active:rawStage===stage}" :aria-pressed="rawStage===stage" @click="rawStage=stage">{{ label(stage) }}</button></div></div>
+    <section class="request-section"><div class="request-section-head"><h3>脱敏原文</h3><div class="request-stage-tabs" role="group" aria-label="原文阶段"><button v-for="stage in rawStages" :key="stage" type="button" :class="{active:rawStage===stage}" :aria-pressed="rawStage===stage" @click="rawStage=stage">{{ label(stage) }}</button></div></div>
       <template v-if="preview"><p class="form-help request-evidence-hash">原正文 {{ preview.original_body_bytes ?? '未观测' }} 字节 · SHA256 {{ preview.original_body_sha256 ?? '未观测' }}</p><p v-if="preview.body_truncated || preview.headers_truncated" role="status" class="form-help">内容已截断。正文：{{ preview.body_truncated ? '已截断' : '完整' }}，请求头：{{ preview.headers_truncated ? '已截断' : '完整' }}。</p><details open class="request-code-block"><summary>请求头</summary><pre>{{ preview.headers.map(([name,value])=>name+': '+value).join('\n') }}</pre></details><details open class="request-code-block"><summary>请求正文</summary><pre>{{ bodyText() }}</pre></details></template><div v-else class="request-empty-capture"><strong>本次未保存所选阶段的原文</strong><p>组装中间值与最终 TLS 观测分别展示。</p></div>
     </section>
   </div>

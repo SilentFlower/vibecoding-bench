@@ -271,7 +271,10 @@ def _validate_preview(value,budget):
 def read_snapshot(root, account_id, attempt_id):
     """读取固定平台目录并合并有界阶段。@param root 已绑定环境根。@param account_id 账号。@param attempt_id 尝试。@return 脱敏快照。"""
     base = Path(root) / 'flows/api/agy-prepared'
-    value = _read(base, account_id, attempt_id, 'agy_prepared')
+    try:
+        value = _read(base, account_id, attempt_id, 'agy_prepared')
+    except FileNotFoundError:
+        value = None
     try:
         ingress = _read(base / 'ingress', account_id, attempt_id, 'agy_ingress')['ingress']
     except FileNotFoundError: ingress = None
@@ -280,8 +283,13 @@ def read_snapshot(root, account_id, attempt_id):
         raw = ingress['body'].encode()
         ingress['body'] = raw[:BODY_LIMIT // 4].decode('utf-8', errors='ignore')
         ingress['body_truncated'] = bool(ingress.get('body_truncated')) or len(raw) > BODY_LIMIT // 4
+        if value is None:
+            value = {**ingress, 'schema_version': 1, 'stage': 'agy_ingress', 'account_id': account_id,
+                'attempt_id': attempt_id, 'stages': []}
         value['ingress'] = ingress
         value['stages'].insert(0, {'stage': 'ingress', 'source': 'gateway_http_ingress', 'representation': 'http_logical_bytes', 'status': 'truncated' if ingress['body_truncated'] else 'complete'})
     else:
+        if value is None:
+            raise FileNotFoundError('本次请求的采集文件尚未保存')
         value['stages'].insert(0, {'stage':'ingress','source':'unavailable','representation':'unavailable','status':'unavailable','note':'本次入站旁路缺失或尚未保存'})
     return value

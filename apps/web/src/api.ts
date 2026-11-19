@@ -557,6 +557,8 @@ export interface DiagnosticContext {
   native_model_calls?: number | null
   control_state?: string | null
   control_observed_at?: string | null
+  input_rejection_reason?: string | null
+  input_rejection_field?: string | null
   response_headers_source?: string | null
   usage?: { source: string; usage_metadata: unknown; total_tokens: number | null; thoughts_tokens: number | null; complete: boolean } | null
   system_prompt_policy?: { enabled: boolean; rule_version: string; rule_sha256: string | null; source: string | null;
@@ -605,12 +607,12 @@ export interface NativeTlsCapture extends Omit<NativeCapturePreview, 'original_b
   binding_generation?: number
 }
 
-/** 已脱敏的 CC 组装后快照。 */
+/** 已脱敏的请求阶段快照。 */
 export interface NativeCapture {
   state: string
   message?: string
   snapshot?: {
-    stage: 'cc_prepared' | 'ingress_rejected' | 'agy_prepared'
+    stage: 'cc_prepared' | 'ingress_rejected' | 'agy_prepared' | 'agy_ingress'
     decoded_gemini?: NativeCapturePreview
     ingress?: NativeCapturePreview
     wire_final?: NativeTlsCapture

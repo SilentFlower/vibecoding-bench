@@ -9,6 +9,7 @@ use claude_code_gateway::store::scheduling_store::SchedulingStore;
 use claude_code_gateway::tlsfp;
 
 use std::env;
+use std::path::Path;
 use std::process::exit;
 use std::sync::Arc;
 use tracing::{info, warn};
@@ -104,7 +105,15 @@ async fn main() {
         .expect("初始化原生消息缓存默认配置失败");
     let prime_log_store = Arc::new(store::prime_log_store::PrimeLogStore::new(pool.clone()));
     let usage_store = Arc::new(store::usage_store::UsageStore::new(pool.clone()));
-    let diagnostics_store = Arc::new(DiagnosticsStore::new(pool.clone()));
+    let capture_root = if driver == "sqlite" {
+        Path::new(&dsn).parent().unwrap_or_else(|| Path::new("."))
+    } else {
+        Path::new("data")
+    };
+    let diagnostics_store = Arc::new(DiagnosticsStore::with_rejected_ingress_dir(
+        pool.clone(),
+        Some(capture_root.join("rejected-request-ingress")),
+    ));
 
     let proxy_client_pool_enabled = settings_store
         .get_value(

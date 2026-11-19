@@ -22,6 +22,7 @@ use crate::model::request_diagnostics::{
     DiagnosticTokens, ExecutionLocation, NativeRejection, NativeRequestObservation,
     RequestDiagnostic, RequestLogMode, normalize_correlation_id, safe_model,
 };
+use crate::service::native_capture;
 use crate::service::rewriter::extract_session_id_from_body;
 use crate::service::usage::UsageCapture;
 use crate::service::v3_scheduling::SchedulingRequest;
@@ -61,6 +62,13 @@ struct TraceState {
     local_outcome: Option<&'static str>,
     next_retry: Option<&'static str>,
     last_attempt: Option<(u32, String, Option<String>)>,
+    pending_ingress: Option<PendingIngress>,
+}
+
+struct PendingIngress {
+    headers: HeaderMap,
+    body: Option<Bytes>,
+    token: String,
 }
 
 /// 可跨响应生命周期持有的请求上下文，只存白名单摘要。
@@ -118,10 +126,24 @@ impl TraceContext {
                 local_outcome: None,
                 next_retry: None,
                 last_attempt: None,
+                pending_ingress: None,
             })),
         };
         trace.emit(None);
         trace
+    }
+
+    /// 仅在 Debug 保留已鉴权入站，终态若为本地拒绝才写入证据。@param headers 原始头。@param token 入口密钥。
+    pub(crate) fn remember_ingress(&self, headers: &HeaderMap, token: &str) {
+        if current_log_mode() == RequestLogMode::Debug
+            && self.store.rejected_ingress_dir().is_some()
+        {
+            self.lock().pending_ingress = Some(PendingIngress {
+                headers: headers.clone(),
+                body: None,
+                token: token.into(),
+            });
+        }
     }
 
     fn lock(&self) -> MutexGuard<'_, TraceState> {
@@ -323,6 +345,24 @@ pub(crate) fn native_rejection(
             capture_status: capture_status.to_owned(),
         });
     });
+}
+
+/// 记录已经完成读取的逻辑正文，清理和脱敏延后到本地拒绝终态。@param bytes 原逻辑正文。
+pub(crate) fn remember_ingress_body(bytes: &Bytes) {
+    if current_log_mode() == RequestLogMode::Debug {
+        let _ = CURRENT_TRACE.try_with(|trace| {
+            if let Some(ingress) = trace.lock().pending_ingress.as_mut() {
+                ingress.body = Some(bytes.clone());
+            }
+        });
+    }
+}
+
+/// 检查是否已打开本地拒绝入站采集。@return 仅已装配的 Debug 请求返回真。
+pub(crate) fn observes_rejected_ingress() -> bool {
+    CURRENT_TRACE
+        .try_with(|trace| trace.lock().pending_ingress.is_some())
+        .unwrap_or(false)
 }
 
 /// 记录既有 session 解析结果，绝不额外解析或刷新池 TTL。
@@ -815,6 +855,32 @@ impl RequestTraceGuard {
                 .get("x-request-id")
                 .and_then(|v| v.to_str().ok())
                 .map(normalize_correlation_id);
+            let pending = state.pending_ingress.take();
+            if (response.status().is_client_error() || response.status().is_server_error())
+                && state.request.attempt_count == 0
+                && state.request.native_rejection.is_none()
+                && let Some(pending) = pending
+                && let Some(directory) = self.trace.store.rejected_ingress_dir()
+            {
+                let status = native_capture::record_gateway_rejection(
+                    directory,
+                    &id,
+                    pending.headers,
+                    pending.body,
+                    pending.token,
+                );
+                let reason = state
+                    .request
+                    .context
+                    .as_ref()
+                    .and_then(|context| context.input_rejection_reason.clone())
+                    .or_else(|| state.request.error_stage.clone());
+                state.request.native_rejection = Some(NativeRejection {
+                    capture_id: id.clone(),
+                    reason,
+                    capture_status: status.into(),
+                });
+            }
         }
         let (parts, body) = response.into_parts();
         Response::from_parts(

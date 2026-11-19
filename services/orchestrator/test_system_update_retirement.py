@@ -96,6 +96,36 @@ class RetirementTests(unittest.TestCase):
                 self.assertEqual(partial.call_args.args[-1], body['allowed_image_ids'])
                 runtime.ensure.assert_not_called()
 
+                # 反重力升级在停止旧发送器后清除监督器记录，重建才能正常唤醒。
+                with connect() as connection:
+                    connection.executescript('CREATE TABLE platform_api_environments(gateway_account_id INTEGER,environment_id TEXT,platform TEXT);'
+                        "INSERT INTO account_environments VALUES('agy',NULL,8,'ready');"
+                        "INSERT INTO platform_api_environments VALUES(14,'agy','antigravity');")
+                target = Path(folder) / 'agy'
+                stale = target / 'runtime/native/agy/kernels/old/worker/supervisor.json'
+                archive = target / 'flows/api/agy-prepared/attempt'
+                archive.mkdir(parents=True)
+                (archive / 'home').mkdir()
+                payload = archive / 'snapshot.json'
+                payload.write_text('{}')
+                runtime._root = lambda row: target
+                runtime._stop_environment.side_effect = lambda row, remove: self.assertTrue(stale.is_file())
+                evidence.update(ready=True, active=0, environments=[])
+                for action in ('stop', 'rebuild'):
+                    stale.parent.mkdir(parents=True)
+                    stale.write_text('{}')
+                    with patch('agy_environment.transport') as transport:
+                        transport.side_effect = lambda *args, **kwargs: self.assertFalse(stale.exists())
+                        response = post({**body,'action':action,'environment_id':'agy','generation':8},headers)
+                    self.assertEqual(200,response.status_code)
+                    self.assertFalse((target / 'runtime/native/agy').exists())
+                    self.assertTrue(payload.is_file())
+                    self.assertFalse((archive / 'home').exists())
+                    if action == 'rebuild':
+                        transport.assert_called_once_with(runtime,14,system_maintenance=True)
+                    else:
+                        transport.assert_not_called()
+
                 # 更新恢复承接实际基础布局，不能因目标原生预算为空而再次阻断CLI。
                 fixture = test_account_runtime.AccountRuntimeTests()
                 fixture.setUp()

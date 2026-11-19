@@ -51,6 +51,7 @@ use crate::service::gateway::{
     parse_bootstrap_additional_model_options,
 };
 use crate::service::gemini::{self, GeminiService};
+use crate::service::native_capture;
 use crate::service::native_contract::validate_idle_timeout;
 use crate::service::oauth::TokenTester;
 use crate::service::oauth_flow::OAuthFlowService;
@@ -2971,6 +2972,12 @@ async fn request_native_capture(
             serde_json::json!({"state":"summary", "message":"本次请求仅保存摘要"})
         } else if rejected.capture_status == "disabled" {
             serde_json::json!({"state":"disabled", "message":"本次请求发生时内容采集已关闭"})
+        } else if rejected.capture_id == detail.request.request_id {
+            if let Some(directory) = store.rejected_ingress_dir() {
+                native_capture::read_gateway_rejection(directory, &rejected.capture_id).await
+            } else {
+                serde_json::json!({"state":"missing", "message":"本地入站快照不可用"})
+            }
         } else {
             let account_id = detail.request.account_id.ok_or(AppError::NotFound)?;
             runtime_bridge::native_capture(account_id, &rejected.capture_id).await?

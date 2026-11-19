@@ -465,6 +465,9 @@ class Supervisor:
                 if kind == 'tool_turn_finalized':
                     job['waiting'] = False
                     job['final_status'] = event.get('status')
+                if kind == 'rejected' and value.get('capture_enabled'):
+                    # 解析拒绝没有原生提交，仍让网关保存同次脱敏入站。
+                    event['capture_status'] = 'queued'
                 self.emit('native_event', value['request_id'], event=event,
                     credential_generation=value['credential_snapshot']['credential_generation'])
                 if kind in ['error', 'cancelled', 'rejected']:

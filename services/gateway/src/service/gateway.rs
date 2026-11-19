@@ -21,7 +21,7 @@ use std::error::Error;
 use std::future::Future;
 use std::io::Read;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tokio::time::{Instant as TokioInstant, timeout_at};
 use tracing::{debug, info, warn};
@@ -1758,6 +1758,10 @@ impl GatewayService {
             };
         };
         let trace = TraceContext::new(store.clone());
+        trace.remember_ingress(
+            req.headers(),
+            api_token.map_or("", |token| token.token.as_str()),
+        );
         let guard = RequestTraceGuard::new(trace.clone());
         let response = match CURRENT_TRACE
             .scope(trace, self.handle_request_inner(req, api_token))
@@ -2077,11 +2081,25 @@ impl GatewayService {
         let (request_profile, default_tls_profile) = {
             let snapshot = self.access_profile_config.read().await;
             if let Err(rejection) = snapshot.policy.check_user_agent(&ua) {
+                drop(snapshot);
                 diagnostics::error_stage("access_policy");
                 warn!(
                     "access policy rejected request: setting={} reason={}",
                     rejection.setting, rejection.reason
                 );
+                if diagnostics::observes_rejected_ingress() {
+                    // 原准入已判定拒绝。只在短预算内观察已经送达的 Debug 正文。
+                    let observe = async {
+                        if let Ok(encoding) = RequestBodyEncoding::from_headers(&native_header_map)
+                            && let Ok(raw) =
+                                axum::body::to_bytes(req.into_body(), REQUEST_BODY_LIMIT).await
+                            && let Ok(decoded) = encoding.decode(raw).await
+                        {
+                            diagnostics::remember_ingress_body(&decoded);
+                        }
+                    };
+                    let _ = tokio::time::timeout(Duration::from_millis(250), observe).await;
+                }
                 return Ok(access_policy_error_response(&rejection));
             }
             // 准入通过后，在同一个读锁内冻结；body 与重试不重新决定画像。
@@ -2117,6 +2135,7 @@ impl GatewayService {
             Err(error) => return Ok(request_body_codec_error_response(error)),
         };
 
+        diagnostics::remember_ingress_body(&body_bytes);
         // 解析请求体
         let body_map: serde_json::Value = if body_bytes.is_empty() {
             serde_json::json!({})

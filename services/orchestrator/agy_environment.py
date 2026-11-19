@@ -240,13 +240,26 @@ def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance
 
 def clear_work_copies(runtime, row: dict) -> None:
     """在角色实际停止后清理派生进程与AT副本，保留采集。@param runtime 现有运行时。@param row 原环境。@return 无。"""
-    shutil.rmtree(runtime._root(row)/'runtime/native/agy',ignore_errors=True)
-    captures=runtime._root(row)/'flows/api/agy-prepared'
+    root=runtime._root(row)
+    try:
+        shutil.rmtree(root/'runtime/native/agy')
+    except FileNotFoundError:
+        pass
+    captures=root/'flows/api/agy-prepared'
     if captures.is_dir() and not captures.is_symlink():
         for folder in captures.iterdir():
             if folder.is_dir() and not folder.is_symlink():
                 shutil.rmtree(folder/'home',ignore_errors=True)
-                atomic_json(folder/'retired.json',{'retired_at':time.time()})
+                if not (folder/'retired.json').is_file():
+                    atomic_json(folder/'retired.json',{'retired_at':time.time()})
+
+
+def stop_environment(runtime, row: dict, *, remove: bool) -> None:
+    """在实际停止反重力角色后清理该环境的派生状态。@param runtime 现有运行时。@param row 已排空的环境。@param remove 是否移除已停止角色。@return 无。"""
+    runtime._stop_environment(row,remove=remove)
+    # Docker 停机可能直接终止监督进程。旧启动记录属于已停止的进程，会误拦后续唤醒。
+    clear_work_copies(runtime,row)
+    runtime._update(row,state='stopped')
 
 
 def quiesce(runtime, row: dict, proof: dict) -> None:
@@ -258,9 +271,7 @@ def quiesce(runtime, row: dict, proof: dict) -> None:
             raise ValueError('AGY配置事务许可已变化')
         if runtime._running_sender_active(row):
             raise ValueError('AGY原生请求或工具轮仍在执行')
-        runtime._stop_environment(row,remove=True)
-        clear_work_copies(runtime,row)
-        runtime._update(row,state='stopped')
+        stop_environment(runtime,row,remove=True)
 
 
 def maintenance(runtime, row: dict, operation: str) -> None:
@@ -283,10 +294,6 @@ def maintenance(runtime, row: dict, operation: str) -> None:
             if actual.get('reconcile_allowed') is not True:
                 raise ValueError('AGY原生控制仍有有效工作，等待原截止收口')
         runtime.gateway._request('POST',path,{'operation':'claim','owner':owner,'generation':proof['generation']})
-        runtime._stop_environment(row,remove=operation in ('rebuild','reconcile'))
-        if operation in ('rebuild','reconcile'):
-            # 角色已经实际停止，原工具轮随故障终止；只清理派生worker与AT工作副本。
-            clear_work_copies(runtime,row)
-        runtime._update(row,state='stopped')
+        stop_environment(runtime,row,remove=operation in ('rebuild','reconcile'))
     finally:
         runtime.gateway._request('POST',path,{'operation':'release','owner':owner,'generation':proof['generation']})
