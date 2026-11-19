@@ -3,6 +3,7 @@ import argparse
 import json
 import os
 import shutil
+import sys
 import tempfile
 import time
 import uuid
@@ -11,15 +12,108 @@ from pathlib import Path
 from source_layout import source_path
 
 
+def _failure_evidence(container, phase: str, generation: int) -> dict:
+    """收集固定合成探针的白名单证据。@param container 本次容器。@param phase 等待阶段。@param generation 合成代次。@return 有界脱敏摘要。"""
+    result = {'event': 'agy-probe-failure', 'phase': phase, 'credential_generation': generation,
+        'capture_failed': []}
+    try:
+        container.reload()
+        state = container.attrs.get('State', {})
+        result['state'] = {key: state.get(key) if type(state.get(key)) is kind else None
+            for key, kind in [('Running', bool), ('OOMKilled', bool), ('ExitCode', int)]}
+    except Exception:
+        result['capture_failed'].append('state')
+    try:
+        counts, codes = {}, {}
+        # 只保留协议分类；异常正文、凭据、身份和完整原生日志均不进入公开摘要。
+        for line in container.logs(tail=32)[-32768:].splitlines():
+            try:
+                value = json.loads(line)
+            except (ValueError, UnicodeError):
+                continue
+            if not isinstance(value, dict):
+                continue
+            kind = value.get('type')
+            kind = kind if kind in ('supervisor_ready', 'prepared', 'job_finalized', 'status',
+                'error', 'rejected', 'worker_error', 'shutdown_complete') else 'other'
+            counts[kind] = counts.get(kind, 0) + 1
+            if kind in ('error', 'rejected', 'worker_error'):
+                code = value.get('code')
+                code = code if code in ('worker_start_failed', 'request_deadline_exceeded',
+                    'worker_capacity_deadline', 'supervisor_execution_failed', 'invalid_submission',
+                    'invalid_supervisor_input', 'supervisor_closed') else 'other'
+                codes[code] = codes.get(code, 0) + 1
+        result.update(event_counts=counts, error_codes=codes)
+    except Exception:
+        result['capture_failed'].append('events')
+    code = r'''import json,os
+from itertools import islice
+from pathlib import Path
+result={'processes':{},'memory_events':{},'stages':{},'startup_errors':{}}
+for path in list(Path('/proc').iterdir()):
+    if not path.name.isdigit():continue
+    try:
+        with (path/'cmdline').open('rb') as stream:args=stream.read(4096).split(b'\x00')
+        try:exe=os.readlink(path/'exe')
+        except OSError:exe=''
+        role=('supervisor' if b'agy_runtime.supervisor' in args else 'kernel' if b'agy_runtime.kernel' in args
+            else 'observer' if exe.endswith('/observer-c') or args[0].endswith(b'/observer-c')
+            else 'native' if exe.startswith('/memfd:agy-native-runtime') else 'other')
+        result['processes'][role]=result['processes'].get(role,0)+1
+    except OSError:continue
+for name in ('memory.events','memory/memory.failcnt'):
+    try:
+        text=(Path('/sys/fs/cgroup')/name).read_text()
+        if name.endswith('failcnt'):result['memory_events']['failcnt']=int(text)
+        else:
+            for line in text.splitlines():
+                key,value=line.split()
+                if key in ('oom','oom_kill','max'):result['memory_events'][key]=int(value)
+    except (OSError,ValueError):continue
+for name,pattern in [('worker_config','*/config.json'),('kernel_lock','*/state/kernel.lock'),('kernel_error','*/state/kernel-error.log'),('input_pipe','*/state/workers/*/*/input.pipe'),('listener_identity','*/state/workers/*/listener-identity.json')]:
+    result['stages'][name]=sum(1 for _ in islice(Path('/state/root/workers').glob(pattern),256))
+for path in islice(Path('/state/root/workers').glob('*/state/kernel-error.log'),256):
+    try:
+        with path.open('rb') as stream:
+            stream.seek(max(0,os.fstat(stream.fileno()).st_size-8192));lines=stream.read(8192).decode(errors='replace').splitlines()
+        for line in lines:
+            kind=line.split(':',1)[0]
+            if kind in ('RuntimeError','ValueError','PermissionError','FileNotFoundError','TimeoutError','OSError'):
+                result['startup_errors'][kind]=result['startup_errors'].get(kind,0)+1
+            for message,reason in [('RuntimeError: 原生观察器握手失败','observer_handshake_failed'),('RuntimeError: native_listener_identity_timeout','native_listener_identity_timeout'),('ValueError: image_decode_failed','image_decode_failed')]:
+                if line==message:result['startup_errors'][reason]=result['startup_errors'].get(reason,0)+1
+    except OSError:continue
+print(json.dumps(result))
+'''
+    try:
+        probe = container.exec_run(['python3', '-c', code], user='1001:1001')
+        if probe.exit_code != 0 or len(probe.output) > 8192:
+            raise ValueError('诊断子进程失败')
+        # 容器返回值也再次投影，避免诊断源码后续扩展时意外公开私有字段。
+        value = json.loads(probe.output)
+        result['runtime'] = {section: {key: number for key, number in value[section].items()
+            if key in keys and type(number) is int and 0 <= number < 2**63}
+            for section, keys in [('processes', ('supervisor', 'kernel', 'observer', 'native', 'other')),
+                ('memory_events', ('oom', 'oom_kill', 'max', 'failcnt')),
+                ('stages', ('worker_config', 'kernel_lock', 'kernel_error', 'input_pipe', 'listener_identity')),
+                ('startup_errors', ('RuntimeError', 'ValueError', 'PermissionError', 'FileNotFoundError',
+                    'TimeoutError', 'OSError', 'observer_handshake_failed', 'native_listener_identity_timeout', 'image_decode_failed'))]}
+    except Exception:
+        result['capture_failed'].append('runtime')
+    return result
+
+
 def native_probe(image: str, *, crash: bool = False, image_package: bool = False) -> dict:
     """在明确镜像中执行零模型探针。@param image 已有测试镜像。@param crash 是否杀监督器。@param image_package 是否只使用镜像内包。@return 分项证据。"""
     import docker
     root=Path(__file__).resolve().parents[2]
     package=source_path(root,'orchestrator')
     temporary=Path(tempfile.mkdtemp(prefix='agy-native-offline-'))
-    client=docker.from_env(timeout=15)
+    client=None
     container=connection=None
+    phase,generation='launch',0
     try:
+        client=docker.from_env(timeout=15)
         temporary.chmod(0o700)
         os.chown(temporary,1001,1001)
         config={'account_id':17,'environment_id':'synthetic-env','environment_generation':2,'max_workers':1,
@@ -47,6 +141,8 @@ def native_probe(image: str, *, crash: bool = False, image_package: bool = False
                 except ValueError:continue
             return result
         def wait(kind, request=None):
+            nonlocal phase
+            phase=kind
             until=time.monotonic()+50
             while time.monotonic()<until:
                 for event in events():
@@ -98,10 +194,30 @@ print(json.dumps({'terminated':not any(running(pid) for pid in pids)}))
                 if name in ('controller','native','observer') and values} for process in status['processes']],
             'cgroup_memory':status['cgroup_memory'],
             'crash':crash,'terminated':terminated}
+    except Exception:
+        if container:
+            try:
+                print(json.dumps(_failure_evidence(container,phase,generation)),file=sys.stderr,flush=True)
+            except Exception:
+                # 诊断本身失败时仍保留首个验证异常及后续容器清理。
+                pass
+        raise
     finally:
-        if connection:connection.close()
-        if container:container.remove(force=True)
-        shutil.rmtree(temporary)
+        original_error=sys.exception()
+        cleanup_failed=[]
+        # 独立尝试各项清理，保持首错，同时避免一次关闭异常跳过后续资源收口。
+        for name, cleanup in [('connection', lambda: connection.close() if connection else None),
+                ('container', lambda: container.remove(force=True) if container else None),
+                ('state', lambda: shutil.rmtree(temporary)),
+                ('client', lambda: client.close() if client else None)]:
+            try:cleanup()
+            except Exception:cleanup_failed.append(name)
+        if cleanup_failed:
+            try:
+                print(json.dumps({'event':'agy-probe-cleanup-failure','steps':cleanup_failed}),file=sys.stderr,flush=True)
+            except Exception:
+                pass
+            if original_error is None:raise ValueError('AGY探针清理失败')
 
 
 def main() -> None:

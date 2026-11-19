@@ -668,6 +668,7 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - `export` 独占交付 `agy-execution-linux-x64.xz` 与 `agy-artifact.json`。清单含 `schema_version=1`、`source_version=1.5.9`、`archive{name,bytes,sha256}` 和 `image{bytes,sha256}`。
 - `prepare` 返回已核验的 `agy-1.5.9`，CI通过现有 `GITHUB_ENV` 写入 `V3_AGY_AUTH_ASSET`；显式输入优先，缓存身份每次核验。
 - `verify_agy_runtime.native_probe(image, *, crash=False, image_package=False)` 默认研究模式；正式验收显式设置 `image_package=True`，只挂合成状态。
+- 探针失败在stderr输出 `event=agy-probe-failure`，含 `phase`、`credential_generation`、`capture_failed` 及可用的 `state/event_counts/error_codes/runtime`；清理异常另输出 `event=agy-probe-cleanup-failure,steps=[connection|container|state|client]`。
 
 ### 3. Contracts
 
@@ -678,6 +679,8 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - 自动构建及完整手动构建共用只读附件准备action；候选复用跳过准备和构建。两条发布路径均在交付前执行镜像验收，可信候选的必需成功步骤包含“验收镜像内AGY能力”。
 - 正式候选、镜像发布及系统签发使用 `require_auth_asset` 要求 `agy_auth.available=true` 及固定身份。`inspect_images` 对声明可用能力的两个角色核对 `agy-runtime-protocol=1`，account的auth/runtime源摘要须与清单一致。历史读取及通用本地可选构建沿原边界处理缺省能力。
 - CI宿主通过sudo调用同一虚拟环境解释器，以改属私有合成状态目录和配置。实际容器继续UID1001、断网、只读根、cap-drop及有限内存；只使用镜像自带包，验收两代凭据、单次共享解码和正常/异常物理退出。外部模型调用预算为0。
+- 失败诊断只投影固定协议分类、Running/OOMKilled/ExitCode、进程角色、阶段及资源计数。日志最多取末32行并在解析前截为末32768字节；固定容器诊断输出上限8192字节，宿主再次按字段白名单和非负整数投影。私有启动错误仅提取固定异常类型及已登记原因；worker提前回收后的文件阶段计数按实际为0，字段缺省表示未知。
+- 连接、容器、临时状态及Docker客户端独立尝试清理；诊断或清理异常保留原验证错误。原验证成功而清理失败时返回非零状态。诊断中间提交保留后续根因验收和实际CI运行记录。
 
 ### 4. Validation & Error Matrix
 
@@ -689,16 +692,20 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 | 正式清单缺失能力或实际镜像标签失配 | 在镜像推送和签发前拒绝 |
 | 镜像模块、资源或零模型退出验收失败 | 阻止候选交付及正式发布 |
 | 普通runner直接调用需改属状态的探针 | PermissionError；工作流必须通过sudo调用同一解释器 |
+| 探针启动/准备超时，或诊断采集失败 | 输出有界分类及采集失败步骤，原异常继续抛出 |
+| 单项清理失败 | 后续清理继续；保留首错，原成功路径转为清理失败 |
 
 ### 5. Scenarios and Examples
 
 - 正常：核验并交付本仓处理产物附件 → CI恢复或下载XZ并验证两层身份 → 构建当前适配资源与镜像 → 验收镜像自身 → 导出候选或进入原兼容、签名流程。
 - 边界：同源码候选复用通过来源与归档检查、换批后，仍执行实际镜像验收；历史已签发行读取保持原合同。
 - 错误用法：仅挂当前源码做探针就认定镜像完整，或在root本地验证后直接让普通runner执行改属。正确处理：正式探针使用 `image_package=True`，工作流以sudo调用原虚拟环境，容器身份及权限约束继续核对。
+- 故障定位：正式CI准备失败时先保留受控阶段与资源摘要，再删除临时根。错误用法是把完整HOME或原生日志直接打印；正确处理是先做白名单投影，再依据正式CI证据定位根因。
 
 ### 6. Tests Required
 
 - `test_agy_artifact`：现有处理产物导出、冷热缓存、双层身份、截断/尾随/拼接、解码预算、链接及中断原子交付。
 - `test_agy_images`、`test_publication`、`test_system_candidate_build`、`test_system_publish`：能力缺失在副作用前拒绝、实际标签匹配、候选换批与历史兼容。
 - `test_system_workflow`：真实YAML准备→构建→镜像验收→交付顺序、候选复用条件、两个验收步骤的sudo及同一解释器。全部run步骤执行 `bash -n`。
+- `test_system_agy_probe`：敏感/未知字段排除、字节及数值预算、诊断失败、首错保留、各项清理独立执行及客户端建立失败时的状态回收；测试由CI现有 `test_system*.py` 宿主发现覆盖。
 - 真实Docker复现旧白名单COPY缺失；修正版镜像只读导入、资源身份及断网正常/异常退出均通过。隔离夹具与正式完整镜像CI结果分别记录。
