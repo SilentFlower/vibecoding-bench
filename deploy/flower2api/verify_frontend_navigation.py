@@ -40,7 +40,8 @@ async def run(output):
                 else:
                     await page.get_by_role('link', name=label, exact=True).click()
                 await expect(page).to_have_url(BASE + path)
-                await expect(page.locator('.toolbar-page')).to_have_text(label)
+                # 应用栏显示页面标题：账号页标题为「账号管理」，其余与导航名相同。
+                await expect(page.locator('.toolbar-page')).to_have_text('账号管理' if label == '账号' else label)
                 if width < 768:
                     await expect(page.locator('.mobile-navigation-panel')).to_have_count(0)
                 elif label != '系统更新':

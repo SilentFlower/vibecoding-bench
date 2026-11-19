@@ -1,0 +1,137 @@
+/* 控制台外壳与登录页：侧栏、移动端应用栏与抽屉、内容区、登录页。只引用 --ui-* token（默认值见 legacy-web/ui-foundation.css）。
+   基准：doc/design/console-v2/mock.html 的 .sb / .page / .m-top，登录页为 doc/design/console-v2/v1/mock.html#login。
+   类名沿用旧外壳（脚本与业务代码依赖），旧的未分层规则已删除。 */
+@layer components {
+  /* ---------- 外壳与内容区 ---------- */
+  .console-shell { --navigation-width: 248px; min-height: 100dvh; background: var(--ui-color-layout); }
+  .console-shell.sidebar-collapsed { --navigation-width: 76px; }
+  /* 外壳容器内只有外壳自身的文字，可设置可继承的文字属性；内容区 main 不设，避免改变未迁移页面。 */
+  .console-sidebar, .console-toolbar, .mobile-navigation-panel { color: var(--ui-color-text); font: 400 var(--ui-font-size-md)/1.55 var(--ui-font-family); }
+  .console-workspace { min-width: 0; margin-left: var(--navigation-width); }
+  .console-content { padding: calc(var(--ui-space-unit) * 6) calc(var(--ui-space-unit) * 7) calc(var(--ui-space-unit) * 12); }
+
+  /* ---------- 侧栏：品牌行 · 导航（内部滚动）· 底部管理员区 ---------- */
+  .console-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 40; display: flex; flex-direction: column; width: var(--navigation-width); padding: calc(var(--ui-space-unit) * 5) calc(var(--ui-space-unit) * 3.5) calc(var(--ui-space-unit) * 3.5); background: var(--ui-color-surface); box-shadow: var(--ui-shadow-side); }
+  /* 标志跨两行居中；名称与版本号同一行，说明在下一行（设计稿 .sb-brand）。 */
+  .console-brand-row { display: grid; flex-shrink: 0; grid-template-areas: 'mark name version' 'mark tagline tagline'; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; padding: 0 calc(var(--ui-space-unit) * 1.5); }
+  .console-brand-mark { grid-area: mark; display: grid; place-items: center; width: 40px; height: 40px; margin-right: 11px; border-radius: calc(var(--ui-radius-block) - 1px); background: var(--ui-color-ink); }
+  .console-brand-mark:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
+  .console-brand-name { grid-area: name; color: var(--ui-color-text); font-size: calc(var(--ui-font-size-title) + 1px); font-weight: 780; letter-spacing: -.01em; }
+  .brand-update { grid-area: version; justify-self: start; display: inline-flex; align-items: center; gap: 4px; height: 20px; margin-left: 7px; padding: 0 7px; border-radius: var(--ui-radius-btn); background: var(--ui-color-fill); color: var(--ui-color-text-2); font: 650 calc(var(--ui-font-size-xs) - 1px)/1 var(--ui-font-family-mono); white-space: nowrap; text-decoration: none; transition: background-color .15s; }
+  .brand-update svg { flex: none; width: 12px; height: 12px; }
+  .brand-update:hover { background: var(--ui-color-fill-hover); }
+  .brand-update.has-update { background: var(--ui-color-success-bg); color: var(--ui-color-success-text); }
+  .brand-update.has-update:hover { background: color-mix(in srgb, var(--ui-color-success-bg), var(--ui-color-success) 12%); }
+  .brand-update:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
+  .sidebar-tagline { grid-area: tagline; margin-top: 2px; color: var(--ui-color-text-3); font-size: var(--ui-font-size-xs); font-weight: 550; }
+
+  .console-navigation { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow-y: auto; }
+  .navigation-group { display: flex; flex-direction: column; }
+  .navigation-group-label { margin: 0; padding: calc(var(--ui-space-unit) * 4.5) calc(var(--ui-space-unit) * 3) calc(var(--ui-space-unit) * 1.5); color: var(--ui-color-text-4); font-size: var(--ui-font-size-sm); font-weight: 650; }
+  .navigation-system { margin-top: calc(var(--ui-space-unit) * 3.5); }
+  .navigation-item { display: flex; flex-shrink: 0; align-items: center; gap: calc(var(--ui-space-unit) * 3); height: calc(var(--ui-control-md) + 4px); padding: 0 calc(var(--ui-space-unit) * 3); border-radius: var(--ui-radius-control); color: var(--ui-color-text-2); font-size: var(--ui-font-size-title); font-weight: 600; text-decoration: none; transition: background-color .15s, color .15s; }
+  .navigation-item svg { flex: none; width: 18px; height: 18px; color: var(--ui-color-text-3); }
+  .navigation-item:hover { background: var(--ui-color-fill); color: var(--ui-color-text); }
+  .navigation-item.is-active { background: var(--ui-color-fill-active); color: var(--ui-color-text); font-weight: 720; }
+  .navigation-item.is-active svg { color: var(--ui-color-primary); }
+  .navigation-item:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: -2px; }
+  .navigation-count { display: grid; place-items: center; min-width: 26px; height: 20px; margin-left: auto; padding: 0 6px; border-radius: var(--ui-radius-btn); background: var(--ui-color-fill); color: var(--ui-color-text-2); font: 700 calc(var(--ui-font-size-xs) - .5px) var(--ui-font-family-mono); }
+  .navigation-item.is-active .navigation-count { background: var(--ui-color-surface); }
+  .navigation-running { display: inline-flex; align-items: center; gap: 5px; height: 20px; margin-left: auto; padding: 0 7px; border-radius: var(--ui-radius-btn); background: var(--ui-color-success-bg); color: var(--ui-color-success-text); font: 700 calc(var(--ui-font-size-xs) - .5px) var(--ui-font-family-mono); }
+  .navigation-running::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--ui-color-success); }
+  .navigation-running[data-idle=true] { background: var(--ui-color-fill); color: var(--ui-color-text-3); }
+  .navigation-running[data-idle=true]::before { background: var(--ui-color-text-4); }
+
+  .sidebar-footer { display: flex; flex-shrink: 0; align-items: center; gap: calc(var(--ui-space-unit) * 1.5); margin-top: calc(var(--ui-space-unit) * 3); padding: calc(var(--ui-space-unit) * 2); border-radius: var(--ui-radius-block); background: var(--ui-color-fill-subtle); }
+  .sidebar-avatar { display: grid; flex: none; place-items: center; width: 30px; height: 30px; border-radius: calc(var(--ui-radius-control) + 1px); background: var(--ui-color-primary-container); color: var(--ui-color-primary-text); font-weight: 750; }
+  .sidebar-identity { display: grid; flex: 1; min-width: 0; }
+  .sidebar-identity strong { overflow: hidden; font-size: var(--ui-font-size-md); font-weight: 720; text-overflow: ellipsis; white-space: nowrap; }
+  .sidebar-identity small { overflow: hidden; color: var(--ui-color-text-3); font-size: var(--ui-font-size-xs); text-overflow: ellipsis; white-space: nowrap; }
+  .sidebar-tools { display: flex; flex: none; gap: 2px; margin-left: auto; }
+  .sidebar-tool { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: var(--ui-radius-btn); background: transparent; color: var(--ui-color-text-3); cursor: pointer; transition: background-color .15s, color .15s; }
+  .sidebar-tool svg { width: 14px; height: 14px; }
+  .sidebar-tool:hover:not(:disabled) { background: var(--ui-color-fill); color: var(--ui-color-text); }
+  .sidebar-tool:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 1px; }
+  .sidebar-tool:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* 折叠：只留标志、版本图标、导航图标与两个工具按钮；分组名仅读屏可见（AppNavigation 加 sr-only）。 */
+  .sidebar-collapsed .sidebar-label { display: none; }
+  .sidebar-collapsed .console-brand-row { grid-template-areas: 'mark' 'version'; grid-template-columns: minmax(0, 1fr); justify-items: center; row-gap: 10px; padding: 0; }
+  .sidebar-collapsed .console-brand-mark { margin-right: 0; }
+  .sidebar-collapsed .brand-update { justify-self: center; margin-left: 0; padding: 0 6px; }
+  .sidebar-collapsed .console-navigation { gap: calc(var(--ui-space-unit) * 3); padding-top: calc(var(--ui-space-unit) * 4); }
+  .sidebar-collapsed .navigation-system { margin-top: 0; }
+  .sidebar-collapsed .navigation-item { justify-content: center; padding: 0; }
+  .sidebar-collapsed .sidebar-footer { flex-direction: column; padding: calc(var(--ui-space-unit) * 1.5) 0; }
+  .sidebar-collapsed .sidebar-avatar { display: none; }
+  .sidebar-collapsed .sidebar-tools { flex-direction: column; margin-left: 0; }
+
+  /* ---------- 移动端应用栏与抽屉（≤760px，设计稿 .m-top） ---------- */
+  .console-toolbar { display: none; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); padding: calc(var(--ui-space-unit) * 3) calc(var(--ui-space-unit) * 4); background: var(--ui-color-surface); box-shadow: var(--ui-shadow-bar); }
+  .console-toolbar-mark { display: grid; flex: none; place-items: center; width: 34px; height: 34px; border-radius: calc(var(--ui-radius-control) + 1px); background: var(--ui-color-ink); }
+  .toolbar-page { min-width: 0; overflow: hidden; color: var(--ui-color-text); font-size: calc(var(--ui-font-size-card) + 1px); font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+  .mobile-sidebar-toggle { display: grid; flex: none; place-items: center; width: 36px; height: 36px; margin-left: auto; padding: 0; border: 0; border-radius: calc(var(--ui-radius-control) + 1px); background: var(--ui-color-fill); color: var(--ui-color-text-2); cursor: pointer; transition: background-color .15s; }
+  .mobile-sidebar-toggle svg { width: 18px; height: 18px; }
+  .mobile-sidebar-toggle:hover { background: var(--ui-color-fill-hover); }
+  .mobile-sidebar-toggle:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
+  /* 抽屉沿用 Dialog（焦点圈定、Esc 关闭），定位由模板传入的工具类覆盖居中定位；这里只定外观。 */
+  .mobile-navigation-panel { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 4); padding: calc(var(--ui-space-unit) * 5) calc(var(--ui-space-unit) * 3.5) calc(var(--ui-space-unit) * 3.5); border-radius: 0; background: var(--ui-color-surface); box-shadow: var(--ui-shadow-modal); }
+  .mobile-navigation-panel .console-brand-name { margin: 0; padding: 0; font-size: calc(var(--ui-font-size-title) + 1px); font-weight: 780; line-height: 1.55; }
+  .mobile-navigation-panel .console-navigation { flex: 1; }
+  .mobile-navigation-panel .sidebar-footer { margin-top: 0; }
+
+  @media (max-width: 1000px) and (min-width: 761px) {
+    .console-shell { --navigation-width: 224px; }
+    .console-sidebar { padding-inline: calc(var(--ui-space-unit) * 3); }
+    .console-content { padding-inline: calc(var(--ui-space-unit) * 5); }
+  }
+  @media (min-width: 1920px) { .console-shell { --navigation-width: 264px; } }
+  @media (min-width: 2560px) { .console-shell { --navigation-width: 280px; } }
+  @media (max-width: 760px) {
+    .console-sidebar { display: none; }
+    .console-workspace { margin-left: 0; }
+    .console-toolbar { display: flex; }
+    .console-content { padding: calc(var(--ui-space-unit) * 3) calc(var(--ui-space-unit) * 4) calc(var(--ui-space-unit) * 8); }
+  }
+
+  /* ---------- 登录页（第一版设计：深墨品牌区 + 表单；表单控件为组件库统一样式） ---------- */
+  .login-page { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 100dvh; font-family: var(--ui-font-family); line-height: 1.5; }
+  .login-art { position: relative; display: flex; flex-direction: column; overflow: hidden; padding: calc(var(--ui-space-unit) * 14) calc(var(--ui-space-unit) * 16); background: var(--ui-color-ink); color: var(--ui-color-on-ink); }
+  .login-art-pattern { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .login-art-petals path { fill: var(--ui-color-brand); }
+  .login-art-rings circle { fill: none; stroke: var(--ui-color-on-ink); stroke-opacity: .05; stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .login-art-brand { position: relative; display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 3); }
+  .login-art-brand b { font-size: var(--ui-font-size-heading); font-weight: 650; }
+  .login-art-copy { position: relative; margin-top: auto; }
+  .login-art-copy h2 { margin: 0; font-size: calc(var(--ui-font-size-page) + 12px); font-weight: 650; line-height: 1.15; letter-spacing: -.02em; }
+  .login-art-copy p { max-width: 380px; margin: calc(var(--ui-space-unit) * 4) 0 0; color: var(--ui-color-ink-text); font-size: calc(var(--ui-font-size-title) + 1px); }
+  .login-art-meta { display: flex; gap: calc(var(--ui-space-unit) * 7); margin-top: calc(var(--ui-space-unit) * 10); color: var(--ui-color-ink-muted); font-size: var(--ui-font-size-meta); }
+  .login-form-area { display: grid; place-items: center; padding: calc(var(--ui-space-unit) * 8); background: var(--ui-color-surface); color: var(--ui-color-text); }
+  .login-form { display: flex; flex-direction: column; gap: 22px; width: min(360px, 100%); }
+  .login-heading h1 { margin: 0; font-size: calc(var(--ui-font-size-heading) + 4px); font-weight: 650; }
+  .login-heading p { margin: calc(var(--ui-space-unit) * 1.5) 0 0; color: var(--ui-color-text-3); font-size: calc(var(--ui-font-size-md) + .5px); }
+  .login-field { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 1.5); }
+  .login-password { height: var(--ui-control-lg); }
+  .login-reveal { display: grid; flex: none; place-items: center; width: 28px; height: 28px; margin-right: calc(var(--ui-space-unit) * -1); padding: 0; border: 0; border-radius: var(--ui-radius-btn); background: transparent; color: var(--ui-color-text-4); cursor: pointer; }
+  .login-reveal svg { width: 14px; height: 14px; }
+  .login-reveal:hover, .login-reveal[aria-pressed=true] { color: var(--ui-color-primary); }
+  .login-reveal:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 1px; }
+  .login-submit { width: 100%; }
+  .login-error { margin: 0; color: var(--ui-color-danger-text); font-size: var(--ui-font-size-sm); }
+  .login-note { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-meta); text-align: center; }
+  .login-mobile-brand { display: none; }
+  @media (max-width: 760px) {
+    .login-page { grid-template-columns: minmax(0, 1fr); }
+    .login-art { display: none; }
+    .login-form-area { padding: calc(var(--ui-space-unit) * 6); }
+    .login-mobile-brand { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); font-size: calc(var(--ui-font-size-card) + 1px); font-weight: 800; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .brand-update, .navigation-item, .sidebar-tool, .mobile-sidebar-toggle { transition: none; }
+  }
+}
+
+/* 未分层：style.css 的全局弹窗高度规则（max-height: 100dvh - 32px）未分层，会压过任何层内规则；
+   抽屉须同样未分层且选择器更具体，才能铺满视口高度。 */
+[data-slot=dialog-content].mobile-navigation-panel { height: 100dvh; max-height: 100dvh; }

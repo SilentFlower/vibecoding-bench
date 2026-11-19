@@ -16,6 +16,7 @@ import { schedulingReasonLabel } from '../lib/scheduling';
 import { accountUpdateDelta } from '../lib/accountUpdate';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -1222,9 +1223,8 @@ async function copyText(text: string) {
   <div class="space-y-4">
     <template v-if="!workspaceAccountId">
     <!-- 标题栏 -->
-    <div class="page-heading">
-      <div><p class="page-eyebrow">连接与调度</p><h2>账号管理</h2><p class="page-description">状态、用量和调度集中展示，常用操作直接可达。</p></div>
-      <div class="flex gap-2">
+    <PageHeader title="账号管理" description="状态、用量和调度集中展示，常用操作直接可达。">
+      <template #actions>
         <Button
           @click="openOAuthFlow()"
           variant="outline"
@@ -1232,14 +1232,11 @@ async function copyText(text: string) {
         >
           <KeyRound :size="15" />授权登录
         </Button>
-        <Button
-          @click="openCreate"
-          class="bg-primary hover:bg-primary text-white font-medium rounded-xl transition-all duration-200 hover:shadow-md"
-        >
+        <Button @click="openCreate">
           <Plus :size="15" />添加账号
         </Button>
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <div class="account-toolbar">
       <ChoiceSelect class="account-platform-filter" :model-value="platformFilter" label="平台筛选" :options="[{value:'all',label:'全部平台'},...platformOptions]" @update:model-value="choosePlatformFilter" />

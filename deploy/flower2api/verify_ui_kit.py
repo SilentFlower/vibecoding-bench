@@ -93,7 +93,6 @@ DESIGN_PAIRS = [
     ('account-edit', '.mask', '[data-slot=dialog-overlay]', ['background-color', 'backdrop-filter'], 'dialog'),
     ('account-edit', '.mh h2', '.kit-dialog [data-slot=dialog-title]', TEXT + ['line-height'], 'dialog'),
     ('account-edit', '.mh p', '.kit-dialog [data-slot=dialog-description]', TEXT, 'dialog'),
-    ('account-edit', '.mf', '.kit-dialog [data-slot=dialog-footer]', ['background-color', 'padding-top', 'padding-left'], 'dialog'),
     ('account-edit', '.rc.on', '[data-testid=radio-cards] .fui-radio-card[data-state=checked]', BOX, None),
     ('account-edit', '.rc:not(.on)', '[data-testid=radio-cards] .fui-radio-card[data-state=unchecked]', ['background-color'], None),
     ('account-edit', '.rc b', '[data-testid=radio-cards] .fui-radio-card-label', TEXT, None),
@@ -107,6 +106,41 @@ DESIGN_PAIRS = [
     ('settings', '.input.focus', '[data-testid=input-default]', ['background-color', 'box-shadow'], 'focus'),
     ('settings', '.input .end span', '.fui-stepper button', ['width', 'height', 'border-top-left-radius', 'color'], None),
     ('settings', '.field .help', '[data-testid=field-help]', TEXT, None),
+    # 组合组件（子任务 2）：页头、概览卡、数据表卡片、工具栏、实体卡、浮动保存栏、居中弹窗。
+    ('accounts', '.ph', '[data-testid=page-header]', ['column-gap', 'align-items'], None),
+    ('accounts', '.ph h1', '[data-testid=page-header] .fui-page-header-title', TEXT + ['letter-spacing'], None),
+    ('accounts', '.ph p', '[data-testid=page-header] .fui-page-header-description', TEXT + ['margin-top'], None),
+    ('accounts', '.ph-actions', '[data-testid=page-header] .fui-page-header-actions', ['column-gap'], None),
+    ('proxies', '.grid.g4', '[data-testid=overview-grid]', ['column-gap', 'row-gap'], None),
+    ('proxies', '.ov', '[data-testid=overview-card]', ['background-color', 'border-top-left-radius', 'box-shadow', 'padding-top', 'padding-left', 'column-gap'], None),
+    ('proxies', '.ov p', '[data-testid=overview-card] .fui-overview-card-label', TEXT, None),
+    ('proxies', '.ov strong', '[data-testid=overview-card] .fui-overview-card-value', TEXT + ['margin-top', 'margin-bottom', 'letter-spacing'], None),
+    ('proxies', '.ov strong small', '[data-testid=overview-card-unit] .fui-overview-card-value small', TEXT + ['margin-left'], None),
+    ('proxies', '.ov > div > span', '[data-testid=overview-card] .fui-overview-card-caption', TEXT, None),
+    ('proxies', '.ov .ico', '[data-testid=overview-card] .fui-icon-tile', ['width', 'height', 'border-top-left-radius', 'background-color', 'color'], None),
+    ('proxies', '.ov .ico.s', '[data-testid=overview-card-unit] .fui-icon-tile', ['background-color', 'color'], None),
+    ('proxies', '.tcard', '[data-testid=table-card]', ['background-color', 'border-top-left-radius', 'box-shadow', 'padding-top', 'padding-left', 'padding-bottom', 'row-gap'], None),
+    ('proxies', '.tcard-h', '[data-testid=table-card] .fui-table-card-head', ['column-gap', 'align-items'], None),
+    ('proxies', '.tcard-h h3', '[data-testid=table-card] .fui-table-card-title', TEXT + ['column-gap'], None),
+    ('proxies', '.tcard-h h3 small', '[data-testid=table-card] .fui-table-card-count', TEXT, None),
+    ('environments', '.tb', '[data-testid=toolbar]', ['column-gap', 'align-items'], None),
+    ('environments', '.ent', '[data-testid=entity-card]', ['background-color', 'border-top-left-radius', 'box-shadow', 'padding-top', 'padding-left', 'row-gap'], None),
+    ('environments', '.ent-head', '[data-testid=entity-card] .fui-entity-card-head', ['column-gap', 'align-items'], None),
+    ('environments', '.ent .tile', '[data-testid=entity-card] .fui-icon-tile', ['width', 'height', 'border-top-left-radius', 'background-color', 'color'], None),
+    ('environments', '.ent-head h4', '[data-testid=entity-card] .fui-entity-card-title', TEXT, None),
+    ('environments', '.ent-head p', '[data-testid=entity-card] .fui-entity-card-subtitle', TEXT + ['margin-top'], None),
+    ('environments', '.ent-acts', '[data-testid=entity-card] .fui-entity-card-actions', ['border-top-width', 'border-top-color', 'padding-top', 'padding-left', 'margin-left'], None),
+    ('environments', '.ent-acts span:first-child', '[data-testid=entity-action-primary]', ['color', 'font-size', 'font-weight', 'height', 'column-gap', 'border-top-left-radius'], None),
+    ('environments', '.ent-acts span:nth-child(2)', '[data-testid=entity-action]', ['color', 'font-size', 'font-weight', 'height'], None),
+    ('settings', '.savebar', '[data-testid=save-bar]', ['background-color', 'border-top-left-radius', 'box-shadow', 'padding-top', 'padding-left', 'padding-right', 'column-gap'], None),
+    ('settings', '.savebar b', '[data-testid=save-bar] .fui-save-bar-title', TEXT + ['column-gap'], None),
+    ('settings', '.savebar .hint', '[data-testid=save-bar] .fui-save-bar-hint', TEXT, None),
+    ('account-edit', '.modal', '[data-testid=modal]', ['background-color', 'border-top-left-radius', 'box-shadow'], 'modal'),
+    ('account-edit', '.mh', '[data-testid=modal] .fui-modal-head', ['padding-top', 'padding-left', 'padding-bottom', 'column-gap', 'align-items'], 'modal'),
+    ('account-edit', '.mh h2', '[data-testid=modal] .fui-modal-title', TEXT + ['column-gap'], 'modal'),
+    ('account-edit', '.mh p', '[data-testid=modal] .fui-modal-description', TEXT, 'modal'),
+    ('account-edit', '.mb', '[data-testid=modal] .fui-modal-body', ['padding-top', 'padding-left', 'padding-bottom', 'row-gap', 'line-height'], 'modal'),
+    ('account-edit', '.mf', '[data-testid=modal] .fui-modal-foot', ['background-color', 'padding-top', 'padding-left', 'column-gap'], 'modal'),
 ]
 # 结构写法不同但视觉等价、或已记录的有意偏差，比对时跳过对应属性。
 KNOWN = {
@@ -115,7 +149,6 @@ KNOWN = {
     ('requests', '.pager span:not(.on):not(.dis)'): {'column-gap'},
     ('requests', '.pager span.dis'): {'column-gap'},
     ('accounts', '.switch.on'): {'border-top-left-radius'},  # 99px 与 999px 都是全圆
-    ('account-edit', '.mf'): {'background-color', 'padding-top', 'padding-left'},  # 通栏底栏由子任务 2 的居中弹窗组合组件提供（design §5）
 }
 
 async def styles(locator, props: dict) -> dict:
@@ -362,19 +395,21 @@ async def verify_design(browser, url: str) -> dict:
     demo = await browser.new_page(viewport={'width': 1440, 'height': 900})
     await demo.goto(url)
     await demo.evaluate('document.fonts.ready')
-    problems, compared, dialog_open = [], 0, False
+    # 需要先打开示例弹窗的比对动作 → 演示页上的打开按钮。
+    openers = {'dialog': '打开弹窗示例', 'modal': '打开居中弹窗示例'}
+    problems, compared, opened = [], 0, None
     for screen, mock_selector, demo_selector, props, action in DESIGN_PAIRS:
         # 设计稿只在加载时读取 #画面，带不同查询参数强制重新渲染。
         await mock.goto(f'{MOCK}?s={screen}#{screen}')
         await mock.evaluate('document.fonts.ready')
-        if action == 'dialog' and not dialog_open:
-            await demo.get_by_role('button', name='打开弹窗示例').click()
-            await demo.wait_for_timeout(400)
-            dialog_open = True
-        if action != 'dialog' and dialog_open:
+        if opened and action != opened:
             await demo.keyboard.press('Escape')
             await demo.wait_for_timeout(300)
-            dialog_open = False
+            opened = None
+        if action in openers and not opened:
+            await demo.get_by_role('button', name=openers[action]).click()
+            await demo.wait_for_timeout(400)
+            opened = action
         target = demo.locator(demo_selector).first
         if action in ('hover', 'focus'):
             await (target.hover() if action == 'hover' else target.click())

@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, defineAsyncComponent, onMounted, onUnmounted } from 'vue';
-import { Menu, PanelLeftClose, PanelLeftOpen, ChevronRight, LogOut, X } from '@/components/ui/icon';
+import { Menu, PanelLeftClose, PanelLeftOpen, ChevronRight, LogOut, X, ArrowUpCircle } from '@/components/ui/icon';
 import AppNavigation from './AppNavigation.vue';
 import { api } from '../api';
 import { releaseVersion } from '../lib/platformVersion';
 import { usePlatformVersion } from '../composables/usePlatformVersion';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { useRoute } from 'vue-router';
-import { Button } from '@/components/ui/button';
 import { logout } from '../router';
 import { useToast } from '../composables/useToast';
 
@@ -67,7 +66,8 @@ async function refreshMetadata(force=false,checkUpdates=false): Promise<void> {
 onMounted(()=>{void refreshMetadata(false,true);});
 onUnmounted(()=>{clearTimeout(updateTimer);metadataController.abort();});
 watch(()=>route.fullPath,()=>{void refreshMetadata();});
-const titles: Record<string, string> = { proxies: '代理管理', updates: '系统更新', environments: '运行环境', tasks: '任务与工程', accounts: '账号', requests: '请求记录', tokens: '访问令牌', settings: '系统设置' };
+// 移动端应用栏显示的页面标题，与各页页头一致。
+const titles: Record<string, string> = { accounts: '账号管理', requests: '请求记录', 'session-blocks': '会话封禁', tokens: '访问令牌', proxies: '代理管理', environments: '运行环境', nodes: '节点管理', tasks: '任务与工程', settings: '系统设置', updates: '系统更新' };
 const pageTitle = computed(() => titles[String(route.name)] ?? '管理控制台');
 watch(() => route.fullPath, () => { mobileOpen.value = false; });
 const toast = useToast();
@@ -107,44 +107,52 @@ watch(() => route.fullPath, closeUpdatePanel);
   <div class="console-shell" :class="{ 'sidebar-collapsed': collapsed, 'console-native-tasks': nativeTasks }">
     <aside class="console-sidebar" aria-label="侧边栏">
       <div class="console-brand-row">
-        <router-link :to="{ name: 'accounts' }" class="console-brand" aria-label="flower2api 首页">
-          <img src="/favicon.svg?v=flower2api-pink-04" alt="flower2api 标志" class="size-7 shrink-0" />
-          <span class="sidebar-label"><strong>flower2api</strong></span>
-        </router-link>
+        <router-link :to="{ name: 'accounts' }" class="console-brand-mark" aria-label="flower2api 首页"><img src="/favicon.svg?v=flower2api-pink-04" alt="flower2api 标志" width="24" height="24" /></router-link>
+        <strong class="console-brand-name sidebar-label">flower2api</strong>
         <a href="/updates" class="brand-update" aria-label="系统更新" :class="{'has-update': updateAvailable}" :title="updateAvailable ? '系统更新 · 有可用新版' : '系统更新'" @click="openUpdatePanel">
-          <span v-if="!collapsed">{{ currentVersion ?? '版本' }}</span><ChevronRight class="size-3" />
+          <template v-if="!collapsed">{{ currentVersion ?? '版本' }}<ArrowUpCircle v-if="updateAvailable" /></template>
+          <template v-else><ArrowUpCircle v-if="updateAvailable" /><ChevronRight v-else /></template>
         </a>
+        <small class="sidebar-tagline sidebar-label">让每一次调用井然有序</small>
       </div>
-      <p class="sidebar-tagline sidebar-label">让每一次调用井然有序</p>
       <AppNavigation :collapsed="collapsed" :account-count="accountCount" :running-count="runningCount" />
       <div class="sidebar-footer">
         <span class="sidebar-avatar" aria-hidden="true">管</span>
         <div class="sidebar-label sidebar-identity"><strong>管理员</strong><small>本地管理控制台</small></div>
-
-        <Button variant="ghost" size="icon" class="desktop-sidebar-toggle" :aria-label="collapsed ? '展开侧边栏' : '收起侧边栏'" :aria-expanded="!collapsed" @click="collapsed = !collapsed">
-          <PanelLeftOpen v-if="collapsed" class="size-4" /><PanelLeftClose v-else class="size-4" />
-        </Button>
-
-        <Button variant="ghost" size="icon" @click="handleLogout" :disabled="loggingOut" class="sidebar-exit" aria-label="退出" title="退出"><LogOut class="size-4" /></Button>
+        <div class="sidebar-tools">
+          <button type="button" class="sidebar-tool desktop-sidebar-toggle" :aria-label="collapsed ? '展开侧边栏' : '收起侧边栏'" :aria-expanded="!collapsed" :title="collapsed ? '展开侧边栏' : '收起侧边栏'" @click="collapsed = !collapsed">
+            <PanelLeftOpen v-if="collapsed" /><PanelLeftClose v-else />
+          </button>
+          <button type="button" class="sidebar-tool sidebar-exit" :disabled="loggingOut" aria-label="退出" title="退出" @click="handleLogout"><LogOut /></button>
+        </div>
       </div>
     </aside>
     <div class="console-workspace">
       <header class="console-toolbar">
+        <span class="console-toolbar-mark" aria-hidden="true"><img src="/favicon.svg?v=flower2api-pink-04" alt="" width="20" height="20" /></span>
+        <span class="toolbar-page">{{ pageTitle }}</span>
         <Dialog v-model:open="mobileOpen">
-          <DialogTrigger as-child><Button variant="ghost" size="icon" class="mobile-sidebar-toggle" aria-label="打开主导航"><Menu class="size-5" /></Button></DialogTrigger>
-          <DialogContent class="mobile-navigation-panel" :aria-describedby="undefined">
-            <DialogTitle>flower2api</DialogTitle>
-            <a href="/updates" class="brand-update" aria-label="系统更新" :class="{'has-update': updateAvailable}" :title="updateAvailable ? '系统更新 · 有可用新版' : '系统更新'" @click="openUpdatePanel">{{ currentVersion ?? '系统更新' }}<ChevronRight class="size-3" /></a>
+          <DialogTrigger as-child><button type="button" class="mobile-sidebar-toggle" aria-label="打开主导航"><Menu /></button></DialogTrigger>
+          <!-- 抽屉：工具类覆盖 DialogContent 的居中定位与尺寸（cn 合并会去掉冲突类），外观见 console-shell.css。 -->
+          <DialogContent class="mobile-navigation-panel flex flex-col top-0 left-0 translate-x-0 translate-y-0 w-[min(300px,88vw)] max-w-none sm:max-w-none data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left" :aria-describedby="undefined">
+            <div class="console-brand-row">
+              <span class="console-brand-mark" aria-hidden="true"><img src="/favicon.svg?v=flower2api-pink-04" alt="" width="24" height="24" /></span>
+              <DialogTitle class="console-brand-name">flower2api</DialogTitle>
+              <a href="/updates" class="brand-update" aria-label="系统更新" :class="{'has-update': updateAvailable}" :title="updateAvailable ? '系统更新 · 有可用新版' : '系统更新'" @click="openUpdatePanel">{{ currentVersion ?? '系统更新' }}<ArrowUpCircle v-if="updateAvailable" /></a>
+              <small class="sidebar-tagline">让每一次调用井然有序</small>
+            </div>
             <DialogDescription class="sr-only">选择管理页面</DialogDescription>
             <AppNavigation :account-count="accountCount" :running-count="runningCount" @navigate="mobileOpen = false" />
-            <Button variant="outline" @click="handleLogout" :disabled="loggingOut"><LogOut class="size-4" />退出</Button>
+            <div class="sidebar-footer">
+              <span class="sidebar-avatar" aria-hidden="true">管</span>
+              <div class="sidebar-identity"><strong>管理员</strong><small>本地管理控制台</small></div>
+              <div class="sidebar-tools"><button type="button" class="sidebar-tool" :disabled="loggingOut" aria-label="退出" title="退出" @click="handleLogout"><LogOut /></button></div>
+            </div>
           </DialogContent>
         </Dialog>
-        <span class="toolbar-page">{{ pageTitle }}</span>
-        <span class="toolbar-brand">flower2api</span>
       </header>
       <!-- 嵌入工作区沿用自己的滚动容器；折叠侧栏只改变宽度，保留文档身份。 -->
-      <main id="console-content" class="console-content space-y-6">
+      <main id="console-content" class="console-content">
       <!-- 子路由内容 -->
       <router-view />
       </main>

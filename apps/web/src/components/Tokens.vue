@@ -4,6 +4,7 @@ import AccountScopePicker from './AccountScopePicker.vue';
 import { ref, onMounted, onUnmounted } from 'vue';
 import { api, type ApiToken, type Account } from '../api';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Input } from '@/components/ui/input';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -185,7 +186,7 @@ function formatAccountIds(ids: string): string {
 
 <template>
   <div class="tokens-page">
-    <header class="page-heading"><div><p class="page-eyebrow">访问控制</p><h2>访问令牌</h2><p class="page-description">管理客户端凭据和可用账号范围。</p></div><Button @click="openCreate"><Plus :size="15" />创建令牌</Button></header>
+    <PageHeader title="访问令牌" description="管理客户端凭据和可用账号范围。"><template #actions><Button @click="openCreate"><Plus :size="15" />创建令牌</Button></template></PageHeader>
     <p v-if="loadError" class="token-load-error" role="alert">{{ loadError }} <button type="button" @click="load">重试</button></p>
     <section class="token-panel" :aria-busy="loading"><header class="token-panel-head"><h3>访问令牌</h3><span>{{ tokens.length }} 个令牌</span></header>
       <article v-for="t in tokens" :key="t.id" class="token-row"><span class="token-icon"><KeyRound :size="19" /></span><div class="token-identity"><strong>{{ t.name || '未命名令牌' }}</strong><div class="token-meta"><code>{{ maskToken(t.token) }}</code><button type="button" class="token-copy" @click="copyToken(t)"><Copy :size="12" />{{ copiedId === t.id ? '已复制' : '复制' }}</button><span>{{ t.allowed_accounts ? `仅允许 ${formatAccountIds(t.allowed_accounts)}` : '全部可用账号' }}<template v-if="t.blocked_accounts"> · 排除 {{ formatAccountIds(t.blocked_accounts) }}</template></span></div></div>

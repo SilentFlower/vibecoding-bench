@@ -13,8 +13,9 @@ async def main():
         browser=await p.chromium.launch();context=await browser.new_context(viewport={'width':2560,'height':1440});await context.route('**/*',fixture.route);await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only')")
         page=await context.new_page();page.on('pageerror',lambda error:errors.append(str(error)));await page.goto(BASE+'/');await expect(page.locator('.account-card')).to_have_count(12)
         dimensions=[]
+        # 内容区右边距属于外壳，由 verify_ui_shell.py 对照第二版设计稿核对；这里只核对卡片区铺满到内容区边距。
         for width in [1280,1680,1920,2560,3440]:
-            await page.set_viewport_size({'width':width,'height':1440});value=await page.evaluate('''()=>{const sidebar=document.querySelector('.console-sidebar').getBoundingClientRect(),grid=document.querySelector('.account-card-grid').getBoundingClientRect();return {width:innerWidth,sidebarLeft:sidebar.left,right:innerWidth-grid.right,columns:getComputedStyle(document.querySelector('.account-card-grid')).gridTemplateColumns.split(' ').length,overflow:document.documentElement.scrollWidth>innerWidth}}''');dimensions.append(value);assert value['sidebarLeft']==0,value;assert abs(value['right']-40)<=1,value;assert not value['overflow'],value
+            await page.set_viewport_size({'width':width,'height':1440});value=await page.evaluate('''()=>{const sidebar=document.querySelector('.console-sidebar').getBoundingClientRect(),grid=document.querySelector('.account-card-grid').getBoundingClientRect();return {width:innerWidth,sidebarLeft:sidebar.left,right:innerWidth-grid.right,padding:parseFloat(getComputedStyle(document.getElementById('console-content')).paddingRight),columns:getComputedStyle(document.querySelector('.account-card-grid')).gridTemplateColumns.split(' ').length,overflow:document.documentElement.scrollWidth>innerWidth}}''');dimensions.append(value);assert value['sidebarLeft']==0,value;assert abs(value['right']-value['padding'])<=1,value;assert not value['overflow'],value
             if width>=1680:assert value['columns']==4,value
         await page.screenshot(path=str(out/'accounts-wide-3440.png'))
         cursors={}

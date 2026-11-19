@@ -86,15 +86,16 @@ const TUNED_TONES: Readonly<Record<string, ToneFamily>> = {
 // 不随主题变化的中性、平台与品牌色；柔光材质只调整其中的底色组。
 const NEUTRALS = {
   layout: '#f5f6fa', surface: WHITE, fill: 'rgba(98, 96, 158, 0.075)', 'fill-hover': 'rgba(98, 96, 158, 0.11)',
-  'fill-muted': '#f1f2f7', 'fill-subtle': '#f7f8fb', 'fill-strong': '#d8dce8', track: '#e9ebf3', line: '#e6e8f0',
+  'fill-muted': '#f1f2f7', 'fill-subtle': '#f7f8fb', 'fill-strong': '#d8dce8', 'fill-active': '#eceef5', track: '#e9ebf3', line: '#e6e8f0',
   mask: 'rgba(14, 23, 38, 0.3)', scrollbar: '#aab2c2',
   text: TEXT, 'text-2': '#414a5c', 'text-3': '#5f6878', 'text-4': '#97a0b2',
   'table-head': '#eff1f8', 'table-stripe': '#f8f9fc', 'table-hover': '#f0f1f9',
   'neutral-text': '#535b67', 'neutral-bg': '#f1f3f7',
   'cc-text': '#9a5634', 'cc-bg': '#fbf1ea', 'agy-text': '#3f62b0', 'agy-bg': '#eef3fd',
-  brand: '#ed6ea7', ink: '#191b2c', 'feedback-surface': '#191b2c', 'feedback-text': WHITE,
+  brand: '#ed6ea7', ink: '#191b2c', 'on-ink': WHITE, 'ink-text': '#a7abc3', 'ink-muted': '#6c708e',
+  'feedback-surface': '#191b2c', 'feedback-text': WHITE,
 } as const;
-const SOFT_TINTED = ['layout', 'fill-muted', 'fill-subtle', 'line', 'table-head', 'table-stripe', 'table-hover'] as const;
+const SOFT_TINTED = ['layout', 'fill-muted', 'fill-subtle', 'fill-active', 'line', 'table-head', 'table-stripe', 'table-hover'] as const;
 
 /**
  * 派生主色组；按钮文字先取白色，再取正文深色，两者都不足 4.5 时压暗主色直到白字达标。
@@ -166,6 +167,8 @@ export function createTheme(seed: ThemeSeed): ThemeVars {
     '--ui-shadow-modal': `0 24px 60px -20px rgba(${SHADOW_RGB}, ${fade(0.35, s)})`,
     '--ui-shadow-raised': `0 1px 3px rgba(${SHADOW_RGB}, ${fade(0.08, s)})`,
     '--ui-shadow-knob': `0 1px 2px rgba(0, 0, 0, ${fade(0.18, s)})`,
+    '--ui-shadow-side': `2px 0 12px -10px rgba(${SHADOW_RGB}, ${fade(0.12, s)})`,
+    '--ui-shadow-bar': `0 2px 12px -10px rgba(${SHADOW_RGB}, ${fade(0.2, s)})`,
     '--ui-radius-btn': `${Math.max(seed.radius - 2, 0)}px`,
     '--ui-radius-control': `${seed.radius}px`,
     '--ui-radius-block': `${seed.radius + 4}px`,

@@ -18,7 +18,7 @@ async def run(output=None,gateway=None):
             for _ in range(100):
                 if fixture.reads>before:break
                 await page.wait_for_timeout(10)
-            await expect(page.locator('.runtime-page-heading button')).to_be_enabled()
+            await expect(page.locator('.runtime-environments .fui-page-header button')).to_be_enabled()
         async def open_tab(tab):
             if not await workspace.is_visible():await cards.first.get_by_role('button',name='环境详情',exact=True).click()
             await workspace.get_by_role('tab',name=tab,exact=True).click()

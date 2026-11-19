@@ -3,6 +3,8 @@ import { ref, onMounted, computed, nextTick, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { api, type PrimeLogEntry } from '../api';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
+import { FloatingSaveBar } from '@/components/ui/save-bar';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -815,7 +817,7 @@ onMounted(async () => {
 
 <template>
  <div class="settings-page">
-  <div class="page-heading"><div><p class="page-eyebrow">平台配置</p><h2>系统设置</h2><p class="page-description">按用途管理网关策略，修改后统一保存。</p></div></div>
+  <PageHeader title="系统设置" description="按用途管理网关策略，修改后统一保存。" />
   <div class="settings-overview-bar"><SearchInput v-model="settingsQuery" label="搜索系统设置" placeholder="搜索配置名称、用途或关键词" class="settings-search" /><span>{{ allFields.length }} 项配置</span></div>
   <div class="system-settings-layout">
    <nav class="system-settings-nav" aria-label="系统设置分类"><button v-for="group in settingsGroups" :key="group.id" type="button" :class="{active:settingsCategory===group.id && !settingsQuery}" :aria-pressed="settingsCategory===group.id && !settingsQuery" @click="chooseCategory(group.id)"><component :is="groupIcons[group.id as keyof typeof groupIcons]" :size="16" /><span>{{ group.label }}</span><i v-if="group.sections.some(section=>section.fields.some(field=>dirtyKeys.includes(field.key)))" /><b v-if="group.id==='history'">{{ primeLogs.length }}</b></button><p>所有配置统一保存。<br>切换分类保留未保存内容。</p></nav>
@@ -856,7 +858,7 @@ onMounted(async () => {
      </section>
      <section v-if="!visibleGroups.length && (settingsCategory!=='history' || settingsQuery)" class="settings-empty"><h3>没有匹配的配置</h3><p>试试功能名称、模型或配置关键词。</p><Button type="button" variant="outline" @click="settingsQuery=''">清空搜索</Button></section>
     </div>
-    <footer class="settings-save-bar"><div><strong>{{ dirtyKeys.length ? `${dirtyKeys.length} 项待保存` : '配置已同步' }}</strong><small>修改将统一应用到网关</small></div><div class="settings-save-actions"><Button type="button" variant="outline" :disabled="!loaded || saving || !dirtyKeys.length" @click="revertChanges">撤销修改</Button><Button type="submit" :disabled="!loaded || saving || !dirtyKeys.length">{{ saving ? '保存中…' : '保存配置' }}</Button></div></footer>
+    <FloatingSaveBar class="settings-save-bar" :count="dirtyKeys.length" hint="修改将统一应用到网关" clean-label="配置已同步"><template #actions><Button type="button" variant="outline" :disabled="!loaded || saving || !dirtyKeys.length" @click="revertChanges">撤销修改</Button><Button type="submit" :disabled="!loaded || saving || !dirtyKeys.length">{{ saving ? '保存中…' : '保存配置' }}</Button></template></FloatingSaveBar>
     </form>
    </div>
   </div>

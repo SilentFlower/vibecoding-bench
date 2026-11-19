@@ -2,7 +2,7 @@
 import { useRoute } from 'vue-router';
 import { Users, Activity, KeyRound, Boxes, Server, ListTodo, Settings2, Globe, ShieldCheck } from '@/components/ui/icon';
 
-/** 主导航复用于桌面侧栏与移动抽屉，保证两个入口集合一致。 */
+/** 主导航复用于桌面侧栏与移动抽屉，保证两个入口集合一致；「系统设置」单独成组位于底部（主题设置随其页面加入同组）。 */
 defineProps<{ collapsed?: boolean; accountCount?: number | null; runningCount?: number | null }>();
 const emit = defineEmits<{ navigate: [] }>();
 const route = useRoute();
@@ -21,7 +21,7 @@ const groups = [
       <router-link v-for="link in group.items" :key="link.name" :to="{ name: link.name }" class="navigation-item"
         :class="{ 'is-active': route.name === link.name }" :title="collapsed ? link.label : undefined"
         :aria-label="link.label" :aria-current="route.name === link.name ? 'page' : undefined" @click="emit('navigate')">
-        <component :is="link.icon" class="size-[18px] shrink-0" /><span class="sidebar-label">{{ link.label }}</span><b v-if="link.name==='accounts' && accountCount!=null" class="navigation-count sidebar-label">{{ accountCount }}</b><span v-if="link.name==='tasks' && runningCount!=null" class="navigation-running sidebar-label">{{ runningCount }}</span>
+        <component :is="link.icon" class="size-[18px] shrink-0" /><span class="sidebar-label">{{ link.label }}</span><b v-if="link.name==='accounts' && accountCount!=null" class="navigation-count sidebar-label">{{ accountCount }}</b><span v-if="link.name==='tasks' && runningCount!=null" class="navigation-running sidebar-label" :data-idle="runningCount === 0">{{ runningCount }}</span>
       </router-link>
     </div>
   </nav>

@@ -4,6 +4,7 @@ import { api, type SessionPolicyBlock } from '../api';
 import { formatLocalTime } from '../lib/time';
 import { useToast } from '../composables/useToast';
 import { Button } from './ui/button';
+import { PageHeader } from './ui/page-header';
 import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { SearchInput, ChoiceSelect, Pagination, InfoTooltip } from './ui/controls';
@@ -115,9 +116,9 @@ onUnmounted(() => { alive=false;generation++;controller?.abort();clearInterval(c
 
 <template>
   <div class="session-block-page">
-    <header class="page-heading"><div><p class="page-eyebrow">网关</p><h2>会话封禁</h2><p class="page-description">查看策略拒答触发的会话封禁，以及到期和解除记录。</p></div>
-      <router-link :to="{ name:'settings',query:{ category:'scheduling',section:'session-policy-block' } }"><Button variant="outline"><Settings2 :size="15" />封禁设置</Button></router-link>
-    </header>
+    <PageHeader title="会话封禁" description="查看策略拒答触发的会话封禁，以及到期和解除记录。">
+      <template #actions><router-link :to="{ name:'settings',query:{ category:'scheduling',section:'session-policy-block' } }"><Button variant="outline"><Settings2 :size="15" />封禁设置</Button></router-link></template>
+    </PageHeader>
     <section class="session-block-panel">
       <form class="session-block-toolbar" @submit.prevent="load(1)">
         <ChoiceSelect v-model="state" label="封禁状态" :options="states" />
@@ -160,7 +161,6 @@ onUnmounted(() => { alive=false;generation++;controller?.abort();clearInterval(c
 
 <style scoped>
 .session-block-page{display:grid;gap:20px;min-width:0}
-.session-block-page>.page-heading{margin-bottom:8px}
 .session-block-panel{min-width:0;background:var(--card);border:1px solid var(--ui-border);border-radius:12px;overflow:hidden}
 .session-block-toolbar{display:flex;align-items:flex-end;flex-wrap:wrap;gap:9px;padding:20px 24px 12px}
 .session-block-toolbar>:first-child{width:150px}
@@ -209,6 +209,5 @@ onUnmounted(() => { alive=false;generation++;controller?.abort();clearInterval(c
   .block-actions{flex-direction:column;align-items:flex-start}
   .session-block-pagination{padding:12px}
   .session-block-page{gap:16px}
-  .page-heading{align-items:flex-start;gap:12px;flex-wrap:wrap}
 }
 </style>

@@ -21,23 +21,26 @@ async def main():
             for key,current,selector in [('reference',reference,'.account-card-grid'),('actual',page,'.account-card-grid')]:
                 await current.set_viewport_size({'width':width,'height':1000})
                 result[key]=await current.locator(selector).evaluate('(e)=>({columns:getComputedStyle(e).gridTemplateColumns.split(" ").length,width:e.getBoundingClientRect().width,card:e.firstElementChild.getBoundingClientRect().width})')
+            # 侧栏宽度与内容区边距属于外壳，已按第二版设计稿调整并由 verify_ui_shell.py 核对；这里改为核对卡片区铺满内容区，列数仍与定稿一致。
+            result['content']=await page.locator('#console-content').evaluate('(e)=>{const s=getComputedStyle(e);return e.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)}')
             assert result['reference']['columns']==result['actual']['columns'],result
             if width>1762:
-                assert result['actual']['columns']==4 and abs(result['actual']['width']-(width-332))<1,result
-            else:
-                assert abs(result['reference']['width']-result['actual']['width'])<1,result
+                assert result['actual']['columns']==4,result
+            assert abs(result['content']-result['actual']['width'])<1,result
             layout.append(result)
         await page.set_viewport_size({'width':1680,'height':1000});await page.screenshot(path=str(out/'accounts-four-columns.png'))
         await page.set_viewport_size({'width':1440,'height':1000});await reference.set_viewport_size({'width':1440,'height':1000})
         await reference.locator('[data-usage-bubble]').first.hover();await page.get_by_role('button',name='查看5h完整费用统计',exact=True).first.hover()
         original=reference.locator('#usage-bubble');bubble=page.locator('.usage-cost-bubble');await expect(original).to_be_visible();await expect(bubble).to_be_visible()
         await expect(bubble.locator('header')).to_have_text('5 小时用量统计网关记录');await expect(bubble.locator('.usage-bubble-grid>div')).to_have_count(4)
-        props=['width','padding','borderRadius','borderColor','backgroundColor','color','boxShadow','fontSize','lineHeight']
+        # 气泡表面阴影属于组件库（.fui-popover 取 --ui-shadow-pop，由 verify_ui_kit.py 核对），不再与旧原型比对。
+        props=['width','padding','borderRadius','borderColor','backgroundColor','color','fontSize','lineHeight']
         get='(e,keys)=>Object.fromEntries(keys.map(k=>[k,getComputedStyle(e)[k]]))'
         expected=await original.evaluate(get,props);actual=await bubble.evaluate(get,props);assert expected==actual,(expected,actual)
         await page.screenshot(path=str(out/'usage-bubble.png'));await page.keyboard.press('Escape');await reference.keyboard.press('Escape')
         hover=[]
-        for name,refsel,selector in [('卡片编辑','[data-account-action=edit]','.account-card-actions button:first-child'),('调度优先级','.scheduling-group','.account-routing button'),('侧栏','.nav button[data-page=proxies]','.navigation-item[href="/proxies"]')]:
+        # 侧栏悬停已换为第二版外壳，由 verify_ui_shell.py 核对，这里只比对页面主体的悬停态。
+        for name,refsel,selector in [('卡片编辑','[data-account-action=edit]','.account-card-actions button:first-child'),('调度优先级','.scheduling-group','.account-routing button')]:
             original=reference.locator(refsel).first;current=page.locator(selector).first
             if not await original.count():continue
             await original.hover();await current.hover()

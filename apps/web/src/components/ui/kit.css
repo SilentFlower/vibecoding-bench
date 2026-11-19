@@ -205,8 +205,92 @@
   .fui-empty-state-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: calc(var(--ui-space-unit) * 2); margin-top: calc(var(--ui-space-unit) * 2); }
   .fui-skeleton { display: block; min-height: 1em; border-radius: var(--ui-radius-btn); background: linear-gradient(90deg, var(--ui-color-fill-muted) 25%, var(--ui-color-fill-subtle) 50%, var(--ui-color-fill-muted) 75%) 0 0 / 200% 100%; animation: fui-shimmer 1.4s ease-in-out infinite; }
 
+  /* ---------- 组合组件：页头、概览卡、图标块、工具栏、实体卡、数据表卡片、浮动保存栏（设计稿 .ph/.ov/.tb/.ent/.tcard/.savebar） ---------- */
+  .fui-page-header { display: flex; flex-wrap: wrap; align-items: flex-end; gap: calc(var(--ui-space-unit) * 4); margin-bottom: calc(var(--ui-space-unit) * 4.5); }
+  .fui-page-header-text { min-width: 0; }
+  .fui-page-header-title { margin: 0; color: var(--ui-color-text); font-size: var(--ui-font-size-page); font-weight: 800; line-height: calc(var(--ui-font-size-page) + 6px); letter-spacing: -.02em; }
+  .fui-page-header-description { margin: calc(var(--ui-space-unit) * 1.5) 0 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-title); font-weight: 550; line-height: 1.55; }
+  .fui-page-header-actions { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 2); margin-left: auto; }
+
+  .fui-icon-tile { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: calc(var(--ui-radius-block) - 2px); background: var(--ui-color-primary-container); color: var(--ui-color-primary-text); }
+  .fui-icon-tile[data-size=lg] { width: 40px; height: 40px; border-radius: calc(var(--ui-radius-block) - 1px); }
+  .fui-icon-tile svg { width: 18px; height: 18px; }
+  .fui-icon-tile[data-tone=success] { background: var(--ui-color-success-bg); color: var(--ui-color-success-text); }
+  .fui-icon-tile[data-tone=warning] { background: var(--ui-color-warning-bg); color: var(--ui-color-warning-text); }
+  .fui-icon-tile[data-tone=danger] { background: var(--ui-color-danger-bg); color: var(--ui-color-danger-text); }
+  .fui-icon-tile[data-tone=info] { background: var(--ui-color-info-bg); color: var(--ui-color-info-text); }
+  .fui-icon-tile[data-tone=cc] { background: var(--ui-color-cc-bg); color: var(--ui-color-cc-text); }
+  .fui-icon-tile[data-tone=agy] { background: var(--ui-color-agy-bg); color: var(--ui-color-agy-text); }
+  .fui-icon-tile[data-tone=neutral] { background: var(--ui-color-neutral-bg); color: var(--ui-color-neutral-text); }
+
+  .fui-overview-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 4); }
+  .fui-overview-card { display: flex; align-items: flex-start; gap: calc(var(--ui-space-unit) * 3); padding: calc(var(--ui-space-unit) * 4) calc(var(--ui-space-unit) * 4.5); border-radius: var(--ui-radius-card); background: var(--ui-color-surface); box-shadow: var(--ui-shadow-card); line-height: 1.55; }
+  .fui-overview-card-body { flex: 1; min-width: 0; }
+  .fui-overview-card-label { margin: 0; color: var(--ui-color-text-2); font-size: var(--ui-font-size-sm); font-weight: 700; }
+  .fui-overview-card-value { display: block; margin: 9px 0 7px; color: var(--ui-color-text); font: 800 calc(var(--ui-font-size-page) - 2px)/1 var(--ui-font-family-mono); letter-spacing: -.02em; }
+  .fui-overview-card-value small { margin-left: 4px; color: var(--ui-color-text-4); font-size: var(--ui-font-size-md); font-weight: 650; }
+  .fui-overview-card-caption { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; white-space: nowrap; }
+
+  .fui-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); }
+  .fui-toolbar > .fui-segmented { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .fui-toolbar-end { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); margin-left: auto; }
+
+  .fui-entity-card { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 3); padding: calc(var(--ui-space-unit) * 4.5) calc(var(--ui-space-unit) * 5) 0; border-radius: var(--ui-radius-card); background: var(--ui-color-surface); box-shadow: var(--ui-shadow-card); line-height: 1.55; }
+  .fui-entity-card:not(.has-actions) { padding-bottom: calc(var(--ui-space-unit) * 4); }
+  .fui-entity-card-head { display: flex; align-items: flex-start; gap: calc(var(--ui-space-unit) * 3); }
+  .fui-entity-card-identity { flex: 1; min-width: 0; }
+  .fui-entity-card-title { display: flex; flex-wrap: wrap; align-items: center; gap: 2px calc(var(--ui-space-unit) * 2); margin: 0; color: var(--ui-color-text); font-size: var(--ui-font-size-card); font-weight: 760; line-height: 1.55; }
+  .fui-entity-card-subtitle { display: flex; flex-wrap: wrap; align-items: center; gap: 0 calc(var(--ui-space-unit) * 1.5); margin: 2px 0 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-meta); font-weight: 550; }
+  .fui-entity-card-status { flex: none; }
+  .fui-entity-block { padding: calc(var(--ui-space-unit) * 3) calc(var(--ui-space-unit) * 3.5); border-radius: var(--ui-radius-block); background: var(--ui-color-fill-subtle); }
+  .fui-entity-card-actions { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; margin: 0 calc(var(--ui-space-unit) * -5); padding: calc(var(--ui-space-unit) * 1.5) calc(var(--ui-space-unit) * 2.5); border-top: 1px solid var(--ui-color-line); }
+  .fui-entity-action { display: inline-flex; align-items: center; justify-content: center; gap: calc(var(--ui-space-unit) * 1.5); min-width: 0; height: calc(var(--ui-control-md) - 2px); padding: 0 calc(var(--ui-space-unit) * 1.5); border: 0; border-radius: var(--ui-radius-btn); background: transparent; color: var(--ui-color-text-2); font: 650 var(--ui-font-size-meta)/1 var(--ui-font-family); white-space: nowrap; cursor: pointer; transition: background-color .15s, color .15s; }
+  .fui-entity-action svg { flex: none; width: 14px; height: 14px; }
+  .fui-entity-action[data-tone=primary] { color: var(--ui-color-primary-text); }
+  .fui-entity-action[data-tone=danger] { color: var(--ui-color-danger-text); }
+  .fui-entity-action:hover:not(:disabled) { background: var(--ui-color-fill); }
+  .fui-entity-action:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: -2px; }
+  .fui-entity-action:disabled { opacity: .45; cursor: not-allowed; }
+
+  .fui-table-card { padding: calc(var(--ui-space-unit) * 4.5) calc(var(--ui-space-unit) * 5) calc(var(--ui-space-unit) * 3.5); min-width: 0; }
+  .fui-table-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); }
+  .fui-table-card-title { display: flex; align-items: baseline; gap: calc(var(--ui-space-unit) * 2); margin: 0 auto 0 0; color: var(--ui-color-text); font-size: var(--ui-font-size-card); font-weight: 760; line-height: 1.55; }
+  .fui-table-card-count { color: var(--ui-color-text-4); font: 650 var(--ui-font-size-sm) var(--ui-font-family-mono); }
+  .fui-table-card-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); }
+  .fui-table-card-scroll { min-width: 0; overflow-x: auto; }
+  /* 最右操作列横向滚动时固定；底色跟随行状态（斑马、悬停、选中规则选择器更具体，会覆盖这里的白底）。 */
+  .fui-table-head.fui-table-actions, .fui-table-cell.fui-table-actions { position: sticky; right: 0; z-index: 1; text-align: right; }
+  .fui-table-cell.fui-table-actions { background: var(--ui-color-surface); }
+
+  .fui-save-bar { position: sticky; bottom: calc(var(--ui-space-unit) * 5); z-index: 20; display: flex; margin-top: calc(var(--ui-space-unit) * 4.5); flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); padding: calc(var(--ui-space-unit) * 3) calc(var(--ui-space-unit) * 3.5) calc(var(--ui-space-unit) * 3) calc(var(--ui-space-unit) * 4.5); border-radius: calc(var(--ui-radius-block) + 2px); background: var(--ui-color-surface); box-shadow: var(--ui-shadow-pop); line-height: 1.55; }
+  .fui-save-bar-title { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2); color: var(--ui-color-text); font-size: var(--ui-font-size-md); font-weight: 720; }
+  .fui-save-bar-title::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ui-color-success); }
+  .fui-save-bar[data-dirty=true] .fui-save-bar-title::before { background: var(--ui-color-warning); }
+  .fui-save-bar-hint { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; }
+  .fui-save-bar-actions { display: flex; flex-wrap: wrap; gap: calc(var(--ui-space-unit) * 2.5); margin-left: auto; }
+
+  .fui-modal { gap: 0; padding: 0; }
+  .fui-modal-head { display: flex; align-items: flex-start; gap: calc(var(--ui-space-unit) * 3); padding: calc(var(--ui-space-unit) * 5.5) calc(var(--ui-space-unit) * 6) calc(var(--ui-space-unit) * 4); }
+  .fui-modal-heading { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
+  .fui-modal > .fui-dialog-close { top: calc(var(--ui-space-unit) * 5.5); right: calc(var(--ui-space-unit) * 6); }
+  .fui-modal-title { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2); }
+  .fui-modal-body { display: flex; flex: 1; flex-direction: column; gap: calc(var(--ui-space-unit) * 4.5); min-height: 0; overflow-y: auto; padding: calc(var(--ui-space-unit) * 1) calc(var(--ui-space-unit) * 6) calc(var(--ui-space-unit) * 5); line-height: 1.55; }
+  .fui-modal-foot { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); padding: calc(var(--ui-space-unit) * 3.5) calc(var(--ui-space-unit) * 6); background: var(--ui-color-fill-subtle); line-height: 1.55; }
+
+  @media (max-width: 1000px) { .fui-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 760px) {
+    /* 移动端标题由应用栏显示：页头文字只留给读屏，无操作的页头不占高度。 */
+    .fui-page-header-text { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    .fui-page-header:not(.has-actions) { margin-bottom: 0; }
+  }
+  @media (max-width: 600px) {
+    .fui-overview-grid { grid-template-columns: minmax(0, 1fr); }
+    /* 窄屏一行放不下多字操作时按最小宽度换行，避免文字互相覆盖。 */
+    .fui-entity-card-actions { grid-auto-flow: row; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .fui-button, .fui-input, .fui-textarea, .fui-input-group, .fui-number, .fui-choice, .fui-search, .fui-date-trigger, .fui-segmented-item, .fui-switch, .fui-switch-thumb, .fui-checkbox-box, .fui-radio-card, .fui-radio-card-dot, .fui-dialog-close, .fui-table-cell { transition: none; }
+    .fui-button, .fui-input, .fui-textarea, .fui-input-group, .fui-number, .fui-choice, .fui-search, .fui-date-trigger, .fui-segmented-item, .fui-switch, .fui-switch-thumb, .fui-checkbox-box, .fui-radio-card, .fui-radio-card-dot, .fui-dialog-close, .fui-table-cell, .fui-entity-action { transition: none; }
     .fui-skeleton { animation: none; }
   }
   @media (forced-colors: active) {
@@ -215,3 +299,7 @@
   }
 }
 @keyframes fui-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+/* 未分层：style.css 的全局弹窗规则 [data-slot=dialog-content] { max-height; overflow-y: auto } 未分层，会压过层内规则；
+   居中弹窗需同样未分层且更具体，才能只让内容区滚动、头部与底栏固定。 */
+[data-slot=dialog-content].fui-modal { max-height: min(840px, calc(100dvh - 32px)); overflow: hidden; }

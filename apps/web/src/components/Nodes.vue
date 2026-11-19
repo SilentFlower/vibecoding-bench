@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { api, type Account } from '../api';
 import { useToast } from '../composables/useToast';
 import { Button } from './ui/button';
+import { PageHeader } from './ui/page-header';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Server, Plus, RefreshCw, ShieldCheck, Trash2, Pencil } from './ui/icon';
@@ -233,7 +234,7 @@ onUnmounted(() => { alive = false; loadGeneration++; if (refreshTimer) clearTime
 
 <template>
   <section class="nodes-page">
-    <header class="page-heading"><div><p class="page-eyebrow">资源</p><h1>节点管理</h1><p class="page-description">管理执行服务器、组件状态与账号运行位置。</p></div><div class="nodes-actions"><Button variant="outline" :disabled="synchronizing" @click="synchronize">{{ synchronizing ? '提交中…' : '同步全部节点' }}</Button><Button variant="outline" :disabled="loading" @click="refresh"><RefreshCw :size="16" />刷新列表</Button><Button @click="setEditor(true)"><Plus :size="16" />添加节点</Button></div></header>
+    <PageHeader title="节点管理" description="管理执行服务器、组件状态与账号运行位置。"><template #actions><div class="nodes-actions"><Button variant="outline" :disabled="synchronizing" @click="synchronize">{{ synchronizing ? '提交中…' : '同步全部节点' }}</Button><Button variant="outline" :disabled="loading" @click="refresh"><RefreshCw :size="16" />刷新列表</Button><Button @click="setEditor(true)"><Plus :size="16" />添加节点</Button></div></template></PageHeader>
     <p v-if="error" class="nodes-error" role="alert">{{ error }}</p>
     <p v-if="agyError" class="nodes-error" role="alert">{{ agyError }}</p>
     <p v-if="loading && !rows.length" role="status">正在读取节点…</p>

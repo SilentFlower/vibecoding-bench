@@ -1,5 +1,3 @@
-.request-page-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; margin-bottom: 28px; }
-.request-page-heading > .heading, .request-page-heading .heading { margin: 0px; }
 .request-mode { width: 190px; flex: 0 0 auto; }
 .request-mode .field { margin: 0px; gap: 5px; }
 .request-mode > small { display: block; color: rgb(163, 172, 185); font-size: var(--ui-font-small); margin-top: 7px; }
@@ -171,7 +169,7 @@
 .request-status small { font-size: var(--ui-font-small); }
 .request-filter-fields { grid-template-columns: 1fr 1fr; }
 .request-records td > strong { font-size: var(--ui-font-small); }}
-@media (max-width: 760px) {.request-page-heading { flex-direction: column; gap: 20px; }
+@media (max-width: 760px) {
 .request-mode { width: 100%; max-width: 260px; }
 .request-query-toolbar { flex-wrap: wrap; }
 .request-search { flex-basis: 100%; }
@@ -227,7 +225,6 @@
 .request-evidence-table .request-header-runtime .request-header-badge { background: rgb(241, 235, 248); color: rgb(154, 124, 181); }
 .request-evidence-table .request-header-context .request-header-badge { background: rgb(237, 242, 250); color: rgb(128, 155, 193); }
 .request-filter-fields { grid-template-columns: minmax(200px, 1.25fr) minmax(150px, 1fr) minmax(190px, 1.1fr) minmax(190px, 1.1fr); }
-.request-page-heading .heading p { color: rgb(104, 120, 141); }
 .request-mode .choice-label, .request-filter-fields .field, .request-filter-fields .date-time-field > span { color: rgb(100, 116, 139); }
 .request-mode > small, .request-filter-footer, .request-page-summary, .request-page-summary small { color: rgb(108, 123, 144); }
 .request-page-summary strong, .request-page-summary b { color: rgb(64, 85, 112); }
@@ -297,7 +294,6 @@
 
 /* Vue Dialog 使用 data-state；坐标与原生定稿侧工作区保持一致。 */
 [data-slot=dialog-content].request-workspace{left:auto;top:14px;right:14px;bottom:14px;max-width:none;transform:none;translate:none}
-.request-page-heading .page-heading{margin-bottom:0}
 .request-query-toolbar>.fui-search{flex:1;min-width:0}
 .request-filter-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
 .request-filter-footer{grid-column:1/-1}
@@ -308,7 +304,7 @@
 .request-list-footer>div{display:flex;align-items:center;gap:10px;flex:none}
 .request-empty{text-align:center;padding:40px!important}.request-empty svg{margin:0 auto 12px;color:#8e7ca3}.request-empty strong,.request-empty p{display:block;margin-bottom:10px}
 @media(max-width:1000px){.request-filter-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:760px){.request-filter-fields{grid-template-columns:1fr}.request-extra{display:none}.request-records th:nth-child(1){width:30%}.request-records th:nth-child(2){width:30%}.request-records th:nth-child(4){width:25%}.request-records th:nth-child(9){width:15%}.request-page-heading{flex-wrap:wrap}.request-list-footer{align-items:flex-start;flex-direction:column}.request-records td{padding:12px 8px}.request-records time{font-size:var(--ui-font-small);overflow-wrap:anywhere}.request-records [data-slot=button]{padding:5px;font-size:var(--ui-font-small)}}
+@media(max-width:760px){.request-filter-fields{grid-template-columns:1fr}.request-extra{display:none}.request-records th:nth-child(1){width:30%}.request-records th:nth-child(2){width:30%}.request-records th:nth-child(4){width:25%}.request-records th:nth-child(9){width:15%}.request-list-footer{align-items:flex-start;flex-direction:column}.request-records td{padding:12px 8px}.request-records time{font-size:var(--ui-font-small);overflow-wrap:anywhere}.request-records [data-slot=button]{padding:5px;font-size:var(--ui-font-small)}}
 
 .request-detail-scroll{padding:25px 28px;flex:1;min-height:0;overflow:auto;overscroll-behavior:contain}
 .request-detail-head{display:flex;flex-direction:column;align-items:stretch;text-align:left;gap:0;padding:23px 27px 20px}

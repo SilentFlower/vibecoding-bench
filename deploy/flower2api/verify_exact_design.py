@@ -7,24 +7,15 @@ from verify_run_detail_design import RunDetailFixture
 from verify_environment_ui import BASE, ROOT
 
 PROPERTIES=['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing','color','backgroundColor','borderRadius','padding','gap','boxShadow']
+# 侧栏、品牌、版本号、页头（含分组名与页头主按钮）已换为第二版外壳，由 verify_ui_shell.py 对照 doc/design/console-v2 核对，这里只比对页面主体。
 MAPPING={
     '筛选容器':('.account-toolbar .tabs','.account-filter-tabs'),
     '筛选按钮':('.account-toolbar .tab:not(.active)','.account-filter-tabs button:not(.active)'),
     '筛选选中态':('.account-toolbar .tab.active','.account-filter-tabs button.active'),
     '筛选计数':('.account-toolbar .tab span','.account-filter-tabs button span'),
-    '品牌标志':('.brand .flower','.console-brand img'),
-    '品牌文字':('.brand-name','.console-brand strong'),
-    '版本按钮':('.brand .version','.console-brand-row .brand-update'),
-    '品牌说明':('.brand-note','.sidebar-tagline'),
     '全局字体根':('html','html'),
     '卡片名称':('.account-name strong','.account-identity h3'),
     '邮箱文字':('.account-name small','.account-identity p'),
-    '页面标题':('.heading h1','.page-heading h2'),
-    '页面说明':('.heading p','.page-description'),
-    '眉题':('.eyebrow','.page-eyebrow'),
-    '侧栏文字':('.nav .nav-text','.navigation-item .sidebar-label'),
-    '侧栏分组':('.nav-label','.navigation-group-label'),
-    '主按钮':('[data-action=add]','.page-heading [data-variant=default]'),
     '卡片表面':('.account-card','.account-card'),
     '卡片底栏':('.account-card-actions button','.account-card-actions button'),
     '用量标题':('.aligned-usage-label','.usage-window-label'),
@@ -68,7 +59,8 @@ async def main():
             compared[key]={'reference':expected,'actual':observed,'differences':diff}
             if diff:differences.append(key)
         rendered_fonts = {}
-        for key in ['页面标题','卡片名称','邮箱文字','用量数值']:
+        # 页面标题已由第二版页头接管（verify_ui_shell.py），字体回退只核对页面主体文字。
+        for key in ['卡片名称','邮箱文字','用量数值']:
             ref_selector,actual_selector = MAPPING[key]
             faces = {}
             for name,current,selector in [('reference',reference,ref_selector),('actual',actual,actual_selector)]:

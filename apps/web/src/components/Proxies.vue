@@ -6,6 +6,7 @@ import { api, type ProxyRoute, type ProxyInput } from '../api';
 import { useToast } from '../composables/useToast';
 import { ConfirmationDialog } from './ui/feedback';
 import { Button } from './ui/button';
+import { PageHeader } from './ui/page-header';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
@@ -181,7 +182,7 @@ onUnmounted(() => { alive = false; cancelBatch.value = true; generation++; reque
 
 <template>
   <div class="proxy-page">
-    <header class="page-heading"><div><p class="page-eyebrow">资源</p><h2>代理管理</h2><p class="page-description">出口位置、连接质量与账号使用情况，一处查看。</p></div><div class="flex gap-2"><Button variant="outline" @click="importOpen = true; formError = ''"><Download :size="15" />批量导入</Button><Button @click="edit(null)"><Plus :size="15" />添加代理</Button></div></header>
+    <PageHeader title="代理管理" description="出口位置、连接质量与账号使用情况，一处查看。"><template #actions><Button variant="outline" @click="importOpen = true; formError = ''"><Download :size="15" />批量导入</Button><Button @click="edit(null)"><Plus :size="15" />添加代理</Button></template></PageHeader>
     <div class="proxy-summary"><span><strong>{{ counts?.all ?? total }}</strong> 条代理</span><span><strong>{{ counts?.available ?? '—' }}</strong> 条可用</span><span><strong>{{ counts?.used ?? '—' }}</strong> 条被使用</span><span v-if="!complete" class="text-amber-700">部分使用情况待核对</span><span>出口信息来自最近一次检测</span></div>
     <section class="proxy-panel">
       <header class="proxy-toolbar"><h3>代理线路 <small>{{ total }} / {{ counts?.all ?? total }} 条</small></h3><SearchInput v-model="query" label="搜索代理" placeholder="名称、地址、出口 IP 或地区" maxlength="256" @search="search" /><Button variant="outline" size="sm" :disabled="batch.running || !total || loading" @click="probeAll"><Activity :size="14" />批量检测</Button></header>

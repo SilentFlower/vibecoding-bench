@@ -53,7 +53,7 @@ async def main():
         before=await page.evaluate('scrollY')
         fixture.rows[0]['native_preparation']['idle_workers']=2
         await page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
-        await expect(page.locator('.runtime-page-heading button')).to_be_enabled()
+        await expect(page.locator('.runtime-environments .fui-page-header button')).to_be_enabled()
         assert await page.evaluate("stableEnvironment===document.querySelector('.environment-rich')&&stableButton===stableEnvironment.querySelector('.environment-card-actions button')")
         assert await page.evaluate('scrollY')==before
         await page.set_viewport_size({'width':1440,'height':620})
@@ -64,7 +64,7 @@ async def main():
         scroll=await page.evaluate('resourceScroll.scrollTop')
         for _ in range(3):
             await page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
-            await expect(page.locator('.runtime-page-heading button')).to_be_enabled()
+            await expect(page.locator('.runtime-environments .fui-page-header button')).to_be_enabled()
         assert await page.evaluate("!formDetached&&stableForm===document.querySelector('.environment-resource-editor form')&&stableInput===document.activeElement")
         assert await page.evaluate('resourceScroll.scrollTop')==scroll
         await expect(cpu).to_have_value('1.5');await page.evaluate('formObserver.disconnect()')

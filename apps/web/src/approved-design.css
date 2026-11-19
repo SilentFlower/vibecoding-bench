@@ -1,26 +1,7 @@
 /* 对照 flower2api-concept.html 的共享排版及账号结构；具体值来自渲染结果。 */
 html{color:#0e1726;font-family:var(--font-body);font-size:var(--ui-font-body);font-weight:400;line-height:normal;font-synthesis:none}
 body{line-height:normal;font-synthesis:none}
-.console-shell{max-width:none;margin:0}
-.console-sidebar{left:0}
-.console-content{max-width:none;width:100%;padding:38px 40px 48px}
 .account-card-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:18px;align-items:stretch}
-.page-heading{padding:0;gap:24px;margin-bottom:32px}
-.page-heading h1,.page-heading h2{font-size:var(--ui-font-page);font-weight:650;line-height:1.3;letter-spacing:-.5px;color:#0e1726}
-.page-heading .page-description{font-size:var(--ui-font-body);line-height:1.65;color:#5f6876;margin-top:9px}
-.page-eyebrow{font-size:var(--ui-font-small);font-weight:600;line-height:normal;letter-spacing:.8px;text-transform:uppercase;color:#7760c5;margin:0 0 10px}
-.console-sidebar{padding-top:29px}
-.console-brand strong{font-size:var(--ui-font-heading);font-weight:650;letter-spacing:-.7px}
-.console-navigation{gap:0;padding-top:0}
-.navigation-group{gap:0}
-.navigation-group-label{margin:22px 0 10px;padding:0 13px;font-size:var(--ui-font-small);color:#9b9eb4;letter-spacing:.5px;line-height:normal}
-.navigation-item{padding:12px 13px;gap:12px;min-height:44px;line-height:normal;font-size:var(--ui-font-body);font-weight:550;color:#aeb0c4}
-.navigation-item.is-active{background:#3a3453;color:#eee8ff;font-weight:650}
-.navigation-item.is-active svg{color:#c5b1f5}
-.navigation-item svg{width:20px;height:20px;stroke-width:1.7}
-.sidebar-tagline{padding:0;margin:12px 0 11px 35px;font-size:var(--ui-font-small);line-height:normal}
-.sidebar-footer{border-top-color:#383a4c;gap:7px;padding:20px 5px 0}
-.sidebar-identity{gap:0}.sidebar-identity strong{font-size:var(--ui-font-small);color:#dfdfeb}.sidebar-identity small{font-size:var(--ui-font-small);color:#a0a5b9}
 .account-card{border-color:#e5e9f0;box-shadow:0 5px 16px -13px #24304a24}
 .account-card-body{padding:20px 18px 17px;gap:0}
 .account-identity{gap:12px;padding:0 1px}
@@ -82,8 +63,6 @@ body{line-height:normal;font-synthesis:none}
 .account-card-actions button{display:flex;gap:4px;border:0;background:none;color:#7b86a0;font-size:var(--ui-font-small);line-height:normal;padding:6px 4px;border-radius:5px}
 .account-card-actions button.danger{color:#bb8690}
 .account-card-actions svg{width:13px;height:13px;stroke-width:1.7}
-@media(max-width:1000px) and (min-width:761px){.console-shell{--navigation-width:224px}.console-sidebar{padding-inline:12px}.console-content{padding-inline:26px}}
-@media(max-width:760px){.console-content{padding:22px 18px 35px}.page-heading{align-items:flex-start;flex-direction:column;gap:17px}.page-heading h1,.page-heading h2{font-size:24px}.sidebar-tagline{margin-bottom:11px}}
 
 /* 令牌行与账号范围选择复用定稿的组件样式。 */
 .token-row{display:flex;align-items:center;gap:14px;padding:22px 24px;border-bottom:1px solid var(--border)}
@@ -152,11 +131,10 @@ body{line-height:normal;font-synthesis:none}
 .account-routing>div>strong{display:block}
 .account-usage-windows{margin:0}
 .token-meta>span{overflow-wrap:anywhere}
-.console-brand{min-height:28px}.sidebar-tagline{margin-bottom:11px}.navigation-group-label{margin-top:22px}.account-network{padding-top:16px}
+.account-network{padding-top:16px}
 .account-toolbar .fui-search{background:transparent;border-color:transparent;box-shadow:none}
 .account-toolbar .fui-search:focus-within{border-color:#ad9bc4;background:white;box-shadow:0 0 0 3px #a28eb414}
 
-@media(min-width:761px) and (max-width:767px){.console-sidebar{display:flex}.console-workspace{margin-left:var(--navigation-width)}.console-toolbar{display:none}}
 @media(max-width:760px){.account-card-grid{grid-template-columns:minmax(0,1fr);gap:16px}}
 /* 用量气泡按定稿两列信息层级呈现。 */
 .fui-info-content.usage-cost-bubble{width:300px;max-width:calc(100vw - 20px);padding:17px 18px;border-color:#e6e2ed;color:#43516a}
@@ -183,25 +161,6 @@ body{line-height:normal;font-synthesis:none}
 @media(max-width:600px){.account-filter-tabs button{font-size:var(--ui-font-small);padding:7px 8px}}
 
 .account-filter-tabs button span{font-family:"JetBrains Mono Variable",monospace}
-
-/* 侧栏直接对齐定稿品牌、版本与分组的像素值。 */
-.console-sidebar{padding:29px 17px 20px;border:0}
-.console-brand-row{gap:7px;padding:0 1px;min-height:28px}
-.console-brand{gap:7px;min-height:28px}
-.console-brand img{width:28px;height:28px}
-.console-brand strong{font-size:var(--ui-font-heading);font-weight:750;letter-spacing:-.6px}
-.brand-update{position:relative;display:flex;align-items:center;gap:3px;padding:4px 5px;border:1px solid #525268;border-radius:6px;background:#303247;color:#d3c7ff;font:650 9px "JetBrains Mono Variable",monospace;line-height:normal}
-.brand-update svg{width:10px;height:10px}
-.brand-update.has-update::after{content:'';position:absolute;right:-2px;top:-2px;width:5px;height:5px;border-radius:50%;background:#c5f0b1;box-shadow:0 0 0 3px #202235}
-.sidebar-tagline{padding:0;margin:12px 0 18px 35px;color:#a0a5b9;letter-spacing:.5px}
-.navigation-group{display:flex;flex-direction:column;gap:5px}
-.navigation-group-label{margin-bottom:5px}
-.navigation-system{margin-top:24px}
-.navigation-count{margin-left:auto;font-size:var(--ui-font-small);font-weight:500;background:#48405f;color:#e1d6fa;padding:2px 7px;border-radius:5px}
-.navigation-running{margin-left:auto;display:inline-flex;align-items:center;font-size:var(--ui-font-small);font-weight:500;color:#8e6ab6;background:#f0eafa;border-radius:5px;padding:4px 7px}
-.sidebar-collapsed .navigation-count,.sidebar-collapsed .navigation-running{display:none}
-
-@media(max-width:1000px) and (min-width:761px){.console-sidebar{padding-inline:12px}.console-brand strong{font-size:var(--ui-font-card)}.brand-update{font-size:var(--ui-font-small)}}
 
 /* 宽屏铺满视口，账号保持定稿四列，避免卡片随分辨率增加而过密。 */
 @media(min-width:1680px){.account-card-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
@@ -269,10 +228,6 @@ button:disabled,select:disabled,[aria-disabled=true]{cursor:not-allowed}
 .proxy-account-identity:is(button){cursor:pointer}
 /* 页码选中态使用明确按钮变体，避免透明ghost覆盖背景后留下白字。 */
 
-/* 阅读字号放大后同步保留侧栏身份与操作空间。 */
-.sidebar-identity small{white-space:nowrap}
-@media(min-width:1920px){.console-shell{--navigation-width:264px}.console-shell.sidebar-collapsed{--navigation-width:76px}}
-@media(min-width:2560px){.console-shell{--navigation-width:280px}.console-shell.sidebar-collapsed{--navigation-width:76px}}
 
 /* 更新状态、说明、平台与记录各自成区，展开动作保持独立。 */
 .approved-update-dialog{width:min(1080px,calc(100vw - 32px))}

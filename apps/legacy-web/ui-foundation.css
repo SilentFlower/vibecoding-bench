@@ -8,6 +8,7 @@
   --ui-color-fill-muted: #f1f2f7;
   --ui-color-fill-subtle: #f7f8fb;
   --ui-color-fill-strong: #d8dce8;
+  --ui-color-fill-active: #eceef5;
   --ui-color-track: #e9ebf3;
   --ui-color-line: #e6e8f0;
   --ui-color-mask: rgba(14, 23, 38, 0.3);
@@ -27,6 +28,9 @@
   --ui-color-agy-bg: #eef3fd;
   --ui-color-brand: #ed6ea7;
   --ui-color-ink: #191b2c;
+  --ui-color-on-ink: #ffffff;
+  --ui-color-ink-text: #a7abc3;
+  --ui-color-ink-muted: #6c708e;
   --ui-color-feedback-surface: #191b2c;
   --ui-color-feedback-text: #ffffff;
   --ui-color-primary: #6c54b4;
@@ -52,6 +56,8 @@
   --ui-shadow-modal: 0 24px 60px -20px rgba(14, 23, 38, 0.35);
   --ui-shadow-raised: 0 1px 3px rgba(14, 23, 38, 0.08);
   --ui-shadow-knob: 0 1px 2px rgba(0, 0, 0, 0.18);
+  --ui-shadow-side: 2px 0 12px -10px rgba(14, 23, 38, 0.12);
+  --ui-shadow-bar: 0 2px 12px -10px rgba(14, 23, 38, 0.2);
   --ui-radius-btn: 6px;
   --ui-radius-control: 8px;
   --ui-radius-block: 12px;

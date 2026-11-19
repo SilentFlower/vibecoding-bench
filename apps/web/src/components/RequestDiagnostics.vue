@@ -12,6 +12,7 @@ import ExecutionNodeBadge from './runtime/ExecutionNodeBadge.vue';
 import PlatformBadge from './PlatformBadge.vue';
 import { api, type DiagnosticRequest, type DiagnosticAttempt, type NativeCapture } from '../api';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 const toast = useToast();
@@ -330,7 +331,7 @@ onUnmounted(() => { mounted = false; listGeneration++; detailGeneration++; listC
 
 <template>
   <section class="requests-page" aria-label="请求记录">
-    <header class="request-page-heading"><div class="page-heading"><div><p class="page-eyebrow">观测与诊断</p><h1>请求记录</h1><p class="page-description">从请求结果、用量到处理链路，快速找到需要关注的调用。</p></div></div><div class="request-mode"><ChoiceSelect :model-value="mode" label="后续请求日志" :options="[{value:'unknown',label:'读取中',disabled:true},{value:'info',label:'info · 摘要'},{value:'debug',label:'debug · 脱敏内容'}]" :disabled="modeSaving || mode === 'unknown'" @update:model-value="saveMode" /><small>仅影响后续请求</small></div></header>
+    <PageHeader title="请求记录" description="从请求结果、用量到处理链路，快速找到需要关注的调用。"><template #actions><div class="request-mode"><ChoiceSelect :model-value="mode" label="后续请求日志" :options="[{value:'unknown',label:'读取中',disabled:true},{value:'info',label:'info · 摘要'},{value:'debug',label:'debug · 脱敏内容'}]" :disabled="modeSaving || mode === 'unknown'" @update:model-value="saveMode" /><small>仅影响后续请求</small></div></template></PageHeader>
     <p v-if="modeError" role="alert" class="text-destructive">{{ modeError }}</p>
     <section class="request-query-panel"><div class="request-quick-tabs" role="group" aria-label="请求快捷筛选"><button v-for="item in quickTabs" :key="item.id" type="button" :class="{active:quick===item.id && !outcome}" :aria-pressed="quick===item.id && !outcome" @click="chooseQuick(item.id)"><component :is="item.icon" :size="14" />{{ item.label }}<span>{{ counts?.[item.id] ?? '—' }}</span></button></div>
       <form @submit.prevent="load()"><div class="request-query-toolbar"><SearchInput v-model="correlation" label="请求关联 ID" placeholder="输入完整请求 ID / 响应关联 ID / 上游请求 ID" @search="load()" /><Button type="button" variant="outline" :aria-expanded="filtersOpen" aria-controls="request-filters" @click="filtersOpen=!filtersOpen"><Settings2 :size="14" />筛选<i v-if="account || outcome || since || until || platform || protocol || kernelVersion || requestedModel || actualModel" class="request-filter-dot" /></Button><Button type="submit" :disabled="loading"><Search :size="14" />查询</Button><Button type="button" variant="outline" :disabled="loading" @click="load(page)"><RefreshCw :size="14" />刷新</Button></div>

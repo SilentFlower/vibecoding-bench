@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Check, Save, RotateCcw } from '@/components/ui/icon';
 import { DEFAULT_THEME_SEED, THEME_PRESETS, applyTheme, createTheme, readStoredTheme, writeStoredTheme, type ThemeSeed } from '@/theme';
 import KitShowcase from './KitShowcase.vue';
+import CompositeShowcase from './CompositeShowcase.vue';
 
 const { show: notify } = useToast();
 const { ask } = useConfirmation();
@@ -115,6 +116,7 @@ const localSwitch = ref(true);
     </form>
 
     <KitShowcase />
+    <CompositeShowcase />
 
     <section class="preview-card">
       <div class="preview-section-title"><h2>搜索与完整信息</h2><span>聚焦容器 · 溢出可查看</span></div>
