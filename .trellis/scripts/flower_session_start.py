@@ -24,6 +24,7 @@ WORKFLOW_BLOCK = re.compile(r"<trellis-workflow>\n(.*?)\n</trellis-workflow>\n*"
 ASTRA_MODEL = "gpt-6-astra"
 SOL_MODEL = "gpt-6-sol"
 SOL_6_1_MODEL = "gpt-6.1-sol"
+GPT_MODEL = re.compile(r"gpt-[A-Za-z0-9][A-Za-z0-9._-]*")
 MODEL_HINT_MAX_BYTES = 2048
 WORKFLOW_STATE_REFRESH_ARG = "--trellis-session-start-refresh"
 CODE_DESIGN_HINT = """<trellis-code-design>
@@ -36,14 +37,14 @@ CONFIRMATION_HINT = """<trellis-confirmation>
 Before final Brief/Check-All/Push output, follow .trellis/scripts/confirmation.md: resolve --entry, attempt eligible prepare, background wait, full display, end turn. Manual fallback needs an exclusion or actual failure reason. Generic commit intent does not approve a later plan. Execute only on valid human/runner authorization or policy_timeout claim plus started receipt. Human decisions and host approvals stay manual.
 </trellis-confirmation>"""
 MODEL_WORKFLOW_HINT_BODY = """Applies only to active {model}. Keep ordinary replies brief; perform checks internally.
-When executing the current task:
-- Follow SKILL and WORKFLOW steps autonomously. Simplicity, redundant checks or fewer interruptions do not waive required steps, references, gates or templates.
-- Before a step, read its rules and required references. Reuse fully read, unchanged material; search matches are not full reads.
-- Preserve required template headings, order and conditional sections. Brevity does not waive structure.
-- Resolve conflicts by instruction hierarchy; follow the owner's phase transitions. Planning intent does not approve a final plan.
-- Generic work/Git intent does not approve a later plan. Follow the gate owner BEFORE ending the turn: eligible prepare, background wait, full display; exclusions or actual failures use manual confirmation. Act only on a verified user reply, valid runner authorization, or policy_timeout claim AND started receipt. Silence and display are not human approval; unresolved decisions and host approvals stay manual.
-- Verify actual tool records and artifacts before claiming read, checked or complete. Reading and compliance are separate facts.
-- When corrected, inspect applicable rules, records and results before repairing. State missing evidence; do not invent causes or substitute unrelated rules."""
+For the current task:
+- Follow SKILL/WORKFLOW steps, references, gates and templates autonomously; convenience never waives them.
+- Read step rules/references; reuse unchanged full reads. Search hits are not full reads.
+- Keep template headings/order/conditional sections, instruction hierarchy and owner phase transitions.
+- Planning/work/Git intent is not final-plan approval. Follow the gate owner BEFORE ending the turn: eligible prepare, background wait, full display; exclusions or actual failure use manual confirmation. Execute only on a verified user reply, valid runner authorization, or policy_timeout claim AND started receipt. Silence/display are not approval; unresolved decisions and host approvals stay manual.
+- Verify records/artifacts before claiming read, checked or complete. Reading is not compliance. On correction, inspect rules/evidence, state gaps, never invent causes.
+- Code: no speculative guards/caps or silent fallbacks. Justify new/inherited checks, fallbacks and timeouts by requirements, concrete evidence, measured resource budgets or dependency contracts; keep scope minimal. Prefer streaming/batching and progress-aware waits over larger caps.
+- Validate relevant inputs at trust/use boundaries; tolerate irrelevant metadata by contract. Surface errors and actionable recovery. Test valid large/long-running, version and recovery paths across related entry points alongside rejection. Preserve identity, authorization, integrity and single execution."""
 ASTRA_WORKFLOW_HINT = (f'<trellis-astra-workflow-hint model="{ASTRA_MODEL}" version="1">\n'
                        f'{MODEL_WORKFLOW_HINT_BODY.format(model=ASTRA_MODEL)}\n'
                        '</trellis-astra-workflow-hint>')
@@ -73,14 +74,16 @@ def _model_workflow_hint(root: Path, config_key: str, hint: str, label: str) -> 
     codex = config.get("codex", {})
     if not isinstance(codex, dict):
         raise ValueError("codex 配置必须为映射")
-    enabled = codex.get(config_key, True)
-    # 上游无依赖 YAML 读取器返回字符串，不能把字符串 false 当作真值。
-    if isinstance(enabled, str) and enabled.lower() in ("true", "false"):
-        enabled = enabled.lower() == "true"
-    if not isinstance(enabled, bool):
-        raise ValueError(f"codex.{config_key} 必须为 true 或 false")
-    if not enabled:
-        return ""
+    # 总开关优先；旧型号继续尊重独立开关，避免升级后重新开启用户关闭的提示。
+    for key in dict.fromkeys(("gpt_workflow_hint", config_key)):
+        enabled = codex.get(key, True)
+        # 上游无依赖 YAML 读取器返回字符串，不能把字符串 false 当作真值。
+        if isinstance(enabled, str) and enabled.lower() in ("true", "false"):
+            enabled = enabled.lower() == "true"
+        if not isinstance(enabled, bool):
+            raise ValueError(f"codex.{key} 必须为 true 或 false")
+        if not enabled:
+            return ""
     if len(hint.encode("utf-8")) > MODEL_HINT_MAX_BYTES:
         raise ValueError(f"{label} 工作流提示超过 2048 字节预算")
     return hint
@@ -111,6 +114,19 @@ def _sol_6_1_workflow_hint(root: Path) -> str:
     @return: Sol 6.1 提示块；关闭时为空串。
     """
     return _model_workflow_hint(root, "sol_6_1_workflow_hint", SOL_6_1_WORKFLOW_HINT, "Sol 6.1")
+
+
+def _gpt_workflow_hint(root: Path, model: str) -> str:
+    """为已校验的 GPT 模型生成共用工作流提示。
+
+    @param root: 当前部署项目根目录。
+    @param model: 已通过 GPT_MODEL 完整匹配的事件模型名称。
+    @return: 完整提示块；总开关关闭时为空串。
+    """
+    hint = (f'<trellis-gpt-workflow-hint model="{model}" version="1">\n'
+            f'{MODEL_WORKFLOW_HINT_BODY.format(model=model)}\n'
+            '</trellis-gpt-workflow-hint>')
+    return _model_workflow_hint(root, "gpt_workflow_hint", hint, "GPT")
 
 
 def split_workflow(summary: str) -> dict[str, str]:
@@ -402,9 +418,11 @@ def render_part(root: Path, hook: str, part: str, hook_input: dict) -> dict | No
                 hint_builder, label = _sol_workflow_hint, "Sol"
             elif model == SOL_6_1_MODEL:
                 hint_builder, label = _sol_6_1_workflow_hint, "Sol 6.1"
-            if hint_builder is not None:
+            elif isinstance(model, str) and GPT_MODEL.fullmatch(model):
+                label = "GPT"
+            if label:
                 try:
-                    hint = hint_builder(root)
+                    hint = hint_builder(root) if hint_builder is not None else _gpt_workflow_hint(root, model)
                     if hint:
                         context = f"{context}\n{hint}"
                 except Exception as error:
