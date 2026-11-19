@@ -111,14 +111,14 @@ class Worker:
     def start(self, until):
         """在同UID隔离角色中启动并核对真实就绪。@param until 原单调截止。@return 无。"""
         # 与发送器的冻结模块路径一致，共享私有文件助手由正式镜像放在/usr/local/bin。
-        environment = {'PATH': '/usr/local/bin:/usr/bin:/bin', 'PYTHONPATH': str(Path(__file__).resolve().parents[1])+':/usr/local/bin',
+        environment = {'PATH': '/usr/local/bin:/usr/bin:/bin', 'PYTHONPATH': str(Path(__file__).resolve().parents[1])+':/opt/v3/python:/usr/local/bin',
             'AGY_RUNTIME_IMAGE_SOCKET': str(self.owner.socket_path), 'AGY_RUNTIME_SUPERVISOR_PID':str(os.getpid()), 'TMPDIR':str(self.folder)}
         with self.lifecycle_lock:
             if self.closed or self.owner.closed:
                 raise InputError('supervisor_closed')
             if time.monotonic() >= until:
                 raise InputError('request_deadline_exceeded')
-            self.process = subprocess.Popen([sys.executable, '-m', 'agy_runtime.kernel',
+            self.process = subprocess.Popen([sys.executable, '-P', '-m', 'agy_runtime.kernel',
                 '--config', str(self.folder / 'config.json'), '--state-dir', str(self.folder / 'state')],
                 env=environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                 start_new_session=True)

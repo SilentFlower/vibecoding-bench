@@ -858,6 +858,28 @@ def _owned_root(values: dict, stopped: bool = False) -> Path:
     return root
 
 
+def stage_agy_kernel(values: dict, environment_id: str, source: Path) -> dict:
+    """给主机上的单个反重力发送器登记候选包。@param values 部署配置。@param environment_id 固定环境。@param source 已构建的 agy_runtime 目录。@return 候选摘要。"""
+    from agy_kernel import stage
+
+    if os.geteuid() != 0:
+        raise ValueError('请由部署宿主管理员准备请求内核')
+    if not re.fullmatch(r'[0-9a-f]{32}', environment_id):
+        raise ValueError('环境标识不合法')
+    bench = _owned_root(values) / 'bench'
+    with sqlite3.connect((bench / 'db.sqlite').as_uri() + '?mode=ro', uri=True) as database:
+        row = database.execute(
+            "SELECT e.generation FROM account_environments e JOIN platform_api_environments p "
+            "ON p.environment_id=e.environment_id WHERE p.platform='antigravity' AND e.account_id IS NULL "
+            "AND e.environment_id=?", (environment_id,)).fetchone()
+    if not row:
+        raise ValueError('部署中没有该反重力环境')
+    sender = bench / 'environments' / environment_id / 'runtime/sender'
+    if not (sender / 'sender.json').is_file():
+        raise ValueError('请先初始化目标环境的发送器')
+    return {'environment_id': environment_id, 'kernel': stage(source, sender)}
+
+
 def status(values: dict) -> dict:
     """展示本部署全部容器、账号占用和实际镜像 ID，不输出服务秘密。
 
@@ -1214,7 +1236,7 @@ def main() -> None:
     :return: None
     """
     parser = argparse.ArgumentParser(description="v3 联合镜像管理")
-    parser.add_argument("action", choices=("build", "publish", "pull", "load", "check", "up", "status", "stop", "backup", "verify-backup", "storage", "import-offline"))
+    parser.add_argument("action", choices=("build", "publish", "pull", "load", "check", "up", "status", "stop", "backup", "verify-backup", "storage", "import-offline", "stage-agy-kernel"))
     parser.add_argument("--env", type=Path)
     parser.add_argument("--release")
     parser.add_argument("--manifest", type=Path)
@@ -1225,6 +1247,7 @@ def main() -> None:
     parser.add_argument("--full", action="store_true", help="显式完整备份；默认只保留可验证恢复的关键状态")
     parser.add_argument('--cluster-epoch',help='全部节点停机后共用的32位集群备份批次')
     parser.add_argument("--source", type=Path)
+    parser.add_argument('--environment-id', help='目标反重力环境标识')
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     if args.action == "build":
@@ -1252,6 +1275,11 @@ def main() -> None:
     if not args.env:
         parser.error("此操作需要 --env")
     values = load_environment(args.env)
+    if args.action == 'stage-agy-kernel':
+        if not args.source or not args.environment_id:
+            parser.error('准备候选内核需要 --environment-id 和 --source')
+        print(json.dumps(stage_agy_kernel(values, args.environment_id, args.source), ensure_ascii=False))
+        return
     if args.action == 'storage':
         if args.apply and not args.source:
             parser.error('应用维护清单需要 --source')

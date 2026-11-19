@@ -12,6 +12,7 @@ from docker.errors import NotFound
 
 from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, create_environment, role_container
 from account_update_identity import configured_release, image_origin, role_release
+from agy_kernel import kernel_id, module_root, selection, work_root
 from native_capture_policy import capture_enabled
 from resource_budget import account_limits, default_account_memory, isolated_account_limits
 from runtime_files import atomic_json
@@ -110,7 +111,11 @@ def summary(runtime, row: dict) -> dict:
                 raise ValueError('AGY观测代次不一致')
             result['busy']=value['active']>0
             if isinstance(value.get('agy'),dict):
-                result['agy_runtime'].update(value['agy'])
+                observed = dict(value['agy'])
+                loaded = observed.pop('module_root', None)
+                result['agy_runtime'].update(observed)
+                if loaded is not None:
+                    result['agy_runtime']['loaded_kernel'] = kernel_id(loaded)
                 if value['agy'].get('state') in ('unknown','reconcile'):
                     result['state']='reconcile'
                     result['reconcile_allowed']=True
@@ -177,6 +182,8 @@ def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance
                 'vibebench.isolation-version':str(ISOLATION_VERSION)}.items()):
             raise ValueError('AGY账号镜像身份或批次不一致')
         desired = sender_config(configuration,json.loads(row['fingerprint_json']),labels)
+        current_kernel = selection(runtime, row, release=configured_release(runtime))
+        desired.update(module_root=module_root(current_kernel), work_root=work_root(current_kernel))
         present = [bool(row.get(column)) for column in ROLE_COLUMNS.values()]
         if any(present) and not all(present):
             runtime._update(row,state='reconcile')

@@ -40,6 +40,7 @@ struct Subscriber {
 
 struct Controller {
     identity: String,
+    module_root: String,
     input: Mutex<ChildStdin>,
     child: Mutex<Child>,
     requests: Mutex<HashMap<String, Subscriber>>,
@@ -294,14 +295,14 @@ impl AgyPool {
             "proxy_url":config.proxy_url,"capture_enabled":false,"capture_root":"/flows/api/agy-prepared"}),
         )?;
         let mut child = Command::new("python3")
-            .args(["-m", "agy_runtime.supervisor", "--config"])
+            .args(["-P", "-m", "agy_runtime.supervisor", "--config"])
             .arg(&path)
             .env_clear()
             .env("PATH", "/usr/local/bin:/usr/bin:/bin")
             .env("TMPDIR", &generation_root)
             .env(
                 "PYTHONPATH",
-                format!("{}:/usr/local/bin", native.module_root),
+                format!("{}:/opt/v3/python:/usr/local/bin", native.module_root),
             )
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -313,6 +314,7 @@ impl AgyPool {
         let output = child.stdout.take().ok_or_else(unavailable)?;
         let controller = Arc::new(Controller {
             identity,
+            module_root: native.module_root.clone(),
             input: Mutex::new(input),
             child: Mutex::new(child),
             requests: Mutex::new(HashMap::new()),
@@ -486,9 +488,13 @@ impl AgyPool {
         }
         .await;
         controller.requests.lock().await.remove(&id);
-        result
+        let mut status = result
             .map(|(event, _permit)| event["status"].clone())
-            .unwrap_or(json!({"state":"unknown"}))
+            .unwrap_or(json!({"state":"unknown"}));
+        if let Some(fields) = status.as_object_mut() {
+            fields.insert("module_root".into(), json!(controller.module_root));
+        }
+        status
     }
 }
 

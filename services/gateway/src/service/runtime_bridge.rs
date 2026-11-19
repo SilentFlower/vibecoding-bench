@@ -532,10 +532,11 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
             _ => false,
         };
     }
-    if let Some(environment) = api_path
-        .strip_prefix("environments/")
-        .and_then(|value| value.strip_suffix("/content-capture"))
-    {
+    if let Some(environment) = api_path.strip_prefix("environments/").and_then(|value| {
+        value
+            .strip_suffix("/content-capture")
+            .or_else(|| value.strip_suffix("/agy-kernel"))
+    }) {
         return matches!(*method, Method::GET | Method::POST)
             && environment.len() == 32
             && environment.bytes().all(|value| value.is_ascii_hexdigit());
@@ -1164,19 +1165,25 @@ mod tests {
         }
     }
 
-    /// 采集开关只开放精确环境资源和读写方法。
+    /// 环境采集和反重力内核只开放精确的读写入口。
     #[test]
-    fn content_capture_bridge_is_scoped_to_one_environment() {
-        let path = format!("/api/environments/{}/content-capture", "a".repeat(32));
-        assert!(browser_path_allowed(&Method::GET, &path));
-        assert!(browser_path_allowed(&Method::POST, &path));
-        for method in [Method::PUT, Method::DELETE, Method::PATCH] {
-            assert!(!browser_path_allowed(&method, &path));
-        }
-        for environment in ["short", "../internal", "invalid-environment-identifier-xx"] {
+    fn environment_controls_are_scoped_to_one_environment() {
+        for action in ["content-capture", "agy-kernel"] {
+            let path = format!("/api/environments/{}/{action}", "a".repeat(32));
+            assert!(browser_path_allowed(&Method::GET, &path));
+            assert!(browser_path_allowed(&Method::POST, &path));
+            for method in [Method::PUT, Method::DELETE, Method::PATCH] {
+                assert!(!browser_path_allowed(&method, &path));
+            }
+            for environment in ["short", "../internal", "invalid-environment-identifier-xx"] {
+                assert!(!browser_path_allowed(
+                    &Method::POST,
+                    &format!("/api/environments/{environment}/{action}")
+                ));
+            }
             assert!(!browser_path_allowed(
                 &Method::POST,
-                &format!("/api/environments/{environment}/content-capture")
+                &format!("{path}/upload")
             ));
         }
     }

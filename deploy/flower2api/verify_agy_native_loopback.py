@@ -410,7 +410,50 @@ def verify_png(request, wait_idle, database, base):
         'diagnostic_requests':len(rows),'account_gif_switch':True,'original_jpeg_and_wav':True,'live_gif_retry':True}
 
 
-def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False):
+def verify_kernel_selection(request, wait_idle, base):
+    """用真实内核验证切换、原生工作进程换代和恢复。@param request Gemini 入口。@param wait_idle 实际排空。@param base 模型入口。@return 验证摘要。"""
+    configuration_path = Path('/state/sender.json')
+    configuration = json.loads(configuration_path.read_bytes())
+    builtin = configuration['agy'].copy()
+    target = Path('/state/candidate')
+    source = Path(builtin['module_root']) / 'agy_runtime'
+    shutil.copytree(source, target / 'agy_runtime')
+    mapping = target / 'agy_runtime/gemini_contract.py'
+    with mapping.open('a') as output:
+        output.write('''
+_base_history = native_history
+def native_history(*args, **kwargs):
+    steps = _base_history(*args, **kwargs)
+    steps[-1]['userInput']['userResponse'] += ' TLS_SYNTHETIC_CANDIDATE'
+    return steps
+''')
+
+    body = {'contents': [{'role': 'user', 'parts': [{'text': 'TLS_SYNTHETIC_TEXT'}]}]}
+    def check(native, uses_candidate):
+        configuration['agy'] = native
+        staged = configuration_path.with_suffix('.tmp')
+        staged.write_text(json.dumps(configuration))
+        staged.replace(configuration_path)
+        status, raw = request(base + 'generateContent', body)
+        require(status == 200, '切换后请求失败：' + str(status) + ' ' + raw.decode()[:350])
+        wait_idle()
+        wire = Upstream.calls[-1]['body']['request']['contents']
+        require(('TLS_SYNTHETIC_CANDIDATE' in json.dumps(wire)) == uses_candidate, '实际 worker 没有使用所选映射')
+        query = Request('http://127.0.0.1:8091/internal/status', headers={'authorization': 'Bearer ' + SECRET})
+        with urlopen(query, timeout=5) as response:
+            state = json.load(response)['agy']
+        require(state['module_root'] == native['module_root'], '进程内核来源报告不一致')
+        return state['processes'][0]['native']['pid']
+
+    first = check(builtin, False)
+    second = check({**builtin, 'module_root': str(target), 'work_root': '/state/native-candidate'}, True)
+    third = check(builtin, False)
+    require(len({first, second, third}) == 3 and len(Upstream.calls) == 3, '未完成独立进程换代及单次提交')
+    return {'passed': True, 'candidate_wire_observed': True, 'builtin_restored': True,
+        'distinct_native_processes': 3, 'synthetic_submissions': len(Upstream.calls)}
+
+
+def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,kernel_selection=False):
     """执行真实公共业务。@param homoglyph 检验系统策略。@param capture_off 验证关闭采集。@param png 核对图片与工具历史。@param installed_adapter 使用镜像内适配器。@return 脱敏验证摘要。"""
     require(os.geteuid()==1001,'原生业务探针必须使用UID1001')
     os.umask(0o077)
@@ -474,6 +517,10 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False):
             database.execute("INSERT INTO api_tokens(name,token,allowed_accounts,status) VALUES('synthetic','synthetic-key','1','active')")
         require(request('/admin/settings',{'request_diagnostics_log_mode':'debug'},admin=True)[0]==200,'测试日志模式设置失败')
         base='/v1beta/models/'+MODEL+':'
+        if kernel_selection:
+            result = verify_kernel_selection(request, wait_idle, base)
+            database.close()
+            return result
         if png:
             result=verify_png(request,wait_idle,database,base)
             database.close()
@@ -591,10 +638,11 @@ def main():
     parser.add_argument('--capture-off',action='store_true')
     parser.add_argument('--png',action='store_true')
     parser.add_argument('--installed-adapter',action='store_true')
+    parser.add_argument('--kernel-selection',action='store_true')
     args=parser.parse_args()
-    installed_adapter=args.installed_adapter or args.png
+    installed_adapter=args.installed_adapter or args.png or args.kernel_selection
     if args.inside:
-        print(json.dumps(inside(args.homoglyph,args.capture_off,args.png,installed_adapter),ensure_ascii=False));return
+        print(json.dumps(inside(args.homoglyph,args.capture_off,args.png,installed_adapter,args.kernel_selection),ensure_ascii=False));return
     require(bool(args.image),'需要明确的固定原版测试镜像')
     import docker
     root=Path(__file__).resolve().parents[2]
@@ -632,7 +680,7 @@ def main():
                 volumes[str(library)]={'bind':'/opt/verify-lib/'+name,'mode':'ro'}
         probe=['/opt/probe.py','--inside']
         for flag,enabled in (('--homoglyph',args.homoglyph),('--capture-off',args.capture_off),('--png',args.png),
-                ('--installed-adapter',installed_adapter)):
+                ('--installed-adapter',installed_adapter),('--kernel-selection',args.kernel_selection)):
             if enabled:probe.append(flag)
         container=client.containers.run(args.image,probe,entrypoint=['python3'],detach=True,
             user='1001:1001',network_mode='none',read_only=True,cap_drop=['ALL'],security_opt=['no-new-privileges:true'],
@@ -644,7 +692,7 @@ def main():
             labels={'vibebench.test-task':'agy-request-records'})
         result=container.wait(timeout=540)
         logs=container.logs().decode(errors='replace')
-        evidence=root/('.trellis/.runtime/agy-png-loopback-private' if args.png else '.trellis/.runtime/agy-homoglyph-capture-off-private' if args.capture_off else '.trellis/.runtime/agy-homoglyph-loopback-private' if args.homoglyph else '.trellis/.runtime/agy-runtime-loopback-private')
+        evidence=root/('.trellis/.runtime/agy-kernel-selection-private' if args.kernel_selection else '.trellis/.runtime/agy-png-loopback-private' if args.png else '.trellis/.runtime/agy-homoglyph-capture-off-private' if args.capture_off else '.trellis/.runtime/agy-homoglyph-loopback-private' if args.homoglyph else '.trellis/.runtime/agy-runtime-loopback-private')
         if evidence.exists():shutil.rmtree(evidence)
         shutil.copytree(folder,evidence,ignore=lambda directory,names:[name for name in names
             if not (Path(directory)/name).is_file() and not (Path(directory)/name).is_dir()])

@@ -25,7 +25,8 @@ class SourceLayoutTests(unittest.TestCase):
                 'cc2api/Cargo.lock', 'cc2api/vendor/dependency.rs', 'cc2api/craftls/lib.rs',
                 'orchestrator/runtime_files.py', 'orchestrator/runtime_diagnostics.py',
                 'orchestrator/cli_quota.py', 'orchestrator/process_metrics.py',
-                'orchestrator/native_sender.py', 'orchestrator/agy_auth.py', 'orchestrator/agy_runtime/__init__.py', 'webui/index.html', 'cc2api/web/src/main.ts',
+                'orchestrator/native_sender.py', 'orchestrator/agy_auth.py', 'orchestrator/requirements.txt',
+                'orchestrator/agy_runtime/__init__.py', 'webui/index.html', 'cc2api/web/src/main.ts',
                 'cc2api/web/package-lock.json', 'images/account/init.py',
                 'images/sidecar/start.sh', 'images/worker/task_followups.py',
                 'images/worker/entrypoint.sh', 'images/account/projects_cli.py')
@@ -45,6 +46,9 @@ class SourceLayoutTests(unittest.TestCase):
             changed = source_path(new, 'orchestrator/native_sender.py')
             changed.write_text('synthetic:changed')
             self.assertNotEqual(component_content(old, 'account'), component_content(new, 'account'))
+            account_before = component_content(new, 'account')
+            source_path(new, 'orchestrator/requirements.txt').write_text('Pillow==13.0.0')
+            self.assertNotEqual(account_before, component_content(new, 'account'))
             control_before = component_content(new, 'control')
             account_before = component_content(new, 'account')
             source_path(new, 'images/worker/entrypoint.sh').write_text('合成driver改动')

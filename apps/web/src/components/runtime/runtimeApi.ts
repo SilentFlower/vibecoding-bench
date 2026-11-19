@@ -31,6 +31,8 @@ export interface EnvironmentKernel {
   previous?: KernelReference | null; builtin?: KernelReference | null; error?: string | null; pid?: number;
   image_sha256?: string; warmup?: unknown;
 }
+/** 反重力环境内核选择与本环境已登记制品。 */
+export interface AgyKernelCatalog { generation: number; kernel: string | null; candidates: string[] }
 /** 某一源版本的实际准备观察，版本集合保持独立归属。 */
 export interface NativePreparationSnapshot {
   state: string; reason?: string; checking?: boolean; idle_workers?: number; live_workers?: number;
@@ -42,7 +44,7 @@ export interface RuntimeEnvironment {
   platform?: 'claude_code' | 'antigravity';
   agy_runtime?: { version: string; source_sha256: string; state: string; workers?: number; active?: number;
     tool_waiting?: number; max_workers?: number; image_bytes?: number; image_decode_calls?: number;
-    controller?: { Rss?: number; Pss?: number; USS?: number }; processes?: unknown[] };
+    controller?: { Rss?: number; Pss?: number; USS?: number }; processes?: unknown[]; loaded_kernel?: string | null };
   node?: Pick<AccountNodeAssignment, 'node_id' | 'node_key' | 'node_name' | 'kind' | 'enabled'>; node_observed?: boolean; node_message?: string;
   login_draft?: boolean;
   environment_id: string; name: string; account_id: number | null; gateway_account_id?: number | null;
