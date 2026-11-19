@@ -1,0 +1,9 @@
+{
+  "artifact": "agy.xz",
+  "archive_bytes": 80922084,
+  "archive_sha256": "22ade718c0914d0a7ea14cac1e1575a78e0c8a7b337f49f3ff5c729291f7cfea",
+  "decoded_bytes": 265700040,
+  "decoded_sha256": "39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43",
+  "matches_current_runtime": true,
+  "reuse_scope": "固定执行映像；适配源码和观察资源沿当前仓库构建"
+}
