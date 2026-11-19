@@ -1,0 +1,83 @@
+{
+  "phase": "诊断中间交付",
+  "source_sha256": "a48621b400d00b2e254a925fdf3c7c73c3bbe527a80b0d99632ae9e61bfd7046",
+  "unit": {
+    "full_deploy": {
+      "tests": 291,
+      "skipped": 1,
+      "passed": true
+    },
+    "final_focused": {
+      "tests": 16,
+      "passed": true
+    }
+  },
+  "docker": {
+    "fault": {
+      "passed": true,
+      "real_model_requests": 0,
+      "evidence": {
+        "event": "agy-probe-failure",
+        "phase": "prepared",
+        "credential_generation": 1,
+        "capture_failed": [],
+        "state": {
+          "Running": true,
+          "OOMKilled": false,
+          "ExitCode": 0
+        },
+        "event_counts": {
+          "supervisor_ready": 1,
+          "error": 1,
+          "job_finalized": 1
+        },
+        "error_codes": {
+          "worker_start_failed": 1
+        },
+        "runtime": {
+          "processes": {
+            "other": 2,
+            "supervisor": 1
+          },
+          "memory_events": {
+            "max": 0,
+            "oom": 0,
+            "oom_kill": 0
+          },
+          "stages": {
+            "worker_config": 0,
+            "kernel_lock": 0,
+            "kernel_error": 0,
+            "input_pipe": 0,
+            "listener_identity": 0
+          },
+          "startup_errors": {}
+        }
+      }
+    },
+    "normal": {
+      "passed": true,
+      "real_model_requests": 0,
+      "credential_generations": [
+        1,
+        2
+      ],
+      "image_decode_calls": 1,
+      "terminated": true,
+      "package_source": "image"
+    },
+    "crash": {
+      "passed": true,
+      "real_model_requests": 0,
+      "credential_generations": [
+        1,
+        2
+      ],
+      "image_decode_calls": 1,
+      "terminated": true,
+      "package_source": "image"
+    }
+  },
+  "formal_ci_root_cause": "待正式CI取证",
+  "task_completion": "in_progress"
+}
