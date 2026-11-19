@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from source_layout import source_path
 
-from system_release import GATEWAY_SCHEMA_SOURCES, REPO, migration_registries
+from system_release import BENCH_SCHEMA_SOURCES, GATEWAY_SCHEMA_SOURCES, REPO, migration_registries
 from database_migration_contract import load_registry
 
 
@@ -22,11 +22,18 @@ def source_ownership(root: Path) -> list[str]:
     :return: 需要迁移登记的位置，不包含 SQL 或业务数据。
     """
     findings = []
-    schema = source_path(root, 'orchestrator/database_schema.py')
-    for node in ast.walk(ast.parse(schema.read_text())):
-        if ((isinstance(node, ast.ImportFrom) and node.module != '__future__')
-                or (isinstance(node, ast.Import) and any(item.name not in ('re', 'sqlite3') for item in node.names))):
-            findings.append(str(schema.relative_to(root)) + ':' + str(node.lineno))
+    bench_registry = load_registry(source_path(root, 'orchestrator/database-migration-registry.json'), 'bench')
+    bench_registered = {step['id'] for step in bench_registry['steps']}
+    python_schemas = {source_path(root, logical) for key, logical in BENCH_SCHEMA_SOURCES.items() if key in bench_registered}
+    # 临时清单在每次迁移的私有目录创建并删除，不进入业务数据库版本台账；纯定义仍由此入口核验。
+    python_schemas.add(source_path(root, 'orchestrator/cluster_archive_schema.py'))
+    for schema in sorted(python_schemas):
+        if not schema.is_file():
+            continue
+        for node in ast.walk(ast.parse(schema.read_text())):
+            if ((isinstance(node, ast.ImportFrom) and node.module != '__future__')
+                    or (isinstance(node, ast.Import) and any(item.name not in ('re', 'sqlite3') for item in node.names))):
+                findings.append(str(schema.relative_to(root)) + ':' + str(node.lineno))
     registry = load_registry(source_path(root, 'cc2api/src/store/database-migration-registry.json'), 'gateway')
     registered = {step['id'] for step in registry['steps']}
     rust_schemas = {source_path(root, logical) for key, logical in GATEWAY_SCHEMA_SOURCES.items() if key in registered}
@@ -37,7 +44,7 @@ def source_ownership(root: Path) -> list[str]:
         if re.search(r'\b(?:crate|super)::', RUST_LITERAL.sub(' ', definitions)):
             findings.append(str(rust_schema.relative_to(root)) + ':1')
     for path in (source_path(root, 'orchestrator')).glob('*.py'):
-        if path.name.startswith('test_') or path.name == 'database_schema.py':
+        if path.name.startswith('test_') or path in python_schemas:
             continue
         tree = ast.parse(path.read_text())
         docstrings = set()

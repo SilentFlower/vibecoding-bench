@@ -86,7 +86,7 @@ class ProjectsVerification:
     :param accepted: 返回权威已验收工作，用于保护同项目此前交付的能力。
     """
 
-    def __init__(self, catalog, terminal, native, pi, provider, event=None, accepted=None) -> None:
+    def __init__(self, catalog, terminal, native, pi, provider, event=None, accepted=None, *, program=None) -> None:
         """保存验收依赖，不触发任何模型或容器请求。
 
         :param catalog: 内容目录。
@@ -96,11 +96,13 @@ class ProjectsVerification:
         :param provider: 模型配置。
         :param event: 公开验收阶段与用量事件回调。
         :param accepted: 返回同账号、身份和固定项目已验收工作的权威回调。
+        :param program: 按原工作路由程序验收，返回None时使用原本机验证器。
         :return: None。
         """
         self.catalog, self.terminal, self.native = catalog, terminal, native
         self.pi, self.provider, self.event = pi, provider, event
         self.accepted = accepted
+        self.program = program
 
     def _progress(self, work: dict, directory: Path, stage: str, message: str, **details) -> None:
         """在耗时操作前发布真实阶段，不公开私有检查内容。
@@ -136,6 +138,16 @@ class ProjectsVerification:
             raise ValueError('交付合同与原工作冻结版本不一致')
         candidate = directory / 'candidate'
         materialize_snapshot(snapshot, objects, candidate)
+
+        def verify(target, project_root, specification, environment, profile, *, answer='', regression=False, cancel=None):
+            # 当前目标和历史已通过目标都沿同一个候选验证；节点路由只替换程序的实际执行位置。
+            if self.program:
+                result = self.program(work, snapshot, directory, target, answer=answer, regression=regression, cancel=cancel)
+                if result is not None:
+                    return result
+            return self.native.verify_native(candidate, project_root, specification, environment, profile,
+                answer=answer, regression=regression, cancel=cancel)
+
         scope = check_change_scope(json.loads(work['baseline_json']), snapshot, definition['allowed_paths'])
         if scope['status'] != 'passed':
             return {'status': 'failed', 'checks': {'scope': 'failed'},
@@ -148,17 +160,17 @@ class ProjectsVerification:
         if not answer:
             return {'status': 'error', 'feedback': ['缺少 Claude 原生实际交付回答']}
         self._progress(work, directory, 'business', '执行当前目标的业务检查')
-        report = self.native.verify_native(candidate, project.root, specification, environment, profile, answer=answer, cancel=cancel)
+        report = verify(work, project.root, specification, environment, profile, answer=answer, cancel=cancel)
         if report['status'] == 'error':
             self._progress(work, directory, 'business', '业务检查环境异常，正在重试（第 2 次）', attempt=2)
-            report = self.native.verify_native(candidate, project.root, specification, environment, profile, answer=answer, cancel=cancel)
+            report = verify(work, project.root, specification, environment, profile, answer=answer, cancel=cancel)
         checks = {'scope': 'passed', 'business': report['status']}
         if report['status'] == 'passed' and specification.get('regression'):
             self._progress(work, directory, 'regression', '执行完整回归测试')
-            regression = self.native.verify_native(candidate, project.root, specification, environment, profile, regression=True, cancel=cancel)
+            regression = verify(work, project.root, specification, environment, profile, regression=True, cancel=cancel)
             if regression['status'] == 'error':
                 self._progress(work, directory, 'regression', '回归测试环境异常，正在重试（第 2 次）', attempt=2)
-                regression = self.native.verify_native(candidate, project.root, specification, environment, profile, regression=True, cancel=cancel)
+                regression = verify(work, project.root, specification, environment, profile, regression=True, cancel=cancel)
             checks['regression'] = regression['status']
             report = {'status': regression['status'], 'business': report, 'regression': regression}
         if report['status'] == 'passed' and self.accepted:
@@ -175,13 +187,13 @@ class ProjectsVerification:
                 old_library = old_assets.library
                 old_environment = old_project.manifest['environment']
                 old_specification = read_document(old_project.root / safe_relative(old_definition['evaluation']['native']))
-                prior = self.native.verify_native(candidate, old_project.root, old_specification,
+                prior = verify(previous, old_project.root, old_specification,
                     old_library.root / 'environments' / old_environment, old_library.environments[old_environment],
                     cancel=cancel)
                 if prior['status'] == 'error':
                     self._progress(work, directory, 'previous_objectives', message + '，环境异常重试（第 2 次）',
                         current=index, total=len(previous_work), attempt=2)
-                    prior = self.native.verify_native(candidate, old_project.root, old_specification,
+                    prior = verify(previous, old_project.root, old_specification,
                         old_library.root / 'environments' / old_environment, old_library.environments[old_environment],
                         cancel=cancel)
                 accepted_reports.append({'objective_id': previous['objective_id'], 'report': prior})

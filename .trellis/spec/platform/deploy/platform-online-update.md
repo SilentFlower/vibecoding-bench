@@ -81,6 +81,7 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 - 两端活动计数覆盖响应正文 EOF、错误及断连。批次排队等待属于待认领工作；有限分派事务和实际执行计入活动。维护期间保留待认领项，释放门禁或控制重启后继续调度。
 - 原工程或登录只能凭实际仍登记的有限作业续接。续接继续检查身份、时间窗口与配额；作业撤销后证明失效。
 - 排空核对实际 API、jobs、executions、租约、sender、CLI 孤儿、三角色镜像及未决意图。未知活动阻断切换。排空超时和切换前取消按原操作释放门禁。
+- 暂停的提交前节点迁移可随平台维护保留：核对原操作/分配/环境代次/指纹及源隔离，实际API、等待、导入和角色均已停止，原排他租约身份保持。原源和目标资料纳入节点完整备份，维护不重建或激活暂停账号。恢复后仍由原迁移继续；具体字段和测试归[集群迁移兼容与暂停维护](../../orchestrator/backend/account-runtime-v3.md#scenario-集群迁移兼容与暂停维护)。
 - v1 安装正常阶段为 `preparing → draining → switching → verifying → committing → cleaning → succeeded`。v2 在排空并锁定切换意图后增加 `snapshotting`；目标为 v2 时执行 `migrating`，随后进入 `switching`。失败恢复增加 `restoring_data`。单独 prepare 在 `prepared` 完成。恢复按持久意图、真实容器、配置 CAS、软件字段 CAS 与双库/身份摘要确定动作；不确定现场进入 `reconcile`。
 - 账号部分恢复最多允许冻结的原版和候选两个实际镜像 ID。恢复仍要求环境、代次、epoch 以及原作业证明一致。恢复已释放的门禁前重新检查后来工作。
 - `finalize --apply` 与独立执行器共用 `service.lock` 及存储维护锁。原首次接入在状态提交后、门禁释放前后中断，均可用同一发行重试收口。已完成重试保留原 `installed_at`；外来门禁和后来 revision 拒绝覆盖。
@@ -151,6 +152,7 @@ python3 deploy/flower2api/upgrade_system_updater.py --policy <原策略> --servi
 system_schema_migrations(migration_id TEXT PRIMARY KEY, version INTEGER NOT NULL UNIQUE,
   checksum TEXT NOT NULL, applied_at TEXT NOT NULL, operation_id TEXT NOT NULL)
 system_release.migration_registries(root: Path) -> dict
+system_release.BENCH_SCHEMA_SOURCES: dict[str, str]
 system_release.GATEWAY_SCHEMA_SOURCES: dict[str, str]
 ```
 
@@ -158,9 +160,13 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 ### 3. Contracts
 
-- 两库登记为 `{schema_version:1,database,steps}`；每步固定 `id,version,predecessor,checksum,engine,kind,rollback_mode`，要求连续前驱、`engine=sqlite`、`kind=schema|data`、`rollback_mode=compatible`。首版仅登记各自 `baseline.1`。增加版本需同时实现对应执行分支及演练。
+- 两库登记为 `{schema_version:1,database,steps}`；每步固定 `id,version,predecessor,checksum,engine,kind,rollback_mode`，要求连续前驱、`engine=sqlite`、`kind=schema|data`、`rollback_mode=compatible`。冻结各自`baseline.1`，当前登记以源码版本链为准。增加版本需同时实现对应执行分支及演练。
 - 合同为按 key 排序、紧凑 UTF-8 JSON 登记的 SHA256。Python 冻结定义使用忽略文档/注释的 AST 摘要，Rust 使用测试段之前的纯定义原字节摘要。冻结 SQL、默认值、历史画像及命名空间依赖归纯迁移模块所有，普通业务查询和页面改动保持合同。
-- 发布校验与DDL扫描共用步骤ID到精确源路径的映射：gateway.baseline.1→database_schema.rs、gateway.proxies.2→proxy_schema.rs、gateway.proxy-sync.3→proxy_sync_schema.rs、gateway.session-policy-blocks.4→session_policy_block_schema.rs，均位于网关src/store。仅当前登记中的对应路径拥有DDL定义；同名业务文件不豁免。每个网关步骤都核对源码摘要，未知步骤、缺失来源和摘要漂移在签发前拒绝。
+- 发布校验与DDL扫描共用步骤ID到精确源路径的映射：gateway.baseline.1→database_schema.rs、gateway.proxies.2→proxy_schema.rs、gateway.proxy-sync.3→proxy_sync_schema.rs、gateway.session-policy-blocks.4→session_policy_block_schema.rs、gateway.account-platforms.5→account_platform_schema.rs、gateway.request-records.6→request_records_schema.rs，均位于网关src/store。仅当前登记中的对应路径拥有DDL定义；同名业务文件不豁免。每个网关步骤都核对源码摘要，未知步骤、缺失来源和摘要漂移在签发前拒绝。
+- bench映射为`bench.baseline.1→database_schema.py`、`bench.cluster.2→cluster_schema.py`、`bench.node-executions.3→node_execution_schema.py`、`bench.node-login-drafts.4→node_login_draft_schema.py`、`bench.agy-environments.5→agy_environment_schema.py`，均位于编排服务根。`system_release.BENCH_SCHEMA_SOURCES`与定义扫描共用该唯一来源表，每个已登记步骤均核对摘要；集群离线备份/换批沿[账号环境共同合同](../../orchestrator/backend/account-runtime-v3.md)及`deploy/flower2api/CLUSTER.md`。
+- AGY与集群共存时保留已发布bench1—4的身份与摘要，AGY环境增量位于版本5。旧开发分支`bench.agy-environments.2`与正式版本2存在身份分叉，继续在写入前受控拒绝；不得自动覆盖原台账。
+- 固定宿主源码包须在仓库外以`python -I`导入`manage/system_updater/system_release`。`install_system_updater.SOURCE_FILES`包含迁移执行器的全部纯定义依赖，AGY环境步骤对应`orchestrator/agy_environment_schema.py`；开发树的PYTHONPATH不能补足交付包漏项。
+- 临时迁移磁盘清单定义限`services/orchestrator/cluster_archive_schema.py`纯模块，由定义扫描核验；它在每次迁移私有临时目录建立和删除，不进入bench业务版本链。同名业务文件及业务模块中的DDL继续拒绝。
 - 自哈希Rust模块使用 `concat!("#[cfg(", "test)]")` 构造测试分隔标记，保证迁移执行和结构校验也进入摘要。源码内直接写完整分隔字符串会使字节切分提前停止。首次发布前修正新增定义需同步登记摘要；已发布步骤继续冻结。
 - CLI 返回 `database,contract,current_version,target_version,steps,state,reason`；执行完成保留原台账 operation_id。已知台账摘要冲突或版本断链拒绝；旧程序读取兼容新增版本返回 `compatible_newer`。
 - 旧库迁移前核验稳定账号核心字段。迁移完成且写入成功台账之前、以及已登记库 plan/apply 时，复核冻结基线的最低表/列、SQLite 亲和、主键及完整性。允许兼容新增表/列；非主键数字亲和支持历史兼容。空库沿相同初始化建立基线。
@@ -168,6 +174,9 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 - v2 使用独立 `updates/v3-migrations` 通道，首发继承旧受信发行。`updates/v3` 保留 v1 及原最高序号，仅刷新时间和签名。受信新通道 ref 404 才允许读取旧通道；已有通道资产缺失直接失败。正式证据要求干净同批镜像。
 - 从空闲现场关闭门禁并排空，停止双端并确认数据库 FD 退出后，保存同操作私有双库快照。回执绑定 deployment、operation_id、epoch、原发行、权限/归属及每库文件/逻辑摘要；空间预算先于迁移。默认保留最近两组完成快照，另外保护活动恢复引用，异常目录保留并报告。
 - `database_snapshot` 仅公开 `state,completed_at,bytes`；`database_migrations` 按库公开 state 和 target_version。页面显示快照、迁移、数据恢复及具体阻断原因，未知值保留可见。
+- 托管Node加入原维护范围：最终排空快照冻结节点集合，`prepare_nodes`在中央切换和双库快照前收齐同epoch实际停止回执，Node作业采用data_policy=in_place保留当前资料；`resume_nodes`在新控制就绪后恢复同一作业，最终健康核验后才开放接单。内部`POST /internal/v3/system-updates/nodes`沿原更新凭据、operation_id和epoch，仅接受prepare/status/resume/restore/rollback/cancel-preparation。普通管理准入继续遵守全局门禁；内部活动由`reserve_maintenance`按原维护身份登记。
+- `cluster_nodes={phase,nodes}`公开逐节点名称、阶段、运行标记和受控preparation；原控制配置及小型恢复日志保留在节点私有目录。取消先等待原辅助进程收口，再恢复原组件；新中央重启须由原宿主明确resume授予本次boot身份，防止排空后提前切换。后台断线沿同一操作重试。
+- `release_started`前的失败恢复原中央数据；新Node原地作业只切回旧控制与账号组件，保留当前HOME、工程和节点执行库，不生成全量副本或隔离目录。历史Node快照作业继续沿原成组快照恢复，持久完成边界先于程序恢复。已重新接单后的恢复沿当前资料反向切换组件。历史中央缺少内部节点维护接口时首次接入按集群离线SOP执行；后续同能力版本可统一维护。
 - `release_started` 先于实际释放准入持久化。此前失败按原 UUID 恢复同组两库和原程序；恢复意图先于暂存复制和替换，支持部分两库完成。账号重建后的六项生命周期登记以原身份和 CAS 续接，再恢复原环境。`database_restored` 先于原程序启动落盘，重启收口保护原程序后来写入。重新接单后的显式回退保留当前数据。
 - 底座首次能力接入默认预览，持有独立接入锁；完整备份后发布 `updater-upgrades/<UUID>/upgrade.json`。未完成日志阻止新接入。`--recover` 默认预览，允许服务 inactive，按精确原/新源码 SHA、原策略/状态副本摘要、空闲门禁及服务归属验收，持有服务锁和存储锁后恢复原版并验证 socket。恢复再次中断继续原 UUID；后来状态、外来源码及后续接入日志触发现场保护。
 
@@ -177,6 +186,7 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 | --- | --- |
 | 缺稳定核心字段、已登记库缺必要字段、类型/主键异常 | CLI 非零，拒绝登记成功 |
 | 重复 ID、前驱断链、校验和改变、未登记结构定义 | 构建或维护验证失败 |
+| 旧开发AGY版本2与正式集群版本2身份分叉 | 迁移CLI非零，保留原数据及原台账 |
 | 迁移步骤无对应源码、来源缺失、同名文件冒充所有者、增量定义依赖业务模块 | 来源或所有权校验失败，禁止签发 |
 | 同合同仅历史许可列表变化 | 允许常规兼容安装 |
 | v2 附件、来源清单或实际镜像证据不符 | 阻止准备/安装及兼容发布 |
@@ -200,11 +210,14 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 错误用法：只复制基线源码的夹具通过后，直接把新迁移加入发行；或仅按文件名跳过DDL扫描。正确处理：真实仓库执行所有权检查，夹具覆盖全部已登记定义，并同时验证来源路径、纯定义及每步摘要。
 
+错误用法：合并AGY时覆盖已发布的`bench.cluster.2`，或重复赋值迁移来源表。正确处理：保持集群1—4并追加`bench.agy-environments.5`，所有步骤进入同一来源映射；旧开发分支台账保持受控拒绝。
+
 ### 6. Tests Required
 
 - `verify_database_definitions.py`：DDL 所有权和冻结摘要；业务模块 DDL、触发器/视图及纯定义外部依赖必须被拒绝。
 - `test_database_definitions.py`：真实仓库入口通过；修改任一增量文件的后续DDL使扫描验收及data_contracts都失败；同名文件、业务依赖、未知步骤和缺失来源分别拒绝。历史发行已经登记的步骤须与发布附件逐字段一致。
 - 两库迁移测试：空库、旧库、重复执行、台账冲突、兼容新增；缺列/类型/主键异常拒绝登记。Python 增量事务失败保持数据与台账。
+- AGY集成回归覆盖bench4→5和gateway4→6、原账号/节点归属与历史台账保持、旧程序读写、重跑幂等及AGY开发版本2整库不变的受控拒绝。`test_system_workflow.test_frozen_updater_can_import_build_helpers`复制实际SOURCE_FILES并在仓库外导入全部三个助手，防止纯迁移模块漏包。
 - `test_system_database.py`、`test_system_migrations.py`：WAL、空间、损坏/外来快照、部分复制/替换恢复、保留轮换、同合同准入及开放后的数据保护。
 - `test_system_upgrade.py`：来源/服务归属、失败恢复、源码/策略/状态替换真实进程终止、按 UUID 预览、恢复再次中断、重复恢复及后来状态保护。
 - `verify_database_compatibility.py`：真实旧库→候选→原程序读写、重复迁移及快照恢复；结果绑定精确镜像及合同。默认环境独立入口必须工作。
@@ -222,14 +235,15 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 - `deploy/flower2api/platform-release.json` 精确字段为 `schema_version:1`、`version:string`、`changes:string`。
 - `read_version(path)` 校验规范 `v<major>.<minor>.<patch>` 及说明；`signed_changes(metadata)` 生成受控首行 `平台版本：v1.0.0` 与正文。
-- `ensure_forward_version(current,previous)` 检查受信前后发行；前端使用 `VITE_PLATFORM_VERSION` 构建输入。
+- `ensure_forward_version(current,previous)` 检查受信前后发行；`GET /api/system-updates/version` 精确返回 `{version:string|null}`，响应设置 `Cache-Control:no-store`。
 
 ### 3. Contracts
 
-- 新发行首版 v1.0.0；修复递增补丁，功能递增次版本。元数据为唯一维护源，build 将版本传入 frontend Docker 阶段，且将元数据纳入源快照摘要。
+- 新发行首版 v1.0.0；修复递增补丁，功能递增次版本。元数据为唯一维护源，build 派生只含version的 `runtime-build/platform-version.json`，两者均纳入源快照摘要。control最终阶段将派生文件复制到 `/app/platform-version.json`；frontend/backend编译输入及Cargo源码缓存键排除版本元数据。account沿原组件复用合同，更新器始终选择目标control。
 - 发布端从同一元数据生成现有签名 changes，GitHub 标题使用可读版本。原 release/sequence/镜像/清单摘要及 v1/v2 字段集合保持原合同。
 - 发布前从原已签目录取得最新完整清单并核对大小、摘要及格式；旧目录按签发时刻验证，允许正式发布刷新过期通道。不同源码使用相同或更低语义版本拒绝；同源重跑允许相同版本。
-- 当前平台版本来自控制镜像中构建的前端；可用版本从已验签说明首行提取。独立构建缺输入时使用已有受信信息或历史构建语义。
+- 当前平台版本从控制镜像固定文件读取，独立于宿主更新器。按1024字节上限、普通文件、禁止跟随链接及严格JSON校验，只接受唯一version字段及规范ASCII语义版本；缺失或损坏返回null。浏览器通过原管理鉴权桥的精确GET白名单 `/runtime/api/system-updates/version` 读取；其它方法及子路径沿原拒绝规则。
+- Dashboard与SystemUpdates优先显示运行时版本。读取失败、旧端404或null时，只按已验签目录中的current_release精确匹配回退；缺当前项时使用既有未知/历史文案。最新可用版本始终属于可用发行展示。视图独立取消旧读，卸载及迟到回执失效。
 - 旧发行字节保持可追溯，缺元数据展示历史构建日期及技术详情；CLI 和内核按账号分别展示实际来源。
 - 更新列表默认突出当前与最新可用项，历史折叠，同一列表只保留一个详情展开。安装确认冻结真实 release、摘要、revision 及显示标题，轮询保持原参数。
 - 时间按浏览者时区显示，技术详情保留原始标识；UTC 存储及安装参数沿用。
@@ -241,6 +255,9 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 | 非规范版本、空说明、未知元数据字段 | 构建/发布拒绝 |
 | 不同源码复用版本、版本倒退 | 发布拒绝 |
 | 原清单大小或摘要不符 | 发布拒绝 |
+| 版本文件缺失、超限、特殊文件、链接、JSON或版本非法 | 返回version:null；前端按当前发行回退 |
+| 更新器未接入、不可达、目录缺当前发行 | 运行时版本独立可读并展示 |
+| 管理会话缺失或错误 / 写方法或子路径 | 沿原鉴权拒绝 / 沿原白名单拒绝 |
 | 历史发行缺可读版本 | 日期及技术详情 |
 | 目录不新鲜或安装现场变化 | 原更新合同要求重新检查/确认 |
 
@@ -248,11 +265,14 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 - 正常：v1.0.0 → 修复 v1.0.1 → 功能 v1.1.0；同一源码 Action 重跑保留原版本。
 - 边界：原系统仍使用严格 v1/v2 清单，版本信息沿受信 changes 兼容展示。
+- 正常：同一代码从v1.17.2递增到v1.17.3，frontend/backend复用缓存，control内版本文件与API变为v1.17.3。边界：宿主更新器离线时版本仍显示当前控制版本。错误用法：当前项退出目录后显示目录最新版本。正确处理：使用运行时版本，缺失时保留未知语义。
 - 错误用法：把 ci 编号直接改名后作为安装参数。正确处理：语义版本用于展示，安装使用原受信身份。
 
 ### 6. Tests Required
 
 - `test_system_platform_version` 覆盖实际元数据、历史说明、递增和不同源码拒绝；`test_system_release` 验证原签名与字段合同。
+- `test_system_update_version` 覆盖真实ASGI只读响应、鉴权、no-store、大小及文件/JSON边界；网关测试覆盖精确GET白名单。实际manage快照测试核对版本派生、源码摘要及编译输入边界；真实Docker两版本对照核对frontend/backend命中缓存与最终文件变化。
+- `verify_runtime_platform_version.py` 覆盖两个实际入口的运行时优先、旧端404、null、非法值、目录缺当前项及更新器未接入/不可达，并用实际组合函数验证乱序、取消及卸载。
 - Vue/TypeScript 生产构建和 `verify_management_ui.py` 覆盖当前/最新/历史、单展开、取消零写入及两个浏览器时区。
 
 
@@ -268,16 +288,25 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 - `publish_system_release.check_signing_key() -> None`、`python3 deploy/flower2api/publish_system_release.py --check-signing`：核对实际手动入口和 Ed25519 签名配置。
 - `gh workflow run v3-build.yml --ref flower2api`：只构建验证。
 - `gh workflow run v3-release.yml --ref flower2api -f publish=true`：明确发布。
+- `gh workflow run v3-release.yml --ref flower2api -f publish=true -f full_build=true`：明确选择原完整验证和构建路径，`full_build:boolean`默认false。
+- `candidate_artifacts.py export --manifest PATH --output DIR`导出受信候选；`resolve --manifest PATH [--wait-seconds 1200]`核对并换批，输出`GITHUB_OUTPUT.reused=true|false`；等待参数为0至3600的整数。
+- `candidate.json`严格字段：`schema_version:1,repository,ref,revision,run_id,run_attempt,manifest,bundle`；两份文件描述均为`{name,size,sha256}`，名称固定为`v3-local.json`、`candidate-images.tar.gz`。
 
 ### 3. Contracts
 
 - 发版先预览、再执行。读取签名更新目录中的最新发行及其源码 SHA，并读取目标远端分支当前 SHA。按两者的实际提交和文件差异拟定版本及更新说明，区分用户可见改动、维护改动和候选之外的本地提交。预览应注明目标分支、候选 SHA、更新说明、数据库迁移或安装注意事项、验证状态及待确认范围。先展示完整说明，等待发起人确认本次版本和范围。
 - 经确认后，将预览的版本与说明写入并校验 `deploy/flower2api/platform-release.json`。若另建发版准备提交，推送前核实候选到最终发行 SHA 的新增差异仅为已确认的发行元数据和文档。触发发布前重新读取目标远端引用，确认它指向最终发行 SHA。候选内容、版本或说明变化时重新展示并确认。触发后核对 Action 的 `headSha`，偏离时立即尝试取消并核对实际远端发行状态。
 - 正式发行使用原签名流程。成功后核对 GitHub Release、受信目录、签名清单、版本说明和来源 SHA 对应一致。生产实例安装沿独立授权流程。
-- v3-build 的 push/目标 PR 分支为 v3、flower2api，另有手动构建。权限 contents:read，checkout 关闭持久凭据；仅测试、构建两镜像并上传本地清单，发布副作用为零。
-- v3-release 仅 workflow_dispatch；布尔 input `publish` 默认 false，必须明确选中。本仓 v3/flower2api 分支可发布，同一 runner 冻结实际 SHA 并重新验证构建，真实旧库兼容演练通过后才推镜像。只有发布 job 取得 contents/packages 写权限。
+- v3-build 的 push/目标 PR 分支为 v3、flower2api，另有手动构建。权限 contents:read，checkout 关闭持久凭据；测试、构建两镜像并上传本地清单，发布副作用为零。本仓受信分支的push/手动构建另保存`v3-candidate-<run_id>-<attempt>`，包含严格元数据、原清单和完整归档，保留一天、上传压缩级别为0；PR只保存原清单。
+- v3-release 仅 workflow_dispatch；布尔 input `publish` 默认 false，必须明确选中。本仓 v3/flower2api 分支可发布，同一runner冻结实际SHA；优先复用同源码候选，缺失、过期、失败或旧构建无候选时重新完整验证构建。真实旧库兼容演练通过后才推镜像。只有发布job取得contents/packages写权限，并通过actions:read核对候选。
+- 候选复用前核对干净checkout的HEAD、GitHub运行的仓库/原仓库ID、分支、SHA、工作流路径、run/attempt和归档来源。原`build`作业的合同校验、镜像构建、候选导出及上传四步均成功后即可复用，允许其缓存post继续执行。选定后来源/attempt变化、归档来源或摘要异常直接失败；API读取失败保持失败。未选中受信来源视为候选缺失，进入完整构建路径。
+- 下载先核对GitHub原始ZIP的SHA256，仅解包三份固定普通文件；重复成员、链接、路径穿越、未知成员、加密及超预算成员均拒绝。JSON读取沿原131072字节预算，镜像包沿原16GiB预算，文件名称、真实大小和SHA256逐项核对。产物读取API限60秒，归档下载限900秒，在途构建轮询默认预算1200秒。
+- 候选加载后沿原`inspect_images`核对两角色身份，再只重写`vibebench.release`为当前手动Action批次；完整Config除该标签外必须一致，RootFS及平台必须一致，ONBUILD非空拒绝构建。原镜像及正式目标标签均核对禁止覆盖，正式清单通过原批次校验和镜像核验后才独占发布；兼容演练绑定换批后的真实镜像。
+- 复用成功跳过重复合同测试、缓存恢复、原生资产下载和二进制构建。`full_build=true`跳过候选解析，并重新执行原完整链路。签名预检、真实兼容演练、发布命名空间和原手动run/attempt门禁对两条路径都保持强制。
+- 两路推送与离线gzip归档在全部标签预检并创建原started标记后并行执行；上下文等待全部作业退出，全部成功才原子交付最终包及完整清单。失败保留原attempt标记，最终交付路径不暴露临时包。大包只上传正式Release，Actions发行artifact保存诊断清单及兼容证据；签名发行与原子目录完成即具备安装条件，构建缓存post独立收尾。
 - 两个 Python 发布入口共用来源校验：`GITHUB_ACTIONS=true`、`GITHUB_EVENT_NAME=workflow_dispatch`、`V3_PUBLISH_CONFIRMED=true`、精确 repo/ref，以及 `GITHUB_WORKFLOW_REF=<repo>/.github/workflows/v3-release.yml@<ref>`。run/attempt 为正整数串、SHA 为40位小写hex；清单批次、revision和clean标记必须匹配。
 - 发布预检要求有效 `V3_SYSTEM_RELEASE_PRIVATE_KEY`，用实际 DER 格式确认 Ed25519。缺配置/错误类型在构建及推送前失败。签名私钥仅供手动发布侧使用。
+- CI历史目录读取显式使用发布任务的`GH_TOKEN`，sudo仅追加保留该现有临时令牌。`fetch_bytes(...,github_token=None)`及`fetch_repository_file(...,github_token=None)`默认公开读取；显式认证只发往`https://api.github.com/repos/SilentFlower/vibecoding-bench/`，拒绝编码/相对路径绕过及全部认证重定向。分支引用、Contents元数据及Git blob均传递同一令牌；发行附件沿原公开下载，原大小、blob身份、摘要、签名和历史兼容校验保持。
 - 工作流拆分后的 run_number 不用作发行序号；从同信任根已验签目录主序号最大值加1，第二项使用实际 attempt。历史目录按签发时刻校验原合同，主序号达到2^53-1时拒绝新发行。完整附件后才普通 fast-forward 推进目录，保留原版本递增与批次不可覆盖规则。
 - 原仓库、v3镜像名、system-ci/v3-ci身份、updates/v3-migrations及updates/v3语义、信任根与双库兼容合同保持。管理员从原系统更新页准备/安装；旧底座按既有SOP原地补齐能力。
 - `install_system_updater.SOURCE_FILES` 含 manage 的直接依赖 platform_version.py、release_ci.py；固定源码复制后必须能在仓库外独立导入。
@@ -292,16 +321,27 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 | push/PR/构建入口调用发布脚本 | ValueError，Docker/GitHub发布副作用为零 |
 | 错误分支、仓库、SHA、工作流或缺确认标记 | 发布前拒绝 |
 | 缺私钥、密钥非Ed25519 | 预检失败 |
+| CI读取固定历史目录 | 显式传递当前job临时令牌，避免匿名API配额 |
+| 带认证访问附件/外仓/编码路径或发生跳转 | 读取前拒绝，认证材料保持在原固定仓库API |
 | 历史目录主序号700，新工作流run_number=1 | 发行主序号701，原发行继续可读 |
 | 历史签名损坏或序号达到上限 | 正式发行写入前失败 |
 | 附件上传或目录并发推送失败 | 原目录受保护，已完成事实保留，无force覆盖 |
 | 更新器源码包缺直接依赖 | 独立导入回归失败 |
+| 无候选、候选过期、旧构建或已失败构建 | 原完整校验和构建；继续执行全部兼容、发布与签名门禁 |
+| 必要步骤未完成、候选仍在构建 | 轮询等待；超过预算以非零状态退出 |
+| 候选来源/attempt漂移、GitHub ZIP或文件摘要不符、非法成员 | 失败，拒绝加载或发布；显式full_build可重新运行完整链路 |
+| 候选包含ONBUILD、换批改变运行配置或文件层、正式标签已占用 | 失败，完整正式清单保持未发布 |
+| 任一路推送或打包失败 | 等待其余作业收口，保留started标记，换新attempt重跑 |
 
 ### 5. Scenarios and Examples
 
 正常：读取签名基线和目标远端候选→展示补丁版本与说明→确认→校验并推送发行元数据→核对远端 SHA 后手动发布→核验发行与签名目录→原 v3 管理员按独立授权检查并安装。
 
 边界：迁移通道首发承接原v1签名历史，并在原序号之后生成新序号。
+
+正常：构建run123/attempt1产生同SHA候选，核心步骤成功后发布run456/attempt2可在原缓存post期间读取；只把镜像批次改为`ci-456-2`，沿原校验、兼容及签名发布。
+
+错误用法：仅凭产物名称或同SHA就直接加载，或复用原构建的批次绕开手动发布校验。正确处理：核对GitHub来源、步骤和原始归档摘要，再换为当前发布批次并运行真实兼容演练。
 
 错误用法：仅修改flower2api中的工作流就宣称v3/main远端自动发布已关闭。正确处理：将精确修复同步至各目标分支并分别验证实际触发规则。
 
@@ -311,6 +351,8 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 - 发版预检：核对上一份已签名发行及其源码、实际远端候选、版本递增与完整说明；使用 `platform_version.read_version` 和 `signed_changes` 检查预览与元数据投影一致。发布后核对同批发行、运行源码及受信目录。
 - test_publication：两分支手动来源通过，自动/未确认/错误入口零Docker副作用，原批次与digest保护成立。
+- `test_system_candidate_build`覆盖PR/外仓/错分支/脏源码拒绝，步骤未完成、来源变化、重复/过期产物、归档摘要及ZIP路径/类型/大小、完整构建回退和发布错误脱敏。真实Docker开关`FLOWER2API_CANDIDATE_DOCKER=1`核对导出、移除原镜像、API选择、ZIP加载和换批后的RootFS、Config及原标签保留。
+- `test_publication`三方屏障证明两路推送与归档并行，原失败/半批次保护继续通过；`test_system_workflow`覆盖复用和full_build两条路径的门禁及条件，真实GitHub小归档核对API摘要合同，actionlint检查两个实际workflow。
 - test_system_publish：真实临时签名、高历史序号、迁移通道首发继承、签名损坏、目录竞争和安全整数上限。
 - test_system_workflow：实际YAML事件、权限、零发布步骤、签名预检/兼容演练顺序，以及固定源码包仓库外独立导入。CI测试依赖固定PyYAML 6.0.3。
 - actionlint覆盖三个工作流；原系统更新、双库合同及宿主恢复回归继续通过。
@@ -394,7 +436,10 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 
 - `manage.build(release: str, manifest_path: Path) -> None` 保留原调用方式；`_build_arguments(role: str) -> list[str]` 为两个角色生成受限命令前缀。
 - `verify_database_compatibility.verify(manifest: Path, public_key: str, output: Path, *, history_root: Path | None = None, workers: int = 1) -> dict`。
-- `python3 deploy/flower2api/verify_database_compatibility.py --manifest <候选清单> --output <新证据> --workers {1,2}`。
+- `python3 deploy/flower2api/verify_database_compatibility.py --manifest <候选清单> --output <新证据> --workers {1,2,4}`。
+- `python3 deploy/flower2api/build_cache_key.py images/v3/Dockerfile` 输出 backend 阶段及全局前言的 SHA256。
+- `python3 deploy/flower2api/verify_release_tests.py --python <已安装依赖的解释器>` 并行运行三组原发行校验，失败以非零状态退出。
+- `verification_resources.VerificationResources(workers: int, *, proc_root: Path = Path('/proc'), interval: float = 1.0)` 为历史演练提供独立的主机资源观测上下文。
 
 ### 3. Contracts
 
@@ -403,11 +448,15 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 - 无 builder 使用原 `docker build`；有 builder 使用 `docker buildx build --builder ... --load --progress plain`。scope 为空或缺少 runtime token／results URL 时使用本地缓存。缓存凭据通过 job runtime 提供。
 - GHA 层缓存为 API v2，control／account 分 scope，导入与导出分别限两分钟。导出使用 `mode=max,ignore-error=true`。写入同时要求显式 write=true、GitHub Actions、本仓、v3／flower2api ref 及 push／workflow_dispatch 事件。
 - 共享 action 位于 `.github/actions/flower2api-build-cache/action.yml`。Cargo registry／git／target 沿 Dockerfile 的三个具名 mount id 和 target 恢复；key 包含平台、依赖配方与源码，restore 前缀限定兼容依赖配方。可信分支注册保存动作，PR使用只读恢复。
+- Cargo v2 配方只包含完整 backend 构建阶段和全局前言，依赖摘要继续覆盖 Cargo.toml/lock、vendor、craftls。control/account 阶段的软件包变化不清空 Rust 编译缓存；Rust 基础镜像、编译命令或全局参数变化继续失效。过渡只允许按同一完整旧 Dockerfile 配方回读 v1 前缀。
+- 三组校验分别在独立进程执行宿主 test_system*、编排 test_system_update* 和原额外模块；宿主测试保留 sudo。模块 test_system_workflow 由宿主发现覆盖一次。任一非零退出或进程启动失败均等待其余组收口后整体失败，记录每组耗时及退出码。
+- 联合镜像包继续采用流式 gzip，mtime=0、compresslevel=1，完整摘要和离线加载校验沿原合同。压缩收益与包大小变化使用实际样本测量，整体收益由下一次 CI 记录。
 - composite 内先注册 Actions cache 保存，再注册 cache-dance 挂载提取，post 按相反顺序提取、保存及回收 builder。只在所有准备成功后向 GITHUB_ENV 激活三个缓存选项；调用方仅容忍缓存准备错误，实际构建与验收错误继续阻断。
 - 两镜像继续来自同一受控源码快照，读取实际加载的镜像生成原联合清单，保留来源标签、run／attempt／SHA 与摘要检查。
-- workers 严格为整数1或2，bool 拒绝；默认串行，发行工作流显式2。协调器先核验候选、迁移合同及全部签名来源，再分发最多两路单来源演练。
+- workers 严格为整数1、2或4，bool 拒绝；默认串行，发行工作流显式4。协调器先核验候选、迁移合同及全部签名来源，再分发最多四路单来源演练；每容器保留768MiB、128PIDs及原隔离参数。
 - 各来源使用独立临时根、双库、UUID及容器，保留原安全参数和期限，完整执行两次迁移、新旧程序读写和快照恢复。首次失败通知共享停止状态，排队项停止，已启动项先执行原 finally 收口，再传播附来源 note 的原异常。
 - 全部来源成功后才原子写入证据，来源顺序沿受信目录，schema与checks字段维持原合同。每角色、每来源及总体耗时分别用 flower2api 性能事件记录。
+- `VerificationResources(workers, *, proc_root=Path('/proc'), interval=1.0)` 在工作线程执行期间采样，并在上下文退出时停止及回收采样线程，输出 `flower2api-database-resources`。事件固定 `scope=host`，包含 `github_actions,workers,available,samples,cpu_count,cpu_peak_percent,memory_total_bytes,memory_used_start_bytes,memory_used_peak_bytes,memory_used_peak_delta_bytes,memory_available_min_bytes,oom_kill_delta`；不可用附受控 `error=host_resources_unavailable`，未知值为null。CPU只计前八项并排除guest重复累计，内存以MemTotal-MemAvailable计量。主机指标包含Docker及其它进程，日志不进入原签名证据；采样缺失保持原演练错误和验证门禁。
 - 对外展示名为小写 `flower2api`；既有部署路径、CLI／API、浏览器存储键及签名身份按原升级合同保留；镜像及容器名称遵循下方名称切换合同。默认 main 注册手动构建入口；其 build job 只允许本仓 v3／flower2api，main自身跳过。实际工作使用所选目标分支源码。
 
 ### 4. Validation & Error Matrix
@@ -420,26 +469,33 @@ manage.restore_upstream_checkout_bytes(root: Path) -> list[str]
 | 缓存导入服务不可达 | BuildKit报告缓存错误，完整构建继续；实际编译失败仍阻断 |
 | PR、外仓、其它 ref／事件 | 无 GHA 缓存导出 |
 | workers为bool、0、3或字符串 | 文件和Docker读取前 ValueError |
+| 主机资源文件缺失、计数损坏或累计CPU/OOM回退 | 资源日志available=false，原演练成功/失败门禁及原异常保持 |
+| sudo运行正式兼容演练 | 显式保留GITHUB_ACTIONS供性能日志标注CI来源，签名私钥沿原限定环境传递 |
 | 首项晚完成、不同来源乱序完成 | 最终证据仍按原目录顺序排列 |
 | 任一来源失败 | 等待已启动项收口后抛原异常，零成功证据写入 |
 | main手动选择构建 | job跳过，目标分支由分支选择器明确指定 |
+| backend阶段缺失或重复 | 配方摘要拒绝计算，缓存准备沿原完整构建回退 |
+| 任一校验组失败或解释器无法启动 | 其余组收口后入口非零退出，后续构建受阻 |
 
 ### 5. Scenarios and Examples
 
 - 正常：push flower2api完成只构建CI及缓存保存，再对同SHA手动构建；核对跨runner命中和含恢复／保存开销的完整耗时。
 - 基础：本地普通build保留原行为；显式builder使用load生成实际可检查的镜像；workers=1保留串行。
 - 错误用法：把构建步骤设为continue-on-error以隐藏缓存故障。正确方式：仅缓存准备可回退，编译、迁移、签名与发布失败继续阻断。
-- 错误用法：将四个真实历史镜像组成的八条合成历史测量写成正式八版本CI结果。正确方式：记录夹具构成；正式最近八个发行的双路演练由下一次明确发行独立验收。
+- 错误用法：将多个真实历史镜像组成的八条合成历史测量写成正式八版本CI结果。正确方式：记录夹具构成、CPU数量和主机指标范围；正式最近八个发行的四路演练由下一次明确发行独立验收。
+- 正常：只给 control 增加 sshpass，backend 配方和 Cargo 依赖恢复前缀保持一致；修改 Rust 基础镜像或编译参数则更换配方摘要。
 
 ### 6. Tests Required
 
 - `test_system_build_cache`：本地默认、角色scope、可信写入、非法配置零副作用、精确mount映射、恢复与提取顺序、仅缓存准备可容错。
-- `test_database_compatibility`：真实线程上限2、默认串行、乱序结果归位、待运行取消、运行项收口、原错误和来源note、非法workers。
+- `test_system_release_speed`：控制层与 Rust 配方隔离、全局参数失效、唯一阶段约束、三进程真实屏障、失败及启动异常收口、完整校验组与宿主权限；`test_publication` 继续验证 gzip 包原字节恢复及摘要。
+- `test_database_compatibility`：真实线程上限2及4、四路屏障、默认串行、乱序结果归位、待运行取消、运行项收口、原错误和来源note、失败保留原证据、CLI四路及非法workers。
+- `test_system_verification_resources`：guest CPU去重、内存计量、峰值保留、OOM增量、不可用指标null及受控错误、实际线程异常收口、无效计数拒绝；`test_system_workflow`核对sudo保留CI标记。
 - 原 `test_system_workflow`、`test_publication` 及系统更新回归覆盖手动发布门禁、固定包仓库外独立导入和摘要身份；actionlint核验实际两个分支工作流。
-- 真实隔离Docker对同一八来源做串行／双路对照及迁移启动故障注入，核对完整证据等价、成功证据边界和全部自有容器收口。使用合成密钥及测试数据。
+- 真实隔离Docker对同一八来源做双路／四路对照及迁移启动故障注入，核对完整检查、CPU与内存观测、成功证据边界和全部自有容器收口。使用合成密钥及测试数据，记录真实镜像与合成历史构成。
 - 实际Buildx缓存导入故障与真实构建失败分别验证；实际两轮同源构建后用 `manage.inspect_images` 核对两镜像的标签、平台和摘要。
 - Vue与运行时页面构建、原浏览器验收覆盖展示名称所在页面及原交互；README的本地链接与历史来源正文保留核对。
-- GitHub缓存命中、恢复／保存和完整冷热耗时依赖批准推送后的外部CI验收。正式八发行的双路证据由下一次明确发行承接。两类结果分别记录。
+- GitHub缓存命中、恢复／保存和完整冷热耗时依赖批准推送后的外部CI验收。正式八发行的四路证据及runner资源由下一次明确发行承接。两类结果分别记录。
 
 
 ## Scenario: Flower2API 单部署名称切换与完整快照
@@ -497,3 +553,169 @@ runtime_names.account_container_prefix(deployment: str, *, legacy: bool = False)
 - `test_system_host`：受信网络唯一性、冻结角色删除、已接网/停止角色、精确管理白名单、完整 capture、限定409重试、意图先持久及重复收口。
 - `test_system_update_snapshot_lock`：真实线程短锁释放后 ready；持续锁仍 blocked。`test_system_update_retirement` 与既有恢复测试：token/epoch/代次、未知角色/镜像/活动和部分恢复边界。
 - `verify_system_update.py --migration-manifest <候选清单>`：真实旧名部署进入新基线、两个运行环境和一个停止环境、真实 CLI 孤儿及取消、基线内升级/回退、控制验收失败、部分角色/进程中断恢复、镜像引用保护与精确回收。固定源码刷新另验成功、部分替换、导入失败及重启失败恢复，使用合成身份且真实模型调用为零。
+
+
+## Scenario: CLI 临时文件持久化的两阶段发行兼容
+
+### 1. Scope / Trigger
+
+首次将账号 CLI scratchpad 从内存盘切到磁盘时，先安装具备恢复能力的管理端，再发布启用布局的账号镜像。该顺序使失败恢复保全迁盘后的最新文件。
+
+### 2. Signatures
+
+```python
+validate_release(value: dict) -> dict
+compatible_scratchpad(original: dict, target: dict) -> bool
+```
+
+隔离验收：`python deploy/flower2api/run_local_verification.py --manifest <本地测试清单> --warmup-pi-only --evidence-dir <全新证据目录>`。项目模式使用既有 `--pi-projects-only`。
+
+签名清单沿原 `compatibility` 对象增加可选字段。发行器从已检查的镜像元数据生成字段。
+
+### 3. Contracts
+
+- `scratchpad_storage`、`scratchpad_activation` 出现时必须为整数 `1`。激活声明同时要求恢复声明。历史清单缺少字段时保持原格式。
+- 控制镜像标签 `vibebench.cli-scratchpad-storage=1` 对应构建元数据 `cli_scratchpad_storage=1`。账号标签 `vibebench.cli-scratchpad-protocol=1` 对应 `cli_scratchpad_protocol=1`。元数据缺省为 `0`，发行器仅接受严格整数 `0/1`。
+- 兼容阶段仅声明 storage，账号组件内容摘要与原正式发行完全一致。启用阶段增加 activation。目标 activation 为1时，当前发行必须已有 storage 为1。当前 storage 为1时，目标也必须具备 storage 为1。
+- 版本列表、回退可用性、prepare/install/rollback 共用兼容判断。宿主失败恢复在已有环境重建意图且原版不兼容时保留维护门禁并拒绝切换。
+- 已有宿主更新器 v2 先沿同协议源码维护 SOP 刷新固定源码。冻结来源和原文件摘要，备份并校验服务与状态，失败按原文件恢复。
+
+- `--warmup-pi-only` 通过验证进程内的 `VERIFY_PI_PROJECTS_NAMESPACE=warmup` 选择养号空间；项目模式为 `projects`。验收函数仅接受这两个空间。该参数只作用于合成账号和私有测试数据。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 能力字段为 bool、字符串、0或2 | 清单校验拒绝 |
+| activation 存在且 storage 缺少 | 清单校验拒绝 |
+| 旧版直接安装激活版 | 宿主操作前拒绝 |
+| 兼容版或激活版回退到无恢复能力旧版 | 列表及回退投影标记不兼容，提交入口拒绝 |
+| 激活版恢复兼容版 | 保留新布局和最新文件，沿原恢复链执行 |
+| 验收函数收到其他 namespace | 准备账号和启动工作前 ValueError |
+| 已有环境重建意图且恢复版本不兼容 | 控制切换前拒绝，维护门禁保留 |
+
+### 5. Scenarios and Examples
+
+- 正常：原版 → 兼容版（账号内容摘要一致）→ 激活版。激活失败恢复兼容版，并在原 `/tmp/claude-1000` 读取原会话文件。
+- 基础：无新增能力字段的历史签名清单继续校验。兼容阶段账号容器沿原组件复用规则处理。
+- 错误用法：仅凭数据库可回退就恢复到旧管理端。正确处理：同时检查 scratchpad 恢复能力，并保留磁盘布局和新增数据。
+
+- 验收正常路径：新环境合成登录、两个依赖目标分别正常启动交付，中间执行原停止/唤醒；核对同一工作区、历史成果复验、UID1000和原路径磁盘文件保留。错误用法是沿旧夹具期待单次指挥交付两个目标；应分别启动两次正常指挥。
+
+### 6. Tests Required
+
+- `test_scratchpad_update_compatibility`：严格类型、全兼容矩阵、真实签名清单、跳过兼容阶段在宿主副作用前拒绝、旧回退隐藏及提交防绕过、健康检查失败恢复兼容版、部分恢复保留门禁、发行能力源自真实镜像元数据。
+- `verify_scratchpad_storage.py`：实际原账号镜像与兼容管理代码挂载磁盘并恢复同一真实 CLI 会话，校验账号和兄弟 session 归属。
+- 发布前校验兼容阶段账号 `content_sha256` 与线上签名清单相等；正式发行后核对签名、能力声明、来源 SHA 及实际安装耗时。
+
+- 启用验收同时运行养号与项目模式，断言实际挂载的noexec/nosuid/nodev、宿主持久目录文件、双目标交付、21次工具调用、6次TTY输入与零真实模型调用。验证专用镜像按已有只读入口提供测试CA，收尾按随机部署标签删除临时容器、卷和网络。
+
+## Scenario: 历史账号环境的集群升级兼容
+
+### 1. Scope / Trigger
+
+已有单机安装升级到集群版本，或维护快照、环境归属与账号重建阻塞发生变化时适用。历史账号与环境资料继续保留。
+
+### 2. Signatures
+
+- `ClusterService.owns_local(row: dict) -> bool`：判定维护和文件访问的本机归属。
+- `ClusterStore.assignment(account_id: int) -> dict`：业务准入只接受有效账号的完整分配。
+- `HostDeployment.update_environments(operation: dict, selected: dict, save) -> None`：账号重建前保存新鲜阻塞证明。
+
+### 3. Contracts
+
+- 维护归属读取持久分配和实际节点状态，软删除账号仍沿原本机或远程归属核验。新工作准入继续使用过滤已删除账号的 `assignment`；维护归属成功不能代替业务准入。
+- 集群前账号已物理删除且缺少分配的环境，仅在数据库内原环境 ID 与账号引用匹配、状态为 `stopped|retired`、三个角色 ID 均为空、默认本机节点有效时允许旧本机兼容。环境还须没有节点执行、迁移、登录历史以及 `runtime/node-assignment.json|node-fence.json|node-migration-target.json` 标记，环境根和 runtime 目录不得为符号链接。
+- 有效账号缺分配、节点缺失或已删除、真实远程归属、孤立环境仍有角色或未知生命周期、任何节点历史和断开标记链接继续阻断本机兼容。
+- 本机归属确认后仍核验实际角色、执行登记、租约和维护活动；历史停止状态保持，未知证据沿原排空保护处理。
+- 账号重建前 `ready=false` 时，宿主先将最多256条脱敏 `blockers` 持久保存，再抛出包含前三项的错误摘要；外层沿原300字符错误上限处理。该宿主诊断改进随固定源码维护刷新生效。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 软删除账号仍归属本机 | 沿原生命周期逐项核验，已删除账号的新工作准入继续拒绝 |
+| 孤立旧环境满足全部空环境及归属条件 | 只读维护核验通过，保留原停止状态与历史资料 |
+| 远程、节点异常、分配缺失、角色或节点历史未核清 | 阻断兼容路径，保留原归属与资料 |
+| 本机环境存在未收口执行 | 维护快照继续返回具体阻塞 |
+| 重建前出现持续阻塞 | 先保存阻塞列表，角色重建和CPU调整保持关闭 |
+
+### 5. Scenarios and Examples
+
+- 正常：旧部署保留软删除账号环境，升级时依据真实本机分配完成核验，运行账号按原流程重建。
+- 边界：账号已物理删除的旧空环境保留原环境行，通过全部旧本机条件后继续维护。
+- 错误用法：把业务账号查询失败直接解释为远程节点，或把所有缺分配环境当作本机。正确处理是分别核验持久分配、历史停止证据与节点历史，保留业务准入边界。
+
+### 6. Tests Required
+
+- `test_cluster_historical_locality` 使用真实迁移、存储和维护快照，覆盖软删除空环境及停止三角色、孤立旧空环境、业务准入拒绝、有效账号缺分配、远程及已删除节点、未知角色和生命周期、节点执行/迁移/登录历史、断开标记链接及持久活动。
+- `test_system_host.HostNetworkNamesTests.test_environment_update_preserves_blockers_before_any_rebuild` 核对阻塞先持久化、错误摘要可定位、角色和CPU操作保持关闭。账号运行及集群草稿、迁移、管理和转发回归继续通过。
+
+## Scenario: AGY处理产物随镜像交付与发行前验收
+
+### 1. Scope / Trigger
+
+修改AGY固定执行映像的CI输入、Docker上下文、候选复用及正式发布完整性检查时适用。固定映像复用已处理产物，适配源码与观察资源沿当前仓库构建。
+
+### 2. Signatures
+
+```bash
+python3 deploy/flower2api/agy_artifact.py export --source <现有agy.xz> --output <全新附件目录>
+python3 deploy/flower2api/agy_artifact.py prepare --directory <构建私有目录> [--source <现有agy.xz>]
+sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_images.py --manifest releases/v3-local.json
+```
+
+- `export` 独占交付 `agy-execution-linux-x64.xz` 与 `agy-artifact.json`。清单含 `schema_version=1`、`source_version=1.5.9`、`archive{name,bytes,sha256}` 和 `image{bytes,sha256}`。
+- `prepare` 返回已核验的 `agy-1.5.9`，CI通过现有 `GITHUB_ENV` 写入 `V3_AGY_AUTH_ASSET`；显式输入优先，缓存身份每次核验。
+- `verify_agy_runtime.native_probe(image, *, crash=False, image_package=False)` 默认研究模式；正式验收显式设置 `image_package=True`，只挂合成状态。
+- 探针失败在stderr输出 `event=agy-probe-failure`，含 `phase`、`credential_generation`、`capture_failed` 及可用的 `state/event_counts/error_codes/runtime`；清理异常另输出 `event=agy-probe-cleanup-failure,steps=[connection|container|state|client]`。
+
+### 3. Contracts
+
+- 压缩附件固定为80922084字节、SHA256 `22ade718c0914d0a7ea14cac1e1575a78e0c8a7b337f49f3ff5c729291f7cfea`。解码执行体固定为265700040字节、SHA256 `39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43`。
+- 冷缓存仅从本仓 `SilentFlower/vibecoding-bench` 的 `agy-runtime-1.5.9-v1` Release读取固定附件。缓存键绑定完整压缩摘要。辅助制品为预发布且 `latest=false`，与系统签名目录分开；附件交付与远端身份复验先于依赖它的源码推送。
+- XZ流式解码使用1MiB输出块及512MiB解码内存上限，拒绝截断、拼接、尾随、超预算及两层摘要失配。全部核验成功后原子发布构建输入，二进制保持在Git源码之外。
+- Dockerfile专属白名单显式允许 `agy-auth/agy-1.5.9`、缺省标记与 `orchestrator/agy_runtime/**`。control内包位于 `/app`，account内包位于 `/opt/v3/python`；公共 `runtime_files` 位于 `/usr/local/bin`。
+- 自动构建及完整手动构建共用只读附件准备action；候选复用跳过准备和构建。两条发布路径均在交付前执行镜像验收，可信候选的必需成功步骤包含“验收镜像内AGY能力”。
+- 正式候选、镜像发布及系统签发使用 `require_auth_asset` 要求 `agy_auth.available=true` 及固定身份。`inspect_images` 对声明可用能力的两个角色核对 `agy-runtime-protocol=1`，account的auth/runtime源摘要须与清单一致。历史读取及通用本地可选构建沿原边界处理缺省能力。
+- CI宿主通过sudo调用同一虚拟环境解释器，以改属私有合成状态目录和配置。实际容器继续UID1001、断网、只读根、cap-drop及有限内存；只使用镜像自带包，验收两代凭据、单次共享解码和正常/异常物理退出。外部模型调用预算为0。
+- 每代准备请求使用既有120秒截止，prepared等待125秒，其他控制事件保持50秒；PID1观察窗口600秒覆盖两代准备与退出验证。成功结果增加两项 `prepare_seconds` 和 `prepare_deadline_seconds=120`，退役耗时计入该代准备。
+- 正常及异常退出使用90秒物理观察窗口，覆盖监督器原85秒停止窗口；逐项核对监督器、kernel、observer和native的实际PID终止。成功结果含 `shutdown_seconds` 及 `shutdown_deadline_seconds=90`；退出失败标记 `phase=shutdown`，继续原首错和清理合同。运行时退役与停止预算保持。
+- 失败诊断只投影固定协议分类、Running/OOMKilled/ExitCode、进程角色、阶段及资源计数。日志最多取末32行并在解析前截为末32768字节；固定容器诊断输出上限8192字节，宿主再次按字段白名单和非负整数投影。私有启动错误仅提取固定异常类型及已登记原因；worker提前回收后的文件阶段计数按实际为0，字段缺省表示未知。
+- 连接、容器、临时状态及Docker客户端独立尝试清理；诊断或清理异常保留原验证错误。原验证成功而清理失败时返回非零状态。诊断中间提交保留后续根因验收和实际CI运行记录。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 已核验缓存再次准备 | 核对完整身份并幂等复用 |
+| 缓存链接、长度/摘要不符、XZ边界或预算失配 | 非零退出；新输入保持未发布 |
+| 下载中断或解码失败 | 临时目录清理，原已核验输入保持 |
+| 正式清单缺失能力或实际镜像标签失配 | 在镜像推送和签发前拒绝 |
+| 镜像模块、资源或零模型退出验收失败 | 阻止候选交付及正式发布 |
+| 普通runner直接调用需改属状态的探针 | PermissionError；工作流必须通过sudo调用同一解释器 |
+| 探针启动/准备超时，或诊断采集失败 | 输出有界分类及采集失败步骤，原异常继续抛出 |
+| 旧代退役后原请求截止已过 | `request_deadline_exceeded`，停止新代创建及原生启动 |
+| 退出观察窗口内仍有目标PID存活 | 原物理收口错误，诊断标记shutdown，候选交付拒绝 |
+| 单项清理失败 | 后续清理继续；保留首错，原成功路径转为清理失败 |
+
+### 5. Scenarios and Examples
+
+- 正常：核验并交付本仓处理产物附件 → CI恢复或下载XZ并验证两层身份 → 构建当前适配资源与镜像 → 验收镜像自身 → 导出候选或进入原兼容、签名流程。
+- 边界：同源码候选复用通过来源与归档检查、换批后，仍执行实际镜像验收；历史已签发行读取保持原合同。
+- 错误用法：仅挂当前源码做探针就认定镜像完整，或在root本地验证后直接让普通runner执行改属。正确处理：正式探针使用 `image_package=True`，工作流以sudo调用原虚拟环境，容器身份及权限约束继续核对。
+- 故障定位：正式CI准备失败时先保留受控阶段与资源摘要，再删除临时根。错误用法是把完整HOME或原生日志直接打印；正确处理是先做白名单投影，再依据正式CI证据定位根因。
+- 预算边界：旧代退役45秒、新代启动约8秒仍可处于原有生命周期预算内。错误用法是给整代准备45秒截止；正确处理是使用现有120秒请求上限，并在退役后及Popen前复核原截止。
+- 退出边界：45秒退役处于现有60秒预算内。错误用法是15秒仍存活即判定收口失败；正确处理是90秒有界观察全部实际PID，超过窗口继续拒绝交付。
+
+### 6. Tests Required
+
+- `test_agy_artifact`：现有处理产物导出、冷热缓存、双层身份、截断/尾随/拼接、解码预算、链接及中断原子交付。
+- `test_agy_images`、`test_publication`、`test_system_candidate_build`、`test_system_publish`：能力缺失在副作用前拒绝、实际标签匹配、候选换批与历史兼容。
+- `test_system_workflow`：真实YAML准备→构建→镜像验收→交付顺序、候选复用条件、两个验收步骤的sudo及同一解释器。全部run步骤执行 `bash -n`。
+- `test_system_agy_probe`：敏感/未知字段排除、字节及数值预算、诊断失败、首错保留、各项清理独立执行及客户端建立失败时的状态回收；测试由CI现有 `test_system*.py` 宿主发现覆盖。
+- `test_system_agy_probe`核对实际提交信封覆盖90秒启动窗口且不超过120秒，并断言两项准备耗时。`verify_release_tests.py`的publication组包含 `test_agy_supervisor`、`test_agy_artifact`、`test_agy_images`，`test_system_release_speed`同步核对模块集合。
+- 宿主测试经sudo运行会清除外部PYTHONPATH。探针测试在导入编排模块前沿 `source_layout.source_path`初始化搜索路径；独立执行 `env -u PYTHONPATH <项目Python> -m unittest discover -s deploy/flower2api -p test_system_agy_probe.py`，再以相同环境执行 `verify_release_tests.py --python <项目Python>`。错误用法是仅凭预设PYTHONPATH的测试结果认定正式入口通过。
+- 慢退役受控对照显式标记源码挂载夹具，核对45秒旧截止失败、120秒准备通过和零模型调用；正式完整镜像由独立CI验收，两类证据分别记录。
+- 探针测试执行真实物理观察脚本，以虚拟时钟覆盖25秒退出；受控慢退出对照覆盖旧15秒失败摘要、新90秒窗口内全部PID终止及零模型。正常和异常退出另外验收镜像自带源码，并分别记录实际耗时。
+- 真实Docker复现旧白名单COPY缺失；修正版镜像只读导入、资源身份及断网正常/异常退出均通过。隔离夹具与正式完整镜像CI结果分别记录。

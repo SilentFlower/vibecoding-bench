@@ -4,6 +4,7 @@ export interface RuntimeRun {
   started_at?: number | null; ended_at?: number | null;
   exit_code: number | null; claude_code_version?: string; claude_effort_level?: string;
   execution_model?: string; capture_model_override?: string; prompt?: string; error?: string;
+  execution_node?: { id: number; key: string; name: string; environment_id: string; assignment_revision: number; generation: number } | null;
   quota_resume_at?: number; passive_quota?: { observed_at?: number };
   followups?: { phase?: string; messages?: string[]; mode?: string; offsets_sec?: number[]; items?: string[]; planned?: number; completed?: number; delivered?: number; consumed?: number };
 }

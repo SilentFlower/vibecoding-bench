@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 from stat import S_ISLNK, S_ISREG
 
 from storage_maintenance import deduplicate_immutable_tree
+from runtime_files import directory_fd
 
 
 PROJECT_KEY = re.compile(r"^[a-z][a-z0-9-]{0,79}$")
@@ -145,6 +146,43 @@ def snapshot_tree(root: Path, objects: Path | None = None) -> dict:
     finally:
         os.close(descriptor)
     return {"schema": 1, "files": files, "bytes": total, "digest": digest_json(files)}
+
+
+def read_checkpoint(objects: Path, manifests: Path, checksum: str) -> dict:
+    """核对原检查点清单及所有内容对象，供中央和节点共享读取。
+
+    :param objects: 调用方固定的对象根。
+    :param manifests: 调用方固定的清单根。
+    :param checksum: 已冻结的源码树摘要。
+    :return: 完整且所有对象摘要均通过的原清单。
+    """
+    if not re.fullmatch(r'[a-f0-9]{64}',checksum):
+        raise ValueError('原计划检查点摘要无效')
+    descriptor=directory_fd(manifests)
+    os.close(descriptor)
+    manifest=read_document(manifests/(checksum+'.json'))
+    if (not isinstance(manifest,dict) or manifest.get('schema')!=1 or manifest.get('digest')!=checksum
+            or not isinstance(manifest.get('files'),dict) or digest_json(manifest['files'])!=checksum):
+        raise ValueError('原计划检查点清单缺失或损坏')
+    for name,item in manifest['files'].items():
+        safe_relative(name)
+        if (not isinstance(item,dict) or not isinstance(item.get('digest'),str)
+                or not re.fullmatch(r'[a-f0-9]{64}',item['digest']) or type(item.get('size')) is not int
+                or not 0<=item['size']<=MAX_TREE_BYTES):
+            raise ValueError('原计划检查点对象清单无效')
+        parent=directory_fd(objects/item['digest'][:2])
+        try:
+            descriptor=os.open(item['digest'],os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parent)
+        finally:
+            os.close(parent)
+        with os.fdopen(descriptor,'rb') as stream:
+            metadata=os.fstat(stream.fileno())
+            if not S_ISREG(metadata.st_mode) or metadata.st_size!=item['size']:
+                raise ValueError('原计划检查点对象类型或大小无效')
+            content=stream.read(item['size']+1)
+        if hashlib.sha256(content).hexdigest()!=item['digest']:
+            raise ValueError('原计划检查点对象已损坏')
+    return manifest
 
 
 def materialize_snapshot(manifest: dict, objects: Path, destination: Path) -> None:

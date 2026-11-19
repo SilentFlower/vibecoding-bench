@@ -25,9 +25,10 @@ class SourceLayoutTests(unittest.TestCase):
                 'cc2api/Cargo.lock', 'cc2api/vendor/dependency.rs', 'cc2api/craftls/lib.rs',
                 'orchestrator/runtime_files.py', 'orchestrator/runtime_diagnostics.py',
                 'orchestrator/cli_quota.py', 'orchestrator/process_metrics.py',
-                'orchestrator/native_sender.py', 'webui/index.html', 'cc2api/web/src/main.ts',
+                'orchestrator/native_sender.py', 'orchestrator/agy_auth.py', 'orchestrator/agy_runtime/__init__.py', 'webui/index.html', 'cc2api/web/src/main.ts',
                 'cc2api/web/package-lock.json', 'images/account/init.py',
-                'images/sidecar/start.sh', 'images/worker/task_followups.py')
+                'images/sidecar/start.sh', 'images/worker/task_followups.py',
+                'images/worker/entrypoint.sh', 'images/account/projects_cli.py')
             for name in names:
                 target = old / name
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -44,6 +45,11 @@ class SourceLayoutTests(unittest.TestCase):
             changed = source_path(new, 'orchestrator/native_sender.py')
             changed.write_text('synthetic:changed')
             self.assertNotEqual(component_content(old, 'account'), component_content(new, 'account'))
+            control_before = component_content(new, 'control')
+            account_before = component_content(new, 'account')
+            source_path(new, 'images/worker/entrypoint.sh').write_text('合成driver改动')
+            self.assertNotEqual(control_before, component_content(new, 'control'))
+            self.assertEqual(account_before, component_content(new, 'account'))
 
     def test_missing_migrated_file_does_not_use_leftover_old_copy(self) -> None:
         """模块已迁移后，缺失文件保持可见，避免混用两套来源。@return None。"""

@@ -1,0 +1,68 @@
+{
+  "id": "agy-ci-artifact",
+  "name": "agy-ci-artifact",
+  "title": "补齐 AGY 正式构建制品与发布完整性校验",
+  "description": "复用固定AGY制品并接通CI到账号镜像的打包链路，阻止缺失能力的正式发行。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": "platform",
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-19",
+  "completedAt": "2026-11-19",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-19T05:39:49Z",
+    "blockers": []
+  },
+  "branch": "release/agy-flower2api",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-11-19T04:54:22Z",
+      "contextKey": "codex_01a1ecb2-7973-79d1-ba23-defdab247bfc",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "7625142c2fbfbf26ee0f09e04309447b4c02f606",
+        "status": [],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "7625142c2fbfbf26ee0f09e04309447b4c02f606",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "948d24ce4ab9889a5c5b7397d0529ee08538a3cfe7181a61415c37321baca75c"
+          }
+        ],
+        "fingerprint": "fdd7379acc6d24fd8b75c443a1265f08c1f980b058c13657eba5542b2230f848"
+      }
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-11-19T05:39:49.360119+00:00",
+    "completedSteps": [
+      "复用既有处理产物并完成自有附件发布及远端复验",
+      "补齐CI输入、Docker打包与正式能力门禁",
+      "完成部署及编排回归、断网镜像验收和CHK-001修复重检",
+      "完成Spec合同与修复源码推送"
+    ],
+    "partialStep": null,
+    "nextStep": "核对正式完整镜像CI并恢复v1.19.0发版预览",
+    "notes": "模型调用为0；本地镜像证据为隔离夹具，正式完整镜像由推送后的CI验收。"
+  }
+}

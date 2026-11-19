@@ -1,0 +1,207 @@
+{
+  "scope": "生命周期预算及截止护栏修复",
+  "source_sha256": {
+    "deploy/flower2api/verify_agy_runtime.py": "c9b0fc87084bb0fee98b7b7d346178ab259b5a1780ea8383b4ef4d72c2fe0d24",
+    "deploy/flower2api/test_system_agy_probe.py": "906f5f17eb240455a4e979322e38958f281ae88d96ecd5a2374b34a9bdef6b7c",
+    "deploy/flower2api/verify_release_tests.py": "ab37ee98630dd2f7f719e015b4c04179c34b0da8d65b83c019883c5645c33562",
+    "deploy/flower2api/test_system_release_speed.py": "e0dc10501c9a8459e22b0c997630fa71c539f0075888189d0d6e8941863c601f",
+    "services/orchestrator/agy_runtime/supervisor.py": "d42f881623068e7203a332bf01e986b8a5fb27d391127e557ccaa6e1d67b6957",
+    "services/orchestrator/test_agy_supervisor.py": "589f0e48a43f67edeeeb16950fa4efd3b28e82b4070a054ab5135b9a74ae9659"
+  },
+  "tests": {
+    "focused": 37,
+    "agy": 64,
+    "deploy": 294,
+    "deploy_skipped": 1,
+    "passed": true
+  },
+  "deadline_regression": {
+    "before_fix_failures": 3,
+    "after_fix_passed": true
+  },
+  "budget_fixture": {
+    "passed": true,
+    "scope": "源码挂载的受控慢退役夹具",
+    "results": {
+      "baseline_45s": {
+        "retire_seconds": 45.3469445189985,
+        "passed": false,
+        "error": "固定AGY断网准备失败",
+        "evidence": {
+          "event": "agy-probe-failure",
+          "phase": "prepared",
+          "credential_generation": 2,
+          "capture_failed": [],
+          "state": {
+            "Running": true,
+            "OOMKilled": false,
+            "ExitCode": 0
+          },
+          "event_counts": {
+            "supervisor_ready": 1,
+            "prepared": 1,
+            "job_finalized": 2,
+            "error": 1
+          },
+          "error_codes": {
+            "request_deadline_exceeded": 1
+          },
+          "runtime": {
+            "processes": {
+              "other": 2,
+              "supervisor": 1
+            },
+            "memory_events": {
+              "max": 0,
+              "oom": 0,
+              "oom_kill": 0
+            },
+            "stages": {
+              "worker_config": 0,
+              "kernel_lock": 0,
+              "kernel_error": 0,
+              "input_pipe": 0,
+              "listener_identity": 0
+            },
+            "startup_errors": {}
+          }
+        },
+        "seconds": 55.701
+      },
+      "aligned_120s": {
+        "retire_seconds": 45.39961063901137,
+        "passed": true,
+        "credential_generations": [
+          1,
+          2
+        ],
+        "image_decode_calls": 1,
+        "terminated": true,
+        "model_submissions": 0,
+        "prepare_seconds": [
+          8.604,
+          53.438
+        ],
+        "seconds": 63.502
+      }
+    }
+  },
+  "images": {
+    "normal": {
+      "passed": true,
+      "credential_generations": [
+        1,
+        2
+      ],
+      "image_decode_calls": 1,
+      "terminated": true,
+      "package_source": "image",
+      "prepare_seconds": [
+        9.278,
+        8.548
+      ],
+      "prepare_deadline_seconds": 120,
+      "model_submissions": 0
+    },
+    "crash": {
+      "passed": true,
+      "credential_generations": [
+        1,
+        2
+      ],
+      "image_decode_calls": 1,
+      "terminated": true,
+      "package_source": "image",
+      "prepare_seconds": [
+        9.279,
+        8.48
+      ],
+      "prepare_deadline_seconds": 120,
+      "model_submissions": 0
+    }
+  },
+  "database_versions": {
+    "bench": 5,
+    "gateway": 6
+  },
+  "formal_ci": {
+    "state": "failure",
+    "run": 44475828322,
+    "source": "4b4266da02043110e017922febac4a727af7d3d0",
+    "phase": "系统更新合同与恢复状态机",
+    "error": "test_system_agy_probe导入agy_auth失败；sudo清除PYTHONPATH后缺少编排模块路径",
+    "images_started": false
+  },
+  "import_fix_validation": {
+    "source_sha256": {
+      "deploy/flower2api/test_system_agy_probe.py": "814627db72246a46288b770c39520c3fc540076da77e78d24527f18ab5919055"
+    },
+    "environment": "清除PYTHONPATH；host沿真实sudo入口",
+    "isolated_discovery": {
+      "tests": 7,
+      "passed": true
+    },
+    "release_entry": {
+      "host": 143,
+      "host_skipped": 1,
+      "orchestrator": 25,
+      "publication": 86,
+      "passed": true
+    },
+    "formal_ci": {
+      "state": "failure",
+      "run": 44476665812,
+      "source": "c462479a9800f71b1badd14b1f3832482608a09b",
+      "phase": "正常退出的物理收口",
+      "error": "AGY物理进程收口未完成",
+      "passed": [
+        "合同测试",
+        "本仓AGY处理产物准备",
+        "两个正式镜像构建",
+        "镜像模块及资源检查",
+        "两代prepared及job_finalized",
+        "单次共享映像和空闲状态检查"
+      ],
+      "diagnostic": {
+        "event": "agy-probe-failure",
+        "phase": "status",
+        "credential_generation": 2,
+        "capture_failed": [],
+        "state": {
+          "Running": true,
+          "OOMKilled": false,
+          "ExitCode": 0
+        },
+        "event_counts": {
+          "supervisor_ready": 1,
+          "prepared": 2,
+          "job_finalized": 2,
+          "status": 1
+        },
+        "error_codes": {},
+        "runtime": {
+          "processes": {
+            "other": 2,
+            "supervisor": 1,
+            "kernel": 1,
+            "observer": 1,
+            "native": 1
+          },
+          "memory_events": {
+            "max": 0,
+            "oom": 0,
+            "oom_kill": 0
+          },
+          "stages": {
+            "worker_config": 1,
+            "kernel_lock": 1,
+            "kernel_error": 0,
+            "input_pipe": 1,
+            "listener_identity": 1
+          },
+          "startup_errors": {}
+        }
+      }
+    }
+  }
+}

@@ -12,13 +12,21 @@ runs:
       id: config
       shell: bash
       env:
-        DEPENDENCIES: ${{ hashFiles('images/v3/Dockerfile', 'services/gateway/Cargo.toml', 'services/gateway/Cargo.lock', 'services/gateway/vendor/**', 'services/gateway/craftls/**') }}
-        SOURCES: ${{ hashFiles('services/gateway/src/**', 'apps/web/**', 'deploy/flower2api/platform-release.json') }}
+        DEPENDENCIES: ${{ hashFiles('services/gateway/Cargo.toml', 'services/gateway/Cargo.lock', 'services/gateway/vendor/**', 'services/gateway/craftls/**') }}
+        LEGACY_DEPENDENCIES: ${{ hashFiles('images/v3/Dockerfile', 'services/gateway/Cargo.toml', 'services/gateway/Cargo.lock', 'services/gateway/vendor/**', 'services/gateway/craftls/**') }}
+        SOURCES: ${{ hashFiles('services/gateway/src/**', 'apps/web/**') }}
         CACHE_PLATFORM: ${{ runner.os }}-${{ runner.arch }}
         CACHE_WRITE: ${{ github.repository == 'SilentFlower/vibecoding-bench' && (github.ref == 'refs/heads/v3' || github.ref == 'refs/heads/flower2api') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
       run: |
-        printf 'key=flower2api-cargo-v1-%s-%s-%s\n' "$CACHE_PLATFORM" "$DEPENDENCIES" "$SOURCES" >> "$GITHUB_OUTPUT"
-        printf 'prefix=flower2api-cargo-v1-%s-%s-\n' "$CACHE_PLATFORM" "$DEPENDENCIES" >> "$GITHUB_OUTPUT"
+        BACKEND_RECIPE=$(python3 deploy/flower2api/build_cache_key.py images/v3/Dockerfile)
+        printf 'key=flower2api-cargo-v2-%s-%s-%s-%s\n' "$CACHE_PLATFORM" "$BACKEND_RECIPE" "$DEPENDENCIES" "$SOURCES" >> "$GITHUB_OUTPUT"
+        # 过渡时仅回读同一完整旧配方，后续恢复前缀限定 Rust 配方与依赖。
+        {
+          printf 'prefix<<FLOWER_CACHE_PREFIX\n'
+          printf 'flower2api-cargo-v2-%s-%s-%s-\n' "$CACHE_PLATFORM" "$BACKEND_RECIPE" "$DEPENDENCIES"
+          printf 'flower2api-cargo-v1-%s-%s-\n' "$CACHE_PLATFORM" "$LEGACY_DEPENDENCIES"
+          printf 'FLOWER_CACHE_PREFIX\n'
+        } >> "$GITHUB_OUTPUT"
         printf 'write=%s\n' "$CACHE_WRITE" >> "$GITHUB_OUTPUT"
     # 先注册保存动作，再注册挂载提取；job post 会按相反顺序完成提取、保存与 builder 回收。
     - name: 恢复并保存可信分支 Cargo 缓存

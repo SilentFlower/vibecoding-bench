@@ -1,0 +1,24 @@
+{
+  "legacy_cleanup": {
+    "isolation_version": 0,
+    "error_type": "TypeError",
+    "frames": [
+      "<stdin>:12:<module>",
+      "account_runtime.py:725:_stop_environment",
+      "cli_scratchpad.py:357:preserve_cli_scratchpad"
+    ]
+  },
+  "live_boot_restore": {
+    "error_type": "ValueError",
+    "error": "CLI临时文件恢复未确认",
+    "pending_marker": true,
+    "current_content": "version-b",
+    "subsequent_stop_error": "CLI临时文件恢复尚未确认，保留原转存包"
+  },
+  "unknown_runtime_archive": {
+    "source_file_exists": true,
+    "restored_file_exists": false,
+    "registered_layout_exists": false
+  },
+  "root": "/tmp/scratchpad-check-reproductions-mkgs633s"
+}

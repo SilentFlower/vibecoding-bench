@@ -100,6 +100,8 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 ### 请求列表与诊断详情
 
+- 既有请求页同时展示CC及AGY，平台与模型分别表达；AGY上的Claude模型保持Antigravity标记。高级筛选追加平台、协议、内核版本、请求模型和实际模型，沿用服务端计数与分页。账号选择器仅该入口显式platform=all并展示平台标记。
+- 四页签复用现有布局，展示源usageMetadata、冻结策略、工具前驱及独立控制收口。历史事实未知、真实0和采集缺口分别展示；已解码Gemini、Cortex提交与最终TLS阶段按来源区分。具体字段及权限沿网关settings-database的AGY请求记录合同。
 - 列表核心字段包括时间/请求ID、账号、模型/转发、持久结果/响应码、总耗时/首输出、Token及尝试数。模型、Token与首输出注明末次尝试口径；总耗时只按请求起止观测计算。
 - 增加“原始 Session ID”列，直接读取根记录 `original_session_id`，支持完整值复制，详情概览同步展示。缺失和旧记录显示“未提供”，长值可省略并通过详情查看完整值；复制始终使用原始完整字符串。
 - “模型 / 转发方式”沿现有列显示“原生运行时 · 2.1.280”或“原有转发 · 2.1.293”，版本取 `last_attempt.profile_version`，缺失显示“未观测”。账号基础版本、客户端 UA 或配置默认值不作为实际尝试版本的替代来源。
@@ -155,8 +157,10 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 ### 正式控制台与账号首批迁移
 
+- 节点管理导航和卡片使用共用SVG sprite的i-server；运行环境继续使用i-box。节点页先显示汇总和紧凑服务器卡片，账号归属/迁移区保持原确认与轮询。页头复用page-heading/page-eyebrow/page-description，页面留白由console-content统一提供；卡片、辅助文字和资源数字使用ui-font-card/ui-font-small/ui-font-heading，沿390/1440/1920/2560px核对与账号页的页头计算样式及坐标一致。主机指纹、认证方式、路径及批次收进详情；同批已就绪节点隐藏相同来源到目标的箭头。stopping显示停止原组件，旧协议backed_up显示已停止待切换。
+
 - `apps/web/src/style.css` 保留现有主题变量名，采用已确认紫色强调、深色侧栏与浅色内容区。字体来自 `src/assets/fonts/` 中的本地 WOFF2，许可一并保留；离线导出须把同源字体内嵌，不能依赖构建目录外链。
-- `Dashboard.vue` 在品牌旁保留 `/updates` 入口，版本使用 `platformVersion` 的真实构建值；缺省显示“更新”。桌面折叠位于管理员区域，偏好键为 `flower2api-sidebar-collapsed`，存储失败仍保持本次会话选择。移动导航保留原七个模块。
+- `Dashboard.vue` 在品牌旁保留 `/updates` 入口，版本优先使用 `usePlatformVersion` 读取的当前控制镜像版本；旧端回退到已验签目录精确匹配的current_release，缺省显示“版本”。移动入口缺省显示“系统更新”。桌面折叠位于管理员区域，偏好键为 `flower2api-sidebar-collapsed`，存储失败仍保持本次会话选择。移动导航保留原七个模块。
 - 正式账号仍使用既有分页及每5秒读取。卡片显示三种额度窗口，7天Sonnet数据类型继续兼容；完整旧配置/画像/评分等信息位于详情。代理公共摘要仅含protocol/host，编辑及OAuth代理输入默认遮蔽认证信息。
 - 账号数字草稿由 `numberDrafts` 保存 `number|string`，`applyNumberDrafts()` 在提交边界检查非空整数再写入原数字字段；原范围校验与 `accountUpdateDelta` 继续生效。认证编辑默认收起，新建默认展开，全部旧字段保留。
 - `useActiveScrollbars()` 由应用根调用一次，通过捕获真实scroll标记容器，800ms后清理；卸载清理监听器及全部计时器。窗口标题/页脚固定，正文独立滚动。

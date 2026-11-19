@@ -1,0 +1,2015 @@
+{
+  "description": "按源码接收者名称筛选的调用定位；具体对象类型仍须按各模块定义核对",
+  "calls": [
+    {
+      "file": "services/orchestrator/account_isolation.py",
+      "line": 86,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/account_isolation.py",
+      "line": 114,
+      "receiver": "runtime",
+      "method": "_proxy"
+    },
+    {
+      "file": "services/orchestrator/account_isolation.py",
+      "line": 143,
+      "receiver": "runtime",
+      "method": "_adopt_sender_evidence"
+    },
+    {
+      "file": "services/orchestrator/account_isolation.py",
+      "line": 153,
+      "receiver": "runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/account_isolation.py",
+      "line": 37,
+      "receiver": "runtime",
+      "method": "_labels"
+    },
+    {
+      "file": "services/orchestrator/account_isolation.py",
+      "line": 56,
+      "receiver": "runtime",
+      "method": "_labels"
+    },
+    {
+      "file": "services/orchestrator/account_isolation.py",
+      "line": 204,
+      "receiver": "runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/account_isolation.py",
+      "line": 243,
+      "receiver": "runtime",
+      "method": "prepare_system_profile"
+    },
+    {
+      "file": "services/orchestrator/account_isolation.py",
+      "line": 258,
+      "receiver": "runtime",
+      "method": "check_system_profile"
+    },
+    {
+      "file": "services/orchestrator/account_isolation.py",
+      "line": 298,
+      "receiver": "runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/account_update_identity.py",
+      "line": 30,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/account_update_identity.py",
+      "line": 60,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/cluster_environment.py",
+      "line": 48,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/cluster_environment.py",
+      "line": 91,
+      "receiver": "runtime",
+      "method": "_running_sender_active"
+    },
+    {
+      "file": "services/orchestrator/cluster_environment.py",
+      "line": 97,
+      "receiver": "runtime",
+      "method": "_stop_environment"
+    },
+    {
+      "file": "services/orchestrator/cluster_environment.py",
+      "line": 98,
+      "receiver": "runtime",
+      "method": "_labels"
+    },
+    {
+      "file": "services/orchestrator/cluster_environment.py",
+      "line": 111,
+      "receiver": "runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/cluster_environment.py",
+      "line": 131,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/cluster_environment.py",
+      "line": 73,
+      "receiver": "runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/cluster_environment.py",
+      "line": 74,
+      "receiver": "runtime",
+      "method": "_execution_records"
+    },
+    {
+      "file": "services/orchestrator/cluster_environment.py",
+      "line": 79,
+      "receiver": "runtime",
+      "method": "_container"
+    },
+    {
+      "file": "services/orchestrator/cluster_execution.py",
+      "line": 773,
+      "receiver": "runtime",
+      "method": "_row"
+    },
+    {
+      "file": "services/orchestrator/cluster_execution.py",
+      "line": 774,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/cluster_execution.py",
+      "line": 778,
+      "receiver": "runtime",
+      "method": "transport"
+    },
+    {
+      "file": "services/orchestrator/cluster_execution.py",
+      "line": 288,
+      "receiver": "runtime",
+      "method": "read_cli_identity"
+    },
+    {
+      "file": "services/orchestrator/cluster_execution.py",
+      "line": 300,
+      "receiver": "runtime",
+      "method": "role_status"
+    },
+    {
+      "file": "services/orchestrator/cluster_execution.py",
+      "line": 353,
+      "receiver": "runtime",
+      "method": "read_cli_identity"
+    },
+    {
+      "file": "services/orchestrator/cluster_execution.py",
+      "line": 357,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/cluster_execution.py",
+      "line": 686,
+      "receiver": "runtime",
+      "method": "read_cli_identity"
+    },
+    {
+      "file": "services/orchestrator/cluster_execution.py",
+      "line": 689,
+      "receiver": "runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/cluster_execution.py",
+      "line": 689,
+      "receiver": "runtime",
+      "method": "_execution_records"
+    },
+    {
+      "file": "services/orchestrator/cluster_execution.py",
+      "line": 694,
+      "receiver": "runtime",
+      "method": "_running_sender_active"
+    },
+    {
+      "file": "services/orchestrator/cluster_execution.py",
+      "line": 696,
+      "receiver": "runtime",
+      "method": "_stop_environment"
+    },
+    {
+      "file": "services/orchestrator/cluster_execution.py",
+      "line": 697,
+      "receiver": "runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/cluster_execution.py",
+      "line": 698,
+      "receiver": "runtime",
+      "method": "role_status"
+    },
+    {
+      "file": "services/orchestrator/cluster_execution.py",
+      "line": 707,
+      "receiver": "runtime",
+      "method": "role_status"
+    },
+    {
+      "file": "services/orchestrator/cluster_migration_io.py",
+      "line": 75,
+      "receiver": "self.runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/cluster_migration_io.py",
+      "line": 76,
+      "receiver": "self.runtime",
+      "method": "read_cli_identity"
+    },
+    {
+      "file": "services/orchestrator/cluster_migration_runner.py",
+      "line": 84,
+      "receiver": "self.runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/cluster_migration_runner.py",
+      "line": 96,
+      "receiver": "self.runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/cluster_migration_runner.py",
+      "line": 182,
+      "receiver": "self.runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/cluster_migration_runner.py",
+      "line": 270,
+      "receiver": "self.runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/cluster_service.py",
+      "line": 191,
+      "receiver": "runtime",
+      "method": "_row"
+    },
+    {
+      "file": "services/orchestrator/cluster_service.py",
+      "line": 192,
+      "receiver": "runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/cluster_service.py",
+      "line": 298,
+      "receiver": "runtime",
+      "method": "_account_lock"
+    },
+    {
+      "file": "services/orchestrator/cluster_service.py",
+      "line": 309,
+      "receiver": "runtime",
+      "method": "_row"
+    },
+    {
+      "file": "services/orchestrator/cluster_service.py",
+      "line": 313,
+      "receiver": "runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/content_capture_settings.py",
+      "line": 96,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/content_capture_settings.py",
+      "line": 23,
+      "receiver": "runtime",
+      "method": "_sender_config"
+    },
+    {
+      "file": "services/orchestrator/cpu_resources.py",
+      "line": 156,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/cpu_resources.py",
+      "line": 157,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/cpu_resources.py",
+      "line": 49,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/credential_ownership.py",
+      "line": 325,
+      "receiver": "self.runtime",
+      "method": "_row"
+    },
+    {
+      "file": "services/orchestrator/credential_ownership.py",
+      "line": 326,
+      "receiver": "self.runtime",
+      "method": "_local_credentials"
+    },
+    {
+      "file": "services/orchestrator/credential_ownership.py",
+      "line": 329,
+      "receiver": "self.runtime",
+      "method": "_local_oauth"
+    },
+    {
+      "file": "services/orchestrator/credential_ownership.py",
+      "line": 335,
+      "receiver": "self.runtime",
+      "method": "_row"
+    },
+    {
+      "file": "services/orchestrator/credential_ownership.py",
+      "line": 719,
+      "receiver": "self.runtime",
+      "method": "_row"
+    },
+    {
+      "file": "services/orchestrator/credential_ownership.py",
+      "line": 422,
+      "receiver": "self.runtime",
+      "method": "sync_credentials"
+    },
+    {
+      "file": "services/orchestrator/credential_ownership.py",
+      "line": 720,
+      "receiver": "self.runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/credential_ownership.py",
+      "line": 727,
+      "receiver": "self.runtime",
+      "method": "sync_credentials"
+    },
+    {
+      "file": "services/orchestrator/credential_ownership.py",
+      "line": 422,
+      "receiver": "self.runtime",
+      "method": "_row"
+    },
+    {
+      "file": "services/orchestrator/credential_ownership.py",
+      "line": 676,
+      "receiver": "self.runtime",
+      "method": "owner_transition"
+    },
+    {
+      "file": "services/orchestrator/credential_ownership.py",
+      "line": 563,
+      "receiver": "self.runtime",
+      "method": "owner_transition"
+    },
+    {
+      "file": "services/orchestrator/credential_ownership.py",
+      "line": 336,
+      "receiver": "self.runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/credential_ownership.py",
+      "line": 720,
+      "receiver": "self.runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/login_drafts.py",
+      "line": 147,
+      "receiver": "self.runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/login_drafts.py",
+      "line": 167,
+      "receiver": "self.runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/login_drafts.py",
+      "line": 173,
+      "receiver": "self.runtime",
+      "method": "_execution_records"
+    },
+    {
+      "file": "services/orchestrator/login_drafts.py",
+      "line": 186,
+      "receiver": "self.runtime",
+      "method": "_running_sender_active"
+    },
+    {
+      "file": "services/orchestrator/login_drafts.py",
+      "line": 212,
+      "receiver": "self.runtime",
+      "method": "_sender_config"
+    },
+    {
+      "file": "services/orchestrator/login_drafts.py",
+      "line": 170,
+      "receiver": "self.runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/login_drafts.py",
+      "line": 261,
+      "receiver": "self.runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/login_drafts.py",
+      "line": 266,
+      "receiver": "self.runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/login_drafts.py",
+      "line": 272,
+      "receiver": "self.runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/login_drafts.py",
+      "line": 275,
+      "receiver": "self.runtime",
+      "method": "_running_sender_active"
+    },
+    {
+      "file": "services/orchestrator/login_drafts.py",
+      "line": 282,
+      "receiver": "self.runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/login_drafts.py",
+      "line": 284,
+      "receiver": "self.runtime",
+      "method": "_stop_environment"
+    },
+    {
+      "file": "services/orchestrator/login_drafts.py",
+      "line": 277,
+      "receiver": "self.runtime",
+      "method": "_execution_records"
+    },
+    {
+      "file": "services/orchestrator/login_drafts.py",
+      "line": 241,
+      "receiver": "self.runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 7760,
+      "receiver": "account_runtime",
+      "method": "control_execution"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12821,
+      "receiver": "account_runtime",
+      "method": "role_status"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12822,
+      "receiver": "account_runtime",
+      "method": "reprofile_blocker"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12836,
+      "receiver": "account_runtime",
+      "method": "native_preparation_summary"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12913,
+      "receiver": "account_runtime",
+      "method": "native_preparation_snapshots"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 13019,
+      "receiver": "account_runtime",
+      "method": "native_preparation_snapshots"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 13084,
+      "receiver": "account_runtime",
+      "method": "native_preparation_snapshots"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 1266,
+      "receiver": "account_runtime",
+      "method": "_row"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 1267,
+      "receiver": "account_runtime",
+      "method": "sync_credentials"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 6050,
+      "receiver": "account_runtime",
+      "method": "run_session_path"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 6080,
+      "receiver": "account_runtime",
+      "method": "run_session_path"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 7735,
+      "receiver": "account_runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 8113,
+      "receiver": "account_runtime",
+      "method": "reconcile"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 8114,
+      "receiver": "account_runtime",
+      "method": "start"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 9090,
+      "receiver": "account_runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 9197,
+      "receiver": "account_runtime",
+      "method": "identity_import"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 9208,
+      "receiver": "account_runtime",
+      "method": "_row"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 9209,
+      "receiver": "account_runtime",
+      "method": "read_cli_identity"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 9437,
+      "receiver": "account_runtime",
+      "method": "_row"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 9438,
+      "receiver": "account_runtime",
+      "method": "sync_credentials"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 10747,
+      "receiver": "account_runtime",
+      "method": "commit_login"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 11811,
+      "receiver": "account_runtime",
+      "method": "run_artifact_path"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 11917,
+      "receiver": "account_runtime",
+      "method": "run_artifact_path"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12715,
+      "receiver": "account_runtime",
+      "method": "_account_lock"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12720,
+      "receiver": "account_runtime",
+      "method": "_row"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12730,
+      "receiver": "account_runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12785,
+      "receiver": "account_runtime",
+      "method": "transport"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12868,
+      "receiver": "account_runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 13068,
+      "receiver": "account_runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 3911,
+      "receiver": "account_runtime",
+      "method": "start_run"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4031,
+      "receiver": "account_runtime",
+      "method": "wait_worker"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4043,
+      "receiver": "account_runtime",
+      "method": "run_artifact_path"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4090,
+      "receiver": "account_runtime",
+      "method": "run_artifact_path"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4091,
+      "receiver": "account_runtime",
+      "method": "run_artifact_path"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4150,
+      "receiver": "account_runtime",
+      "method": "job_for_container"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4151,
+      "receiver": "account_runtime",
+      "method": "sync_credentials"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4199,
+      "receiver": "account_runtime",
+      "method": "begin_continue"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4341,
+      "receiver": "account_runtime",
+      "method": "ensure"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4342,
+      "receiver": "account_runtime",
+      "method": "claim"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4880,
+      "receiver": "account_runtime",
+      "method": "job_for_container"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4882,
+      "receiver": "account_runtime",
+      "method": "cli_command"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5279,
+      "receiver": "account_runtime",
+      "method": "exec_cli"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5366,
+      "receiver": "account_runtime",
+      "method": "cleanup"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5447,
+      "receiver": "account_runtime",
+      "method": "login_commit_context"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5468,
+      "receiver": "account_runtime",
+      "method": "finish_bound_login"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5472,
+      "receiver": "account_runtime",
+      "method": "login_commit_context"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 6059,
+      "receiver": "account_runtime",
+      "method": "run_artifact_path"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 8141,
+      "receiver": "account_runtime",
+      "method": "set_project_iterations"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 8212,
+      "receiver": "account_runtime",
+      "method": "stop"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 10092,
+      "receiver": "account_runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 10097,
+      "receiver": "account_runtime",
+      "method": "maintenance"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 10148,
+      "receiver": "account_runtime",
+      "method": "recover_login"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 10292,
+      "receiver": "account_runtime",
+      "method": "send_login_code"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12009,
+      "receiver": "account_runtime",
+      "method": "run_workspace_path"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12723,
+      "receiver": "account_runtime",
+      "method": "_running_sender_active"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12753,
+      "receiver": "account_runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12784,
+      "receiver": "account_runtime",
+      "method": "existing_transport"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12838,
+      "receiver": "account_runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12840,
+      "receiver": "account_runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12849,
+      "receiver": "account_runtime",
+      "method": "read_cli_identity"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12959,
+      "receiver": "account_runtime",
+      "method": "refresh_physical_features"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 13021,
+      "receiver": "account_runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 13086,
+      "receiver": "account_runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 13148,
+      "receiver": "account_runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 1863,
+      "receiver": "account_runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 3763,
+      "receiver": "account_runtime",
+      "method": "execution_flows"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 3785,
+      "receiver": "account_runtime",
+      "method": "cleanup"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4057,
+      "receiver": "account_runtime",
+      "method": "cleanup"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4347,
+      "receiver": "account_runtime",
+      "method": "sync_credentials"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4351,
+      "receiver": "account_runtime",
+      "method": "release"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4562,
+      "receiver": "account_runtime",
+      "method": "cli_command"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4603,
+      "receiver": "account_runtime",
+      "method": "ensure"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4604,
+      "receiver": "account_runtime",
+      "method": "claim"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5140,
+      "receiver": "account_runtime",
+      "method": "begin_login"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5279,
+      "receiver": "account_runtime",
+      "method": "execution_token"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5366,
+      "receiver": "account_runtime",
+      "method": "execution_token"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5474,
+      "receiver": "account_runtime",
+      "method": "reconcile"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 8885,
+      "receiver": "account_runtime",
+      "method": "owner_transition"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 9284,
+      "receiver": "account_runtime",
+      "method": "process_identity_import"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12400,
+      "receiver": "account_runtime",
+      "method": "job_for_container"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12420,
+      "receiver": "account_runtime",
+      "method": "register_exec"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12722,
+      "receiver": "account_runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12727,
+      "receiver": "account_runtime",
+      "method": "_stop_environment"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12845,
+      "receiver": "account_runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12945,
+      "receiver": "account_runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 13168,
+      "receiver": "account_runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 13250,
+      "receiver": "account_runtime",
+      "method": "maintenance"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4101,
+      "receiver": "account_runtime",
+      "method": "job_for_container"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4106,
+      "receiver": "account_runtime",
+      "method": "cleanup"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4113,
+      "receiver": "account_runtime",
+      "method": "job_for_container"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4607,
+      "receiver": "account_runtime",
+      "method": "sync_credentials"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4612,
+      "receiver": "account_runtime",
+      "method": "_configure_network_context"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4625,
+      "receiver": "account_runtime",
+      "method": "cleanup"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4885,
+      "receiver": "account_runtime",
+      "method": "execution_environment"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5131,
+      "receiver": "account_runtime",
+      "method": "_row"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5149,
+      "receiver": "account_runtime",
+      "method": "login_commit_context"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5370,
+      "receiver": "account_runtime",
+      "method": "reconcile"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5508,
+      "receiver": "account_runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 10032,
+      "receiver": "account_runtime",
+      "method": "_container"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 10791,
+      "receiver": "account_runtime",
+      "method": "reconcile"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 13044,
+      "receiver": "account_runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 13104,
+      "receiver": "account_runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4114,
+      "receiver": "account_runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4115,
+      "receiver": "account_runtime",
+      "method": "job_for_container"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4561,
+      "receiver": "account_runtime",
+      "method": "job_for_container"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5502,
+      "receiver": "account_runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 10767,
+      "receiver": "account_runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4126,
+      "receiver": "account_runtime",
+      "method": "job_for_container"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4129,
+      "receiver": "account_runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4569,
+      "receiver": "account_runtime",
+      "method": "execution_environment"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4611,
+      "receiver": "account_runtime",
+      "method": "_network_runtime"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5262,
+      "receiver": "account_runtime",
+      "method": "cleanup"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 6901,
+      "receiver": "account_runtime",
+      "method": "run_artifact_path"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 10384,
+      "receiver": "account_runtime",
+      "method": "login_terminal_alive"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12404,
+      "receiver": "account_runtime",
+      "method": "cli_command"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12889,
+      "receiver": "account_runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4131,
+      "receiver": "account_runtime",
+      "method": "job_for_container"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4620,
+      "receiver": "account_runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5262,
+      "receiver": "account_runtime",
+      "method": "execution_token"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 6922,
+      "receiver": "account_runtime",
+      "method": "run_session_path"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 10383,
+      "receiver": "account_runtime",
+      "method": "capture_login_pane"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4569,
+      "receiver": "account_runtime",
+      "method": "job_for_container"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 6895,
+      "receiver": "account_runtime",
+      "method": "run_artifact_path"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 12413,
+      "receiver": "account_runtime",
+      "method": "execution_environment"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 5503,
+      "receiver": "account_runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "line": 4567,
+      "receiver": "account_runtime",
+      "method": "job_for_container"
+    },
+    {
+      "file": "services/orchestrator/native_criu_settings.py",
+      "line": 87,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/native_criu_settings.py",
+      "line": 22,
+      "receiver": "runtime",
+      "method": "_sender_config"
+    },
+    {
+      "file": "services/orchestrator/native_kernel_upgrade.py",
+      "line": 303,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/native_kernel_upgrade.py",
+      "line": 305,
+      "receiver": "runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/native_kernel_upgrade.py",
+      "line": 245,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/native_kernel_upgrade.py",
+      "line": 333,
+      "receiver": "runtime",
+      "method": "_write_sender_config"
+    },
+    {
+      "file": "services/orchestrator/native_kernel_upgrade.py",
+      "line": 274,
+      "receiver": "runtime",
+      "method": "_sender_config"
+    },
+    {
+      "file": "services/orchestrator/native_kernel_upgrade.py",
+      "line": 247,
+      "receiver": "runtime",
+      "method": "_sender_config"
+    },
+    {
+      "file": "services/orchestrator/native_kernel_upgrade.py",
+      "line": 411,
+      "receiver": "runtime",
+      "method": "_sender_active"
+    },
+    {
+      "file": "services/orchestrator/native_kernel_upgrade.py",
+      "line": 464,
+      "receiver": "runtime",
+      "method": "_sender_active"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 37,
+      "receiver": "runtime",
+      "method": "_running_sender_active"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 31,
+      "receiver": "runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 47,
+      "receiver": "runtime",
+      "method": "_owned_lease"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 54,
+      "receiver": "runtime",
+      "method": "_stop_environment"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 55,
+      "receiver": "runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 56,
+      "receiver": "runtime",
+      "method": "ensure"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 39,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 48,
+      "receiver": "runtime",
+      "method": "_running_sender_active"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 59,
+      "receiver": "runtime",
+      "method": "_stop_environment"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 60,
+      "receiver": "runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 90,
+      "receiver": "runtime",
+      "method": "_owned_lease"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 96,
+      "receiver": "runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 70,
+      "receiver": "runtime",
+      "method": "_stop_environment"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 71,
+      "receiver": "runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 72,
+      "receiver": "runtime",
+      "method": "ensure"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 82,
+      "receiver": "runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 75,
+      "receiver": "runtime",
+      "method": "_stop_environment"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 76,
+      "receiver": "runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/native_settings_operation.py",
+      "line": 80,
+      "receiver": "runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 378,
+      "receiver": "runtime",
+      "method": "job_for_container"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 381,
+      "receiver": "runtime",
+      "method": "_container"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 431,
+      "receiver": "runtime",
+      "method": "job_for_container"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 479,
+      "receiver": "self.runtime",
+      "method": "control_execution"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 80,
+      "receiver": "runtime",
+      "method": "_cli_setup"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 221,
+      "receiver": "self.runtime",
+      "method": "job_for_container"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 227,
+      "receiver": "self.runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 432,
+      "receiver": "runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 435,
+      "receiver": "runtime",
+      "method": "_container"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 474,
+      "receiver": "self.runtime",
+      "method": "job_for_container"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 475,
+      "receiver": "self.runtime",
+      "method": "cleanup"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 89,
+      "receiver": "runtime",
+      "method": "sync_credentials"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 90,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 113,
+      "receiver": "runtime",
+      "method": "_save_execution"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 114,
+      "receiver": "runtime",
+      "method": "execution_flows"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 118,
+      "receiver": "runtime",
+      "method": "_install_cli_quota"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 182,
+      "receiver": "runtime",
+      "method": "_save_execution"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 185,
+      "receiver": "runtime",
+      "method": "_attach_process"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 119,
+      "receiver": "runtime",
+      "method": "_network_runtime"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 132,
+      "receiver": "runtime",
+      "method": "_save_execution"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 134,
+      "receiver": "runtime",
+      "method": "_configure_network_context"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 138,
+      "receiver": "runtime",
+      "method": "_configure_network_context"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 165,
+      "receiver": "runtime",
+      "method": "execution_environment"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 341,
+      "receiver": "self.runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 433,
+      "receiver": "runtime",
+      "method": "job_for_container"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 200,
+      "receiver": "runtime",
+      "method": "cleanup"
+    },
+    {
+      "file": "services/orchestrator/pi_terminal.py",
+      "line": 139,
+      "receiver": "runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 366,
+      "receiver": "self.runtime",
+      "method": "_container"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 382,
+      "receiver": "self.runtime",
+      "method": "_wait_network"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 383,
+      "receiver": "self.runtime",
+      "method": "_sender_active"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 384,
+      "receiver": "self.runtime",
+      "method": "check_system_profile"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 385,
+      "receiver": "self.runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 414,
+      "receiver": "self.runtime",
+      "method": "_execution_records"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 575,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 600,
+      "receiver": "runtime",
+      "method": "ensure"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 735,
+      "receiver": "self.runtime",
+      "method": "_save_execution"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 128,
+      "receiver": "self.runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 241,
+      "receiver": "self.runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 412,
+      "receiver": "self.runtime",
+      "method": "_labels"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 416,
+      "receiver": "self.runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 489,
+      "receiver": "self.runtime",
+      "method": "_labels"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 521,
+      "receiver": "self.runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 601,
+      "receiver": "runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 611,
+      "receiver": "runtime",
+      "method": "claim"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 209,
+      "receiver": "self.runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 413,
+      "receiver": "self.runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 606,
+      "receiver": "runtime",
+      "method": "_execution_records"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 616,
+      "receiver": "runtime",
+      "method": "_save_execution"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 617,
+      "receiver": "runtime",
+      "method": "_ensure_version"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 618,
+      "receiver": "runtime",
+      "method": "sync_credentials"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 648,
+      "receiver": "runtime",
+      "method": "render_driver"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 653,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 665,
+      "receiver": "runtime",
+      "method": "_configure_network_context"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 679,
+      "receiver": "runtime",
+      "method": "_save_execution"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 696,
+      "receiver": "runtime",
+      "method": "_save_execution"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 707,
+      "receiver": "runtime",
+      "method": "_attach_process"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 711,
+      "receiver": "runtime",
+      "method": "_save_execution"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 210,
+      "receiver": "self.runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 212,
+      "receiver": "self.runtime",
+      "method": "_container"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 681,
+      "receiver": "runtime",
+      "method": "execution_environment"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 714,
+      "receiver": "runtime",
+      "method": "cleanup"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 604,
+      "receiver": "runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 645,
+      "receiver": "runtime",
+      "method": "execution_environment"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 606,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 676,
+      "receiver": "runtime",
+      "method": "execution_environment"
+    },
+    {
+      "file": "services/orchestrator/project_review_runtime.py",
+      "line": 666,
+      "receiver": "runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/projects_runtime.py",
+      "line": 427,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/projects_runtime.py",
+      "line": 57,
+      "receiver": "self.runtime",
+      "method": "ensure"
+    },
+    {
+      "file": "services/orchestrator/projects_runtime.py",
+      "line": 350,
+      "receiver": "runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/projects_runtime.py",
+      "line": 359,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/projects_runtime.py",
+      "line": 79,
+      "receiver": "runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/projects_runtime.py",
+      "line": 93,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/projects_runtime.py",
+      "line": 368,
+      "receiver": "runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/projects_runtime.py",
+      "line": 90,
+      "receiver": "runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/projects_runtime.py",
+      "line": 91,
+      "receiver": "runtime",
+      "method": "role_status"
+    },
+    {
+      "file": "services/orchestrator/proxy_sync.py",
+      "line": 75,
+      "receiver": "runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/proxy_sync.py",
+      "line": 89,
+      "receiver": "runtime",
+      "method": "_stop_environment"
+    },
+    {
+      "file": "services/orchestrator/proxy_sync.py",
+      "line": 90,
+      "receiver": "runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/proxy_sync.py",
+      "line": 94,
+      "receiver": "runtime",
+      "method": "_write_sender_config"
+    },
+    {
+      "file": "services/orchestrator/proxy_sync.py",
+      "line": 86,
+      "receiver": "runtime",
+      "method": "_running_sender_active"
+    },
+    {
+      "file": "services/orchestrator/proxy_sync.py",
+      "line": 85,
+      "receiver": "runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/proxy_sync.py",
+      "line": 92,
+      "receiver": "runtime",
+      "method": "_sender_config"
+    },
+    {
+      "file": "services/orchestrator/system_updates.py",
+      "line": 288,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/system_updates.py",
+      "line": 315,
+      "receiver": "runtime",
+      "method": "_running_sender_active"
+    },
+    {
+      "file": "services/orchestrator/system_updates.py",
+      "line": 251,
+      "receiver": "runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/system_updates.py",
+      "line": 286,
+      "receiver": "runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/system_updates.py",
+      "line": 289,
+      "receiver": "runtime",
+      "method": "_execution_records"
+    },
+    {
+      "file": "services/orchestrator/system_updates.py",
+      "line": 441,
+      "receiver": "runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/system_updates.py",
+      "line": 179,
+      "receiver": "runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/system_updates.py",
+      "line": 184,
+      "receiver": "runtime",
+      "method": "environment_jobs"
+    },
+    {
+      "file": "services/orchestrator/system_updates.py",
+      "line": 186,
+      "receiver": "runtime",
+      "method": "_root"
+    },
+    {
+      "file": "services/orchestrator/system_updates.py",
+      "line": 452,
+      "receiver": "runtime",
+      "method": "_stop_environment"
+    },
+    {
+      "file": "services/orchestrator/system_updates.py",
+      "line": 453,
+      "receiver": "runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/system_updates.py",
+      "line": 187,
+      "receiver": "runtime",
+      "method": "_execution_records"
+    },
+    {
+      "file": "services/orchestrator/system_updates.py",
+      "line": 213,
+      "receiver": "runtime",
+      "method": "_running_sender_active"
+    },
+    {
+      "file": "services/orchestrator/system_updates.py",
+      "line": 457,
+      "receiver": "runtime",
+      "method": "ensure"
+    },
+    {
+      "file": "services/orchestrator/task_proxy.py",
+      "line": 159,
+      "receiver": "runtime",
+      "method": "environment_lock"
+    },
+    {
+      "file": "services/orchestrator/task_proxy.py",
+      "line": 167,
+      "receiver": "runtime",
+      "method": "_stop_environment"
+    },
+    {
+      "file": "services/orchestrator/task_proxy.py",
+      "line": 168,
+      "receiver": "runtime",
+      "method": "_update"
+    },
+    {
+      "file": "services/orchestrator/task_proxy.py",
+      "line": 165,
+      "receiver": "runtime",
+      "method": "_running_sender_active"
+    },
+    {
+      "file": "services/orchestrator/task_proxy.py",
+      "line": 164,
+      "receiver": "runtime",
+      "method": "environment_jobs"
+    }
+  ]
+}

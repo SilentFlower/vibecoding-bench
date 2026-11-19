@@ -19,6 +19,7 @@ import uuid
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from source_layout import source_path
 from stat import S_ISREG, S_ISSOCK
@@ -30,6 +31,7 @@ COMPOSE = Path(__file__).with_name("compose.yml")
 sys.path.insert(0, str(source_path(REPO, "orchestrator")))
 from resource_budget import account_limits, default_account_memory, isolated_account_limits
 from native_sender import prewarm_account_id, stage_asset
+from agy_auth import auth_asset_identity, stage_auth_asset
 from cpu_resources import default_cpu_limits
 from cli_telemetry_policy import cli_telemetry_mode
 from platform_version import read_version
@@ -90,6 +92,7 @@ def inspect_images(values: dict) -> dict:
     if values.get("V3_RELEASE", manifest["release"]) != manifest["release"]:
         raise ValueError("配置批次与清单不一致")
     values["V3_RELEASE"] = manifest["release"]
+    agy_asset = auth_asset_identity(manifest.get('agy_auth'))
     for role in ("control", "account"):
         name = values[f"V3_{role.upper()}_IMAGE"]
         if name.endswith(":latest") or ":v3-" not in name:
@@ -103,6 +106,12 @@ def inspect_images(values: dict) -> dict:
             raise ValueError("镜像平台与清单不匹配")
         if labels.get("vibebench.product") != "v3" or labels.get("vibebench.role") != role:
             raise ValueError("镜像产品或角色不匹配")
+        if agy_asset is not None:
+            if labels.get('vibebench.agy-runtime-protocol') != '1':
+                raise ValueError('镜像缺少已声明的AGY协议能力')
+            if role == 'account' and any(labels.get(key) != agy_asset['sha256'] for key in
+                    ('vibebench.agy-auth-source-sha256', 'vibebench.agy-runtime-source-sha256')):
+                raise ValueError('账号镜像AGY制品身份与清单不符')
         if manifest["layout_version"] == 2 and labels.get("vibebench.isolation-version") != "2":
             raise ValueError("联合镜像缺少三角色隔离能力")
         if manifest.get('credential_ownership_protocol') == 1 and labels.get('vibebench.credential-ownership-protocol') != '1':
@@ -282,6 +291,9 @@ def source_snapshot_ignore(directory: str, names: list[str]) -> set[str]:
     :return: 仍应排除的名称集合。
     """
     ignored = set(shutil.ignore_patterns('.git','target','node_modules','__pycache__','.env','.env.*','*.log')(directory,names))
+    if Path(directory).as_posix().endswith('/agy_runtime/resources'):
+        # 构建器从固定源码生成资源，宿主临时编译产物不进入交付身份。
+        ignored.update(set(names) & {'observer-c', 'relocation_reclaim.so', 'admission.json'})
     if not ignored:
         return ignored
     resolved_directory = Path(directory).resolve()
@@ -505,8 +517,13 @@ def build(release: str, manifest_path: Path) -> None:
         for relative in ("cc2api/Cargo.toml", "cc2api/Cargo.lock", "topics.md", "deploy/v3/platform-release.json"):
             (snapshot / relative).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source_path(REPO, relative), snapshot / relative)
+        # 版本文件单独进入控制镜像，源摘要仍绑定它，编译输入保持只依赖实际代码。
+        version_file = snapshot / 'runtime-build/platform-version.json'
+        version_file.parent.mkdir()
+        version_file.write_text(json.dumps({'version': platform_version}) + '\n')
         native_runtime = stage_asset(snapshot / "native-runtime/ccrb-runtime")
         native_runtime['runtimes'] = {'2.1.280': stage_asset(snapshot / 'native-runtime/ccrb-runtime-280', version='2.1.280')}
+        agy_auth = stage_auth_asset(snapshot / 'agy-auth')
         restore_upstream_checkout_bytes(snapshot)
         digest = hashlib.sha256()
         for path in sorted(item for item in snapshot.rglob("*") if item.is_file()):
@@ -522,9 +539,12 @@ def build(release: str, manifest_path: Path) -> None:
             if subprocess.run(["docker", "image", "inspect", reference], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
                 raise ValueError("批次镜像标签已经存在，禁止覆盖")
             started = time.monotonic()
-            command(*build_commands[role], "-f", str(snapshot / "images/v3/Dockerfile"), "--target", role,
+            control_labels = (['--label', 'vibebench.cli-scratchpad-storage=1']
+                if role == 'control' and (snapshot / 'orchestrator/cli_scratchpad.py').is_file() else [])
+            command(*build_commands[role], *control_labels, "-f", str(snapshot / "images/v3/Dockerfile"), "--target", role,
                 "--build-arg", f"V3_RELEASE={release}", "--build-arg", f"V3_PARENT_REV={parent}",
-                "--build-arg", f"V3_GATEWAY_REV={gateway}", "--build-arg", f"VITE_PLATFORM_VERSION={platform_version}",
+                "--build-arg", f"V3_GATEWAY_REV={gateway}",
+                "--build-arg", f"V3_AGY_AUTH_SHA256={agy_auth['sha256']}",
                 "-t", reference, str(snapshot))
             print(json.dumps({'event': 'flower2api-build-role', 'role': role,
                 'seconds': round(time.monotonic() - started, 3)}, ensure_ascii=False), flush=True)
@@ -533,11 +553,16 @@ def build(release: str, manifest_path: Path) -> None:
                 "config_digest": _image_config_digest(reference),
                 "unpacked_bytes": info.get("Size", 0),
                 "platform": info["Os"] + "/" + info["Architecture"]}
+            labels = info.get('Config', {}).get('Labels') or {}
+            if role == 'control':
+                images[role]['cli_scratchpad_storage'] = 1 if labels.get('vibebench.cli-scratchpad-storage') == '1' else 0
+            elif role == 'account':
+                images[role]['cli_scratchpad_protocol'] = 1 if labels.get('vibebench.cli-scratchpad-protocol') == '1' else 0
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     with manifest_path.open("x") as output:
         json.dump({"schema": 3, "bridge_protocol": 1, "credential_ownership_protocol": 1, "system_update_protocol": 1, "layout_version": 2, "default_cli_version": "2.1.293",
             "release": release, "parent_revision": parent, "gateway_revision": gateway,
-            "dirty_worktree": dirty, "source_content_sha256": source_hash, "native_runtime": native_runtime, "images": images}, output, indent=2)
+            "dirty_worktree": dirty, "source_content_sha256": source_hash, "native_runtime": native_runtime, "agy_auth": agy_auth, "images": images}, output, indent=2)
         output.write("\n")
 
 
@@ -664,6 +689,50 @@ def _check_local_reference(reference: str, expected: dict) -> None:
         raise ValueError("无法核对本地镜像，拒绝继续")
 
 
+def save_image_bundle(references: list[str], bundle_path: Path) -> dict:
+    """独占生成同批镜像归档，复用候选交付与正式发布的相同格式。
+
+    :param references: 已核对且固定的镜像引用。
+    :param bundle_path: 全新归档路径。
+    :return: 归档名称、大小和原始字节摘要。
+    """
+    bundle_path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=bundle_path.name + ".", dir=bundle_path.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as output:
+            process = subprocess.Popen(["docker", "save", *references], cwd=REPO, stdout=subprocess.PIPE)
+            try:
+                with gzip.GzipFile(fileobj=output, mode="wb", compresslevel=1, mtime=0) as archive:
+                    shutil.copyfileobj(process.stdout, archive, length=1024 * 1024)
+                if process.wait() != 0:
+                    raise ValueError("同批镜像包生成失败")
+                output.flush()
+                os.fsync(output.fileno())
+            finally:
+                process.stdout.close()
+                if process.poll() is None:
+                    process.terminate()
+                    process.wait()
+        os.link(temporary, bundle_path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+    return {"name": bundle_path.name, "sha256": _file_sha256(bundle_path), "size": bundle_path.stat().st_size}
+
+
+def _push_image(entry: dict, reference: str) -> dict:
+    """推送一个已固定角色并核对真实仓库摘要。"""
+    command("docker", "push", reference)
+    info = json.loads(command("docker", "image", "inspect", reference, capture=True))[0]
+    repository = reference.rsplit(":", 1)[0]
+    digests = {value[len(repository) + 1:] for value in info.get("RepoDigests", [])
+        if value.startswith(repository + "@")}
+    if info["Id"] != entry["digest"] or len(digests) != 1 or not re.fullmatch(r"sha256:[0-9a-f]{64}", next(iter(digests), "")):
+        raise ValueError("推送后镜像配置 ID 或仓库 digest 无法核对")
+    return {**entry, "reference": reference,
+        "config_digest": entry.get("config_digest") or _image_config_digest(entry["reference"]),
+        "registry_digest": next(iter(digests))}
+
+
 def publish(manifest_path: Path, output_path: Path, bundle_path: Path,
             namespace: str = "ghcr.io/silentflower") -> dict:
     """将当前 v3 Action 的同批镜像发布到 GHCR，最后才生成完整交付清单。
@@ -695,40 +764,18 @@ def publish(manifest_path: Path, output_path: Path, bundle_path: Path,
         {"release": manifest["release"], "parent_revision": manifest["parent_revision"]})
     published = {**manifest, "images": {}}
     for role, reference in references.items():
-        entry = manifest["images"][role]
-        command("docker", "tag", entry["reference"], reference)
-        command("docker", "push", reference)
-        info = json.loads(command("docker", "image", "inspect", reference, capture=True))[0]
-        repository = reference.rsplit(":", 1)[0]
-        digests = {value[len(repository) + 1:] for value in info.get("RepoDigests", [])
-            if value.startswith(repository + "@")}
-        if info["Id"] != entry["digest"] or len(digests) != 1 or not re.fullmatch(r"sha256:[0-9a-f]{64}", next(iter(digests), "")):
-            raise ValueError("推送后镜像配置 ID 或仓库 digest 无法核对")
-        config_digest = entry.get("config_digest") or _image_config_digest(entry["reference"])
-        published["images"][role] = {**entry, "reference": reference,
-            "config_digest": config_digest, "registry_digest": next(iter(digests))}
+        command("docker", "tag", manifest["images"][role]["reference"], reference)
     bundle_path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=bundle_path.name + ".", dir=bundle_path.parent)
-    process = None
-    try:
-        with os.fdopen(descriptor, "wb") as output:
-            process = subprocess.Popen(["docker", "save", *references.values()], cwd=REPO, stdout=subprocess.PIPE)
-            try:
-                with gzip.GzipFile(fileobj=output, mode="wb", mtime=0) as archive:
-                    shutil.copyfileobj(process.stdout, archive, length=1024 * 1024)
-                if process.wait() != 0:
-                    raise ValueError("同批镜像包生成失败")
-                output.flush()
-                os.fsync(output.fileno())
-            finally:
-                process.stdout.close()
-                if process.poll() is None:
-                    process.terminate()
-                    process.wait()
-        os.link(temporary, bundle_path)
-    finally:
-        Path(temporary).unlink(missing_ok=True)
-    published["bundle"] = {"name": bundle_path.name, "sha256": _file_sha256(bundle_path), "size": bundle_path.stat().st_size}
+    # 归档只读已固定的本地镜像，可与两路推送独立执行；全部成功才发布交付文件。
+    with tempfile.TemporaryDirectory(prefix=bundle_path.name + ".stage-", dir=bundle_path.parent) as temporary:
+        staged = Path(temporary) / bundle_path.name
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            pushes = {role: executor.submit(_push_image, manifest["images"][role], reference)
+                for role, reference in references.items()}
+            package = executor.submit(save_image_bundle, list(references.values()), staged)
+            published["images"] = {role: future.result() for role, future in pushes.items()}
+            published["bundle"] = package.result()
+        os.link(staged, bundle_path)
     _write_new_json(output_path, published)
     return published
 
@@ -1035,13 +1082,14 @@ def _prune_previous_backups(target: Path, deployment: str, root: Path) -> int:
 
 
 def backup(values: dict, destination: Path, *, full: bool = False,
-           configuration_path: Path | None = None) -> None:
+           configuration_path: Path | None = None, cluster_epoch: str | None = None) -> None:
     """停机后默认精简备份，并在独立目录验证恢复后轮换旧副本。
 
     :param values: 当前部署配置
     :param destination: 全新且与数据根分离的绝对备份目录
     :param full: 显式保留完整可重建程序与下载缓存。
     :param configuration_path: 可选的部署环境配置，命令行入口始终传入。
+    :param cluster_epoch: 已全部停机的中央和Node共用备份批次。
     :return: None；新备份校验成功后只保留同目录、同部署及同数据根的本次备份。
     """
     deployment = values["V3_DEPLOYMENT_ID"]
@@ -1076,7 +1124,7 @@ def backup(values: dict, destination: Path, *, full: bool = False,
                     if candidate.exists():
                         configuration[name] = candidate
             summary = create_backup_data(root, target, excluded=excluded,
-                mode='full' if full else 'essential', configuration=configuration)
+                mode='full' if full else 'essential', configuration=configuration,cluster_epoch=cluster_epoch)
             verified = verify_backup_data(target)
             _owned_root(values, stopped=True)
             _write_new_json(target / 'release.json', manifest)
@@ -1175,6 +1223,7 @@ def main() -> None:
     parser.add_argument("--namespace", default="ghcr.io/silentflower")
     parser.add_argument("--backup-dir", type=Path)
     parser.add_argument("--full", action="store_true", help="显式完整备份；默认只保留可验证恢复的关键状态")
+    parser.add_argument('--cluster-epoch',help='全部节点停机后共用的32位集群备份批次')
     parser.add_argument("--source", type=Path)
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
@@ -1220,7 +1269,7 @@ def main() -> None:
     if args.action == "backup":
         if not args.backup_dir:
             parser.error("backup 需要 --backup-dir")
-        backup(values, args.backup_dir, full=args.full, configuration_path=args.env)
+        backup(values, args.backup_dir, full=args.full, configuration_path=args.env,cluster_epoch=args.cluster_epoch)
         return
     environment = dict(os.environ, **values)
     compose = ["docker", "compose", "--env-file", str(args.env.resolve()), "-f", str(COMPOSE)]

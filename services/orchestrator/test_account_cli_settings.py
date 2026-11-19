@@ -42,6 +42,25 @@ class AccountCliSettingsTests(unittest.TestCase):
             finally:
                 connection.close()
 
+    def test_account_list_exposes_resolved_cli_version_for_node_migration(self) -> None:
+        """迁移选择器读取账号列表即可取得继承版本，停用账号保留且删除账号隐藏。:return: None。"""
+        self.sql("INSERT INTO accounts(id,name,profile_path,enabled,claude_code_version) "
+            "VALUES(2,'disabled','profiles/disabled',0,'2.1.303')")
+        self.sql("INSERT INTO accounts(id,name,profile_path,deleted_at) VALUES(3,'deleted','profiles/deleted',1)")
+        original = self.sql('SELECT * FROM accounts ORDER BY id')
+        response = self.client.get('/api/accounts')
+        self.assertEqual(200, response.status_code)
+        accounts = response.json()
+        self.assertEqual([1, 2], [row['id'] for row in accounts])
+        for account, expected in zip(accounts, [('2.1.293', 'global'), ('2.1.303', 'account')]):
+            with self.subTest(account_id=account['id']):
+                self.assertEqual(expected, (account['effective_claude_code_version'], account['claude_code_version_source']))
+                settings = self.client.get(f"/api/accounts/{account['id']}/cli-settings").json()
+                self.assertEqual(settings['effective_claude_code_version'], account['effective_claude_code_version'])
+        self.assertEqual(original, self.sql('SELECT * FROM accounts ORDER BY id'))
+        self.assertEqual([], self.sql('SELECT id FROM runs'))
+        main.scheduler.submit.assert_not_called()
+
     def test_settings_default_off_partial_updates_and_validation(self) -> None:
         """两个空间独立更新，清空版本继承全局，错误不落库。:return: None。"""
         value = self.client.get('/api/accounts/1/cli-settings').json()

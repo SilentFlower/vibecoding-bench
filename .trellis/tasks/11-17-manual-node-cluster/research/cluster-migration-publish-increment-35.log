@@ -1,0 +1,27 @@
+F
+======================================================================
+FAIL: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 181, in test_remote_account_preparation_and_sender_json_sse
+    self.verify_migration_files(service, runtime, node, account, secondary_fixtures,
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 271, in verify_migration_files
+    self.assertEqual((target['id'], 2, 'ready'), (actual['node_id'], actual['revision'], actual['phase']))
+AssertionError: Tuples differ: (3, 2, 'ready') != (3, 3, 'ready')
+
+First differing element 1:
+2
+3
+
+- (3, 2, 'ready')
+?     ^
+
++ (3, 3, 'ready')
+?     ^
+
+
+----------------------------------------------------------------------
+Ran 1 test in 47.351s
+
+FAILED (failures=1)

@@ -3,7 +3,8 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { ApiError, api, type SystemUpdateCatalog, type SystemUpdateRequest, type SystemUpdateStatus, type SystemUpdateRelease } from '../api';
 import { Download, ChevronDown, ChevronRight, RefreshCw, Layers, Cpu, Check, ArrowRight } from 'lucide-vue-next';
 import { formatLocalTime } from '../lib/time';
-import { platformVersion, releaseNotes, releaseVersion } from '../lib/platformVersion';
+import { releaseNotes, releaseVersion } from '../lib/platformVersion';
+import { usePlatformVersion } from '../composables/usePlatformVersion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChoiceSelect } from '@/components/ui/controls';
@@ -18,6 +19,8 @@ const notesOpen = ref(false);
 const expanded = ref('');
 const status = ref<SystemUpdateStatus | null>(null);
 const catalog = ref<SystemUpdateCatalog | null>(null);
+const { version: runtimeVersion, refresh: refreshPlatformVersion } = usePlatformVersion();
+const versionController = new AbortController();
 const error = ref('');
 const loading = ref(true);
 const writing = ref(false);
@@ -41,6 +44,8 @@ const phases: Record<string, string> = {
   failed: '本次更新失败', cancelled: '本次更新已取消', reconcile: '等待恢复与对账',
 };
 const progress = computed(() => status.value?.operation);
+const nodePhases: Record<string, string> = { registering: '等待同步', checking: '核对组件', draining: '等待原工作完成', fenced: '原环境已停止', stopping: '停止原组件', backing_up: '备份资料', backed_up: '已停止，等待切换', switching: '切换组件', restoring: '恢复账号', completed: '同步完成', rolled_back: '已恢复原组件', rolling_back_control: '恢复原组件', platform_restoring: '恢复原组件', platform_restored: '恢复完成', waiting: '等待重试', needs_check: '等待核对' };
+
 const cancelAllowed = computed(() => status.value?.busy && ['preparing', 'draining'].includes(progress.value?.phase ?? ''));
 const recoveryAllowed = computed(() => ['reconcile', 'succeeded_cleanup_pending'].includes(progress.value?.phase ?? ''));
 const runningEnvironments = computed(() => status.value?.environments?.filter(item => item.running).length ?? 0);
@@ -56,7 +61,7 @@ const environmentSources = computed(() => {
 const prominent = computed(() => (catalog.value?.releases ?? []).filter((release, index) => index === 0 || release.release === status.value?.current_release));
 const older = computed(() => (catalog.value?.releases ?? []).filter(release => !prominent.value.includes(release)));
 const displayed = computed(() => historyOpen.value ? [...prominent.value, ...older.value] : prominent.value);
-const currentVersion = computed(() => platformVersion ?? (catalog.value?.releases.find(item => item.release === status.value?.current_release)
+const currentVersion = computed(() => runtimeVersion.value ?? (catalog.value?.releases.find(item => item.release === status.value?.current_release)
   ? releaseVersion(catalog.value.releases.find(item => item.release === status.value?.current_release)!.changes) : null) ?? '历史构建');
 
 /** 根据现有目录和现场显示检查结果，不用构建序号推断升级关系。 */
@@ -108,6 +113,7 @@ async function refresh(): Promise<void> {
   if (controller) return;
   controller = new AbortController();
   const signal = controller.signal;
+  void refreshPlatformVersion(versionController.signal);
   try {
     const current = await api.systemUpdateStatus(signal);
     const available = current.installed ? await api.systemUpdateReleases(signal) : null;
@@ -231,7 +237,7 @@ async function connect(): Promise<void> {
 }
 
 onMounted(connect);
-onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); dialog.value?.close(); });
+onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); versionController.abort(); dialog.value?.close(); });
 </script>
 
 <template>
@@ -239,7 +245,8 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); dia
     <header v-if="!embedded" class="page-heading"><div><h1 class="text-2xl font-bold tracking-tight">系统更新</h1><p class="mt-1 text-sm text-muted-foreground">查看当前版本与变更，选择合适的时间安装</p></div></header>
     <p v-if="error" role="alert" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{{ error }}</p>
     <p v-if="loading" class="py-10 text-center text-muted-foreground">正在读取系统版本…</p>
-    <Card v-else-if="status && !status.installed" class="gap-3 p-5 shadow-none"><h2 class="font-semibold">首次接入系统更新</h2><p class="text-sm text-muted-foreground">{{ status.message }}</p><p class="text-sm text-muted-foreground">接入独立更新服务及维护底座后，即可安装后续版本。</p></Card>
+    <p v-if="!loading && !status?.installed" class="text-sm text-muted-foreground">当前版本：{{ currentVersion }}</p>
+    <Card v-if="!loading && status && !status.installed" class="gap-3 p-5 shadow-none"><h2 class="font-semibold">首次接入系统更新</h2><p class="text-sm text-muted-foreground">{{ status.message }}</p><p class="text-sm text-muted-foreground">接入独立更新服务及维护底座后，即可安装后续版本。</p></Card>
     <template v-if="status?.installed">
       <div class="approved-update-banner">
         <div><p class="eyebrow" role="status">{{ updateSummary }}</p><div class="approved-version">{{ latestRelease ? releaseLabel(latestRelease.release) : currentVersion }}</div><h2>{{ !catalog?.fresh ? '等待检查版本' : !latestRelease ? '暂无可用发行' : latestRelease.release !== status.current_release ? '新版本已就绪' : '当前已是最新版本' }}</h2><p>{{ latestRelease && latestRelease.release !== status.current_release ? '阅读发布说明，选择合适的时间安装。' : '查看本次发布说明与平台维护记录。' }}</p></div>
@@ -252,6 +259,12 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); dia
       <section v-if="progress" class="update-operation rounded-xl border bg-card" :class="{'update-operation-priority': status.busy || progress.error || progress.blockers?.length}" aria-live="polite">
         <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div class="flex min-w-0 items-center gap-3"><span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Check v-if="progress.phase === 'succeeded'" class="size-4" /><RefreshCw v-else class="size-4" :class="status.busy ? 'animate-spin motion-reduce:animate-none' : ''" /></span><div><h2 class="text-sm font-semibold">{{ phases[progress.phase] ?? progress.phase }}</h2><p class="mt-1 text-xs text-muted-foreground">{{ releaseLabel(progress.target_release) }}</p></div></div><div class="flex gap-2"><Button v-if="cancelAllowed" variant="outline" size="sm" :disabled="writing || progress.cancel_requested" @click="cancel">{{ progress.cancel_requested ? '正在取消…' : '取消等待' }}</Button><Button v-if="recoveryAllowed" variant="outline" size="sm" :disabled="writing" @click="confirm('recover', progress.target_release, '', true)">恢复操作</Button></div></div>
         <div v-if="status.busy || progress.error || progress.blockers?.length" class="space-y-3 border-t px-5 py-4 text-sm"><p v-if="status.busy" class="text-muted-foreground">维护期间新工作暂缓，在途工作自然结束后继续。</p><ul v-if="progress.blockers?.length" class="space-y-1 rounded-lg bg-muted p-3"><li v-for="blocker in progress.blockers" :key="blocker" class="break-words">{{ blocker }}</li></ul><p v-if="progress.error" role="alert" class="text-amber-800">{{ progress.error }}</p></div>
+        <ul v-if="progress.cluster_nodes?.nodes.length" class="space-y-2 border-t px-5 py-4 text-sm" aria-label="节点同步进度">
+          <li v-for="node in progress.cluster_nodes.nodes" :key="node.node_id" class="rounded-lg bg-muted p-3">
+            <div class="flex justify-between gap-3"><span class="min-w-0 break-words font-medium">{{ node.name ?? `节点 ${node.node_id}` }}</span><span class="shrink-0">{{ nodePhases[node.preparation?.phase ?? node.phase] ?? nodePhases[node.phase] ?? '正在核对' }}</span></div>
+            <p v-if="node.preparation?.reason" class="mt-1 text-xs text-muted-foreground">{{ node.preparation.reason }}</p>
+          </li>
+        </ul>
         <details class="border-t px-5 py-3 text-xs text-muted-foreground"><summary class="cursor-pointer">操作详情与数据库快照</summary><div class="mt-3 space-y-2"><p class="break-all">目标发行：<code>{{ progress.target_release }}</code></p><p class="break-all">操作 ID：<code>{{ progress.operation_id }}</code></p><p :title="progress.updated_at">更新时间：{{ formatLocalTime(progress.updated_at) }}</p><p v-if="progress.database_snapshot">数据库快照{{ progress.database_snapshot.state === 'verified' ? '已校验' : '状态：' + progress.database_snapshot.state }} · {{ (progress.database_snapshot.bytes / 1024 / 1024).toFixed(1) }} MiB</p><p v-for="(migration, database) in progress.database_migrations ?? {}" :key="database">{{ database === 'bench' ? '平台数据库' : '网关数据库' }} · 目标版本 {{ migration.target_version }} · {{ migration.state === 'completed' ? '迁移完成' : migration.state === 'running' ? '正在迁移' : migration.state }}</p></div></details>
       </section>
       <details class="approved-maintenance update-disclosure"><summary>运行组件与维护详情</summary>

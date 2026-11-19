@@ -185,6 +185,7 @@ const isValidLimit = computed(() => {
 - 顶层 `/environments` 为环境列表，`/tasks` 默认内部 accounts；`/tasks?tab=topics|tasks|runs|projects|warmup` 显式选择其它内部页面，兼容 `tab=accounts`。
 - 主路由使用Vue环境组件与任务ES模块宿主；独立兼容地址`/runtime/?view=environments|tasks#<tab>?account=...&environment=...&gateway_account=...`保留受控参数。
 - 首页沿用 `api.systemUpdateStatus(signal)`、`api.systemUpdateReleases(signal)` 和 `api.systemUpdateCheck()`，消费既有 `installed/current_release/busy`、`releases/checking` 字段。
+- `api.systemPlatformVersion(signal):Promise<SystemPlatformVersion>` 通过原管理请求入口读取 `{version:string|null}`；`usePlatformVersion()` 提供视图独立的version引用和refresh(signal)。
 
 ### 3. Contracts
 
@@ -193,6 +194,8 @@ const isValidLimit = computed(() => {
 - SystemUpdates 的原生 `dialog.showModal()` 显式设置 `margin:auto`，避免 Tailwind preflight 的零外边距覆盖浏览器居中；最大高度为视口减 2rem，内容超高时内部滚动。安装、回退和恢复继续沿用冻结操作、冲突保护及取消/Esc/遮罩收口。
 - 系统安装与回退确认每次打开默认一分钟，冻结请求为60秒；可选1/5/15/30/60/120分钟，已登记操作与恢复继续使用原参数。后端默认及冲突合同见[平台在线更新](../../platform/deploy/platform-online-update.md)。
 - 管理外壳首次挂载时，已接入更新器且空闲的实例自动检查一次受信目录；已有检查直接复用。检查期间每2秒串行读取状态与目录，完成后停止，路由切换复用30秒摘要且不重复发起检查。桌面和移动导航共用版本与角标；目录最新发行身份不同于当前发行即提示，当前发行退出最近八项目录仍能提示。失败保留已读取版本，具体错误由更新面板展示；外壳卸载清理计时器、取消读取并丢弃迟到回执。
+- 当前版本读取与更新状态/目录独立启动，运行时版本优先。旧端404、null、非法值或读取失败时，只按current_release精确匹配受信目录回退。缺当前条目时沿未知/历史文案，禁止把最新可用版本作为当前版本。SystemUpdates在更新器未接入或不可达时仍展示当前版本。每个视图持有独立组合函数实例，刷新取消旧读，卸载取消在途读取，迟到回执按请求身份与取消信号丢弃。
+- 首页通过既有api.openRuntime共享管理Cookie签发，签发完成后并发读取版本、更新状态和摘要；Bearer管理凭据与管理桥Cookie保持各自鉴权。签发失败时保留未知展示；签发期间卸载后丢弃后续读取。SystemUpdates沿connect的原签发顺序。
 - 环境直接使用Vue分区，任务模块隐藏环境子Tab。原任务内部链接通过作用域回调`runtime:navigate`同步Vue Router；宿主校验Tab、账号身份及受控查询字段，浏览器消息不直接调用模块内部函数。
 - 任务子页共享同一模块实例及DOM根。顶层URL变化通过作用域`setRoute`同步内部地址模型；离开路由释放资源。环境与任务统一由主文档滚动，详情内部滚动。
 - 点击内部链接先阻止内部 hash 入栈；数字键、搜索、账号直达及创建后的程序化跳转统一走 `navigateTo(hash)`，嵌入时由 `runtime:navigate` 创建唯一顶层历史项，独立页面继续 hash 导航。账号筛选以 replace 同步，刷新和前进后退均以 URL 为准。
@@ -227,6 +230,10 @@ const isValidLimit = computed(() => {
 | 复制命令失败或异常 | 清理临时节点并恢复焦点，显示手动复制提示 |
 | 更新器未接入 / 维护忙碌 / 已在检查 | 跳过自动检查 / 跳过新检查 / 复用并轮询已有检查 |
 | 自动检查失败 / 最新发行与当前相同 | 保留已有版本展示 / 保持普通版本入口 |
+| 运行时版本与目录当前项不同 / 目录缺当前项 | 运行时版本优先 / 有效运行时版本继续展示 |
+| 旧端404、null或非法版本 / 当前发行退出目录且无运行时版本 | 按当前项回退 / 沿未知或历史展示 |
+| 更新器未接入或不可达 / 刷新、卸载后旧回执 | 版本独立展示 / 旧回执失效 |
+| 首次登录或延迟签发 / 签发失败 / 签发期间卸载 | 签发完成后读取 / 沿未知展示 / 后续读取失效 |
 
 ### 5. Scenarios and Examples
 
@@ -245,6 +252,7 @@ const isValidLimit = computed(() => {
 
 - `npm --prefix apps/web run build`；通过 Vue/TypeScript 和生产构建。
 - `.venv/bin/python deploy/flower2api/verify_dashboard_update.py`：实际产物与合成接口覆盖首次检查、已有检查、未接入、维护、失败、当前发行退出目录、已最新及卸载；断言检查次数、轮询停止、路由复用和桌面/移动提示。
+- `.venv/bin/python deploy/flower2api/verify_runtime_platform_version.py`：实际两个展示入口覆盖运行时优先、旧端、null/非法值、目录缺当前项及更新器独立性；夹具沿管理Cookie签发顺序拒绝提前读取，覆盖首登、延迟签发、签发失败及签发期间卸载；实际组合函数覆盖乱序、独立实例、卸载取消和迟到回执。
 - `python deploy/flower2api/verify_management_ui.py --output .deploy/management-ui/combined`：实际产物、合成 API、两个时区、390px、版本单展开、导航历史、采集开关及异步关闭；覆盖长名称邮箱、跨账号尝试、资料缺失与空账号及原 ID 直达；追加原始会话完整复制、256 字节长值、旧记录缺字段、实际 280/293/原有转发版本、平均 TPS 正常/零值/未知/不完整和列表时区后缀省略断言。
 - 同一浏览器验证覆盖默认 accounts、六个内部页面、真实模块/DOM根身份、深链接参数、刷新/连续后退/前进、快捷键/搜索/账号直达、独立页面兼容、已打开弹窗与迟到详情收口，以及实际构建模块和独立兼容入口资源。
 - 原 `verify_environment_ui.py` 继续覆盖内核、时段、焦点、乱序和物理实测；所有浏览器模型调用为零。

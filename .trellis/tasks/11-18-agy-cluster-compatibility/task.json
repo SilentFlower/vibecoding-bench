@@ -1,0 +1,74 @@
+{
+  "id": "agy-cluster-compatibility",
+  "name": "agy-cluster-compatibility",
+  "title": "AGY 与 Flower2API 集群版本兼容集成",
+  "description": "保留已发布集群迁移与节点执行合同，接入 AGY 并修复跨层合并兼容。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": "platform",
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-18",
+  "completedAt": "2026-11-18",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-18T15:47:20Z",
+    "blockers": []
+  },
+  "branch": "merge/agy-into-flower2api",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "services/orchestrator/database-migration-registry.json",
+    "services/orchestrator/database_migrations.py",
+    "services/orchestrator/main.py",
+    "deploy/flower2api/system_release.py",
+    "services/gateway/src/model/request_diagnostics.rs",
+    "apps/web/src/components/RuntimeEnvironments.vue"
+  ],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-11-18T14:55:25Z",
+      "contextKey": "claude_64cf216a-c5d1-4c58-8cc2-e9f075aca396",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "ca198ee979ec968bcd7d1a2063c872edb05850f7",
+        "status": [],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "ca198ee979ec968bcd7d1a2063c872edb05850f7",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "685b442941a4e00a044a08f9ed36119b0d18d5d5be0bad099a1a902aef6e3942"
+          }
+        ],
+        "fingerprint": "837b6363cce10371c055da912ea2c7377d4c805832163fbfdd6cb61eaf9e7aa0"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "完成AGY与集群版本兼容集成",
+      "完成bench5/gateway6迁移及旧程序兼容验证",
+      "通过完整编排、Rust、部署、Web与浏览器回归和Check-All/Spec评估"
+    ],
+    "partialStep": null,
+    "nextStep": "沿目标分支流程将集成分支合回Flower2API",
+    "notes": "真实外部模型调用0。旧AGY开发版本2数据库转换及生产验收由独立流程承接。",
+    "updatedAt": "2026-11-18T15:47:20Z"
+  }
+}

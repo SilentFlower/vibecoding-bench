@@ -86,6 +86,26 @@ class HostNetworkNamesTests(unittest.TestCase):
         with patch.object(host, 'drained', return_value=blocked), patch('system_update_host.time.monotonic', side_effect=[0, 6]):
             self.assertIs(host._settled({}), blocked)
 
+    def test_environment_update_preserves_blockers_before_any_rebuild(self) -> None:
+        """账号重建前持久保存具体阻塞，错误详情可定位且角色操作保持关闭。:return: None。"""
+        host = HostDeployment({'state_root': '/unused', 'data_root': '/unused-data',
+            'env_file': '/unused-env', 'deployment': 'test'})
+        current = {'environment_id': 'synthetic', 'origin': {'release': 'ci-old-1'},
+            'roles': {'cli': {'state': 'running'}}}
+        operation = {'original': {'selection': {'account': {}}}, 'before': {'environments': [current]}}
+        selected = {'selection': {'account': {'release': 'ci-new-1'}}}
+        evidence = {'ready': False, 'blockers': ['synthetic：持久执行登记尚未收口'], 'environments': [current]}
+        saved = []
+        with patch('system_update_host.account_rebuild_required', return_value=True), \
+                patch.object(host, '_settled', return_value=evidence), \
+                patch.object(host, '_environment_request') as request, patch.object(host, 'environment_cpu') as cpu:
+            with self.assertRaisesRegex(ValueError, 'synthetic：持久执行登记尚未收口'):
+                host.update_environments(operation, selected, lambda: saved.append(list(operation['blockers'])))
+        self.assertEqual([evidence['blockers']], saved)
+        self.assertEqual(evidence['blockers'], operation['blockers'])
+        request.assert_not_called()
+        cpu.assert_not_called()
+
     def test_failed_new_package_recovery_retires_only_persisted_environment_intents(self) -> None:
         """失败恢复先由候选程序收口已登记环境，完成回执阻止重复重建。@return None。"""
         with tempfile.TemporaryDirectory() as folder:

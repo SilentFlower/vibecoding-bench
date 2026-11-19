@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "upgrade": "gateway4→6",
+  "repeat": true,
+  "old_plan_target_four": "compatible_newer",
+  "original_account_and_ledger_retained": true,
+  "historical_account_platform": "claude_code",
+  "previous_binary_contract_maximum": 5
+}

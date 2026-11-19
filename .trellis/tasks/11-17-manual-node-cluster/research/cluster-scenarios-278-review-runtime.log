@@ -1,0 +1,17 @@
+......................................请求快照清理 scanned=0 deleted=0 failed=1
+...................................................................................E
+======================================================================
+ERROR: test_review_reaches_cli_handoff_with_native_selection_and_no_sender_budget (test_account_runtime.AccountRuntimeTests.test_review_reaches_cli_handoff_with_native_selection_and_no_sender_budget)
+真实评审入口先准备基础CLI，发送器预算不会阻断串行资源交接。@return None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_account_runtime.py", line 2085, in test_review_reaches_cli_handoff_with_native_selection_and_no_sender_budget
+    self.runtime.reviews.start_run(account, {}, 'review-proof', {'QUOTA_SOURCE': 'review:proof'}, {})
+  File "/root/project/vibecoding-bench/services/orchestrator/project_review_runtime.py", line 604, in start_run
+    raise ValueError('私有评审缺少本次项目所有者或中央放行上下文')
+ValueError: 私有评审缺少本次项目所有者或中央放行上下文
+
+----------------------------------------------------------------------
+Ran 122 tests in 14.739s
+
+FAILED (errors=1)

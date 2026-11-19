@@ -1,0 +1,25 @@
+F
+======================================================================
+FAIL: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 185, in test_remote_account_preparation_and_sender_json_sse
+    self.verify_gateway(client, service, runtime, account, upstream_root, network, configuration, backend, after=after)
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 575, in verify_gateway
+    after(context['gateway'])
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 182, in <lambda>
+    after = (lambda real_gateway: self.verify_migration_files(service, runtime, node, account,
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 241, in verify_migration_files
+    self.verify_local_target(service, runtime, account, coordinator_gateway, upstream, upstream_root, configuration, backend)
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 435, in verify_local_target
+    self.verify_gateway(client, service, runtime, account, upstream_root, runtime.network, configuration, backend)
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 571, in verify_gateway
+    self.assertEqual(200, response.status_code, response.text[:300])
+AssertionError: 200 != 502 : {"type":"error","error":{"type":"upstream_error","message":"Upstream request failed"}}
+
+----------------------------------------------------------------------
+Ran 1 test in 112.536s
+
+FAILED (failures=1)

@@ -38,15 +38,39 @@ class SystemProfileTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 validate_system_profile(value)
 
-    def test_unknown_mixed_or_changed_cpu_cannot_silently_select_another_profile(self) -> None:
-        """不支持的宿主与迁移代际冲突都明确拒绝，不伪造能力。@return None。"""
+    def test_cross_host_cpu_preserves_saved_profile_and_real_capabilities(self) -> None:
+        """跨代和跨厂商迁移保留画像，硬件能力沿目标实际值渲染。@return None。"""
         profile = generate_system_profile(self.cpuinfo)
-        for cpu in ('', 'processor: 0\nmodel name: missing', self.cpuinfo.replace('23', '999'),
+        for cpu in ('', 'processor: 0\nmodel name: missing',
                 self.cpuinfo + self.cpuinfo.replace('23', '25')):
             with self.subTest(cpu=cpu[:30]), self.assertRaises(ValueError):
                 generate_system_profile(cpu)
-        with self.assertRaisesRegex(ValueError, '代际冲突'):
-            validate_system_profile(profile, self.cpuinfo.replace('cpu family\t: 23', 'cpu family\t: 25'))
+        for vendor, family, model in [('AuthenticAMD', '26', '0'), ('GenuineIntel', '6', '143')]:
+            target = self.cpuinfo.replace('AuthenticAMD', vendor).replace('family\t: 23', 'family\t: ' + family)
+            target = target.replace('model\t\t: 1', 'model\t\t: ' + model).replace('sse sse2 avx2', 'sse sse2 avx avx2 avx512f')
+            original = copy.deepcopy(profile)
+            self.assertEqual(profile, validate_system_profile(profile, target))
+            rendered = render_system_profile(profile, target)['cpuinfo']
+            self.assertIn('avx512f', rendered)
+            self.assertIn('family\t: ' + family, rendered)
+            self.assertEqual(original, profile)
+
+    def test_unregistered_cpu_uses_actual_model_and_portable_computer(self) -> None:
+        """未知型号首次创建沿实际CPU，通用机型拥有独立持久身份。@return None。"""
+        for vendor, family, model in [('AuthenticAMD', '26', '0'), ('GenuineIntel', '6', '143')]:
+            cpu = self.cpuinfo.replace('AuthenticAMD', vendor).replace('family\t: 23', 'family\t: ' + family)
+            cpu = cpu.replace('model\t\t: 1', 'model\t\t: ' + model)
+            system = generate_system_profile(cpu)
+            self.assertEqual([vendor, family, model], system['cpu_signature'])
+            self.assertEqual('host-cpu-v1', system['cpu_template_id'])
+            self.assertEqual(system, validate_system_profile(system, cpu))
+            computer = generate_computer_profile(system)
+            self.assertEqual('portable-computer-v1', computer['template_id'])
+            self.assertEqual(computer, validate_computer_profile(computer, system))
+            render_system_profile(system, cpu)
+            for invalid in ({**system, 'cpu_model_name': 'bad\nmodel'}, {**system, 'cpu_signature': [vendor, family, 0]}):
+                with self.assertRaises(ValueError):
+                    validate_system_profile(invalid)
 
     def test_computer_identity_is_independent_and_matches_cpu_family(self) -> None:
         """两个 CPU 家族只选兼容机型，每次新身份的 UUID 和序列号各自独立。@return None。"""

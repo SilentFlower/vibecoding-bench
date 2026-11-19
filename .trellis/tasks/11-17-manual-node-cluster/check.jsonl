@@ -1,0 +1,5 @@
+{"file":".trellis/tasks/11-17-manual-node-cluster/research/current-architecture.md","reason":"核对人工归属范围及原有本地执行路径的跨节点完整性"}
+{"file":".trellis/spec/orchestrator/backend/index.md","reason":"按检查范围读取凭据所有权、维护门禁、账号隔离及恢复证据的完整章节"}
+{"file":".trellis/spec/gateway/backend/testing-quality.md","reason":"网关及传输协议回归的验证要求"}
+{"file":".trellis/spec/platform/deploy/index.md","reason":"按检查范围读取迁移版本链、发行兼容及快照回退的完整章节"}
+{"file":".trellis/spec/web/frontend/index.md","reason":"按检查范围读取节点管理与手动迁移的界面及浏览器验收完整章节"}

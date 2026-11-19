@@ -1,0 +1,17 @@
+{
+  "evidence": "native_oauth",
+  "scope": "idle_native_listener",
+  "model_submissions": 0,
+  "native_port_observed": true,
+  "log_files": 1,
+  "before": {
+    "status": 200,
+    "bytes": 269284,
+    "has_models": true
+  },
+  "after_file_replacement": {
+    "status": 200,
+    "bytes": 269284,
+    "has_models": true
+  }
+}

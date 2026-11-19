@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from source_layout import source_path
 
-from system_release import GATEWAY_SCHEMA_SOURCES, REPO, data_contracts
+from system_release import BENCH_SCHEMA_SOURCES, GATEWAY_SCHEMA_SOURCES, REPO, data_contracts
 from verify_database_definitions import source_ownership, verify
 
 
@@ -18,7 +18,7 @@ class DatabaseDefinitionTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
-        for name in ('orchestrator/database_schema.py', 'orchestrator/database-migration-registry.json',
+        for name in (*BENCH_SCHEMA_SOURCES.values(), 'orchestrator/database-migration-registry.json',
                 'cc2api/src/store/database-migration-registry.json', *GATEWAY_SCHEMA_SOURCES.values()):
             target = self.root / name
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -104,6 +104,17 @@ class DatabaseDefinitionTests(unittest.TestCase):
                 'SELECT 1; CREATE TABLE synthetic(id INT)'):
             (self.root / 'orchestrator/business.py').write_text('QUERY=' + repr(statement) + '\n')
             self.assertEqual(len(source_ownership(self.root)), 1)
+
+    def test_transient_archive_definition_has_exact_owner_and_stays_pure(self) -> None:
+        """临时索引定义限固定纯模块，同名业务文件和业务依赖继续拒绝。:return: None。"""
+        definition = self.root / 'orchestrator/cluster_archive_schema.py'
+        definition.write_text('SCHEMA="CREATE TABLE entries(path TEXT PRIMARY KEY)"\n')
+        self.assertEqual([], source_ownership(self.root))
+        definition.write_text(definition.read_text() + 'from account_runtime import mutable_runtime\n')
+        self.assertEqual(['orchestrator/cluster_archive_schema.py:2'], source_ownership(self.root))
+        definition.unlink()
+        (self.root / 'orchestrator/business.py').write_text('SCHEMA="CREATE TABLE entries(path TEXT)"\n')
+        self.assertEqual(['orchestrator/business.py:1'], source_ownership(self.root))
 
 
 if __name__ == '__main__':

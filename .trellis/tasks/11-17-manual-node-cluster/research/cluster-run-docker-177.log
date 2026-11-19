@@ -1,0 +1,36 @@
+F
+======================================================================
+FAIL: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_run.py", line 101, in verify_node_run
+    status = remote.poll(token)
+             ^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_runner.py", line 114, in poll
+    result = self.sessions._call(row, 'run-poll', row['record']['scope'])
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_terminal_sessions.py", line 118, in _call
+    result = self.service.connection(node['id']).execution_environment(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_ssh.py", line 375, in execution_environment
+    return self._execute_environment(container, payload, operation)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_ssh.py", line 412, in _execute_environment
+    raise ValueError('节点环境准备失败，请检查执行组件、环境归属与资源')
+ValueError: 节点环境准备失败，请检查执行组件、环境归属与资源
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 165, in test_remote_account_preparation_and_sender_json_sse
+    verify_node_run(self, service, runtime, node, account, unused_gateway)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_run.py", line 131, in verify_node_run
+    raise AssertionError('隔离Run失败；节点调用位置：' + control.logs(tail=15).decode(errors='replace')
+AssertionError: 隔离Run失败；节点调用位置：节点执行失败 operation=run-poll error_type=BlockingIOError frames=cluster_agent.py:117:dispatch,cluster_runs.py:138:dispatch,cluster_runs.py:214:poll,contextlib.py:137:__enter__,cluster_execution.py:260:_locked
+；原worker转录：
+
+----------------------------------------------------------------------
+Ran 1 test in 26.289s
+
+FAILED (failures=1)

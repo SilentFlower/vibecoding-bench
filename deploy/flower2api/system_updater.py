@@ -28,7 +28,7 @@ from runtime_files import atomic_json, atomic_text, directory_fd
 from runtime_names import account_rebuild_required
 from storage_maintenance import acquire_storage_lock
 from system_update_contract import (DEPLOYMENT_RE, DOWNLOAD_ROOT, INDEX_LIMIT, MANIFEST_LIMIT,
-    RELEASE_RE, REPOSITORY, SHA_RE, TERMINAL, compatible_data, fetch_bytes, fetch_repository_file, safe_read, strict_json,
+    RELEASE_RE, REPOSITORY, SHA_RE, TERMINAL, compatible_data, compatible_scratchpad, fetch_bytes, fetch_repository_file, safe_read, strict_json,
     utc_now, validate_index, validate_operation, validate_release, verify_signed, validate_migration_plan, validate_migration_evidence)
 from system_update_host import HostDeployment
 
@@ -159,6 +159,7 @@ class SystemUpdater:
                 try:
                     value = self.load_release(entry['release'], entry['manifest']['sha256'])
                     compatible = compatible_data(self.state['current']['release']['data_compatibility'], value['data_compatibility'])
+                    compatible = compatible and compatible_scratchpad(self.state['current']['release'], value)
                     reason = None if compatible else 'data_contract_unverified'
                     migrations = []
                     if value['schema_version'] == 2:
@@ -217,7 +218,8 @@ class SystemUpdater:
             history = [{'release': item['release']['release'],
                 'manifest_sha256': hashlib.sha256(safe_read(self.root / 'releases' / item['release']['release'] / 'system-release.json')).hexdigest(),
                 'installed_at': item.get('installed_at'),
-                'rollback_available': compatible_data(item['release']['data_compatibility'], current['release']['data_compatibility'])}
+                'rollback_available': compatible_data(item['release']['data_compatibility'], current['release']['data_compatibility'])
+                    and compatible_scratchpad(current['release'], item['release'])}
                 for item in self.state['history'][:8]]
             return {'installed': True, 'revision': self.state['revision'],
                 'deployment': self.policy['deployment'], 'current_release': current['release']['release'],
@@ -230,7 +232,7 @@ class SystemUpdater:
 
     def _public_operation(self, operation: dict) -> dict:
         return {key: copy.deepcopy(operation.get(key)) for key in ('operation_id', 'action', 'phase', 'created_at',
-            'updated_at', 'target_release', 'error', 'blockers', 'cancel_requested', 'cleanup', 'environment_results', 'database_snapshot', 'database_migrations')}
+            'updated_at', 'target_release', 'error', 'blockers', 'cancel_requested', 'cleanup', 'environment_results', 'database_snapshot', 'database_migrations', 'cluster_nodes')}
 
     def operation(self, identifier: str) -> dict:
         """读取指定操作的脱敏进度。
@@ -341,6 +343,8 @@ class SystemUpdater:
                     raise ValueError('目标版本不在当前受信目录中，请重新检查版本')
             target = self.load_release(body['target_release'], body['target_manifest_sha256'])
             original = copy.deepcopy(self.state['current'])
+            if not compatible_scratchpad(original['release'], target):
+                raise ValueError('CLI临时文件布局不兼容，请先安装兼容版本并选择具备恢复能力的回退目标')
             selected = {'release': target, 'selection': {role: copy.deepcopy(target[role]) for role in ('control', 'account')}}
             if action == 'rollback':
                 stored = next((item for item in self.state['history'] if item['release']['release'] == target['release']), None)
@@ -415,6 +419,9 @@ class SystemUpdater:
                 time.sleep(0.5)
             # 以在途自然结束后的身份和环境为切换基线，接纳原工作合法完成的变化。
             operation['before'] = self.backend.capture(operation['original'])
+            prepare_nodes = getattr(self.backend, 'prepare_nodes', None)
+            if prepare_nodes is not None and operation['before'].get('nodes'):
+                prepare_nodes(operation, selected, lambda: self._record(operation), lambda: self._cancelled(operation))
             # 与取消接口共用锁，使最后一次取消核对和进入切换成为同一个边界。
             with self.lock:
                 cancelled = self._cancelled(operation)
@@ -435,6 +442,9 @@ class SystemUpdater:
             self.backend.switch(operation, selected)
             self._phase(operation, 'verifying')
             self.backend.wait_controls(time.monotonic() + 180)
+            resume_nodes = getattr(self.backend, 'resume_nodes', None)
+            if resume_nodes is not None and operation['before'].get('nodes'):
+                resume_nodes(operation, selected, lambda: self._record(operation))
             self.backend.update_environments(operation, selected, lambda: self._record(operation))
             self.backend.health(operation, selected)
             self._phase(operation, 'committing')

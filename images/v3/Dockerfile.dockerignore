@@ -1,7 +1,12 @@
 *
+!runtime-build
+!runtime-build/platform-version.json
 !native-runtime
 !native-runtime/ccrb-runtime
 !native-runtime/ccrb-runtime-280
+!agy-auth
+!agy-auth/agy-1.5.9
+!agy-auth/agy-auth-unavailable
 !cc2api
 !cc2api/Cargo.toml
 !cc2api/Cargo.lock
@@ -34,6 +39,8 @@
 !images/v3/**
 !orchestrator
 !orchestrator/*.py
+!orchestrator/agy_runtime
+!orchestrator/agy_runtime/**
 !orchestrator/requirements.txt
 !webui
 !webui/**

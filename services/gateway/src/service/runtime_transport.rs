@@ -18,7 +18,7 @@ use axum::Json;
 use axum::Router;
 use axum::body::{Body, Bytes};
 use axum::extract::{DefaultBodyLimit, State};
-use axum::http::{HeaderMap, Method};
+use axum::http::{HeaderMap, HeaderValue, Method};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use base64::Engine;
@@ -34,17 +34,26 @@ use subtle::ConstantTimeEq;
 
 use crate::error::AppError;
 use crate::model::account::Account;
-use crate::model::request_diagnostics::RequestLogMode;
+use crate::model::request_diagnostics::{ExecutionLocation, RequestLogMode};
+use crate::service::agy_contract::{
+    AgyAccessSnapshot, AgyModelId, AgySenderConfig, AgySubmission, AgySystemPromptPolicy,
+    AgyToolCompletion,
+};
+use crate::service::agy_runtime::AgyPool;
 use crate::service::native_contract::{NativeIdlePolicy, validate_idle_timeout};
 use crate::service::native_contract::{
     NativePreparation, NativePreparationControl, NativePreparationStatus, NativeReadinessStatus,
     NativeSourceVersion,
 };
 use crate::service::native_runtime::{NativePool, NativeSenderConfig, NativeSubmission};
-use crate::tlsfp::{TlsProfileId, get_request_client_for_profile};
+use crate::service::runtime_background::{BACKGROUND_HEADER, BackgroundPurpose};
+use crate::tlsfp::{
+    TlsProfileId, get_background_request_client_for_profile, get_request_client_for_profile,
+};
 
 const META_HEADER: &str = "x-v3-request";
 const ERROR_HEADER: &str = "x-v3-transport-error";
+const NODE_RELAY_PREFIX: &str = "/cluster-transports/v2/";
 /// 私有请求最多持有的单调执行预算。
 pub(crate) const REQUEST_BUDGET_MS: u64 = 120_000;
 /// 绑定校验允许的跨进程墙钟偏差。
@@ -82,6 +91,8 @@ pub struct PreparedRequest {
 /// 账号进程的受限配置；由管理进程原子写入，CLI 用户不可读取。
 #[derive(Clone, Deserialize, Serialize)]
 pub struct SenderConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agy: Option<AgySenderConfig>,
     #[serde(default)]
     pub native: Option<NativeSenderConfig>,
     #[serde(default)]
@@ -244,6 +255,125 @@ pub struct PreparedTransport {
     route: PreparedRoute,
 }
 
+impl PreparedTransport {
+    /// 无新凭据地回填原工具轮，并等待真实收口。@param previous 原私有请求。@param api_token_id 原调用方。@param body 真实工具结果。@param deadline 原冻结截止。@return 原工具已结束。
+    pub async fn finish_agy_tools(
+        &self,
+        previous: &str,
+        api_token_id: i64,
+        body: Value,
+        deadline: Instant,
+    ) -> Result<(), AppError> {
+        let PreparedRoute::V3 { client, binding } = &self.route else {
+            return Err(AppError::ServiceUnavailable("原AGY环境不可用".into()));
+        };
+        let id = Uuid::new_v4().to_string();
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(AppError::BadRequest("原工具轮已到期".into()));
+        }
+        let input = AgyToolCompletion {
+            request: PreparedRequest {
+                account_id: self.account_id,
+                environment_id: binding.environment_id.clone(),
+                generation: binding.generation,
+                request_id: id.clone(),
+                deadline_unix_ms: now_ms() + remaining.as_millis() as u64,
+                method: "POST".into(),
+                target_url: "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent"
+                    .into(),
+                headers: vec![],
+                preserve_header_casing: false,
+                tls_profile: TlsProfileId::default(),
+            },
+            api_token_id,
+            previous_request_id: previous.into(),
+            body,
+        };
+        let response = timeout_at(
+            deadline,
+            client
+                .post(format!("{}/internal/agy/tools", binding.endpoint))
+                .bearer_auth(&binding.secret)
+                .json(&input)
+                .send(),
+        )
+        .await
+        .map_err(|_| AppError::ServiceUnavailable("AGY工具回填结果待对账".into()))?
+        .map_err(|_| AppError::ServiceUnavailable("AGY工具回填结果待对账".into()))?;
+        if !response.status().is_success() {
+            return Err(AppError::BadRequest("AGY原工具轮拒绝回填".into()));
+        }
+        let result: Value = timeout_at(deadline, response.json())
+            .await
+            .map_err(|_| AppError::ServiceUnavailable("AGY工具收口超时".into()))?
+            .map_err(|_| AppError::ServiceUnavailable("AGY工具收口回执无效".into()))?;
+        if result["finished"] != true
+            || result["request_id"] != id
+            || result["previous_request_id"] != previous
+        {
+            return Err(AppError::ServiceUnavailable("AGY工具收口归属无效".into()));
+        }
+        Ok(())
+    }
+    /// 在既有受信绑定中提交AGY请求。@param request_id 公共请求身份。@param api_token_id 调用方。@param snapshot AT-only快照。@param model 公开模型。@param native_model 观测枚举。@param body Gemini正文。@param system_prompt_policy 本HTTP冻结的账号策略。@param deadline 原单调截止。@param capture 采集策略。@return 持续到原生作业收口的私有事件流。
+    pub async fn send_agy(
+        &self,
+        request_id: &str,
+        api_token_id: i64,
+        snapshot: AgyAccessSnapshot,
+        model: &str,
+        native_model: AgyModelId,
+        body: Value,
+        system_prompt_policy: AgySystemPromptPolicy,
+        deadline: Instant,
+        capture: bool,
+    ) -> Result<reqwest::Response, AppError> {
+        let PreparedRoute::V3 { client, binding } = &self.route else {
+            return Err(AppError::ServiceUnavailable(
+                "AGY需要受管账号运行环境".into(),
+            ));
+        };
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(AppError::ServiceUnavailable("AGY请求已到截止时间".into()));
+        }
+        let submission = AgySubmission {
+            request: PreparedRequest {
+                account_id: self.account_id,
+                environment_id: binding.environment_id.clone(),
+                generation: binding.generation,
+                request_id: request_id.into(),
+                deadline_unix_ms: now_ms() + remaining.as_millis() as u64,
+                method: "POST".into(),
+                target_url: "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent"
+                    .into(),
+                headers: vec![],
+                preserve_header_casing: false,
+                tls_profile: TlsProfileId::default(),
+            },
+            api_token_id,
+            credential_snapshot: snapshot,
+            model: model.into(),
+            native_model,
+            body,
+            system_prompt_policy,
+            capture_enabled: capture,
+        };
+        timeout_at(
+            deadline,
+            client
+                .post(format!("{}/internal/agy/generate", binding.endpoint))
+                .bearer_auth(&binding.secret)
+                .json(&submission)
+                .send(),
+        )
+        .await
+        .map_err(|_| AppError::ServiceUnavailable("AGY发送等待超时".into()))?
+        .map_err(|_| AppError::BadGateway("AGY提交状态待对账".into()))
+    }
+}
+
 /// 已确认归属的内部通道或原有直连兼容通道。
 enum PreparedRoute {
     Direct(String),
@@ -331,7 +461,7 @@ pub(crate) async fn prepare_existing(
             base.trim_end_matches('/'),
             account.id
         ))
-        .bearer_auth(secret)
+        .bearer_auth(&secret)
         .timeout(Duration::from_secs(10))
         .send()
         .await
@@ -350,6 +480,7 @@ pub(crate) async fn prepare_existing(
         &std::env::var("V3_DEPLOYMENT_ID").unwrap_or_default(),
         &configured_account_release(),
     )?;
+    let client = binding_client(client, &binding, &secret)?;
     Ok(Some(PreparedTransport {
         account_id: account.id,
         route: PreparedRoute::V3 { client, binding },
@@ -407,6 +538,7 @@ async fn prepare_from_runtime(
         .await
         .map_err(|_| AppError::ServiceUnavailable("invalid runtime binding".into()))?;
     validate_binding(&binding, account.id, deployment, release)?;
+    let client = binding_client(client, &binding, secret)?;
     Ok(PreparedTransport {
         account_id: account.id,
         route: PreparedRoute::V3 { client, binding },
@@ -414,6 +546,28 @@ async fn prepare_from_runtime(
 }
 
 impl PreparedTransport {
+    /// 从已经验证的绑定提取本次实际发送位置，不公开地址或认证材料。
+    /// @return 原节点、环境和代次；直连兼容通道为空。
+    pub(crate) fn execution_location(&self) -> Option<ExecutionLocation> {
+        let PreparedRoute::V3 { binding, .. } = &self.route else {
+            return None;
+        };
+        let endpoint = reqwest::Url::parse(&binding.endpoint).ok()?;
+        let (node_key, assignment_revision) =
+            if let Some(rest) = endpoint.path().strip_prefix(NODE_RELAY_PREFIX) {
+                let parts: Vec<_> = rest.split('/').collect();
+                (parts.get(1)?.to_string(), Some(parts.get(3)?.parse().ok()?))
+            } else {
+                ("local".into(), None)
+            };
+        Some(ExecutionLocation {
+            node_key,
+            environment_id: binding.environment_id.clone(),
+            generation: binding.generation,
+            assignment_revision,
+        })
+    }
+
     /// 经已验证运行绑定同步空闲策略，兼容尚在切换的旧sender。
     /// @param seconds 已验证的全局回收秒数。
     /// @return 支持该接口时返回true，旧sender返回false，传输故障返回错误。
@@ -707,9 +861,37 @@ impl PreparedTransport {
     /// @return 上游响应或提交未知错误；不会自动重放。
     pub async fn submit(
         self,
+        prepared: PreparedRequest,
+        body: &[u8],
+        ttfb_timeout: Duration,
+    ) -> Result<reqwest::Response, AppError> {
+        self.submit_inner(prepared, body, ttfb_timeout, None).await
+    }
+
+    /// 提交固定后台动作，并为整个后台响应保留有界期限。
+    /// @param prepared 原冻结请求。
+    /// @param body 原字节。
+    /// @param ttfb_timeout 原后台期限。
+    /// @param purpose 服务端固定动作。
+    /// @return 原响应及明确提交边界。
+    pub(crate) async fn submit_background(
+        self,
+        prepared: PreparedRequest,
+        body: &[u8],
+        ttfb_timeout: Duration,
+        purpose: BackgroundPurpose,
+    ) -> Result<reqwest::Response, AppError> {
+        purpose.validate(&prepared.method, &prepared.target_url)?;
+        self.submit_inner(prepared, body, ttfb_timeout, Some(purpose))
+            .await
+    }
+
+    async fn submit_inner(
+        self,
         mut prepared: PreparedRequest,
         body: &[u8],
         ttfb_timeout: Duration,
+        purpose: Option<BackgroundPurpose>,
     ) -> Result<reqwest::Response, AppError> {
         let PreparedRoute::V3 { client, binding } = self.route else {
             let PreparedRoute::Direct(proxy_url) = self.route else {
@@ -735,21 +917,23 @@ impl PreparedTransport {
             serde_json::to_vec(&prepared)
                 .map_err(|_| AppError::Internal("serialize runtime request".into()))?,
         );
-        let response = timeout(
-            ttfb_timeout,
-            client
-                .post(format!(
-                    "{}/internal/send",
-                    binding.endpoint.trim_end_matches('/')
-                ))
-                .bearer_auth(binding.secret)
-                .header(META_HEADER, meta)
-                .body(body.to_vec())
-                .send(),
-        )
-        .await
-        .map_err(|_| AppError::BadGateway("account submission status unknown".into()))?
-        .map_err(|_| AppError::BadGateway("account submission status unknown".into()))?;
+        let mut request = client
+            .post(format!(
+                "{}/internal/send",
+                binding.endpoint.trim_end_matches('/')
+            ))
+            .bearer_auth(binding.secret)
+            .header(META_HEADER, meta)
+            .body(body.to_vec());
+        if let Some(purpose) = purpose {
+            request = request
+                .header(BACKGROUND_HEADER, purpose.as_str())
+                .timeout(ttfb_timeout);
+        }
+        let response = timeout(ttfb_timeout, request.send())
+            .await
+            .map_err(|_| AppError::BadGateway("account submission status unknown".into()))?
+            .map_err(|_| AppError::BadGateway("account submission status unknown".into()))?;
         if let Some(error) = response.headers().get(ERROR_HEADER) {
             return Err(if error == "before-send" {
                 AppError::ServiceUnavailable("account request rejected before submission".into())
@@ -814,6 +998,23 @@ fn validate_binding(
             binding.environment_id
         ),
     ];
+    let local_endpoint = hosts
+        .iter()
+        .any(|host| endpoint.host_str() == Some(host.as_str()))
+        && endpoint.scheme() == "http"
+        && endpoint.port() == Some(8091)
+        && endpoint.path() == "/";
+    let remote_endpoint = std::env::var("V3_RUNTIME_URL")
+        .ok()
+        .and_then(|value| reqwest::Url::parse(&value).ok())
+        .is_some_and(|base| {
+            remote_endpoint_matches(
+                &endpoint,
+                &base,
+                &binding.environment_id,
+                &deployment_key[..12],
+            )
+        });
     if deployment.is_empty()
         || release.is_empty()
         || binding.release_id != release
@@ -822,16 +1023,11 @@ fn validate_binding(
             .environment_id
             .bytes()
             .all(|byte| byte.is_ascii_hexdigit())
-        || !hosts
-            .iter()
-            .any(|host| endpoint.host_str() == Some(host.as_str()))
+        || !(local_endpoint || remote_endpoint)
         || binding.account_id != account_id
         || binding.secret.len() < 32
-        || endpoint.scheme() != "http"
-        || endpoint.port() != Some(8091)
         || !endpoint.username().is_empty()
         || endpoint.password().is_some()
-        || endpoint.path() != "/"
         || endpoint.query().is_some()
         || endpoint.fragment().is_some()
     {
@@ -842,11 +1038,71 @@ fn validate_binding(
     Ok(())
 }
 
+fn remote_endpoint_matches(
+    endpoint: &reqwest::Url,
+    base: &reqwest::Url,
+    environment_id: &str,
+    deployment_key: &str,
+) -> bool {
+    if endpoint.origin() != base.origin()
+        || !matches!(base.scheme(), "http" | "https")
+        || base.path() != "/"
+        || !base.username().is_empty()
+        || base.password().is_some()
+        || base.query().is_some()
+        || base.fragment().is_some()
+    {
+        return false;
+    }
+    let Some(rest) = endpoint.path().strip_prefix(NODE_RELAY_PREFIX) else {
+        return false;
+    };
+    let parts: Vec<_> = rest.split('/').collect();
+    parts.len() == 4
+        && parts[0] == deployment_key
+        && parts[1].len() == 32
+        && parts[1].bytes().all(|value| value.is_ascii_hexdigit())
+        && parts[2] == environment_id
+        && parts[3]
+            .parse::<u64>()
+            .is_ok_and(|revision| revision > 0 && revision.to_string() == parts[3])
+}
+
+fn binding_client(
+    client: Client,
+    binding: &TransportBinding,
+    secret: &str,
+) -> Result<Client, AppError> {
+    let endpoint = reqwest::Url::parse(&binding.endpoint)
+        .map_err(|_| AppError::ServiceUnavailable("invalid sender endpoint".into()))?;
+    if !endpoint.path().starts_with(NODE_RELAY_PREFIX) {
+        return Ok(client);
+    }
+    // 中央认证只发送给已核对 origin 的内部转接；账号 bearer 继续由 sender 独立核验。
+    let mut headers = HeaderMap::new();
+    let mut value = HeaderValue::from_str(secret).map_err(|_| {
+        AppError::ServiceUnavailable("node relay authentication unavailable".into())
+    })?;
+    value.set_sensitive(true);
+    headers.insert("x-v3-relay-token", value);
+    Client::builder()
+        .no_proxy()
+        .redirect(Policy::none())
+        .no_gzip()
+        .no_brotli()
+        .no_deflate()
+        .default_headers(headers)
+        .connect_timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|_| AppError::ServiceUnavailable("node relay unavailable".into()))
+}
+
 /// 账号发送器运行状态；活跃计数覆盖响应流生命周期。
 #[derive(Clone)]
 struct SenderState {
     config_path: String,
     native_pool: Arc<NativePool>,
+    agy_pool: Arc<AgyPool>,
     native_transition: Arc<RwLock<()>>,
     active: Arc<AtomicU64>,
     evidence_error: Arc<AtomicBool>,
@@ -866,6 +1122,14 @@ fn read_config(path: &str) -> Result<SenderConfig, AppError> {
         .map_err(|_| AppError::ServiceUnavailable("sender configuration unavailable".into()))?;
     let mut config: SenderConfig = serde_json::from_slice(&bytes)
         .map_err(|_| AppError::ServiceUnavailable("invalid sender configuration".into()))?;
+    if let Some(agy) = &config.agy {
+        agy.validate()?;
+        if config.native.is_some() {
+            return Err(AppError::ServiceUnavailable(
+                "账号发送器平台配置冲突".into(),
+            ));
+        }
+    }
     if let Some(native) = &mut config.native {
         // 历史字段兼容解码，执行身份统一由本平台固定清单决定。
         native.release = None;
@@ -921,6 +1185,14 @@ fn validate_request_at(
         .map_err(|_| AppError::BadRequest("invalid upstream URL".into()))?;
     let allowed = reqwest::Url::parse(&config.allowed_origin)
         .map_err(|_| AppError::ServiceUnavailable("invalid allowed origin".into()))?;
+    // AGY官方路径使用冒号动作，必须在原归属校验内按平台放行精确目标。
+    let allowed_path = if config.agy.is_some() {
+        url.path() == "/v1internal:streamGenerateContent"
+    } else {
+        ["/v1/", "/api/"]
+            .iter()
+            .any(|prefix| url.path().starts_with(prefix))
+    };
     if Uuid::parse_str(&prepared.request_id).is_err()
         || prepared.deadline_unix_ms <= wall_now_ms
         || prepared.deadline_unix_ms > wall_now_ms.saturating_add(REQUEST_BUDGET_MS + CLOCK_SKEW_MS)
@@ -931,9 +1203,7 @@ fn validate_request_at(
         || !url.username().is_empty()
         || url.password().is_some()
         || url.fragment().is_some()
-        || !["/v1/", "/api/"]
-            .iter()
-            .any(|prefix| url.path().starts_with(prefix))
+        || !allowed_path
     {
         return Err(AppError::BadRequest(
             "runtime request binding or target mismatch".into(),
@@ -955,9 +1225,10 @@ async fn status(
     let config = read_config(&state.config_path)?;
     authenticate(&headers, &config)?;
     Ok(Json(
-        serde_json::json!({"active": state.active.load(Ordering::SeqCst),
+        serde_json::json!({"active": state.active.load(Ordering::SeqCst).max(state.agy_pool.active().await),
         "environment_id": config.binding.environment_id, "generation": config.binding.generation,
-        "evidence_ok": !state.evidence_error.load(Ordering::SeqCst)}),
+        "evidence_ok": !state.evidence_error.load(Ordering::SeqCst),
+        "agy":if config.agy.is_some() {Some(state.agy_pool.status(&config).await)} else {None}}),
     ))
 }
 
@@ -965,8 +1236,11 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
     let mut submitted = false;
     let result =
         async {
-            let config = read_config(&state.config_path)?;
+            let mut config = read_config(&state.config_path)?;
             authenticate(&headers, &config)?;
+            if config.agy.is_some() {
+                return Err(AppError::BadRequest("AGY账号只接受对应原生执行协议".into()));
+            }
             if state.evidence_error.load(Ordering::SeqCst) {
                 return Err(AppError::ServiceUnavailable(
                     "API evidence requires maintenance".into(),
@@ -981,20 +1255,46 @@ async fn forward(State(state): State<SenderState>, headers: HeaderMap, body: Byt
                 .map_err(|_| AppError::BadRequest("invalid runtime request".into()))?;
             let prepared: PreparedRequest = serde_json::from_slice(&bytes)
                 .map_err(|_| AppError::BadRequest("invalid runtime request".into()))?;
+            let purpose = headers
+                .get(BACKGROUND_HEADER)
+                .map(|value| {
+                    if headers.get_all(BACKGROUND_HEADER).iter().count() != 1 {
+                        return Err(AppError::BadRequest("后台发送动作头重复".into()));
+                    }
+                    let value = value
+                        .to_str()
+                        .map_err(|_| AppError::BadRequest("后台发送动作头无效".into()))?;
+                    BackgroundPurpose::parse(value)
+                })
+                .transpose()?;
+            if let Some(purpose) = purpose {
+                config.allowed_origin = purpose.validate(&prepared.method, &prepared.target_url)?;
+            }
             let deadline = validate_request(&prepared, &config)?;
             state.active.fetch_add(1, Ordering::SeqCst);
             let guard = ActiveRequest(state.active.clone());
             submitted = true;
-            let upstream = timeout_at(
-                deadline,
-                send_direct(&config.proxy_url, &prepared, body.to_vec()),
-            )
+            let upstream = timeout_at(deadline, async {
+                if purpose.is_some() {
+                    let client = get_background_request_client_for_profile(
+                        &config.proxy_url,
+                        prepared.tls_profile,
+                    )
+                    .map_err(|_| AppError::BadGateway("后台账号客户端不可用".into()))?;
+                    send_with_client(&client, &prepared, body.to_vec()).await
+                } else {
+                    send_direct(&config.proxy_url, &prepared, body.to_vec()).await
+                }
+            })
             .await
             .map_err(|_| AppError::BadGateway("upstream submission status unknown".into()))??;
             let code = upstream.status();
             {
                 let _lock = state.evidence_lock.lock().unwrap();
-                if record_headers(&config, &prepared, &upstream).is_err() {
+                // 遥测、usage和刷新成功不能充当模型额度恢复证据。
+                if (purpose.is_none() || purpose == Some(BackgroundPurpose::TokenTest))
+                    && record_headers(&config, &prepared, &upstream).is_err()
+                {
                     // 当前 API 响应仍保持原样，故障通过健康状态阻止下一作业或新提交。
                     state.evidence_error.store(true, Ordering::SeqCst);
                 }
@@ -1230,6 +1530,111 @@ async fn native_prepare_cancel(
     Ok(Json(serde_json::json!({"cancelled":true})))
 }
 
+/// 沿现有账号鉴权和环境准入分派AGY私有请求。@param state 发送器。@param headers 服务证明。@param submission 冻结信封。@param prepare 是否仅准备。@return 原生私有事件流。
+async fn agy_operation(
+    state: SenderState,
+    headers: HeaderMap,
+    mut submission: AgySubmission,
+    prepare: bool,
+) -> Response {
+    let mut started = false;
+    let result = async {
+        let transition = state.native_transition.clone().read_owned().await;
+        let config = read_config(&state.config_path)?;
+        authenticate(&headers, &config)?;
+        if config.agy.is_none() {
+            return Err(AppError::ServiceUnavailable(
+                "该账号环境未配置AGY内核".into(),
+            ));
+        }
+        let deadline = validate_request(&submission.request, &config)?;
+        submission.validate(now_ms())?;
+        let target = reqwest::Url::parse(&submission.request.target_url)
+            .map_err(|_| AppError::BadRequest("AGY目标无效".into()))?;
+        if submission.request.method != "POST"
+            || target.path() != "/v1internal:streamGenerateContent"
+            || target.query().is_some()
+        {
+            return Err(AppError::BadRequest("AGY目标与冻结业务协议不符".into()));
+        }
+        state.active.fetch_add(1, Ordering::SeqCst);
+        let guard = ActiveRequest(state.active.clone());
+        submission.capture_enabled =
+            submission.capture_enabled && config.native_capture_dir.is_some();
+        started = true;
+        let response = state
+            .agy_pool
+            .submit(&config, submission, deadline, prepare)
+            .await?;
+        let (parts, body) = response.into_parts();
+        let stream = unfold(
+            (body.into_data_stream(), guard, transition),
+            |(mut stream, guard, transition)| async move {
+                stream
+                    .next()
+                    .await
+                    .map(|item| (item, (stream, guard, transition)))
+            },
+        );
+        Ok::<Response, AppError>(Response::from_parts(parts, Body::from_stream(stream)))
+    }
+    .await;
+    result.unwrap_or_else(|error| {
+        let mut response = error.into_response();
+        response.headers_mut().insert(
+            ERROR_HEADER,
+            if started { "uncertain" } else { "before-send" }
+                .parse()
+                .unwrap(),
+        );
+        response
+    })
+}
+
+/// 只准备AGY进程，模型提交为零。@param state 发送器。@param headers 服务证明。@param submission 准备身份。@return 准备事件流。
+async fn agy_prepare(
+    State(state): State<SenderState>,
+    headers: HeaderMap,
+    Json(submission): Json<AgySubmission>,
+) -> Response {
+    agy_operation(state, headers, submission, true).await
+}
+
+/// 验证原环境并完成工具回填，独立于新凭据发布。@param state 发送器。@param headers 受信证明。@param input 原工具归属。@return 真实收口回执。
+async fn agy_tools(
+    State(state): State<SenderState>,
+    headers: HeaderMap,
+    Json(input): Json<AgyToolCompletion>,
+) -> Result<Json<Value>, AppError> {
+    let _transition = state.native_transition.clone().read_owned().await;
+    let config = read_config(&state.config_path)?;
+    authenticate(&headers, &config)?;
+    if config.agy.is_none() {
+        return Err(AppError::ServiceUnavailable("原AGY环境不可用".into()));
+    }
+    let deadline = validate_request(&input.request, &config)?;
+    let target = reqwest::Url::parse(&input.request.target_url)
+        .map_err(|_| AppError::BadRequest("AGY工具目标无效".into()))?;
+    if input.request.method != "POST"
+        || target.path() != "/v1internal:streamGenerateContent"
+        || target.query().is_some()
+    {
+        return Err(AppError::BadRequest("AGY工具目标与原协议不符".into()));
+    }
+    state.active.fetch_add(1, Ordering::SeqCst);
+    let _guard = ActiveRequest(state.active.clone());
+    state.agy_pool.finish_tools(input, deadline).await.map(Json)
+}
+
+/// 投递AGY模型业务。@param state 发送器。@param headers 服务证明。@param submission 冻结请求。@return 私有原生事件流。
+async fn agy_generate(
+    State(state): State<SenderState>,
+    headers: HeaderMap,
+    Json(submission): Json<AgySubmission>,
+) -> Response {
+    agy_operation(state, headers, submission, false).await
+}
+
 async fn native_forward(
     State(state): State<SenderState>,
     headers: HeaderMap,
@@ -1321,6 +1726,9 @@ async fn native_forward(
 pub fn sender_router(config_path: String) -> Router {
     Router::new()
         .route("/internal/send", post(forward))
+        .route("/internal/agy/prepare", post(agy_prepare))
+        .route("/internal/agy/generate", post(agy_generate))
+        .route("/internal/agy/tools", post(agy_tools))
         .route("/internal/native/status", get(native_status))
         .route("/internal/native/prepare", post(native_prepare))
         .route("/internal/native/readiness", post(native_readiness))
@@ -1335,6 +1743,7 @@ pub fn sender_router(config_path: String) -> Router {
         .with_state(SenderState {
             config_path,
             native_pool: Arc::new(NativePool::default()),
+            agy_pool: Arc::new(AgyPool::default()),
             native_transition: Arc::new(RwLock::new(())),
             active: Arc::new(AtomicU64::new(0)),
             evidence_error: Arc::new(AtomicBool::new(false)),
@@ -1346,6 +1755,7 @@ pub fn sender_router(config_path: String) -> Router {
 mod tests {
     use super::*;
 
+    use crate::service::agy_contract::AGY_SOURCE_SHA256;
     use crate::tlsfp::{parse_test_clienthello, test_request_client};
     use rustls_pki_types::CertificateDer;
     use serde_json::{Value, json};
@@ -1355,6 +1765,38 @@ mod tests {
     use std::path::PathBuf;
     use std::process::{Child, Command, Stdio};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    /// 精确AGY动作通过共享准入，跨平台路径和不同上游继续拒绝。@return 无。
+    #[test]
+    fn agy_action_uses_platform_specific_target_admission() {
+        let mut config: SenderConfig = serde_json::from_value(json!({
+            "binding":{"account_id":17,"environment_id":"synthetic-env","generation":2,
+                "endpoint":"http://localhost:8091","secret":"synthetic-private-secret","release_id":"synthetic"},
+            "proxy_url":"","allowed_origin":"https://cloudcode-pa.googleapis.com",
+            "agy":{"protocol_version":1,"source_sha256":AGY_SOURCE_SHA256,
+                "module_root":"/synthetic/modules","binary_path":"/synthetic/binary","work_root":"/synthetic/work",
+                "max_workers":1,"memory_mib":0}
+        })).unwrap();
+        let mut prepared: PreparedRequest = serde_json::from_value(json!({
+            "account_id":17,"environment_id":"synthetic-env","generation":2,
+            "request_id":Uuid::new_v4().to_string(),"deadline_unix_ms":now_ms()+60000,
+            "method":"POST","target_url":"https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent",
+            "headers":[],"preserve_header_casing":false
+        })).unwrap();
+        assert!(validate_request(&prepared, &config).is_ok());
+        for target in [
+            "https://cloudcode-pa.googleapis.com/v1/messages",
+            "https://cloudcode-pa.googleapis.com/v1internal:generateContent",
+            "https://other.example.test/v1internal:streamGenerateContent",
+        ] {
+            prepared.target_url = target.into();
+            assert!(validate_request(&prepared, &config).is_err());
+        }
+        prepared.target_url =
+            "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent".into();
+        config.agy = None;
+        assert!(validate_request(&prepared, &config).is_err());
+    }
 
     /// 历史root和每版发行选择兼容解码，执行配置收敛为平台内置。@return 无。
     #[test]
@@ -1383,6 +1825,142 @@ mod tests {
             "/usr/local/bin/ccrb-runtime-280"
         );
         fs::remove_file(path).unwrap();
+    }
+
+    /// 固定后台动作的方法、目标、认证及旧分配在发送前被核对。@return 无。
+    #[tokio::test]
+    async fn background_sender_rejects_wrong_purpose_target_and_binding_before_upstream() {
+        let path = temp_dir().join(format!("background-sender-{}.json", Uuid::new_v4()));
+        let secret = "synthetic-background-private-service-secret";
+        let proxy = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let config: SenderConfig = serde_json::from_value(json!({
+            "binding":{"account_id":7,"environment_id":"synthetic","generation":3,
+                "endpoint":"http://localhost:8091","secret":secret,"release_id":"synthetic"},
+            "proxy_url":format!("http://{}",proxy.local_addr().unwrap()),"allowed_origin":"https://api.anthropic.com"
+        })).unwrap();
+        fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(
+            axum::serve(listener, sender_router(path.to_string_lossy().into_owned())).into_future(),
+        );
+        let prepared = PreparedRequest {
+            account_id: 7,
+            environment_id: "synthetic".into(),
+            generation: 3,
+            request_id: Uuid::new_v4().to_string(),
+            deadline_unix_ms: now_ms() + 5000,
+            method: "GET".into(),
+            target_url: crate::service::runtime_background::USAGE_URL.into(),
+            headers: vec![],
+            preserve_header_casing: false,
+            tls_profile: TlsProfileId::ClaudeCode293,
+        };
+        for (purpose, token, change) in [
+            ("arbitrary-url", secret, ""),
+            ("usage", secret, "url"),
+            ("usage", secret, "generation"),
+            ("oauth-refresh", secret, ""),
+            ("usage", "wrong", ""),
+        ] {
+            let mut request = prepared.clone();
+            if change == "url" {
+                request.target_url = "https://api.anthropic.com/v1/messages".into();
+            }
+            if change == "generation" {
+                request.generation = 2;
+            }
+            let meta = STANDARD.encode(serde_json::to_vec(&request).unwrap());
+            let response = Client::new()
+                .post(format!("{endpoint}/internal/send"))
+                .bearer_auth(token)
+                .header(META_HEADER, meta)
+                .header(BACKGROUND_HEADER, purpose)
+                .send()
+                .await
+                .unwrap();
+            assert!(!response.status().is_success());
+            assert_eq!(response.headers().get(ERROR_HEADER).unwrap(), "before-send");
+        }
+        assert!(
+            timeout(Duration::from_millis(50), proxy.accept())
+                .await
+                .is_err()
+        );
+        server.abort();
+        let _ = server.await;
+        fs::remove_file(path).unwrap();
+    }
+
+    /// 实际HTTP桥收到原后台purpose和绑定，正文及原TLS画像保持同一次冻结。@return 无。
+    #[tokio::test]
+    async fn background_transport_preserves_original_scope_and_fixed_purpose() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let router = Router::new().route(
+            "/internal/send",
+            post(|headers: HeaderMap, body: Bytes| async move {
+                assert_eq!(headers.get(BACKGROUND_HEADER).unwrap(), "usage");
+                assert_eq!(
+                    headers.get("authorization").unwrap(),
+                    "Bearer synthetic-background-secret"
+                );
+                let decoded = STANDARD.decode(headers.get(META_HEADER).unwrap()).unwrap();
+                let request: PreparedRequest = serde_json::from_slice(&decoded).unwrap();
+                assert_eq!(request.account_id, 7);
+                assert_eq!(request.environment_id, "original-environment");
+                assert_eq!(request.generation, 9);
+                assert_eq!(request.tls_profile, TlsProfileId::ClaudeCode293);
+                assert_eq!(
+                    request.target_url,
+                    crate::service::runtime_background::USAGE_URL
+                );
+                assert_eq!(body, Bytes::new());
+                Json(json!({"window":"original-usage"}))
+            }),
+        );
+        let server = tokio::spawn(axum::serve(listener, router).into_future());
+        let transport = PreparedTransport {
+            account_id: 7,
+            route: PreparedRoute::V3 {
+                client: Client::new(),
+                binding: TransportBinding {
+                    account_id: 7,
+                    environment_id: "original-environment".into(),
+                    generation: 9,
+                    endpoint,
+                    secret: "synthetic-background-secret".into(),
+                    release_id: "synthetic".into(),
+                },
+            },
+        };
+        let request = PreparedRequest {
+            account_id: 0,
+            environment_id: String::new(),
+            generation: 0,
+            request_id: String::new(),
+            deadline_unix_ms: 0,
+            method: "GET".into(),
+            target_url: crate::service::runtime_background::USAGE_URL.into(),
+            headers: vec![],
+            preserve_header_casing: false,
+            tls_profile: TlsProfileId::ClaudeCode293,
+        };
+        let response = transport
+            .submit_background(
+                request,
+                &[],
+                Duration::from_secs(5),
+                BackgroundPurpose::Usage,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response.json::<Value>().await.unwrap()["window"],
+            "original-usage"
+        );
+        server.abort();
+        let _ = server.await;
     }
 
     /// 真实HTTP策略同步检查鉴权、账号代次、范围及旧sender兼容。@return 无。
@@ -1520,6 +2098,7 @@ mod tests {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let endpoint = format!("http://{}", listener.local_addr().unwrap());
         let config = SenderConfig {
+            agy: None,
             native: None,
             binding: TransportBinding {
                 account_id: 7,
@@ -1618,6 +2197,92 @@ mod tests {
         assert_eq!(status["active"], 0);
         sender.abort();
         fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn execution_location_freezes_remote_identity_and_omits_secrets() {
+        let environment_id = "e".repeat(32);
+        let node_key = "a".repeat(32);
+        let binding = TransportBinding {
+            account_id: 7,
+            environment_id: environment_id.clone(),
+            generation: 5,
+            endpoint: format!(
+                "http://orchestrator:8000/cluster-transports/v2/0123456789ab/{node_key}/{environment_id}/3"
+            ),
+            secret: "synthetic-private-transport-secret".into(),
+            release_id: "synthetic-release".into(),
+        };
+        let mut transport = PreparedTransport {
+            account_id: 7,
+            route: PreparedRoute::V3 {
+                client: Client::new(),
+                binding,
+            },
+        };
+        let frozen = transport.execution_location().unwrap();
+        assert_eq!(
+            frozen,
+            ExecutionLocation {
+                node_key,
+                environment_id,
+                generation: 5,
+                assignment_revision: Some(3)
+            }
+        );
+        let public = serde_json::to_string(&frozen).unwrap();
+        assert!(!public.contains("secret"));
+        assert!(!public.contains("orchestrator"));
+        if let PreparedRoute::V3 { binding, .. } = &mut transport.route {
+            binding.endpoint = "http://flower2api-local:8091".into();
+            binding.generation = 6;
+        }
+        let local = transport.execution_location().unwrap();
+        assert_eq!(local.node_key, "local");
+        assert_eq!(local.assignment_revision, None);
+        assert_eq!(frozen.generation, 5);
+        assert!(
+            PreparedTransport {
+                account_id: 7,
+                route: PreparedRoute::Direct(String::new())
+            }
+            .execution_location()
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn node_relay_endpoint_requires_fixed_origin_and_full_identity() {
+        let base = reqwest::Url::parse("http://orchestrator:8000").unwrap();
+        let environment_id = "e".repeat(32);
+        let node_key = "a".repeat(32);
+        let deployment_key = "0123456789ab";
+        let endpoint = format!(
+            "http://orchestrator:8000/cluster-transports/v2/{deployment_key}/{node_key}/{environment_id}/3"
+        );
+        let matches = |value: &str| {
+            remote_endpoint_matches(
+                &reqwest::Url::parse(value).unwrap(),
+                &base,
+                &environment_id,
+                deployment_key,
+            )
+        };
+        assert!(matches(&endpoint));
+        for invalid in [
+            endpoint.replace("orchestrator", "foreign-node"),
+            endpoint.replace(":8000", ":8001"),
+            endpoint.replace("http:", "https:"),
+            endpoint.replace(deployment_key, "other-release"),
+            endpoint.replace(&node_key, "short-node"),
+            endpoint.replace(&environment_id, &"f".repeat(32)),
+            endpoint.replace("/3", "/03"),
+            endpoint.replace("/3", "/0"),
+            endpoint.replace("/3", "/-1"),
+            format!("{endpoint}/internal/send"),
+        ] {
+            assert!(!matches(&invalid), "accepted {invalid}");
+        }
     }
 
     #[test]
@@ -1870,6 +2535,7 @@ mod tests {
             release_id: "test".into(),
         };
         let config = SenderConfig {
+            agy: None,
             native: None,
             binding,
             proxy_url: String::new(),

@@ -87,10 +87,17 @@ class BuildCacheTests(unittest.TestCase):
         reader = next(step for step in steps if step.get('uses') == 'actions/cache/restore@v5')
         self.assertIn("write != 'true'", reader['if'])
         config = next(step for step in steps if step.get('id') == 'config')['env']
-        for path in ('Cargo.toml', 'Cargo.lock', 'vendor/**', 'craftls/**', 'Dockerfile'):
+        for path in ('Cargo.toml', 'Cargo.lock', 'vendor/**', 'craftls/**'):
             self.assertIn(path, config['DEPENDENCIES'])
-        for path in ('services/gateway/src/**', 'apps/web/**', 'platform-release.json'):
+        self.assertNotIn('Dockerfile', config['DEPENDENCIES'])
+        self.assertIn('Dockerfile', config['LEGACY_DEPENDENCIES'])
+        configuration = next(step for step in steps if step.get('id') == 'config')['run']
+        self.assertIn('build_cache_key.py images/v3/Dockerfile', configuration)
+        self.assertIn('flower2api-cargo-v2-', configuration)
+        self.assertIn('flower2api-cargo-v1-', configuration)
+        for path in ('services/gateway/src/**', 'apps/web/**'):
             self.assertIn(path, config['SOURCES'])
+        self.assertNotIn('platform-release.json', config['SOURCES'])
 
     def test_only_cache_preparation_is_optional_in_both_workflows(self) -> None:
         """缓存准备可回退，实际构建与全部来源的演练错误阻断流程。@return None。"""
@@ -104,7 +111,7 @@ class BuildCacheTests(unittest.TestCase):
             self.assertLess(steps.index(optional[0]), steps.index(build))
             if filename == 'v3-release.yml':
                 verify = next(step for step in steps if 'verify_database_compatibility.py --manifest' in step.get('run', ''))
-                self.assertIn('--workers 2', verify['run'])
+                self.assertIn('--workers 4', verify['run'])
 
 
 if __name__ == '__main__':

@@ -37,6 +37,7 @@ class LoginDraftTests(unittest.TestCase):
         with database() as connection:
             connection.executescript(main._SCHEMA)
         self.client = Mock()
+        self.client.images.get.return_value.attrs = {'Config': {'Labels': {}}}
         env = patch.dict(os.environ, {"V3_DEPLOYMENT_ID": "draft-unit", "V3_ACCOUNT_IMAGE": "fake",
             "V3_NETWORK": "fake", "V3_RELEASE": "fake", "V3_ACCOUNT_MEMORY": "1536m"})
         env.start()

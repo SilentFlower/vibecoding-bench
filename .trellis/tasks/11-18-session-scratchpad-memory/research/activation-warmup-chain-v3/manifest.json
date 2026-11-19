@@ -1,0 +1,15 @@
+{
+  "release": "manual-cluster-20261118",
+  "images": {
+    "control": {
+      "reference": "sha256:1fbed05a785c893f4590caa3c331bf87889dbba018c17a86cc5281dbad2560e5"
+    },
+    "account": {
+      "reference": "bench-scratchpad-activation-account:4628eda80d"
+    }
+  },
+  "verification_only": true,
+  "base_account_id": "sha256:60239165104eb16935795b7d5fb908531ea22532b2caeaee0d4d6be04d8fed70",
+  "base_parent_revision": "f9663c69f6ceb31900dc6ee1d7b01fc60408c29a",
+  "activation_account_id": "sha256:d93fe1db556bc7f9cb983d5a47696da28aa1ea84bfc5306052bfdd52a8cfa181"
+}

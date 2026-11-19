@@ -1,0 +1,13 @@
+{
+  "archive_bytes": 99166075,
+  "archive_sha256": "8b1f5e56779f2434a0af36f1b715a8392a084de550f8c68bc79821f95fabf3fa",
+  "members": [
+    {
+      "name": "antigravity",
+      "size": 265700040,
+      "regular": true,
+      "sha256": "39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43"
+    }
+  ],
+  "original_matches_local_contract": true
+}

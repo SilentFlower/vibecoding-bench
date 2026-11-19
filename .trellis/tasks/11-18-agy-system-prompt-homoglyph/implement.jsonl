@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/gateway/backend/index.md", "reason": "账号布尔字段、私有DTO、Gemini准入和恢复调用方的实际合同"}
+{"file": ".trellis/spec/orchestrator/backend/index.md", "reason": "按索引读取原生运行、资源、日志及输入校验规范"}
+{"file": ".trellis/spec/web/frontend/index.md", "reason": "沿原账号控件及UI规范验证草稿、焦点和异步回执"}
+{"file": ".trellis/spec/platform/deploy/agy-credential-contract.md", "reason": "固定原版、AT-only、零真实模型费用及独立外部验收边界"}
+{"file": ".trellis/tasks/11-18-agy-system-prompt-homoglyph/research/current-contracts.md", "reason": "参考映射、真实系统段出站和请求策略接线研究"}
+{"file": ".trellis/tasks/11-18-agy-system-prompt-homoglyph/research/reference-mapping.json", "reason": "26字符固定映射及参考源码SHA"}

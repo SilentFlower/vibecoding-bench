@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 
 from projects import ProjectsService
 from projects_api import projects_router
-from project_library import materialize_snapshot, read_document
+from project_library import materialize_snapshot, read_document, snapshot_tree
 
 
 class CatalogFixture:
@@ -63,6 +63,10 @@ class TerminalFixture:
         """返回合法冻结配置。:return: CLI 配置。"""
         return {'claude_code_version': '2.1.293', 'claude_effort_level': 'high', 'execution_model': None}
 
+    def recover_work(self, work):
+        """本机夹具沿原持久状态恢复。:param work: 原工作。:return: None。"""
+        return None
+
     def prepare_startup_recovery(self, account, work):
         """模拟零模型环境准备，实际安全证明仍由各场景提供。:param account: 账号。:param work: 原工作。:return: None。"""
         return None
@@ -84,6 +88,10 @@ class TerminalFixture:
         """读取精确账号目录。:param work: 当前工作。:return: 工作目录。"""
         return self.root / str(work['account_id']) / work['project_key']
 
+    def snapshot(self, work, objects=None, *, snapshot_id=None):
+        """保存夹具实际源码。:param work: 当前工作。:param objects: 对象目录。:param snapshot_id: 提交标识。:return: 源码清单。"""
+        return snapshot_tree(self.workspace(work), objects)
+
     def observe(self, work, cursor=0):
         """提供终端画面。:param work: 工作。:param cursor: 游标。:return: 实际画面。"""
         return {'screen': self.screen, 'events': [], 'cursor': cursor, 'running': self.running, 'quota_paused': False}
@@ -93,6 +101,10 @@ class TerminalFixture:
         self.sent.append((work['account_id'], operation_id, text, keys, submit))
         if self.unknown:
             raise RuntimeError('已发送但回执丢失')
+
+    def resolve_input(self, work, operation_id, sent):
+        """本机夹具沿中央动作保存人工结论。:param work: 原工作。:param operation_id: 原输入。:param sent: 人工事实。:return: None。"""
+        return None
 
     def control(self, work, operation):
         """记录定向控制。:param work: 工作。:param operation: 动作。:return: 实际结果。"""
@@ -650,6 +662,50 @@ class ProjectsAgentTests(unittest.TestCase):
         self.assertEqual(1, len(self.service.state(1)['agents'][0]['passed']))
         self.assertEqual('rejected', self.start_work()['status'])
 
+    def test_baseline_and_submit_use_terminal_snapshot_without_central_workspace_access(self):
+        """终端提供异地快照时，真实工程流程保存原清单及对象。:return: None。"""
+        source = self.root / 'node-workspace'
+        source.mkdir()
+        (source / 'app.py').write_text('节点上的基线\n')
+        submissions = []
+
+        def snapshot(work, objects=None, *, snapshot_id=None):
+            if objects is not None:
+                submissions.append(snapshot_id)
+            return snapshot_tree(source, objects)
+
+        self.terminal.snapshot = snapshot
+        with patch.object(self.terminal, 'workspace', side_effect=AssertionError('中央不应打开节点目录')):
+            self.activate()
+            started = self.start_work()
+            work = self.service._one('SELECT * FROM projects_work WHERE id=?', (started['work_id'],))
+            self.assertEqual(snapshot_tree(source), json.loads(work['baseline_json']))
+            (source / 'app.py').write_text('节点上的实际候选\n')
+            result = self.tool('project_submit', {'summary': '提交实际候选'})
+            self.assertEqual('failed', result['status'])
+        self.assertEqual([result['submission_id']], submissions)
+        saved = read_document(self.root / 'projects/submissions' / result['submission_id'] / 'snapshot.json')
+        restored = self.root / 'restored'
+        materialize_snapshot(saved, self.root / 'projects/objects', restored)
+        self.assertEqual('节点上的实际候选\n', (restored / 'app.py').read_text())
+
+    def test_remote_resolution_failure_keeps_original_unknown_and_frozen_human_decision(self):
+        """节点结论响应丢失后中央继续阻塞，重复只沿原人工结论恢复。:return: None。"""
+        self.activate()
+        self.start_work()
+        self.terminal.unknown = True
+        observation = self.tool('claude_observe')
+        result = self.tool('claude_input', {'observation_id': observation['observation_id'], 'text': '输入'})
+        self.service.pause(1)
+        with patch.object(self.terminal, 'resolve_input', side_effect=ConnectionError('节点已保存但响应丢失')):
+            with self.assertRaises(ConnectionError):
+                self.service.reconcile(1, result['operation_id'], True)
+        self.assertEqual(1, len(self.service.actions(1)))
+        with self.assertRaisesRegex(ValueError, '另一人工'):
+            self.service.reconcile(1, result['operation_id'], False)
+        self.service.reconcile(1, result['operation_id'], True)
+        self.assertEqual([], self.service.actions(1))
+
     def test_stop_during_verification_cannot_accept_or_resume_old_process(self):
         """验收期间停止优先，迟到通过不能增加完成数或恢复已停止进程。:return: None。"""
         self.activate(); self.start_work()
@@ -661,6 +717,28 @@ class ProjectsAgentTests(unittest.TestCase):
         self.assertEqual('rejected', result['status'])
         self.assertEqual([], self.service.state(1)['agents'][0]['passed'])
         self.assertNotIn('resume', [operation for _, operation in self.terminal.controls])
+
+    def test_restart_keeps_failed_node_stop_blocked_and_other_account_can_recover(self):
+        """原节点停止失败时保留执行定位，其他账号仍按各自实际事实恢复。:return: None。"""
+        self.activate(1)
+        self.activate(2)
+        original = self.start_work(1)
+        other = self.start_work(2)
+        self.service._write("UPDATE projects_agents SET status='paused'")
+
+        def recover(work):
+            if work['account_id'] == 1:
+                raise ConnectionError('原节点仍待核对')
+
+        with patch.object(self.terminal, 'recover_work', side_effect=recover):
+            self.service.recover()
+        first = self.service._one('SELECT * FROM projects_work WHERE id=?', (original['work_id'],))
+        second = self.service._one('SELECT * FROM projects_work WHERE id=?', (other['work_id'],))
+        self.assertEqual('blocked', first['status'])
+        self.assertIsNotNone(first['runtime_json'])
+        self.assertIsNone(second['runtime_json'])
+        self.assertEqual('paused', second['status'])
+        self.assertEqual('blocked', self.service._one('SELECT status FROM projects_agents WHERE account_id=1')['status'])
 
     def test_restart_reserves_elapsed_work_and_preserves_unknown_input(self):
         """重启不能清零累计耗时，未确认输入仍需对账。:return: None。"""

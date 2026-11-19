@@ -1,0 +1,563 @@
+# 远程CLI与工程执行边界研究
+
+## 已核对的源码入口
+
+- AST定位表`remote-execution-call-map.json`记录335次候选调用，覆盖21个生产模块。它按接收者名称定位；具体类型需逐模块继续核对。
+- `PiTerminal`位于`pi_terminal.py`。start读取work.settings_json，使用原runtime._cli_setup/source/共享CLI合同，保存独占handle、process/start证明后返回token/source/workspace/native/interaction_signal/quota_signal。
+- observe按实际job读取tmux、原生JSONL和exec状态，send在环境锁内核对source并通过stdin投递，未知不重放。control使用原cleanup/control_execution；workspace返回真实Path，conversation有256KiB完整上限，usage读取同一原生会话。
+- `ProjectsTerminal`位于`projects_runtime.py`，继承PiTerminal并准备只读工程资产和工作区。`ProjectsCatalog.for_work`位于`projects_catalog.py`，按library_digest/library_root读取同一冻结发布；目录与摘要不匹配拒绝换新合同。
+- 原AccountRuntime._heartbeat每5秒续期；失败进入cleanup。跨机失联必须区分关闭新输入和实际执行已停止，保留原未知输入及会话。原RuntimeGate过期与重启继续持有占用，仍须实际作业对账后释放。
+- 实际`/admin/runtime/accounts/:id/config`返回身份、代理、后端、并发和credential_ownership元数据，不返回AT/RT。当前NodePreparation profile为AT-only。
+
+## 增量设计
+
+1. 节点执行进程仅监听私有Unix socket，沿SSH固定操作接入，持有单节点运行时及其jobs。NodeExecution临时运行时路径保持兼容；持久执行路径按明确生命周期借用/释放，避免关闭共享线程池。
+2. 中央实际网关租约/额度认领后发有限证明。冻结node/account/environment/assignment/generation/operation/source及原lease owner/generation，截止和单调更新序号持久保存。节点只镜像原证明，不获得中央管理口令或真实续约权。
+3. 新启动和终端输入需当前证明。过期拒绝下一输入，已接受输入保留进程与结果，真实停止继续由原监督合同核对。输入意图先落盘，未知结果不自动重放。
+4. 按具体CLI、Pi、工程与终端接口路由，不引入通用远程SQL/文件系统。工程资产传输保持原冻结摘要和允许路径；只读页面与日志读取有界。
+5. 所有实现前继续读取对应类/DTO和原规范。节点重启恢复、API/CLI并行、额度与凭据刷新、评审和终端WebSocket仍待逐项接入与隔离验证。
+
+## 持久执行底座与有限证明增量
+
+- `cluster_agent.py`与`cluster_agent_client.py`已接入node-control入口。固定私有UDS为`/data/node-agent/control.sock`，目录0700/socket0600，原节点独立token认证、8个有界操作槽、2MiB输入/256KiB回执。生命周期flock拒绝两个进程替换socket；未知普通文件保持原样。SSH的docker exec只调用长驻服务，服务失联返回固定失败，不建立临时运行时。
+- `cluster_private.py`在root容器启动时完整核对原安装标记及维护记录，接管合法SSH用户创建的门禁UID；blocked/epoch/op原字节保留。真实UID65534进程二次bootstrap可核对root私有门禁目录。旧节点门禁缺失时拒绝重置。67号14项、68号40项、69号19项通过；70号改用标准HTTPConnection后12项及ResourceWarning检查通过。
+- 节点准备新增真实私有agent健康核验，匹配node/deployment/release/protocol。build08开发镜像真实SSH/Docker/Rust全链路71号104秒通过，包括双节点迁移、迁回取消、默认本机迁回及JSON/SSE。镜像继续使用合成CA开发基底。
+- `cluster_lease_mirror.py`提供原AccountRuntime认领合同的有限镜像，节点心跳读取原截止；实际中央租约仍需中央续约/释放。74号136项覆盖原runtime实际claim、超期心跳保留原作业、关闭新输入、停止后本地release、慢版本准备超期及Pi缓冲上传后超期拒绝paste/Enter。
+- 72号运行命令引用了不存在的test_pi_terminal，122项中该模块导入失败。已定位实际test_projects_terminal/test_pi_interaction并在73/74号纠正。73号21项、74号136项通过。
+- 当前仅完成底座与原输入边界。中央到节点的具体CLI/Pi/工程启动和输入收据、真实中央CLI续约/额度、工程资产/冻结目录、WebSocket桥、独立账号与登录/评审、自动followup输入、断连重启对账尚待实施。`build08`早于租约镜像及原输入边界代码，下轮真实节点验证前需重建。
+
+## 具体节点终端操作增量
+
+- `cluster_terminal.py`新增受限TerminalWork/Start/Observe/Input/Resolution/Control DTO。节点按本地冻结摘要推导library_root，并从自己保存的启动结果推导runtime_json；中央请求不能指定节点文件系统定位。
+- 已接入同批资产注册、单次启动、观察、输入/输入回执、定向控制、会话/用量/原生补证读取及原输入人工核对。未知启动保留reconcile。未知输入先保存pending_input再投递，重复仅查询；新操作被原未决指针阻止。已确认收据可修复崩溃窗口残留指针。
+- grant续接/关闭只改原私有证明，独立于长安装持有的环境文件锁。启动与输入回执通过原子文件发布，GET可在starting期间读取；实际操作仍按原环境锁和scope核对。
+- 75号154项原管理/工程恢复/迁移/relay回归通过；76号32项、77号36项、78号35项、79号36项及81号22项定向回归通过。节点执行部分使用原运行时接口的离线终端替身；实际完整终端调用链尚在单独验证。
+- build09包含节点终端协议、有限镜像和原输入边界，早于最新GET/历史资产复用的小改。80号真实native293已完成资产注册和迁移，末尾停止状态断言失败；已核对夹具transport忽略wake=false，将后台只读查询当作启动。修正为正式main.v3_transport相同行为并将预期归属竞争映射503，82号重跑中。
+- 新`deploy/flower2api/verify_cluster_terminal.py`通过原SSH、实际Rust共享CLI租约、原Pi/Projects监督器和本次账号私有合成CLI做离线终端验证。包含中央续约→节点证明续接、多行输入/同操作重试、原生会话唯一记录、真实过期后观察原进程且拒绝新输入、真实停止后释放原中央租约。83号验证进行中，结果待核对。
+
+## 中央工程适配仍需覆盖的实际消费者
+
+- `projects.py`：start后baseline直接snapshot_tree(terminal.workspace)；submit先freeze再snapshot_tree并注册objects；capture直接terminal.runtime._root。需用明确的节点snapshot/capture接口替换这些中央本地路径。
+- `projects_verification.py`：原冻结合同、本次candidate/objects及会话参与业务/回归验证；独立ProjectVerifier的真实执行也应按节点预算承接，保留中央语义验收与事件发布职责。
+- `main.py`的_shared_pi_admission/_pi_admission目前按中央runtime.jobs取得原source、CLI容量和正式许可。远程适配需要读取中央远程执行登记并保留原quota/credential/Pi owner guard。
+- 中央准备先同步原凭据、准备远程环境/同批资产、取得真实CLI租约与原额度许可，再发grant并调用节点terminal-start。中央登记须持久化原node/config摘要、分配/实际代次、work/source、操作、真实lease/sequence及节点启动收据；重启先对账，未知启动不能换操作重发。
+- 旧内容资产跨节点传输、独立账号/登录、普通Runner/continue/Review、后台出站、远程文件与浏览器WS仍在原批准任务范围内。
+
+## 真实终端与中央协调增量
+
+- 82号native293资产注册、双SSH迁移、迁回取消、默认本机迁回和Rust JSON/SSE通过（244秒）。80号失败来自夹具忽略wake=false；正式main路径已有只读分支，修正夹具后成功。
+- 83号真实SSH/Pi/Projects监督器+离线合成CLI完整通过（150秒）：实际Rust共享CLI租约/中央心跳/节点续接、多行输入与重复同操作仅一条原生会话输入、真实截止后原进程保持可读且新输入被拒绝、实际停止后释放原中央租约。
+- `node_execution_schema.py`追加`bench.node-executions.3`及宿主来源/发布验证映射。`node_executions`冻结原scope/source、分配与实际代次、发布/配置摘要、工作及CAS版本。活动source使用部分唯一索引，已确认停止与释放后的同代原会话可新握手，保留全部旧回执。此第三步为本任务首发前增量；首次发布前按原Pi允许同工作同代次多次恢复的合同校正活动唯一性并同步新摘要。既有baseline.1/cluster.2摘要保持原值。
+- `cluster_execution_store.py`实现NodeExecutions/CentralExecutionRecord，限制原真实租约的owner/generation/模式和截止，限制grant单调序号，冻结实际token/source。关闭必须有节点closed及同代中央释放回执。明确尚未登记网关认领意图的本处理者失败，可用central_not_started保存关闭事实；同source并发处理者通过require_new和活动唯一索引拒绝。
+- 原main账号凭据切换/迁移门禁纳入未收口node_executions，历史引用阻止节点移除并保留账号。84号结构校验内存库漏设Row导致失败，已修正；85号新测试误写不存在的note列，已按实际timezone字段修正。86号119项、87号38项、88号52项、89号125项通过。
+- `cluster_terminal_sessions.py`实现TerminalSessions：真实Gateway prepare/claim/heartbeat及节点有限证明，长安装期间独立续约；重复启动只读原账本。新处理者先持久独占原source，再认领真实额度，失败前后按网关意图边界区别；未知启动保留原holder及维护活动。停止/释放响应丢失只读原回执确认；保存已确认双端事实后才释放原额度，额度收尾失败恢复复用原停止与释放回执。
+- 中央协调器具备固定观察/回执/会话/用量/补证、发送、监督控制和人工输入结论转交。只读参数白名单固定scope，关闭服务后关闭新输入；原停止与只读核对继续可用。中央维护活动按原执行保留，双端及额度收口后释放。
+- 90号23项、91号125项、93号128项、94号22项、95号17项、96号20项通过。92号实际协调器链路在输入回执查询处发现内外operation_id参数冲突，期间启动/输入/过期限制和finally停止/释放均已执行；已改为input_id并补定向回归。97号真实链路、98/99号定向回归进行中，结果待核对。
+- build10包含此时的第三步迁移与中央协调基础。后续改动主要在中央协调器与测试；下次最终跨层验收前仍须按当前源码重建。
+- 当前正式main/ProjectsService尚未创建并路由TerminalSessions。中央额度回调仍须接入真实QuotaGuard及原生补证/远程采集游标；快照/源码对象、候选验证、captures、老冻结资产传输、普通Runner/continue/login/Review与后台出站仍待实施。完整任务保持in_progress。
+
+## 工作区、中央路由与远程额度增量
+
+- 97号正式TerminalSessions真实SSH/Pi/原Rust共享CLI租约全链路通过（145秒）；98号117项、99号28项、100号17项通过。
+- `cluster_workspace.py`实现原snapshot_tree的128MiB/10000文件合同、首次输入前基线、实际监督树冻结后候选、scope绑定私有USTAR包及内容对象验证。`cluster_transfer.py`增加固定节点快照路径下载。中央核对整包、清单、路径、大小、对象摘要及尾部后才发布对象；相同快照仅读原收据。
+- TerminalWork原baseline全文改为has_baseline布尔投影。ProjectsTerminal原准备只消费是否存在基线；完整清单留在中央。PiTerminal显式snapshot接口替换ProjectsService基线/提交的本地workspace访问。
+- 102号44项、103号52项、104号43项、105号44项、106号原工程211项通过。build11含快照代码。107号真实链路已经完成基线/候选/对象还原，后续夹具误读inspect不存在的frozen字段导致失败；按实际cli-control的state/processes核对后，108号真实全链路通过（146秒）。
+- `cluster_projects_terminal.py`按原中央归属启动；原工作按冻结remote_execution/source/token核对，停用后保留原只读入口，新输入继续受原中央证明限制。工作清除runtime_json后按source读取原关闭历史。远程capture复用原脱敏读取器，cleanup/recovery-ready采用当前归属与原冻结工作维护操作；main正式装配尚待完成。
+- 中央人工输入结论先保存input_resolution_intent原事件，再请求原节点结论，最后完成中央动作状态。响应丢失继续阻塞并冻结同一人工结论；节点已知sent/not_sent原事实必须与人工结论一致。关闭执行历史继续冻结，输入核对收据独立保存在原节点。
+- 节点原生错误补证增加持久发件箱，原Pi读取器只有落盘发件箱后才推进游标。中央保存后通过原scope/evidence_key确认，响应丢失重读同一事实。
+- 109/110号测试命令误用了不存在的test_capture_artifacts；110号新夹具还误读NodeMigrationTests.root。已定位实际test_tls_capture_artifacts和夹具.path.parent并纠正。111号120项、112号124项通过。
+- `cluster_quota.py`绑定原scope和证明序号，节点保留中央门禁采样的单调时刻，旧身份/过期证明/迟到采样拒绝覆盖原只读挂载。CLI和Recorder额度文件按原source推导固定路径，最多128KiB原字节，经中央私有镜像继续由原QuotaGuard及quota_observation_cursors消费。半行、错误source/identity、轮转及复制后游标发布失败均保留原语义；同source关闭后恢复沿用原中央镜像路径。
+- 113号冻结测试时钟使改变状态共享同一采样时刻，按合同被拒绝；测试推进实际采样时刻后，114号38项通过。build12包含当前节点路由/补证/额度协议。115号正在使用ClusterProjectsTerminal和原QuotaGuard验证真实SSH链路、节点门禁更新、快照和终端期限。
+- 当前main/lifespan尚未装配远程终端路由与原额度回调。独立验收仍须实际卸载至节点，不能因终端/快照通过而视为整体完成。节点重启对账、历史资产传输、普通Runner/continue/login/Review、后台出站、终端WS/文件、资源/升级备份及A1-A11继续实施。任务保持in_progress，Check-All/Spec/Push等待整体完成。
+
+## 正式main装配、实际独立验收与重启收口
+
+- 115号真实SSH/ClusterProjectsTerminal/原QuotaGuard/原Rust CLI租约/基线候选/期限链路通过（149秒）。节点只读门禁已由原中央采样更新。
+- `cluster_verification.py`与`cluster_program_verification.py`实现固定候选和冻结合同的节点独立程序作业：意图先落盘、唯一尝试、后台两个原验收槽位、同尝试GET恢复、持久取消及精确容器标签；完整报告上限32MiB，控制回执只保存范围/摘要。`cluster_transfer.download_verification`复用原有单文件Docker归档校验。
+- `ProjectsVerification`保持范围、同候选历史目标、语义审查和最终结论，只将原程序执行回调路由到节点。原ProjectVerifier增加受限内部节点/环境/执行/尝试标签；原镜像、无网络、只读挂载及冻结资源预算继续复用。
+- 116号79项通过（1项既有按需测试skip），117号207项、119号34项通过。120号真实隔离程序返回环境错误；已定位NodeAgent的077 umask使离线依赖复制后仅root可读。修正为本次验收的校验副本，显式0755目录/0644制品，不更改冻结原件权限；122号37项包含077回归通过。123号真实完整链路通过（259秒），原始候选的真实业务失败被准确返回，完整报告和抓包摘要从原节点读取。增加的时间主要包含全库注册和隔离临时资料清理。
+- main/lifespan已创建NodeExecutions、TerminalSessions和RemoteTerminalQuota，并在两个工程空间创建ClusterProjectsTerminal/节点程序回调。远程凭据准备只在原owner/profile边界更新中央管理profile，实际HOME由所属节点准备；正式远程额度认领调用原QuotaGuard。工程准入核对远程真实来源、有限证明及CLI计数。原QuotaGuard对远程账号跳过中央本地API证据路径登记。
+- `DeploymentGate.restore_reserved`只恢复已经持久登记的旧占用，维护期新准入继续关闭。TerminalSessions.recover逐条保留旧活动并标记central_restart；坏记录独立保留占用。ProjectsService.recover先调用终端原作业收口，失败保留runtime_json及blocked，不影响其他账号。
+- 118号289项、121号78项、124号113项、125号143项、126号153项、127号146项通过。恢复覆盖维护期旧活动、未知停止保持原定位、其他账号独立恢复及正式中央回调。
+- 节点强杀重启恢复正在验证：NodeLeaseMirror.recover只重建原停止能力；AccountRuntime.restore_execution核对原私有文件/账号/实际代次/模式与租约代次，恢复原监督器并明确recovery_only；原实际输入入口拒绝恢复作业的新输入。NodeTerminals.recover_stop先关闭新输入并收口依赖验收，按原真实exec/监督器停止，缺少执行文件时要求实际CLI停止或进程为空。NodeHost恢复只登记原网关占位，后续真实配置仍由中央准备投影。Node.GET在运行时尚未恢复时投影NodeRestart/reconcile。中央停止未知时沿同scope调用固定terminal-recover，再核对closed回执后释放真实租约。
+- build15早于恢复网关占位的小修；build16含当前节点停止恢复代码。128号实际SIGKILL节点控制进程后沿原监督器停止/中央释放验证、129号定向回归进行中。两个测试均需核对结果。
+- 当前仍需接入并验证独立账号/登录、普通Runner/continue/Review、后台额度/预热/遥测/刷新及相关原生操作、浏览器WS/文件、资源/升级备份、历史资产跨节点传输与A1-A11总体验收。main工程纵向接通不表示整体范围完成。保持in_progress，最终Check-All/Spec/Push等待整体实施完成。
+
+## 节点强杀恢复结果
+
+- 128号完整真实SSH/Pi/Rust/原QuotaGuard/快照/独立隔离验收/报告下载/节点SIGKILL重启通过（263秒）：原有限证明过期后实际CLI继续可读；强杀NodeAgent保留独立CLI容器进程；新NodeAgent先返回NodeRestart/reconcile，再沿原私有exec/监督器身份停止，实际CLI status为空，中央最后释放原租约。129号166项定向回归通过。
+- build16为上述实际验证使用镜像。恢复运行时会登记原网关的空配置占位以允许原lease release；已有完整配置保持原对象，后续中央prepare才提供新真实配置。所有恢复作业recovery_only，先关闭节点新输入再恢复停止能力。
+- 后续后台出站研究已定位：Rust oauth::fetch_usage直接在中央请求api.anthropic.com/api/oauth/usage；AccountService托管刷新调用oauth::refresh_oauth_token_at，原Internal错误表示提交/响应未知并保留凭据维护；telemetry_loop使用中央reqwest客户端。原Sender.allowed_origin固定API，OAuth token域和Statsig域需要受限purpose合同，不可任意放开URL；PreparedTransport.submit已有before-send/unknown错误边界，应复用。改动前已读gateway index/testing-quality及spec_router匹配OAuth Usage/三角色出口章节，方案待写入设计后实施。
+
+## 受限后台发送与API额度镜像增量
+
+- Rust新增runtime_background固定purpose合同，原usage、TokenTest、唯一托管OAuth刷新及现有event batch/GrowthBook遥测按原账号prepare/send通道送到所属节点。sender验证精确方法/URL、独立内部purpose、账号/环境/代次/截止，后台使用原TLS/代理构建器的独立禁止重定向连接池。独立部署继续原客户端。后台30秒整体期限，原SSE长流保持。OAuth未知映为原Internal，维持唯一刷新所有者的持久reconcile。telemetry保持创建时冻结的账号/画像副本。
+- 130号固定目标单测、131号4项（目标/绑定发送前拒绝、真实HTTP桥scope/purpose与TLS池分桶）通过。132号850项通过、1项OAuth错误标识断言失败；保留原错误前缀并脱敏后，133号OAuth断言通过，但长压缩响应异步用量超时。138号该长响应单独复测通过（18.55秒）；完整cargo test仍需最终成功记录。新增真实302用例已在这些回归中通过。
+- 135号临时镜像复制缺少可执行权限，136号还早于镜像构建完成；139号修复0755后，141/144号揭示宿主构建ABI不兼容Bookworm，sender依赖GLIBC_2.39。正式Dockerfile本来使用Bookworm；现145号按同一Rust1.96 Bookworm/cache合同重新构建验证二进制。145号仍在运行，后台真实SSH验证尚未通过。临时镜像带verification extra-ca，仅用于合成上游。
+- NodeAgent失败日志仅记录固定操作、异常类型、最多8个文件名/行号/函数名，不输出异常原文/locals/输入。实际144号定位到AccountRuntime发送器未就绪；容器内ldd确认ABI边界。
+- cluster_quota增加API固定环境scope/read/chunk及RemoteApiQuota，沿固定flows/api/observations.jsonl读取128KiB片段，与原终端镜像共用NoFollow/普通文件/大小/轮转/游标落盘逻辑。原QuotaGuard继续核对source/identity并事务消费；SSH读取移到全局额度锁外，断连关闭该次新准入，旧事实保留。启动recover先消费已有中央镜像，再安装远程读取器，避免单个离线节点阻断中央启动。
+- 绑定远程账号的显式手动额度查询改走原网关凭据所有者与受限usage发送，不调用中央本机ensure/claim。失败返回固定中文说明。140号60项、143号74项通过，含API半行、旧分配/代次/节点、链接/断连保留事实、手动原所有者及原终端镜像回归。146号增加实际UDS API RPC测试，结果待核对。
+- 新verify_cluster_background.py准备核对真实SSH sender来源IP、usage、TokenTest、两类遥测、唯一所有者的确定刷新/提交未知后重复拒绝，以及API证据到原QuotaGuard。待145号Bookworm产物后构建control/account验证镜像再运行。
+- 剩余整体范围保持：独立账号/登录、普通Runner/continue/Review、原生维护操作、WS/文件、节点资源及升级备份、历史资产传输和A1-A11总体验收。任务保持in_progress。
+
+## 后台真实验证与独立账号增量
+
+- 145号Bookworm release验证二进制构建通过，输出/tmp/cluster-bookworm-binaries；147号已覆盖control/account测试镜像。148号完整cargo test --locked -- --test-threads=2通过：库851项，含全部集成共937项通过、9项按原合同忽略，fmt通过。宿主debug二进制仍不适配Bookworm；后续真实Docker继续使用上述release产物。
+- 149号后台实际发送全部成功后，夹具错误要求SOCKS5记录域名；原协议在本地DNS后发送IP，已改核对TLS上游Host。150号API额度无完整窗口，按原解析器定位隔离响应缺reset；夹具补真实有效5h reset。152号legacy完整后台真实SSH通过（35.9秒）：usage/TokenTest、两种Rust遥测、固定OAuth域与同一节点出口IP、中央API额度真实消费、确定刷新落库和响应丢失后reconcile/重复拒绝（仅一次实际刷新）。
+- 153号native293误期待Rust自动遥测；源码原生分支在Rust遥测激活前返回，自身沿native runtime遥测合同。夹具按原后端边界调整，154号恰逢新NodePreparation.cli_only字段而使用旧镜像，严格schema拒绝。158号当前Python控制组件重建后，159号native293后台/JSON/SSE/API额度/刷新未知链路通过（37秒）。
+- 146号101项、151号62项通过，覆盖真实私有UDS API额度读取、旧范围拒绝、镜像坏游标保留、原CLI/Recorder额度及手动查询。公共_sync_bound_account_credentials_locked已按归属只在默认本机发布HOME；远程继续更新中央管理profile，实际HOME留给所属节点。Projects凭据入口改为复用该公共边界，避免独立分支漂移。
+- 独立账号增量已写设计：NodePreparation.cli_only准备原CLI布局，未绑定时保留完整本地凭据，已有节点HOME轮换结果由原_local_credentials优先选取；NodeGateway为独立账号登记原额度身份。ClusterService.prepare_remote_cli复用原统一准备/中央CAS，独立返回实际环境而不登记传输endpoint；绑定路径保持原sender准备。
+- CentralExecutionRecord新增local_admission_intent/local_admission_released，独立grant.lease为null，拒绝虚构网关租约；stop必须原节点closed且额度释放后才closed。TerminalSessions对独立账号仅持久额度/活动与有限30秒证明，续接过期先对账，原中央/节点重启保持占用。NodeLeaseMirror在实际停止和proof关闭后单独解除独立source绑定，墓碑保留。
+- AccountRuntime.restore_execution接受独立原null租约并保留recovery_only；节点启动意图冻结实际shared_cli模式，恢复只停止原scope/exec，缺文件仍核对实际CLI空闲，独立停止不调用网关lease。main工程准入用真实grant识别独立原作业的恢复许可。
+- 155号51项中5项旧夹具缺prepare_remote_cli，更新夹具接口后156号180项、157号173项通过。161号188项通过，含公共远程profile同步。160号独立账号真实SSH/Pi/原QuotaGuard/快照/实际隔离验收/节点SIGKILL收口验证仍在运行，结果待核对。控制镜像目前为158号Python（中央后续少量同步/helper校验变更只在源码）；账号镜像为147号Bookworm Rust。
+- 下一段Runner研究：原Runner.start_run在构造环境前调用_quota_mounts→AccountRuntime.execution_flows，会在中央造本机目录，远程路由必须在这些本地操作前进入。原AccountRuntime.start_run/runtime wait/cleanup与私有exec实际签名已读；runs.id生产为12hex，source为run:rid:quota_attempt。现node_executions的SQL role本来涵盖cli/login/review，无需改前三步DDL来加入这些行为；目前CentralExecutionRecord.work仍只接受TerminalWork，需具体RunWork DTO及分类校验。
+- 普通worker的自动后续/收尾/认证恢复实际输入集中在images/worker/entrypoint.sh的inject_tmux_prompt/interrupt_and_inject_tmux_prompt和启动/引导send-keys；task_followups.py只推进计划，不能在那里加一个形式检查就宣称覆盖输入。失联证明必须沿root只读控制投影逐次核对实际投递，保持已接受输入与原时限/退出规则。AccountRuntime.render_driver读取/opt/v3/worker.sh并按固定run/handle/cwd改写路径，源构建镜像和宿主包必须同步。
+- 下一scope spec_router命中的runtime-contract293-316、project-iterations78-121及896-906、account-runtime1628-1634及796-807已完整读取。普通Runner/continue/Review、独立刷新与登录/绑定、原生维护、WS/文件、资源/升级备份、历史资产和A1-A11继续属于原批准整体任务。
+
+## 独立真实链路的null身份修复
+
+- 160号实际独立节点已完成CLI/额度/快照，GET程序验收阶段及停止依赖读取失败。已定位NodeVerifications._state的model_dump(exclude_none=True)递归删去scope.gateway_account_id=null，破坏冻结身份相等性。改为只裁剪顶层可选字段，嵌套scope保持完整；新增独立回执及stop依赖读取回归。163号Python控制组件已重建，164号完整独立真实链路重跑中。
+- 同类搜索cluster_*.py仅此一处exclude_none，修复沿原VerificationState严格模型，不调整节点scope合同。162号定向回归仍在运行，需核对结果。
+
+## 独立链路通过与下一段输入设计边界
+
+- 162号159项定向回归通过。164号独立账号真实SSH/Pi/原额度/基线候选/实际隔离程序/完整报告/实际输入去重/证明过期/节点SIGKILL后原exec收口通过（283.7秒），全程原网关客户端调用数为零；本地许可释放有单独原记录，lease及lease_released保持null。当前control为163号Python和Bookworm Rust。
+- 下一段输入候选：使用按原scope绑定的root侧私有输入broker，在worker实际paste/Enter/中断前复用原AccountRuntime.authorize_input；原PiTerminal.send的实际安全发送实现已读，可提取共用受限发送而避免复制。比只给CLI镜像一个可过期文件更容易保留每次投递的真实Node证明核对。broker路径/命令须由原作业推导，持久输入意图、未知阻断和原操作查询继续保留。此项仍是研究候选，尚未添加RunWork或普通Runner协议实现。
+- private review在ProjectReviewRuntime.start_run将root/controls以只读挂载到/controls，其他HOME/driver/flow均为独立路径；实际目标为reviews.container(job)，不能让共享发送helper误用账号默认CLI容器。原PiTerminal.send只消费work.runtime_json的token，真实job提供tmux_socket/tmux/exec；正文由stdin缓冲，投递前与Enter前分别authorize。
+- 所有后续共享发送、worker入口和新NodeRun协议需同步固定源码清单与两个镜像；不能因已有Pi终端通过而视为普通Runner、continue或经典Review已接通。
+
+
+## 普通Runner与实际worker输入增量
+
+- 167号210项通过。runtime_terminal_input已提取原Pi安全缓冲/paste/Enter与专属Review目标；新增NodeInputBroker按原scope/token绑定root私有UDS，原controls只读挂载到账号，SO_PEERCRED核对root/1000。使用/proc/self/fd短地址绑定真实控制目录内的socket，覆盖长数据根和私有Review路径。正文只走有界stdin/数据帧，root持久回执只保存scope、操作、正文摘要和阶段。
+- worker原shell启动、四类引导按键、初始题目/业务补充/收尾/认证与API恢复均在远程分支调用root端点。响应丢失只查询原输入操作，unknown保持原未决指针并停止driver（45）；本机分支保留原按键行为。NodeRuntimeHost安装可选输入hook，AccountRuntime及原Review启动前创建端点，原实际停止后关闭端点。Review实际exec/监督许可前也补原authorize_input。
+- 168号24项、169号239项通过；含真实UNIX socket、原文/去重、过期前拒绝、部分提交跨actor重建、丢失响应只读同操作和原worker实际函数。173号293项通过，175号20项通过。165/166曾误填不存在测试模块，实际26项通过，随后167使用已定位模块完成210项回归。
+- 新RunWork/RunTask/RunStart仅携带原12hex Run、attempt、模式及白名单worker环境。NodeRuns投影本次runs行，沿原AccountRuntime.start_run/监督器执行，不复制中央tasks/全库或启动调度。复用中央NodeExecutions与TerminalSessions的真实许可、证明续接和停止恢复，SQL前三步保持不变；cli角色接受具体RunWork，已停止同一尝试拒绝用新操作重放。run-*新增具体SSH/UDS白名单，短poll返回原exec实际状态，额度读取按原task/run流组。Node停止后追加最终额度镜像/消费回调，确认后释放中央许可。
+- main的原Runner在_quota_mounts与工作目录创建前选择ClusterRunner，保留原冻结版本/模型/补充计划；wait/status/cleanup及恢复收口已路由。经典项目上下文、continue/Review、远程OAuth watcher、日志/文件与后续管理消费者继续实施。170/171新增用例存在夹具额度身份和异常记录计数问题，修正后172号5项通过，173号完整增量回归通过。
+- 174号控制镜像已覆盖当前Python和worker，账号镜像新增v3-node-input。Rust继续147号Bookworm产物。176号独立普通Runner真实SSH/原worker/离线CLI两次补充、原QuotaGuard、撤销后拒绝后续输入验证正在运行，需要核对结果。新verify_cluster_run复用现有mock_cli，仅将本次隔离副本版本改为2.1.303，不进入产品镜像。
+- 整体仍in_progress，后续包括普通Runner剩余消费者/经典项目与Review、continue、独立刷新/登录/绑定、原生维护、WS/文件、资源/升级备份、历史资产和A1-A11整体验收。
+
+## 普通Run消费者、恢复与额度细化
+
+- 176/177实际读写环境锁冲突已修，只读busy最多10秒查询同一scope。182/184真实worker通过初始和两次补充，夹具额度采样与阶段预期随后按实际合同修正。193号独立普通Run完整通过138.633秒，196号绑定真实网关和main真实owner锁回调通过143.197秒，197号独立Run撤销后NodeAgent SIGKILL重启及实际收口通过70.355秒。
+- run-artifact/session按原scope读取，公开日志支持有界tail及完整流，阶段沿原冻结计划核对。实际停止后原轻量产物冻结至操作私有目录并保存SHA256，后续attempt不能覆盖旧回执。quota-control固定root只读别名接回原额度补证消费者。
+- run-refresh/run-refresh-get仅发布中央唯一所有者结果及AT，丢ACK只查询原结果，不重做OAuth。中央先恢复原占用再恢复额度，后台只收口启动时冻结的旧来源；离线保持原Run和占用，回连取得实际停止后调用原Scheduler及batch/warmup回调。
+- prepared尚未启动可在原环境锁内撤销证明并写closed墓碑，迟到start拒绝。中央Gateway prepare未知且未授Node证明时按原holder查询并释放，单独保存node_start_cancelled，额度释放失败继续reconcile。188号取消阶段错误已修，189号114项、190号90项、191号185项通过。
+- 每Scope独立保存额度上下文，账号公共窗口只接受更新采样；原锁内冻结sampled_at。输入broker独立操作socket且绑定原job对象，兼容token复用拒绝迟到输入。普通Run回调复用原Scheduler已持owner锁，195号144项通过。194号365项广回归通过。
+- 当前control为192号Python/worker，account为174号helper，Rust为147号Bookworm产物。普通Run文件/统计消费者正在接入，198号定向回归运行中。整体剩余范围沿原PRD/Brief，继续Phase2.1。
+
+## 普通Run文件、统计和并行验证
+
+- run-files/run-file/run-stats/run-capture新增具体只读操作，SSH/UDS白名单和原中央可见运行入口已接通。工作区逐级dirfd/O_NOFOLLOW，拒绝私有根、软/硬链接、FIFO；清单10000条/2MiB且128条/96KiB分页，原64KiB预览以base64避免控制字符膨胀。物理路径来自原scope，公共普通项目别名与AccountRuntime共享。
+- run_usage共享原sidecar阶段/flow去重、错误数、缓存输入和Claude requestId/usage回退去重；文件总量64MiB/单行8MiB，安全FD有界读取，超限显式失败。保留经典项目独立native_usage消费者。run_capture只暂存有界元数据，原正文仅列元信息，复用原脱敏摘要/TLS/预览白名单；续聊链接限同环境受管group。
+- 198号93项、199号37项、202号129项、207号194项通过；200号control构建含当前消费者。201号真实独立原worker/中文文件/原会话用量和公开入口/撤销/停止冻结通过160.253秒。208号native293绑定真实网关、同账号两个shared实际多轮、独立会话与Scope额度上下文通过126.473秒。
+- 203号在节点observe失败，单独合成SSH预检随后退出0。204号并行poll发生SSH期限失败，finally和网关回调遇到SQLite锁及Docker清理超时，原始日志保留；204的最初超时原因仍待复核。精确标签cluster-test-1314a08f33b8残留已清理。206号使用仅隔离诊断镜像及双端faulthandler，两个实际任务和多轮均完成，夹具误读store私有row.data_root发生KeyError；修正为原已冻结环境根后208通过。诊断镜像不进入正式产物。
+- 续聊研究已明确：原ContinueManager保持source=continue:sid:generation和窗口/额度；Node应准备原begin_continue后只启动一次原resume PTY。选用单独SSH转发Node私有UDS WebSocket，输入逐帧原scope证明与root收据、输出有界背压；原浏览器WS鉴权保持中央。具体ContinueWork合同、中央工作union及操作前缀路由正在实现，尚未装配Node或中央PTY。
+- websockets当前本地17.3、隔离control17.4；已核对17.3官方sync client API，支持传入socket、额外认证头、禁代理与有界max_size/max_queue。实际接入时固定直接依赖和匹配镜像，并保留一次连接/未知输入只查询原回执。官方参考：https://websockets.readthedocs.io/en/stable/reference/sync/client.html 。
+
+## 续聊原PTY与失败所有者收口增量
+
+- 新增ContinueWork/ContinueTask/ContinueStart，中央执行work union识别具体continue:sid:generation；沿原非共享CLI及普通交互额度规则，复用已持owner锁回调，校验原ContinueManager会话锁、Run/账号、控制代次和窗口。节点投影只含本次原Run最小字段，实际session要求同一冻结环境的原物理目录。
+- NodeContinues复用NodeTerminals的真实停止/重启恢复。原begin_continue准备一次，PTY先写opening意图，再通过共享continue_pty复用原resume argv、版本/模型/权限、画像/CA环境和实际exec登记，实际启动前再次授权。PTY重复连接拒绝重建。AccountRuntime.restore_execution新增原continue停止能力，并在节点停止前核对冻结原Run，防止清理后来作业。
+- 固定/continue-pty私有UDS WebSocket具备独立节点token、Scope首帧、4连接上限、32KiB帧与有限队列。独立SSH node-pty隧道目标固定管理员data_root/node-agent/control.sock。中央RemoteContinuePty保持原socket输出消费接口，4KiB逐帧有界背压；输入最多256KiB分16KiB一次性帧，root私有摘要/意图/sent/not_sent/unknown收据。丢ACK或发送异常只查同一输入。部分写入和未知阻断新输入，输出仍可读。websockets固定直接依赖17.3，已核官方API。
+- main原Runner.start_continue/cleanup/凭据同步、原ContinueManager输入/额度控制以及原浏览器WS已接入。暂停、窗口拦截、托管OAuth恢复和同会话代次继续沿原中央规则；远程停止失败保留会话和原账本并加入后台收口。中央重启收口旧续聊，正常新会话继续由原Manager持有。
+- 普通Run启动/停止所有者失败也会显式登记原来源后台收口。重启扫描包含终态Run的遗留活动scope，后来的Run attempt状态保留。新增单测模拟start回执未知、中央Run已经failed及新恢复对象查询同scope。
+- 209号184项通过；210号5项新增回归通过（含真实UDS/WS原字节与丢ACK查原回执）；211号37项实际回归通过，另有误填不存在test_cluster_agent_client的loader错误，212号改用已定位模块后130项通过。216号48项通过（其中导入测试类导致附带节点测试已修为模块导入）。
+- 213号control镜像已安装websockets17.3并含续聊Node/中央代码，account174/Rust147保留。214真实验证在控制容器创建阶段15秒Docker期限失败；NodeDeployment安装改为独立120秒客户端，镜像流仍600秒、日常客户端15秒，未知创建沿原固定容器名/标签/镜像核对。
+- 215号已完成原普通Run、原HTTP续聊准入、真实SSH/UDS/WS原CLI启动输出及实际停止；夹具调用中央run_workspace_path触发远程归属保护，已改共享ordinary_run_alias定位隔离断言。217控制镜像同步中，218号定向回归运行中；下一步219真实续聊原字节/窗口/撤销，再跑节点SIGKILL恢复与绑定版本。整体仍Phase2.1，继续经典项目/Review、独立刷新/登录/绑定、原生维护、资源/升级备份、历史资产及A1-A11交付。
+
+
+## 续聊实际验证与失败恢复补齐
+
+- 217号控制镜像构建通过，218号91项回归通过。220号独立账号原HTTP入口/原Manager/真实SSH与私有WS/原PTY、多行输入/窗口拒绝/撤销/实际停止通过197.323秒。221号NodeControl SIGKILL后原Scope核对与实际exec停止通过123.362秒。222号绑定native293、真实网关租约和同一续聊链路通过132.356秒。224号独立真实额度耗尽、暂停并停止原Scope、真实到期后同sid/gen1同session恢复、拒绝旧代次、一次新输入与最终停止通过151.449秒。
+- 223号额度夹具传入简化账号缺少enabled，触发原Manager合法收口；改用数据库完整账号并使finally核对活动账本，224重跑通过。219号存在SQLite锁和续约线程退出超时，最初IO超时原因仍待复核；显式失败所有者的后台恢复缺口已补：隔离落盘失败也记内存队列，恢复处理集合内原running来源，按原source/attempt收口。
+- NodeDeployment容器创建及网络核对采用独立120秒Docker客户端；导入镜像保留独立600秒，日常共享客户端仍15秒。创建未知沿原固定名称及标签核对。执行token改用private safe_read，拒绝链接/FIFO/公开权限。214迟到容器按精确部署标签收口。
+- 225号239项回归通过342.921秒，覆盖继续PTY/真实UDS与丢ACK只查回执、普通Run失败恢复、独立安装客户端、私有token、中央执行登记、额度、节点SSH、main/窗口、文件/统计/抓包及源码布局。
+- 经典项目下一段已读原ProjectIterationManager/Plans/Scenarios及私有Review实际消费者：execution_configuration含中央source/预算/阶段事务；原checkpoint、原生输入父链和验收推进继续保持中央权威。节点只承接有界具体文件事实与实际进程。整体仍Phase2.1，后续沿原PRD/Brief。
+
+
+## 经典schema1实例的节点文件与监督放行
+
+- 新增LegacyProjectWork、NodeLegacyProject和ClusterLegacyProjectIO。每个原Run携带实例/尝试/批次代次、冻结library/seed及项目键；节点始终从固定同批只读内容解析路径。普通RunWork默认project=null，旧节点原工作在读取时归一化。原中央ProjectIterationManager继续调度和验收，AccountRuntime只在本次调用接收受限文件提供器。
+- project_workspace提取原首次物化合同，本机/节点共用seed、物化marker、稳定实例别名与未知目录拒绝。seed只在首次发布时解析，已有项目仍复用原现场。节点先启动原监督器等待许可，中央核对实际物化回执并CAS保存workspace_relative/started_at，再复核原批次并通过run-project-permit发布原start.json。重复放行核对同一监督器，后续实际输入继续经过root broker原证明。
+- run-project-facts/native只返回原项目物化、首次字节起点/停止终点及受限JSONL片段；512文件/64MiB，中央固定Scope/文件身份，逐块保留原字节到root私有镜像。原native_usage/latest_native_session继续解析原步骤边界，经典统计避免普通Run全历史回退。停止终点按Scope幂等冻结，后来的步骤仍保留原区间。
+- run-snapshot/run-snapshot-get复用原有界源码包、整包/manifest/对象SHA256和中央对象发布。候选新建前核对原实例目录最后所有者，后续步骤取得工作区后只可读取已有旧包。原_capture从节点包物化候选并继续原中央独立验收。原恢复/cleanup补原生事实读取及execution_released回调。
+- 226号53项回归通过85.187秒。227新夹具将操作锁错误复用中央非重入写锁，已中断该单独测试并改为独立RLock；229号其余3项通过，暂停断言误用RuntimeError而实际为原RuntimeBusy，已修断言。230号296项通过227.175秒，覆盖新增四项实际SQLite/文件/源码包以及原Run、工程快照、许可、AccountRuntime、计划、场景、main、用量和布局。
+- 228、231控制镜像构建通过；当前control为231，account174、Rust147。232号真实独立SSH原经典worker、两步工作区接续、原生区间和中央实际隔离验收运行中。schema2计划/schema3场景及私有Review仍需适配，整体继续Phase2.1。
+
+### 下一段计划的研究候选（尚未实施）
+
+- 原schema1内容的policy.schema=2计划可复用当前实例文件提供器。Node实际exec需要PROJECT_PLAN_JSON提前注入，因此在原grant/额度认领及心跳启动后、terminal-start之前增加按原Run的准备回调：具体run-project-prepare先物化目录与原生起点，中央镜像实际文件并调用原ProjectPlans.execution_configuration保存source/证据/当前步骤事务，再以具体配置发布到原Scope。Node最后仍由原run-project-permit放行监督器。
+- 预准备与实际start意图必须分开持久。预准备可查询同一事实；进入实际start意图后重试只读原回执。不能把任意starting记录当成可重复启动。中央执行work保持初始冻结定位，计划配置另由原Scope固定私有收据保管，不复制全局项目表。
+- 计划原request/state通过固定run-project读别名同步到中央私有控制镜像；原ProjectPlans._inspect在原证据解析前同步，原_decision在持久业务事务之后用具体decision动作发布至Node root controls。schema/source/plan/generation/session/phase和大小需验证，节点保持有限输入证明。原_Evidence父链、checkpoint及accept事务继续中央权威。
+- _project_execution_control需按原run/attempt查冻结节点scope，沿sessions.control控制原监督树。每次计划阶段的候选包ID应包含原operation与当前phase_seq；旧阶段的同包身份可查询，阶段推进不能重用前一候选。
+- 场景的execution_configuration额外写project_execution_sources、delivery与reserve_segment。实际boot_id/monotonic必须来自Node；当前335行用中央/proc boot和time.monotonic，后续需明确受限实际时钟注入及原work文件的Node读取。permit_start仍由中央事务保存start_permitted后才放行监督器。私有Review另需原冻结package与独立容器资源交接。
+
+
+- 232号真实独立SSH经典项目两步接续通过135.806秒：原main.Runner/worker、中央物化CAS后监督许可、同一实例工作区、每轮原生用量(3入/7出/1次)、停止终点、原有界候选下载及实际隔离ProjectVerifier全部通过。合成CLI完成真实题目输入，测试作者提供固定候选程序；完整上游和账号均为隔离替身。
+- 最近补充候选冻结前实际job的账号/环境/代次/source检查，并验证后续会话追加后record_native_end继续保留旧终点。233新增四项回归、234镜像同步及235绑定native293经典链路按顺序执行中，需核对结果。
+
+
+## 同会话计划接入与实际验证待核对
+
+- 233号四项增量回归通过12.961秒，234号control构建通过。235号绑定native293真实网关租约/SSH经典两步同工作区、逐轮用量与实际隔离验收通过133.553秒。经典单步独立和绑定两条实际链路均通过。
+- 新增LegacyProjectPlan、ProjectPlanConfiguration/Decision等严格DTO。原计划phase_seq从0开始；237首次验证发现模型误设ge=1，已按database_schema实际DEFAULT 0改为ge=0。238暴露原checkpoint需要中央seed manifest，远程物化适配增加中央原固定seed对象/清单保存，保留原_checkpoint核对。239发现决定发布钩子字符串编辑漏应用及替身缺少jobs，已按实际函数修复；240号7项通过17.634秒。
+- TerminalSessions.run_prepare在原真实许可和续约之后、实际terminal-start之前执行。run-project-prepare保存文件意图并激活Scope，实际exec另有start_intent；预准备停止可按明确未进入exec事实关闭原Scope并保存unsubmitted墓碑，保留其他实际CLI。实际start未知继续只查询原记录。
+- 中央调用原ProjectPlans.execution_configuration保存source/会话边界/步骤事务，再通过固定run-project-configure发布Node私有配置。Node provider仅返回该配置，原worker按原同会话driver执行。中央逐阶段决定通过具体run-project-decision发布，绑定原计划/Run/source/gen/session，阶段回退/跳跃/同阶段变更拒绝，同内容保持原文件。
+- 原ProjectPlans._inspect同步request/state/原生文件；原_verify实际freeze后再次同步，避免初次镜像和通知跨时点。_evidence父链及_accept事务保留。_project_execution_control按原run/attempt路由原Node Scope；候选包ID带实际phase_seq，后续步骤不重用旧候选。
+- 236号147项回归通过112.971秒。241号83项原计划/具体节点/快照/许可/布局回归通过82.762秒，242号控制镜像构建通过。243号独立真实SSH同会话原worker两步/逐阶段候选与实际隔离验收运行中，需核对。新增启动未知只读原意图和main旧代次控制拦截两项还需随下一次定向验证运行。
+- 当前control242/account174/Rust147。场景/私有Review、独立刷新/登录/绑定、原生维护、资源/升级备份、历史资产和整体验收继续在原范围内实施。
+
+
+- 243号独立真实SSH同会话计划通过99.645秒。原worker/原计划driver在同一次CLI内实际发送两个步骤，合成CLI按固定测试源码实现两次变更；中央冻结、原生父链、两次候选包和实际隔离ProjectVerifier均通过。固定会话两轮输入、总用量14入/33出/2次、每步输出11/22以及原Scope最终收口均通过。
+- 最近补充原exec启动未知只读同意图、main原run/attempt控制路由与旧代次拒绝两项测试；Node具体配置首次发布沿原execution_configuration清除旧候选通知，保留原输入状态文件。244新增九项回归→245构建→246绑定native293真实同会话计划按顺序运行中，需核对。
+
+
+## 计划绑定链路、准备窗口与历史日志资源边界
+
+- 244号九项定向回归通过23.239秒，245号control构建通过。246号绑定native293真实网关/SSH同会话两步、逐阶段冻结与实际隔离验收、固定会话和分步用量通过112.758秒。
+- 计划准备窗口需先确认当前Scope实际running且source与中央执行行相等，再读通知；重建来源的预准备期间保留原现场。原driver需要保留上一额度尝试的输入状态；中央镜像只忽略同Run更旧attempt的通知，跨Run/source继续拒绝。新增用例已覆盖这两条边界。
+- 原生镜像改为只传本Run新增/变化文件或原计划固定会话；实际停止后严格按冻结end裁剪，后续新会话与原会话追加均不会进入旧镜像。旧会话只保留start/end尺寸事实，原native_usage在零新增字节时跳过正文读取。512文件元信息、单文件尺寸至64GiB、实际相关正文64MiB；每片最多128KiB并按剩余冻结字节限定，保持原半行/身份/截断校验。测试加入128MiB旧日志、128MiB后续日志、冻结后追加及3字节片段。
+- 247首次资源适配测试发现文件选择字典被片段变量覆盖，已中断该单独回归并改为selected_files。248号11项通过27.700秒。249号303项相关回归通过203.897秒，覆盖经典/计划、原实例、AccountRuntime/main、NodeRun/许可/额度/布局。分块最大值接口更新后的250定向回归→251构建→252真实计划NodeControl SIGKILL恢复按序运行中，需核对。
+- 252场景：原第一步已独立接受后强杀NodeControl，重启先投影NodeRestart/reconcile，再沿原Scope/exec实际停止；保留已接受checkpoint、关闭旧Scope及拒绝旧Run重启。真实额度恢复仍需后续验证。
+- 节点停用现有测试约束为拒绝后续准入、保留原会话只读及停止能力（test_cluster_execution_store）；本次未调整该已有边界。迁移排除表为精确runtime项，legacy-projects/legacy-project-instances默认保留；历史node-runs全局收据迁移仍是后续消费者工作。
+
+
+## 计划节点重启与真实额度接续通过
+
+- 250号80项定向回归通过97.545秒，251控制镜像构建通过。252号独立真实SSH计划在首步接受后SIGKILL NodeControl，通过NodeRestart/reconcile、原exec实际停止、原checkpoint保留、旧Scope关闭和旧Run拒重启，通过83.002秒。
+- 253额度夹具直接调用quota_refresh存在与正式续约交错窗口，改为原Scope操作锁内重读ledger后发布。254只提供statusLine100并等待当前忙碌模型停止，与原test_quota_completion的在途收尾合同不符；夹具补充真实形状的isApiErrorMessage/error=rate_limit、5-hour文本，沿原worker分类器退出43。保留百分比观察后原在途工作的规则。
+- 255号真实独立SSH原同会话计划额度接续通过166.105秒。第一步实际接受，第二步消费输入后返回合成限额拒绝；原statusLine100采样进入真实QuotaGuard，原worker退出43；真实窗口到期时原Scope尚未确认停止，原QuotaGuard仍保留attempt0；实际停止并释放后原_resume_account排入attempt1，同Run/同固定会话实际继续并完成步骤2。三个实际输入（首步、限额尝试、接续）、总用量14/33/2、每步输出11/22、原验收及最终空闲均通过。释放记录按冻结work.task.quota_attempt取得实际代次。
+- 当前control251/account174/Rust147。原阶段完成状态、镜像与新调用maximum均有实际链路证据；整体仍in_progress。后续开始场景/私有Review，保持原中央输入依赖、工作预算及验收权威。
+
+### 场景输入研究结论（尚未实施）
+
+- 已完整读取ProjectScenarios._prepare_inputs/_bind_code_dependencies/_materialize_inputs与execution_configuration。_prepare_inputs只在prepare_workspace及execution_configuration调用。依赖job父链和base checkpoint选择属于中央业务权威；替换工作目录/复制固定setup/物化marker属于执行节点文件责任。
+- _bind_code_dependencies先计算原已接受代码job父链与base，再保存replacing意图、previous workspace和ready标记。_materialize_inputs按固定项目定义的setup source/target复制，拒绝已有不同内容和链接，保存每阶段snapshot及input_checkpoint_digest。后续需提取共用文件执行器，Node按冻结定义/选择的base manifest执行；中央取得真实回执与完整对象后保存原marker/任务状态。直接先在中央临时树调用原方法会提前发布ready业务事实，失败恢复风险需避免。
+- 场景source/segment/reserve工作预算继续中央事务。实际boot_id/monotonic来自Node，original execution_configuration目前读取中央/proc及time.monotonic，需要明确注入实际执行时钟。私有Review另有冻结package、模型和独立容器资源交接，保持单一凭据刷新所有者。
+- storage_maintenance.tree_inventory和storage_backup已按S_ISSOCK跳过socket，旧输入端点属于既有盘点排除；迁移精确排除表继续保留legacy项目状态目录。
+
+
+## 场景输入文件执行器与双向源码包基础
+
+- 256号26项通过41.891秒，257号61项通过90.834秒。提取project_input_files的原代码替换、replacing/ready、逐阶段setup；真实文件用例覆盖第二次rename失败、到期证明、冲突/链接及ready接续保留半成品。
+- ProjectScenarios.code_input_selection/input_selection保留原中央依赖作业父链、base及披露选择；仅选择时不写工作区或ready。prepare_scenario_input_files按冻结场景入口、任务和已披露分支依次执行，保留每阶段原marker与完整manifest/objects。原本机场景接回共用执行器；新增真实文件用例覆盖三阶段对象、未披露文件排除和原现场保留。
+- 258号61项通过140.202秒；259号36项通过93.054秒。read_checkpoint提取原ProjectPlans检查点核对，节点和中央复用；publish_project_workspace支持原scenario_id标记和随环境保留的staging。write_workspace_bundle提取NodeWorkspaceSnapshots原打包器，保留Scope/清单/完整对象/整包摘要及不覆盖发布文件，用于已接受基线的反向传输。260号67项通过109.737秒。
+- 新增cluster_scenario_files严格文件DTO和NodeScenarioFiles。仅接受同批冻结内容键与中央选择；节点实际导入原Scope/基线摘要的源码包，准备场景工作区和阶段输入；输入对象/清单/旧现场保存在环境runtime/scenario-inputs，原意图后未知拒绝重新准备。真实回执附Node boot_id/monotonic；逐阶段源码包从实际已登记manifest导出，原Scope关闭后仍可读取历史事实。
+- 261首次发现对象导入自动创建的父目录权限755不满足private_directory，改为导入前显式创建私有store/objects/manifests。262夹具误用中文reason而原ExecutionGrants.close要求固定ASCII原因代码，按实际合同改夹具；263号四项全部通过4.091秒。
+- 当前文件执行器为接入基础。中央Run路由仍保留原场景门禁；具体传输RPC、中央回执核对和持久marker、场景配置/Node真实时钟预算、私有Review及独立验收尚待接通。260之后补充打包器已发布包不覆盖/对象损坏拒绝用例，需随下一次回归核对。
+
+
+## 场景具体Run协议、中央回执与原driver接入
+
+- 264号104项回归通过195.003秒，含共用打包器不覆盖已发布包和损坏对象拒绝。新增ScenarioProjectWork/ScenarioConfiguration、NodeScenarioProject按次文件提供器，Node全局project_iterations继续为空；原AccountRuntime离线Python准备消费本次manager，延后许可时场景start_permitted由中央保存后再放行原监督器。
+- 新增run-scenario-input-stage/commit/facts/archive具体动作。原NodeRun先保存冻结基线暂存意图并认领Scope，固定目录上传包后核对完整原Scope/基线及对象，再登记ready；原prepare_project将已导入来源一次推进文件准备，project_prepare_intent后未知保留reconcile。stage/commit不执行CLI，原start仍需准备及配置完成。SSH/client白名单同步；NodeArchiveTransfer共用原流式上传，场景路径固定到node-runs/<env>/<op>/scenario-inputs。
+- 265发现暂存子目录自动创建的父目录为755，改为先显式创建原私有scenario-inputs操作根。266夹具误把recover_stop的实际{stopped:true}当phase回执，按实际合同检查stopped与持久record.phase；267号45项通过45.016秒，268号102项通过132.276秒。
+- ClusterScenarioIO在中央复用原业务输入选择，完整基线包上传到原Scope；Node实际文件准备完成后，中央逐阶段下载并核对完整对象/manifest，核对固定内容setup身份、代码父链选择、原现场路径和真实Node时钟，再保存原marker及原scenario/task状态。中央原execution_configuration接收已核对的execution_files，保留私有原生镜像root权限，并用Node boot_id/start_mono预留原工作片段；Node再次核对预算boot/path。
+- 原ProjectScenarios候选封存/调度/释放同步具体request/state/project-work及原生会话；冻结后再次同步通知。完成决定经原ProjectPlans._decision发布回Node。原_capture按场景task定位原候选包，中央继续保存父链、候选和验收业务事务。AccountRuntime原产物白名单补充实际场景project-work.json。
+- 269号28项通过42.668秒（含导入的原场景测试，随后改为模块导入避免重复）；270号三项跨数据根真实文件/原driver测试通过6.978秒：完整阶段对象先于中央ready、Node时钟/原source预算、中央原生镜像700/root、真实通知/候选包/完成决定、输入下载中断后同Scope文件准备回执恢复。
+- 正在补充基线上传失败且尚未执行的恢复：Node具体原未执行墓碑只读fact，中央保留空投递证明，不将虚拟目录保存为实际物化；sync_plan跳过尚未执行的driver产物。271广回归及272增量回归运行中，待核对。
+- 新增verify_cluster_scenario真实Docker/SSH候选验证入口，复用原合法离线wheel内容夹具及mock场景CLI；场景mock可选择沿原statusLine发布合成额度。该验证尚未运行。control仍251/account174/Rust147，新Python需同步构建后运行。
+- 候选接入仍属阶段交付。私有Review、场景独立机械验收卸载、多来源/额度/超时恢复及原PRD剩余范围继续实施；整体尚未完成。
+
+
+## 场景候选真实SSH独立/绑定两条链路通过
+
+- 271号117项通过144.573秒，272号55项通过84.472秒。新增上传中断后的原未执行墓碑事实：Node明确未进入exec才返回unsubmitted；中央不保存虚拟物化目录，保留原Scope零投递证明，跳过尚未出现的driver产物。失败导入同Scope可继续核对完整对象，未知实际文件准备仍拒绝重做。
+- 273号control增量镜像构建通过，包含最新场景Python/worker，account174/Rust147沿用。274号独立账号实际Docker/SSH场景候选通过85.906秒；275号绑定native293实际网关/SSH同一路径通过106.680秒。两个夹具使用create_scenario_fixture合法离线wheel、原worker/场景driver及合成CLI；固定材料实际进入Node工作区，原生响应及候选包实际传回中央，Node真实boot/mono进入原预算，实际停止后原project-work归档和片段settled/正耗时、Scope closed及许可空闲均通过。候选未在中央建立活动工作目录，语义业务接受留待私有Review。
+- 新增部署夹具verify_cluster_scenario.py及CLUSTER_TEST_RUN_SCENARIO入口；mock场景CLI可按可选quota_samples走原statusLine。仅本次随机cluster-test部署及合成账号，非真实模型调用。项目输入材料来自固定内容，而候选响应为测试作者提供的合成结果。
+- 276运行环境回归先在旧test_native_release_mount_is_available_for_two_account_environments报V3_NATIVE_RELEASE_PUBLIC_KEY KeyError；当时源码已显示新的test_platform_builtin_sender_is_independent_of_release_mount_for_two_accounts，运行记录与当前源码不一致。按当前源码重跑277号177项通过38.146秒，覆盖AccountRuntime/私有评审/内容/中央终端租约/有限证明。
+- 构建273之后，宿主account_runtime.py、system_updates.py、native_kernel_releases.py、native_kernel_upgrade.py与构建上下文摘要已不同；后三者本轮未编辑。工作区存在并行原生内核更新改动，后续仅按精确函数增量适配，保留当前内容；下一次镜像需同步当前源码后验证，274/275证据指向273冻结Python。
+
+### 私有Review下一段研究
+
+- 已读取ProjectReviewRuntime.start_run完整串行资源交接、sync_credentials、is_review/root_for_run/root_for_job、原冻结package/模型以及AccountRuntime/NodeRun/NodeQuota消费者。spec_router新边界匹配的账号凭据单一所有者53–83、平台单仓314–346、原始输入622–639及project-iterations严格释放/模型/串行/包合同250–273已加载。
+- 原私有Review位于data/project-review-private/session，独立于候选可挂载根；不能直接放入候选可读的共享HOME/项目目录。原Runtime.reviews.start_run直接依赖runtime.project_iterations，需要按次manager和延后许可，继续复用原非共享claim、stop/reload固定CLI、私有容器、AT-only副本、root输入broker及严格清理恢复原CLI。
+- 原Node投影apply_migrations已创建全表，业务表未复制中央数据。无需为Review同步中央任务/评测表。可按本次冻结session计算私有根，将NodeRun所有具体产物/poll/refresh/额度读路径明确指向原Scope的私有根；原start_run用本次manager提供原package和配置，job.private_relative负责实际停止/重启恢复。
+- RunWork当前shared_cli按普通capture/warmup决定；Review需依据冻结scenario.review定位为false，保持scope.role=cli及中央原正常额度/非共享CLI许可。基线prepare专供候选；Review另有512KiB冻结包的具体暂存/核验，Work只携带原job/模型/包摘要，不嵌入大包或新增凭据。
+- NodeInputBroker已使用调用方实际controls，send_terminal_input已有project-review私有容器分支。NodeRun.permit_project目前写env/controls且要求shared_cli，需要按冻结review角色核对原实际job后写私有controls；poll/refresh/产物和NodeQuota.read也须同步具体私有路径。
+- 独立账号RT仍由Node原HOME唯一所有；Review只有AT副本。原独立刷新/登录/绑定、Review认证错误和历史迁移归档仍属后续范围，避免把中央过时profile当原Node HOME当前所有者。
+
+## 私有Review协议、原串行资源和真实SSH验证
+
+- 新增ScenarioReviewWork、NodeReviewInputs和NodeScenarioReview，冻结原job/模型/完整包摘要与512KiB上限。具体stage/commit/facts沿原Scope传输包，私有根保持在候选挂载根外。原ProjectReviewRuntime使用按次manager和延后许可，继续原非共享CLI、真实停止固定CLI、私有容器及严格恢复流程。Node全局项目管理器保持为空；具体产物、原生、额度和刷新定位均沿私有根。
+- 中央ClusterScenarioIO在实际Node包回执后保存原source/预算配置，再发布私有监督许可；完成通知封存后等待实际释放，由原业务事务接受。原quota_env和只读/quota-account挂载同时保留。279号158项、280号18项、281号65项、283号24项、284号78项、285号5项、286号125项定向回归通过。
+- 287/288号control构建通过。289发现合成额度trace写入候选工作区，被原任务allowed_paths=[]正确拒绝。夹具将场景trace固定到本次runtime目录，保留原范围检查。290真实评审已走到接受与预算结算，末尾夹具误期望已清理的私有容器仍存在，改为核对已停止或已移除及原CLI限额保持。
+- 291/292真实复验遇隔离中央SQLite锁等待，涉及runs/node_executions读取和heartbeat退出。沿trellis-break-loop研究长事务与提交竞争，新增仅随机部署启用的verify_cluster_sqlite诊断，记录SQL类别、线程、时序及调用位置，不记录正文参数或令牌。生产SQLite模式和超时保持原合同。夹具仅对原Scope停止/查询采用有界失败恢复，不重新启动或重发业务。
+- 293号独立真实SSH候选→原机械检查→实际私有Review→严格释放→原业务通过，171.888秒。核对完整包、相同实际模型、AT-only、独立HOME/只读挂载、UID1000/PID128、原netns、网络/sender持续运行、原CLI限额恢复、原预算settled及中央许可空闲。诊断观察到一次heartbeat提交1.168秒和并发读约0.87秒等待；前两次超过默认超时的锁持有根因仍待定位。
+- 新增主流程原节点只读review-admission和TerminalSessions落账前CLI优先级门禁。实际Node检查冻结归属及资源，中央显式提供额度身份；重启后待办仍以当前Node HOME核对被拒AT。新普通CLI排队先于ledger.begin/额度认领，精确当前Review可继续，已有Scope幂等查询保留。294号64项21.453秒、295号45项20.385秒通过。
+- 真实场景夹具现接入runtime.set_project_iterations、main._project_review_admission和main._remote_cli_admission。296同步当前源码构建中，后续验证绑定native293完整Review。私有Review故障/额度/认证恢复、场景机械验收卸载及PRD剩余范围仍在实施。
+
+### 主流程准入、绑定Review与节点停止恢复
+
+- 296当前control构建通过。297绑定native293真实SSH候选→实际私有Review→严格释放→原业务通过，176.918秒；夹具使用main实际原节点只读准入和落账前评审优先级，实际资源/挂载、原模型及预算断言保留。
+- 恢复研究发现AccountRuntime.restore_execution对非共享Run只接受无execution_role登记，遗漏原project-review角色，实际NodeRestart恢复会在原持久登记核对被拒。精确扩充为同一12位Run/source的project-review，继续原账号、容器代次、原租约/模式校验，恢复作业recovery_only关闭输入。原私有路径/创建意图/资源模式仍沿持久记录传递并由原清理器核对。
+- 新增绑定和独立评审恢复实际持久文件测试，断言私有定位保留、只有停止能力、错Run登记拒绝；298号176项通过41.107秒。299当前control构建通过，300独立实际私有评审结果封存后NodeControl SIGKILL恢复运行中，待核对。
+
+- 300号独立真实SSH私有Review结果封存后NodeControl SIGKILL恢复通过169.050秒。原私有容器在控制进程重启后继续保留，节点回执明确reconcile/NodeRestart；随后沿原持久非共享作业定向停止，恢复原固定CLI及完全相同限额，Scope/额度许可释放后原中央接受已封存结果，工作预算settled。
+
+## 场景独立程序卸载基础与中央持久活动
+
+- 新增RunVerificationStart及NodeRunVerifications，使用原已释放候选Scope和冻结包，独立有限启动期限；原CLI证明保持closed，原验证器仅执行固定场景任务的原生合同。复用NodeVerifications的完整对象/报告、唯一尝试、实际取消与标签核对；原工程与场景共用两槽位。节点源fence/export先核对持久独立程序占用。
+- 原NodeVerifications提取_authorize/_contract/_runtime执行位置钩子，保留旧工程路径。场景ProjectLibrary制品实际合同仅承诺path/digest，新增真实场景测试发现原验收器假设必有size；容量改用冻结文件实际大小，副本继续核对可选size及完整SHA。301号16项18.288秒，304号45项22.534秒通过，覆盖原工程/节点/传输回归和已释放Run程序许可、真实候选、源隔离活动及取消。
+- 新增RemoteRunPrograms中央私有具体账本，原owner锁内登记后才发送；原场景机械验收通过ClusterLegacyProjectIO路由到原节点，保留原中央范围和业务权威及一次已知环境错误复验。记录冻结具体节点/原Scope/输入，更新门禁占用先登记，中央重启恢复活动并沿原尝试实际取消；迁移和凭据交接读取同一活动事实。未知启动只query同一尝试；取消未送达请求时，Node先保存取消墓碑，拒绝迟到启动。
+- 主流程lifespan与真实场景夹具已装配该协调器；夹具增加CLUSTER_TEST_SCENARIO_PROGRAM合成原生合同开关。305号45项61.751秒通过。306中央新夹具最初使用非原算法的snapshot_id，导致原Node按固定快照正确拒绝；已改为原legacy-candidate摘要算法，307中央账本/未知ACK/取消墓碑与相关回归运行中。
+- 当前control仍299，新独立程序源码尚待重建及真实Docker验证。中央持久活动损坏、实际取消后旧报告、已知错误复验及重启未决等边界继续补齐；私有Review额度/认证与原PRD剩余范围保持in_progress。
+
+### 独立程序中央恢复与严格实际停止
+
+- 307号23项通过14.638秒，覆盖中央账本、丢失启动ACK后同尝试查询、已验证报告缓存重读、从未送达启动的重启取消墓碑，以及旧归属拒绝。原更新活动使用DeploymentGate真实私有门禁记录；账号迁移/凭据交接门禁在未收口程序存在时明确等待。
+- Node完成报告发布前按精确节点/环境/执行/尝试标签核对实际验收容器，停止失败保留reconcile及活动；已完成/取消记录的再次取消也核对实际标签。新增清理失败后实际停止才能撤销占用的回归。
+- 308在并行增量镜像构建期间触发新夹具5秒等待期限，失败为后台程序尚未返回；309镜像构建通过。保持夹具原期限，串行重跑310号50项通过44.543秒。311号65项跨原场景/私有评审/独立程序整合回归通过238.446秒。该次等待失败的具体时序根因未定。
+- 中央新增关闭准入与父批次停止/换代时实际取消；完整环境错误或已确认停止的Node/中央重启，可沿原机械验收的一次有限复验再执行原冻结候选，原CLI仍closed。未知送达、缓存摘要、取消墓碑和父停止参与11项真实文件/真实SQLite/实际更新活动回归，312号11项通过26.884秒。
+- 313同步当前全部Python/worker构建中，接下来使用CLUSTER_TEST_SCENARIO_PROGRAM=1验证实际Node隔离程序→实际私有Review→严格释放→原业务接受。程序的真实NodeRestart故障链路、私有Review额度/认证及原PRD剩余范围继续实施。
+
+### 实际程序脚本挂载权限缺口
+
+- 313当前control构建通过。314号独立真实SSH场景程序181.675秒失败：原范围检查通过，实际UID1000隔离程序读取/request-data/verification/native.py返回Permission denied，原业务正确保留失败结果。Root输入中已chmod的脚本会被原verification嵌套挂载覆盖；冻结脚本父目录可为0700，离线包副本修复尚未覆盖脚本与基线。
+- 按原快照对象新增本次完整合同副本，复制前后摘要一致，materialize_snapshot将目录/文件恢复0755/0644；ProjectVerifier只读挂载该副本中的verification与seed。原库权限保持，容量预检增加合同对象与物化副本。已完整核对候选、request-data、verification、baseline、offline及helper挂载路径，分析见program-permission-analysis.md。
+- 315号30项通过107.116秒，含原SSH、工程/场景程序及中央账本回归。新增077真实文件回归进一步核对脚本、合同JSON、基线的副本可读与原件私有，316单项当前用例复核中。程序get动作同步原SSH与Node客户端的短只读期限。实际程序运行中NodeControl SIGKILL夹具已补，待当前镜像与健康链路通过后执行。
+
+- 316号077合同/脚本/基线单项通过8.377秒；317当前control构建通过。318独立真实SSH实际隔离程序→实际私有Review→严格释放→原业务接受通过331.639秒，实际UID1000挂载权限修复有效。观察到一次SQLite提交等待2.751秒，该轮没有锁超时。
+- 319绑定native293程序执行中NodeControl SIGKILL及原有限复验完整链路运行中；夹具按Node/实际执行/独立程序标签定位真实运行容器，重启后先核对原取消，再继续同一冻结候选的一次复验及原私有Review。采用strace只记录fsync/fdatasync/fcntl的系统调用及耗时，诊断JSON增加Unix时间和内核线程ID用于关联；不包含SQL、HTTP正文或令牌。尚待核对结果。
+
+### 程序节点重启时的观察窗口
+
+- 319绑定native293故障注入195.217秒失败：实际程序容器运行后强杀NodeControl，中央轮询在控制进程恢复期间收到NodeSshError(remote_command_failed)，原机械线程立即把作业置为uncertain，未等到同一程序的NodeRestart回执。失败恢复随后沿原具体取消收口，活动仍受持久账本保护。
+- 新增最长30秒的同尝试纯查询恢复窗口，限SSH超时/连接/控制命令中断及Node未准备的固定错误；主机指纹、认证、范围或回执冲突立即失败。窗口中保留reconcile与原更新占用，不重新提交程序启动。恢复后再消费原NodeRestart/完成回执，实际取消后才沿原一次环境复验。
+- 320号23项通过30.045秒。程序协调器记录当前前台观察尝试，原ClusterRunner恢复线程每轮仅收口前台已结束的reconcile程序，连接恢复后继续同一取消墓碑。新增实际中央活动与Nodeactor后台收口回归。321校验命令误写不存在的test_cluster_runner模块，20个实际用例后载入失败；已按rg实际路径改用test_cluster_runs/test_cluster_legacy_projects，322运行中。
+- 319 strace共650次fsync/fdatasync调用，最慢一次测试Python主线程fsync为1.873370秒，最慢fdatasync为0.124045秒；该轮没有SQLite慢操作JSON，尚未捕获先前SQLite超时的锁持有者。该证据说明测试进程曾出现文件同步延迟，SQLite根因继续保持未定。
+- 322按实际模块名运行52项回归通过67.949秒，覆盖原Run停止恢复、经典项目、具体独立程序和Node实际取消。前台观察中的尝试继续由原线程负责；前台已结束的reconcile才交给原Run后台线程收口。323当前源码control构建中，下一轮继续绑定native293实际程序强杀/同一候选有限复验/私有Review链路。
+- 323当前control构建通过；324绑定native293真实强杀/同一候选有限复验/私有Review链路复验中，继续相同strace诊断。
+- 后续控制入口性能研究：当前每次SSH动作调用cluster_execution.py，进入NodeControl转发前仍加载完整执行模块。宿主四个独立Python进程的纯导入对比为cluster_agent_client约0.044/0.052秒、完成后136模块，cluster_execution约0.341/0.365秒、489模块。该数据仅为宿主导入对比；可在当前恢复链路稳定后将固定Node SSH命令改为轻量私有客户端入口，保持原UDS/认证/白名单/有界输入输出/错误合同，减少重复构造执行模型。
+
+- 324绑定native293真实程序执行中NodeControl SIGKILL→原程序实际取消→同一冻结候选的一次复验→实际私有Review→严格释放及原业务接受通过234.091秒。实际两个程序记录分别cancelled/node_restart与complete，候选摘要相同，旧原生容器已移除或停止，原CLI Scope保持closed。该轮strace同步调用822次，最慢1.013125秒，SQLite诊断无慢事件。
+
+### 轻量固定SSH入口
+
+- 按已记录导入开销调整固定SSH命令为/app/cluster_agent_client.py <原操作>。新增轻量main，只接受node-control及精确参数数目，原2MiB输入、原UDS、独立服务认证、动作白名单、读取期限与固定脱敏输出继续共用node_agent_request。原cluster_execution入口保留同一私有转发。Node执行器和全部模型由长驻服务装载一次。
+- 新增真实子进程→真实UDS的入口测试，并断言子进程未装载cluster_execution；错误角色与超限输入返回固定脱敏失败。325首个既有UDS夹具触发5秒服务启动等待期限，根因未定；326按当前源码重跑入口/SSH及主机指纹立即失败用例中。当前镜像仍323，新轻量入口须重建后验证真实SSH。
+- 326当前源码18项通过10.489秒，覆盖轻量子进程实际UDS、角色/大小拒绝、原SSH路径和指纹变化立即失败。327当前control构建通过。328使用轻量固定入口验证绑定native293实际Node程序强杀/原候选有限复验/私有Review完整链路，运行中。
+
+### 下一段认证消费者研究
+
+- 已读取main.Runner.watch_managed_oauth_refresh、ClusterRunner.watch_managed_oauth_refresh、NodeRuns.refresh、main._refresh_project_review_owner和Runner.refresh_account_oauth_token。当前远程watcher仅接收绑定账号；NodeRuns.refresh同样只发布中央托管刷新结果与AT。独立私有Review的AT-only副本不能取得Node HOME的RT，实际401需要先在原Node保存待办、严格释放评审，再通过原Node HOME唯一所有者执行刷新。
+- main原私有Review owner-refresh线程和本地refresh_account_oauth_token仍使用中央运行时/本地profile。远程独立账号需要具体无模型维护许可、实际Node HOME凭据事实及原CredentialOwnership配合；不应把原中央旧profile当当前Node所有者，或用旧已关闭CLI Scope授予新的RT刷新权限。该部分尚待接通，当前独立正常评审通过不包含401恢复。
+- 补充已读取CredentialOwnership.guard/begin_local_refresh/finish_local_refresh：中央原持久刷新维护只按原账号/source保存待确认并解除，不读取RT，适合保留中央唯一授权及不确定提交门禁。凭据关联/交接的_material/_authorized_profile仍依赖本地profile和设备身份，远程登录/绑定阶段另需实际Node资料读取。
+- 原Runner._exec_oauth_refresh_probe的固定脚本、Node fetch与最终执行包装已读取：目标固定platform.claude.com/v1/oauth/token、原client_id/scopes，使用当前HOME RT、原网络与执行画像，输出refreshed/skipped/到期或有界错误，成功原地替换HOME。可提取本机/Node共用执行核心，保持原网络和TLS路径。原包装的Docker exec定位与持久维护收据需要一并核对；新无模型维护执行在发送前保存意图，未知RT结果保持原CredentialOwnership维护，避免另起刷新重放。
+
+
+### 独立Node凭据维护增量（328～340）
+
+- 327镜像上的328轻量SSH入口真实native293链路通过187.480秒：程序执行中强杀NodeControl、原程序取消、同一候选有限复验、实际私有Review及严格释放。
+- 原固定OAuth探针提取共享核心，329号7项通过4.076秒。330新凭据合同测试跳过原stopping阶段，331按原状态转换修正后26项通过17.928秒。
+- 凭据工作使用原login操作族与oauth-refresh具体来源；原中央账本接受无模型额度、无网关租约的具体维护。普通模型工作继续要求原额度身份。未改既有迁移摘要。
+- NodeCredentials沿当前Node HOME、原独占_cli_setup及固定探针执行。真实exec/group定位和启动意图先于exec_start。启动HTTP握手与许可核对同处短临界区，响应正文在锁外有界读取，允许原stop定向停止。DNS等待后、HTTP发送前再检查固定启动截止。未知提交仅保留原操作与无凭据结论。
+- AccountRuntime.restore_execution按具体oauth-refresh来源及credential-refresh角色，恢复独立独占作业的停止能力。原模型/Pi/私有Review恢复合同继续保留。332当时127项通过21.712秒，新增独占恢复用例已进入336。
+- 333暴露启动前误用active authorize，已按原activate一次合同修正。334私有回执原子替换与读取竞态触发单链接校验：旧fd可在fstat之前因原子替换变为零链接；本具体actor的发布与读取通过同进程锁串行，保留原私有权限要求。335号28项通过12.545秒；336号15项通过3.522秒，含真实NodeJS固定脚本截止前拒绝HTTP发送、原OAuth脚本作用域/脱敏及独占恢复。
+- RemoteCredentialRefresh复用原中央NodeExecutions、CredentialOwnership、更新活动与SSH通道；发送前保存原所有者pending及有限证明，未知Node提交只查询/停止原操作，实际进程已停止且RT结果仍未知时保留原所有权和活动。主Runner独立SSH刷新入口已路由，原不可重入owner锁由既有调用方持有。后台恢复复用原ClusterRunner循环。337号46项通过31.045秒。
+- 338当前control构建成功。339临时测试account镜像仅添加NODE_EXTRA_CA_CERTS=/etc/mitm/cluster-test-ca.pem；本次夹具复制本地测试CA到原只读公开CA挂载，继续执行Node原生证书/主机名验证。测试制品仅用于本地合成TLS验证。340真实SSH/当前HOME权威/本地TLS/原代理/断流未知恢复运行中。
+- 当前尚需将私有Review401待办与本具体维护协调接通、接回Node pending准入和同会话恢复，并覆盖schema3开发等剩余消费者。当前整体任务保持in_progress。
+
+
+### 独立凭据真实TLS结果
+
+340暴露夹具初始HOME尚未物化，Node维护也补齐原sync_credentials与passthrough网络上下文；341号16项通过5.379秒。342当前control构建。343夹具尚未预装离线CLI缓存，原_cli_setup进入固定版本安装等待；补合成只读CLI版本缓存。344已完成真实刷新、当前HOME RT优先、中央旧副本保留及原所有权释放，代理断言误把TUN固定DNS地址当作域名，按mock_network原198.18.0.10合同核对实际节点IP与443。345整体通过38.651秒：当前Node HOME RT对应完整请求SHA，Node原生TLS验证本地CA/主机名，原节点代理出口、有效HOME跳过零新增请求、已发送后断流、实际exec收口、持久CredentialOwnership与中央账本reconcile，以及同原操作恢复和拒绝重发。
+
+当前源码新增私有Review原401请求核对/待办RPC和可选只读pending投影，正在接中央续接，尚未完成该评审恢复链。整体保持Phase2.1。
+
+
+### 私有Review401接入及边界验证（346～351）
+
+- Node原401待办RPC、显式只读待办投影、中央按原Scope冻结维护与更新活动、先严格释放旧评审再执行RT、Node待办完成/已知未提交最多两次、原Runner watcher及场景回调已接通。346号65项通过35.039秒；347新增独立fixture遗漏账号投影切换，已修为显式独立账号；348号69项通过44.728秒，含原Node请求SHA、幂等待办、读投影脱敏、中央先登记再停止和新Scope实际启动顺序。
+- 349当前control构建。350真实合成401链路已完成原私有Scope关闭、Node当前HOME真实TLS刷新、Node待办complete及中央维护关闭；随后旧场景source的released_at仍为空，完整恢复验证失败123.316秒。保持原严格预算与会话核对。351仅补充source.execution_error到断言，正在采集具体失败原因。
+
+
+### Review401严格边界修正（351～360）
+
+351真实错误为“driver未给出准确退出计时边界”（120.267秒）。原worker留下原所有者待办后继续等待profile，控制侧主动停止与EXIT最终计时存在竞态。worker现沿认证失败正常退出，原所有者待办之后有界观察同一真实exec的Running=False及整数ExitCode，再严格停止、恢复固定CLI并刷新。原driver尾段仍为预算权威。353号57项通过20.672秒；354构建。355确认原401尾段settled=True且elapsed_sec=2.6242162409762386，原source已释放、review_resume=1/infra_recoveries=1、同session/包/逻辑尝试接续；第二次worker退出42，整体失败151.849秒。
+
+原认证观察忽略已存在COMPLETION_BASELINE，since_epoch默认0导致同会话历史401被重新识别。356用真实bash/Python函数复现该错误，修复改为按原完整字节游标只扫描本轮追加JSONL。新401仍被识别，原轮内时间边界与TUI规则保持。357号106项通过44.864秒，包含原OAuth探针/版本/定时入口和私有评审。共享恢复循环新增非阻塞owner锁，避免一个账号占锁阻塞其他恢复；358号15项通过6.431秒。359镜像构建中，360计划复验实际401接续至原业务接受。
+
+
+待后续验收的消费者核对：当前ProjectDevelopment.advance负责中央外部需求方事务；_apply的verify动作返回False，继续进入已经路由独立Node程序的ProjectScenarios._mechanical_job。当前源码未发现该文件直接调用Docker验证器。仍需验证完整development_cycle对话/同会话多轮/验收和反馈消费者，以及原Requester出站的独立管理配置边界。后续按实际代码与完整验证推进，避免仅据先前摘要假定另一条本地程序路径。
+
+
+360完整真实SSH独立私有Review401接续通过167.918秒，包含原Node请求SHA待办、旧Scope实际停止和中央许可释放、原driver最终尾段、当前HOME真实TLS刷新、Node待办complete、原逻辑评审尝试/会话/冻结包保持、剩余预算继续、恢复评审原生实际模型核验及最终严格释放后业务接受。整体任务保持Phase2.1，继续实际刷新途中NodeControl重启和原PRD剩余范围。
+
+
+361真实刷新途中Node重启验证通过38.130秒。真实RT已到达本地TLS上游后暂停返回，先保存原exclusive credential-refresh执行/实际exec与group定位，再SIGKILL并恢复NodeControl；原作用域恢复实际停止旧exec，删除原私有execution，Node返回closed/uncertain，中央继续reconcile，真实CredentialOwnership.refresh_pending保持，更新活动保留。恢复及新刷新拒绝均未增加上游请求数。测试finally和原随机部署清理负责停止本次全部资源。
+
+后续公开OAuth状态与定时_needs_refresh当前仍取中央profile，Node HOME轮换后应提供受限实际到期/状态投影；范围内继续核对。独立usage、远程登录/重授权/绑定交接及独立迁移仍需按实际接口接入。
+
+
+schema3完整开发周期已有消费者回归362号37项通过32.962秒，实际ProjectDialogueClient连接本地自签CA/主机名验证的HTTPS服务预检通过，管理请求来自中央127.0.0.1。新增363真实SSH三轮reply/implement/verify、同会话/工作区、普通交流零评分、原Node程序与私有评审及最终一次接受运行中。管理需求方使用独立合成认证，测试通过原HTTPS客户端、真实协议和usage核对；Node工作包与公开业务上下文检查密钥及隐藏验收内容隔离。
+
+
+363完整开发周期真实纵向验证通过234.544秒：三轮Node候选使用同一会话和实际工作区，中央ProjectDialogueClient通过真实本地HTTPS取得reply/implement/verify与实际usage，普通交流没有程序或私有评分，同一冻结回答重复处理不重调模型。交付阶段实际Node程序和原私有Review通过，中央业务接受、逻辑尝试及严格释放核对通过。管理需求方认证不进入Node工作包，公开上下文不含私有验收哨兵。生产ProjectDevelopment.advance的verify动作原本即回到已接入的远程机械路径，本阶段新增验证夹具并复用原消费者。
+# 独立账号当前HOME观察与具体手动usage（364～）
+
+- 新增只读credential-status，严格输入包含Node、账号、环境、分配版本、代次和原稳定身份。Node读取当前HOME身份及到期值，返回四字段、真实观察时间和原范围。接口不调用Docker exec、初始化HOME或上游HTTP。
+- 新增共用oauth_status解析，保持本机原有效/临期/过期、missing/invalid语义，非法布尔/非有限/日期越界值返回invalid。中央协调器按完整范围及SSH配置摘要保存最多4096账号、120秒的内存观察；列表只读缓存，原OAuth调度器明确只读Node后再判断，失败和范围变化显示unknown。
+- 364号111项回归通过62.600秒。365构建成功。366号真实SSH/TLS刷新与状态观察通过36.378秒；Node当前HOME已轮换时中央旧profile仍保持原值，故意将中央旧到期设1仍读取Node有效期。
+- 具体手动usage增量：CredentialUsageWork/Start使用原login操作族与quota唯一来源，复用原NodeExecutions及Node凭据执行记录。Node只认领非独占CLI、原代理与当前HOME，原固定usage脚本与本机共用；无CLI安装、无模型额度认领、无网关租约、无RT所有权转换。明确HTTP错误正文不进入回执，原永久账号错误代码/429重试时间保留，成功窗口与limits/spend/extra_usage保持原字段；当前HOME令牌在Node进入回执前脱敏。
+- 原具体start/get/stop保持单次提交、真实exec定位与严格释放；GET结果未知在原实际停止后结束本次错误，恢复只查询/停止原操作。RT未知隔离保持原路径。367号161项通过45.905秒；368号45项通过20.610秒；369号163项通过34.240秒，含实际NodeJS截止/网络失败单次/429单次、Runtime非独占恢复与原路径。
+- 正在进行真实中央HTTP→SSH→Node原生TLS→原额度合并验证。整体PRD仍有远程登录/明确重授权/所有权交接、迁移及多节点验收等剩余范围。
+- 370构建完成。371首轮真实HTTP查询已实际返回并写入三窗口，夹具将14与原浮点换算结果14.000000000000002做精确相等而失败；仅将该断言改为assertAlmostEqual。372同源码通过48.859秒，覆盖真实Bearer鉴权HTTP、原owner锁、Node当前AT摘要/严格TLS/代理来源、四次usage、原QuotaGuard三窗口合并、Fable scoped回退及limits/spend/extra_usage保留；429和普通401保留旧窗口且不猜永久封禁，明确account_on_hold沿原持久门禁。AT/RT及中央旧副本保持原值，无新增RT请求。
+- 凭据维护在实际exec_start前增加当前HOME稳定身份复核，覆盖准备后被换号与HOME缺失；停止仍按原Scope收口。373号37项通过20.784秒；374构建完成。375正在进行usage实际发出后NodeControl强杀/重启、原非独占exec停止及零重发验证。
+- 375通过59.134秒：五次明确手动usage（一次正常、429、普通401、明确account_on_hold、最后一次发送中Node强杀），真实上游各一次；Node重启后原非独占exec实际停止、执行文件移除、中央账本closed/许可释放、维护活动清空，RT所有权保持ready且无新增RT请求。二次恢复没有新增GET。
+- 376新增claim后、维护角色登记前崩溃的回归按预期失败0.046秒，定位原restore_execution严格角色检查使该无输入旧记录只能隔离。增加受限准备阶段停止恢复：显式具体用途、原不可复用来源、容器/代次/绑定/独占标记均照原校验，且原记录没有角色及任何exec/handle/tmux/process/其它输入定位。带任一实际输入定位而角色缺失继续拒绝。377号150项通过31.834秒；本增量仅恢复停止能力。
+
+## 已有独立Node账号明确重授权基础（378～）
+
+- 增加AccountLoginWork/Start/Code/CodeRead/Accept具体合同、中央NodeExecutions无模型login许可及旧SID收口后禁止重放。Work冻结原账号、稳定身份、SID、版本、明确force和授权TTL；新账号NULL草稿与绑定账号未套用本合同。
+- NodeAccountLogins经原唯一Host/有限证明/环境锁启动原begin_login暂存和tmux；新输入复核原归属、当前HOME身份与TTL。固定CLI认证检查同时要求实际完整暂存OAuth文件。授权码仅走原stdin，sending/delivered/rejected/uncertain以私有原子回执保存；同标识和重启只读原回执，无码重放。操作已接私有UDS、轻量SSH入口及固定白名单。
+- 378发现prepared证明尚未activate时调用authorize，改为先核对原prepared证明及TTL，再activate；379发现夹具遗漏原execution_token方法，补上实际静态实现。380号6项通过3.071秒。381号192项通过60.161秒，包含原Runtime/终端/SSH与真实UDS验证安全错误和Unicode输入。382号155项通过35.731秒。
+- Node提交先在私有authorization文件目录冻结本次已认证材料，操作记录仅保存摘要/阶段/RT摘要。复用原commit_login提取的文件发布核心，按frozen→home_saved→saved补齐原HOME与Node profile；未知不新开CLI、不重交换授权码。具体snapshot只对原已保存操作返回受信材料，普通回执保持无码无令牌。中央同摘要accept后实际停止原tmux，使用目录fd删除本次暂存和私有冻结副本，最后确认cleanup_pending=false。待确认提交拒绝普通停止。
+- 383号181项通过35.224秒，覆盖HOME成功/profile失败后新actor补齐同一材料、原CLI与草稿回归、同摘要接受/错摘要拒绝、实际停止与清理后再收口；384号74项通过25.913秒，包含真实私有UDS与原登录/草稿。385控制测试镜像构建中；下一步真实SSH验证Node层原tmux/隐藏码/实际文件及严格收口。
+- 中央LoginManager/HTTP/WS产品消费者、原未知RT隔离的明确重授权收口和完整CredentialOwnership授权证明仍待接通。绑定账号重授权及NULL新账号草稿继续保留各自原合同。整体任务保持in_progress。
+
+
+### 386～397：独立SSH明确登录与产品消费者
+
+- 386真实SSH/tmux、关闭回显的单次码、CLI认证检查、冻结提交、私有快照及实际停止/清理通过40.321秒。当时中央账本由夹具协调。
+- 387号112项当前Node材料/身份provider与原Owner通过57.652秒；388负例env使用相同值导致假失败，改为真实不同env后389号51项通过29.125秒。
+- 390取消负例预期未覆盖缺环境文件的FileNotFoundError，修正后391号16项通过8.719秒。新增无证明取消门禁、sending中断投影未知、discard和接受清理失败恢复。
+- 新ClusterAccountLogins原持久账本/活动/有限证明、真实停止RT父来源、冻结快照与提交恢复392号7项通过3.609秒。
+- 产品LoginManager/HTTP/code/status/commit/cancel及原授权证明已接入；具体PTY共用原续聊的私有WS桥，Node保持一次输入和未知隔离。393回归暴露旧WS替身缺新增remote_operation字段，补完整替身后394号75项通过25.852秒。
+- 395真实ASGI暴露远程分支前仍读取中央LoginDraft；将远程路由提到该读取之前，396号4项通过2.237秒。覆盖原证明、新材料镜像、未知RT父隔离、接受响应丢失、中央恢复与取消。
+- 397广回归执行中；下一步构建包含新Node操作/PTY的control，使用真实SSH和原中央HTTP/WS验证。合成离线CLI产物仅验证生命周期，真实OAuth成功仍属部署验收边界。整体保持in_progress。
+
+### 397～405：产品明确登录真实纵向与ASGI取消
+
+- 397号255项定向回归通过71.995秒；398构建成功。399真实链路到达授权链接后，原票据鉴权拒绝夹具空管理用户名。补合成管理身份后400真实SSH/原HTTP/管理会话与路径票据/WS键盘及resize/码回执/CLI检查/新授权镜像与来源证明/未知RT父隔离/实际接受后丢响应/中央重建恢复通过46.791秒。
+- 400日志出现原PTY输出socket释放告警。根因窗口为ASGI在连接开启或pump清理await期间取消，句柄可能迟到或被跳过关闭。原WS桥增加线程间清理责任交接和嵌套finally的同步有界关闭；401号31项通过14.178秒，402号5项通过2.824秒。
+- 403当前control构建成功，404完整同链路复验通过45.154秒，日志无原socket告警。账号HOME原userID保留；新RT与中央镜像一致；原冻结293版本证明保存；旧未知结果仍为uncertain历史，关闭原父来源后本次登录最终释放。
+- 本用例是合成账号、离线CLI授权产物、本地TLS和真实SSH/tmux/HTTP/WS。真实供应商OAuth成功与真实模型不在该证据范围。
+- 405正在补原容器NotFound、许可创建响应未知、实际ASGI连接取消等定向回归。下一阶段绑定SSH账号重授权仍需原Gateway长期暂停、精确独占租约、导入回执、AT-only发布及失败恢复。停用/退休账号与NULL草稿保持待接。
+
+### 405～415：绑定Node当前设备与显式登录准备
+
+- 405原许可创建未知测试替身GET错误返回None，按实际Node缺记录语义改为FileNotFoundError；406号51项通过23.255秒，含真实ASGI取消后输出socket关闭、迟到open句柄关闭及原容器NotFound。
+- 新account-bound-identity纯私有操作核对绑定/环境/代次/分配/Gateway UUID组织，保持原trim/lower及可选组织语义，返回当前HOME设备；中央前后核对DB绑定、Node配置和同批发布。Owner.read_bound_identity钩子默认为None，本机沿旧路径；主产品等待完整绑定流程就绪后再注入。407号38项、408号39项通过21.347/21.291秒。
+- 409构建；410真实绑定SSH设备纯读取通过20.534秒，实际容器启动时间与中央HOME缺失保持，原执行账本为空。
+- NodePreparation.login_sid仅用于原绑定+cli_only的明确准备；原ensure(prepare_sender=False,allow_inactive_login=True,ownership_source=login:SID)保持绑定、原代理及AT-only投影，尚不启动auth login。411号53项通过23.464秒；412号47项通过17.915秒。
+- 413构建；414真实SSH认证停用绑定账号的CLI准备及纯设备核对通过21.184秒，现有容器启动时间保持，无RT进入Node管理profile。
+- 新严格BoundLoginWork/Start/Publish/Abort合同和原CentralExecutionRecord中的排他lease/无模型额度支持已落盘，415执行中。完整Node绑定登录actor、Gateway导入/回执、AT-only发布、长期所有权finish、取消fence和产品消费者仍在实施。
+
+### 415～424：绑定Node登录冻结与AT-only发布
+
+- 415号28项通过13.949秒，严格BoundLoginWork/Start/Publish/Abort与原账本保持真实排他lease和无模型额度。
+- 共用Node登录解析/冻结核心保持独立语义；AccountRuntime.restore_execution(account_login=True)扩展原绑定排他lease，Source/SID/socket/版本与旧代次仍严核，仅恢复停止。416号164项通过40.675秒。
+- 新NodeBoundAccountLogins只冻结完整授权，实际HOME/profile继续AT-only；Gateway当前AT发布后才accept、原tmux实际停止和RT暂存清理。绑定私有RPC/PTY用途、共享有限槽位及原镜像释放已接通。417号29项通过18.997秒。418负例ID碰撞原RT维护ID，改用唯一ID后419号189项通过65.625秒。
+- 发布复用原sync_credentials覆盖HOME、runtime/access与runtime/network/access；421夹具旧isolation_version=1不生成v2网络副本，按实际v2布局显式对齐后422号42项通过21.146秒。420旧构建被423新构建替代。
+- 424真实SSH绑定Node原tmux、同Scope私有WS键盘/resize、重复码只投递一次、CLI认证检查、冻结RT、模拟Gateway当前AT全副本发布、实际停止及RT暂存删除通过30.467秒。Gateway真实租约、导入和长期Owner在该Node用例中为显式合成输入。
+- 当前control423。下一步中央绑定协调器及真实Gateway原同操作导入/回执、长期所有权、部分提交与fence取消恢复；完整就绪后才注入原主产品入口及Owner远程闲置/同步钩子。
+
+### 中央绑定登录协调与管理入口（425～429）
+
+- 425：49项36.923秒，原Owner可选钩子、具体RPC前缀及真实排他lease解析。426：中央Bound协调器8项8.150秒。
+- 427：61项46.840秒，覆盖同操作导入未知、原Node清理未知、到期未导入取消、已发布而缺导入回执继续隔离及长期回执关联冲突。
+- 原LoginManager/HTTP/WS按冻结binding选择具体协调器，历史完成SID保留原绑定；取消先走远程收口，已abort记录重建后不恢复成已提交。原Owner通过所属Node当前设备、实际停止及AT-only发布钩子完成长期暂停。绑定镜像保持原userID、未知配置、策略及额度，不创建本地刷新所有权证明。
+- 428：62项164.431秒，原独立/绑定协调、单机登录与Owner回归。429：7项5.346秒，真实管理ASGI、真实CredentialOwnership及SQLite；Node/Gateway使用明确替身。覆盖码回执、WS、同操作导入/接受响应未知、fence取消、长期prepare未知、原策略/额度保留与后续解绑后的历史SID。
+- 正在准备真实Rust Gateway + SSH + 原管理入口纵向；该项尚未运行完成。整体继续in_progress。
+
+### 绑定原产品真实Gateway与人工停用（430～440）
+
+- 430构建。431实际链路在首次状态读取503失败；432同代码补安全诊断后完整通过37.519秒，首次瞬时错误原因未定。432实际Rust同操作导入、原管理HTTP/票据WS、Node实际授权及清理、真实lease释放和原长期Owner完成；实际导入与清理后各丢响应，原Scope重建恢复通过。
+- 原中央status在Node accepted而账本未闭时保持submitting。433错误模块名test_cluster_runner造成导入失败，33项执行通过。434按已存在模块运行82项45.385秒通过，覆盖原独立/绑定入口、账本/证明/普通Run与停用例外。
+- 原bench停用的绑定账号只允许严格绑定登录SID，Root/Node保持原enabled与额度；普通作业/刷新与删除账号仍拒绝。435构建。437真实Rust/SSH/原管理入口bench人工停用场景37.091秒通过，Gateway仍保持原状态。
+- 436尝试Gateway与bench双方人工停用，实际Gateway配置事务调用中央quiesce时失败：夹具缺该回调，生产原v3_quiesce也只操作中央Docker。新增cluster_quiesce明确有限gateway-config排他证明、完整Node/环境/分配/代次、实际作业/评审/程序/发送连接准入、实际Docker停止与回执；保留原HOME/凭据/归属，无迁移fence。原内部入口按所属Node路由，私有SSH/UDS白名单同步。夹具补原产品回调，真实双方停用链路待运行。
+- 438新用例重复运行遇替身labels字典被pop，改为显式拷贝；439号69项35.897秒通过。440早期截止核验与数据库连接关闭的小修定向验证中。
+
+### 配置回调竞争保护与实际持久Host边界（440～451）
+
+- 440号7项3.440秒，早期有限截止与显式连接关闭。442号16项9.172秒，登录预留和中央未收口账本阻止配置事务抢占准备中的账号。
+- 444/447实际配置回调失败。静态核对发现回执缺顶层node_key，修复后445号8项3.421秒通过。447仍在Node内部失败，448追加真实Node受控调用位置：cluster_quiesce.py:59→NodeExecution._runtime→NodeRuntimeHost.acquire→_NodeGatewayConfigurations.adopt:33。
+- 新停止借用曾传入正Gateway ID但无bench身份的空配置。真实Host按身份拒绝；给其补bench身份也会覆盖既有配置，正确采用原inspect使用的_GatewaySnapshot(0,{})只读借用。实际授权范围仍由严格NodeQuiesce中的正Gateway ID及环境/分配/代次和有限真实配置lease核验。
+- 449号13项8.053秒通过，新增真实NodeRuntimeHost借用及原配置对象保持回归，Docker停止仍用明确替身。450 control构建成功；451真实Gateway停用回调及双方人工停用重授权验证运行中。当前单测证据不替代451实际链路。
+
+### 双后端绑定收口/实际取消及独立停用准备（451～458）
+
+- 451 legacy46.536秒、452 native29352.434秒，实际Gateway配置停用回调所属SSH物理停止后，双方人工停用的原管理HTTP/票据WS重授权及两次响应未知恢复通过；保持原状态、设备/策略/额度和Node全副本AT-only。故障复盘见config-quiesce-debug.md。
+- 补冻结未导入后的真实取消：453取消本身已完成，最终误用旧导入回执触发Gateway历史保护。修改为读取当前账号AT/RT/expiry比较，454 legacy53.561秒、457 native29359.673秒通过，覆盖真实fence、原导入未提交查询、Node实际abort/临时RT删除、长期cancel与当前材料保持。
+- 已有独立账号明确登录按精确login:SID及严格AccountLoginWork进入原停用例外，准备入口要求正账号ID。纯材料/身份读取允许未删除的原停用账号，完整归属/代次/当前HOME稳定身份继续核验；网络刷新/usage/Run不采用该例外。
+- 455号108项63.321秒通过，覆盖Node真实文件/证明/SQLite、原Owner退休状态新授权证明后解除及enabled最后恢复、绑定与普通路径；456构建。458退休初始状态真实SSH验证运行中。退休状态由已归还本地的合成初始记录建立；实际退休/远程解绑入口另待接入。
+
+### 独立停用/退休真实新授权（458～459）
+
+- 458通过42.843秒：从原已归还本地的合成退休/停用状态，经实际SSH原CLI、管理HTTP/票据WS、单次码、新授权、Node接受后丢响应与中央重建恢复，当前HOME与中央镜像同RT及冻结293版本来源核验后解除retired、恢复enabled。该验证不代表远程退休/解绑入口已完成。
+- 459通过48.981秒：原实际TLS RT提交未知并实际关闭旧Scope后，设置原bench停用状态；新明确授权前保持enabled0，旧RT父操作保持隔离，完整新授权/来源证明后恢复enabled1。Node实际接受响应丢失后重建恢复，原父Scope最后以superseded_by_new_authorization收口，原RT零重发。
+- 当前control456/account174/TLS339。上述CLI授权产物来自离线合成夹具；实际TLS访问仅本地上游。整体继续in_progress，NULL新账号草稿另立真实草稿身份。
+
+### NULL草稿独立身份、首次提交和实际协调恢复（460～487）
+
+- 独立`bench.node-login-drafts.4`、结构检查/登记/固定宿主映射保留前三步身份。461号42项、462号31项通过，DDL冻结检查bench4/gateway4通过。中央草稿使用真实NULL环境、单独Scope和有限证明，正式正ID账本继续拒绝尚未收口的首次保存账号。
+- `cluster_draft_login_store.py`登记原Node、工作/逻辑代次、实际Scope、有限证明、启动意图、受控Node回执、完整文件索引及激活回执。CAS禁止身份替换、证明回退及授权材料变化；首次正式账号disabled、原NULL环境认领、首次远程分配及原保存ID同事务发布，最后一步注入失败整次回滚。
+- `DraftLoginGrants`复用原证明状态机，独立私有目录及NULL身份检查。Node Actor通过原登录核心、原授权码/PTY一次输入、冻结文件和实际停止继续工作。草稿取消保留产物；新SID恢复只执行原`recover_login`和认证检查。真实停止的NULL对象及无tmux恢复用途修复复盘见`draft-runtime-stop-debug.md`。
+- 完整授权文件通过固定三文件索引及原SSH Docker归档按文件读取，逐字节/大小/规范集合摘要一起校验，保留未知字段和超过公开RPC大小的配置。原接受前中央先镜像完整文件；原Node接受确认实际停止和暂存清理后，中央才首次落库。Node按持久激活意图移除缺正式额度挂载的草稿角色、保留HOME/设备/CLI缓存并发布真实ID/原首次分配；原Owner只读当前HOME登记来源，中央最终事务启用/关闭。新独立账号保持原可选CLI设备证明语义，已有证明严格匹配冻结来源。
+- 474实际SSH/tmux/WS、一次授权码、取消保留、新SID恢复、认证检查/实际停止/清理和首次disabled落库通过31.264秒。477含80KiB未知配置完整传输通过31.944秒。482含实际真实ID激活/原角色移除、真实Owner来源证明、最后启用及下一正式CLI只读额度挂载通过46.541秒。484原接受和激活后分别重建中央账本通过46.318秒。
+- 479号191项、480号SQL认领后Node分配文件发布中断的同操作恢复通过。中央具体`ClusterDraftLogins`已接独立账本、原部署活动、续接/观察、码/PTY、完整提交和重建恢复。485首次发现Root仍preparing而Node已实际授权并冻结的合法时序，提交必须有原启动意图和严格Node冻结回执；486真实Node ASGI/双SQLite4项通过。487正式协调器实际SSH、原tmux/私有WS、一次码、Node接受和激活后各丢响应、重建中央协调器、原Owner实际来源/完整镜像及最终启用通过56.185秒。
+- 当前Node控制镜像481，账号174，TLS339。新增只读summary已编写，查询不构造运行时或唤醒Node角色，尚待定向验证。原管理LoginDraftStore/LoginManager/HTTP/WS、NULL完整删除、准备结果未知处理、界面及整体验收继续实施。上述CLI均离线合成，整体保持in_progress。
+
+### 488～507：原产品NULL草稿、完整删除与界面
+
+- 488号57项、490号175项通过。489在既有远程API的简化Runtime上暴露不必要读取Global草稿目录的问题；按标记实际存在性读取后490通过。
+- 491因测试使用不存在的POST取消路由失败，改为原DELETE路由后492号3项通过。原LoginManager新建节点选择、NULL环境、冻结私有配置、原SID恢复、列表Node摘要、resume/restart/reconcile和正式提交已接。
+- Node完整删除使用环境外deleting/deleted回执，环境锁与全Node准备锁串行，确认原停止、正式/软删除及历史无引用、专属角色移除后清环境/profile/私有准备。中央持久Node回执后再清镜像、条件删除NULL环境及草稿行，最后清Global标记。Node实际删除响应丢失及最后Global标记失败均可重试。
+- Scope未知准备沿原私有准备先持久recovery-only，禁止旧操作启动/输入，仅完成资源范围核对并立即调用原停止。过期和Node隔离后只授停止能力；后续恢复/重登必须新SID与逻辑代次。部署门禁继续保护新准入。
+- 493号48项25.484秒、494号83项41.556秒、495号181项42.394秒通过。498中新测试把幂等返回closed误期望为异常，修正断言后499号47项32.598秒通过。500号6项8.731秒通过。504号197项66.871秒覆盖原本机/绑定/已有独立及NULL管理入口、半保存可见性、末尾提交标记失败保留提交按钮、换代标记失败仅按原前代Scope恢复。
+- 501当前控制镜像构建成功。502实际原管理链路在独立码投递后认证等待超时115.107秒。夹具由立即关闭PTY改为等待原CLI实际消费键盘输入后再关闭，503完整链路通过69.317秒。原失败的首个输入回执时序尚待单独故障注入定位；补第二个ping/pong屏障确认原输入处理收口，继续保留未知输入隔离规则。
+- 503实际原HTTP/票据WS/SSH、CLI键盘和resize、独立码、取消保留产物、新SID仅检查原HOME、激活实际动作后丢响应/中央协调重建、80KiB未知配置完整镜像、原Owner证明和最终启用通过。另覆盖准备回包丢失后的原代恢复检查、Node完整删除回包丢失后的重建与尾段清理；全部离线合成CLI，零真实模型请求。
+- 496/505 web构建通过，497/506实际构建浏览器1440/720/390通过。新建节点数值载荷、默认本机兼容、草稿节点名称转义通过；506补preparing不结束轮询、实际就绪后一次连接原会话。终态继续禁用连接与输入。
+- 507 cargo管理桥10项通过；代理目录翻译保留node_id，成功白名单保留node_id/node_name。合并真实Rust管理桥与SSH链路继续实施。中央尾段及界面最新源码待下次最终镜像同步。整体任务保持in_progress。
+
+### 508～525：真实Rust管理桥、零代准备清理与中央消费者
+
+- 508/510宿主Rust网关构建成功。509与511首次合并管理桥返回400；512保留非空Root错误及Node调用位置，确认原隔离环境必须使用上游代理。513修正夹具的真实代理列表data字段；514通过真实Rust创建代理、按实际ID/revision选线、原HTTP/票据WS/SSH及两端SQLite完整链路，69.510秒。网关成功白名单保留node_id/node_name；上游5xx继续脱敏并映射503，514覆盖准备响应未知。
+- 准备本身失败时新增独立DraftLoginPreparationDelete与login-draft-preparation回执。请求只有原Work/Node/前代，清理无需Root私有配置文件或再次准备资源。Node核对当前操作无证明/实际登录登记、原私有工作或明确已停止前代、NULL/历史/profile归属，再按实际代次清理，generation=0与正式Scope/Grant保持隔离。外部墓碑阻止迟到准备和所有新输入许可。
+- 515号41项通过40.069秒。516暴露首次请求尚未到Node时环境结构未初始化；清理沿原迁移入口初始化后，517号71项通过51.214秒，覆盖零代资源失败、Root私有副本缺失、删除回包丢失、准备从未到Node、迟到准备拒绝与最终标记重试保留后来复用名称的profile。
+- 518测试断言错误地把RuntimeBusy视作RuntimeError；该类实际继承ValueError，改为具体异常。519暴露原远程工程测试的旧三参数断言；共用所有者函数显式传force_refresh=False，更新对应断言，520号212项通过55.664秒，包含本机账号创建与软删除恢复策略。
+- ClusterService.draft_node使用v4及原私有标记定位NULL草稿。本机准入关闭远程草稿，AccountRuntime启动/文件访问按owns_local识别位置。普通profile导入和新登录共用原名称锁及草稿保护，已取消保留和末尾保存/清理标记继续拒绝旁路正式建号。
+- 原环境API仅查询Node摘要，公开草稿位置且无正式账号ID/分配版本；中央HOME/Docker哨兵验证通过。Vue与兼容环境工作区为只读草稿提示，角色未知保持未知，所有实际登录与清理回到原账号草稿入口。
+- NodeLoginDrafts.preparation统一私有配置读取，核对Work/Node/前代。LoginDraftStore.account与代理引用改用此读取器；中央sender路径哨兵验证通过，代理引用完整且仅返回内部摘要。521号103项通过52.910秒。
+- 522真实web构建、523真实浏览器通过，含节点数值载荷/默认本机兼容/名称转义、preparing持续轮询后一次连接，以及草稿环境只读/节点位置和1440/720/390。524控制测试镜像构建成功。525真实Rust/目录代理/原HTTP与WS/SSH通过71.942秒，覆盖准备缺代理失败、Node实际generation=0、Root私有副本缺失、清理响应丢失/中央重建、实际资源删除及清理身份不能获取输入证明。
+- 首次Global节点标记已写入而v4登记本身失败的分支正在补明确准备意图；仅新协议false允许中央专属清理，true或旧标记缺字段继续保持未知保护。整体任务in_progress，凭据其余生命周期、独立迁移和部署备份继续实施。
+
+### 526～530：首次登记失败与节点准备意图
+
+- 新建SSH草稿首次保存`node_prepare_intent=false`及原node_key/name；管理入口要求具体协调器安装准备回调。所有prepare/recover-preparation RPC先在原owner/profile锁内校验当前或明确前代标记，再原子持久true；跨逻辑代次保留true。
+- LoginDraftStore.unregistered仅接受明确false、合法冻结节点/SID/home/代次、v4行缺失、NULL/实际generation=0/无本机角色、无其它环境/profile/正式或软删除账号/历史引用。原页面只开放显式完整删除中央专属环境/profile/私有准备。真实节点RPC、中央HOME定位和Docker均不参与此分支。true或旧标记缺字段保持未知保护。
+- 清理先校验原专属树及无执行/交接/分配记录，再写外部deleting，清目录后条件删除NULL行，最后清标记。数据库已删除而最后标记失败时，重试只清旧标记，保护后来复用名称的profile。
+- 526原换代标记故障现在被准备前回调提前拦截；527恢复检查成功后的resume因新暂存HOME尚无授权而拒绝，按真实阶段改为明确restart。528号17项通过17.475秒；包含意图写失败不发RPC、已登记零代独立清理、未知意图保护及跨代保留。
+- 529号220项跨入口回归通过64.232秒；530真实Rust/目录代理/原HTTP/票据WS/SSH完整链路通过72.721秒。真实原产品夹具新增v4登记失败、原页面可见与删除、准备意图false及Node调用序列保持不变的断言。Node控制524/account174/TLS339、宿主网关510，中央Root使用当前源码。完整最终双镜像/发行源码同步仍由后续交付阶段承接。
+- NULL草稿当前增量完成，整体任务继续in_progress。下一实现边界为原CredentialOwnership的实际Node停止/绑定切换/凭据发布及故障恢复。
+
+- 531号54项原草稿/有限证明/持久模型/Agent及SSH协议回归通过24.344秒，覆盖此前追加的严格模型断言。后续凭据交接源码边界记录于`credential-owner-transition-boundaries.md`。整体Phase2.1继续，凭据生命周期等实施项仍待完成。
+
+### 532～546：远程凭据交接与限制审查（实施中）
+
+- 新增OwnerScope/有限binding真实lease、Node prepare/publish/get和SSH操作；Node持久owner-transition关闭新证明/启动/输入，原get/stop继续可读。Node发布复用原AccountRuntime.owner_transition/sync_credentials，保持同身份HOME、未知字段、AT-only、完整RT和退休语义。中央原CredentialOwnership增加所属位置回调，绑定与长期回执仍沿原事务。
+- 533号6项Node真实库/原发布器通过3.917秒；534号170项本机/节点/Agent/SSH回归通过45.490秒。535/536/537修正组合夹具的实际host参数、config.account_id及按操作ID回执前提，538号4项通过7.312秒；539号18项、540号19项通过，后者16.345秒，覆盖真实Node HTTP/双SQLite、准备/发布实际完成后丢响应、中央绑定已改后的接续、暂停Node及退休后中央级联删除。
+- 新增完整身份导入读取，复用原实测环境/进程采样器；已有Gateway目标改用Node纯设备核对，保持本机首次准备兼容。Gateway明确删除仍要求原404因果与完整缺失证明，Node消费该受信结论。
+- 移除RemoteBoundIdentity纯设备查询对Node.enabled的准入要求，显式解绑与旧操作收尾保持可用。新执行沿原enabled门禁。
+- 541控制测试镜像成功。542真实Rust/SSH链路暴露后台完成后原LoginManager名称缓存仍占用，543增加复现后失败；补齐正式远程会话environment_id，并以同SID/同操作/同环境的持久closed事实清理旧名称缓存，未知状态继续占用。544号55项通过48.723秒。
+- 545真实链路到达Node凭据准备，公开错误被SSH固定脱敏；实际Node调用失败位置仍待读取。夹具追加本次随机控制容器的有限结构化日志用于定位，继续保留原保护。
+- 独立迁移已接中央原owner锁+持久maintenance许可，保持零Gateway租约，目标仅CLI布局并要求binding=None。新增同操作激活未知与完整切换测试，546验证进行中。
+- Node交接待办参与迁移源fence/导出门禁；已完成Node回执从迁移包排除，避免目标继承旧Node身份。整体Phase2.1继续，实际所有权链路、独立迁移真实验证、部署备份与整体验收待完成。
+
+### 547～551：真实交接通过，独立迁移继续
+
+- 547有限容器日志为空，沿调用链确认cluster_agent_client的固定操作白名单漏同步。548测试控制镜像更新该入口，并加入真实UDS逐动作DTO到达验证，保持轻量CLI不加载执行模型。
+- 549真实Rust/原管理HTTP与票据WS/SSH/双SQLite完整重授权及所有权交接通过56.404秒，覆盖Node准备/发布实际生效后丢响应、原操作恢复、解绑完整RT、当前Node HOME轮换值回交原Gateway ID、AT-only、原Node退休和中央删除。全部合成凭据。
+- 550号121项跨入口回归通过142.387秒。546号44项独立迁移/原Owner/原登录/源隔离/归档回归通过29.328秒。新增真实双SSH独立迁移验证551运行中，含激活实际生效后丢响应、同操作恢复、完整HOME/未知字段/工程保留、迁回取消及另一节点上的第二账号与离线隔离。
+- 原交接lease改用binding:原操作ID。prepare响应丢失后可读取本操作当前真实lease；到期/原reconcile仅按同来源定向释放后再认领。已发布非长期操作的遗留lease仅在同Node当前回执及原目标一致、实际无API活动时收口，避免永久占用管理入口。新增定向故障测试。
+
+### 552～567：独立迁移、备份、界面与限制审查
+
+- 551真实独立迁移发现首次CLI布局尚未发布完整HOME；普通独立准备复用原sync_credentials，显式登录继续保留暂存规则。552号69项通过57.785秒，553控制镜像完成。
+- 554发现新增迁移判断错误地把预建sender角色当作Gateway绑定，改为核对实际binding=None。555双SSH真实独立迁移、激活响应未知恢复、迁回取消、完整HOME/当前RT/未知字段/工程保持及第二账号故障隔离通过312.481秒，全程零Gateway租约。
+- 558备份18项通过8.629秒；557曾因离线范围读取生成WAL辅助文件而失败，改用immutable只读连接。563备份/Node部署32项通过8.842秒，覆盖独立验收进程的停机检查、中央与Node同批索引、完整SQLite和实际隔离恢复。
+- 559原Owner/绑定身份/Agent34项通过37.596秒，561节点管理/真实Node进程采样/固定运行位置/更新范围34项通过15.182秒。562前端构建与实际浏览器通过，含独立账号迁移、提交未知、同操作激活、取消、账号切换及390/1440布局。
+- 新增所属Node进程导入路径，复用原process_identity_import_current；历史Run从原执行账本公开冻结位置，保持迁移后的历史来源。新的真实Rust/SSH链路565在首次启用Node镜像来源时暴露CI编号过严，继续修正并复验。
+- 新增Node本机check/status/stop/up、集群停机/备份/升级文档；Node升级仅替换全部角色及独立验收已停止的原控制实例，HOME与账号镜像重建沿原生命周期。中央在线更新对远程环境明确显示集群停机维护范围。566号12项通过3.558秒。

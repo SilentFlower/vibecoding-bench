@@ -70,6 +70,7 @@ def main() -> None:
     parser.add_argument("--legacy-account-image")
     parser.add_argument("--project-iterations-only", action="store_true")
     parser.add_argument('--pi-projects-only', action='store_true')
+    parser.add_argument('--warmup-pi-only', action='store_true')
     parser.add_argument("--project-scheduling-only", action="store_true")
     parser.add_argument('--project-scenarios-only', action='store_true')
     parser.add_argument('--scenario-capacity', type=int, choices=(1,2), default=2)
@@ -143,8 +144,9 @@ def main() -> None:
                     "VERIFY_LEGACY_ACCOUNT_IMAGE": args.legacy_account_image or "",
                     "VERIFY_SOURCE_ROOT": str(repository),
                     "VERIFY_FOLLOWUPS_ONLY": "1" if args.followups_only or args.timed_followups_only else "0",
-                    'VERIFY_PI_PROJECTS_ONLY': '1' if args.pi_projects_only else '0',
-                    'PROJECTS_AGENT_ENABLED': '1' if args.pi_projects_only else '0',
+                    'VERIFY_PI_PROJECTS_ONLY': '1' if args.pi_projects_only or args.warmup_pi_only else '0',
+                    'VERIFY_PI_PROJECTS_NAMESPACE': 'warmup' if args.warmup_pi_only else 'projects',
+                    'PROJECTS_AGENT_ENABLED': '1' if args.pi_projects_only or args.warmup_pi_only else '0',
                     "VERIFY_TIMED_FOLLOWUPS_ONLY": "1" if args.timed_followups_only else "0",
                     "VERIFY_QUOTA_COMPLETION_ONLY": "1" if args.quota_completion_only else "0",
                     "VERIFY_RUN_WINDOWS_ONLY": "1" if args.run_windows_only else "0",
@@ -218,6 +220,10 @@ def main() -> None:
     finally:
         for instance in client.containers.list(all=True, filters={"label": ["vibebench.product=v3", "vibebench.deployment=" + deployment]}):
             instance.remove(force=True)
+        # 磁盘临时文件卷独立于容器，隔离验证结束后按本次部署标签一起收口。
+        for volume in client.volumes.list(filters={'label': [
+                'vibebench.deployment=' + deployment, 'vibebench.role=cli-scratchpad']}):
+            volume.remove()
         network.remove()
 
 

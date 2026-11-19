@@ -1,0 +1,37 @@
+{
+  "finding": "FBK-003",
+  "status": "resolved",
+  "strategy": "兼容管理端先行，随后启用账号磁盘布局；各入口校验能力并保护旧程序恢复",
+  "tests": {
+    "deployment": {
+      "tests": 208,
+      "seconds": 242.726,
+      "exit": 0
+    },
+    "runtime_affected": {
+      "tests": 225,
+      "seconds": 243.325,
+      "exit": 0
+    },
+    "storage_core_final": {
+      "tests": 18,
+      "seconds": 3.147,
+      "exit": 0
+    },
+    "new_guard_cost": {
+      "tests": 6,
+      "wall_seconds": 3.87,
+      "exit": 0
+    }
+  },
+  "legacy_parser": "legacy-updater-capability-verification.json",
+  "bridge_account_identity": "c85c367efeb4d665d44a711bd4c6a2f3afc578ebea5bb05beab6a677c98a52e7",
+  "functional_verification": {
+    "artifact": "bridge-activation-verification.json",
+    "completed_scenes": 11,
+    "command_exit": 1,
+    "failure_stage": "性能预检需要专用测试CA镜像；此前11项真实官方账号镜像功能验收完成",
+    "performance_evidence_reused": "docker-performance.json"
+  },
+  "remaining_findings": []
+}

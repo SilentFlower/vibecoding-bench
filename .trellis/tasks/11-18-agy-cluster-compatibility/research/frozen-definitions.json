@@ -1,0 +1,15 @@
+{
+  "previous_sha": "0764b5fa75e0df6c5c12969fdc40b53d3bbf734c",
+  "bench_steps_1_to_4_equal": true,
+  "gateway_steps_1_to_4_equal": true,
+  "source_hashes": {
+    "services/orchestrator/database_schema.py": "4ed5290f996ecb31e4c0cebd3fcca16f3cda46d95f79eb63136ad4e2477c3c10",
+    "services/orchestrator/cluster_schema.py": "525c0936fc5bb386650bef10199e5821fef8ab519d0cfb2cb039906d5bab8b1e",
+    "services/orchestrator/node_execution_schema.py": "59066fe578ea32f61fb96456b2cbddaaa15d4c876c9c91ef2d2a4a823af316ac",
+    "services/orchestrator/node_login_draft_schema.py": "adf8a7ce2b11b5b2362fa17a342cab2b324f3aa4a526e4bee4cbefa88f524e71",
+    "services/gateway/src/store/database_schema.rs": "c1664dc20e8bd098defcbc438260ddf24cb7d7cf12864b6bf4243281374c6d27",
+    "services/gateway/src/store/proxy_schema.rs": "ea030e7d237cf5d390ea69f729d0753b2c3a03e48304dcbefe99e679a0ff2fe3",
+    "services/gateway/src/store/proxy_sync_schema.rs": "34f50a86bb0f55d4dcd9b357d749981d5bda129f46ecb5e289c30a666f102547",
+    "services/gateway/src/store/session_policy_block_schema.rs": "02ef9a77941fbf8049327838369110d1527d811a266d995075bb5aa274711713"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "findings": {
+    "CHK-001": "resolved",
+    "FBK-001": "resolved",
+    "FBK-002": "resolved"
+  },
+  "full_baseline": {
+    "command": "PYTHONPATH=services/orchestrator:deploy/flower2api .venv/bin/python -m unittest discover -s services/orchestrator",
+    "tests": 1939,
+    "seconds": 784.602,
+    "exit_code": 0,
+    "skipped": 2
+  },
+  "final_affected_modules": {
+    "command": "PYTHONPATH=services/orchestrator:deploy/flower2api .venv/bin/python -m unittest test_cli_scratchpad test_login_drafts test_account_runtime test_project_review_runtime test_cluster_environment test_cluster_migration_files test_cluster_archive test_cluster_runtime_host test_storage_backup",
+    "tests": 248,
+    "seconds": 35.006,
+    "exit_code": 0
+  },
+  "evidence_reuse": "全量基线运行期间补充源快照保护，受影响模块由最终代码的248项回归和10场景Docker验收覆盖。其余全量证据按未变化范围复用。",
+  "docker": "research/docker-repair-final-functional.json",
+  "syntax_files": 12,
+  "diff_check": 0,
+  "profile": {
+    "requested": "auto",
+    "effective": "full",
+    "confidence": "high"
+  },
+  "check_all": "strict-pass",
+  "sha256": {
+    "images/v3/Dockerfile": "a261b6bd86f6c773c6e425c26e3c134a307710c1381e1a9801932be28b349735",
+    "services/orchestrator/account_isolation.py": "7523c938e8e5eaabf3def3bf20510a2caa0b6f36782a2b900b852ebf5fc847ff",
+    "services/orchestrator/account_runtime.py": "86a54f0c65971e94db1065b53480bc449c993bd3b4ab305a11e8f804a55cd682",
+    "services/orchestrator/project_review_runtime.py": "9d0294342921db82a9a0df636a7b677155cb4afecbb6cae70a40d9429ac99322",
+    "services/orchestrator/test_account_runtime.py": "f21e12bd83140e8837d9c23fd523346f31c0ba2b3ded1b5f57d09feab5764782",
+    "services/orchestrator/test_project_review_runtime.py": "cef6d19c2dd6d06efb5c57b630818a1327755bf503ea943a92d84c612ccdb18c",
+    "services/orchestrator/cli_scratchpad.py": "656908f1c5748e74e05461ee631f8eefc8115fcc93f3a57edf6b5da4167d4d44",
+    "services/orchestrator/test_cli_scratchpad.py": "1dc7e0531c11a672de505715002c8ea16b482b92f3610271695eb9990372019d",
+    "services/orchestrator/cluster_migration_files.py": "b63e171259e1452d8c9570cd2b5e157a13e3ebc55be77270706a2025b3c5d7bf",
+    "deploy/flower2api/scratchpad_cli_fixture.py": "879b7a88f39860c84910a7cfbc87698e5da2392f5728148c6241d2d0615f67c5",
+    "deploy/flower2api/scratchpad_sender_benchmark.py": "fc71678dc59e63fac9612f6bceb27e246b57f8ccf7d8702759577d291b9ccf6e",
+    "deploy/flower2api/verify_scratchpad_storage.py": "c91a93b22d3511d0d1bab731fa0b82c52dce47a1d3f6b2068bc95ca5f1cbbb49",
+    "services/orchestrator/test_login_drafts.py": "fa6fa7f0c317dce9b29720657b804618fe2212d0ed4db49ed959be03fc5937a2"
+  }
+}

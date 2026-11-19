@@ -43,6 +43,10 @@ scripts/flower2api-stack load --manifest /absolute/path/v3.json --bundle /absolu
 
 pull 按 `registry_digest` 固定下载，核对配置 ID后建立清单中的标签；load 先核对包名称、大小和 SHA256。随后两者都执行角色、批次、提交与平台核对。首次发布不自动修改包可见性；离线交付不需要服务器保存 GHCR PAT。env 中的两个镜像引用必须和发布清单完全一致。
 
+## 人工分配集群
+
+节点 SSH 接入、统一网关、迁移、停机操作、组合备份和升级见 [集群操作单](CLUSTER.md)。
+
 ## RAM 与 swap 预算
 
 账号可在 cc2api 选择 `request_backend=native293`，界面显示280 / 293自动匹配。新版镜像分别安装两版单文件执行内核。293沿固定beta.6附件，280由CI从固定官方来源隔离构建并校验最终摘要。本地分别用 `V3_NATIVE_RUNTIME_ASSET`、`V3_NATIVE_RUNTIME_280_ASSET` 提供同摘要制品。来源、安装、双版本准备和升级说明见[原生双版本合同](../../services/runtime/docs/native-versions.md)。

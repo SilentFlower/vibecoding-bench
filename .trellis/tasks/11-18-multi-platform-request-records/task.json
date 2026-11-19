@@ -1,0 +1,43 @@
+{
+  "id": "multi-platform-request-records",
+  "name": "multi-platform-request-records",
+  "title": "多平台请求记录与端到端回归",
+  "description": "将AGY按真实HTTP、尝试、用量、工具及策略接入既有请求诊断，保留原页面、历史兼容和采集权限，并完成跨层回归。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "gateway",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-18",
+  "completedAt": "2026-11-18",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-18T13:13:25Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-18-multi-platform-account-runtime",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-18T13:13:25.155831+00:00",
+    "completedSteps": [
+      "多平台请求记录接入及受控采集",
+      "双库和旧程序兼容验证",
+      "FBK-001修复及Check-All重检通过",
+      "执行合同同步完成"
+    ],
+    "partialStep": null,
+    "nextStep": "父任务跨子项收尾核对",
+    "notes": "全量Python的既有python-dateutil种子摘要错误单独登记。真实外部模型提交为0。"
+  }
+}

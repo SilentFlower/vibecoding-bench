@@ -1,0 +1,21 @@
+....E..............................
+======================================================================
+ERROR: test_local_target_keeps_central_authority_and_management_refresh_token (test_cluster_execution.NodeExecutionTests.test_local_target_keeps_central_authority_and_management_refresh_token)
+本机目标准备使用独立投影，管理profile及中央环境行保持权威。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_execution.py", line 256, in test_local_target_keeps_central_authority_and_management_refresh_token
+    apply_migrations(connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 178, in apply_migrations
+    runner[0](connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 626, in initialize_bench_schema
+    initialize_plan_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 387, in initialize_plan_schema
+    if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
+       ~~~~~^^^^^^^^^^
+TypeError: tuple indices must be integers or slices, not str
+
+----------------------------------------------------------------------
+Ran 35 tests in 9.380s
+
+FAILED (errors=1)

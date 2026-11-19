@@ -1,0 +1,12 @@
+/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+  warnings.warn(  # deprecated in 14.0 - 2024-11-09
+/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/uvicorn/protocols/websockets/websockets_impl.py:16: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+  from websockets.server import WebSocketServerProtocol
+......../usr/lib/python3.12/ast.py:52: ResourceWarning: unclosed <socket.socket fd=3, family=1, type=1, proto=0>
+  return compile(source, filename, mode, flags,
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+...........
+----------------------------------------------------------------------
+Ran 19 tests in 6.741s
+
+OK

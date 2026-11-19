@@ -14,6 +14,7 @@ from docker.errors import DockerException, NotFound
 from account_isolation import ISOLATION_VERSION, role_container
 from account_runtime import RuntimeBusy, _read_json, atomic_json
 from cpu_resources import default_cpu_limits, read_policy as read_cpu_policy
+from cli_scratchpad import preserve_cli_scratchpad, restore_cli_scratchpad
 from project_library import read_document, safe_relative, write_document
 from resource_budget import isolated_account_limits, scenario_account_limits, serial_review_limits
 from system_profile import SYSTEM_PROFILE_DIRECTORY
@@ -37,23 +38,25 @@ class ProjectReviewRuntime:
         self._refresh_lock = threading.Lock()
         self._refreshing = set()
 
-    def owner_refresh_state(self, account: dict) -> dict | None:
+    def owner_refresh_state(self, account: dict, *, identity: str | None = None) -> dict | None:
         """读取原凭据所有者的持久刷新待办，不触发网络请求。
 
         :param account: 原账号。
+        :param identity: 本次中央只读检查的冻结额度身份，省略时沿原运行时解析。
         :return: 当前身份、环境及凭据版本的未完成或失败待办；历史请求返回None。
         """
         path = self.runtime.data/'project-review-owner-refresh'/(str(account['id'])+'.json')
         if not path.exists():
             return None
         state = read_document(path)
-        if state['status'] in ('complete','superseded') or not self._refresh_applies(state,account):
+        if state['status'] in ('complete','superseded') or not self._refresh_applies(state,account,identity=identity):
             return None
         return state
 
-    def _refresh_applies(self, state: dict, account: dict) -> bool:
+    def _refresh_applies(self, state: dict, account: dict, *, identity: str | None = None) -> bool:
         # 原业务Run仍由父批次身份门禁保护；旧刷新故障不能串到新的有效上下文。
-        if self.runtime.quota_identity and state.get('identity')!=self.runtime.quota_identity(account):
+        current_identity=identity if identity is not None else self.runtime.quota_identity(account) if self.runtime.quota_identity else None
+        if current_identity is not None and state.get('identity')!=current_identity:
             return False
         connection=self.runtime.database()
         try:
@@ -64,6 +67,11 @@ class ProjectReviewRuntime:
                 or state.get('environment_generation')!=environment['generation']):
             return False
         path=self.runtime.data/'profiles'/account['name']/'.credentials.json'
+        if getattr(self.runtime,'node_key',None) is not None:
+            current=self.runtime._root(dict(environment))/'home/.claude/.credentials.json'
+            if current.is_symlink():
+                raise ValueError('节点当前HOME凭据路径需要核对')
+            path=current
         if state.get('rejected_access_digest') and path.is_file():
             oauth=read_document(path).get('claudeAiOauth',{})
             token,expires=oauth.get('accessToken'),oauth.get('expiresAt')
@@ -114,6 +122,30 @@ class ProjectReviewRuntime:
                 write_document(path.parent/'archive'/(identity+'.json'),{**previous,'status':'superseded',
                     'previous_status':previous['status'],'superseded_at':time.time(),'replaced_by':state['request_id']})
             write_document(path,state)
+
+    def wait_owner_refresh_exit(self, job: dict) -> None:
+        """有界观察原401 worker正常退出，保留driver的最终计时写入。
+
+        :param job: 当前独立私有评审作业。
+        :return: None；八秒内尚未结束时保留原待办并要求后续核对。
+        """
+        runtime=self.runtime
+        with runtime.lock:
+            if (not runtime._owns_job(job) or job.get('execution_role')!=REVIEW_ROLE
+                    or job['account'].get('cc2api_account_id') is not None
+                    or not isinstance(job.get('exec'),str) or not job['exec']):
+                raise ValueError('原401退出观察与当前独立私有作业不一致')
+        deadline=time.monotonic()+8
+        while True:
+            observed=runtime.client.api.exec_inspect(job['exec'])
+            if type(observed.get('Running')) is not bool or not observed['Running'] and type(observed.get('ExitCode')) is not int:
+                raise ValueError('原401 worker实际退出回执需要核对')
+            if not observed['Running']:
+                return
+            if time.monotonic()>=deadline:
+                raise RuntimeBusy('原401 worker仍在写入退出边界，保持原待办')
+            # 只观察同一实际exec；不重复业务指令或借用新的模型许可。
+            time.sleep(.05)
 
     def retry_owner_refresh(self, account: dict, refresh) -> bool:
         """空闲后异步调用原排他刷新入口，不占评审holder或项目tick。
@@ -188,13 +220,14 @@ class ProjectReviewRuntime:
         threading.Thread(target=process,name='project-review-owner-refresh',daemon=True).start()
         return True
 
-    def admission(self, account: dict) -> dict:
+    def admission(self, account: dict, *, identity: str | None = None) -> dict:
         """只读检查评审池与原环境布局，等待和永久受阻分开。
 
         :param account: 原账号。
+        :param identity: 中央本次只读检查的冻结额度身份。
         :return: allowed、blocked及用户可见原因。
         """
-        state=self.owner_refresh_state(account)
+        state=self.owner_refresh_state(account,identity=identity)
         if state:
             return {'allowed':False,'blocked':state['status']=='error','message':
                 '原凭据所有者刷新失败，评审受阻' if state['status']=='error' else '等待原凭据所有者完成刷新'}
@@ -340,6 +373,7 @@ class ProjectReviewRuntime:
             'review_limits':{'Memory':memory,'MemorySwap':total}}
         atomic_json(self.serial_path(job['row']),state)
         self._serial_phase(job,'cli_stopping')
+        preserve_cli_scratchpad(self.runtime, job['row'], cli)
         cli.stop(timeout=5)
         cli.reload()
         if cli.status not in STOPPED_STATES:
@@ -379,6 +413,7 @@ class ProjectReviewRuntime:
             cli.reload()
         if cli.status != 'running':
             raise ValueError('固定 CLI 恢复结果未确认')
+        restore_cli_scratchpad(self.runtime, job['row'], cli)
         self.runtime._wait_network(job['row'])
         self.runtime._sender_active(job['row'])
         self.runtime.check_system_profile(job['row'],cli)
@@ -585,7 +620,8 @@ class ProjectReviewRuntime:
         identity['projects'] = {'/home/node/review': {'hasTrustDialogAccepted': True}}
         write_document(root / 'home/.claude.json', identity, mode=0o600, owner=(1000, 1000))
 
-    def start_run(self, account: dict, task: dict, run_id: str, worker_env: dict, quota_env: dict) -> tuple[str, str]:
+    def start_run(self, account: dict, task: dict, run_id: str, worker_env: dict, quota_env: dict, *,
+                  project_manager=None, defer_permission: bool = False) -> tuple[str, str]:
         """经原非共享 CLI 租约与监督器启动串行隔离评审。
 
         :param account: 原账号。
@@ -593,9 +629,14 @@ class ProjectReviewRuntime:
         :param run_id: 持久评审Run。
         :param worker_env: 已冻结版本、模型及effort。
         :param quota_env: 原被动额度上下文。
+        :param project_manager: 本次节点的冻结文件提供器，省略时沿用原中央管理器。
+        :param defer_permission: 节点监督器是否等待中央保存原启动许可后放行。
         :return: 原作业完整token，保留旧运行器接口。
         """
         runtime = self.runtime
+        manager=project_manager if project_manager is not None else runtime.project_iterations
+        if defer_permission and project_manager is None:
+            raise ValueError('私有评审缺少本次项目所有者或中央放行上下文')
         source = worker_env['QUOTA_SOURCE']
         row, cli = runtime.ensure(account, scenario_resources=True, prepare_sender=False)
         with runtime.environment_lock(row['environment_id']):
@@ -606,7 +647,10 @@ class ProjectReviewRuntime:
             if runtime._execution_records(row) or (runtime._root(row)/'runtime/execution.json').exists():
                 raise RuntimeBusy('原账号执行记录尚未收口，等待评审')
             # 创建意图必须早于Docker创建，避免ACK丢失后产生第二个私有实例。
-            root = self.root_for_run(run_id)
+            if project_manager is None:
+                root = self.root_for_run(run_id)
+            else:
+                root = self.root_for_job({'private_relative':str(manager.review_root(run_id).relative_to(runtime.data))})
             handle = hashlib.sha256(source.encode()).hexdigest()[:20]
             job = runtime.claim(row, account, source)
             try:
@@ -628,15 +672,15 @@ class ProjectReviewRuntime:
                 os.chown(root/'home',1000,1000)
                 (root/'home').chmod(0o700)
                 self.sync_credentials(job)
-                context = runtime.project_iterations.scenarios.context(run_id)
-                package = read_document(runtime.project_iterations.scenarios._package_path(context['scenario_execution']['evaluation_job_id']))
+                context = manager.scenarios.context(run_id)
+                package = read_document(manager.scenarios._package_path(context['scenario_execution']['evaluation_job_id']))
                 if not isinstance(package.get('resolved_model'),str) or not re.fullmatch(r'[A-Za-z0-9._\-\[\]]{1,128}',package['resolved_model']):
                     raise ValueError('评审缺少候选实际使用的固定模型')
                 write_document(root / 'input/package.json', package, mode=0o640, owner=(0, 1000))
                 cwd = '/home/node/review'
                 native = root / 'home/.claude/projects' / cwd.replace('/', '-')
                 controls = root / 'controls' / handle
-                plan = runtime.project_iterations.scenarios.execution_configuration(run_id, source, int(task.get('quota_attempt') or 0),
+                plan = manager.scenarios.execution_configuration(run_id, source, int(task.get('quota_attempt') or 0),
                     native, root / 'runtime/runs' / run_id / 'project-plan-request.json', controls / 'project-plan-decision.json', cwd)
                 configuration = {'source': 'cli:' + source, 'identity': quota_env.get('QUOTA_IDENTITY'), 'cwd': cwd,
                     'session_dir': '/home/node/.claude/projects/' + cwd.replace('/', '-'),
@@ -660,6 +704,11 @@ class ProjectReviewRuntime:
                     (parent / 'runtime/system-profile', SYSTEM_PROFILE_DIRECTORY, 'ro'),
                     (parent / 'runtime/system-profile/cpuinfo', '/proc/cpuinfo', 'ro'),
                     (parent / 'runtime/system-profile/ld.so.preload', '/etc/ld.so.preload', 'ro')]
+                if quota_env.get('QUOTA_STATE_FILE'):
+                    quota_root=runtime.data/'quota'/str(account['id'])
+                    if not quota_root.is_dir() or quota_root.is_symlink():
+                        raise ValueError('私有评审缺少原账号已发布的额度状态目录')
+                    bindings.append((quota_root,'/quota-account','ro'))
                 network = role_container(runtime, row, 'network')
                 shared_context = {'NETWORK_INSPECTION_MODE': 'passthrough', 'QUOTA_SOURCE': ''}
                 runtime._configure_network_context(cli, shared_context, reuse_passthrough=True,
@@ -678,7 +727,7 @@ class ProjectReviewRuntime:
                 job.update(review_container_id=child.id, review_phase='created', cwd=cwd, version=worker_env['CLAUDE_CODE_VERSION'])
                 runtime._save_execution(job)
                 self._serial_phase(job,'review_running',review_container_id=child.id)
-                environment = {**worker_env, **runtime.execution_environment(row), 'HOME': '/home/node',
+                environment = {**worker_env, **quota_env, **runtime.execution_environment(row), 'HOME': '/home/node',
                     'CLAUDE_MODEL_OVERRIDE':package['resolved_model'],
                     'V3_PERSISTENT_HOME': '1', 'USE_SIDECAR_DNS': '1', 'EXTERNAL_OAUTH_REFRESH': '1',
                     'PATH': f"/cli/{worker_env['CLAUDE_CODE_VERSION']}/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
@@ -688,6 +737,9 @@ class ProjectReviewRuntime:
                     'QUOTA_SIGNAL_FILE': '/controls/' + handle + '/pause.json'}
                 if plan['resume']:
                     environment['RESUME_SESSION_ID'] = plan['session_id']
+                job.update(tmux='claude-' + run_id, tmux_socket='/run/v3/jobs/' + handle + '/tmux-1000/default')
+                if runtime.execution_input is not None:
+                    environment.update(runtime.execution_input(runtime, job, controls))
                 command = ['python3', '-I', '/usr/local/bin/v3-cli-control', 'supervise', '--source', source,
                     '--proof', '/run/v3/jobs/' + handle + '/process.json', '--ready', '/controls/' + handle + '/start.json',
                     '--result', '/run/v3/jobs/' + handle + '/process-result.json', '--', 'bash', '/run/v3/drivers/job-' + handle + '.sh']
@@ -701,12 +753,16 @@ class ProjectReviewRuntime:
                             (row['environment_id'], row['generation'], source, runtime.release_id, run_id))
                 finally:
                     connection.close()
-                if not runtime.project_iterations.can_start(run_id):
+                if not manager.can_start(run_id):
                     raise ValueError('评审实际执行前父门禁已变化')
+                runtime.authorize_input(job)
                 runtime.client.api.exec_start(execution['Id'], detach=True)
                 runtime._attach_process(job, root / 'runtime/jobs' / handle / 'process.json')
-                runtime.project_iterations.scenarios.permit_start(run_id,source)
-                write_document(controls / 'start.json', job['process'], mode=0o640, owner=(0, 1000))
+                runtime.authorize_input(job)
+                if not defer_permission:
+                    manager.scenarios.permit_start(run_id,source)
+                    runtime.authorize_input(job)
+                    write_document(controls / 'start.json', job['process'], mode=0o640, owner=(0, 1000))
                 job['review_phase'] = 'running'
                 runtime._save_execution(job)
                 return job['token'], job['token']

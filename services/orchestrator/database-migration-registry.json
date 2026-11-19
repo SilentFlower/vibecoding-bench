@@ -10,6 +10,42 @@
       "predecessor": 0,
       "rollback_mode": "compatible",
       "version": 1
+    },
+    {
+      "checksum": "cadeaa69f643b7b5188499bb0bccd938404e08c9135578327e1d2d50fd0f712d",
+      "engine": "sqlite",
+      "id": "bench.cluster.2",
+      "kind": "schema",
+      "predecessor": 1,
+      "rollback_mode": "compatible",
+      "version": 2
+    },
+    {
+      "checksum": "195602763d6c53695d1849de19818e452649aa46a20520545baf7f5759d23d92",
+      "engine": "sqlite",
+      "id": "bench.node-executions.3",
+      "kind": "schema",
+      "predecessor": 2,
+      "rollback_mode": "compatible",
+      "version": 3
+    },
+    {
+      "checksum": "b099ad3f403eb0582b285f801831a31723bfe3ba7aca3cbdb0b266cf52739d8d",
+      "engine": "sqlite",
+      "id": "bench.node-login-drafts.4",
+      "kind": "schema",
+      "predecessor": 3,
+      "rollback_mode": "compatible",
+      "version": 4
+    },
+    {
+      "checksum": "e3b0ff0d39d39dd55e8d362328ee088ebbb15c2f2e0a2779b04fb669dc2f4f76",
+      "engine": "sqlite",
+      "id": "bench.agy-environments.5",
+      "kind": "schema",
+      "predecessor": 4,
+      "rollback_mode": "compatible",
+      "version": 5
     }
   ]
 }

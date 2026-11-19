@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from requests.exceptions import ReadTimeout
 
 import main
+from manage import restore_upstream_checkout_bytes, source_snapshot_ignore
 from project_iteration import ProjectIterationManager
 from project_library import ProjectLibrary, materialize_snapshot, snapshot_tree
 from project_test_content import create_project_fixture
@@ -457,7 +458,32 @@ class ProjectIterationTests(ProjectIterationFixture):
 
     def test_retired_generated_content_is_not_a_production_catalog(self) -> None:
         """正式库只接入就绪真实内容，临时调度夹具不计真实项目。@return None。"""
-        root = ROOT/'resources/project-library'
+        source_root = ROOT/'resources/project-library'
+        snapshot = self.data/'production-source'
+        root = snapshot/'project_library'
+        dateutil = source_root/'projects/python-dateutil'
+        source_digest = snapshot_tree(dateutil/'seed')['digest']
+
+        def copy_content(original: str, target: str) -> str:
+            """为待恢复项目建立私有副本，其余冻结资料只读复用。
+
+            :param original: 工作树原文件。
+            :param target: 临时交付文件。
+            :return: 已复制或链接的目标路径。
+            """
+            # 恢复函数会写 Dateutil 原件；其余只读制品复用硬链接，避免复制整套离线依赖。
+            if Path(original).is_relative_to(dateutil):
+                return shutil.copy2(original, target)
+            try:
+                os.link(original, target)
+            except OSError:
+                # 工作树和临时目录可能跨文件系统；硬链接不可用时仍可用独立副本校验。
+                return shutil.copy2(original, target)
+            return target
+
+        shutil.copytree(source_root, root, copy_function=copy_content, ignore=source_snapshot_ignore)
+        restore_upstream_checkout_bytes(snapshot)
+        self.assertEqual(source_digest, snapshot_tree(dateutil/'seed')['digest'])
         catalog = json.loads((root/'catalog.json').read_text())
         self.assertEqual(3,catalog['schema'])
         self.assertEqual('development.json',catalog['project_manifest'])

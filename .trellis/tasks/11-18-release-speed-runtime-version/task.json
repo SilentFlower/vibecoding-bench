@@ -1,0 +1,59 @@
+{
+  "id": "release-speed-runtime-version",
+  "name": "release-speed-runtime-version",
+  "title": "发行二期提速：运行时版本与数据库四路演练",
+  "description": "",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-18",
+  "completedAt": null,
+  "closeout": {
+    "status": "pending",
+    "closedAt": null,
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "11-18-runtime-platform-version",
+    "11-18-database-proof-workers-four"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-11-18T13:12:39Z",
+      "contextKey": "codex_01a1ed1b-8f82-7600-8044-64367bdae57a",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "e3bd1db9d2fc4da80dd0fa7b27549a06ecbc70ab",
+        "status": [],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "e3bd1db9d2fc4da80dd0fa7b27549a06ecbc70ab",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "37aa23998bd0c3cb3305d38b51ce9b037e87635f0c2451e211e2147d2e64291f"
+          }
+        ],
+        "fingerprint": "f07658f4b7b454f08daba43a3407988685426e23dff5dbafdbb56eea244fb4a7"
+      }
+    }
+  }
+}

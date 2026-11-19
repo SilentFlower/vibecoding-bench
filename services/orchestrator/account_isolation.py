@@ -12,6 +12,7 @@ from docker.types import Mount
 from cpu_resources import default_cpu_limits, read_policy as read_cpu_policy
 
 from account_update_identity import configured_release, image_origin, role_release, save_image_origin
+from cli_scratchpad import SCRATCHPAD_STORE, prepare_scratchpad_mount, restore_cli_scratchpad
 
 from native_kernel_upgrade import migrate_records
 from native_capture_policy import capture_enabled
@@ -51,6 +52,8 @@ def role_container(runtime, row: dict, role: str, allow_old_release: bool = Fals
     if not identifier:
         raise ValueError('账号隔离角色尚未登记，需要先对账')
     container = runtime.client.containers.get(identifier)
+    if container.labels.get('vibebench.cluster-node') != getattr(runtime, 'node_key', None):
+        raise ValueError('账号角色属于其他执行节点')
     expected = {**runtime._labels(row), 'vibebench.role': ROLE_LABELS[role],
         'vibebench.isolation-version': str(ISOLATION_VERSION)}
     if not allow_old_release:
@@ -84,10 +87,14 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     root = runtime._root(row)
     fingerprint = json.loads(row['fingerprint_json'])
     native = account.get('native_sender')
+    agy = account.get('agy_sender')
+    if native and agy:
+        raise ValueError('同一账号环境只能采用一个平台内核')
     if native:
         migrate_records(root, int(account.get('cc2api_account_id') or 0), reconciled=account.get('native_migration') is True)
+    execution = agy or native
     limits = isolated_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'),
-        ('unlimited' if native['memory_mib'] == 0 else str(native['memory_mib']) + 'm') if native else None)
+        ('unlimited' if execution['memory_mib'] == 0 else str(execution['memory_mib']) + 'm') if execution else None)
     layout_path = root / 'runtime/project-review-layout.json'
     review_layout = json.loads(layout_path.read_text()) if layout_path.is_file() else None
     if review_layout:
@@ -110,7 +117,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
             managers.append(str(ipaddress.IPv4Address(configuration['Gateway'])))
     for container in runtime.client.containers.list(filters={'label': [
             'vibebench.product=v3', f'vibebench.deployment={runtime.deployment}']}):
-        if container.labels.get('vibebench.role') not in ('orchestrator', 'gateway'):
+        if container.labels.get('vibebench.role') not in ('orchestrator', 'gateway', 'node-control'):
             continue
         manager = container.attrs.get('NetworkSettings', {}).get('Networks', {}).get(runtime.network, {}).get('IPAddress')
         if manager:
@@ -146,11 +153,11 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     restore = restore_policy(native, fingerprint, image_labels.get('vibebench.native-criu') == '1')
     sender_file = paths['sender'] / 'sender.json'
     write_json(sender_file, {'binding': binding, 'proxy_url': resolved_proxy, 'proxy_source': proxy,
-        'native': native, 'native_capture_dir': '/flows/api/cc-prepared' if native and capture_enabled(fingerprint) else None,
+        'native': native, 'agy': agy, 'native_capture_dir': ('/flows/api/agy-prepared' if agy else '/flows/api/cc-prepared') if execution and capture_enabled(fingerprint) else None,
         'native_tls_observer_protocol': observer_protocol,
         'native_criu_enabled': restore['eligible'], 'native_criu_reason': restore['reason'],
         'native_criu_protocol': 1 if native and image_labels.get('vibebench.native-criu') == '1' else None,
-        'allowed_origin': 'https://api.anthropic.com', 'evidence_file': '/flows/api/observations.jsonl', 'quota_identity': ''}, 0o640)
+        'allowed_origin': 'https://cloudcode-pa.googleapis.com' if agy else 'https://api.anthropic.com', 'evidence_file': '/flows/api/observations.jsonl', 'quota_identity': ''}, 0o640)
     os.chown(sender_file, 0, 1001)
     write_json(paths['network'] / 'context.json', {'NETWORK_INSPECTION_MODE': 'passthrough', 'QUOTA_SOURCE': ''})
     (paths['network'] / 'ready').unlink(missing_ok=True)
@@ -168,12 +175,13 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
 
     def launch(role, **options):
         memory, total = limits[role]
-        role_pids = 128 + 32 * native['max_workers'] if role == 'sender' and native else 512 if role == 'cli' else 128
+        role_pids = 128 + (64 if agy else 32) * execution['max_workers'] if role == 'sender' and execution else 512 if role == 'cli' else 128
         options.update(name=name if role == 'network' else name + '-' + role,
             labels=role_labels(runtime, row, role), detach=True, auto_remove=False, read_only=True,
             mem_limit=memory, memswap_limit=total, nano_cpus=default_cpus[role],
             pids_limit=role_pids, security_opt=options.pop('security_opt', ['no-new-privileges:true']),
-            log_config={'type': 'json-file', 'config': {'max-size': '10m', 'max-file': '3'}}, mounts=[machine_mount])
+            log_config={'type': 'json-file', 'config': {'max-size': '10m', 'max-file': '3'}},
+            mounts=[machine_mount, *options.pop('mounts', [])])
         if role == 'cli' and review_layout:
             options.update(nano_cpus=review_layout['cli_nano_cpus'], pids_limit=384)
             options['labels']['vibebench.review-layout'] = '1'
@@ -226,6 +234,12 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
             time.sleep(0.25)
         runtime.prepare_system_profile(row, network)
         base = {'network_mode': 'container:' + network.id, 'cap_drop': ['ALL']}
+        scratchpad = []
+        if (image_labels.get('vibebench.cli-scratchpad-protocol') == '1'
+                or (root / SCRATCHPAD_STORE).exists() or (root / SCRATCHPAD_STORE).is_symlink()):
+            scratchpad_mount = prepare_scratchpad_mount(runtime, row)
+            if scratchpad_mount is not None:
+                scratchpad.append(scratchpad_mount)
         cli = launch('cli', **base, user='1000:1000', entrypoint=['python3', '-I', '/usr/local/bin/v3-cli-control'], command=['idle'],
             environment={'HOME': '/home/node', 'TZ': fingerprint['tz'],
                 'LANG': fingerprint['lang'], 'LC_ALL': fingerprint['lang'], 'SHELL': '/bin/bash'},
@@ -238,7 +252,8 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
                 ('runtime/drivers', '/run/v3/drivers', 'ro'), ('runtime/runs', '/run/v3/runs', 'rw'),
                 ('runtime/jobs', '/run/v3/jobs', 'rw'), ('runtime/access', '/run/v3/access', 'ro'),
                 ('flows', '/flows', 'rw'), ('runtime/empty', '/flows/api', 'ro'), ('controls', '/controls', 'ro')]),
-            tmpfs={'/tmp': 'rw,noexec,nosuid,nodev,size=128m,mode=1777'})
+            tmpfs={'/tmp': 'rw,noexec,nosuid,nodev,size=128m,mode=1777'}, mounts=scratchpad)
+        restore_cli_scratchpad(runtime, row, cli, fresh=True)
         runtime.check_system_profile(row, cli)
         _directory(root / 'runtime/native', 1001, 1001, 0o700)
         sender_mounts = mounts([*common_files, ('runtime/sender', '/run/v3', 'ro'), ('flows/api', '/flows/api', 'rw'), ('runtime/native', '/native', 'rw')])

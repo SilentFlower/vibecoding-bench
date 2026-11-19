@@ -5,12 +5,14 @@ import json
 import os
 import subprocess
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import manage
+from agy_auth import SOURCE_BYTES, SOURCE_SHA256
 
 
 class PublicationTests(unittest.TestCase):
@@ -30,6 +32,7 @@ class PublicationTests(unittest.TestCase):
         self.manifest = {"schema": 3, "bridge_protocol": 1, "layout_version": 1,
             "release": "ci-123-1", "parent_revision": "a" * 40, "gateway_revision": "b" * 40,
             "dirty_worktree": False, "source_content_sha256": "c" * 64,
+            'agy_auth': {'available': True, 'source_version': '1.5.9', 'bytes': SOURCE_BYTES, 'sha256': SOURCE_SHA256},
             "images": {role: {"reference": f"vibebench-v3-{role}:v3-ci-123-1",
                 "digest": "sha256:" + value * 64,
                 "config_digest": "sha256:" + ("5" if role == "control" else "6") * 64, "platform": "linux/amd64"}
@@ -48,6 +51,8 @@ class PublicationTests(unittest.TestCase):
         return {"Id": self.manifest["images"][role]["digest"], "Os": "linux", "Architecture": "amd64",
             "RepoDigests": [reference + "@sha256:" + ("3" if role == "control" else "4") * 64],
             "Config": {"Labels": {"vibebench.product": "v3", "vibebench.role": role,
+                'vibebench.agy-runtime-protocol': '1', 'vibebench.agy-runtime-source-sha256': SOURCE_SHA256,
+                'vibebench.agy-auth-source-sha256': SOURCE_SHA256,
                 "vibebench.release": "ci-123-1", "vibebench.parent-revision": "a" * 40,
                 "vibebench.gateway-revision": "b" * 40}}}
 
@@ -83,12 +88,53 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(result["bundle"]["sha256"], manage._file_sha256(self.bundle))
         self.assertEqual(self.output.stat().st_mode & 0o777, 0o600)
 
+    def test_missing_agy_asset_rejects_before_docker_publication(self) -> None:
+        """缺失能力在镜像推送和发布标记之前拒绝。@return 无。"""
+        for asset in [None, {'available': False, 'source_version': '1.5.9', 'sha256': ''}]:
+            with self.subTest(asset=asset):
+                self.manifest['agy_auth'] = asset
+                self.input.write_text(json.dumps(self.manifest))
+                with patch.object(manage, 'command') as command:
+                    with self.assertRaisesRegex(ValueError, 'AGY'):
+                        manage.publish(self.input, self.output, self.bundle)
+                    command.assert_not_called()
+                self.assertFalse(self.output.with_name(self.output.name + '.started').exists())
+
+    def test_declared_agy_image_requires_actual_matching_labels(self) -> None:
+        """清单声明可用时，实际镜像标签也须匹配。@return 无。"""
+        original = self._image
+        def image(role):
+            """只改变合成账号镜像的固定摘要。@param role 角色。@return 镜像元数据。"""
+            value = original(role)
+            if role == 'account':
+                value['Config']['Labels']['vibebench.agy-runtime-source-sha256'] = '0' * 64
+            return value
+        with patch.object(self, '_image', side_effect=image):
+            with self.assertRaisesRegex(ValueError, 'AGY'):
+                self._publish()
+
     def test_flower2api_manual_publication_uses_new_package_names(self) -> None:
         """融合分支手动发布生成新包名并保持实际镜像配置身份。@return None。"""
         with patch.dict(os.environ, {"GITHUB_REF": "refs/heads/flower2api",
                 "GITHUB_WORKFLOW_REF": "SilentFlower/vibecoding-bench/.github/workflows/v3-release.yml@refs/heads/flower2api"}):
             result = self._publish()
         self.assertTrue(all('/flower2api-' in entry['reference'] for entry in result['images'].values()))
+
+    def test_two_pushes_and_bundle_reach_the_same_barrier(self) -> None:
+        """两路推送与归档必须同时进入屏障，串行交付会超时失败。:return: None。"""
+        barrier = threading.Barrier(3, timeout=3)
+        original = manage.save_image_bundle
+        def save(references, path):
+            barrier.wait()
+            return original(references, path)
+        def command(*args, **kwargs):
+            if args[:2] == ('docker', 'push'):
+                barrier.wait()
+            return self._command(*args, **kwargs)
+        with patch.object(manage, 'save_image_bundle', side_effect=save):
+            result = self._publish(command)
+        self.assertEqual({'control', 'account'}, set(result['images']))
+        self.assertTrue(self.bundle.exists())
 
     def test_automatic_or_unconfirmed_publication_refuses_before_docker(self) -> None:
         """构建及其它入口在 Docker 副作用前拒绝发布。@return None。"""

@@ -12,6 +12,7 @@ import test_system_release as release_tests
 from system_release import create_index, sign_file
 from system_update_contract import validate_index, validate_release, verify_signed
 from test_system_migrations import evidence_for
+from agy_auth import SOURCE_BYTES, SOURCE_SHA256
 
 
 class SystemPublishTests(unittest.TestCase):
@@ -26,6 +27,8 @@ class SystemPublishTests(unittest.TestCase):
         self.bundle.write_bytes(b'synthetic-image-bundle')
         self.fixture.build['bundle'] = {'name': self.bundle.name, 'size': self.bundle.stat().st_size,
             'sha256': hashlib.sha256(self.bundle.read_bytes()).hexdigest()}
+        self.fixture.build['agy_auth'] = {'available': True, 'source_version': '1.5.9',
+            'bytes': SOURCE_BYTES, 'sha256': SOURCE_SHA256}
         self.fixture.manifest.write_text(json.dumps(self.fixture.build))
         self.calls = []
         self.fail_upload = False

@@ -1,0 +1,13 @@
+[
+  ".trellis/spec/orchestrator/backend/account-runtime-v3.md",
+  ".trellis/spec/platform/deploy/platform-online-update.md",
+  ".trellis/spec/web/frontend/ui-guidelines.md",
+  "apps/web/src/api.ts",
+  "deploy/flower2api/system_update_host.py",
+  "deploy/flower2api/test_system_release.py",
+  "deploy/flower2api/test_system_workflow.py",
+  "services/gateway/src/service/runtime_bridge.rs",
+  "services/orchestrator/account_runtime.py",
+  "services/orchestrator/main.py",
+  "services/orchestrator/system_updates.py"
+]

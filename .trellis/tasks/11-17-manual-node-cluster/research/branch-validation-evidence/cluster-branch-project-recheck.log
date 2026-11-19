@@ -1,0 +1,53 @@
+test_coverage_gate_is_reported_as_actual_numbers_without_guessing (test_project_arrow_adapter.ArrowAdapterTests.test_coverage_gate_is_reported_as_actual_numbers_without_guessing)
+覆盖率失败给出原门槛和真实值，不伪造某项原测试报错。:return: None。 ... ok
+test_empty_list_error_variants_are_accepted_but_accepting_invalid_input_fails (test_project_arrow_adapter.ArrowAdapterTests.test_empty_list_error_variants_are_accepted_but_accepting_invalid_input_fails)
+真实辅助函数接受合同允许的两种拒绝，错误类型或未拒绝都失败。:return: None。 ... ok
+test_feature_probe_failure_does_not_corrupt_original_pytest_node (test_project_arrow_adapter.ArrowAdapterTests.test_feature_probe_failure_does_not_corrupt_original_pytest_node)
+真实pytest仍通过原节点，新增边界失败单列且不暴露断言原文。:return: None。 ... ok
+test_legacy_and_current_helpers_use_identical_precise_fix (test_project_arrow_adapter.ArrowAdapterTests.test_legacy_and_current_helpers_use_identical_precise_fix)
+只修空列表的异常子类选择，非空错误类型的严格检查继续保留。:return: None。 ... ok
+test_product_entry_overlays_helper_without_writing_frozen_assets (test_project_arrow_adapter.ArrowAdapterTests.test_product_entry_overlays_helper_without_writing_frozen_assets)
+真实入口同时使用可信wrapper和只读辅助挂载，旧合同及文件保持原字节。:return: None。 ... ok
+test_public_diagnostics_have_node_and_exception_but_no_private_log (test_project_arrow_adapter.ArrowAdapterTests.test_public_diagnostics_have_node_and_exception_but_no_private_log)
+模型可定位公开节点，原日志、私有堆栈、异常正文不会透传。:return: None。 ... ok
+test_chardet_real_behavior_errors_still_fail (test_project_contract_observers.ContractObserverTests.test_chardet_real_behavior_errors_still_fail)
+结果、顺序、惰性、局部隔离、策略、上游与真实检测错误仍拒绝。:return: None。 ... ok
+test_chardet_reasonable_indexes_and_error_representations_pass (test_project_contract_observers.ContractObserverTests.test_chardet_reasonable_indexes_and_error_representations_pass)
+两种连续编号及三种明确错误表示均保持相同业务语义。:return: None。 ... ok
+test_feedback_stays_bounded_specific_and_private (test_project_contract_observers.ContractObserverTests.test_feedback_stays_bounded_specific_and_private)
+新诊断可进入历史反馈，重复或私有诊断不能污染公开说明。:return: None。 ... ok
+test_known_sources_and_future_copies_are_exact (test_project_contract_observers.ContractObserverTests.test_known_sources_and_future_copies_are_exact)
+既有冻结版本和未来副本均使用精确受信代码，未知字节拒绝。:return: None。 ... ok
+test_real_entry_keeps_frozen_bytes_and_strict_diagnostics (test_project_contract_observers.ContractObserverTests.test_real_entry_keeps_frozen_bytes_and_strict_diagnostics)
+产品入口只读旧资产，额外字段、假布尔和伪造类别均不能通过。:return: None。 ... ok
+test_reference_and_reasonable_variants_pass_public_and_business_checks (test_project_contract_observers.ContractObserverTests.test_reference_and_reasonable_variants_pass_public_and_business_checks)
+旧参考与合理兼容变体均通过独立矩阵及未来公开用例。:return: None。 ... ok
+test_wrong_locale_behaviors_remain_failures_with_specific_feedback (test_project_contract_observers.ContractObserverTests.test_wrong_locale_behaviors_remain_failures_with_specific_feedback)
+质量、顺序、排除、输入边界及一次性消费错误仍分别拒绝。:return: None。 ... ok
+test_wrong_pages_behaviors_remain_failures_with_specific_feedback (test_project_contract_observers.ContractObserverTests.test_wrong_pages_behaviors_remain_failures_with_specific_feedback)
+归一、未知格式、原值、非原地修改和其它字段错误均拒绝。:return: None。 ... ok
+test_candidate_evidence_requires_explicit_permission_and_actual_file (test_project_evaluation.ReviewProtocolTests.test_candidate_evidence_requires_explicit_permission_and_actual_file)
+交付文件引用须由判定项授权且实际存在，不能任意编路径。@return None。 ... ok
+test_copied_rubric_metadata_is_normalized_without_changing_the_frozen_package (test_project_evaluation.ReviewProtocolTests.test_copied_rubric_metadata_is_normalized_without_changing_the_frozen_package)
+兼容评审抄回的输入元数据，返回值只保留判定且不改写冻结依据。@return None。 ... ok
+test_disclosure_is_fixed_and_input_digest_is_verified (test_project_evaluation.ReviewProtocolTests.test_disclosure_is_fixed_and_input_digest_is_verified)
+只能选择现有固定分支，完整业务对话不能被替换。@return None。 ... ok
+test_redundant_metadata_cannot_grant_evidence_permission_or_rewrite_requirements (test_project_evaluation.ReviewProtocolTests.test_redundant_metadata_cannot_grant_evidence_permission_or_rewrite_requirements)
+输出中的权限和要求不能替代原冻结规则，布尔值也不能用整数冒充。@return None。 ... ok
+test_single_json_fence_is_accepted_but_surrounding_text_or_multiple_objects_are_rejected (test_project_evaluation.ReviewProtocolTests.test_single_json_fence_is_accepted_but_surrounding_text_or_multiple_objects_are_rejected)
+纯 JSON 代码块不改变结论，夹带说明和多个对象仍无法确定唯一评审。@return None。 ... ok
+test_tolerant_envelope_preserves_identity_evidence_and_business_guards (test_project_evaluation.ReviewProtocolTests.test_tolerant_envelope_preserves_identity_evidence_and_business_guards)
+兼容展示格式后，身份错配、重复字段、伪造证据和程序失败仍必须拒绝。@return None。 ... ok
+test_valid_pass_and_uncertain_have_distinct_semantics (test_project_evaluation.ReviewProtocolTests.test_valid_pass_and_uncertain_have_distinct_semantics)
+合法短答案通过；uncertain有效但不声明业务成功。@return None。 ... ok
+test_wrong_identity_duplicates_unknown_evidence_and_program_failure_rejected (test_project_evaluation.ReviewProtocolTests.test_wrong_identity_duplicates_unknown_evidence_and_program_failure_rejected)
+不能靠回显错误身份、重复字段或伪造证据覆盖程序事实。@return None。 ... ok
+test_duplicate_streaming_responses_preserve_known_cache_fields (test_project_evaluation.ScenarioUsageTests.test_duplicate_streaming_responses_preserve_known_cache_fields)
+同一响应后续增量缺字段时仍保留已知计数，只计一次请求。@return None。 ... ok
+test_unanswered_or_truncated_source_stays_unknown (test_project_evaluation.ScenarioUsageTests.test_unanswered_or_truncated_source_stays_unknown)
+只有已消费问题或截断边界时，未知token不是零。@return None。 ... ok
+
+----------------------------------------------------------------------
+Ran 24 tests in 23.426s
+
+OK

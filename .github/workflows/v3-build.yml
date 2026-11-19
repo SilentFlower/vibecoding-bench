@@ -28,10 +28,8 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/v3-update-venv"
           "$RUNNER_TEMP/v3-update-venv/bin/pip" install -r services/orchestrator/requirements.txt PyYAML==6.0.3
           python3 deploy/flower2api/verify_database_definitions.py
-          # 宿主快照测试需核验跨进程数据库句柄，使用与正式执行器相同的 root 权限。
-          sudo "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest discover -s deploy/flower2api -p 'test_system*.py'
-          "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest discover -s services/orchestrator -p 'test_system_update*.py'
-          PYTHONPATH=services/orchestrator:deploy/flower2api "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest test_publication test_system_workflow test_database_definitions test_database_migrations test_database_compatibility test_source_layout test_legacy_packages
+          # 三组独立测试并行收口；宿主快照仍由入口以 root 权限验证。
+          python3 deploy/flower2api/verify_release_tests.py --python "$RUNNER_TEMP/v3-update-venv/bin/python"
       - name: 准备共享构建缓存
         id: flower2api-cache
         continue-on-error: true
@@ -41,8 +39,33 @@ jobs:
         run: printf '%s\n' '::warning::CI缓存准备失败，本次沿普通Docker构建路径执行。'
       - name: 准备双版本原生运行时
         uses: ./.github/actions/flower2api-native-runtime
+      - name: 准备AGY处理产物
+        # 固定执行映像复用本仓处理产物，源码适配层由当前快照构建。
+        uses: ./.github/actions/flower2api-agy-artifact
       - name: 构建两个镜像并生成版本清单
         run: python3 deploy/flower2api/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3-local.json
+      - name: 验收镜像内AGY能力
+        run: |
+          # 合成状态目录须归属容器UID 1001，沿宿主验证权限调用同一虚拟环境。
+          sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_images.py --manifest releases/v3-local.json
+      - name: 导出可信候选镜像
+        if: >-
+          github.repository == 'SilentFlower/vibecoding-bench' &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+          (github.ref == 'refs/heads/v3' || github.ref == 'refs/heads/flower2api')
+        run: python3 deploy/flower2api/candidate_artifacts.py export --manifest releases/v3-local.json --output releases/candidate
+      - name: 上传可信候选产物
+        if: >-
+          github.repository == 'SilentFlower/vibecoding-bench' &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+          (github.ref == 'refs/heads/v3' || github.ref == 'refs/heads/flower2api')
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+          path: releases/candidate/
       - name: 保存本地构建清单
         uses: actions/upload-artifact@v4
         with:

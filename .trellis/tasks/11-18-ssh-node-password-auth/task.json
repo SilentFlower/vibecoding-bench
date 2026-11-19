@@ -1,0 +1,68 @@
+{
+  "id": "ssh-node-password-auth",
+  "name": "ssh-node-password-auth",
+  "title": "SSH 节点支持账号密码认证",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-18",
+  "completedAt": "2026-11-18",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-18T09:15:44Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-11-18T08:50:43Z",
+      "contextKey": "codex_01a1ed1b-8f82-7600-8044-64367bdae57a",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "97e38cd2a95fa177c8c71631a88288dc049bcd40",
+        "status": [],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "97e38cd2a95fa177c8c71631a88288dc049bcd40",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "59ec50a6c1a4cdcbdbd55f777971fe74fd6ab10532f4bdfb5c257049298d44f9"
+          }
+        ],
+        "fingerprint": "c278954782cf03e72fce95eb4ae9fb4c9cbe59acd7a8ec2489c186332b5cdd95"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "SSH 节点密码认证及全部连接通道",
+      "真实 SSH、浏览器、部署与集群回归验证",
+      "CHK-001 密钥节点旧版读取兼容修复",
+      "认证与运维合同规范沉淀"
+    ],
+    "partialStep": null,
+    "nextStep": "发行与生产维护按各自流程续接",
+    "notes": "US 受信模板维护及 main 组件实际准备属于上线后验证。",
+    "updatedAt": "2026-11-18T09:15:44.527034+00:00"
+  }
+}

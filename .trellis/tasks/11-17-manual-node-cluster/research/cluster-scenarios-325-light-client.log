@@ -1,0 +1,18 @@
+F/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+  warnings.warn(  # deprecated in 14.0 - 2024-11-09
+/root/project/vibecoding-bench/.venv/lib/python3.12/site-packages/uvicorn/protocols/websockets/websockets_impl.py:16: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+  from websockets.server import WebSocketServerProtocol
+
+======================================================================
+FAIL: test_api_quota_rpc_checks_exact_environment_and_returns_bounded_original_bytes (test_cluster_agent.NodeAgentTests.test_api_quota_rpc_checks_exact_environment_and_returns_bounded_original_bytes)
+实际UDS操作只读精确环境的API文件，旧分配拒绝。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_agent.py", line 49, in setUp
+    self.fail('隔离节点服务启动超时')
+AssertionError: 隔离节点服务启动超时
+
+----------------------------------------------------------------------
+Ran 1 test in 18.290s
+
+FAILED (failures=1)

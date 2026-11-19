@@ -3457,6 +3457,7 @@ mod tests {
         let pool = Arc::new(NativePool::default());
         let id = Uuid::new_v4().to_string();
         let config = SenderConfig {
+            agy: None,
             native: Some(NativeSenderConfig {
                 source_version: Default::default(),
                 runtimes: Default::default(),
@@ -3803,6 +3804,7 @@ mod tests {
         let normal = if unlimited { 2 } else { 3 };
         let root = temp_dir().join(format!("cc2api-native-{}", Uuid::new_v4()));
         let config = SenderConfig {
+            agy: None,
             native: Some(NativeSenderConfig {
                 source_version: Default::default(),
                 runtimes: Default::default(),

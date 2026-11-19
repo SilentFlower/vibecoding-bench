@@ -1,0 +1,40 @@
+{"event": "flower2api-database-source", "release": "0", "seconds": 0.01}
+{"event": "flower2api-database-source", "release": "1", "seconds": 0.01}
+{"event": "flower2api-database-source", "release": "2", "seconds": 0.01}
+{"event": "flower2api-database-source", "release": "3", "seconds": 0.01}
+{"event": "flower2api-database-source", "release": "4", "seconds": 0.01}
+{"event": "flower2api-database-source", "release": "5", "seconds": 0.01}
+{"event": "flower2api-database-source", "release": "6", "seconds": 0.01}
+{"event": "flower2api-database-source", "release": "7", "seconds": 0.01}
+{"event": "flower2api-database-complete", "workers": 1, "sources": 8, "seconds": 0.006}
+.{"event": "flower2api-database-source", "release": "1", "seconds": 0.01}
+..{"event": "flower2api-database-source", "release": "1", "seconds": 0.01}
+{"event": "flower2api-database-source", "release": "0", "seconds": 0.01}
+{"event": "flower2api-database-source", "release": "2", "seconds": 0.01}
+{"event": "flower2api-database-source", "release": "3", "seconds": 0.01}
+{"event": "flower2api-database-source", "release": "4", "seconds": 0.01}
+{"event": "flower2api-database-source", "release": "5", "seconds": 0.01}
+{"event": "flower2api-database-source", "release": "6", "seconds": 0.01}
+{"event": "flower2api-database-source", "release": "7", "seconds": 0.01}
+{"event": "flower2api-database-complete", "workers": 2, "sources": 8, "seconds": 0.006}
+...............................................................................................GitHub缓存上下文不可用，本次构建使用本机缓存。
+.....................................................................................................
+----------------------------------------------------------------------
+Ran 199 tests in 57.073s
+
+OK
+v3 essential 备份及隔离恢复验证完成：/tmp/tmpkj6u7m78/backup；文件字节 8231；保留最近 1 份，已移除旧备份 0 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmpqvrcwz2o/backups/first；文件字节 26；保留最近 1 份，已移除旧备份 0 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmpqvrcwz2o/backups/second；文件字节 27；保留最近 1 份，已移除旧备份 1 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmpqxpihh0l/backups/first；文件字节 21；保留最近 1 份，已移除旧备份 0 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmpn2361_0m/backups/first；文件字节 21；保留最近 1 份，已移除旧备份 0 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmpfiv8bmlp/backups/first；文件字节 21；保留最近 1 份，已移除旧备份 0 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmpfiv8bmlp/backups/second；文件字节 21；保留最近 1 份，已移除旧备份 1 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmpfiv8bmlp/backups/third；文件字节 429；保留最近 1 份，已移除旧备份 1 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmpb01h8tkm/backup；文件字节 115；保留最近 1 份，已移除旧备份 0 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmp797m5lxl/backup；文件字节 140；保留最近 1 份，已移除旧备份 0 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmp2sjn4kub/backup；文件字节 115；保留最近 1 份，已移除旧备份 0 份
+v3 full 备份及隔离恢复验证完成：/tmp/tmp6smiam5g/backup；文件字节 8307；保留最近 1 份，已移除旧备份 0 份
+v3 full 备份及隔离恢复验证完成：/tmp/tmp346nxt9i/first；文件字节 8307；保留最近 1 份，已移除旧备份 0 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmpu26lp0ks/backup；文件字节 115；保留最近 1 份，已移除旧备份 0 份
+v3 essential 备份及隔离恢复验证完成：/tmp/tmpy6jvaoh8/backup；文件字节 115；保留最近 1 份，已移除旧备份 0 份

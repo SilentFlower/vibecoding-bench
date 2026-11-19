@@ -27,6 +27,7 @@ def run_scenario_fixture(plan: dict) -> None:
     """
     review = Path('/input/package.json').is_file()
     configuration = {} if review else json.loads((home/'.synthetic-scenarios'/(plan['session_id']+'.json')).read_text())
+    configuration['quota_trace_runtime']=True
     directory=home/'.claude/projects'/str(Path.cwd()).replace('/','-')
     directory.mkdir(parents=True,exist_ok=True)
     session=directory/(plan['session_id']+'.jsonl')
@@ -34,6 +35,8 @@ def run_scenario_fixture(plan: dict) -> None:
     if session.exists():
         for line in session.read_text().splitlines():
             previous=json.loads(line).get('uuid',previous)
+    for sample in configuration.get('quota_samples',[]):
+        previous=emit_fixture_quota(configuration,Path.cwd(),session,previous,sample,'scenario-'+uuid4().hex)
     print('Synthetic task pane',flush=True)
     tty.setraw(sys.stdin.fileno())
     os.write(sys.stdout.fileno(),b'\x1b[?2004h')
@@ -86,19 +89,77 @@ def run_scenario_fixture(plan: dict) -> None:
                 partial.write_text('保留真实超时前的半成品')
                 while True:
                     time.sleep(1)
-            if key=='Q4':
+            if configuration.get('development'):
+                if configuration.get('implement'):
+                    (Path.cwd()/'library/example.py').write_text('VALUE = 2\n')
+                text=configuration['answer']
+            elif key=='Q4':
                 (Path.cwd()/'library/example.py').write_text('VALUE = 2\n')
-            text='NEED_CONTEXT：请提供调用示例。' if key=='Q2' and '冻结调用材料' not in prompt else '固定公开行为正确，当前任务已回答。'
+                text='固定公开行为正确，当前任务已回答。'
+            else:
+                text='NEED_CONTEXT：请提供调用示例。' if key=='Q2' and '冻结调用材料' not in prompt else '固定公开行为正确，当前任务已回答。'
         time.sleep(configuration.get('delay_sec',0.5) if not review else 0.5)
+        auth_error=(review and json.loads((home/'.claude/.credentials.json').read_text())
+            .get('claudeAiOauth',{}).get('accessToken')=='synthetic-review-refresh-required')
+        if auth_error:
+            text='API Error: 401 Invalid authentication credentials'
         response={'type':'assistant','uuid':identity+'-answer','parentUuid':previous,'sessionId':plan['session_id'],
             'timestamp':datetime.now(timezone.utc).isoformat(),'message':{'role':'assistant','id':identity,'model':'offline-fixture',
                 'usage':{'input_tokens':7,'output_tokens':11,'cache_read_input_tokens':0,'cache_creation_input_tokens':0},
                 'stop_reason':'end_turn','content':[{'type':'text','text':text}]}}
+        if auth_error:
+            response.update(isApiErrorMessage=True,error='authentication_error')
+            response['message']['model']='<synthetic>'
         with session.open('a') as output:
             output.write(json.dumps(response,ensure_ascii=False)+'\n')
         previous=response['uuid']
         print('Fixture scenario response complete',flush=True)
 
+
+
+def emit_fixture_quota(config: dict, cwd: Path, session: Path, previous: str | None, sample: dict, index: int | str) -> str:
+    """沿正式statusLine发布合成额度事实并保留真实原生父链。
+
+    :param config: 原合成会话配置。
+    :param cwd: 当前实际工作区。
+    :param session: 当前实际原生文件。
+    :param previous: 原父消息。
+    :param sample: 固定测试额度。
+    :param index: 本次样本唯一标识。
+    :return: 本次原生消息身份。
+    """
+    # 使用正式 statusLine 入口和正常工具响应，验证真实采集链路而非直接改额度状态。
+    observed = time.time()
+    identity = f"{config['session']}-quota-{index}"
+    response = {'type':'assistant','uuid':identity,'parentUuid':previous,
+        'sessionId':config['session'],'timestamp':datetime.now(timezone.utc).isoformat(),
+        'message':{'id':identity,'role':'assistant','model':'offline-fixture','stop_reason':'tool_use',
+            'content':[{'type':'tool_use','id':identity+'-tool','name':'Bash','input':{'command':'synthetic'}}]}}
+    with session.open('a') as stream:
+        stream.write(json.dumps(response)+'\n')
+    previous = identity
+    settings = json.loads(Path(os.environ.get('CLAUDE_EXECUTION_SETTINGS',str(home/'.claude/settings.json'))).read_text())
+    payload = {'cwd':str(cwd),'session_id':config['session'],'transcript_path':str(session),
+        'rate_limits':{key:{'used_percentage':sample[key],
+            'resets_at':observed+sample.get(key+'_reset_seconds',delay)}
+            for key,delay in (('five_hour',600),('seven_day',3600))}}
+    trace=(Path('/run/v3/runs')/os.environ['RUN_ID'] if config.get('quota_trace_runtime') else cwd)
+    with (trace/'.synthetic-quota.jsonl').open('a') as stream:
+        stream.write(json.dumps({'at':observed,'five_hour':sample['five_hour'],
+            'seven_day':sample['seven_day']})+'\n')
+    subprocess.run(shlex.split(settings['statusLine']['command']), input=json.dumps(payload),
+        text=True,capture_output=True,check=True)
+    if config.get('quota_pause_step') and sample['five_hour']>=100:
+        # 额度百分比保留当前在途工作；原worker由真实形状的CLI限额拒绝收口。
+        rejected=identity+'-rejected'
+        response={'type':'assistant','uuid':rejected,'parentUuid':identity,'sessionId':config['session'],
+            'timestamp':datetime.now(timezone.utc).isoformat(),'isApiErrorMessage':True,'error':'rate_limit',
+            'message':{'id':rejected,'model':'<synthetic>','role':'assistant','stop_reason':'end_turn',
+                'content':[{'type':'text','text':'5-hour session limit reached.'}]}}
+        with session.open('a') as stream:
+            stream.write(json.dumps(response)+'\n')
+        return rejected
+    return identity
 
 def run_followup_fixture() -> None:
     """消费真实 tmux 按键或粘贴，写入原生形状主会话证据，不进行推理。
@@ -137,25 +198,7 @@ def run_followup_fixture() -> None:
         for index, sample in enumerate(config.get('quota_schedule', [])):
             if quota_started is None or index in quota_sent or time.monotonic()-quota_started < sample['after']:
                 continue
-            # 使用正式 statusLine 入口和正常工具响应，验证真实采集链路而非直接改额度状态。
-            observed = time.time()
-            identity = f"{config['session']}-quota-{index}"
-            response = {'type':'assistant','uuid':identity,'parentUuid':previous,
-                'sessionId':config['session'],'timestamp':datetime.now(timezone.utc).isoformat(),
-                'message':{'id':identity,'role':'assistant','model':'offline-fixture','stop_reason':'tool_use',
-                    'content':[{'type':'tool_use','id':identity+'-tool','name':'Bash','input':{'command':'synthetic'}}]}}
-            with session.open('a') as stream:
-                stream.write(json.dumps(response)+'\n')
-            previous = identity
-            settings = json.loads(Path(os.environ.get('CLAUDE_EXECUTION_SETTINGS',str(home/'.claude/settings.json'))).read_text())
-            payload = {'cwd':str(cwd),'session_id':config['session'],'transcript_path':str(session),
-                'rate_limits':{key:{'used_percentage':sample[key],'resets_at':observed+delay}
-                    for key,delay in (('five_hour',600),('seven_day',3600))}}
-            with (cwd/'.synthetic-quota.jsonl').open('a') as stream:
-                stream.write(json.dumps({'at':observed,'five_hour':sample['five_hour'],
-                    'seven_day':sample['seven_day']})+'\n')
-            subprocess.run(shlex.split(settings['statusLine']['command']), input=json.dumps(payload),
-                text=True,capture_output=True,check=True)
+            previous = emit_fixture_quota(config,cwd,session,previous,sample,index)
             quota_sent.add(index)
         if busy_until and native_queue:
             for queued in list(queued_users):
@@ -183,6 +226,9 @@ def run_followup_fixture() -> None:
                 'timestamp':datetime.now(timezone.utc).isoformat(),'message':{'role':'assistant',
                     'stop_reason':'end_turn','content':[{'type':'text','text':
                         'All queued extensions complete.' if native_queue else 'Initial work complete.'}]}}
+            if config.get('reply_usage'):
+                initial_reply['requestId'] = initial_reply['uuid']
+                initial_reply['message']['usage'] = config['reply_usage']
             previous = initial_reply['uuid']
             events = [initial_reply]
             for queued in queued_users:
@@ -257,6 +303,15 @@ def run_followup_fixture() -> None:
                 (cwd/'partial-artifact.txt').write_text('half of step '+str(step))
                 while True:
                     time.sleep(1)
+            quota_marker=cwd/'.synthetic-plan-quota-once'
+            if config.get('quota_pause_step')==step:
+                if not quota_marker.exists():
+                    quota_marker.write_text('本次真实输入已消费，暂停后沿原会话继续')
+                    quota_started=time.monotonic()
+                    busy_until=time.monotonic()+3600
+                    continue
+                previous=emit_fixture_quota(config,cwd,session,previous,
+                    {'five_hour':25,'seven_day':9},'plan-recovery-'+uuid4().hex)
             if config.get('delay_sec'):
                 time.sleep(config['delay_sec'])
             # 仅合成 CLI 使用可信测试程序，生产镜像不会携带参考实现。
@@ -306,6 +361,9 @@ def run_followup_fixture() -> None:
             'timestamp': datetime.now(timezone.utc).isoformat(), 'message': {'role': 'assistant',
             'stop_reason': 'end_turn', 'content': [{'type': 'thinking', 'thinking': 'Local fixture reasoning.'},
                 {'type': 'text', 'text': 'Completed the requested local fixture stage.'}]}}
+        if config.get('reply_usage'):
+            assistant['requestId'] = assistant['uuid']
+            assistant['message']['usage'] = config['reply_usage']
         if config.get('auth_failure'):
             assistant.update(isApiErrorMessage=True, error='account_on_hold')
             assistant['message'].update(model='<synthetic>', content=[{'type': 'thinking', 'thinking': 'Not a delivery.'},

@@ -8,14 +8,13 @@ import os
 import re
 import secrets
 from contextlib import ExitStack
-from http.client import HTTPConnection
 from pathlib import Path
-from socket import AF_UNIX, SOCK_STREAM, socket
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from docker.errors import NotFound
 from starlette.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, StrictInt, StrictStr
+from pydantic import BaseModel, ConfigDict, StrictBool, StrictInt, StrictStr
+from typing import Literal
 
 from account_isolation import ROLE_COLUMNS, ROLE_LABELS, role_container
 from account_update_identity import image_origin
@@ -23,6 +22,10 @@ from native_kernel_upgrade import migrate_records, pending_upgrade, validate_rec
 from native_sender import builtin_config
 from system_update_contract import MANIFEST_LIMIT, safe_read, strict_json, validate_operation
 from system_update_gate import UPDATE_GATE
+from cluster_migration_maintenance import paused_migration_lease
+
+
+_PLATFORM_VERSION_FILE = Path(__file__).with_name('platform-version.json')
 
 
 class SystemUpdateAdmissionMiddleware:
@@ -93,6 +96,21 @@ class UpdateControl(BaseModel):
     """
     model_config = ConfigDict(extra='forbid')
     expected_revision: StrictStr
+
+
+class ClusterUpdate(BaseModel):
+    """已认证宿主的固定节点维护输入。:param operation_id: 原操作。:param epoch: 原代次。:param action: 固定动作。"""
+
+    model_config = ConfigDict(extra='forbid')
+    operation_id: StrictStr
+    epoch: StrictStr
+    action: Literal['prepare', 'status', 'rollback', 'resume', 'restore', 'cancel-preparation']
+    target_release: StrictStr | None = None
+    control_release: StrictStr | None = None
+    control_image: StrictStr | None = None
+    account_image: StrictStr | None = None
+    account_release: StrictStr | None = None
+    preserve_data: StrictBool = False
 
 
 class EnvironmentUpdate(BaseModel):
@@ -172,9 +190,21 @@ def runtime_snapshot(runtime) -> dict:
         connection.close()
     blockers = ['管理端仍有在途活动'] if gate['active'] else []
     environments = []
+    locality = getattr(runtime, 'locality', None)
     for row in rows:
         reasons = []
         item = {key: row.get(key) for key in ('environment_id', 'generation', 'state', 'name', 'account_id')}
+        if locality is not None and not locality(row):
+            service = getattr(runtime, 'cluster_service', None)
+            try:
+                if service is None or service.synchronization is None or accounts.get(row['account_id']) is None:
+                    raise ValueError('远程维护尚未接入')
+                item = service.synchronization.environment_snapshot(row, accounts[row['account_id']])
+            except Exception:
+                item.update(roles={}, origin=None, node_kind='ssh', blockers=['节点工作、连接或同步状态仍需核对'])
+                blockers.append(row['name'] + ': 节点工作、连接或同步状态仍需核对')
+            environments.append(item)
+            continue
         try:
             with ExitStack() as locks:
                 guard = runtime.environment_lock(row['environment_id'])
@@ -190,6 +220,14 @@ def runtime_snapshot(runtime) -> dict:
                 if pending_upgrade(root):
                     reasons.append('请求内核维护尚未完成')
                 account = accounts.get(row.get('account_id'))
+                from agy_environment import lookup_environment
+                agy=lookup_environment(runtime,row['environment_id'])
+                if agy:
+                    item.update(platform='antigravity',gateway_account_id=agy['gateway_account_id'])
+                    lease=runtime.gateway._request('GET',f"/admin/runtime/accounts/{agy['gateway_account_id']}/lease")
+                    configuration=runtime.gateway._request('GET',f"/admin/runtime/accounts/{agy['gateway_account_id']}/config")
+                    if lease.get('active') or lease.get('waiting') or lease.get('lease') or configuration.get('credential_state',{}).get('phase')!='ready':
+                        reasons.append('AGY账号许可或凭据操作尚未收口')
                 ownership = getattr(runtime, 'credential_ownership', None)
                 if ownership and account:
                     record = ownership.state(account['id'])
@@ -197,7 +235,17 @@ def runtime_snapshot(runtime) -> dict:
                         reasons.append('凭据交接或刷新结果尚未确认')
                 if account and account.get('cc2api_account_id'):
                     lease = runtime.gateway._request('GET', f'/admin/runtime/accounts/{int(account["cc2api_account_id"])}/lease')
-                    if lease.get('active') or lease.get('waiting') or lease.get('lease') or lease.get('holders'):
+                    paused = paused_migration_lease(runtime.database, row, lease)
+                    if paused is not None:
+                        fence = strict_json((root / 'runtime/node-fence.json').read_bytes())
+                        record = paused['record']
+                        if any(fence.get(key) != value for key, value in {
+                                'phase': 'fenced', 'operation_id': paused['operation_id'], 'node_key': 'local',
+                                'environment_id': row['environment_id'], 'account_id': row['account_id'],
+                                'generation': row['generation'], 'assignment_revision': record['source_revision']}.items()):
+                            paused = None
+                    if (lease.get('active') or lease.get('waiting') or lease.get('lease') or lease.get('holders')
+                            or lease.get('importing')) and paused is None:
                         reasons.append('账号 API 或运行租约尚未收口')
                 roles, image_ids = {}, set()
                 for role, column in ROLE_COLUMNS.items():
@@ -206,6 +254,10 @@ def runtime_snapshot(runtime) -> dict:
                     container = role_container(runtime, row, role)
                     container.reload()
                     roles[role] = {'id': container.id, 'state': container.status, 'image_id': container.attrs['Image']}
+                    if account and account.get('cc2api_account_id') and paused is not None:
+                        state = container.attrs.get('State', {})
+                        if state.get('Running') is not False or state.get('Pid') != 0:
+                            reasons.append('原迁移源角色尚未确认停止')
                     image_ids.add(container.attrs['Image'])
                     if role == 'cli' and container.status == 'running' and not reasons:
                         result = container.exec_run(['python3', '-I', '/usr/local/bin/v3-cli-control', 'orphans'])
@@ -228,8 +280,11 @@ def runtime_snapshot(runtime) -> dict:
         item['blockers'] = reasons
         blockers.extend(f'{row["name"]}: {reason}' for reason in reasons)
         environments.append(item)
+    service = getattr(runtime, 'cluster_service', None)
+    nodes = [row for row in service.store.list() if row['kind'] == 'ssh'
+        and ((row.get('preparation') or {}).get('release') or (row.get('preparation') or {}).get('current_release'))] if service else []
     return {**gate, 'ready': gate['phase'] == 'blocked' and not blockers,
-        'environments': environments, 'blockers': blockers[:256]}
+        'environments': environments, 'nodes': nodes, 'blockers': blockers[:256]}
 
 
 def environment_sources(runtime) -> list[dict]:
@@ -249,6 +304,24 @@ def environment_sources(runtime) -> list[dict]:
     for row in rows:
         item = {'environment_id': row['environment_id'], 'name': row['name'], 'release': None,
             'running': False, 'verified': True}
+        locality = getattr(runtime, 'locality', None)
+        if locality is not None and not locality(row):
+            item.update(verified=False, node_kind='ssh', maintenance='节点自动同步')
+            service = getattr(runtime, 'cluster_service', None)
+            if service is not None and service.synchronization is not None:
+                connection = runtime.database()
+                try:
+                    account = connection.execute('SELECT * FROM accounts WHERE id=?', (row['account_id'],)).fetchone()
+                finally:
+                    connection.close()
+                try:
+                    actual = service.synchronization.environment_snapshot(row, dict(account), quiescent=False)
+                    item.update(verified=True, release=(actual.get('origin') or {}).get('release'),
+                        running=any(role['state'] == 'running' for role in actual['roles'].values()), maintenance=None)
+                except Exception:
+                    item['maintenance'] = '节点同步状态需要核对'
+            result.append(item)
+            continue
         guard = runtime.environment_lock(row['environment_id'])
         if not guard.acquire(blocking=False):
             item['verified'] = False
@@ -324,6 +397,24 @@ def system_updates_router(runtime_provider) -> APIRouter:
     :return: FastAPI 路由。
     """
     router = APIRouter()
+
+    @router.get('/api/system-updates/version')
+    def version(response: Response) -> dict:
+        """读取当前控制镜像中的独立版本文件。
+
+        :param response: 管理响应，禁止跨控制镜像缓存版本。
+        :return: 规范平台版本或未知值。
+        """
+        response.headers['Cache-Control'] = 'no-store'
+        try:
+            value = strict_json(safe_read(_PLATFORM_VERSION_FILE, 1024), 1024)
+        except (OSError, ValueError):
+            # 独立启动和旧控制端可能缺少版本文件，保持未知值以兼容原管理入口。
+            return {'version': None}
+        current = value.get('version')
+        valid = (set(value) == {'version'} and isinstance(current, str)
+            and re.fullmatch(r'v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)', current))
+        return {'version': current if valid else None}
 
     @router.post('/internal/v3/system-updates/admitted-control')
     async def admitted_control(body: dict):
@@ -413,6 +504,21 @@ def system_updates_router(runtime_provider) -> APIRouter:
         internal_proof(request)
         return runtime_snapshot(runtime_provider())
 
+    @router.post('/internal/v3/system-updates/nodes')
+    def nodes(request: Request, body: ClusterUpdate) -> dict:
+        """沿原内部认证协调同代节点备份与恢复。:param request: 原宿主证明。:param body: 固定范围。:return: 节点进度。"""
+        gate = internal_proof(request)
+        if gate.get('operation_id') != body.operation_id or gate.get('epoch') != body.epoch or gate.get('phase') != 'blocked':
+            raise HTTPException(409, '节点平台维护操作或代次已变化')
+        runtime = runtime_provider()
+        service = getattr(runtime, 'cluster_service', None)
+        if service is None:
+            return {'nodes': []}
+        try:
+            return service.platform_nodes(body.model_dump())
+        except (ValueError, RuntimeError):
+            raise HTTPException(409, '节点平台维护仍需核对原任务') from None
+
     @router.post('/internal/v3/system-updates/environment')
     def environment(request: Request, body: EnvironmentUpdate):
         """只在同一维护操作下收口或重建环境。
@@ -464,6 +570,12 @@ def system_updates_router(runtime_provider) -> APIRouter:
                             config['native'] = builtin_config(config.get('native'), ('2.1.293',))
                             runtime._write_sender_config(row, config)
                 if body.action in ('rebuild', 'restore'):
+                    from agy_environment import lookup_environment, transport as agy_transport
+                    agy=lookup_environment(runtime,row['environment_id'])
+                    if agy:
+                        agy_transport(runtime,agy['gateway_account_id'],system_maintenance=True)
+                        row=lookup_environment(runtime,row['environment_id'])
+                        return {'environment_id':row['environment_id'],'generation':row['generation'],'state':row['state'],'origin':image_origin(runtime,row)}
                     if not account:
                         raise HTTPException(409, '环境缺少原始账号归属')
                     row, _ = runtime.ensure(dict(account), prepare_sender=False)

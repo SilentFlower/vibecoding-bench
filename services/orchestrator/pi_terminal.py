@@ -8,22 +8,17 @@ import time
 from datetime import datetime
 from math import isfinite
 from pathlib import Path
-from socket import SHUT_WR
 from stat import S_ISREG
 from threading import RLock
 from uuid import uuid4
 
 from account_runtime import AccountRuntime, atomic_json
 from capture_artifacts import capture_context_json
-from project_library import read_document, safe_relative
+from project_library import read_document, safe_relative, snapshot_tree
 from project_scenario_usage import aggregate_usage, source_usage
 from project_runtime_policy import ProjectRuntimeError
 from runtime_diagnostics import runtime_failure, write_runtime_failure
-
-
-KEYS = {'Enter', 'Escape', 'Up', 'Down', 'Left', 'Right', 'Tab', 'BTab', 'Space',
-    'BSpace', 'Delete', 'Home', 'End', 'PPage', 'NPage'} | {
-    'C-' + character for character in 'abcdefghijklmnopqrstuvwxyz'} | {'F' + str(index) for index in range(1, 13)}
+from runtime_terminal_input import KEYS, send_terminal_input
 
 
 class PiTerminal:
@@ -180,9 +175,11 @@ class PiTerminal:
                     environment=environment, workdir=cwd)
                 job['exec'] = execution['Id']
                 runtime._save_execution(job)
+                runtime.authorize_input(job)
                 runtime.client.api.exec_start(execution['Id'], detach=True)
                 launched = True
                 runtime._attach_process(job, runtime_job / 'process.json')
+                runtime.authorize_input(job)
                 atomic_json(controls / 'start.json', job['process'], 0o640)
                 os.chown(controls / 'start.json', 0, 1000, follow_symlinks=False)
                 return {'token': job['token'], 'source': source, 'workspace': str(workspace.relative_to(runtime.data)),
@@ -424,43 +421,17 @@ class PiTerminal:
         :param submit: 是否在文本后发送 Enter。
         :return: None；任何不确定投递抛出 RuntimeError。
         """
-        if len(text.encode()) > 48000 or len(keys) > 16 or any(key not in KEYS for key in keys):
-            raise ValueError('终端文本或按键不符合限制')
-        runtime = self.runtime
-        info = json.loads(work['runtime_json'])
-        job = runtime.job_for_container(info['token'])
-        with runtime.environment_lock(job['row']['environment_id']):
-            if job.get('heartbeat_failed') or runtime.job_for_container(info['token']) is not job:
-                raise ValueError('账号执行归属已改变')
-            container = runtime._container(job['row'])
-            command = ['tmux', '-S', job['tmux_socket']]
-            stream = None
-            try:
-                if text:
-                    execution = runtime.client.api.exec_create(container.id,
-                        [*command, 'load-buffer', '-b', operation_id, '-'], stdin=True, tty=False)
-                    stream = runtime.client.api.exec_start(execution['Id'], socket=True, tty=False)
-                    raw = getattr(stream, '_sock', None) or stream
-                    raw.settimeout(5)
-                    raw.sendall(text.encode())
-                    raw.shutdown(SHUT_WR)
-                    while raw.recv(4096):
-                        pass
-                    if runtime.client.api.exec_inspect(execution['Id']).get('ExitCode') != 0:
-                        raise RuntimeError('终端缓冲未确认')
-                    result = container.exec_run([*command, 'paste-buffer', '-p', '-b', operation_id, '-t', job['tmux']])
-                    if result.exit_code:
-                        raise RuntimeError('终端文本投递未确认')
-                sequence = [*keys, *(['Enter'] if submit else [])]
-                if sequence and container.exec_run([*command, 'send-keys', '-t', job['tmux'], *sequence]).exit_code:
-                    raise RuntimeError('终端按键投递未确认')
-            except Exception:
-                raise RuntimeError('终端输入结果未知，已保留意图，禁止自动重复发送') from None
-            finally:
-                if stream:
-                    stream.close()
-                if text:
-                    container.exec_run([*command, 'delete-buffer', '-b', operation_id])
+        send_terminal_input(self.runtime, json.loads(work['runtime_json'])['token'], operation_id, text, keys, submit)
+
+    def resolve_input(self, work: dict, operation_id: str, sent: bool) -> None:
+        """本机输入的人工结论由原中央动作账本保存。
+
+        :param work: 原工作。
+        :param operation_id: 原未知输入。
+        :param sent: 人工核对的发送事实。
+        :return: None。
+        """
+        return None
 
     def control(self, work: dict, operation: str) -> dict:
         """暂停、恢复或收口精确的执行树。
@@ -489,6 +460,16 @@ class PiTerminal:
         if path.is_symlink() or not path.is_dir():
             raise ValueError('工作区缺失或已被替换')
         return path
+
+    def snapshot(self, work: dict, objects: Path | None = None, *, snapshot_id: str | None = None) -> dict:
+        """读取当前工作源码清单，并按需保存内容对象。
+
+        :param work: 已登记的原工作。
+        :param objects: 候选内容对象目录，基线为None。
+        :param snapshot_id: 本次固定提交标识，供远程适配器关联收据。
+        :return: 原snapshot_tree格式的完整清单。
+        """
+        return snapshot_tree(self.workspace(work), objects)
 
     def conversation(self, work: dict) -> list[dict]:
         """读取原生实际交流，作为独立验收依据，超限时明确拒绝截断评分。

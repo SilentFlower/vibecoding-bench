@@ -796,7 +796,7 @@ AccountRuntime.check_system_profile(row: dict, container) -> None
 ### 3. Contracts
 
 - `system_profile` 独立于原 `profile_version=2`。首次受控创建时读取真实 Docker 网络角色的 `/proc/cpuinfo`，限定 4 MiB，核对所有逻辑 CPU 代际后从内置兼容模板选择一次；保存后跨 run、续聊、改名、停止唤醒、重建及回退复用。仅缺 key 可补齐，显式 null、未知 schema/模板或改写内容必须拒绝，不能重新随机。模板 ID 及内容只追加，不重解释旧记录。
-- 当前支持 `AuthenticAMD/23/1`（Naples）与 `AuthenticAMD/25/80`（Cezanne）。只替换 CPU 型号文本，保留创建时实际厂商、family/model/stepping、flags、数量/拓扑/频率等原文；真实硬件变化后空闲重建刷新非替换字段，跨代际迁移必须先核对，不能自动换画像。
+- 已登记模板覆盖 `AuthenticAMD/23/1`（Naples）与 `AuthenticAMD/25/80`（Cezanne）；其它x64 CPU首次创建使用`host-cpu-v1`保存真实厂商、family/model和型号，缺少对应机型时使用`portable-computer-v1`。已保存画像跨CPU代际及厂商迁移保持原值；渲染只替换型号，目标实际family/model/stepping、flags、核心数和拓扑继续使用目标原文。格式、固定模板及身份完整性继续核验。
 - 生成发生在环境锁内、CLI 创建前；有活动 job 或已有 CLI 实例时拒绝应用。旧容器须显式空闲重建，不能在 GET、普通 API 发送或正在运行的 CLI 中静默迁移。既有 hostname、MAC、machine-id、时区、设备、凭据和绑定保留；即使执行已获许可的 legacy reprofile，也保留已有合法 system_profile。
 - account 镜像携带 `vibebench.system-profile-version=1` 能力标签及镜像内编译的共享库；容器可能继承镜像标签，不能据此推断某角色已加载。只有 CLI 挂载 root 所有的只读 `/etc/v3-system-profile`、`/etc/ld.so.preload` 与 `/proc/cpuinfo`；network/sender 的 preload 为空，权限、网络和预算沿用三角色契约。
 - 覆盖库通过 libc uname 替换 release/version，保留 hostname/架构；常规 open/open64/openat/openat64、fopen/fopen64 及 fortified open 对三个内核文件精确重定向：`/proc/version`、`/proc/sys/kernel/osrelease`、`/proc/sys/kernel/version`。支持词法归一化、相对 cwd/目录 fd；写入仍走原接口，保留创建 mode、errno 和原 fortify 拒绝。配置初始化避免 hook 递归并使用 pthread_once，坏字段返回 EIO。
@@ -811,7 +811,8 @@ AccountRuntime.check_system_profile(row: dict, container) -> None
 | --- | --- |
 | 同账号新任务、续聊、唤醒、重建 | 固定替换字段保持，原项目目录规则不变 |
 | 画像缺 key / 显式 null 或内容损坏 | 受控创建时补齐一次 / 拒绝，不重新随机 |
-| 未支持、混合或迁移后的冲突 CPU 代际 | 明确报错，保留原记录 |
+| 未登记CPU / 迁移后的不同CPU代际 | 使用实际型号首次生成 / 保留原画像 |
+| CPU信息缺失、格式异常或混合代际 | 明确报错，保留原记录 |
 | 活动 job 或已有 CLI 实例调用准备函数 | 拒绝改写，先完成空闲重建 |
 | 旧 CLI 或实际读取不符 | CLI 待对账；健康 API 保留，可显式排空后重建 |
 | preload 或覆盖库未实际加载、其它画像文件不符 | 实际探针失败，不假报 ready |
@@ -826,7 +827,7 @@ AccountRuntime.check_system_profile(row: dict, container) -> None
 
 ### 6. Tests Required
 
-- 单元覆盖型号之外的 CPU 原文保持、未知/混合/迁移代际拒绝、画像损坏不重生成、首次增补一次、改名/重建/legacy reprofile 保持及 CLI 待对账仍可显式维护。
+- 单元覆盖型号之外的CPU原文保持、未知CPU实际型号、跨代/跨厂商迁移保留画像、混合代际拒绝、画像损坏不重生成、首次增补一次、改名/重建/legacy reprofile保持及CLI待对账仍可显式维护。
 - 实际 Docker 验证动态与静态 C、直接 uname syscall/CPUID、普通/fortified open、相对 openat、fopen、并发读取、Node/子进程、真实只读挂载及损坏字段 EIO；network/sender 不加载覆盖，实际资源/秘密边界保持。
 - 精确官方 CLI 2.1.293 在无账号断网环境验证版本、认证状态和登录帮助，结合动态绑定证明 uname 确实走覆盖。auth status 的未登录退出码 1 不算启动失败；不能据此声称真实登录或模型交互已验收。
 - 用 `run_local_verification.py` 的正式构建清单及显式旧 control/account 镜像验证 API/CLI 生命周期、重建和回退再启用，核对画像、身份及 HOME/凭据保留；记录本地启动性能及未执行的生产/真实模型边界。
@@ -855,7 +856,7 @@ account 镜像能力标签：vibebench.computer-profile-version="1"
 
 ### 3. Contracts
 
-- 旧 `system_profile` schema=1 保持不变。计算机对象和 dmi 对象必须精确匹配声明的键；schema 必须为整数 1，不能用 bool。厂商／产品／版本／系列作为兼容 CPU 代际的一套合成模板选择，模板 ID 和显示内容只追加、不重解释，也不声称是原厂 DMI 快照。
+- 旧 `system_profile` schema=1 保持不变。计算机对象和 dmi 对象必须精确匹配声明的键；schema 必须为整数 1，不能用 bool。已登记CPU优先选同代合成机型，其余使用不绑定CPU的`portable-computer-v1`；已有机型随原画像迁移，serial和UUID保持。模板ID及显示内容只追加、不重解释，也不声称是原厂DMI快照。
 - serial 为独立随机生成的 16 位大写十六进制，uuid 为独立标准小写 UUIDv4；不从 MAC、machine-id、账号或官方设备身份派生。已有合法 hostname、MAC、machine-id、时区／语言、CPU／内核、HOME、凭据及绑定继续保留；CPU 能力、实际限额和 RSS 不随机替换。
 - `prepare_system_profile` 在环境锁内、CLI 创建前读取实际 CPU；Docker 读取位于 SQLite 写事务外。`BEGIN IMMEDIATE` 后重读本行指纹、generation 和 container_id，仅缺 key 才生成；不持全局 jobs 锁等待 SQLite。UUID 占用查询与首次提交位于同一事务，未发布碰撞最多尝试 8 次；已保存重复值报错，不能旋转身份。
 - 先提交完整权威 JSON，再用逐级 O_NOFOLLOW 的原子写入渲染只读文件。画像和 dmi 目录 root 所有且 0755，文件 0444，计算机标记最后发布；提交后渲染失败、旧 row 重试或并发初始化都从 DB 复用同一对象。新任务、恢复、进程重启、唤醒、重建和镜像更新不重抽；legacy reprofile 也保留合法计算机对象。
@@ -893,7 +894,7 @@ validate_computer_profile(saved['computer_profile'], saved['system_profile'])
 
 ### 6. Tests Required
 
-- `test_system_profile.py` 覆盖 Naples／Cezanne 兼容候选、独立 serial／UUID、严格键和格式校验、跨代拒绝；保留型号之外真实 CPU 原文的断言。
+- `test_system_profile.py`覆盖Naples／Cezanne候选、未知CPU通用机型、独立serial／UUID、严格键和格式校验、跨宿主保留原机型；机型与保存画像的内部关联仍核验，型号之外真实CPU原文继续断言。
 - `test_account_runtime.py` 覆盖两个独立运行时共享 SQLite 的首次并发、提交后写文件失败及 stale row 重试、损坏记录拒绝、未发布 UUID 碰撞、旧身份／legacy reprofile 保留和健康 API 不受 CLI 门禁影响。
 - `verify_system_profile.py --manifest` 与原生探针覆盖两目录六字段、Node/libuv statx、元数据／权限／只读、相对 fd／cwd、零／六参数 syscall 和 errno、静态／CPUID 边界，以及已有宿主值和坏标记不回退。
 - `run_local_verification.py` 核对跨任务／恢复／重建、三角色权限、HOME／凭据和 CLI／API 隔离；任务研究中的 `identity_lifecycle_probe.py` 使用独立控制端进程、持久合成 SQLite 和两批真实镜像证明静态摘要、HOME／设备配置保持。真实账号、OAuth、模型和公网遥测不用于本地验收。
@@ -1696,3 +1697,431 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 ### 6. Tests Required
 
 `test_environment_summary`断言并发上限、排序、ContextVar、空列表与异常；`test_account_runtime`继续覆盖只读身份、维护锁、删除/草稿过滤与公开字段。`verify_native_environments.py`及`verify_environment_cpu_summary.py`保持列表、CPU换代和编辑草稿回归。
+
+## Scenario: CLI scratchpad 私有磁盘与启动恢复
+
+### 1. Scope / Trigger
+
+- 修改账号CLI的`/tmp/claude-1000`挂载、停止转存、重建、评审交接、备份或节点迁移时适用。实现归`cli_scratchpad.py`，调用入口沿用账号运行环境的原锁、空闲门禁和维护租约。
+
+### 2. Signatures
+
+- `preserve_cli_scratchpad(runtime, row: dict, container) -> None`：在停止原CLI前保全可读取的内存盘。
+- `prepare_scratchpad_mount(runtime, row: dict) -> Mount | None`：准备账号独立磁盘卷，返回原容器路径的挂载。
+- `restore_cli_scratchpad(runtime, row: dict, container, *, fresh: bool = False) -> None`：恢复原临时路径，或核验磁盘挂载。`fresh=True`只由已创建新空CLI的角色入口传入。
+- `scratchpad_runtime_registered(root: Path, environment_id: str) -> bool`：核验允许在目标节点重建的工作目录协议。
+- `remove_scratchpad_volume(runtime, row: dict) -> None`：全部角色移除后核验并清理卷元数据，持久文件继续独立保存。
+
+### 3. Contracts
+
+- 镜像标签`vibebench.cli-scratchpad-protocol=1`启用候选布局；已有`cli-scratchpad`资料继续进入保护逻辑。目录按不可变environment_id持有，HOME、原session路径、执行source和账号身份沿原映射。
+- 持久根为`cli-scratchpad/data`，UID1000。Docker local overlay使用私有空lower、磁盘upper及work，目标固定`/tmp/claude-1000`，参数含`noexec,nosuid,nodev`。CLI继续UID1000、能力清零、只读根和no-new-privileges。普通`/tmp`沿原tmpfs。
+- 管理记录属于root私有目录，协议身份为`{protocol:1,environment_id}`。`legacy.json`另绑定`container_id/generation/node_key/started_at/archive/sha256`；`restore.json`和`restored.json`绑定目标`container_id/started_at/archive_sha256`。转存流最多512MiB、清单最多100000条，拒绝路径逃逸、设备及链接父目录，核对文件内容与元数据并持久化后发布。
+- Docker归档接口对隔离tmpfs的视图不作为转存依据。可信标准库程序通过原CLI的exec流导出，并在CLI实际挂载命名空间中恢复。导出结束复核源StartedAt，启动身份变化阻挡发布并保留上次快照。
+- 同容器、同StartedAt且没有待恢复记录时，当前文件是权威状态，恢复入口直接沿用。启动身份改变或旧回执缺少started_at时，须先取得匹配本次启动与快照摘要的恢复完成证明，再允许新转存，避免空tmpfs覆盖唯一旧快照。恢复失败保留待恢复门禁及原包。
+- 卷名称、真实宿主路径、driver、选项和标签绑定部署、节点及环境。管理容器路径使用data，Docker挂载源使用host_data。实际能力探针核验UID和挂载标志；新布局尚未发布时，能力不足可沿用tmpfs，已有磁盘资料要求兼容节点继续恢复。
+- `runtime/scratchpad-mount/mount.json`与持久`layout.json`共同证明目录归属；已登记目录只含mount.json、lower、work，lower必须为空，目录保持管理端私有。创建归属标记先于lower/work，部分创建按同一身份续接。未知同名内容保留并阻挡挂载接管。
+- 本机完整及精简备份保全真实数据。节点集群接线由集群任务持有：节点导出须在`scratchpad_runtime_registered`通过后动态排除工作目录，未知同名目录随迁移包保全。回退候选须识别并保护磁盘资料与最新HOME。
+- 内存收益按退出tmpfs的shmem独立报告，普通页缓存、cgroup、进程内存及磁盘成本分别解释。接纳性能以固定sender、同宿主交错配对和明确负载的证据为准，实际发行镜像另做节点灰度。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 转存失败、磁盘满、内容变化或源启动身份改变 | 保留原实例及上次快照，阻挡后续停止移除 |
+| 本次启动尚未恢复旧快照 | 拒绝新转存，保留原包及恢复定位 |
+| 恢复失败或目标有未知内容 | 保留待恢复门禁及原文件，按同一恢复身份重试 |
+| 外来环境、卷标签或挂载选项不符 | 拒绝复用与清理 |
+| 已登记工作目录出现未知内容或外来标记 | 拒绝挂载及迁移排除，保留现场 |
+| 未登记的同名历史目录 | 迁移保全；挂载接管要求先对账 |
+
+### 5. Scenarios and Examples
+
+- 正常：空闲旧CLI完成转存后重建，新CLI在原路径读取同一session文件，真实历史会话继续执行。
+- 边界：转存后停止失败，源仍在同次启动中继续写入；对账沿用最新文件，下次转存保存新内容。
+- 错误用法：CLI重启后先对空tmpfs转存。正确处理是先按旧快照恢复并保存本次启动证明，再允许新的转存。
+- 错误用法：仅根据目录名称排除历史文件。正确处理是核验双份协议和私有目录，未知目录随迁移包保留。
+
+### 6. Tests Required
+
+- `test_cli_scratchpad`覆盖原路径、权限、硬链接/符号链接、三会话、源启动变化、同次启动继续写入、未恢复快照保护、旧回执、磁盘满、发布/恢复中断、跨账号及节点归属、完整/精简备份；集群迁移文件工具由集群交付追加验收。
+- 登录草稿夹具提供实际镜像Config/Labels结构，`test_login_drafts`继续验证旧布局删除、重试和对账；账号及评审运行环境回归核对原门禁与停止顺序。
+- `deploy/flower2api/verify_scratchpad_storage.py`在无外网隔离Docker中使用真实官方CLI和模拟上游，验证原会话续跑、两账号内容归属、安全挂载、重启前后快照保护、能力不足回退及3×8MiB退出tmpfs。性能配对模式覆盖真实sender、并发、吞吐、TTFT、分位延迟、冷启动和CPU。
+
+## Scenario: 人工节点集群、所属执行与停机迁移
+
+### 1. Scope / Trigger
+
+- 人工分配改变Docker、HOME、工作区和出站执行位置，中央继续持有账号策略、唯一Gateway凭据所有权、任务和准入权威。默认`local`节点保留原单机路径。
+- 首版使用中央可达的Linux x64服务器、同批control/account镜像、专用SSH密钥及已核对主机公钥。控制、业务和PTY通道各自保持原生命周期；操作规范见`deploy/flower2api/CLUSTER.md`。
+
+### 2. Signatures
+
+```text
+GET/POST /api/nodes
+GET /api/accounts -> effective_claude_code_version:string, claude_code_version_source:account|global
+POST /api/nodes/host-keys
+POST /api/nodes/{node_id}/check
+POST /api/nodes/{node_id}/prepare -> 202，返回已登记的公开安装状态
+POST /api/nodes/synchronize -> 202，服务端选择当前可信批次并返回 {items}
+ArchiveIndex(path): Mapping，临时磁盘清单
+ProfileReference={sha256:HEX64,bytes:int>=2}
+NodeSynchronization.install(installer,node_id,revision,maintenance=None,stage_only=False,late_restore=False) -> dict
+GET /nodes、已登记管理页面及其尾斜杠地址 -> SPA HTML
+PUT /api/nodes/{node_id}/enabled
+DELETE /api/nodes/{node_id}
+GET/PUT /api/accounts/{aid}/node
+GET/POST /api/accounts/{account_id}/node-migrations
+GET /api/accounts/{account_id}/node-migrations/{operation_id}
+POST /api/accounts/{account_id}/node-migrations/{operation_id}/{resume|cancel}
+POST /api/environments/{environment_id}/maintenance {operation,expected_generation?}
+cluster_node_ops.py check|status|stop|up --data-root PATH --host-data-root PATH
+cluster_backup.py backup --data-root PATH --backup-dir PATH --epoch HEX32
+node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-backup PATH]
+```
+
+- bench追加`bench.cluster.2`、`bench.node-executions.3`、`bench.node-login-drafts.4`，定义分别归`cluster_schema.py`、`node_execution_schema.py`、`node_login_draft_schema.py`所有。新增`cluster_nodes/account_node_assignments/node_migrations/node_executions/node_login_drafts`；旧账号默认归属local，保留冻结基线摘要。
+- Node持有`node-execution.sqlite`受限投影，默认本机迁移目标使用`node-execution-local.sqlite`。完整中央可写库和管理员凭据保持中央所有。
+
+### 3. Contracts
+
+- 节点迁移选择器从`GET /api/accounts`读取有效CLI版本；列表与`GET /api/accounts/{aid}/cli-settings`共用`_resolve_account_cli_version`，账号版本优先、全局版本兜底，并返回`claude_code_version_source`。读取列表只生成投影。
+- `GET /api/nodes`的`account_count`只统计关联到`accounts.deleted_at IS NULL`的归属，包含人工停用账号；软删除的历史归属继续保留，零账号节点返回0。
+- 节点安装在返回202前核对原配置并持久化`preparing`、预留更新活动；单节点后台线程持有原操作锁及有限续接证明，结束后保存`prepared/failed`并释放活动。重复同版本提交复用在途安装，版本变化仍拒绝；安装期间移除节点返回409。启动失败释放原锁与活动；服务重启将旧`preparing`标为`needs_check`，保留原目标和私有日志，后台沿原操作重新核对组件。
+- 节点页提交受理后关闭确认窗，处理中及等待状态按3秒读取原节点列表，已托管空闲节点每15秒核对自动同步进度；离页清理轮询，返回页面从持久状态恢复。安装中禁用重复安装与移除；提交结果未知先只读核对，错误按受控说明显示。
+- Rust为Vue已登记管理页面显式提供SPA入口及尾斜杠别名，包含`/nodes`；页面登录仍由Vue原守卫处理，管理API与未知路径保持原鉴权边界。
+- `NodeLocation={node_key,account_id,environment_id,assignment_revision}`核对安装、正式账号和分配标记；具体工作另冻结实际环境`generation`、原source、操作和内容摘要。分配版本、环境代次、草稿身份及租约代次分别使用各自模型。
+- Node私有UDS由同批control的长驻`cluster_agent`持有真实runtime/jobs。SSH只调用`cluster_agent_client`固定操作；轻量入口、Actor和SSH共用具体操作白名单，控制查询/续接保留独立槽位。
+- 中央持有真实Gateway租约与原QuotaGuard许可。`ExecutionLeaseProof`只传`owner/generation/expires_at/exclusive/shared_cli`，从Gateway回执投影时保留其原`phase`在中央核对，claim后使用更新的截止时间。证明过期关闭新启动和输入；原Scope可恢复停止能力，实际停止确认后才释放原许可。
+- 原Pi/Projects、Run、续聊、场景、私有评审和独立程序沿冻结工作调用Node原执行器。中央保留调度、预算、业务接受及最终验收；文件、日志、统计和快照从原执行位置读取。未知输入只查询同操作收据，已提交模型和未知RT交换保持单发。
+- `TransportBinding`沿原字段，远程endpoint固定为中央`V3_RUNTIME_URL`的`/cluster-transports/v2/{deployment_digest}/{node_key}/{environment_id}/{assignment_revision}`。中央剥离服务认证后经独立SSH业务socket转发，核对账号/环境/实际代次与认证，保留原请求字节、SSE、取消和用量路径。
+- legacy/native293及账号count_tokens、usage、遥测、预热和受管OAuth出站遵守同一节点归属及原代理。后台固定目标继续关闭自动重定向；独立账号使用当前Node HOME，绑定账号保持Gateway唯一刷新权和Node AT-only。
+- 原`CredentialOwnership`继续管理关联、解绑、归还、重授权和退休。Node先持久原操作意图并确认真实角色停止，再发布原绑定结果和完整材料；迟到普通prepare不得写回旧绑定。published回执仅能重读原结果。原账号解绑后，配置缓存按实际Node SQL绑定允许新正式所有者接管原Gateway ID。
+- generation=0的未准备独立正式账号退休仅建立无凭据停用投影，核对原账号/环境/分配、未知资料和实际角色，不为删除创建CLI或OAuth。投影中断按同一分配标记接续。
+- 人工停用bench账号可迁移，保留enabled原值。独立迁移沿原owner/profile锁、持久maintenance归属、实际源fence和完整校验执行，保持lease=null；绑定迁移沿原真实排他租约。提交前取消先确认目标停止再恢复源；CAS后继续原目标激活。
+- 暂停节点关闭普通新工作。不启动CLI的设备纯读、原操作停止及凭据交接收尾继续核对原Scope。节点容量或连接未知保持可见，其他节点独立准入。
+- CPU、物理采样、私有请求快照、采集/CRIU和环境维护按人工归属落到Node原方法；中央先发现实际代次，前后核对归属及SSH配置，再CAS镜像环境。CPU保留原在线调整语义；采集/CRIU以每调用`lease_gateway/lease_owner`消费真实中央租约，避免替换共享runtime.gateway。
+- 维护页面冻结`expected_generation`并原样交给所属执行路径。远程CC携带该字段时须为严格整数并匹配重读后的实际代次，在租约及停止前拒绝旧页面；Node再核对原Scope的generation。历史CC调用允许省略字段，本机CC的null沿原可选调用；AGY维护按其独立合同必填严格整数。
+- 配置/维护SSH结果未知时，中央保留关闭的原租约；显式环境对账确认实际停止后释放。原Node配置审计和实际状态用于重读，不以TTL单独认定停止。原授权/凭据待确认继续由原协调器收口。
+- 环境管理私有输入沿Actor的2MiB预算；响应预算由共用`response_limit`决定：请求快照8MiB，其余4MiB，服务端、轻量客户端和SSH一致。快照仍由原`read_capture`执行6MiB文件、UUID、账号和保留期校验；模型业务流不经该JSON预算。
+- 环境摘要从Node原读取器取得采集/CRIU设置，Gateway观察仍核对环境、代次、内核及采样时效。缺失或失联显示未知。请求诊断的可选`execution_location={node_key,environment_id,generation,assignment_revision?}`来自同次已验证传输并沿原JSON持久化；历史缺字段保持未观测。Run详情使用原执行账本定位。
+- AGY尝试同样从已核验TransportBinding冻结execution_location；当前本机执行的node_key为local、assignment_revision为空，与平台/凭据/工具轮的context独立共存。字段缺失保持未知，禁止根据当前账号归属补写历史位置。
+- Node从首次安装保存自己的更新目录与实际镜像来源。来源校验沿原`image_reference`命名合同支持自定义批次；正式签名发行仍使用原独立规则。已托管节点后台自动识别当前目标；同批幂等复核，跨批经原工作排空、停止、原地切换组件后恢复，保持原HOME和身份。历史中央首次能力接入及离线应急沿集群停机SOP。
+- 原迁移使用磁盘SQLite索引逐条读取和写出兼容的`{identity,entries,excluded}`清单，取消清单16MiB及100000条业务上限。临时定义由`cluster_archive_schema.py`纯模块所有，索引随当前临时目录删除；业务库版本台账保持原链。单条元数据解析预算128KiB，路径、类型、权限、逐文件/整包摘要、冻结实际字节与真实剩余磁盘继续核验。
+- 迁移export/verify-import/prepare-import及大profile prepare-files取消UDS/SSH总时限。迁移包和profile取消600秒总传输时限，HTTP逐次读写15秒、SSH连接与存活检测保持。排空默认沿原操作等待并续约，服务关闭或租约变化终止推进。
+- 普通profile准备以1MiB作为通路选择阈值，大文件进入私有摘要文件；迁移同样使用`profile_references`。固定文件名仅`.credentials.json/.claude.json/settings.json`，实际长度、SHA256、0600权限、单链接和归属逐次核验；绑定账号先去除RT。历史端通过固定受限适配复用其原锁、类型和准备器，身份算法沿原版本。
+- `record.progress.stage`只表示实际处理步骤，确认阶段仍由原回执推进。reconcile公开固定`failure={code,stage,message,action}`，历史缺字段使用原通用提示；任意底层正文及私有路径排除出公开投影。继续迁移保持原operation_id和所有权，提交前取消继续先撤销目标再恢复源。
+- 节点同步私有日志保存原目标、配置摘要、原控制/镜像、账号与隔离收据。并发最多两台，单节点组件切换与两端迁移共用操作锁。运行中的迁移先完成后同步；登记后尚未建立目标副本时可先同步空目标。暂停迁移按下述维护兼容规则核对实际停止和原租约，保留迁移资料及关闭的账号准入，只升级组件。
+- 同步核对真实jobs、流、草稿、独立验收、凭据交接和实际角色。暂停接单偏好独立保存。停止原角色和控制后原地切换组件，作业持久data_policy=in_place；不生成数据根全量副本或隔离恢复副本。旧在途复制进程按作业ID及原镜像确认后停止。新控制失败在账号更新前恢复原实例；账号恢复已开始则保留当前现场继续。相同账号镜像以原撤销fence复用原角色和代次，镜像变化交原生命周期重建；回传传输绑定按实际账号镜像批次核验。
+- 全局完整备份收齐同部署、同epoch的中央及全部登记Node快照。SQLite复制使用原backup API；离线固定副本读取使用immutable，避免生成WAL辅助文件改变清单。组合恢复核对安装身份、归属/分配和实际环境，保留pending/reconcile事实。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 期望 |
+| --- | --- |
+| Node参数或私钥格式非法 | 固定校验错误，不回显输入材料 |
+| 账号版本继承全局或人工停用 | 列表仍返回有效CLI版本；停用账号仍计入节点归属 |
+| 账号软删除 | 账号列表隐藏且节点计数排除，原历史归属保留 |
+| 安装前缺必需配置、配置版本不符或平台维护 | 409，保持原组件归属 |
+| 后台安装失败或服务重启中断 | 持久状态分别为failed或needs_check；释放活动后允许明确重试 |
+| 已登记页面直达、刷新或尾斜杠 | 返回HTML；原管理API与未知网关路径继续鉴权 |
+| 主机公钥、Scope、绑定、分配或实际代次变化 | 拒绝原提交，保留原归属及恢复定位 |
+| malformed Node结果携带较新代次 | 结果校验失败，中央镜像保持原代次 |
+| 远程维护携带过期或非整数expected_generation | 原公共入口返回409，在租约与实际停止前拒绝 |
+| 旧证明、未知输入、未收口执行或RT未知 | 新业务保持关闭，查询/原停止继续按原范围 |
+| Node暂停或bench人工停用 | 普通准入沿原门禁；允许合同中明确的管理或迁移操作 |
+| 原快照缺失/过期/损坏 | 分别返回原404/410/503合同 |
+| 配置准备回包丢失且尚未提交Node | 按本次唯一owner回查并收口原租约 |
+| Node配置/维护提交后回包未知 | 保留原租约，实际停止对账后释放 |
+| 源离线、资料不全或目标校验失败 | 保留原迁移阶段与维护状态 |
+| 大清单、大profile或长迁移 | 逐条清单及独立文件通路，按实际空间与摘要核验 |
+| 源导出暂停且目标无副本 | 空目标可先同步；原迁移随后按同一操作继续 |
+| 工作或凭据维护未完成 | 保存等待原因，按原目标自动重试 |
+| 同批组件 | 幂等核验，账号状态沿原生命周期保持 |
+| 组合备份缺Node、错epoch或错安装归属 | 完整性校验拒绝，保留已生成快照 |
+
+### 5. Scenarios and Examples
+
+- 正常：准备SSH节点2后，为尚无执行资料的账号1发送`PUT /api/accounts/1/node`，body为`{"node_id":2,"revision":1}`；原统一网关继续使用该账号原令牌。
+- 正常：全局CLI为`2.1.293`且账号继承时，账号列表返回该有效版本供迁移确认冻结；本机14条归属中10个账号已软删除，页面`account_count`为4。
+- 正常：提交安装收到202后可切页，返回后继续显示后台安装状态；后台作业真实完成后发布prepared。错误用法是用HTTP响应结束判定安装完成，或给所有未知路径返回SPA绕开网关鉴权；正确处理是保留真实后台活动并仅登记已知页面入口。
+- 错误用法：直接把数据库内可空的`claude_code_version`作为迁移按钮准入版本。正确处理是返回解析后的`effective_claude_code_version`。
+- 边界：人工停用的独立账号迁移仍保留enabled=0，当前HOME/RT及未知字段随完整包保存；后续普通执行沿原准入。
+- 错误用法：对已有环境直接PUT换节点。正确处理是`POST /api/accounts/1/node-migrations`，冻结`{"operation_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","node_id":2,"revision":1,"version":"2.1.293"}`并按原操作查询/恢复。
+- 错误用法：SSH断连后重新发送模型、OAuth或另起输入。正确处理是先查询原Scope/回执，未知状态保持隔离，明确实际停止后再按原业务恢复。
+- 错误用法：合并诊断时用AGY context替换执行位置字段。正确处理是保留两个可选字段，并在同一真实尝试上分别记录平台上下文和冻结的执行位置。
+
+### 6. Tests Required
+
+- `test_cluster*`覆盖真实双SQLite、私有UDS/SSH、错误Scope/认证、有限证明、未知输入、各执行消费者、迁移CAS和恢复；Node关闭后仅恢复实际停止能力。
+- `test_account_cli_settings`通过真实HTTP账号列表核对全局继承、账号覆盖与设置接口一致，软删除隐藏且读取保持账号数据和执行记录；`test_cluster_nodes`核对删除过滤、停用计数、空节点为0、历史归属保留及恢复后的计数。
+- `test_cluster_node_installation`覆盖202、同节点去重、版本竞争、安装中移除、作业跨请求门禁、失败重试、线程启动失败及重启中断；`verify_cluster_ui.py`覆盖提交关闭、刷新恢复、自动收口与提交响应中断只读核对。Rust真实组合路由测试覆盖全部管理页面、尾斜杠、公开hello及未知路径鉴权。
+- `test_cluster_environment_management`覆盖原HTTP路由、暂停节点管理、大快照、claim延期字段、未知提交保留门禁、实际对账释放及坏回执不推进中央代次；原本机CPU/采集/CRIU测试继续执行。
+- 远程维护过期代次用例经原公共入口验证409、零实际停止和零维护租约；AGY诊断单测与`verify_cluster_request_ui.py`验证context与本机execution_location共存、历史未知以及1440/390布局。
+- `test_cluster_node_docker`按开关运行随机隔离部署：同一真实Rust网关的双账号双Node JSON/SSE及并发、冻结诊断、原管理HTTP/WS、完整所有权、零代删除、独立迁移故障隔离、Node停机换批及HOME身份保留。上游及凭据均使用合成夹具。
+- `test_cluster_recovery_limits`核对大于16MiB且超过100000条的原JSON清单、大profile、摘要/权限/路径限制及固定错误投影。规模演练须实际导出、恢复并核对原树，不以元数据样本代替完整恢复。
+- `test_cluster_synchronization`核对旧控制自动停止原地换批、同批幂等、原容器回退、未知角色、未完成迁移、空目标先升级、互斥及平台重启续接。`test_cluster_system_update`核对宿主排空/取消/恢复及真实更新状态机先停止再原地切换的顺序。
+- `verify_cluster_node_upgrade.py`的隔离Docker开关覆盖自动控制更新保持原代次、账号镜像变化重建、组件恢复与最新资料保留、历史端大profile。`verify_cluster_ui.py`覆盖统一同步、明确失败动作及390px布局。
+- `test_cluster_backup`及原备份测试核对真实SQLite隔离复制、清单/逻辑摘要、同批组合对应和pending恢复事实。`verify_database_definitions.py`核对当前bench5/gateway6及原步骤1—4冻结来源。
+- 前端生产构建及`verify_cluster_ui.py`、`verify_cluster_draft_ui.py`、`verify_cluster_request_ui.py`覆盖冻结确认、迟到响应、独立/停用账号、原草稿/WS、历史未观测及390/1440布局；Rust执行fmt与全量测试。
+
+## Scenario: SSH 节点密码认证与旧密钥配置兼容
+
+### 1. Scope / Trigger
+
+修改节点登记 DTO、私有认证存储、OpenSSH 命令与隧道、管理表单或节点安装配置诊断时适用。节点用户名沿原配置，认证方式支持私钥和 SSH password。
+
+### 2. Signatures
+
+- `POST /api/nodes`：在原配置上增加 `auth_method: private_key|password`，缺省为 private_key；只写 `private_key?:string|null`、`password?:string|null`。
+- `GET /api/nodes` 的 SSH 投影增加 `auth_method`；本机为 null。NodeConfiguration 继续作为公开配置的严格模型。
+- `SshNode.save_password(password)` 保存私有密码；命令由 `_command` 统一认证，Docker、sender、PTY 继续建立独立连接。
+- `NodeInstallationConfigurationError` 仅公开缺失的 `V3_DEPLOYMENT_ID/V3_RELEASE/V3_CONTROL_IMAGE/V3_ACCOUNT_IMAGE` 名称，准备接口返回 409。
+
+### 3. Contracts
+
+- 所选认证方式必须对应唯一非空材料。私钥长度 64～32768 字符；密码长度 1～4096 字符，拒绝 NUL、CR、LF。密码保留前后空格、中文及 Shell 特殊字符。
+- 私钥与密码排除 model_dump 和 repr，秘密仅进入中央节点专属私有文件；目录 0700、文件 0600。公开 config_json 仅保存配置。密钥节点省略默认 auth_method，保持已发布严格读取器的字段集合；密码节点显式保存 auth_method=password。
+- 密码文件通过无链接目录访问及 O_NOFOLLOW 打开，fstat 核对当前 UID、常规文件和私有权限。sshpass 通过单独继承的文件描述符读取密码，业务 stdin、argv 和环境继续排除密码。
+- 密码认证限制为 password 和一次密码提交，关闭公钥及键盘交互回退。两种方式继续固定主机公钥、known_hosts/HostKeyAlias、StrictHostKeyChecking，禁用用户 SSH 配置、代理及 agent。
+- 命令、独立 Docker/业务/PTY 隧道共享认证构造。超时、失败和关闭按原归属回收进程及 socket；sshpass/OpenSSH 错误仅映射固定公开原因。
+- 表单只提交所选材料；切换、成功、关闭和卸载清理秘密。既有节点在线换密和二次认证属于独立范围。
+- 固定宿主模板与应用镜像分别维护。旧模板需按 SYSTEM-UPDATES.md 校验原字节、策略摘要及资源设置，通过原服务锁/存储锁同步，再沿维护门禁重建控制端。V3_RUNTIME_URL 沿模板采用中央回连地址。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 空密码、冲突材料、非法方式或控制字符 | 422 固定参数说明，排除原输入 |
+| 错误密码 | 检查记录 unreachable，reason_code=authentication_failed |
+| 主机公钥不符 | 拒绝连接，固定 host_key_mismatch 原因 |
+| 密码文件为链接、公开权限或错误 UID | 拒绝使用该凭据 |
+| 缺少中央安装配置 | 409 列出配置名，保留原准备状态 |
+| 旧节点缺 auth_method | 默认私钥；新密钥节点继续可由旧版配置模型读取 |
+
+### 5. Scenarios and Examples
+
+- 正常：原主机配置加 `{"auth_method":"password","password":" 合成密码! "}`，保存原值并完成检查；连接复用及服务重启后重连均读取本节点私有文件。
+- 边界：原请求只含 private_key，继续以密钥登记；公开列表显示 private_key，数据库保持原字段集合。
+- 错误用法：同时提交 password 和 private_key，或把密码拼进 sshpass 参数、Shell、环境或业务 stdin。正确处理是唯一材料校验与独立文件描述符传递。
+- 回退：密码节点要求包含 sshpass 的新控制程序；回退旧程序前先完成密码节点账号迁移和引用收口。私钥节点保留旧格式。
+
+### 6. Tests Required
+
+- `test_cluster_password` 核对严格 DTO、原值保存、只写/repr、目录权限、符号链接拒绝、重复登记清理、默认密钥持久字段和安装配置诊断。
+- `CLUSTER_SSH_PASSWORD_TEST=1 ... -m unittest test_cluster_ssh_password` 使用合成密码与隔离回环 Docker sshd，核对正确/错误密码、主机指纹拒绝、特殊字符和大 stdin、实际 Docker SDK、三类隧道、重连及进程清理。夹具构建见 `deploy/flower2api/fixtures/ssh-password/Dockerfile`。
+- 原 `test_cluster_nodes/test_cluster_ssh/test_cluster_backup` 回归，实际已发布 NodeConfiguration 重读新密钥配置；前端构建及 `verify_node_password_ui.py` 核对认证切换、掩码、唯一凭据、清理和 1440/390 布局。
+
+## Scenario: 集群迁移兼容与暂停维护
+
+### 1. Scope / Trigger
+
+- 跨CPU代际/厂商、未准备或旧批次目标、目标创建中断，以及暂停迁移期间的组件/平台升级。现有交付制品仍为Linux x64，ARM需要匹配的运行制品。
+
+### 2. Signatures
+
+```text
+MigrationCoordinator._ready(node, synchronize=False)
+NodeExecution._prepare_locked(..., import_intent=None)
+paused_migration_record(migration) -> dict | None
+paused_migration_lease(database, environment, snapshot) -> dict | None
+GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不展示上次failure
+```
+
+### 3. Contracts
+
+- 首次归属和迁移选择器允许选择已启用、尚未准备的节点。保存首次归属后，后台扫描按account_count纳管；普通准备遇到未就绪组件主动提交同步并返回可重试的RuntimeBusy。迁移先在后台`preflight`等待原安装/自动同步、核对实际agent部署及批次，再取得两端操作锁并隔离源。检查保存画像的格式发生在登记前，原像完整性失败不会先停止源。
+- 源隔离收据确认后，按原环境ID/账号/generation同步中央state=stopped；原运行意图保存在record.source_state。包、profile文件和逻辑身份沿原操作保留。普通节点准备取消1MiB拒绝条件，大profile继续由deliver_preparation按摘要文件通道传输；2MiB控制消息预算保持。
+- 新操作在execution检查点保存source_node_location/target_node_location，字段为host、port、host_key、data_root。名称、SSH用户名及认证方式变化不改变资料定位；主机身份或数据位置变化仍拒绝。历史检查点缺location时继续核对原config_sha256。
+- 暂停维护仅认可phase=reconcile、last_confirmed_phase为source_fenced/exporting/importing/verified、无cancellation的提交前操作。中央分配仍在原源且为reconcile，revision、environment_id、source_generation和source_fingerprint_sha256一致；网关active/waiting/importing全为0，唯一排他holder的owner/generation与原gateway_lease精确一致。独立账号保持空租约。历史SSH源中央state=ready时仍须取得节点实际停止证明。
+- 本机源核对原fenced标记和全部角色Running=false/Pid=0。SSH源核对同标记、实际角色ID集合及停止状态；已发布的目标核对原operation、node、account、environment、revision和source_generation及published/prepared标记。无目标目录时不得存在目标角色。凭据交接、中央执行及连接继续排空。暂停账号从组件重建名单排除，全部资料原地保留，原租约和迁移游标保持。
+- 目标创建失败留下reconcile时，prepare_import仅凭原published标记与相同import_intent恢复。原登记角色必须均已停止、没有外来角色或实际作业；收口这些角色后恢复stopped并按原身份重建，HOME、profile和迁移尝试保持。
+- 已取消迁移的目标副本可随组件原地换批保留：中央phase及last_confirmed_phase均为cancelled，target_revoked收据精确匹配操作、目标节点、账号、环境及source_revision+1；节点node-fence同范围且为fenced，node-migration-target和原操作revoked.json同范围且为revoked，目标标记source_generation匹配原记录。实际剩余角色须属于fence.stopped_containers及已登记角色类型，全部Running=false/Pid=0。核对通过后沿原同步日志继续；保留HOME、工程、标记、取消状态和中央归属。新作业恢复旧控制组件时保留当前节点执行库和最新资料；历史缺data_policy的快照作业沿原恢复分支。backed_up作为旧宿主兼容的排空回执保留，公开页面显示已停止待切换。
+- 迁移prepare-import回执的binding.release_id按configured_release(runtime)核对账号镜像来源，组件健康继续核对runtime.release_id。启用更新底座时允许V3_ACCOUNT_RELEASE与V3_RELEASE不同；账号、环境、代次、绑定秘密及原操作范围继续核验。旧控制端批次误判留下的importing/reconcile沿原操作和transfer_id续接，保持单次源隔离/导出，成功激活后释放原租约。
+- 已保存CPU/机型画像随账号保留；目标硬件能力保持实际值。旧版仍使用各自的CPU和模板校验，跨代迁移后回退应选择包含该兼容能力的版本，或先按原迁移流程迁回旧版支持的节点。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 保存画像与目标CPU跨代/跨厂商 | 保留原画像并使用目标实际能力 |
+| 新x64 CPU没有登记模板 | host-cpu-v1及通用机型，持久身份只生成一次 |
+| 目标组件尚未就绪 | 后台preflight准备，源隔离延后 |
+| 暂停且原租约、停止及身份均确认 | 保留原操作/资料，允许原地组件维护 |
+| 外来holder、活动请求/导入、未知角色或标记不符 | 继续阻断维护 |
+| 目标本次创建失败且全部角色已停止 | 收口本次失败角色，继续同次迁移 |
+| 已取消迁移目标残留停止角色且双端撤销证明一致 | 自动识别历史副本，沿原同步完成组件换批并保留资料 |
+| 控制组件已更新且账号镜像沿用原批次 | 按配置账号批次接纳准备回执；仅匹配控制批次的错误绑定继续拒绝 |
+| 固定画像损坏/组件不符/位置变化/Docker创建失败 | system_profile/component_version/node_configuration/runtime_preparation固定公开原因 |
+
+### 5. Scenarios and Examples
+
+- 正常：Naples画像迁入Cezanne或Turin节点，保留设备、机型、HOME及工程资料，目标实际flags及核心数按宿主渲染。
+- 正常：V3_RELEASE为新控制批次、V3_ACCOUNT_RELEASE为复用账号批次时，目标binding使用账号批次，完成原迁移并激活。错误：把binding改成控制批次来通过校验；正确处理：沿账号来源核对并续接原操作。
+- 边界：目标已有本次迁移的停止角色和发布目录；原迁移暂停后原地升级控制组件并保留目标目录，随后继续原操作。
+- 边界：取消后目标仅剩停止的account-network，中央归属账号为0；核对原取消收据、目标撤销标记及实际停止登记后自动继续原同步。缺失撤销证明或额外角色须核对原操作，不能仅凭零账号计数或exited状态放行。
+- 错误用法：按租约TTL删除占用、把reconcile直接改ready，或删除画像重新随机。正确处理：核对原持久操作、双端实际停止和原代次，保留迁移关闭状态并继续原收口路径。
+
+### 6. Tests Required
+
+- test_system_profile：Turin/Intel首次画像、跨代渲染保持实际能力、旧画像和DMI身份保持、坏格式拒绝。
+- test_cluster_migration_runner/migrations/nodes/synchronization：自动准备先于源隔离、名称/认证变更与位置保护、源停止镜像、未准备节点首次选择及自动纳管。
+- test_cluster_migration_maintenance/execution：真实SQLite原租约及过期/外来/活动矩阵、源隔离证明、SSH磁盘标记、失败角色恢复保留身份与资料；未知或运行角色保持阻断。
+- test_cluster_synchronization：取消目标残留停止网络角色时沿原job_id恢复并原地完成换批，资料字节、取消状态和中央归属保持；中央收据、撤销文件、节点/账号/操作/分配/源代次错配及外来/运行/PID非零角色继续阻断；已完成迁移旧源仍核对原代次。
+- test_cluster_migration_runner：控制/账号不同批次完成归属CAS和激活；旧批次误判后的importing/reconcile复用原stage，源只隔离和导出一次；错误控制批次绑定保留源归属、reconcile及原租约。
+- verify_cluster_ui：未准备目标可选并可提交迁移，既有确认、未知结果、恢复及窄屏交互保持。
+- 隔离SSH/Docker验收：跨代画像完整迁移后读取目标实际CLI；暂停迁移目标原地控制换批及切回旧组件，原停止角色、标记、最新资料和中央游标保持；备份目录保持为空。正常账号升级/恢复保留最新工程文件及大profile。
+
+## Scenario: AGY账号运行环境与Gemini业务接入
+
+### 1. Scope / Trigger
+
+修改AGY公共Gemini路由、账号发送器、原生适配、环境维护、资源或交付时适用。实现入口为gateway的gemini/runtime_transport/agy_runtime、orchestrator的agy_environment及agy_runtime包。管理凭据的唯一所有者继续遵循[AGY凭据合同](../../platform/deploy/agy-credential-contract.md)。
+
+### 2. Signatures
+
+- 公共GET `/v1beta/models`，POST `/v1beta/models/:model:generateContent`及`:streamGenerateContent?alt=sse`。令牌接受x-api-key、x-goog-api-key、Bearer或query key；不同来源冲突及重复query key拒绝。
+- 账号发送器POST `/internal/agy/prepare`、`/internal/agy/generate`、`/internal/agy/tools`，复用Bearer、TransportBinding、原请求ID和截止校验；只接受冻结的POST `https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent`目标。
+- `AgyAccessSnapshot`为account_id、credential_generation、access_token、expires_at、email，拒绝refresh_token。`AgyToolCompletion`为request、api_token_id、previous_request_id、body；旧工具控制不携带凭据。
+- `AgySenderConfig`包含protocol_version=1、完整source_sha256、module_root、binary_path、work_root、max_workers和memory_mib。内部监督协议schema_version=1，命令submit/prepare/finish_tools/status/cancel/shutdown，事件持续到job_finalized。
+- 追加`bench.agy-environments.5`：platform_api_environments以唯一gateway_account_id及唯一environment_id绑定现有account_environments，platform固定antigravity。AGY环境account_id为空，名称采用`agy:<gateway-id>`；历史基线保持冻结。
+
+### 3. Contracts
+
+- 候选复用API令牌账号白黑名单、平台、active、凭据ready、已观测model_mappings、冷却、原队列/RPM/并发许可和维护门禁。AGY账号的Gemini/Claude模型都进入固定AGY 1.5.9；公开名与原生MODEL_*或整数ID由受信目录映射，不能按名称猜测。
+- temperature/topP兼容接收后忽略，记录字段及policy=native_default；maxOutputTokens映射原生maxTokens。工具、签名及其他输入继续按实际能力校验。SSE交付源JSON逻辑帧，非流式沿同一执行路径聚合Parts、未知扩展及usage；禁止伪造STOP、[DONE]或成功用量。
+- 正式OAuth观察器核对完整原版SHA、映像身份及四个指令指纹。原生路由为0xa098532，channelModelResponseStream.Receive接收返回位置0x95d1e90，遥测0x89ed91f，codeassist Scanner栈检查后0x95f3212。Receive在AL给出接收结果、RCX给出已核对的GetChatMessageResponse；Scanner原块先私有归档，再解开SSE及response信封。EOF保留错误未知标记，业务成功同时要求源finishReason/安全拦截终态及真实控制RPC成功。部分文本、usage或通道关闭单独出现均不算成功。
+- 管理侧锁内冻结ready状态和AT-only快照。新代采用新worker，最高代次单调，同代不同AT拒绝；旧在途及原工具轮保留归属。工具结果匹配调用方、账号、原历史和函数身份，先回填原MCP并收口，再读当前ready快照开始下一模型轮。concurrency=1复用原许可；pending/reconcile期间可独立收口旧工具，普通发布继续关闭。同结果回执仅在原截止内幂等，副作用只回填一次。
+- 监督器将请求墙钟截止转换为单调截止，接收剩余时间范围 `(0,125]` 秒并限制原请求预算最多120秒。`Supervisor.acquire(value, until)`在选择及创建worker前复核截止，旧代关闭后重新检查；`Worker.start(until)`在Popen前再次复核。退役计入原请求耗时，过期返回 `request_deadline_exceeded`，停止新代创建及原生启动。
+- 仅源错误code=401/status=UNAUTHENTICATED且没有候选及usage时参与有界恢复；须尚未交付、无工具结果历史、原作业实际收口、同账号ready新代且AT改变，最多一次。容量/控制失败、SSE首帧后、取消或过期均不重放。
+- 账号内共享完整265700040字节封存映像，核对SHA和四封存，decode计数、分发大小、控制/内核/观察器/原生RSS/PSS/USS与cgroup独立展示。max_workers等于账号concurrency，范围1..64，跨模型和凭据代次共用物理上限。有限sender RAM为512+256×workers MiB，network 256MiB、CLI至少512MiB，总量受原预算约束；零沿明确无限策略。
+- cgroup v2读取memory.max、memory.current、memory.peak和memory.swap.current；v1支持memory子目录或挂载根的memory.limit_in_bytes、memory.usage_in_bytes、memory.max_usage_in_bytes，memory.memsw.usage_in_bytes减RAM占用才是swap。v1限制大于等于2^60沿既有规则按无限处理；缺失/损坏为未知，监督器与冻结RAM不一致时拒绝，不能把未知当作无限。
+- 正式模块根为/opt/v3/python，共享runtime_files位于/usr/local/bin。监督器和worker都冻结这两个搜索路径。AT HOME随worker私有发布，退役删除；采集复用账号开关与HTTP日志模式，长期有界脱敏快照位于flows/api/agy-prepared，原始执行材料沿临时worker目录和关闭清理。历史已退役采集保留七天；统一容量、内部旁路及读取合同由网关settings-database的AGY请求记录场景持有。普通输出采用有界匿名暂存，私有事件读取按帧及总字节控制背压。
+- 旧工具和实际Root active纳入维护/升级排空。未知退出阻止新准备，显式对账停止本环境三角色后只清派生缓存和AT副本，保留权威凭据及身份。环境维护回执核对expected_generation；读取不唤醒，UI轮询保留草稿和焦点。存在AGY映射时目标control/account都须声明agy-runtime-protocol=1。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 缺失/禁用令牌 | 401，账号许可不进入业务 |
+| 冲突key、未知输入、错工具调用方/ID或重复续轮 | 受控400，拒绝发送或回填 |
+| pending/reconcile、旧凭据代次、容量或原生失败 | 受控503，保留原请求归属及实际入口计数 |
+| 源只有文本或usage、缺少源终态 | 原生流不完整；非流式503，已开始SSE按失败收尾 |
+| v1/v2合法有限或明确无限预算 | 按冻结值准入；未知/不匹配拒绝 |
+| 公共断连、原截止到期 | 精确取消原作业，活动保持到实际收口后释放 |
+| 准入时、旧代收尾后或Popen前原截止已过 | `request_deadline_exceeded`，停止后续建代或启动副作用 |
+| 监督器异常或旧镜像缺协议 | 待对账或拒绝升级，不自动重放未知请求 |
+
+### 5. Scenarios and Examples
+
+正常：Gemini工具首轮返回真实functionCall并保留原许可；管理侧发布AT2后，调用方带原历史和functionResponse续轮，原AT1 worker完成真实MCP回填，下一模型由AT2 worker执行。边界：管理侧reconcile时先完成旧工具并保留原截止内回执，恢复ready后继续；资源无限必须有真实cgroup依据。
+
+错误用法：以HTTP 200、Go RPC返回或EOF认定部分文本成功；正确处理是同时验证源终态和控制终态。错误用法：用发送器替身的通过结果宣称原生OAuth业务已验证；正确处理是独立运行固定原版、本地TLS及真实MCP闭环。真实Google身份、目录接受性及跨实际到期仍由具备授权账号和独立预算的后续验收承接。
+
+截止边界：旧代退役消耗剩余时间后，应使用原单调截止拒绝下一代。错误用法是收尾后重新给满预算或启动已过期进程；正确处理是继续沿用原 `until`，在建代和Popen前独立复核。
+
+### 6. Tests Required
+
+- `test_agy_runtime`、`test_agy_supervisor`、`test_agy_environment`覆盖AT-only、参数、目录、帧/签名、终态、代次/工具、v1/v2有限/无限/未知预算、环境归属与维护。
+- `test_agy_supervisor`覆盖已过期准入、旧代关闭耗尽截止以及真实Worker.start过期；分别断言worker创建为0、新代启动为0及Popen调用为0，均返回 `request_deadline_exceeded`。
+- Rust的runtime_transport单测覆盖精确AGY目标及CC路径隔离；agy_sender_test、gemini_account_test、gemini_contract_test、runtime_transport_test覆盖鉴权、绑定、权限、源聚合与取消。
+- `verify_agy_native_loopback.py --image <明确测试镜像> [--loader-root <显式glibc目录>]`使用真实网关/SQLite/account-sender/监督器/原版和本地TLS/MCP；容器network=none、UID1001、根只读、零真实外部生成。一次性CA只挂验证容器系统信任根，正式配置无测试CA或跳过校验开关。断言参数实际出站、源usage、两代AT、并发1工具回填、重复拒绝、64重复帧与SIGURG、截断/容量失败、断连取消、实际许可释放和共享映像。
+- `verify_agy_runtime.py --native-image <明确镜像> [--crash]`保持零模型准备、两代、单次映像解码及正常/异常物理退出；`verify_agy_gemini.py`继续单独标记发送器替身证据；`verify_agy_environment_ui.py`覆盖1440/720/390px及实际控件边界、草稿、焦点和离页清理。制品资源须从当前受管理源码构建。
+
+## Scenario: AGY账号系统文本同形体策略
+
+### 1. Scope / Trigger
+
+- 修改账号字段`agy_system_prompt_homoglyph_enabled`、Gemini准入/恢复、AGY私有提交、系统文本解码或策略记录时适用。开关按账号独立保存，缺省false；CC、工程任务和养号保持各自合同。
+
+### 2. Signatures
+
+- Rust `AgySubmission.system_prompt_policy: AgySystemPromptPolicy`：`schema_version=1`、`enabled:boolean`、`rule_version="new-api-homoglyph-v1"`。历史信封缺省关闭，关闭时省略扩展序列化；显式策略拒绝未知字段和版本。
+- Python监督信封和`gemini_request`携带同名快照；公开Gemini正文无策略覆盖字段。`transform_system(system, policy)`返回提交文本及策略回执。
+- `verify_agy_native_loopback.py --image <明确镜像> [--loader-root <显式glibc目录>] --homoglyph`验证真实固定原版系统段；`--capture-off`独立验证采集关闭。
+
+### 3. Contracts
+
+- 账号准入读取当前账号后冻结策略。同HTTP的有界OAuth恢复复用该快照；新HTTP工具续轮先收口原工具，再采用新请求的账号配置。策略排除在worker key之外，单独切换开关复用暖worker。
+- 唯一字符表位于`agy_runtime/resources/system-prompt-homoglyph-v1.json`，固定26个ASCII到同形Unicode映射，构建纳入`admission.json.resource_hashes`。镜像及组件内容身份包含受管理规则资源，运行不依赖外部Worker目录。
+- 只处理解码后的独立`system`，经Cortex自定义prompt section提交。多Part按既有换行合并；未命中码点原样，输出确定、幂等、Unicode码点数量保持一致。UTF-8字节数可改变。用户/模型历史、工具、参数、结果、ID和签名继续既有映射；原始`gemini_body`深拷贝保持转换前数据。
+- `request_accepted.system_prompt_policy`含`schema_version/enabled/rule_version/rule_sha256/source/changed/replaced_codepoints/system_codepoints`。source固定`cortex_custom_system`，描述独立系统段处理来源；该事件产生于原生RPC提交前。`rule_sha256`标识规则资源字节，计数表示Unicode码点，均不换算token。开启但空文本或已转换文本可有`changed=false`。
+- 网关按本HTTP和实际attempt身份核对回执的开关、版本、来源、摘要形状及计数一致性。启用请求收到匹配回执后才交付Gemini源帧；每次认证恢复重新等待回执。历史关闭请求兼容缺失回执。
+- 临时执行材料中，`gemini-input.json`为转换前已解码Gemini视图，`input-mapping.json`记录策略，`rpc.ndjson`包含提交的系统段。长期采集使用独立有界脱敏快照，区分decoded_gemini_input及native_cascade_prompt_sections；原始HTTP由独立入站旁路保存。采集关闭沿匿名暂存与收口清理，公共日志仅记录策略元数据。
+- 上游`usageMetadata`、缓存及思考扩展沿源帧交付。真实分词、缓存命中和计费效果使用授权账号及独立预算验收；本地TLS合成usage只验证来源保真。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 缺省关闭、显式关闭 | 目标文本原样处理；旧默认私有发送兼容 |
+| 启用、空系统文本、已经转换 | 确定性处理；无替换时changed=false |
+| 畸形策略、未知规则或资源摘要失配 | 在模型发送前拒绝；旧严格消费者拒绝未知启用扩展 |
+| 启用请求缺失或错误回执 | 公共请求受控失败，拒绝交付源帧 |
+| 超出固定原版上下文预算 | 保留原生失败边界；本地验收503且零模型提交，后续预算内请求可用 |
+| 关闭账号开关 | 后续HTTP恢复原文；同HTTP恢复和旧工具归属继续冻结合同 |
+
+### 5. Scenarios and Examples
+
+- 正常：开启账号将系统`ABC system 中文 {x: 3}`转换为`ΑΒС ѕуѕtеm 中文 {х: 3}`。同样内容作为用户文本仍按原历史映射；再次经过保持同一系统文本。
+- 边界：请求开启后收到明确401，此时管理员关闭账号开关；该HTTP认证恢复仍开启，下个HTTP采用关闭配置。
+- 错误用法：对完整Gemini JSON做字符替换，或以替换字符数宣称真实缓存收益。正确处理：只转换独立system，保留原始入站与结构字段，缓存及计费单独用供应商来源验收。
+
+### 6. Tests Required
+
+- `test_agy_system_prompt`核对26字符参考向量、幂等、Unicode/空文本/大文本、原始正文与历史/工具/签名保护、严格策略及公开覆盖拒绝。
+- Rust `gemini_contract_test`、`agy_sender_test`核对缺省关闭省略、错误规则在启动前拒绝及回执计数/版本/来源；完整`cargo test --locked`继续覆盖CC回归。
+- `verify_agy_gemini.py`单独标记真实HTTP/SQLite与合成发送器证据，覆盖两账号隔离、认证恢复策略冻结、下一HTTP读取新开关及缺失/错误回执。
+- 本地TLS的`--homoglyph`覆盖普通/SSE、工具新HTTP、实际系统文本及用户历史对照、幂等、预算内大文本/超限零提交、暖PID、源usage/cache和策略账本；`--capture-off`核对转换生效且收口后无请求正文归档。容器保持断网、UID1001、零真实外部模型费用。
+- 前端构建及`verify_agy_accounts_ui.py`覆盖原账号控件默认值、两账号差异载荷、草稿、授权回执归属及390px；迟到保存反馈继续受editorGeneration约束。
+
+## Scenario: 节点迁移后的额度交接、上传续接与历史抓包
+
+### 1. Scope / Trigger
+
+- 本机与 SSH 节点双向或连续迁移、API 额度证据重读、上传中断续接及已结束工程的抓包查询适用。
+
+### 2. Signatures
+
+- `register_api_quota_cursor(connection, data, account_id, identity, environment_id, *, remote) -> None`；来源仍为 `api:<environment_id>:<identity>`。
+- `quota_observation_cursors` 保持原结构；交接更新 `path/file_identity/byte_offset`。额度状态 JSON 的 `auth_verified_at` 保存完整人工核验的 UTC 秒时序。
+- `MigrationFiles.stage(ImportStage)` 返回 `uploaded:bool,upload_state:empty|complete|incomplete` 及原 `protocol/node_key/operation_id/transfer_id/revision`。
+- `NodeMigrations.renew_transfer(operation_id, previous, transfer_id) -> dict` 保存 `checkpoints.transfer={transfer_id,previous_transfer_ids}`；初始 `checkpoints.execution.transfer_id` 保持冻结。
+- Node 私有操作 `project-history-capture` 使用 `ProjectHistoryCapture(NodeLocation)`，追加 `generation:int>=0,namespace:projects|warmup,work_id:32位hex,relative:str|null`。返回 `{protocol:1,node_key,history:{reference:<原请求>,capture:<原脱敏摘要或预览>}}`。
+
+### 3. Contracts
+
+- API 游标仅在同账号、同身份、同环境的系统固定本机证据和中央远程镜像路径间交接。同路径保留字节进度；切换路径清空文件身份并从零消费。额度窗口及已用恢复机会仍保存在原表，禁止以迁移清空。
+- 远程读后与登记事务内核对分配／代次，本机登记也核对当前本机 ready 归属。消费以已打开文件的 fstat 身份读取，提交 CAS 比较来源、身份、路径、旧文件身份和字节位置；API 消费同时核对冻结分配／代次，拒绝往返迁移后的迟到写入。
+- 历史认证错误只能按真实时序进入状态。完整人工核验解除门禁后保存 auth_verified_at，较旧或同次历史错误重读不能再次收口任务。较新的真实错误保持原保护。旧允许样本不得清除较新的恢复占用。
+- 上传不完整状态由有限结构化回执表达，中央按专用异常进入新尝试登记。新尝试只允许在原 exporting 阶段且没有 target／cancellation 检查点时 CAS 认领；先持久后执行，旧部分文件和原包身份保留。完整上传未知回包重读原结果；已核验／发布的包变化继续报错，禁止作为普通中断换源。 最终激活和 committed 后的协调器重建同样读取持久化 transfer 检查点；缺少该检查点的旧操作才读取 execution 初始尝试。
+- 已结束工作抓包与活动执行定位分开。中央从真实工作及当前环境确定查询；历史账本保留原节点。当前资料已完成迁移时，从当前节点读取原 `flows/group-sha256(namespace/work_id)[:20]`，旧节点离线不影响已迁移资料。
+- 历史查询在 Node 只读锁内核对安装、账号／环境、分配和代次，复用原 capture_summary／capture_file_preview，保持空间隔离、文件白名单与脱敏；不准备运行时或启动角色。中央读后复核归属／代次，并核对完整查询回执。
+- 新 Node 操作同时进入 Agent、轻量客户端与 SSH 操作／短查询白名单。中央与 Node 按同批控制组件发布；回滚前收口活动的新 transfer 检查点操作。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 固定 API 路径迁出／回迁 | 交接游标，保留原额度及许可 |
+| 其他身份、未知路径、旧归属或迟到游标 | ValueError 或拒绝提交，保留新位置和原事实 |
+| 人工核验后重读旧认证错误 | 门禁保持解除；新真实错误仍触发原保护 |
+| 未核验的部分上传 | 回执 incomplete，原迁移登记新尝试 |
+| 新尝试已经提交，激活回包未知或协调器重启 | 继续激活已发布的新尝试，保持原归属和准备结果 |
+| 上传尝试 CAS 失配、取消或已发布 | 拒绝换源，沿原操作核对 |
+| 历史抓包旧代次、错环境、目录链接、越界／私有文件 | 拒绝读取，公开入口沿原 404 合同 |
+| 历史资料读取期间归属变化 | 拒绝迟到结果，不准备新环境 |
+
+### 5. Scenarios and Examples
+
+- 正常：本机 10% 游标迁出后消费远程 20%，回迁消费新 60%，再次迁出消费新 70%；逻辑来源保持。
+- 基础：没有 transfer 检查点的旧迁移沿初始尝试；上传已经完整时重用原结果。旧额度 JSON 缺少 auth_verified_at 时沿既有观察时序处理。
+- 中断：原尝试留下 partial 文件，新尝试先登记再上传；完整上传回包丢失并重建协调器后，继续同一迁移并复用已完整文件。 激活请求必须引用新尝试；committed 后激活回包丢失时，重建协调器仍引用相同新尝试，目标准备保持一次。
+- 错误用法：直接覆盖 API 游标为任意路径、删除部分上传、为历史本机工作虚构远程操作。正确处理：核对固定来源后交接、保留旧证据并登记新尝试、使用独立的历史只读定位。
+
+### 6. Tests Required
+
+- `test_cluster_quota`：本机↔远程连续交接、两个真实 Node 数据根、旧位置迟到消费和未知路径保护、完整人工核验后换代重读及新认证错误。
+- `test_cluster_migration_files/test_cluster_migration_runner`：真实部分文件、上传完成回包未知、协调器重建、CAS／取消后拒绝、已核验包和链接保护。 节点激活替身核对实际已准备尝试，覆盖新尝试的最终激活及 `test_renewed_transfer_activation_resumes_after_committed_response_loss` 的提交后重启续接。
+- `test_cluster_project_capture/test_cluster_projects_terminal`：双空间实际文件、真实迁移归档、旧节点离线、原账本保持、零运行时准备、scope 和路径拒绝。
+- `test_cluster_agent.NodeAgentTests.test_history_capture_through_real_ssh_light_client_and_actor`：真实隔离 SSH→轻量客户端→UDS Actor→原文件；Docker exec 使用明确命令替身，保持零真实账号请求。

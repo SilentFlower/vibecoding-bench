@@ -1,0 +1,17 @@
+..F..........................................
+======================================================================
+FAIL: test_failure_exposes_recovery_controls_and_cancel_closes_original_scope (test_cluster_migration_api.MigrationApiTests.test_failure_exposes_recovery_controls_and_cancel_closes_original_scope)
+目标未知后通过原操作取消，界面仅获得脱敏阶段。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_migration_api.py", line 99, in test_failure_exposes_recovery_controls_and_cancel_closes_original_scope
+    self.assertEqual('cancelled', self.settled()['phase'])
+AssertionError: 'cancelled' != 'reconcile'
+- cancelled
++ reconcile
+
+
+----------------------------------------------------------------------
+Ran 45 tests in 15.083s
+
+FAILED (failures=1)

@@ -353,14 +353,15 @@ def _capture_files(base: Path) -> list[dict[str, object]]:
     return files
 
 
-def capture_summary(base: Path, *, running: bool = False) -> dict:
+def capture_summary(base: Path, *, running: bool = False, files: list[dict] | None = None) -> dict:
     """聚合旧平铺及各执行代次，索引缺失时仍返回已落盘文件。
 
     :param base: 调用方已核对账号及执行归属的证据根目录。
     :param running: 业务侧是否仍有活动执行。
+    :param files: 节点已安全核对的原公开文件元信息；默认按本机目录读取。
     :return: 脱敏索引、文件清单、采样数量及真实完整性状态。
     """
-    files = _capture_files(base)
+    files = _capture_files(base) if files is None else files
     tls = _tls_preview([base / item['path'] for item in files if Path(item['path']).name == 'tls_clienthello.jsonl'])
     paths = [(root, path) for root in _capture_roots(base)
         for path in [root / 'capture_index.json', *sorted(root.glob('executions/*/capture_index.json'))]]

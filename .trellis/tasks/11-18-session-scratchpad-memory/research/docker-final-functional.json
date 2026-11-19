@@ -1,0 +1,31 @@
+{
+  "root": "/tmp/scratchpad-storage-verify-lf672lrw",
+  "checks": [
+    "实际安全挂载",
+    "三会话文件转存",
+    "旧CLI停止后恢复",
+    "真实CLI原会话迁盘续跑",
+    "两账号内容归属",
+    "tmpfs刚性占用减量",
+    "删除重建容器及卷后的原会话续跑",
+    "能力不足沿用tmpfs并在新CLI续跑原会话"
+  ],
+  "image": "flower2api-account:cluster-background-local",
+  "before": {
+    "anon": 8093696,
+    "file": 25178112,
+    "shmem": 25178112
+  },
+  "after": {
+    "anon": 8093696,
+    "file": 0,
+    "shmem": 0
+  },
+  "tmpfs_reduction_bytes": 25178112,
+  "cli_sessions": [
+    "6738843e-a6af-424a-aad4-3716b0bea01c",
+    "226a311a-d383-4820-a4b7-393db9be1af5"
+  ],
+  "passed": true,
+  "cleanup_errors": []
+}

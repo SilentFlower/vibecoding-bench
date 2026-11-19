@@ -1,0 +1,116 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.13kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/flower2api-control:cluster-background-local
+#2 DONE 0.1s
+
+#3 [internal] load metadata for docker.io/library/rust:1.96.0-slim-bookworm
+#3 DONE 0.9s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [backend 1/6] FROM docker.io/library/rust:1.96.0-slim-bookworm@sha256:4732ca96fd086cb9be682050c3f0176288eebaac2b80aa2bcefccfaf198e1950
+#5 resolve docker.io/library/rust:1.96.0-slim-bookworm@sha256:4732ca96fd086cb9be682050c3f0176288eebaac2b80aa2bcefccfaf198e1950 0.0s done
+#5 DONE 0.0s
+
+#6 [control 1/2] FROM docker.io/library/flower2api-control:cluster-background-local@sha256:0235a412b67d408bb90718d59a49791b4cc5006057609c310c8bca26f585e159
+#6 resolve docker.io/library/flower2api-control:cluster-background-local@sha256:0235a412b67d408bb90718d59a49791b4cc5006057609c310c8bca26f585e159 0.0s done
+#6 DONE 0.2s
+
+#7 [internal] load build context
+#7 transferring context: 31.38kB 0.0s done
+#7 DONE 0.1s
+
+#8 [backend 2/6] RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
+#8 CACHED
+
+#9 [backend 3/6] WORKDIR /source/services/gateway
+#9 CACHED
+
+#10 [backend 4/6] COPY gateway/ ./
+#10 CACHED
+
+#11 [backend 5/6] COPY web-dist/ /source/apps/web/dist/
+#11 CACHED
+
+#12 [backend 6/6] RUN --mount=type=cache,id=vibebench-v3-cargo-registry,target=/usr/local/cargo/registry,sharing=locked --mount=type=cache,id=vibebench-v3-cargo-git,target=/usr/local/cargo/git,sharing=locked --mount=type=cache,id=vibebench-v3-cargo-target,target=/source/services/gateway/target,sharing=locked cargo build --locked --release --bins --features v3-verification && mkdir -p /out && cp target/release/claude-code-gateway target/release/account-sender /out/
+#12 CACHED
+
+#13 [control 2/2] COPY --from=backend /out/claude-code-gateway /app/claude-code-gateway
+#13 DONE 0.1s
+
+#14 exporting to image
+#14 exporting layers
+#14 exporting layers 1.3s done
+#14 exporting manifest sha256:1a14ab516fb1ae955c8f36cf2167045af5a94913ee31bf100ad116f5e2688ce6 0.0s done
+#14 exporting config sha256:499639a4da18d93dc4e78937de9fca28a833aa6dc4522cc1438fe9f323213454 0.0s done
+#14 exporting attestation manifest sha256:1a0cb7ddaa28e95493637467bce4e00e3464387df5693c8becc9dba15838684c 0.0s done
+#14 exporting manifest list sha256:548d6455f62e3dd58f77214c87234c4b099c367432ce16d285a286e822bf0fda 0.0s done
+#14 naming to docker.io/library/flower2api-control:cluster-background-local done
+#14 unpacking to docker.io/library/flower2api-control:cluster-background-local
+#14 unpacking to docker.io/library/flower2api-control:cluster-background-local 0.2s done
+#14 DONE 1.7s
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.13kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/flower2api-account:v3-verify-ui-native-20261116-10
+#2 DONE 0.1s
+
+#3 [internal] load metadata for docker.io/library/rust:1.96.0-slim-bookworm
+#3 DONE 0.3s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [backend 1/6] FROM docker.io/library/rust:1.96.0-slim-bookworm@sha256:4732ca96fd086cb9be682050c3f0176288eebaac2b80aa2bcefccfaf198e1950
+#5 resolve docker.io/library/rust:1.96.0-slim-bookworm@sha256:4732ca96fd086cb9be682050c3f0176288eebaac2b80aa2bcefccfaf198e1950 0.0s done
+#5 DONE 0.0s
+
+#6 [account 1/2] FROM docker.io/library/flower2api-account:v3-verify-ui-native-20261116-10@sha256:ac0f5e5dcee796073990186a3a3ce4cc710e322ed5e576faff73610de7df7cdf
+#6 resolve docker.io/library/flower2api-account:v3-verify-ui-native-20261116-10@sha256:ac0f5e5dcee796073990186a3a3ce4cc710e322ed5e576faff73610de7df7cdf 0.0s done
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 31.38kB 0.0s done
+#7 DONE 0.0s
+
+#8 [backend 2/6] RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
+#8 CACHED
+
+#9 [backend 3/6] WORKDIR /source/services/gateway
+#9 CACHED
+
+#10 [backend 4/6] COPY gateway/ ./
+#10 CACHED
+
+#11 [backend 5/6] COPY web-dist/ /source/apps/web/dist/
+#11 CACHED
+
+#12 [backend 6/6] RUN --mount=type=cache,id=vibebench-v3-cargo-registry,target=/usr/local/cargo/registry,sharing=locked --mount=type=cache,id=vibebench-v3-cargo-git,target=/usr/local/cargo/git,sharing=locked --mount=type=cache,id=vibebench-v3-cargo-target,target=/source/services/gateway/target,sharing=locked cargo build --locked --release --bins --features v3-verification && mkdir -p /out && cp target/release/claude-code-gateway target/release/account-sender /out/
+#12 CACHED
+
+#6 [account 1/2] FROM docker.io/library/flower2api-account:v3-verify-ui-native-20261116-10@sha256:ac0f5e5dcee796073990186a3a3ce4cc710e322ed5e576faff73610de7df7cdf
+#6 CACHED
+
+#13 [account 2/2] COPY --from=backend /out/account-sender /usr/local/bin/account-sender
+#13 DONE 0.2s
+
+#14 exporting to image
+#14 exporting layers
+#14 exporting layers 0.7s done
+#14 exporting manifest sha256:c551f9a5d995e9f74edbbdb6d714785817115e5a5f0411b6881456199315dcfc 0.0s done
+#14 exporting config sha256:381f20545a0218f80f005c7c8daa437d1146435a281f209f1c29d838ac93078c 0.0s done
+#14 exporting attestation manifest sha256:9e31eacfd4f04f72875ba7505c5a353807b37bb4b0a49e3668f7195fd8aba383 0.0s done
+#14 exporting manifest list sha256:71eb8b20d044aace93c71b3286606efdbdb98750c9328c70aa860d614e5da3ed 0.0s done
+#14 naming to docker.io/library/flower2api-account:cluster-background-local done
+#14 unpacking to docker.io/library/flower2api-account:cluster-background-local 0.1s done
+#14 DONE 1.0s

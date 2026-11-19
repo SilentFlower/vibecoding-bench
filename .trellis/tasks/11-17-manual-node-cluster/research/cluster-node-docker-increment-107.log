@@ -1,0 +1,21 @@
+E
+======================================================================
+ERROR: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 198, in test_remote_account_preparation_and_sender_json_sse
+    self.verify_gateway(client, service, runtime, account, upstream_root, network, configuration, backend, after=after)
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 600, in verify_gateway
+    after(context['gateway'])
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 191, in after_work
+    verify_node_terminal(self, service, runtime, node, account, real_gateway)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_terminal.py", line 144, in verify_node_terminal
+    testcase.assertTrue(sessions.control(scope.operation_id, 'inspect')['frozen'])
+                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+KeyError: 'frozen'
+
+----------------------------------------------------------------------
+Ran 1 test in 146.509s
+
+FAILED (errors=1)

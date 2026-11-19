@@ -1,0 +1,98 @@
+{
+  "source": "2dd715d3459668d48051003bc04650f74680f16a",
+  "ci_run": 44466706477,
+  "ci_url": "https://github.com/SilentFlower/vibecoding-bench/actions/runs/44466706477",
+  "ci_result": "failure",
+  "passed": [
+    "系统更新合同与恢复测试",
+    "本仓AGY处理产物准备",
+    "control/account正式镜像构建",
+    "两个镜像模块导入与资源校验",
+    "supervisor_ready"
+  ],
+  "failure": {
+    "file": "deploy/flower2api/verify_agy_runtime.py",
+    "line": 65,
+    "phase": "首代prepare等待prepared",
+    "error": "固定AGY断网探针超时",
+    "root_cause": "待定位"
+  },
+  "host": {
+    "ci_docker": "28.0.4",
+    "ci_kernel": "7.0.0-1014-aws",
+    "ci_cpus": 4,
+    "local_docker": "29.1.2",
+    "docker_sdk": "7.1.0",
+    "requests": "2.34.2",
+    "urllib3": "2.8.0",
+    "client_versions_equal": true
+  },
+  "local_cpu_reproduction": {
+    "nano_cpus": 2000000000,
+    "passed": true,
+    "seconds": 18.98,
+    "scope": "既有隔离镜像、两代准备与正常退出",
+    "real_model_requests": 0
+  },
+  "delivered": {
+    "artifact_tag": "agy-runtime-1.5.9-v1",
+    "artifact_download_and_hash_verified": true,
+    "business_commit": "a34742af6f02e4e124290b82faad547fe41e8994",
+    "task_commit": "2dd715d3459668d48051003bc04650f74680f16a",
+    "prior_task": "11-19-agy-ci-artifact",
+    "prior_task_status": "completed+closed"
+  },
+  "formal_latest": "v1.18.3",
+  "diagnostic_run": {
+    "run": 44471427734,
+    "source": "1435bb2a1c263430d5854f93fff598d3c0e95532",
+    "evidence": {
+      "event": "agy-probe-failure",
+      "phase": "prepared",
+      "credential_generation": 2,
+      "capture_failed": [],
+      "state": {
+        "Running": true,
+        "OOMKilled": false,
+        "ExitCode": 0
+      },
+      "event_counts": {
+        "supervisor_ready": 1,
+        "prepared": 1,
+        "job_finalized": 1
+      },
+      "error_codes": {},
+      "runtime": {
+        "processes": {
+          "other": 2,
+          "supervisor": 1,
+          "kernel": 1,
+          "observer": 1,
+          "native": 1
+        },
+        "memory_events": {
+          "max": 0,
+          "oom": 0,
+          "oom_kill": 0
+        },
+        "stages": {
+          "worker_config": 1,
+          "kernel_lock": 1,
+          "kernel_error": 0,
+          "input_pipe": 1,
+          "listener_identity": 0
+        },
+        "startup_errors": {}
+      }
+    },
+    "signature_matches_slow_retirement_fixture": true
+  },
+  "budget_fix_run": {
+    "run": 44475828322,
+    "source": "4b4266da02043110e017922febac4a727af7d3d0",
+    "result": "failure",
+    "phase": "host测试导入",
+    "error": "ModuleNotFoundError: No module named agy_auth",
+    "images_started": false
+  }
+}

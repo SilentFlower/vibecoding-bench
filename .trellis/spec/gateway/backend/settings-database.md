@@ -277,7 +277,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 
 - 账号展示字段兼容旧 JSON 缺失。列表根请求与详情各次尝试分别按实际 account_id LEFT JOIN 当前账号，仅查询 name/email 安全列；空资料为 None。账号资料只在查询时填充，沿用原持久表结构，账号改名按当前资料展示。
 
-- 仅在网关 Token 鉴权后的精确 `/v1/messages` 入口建立根请求 UUID；每次真实提交建立独立尝试 UUID。`count_tokens`、Hello、后台遥测不混入此请求尝试链。
+- 在网关 Token 鉴权后的精确 `/v1/messages` 及AGY Gemini生成入口建立根请求 UUID；每次真实提交建立独立尝试 UUID。多平台扩展遵循本文的AGY请求记录合同。`count_tokens`、模型目录、Hello、后台遥测不混入此请求尝试链。
 - 下游新增 `X-CC2API-Request-Id` 根 UUID；保留已有 `X-Request-Id`，缺失时补根 UUID。根 UUID、最终响应 ID、上游 `request-id/x-request-id` 可用于列表反查；标准 UUID 和 `req_` 字母数字 ID 保留，其它头值先 SHA256。诊断 ID 不增加到发往上游的业务 headers/body。
 - 尝试记录实际冻结画像 key/选择方式、最终模型/max_tokens/thinking 类型与预算/effort/stream/工具数量、匿名 session/thread、响应模型与消息、stop_reason、六类 token、partial、状态、耗时、重试原因和受控错误阶段/类型。未知字段保留 `null`；累计 usage 使用每字段最大值，5m/1h 缓存写明细不重复加入总量。
 - 根记录包含起止时间、下游状态、最终选中账号、结果、尝试数和可选的 `original_session_id`。根状态与尝试实际上游状态分开；中间认证或签名错误不得覆盖后续尝试结果。首字节字段 `ttft_ms` 测量响应头到达耗时，不解释为首个模型文本 token。
@@ -569,3 +569,55 @@ let observed = capture.observation(complete);
 - `default_idle_reaper_keeps_spare_until_two_minutes`：真实子进程、默认阈值、缩短唤醒、延长保留、忙进程存活、一个基础暖进程、映像引用及原池身份保持。
 - `idle_policy_updates_all_versions_without_replacing_pool_identity`：已有及后建版本继承更新，保持零进程启动。
 - 浏览器基于真实构建产物核对1440/390px的120默认、跨分类草稿、范围拒绝、字符串保存、回读、撤销及页面宽度；沿既有全量Rust与前端构建验证。
+
+## Scenario: AGY多平台请求记录与受控阶段采集
+
+### 1. Scope / Trigger
+
+修改Gemini诊断观察、请求记录查询、工具晚收口、AGY阶段快照及筛选迁移时适用。复用现有DiagnosticsStore、管理接口和四页签详情；CC UsageCapture及费用表继续沿原合同。
+
+### 2. Signatures
+
+- `RequestDiagnostic.context`与`AttemptDiagnostic.context`为可缺省的`DiagnosticContext`。根冻结`platform/entry_protocol/requested_model`；尝试记录`kernel/kernel_version/source_sha256/submitted_model/response_model_version`、凭据/环境/worker代次及原生会话。
+- `GET /admin/request-diagnostics`追加`platform/entry_protocol/kernel_version/requested_model/actual_model`；与原account_id、时间、结果及关联ID组合。`platform=claude_code|antigravity|history_unknown`，协议为`anthropic_messages|gemini|history_unknown`；模型及版本为最多128字节的安全标识。
+- `gateway.request-records.6`由`request_records_schema.rs`定义：根表追加可空TEXT列`platform/entry_protocol/requested_model`，尝试表追加`platform/kernel_version/actual_model`及对应查询索引。步骤1—5保持原摘要，发布精确源码映射同步。
+- `AgyAttemptTrace::tool_finalized(status)`只更新工具结果；`finalized(status)`仅由已核对的`job_finalized`调用，限定更新`control_state/control_observed_at`。
+- 管理采集沿`GET /admin/request-diagnostics/:request_id/captures/:attempt_id`。受信内部读取为`GET /internal/v3/native-captures/:account_id/:attempt_id?platform=antigravity`；独立入站发布为`POST /internal/v3/agy-ingress/:account_id/:attempt_id`，正文精确包含`environment_generation:StrictInt`与`ingress:dict`。
+
+### 3. Contracts
+
+- 每个已鉴权生成HTTP建立一根；HTTP根UUID与实际提交attempt UUID独立。在真实私有发送边界计尝试；准备拒绝为零，传输未知保持未知。认证恢复沿一根创建独立尝试，标记oauth_recovery并保留每代凭据和同HTTP策略。
+- 平台按实际入口冻结。AGY调用Claude模型仍为antigravity/AGY1.5.9。历史context缺失保持未知，不用当前账号平台、策略或版本回填。五类新增筛选在SQL中执行；history_unknown覆盖缺失事实。counts只移除结果维度，保留其余条件及服务端分页。
+- 工具下一HTTP从已验证ToolTurn取得前驱根与attempt。工具状态与物理控制终态分别观察；工具已完成后控制仍可未知或失败。提前原生error/cancelled只终结所观测的模型尝试。仅实际job_finalized登记控制收口；重复回执保持首次状态和时刻。限定补写保持原HTTP结果、起止时间和尝试数。
+- 源用量来自Gemini usageMetadata，输入/输出/缓存读取/思考/总量分别保留，累计字段取最大值。缺省为未知，真实零保持零。原始用量最多32字段、每数组32项及4096字节，字符串扩展被移除；缺失必要计数、畸形或截断标记不完整。源模型版本使用安全标识。私有响应头耗时标记agy_account_sender来源；首次有效输出另计。
+- 摘要仅存显式元数据、受控状态及账号域工具散列；正文和工具参数留在权限控制的内容视图。模式在HTTP入口冻结，debug与账号目录共同决定采集；同HTTP恢复复用原策略。诊断队列及采集故障只形成缺口，保持原业务提交、重试、字节及许可语义。
+- 快照来源分别为gateway_http_ingress/http_logical_bytes、decoded_gemini_input和cortex_submission/native_cascade_prompt_sections。原始HTTP长度/摘要在脱敏前计算；显示副本脱敏重复秘密。入口保留既有captured_at_ms；入站旁路缺失显示unavailable。最终TLS线字节沿未采集状态，不以Cortex提交替代。
+- 私有快照位于固定账号环境的flows/api/agy-prepared/snapshots及ingress/snapshots；读取先核对持久请求/尝试/平台，再核对唯一AGY环境和文件归属。服务Bearer、代次、标准UUID、目录FD、NOFOLLOW、单硬链接、0600文件、白名单和七天期限共同保护。读取保持环境休眠，管理响应no-store。
+- 正文预览共享2MiB，头128KiB，单快照6MiB；每账号原生/入口快照及历史调试材料共同计入1GiB。共享非阻塞文件锁串行容量淘汰，空间不足丢弃采集。后台按实际AGY映射清理过期快照；历史原始目录仅在账号匹配、worker已退役且过期后清理。新原始执行材料沿临时worker目录与原关闭清理。
+- SQLite凭据CAS提交及限定诊断补写在读取前取得写入权限，避免并行诊断写入引起BUSY_SNAPSHOT；CAS条件和RT所有权保持。双库投影沿稳定Any绑定；旧程序compatible_newer读写在隔离库验证。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| AGY调用Claude / 401恢复 | 平台保持AGY / 同根独立尝试与凭据代次 |
+| 工具完成后退役失败 / 原生取消先于idle | 工具结果独立 / 实际作业回执前控制未知 |
+| 重复物理回执 / 工具晚补写 | 保留首次控制状态及时刻 / 原HTTP时间和结果保持 |
+| 缺失context / 缺失用量 / 真实0 | 历史未记录 / 未观测及partial / 显示0 |
+| 非法筛选 / 非法代次或附加字段 | 管理查询400 / 内部DTO422或旧代次409 |
+| 匿名 / 错请求或账号 / 链接或越界 | 鉴权拒绝 / 归属拒绝 / 受控采集失败 |
+| info / 账号关闭 / 文件缺失或过期 | 摘要 / 已关闭 / missing或expired；读取不触发模型 |
+| 入站发布超时或旧组件不支持 | 缺口可见，业务继续原单次提交 |
+
+### 5. Scenarios and Examples
+
+- 正常：管理员以platform=antigravity和requested_model查询一次401恢复，查看同根两次凭据代次、源用量及冻结策略，再按原attempt读取独立阶段。
+- 边界：工具HTTP已成功，tool_turn_finalized表示工具完成；排空期间control_state保持未知，实际job_finalized=error后仅控制显示失败，原HTTP结果和耗时保持。
+- 错误用法：工具完成时写入物理completed，或把每帧累计token求和。正确处理：分离工具和job回执，源计数取最大值并保留未知。
+
+### 6. Tests Required
+
+- Rust诊断/存储覆盖双库组合筛选、全量计数、历史未知、真实0、重复源用量、限定晚补写及并行凭据CAS。顺序测试覆盖工具完成后控制失败、取消先于回执、重复回执及HTTP起止保持。
+- test_agy_capture及test_agy_capture_api覆盖三种来源、重复秘密、入站时间、共享预算、过期清理、活跃保护、链接/硬链接、嵌套白名单、服务鉴权和环境代次。
+- verify_agy_gemini.py核对真实HTTP/SQLite与合成发送器；verify_agy_native_loopback.py --homoglyph独立核对固定原版、本地TLS/MCP、真实尝试及入站旁路；--capture-off验证关闭路径。真实外部模型预算为0。
+- verify_agy_request_records.py --image <固定测试镜像> --baseline <旧网关副本>验证5→6、重复迁移、旧程序读写及真实UI/API/SQLite；verify_management_ui.py保持CC旧视图、迟到回包与移动端回归。窄屏截图先等待弹窗实际宽度并断言左右边界。

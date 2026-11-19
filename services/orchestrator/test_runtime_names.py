@@ -42,3 +42,15 @@ class RuntimeNamesTests(unittest.TestCase):
         for invalid in ('', '../us', 'us/other', 'US'):
             with self.subTest(deployment=invalid), self.assertRaises(ValueError):
                 deployment_network_names(invalid)
+
+    def test_remote_role_names_include_node_and_fit_dns_label(self) -> None:
+        """同一环境在两节点的停止副本和目标实例有独立短名称。:return: None。"""
+        first = account_container_prefix('test', node_key='a' * 32)
+        second = account_container_prefix('test', node_key='b' * 32)
+        self.assertNotEqual(first, second)
+        self.assertNotEqual(first, account_container_prefix('test'))
+        self.assertLessEqual(len(first + 'e' * 32 + '-sender'), 63)
+        with self.assertRaises(ValueError):
+            account_container_prefix('test', node_key='short')
+        with self.assertRaises(ValueError):
+            account_container_prefix('test', node_key='a' * 32, legacy=True)

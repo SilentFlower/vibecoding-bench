@@ -1,0 +1,16 @@
+..E.
+======================================================================
+ERROR: test_original_workspace_waits_for_central_parent_then_permits_once (test_cluster_legacy_projects.LegacyNodeProjectTests.test_original_workspace_waits_for_central_parent_then_permits_once)
+实际物化与中央CAS在放行前，暂停父批次拒绝监督放行。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_legacy_projects.py", line 110, in test_original_workspace_waits_for_central_parent_then_permits_once
+    self.io.permit(self.row)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_legacy_project_io.py", line 104, in permit
+    raise RuntimeBusy('原经典项目在实际放行前已暂停或停止')
+account_runtime.RuntimeBusy: 原经典项目在实际放行前已暂停或停止
+
+----------------------------------------------------------------------
+Ran 4 tests in 12.144s
+
+FAILED (errors=1)

@@ -1,0 +1,14 @@
+F
+======================================================================
+FAIL: test_active_program_blocks_source_fence_until_actual_cancel (test_cluster_run_verification.ReleasedRunProgramTests.test_active_program_blocks_source_fence_until_actual_cancel)
+独立程序占用参与源隔离，取消后核对原容器再撤销占用。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_run_verification.py", line 109, in test_active_program_blocks_source_fence_until_actual_cancel
+    self.assertTrue(entered.wait(3))
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 1 test in 3.954s
+
+FAILED (failures=1)

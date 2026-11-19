@@ -1,0 +1,7 @@
+{
+  "deployment": "verify-60186a7454b7",
+  "runner_id": "5aa41a2a68c2950d694962f2181aa5cac19e979ea5f95942ef921fceec92e5e8",
+  "network": "vibebench-v3-verify-60186a7454b7",
+  "root": "/root/project/vibecoding-bench/.trellis/tasks/11-18-session-scratchpad-memory/research/activation-projects-chain/vibebench-v3-verify-eb_iyteo",
+  "release": "manual-cluster-20261118"
+}

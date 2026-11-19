@@ -18,6 +18,7 @@ from unittest.mock import Mock, call, patch
 from content_capture_settings import read_settings as read_content_capture, set_settings as set_content_capture
 
 from docker import APIClient
+from docker.types import Mount
 
 from account_runtime import AccountRuntime, RuntimeBusy, atomic_json, derive_v3_fingerprint, locale_for_timezone
 from account_isolation import ROLE_COLUMNS, role_labels
@@ -51,6 +52,7 @@ class AccountRuntimeTests(unittest.TestCase):
             connection.execute("CREATE TABLE app_settings(key TEXT PRIMARY KEY, value TEXT)")
             connection.execute("INSERT INTO accounts(id,name,cc2api_account_id) VALUES(1,'synthetic',7)")
         self.client = Mock()
+        self.client.images.get.return_value.attrs = {'Config': {'Labels': {}}}
         self.client.containers.list.return_value = []
         self.gateway = Mock()
         self.fingerprint = Mock(return_value={"profile_version": 2, "hostname": "fixed", "machine_id": "a" * 32,
@@ -62,6 +64,225 @@ class AccountRuntimeTests(unittest.TestCase):
         self.addCleanup(environment.stop)
         self.runtime = AccountRuntime(self.client, self.root, self.root, database, self.fingerprint, self.gateway)
         self.addCleanup(self.runtime.heartbeat_pool.shutdown)
+
+    def test_restore_persistent_execution_keeps_source_process_and_original_lease_without_new_admission(self) -> None:
+        """原私有登记可恢复停止定位，过期租约保持原截止，其他租约代次被拒绝。:return: None。"""
+        row = self.runtime._row('synthetic', 1)
+        row.update(generation=3, container_id='original-container')
+        source = 'projects:' + 'a' * 32 + ':1'
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7}
+        lease = {'owner': source, 'generation': 'original-lease', 'expires_at': 0, 'exclusive': False, 'shared_cli': True}
+        process = {'schema': 1, 'source': source, 'pid': 123, 'started': 456, 'parent': 0, 'uid': 1000}
+        original = {'row': row, 'account': account, 'source': source, 'lease': lease, 'shared_cli': True,
+            'exclusive': False, 'exec': 'original-exec', 'handle': 'original-handle', 'process': process,
+            'settings_override': 'runtime/jobs/original/settings.json'}
+        self.runtime._save_execution(original)
+        restored = self.runtime.restore_execution(row, account, source, lease, shared_cli=True)
+        self.assertEqual(process, restored['process'])
+        self.assertEqual(0, restored['lease']['expires_at'])
+        self.assertEqual('original-exec', restored['exec'])
+        self.assertEqual('runtime/jobs/original/settings.json', restored['settings_override'])
+        with self.assertRaisesRegex(ValueError, '停止能力'):
+            self.runtime.authorize_input(restored)
+        self.assertIs(restored, self.runtime.restore_execution(row, account, source, lease, shared_cli=True))
+        self.gateway._request.assert_not_called()
+        with self.assertRaises(ValueError):
+            self.runtime.restore_execution(row, account, source, {**lease, 'generation': 'other-lease'}, shared_cli=True)
+        self.runtime._remove_job(restored)
+        with self.assertRaisesRegex(ValueError, '租约'):
+            self.runtime.restore_execution(row, account, source, {**lease, 'generation': 'other-lease'}, shared_cli=True)
+
+    def test_restore_independent_execution_keeps_null_lease_and_only_stop_capability(self) -> None:
+        """独立原作业按私有登记恢复停止能力，网关租约保持空。:return: None。"""
+        row = self.runtime._row('synthetic', 1)
+        row.update(generation=3, container_id='original-independent-container')
+        source = 'projects:' + 'b' * 32 + ':1'
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': None}
+        job = {'row': row, 'account': account, 'source': source, 'lease': None,
+            'shared_cli': True, 'exclusive': False, 'exec': 'independent-exec'}
+        self.runtime._save_execution(job)
+        restored = self.runtime.restore_execution(row, account, source, None, shared_cli=True)
+        self.assertIsNone(restored['lease'])
+        self.assertEqual('independent-exec', restored['exec'])
+        with self.assertRaisesRegex(ValueError, '停止能力'):
+            self.runtime.authorize_input(restored)
+        with self.assertRaises(ValueError):
+            self.runtime.restore_execution(row, account, source, {'owner': source}, shared_cli=True)
+        self.gateway._request.assert_not_called()
+
+    def test_restore_private_review_retains_nonshared_identity_and_only_stop_capability(self) -> None:
+        """绑定与独立评审恢复原私有定位，错Run登记拒绝恢复。:return: None。"""
+        row=self.runtime._row('synthetic',1)
+        row.update(generation=3,container_id='original-review-cli')
+        run_id='a'*12
+        source=f'run:{run_id}:0'
+        for gateway_id in (7,None):
+            with self.subTest(gateway_id=gateway_id):
+                account={'id':1,'name':'synthetic','cc2api_account_id':gateway_id}
+                lease=({'owner':source,'generation':'original-review-lease','expires_at':0,
+                    'exclusive':False,'shared_cli':False} if gateway_id else None)
+                original={'row':row,'account':account,'source':source,'lease':lease,'shared_cli':False,
+                    'exclusive':False,'run_id':run_id,'execution_role':'project-review',
+                    'private_relative':'project-review-private/original','review_intent':'b'*64,
+                    'review_container_id':'original-private-container','resource_mode':'serial-v1'}
+                self.runtime._save_execution(original)
+                restored=self.runtime.restore_execution(row,account,source,lease,shared_cli=False)
+                for key in ('private_relative','review_intent','review_container_id','resource_mode'):
+                    self.assertEqual(original[key],restored[key])
+                self.assertFalse(restored['shared_cli'])
+                self.assertTrue(restored['recovery_only'])
+                with self.assertRaisesRegex(ValueError,'停止能力'):
+                    self.runtime.authorize_input(restored)
+                self.runtime._remove_job(restored)
+                self.runtime._save_execution({**original,'run_id':'c'*12})
+                with self.assertRaisesRegex(ValueError,'执行登记'):
+                    self.runtime.restore_execution(row,account,source,lease,shared_cli=False)
+        self.gateway._request.assert_not_called()
+
+    def test_restore_credential_refresh_keeps_original_exclusive_stop_capability(self) -> None:
+        """仅具体独立OAuth维护可恢复独占作业，原令牌与进程组保持一致。:return: None。"""
+        row=self.runtime._row('synthetic',1)
+        row.update(generation=3,container_id='original-refresh-cli')
+        account={'id':1,'name':'synthetic','cc2api_account_id':None}
+        source='oauth-refresh:'+'d'*32
+        original={'row':row,'account':account,'source':source,'lease':None,'shared_cli':False,
+            'exclusive':True,'execution_role':'credential-refresh','handle':'original-refresh-handle','exec':'original-refresh-exec'}
+        self.runtime._save_execution(original)
+        with self.assertRaisesRegex(ValueError,'执行登记'):
+            self.runtime.restore_execution(row,account,source,None,shared_cli=False)
+        restored=self.runtime.restore_execution(row,account,source,None,shared_cli=False,credential_refresh=True)
+        self.assertTrue(restored['exclusive'])
+        self.assertTrue(restored['recovery_only'])
+        self.assertEqual('original-refresh-exec',restored['exec'])
+        self.assertEqual('original-refresh-handle',restored['handle'])
+        with self.assertRaisesRegex(ValueError,'停止能力'):
+            self.runtime.authorize_input(restored)
+        with self.assertRaisesRegex(ValueError,'账号、来源'):
+            self.runtime.restore_execution(row,account,'login:'+'d'*32,None,shared_cli=False,credential_refresh=True)
+        self.gateway._request.assert_not_called()
+
+    def test_restore_usage_preserves_nonexclusive_stop_only_mode(self) -> None:
+        """原usage记录只能恢复停止能力，错用途或独占标记保持拒绝。:return: None。"""
+        row=self.runtime._row('synthetic',1)
+        row.update(generation=3,container_id='original-usage-cli')
+        account={'id':1,'name':'synthetic','cc2api_account_id':None}
+        source='quota:'+'d'*32
+        original={'row':row,'account':account,'source':source,'lease':None,'shared_cli':False,
+            'exclusive':False,'execution_role':'credential-usage','handle':'original-usage-handle','exec':'original-usage-exec'}
+        self.runtime._save_execution(original)
+        with self.assertRaisesRegex(ValueError,'执行登记'):
+            self.runtime.restore_execution(row,account,source,None,shared_cli=False)
+        restored=self.runtime.restore_execution(row,account,source,None,shared_cli=False,credential_usage=True)
+        self.assertFalse(restored['exclusive'])
+        self.assertTrue(restored['recovery_only'])
+        self.assertEqual('original-usage-exec',restored['exec'])
+        with self.assertRaisesRegex(ValueError,'停止能力'):
+            self.runtime.authorize_input(restored)
+        self.runtime._remove_job(restored)
+        self.runtime._save_execution({**original,'exclusive':True})
+        with self.assertRaisesRegex(ValueError,'执行登记'):
+            self.runtime.restore_execution(row,account,source,None,shared_cli=False,credential_usage=True)
+        with self.assertRaisesRegex(ValueError,'账号、来源'):
+            self.runtime.restore_execution(row,account,'oauth-refresh:'+'d'*32,None,shared_cli=False,credential_usage=True)
+        self.gateway._request.assert_not_called()
+
+    def test_credential_claim_crash_restores_only_unstarted_original_scope(self) -> None:
+        """原维护在claim后崩溃时可停止，已有exec而缺角色的记录继续拒绝。:return: None。"""
+        row=self.runtime._row('synthetic',1)
+        row.update(generation=3,container_id='original-maintenance-cli')
+        account={'id':1,'name':'synthetic','cc2api_account_id':None}
+        for kind,exclusive in (('oauth-refresh',True),('quota',False)):
+            source=kind+':'+'d'*32
+            original={'row':row,'account':account,'source':source,'lease':None,'shared_cli':False,
+                'exclusive':exclusive,'exec':None}
+            self.runtime._save_execution(original)
+            options={'credential_refresh':exclusive,'credential_usage':not exclusive}
+            restored=self.runtime.restore_execution(row,account,source,None,shared_cli=False,**options)
+            self.assertTrue(restored['recovery_only'])
+            self.assertEqual(exclusive,restored['exclusive'])
+            with self.assertRaisesRegex(ValueError,'停止能力'):
+                self.runtime.authorize_input(restored)
+            self.runtime._remove_job(restored)
+            self.runtime._save_execution({**original,'exec':'ambiguous-existing-exec'})
+            with self.assertRaisesRegex(ValueError,'执行登记'):
+                self.runtime.restore_execution(row,account,source,None,shared_cli=False,**options)
+
+    def test_restore_original_account_login_keeps_exact_tmux_and_stop_only_scope(self) -> None:
+        """登录只能恢复原SID/socket/版本的独占停止能力，错tmux保持拒绝。:return: None。"""
+        row=self.runtime._row('synthetic',1)
+        row.update(generation=3,container_id='original-login-cli')
+        account={'id':1,'name':'synthetic','cc2api_account_id':None}
+        sid='a'*12
+        source='login:'+sid
+        original={'row':row,'account':account,'source':source,'lease':None,'shared_cli':False,'exclusive':True,
+            'tmux':sid,'tmux_socket':'/tmp/v3-login-'+sid+'.sock','version':'2.1.303'}
+        for role in (None,'account-login'):
+            value={**original,**({'execution_role':role} if role is not None else {})}
+            self.runtime._save_execution(value)
+            with self.assertRaisesRegex(ValueError,'执行登记'):
+                self.runtime.restore_execution(row,account,source,None,shared_cli=False)
+            restored=self.runtime.restore_execution(row,account,source,None,shared_cli=False,account_login=True)
+            self.assertTrue(restored['exclusive'])
+            self.assertTrue(restored['recovery_only'])
+            self.assertEqual(original['tmux_socket'],restored['tmux_socket'])
+            with self.assertRaisesRegex(ValueError,'停止能力'):
+                self.runtime.authorize_input(restored)
+            self.runtime._remove_job(restored)
+        self.runtime._save_execution({**original,'tmux':'b'*12})
+        with self.assertRaisesRegex(ValueError,'执行登记'):
+            self.runtime.restore_execution(row,account,source,None,shared_cli=False,account_login=True)
+        self.gateway._request.assert_not_called()
+
+    def test_restore_null_draft_auth_check_requires_explicit_recovery_and_preserves_no_tmux(self) -> None:
+        """NULL草稿检查保留版本而无tmux，仅原明确恢复模式可取得停止能力。:return: None。"""
+        row=self.runtime._row('draft_only')
+        row.update(generation=3,container_id='original-null-login-cli')
+        account={'id':None,'name':'draft_only','cc2api_account_id':None}
+        source='login:'+'c'*12
+        original={'row':row,'account':account,'source':source,'lease':None,'shared_cli':False,'exclusive':True,
+            'version':'2.1.293','execution_role':'draft-login-recovery'}
+        self.runtime._save_execution(original)
+        with self.assertRaises(ValueError):
+            self.runtime.restore_execution(row,account,source,None,shared_cli=False,account_login=True)
+        restored=self.runtime.restore_execution(row,account,source,None,shared_cli=False,account_login=True,draft_login_recovery=True)
+        self.assertTrue(restored['recovery_only'])
+        self.assertEqual('2.1.293',restored['version'])
+        self.assertIsNone(restored.get('tmux'))
+        self.assertIsNone(restored.get('tmux_socket'))
+        with self.assertRaises(ValueError):
+            self.runtime.authorize_input(restored)
+        self.runtime._remove_job(restored)
+        for changes in ({'tmux':'c'*12},{'tmux_socket':'/tmp/v3-login-'+'c'*12+'.sock'},
+                {'exec':'unexpected-exec'},{'version':'invalid'},{'execution_role':'account-login'}):
+            self.runtime._save_execution({**original,**changes})
+            with self.subTest(changes=changes),self.assertRaises(ValueError):
+                self.runtime.restore_execution(row,account,source,None,shared_cli=False,account_login=True,draft_login_recovery=True)
+        for changed in ({**account,'id':17},{**account,'cc2api_account_id':7}):
+            with self.subTest(changed=changed),self.assertRaises(ValueError):
+                self.runtime.restore_execution(row,changed,source,None,shared_cli=False,account_login=True,draft_login_recovery=True)
+        self.gateway._request.assert_not_called()
+
+    def test_restore_bound_login_requires_original_exclusive_gateway_lease(self) -> None:
+        """绑定登录恢复严格保留原Gateway排他代次，恢复句柄只有停止能力。:return: None。"""
+        row=self.runtime._row('synthetic',1)
+        row.update(generation=3,container_id='original-bound-login-cli')
+        account={'id':1,'name':'synthetic','cc2api_account_id':7}
+        sid='a'*12
+        source='login:'+sid
+        lease={'owner':source,'generation':'original-bound-lease','expires_at':0,'exclusive':True,'shared_cli':False}
+        original={'row':row,'account':account,'source':source,'lease':lease,'shared_cli':False,'exclusive':True,
+            'tmux':sid,'tmux_socket':'/tmp/v3-login-'+sid+'.sock','version':'2.1.293','execution_role':'account-login'}
+        self.runtime._save_execution(original)
+        restored=self.runtime.restore_execution(row,account,source,lease,shared_cli=False,account_login=True)
+        self.assertTrue(restored['recovery_only'])
+        self.assertEqual(lease,restored['lease'])
+        with self.assertRaisesRegex(ValueError,'停止能力'):
+            self.runtime.authorize_input(restored)
+        self.runtime._remove_job(restored)
+        for changes in ({'exclusive':False},{'shared_cli':True},{'generation':'other-generation'}):
+            with self.subTest(changes=changes),self.assertRaises(ValueError):
+                self.runtime.restore_execution(row,account,source,{**lease,**changes},shared_cli=False,account_login=True)
+        self.gateway._request.assert_not_called()
 
     def _scenario_python_fixture(self) -> SimpleNamespace:
         """准备最小冻结制品与容器替身，不访问网络或真实账号。@return 测试夹具。"""
@@ -87,6 +308,21 @@ class AccountRuntimeTests(unittest.TestCase):
             virtual_marker=account_root / "runtime/project-python-sessions/11.json",
             cli=Mock(exec_run=Mock(return_value=SimpleNamespace(exit_code=0, output=b"3.11.9\n"))),
             network=Mock())
+
+    def test_remote_environment_is_excluded_from_local_recovery_and_files(self) -> None:
+        """远程代次和停止状态不被本机恢复改变，本机文件访问保持拒绝。:return: None。"""
+        row = self.runtime._row('synthetic', 1)
+        self.runtime._update(row, state='ready', generation=3, container_id='remote-container')
+        self.runtime.locality = lambda current: False
+        self.runtime.reconcile()
+        actual = self.runtime._row('synthetic', 1)
+        self.assertEqual(('ready', 3, 'remote-container'),
+            (actual['state'], actual['generation'], actual['container_id']))
+        with self.assertRaises(RuntimeBusy):
+            self.runtime._root(row)
+        with self.assertRaises(RuntimeBusy):
+            self.runtime._container(row)
+        self.client.containers.get.assert_not_called()
 
     def test_background_binding_query_keeps_absent_and_sleeping_environments(self) -> None:
         """后台解析只读持久绑定，缺失或休眠时不创建角色。@return None。"""
@@ -2069,6 +2305,109 @@ class AccountRuntimeTests(unittest.TestCase):
             self.runtime._applied_native_sender(row)
         self.client.containers.run.assert_not_called()
 
+    def test_foreign_terminal_kernel_record_blocks_layout_rebuild_before_stop(self) -> None:
+        """另一个账号的已完成记录在任何角色停止之前被拒绝。@return None。"""
+        self._isolated_docker()
+        labels = self.client.images.get.return_value.attrs['Config']['Labels']
+        labels['vibebench.native-runtime'] = '293-raw-1'
+        account = {'id':1,'name':'synthetic','cc2api_account_id':7,
+            'upstream_socks5_host':'192.0.2.2','upstream_socks5_port':1080}
+        self.gateway._request.return_value = {'auth_type':'oauth','status':'active','proxy_url':'',
+            'request_backend':'native293','concurrency':3}
+        with patch.object(self.runtime,'_make_room'), patch.object(self.runtime,'_sync_proxy'), \
+                patch.object(self.runtime,'_sender_active',return_value=0), \
+                patch.object(self.runtime,'_notify_native_preparation'), \
+                patch.dict(os.environ,{'V3_NATIVE_SENDER_MEMORY':'1536m'}):
+            row, _ = self.runtime.ensure(account)
+            original = row['generation']
+            path = self.runtime._root(row) / 'runtime/native-kernel-upgrade.json'
+            atomic_json(path, {'state':'active','account_id':8,'current':{'release':'v0.1.0-beta.6'}})
+            labels['vibebench.native-runtime-versions'] = '2.1.280,2.1.293'
+            with patch.object(self.runtime,'_stop_environment') as stop:
+                with self.assertRaisesRegex(ValueError,'归属不符'):
+                    self.runtime.ensure(account)
+                stop.assert_not_called()
+            self.assertEqual(self.runtime._row('synthetic',1)['generation'], original)
+            self.assertEqual(json.loads(path.read_text())['account_id'],8)
+
+    def test_stopped_choices_migrate_without_start_and_next_cli_gets_target_layout(self) -> None:
+        """停止时清除历史选择，后续CLI唤醒先补齐双版布局。@return None。"""
+        containers = self._isolated_docker()
+        labels = self.client.images.get.return_value.attrs['Config']['Labels']
+        labels['vibebench.native-runtime'] = '293-raw-1'
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
+            'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        def gateway(method, path, body=None):
+            """提供固定后端及空闲门禁。@return 权威配置或租约。"""
+            return {'active':0,'waiting':0,'lease':None} if path.endswith('/lease') else {
+                'auth_type':'oauth','status':'active','proxy_url':'','request_backend':'native293','concurrency':3}
+        self.gateway._request.side_effect = gateway
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
+                patch.object(self.runtime, '_sender_active', return_value=0), \
+                patch.object(self.runtime, '_notify_native_preparation'), \
+                patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY':'1536m'}):
+            row, _ = self.runtime.ensure(account)
+            for container in containers.values():
+                container.status = 'exited'
+            self.runtime._update(row, state='stopped')
+            config = json.loads(self.runtime._sender_config(row).read_text())
+            config['native'].update(release={'release':'v0.1.0-beta.6','launcher_sha256':'a'*64}, kernel_generation='old')
+            atomic_json(self.runtime._sender_config(row), config)
+            record = self.runtime._root(row) / 'runtime/native-kernel-upgrade.json'
+            atomic_json(record, {'account_id':7,'state':'active','current':config['native']['release']})
+            self.runtime._migrate_stopped_native(row)
+            self.assertEqual(row['state'], 'stopped')
+            self.assertEqual(self.client.containers.run.call_count, 3)
+            self.assertIsNone(json.loads(record.read_text())['current'])
+            self.assertNotIn('release', json.loads(self.runtime._sender_config(row).read_text())['native'])
+            labels['vibebench.native-runtime-versions'] = '2.1.280,2.1.293'
+            resumed, _ = self.runtime.ensure(account, prepare_sender=False)
+            self.assertEqual(resumed['state'], 'ready')
+            self.assertEqual(self.client.containers.run.call_count, 6)
+            self.assertIn('2.1.280', json.loads(self.runtime._sender_config(resumed).read_text())['native']['runtimes'])
+
+    def test_platform_upgrade_completes_dual_layout_before_warmup_and_first_api(self) -> None:
+        """旧293登记在维护重建时补齐，养号期间首笔293和280保持原代次。@return None。"""
+        self._isolated_docker()
+        labels = self.client.images.get.return_value.attrs['Config']['Labels']
+        labels['vibebench.native-runtime'] = '293-raw-1'
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
+            'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        self.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': '',
+            'request_backend': 'native293', 'concurrency': 3}
+        def verified(request, timeout):
+            """使用实际身份返回目标发送器的固定制品核验结果。@return HTTP响应。"""
+            self.assertTrue(request.full_url.endswith('/internal/native/status'))
+            row = self.runtime._row('synthetic', 1)
+            return io.BytesIO(json.dumps({'environment_id': row['environment_id'], 'generation': row['generation'],
+                'versions': {version: {'available': True, 'version': version} for version in ('2.1.280','2.1.293')}}).encode())
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
+                patch.object(self.runtime, '_sender_active', return_value=0), \
+                patch.object(self.runtime, '_notify_native_preparation'), \
+                patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '1536m'}):
+            original, _ = self.runtime.ensure(account)
+            self.assertNotIn('runtimes', json.loads(self.runtime._sender_config(original).read_text())['native'])
+            self.runtime._stop_environment(original, remove=True)
+            self.runtime._update(original, state='stopped')
+            labels.update({'vibebench.native-runtime-versions': '2.1.280,2.1.293', 'vibebench.native-platform-managed': '1'})
+            with patch('account_runtime.urllib.request.build_opener') as opener:
+                opener.return_value.open.side_effect = verified
+                upgraded, _ = self.runtime.ensure(account, prepare_sender=False)
+                self.assertEqual(upgraded['state'], 'ready')
+                opener.return_value.open.assert_called_once()
+            installed = json.loads(self.runtime._sender_config(upgraded).read_text())['native']
+            self.assertEqual(installed['runtimes'], {'2.1.280': {'binary_path': '/usr/local/bin/ccrb-runtime-280'}})
+            self.assertEqual(installed['memory_mib'], 1536)
+            generation, roles = upgraded['generation'], {role: upgraded[column] for role,column in ROLE_COLUMNS.items()}
+            with patch.object(self.runtime, 'environment_jobs', return_value=[{'source': 'warmup:synthetic'}]), \
+                    patch.object(self.runtime, '_stop_environment', side_effect=AssertionError('养号期间禁止布局重建')):
+                for version in ('2.1.293', '2.1.280'):
+                    binding = self.runtime.transport(account, version)
+                    self.assertEqual(binding['generation'], generation)
+                    current = self.runtime._row('synthetic', 1)
+                    self.assertEqual({role: current[column] for role,column in ROLE_COLUMNS.items()}, roles)
+            self.assertEqual(self.client.containers.run.call_count, 6)
+
     def test_native_layout_rebuild_after_quiesce_keeps_busy_sender_protected(self) -> None:
         """忙时保护原角色，空闲重建允许低额度并落实到实际sender。@return None。"""
         containers = self._isolated_docker()
@@ -2217,6 +2556,34 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertTrue(all(item.kwargs['mem_limit'] == 0 and item.kwargs['memswap_limit'] == -1 for item in created))
         self.assertTrue(all(item.kwargs['nano_cpus'] > 0 and item.kwargs['pids_limit'] > 0 for item in created))
 
+    def test_platform_builtin_sender_is_independent_of_release_mount_for_two_accounts(self) -> None:
+        """两个原生环境均使用内置程序，历史公钥配置保持兼容。@return None。"""
+        self._isolated_docker()
+        self.client.images.get.return_value.attrs['Config']['Labels']['vibebench.native-runtime'] = '293-raw-1'
+        self.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': '',
+            'request_backend': 'native293', 'concurrency': 4}
+        with self.database() as connection:
+            connection.execute("INSERT INTO accounts(id,name,cc2api_account_id) VALUES(2,'second',8)")
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
+                patch.object(self.runtime, '_sender_active', return_value=0), patch.dict(os.environ, {
+                    'V3_NATIVE_RELEASE_PUBLIC_KEY': 'b' * 64,
+                    'V3_NATIVE_RELEASE_PILOT_ENVIRONMENT': '0' * 32, 'V3_NATIVE_SENDER_MEMORY': ''}):
+            for account_id, name, remote_id in ((1, 'synthetic', 7), (2, 'second', 8)):
+                row = self.runtime._row(name, account_id)
+                fingerprint = json.loads(row['fingerprint_json']); fingerprint['mem'] = 'unlimited'
+                self.runtime._update(row, fingerprint_json=json.dumps(fingerprint))
+                self.runtime.ensure({'id': account_id, 'name': name, 'cc2api_account_id': remote_id,
+                    'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080})
+        calls = self.client.containers.run.call_args_list
+        senders = [item.kwargs for item in calls if item.kwargs['labels']['vibebench.role'] == 'account-sender']
+        self.assertEqual(len(senders), 2)
+        for sender in senders:
+            self.assertNotIn('V3_NATIVE_RELEASE_PUBLIC_KEY', sender['environment'])
+            self.assertNotIn(str(self.root / 'native-releases'), sender['volumes'])
+        for item in calls:
+            if item.kwargs['labels']['vibebench.role'] != 'account-sender':
+                self.assertNotIn('V3_NATIVE_RELEASE_PUBLIC_KEY', item.kwargs['environment'])
+                self.assertNotIn(str(self.root / 'native-releases'), item.kwargs['volumes'])
 
     def test_native_startup_prewarm_configures_sender_before_notification(self) -> None:
         """三角色就绪后写入补位开关，再通知网关预热首个 worker。"""
@@ -2270,6 +2637,28 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertNotIn("mac_address", network)
         self.assertEqual(json.loads(row["fingerprint_json"])["mac"],
             network["networking_config"][self.runtime.network]["MacAddress"])
+
+    def test_scratchpad_mount_and_copy_failure_protect_all_original_roles(self) -> None:
+        """新CLI接收专有挂载，转存失败时三个原角色都保留。:return: None。"""
+        containers = self._isolated_docker()
+        self.client.images.get.return_value.attrs['Config']['Labels']['vibebench.cli-scratchpad-protocol'] = '1'
+        account = {'id': 1, 'name': 'synthetic', 'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        mount = Mount('/tmp/claude-1000', 'owned-scratchpad', no_copy=True)
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sender_active', return_value=0), \
+                patch('account_isolation.prepare_scratchpad_mount', return_value=mount), \
+                patch('account_isolation.restore_cli_scratchpad') as restore:
+            row, cli = self.runtime.ensure(account)
+        options = next(item.kwargs for item in self.client.containers.run.call_args_list
+            if item.kwargs['labels']['vibebench.role'] == 'account')
+        self.assertIn(mount, options['mounts'])
+        self.assertEqual(2, len(options['mounts']))
+        restore.assert_called_once_with(self.runtime, row, cli, fresh=True)
+        with patch('account_runtime.preserve_cli_scratchpad', side_effect=ValueError('合成转存失败')), \
+                self.assertRaisesRegex(ValueError, '合成转存失败'):
+            self.runtime._stop_environment(row, remove=True)
+        for container in containers.values():
+            container.stop.assert_not_called()
+            container.remove.assert_not_called()
 
     def test_existing_api_evidence_keeps_content_and_moves_to_sender(self) -> None:
         """旧 root 证据交接给普通发送器，历史和轮换文件均保留。@return None。"""
@@ -2615,143 +3004,6 @@ class AccountRuntimeTests(unittest.TestCase):
                 self.fail("不得进入绑定事务")
         self.client.containers.get.assert_not_called()
 
-
-    def test_foreign_terminal_kernel_record_blocks_layout_rebuild_before_stop(self) -> None:
-        """另一个账号的已完成记录在任何角色停止之前被拒绝。@return None。"""
-        self._isolated_docker()
-        labels = self.client.images.get.return_value.attrs['Config']['Labels']
-        labels['vibebench.native-runtime'] = '293-raw-1'
-        account = {'id':1,'name':'synthetic','cc2api_account_id':7,
-            'upstream_socks5_host':'192.0.2.2','upstream_socks5_port':1080}
-        self.gateway._request.return_value = {'auth_type':'oauth','status':'active','proxy_url':'',
-            'request_backend':'native293','concurrency':3}
-        with patch.object(self.runtime,'_make_room'), patch.object(self.runtime,'_sync_proxy'), \
-                patch.object(self.runtime,'_sender_active',return_value=0), \
-                patch.object(self.runtime,'_notify_native_preparation'), \
-                patch.dict(os.environ,{'V3_NATIVE_SENDER_MEMORY':'1536m'}):
-            row, _ = self.runtime.ensure(account)
-            original = row['generation']
-            path = self.runtime._root(row) / 'runtime/native-kernel-upgrade.json'
-            atomic_json(path, {'state':'active','account_id':8,'current':{'release':'v0.1.0-beta.6'}})
-            labels['vibebench.native-runtime-versions'] = '2.1.280,2.1.293'
-            with patch.object(self.runtime,'_stop_environment') as stop:
-                with self.assertRaisesRegex(ValueError,'归属不符'):
-                    self.runtime.ensure(account)
-                stop.assert_not_called()
-            self.assertEqual(self.runtime._row('synthetic',1)['generation'], original)
-            self.assertEqual(json.loads(path.read_text())['account_id'],8)
-
-
-    def test_stopped_choices_migrate_without_start_and_next_cli_gets_target_layout(self) -> None:
-        """停止时清除历史选择，后续CLI唤醒先补齐双版布局。@return None。"""
-        containers = self._isolated_docker()
-        labels = self.client.images.get.return_value.attrs['Config']['Labels']
-        labels['vibebench.native-runtime'] = '293-raw-1'
-        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
-            'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
-        def gateway(method, path, body=None):
-            """提供固定后端及空闲门禁。@return 权威配置或租约。"""
-            return {'active':0,'waiting':0,'lease':None} if path.endswith('/lease') else {
-                'auth_type':'oauth','status':'active','proxy_url':'','request_backend':'native293','concurrency':3}
-        self.gateway._request.side_effect = gateway
-        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
-                patch.object(self.runtime, '_sender_active', return_value=0), \
-                patch.object(self.runtime, '_notify_native_preparation'), \
-                patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY':'1536m'}):
-            row, _ = self.runtime.ensure(account)
-            for container in containers.values():
-                container.status = 'exited'
-            self.runtime._update(row, state='stopped')
-            config = json.loads(self.runtime._sender_config(row).read_text())
-            config['native'].update(release={'release':'v0.1.0-beta.6','launcher_sha256':'a'*64}, kernel_generation='old')
-            atomic_json(self.runtime._sender_config(row), config)
-            record = self.runtime._root(row) / 'runtime/native-kernel-upgrade.json'
-            atomic_json(record, {'account_id':7,'state':'active','current':config['native']['release']})
-            self.runtime._migrate_stopped_native(row)
-            self.assertEqual(row['state'], 'stopped')
-            self.assertEqual(self.client.containers.run.call_count, 3)
-            self.assertIsNone(json.loads(record.read_text())['current'])
-            self.assertNotIn('release', json.loads(self.runtime._sender_config(row).read_text())['native'])
-            labels['vibebench.native-runtime-versions'] = '2.1.280,2.1.293'
-            resumed, _ = self.runtime.ensure(account, prepare_sender=False)
-            self.assertEqual(resumed['state'], 'ready')
-            self.assertEqual(self.client.containers.run.call_count, 6)
-            self.assertIn('2.1.280', json.loads(self.runtime._sender_config(resumed).read_text())['native']['runtimes'])
-
-
-    def test_platform_upgrade_completes_dual_layout_before_warmup_and_first_api(self) -> None:
-        """旧293登记在维护重建时补齐，养号期间首笔293和280保持原代次。@return None。"""
-        self._isolated_docker()
-        labels = self.client.images.get.return_value.attrs['Config']['Labels']
-        labels['vibebench.native-runtime'] = '293-raw-1'
-        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
-            'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
-        self.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': '',
-            'request_backend': 'native293', 'concurrency': 3}
-        def verified(request, timeout):
-            """使用实际身份返回目标发送器的固定制品核验结果。@return HTTP响应。"""
-            self.assertTrue(request.full_url.endswith('/internal/native/status'))
-            row = self.runtime._row('synthetic', 1)
-            return io.BytesIO(json.dumps({'environment_id': row['environment_id'], 'generation': row['generation'],
-                'versions': {version: {'available': True, 'version': version} for version in ('2.1.280','2.1.293')}}).encode())
-        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
-                patch.object(self.runtime, '_sender_active', return_value=0), \
-                patch.object(self.runtime, '_notify_native_preparation'), \
-                patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '1536m'}):
-            original, _ = self.runtime.ensure(account)
-            self.assertNotIn('runtimes', json.loads(self.runtime._sender_config(original).read_text())['native'])
-            self.runtime._stop_environment(original, remove=True)
-            self.runtime._update(original, state='stopped')
-            labels.update({'vibebench.native-runtime-versions': '2.1.280,2.1.293', 'vibebench.native-platform-managed': '1'})
-            with patch('account_runtime.urllib.request.build_opener') as opener:
-                opener.return_value.open.side_effect = verified
-                upgraded, _ = self.runtime.ensure(account, prepare_sender=False)
-                self.assertEqual(upgraded['state'], 'ready')
-                opener.return_value.open.assert_called_once()
-            installed = json.loads(self.runtime._sender_config(upgraded).read_text())['native']
-            self.assertEqual(installed['runtimes'], {'2.1.280': {'binary_path': '/usr/local/bin/ccrb-runtime-280'}})
-            self.assertEqual(installed['memory_mib'], 1536)
-            generation, roles = upgraded['generation'], {role: upgraded[column] for role,column in ROLE_COLUMNS.items()}
-            with patch.object(self.runtime, 'environment_jobs', return_value=[{'source': 'warmup:synthetic'}]), \
-                    patch.object(self.runtime, '_stop_environment', side_effect=AssertionError('养号期间禁止布局重建')):
-                for version in ('2.1.293', '2.1.280'):
-                    binding = self.runtime.transport(account, version)
-                    self.assertEqual(binding['generation'], generation)
-                    current = self.runtime._row('synthetic', 1)
-                    self.assertEqual({role: current[column] for role,column in ROLE_COLUMNS.items()}, roles)
-            self.assertEqual(self.client.containers.run.call_count, 6)
-
-
-    def test_platform_builtin_sender_is_independent_of_release_mount_for_two_accounts(self) -> None:
-        """两个原生环境均使用内置程序，历史公钥配置保持兼容。@return None。"""
-        self._isolated_docker()
-        self.client.images.get.return_value.attrs['Config']['Labels']['vibebench.native-runtime'] = '293-raw-1'
-        self.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': '',
-            'request_backend': 'native293', 'concurrency': 4}
-        with self.database() as connection:
-            connection.execute("INSERT INTO accounts(id,name,cc2api_account_id) VALUES(2,'second',8)")
-        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
-                patch.object(self.runtime, '_sender_active', return_value=0), patch.dict(os.environ, {
-                    'V3_NATIVE_RELEASE_PUBLIC_KEY': 'b' * 64,
-                    'V3_NATIVE_RELEASE_PILOT_ENVIRONMENT': '0' * 32, 'V3_NATIVE_SENDER_MEMORY': ''}):
-            for account_id, name, remote_id in ((1, 'synthetic', 7), (2, 'second', 8)):
-                row = self.runtime._row(name, account_id)
-                fingerprint = json.loads(row['fingerprint_json']); fingerprint['mem'] = 'unlimited'
-                self.runtime._update(row, fingerprint_json=json.dumps(fingerprint))
-                self.runtime.ensure({'id': account_id, 'name': name, 'cc2api_account_id': remote_id,
-                    'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080})
-        calls = self.client.containers.run.call_args_list
-        senders = [item.kwargs for item in calls if item.kwargs['labels']['vibebench.role'] == 'account-sender']
-        self.assertEqual(len(senders), 2)
-        for sender in senders:
-            self.assertNotIn('V3_NATIVE_RELEASE_PUBLIC_KEY', sender['environment'])
-            self.assertNotIn(str(self.root / 'native-releases'), sender['volumes'])
-        for item in calls:
-            if item.kwargs['labels']['vibebench.role'] != 'account-sender':
-                self.assertNotIn('V3_NATIVE_RELEASE_PUBLIC_KEY', item.kwargs['environment'])
-                self.assertNotIn(str(self.root / 'native-releases'), item.kwargs['volumes'])
-
-
     def test_owner_transition_archives_kernel_history_before_new_native_transport(self) -> None:
         """合法改绑归档旧选择后，新账号经真实ensure和transport取得当前绑定。@return None。"""
         containers = self._isolated_docker()
@@ -2793,7 +3045,6 @@ class AccountRuntimeTests(unittest.TestCase):
             self.assertGreater(binding['generation'], row['generation'])
             self.assertEqual(json.loads(path.with_name('native-kernel-upgrade.account-7.json').read_text()), original)
             self.assertEqual(leases, {})
-
 
     def test_binding_archive_survives_interrupted_transaction_and_detach_rebind(self) -> None:
         """交接前中断保留归档，重试、解绑及首次再绑定均通过历史归属门禁。@return None。"""

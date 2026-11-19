@@ -1,0 +1,63 @@
+{
+  "passed": true,
+  "scope": "源码挂载的受控慢退役夹具",
+  "results": {
+    "baseline_45s": {
+      "retire_seconds": 45.33716030999494,
+      "passed": false,
+      "error": "固定AGY断网探针超时",
+      "evidence": {
+        "event": "agy-probe-failure",
+        "phase": "prepared",
+        "credential_generation": 2,
+        "capture_failed": [],
+        "state": {
+          "Running": true,
+          "OOMKilled": false,
+          "ExitCode": 0
+        },
+        "event_counts": {
+          "supervisor_ready": 1,
+          "prepared": 1,
+          "job_finalized": 1
+        },
+        "error_codes": {},
+        "runtime": {
+          "processes": {
+            "other": 2,
+            "supervisor": 1,
+            "kernel": 1,
+            "observer": 1,
+            "native": 1
+          },
+          "memory_events": {
+            "max": 0,
+            "oom": 0,
+            "oom_kill": 0
+          },
+          "stages": {
+            "worker_config": 1,
+            "kernel_lock": 1,
+            "kernel_error": 0,
+            "input_pipe": 1,
+            "listener_identity": 0
+          },
+          "startup_errors": {}
+        }
+      },
+      "seconds": 59.96
+    },
+    "aligned_120s": {
+      "retire_seconds": 45.36576782200427,
+      "passed": true,
+      "credential_generations": [
+        1,
+        2
+      ],
+      "image_decode_calls": 1,
+      "terminated": true,
+      "model_submissions": 0,
+      "seconds": 63.635
+    }
+  }
+}

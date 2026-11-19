@@ -10,6 +10,8 @@ use tracing::debug;
 
 use crate::error::AppError;
 use crate::model::proxy::ProxyConnection;
+use crate::service::runtime_bridge::agy_request;
+use serde_json::{Value, json};
 
 // ---------------------------------------------------------------------------
 // OAuth 常量
@@ -70,7 +72,10 @@ fn generate_session_id() -> String {
 // 会话存储
 // ---------------------------------------------------------------------------
 
+#[derive(Clone)]
 struct OAuthSession {
+    native: bool,
+    account_id: Option<i64>,
     state: String,
     code_verifier: String,
     scope: String,
@@ -110,6 +115,8 @@ impl SessionStore {
 /// 生成授权 URL 的请求。
 #[derive(Deserialize)]
 pub struct GenerateAuthUrlRequest {
+    pub platform: Option<String>,
+    pub account_id: Option<i64>,
     pub proxy_url: Option<String>,
     pub proxy_id: Option<String>,
     pub proxy_revision: Option<String>,
@@ -132,6 +139,9 @@ pub struct ExchangeCodeRequest {
 /// 交换 code 的响应。
 #[derive(Serialize)]
 pub struct ExchangeCodeResponse {
+    /// 同次AGY原生身份核验的有来源能力，CC响应沿原字段集合。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capabilities: Option<Value>,
     pub access_token: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub refresh_token: String,
@@ -194,6 +204,9 @@ impl OAuthFlowService {
         let Ok(connection) = ProxyConnection::parse(&session.proxy_url) else {
             return false;
         };
+        if session.native && connection.fingerprint() == source {
+            return false;
+        }
         if connection.fingerprint() == source {
             session.proxy_url = destination.to_owned();
         }
@@ -215,6 +228,78 @@ impl OAuthFlowService {
             .filter(|(_, session)| !session.proxy_url.is_empty())
             .map(|(id, session)| (id.clone(), session.proxy_url.clone()))
             .collect()
+    }
+
+    /// 按可选平台复用原授权入口。@param req 平台、代理和目标。@return 既有链接与会话响应。
+    pub async fn generate_platform_auth_url(
+        &self,
+        req: &GenerateAuthUrlRequest,
+        generation: Option<i64>,
+    ) -> Result<GenerateAuthUrlResponse, AppError> {
+        match req.platform.as_deref().unwrap_or("claude_code") {
+            "claude_code" => Ok(self.generate_auth_url(req)),
+            "antigravity" => {
+                let result = agy_request("start", &json!({"proxy_url":req.proxy_url.as_deref().unwrap_or(""),"account_id":req.account_id,"generation":generation})).await?;
+                let auth_url = result["auth_url"]
+                    .as_str()
+                    .ok_or_else(|| AppError::ServiceUnavailable("AGY 原生授权链接缺失".into()))?
+                    .to_owned();
+                let session_id = result["session_id"]
+                    .as_str()
+                    .filter(|value| {
+                        value.len() == 32 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+                    })
+                    .ok_or_else(|| AppError::ServiceUnavailable("AGY 原生会话身份无效".into()))?
+                    .to_owned();
+                self.store.set(
+                    &session_id,
+                    OAuthSession {
+                        native: true,
+                        account_id: req.account_id,
+                        state: String::new(),
+                        code_verifier: String::new(),
+                        scope: String::new(),
+                        proxy_url: req.proxy_url.clone().unwrap_or_default(),
+                        created_at: Instant::now(),
+                    },
+                );
+                Ok(GenerateAuthUrlResponse {
+                    auth_url,
+                    session_id,
+                })
+            }
+            _ => Err(AppError::BadRequest("授权平台无效".into())),
+        }
+    }
+
+    /// 读取原生会话绑定的账号。@param id 原会话。@return 冻结的目标账号。
+    pub fn native_target(&self, id: &str) -> Option<i64> {
+        self.store
+            .sessions
+            .lock()
+            .unwrap()
+            .get(id)
+            .filter(|session| session.native && session.created_at.elapsed() < SESSION_TTL)
+            .and_then(|session| session.account_id)
+    }
+
+    /// 收尾持久原生会话。@param id 原会话。@return 驱动终态。
+    pub async fn cancel_native_session(&self, id: &str) -> Result<String, AppError> {
+        let result = agy_request("cancel", &json!({"session_id":id})).await?;
+        self.store.take(id);
+        Ok(result["phase"].as_str().unwrap_or("reconcile").to_owned())
+    }
+
+    /// 取消原会话并结束原生进程。@param id 原会话。@return 原生阶段或普通取消终态。
+    pub async fn cancel_session(&self, id: &str) -> Result<String, AppError> {
+        let session = self.store.sessions.lock().unwrap().get(id).cloned();
+        if session.is_some_and(|session| session.native) {
+            let result = agy_request("cancel", &json!({"session_id":id})).await?;
+            self.store.take(id);
+            return Ok(result["phase"].as_str().unwrap_or("reconcile").to_owned());
+        }
+        self.store.take(id);
+        Ok("cancelled".into())
     }
 
     /// 生成 OAuth 授权 URL（完整 scope）。
@@ -257,6 +342,8 @@ impl OAuthFlowService {
         self.store.set(
             &session_id,
             OAuthSession {
+                native: false,
+                account_id: None,
                 state: state.clone(),
                 code_verifier,
                 scope: scope.to_string(),
@@ -287,6 +374,53 @@ impl OAuthFlowService {
         raw_code: &str,
         is_setup_token: bool,
     ) -> Result<ExchangeCodeResponse, AppError> {
+        let native = self
+            .store
+            .sessions
+            .lock()
+            .unwrap()
+            .get(session_id)
+            .filter(|session| session.native)
+            .cloned();
+        if let Some(session) = native {
+            if is_setup_token || session.created_at.elapsed() >= SESSION_TTL {
+                return Err(AppError::BadRequest("AGY 授权会话无效或已过期".into()));
+            }
+            let result = agy_request(
+                "exchange",
+                &json!({"session_id":session_id,"code":raw_code}),
+            )
+            .await?;
+            let token = &result["document"]["token"];
+            let text = |key: &str| {
+                token[key]
+                    .as_str()
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_owned)
+                    .ok_or_else(|| AppError::ServiceUnavailable("AGY 原生授权结果缺少凭据".into()))
+            };
+            let access_token = text("access_token")?;
+            let refresh_token = text("refresh_token")?;
+            let expires_at = chrono::DateTime::parse_from_rfc3339(&text("expiry")?)
+                .map_err(|_| AppError::ServiceUnavailable("AGY 原生有效期无效".into()))?
+                .timestamp();
+            let email_address = result["email_address"]
+                .as_str()
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| AppError::ServiceUnavailable("AGY 原生账号身份缺失".into()))?
+                .to_owned();
+            return Ok(ExchangeCodeResponse {
+                capabilities: result.get("capabilities").cloned(),
+                access_token,
+                refresh_token,
+                expires_in: expires_at - chrono::Utc::now().timestamp(),
+                expires_at,
+                email_address,
+                scope: String::new(),
+                account_uuid: String::new(),
+                organization_uuid: String::new(),
+            });
+        }
         let session = self
             .store
             .take(session_id)
@@ -304,7 +438,7 @@ impl OAuthFlowService {
         };
 
         // 构建 token exchange 请求体
-        let mut body = serde_json::json!({
+        let mut body = json!({
             "grant_type": "authorization_code",
             "code": auth_code,
             "redirect_uri": REDIRECT_URI,
@@ -319,7 +453,7 @@ impl OAuthFlowService {
         }
 
         if is_setup_token {
-            body["expires_in"] = serde_json::json!(SETUP_TOKEN_EXPIRES_IN);
+            body["expires_in"] = json!(SETUP_TOKEN_EXPIRES_IN);
         }
 
         debug!("exchanging code for session {}", session_id);
@@ -357,6 +491,7 @@ impl OAuthFlowService {
         let expires_at = chrono::Utc::now().timestamp() + expires_in;
 
         Ok(ExchangeCodeResponse {
+            capabilities: None,
             access_token: token_resp.access_token,
             refresh_token: token_resp.refresh_token,
             expires_in,
@@ -405,6 +540,8 @@ mod directory_tests {
     fn selected_connection_is_frozen_for_original_authorization_session() {
         let service = OAuthFlowService::new();
         let request = GenerateAuthUrlRequest {
+            platform: None,
+            account_id: None,
             proxy_url: Some("socks5://user:secret@synthetic.invalid:1080".into()),
             proxy_id: None,
             proxy_revision: None,

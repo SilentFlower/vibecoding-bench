@@ -1,0 +1,108 @@
+E
+======================================================================
+ERROR: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_run.py", line 105, in verify_node_run
+    status = remote.poll(token)
+             ^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_runner.py", line 151, in poll
+    row = self._row(token)
+          ^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_runner.py", line 49, in _row
+    row = self.sessions.ledger.get(token.removeprefix('remote-run:'))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_execution_store.py", line 181, in get
+    return self._decode(connection.execute('SELECT * FROM node_executions WHERE operation_id=?', (operation_id,)).fetchone())
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.OperationalError: database is locked
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_run.py", line 173, in verify_node_run
+    raise AssertionError('隔离Run失败；节点调用位置：' + control.logs(tail=15).decode(errors='replace')
+AssertionError: 隔离Run失败；节点调用位置：；原worker转录：node@a32825818aa5:~/projects/project-899e7911f136$ set +m; export HOME='/home/node' && cd /home/node/projects/project-899e7911f136 && env PATH='/cli/2.1.303/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr
+/bin:/sbin:/bin' HOME='/home/node'  claude --permission-mode bypassPermissions --settings /run/v3/jobs/606ba05fbf943a0fc580/settings.json --model offline-model ; code=$?; echo; echo "[entrypoint] claude exited with code
+$code"; echo $code >/run/v3/jobs/606ba05fbf943a0fc580/claude-exit-code; touch /run/v3/jobs/606ba05fbf943a0fc580/claude-exited; sleep 3600
+Synthetic task pane
+Fixture initial work busy
+                         Fixture busy queue consumed
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 165, in test_remote_account_preparation_and_sender_json_sse
+    verify_node_run(self, service, runtime, node, account, unused_gateway)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_run.py", line 177, in verify_node_run
+    local.cleanup(token, token)
+  File "/root/project/vibecoding-bench/services/orchestrator/main.py", line 4126, in cleanup
+    cluster_runner.cleanup(worker_id or sidecar_id)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_runner.py", line 360, in cleanup
+    self.sessions.stop(row['operation_id'])
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_terminal_sessions.py", line 456, in stop
+    self._stop_heartbeat(operation_id)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_terminal_sessions.py", line 414, in _stop_heartbeat
+    raise ValueError('原远程租约续接仍在收口，请等待并查询原操作')
+ValueError: 原远程租约续接仍在收口，请等待并查询原操作
+
+----------------------------------------------------------------------
+Ran 1 test in 164.305s
+
+FAILED (errors=1)

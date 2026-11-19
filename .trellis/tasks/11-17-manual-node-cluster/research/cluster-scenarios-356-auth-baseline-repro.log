@@ -1,0 +1,15 @@
+F
+======================================================================
+FAIL: test_auth_detector_respects_existing_session_byte_baseline (test_worker_startup.WorkerStartupTests.test_auth_detector_respects_existing_session_byte_baseline)
+同会话恢复只识别本轮追加401，旧错误记录保持为历史证据。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_worker_startup.py", line 62, in test_auth_detector_respects_existing_session_byte_baseline
+    self.assertEqual(1,result.returncode,result.stdout+result.stderr)
+AssertionError: 1 != 0 : API Error: 401
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.059s
+
+FAILED (failures=1)

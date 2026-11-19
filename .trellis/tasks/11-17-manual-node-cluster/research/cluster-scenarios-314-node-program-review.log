@@ -1,0 +1,24 @@
+F
+======================================================================
+FAIL: test_remote_account_preparation_and_sender_json_sse (test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse)
+中央人工分配经真实SSH准备节点，三角色发送JSON和SSE到本地TLS。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_node_docker.py", line 165, in test_remote_account_preparation_and_sender_json_sse
+    verify_node_run(self, service, runtime, node, account, unused_gateway)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_run.py", line 73, in verify_node_run
+    verify_cluster_scenario(testcase,service,runtime,node,account,local,remote)
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_scenario.py", line 151, in verify_cluster_scenario
+    testcase.assertGreater(segment['confirmed_sec'],0)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/deploy/flower2api/verify_cluster_scenario.py", line 185, in _verify_private_review
+    'JOIN runs r ON r.id=e.run_id WHERE e.id=?',(candidate['id'],))
+AssertionError: 'review_ready' != 'failed'
+- review_ready
++ failed
+ : {"changed_files":[],"feedback_codes":[],"native":{"message":"原生业务观察未正常结束","status":"failed","stderr":"/work/python/bin/python: can't open file '/request-data/verification/native.py': [Errno 13] Permission denied\n"},"status":"failed","unauthorized_files":[]}
+
+----------------------------------------------------------------------
+Ran 1 test in 181.675s
+
+FAILED (failures=1)

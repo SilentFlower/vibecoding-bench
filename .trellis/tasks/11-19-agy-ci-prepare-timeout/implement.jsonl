@@ -1,0 +1,5 @@
+{"file": ".trellis/tasks/11-19-agy-ci-prepare-timeout/research/ci-failure.json", "reason": "正式CI失败与本地受限CPU复验的事实基线"}
+{"file": ".trellis/spec/platform/deploy/platform-online-update.md", "reason": "正式制品、镜像验收与发布门禁合同"}
+{"file": ".trellis/spec/platform/deploy/agy-credential-contract.md", "reason": "合成离线、凭据与零模型边界"}
+{"file": ".trellis/tasks/11-19-agy-ci-prepare-timeout/research/budget-alignment.json", "reason": "旧探针预算可复现正式CI相同失败摘要的原型对照"}
+{"file": ".trellis/tasks/11-19-agy-ci-prepare-timeout/research/root-validation.json", "reason": "最终源码、截止回归、受控慢退役及新镜像验证证据"}

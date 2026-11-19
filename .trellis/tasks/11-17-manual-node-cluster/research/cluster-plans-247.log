@@ -1,0 +1,45 @@
+.EE..........Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/usr/lib/python3.12/unittest/__main__.py", line 18, in <module>
+    main(module=None)
+  File "/usr/lib/python3.12/unittest/main.py", line 105, in __init__
+    self.runTests()
+  File "/usr/lib/python3.12/unittest/main.py", line 281, in runTests
+    self.result = testRunner.run(self.test)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/runner.py", line 240, in run
+    test(result)
+  File "/usr/lib/python3.12/unittest/suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/suite.py", line 122, in run
+    test(result)
+  File "/usr/lib/python3.12/unittest/suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/suite.py", line 122, in run
+    test(result)
+  File "/usr/lib/python3.12/unittest/suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/suite.py", line 122, in run
+    test(result)
+  File "/usr/lib/python3.12/unittest/case.py", line 690, in __call__
+    return self.run(*args, **kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/unittest/case.py", line 630, in run
+    self._callSetUp()
+  File "/usr/lib/python3.12/unittest/case.py", line 586, in _callSetUp
+    self.setUp()
+  File "/root/project/vibecoding-bench/services/orchestrator/test_project_iterations.py", line 58, in setUp
+    main.init_db()
+  File "/root/project/vibecoding-bench/services/orchestrator/main.py", line 1422, in init_db
+    apply_migrations(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_migrations.py", line 206, in apply_migrations
+    runner[0](connection)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 627, in initialize_bench_schema
+    initialize_scenario_schema(conn)
+  File "/root/project/vibecoding-bench/services/orchestrator/database_schema.py", line 518, in initialize_scenario_schema
+    connection.executescript(SCENARIO_SCHEMA + DEVELOPMENT_SQL)
+KeyboardInterrupt

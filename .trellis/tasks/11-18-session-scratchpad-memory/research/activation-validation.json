@@ -1,0 +1,76 @@
+{
+  "scope": [
+    "images/v3/Dockerfile",
+    "deploy/flower2api/run_local_verification.py",
+    "deploy/flower2api/verify_local.py",
+    "deploy/flower2api/verify_pi_projects_execution.py"
+  ],
+  "profile": {
+    "context": "interactive",
+    "requested_depth": "auto",
+    "effective_depth": "full",
+    "confidence": "high",
+    "reasons": [
+      "启用既有持久化布局，影响新账号创建和历史文件恢复"
+    ]
+  },
+  "findings": [],
+  "checks": {
+    "unit": {
+      "tests": 181,
+      "seconds": 13.288,
+      "exit": 0,
+      "log": "/tmp/scratchpad-activation-regression-final.log"
+    },
+    "cluster": {
+      "tests": 31,
+      "seconds": 0.673,
+      "exit": 0,
+      "log": "/tmp/scratchpad-activation-cluster.log"
+    },
+    "storage": {
+      "scenes": 11,
+      "artifact": "research/activation-storage-functional.json",
+      "exit": 0
+    },
+    "warmup": {
+      "artifact": "research/activation-warmup-chain-v3",
+      "exit": 0
+    },
+    "projects": {
+      "artifact": "research/activation-projects-chain",
+      "exit": 0
+    },
+    "syntax": 3,
+    "diff_check": 0
+  },
+  "boundaries": [
+    "本阶段仅提交启用实现；修复版本统一发布和部署",
+    "实际节点迁盘和内存收益沿修复版本上线验收"
+  ],
+  "sha256": {
+    "images/v3/Dockerfile": "a261b6bd86f6c773c6e425c26e3c134a307710c1381e1a9801932be28b349735",
+    "deploy/flower2api/run_local_verification.py": "635782a030e3828c78e463b06676623c9ad3e58eff047d585a8ec9ba5df7bc10",
+    "deploy/flower2api/verify_local.py": "4f2b29194c071b76047751c7c3951e1f342e9f874a3b0150a97fab58bb801251",
+    "deploy/flower2api/verify_pi_projects_execution.py": "14a51f013c469527b7403b598340a17806653649b452916e07091d4f6668a0b2"
+  },
+  "delivery": "用户要求将启用改动提交flower2api，随修复版本统一发布和部署",
+  "spec": {
+    "status": "written",
+    "reason": "在既有六节合同中补齐养号验收入口、空间边界和磁盘文件保留断言。",
+    "evidence": [
+      "deploy/flower2api/run_local_verification.py",
+      "deploy/flower2api/verify_pi_projects_execution.py",
+      "research/activation-warmup-chain-v3",
+      "research/activation-projects-chain"
+    ],
+    "changed_files": [
+      ".trellis/spec/platform/deploy/platform-online-update.md"
+    ],
+    "validation": [
+      "git diff --check通过",
+      "实际命令、namespace校验及两类完整链路断言反向核对通过",
+      "规范调用内仅修改.trellis/spec文件"
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "source": "ca198ee979ec968bcd7d1a2063c872edb05850f7",
+  "target": "0764b5fa75e0df6c5c12969fdc40b53d3bbf734c",
+  "new_branch": "merge/agy-into-flower2api",
+  "tree": "046a08e7947610cfc390fef59df39d4495601613",
+  "verified_tree_equal": true,
+  "cached_whitespace_check": "passed",
+  "normalization": [
+    {
+      "file": ".trellis/tasks/11-18-multi-platform-account-runtime/prd.md",
+      "change": "仅规范文件末尾空行",
+      "python_ast_equal": null
+    },
+    {
+      "file": "services/orchestrator/agy_runtime/capture_bridge.py",
+      "change": "仅规范文件末尾空行",
+      "python_ast_equal": true
+    },
+    {
+      "file": "services/orchestrator/agy_runtime/native_bridge.py",
+      "change": "仅规范文件末尾空行",
+      "python_ast_equal": true
+    }
+  ]
+}

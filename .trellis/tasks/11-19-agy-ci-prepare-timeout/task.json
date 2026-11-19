@@ -1,0 +1,68 @@
+{
+  "id": "agy-ci-prepare-timeout",
+  "name": "agy-ci-prepare-timeout",
+  "title": "定位并修复 AGY 正式镜像准备超时",
+  "description": "正式镜像构建后首代prepare超时；补齐受控失败证据，定位CI运行差异并修复，恢复v1.19.0发行准备。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-19",
+  "completedAt": null,
+  "closeout": {
+    "status": "pending",
+    "closedAt": null,
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-11-19T05:56:12Z",
+      "contextKey": "codex_01a1ecb2-7973-79d1-ba23-defdab247bfc",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "2dd715d3459668d48051003bc04650f74680f16a",
+        "status": [],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "2dd715d3459668d48051003bc04650f74680f16a",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "ff1306c88860490c9ffadf8915ef081a0ad9a7fd370856fd6339b24b45737696"
+          }
+        ],
+        "fingerprint": "8df164dc52e26ebce23e2fe3d5b717ca71c338e7471c44ba6fde8ee4478e88ea"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "完成AGY准备预算、截止护栏和失败诊断修复",
+      "完成宿主导入修复及原三组入口验证",
+      "正式CI通过两个镜像构建及两代准备",
+      "保留正式CI正常退出的物理收口失败证据"
+    ],
+    "partialStep": "正式镜像正常退出未在探针15秒观察窗口内完成",
+    "nextStep": "对照监督器与worker实际收尾预算，复现并修复物理退出验收",
+    "notes": "AC3/AC4待完成，任务保持in_progress；真实模型预算为0。",
+    "updatedAt": "2026-11-19T07:13:12Z"
+  }
+}

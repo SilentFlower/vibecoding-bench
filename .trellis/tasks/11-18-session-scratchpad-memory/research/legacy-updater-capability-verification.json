@@ -1,0 +1,19 @@
+{
+  "old_source_revision": "b26e5454bc695611966de8be44d182e3dacdc807",
+  "old_source_sha256": "400dcc504b935443ca170053e9f5b0c0914bc6db8b97bf9816f802924272ffb2",
+  "old_parser_accepts_original": true,
+  "old_parser_rejects_storage_capability": true,
+  "new_parser_accepts_bridge": true,
+  "bridge_capabilities": {
+    "updater": 1,
+    "gate": 1,
+    "bridge": 1,
+    "layout": 2,
+    "cli_install": 2,
+    "credential_ownership": 1,
+    "account_protocols": [
+      1
+    ],
+    "scratchpad_storage": 1
+  }
+}

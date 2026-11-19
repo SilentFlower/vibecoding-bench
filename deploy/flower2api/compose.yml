@@ -40,6 +40,8 @@ services:
         condition: service_healthy
     environment:
       V3_ROLE: orchestrator
+      V3_CONTROL_IMAGE: ${V3_CONTROL_IMAGE}
+      V3_RUNTIME_URL: http://orchestrator:8000
       V3_RELEASE: ${V3_RELEASE}
       V3_DEPLOYMENT_ID: ${V3_DEPLOYMENT_ID}
       V3_NETWORK: flower2api-${V3_DEPLOYMENT_ID}

@@ -1,0 +1,96 @@
+..................E.EEEE...........................
+======================================================================
+ERROR: test_input_unknown_raises_and_candidate_snapshot_requires_original_submission_id (test_cluster_projects_terminal.ClusterProjectsTerminalTests.test_input_unknown_raises_and_candidate_snapshot_requires_original_submission_id)
+未知节点输入进入原中央阻塞，候选不创建无归属的快照操作。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_projects_terminal.py", line 103, in test_input_unknown_raises_and_candidate_snapshot_requires_original_submission_id
+    work = self.started()
+           ^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_projects_terminal.py", line 46, in started
+    result = self.terminal.start(self.account, self.work)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_projects_terminal.py", line 103, in start
+    return self._location(self.sessions.start(self._prepare(account, work)))
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_projects_terminal.py", line 66, in _prepare
+    service.prepare_remote_cli(account, self.runtime, self.sessions.gateway, self.identity(account))
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'types.SimpleNamespace' object has no attribute 'prepare_remote_cli'. Did you mean: 'prepare_remote'?
+
+======================================================================
+ERROR: test_reads_follow_frozen_operation_and_input_is_rejected_after_node_disabled (test_cluster_projects_terminal.ClusterProjectsTerminalTests.test_reads_follow_frozen_operation_and_input_is_rejected_after_node_disabled)
+停用节点后只读沿原节点，新输入遵守中央归属门禁。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_projects_terminal.py", line 76, in test_reads_follow_frozen_operation_and_input_is_rejected_after_node_disabled
+    work = self.started()
+           ^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_projects_terminal.py", line 46, in started
+    result = self.terminal.start(self.account, self.work)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_projects_terminal.py", line 103, in start
+    return self._location(self.sessions.start(self._prepare(account, work)))
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_projects_terminal.py", line 66, in _prepare
+    service.prepare_remote_cli(account, self.runtime, self.sessions.gateway, self.identity(account))
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'types.SimpleNamespace' object has no attribute 'prepare_remote_cli'. Did you mean: 'prepare_remote'?
+
+======================================================================
+ERROR: test_remote_start_keeps_node_paths_private_and_duplicate_never_submits_again (test_cluster_projects_terminal.ClusterProjectsTerminalTests.test_remote_start_keeps_node_paths_private_and_duplicate_never_submits_again)
+启动经过真实账本和租约替身，同来源重试只返回原节点定位。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_projects_terminal.py", line 51, in test_remote_start_keeps_node_paths_private_and_duplicate_never_submits_again
+    work = self.started()
+           ^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_projects_terminal.py", line 46, in started
+    result = self.terminal.start(self.account, self.work)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_projects_terminal.py", line 103, in start
+    return self._location(self.sessions.start(self._prepare(account, work)))
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_projects_terminal.py", line 66, in _prepare
+    service.prepare_remote_cli(account, self.runtime, self.sessions.gateway, self.identity(account))
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'types.SimpleNamespace' object has no attribute 'prepare_remote_cli'. Did you mean: 'prepare_remote'?
+
+======================================================================
+ERROR: test_stop_and_historical_usage_keep_original_operation_after_runtime_pointer_cleared (test_cluster_projects_terminal.ClusterProjectsTerminalTests.test_stop_and_historical_usage_keep_original_operation_after_runtime_pointer_cleared)
+双端收口后清除工作定位仍可读取原会话及抓包。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_projects_terminal.py", line 92, in test_stop_and_historical_usage_keep_original_operation_after_runtime_pointer_cleared
+    work = self.started()
+           ^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_projects_terminal.py", line 46, in started
+    result = self.terminal.start(self.account, self.work)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_projects_terminal.py", line 103, in start
+    return self._location(self.sessions.start(self._prepare(account, work)))
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_projects_terminal.py", line 66, in _prepare
+    service.prepare_remote_cli(account, self.runtime, self.sessions.gateway, self.identity(account))
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'types.SimpleNamespace' object has no attribute 'prepare_remote_cli'. Did you mean: 'prepare_remote'?
+
+======================================================================
+ERROR: test_unknown_start_preserves_original_operation_and_does_not_call_local (test_cluster_projects_terminal.ClusterProjectsTerminalTests.test_unknown_start_preserves_original_operation_and_does_not_call_local)
+节点已提交且响应丢失时重复启动留在原未知操作。:return: None。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/services/orchestrator/test_cluster_projects_terminal.py", line 67, in test_unknown_start_preserves_original_operation_and_does_not_call_local
+    self.terminal.start(self.account, self.work)
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_projects_terminal.py", line 103, in start
+    return self._location(self.sessions.start(self._prepare(account, work)))
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/services/orchestrator/cluster_projects_terminal.py", line 66, in _prepare
+    service.prepare_remote_cli(account, self.runtime, self.sessions.gateway, self.identity(account))
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'types.SimpleNamespace' object has no attribute 'prepare_remote_cli'. Did you mean: 'prepare_remote'?
+
+----------------------------------------------------------------------
+Ran 51 tests in 26.358s
+
+FAILED (errors=5)

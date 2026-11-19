@@ -1,0 +1,7 @@
+........请求快照清理 scanned=0 deleted=0 failed=1
+........................................................................................................................节点执行失败 operation=environment-maintenance error_type=ValueError frames=cluster_agent.py:158:dispatch,cluster_environment_management.py:203:environment_management,mock.py:1134:__call__,mock.py:1138:_mock_call,mock.py:1193:_execute_mock_call
+............................................................................
+----------------------------------------------------------------------
+Ran 204 tests in 50.641s
+
+OK

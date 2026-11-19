@@ -1,0 +1,8 @@
+{
+  "evidence": "native_tls_system_baseline",
+  "synthetic_native_model_submissions": 9,
+  "real_external_model_submissions": 0,
+  "system_texts_equal": true,
+  "wire_location": "request.systemInstruction.parts[].text",
+  "native_input_location": "cascadeConfig.plannerConfig.declarativeMixinConfig.promptSections[].custom.content"
+}

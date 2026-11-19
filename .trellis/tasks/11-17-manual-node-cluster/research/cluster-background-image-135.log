@@ -1,0 +1,76 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 260B 0.0s done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/flower2api-control:cluster-test-local
+#2 DONE 0.1s
+
+#3 [internal] load .dockerignore
+#3 transferring context:
+#3 transferring context: 2B done
+#3 DONE 0.1s
+
+#4 [internal] load build context
+#4 transferring context: 266.70MB 2.0s done
+#4 ...
+
+#5 [control 1/2] FROM docker.io/library/flower2api-control:cluster-test-local@sha256:c0b32c9e9ec6cd2dc0ac22a77f556f368347edc7355f1aa605f3b67255f8bcd4
+#5 resolve docker.io/library/flower2api-control:cluster-test-local@sha256:c0b32c9e9ec6cd2dc0ac22a77f556f368347edc7355f1aa605f3b67255f8bcd4 0.1s done
+#5 DONE 2.9s
+
+#4 [internal] load build context
+#4 DONE 2.9s
+
+#6 [control 2/2] COPY claude-code-gateway /app/claude-code-gateway
+#6 DONE 21.1s
+
+#7 exporting to image
+#7 exporting layers
+#7 exporting layers 9.3s done
+#7 exporting manifest sha256:acae1ceca9695cbc9528041fdd3d873f44c1b3cc5467843024ed6c5b65d6daa8 0.0s done
+#7 exporting config sha256:5d58032371b1520800952ca9c10abe61666032988a2d29156f21e74eebe0aac5 0.0s done
+#7 exporting attestation manifest sha256:bac162f21d28a083db49c478e3adc76e68a1df2a58b72e97835f58e7ae2af8b8 0.1s done
+#7 exporting manifest list sha256:1ddadc35283174a43dc1038816de3bd6cbe356a1e20594b606fcf60eb54ff9a0
+#7 exporting manifest list sha256:1ddadc35283174a43dc1038816de3bd6cbe356a1e20594b606fcf60eb54ff9a0 0.0s done
+#7 naming to docker.io/library/flower2api-control:cluster-background-local done
+#7 unpacking to docker.io/library/flower2api-control:cluster-background-local
+#7 unpacking to docker.io/library/flower2api-control:cluster-background-local 1.2s done
+#7 DONE 10.7s
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 260B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/flower2api-account:v3-verify-ui-native-20261116-10
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [account 1/2] FROM docker.io/library/flower2api-account:v3-verify-ui-native-20261116-10@sha256:ac0f5e5dcee796073990186a3a3ce4cc710e322ed5e576faff73610de7df7cdf
+#4 resolve docker.io/library/flower2api-account:v3-verify-ui-native-20261116-10@sha256:ac0f5e5dcee796073990186a3a3ce4cc710e322ed5e576faff73610de7df7cdf 0.0s done
+#4 CACHED
+
+#5 [internal] load build context
+#5 transferring context: 237.38MB 1.1s done
+#5 DONE 1.2s
+
+#6 [account 2/2] COPY account-sender /usr/local/bin/account-sender
+#6 DONE 6.9s
+
+#7 exporting to image
+#7 exporting layers
+#7 exporting layers 6.7s done
+#7 exporting manifest sha256:aed83970f8fb58a0344b1792dacfaa1af62355fd88322efdaed88887d62d1606 0.0s done
+#7 exporting config sha256:3b0a9a052f5f47d5552077e7e404c5f4dce792b910f5de1197e8a55f4053d1b3 0.0s done
+#7 exporting attestation manifest sha256:ed03eb8afffaafd993676fb5686bf1d194c2013a02296d2acc95ba4beed6e250 0.0s done
+#7 exporting manifest list sha256:d84c6a231028c2f18839104cedc6b42ad4fb282a2ef63fe353d84ba70ebac56a 0.0s done
+#7 naming to docker.io/library/flower2api-account:cluster-background-local
+#7 naming to docker.io/library/flower2api-account:cluster-background-local done
+#7 unpacking to docker.io/library/flower2api-account:cluster-background-local
+#7 unpacking to docker.io/library/flower2api-account:cluster-background-local 1.0s done
+#7 DONE 7.9s

@@ -63,12 +63,66 @@ class WorkflowTests(unittest.TestCase):
         self.assertLess(build, verify)
         self.assertLess(verify, publish)
         self.assertNotIn('if [', runs[verify])
+        self.assertIn('--workers 4', runs[verify])
+        self.assertIn('--preserve-env=V3_SYSTEM_RELEASE_PRIVATE_KEY,GITHUB_ACTIONS,GH_TOKEN', runs[verify])
+        self.assertEqual(job['steps'][verify]['env']['GH_TOKEN'], '${{ github.token }}')
         build_runs = [step.get('run', '') for step in self.workflow('v3-build.yml')['jobs']['build']['steps']]
         self.assertIn(runs[build], build_runs)
-        validation = next(run for run in runs if 'unittest discover' in run)
-        self.assertIn(validation, build_runs)
-        for required in ('test_publication', 'test_system_workflow', 'test_database_compatibility'):
-            self.assertIn(required, validation)
+        validation = next(run for run in runs if 'verify_release_tests.py --python' in run)
+        self.assertTrue(any(validation in run for run in build_runs))
+        self.assertIn('verify_database_definitions.py', validation)
+
+    def test_agy_processed_input_and_image_verification_precede_delivery(self) -> None:
+        """真实工作流先准备自有处理产物，再核对实际镜像后交付。@return 无。"""
+        for filename in ('v3-build.yml', 'v3-release.yml'):
+            steps = self.workflow(filename)['jobs']['build' if filename == 'v3-build.yml' else 'release']['steps']
+            prepare = next(i for i, step in enumerate(steps) if step.get('uses') == './.github/actions/flower2api-agy-artifact')
+            build = next(i for i, step in enumerate(steps) if 'manage.py build' in step.get('run', ''))
+            verify = next(i for i, step in enumerate(steps) if 'verify_agy_images.py' in step.get('run', ''))
+            delivery = next(i for i, step in enumerate(steps) if
+                ('candidate_artifacts.py export' if filename == 'v3-build.yml' else 'manage.py publish') in step.get('run', ''))
+            self.assertLess(prepare, build)
+            self.assertLess(build, verify)
+            self.assertLess(verify, delivery)
+            # 宿主负责私有状态改属，容器身份继续由探针固定为1001。
+            command = next(line.strip() for line in steps[verify]['run'].splitlines()
+                if 'verify_agy_images.py' in line)
+            self.assertEqual(command, 'sudo "$RUNNER_TEMP/v3-update-venv/bin/python" '
+                'deploy/flower2api/verify_agy_images.py --manifest releases/v3-local.json')
+            if filename == 'v3-release.yml':
+                self.assertEqual("steps.candidate.outputs.reused != 'true'", steps[prepare]['if'])
+                self.assertNotIn('if', steps[verify])
+
+    def test_candidate_reuse_keeps_trusted_build_and_manual_publish_boundaries(self) -> None:
+        """候选仅由受信构建导出，复用跳过重复构建但兼容与签名继续阻断。:return: None。"""
+        build = self.workflow('v3-build.yml')['jobs']['build']['steps']
+        export = next(step for step in build if 'candidate_artifacts.py export' in step.get('run', ''))
+        upload = next(step for step in build if step['name'] == '上传可信候选产物')
+        for step in (export, upload):
+            for expected in ('SilentFlower/vibecoding-bench', 'refs/heads/v3', 'refs/heads/flower2api',
+                    "github.event_name == 'push'", "github.event_name == 'workflow_dispatch'"):
+                self.assertIn(expected, step['if'])
+            self.assertNotIn('pull_request', step['if'])
+        self.assertEqual(upload['with']['compression-level'], '0')
+        self.assertEqual(upload['with']['retention-days'], '1')
+        release = self.workflow('v3-release.yml')['jobs']['release']
+        full_build = self.workflow('v3-release.yml')['on']['workflow_dispatch']['inputs']['full_build']
+        self.assertEqual(full_build['type'], 'boolean')
+        self.assertEqual(full_build['default'], 'false')
+        self.assertEqual(release['permissions']['actions'], 'read')
+        steps = release['steps']
+        candidate = next(step for step in steps if step.get('id') == 'candidate')
+        self.assertEqual(candidate['if'], 'inputs.full_build != true')
+        self.assertNotIn('continue-on-error', candidate)
+        for step in steps:
+            run = step.get('run', '')
+            if 'verify_release_tests.py' in run or 'manage.py build' in run:
+                self.assertEqual(step['if'], "steps.candidate.outputs.reused != 'true'")
+                self.assertLess(steps.index(candidate), steps.index(step))
+            if 'verify_database_compatibility.py' in run or 'manage.py publish' in run or run.endswith('publish_system_release.py'):
+                self.assertNotIn('if', step)
+        diagnostic = next(step for step in steps if step.get('uses') == 'actions/upload-artifact@v4')
+        self.assertNotIn('v3-images.tar.gz', diagnostic['with']['path'])
 
     def test_legacy_main_publish_is_manual(self) -> None:
         """历史入口保留明确退役说明，写权限和镜像发布步骤归零。@return None。"""
@@ -106,7 +160,7 @@ class WorkflowTests(unittest.TestCase):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(source_path(ROOT, name), target)
             result = subprocess.run([sys.executable, '-I', '-c',
-                'import sys; sys.path.insert(0, sys.argv[1]); import manage, system_updater',
+                'import sys; sys.path.insert(0, sys.argv[1]); import manage, system_updater, system_release',
                 str(root / 'deploy/v3')], cwd=root, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
 

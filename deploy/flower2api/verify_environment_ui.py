@@ -100,6 +100,8 @@ class Fixture:
             payload = {'active_runs':0}
         elif path == '/runtime/api/system-updates/status':
             payload = {'installed':False}
+        elif path == '/runtime/api/system-updates/version':
+            payload = {'version':None}
         elif path == '/admin/runtime/session':
             assert request.method == 'POST'
             self.sessions += 1
@@ -162,6 +164,12 @@ class Fixture:
                     payload = {'queued': True}
                 elif api.endswith('/physical-features/refresh') or api.endswith('/maintenance'):
                     payload = {'ok': True}
+                    if api.endswith('/maintenance'):
+                        self.operation_started.set()
+                        if self.operation_gate:
+                            await self.operation_gate.wait()
+                        if self.fail_operation or body.get('expected_generation') != self.rows[0]['generation']:
+                            status, payload = 409, {'detail': '环境代次已变化，请重新读取'}
                 elif api.endswith('/run-window') and request.method == 'PUT':
                     self.rows[0]['run_window']['config'] = body
                     payload = self.rows[0]['run_window']

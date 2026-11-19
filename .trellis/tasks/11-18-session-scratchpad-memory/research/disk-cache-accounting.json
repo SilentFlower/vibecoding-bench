@@ -1,0 +1,20 @@
+{
+  "measurement": "验收完成后遗留数据的只读盘点；mincore只读取页驻留状态；缓存归属cgroup未测量",
+  "page_size": 4096,
+  "accounts": [
+    {
+      "environment_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "files": 10,
+      "logical_bytes": 25165904,
+      "allocated_file_blocks_bytes": 25239552,
+      "resident_file_pages_bytes": 0
+    },
+    {
+      "environment_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "files": 7,
+      "logical_bytes": 25165900,
+      "allocated_file_blocks_bytes": 25214976,
+      "resident_file_pages_bytes": 0
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+5e04ef198aaaa3c741fcd79ba993f77809a5b66f
+.trellis/spec/orchestrator/backend/account-runtime-v3.md
+.trellis/spec/platform/deploy/platform-online-update.md
+deploy/flower2api/test_system_release.py
+services/orchestrator/main.py
+
+Auto-merging .trellis/spec/orchestrator/backend/account-runtime-v3.md
+CONFLICT (content): Merge conflict in .trellis/spec/orchestrator/backend/account-runtime-v3.md
+Auto-merging .trellis/spec/platform/deploy/platform-online-update.md
+CONFLICT (content): Merge conflict in .trellis/spec/platform/deploy/platform-online-update.md
+Auto-merging .trellis/spec/web/frontend/ui-guidelines.md
+Auto-merging apps/web/src/api.ts
+Auto-merging deploy/flower2api/system_update_host.py
+Auto-merging deploy/flower2api/test_system_release.py
+CONFLICT (content): Merge conflict in deploy/flower2api/test_system_release.py
+Auto-merging deploy/flower2api/test_system_workflow.py
+Auto-merging services/gateway/src/service/runtime_bridge.rs
+Auto-merging services/orchestrator/account_runtime.py
+Auto-merging services/orchestrator/main.py
+CONFLICT (content): Merge conflict in services/orchestrator/main.py
+Auto-merging services/orchestrator/system_updates.py
