@@ -1755,6 +1755,8 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 人工分配改变Docker、HOME、工作区和出站执行位置，中央继续持有账号策略、唯一Gateway凭据所有权、任务和准入权威。默认`local`节点保留原单机路径。
 - 首版使用中央可达的Linux x64服务器、同批control/account镜像、专用SSH密钥及已核对主机公钥。控制、业务和PTY通道各自保持原生命周期；操作规范见`deploy/flower2api/CLUSTER.md`。
 
+- 账号、运行环境与请求诊断公开展示节点归属及原执行位置时沿本合同。
+
 ### 2. Signatures
 
 ```text
@@ -1782,6 +1784,8 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 
 - bench追加`bench.cluster.2`、`bench.node-executions.3`、`bench.node-login-drafts.4`，定义分别归`cluster_schema.py`、`node_execution_schema.py`、`node_login_draft_schema.py`所有。新增`cluster_nodes/account_node_assignments/node_migrations/node_executions/node_login_drafts`；旧账号默认归属local，保留冻结基线摘要。
 - Node持有`node-execution.sqlite`受限投影，默认本机迁移目标使用`node-execution-local.sqlite`。完整中央可写库和管理员凭据保持中央所有。
+
+- `GET /api/accounts` 可选追加 `node:{node_id,node_key,node_name,kind,enabled,revision,phase}|null`、`node_observation:{state,stale,observed_at}|null`。账号身份使用外层 `id`；`ClusterStore.assignment_summaries() -> dict[int,dict]` 批量只读，归属版本取分配记录的 revision。
 
 ### 3. Contracts
 
@@ -1815,6 +1819,10 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - 同步核对真实jobs、流、草稿、独立验收、凭据交接和实际角色。暂停接单偏好独立保存。停止原角色和控制后原地切换组件，作业持久data_policy=in_place；不生成数据根全量副本或隔离恢复副本。旧在途复制进程按作业ID及原镜像确认后停止。新控制失败在账号更新前恢复原实例；账号恢复已开始则保留当前现场继续。相同账号镜像以原撤销fence复用原角色和代次，镜像变化交原生命周期重建；回传传输绑定按实际账号镜像批次核验。
 - 全局完整备份收齐同部署、同epoch的中央及全部登记Node快照。SQLite复制使用原backup API；离线固定副本读取使用immutable，避免生成WAL辅助文件改变清单。组合恢复核对安装身份、归属/分配和实际环境，保留pending/reconcile事实。
 
+- 账号节点摘要从单次 SQL 读取有效账号与未删除节点，明确选择公开字段；账号停用继续返回归属。观察复用原缓存，state为reachable/unreachable、observed_at为秒、stale沿原60秒判定。列表读取不连接Node、不准备环境。
+- 网关账号按外层 `cc2api_account_id` 关联节点摘要，通过同源 `/runtime/api/accounts` 批量读取。账号列表沿原5秒刷新；隐藏和卸载取消读取，代次丢弃迟到回执；读取失败保留原身份并标记归属待刷新。
+- 账号与环境显示当前归属，请求列表只读末次 `last_attempt.execution_location`，详情从独立返回的有序 attempts 读取各次及末次位置。历史位置禁止用账号当前归属回填；只有真实node_key=local才显示默认本机。缺字段显示节点未观测，零次尝试显示无执行尝试。
+
 ### 4. Validation & Error Matrix
 
 | 条件 | 期望 |
@@ -1839,6 +1847,8 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 | 工作或凭据维护未完成 | 保存等待原因，按原目标自动重试 |
 | 同批组件 | 幂等核验，账号状态沿原生命周期保持 |
 | 组合备份缺Node、错epoch或错安装归属 | 完整性校验拒绝，保留已生成快照 |
+| 节点不可达、观察过期或账号列表读取失败 | 保留已保存归属，分别显示不可达、过期或待刷新 |
+| 旧请求缺执行位置或请求无上游尝试 | 分别显示节点未观测或无执行尝试，原记录保持可读 |
 
 ### 5. Scenarios and Examples
 
@@ -1851,6 +1861,8 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - 错误用法：SSH断连后重新发送模型、OAuth或另起输入。正确处理是先查询原Scope/回执，未知状态保持隔离，明确实际停止后再按原业务恢复。
 - 错误用法：合并诊断时用AGY context替换执行位置字段。正确处理是保留两个可选字段，并在同一真实尝试上分别记录平台上下文和冻结的执行位置。
 
+- 正常：账号已迁移到Node B，历史请求仍显示原尝试的Node A；跨节点重试逐次显示各自环境和代次。错误用法：用账号当前归属填补旧请求。正确处理：旧记录缺字段时保持未观测。
+
 ### 6. Tests Required
 
 - `test_cluster*`覆盖真实双SQLite、私有UDS/SSH、错误Scope/认证、有限证明、未知输入、各执行消费者、迁移CAS和恢复；Node关闭后仅恢复实际停止能力。
@@ -1862,8 +1874,9 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - `test_cluster_recovery_limits`核对大于16MiB且超过100000条的原JSON清单、大profile、摘要/权限/路径限制及固定错误投影。规模演练须实际导出、恢复并核对原树，不以元数据样本代替完整恢复。
 - `test_cluster_synchronization`核对旧控制自动停止原地换批、同批幂等、原容器回退、未知角色、未完成迁移、空目标先升级、互斥及平台重启续接。`test_cluster_system_update`核对宿主排空/取消/恢复及真实更新状态机先停止再原地切换的顺序。
 - `verify_cluster_node_upgrade.py`的隔离Docker开关覆盖自动控制更新保持原代次、账号镜像变化重建、组件恢复与最新资料保留、历史端大profile。`verify_cluster_ui.py`覆盖统一同步、明确失败动作及390px布局。
-- `test_cluster_backup`及原备份测试核对真实SQLite隔离复制、清单/逻辑摘要、同批组合对应和pending恢复事实。`verify_database_definitions.py`核对当前bench5/gateway6及原步骤1—4冻结来源。
+- `test_cluster_backup`及原备份测试核对真实SQLite隔离复制、清单/逻辑摘要、同批组合对应和pending恢复事实。`verify_database_definitions.py`核对当前bench5/gateway7及原步骤1—4冻结来源。
 - 前端生产构建及`verify_cluster_ui.py`、`verify_cluster_draft_ui.py`、`verify_cluster_request_ui.py`覆盖冻结确认、迟到响应、独立/停用账号、原草稿/WS、历史未观测及390/1440布局；Rust执行fmt与全量测试。
+- `test_cluster_nodes`、`test_cluster_main`覆盖批量摘要的只读性、字段白名单、删除过滤、停用账号及失联归属；`verify_execution_node_visibility.py`覆盖账号/环境/请求/任务账号的列表与详情、读取失败、跨节点历史、无尝试和1440/720/390px。节点样式复用ExecutionNodeBadge及兼容入口的renderAccountNode，长标识可换行，手机请求记录保留结果和详情入口。
 
 ## Scenario: SSH 节点密码认证与旧密钥配置兼容
 
@@ -2074,6 +2087,108 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_agy_gemini.py`单独标记真实HTTP/SQLite与合成发送器证据，覆盖两账号隔离、认证恢复策略冻结、下一HTTP读取新开关及缺失/错误回执。
 - 本地TLS的`--homoglyph`覆盖普通/SSE、工具新HTTP、实际系统文本及用户历史对照、幂等、预算内大文本/超限零提交、暖PID、源usage/cache和策略账本；`--capture-off`核对转换生效且收口后无请求正文归档。容器保持断网、UID1001、零真实外部模型费用。
 - 前端构建及`verify_agy_accounts_ui.py`覆盖原账号控件默认值、两账号差异载荷、草稿、授权回执归属及390px；迟到保存反馈继续受editorGeneration约束。
+
+## Scenario: 节点迁移后的额度交接、上传续接与历史抓包
+
+### 1. Scope / Trigger
+
+- 本机与 SSH 节点双向或连续迁移、API 额度证据重读、上传中断续接及已结束工程的抓包查询适用。
+
+### 2. Signatures
+
+- `register_api_quota_cursor(connection, data, account_id, identity, environment_id, *, remote) -> None`；来源仍为 `api:<environment_id>:<identity>`。
+- `quota_observation_cursors` 保持原结构；交接更新 `path/file_identity/byte_offset`。额度状态 JSON 的 `auth_verified_at` 保存完整人工核验的 UTC 秒时序。
+- `MigrationFiles.stage(ImportStage)` 返回 `uploaded:bool,upload_state:empty|complete|incomplete` 及原 `protocol/node_key/operation_id/transfer_id/revision`。
+- `NodeMigrations.renew_transfer(operation_id, previous, transfer_id) -> dict` 保存 `checkpoints.transfer={transfer_id,previous_transfer_ids}`；初始 `checkpoints.execution.transfer_id` 保持冻结。
+- Node 私有操作 `project-history-capture` 使用 `ProjectHistoryCapture(NodeLocation)`，追加 `generation:int>=0,namespace:projects|warmup,work_id:32位hex,relative:str|null`。返回 `{protocol:1,node_key,history:{reference:<原请求>,capture:<原脱敏摘要或预览>}}`。
+
+### 3. Contracts
+
+- API 游标仅在同账号、同身份、同环境的系统固定本机证据和中央远程镜像路径间交接。同路径保留字节进度；切换路径清空文件身份并从零消费。额度窗口及已用恢复机会仍保存在原表，禁止以迁移清空。
+- 远程读后与登记事务内核对分配／代次，本机登记也核对当前本机 ready 归属。消费以已打开文件的 fstat 身份读取，提交 CAS 比较来源、身份、路径、旧文件身份和字节位置；API 消费同时核对冻结分配／代次，拒绝往返迁移后的迟到写入。
+- 历史认证错误只能按真实时序进入状态。完整人工核验解除门禁后保存 auth_verified_at，较旧或同次历史错误重读不能再次收口任务。较新的真实错误保持原保护。旧允许样本不得清除较新的恢复占用。
+- 上传不完整状态由有限结构化回执表达，中央按专用异常进入新尝试登记。新尝试只允许在原 exporting 阶段且没有 target／cancellation 检查点时 CAS 认领；先持久后执行，旧部分文件和原包身份保留。完整上传未知回包重读原结果；已核验／发布的包变化继续报错，禁止作为普通中断换源。 最终激活和 committed 后的协调器重建同样读取持久化 transfer 检查点；缺少该检查点的旧操作才读取 execution 初始尝试。
+- 已结束工作抓包与活动执行定位分开。中央从真实工作及当前环境确定查询；历史账本保留原节点。当前资料已完成迁移时，从当前节点读取原 `flows/group-sha256(namespace/work_id)[:20]`，旧节点离线不影响已迁移资料。
+- 历史查询在 Node 只读锁内核对安装、账号／环境、分配和代次，复用原 capture_summary／capture_file_preview，保持空间隔离、文件白名单与脱敏；不准备运行时或启动角色。中央读后复核归属／代次，并核对完整查询回执。
+- 新 Node 操作同时进入 Agent、轻量客户端与 SSH 操作／短查询白名单。中央与 Node 按同批控制组件发布；回滚前收口活动的新 transfer 检查点操作。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 固定 API 路径迁出／回迁 | 交接游标，保留原额度及许可 |
+| 其他身份、未知路径、旧归属或迟到游标 | ValueError 或拒绝提交，保留新位置和原事实 |
+| 人工核验后重读旧认证错误 | 门禁保持解除；新真实错误仍触发原保护 |
+| 未核验的部分上传 | 回执 incomplete，原迁移登记新尝试 |
+| 新尝试已经提交，激活回包未知或协调器重启 | 继续激活已发布的新尝试，保持原归属和准备结果 |
+| 上传尝试 CAS 失配、取消或已发布 | 拒绝换源，沿原操作核对 |
+| 历史抓包旧代次、错环境、目录链接、越界／私有文件 | 拒绝读取，公开入口沿原 404 合同 |
+| 历史资料读取期间归属变化 | 拒绝迟到结果，不准备新环境 |
+
+### 5. Scenarios and Examples
+
+- 正常：本机 10% 游标迁出后消费远程 20%，回迁消费新 60%，再次迁出消费新 70%；逻辑来源保持。
+- 基础：没有 transfer 检查点的旧迁移沿初始尝试；上传已经完整时重用原结果。旧额度 JSON 缺少 auth_verified_at 时沿既有观察时序处理。
+- 中断：原尝试留下 partial 文件，新尝试先登记再上传；完整上传回包丢失并重建协调器后，继续同一迁移并复用已完整文件。 激活请求必须引用新尝试；committed 后激活回包丢失时，重建协调器仍引用相同新尝试，目标准备保持一次。
+- 错误用法：直接覆盖 API 游标为任意路径、删除部分上传、为历史本机工作虚构远程操作。正确处理：核对固定来源后交接、保留旧证据并登记新尝试、使用独立的历史只读定位。
+
+### 6. Tests Required
+
+- `test_cluster_quota`：本机↔远程连续交接、两个真实 Node 数据根、旧位置迟到消费和未知路径保护、完整人工核验后换代重读及新认证错误。
+- `test_cluster_migration_files/test_cluster_migration_runner`：真实部分文件、上传完成回包未知、协调器重建、CAS／取消后拒绝、已核验包和链接保护。 节点激活替身核对实际已准备尝试，覆盖新尝试的最终激活及 `test_renewed_transfer_activation_resumes_after_committed_response_loss` 的提交后重启续接。
+- `test_cluster_project_capture/test_cluster_projects_terminal`：双空间实际文件、真实迁移归档、旧节点离线、原账本保持、零运行时准备、scope 和路径拒绝。
+- `test_cluster_agent.NodeAgentTests.test_history_capture_through_real_ssh_light_client_and_actor`：真实隔离 SSH→轻量客户端→UDS Actor→原文件；Docker exec 使用明确命令替身，保持零真实账号请求。
+
+## Scenario: 独立接单与账号整体停用
+
+### 1. Scope / Trigger
+
+修改网关账号工作准入、编排整体启停、工程/养号运行控制或计划恢复时适用。API 接单偏好、健康资格、业务计划与整体启用各自保存。
+
+### 2. Signatures
+
+- 网关 `GET/PUT /admin/accounts/:id/work-control`；PUT 接收 `api_accepting?:bool`、`work_enabled?:bool`、`expected_revision?:i64`，拒绝附加字段和空增量。
+- 编排 `GET/PUT /api/accounts/{aid}/work-control`、`/api/gateway-accounts/{gateway_id}/work-control`；PUT 接收 `enabled:StrictBool`，拒绝附加字段。
+- 网关增量表 `account_work_controls(account_id BIGINT PRIMARY KEY, api_accepting INTEGER DEFAULT 1, work_enabled INTEGER DEFAULT 1, revision BIGINT DEFAULT 0)`，所有列非空；迁移 `gateway.account-work.7`。
+- `AccountWorkCoordinator.change(account_id, enabled)`、`snapshot(account_id)`、`recover()`；操作保存在原 `app_settings` 的 `account_work_control:<aid>`，字段 `id/enabled/phase`。
+- 工程/养号运行控制 `ProjectsControlIn.disable_schedule:StrictBool=True`；新界面只暂停/停止当前运行时明确提交 false。
+
+### 3. Contracts
+
+- 网关快照返回 `api_accepting/work_enabled/revision/admitted_requests/phase/coordinated`；phase 为 enabled/draining/disabled。未保存记录默认两个开关开启、revision=0。原 status 继续表示健康资格。
+- 开关保存和 `admit` 共用同步边界；请求进入账号队列前登记，许可随响应体终结或取消释放。关闭只拒绝此后登记的新请求，已有排队、JSON 和 SSE 沿原预算与活动许可正常结束。换到其它账号时重新核对目标准入。
+- 整体操作先在身份锁内同事务保存 pending 意图并写 `accounts.enabled=0`，再在身份锁外更新网关并调用原停止能力，避免项目锁与身份锁反转。两端成功后保存 enabled/disabled；部分失败保存 reconcile 并保持新工作关闭。
+- 编排快照返回 `enabled/phase/active_work/api/operation_id/message`；phase 追加 reconcile。占用读取失败时 active_work=null，公开待核对。实际占用或已接纳 API 尚在时显示 draining。
+- 重复启用先核对两端目标已达成，直接只读返回，保持运行中的准入。停止重试复用原 operation_id，在单运行可重入锁内按原 quota_attempt 与 token 清理，保留 stop_requested_at；同线程清理回调的重复停止沿原 stopping 状态幂等返回，跨线程继续串行。隔离环境对账在原 environment_lock 内核对 environment_id/generation；旧代次禁止清理新环境。
+- 计划到期与启动之间并发停用仍保留原触发时间；重启时为原中断计划保留下一次检查，已有未知动作、失败、额度冷却和业务阻塞保持原约束。整体恢复使用保存的独立开关与计划。
+- `V3_RUNTIME_URL` 非空时，网关整体工作写入要求原内部服务身份；浏览器经原管理会话与精确 runtime bridge 白名单进入编排协调。独立 API 接单使用热更新入口。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 编排 enabled 错类型、附加字段或缺 PUT 正文 | 422，原意图保持 |
+| 网关空增量或旧 expected_revision | 400，原开关保持 |
+| 已关联部署直接从普通管理入口写整体开关 | 原内部身份核验拒绝 |
+| 新请求到达已关闭账号 | 503 或沿原调度策略选择其它合格账号 |
+| 部分停止失败、环境代次变化 | reconcile，保留原操作并支持重试；冲突 409，连接故障 503 |
+| API 活动期间整体关闭 | 既有请求正常完成，观察实际占用后收口 |
+
+### 5. Scenarios and Examples
+
+- 正常：提交 `{"api_accepting":false}`，已有 SSE 完整结束；养号和工程按各自计划继续。
+- 边界：整体停用跨过计划时间，恢复启用后原计划重新检查；重复启用期间运行准入保持开启。
+- 错误用法：把 stopping 当成已清理成功。正确处理：沿同一操作和执行代次实际重试，隔离现场完成对账后才能宣布收口。
+- 错误用法：用账号 status 承载接单偏好。正确处理：独立保存 api_accepting，原认证、额度、节点和维护资格继续生效。
+
+### 6. Tests Required
+
+- 网关真实 HTTP SSE 覆盖 legacy/v3 下关闭接单与整体关闭、原流完整、新请求拒绝、排队许可和取消回收；热更新验证健康状态、凭据和活动租约保持。
+- `test_account_work_control` 覆盖部分成功、重启、同操作重试、重复启用和未知观察；`test_account_work_recovery` 覆盖失败停止、并发单执行、旧 quota_attempt、隔离环境及环境换代。
+- `test_project_plans.ProjectPlanTests.test_repeated_internal_stop_does_not_clean_same_execution_twice`覆盖原清理回调重入；只清理一次，原运行最终成为stopped。
+- `test_projects_schedule` 覆盖整体停用跨过触发时间、预查后并发停用、重启前后恢复、独立暂停保留计划及原业务阻塞。
+- 真实浏览器验证独立开关、收尾进度与恢复偏好；迁移注册和数据库定义检查覆盖增量表。
+
 
 ## Scenario: 节点迁移后的额度交接、上传续接与历史抓包
 

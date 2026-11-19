@@ -6,6 +6,7 @@ import sqlite3
 import subprocess
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -93,6 +94,35 @@ class ClusterNodeTests(unittest.TestCase):
         connection.execute('DROP TRIGGER cluster_assign_new_account')
         with self.assertRaisesRegex(ValueError, '节点迁移'):
             migration_plan(connection)
+
+    def test_account_node_summaries_are_read_only_safe_and_preserve_unreachable_assignment(self) -> None:
+        """停用账号和失联节点保留真实归属，列表摘要排除内部配置。:return: None。"""
+        remote = self.store.create('a' * 32, NodeConfiguration(**self.config))
+        connection = self.database()
+        try:
+            with connection:
+                connection.execute("INSERT INTO accounts(name,profile_path) VALUES('local-account','profiles/local')")
+                connection.execute("INSERT INTO accounts(name,profile_path,enabled) VALUES('remote-account','profiles/remote',0)")
+                connection.execute("INSERT INTO accounts(name,profile_path,deleted_at) VALUES('deleted-account','profiles/deleted',1)")
+                connection.execute("UPDATE account_node_assignments SET node_id=?,revision=3 WHERE account_id=2", (remote['id'],))
+                connection.execute("UPDATE cluster_nodes SET observation_json=? WHERE id=?",
+                    (json.dumps({'state': 'unreachable', 'observed_at': time.time(), 'reason': 'synthetic-private'}), remote['id']))
+            traced = []
+            connection.set_trace_callback(traced.append)
+            with patch.object(self.store, 'database', return_value=connection):
+                result = self.store.assignment_summaries()
+            self.assertTrue(all(statement.startswith('SELECT ') for statement in traced))
+        finally:
+            connection.close()
+        self.assertEqual(result[1]['node']['node_key'], 'local')
+        self.assertIsNone(result[1]['node_observation'])
+        self.assertNotIn(3, result)
+        self.assertEqual(result[2]['node']['node_key'], 'a' * 32)
+        self.assertEqual(result[2]['node']['revision'], 3)
+        self.assertEqual(result[2]['node_observation']['state'], 'unreachable')
+        self.assertFalse(result[2]['node_observation']['stale'])
+        self.assertEqual(set(result[2]['node']), {'node_id', 'node_key', 'node_name', 'kind', 'enabled', 'revision', 'phase'})
+        self.assertNotIn('synthetic-private', json.dumps(result))
 
     def test_registration_keeps_private_key_out_of_database_and_responses(self) -> None:
         """只写密钥进入0700/0600私有文件，公开及数据库保持脱敏。:return: None。"""

@@ -44,6 +44,7 @@ use crate::service::access_policy::{
     validate_claude_code_versions, validate_user_agent_patterns,
 };
 use crate::service::account::AccountService;
+use crate::service::account_work::{AccountWorkSnapshot, AccountWorkUpdate};
 use crate::service::gateway::{
     AutoModeClassifierMode, BootstrapModelOptionsMode, CliBgStatusClassifierMode, GatewayService,
     parse_bootstrap_additional_model_options,
@@ -209,6 +210,10 @@ pub fn build_router(
         .route(
             "/admin/runtime/accounts/:id/lease",
             get(runtime_lease_status).post(runtime_lease_update),
+        )
+        .route(
+            "/admin/accounts/:id/work-control",
+            get(get_account_work).put(update_account_work),
         )
         .route(
             "/admin/runtime/accounts/:id/config",
@@ -485,6 +490,9 @@ async fn list_accounts(
     let mut data: Vec<serde_json::Value> = Vec::with_capacity(accounts.len());
     for a in &accounts {
         let mut obj = serde_json::to_value(a).unwrap_or_default();
+        obj["work_control"] =
+            serde_json::to_value(state.account_svc.work_controls.snapshot(a.id).await?)
+                .map_err(|_| AppError::Internal("账号工作状态编码失败".into()))?;
         if let Ok(connection) = ProxyConnection::parse(&a.proxy_url) {
             if let Some(proxy) = proxy_records
                 .iter()
@@ -983,7 +991,36 @@ async fn get_account(
     if account.is_antigravity() {
         value["credential_state"] = state.account_svc.agy_state(id).await?;
     }
+    value["work_control"] =
+        serde_json::to_value(state.account_svc.work_controls.snapshot(id).await?)
+            .map_err(|_| AppError::Internal("账号工作状态编码失败".into()))?;
     Ok(Json(value))
+}
+
+/// 读取独立工作控制。@param state 服务。@param id 账号。@return 实际准入与收尾状态。
+async fn get_account_work(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Json<AccountWorkSnapshot>, AppError> {
+    state.account_svc.get_account(id).await?;
+    Ok(Json(state.account_svc.work_controls.snapshot(id).await?))
+}
+
+/// 热更新接单；关联部署的整体工作由编排协调。@param state 服务。@param id 账号。@param headers 内部证明。@param input 增量。@return 已保存状态。
+async fn update_account_work(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    headers: HeaderMap,
+    Json(input): Json<AccountWorkUpdate>,
+) -> Result<Json<AccountWorkSnapshot>, AppError> {
+    state.account_svc.get_account(id).await?;
+    if input.work_enabled.is_some()
+        && std::env::var("V3_RUNTIME_URL").is_ok_and(|value| !value.is_empty())
+    {
+        require_v3_credential_service(&headers)?;
+    }
+    let snapshot = state.account_svc.work_controls.update(id, input).await?;
+    Ok(Json(snapshot))
 }
 
 async fn create_account(
@@ -1722,6 +1759,15 @@ async fn test_account(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    if !state
+        .account_svc
+        .work_controls
+        .snapshot(id)
+        .await?
+        .work_enabled
+    {
+        return Err(AppError::BadRequest("账号已整体停用".into()));
+    }
     let _credential_activity = state.account_svc.upstream_activity(id).await?;
     let account = state.account_svc.get_account(id).await?;
     if account.is_antigravity() {
@@ -3636,6 +3682,55 @@ mod tests {
         assert_eq!(unchanged["status"], "active");
         assert_eq!(unchanged["five_hour_usage_limit_percent"], 80);
         assert_eq!(unchanged["seven_day_usage_limit_percent"], 60);
+    }
+
+    /// 接单热更新可在真实活动槽位中完成，账号健康与环境配置保持独立。
+    /// @return 无。
+    #[tokio::test]
+    async fn account_work_route_changes_admission_while_runtime_is_active() {
+        let (app, _, _, _, accounts) = test_router_with_scheduling(true).await;
+        let (status, created) = account_admin_json(&app, Method::POST, "/admin/accounts",
+            json!({"email":"work-route@example.invalid","setup_token":"synthetic-work","auto_telemetry":false})).await;
+        assert!(status.is_success());
+        let id = created["id"].as_i64().unwrap();
+        let queue = accounts.get_or_create_queue(id, 3).await;
+        let held = queue
+            .acquire(Duration::from_secs(1), 2)
+            .await
+            .unwrap()
+            .with_work_admission(accounts.work_controls.admit(id).await.unwrap());
+        let (status, saved) = account_admin_json(
+            &app,
+            Method::PUT,
+            &format!("/admin/accounts/{id}/work-control"),
+            json!({"api_accepting":false,"expected_revision":0}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(saved["admitted_requests"], 1);
+        assert_eq!(saved["work_enabled"], true);
+        assert!(accounts.work_controls.admit(id).await.is_err());
+        let (_, account) = account_admin_json(
+            &app,
+            Method::GET,
+            &format!("/admin/accounts/{id}"),
+            Value::Null,
+        )
+        .await;
+        assert_eq!(account["status"], "active");
+        assert_eq!(account["setup_token"], "synthetic-work");
+        assert_eq!(account["work_control"]["api_accepting"], false);
+        assert_eq!(queue.runtime_gate.snapshot()["active"], 1);
+        drop(held);
+        assert_eq!(
+            accounts
+                .work_controls
+                .snapshot(id)
+                .await
+                .unwrap()
+                .admitted_requests,
+            0
+        );
     }
 
     /// 账号列表随刷新返回本地用量，不把读取转换成主动额度查询。

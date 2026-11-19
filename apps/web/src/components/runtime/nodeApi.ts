@@ -22,6 +22,12 @@ export interface AccountNodeAssignment {
   account_id: number; node_id: number; node_key: string; node_name: string;
   kind: 'local' | 'ssh'; enabled: boolean; revision: number; phase: 'ready' | 'maintenance' | 'reconcile';
 }
+/** 账号列表的只读节点摘要，缓存观察与持久归属分别解释。 */
+export interface AccountNodeSummary {
+  id: number; cc2api_account_id?: number | null;
+  node?: Omit<AccountNodeAssignment, 'account_id'> | null;
+  node_observation?: Pick<NodeObservation, 'state' | 'stale' | 'observed_at'> | null;
+}
 /** 节点选择与迁移所需的任务账号投影。 */
 export interface NodeTaskAccount {
   id: number; name: string; enabled: number; cc2api_account_id?: number | null;

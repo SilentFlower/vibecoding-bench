@@ -67,6 +67,7 @@ from starlette.websockets import WebSocketState
 
 from quota_protocol import merge_quota_observation, passive_recovery_decision, quota_decision, quota_observation, quota_timestamp, warmup_quota_decision, warmup_sample_used
 from account_runtime import AccountRuntime, RuntimeBusy, V3_DEFAULT_TIMEZONE, atomic_json, derive_v3_fingerprint
+from account_work_control import AccountWorkCoordinator
 from oauth_refresh_probe import OAUTH_REFRESH_SCRIPT, execute_oauth_refresh_probe
 from account_update_identity import role_release
 from cluster_api import cluster_router
@@ -369,6 +370,8 @@ _profile_locks_lock = threading.Lock()
 _oauth_owner_locks: dict[str, threading.Lock] = {}
 _oauth_owner_locks_lock = threading.Lock()
 _cc2api_binding_lock = threading.Lock()
+_run_stop_locks: dict[str, threading.RLock] = {}
+_run_stop_locks_lock = threading.Lock()
 
 
 def _profile_lock(account_name: str) -> threading.Lock:
@@ -881,6 +884,7 @@ class Cc2ApiClient:
                     (path == "/admin/accounts" and body and body.get("cli_identity"))
                     or path == '/admin/runtime/credential-capabilities'
                     or re.fullmatch(r'/admin/runtime/accounts/[0-9]+/proxy-selection', path)
+                    or re.fullmatch(r'/admin/accounts/[0-9]+/work-control', path)
                     or re.fullmatch(r'/admin/runtime/task-proxy-operations/[a-f0-9]{32}/claim', path)
                     or re.fullmatch(r"/admin/accounts/[0-9]+/(?:oauth-ownership|oauth-credentials/import(?:/[a-f0-9]{32})?|cli-process/import)", path) else {}),
             },
@@ -8026,6 +8030,9 @@ def _pi_admission(account: dict, work: dict | None, *, admitted_round: bool = Fa
     :param snapshot_only: 页面只读取已持久的观察，不等待全局消费锁或重写额度文件。
     :return: 是否放行、机器可读原因、是否可被动重试及可信恢复时间。
     """
+    if not account or not _projects_account(account['id']):
+        return {'allowed': False, 'reason': 'account_disabled', 'retryable': False,
+            'retry_at': None, 'message': '账号已整体停用'}
     if not admitted_round and not update_open():
         return {'allowed': False, 'reason': 'system_maintenance', 'retryable': True,
             'retry_at': None, 'message': '平台正在维护，等待更新完成后继续', 'quota': None, 'window': None}
@@ -8102,6 +8109,9 @@ def _engineering_pi_admission(account: dict, work: dict | None, namespace: str, 
     :param snapshot_only: 页面读取不等待运行时长锁；锁忙时明确返回状态暂不可读。
     :return: 共同门禁和独占运行判定。
     """
+    if not account or not _projects_account(account['id']):
+        return {'allowed': False, 'reason': 'account_disabled', 'retryable': False,
+            'retry_at': None, 'message': '账号已整体停用'}
     source = json.loads(work['runtime_json']).get('source') if work and work.get('runtime_json') else None
     owner = pi_owners.owner(account['id']) if pi_owners else None
     preparing_source = None
@@ -8570,6 +8580,7 @@ async def lifespan(app: FastAPI):
     login_manager.cleanup_stale()
     continue_manager.cleanup_stale()
     oauth_refresh_scheduler.cleanup_stale()
+    _account_work_controller().recover()
     oauth_refresh_scheduler.start()
     if not V3_ENABLED:
         warmup_scheduler.start()
@@ -9241,6 +9252,14 @@ def _oauth_owner_transition_blocker(account: dict, login_sid: Optional[str] = No
     :return: 阻塞原因；账号空闲时返回 None
     """
     owner = pi_owners.owner(int(account['id'])) if pi_owners else None
+    connection = get_db()
+    try:
+        pending = connection.execute('SELECT value FROM app_settings WHERE key=?',
+            (f"account_work_control:{account['id']}",)).fetchone()
+        if pending and json.loads(pending['value'])['phase'] in ('pending', 'reconcile'):
+            return '账号整体启停仍待核对，请先完成原控制操作'
+    finally:
+        connection.close()
     if owner:
         return f"账号正在由 {owner['kind']} Pi 指挥（代次 {owner['generation']}）"
     if cluster_runner and cluster_runner.project_io and cluster_runner.project_io.programs:
@@ -9730,10 +9749,141 @@ def set_initial_account_node(aid: int, body: AccountNodeChange) -> dict:
         raise HTTPException(409, str(error)) from None
 
 
+account_work_coordinator: Optional[AccountWorkCoordinator] = None
+_account_work_coordinator_lock = threading.Lock()
+
+
+def _account_work_activity(aid: int) -> int:
+    """读取真实任务占用。:param aid: 账号。:return: 尚未收口的占用数量。"""
+    connection = get_db()
+    try:
+        count = connection.execute("SELECT COUNT(*) FROM runs WHERE account_id=? AND status IN ('queued','running','stopping','quota_wait')", (aid,)).fetchone()[0]
+    finally:
+        connection.close()
+    for service in (projects_service, warmup_pi_service):
+        if service is not None:
+            with service.lock:
+                count += int(aid in service.controllers)
+    if continue_manager:
+        count += int(continue_manager.has_active_account(aid))
+    if account_runtime:
+        with account_runtime.lock:
+            count += sum(job['row']['account_id'] == aid for job in account_runtime.jobs.values())
+    if cluster_terminal_sessions:
+        count += len(cluster_terminal_sessions.ledger.active(aid))
+    if cluster_runner and cluster_runner.project_io and cluster_runner.project_io.programs:
+        count += len(cluster_runner.project_io.programs.active(aid))
+    return count
+
+
+def _stop_account_work(aid: int) -> None:
+    """沿原执行身份停止任务并保留独立计划。:param aid: 账号。:return: None。"""
+    failures = []
+
+    def stop(action):
+        try:
+            action()
+        except Exception as error:
+            failures.append(error)
+
+    for service in (projects_service, warmup_pi_service):
+        if service is not None:
+            stop(lambda service=service: service.pause(aid, disable_schedule=False))
+    connection = get_db()
+    try:
+        runs = [row['id'] for row in connection.execute("SELECT id FROM runs WHERE account_id=? AND status IN ('queued','running','stopping','quota_wait')", (aid,))]
+        batches = [row['id'] for row in connection.execute("SELECT id FROM project_iteration_batches WHERE account_id=? AND status IN ('active','pausing','stopping')", (aid,))] if project_iterations else []
+    finally:
+        connection.close()
+    for bid in batches:
+        stop(lambda bid=bid: project_iterations.transition(bid, 'stop'))
+    for rid in runs:
+        stop(lambda rid=rid: _stop_project_run(rid, recover_stopping=True))
+    if continue_manager:
+        with continue_manager._lock:
+            sessions = [sid for sid, session in continue_manager.sessions.items() if session.account_id == aid]
+        for sid in sessions:
+            stop(lambda sid=sid: continue_manager.cleanup(sid))
+    if cluster_terminal_sessions:
+        for execution in cluster_terminal_sessions.ledger.active(aid):
+            stop(lambda execution=execution: cluster_terminal_sessions.stop(execution['operation_id']))
+    if cluster_runner and cluster_runner.project_io and cluster_runner.project_io.programs:
+        programs = cluster_runner.project_io.programs
+        for program in programs.active(aid):
+            stop(lambda program=program: programs.cancel(program))
+    if failures:
+        raise RuntimeBusy('部分工作停止结果需要核对，请继续整体停用以接续原操作') from failures[0]
+
+
+def _account_work_controller() -> AccountWorkCoordinator:
+    """取得当前进程的账号启停协调器。:return: 共享协调器。"""
+    global account_work_coordinator
+    with _account_work_coordinator_lock:
+        if account_work_coordinator is None:
+            account_work_coordinator = AccountWorkCoordinator(lambda: get_db(), _db_lock,
+                _oauth_owner_lock, cc2api_client, _stop_account_work, _account_work_activity)
+    return account_work_coordinator
+
+
+class AccountWorkIn(BaseModel):
+    """整体启停目标。:param enabled: 是否允许账号工作。"""
+    enabled: StrictBool
+    model_config = ConfigDict(extra='forbid')
+
+
+@app.get('/api/accounts/{aid}/work-control')
+def account_work_status(aid: int) -> dict:
+    """读取整体启停进度。:param aid: 账号。:return: 实际观察。"""
+    try:
+        return _account_work_controller().snapshot(aid)
+    except ValueError as error:
+        raise HTTPException(404, str(error)) from None
+
+
+@app.put('/api/accounts/{aid}/work-control')
+def change_account_work(aid: int, body: AccountWorkIn) -> dict:
+    """协调账号整体启停。:param aid: 账号。:param body: 目标。:return: 收尾进度。"""
+    try:
+        with UPDATE_GATE.admission('account-work-control'):
+            return _account_work_controller().change(aid, body.enabled)
+    except (ValueError, RuntimeBusy) as error:
+        raise HTTPException(409, str(error)) from None
+    except (ConnectionError, OSError):
+        raise HTTPException(503, '整体启停结果待核对，请按原账号重试') from None
+
+
+@app.get('/api/gateway-accounts/{gateway_id}/work-control')
+@app.put('/api/gateway-accounts/{gateway_id}/work-control')
+def gateway_account_work(gateway_id: int, request: Request, body: Optional[AccountWorkIn] = None) -> dict:
+    """按原关联定位整体控制入口。:param gateway_id: 网关账号。:param request: 原方法。:param body: 目标。:return: 实际进度。"""
+    if request.method == 'PUT' and body is None:
+        raise HTTPException(422, '请提交整体启停目标')
+    connection = get_db()
+    try:
+        row = connection.execute('SELECT id FROM accounts WHERE cc2api_account_id=? AND deleted_at IS NULL', (gateway_id,)).fetchone()
+    finally:
+        connection.close()
+    if row:
+        return change_account_work(row['id'], body) if request.method == 'PUT' and body else account_work_status(row['id'])
+    try:
+        if request.method == 'PUT':
+            if body is None:
+                raise HTTPException(422, '请提交整体启停目标')
+            with UPDATE_GATE.admission('account-work-control'):
+                return cc2api_client._request('PUT', f'/admin/accounts/{gateway_id}/work-control', {'work_enabled': body.enabled})
+        return cc2api_client._request('GET', f'/admin/accounts/{gateway_id}/work-control')
+    except (ConnectionError, ValueError):
+        raise HTTPException(503, '网关整体工作状态待核对') from None
+
+
 @app.get("/api/accounts")
 def list_accounts():
-    """返回账号列表，并补充有效 CLI 版本及 OAuth 状态。:return: 未删除账号的公开列表。"""
+    """读取账号、OAuth 状态和已保存节点归属。
+
+    :return: 账号资料、节点归属及缓存观察摘要。
+    """
     ownerships = credential_ownership.summaries() if credential_ownership else {}
+    nodes = cluster_service.store.assignment_summaries() if cluster_service else {}
     conn = get_db()
     try:
         rows = conn.execute(
@@ -9746,6 +9896,7 @@ def list_accounts():
                 continue
             account = dict(row)
             account["effective_claude_code_version"], account["claude_code_version_source"] = _resolve_account_cli_version(account)
+            account.update(nodes.get(account['id'], {'node': None, 'node_observation': None}))
             account['credential_ownership'] = ownerships.get(account['id'])
             account['warmup_engine'] = 'projects' if isinstance(warmup_pi_service, ProjectsService) else 'worker'
             account['project_pi'] = None
@@ -13212,16 +13363,60 @@ def stop_run(rid: str) -> dict:
     return _request_run_stop(rid, allow_terminal=False)
 
 
-def _stop_project_run(rid: str) -> dict:
-    """按项目收口意图幂等停止。@param rid 运行标识。@return 停止或已终态标记，不伪造释放证明。"""
-    return _request_run_stop(rid, allow_terminal=True)
+def _stop_project_run(rid: str, *, recover_stopping: bool = False) -> dict:
+    """按项目收口意图幂等停止。@param rid 运行标识。@param recover_stopping 是否接续原停止。@return 实际停止或原终态标记。"""
+    return _request_run_stop(rid, allow_terminal=True, recover_stopping=recover_stopping)
 
 
-def _request_run_stop(rid: str, *, allow_terminal: bool) -> dict:
+def _request_run_stop(rid: str, *, allow_terminal: bool, recover_stopping: bool = False) -> dict:
+    """串行停止同一运行，防止恢复与原清理同时处理执行。
+
+    :param rid: 原运行。
+    :param allow_terminal: 是否接受已完成运行。
+    :param recover_stopping: 整体停用是否接续原停止意图。
+    :return: 原执行收口结果。
+    """
+    with _run_stop_locks_lock:
+        # 原清理回调可以重复停止同一运行；同线程重入后由 stopping 状态幂等收口。
+        lock = _run_stop_locks.setdefault(rid, threading.RLock())
+    with lock:
+        return _request_run_stop_locked(rid, allow_terminal=allow_terminal, recover_stopping=recover_stopping)
+
+
+def _reconcile_stopping_run(run: dict) -> None:
+    """在整体停用中核对本机隔离现场，原维护协议继续保护 API 收尾。
+
+    :param run: 已冻结原代次与执行 token 的运行。
+    :return: None，未知停止结果继续抛错保留原意图。
+    """
+    token = run.get('worker_container') or run.get('sidecar_container')
+    if not account_runtime or not token or cluster_runner and cluster_runner.handles(token):
+        return
+    # 与环境重建共用生命周期锁，使代次核验和维护收口属于同一个现场。
+    with account_runtime.environment_lock(run.get('environment_id')):
+        connection = get_db()
+        try:
+            row = connection.execute('SELECT e.environment_id,e.generation,e.state,a.enabled FROM account_environments e '
+                'JOIN accounts a ON a.id=e.account_id WHERE e.account_id=?', (run['account_id'],)).fetchone()
+        finally:
+            connection.close()
+        if row is None or row['enabled']:
+            raise RuntimeBusy('原运行环境或整体停用状态需要核对')
+        if row['environment_id'] != run.get('environment_id') or row['generation'] != run.get('environment_generation'):
+            raise RuntimeBusy('原运行环境代次已变化，请核对原停止回执')
+        if row['state'] in ('reconcile', 'cli_reconcile', 'profile_reauth_reconcile'):
+            # 原 cleanup 失败会撤出内存作业并隔离现场；空作业不能作为停止证明。
+            account_runtime.maintenance(row['environment_id'], 'reconcile')
+        elif row['state'] not in ('ready', 'stopped'):
+            raise RuntimeBusy('原运行环境仍待核对，请继续整体停用')
+
+
+def _request_run_stop_locked(rid: str, *, allow_terminal: bool, recover_stopping: bool) -> dict:
     """按当前执行代次认领停止，长IO留在数据库锁外。
 
     :param rid: 运行标识。
     :param allow_terminal: 内部收口是否接受已确定终态或已认领停止。
+    :param recover_stopping: 是否持有同运行停止锁接续原停止意图。
     :return: 成功标记；归属、状态或执行代次不符时拒绝。
     """
     if not runner:
@@ -13245,11 +13440,12 @@ def _request_run_stop(rid: str, *, allow_terminal: bool) -> dict:
                 warmup_binding_id = account_row["cc2api_account_id"]
     finally:
         conn.close()
-    if allow_terminal and run["status"] in _TERMINAL_RUN_STATUSES | {"stopping"}:
+    recovering = recover_stopping and run['status'] == 'stopping'
+    if allow_terminal and (run["status"] in _TERMINAL_RUN_STATUSES or run['status'] == 'stopping' and not recovering):
         return {"ok": True}
     if PROJECTS_AGENT_ENABLED and run['run_kind'] in PROJECT_RUN_KINDS:
         raise HTTPException(409, '旧 Projects 执行记录为只读历史')
-    if run["status"] not in ("queued", "running", "quota_wait"):
+    if run["status"] not in ("queued", "running", "quota_wait") and not recovering:
         raise HTTPException(400, f"运行 {rid} 当前不是 queued/running 状态")
     runner.persist_worker_profile(run.get("worker_container"))
     with _db_lock:
@@ -13259,17 +13455,18 @@ def _request_run_stop(rid: str, *, allow_terminal: bool) -> dict:
                 current = conn.execute("SELECT * FROM runs WHERE id=? AND deleted_at IS NULL", (rid,)).fetchone()
                 if not current:
                     raise HTTPException(404, "运行记录不存在")
-                if current["status"] in _TERMINAL_RUN_STATUSES | {"stopping"}:
+                if current["status"] in _TERMINAL_RUN_STATUSES or current['status'] == 'stopping' and not recovering:
                     # 另一个执行已完成或认领停止，旧快照不能把自然终态覆盖成stopped。
                     return {"ok": True}
                 if current["quota_attempt"] != run["quota_attempt"]:
                     raise HTTPException(409, "运行执行代次已变化，请重试停止")
-                if current["status"] not in ("queued", "running", "quota_wait"):
+                if current["status"] not in ("queued", "running", "quota_wait") and not (recovering and current['status'] == 'stopping'):
                     raise HTTPException(400, f"运行 {rid} 当前不可停止")
                 run = dict(current)
                 claimed = conn.execute(
-                    "UPDATE runs SET status='stopping', stop_requested_at=? WHERE id=? AND quota_attempt=? AND status IN ('queued','running','quota_wait')",
-                    (time.time(), rid, run["quota_attempt"]),
+                    "UPDATE runs SET status='stopping', stop_requested_at=COALESCE(stop_requested_at,?) WHERE id=? AND quota_attempt=? "
+                    "AND (status IN ('queued','running','quota_wait') OR (status='stopping' AND ?=1))",
+                    (time.time(), rid, run["quota_attempt"], int(recovering)),
                 )
                 if claimed.rowcount != 1:
                     # 数据库状态条件同时保护其他连接刚写入的终态，未认领者不执行清理。
@@ -13282,6 +13479,8 @@ def _request_run_stop(rid: str, *, allow_terminal: bool) -> dict:
         finally:
             conn.close()
     runner.cleanup(run.get("sidecar_container"), run.get("worker_container"))
+    if recovering:
+        _reconcile_stopping_run(run)
     with _db_lock:
         conn = get_db()
         try:

@@ -1,3 +1,5 @@
+import type { AccountNodeSummary } from './components/runtime/nodeApi'
+
 const BASE = ''
 
 let authToken = ''
@@ -51,6 +53,24 @@ function openRuntimeSession(): Promise<{ ok: boolean }> {
 }
 
 /** 账号持久信息，以及账号管理页使用的运行状态摘要。 */
+/** 网关独立工作开关与真实请求收尾状态。 */
+export interface AccountWorkControl {
+  api_accepting: boolean
+  work_enabled: boolean
+  revision: number
+  admitted_requests: number
+  phase: 'enabled' | 'draining' | 'disabled'
+  coordinated: boolean
+}
+
+/** 整体协调观察，任务和 API 的状态由各执行器确认。 */
+export interface OverallWorkStatus {
+  enabled?: boolean
+  phase: 'enabled' | 'draining' | 'disabled' | 'reconcile'
+  active_work?: number | null
+  message?: string | null
+}
+
 export interface Account {
   id: number
   platform?: string
@@ -59,6 +79,7 @@ export interface Account {
   name: string
   email: string
   status: string
+  work_control?: AccountWorkControl
   auth_type: string
   setup_token: string
   access_token: string
@@ -612,6 +633,8 @@ export interface ProxyConnectionInput { protocol: string; host: string; port: nu
 export interface ProxyInput extends ProxyConnectionInput { name: string; expires_at: string | null; revision?: string }
 
 export const api = {
+  /** 批量只读账号节点归属，沿原同源管理会话。@param signal 取消读取。@return 公开账号摘要。 */
+  runtimeAccountNodes: (signal: AbortSignal) => request<AccountNodeSummary[]>('GET', '/runtime/api/accounts', undefined, signal),
   /** 搜索公开线路。@param page 页码。@param q 公开搜索。@param signal 取消信号。@return 分页。 */
   listProxies: (page = 1, q = '', signal?: AbortSignal, usage = true, pageSize = 20) => request<PagedResult<ProxyRoute> & { references_complete: boolean; counts?: { all:number; available:number; used:number|null } }>('GET', `/admin/proxies?page=${page}&page_size=${pageSize}&q=${encodeURIComponent(q)}&usage=${usage}`, undefined, signal),
   /** 保存线路。@param id 编辑身份，空为新建。@param input 草稿。@return 保存身份。 */
@@ -663,6 +686,12 @@ export const api = {
    */
   /** 按身份读取账号供跨页直达。@param id 账号身份。@return 账号。 */
   accountById: (id: number) => request<Account>('GET', `/admin/accounts/${id}`),
+  /** 局部切换 API 接单。@param id 账号。@param input 明确增量。@return 当前开关与收尾状态。 */
+  updateAccountWork: (id: number, input: {api_accepting?: boolean; work_enabled?: boolean; expected_revision?: number}) => request<AccountWorkControl>('PUT', `/admin/accounts/${id}/work-control`, input),
+  /** 读取整体协调进度。@param id 网关账号。@return API 与任务实际状态。 */
+  overallWork: (id: number) => request<OverallWorkStatus>('GET', `/runtime/api/gateway-accounts/${id}/work-control`),
+  /** 沿账号原关联协调整体启停。@param id 网关账号。@param enabled 目标。@return 实际收口状态。 */
+  setOverallWork: (id: number, enabled: boolean) => request<OverallWorkStatus>('PUT', `/runtime/api/gateway-accounts/${id}/work-control`, {enabled}),
   listAccounts: (page = 1, pageSize = 12, query = '', status = '', signal?: AbortSignal, platform?: string) =>
     request<PagedResult<Account> & {
       account_counts?: {total:number;active:number;error:number;disabled:number}

@@ -62,7 +62,7 @@ async def main() -> None:
         await expect(cards).to_have_count(2)
         await expect(cards.first).to_contain_text('a' * 32)
         await expect(cards.first).to_contain_text('e' * 32 + ' · 5')
-        await expect(cards.nth(1).locator('dt').filter(has_text='执行节点').locator('+ dd')).to_have_text('未观测')
+        await expect(cards.nth(1).locator('dt').filter(has_text='执行节点').locator('+ dd')).to_have_text('节点未观测')
         for width in (1440, 390):
             await page.set_viewport_size({'width': width, 'height': 1000})
             assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
@@ -73,10 +73,11 @@ async def main() -> None:
         await page.get_by_role('button', name='详情', exact=True).click()
         await page.get_by_role('tab', name='请求链路', exact=True).click()
         await expect(cards.first).to_contain_text('Antigravity · agy 1.5.9')
-        await expect(cards.first.locator('dt').filter(has_text='执行节点').locator('+ dd')).to_have_text('默认节点')
+        await expect(cards.first.locator('dt').filter(has_text='执行节点').locator('+ dd').locator('.execution-node-heading > span')).to_have_text('默认本机')
+        await expect(cards.first.locator('dt').filter(has_text='执行节点').locator('+ dd code')).to_have_text('local')
         await expect(cards.first.locator('dt').filter(has_text='凭据代次').locator('+ dd')).to_have_text('8')
         await expect(cards.first).to_contain_text('synthetic-worker')
-        await expect(cards.nth(1).locator('dt').filter(has_text='执行节点').locator('+ dd')).to_have_text('未观测')
+        await expect(cards.nth(1).locator('dt').filter(has_text='执行节点').locator('+ dd')).to_have_text('节点未观测')
         for width in (1440, 390):
             await page.set_viewport_size({'width': width, 'height': 1000})
             assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')

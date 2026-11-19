@@ -139,6 +139,30 @@ class ClusterStore:
             finally:
                 connection.close()
 
+    def assignment_summaries(self) -> dict[int, dict]:
+        """批量只读账号归属和缓存观察，列表读取无需连接执行节点。
+
+        :return: 按账号 ID 索引的安全节点摘要。
+        """
+        connection = self.database()
+        try:
+            rows = connection.execute('SELECT n.*,b.account_id,b.revision AS assignment_revision,b.phase AS assignment_phase '
+                'FROM account_node_assignments b JOIN accounts a ON a.id=b.account_id JOIN cluster_nodes n ON n.id=b.node_id '
+                'WHERE a.deleted_at IS NULL AND n.deleted_at IS NULL').fetchall()
+            result = {}
+            for row in rows:
+                node = self._public(dict(row), 0)
+                observation = node['observation']
+                result[row['account_id']] = {
+                    'node': {'node_id': node['id'], 'node_key': node['node_key'], 'node_name': node['name'],
+                        'kind': node['kind'], 'enabled': node['enabled'], 'revision': row['assignment_revision'],
+                        'phase': row['assignment_phase']},
+                    'node_observation': {key: observation[key] for key in ('state', 'stale', 'observed_at')} if observation else None,
+                }
+            return result
+        finally:
+            connection.close()
+
     def assignment(self, account_id: int) -> dict:
         """读取仍有效账号的固定归属。
 

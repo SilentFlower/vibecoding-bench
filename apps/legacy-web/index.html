@@ -299,6 +299,7 @@
         <button type="button" class="modal-close" data-close="#cli-settings-modal" aria-label="关闭账号配置"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button>
       </div>
       <form id="cli-settings-form" class="dialog-body work-dialog-content">
+        <div id="cli-settings-node"></div>
         <label class="field" id="cli-settings-name">名称<input name="display_name" maxlength="128" required /></label>
         <div class="work-form-grid"><label class="field">Claude Code 版本<input name="claude_code_version" type="text" maxlength="64" pattern="[0-9]+[.][0-9]+[.][0-9]+([+\-][A-Za-z0-9._\-]+)?" placeholder="留空继承全局，例如 2.1.303" /><small class="upgrade-help">支持精确版本及版本后缀，留空沿用全局配置。</small></label></div>
         <p class="hint hidden" id="cli-settings-effective" role="status"></p>

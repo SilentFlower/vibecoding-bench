@@ -111,6 +111,15 @@ impl UsagePollerService {
         debug!("usage poller: polling {} oauth accounts", targets.len());
 
         for id in targets {
+            if !self
+                .account_svc
+                .work_controls
+                .snapshot(id)
+                .await
+                .is_ok_and(|state| state.work_enabled)
+            {
+                continue;
+            }
             if self.mode == PollMode::ResetWindows {
                 attempts.insert(id, Instant::now());
                 // 手动刷新或业务被动观测可能已推进周期，发送前重新读取以避免重复查询。

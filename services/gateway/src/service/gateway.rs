@@ -919,6 +919,12 @@ impl GatewayService {
         slot_units: u32,
     ) -> Result<GatewayAccountAdmission, GatewayAdmissionError> {
         let t_slot = std::time::Instant::now();
+        let work_admission = self
+            .account_svc
+            .work_controls
+            .admit(account.id)
+            .await
+            .map_err(GatewayAdmissionError::Rpm)?;
         let queue = self
             .account_svc
             .get_or_create_queue(account.id, account.concurrency)
@@ -938,7 +944,10 @@ impl GatewayService {
             return Err(GatewayAdmissionError::Rpm(e));
         }
 
-        Ok(GatewayAccountAdmission { permit, slot_wait })
+        Ok(GatewayAccountAdmission {
+            permit: permit.with_work_admission(work_admission),
+            slot_wait,
+        })
     }
 
     /// 使用请求级期限取得 v3 并发许可，不提前消耗发送预算。
@@ -953,6 +962,12 @@ impl GatewayService {
         slot_units: u32,
     ) -> Result<GatewayAccountAdmission, GatewayAdmissionError> {
         let started = std::time::Instant::now();
+        let work_admission = self
+            .account_svc
+            .work_controls
+            .admit(account.id)
+            .await
+            .map_err(GatewayAdmissionError::Rpm)?;
         request.phase(RequestPhase::WaitingConcurrency);
         let queue = await_preparation(
             Some(request),
@@ -971,7 +986,9 @@ impl GatewayService {
             })?;
         request.phase(RequestPhase::Preparing);
         Ok(GatewayAccountAdmission {
-            permit: permit.with_scheduling_request(request.clone()),
+            permit: permit
+                .with_scheduling_request(request.clone())
+                .with_work_admission(work_admission),
             slot_wait: started.elapsed(),
         })
     }
@@ -19450,6 +19467,206 @@ mod tests {
         assert!(summary.starts_with(&format!("{} bytes sha256:", body.len())));
         assert!(!summary.contains("raw-prompt-marker"));
         assert!(!summary.contains("raw-token-marker"));
+    }
+
+    /// 两种调度模式下关闭接单和整体工作后，真实 SSE 仍完整收尾。
+    /// @return 无。
+    #[tokio::test]
+    async fn account_work_close_preserves_real_sse_until_upstream_completion() {
+        use crate::service::account_work::AccountWorkUpdate;
+
+        for scheduled in [false, true] {
+            let control = Arc::new(Mutex::new(None::<mpsc::Sender<Result<Bytes, IoError>>>));
+            let handler_control = control.clone();
+            let calls = Arc::new(AtomicUsize::new(0));
+            let handler_calls = calls.clone();
+            let prefix = Bytes::from_static(b"event: ping\ndata: {}\n\n");
+            let handler_prefix = prefix.clone();
+            let app = Router::new().route(
+                "/v1/messages",
+                post(move || {
+                    let control = handler_control.clone();
+                    let prefix = handler_prefix.clone();
+                    handler_calls.fetch_add(1, Ordering::SeqCst);
+                    async move {
+                        let (sender, receiver) = mpsc::channel(2);
+                        sender.send(Ok(prefix)).await.unwrap();
+                        *control.lock().await = Some(sender);
+                        (
+                            [(CONTENT_TYPE, "text/event-stream")],
+                            Body::from_stream(ReceiverStream::new(receiver)),
+                        )
+                    }
+                }),
+            );
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let upstream = format!("http://{}", listener.local_addr().unwrap());
+            let server = tokio::spawn(async move {
+                axum::serve(listener, app).await.unwrap();
+            });
+            let (service, _) = test_gateway_service_with_scheduling(
+                Arc::new(MemoryStore::new()),
+                upstream,
+                String::new(),
+                scheduled,
+            )
+            .await;
+            let account = create_gateway_account(&service, "work-sse@example.invalid", 1, 0).await;
+            let payload = json!({"model":"claude-sonnet-5-5","max_tokens":16,"stream":true,"messages":[{"role":"user","content":"合成收尾请求"}]});
+            let response = service
+                .handle_request(
+                    profile_request("/v1/messages", Some("python-httpx/0.28.1"), payload.clone()),
+                    None,
+                )
+                .await;
+            assert_eq!(response.status(), StatusCode::OK);
+            let mut body = response.into_body();
+            let first = timeout(Duration::from_secs(3), body.frame())
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap()
+                .into_data()
+                .unwrap();
+            assert_eq!(first, prefix);
+            let state = service
+                .account_svc
+                .work_controls
+                .update(
+                    account.id,
+                    AccountWorkUpdate {
+                        api_accepting: Some(false),
+                        work_enabled: Some(false),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap();
+            assert_eq!(state.phase, "draining");
+            assert_eq!(state.admitted_requests, 1);
+            let rejected = service
+                .handle_request(
+                    profile_request("/v1/messages", Some("python-httpx/0.28.1"), payload),
+                    None,
+                )
+                .await;
+            assert_eq!(rejected.status(), StatusCode::SERVICE_UNAVAILABLE);
+            let suffix =
+                Bytes::from_static(b"event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n");
+            let sender = control.lock().await.take().unwrap();
+            sender.send(Ok(suffix.clone())).await.unwrap();
+            drop(sender);
+            let tail = timeout(Duration::from_secs(3), body::to_bytes(body, 64 * 1024))
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(tail, suffix);
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            assert_eq!(
+                service
+                    .account_svc
+                    .work_controls
+                    .snapshot(account.id)
+                    .await
+                    .unwrap()
+                    .phase,
+                "disabled"
+            );
+            server.abort();
+        }
+    }
+
+    /// 独立关接单与整体停用保护真实排队许可，后续请求拒绝，取消后无占用泄漏。
+    /// @return 无。
+    #[tokio::test]
+    async fn account_work_close_drains_existing_queue_and_rejects_new_admission() {
+        use crate::service::account_work::AccountWorkUpdate;
+
+        let service = Arc::new(test_gateway_service().await);
+        let account = create_gateway_account(&service, "work-control@example.invalid", 1, 0).await;
+        let first = service
+            .acquire_account_admission(
+                &account,
+                false,
+                "",
+                Duration::from_secs(5),
+                DEFAULT_REQUEST_SLOT_UNITS,
+            )
+            .await
+            .unwrap();
+        let waiter_service = service.clone();
+        let waiter_account = account.clone();
+        let waiter = tokio::spawn(async move {
+            waiter_service
+                .acquire_account_admission(
+                    &waiter_account,
+                    false,
+                    "",
+                    Duration::from_secs(5),
+                    DEFAULT_REQUEST_SLOT_UNITS,
+                )
+                .await
+        });
+        wait_until_queue_waiting(&service, &account, 1).await;
+        let state = service
+            .account_svc
+            .work_controls
+            .update(
+                account.id,
+                AccountWorkUpdate {
+                    api_accepting: Some(false),
+                    work_enabled: Some(false),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(state.admitted_requests, 2);
+        assert_eq!(state.phase, "draining");
+        assert!(
+            service
+                .acquire_account_admission(
+                    &account,
+                    false,
+                    "",
+                    Duration::from_secs(1),
+                    DEFAULT_REQUEST_SLOT_UNITS
+                )
+                .await
+                .is_err()
+        );
+        drop(first);
+        let queued = waiter.await.unwrap().unwrap();
+        assert_eq!(
+            service
+                .account_svc
+                .work_controls
+                .snapshot(account.id)
+                .await
+                .unwrap()
+                .admitted_requests,
+            1
+        );
+        drop(queued);
+        assert_eq!(
+            service
+                .account_svc
+                .work_controls
+                .snapshot(account.id)
+                .await
+                .unwrap()
+                .phase,
+            "disabled"
+        );
+        assert_eq!(
+            service
+                .account_svc
+                .get_account(account.id)
+                .await
+                .unwrap()
+                .status,
+            AccountStatus::Active
+        );
     }
 
     #[tokio::test]

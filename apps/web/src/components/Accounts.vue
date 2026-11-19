@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { Pencil, RefreshCw, Activity, ArrowRight, Trash2, Globe, Box, Clock, ChevronRight, KeyRound, Plus, Check } from '@/components/ui/icon';
 import { NumberInput, ChoiceSelect, SearchInput, InfoTooltip, Pagination } from '@/components/ui/controls';
 import { useRoute } from 'vue-router';
 import ProxyPicker from './ProxyPicker.vue';
-import { api, type ProxyRoute, type Account, type OAuthExchangeResult, type UsageWindow, type RuntimeEnvironmentSummary } from '../api';
+import ExecutionNodeBadge from './runtime/ExecutionNodeBadge.vue';
+import type { AccountNodeSummary } from './runtime/nodeApi';
+import { api, type ProxyRoute, type Account, type OAuthExchangeResult, type UsageWindow, type RuntimeEnvironmentSummary, type OverallWorkStatus } from '../api';
 import UsageWindowStats from './UsageWindowStats.vue';
 import SchedulingDetails from './SchedulingDetails.vue';
 import { subscriptionLabel, fiveHourLabel } from '../lib/subscription';
@@ -40,6 +42,7 @@ async function openLinkedAccount(): Promise<void> {
     const account = accounts.value.find(value => value.id === id) ?? await api.accountById(id);
     if (generation !== linkedGeneration) return;
     if (!accounts.value.some(value => value.id === id)) accounts.value.push(account);
+    void loadAccountNodes();
     openEdit(account);
   } catch (cause) {
     if (generation !== linkedGeneration) return;
@@ -59,6 +62,96 @@ const { show: toast } = useToast();
 
 /** 账号列表 */
 const accounts = ref<Account[]>([]);
+const workPending = reactive(new Set<number>());
+const overallStates = reactive(new Map<number, OverallWorkStatus>());
+const accountNodes = ref(new Map<number, AccountNodeSummary>());
+const nodeReadFailed = ref(false);
+const nodeLoaded = ref(false);
+let nodeController: AbortController | undefined;
+let nodeGeneration = 0;
+
+/** 批量读取已保存归属，旧页面及迟到回执不能覆盖当前节点。@return 读取结束。 */
+async function loadAccountNodes(): Promise<void> {
+  nodeController?.abort();
+  const controller = new AbortController(), generation = ++nodeGeneration;
+  nodeController = controller;
+  try {
+    await api.openRuntime();
+    if (controller.signal.aborted) return;
+    const rows = await api.runtimeAccountNodes(controller.signal);
+    if (controller.signal.aborted || generation !== nodeGeneration) return;
+    accountNodes.value = new Map(rows.filter(row => row.cc2api_account_id != null).map(row => [row.cc2api_account_id!, row]));
+    nodeReadFailed.value = false;
+    nodeLoaded.value = true;
+  } catch {
+    if (!controller.signal.aborted && generation === nodeGeneration) nodeReadFailed.value = true;
+  }
+}
+
+/** 归属与缓存观察分别呈现，读取失败保留原身份。@param id 网关账号。@return 观察说明。 */
+function nodeStatus(id: number): string {
+  if (nodeReadFailed.value) return '归属待刷新';
+  if (!nodeLoaded.value) return '归属读取中';
+  const row = accountNodes.value.get(id);
+  if (!row?.node) return '当前归属未观测';
+  if (!row.node.enabled) return '节点已暂停接单';
+  if (row.node.phase !== 'ready') return row.node.phase === 'maintenance' ? '节点迁移维护中' : '节点归属待核对';
+  if (!row.node_observation) return '在线状态未观测';
+  if (row.node_observation.stale) return '在线观察已过期';
+  return row.node_observation.state === 'reachable' ? '最近观测可达' : '最近观测不可达';
+}
+
+/** 标记需要核对的观察，同时保留已知归属。@param id 网关账号。@return 是否提醒。 */
+function nodeAttention(id: number): boolean {
+  const row = accountNodes.value.get(id);
+  return nodeReadFailed.value || !!row?.node && (!row.node.enabled || row.node.phase !== 'ready')
+    || !!row?.node_observation && (row.node_observation.stale || row.node_observation.state === 'unreachable');
+}
+
+/** 读取整体收尾观察。@param rows 当前账号。@return 完成。 */
+async function loadOverallStates(rows: Account[]): Promise<void> {
+  const targets = rows.filter(account => account.work_control?.coordinated && (!account.work_control.work_enabled || overallStates.has(account.id)));
+  if (!targets.length) return;
+  const generation = accountLoadGeneration;
+  try {
+    await api.openRuntime();
+    await Promise.all(targets.map(async account => {
+      try { const state = await api.overallWork(account.id); if (generation === accountLoadGeneration) overallStates.set(account.id, state); }
+      catch { if (generation === accountLoadGeneration) overallStates.set(account.id, {phase:'reconcile',message:'整体工作状态待核对'}); }
+    }));
+  } catch { if (generation === accountLoadGeneration) for (const account of targets) overallStates.set(account.id, {phase:'reconcile',message:'整体工作状态待核对'}); }
+}
+
+/** 按实际协调结果说明整体状态。@param account 账号。@return 显示文本。 */
+function overallLabel(account: Account): string {
+  const phase = overallStates.get(account.id)?.phase ?? account.work_control?.phase;
+  return ({enabled:'整体已启用',draining:'整体正在收尾',disabled:'整体已停用',reconcile:'整体待核对'} as Record<string,string>)[phase ?? ''] ?? '整体状态待读取';
+}
+
+/** 优先采用关联任务账号的整体状态。@param account 账号。@return 是否整体启用。 */
+function overallEnabled(account: Account): boolean {
+  return overallStates.get(account.id)?.enabled ?? account.work_control?.work_enabled ?? false;
+}
+
+/** 控制账号全部工作。@param account 账号。@param enabled 目标。@return 完成。 */
+async function changeOverall(account: Account, enabled: boolean): Promise<void> {
+  if (!account.work_control || workPending.has(account.id)) return;
+  workPending.add(account.id);
+  try {
+    if (account.work_control.coordinated) {
+      await api.openRuntime();
+      overallStates.set(account.id, await api.setOverallWork(account.id, enabled));
+    } else {
+      account.work_control = await api.updateAccountWork(account.id, {work_enabled:enabled,expected_revision:account.work_control.revision});
+    }
+    await load();
+    emit('refresh');
+  } catch (cause) {
+    overallStates.set(account.id, {phase:'reconcile',message:(cause as Error).message});
+    toast((cause as Error).message);
+    await load();
+  } finally { workPending.delete(account.id); }
+}
 /** 网关当前生效的画像配置；旧后端未提供时不推测默认值。 */
 const profileSelectionMode = ref<'client_version' | 'account' | null>(null);
 const defaultVersionProfile = ref<string | null>(null);
@@ -238,13 +331,15 @@ async function load() {
   try {
     if (props.workspaceAccountId) {
       const account = await api.accountById(props.workspaceAccountId);
-      if (generation === accountLoadGeneration) { accounts.value = [account]; accountLoadFailed.value = false; }
+      if (generation === accountLoadGeneration) { accounts.value = [account]; accountLoadFailed.value = false; void loadOverallStates([account]); void loadAccountNodes(); }
       return;
     }
     const [res, overview] = await Promise.all([api.listAccounts(currentPage.value, pageSize.value, accountQuery.value.trim(), accountFilter.value === 'all' ? '' : accountFilter.value, undefined, platformFilter.value), api.getDashboard().catch(() => null)]);
     if (generation !== accountLoadGeneration) return;
     accountLoadFailed.value = false;
     accounts.value = res.data ?? [];
+    void loadOverallStates(accounts.value);
+    void loadAccountNodes();
     accountCounts.value = res.account_counts ?? overview?.accounts ?? null;
     profileSelectionMode.value = res.claude_code_profile_selection_mode ?? null;
     defaultVersionProfile.value = res.claude_code_version_profile ?? null;
@@ -260,6 +355,7 @@ async function load() {
 
 /** 页面恢复可见时立即更新，隐藏时不继续拉取。@return 无。 */
 function refreshVisibleAccounts() {
+  if (document.hidden) { nodeGeneration++; nodeController?.abort(); }
   if (!document.hidden) void load();
 }
 
@@ -292,6 +388,8 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  nodeGeneration++;
+  nodeController?.abort();
   linkedGeneration++;
   accountLoadGeneration++;
   clearTimeout(searchTimer);
@@ -564,22 +662,28 @@ async function refreshUsage(id: number) {
 }
 
 /**
- * 切换账号调度状态（启用/停用）
+ * 只切换 API 接单，保留账号资格与其它工作。
  * @param a 账号对象
+ * @return 完成。
  */
 async function toggleScheduling(a: Account) {
+  if (!a.work_control || workPending.has(a.id)) return;
+  workPending.add(a.id);
   try {
-    const isStopped = a.status === 'disabled' || isRateLimited(a);
-    const newStatus = isStopped ? 'active' : 'disabled';
-    const res = await api.updateAccount(a.id, { status: newStatus });
-    a.status = res.status;
-    a.disable_reason = res.disable_reason ?? '';
-    a.rate_limited_at = res.rate_limited_at;
-    a.rate_limit_reset_at = res.rate_limit_reset_at;
+    a.work_control = await api.updateAccountWork(a.id, {api_accepting:!a.work_control.api_accepting,expected_revision:a.work_control.revision});
     emit('refresh');
   } catch (e: unknown) {
-    toast((e as Error).message || '切换调度失败');
-  }
+    toast((e as Error).message || '切换 API 接单失败');
+  } finally { workPending.delete(a.id); }
+}
+
+/** 显式恢复旧账号资格，独立接单偏好保持原值。@param account 账号。@return 完成。 */
+async function restoreAvailability(account: Account): Promise<void> {
+  if (workPending.has(account.id)) return;
+  workPending.add(account.id);
+  try { await api.updateAccount(account.id, {status:'active'}); await load(); emit('refresh'); }
+  catch (cause) { toast((cause as Error).message); }
+  finally { workPending.delete(account.id); }
 }
 
 /**
@@ -1111,12 +1215,15 @@ async function copyText(text: string) {
               <div><h3>{{ a.name || a.email }}<span class="account-plan">{{ a.platform === 'antigravity' ? 'Antigravity' : a.platform && a.platform !== 'claude_code' ? a.platform : subscriptionLabel(a.subscription_type, a.rate_limit_tier) }}</span></h3></div>
               <p>{{ a.email }}</p>
             </button>
-            <button type="button" role="switch" class="account-status-switch" :aria-checked="!(a.status === 'disabled' || isRateLimited(a))" :aria-label="`${(a.status === 'disabled' || isRateLimited(a)) ? '启用' : '停用'} ${a.name || a.email}`" @click="toggleScheduling(a)"><span /></button>
+            <div class="flex flex-col items-center gap-1"><span class="text-xs text-muted-foreground">API 接单</span><button type="button" role="switch" class="account-status-switch" :disabled="!a.work_control || workPending.has(a.id)" :aria-checked="a.work_control?.api_accepting === true" :aria-label="`${a.work_control?.api_accepting ? '关闭' : '开启'} API 接单 ${a.name || a.email}`" @click="toggleScheduling(a)"><span /></button></div>
           </div>
           <div class="account-network">
             <button type="button" @click="openEdit(a)"><Globe :size="13" /><span>{{ a.proxy_name || publicProxy(a.proxy_url) }}</span></button>
             <router-link v-if="!a.platform || a.platform === 'claude_code'" :to="{ name: 'environments', query: { gateway_account: String(a.id) } }"><Box :size="13" />运行环境</router-link>
           </div>
+          <ExecutionNodeBadge :node="accountNodes.get(a.id)?.node" :status="nodeStatus(a.id)" :attention="nodeAttention(a.id)" />
+          <div class="flex flex-wrap items-center justify-between gap-2 py-2 text-xs"><span>{{ overallLabel(a) }}<template v-if="a.work_control?.admitted_requests"> · 已接纳 {{ a.work_control.admitted_requests }} 个请求</template></span><Button size="sm" variant="outline" :disabled="!a.work_control || workPending.has(a.id)" @click="changeOverall(a, !overallEnabled(a))">{{ overallEnabled(a) ? '整体停用' : '整体启用' }}</Button><Button v-if="overallStates.get(a.id)?.phase==='reconcile'" size="sm" variant="outline" :disabled="workPending.has(a.id)" @click="changeOverall(a, false)">继续停用</Button></div>
+          <p v-if="overallStates.get(a.id)?.message" class="text-xs text-muted-foreground" role="status">{{ overallStates.get(a.id)?.message }}</p>
           <div class="account-health" :class="a.status === 'disabled' ? 'is-disabled' : (isRateLimited(a) || a.auth_error || a.v3_scheduling_error) ? 'is-warning' : ''">
             <span class="account-health-message"><Check v-if="a.status !== 'disabled' && !isRateLimited(a) && !a.auth_error && !a.v3_scheduling_error" :size="13" /><i v-else /><span>{{ a.status === 'disabled' ? '已停用' : a.v3_scheduling ? schedulingReasonLabel(a.v3_scheduling.capacity.reason) : statusStyle(a).label }}<template v-if="a.v3_scheduling"> · {{ a.v3_scheduling.phases.running > 0 ? `正在处理 ${a.v3_scheduling.phases.running} 个请求` : '当前空闲' }}</template></span></span>
             <button v-if="(a.queued_requests ?? 0)>0" class="account-queue-alert" @click="openScheduling(a)">排队 {{ a.queued_requests }}</button>
@@ -1208,6 +1315,7 @@ async function copyText(text: string) {
             <span>{{ statusStyle(detailAccount).label }}</span>
             <small v-if="detailAccount.platform !== 'antigravity'" class="account-score">{{ activeSchedulingScore(detailAccount) }}</small>
           </div>
+          <ExecutionNodeBadge :node="accountNodes.get(detailAccount.id)?.node" :status="nodeStatus(detailAccount.id)" :attention="nodeAttention(detailAccount.id)" />
           <section v-if="detailAccount.platform !== 'antigravity'" class="account-usage-windows"><header><span>用量</span><small>{{ detailAccount.usage_fetched_at ? new Date(detailAccount.usage_fetched_at).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}) + ' 更新' : '未刷新' }}</small></header>
             <div v-for="window in usageWindows" :key="window.key" class="account-usage-window"><UsageWindowStats v-if="window.key!=='seven_day_fable'" :stats="detailAccount.request_usage?.[window.key]" :label="window.key==='five_hour'?'5h':'7d'" /><div class="usage-window-label"><span>{{ window.label }}</span><strong>{{ usagePercentLabel(usageWindow(detailAccount.usage_data,window.key)) }}</strong></div><div class="usage-window-bar"><i :class="usageBarColor(effectiveUtil(usageWindow(detailAccount.usage_data,window.key)))" :style="{width:Math.min(100,effectiveUtil(usageWindow(detailAccount.usage_data,window.key)))+'%'}" /></div><p v-if="hasFutureReset(usageWindow(detailAccount.usage_data,window.key))" class="usage-window-reset">{{ formatTimeLeft(usageWindow(detailAccount.usage_data,window.key)?.resets_at) }} 后重置</p></div>
           </section>
@@ -1217,9 +1325,12 @@ async function copyText(text: string) {
             <OperationFeedback label="测试连接" button-variant="default" :status="testStates.get(detailAccount.id)?.status" :message="testStates.get(detailAccount.id)?.message" :identity="detailAccount.name || detailAccount.email" @action="test(detailAccount.id)" />
             <Button type="button" variant="outline" @click="refreshUsage(detailAccount.id)" :disabled="refreshingUsage === detailAccount.id"><RefreshCw :size="14" />{{ refreshingUsage === detailAccount.id ? '刷新中' : '刷新用量' }}</Button>
             <Button v-if="detailAccount.platform !== 'antigravity'" type="button" variant="ghost" @click="changeWorkspaceTab('scheduling')"><ArrowRight :size="14" />调度详情</Button>
-            <Button v-if="detailAccount.status === 'disabled' || isRateLimited(detailAccount)" type="button" variant="outline" @click="toggleScheduling(detailAccount)">启用账号</Button>
-            <Button v-else type="button" variant="destructive" class="account-stop-action" @click="toggleScheduling(detailAccount)">停用账号</Button>
+            <Button type="button" variant="outline" :disabled="!detailAccount.work_control || workPending.has(detailAccount.id)" @click="toggleScheduling(detailAccount)">{{ detailAccount.work_control?.api_accepting ? '关闭 API 接单' : '开启 API 接单' }}</Button>
+            <Button v-if="detailAccount.status !== 'active' || isRateLimited(detailAccount)" type="button" variant="outline" :disabled="workPending.has(detailAccount.id)" @click="restoreAvailability(detailAccount)">恢复账号资格</Button>
+            <Button type="button" :variant="overallEnabled(detailAccount) ? 'destructive' : 'outline'" :disabled="!detailAccount.work_control || workPending.has(detailAccount.id)" @click="changeOverall(detailAccount, !overallEnabled(detailAccount))">{{ overallEnabled(detailAccount) ? '整体停用' : '整体启用' }}</Button>
           </div>
+          <p class="text-xs text-muted-foreground" role="status">{{ overallLabel(detailAccount) }}。关闭 API 接单后已接纳请求正常收尾。整体停用会停止养号和工程的新工作，并等待原请求收尾。</p>
+          <p v-if="overallStates.get(detailAccount.id)?.message" role="status">{{ overallStates.get(detailAccount.id)?.message }}</p>
         </div>
         <form v-show="workspaceTab === 'configuration'" @submit.prevent="save" class="account-editor-form">
           <div class="account-editor-scroll complete-account-form">

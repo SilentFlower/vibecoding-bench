@@ -20,6 +20,7 @@ use crate::model::account::{
     MAX_UPSTREAM_SESSION_TTL_MINUTES, MIN_UPSTREAM_SESSION_TTL_MINUTES, OAuthCredentialImport,
 };
 use crate::model::credential_ownership::CredentialOwnershipInput;
+use crate::service::account_work::{AccountWorkAdmission, AccountWorkControls};
 use crate::service::rewriter::ClientType;
 use crate::service::runtime_lease::RuntimeGate;
 use crate::service::v3_scheduling::{
@@ -286,6 +287,7 @@ pub struct AccountSlotPermit {
     active_requests: Arc<AtomicI64>,
     scheduling_request: Option<SchedulingRequest>,
     credential_activity: Option<CredentialActivity>,
+    work_admission: Option<AccountWorkAdmission>,
 }
 
 /// 槽位归还前先偿还缩容差额，涵盖等待门禁时取消或超时的路径。
@@ -303,6 +305,7 @@ impl AccountSlotPermit {
             active_requests: queue.active_requests.clone(),
             scheduling_request: None,
             credential_activity: None,
+            work_admission: None,
         }
     }
 
@@ -311,6 +314,12 @@ impl AccountSlotPermit {
     /// @return 持有调度状态的许可。
     pub fn with_scheduling_request(mut self, request: SchedulingRequest) -> Self {
         self.scheduling_request = Some(request);
+        self
+    }
+
+    /// 将接单登记保留到响应结束。@param admission 已接纳许可。@return 当前槽位许可。
+    pub fn with_work_admission(mut self, admission: AccountWorkAdmission) -> Self {
+        self.work_admission = Some(admission);
         self
     }
 
@@ -595,6 +604,8 @@ impl AccountQueue {
 
 /// 统一账号硬资格、凭据及并发；v3 按需装配持久调度。
 pub struct AccountService {
+    /// 独立接单与整体准入，保留已接纳请求的生命周期。
+    pub work_controls: AccountWorkControls,
     native_changes: broadcast::Sender<(i64, bool, bool)>,
     credential_gates: Mutex<HashMap<i64, Arc<CredentialGate>>>,
     scheduler: Option<Arc<V3Scheduler>>,
@@ -736,6 +747,7 @@ impl AccountService {
     ) -> Self {
         Self {
             native_changes: broadcast::channel(128).0,
+            work_controls: AccountWorkControls::new(settings_store.database_pool()),
             store,
             cache,
             oauth_token_url,
@@ -1440,6 +1452,8 @@ impl AccountService {
                         let id_allowed =
                             allowed_ids.is_empty() || allowed_ids.contains(&account_id);
                         if account.is_schedulable()
+                            && self.work_controls.snapshot(account_id).await?.api_accepting
+                            && self.work_controls.snapshot(account_id).await?.work_enabled
                             && !exclude_ids.contains(&account_id)
                             && id_allowed
                         {
@@ -1566,11 +1580,20 @@ impl AccountService {
         let accounts = self.store.list_schedulable().await?;
         let ownerships = self.store.credential_ownerships().await?;
 
+        let mut paused = HashSet::new();
+        for account in &accounts {
+            let control = self.work_controls.snapshot(account.id).await?;
+            if !control.api_accepting || !control.work_enabled {
+                paused.insert(account.id);
+            }
+        }
+
         // 过滤：排除项 + 可用账号限制
         let mut candidates: Vec<Account> = accounts
             .into_iter()
             .filter(|a| {
                 !runtime_exclude_ids.contains(&a.id)
+                    && !paused.contains(&a.id)
                     && (allowed_ids.is_empty() || allowed_ids.contains(&a.id))
                     && ownerships
                         .get(&a.id)
@@ -1748,7 +1771,12 @@ impl AccountService {
             config.wait_seconds as i64 * 1000,
             now,
         );
-        if !account.is_schedulable() || account_usage_limit_reached(account) {
+        let control = self.work_controls.snapshot(account.id).await?;
+        if !account.is_schedulable()
+            || !control.api_accepting
+            || !control.work_enabled
+            || account_usage_limit_reached(account)
+        {
             capacity.immediate = false;
             capacity.can_queue = false;
             capacity.reason = "account_unavailable".into();
@@ -2005,6 +2033,9 @@ impl AccountService {
     /// @param id 账号 ID，仅支持 OAuth 账号。
     /// @return 返回最终持久化的完整用量对象。
     pub async fn refresh_usage(&self, id: i64) -> Result<serde_json::Value, AppError> {
+        if !self.work_controls.snapshot(id).await?.work_enabled {
+            return Err(AppError::BadRequest("账号已整体停用".into()));
+        }
         let _credential_activity = self.upstream_activity(id).await?;
         let account = self.store.get_by_id(id).await?;
         if account.auth_type != crate::model::account::AccountAuthType::Oauth {

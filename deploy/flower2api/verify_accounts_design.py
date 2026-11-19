@@ -21,6 +21,9 @@ class AccountDesignFixture(PreviewFixture):
         source = self.accounts[0]
         self.account_template = copy.deepcopy(source)
         self.accounts = [dict(copy.deepcopy(source), id=i, name=f'正式账号 {i}', email=f'design{i}@example.test', queued_requests=4 if i == 1 else 0) for i in range(1, 14)]
+        for account in [self.account_template, *self.accounts]:
+            account['work_control'] = dict(api_accepting=True, work_enabled=True, revision=0,
+                admitted_requests=2 if account.get('id') == 1 else 0, phase='enabled', coordinated=False)
         stats = dict(requests=128, tokens=845000, cost_usd=4.85, unpriced_requests=0, partial_requests=0, starts_at='2026-11-15T00:00:00Z', ends_at='2099-11-15T05:00:00Z', basis='quota', coverage_complete=True, estimated_total_cost_usd=15.16)
         self.accounts[0].update(proxy_url='socks5://demo-user:demo-secret@proxy.example.test:1080', request_backend='native293', request_usage=dict(recorded_since='2026-11-01T00:00:00Z', five_hour=stats, seven_day=copy.deepcopy(stats)))
         now = int(time.time()*1000)
@@ -42,6 +45,18 @@ class AccountDesignFixture(PreviewFixture):
         request = route.request
         url = urlsplit(request.url)
         path = url.path
+        work = re.fullmatch(r'/admin/accounts/(\d+)/work-control', path)
+        if work:
+            account = next(account for account in self.accounts if account['id'] == int(work[1]))
+            state = account['work_control']
+            if request.method == 'PUT':
+                body = request.post_data_json
+                assert body['expected_revision'] == state['revision']
+                self.writes.append(dict(path=path, method=request.method, body=body))
+                state.update({key: body[key] for key in ('api_accepting', 'work_enabled') if key in body})
+                state['revision'] += 1
+                state['phase'] = 'enabled' if state['work_enabled'] else 'draining' if state['admitted_requests'] else 'disabled'
+            return await self.respond(route, state)
         if path == '/runtime/api/system-updates/check':
             self.background_checks += 1
             return await self.respond(route, {'checking': False})
@@ -124,9 +139,10 @@ async def main():
         dialog = page.get_by_role('dialog')
         await expect(dialog.locator('input[type=radio][value=native293]')).to_be_checked()
         await expect(dialog.locator('.account-auth-fields')).not_to_have_attribute('open', '')
+        before_edit = len(fixture.writes)
         await dialog.get_by_role('spinbutton', name='并发上限', exact=True).fill('')
         await dialog.get_by_role('button', name='保存修改', exact=True).click()
-        assert not fixture.writes
+        assert len(fixture.writes) == before_edit, fixture.writes[before_edit:]
         await dialog.get_by_role('spinbutton', name='并发上限', exact=True).fill('4')
         await dialog.locator('input[type=radio][value=legacy]').check()
         await dialog.get_by_role('button', name='保存修改', exact=True).click()
@@ -135,7 +151,7 @@ async def main():
         await card.get_by_role('button', name='编辑', exact=True).click()
         await dialog.get_by_role('spinbutton', name='并发上限', exact=True).fill('6')
         await dialog.get_by_role('button', name='取消', exact=True).click()
-        assert len(fixture.writes) == 1
+        assert len(fixture.writes) == before_edit + 1
         await card.get_by_role('button', name='详情', exact=True).click()
         await dialog.get_by_role('button',name='环境与诊断',exact=True).click()
         await expect(dialog).to_contain_text('画像选择方式')
@@ -144,14 +160,22 @@ async def main():
         await page.keyboard.press('Escape')
         await card.get_by_role('switch').click()
         await expect(card.get_by_role('switch')).to_have_attribute('aria-checked', 'false')
-        assert fixture.writes[-1]['body'] == {'status': 'disabled'}
+        assert fixture.writes[-1]['body'] == {'api_accepting': False, 'expected_revision': 0}
+        assert fixture.accounts[0]['status'] == 'active' and fixture.accounts[0]['work_control']['work_enabled']
+        await card.get_by_role('button', name='整体停用', exact=True).click()
+        await expect(card).to_contain_text('整体正在收尾')
+        await expect(card.get_by_role('switch')).to_have_attribute('aria-checked', 'false')
+        assert fixture.accounts[0]['status'] == 'active'
+        await card.get_by_role('button', name='整体启用', exact=True).click()
+        await expect(card).to_contain_text('整体已启用')
+        await expect(card.get_by_role('switch')).to_have_attribute('aria-checked', 'false')
         await card.get_by_role('button', name='用量', exact=True).click()
         assert fixture.writes[-1]['path'].endswith('/usage')
         await card.get_by_role('button', name='测试', exact=True).click()
-        await expect(card.get_by_role('button',name='测试结果：连接正常')).to_be_visible()
+        await expect(card.get_by_role('button', name='测试结果：连接正常', exact=True)).to_be_visible()
         await card.get_by_role('button', name='删除', exact=True).click()
         await dialog.get_by_role('button', name='取消', exact=True).click()
-        assert all(write['method'] != 'DELETE' for write in fixture.writes)
+        assert all(write['method'] != 'DELETE' for write in fixture.writes if write['path'].startswith('/admin/accounts'))
         await page.get_by_role('button', name='下一页', exact=True).click()
         await expect(page.locator('.account-card')).to_have_count(1)
         await expect(page.locator('.account-card')).to_contain_text('正式账号 13')

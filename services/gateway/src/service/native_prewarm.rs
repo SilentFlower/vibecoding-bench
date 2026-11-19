@@ -363,6 +363,7 @@ async fn check_one(
     if !account.is_claude_code()
         || account.status != AccountStatus::Active
         || account.request_backend != "native293"
+        || !accounts.work_controls.snapshot(id).await?.work_enabled
     {
         return Ok(json!({"state":"disabled"}));
     }
@@ -408,6 +409,7 @@ async fn check_one(
     if !account.is_claude_code()
         || account.status != AccountStatus::Active
         || account.request_backend != "native293"
+        || !accounts.work_controls.snapshot(id).await?.work_enabled
     {
         return Ok(json!({"state":"disabled"}));
     }

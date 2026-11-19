@@ -146,6 +146,20 @@ class ProjectsScheduleTests(unittest.TestCase):
         self.assertEqual(paused['generation'], agent['generation'])
         self.assertFalse(agent['controller_active'])
 
+    def test_pause_can_preserve_independent_schedule_and_next_due_run(self):
+        """仅暂停当前运行保留计划，下一次到点继续核对。:return: None。"""
+        self.service.configure(1, ['example'])
+        self.service.configure_schedule(1, True, 1)
+        self.service.tick()
+        self.assertTrue(self.pi.entered.wait(1))
+        controller = self.service.controllers[1][0]
+        self.service.pause(1, disable_schedule=False)
+        controller.join(2)
+        agent = self.service.state(1)['agents'][0]
+        self.assertTrue(agent['schedule']['enabled'])
+        self.assertFalse(agent['controller_active'])
+        self.assertIsNotNone(agent['schedule']['next_run_at'])
+
     def test_disabling_schedule_keeps_current_controller_and_generation(self):
         """关闭未来自动运行不等于中断当前轮。:return: None。"""
         self.service.configure(1, ['example'])
@@ -158,6 +172,82 @@ class ProjectsScheduleTests(unittest.TestCase):
         self.assertIs(controller, self.service.controllers[1])
         self.assertFalse(controller[1].is_set())
         self.assertEqual(generation, self.service.state(1)['agents'][0]['generation'])
+
+    def test_overall_disabled_due_plan_survives_tick_and_service_recovery(self):
+        """整体停用跨过触发时间及重启，原计划恢复后可继续。:return: None。"""
+        self.service.configure(1, ['example'])
+        self.service.configure_schedule(1, True, 1)
+        original = self.service.state(1)['agents'][0]['schedule']['next_run_at']
+        with patch.object(self.service, 'account', return_value=None):
+            self.service.tick(time.time() + 120)
+            self.service.recover()
+            self.service.tick(time.time() + 240)
+            held = self.service.state(1)['agents'][0]
+            self.assertTrue(held['schedule']['enabled'])
+            self.assertEqual(original, held['schedule']['next_run_at'])
+            self.assertFalse(held['controller_active'])
+        self.service.tick(time.time() + 300)
+        self.assertTrue(self.pi.entered.wait(1))
+
+    def test_overall_disable_watcher_retains_active_controllers_plan(self):
+        """停用观察先于统一停止回调时，计划仍可恢复。:return: None。"""
+        self.service.configure(1, ['example'])
+        self.service.configure_schedule(1, True, 1)
+        self.service.tick()
+        self.assertTrue(self.pi.entered.wait(1))
+        controller = self.service.controllers[1][0]
+        with patch.object(self.service, 'account', return_value=None):
+            self.service.tick()
+            controller.join(2)
+            held = self.service.state(1)['agents'][0]
+            self.assertTrue(held['schedule']['enabled'])
+            self.assertIsNotNone(held['schedule']['next_run_at'])
+            self.assertFalse(held['controller_active'])
+        self.pi.entered.clear()
+        self.service.tick(time.time() + 120)
+        self.assertTrue(self.pi.entered.wait(1))
+
+    def test_disable_between_due_check_and_start_keeps_original_plan(self):
+        """预查完成后并发停用，启动拒绝继续保留原触发时间。:return: None。"""
+        self.service.configure(1, ['example'])
+        self.service.configure_schedule(1, True, 1)
+        original = self.service.state(1)['agents'][0]['schedule']['next_run_at']
+        account = self.service.account(1)
+        with patch.object(self.service, 'account', side_effect=[account, None, None]):
+            self.service.tick(time.time() + 120)
+        held = self.service.state(1)['agents'][0]
+        self.assertEqual(original, held['schedule']['next_run_at'])
+        self.assertNotEqual('blocked', held['schedule']['state'])
+        self.service.tick(time.time() + 180)
+        self.assertTrue(self.pi.entered.wait(1))
+
+    def test_disable_between_recovery_check_and_start_rearms_original_plan(self):
+        """重启启动前并发停用，恢复下一次检查并保留计划。:return: None。"""
+        self.service.configure(1, ['example'])
+        self.service.configure_schedule(1, True, 1)
+        self.service._write("UPDATE projects_agents SET status='interrupted',schedule_next_at=NULL WHERE account_id=1")
+        account = self.service.account(1)
+        with patch.object(self.service, 'account', side_effect=[account, None, None]):
+            self.service.recover()
+        held = self.service.state(1)['agents'][0]
+        self.assertIsNotNone(held['schedule']['next_run_at'])
+        self.assertNotEqual('blocked', held['status'])
+        self.service.tick(time.time() + 180)
+        self.assertTrue(self.pi.entered.wait(1))
+
+    def test_disabled_restart_rearms_interrupted_round_but_preserves_original_block(self):
+        """重启恢复原在途计划，已有业务阻塞保持原状。:return: None。"""
+        self.service.configure(1, ['example'])
+        self.service.configure_schedule(1, True, 1)
+        self.service._write("UPDATE projects_agents SET status='interrupted',schedule_next_at=NULL WHERE account_id=1")
+        with patch.object(self.service, 'account', return_value=None):
+            self.service.recover()
+            self.assertIsNotNone(self.service.state(1)['agents'][0]['schedule']['next_run_at'])
+            self.service._write("UPDATE projects_agents SET status='blocked',schedule_state='blocked',schedule_next_at=NULL WHERE account_id=1")
+            self.service.recover()
+            blocked = self.service.state(1)['agents'][0]
+            self.assertEqual(blocked['schedule']['state'], 'blocked')
+            self.assertIsNone(blocked['schedule']['next_run_at'])
 
     def test_reenabling_while_old_controller_is_stopping_keeps_a_due_plan(self):
         """已取消但尚在收尾的旧线程不能让重新开启的计划永久失去下次时间。:return: None。"""

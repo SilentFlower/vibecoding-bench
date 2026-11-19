@@ -47,6 +47,12 @@ class ProjectsScheduleIn(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
 
+class ProjectsControlIn(BaseModel):
+    """运行控制与计划解耦。:param disable_schedule: 是否同时关闭独立计划。"""
+    disable_schedule: StrictBool = True
+    model_config = ConfigDict(extra='forbid')
+
+
 def projects_router(service, *, prefix: str = '/api/projects') -> APIRouter:
     """创建路由，运行时读取服务引用，不绕过既有管理鉴权。
 
@@ -176,10 +182,11 @@ def projects_router(service, *, prefix: str = '/api/projects') -> APIRouter:
             raise HTTPException(409, str(error)) from None
 
     @router.post('/agents/{account_id}/{action}')
-    def transition(account_id: int, action: Literal['start', 'pause', 'stop'], body: dict | None = None) -> dict:
+    def transition(account_id: int, action: Literal['start', 'pause', 'stop'], body: ProjectsControlIn | None = None) -> dict:
         """控制账号 Pi。:param account_id: 账号。:param action: 启动、暂停或停止目标。:param body: 保留空请求兼容。:return: 当前状态。"""
         try:
-            return owner().start(account_id) if action == 'start' else owner().pause(account_id, stop_work=action == 'stop')
+            return owner().start(account_id) if action == 'start' else owner().pause(account_id,
+                stop_work=action == 'stop', disable_schedule=body.disable_schedule if body else True)
         except ValueError as error:
             raise HTTPException(409, str(error)) from None
 

@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 
 import main
 import test_quota as quota_fixture
+from cluster_store import ClusterStore
 
 
 class ClusterMainTests(unittest.TestCase):
@@ -33,6 +34,26 @@ class ClusterMainTests(unittest.TestCase):
             context.start()
             self.addCleanup(context.stop)
         self.source = 'projects:' + 'a' * 32 + ':1'
+
+    def test_account_list_keeps_node_assignment_without_remote_inspection(self) -> None:
+        """真实账号列表合并批量节点摘要，工作停用不改变归属。:return: None。"""
+        store = ClusterStore(main.get_db, main._db_lock)
+        service = Mock(store=store)
+        with patch.object(main, 'cluster_service', service), patch.object(main, 'warmup_pi_service', None):
+            enabled = next(row for row in main.list_accounts() if row['id'] == 1)
+            connection = main.get_db()
+            try:
+                with connection:
+                    connection.execute('UPDATE accounts SET enabled=0 WHERE id=1')
+            finally:
+                connection.close()
+            disabled = next(row for row in main.list_accounts() if row['id'] == 1)
+        self.assertEqual(enabled['node'], disabled['node'])
+        self.assertEqual(disabled['node']['node_key'], 'local')
+        self.assertEqual(disabled['cc2api_account_id'], 7)
+        self.assertIsNone(disabled['node_observation'])
+        service.connection.assert_not_called()
+        service.remote_summary.assert_not_called()
 
     def test_run_node_uses_frozen_execution_after_account_moves(self) -> None:
         """历史运行按原账本展示位置，公开响应只含固定定位字段。:return: None。"""

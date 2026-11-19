@@ -244,15 +244,15 @@ window.ProjectsUI = (() => {
     const pending = {action};
     pendingActions.set(selected, pending); paintState();
     feedback(action === 'start' ? '正在启动 / 恢复 Pi，核对账号与执行条件…'
-      : action === 'pause' ? '正在暂停 Pi 并关闭自动计划，保留原会话…' : '正在停止当前目标并保留现场…');
+      : action === 'pause' ? '正在暂停当前 Pi，保留独立计划与原会话…' : '正在停止当前目标，保留独立计划与现场…');
     try {
-      const result = await api(`/projects/agents/${selected}/${action}`, {method: 'POST'});
+      const result = await api(`/projects/agents/${selected}/${action}`, {method: 'POST', body: JSON.stringify({disable_schedule: false})});
       if (current !== revision || selected !== accountId || chosen !== selection) return;
       updateAgents(result); paintState(); await loadReconciliation();
       const agent = agents.find(item => item.account_id === selected);
       feedback(action === 'start' ? agent?.controller_active ? 'Pi 已启动，正在读取项目和原会话。'
         : agent?.message || '执行条件尚未满足，请查看运行总览。'
-        : action === 'pause' ? '已暂停，自动计划已关闭，原会话和工作区已保留。' : '当前目标已停止，现场和交付记录已保留。');
+        : action === 'pause' ? '本轮已暂停，计划配置与原会话已保留。已开启的计划将在下次到点运行。' : '当前目标已停止，计划配置与交付记录已保留。已开启的计划将在下次到点运行。');
       await refreshView();
     } catch (error) {
       if (current === revision && selected === accountId && chosen === selection)

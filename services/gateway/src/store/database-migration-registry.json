@@ -55,6 +55,15 @@
       "predecessor": 5,
       "rollback_mode": "compatible",
       "version": 6
+    },
+    {
+      "checksum": "0a9849f5ba7989523193991ec0afcb36491da8046dd5e2931a70e986ffdee5dd",
+      "engine": "sqlite",
+      "id": "gateway.account-work.7",
+      "kind": "schema",
+      "predecessor": 6,
+      "rollback_mode": "compatible",
+      "version": 7
     }
   ]
 }

@@ -460,10 +460,28 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
     let Some(api_path) = path.strip_prefix("/api/") else {
         return false;
     };
+    if let Some(account) = api_path.strip_prefix("gateway-accounts/").or_else(|| {
+        api_path
+            .strip_prefix("accounts/")
+            .filter(|value| value.ends_with("/work-control"))
+    }) {
+        return account.strip_suffix("/work-control").is_some_and(|id| {
+            !id.is_empty()
+                && id.bytes().all(|value| value.is_ascii_digit())
+                && id.parse::<i64>().is_ok_and(|value| value > 0)
+                && matches!(*method, Method::GET | Method::PUT)
+        });
+    }
     if let Some(account) = api_path.strip_prefix("accounts/") {
         let mut parts = account.split('/');
         let id = parts.next().unwrap_or_default();
         let resource = parts.next();
+        if resource == Some("work-control") {
+            return parts.next().is_none()
+                && id.bytes().all(|value| value.is_ascii_digit())
+                && id.parse::<i64>().is_ok_and(|value| value > 0)
+                && matches!(*method, Method::GET | Method::PUT);
+        }
         if matches!(resource, Some("node" | "node-migrations")) {
             if id.is_empty()
                 || !id.bytes().all(|value| value.is_ascii_digit())
@@ -576,7 +594,10 @@ fn status_timeout(method: &Method, path: &str) -> Option<Duration> {
         matches!(value.split('/').nth(1), Some("node" | "node-migrations"))
             && browser_path_allowed(method, path)
     });
-    if *method == Method::GET && (path.starts_with("/api/system-updates/") || account_node_status) {
+    let account_work_status = path.ends_with("/work-control") && browser_path_allowed(method, path);
+    if *method == Method::GET
+        && (path.starts_with("/api/system-updates/") || account_node_status || account_work_status)
+    {
         return Some(STATUS_TIMEOUT);
     }
     (*method == Method::GET
@@ -1046,6 +1067,27 @@ mod tests {
         assert!(browser_path_allowed(&Method::GET, "/projects.js"));
         assert!(!browser_path_allowed(&Method::POST, "/projects.js"));
         assert!(!browser_path_allowed(&Method::POST, "/app.js"));
+    }
+
+    /// 账号整体控制桥只接纳正整数身份及精确读取、写入方法。
+    /// @return 无。
+    #[test]
+    fn account_work_bridge_is_limited_to_exact_account_control_routes() {
+        for prefix in ["accounts", "gateway-accounts"] {
+            let path = format!("/api/{prefix}/1/work-control");
+            assert!(browser_path_allowed(&Method::GET, &path));
+            assert!(browser_path_allowed(&Method::PUT, &path));
+            assert!(!browser_path_allowed(&Method::DELETE, &path));
+            assert!(!browser_path_allowed(&Method::POST, &path));
+            assert_eq!(status_timeout(&Method::GET, &path), Some(STATUS_TIMEOUT));
+            assert_eq!(status_timeout(&Method::PUT, &path), None);
+            for id in ["0", "-1", "abc", "1/2", "9223372036854775808"] {
+                assert!(!browser_path_allowed(
+                    &Method::PUT,
+                    &format!("/api/{prefix}/{id}/work-control")
+                ));
+            }
+        }
     }
 
     /// 节点归属与人工迁移只开放精确管理动作，操作ID及层级保持规范。

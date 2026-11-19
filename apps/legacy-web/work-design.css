@@ -942,3 +942,17 @@
  :root.console-design .delivery-reading-layout{grid-template-columns:minmax(0,1fr);grid-template-rows:120px minmax(0,1fr);gap:10px}
  :root.console-design #projects-delivery-report{padding:16px}
 }
+
+:root.console-design .work-account-node{display:flex;gap:8px;min-width:0;padding:10px 12px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-field-surface);color:var(--ui-text);font-size:var(--ui-font-small);line-height:1.5;}
+:root.console-design .work-account>.work-account-node{margin:12px 20px;}
+:root.console-design .work-account-node>svg{flex:none;opacity:.6;margin-top:3px;}
+:root.console-design .work-account-node>div{min-width:0;}
+:root.console-design .work-account-node span{font-weight:500;overflow-wrap:anywhere;}
+:root.console-design .work-account-node small{font-size:inherit;margin-left:8px;color:#65758c;}
+:root.console-design .work-account-node code,:root.console-design .work-account-node p{display:block;overflow-wrap:anywhere;font-size:inherit;color:#65758c;margin:0;}
+:root.console-design .work-account-node code{font-family:var(--font-mono,monospace);background:transparent;border:0;padding:0;border-radius:0;word-break:break-all;text-wrap:balance;}
+@media(max-width:600px){:root.console-design .work-account>.work-account-node{margin-inline:16px;}}
+
+:root.console-design .environment-rich>.work-account-node{margin:12px 24px;}
+:root.console-design .workspace-panel-context .work-account-node{margin-top:8px;}
+@media(max-width:600px){:root.console-design .environment-rich>.work-account-node{margin-inline:16px;}}

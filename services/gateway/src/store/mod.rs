@@ -1,5 +1,6 @@
 pub mod account_platform_schema;
 pub mod account_store;
+pub mod account_work_schema;
 pub mod cache;
 pub mod database_migrations;
 pub mod database_schema;

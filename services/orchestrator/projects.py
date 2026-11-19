@@ -357,7 +357,7 @@ class ProjectsService:
                             observation_failed = True
                     account = self.account(account_id)
                     gate = self.admission(account, work) if account else {
-                        'allowed': False, 'retryable': False, 'reason': 'account', 'message': '账号已停用或删除'}
+                        'allowed': False, 'retryable': True, 'reason': 'account_disabled', 'message': '账号已停用，保留计划等待恢复'}
                     if gate['allowed'] and observation_failed:
                         fresh = self._one('SELECT * FROM projects_work WHERE id=?', (work['id'],))
                         if fresh and fresh['runtime_json'] == work['runtime_json'] and fresh['status'] in ('running', 'verifying'):
@@ -369,12 +369,18 @@ class ProjectsService:
                         self._suspend_gate(account_id, agent['generation'], gate, now)
                 elif (not controller and agent['schedule_enabled'] and agent['schedule_next_at'] is not None
                         and agent['schedule_next_at'] <= now):
+                    if not self.account(account_id):
+                        # 整体停用只是覆盖业务准入，不能把独立计划改为永久阻塞。
+                        continue
                     self.start(account_id, scheduled=True, now=now)
             except Exception as error:
                 with self.lock:
                     current = self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
                     if (current and account_id not in self.controllers and current['schedule_enabled']
                             and checked == (current['generation'], current['updated_at'], current['schedule_next_at'])):
+                        if not self.account(account_id):
+                            # 停用可能发生在到期预查之后，启动拒绝仍须保留原计划。
+                            continue
                         message = str(error)[:300] if isinstance(error, ValueError) else '计划检查失败，保留现场等待人工核对'
                         self._write("UPDATE projects_agents SET schedule_next_at=NULL,schedule_state='blocked',schedule_message=? WHERE account_id=?",
                             (message, account_id))
@@ -1629,6 +1635,10 @@ class ProjectsService:
                     self._write("UPDATE projects_agents SET status='blocked',message=? WHERE account_id=?",
                         ('执行收口未确认，已保留原租约和现场，需要环境对账', account_id))
                     raise ValueError('执行收口未确认，原租约和现场已保留') from None
+            if not disable_schedule and controller and agent and agent['schedule_enabled']:
+                # 当前代次已失效，旧控制者的 finally 不再排程，由本次明确停止安排下一轮。
+                self._write("UPDATE projects_agents SET schedule_next_at=?,schedule_state='scheduled',schedule_message=? WHERE account_id=? AND schedule_enabled=1",
+                    (time.time() + self._next_interval(agent), '本轮已停止，按独立计划等待下一轮', account_id))
         return self.state(account_id)
 
     def recover(self) -> None:
@@ -1681,12 +1691,26 @@ class ProjectsService:
                 if not hold:
                     self._write("UPDATE projects_agents SET schedule_next_at=?,schedule_state='scheduled',schedule_message=? WHERE account_id=?",
                         (time.time(), '项目内容已有新的未完成目标，等待检查执行条件', agent['account_id']))
+            if not self.account(agent['account_id']):
+                if (agent['schedule_enabled'] and agent['schedule_next_at'] is None
+                        and agent['status'] in ('running', 'waiting', 'interrupted')
+                        and not uncertain and not cooling and not failure):
+                    self._write("UPDATE projects_agents SET schedule_next_at=?,schedule_state='scheduled',schedule_message=? WHERE account_id=?",
+                        (time.time() + self._next_interval(agent), '整体停用期间保留计划，恢复账号后重新检查', agent['account_id']))
+                continue
             if agent['status'] in ('running', 'waiting', 'interrupted') and not uncertain and not cooling:
                 restart.append(agent['account_id'])
         for account_id in restart:
             try:
                 self.start(account_id, recovering=True)
             except ValueError as error:
+                if not self.account(account_id):
+                    current = self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
+                    if (current['schedule_enabled'] and current['schedule_next_at'] is None
+                            and current['schedule_state'] != 'blocked'):
+                        self._write("UPDATE projects_agents SET schedule_next_at=?,schedule_state='scheduled',schedule_message=? WHERE account_id=?",
+                            (time.time() + self._next_interval(current), '整体停用期间保留计划，恢复账号后重新检查', account_id))
+                    continue
                 self._write("UPDATE projects_agents SET status='blocked',message=? WHERE account_id=?",
                     (str(error)[:400], account_id))
 

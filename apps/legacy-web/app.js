@@ -448,6 +448,23 @@ function bindAccountActions() {
   drafts.onclick = body.onclick = async (e) => {
     if(e.target.dataset.accountDetails){const account=state.accounts.find(item=>String(item.id)===e.target.dataset.accountDetails);if(account){endRunDetail();$('#modal .modal-titlebar-name').textContent='账号详情';$('#modal-content').innerHTML=`<div class="work-dialog-content"><h2>账号详情 · ${escapeHTML(accountDisplayName(account))}</h2><p class="work-note">配置目录 ${escapeHTML(account.profile_path)}</p>${renderOauthTokenStatus(account)}${renderPassiveQuota(account.passive_quota)}${renderAccountTimezone(account)}${renderWarmupStatus(account)}${account.credential_ownership?`<p>${escapeHTML(account.credential_ownership.message)}</p>`:''}</div>`;$('#modal-content').onclick=body.onclick;openModal('#modal');}return;}
     const proxyAction=e.target.closest('[data-proxy-config]');
+    const workAction=e.target.closest('[data-account-work]');
+    if(workAction){
+      const account=state.accounts.find(item=>String(item.id)===workAction.dataset.accountWork);
+      if(!account||workAction.disabled)return;
+      const enabled=!Boolean(account.enabled);
+      workAction.disabled=true;
+      try{
+        const result=await API(`/accounts/${account.id}/work-control`,{method:'PUT',body:JSON.stringify({enabled})});
+        const message={enabled:'账号整体已启用。',disabled:'账号工作已收口。',draining:'新工作已关闭，原工作正在正常收尾。',reconcile:'整体启停仍待核对，请继续原操作。'}[result.phase];
+        notifyRuntime(result.message||message,result.phase==='reconcile'?'warning':result.phase==='draining'?'info':'success');
+        await renderAccounts();
+      }catch(error){notifyRuntime(error.message,'error');}
+      finally{if(workAction.isConnected)workAction.disabled=false;}
+      return;
+    }
+    const workStatus=e.target.closest('[data-account-work-status]');
+    if(workStatus){try{const result=await API(`/accounts/${workStatus.dataset.accountWorkStatus}/work-control`);notifyRuntime(result.message||({enabled:'账号整体已启用。',disabled:'账号工作已收口。',draining:'原工作正在正常收尾。',reconcile:'整体状态待核对。'}[result.phase]),result.phase==='reconcile'?'warning':'info');}catch(error){notifyRuntime(error.message,'error');}return;}
     if (proxyAction) { openAccountProxyConfig(Number(proxyAction.dataset.proxyConfig));return; }
     if (e.target.dataset.cliSettings) {
       await openCliSettingsConfig(Number(e.target.dataset.cliSettings));
@@ -633,6 +650,20 @@ function bindAccountActions() {
   $('#cc2api-binding-form').onsubmit = saveCc2apiBinding;
 }
 
+/**
+ * 展示保存的节点身份和缓存观察，读取页面保持只读。
+ * @param {Object} account 任务账号公开投影。
+ * @param {string|null} observationMessage 环境现场提供的观察说明。
+ * @return {string} 已转义的节点信息。
+ */
+function renderAccountNode(account, observationMessage = null) {
+  const node=account?.node,observation=account?.node_observation;
+  const name=node?.node_name||(node?.node_key==='local'?'默认本机':'执行节点');
+  const status=observationMessage??(!node?'当前归属未观测':!node.enabled?'节点已暂停接单':node.phase!=='ready'?'节点归属待核对':
+    !observation?'在线状态未观测':observation.stale?'在线观察已过期':observation.state==='reachable'?'最近观测可达':'最近观测不可达');
+  return `<div class="work-account-node" data-execution-node>${runtimeIcon('box')}<div><span>${escapeHTML(node?name:'节点未观测')}</span>${node?`<small>${node.kind==='local'?'本机':'SSH'}</small><code>${escapeHTML(node.node_key)}</code>`:''}<p>${escapeHTML(status)}</p></div></div>`;
+}
+
 /** 独立读取正式账号，登录草稿拥有自己的完成与重试状态。@return {Promise<void>} 账号区域就绪。 */
 async function renderAccounts() {
   if (currentTab() !== 'accounts') return;
@@ -660,14 +691,15 @@ async function renderAccounts() {
     const workerAction=Number(a.warmup_enabled||0)===1?`<button type="button" data-warmup-now="${a.id}">立即运行养号 ${runtimeIcon('play')}</button>`:(bound||a.warmup_last_status==='paused')?`<button type="button" data-warmup-resume="${a.id}">恢复养号 ${runtimeIcon('play')}</button>`:`<button type="button" data-warmup-config="${a.id}">配置养号 ${runtimeIcon('arrow')}</button>`;
     const message=a.passive_quota?.account_error?a.passive_quota.message:a.passive_quota?.source==='manual'?'额度已手动更新。':bound?'重新授权提交后，同步更新关联账号的凭据。':'从已有网关账号关联，或创建新的网关账号。';
     return `<article class="work-panel work-account" data-work-account-card="${a.id}">
-      <header><span class="initial">${runtimeIcon('users')}</span><div><h3><button type="button" class="work-title-button" data-account-details="${a.id}">${escapeHTML(accountDisplayName(a))}</button></h3><small>任务账号 #${a.id}</small></div><span class="work-badge ${a.enabled?'good':''}">${a.enabled?'已启用':'已停用'}</span></header>
+      <header><span class="initial">${runtimeIcon('users')}</span><div><h3><button type="button" class="work-title-button" data-account-details="${a.id}">${escapeHTML(accountDisplayName(a))}</button></h3><small>任务账号 #${a.id}</small></div><span class="work-badge ${a.enabled?'good':''}">${a.enabled?'整体已启用':'新工作已关闭'}</span></header>
       <div class="work-proxy-row"><span class="work-proxy-compact" data-task-proxy-id="${a.id}" data-proxy-label="${escapeHTML(a.proxy_selection?.name||(a.upstream_socks5_host?'自定义线路':'直连'))}" data-proxy-url="${escapeHTML(a.proxy_selection?.public_url||'')}">${runtimeIcon('globe')}<span class="work-proxy-name">${escapeHTML(a.proxy_selection?.name||(a.upstream_socks5_host?'自定义线路':'直连'))}</span></span><button type="button" class="work-proxy-switch" data-proxy-config="${a.id}">切换代理</button></div>
+      ${renderAccountNode(a)}
       <div class="work-condition"><span>网关关联</span><strong>${bound?'网关账号 #'+escapeHTML(a.cc2api_account_id):'尚未关联'}</strong></div>
       <div class="work-condition"><span>环境时区</span><strong>${escapeHTML(a.effective_timezone||a.timezone||'未提供')}</strong></div>
       <div class="work-condition"><span>Claude Code</span><strong>${escapeHTML(a.claude_code_version||'继承全局')}</strong></div>
       <div class="work-account-links"><a href="#projects?account=${a.id}">工程迭代 ${runtimeIcon('arrow')}</a>${worker?workerAction:`<a href="#warmup?account=${a.id}">Pi 养号 ${runtimeIcon('arrow')}</a>`}</div>
       <section class="work-gateway-actions" aria-label="${escapeHTML(accountDisplayName(a))}的网关账号操作"><div class="work-gateway-heading"><span>${runtimeIcon('key')}网关账号</span><strong>${bound?'#'+escapeHTML(a.cc2api_account_id):'尚未关联'}</strong></div><div class="work-gateway-buttons">${!bound?`<button type="button" class="btn btn-sm" data-cc2-create="${a.id}">${runtimeIcon('plus')}创建网关账号</button><button type="button" class="btn btn-sm" data-cc2-bind="${a.id}">关联已有账号</button>`:''}${!bound||RUNTIME_BASE?`<button type="button" class="btn btn-sm" data-relogin="${a.id}">${runtimeIcon('key')}${bound?'重新授权并同步':'重新授权'}</button>`:''}${bound?`<button type="button" class="btn btn-sm btn-danger danger" data-cc2-unbind="${a.id}">解绑</button>`:''}${a.credential_ownership?.phase&&a.credential_ownership.phase!=='ready'?'<a class="btn btn-sm" href="#environments">凭据交接对账</a>':''}</div><p role="status">${escapeHTML(message||'')}</p></section>
-      <footer><button type="button" class="btn btn-sm" data-cli-settings="${a.id}">CLI 配置</button><button type="button" class="btn btn-sm" data-quota="${a.id}">额度</button><button type="button" class="btn btn-sm" data-warmup-config="${a.id}">养号 / 额度设置</button>${RUNTIME_BASE?`<button type="button" class="btn btn-sm" data-run-window-config="${a.id}">运行时段</button>`:''}<button type="button" class="btn btn-sm btn-danger danger" data-del="${a.id}">删除</button></footer>
+      <footer><button type="button" class="btn btn-sm" data-account-work="${a.id}">${a.enabled?'整体停用':'整体启用'}</button><button type="button" class="btn btn-sm" data-account-work-status="${a.id}">收尾进度</button><button type="button" class="btn btn-sm" data-cli-settings="${a.id}">CLI 配置</button><button type="button" class="btn btn-sm" data-quota="${a.id}">额度</button><button type="button" class="btn btn-sm" data-warmup-config="${a.id}">养号 / 额度设置</button>${RUNTIME_BASE?`<button type="button" class="btn btn-sm" data-run-window-config="${a.id}">运行时段</button>`:''}<button type="button" class="btn btn-sm btn-danger danger" data-del="${a.id}">删除</button></footer>
     </article>`;
   }).join('') || '<div class="work-empty"><h3>暂无任务账号</h3><p>添加账号后可以授权并开始任务。</p></div>');
 
@@ -2941,6 +2973,7 @@ async function openCliSettingsConfig(accountId, namespace = null) {
   $('#cli-settings-capture-hint').classList.toggle('hidden', namespace == null);
   $('#cli-settings-effective').classList.toggle('hidden', namespace == null);
   $('#cli-settings-effective').textContent = '';
+  $('#cli-settings-node').innerHTML = renderAccountNode(account);
   $('#cli-settings-feedback').textContent = '正在读取配置…';
   $('#cli-settings-feedback').classList.remove('is-error');
   submit.textContent = namespace ? '保存执行配置' : '保存账号配置';

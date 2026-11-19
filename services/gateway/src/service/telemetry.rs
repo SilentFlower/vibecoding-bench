@@ -409,7 +409,15 @@ impl TelemetryService {
     /// @param account 主请求固定画像的账号副本。
     /// @return 激活完成；获取凭证失败时跳过本次激活。
     pub async fn activate_session(&self, account: &Account) {
-        if !account.is_claude_code() || !account.auto_telemetry {
+        if !account.is_claude_code()
+            || !account.auto_telemetry
+            || !self
+                .account_svc
+                .work_controls
+                .snapshot(account.id)
+                .await
+                .is_ok_and(|state| state.work_enabled)
+        {
             return;
         }
 
@@ -571,6 +579,16 @@ async fn telemetry_loop(
 
     loop {
         tokio::time::sleep(TICK_INTERVAL).await;
+
+        if !account_svc
+            .work_controls
+            .snapshot(account_id)
+            .await
+            .is_ok_and(|state| state.work_enabled)
+        {
+            sessions.lock().await.remove(&key);
+            break;
+        }
 
         // 会话缓存的 AT 不能绕过后来发生的解绑或重授权；活动许可覆盖真实发送。
         let _credential_activity = match account_svc.upstream_activity(account_id).await {
