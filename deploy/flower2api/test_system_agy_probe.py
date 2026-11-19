@@ -1,11 +1,17 @@
 """验证合成探针失败证据的隐私、边界与首错清理。"""
 import io
 import json
+import sys
 import time
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from source_layout import source_path
+
+# sudo宿主验证会清除外部PYTHONPATH，先沿统一布局解析编排源码。
+sys.path.insert(0, str(source_path(Path(__file__).resolve().parents[2], 'orchestrator')))
 from agy_auth import SOURCE_BYTES, SOURCE_SHA256
 from agy_runtime.supervisor import validate_submission
 import verify_agy_runtime as probe

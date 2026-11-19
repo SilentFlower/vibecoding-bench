@@ -712,5 +712,6 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - `test_system_workflow`：真实YAML准备→构建→镜像验收→交付顺序、候选复用条件、两个验收步骤的sudo及同一解释器。全部run步骤执行 `bash -n`。
 - `test_system_agy_probe`：敏感/未知字段排除、字节及数值预算、诊断失败、首错保留、各项清理独立执行及客户端建立失败时的状态回收；测试由CI现有 `test_system*.py` 宿主发现覆盖。
 - `test_system_agy_probe`核对实际提交信封覆盖90秒启动窗口且不超过120秒，并断言两项准备耗时。`verify_release_tests.py`的publication组包含 `test_agy_supervisor`、`test_agy_artifact`、`test_agy_images`，`test_system_release_speed`同步核对模块集合。
+- 宿主测试经sudo运行会清除外部PYTHONPATH。探针测试在导入编排模块前沿 `source_layout.source_path`初始化搜索路径；独立执行 `env -u PYTHONPATH <项目Python> -m unittest discover -s deploy/flower2api -p test_system_agy_probe.py`，再以相同环境执行 `verify_release_tests.py --python <项目Python>`。错误用法是仅凭预设PYTHONPATH的测试结果认定正式入口通过。
 - 慢退役受控对照显式标记源码挂载夹具，核对45秒旧截止失败、120秒准备通过和零模型调用；正式完整镜像由独立CI验收，两类证据分别记录。
 - 真实Docker复现旧白名单COPY缺失；修正版镜像只读导入、资源身份及断网正常/异常退出均通过。隔离夹具与正式完整镜像CI结果分别记录。
