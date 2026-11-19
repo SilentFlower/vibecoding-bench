@@ -203,7 +203,7 @@ onUnmounted(() => { stop(); document.removeEventListener('visibilitychange', syn
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div v-for="factor in factors" :key="factor[0]" class="text-xs"><div class="flex justify-between mb-1"><span>{{ factor[0] }}</span><span>{{ (factor[1] * 100).toFixed(0) }}</span></div><div class="h-1.5 rounded bg-border"><div class="h-full rounded bg-primary" :style="{ width: Math.max(0, Math.min(100, factor[1] * 100)) + '%' }" /></div></div>
         </div>
-        <p class="text-[length:var(--ui-font-small)] text-muted-foreground">归一化偏好越高越优，仅影响新会话。延迟取成功请求的首个有效文字、思考或工具输出；图中为账号汇总，实际选号按模型、思考参数和流式方式分别比较。未知额度或反馈保持中性。</p>
+        <p class="text-[length:var(--ui-font-small)] text-muted-foreground">归一化偏好越高越优，仅影响新会话。延迟取成功请求的首个有效文字、思考或工具输出；图中为账号汇总，实际选号按模型、思考参数和流式方式分别比较。未知健康与延迟按满分起步，额度未知按中性计算。</p>
         <p v-if="summary.config.queue_weight && summary.factors.wait_score != null" class="text-xs text-muted-foreground">基础偏好 {{ (summary.factors.score * 100).toFixed(1) }} · 等待排序偏好 {{ (summary.factors.wait_score * 100).toFixed(1) }} · {{ waitBasisLabel }}<span v-if="summary.factors.estimated_wait_ms != null"> · 预计等待 {{ (summary.factors.estimated_wait_ms / 1000).toFixed(1) }} 秒</span>。等待排序单独计算运行负载和等待代价。</p>
         <p v-if="summary.factors.quota_state === 'reset_pending'" class="text-xs text-amber-700">旧额度周期已结束，等待自动刷新用量。</p>
         <p v-else-if="summary.factors.quota_state === 'unknown'" class="text-xs text-muted-foreground">尚无有效额度观测，额度分暂按中性计算。</p>

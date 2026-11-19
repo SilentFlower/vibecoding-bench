@@ -1480,9 +1480,9 @@ SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expect
 - SQLx Any 读取这些整数时使用 `CAST(... AS TEXT)` 再严格解析 i64，表中仍保存 BIGINT；SQLite 的运行时 INTEGER 可能经 Any 按 i32 映射，不能仅用 Rust `get::<i64>` 假定完整毫秒。分页排序使用底层数值列，不能按文本投影排序。
 - 绑定闲置 TTL 为 60 分钟。独立维护循环每分钟按当前 revision 批量续租活动绑定，不推进最近活动；读取不续租。过期清理批次上限 200、每轮最多 50 批；旧版本不能续租或覆盖新版本，重建 revision 不复用。
 - 智能因素为可用负载、有效剩余额度、真实健康、首输出延迟，均高分优先。`Account::usage_quota(now: i64) -> UsageQuota` 为评分和后台重置扫描共用投影；`remaining` 取有效普通 5h／7d 剩余额度的最小值，缺少有效观测时为 0.5。合法未来 reset 或明确 `utilization=0` 且 reset 缺失／null 的窗口参与评分；非法资料保持未知，过期窗口等待新观测，不直接推算满额。
-- `factors.quota_state` 为 `unknown/reset_pending/observed`：存在合法已到期窗口即为 `reset_pending`，其余有效窗口仍可参与评分；没有到期窗口且存在有效观测为 `observed`，否则为 `unknown`。管理页区分待自动刷新与尚无有效观测，前端以可选字段兼容旧响应。健康未知为 0.5；真实终态反馈复用现有观察器，HTTP 200 SSE 错误不算成功，用户输入错误、取消、本地拒绝和采样缺失不污染健康，不主动探测模型。
+- `factors.quota_state` 为 `unknown/reset_pending/observed`：存在合法已到期窗口即为 `reset_pending`，其余有效窗口仍可参与评分；没有到期窗口且存在有效观测为 `observed`，否则为 `unknown`。管理页区分待自动刷新与尚无有效观测，前端以可选字段兼容旧响应。未知健康与首输出延迟均从 1.0 满分起步，让冷启动账号获得真实反馈机会；未知额度仍为 0.5。初始失败率为 0，首次成功健康为 1.0，首次普通失败健康为 0.8，首次容量拒绝健康为 0.6；后续沿既有 EWMA 与时间衰减更新。真实终态反馈复用现有观察器，HTTP 200 SSE 错误不算成功，用户输入错误、取消、本地拒绝和采样缺失不污染健康，不主动探测模型。
 - 首输出从准入后真正提交的 `AttemptTrace::commit` 开始计时，取已有有界解码观察器第一次看到的非空文字／思考 delta、工具参数 delta、有效文本／思考块或带有效 id/name 的 tool_use／server_tool_use；忽略头部、心跳、元数据、空白和签名。非流式 message JSON 在完整解析后记点。仅成功且完整并观察到有效输出时更新延迟；失败、取消、不完整、无输出或无诊断不能用响应头补值。
-- 请求开始时冻结 `model/thinking_type/thinking_budget/effort/stream` 白名单事实，缺失保持未知；每账号最多 64 组成功延迟 EWMA，淘汰最近采样最旧组只恢复中性。实际选号只读取同组，管理页 `factors.latency` 为全部成功首输出的账号汇总，文案必须说明区别。健康继续按账号共享，5 分近优轮换不变。
+- 请求开始时冻结 `model/thinking_type/thinking_budget/effort/stream` 白名单事实，缺失保持未知；每账号最多 64 组成功延迟 EWMA，淘汰最近采样最旧组恢复未知满分基线。实际选号只读取同组，管理页 `factors.latency` 为全部成功首输出的账号汇总，文案必须说明区别。健康继续按账号共享，5 分近优轮换不变。
 - `AttemptDiagnostic.first_output_ms: Option<u64>` 为新增可选 JSON 摘要；历史缺失为 None，不迁移、不回填。原 `ttft_ms` 保留响应头耗时语义，不改变历史与上游遥测载荷。
 - 默认四项权重 `1/0.8/1/0.5`；健康普通 EWMA 0.2、容量拒绝 0.4、失败半衰期 15 分钟、延迟尺度 10 秒。智能近优差值 0.05 内按稳定账号 ID 轮转；所有选号统一智能评分，响应 `config.mode` 固定为 `smart`。旧排序、阶梯评分、旧权重缓存及 `scheduling_score/scheduling_detail` 已退役，容量统计独立保留。
 - 重置偏好仅采用合法未来普通窗口，单窗口 `h/(h+remaining_seconds)`，`h=周期秒数/7`；按 5h／7d 窗口权重平均，缺失周期贡献 0。重置主权重或窗口权重全零时关闭，基础分按原四因素加有效重置权重归一化。
@@ -1522,7 +1522,7 @@ SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expect
 | 调度状态不可读写／数值非法 | 固定 503，停止新增提交，不泄露底层错误 |
 | 本地 mock／缓存命中或提交前取消 | 不造实际提交事件／attempt，不污染上游健康 |
 | HTTP 200 内 SSE 错误 | 原字节透传，现有完整终态进入失败反馈 |
-| 只有头部／心跳、无有效输出或仅有其它分组样本 | 首输出未知，不把头部或其它模型用作低延迟奖励 |
+| 只有头部／心跳、无有效输出或仅有其它分组样本 | 首输出保持未知，延迟分沿用 1.0 基线；不得伪造首输出样本 |
 | 普通旧窗口已到期／没有有效观测／零用量且 reset 为 null | `reset_pending`／`unknown`／`observed`；零用量剩余额度为 1 |
 | 即时容量／全部需等待／无同组耗时 | 基础分／等待排序分／压力回退并标记时长未知 |
 | 到期或缺失重置时间／历史旧模式 | 重置奖励 0／统一智能评分，废弃设置隐藏 |
@@ -1536,6 +1536,7 @@ SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expect
 - 正常：同等条件下 1 小时后重置的窗口获得高于 3 小时窗口的偏好；等待模式中，较快账号即使排队单位更多，也可因较短的成功总耗时估计获选。错误用法是用首输出替代并发槽释放耗时；正确处理是分别保存成功总耗时与首输出。
 - 边界：旧 5h 到期且 7d 已用 4% 时，状态为 `reset_pending`，额度分沿用有效 7d 的 0.96。刷新取得 5h 零用量且无 reset 后，状态为 `observed`，额度分仍为 0.96；错误做法是把明确零用量也当未知，正确处理是接受该官方观测。
 - 边界：头部 100ms、首个有效思考 3000ms 时，调度使用 3000ms；错误做法是沿用 `ttft_ms=100`，正确处理是读取成功终态的 `first_output_ms` 并写入请求冻结分组。
+- 边界：同优先级、容量和额度相同的冷启动账号与成功首输出 1 秒的账号均可进入近优轮换。错误做法是为未知健康预置 50% 失败率；正确处理是从零失败率开始，用真实反馈更新。
 - 错误用法：在数据库等待前采样时间、用选号快照 RPM，或取得许可后立即丢弃再准备提交，会在写锁释放／限额调整时误放行。正确处理：生产调用 `claim_current`，并将许可持有到提交边界：
 
 ```rust
@@ -1549,6 +1550,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 
 ### 6. Tests Required
 
+- `unknown_feedback_baseline_allows_near_best_rotation`、`health_feedback_starts_from_healthy_baseline_and_decays`：未知健康／延迟为 1.0、额度为 0.5；实际近优轮换、首次成功／失败／容量拒绝、十五分钟半衰期及成功恢复。分组隔离与 SSE 错误反馈回归沿用满分未知基线。
 - `tests/v3_scheduling_test.rs`：SQLite／隔离 PG 共用 CAS、回滚、完整 UTC 毫秒、续租、清理、账号删除及跨分钟／重启合同；不得只用小于 i32 上限的模拟时间证明持久精度。
 - `sqlite_write_lock_and_held_permit_cannot_bank_send_time`：写锁延迟后才采样；持有许可时后续不抢跑，提交后仍符合间隔。
 - `waiting_requests_reload_current_rpm_without_resetting_deadline` 及 PG `current_rpm_contract`：300→60、1→300，旧快照不能绕过新 RPM，唤醒及时，期限不变。

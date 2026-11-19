@@ -23371,8 +23371,8 @@ data: {"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":{"out
             .v3_summary(&account, &score, 0)
             .await
             .unwrap();
-        assert!(summary.factors.health < 0.5);
-        assert_eq!(summary.factors.latency, 0.5);
+        assert!((summary.factors.health - 0.8).abs() < 0.01);
+        assert_eq!(summary.factors.latency, 1.0);
         server.abort();
     }
 }

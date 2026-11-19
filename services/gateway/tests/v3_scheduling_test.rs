@@ -681,8 +681,8 @@ async fn real_failures_reduce_health_and_user_errors_do_not_reward_latency() {
     let before = f
         .scheduler
         .factors(&snapshot(a.clone()), &f.scheduler.config(), now_ms());
-    assert_eq!(before.health, 0.5);
-    assert_eq!(before.latency, 0.5);
+    assert_eq!(before.health, 1.0);
+    assert_eq!(before.latency, 1.0);
     request.submitted(a.id);
     request.response_headers(a.id, 503);
     let failed = f
@@ -692,7 +692,7 @@ async fn real_failures_reduce_health_and_user_errors_do_not_reward_latency() {
         .scheduler
         .factors(&snapshot(b), &f.scheduler.config(), now_ms());
     assert!(failed.health < unknown.health);
-    assert_eq!(failed.latency, 0.5);
+    assert_eq!(failed.latency, 1.0);
     assert!(failed.score < unknown.score);
 }
 

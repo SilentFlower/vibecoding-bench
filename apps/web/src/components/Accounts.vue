@@ -1118,8 +1118,8 @@ async function copyText(text: string) {
             <router-link v-if="!a.platform || a.platform === 'claude_code'" :to="{ name: 'environments', query: { gateway_account: String(a.id) } }"><Box :size="13" />运行环境</router-link>
           </div>
           <div class="account-health" :class="a.status === 'disabled' ? 'is-disabled' : (isRateLimited(a) || a.auth_error || a.v3_scheduling_error) ? 'is-warning' : ''">
-            <Check v-if="a.status !== 'disabled' && !isRateLimited(a) && !a.auth_error && !a.v3_scheduling_error" :size="13" /><i v-else />{{ a.status === 'disabled' ? '已停用' : a.v3_scheduling ? schedulingReasonLabel(a.v3_scheduling.capacity.reason) : statusStyle(a).label }}
-            <span v-if="a.v3_scheduling">· {{ a.v3_scheduling.phases.running > 0 ? `正在处理 ${a.v3_scheduling.phases.running} 个请求` : '当前空闲' }}</span><button v-if="(a.queued_requests ?? 0)>0" class="account-queue-alert" @click="openScheduling(a)">排队 {{ a.queued_requests }}</button>
+            <span class="account-health-message"><Check v-if="a.status !== 'disabled' && !isRateLimited(a) && !a.auth_error && !a.v3_scheduling_error" :size="13" /><i v-else /><span>{{ a.status === 'disabled' ? '已停用' : a.v3_scheduling ? schedulingReasonLabel(a.v3_scheduling.capacity.reason) : statusStyle(a).label }}<template v-if="a.v3_scheduling"> · {{ a.v3_scheduling.phases.running > 0 ? `正在处理 ${a.v3_scheduling.phases.running} 个请求` : '当前空闲' }}</template></span></span>
+            <button v-if="(a.queued_requests ?? 0)>0" class="account-queue-alert" @click="openScheduling(a)">排队 {{ a.queued_requests }}</button>
           </div>
           <p v-if="a.auth_error" role="alert" class="rounded-lg bg-red-50 p-3 text-xs text-red-700 break-words">{{ a.auth_error }}</p>
           <p v-if="a.v3_scheduling_error" class="text-xs text-amber-700">{{ a.v3_scheduling_error }}，调度观测待更新。</p>

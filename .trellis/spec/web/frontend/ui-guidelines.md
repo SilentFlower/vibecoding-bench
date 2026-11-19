@@ -153,6 +153,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - 详情/编辑工作区固定标题和页签，仅正文滚动；复杂表单在桌面扩宽并分组。保留草稿、取消和保存语义；不以删除字段或隐藏功能入口换取简洁。
 - 同一账号的概览、配置、调度、环境与诊断使用同一工作区。页内导航保持上下文，二级弹窗主要用于独立确认。
 - 转发方式与代理选择属于主要配置；认证字段放在高级配置。排队数量直接可见。
+- 账号状态栏使用单行弹性布局，长状态文字省略显示，排队按钮保持可见且不收缩。徽标显隐和数字变化保持状态栏行高、卡片尺寸及相邻卡片位置稳定，避免轮询刷新引发布局跳动。
 - 滚动条在滚动时显示，停止800ms后250ms淡出，轨道宽度稳定。采用减少动画偏好时缩短动画，高对比模式采用系统颜色。这一行为目前在静态稿中实现，正式迁移时沿用同样验收。
 
 ### 正式控制台与账号首批迁移
@@ -195,6 +196,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 | 搜索聚焦 | 外框轻量高亮，内部无重复紫色矩形 |
 | 输入法Enter确认 | 仅确认输入，不触发搜索 |
 | 单行统计超宽 | 省略显示，预计费用仍在数据中且完整内容可访问 |
+| 账号排队数在 0、1、8 间切换 | 卡片宽高及相邻位置稳定；排队入口可打开调度详情 |
 | 识别失败/取消编辑 | 业务草稿或原配置保持，不提交请求 |
 
 ## 5. Scenarios and Examples
@@ -238,6 +240,7 @@ python3 deploy/flower2api/verify_ui_controls.py --url http://127.0.0.1:4187/ui-p
 ```
 
 - `verify_ui_controls.py`验证真实Vue组件：数字上下界、空值、小数步长、禁用；空选项原值、菜单键盘与禁用选项；搜索焦点、输入法、清空；气泡和原生dialog浮层；720/390px与触屏。测试不得发业务API请求。
+- `verify_account_queue_layout.py`使用真实构建与合成接口，在 2248/1440/390px 下切换排队数 0→1→8→0，比较全部卡片的宽高和坐标，验证页面横向边界及排队按钮打开调度详情。
 - 静态稿对应检查位于当前任务的 `research/verify_concept.py`、`verify_account_controls.py`、`verify_account_workspace.py`、`verify_proxy_revision.py`、`verify_request_preview.py`、`verify_settings_preview.py`；只在改动该概念稿时运行对应范围。
 - 当前组件证据在 `.deploy/frontend-sidebar-refresh/ui-controls/verification.json`；静态稿证据在 `.deploy/frontend-sidebar-refresh/concept/`。旧截图或过期检查不能替代本次变更验证。
 - `research/verify_check_repairs.py`（当前前端任务）覆盖删除全部任务账号后创建、可选上限、跨模块历史、双入口时区与迟到授权、认证代理导入、独立任务/草稿占用及删除前复核；同时要求零浏览器异常和零外部网络请求。

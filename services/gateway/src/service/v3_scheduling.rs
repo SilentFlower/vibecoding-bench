@@ -651,11 +651,12 @@ impl V3Scheduler {
                 if f.observed {
                     1.0 - f.failure * decay
                 } else {
-                    0.5
+                    1.0
                 }
             })
-            .unwrap_or(0.5);
-        // 只有管理页使用账号汇总；实际选号缺少同类样本时保持中性，不能借用其它模型。
+            .unwrap_or(1.0);
+        // 未知健康和延迟从满分起步，让缺少样本的账号获得采集真实反馈的机会。
+        // 只有管理页使用账号汇总；实际选号缺少同类样本时沿用满分基线，不能借用其它模型。
         let sample = feedback.and_then(|f| class.and_then(|class| f.latencies.get(class)));
         let latency_ms = if class.is_some() {
             sample.map(|sample| sample.ewma_ms)
@@ -670,7 +671,7 @@ impl V3Scheduler {
         drop(state);
         let latency = latency_ms
             .map(|ms| 1.0 / (1.0 + ms / 10000.0))
-            .unwrap_or(0.5);
+            .unwrap_or(1.0);
         let values = [load, quota, health, latency];
         let reset = config.reset_factor(&candidate.account, now_ms);
         let base_weight = config.weights.iter().sum::<f64>() + config.effective_reset_weight();
@@ -964,7 +965,6 @@ impl V3Scheduler {
         let mut state = self.runtime();
         let f = state.feedback.entry(account_id).or_default();
         if !f.observed {
-            f.failure = 0.5;
             f.sampled_at_ms = now;
         }
         let alpha = if capacity { 0.4 } else { 0.2 };
@@ -974,7 +974,7 @@ impl V3Scheduler {
         f.observed = true;
         if let Some(ms) = latency_ms.filter(|ms| ms.is_finite() && *ms >= 0.0) {
             f.latency_ms = Some(f.latency_ms.map(|old| old * 0.8 + ms * 0.2).unwrap_or(ms));
-            // 参数组合可能持续增长；淘汰最旧统计只使该组恢复中性，不限制业务准入。
+            // 参数组合可能持续增长；淘汰最旧统计只使该组恢复未知基线，不限制业务准入。
             if !f.latencies.contains_key(class) && f.latencies.len() >= MAX_LATENCY_CLASSES {
                 if let Some(oldest) = f
                     .latencies
@@ -1655,6 +1655,65 @@ mod tests {
         );
     }
 
+    /// 未知反馈从满分起步，冷启动账号参与近优轮换以获得真实样本。
+    #[tokio::test]
+    async fn unknown_feedback_baseline_allows_near_best_rotation() {
+        let scheduler = scheduler();
+        scheduler.apply_config(SchedulingConfig::default());
+        let request = scheduler.begin(0, None);
+        let fresh = scheduler.factors(&candidate(8), &scheduler.config(), now_ms());
+        assert_eq!(fresh.health, 1.0);
+        assert_eq!(fresh.latency, 1.0);
+        assert_eq!(fresh.quota, 0.5);
+        request.finish_observed_attempt(7, Some(200), "success", None, Some(1000), None);
+        assert_eq!(
+            scheduler
+                .factors(&candidate(7), &scheduler.config(), now_ms())
+                .health,
+            1.0
+        );
+        for expected in [7, 8] {
+            assert_eq!(
+                scheduler
+                    .choose(vec![candidate(7), candidate(8)], &request, 2)
+                    .unwrap()
+                    .id,
+                expected
+            );
+        }
+    }
+
+    /// 首次真实反馈从零失败率平滑更新，失败影响按十五分钟半衰期恢复。
+    #[tokio::test]
+    async fn health_feedback_starts_from_healthy_baseline_and_decays() {
+        let scheduler = scheduler();
+        let request = scheduler.begin(0, None);
+        for (id, expected) in [(7, 1.0), (8, 0.8), (9, 0.6)] {
+            match id {
+                7 => request.finish_observed_attempt(id, Some(200), "success", None, None, None),
+                8 => request.finish_observed_attempt(
+                    id,
+                    Some(500),
+                    "upstream_rejected",
+                    None,
+                    None,
+                    None,
+                ),
+                _ => request.capacity_rejected(id),
+            }
+            let sampled_at = scheduler.runtime().feedback.get(&id).unwrap().sampled_at_ms;
+            let factors = scheduler.factors(&candidate(id), &scheduler.config(), sampled_at);
+            assert!((factors.health - expected).abs() < 1e-9);
+            assert_eq!(factors.latency, 1.0);
+            let recovered =
+                scheduler.factors(&candidate(id), &scheduler.config(), sampled_at + 900000);
+            assert!((recovered.health - (1.0 - (1.0 - expected) / 2.0)).abs() < 1e-9);
+        }
+        request.finish_observed_attempt(8, Some(200), "success", None, None, None);
+        let recovered = scheduler.factors(&candidate(8), &scheduler.config(), now_ms());
+        assert!((recovered.health - 0.84).abs() < 0.001);
+    }
+
     /// 同类成功样本更新 EWMA，其他模型、思考与流式分组保持未知，健康仍按账号共享。
     #[tokio::test]
     async fn first_output_latency_is_scoped_and_only_successful_output_updates_ewma() {
@@ -1703,7 +1762,7 @@ mod tests {
                 now_ms(),
                 Some(&class),
             );
-            assert_eq!(other.latency, 0.5);
+            assert_eq!(other.latency, 1.0);
             assert!(other.health > 0.0);
         }
         request.finish_observed_attempt(7, Some(200), "success", None, Some(4000), None);
@@ -1757,7 +1816,7 @@ mod tests {
             scheduler
                 .factors(&candidate(9), &scheduler.config(), now_ms())
                 .latency,
-            0.5
+            1.0
         );
     }
 

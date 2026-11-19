@@ -37,7 +37,10 @@ body{line-height:normal;font-synthesis:none}
 .account-status-switch[aria-checked=true]{background:#7a6b9e}
 .account-status-switch[aria-checked=true] span{transform:translateX(12px)}
 .account-network{font-size:var(--ui-font-small);color:#7b8496;gap:13px;flex-wrap:wrap;padding:13px 1px 12px}
-.account-health{border-color:#e3efea;border-radius:7px;padding:9px 10px;font-size:var(--ui-font-small);line-height:1.5;margin-bottom:15px;color:#288369}
+.account-health{border-color:#e3efea;border-radius:7px;padding:9px 10px;font-size:var(--ui-font-small);line-height:1.5;margin-bottom:15px;color:#288369;min-width:0;flex-wrap:nowrap}
+.account-health-message{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+.account-health-message>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-health-message>i{flex-shrink:0}
 .account-health svg{width:13px;height:13px;stroke-width:1.7;flex-shrink:0}
 .account-health.is-warning{color:#a47728;background:#fbf6ec;border-color:#f0e6d3}
 .account-health.is-disabled{color:#8b8f9c;background:#f6f6f8;border-color:#eeeef2}
@@ -210,7 +213,7 @@ button[data-slot=button]:disabled{pointer-events:auto;cursor:not-allowed}
 .token-actions [data-slot=button]:hover{background:#f6f4fa;border-color:#c6bbdf}
 @media(min-width:761px){.token-row{flex-wrap:nowrap;padding:22px 24px;gap:14px}.token-actions{flex-basis:auto;justify-content:normal;border-top:0;padding-top:0;margin-top:0}.token-meta{gap:8px 13px}.token-meta>span{flex-basis:auto}}
 .token-panel-head h3{font-size:var(--ui-font-card)}
-.account-queue-alert{border:0;background:#fff5df;border-radius:4px;padding:3px 6px;color:#b18236;font-size:var(--ui-font-small);line-height:1.5;white-space:nowrap}
+.account-queue-alert{border:0;background:#fff5df;border-radius:4px;padding:0 6px;color:#b18236;font-size:var(--ui-font-small);line-height:1.5;white-space:nowrap;flex-shrink:0}
 .account-live-metrics>button:nth-child(3){padding-right:6px}
 .account-live-metrics>button:nth-child(3) strong.text-amber-600{color:#b28235}
 
