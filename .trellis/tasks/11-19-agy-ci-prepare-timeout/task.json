@@ -3,7 +3,7 @@
   "name": "agy-ci-prepare-timeout",
   "title": "定位并修复 AGY 正式镜像准备超时",
   "description": "正式镜像构建后首代prepare超时；补齐受控失败证据，定位CI运行差异并修复，恢复v1.19.0发行准备。",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": "platform",
@@ -11,10 +11,10 @@
   "creator": "silentflower",
   "assignee": "silentflower",
   "createdAt": "2026-11-19",
-  "completedAt": null,
+  "completedAt": "2026-11-19",
   "closeout": {
-    "status": "pending",
-    "closedAt": null,
+    "status": "closed",
+    "closedAt": "2026-11-19T07:35:55Z",
     "blockers": []
   },
   "branch": null,
@@ -55,14 +55,15 @@
   },
   "progress": {
     "completedSteps": [
-      "完成AGY准备预算、截止护栏和失败诊断修复",
-      "完成宿主导入修复及原三组入口验证",
-      "正式CI通过两个镜像构建及两代准备",
-      "保留正式CI正常退出的物理收口失败证据"
+      "完成AGY失败诊断、准备预算和过期建代护栏",
+      "完成宿主测试导入修复与原三组入口验证",
+      "完成物理退出观察修复及慢退出对照",
+      "正式完整镜像CI及可信候选交付通过",
+      "按新候选完整展示v1.19.0发行预览"
     ],
-    "partialStep": "正式镜像正常退出未在探针15秒观察窗口内完成",
-    "nextStep": "对照监督器与worker实际收尾预算，复现并修复物理退出验收",
-    "notes": "AC3/AC4待完成，任务保持in_progress；真实模型预算为0。",
-    "updatedAt": "2026-11-19T07:13:12Z"
+    "partialStep": null,
+    "nextStep": "核对任务记录提交后的最终源码候选，进入原v1.19.0签名发行确认点",
+    "notes": "真实模型预算为0。生产安装由独立授权承接。",
+    "updatedAt": "2026-11-19T07:35:55Z"
   }
 }
