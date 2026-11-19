@@ -158,6 +158,10 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 ### 正式控制台与账号首批迁移
 
+- 账号卡片顶部并排展示平台徽标、“接收请求”开关与“停用账号／启用账号”按钮；开关只改变 API 准入，账号按钮沿整体工作控制。正常启用且没有已接纳请求时省略重复状态行，收尾、待核对和已接纳数量继续显示。
+- `ExecutionNodeBadge` 统一为 `i-server` 图标加单行节点名称的 `/nodes` 链接。账号页并入代理与环境信息栏，环境卡片并入标题下的账号信息栏。节点 key、类型与观察说明放入提示框，异常图标保留提醒。历史请求沿自身 `execution_location` 展示；本机缺名称时显示“默认本机”，其它节点缺名称时使用原节点 key；缺节点时保留未观测或无执行尝试。
+- 账号与环境卡片使用 `PlatformBadge(platform)` 独立标注 Claude Code／反重力，分别为棕色／蓝色，套餐独立展示。请求列表使用发生时 `context.platform`，缺失显示“平台未记录”；账号名称单行省略，资料气泡保留完整名称和邮箱。`verify_execution_node_visibility.py` 覆盖三入口跳转、历史节点、平台未知、顶部独立控制、提示框关闭与1440/720/390px布局。
+
 - 节点管理导航和卡片使用共用SVG sprite的i-server；运行环境继续使用i-box。节点页先显示汇总和紧凑服务器卡片，账号归属/迁移区保持原确认与轮询。页头复用page-heading/page-eyebrow/page-description，页面留白由console-content统一提供；卡片、辅助文字和资源数字使用ui-font-card/ui-font-small/ui-font-heading，沿390/1440/1920/2560px核对与账号页的页头计算样式及坐标一致。主机指纹、认证方式、路径及批次收进详情；同批已就绪节点隐藏相同来源到目标的箭头。stopping显示停止原组件，旧协议backed_up显示已停止待切换。
 
 - `apps/web/src/style.css` 保留现有主题变量名，采用已确认紫色强调、深色侧栏与浅色内容区。字体来自 `src/assets/fonts/` 中的本地 WOFF2，许可一并保留；离线导出须把同源字体内嵌，不能依赖构建目录外链。

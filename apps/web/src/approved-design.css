@@ -37,6 +37,14 @@ body{line-height:normal;font-synthesis:none}
 .account-status-switch[aria-checked=true]{background:#7a6b9e}
 .account-status-switch[aria-checked=true] span{transform:translateX(12px)}
 .account-network{font-size:var(--ui-font-small);color:#7b8496;gap:13px;flex-wrap:wrap;padding:13px 1px 12px}
+.account-card-topline{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.account-work-controls,.account-admission{display:inline-flex;align-items:center;gap:7px;font-size:var(--ui-font-small);color:var(--ui-muted);white-space:nowrap}
+.account-work-controls{margin-left:auto;gap:10px}
+.account-work-toggle{padding:4px 7px;border:1px solid var(--ui-border);border-radius:5px;color:var(--ui-text);font-size:var(--ui-font-small);line-height:1.4;white-space:nowrap}
+.account-work-toggle:hover{background:var(--ui-field-surface);border-color:var(--ui-border-hover)}
+.account-work-status{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:var(--ui-font-small);color:var(--ui-muted);margin:0 0 10px}
+.account-work-status button{color:var(--ui-accent)}
+.account-network>[data-execution-node]{max-width:100%}
 .account-health{border-color:#e3efea;border-radius:7px;padding:9px 10px;font-size:var(--ui-font-small);line-height:1.5;margin-bottom:15px;color:#288369;min-width:0;flex-wrap:nowrap}
 .account-health-message{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
 .account-health-message>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

@@ -299,6 +299,7 @@
 .runtime-weekdays label:has(input:disabled){cursor:not-allowed}
 @media(max-width:520px){.runtime-weekdays{gap:6px}.runtime-weekdays label{min-width:34px;padding:0 8px}}
 
-.native-runtime .environment-node{margin:14px 24px 0;}
+.native-runtime .environment-identity h2{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;overflow-wrap:anywhere;}
+.native-runtime .environment-meta{display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;font-size:var(--ui-font-small);color:#8290a6;}
+.native-runtime .environment-meta .environment-node{margin:0;}
 .native-runtime .workspace-panel-context>div{min-width:0;flex:1;}
-@media(max-width:600px){.native-runtime .environment-node{margin-inline:16px;}}

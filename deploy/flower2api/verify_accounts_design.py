@@ -162,12 +162,12 @@ async def main():
         await expect(card.get_by_role('switch')).to_have_attribute('aria-checked', 'false')
         assert fixture.writes[-1]['body'] == {'api_accepting': False, 'expected_revision': 0}
         assert fixture.accounts[0]['status'] == 'active' and fixture.accounts[0]['work_control']['work_enabled']
-        await card.get_by_role('button', name='整体停用', exact=True).click()
-        await expect(card).to_contain_text('整体正在收尾')
+        await card.get_by_role('button', name='停用账号', exact=True).click()
+        await expect(card).to_contain_text('正在收尾')
         await expect(card.get_by_role('switch')).to_have_attribute('aria-checked', 'false')
         assert fixture.accounts[0]['status'] == 'active'
-        await card.get_by_role('button', name='整体启用', exact=True).click()
-        await expect(card).to_contain_text('整体已启用')
+        await card.get_by_role('button', name='启用账号', exact=True).click()
+        await expect(card).to_contain_text('账号已启用')
         await expect(card.get_by_role('switch')).to_have_attribute('aria-checked', 'false')
         await card.get_by_role('button', name='用量', exact=True).click()
         assert fixture.writes[-1]['path'].endswith('/usage')

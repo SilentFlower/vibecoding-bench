@@ -5,6 +5,7 @@ import { NumberInput, ChoiceSelect, SearchInput, InfoTooltip, Pagination } from 
 import { useRoute } from 'vue-router';
 import ProxyPicker from './ProxyPicker.vue';
 import ExecutionNodeBadge from './runtime/ExecutionNodeBadge.vue';
+import PlatformBadge from './PlatformBadge.vue';
 import type { AccountNodeSummary } from './runtime/nodeApi';
 import { api, type ProxyRoute, type Account, type OAuthExchangeResult, type UsageWindow, type RuntimeEnvironmentSummary, type OverallWorkStatus } from '../api';
 import UsageWindowStats from './UsageWindowStats.vue';
@@ -125,7 +126,7 @@ async function loadOverallStates(rows: Account[]): Promise<void> {
 /** 按实际协调结果说明整体状态。@param account 账号。@return 显示文本。 */
 function overallLabel(account: Account): string {
   const phase = overallStates.get(account.id)?.phase ?? account.work_control?.phase;
-  return ({enabled:'整体已启用',draining:'整体正在收尾',disabled:'整体已停用',reconcile:'整体待核对'} as Record<string,string>)[phase ?? ''] ?? '整体状态待读取';
+  return ({enabled:'账号已启用',draining:'正在收尾',disabled:'账号已停用',reconcile:'状态待核对'} as Record<string,string>)[phase ?? ''] ?? '状态读取中';
 }
 
 /** 优先采用关联任务账号的整体状态。@param account 账号。@return 是否整体启用。 */
@@ -1209,20 +1210,26 @@ async function copyText(text: string) {
         class="account-card"
       >
         <div class="account-card-body">
+          <div class="account-card-topline">
+            <PlatformBadge :platform="a.platform || 'claude_code'" />
+            <div class="account-work-controls">
+              <label class="account-admission"><span>接收请求</span><button type="button" role="switch" class="account-status-switch" :disabled="!a.work_control || workPending.has(a.id)" :aria-checked="a.work_control?.api_accepting === true" :aria-label="`${a.work_control?.api_accepting ? '关闭' : '开启'}接收请求 ${a.name || a.email}`" @click="toggleScheduling(a)"><span /></button></label>
+              <button type="button" class="account-work-toggle" :disabled="!a.work_control || workPending.has(a.id)" @click="changeOverall(a, !overallEnabled(a))">{{ overallEnabled(a) ? '停用账号' : '启用账号' }}</button>
+            </div>
+          </div>
           <div class="account-identity">
             <span class="account-avatar">{{ (a.name || a.email || '?')[0]?.toUpperCase() }}<i class="account-avatar-state" :class="a.status" /></span>
             <button type="button" class="account-identity-text" @click="openAccountDetails(a)">
-              <div><h3>{{ a.name || a.email }}<span class="account-plan">{{ a.platform === 'antigravity' ? 'Antigravity' : a.platform && a.platform !== 'claude_code' ? a.platform : subscriptionLabel(a.subscription_type, a.rate_limit_tier) }}</span></h3></div>
+              <div><h3>{{ a.name || a.email }}<span v-if="!a.platform || a.platform === 'claude_code'" class="account-plan">{{ subscriptionLabel(a.subscription_type, a.rate_limit_tier) }}</span></h3></div>
               <p>{{ a.email }}</p>
             </button>
-            <div class="flex flex-col items-center gap-1"><span class="text-xs text-muted-foreground">API 接单</span><button type="button" role="switch" class="account-status-switch" :disabled="!a.work_control || workPending.has(a.id)" :aria-checked="a.work_control?.api_accepting === true" :aria-label="`${a.work_control?.api_accepting ? '关闭' : '开启'} API 接单 ${a.name || a.email}`" @click="toggleScheduling(a)"><span /></button></div>
           </div>
           <div class="account-network">
             <button type="button" @click="openEdit(a)"><Globe :size="13" /><span>{{ a.proxy_name || publicProxy(a.proxy_url) }}</span></button>
+            <ExecutionNodeBadge :node="accountNodes.get(a.id)?.node" :status="nodeStatus(a.id)" :attention="nodeAttention(a.id)" />
             <router-link v-if="!a.platform || a.platform === 'claude_code'" :to="{ name: 'environments', query: { gateway_account: String(a.id) } }"><Box :size="13" />运行环境</router-link>
           </div>
-          <ExecutionNodeBadge :node="accountNodes.get(a.id)?.node" :status="nodeStatus(a.id)" :attention="nodeAttention(a.id)" />
-          <div class="flex flex-wrap items-center justify-between gap-2 py-2 text-xs"><span>{{ overallLabel(a) }}<template v-if="a.work_control?.admitted_requests"> · 已接纳 {{ a.work_control.admitted_requests }} 个请求</template></span><Button size="sm" variant="outline" :disabled="!a.work_control || workPending.has(a.id)" @click="changeOverall(a, !overallEnabled(a))">{{ overallEnabled(a) ? '整体停用' : '整体启用' }}</Button><Button v-if="overallStates.get(a.id)?.phase==='reconcile'" size="sm" variant="outline" :disabled="workPending.has(a.id)" @click="changeOverall(a, false)">继续停用</Button></div>
+          <div v-if="!overallEnabled(a) || overallStates.get(a.id)?.phase==='reconcile' || a.work_control?.admitted_requests" class="account-work-status"><span>{{ overallLabel(a) }}<template v-if="a.work_control?.admitted_requests"> · 已接纳 {{ a.work_control.admitted_requests }} 个请求</template></span><button v-if="overallStates.get(a.id)?.phase==='reconcile'" type="button" :disabled="workPending.has(a.id)" @click="changeOverall(a, false)">继续停用</button></div>
           <p v-if="overallStates.get(a.id)?.message" class="text-xs text-muted-foreground" role="status">{{ overallStates.get(a.id)?.message }}</p>
           <div class="account-health" :class="a.status === 'disabled' ? 'is-disabled' : (isRateLimited(a) || a.auth_error || a.v3_scheduling_error) ? 'is-warning' : ''">
             <span class="account-health-message"><Check v-if="a.status !== 'disabled' && !isRateLimited(a) && !a.auth_error && !a.v3_scheduling_error" :size="13" /><i v-else /><span>{{ a.status === 'disabled' ? '已停用' : a.v3_scheduling ? schedulingReasonLabel(a.v3_scheduling.capacity.reason) : statusStyle(a).label }}<template v-if="a.v3_scheduling"> · {{ a.v3_scheduling.phases.running > 0 ? `正在处理 ${a.v3_scheduling.phases.running} 个请求` : '当前空闲' }}</template></span></span>
@@ -1312,6 +1319,7 @@ async function copyText(text: string) {
         <div v-if="detailAccount" v-show="workspaceTab === 'overview'" class="account-workspace-scroll">
           <div class="account-overview-identity"><span class="account-avatar">{{ (detailAccount.name || detailAccount.email)[0] }}</span><div><strong>{{ detailAccount.name || detailAccount.email }}</strong><p>{{ detailAccount.email }}</p></div></div>
           <div class="account-overview-status">
+            <PlatformBadge :platform="detailAccount.platform || 'claude_code'" />
             <span>{{ statusStyle(detailAccount).label }}</span>
             <small v-if="detailAccount.platform !== 'antigravity'" class="account-score">{{ activeSchedulingScore(detailAccount) }}</small>
           </div>
