@@ -178,6 +178,9 @@ pub struct Account {
     /// AGY 账号的 GIF 抽帧策略，缺省关闭。
     #[serde(default)]
     pub agy_gif_frames_enabled: bool,
+    /// 交给 AGY 原生 `disableSafetyFiltering` 处理，缺省关闭。
+    #[serde(default)]
+    pub agy_disable_safety_filtering: bool,
     pub name: String,
     pub email: String,
     pub status: AccountStatus,

@@ -9,6 +9,7 @@ import queue
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import uuid
@@ -27,6 +28,9 @@ from .storage import Output, private_dir, verify_resources
 from .system_prompt import decode_policy, default_policy
 
 
+TOOL_WAIT_SECONDS = 3600
+
+
 def deadline(value: int) -> float:
     """把私有墙钟截止冻结为本次单调截止。@param value UTC毫秒。@return 单调截止。"""
     remaining = value / 1000 - time.time() if type(value) is int else -1
@@ -40,7 +44,7 @@ def validate_submission(value: dict, config: dict) -> dict:
     expected = {'schema_version', 'type', 'request_id', 'account_id', 'environment_id',
         'environment_generation', 'api_token_id', 'credential_snapshot', 'model', 'native_model',
         'body', 'deadline_unix_ms'}
-    if not isinstance(value, dict) or set(value)-{'capture_enabled','system_prompt_policy','gif_frames'} != expected or type(value['schema_version']) is not int or value['schema_version'] != 1 or value['type'] not in ['submit', 'prepare']:
+    if not isinstance(value, dict) or set(value)-{'capture_enabled','system_prompt_policy','gif_frames','disable_safety_filtering'} != expected or type(value['schema_version']) is not int or value['schema_version'] != 1 or value['type'] not in ['submit', 'prepare']:
         raise InputError('invalid_submission')
     for key in ['account_id', 'environment_id', 'environment_generation']:
         if type(value[key]) is not type(config[key]) or value[key] != config[key]:
@@ -65,6 +69,8 @@ def validate_submission(value: dict, config: dict) -> dict:
         raise InputError('invalid_capture_policy')
     if type(value.get('gif_frames',False)) is not bool:
         raise InputError('invalid_media_policy')
+    if type(value.get('disable_safety_filtering',False)) is not bool:
+        raise InputError('invalid_safety_policy')
     deadline(value['deadline_unix_ms'])
     result=copy.deepcopy(value)
     result.setdefault('capture_enabled',False)
@@ -233,13 +239,7 @@ class Supervisor:
             raise ValueError('AGY监督器环境身份无效')
         self.root = private_dir(config['work_root'])
         self.capture_root=private_dir(config['capture_root']) if config.get('capture_root') else None
-        if self.capture_root:
-            for folder in self.capture_root.iterdir():
-                marker=folder/'retired.json'
-                if folder.is_dir() and not folder.is_symlink() and marker.is_file() and not marker.is_symlink():
-                    retired=read_private(marker)
-                    if type(retired.get('retired_at')) in (int,float) and time.time()-retired['retired_at']>7*86400:
-                        shutil.rmtree(folder)
+        # 编排端独立按归属清理历史采集。发送器启动只依赖当前监督器的私有状态。
         private_dir(self.root / 'workers')
         verify_resources()
         self.condition = threading.Condition(threading.RLock())
@@ -252,10 +252,14 @@ class Supervisor:
         self.output = output or Output()
         self.pool = ImagePool(config['binary_path'])
         self.image_sha = '39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43'
-        self.socket_path = self.root / 'image.sock'
-        if self.socket_path.exists():
-            raise ValueError('AGY映像端点仍被原监督器持有')
-        self.broker = Broker(self.socket_path, self.pool, {os.getuid()})
+        # 候选摘要与监督代次叠加后会超过 Unix socket 路径上限。端点使用发送器私有临时目录。
+        self.socket_directory = tempfile.TemporaryDirectory(prefix='agy-image-', dir='/tmp')
+        self.socket_path = Path(self.socket_directory.name) / 'image.sock'
+        try:
+            self.broker = Broker(self.socket_path, self.pool, {os.getuid()})
+        except Exception:
+            self.socket_directory.cleanup()
+            raise
         self.reaper = threading.Thread(target=self.reap_idle, daemon=True)
         self.reaper.start()
 
@@ -441,6 +445,7 @@ class Supervisor:
             payload={'schema_version': 1, 'type': 'gemini_request', 'request_id': value['request_id'],
                 'model': value['model'], 'body': value['body'], 'system_prompt_policy':value['system_prompt_policy']}
             if value.get('gif_frames'):payload['gif_frames']=True
+            if value.get('disable_safety_filtering'):payload['disable_safety_filtering']=True
             worker.send(payload)
             while True:
                 event = worker.next(until)
@@ -459,9 +464,17 @@ class Supervisor:
                     for candidate in frame.get('candidates', []):
                         job['calls'].extend(part['functionCall'] for part in candidate.get('content', {}).get('parts', []) if 'functionCall' in part)
                 if kind == 'completed':
-                    job['waiting'] = event.get('native_tool_pending') is True
-                    if not job['waiting']:
-                        job['final_status'] = 'completed'
+                    with self.condition:
+                        if event.get('native_tool_pending') is True:
+                            # 只有已确认的原生工具调用进入独立等待期，普通生成仍遵守提交截止。
+                            expires_at_ms = time.time_ns() // 1_000_000 + TOOL_WAIT_SECONDS * 1000
+                            until = time.monotonic() + TOOL_WAIT_SECONDS
+                            job['until'] = until
+                            event['tool_wait_expires_at_ms'] = expires_at_ms
+                            job['waiting'] = True
+                        else:
+                            job['waiting'] = False
+                            job['final_status'] = 'completed'
                 if kind == 'tool_turn_finalized':
                     job['waiting'] = False
                     job['final_status'] = event.get('status')
@@ -554,7 +567,10 @@ class Supervisor:
         for done in list(self.controls.values()):
             done.wait(max(0,until-time.monotonic()))
         self.reaper.join(timeout=max(0, until-time.monotonic()))
-        self.broker.close()
+        try:
+            self.broker.close()
+        finally:
+            self.socket_directory.cleanup()
         self.pool.close()
         self.output.close()
         if all(job['finished'].is_set() for job in self.jobs.values()) and all(not worker.process or worker.process.poll() is not None for worker in workers):

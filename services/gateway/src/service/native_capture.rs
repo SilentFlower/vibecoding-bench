@@ -21,11 +21,16 @@ use tokio::task::{JoinHandle, spawn_blocking};
 use uuid::Uuid;
 
 use crate::model::request_diagnostics::RequestLogMode;
+use crate::service::gemini::BODY_LIMIT as GEMINI_BODY_LIMIT;
 use crate::service::native_contract::NativeSubmission;
 use axum::body::Bytes;
 use axum::http::HeaderMap;
 
 const BODY_LIMIT: usize = 2 * 1024 * 1024;
+const INGRESS_PREVIEW_LIMIT: usize = 1024 * 1024;
+const SNAPSHOT_LIMIT: usize = 6 * 1024 * 1024;
+// 完整入站只存一份正文，为脱敏替换、JSON 字符串转义及请求头预留空间。
+const REJECTED_SNAPSHOT_LIMIT: usize = 4 * GEMINI_BODY_LIMIT;
 const HEADER_LIMIT: usize = 128 * 1024;
 const STORAGE_LIMIT: u64 = 1024 * 1024 * 1024;
 const GATEWAY_RETENTION: Duration = Duration::from_secs(7 * 86400);
@@ -147,6 +152,26 @@ fn collect(value: &Value, secrets: &mut Vec<String>) {
     }
 }
 
+fn redact_sensitive_fields(value: &mut Value) {
+    match value {
+        Value::Object(fields) => {
+            for (name, field) in fields {
+                if sensitive(name) {
+                    *field = json!("[REDACTED]");
+                } else {
+                    redact_sensitive_fields(field);
+                }
+            }
+        }
+        Value::Array(values) => {
+            for value in values {
+                redact_sensitive_fields(value);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn add_secret(value: &str, secrets: &mut Vec<String>) {
     if value.len() >= 4 {
         secrets.push(value.to_owned());
@@ -225,6 +250,16 @@ pub(crate) fn ingress(
     if mode != RequestLogMode::Debug {
         return None;
     }
+    ingress_snapshot(headers, raw, parsed, bearer, false)
+}
+
+fn ingress_snapshot(
+    headers: &[(String, String)],
+    raw: &[u8],
+    parsed: &Value,
+    bearer: &str,
+    full: bool,
+) -> Option<Value> {
     let original = std::str::from_utf8(raw).ok()?;
     let mut secrets = vec![bearer.to_owned()];
     collect(parsed, &mut secrets);
@@ -236,11 +271,24 @@ pub(crate) fn ingress(
     secrets.retain(|secret| secret.len() >= 4);
     secrets.sort_by_key(|secret| Reverse(secret.len()));
     secrets.dedup();
-    let body = redact_body(original, &secrets).ok()?;
-    let (body, body_truncated) = prefix(&body, 1024 * 1024);
+    let (body, representation) = if full && !raw.is_empty() {
+        let mut safe = parsed.clone();
+        redact_sensitive_fields(&mut safe);
+        (
+            redact_body(&serde_json::to_string(&safe).ok()?, &secrets).ok()?,
+            "redacted_json",
+        )
+    } else {
+        (redact_body(original, &secrets).ok()?, "http_logical_bytes")
+    };
+    let (body, body_truncated) = if full {
+        (body.as_str(), false)
+    } else {
+        prefix(&body, INGRESS_PREVIEW_LIMIT)
+    };
     let (headers, headers_truncated) = redact_headers(headers, &secrets);
     Some(
-        json!({"source":"gateway_http_ingress","representation":"http_logical_bytes",
+        json!({"source":"gateway_http_ingress","representation":representation,
         "captured_at_ms":SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
         "headers":headers,"body":body,"body_truncated":body_truncated,"headers_truncated":headers_truncated,
         "original_body_bytes":raw.len(),"original_body_sha256":format!("{:x}",Sha256::digest(raw))}),
@@ -784,8 +832,13 @@ fn save(directory: &Path, submission: &NativeSubmission, payload: &Value) -> io:
 fn save_snapshot(directory: &Path, id: Uuid, value: &Value) -> io::Result<()> {
     let rejected = value["stage"] == "ingress_rejected";
     let suffix = if rejected { ".rejected.json" } else { ".json" };
+    let limit = if rejected {
+        REJECTED_SNAPSHOT_LIMIT
+    } else {
+        SNAPSHOT_LIMIT
+    };
     let bytes = serde_json::to_vec(&value)?;
-    if bytes.len() > 6 * 1024 * 1024 {
+    if bytes.len() > limit {
         return Err(io::ErrorKind::InvalidData.into());
     }
     let _guard = STORAGE.lock().map_err(|_| io::ErrorKind::Other)?;
@@ -808,8 +861,8 @@ fn save_snapshot(directory: &Path, id: Uuid, value: &Value) -> io::Result<()> {
                     return Err(io::ErrorKind::InvalidData.into());
                 }
                 let mut previous = Vec::new();
-                file.take(6 * 1024 * 1024 + 1).read_to_end(&mut previous)?;
-                if previous.len() <= 6 * 1024 * 1024 {
+                file.take(limit as u64 + 1).read_to_end(&mut previous)?;
+                if previous.len() <= limit {
                     if let Ok(previous) = serde_json::from_slice::<Value>(&previous) {
                         let rank = |wire: &Value| match wire["status"].as_str() {
                             Some("complete") => 3,
@@ -902,13 +955,14 @@ fn save_snapshot(directory: &Path, id: Uuid, value: &Value) -> io::Result<()> {
     result
 }
 
-/// 后台保存已鉴权的网关本地拒绝入站。@param directory 私有网关目录。@param id 根请求。@param headers 原始头。@param raw 已读取的正文。@param token 需要脱敏的入口密钥。@return 采集队列状态。
+/// 后台保存已鉴权的本地拒绝入站。@param directory 私有网关目录。@param id 根请求。@param headers 原始头。@param raw 已读取的正文。@param token 需要脱敏的入口密钥。@param full 是否保存完整正文。@return 采集队列状态。
 pub(crate) fn record_gateway_rejection(
     directory: &Path,
     id: &str,
     headers: HeaderMap,
     raw: Option<Bytes>,
     token: String,
+    full: bool,
 ) -> &'static str {
     let Ok(id) = Uuid::parse_str(id) else {
         return "dropped";
@@ -931,8 +985,7 @@ pub(crate) fn record_gateway_rejection(
             .map_or((&[][..], &Value::Null), |parsed| {
                 (raw.as_deref().unwrap_or_default(), parsed)
             });
-        let Some(mut preview) = ingress(RequestLogMode::Debug, &headers, body, parsed, &token)
-        else {
+        let Some(mut preview) = ingress_snapshot(&headers, body, parsed, &token, full) else {
             return;
         };
         let available = json_body.is_some();
@@ -948,11 +1001,11 @@ pub(crate) fn record_gateway_rejection(
         } else {
             "complete"
         };
-        let mut stage = json!({"stage":"ingress","source":"gateway_http_ingress","representation":"http_logical_bytes","status":status});
+        let mut stage = json!({"stage":"ingress","source":"gateway_http_ingress","representation":preview["representation"],"status":status});
         if !available {
             stage["note"] = json!("已保存入站头部，正文读取、解码或 JSON 解析未完成");
         }
-        let mut snapshot = preview.clone();
+        let mut snapshot = if full { json!({}) } else { preview.clone() };
         snapshot["schema_version"] = json!(1);
         snapshot["stage"] = json!("ingress_rejected");
         snapshot["attempt_id"] = json!(id.to_string());
@@ -982,7 +1035,7 @@ pub(crate) async fn read_gateway_rejection(directory: &Path, id: &str) -> Value 
         let Ok(metadata) = file.metadata() else {
             return json!({"state":"missing"});
         };
-        if !metadata.is_file() || metadata.len() > 6 * 1024 * 1024 {
+        if !metadata.is_file() || metadata.len() > REJECTED_SNAPSHOT_LIMIT as u64 {
             return json!({"state":"missing"});
         }
         if metadata
@@ -995,10 +1048,10 @@ pub(crate) async fn read_gateway_rejection(directory: &Path, id: &str) -> Value 
         }
         let mut bytes = Vec::new();
         if file
-            .take(6 * 1024 * 1024 + 1)
+            .take(REJECTED_SNAPSHOT_LIMIT as u64 + 1)
             .read_to_end(&mut bytes)
             .is_err()
-            || bytes.len() > 6 * 1024 * 1024
+            || bytes.len() > REJECTED_SNAPSHOT_LIMIT
         {
             return json!({"state":"missing"});
         }
@@ -1008,7 +1061,9 @@ pub(crate) async fn read_gateway_rejection(directory: &Path, id: &str) -> Value 
         if value["stage"] != "ingress_rejected" || value["attempt_id"] != id.to_string() {
             return json!({"state":"missing"});
         }
-        json!({"state":"saved","snapshot":value})
+        let mut result = json!({"state":"saved"});
+        result["snapshot"] = value;
+        result
     })
     .await
     .unwrap_or_else(|_| json!({"state":"missing"}))

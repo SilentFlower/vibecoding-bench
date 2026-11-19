@@ -103,11 +103,16 @@ class RetirementTests(unittest.TestCase):
                         "INSERT INTO platform_api_environments VALUES(14,'agy','antigravity');")
                 target = Path(folder) / 'agy'
                 stale = target / 'runtime/native/agy/kernels/old/worker/supervisor.json'
-                archive = target / 'flows/api/agy-prepared/attempt'
+                captures = target / 'flows/api/agy-prepared'
+                archive = captures / ('a' * 32)
                 archive.mkdir(parents=True)
                 (archive / 'home').mkdir()
                 payload = archive / 'snapshot.json'
                 payload.write_text('{}')
+                permanent = [captures / 'snapshots', captures / 'ingress']
+                for path in permanent:
+                    path.mkdir()
+                    (path / 'snapshot.json').write_text('{}')
                 runtime._root = lambda row: target
                 runtime._stop_environment.side_effect = lambda row, remove: self.assertTrue(stale.is_file())
                 evidence.update(ready=True, active=0, environments=[])
@@ -121,6 +126,10 @@ class RetirementTests(unittest.TestCase):
                     self.assertFalse((target / 'runtime/native/agy').exists())
                     self.assertTrue(payload.is_file())
                     self.assertFalse((archive / 'home').exists())
+                    self.assertTrue((archive / 'retired.json').is_file())
+                    for path in permanent:
+                        self.assertTrue((path / 'snapshot.json').is_file())
+                        self.assertFalse((path / 'retired.json').exists())
                     if action == 'rebuild':
                         transport.assert_called_once_with(runtime,14,system_maintenance=True)
                     else:

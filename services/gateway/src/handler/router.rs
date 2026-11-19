@@ -591,6 +591,7 @@ struct CreateAccountRequest {
     platform: Option<String>,
     agy_system_prompt_homoglyph_enabled: Option<bool>,
     agy_gif_frames_enabled: Option<bool>,
+    agy_disable_safety_filtering: Option<bool>,
     cli_identity: Option<CliIdentityImport>,
     credential_ownership: Option<CredentialOwnershipInput>,
     name: Option<String>,
@@ -1114,6 +1115,9 @@ async fn create_account(
     if platform != "antigravity" && req.agy_gif_frames_enabled == Some(true) {
         return Err(AppError::BadRequest("GIF 抽帧仅适用于 AGY 账号".into()));
     }
+    if platform != "antigravity" && req.agy_disable_safety_filtering == Some(true) {
+        return Err(AppError::BadRequest("原生安全开关仅适用于 AGY 账号".into()));
+    }
     let auth_type = req.auth_type.unwrap_or_else(|| "setup_token".into()).into();
     let setup_token = req.setup_token.or(req.token).unwrap_or_default();
     let mut account = Account {
@@ -1122,6 +1126,7 @@ async fn create_account(
             .agy_system_prompt_homoglyph_enabled
             .unwrap_or(false),
         agy_gif_frames_enabled: req.agy_gif_frames_enabled.unwrap_or_default(),
+        agy_disable_safety_filtering: req.agy_disable_safety_filtering.unwrap_or_default(),
         id: 0,
         name: req.name.unwrap_or_default(),
         email: req.email,
@@ -1426,6 +1431,9 @@ async fn update_account(
     }
     if updates.get("agy_gif_frames_enabled").is_some() {
         return Err(AppError::BadRequest("GIF 抽帧仅适用于 AGY 账号".into()));
+    }
+    if updates.get("agy_disable_safety_filtering").is_some() {
+        return Err(AppError::BadRequest("原生安全开关仅适用于 AGY 账号".into()));
     }
     if let Some(value) = updates.get("agy_system_prompt_homoglyph_enabled") {
         if !existing.is_antigravity() {
@@ -2394,9 +2402,19 @@ async fn get_settings(State(state): State<AppState>) -> Result<Json<serde_json::
     settings
         .entry("intercept_assistant_prefill_models".into())
         .or_insert_with(|| DEFAULT_INTERCEPT_ASSISTANT_PREFILL_MODELS.to_string());
+    let request_diagnostics = state.gateway_svc.request_diagnostics_config().await;
     settings.insert(
         "request_diagnostics_log_mode".into(),
-        state.gateway_svc.request_log_mode().await.as_str().into(),
+        request_diagnostics.mode.as_str().into(),
+    );
+    settings.insert(
+        "request_diagnostics_rejected_body".into(),
+        if request_diagnostics.full_rejected_ingress {
+            "full"
+        } else {
+            "preview"
+        }
+        .into(),
     );
     settings
         .entry("log_429_request_enabled".into())
@@ -2564,6 +2582,13 @@ async fn update_settings(
                 "request_diagnostics_log_mode 必须是 info 或 debug".into(),
             ));
         }
+    }
+    if let Some(value) = body.get("request_diagnostics_rejected_body")
+        && !matches!(value.as_str(), "preview" | "full")
+    {
+        return Err(AppError::BadRequest(
+            "本地拒绝入站正文必须选择限长预览或完整正文".into(),
+        ));
     }
     if let Some(val) = body.get("message_cache_control_rewrite") {
         MessageCacheControlRewrite::parse_setting(val)?;
@@ -2756,7 +2781,9 @@ async fn update_settings(
             .reload_assistant_prefill_intercept_config()
             .await?;
     }
-    if body.contains_key("request_diagnostics_log_mode") {
+    if body.contains_key("request_diagnostics_log_mode")
+        || body.contains_key("request_diagnostics_rejected_body")
+    {
         state.gateway_svc.reload_request_log_mode().await?;
     }
     if body.contains_key("log_429_request_enabled")

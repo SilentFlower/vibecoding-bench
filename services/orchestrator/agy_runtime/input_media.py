@@ -5,7 +5,7 @@ import json
 import struct
 import zlib
 
-from .contract import InputError
+from .contract import InputError, decode_gemini_bytes
 
 BODY_LIMIT = 16 * 1024 * 1024
 PNG_SIGNATURE = b'\x89PNG\r\n\x1a\n'
@@ -201,16 +201,14 @@ def media_part(part, path, role, gif=None):
         raise InputError('unsupported_gemini_media_type:' + path)
     data = value['data']
     reason = 'invalid_gemini_png:' if mime == 'image/png' else 'invalid_gemini_media:'
-    if not isinstance(data, str):
-        raise InputError(reason + path)
     try:
-        decoded = base64.b64decode(data, validate=True)
+        decoded, encoded = decode_gemini_bytes(data)
     except ValueError as err:
         raise InputError(reason + path) from err
     valid = _valid_png(memoryview(decoded)) if mime == 'image/png' else _file_type_matches(mime, decoded)
     if not valid:
         raise InputError(reason + path)
-    return gif.convert(decoded, path) if gif and mime == 'image/gif' else [{'mimeType': mime, 'inlineData': data}]
+    return gif.convert(decoded, path) if gif and mime == 'image/gif' else [{'mimeType': mime, 'inlineData': encoded}]
 
 
 def preflight_gif(body):

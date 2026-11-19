@@ -38,8 +38,9 @@ use crate::service::runtime_transport::{self, PreparedTransport};
 use crate::service::system_update::{self, UpdateActivity};
 use crate::service::{native_capture, runtime_bridge};
 
-const BODY_LIMIT: usize = 16 * 1024 * 1024;
+pub(crate) const BODY_LIMIT: usize = 16 * 1024 * 1024;
 const FRAME_LIMIT: usize = 64 * 1024 * 1024;
+const AGY_TOOL_WAIT_LIMIT: Duration = Duration::from_secs(3600);
 
 /// 随原生工具轮保留的许可，下一HTTP请求共享同一份所有权。
 struct Admission {
@@ -104,7 +105,7 @@ impl ContinuationClaim {
             .key
             .as_ref()
             .ok_or_else(|| invalid("原工具归属已释放"))?;
-        let (transport, previous, finished) = {
+        let (transport, previous, finished, previous_deadline) = {
             let turns = self
                 .service
                 .turns
@@ -115,11 +116,18 @@ impl ContinuationClaim {
                 turn.transport.clone(),
                 turn.previous_request_id.clone(),
                 turn.receipt_body.is_some(),
+                turn.deadline,
             )
         };
         if !finished {
             transport
-                .finish_agy_tools(&previous, token_id, body.clone(), deadline, gif_frames)
+                .finish_agy_tools(
+                    &previous,
+                    token_id,
+                    body.clone(),
+                    deadline.min(previous_deadline),
+                    gif_frames,
+                )
                 .await?;
             let mut turns = self
                 .service
@@ -146,6 +154,12 @@ fn invalid(message: &str) -> AppError {
 }
 
 fn gemini_error(error: AppError) -> Response {
+    let (status, body) = gemini_error_body(error);
+    (status, Json(body)).into_response()
+}
+
+/// 普通响应与 SSE 错误帧使用同一个公开错误合同。@param error 已分类错误。@return HTTP 状态及安全正文。
+fn gemini_error_body(error: AppError) -> (StatusCode, Value) {
     if let AppError::AgyInput {
         reason,
         message,
@@ -163,7 +177,7 @@ fn gemini_error(error: AppError) -> Response {
                 "fieldViolations":[{"field":field,"description":message}]}));
         }
         return (StatusCode::BAD_REQUEST,
-            Json(json!({"error":{"code":400,"status":"INVALID_ARGUMENT","message":message,"details":details}}))).into_response();
+            json!({"error":{"code":400,"status":"INVALID_ARGUMENT","message":message,"details":details}}));
     }
     let (code, status, message) = match error {
         AppError::Unauthorized => (
@@ -182,6 +196,11 @@ fn gemini_error(error: AppError) -> Response {
             "RESOURCE_EXHAUSTED",
             "账号当前容量不足".into(),
         ),
+        error @ AppError::AgyUpstreamQuota => (
+            StatusCode::TOO_MANY_REQUESTS,
+            "RESOURCE_EXHAUSTED",
+            error.to_string(),
+        ),
         _ => (
             StatusCode::SERVICE_UNAVAILABLE,
             "UNAVAILABLE",
@@ -190,9 +209,8 @@ fn gemini_error(error: AppError) -> Response {
     };
     (
         code,
-        Json(json!({"error":{"code":code.as_u16(),"status":status,"message":message}})),
+        json!({"error":{"code":code.as_u16(),"status":status,"message":message}}),
     )
-        .into_response()
 }
 
 /// 仅在Gemini入口解析四种令牌来源，拒绝冲突和重复查询密钥。@param headers 原头。@param query 原查询。@return 唯一密钥。
@@ -522,7 +540,7 @@ impl GeminiService {
         token: &ApiToken,
         model: &str,
         body: &Value,
-    ) -> Result<Option<(Account, Arc<Admission>, Instant, ContinuationClaim)>, AppError> {
+    ) -> Result<Option<(Account, Arc<Admission>, ContinuationClaim)>, AppError> {
         let Some((index, _)) = body["contents"]
             .as_array()
             .and_then(|contents| contents.last().map(|content| (contents.len() - 1, content)))
@@ -574,7 +592,6 @@ impl GeminiService {
         Ok(Some((
             turn.account.clone(),
             turn.admission.clone(),
-            turn.deadline,
             ContinuationClaim {
                 service: self.clone(),
                 key: Some(matches[0].clone()),
@@ -594,15 +611,19 @@ pub async fn generate(
         Ok(token) => token,
         Err(error) => return gemini_error(error),
     };
-    let mode = state.gateway_svc.request_log_mode().await;
+    let config = state.gateway_svc.request_diagnostics_config().await;
     CURRENT_LOG_MODE
-        .scope(mode, async move {
+        .scope(config.mode, async move {
             let trace = state
                 .gateway_svc
                 .diagnostics_store()
                 .map(|store| TraceContext::for_protocol(store.clone(), "antigravity", "gemini"));
             if let Some(trace) = trace.as_ref() {
-                trace.remember_ingress(request.headers(), &token.token);
+                trace.remember_ingress(
+                    request.headers(),
+                    &token.token,
+                    config.full_rejected_ingress,
+                );
             }
             let guard = trace
                 .as_ref()
@@ -686,12 +707,10 @@ async fn generate_inner(
     let has_thinking_config = thinking_config.is_some();
     diagnostics::error_stage("account_selection");
     let continuation = state.gemini_svc.continuation(&token, model, &body)?;
-    let deadline = continuation
-        .as_ref()
-        .map(|(_, _, deadline, _)| *deadline)
-        .unwrap_or(started + Duration::from_secs(AGY_REQUEST_SECONDS as u64));
+    // 原工具轮按原截止完成。新一轮模型生成使用本次 HTTP 的时间预算。
+    let deadline = started + Duration::from_secs(AGY_REQUEST_SECONDS as u64);
     let (account, admission, mut claim, resolved_model) =
-        if let Some((account, admission, _, claim)) = continuation {
+        if let Some((account, admission, claim)) = continuation {
             let resolved_model = claim.resolved_model.clone();
             let current = if media.is_empty() {
                 account
@@ -797,6 +816,7 @@ async fn generate_inner(
     }
     let system_prompt_policy =
         AgySystemPromptPolicy::new(current.agy_system_prompt_homoglyph_enabled);
+    let disable_safety_filtering = current.agy_disable_safety_filtering;
     let native_model =
         AccountService::agy_model(&current, &model.resolved).ok_or(AppError::NotFound)?;
     diagnostics::error_stage("runtime_prepare");
@@ -860,8 +880,18 @@ async fn generate_inner(
             deadline,
             capture_requested,
             gif_frames,
+            disable_safety_filtering,
         )
         .await;
+    if let Some(key) = completed_turn {
+        // 回填已经收口，本次发送即使状态待对账，也不再保留原工具轮的并发许可。
+        state
+            .gemini_svc
+            .turns
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .remove(&key);
+    }
     let upstream = match upstream {
         Ok(response) => response,
         Err(error) => {
@@ -879,14 +909,6 @@ async fn generate_inner(
             observer.finish("upstream_error", Some("sender_rejection"));
         }
         return Err(AppError::ServiceUnavailable("AGY账号发送器拒绝请求".into()));
-    }
-    if let Some(key) = completed_turn {
-        state
-            .gemini_svc
-            .turns
-            .lock()
-            .unwrap_or_else(|error| error.into_inner())
-            .remove(&key);
     }
     let (sender, mut receiver) = mpsc::channel(2);
     let service = state.gemini_svc.clone();
@@ -914,6 +936,7 @@ async fn generate_inner(
             native_model,
             system_prompt_policy,
             gif_frames,
+            disable_safety_filtering,
             &mut sender,
         )
         .await;
@@ -938,10 +961,16 @@ async fn generate_inner(
         .map_err(|_| AppError::ServiceUnavailable("AGY响应超时".into()))?
         .ok_or_else(|| AppError::BadGateway("AGY响应提前结束".into()))??;
     if streaming {
-        let stream=futures_util::stream::once(async {Ok(first)}).chain(ReceiverStream::new(receiver)).map(|event| {
-            let value=match event {Ok(value)=>value,Err(_)=>json!({"error":{"code":503,"status":"UNAVAILABLE","message":"AGY原生请求失败"}})};
-            Ok::<Bytes,IoError>(Bytes::from(format!("data: {}\n\n",value)))
-        });
+        let stream = futures_util::stream::once(async { Ok(first) })
+            .chain(ReceiverStream::new(receiver))
+            .map(|event| {
+                let value = match event {
+                    Ok(value) => value,
+                    Err(error @ AppError::AgyUpstreamQuota) => gemini_error_body(error).1,
+                    Err(_) => json!({"error":{"code":503,"status":"UNAVAILABLE","message":"AGY原生请求失败"}}),
+                };
+                Ok::<Bytes, IoError>(Bytes::from(format!("data: {value}\n\n")))
+            });
         return Ok((
             [
                 ("content-type", "text/event-stream"),
@@ -999,6 +1028,34 @@ impl EventReader {
     }
 }
 
+/// 将私有工具等待回执换算为本机截止。@param event 原生完成事件。@param request_deadline 旧发送器使用的生成截止。@return 工具等待截止。
+fn tool_wait_deadline(event: &Value, request_deadline: Instant) -> Result<Instant, AppError> {
+    let Some(expires) = event.get("tool_wait_expires_at_ms") else {
+        return Ok(request_deadline);
+    };
+    let now = Instant::now();
+    let unix_ms = runtime_transport::now_ms();
+    let remaining = expires
+        .as_u64()
+        .and_then(|value| value.checked_sub(unix_ms))
+        .filter(|value| *value > 0)
+        .ok_or_else(|| AppError::BadGateway("AGY工具等待回执无效或已到期".into()))?;
+    // 远程发送器的时钟偏差不能扩大本地保留窗口。
+    Ok(now + Duration::from_millis(remaining).min(AGY_TOOL_WAIT_LIMIT))
+}
+
+/// 在同一请求截止内把帧交给下游。@param sender 下游通道。@param frame 已核验帧。@param deadline 请求截止。@return 交付结果。
+async fn send_gemini_frame(
+    sender: &mpsc::Sender<Result<Value, AppError>>,
+    frame: Value,
+    deadline: Instant,
+) -> Result<(), AppError> {
+    timeout_at(deadline, sender.send(Ok(frame)))
+        .await
+        .map_err(|_| AppError::BadGateway("客户端背压超时".into()))?
+        .map_err(|_| AppError::BadGateway("客户端已取消".into()))
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn drive(
     upstream: reqwest::Response,
@@ -1022,6 +1079,7 @@ async fn drive(
     native_model: AgyModelId,
     system_prompt_policy: AgySystemPromptPolicy,
     gif_frames: bool,
+    disable_safety_filtering: bool,
     sender: &mut Option<mpsc::Sender<Result<Value, AppError>>>,
 ) -> Result<(), AppError> {
     let mut reader = EventReader {
@@ -1030,6 +1088,8 @@ async fn drive(
         deadline,
     };
     let mut calls = Vec::new();
+    let mut pending_tool_frames = Vec::new();
+    let mut pending_tool_bytes = 0;
     let mut completed = false;
     let mut attempt_id = initial_attempt_id;
     let mut attempted_recovery = false;
@@ -1147,6 +1207,16 @@ async fn drive(
                     observer.frame(&frame);
                 }
                 if frame.get("error").is_some() {
+                    if frame["error"]["code"] == 429
+                        && frame["error"]["status"] == "RESOURCE_EXHAUSTED"
+                        && frame.get("candidates").is_none()
+                        && frame.get("usageMetadata").is_none()
+                    {
+                        if let Some(observer) = observation.as_mut() {
+                            observer.upstream_quota();
+                        }
+                        return Err(AppError::AgyUpstreamQuota);
+                    }
                     if !verified_auth_failure(&frame)
                         || attempted_recovery
                         || completed
@@ -1228,6 +1298,7 @@ async fn drive(
                             deadline,
                             capture_requested,
                             gif_frames,
+                            disable_safety_filtering,
                         )
                         .await?;
                     if let Some(observer) = observation.as_mut() {
@@ -1260,22 +1331,34 @@ async fn drive(
                         }
                     }
                 }
+                if !calls.is_empty() {
+                    // 先登记同次原生工具轮，再把客户端可执行的调用和后续帧按原顺序交付。
+                    pending_tool_bytes += raw.len();
+                    if pending_tool_bytes > FRAME_LIMIT {
+                        return Err(AppError::BadGateway("AGY工具响应超过聚合上限".into()));
+                    }
+                    pending_tool_frames.push(frame);
+                    continue;
+                }
                 if let Some(sender) = sender.as_ref() {
-                    timeout_at(deadline, sender.send(Ok(frame)))
-                        .await
-                        .map_err(|_| AppError::BadGateway("客户端背压超时".into()))?
-                        .map_err(|_| AppError::BadGateway("客户端已取消".into()))?;
+                    send_gemini_frame(sender, frame, deadline).await?;
                     forwarded += 1;
                 }
             }
             Some("completed") => {
-                if let Some(observer) = observation.as_mut() {
-                    observer.completed(native["native_tool_pending"] == true, &calls);
+                let tool_pending = native["native_tool_pending"] == true;
+                let has_calls = !calls.is_empty();
+                if tool_pending != has_calls {
+                    return Err(AppError::BadGateway("AGY工具调用归属未确认".into()));
                 }
-                if native["native_tool_pending"] == true {
-                    if calls.is_empty() {
-                        return Err(AppError::BadGateway("工具调用归属缺失".into()));
-                    }
+                let tool_deadline = tool_pending
+                    .then(|| tool_wait_deadline(native, deadline))
+                    .transpose()?;
+                if let Some(observer) = observation.as_mut() {
+                    observer.completed(tool_pending, &calls);
+                }
+                if let Some(tool_deadline) = tool_deadline {
+                    reader.deadline = tool_deadline;
                     service
                         .turns
                         .lock()
@@ -1288,7 +1371,7 @@ async fn drive(
                                 model: model.clone(),
                                 contents: body["contents"].clone(),
                                 calls: calls.clone(),
-                                deadline,
+                                deadline: tool_deadline,
                                 admission: admission.clone(),
                                 transport: transport.clone(),
                                 previous_request_id: attempt_id.clone(),
@@ -1300,7 +1383,7 @@ async fn drive(
                     let weak = Arc::downgrade(&service);
                     let id = request_id.to_string();
                     tokio::spawn(async move {
-                        sleep_until(deadline).await;
+                        sleep_until(tool_deadline).await;
                         if let Some(service) = weak.upgrade() {
                             service
                                 .turns
@@ -1309,6 +1392,11 @@ async fn drive(
                                 .remove(&id);
                         }
                     });
+                    if let Some(sender) = sender.as_ref() {
+                        for frame in pending_tool_frames.drain(..) {
+                            send_gemini_frame(sender, frame, deadline).await?;
+                        }
+                    }
                 }
                 completed = true;
                 sender.take();
@@ -1326,6 +1414,12 @@ async fn drive(
                 }
             }
             Some("error" | "cancelled") => {
+                if native["type"] == "error" && native["upstream_http_status"] == 429 {
+                    if let Some(observer) = observation.as_mut() {
+                        observer.upstream_quota();
+                    }
+                    return Err(AppError::AgyUpstreamQuota);
+                }
                 if let Some(observer) = observation.as_mut() {
                     observer.finish(
                         if native["type"] == "cancelled" {

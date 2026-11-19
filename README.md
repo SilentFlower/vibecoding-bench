@@ -54,6 +54,8 @@ scripts/flower2api-stack status --env /absolute/path/flower2api.env
 3. 在「令牌」中创建供客户端使用的 API 令牌。
 4. 接入客户端后，在「请求记录」查看实际请求；工程执行通过「任务」入口管理。
 
+在「请求记录」开启 Debug 后，可为本地拒绝选择「限长预览」或「完整正文」。设置对后续请求生效，保存的正文仍会脱敏并沿用 7 天保留期。
+
 ## 客户端接入
 
 flower2api 提供 Anthropic Messages 请求入口。客户端使用管理后台「令牌」中创建的 API 令牌。

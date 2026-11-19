@@ -32,6 +32,13 @@ use crate::store::diagnostics_store::{ActiveDiagnostic, DiagnosticEvent, Diagnos
 
 pub(crate) mod agy;
 
+/// 在同一请求入口冻结日志级别与拒绝正文范围。
+#[derive(Clone, Copy, Default)]
+pub(crate) struct RequestDiagnosticsConfig {
+    pub(crate) mode: RequestLogMode,
+    pub(crate) full_rejected_ingress: bool,
+}
+
 tokio::task_local! {
     /// 独立于诊断存储的请求模式，保证旁路故障时内容策略仍生效。
     pub(crate) static CURRENT_LOG_MODE: RequestLogMode;
@@ -69,6 +76,7 @@ struct PendingIngress {
     headers: HeaderMap,
     body: Option<Bytes>,
     token: String,
+    full: bool,
 }
 
 /// 可跨响应生命周期持有的请求上下文，只存白名单摘要。
@@ -133,8 +141,8 @@ impl TraceContext {
         trace
     }
 
-    /// 仅在 Debug 保留已鉴权入站，终态若为本地拒绝才写入证据。@param headers 原始头。@param token 入口密钥。
-    pub(crate) fn remember_ingress(&self, headers: &HeaderMap, token: &str) {
+    /// 仅在 Debug 保留已鉴权入站，终态若为本地拒绝才写入证据。@param headers 原始头。@param token 入口密钥。@param full 是否保存完整拒绝正文。
+    pub(crate) fn remember_ingress(&self, headers: &HeaderMap, token: &str, full: bool) {
         if current_log_mode() == RequestLogMode::Debug
             && self.store.rejected_ingress_dir().is_some()
         {
@@ -142,6 +150,7 @@ impl TraceContext {
                 headers: headers.clone(),
                 body: None,
                 token: token.into(),
+                full,
             });
         }
     }
@@ -149,6 +158,46 @@ impl TraceContext {
     fn lock(&self) -> MutexGuard<'_, TraceState> {
         // 观测锁不包裹 await；即使异常展开污染锁，也不能中断业务转发。
         self.state.lock().unwrap_or_else(|error| error.into_inner())
+    }
+
+    fn save_rejected_ingress(
+        &self,
+        state: &mut TraceState,
+        reason: Option<String>,
+        full_only: bool,
+    ) -> bool {
+        if full_only
+            && !state
+                .pending_ingress
+                .as_ref()
+                .is_some_and(|entry| entry.full)
+        {
+            return false;
+        }
+        let Some(directory) = self.store.rejected_ingress_dir() else {
+            return false;
+        };
+        let Some(pending) = state.pending_ingress.take() else {
+            return false;
+        };
+        let id = &state.request.request_id;
+        let status = native_capture::record_gateway_rejection(
+            directory,
+            id,
+            pending.headers,
+            pending.body,
+            pending.token,
+            pending.full,
+        );
+        if full_only && status == "dropped" {
+            return false;
+        }
+        state.request.native_rejection = Some(NativeRejection {
+            capture_id: id.clone(),
+            reason,
+            capture_status: status.into(),
+        });
+        true
     }
 
     fn emit(&self, attempt: Option<AttemptDiagnostic>) {
@@ -339,7 +388,14 @@ pub(crate) fn native_rejection(
     capture_status: &str,
 ) {
     let _ = CURRENT_TRACE.try_with(|trace| {
-        trace.lock().request.native_rejection = Some(NativeRejection {
+        let mut state = trace.lock();
+        // 发送器只有在对应账号允许内容采集时才回执 queued。
+        if capture_status == "queued"
+            && trace.save_rejected_ingress(&mut state, reason.map(str::to_owned), true)
+        {
+            return;
+        }
+        state.request.native_rejection = Some(NativeRejection {
             reason: reason.map(str::to_owned),
             capture_id: capture_id.to_owned(),
             capture_status: capture_status.to_owned(),
@@ -817,6 +873,7 @@ impl RequestTraceGuard {
             AppError::BadRequest(_) | AppError::AgyInput { .. } => "request",
             AppError::Unauthorized | AppError::PermanentCredential(_) => "credentials",
             AppError::TooManyRequests(_) => "admission",
+            AppError::AgyUpstreamQuota => "upstream_model",
             AppError::BadGateway(_) => "transport",
             // 503 可来自凭据、环境或原生准备，具体阶段由失败边界记录。
             AppError::ServiceUnavailable(_) => "gateway",
@@ -855,32 +912,19 @@ impl RequestTraceGuard {
                 .get("x-request-id")
                 .and_then(|v| v.to_str().ok())
                 .map(normalize_correlation_id);
-            let pending = state.pending_ingress.take();
             if (response.status().is_client_error() || response.status().is_server_error())
                 && state.request.attempt_count == 0
                 && state.request.native_rejection.is_none()
-                && let Some(pending) = pending
-                && let Some(directory) = self.trace.store.rejected_ingress_dir()
             {
-                let status = native_capture::record_gateway_rejection(
-                    directory,
-                    &id,
-                    pending.headers,
-                    pending.body,
-                    pending.token,
-                );
                 let reason = state
                     .request
                     .context
                     .as_ref()
                     .and_then(|context| context.input_rejection_reason.clone())
                     .or_else(|| state.request.error_stage.clone());
-                state.request.native_rejection = Some(NativeRejection {
-                    capture_id: id.clone(),
-                    reason,
-                    capture_status: status.into(),
-                });
+                self.trace.save_rejected_ingress(&mut state, reason, false);
             }
+            state.pending_ingress = None;
         }
         let (parts, body) = response.into_parts();
         Response::from_parts(

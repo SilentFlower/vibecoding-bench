@@ -21,6 +21,9 @@ pub enum AppError {
     Unauthorized,
     #[error("too many requests: {0}")]
     TooManyRequests(String),
+    /// AGY 模型返回的确证限流或配额耗尽。
+    #[error("AGY 上游额度不足或触发限流")]
+    AgyUpstreamQuota,
     /// 本地准入拒绝，携带保守重试提示，保持账号绑定。
     #[error("本地准入容量不足或等待超时")]
     AdmissionLimited { retry_after: u64 },
@@ -61,7 +64,9 @@ impl IntoResponse for AppError {
             AppError::SchedulingConflict => {
                 (StatusCode::SERVICE_UNAVAILABLE, "会话绑定已更新，请重试")
             }
-            AppError::TooManyRequests(_) => (StatusCode::TOO_MANY_REQUESTS, ""),
+            AppError::TooManyRequests(_) | AppError::AgyUpstreamQuota => {
+                (StatusCode::TOO_MANY_REQUESTS, "")
+            }
             AppError::BadGateway(_) => (StatusCode::BAD_GATEWAY, ""),
             AppError::ServiceUnavailable(_) => (StatusCode::SERVICE_UNAVAILABLE, ""),
             AppError::PermanentCredential(_) => (StatusCode::SERVICE_UNAVAILABLE, ""),

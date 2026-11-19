@@ -1,10 +1,9 @@
 """解析 Gemini 工具与调用方持有的历史，构造独立 Cortex 输入。"""
-import base64
 import copy
 import json
 import re
 from collections import Counter
-from .contract import InputError, MODEL, text, tools
+from .contract import InputError, MODEL, decode_gemini_bytes, text, tools
 from .tool_schema import normalize
 from .input_media import gif_budget, media_part
 from .system_prompt import decode_policy, default_policy, transform_system
@@ -50,14 +49,14 @@ def definitions(body, changes):
 
 
 def call_signature(value, native):
-    """分别承载原生字节签名与网关的显式绕过标记。@param value 签名文本。@param native 原生调用。@return 无。"""
+    """保留签名字节并统一原生序列化格式。@param value 签名文本。@param native 原生调用。@return 无。"""
     if value is None:return
     value=text(value)
     if value==BYPASS_SIGNATURE:native['thoughtSignature']=value;return
     try:
-        if not base64.b64decode(value,validate=True):raise ValueError()
+        _, encoded = decode_gemini_bytes(value)
     except (ValueError,TypeError) as exc:raise InputError('invalid_gemini_thought_signature') from exc
-    native['thinkingSignature']=value
+    native['thinkingSignature']=encoded
 
 
 def native_value(value):
@@ -200,7 +199,7 @@ def native_history(contents, tool_names=(), gif=None):
 
 def decode_request(raw):
     """校验 Gemini 业务正文并给出原生执行参数。@param raw 控制信封。@return 内部请求。"""
-    checked_fields(raw,{'schema_version','type','request_id','model','body','system_prompt_policy','gif_frames'},'')
+    checked_fields(raw,{'schema_version','type','request_id','model','body','system_prompt_policy','gif_frames','disable_safety_filtering'},'')
     if type(raw.get('schema_version')) is not int or raw['schema_version']!=1 or raw.get('type')!='gemini_request':raise InputError('invalid_schema')
     ident=text(raw.get('request_id'))
     if not ident or len(ident)>128:raise InputError('invalid_request_id')
@@ -208,6 +207,8 @@ def decode_request(raw):
     body=raw.get('body');checked_fields(body,{'contents','systemInstruction','generationConfig','tools','safetySettings','toolConfig'},'/body')
     enabled=raw.get('gif_frames',False)
     if type(enabled) is not bool:raise InputError('invalid_media_policy')
+    native_safety=raw.get('disable_safety_filtering',False)
+    if type(native_safety) is not bool:raise InputError('invalid_safety_policy')
     changes=[];notices=[];declared=definitions(body,changes)
     steps=native_history(body.get('contents'), (tool['name'] for tool in declared), gif_budget(body,enabled));system=[]
     if 'systemInstruction' in body:
@@ -217,7 +218,9 @@ def decode_request(raw):
         for part in value['parts']:checked_fields(part,{'text'},'/body/systemInstruction/parts');system.append(text(part.get('text')))
     completion={}
     if 'generationConfig' in body:
-        value=body['generationConfig'];checked_fields(value,{'maxOutputTokens','temperature','topP'},'/body/generationConfig')
+        value=body['generationConfig'];checked_fields(value,{'maxOutputTokens','temperature','topP','responseModalities'},'/body/generationConfig')
+        if value.get('responseModalities',[]) not in ([],['TEXT']):
+            raise InputError('unsupported_gemini_output_modality:/body/generationConfig/responseModalities')
         for name in ['temperature','topP']:
             if name in value:
                 notices.append({'field':'generationConfig.'+name,'policy':'native_default'})
@@ -225,15 +228,26 @@ def decode_request(raw):
             tokens=value['maxOutputTokens']
             if type(tokens) is not int or not 1<=tokens<=2147483647:raise InputError('invalid_gemini_max_output_tokens')
             completion['maxTokens']=tokens
+    safety_egress_rules=[]
+    if native_safety:
+        completion['disableSafetyFiltering']=True
+        notices.append({'field':'safetySettings','policy':'account_native_safety','native_field':'disableSafetyFiltering'})
     if 'safetySettings' in body:
         values=body['safetySettings']
         if not isinstance(values,list):raise InputError('invalid_gemini_safety_settings')
-        categories=set()
+        categories=set();thresholds=set()
         for value in values:
             checked_fields(value,{'category','threshold'},'/body/safetySettings')
-            if value.get('category') in categories or value.get('category') not in SAFETY_CATEGORIES or value.get('threshold') not in ['OFF','BLOCK_NONE']:raise InputError('unsupported_gemini_safety_settings')
-            categories.add(value['category'])
-        if categories:
+            category,threshold=value.get('category'),value.get('threshold')
+            if not isinstance(category,str) or category not in SAFETY_CATEGORIES or category in categories or threshold not in (
+                    'OFF','BLOCK_NONE','BLOCK_LOW_AND_ABOVE','BLOCK_MEDIUM_AND_ABOVE','BLOCK_ONLY_HIGH','HARM_BLOCK_THRESHOLD_UNSPECIFIED'):
+                raise InputError('unsupported_gemini_safety_settings')
+            categories.add(category);thresholds.add(threshold)
+        if not native_safety and thresholds-{'OFF','BLOCK_NONE'}:
+            # 原生布尔开关表达不了逐类阈值，保留全部规则到同次原生请求的出站边界。
+            safety_egress_rules=copy.deepcopy(values)
+            notices.append({'field':'safetySettings','policy':'native_safety_egress','requested_categories':sorted(categories)})
+        elif not native_safety and categories:
             if categories!=SAFETY_CATEGORIES:raise InputError('unsupported_partial_safety_settings')
             completion['disableSafetyFiltering']=True
             notices.append({'field':'safetySettings','policy':'native_completion_mapping','native_field':'disableSafetyFiltering','native_wire_categories':['HARM_CATEGORY_DANGEROUS_CONTENT'],'requested_categories':sorted(categories)})
@@ -249,7 +263,8 @@ def decode_request(raw):
     policy=decode_policy(raw.get('system_prompt_policy',default_policy()))
     submitted,report=transform_system('\n'.join(system),policy)
     return {'request_id':ident,'prompt':'','messages':[],'history_id':None,'system':submitted,'system_prompt_policy':report,'model':MODEL,'tools':declared,'max_generations':1,
-        'request_format':'gemini','gemini_body':copy.deepcopy(body),'native_completion':completion,'native_steps':steps,'schema_changes':changes,'compatibility_notes':notices}
+        'request_format':'gemini','gemini_body':copy.deepcopy(body),'native_completion':completion,'native_steps':steps,'schema_changes':changes,'compatibility_notes':notices,
+        'safety_egress_rules':safety_egress_rules}
 def continuation_results(previous, calls, incoming):
     """把续轮结果绑定到本 worker 唯一待回填工具轮。@param previous 原始入站正文。@param calls 实际模型调用。@param incoming 新正文。@return 按函数名索引的真实结果。"""
     original=previous['contents'];contents=incoming['contents'];count=len(original)

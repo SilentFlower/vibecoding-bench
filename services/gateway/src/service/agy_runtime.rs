@@ -420,6 +420,9 @@ impl AgyPool {
         if submission.gif_frames {
             value["gif_frames"] = Value::Bool(true);
         }
+        if submission.disable_safety_filtering {
+            value["disable_safety_filtering"] = Value::Bool(true);
+        }
         if let Err(error) = controller.send(&value).await {
             controller.requests.lock().await.remove(&request_id);
             return Err(error);

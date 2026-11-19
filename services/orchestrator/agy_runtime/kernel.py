@@ -2,6 +2,7 @@
 import argparse
 import copy
 import fcntl
+from functools import partial
 import hashlib
 import http.client
 import json
@@ -22,8 +23,9 @@ from .layer_reader import LayerReader
 from .tool_broker import Broker
 from .gemini_frames import Frames
 from .models import configure_model
-from .capture import save_submission
+from .capture import save_egress, save_submission
 from .credentials import read_access_document
+from .safety_egress import CLOUD_CODE, SafetyEgress
 
 SNAPSHOT_WRITERS=threading.BoundedSemaphore(2)
 
@@ -38,6 +40,8 @@ class RPC:
             """归档实际原生结果。@return 无返回值。"""
             connection=http.client.HTTPConnection('127.0.0.1',worker.port,timeout=timeout)
             record={'method':method,'body':body,'request_seq':scope.seq,'generation':worker.bridge.generation,'history_step_count':scope.history_count}
+            if method=='SetCloudCodeURL' and body.get('url','').startswith('http://127.0.0.1:'):
+                record['body']={'target':'request_scoped_loopback'}
             try:
                 connection.request('POST','/exa.language_server_pb.LanguageServerService/'+method,json.dumps(body,ensure_ascii=False).encode(),
                     {'Content-Type':'application/json','x-codeium-csrf-token':worker.bridge.csrf})
@@ -60,6 +64,7 @@ class Scope:
         self.history_count=len(value['native_steps']) if 'native_steps' in value else len(history_steps(value['messages']));self.value=value;self.seq=seq;self.worker=worker;self.route=f'r-{seq}';self.root=None;self.job=None
         self.frames=Frames();self.native_tool_calls=None;self.compatibility_error=None;self.tool_wait_ready=threading.Event();self.tool_wait_published=False;self.resume_claimed=False;self.final_status=None;self.yield_tools=threading.Event();self.yield_cancelled=threading.Event();self.yield_started=None;self.yield_rpc=None
         self.broker=None;self.cancel=threading.Event();self.cancel_started=None;self.cancel_sent=False;self.finished=threading.Event()
+        self.safety_egress=None
 
     def identity(self):
         """返回公开协议身份。@return 身份字段。"""
@@ -151,6 +156,8 @@ class Worker:
             if scope is None or scope.worker is not self or event['request_id']!=scope.route:raise RuntimeError('source_request_identity')
             if kind=='model_start' and event['native_context']['ConversationID']!=scope.root:raise RuntimeError('native_root_identity')
             if kind=='gemini_response' and scope.value.get('request_format')=='gemini':
+                if scope.safety_egress and not scope.safety_egress.model_started:
+                    scope.compatibility_error='native_safety_egress_unobserved';scope.yield_tools.set();return
                 try:frames=scope.frames.project(event)
                 except RuntimeError as exc:
                     # 兼容拒绝仍让原生读取器继续排空，并使用同一取消路径收回运行态。
@@ -335,6 +342,12 @@ class Kernel:
                 scope.broker=Broker(self,scope,folder);scope.broker.configure(cfg)
             cfg['trajectoryConversionConfig'].update(useStructuredToolResponses=True,wrapToolResponses=False)
             active=worker.bridge.run_folder/'active.json';temporary=active.with_suffix('.new');temporary.write_text(json.dumps({'request_id':scope.route}));temporary.replace(active)
+            if rules:=scope.value.get('safety_egress_rules'):
+                token=read_access_document(worker.bridge.native_home)['token']['access_token']
+                capture=partial(self.capture_egress,scope,token) if self.cfg.get('capture_root') else None
+                scope.safety_egress=SafetyEgress(rules,token,worker.bridge.proxy_url,worker.bridge.ca_file,capture)
+                switched=worker.call('SetCloudCodeURL',{'url':scope.safety_egress.url},scope)
+                if switched['status']!=200:raise RuntimeError('native_safety_endpoint_rejected')
             root=worker.call('StartCascade',{'source':'CORTEX_TRAJECTORY_SOURCE_AGENT_API','requestedModel':MODEL},scope)
             if root['status']!=200:raise RuntimeError('native_start_rejected')
             scope.root=root['response']['cascadeId']
@@ -386,6 +399,10 @@ class Kernel:
                 ident=None;history_error='native_history_export_failed'
                 with (folder/'history-error.log').open('a') as stream:traceback.print_exc(file=stream)
             worker.jobs+=1;retire=retire or self.cfg['rotate_after'] is not None and worker.jobs>=self.cfg['rotate_after']
+            if scope.safety_egress and not retire and not self.closing:
+                # 空值不能恢复原生端点。恢复失败时退役当前进程，避免影响下一次请求。
+                try:retire=worker.call('SetCloudCodeURL',{'url':CLOUD_CODE},scope)['status']!=200
+                except RuntimeError:retire=True
             last_planner=next((s['plannerResponse'] for s in reversed(trajectory['steps']) if 'plannerResponse' in s),{})
             finish_reason='tool_calls' if scope.value.get('request_format')=='gemini' and scope.frames.calls else 'generation_limit' if last_planner.get('toolCalls') else 'stop'
             scope.final_status='completed'
@@ -395,12 +412,16 @@ class Kernel:
             with (folder/'error.log').open('a') as stream:traceback.print_exc(file=stream)
             kind='cancelled' if scope.cancel.is_set() else 'error'
             scope.final_status=kind
-            self.emit('tool_turn_finalized' if scope.tool_wait_published else kind,**scope.identity(),status=kind,code=code if code in {'cancelled','cancel_timeout','native_transport_error','native_request_failed','native_stream_incomplete','native_delivery_error','native_not_idle','native_start_rejected','native_process_exited','native_protocol_error','tool_protocol_error','native_tool_yield_timeout','native_tool_yield_failed','ambiguous_parallel_function_calls','unsupported_gemini_candidate_count','invalid_native_gemini_parts'} else 'kernel_internal_error',
+            upstream={}
+            if kind=='error' and scope.safety_egress and scope.safety_egress.model_status==429:
+                upstream['upstream_http_status']=429
+            self.emit('tool_turn_finalized' if scope.tool_wait_published else kind,**scope.identity(),status=kind,code=code if code in {'cancelled','cancel_timeout','native_transport_error','native_request_failed','native_stream_incomplete','native_delivery_error','native_not_idle','native_start_rejected','native_process_exited','native_protocol_error','tool_protocol_error','native_tool_yield_timeout','native_tool_yield_failed','ambiguous_parallel_function_calls','unsupported_gemini_candidate_count','invalid_native_gemini_parts','native_safety_endpoint_rejected','native_safety_egress_unobserved'} else 'kernel_internal_error',
                 native_stream_complete=bool(scope.job and scope.job.ended.is_set()),native_model_calls=scope.job.calls if scope.job else 0,
-                native_cascade_id=scope.root,native_trajectory_id=scope.broker.trajectory_id if scope.broker else None)
+                native_cascade_id=scope.root,native_trajectory_id=scope.broker.trajectory_id if scope.broker else None,**upstream)
         finally:
             try:
                 if scope.broker:scope.broker.close()
+                if scope.safety_egress:scope.safety_egress.close()
                 if retire or self.closing:
                     worker.retire('shutdown' if self.closing else 'request_error' if failed else 'gemini_tool_yield' if scope.yield_tools.is_set() else 'rotation')
                 if spool:
@@ -434,6 +455,16 @@ class Kernel:
             finally:
                 SNAPSHOT_WRITERS.release()
                 self.emit('capture_status',**scope.identity(),capture_status=status)
+        threading.Thread(target=save,daemon=True).start()
+
+    def capture_egress(self, scope, token, trace, raw, incoming, forwarded):
+        """后台保存同一作业的出站观察。@param scope 原请求。@param token 访问凭据。@param trace 实际观察。@param raw 提交实体。@param incoming 原生头。@param forwarded 适配头。@return 无。"""
+        if not SNAPSHOT_WRITERS.acquire(blocking=False):return
+        def save():
+            try:
+                save_egress(self.cfg['capture_root'],self.cfg['account_id'],scope.value['request_id'],trace,raw,incoming,forwarded,token)
+            except (OSError,ValueError):pass
+            finally:SNAPSHOT_WRITERS.release()
         threading.Thread(target=save,daemon=True).start()
 
     def shutdown(self):

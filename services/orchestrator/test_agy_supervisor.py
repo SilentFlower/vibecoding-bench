@@ -147,6 +147,23 @@ class AgySupervisorTests(unittest.TestCase):
                 supervisor=Supervisor(config,OutputFixture())
             supervisor.close()
 
+    def test_existing_capture_retirement_markers_do_not_block_startup(self):
+        """上一版写入采集目录的错误标记与当前发送生命周期隔离。@return 无。"""
+        captures = Path(self.temporary.name) / 'agy-prepared'
+        for name in ('snapshots', 'ingress'):
+            path = captures / name
+            path.mkdir(parents=True, mode=0o700)
+            (path / 'retired.json').write_text('上一版遗留的不可读标记')
+            (path / 'sample.json').write_text('{}')
+        captures.chmod(0o700)
+        config = {**self.config, 'capture_root': str(captures),
+            'work_root': str(Path(self.temporary.name) / 'next-generation')}
+        supervisor = Supervisor(config, OutputFixture())
+        self.addCleanup(supervisor.close)
+        self.assertEqual(supervisor.status()['state'], 'ready')
+        for name in ('snapshots', 'ingress'):
+            self.assertEqual((captures / name / 'sample.json').read_text(), '{}')
+
     def continue_body(self, value):
         """构造真实函数回填历史。@param value 原请求。@return 新正文。"""
         body = copy.deepcopy(value['body'])
@@ -160,7 +177,9 @@ class AgySupervisorTests(unittest.TestCase):
         """原工具结果在独立控制路径收口，幂等确认保持零额外模型。@return 无。"""
         first=self.submission()
         self.supervisor.submit(first)
-        self.output.wait(first['request_id'],'completed')
+        completed=self.output.wait(first['request_id'],'completed')['event']
+        self.assertAlmostEqual(completed['tool_wait_expires_at_ms']/1000-time.time(),3600,delta=3)
+        self.assertAlmostEqual(self.supervisor.jobs[first['request_id']]['until']-time.monotonic(),3600,delta=3)
         body=self.continue_body(first)
         value={'schema_version':1,'type':'finish_tools','request_id':str(uuid.uuid4()),'previous_request_id':first['request_id'],
             'account_id':17,'environment_id':'synthetic-env','environment_generation':2,'api_token_id':4,'body':body}

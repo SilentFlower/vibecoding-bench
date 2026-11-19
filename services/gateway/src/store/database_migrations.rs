@@ -13,7 +13,7 @@ use crate::config::Config;
 use crate::store::database_schema::migrate_legacy;
 use crate::store::db::init_db;
 use crate::store::{
-    account_platform_schema, account_work_schema, agy_media_schema, proxy_schema,
+    account_platform_schema, account_work_schema, agy_media_schema, agy_safety_schema, proxy_schema,
     proxy_sync_schema, request_records_schema, session_policy_block_schema,
 };
 
@@ -41,6 +41,9 @@ fn registry() -> Result<Value, sqlx::Error> {
         return Err(sqlx::Error::Protocol("迁移定义与登记不符".into()));
     }
     for (index, step) in steps.iter().enumerate() {
+        if step["id"] == "gateway.agy-safety.9" && step["checksum"] != agy_safety_schema::checksum() {
+            return Err(sqlx::Error::Protocol("AGY 原生安全迁移定义与登记不符".into()));
+        }
         if step["id"] == "gateway.agy-media.8" && step["checksum"] != agy_media_schema::checksum() {
             return Err(sqlx::Error::Protocol("AGY 媒体迁移定义与登记不符".into()));
         }
@@ -229,7 +232,7 @@ pub async fn plan(pool: &AnyPool, target: Option<usize>) -> Result<Value, sqlx::
     .fetch_one(pool)
     .await?;
     let rows = if exists > 0 {
-        sqlx::query("SELECT migration_id,CAST(version AS TEXT) AS version,checksum FROM system_schema_migrations ORDER BY version").fetch_all(pool).await?
+        sqlx::query("SELECT migration_id,CAST(version AS TEXT) AS version,checksum FROM system_schema_migrations ORDER BY system_schema_migrations.version").fetch_all(pool).await?
     } else {
         Vec::new()
     };
@@ -272,6 +275,9 @@ pub async fn plan(pool: &AnyPool, target: Option<usize>) -> Result<Value, sqlx::
     if rows.len() >= 8 {
         agy_media_schema::verify(pool).await?;
     }
+    if rows.len() >= 9 {
+        agy_safety_schema::verify(pool).await?;
+    }
     for step in &mut steps {
         step["state"] = json!(
             if step["version"].as_u64().unwrap_or(u64::MAX) <= rows.len() as u64 {
@@ -303,6 +309,7 @@ pub async fn migrate(pool: &AnyPool, driver: &str) -> Result<(), sqlx::Error> {
         request_records_schema::apply(&mut transaction, driver).await?;
         account_work_schema::apply(&mut transaction).await?;
         agy_media_schema::apply(&mut transaction, driver).await?;
+        agy_safety_schema::apply(&mut transaction, driver).await?;
         transaction.commit().await?;
         return Ok(());
     }
@@ -344,7 +351,8 @@ pub async fn apply(
                 | "gateway.account-platforms.5"
                 | "gateway.request-records.6"
                 | "gateway.account-work.7"
-                | "gateway.agy-media.8",
+                | "gateway.agy-media.8"
+                | "gateway.agy-safety.9",
             ) => {}
             _ => return Err(sqlx::Error::Protocol("迁移实现尚未登记".into())),
         }
@@ -372,6 +380,9 @@ pub async fn apply(
         }
         if step["id"] == "gateway.agy-media.8" {
             agy_media_schema::apply(&mut transaction, "sqlite").await?;
+        }
+        if step["id"] == "gateway.agy-safety.9" {
+            agy_safety_schema::apply(&mut transaction, "sqlite").await?;
         }
         sqlx::query("CREATE TABLE IF NOT EXISTS system_schema_migrations (migration_id TEXT PRIMARY KEY,version INTEGER NOT NULL UNIQUE,checksum TEXT NOT NULL,applied_at TEXT NOT NULL,operation_id TEXT NOT NULL)")
             .execute(&mut *transaction).await?;
@@ -472,7 +483,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 8);
+        assert_eq!(result["current_version"], 9);
         let preserved: Vec<(String, String, String, String)> = sqlx::query_as(
             "SELECT migration_id,CAST(version AS TEXT),checksum,operation_id FROM system_schema_migrations WHERE version<=6 ORDER BY version",
         )
@@ -503,7 +514,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 8);
+        assert_eq!(result["current_version"], 9);
         let duration: String = sqlx::query_scalar(
             "SELECT value FROM settings WHERE key='session_policy_block_duration_minutes'",
         )
@@ -541,7 +552,7 @@ mod tests {
         let result = apply(&database, &Uuid::new_v4().to_string(), None)
             .await
             .unwrap();
-        assert_eq!(result["current_version"], 8);
+        assert_eq!(result["current_version"], 9);
         let original: String =
             sqlx::query_scalar("SELECT operation_id FROM system_schema_migrations")
                 .fetch_one(&database)

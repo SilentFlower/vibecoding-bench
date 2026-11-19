@@ -546,6 +546,7 @@ impl AccountService {
             "rpm_limit",
             "agy_system_prompt_homoglyph_enabled",
             "agy_gif_frames_enabled",
+            "agy_disable_safety_filtering",
         ];
         if !current.is_antigravity() || fields.keys().any(|key| !allowed.contains(&key.as_str())) {
             return Err(AppError::BadRequest("该字段不属于 AGY 账号配置".into()));

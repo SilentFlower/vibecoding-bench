@@ -6917,6 +6917,7 @@ mod tests {
             platform: "claude_code".into(),
             agy_system_prompt_homoglyph_enabled: false,
             agy_gif_frames_enabled: false,
+            agy_disable_safety_filtering: false,
             id: 1,
             name: "测试账号".into(),
             email: "user@example.com".into(),

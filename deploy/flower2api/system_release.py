@@ -29,6 +29,7 @@ BENCH_SCHEMA_SOURCES = {
     'bench.agy-environments.5': 'orchestrator/agy_environment_schema.py',
 }
 GATEWAY_SCHEMA_SOURCES = {
+    'gateway.agy-safety.9': 'cc2api/src/store/agy_safety_schema.rs',
     'gateway.agy-media.8': 'cc2api/src/store/agy_media_schema.rs',
     'gateway.account-work.7': 'cc2api/src/store/account_work_schema.rs',
     'gateway.request-records.6': 'cc2api/src/store/request_records_schema.rs',

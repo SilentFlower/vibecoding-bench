@@ -192,6 +192,9 @@ pub struct AgySubmission {
     pub gif_frames: bool,
     #[serde(default)]
     pub capture_enabled: bool,
+    /// 本次模型生成冻结的账号原生安全开关。
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub disable_safety_filtering: bool,
 }
 
 impl AgySubmission {

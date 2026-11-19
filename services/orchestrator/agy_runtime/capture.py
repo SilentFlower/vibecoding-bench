@@ -1,7 +1,9 @@
 """AGY受控阶段快照；原生日志、HOME和配置不作为管理下载。"""
 import copy
 import fcntl
+import gzip
 import hashlib
+from io import BytesIO
 import json
 import os
 import re
@@ -9,6 +11,7 @@ import stat
 import shutil
 import time
 import uuid
+import zlib
 from pathlib import Path
 
 from runtime_files import atomic_json, directory_fd
@@ -19,6 +22,10 @@ STORAGE_LIMIT = 1024 * 1024 * 1024
 RETENTION_MS = 7 * 86400 * 1000
 SENSITIVE = re.compile(r'authorization|cookie|token|api[-_]?key|password|secret', re.I)
 PREVIEW_KEYS = {'source','representation','headers','body','body_truncated','headers_truncated','original_body_bytes','original_body_sha256','captured_at_ms'}
+EGRESS_SOURCE = 'agy_http_transport'
+EGRESS_REPRESENTATION = 'http_entity_from_transport_trace'
+EGRESS_KEYS = PREVIEW_KEYS | {'status','http_status','complete','reason'}
+HEADER_TOKEN = re.compile(r"[!#$%&'*+.^_\x60|~0-9A-Za-z-]{1,128}")
 
 
 def _identifier(value):
@@ -72,7 +79,7 @@ def _snapshot_directory(folder):
 
 
 def _save(folder, value):
-    folder=Path(folder);base=folder.parent if folder.name=='ingress' else folder
+    folder=Path(folder);base=folder.parent if folder.name in ('ingress','egress') else folder
     directory,owner=_snapshot_directory(base)
     lock=None
     try:
@@ -141,15 +148,75 @@ def save_ingress(root, account_id, attempt_id, ingress):
     if set(ingress)-PREVIEW_KEYS:raise ValueError('入口包含未知字段')
     value = {'schema_version': 1, 'stage': 'agy_ingress', 'account_id': account_id, 'attempt_id': _identifier(attempt_id),
         'captured_at_ms': int(time.time() * 1000), 'ingress': ingress}
+    _save(_channel(root,'ingress'), value)
+
+
+def _channel(root, name):
+    root=Path(root)
     directory=directory_fd(root)
     try:
         owner=os.fstat(directory)
         try:
-            os.mkdir('ingress',0o700,dir_fd=directory)
-            if os.geteuid()==0:os.chown('ingress',owner.st_uid,owner.st_gid,dir_fd=directory,follow_symlinks=False)
+            os.mkdir(name,0o700,dir_fd=directory)
+            if os.geteuid()==0:os.chown(name,owner.st_uid,owner.st_gid,dir_fd=directory,follow_symlinks=False)
         except FileExistsError:pass
     finally:os.close(directory)
-    _save(Path(root)/'ingress', value)
+    return root/name
+
+
+def save_egress(root, account_id, attempt_id, trace, expected, incoming, forwarded, bearer):
+    """保存实际传输观察及逐头处理。@param root 采集根。@param account_id 账号。@param attempt_id 尝试。@param trace 实际传输观察。@param expected 本次发送实体。@param incoming AGY 交给适配层的头。@param forwarded 适配层保留的头。@param bearer 当前访问凭据。@return 无。"""
+    raw=trace.body(expected)
+    headers=trace.headers or []
+    original_headers={name.lower() for name,_ in incoming if HEADER_TOKEN.fullmatch(name)}
+    forwarded_values={name.lower():value.strip() for name,_,value in (header.partition(':') for header in forwarded)}
+    sent_values={name:value for name,value in headers if HEADER_TOKEN.fullmatch(name)}
+    secrets={value for name,value in (*incoming,*headers) if value and SENSITIVE.search(name)}
+    if bearer:secrets.add(bearer)
+    ordered_secrets=sorted(secrets,key=len,reverse=True)
+    display=[];header_bytes=0
+    for name,value in headers:
+        if SENSITIVE.search(name):
+            value='[redacted]'
+        else:
+            for secret in ordered_secrets:
+                value=value.replace(secret,'[redacted]')
+        size=len(name.encode())+len(value.encode())
+        if header_bytes+size>64*1024 or len(display)>=128:break
+        display.append([name,value]);header_bytes+=size
+    body='';truncated=False
+    if raw is not None:
+        try:
+            entity=raw
+            if ['content-encoding','gzip'] in headers:
+                with gzip.GzipFile(fileobj=BytesIO(raw)) as stream:
+                    entity=stream.read(64*1024*1024+1)
+            if len(entity)>64*1024*1024:raise ValueError('出站预览过大')
+            related=({name:value} for name,value in (*incoming,*headers))
+            cleaned=_redacted(json.loads(entity),bearer,related).encode()
+            body=cleaned[:BODY_LIMIT//2].decode('utf-8',errors='ignore')
+            truncated=len(cleaned)>BODY_LIMIT//2
+        except (ValueError,OSError,EOFError,zlib.error):truncated=True
+    wire={'source':EGRESS_SOURCE,'representation':EGRESS_REPRESENTATION,'status':'complete' if raw is not None else 'incomplete',
+        'complete':raw is not None,'reason':None if raw is not None else 'HTTP_PARTIAL','http_status':trace.status,
+        'body':body,'body_truncated':truncated,'headers':display,'headers_truncated':len(display)<len(headers),
+        'original_body_bytes':len(raw) if raw is not None else None,
+        'original_body_sha256':hashlib.sha256(raw).hexdigest() if raw is not None else None}
+    decisions=[]
+    for name in sorted(original_headers|sent_values.keys()):
+        if name in sent_values and name in forwarded_values and sent_values[name]==forwarded_values[name]:
+            action,reason='keep','出站适配沿用 AGY 原生值'
+        elif name in sent_values:
+            action,reason='runtime','按实际目标或正文重新生成'
+        elif trace.headers is None:
+            continue
+        else:
+            action,reason='drop','出站适配移除或由传输层重新计算'
+        decisions.append({'name':name,'action':action,'reason':reason})
+    value={'schema_version':1,'stage':'agy_egress','account_id':account_id,'attempt_id':_identifier(attempt_id),
+        'captured_at_ms':int(time.time()*1000),'wire_final':wire,'decisions':decisions[:128],
+        'observed_count':len(decisions)}
+    _save(_channel(root,'egress'), value)
 
 
 def _read(root, account_id, attempt_id, stage, allow_expired=False):
@@ -185,16 +252,18 @@ def _read(root, account_id, attempt_id, stage, allow_expired=False):
             if (name=='wire_final') != (row['status']=='unavailable'):raise ValueError('最终线字节状态无效')
         allowed={'schema_version','stage','account_id','attempt_id','captured_at_ms','source','representation','headers','body','body_truncated','headers_truncated','original_body_bytes','original_body_sha256','decoded_gemini','stages','system_prompt_policy'}
         if set(value)-allowed:raise ValueError('快照包含未知字段')
-    else:
+    elif stage=='agy_ingress':
         ingress=value.get('ingress');_validate_preview(ingress,1024*1024)
         if set(value)-{'schema_version','stage','account_id','attempt_id','captured_at_ms','ingress'} or set(ingress)-PREVIEW_KEYS or ingress.get('source')!='gateway_http_ingress' or ingress.get('representation')!='http_logical_bytes':raise ValueError('入口来源无效')
+    else:
+        _validate_egress(value)
     return value
 
 
 def cleanup_snapshot_steps(root, account_id, stopping=lambda: False):
     """按实际归属和七天时间清理快照，保护后来原子替换。@param root 环境根。@param account_id 网关账号。@param stopping 停止标记。@return 逐项清理计数。"""
     base=Path(root)/'flows/api/agy-prepared'
-    for folder,stage in [(base,'agy_prepared'),(base/'ingress','agy_ingress')]:
+    for folder,stage in [(base,'agy_prepared'),(base/'ingress','agy_ingress'),(base/'egress','agy_egress')]:
         try:directory=directory_fd(folder/'snapshots')
         except FileNotFoundError:continue
         try:
@@ -268,6 +337,45 @@ def _validate_preview(value,budget):
     if 'captured_at_ms' in value and (type(value['captured_at_ms']) is not int or value['captured_at_ms']<=0 or value['captured_at_ms']>int(time.time()*1000)+300000):raise ValueError('入口预览时间无效')
 
 
+def _validate_egress(value):
+    keys={'schema_version','stage','account_id','attempt_id','captured_at_ms','wire_final','decisions','observed_count'}
+    wire=value.get('wire_final')
+    if set(value)!=keys or not isinstance(wire,dict) or set(wire)!=EGRESS_KEYS-{'captured_at_ms'}:
+        raise ValueError('出站采集字段无效')
+    if wire.get('source')!=EGRESS_SOURCE or wire.get('representation')!=EGRESS_REPRESENTATION:
+        raise ValueError('出站采集来源无效')
+    status=wire.get('http_status')
+    if status is not None and (type(status) is not int or not 100<=status<=599):raise ValueError('上游状态无效')
+    if wire.get('complete') is True and wire.get('status')=='complete' and wire.get('reason') is None:
+        _validate_preview(wire,BODY_LIMIT//2)
+    elif (wire.get('complete') is False and wire.get('status')=='incomplete' and wire.get('reason')=='HTTP_PARTIAL'
+          and wire.get('original_body_bytes') is None and wire.get('original_body_sha256') is None and wire.get('body')==''):
+        _validate_preview({**wire,'original_body_bytes':0,'original_body_sha256':'0'*64},BODY_LIMIT//2)
+    else:raise ValueError('出站采集完整性无效')
+    decisions=value['decisions']
+    count=value['observed_count']
+    if not isinstance(decisions,list) or len(decisions)>128 or type(count) is not int or count<len(decisions):
+        raise ValueError('出站头处理数量无效')
+    for row in decisions:
+        if (not isinstance(row,dict) or set(row)!={'name','action','reason'} or not isinstance(row['name'],str)
+                or not HEADER_TOKEN.fullmatch(row['name']) or row['action'] not in ('drop','keep','runtime')
+                or not isinstance(row['reason'],str) or len(row['reason'])>128):
+            raise ValueError('出站头处理无效')
+
+
+def _ingress_decisions(ingress):
+    for name in sorted({name.lower() for name,_ in ingress.get('headers',[]) if HEADER_TOKEN.fullmatch(name)}):
+        if name in ('x-api-key','x-goog-api-key'):
+            action,reason='context','网关用于入口鉴权'
+        elif name=='authorization':
+            action,reason='runtime','网关鉴权后由 AGY 使用账号凭据'
+        elif name in ('content-type','content-length','transfer-encoding','host','user-agent','accept-encoding','connection'):
+            action,reason='runtime','由 AGY 生成实际模型请求头'
+        else:
+            action,reason='drop','网关的 Gemini 请求信封未转发该入口头'
+        yield {'name':name,'action':action,'reason':reason,'stage':'ingress'}
+
+
 def read_snapshot(root, account_id, attempt_id):
     """读取固定平台目录并合并有界阶段。@param root 已绑定环境根。@param account_id 账号。@param attempt_id 尝试。@return 脱敏快照。"""
     base = Path(root) / 'flows/api/agy-prepared'
@@ -278,6 +386,9 @@ def read_snapshot(root, account_id, attempt_id):
     try:
         ingress = _read(base / 'ingress', account_id, attempt_id, 'agy_ingress')['ingress']
     except FileNotFoundError: ingress = None
+    try:
+        egress = _read(base / 'egress', account_id, attempt_id, 'agy_egress')
+    except FileNotFoundError: egress = None
     if ingress is not None:
         ingress = copy.deepcopy(ingress)
         raw = ingress['body'].encode()
@@ -289,7 +400,38 @@ def read_snapshot(root, account_id, attempt_id):
         value['ingress'] = ingress
         value['stages'].insert(0, {'stage': 'ingress', 'source': 'gateway_http_ingress', 'representation': 'http_logical_bytes', 'status': 'truncated' if ingress['body_truncated'] else 'complete'})
     else:
-        if value is None:
+        if value is None and egress is None:
             raise FileNotFoundError('本次请求的采集文件尚未保存')
-        value['stages'].insert(0, {'stage':'ingress','source':'unavailable','representation':'unavailable','status':'unavailable','note':'本次入站旁路缺失或尚未保存'})
+        if value is not None:
+            value['stages'].insert(0, {'stage':'ingress','source':'unavailable','representation':'unavailable','status':'unavailable','note':'本次入站旁路缺失或尚未保存'})
+    decisions=list(_ingress_decisions(ingress or {}))
+    count=len(decisions)
+    if egress is not None:
+        wire=egress['wire_final']
+        if value is None:
+            value={key:egress[key] for key in ('schema_version','account_id','attempt_id','captured_at_ms')}
+            value.update(stage='agy_egress',stages=[])
+        elif value['stage']=='agy_ingress':
+            value['stage']='agy_egress'
+            for key in PREVIEW_KEYS-{'captured_at_ms'}:value.pop(key,None)
+        value['wire_final']=wire
+        # 给出站预览腾出共享正文预算，历史及仅入口记录沿原预算读取。
+        sections={'ingress':ingress,'decoded_gemini':value.get('decoded_gemini'),'agy_prepared':value}
+        for stage,budget in [('agy_prepared',BODY_LIMIT//4),('decoded_gemini',BODY_LIMIT//8),('ingress',BODY_LIMIT//8)]:
+            section=sections[stage]
+            if section is None or 'body' not in section:continue
+            encoded=section['body'].encode()
+            if len(encoded)>budget:
+                section['body']=encoded[:budget].decode('utf-8',errors='ignore')
+                section['body_truncated']=True
+        value['stages']=[row for row in value['stages'] if row['stage']!='wire_final']
+        for row in value['stages']:
+            section=sections.get(row['stage'])
+            if section and section.get('body_truncated'):row['status']='truncated'
+        value['stages'].append({'stage':'wire_final','source':EGRESS_SOURCE,'representation':EGRESS_REPRESENTATION,'status':wire['status']})
+        decisions.extend({**row,'stage':'egress'} for row in egress['decisions'])
+        count+=egress['observed_count']
+    if decisions and value['stage']!='agy_ingress':
+        value['header_policy']={'source':'agy_header_policy','status':'truncated' if count>128 or (ingress or {}).get('headers_truncated') else 'complete',
+            'observed_count':count,'stored_count':min(128,len(decisions)),'decisions':decisions[:128]}
     return value

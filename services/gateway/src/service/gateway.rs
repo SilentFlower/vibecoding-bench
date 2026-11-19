@@ -43,7 +43,9 @@ use crate::service::account::{
     AccountSelectionContext, AccountService, AccountSlotPermit, DEFAULT_REQUEST_SLOT_UNITS,
     HAIKU_REQUEST_SLOT_UNITS, QueueWaitError, RateLimitDecision, UsageObservationKind,
 };
-use crate::service::diagnostics::{self, CURRENT_TRACE, RequestTraceGuard, TraceContext};
+use crate::service::diagnostics::{
+    self, CURRENT_TRACE, RequestDiagnosticsConfig, RequestTraceGuard, TraceContext,
+};
 use crate::service::native_contract::NativeSourceVersion;
 use crate::service::native_contract::validate_idle_timeout;
 use crate::service::native_error::{REJECTION_CAPTURE_HEADER, REJECTION_HEADER, rejection_reason};
@@ -103,13 +105,13 @@ use crate::store::settings_store::{
     DEFAULT_MESSAGE_BODY_ORDER_FINGERPRINT_ENABLED, DEFAULT_MESSAGE_CACHE_CONTROL_REWRITE,
     DEFAULT_MESSAGE_TOP_FIELD_FILTER_ENABLED, DEFAULT_NON_STREAM_PROBE_CACHE_ENABLED,
     DEFAULT_PASSTHROUGH_OS_VERSION, DEFAULT_PASSTHROUGH_SHELL, DEFAULT_PASSTHROUGH_WORKING_DIR,
-    DEFAULT_REQUEST_DIAGNOSTICS_LOG_MODE, DEFAULT_REWRITE_DISABLED_THINKING_ENABLED,
-    DEFAULT_REWRITE_DISABLED_THINKING_MODELS, DEFAULT_SESSION_HELLO_PROBE_ENABLED,
-    DEFAULT_SESSION_HELLO_PROBE_FAILURE_COOLDOWN_SECS, DEFAULT_SESSION_HELLO_PROBE_STRICT,
-    DEFAULT_SESSION_HELLO_PROBE_SUCCESS_TTL_SECS, DEFAULT_SESSION_HELLO_PROBE_TIMEOUT_SECS,
-    DEFAULT_STREAM_KEEPALIVE_ENABLED, DEFAULT_STREAM_KEEPALIVE_INTERVAL_SECS,
-    DEFAULT_STREAM_UPSTREAM_IDLE_TIMEOUT_SECS, SettingsStore,
-    normalize_message_top_field_filter_enabled,
+    DEFAULT_REQUEST_DIAGNOSTICS_LOG_MODE, DEFAULT_REQUEST_DIAGNOSTICS_REJECTED_BODY,
+    DEFAULT_REWRITE_DISABLED_THINKING_ENABLED, DEFAULT_REWRITE_DISABLED_THINKING_MODELS,
+    DEFAULT_SESSION_HELLO_PROBE_ENABLED, DEFAULT_SESSION_HELLO_PROBE_FAILURE_COOLDOWN_SECS,
+    DEFAULT_SESSION_HELLO_PROBE_STRICT, DEFAULT_SESSION_HELLO_PROBE_SUCCESS_TTL_SECS,
+    DEFAULT_SESSION_HELLO_PROBE_TIMEOUT_SECS, DEFAULT_STREAM_KEEPALIVE_ENABLED,
+    DEFAULT_STREAM_KEEPALIVE_INTERVAL_SECS, DEFAULT_STREAM_UPSTREAM_IDLE_TIMEOUT_SECS,
+    SettingsStore, normalize_message_top_field_filter_enabled,
 };
 use crate::store::usage_store::UsageStore;
 use crate::tlsfp::{
@@ -640,7 +642,7 @@ pub struct GatewayService {
     disabled_thinking_rewrite: RwLock<DisabledThinkingRewrite>,
     assistant_prefill_intercept_config: RwLock<AssistantPrefillInterceptConfig>,
     rate_limit_request_log_config: RwLock<RateLimitRequestLogConfig>,
-    request_log_mode: RwLock<RequestLogMode>,
+    request_diagnostics_config: RwLock<RequestDiagnosticsConfig>,
     non_stream_probe_cache_config: RwLock<NonStreamProbeCacheConfig>,
     non_stream_probe_cache: RwLock<HashMap<String, CachedProbeResponse>>,
     stream_stability_config: RwLock<StreamStabilityConfig>,
@@ -739,7 +741,7 @@ impl GatewayService {
                 default_assistant_prefill_intercept_config(),
             ),
             rate_limit_request_log_config: RwLock::new(default_rate_limit_request_log_config()),
-            request_log_mode: RwLock::new(RequestLogMode::Info),
+            request_diagnostics_config: RwLock::default(),
             non_stream_probe_cache_config: RwLock::new(default_non_stream_probe_cache_config()),
             non_stream_probe_cache: RwLock::new(HashMap::new()),
             stream_stability_config: RwLock::new(default_stream_stability_config()),
@@ -1284,21 +1286,25 @@ impl GatewayService {
     /// 热加载后续请求的日志模式，读取错误保留已生效缓存。
     /// @return 成功刷新或设置读取错误。
     pub async fn reload_request_log_mode(&self) -> Result<(), AppError> {
-        let value = self
-            .settings_store
-            .get_value(
-                "request_diagnostics_log_mode",
-                DEFAULT_REQUEST_DIAGNOSTICS_LOG_MODE,
-            )
-            .await?;
-        *self.request_log_mode.write().await = RequestLogMode::parse(&value).unwrap_or_default();
+        let mut config = self.request_diagnostics_config.write().await;
+        let values = self.settings_store.get_all().await?;
+        let mode = values
+            .get("request_diagnostics_log_mode")
+            .map_or(DEFAULT_REQUEST_DIAGNOSTICS_LOG_MODE, String::as_str);
+        let body = values
+            .get("request_diagnostics_rejected_body")
+            .map_or(DEFAULT_REQUEST_DIAGNOSTICS_REJECTED_BODY, String::as_str);
+        *config = RequestDiagnosticsConfig {
+            mode: RequestLogMode::parse(mode).unwrap_or_default(),
+            full_rejected_ingress: body == "full",
+        };
         Ok(())
     }
 
-    /// 返回当前实际生效的日志模式，管理页不从数据库值猜测缓存状态。
-    /// @return 下一个请求入口将冻结的模式。
-    pub async fn request_log_mode(&self) -> RequestLogMode {
-        *self.request_log_mode.read().await
+    /// 返回当前实际生效的请求诊断设置。
+    /// @return 下一个请求入口将冻结的设置。
+    pub(crate) async fn request_diagnostics_config(&self) -> RequestDiagnosticsConfig {
+        *self.request_diagnostics_config.read().await
     }
 
     /// 从全局设置刷新 429 请求观测日志配置。
@@ -1723,11 +1729,15 @@ impl GatewayService {
     /// @param api_token 已校验的账号访问范围。
     /// @return 原有业务响应及可用的诊断关联头。
     pub async fn handle_request(&self, req: Request, api_token: Option<&ApiToken>) -> Response {
-        let mode = *self.request_log_mode.read().await;
+        let config = self.request_diagnostics_config().await;
         diagnostics::CURRENT_LOG_MODE
             .scope(
-                mode,
-                session_policy_block::scope(self.handle_request_with_diagnostics(req, api_token)),
+                config.mode,
+                session_policy_block::scope(self.handle_request_with_diagnostics(
+                    req,
+                    api_token,
+                    config.full_rejected_ingress,
+                )),
             )
             .await
     }
@@ -1735,11 +1745,13 @@ impl GatewayService {
     /// 在已冻结内容策略的作用域中装配诊断，保持独立存储的旁路性质。
     /// @param req 已鉴权请求。
     /// @param api_token 当前访问范围。
+    /// @param full_rejected_ingress 是否保存完整拒绝正文。
     /// @return 包含关联标识的响应。
     async fn handle_request_with_diagnostics(
         &self,
         req: Request,
         api_token: Option<&ApiToken>,
+        full_rejected_ingress: bool,
     ) -> Response {
         let Some(store) = self
             .diagnostics_store
@@ -1761,6 +1773,7 @@ impl GatewayService {
         trace.remember_ingress(
             req.headers(),
             api_token.map_or("", |token| token.token.as_str()),
+            full_rejected_ingress,
         );
         let guard = RequestTraceGuard::new(trace.clone());
         let response = match CURRENT_TRACE
@@ -4916,6 +4929,11 @@ fn count_tokens_app_error_response(err: AppError) -> Response {
         AppError::TooManyRequests(message) => {
             anthropic_error_response(StatusCode::TOO_MANY_REQUESTS, "rate_limit_error", &message)
         }
+        error @ AppError::AgyUpstreamQuota => anthropic_error_response(
+            StatusCode::TOO_MANY_REQUESTS,
+            "rate_limit_error",
+            &error.to_string(),
+        ),
         AppError::BadGateway(_) => anthropic_error_response(
             StatusCode::BAD_GATEWAY,
             "upstream_error",
@@ -9638,6 +9656,7 @@ mod tests {
             platform: "claude_code".into(),
             agy_system_prompt_homoglyph_enabled: false,
             agy_gif_frames_enabled: false,
+            agy_disable_safety_filtering: false,
             id: 42,
             name: "测试账号".into(),
             email: "user@example.com".into(),
@@ -21746,7 +21765,10 @@ data: {"type":"message_delta","delta":{"safeguard_results":[{"type":"dangerous_t
     async fn request_log_mode_reload_preserves_effective_cache_on_failure() {
         use sqlx::any::AnyPoolOptions;
         let mut service = test_gateway_service().await;
-        assert_eq!(service.request_log_mode().await, RequestLogMode::Info);
+        assert_eq!(
+            service.request_diagnostics_config().await.mode,
+            RequestLogMode::Info
+        );
         for (raw, expected) in [
             ("debug", RequestLogMode::Debug),
             ("invalid", RequestLogMode::Info),
@@ -21761,7 +21783,7 @@ data: {"type":"message_delta","delta":{"safeguard_results":[{"type":"dangerous_t
                 .await
                 .unwrap();
             service.reload_request_log_mode().await.unwrap();
-            assert_eq!(service.request_log_mode().await, expected);
+            assert_eq!(service.request_diagnostics_config().await.mode, expected);
         }
         let closed = AnyPoolOptions::new()
             .connect("sqlite::memory:")
@@ -21770,7 +21792,10 @@ data: {"type":"message_delta","delta":{"safeguard_results":[{"type":"dangerous_t
         closed.close().await;
         service.settings_store = Arc::new(SettingsStore::new(closed));
         assert!(service.reload_request_log_mode().await.is_err());
-        assert_eq!(service.request_log_mode().await, RequestLogMode::Debug);
+        assert_eq!(
+            service.request_diagnostics_config().await.mode,
+            RequestLogMode::Debug
+        );
     }
 
     #[test]

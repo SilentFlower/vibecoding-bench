@@ -1,6 +1,7 @@
 """把网关AGY账号接入现有隔离角色和环境生命周期。"""
 import json
 import hashlib
+import re
 import shutil
 import os
 import time
@@ -248,10 +249,12 @@ def clear_work_copies(runtime, row: dict) -> None:
     captures=root/'flows/api/agy-prepared'
     if captures.is_dir() and not captures.is_symlink():
         for folder in captures.iterdir():
-            if folder.is_dir() and not folder.is_symlink():
-                shutil.rmtree(folder/'home',ignore_errors=True)
-                if not (folder/'retired.json').is_file():
-                    atomic_json(folder/'retired.json',{'retired_at':time.time()})
+            # 旧工作目录用 UUID hex 命名。共享采集目录由快照保留策略独立管理。
+            if not re.fullmatch('[0-9a-f]{32}',folder.name) or folder.is_symlink() or not folder.is_dir():
+                continue
+            shutil.rmtree(folder/'home',ignore_errors=True)
+            if not (folder/'retired.json').is_file():
+                atomic_json(folder/'retired.json',{'retired_at':time.time()})
 
 
 def stop_environment(runtime, row: dict, *, remove: bool) -> None:

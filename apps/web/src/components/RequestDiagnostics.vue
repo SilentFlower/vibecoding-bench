@@ -55,6 +55,7 @@ const dialogOpen = ref(false);
 const detailLoading = ref(false);
 const detailError = ref('');
 const mode = ref<'info' | 'debug' | 'unknown'>('unknown');
+const rejectedBody = ref<'preview' | 'full'>('preview');
 const modeSaving = ref(false);
 const modeError = ref('');
 let listController: AbortController | null = null;
@@ -194,21 +195,29 @@ function restoreFocus(event: Event): void {
 async function loadMode(): Promise<void> {
   try {
     const settings = await api.getSettings(settingsController.signal);
-    if (mounted) mode.value = settings.request_diagnostics_log_mode === 'debug' ? 'debug' : 'info';
+    if (mounted) {
+      mode.value = settings.request_diagnostics_log_mode === 'debug' ? 'debug' : 'info';
+      rejectedBody.value = settings.request_diagnostics_rejected_body === 'full' ? 'full' : 'preview';
+    }
   } catch (cause) {
     if (mounted && !settingsController.signal.aborted) modeError.value = cause instanceof Error ? cause.message : '日志模式读取失败';
   }
 }
 
-/** 保存后续请求使用的模式。@param value 日志模式。@return 保存结束。 */
-async function saveMode(value: string): Promise<void> {
-  if (value !== 'info' && value !== 'debug') return;
+/** 保存后续请求使用的诊断设置。@param value 日志模式或拒绝正文范围。@return 保存结束。 */
+async function saveDiagnostics(value: string): Promise<void> {
+  const logMode = value === 'info' || value === 'debug';
+  if (!logMode && value !== 'preview' && value !== 'full') return;
   modeSaving.value = true; modeError.value = '';
   try {
-    await api.updateSettings({ request_diagnostics_log_mode: value });
-    if (mounted) mode.value = value;
+    const key = logMode ? 'request_diagnostics_log_mode' : 'request_diagnostics_rejected_body';
+    await api.updateSettings({ [key]: value });
+    if (mounted) {
+      if (value === 'info' || value === 'debug') mode.value = value;
+      else rejectedBody.value = value;
+    }
   } catch (cause) {
-    if (mounted) modeError.value = cause instanceof Error ? cause.message : '日志模式保存失败';
+    if (mounted) modeError.value = cause instanceof Error ? cause.message : '诊断设置保存失败';
   } finally {
     if (mounted) { modeSaving.value = false; }
   }
@@ -334,7 +343,13 @@ onUnmounted(() => { mounted = false; listGeneration++; detailGeneration++; listC
 
 <template>
   <section class="requests-page" aria-label="请求记录">
-    <header class="request-page-heading"><div class="page-heading"><div><p class="page-eyebrow">观测与诊断</p><h1>请求记录</h1><p class="page-description">从请求结果、用量到处理链路，快速找到需要关注的调用。</p></div></div><div class="request-mode"><ChoiceSelect :model-value="mode" label="后续请求日志" :options="[{value:'unknown',label:'读取中',disabled:true},{value:'info',label:'info · 摘要'},{value:'debug',label:'debug · 脱敏内容'}]" :disabled="modeSaving || mode === 'unknown'" @update:model-value="saveMode" /><small>仅影响后续请求</small></div></header>
+    <header class="request-page-heading">
+      <div class="page-heading"><div><p class="page-eyebrow">观测与诊断</p><h1>请求记录</h1><p class="page-description">从请求结果、用量到处理链路，快速找到需要关注的调用。</p></div></div>
+      <div class="request-diagnostics-settings">
+        <div class="request-mode"><ChoiceSelect :model-value="mode" label="后续请求日志" :options="[{value:'unknown',label:'读取中',disabled:true},{value:'info',label:'info · 摘要'},{value:'debug',label:'debug · 脱敏内容'}]" :disabled="modeSaving || mode === 'unknown'" @update:model-value="saveDiagnostics" /></div>
+        <div v-if="mode === 'debug'" class="request-mode"><ChoiceSelect :model-value="rejectedBody" label="本地拒绝入站正文" :options="[{value:'preview',label:'限长预览'},{value:'full',label:'完整正文 · 脱敏'}]" :disabled="modeSaving" @update:model-value="saveDiagnostics" /></div>
+      </div>
+    </header>
     <p v-if="modeError" role="alert" class="text-destructive">{{ modeError }}</p>
     <section class="request-query-panel"><div class="request-quick-tabs" role="group" aria-label="请求快捷筛选"><button v-for="item in quickTabs" :key="item.id" type="button" :class="{active:quick===item.id && !outcome}" :aria-pressed="quick===item.id && !outcome" @click="chooseQuick(item.id)"><component :is="item.icon" :size="14" />{{ item.label }}<span>{{ counts?.[item.id] ?? '—' }}</span></button></div>
       <form @submit.prevent="load()"><div class="request-query-toolbar"><SearchInput v-model="correlation" label="请求关联 ID" placeholder="输入完整请求 ID / 响应关联 ID / 上游请求 ID" @search="load()" /><Button type="button" variant="outline" :aria-expanded="filtersOpen" aria-controls="request-filters" @click="filtersOpen=!filtersOpen"><Settings2 :size="14" />筛选<i v-if="account || outcome || since || until || platform || protocol || kernelVersion || requestedModel || actualModel" class="request-filter-dot" /></Button><Button type="submit" :disabled="loading"><Search :size="14" />查询</Button><Button type="button" variant="outline" :disabled="loading" @click="load(page)"><RefreshCw :size="14" />刷新</Button></div>
@@ -357,7 +372,7 @@ onUnmounted(() => { mounted = false; listGeneration++; detailGeneration++; listC
           <section v-if="selected" :id="`request-panel-${activeTab}`" role="tabpanel" :aria-labelledby="`request-tab-${activeTab}`" tabindex="0" class="outline-none">
             <template v-if="activeTab === 'overview'">
               <div class="request-detail-hero"><div><span class="request-status" :class="outcomeTone(selected.outcome).replace('diagnostic-','is-')"><i></i>{{ outcomeLabel(selected.outcome) }}<small>{{ selected.status_code ?? '待终结' }}</small></span><h3>{{ selected.account_name || selected.account_email || accountLabel(selected) }}</h3><p>{{ selected.account_email || '暂无账号邮箱' }}</p></div><div><span>请求总耗时</span><strong>{{ milliseconds(elapsed(selected)) }}</strong></div></div>
-              <div v-if="selected.error_stage" class="request-error-explanation"><AlertCircle /><div><strong>{{ outcomeLabel(selected.outcome) }}</strong><p>错误阶段：{{ selected.error_stage }}{{ selected.status_code===200?' · HTTP 200，响应未完整结束':'' }}</p></div></div>
+              <div v-if="selected.error_stage" class="request-error-explanation"><AlertCircle /><div><strong>{{ outcomeLabel(selected.outcome) }}</strong><p v-if="attempts.at(-1)?.error_type === 'RESOURCE_EXHAUSTED'">上游额度不足或触发限流（RESOURCE_EXHAUSTED）</p><p>错误阶段：{{ selected.error_stage === 'upstream_model' ? '上游模型' : selected.error_stage }}{{ selected.status_code===200?' · HTTP 200，响应未完整结束':'' }}</p></div></div>
               <div v-if="selected.native_rejection" class="request-error-explanation"><AlertCircle /><div><strong>{{ rejectionLabel(selected.native_rejection.reason) }}</strong><p>本次在上游发送前拒绝。入口采集状态：{{ captureLabel(selected.native_rejection.capture_status) }}<template v-if="selected.context?.input_rejection_field"> · <code>{{ selected.context.input_rejection_field }}</code></template></p><button type="button" class="btn small" :disabled="detailLoading" @click="inspect()">查看入站请求</button></div></div>
               <div v-else-if="selected.context?.input_rejection_reason" class="request-error-explanation"><AlertCircle /><div><strong>请求在上游发送前被拒绝</strong><p><code>{{ selected.context.input_rejection_reason }}</code><template v-if="selected.context.input_rejection_field"> · <code>{{ selected.context.input_rejection_field }}</code></template></p><button v-if="currentAttempt && canInspect(currentAttempt)" type="button" class="btn small" :disabled="detailLoading" @click="inspect(currentAttempt)">查看入站请求</button></div></div>
               <dl class="request-definitions"><dt>开始时间</dt><dd :title="selected.started_at">{{ formatLocalTime(selected.started_at) }}</dd><dt>结束时间</dt><dd :title="selected.finished_at ?? undefined">{{ formatLocalTime(selected.finished_at) }}</dd><dt>原始 Session ID</dt><dd><div v-if="selected.original_session_id" class="request-session request-session-full"><code>{{ selected.original_session_id }}</code><button type="button" :aria-label="`复制原始 Session ID ${selected.original_session_id}`" @click="copy(selected.original_session_id,$event)"><Copy :size="12" /></button></div><span v-else>未提供</span></dd><dt>账号平台</dt><dd>{{ platformLabel(selected.context?.platform) }}</dd><dt>入口协议</dt><dd>{{ selected.context?.entry_protocol ?? '历史未记录' }}</dd><dt>请求模型</dt><dd>{{ selected.context?.requested_model ?? '历史未记录' }}</dd><dt>响应关联 ID</dt><dd><code>{{ selected.response_request_id ?? '未观测' }}</code></dd><dt>发生时日志</dt><dd>{{ selected.log_mode || '历史模式未知' }}</dd><dt>尝试次数</dt><dd>{{ selected.attempt_count }}</dd><dt>末次执行节点</dt><dd><ExecutionNodeBadge compact :node="latestExecution" :empty-label="selected.attempt_count===0 ? '无执行尝试' : '节点未观测'" /></dd><dt>显示时区</dt><dd>{{ Intl.DateTimeFormat().resolvedOptions().timeZone }}</dd></dl>
@@ -382,7 +397,7 @@ onUnmounted(() => { mounted = false; listGeneration++; detailGeneration++; listC
               <div v-if="selected.native_rejection" class="request-raw-controls"><button type="button" class="btn" :disabled="detailLoading" @click="inspect()"><RefreshCw :size="14" />{{ detailLoading ? '读取中…' : '读取拒绝请求的入站证据' }}</button><span>{{ rejectionLabel(selected.native_rejection.reason) }}</span></div>
               <div class="request-raw-controls"><ChoiceSelect :model-value="currentAttempt?.attempt_id" label="当前尝试" :options="attempts.map(attempt=>({value:attempt.attempt_id,label:`尝试 ${attempt.ordinal} · ${accountLabel(attempt)}`}))" @update:model-value="value=>{selectedAttempt=value;changeAttempt()}" /><button v-if="currentAttempt && canInspect(currentAttempt)" type="button" class="btn" :disabled="detailLoading" @click="inspect(currentAttempt)"><RefreshCw :size="14" />{{ detailLoading ? '读取中…' : capture ? '刷新阶段证据' : '读取阶段证据' }}</button></div>
               <div v-if="currentAttempt && !canInspect(currentAttempt)" class="request-empty-capture"><ShieldCheck :size="20" /><strong>{{ currentAttempt.log_mode === 'info' ? '本次仅保存摘要' : captureLabel(currentAttempt.capture_status) }}</strong><p>完整阶段原文需要账号内容采集开启及 debug 日志模式。设置对后续请求生效。</p><router-link :to="{name:'environments',query:{gateway_account:String(currentAttempt.account_id)}}" class="btn small">前往该账号环境配置<ArrowRight :size="13" /></router-link></div>
-              <section v-else-if="capture"><p v-if="capture.state!=='available' || capture.message" role="status" class="form-help">阶段证据 · {{ capture.state === 'missing' ? '文件缺失或已清理' : capture.state === 'expired' ? '已超过保留期' : capture.state === 'available' ? '已读取' : capture.state }}{{ capture.message ? ' · '+capture.message : '' }}</p><NativeStageDetails v-if="capture.snapshot" :key="selectedAttempt" :snapshot="capture.snapshot" /></section>
+              <section v-else-if="capture"><p v-if="!['available', 'saved'].includes(capture.state) || capture.message" role="status" class="form-help">阶段证据 · {{ capture.state === 'missing' ? '文件缺失或已清理' : capture.state === 'expired' ? '已超过保留期' : ['available', 'saved'].includes(capture.state) ? '已读取' : capture.state }}{{ capture.message ? ' · '+capture.message : '' }}</p><NativeStageDetails v-if="capture.snapshot" :key="selectedAttempt" :snapshot="capture.snapshot" /></section>
               <div v-else-if="!detailLoading" class="request-empty-capture"><strong>按需读取阶段证据</strong><p>选择上方尝试后读取脱敏处理信息。</p></div>
               <details class="request-code-block"><summary>已脱敏诊断字段 · 原始时间</summary><pre>{{ JSON.stringify({request:selected,attempts},null,2) }}</pre></details>
             </template>

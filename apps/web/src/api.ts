@@ -76,6 +76,7 @@ export interface Account {
   platform?: string
   agy_system_prompt_homoglyph_enabled?: boolean
   agy_gif_frames_enabled?: boolean
+  agy_disable_safety_filtering?: boolean
   credential_state?: {generation:number; phase:string; operation_id?:string | null}
   name: string
   email: string
@@ -582,8 +583,8 @@ export interface NativeCapturePreview {
   body: string
   body_truncated: boolean
   headers_truncated: boolean
-  original_body_bytes: number
-  original_body_sha256: string
+  original_body_bytes: number | null
+  original_body_sha256: string | null
 }
 
 /** 原生TLS实际接受的实体证据；未知范围与网络刷出单独表示。 */
@@ -607,15 +608,24 @@ export interface NativeTlsCapture extends Omit<NativeCapturePreview, 'original_b
   binding_generation?: number
 }
 
+/** AGY 账号出站适配层观察到的 HTTP 请求。 */
+export interface AgyWireCapture extends NativeCapturePreview {
+  source: 'agy_http_transport'
+  representation: 'http_entity_from_transport_trace'
+  status: 'complete' | 'incomplete'
+  reason: string | null
+  http_status: number | null
+  complete: boolean
+}
+
 /** 已脱敏的请求阶段快照。 */
 export interface NativeCapture {
   state: string
   message?: string
   snapshot?: {
-    stage: 'cc_prepared' | 'ingress_rejected' | 'agy_prepared' | 'agy_ingress'
     decoded_gemini?: NativeCapturePreview
     ingress?: NativeCapturePreview
-    wire_final?: NativeTlsCapture
+    wire_final?: NativeTlsCapture | AgyWireCapture
     final_body_changes?: {
       source: string
       status: string
@@ -633,7 +643,7 @@ export interface NativeCapture {
       observed_count?: number
       stored_count?: number
       note?: string
-      decisions: { name: string; action: 'keep' | 'drop' | 'runtime' | 'context'; reason: string }[]
+      decisions: { name: string; action: 'keep' | 'drop' | 'runtime' | 'context'; reason: string; stage?: 'ingress' | 'egress' }[]
     }
     body_changes?: {
       source: string
@@ -641,13 +651,10 @@ export interface NativeCapture {
       note?: string
       items: { path: string; action: 'added' | 'removed' | 'changed'; reason: string }[]
     }
-    headers: [string, string][]
-    body: string
-    body_truncated: boolean
-    headers_truncated: boolean
-    original_body_bytes: number | null
-    original_body_sha256: string | null
-  }
+  } & (
+    | ({ stage: 'cc_prepared' | 'agy_prepared' } & NativeCapturePreview)
+    | ({ stage: 'ingress_rejected' | 'agy_ingress' | 'agy_egress' } & Partial<NativeCapturePreview>)
+  )
 }
 
 /** 代理线路公开投影，认证字段仅显示是否已设置。 */

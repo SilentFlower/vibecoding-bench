@@ -1,6 +1,7 @@
 .request-page-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; margin-bottom: 28px; }
 .request-page-heading > .heading, .request-page-heading .heading { margin: 0px; }
 .request-mode { width: 190px; flex: 0 0 auto; }
+.request-diagnostics-settings { display: flex; flex-wrap: wrap; gap: 12px; }
 .request-mode .field { margin: 0px; gap: 5px; }
 .request-mode > small { display: block; color: rgb(163, 172, 185); font-size: var(--ui-font-small); margin-top: 7px; }
 .request-mode .choice-label { font-size: var(--ui-font-body); }

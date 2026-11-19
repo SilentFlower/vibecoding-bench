@@ -1,6 +1,7 @@
 """使用合成凭据及真实文件核对AGY原生运行边界，模型提交为零。"""
 import base64
 import copy
+import gzip
 import json
 import io
 import os
@@ -9,6 +10,8 @@ import threading
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.error import HTTPError
+from urllib.request import ProxyHandler, Request, build_opener
 from unittest.mock import patch
 from types import SimpleNamespace
 
@@ -19,6 +22,7 @@ from agy_runtime.gemini_frames import Frames
 from agy_runtime.models import configure_model, decode_catalog, decode_media_support, decode_png_support
 from agy_runtime.native_bridge import NativeBridge
 from agy_runtime.process_memory import cgroup_memory
+from agy_runtime.safety_egress import MODEL_PATH, SafetyEgress, _Request
 from agy_runtime.kernel import Kernel
 from agy_runtime.tool_broker import Broker
 from agy_runtime.storage import Output, config
@@ -40,6 +44,53 @@ class AgyRuntimeTests(unittest.TestCase):
         return {'account_id': 17, 'credential_generation': 4, 'access_token': 'synthetic-at',
             'expires_at': int((datetime.now(timezone.utc) + timedelta(hours=2)).timestamp() * 1000),
             'email': 'synthetic@example.test'}
+
+    def test_gemini_text_modality_uses_native_default(self):
+        """确认显式文本输出沿用默认行为，图片和音频仍保留字段级错误。@return 无。"""
+        raw = {'schema_version': 1, 'type': 'gemini_request', 'request_id': 'modalities',
+               'model': 'gemini-synthetic', 'body': {'contents': [{'parts': [{'text': '合成请求'}]}]}}
+        expected = gemini_contract.decode_request(raw)['native_completion']
+        for modalities in ([], ['TEXT']):
+            raw['body']['generationConfig'] = {'responseModalities': modalities}
+            self.assertEqual(gemini_contract.decode_request(raw)['native_completion'], expected)
+        for modalities in (None, 'TEXT', ['IMAGE'], ['TEXT', 'AUDIO']):
+            raw['body']['generationConfig'] = {'responseModalities': modalities}
+            with self.subTest(modalities=modalities), self.assertRaisesRegex(
+                    InputError, 'unsupported_gemini_output_modality:/body/generationConfig/responseModalities'):
+                gemini_contract.decode_request(raw)
+
+    def test_safety_egress_validates_binding_and_sends_model_once(self):
+        """覆盖口令、随机路径、压缩正文和重复模型提交。@return 无。"""
+        rules=[{'category':'HARM_CATEGORY_HARASSMENT','threshold':'BLOCK_MEDIUM_AND_ABOVE'}]
+        token='synthetic-access'
+        outbound=[]
+        def forward(handler, scope, path, headers, raw):
+            outbound.append((path, headers, json.loads(gzip.decompress(raw))))
+            handler.send_response(200)
+            handler.end_headers()
+        egress=SafetyEgress(rules,token,'http://127.0.0.1:1080')
+        self.addCleanup(egress.close)
+        opener=build_opener(ProxyHandler({}))
+        body={'request':{'contents':[{'parts':[{'text':'合成请求'}]}]}}
+        def post(url, bearer):
+            compressed=gzip.compress(json.dumps(body).encode())
+            request=Request(url,data=iter([compressed[:5],compressed[5:]]),
+                headers={'Authorization':'Bearer '+bearer,'Content-Encoding':'gzip'})
+            return opener.open(request,timeout=2)
+        with patch.object(_Request,'_forward',forward):
+            for target,bearer in ((egress.url+MODEL_PATH,'invalid'),(egress.url+'/wrong'+MODEL_PATH,token)):
+                with self.assertRaises(HTTPError) as exc:
+                    post(target,bearer)
+                self.assertIn(exc.exception.code,(403,404))
+            with post(egress.url+MODEL_PATH,token) as response:
+                self.assertEqual(response.status,200)
+            with self.assertRaises(HTTPError) as exc:
+                post(egress.url+MODEL_PATH,token)
+            self.assertEqual(exc.exception.code,409)
+        self.assertEqual(len(outbound),1)
+        self.assertIn('Content-Encoding: gzip',outbound[0][1])
+        self.assertIn('Transfer-Encoding: chunked',outbound[0][1])
+        self.assertEqual(outbound[0][2]['request'],{**body['request'],'safetySettings':rules})
 
     def test_cgroup_versions_keep_ram_swap_and_unknown_limits_distinct(self):
         """真实文件覆盖v1/v2预算、无限哨兵、损坏及未知，防止合法环境被拒绝。@return 无。"""
@@ -248,6 +299,30 @@ class AgyRuntimeTests(unittest.TestCase):
         self.assertNotIn('usageMetadata', decoded[0])
         self.assertEqual(decoded[-1]['usageMetadata'], body['usageMetadata'])
         self.assertTrue(all(item['candidates'][0]['syntheticExtension'] for item in decoded))
+
+    def test_gemini_history_normalizes_thought_signature_encoding(self):
+        """工具和思考签名兼容双字母表与缺省填充，原字节保持一致。@return 无。"""
+        for signature in ('+/8=', '+/8', '-_8=', '-_8'):
+            with self.subTest(signature=signature):
+                turns = [
+                    {'role': 'model', 'parts': [
+                        {'text': '合成思考', 'thought': True, 'thoughtSignature': signature},
+                        {'functionCall': {'name': 'synthetic_tool', 'id': 'synthetic-id'}, 'thoughtSignature': signature},
+                    ]},
+                    {'role': 'user', 'parts': [{'functionResponse': {
+                        'name': 'synthetic_tool', 'id': 'synthetic-id', 'response': {'ok': True},
+                    }}]},
+                ]
+                original = copy.deepcopy(turns)
+                plan, reply = gemini_contract.native_history(turns)
+                planner = plan['plannerResponse']
+                self.assertEqual(planner['thinkingSignature'], '+/8=')
+                self.assertEqual(planner['toolCalls'][0]['thinkingSignature'], '+/8=')
+                self.assertEqual(reply['metadata']['toolCall']['thinkingSignature'], '+/8=')
+                self.assertEqual(turns, original)
+        for malformed in ('', '-+8=', '-_8==', 'A', 'bad%'):
+            with self.subTest(malformed=malformed), self.assertRaisesRegex(InputError, 'invalid_gemini_thought_signature'):
+                gemini_contract.call_signature(malformed, {})
 
     def test_oauth_scanner_envelope_preserves_frames_and_authentication_errors(self):
         """真实OAuth逻辑块解开信封并保留签名、扩展和认证错误。@return 无。"""

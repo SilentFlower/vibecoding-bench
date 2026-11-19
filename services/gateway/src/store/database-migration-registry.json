@@ -73,6 +73,15 @@
       "predecessor": 7,
       "rollback_mode": "compatible",
       "version": 8
+    },
+    {
+      "checksum": "3875db8c0287d725cb38b78eaec60f0764ecb165678bda75c5b1a6320e192fd8",
+      "engine": "sqlite",
+      "id": "gateway.agy-safety.9",
+      "kind": "schema",
+      "predecessor": 8,
+      "rollback_mode": "compatible",
+      "version": 9
     }
   ]
 }

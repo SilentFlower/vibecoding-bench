@@ -34,6 +34,21 @@ def text(value):
     return value
 
 
+def decode_gemini_bytes(value: str) -> tuple[bytes, str]:
+    """解码 Gemini 字节字段。@param value Base64 或 Base64URL 文本。@return 原字节及标准 Base64 表示。"""
+    if not isinstance(value, str) or not value:
+        raise ValueError('Gemini 字节字段需要非空 Base64')
+    try:
+        return base64.b64decode(value, validate=True), value
+    except ValueError:
+        # 两种字母表分别校验，避免把混用字符或损坏的填充误当成兼容数据。
+        if not re.fullmatch(r'(?:[A-Za-z0-9+/]+|[A-Za-z0-9_-]+)={0,2}', value):
+            raise
+        padded = value if value.endswith('=') else value + '=' * (-len(value) % 4)
+        raw = base64.b64decode(padded, altchars=b'-_', validate=True)
+        return raw, base64.b64encode(raw).decode('ascii')
+
+
 def signature(value):
     """检查签名字节的可逆表示。@param value Base64文本。@return 原文本。"""
     text(value)

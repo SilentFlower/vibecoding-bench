@@ -694,6 +694,16 @@ export const settingsGroups:SettingsGroup[] = [
                 "debug · 脱敏内容"
               ]
             ]
+          },
+          {
+            "key": "request_diagnostics_rejected_body",
+            "label": "本地拒绝入站正文",
+            "kind": "select",
+            "help": "仅在 Debug 下生效。完整正文仍会脱敏，并保留原有保留期。",
+            "options": [
+              ["preview", "限长预览"],
+              ["full", "完整正文 · 脱敏"]
+            ]
           }
         ]
       },

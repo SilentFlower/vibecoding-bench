@@ -409,8 +409,27 @@ impl AgyAttemptTrace {
             context.input_rejection_reason = Some((*reason).into());
             context.input_rejection_field = field.clone();
             context.native_model_calls = Some(0);
+            // 账号侧确认内容采集后，才允许网关持久化该次完整入口。
+            if matches!(
+                self.record.capture_status.as_deref(),
+                Some("queued" | "saved")
+            ) {
+                self.trace.save_rejected_ingress(
+                    &mut self.trace.lock(),
+                    Some((*reason).into()),
+                    true,
+                );
+            }
         }
         self.finish("local_rejected", Some("native_input"));
+    }
+
+    /// 保存已核实的上游额度或限流标记。@return 无。
+    pub(crate) fn upstream_quota(&mut self) {
+        if !self.finished {
+            self.record.error_type = Some("RESOURCE_EXHAUSTED".into());
+            self.finish("upstream_error", Some("upstream_model"));
+        }
     }
 
     /// 终结异常尝试，重复终结保持首次结果。@param outcome 受控结果。@param stage 实际阶段。@return 无。
