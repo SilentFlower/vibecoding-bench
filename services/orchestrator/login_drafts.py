@@ -77,24 +77,29 @@ class LoginDraftStore:
         return value
 
     def rows(self) -> list[dict]:
-        """列出未关联环境和清理中遗留标记。
+        """列出可能属于登录草稿的环境和清理中遗留标记。
 
         :return: 环境行；正式账号环境不混入
         """
         connection = self.database()
         try:
+            api_environments = set()
+            if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='platform_api_environments'").fetchone():
+                api_environments = {row[0] for row in connection.execute("SELECT environment_id FROM platform_api_environments")}
+            # API 专用环境没有任务账号 ID，正式归属以平台映射为准。
             rows = {row["environment_id"]: dict(row) for row in connection.execute(
-                "SELECT * FROM account_environments WHERE account_id IS NULL")}
+                "SELECT * FROM account_environments WHERE account_id IS NULL") if row["environment_id"] not in api_environments}
             if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='node_login_drafts'").fetchone():
                 for row in connection.execute("SELECT e.* FROM account_environments e JOIN node_login_drafts d "
                         "ON d.environment_id=e.environment_id WHERE d.phase<>'closed' AND d.saved_account_id IS NOT NULL"):
-                    rows[row['environment_id']]=dict(row)
+                    if row['environment_id'] not in api_environments:
+                        rows[row['environment_id']]=dict(row)
         finally:
             connection.close()
         if self.directory.is_symlink():
             raise ValueError("草稿目录归属异常")
         for path in self.directory.glob("*.json"):
-            if path.stem not in rows:
+            if path.stem not in rows and path.stem not in api_environments:
                 if not re.fullmatch(r"[a-f0-9]{32}", path.stem):
                     continue
                 try:

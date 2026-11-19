@@ -8,7 +8,7 @@ import json
 import re
 import time
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from playwright.async_api import async_playwright, expect
 
@@ -38,6 +38,8 @@ class ClusterUiFixture(Fixture):
         self.synchronize_posts = 0
         self.install_complete = False
         self.fail_install_response = False
+        self.fail_agy_response = False
+        self.assignment_reads = []
 
     async def route(self, route) -> None:
         """截获当前节点管理的全部业务路径。:param route: 浏览器请求。:return: None。"""
@@ -66,7 +68,16 @@ class ClusterUiFixture(Fixture):
         elif path == '/runtime/api/accounts':
             payload = [{'id': number, 'name': '合成账号 ' + str(number), 'enabled': 1 if number == 1 else 0,
                 'cc2api_account_id': 7 if number == 1 else None, 'effective_claude_code_version': '2.1.293'} for number in (1, 2)]
+        elif path == '/admin/accounts':
+            query = parse_qs(urlsplit(request.url).query)
+            assert query.get('platform') == ['antigravity']
+            if self.fail_agy_response:
+                await route.fulfill(status=503, content_type='application/json', body='{}')
+                return
+            payload = {'data': [{'id': 1, 'name': '合成反重力', 'status': 'disabled', 'platform': 'antigravity'}],
+                'total': 1, 'page': 1, 'page_size': 100, 'total_pages': 1}
         elif match := re.fullmatch(r'/runtime/api/accounts/([12])/node', path):
+            self.assignment_reads.append(int(match[1]))
             payload = self.assignments[int(match[1])]
         elif match := re.fullmatch(r'/runtime/api/accounts/([12])/node-migrations(?:/([a-f0-9]{32})(?:/(resume|cancel))?)?', path):
             account_id = int(match[1])
@@ -141,8 +152,22 @@ async def run(output: Path, gateway: Path) -> dict:
         await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only')")
         page = await context.new_page()
         page.on('pageerror', lambda error: errors.append(str(error)))
+        fixture.fail_agy_response = True
         await page.goto(BASE + '/nodes')
         node_card = page.locator('.node-card').filter(has=page.get_by_role('heading', name='上海执行节点', exact=True))
+        local_card = page.locator('.node-card').filter(has=page.get_by_role('heading', name='默认节点', exact=True))
+        await expect(page.get_by_role('alert')).to_contain_text('反重力账号归属读取失败')
+        await expect(local_card.locator('dd').last).to_have_text('—')
+        await expect(node_card.locator('dd').last).to_have_text('1')
+        fixture.fail_agy_response = False
+        await page.get_by_role('button', name='刷新列表', exact=True).click()
+        await expect(local_card.locator('dd').last).to_have_text('2')
+        await expect(page.locator('.nodes-summary')).to_contain_text('3 个归属账号')
+        await select(page, '账号', '合成反重力（反重力 · 已停用）')
+        await expect(page.get_by_role('combobox', name='执行节点')).to_be_disabled()
+        await expect(page.locator('.account-node-selector')).to_contain_text('当前节点：默认节点 · 反重力 API 执行')
+        await expect(page.get_by_role('button', name='保存首次执行节点')).to_have_count(0)
+        assert not fixture.assignment_reads and not fixture.writes
         await node_card.get_by_role('button', name='检查并同步组件', exact=True).click()
         installation = page.get_by_role('dialog', name='准备节点运行组件', exact=True)
         await installation.get_by_role('button', name='开始准备', exact=True).click()
@@ -167,7 +192,7 @@ async def run(output: Path, gateway: Path) -> dict:
         fixture.install_complete = False
         fixture.nodes[1]['preparation'] = None
         await page.reload()
-        await select(page, '任务账号', '合成账号 1')
+        await select(page, '账号', '合成账号 1')
         await select(page, '执行节点', '上海执行节点')
         start = page.get_by_role('button', name='迁移到所选节点', exact=True)
         await expect(start).to_be_enabled()
@@ -205,7 +230,7 @@ async def run(output: Path, gateway: Path) -> dict:
         fixture.histories[1].insert(0, previous)
         fixture.assignments[1]['phase'] = 'reconcile'
         await page.reload()
-        await select(page, '任务账号', '合成账号 1')
+        await select(page, '账号', '合成账号 1')
         await page.get_by_role('button', name='取消迁移', exact=True).click()
         cancel = page.get_by_role('dialog', name='取消原迁移', exact=True)
         before = len(fixture.writes)
@@ -215,7 +240,7 @@ async def run(output: Path, gateway: Path) -> dict:
         await cancel.get_by_role('button', name='确认取消迁移', exact=True).click()
         await expect(page.locator('.migration-status')).to_contain_text('迁移已取消')
         assert fixture.assignments[1]['node_id'] == 2 and fixture.assignments[1]['revision'] == 2
-        await select(page, '任务账号', '合成账号 2（已停用）')
+        await select(page, '账号', '合成账号 2（已停用）')
         await expect(page.locator('.node-migration')).to_contain_text('当前账号还没有迁移记录')
         await select(page, '执行节点', '上海执行节点')
         await expect(start).to_be_enabled()
@@ -230,7 +255,7 @@ async def run(output: Path, gateway: Path) -> dict:
         await page.screenshot(path=str(output / 'node-synchronization-390.png'), full_page=True)
         assert not errors and not fixture.unexpected and not fixture.external, (errors, fixture.unexpected, fixture.external)
         await browser.close()
-    return {'passed': True, 'scenes': ['后台安装提交后关闭弹窗', '刷新页面恢复安装状态及轮询完成', '安装提交响应中断后只读核对', '冻结确认与取消零写入', '提交未知只核对原操作', '提交后继续目标激活',
+    return {'passed': True, 'scenes': ['反重力本机归属与同数字身份隔离', '反重力列表失败及刷新恢复', '后台安装提交后关闭弹窗', '刷新页面恢复安装状态及轮询完成', '安装提交响应中断后只读核对', '冻结确认与取消零写入', '提交未知只核对原操作', '提交后继续目标激活',
         '提交前取消保持源分配版本', '账号切换隔离', '停用独立账号迁移入口', '1440和390视口', '统一同步后台受理与阶段显示', '迁移固定原因与恢复动作', '未准备节点可选择并直接提交迁移'], 'errors': errors, 'real_model_requests': 0}
 
 

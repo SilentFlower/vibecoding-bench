@@ -14,6 +14,8 @@ from unittest.mock import Mock, patch
 from fastapi import HTTPException, Response
 from fastapi.testclient import TestClient
 from account_runtime import AccountRuntime, atomic_json, derive_v3_fingerprint
+from agy_environment import register
+from agy_environment_schema import initialize_agy_environment_schema
 from login_drafts import LoginDraftStore
 import main
 
@@ -365,6 +367,17 @@ class LoginDraftTests(unittest.TestCase):
         self.assertNotIn("account_id", rows[0])
         with self.database() as connection:
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM accounts").fetchone()[0], 0)
+
+    def test_platform_api_environment_is_excluded_from_drafts(self) -> None:
+        """按正式平台映射排除 API 环境及其遗留标记。@return None。"""
+        with self.database() as connection:
+            initialize_agy_environment_schema(connection)
+        environment = register(self.runtime, 14)
+        atomic_json(self.root / "login-drafts" / (environment["environment_id"] + ".json"),
+            {"phase": "deleting", "name": "old-marker"})
+
+        self.assertIsNone(environment["account_id"])
+        self.assertEqual([row["name"] for row in main.list_login_drafts()], ["new-draft"])
 
     def test_delete_is_complete_and_idempotent(self) -> None:
         """删除清理唯一容器、完整 HOME/profile 和数据库，重复不越界。@return None。"""

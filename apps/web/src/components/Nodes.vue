@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
-import { api } from '../api';
+import { api, type Account } from '../api';
 import { useToast } from '../composables/useToast';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -14,6 +14,8 @@ import AccountNodeSelector from './runtime/AccountNodeSelector.vue';
 
 const { show: toast } = useToast();
 const rows = ref<ExecutionNode[]>([]), loading = ref(false), error = ref('');
+type AgyAccount = Pick<Account, 'id' | 'name' | 'email' | 'status'>;
+const agyAccounts = ref<AgyAccount[] | null>(null), agyError = ref('');
 const synchronizing = ref(false);
 const pending = reactive(new Set<number>());
 const editor = ref(false), saving = ref(false), probing = ref(false), formError = ref('');
@@ -26,7 +28,7 @@ const installing = ref<ExecutionNode | null>(null), installError = ref('');
 const options = computed(() => keys.value.map(key => ({ value: key.key, label: `${key.algorithm} · ${key.sha256}` })));
 const selectedFingerprint = computed(() => keys.value.find(key => key.key === selectedKey.value)?.sha256);
 let alive = true, loadGeneration = 0, probeGeneration = 0;
-let listRequest: AbortController | undefined, probeRequest: AbortController | undefined;
+let listRequest: AbortController | undefined, probeRequest: AbortController | undefined, agyRequest: AbortController | undefined;
 let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
 /** 保留已有列表并拒绝旧请求覆盖。@param background 沿已建立的会话轮询安装状态。@return 刷新完成。 */
@@ -51,6 +53,41 @@ async function load(background = false): Promise<void> {
     }
   }
 }
+/** 读取网关正式反重力账号，并使用完整列表计算节点归属。@return 刷新完成。 */
+async function loadAgyAccounts(): Promise<void> {
+  agyRequest?.abort();
+  const controller = new AbortController();
+  agyRequest = controller;
+  agyError.value = '';
+  const accounts = new Map<number, AgyAccount>();
+  try {
+    let page = 1;
+    while (!controller.signal.aborted) {
+      const result = await api.listAccounts(page, 100, '', '', controller.signal, 'antigravity');
+      if (controller.signal.aborted) return;
+      for (const { id, name, email, status, platform } of result.data) {
+        if (platform === 'antigravity') accounts.set(id, { id, name, email, status });
+      }
+      if (page >= result.total_pages) break;
+      page++;
+    }
+    if (alive && !controller.signal.aborted) agyAccounts.value = [...accounts.values()];
+  } catch {
+    if (alive && !controller.signal.aborted) agyError.value = '反重力账号归属读取失败，请刷新列表';
+  }
+}
+/** 使用同一份正式账号列表更新归属选择和节点计数。@return 无。 */
+function refresh(): void {
+  void load();
+  void loadAgyAccounts();
+}
+/** 汇总本机反重力账号和已有任务账号归属。@param node 节点。@return 归属数量或待核对占位。 */
+function accountCount(node: ExecutionNode): number | string {
+  if (node.kind !== 'local') return node.account_count;
+  return agyAccounts.value === null ? '—' : node.account_count + agyAccounts.value.length;
+}
+const totalAccounts = computed(() => agyAccounts.value === null ? '—'
+  : rows.value.reduce((total, node) => total + node.account_count, agyAccounts.value.length));
 /** 地址变化使旧公钥确认失效。@return 无。 */
 function resetProbe(): void {
   probeGeneration++; probeRequest?.abort(); probing.value = false;
@@ -158,20 +195,21 @@ function state(node: ExecutionNode): string {
   if (node.observation.stale) return '观测已过期';
   return node.observation.state === 'reachable' ? '连接正常' : '连接异常';
 }
-onMounted(() => { void load(); });
-onUnmounted(() => { alive = false; loadGeneration++; if (refreshTimer) clearTimeout(refreshTimer); listRequest?.abort(); resetProbe(); privateKey.value = ''; password.value = ''; });
+onMounted(refresh);
+onUnmounted(() => { alive = false; loadGeneration++; if (refreshTimer) clearTimeout(refreshTimer); listRequest?.abort(); agyRequest?.abort(); resetProbe(); privateKey.value = ''; password.value = ''; });
 </script>
 
 <template>
   <section class="nodes-page">
-    <header class="page-heading"><div><p class="page-eyebrow">资源</p><h1>节点管理</h1><p class="page-description">管理执行服务器、组件状态与账号运行位置。</p></div><div class="nodes-actions"><Button variant="outline" :disabled="synchronizing" @click="synchronize">{{ synchronizing ? '提交中…' : '同步全部节点' }}</Button><Button variant="outline" :disabled="loading" @click="load()"><RefreshCw :size="16" />刷新列表</Button><Button @click="setEditor(true)"><Plus :size="16" />添加节点</Button></div></header>
+    <header class="page-heading"><div><p class="page-eyebrow">资源</p><h1>节点管理</h1><p class="page-description">管理执行服务器、组件状态与账号运行位置。</p></div><div class="nodes-actions"><Button variant="outline" :disabled="synchronizing" @click="synchronize">{{ synchronizing ? '提交中…' : '同步全部节点' }}</Button><Button variant="outline" :disabled="loading" @click="refresh"><RefreshCw :size="16" />刷新列表</Button><Button @click="setEditor(true)"><Plus :size="16" />添加节点</Button></div></header>
     <p v-if="error" class="nodes-error" role="alert">{{ error }}</p>
+    <p v-if="agyError" class="nodes-error" role="alert">{{ agyError }}</p>
     <p v-if="loading && !rows.length" role="status">正在读取节点…</p>
-    <div v-if="rows.length" class="nodes-summary"><span><strong>{{ rows.length }}</strong> 个节点</span><span><strong>{{ rows.filter(node => node.kind === 'ssh').length }}</strong> 台远程服务器</span><span><strong>{{ rows.reduce((total, node) => total + node.account_count, 0) }}</strong> 个归属账号</span></div>
+    <div v-if="rows.length" class="nodes-summary"><span><strong>{{ rows.length }}</strong> 个节点</span><span><strong>{{ rows.filter(node => node.kind === 'ssh').length }}</strong> 台远程服务器</span><span><strong>{{ totalAccounts }}</strong> 个归属账号</span></div>
     <div class="nodes-grid">
       <article v-for="node in rows" :key="node.id" class="node-card">
         <header><span class="node-icon"><Server :size="20" /></span><div><h2>{{ node.name }}</h2><p>{{ node.kind === 'local' ? '默认本机节点' : `${node.username}@${node.host}:${node.port}` }}</p></div><span class="node-state" :class="{ failed: node.observation?.state === 'unreachable', muted: !node.enabled || node.observation?.stale }">{{ state(node) }}</span></header>
-        <dl class="node-resources"><div><dt>CPU</dt><dd>{{ node.observation?.host_cpus ?? '未采集' }}<small v-if="node.observation?.host_cpus != null"> 核</small></dd></div><div><dt>可用内存</dt><dd>{{ bytes(node.observation?.memory?.MemAvailable) }}</dd></div><div><dt>可用磁盘</dt><dd>{{ bytes(node.observation?.disk_available_bytes) }}</dd></div><div><dt>归属账号</dt><dd>{{ node.account_count }}</dd></div></dl>
+        <dl class="node-resources"><div><dt>CPU</dt><dd>{{ node.observation?.host_cpus ?? '未采集' }}<small v-if="node.observation?.host_cpus != null"> 核</small></dd></div><div><dt>可用内存</dt><dd>{{ bytes(node.observation?.memory?.MemAvailable) }}</dd></div><div><dt>可用磁盘</dt><dd>{{ bytes(node.observation?.disk_available_bytes) }}</dd></div><div><dt>归属账号</dt><dd>{{ accountCount(node) }}</dd></div></dl>
         <p v-if="node.observation?.reason" class="nodes-error" role="status">{{ node.observation.reason }}</p>
         <div class="node-meta"><span>最近检查</span><time>{{ node.observation && node.observation.observed_at > 0 ? new Date(node.observation.observed_at * 1000).toLocaleString('zh-CN') : '尚未检查' }}</time><span>Docker</span><span>{{ node.observation?.docker_version ?? '未采集' }}</span><template v-if="node.kind === 'ssh'"><span>运行组件</span><span>{{ preparationState(node) }}</span></template></div>
         <p v-if="node.preparation?.target_release && node.preparation.target_release !== (node.preparation.current_release || node.preparation.release)" class="node-note">{{ node.preparation.current_release || node.preparation.release || '首次安装' }} → {{ node.preparation.target_release }}</p>
@@ -180,7 +218,7 @@ onUnmounted(() => { alive = false; loadGeneration++; if (refreshTimer) clearTime
         <footer><Button variant="outline" :disabled="pending.has(node.id)" @click="operate(node, 'check')"><RefreshCw :size="14" />{{ pending.has(node.id) ? '处理中…' : '检查连接' }}</Button><Button v-if="node.kind === 'ssh'" variant="outline" :disabled="pending.has(node.id) || !node.enabled || node.preparation?.state === 'preparing'" @click="installError = ''; installing = node">{{ node.preparation?.state === 'preparing' ? '后台同步中…' : node.preparation?.state === 'prepared' ? '检查并同步组件' : '准备运行组件' }}</Button><Button variant="outline" :disabled="pending.has(node.id)" @click="operate(node, 'enable')">{{ node.enabled ? '暂停接单' : '恢复接单' }}</Button><Button v-if="node.kind === 'ssh'" variant="ghost" :disabled="pending.has(node.id) || node.account_count > 0 || node.preparation?.state === 'preparing'" @click="deleteError = ''; deleting = node"><Trash2 :size="14" />移除</Button></footer>
       </article>
     </div>
-    <AccountNodeSelector v-if="rows.length" :nodes="rows" @changed="load" />
+    <AccountNodeSelector v-if="rows.length" :nodes="rows" :agy-accounts="agyAccounts ?? []" @changed="load" />
     <Dialog :open="editor" @update:open="setEditor"><DialogContent class="node-editor" :show-close-button="!saving" @escape-key-down="event => { if (saving) event.preventDefault(); }" @interact-outside="event => { if (saving) event.preventDefault(); }"><DialogHeader><DialogTitle>添加 SSH 节点</DialogTitle><DialogDescription>服务器需要具备 SSH、Python 3 和 Docker。使用具有对应 Docker 权限的专用账号。</DialogDescription></DialogHeader>
       <form class="node-form" @submit.prevent="save"><div class="node-form-grid"><label>节点名称<Input v-model="name" required maxlength="80" :disabled="saving" /></label><label>服务器地址<Input v-model="host" required placeholder="IP 或主机名" :disabled="saving" /></label><NumberInput v-model="port" label="SSH 端口" :min="1" :max="65535" required :disabled="saving" /><label>SSH 用户<Input v-model="username" required autocomplete="off" :disabled="saving" /></label></div><label>独立数据目录<Input v-model="dataRoot" required :disabled="saving" /></label>
         <div class="node-fingerprint"><Button type="button" variant="outline" :disabled="saving || probing || !host.trim() || !port" @click="probe">{{ probing ? '正在探测…' : '探测主机公钥' }}</Button><ChoiceSelect v-if="keys.length" v-model="selectedKey" label="服务器主机公钥" :options="options" :disabled="saving" placeholder="选择已核对的公钥" /><code v-if="selectedFingerprint">{{ selectedFingerprint }}</code><label v-if="selectedFingerprint" class="node-verify"><input v-model="verified" type="checkbox" :disabled="saving" />我已通过可信渠道核对这个主机指纹</label></div>
