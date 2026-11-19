@@ -167,7 +167,11 @@ async fn usage_limits_storage_contract(pool: &AnyPool, driver: &str) {
     migrate_legacy(pool, driver).await.unwrap();
     let store = AccountStore::new(pool.clone(), driver.into());
     let mut account = new_account("usage-limits-storage@example.invalid");
-    store.create(&mut account).await.unwrap();
+    // 通过旧版真实列种入账号，再由正式迁移补充平台和策略字段。
+    account.id = sqlx::query_scalar("INSERT INTO accounts(email,token,device_id,auth_type,access_token,refresh_token) VALUES($1,$2,$3,$4,$5,$6) RETURNING id")
+        .bind(&account.email).bind(&account.setup_token).bind(&account.device_id)
+        .bind(account.auth_type.to_string()).bind(&account.access_token).bind(&account.refresh_token)
+        .fetch_one(pool).await.unwrap();
     // 在独立测试库中模拟升级前已有账号且尚未添加新列的状态。
     for column in [
         "five_hour_usage_limit_percent",
@@ -375,6 +379,8 @@ async fn usage_limits_postgres_storage_and_legacy_migration() {
 
 fn new_account(email: &str) -> Account {
     Account {
+        platform: "claude_code".into(),
+        agy_system_prompt_homoglyph_enabled: false,
         id: 0,
         name: "ts-test".into(),
         email: email.into(),

@@ -9596,6 +9596,8 @@ mod tests {
 
     fn test_account() -> Account {
         Account {
+            platform: "claude_code".into(),
+            agy_system_prompt_homoglyph_enabled: false,
             id: 42,
             name: "测试账号".into(),
             email: "user@example.com".into(),
@@ -11329,6 +11331,7 @@ mod tests {
             release_id: "native-offline".into(),
         };
         let config = SenderConfig {
+            agy: None,
             native: Some(NativeSenderConfig {
                 source_version: Default::default(),
                 runtimes: Default::default(),

@@ -31,6 +31,7 @@ COMPOSE = Path(__file__).with_name("compose.yml")
 sys.path.insert(0, str(source_path(REPO, "orchestrator")))
 from resource_budget import account_limits, default_account_memory, isolated_account_limits
 from native_sender import prewarm_account_id, stage_asset
+from agy_auth import stage_auth_asset
 from cpu_resources import default_cpu_limits
 from cli_telemetry_policy import cli_telemetry_mode
 from platform_version import read_version
@@ -283,6 +284,9 @@ def source_snapshot_ignore(directory: str, names: list[str]) -> set[str]:
     :return: 仍应排除的名称集合。
     """
     ignored = set(shutil.ignore_patterns('.git','target','node_modules','__pycache__','.env','.env.*','*.log')(directory,names))
+    if Path(directory).as_posix().endswith('/agy_runtime/resources'):
+        # 构建器从固定源码生成资源，宿主临时编译产物不进入交付身份。
+        ignored.update(set(names) & {'observer-c', 'relocation_reclaim.so', 'admission.json'})
     if not ignored:
         return ignored
     resolved_directory = Path(directory).resolve()
@@ -512,6 +516,7 @@ def build(release: str, manifest_path: Path) -> None:
         version_file.write_text(json.dumps({'version': platform_version}) + '\n')
         native_runtime = stage_asset(snapshot / "native-runtime/ccrb-runtime")
         native_runtime['runtimes'] = {'2.1.280': stage_asset(snapshot / 'native-runtime/ccrb-runtime-280', version='2.1.280')}
+        agy_auth = stage_auth_asset(snapshot / 'agy-auth')
         restore_upstream_checkout_bytes(snapshot)
         digest = hashlib.sha256()
         for path in sorted(item for item in snapshot.rglob("*") if item.is_file()):
@@ -532,6 +537,7 @@ def build(release: str, manifest_path: Path) -> None:
             command(*build_commands[role], *control_labels, "-f", str(snapshot / "images/v3/Dockerfile"), "--target", role,
                 "--build-arg", f"V3_RELEASE={release}", "--build-arg", f"V3_PARENT_REV={parent}",
                 "--build-arg", f"V3_GATEWAY_REV={gateway}",
+                "--build-arg", f"V3_AGY_AUTH_SHA256={agy_auth['sha256']}",
                 "-t", reference, str(snapshot))
             print(json.dumps({'event': 'flower2api-build-role', 'role': role,
                 'seconds': round(time.monotonic() - started, 3)}, ensure_ascii=False), flush=True)
@@ -549,7 +555,7 @@ def build(release: str, manifest_path: Path) -> None:
     with manifest_path.open("x") as output:
         json.dump({"schema": 3, "bridge_protocol": 1, "credential_ownership_protocol": 1, "system_update_protocol": 1, "layout_version": 2, "default_cli_version": "2.1.293",
             "release": release, "parent_revision": parent, "gateway_revision": gateway,
-            "dirty_worktree": dirty, "source_content_sha256": source_hash, "native_runtime": native_runtime, "images": images}, output, indent=2)
+            "dirty_worktree": dirty, "source_content_sha256": source_hash, "native_runtime": native_runtime, "agy_auth": agy_auth, "images": images}, output, indent=2)
         output.write("\n")
 
 

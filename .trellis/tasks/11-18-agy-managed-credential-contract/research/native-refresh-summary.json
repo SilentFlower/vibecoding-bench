@@ -1,0 +1,11 @@
+{
+  "evidence": "native_oauth",
+  "scope": "single_owner_refresh",
+  "model_submissions": 0,
+  "original_restored": true,
+  "exit_code": 0,
+  "access_changed": true,
+  "refresh_changed": false,
+  "expiry_valid": true,
+  "credential_mode": "0o600"
+}

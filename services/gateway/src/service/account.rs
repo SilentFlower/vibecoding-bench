@@ -1,5 +1,5 @@
 use chrono::Utc;
-use serde_json::Value;
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicI32, AtomicI64, Ordering};
@@ -31,6 +31,9 @@ use crate::service::version_profile::{
 };
 use crate::store::account_store::AccountStore;
 use crate::store::scheduling_store::SchedulingStore;
+
+#[path = "agy_account.rs"]
+mod agy_account;
 
 #[path = "credential_ownership.rs"]
 mod credential_ownership;
@@ -807,6 +810,13 @@ impl AccountService {
     /// @param a 待创建账号，成功后回填身份与持久化字段。
     /// @return 创建或配置校验结果。
     pub async fn create_account(&self, a: &mut Account) -> Result<(), AppError> {
+        if a.is_antigravity() {
+            self.verify_agy_account(a).await?;
+            return self.store.create(a).await;
+        }
+        if !a.is_claude_code() {
+            return Err(AppError::BadRequest("未知账号平台".into()));
+        }
         let (device_id, env, prompt, process) =
             crate::model::identity::generate_canonical_identity();
         a.device_id = device_id;
@@ -874,6 +884,11 @@ impl AccountService {
             || !prompt.working_dir.starts_with('/')
         {
             return Err(AppError::BadRequest("unconfirmed CLI identity".into()));
+        }
+        if !account.is_claude_code() {
+            return Err(AppError::BadRequest(
+                "CLI 绑定仅支持 Claude Code 账号".into(),
+            ));
         }
         normalize_account_auth(account)?;
         normalize_account_subscription(account)?;
@@ -957,6 +972,11 @@ impl AccountService {
         input: &CliProcessImport,
     ) -> Result<Value, AppError> {
         let account = self.store.get_by_id(id).await?;
+        if !account.is_claude_code() {
+            return Err(AppError::BadRequest(
+                "此环境导入入口仅适用于 Claude Code".into(),
+            ));
+        }
         let same = |left: &str, right: &str| left.trim().eq_ignore_ascii_case(right.trim());
         if account.auth_type != AccountAuthType::Oauth
             || input.device_id.len() != 64
@@ -1064,6 +1084,19 @@ impl AccountService {
     /// @param id 已获准删除的账号。
     /// @return 删除成功或存储错误。
     pub async fn delete_account(&self, id: i64) -> Result<(), AppError> {
+        let account = self.store.get_by_id(id).await?;
+        if account.is_antigravity() {
+            let (key, owner) = self.acquire_oauth_credential_lock(id).await?;
+            let result = async {
+                if self.store.agy_credential_state(id).await?.phase != "ready" {
+                    return Err(AppError::BadRequest("请先结束或核对原凭据操作".into()));
+                }
+                self.store.delete(id).await
+            }
+            .await;
+            self.cache.release_lock(&key, &owner).await;
+            return result;
+        }
         if let Some(scheduler) = &self.scheduler {
             scheduler.store.delete_account(id).await?;
             scheduler.forget_account(id);
@@ -1085,6 +1118,17 @@ impl AccountService {
         account: &Account,
         replacement: &str,
     ) -> Result<bool, AppError> {
+        if account.is_antigravity() {
+            if self.store.get_by_id(account.id).await?.proxy_url != account.proxy_url {
+                return Ok(false);
+            }
+            self.update_agy_fields(account.id, &json!({"proxy_url":replacement}))
+                .await?;
+            return Ok(true);
+        }
+        if !account.is_claude_code() {
+            return Err(AppError::BadRequest("未知账号平台".into()));
+        }
         let updated = self
             .store
             .replace_proxy_connection(account.id, &account.proxy_url, replacement)
@@ -1112,6 +1156,16 @@ impl AccountService {
         Ok((accounts, total))
     }
 
+    /// 读取平台管理计数。@param platform 平台筛选。@return 状态计数。
+    pub async fn platform_counts(&self, platform: &str) -> Result<Value, AppError> {
+        self.store.platform_counts(platform).await
+    }
+
+    /// 读取管理引用的全部平台账号。@return 全部权威账号。
+    pub async fn list_platform_accounts(&self) -> Result<Vec<Account>, AppError> {
+        self.store.list_all_platforms().await
+    }
+
     /// 查询管理账号列表，过滤在存储分页之前执行。
     /// @param page 页码。
     /// @param page_size 每页数量。
@@ -1124,9 +1178,10 @@ impl AccountService {
         page_size: i64,
         search: &str,
         status: &str,
+        platform: &str,
     ) -> Result<(Vec<Account>, i64), AppError> {
         self.store
-            .list_filtered(page, page_size, search, status)
+            .list_filtered(page, page_size, search, status, platform)
             .await
     }
 
@@ -1957,6 +2012,18 @@ impl AccountService {
                 "usage query is only supported for OAuth accounts, SetupToken accounts cannot query usage via this endpoint".into(),
             ));
         }
+        if account.is_antigravity() {
+            self.resolve_oauth_credentials(id, 60, false).await?;
+            let mut verified = self.store.get_by_id(id).await?;
+            self.verify_agy_account(&mut verified).await?;
+            self.store
+                .update_usage(id, &verified.usage_data.to_string())
+                .await?;
+            return Ok(verified.usage_data);
+        }
+        if !account.is_claude_code() {
+            return Err(AppError::BadRequest("未知账号平台".into()));
+        }
         let token = self.resolve_upstream_token(id).await?;
         let usage = crate::service::oauth::fetch_account_usage(&account, &token).await?;
         self.persist_usage_observation(id, usage, UsageObservationKind::Allowed)
@@ -1997,6 +2064,11 @@ impl AccountService {
     pub async fn resolve_upstream_token(&self, id: i64) -> Result<String, AppError> {
         let _credential_activity = self.upstream_activity(id).await?;
         let account = self.store.get_by_id(id).await?;
+        if !account.is_claude_code() {
+            return Err(AppError::ServiceUnavailable(
+                "该平台的业务运行环境尚未接入".into(),
+            ));
+        }
         match account.auth_type {
             AccountAuthType::SetupToken => {
                 if account.setup_token.is_empty() {
@@ -2071,6 +2143,11 @@ impl AccountService {
         failed_access_token: &str,
     ) -> Result<String, AppError> {
         let latest = self.store.get_by_id(id).await?;
+        if !latest.is_claude_code() {
+            return Err(AppError::BadRequest(
+                "此认证恢复入口仅适用于 Claude Code".into(),
+            ));
+        }
         validate_managed_oauth_account(&latest)?;
 
         // 并发请求可能已在等待期间完成刷新。复用新 Token，避免每个等待者依次强刷。
@@ -2115,6 +2192,12 @@ impl AccountService {
             ));
         }
 
+        let original = self.store.get_by_id(id).await?;
+        let agy_generation = if original.is_antigravity() {
+            Some(self.store.agy_credential_state(id).await?.generation)
+        } else {
+            None
+        };
         let lock_key = format!("oauth:refresh:account:{}", id);
         let lock_owner = Uuid::new_v4().to_string();
         for attempt in 0..=OAUTH_WAIT_ATTEMPTS {
@@ -2123,8 +2206,14 @@ impl AccountService {
                 .acquire_lock(&lock_key, &lock_owner, OAUTH_LOCK_TTL)
                 .await?;
             if acquired {
-                let result = self
-                    .resolve_oauth_credentials_locked(
+                let result = async {
+                    let force_refresh = if let Some(generation) = agy_generation {
+                        force_refresh
+                            && self.store.agy_credential_state(id).await?.generation == generation
+                    } else {
+                        force_refresh
+                    };
+                    self.resolve_oauth_credentials_locked(
                         id,
                         OAuthResolvePolicy {
                             min_validity_seconds,
@@ -2132,7 +2221,9 @@ impl AccountService {
                             allow_still_valid_fallback: false,
                         },
                     )
-                    .await;
+                    .await
+                }
+                .await;
                 self.cache.release_lock(&lock_key, &lock_owner).await;
                 return result;
             }
@@ -2155,6 +2246,11 @@ impl AccountService {
         id: i64,
         input: &OAuthCredentialImport,
     ) -> Result<OAuthCredentialSnapshot, AppError> {
+        if !self.store.get_by_id(id).await?.is_claude_code() {
+            return Err(AppError::BadRequest(
+                "此凭据导入入口仅适用于 Claude Code 账号".into(),
+            ));
+        }
         if input.operation_id.len() != 32
             || !input
                 .operation_id
@@ -2369,6 +2465,18 @@ impl AccountService {
     ) -> Result<OAuthCredentialSnapshot, AppError> {
         let account = self.store.get_by_id(id).await?;
         validate_managed_oauth_account(&account)?;
+        if account.is_antigravity() {
+            return self
+                .resolve_agy_credentials(
+                    &account,
+                    policy.min_validity_seconds,
+                    policy.force_refresh,
+                )
+                .await;
+        }
+        if !account.is_claude_code() {
+            return Err(AppError::BadRequest("未知账号平台".into()));
+        }
         if account.refresh_token.is_empty() {
             if !self
                 .store
@@ -2455,6 +2563,11 @@ impl AccountService {
         policy: OAuthResolvePolicy,
     ) -> Result<Account, AppError> {
         let latest = self.store.get_by_id(id).await?;
+        if !latest.is_claude_code() {
+            return Err(AppError::BadRequest(
+                "此上游刷新入口仅适用于 Claude Code".into(),
+            ));
+        }
         validate_managed_oauth_account(&latest)?;
         if latest.refresh_token.is_empty() {
             if !self
@@ -3531,6 +3644,8 @@ mod tests {
 
     fn test_account_with_usage(usage_data: serde_json::Value) -> Account {
         Account {
+            platform: "claude_code".into(),
+            agy_system_prompt_homoglyph_enabled: false,
             id: 1,
             name: "测试账号".into(),
             email: "user@example.com".into(),
@@ -3579,6 +3694,8 @@ mod tests {
 
     fn new_account_request(email: &str) -> Account {
         Account {
+            platform: "claude_code".into(),
+            agy_system_prompt_homoglyph_enabled: false,
             id: 0,
             name: "测试账号".into(),
             email: email.into(),

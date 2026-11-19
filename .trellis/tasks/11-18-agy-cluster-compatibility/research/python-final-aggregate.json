@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "discovered": 2034,
+  "run": 2034,
+  "passed_cases": 2024,
+  "skipped": 10,
+  "coverage_matches_discovery": true,
+  "batch_case_counts": [
+    477,
+    530,
+    516,
+    511
+  ],
+  "maximum_seconds": 343.38
+}

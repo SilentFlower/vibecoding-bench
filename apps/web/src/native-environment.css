@@ -288,6 +288,8 @@
 @media(max-width:760px){.native-runtime .environment-toolbar>.fui-search{width:100%}}
 
 .runtime-local-loading{padding:28px;display:grid;gap:16px}
+/* 视口变化立即收拢工作区，避免全局宽度过渡将保存与关闭按钮留在屏外。 */
+.runtime-environment-dialog[data-slot=dialog-content]{transition:none}
 /* 星期选择与时间控件保持同一层次，保留原复选语义与键盘操作。 */
 .runtime-weekdays{gap:8px;margin-bottom:20px}
 .runtime-weekdays label{position:relative;display:grid;place-items:center;min-width:44px;height:36px;padding:0 12px;border:1px solid #e2e7ef;border-radius:7px;background:#fff;font-size:var(--ui-font-small);color:#70819b;cursor:pointer}

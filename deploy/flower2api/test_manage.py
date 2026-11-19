@@ -114,11 +114,12 @@ class PreflightTests(unittest.TestCase):
                 patch.object(manage.Path, 'read_text', return_value='MemAvailable: 2097152 kB\nSwapFree: 0 kB\n'):
             self.assertEqual(manage.preflight(self.values), self.root)
             self.values['V3_NATIVE_RELEASE_PILOT_ENVIRONMENT'] = 'obsolete'
-            self.assertEqual(manage.preflight(self.values), self.root)
-            for key in ('b' * 63, 'z' * 64):
+            for key in ('', 'b' * 64, 'b' * 63, 'z' * 64):
                 self.values['V3_NATIVE_RELEASE_PUBLIC_KEY'] = key
                 with self.subTest(key=key):
-                    self.assertEqual(self.root,manage.preflight(self.values))
+                    self.assertEqual(manage.preflight(self.values), self.root)
+                    self.assertEqual(key, self.values['V3_NATIVE_RELEASE_PUBLIC_KEY'])
+                    self.assertEqual('obsolete', self.values['V3_NATIVE_RELEASE_PILOT_ENVIRONMENT'])
 
     def test_native_criu_flag_requires_explicit_binary_value(self) -> None:
         """防止恢复权限开关被拼写错误静默关闭。@return None。"""

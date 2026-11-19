@@ -1,0 +1,16 @@
+[
+  {
+    "from": "agy",
+    "to": "cluster",
+    "exit": 0,
+    "result": "{\"current_version\": 2, \"rejected\": true, \"reason\": \"数据库迁移台账版本或摘要与当前程序不符\"}",
+    "stderr": ""
+  },
+  {
+    "from": "cluster",
+    "to": "agy",
+    "exit": 0,
+    "result": "{\"current_version\": 4, \"rejected\": true, \"reason\": \"数据库迁移台账版本或摘要与当前程序不符\"}",
+    "stderr": ""
+  }
+]

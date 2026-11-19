@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/gateway/backend/settings-database.md", "reason": "现有诊断、私有采集、SQLite/PG及冻结迁移合同"}
+{"file": ".trellis/spec/gateway/backend/testing-quality.md", "reason": "完整Rust回归、敏感边界及工程验证要求"}
+{"file": ".trellis/spec/web/frontend/ui-guidelines.md", "reason": "沿用请求列表、四页签、筛选、分页和移动端交互"}
+{"file": ".trellis/spec/orchestrator/backend/account-runtime-v3.md", "reason": "AGY身份、工具收口、系统策略及账号采集权限"}
+{"file": ".trellis/spec/platform/deploy/platform-online-update.md", "reason": "追加迁移、精确来源映射及隔离旧程序兼容演练"}
+{"file": ".trellis/spec/platform/deploy/agy-credential-contract.md", "reason": "固定原版、凭据所有权和零真实模型费用"}
+{"file": ".trellis/tasks/11-18-multi-platform-request-records/research/current-contracts.md", "reason": "实际DTO、调用链、生命周期及验证资产研究"}

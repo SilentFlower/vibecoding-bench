@@ -1,3 +1,4 @@
+pub mod account_platform_schema;
 pub mod account_store;
 pub mod cache;
 pub mod database_migrations;
@@ -9,6 +10,7 @@ pub mod prime_log_store;
 pub mod proxy_schema;
 pub mod proxy_store;
 pub mod redis;
+pub mod request_records_schema;
 pub mod scheduling_store;
 pub mod settings_store;
 pub mod token_store;

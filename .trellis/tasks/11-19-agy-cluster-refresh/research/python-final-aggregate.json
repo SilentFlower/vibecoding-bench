@@ -1,0 +1,76 @@
+{
+  "discovered": 2074,
+  "unique_cases": 2021,
+  "covered_counter_matches": true,
+  "passed_after_focused_recheck": true,
+  "passed_cases": 2064,
+  "skipped": [
+    {
+      "case": "test_cluster_node_docker.ClusterNodeDockerTests.test_remote_account_preparation_and_sender_json_sse",
+      "reason": "真实Docker纵向验证按需显式启用"
+    },
+    {
+      "case": "test_project_native_regression.NativeRegressionTests.test_nose2_keeps_function_and_class_nodes_and_rejects_code_or_skip_drift",
+      "reason": "nose2仅在对应原生验证环境安装；专用环境另跑本项"
+    },
+    {
+      "case": "test_cluster_ssh_password.ClusterSshPasswordTests.test_bad_password_and_bad_host_key_are_classified_without_secret",
+      "reason": "真实密码 SSH 验证需显式开启隔离 Docker sshd"
+    },
+    {
+      "case": "test_cluster_ssh_password.ClusterSshPasswordTests.test_command_timeout_reaps_sshpass_and_ssh",
+      "reason": "真实密码 SSH 验证需显式开启隔离 Docker sshd"
+    },
+    {
+      "case": "test_cluster_ssh_password.ClusterSshPasswordTests.test_independent_docker_business_and_pty_tunnels_reconnect_and_close",
+      "reason": "真实密码 SSH 验证需显式开启隔离 Docker sshd"
+    },
+    {
+      "case": "test_cluster_ssh_password.ClusterSshPasswordTests.test_password_preserves_special_characters_and_business_stdin",
+      "reason": "真实密码 SSH 验证需显式开启隔离 Docker sshd"
+    },
+    {
+      "case": "test_projects_pi_round.PiRoundPipeTests.test_cancelled_ready_exit_never_schedules_recovery",
+      "reason": "当前环境未安装固定 Pi SDK；完整管道需在具备依赖的环境执行"
+    },
+    {
+      "case": "test_projects_pi_round.PiRoundPipeTests.test_parent_delivers_success_and_receives_normal_completion",
+      "reason": "当前环境未安装固定 Pi SDK；完整管道需在具备依赖的环境执行"
+    },
+    {
+      "case": "test_projects_pi_round.PiRoundPipeTests.test_startup_failure_is_persisted_before_handing_back_without_more_model_requests",
+      "reason": "当前环境未安装固定 Pi SDK；完整管道需在具备依赖的环境执行"
+    },
+    {
+      "case": "test_projects_pi_round.PiRoundPipeTests.test_unexpected_exit_is_recoverable_only_after_valid_ready",
+      "reason": "当前环境未安装固定 Pi SDK；完整管道需在具备依赖的环境执行"
+    }
+  ],
+  "initial_failures": [
+    "test_project_plans.ProjectPlanTests.test_missing_checkpoint_blocks_without_rebuilding_seed"
+  ],
+  "rechecks": {
+    "isolated": 1,
+    "same_module": 31,
+    "new_agy_case_module": 8
+  },
+  "initial_failure_cause": "首次失败原因待确认；单项与同模块复验通过，相关源码与两侧冻结基线一致。",
+  "unchanged_failure_sources": {
+    "services/orchestrator/project_iteration.py": {
+      "sha256": "e45041b944ecf53a343d5c56ca7386e58663fa72ee54bfec5f15919f845f986d",
+      "equal_to_both": true
+    },
+    "services/orchestrator/project_plans.py": {
+      "sha256": "7378fe9143856abf671710b28511f307aa7a30de2352d3093fd0718cc9c9706c",
+      "equal_to_both": true
+    },
+    "services/orchestrator/test_project_plans.py": {
+      "sha256": "bc1ddf923925e9876147e5d6977bb25244250d66b5e300fabfe535053eb2e661",
+      "equal_to_both": true
+    },
+    "services/orchestrator/test_project_iterations.py": {
+      "sha256": "be03b1cd5a4cd960eb84937d3286526a6fe5d71c1f400e8c63351e733f4203ed",
+      "equal_to_both": true
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "target_only": {
+    "total": 822,
+    "equal": 815,
+    "explicit_adjustments": [
+      "deploy/flower2api/test_system_workflow.py",
+      "deploy/flower2api/verify_cluster_request_ui.py",
+      "deploy/flower2api/verify_environment_ui.py",
+      "services/orchestrator/cluster_environment_control.py",
+      "services/orchestrator/test_cluster_draft_schema.py",
+      "services/orchestrator/test_cluster_environment_management.py",
+      "services/orchestrator/test_cluster_quiesce.py"
+    ]
+  },
+  "source_only": {
+    "total": 170,
+    "equal": 164,
+    "explicit_adjustments": [
+      ".trellis/tasks/11-18-multi-platform-account-runtime/prd.md",
+      "services/gateway/src/service/diagnostics/agy.rs",
+      "services/gateway/src/service/gemini.rs",
+      "services/orchestrator/agy_runtime/capture_bridge.py",
+      "services/orchestrator/agy_runtime/native_bridge.py",
+      "services/orchestrator/test_agy_environment.py"
+    ]
+  },
+  "other_explicit_adjustments": [
+    "deploy/flower2api/verify_native_environment_edges.py",
+    "deploy/flower2api/verify_native_environments.py"
+  ]
+}

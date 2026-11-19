@@ -409,7 +409,7 @@ impl TelemetryService {
     /// @param account 主请求固定画像的账号副本。
     /// @return 激活完成；获取凭证失败时跳过本次激活。
     pub async fn activate_session(&self, account: &Account) {
-        if !account.auto_telemetry {
+        if !account.is_claude_code() || !account.auto_telemetry {
             return;
         }
 
@@ -488,7 +488,7 @@ impl TelemetryService {
         account: &Account,
         context: MessageTelemetryContext,
     ) {
-        if !account.auto_telemetry {
+        if !account.is_claude_code() || !account.auto_telemetry {
             return;
         }
         let mut sessions = self.sessions.lock().await;
@@ -519,7 +519,7 @@ impl TelemetryService {
         context: MessageTelemetryContext,
         result: MessageTelemetryResult,
     ) {
-        if !account.auto_telemetry {
+        if !account.is_claude_code() || !account.auto_telemetry {
             return;
         }
         let mut sessions = self.sessions.lock().await;
@@ -2344,6 +2344,8 @@ mod tests {
             ..Default::default()
         };
         Account {
+            platform: "claude_code".into(),
+            agy_system_prompt_homoglyph_enabled: false,
             id: 1,
             name: "测试账号".into(),
             email: "user@example.com".into(),

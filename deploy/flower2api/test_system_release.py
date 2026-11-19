@@ -11,13 +11,42 @@ from pathlib import Path
 from urllib.request import Request
 from unittest.mock import patch
 
-from system_release import REPO, create_index, create_release, data_contracts
+from system_release import REPO, create_index, create_release, data_contracts, sign_file
 from system_update_contract import REPOSITORY, ReleaseRedirect, compatible_data, fetch_bytes, fetch_repository_file, safe_read, strict_json, validate_index, validate_operation, validate_release, verify_signed
-from runtime_names import image_reference
+from runtime_names import image_reference, account_rebuild_required
+from agy_auth import SOURCE_BYTES, SOURCE_SHA256
 
 
 class SystemReleaseTests(unittest.TestCase):
     """发行与目录实际验签测试，仅使用临时密钥及本地文件。"""
+
+    def test_agy_asset_changes_select_account_image_with_historical_default(self) -> None:
+        """同源码制品启停均切换账号镜像，历史缺省与显式未提供一致。@return 无。"""
+        previous = self.release['account']
+        for available in [False, True]:
+            build = copy.deepcopy(self.build)
+            build['agy_auth'] = {'available': available, 'source_version': '1.5.9',
+                'sha256': SOURCE_SHA256 if available else ''}
+            if available: build['agy_auth']['bytes'] = SOURCE_BYTES
+            self.manifest.write_text(json.dumps(build))
+            release = create_release(self.manifest, self.policy, self.root / ('with-asset' if available else 'without-asset'),
+                self.key, [11, 1], '合成制品切换')
+            self.assertEqual(account_rebuild_required(previous, release['account']), available)
+            self.assertEqual(account_rebuild_required(release['account'], previous), available)
+            self.assertEqual(release['control']['content_sha256'], self.release['control']['content_sha256'])
+            raw = (self.root / ('with-asset' if available else 'without-asset') / 'system-release.json').read_bytes()
+            signature = (self.root / ('with-asset' if available else 'without-asset') / 'system-release.sig').read_bytes()
+            self.assertEqual(validate_release(verify_signed(raw, signature, self.public)), release)
+
+    def test_agy_asset_invalid_identity_blocks_release(self) -> None:
+        """错误制品声明在签发前拒绝。@return 无。"""
+        for changes in [{'sha256': 'a'*64}, {'bytes': 1}, {'available': 'true'}]:
+            build = copy.deepcopy(self.build)
+            build['agy_auth'] = dict(available=True, source_version='1.5.9', sha256=SOURCE_SHA256, bytes=SOURCE_BYTES)
+            build['agy_auth'].update(changes)
+            self.manifest.write_text(json.dumps(build))
+            with self.assertRaises(ValueError):
+                create_release(self.manifest, self.policy, self.root / 'invalid-asset', self.key, [11, 1], '合成错误')
 
     def setUp(self) -> None:
         """准备独立发行输入和合成密钥。

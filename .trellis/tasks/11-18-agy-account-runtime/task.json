@@ -1,0 +1,45 @@
+{
+  "id": "agy-account-runtime",
+  "name": "agy-account-runtime",
+  "title": "AGY 运行环境与 Gemini API 接入",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "orchestrator",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-18",
+  "completedAt": "2026-11-18",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-18T10:21:47Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-18-multi-platform-account-runtime",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "固定AGY运行适配、AT-only快照及现有账号环境接入完成",
+      "Gemini接口、权限限流、真实工具续轮及凭据代次链路完成",
+      "OAuth观察、源终态、cgroup兼容及正式镜像模块路径修复完成",
+      "固定原版本地TLS/MCP九次合成生成、重复帧、错误及取消验证通过",
+      "网关、环境、迁移、部署、UI及原生进程生命周期回归通过",
+      "Check-All问题全部关闭，运行合同已固化，业务交付完成"
+    ],
+    "partialStep": null,
+    "nextStep": "后续独立子任务继续按各自范围实施；真实Google验收按独立授权和预算安排",
+    "notes": "真实外部模型调用0。固定原版九次本地TLS合成生成通过，768MiB预算内验证真实MCP、两代AT、并发1、重复帧/SIGURG、截断、容量错误及取消。Python定向181项及后续核心20项、Rust传输10项及集成11项通过。真实Google身份、模型接受性及跨实际到期保持外部验收。仓库既有python-dateutil种子摘要异常独立记录。",
+    "updatedAt": "2026-11-18T10:21:47Z"
+  }
+}

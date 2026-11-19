@@ -129,6 +129,7 @@ class CentralQuiesceTests(unittest.TestCase):
         self.sessions=fixture.sessions
         self.execution_fixture=fixture.fixture.fixture
         self.runtime=self.sessions.runtime
+        self.runtime.database=self.sessions.service.store.database
         self.runtime.release_id=self.sessions.ledger.release
         self.runtime._account_lock=lambda account:nullcontext()
         self.runtime.environment_lock=lambda environment:nullcontext()

@@ -1,0 +1,261 @@
+[
+  {
+    "file": ".flower/plugin-lock.json",
+    "decision": "两侧一致",
+    "source_sha256": "de7e31e86102f6f791f05142a71ab86d1a0cfe4ecd88f756bbeaa158dc4b2c05",
+    "target_sha256": "de7e31e86102f6f791f05142a71ab86d1a0cfe4ecd88f756bbeaa158dc4b2c05",
+    "merged_sha256": "de7e31e86102f6f791f05142a71ab86d1a0cfe4ecd88f756bbeaa158dc4b2c05"
+  },
+  {
+    "file": ".flower/plugins.json",
+    "decision": "两侧一致",
+    "source_sha256": "62a955e02fe0326d9b7597ecca1bb655c474361d648ef2c29d945aa43e6d9cb7",
+    "target_sha256": "62a955e02fe0326d9b7597ecca1bb655c474361d648ef2c29d945aa43e6d9cb7",
+    "merged_sha256": "62a955e02fe0326d9b7597ecca1bb655c474361d648ef2c29d945aa43e6d9cb7"
+  },
+  {
+    "file": ".trellis/scripts/confirmation_policy.py",
+    "decision": "两侧一致",
+    "source_sha256": "c67973f7fed4d7df095791e389d0b2a1207ac70de84782aa6d9911db652f168e",
+    "target_sha256": "c67973f7fed4d7df095791e389d0b2a1207ac70de84782aa6d9911db652f168e",
+    "merged_sha256": "c67973f7fed4d7df095791e389d0b2a1207ac70de84782aa6d9911db652f168e"
+  },
+  {
+    "file": ".trellis/scripts/flower_session_start.py",
+    "decision": "两侧一致",
+    "source_sha256": "9b2bb18328a0b4c1db491dcc5a0e03e1ccea4342fcfe5cad6ba2a09d64a533a0",
+    "target_sha256": "9b2bb18328a0b4c1db491dcc5a0e03e1ccea4342fcfe5cad6ba2a09d64a533a0",
+    "merged_sha256": "9b2bb18328a0b4c1db491dcc5a0e03e1ccea4342fcfe5cad6ba2a09d64a533a0"
+  },
+  {
+    "file": ".trellis/spec/orchestrator/backend/account-runtime-v3.md",
+    "decision": "组合",
+    "source_sha256": "5e2757a6739f97f9fd9a22b36f6f4141834db5ca387bfcf6457a627df03df6b4",
+    "target_sha256": "5d3de998e0f905f1a464694f86dc86b9b3c2f6cd33c34af047ef86b7564d4c1c",
+    "merged_sha256": "29c4054e685bfeea5d34250c1687d9acd92122c7979f26e09952389b47d5c2c6"
+  },
+  {
+    "file": ".trellis/spec/platform/deploy/platform-online-update.md",
+    "decision": "组合",
+    "source_sha256": "40a8608a3ac5e0088181da1f029e5627f521db07fc93db3fcc8264e2e5c11b52",
+    "target_sha256": "ab750059cf118441d41052f6f0c8cc7485f5de1926955904ab25b6863136ee29",
+    "merged_sha256": "49d270116fc5b04728fae0a56d241f5828c85d2eceeade673c08c2402e19ecaf"
+  },
+  {
+    "file": ".trellis/spec/web/frontend/ui-guidelines.md",
+    "decision": "组合",
+    "source_sha256": "abd3f31698691949526a1f6db443abf9d773df85b3078df81ec10426d6c1fcd7",
+    "target_sha256": "82a19b10e1fd528d21a99a54aa87ab558bb0460e5a9797f68820ebc69a6bb8c5",
+    "merged_sha256": "5f96962494a12032bf97c0e20423edfc1d5132d60e901cdb5e70d526099495b3"
+  },
+  {
+    "file": "apps/web/src/api.ts",
+    "decision": "组合",
+    "source_sha256": "71bd09e29e6831127524b6ce9c44dc4b4280b4941643153019361c173015cf05",
+    "target_sha256": "fabb3fd2a27abd09c4e49debd971137a80d018e43ee9d98e36616306012f0004",
+    "merged_sha256": "61e11999c569687db9e787edb5e3fee2e105eb8039704ebc11c774de94f569d0"
+  },
+  {
+    "file": "apps/web/src/components/RequestDiagnostics.vue",
+    "decision": "组合",
+    "source_sha256": "a4a5cd4b5331ab5921ee87c88795f8256ec017c2456354ec5f8601a05448cbad",
+    "target_sha256": "4234d5cf530604c4cdbd79260fb06acf948e9434b5fb8d1b9e26ea49b190bc3a",
+    "merged_sha256": "eb6b221661499c1bd8d6d49550b37ddd1acb382e6e832bfab51a2041e95e60b1"
+  },
+  {
+    "file": "apps/web/src/components/RuntimeEnvironments.vue",
+    "decision": "组合",
+    "source_sha256": "6974f259aa8c2d88022dffbd311ed30e290a48f33c8d1eee4cd9f689fa5fb5b3",
+    "target_sha256": "babda472893c2183283402a411498678998a2ede7ad06bd31616cf1643843c7a",
+    "merged_sha256": "596ca7f95415818846be303d476c7d65791d64dcf9f30c86a582eef6ea0b8157"
+  },
+  {
+    "file": "apps/web/src/components/runtime/runtimeApi.ts",
+    "decision": "组合",
+    "source_sha256": "a41962ccb95468d71485d6a5a1e17f48265a314365c472cf32a87da69e9a7fe9",
+    "target_sha256": "c4c29ee02c3b6b24ed690c2843d390d03f89082107b3632b4e41da1688aa6491",
+    "merged_sha256": "e17977b67f5aa6141b260c7cd1c9256cc8deac721d65b4bc637bb221a6e0d127"
+  },
+  {
+    "file": "deploy/flower2api/install_system_updater.py",
+    "decision": "组合",
+    "source_sha256": "3d887b6f6ece59379e1c79a8b151555c5b2559f3cdde8b56b6a97c8da971a8cc",
+    "target_sha256": "ed0c260cc2acd0f7d0fcb230b2c270f7341c356f08a823b0c20eced2468a5794",
+    "merged_sha256": "6c8957f570bbe9a2c88328301e11f4fda346ebb27ed77534cb88f3a3d586eeea"
+  },
+  {
+    "file": "deploy/flower2api/manage.py",
+    "decision": "组合",
+    "source_sha256": "f40ea88fb10ea32037d5218fee365a425e13ae0818e724fd678364b7698e0118",
+    "target_sha256": "6b691d406d319e41836e60106bbb9cb821562a485e39f5d723ee9a1008b2974b",
+    "merged_sha256": "480dbde32ae164057e18db7098c786b37fd2c19b393af368aef767b956d5d6d3"
+  },
+  {
+    "file": "deploy/flower2api/system_release.py",
+    "decision": "组合",
+    "source_sha256": "90f24064941013900c883f746f0ccd9395aa7256a1442299d79bbcbb4ae44127",
+    "target_sha256": "4267104398794490af764fd4fcfb96a181c00690dc22694a9b2fbca1ec122d17",
+    "merged_sha256": "8871d3f48c2d2b99c25d19e4eadd9af09547fc3856decdeef6d6b24934a4f56a"
+  },
+  {
+    "file": "deploy/flower2api/system_update_host.py",
+    "decision": "组合",
+    "source_sha256": "ec4b49ddd3a6f4123f7e8a6ddbb0d65b9d78fe7eb21813f622cd72fec0d02fff",
+    "target_sha256": "20194fba0b7908c45c2e0ceec4cb12526b2adb08e40b72e1b35497415743bc51",
+    "merged_sha256": "52967e993d16a64c327f143ab95ce9d997dc6d3271386b6c8b6f8dfa3bfaf78d"
+  },
+  {
+    "file": "deploy/flower2api/test_database_definitions.py",
+    "decision": "沿用集群",
+    "source_sha256": "aa9e30098799d576623cbb557b4e812aa1f2c6dddb35014e15c785eba99d3958",
+    "target_sha256": "0b97926bfa609e2245e0e6ce53bdf9f7f7bdb44c16be77408aae3395df990053",
+    "merged_sha256": "0b97926bfa609e2245e0e6ce53bdf9f7f7bdb44c16be77408aae3395df990053"
+  },
+  {
+    "file": "deploy/flower2api/test_manage.py",
+    "decision": "组合",
+    "source_sha256": "d1360d331ff61ffb3b87d22754408d0a70e5c9f2f81bb79be35201359e6895d3",
+    "target_sha256": "78b820ff7aed2b65b39486d2b7af6334dde364d383efe515c872ff2b8a52a966",
+    "merged_sha256": "a15fffe05800762cea6d5c809fe8b90e0f9d663b17700951774ba6cb9e197722"
+  },
+  {
+    "file": "deploy/flower2api/test_source_layout.py",
+    "decision": "组合",
+    "source_sha256": "0125c1f6f01073f6021baf03cfbbd4ca67f1159e89bb83b8b027e6b2071485b6",
+    "target_sha256": "1be0f2e5521f404988918fb651fc4bad57cb28e3c2acb30019dd6b089ef355c9",
+    "merged_sha256": "924f51f37eeae872db80378d0894877e440c6cd30637af51c7d4baac2adb0cd3"
+  },
+  {
+    "file": "deploy/flower2api/verify_database_definitions.py",
+    "decision": "沿用集群",
+    "source_sha256": "4ec99a5ddd1d93be8486591c1cf682d9e0d1e57b862ec9a6598a75a94bfc35fb",
+    "target_sha256": "ea80f65f290113d147de6b57b7abb4590d3bf1a5d5a1bee72b17be26fa51b4b6",
+    "merged_sha256": "ea80f65f290113d147de6b57b7abb4590d3bf1a5d5a1bee72b17be26fa51b4b6"
+  },
+  {
+    "file": "images/v3/Dockerfile",
+    "decision": "组合",
+    "source_sha256": "4d1088d119dc645b62a9e3043d21faf8befaab208efeec7372e9afcef8e5fd9b",
+    "target_sha256": "69a2ac36adf20e0a97e2368623fb0219809d60094ef5ab97d5e1d4b952f56ae6",
+    "merged_sha256": "754ec648ef7fa26537167648db23ae86174ea1f2759a489b4621d1a6b4a4d04d"
+  },
+  {
+    "file": "services/gateway/src/handler/router.rs",
+    "decision": "组合",
+    "source_sha256": "a58a7ae8ae7eea7e9d7f42b6cdc6324def1364fbe77b1bc62395a6cd8aca2bb0",
+    "target_sha256": "d4da6c6826594c04f1e15263547ec8214dfbcd635c036ceeacda5925e2824879",
+    "merged_sha256": "cbb777276ecb7865d5eab0b5a40dd38ecc8ac9be11d94f83f0764c782279551d"
+  },
+  {
+    "file": "services/gateway/src/model/request_diagnostics.rs",
+    "decision": "组合",
+    "source_sha256": "3188953feeaeec0bbb23fd1b4f1924a02afa7a58e7480ce21a0b7898224e2858",
+    "target_sha256": "e6c2698db3f9d92ff6a11a7ed86acdebfec7c87be4be177f6d3fa1f66ea20e9c",
+    "merged_sha256": "238e550a43dda6ad19d7e811b150d8b3df9594df8fcfedd3bfe98e3efd769dd3"
+  },
+  {
+    "file": "services/gateway/src/service/account.rs",
+    "decision": "组合",
+    "source_sha256": "b8e2b174ad4c8bda3b38919f71dba7b979d4959fdb30e89835e0e9ede60ecdf3",
+    "target_sha256": "15919873773d696e6de200af5617bbc84567b0c247a2217b8b02dae98dede256",
+    "merged_sha256": "4243e3c8c76fcf902a2224d8093af43690997a6f8e0197f1ca06b77aaccb94aa"
+  },
+  {
+    "file": "services/gateway/src/service/diagnostics.rs",
+    "decision": "组合",
+    "source_sha256": "e25696d33eb3e58115d56b638c7f9013e6c86457b0d73d63948b5fe73a6ea247",
+    "target_sha256": "4aa07c4472d1c936e7e155fa0901b81b191ce2203127c90bcf8845130257ccdb",
+    "merged_sha256": "6f3a0a69cf0c3f5230dc5caf866ca6bca6687f70eff9df500307e0fddfc40303"
+  },
+  {
+    "file": "services/gateway/src/service/gateway.rs",
+    "decision": "组合",
+    "source_sha256": "edf6f29722661e3a1f9a283b13452378b68090bcfc5929e062bdcfa96e6edb67",
+    "target_sha256": "13f439b310a5ae8140ff7ffda9135bff3b69aed6d3a3969e3e13662b23f914b6",
+    "merged_sha256": "ad77f9accf27ce215af0b53759ab4426efb6c2f0bea1262063e21af09faa106d"
+  },
+  {
+    "file": "services/gateway/src/service/mod.rs",
+    "decision": "组合",
+    "source_sha256": "4d17d244ed2ba5fd15f2f9511303e2ffc8562a3370ba023430cf5556fdd77398",
+    "target_sha256": "425cd42c8a262a93180d5a7e5b972d314028ac943bfc4feeb11ca7d0f8ea7928",
+    "merged_sha256": "27a9aa7be622db22ba9fffdacef686c7dd5a5f91d70da63dd97b397063700a4b"
+  },
+  {
+    "file": "services/gateway/src/service/runtime_bridge.rs",
+    "decision": "组合",
+    "source_sha256": "37af35387dcaa122ce6e9683bbbefe613312bef555129395424db16632ddef1a",
+    "target_sha256": "97214e8ea8b1e5effd4f319897b3ff85bb43a75adfd0ea0324b20e93eb93473c",
+    "merged_sha256": "10a8a8a60016ecef33c240acdc919c94ae57389ff932657aef6da35049837853"
+  },
+  {
+    "file": "services/gateway/src/service/runtime_transport.rs",
+    "decision": "组合",
+    "source_sha256": "4b392b9b2acd663edf0b577413092e71b244a3935ddacd5bbae4569f5fee0743",
+    "target_sha256": "7571828e4b3b90b902f605e3d2b8a9181dec4abf032d70471c669c3fa06032d7",
+    "merged_sha256": "b8c75c1a258c03b26d0cf9cde3c7713c1555410e5fb65036946b25d358b8a7eb"
+  },
+  {
+    "file": "services/gateway/src/service/telemetry.rs",
+    "decision": "组合",
+    "source_sha256": "d580540777783d5016e168f9fcc1d6cff855b4f37748d631ae5a99c4ce9ee09b",
+    "target_sha256": "c4e2cff90b4bb27e4ecc64aee94010183efdbf0bc0fa43c76b4eed149abaa6f1",
+    "merged_sha256": "ce1bbc25315837cb98acac1cbf8d71c80e2dd48b2f91e53e4df8c15ab4576ffd"
+  },
+  {
+    "file": "services/gateway/src/store/diagnostics_store.rs",
+    "decision": "组合",
+    "source_sha256": "3495395368e2d6394bf06080cf650647512a3154e1970032125589e39dcca7cb",
+    "target_sha256": "d871200457e7eeee9e145412f39147b865cde423ef8923b78bcfd15ec95c9955",
+    "merged_sha256": "d248954990da81b73aaa3702a223284a95c18e4526c0b4baacf5e8cb25e61128"
+  },
+  {
+    "file": "services/orchestrator/account_isolation.py",
+    "decision": "组合",
+    "source_sha256": "7edcd11599bc9a2785b07c20da9dccf35ea48989d4f261ecc6d5dee930a874ea",
+    "target_sha256": "7523c938e8e5eaabf3def3bf20510a2caa0b6f36782a2b900b852ebf5fc847ff",
+    "merged_sha256": "88758e9c118fd392a83c7ad489561bdc4234c214ce30799833c3667cbdf94b81"
+  },
+  {
+    "file": "services/orchestrator/account_runtime.py",
+    "decision": "组合",
+    "source_sha256": "6e7ef2422c3a0eab2818c06254cda6435a9cf371d16ff030abe309950b60c3b5",
+    "target_sha256": "86a54f0c65971e94db1065b53480bc449c993bd3b4ab305a11e8f804a55cd682",
+    "merged_sha256": "cd353699ad9927cf17e92440f16ec84ba7bfdc61e7ec5c0eb36e8fb075e3bb6b"
+  },
+  {
+    "file": "services/orchestrator/database-migration-registry.json",
+    "decision": "组合",
+    "source_sha256": "4b6ef20f50defe3b0f38636e6e8c1821531b441c8c8d8ca4396452f06f89c474",
+    "target_sha256": "e722a0fbccb497cb025e04d01b91a6f9cdb0218934a57a0a15c473e2ef60172b",
+    "merged_sha256": "f2b59d72f18a1cf40c1c7c63152f3659e6e9b7e0a401b27b39e38ffe1482618d"
+  },
+  {
+    "file": "services/orchestrator/database_migrations.py",
+    "decision": "组合",
+    "source_sha256": "7eb559452101d465d61d496b37c47b9bb9f35d43921b7f468c7f3da31d18aed4",
+    "target_sha256": "9b34e21f9a22584a581ad6be3ecf1dbafe7b264e4c9ab78f0ba4d83c875f3823",
+    "merged_sha256": "8fb24f77033c31922f72efb4ff5876a2411ef31a282708d6e6bb930ed155e68e"
+  },
+  {
+    "file": "services/orchestrator/main.py",
+    "decision": "组合",
+    "source_sha256": "ac2cbe4a5d4ff94a2e5ca3cc01ebb149057abc33ab1b31b9e0334f8a381741f9",
+    "target_sha256": "1d106256868110606511445671c83b552b4a675df4f7fd9025bf4da156d4f592",
+    "merged_sha256": "d5a726c721f100a7d9d704cdea1196a74631717fa3abb4a5af4ca2031db11dce"
+  },
+  {
+    "file": "services/orchestrator/system_updates.py",
+    "decision": "组合",
+    "source_sha256": "3017f852f5423638f451168f7c5974d45d1a5f49ac8a5e27636311477ebe1cb2",
+    "target_sha256": "23be20563c01f17921b554b33e3151c6a33e930ef40a8e29c4228a9522efc572",
+    "merged_sha256": "e954e1850798412c03f15e43fed8070059b78a3d4053f276e81e768ef1028b9e"
+  },
+  {
+    "file": "services/orchestrator/test_database_migrations.py",
+    "decision": "组合",
+    "source_sha256": "7676ab0bceaff3778d8b78b195c843cf743e7e377566c61bf6eb63f993255d34",
+    "target_sha256": "d23dcab03951d3cb19b610a0a1f44423bcb4677a45cb6313aeecea03e0bb4267",
+    "merged_sha256": "9c6938101bff18e5d6dd02ff0eadc6709b08101230330f2faa3f695281796686"
+  }
+]

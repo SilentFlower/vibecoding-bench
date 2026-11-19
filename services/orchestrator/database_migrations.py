@@ -13,6 +13,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from database_schema import initialize_bench_schema
+from agy_environment_schema import initialize_agy_environment_schema, verify_agy_environment_schema
 from cluster_schema import initialize_cluster_schema
 from node_execution_schema import initialize_node_execution_schema
 from node_login_draft_schema import initialize_node_login_draft_schema
@@ -195,6 +196,8 @@ def migration_plan(connection: sqlite3.Connection, target: int | None = None, *,
         if version <= len(steps) and (identity, actual_version, checksum) != (steps[version-1]['id'], version, steps[version-1]['checksum']):
             raise ValueError('数据库迁移台账版本或摘要与当前程序不符')
     current = len(rows)
+    if any(row[0]=='bench.agy-environments.5' for row in rows):
+        verify_agy_environment_schema(connection)
     validate_structure(connection, completed=current > 0)
     if any(step['id'] == 'bench.cluster.2' and step['version'] <= current for step in steps):
         _validate_cluster_structure(connection)
@@ -228,7 +231,9 @@ def apply_migrations(connection: sqlite3.Connection, operation_id: str | None = 
         'bench.node-executions.3': (initialize_node_execution_schema,
             lambda: schema_checksum(Path(__file__).with_name('node_execution_schema.py'))),
         'bench.node-login-drafts.4': (initialize_node_login_draft_schema,
-            lambda: schema_checksum(Path(__file__).with_name('node_login_draft_schema.py')))}
+            lambda: schema_checksum(Path(__file__).with_name('node_login_draft_schema.py'))),
+        'bench.agy-environments.5': (initialize_agy_environment_schema,
+            lambda: schema_checksum(Path(__file__).with_name('agy_environment_schema.py')))}
     plan = migration_plan(connection, target, registry=registry)
     for step in registry['steps'][:plan['target_version']]:
         runner = runners.get(step['id'])

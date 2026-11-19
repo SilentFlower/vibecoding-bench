@@ -1,0 +1,587 @@
+{
+  "schema_version": 1,
+  "source_commit": "64d72ce633d26734779579c96d1d586226313ad3",
+  "task": "11-18-multi-platform-account-runtime",
+  "real_external_model_budget": 0,
+  "evidence_policy": "按批次、实际来源与覆盖表达，重叠结果不求和；忽略项不视为执行通过。",
+  "children": [
+    {
+      "task": "11-18-agy-managed-credential-contract",
+      "status": "completed",
+      "closeout": "closed",
+      "task_record_commit": "a99bee29a61e95d5a45ad5a4607d79dfacbb9339",
+      "task_file_sha256": "48da96da8c603fbe0f145d6b4297bb6d05d3d5e7138b532334d1bad14b72b4c9"
+    },
+    {
+      "task": "11-18-multi-platform-account-auth",
+      "status": "completed",
+      "closeout": "closed",
+      "task_record_commit": "6f82ec6203b9b961e4e220b74b024fe045019db2",
+      "task_file_sha256": "8c1ca73064de63bfc6b93ae234fdbc6040729eaf5934f8ae41c646dc8c9a05a0"
+    },
+    {
+      "task": "11-18-agy-account-runtime",
+      "status": "completed",
+      "closeout": "closed",
+      "task_record_commit": "37aa13990cfa5b3721e06586c390af9ac5b0032d",
+      "task_file_sha256": "d6f4d24c2628d90348caa968d22e9eb3a1ea2732c6de5833883c280fa9674eb0"
+    },
+    {
+      "task": "11-18-multi-platform-request-records",
+      "status": "completed",
+      "closeout": "closed",
+      "task_record_commit": "64d72ce633d26734779579c96d1d586226313ad3",
+      "task_file_sha256": "c0975a3e980e2410c99808b5ae041feec53ecea256349ad47477236b8575def8"
+    },
+    {
+      "task": "11-18-agy-system-prompt-homoglyph",
+      "status": "completed",
+      "closeout": "closed",
+      "task_record_commit": "c0c9122edb429d832809779c1ed3b7b0db37f682",
+      "task_file_sha256": "7f7ac12910161ef0947139767e432f9613d87bb19b098f0173773717b247c347"
+    }
+  ],
+  "source_inputs": [
+    {
+      "file": "services/gateway/src/model/account.rs",
+      "sha256": "b74a34c554f3350d3a69888cefa125ca185834a08f74111a791016e296b36974",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/gateway/src/model/request_diagnostics.rs",
+      "sha256": "3188953feeaeec0bbb23fd1b4f1924a02afa7a58e7480ce21a0b7898224e2858",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/gateway/src/service/account.rs",
+      "sha256": "b8e2b174ad4c8bda3b38919f71dba7b979d4959fdb30e89835e0e9ede60ecdf3",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/gateway/src/service/agy_account.rs",
+      "sha256": "4a2483b2963149d0aa49ccb5deed263472590b29612543ba2bba79cce8819d69",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/gateway/src/service/agy_contract.rs",
+      "sha256": "04f001427f84be060f43a5737e8e922a92e42889921273261adba86828b0bd2b",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/gateway/src/service/oauth_flow.rs",
+      "sha256": "7e73739068617b73893e36e3f9f63e454e4ffb40f2a0a3897a8b8b360a48c9a4",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/gateway/src/service/gemini.rs",
+      "sha256": "bd6bbad26c973b2646f6160ca3c611e476ac223643f7be923ab2328bc98e1327",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/gateway/src/service/runtime_transport.rs",
+      "sha256": "4b392b9b2acd663edf0b577413092e71b244a3935ddacd5bbae4569f5fee0743",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/gateway/src/service/agy_runtime.rs",
+      "sha256": "02a31ff73b0d7fbf96d5dd06db05f20fe460cb7ca3ff5c37eff1451fb3fdc8ac",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/gateway/src/service/diagnostics/agy.rs",
+      "sha256": "2f866197e3eb7f60dc082cbd4115a23feb0a32c9ac8fa681661ed87cc562131a",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/gateway/src/store/agy_credentials.rs",
+      "sha256": "2b1e66d0092648cc3ac4cef42111484d9218eb6e9f67eecdefe03d0346759b2b",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/gateway/src/store/diagnostics_store.rs",
+      "sha256": "3495395368e2d6394bf06080cf650647512a3154e1970032125589e39dcca7cb",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/gateway/src/store/database-migration-registry.json",
+      "sha256": "7f777cd599e673a80b0444f1a2046267f3d18a54c7e24681471160f3ff04f84a",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/gateway/src/store/request_records_schema.rs",
+      "sha256": "436c8df2f354698101ef5e5fbdbcbda6b9b5d6bee806f873196141b3bef1b36f",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/orchestrator/agy_auth.py",
+      "sha256": "b1bf80c687f4aa01cf9b2ba80f2084f0c9b49f44ea642f671875ae4d1f84396f",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/orchestrator/agy_environment.py",
+      "sha256": "7e97392ef93126c584d3741cb394c84de4a200bb4190f63ddf1d1c0a8a6d4def",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/orchestrator/account_runtime.py",
+      "sha256": "6e7ef2422c3a0eab2818c06254cda6435a9cf371d16ff030abe309950b60c3b5",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/orchestrator/main.py",
+      "sha256": "ac2cbe4a5d4ff94a2e5ca3cc01ebb149057abc33ab1b31b9e0334f8a381741f9",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/orchestrator/agy_runtime/kernel.py",
+      "sha256": "173eb1941b3a59a9f1e575486dc6dd5861cfea287466285b527551e15fe4864f",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/orchestrator/agy_runtime/supervisor.py",
+      "sha256": "abb88dd84dc20f94f002ae4ac0cb3741b5243770ce914137cd644193b6199b35",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/orchestrator/agy_runtime/credentials.py",
+      "sha256": "f2c98b31b44a30d9073749b18f75c1b8ce71e6cc5abb54ef9fb14e4dfef08b82",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/orchestrator/agy_runtime/system_prompt.py",
+      "sha256": "383df82ac383a04bcef4495a7f83d753d52f892014090976c3017631ebbab115",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/orchestrator/agy_runtime/capture.py",
+      "sha256": "bda57bfc6ed8293ca4a83d1fbbe0005cc0cfbdc8f304e947db9114a5e1efeaa1",
+      "matches_source_commit": true
+    },
+    {
+      "file": "services/orchestrator/agy_runtime/resources/system-prompt-homoglyph-v1.json",
+      "sha256": "5f54c46b6971a51d6199d208afecaa262e792a8a28524c4db48a9bb859106a5f",
+      "matches_source_commit": true
+    },
+    {
+      "file": "apps/web/src/api.ts",
+      "sha256": "71bd09e29e6831127524b6ce9c44dc4b4280b4941643153019361c173015cf05",
+      "matches_source_commit": true
+    },
+    {
+      "file": "apps/web/src/components/Accounts.vue",
+      "sha256": "1a3f8c66b38aba707b73a6410068fb23fe9a50d009c07e959738e5c47dc43461",
+      "matches_source_commit": true
+    },
+    {
+      "file": "apps/web/src/components/RuntimeEnvironments.vue",
+      "sha256": "6974f259aa8c2d88022dffbd311ed30e290a48f33c8d1eee4cd9f689fa5fb5b3",
+      "matches_source_commit": true
+    },
+    {
+      "file": "apps/web/src/components/RequestDiagnostics.vue",
+      "sha256": "a4a5cd4b5331ab5921ee87c88795f8256ec017c2456354ec5f8601a05448cbad",
+      "matches_source_commit": true
+    },
+    {
+      "file": "apps/web/src/components/AccountFilterSelect.vue",
+      "sha256": "53e18ada9290026211832956af6af0c72e99dac268f2ff816a8265f8f5644319",
+      "matches_source_commit": true
+    },
+    {
+      "file": "apps/web/src/components/NativeStageDetails.vue",
+      "sha256": "0917fddf74569e154a998b7ba0da7aed11cc2134e2c625a1826cd76e4b3dbdf2",
+      "matches_source_commit": true
+    },
+    {
+      "file": "deploy/flower2api/system_release.py",
+      "sha256": "90f24064941013900c883f746f0ccd9395aa7256a1442299d79bbcbb4ae44127",
+      "matches_source_commit": true
+    },
+    {
+      "file": "deploy/flower2api/verify_agy_gemini.py",
+      "sha256": "7aeff1e457999c0e90bfa8bde22a0385ffb747b37275ee16c09164f8fe34bc11",
+      "matches_source_commit": true
+    },
+    {
+      "file": "deploy/flower2api/verify_agy_native_loopback.py",
+      "sha256": "75fdc5cdb12cb7664728348c19f69fe38e3e2160f049e72b91aefd2122697457",
+      "matches_source_commit": true
+    },
+    {
+      "file": "deploy/flower2api/verify_agy_request_records.py",
+      "sha256": "bbb7788c0f75c0cfa593aa35a712f011c0c4f9ce5ecd1c5441957fa277263dcb",
+      "matches_source_commit": true
+    }
+  ],
+  "verification": [
+    {
+      "id": "E01",
+      "file": ".trellis/.runtime/agy-records-rust-final.log",
+      "sha256": "05d605161c99d0f8c3ac37dc85f3e8959f64e09ca7224eb0d7a1f6cdbacd3022",
+      "scope": "CC及AGY常规Rust完整批次；日志专项被单独筛出",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "cargo test --locked --manifest-path services/gateway/Cargo.toml -- --skip stable_stream_logs_distinguish_body_error_timeout_eof_and_drop --test-threads=4",
+      "exit_code": 0,
+      "passed": 970,
+      "ignored": 13,
+      "batches": 17,
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E02",
+      "file": ".trellis/.runtime/agy-records-stream-log.log",
+      "sha256": "8d71f5bca34540ab6655e5b4d094412e27aebd9240fc0229700451ac44e7f056",
+      "scope": "独立执行日志专项",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "cargo test --locked --manifest-path services/gateway/Cargo.toml stable_stream_logs_distinguish_body_error_timeout_eof_and_drop -- --test-threads=1",
+      "exit_code": 0,
+      "passed": 1,
+      "ignored": 0,
+      "batches": 16,
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E03",
+      "file": ".trellis/.runtime/agy-records-repair-diagnostics.log",
+      "sha256": "943102f0e30bb4f3169d669166eb49843b43ceb32d5a8129034cfec363cdc59c",
+      "scope": "最终诊断修复与工具/物理控制顺序",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "cargo test --locked --manifest-path services/gateway/Cargo.toml --lib diagnostics -- --test-threads=1",
+      "exit_code": 0,
+      "passed": 20,
+      "ignored": 1,
+      "batches": 1,
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E04",
+      "file": ".trellis/.runtime/agy-records-pg.log",
+      "sha256": "0b67c877e8df01be37879782cb2856b9b39457c8c6dd34f0f59adf217e8e251c",
+      "scope": "隔离PostgreSQL诊断存储、NULL/实值、筛选和晚补写",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "独立CC2API_DIAGNOSTICS_TEST_POSTGRES_DSN下运行cargo test --lib postgres_diagnostics_storage_contract -- --ignored --test-threads=1",
+      "exit_code": 0,
+      "passed": 1,
+      "ignored": 0,
+      "batches": 1,
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E05",
+      "file": ".trellis/.runtime/agy-records-repair-http.log",
+      "sha256": "0d2a726bffbf389155f92f0c876c97d3caeda388c1431ed7f2993b278282dc40",
+      "scope": "真实HTTP/SQLite，发送器为合成替身，含401及AGY调用Claude",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "verify_agy_gemini.py --image python@sha256:6dd8b6dab6b3adc7812bab69eca5dbdc1a5cc690ad28306d234ffb4ef8ac9753",
+      "exit_code": 0,
+      "result": {
+        "passed": true,
+        "evidence": "real_http_sqlite_synthetic_sender",
+        "network": "none",
+        "real_model_submissions": 0,
+        "synthetic_submissions": 20
+      },
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E06",
+      "file": ".trellis/.runtime/agy-records-repair-native.log",
+      "sha256": "1e9b40c0a882e95e0bcdc8a67b49ca9f0cbaa43e479b4e80391b6ea6eba043ae",
+      "scope": "固定原版、本地TLS、真实MCP、策略及诊断归属",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "verify_agy_native_loopback.py --image flower2api-agy-auth:task-smoke --loader-root /lib/x86_64-linux-gnu --homoglyph",
+      "exit_code": 0,
+      "result": {
+        "passed": true,
+        "evidence": "real_gateway_sender_native_tls",
+        "network": "none",
+        "real_model_submissions": 0,
+        "synthetic_native_model_submissions": 17,
+        "diagnostic_requests": 19,
+        "diagnostic_attempts": 18
+      },
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E07",
+      "file": ".trellis/.runtime/agy-records-native-off.log",
+      "sha256": "8e7c4ce120104e994ee564ad0a83205f314a9afb8cd2347191f1ba80fbdfc93a",
+      "scope": "固定原版采集关闭路径",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "verify_agy_native_loopback.py --image flower2api-agy-auth:task-smoke --loader-root /lib/x86_64-linux-gnu --capture-off",
+      "exit_code": 0,
+      "result": {
+        "passed": true,
+        "evidence": "real_gateway_sender_native_tls_capture_off",
+        "network": "none",
+        "real_model_submissions": 0,
+        "synthetic_native_model_submissions": 1
+      },
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E08",
+      "file": ".trellis/.runtime/agy-records-full-chain.log",
+      "sha256": "673206efde1765cd1812472ff1faf0051c04e953bb5f1b588f7a49aea3b70744",
+      "scope": "UI/API/SQLite、5→6与旧程序读写、390px边界",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "verify_agy_request_records.py --image flower2api-agy-auth:task-smoke --baseline .trellis/.runtime/agy-records-baseline-gateway",
+      "exit_code": 0,
+      "result": {
+        "network": "none",
+        "real_model_submissions": 0,
+        "diagnostic_requests": 19,
+        "ui_api_db_passed": true,
+        "migration_5_to_6_repeat_old_plan": true,
+        "old_program_read_write_preserved": true,
+        "isolated_data_removed": true
+      },
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E09",
+      "file": ".trellis/.runtime/agy-records-management-ui.log",
+      "sha256": "cd5647761fdbac40207587148fcd297c27fdf016a7371d4619516e5bbffc8b5e",
+      "scope": "既有CC详情、导航、采集与两主题/时区",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "verify_management_ui.py --output .trellis/.runtime/agy-records-management-ui",
+      "exit_code": 0,
+      "result": {
+        "passed": true
+      },
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E10",
+      "file": ".trellis/.runtime/agy-records-web-build.log",
+      "sha256": "4f23235b00cfcad6010ce674d7efbacc939c8c55f9413e4b1f26c820ddc70a15",
+      "scope": "当前Web DTO与实际构建",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "npm --prefix apps/web run build",
+      "exit_code": 0,
+      "result": "Vue类型检查与构建通过",
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E11",
+      "file": ".trellis/.runtime/agy-records-python-core.log",
+      "sha256": "adf8b858c5e28e7e25c35a7118476ae10b4bf8f4aaf3cdd04aabea9f13c0bb8c",
+      "scope": "AGY核心/监督/环境/策略/采集及接口定向批次",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "exit_code": 0,
+      "passed": 49
+    },
+    {
+      "id": "E12",
+      "file": ".trellis/.runtime/agy-records-capture-api.log",
+      "sha256": "1136b7199f74ea99ca6d09f0b55a2a9203fdf3a6aa3f0d22730c25ed0b217746",
+      "scope": "最后采集、内部鉴权、代次和归属批次",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "exit_code": 0,
+      "passed": 24
+    },
+    {
+      "id": "E13",
+      "file": ".trellis/.runtime/agy-records-deploy-all.log",
+      "sha256": "20f8dbd307b22e79f046c62cc3f771d86d5fc095a6518e33ba515e9854a9093b",
+      "scope": "部署回归",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "PYTHONPATH=services/orchestrator:deploy/flower2api /root/project/vibecoding-bench/.venv/bin/python -m unittest discover -s deploy/flower2api",
+      "exit_code": 0,
+      "passed": 223,
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E14",
+      "file": ".trellis/.runtime/agy-repair-api-tests.log",
+      "sha256": "610e4e5830d9795ce762d861a88820232309a1aa9d1ae5e231ac874d5a332688",
+      "scope": "账号真实HTTP/SQLite替身；并发一次刷新、丢回执和重启恢复",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "verify_agy_accounts_api.py",
+      "exit_code": 0,
+      "result": {
+        "passed": true,
+        "evidence": "gateway_http_sqlite_synthetic_native",
+        "model_submissions": 0,
+        "concurrent_refresh_calls": 1
+      },
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E15",
+      "file": ".trellis/.runtime/agy-repair-agy-ui-tests.log",
+      "sha256": "929e3d31cc54f65159fe11f472875614b6b679011b61a0ed9b4f55e226216d4c",
+      "scope": "AGY账号平台、独立开关、草稿及迟到授权",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "verify_agy_accounts_ui.py",
+      "exit_code": 0,
+      "result": {
+        "passed": true,
+        "model_submissions": 0
+      },
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E16",
+      "file": ".trellis/.runtime/agy-repair-cc-ui-tests.log",
+      "sha256": "2a2e07503aa565dd03315a00413db73b6c255981d6ce12507bd66095eb09857f",
+      "scope": "CC账号管理及1440/720/390px",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "PYTHONPATH=deploy/flower2api /root/project/vibecoding-bench/.venv/bin/python deploy/flower2api/verify_accounts_design.py",
+      "exit_code": 0,
+      "result": {
+        "passed": true
+      },
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E17",
+      "file": ".trellis/.runtime/agy-runtime-ui-tests.log",
+      "sha256": "02059ec4d526d1ef4fc60f1ac1b6a7d9bbcef0b7fc9c2e9d948040df8f5a95f0",
+      "scope": "AGY环境页资源、控件、焦点及离页",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "verify_agy_environment_ui.py",
+      "exit_code": 0,
+      "result": {
+        "passed": true
+      },
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E18",
+      "file": ".trellis/.runtime/agy-runtime-native-normal.log",
+      "sha256": "d191166cc59e2df43d3b54176692d860c36c312df2dbe28d8bb7862c00cabf50",
+      "scope": "固定原版断网准备、两代、共享映像及正常退出",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "verify_agy_runtime.py --native-image flower2api-agy-auth:task-smoke",
+      "exit_code": 0,
+      "result": {
+        "passed": true,
+        "evidence": "native_offline",
+        "network": "none",
+        "model_submissions": 0
+      },
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E19",
+      "file": ".trellis/.runtime/agy-runtime-native-crash.log",
+      "sha256": "f5878571dce6430f23deaf15eab31512c7d9c75453112b51b711424d5704351d",
+      "scope": "固定原版断网监督器异常与物理进程终止",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "verify_agy_runtime.py --native-image flower2api-agy-auth:task-smoke --crash",
+      "exit_code": 0,
+      "result": {
+        "passed": true,
+        "evidence": "native_offline",
+        "network": "none",
+        "model_submissions": 0
+      },
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E20",
+      "file": ".trellis/.runtime/agy-parent-database-definitions.log",
+      "sha256": "a53a04e7b945a67a0a07a5297c5b0492ee187e2c58e85470c12d47fe664e4f0c",
+      "scope": "本轮数据定义登记核对",
+      "reuse_reason": "本轮在当前源码基线实际补验",
+      "command": "PYTHONPATH=services/orchestrator:deploy/flower2api /root/project/vibecoding-bench/.venv/bin/python deploy/flower2api/verify_database_definitions.py",
+      "exit_code": 0,
+      "result": {
+        "status": "passed",
+        "databases": {
+          "bench": 2,
+          "gateway": 6
+        }
+      },
+      "command_kind": "本轮实际执行"
+    },
+    {
+      "id": "E21",
+      "file": ".trellis/.runtime/agy-parent-auth-contract.log",
+      "sha256": "15e30c75d75c502025b1adf28f2555566d958f3a809281d2a1b8a0f677fd6e00",
+      "scope": "本轮补验原生管理驱动与内部鉴权",
+      "reuse_reason": "当前父任务仅交付总验收材料；源码与已交付基线一致，最后定向批次补齐原完整回归后的修复覆盖。",
+      "command": "PYTHONPATH=services/orchestrator:deploy/flower2api /root/project/vibecoding-bench/.venv/bin/python -m unittest test_agy_auth test_agy_auth_api",
+      "exit_code": 0,
+      "passed": 18,
+      "command_kind": "本轮实际执行"
+    },
+    {
+      "id": "E22",
+      "file": ".trellis/.runtime/agy-records-python-all.log",
+      "sha256": "d8d3208b9f940738a2a2bd95bf326a556ef58781e232a71e5a403646f11f8479",
+      "exit_code": 1,
+      "total": 1386,
+      "passed": 1380,
+      "skipped": 5,
+      "errors": 1,
+      "scope": "全量编排回归，既有项目种子摘要错误独立保留",
+      "command": "PYTHONPATH=services/orchestrator:deploy/flower2api /root/project/vibecoding-bench/.venv/bin/python -m unittest discover -s services/orchestrator",
+      "reuse_reason": "原全量结果与本轮隔离HEAD复核一致；任务相关最新定向回归另列E11/E12/E21",
+      "known_baseline": {
+        "source_commit": "64d72ce633d26734779579c96d1d586226313ad3",
+        "source_path": "resources/project-library/projects/python-dateutil",
+        "expected": "217058e8e1fe1dc0d86478ce10c39e3b2b7df50ee44ac90303f12c1f148b85ec",
+        "head_archive_actual": "6841c1333e2b107b8a79096002fb10ef5ec3bb7e18ac1c58150d406f646e5d90",
+        "working_tree_actual": "6841c1333e2b107b8a79096002fb10ef5ec3bb7e18ac1c58150d406f646e5d90",
+        "focused_recheck": {
+          "file": ".trellis/.runtime/agy-parent-known-baseline-recheck.log",
+          "sha256": "2f7a57fd29013d960158bb0dcfcacab2594e3f8e42a81dda9225632c0b8ab280",
+          "exit_code": 1
+        },
+        "archive_recheck": {
+          "file": ".trellis/.runtime/agy-parent-seed-baseline.json",
+          "sha256": "3fae841dfde4e88f6ab4de9c4655fcc498ccdaa6ca8ed12ea62e8f209a3b7609",
+          "exit_code": 0
+        }
+      },
+      "command_kind": "本次或既有记录的复现入口；执行结果按file对应批次保留"
+    },
+    {
+      "id": "E23",
+      "file": ".trellis/.runtime/agy-repair-postgres-tests.log",
+      "sha256": "a18203096c52ab39271d4993ed225cb3dfd4dd4681934787b30c27ff07c3f5a7",
+      "exit_code": 0,
+      "passed": 1,
+      "ignored": 0,
+      "scope": "独立PG15的历史账号升级、跨平台同邮箱、能力TEXT时间及凭据事务",
+      "command": "CCRB_TEST_POSTGRES_URL指向独立PG后运行postgres_native_backend_migration_create_update_and_rollback -- --ignored",
+      "command_kind": "子任务implement.md记录的复现入口，结果按原日志批次保留",
+      "reuse_reason": "相关PG身份/能力事务路径保持原合同；后续SQLite写权限修复仅作用于SQLite。"
+    }
+  ],
+  "historical_native_research": [
+    {
+      "file": ".trellis/tasks/11-18-agy-managed-credential-contract/research/native-directory-summary.json",
+      "sha256": "36cc3ed49a468b822ce3b74019e93843a368cf7dad19e364206856572a1baecc",
+      "scope": "历史真实原生研究；当前产品Google入口的真实集成验收沿外部清单"
+    },
+    {
+      "file": ".trellis/tasks/11-18-agy-managed-credential-contract/research/native-cache-summary.json",
+      "sha256": "f3f929af45bba4977fd8cd10f30a8239de3d8bcddc21ff99b652712d951ba70d",
+      "scope": "历史真实原生研究；当前产品Google入口的真实集成验收沿外部清单"
+    },
+    {
+      "file": ".trellis/tasks/11-18-agy-managed-credential-contract/research/native-refresh-summary.json",
+      "sha256": "c14f5ebda85fe43694e0df1336336a0637e8eb941819fa3ea6444cc24fbbec4b",
+      "scope": "历史真实原生研究；当前产品Google入口的真实集成验收沿外部清单"
+    },
+    {
+      "file": ".trellis/tasks/11-18-agy-managed-credential-contract/research/native-model-summary.json",
+      "sha256": "9a37938f9f9640f69222f25d1e1bc3832b1e4eea7e6c4675e8fc14775b7579c4",
+      "scope": "历史真实原生研究；当前产品Google入口的真实集成验收沿外部清单"
+    },
+    {
+      "file": ".trellis/tasks/11-18-agy-managed-credential-contract/research/native-sse-summary.json",
+      "sha256": "a3dbeabe9f6a4c4057787010d7ac1ceed5bd173e96c2c351cc4b8a1b3921b82c",
+      "scope": "历史真实原生研究；当前产品Google入口的真实集成验收沿外部清单"
+    },
+    {
+      "file": ".trellis/tasks/11-18-agy-managed-credential-contract/research/native-final-state.json",
+      "sha256": "4cd9374f9458356cd3c1f82a8971f8ef6e5f42dda550ad6fd847c5399a1d84d8",
+      "scope": "历史真实原生研究；当前产品Google入口的真实集成验收沿外部清单"
+    }
+  ],
+  "overall_engineering_evidence": "工程相关证据通过。既有种子基线错误单列。父任务最终结论由Check-All给出。"
+}

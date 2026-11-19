@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "previous_sha": "0764b5fa75e0df6c5c12969fdc40b53d3bbf734c",
+  "old_program": {
+    "state": "compatible_newer",
+    "current_version": 5,
+    "target_version": 4
+  },
+  "ledger_unchanged": true,
+  "agy_mapping_retained": true,
+  "old_account_write_and_cluster_trigger": true
+}
