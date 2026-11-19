@@ -26,6 +26,7 @@ export const Trash2 = icon('trash');
 export const Globe = icon('globe');
 export const Box = icon('box');
 export const Boxes = icon('box');
+export const Server = icon('server');
 export const ChevronRight = icon('chevron');
 export const KeyRound = icon('key');
 export const Plus = icon('plus');

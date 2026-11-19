@@ -91,7 +91,7 @@ def wait_node_preparation(testcase, service, node: dict) -> dict:
 
 
 def verify_node_snapshot_restore(testcase, service, runtime, node: dict, account: dict, root: Path) -> None:
-    """用隔离Node实际恢复原完整快照，并验证历史控制端承载大profile。
+    """用隔离Node原地切回旧组件，保留当前资料并核对大profile。
 
     :param testcase: 隔离验证器。
     :param service: 原节点服务。
@@ -114,7 +114,7 @@ def verify_node_snapshot_restore(testcase, service, runtime, node: dict, account
         'operation_id': operation, 'epoch': epoch, 'phase': 'blocked', 'target_release': 'cluster-sync-current',
         'revision': str(uuid.uuid4()), 'created_at': time.time()})
     later = root / 'projects/later.txt'
-    later.write_text('后来资料应隔离保留')
+    later.write_text('后来资料原地保留')
     large = service.data / 'profiles' / account['name'] / 'settings.json'
     atomic_json(large, {'large_config': 'x' * (2 * 1024 ** 2)})
     with patch('cluster_synchronization.UPDATE_GATE', gate), patch.object(sync.gateway, '_request', return_value={
@@ -122,9 +122,11 @@ def verify_node_snapshot_restore(testcase, service, runtime, node: dict, account
         restored = sync.restore_platform_snapshot(node['id'])
     testcase.assertEqual('prepared', restored['state'])
     testcase.assertEqual(job['old_release'], restored['release'])
-    testcase.assertFalse(later.exists())
+    testcase.assertEqual('in_place', job['data_policy'])
+    testcase.assertNotIn('backup', job)
+    testcase.assertEqual('后来资料原地保留', later.read_text())
     quarantine = root.parents[1].parent / ('.flower-node-previous-' + job['job_id'])
-    testcase.assertEqual('后来资料应隔离保留', (quarantine / 'environments' / root.name / 'projects/later.txt').read_text())
+    testcase.assertFalse(quarantine.exists())
     actual = json.loads((root.parents[1] / 'profiles' / account['name'] / 'settings.json').read_text())
     testcase.assertEqual(2 * 1024 ** 2, len(actual['large_config']))
     testcase.assertEqual('platform_restored', json.loads(journal.read_text())['phase'])

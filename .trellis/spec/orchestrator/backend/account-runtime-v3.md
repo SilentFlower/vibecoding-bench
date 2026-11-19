@@ -1809,7 +1809,7 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - 普通profile准备以1MiB作为通路选择阈值，大文件进入私有摘要文件；迁移同样使用`profile_references`。固定文件名仅`.credentials.json/.claude.json/settings.json`，实际长度、SHA256、0600权限、单链接和归属逐次核验；绑定账号先去除RT。历史端通过固定受限适配复用其原锁、类型和准备器，身份算法沿原版本。
 - `record.progress.stage`只表示实际处理步骤，确认阶段仍由原回执推进。reconcile公开固定`failure={code,stage,message,action}`，历史缺字段使用原通用提示；任意底层正文及私有路径排除出公开投影。继续迁移保持原operation_id和所有权，提交前取消继续先撤销目标再恢复源。
 - 节点同步私有日志保存原目标、配置摘要、原控制/镜像、账号与隔离收据。并发最多两台，单节点组件切换与两端迁移共用操作锁。运行中的迁移先完成后同步；登记后尚未建立目标副本时可先同步空目标。暂停迁移按下述维护兼容规则核对实际停止和原租约，保留迁移资料及关闭的账号准入，只升级组件。
-- 同步核对真实jobs、流、草稿、独立验收、凭据交接和实际角色。暂停接单偏好独立保存。停止原角色和控制后以原镜像执行完整私有备份，备份进程仍运行时继续等待。新控制失败在账号更新前恢复原实例；账号恢复已开始则保留当前现场继续。相同账号镜像以原撤销fence复用原角色和代次，镜像变化交原生命周期重建；回传传输绑定按实际账号镜像批次核验。
+- 同步核对真实jobs、流、草稿、独立验收、凭据交接和实际角色。暂停接单偏好独立保存。停止原角色和控制后原地切换组件，作业持久data_policy=in_place；不生成数据根全量副本或隔离恢复副本。旧在途复制进程按作业ID及原镜像确认后停止。新控制失败在账号更新前恢复原实例；账号恢复已开始则保留当前现场继续。相同账号镜像以原撤销fence复用原角色和代次，镜像变化交原生命周期重建；回传传输绑定按实际账号镜像批次核验。
 - 全局完整备份收齐同部署、同epoch的中央及全部登记Node快照。SQLite复制使用原backup API；离线固定副本读取使用immutable，避免生成WAL辅助文件改变清单。组合恢复核对安装身份、归属/分配和实际环境，保留pending/reconcile事实。
 
 ### 4. Validation & Error Matrix
@@ -1928,9 +1928,9 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 源隔离收据确认后，按原环境ID/账号/generation同步中央state=stopped；原运行意图保存在record.source_state。包、profile文件和逻辑身份沿原操作保留。普通节点准备取消1MiB拒绝条件，大profile继续由deliver_preparation按摘要文件通道传输；2MiB控制消息预算保持。
 - 新操作在execution检查点保存source_node_location/target_node_location，字段为host、port、host_key、data_root。名称、SSH用户名及认证方式变化不改变资料定位；主机身份或数据位置变化仍拒绝。历史检查点缺location时继续核对原config_sha256。
 - 暂停维护仅认可phase=reconcile、last_confirmed_phase为source_fenced/exporting/importing/verified、无cancellation的提交前操作。中央分配仍在原源且为reconcile，revision、environment_id、source_generation和source_fingerprint_sha256一致；网关active/waiting/importing全为0，唯一排他holder的owner/generation与原gateway_lease精确一致。独立账号保持空租约。历史SSH源中央state=ready时仍须取得节点实际停止证明。
-- 本机源核对原fenced标记和全部角色Running=false/Pid=0。SSH源核对同标记、实际角色ID集合及停止状态；已发布的目标核对原operation、node、account、environment、revision和source_generation及published/prepared标记。无目标目录时不得存在目标角色。凭据交接、中央执行及连接继续排空。暂停账号从组件重建名单排除，全部资料纳入完整备份，原租约和迁移游标保持。
+- 本机源核对原fenced标记和全部角色Running=false/Pid=0。SSH源核对同标记、实际角色ID集合及停止状态；已发布的目标核对原operation、node、account、environment、revision和source_generation及published/prepared标记。无目标目录时不得存在目标角色。凭据交接、中央执行及连接继续排空。暂停账号从组件重建名单排除，全部资料原地保留，原租约和迁移游标保持。
 - 目标创建失败留下reconcile时，prepare_import仅凭原published标记与相同import_intent恢复。原登记角色必须均已停止、没有外来角色或实际作业；收口这些角色后恢复stopped并按原身份重建，HOME、profile和迁移尝试保持。
-- 已取消迁移的目标副本可随组件同步完整备份并保留：中央phase及last_confirmed_phase均为cancelled，target_revoked收据精确匹配操作、目标节点、账号、环境及source_revision+1；节点node-fence同范围且为fenced，node-migration-target和原操作revoked.json同范围且为revoked，目标标记source_generation匹配原记录。实际剩余角色须属于fence.stopped_containers及已登记角色类型，全部Running=false/Pid=0。核对通过后沿原同步日志继续；保留HOME、工程、标记、取消状态和中央归属。
+- 已取消迁移的目标副本可随组件原地换批保留：中央phase及last_confirmed_phase均为cancelled，target_revoked收据精确匹配操作、目标节点、账号、环境及source_revision+1；节点node-fence同范围且为fenced，node-migration-target和原操作revoked.json同范围且为revoked，目标标记source_generation匹配原记录。实际剩余角色须属于fence.stopped_containers及已登记角色类型，全部Running=false/Pid=0。核对通过后沿原同步日志继续；保留HOME、工程、标记、取消状态和中央归属。新作业恢复旧控制组件时保留当前节点执行库和最新资料；历史缺data_policy的快照作业沿原恢复分支。backed_up作为旧宿主兼容的排空回执保留，公开页面显示已停止待切换。
 - 迁移prepare-import回执的binding.release_id按configured_release(runtime)核对账号镜像来源，组件健康继续核对runtime.release_id。启用更新底座时允许V3_ACCOUNT_RELEASE与V3_RELEASE不同；账号、环境、代次、绑定秘密及原操作范围继续核验。旧控制端批次误判留下的importing/reconcile沿原操作和transfer_id续接，保持单次源隔离/导出，成功激活后释放原租约。
 - 已保存CPU/机型画像随账号保留；目标硬件能力保持实际值。旧版仍使用各自的CPU和模板校验，跨代迁移后回退应选择包含该兼容能力的版本，或先按原迁移流程迁回旧版支持的节点。
 
@@ -1941,10 +1941,10 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 | 保存画像与目标CPU跨代/跨厂商 | 保留原画像并使用目标实际能力 |
 | 新x64 CPU没有登记模板 | host-cpu-v1及通用机型，持久身份只生成一次 |
 | 目标组件尚未就绪 | 后台preflight准备，源隔离延后 |
-| 暂停且原租约、停止及身份均确认 | 保留原操作/资料，允许备份与组件维护 |
+| 暂停且原租约、停止及身份均确认 | 保留原操作/资料，允许原地组件维护 |
 | 外来holder、活动请求/导入、未知角色或标记不符 | 继续阻断维护 |
 | 目标本次创建失败且全部角色已停止 | 收口本次失败角色，继续同次迁移 |
-| 已取消迁移目标残留停止角色且双端撤销证明一致 | 自动识别历史副本，沿原同步完成备份和组件换批 |
+| 已取消迁移目标残留停止角色且双端撤销证明一致 | 自动识别历史副本，沿原同步完成组件换批并保留资料 |
 | 控制组件已更新且账号镜像沿用原批次 | 按配置账号批次接纳准备回执；仅匹配控制批次的错误绑定继续拒绝 |
 | 固定画像损坏/组件不符/位置变化/Docker创建失败 | system_profile/component_version/node_configuration/runtime_preparation固定公开原因 |
 
@@ -1952,7 +1952,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 
 - 正常：Naples画像迁入Cezanne或Turin节点，保留设备、机型、HOME及工程资料，目标实际flags及核心数按宿主渲染。
 - 正常：V3_RELEASE为新控制批次、V3_ACCOUNT_RELEASE为复用账号批次时，目标binding使用账号批次，完成原迁移并激活。错误：把binding改成控制批次来通过校验；正确处理：沿账号来源核对并续接原操作。
-- 边界：目标已有本次迁移的停止角色和发布目录；原迁移暂停后升级控制组件，完整备份并保留目标目录，随后继续原操作。
+- 边界：目标已有本次迁移的停止角色和发布目录；原迁移暂停后原地升级控制组件并保留目标目录，随后继续原操作。
 - 边界：取消后目标仅剩停止的account-network，中央归属账号为0；核对原取消收据、目标撤销标记及实际停止登记后自动继续原同步。缺失撤销证明或额外角色须核对原操作，不能仅凭零账号计数或exited状态放行。
 - 错误用法：按租约TTL删除占用、把reconcile直接改ready，或删除画像重新随机。正确处理：核对原持久操作、双端实际停止和原代次，保留迁移关闭状态并继续原收口路径。
 
@@ -1961,7 +1961,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - test_system_profile：Turin/Intel首次画像、跨代渲染保持实际能力、旧画像和DMI身份保持、坏格式拒绝。
 - test_cluster_migration_runner/migrations/nodes/synchronization：自动准备先于源隔离、名称/认证变更与位置保护、源停止镜像、未准备节点首次选择及自动纳管。
 - test_cluster_migration_maintenance/execution：真实SQLite原租约及过期/外来/活动矩阵、源隔离证明、SSH磁盘标记、失败角色恢复保留身份与资料；未知或运行角色保持阻断。
-- test_cluster_synchronization：取消目标残留停止网络角色时沿原job_id恢复并完成备份/换批，资料字节、取消状态和中央归属保持；中央收据、撤销文件、节点/账号/操作/分配/源代次错配及外来/运行/PID非零角色继续阻断；已完成迁移旧源仍核对原代次。
+- test_cluster_synchronization：取消目标残留停止网络角色时沿原job_id恢复并原地完成换批，资料字节、取消状态和中央归属保持；中央收据、撤销文件、节点/账号/操作/分配/源代次错配及外来/运行/PID非零角色继续阻断；已完成迁移旧源仍核对原代次。
 - test_cluster_migration_runner：控制/账号不同批次完成归属CAS和激活；旧批次误判后的importing/reconcile复用原stage，源只隔离和导出一次；错误控制批次绑定保留源归属、reconcile及原租约。
 - verify_cluster_ui：未准备目标可选并可提交迁移，既有确认、未知结果、恢复及窄屏交互保持。
-- 隔离SSH/Docker验收：跨代画像完整迁移后读取目标实际CLI；暂停迁移目标完整备份/控制换批，原停止角色、标记、资料和中央游标保持。
+- 隔离SSH/Docker验收：跨代画像完整迁移后读取目标实际CLI；暂停迁移目标原地控制换批及切回旧组件，原停止角色、标记、最新资料和中央游标保持；备份目录保持为空。正常账号升级/恢复保留最新工程文件及大profile。

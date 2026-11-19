@@ -155,6 +155,8 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 ### 正式控制台与账号首批迁移
 
+- 节点管理导航和卡片使用共用SVG sprite的i-server；运行环境继续使用i-box。节点页先显示汇总和紧凑服务器卡片，账号归属/迁移区保持原确认与轮询。主机指纹、认证方式、路径及批次收进详情；同批已就绪节点隐藏相同来源到目标的箭头。stopping显示停止原组件，旧协议backed_up显示已停止待切换。
+
 - `apps/web/src/style.css` 保留现有主题变量名，采用已确认紫色强调、深色侧栏与浅色内容区。字体来自 `src/assets/fonts/` 中的本地 WOFF2，许可一并保留；离线导出须把同源字体内嵌，不能依赖构建目录外链。
 - `Dashboard.vue` 在品牌旁保留 `/updates` 入口，版本优先使用 `usePlatformVersion` 读取的当前控制镜像版本；旧端回退到已验签目录精确匹配的current_release，缺省显示“版本”。移动入口缺省显示“系统更新”。桌面折叠位于管理员区域，偏好键为 `flower2api-sidebar-collapsed`，存储失败仍保持本次会话选择。移动导航保留原七个模块。
 - 正式账号仍使用既有分页及每5秒读取。卡片显示三种额度窗口，7天Sonnet数据类型继续兼容；完整旧配置/画像/评分等信息位于详情。代理公共摘要仅含protocol/host，编辑及OAuth代理输入默认遮蔽认证信息。

@@ -67,20 +67,72 @@ class NodeSynchronizationTests(unittest.TestCase):
         self.node.docker_socket=Mock(return_value=self.fixture.root/'docker.sock')
         self.node.agent_health=Mock(return_value={'release':'old','node_key':self.row['node_key']})
 
-    def test_old_running_control_is_stopped_backed_up_and_replaced(self) -> None:
-        """旧控制运行时自动完成停止、完整备份和换批，保留接单偏好。:return: None。"""
+    def test_old_running_control_is_stopped_and_replaced_in_place(self) -> None:
+        """旧控制原地停止并换批，保留数据与接单偏好。:return: None。"""
         result=self.sync.install(self.installer,self.row['id'],1)
         self.assertEqual('prepared',result['state'])
-        self.assertEqual(['stop','backup','rename','install'],self.events)
+        self.assertEqual(['stop','rename','install'],self.events)
         self.old.remove.assert_called_once()
         job=json.loads((self.node.private/'maintenance/current.json').read_text())
         self.assertEqual('completed',job['phase'])
         self.assertEqual('old',job['old_release'])
         self.assertEqual('new',job['target_release'])
+        self.assertEqual('in_place', job['data_policy'])
+        self.assertNotIn('backup', job)
+        self.remote.containers.run.assert_not_called()
         self.assertTrue(self.service.store.get(self.row['id'])['enabled'])
 
+    def test_in_place_platform_restore_keeps_later_data_and_uses_no_copy_helper(self) -> None:
+        """原地恢复旧组件时保留后来文件及同一目录，不建立复制或恢复进程。:return: None。"""
+        self.sync.install(self.installer, self.row['id'], 1)
+        journal = self.node.private / 'maintenance/current.json'
+        job = json.loads(journal.read_text())
+        job.update(platform_operation='a' * 32, platform_epoch='b' * 32)
+        atomic_json(journal, job)
+        project = self.fixture.root / 'data/projects/current.txt'
+        project.parent.mkdir(parents=True)
+        project.write_text('当前工程资料')
+        inode = project.stat().st_ino
+        self.node.observe = Mock()
+        gate = {'operation_id': job['platform_operation'], 'epoch': job['platform_epoch'], 'phase': 'blocked', 'active': 0}
+        self.sync.gateway._request.return_value = gate
+        with patch('cluster_synchronization.UPDATE_GATE.state', return_value=gate), \
+                patch('cluster_synchronization.DockerClient') as client:
+            result = self.sync.restore_platform_snapshot(self.row['id'])
+        self.assertEqual('old', result['release'])
+        self.assertEqual('当前工程资料', project.read_text())
+        self.assertEqual(inode, project.stat().st_ino)
+        self.assertEqual(self.name, self.old.name)
+        self.assertEqual('running', self.old.status)
+        self.assertEqual('platform_restored', json.loads(journal.read_text())['phase'])
+        client.assert_not_called()
+        self.remote.containers.run.assert_not_called()
+
+    def test_legacy_backup_worker_is_stopped_before_in_place_switch(self) -> None:
+        """历史在途复制仅在原作业和镜像匹配后停止，沿同一日志切换。:return: None。"""
+        maintenance = {'operation_id': 'a' * 32, 'epoch': 'b' * 32}
+        gate = {**maintenance, 'phase': 'blocked', 'active': 0}
+        self.sync.gateway._request.return_value = gate
+        with patch('cluster_synchronization.UPDATE_GATE.state', return_value=gate):
+            self.sync.install(self.installer, self.row['id'], 1, maintenance=maintenance, stage_only=True)
+            journal = self.node.private / 'maintenance/current.json'
+            job = json.loads(journal.read_text())
+            job['phase'] = 'fenced'
+            job.pop('data_policy')
+            atomic_json(journal, job)
+            helper = Mock(labels={'flower.maintenance.job': job['job_id']})
+            helper.attrs = {'Image': job['old_image'], 'State': {'Running': True, 'Pid': 1}}
+            helper.stop.side_effect = lambda **options: helper.attrs.update(State={'Running': False, 'Pid': 0})
+            lookup = self.remote.containers.get.side_effect
+            self.remote.containers.get.side_effect = lambda name: helper if name.startswith('flower-node-backup-') else lookup(name)
+            self.sync.install(self.installer, self.row['id'], 1, maintenance=maintenance)
+        helper.stop.assert_called_once_with(timeout=5)
+        helper.remove.assert_called_once()
+        self.assertEqual('in_place', json.loads(journal.read_text())['data_policy'])
+        self.remote.containers.run.assert_not_called()
+
     def test_failed_new_control_returns_original_named_running_control(self) -> None:
-        """新控制启动失败时恢复原容器名和原运行状态，保留备份。:return: None。"""
+        """新控制启动失败时原地恢复原容器名和原运行状态。:return: None。"""
         self.installer.prepare.side_effect=RuntimeError('PRIVATE_SYNC_CANARY')
         with self.assertRaises(RuntimeError):
             self.sync.install(self.installer,self.row['id'],1)
@@ -89,7 +141,9 @@ class NodeSynchronizationTests(unittest.TestCase):
         self.old.remove.assert_not_called()
         job=json.loads((self.node.private/'maintenance/current.json').read_text())
         self.assertEqual('rolled_back',job['phase'])
-        self.assertIn('backup',job)
+        self.assertEqual('in_place',job['data_policy'])
+        self.assertNotIn('backup',job)
+        self.remote.containers.run.assert_not_called()
         self.assertNotIn('PRIVATE_SYNC_CANARY',str(self.service.store.list()))
 
     def test_same_batch_uses_original_idempotent_installer(self) -> None:
@@ -151,8 +205,8 @@ class NodeSynchronizationTests(unittest.TestCase):
         return {'environment': environment, 'operation': operation, 'root': root,
             'target': target, 'revoked': revoked, 'fence': fence, 'role': role}
 
-    def test_cancelled_target_is_backed_up_and_component_upgrade_resumes(self) -> None:
-        """取消目标残留网络角色时，自动核对后完成原同步并保留全部资料。:return: None。"""
+    def test_cancelled_target_is_preserved_and_component_upgrade_resumes(self) -> None:
+        """取消目标残留网络角色时，自动核对后原地完成同步并保留全部资料。:return: None。"""
         target = self._cancelled_target()
         original = {path: path.read_bytes() for path in target['root'].rglob('*') if path.is_file()}
         revoked = target['revoked'].read_bytes()
@@ -163,7 +217,7 @@ class NodeSynchronizationTests(unittest.TestCase):
         target['revoked'].write_bytes(revoked)
         result = self.sync.install(self.installer, self.row['id'], 1)
         self.assertEqual('prepared', result['state'])
-        self.assertEqual(['stop', 'backup', 'rename', 'install'], self.events)
+        self.assertEqual(['stop', 'rename', 'install'], self.events)
         job = json.loads((self.node.private / 'maintenance/current.json').read_text())
         self.assertEqual(pending['job_id'], job['job_id'])
         self.assertEqual('completed', job['phase'])
@@ -268,8 +322,8 @@ class NodeSynchronizationTests(unittest.TestCase):
         self.sync.synchronize()
         self.service.prepare_node.assert_called_once_with(self.row['id'], 1, automatic=True)
 
-    def test_platform_preparation_only_backs_up_then_resumes_original_journal(self) -> None:
-        """平台切换前仅冻结备份，新中央沿同一操作恢复而只备份一次。:return: None。"""
+    def test_platform_preparation_only_stops_then_resumes_original_journal(self) -> None:
+        """平台切换前仅冻结停止，新中央沿同一操作原地恢复。:return: None。"""
         maintenance = {'operation_id': 'a' * 32, 'epoch': 'b' * 32}
         gate = {**maintenance, 'phase': 'blocked', 'active': 0}
         self.sync.gateway._request.return_value = gate
@@ -281,7 +335,8 @@ class NodeSynchronizationTests(unittest.TestCase):
             self.assertEqual('backed_up', job['phase'])
             self.assertEqual('b' * 32, job['backup_epoch'])
             self.sync.install(self.installer, self.row['id'], 1, maintenance=maintenance)
-        self.assertEqual(1, self.events.count('backup'))
+        self.assertEqual(0, self.events.count('backup'))
+        self.remote.containers.run.assert_not_called()
         self.assertEqual(1, self.events.count('install'))
 
     def test_platform_restart_requires_original_host_resume_for_current_boot(self) -> None:

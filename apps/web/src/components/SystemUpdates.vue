@@ -44,7 +44,7 @@ const phases: Record<string, string> = {
   failed: '本次更新失败', cancelled: '本次更新已取消', reconcile: '等待恢复与对账',
 };
 const progress = computed(() => status.value?.operation);
-const nodePhases: Record<string, string> = { registering: '等待同步', checking: '核对组件', draining: '等待原工作完成', fenced: '原环境已停止', backing_up: '备份资料', backed_up: '备份完成', switching: '切换组件', restoring: '恢复账号', completed: '同步完成', rolled_back: '已恢复原组件', rolling_back_control: '恢复原组件', platform_restoring: '恢复原资料', platform_restored: '恢复完成', waiting: '等待重试', needs_check: '等待核对' };
+const nodePhases: Record<string, string> = { registering: '等待同步', checking: '核对组件', draining: '等待原工作完成', fenced: '原环境已停止', stopping: '停止原组件', backing_up: '备份资料', backed_up: '已停止，等待切换', switching: '切换组件', restoring: '恢复账号', completed: '同步完成', rolled_back: '已恢复原组件', rolling_back_control: '恢复原组件', platform_restoring: '恢复原组件', platform_restored: '恢复完成', waiting: '等待重试', needs_check: '等待核对' };
 
 const cancelAllowed = computed(() => status.value?.busy && ['preparing', 'draining'].includes(progress.value?.phase ?? ''));
 const recoveryAllowed = computed(() => ['reconcile', 'succeeded_cleanup_pending'].includes(progress.value?.phase ?? ''));

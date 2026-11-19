@@ -51,7 +51,7 @@ class ClusterUiFixture(Fixture):
             payload = {'items': self.nodes}
         elif path == '/runtime/api/nodes/synchronize' and request.method == 'POST':
             self.synchronize_posts += 1
-            self.nodes[1]['preparation'] = {'state': 'preparing', 'phase': 'backing_up', 'current_release': 'old', 'target_release': 'new'}
+            self.nodes[1]['preparation'] = {'state': 'preparing', 'phase': 'stopping', 'current_release': 'old', 'target_release': 'new'}
             payload = {'items': self.nodes}
         elif path == '/runtime/api/nodes/2/prepare' and request.method == 'POST':
             assert json.loads(request.post_data)['revision'] == self.nodes[1]['revision']
@@ -224,7 +224,7 @@ async def run(output: Path, gateway: Path) -> dict:
         await confirmation.get_by_role('button', name='取消', exact=True).click()
         fixture.install_complete = False
         await page.get_by_role('button', name='同步全部节点', exact=True).click()
-        await expect(node_card).to_contain_text('备份节点资料')
+        await expect(node_card).to_contain_text('停止原组件')
         await expect(node_card).to_contain_text('old → new')
         assert fixture.synchronize_posts == 1
         await page.screenshot(path=str(output / 'node-synchronization-390.png'), full_page=True)

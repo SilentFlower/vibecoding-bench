@@ -237,7 +237,7 @@ class ClusterService:
                 'retry_at': time.time() + 15, 'reason': '节点恢复连接中断，正在等待原连接恢复'})
         except Exception:
             self.store.save_preparation(row['id'], row['revision'], {'state': 'failed', 'phase': 'needs_check',
-                'reason': '节点恢复尚未完整核验，原快照及后来资料已保留，请恢复原平台操作'})
+                'reason': '节点恢复尚未完整核验，原维护记录和当前资料已保留，请恢复原平台操作'})
         finally:
             UPDATE_GATE.release_reserved(activity)
             with self.lock:

@@ -171,9 +171,9 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 - v2 使用独立 `updates/v3-migrations` 通道，首发继承旧受信发行。`updates/v3` 保留 v1 及原最高序号，仅刷新时间和签名。受信新通道 ref 404 才允许读取旧通道；已有通道资产缺失直接失败。正式证据要求干净同批镜像。
 - 从空闲现场关闭门禁并排空，停止双端并确认数据库 FD 退出后，保存同操作私有双库快照。回执绑定 deployment、operation_id、epoch、原发行、权限/归属及每库文件/逻辑摘要；空间预算先于迁移。默认保留最近两组完成快照，另外保护活动恢复引用，异常目录保留并报告。
 - `database_snapshot` 仅公开 `state,completed_at,bytes`；`database_migrations` 按库公开 state 和 target_version。页面显示快照、迁移、数据恢复及具体阻断原因，未知值保留可见。
-- 托管Node加入原维护范围：最终排空快照冻结节点集合，`prepare_nodes`在中央切换和双库快照前收齐同epoch完整Node备份；`resume_nodes`在新控制就绪后恢复同一作业，最终健康核验后才开放接单。内部`POST /internal/v3/system-updates/nodes`沿原更新凭据、operation_id和epoch，仅接受prepare/status/resume/restore/rollback/cancel-preparation。普通管理准入继续遵守全局门禁；内部活动由`reserve_maintenance`按原维护身份登记。
-- `cluster_nodes={phase,nodes}`公开逐节点名称、阶段、运行标记和受控preparation；备份及控制配置秘密保留在节点私有日志。取消先等待原辅助进程收口，再恢复原组件；新中央重启须由原宿主明确resume授予本次boot身份，防止备份后提前切换。后台断线沿同一操作重试。
-- `release_started`前的失败恢复成组Node快照与原中央数据，原数据先隔离再原子切换，持久完成边界先于程序恢复。后来资料保留在独立隔离目录。已重新接单后的恢复沿当前资料反向切换组件。历史中央缺少内部节点维护接口时首次接入按集群离线SOP执行；后续同能力版本可统一维护。
+- 托管Node加入原维护范围：最终排空快照冻结节点集合，`prepare_nodes`在中央切换和双库快照前收齐同epoch实际停止回执，Node作业采用data_policy=in_place保留当前资料；`resume_nodes`在新控制就绪后恢复同一作业，最终健康核验后才开放接单。内部`POST /internal/v3/system-updates/nodes`沿原更新凭据、operation_id和epoch，仅接受prepare/status/resume/restore/rollback/cancel-preparation。普通管理准入继续遵守全局门禁；内部活动由`reserve_maintenance`按原维护身份登记。
+- `cluster_nodes={phase,nodes}`公开逐节点名称、阶段、运行标记和受控preparation；原控制配置及小型恢复日志保留在节点私有目录。取消先等待原辅助进程收口，再恢复原组件；新中央重启须由原宿主明确resume授予本次boot身份，防止排空后提前切换。后台断线沿同一操作重试。
+- `release_started`前的失败恢复原中央数据；新Node原地作业只切回旧控制与账号组件，保留当前HOME、工程和节点执行库，不生成全量副本或隔离目录。历史Node快照作业继续沿原成组快照恢复，持久完成边界先于程序恢复。已重新接单后的恢复沿当前资料反向切换组件。历史中央缺少内部节点维护接口时首次接入按集群离线SOP执行；后续同能力版本可统一维护。
 - `release_started` 先于实际释放准入持久化。此前失败按原 UUID 恢复同组两库和原程序；恢复意图先于暂存复制和替换，支持部分两库完成。账号重建后的六项生命周期登记以原身份和 CAS 续接，再恢复原环境。`database_restored` 先于原程序启动落盘，重启收口保护原程序后来写入。重新接单后的显式回退保留当前数据。
 - 底座首次能力接入默认预览，持有独立接入锁；完整备份后发布 `updater-upgrades/<UUID>/upgrade.json`。未完成日志阻止新接入。`--recover` 默认预览，允许服务 inactive，按精确原/新源码 SHA、原策略/状态副本摘要、空闲门禁及服务归属验收，持有服务锁和存储锁后恢复原版并验证 socket。恢复再次中断继续原 UUID；后来状态、外来源码及后续接入日志触发现场保护。
 

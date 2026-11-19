@@ -300,7 +300,7 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
             result = []
             for account in accounts:
                 if any(value['account_id'] == account['id'] for value in paused):
-                    # 已暂停的源保持原隔离和租约；只换组件并完整备份，不重建或激活该账号。
+                    # 已暂停的源保持原隔离和租约；只换组件并原地保留资料，不重建或激活该账号。
                     continue
                 environment = connection.execute('SELECT * FROM account_environments WHERE account_id=?', (account['id'],)).fetchone()
                 if environment is not None:
@@ -440,6 +440,7 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
                     'target_release': installer.release, 'old_release': control.labels['vibebench.release'],
                     'old_container': control.id, 'old_image': control.attrs['Image'], 'old_running': control.status == 'running',
                     'phase': 'draining', 'journal': str(journal), 'fences': {}, 'accounts': [], 'late_restore': late_restore,
+                    'data_policy': 'in_place',
                     'preparation_before': saved.get('original_preparation') or saved}
                 if maintenance is not None:
                     job.update(platform_operation=maintenance['operation_id'], platform_epoch=maintenance['epoch'])
@@ -493,7 +494,7 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
                         checks.append(leases.enter_context(self._lease(item['account'], job)))
                 for check in checks:
                     check()
-                self.status(node_id, revision, 'backing_up', current_release=job['old_release'])
+                self.status(node_id, revision, 'stopping', current_release=job['old_release'])
                 if job['phase'] == 'fenced':
                     labels = {'vibebench.product': 'v3', 'vibebench.deployment': self.runtime.deployment,
                         'vibebench.cluster-node': row['node_key']}
@@ -524,35 +525,23 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
                         container.reload()
                         if container.attrs.get('State', {}).get('Running') is not False or container.attrs.get('State', {}).get('Pid') != 0:
                             raise NodeSynchronizationWait('节点角色停止尚未确认')
-                    config = json.loads(row['config_json'])
-                    backup = config['data_root'].rstrip('/') + '-backups/' + job['job_id']
-                    job['backup'] = backup
-                    self._save(job)
-                    script = ('from pathlib import Path;from cluster_backup import backup_node;'
-                        'from storage_backup import verify_backup_data;import json;'
-                        'p=Path("/backup/snapshot");marker=p/".v3-node-backup.json";'
-                        'result=verify_backup_data(p) if marker.exists() and json.loads(marker.read_text()).get("epoch")== '
-                        + repr(job.get('backup_epoch', job['job_id'])) + ' else backup_node(Path("/data"),p,' + repr(job.get('backup_epoch', job['job_id'])) + ');print(json.dumps(result))')
-                    backup_client = DockerClient(base_url='unix://' + str(node.docker_socket()), version='auto', timeout=None)
+                    # 旧版本中断时可能留下独立复制进程，先按原作业停止，避免继续占盘。
                     try:
-                        helper_name = 'flower-node-backup-' + job['job_id'][:24]
-                        try:
-                            helper = backup_client.containers.get(helper_name)
-                            helper.reload()
-                            if (helper.labels.get('flower.maintenance.job') != job['job_id']
-                                    or helper.attrs['Image'] != job['old_image']):
-                                raise ValueError('节点原备份进程归属不一致')
-                        except NotFound:
-                            helper = backup_client.containers.run(job['old_image'], ['-c', script], entrypoint='python3',
-                                name=helper_name, detach=True, network_mode='none', labels={'flower.maintenance.job': job['job_id'], 'vibebench.product': 'v3',
-                                    'vibebench.deployment': self.runtime.deployment, 'vibebench.role': 'node-backup'},
-                                volumes={config['data_root']: {'bind': '/data', 'mode': 'rw'}, backup: {'bind': '/backup', 'mode': 'rw'},
-                                    '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'rw'}})
-                        if helper.wait().get('StatusCode') != 0:
-                            raise ValueError('节点原完整备份进程未通过核验')
+                        helper = remote.containers.get('flower-node-backup-' + job['job_id'][:24])
+                    except NotFound:
+                        helper = None
+                    if helper is not None:
+                        helper.reload()
+                        if (helper.labels.get('flower.maintenance.job') != job['job_id']
+                                or helper.attrs['Image'] != job['old_image']):
+                            raise ValueError('节点原备份进程归属不一致')
+                        helper.stop(timeout=5)
+                        helper.reload()
+                        if helper.attrs.get('State', {}).get('Running') is not False or helper.attrs.get('State', {}).get('Pid') != 0:
+                            raise NodeSynchronizationWait('节点原备份进程尚未确认停止')
                         helper.remove()
-                    finally:
-                        backup_client.close()
+                    job['data_policy'] = 'in_place'
+                    # backed_up沿用已安装宿主的排空完成回执；原地模式只保留小型作业日志。
                     job['phase'] = 'backed_up'
                     self._save(job)
                 for check in checks:
@@ -561,7 +550,7 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
                     raise NodeSynchronizationWait('节点服务正在关闭，原同步资料已保留')
                 if stage_only:
                     if job['phase'] != 'backed_up':
-                        raise ValueError('节点平台备份阶段尚未完成')
+                        raise ValueError('节点平台停止阶段尚未完成')
                     return {'state': 'preparing', 'phase': 'waiting_for_platform',
                         'current_release': job['old_release'], 'target_release': installer.release}
                 if job['phase'] == 'backed_up':
@@ -825,10 +814,10 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
         return {'nodes': result}
 
     def restore_platform_snapshot(self, node_id: int) -> dict:
-        """在原全局门禁下恢复Node完整快照及原组件。
+        """在原全局门禁下恢复旧组件，原地作业保留当前资料。
 
         :param node_id: 原节点。
-        :return: 原组件健康状态；保留切换后的隔离资料。
+        :return: 原组件健康状态；历史快照作业沿原独立恢复路径。
         """
         row = self.service.store.get(node_id)
         node = self.service.connection(node_id)
@@ -863,33 +852,35 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
             container.reload()
             if container.attrs.get('State',{}).get('Running') is not False or container.attrs.get('State',{}).get('Pid') != 0:
                 raise ValueError('节点完整恢复尚未确认角色停止')
-        config = json.loads(row['config_json'])
-        root = Path(config['data_root'])
-        client = DockerClient(base_url='unix://'+str(node.docker_socket()),version='auto',timeout=None)
-        try:
-            payload = {'name':root.name,'job_id':job['job_id'],'epoch':job.get('backup_epoch',job['job_id']),
-                'node_key':row['node_key'],'deployment':self.runtime.deployment}
-            if not job.get('snapshot_restored'):
-                helper_name = 'flower-node-restore-' + job['job_id'][:24]
-                try:
-                    helper = client.containers.get(helper_name)
-                    helper.reload()
-                    if (helper.labels.get('flower.maintenance.job') != job['job_id']
-                            or helper.attrs['Image'] != job['old_image']):
-                        raise ValueError('节点原恢复进程归属不一致')
-                except NotFound:
-                    helper = client.containers.run(job['old_image'],['-c',RESTORE_NODE_DATA,json.dumps(payload)],entrypoint='python3',
-                        name=helper_name,detach=True,network_mode='none',labels={'flower.maintenance.job':job['job_id'], 'vibebench.product':'v3',
-                            'vibebench.deployment':self.runtime.deployment, 'vibebench.role':'node-restore'},
-                        volumes={str(root.parent):{'bind':'/node-parent','mode':'rw'},job['backup']:{'bind':'/backup','mode':'rw'}})
-                if helper.wait().get('StatusCode') != 0:
-                    raise ValueError('节点原恢复进程未通过核验')
-                helper.remove()
-                job['snapshot_restored'] = True
-                job['source_restored'] = []
-                self._save(job)
-        finally:
-            client.close()
+        # 新维护只切回程序并保留当前资料；历史带完整快照的作业继续沿原恢复合同。
+        if job.get('data_policy') != 'in_place':
+            config = json.loads(row['config_json'])
+            root = Path(config['data_root'])
+            client = DockerClient(base_url='unix://'+str(node.docker_socket()),version='auto',timeout=None)
+            try:
+                payload = {'name':root.name,'job_id':job['job_id'],'epoch':job.get('backup_epoch',job['job_id']),
+                    'node_key':row['node_key'],'deployment':self.runtime.deployment}
+                if not job.get('snapshot_restored'):
+                    helper_name = 'flower-node-restore-' + job['job_id'][:24]
+                    try:
+                        helper = client.containers.get(helper_name)
+                        helper.reload()
+                        if (helper.labels.get('flower.maintenance.job') != job['job_id']
+                                or helper.attrs['Image'] != job['old_image']):
+                            raise ValueError('节点原恢复进程归属不一致')
+                    except NotFound:
+                        helper = client.containers.run(job['old_image'],['-c',RESTORE_NODE_DATA,json.dumps(payload)],entrypoint='python3',
+                            name=helper_name,detach=True,network_mode='none',labels={'flower.maintenance.job':job['job_id'], 'vibebench.product':'v3',
+                                'vibebench.deployment':self.runtime.deployment, 'vibebench.role':'node-restore'},
+                            volumes={str(root.parent):{'bind':'/node-parent','mode':'rw'},job['backup']:{'bind':'/backup','mode':'rw'}})
+                    if helper.wait().get('StatusCode') != 0:
+                        raise ValueError('节点原恢复进程未通过核验')
+                    helper.remove()
+                    job['snapshot_restored'] = True
+                    job['source_restored'] = []
+                    self._save(job)
+            finally:
+                client.close()
         name = node_container_name(self.runtime.deployment,row['node_key'])
         try:
             current = remote.containers.get(name)
