@@ -20,6 +20,7 @@ from cluster_deployment import image_config_digest, node_container_name
 from cluster_execution import NodeInspection
 from account_isolation import ROLE_COLUMNS, ROLE_LABELS
 from cluster_environment import EnvironmentFence
+from cluster_image_cleanup import cleanup_node_images
 from cluster_migration_errors import MigrationFailure
 from cluster_migrations import pristine_target_migration
 from cluster_migration_maintenance import paused_migration_lease, paused_migration_record
@@ -62,10 +63,33 @@ class NodeSynchronization:
         while not self.stopping.is_set():
             try:
                 self.synchronize()
+                self._cleanup_ready_nodes()
             except Exception:
                 # 单个不可用节点的实际原因由各自安装作业持久化，扫描不会影响其他节点。
                 pass
             self.stopping.wait(15)
+
+    def _cleanup_ready_nodes(self) -> None:
+        if UPDATE_GATE.state()['phase'] != 'idle':
+            return
+        for row in self.service.store.list():
+            saved = row.get('preparation') or {}
+            if self.stopping.is_set():
+                return
+            if row['kind'] != 'ssh' or saved.get('state') != 'prepared' or saved.get('release') != self.runtime.release_id:
+                continue
+            with self.service.lock:
+                lock = self.service.operation_locks.setdefault(row['id'], threading.Lock())
+            if not lock.acquire(blocking=False):
+                continue
+            try:
+                with UPDATE_GATE.admission('cluster-node-image-cleanup'):
+                    cleanup_node_images(self.service, row['id'], self.runtime.deployment, self.runtime.release_id)
+            except (OSError, ValueError, RuntimeError, KeyError, TypeError):
+                # 原维护目录暂不可读或平台正在切换时，保留原证据供下次扫描。
+                continue
+            finally:
+                lock.release()
 
     def synchronize(self, *, explicit: bool = False) -> list[dict]:
         """提交当前目标的节点后台同步。
