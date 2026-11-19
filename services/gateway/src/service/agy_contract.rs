@@ -86,6 +86,8 @@ pub struct AgyToolCompletion {
     pub api_token_id: i64,
     pub previous_request_id: String,
     pub body: Value,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub gif_frames: bool,
 }
 
 /// 管理端冻结的账号内AGY执行配置。
@@ -186,6 +188,8 @@ pub struct AgySubmission {
     pub body: Value,
     #[serde(default, skip_serializing_if = "AgySystemPromptPolicy::is_disabled")]
     pub system_prompt_policy: AgySystemPromptPolicy,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub gif_frames: bool,
     #[serde(default)]
     pub capture_enabled: bool,
 }

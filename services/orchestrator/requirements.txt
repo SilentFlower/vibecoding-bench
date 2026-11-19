@@ -6,3 +6,5 @@ pydantic==2.9.2
 httpx==0.28.1
 # 续聊私有PTY使用原SSH转发的UDS，客户端API与有界背压保持固定版本。
 websockets==17.3
+# GIF 帧合成使用固定版本的图像解码器。
+Pillow==13.0.0

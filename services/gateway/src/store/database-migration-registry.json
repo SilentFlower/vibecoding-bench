@@ -64,6 +64,15 @@
       "predecessor": 6,
       "rollback_mode": "compatible",
       "version": 7
+    },
+    {
+      "checksum": "33da64aa088cfb57a0cb8e0b7e2f1b67a880c4d3f288b565e81f6931e66e284f",
+      "engine": "sqlite",
+      "id": "gateway.agy-media.8",
+      "kind": "schema",
+      "predecessor": 7,
+      "rollback_mode": "compatible",
+      "version": 8
     }
   ]
 }

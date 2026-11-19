@@ -774,7 +774,7 @@ impl RequestTraceGuard {
     pub(crate) fn error(&self, error: &AppError) {
         let stage = match error {
             AppError::AdmissionLimited { .. } | AppError::SchedulingConflict => "admission",
-            AppError::BadRequest(_) => "request",
+            AppError::BadRequest(_) | AppError::AgyInput { .. } => "request",
             AppError::Unauthorized | AppError::PermanentCredential(_) => "credentials",
             AppError::TooManyRequests(_) => "admission",
             AppError::BadGateway(_) => "transport",
@@ -783,6 +783,12 @@ impl RequestTraceGuard {
             AppError::Internal(_) | AppError::NotFound => "gateway",
         };
         let mut state = self.trace.lock();
+        if let (AppError::AgyInput { reason, field, .. }, Some(context)) =
+            (error, state.request.context.as_mut())
+        {
+            context.input_rejection_reason = Some((*reason).into());
+            context.input_rejection_field = field.clone();
+        }
         if state.request.error_stage.is_none() {
             state.request.error_stage = Some(stage.into());
         }

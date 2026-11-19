@@ -445,19 +445,24 @@ with ThreadPoolExecutor(max_workers=len(sys.argv[3:])) as pool:
             catalog = container.exec_run([*rpc, '{"forceRefresh":true}' if include_quota else '{}', *methods],
                 user='1001:1001')
             mapping = {}
+            media_inputs = {}
             responses = {}
             if catalog.exit_code == 0:
                 try:
-                    from agy_runtime.models import decode_catalog
+                    from agy_runtime.models import decode_catalog, decode_media_support
                     responses = json.loads(catalog.output)
-                    observed = decode_catalog(responses.get('GetAvailableModels'))
+                    raw_catalog = responses.get('GetAvailableModels')
+                    observed = decode_catalog(raw_catalog)
                     mapping = {name: observed[name] for name in names if name in observed}
+                    media_inputs = decode_media_support(raw_catalog, mapping)
                 except (ValueError, TypeError, KeyError):
                     # 身份核验仍独立成立；未知模型映射保持未就绪，不猜测枚举发送业务。
                     mapping = {}
             verified = {'email_address': email.strip(), 'capabilities': {'source': 'agy:1.5.9:native',
                 'observed_at_ms': observed_at_ms, 'models': names,
                 'model_mappings': mapping, 'model_mapping_status': 'observed' if mapping else 'unavailable',
+                'media_inputs': media_inputs, 'png_inputs': {name: formats['image/png']
+                    for name, formats in media_inputs.items() if 'image/png' in formats},
                 'provider': {key: status[key] for key in ('planStatus', 'userTier') if key in status}}}
             if include_quota:
                 from agy_runtime.models import decode_quota

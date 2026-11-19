@@ -16,7 +16,7 @@ from agy_runtime import gemini_contract
 from agy_runtime.contract import InputError
 from agy_runtime.credentials import TOKEN_PATH, publish_access_document, read_access_document, read_private
 from agy_runtime.gemini_frames import Frames
-from agy_runtime.models import configure_model, decode_catalog
+from agy_runtime.models import configure_model, decode_catalog, decode_media_support, decode_png_support
 from agy_runtime.native_bridge import NativeBridge
 from agy_runtime.process_memory import cgroup_memory
 from agy_runtime.kernel import Kernel
@@ -156,6 +156,85 @@ class AgyRuntimeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             decode_catalog({'response': {'models': {'claude-unknown': {}}}})
 
+    def test_png_directory_uses_verified_model_and_known_flags(self):
+        """目录只为已核对的模型报告明确能力。@return 无。"""
+        entries = {
+            'gemini-yes': {'model': 1, 'supportsImages': False, 'supportedMimeTypes': {'image/png': True}},
+            'gemini-no': {'model': 2, 'supportsImages': False},
+            'gemini-unknown': {'model': 3},
+            'gemini-different': {'model': 4, 'supportsImages': True},
+            'gemini-general': {'model': 6, 'supportsImages': True, 'supportedMimeTypes': {'image/png': False}},
+        }
+        mapping = {'gemini-yes': 1, 'gemini-no': 2, 'gemini-unknown': 3, 'gemini-different': 5, 'gemini-general': 6}
+        self.assertEqual(decode_png_support({'response': {'models': entries}}, mapping),
+            {'gemini-yes': True, 'gemini-no': False, 'gemini-general': True})
+
+    def test_media_capabilities_do_not_infer_audio_or_video_from_images(self):
+        """按实际型号登记各 MIME，图片通用能力只覆盖图片。@return 无。"""
+        directory = {'response': {'models': {'gemini-synthetic': {'model': 36, 'supportsImages': True,
+            'supportedMimeTypes': {'audio/wav': True, 'video/mp4': False}}}}}
+        supported = decode_media_support(directory, {'gemini-synthetic': 36})['gemini-synthetic']
+        self.assertTrue(supported['image/jpeg'])
+        self.assertTrue(supported['image/gif'])
+        self.assertTrue(supported['audio/wav'])
+        self.assertFalse(supported['video/mp4'])
+        self.assertNotIn('application/pdf', supported)
+
+    def test_gif_frames_preserve_colors_and_request_budget(self):
+        """验证缺省原样、启用后首尾帧和同次请求总量。@return 无。"""
+        from PIL import Image
+
+        frames = [Image.new('RGB', (16, 16), (i * 20, 20, 220 - i * 20)) for i in range(9)]
+        gif = io.BytesIO()
+        frames[0].save(gif, format='GIF', save_all=True, append_images=frames[1:], duration=100, disposal=2)
+        media = {'inlineData': {'mimeType': 'image/gif', 'data': base64.b64encode(gif.getvalue()).decode()}}
+        user = {'role': 'user', 'parts': [media]}
+        raw = {'schema_version': 1, 'type': 'gemini_request', 'request_id': 'gif-trial', 'model': 'gemini-synthetic',
+               'body': {'contents': [user, user]}}
+        output = gemini_contract.decode_request(raw)['native_steps']
+        self.assertEqual(output[0]['userInput']['media'][0]['inlineData'], media['inlineData']['data'])
+        raw['gif_frames'] = True
+        output = gemini_contract.decode_request(raw)['native_steps']
+        for step in output:
+            images = step['userInput']['media']
+            self.assertEqual([image['mimeType'] for image in images], ['image/png'] * 8)
+            for index, original in ((0, frames[0]), (-1, frames[-1])):
+                with Image.open(io.BytesIO(base64.b64decode(images[index]['inlineData']))) as frame:
+                    self.assertEqual(frame.convert('RGB').getpixel((0, 0)), original.getpixel((0, 0)))
+        raw['body']['contents'] = [user] * 17
+        with self.assertRaisesRegex(InputError, 'gif_conversion_limit'):
+            gemini_contract.decode_request(raw)
+
+    def test_legacy_letter_ids_require_prior_history_evidence(self):
+        """已观测旧式编号可恢复，普通纯字母名称单独出现时仍拒绝。@return 无。"""
+        call = {'role': 'model', 'parts': [{'functionCall': {'name': 'synthetic_lookup', 'args': {}}}]}
+        ids = ['V7rd5Z9q', 'QvKrmPax', 'call_' + 'a1f0' * 8]
+        replies = [{'role': 'user', 'parts': [{'functionResponse': {'name': alias, 'response': {}}}]} for alias in ids]
+        turns = [turn for reply in replies for turn in (call, reply)]
+        steps = gemini_contract.native_history(turns)
+        self.assertEqual([step['metadata']['toolCall']['id'] for step in steps if 'generic' in step], ids)
+        with self.assertRaisesRegex(InputError, 'ambiguous_or_unknown_function_response'):
+            gemini_contract.native_history(turns[2:4])
+
+    def test_legacy_tool_history_reconstructs_unambiguous_calls_and_keeps_input(self):
+        """旧格式按相邻单轮恢复，多个或冲突的历史给出拒绝。@return 无。"""
+        call = {'functionCall': {'name': 'synthetic_tool', 'args': {'value': 1}}}
+        reply = {'functionResponse': {'name': 'call_123', 'response': {'success': True}}}
+        contents = [{'role': 'model', 'parts': [call]}, {'role': 'user', 'parts': [reply]}]
+        original = copy.deepcopy(contents)
+        steps = gemini_contract.native_history(contents)
+        self.assertEqual(contents, original)
+        original_call = steps[0]['plannerResponse']['toolCalls'][0]
+        self.assertEqual(original_call['id'], 'call_123')
+        self.assertEqual(original_call['name'], 'synthetic_tool')
+        self.assertEqual(steps[1]['metadata']['toolCall'], original_call)
+        for invalid in (contents * 2, [{**contents[0], 'parts': [call, call]}, contents[1]],
+                [contents[0], {'role': 'user', 'parts': [{'text': '间隔'}]}, contents[1]]):
+            with self.assertRaisesRegex(InputError, 'function_response'):
+                gemini_contract.native_history(invalid)
+        with self.assertRaisesRegex(InputError, 'ambiguous_or_unknown_function_response'):
+            gemini_contract.native_history(contents, ['call_123'])
+
     def test_split_frames_preserve_parts_signature_extensions_and_single_usage(self):
         """兼容投影保留所有Part，并只在最后一帧发布终态与用量。@return 无。"""
         body = {'candidates': [{'index': 0, 'content': {'role': 'model', 'parts': [
@@ -207,6 +286,14 @@ class AgyRuntimeTests(unittest.TestCase):
         incoming['contents'] += [{'role': 'model', 'parts': [{'functionCall': copy.deepcopy(call)}]},
             {'role': 'user', 'parts': [{'functionResponse': {'name': 'synthetic_tool', 'id': 'synthetic-call',
                 'response': {'value': '合成结果'}}}]}]
+        self.assertEqual(gemini_contract.continuation_results(previous, [call], incoming),
+            {'synthetic_tool': {'value': '合成结果'}})
+        incoming['contents'][-1]['parts'][0]['functionResponse']['name'] = 'old-result-name'
+        self.assertEqual(gemini_contract.continuation_results(previous, [call], incoming),
+            {'synthetic_tool': {'value': '合成结果'}})
+        result = incoming['contents'][-1]['parts'][0]['functionResponse']
+        result.pop('id')
+        result['name'] = 'synthetic-call'
         self.assertEqual(gemini_contract.continuation_results(previous, [call], incoming),
             {'synthetic_tool': {'value': '合成结果'}})
         incoming['contents'][-1]['parts'][0]['functionResponse']['id'] = 'wrong-call'

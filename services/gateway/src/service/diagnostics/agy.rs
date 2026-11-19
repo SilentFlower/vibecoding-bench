@@ -5,6 +5,7 @@ use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
 use super::{TraceContext, identity_hash, now};
+use crate::error::AppError;
 use crate::model::account::Account;
 use crate::model::request_diagnostics::{
     AttemptDiagnostic, DiagnosticContext, DiagnosticParameters, DiagnosticSessions,
@@ -397,6 +398,19 @@ impl AgyAttemptTrace {
             status,
             &now(),
         );
+    }
+
+    /// 记录模型提交前的受控输入拒绝。@param error 已投影的错误。@return 无。
+    pub(crate) fn input_rejected(&mut self, error: &AppError) {
+        if let (AppError::AgyInput { reason, field, .. }, Some(context)) =
+            (error, self.record.context.as_mut())
+        {
+            self.record.error_type = Some((*reason).into());
+            context.input_rejection_reason = Some((*reason).into());
+            context.input_rejection_field = field.clone();
+            context.native_model_calls = Some(0);
+        }
+        self.finish("local_rejected", Some("native_input"));
     }
 
     /// 终结异常尝试，重复终结保持首次结果。@param outcome 受控结果。@param stage 实际阶段。@return 无。

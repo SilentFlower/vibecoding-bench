@@ -40,6 +40,7 @@ use crate::service::agy_contract::{
     AgyToolCompletion,
 };
 use crate::service::agy_runtime::AgyPool;
+use crate::service::gemini::agy_input_rejection;
 use crate::service::native_contract::{NativeIdlePolicy, validate_idle_timeout};
 use crate::service::native_contract::{
     NativePreparation, NativePreparationControl, NativePreparationStatus, NativeReadinessStatus,
@@ -50,6 +51,8 @@ use crate::service::runtime_background::{BACKGROUND_HEADER, BackgroundPurpose};
 use crate::tlsfp::{
     TlsProfileId, get_background_request_client_for_profile, get_request_client_for_profile,
 };
+
+const AGY_TOOL_INPUT_REJECTION: &str = "x-flower2api-agy-input-rejection";
 
 const META_HEADER: &str = "x-v3-request";
 const ERROR_HEADER: &str = "x-v3-transport-error";
@@ -256,13 +259,14 @@ pub struct PreparedTransport {
 }
 
 impl PreparedTransport {
-    /// 无新凭据地回填原工具轮，并等待真实收口。@param previous 原私有请求。@param api_token_id 原调用方。@param body 真实工具结果。@param deadline 原冻结截止。@return 原工具已结束。
+    /// 无新凭据地回填原工具轮，并等待真实收口。@param previous 原私有请求。@param api_token_id 原调用方。@param body 真实工具结果。@param deadline 原冻结截止。@param gif_frames 下一轮 GIF 预检策略。@return 原工具已结束。
     pub async fn finish_agy_tools(
         &self,
         previous: &str,
         api_token_id: i64,
         body: Value,
         deadline: Instant,
+        gif_frames: bool,
     ) -> Result<(), AppError> {
         let PreparedRoute::V3 { client, binding } = &self.route else {
             return Err(AppError::ServiceUnavailable("原AGY环境不可用".into()));
@@ -289,6 +293,7 @@ impl PreparedTransport {
             api_token_id,
             previous_request_id: previous.into(),
             body,
+            gif_frames,
         };
         let response = timeout_at(
             deadline,
@@ -302,6 +307,15 @@ impl PreparedTransport {
         .map_err(|_| AppError::ServiceUnavailable("AGY工具回填结果待对账".into()))?
         .map_err(|_| AppError::ServiceUnavailable("AGY工具回填结果待对账".into()))?;
         if !response.status().is_success() {
+            if response.status() == StatusCode::BAD_REQUEST {
+                if let Some(code) = response
+                    .headers()
+                    .get(AGY_TOOL_INPUT_REJECTION)
+                    .and_then(|header| header.to_str().ok())
+                {
+                    return Err(agy_input_rejection(code));
+                }
+            }
             return Err(AppError::BadRequest("AGY原工具轮拒绝回填".into()));
         }
         let result: Value = timeout_at(deadline, response.json())
@@ -316,7 +330,7 @@ impl PreparedTransport {
         }
         Ok(())
     }
-    /// 在既有受信绑定中提交AGY请求。@param request_id 公共请求身份。@param api_token_id 调用方。@param snapshot AT-only快照。@param model 公开模型。@param native_model 观测枚举。@param body Gemini正文。@param system_prompt_policy 本HTTP冻结的账号策略。@param deadline 原单调截止。@param capture 采集策略。@return 持续到原生作业收口的私有事件流。
+    /// 在既有受信绑定中提交AGY请求。@param request_id 公共请求身份。@param api_token_id 调用方。@param snapshot AT-only快照。@param model 公开模型。@param native_model 观测枚举。@param body Gemini正文。@param system_prompt_policy 本HTTP冻结的账号策略。@param deadline 原单调截止。@param capture 采集策略。@param gif_frames 冻结的 GIF 策略。@return 持续到原生作业收口的私有事件流。
     pub async fn send_agy(
         &self,
         request_id: &str,
@@ -328,6 +342,7 @@ impl PreparedTransport {
         system_prompt_policy: AgySystemPromptPolicy,
         deadline: Instant,
         capture: bool,
+        gif_frames: bool,
     ) -> Result<reqwest::Response, AppError> {
         let PreparedRoute::V3 { client, binding } = &self.route else {
             return Err(AppError::ServiceUnavailable(
@@ -359,6 +374,7 @@ impl PreparedTransport {
             body,
             system_prompt_policy,
             capture_enabled: capture,
+            gif_frames,
         };
         timeout_at(
             deadline,
@@ -1605,7 +1621,7 @@ async fn agy_tools(
     State(state): State<SenderState>,
     headers: HeaderMap,
     Json(input): Json<AgyToolCompletion>,
-) -> Result<Json<Value>, AppError> {
+) -> Result<Response, AppError> {
     let _transition = state.native_transition.clone().read_owned().await;
     let config = read_config(&state.config_path)?;
     authenticate(&headers, &config)?;
@@ -1623,7 +1639,17 @@ async fn agy_tools(
     }
     state.active.fetch_add(1, Ordering::SeqCst);
     let _guard = ActiveRequest(state.active.clone());
-    state.agy_pool.finish_tools(input, deadline).await.map(Json)
+    let result = state.agy_pool.finish_tools(input, deadline).await?;
+    if let Some(code) = result["input_rejection"].as_str() {
+        let mut response = AppError::BadRequest("AGY原工具轮拒绝回填".into()).into_response();
+        if let Ok(value) = HeaderValue::from_str(code) {
+            response
+                .headers_mut()
+                .insert(AGY_TOOL_INPUT_REJECTION, value);
+        }
+        return Ok(response);
+    }
+    Ok(Json(result).into_response())
 }
 
 /// 投递AGY模型业务。@param state 发送器。@param headers 服务证明。@param submission 冻结请求。@return 私有原生事件流。

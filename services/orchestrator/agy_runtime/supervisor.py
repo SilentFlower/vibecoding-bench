@@ -19,6 +19,7 @@ from runtime_files import atomic_json
 from .contract import InputError
 from .credentials import publish_access_document, read_private
 from .gemini_contract import continuation_results
+from .input_media import preflight_gif
 from .image_pool import Broker, ImagePool
 from .models import native_identifier
 from .process_memory import cgroup_memory, memory
@@ -39,7 +40,7 @@ def validate_submission(value: dict, config: dict) -> dict:
     expected = {'schema_version', 'type', 'request_id', 'account_id', 'environment_id',
         'environment_generation', 'api_token_id', 'credential_snapshot', 'model', 'native_model',
         'body', 'deadline_unix_ms'}
-    if not isinstance(value, dict) or set(value)-{'capture_enabled','system_prompt_policy'} != expected or type(value['schema_version']) is not int or value['schema_version'] != 1 or value['type'] not in ['submit', 'prepare']:
+    if not isinstance(value, dict) or set(value)-{'capture_enabled','system_prompt_policy','gif_frames'} != expected or type(value['schema_version']) is not int or value['schema_version'] != 1 or value['type'] not in ['submit', 'prepare']:
         raise InputError('invalid_submission')
     for key in ['account_id', 'environment_id', 'environment_generation']:
         if type(value[key]) is not type(config[key]) or value[key] != config[key]:
@@ -62,6 +63,8 @@ def validate_submission(value: dict, config: dict) -> dict:
         raise InputError('invalid_model_or_body')
     if type(value.get('capture_enabled',False)) is not bool:
         raise InputError('invalid_capture_policy')
+    if type(value.get('gif_frames',False)) is not bool:
+        raise InputError('invalid_media_policy')
     deadline(value['deadline_unix_ms'])
     result=copy.deepcopy(value)
     result.setdefault('capture_enabled',False)
@@ -384,7 +387,7 @@ class Supervisor:
     def finish_tools_command(self, value):
         """只投递原工具结果，保持零模型发送和原截止。@param value 无凭据控制信封。@return 无。"""
         expected={'schema_version','type','request_id','account_id','environment_id','environment_generation','api_token_id','previous_request_id','body'}
-        if set(value)!=expected or value['type']!='finish_tools' or type(value['api_token_id']) is not int or value['api_token_id']<1 or not isinstance(value['body'],dict):
+        if set(value)-{'gif_frames'}!=expected or type(value.get('gif_frames',False)) is not bool or value['type']!='finish_tools' or type(value['api_token_id']) is not int or value['api_token_id']<1 or not isinstance(value['body'],dict):
             raise InputError('invalid_tool_completion')
         for key in ['account_id','environment_id','environment_generation']:
             if type(value[key]) is not type(self.config[key]) or value[key]!=self.config[key]:raise InputError('submission_binding_mismatch')
@@ -401,6 +404,8 @@ class Supervisor:
         """等待原工具轮真实收口，并保存幂等回填凭据。@param value 控制输入。@param done 控制完成通知。@return 无。"""
         try:
             digest=hashlib.sha256(json.dumps(value['body'],sort_keys=True,separators=(',',':')).encode()).hexdigest()
+            if value.get('gif_frames'):
+                preflight_gif(value['body'])
             with self.condition:
                 job=self.jobs.get(value['previous_request_id'])
                 if not job or job['value']['api_token_id']!=value['api_token_id'] or job['until']<=time.monotonic():raise InputError('tool_continuation_identity')
@@ -433,8 +438,10 @@ class Supervisor:
             if value['type'] == 'prepare':
                 self.emit('prepared', value['request_id'], native=worker.ready)
                 return
-            worker.send({'schema_version': 1, 'type': 'gemini_request', 'request_id': value['request_id'],
-                'model': value['model'], 'body': value['body'], 'system_prompt_policy':value['system_prompt_policy']})
+            payload={'schema_version': 1, 'type': 'gemini_request', 'request_id': value['request_id'],
+                'model': value['model'], 'body': value['body'], 'system_prompt_policy':value['system_prompt_policy']}
+            if value.get('gif_frames'):payload['gif_frames']=True
+            worker.send(payload)
             while True:
                 event = worker.next(until)
                 kind = event.get('type')

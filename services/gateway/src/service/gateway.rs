@@ -4886,6 +4886,9 @@ fn count_tokens_app_error_response(err: AppError) -> Response {
         AppError::BadRequest(message) => {
             anthropic_error_response(StatusCode::BAD_REQUEST, "invalid_request_error", &message)
         }
+        AppError::AgyInput { message, .. } => {
+            anthropic_error_response(StatusCode::BAD_REQUEST, "invalid_request_error", message)
+        }
         AppError::Unauthorized => anthropic_error_response(
             StatusCode::UNAUTHORIZED,
             "authentication_error",
@@ -9615,6 +9618,7 @@ mod tests {
         Account {
             platform: "claude_code".into(),
             agy_system_prompt_homoglyph_enabled: false,
+            agy_gif_frames_enabled: false,
             id: 42,
             name: "测试账号".into(),
             email: "user@example.com".into(),

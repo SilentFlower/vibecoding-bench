@@ -52,6 +52,9 @@ RUN python3 /source/criu/package.py --source /source/criu --out /opt/ccrb-criu \
 FROM python:3.12-slim-bookworm AS agy-runtime-build
 RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev libssl-dev \
     && rm -rf /var/lib/apt/lists/*
+COPY orchestrator/requirements.txt /tmp/agy-requirements.txt
+RUN requirement="$(grep '^Pillow==' /tmp/agy-requirements.txt)" \
+    && python3 -m pip install --no-cache-dir --no-deps --target /opt/v3/python "$requirement"
 COPY orchestrator/agy_runtime/ /opt/v3/python/agy_runtime/
 RUN PYTHONPATH=/opt/v3/python python3 -m agy_runtime.build --root /opt/v3/python/agy_runtime \
     && chmod -R go-w /opt/v3/python/agy_runtime
@@ -155,7 +158,7 @@ COPY orchestrator/cli_quota.py /usr/local/bin/v3-cli-quota
 COPY orchestrator/process_metrics.py /usr/local/bin/process_metrics.py
 COPY orchestrator/process_metrics.py /usr/local/bin/v3-process-metrics
 COPY --from=backend /out/account-sender /usr/local/bin/account-sender
-COPY --from=agy-runtime-build /opt/v3/python/agy_runtime/ /opt/v3/python/agy_runtime/
+COPY --from=agy-runtime-build /opt/v3/python/ /opt/v3/python/
 COPY --from=tls-observer-build /opt/ccrb-tls-observer/ /opt/ccrb-tls-observer/
 COPY --from=criu-build /opt/ccrb-criu/ /opt/ccrb-criu/
 # iproute2已有libbpf运行依赖；在镜像内验证真实动态库，避免重复刷新整层系统依赖。

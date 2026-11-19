@@ -110,6 +110,7 @@ impl Fixture {
         let mut account = Account {
             platform: "claude_code".into(),
             agy_system_prompt_homoglyph_enabled: false,
+            agy_gif_frames_enabled: false,
             id: 0,
             name: name.into(),
             email: format!("{}@example.invalid", Uuid::new_v4()),

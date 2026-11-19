@@ -10,6 +10,13 @@ pub enum AppError {
     NotFound,
     #[error("bad request: {0}")]
     BadRequest(String),
+    /// AGY 输入拒绝的公开分类和允许披露的字段路径。
+    #[error("{message}")]
+    AgyInput {
+        reason: &'static str,
+        message: &'static str,
+        field: Option<String>,
+    },
     #[error("unauthorized")]
     Unauthorized,
     #[error("too many requests: {0}")]
@@ -48,7 +55,7 @@ impl IntoResponse for AppError {
 
         let (status, msg) = match &self {
             AppError::NotFound => (StatusCode::NOT_FOUND, "not found"),
-            AppError::BadRequest(_) => (StatusCode::BAD_REQUEST, ""),
+            AppError::BadRequest(_) | AppError::AgyInput { .. } => (StatusCode::BAD_REQUEST, ""),
             AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized"),
             AppError::AdmissionLimited { .. } => unreachable!(),
             AppError::SchedulingConflict => {

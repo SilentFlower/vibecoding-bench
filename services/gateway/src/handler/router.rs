@@ -589,6 +589,7 @@ async fn list_accounts(
 struct CreateAccountRequest {
     platform: Option<String>,
     agy_system_prompt_homoglyph_enabled: Option<bool>,
+    agy_gif_frames_enabled: Option<bool>,
     cli_identity: Option<CliIdentityImport>,
     credential_ownership: Option<CredentialOwnershipInput>,
     name: Option<String>,
@@ -1109,6 +1110,9 @@ async fn create_account(
             "AGY 账号配置包含 Claude Code 专用字段".into(),
         ));
     }
+    if platform != "antigravity" && req.agy_gif_frames_enabled == Some(true) {
+        return Err(AppError::BadRequest("GIF 抽帧仅适用于 AGY 账号".into()));
+    }
     let auth_type = req.auth_type.unwrap_or_else(|| "setup_token".into()).into();
     let setup_token = req.setup_token.or(req.token).unwrap_or_default();
     let mut account = Account {
@@ -1116,6 +1120,7 @@ async fn create_account(
         agy_system_prompt_homoglyph_enabled: req
             .agy_system_prompt_homoglyph_enabled
             .unwrap_or(false),
+        agy_gif_frames_enabled: req.agy_gif_frames_enabled.unwrap_or_default(),
         id: 0,
         name: req.name.unwrap_or_default(),
         email: req.email,
@@ -1417,6 +1422,9 @@ async fn update_account(
     }
     if let Some(fields) = updates.as_object_mut() {
         fields.remove("platform");
+    }
+    if updates.get("agy_gif_frames_enabled").is_some() {
+        return Err(AppError::BadRequest("GIF 抽帧仅适用于 AGY 账号".into()));
     }
     if let Some(value) = updates.get("agy_system_prompt_homoglyph_enabled") {
         if !existing.is_antigravity() {

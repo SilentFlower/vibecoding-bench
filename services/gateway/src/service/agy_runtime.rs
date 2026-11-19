@@ -227,11 +227,21 @@ impl AgyPool {
             );
         }
         let result=async {
-            controller.send(&json!({"schema_version":1,"type":"finish_tools","request_id":id,
+            let mut value = json!({"schema_version":1,"type":"finish_tools","request_id":id,
                 "account_id":input.request.account_id,"environment_id":input.request.environment_id,
                 "environment_generation":input.request.generation,"api_token_id":input.api_token_id,
-                "previous_request_id":input.previous_request_id,"body":input.body})).await?;
+                "previous_request_id":input.previous_request_id,"body":input.body});
+            if input.gif_frames { value["gif_frames"] = Value::Bool(true); }
+            controller.send(&value).await?;
             let (event,_permit)=timeout_at(deadline,receiver.recv()).await.map_err(|_|unavailable())?.ok_or_else(unavailable)?;
+            if event["type"] == "control_error" {
+                if let Some(code) = event["code"].as_str() {
+                    let kind = code.split(':').next().unwrap_or_default();
+                    if matches!(kind, "invalid_gemini_png" | "invalid_gemini_media" | "unsupported_gemini_media_type" | "unsupported_gemini_image_type" | "gif_conversion_limit" | "gemini_pending_results_mismatch") {
+                        return Ok(json!({"input_rejection":code}));
+                    }
+                }
+            }
             if event["type"]!="tools_finished" {return Err(AppError::BadRequest("AGY原工具轮回填失败".into()));}
             Ok(json!({"finished":true,"request_id":id,"previous_request_id":input.previous_request_id}))
         }.await;
@@ -404,6 +414,9 @@ impl AgyPool {
         if submission.system_prompt_policy.enabled {
             value["system_prompt_policy"] = serde_json::to_value(&submission.system_prompt_policy)
                 .map_err(|_| unavailable())?;
+        }
+        if submission.gif_frames {
+            value["gif_frames"] = Value::Bool(true);
         }
         if let Err(error) = controller.send(&value).await {
             controller.requests.lock().await.remove(&request_id);

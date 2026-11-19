@@ -29,6 +29,7 @@ BENCH_SCHEMA_SOURCES = {
     'bench.agy-environments.5': 'orchestrator/agy_environment_schema.py',
 }
 GATEWAY_SCHEMA_SOURCES = {
+    'gateway.agy-media.8': 'cc2api/src/store/agy_media_schema.rs',
     'gateway.account-work.7': 'cc2api/src/store/account_work_schema.rs',
     'gateway.request-records.6': 'cc2api/src/store/request_records_schema.rs',
     'gateway.account-platforms.5': 'cc2api/src/store/account_platform_schema.rs',
@@ -104,7 +105,8 @@ def component_content(root: Path, role: str) -> str:
         else common + ['images/account', 'images/sidecar', 'images/worker/task_followups.py',
             'images/v3/criu', 'images/v3/tls-observer',
             'orchestrator/runtime_files.py', 'orchestrator/runtime_diagnostics.py',
-            'orchestrator/cli_quota.py', 'orchestrator/process_metrics.py', 'orchestrator/native_sender.py', 'orchestrator/agy_auth.py', 'orchestrator/agy_runtime'])
+            'orchestrator/cli_quota.py', 'orchestrator/process_metrics.py', 'orchestrator/native_sender.py', 'orchestrator/agy_auth.py',
+            'orchestrator/requirements.txt', 'orchestrator/agy_runtime'])
     digest = hashlib.sha256()
     for name in names:
         source = source_path(root, name)

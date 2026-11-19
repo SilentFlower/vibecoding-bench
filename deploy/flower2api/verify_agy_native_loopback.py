@@ -3,6 +3,7 @@ import argparse
 import base64
 import copy
 import gzip
+import io
 import hashlib
 import json
 import os
@@ -10,10 +11,13 @@ import shutil
 import signal
 import sqlite3
 import ssl
+import struct
 import subprocess
 import tempfile
 import threading
 import time
+import wave
+import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError
@@ -41,6 +45,7 @@ class Upstream(BaseHTTPRequestHandler):
     requests=[]
     wire=[]
     cancelled=threading.Event()
+    png_support=False
 
     def log_message(self,*args):
         """避免将请求头体输出到公共日志。@param args 日志参数。@return 无。"""
@@ -87,7 +92,8 @@ class Upstream(BaseHTTPRequestHandler):
             self.send_header('Connection','close')
             self.end_headers()
             self.close_connection=True
-            part={'functionCall':{'name':'synthetic_tool','args':{'x':1},'id':'synthetic-call'},'thoughtSignature':'c3ludGhldGljLXNpZw=='} if tool else {'text':'本地TLS回复'}
+            tool_id='call_'+('a1b2'*8) if self.png_support else 'synthetic-call'
+            part={'functionCall':{'name':'synthetic_tool','args':{'x':1},'id':tool_id},'thoughtSignature':'c3ludGhldGljLXNpZw=='} if tool else {'text':'本地TLS回复'}
             frames=[{'candidates':[{'index':0,'content':{'role':'model','parts':[part]}}]}]
             if repeated:frames*=64
             if capacity:frames=[{'error':{'code':429,'status':'RESOURCE_EXHAUSTED'}}]
@@ -117,6 +123,9 @@ class Upstream(BaseHTTPRequestHandler):
             value={'cloudaicompanionProject':'synthetic-project','currentTier':{'id':'standard-tier','name':'Standard'}}
         elif ':fetchAvailableModels' in self.path:
             value={'models':{MODEL:{'model':'MODEL_PLACEHOLDER_M36','displayName':MODEL}}}
+            if self.png_support:
+                value['models'][MODEL]['supportedMimeTypes']={mime:True for mime in ('image/png','image/jpeg','image/gif','audio/wav')}
+                value['defaultAgentModelId']=MODEL
         else:
             value={}
         raw=json.dumps(value).encode()
@@ -247,10 +256,165 @@ def homoglyph_cases(database, request, base, wait_idle):
     return ['固定同形映射实际出站','普通和SSE一致','用户及历史保护','重复经过幂等','预算内大文本及超限零提交','暖worker复用','工具下一HTTP策略','源缓存及思考用量','策略账本与入站视图']
 
 
-def inside(homoglyph=False,capture_off=False):
-    """执行真实公共业务。@param homoglyph 检验系统策略。@param capture_off 验证关闭采集。@return 脱敏验证摘要。"""
+def verify_png(request, wait_idle, database, base):
+    """验证历史恢复、工具续轮与真实图片出站。@param request 真实网关入口。@param wait_idle 排空观察。@param database 合成账号库。@param base Gemini 路径。@return 脱敏结果。"""
+    def image(color):
+        def chunk(kind, data):
+            return struct.pack('>I', len(data))+kind+data+struct.pack('>I', zlib.crc32(kind+data))
+        pixels=(b'\0'+bytes(color)*32)*32
+        png=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',32,32,8,2,0,0,0))
+        png+=chunk(b'IDAT',zlib.compress(pixels))+chunk(b'IEND',b'')
+        return base64.b64encode(png).decode('ascii')
+
+    def set_support(value):
+        capabilities={'model_mappings':{MODEL:'MODEL_PLACEHOLDER_M36'}}
+        if value is not None:
+            capabilities['png_inputs']={MODEL:value}
+        with database:
+            database.execute('UPDATE accounts SET usage_data=? WHERE id=1',(json.dumps({'capabilities':capabilities}),))
+
+    historical,current=image((255,0,0)),image((0,0,255))
+    first={'role':'user','parts':[{'text':'历史图'},{'inlineData':{'mimeType':'image/png','data':historical}}]}
+    last={'role':'user','parts':[{'inline_data':{'mime_type':'image/png','data':current}}]}
+    body={'contents':[first], 'tools':[{'functionDeclarations':[{'name':'synthetic_lookup'}]}]}
+    for index in range(76):
+        body['contents'].extend([
+            {'role':'model','parts':[{'functionCall':{'name':'synthetic_lookup','args':{'index':index}}}]},
+            {'role':'user','parts':[{'functionResponse':{'name':f'call_{index+1}','response':{'index':index}}}]},
+        ])
+    body['contents'].append(last)
+    set_support(True)
+    for count,operation in enumerate(('generateContent','streamGenerateContent?alt=sse'),1):
+        status,raw=request(base+operation,body)
+        require(status==200,'含工具历史及 PNG 的公共请求失败：'+str(status)+' '+raw.decode()[:350])
+        wait_idle()
+        require(len(Upstream.calls)==count,'合法请求的上游提交次数错误')
+        wire=Upstream.calls[-1]['body']['request']['contents']
+        parts=[part for message in wire for part in message.get('parts',[])]
+        photos=[part['inlineData'] for part in parts if 'inlineData' in part]
+        require([(part['mimeType'],part['data']) for part in photos]==[('image/png',historical),('image/png',current)],
+            '上游未收到对应历史和当前轮的原始 PNG')
+        owners=[message for message in wire if any('inlineData' in part for part in message.get('parts',[]))]
+        require(len(owners)==2 and all(message['role']=='user' for message in owners)
+            and any('历史图' in part.get('text','') for part in owners[0]['parts']), '图片的原用户轮次丢失')
+        tool_results=[part['functionResponse'] for part in parts if 'functionResponse' in part]
+        require(len(tool_results)==76 and all(part['name']=='synthetic_lookup' for part in tool_results),
+            '旧格式 76 组工具结果未以真实工具名提交：'+str(len(tool_results)))
+
+    count=len(Upstream.calls)
+    invalid_image={'contents':[{'parts':[{'inlineData':{'mimeType':'image/png','data':'aW52YWxpZA=='}}]}]}
+    invalid_tool=copy.deepcopy(body)
+    invalid_tool['contents'][4]['parts'][0]['functionResponse']['name']='call_1'
+    for value,request_body,reason in ((True,invalid_image,'AGY_INVALID_PNG'),
+            (True,invalid_tool,'AGY_TOOL_RESULT_MISMATCH'),(None,body,'AGY_PNG_CAPABILITY_UNKNOWN'),
+            (False,body,'AGY_PNG_UNSUPPORTED')):
+        set_support(value)
+        status,raw=request(base+'streamGenerateContent?alt=sse',request_body)
+        error=json.loads(raw)['error']
+        require(status==400 and error['details'][0]['reason']==reason,'公开错误分类不符：'+str(error))
+        wait_idle()
+    require(len(Upstream.calls)==count==2,'拒绝请求触发了额外模型提交')
+    set_support(True)
+    tool={'contents':[{'role':'user','parts':[{'text':'TLS_SYNTHETIC_TOOL'}]}],
+        'tools':[{'functionDeclarations':[{'name':'synthetic_tool','parameters':{'type':'OBJECT',
+            'properties':{'x':{'type':'INTEGER'}}}}]}]}
+    status,raw=request(base+'generateContent',tool)
+    require(status==200,'真实工具首轮失败：'+str(status)+' '+raw.decode()[:350])
+    history=tool['contents']+[json.loads(raw)['candidates'][0]['content']]
+    result={'functionResponse':{'name':'call_'+('a1b2'*8),'response':{'value':'TLS_SYNTHETIC_RESULT'}}}
+    invalid_live={**tool,'contents':history+[{'role':'user','parts':[result,*invalid_image['contents'][0]['parts']]}]}
+    status,raw=request(base+'generateContent',invalid_live)
+    detail=json.loads(raw)['error']
+    require(status==400 and detail['details'][0]['reason']=='AGY_INVALID_PNG'
+        and detail['details'][1]['fieldViolations'][0]['field']=='contents[2].parts[1].inlineData',
+        '原工具续轮缺少 PNG 拒绝位置：'+str(detail))
+    require(len(Upstream.calls)==3,'坏图触发模型提交')
+    valid_live={**tool,'contents':history+[{'role':'user','parts':[result,*last['parts']]}]}
+    status,raw=request(base+'generateContent',valid_live)
+    require(status==200,'修正 PNG 后原工具轮未能完成：'+str(status)+' '+raw.decode()[:350])
+    wait_idle()
+    parts=[part for message in Upstream.calls[-1]['body']['request']['contents'] for part in message['parts']]
+    require(any(part.get('inlineData',{}).get('data')==current for part in parts)
+        and any(part.get('functionResponse',{}).get('name')=='synthetic_tool' for part in parts),
+        '原工具续轮缺少 PNG 或工具结果')
+    require(request(base+'generateContent',valid_live)[0]==400 and len(Upstream.calls)==4,'重复工具结果产生额外模型提交')
+
+    from PIL import Image
+
+    first=Image.new('RGB',(16,16),(255,0,0));second=Image.new('RGB',(16,16),(0,0,255))
+    gif=io.BytesIO();first.save(gif,format='GIF',save_all=True,append_images=[second],duration=100,disposal=2)
+    jpeg=io.BytesIO();first.save(jpeg,format='JPEG')
+    sound=io.BytesIO()
+    with wave.open(sound,'wb') as writer:
+        writer.setnchannels(1);writer.setsampwidth(2);writer.setframerate(8000);writer.writeframes(b'\0\1'*160)
+    media_parts=[{'inlineData':{'mimeType':kind,'data':base64.b64encode(blob.getvalue()).decode()}}
+        for kind,blob in [('image/jpeg',jpeg),('image/gif',gif),('audio/wav',sound)]]
+    attached={'contents':[{'role':'user','parts':[{'text':'带媒体输入'},*media_parts]}]}
+    def save_capabilities(gif_allowed):
+        capabilities={'model_mappings':{MODEL:'MODEL_PLACEHOLDER_M36'},'media_inputs':{MODEL:{'image/png':True,
+            'image/jpeg':True,'image/gif':gif_allowed,'audio/wav':True,'video/mp4':False}}}
+        with database:database.execute('UPDATE accounts SET usage_data=? WHERE id=1',(json.dumps({'capabilities':capabilities}),))
+    def native_media():
+        messages=Upstream.calls[-1]['body']['request']['contents']
+        return [part['inlineData'] for message in messages for part in message['parts'] if 'inlineData' in part]
+
+    save_capabilities(True)
+    status,raw=request('/admin/accounts/1',admin=True)
+    require(status==200 and json.loads(raw)['agy_gif_frames_enabled'] is False,'旧账号 GIF 开关缺省值错误')
+    require(request(base+'generateContent',attached)[0]==200,'关闭开关时媒体原样请求失败')
+    wait_idle()
+    require(native_media()==[part['inlineData'] for part in media_parts],'JPEG、GIF 或 WAV 原始字节丢失')
+    status,raw=request('/admin/accounts/1',{'agy_gif_frames_enabled':True},admin=True)
+    require(status==200 and json.loads(raw)['agy_gif_frames_enabled'] is True,'账号 GIF 开关保存失败')
+    save_capabilities(False)
+    require(request(base+'generateContent',attached)[0]==200,'已启用转换时 GIF 未按 PNG 能力准入')
+    wait_idle()
+    sent=native_media()
+    require([item['mimeType'] for item in sent]==['image/jpeg','image/png','image/png','audio/wav'],'转换顺序或媒体 MIME 错误')
+    require(sent[0]==media_parts[0]['inlineData'] and sent[-1]==media_parts[-1]['inlineData'],'混合媒体转发字节变化')
+    for frame,expected in zip(sent[1:3],[(255,0,0),(0,0,255)]):
+        with Image.open(io.BytesIO(base64.b64decode(frame['data']))) as observed:
+            require(observed.convert('RGB').getpixel((0,0))==expected,'GIF 抽帧颜色或顺序错误')
+    rejected={'contents':[{'parts':[{'inlineData':{'mimeType':'video/mp4','data':'aW52YWxpZA=='}}]}]}
+    status,raw=request(base+'generateContent',rejected)
+    require(status==400 and json.loads(raw)['error']['details'][0]['reason']=='AGY_MEDIA_UNSUPPORTED'
+        and len(Upstream.calls)==6,'型号明确拒绝媒体后仍有模型提交')
+
+    status,raw=request(base+'generateContent',tool)
+    require(status==200,'GIF 工具首轮失败')
+    history=tool['contents']+[json.loads(raw)['candidates'][0]['content']]
+    damaged_gif=base64.b64encode(gif.getvalue()[:-8]+b';').decode()
+    bad_gif={'inlineData':{'mimeType':'image/gif','data':damaged_gif}}
+    invalid_live={**tool,'contents':history+[{'role':'user','parts':[result,bad_gif]}]}
+    status,raw=request(base+'generateContent',invalid_live)
+    require(status==400 and json.loads(raw)['error']['details'][0]['reason']=='AGY_INVALID_MEDIA'
+        and len(Upstream.calls)==7,'坏 GIF 提交或错误分类异常')
+    valid_live={**tool,'contents':history+[{'role':'user','parts':[result,media_parts[1]]}]}
+    require(request(base+'generateContent',valid_live)[0]==200,'修正 GIF 后原工具轮未能完成')
+    wait_idle()
+    require(native_media()==sent[1:3] and len(Upstream.calls)==8,'工具续轮的 GIF 转换结果错误')
+    require(request(base+'generateContent',valid_live)[0]==400 and len(Upstream.calls)==8,'重复 GIF 工具结果产生额外模型提交')
+
+    until=time.monotonic()+10
+    while True:
+        status,raw=request('/admin/request-diagnostics?platform=antigravity&entry_protocol=gemini&page_size=50',admin=True)
+        require(status==200,'请求诊断查询失败')
+        rows=json.loads(raw)['items']
+        if len(rows)>=10:break
+        require(time.monotonic()<until,'请求诊断落账条数不足');time.sleep(.1)
+    reasons={row['context'].get('input_rejection_reason') for row in rows}
+    require({'AGY_INVALID_PNG','AGY_TOOL_RESULT_MISMATCH','AGY_PNG_CAPABILITY_UNKNOWN','AGY_PNG_UNSUPPORTED'}<=reasons,
+        '根请求缺少受控输入拒绝分类')
+    return {'passed':True,'network':'none','real_model_submissions':0,'synthetic_native_model_submissions':len(Upstream.calls),
+        'legacy_tool_results_per_request':76,'outbound_pngs_per_history_request':2,'live_tool_retry':True,
+        'diagnostic_requests':len(rows),'account_gif_switch':True,'original_jpeg_and_wav':True,'live_gif_retry':True}
+
+
+def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False):
+    """执行真实公共业务。@param homoglyph 检验系统策略。@param capture_off 验证关闭采集。@param png 核对图片与工具历史。@param installed_adapter 使用镜像内适配器。@return 脱敏验证摘要。"""
     require(os.geteuid()==1001,'原生业务探针必须使用UID1001')
     os.umask(0o077)
+    Upstream.png_support=png
     context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain('/state/server.crt','/state/server.key')
     proxy=ThreadingHTTPServer(('127.0.0.1',19090),Proxy)
@@ -261,7 +425,7 @@ def inside(homoglyph=False,capture_off=False):
     config={'binding':{'account_id':1,'environment_id':ENVIRONMENT,'generation':1,'endpoint':'http://localhost:8091',
         'secret':SECRET,'release_id':'synthetic-release'},'proxy_url':'http://127.0.0.1:19090',
         'allowed_origin':'https://cloudcode-pa.googleapis.com','native_capture_dir':'/state/capture',
-        'agy':{'protocol_version':1,'source_sha256':SOURCE_SHA,'module_root':'/opt/orchestrator',
+        'agy':{'protocol_version':1,'source_sha256':SOURCE_SHA,'module_root':'/opt/v3/python' if installed_adapter else '/opt/orchestrator',
             'binary_path':'/usr/local/bin/agy-1.5.9','work_root':'/state/native','max_workers':1,'memory_mib':768}}
     if capture_off:config.pop('native_capture_dir')
     Path('/state/sender.json').write_text(json.dumps(config))
@@ -277,7 +441,7 @@ def inside(homoglyph=False,capture_off=False):
         """通过真实公共HTTP执行一次请求。@param path 路径。@param body Gemini正文。@return 状态与正文。"""
         headers={'x-api-key':'synthetic-admin' if admin else 'synthetic-key','content-type':'application/json'}
         value=Request('http://127.0.0.1:5674'+path,data=json.dumps(body).encode() if body is not None else None,headers=headers,
-            method='PUT' if path=='/admin/settings' and body is not None else None)
+            method='PUT' if body is not None and (path=='/admin/settings' or path.startswith('/admin/accounts/')) else None)
         try:
             with urlopen(value,timeout=125) as response:
                 if response.headers.get('x-cc2api-request-id'):request_ids.append(response.headers['x-cc2api-request-id'])
@@ -310,6 +474,10 @@ def inside(homoglyph=False,capture_off=False):
             database.execute("INSERT INTO api_tokens(name,token,allowed_accounts,status) VALUES('synthetic','synthetic-key','1','active')")
         require(request('/admin/settings',{'request_diagnostics_log_mode':'debug'},admin=True)[0]==200,'测试日志模式设置失败')
         base='/v1beta/models/'+MODEL+':'
+        if png:
+            result=verify_png(request,wait_idle,database,base)
+            database.close()
+            return result
         body={'contents':[{'role':'user','parts':[{'text':'TLS_SYNTHETIC_TEXT'}]}],
             'generationConfig':{'temperature':.2,'topP':.8,'maxOutputTokens':128}}
         if capture_off:
@@ -421,9 +589,12 @@ def main():
     parser.add_argument('--inside',action='store_true')
     parser.add_argument('--homoglyph',action='store_true')
     parser.add_argument('--capture-off',action='store_true')
+    parser.add_argument('--png',action='store_true')
+    parser.add_argument('--installed-adapter',action='store_true')
     args=parser.parse_args()
+    installed_adapter=args.installed_adapter or args.png
     if args.inside:
-        print(json.dumps(inside(args.homoglyph,args.capture_off),ensure_ascii=False));return
+        print(json.dumps(inside(args.homoglyph,args.capture_off,args.png,installed_adapter),ensure_ascii=False));return
     require(bool(args.image),'需要明确的固定原版测试镜像')
     import docker
     root=Path(__file__).resolve().parents[2]
@@ -451,22 +622,29 @@ def main():
             str(folder):{'bind':'/state','mode':'rw'},
             str(folder/'capture'):{'bind':'/flows','mode':'rw'},
             str(folder/'trust.pem'):{'bind':'/etc/ssl/certs/ca-certificates.crt','mode':'ro'}}
+        if installed_adapter:
+            del volumes[str(package/'agy_runtime')]
+        python_package='/opt/v3/python' if installed_adapter else '/opt/orchestrator'
         if args.loader_root:
             # 开发机调试产物可能依赖较新glibc，加载器只作用于测试Rust进程。
             for name in ['ld-linux-x86-64.so.2','libc.so.6','libm.so.6','libgcc_s.so.1']:
                 library=(args.loader_root/name).resolve(strict=True)
                 volumes[str(library)]={'bind':'/opt/verify-lib/'+name,'mode':'ro'}
-        container=client.containers.run(args.image,['/opt/probe.py','--inside']+(['--homoglyph'] if args.homoglyph else [])+(['--capture-off'] if args.capture_off else []),entrypoint=['python3'],detach=True,
+        probe=['/opt/probe.py','--inside']
+        for flag,enabled in (('--homoglyph',args.homoglyph),('--capture-off',args.capture_off),('--png',args.png),
+                ('--installed-adapter',installed_adapter)):
+            if enabled:probe.append(flag)
+        container=client.containers.run(args.image,probe,entrypoint=['python3'],detach=True,
             user='1001:1001',network_mode='none',read_only=True,cap_drop=['ALL'],security_opt=['no-new-privileges:true'],
             mem_limit='768m',pids_limit=512,extra_hosts={host:'127.0.0.1'},tmpfs={'/tmp':'rw,nosuid,nodev,size=128m'},
-            volumes=volumes,environment={'PYTHONPATH':'/opt/orchestrator:/usr/local/bin','DATABASE_DRIVER':'sqlite',
+            volumes=volumes,environment={'PYTHONPATH':python_package+':/usr/local/bin','DATABASE_DRIVER':'sqlite',
                 'DATABASE_DSN':'/state/gateway.sqlite','ADMIN_PASSWORD':'synthetic-admin','V3_SENDER_CONFIG':'/state/sender.json',
                 'V3_RUNTIME_URL':'http://127.0.0.1:8765','V3_INTERNAL_TOKEN':SECRET,'V3_DEPLOYMENT_ID':'synthetic',
                 'V3_RELEASE':'synthetic-release','LOG_LEVEL':'warn','TOKIO_WORKER_THREADS':'2'},
             labels={'vibebench.test-task':'agy-request-records'})
         result=container.wait(timeout=540)
         logs=container.logs().decode(errors='replace')
-        evidence=root/('.trellis/.runtime/agy-homoglyph-capture-off-private' if args.capture_off else '.trellis/.runtime/agy-homoglyph-loopback-private' if args.homoglyph else '.trellis/.runtime/agy-runtime-loopback-private')
+        evidence=root/('.trellis/.runtime/agy-png-loopback-private' if args.png else '.trellis/.runtime/agy-homoglyph-capture-off-private' if args.capture_off else '.trellis/.runtime/agy-homoglyph-loopback-private' if args.homoglyph else '.trellis/.runtime/agy-runtime-loopback-private')
         if evidence.exists():shutil.rmtree(evidence)
         shutil.copytree(folder,evidence,ignore=lambda directory,names:[name for name in names
             if not (Path(directory)/name).is_file() and not (Path(directory)/name).is_dir()])

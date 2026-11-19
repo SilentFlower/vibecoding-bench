@@ -40,6 +40,7 @@ async fn create_test_account(svc: &AccountService, email: &str) -> Account {
     let mut account = Account {
         platform: "claude_code".into(),
         agy_system_prompt_homoglyph_enabled: false,
+        agy_gif_frames_enabled: false,
         id: 0,
         name: "test".into(),
         email: email.into(),

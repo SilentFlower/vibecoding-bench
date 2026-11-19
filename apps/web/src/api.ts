@@ -75,6 +75,7 @@ export interface Account {
   id: number
   platform?: string
   agy_system_prompt_homoglyph_enabled?: boolean
+  agy_gif_frames_enabled?: boolean
   credential_state?: {generation:number; phase:string; operation_id?:string | null}
   name: string
   email: string

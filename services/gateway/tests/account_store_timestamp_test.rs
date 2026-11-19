@@ -381,6 +381,7 @@ fn new_account(email: &str) -> Account {
     Account {
         platform: "claude_code".into(),
         agy_system_prompt_homoglyph_enabled: false,
+        agy_gif_frames_enabled: false,
         id: 0,
         name: "ts-test".into(),
         email: email.into(),

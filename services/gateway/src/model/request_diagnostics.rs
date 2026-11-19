@@ -314,6 +314,10 @@ pub struct DiagnosticContext {
     pub conversation_id: Option<String>,
     pub trajectory_id: Option<String>,
     pub native_model_calls: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_rejection_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_rejection_field: Option<String>,
     pub control_state: Option<String>,
     pub control_observed_at: Option<String>,
     pub usage: Option<GeminiDiagnosticUsage>,

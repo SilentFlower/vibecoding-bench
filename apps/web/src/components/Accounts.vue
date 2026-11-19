@@ -225,6 +225,7 @@ const savingAccount = ref(false);
 const form = ref({
   platform: 'claude_code',
   agy_system_prompt_homoglyph_enabled: false,
+  agy_gif_frames_enabled: false,
   name: '',
   email: '',
   auth_type: 'setup_token',
@@ -261,6 +262,7 @@ function selectAccountPlatform(value:string): void {
   form.value.auth_type=value==='antigravity'?'oauth':'setup_token';
   form.value.setup_token=''; form.value.access_token=''; form.value.refresh_token=''; form.value.expires_at='';
   form.value.agy_system_prompt_homoglyph_enabled=false;
+  form.value.agy_gif_frames_enabled=false;
 }
 /** 详情始终读取当前列表快照，列表刷新后不保留过期对象。 */
 const detailAccountId = ref<number | null>(null);
@@ -465,6 +467,7 @@ function openCreate() {
   form.value = {
     platform: 'claude_code',
     agy_system_prompt_homoglyph_enabled: false,
+    agy_gif_frames_enabled: false,
     name: '',
     email: '',
     auth_type: 'setup_token',
@@ -510,6 +513,7 @@ function openEdit(a: Account) {
   form.value = {
     platform: a.platform ?? 'claude_code',
     agy_system_prompt_homoglyph_enabled: a.agy_system_prompt_homoglyph_enabled ?? false,
+    agy_gif_frames_enabled: a.agy_gif_frames_enabled ?? false,
     name: a.name,
     email: a.email,
     auth_type: a.auth_type || 'setup_token',
@@ -560,7 +564,7 @@ function usageLimitInput(value: unknown, label: string): number {
   return number;
 }
 
-const agyFormKeys = ['platform','agy_system_prompt_homoglyph_enabled','name','email','auth_type','access_token','refresh_token','expires_at','proxy_url','proxy_id','proxy_revision','concurrency','priority','rpm_limit'];
+const agyFormKeys = ['platform','agy_system_prompt_homoglyph_enabled','agy_gif_frames_enabled','name','email','auth_type','access_token','refresh_token','expires_at','proxy_url','proxy_id','proxy_revision','concurrency','priority','rpm_limit'];
 
 /** 保存账号（新建或更新）。@return 保存完成后的空结果。 */
 async function save() {
@@ -606,6 +610,7 @@ async function save() {
       const payload: Record<string, unknown> = {
         platform: form.value.platform,
         agy_system_prompt_homoglyph_enabled: form.value.agy_system_prompt_homoglyph_enabled,
+        agy_gif_frames_enabled: form.value.agy_gif_frames_enabled,
         name: form.value.name,
         email: form.value.email,
         auth_type: form.value.auth_type,
@@ -1145,6 +1150,7 @@ function applyOAuthResult() {
   form.value = {
     platform: oauthPlatform.value,
     agy_system_prompt_homoglyph_enabled: false,
+    agy_gif_frames_enabled: false,
     name: '',
     email: r.email_address || '',
     auth_type: isSetupToken ? 'setup_token' : 'oauth',
@@ -1426,6 +1432,7 @@ async function copyText(text: string) {
             <section v-if="isAgyForm" class="account-form-section">
               <h3>Antigravity 配置</h3><p class="form-help">账号能力来自最近的原生观测。模型服务等待运行环境接入。</p>
               <label class="account-check"><span><strong>系统提示词同形体转换</strong><small>按当前账号保存，开启后转换系统提示词文本。</small></span><input v-model="form.agy_system_prompt_homoglyph_enabled" type="checkbox"></label>
+              <label class="account-check"><span><strong>GIF 抽帧兼容</strong><small>开启后每张 GIF 最多抽取 8 帧 PNG。</small></span><input v-model="form.agy_gif_frames_enabled" type="checkbox"></label>
               <div class="account-edit-grid three"><NumberInput v-model="numberDrafts.concurrency" label="并发上限" :min="1" required /><NumberInput v-model="numberDrafts.rpm_limit" label="RPM 上限" :min="0" required /><NumberInput v-model="numberDrafts.priority" label="调度优先级" :min="1" required /></div>
               <Button v-if="editing" type="button" variant="outline" @click="openOAuthFlow(editing)">重新授权</Button>
               <Button v-if="editing?.credential_state && editing.credential_state.phase !== 'ready'" type="button" variant="outline" @click="recoverAgy(editing.id)">核对原凭据操作</Button>
