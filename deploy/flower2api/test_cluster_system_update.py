@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import unittest
+from hashlib import sha256
 from unittest.mock import Mock, patch
 
 from system_update_host import HostDeployment
@@ -31,6 +32,7 @@ class ClusterHostUpdateTests(unittest.TestCase):
         self.assertEqual('original-account', body['account_release'])
         self.assertEqual([row], self.operation['cluster_backups'])
         self.assertEqual('backed_up', self.operation['cluster_nodes']['phase'])
+        self.assertTrue(self.operation['node_backup_requested'])
 
     def test_cancel_waits_for_original_node_worker_before_returning(self) -> None:
         """取消先通知原节点作业，再等待实际后台收口。:return: None。"""
@@ -57,6 +59,35 @@ class ClusterHostUpdateTests(unittest.TestCase):
         self.assertEqual({'operation_id': 'original', 'epoch': 'epoch', 'action': 'restore', 'preserve_data': False}, body)
         self.assertEqual('restored', self.operation['cluster_nodes']['phase'])
 
+    def test_drain_waits_for_active_removal_and_fails_fast_for_retry(self) -> None:
+        """安装和回退共用排空，待重试时结束维护并给出可处理原因。:return: 无。"""
+        gate = {'phase': 'blocked', 'epoch': 'epoch', 'active': 0}
+        runtime = {**gate, 'active': 1, 'ready': False, 'environments': [], 'blockers': ['隔离节点正在移除'],
+            'node_removals': [{'name': '隔离节点', 'state': 'removing'}]}
+        self.host.request = Mock(side_effect=[runtime, gate])
+        self.assertFalse(self.host.drained(self.operation)['ready'])
+        runtime['active'] = 0
+        self.host.request = Mock(side_effect=[runtime, gate])
+        with self.assertRaisesRegex(ValueError, '等待续接'):
+            self.host.drained(self.operation)
+        runtime['node_removals'][0]['state'] = 'needs_check'
+        self.host.request = Mock(side_effect=[runtime, gate])
+        with self.assertRaisesRegex(ValueError, '重试移除后再更新平台：隔离节点'):
+            self.host.drained(self.operation)
+
+    def test_abandon_before_node_backup_leaves_other_nodes_untouched(self) -> None:
+        """移除阻止排空时，仅释放本次平台门禁。:return: 无。"""
+        self.host.env = 'test-only'
+        self.host.request = Mock()
+        self.host.controls = Mock(return_value={})
+        self.host.release = Mock()
+        self.operation.update(node_backup_requested=False)
+        self.operation['before'].update(env_sha256=sha256(b'test').hexdigest(), controls={})
+        with patch('system_update_host.safe_read', return_value=b'test'):
+            self.host.abandon(self.operation)
+        self.host.request.assert_not_called()
+        self.host.release.assert_called_once_with(self.operation)
+
 
 class ClusterUpdateOrderingTests(unittest.TestCase):
     """真实签名与持久状态机覆盖集群可选宿主钩子顺序。"""
@@ -76,3 +107,29 @@ class ClusterUpdateOrderingTests(unittest.TestCase):
         self.assertLess(calls.index('nodes-backup'), calls.index('switch'))
         self.assertLess(calls.index('switch'), calls.index('nodes-resume'))
         self.assertLess(calls.index('nodes-resume'), calls.index('health'))
+
+    def test_failed_node_removal_prevents_switching_back_to_older_control(self) -> None:
+        """回退使用相同排空保护并释放原平台门禁，待移除节点不交给旧版。:return: 无。"""
+        fixture = test_system_updater.SystemUpdaterTests(methodName='runTest')
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        fixture.engine.submit('install', fixture.request())
+        self.assertEqual('succeeded', fixture.join()['operation']['phase'])
+        prior_calls = len(fixture.backend.calls)
+
+        def blocked(operation):
+            """使用待移除的真实宿主排空判断。:param operation: 原平台操作。:return: 排空结果。"""
+            host = HostDeployment.__new__(HostDeployment)
+            gate = {'phase': 'blocked', 'epoch': operation['epoch'], 'active': 0}
+            host.request = Mock(side_effect=[{**gate, 'node_removals': [{'name': '隔离节点', 'state': 'needs_check'}]}, gate])
+            return host.drained(operation)
+
+        fixture.backend.drained = blocked
+        fixture.engine.submit('rollback', fixture.request(fixture.old))
+        state = fixture.join()
+        self.assertEqual('failed', state['operation']['phase'])
+        self.assertIn('重试移除', state['operation']['error'])
+        self.assertEqual(fixture.target['release'], state['current_release'])
+        self.assertIn('abandon', fixture.backend.calls[prior_calls:])
+        self.assertNotIn('switch', fixture.backend.calls[prior_calls:])
+        self.assertFalse(fixture.backend.blocked)

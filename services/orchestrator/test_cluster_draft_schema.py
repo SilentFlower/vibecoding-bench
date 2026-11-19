@@ -93,17 +93,22 @@ class NodeLoginDraftSchemaTests(unittest.TestCase):
         self.assertIsNone(self.connection.execute("SELECT account_id FROM account_environments WHERE name='draft_only'").fetchone()[0])
 
     def test_node_and_environment_references_survive_closed_state_until_explicit_cleanup(self) -> None:
-        """当前及关闭草稿都保护原节点，删除专属记录后才解除引用。:return: None。"""
+        """活动草稿阻止移除，关闭草稿在节点归档后仍可引用原环境和节点。:return: None。"""
         apply_migrations(self.connection)
-        self._insert(phase='closed')
+        self._insert(phase='active')
         with self.assertRaisesRegex(ValueError,'登录草稿'):
-            self.store.remove(self.node_id,1)
+            self.store.begin_removal(self.node_id,1)
+        with self.connection:
+            self.connection.execute("UPDATE node_login_drafts SET phase='closed'")
+        _, removal = self.store.begin_removal(self.node_id,1)
+        removal.update(phase='clearing_data', proof={'synthetic': True})
+        self.store.save_removal(self.node_id, removal)
+        self.store.save_removal(self.node_id, {**removal, 'state': 'completed', 'phase': 'completed'})
         with self.assertRaises(sqlite3.IntegrityError),self.connection:
             self.connection.execute('DELETE FROM account_environments WHERE environment_id=?',('e'*32,))
-        with self.connection:
-            self.connection.execute('DELETE FROM node_login_drafts')
-        self.store.remove(self.node_id,1)
+        self.assertEqual(self.node_id,self.connection.execute('SELECT node_id FROM node_login_drafts').fetchone()[0])
         self.assertIsNotNone(self.connection.execute('SELECT deleted_at FROM cluster_nodes WHERE id=?',(self.node_id,)).fetchone()[0])
+        self.assertEqual({'e' * 32}, self.store.removed_draft_environments())
 
     def test_partial_ddl_failure_rolls_back_new_table_and_preserves_version_three(self) -> None:
         """第四步DDL中断不会留下半表或成功台账。:return: None。"""

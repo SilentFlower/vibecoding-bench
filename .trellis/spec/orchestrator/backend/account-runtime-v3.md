@@ -1771,7 +1771,8 @@ ProfileReference={sha256:HEX64,bytes:int>=2}
 NodeSynchronization.install(installer,node_id,revision,maintenance=None,stage_only=False,late_restore=False) -> dict
 GET /nodes、已登记管理页面及其尾斜杠地址 -> SPA HTML
 PUT /api/nodes/{node_id}/enabled
-DELETE /api/nodes/{node_id}
+PUT /api/nodes/{node_id}/name -> 更新显示名与配置版本
+DELETE /api/nodes/{node_id} -> 202，返回原移除操作状态
 GET/PUT /api/accounts/{aid}/node
 GET/POST /api/accounts/{account_id}/node-migrations
 GET /api/accounts/{account_id}/node-migrations/{operation_id}
@@ -1877,6 +1878,44 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - `test_cluster_backup`及原备份测试核对真实SQLite隔离复制、清单/逻辑摘要、同批组合对应和pending恢复事实。`verify_database_definitions.py`核对当前bench5/gateway7及原步骤1—4冻结来源。
 - 前端生产构建及`verify_cluster_ui.py`、`verify_cluster_draft_ui.py`、`verify_cluster_request_ui.py`覆盖冻结确认、迟到响应、独立/停用账号、原草稿/WS、历史未观测及390/1440布局；Rust执行fmt与全量测试。
 - `test_cluster_nodes`、`test_cluster_main`覆盖批量摘要的只读性、字段白名单、删除过滤、停用账号及失联归属；`verify_execution_node_visibility.py`覆盖账号/环境/请求/任务账号的列表与详情、读取失败、跨节点历史、无尝试和1440/720/390px。节点样式复用ExecutionNodeBadge及兼容入口的renderAccountNode，长标识可换行，手机请求记录保留结果和详情入口。
+
+## Scenario: 远程节点改名与移除
+
+### 1. Scope / Trigger
+
+- 涉及管理员改名、卸载远程节点、读取原节点历史或平台排空时，核对节点操作锁、远端归属证明与持久移除状态。
+
+### 2. Signatures
+
+- `PUT /api/nodes/{node_id}/name` 接受 `{revision, name}`，返回更新后的节点。`name` 限 1 至 80 字符，裁剪两端空白并拒绝控制字符。
+- `DELETE /api/nodes/{node_id}` 接受 `{revision}`，以 `202` 返回 `{operation_id, state, phase, reason}`。`GET /api/nodes` 对活动节点返回同形状的 `removal` 或 `null`。
+- `POST /internal/v3/system-updates/snapshot` 返回 `{nodes, node_removals, blockers, ...}`。`node_removals` 每项含 `name`、`state`，供原宿主排空读取。
+
+### 3. Contracts
+
+- 改名只写 `cluster_nodes.name` 并更新版本。SSH 登记 JSON 始终保留原字节，供在途迁移、执行、草稿及组件维护验证摘要。历史投影读取归档节点的名称和标识。
+- 按节点配置版本和操作锁受理移除，登记 `preparation_json.removal` 并关闭接单。保留已完成或取消的迁移、已关闭的执行和草稿。当前有效归属包含人工停用账号。软删除账号保留历史关联，在移除开始后沿用新账号登记入口。
+- 移除按 `checking → retiring_components → clearing_data → completed` 推进。`needs_check` 保留原操作 ID 与检查点，重试不产生新操作。核对原 SSH 主机、安装标记、控制角色、网络与数据根身份后推进。以宿主解析的真实路径和挂载身份识别其他 Docker 绑定源。原数据根可位于独占挂载，子挂载及其他容器共享源阻止清理。先停止控制角色，再移除本节点组件和网络，最后清空原数据根。保留空目录、中央历史及共享镜像。
+- 远端清理核对通过后归档节点并释放 SSH 地址。关联到原节点的中央迁移、执行和关闭草稿保持历史视图。原节点独有的日志和产物返回 `410`。已归档且已确认清理的无账号关闭草稿按历史投影平台快照。
+- 持久移除纳入平台升级和回退的排空条件。正在执行的移除可以完成，需重试或等待续接的操作使同版本平台更新在切换前结束。宿主在实际请求节点备份前保存 `node_backup_requested`，排空退出时仅收口原操作已经请求的备份。
+
+### 4. Validation & Error Matrix
+
+- 名称非法返回 `422`。本机节点、旧版本、有效账号归属、活动迁移或执行、未关闭草稿和组件维护返回 `409`。
+- SSH 断线、原数据根身份变化和共享挂载返回可重试的 `needs_check`。已安装节点首次缺少归属证明时保持未归档。被新数据占用的原数据根仍须保留。
+- 合法版本重试同一删除动作时返回原回执。移除已完成的节点由历史定位读取，远程文件接口返回受控 `410`。
+
+### 5. Scenarios and Examples
+
+- 已取消的迁移仍指向旧节点。执行 `DELETE` 后跟踪 `removal`，远端确认空目录后原 SSH 地址可再次登记，迁移记录沿原节点 ID 查询。
+- 其他容器通过软链接挂载本节点的目录。比较容器报告的路径字符串会漏判，应该使用 SSH 宿主解析实际路径和文件系统挂载位置。
+- 平台等待排空时收到移除待重试。宿主释放原平台门禁并提示从节点管理续接。原节点清理完成后重新发起更新或回退。
+
+### 6. Tests Required
+
+- `test_cluster_nodes`、`test_cluster_draft_schema` 覆盖改名换版、有效账号门禁、终态历史、断线重试、同地址登记和远程文件状态。
+- `test_cluster_removal` 覆盖源路径别名、独占挂载根、嵌套挂载和清理幂等。隔离双节点验收使用真实 SSH 与 Docker，验证共享挂载阻断和回执丢失后的续接。
+- `test_system_update_snapshot_lock`、`test_cluster_system_update` 覆盖移除期间的升级与回退门禁、待重试快速退出、归档后的历史投影和其他节点状态保护。`verify_cluster_ui.py` 覆盖改名、账号门禁、进度及重试。
 
 ## Scenario: SSH 节点密码认证与旧密钥配置兼容
 

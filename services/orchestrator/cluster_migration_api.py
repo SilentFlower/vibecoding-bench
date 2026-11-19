@@ -130,7 +130,7 @@ class MigrationOperations:
         committed = record['last_confirmed_phase'] in ('committed', 'completed')
         nodes = {}
         for side in ('source', 'target'):
-            node = self.coordinator.service.store.get(migration[side + '_node_id'])
+            node = self.coordinator.service.store.history_identity(migration[side + '_node_id'])
             nodes[side] = {'id': node['id'], 'name': node['name']}
         return {'operation_id': operation_id, 'account_id': account_id, **nodes,
             'phase': migration['phase'], 'last_confirmed_phase': record['last_confirmed_phase'],

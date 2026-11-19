@@ -112,6 +112,8 @@ finally:
 print(json.dumps({'ok':True,'node_key':value['node_key']}))
 '''
 
+REMOVAL_FILES_SCRIPT = Path(__file__).with_name('cluster_removal_files.py').read_text(encoding='utf-8')
+
 
 class NodeSshError(ValueError):
     """节点 SSH 的固定公开故障原因，不携带远端原始输出。
@@ -400,6 +402,19 @@ class SshNode:
         result = json.loads(self._command(command, data=body))
         if result != {'ok': True, 'node_key': self.node_key}:
             raise ValueError('节点数据根归属初始化未确认')
+
+    def removal_files(self, action: str, owner: dict, proof: dict | None = None) -> dict:
+        """通过已固定身份的 SSH 核对或擦除原数据目录。:param action: 文件动作。:param owner: 安装归属。:param proof: 原目录身份。:return: 受限目录状态。"""
+        body = json.dumps({'action': action, 'root': self.config.data_root, 'owner': owner, 'proof': proof}).encode()
+        command = 'python3 -c ' + shlex.quote(REMOVAL_FILES_SCRIPT)
+        return json.loads(self._command(command, data=body, timeout=None if action == 'erase' else 15,
+            maximum_output=8192))
+
+    def verify_removal_mounts(self, sources: list[str]) -> dict:
+        """批量核对其他容器绑定源的实际宿主目录。:param sources: 原 Docker 绑定路径。:return: 确认或受控原因。"""
+        body = json.dumps({'action': 'verify_mounts', 'root': self.config.data_root, 'sources': sources}).encode()
+        command = 'python3 -c ' + shlex.quote(REMOVAL_FILES_SCRIPT)
+        return json.loads(self._command(command, data=body, maximum_output=8192))
 
     def prepare_environment(self, container: str, payload: dict, *, inspect: bool = False) -> dict:
         """通过固定容器组件准备一个账号，不暴露任意远程命令。

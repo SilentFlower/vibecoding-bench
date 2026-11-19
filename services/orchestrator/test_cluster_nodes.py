@@ -9,16 +9,20 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from cluster_api import cluster_router
+from cluster_migration_api import MigrationOperations
+from cluster_migrations import NodeMigrations
 from cluster_nodes import NodeAddress, NodeConfiguration, NodeCreate, host_key_identity
 from cluster_service import ClusterService
-from cluster_store import ClusterStore
+from cluster_ssh import NodeSshError
+from cluster_store import ClusterStore, NodeRemoved
 from account_runtime import AccountRuntime, RuntimeBusy, derive_v3_fingerprint
 from database_migrations import apply_migrations, migration_plan
 
@@ -159,7 +163,7 @@ class ClusterNodeTests(unittest.TestCase):
         connection = self.database()
         self.addCleanup(connection.close)
         with connection:
-            account = connection.execute("INSERT INTO accounts(name,profile_path) VALUES('linked','profiles/linked')").lastrowid
+            account = connection.execute("INSERT INTO accounts(name,profile_path,enabled) VALUES('linked','profiles/linked',0)").lastrowid
             connection.execute('UPDATE account_node_assignments SET node_id=? WHERE account_id=?', (node['id'], account))
         self.assertEqual(node['id'], self.store.assignment(account)['node_id'])
         with self.assertRaisesRegex(ValueError, '关联账号'):
@@ -167,6 +171,97 @@ class ClusterNodeTests(unittest.TestCase):
         local = self.store.list()[0]
         with self.assertRaisesRegex(ValueError, '本机'):
             self.service.remove(local['id'], local['revision'])
+
+    def test_rename_paused_node_preserves_raw_ssh_identity_and_account_assignment(self) -> None:
+        """改名沿原身份更新显示列，并拒绝旧版本或无效名称。:return: 无。"""
+        node = self.service.register(NodeCreate(**self.config, private_key=self.key.read_text()))
+        paused = self.store.set_enabled(node['id'], node['revision'], False)
+        original = self.store.get(node['id'])['config_json']
+        connection = self.database()
+        self.addCleanup(connection.close)
+        with connection:
+            account = connection.execute("INSERT INTO accounts(name,profile_path) VALUES('linked','profiles/linked')").lastrowid
+            connection.execute('UPDATE account_node_assignments SET node_id=? WHERE account_id=?', (node['id'], account))
+        app = FastAPI()
+        app.include_router(cluster_router(lambda: self.service))
+        with TestClient(app) as client, patch.object(self.service, 'connection', side_effect=AssertionError('改名无需连接宿主')):
+            path = f"/api/nodes/{node['id']}/name"
+            body = {'revision': paused['revision'], 'name': ' 日本执行节点 '}
+            self.assertEqual(422, client.put(path, json={**body, 'name': '一\n二'}).status_code)
+            response = client.put(path, json=body)
+            self.assertEqual(200, response.status_code)
+            self.assertEqual(409, client.put(path, json=body).status_code)
+        self.assertEqual('日本执行节点', response.json()['name'])
+        self.assertEqual((False, node['node_key']), (response.json()['enabled'], response.json()['node_key']))
+        self.assertEqual(original, self.store.get(node['id'])['config_json'])
+        self.assertEqual(('日本执行节点', 1), (self.store.assignment(account)['node_name'], self.store.assignment(account)['revision']))
+
+    def test_removal_retries_original_operation_and_releases_endpoint_after_completion(self) -> None:
+        """遗留已取消迁移可归档，断线重试继续原操作，原地址可重新登记。:return: 无。"""
+        request = NodeCreate(**self.config, private_key=self.key.read_text())
+        node = self.service.register(request)
+        local = self.store.list()[0]
+        connection = self.database()
+        self.addCleanup(connection.close)
+        with connection:
+            account = connection.execute("INSERT INTO accounts(name,profile_path) VALUES('history','profiles/history')").lastrowid
+            connection.execute("INSERT INTO accounts(name,profile_path,deleted_at) VALUES('old','profiles/old',1)")
+            connection.execute("UPDATE account_node_assignments SET node_id=? WHERE account_id=(SELECT id FROM accounts WHERE name='old')", (node['id'],))
+            connection.execute("INSERT INTO node_migrations VALUES(?,?,?,?,'requested',?,0,0)",
+                ('a' * 32, account, local['id'], node['id'], json.dumps({'source_revision': 1, 'last_confirmed_phase': 'requested'})))
+        with self.assertRaisesRegex(ValueError, '未结束迁移'):
+            self.service.remove(node['id'], node['revision'])
+        with connection:
+            connection.execute("UPDATE node_migrations SET phase='cancelled'")
+        app = FastAPI()
+        app.include_router(cluster_router(lambda: self.service))
+        release = threading.Event()
+        self.addCleanup(release.set)
+
+        def interrupt(record, installed, checkpoint):
+            checkpoint(phase='clearing_data', proof={'original': True})
+            release.wait(timeout=5)
+            raise NodeSshError('connection_failed')
+
+        def finish(record, installed, checkpoint):
+            self.assertEqual('clearing_data', record['phase'])
+            self.assertEqual({'original': True}, record['proof'])
+
+        with TestClient(app) as client, patch('cluster_service.NodeRemoval') as cleanup, patch.object(self.service, 'docker'):
+            cleanup.return_value.run.side_effect = interrupt
+            path = f"/api/nodes/{node['id']}"
+            body = {'revision': node['revision']}
+            accepted = client.request('DELETE', path, json=body)
+            self.assertEqual(202, accepted.status_code)
+            operation = accepted.json()['operation_id']
+            self.assertEqual(operation, client.request('DELETE', path, json=body).json()['operation_id'])
+            self.assertFalse(self.store.get(node['id'])['enabled'])
+            with self.assertRaisesRegex(ValueError, '原账号的节点'):
+                self.store.require_account_restore(connection, 'old')
+            with self.assertRaisesRegex(ValueError, '暂停接单'):
+                self.store.assign_unstarted(account, node['id'], 1)
+            with self.assertRaisesRegex(ValueError, '进入移除'):
+                self.store.set_enabled(node['id'], node['revision'] + 1, True)
+            with self.assertRaisesRegex(ValueError, '已登记'):
+                self.service.register(request)
+            with self.service.lock:
+                worker = self.service.removal_workers[node['id']]
+            release.set()
+            worker.join(timeout=5)
+            failed = self.store.list()[1]['removal']
+            self.assertEqual((operation, 'needs_check', 'clearing_data'), (failed['operation_id'], failed['state'], failed['phase']))
+            cleanup.return_value.run.side_effect = finish
+            self.assertEqual(202, client.request('DELETE', path, json={'revision': node['revision'] + 1}).status_code)
+            with self.service.operation_locks[node['id']]:
+                self.assertEqual([local['id']], [item['id'] for item in self.store.list()])
+            replay = client.request('DELETE', path, json=body)
+            self.assertEqual((operation, 'completed'), (replay.json()['operation_id'], replay.json()['state']))
+        self.assertEqual(('cancelled', node['id']), tuple(connection.execute('SELECT phase,target_node_id FROM node_migrations').fetchone()))
+        history = MigrationOperations(SimpleNamespace(service=self.service, ledger=NodeMigrations(self.store))).list(account)
+        self.assertEqual(('cancelled', {'id': node['id'], 'name': node['name']}), (history['items'][0]['phase'], history['items'][0]['target']))
+        with self.assertRaisesRegex(ValueError, '远程文件已清理'):
+            self.service.connection(node['id'])
+        self.assertNotEqual(node['node_key'], self.service.register(request)['node_key'])
 
     def test_execution_history_keeps_original_node_and_account_references(self) -> None:
         """账号已迁出后仍保留节点执行历史，未收口执行阻止凭据切换。:return: None。"""
@@ -190,8 +285,21 @@ class ClusterNodeTests(unittest.TestCase):
             with connection:
                 connection.execute("UPDATE node_executions SET phase='closed'")
             self.assertIsNone(main._oauth_owner_transition_blocker(account))
-        with self.assertRaisesRegex(ValueError, '执行记录'):
-            self.service.remove(node['id'], node['revision'])
+        _, removal = self.store.begin_removal(node['id'], node['revision'])
+        removal.update(phase='clearing_data', proof={'synthetic': True})
+        self.store.save_removal(node['id'], removal)
+        self.store.save_removal(node['id'], {**removal, 'state': 'completed', 'phase': 'completed'})
+        self.assertEqual(('closed', node['id']), tuple(connection.execute('SELECT phase,node_id FROM node_executions').fetchone()))
+        runner = Mock()
+        runner.sessions.service = self.service
+        runner.for_run.return_value = {'node_id': node['id'], 'record': {'scope': {'node_key': node['node_key'],
+            'environment_id': 'e' * 32, 'assignment_revision': 1, 'generation': 1}}}
+        runner.artifact_chunk.side_effect = NodeRemoved('原节点已移除，远程文件已清理')
+        with patch.object(main, 'cluster_runner', runner), patch.object(main, '_require_visible_run'):
+            self.assertEqual(node['name'], main._public_run_node('historic-run')['name'])
+            with self.assertRaises(HTTPException) as raised:
+                main.get_transcript('historic-run')
+            self.assertEqual((410, '原节点已移除，远程文件已清理'), (raised.exception.status_code, raised.exception.detail))
 
     def test_invalid_inputs_do_not_reach_shell_or_echo_private_material(self) -> None:
         """非法地址、路径及私钥错误经过公开接口时保持固定错误。:return: None。"""

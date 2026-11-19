@@ -191,11 +191,21 @@ def runtime_snapshot(runtime) -> dict:
     blockers = ['管理端仍有在途活动'] if gate['active'] else []
     environments = []
     locality = getattr(runtime, 'locality', None)
+    service = getattr(runtime, 'cluster_service', None)
+    node_rows = service.store.list() if service else []
+    removed_drafts = service.store.removed_draft_environments() if service else set()
+    node_removals = [{'name': row['name'], 'state': row['removal']['state']} for row in node_rows if row.get('removal')]
+    for removal in node_removals:
+        action = '请在节点管理重试移除' if removal['state'] == 'needs_check' else '正在移除，请等待原操作完成'
+        blockers.append(f"{removal['name']}：{action}")
     for row in rows:
         reasons = []
         item = {key: row.get(key) for key in ('environment_id', 'generation', 'state', 'name', 'account_id')}
+        if row['account_id'] is None and row['environment_id'] in removed_drafts:
+            # 节点清理回执已证明原草稿的远端资料与组件收口，中央行继续保存历史引用。
+            environments.append({**item, 'node_kind': 'ssh', 'roles': {}, 'origin': None, 'blockers': []})
+            continue
         if locality is not None and not locality(row):
-            service = getattr(runtime, 'cluster_service', None)
             try:
                 if service is None or service.synchronization is None or accounts.get(row['account_id']) is None:
                     raise ValueError('远程维护尚未接入')
@@ -280,11 +290,10 @@ def runtime_snapshot(runtime) -> dict:
         item['blockers'] = reasons
         blockers.extend(f'{row["name"]}: {reason}' for reason in reasons)
         environments.append(item)
-    service = getattr(runtime, 'cluster_service', None)
-    nodes = [row for row in service.store.list() if row['kind'] == 'ssh'
-        and ((row.get('preparation') or {}).get('release') or (row.get('preparation') or {}).get('current_release'))] if service else []
+    nodes = [row for row in node_rows if row['kind'] == 'ssh' and not row.get('removal')
+        and ((row.get('preparation') or {}).get('release') or (row.get('preparation') or {}).get('current_release'))]
     return {**gate, 'ready': gate['phase'] == 'blocked' and not blockers,
-        'environments': environments, 'nodes': nodes, 'blockers': blockers[:256]}
+        'environments': environments, 'nodes': nodes, 'node_removals': node_removals, 'blockers': blockers[:256]}
 
 
 def environment_sources(runtime) -> list[dict]:

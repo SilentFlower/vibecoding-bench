@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from docker.errors import DockerException
 
-from cluster_nodes import NodeAddress, NodeCreate, NodeEnabled, NodeRevision
+from cluster_nodes import NodeAddress, NodeCreate, NodeEnabled, NodeRename, NodeRevision
 from cluster_deployment import NodeInstallationConfigurationError
 from cluster_ssh import probe_host_keys
 
@@ -27,7 +27,7 @@ class NodeRoute(APIRoute):
             try:
                 return await handler(request)
             except RequestValidationError:
-                return JSONResponse({'detail': '节点参数无效，请核对地址、身份、认证材料和配置版本'}, status_code=422)
+                return JSONResponse({'detail': '节点参数无效，请核对名称、地址、身份、认证材料和配置版本'}, status_code=422)
         return safe_handler
 
 
@@ -91,6 +91,14 @@ def cluster_router(service) -> APIRouter:
         except ValueError as error:
             raise HTTPException(409, str(error)) from None
 
+    @router.put('/{node_id}/name')
+    def rename_node(node_id: int, body: NodeRename) -> dict:
+        """更新节点显示名称。:param node_id: 节点。:param body: 当前版本及名称。:return: 公开状态。"""
+        try:
+            return current().rename(node_id, body.revision, body.name)
+        except ValueError as error:
+            raise HTTPException(409, str(error)) from None
+
     @router.post('/{node_id}/prepare', status_code=202)
     def prepare_node(node_id: int, body: NodeRevision) -> dict:
         """提交后台组件安装。:param node_id: 节点。:param body: 版本。:return: 可轮询的公开状态。"""
@@ -101,13 +109,14 @@ def cluster_router(service) -> APIRouter:
         except (ValueError, OSError, RuntimeError, DockerException):
             raise HTTPException(409, '节点组件安装未完成，请核对配置、镜像、SSH 身份及远程数据归属') from None
 
-    @router.delete('/{node_id}')
+    @router.delete('/{node_id}', status_code=202)
     def remove_node(node_id: int, body: NodeRevision) -> dict:
-        """移除无引用远程节点。:param node_id: 节点。:param body: 版本。:return: 完成回执。"""
+        """提交无归属账号节点的后台移除。:param node_id: 节点。:param body: 版本。:return: 可轮询的原移除回执。"""
         try:
-            current().remove(node_id, body.revision)
-            return {'ok': True}
+            return current().remove(node_id, body.revision)
         except ValueError as error:
             raise HTTPException(409, str(error)) from None
+        except RuntimeError:
+            raise HTTPException(409, '平台正在维护，请稍后继续移除') from None
 
     return router

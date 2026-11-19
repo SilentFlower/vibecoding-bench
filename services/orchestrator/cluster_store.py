@@ -4,9 +4,14 @@ from __future__ import annotations
 import json
 import math
 import time
+import uuid
 from typing import Callable
 
 from cluster_nodes import NodeConfiguration, host_key_identity
+
+
+class NodeRemoved(ValueError):
+    """原节点已归档，禁止远程访问。"""
 
 
 class ClusterStore:
@@ -40,10 +45,34 @@ class ClusterStore:
         """
         connection = self.database()
         try:
-            row = connection.execute('SELECT * FROM cluster_nodes WHERE id=? AND deleted_at IS NULL', (node_id,)).fetchone()
+            row = connection.execute('SELECT * FROM cluster_nodes WHERE id=?', (node_id,)).fetchone()
+            if row is None:
+                raise ValueError('节点不存在')
+            if row['deleted_at'] is not None:
+                removal = json.loads(row['preparation_json'] or '{}').get('removal')
+                raise NodeRemoved('原节点已移除，远程文件已清理' if removal else '原节点已移除')
+            return dict(row)
+        finally:
+            connection.close()
+
+    def history_identity(self, node_id: int) -> dict:
+        """读取历史记录所需的原节点名称与身份。:param node_id: 节点 ID。:return: 只读定位和归档时间。"""
+        connection = self.database()
+        try:
+            row = connection.execute('SELECT id,node_key,name,deleted_at FROM cluster_nodes WHERE id=?', (node_id,)).fetchone()
             if row is None:
                 raise ValueError('节点不存在')
             return dict(row)
+        finally:
+            connection.close()
+
+    def removed_draft_environments(self) -> set[str]:
+        """读取已核对远端清理的关闭草稿。:return: 可按中央历史投影的环境身份。"""
+        connection = self.database()
+        try:
+            return {row[0] for row in connection.execute('SELECT d.environment_id FROM node_login_drafts d '
+                "JOIN cluster_nodes n ON n.id=d.node_id WHERE d.phase='closed' AND n.deleted_at IS NOT NULL "
+                "AND CASE WHEN json_valid(n.preparation_json) THEN json_extract(n.preparation_json,'$.removal.state') END='completed'")}
         finally:
             connection.close()
 
@@ -62,14 +91,35 @@ class ClusterStore:
             connection = self.database()
             try:
                 with connection:
-                    if connection.execute('SELECT 1 FROM cluster_nodes WHERE endpoint_key=?', (endpoint,)).fetchone():
+                    if connection.execute('SELECT 1 FROM cluster_nodes WHERE endpoint_key=? AND deleted_at IS NULL', (endpoint,)).fetchone():
                         raise ValueError('该 SSH 节点已登记')
+                    connection.execute('UPDATE cluster_nodes SET endpoint_key=NULL WHERE endpoint_key=? AND deleted_at IS NOT NULL', (endpoint,))
                     cursor = connection.execute('INSERT INTO cluster_nodes(node_key,name,kind,endpoint_key,enabled,config_json,created_at) '
                         "VALUES(?,?,'ssh',?,?,?,?)", (node_key, config.name, endpoint, int(config.enabled), encoded, time.time()))
                     row = connection.execute('SELECT * FROM cluster_nodes WHERE id=?', (cursor.lastrowid,)).fetchone()
                     return self._public(dict(row), 0)
             finally:
                 connection.close()
+
+    def rename(self, node_id: int, revision: int, name: str) -> dict:
+        """更新原远程节点的显示名称。:param node_id: 节点。:param revision: 预期版本。:param name: 规范名称。:return: 公开节点。"""
+        with self.lock:
+            connection = self.database()
+            try:
+                with connection:
+                    row = connection.execute('SELECT * FROM cluster_nodes WHERE id=? AND revision=? AND deleted_at IS NULL',
+                        (node_id, revision)).fetchone()
+                    if row is None or row['kind'] != 'ssh':
+                        raise ValueError('请指定配置版本一致的远程节点')
+                    preparation = json.loads(row['preparation_json'] or '{}')
+                    if preparation.get('removal') or preparation.get('state') == 'preparing' or preparation.get('platform_operation_id'):
+                        raise ValueError('请等待节点维护完成后再改名')
+                    # 在途作业按原登记 JSON 的字节摘要识别 SSH 身份，显示名独立更新。
+                    connection.execute('UPDATE cluster_nodes SET name=?,revision=revision+1 WHERE id=? AND revision=?',
+                        (name, node_id, revision))
+            finally:
+                connection.close()
+        return next(item for item in self.list() if item['id'] == node_id)
 
     def set_enabled(self, node_id: int, revision: int, enabled: bool) -> dict:
         """按版本修改接单状态，不停止既有工作。
@@ -87,12 +137,16 @@ class ClusterStore:
                         (node_id, revision)).fetchone()
                     preparation = previous['preparation_json'] if previous else None
                     try:
-                        if preparation and json.loads(preparation).get('state') == 'preparing':
-                            preparation = json.dumps({**json.loads(preparation), 'state': 'needs_check',
+                        record = json.loads(preparation or '{}')
+                        if record.get('state') == 'preparing':
+                            preparation = json.dumps({**record, 'state': 'needs_check',
                                 'phase': 'waiting', 'retry_at': time.time(), 'updated_at': time.time(),
                                 'reason': '接单偏好已保存，节点同步将沿原任务继续核对'})
                     except (ValueError, TypeError):
                         preparation = None
+                        record = {}
+                    if record.get('removal'):
+                        raise ValueError('节点已进入移除流程，请继续原操作')
                     result = connection.execute('UPDATE cluster_nodes SET enabled=?,revision=revision+1,preparation_json=? '
                         'WHERE id=? AND revision=? AND deleted_at IS NULL', (int(enabled), preparation, node_id, revision))
                     if result.rowcount != 1:
@@ -133,7 +187,7 @@ class ClusterStore:
             try:
                 with connection:
                     return connection.execute('UPDATE cluster_nodes SET preparation_json=? '
-                        'WHERE id=? AND revision=? AND deleted_at IS NULL',
+                        "WHERE id=? AND revision=? AND deleted_at IS NULL AND json_extract(preparation_json,'$.removal') IS NULL",
                         (json.dumps({**state, 'updated_at': time.time()}, ensure_ascii=False, allow_nan=False),
                             node_id, revision)).rowcount == 1
             finally:
@@ -212,39 +266,97 @@ class ClusterStore:
                 connection.close()
         return self.assignment(account_id)
 
-    def remove(self, node_id: int, revision: int) -> None:
-        """只移除已无账号、迁移及执行历史引用的远程节点。
+    @staticmethod
+    def _require_removable(connection, node_id: int) -> None:
+        if connection.execute('SELECT 1 FROM account_node_assignments b JOIN accounts a ON a.id=b.account_id '
+                'WHERE b.node_id=? AND a.deleted_at IS NULL', (node_id,)).fetchone():
+            raise ValueError('节点仍有关联账号，请先迁移账号')
+        if connection.execute("SELECT 1 FROM node_migrations WHERE (source_node_id=? OR target_node_id=?) "
+                "AND phase NOT IN ('completed','cancelled')", (node_id, node_id)).fetchone():
+            raise ValueError('节点仍有未结束迁移，请先完成原迁移')
+        if connection.execute("SELECT 1 FROM node_executions WHERE node_id=? AND phase<>'closed'", (node_id,)).fetchone():
+            raise ValueError('节点仍有未结束执行记录，请先收口原执行')
+        if connection.execute("SELECT 1 FROM node_login_drafts WHERE node_id=? AND phase<>'closed'", (node_id,)).fetchone():
+            raise ValueError('节点仍有未结束的登录草稿，请先完成原草稿操作')
 
-        :param node_id: 待移除节点。
-        :param revision: 预期版本。
-        :return: None，节点历史保留且接单关闭。
-        """
+    @staticmethod
+    def require_account_restore(connection, name: str) -> None:
+        """防止软删除账号在节点清理期间重新归属原址。:param connection: 持有中央写锁的连接。:param name: 原账号名称。:return: 无。"""
+        node = connection.execute('SELECT n.deleted_at,n.preparation_json FROM accounts a '
+            'JOIN account_node_assignments b ON b.account_id=a.id JOIN cluster_nodes n ON n.id=b.node_id '
+            'WHERE a.name=? AND a.deleted_at IS NOT NULL', (name,)).fetchone()
+        if node is not None and (node['deleted_at'] is not None or json.loads(node['preparation_json'] or '{}').get('removal')):
+            raise ValueError('原账号的节点已进入移除流程，请重新登记账号')
+
+    def begin_removal(self, node_id: int, revision: int) -> tuple[dict, dict]:
+        """关闭节点准入并登记或续接原移除。:param node_id: 节点。:param revision: 页面版本。:return: 冻结节点及操作。"""
         with self.lock:
             connection = self.database()
             try:
                 with connection:
-                    row = connection.execute('SELECT * FROM cluster_nodes WHERE id=? AND revision=? AND deleted_at IS NULL',
-                        (node_id, revision)).fetchone()
+                    connection.execute('BEGIN IMMEDIATE')
+                    row = connection.execute('SELECT * FROM cluster_nodes WHERE id=?', (node_id,)).fetchone()
                     if row is None or row['kind'] == 'local':
-                        raise ValueError('本机节点不可移除，或节点配置已变化')
-                    if row['preparation_json'] and json.loads(row['preparation_json']).get('state') == 'preparing':
+                        raise ValueError('本机节点不可移除，或节点不存在')
+                    preparation = json.loads(row['preparation_json'] or '{}')
+                    removal = preparation.get('removal')
+                    if removal:
+                        if revision not in (removal['requested_revision'], removal['revision']):
+                            raise ValueError('节点配置已变化，请刷新后重试')
+                        if removal['state'] == 'completed':
+                            return dict(row), removal
+                    elif row['deleted_at'] is not None or row['revision'] != revision:
+                        raise ValueError('节点配置已变化，请刷新后重试')
+                    elif preparation.get('state') == 'preparing':
                         raise ValueError('节点组件正在后台安装，请等待安装结束后再移除')
-                    if connection.execute('SELECT 1 FROM account_node_assignments WHERE node_id=?', (node_id,)).fetchone():
-                        raise ValueError('节点仍有关联账号，请先迁移账号')
-                    if connection.execute('SELECT 1 FROM node_migrations WHERE source_node_id=? OR target_node_id=?',
-                            (node_id, node_id)).fetchone():
-                        raise ValueError('节点仍有迁移记录引用，请保留节点历史')
-                    if connection.execute('SELECT 1 FROM node_executions WHERE node_id=? LIMIT 1', (node_id,)).fetchone():
-                        raise ValueError('节点仍有执行记录引用，请保留原运行历史')
-                    if connection.execute('SELECT 1 FROM node_login_drafts WHERE node_id=? LIMIT 1', (node_id,)).fetchone():
-                        raise ValueError('节点仍有登录草稿或已提交记录引用，请先完成原草稿操作')
-                    connection.execute('UPDATE cluster_nodes SET deleted_at=?,enabled=0,revision=revision+1 WHERE id=?',
-                        (time.time(), node_id))
+                    self._require_removable(connection, node_id)
+                    if removal is None:
+                        removal = {'operation_id': uuid.uuid4().hex, 'requested_revision': revision, 'revision': revision + 1,
+                            'node_key': row['node_key'], 'phase': 'checking'}
+                    removal = {**removal, 'state': 'removing', 'reason': None}
+                    preparation['removal'] = removal
+                    connection.execute('UPDATE cluster_nodes SET enabled=0,revision=?,preparation_json=? WHERE id=?',
+                        (removal['revision'], json.dumps(preparation, ensure_ascii=False), node_id))
+                    return dict(row), removal
             finally:
                 connection.close()
 
+    def save_removal(self, node_id: int, removal: dict) -> None:
+        """保存原移除进度或在远端核对成功后归档。:param node_id: 节点。:param removal: 持久进度。:return: 无。"""
+        with self.lock:
+            connection = self.database()
+            try:
+                with connection:
+                    connection.execute('BEGIN IMMEDIATE')
+                    row = connection.execute('SELECT * FROM cluster_nodes WHERE id=? AND revision=? AND node_key=? AND deleted_at IS NULL',
+                        (node_id, removal['revision'], removal['node_key'])).fetchone()
+                    if row is None:
+                        raise ValueError('原节点移除身份已变化')
+                    preparation = json.loads(row['preparation_json'])
+                    current = preparation['removal']
+                    if current['operation_id'] != removal['operation_id']:
+                        raise ValueError('原节点移除操作已变化')
+                    preparation['removal'] = removal
+                    encoded = json.dumps(preparation, ensure_ascii=False)
+                    if removal['state'] == 'completed':
+                        if current['phase'] != 'clearing_data' or not current.get('proof') or current['proof'] != removal.get('proof'):
+                            raise ValueError('移除步骤与原远程归属回执不一致')
+                        self._require_removable(connection, node_id)
+                        connection.execute('UPDATE cluster_nodes SET deleted_at=?,endpoint_key=NULL,revision=revision+1,preparation_json=? WHERE id=?',
+                            (time.time(), encoded, node_id))
+                    else:
+                        connection.execute('UPDATE cluster_nodes SET preparation_json=? WHERE id=?', (encoded, node_id))
+            finally:
+                connection.close()
+
+    @staticmethod
+    def public_removal(removal: dict) -> dict:
+        """仅公开用于轮询的移除字段。:param removal: 原进度。:return: 公开状态。"""
+        return {key: removal.get(key) for key in ('operation_id', 'state', 'phase', 'reason')}
+
     def _public(self, row: dict, account_count: int) -> dict:
         config, fingerprint, observation, preparation = {}, None, None, None
+        removal = None
         try:
             if row['kind'] == 'ssh':
                 config = NodeConfiguration.model_validate(json.loads(row['config_json'])).model_dump()
@@ -252,9 +364,12 @@ class ClusterStore:
             observation = json.loads(row['observation_json']) if row['observation_json'] else None
             if row.get('preparation_json'):
                 record = json.loads(row['preparation_json'])
-                if record.get('state') not in ('preparing', 'prepared', 'failed', 'needs_check'):
+                if record.get('removal'):
+                    removal = self.public_removal(record['removal'])
+                if record.get('state') in ('preparing', 'prepared', 'failed', 'needs_check'):
+                    preparation = {key: record[key] for key in ('state', 'release', 'protocol', 'updated_at', 'reason', 'phase', 'current_release', 'target_release', 'reason_code', 'retry_at') if key in record}
+                elif removal is None:
                     raise ValueError('节点安装记录无效')
-                preparation = {key: record[key] for key in ('state', 'release', 'protocol', 'updated_at', 'reason', 'phase', 'current_release', 'target_release', 'reason_code', 'retry_at') if key in record}
             if observation is not None:
                 timestamp = observation['observed_at']
                 if (observation['state'] not in ('reachable', 'unreachable') or type(timestamp) not in (int, float)
@@ -270,4 +385,4 @@ class ClusterStore:
             'data_root': config.get('data_root'),
             'auth_method': config.get('auth_method'),
             'host_key_sha256': fingerprint,
-            'observation': observation, 'preparation': preparation}
+            'observation': observation, 'preparation': preparation, 'removal': removal}

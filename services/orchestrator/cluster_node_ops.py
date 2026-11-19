@@ -11,6 +11,8 @@ from cluster_backup_index import cluster_backup_scope
 from cluster_deployment import node_container_name
 from project_library import digest_json
 
+NODE_COMPONENT_ORDER = {'project-review': 0, 'account': 1, 'account-sender': 2, 'account-network': 3, 'node-control': 4}
+
 
 def node_action(data: Path, host_data: Path, action: str, *, release: str | None = None, client=None) -> dict:
     """核对安装与实际容器后执行一个明确的本机动作。
@@ -34,7 +36,7 @@ def node_action(data: Path, host_data: Path, action: str, *, release: str | None
         client = DockerClient.from_env()
     labels = {'vibebench.product': 'v3', 'vibebench.deployment': scope['deployment_id'],
         'vibebench.cluster-node': scope['node_key']}
-    order = {'project-review': 0, 'account': 1, 'account-sender': 2, 'account-network': 3, 'node-control': 4}
+    order = NODE_COMPONENT_ORDER
     try:
         containers = client.containers.list(all=True, filters={'label': [key + '=' + value for key, value in labels.items()]})
         programs = client.containers.list(all=True, filters={'label': ['vibebench.project-verifier=native',

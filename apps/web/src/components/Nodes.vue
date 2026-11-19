@@ -5,7 +5,7 @@ import { useToast } from '../composables/useToast';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { Server, Plus, RefreshCw, ShieldCheck, Trash2 } from './ui/icon';
+import { Server, Plus, RefreshCw, ShieldCheck, Trash2, Pencil } from './ui/icon';
 import { ChoiceSelect, NumberInput } from './ui/controls';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { ConfirmationDialog } from './ui/feedback';
@@ -25,6 +25,7 @@ const authMethod = ref<'private_key' | 'password'>('private_key'), password = re
 const authenticationOptions = [{ value: 'private_key', label: 'SSH 私钥' }, { value: 'password', label: 'SSH 密码' }];
 const keys = ref<NodeHostKey[]>([]), deleting = ref<ExecutionNode | null>(null), deleteError = ref('');
 const installing = ref<ExecutionNode | null>(null), installError = ref('');
+const renaming = ref<ExecutionNode | null>(null), newName = ref(''), renameError = ref('');
 const options = computed(() => keys.value.map(key => ({ value: key.key, label: `${key.algorithm} · ${key.sha256}` })));
 const selectedFingerprint = computed(() => keys.value.find(key => key.key === selectedKey.value)?.sha256);
 let alive = true, loadGeneration = 0, probeGeneration = 0;
@@ -46,7 +47,7 @@ async function load(background = false): Promise<void> {
   } finally {
     if (alive && generation === loadGeneration) {
       loading.value = false;
-      const syncing = rows.value.some(node => node.preparation?.state === 'preparing' || node.preparation?.phase === 'waiting');
+      const syncing = rows.value.some(node => node.removal?.state === 'removing' || node.preparation?.state === 'preparing' || node.preparation?.phase === 'waiting');
       if (syncing || rows.value.some(node => node.kind === 'ssh' && node.preparation)) {
         refreshTimer = setTimeout(() => { void load(true); }, syncing ? 3000 : 15000);
       }
@@ -139,13 +140,40 @@ async function operate(node: ExecutionNode, operation: 'check' | 'enable'): Prom
   } catch (cause) { if (alive) toast((cause as Error).message); }
   finally { pending.delete(node.id); }
 }
-/** 服务端核对引用后归档节点。@return 完成。 */
-async function remove(): Promise<void> {
-  const node = deleting.value;
+/** 打开改名表单并冻结当前配置版本。@param node 当前节点。@return 无。 */
+function openRename(node: ExecutionNode): void {
+  newName.value = node.name; renameError.value = ''; renaming.value = node;
+}
+/** 保存节点显示名称。@return 更新完成。 */
+async function rename(): Promise<void> {
+  const node = renaming.value;
+  if (!node || pending.has(node.id) || !newName.value.trim()) return;
+  pending.add(node.id); renameError.value = '';
+  try {
+    await nodeApi.rename(node, newName.value.trim());
+    if (alive) { renaming.value = null; await load(); }
+  } catch (cause) {
+    if (alive) { renameError.value = (cause as Error).message; void load(true); }
+  } finally { pending.delete(node.id); }
+}
+/** 提交原节点清理或续接已经确认的移除。@param node 当前节点。@return 已读取最新状态。 */
+async function remove(node = deleting.value): Promise<void> {
   if (!node || pending.has(node.id)) return;
   pending.add(node.id); deleteError.value = '';
-  try { await nodeApi.remove(node); if (alive) { deleting.value = null; await load(); } }
-  catch (cause) { if (alive) deleteError.value = (cause as Error).message; }
+  try {
+    const removal = await nodeApi.remove(node);
+    if (alive) {
+      deleting.value = null;
+      rows.value = rows.value.map(row => row.id === node.id ? { ...row, enabled: false, removal } : row);
+      await load(true);
+    }
+  } catch (cause) {
+    if (alive) {
+      if (deleting.value) deleteError.value = (cause as Error).message;
+      else toast((cause as Error).message);
+      void load(true);
+    }
+  }
   finally { pending.delete(node.id); }
 }
 /** 管理员确认影响后安装远程执行组件。@return 安装完成。 */
@@ -177,6 +205,9 @@ async function synchronize(): Promise<void> {
 }
 /** 将持久阶段显示为实际处理进度。@param node 当前节点。@return 阶段说明。 */
 function preparationState(node: ExecutionNode): string {
+  if (node.removal) return {
+    checking: '核对远程归属', retiring_components: '移除远程组件', clearing_data: '清理远程数据', completed: '已移除',
+  }[node.removal.phase];
   const phase = node.preparation?.phase;
   const labels: Record<string, string> = { checking: '核对现有组件', draining: '等待原工作完成',
     waiting: '等待同步', waiting_for_platform: '已停止，等待平台切换', stopping: '停止原组件', backing_up: '备份节点资料', switching: '切换组件', restoring: '恢复原账号环境', ready: '已就绪' };
@@ -190,6 +221,7 @@ function bytes(value: number | null | undefined): string {
 }
 /** 来源时间与状态分别显示。@param node 节点。@return 连接说明。 */
 function state(node: ExecutionNode): string {
+  if (node.removal) return { removing: '移除中', needs_check: '移除待重试', completed: '已移除' }[node.removal.state];
   if (!node.enabled) return '已暂停接单';
   if (!node.observation) return '待检查';
   if (node.observation.stale) return '观测已过期';
@@ -213,9 +245,19 @@ onUnmounted(() => { alive = false; loadGeneration++; if (refreshTimer) clearTime
         <p v-if="node.observation?.reason" class="nodes-error" role="status">{{ node.observation.reason }}</p>
         <div class="node-meta"><span>最近检查</span><time>{{ node.observation && node.observation.observed_at > 0 ? new Date(node.observation.observed_at * 1000).toLocaleString('zh-CN') : '尚未检查' }}</time><span>Docker</span><span>{{ node.observation?.docker_version ?? '未采集' }}</span><template v-if="node.kind === 'ssh'"><span>运行组件</span><span>{{ preparationState(node) }}</span></template></div>
         <p v-if="node.preparation?.target_release && node.preparation.target_release !== (node.preparation.current_release || node.preparation.release)" class="node-note">{{ node.preparation.current_release || node.preparation.release || '首次安装' }} → {{ node.preparation.target_release }}</p>
-        <p v-if="node.preparation?.reason" class="nodes-error" role="status">{{ node.preparation.reason }}</p>
+        <p v-if="node.removal?.reason || (!node.removal && node.preparation?.reason)" class="nodes-error" role="status">{{ node.removal?.reason || node.preparation?.reason }}</p>
         <details v-if="node.kind === 'ssh'" class="node-identity"><summary><ShieldCheck :size="14" />主机身份与版本</summary><p>组件版本：<code>{{ node.preparation?.release || '待安装' }}</code></p><p><code>{{ node.host_key_sha256 }}</code></p><p>认证方式：{{ node.auth_method === 'password' ? 'SSH 密码' : 'SSH 私钥' }}</p><p>节点数据目录：<code>{{ node.data_root }}</code></p></details>
-        <footer><Button variant="outline" :disabled="pending.has(node.id)" @click="operate(node, 'check')"><RefreshCw :size="14" />{{ pending.has(node.id) ? '处理中…' : '检查连接' }}</Button><Button v-if="node.kind === 'ssh'" variant="outline" :disabled="pending.has(node.id) || !node.enabled || node.preparation?.state === 'preparing'" @click="installError = ''; installing = node">{{ node.preparation?.state === 'preparing' ? '后台同步中…' : node.preparation?.state === 'prepared' ? '检查并同步组件' : '准备运行组件' }}</Button><Button variant="outline" :disabled="pending.has(node.id)" @click="operate(node, 'enable')">{{ node.enabled ? '暂停接单' : '恢复接单' }}</Button><Button v-if="node.kind === 'ssh'" variant="ghost" :disabled="pending.has(node.id) || node.account_count > 0 || node.preparation?.state === 'preparing'" @click="deleteError = ''; deleting = node"><Trash2 :size="14" />移除</Button></footer>
+        <footer>
+          <template v-if="!node.removal">
+            <Button variant="outline" :disabled="pending.has(node.id)" @click="operate(node, 'check')"><RefreshCw :size="14" />检查连接</Button>
+            <Button v-if="node.kind === 'ssh'" variant="outline" :disabled="pending.has(node.id) || !node.enabled || node.preparation?.state === 'preparing'" @click="installError = ''; installing = node">{{ node.preparation?.state === 'preparing' ? '后台同步中…' : node.preparation?.state === 'prepared' ? '检查并同步组件' : '准备运行组件' }}</Button>
+            <Button variant="outline" :disabled="pending.has(node.id)" @click="operate(node, 'enable')">{{ node.enabled ? '暂停接单' : '恢复接单' }}</Button>
+            <Button v-if="node.kind === 'ssh'" variant="ghost" :disabled="pending.has(node.id) || node.preparation?.state === 'preparing'" @click="openRename(node)"><Pencil :size="14" />改名</Button>
+            <Button v-if="node.kind === 'ssh'" variant="ghost" :title="node.account_count ? '请先迁移归属账号' : undefined" :disabled="pending.has(node.id) || node.account_count > 0 || node.preparation?.state === 'preparing'" @click="deleteError = ''; deleting = node"><Trash2 :size="14" />移除</Button>
+          </template>
+          <Button v-else-if="node.removal.state === 'needs_check'" variant="outline" :disabled="pending.has(node.id)" @click="remove(node)"><RefreshCw :size="14" />重试移除</Button>
+          <span v-else class="node-note" role="status">{{ node.removal.state === 'removing' ? '正在后台移除，可离开此页面' : '已清理远程组件和数据' }}</span>
+        </footer>
       </article>
     </div>
     <AccountNodeSelector v-if="rows.length" :nodes="rows" :agy-accounts="agyAccounts ?? []" @changed="load" />
@@ -227,7 +269,17 @@ onUnmounted(() => { alive = false; loadGeneration++; if (refreshTimer) clearTime
         <label v-else>SSH 密码<Input v-model="password" type="password" required maxlength="4096" autocomplete="new-password" :disabled="saving" /></label><p class="node-note">认证材料由管理中心以受保护文件保存，关闭此窗口后清空输入。</p><p v-if="formError" class="nodes-error" role="alert">{{ formError }}</p><footer><Button type="button" variant="outline" :disabled="saving" @click="setEditor(false)">取消</Button><Button type="submit" :disabled="saving || !verified">{{ saving ? '正在登记…' : '登记节点' }}</Button></footer>
       </form>
     </DialogContent></Dialog>
-    <ConfirmationDialog :open="!!deleting" title="移除节点" :message="`确认移除「${deleting?.name ?? ''}」？该操作归档节点登记并断开管理连接。远程容器与持久数据保留。`" confirm-label="移除节点" danger :busy="!!deleting && pending.has(deleting.id)" :error="deleteError" @confirm="remove" @cancel="deleting = null" />
+    <Dialog :open="!!renaming" @update:open="open => { if (!open && renaming && !pending.has(renaming.id)) renaming = null; }">
+      <DialogContent class="node-rename" :show-close-button="!renaming || !pending.has(renaming.id)">
+        <DialogHeader><DialogTitle>修改节点名称</DialogTitle><DialogDescription>{{ renaming?.username }}@{{ renaming?.host }}:{{ renaming?.port }}</DialogDescription></DialogHeader>
+        <form class="node-form" @submit.prevent="rename">
+          <label>节点名称<Input v-model="newName" required maxlength="80" :disabled="!!renaming && pending.has(renaming.id)" /></label>
+          <p v-if="renameError" class="nodes-error" role="alert">{{ renameError }}</p>
+          <footer><Button type="button" variant="outline" :disabled="!!renaming && pending.has(renaming.id)" @click="renaming = null">取消</Button><Button type="submit" :disabled="!newName.trim() || (!!renaming && pending.has(renaming.id))">保存名称</Button></footer>
+        </form>
+      </DialogContent>
+    </Dialog>
+    <ConfirmationDialog :open="!!deleting" title="移除节点" :message="`将停止并删除「${deleting?.name ?? ''}」的远程组件，清空 ${deleting?.data_root ?? ''} 中本节点的日志、产物和其他专属数据。中央操作历史会保留。`" confirm-label="移除节点" danger :busy="!!deleting && pending.has(deleting.id)" :error="deleteError" @confirm="remove()" @cancel="deleting = null" />
     <ConfirmationDialog :open="!!installing" title="准备节点运行组件" :message="`将在「${installing?.name ?? ''}」核对现有组件与当前批次，自动完成首次安装或更新。需要换批时先等待原工作完成，再原地切换组件并恢复账号。任务在后台执行，可离开页面后查看进度。`" confirm-label="开始准备" :busy="!!installing && pending.has(installing.id)" :error="installError" @confirm="install" @cancel="installing = null" />
   </section>
 </template>
@@ -235,4 +287,4 @@ onUnmounted(() => { alive = false; loadGeneration++; if (refreshTimer) clearTime
 <style scoped>
 .nodes-page{color:var(--foreground)}.nodes-actions,.node-card>header,.node-card>footer,.node-form>footer{display:flex;align-items:center;gap:12px}.nodes-actions{flex-wrap:wrap;max-width:100%}.node-card p{color:var(--muted-foreground);font-size:var(--ui-font-small)}.nodes-grid{margin-bottom:24px;display:grid;align-items:start;grid-template-columns:repeat(auto-fit,minmax(min(100%,390px),1fr));gap:20px}.node-card{background:var(--ui-surface,#fff);border:1px solid var(--ui-border,#e2e6ed);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px}.node-card h2{font-size:var(--ui-font-card);font-weight:650}.node-card>header>div{min-width:0}.node-card>header p{overflow-wrap:anywhere}.node-icon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--ui-accent-soft,#eee8f7);color:var(--ui-accent,#856b9e);flex-shrink:0}.node-state{margin-left:auto;padding:4px 8px;border-radius:6px;font-size:var(--ui-font-small);color:#39836a;background:#edf6f1;white-space:nowrap}.node-state.failed,.nodes-error{color:var(--ui-danger,#b45b67)}.node-state.muted{color:var(--ui-muted,#7d879a);background:var(--ui-field-surface,#f6f7fa)}.nodes-summary{display:flex;align-items:center;flex-wrap:wrap;gap:12px 24px;margin-bottom:24px;font-size:var(--ui-font-small);color:var(--muted-foreground)}.nodes-summary strong{font:650 var(--ui-font-heading) var(--font-mono);color:var(--foreground);margin-right:5px;font-variant-numeric:tabular-nums}.node-resources{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}.node-resources dt,.node-meta{font-size:var(--ui-font-small);color:var(--ui-muted,#7d879a)}.node-resources dd{font-size:var(--ui-font-heading);margin-top:5px;font-variant-numeric:tabular-nums}.node-resources small{font-size:var(--ui-font-small)}.node-meta{display:grid;grid-template-columns:auto 1fr;gap:8px 16px}.node-meta>span:nth-child(even),.node-meta time{text-align:right;overflow-wrap:anywhere}.node-identity{font-size:var(--ui-font-small);border-top:1px solid var(--ui-border,#e2e6ed);padding-top:12px}.node-identity summary{cursor:pointer;display:flex;align-items:center;gap:8px}.node-identity p{margin-top:8px}.node-identity code,.node-fingerprint code{overflow-wrap:anywhere}.node-card>footer{flex-wrap:wrap;border-top:1px solid var(--ui-border,#e2e6ed);padding-top:16px}.node-form,.node-form label,.node-fingerprint{display:grid;gap:8px}.node-form{gap:18px}.node-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.node-form label{font-size:var(--ui-font-body)}.node-fingerprint{padding:14px;border:1px solid var(--ui-border,#e2e6ed);border-radius:8px}.node-fingerprint>button{justify-self:start}.node-form .node-verify{display:flex;align-items:flex-start;gap:8px}.node-verify input{margin-top:3px;accent-color:var(--ui-accent,#856b9e)}.node-note{overflow-wrap:anywhere;font-size:var(--ui-font-small);color:var(--ui-muted,#7d879a)}.node-form>footer{justify-content:flex-end}.nodes-error{font-size:var(--ui-font-body);overflow-wrap:anywhere}@media(max-width:600px){.node-form-grid{grid-template-columns:1fr}.node-card{padding:18px}}
 </style>
-<style>.node-editor{width:calc(100% - 32px);max-width:640px;max-height:90dvh;overflow-y:auto}</style>
+<style>.node-editor,.node-rename{width:calc(100% - 32px);max-height:90dvh;overflow-y:auto}.node-editor{max-width:640px}.node-rename{max-width:420px}</style>

@@ -528,7 +528,7 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
         return match action {
             None => *method == Method::DELETE,
             Some("check" | "prepare") => *method == Method::POST,
-            Some("enabled") => *method == Method::PUT,
+            Some("enabled" | "name") => *method == Method::PUT,
             _ => false,
         };
     }
@@ -900,6 +900,7 @@ mod tests {
             (Method::POST, "/api/nodes/2/check"),
             (Method::POST, "/api/nodes/2/prepare"),
             (Method::PUT, "/api/nodes/2/enabled"),
+            (Method::PUT, "/api/nodes/2/name"),
             (Method::DELETE, "/api/nodes/2"),
         ] {
             assert!(browser_path_allowed(&method, path), "{path}");
@@ -909,6 +910,8 @@ mod tests {
             (Method::POST, "/api/nodes/2/shell"),
             (Method::GET, "/api/nodes/host-keys"),
             (Method::GET, "/api/nodes/synchronize"),
+            (Method::POST, "/api/nodes/2/name"),
+            (Method::PUT, "/api/nodes/2/name/extra"),
             (Method::POST, "/api/nodes/2/check/extra"),
             (Method::POST, "/api/nodes/../check"),
             (Method::POST, "/api/nodes/2%2fcheck"),

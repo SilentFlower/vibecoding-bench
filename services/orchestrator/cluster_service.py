@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import hashlib
 import ipaddress
+import logging
 import os
 import platform
 import re
@@ -28,6 +29,7 @@ from cluster_store import ClusterStore
 from cluster_deployment import NodeDeployment, node_container_name
 from cluster_synchronization import NodeSynchronization, NodeSynchronizationWait
 from cluster_preparation_files import PreparationFiles, PreparationFileScope
+from cluster_removal import NodeRemoval, NodeRemovalError
 from cluster_migration_profiles import MigrationProfiles
 from cluster_migrations import pristine_target_migration
 from cluster_migration_maintenance import paused_migration_record
@@ -38,6 +40,8 @@ from cluster_transport import NodeTransport, NodeTransports
 from runtime_files import atomic_json
 from system_update_gate import UPDATE_GATE
 from system_update_contract import safe_read, strict_json
+
+logger = logging.getLogger(__name__)
 
 
 class ClusterService:
@@ -66,12 +70,13 @@ class ClusterService:
         self.docker_clients: dict[int, DockerClient] = {}
         self.operation_locks: dict[int, threading.Lock] = {}
         self.install_workers: dict[int, threading.Thread] = {}
+        self.removal_workers: dict[int, threading.Thread] = {}
         self.closing = False
         self.synchronization = None
         self.transports = NodeTransports(store)
         # 线程索引只属于原进程；目标和维护日志保留，后台接入运行时后继续核对。
         for row in self.store.list():
-            if (row.get('preparation') or {}).get('state') == 'preparing':
+            if not row.get('removal') and (row.get('preparation') or {}).get('state') == 'preparing':
                 self.store.save_preparation(row['id'], row['revision'], {**row['preparation'], 'state': 'needs_check',
                     'phase': 'waiting', 'retry_at': time.time(),
                     'target_release': row['preparation'].get('target_release') or os.environ.get('V3_RELEASE'),
@@ -124,7 +129,10 @@ class ClusterService:
         if body['action'] == 'prepare':
             if gate.get('target_release') != body['target_release']:
                 raise ValueError('节点平台目标与原维护不一致')
-            for row in self.store.list():
+            rows = self.store.list()
+            if any(row.get('removal') for row in rows):
+                raise ValueError('节点移除尚未完成，请先收口原移除操作')
+            for row in rows:
                 saved = row.get('preparation') or {}
                 if row['kind'] != 'ssh' or not (saved.get('release') or saved.get('current_release')):
                     continue
@@ -145,7 +153,7 @@ class ClusterService:
                     or os.environ.get('V3_RELEASE') != body['control_release']):
                 raise ValueError('节点恢复中央来源与原宿主选择不一致')
             for row in self.store.list():
-                if row['kind'] != 'ssh':
+                if row['kind'] != 'ssh' or row.get('removal'):
                     continue
                 path = self.connection(row['id']).private / 'maintenance/current.json'
                 if not path.exists():
@@ -762,6 +770,8 @@ class ClusterService:
         row = self.store.get(node_id)
         if row['revision'] != revision:
             raise ValueError('节点配置已变化，请刷新后重试')
+        if json.loads(row['preparation_json'] or '{}').get('removal'):
+            raise ValueError('节点已进入移除流程，请继续原操作')
         try:
             observation = self._local_observation() if row['kind'] == 'local' else self.connection(node_id).observe()
         except NodeSshError as error:
@@ -793,6 +803,9 @@ class ClusterService:
             return next(item for item in self.store.list() if item['id'] == node_id)
         activity, saved = None, False
         try:
+            row = self.store.get(node_id)
+            if row['revision'] != revision or json.loads(row['preparation_json'] or '{}').get('removal'):
+                raise ValueError('节点配置已变化或已进入移除流程')
             installer = installer_override or NodeDeployment(self, os.environ.get('V3_DEPLOYMENT_ID', ''), os.environ.get('V3_RELEASE', ''),
                 os.environ.get('V3_CONTROL_IMAGE', ''), os.environ.get('V3_ACCOUNT_IMAGE', ''))
             # 与迁移登记共用存储锁，原迁移先完成时继续保持原组件可用。
@@ -909,27 +922,116 @@ class ClusterService:
             'docker_architecture': info.get('Architecture'), 'docker_cpus': info.get('NCPU'),
             'swap_limit': info.get('SwapLimit')}
 
-    def remove(self, node_id: int, revision: int) -> None:
-        """归档无账号引用的节点并停止其中央隧道。
-
-        :param node_id: 节点 ID。
-        :param revision: 预期版本。
-        :return: None，远程容器及资料保持原状态。
-        """
-        self.store.remove(node_id, revision)
+    def rename(self, node_id: int, revision: int, name: str) -> dict:
+        """在节点组件操作边界内更新远程节点显示名。:param node_id: 节点。:param revision: 预期版本。:param name: 已校验名称。:return: 公开节点。"""
         with self.lock:
-            client = self.docker_clients.pop(node_id, None)
+            lock = self.operation_locks.setdefault(node_id, threading.Lock())
+        if not lock.acquire(blocking=False):
+            raise ValueError('节点组件正在维护，请稍后改名')
+        try:
+            return self.store.rename(node_id, revision, name)
+        finally:
+            lock.release()
+
+    def remove(self, node_id: int, revision: int) -> dict:
+        """受理同一移除操作，实际远端清理在后台执行。:param node_id: 节点。:param revision: 页面版本。:return: 公开移除进度。"""
+        with self.lock:
+            if self.closing:
+                raise ValueError('节点服务正在关闭')
+            lock = self.operation_locks.setdefault(node_id, threading.Lock())
+        if not lock.acquire(blocking=False):
+            row = self.store.get(node_id)
+            removal = json.loads(row['preparation_json'] or '{}').get('removal')
+            if removal and revision in (removal['requested_revision'], removal['revision']):
+                return self.store.public_removal(removal)
+            raise ValueError('节点组件正在后台安装或维护，请等待原操作完成')
+        activity, started = None, False
+        try:
+            active = next((row for row in self.store.list() if row['id'] == node_id), None)
+            if active is not None and active['kind'] == 'ssh':
+                journal = self.private_root / active['node_key'] / 'maintenance/current.json'
+                if journal.exists() and json.loads(journal.read_text()).get('phase') not in ('completed', 'rolled_back', 'platform_restored'):
+                    raise ValueError('节点组件维护尚未结束，请先收口原维护')
+            # 先登记实际作业占用，避免平台排空跨过中央受理与后台启动之间的间隔。
+            activity = UPDATE_GATE.reserve('cluster-node-remove:' + str(node_id))
+            row, removal = self.store.begin_removal(node_id, revision)
+            if removal['state'] == 'completed':
+                return self.store.public_removal(removal)
+            worker = threading.Thread(target=self._remove_node, args=(row, removal, lock, activity),
+                name='cluster-node-remove', daemon=True)
+            with self.lock:
+                if self.closing:
+                    raise ValueError('节点服务正在关闭')
+                self.removal_workers[node_id] = worker
+                try:
+                    result = self.store.public_removal(removal)
+                    worker.start()
+                    started = True
+                except BaseException:
+                    self.removal_workers.pop(node_id, None)
+                    raise
+            return result
+        finally:
+            if not started:
+                UPDATE_GATE.release_reserved(activity)
+                lock.release()
+
+    def resume_removals(self) -> None:
+        """在管理服务重启后续接已受理的移除。:return: 无。"""
+        if UPDATE_GATE.state()['phase'] != 'idle':
+            return
+        for row in self.store.list():
+            if (row.get('removal') or {}).get('state') == 'removing':
+                with self.lock:
+                    if row['id'] in self.removal_workers:
+                        continue
+                try:
+                    self.remove(row['id'], row['revision'])
+                except (ValueError, RuntimeError):
+                    continue
+
+    def _remove_node(self, row: dict, removal: dict, lock, activity) -> None:
+        node_id = row['id']
+
+        def checkpoint(**fields):
+            removal.update(fields)
+            self.store.save_removal(node_id, removal)
+
+        try:
+            context = UPDATE_GATE.continue_reserved(activity) if activity is not None else nullcontext()
+            with context:
+                node = self.connection(node_id)
+                state = json.loads(row['preparation_json'] or '{}')
+                installed = state.get('state') == 'prepared' or bool(state.get('release') or state.get('current_release'))
+                cleanup = NodeRemoval(node, self.docker(node_id), os.environ.get('V3_DEPLOYMENT_ID', ''), removal)
+                cleanup.run(removal, installed, checkpoint)
+                self.store.save_removal(node_id, {**removal, 'state': 'completed', 'phase': 'completed'})
+        except Exception as error:
+            if isinstance(error, (NodeSshError, NodeRemovalError)):
+                reason = str(error)
+            else:
+                reason = '远程清理尚未确认，请核对 SSH 与 Docker 状态后重试原移除'
+                logger.warning('节点 %s 移除操作 %s 中断，错误类型 %s', node_id, removal['operation_id'], type(error).__name__)
+            checkpoint(state='needs_check', reason=reason)
+        else:
+            with self.lock:
+                client = self.docker_clients.pop(node_id, None)
+                node = self.nodes.pop(node_id, None)
             if client:
                 client.close()
-            node = self.nodes.pop(node_id, None)
             if node:
                 node.close()
+        finally:
+            UPDATE_GATE.release_reserved(activity)
+            with self.lock:
+                self.removal_workers.pop(node_id, None)
+                lock.release()
 
     def close(self) -> None:
         """服务退出时释放本对象持有的所有 SSH 进程。:return: None。"""
         with self.lock:
             self.closing = True
-            workers = list(self.install_workers.values())
+            workers = [*self.install_workers.values(), *self.removal_workers.values()]
         if self.synchronization is not None:
             self.synchronization.close()
         for worker in workers:

@@ -365,7 +365,7 @@ class SystemUpdater:
                 'request': copy.deepcopy(body), 'target_release': target['release'], 'target': target,
                 'original': original, 'selected': selected, 'revision': revision,
                 'epoch': str(uuid.uuid4()), 'phase': 'preparing', 'created_at': utc_now(), 'updated_at': utc_now(),
-                'error': None, 'blockers': [], 'cancel_requested': False}
+                'error': None, 'blockers': [], 'cancel_requested': False, 'node_backup_requested': False}
             folder = path.parent
             folder.mkdir(mode=0o700)
             self.state.update(revision=revision, active_operation=body['operation_id'], last_operation=body['operation_id'])

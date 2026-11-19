@@ -348,6 +348,12 @@ class HostDeployment:
         gateway = self.request('gateway', '/admin/runtime/system-update/status')
         if any(value.get('phase') != 'blocked' or value.get('epoch') != operation['epoch'] for value in (gateway, runtime)):
             raise ValueError('部署维护接管代次不一致')
+        node_removals = runtime.get('node_removals', [])
+        removal_retries = [item['name'] for item in node_removals if item['state'] == 'needs_check']
+        if removal_retries:
+            raise ValueError('请在节点管理重试移除后再更新平台：' + '、'.join(removal_retries[:3]))
+        if node_removals and runtime.get('active') == 0:
+            raise ValueError('节点移除等待续接，请等待节点移除完成后再更新平台')
         return {'ready': gateway.get('active') == 0 and runtime.get('ready') is True,
             'blockers': (['网关仍有在途活动'] if gateway.get('active') else []) + runtime.get('blockers', []),
             'environments': runtime['environments']}
@@ -367,6 +373,9 @@ class HostDeployment:
         body = {'operation_id': operation['operation_id'], 'epoch': operation['epoch'], 'action': 'prepare',
             'target_release': selected['release']['release'], 'control_release': selected['selection']['control']['release'], 'control_image': selected['selection']['control']['reference'],
             'account_image': selected['selection']['account']['reference'], 'account_release': selected['selection']['account']['release']}
+        # 排空因节点移除结束时，只收口本次实际提交过的节点备份。
+        operation['node_backup_requested'] = True
+        save()
         self.request('orchestrator', '/internal/v3/system-updates/nodes', body, timeout=30)
         cancel_sent = False
         while True:
@@ -1020,7 +1029,7 @@ class HostDeployment:
             actual = controls[role]
             if actual['Id'] != original['id'] or actual['Image'] != original['image_id'] or actual['State']['Status'] != 'running':
                 raise ValueError('取消维护时原控制服务状态已经变化')
-        if operation['before'].get('nodes'):
+        if operation['before'].get('nodes') and operation.get('node_backup_requested', True):
             self.request('orchestrator', '/internal/v3/system-updates/nodes',
                 {'operation_id': operation['operation_id'], 'epoch': operation['epoch'], 'action': 'rollback'}, timeout=180)
         self.release(operation)

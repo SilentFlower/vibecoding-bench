@@ -14,6 +14,14 @@ export interface ExecutionNode {
   data_root: string | null; host_key_sha256: string | null; observation: NodeObservation | null;
   auth_method?: 'private_key' | 'password' | null;
   preparation: { state: 'preparing' | 'prepared' | 'failed' | 'needs_check'; release?: string; protocol?: number; updated_at: number; reason?: string; phase?: string; current_release?: string | null; target_release?: string; retry_at?: number } | null;
+  removal?: NodeRemoval | null;
+}
+/** 原节点移除的公开进度，使用同一操作编号续接。 */
+export interface NodeRemoval {
+  operation_id: string;
+  state: 'removing' | 'needs_check' | 'completed';
+  phase: 'checking' | 'retiring_components' | 'clearing_data' | 'completed';
+  reason: string | null;
 }
 /** 主机公钥候选，管理员通过可信渠道核对后选择。 */
 export interface NodeHostKey { key: string; algorithm: string; sha256: string }
@@ -77,6 +85,8 @@ export const nodeApi = {
   prepare: (node: ExecutionNode) => runtimeRequest<ExecutionNode>(`/nodes/${node.id}/prepare`, { method: 'POST', body: { revision: node.revision } }),
   /** 更新新工作接纳。@param node 原节点。@param enabled 新状态。@return 新版本。 */
   enable: (node: ExecutionNode, enabled: boolean) => runtimeRequest<ExecutionNode>(`/nodes/${node.id}/enabled`, { method: 'PUT', body: { revision: node.revision, enabled } }),
-  /** 归档无引用节点。@param node 节点版本。@return 完成回执。 */
-  remove: (node: ExecutionNode) => runtimeRequest<{ ok: boolean }>(`/nodes/${node.id}`, { method: 'DELETE', body: { revision: node.revision } }),
+  /** 更新节点显示名称。@param node 原节点。@param name 新名称。@return 新版本。 */
+  rename: (node: ExecutionNode, name: string) => runtimeRequest<ExecutionNode>(`/nodes/${node.id}/name`, { method: 'PUT', body: { revision: node.revision, name } }),
+  /** 后台清理无归属账号的节点。@param node 节点版本。@return 原操作状态。 */
+  remove: (node: ExecutionNode) => runtimeRequest<NodeRemoval>(`/nodes/${node.id}`, { method: 'DELETE', body: { revision: node.revision } }),
 };

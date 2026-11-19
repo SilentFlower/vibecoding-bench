@@ -40,6 +40,8 @@ class ClusterUiFixture(Fixture):
         self.fail_install_response = False
         self.fail_agy_response = False
         self.assignment_reads = []
+        self.removal_attempts = 0
+        self.removal_status = None
 
     async def route(self, route) -> None:
         """截获当前节点管理的全部业务路径。:param route: 浏览器请求。:return: None。"""
@@ -50,7 +52,8 @@ class ClusterUiFixture(Fixture):
         if path == '/runtime/api/nodes':
             if self.install_complete:
                 self.nodes[1]['preparation'] = {'state': 'prepared', 'updated_at': time.time()}
-            payload = {'items': self.nodes}
+            self.nodes[1]['removal'] = self.removal_status
+            payload = {'items': self.nodes[:1] if (self.removal_status or {}).get('state') == 'completed' else self.nodes}
         elif path == '/runtime/api/nodes/synchronize' and request.method == 'POST':
             self.synchronize_posts += 1
             self.nodes[1]['preparation'] = {'state': 'preparing', 'phase': 'stopping', 'current_release': 'old', 'target_release': 'new'}
@@ -64,6 +67,22 @@ class ClusterUiFixture(Fixture):
                 await route.fulfill(status=503, content_type='application/json', body=json.dumps({'detail': '安装提交响应中断'}))
                 return
             await route.fulfill(status=202, content_type='application/json', body=json.dumps(self.nodes[1]))
+            return
+        elif path == '/runtime/api/nodes/2/name' and request.method == 'PUT':
+            body = json.loads(request.post_data)
+            assert body['revision'] == self.nodes[1]['revision']
+            self.nodes[1].update(name=body['name'], revision=body['revision'] + 1)
+            payload = self.nodes[1]
+        elif path == '/runtime/api/nodes/2' and request.method == 'DELETE':
+            assert json.loads(request.post_data)['revision'] == self.nodes[1]['revision']
+            self.removal_attempts += 1
+            if self.removal_attempts == 1:
+                self.nodes[1].update(enabled=False, revision=self.nodes[1]['revision'] + 1)
+            else:
+                assert self.removal_status['state'] == 'needs_check'
+            self.removal_status = {'operation_id': 'c' * 32, 'state': 'removing',
+                'phase': 'retiring_components' if self.removal_attempts == 1 else 'clearing_data', 'reason': None}
+            await route.fulfill(status=202, content_type='application/json', body=json.dumps(self.removal_status))
             return
         elif path == '/runtime/api/accounts':
             payload = [{'id': number, 'name': '合成账号 ' + str(number), 'enabled': 1 if number == 1 else 0,
@@ -253,10 +272,43 @@ async def run(output: Path, gateway: Path) -> dict:
         await expect(node_card).to_contain_text('old → new')
         assert fixture.synchronize_posts == 1
         await page.screenshot(path=str(output / 'node-synchronization-390.png'), full_page=True)
+        fixture.install_complete = True
+        await expect(node_card.get_by_role('button', name='改名', exact=True)).to_be_enabled(timeout=10000)
+        await expect(node_card.get_by_role('button', name='移除', exact=True)).to_be_disabled()
+        await node_card.get_by_role('button', name='改名', exact=True).click()
+        rename = page.get_by_role('dialog', name='修改节点名称', exact=True)
+        await rename.get_by_role('textbox', name='节点名称').fill('日本执行节点')
+        await rename.get_by_role('button', name='保存名称', exact=True).click()
+        node_card = page.locator('.node-card').filter(has=page.get_by_role('heading', name='日本执行节点', exact=True))
+        await expect(node_card).to_be_visible()
+        fixture.nodes[1]['account_count'] = 0
+        await page.get_by_role('button', name='刷新列表', exact=True).click()
+        await node_card.get_by_role('button', name='移除', exact=True).click()
+        removal = page.get_by_role('dialog', name='移除节点', exact=True)
+        await expect(removal).to_contain_text('/srv/synthetic')
+        await expect(removal).to_contain_text('中央操作历史会保留')
+        await page.screenshot(path=str(output / 'node-removal-confirmation-390.png'), full_page=True)
+        await removal.get_by_role('button', name='取消', exact=True).click()
+        assert fixture.removal_attempts == 0
+        await node_card.get_by_role('button', name='移除', exact=True).click()
+        await removal.get_by_role('button', name='移除节点', exact=True).click()
+        await expect(node_card).to_contain_text('移除远程组件')
+        await expect(node_card.get_by_role('button', name='恢复接单', exact=True)).to_have_count(0)
+        fixture.removal_status.update(state='needs_check', reason='SSH 连接中断，请核对节点网络')
+        await expect(node_card).to_contain_text('SSH 连接中断', timeout=10000)
+        await page.reload()
+        await expect(node_card).to_contain_text('移除待重试')
+        await node_card.get_by_role('button', name='重试移除', exact=True).click()
+        await expect(node_card).to_contain_text('清理远程数据')
+        await expect(removal).to_have_count(0)
+        fixture.removal_status.update(state='completed', phase='completed')
+        await expect(node_card).to_have_count(0, timeout=10000)
+        assert fixture.removal_attempts == 2
         assert not errors and not fixture.unexpected and not fixture.external, (errors, fixture.unexpected, fixture.external)
         await browser.close()
     return {'passed': True, 'scenes': ['反重力本机归属与同数字身份隔离', '反重力列表失败及刷新恢复', '后台安装提交后关闭弹窗', '刷新页面恢复安装状态及轮询完成', '安装提交响应中断后只读核对', '冻结确认与取消零写入', '提交未知只核对原操作', '提交后继续目标激活',
-        '提交前取消保持源分配版本', '账号切换隔离', '停用独立账号迁移入口', '1440和390视口', '统一同步后台受理与阶段显示', '迁移固定原因与恢复动作', '未准备节点可选择并直接提交迁移'], 'errors': errors, 'real_model_requests': 0}
+        '提交前取消保持源分配版本', '账号切换隔离', '停用独立账号迁移入口', '1440和390视口', '统一同步后台受理与阶段显示', '迁移固定原因与恢复动作', '未准备节点可选择并直接提交迁移',
+        '改名后更新节点标题', '有归属账号时禁用移除', '确认清理范围及取消零写入', '移除进度、断线后续接与完成归档'], 'errors': errors, 'real_model_requests': 0}
 
 
 def main() -> None:

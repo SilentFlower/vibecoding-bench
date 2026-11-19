@@ -91,7 +91,7 @@ from cluster_run_programs import RemoteRunPrograms
 from cluster_continue_contract import ContinueTask, ContinueWork
 from cluster_continue_runner import ClusterContinues
 from continue_pty import open_continue_pty
-from cluster_store import ClusterStore
+from cluster_store import ClusterStore, NodeRemoved
 from cluster_terminal_sessions import TerminalSessions
 from cluster_execution_grants import ExecutionScope
 from cluster_transport import node_transport_router
@@ -1702,6 +1702,11 @@ def _restore_deleted_account(
     :param enabled: 恢复后的启用状态
     :return: 恢复后的账号 ID
     """
+    if cluster_service:
+        try:
+            ClusterStore.require_account_restore(conn, name)
+        except ValueError as error:
+            raise HTTPException(409, str(error)) from None
     conn.execute(
         "UPDATE accounts SET profile_path=?, upstream_proxy_scheme=?, "
         "upstream_socks5_host=?, upstream_socks5_port=?, upstream_socks5_user=?, "
@@ -10786,9 +10791,12 @@ def _unverified_login_draft(row: dict) -> dict:
 def _remote_login_draft_summary(current: dict, operation: dict, acquired: bool) -> dict:
     """按冻结节点投影草稿，所有产物与容器状态均读取原Node。"""
     work=operation['record']['work']
-    node=cluster_draft_logins.service.store.get(operation['node_id'])
+    node=cluster_draft_logins.service.store.history_identity(operation['node_id'])
     value={**_unverified_login_draft(current),'generation':work['draft_generation'],
         'node_id':node['id'],'node_name':node['name'],'state':operation['phase']}
+    if node['deleted_at'] is not None:
+        value.update(state='ended', container_status='missing', message='原节点已移除，远程草稿资料已清理')
+        return value
     if not acquired:
         value['message']='登录操作进行中，请稍候刷新'
         return value
@@ -11907,6 +11915,11 @@ def _login_commit_locked(sid: str, body: LoginStartIn):
                     account_id = restored_account_id if restored_account_id is not None else cur.lastrowid
                 except sqlite3.IntegrityError:
                     # 同名账号已存在 → 视为"重新登录"：覆盖代理配置，并重新启用账号。
+                    if cluster_service:
+                        try:
+                            ClusterStore.require_account_restore(conn, name)
+                        except ValueError as error:
+                            raise HTTPException(409, str(error)) from None
                     conn.execute(
                         "UPDATE accounts SET profile_path=?, upstream_proxy_scheme=?, upstream_socks5_host=?, "
                         "upstream_socks5_port=?, upstream_socks5_user=?, "
@@ -13064,7 +13077,7 @@ def _public_followup_progress(run: dict) -> dict:
                 or (state["phase"] == "complete") != (count == len(messages) + 1):
             raise ValueError("阶段归属或进度无效")
         result.update(completed=max(0, count - 1), phase=state["phase"], stage=count)
-    except FileNotFoundError:
+    except (FileNotFoundError, NodeRemoved):
         if run.get("status") not in ("queued",):
             result["phase"] = "unknown"
     except (OSError, ValueError, TypeError):
@@ -13088,7 +13101,7 @@ def _public_run_node(rid: str) -> dict | None:
     if original is None:
         return None
     scope = original['record']['scope']
-    node = cluster_runner.sessions.service.store.get(original['node_id'])
+    node = cluster_runner.sessions.service.store.history_identity(original['node_id'])
     return {'id': original['node_id'], 'key': scope['node_key'], 'name': node['name'],
         'environment_id': scope['environment_id'], 'assignment_revision': scope['assignment_revision'],
         'generation': scope['generation']}
@@ -13140,7 +13153,10 @@ def get_transcript(rid: str, tail_bytes: Optional[int] = None):
         if remote is not None:
             if tail_bytes is not None and not 1024 <= tail_bytes <= 1048576:
                 raise HTTPException(400, '日志读取范围无效')
-            chunk = cluster_runner.artifact_chunk(remote, 'transcript.log')
+            try:
+                chunk = cluster_runner.artifact_chunk(remote, 'transcript.log')
+            except NodeRemoved as error:
+                raise HTTPException(410, str(error)) from None
             if chunk.file_identity is None:
                 raise HTTPException(404, 'transcript not yet available')
             if tail_bytes is None:
@@ -13200,6 +13216,8 @@ def list_workspace(rid: str):
             return cluster_runner.files(rid)
         base = account_runtime.run_workspace_path(rid) if account_runtime else WORKSPACES_DIR / rid
         return list_workspace_files(base)
+    except NodeRemoved as error:
+        raise HTTPException(410, str(error)) from None
     except FileNotFoundError:
         raise HTTPException(404, "运行产物目录尚未提供") from None
     except (OSError, ValueError, RuntimeBusy):
@@ -13240,6 +13258,8 @@ def preview_run_file(rid: str, path: str) -> dict:
         if cluster_runner and cluster_runner.for_run(rid) is not None:
             try:
                 return cluster_runner.file(rid, relative)
+            except NodeRemoved as error:
+                raise HTTPException(410, str(error)) from None
             except FileNotFoundError:
                 raise HTTPException(404, "原节点产物文件已移除或尚未提供") from None
             except (OSError, ValueError, RuntimeBusy):
@@ -13264,6 +13284,8 @@ def get_stats(rid: str):
     if cluster_runner and cluster_runner.for_run(rid) is not None:
         try:
             return cluster_runner.stats(rid)
+        except NodeRemoved as error:
+            raise HTTPException(410, str(error)) from None
         except (OSError, ValueError, RuntimeBusy):
             raise HTTPException(503, "原节点用量统计读取失败，请稍后查询") from None
     base = FLOWS_DIR
@@ -13314,6 +13336,8 @@ def get_capture(rid: str, path: Optional[str] = None):
     if cluster_runner and (execution := cluster_runner.for_run(rid)) is not None:
         try:
             summary = cluster_runner.capture(rid, running=run.get('status') in ('running', 'stopping'), relative=path)
+        except NodeRemoved as error:
+            raise HTTPException(410, str(error)) from None
         except (OSError, ValueError, RuntimeBusy):
             raise HTTPException(503, "原节点抓包读取失败，请核对公开路径或稍后查询") from None
         if path is not None:

@@ -95,9 +95,37 @@ class SnapshotLockTests(unittest.TestCase):
             'generation': 7, 'roles': {}, 'blockers': []}
         store = Mock()
         store.list.return_value = [{'kind': 'ssh', 'id': 2, 'preparation': {'release': 'synthetic'}}]
+        store.removed_draft_environments.return_value = set()
         self.runtime.cluster_service = SimpleNamespace(synchronization=synchronization, store=store)
         snapshot = runtime_snapshot(self.runtime)
         self.assertTrue(snapshot['ready'])
         self.assertEqual(7, snapshot['environments'][0]['generation'])
         self.assertEqual(2, snapshot['nodes'][0]['id'])
         synchronization.environment_snapshot.assert_called_once()
+
+    def test_pending_removal_blocks_upgrade_and_rollback_before_node_capture(self) -> None:
+        """旧版切换用同一排空门禁，未收口移除不会进入待备份节点集合。:return: 无。"""
+        store = Mock()
+        store.removed_draft_environments.return_value = set()
+        node = {'kind': 'ssh', 'id': 2, 'name': '隔离节点', 'preparation': {'release': 'synthetic'}}
+        self.runtime.cluster_service = SimpleNamespace(store=store)
+        for state, action in [('removing', '等待原操作完成'), ('needs_check', '重试移除')]:
+            store.list.return_value = [{**node, 'removal': {'state': state}}]
+            snapshot = runtime_snapshot(self.runtime)
+            self.assertFalse(snapshot['ready'])
+            self.assertEqual([], snapshot['nodes'])
+            self.assertIn(action, snapshot['blockers'][0])
+            self.assertEqual([{'name': node['name'], 'state': state}], snapshot['node_removals'])
+        store.list.return_value = []
+        self.assertTrue(runtime_snapshot(self.runtime)['ready'])
+
+    def test_archived_closed_draft_keeps_history_without_node_probe(self) -> None:
+        """归档回执已确认原草稿清理，平台沿中央历史完成快照。:return: 无。"""
+        self.runtime.locality = Mock(side_effect=AssertionError('归档后的草稿无需执行归属检查'))
+        store = Mock()
+        store.removed_draft_environments.return_value = {'synthetic'}
+        store.list.return_value = []
+        self.runtime.cluster_service = SimpleNamespace(store=store)
+        snapshot = runtime_snapshot(self.runtime)
+        self.assertTrue(snapshot['ready'])
+        self.assertEqual(('synthetic', 'ssh', {}), tuple(snapshot['environments'][0][key] for key in ('environment_id', 'node_kind', 'roles')))

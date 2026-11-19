@@ -62,6 +62,7 @@ class NodeSynchronization:
     def _watch(self) -> None:
         while not self.stopping.is_set():
             try:
+                self.service.resume_removals()
                 self.synchronize()
                 self._cleanup_ready_nodes()
             except Exception:
@@ -76,13 +77,16 @@ class NodeSynchronization:
             saved = row.get('preparation') or {}
             if self.stopping.is_set():
                 return
-            if row['kind'] != 'ssh' or saved.get('state') != 'prepared' or saved.get('release') != self.runtime.release_id:
+            if row['kind'] != 'ssh' or row.get('removal') or saved.get('state') != 'prepared' or saved.get('release') != self.runtime.release_id:
                 continue
             with self.service.lock:
                 lock = self.service.operation_locks.setdefault(row['id'], threading.Lock())
             if not lock.acquire(blocking=False):
                 continue
             try:
+                current = self.service.store.get(row['id'])
+                if current['revision'] != row['revision']:
+                    continue
                 with UPDATE_GATE.admission('cluster-node-image-cleanup'):
                     cleanup_node_images(self.service, row['id'], self.runtime.deployment, self.runtime.release_id)
             except (OSError, ValueError, RuntimeError, KeyError, TypeError):
@@ -100,7 +104,7 @@ class NodeSynchronization:
         gate = UPDATE_GATE.state()
         for row in self.service.store.list():
             saved = row.get('preparation') or {}
-            if row['kind'] != 'ssh' or self.stopping.is_set():
+            if row['kind'] != 'ssh' or row.get('removal') or self.stopping.is_set():
                 continue
             managed = bool(saved.get('release') or saved.get('target_release') or row.get('account_count'))
             due = saved.get('retry_at', 0) <= time.time()
@@ -822,7 +826,7 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
         result = []
         for row in self.service.store.list():
             saved = row.get('preparation') or {}
-            if row['kind'] != 'ssh' or not saved:
+            if row['kind'] != 'ssh' or row.get('removal') or not saved:
                 continue
             with self.service.lock:
                 running = row['id'] in self.service.install_workers

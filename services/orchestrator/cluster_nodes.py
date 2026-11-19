@@ -149,6 +149,18 @@ class NodeEnabled(NodeRevision):
     enabled: StrictBool
 
 
+class NodeRename(NodeRevision):
+    """节点显示名称更新。:param name: 管理员填写的名称。"""
+
+    name: StrictStr = Field(min_length=1, max_length=80)
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        """复用登记名称校验。:param value: 名称。:return: 规范名称。"""
+        return NodeConfiguration.validate_name(value)
+
+
 class AccountNodeChange(NodeRevision):
     """尚未执行环境的人工分配请求。
 
