@@ -48,6 +48,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 | `TableCard`（`table-card`） | `title`，`count?`；`toolbar`、默认（`Table`）、`footer`（分页）插槽 | 表格区横向滚动；最右列的 `TableHead` / `TableCell` 加 `fui-table-actions` 即固定在右侧，底色跟随行状态 |
 | `FloatingSaveBar`（`save-bar`） | `count: number`，`hint?`，`cleanLabel?`（默认「已同步」）；`actions` 插槽 | 吸底；`count > 0` 显示「N 项待保存」并 `data-dirty=true` |
 | `ModalDialog`（`modal`） | `title`，`description?`，`width?`（默认 820）；`v-model:open`；`media`、`title-extra`、默认、`footer` 插槽；其余属性透传到弹窗面板 | 头部与通栏浅灰底栏固定，只有内容区滚动；最大高 `min(840px, 100dvh − 32px)`。`style.css` 的全局 `[data-slot=dialog-content] { max-height; overflow-y: auto }` 未分层，`kit.css` 末尾用未分层的 `[data-slot=dialog-content].fui-modal` 覆盖，层内规则做不到 |
+| `NoticeStrip`（`notice-strip`） | `tone?: 'success' \| 'warning' \| 'danger' \| 'info' \| 'neutral'`（默认 neutral）；默认插槽（图标 + 文字）、`end` 插槽（靠右徽标） | 设计稿 `.strip`：单行高 36px（9px 上下内边距 + 18px 行高），长文本换行增高。类名 `.fui-strip`——`.fui-notice` 已被通知浮层占用；原生模板可直接用该类 |
 
 既有组件只做增量扩展：`Button` 新增 variant `soft`、`destructive-ghost`（`outline`/`secondary` 为次要填充、`ghost` 为文字、`destructive` 为危险浅底）；`Badge` 新增 variant `success/warning/info/cc/agy` 与 `dot` prop。表格单元格内「主值下一行」的辅助值用 `fui-table-sub`，字段说明用 `fui-field-help`。
 
@@ -187,6 +188,15 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - **应用栏标题**：取 `Dashboard.vue` 的标题表，与各页页头一致（账号为「账号管理」）；新增路由时同步补表。
 - **登录页**：两列（深墨品牌区 + 表单），品牌区纹理为内联 SVG（第一版 canvas 几何），表单控件为组件库大号控件 44px。登录行为、错误文案、凭据存储（`localStorage['claude-code-gateway_auth']`，退出清除）不变。品牌区不显示版本号：版本接口需登录后访问。≤760px 隐藏品牌区，表单上方显示标志与名称。
 
+### 系统更新弹窗
+
+- **入口与路由**：`SystemUpdateDialog.vue`（基于 `ModalDialog`，宽 768，面板类名 `.system-update-dialog`）由 `Dashboard.vue` 在 `updatesOpen` 为真时挂载，关闭即卸载并停止轮询。`router.ts` 的 `updates` 子路由渲染 `Accounts.vue` 作背景；`route.fullPath` 变化时 `updatesOpen = route.name === 'updates'`。关闭时若仍在 `updates` 则 `router.replace({ name: 'accounts' })`，并刷新版本号角标。弹窗内 router-link 跳转后自然关闭。
+- **视图**：`[data-update-view=overview|progress|history|maintenance|details]`；未接入或更新服务不可用时为 `uninstalled`，始终显示「当前版本：x」。主视图规则：没有操作记录→概览；`busy`、`reconcile`、`succeeded_cleanup_pending`，或本次弹窗内观察到该操作在维护中（`followed`）→进度；其余已结束操作在概览显示一行「上次操作 · 阶段 · 版本 · 时间」，「查看记录」进入进度。版本记录、维护详情、操作详情是带「返回」的二级视图（返回栈）。
+- **写请求**：冻结合同同 [平台在线更新](../../platform/deploy/platform-online-update.md)。概览底栏「安装更新」直接冻结并提交最新版本，等待上限取安装方式区的 `NumberInput`（「在途等待上限（分钟）」，1～120，默认 1）；提交后锁定输入，网络不确定时重发同一冻结对象；409 显示「现场版本已经变化…」并禁用安装，不自动重放。版本记录列表中的安装（含最新）、回退、恢复都先打开 `ConfirmationDialog`（「确认安装更新 / 确认版本回退 / 恢复本次操作」），前两者带等待上限，默认 1。
+- **步骤表**：`lib/updateSteps.ts` 的 `updateSteps(operation, { snapshot, migrate, busy })` 返回 `{ rows, done, total, outcome }`。规范顺序 `preparing → draining → [snapshotting → migrating] → switching → verifying → committing → cleaning`（`snapshot` 取 `status.migration_capability`，`migrate` 取目录中目标版本的 `migrations` 或记录中出现过 `migrating`）。结局阶段（succeeded、succeeded_cleanup_pending、failed、cancelled、restored、reconcile、prepared）不成行；带快照部署越过取消边界的第一次 `switching` 不成行，进行中仍显示「等待在途完成」；重复阶段只留最后一次；维护中补「待执行」；无 `steps` 的旧操作按当前阶段推出（时间显示「—」）。行内说明只取真实数据（阻塞数、快照、各库迁移状态）。行为 `[data-update-step][data-state=done|active|pending]`。
+- **钩子**：摘要格 `[data-update-tile=current|latest|published|checked|target|operation|updated]`，版本卡 `[data-release-card]`、展开详情 `[data-release-details]`；关闭按钮名「关闭」。样式在 `src/system-update.css`（`@layer components`，类名前缀 `su-`，只取 token）。
+- **示例**：带快照部署的记录 `preparing, draining, switching, snapshotting, migrating, switching, verifying` 已记录部分显示为 `preparing, draining, snapshotting, migrating, switching, verifying` 6 行（维护中再补 `committing, cleaning` 待执行），第一次 `switching` 并入真正的切换。错误用法：把 `steps` 原样逐条成行，越过取消边界的切换会显示成「切换平台服务」已完成、快照仍待执行；正确处理：一律经 `updateSteps` 推导。错误用法：自动化脚本 `goto('/updates')` 后直接点背景页导航（被模态挡住）；正确处理：先关闭弹窗，等地址回到 `/`。
+
 ### 布局与信息组织
 
 - 左侧为可折叠导航，右侧直接从页面标题开始。当前基准取消“我的工作空间”卡片和重复顶部工具栏；折叠/展开放到侧栏底部管理员区域。
@@ -209,7 +219,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - 节点管理导航和卡片使用共用SVG sprite的i-server；运行环境继续使用i-box。节点页先显示汇总和紧凑服务器卡片，账号归属/迁移区保持原确认与轮询。页头使用 `PageHeader`，页面留白由 console-content 统一提供；卡片、辅助文字和资源数字使用ui-font-card/ui-font-small/ui-font-heading，沿390/1440/1920/2560px核对与账号页的页头计算样式及坐标一致。主机指纹、认证方式、路径及批次收进详情；同批已就绪节点隐藏相同来源到目标的箭头。stopping显示停止原组件，旧协议backed_up显示已停止待切换。
 
 - `apps/web/src/style.css` 保留旧层主题变量名（过渡期冻结）；外壳为第二版白色侧栏与浅色内容区（`console-shell.css`）。字体来自 `src/assets/fonts/` 中的本地 WOFF2，许可一并保留；离线导出须把同源字体内嵌，不能依赖构建目录外链。
-- `Dashboard.vue` 在品牌旁保留 `/updates` 入口，版本优先使用 `usePlatformVersion` 读取的当前控制镜像版本；旧端回退到已验签目录精确匹配的current_release，缺省显示“版本”。移动入口缺省显示“系统更新”。桌面折叠位于管理员区域，偏好键为 `flower2api-sidebar-collapsed`，存储失败仍保持本次会话选择。移动导航保留原七个模块。
+- `Dashboard.vue` 在品牌旁保留 `/updates` 入口：普通点击打开系统更新弹窗、地址不变，按住修饰键在新标签打开 `/updates`（见「系统更新弹窗」节）。版本优先使用 `usePlatformVersion` 读取的当前控制镜像版本；旧端回退到已验签目录精确匹配的current_release，缺省显示“版本”。移动入口缺省显示“系统更新”。桌面折叠位于管理员区域，偏好键为 `flower2api-sidebar-collapsed`，存储失败仍保持本次会话选择。移动导航保留原七个模块。
 - 正式账号仍使用既有分页及每5秒读取。卡片显示三种额度窗口，7天Sonnet数据类型继续兼容；完整旧配置/画像/评分等信息位于详情。代理公共摘要仅含protocol/host，编辑及OAuth代理输入默认遮蔽认证信息。
 - 账号数字草稿由 `numberDrafts` 保存 `number|string`，`applyNumberDrafts()` 在提交边界检查非空整数再写入原数字字段；原范围校验与 `accountUpdateDelta` 继续生效。认证编辑默认收起，新建默认展开，全部旧字段保留。
 - `useActiveScrollbars()` 由应用根调用一次，通过捕获真实scroll标记容器，800ms后清理；卸载清理监听器及全部计时器。窗口标题/页脚固定，正文独立滚动。
@@ -288,11 +298,16 @@ npm --prefix apps/web run dev -- --host 127.0.0.1 --port 4187 --strictPort
 python3 deploy/flower2api/verify_ui_controls.py --url http://127.0.0.1:4187/ui-preview.html
 python3 deploy/flower2api/verify_ui_kit.py --url http://127.0.0.1:4187/ui-preview.html
 python3 deploy/flower2api/verify_ui_shell.py
+node --experimental-strip-types --test apps/web/tests/update-steps.test.mjs
+python3 deploy/flower2api/verify_update_design.py
+python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录>
 ```
 
 - `theme.test.mjs`：默认主题与 ui-foundation.css 双向一致、预设与边界色对比度、尺寸派生、种子校验与存储失败矩阵、组件样式不写死颜色与圆角。
 - `verify_ui_kit.py`：与 `doc/design/console-v2/mock.html` 逐项比对计算样式（结构等价项在脚本白名单中注明原因），组件各状态取值、预设与自定义主色、柔光材质、局部主题隔离、刷新保持、存储缺失/损坏/越界/抛错回退、减少动效，以及真实构建入口首屏即为保存的主题（需先 `npm --prefix apps/web run build`）。
 - `verify_ui_shell.py`（需先构建）：真实构建加合成夹具，1440 下侧栏、品牌行、版本号两态、导航、计数徽标、底部区、内容区与页头对 `mock.html#accounts` 逐项比对；8 个页面页头无分组名且样式一致；系统设置保存栏比对与「1 项待保存 / 配置已同步」；折叠保持、1440×560 导航内部滚动；390 应用栏比对、抽屉贴左铺满并在导航后关闭；登录页对 `v1/mock.html#login` 比对及空密码、错误密码、成功、显示密码四条路径；零控制台错误。
+- `update-steps.test.mjs`：正向含迁移、维护中进行中与待执行、越过取消边界的切换合并、无快照部署、恢复路径、旧操作无 `steps`、未知阶段、截断记录。
+- `verify_update_design.py`、`verify_system_update_browser.py`（需先构建）：前者对设计稿 `#update`、`#update-progress` 比对 45 项计算样式并检查说明展开、转义与零写入；后者覆盖版本记录与嵌套确认 Esc、居中与矮视口、直接安装默认 60 秒 / 30 分钟 1800 秒 / 双击幂等、步骤与时间、断线重连、快照与迁移、数据恢复、完成与刷新、409、未接入、回退与取消等待、等待对账与恢复。
 - 迁移期改造旧原型对比脚本：组件库负责的属性在脚本内用 `component_keys`（采样名 → 属性集合）跳过，并注明已由 `verify_ui_kit.py` 覆盖；页面级属性继续与旧原型比对。写死的组件颜色改为在被测节点内插入探针元素读取 token 实际渲染值（`verify_shared_pagination.py::token`），不得把旧色值改成新色值再写死。业务断言不放宽。外壳尺寸（侧栏宽、内容区边距）推算出的页面宽度断言改为读取实际值（如卡片区铺满 `#console-content` 内容宽度、右边距等于其实际 `padding-right`），外壳本身由 `verify_ui_shell.py` 对照设计稿核对。
 - 运行环境：`verify_shared_pagination.py`、`verify_page_sizes.py`、`verify_task_account_config.py` 会导入 `services/orchestrator` 的测试夹具，需先安装 `services/orchestrator/requirements.txt`（含 `docker`、`sse-starlette`）；`verify_task_account_config.py` 另需 `PYTHONPATH=services/orchestrator`。`verify_management_polish.py` 必须传 `--output`，`verify_system_update_browser.py` 同样需要 `--output`。合成夹具（`verify_environment_ui.Fixture` 一系）只响应已登记的页面地址：`/session-blocks`、`/nodes` 等页面须从 `/` 经侧栏链接进入，直接 `goto` 会因 `dist/<路径>` 不存在而超时；夹具缺的接口在脚本内的子类夹具补齐（如 `verify_ui_shell.py::ShellFixture` 补 `/admin/session-policy-blocks`、`/runtime/api/nodes`）。
 
@@ -357,7 +372,7 @@ html根字号与原型共用`--ui-font-body`的14/15/16px三档规则，font-fam
 
 通用原生工作区、运行详情与令牌编辑标题共用`--ui-font-heading`的18/20/22px，沿原650字重、行高及字距。代理编辑宽度680px，表单提示位于控件之后，同排输入保持共同基线。关闭图标使用同一SVG；原生委托事件通过closest定位按钮，沿原清理入口退出。共享输入框焦点由组件库提供（主色细环加 `primary-ring` 外圈），避免残留默认黑色焦点框。
 
-系统更新正文共用`--ui-font-body`，头部22×28px、内容28px；真实发布说明按段落呈现摘要，完整原文、安装计划、取消、历史回退及维护信息保持可达。样式回归使用verify_dialog_typography.py与verify_update_design.py逐控件读取原型实际计算样式，并覆盖说明收起、文本转义和取消零写入。
+系统更新弹窗的排版以第二版设计稿 `mock.html#update`、`#update-progress` 为基准（见「系统更新弹窗」节），由 `verify_update_design.py` 逐项比对计算样式，并覆盖说明展开 / 收起、文本转义与浏览零安装写入。
 
 ### 代理局部账号工作区与刷新稳定性
 
@@ -422,7 +437,7 @@ CPU首屏摘要回归：`verify_environment_cpu_summary.py`覆盖自动读取、
 ### 2. Signatures
 
 - `useToast().show(message, type='error', duration?) -> number`；type为success/error/info/warning，返回独立消息ID；dismiss/pause/resume按ID操作。
-- `ConfirmationDialog`接受open/title/message/confirmLabel/danger/busy/error；发confirm/cancel，业务组件拥有请求。`useConfirmation().ask(options, signal?) -> Promise<boolean>`仅明确执行返回true。
+- `ConfirmationDialog`接受open/title/message/confirmLabel/danger/busy/error/confirmDisabled（默认 false；请求已失效时禁用确认、取消仍可用，如系统更新 409）；发confirm/cancel，业务组件拥有请求。`useConfirmation().ask(options, signal?) -> Promise<boolean>`仅明确执行返回true。
 - `OperationFeedback`接受status/message/label/identity及可选`buttonVariant`（共享Button变体），status为idle/loading/success/error；action仅由初次点击或明确重试发出。
 - `TaskProxyDialog(accountId, accountName?)`发close/saved；API合同见[任务代理选择](../../gateway/backend/proxy-directory.md#scenario-任务账号选择与超时事务保护)。
 - `createRuntimeScope(..., feedback?)`注入nativeNotify/nativeConfirm，离页取消未决确认；refreshAccounts发局部事件。
@@ -474,7 +489,7 @@ CPU首屏摘要回归：`verify_environment_cpu_summary.py`覆盖自动读取、
 - 任务及独立入口固定亮色，移除主题偏好和切换逻辑。六入口采用内容宽度页签、aria-current和focus-visible；窄屏局部横向滚动，选中项可达。
 - 终端底栏的重复交付历史按钮移除。当前/最近目标提供交付入口，历史分区继续可达；两者共用冻结读取。完成、停止、待复验标签放入目标卡片，未知状态保留实际值。
 - 交付弹窗位于各分区共同父层，禁止放在可隐藏的历史分区内。桌面宽度min(1440px,视口-32px)，高度视口-32px；窄屏边距8px。标题与候选固定，文件导航与源码/报告分区滚动，保留关闭、Esc、焦点恢复及旧回执失效。
-- 系统更新优先呈现当前/可用状态与检查动作；有新版时显示安装计划。单行长说明使用普通正文；完整说明、组件维护和版本历史独立展开。活动维护与错误先于发布说明，成功记录紧凑呈现；原UUID/revision/SHA、取消、恢复和回退合同保持。
+- 系统更新弹窗优先呈现当前 / 可用状态与检查动作；有新版时显示安装方式并可直接安装。完整说明、组件维护和版本历史在弹窗内独立展开或进入二级视图。活动维护与需恢复的操作先于发布说明（直接显示进度），已结束操作在概览紧凑呈现；原 UUID / revision / SHA、取消、恢复和回退合同保持。
 
 ### 4. Validation & Error Matrix
 

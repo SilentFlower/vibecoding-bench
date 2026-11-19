@@ -2,7 +2,7 @@
 
 ## 1. 范围与触发
 
-适用于 v3 的签名发行、管理页面 `/updates`、Python/Rust 共同维护门禁、独立宿主执行器和首次接入恢复。修改这些边界时，应同步核对本文与实际测试。日常操作见 [系统更新 SOP](../../../../deploy/flower2api/SYSTEM-UPDATES.md)；原账号归属和内核生命周期继续由 [账号运行时规范](../../orchestrator/backend/account-runtime-v3.md) 定义。
+适用于 v3 的签名发行、管理入口 `/updates`（控制台系统更新弹窗）、Python/Rust 共同维护门禁、独立宿主执行器和首次接入恢复。修改这些边界时，应同步核对本文与实际测试。日常操作见 [系统更新 SOP](../../../../deploy/flower2api/SYSTEM-UPDATES.md)；原账号归属和内核生命周期继续由 [账号运行时规范](../../orchestrator/backend/account-runtime-v3.md) 定义。
 
 默认每六小时检查受信目录，安装由管理员触发。宿主执行器独立于两个控制服务运行，使用固定策略和 Compose 模板。发行材料只提供受限声明。
 
@@ -68,7 +68,7 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 
 已接受的 `cancel_requested=true` 是单向持久意图，执行线程写阶段时必须合并该标记。排空后最后一次现场采集完成，再在与取消接口共用的锁内核对取消并持久进入 `switching`。此前接受的取消收口为 `cancelled`；进入切换后的取消返回 `409`。
 
-已接入状态包含 `installed`、`revision`、`deployment`、`current_release`、`components`、`operation`、`busy`、`history`、`checked_at`、`check_error`；管理桥补充 `environments`。未接入返回 `installed=false` 与接入说明。公开操作包含 `operation_id`、`action`、`phase`、`created_at`、`updated_at`、`target_release`、`error`、`blockers`、`cancel_requested`、`cleanup`、`environment_results`，迁移版本额外返回 `database_snapshot`、`database_migrations`。状态额外提供 `migration_capability:bool`。
+已接入状态包含 `installed`、`revision`、`deployment`、`current_release`、`components`、`operation`、`busy`、`history`、`checked_at`、`check_error`；管理桥补充 `environments`。未接入返回 `installed=false` 与接入说明。公开操作包含 `operation_id`、`action`、`phase`、`created_at`、`updated_at`、`target_release`、`error`、`blockers`、`cancel_requested`、`cleanup`、`environment_results`、`steps`，迁移版本额外返回 `database_snapshot`、`database_migrations`。`steps` 为 `[{phase, at}]`（`at` 为 `utc_now()` ISO 时间），由 `SystemUpdater._record` 在落盘时比较阶段：与最后一条不同才追加，保留最近 `STEP_LIMIT=64` 条。所有阶段写入（`_phase`、`_finish`、宿主恢复回调直接写 `restoring_data` / `restoring` 后的 `save()`）都经过该落盘口；排空等待反复写同一阶段不重复记录。旧操作没有该字段时公开为 `null`，前端按当前阶段推导。状态额外提供 `migration_capability:bool`。
 
 ### 来源、准入与恢复
 
@@ -114,6 +114,8 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 
 错误用法：收到 `409` 后仅替换 UUID 自动重放原确认。正确处理：重新读取 revision、候选摘要和重建范围，再由管理员确认新请求。
 
+错误用法：在 `_phase` 中追加 `steps`。宿主恢复回调直接写 `operation['phase'] = 'restoring_data'` 后调用 `save()`，会漏记该阶段；排空循环每 0.5 秒重写 `draining` 还会重复记录。正确处理：在唯一落盘口 `_record` 比较当前阶段与最后一条步骤，不同才追加并截断到 `STEP_LIMIT`。
+
 错误用法：把 Contents API 返回的二进制签名作为文本重新编码，或直接信任其中的 Base64 `content`。正确处理：按固定提交取得 blob 身份，从 Git Blob API 读取原始字节，校验大小、blob SHA 及 Ed25519 签名。
 
 错误用法：取消接口已经返回成功，执行线程随后用旧操作快照覆盖取消标记。正确处理：持久写入保留单向取消意图，并将最后一次取消核对与进入切换合为同一加锁边界。
@@ -126,11 +128,11 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 
 - CI 权限验证：宿主文件描述符检查采用 root，普通 runner 的 PermissionError 保持失败；同一虚拟环境解释器、明确保留的密钥变量及证据归属回交必须匹配工作流。
 - CI 解释器变更：用干净 Python 3.12 虚拟环境安装 `services/orchestrator/requirements.txt`，执行 workflow 中两条 `unittest discover` 命令；检查设置步骤先于验证，且与两个正式镜像的 Python 次版本一致。工作流 YAML、shell 语法和 `git diff --check` 通过。
-- `deploy/flower2api/test_system_*.py`：签名、目录顺序/时间、严格字段与大小、数据兼容、同参幂等、revision 冲突、恢复与清理保护。首次接入覆盖 dry-run、状态提交中断、释放响应中断、原 installed_at、外来门禁、后来 revision、配置 CAS、真实文件锁互斥。
+- `deploy/flower2api/test_system_*.py`：签名、目录顺序/时间、严格字段与大小、数据兼容、同参幂等、revision 冲突、恢复与清理保护；步骤记录的追加与时间、排空去重、宿主恢复路径、上限截断、旧操作 `steps=null`，迁移安装两次 `switching` 均记录。首次接入覆盖 dry-run、状态提交中断、释放响应中断、原 installed_at、外来门禁、后来 revision、配置 CAS、真实文件锁互斥。
 - 目录读取覆盖 Contents 载荷转换、真实签名字节保留、错误编码/大小/blob SHA 及非固定来源拒绝；取消覆盖执行线程旧快照、最后一次现场采集中的取消，以及切换后的 `409`。真实 Docker 取消验收断言原控制容器保留且操作最终为 `cancelled`。
 - `services/orchestrator/test_system_update*.py`：实际线程/文件准入、ASGI 正文结束、原登录撤销、部分恢复边界；真实 Scheduler + SQLite 验证批次等待不阻塞排空、维护抢先分派、重启续调度、原工程续接与时间窗口/被动配额拒绝。
 - Rust `cargo test` 与 `cargo fmt --check`：门禁启动验证、完整 HttpBody 释放、租约与管理桥回归。Vue `npm --prefix apps/web run build` 在仓库根验证类型和构建。
-- `verify_system_update_browser.py`：真实构建页面配合合成 API，覆盖桌面/移动端、确认、断线重连、409、回退/恢复、未接入；断言零脚本异常与零真实模型调用。
+- `verify_system_update_browser.py`：真实构建的系统更新弹窗配合合成 API，覆盖桌面/移动端、直接安装与二次确认、步骤与时间、断线重连、快照与迁移、数据恢复、409、回退/恢复、未接入；断言零脚本异常与零真实模型调用。
 - `UpdateRequestTests` 与更新浏览器场景：缺省60秒、严格整数、初开及取消重开一分钟、显式30分钟提交1800秒；已有操作的原 UUID 和期限保持。
 - `verify_system_update.py`：随机部署、独立数据根、本地 TLS 和合成密钥下验证真实 Docker 长流排空、控制复用、账号重建、停止状态保留、显式回退、健康失败恢复、部分角色恢复、独立进程中断恢复、容器引用保护与精确回收。Bookworm 二进制沿项目 Docker 构建路径验证兼容性。
 - 生产首次接入、CI 私钥配置和真实发行获取由上线单另行核验。进程中断证据命名为进程恢复，宿主重启采用独立现场核验。

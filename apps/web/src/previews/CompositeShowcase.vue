@@ -14,7 +14,8 @@ import { EntityAction, EntityBlock, EntityCard } from '@/components/ui/entity-ca
 import { TableCard } from '@/components/ui/table-card';
 import { FloatingSaveBar } from '@/components/ui/save-bar';
 import { ModalDialog } from '@/components/ui/modal';
-import { Activity, Box, Calendar, Check, Globe, KeyRound, Pencil, Plus, RefreshCw, Search, Server, Settings2, ShieldCheck, Trash2, Users, Zap } from '@/components/ui/icon';
+import { NoticeStrip } from '@/components/ui/notice-strip';
+import { Activity, Box, Calendar, Check, Globe, Info, KeyRound, Pencil, Plus, RefreshCw, Search, Server, Settings2, ShieldCheck, Trash2, Users, Zap } from '@/components/ui/icon';
 
 /** 组合组件演示：数据取自设计稿 accounts / proxies / environments / settings 画面，供 verify_ui_kit.py 逐项比对。 */
 const environmentFilter = ref('all');
@@ -97,6 +98,12 @@ const modalOpen = ref(false);
       <template #footer><Pagination v-model:page="page" v-model:page-size="pageSize" :total="21" label="代理线路分页" /></template>
     </TableCard>
 
+    <div class="composite-gap composite-notices">
+      <NoticeStrip tone="success" data-testid="notice-strip"><Check />网关凭据正常 · 最近同步 3 分钟前</NoticeStrip>
+      <NoticeStrip data-testid="notice-strip-neutral"><Info />维护期间新工作暂缓，在途工作自然结束后继续。</NoticeStrip>
+      <NoticeStrip tone="danger">invalid_grant：账号异常，需要重新授权或人工核实。长说明在窄宽下换行，提示条随内容增高。<template #end><Badge variant="outline">需处理</Badge></template></NoticeStrip>
+    </div>
+
     <div class="composite-gap">
       <Button variant="outline" @click="modalOpen = true">打开居中弹窗示例</Button>
       <ModalDialog v-model:open="modalOpen" title="正式账号 1" description="design1@example.test" :width="820" data-testid="modal">
@@ -123,6 +130,7 @@ const modalOpen = ref(false);
 
 <style scoped>
 .composite-gap { margin-bottom: calc(var(--ui-space-unit) * 4.5); }
+.composite-notices { display: grid; gap: calc(var(--ui-space-unit) * 2.5); max-width: 560px; }
 .composite-note { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 600; }
 .composite-search { width: 280px; }
 .composite-entities { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 4); }

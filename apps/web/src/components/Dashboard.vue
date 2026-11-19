@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, ref, watch, nextTick, defineAsyncComponent, onMounted, onUnmounted } from 'vue';
-import { Menu, PanelLeftClose, PanelLeftOpen, ChevronRight, LogOut, X, ArrowUpCircle } from '@/components/ui/icon';
+import { computed, ref, watch, defineAsyncComponent, onMounted, onUnmounted } from 'vue';
+import { Menu, PanelLeftClose, PanelLeftOpen, ChevronRight, LogOut, ArrowUpCircle } from '@/components/ui/icon';
 import AppNavigation from './AppNavigation.vue';
 import { api } from '../api';
 import { releaseVersion } from '../lib/platformVersion';
 import { usePlatformVersion } from '../composables/usePlatformVersion';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { logout } from '../router';
 import { useToast } from '../composables/useToast';
 
@@ -86,21 +86,24 @@ async function handleLogout(): Promise<void> {
   }
 }
 
-const SystemUpdates = defineAsyncComponent(() => import('./SystemUpdates.vue'));
-const updatePanel = ref<HTMLDialogElement | null>(null);
-const updatesOpen = ref(false);
-/** 从品牌打开更新工作区，保留当前页面；修饰键沿用独立深链接。@param event 链接点击。@return 面板打开完成。 */
-async function openUpdatePanel(event: MouseEvent): Promise<void> {
+const SystemUpdateDialog = defineAsyncComponent(() => import('./SystemUpdateDialog.vue'));
+const router = useRouter();
+// 直接访问 /updates 时背后是账号页，弹窗自动打开；导航到其他页面时关闭。
+const updatesOpen = ref(route.name === 'updates');
+/** 从版本号打开更新弹窗，地址保持不变；修饰键沿用独立深链接。@param event 链接点击。@return 无。 */
+function openUpdatePanel(event: MouseEvent): void {
   if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
   mobileOpen.value = false;
   updatesOpen.value = true;
-  await nextTick();
-  updatePanel.value?.showModal();
 }
-/** 关闭更新面板并卸载轮询。@return 无。 */
-function closeUpdatePanel(): void { const wasOpen=updatesOpen.value;updatePanel.value?.close();updatesOpen.value = false;if(wasOpen)void refreshMetadata(true); }
-watch(() => route.fullPath, closeUpdatePanel);
+watch(() => route.fullPath, () => { updatesOpen.value = route.name === 'updates'; });
+// 弹窗关闭即卸载轮询并刷新版本号角标；从 /updates 进入的回到账号页。
+watch(updatesOpen, value => {
+  if (value) return;
+  void refreshMetadata(true);
+  if (route.name === 'updates') void router.replace({ name: 'accounts' });
+});
 </script>
 
 <template>
@@ -157,9 +160,6 @@ watch(() => route.fullPath, closeUpdatePanel);
       <router-view />
       </main>
     </div>
-    <dialog ref="updatePanel" class="approved-update-dialog" aria-labelledby="system-update-panel-title" @close="updatesOpen = false" @click="event => { if (event.target === updatePanel) closeUpdatePanel(); }">
-      <header class="approved-update-head"><div><h2 id="system-update-panel-title">系统更新</h2><p>flower2api · 应用与运行组件</p></div><button type="button" aria-label="关闭更新面板" @click="closeUpdatePanel"><X :size="18" /></button></header>
-      <div class="approved-update-scroll"><SystemUpdates v-if="updatesOpen" embedded /></div>
-    </dialog>
+    <SystemUpdateDialog v-if="updatesOpen" v-model:open="updatesOpen" />
   </div>
 </template>

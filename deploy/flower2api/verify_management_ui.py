@@ -324,8 +324,10 @@ async def run(output):
             await context.add_init_script(f"localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','{theme}');")
             page = await context.new_page()
             page.on('pageerror', lambda error: errors.append(str(error)))
-            await page.goto(BASE + '/updates')
-            await page.locator('details.update-history > summary').click()
+            # 从版本号打开系统更新弹窗（/updates 背后是账号页，本夹具未声明账号接口；深链接由 verify_system_update_browser.py 覆盖）。
+            await page.goto(BASE + '/environments')
+            await page.locator('.console-sidebar .brand-update').click()
+            await page.locator('.system-update-dialog').get_by_role('button', name='版本记录与回退', exact=True).click()
             await expect(page.locator('[data-release-card]')).to_have_count(2)
             assert await page.locator('[data-release-details]').count() == 0
             cards = page.locator('[data-release-card]')
@@ -336,10 +338,12 @@ async def run(output):
             await cards.nth(1).locator('button[aria-expanded]').click()
             await expect(page.locator('[data-release-details]')).to_have_count(0)
             assert 'system-ci-' not in await page.locator('[data-release-card]').first.inner_text()
-            await page.get_by_role('button', name='安装更新', exact=True).click()
-            await expect(page.locator('.update-page > dialog')).to_be_visible()
+            # 版本记录中的安装先弹二次确认，取消后零安装写入。
+            await cards.nth(0).get_by_role('button', name='安装更新', exact=True).click()
+            confirm = page.get_by_role('dialog', name='确认安装更新', exact=True)
+            await expect(confirm).to_be_visible()
             assert all(write['path']=='/runtime/api/system-updates/check' for write in fixture.writes),fixture.writes
-            await page.locator('.update-page > dialog').get_by_role('button', name='取消', exact=True).click()
+            await confirm.get_by_role('button', name='取消', exact=True).click()
             await page.get_by_role('button', name='查看历史版本与回退', exact=False).click()
             await expect(cards).to_have_count(4)
             await page.get_by_role('button', name='收起历史版本', exact=True).click()
@@ -347,6 +351,9 @@ async def run(output):
                 await page.set_viewport_size({'width': width, 'height': 1000})
                 assert await page.locator('html').evaluate('node=>node.scrollWidth<=innerWidth')
                 await page.screenshot(path=str(output / f'updates-{width}-{theme}.png'), full_page=True)
+            # 关闭弹窗后仍在运行环境页，再从导航进入运行环境。
+            await page.keyboard.press('Escape')
+            await expect(page.locator('.system-update-dialog')).to_be_hidden()
             if page.viewport_size['width'] < 768:
                 await page.get_by_role('button', name='打开主导航', exact=True).click()
             await page.get_by_role('link', name='运行环境', exact=True).click()

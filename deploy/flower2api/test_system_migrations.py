@@ -139,6 +139,9 @@ class SystemMigrationTests(unittest.TestCase):
         operation = self.engine._operation(status['operation']['operation_id'])
         self.assertTrue(operation['release_started'])
         self.assertEqual(status['operation']['database_snapshot']['state'], 'verified')
+        # 越过取消边界与真正切换各记一次 switching，快照与迁移夹在两者之间。
+        self.assertEqual([step['phase'] for step in status['operation']['steps']], ['preparing', 'draining', 'switching',
+            'snapshotting', 'migrating', 'switching', 'verifying', 'committing', 'cleaning', 'succeeded'])
 
     def test_same_contract_ignores_changed_historical_allowlist(self) -> None:
         """普通业务发行保持数据合同，历史许可列表轮换不造成误拦。@return None。"""

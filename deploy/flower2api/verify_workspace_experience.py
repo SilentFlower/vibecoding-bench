@@ -83,12 +83,12 @@ async def main():
         result['session_shell_ms'] = round((time.monotonic() - started) * 1000)
         assert await root.evaluate('e=>e.inert')
         await page.locator('.brand-update').click()
-        await expect(page.locator('.approved-update-dialog')).to_be_visible()
+        await expect(page.locator('.system-update-dialog')).to_be_visible()
         await page.wait_for_timeout(1500)
         assert fixture.hits == 1
         fixture.release.set()
         await expect(root.locator('.work-account')).to_have_count(1)
-        await page.get_by_role('button', name='关闭更新面板').click()
+        await page.locator('.system-update-dialog').get_by_role('button', name='关闭', exact=True).click()
         assert await root.get_attribute('data-theme') == 'light'
         assert await page.locator('#theme-toggle').count() == 0
         await page.goto(BASE + '/environments')

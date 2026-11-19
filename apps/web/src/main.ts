@@ -3,6 +3,7 @@ import '../../legacy-web/ui-foundation.css';
 import './style.css';
 import './components/ui/kit.css';
 import './console-shell.css';
+import './system-update.css';
 import './approved-design.css';
 import './proxy-design.css';
 import App from './App.vue';

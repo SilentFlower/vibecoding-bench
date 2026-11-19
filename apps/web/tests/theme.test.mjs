@@ -122,9 +122,10 @@ test('组件样式不写死颜色，圆角只取 token', () => {
     new URL('../../legacy-web/ui-foundation.css', import.meta.url),
     new URL('../../legacy-web/pagination.css', import.meta.url),
     new URL('../src/console-shell.css', import.meta.url),
+    new URL('../src/system-update.css', import.meta.url),
   ];
-  // 外壳组件与组件库同样只取 token。
-  const shell = ['Dashboard.vue', 'AppNavigation.vue', 'Login.vue'].map(name => new URL(`../src/components/${name}`, import.meta.url));
+  // 外壳组件、系统更新弹窗与组件库同样只取 token。
+  const shell = ['Dashboard.vue', 'AppNavigation.vue', 'Login.vue', 'SystemUpdateDialog.vue'].map(name => new URL(`../src/components/${name}`, import.meta.url));
   const problems = [];
   for (const file of [...sheets, ...shell, ...sourceFiles(uiRoot)]) {
     const text = readFileSync(file, 'utf8');

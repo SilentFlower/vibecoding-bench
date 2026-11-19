@@ -34,6 +34,8 @@ from system_update_host import HostDeployment
 
 DONE = TERMINAL | {'prepared'}
 STATE_LIMIT = 8 * 1024 * 1024
+# 正常安装约 10 步；恢复反复进入阶段时只保留最近记录，避免操作文件无界增长。
+STEP_LIMIT = 64
 
 
 class UpdateConflict(ValueError):
@@ -107,6 +109,11 @@ class SystemUpdater:
             # 控制线程单独读取并保存取消意图，执行线程的旧快照必须保留该单向标记。
             if path.exists() and self._operation(operation['operation_id']).get('cancel_requested') is True:
                 operation['cancel_requested'] = True
+            # 所有阶段写入（含宿主恢复回调直接改 phase）都经过这里；排空等待会反复写同一阶段，只在变化时追加步骤。
+            steps = operation.setdefault('steps', [])
+            if not steps or steps[-1]['phase'] != operation['phase']:
+                steps.append({'phase': operation['phase'], 'at': utc_now()})
+                del steps[:-STEP_LIMIT]
             atomic_json(path, operation)
             self._persist()
 
@@ -232,7 +239,7 @@ class SystemUpdater:
 
     def _public_operation(self, operation: dict) -> dict:
         return {key: copy.deepcopy(operation.get(key)) for key in ('operation_id', 'action', 'phase', 'created_at',
-            'updated_at', 'target_release', 'error', 'blockers', 'cancel_requested', 'cleanup', 'environment_results', 'database_snapshot', 'database_migrations', 'cluster_nodes')}
+            'updated_at', 'target_release', 'error', 'blockers', 'cancel_requested', 'cleanup', 'environment_results', 'database_snapshot', 'database_migrations', 'cluster_nodes', 'steps')}
 
     def operation(self, identifier: str) -> dict:
         """读取指定操作的脱敏进度。

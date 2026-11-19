@@ -135,6 +135,9 @@ DESIGN_PAIRS = [
     ('settings', '.savebar', '[data-testid=save-bar]', ['background-color', 'border-top-left-radius', 'box-shadow', 'padding-top', 'padding-left', 'padding-right', 'column-gap'], None),
     ('settings', '.savebar b', '[data-testid=save-bar] .fui-save-bar-title', TEXT + ['column-gap'], None),
     ('settings', '.savebar .hint', '[data-testid=save-bar] .fui-save-bar-hint', TEXT, None),
+    ('tasks', '.strip.s', '[data-testid=notice-strip]', BOX + ['font-family', 'align-items'], None),
+    ('tasks', '.strip.s svg', '[data-testid=notice-strip] svg', ['width', 'height'], None),
+    ('update-progress', '.strip.n', '[data-testid=notice-strip-neutral]', BOX + ['font-family'], None),
     ('account-edit', '.modal', '[data-testid=modal]', ['background-color', 'border-top-left-radius', 'box-shadow'], 'modal'),
     ('account-edit', '.mh', '[data-testid=modal] .fui-modal-head', ['padding-top', 'padding-left', 'padding-bottom', 'column-gap', 'align-items'], 'modal'),
     ('account-edit', '.mh h2', '[data-testid=modal] .fui-modal-title', TEXT + ['column-gap'], 'modal'),
@@ -149,6 +152,8 @@ KNOWN = {
     ('requests', '.pager span:not(.on):not(.dis)'): {'column-gap'},
     ('requests', '.pager span.dis'): {'column-gap'},
     ('accounts', '.switch.on'): {'border-top-left-radius'},  # 99px 与 999px 都是全圆
+    ('tasks', '.strip.s'): {'padding-top'},  # 设计稿固定高 36、上下零内边距；组件用 9px + 18px 行高凑成同高，长文本可换行
+    ('update-progress', '.strip.n'): {'padding-top'},
 }
 
 async def styles(locator, props: dict) -> dict:

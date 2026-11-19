@@ -24,7 +24,12 @@ async def run(output):
         page.on('pageerror', lambda error: errors.append(str(error)))
         for width in [1280, 720, 390]:
             await page.set_viewport_size({'width': width, 'height': 900})
+            # /updates 在账号页之上打开系统更新弹窗；关闭后回到账号页（地址 /）。
             await page.goto(BASE + '/updates')
+            await expect(page.locator('.system-update-dialog')).to_be_visible()
+            await expect(page.locator('.toolbar-page')).to_have_text('系统更新')
+            await page.locator('.system-update-dialog').get_by_role('button', name='关闭', exact=True).click()
+            await expect(page).to_have_url(BASE + '/')
             for label, path in [('账号', '/'), ('访问令牌', '/tokens'), ('系统设置', '/settings'), ('请求记录', '/requests'),
                     ('运行环境', '/environments'), ('任务与工程', '/tasks'), ('系统更新', '/updates')]:
                 if width < 768:
@@ -33,10 +38,13 @@ async def run(output):
                 if label == '系统更新':
                     before = page.url
                     await page.get_by_role('link', name=label, exact=True).click()
-                    await expect(page.locator('.approved-update-dialog')).to_be_visible()
+                    await expect(page.locator('.system-update-dialog')).to_be_visible()
                     assert page.url == before
-                    await page.get_by_role('button', name='关闭更新面板').click()
+                    await page.locator('.system-update-dialog').get_by_role('button', name='关闭', exact=True).click()
+                    await expect(page.locator('.system-update-dialog')).to_be_hidden()
+                    assert page.url == before
                     await page.goto(BASE + '/updates')
+                    await expect(page.locator('.system-update-dialog')).to_be_visible()
                 else:
                     await page.get_by_role('link', name=label, exact=True).click()
                 await expect(page).to_have_url(BASE + path)

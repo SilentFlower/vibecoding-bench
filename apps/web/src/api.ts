@@ -374,6 +374,8 @@ export interface SystemUpdateOperation {
   database_snapshot?: { state: string; completed_at: string; bytes: number } | null
   database_migrations?: Record<string, { state: string; target_version: number }> | null
   cleanup?: { status: string; removed: string[]; retained?: string[] } | null
+  /** 按实际顺序记录的阶段与进入时间；旧操作没有记录时为空。 */
+  steps?: Array<{ phase: string; at: string }> | null
 }
 
 /** 当前控制镜像提供的独立平台版本。 */

@@ -256,6 +256,80 @@ class SystemUpdaterTests(unittest.TestCase):
         self.assertIn('restore', self.backend.calls)
         self.assertFalse(self.backend.blocked)
 
+    def test_steps_record_each_phase_once(self) -> None:
+        """每次进入新阶段追加一条带时间的步骤，排空等待的重复写入不重复记录。
+
+        :return: None。
+        """
+        pending = iter([False, False])
+        drained = self.backend.drained
+
+        def slow_drain(*args):
+            self.backend.ready = next(pending, True)
+            return drained(*args)
+        self.backend.drained = slow_drain
+        self.engine.submit('install', self.request())
+        state = self.join()
+        steps = state['operation']['steps']
+        self.assertEqual([step['phase'] for step in steps],
+            ['preparing', 'draining', 'switching', 'verifying', 'committing', 'cleaning', 'succeeded'])
+        self.assertTrue(all(isinstance(step['at'], str) and step['at'] for step in steps))
+        self.assertEqual(self.backend.calls.count('drained'), 3)
+        self.assertEqual(self.engine.operation(state['operation']['operation_id'])['steps'], steps)
+
+    def test_steps_include_host_restore_path(self) -> None:
+        """宿主恢复回调直接改写的数据库恢复阶段同样进入步骤记录。
+
+        :return: None。
+        """
+        self.backend.fail = 'health'
+        restore = self.backend.restore
+
+        def host_restore(operation, save):
+            # 与 system_update_host.restore 相同：直接写 phase 后经回调落盘。
+            operation['phase'] = 'restoring_data'
+            save()
+            operation['phase'] = 'restoring'
+            save()
+            restore(operation, save)
+        self.backend.restore = host_restore
+        self.engine.submit('install', self.request())
+        state = self.join()
+        self.assertEqual([step['phase'] for step in state['operation']['steps']],
+            ['preparing', 'draining', 'switching', 'verifying', 'restoring', 'restoring_data', 'restoring', 'restored'])
+
+    def test_legacy_operation_without_steps(self) -> None:
+        """没有步骤记录的旧操作照常公开，steps 为空。
+
+        :return: None。
+        """
+        body = self.request()
+        with patch.object(self.engine, '_execute'):
+            self.engine.submit('install', body)
+            self.engine.worker.join(1)
+        legacy = self.engine._operation(body['operation_id'])
+        del legacy['steps']
+        atomic_json(self.root / 'operations' / body['operation_id'] / 'operation.json', legacy)
+        self.assertIsNone(self.engine.status()['operation']['steps'])
+        self.assertIsNone(self.engine.operation(body['operation_id'])['steps'])
+
+    def test_steps_keep_latest_limit(self) -> None:
+        """反复进入阶段时只保留最近的固定条数。
+
+        :return: None。
+        """
+        body = self.request()
+        with patch.object(self.engine, '_execute'):
+            self.engine.submit('install', body)
+            self.engine.worker.join(1)
+        operation = self.engine._operation(body['operation_id'])
+        for index in range(70):
+            self.engine._phase(operation, 'restoring' if index % 2 else 'restoring_data')
+        steps = self.engine.operation(body['operation_id'])['steps']
+        self.assertEqual(len(steps), system_updater.STEP_LIMIT)
+        self.assertEqual(steps[-1]['phase'], 'restoring')
+        self.assertEqual(steps[0]['phase'], 'restoring_data')
+
     def test_cleanup_failure_keeps_verified_target(self) -> None:
         """回收失败和服务安装结果分别记录。
 

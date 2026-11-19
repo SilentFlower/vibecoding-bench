@@ -165,9 +165,9 @@ async def verify_desktop(browser, output: Path, problems: list, errors: list) ->
 
     # 版本号点击沿用现有更新面板。
     await badge.click()
-    await expect(page.locator('.approved-update-dialog')).to_be_visible()
-    await page.get_by_role('button', name='关闭更新面板').click()
-    await expect(page.locator('.approved-update-dialog')).to_be_hidden()
+    await expect(page.locator('.system-update-dialog')).to_be_visible()
+    await page.locator('.system-update-dialog').get_by_role('button', name='关闭', exact=True).click()
+    await expect(page.locator('.system-update-dialog')).to_be_hidden()
 
     # 折叠：宽度 76、只留图标，刷新后保持。
     await page.get_by_role('button', name='收起侧边栏').click()

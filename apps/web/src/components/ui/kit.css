@@ -269,6 +269,15 @@
   .fui-save-bar-hint { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; }
   .fui-save-bar-actions { display: flex; flex-wrap: wrap; gap: calc(var(--ui-space-unit) * 2.5); margin-left: auto; }
 
+  /* 提示条：单行时高 36（9 + 18 + 9），长文本换行时随内容增高。 */
+  .fui-strip { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2); min-height: 36px; padding: 9px calc(var(--ui-space-unit) * 3); border-radius: calc(var(--ui-radius-control) + 2px); background: var(--ui-color-neutral-bg); color: var(--ui-color-neutral-text); font-size: var(--ui-font-size-meta); font-weight: 650; line-height: 18px; overflow-wrap: anywhere; }
+  .fui-strip > svg { flex: none; width: 14px; height: 14px; }
+  .fui-strip[data-tone=success] { background: var(--ui-color-success-bg); color: var(--ui-color-success-text); }
+  .fui-strip[data-tone=warning] { background: var(--ui-color-warning-bg); color: var(--ui-color-warning-text); }
+  .fui-strip[data-tone=danger] { background: var(--ui-color-danger-bg); color: var(--ui-color-danger-text); }
+  .fui-strip[data-tone=info] { background: var(--ui-color-info-bg); color: var(--ui-color-info-text); }
+  .fui-strip-end { margin-left: auto; flex: none; }
+
   .fui-modal { gap: 0; padding: 0; }
   .fui-modal-head { display: flex; align-items: flex-start; gap: calc(var(--ui-space-unit) * 3); padding: calc(var(--ui-space-unit) * 5.5) calc(var(--ui-space-unit) * 6) calc(var(--ui-space-unit) * 4); }
   .fui-modal-heading { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }

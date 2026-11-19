@@ -153,7 +153,7 @@ async def main():
                 await expect(page.get_by_text('当前版本：' + expected, exact=True)).to_be_visible()
                 assert fixture.catalog_reads == 0
             else:
-                await expect(page.locator('.approved-platform dd').first).to_have_text('历史构建' if scenario == 'old-missing' else expected)
+                await expect(page.locator('[data-update-tile=current] b')).to_have_text('历史构建' if scenario == 'old-missing' else expected)
             if scenario != 'session-failure':
                 assert fixture.version_reads >= 2
             assert fixture.sessions >= 1

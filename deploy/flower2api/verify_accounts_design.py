@@ -203,9 +203,9 @@ async def main():
         await page.reload()
         await expect(page.locator('.console-shell')).to_have_class(re.compile('sidebar-collapsed'))
         await page.get_by_role('link', name='系统更新', exact=True).click()
-        await expect(page.locator('.approved-update-dialog')).to_be_visible()
+        await expect(page.locator('.system-update-dialog')).to_be_visible()
         await expect(page).to_have_url(BASE + '/')
-        await page.get_by_role('button',name='关闭更新面板').click()
+        await page.locator('.system-update-dialog').get_by_role('button', name='关闭', exact=True).click()
         await page.get_by_role('button', name='展开侧边栏').click()
         for width in [1440, 720, 390]:
             await page.set_viewport_size({'width': width, 'height': 1000})
