@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/web/frontend/ui-guidelines.md", "reason": "视觉 token、组件库层叠与继承规则、测试命令的现行合同；本任务新增外壳与组合组件一节"}
+{"file": ".trellis/spec/web/frontend/frontend-guidelines.md", "reason": "apps/web 技术栈与通用前端约定"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "组合组件复用基础控件、避免重复样式"}
+{"file": ".trellis/tasks/11-19-console-ui-kit/design.md", "reason": "子任务 1 的 token 命名、层叠、继承规则、脚本分诊规则，本任务沿用"}
+{"file": ".trellis/tasks/11-19-console-ui-revamp/prd.md", "reason": "父任务需求 R2、R3 与跨子任务验收"}
+{"file": ".trellis/tasks/11-19-console-ui-revamp/design.md", "reason": "父任务跨子任务边界、验证策略与发布过渡态"}
+{"file": ".trellis/tasks/11-19-console-ui-revamp/research/frontend-architecture.md", "reason": "外壳结构、样式入口、验证脚本的代码证据"}

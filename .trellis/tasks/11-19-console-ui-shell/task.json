@@ -1,0 +1,51 @@
+{
+  "id": "console-ui-shell",
+  "name": "console-ui-shell",
+  "title": "控制台外壳与通用业务组件",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "web",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-19",
+  "completedAt": "2026-11-19",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-19T17:19:28Z",
+    "blockers": []
+  },
+  "branch": "feat/console-ui-revamp",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-19-console-ui-revamp",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-20T01:19:28+08:00",
+    "completedSteps": [
+      "规划评审",
+      "基线",
+      "新 token",
+      "组合组件与演示页",
+      "外壳与移动端",
+      "8 个页头",
+      "浮动保存栏",
+      "登录页",
+      "验证脚本与分诊",
+      "回归",
+      "规范同步",
+      "Check-All 通过"
+    ],
+    "partialStep": null,
+    "nextStep": "子任务 3（系统更新弹窗）或子任务 4（Vue 业务页迁移）的规划评审",
+    "notes": "实施中补上居中弹窗组合组件（父任务 R3），品牌标志沿用 favicon 品牌合同；父任务与兄弟子任务规划目录仍未提交。"
+  }
+}
