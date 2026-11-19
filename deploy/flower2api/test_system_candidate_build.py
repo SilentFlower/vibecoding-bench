@@ -262,6 +262,21 @@ class CandidateBuildTests(unittest.TestCase):
         with patch.object(artifacts, 'check_checkout'), patch.object(artifacts, 'github_json', side_effect=self.api), self.assertRaises(RuntimeError):
             artifacts.resolve_candidate(self.root / 'formal.json', 0)
 
+    def test_unverified_agy_candidate_uses_full_build_path(self) -> None:
+        """候选的原验收缺失、失败或跳过时，发布侧继续实际构建与验收。@return 无。"""
+        name = '验收镜像内AGY能力'
+        self.run.update(status='completed', conclusion='success')
+        steps = [step for step in self.jobs['jobs'][0]['steps'] if step['name'] != name]
+        with patch.object(artifacts, 'check_checkout'), patch.object(artifacts, 'github_json', side_effect=self.api), \
+                patch.object(artifacts, 'download_archive') as download:
+            for conclusion in (None, 'failure', 'skipped'):
+                with self.subTest(conclusion=conclusion):
+                    validation = [] if conclusion is None else [
+                        {'name': name, 'status': 'completed', 'conclusion': conclusion}]
+                    self.jobs['jobs'][0]['steps'] = [*steps, *validation]
+                    self.assertFalse(artifacts.resolve_candidate(self.root / 'formal.json', 0))
+            download.assert_not_called()
+
     def test_dirty_or_different_checkout_refuses_before_candidate_lookup(self) -> None:
         """复用不能掩盖本地源码变更，干净同SHA才允许读取候选。:return: None。"""
         for head, dirty in [('f' * 40, ''), ('a' * 40, ' M source.py')]:
@@ -295,11 +310,16 @@ class CandidateBuildTests(unittest.TestCase):
         (source / 'payload').write_bytes(b'synthetic candidate file\n')
         for role in ('control', 'account'):
             reference = images.image_reference(role, self.manifest['release'])
+            agy_labels = 'LABEL vibebench.agy-runtime-protocol="1"\n'
+            if role == 'account':
+                sha256 = self.manifest['agy_auth']['sha256']
+                agy_labels += (f'LABEL vibebench.agy-auth-source-sha256="{sha256}" '
+                    f'vibebench.agy-runtime-source-sha256="{sha256}"\n')
             (source / 'Dockerfile').write_text('FROM scratch\nCOPY payload /payload\n'
                 'ENV SYNTHETIC_CONFIG=stable\nCMD ["/payload"]\n'
                 f'LABEL flower2api.test-id="{token}" vibebench.product="v3" vibebench.role="{role}" '
                 f'vibebench.release="{self.manifest["release"]}" vibebench.isolation-version="2" '
-                f'vibebench.parent-revision="{"a" * 40}" vibebench.gateway-revision="{"a" * 40}"\n')
+                f'vibebench.parent-revision="{"a" * 40}" vibebench.gateway-revision="{"a" * 40}"\n{agy_labels}')
             subprocess.run(['docker', 'build', '--network=none', '-t', reference, str(source)],
                 check=True, capture_output=True)
             info = inspect(reference)
@@ -335,9 +355,10 @@ class CandidateBuildTests(unittest.TestCase):
                 before = inspect(self.manifest['images'][role]['reference'])
                 after = inspect(adopted['images'][role]['reference'])
                 self.assertEqual(before['RootFS'], after['RootFS'])
-                self.assertEqual(before['Config']['Env'], after['Config']['Env'])
-                self.assertEqual(before['Config']['Cmd'], after['Config']['Cmd'])
                 self.assertEqual(self.manifest['release'], before['Config']['Labels']['vibebench.release'])
+                expected = copy.deepcopy(before['Config'])
+                expected['Labels']['vibebench.release'] = adopted['release']
+                self.assertEqual(expected, after['Config'])
             with self.assertRaises(ValueError):
                 images.adopt_candidate(self.root / 'exported', self.identity, self.root / 'repeated.json')
 

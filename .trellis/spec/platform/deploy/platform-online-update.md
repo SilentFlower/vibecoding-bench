@@ -299,10 +299,10 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 - 正式发行使用原签名流程。成功后核对 GitHub Release、受信目录、签名清单、版本说明和来源 SHA 对应一致。生产实例安装沿独立授权流程。
 - v3-build 的 push/目标 PR 分支为 v3、flower2api，另有手动构建。权限 contents:read，checkout 关闭持久凭据；测试、构建两镜像并上传本地清单，发布副作用为零。本仓受信分支的push/手动构建另保存`v3-candidate-<run_id>-<attempt>`，包含严格元数据、原清单和完整归档，保留一天、上传压缩级别为0；PR只保存原清单。
 - v3-release 仅 workflow_dispatch；布尔 input `publish` 默认 false，必须明确选中。本仓 v3/flower2api 分支可发布，同一runner冻结实际SHA；优先复用同源码候选，缺失、过期、失败或旧构建无候选时重新完整验证构建。真实旧库兼容演练通过后才推镜像。只有发布job取得contents/packages写权限，并通过actions:read核对候选。
-- 候选复用前核对干净checkout的HEAD、GitHub运行的仓库/原仓库ID、分支、SHA、工作流路径、run/attempt和归档来源。原`build`作业的合同校验、镜像构建、候选导出及上传四步均成功后即可复用，允许其缓存post继续执行。选定后来源/attempt变化、归档来源或摘要异常直接失败；API读取失败保持失败。未选中受信来源视为候选缺失，进入完整构建路径。
+- 候选复用前核对干净 checkout 的 HEAD、GitHub 运行的仓库和原仓库 ID、分支、SHA、工作流路径、run/attempt 和归档来源。原 `build` 作业的合同校验、镜像构建、AGY 镜像验收、候选导出和上传均成功后即可复用，允许缓存 post 继续执行。选定后来源、attempt、归档身份或摘要异常直接失败。API 读取失败保持失败。未选中受信来源时进入完整构建路径。
 - 下载先核对GitHub原始ZIP的SHA256，仅解包三份固定普通文件；重复成员、链接、路径穿越、未知成员、加密及超预算成员均拒绝。JSON读取沿原131072字节预算，镜像包沿原16GiB预算，文件名称、真实大小和SHA256逐项核对。产物读取API限60秒，归档下载限900秒，在途构建轮询默认预算1200秒。
 - 候选加载后沿原`inspect_images`核对两角色身份，再只重写`vibebench.release`为当前手动Action批次；完整Config除该标签外必须一致，RootFS及平台必须一致，ONBUILD非空拒绝构建。原镜像及正式目标标签均核对禁止覆盖，正式清单通过原批次校验和镜像核验后才独占发布；兼容演练绑定换批后的真实镜像。
-- 复用成功跳过重复合同测试、缓存恢复、原生资产下载和二进制构建。`full_build=true`跳过候选解析，并重新执行原完整链路。签名预检、真实兼容演练、发布命名空间和原手动run/attempt门禁对两条路径都保持强制。
+- 复用成功跳过重复合同测试、缓存恢复、原生资产下载、二进制构建和 AGY 镜像验收。`full_build=true` 跳过候选解析并重新执行完整构建与实际验收。签名预检、真实兼容演练、发布命名空间和原手动 run/attempt 门禁对两条路径都保持强制。
 - 两路推送与离线gzip归档在全部标签预检并创建原started标记后并行执行；上下文等待全部作业退出，全部成功才原子交付最终包及完整清单。失败保留原attempt标记，最终交付路径不暴露临时包。大包只上传正式Release，Actions发行artifact保存诊断清单及兼容证据；签名发行与原子目录完成即具备安装条件，构建缓存post独立收尾。
 - 两个 Python 发布入口共用来源校验：`GITHUB_ACTIONS=true`、`GITHUB_EVENT_NAME=workflow_dispatch`、`V3_PUBLISH_CONFIRMED=true`、精确 repo/ref，以及 `GITHUB_WORKFLOW_REF=<repo>/.github/workflows/v3-release.yml@<ref>`。run/attempt 为正整数串、SHA 为40位小写hex；清单批次、revision和clean标记必须匹配。
 - 发布预检要求有效 `V3_SYSTEM_RELEASE_PRIVATE_KEY`，用实际 DER 格式确认 Ed25519。缺配置/错误类型在构建及推送前失败。签名私钥仅供手动发布侧使用。
@@ -328,6 +328,7 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 | 附件上传或目录并发推送失败 | 原目录受保护，已完成事实保留，无force覆盖 |
 | 更新器源码包缺直接依赖 | 独立导入回归失败 |
 | 无候选、候选过期、旧构建或已失败构建 | 原完整校验和构建；继续执行全部兼容、发布与签名门禁 |
+| 已完成的候选构建缺失、跳过或未通过 AGY 镜像验收 | 候选不可复用，发布侧执行完整构建和实际镜像验收 |
 | 必要步骤未完成、候选仍在构建 | 轮询等待；超过预算以非零状态退出 |
 | 候选来源/attempt漂移、GitHub ZIP或文件摘要不符、非法成员 | 失败，拒绝加载或发布；显式full_build可重新运行完整链路 |
 | 候选包含ONBUILD、换批改变运行配置或文件层、正式标签已占用 | 失败，完整正式清单保持未发布 |
@@ -676,7 +677,7 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - 冷缓存仅从本仓 `SilentFlower/vibecoding-bench` 的 `agy-runtime-1.5.9-v1` Release读取固定附件。缓存键绑定完整压缩摘要。辅助制品为预发布且 `latest=false`，与系统签名目录分开；附件交付与远端身份复验先于依赖它的源码推送。
 - XZ流式解码使用1MiB输出块及512MiB解码内存上限，拒绝截断、拼接、尾随、超预算及两层摘要失配。全部核验成功后原子发布构建输入，二进制保持在Git源码之外。
 - Dockerfile专属白名单显式允许 `agy-auth/agy-1.5.9`、缺省标记与 `orchestrator/agy_runtime/**`。control内包位于 `/app`，account内包位于 `/opt/v3/python`；公共 `runtime_files` 位于 `/usr/local/bin`。
-- 自动构建及完整手动构建共用只读附件准备action；候选复用跳过准备和构建。两条发布路径均在交付前执行镜像验收，可信候选的必需成功步骤包含“验收镜像内AGY能力”。
+- 自动构建及完整手动构建共用只读附件准备 action，交付前均执行镜像验收。可信候选的必需成功步骤包含“验收镜像内AGY能力”。发布换批复核文件层、平台和运行配置，全部核验后复用该验收结果。
 - 正式候选、镜像发布及系统签发使用 `require_auth_asset` 要求 `agy_auth.available=true` 及固定身份。`inspect_images` 对声明可用能力的两个角色核对 `agy-runtime-protocol=1`，account的auth/runtime源摘要须与清单一致。历史读取及通用本地可选构建沿原边界处理缺省能力。
 - CI宿主通过sudo调用同一虚拟环境解释器，以改属私有合成状态目录和配置。实际容器继续UID1001、断网、只读根、cap-drop及有限内存；只使用镜像自带包，验收两代凭据、单次共享解码和正常/异常物理退出。外部模型调用预算为0。
 - 每代准备请求使用既有120秒截止，prepared等待125秒，其他控制事件保持50秒；PID1观察窗口600秒覆盖两代准备与退出验证。成功结果增加两项 `prepare_seconds` 和 `prepare_deadline_seconds=120`，退役耗时计入该代准备。
@@ -702,7 +703,7 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 ### 5. Scenarios and Examples
 
 - 正常：核验并交付本仓处理产物附件 → CI恢复或下载XZ并验证两层身份 → 构建当前适配资源与镜像 → 验收镜像自身 → 导出候选或进入原兼容、签名流程。
-- 边界：同源码候选复用通过来源与归档检查、换批后，仍执行实际镜像验收；历史已签发行读取保持原合同。
+- 边界：同源码候选复用通过来源、原验收成功证据和归档检查，换批核验通过后直接进入旧库兼容演练。候选不可用或显式完整构建时，在发布侧执行实际镜像验收。历史已签发行读取使用原合同。
 - 错误用法：仅挂当前源码做探针就认定镜像完整，或在root本地验证后直接让普通runner执行改属。正确处理：正式探针使用 `image_package=True`，工作流以sudo调用原虚拟环境，容器身份及权限约束继续核对。
 - 故障定位：正式CI准备失败时先保留受控阶段与资源摘要，再删除临时根。错误用法是把完整HOME或原生日志直接打印；正确处理是先做白名单投影，再依据正式CI证据定位根因。
 - 预算边界：旧代退役45秒、新代启动约8秒仍可处于原有生命周期预算内。错误用法是给整代准备45秒截止；正确处理是使用现有120秒请求上限，并在退役后及Popen前复核原截止。
@@ -712,7 +713,7 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 
 - `test_agy_artifact`：现有处理产物导出、冷热缓存、双层身份、截断/尾随/拼接、解码预算、链接及中断原子交付。
 - `test_agy_images`、`test_publication`、`test_system_candidate_build`、`test_system_publish`：能力缺失在副作用前拒绝、实际标签匹配、候选换批与历史兼容。
-- `test_system_workflow`：真实YAML准备→构建→镜像验收→交付顺序、候选复用条件、两个验收步骤的sudo及同一解释器。全部run步骤执行 `bash -n`。
+- `test_system_workflow`：核对真实 YAML 的准备、构建、镜像验收和交付顺序，构建侧始终实测，发布侧仅在成功复用后跳过实测，两个探针均用 sudo 调用同一解释器。全部 run 步骤执行 `bash -n`。`test_system_candidate_build` 核对缺失、失败及跳过的 AGY 验收均使候选不可复用。
 - `test_system_agy_probe`：敏感/未知字段排除、字节及数值预算、诊断失败、首错保留、各项清理独立执行及客户端建立失败时的状态回收；测试由CI现有 `test_system*.py` 宿主发现覆盖。
 - `test_system_agy_probe`核对实际提交信封覆盖90秒启动窗口且不超过120秒，并断言两项准备耗时。`verify_release_tests.py`的publication组包含 `test_agy_supervisor`、`test_agy_artifact`、`test_agy_images`，`test_system_release_speed`同步核对模块集合。
 - 宿主测试经sudo运行会清除外部PYTHONPATH。探针测试在导入编排模块前沿 `source_layout.source_path`初始化搜索路径；独立执行 `env -u PYTHONPATH <项目Python> -m unittest discover -s deploy/flower2api -p test_system_agy_probe.py`，再以相同环境执行 `verify_release_tests.py --python <项目Python>`。错误用法是仅凭预设PYTHONPATH的测试结果认定正式入口通过。

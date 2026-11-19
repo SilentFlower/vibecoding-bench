@@ -76,6 +76,8 @@ jobs:
         if: steps.candidate.outputs.reused != 'true'
         run: python3 deploy/flower2api/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3-local.json
       - name: 验收镜像内AGY能力
+        # 可信候选的原验收必须成功，换批已核对文件层与运行配置。
+        if: steps.candidate.outputs.reused != 'true'
         run: |
           # 合成状态目录须归属容器UID 1001，沿宿主验证权限调用同一虚拟环境。
           sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_images.py --manifest releases/v3-local.json

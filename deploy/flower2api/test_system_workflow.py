@@ -89,8 +89,11 @@ class WorkflowTests(unittest.TestCase):
                 if 'verify_agy_images.py' in line)
             self.assertEqual(command, 'sudo "$RUNNER_TEMP/v3-update-venv/bin/python" '
                 'deploy/flower2api/verify_agy_images.py --manifest releases/v3-local.json')
+            self.assertNotIn('continue-on-error', steps[verify])
             if filename == 'v3-release.yml':
                 self.assertEqual("steps.candidate.outputs.reused != 'true'", steps[prepare]['if'])
+                self.assertEqual(steps[prepare]['if'], steps[verify].get('if'))
+            else:
                 self.assertNotIn('if', steps[verify])
 
     def test_candidate_reuse_keeps_trusted_build_and_manual_publish_boundaries(self) -> None:
