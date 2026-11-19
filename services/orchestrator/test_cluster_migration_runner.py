@@ -74,6 +74,8 @@ class MigrationCoordinatorTests(unittest.TestCase):
         self.owner_lock = threading.RLock()
         service = SimpleNamespace(store=self.store, data=self.root, local_client=Mock(), transports=NodeTransports(self.store),
             migration_nodes=lambda migration: nullcontext())
+        service.connection = Mock(return_value=SimpleNamespace(agent_health=Mock(return_value={
+            'release': 'synthetic-release', 'deployment': 'synthetic'})))
         service.build_preparation = lambda account, row, node_key, revision, runtime, gateway, quota, profile_sink=None, **options: NodePreparation(
             account=account, environment=row, node_key=node_key, assignment_revision=revision,
             gateway_config={}, quota_identity=quota, profile_files={},**options)
@@ -157,6 +159,35 @@ class MigrationCoordinatorTests(unittest.TestCase):
         self.assertEqual([], self.gateway.holders)
         self.assertEqual(['fence', 'export', 'verify-import', 'prepare-import', 'activate-import'], [item[1] for item in self.commands])
         self.assertEqual(result, self.coordinator.run(self.operation))
+
+    def test_outdated_target_is_synchronized_before_source_fence(self) -> None:
+        """原后台迁移先自动同步目标，源隔离发生在准备完成之后。:return: None。"""
+        with self.fixture.database() as connection:
+            connection.execute('UPDATE cluster_nodes SET preparation_json=? WHERE id=?',
+                (json.dumps({'state': 'prepared', 'release': 'old'}), self.fixture.target))
+        self.coordinator.service.synchronization = object()
+        def prepare(node_id, revision, **options):
+            """模拟后台同步完成时的真实中央登记。:return: None。"""
+            self.assertEqual([], self.commands)
+            self.store.save_preparation(node_id, revision, {'state': 'prepared', 'release': 'synthetic-release'})
+        self.coordinator.service.prepare_node = Mock(side_effect=prepare)
+        self.coordinator.begin(1, self.request)
+        self.assertEqual('completed', self.coordinator.run(self.operation)['phase'])
+        self.coordinator.service.prepare_node.assert_called_once_with(self.fixture.target, 1, automatic=True)
+
+    def test_node_display_and_authentication_changes_keep_original_data_location(self) -> None:
+        """显示名和认证方式变化继续原操作，实际数据根变化仍须核对。:return: None。"""
+        self.coordinator.begin(1, self.request)
+        with self.fixture.database() as connection:
+            connection.execute('UPDATE cluster_nodes SET config_json=? WHERE id=?',
+                (json.dumps({'name': '新显示名', 'auth_method': 'password', 'username': 'operator'}), self.fixture.target))
+        with self.guard(1) as (account, row):
+            self.coordinator._context(self.operation, account)
+        with self.fixture.database() as connection:
+            connection.execute('UPDATE cluster_nodes SET config_json=? WHERE id=?',
+                (json.dumps({'data_root': '/srv/other'}), self.fixture.target))
+        with self.guard(1) as (account, row), self.assertRaisesRegex(ValueError, '节点配置'):
+            self.coordinator._context(self.operation, account)
 
     def test_independent_migration_preserves_null_gateway_and_uses_no_gateway_lease(self) -> None:
         """独立账号沿原完整迁移切换，目标保持无Gateway绑定及发送器。:return: None。"""

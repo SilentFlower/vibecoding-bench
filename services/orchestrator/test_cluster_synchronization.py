@@ -124,6 +124,15 @@ class NodeSynchronizationTests(unittest.TestCase):
         self.sync.synchronize()
         self.service.prepare_node.assert_called_once_with(self.row['id'],1,automatic=True)
 
+    def test_initially_assigned_node_is_prepared_without_an_extra_button_click(self) -> None:
+        """已保存首次归属的节点自动纳管，空白未使用节点保持按需准备。:return: None。"""
+        with self.fixture.database() as connection:
+            connection.execute("INSERT INTO accounts(id,name,profile_path) VALUES(1,'synthetic','profiles/synthetic')")
+            connection.execute('UPDATE account_node_assignments SET node_id=? WHERE account_id=1', (self.row['id'],))
+        self.service.prepare_node = Mock()
+        self.sync.synchronize()
+        self.service.prepare_node.assert_called_once_with(self.row['id'], 1, automatic=True)
+
     def test_platform_preparation_only_backs_up_then_resumes_original_journal(self) -> None:
         """平台切换前仅冻结备份，新中央沿同一操作恢复而只备份一次。:return: None。"""
         maintenance = {'operation_id': 'a' * 32, 'epoch': 'b' * 32}

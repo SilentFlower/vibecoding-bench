@@ -211,9 +211,8 @@ class ClusterNodeTests(unittest.TestCase):
                 self.service.admit_local(payload)
 
     def test_initial_assignment_persists_and_existing_environment_requires_migration(self) -> None:
-        """首次分配落库并校验CAS，已有代次拒绝直接换节点。:return: None。"""
+        """首次选择未准备节点仍落库，已有资料沿原迁移和CAS边界。:return: None。"""
         node = self.service.register(NodeCreate(**self.config, private_key=self.key.read_text()))
-        self.store.save_preparation(node['id'], node['revision'], {'state': 'prepared', 'release': 'synthetic', 'protocol': 1})
         connection = self.database()
         self.addCleanup(connection.close)
         with connection:

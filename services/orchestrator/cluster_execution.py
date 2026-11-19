@@ -19,7 +19,7 @@ from docker.errors import DockerException
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr
 
 from account_runtime import AccountRuntime, _read_json, derive_v3_fingerprint, read_cli_identity_at
-from account_isolation import role_container
+from account_isolation import ROLE_COLUMNS, ROLE_LABELS, role_container
 from database_migrations import apply_migrations
 from cluster_environment import EnvironmentFence, fence_environment, restore_fenced_source
 from cluster_deployment import node_network_name
@@ -319,8 +319,6 @@ class NodeExecution:
             raise ValueError('节点准备账号、环境或归属不一致')
         if set(request.profile_files) - {'.credentials.json', '.claude.json', 'settings.json'}:
             raise ValueError('节点 profile 文件超出允许范围')
-        if not migration and sum(len(value.encode()) for value in request.profile_files.values()) > 1024 * 1024:
-            raise ValueError('节点 profile 文件超过允许大小')
         return account_id, name, environment_id, remote_id
 
 
@@ -670,7 +668,7 @@ class NodeExecution:
             prepared = preparation.model_copy(update={'environment': environment})
             self._prepare_import_projection(prepared, path, intent)
             with self._locked():
-                peer = self._prepare_locked(prepared, account_id, name, environment_id, remote_id)
+                peer = self._prepare_locked(prepared, account_id, name, environment_id, remote_id, import_intent=intent)
             row = peer['environment']
             actual_identity = MigrationCliIdentity.model_validate(read_cli_identity_at(root, self.data / 'profiles' / name, archive.cli_version))
             if actual_identity != archive.cli_identity:
@@ -847,7 +845,7 @@ class NodeExecution:
                 self._release_runtime(runtime)
 
     def _prepare_locked(self, request: NodePreparation, account_id: int, name: str,
-                        environment_id: str, remote_id: int | None) -> dict:
+                        environment_id: str, remote_id: int | None, *, import_intent: dict | None = None) -> dict:
         root = self.data / 'environments' / environment_id
         validate_owner_preparation(root,request)
         ownership_path = root / 'runtime/node-assignment.json'
@@ -905,6 +903,23 @@ class NodeExecution:
             # 活动 CLI 需要持久协调；准备入口不能把跨进程丢失的 jobs 当作空闲。
             row = runtime._row(name, account_id)
             self._check_execution_records(runtime, row)
+            if import_intent is not None and row['state'] == 'reconcile':
+                marker = _read_json(root / 'runtime/node-migration-target.json')
+                if marker.get('phase') != 'published' or any(marker.get(key) != value for key, value in import_intent.items()):
+                    raise ValueError('目标恢复缺少原迁移发布证明')
+                roles = {row[column]: role for role, column in ROLE_COLUMNS.items() if row.get(column)}
+                for container in self._scoped_containers(environment_id):
+                    container.reload()
+                    state = container.attrs.get('State', {})
+                    role = roles.get(container.id)
+                    if (role is None or container.labels.get('vibebench.role') != ROLE_LABELS[role]
+                            or state.get('Running') is not False or state.get('Pid') != 0):
+                        raise ValueError('目标原准备仍有实际角色或未知归属，请先核对')
+                if runtime.environment_jobs(environment_id):
+                    raise ValueError('目标原准备仍有实际作业，请先核对')
+                # 仅收口本次尚未提交的已停止失败角色，保留HOME、身份及原迁移游标。
+                runtime._stop_environment(row, remove=True)
+                runtime._update(row, state='stopped')
             if request.cli_only:
                 if request.login_sid is not None:
                     runtime.ensure(request.account,prepare_sender=False,allow_inactive_login=True,

@@ -31,6 +31,8 @@ CPU_TEMPLATES = {
 }
 # 显示配置由本项目定义，原厂资料只核对 CPU 与机型兼容；模板 ID 和内容不可重解释。
 COMPUTER_TEMPLATES = {
+    'portable-computer-v1': (None,
+        {'manufacturer': 'Flower', 'product': 'Portable Computer', 'version': '1.0', 'family': 'Virtual Machine'}),
     'naples-poweredge-r7425-v1': (('AuthenticAMD', '23', '1'),
         {'manufacturer': 'Dell Inc.', 'product': 'PowerEdge R7425', 'version': '1.0', 'family': 'PowerEdge'}),
     'naples-proliant-dl385-v1': (('AuthenticAMD', '23', '1'),
@@ -87,9 +89,10 @@ def cpu_signature(cpuinfo: str) -> tuple[str, str, str]:
     return signatures.pop()
 
 
-def _profile(kernel_id: str, cpu_id: str) -> dict:
+def _profile(kernel_id: str, cpu_id: str, *, signature=None, model_name=None) -> dict:
     release, version = KERNEL_TEMPLATES[kernel_id]
-    signature, model_name = CPU_TEMPLATES[cpu_id]
+    if cpu_id != 'host-cpu-v1':
+        signature, model_name = CPU_TEMPLATES[cpu_id]
     # 内核三种常规表示成套保存，不把宿主编译时间混入随机 release。
     proc_version = (f'Linux version {release} (debian-kernel@lists.debian.org) '
         f'(gcc-12 (Debian 12.2.0-14) 12.2.0, GNU ld (GNU Binutils for Debian) 2.40) {version}\n')
@@ -99,35 +102,47 @@ def _profile(kernel_id: str, cpu_id: str) -> dict:
 
 
 def generate_system_profile(cpuinfo: str) -> dict:
-    """在兼容候选中生成一次画像，调用方负责持久保存。
+    """生成一次持久画像，未登记的CPU使用实际型号。
 
     :param cpuinfo: 当前 Docker 宿主的实际 CPU 信息。
-    :return: 独立于设备身份的系统画像；不支持的代际明确拒绝。
+    :return: 独立于设备身份的系统画像。
     """
     signature = cpu_signature(cpuinfo)
     candidates = [key for key, (compatible, _) in CPU_TEMPLATES.items() if compatible == signature]
     if not candidates:
-        raise ValueError('系统画像尚无当前 CPU 代际的兼容模板，请保留环境并补充核验')
+        model = next(line.split(':', 1)[1].strip() for line in cpuinfo.splitlines()
+            if ':' in line and line.split(':', 1)[0].strip() == 'model name')
+        return _profile(secrets.choice(tuple(KERNEL_TEMPLATES)), 'host-cpu-v1', signature=signature, model_name=model)
     return _profile(secrets.choice(tuple(KERNEL_TEMPLATES)), secrets.choice(candidates))
 
 
 def validate_system_profile(profile: dict, cpuinfo: str | None = None) -> dict:
-    """验证固定模板及可选的实际 CPU 兼容性，不自动修复坏画像。
+    """验证持久画像和实际CPU数据，跨宿主继续使用原画像。
 
     :param profile: 已保存的 system_profile。
     :param cpuinfo: 可选的实际 CPU 文本，创建容器时必须提供。
-    :return: 原画像；任何缺失、改写或代际冲突均抛出 ValueError。
+    :return: 原画像；格式或固定模板损坏时抛出ValueError。
     """
     if not isinstance(profile, dict) or type(profile.get('schema')) is not int \
             or profile['schema'] != SYSTEM_PROFILE_VERSION:
         raise ValueError('系统画像格式或版本无效，禁止重新随机')
     kernel_id, cpu_id = profile.get('kernel_template_id'), profile.get('cpu_template_id')
+    signature, model = profile.get('cpu_signature'), profile.get('cpu_model_name')
+    host = cpu_id == 'host-cpu-v1'
+    if host and (not isinstance(signature, list) or len(signature) != 3
+            or not all(isinstance(item, str) and item and len(item) <= 256
+                and not any(ord(character) < 32 for character in item) for item in signature)
+            or not all(item.isdecimal() for item in signature[1:])
+            or not isinstance(model, str) or not model or len(model) > 512
+            or any(ord(character) < 32 for character in model)):
+        raise ValueError('系统画像CPU字段损坏，禁止重新随机')
     if not isinstance(kernel_id, str) or not isinstance(cpu_id, str) \
-            or kernel_id not in KERNEL_TEMPLATES or cpu_id not in CPU_TEMPLATES \
-            or profile != _profile(kernel_id, cpu_id):
+            or kernel_id not in KERNEL_TEMPLATES or not (host or cpu_id in CPU_TEMPLATES) \
+            or profile != _profile(kernel_id, cpu_id, signature=signature, model_name=model):
         raise ValueError('系统画像模板或内容损坏，禁止重新随机')
-    if cpuinfo is not None and tuple(profile['cpu_signature']) != cpu_signature(cpuinfo):
-        raise ValueError('系统画像与实际 CPU 代际冲突，需要核对迁移')
+    if cpuinfo is not None:
+        # 画像随账号迁移；flags、核心数及其它硬件能力仍由目标真实CPU提供。
+        cpu_signature(cpuinfo)
     return profile
 
 
@@ -139,9 +154,9 @@ def generate_computer_profile(system_profile: dict) -> dict:
     """
     profile = validate_system_profile(system_profile)
     candidates = [key for key, (signature, _) in COMPUTER_TEMPLATES.items()
-        if list(signature) == profile['cpu_signature']]
+        if signature is not None and list(signature) == profile['cpu_signature']]
     if not candidates:
-        raise ValueError('计算机画像尚无兼容模板，请保留已有身份')
+        candidates = ['portable-computer-v1']
     template_id = secrets.choice(candidates)
     return {'schema': COMPUTER_PROFILE_VERSION, 'template_id': template_id,
         'dmi': {**COMPUTER_TEMPLATES[template_id][1], 'serial': secrets.token_hex(8).upper(), 'uuid': str(uuid4())}}
@@ -163,7 +178,7 @@ def validate_computer_profile(profile: dict, system_profile: dict) -> dict:
             or not isinstance(dmi, dict) or set(dmi) != set(DMI_FIELDS):
         raise ValueError('计算机画像模板或字段损坏，禁止重新随机')
     signature, expected = COMPUTER_TEMPLATES[template_id]
-    if list(signature) != system['cpu_signature'] or any(dmi[key] != value for key, value in expected.items()) \
+    if (signature is not None and list(signature) != system['cpu_signature']) or any(dmi[key] != value for key, value in expected.items()) \
             or not isinstance(dmi['serial'], str) or not re.fullmatch(r'[0-9A-F]{16}', dmi['serial']) \
             or not isinstance(dmi['uuid'], str):
         raise ValueError('计算机画像内容或 CPU 兼容性无效，禁止重新随机')

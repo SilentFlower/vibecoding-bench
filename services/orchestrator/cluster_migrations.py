@@ -74,7 +74,7 @@ class NodeMigrations:
                         for side, node in (('原', source), ('目标', target)):
                             if node is None:
                                 raise ValueError(side + '节点归属需要核对')
-                            if node['kind'] == 'ssh' and json.loads(node['preparation_json'] or '{}').get('state') != 'prepared':
+                            if side == '原' and node['kind'] == 'ssh' and json.loads(node['preparation_json'] or '{}').get('state') != 'prepared':
                                 raise ValueError(side + '节点正在同步组件，请完成后再开始迁移')
                         environment = connection.execute('SELECT * FROM account_environments WHERE account_id=?', (account_id,)).fetchone()
                         if environment is None:
@@ -117,6 +117,13 @@ class NodeMigrations:
                     if row is None or _NEXT.get(row['phase']) != phase:
                         raise ValueError('迁移阶段已变化或不能跳过核验')
                     record = json.loads(row['record_json'])
+                    if phase == 'source_fenced':
+                        # SSH源的真实停止也同步到中央，避免维护把已隔离源误认为仍在运行。
+                        changed = connection.execute("UPDATE account_environments SET state='stopped' "
+                            'WHERE environment_id=? AND account_id=? AND generation=?',
+                            (record['environment_id'], row['account_id'], record['source_generation']))
+                        if changed.rowcount != 1:
+                            raise ValueError('源隔离期间中央环境代次已变化')
                     record['receipts'][phase] = receipt
                     record['last_confirmed_phase'] = phase
                     self._save(connection, operation_id, phase, record)
@@ -368,8 +375,8 @@ def pristine_target_migration(migration: dict, node_id: int) -> bool:
     """
     record = json.loads(migration['record_json'])
     return (migration['target_node_id'] == node_id and migration['source_node_id'] != node_id
-        and migration['phase'] in ('source_fenced', 'reconcile')
-        and record.get('last_confirmed_phase') == 'source_fenced'
+        and migration['phase'] in ('requested', 'draining', 'source_fenced', 'reconcile')
+        and record.get('last_confirmed_phase') in ('requested', 'draining', 'source_fenced')
         and set(record.get('receipts', {})) <= {'draining', 'source_fenced'}
         and 'archive' not in record.get('checkpoints', {})
         and 'cancellation' not in record.get('checkpoints', {}))

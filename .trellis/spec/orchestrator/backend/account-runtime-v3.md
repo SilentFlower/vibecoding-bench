@@ -796,7 +796,7 @@ AccountRuntime.check_system_profile(row: dict, container) -> None
 ### 3. Contracts
 
 - `system_profile` 独立于原 `profile_version=2`。首次受控创建时读取真实 Docker 网络角色的 `/proc/cpuinfo`，限定 4 MiB，核对所有逻辑 CPU 代际后从内置兼容模板选择一次；保存后跨 run、续聊、改名、停止唤醒、重建及回退复用。仅缺 key 可补齐，显式 null、未知 schema/模板或改写内容必须拒绝，不能重新随机。模板 ID 及内容只追加，不重解释旧记录。
-- 当前支持 `AuthenticAMD/23/1`（Naples）与 `AuthenticAMD/25/80`（Cezanne）。只替换 CPU 型号文本，保留创建时实际厂商、family/model/stepping、flags、数量/拓扑/频率等原文；真实硬件变化后空闲重建刷新非替换字段，跨代际迁移必须先核对，不能自动换画像。
+- 已登记模板覆盖 `AuthenticAMD/23/1`（Naples）与 `AuthenticAMD/25/80`（Cezanne）；其它x64 CPU首次创建使用`host-cpu-v1`保存真实厂商、family/model和型号，缺少对应机型时使用`portable-computer-v1`。已保存画像跨CPU代际及厂商迁移保持原值；渲染只替换型号，目标实际family/model/stepping、flags、核心数和拓扑继续使用目标原文。格式、固定模板及身份完整性继续核验。
 - 生成发生在环境锁内、CLI 创建前；有活动 job 或已有 CLI 实例时拒绝应用。旧容器须显式空闲重建，不能在 GET、普通 API 发送或正在运行的 CLI 中静默迁移。既有 hostname、MAC、machine-id、时区、设备、凭据和绑定保留；即使执行已获许可的 legacy reprofile，也保留已有合法 system_profile。
 - account 镜像携带 `vibebench.system-profile-version=1` 能力标签及镜像内编译的共享库；容器可能继承镜像标签，不能据此推断某角色已加载。只有 CLI 挂载 root 所有的只读 `/etc/v3-system-profile`、`/etc/ld.so.preload` 与 `/proc/cpuinfo`；network/sender 的 preload 为空，权限、网络和预算沿用三角色契约。
 - 覆盖库通过 libc uname 替换 release/version，保留 hostname/架构；常规 open/open64/openat/openat64、fopen/fopen64 及 fortified open 对三个内核文件精确重定向：`/proc/version`、`/proc/sys/kernel/osrelease`、`/proc/sys/kernel/version`。支持词法归一化、相对 cwd/目录 fd；写入仍走原接口，保留创建 mode、errno 和原 fortify 拒绝。配置初始化避免 hook 递归并使用 pthread_once，坏字段返回 EIO。
@@ -811,7 +811,8 @@ AccountRuntime.check_system_profile(row: dict, container) -> None
 | --- | --- |
 | 同账号新任务、续聊、唤醒、重建 | 固定替换字段保持，原项目目录规则不变 |
 | 画像缺 key / 显式 null 或内容损坏 | 受控创建时补齐一次 / 拒绝，不重新随机 |
-| 未支持、混合或迁移后的冲突 CPU 代际 | 明确报错，保留原记录 |
+| 未登记CPU / 迁移后的不同CPU代际 | 使用实际型号首次生成 / 保留原画像 |
+| CPU信息缺失、格式异常或混合代际 | 明确报错，保留原记录 |
 | 活动 job 或已有 CLI 实例调用准备函数 | 拒绝改写，先完成空闲重建 |
 | 旧 CLI 或实际读取不符 | CLI 待对账；健康 API 保留，可显式排空后重建 |
 | preload 或覆盖库未实际加载、其它画像文件不符 | 实际探针失败，不假报 ready |
@@ -826,7 +827,7 @@ AccountRuntime.check_system_profile(row: dict, container) -> None
 
 ### 6. Tests Required
 
-- 单元覆盖型号之外的 CPU 原文保持、未知/混合/迁移代际拒绝、画像损坏不重生成、首次增补一次、改名/重建/legacy reprofile 保持及 CLI 待对账仍可显式维护。
+- 单元覆盖型号之外的CPU原文保持、未知CPU实际型号、跨代/跨厂商迁移保留画像、混合代际拒绝、画像损坏不重生成、首次增补一次、改名/重建/legacy reprofile保持及CLI待对账仍可显式维护。
 - 实际 Docker 验证动态与静态 C、直接 uname syscall/CPUID、普通/fortified open、相对 openat、fopen、并发读取、Node/子进程、真实只读挂载及损坏字段 EIO；network/sender 不加载覆盖，实际资源/秘密边界保持。
 - 精确官方 CLI 2.1.293 在无账号断网环境验证版本、认证状态和登录帮助，结合动态绑定证明 uname 确实走覆盖。auth status 的未登录退出码 1 不算启动失败；不能据此声称真实登录或模型交互已验收。
 - 用 `run_local_verification.py` 的正式构建清单及显式旧 control/account 镜像验证 API/CLI 生命周期、重建和回退再启用，核对画像、身份及 HOME/凭据保留；记录本地启动性能及未执行的生产/真实模型边界。
@@ -855,7 +856,7 @@ account 镜像能力标签：vibebench.computer-profile-version="1"
 
 ### 3. Contracts
 
-- 旧 `system_profile` schema=1 保持不变。计算机对象和 dmi 对象必须精确匹配声明的键；schema 必须为整数 1，不能用 bool。厂商／产品／版本／系列作为兼容 CPU 代际的一套合成模板选择，模板 ID 和显示内容只追加、不重解释，也不声称是原厂 DMI 快照。
+- 旧 `system_profile` schema=1 保持不变。计算机对象和 dmi 对象必须精确匹配声明的键；schema 必须为整数 1，不能用 bool。已登记CPU优先选同代合成机型，其余使用不绑定CPU的`portable-computer-v1`；已有机型随原画像迁移，serial和UUID保持。模板ID及显示内容只追加、不重解释，也不声称是原厂DMI快照。
 - serial 为独立随机生成的 16 位大写十六进制，uuid 为独立标准小写 UUIDv4；不从 MAC、machine-id、账号或官方设备身份派生。已有合法 hostname、MAC、machine-id、时区／语言、CPU／内核、HOME、凭据及绑定继续保留；CPU 能力、实际限额和 RSS 不随机替换。
 - `prepare_system_profile` 在环境锁内、CLI 创建前读取实际 CPU；Docker 读取位于 SQLite 写事务外。`BEGIN IMMEDIATE` 后重读本行指纹、generation 和 container_id，仅缺 key 才生成；不持全局 jobs 锁等待 SQLite。UUID 占用查询与首次提交位于同一事务，未发布碰撞最多尝试 8 次；已保存重复值报错，不能旋转身份。
 - 先提交完整权威 JSON，再用逐级 O_NOFOLLOW 的原子写入渲染只读文件。画像和 dmi 目录 root 所有且 0755，文件 0444，计算机标记最后发布；提交后渲染失败、旧 row 重试或并发初始化都从 DB 复用同一对象。新任务、恢复、进程重启、唤醒、重建和镜像更新不重抽；legacy reprofile 也保留合法计算机对象。
@@ -893,7 +894,7 @@ validate_computer_profile(saved['computer_profile'], saved['system_profile'])
 
 ### 6. Tests Required
 
-- `test_system_profile.py` 覆盖 Naples／Cezanne 兼容候选、独立 serial／UUID、严格键和格式校验、跨代拒绝；保留型号之外真实 CPU 原文的断言。
+- `test_system_profile.py`覆盖Naples／Cezanne候选、未知CPU通用机型、独立serial／UUID、严格键和格式校验、跨宿主保留原机型；机型与保存画像的内部关联仍核验，型号之外真实CPU原文继续断言。
 - `test_account_runtime.py` 覆盖两个独立运行时共享 SQLite 的首次并发、提交后写文件失败及 stale row 重试、损坏记录拒绝、未发布 UUID 碰撞、旧身份／legacy reprofile 保留和健康 API 不受 CLI 门禁影响。
 - `verify_system_profile.py --manifest` 与原生探针覆盖两目录六字段、Node/libuv statx、元数据／权限／只读、相对 fd／cwd、零／六参数 syscall 和 errno、静态／CPUID 边界，以及已有宿主值和坏标记不回退。
 - `run_local_verification.py` 核对跨任务／恢复／重建、三角色权限、HOME／凭据和 CLI／API 隔离；任务研究中的 `identity_lifecycle_probe.py` 使用独立控制端进程、持久合成 SQLite 和两批真实镜像证明静态摘要、HOME／设备配置保持。真实账号、OAuth、模型和公网遥测不用于本地验收。
@@ -1807,7 +1808,7 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - 迁移export/verify-import/prepare-import及大profile prepare-files取消UDS/SSH总时限。迁移包和profile取消600秒总传输时限，HTTP逐次读写15秒、SSH连接与存活检测保持。排空默认沿原操作等待并续约，服务关闭或租约变化终止推进。
 - 普通profile准备以1MiB作为通路选择阈值，大文件进入私有摘要文件；迁移同样使用`profile_references`。固定文件名仅`.credentials.json/.claude.json/settings.json`，实际长度、SHA256、0600权限、单链接和归属逐次核验；绑定账号先去除RT。历史端通过固定受限适配复用其原锁、类型和准备器，身份算法沿原版本。
 - `record.progress.stage`只表示实际处理步骤，确认阶段仍由原回执推进。reconcile公开固定`failure={code,stage,message,action}`，历史缺字段使用原通用提示；任意底层正文及私有路径排除出公开投影。继续迁移保持原operation_id和所有权，提交前取消继续先撤销目标再恢复源。
-- 节点同步私有日志保存原目标、配置摘要、原控制/镜像、账号与隔离收据。并发最多两台，单节点组件切换与两端迁移共用操作锁。原迁移先完成后同步，等待期间保留prepared原组件，避免循环阻挡。源已隔离、无archive/取消检查点且远端目标操作目录不存在时可先升级空目标；原迁移记录保持原值。
+- 节点同步私有日志保存原目标、配置摘要、原控制/镜像、账号与隔离收据。并发最多两台，单节点组件切换与两端迁移共用操作锁。运行中的迁移先完成后同步；登记后尚未建立目标副本时可先同步空目标。暂停迁移按下述维护兼容规则核对实际停止和原租约，保留迁移资料及关闭的账号准入，只升级组件。
 - 同步核对真实jobs、流、草稿、独立验收、凭据交接和实际角色。暂停接单偏好独立保存。停止原角色和控制后以原镜像执行完整私有备份，备份进程仍运行时继续等待。新控制失败在账号更新前恢复原实例；账号恢复已开始则保留当前现场继续。相同账号镜像以原撤销fence复用原角色和代次，镜像变化交原生命周期重建；回传传输绑定按实际账号镜像批次核验。
 - 全局完整备份收齐同部署、同epoch的中央及全部登记Node快照。SQLite复制使用原backup API；离线固定副本读取使用immutable，避免生成WAL辅助文件改变清单。组合恢复核对安装身份、归属/分配和实际环境，保留pending/reconcile事实。
 
@@ -1904,3 +1905,55 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - `test_cluster_password` 核对严格 DTO、原值保存、只写/repr、目录权限、符号链接拒绝、重复登记清理、默认密钥持久字段和安装配置诊断。
 - `CLUSTER_SSH_PASSWORD_TEST=1 ... -m unittest test_cluster_ssh_password` 使用合成密码与隔离回环 Docker sshd，核对正确/错误密码、主机指纹拒绝、特殊字符和大 stdin、实际 Docker SDK、三类隧道、重连及进程清理。夹具构建见 `deploy/flower2api/fixtures/ssh-password/Dockerfile`。
 - 原 `test_cluster_nodes/test_cluster_ssh/test_cluster_backup` 回归，实际已发布 NodeConfiguration 重读新密钥配置；前端构建及 `verify_node_password_ui.py` 核对认证切换、掩码、唯一凭据、清理和 1440/390 布局。
+
+## Scenario: 集群迁移兼容与暂停维护
+
+### 1. Scope / Trigger
+
+- 跨CPU代际/厂商、未准备或旧批次目标、目标创建中断，以及暂停迁移期间的组件/平台升级。现有交付制品仍为Linux x64，ARM需要匹配的运行制品。
+
+### 2. Signatures
+
+```text
+MigrationCoordinator._ready(node, synchronize=False)
+NodeExecution._prepare_locked(..., import_intent=None)
+paused_migration_record(migration) -> dict | None
+paused_migration_lease(database, environment, snapshot) -> dict | None
+GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不展示上次failure
+```
+
+### 3. Contracts
+
+- 首次归属和迁移选择器允许选择已启用、尚未准备的节点。保存首次归属后，后台扫描按account_count纳管；普通准备遇到未就绪组件主动提交同步并返回可重试的RuntimeBusy。迁移先在后台`preflight`等待原安装/自动同步、核对实际agent部署及批次，再取得两端操作锁并隔离源。检查保存画像的格式发生在登记前，原像完整性失败不会先停止源。
+- 源隔离收据确认后，按原环境ID/账号/generation同步中央state=stopped；原运行意图保存在record.source_state。包、profile文件和逻辑身份沿原操作保留。普通节点准备取消1MiB拒绝条件，大profile继续由deliver_preparation按摘要文件通道传输；2MiB控制消息预算保持。
+- 新操作在execution检查点保存source_node_location/target_node_location，字段为host、port、host_key、data_root。名称、SSH用户名及认证方式变化不改变资料定位；主机身份或数据位置变化仍拒绝。历史检查点缺location时继续核对原config_sha256。
+- 暂停维护仅认可phase=reconcile、last_confirmed_phase为source_fenced/exporting/importing/verified、无cancellation的提交前操作。中央分配仍在原源且为reconcile，revision、environment_id、source_generation和source_fingerprint_sha256一致；网关active/waiting/importing全为0，唯一排他holder的owner/generation与原gateway_lease精确一致。独立账号保持空租约。历史SSH源中央state=ready时仍须取得节点实际停止证明。
+- 本机源核对原fenced标记和全部角色Running=false/Pid=0。SSH源核对同标记、实际角色ID集合及停止状态；已发布的目标核对原operation、node、account、environment、revision和source_generation及published/prepared标记。无目标目录时不得存在目标角色。凭据交接、中央执行及连接继续排空。暂停账号从组件重建名单排除，全部资料纳入完整备份，原租约和迁移游标保持。
+- 目标创建失败留下reconcile时，prepare_import仅凭原published标记与相同import_intent恢复。原登记角色必须均已停止、没有外来角色或实际作业；收口这些角色后恢复stopped并按原身份重建，HOME、profile和迁移尝试保持。
+- 已保存CPU/机型画像随账号保留；目标硬件能力保持实际值。旧版仍使用各自的CPU和模板校验，跨代迁移后回退应选择包含该兼容能力的版本，或先按原迁移流程迁回旧版支持的节点。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 保存画像与目标CPU跨代/跨厂商 | 保留原画像并使用目标实际能力 |
+| 新x64 CPU没有登记模板 | host-cpu-v1及通用机型，持久身份只生成一次 |
+| 目标组件尚未就绪 | 后台preflight准备，源隔离延后 |
+| 暂停且原租约、停止及身份均确认 | 保留原操作/资料，允许备份与组件维护 |
+| 外来holder、活动请求/导入、未知角色或标记不符 | 继续阻断维护 |
+| 目标本次创建失败且全部角色已停止 | 收口本次失败角色，继续同次迁移 |
+| 固定画像损坏/组件不符/位置变化/Docker创建失败 | system_profile/component_version/node_configuration/runtime_preparation固定公开原因 |
+
+### 5. Scenarios and Examples
+
+- 正常：Naples画像迁入Cezanne或Turin节点，保留设备、机型、HOME及工程资料，目标实际flags及核心数按宿主渲染。
+- 边界：目标已有本次迁移的停止角色和发布目录；原迁移暂停后升级控制组件，完整备份并保留目标目录，随后继续原操作。
+- 错误用法：按租约TTL删除占用、把reconcile直接改ready，或删除画像重新随机。正确处理：核对原持久操作、双端实际停止和原代次，保留迁移关闭状态并继续原收口路径。
+
+### 6. Tests Required
+
+- test_system_profile：Turin/Intel首次画像、跨代渲染保持实际能力、旧画像和DMI身份保持、坏格式拒绝。
+- test_cluster_migration_runner/migrations/nodes/synchronization：自动准备先于源隔离、名称/认证变更与位置保护、源停止镜像、未准备节点首次选择及自动纳管。
+- test_cluster_migration_maintenance/execution：真实SQLite原租约及过期/外来/活动矩阵、源隔离证明、SSH磁盘标记、失败角色恢复保留身份与资料；未知或运行角色保持阻断。
+- verify_cluster_ui：未准备目标可选并可提交迁移，既有确认、未知结果、恢复及窄屏交互保持。
+- 隔离SSH/Docker验收：跨代画像完整迁移后读取目标实际CLI；暂停迁移目标完整备份/控制换批，原停止角色、标记、资料和中央游标保持。

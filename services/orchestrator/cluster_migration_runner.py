@@ -19,6 +19,7 @@ from cluster_migration_lease import IndependentMigrationPermit, MigrationLease
 from cluster_migrations import NodeMigrations
 from cluster_migration_errors import migration_failure
 from cluster_migration_profiles import MigrationProfiles
+from system_profile import validate_computer_profile, validate_system_profile
 
 
 class MigrationStart(BaseModel):
@@ -87,10 +88,16 @@ class MigrationCoordinator:
                 row = self._fresh_row(account['id'], row['environment_id'])
                 if row['state'] not in ('ready', 'stopped'):
                     raise ValueError('账号环境需要先完成执行对账，再开始迁移')
+                fingerprint = json.loads(row['fingerprint_json'])
+                if 'system_profile' in fingerprint:
+                    validate_system_profile(fingerprint['system_profile'])
+                    if 'computer_profile' in fingerprint:
+                        validate_computer_profile(fingerprint['computer_profile'], fingerprint['system_profile'])
                 original = self.service.store.assignment(account_id)
                 source = self.service.store.get(original['node_id'])
                 target = self.service.store.get(request.node_id)
-                self._ready(target)
+                if not target['enabled'] or target['kind'] not in ('local', 'ssh'):
+                    raise ValueError('迁移目标节点不可接单，请核对节点状态')
                 if row['generation'] == 0 and not any(row.get(key) for key in ('container_id', 'network_container_id', 'sender_container_id')):
                     if source['kind'] == 'local':
                         root = self.runtime._root(row)
@@ -110,8 +117,10 @@ class MigrationCoordinator:
                     'attempt_id': uuid.uuid4().hex, 'transfer_id': uuid.uuid4().hex,
                     'source_node_key': source['node_key'], 'source_node_revision': source['revision'],
                     'source_node_config_sha256': hashlib.sha256(source['config_json'].encode()).hexdigest(),
+                    'source_node_location': self._node_location(source),
                     'target_node_key': target['node_key'], 'target_node_revision': target['revision'],
-                    'target_node_config_sha256': hashlib.sha256(target['config_json'].encode()).hexdigest()}
+                    'target_node_config_sha256': hashlib.sha256(target['config_json'].encode()).hexdigest(),
+                    'target_node_location': self._node_location(target)}
                 return self.ledger.begin(request.operation_id, account_id, request.node_id, request.revision, execution=execution)
 
     def _fresh_row(self, account_id: int, environment_id: str) -> dict:
@@ -125,13 +134,35 @@ class MigrationCoordinator:
         finally:
             connection.close()
 
-    def _ready(self, node: dict) -> None:
+    def _node_location(self, node: dict) -> dict:
+        config = json.loads(node['config_json'])
+        return {key: config.get(key) for key in ('host', 'port', 'host_key', 'data_root')}
+
+    def _ready(self, node: dict, *, synchronize: bool = False) -> None:
         if not node['enabled']:
             raise ValueError('迁移目标节点已暂停接单')
         if node['kind'] == 'ssh':
             preparation = json.loads(node['preparation_json']) if node['preparation_json'] else {}
+            if synchronize and preparation.get('state') == 'prepared' and preparation.get('release') == self.runtime.release_id:
+                health = self.service.connection(node['id']).agent_health(node_container_name(self.runtime.deployment, node['node_key']))
+                if health.get('release') != self.runtime.release_id or health.get('deployment') != self.runtime.deployment:
+                    raise ValueError('迁移目标需要先准备同批执行组件')
             if preparation.get('state') != 'prepared' or preparation.get('release') != self.runtime.release_id:
-                raise ValueError('迁移目标需要先准备同批执行组件')
+                automatic = getattr(self.service, 'synchronization', None) is not None
+                if not synchronize or not automatic and node['id'] not in getattr(self.service, 'install_workers', {}):
+                    raise ValueError('迁移目标需要先准备同批执行组件')
+                if automatic:
+                    self.service.prepare_node(node['id'], node['revision'], automatic=True)
+                while not self.stopping.wait(.5):
+                    node = self.service.store.get(node['id'])
+                    preparation = json.loads(node['preparation_json']) if node['preparation_json'] else {}
+                    if preparation.get('state') == 'prepared' and preparation.get('release') == self.runtime.release_id:
+                        return self._ready(node, synchronize=True)
+                    if preparation.get('state') in ('failed', 'needs_check'):
+                        raise ValueError('迁移目标需要先准备同批执行组件')
+                    if not automatic and node['id'] not in self.service.install_workers:
+                        raise ValueError('迁移目标需要先准备同批执行组件')
+                raise ValueError('迁移服务正在关闭，请稍后继续原操作')
         elif node['kind'] != 'local':
             raise ValueError('迁移目标节点类型无效')
 
@@ -146,8 +177,10 @@ class MigrationCoordinator:
         for side in ('source', 'target'):
             node = self.service.store.get(migration[side + '_node_id'])
             # 暂停接单会推进页面revision；恢复核对固定连接配置，避免暂停本身阻断原迁移恢复。
-            if (node['node_key'] != execution[side + '_node_key']
-                    or hashlib.sha256(node['config_json'].encode()).hexdigest() != execution[side + '_node_config_sha256']):
+            same_location = (self._node_location(node) == execution[side + '_node_location']
+                if side + '_node_location' in execution else
+                hashlib.sha256(node['config_json'].encode()).hexdigest() == execution[side + '_node_config_sha256'])
+            if node['node_key'] != execution[side + '_node_key'] or not same_location:
                 raise ValueError('迁移原节点配置版本已变化，请核对原操作')
         identity = ArchiveIdentity(operation_id=operation_id, deployment_id=self.runtime.deployment,
             source_node_key=execution['source_node_key'], account_id=account['id'],
@@ -173,6 +206,11 @@ class MigrationCoordinator:
             return migration
         step = 'context'
         try:
+            # 同步在两端操作锁之外等待；后台安装器使用同一把节点锁。
+            if migration['record']['last_confirmed_phase'] != 'committed':
+                step = 'preflight'
+                self.ledger.progress(operation_id, step)
+                self._ready(self.service.store.get(migration['target_node_id']), synchronize=True)
             with self.service.migration_nodes(migration), self.guard(migration['account_id']) as (account, row):
                 migration, execution, identity, fence = self._context(operation_id, account)
                 if migration['phase'] in ('completed', 'cancelled'):

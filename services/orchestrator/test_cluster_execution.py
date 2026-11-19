@@ -128,6 +128,42 @@ class NodeExecutionTests(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(ValueError):
                 self.executor.prepare(request)
 
+    def test_failed_import_preparation_recovers_only_its_stopped_roles(self) -> None:
+        """目标创建失败后保留原资料，重试核对并收口同次已停止角色。:return: None。"""
+        request = self.migration_input()
+        def fail(runtime, account, version):
+            """模拟网络角色建立后的画像校验失败。:return: None。"""
+            with runtime.database() as connection:
+                connection.execute("UPDATE account_environments SET state='reconcile',network_container_id='network'")
+            raise ValueError('系统画像与实际 CPU 代际冲突，需要核对迁移')
+        with patch.object(_Runtime, 'transport', fail), self.assertRaisesRegex(ValueError, 'CPU'):
+            self.executor.prepare_import(request)
+        root = self.root / 'environments' / ('e' * 32)
+        sentinel = (root / 'projects/sentinel.txt').read_bytes()
+        identity = read_cli_identity_at(root, self.root / 'profiles/synthetic', '2.1.293')
+        stopped = SimpleNamespace(id='network', labels={'vibebench.role': 'account-network'}, reload=lambda: None,
+            attrs={'State': {'Running': False, 'Pid': 0}})
+        def remove(runtime, row, *, remove):
+            """只模拟同代停止角色的删除。:return: None。"""
+            self.assertTrue(remove)
+            with runtime.database() as connection:
+                connection.execute('UPDATE account_environments SET network_container_id=NULL')
+        def update(runtime, row, *, state):
+            """保留原代次并更新已核对状态。:return: None。"""
+            with runtime.database() as connection:
+                connection.execute('UPDATE account_environments SET state=?', (state,))
+        with patch.object(self.executor, '_scoped_containers', return_value=[stopped]), \
+                patch.object(_Runtime, 'environment_jobs', return_value=[], create=True), \
+                patch.object(_Runtime, '_stop_environment', remove, create=True), \
+                patch.object(_Runtime, '_update', update, create=True):
+            stopped.attrs['State'] = {'Running': True, 'Pid': 123}
+            with self.assertRaisesRegex(ValueError, '实际角色'):
+                self.executor.prepare_import(request)
+            stopped.attrs['State'] = {'Running': False, 'Pid': 0}
+            self.assertEqual('prepared', self.executor.prepare_import(request)['phase'])
+        self.assertEqual(sentinel, (root / 'projects/sentinel.txt').read_bytes())
+        self.assertEqual(identity, read_cli_identity_at(root, self.root / 'profiles/synthetic', '2.1.293'))
+
     def test_explicit_bound_login_only_prepares_original_cli_with_inactive_exception(self) -> None:
         """绑定账号显式登录准备保持原绑定及AT-only，仅将原SID交给CLI准备例外。:return: None。"""
         request=self.request.model_copy(update={'cli_only':True,'login_sid':'a'*12,

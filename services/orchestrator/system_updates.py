@@ -8,9 +8,7 @@ import os
 import re
 import secrets
 from contextlib import ExitStack
-from http.client import HTTPConnection
 from pathlib import Path
-from socket import AF_UNIX, SOCK_STREAM, socket
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from docker.errors import NotFound
@@ -24,6 +22,7 @@ from native_kernel_upgrade import migrate_records, pending_upgrade, validate_rec
 from native_sender import builtin_config
 from system_update_contract import MANIFEST_LIMIT, safe_read, strict_json, validate_operation
 from system_update_gate import UPDATE_GATE
+from cluster_migration_maintenance import paused_migration_lease
 
 
 _PLATFORM_VERSION_FILE = Path(__file__).with_name('platform-version.json')
@@ -228,7 +227,17 @@ def runtime_snapshot(runtime) -> dict:
                         reasons.append('凭据交接或刷新结果尚未确认')
                 if account and account.get('cc2api_account_id'):
                     lease = runtime.gateway._request('GET', f'/admin/runtime/accounts/{int(account["cc2api_account_id"])}/lease')
-                    if lease.get('active') or lease.get('waiting') or lease.get('lease') or lease.get('holders'):
+                    paused = paused_migration_lease(runtime.database, row, lease)
+                    if paused is not None:
+                        fence = strict_json((root / 'runtime/node-fence.json').read_bytes())
+                        record = paused['record']
+                        if any(fence.get(key) != value for key, value in {
+                                'phase': 'fenced', 'operation_id': paused['operation_id'], 'node_key': 'local',
+                                'environment_id': row['environment_id'], 'account_id': row['account_id'],
+                                'generation': row['generation'], 'assignment_revision': record['source_revision']}.items()):
+                            paused = None
+                    if (lease.get('active') or lease.get('waiting') or lease.get('lease') or lease.get('holders')
+                            or lease.get('importing')) and paused is None:
                         reasons.append('账号 API 或运行租约尚未收口')
                 roles, image_ids = {}, set()
                 for role, column in ROLE_COLUMNS.items():
@@ -237,6 +246,10 @@ def runtime_snapshot(runtime) -> dict:
                     container = role_container(runtime, row, role)
                     container.reload()
                     roles[role] = {'id': container.id, 'state': container.status, 'image_id': container.attrs['Image']}
+                    if account and account.get('cc2api_account_id') and paused is not None:
+                        state = container.attrs.get('State', {})
+                        if state.get('Running') is not False or state.get('Pid') != 0:
+                            reasons.append('原迁移源角色尚未确认停止')
                     image_ids.add(container.attrs['Image'])
                     if role == 'cli' and container.status == 'running' and not reasons:
                         result = container.exec_run(['python3', '-I', '/usr/local/bin/v3-cli-control', 'orphans'])

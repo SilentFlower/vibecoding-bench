@@ -22,6 +22,7 @@ from account_isolation import ROLE_COLUMNS, ROLE_LABELS
 from cluster_environment import EnvironmentFence
 from cluster_migration_errors import MigrationFailure
 from cluster_migrations import pristine_target_migration
+from cluster_migration_maintenance import paused_migration_lease, paused_migration_record
 from cluster_node_recovery import RESTORE_NODE_DATA
 from cluster_profile_reader import profile_reader_source
 from cluster_execution_store import NodeExecutions
@@ -77,7 +78,7 @@ class NodeSynchronization:
             saved = row.get('preparation') or {}
             if row['kind'] != 'ssh' or self.stopping.is_set():
                 continue
-            managed = bool(saved.get('release') or saved.get('target_release'))
+            managed = bool(saved.get('release') or saved.get('target_release') or row.get('account_count'))
             due = saved.get('retry_at', 0) <= time.time()
             needed = saved.get('release') != self.runtime.release_id or saved.get('state') != 'prepared'
             if not explicit and (not managed or not due or not needed):
@@ -129,6 +130,17 @@ class NodeSynchronization:
     def _historical_environment(self, node, control: str, node_id: int, environment_id: str) -> bool:
         if not isinstance(environment_id, str) or not re.fullmatch('[a-f0-9]{32}', environment_id):
             return False
+        connection = self.service.store.database()
+        try:
+            pending = [dict(value) for value in connection.execute("SELECT * FROM node_migrations "
+                "WHERE (source_node_id=? OR target_node_id=?) AND phase='reconcile'", (node_id, node_id))]
+        finally:
+            connection.close()
+        for migration in pending:
+            record = paused_migration_record(migration)
+            if record and record.get('environment_id') == environment_id:
+                if self._paused_environment(migration, node_id):
+                    return True
         script = ('import json,sys;from pathlib import Path;from account_runtime import _read_json;'
             'v=json.load(sys.stdin);print(json.dumps(_read_json(Path("/data/environments")/v["environment_id"]/"runtime/node-fence.json")))')
         try:
@@ -150,11 +162,85 @@ class NodeSynchronization:
         except (ValueError, OSError, RuntimeError):
             return False
 
+    def _paused_environment(self, migration: dict, node_id: int) -> bool:
+        record = paused_migration_record(migration)
+        if record is None:
+            return False
+        node = self.service.store.get(node_id)
+        environment_id = record.get('environment_id')
+        if not isinstance(environment_id, str) or not re.fullmatch('[a-f0-9]{32}', environment_id):
+            return False
+        connection = self.service.store.database()
+        try:
+            environment = connection.execute('SELECT * FROM account_environments WHERE account_id=?',
+                (migration['account_id'],)).fetchone()
+            account = connection.execute('SELECT cc2api_account_id FROM accounts WHERE id=?',
+                (migration['account_id'],)).fetchone()
+        finally:
+            connection.close()
+        if (environment is None or account is None or self.service.transports.account_streams(migration['account_id'])
+                or NodeExecutions(self.service.store, self.runtime.release_id).active(migration['account_id'])):
+            return False
+        owner = getattr(self.runtime, 'credential_ownership', None)
+        if owner:
+            state = owner.state(migration['account_id'])
+            if state and (state.get('phase') != 'ready' or state.get('refresh_pending') or state.get('gateway_refresh_pending')):
+                return False
+        lease = (self.gateway._request('GET', f'/admin/runtime/accounts/{account["cc2api_account_id"]}/lease')
+            if account['cc2api_account_id'] is not None else {'active': 0, 'waiting': 0, 'importing': 0, 'holders': []})
+        if paused_migration_lease(self.service.store.database, dict(environment), lease) is None:
+            return False
+        source = migration['source_node_id'] == node_id
+        config = json.loads(node['config_json'])
+        expected = {'operation_id': migration['operation_id'], 'environment_id': environment_id,
+            'account_id': migration['account_id'], 'node_key': node['node_key']}
+        if source:
+            expected.update(phase='fenced', generation=record['source_generation'], assignment_revision=record['source_revision'])
+        else:
+            expected.update(revision=record['source_revision'] + 1, source_generation=record['source_generation'])
+        script = '''import json,os,sys
+from pathlib import Path
+value=json.load(sys.stdin)
+root=Path(value['root'])/'environments'/value['expected']['environment_id']
+valid=not value['source'] and not root.exists() and not root.is_symlink()
+if root.is_dir() and not root.is_symlink():
+    path=root/'runtime'/('node-fence.json' if value['source'] else 'node-migration-target.json')
+    with os.fdopen(os.open(path,os.O_RDONLY|os.O_NOFOLLOW),'rb') as stream:
+        marker=json.loads(stream.read(16385))
+    valid=all(marker.get(key)==item for key,item in value['expected'].items())
+    if not value['source']:
+        valid=valid and marker.get('phase') in ('published','prepared')
+print(json.dumps({'paused':valid,'environment':root.exists()}))
+'''
+        proof = json.loads(self.service.connection(node_id)._command('python3 -c ' + shlex.quote(script),
+            data=json.dumps({'root': config['data_root'], 'source': source, 'expected': expected}).encode(),
+            timeout=15, maximum_output=1024))
+        if proof.get('paused') is not True:
+            return False
+        labels = ['vibebench.product=v3', 'vibebench.deployment=' + self.runtime.deployment,
+            'vibebench.cluster-node=' + node['node_key'], 'vibebench.environment=' + environment_id]
+        containers = self.service.docker(node_id).containers.list(all=True, filters={'label': labels})
+        if containers and proof.get('environment') is not True:
+            return False
+        if source and {container.id for container in containers} != {
+                environment[column] for column in ROLE_COLUMNS.values() if environment[column]}:
+            return False
+        for container in containers:
+            container.reload()
+            state = container.attrs.get('State', {})
+            if (container.labels.get('vibebench.role') not in ROLE_LABELS.values()
+                    or state.get('Running') is not False or state.get('Pid') != 0):
+                return False
+        return True
+
     def _rows(self, node_id: int) -> list[dict]:
         connection = self.service.store.database()
         try:
             migrations = [dict(value) for value in connection.execute("SELECT * FROM node_migrations WHERE (source_node_id=? OR target_node_id=?) "
                 "AND phase NOT IN ('completed','cancelled')", (node_id, node_id))]
+            paused = [value for value in migrations if paused_migration_record(value) is not None
+                and self._paused_environment(value, node_id)]
+            migrations = [value for value in migrations if value not in paused]
             if any(not pristine_target_migration(value, node_id) for value in migrations):
                 raise NodeSynchronizationWait('节点仍有源或目标迁移，请先完成原迁移')
             if migrations:
@@ -175,6 +261,9 @@ class NodeSynchronization:
                 'FROM accounts a JOIN account_node_assignments b ON b.account_id=a.id WHERE b.node_id=?', (node_id,))]
             result = []
             for account in accounts:
+                if any(value['account_id'] == account['id'] for value in paused):
+                    # 已暂停的源保持原隔离和租约；只换组件并完整备份，不重建或激活该账号。
+                    continue
                 environment = connection.execute('SELECT * FROM account_environments WHERE account_id=?', (account['id'],)).fetchone()
                 if environment is not None:
                     result.append({'account': account, 'environment': dict(environment)})
@@ -585,6 +674,13 @@ class NodeSynchronization:
                 'node_kind': 'ssh', 'roles': {}, 'origin': None, 'blockers': []}
         assignment = self.service.store.assignment(account['id'])
         node_row = self.service.store.get(assignment['node_id'])
+        connection = self.service.store.database()
+        try:
+            pending = connection.execute("SELECT * FROM node_migrations WHERE account_id=? AND phase='reconcile'",
+                (account['id'],)).fetchone()
+        finally:
+            connection.close()
+        paused = pending is not None and self._paused_environment(dict(pending), node_row['id'])
         saved = json.loads(node_row['preparation_json']) if node_row['preparation_json'] else {}
         staged = False
         if saved.get('state') != 'prepared':
@@ -604,7 +700,7 @@ class NodeSynchronization:
             self._check_platform(job)
             self._rows(node_row['id'])
         peer = None
-        if quiescent and not staged:
+        if quiescent and not staged and not paused:
             self._rows(node_row['id'])
             if self.version is None:
                 raise ValueError('节点快照缺少原CLI版本选择器')
@@ -631,7 +727,7 @@ class NodeSynchronization:
                 'vibebench.role': ROLE_LABELS[role]}
             if any(container.labels.get(key) != value for key, value in expected.items()):
                 raise ValueError('远程角色实际归属与中央环境不一致')
-            if staged and (container.attrs.get('State', {}).get('Running') is not False or container.attrs.get('State', {}).get('Pid') != 0):
+            if (staged or paused) and (container.attrs.get('State', {}).get('Running') is not False or container.attrs.get('State', {}).get('Pid') != 0):
                 raise NodeSynchronizationWait('已备份节点的账号角色重新出现活动')
             if peer is not None and peer.get('role_status', {}).get(role) != container.status:
                 raise ValueError('节点运行时角色来源与实际容器不一致')
@@ -651,7 +747,11 @@ class NodeSynchronization:
         if images:
             reference = os.environ['V3_ACCOUNT_IMAGE']
             actual = next(iter(images))
-            if saved.get('account_reference') == reference and saved.get('account_image_id') == actual:
+            if paused:
+                # 源角色已按原冻结ID核验并停止，升级保留其原镜像，原迁移恢复时再创建目标角色。
+                reference = container.attrs['Config']['Image']
+                verified = True
+            elif saved.get('account_reference') == reference and saved.get('account_image_id') == actual:
                 verified = True
             else:
                 original = self.service.local_client.images.get(reference)

@@ -30,6 +30,7 @@ from cluster_synchronization import NodeSynchronization, NodeSynchronizationWait
 from cluster_preparation_files import PreparationFiles, PreparationFileScope
 from cluster_migration_profiles import MigrationProfiles
 from cluster_migrations import pristine_target_migration
+from cluster_migration_maintenance import paused_migration_record
 from cluster_transfer import NodeArchiveTransfer
 from cluster_profile_reader import profile_reader_source
 from cluster_execution import NodeInspection, NodePreparation, NodeReviewAdmission
@@ -567,7 +568,9 @@ class ClusterService:
             node_row = self.store.get(assignment['node_id'])
             preparation = json.loads(node_row['preparation_json']) if node_row['preparation_json'] else {}
             if preparation.get('state') != 'prepared' or preparation.get('release') != runtime.release_id:
-                raise RuntimeBusy('请先在节点管理中准备同批运行组件')
+                if self.synchronization is not None:
+                    self.prepare_node(node_row['id'], node_row['revision'], automatic=True)
+                raise RuntimeBusy('所属节点正在后台准备运行组件，请稍后重试')
             request = self.build_preparation(account, row, node_row['node_key'], assignment['revision'], runtime, gateway, quota_identity,
                 cli_only=cli_only,login_sid=login_sid)
             node = self.connection(node_row['id'])
@@ -741,11 +744,6 @@ class ClusterService:
                 raise ValueError('账号节点归属已变化，请刷新后重试')
             if current['node_id'] == node_id:
                 return current
-            target = self.store.get(node_id)
-            if target['kind'] == 'ssh':
-                preparation = json.loads(target['preparation_json']) if target['preparation_json'] else {}
-                if preparation.get('state') != 'prepared' or preparation.get('release') != runtime.release_id:
-                    raise ValueError('请先准备目标节点的同批执行组件')
             row = runtime._row(account['name'], account['id'], account.get('timezone'))
             root = runtime.data / 'environments' / row['environment_id']
             if root.exists() or root.is_symlink() or current['kind'] != 'local':
@@ -805,7 +803,8 @@ class ClusterService:
                         "AND phase NOT IN ('completed','cancelled')", (node_id, node_id)).fetchall()
                     previous = json.loads(row['preparation_json']) if row['preparation_json'] else {}
                     original = previous.get('original_preparation') or previous
-                    if any(not pristine_target_migration(dict(migration), node_id) for migration in migrations) and original.get('state') == 'prepared':
+                    if any(not pristine_target_migration(dict(migration), node_id)
+                            and paused_migration_record(dict(migration)) is None for migration in migrations) and original.get('state') == 'prepared':
                         waiting = {**original, 'phase': 'waiting', 'target_release': installer.release,
                             'retry_at': time.time() + 15, 'reason': '原迁移正在进行，完成后自动同步节点组件'}
                         with connection:

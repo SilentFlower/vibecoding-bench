@@ -55,6 +55,15 @@ class NodeMigrationTests(unittest.TestCase):
         for phase in ('draining', 'source_fenced', 'exporting', 'importing', 'verified'):
             self.migrations.advance(self.operation, phase, {'verified_stage': phase})
 
+    def test_source_fence_receipt_updates_central_stopped_state(self) -> None:
+        """真实源停止的已确认收据同步中央状态，原运行意图保留在迁移记录。:return: None。"""
+        self.migrations.begin(self.operation, 1, self.target, 1)
+        self.migrations.advance(self.operation, 'draining', {'active': 0})
+        migration = self.migrations.advance(self.operation, 'source_fenced', {'phase': 'fenced'})
+        with self.database() as connection:
+            self.assertEqual('stopped', connection.execute('SELECT state FROM account_environments').fetchone()[0])
+        self.assertEqual('ready', migration['record']['source_state'])
+
     def test_begin_is_idempotent_and_durable_admission_stays_closed(self) -> None:
         """原操作重试返回同一记录，另一个迁移无法穿过维护边界。:return: None。"""
         first = self.migrations.begin(self.operation, 1, self.target, 1)

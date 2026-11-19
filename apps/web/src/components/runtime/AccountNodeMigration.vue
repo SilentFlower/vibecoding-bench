@@ -11,11 +11,11 @@ const error = ref(''), failed = ref(false);
 type Confirmation = { action: 'start' | 'cancel'; accountId: number; accountName: string; targetName: string; operation: string; body?: NodeMigrationStart };
 const frozen = ref<Confirmation | null>(null);
 const latest = computed(() => history.value[0]);
-const failureStages: Record<string, string> = { draining: '等待原工作完成', fence: '隔离源环境', export: '导出资料', transfer: '传输资料', 'verify-import': '核验目标资料', 'prepare-import': '准备目标环境', commit: '保存新归属', 'activate-import': '激活目标环境', 'revoke-import': '撤销目标副本', 'restore-source': '恢复源环境', context: '核对原操作' };
+const failureStages: Record<string, string> = { preflight: '检查目标节点并同步运行组件', draining: '等待原工作完成', fence: '隔离源环境', export: '导出资料', transfer: '传输资料', 'verify-import': '核验目标资料', 'prepare-import': '准备目标环境', commit: '保存新归属', 'activate-import': '激活目标环境', 'revoke-import': '撤销目标副本', 'restore-source': '恢复源环境', context: '核对原操作' };
 const unfinished = computed(() => !!latest.value && !['completed', 'cancelled'].includes(latest.value.phase));
 const canStart = computed(() => loaded.value && !unfinished.value && props.assignment.phase === 'ready'
   && !!props.account?.effective_claude_code_version && !!props.target?.enabled
-  && props.target.id !== props.assignment.node_id && (props.target.kind === 'local' || props.target.preparation?.state === 'prepared'));
+  && props.target.id !== props.assignment.node_id);
 let alive = true, generation = 0, timer: ReturnType<typeof setTimeout> | undefined, controller: AbortController | undefined;
 
 /** 串行读取当前账号的持久迁移状态，轮询保留已有内容。@return 读取结束。 */
@@ -95,13 +95,13 @@ onUnmounted(() => { alive = false; generation++; controller?.abort(); if (timer)
 
 <template>
   <section class="node-migration">
-    <div class="migration-heading"><div><h3>迁移已有环境</h3><p>先排空并停止源环境，再校验和迁移 HOME、身份与工程资料。</p></div><Button variant="outline" :disabled="!canStart || sending || !!frozen" @click="openStart">迁移到所选节点</Button></div>
+    <div class="migration-heading"><div><h3>迁移已有环境</h3><p>先自动准备目标节点，再排空源环境并迁移 HOME、身份与工程资料。</p></div><Button variant="outline" :disabled="!canStart || sending || !!frozen" @click="openStart">迁移到所选节点</Button></div>
     <p v-if="!account?.effective_claude_code_version">账号 CLI 版本待核对。</p>
     <div v-if="latest" class="migration-status" aria-live="polite">
       <strong>{{ latest.source.name }} → {{ latest.target.name }}</strong>
       <p>{{ latest.message }}<span v-if="latest.running"> · 后台处理中</span><span v-else-if="latest.cancelling && unfinished"> · 取消操作待继续</span></p>
       <p v-if="latest.failure" role="alert">{{ latest.failure.message }} · {{ latest.failure.action }}（{{ failureStages[latest.failure.stage] ?? '核对当前步骤' }}）</p>
-      <p v-else-if="latest.phase === 'reconcile'">已保留原操作和维护状态，请继续核对。归属切换后继续目标激活。</p>
+      <p v-else-if="latest.phase === 'reconcile' && !latest.running">已保留原操作和维护状态，请继续核对。归属切换后继续目标激活。</p>
       <div class="migration-actions"><Button v-if="latest.can_resume" :disabled="sending || !!frozen" @click="submit(true)">{{ latest.cancelling ? '继续取消' : '继续原迁移' }}</Button><Button v-if="latest.can_cancel" variant="outline" :disabled="sending || !!frozen" @click="openCancel">取消迁移</Button><Button variant="outline" :disabled="reading || sending" @click="refresh">刷新迁移状态</Button></div>
     </div>
     <p v-else-if="loaded">当前账号还没有迁移记录。</p>

@@ -81,6 +81,7 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 - 两端活动计数覆盖响应正文 EOF、错误及断连。批次排队等待属于待认领工作；有限分派事务和实际执行计入活动。维护期间保留待认领项，释放门禁或控制重启后继续调度。
 - 原工程或登录只能凭实际仍登记的有限作业续接。续接继续检查身份、时间窗口与配额；作业撤销后证明失效。
 - 排空核对实际 API、jobs、executions、租约、sender、CLI 孤儿、三角色镜像及未决意图。未知活动阻断切换。排空超时和切换前取消按原操作释放门禁。
+- 暂停的提交前节点迁移可随平台维护保留：核对原操作/分配/环境代次/指纹及源隔离，实际API、等待、导入和角色均已停止，原排他租约身份保持。原源和目标资料纳入节点完整备份，维护不重建或激活暂停账号。恢复后仍由原迁移继续；具体字段和测试归[集群迁移兼容与暂停维护](../../orchestrator/backend/account-runtime-v3.md#scenario-集群迁移兼容与暂停维护)。
 - v1 安装正常阶段为 `preparing → draining → switching → verifying → committing → cleaning → succeeded`。v2 在排空并锁定切换意图后增加 `snapshotting`；目标为 v2 时执行 `migrating`，随后进入 `switching`。失败恢复增加 `restoring_data`。单独 prepare 在 `prepared` 完成。恢复按持久意图、真实容器、配置 CAS、软件字段 CAS 与双库/身份摘要确定动作；不确定现场进入 `reconcile`。
 - 账号部分恢复最多允许冻结的原版和候选两个实际镜像 ID。恢复仍要求环境、代次、epoch 以及原作业证明一致。恢复已释放的门禁前重新检查后来工作。
 - `finalize --apply` 与独立执行器共用 `service.lock` 及存储维护锁。原首次接入在状态提交后、门禁释放前后中断，均可用同一发行重试收口。已完成重试保留原 `installed_at`；外来门禁和后来 revision 拒绝覆盖。

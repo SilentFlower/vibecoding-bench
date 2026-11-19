@@ -12,9 +12,13 @@ _REASONS = {
     'source_changed': ('源环境资料在导出期间发生变化', '确认源环境停止并收口写入后继续原迁移'),
     'incomplete': ('原迁移包或回执尚未完整核对', '保留原操作资料并核对完整回执'),
     'unconfirmed': ('本阶段执行结果尚未确认', '检查节点状态后继续原操作核对'),
+    'system_profile': ('目标运行环境的系统画像校验失败', '核对节点组件版本与保存的系统画像后继续原迁移'),
+    'component_version': ('目标节点运行组件正在同步', '等待后台同步完成后继续原迁移'),
+    'node_configuration': ('迁移节点的数据位置或主机身份已变化', '恢复原节点位置或核对原操作后继续迁移'),
+    'runtime_preparation': ('目标容器或运行组件准备失败', '检查节点Docker状态、镜像和资源后继续原迁移'),
 }
 _STAGES = {'draining', 'fence', 'export', 'transfer', 'verify-import', 'prepare-import',
-    'commit', 'activate-import', 'revoke-import', 'restore-source', 'context'}
+    'commit', 'activate-import', 'revoke-import', 'restore-source', 'context', 'preflight'}
 
 
 class MigrationFailure(ValueError):
@@ -61,6 +65,25 @@ def migration_failure(error: Exception, stage: str) -> dict:
     elif str(error) in ('原导出回执或文件已变化', '目标暂存包含不完整上传，请使用新的上传尝试',
             '迁移包尚未上传完成'):
         code = 'incomplete'
+    elif str(error) in ('系统画像与实际 CPU 代际冲突，需要核对迁移',
+            '系统画像尚无当前 CPU 代际的兼容模板，请保留环境并补充核验',
+            '计算机画像尚无兼容模板，请保留已有身份', '系统画像模板或内容损坏，禁止重新随机',
+            '系统画像CPU字段损坏，禁止重新随机', '计算机画像内容或 CPU 兼容性无效，禁止重新随机',
+            '系统画像格式或版本无效，禁止重新随机', '计算机画像格式或版本无效，禁止重新随机',
+            '计算机画像模板或字段损坏，禁止重新随机', '计算机画像 UUID 无效，禁止重新随机'):
+        code = 'system_profile'
+    elif str(error) in ('目标原准备仍有实际角色或未知归属，请先核对', '目标原准备仍有实际作业，请先核对'):
+        code = 'busy'
+    elif str(error) in ('目标暂存的CLI设备或登录账号与源收据不一致', '目标准备后的CLI身份与源回执不一致',
+            '目标发布与源账号、分配、身份或代次不一致', '目标恢复缺少原迁移发布证明'):
+        code = 'identity'
+    elif str(error) == '迁移目标需要先准备同批执行组件':
+        code = 'component_version'
+    elif str(error) == '迁移原节点配置版本已变化，请核对原操作':
+        code = 'node_configuration'
+    elif (type(error).__name__ in ('APIError', 'DockerException', 'ImageNotFound', 'ContainerError')
+            or str(error) in ('账号隔离网络未就绪，业务未启动', '账号环境需要先对账，拒绝自动放行')):
+        code = 'runtime_preparation'
     return MigrationFailure(code, stage if stage in _STAGES else 'context').public()
 
 

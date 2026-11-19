@@ -89,3 +89,7 @@ class RecoveryLimitTests(unittest.TestCase):
         self.assertNotIn('PRIVATE_RECORD_CANARY', str(public_failure(value)))
         self.assertEqual('disk_space', migration_failure(OSError(28, 'PRIVATE_DISK'), 'transfer')['code'])
         self.assertEqual('busy', MigrationFailure('busy', 'fence').public()['code'])
+        self.assertEqual('system_profile', migration_failure(ValueError('系统画像与实际 CPU 代际冲突，需要核对迁移'),
+            'prepare-import')['code'])
+        self.assertEqual('component_version', migration_failure(ValueError('迁移目标需要先准备同批执行组件'),
+            'preflight')['code'])

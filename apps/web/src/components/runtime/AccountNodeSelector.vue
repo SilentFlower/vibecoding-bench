@@ -16,7 +16,7 @@ const loading = ref(false), saving = ref(false), confirming = ref(false), error 
 const migrationBusy = ref(false);
 const accountOptions = computed(() => accounts.value.map(row => ({ value: String(row.id), label: row.enabled ? row.name : `${row.name}（已停用）` })));
 const nodeOptions = computed(() => props.nodes.map(row => ({ value: String(row.id), label: row.name,
-  disabled: !row.enabled || (row.kind === 'ssh' && row.preparation?.state !== 'prepared') })));
+  disabled: !row.enabled })));
 const accountName = computed(() => accounts.value.find(row => String(row.id) === selectedAccount.value)?.name ?? '');
 const nodeName = computed(() => props.nodes.find(row => String(row.id) === selectedNode.value)?.name ?? '');
 const currentAccount = computed(() => accounts.value.find(row => String(row.id) === selectedAccount.value));
