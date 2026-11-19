@@ -6,7 +6,7 @@ import { useRoute } from 'vue-router';
 import ProxyPicker from './ProxyPicker.vue';
 import ExecutionNodeBadge from './runtime/ExecutionNodeBadge.vue';
 import PlatformBadge from './PlatformBadge.vue';
-import type { AccountNodeSummary } from './runtime/nodeApi';
+import { nodeApi, type AccountNodeSummary } from './runtime/nodeApi';
 import { api, type ProxyRoute, type Account, type OAuthExchangeResult, type UsageWindow, type RuntimeEnvironmentSummary, type OverallWorkStatus } from '../api';
 import AgyAccountUsage from './AgyAccountUsage.vue';
 import UsageWindowStats from './UsageWindowStats.vue';
@@ -67,6 +67,7 @@ const accounts = ref<Account[]>([]);
 const workPending = reactive(new Set<number>());
 const overallStates = reactive(new Map<number, OverallWorkStatus>());
 const accountNodes = ref(new Map<number, AccountNodeSummary>());
+const agyLocalNodeName = ref<string>();
 const nodeReadFailed = ref(false);
 const nodeLoaded = ref(false);
 let nodeController: AbortController | undefined;
@@ -80,9 +81,15 @@ async function loadAccountNodes(): Promise<void> {
   try {
     await api.openRuntime();
     if (controller.signal.aborted) return;
-    const rows = await api.runtimeAccountNodes(controller.signal);
+    const [bindings, nodes] = await Promise.allSettled([
+      api.runtimeAccountNodes(controller.signal),
+      accounts.value.some(account => account.platform === 'antigravity') ? nodeApi.list(controller.signal) : undefined,
+    ]);
     if (controller.signal.aborted || generation !== nodeGeneration) return;
-    accountNodes.value = new Map(rows.filter(row => row.cc2api_account_id != null).map(row => [row.cc2api_account_id!, row]));
+    const local = nodes.status === 'fulfilled' && nodes.value?.items.find(node => node.kind === 'local');
+    if (local) agyLocalNodeName.value = local.name;
+    if (bindings.status === 'rejected') throw bindings.reason;
+    accountNodes.value = new Map(bindings.value.filter(row => row.cc2api_account_id != null).map(row => [row.cc2api_account_id!, row]));
     nodeReadFailed.value = false;
     nodeLoaded.value = true;
   } catch {
@@ -90,11 +97,18 @@ async function loadAccountNodes(): Promise<void> {
   }
 }
 
-/** 归属与缓存观察分别呈现，读取失败保留原身份。@param id 网关账号。@return 观察说明。 */
-function nodeStatus(id: number): string {
+/** 反重力 API 归属本机，任务账号沿其已保存的节点绑定。@param account 网关账号。@return 当前节点身份。 */
+function accountNode(account: Account) {
+  if (account.platform === 'antigravity') return { node_key: 'local', node_name: agyLocalNodeName.value, kind: 'local' };
+  return accountNodes.value.get(account.id)?.node;
+}
+
+/** 归属与缓存观察分别呈现，读取失败保留原身份。@param account 网关账号。@return 观察说明。 */
+function nodeStatus(account: Account): string {
+  if (account.platform === 'antigravity') return '反重力 API 在本机执行';
   if (nodeReadFailed.value) return '归属待刷新';
   if (!nodeLoaded.value) return '归属读取中';
-  const row = accountNodes.value.get(id);
+  const row = accountNodes.value.get(account.id);
   if (!row?.node) return '当前归属未观测';
   if (!row.node.enabled) return '节点已暂停接单';
   if (row.node.phase !== 'ready') return row.node.phase === 'maintenance' ? '节点迁移维护中' : '节点归属待核对';
@@ -103,9 +117,10 @@ function nodeStatus(id: number): string {
   return row.node_observation.state === 'reachable' ? '最近观测可达' : '最近观测不可达';
 }
 
-/** 标记需要核对的观察，同时保留已知归属。@param id 网关账号。@return 是否提醒。 */
-function nodeAttention(id: number): boolean {
-  const row = accountNodes.value.get(id);
+/** 标记任务账号需要核对的观察，同时保留已知归属。@param account 网关账号。@return 是否提醒。 */
+function nodeAttention(account: Account): boolean {
+  if (account.platform === 'antigravity') return false;
+  const row = accountNodes.value.get(account.id);
   return nodeReadFailed.value || !!row?.node && (!row.node.enabled || row.node.phase !== 'ready')
     || !!row?.node_observation && (row.node_observation.stale || row.node_observation.state === 'unreachable');
 }
@@ -1262,7 +1277,7 @@ async function copyText(text: string) {
           </div>
           <div class="account-network">
             <button type="button" @click="openEdit(a)"><Globe :size="13" /><span>{{ a.proxy_name || publicProxy(a.proxy_url) }}</span></button>
-            <ExecutionNodeBadge :node="accountNodes.get(a.id)?.node" :status="nodeStatus(a.id)" :attention="nodeAttention(a.id)" />
+            <ExecutionNodeBadge :node="accountNode(a)" :status="nodeStatus(a)" :attention="nodeAttention(a)" />
             <router-link :to="{ name: 'environments', query: { gateway_account: String(a.id) } }"><Box :size="13" />运行环境</router-link>
           </div>
           <div v-if="overallWorkNote(a)" class="account-work-status">
@@ -1367,7 +1382,7 @@ async function copyText(text: string) {
             <span v-if="cardPlan(detailAccount)" class="account-plan">{{ cardPlan(detailAccount) }}</span>
             <small v-if="detailAccount.platform !== 'antigravity'" class="account-score">{{ activeSchedulingScore(detailAccount) }}</small>
           </div>
-          <ExecutionNodeBadge :node="accountNodes.get(detailAccount.id)?.node" :status="nodeStatus(detailAccount.id)" :attention="nodeAttention(detailAccount.id)" /></div>
+          <ExecutionNodeBadge :node="accountNode(detailAccount)" :status="nodeStatus(detailAccount)" :attention="nodeAttention(detailAccount)" /></div>
           <section v-if="detailAccount.platform !== 'antigravity'" class="account-usage-windows"><header><span>用量</span><small>{{ detailAccount.usage_fetched_at ? new Date(detailAccount.usage_fetched_at).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}) + ' 更新' : '未刷新' }}</small></header>
             <div v-for="window in usageWindows" :key="window.key" class="account-usage-window"><UsageWindowStats v-if="window.key!=='seven_day_fable'" :stats="detailAccount.request_usage?.[window.key]" :label="window.key==='five_hour'?'5h':'7d'" /><div class="usage-window-label"><span>{{ window.label }}</span><strong>{{ usagePercentLabel(usageWindow(detailAccount.usage_data,window.key)) }}</strong></div><div class="usage-window-bar"><i :class="usageBarColor(effectiveUtil(usageWindow(detailAccount.usage_data,window.key)))" :style="{width:Math.min(100,effectiveUtil(usageWindow(detailAccount.usage_data,window.key)))+'%'}" /></div><p v-if="hasFutureReset(usageWindow(detailAccount.usage_data,window.key))" class="usage-window-reset">{{ formatTimeLeft(usageWindow(detailAccount.usage_data,window.key)?.resets_at) }} 后重置</p></div>
           </section>

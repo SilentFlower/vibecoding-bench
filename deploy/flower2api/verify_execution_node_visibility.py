@@ -17,9 +17,10 @@ class ExecutionNodeFixture(AccountDesignFixture):
     def __init__(self):
         """准备当前归属和迁移前的历史节点。:return: None。"""
         super().__init__()
-        self.accounts[1]['platform'] = 'antigravity'
+        self.accounts[2]['platform'] = 'antigravity'
         self.rows[1]['platform'] = 'antigravity'
         self.node_failed = False
+        self.local_node_failed = False
         self.node_reads = 0
         self.task_accounts = []
         for index, name in enumerate(('默认本机', '上海 · 工程执行节点', '历史账号'), 1):
@@ -51,7 +52,9 @@ class ExecutionNodeFixture(AccountDesignFixture):
         """截获只读节点和历史请求接口。:param route: 浏览器请求。:return: None。"""
         path = urlsplit(route.request.url).path
         if path == '/runtime/api/nodes':
-            return await self.respond(route, {'items': []})
+            return await self.respond(route, {'detail': '本机节点读取故障'} if self.local_node_failed else {
+                'items': [dict(id=1, name='本机执行节点', kind='local', node_key='local', enabled=True)]},
+                503 if self.local_node_failed else 200)
         if path == '/runtime/api/accounts':
             self.node_reads += 1
             return await self.respond(route, {'detail': '合成节点读取故障'} if self.node_failed else self.task_accounts,
@@ -114,7 +117,10 @@ async def main():
         await expect(cards).to_have_count(12)
         await expect(cards.first.locator('[data-execution-node]')).to_contain_text('默认本机')
         await expect(cards.first.locator('[data-platform-badge]')).to_have_text('Claude Code')
-        await expect(cards.nth(1).locator('[data-platform-badge]')).to_have_text('反重力')
+        agy = cards.nth(2)
+        await expect(agy.locator('[data-platform-badge]')).to_have_text('反重力')
+        await expect(agy.locator('[data-execution-node]')).to_have_text('本机执行节点')
+        await node_details(page, agy.locator('[data-execution-node]'), '反重力 API 在本机执行')
         await node_details(page, cards.nth(1).locator('[data-execution-node]'), '最近观测不可达')
         await node_details(page, cards.nth(1).locator('[data-execution-node]'), 'b' * 32)
         for card in await cards.all():
@@ -136,12 +142,21 @@ async def main():
         await expect(page.locator('.account-workspace [data-execution-node]').first).to_contain_text('上海 · 工程执行节点')
         await snapshot(page, output, 'account-detail')
         await page.keyboard.press('Escape')
+        await agy.get_by_role('button', name='详情', exact=True).click()
+        await expect(page.locator('.account-workspace [data-execution-node]').first).to_have_text('本机执行节点')
+        await page.keyboard.press('Escape')
         fixture.node_failed = True
         await page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
         await node_details(page, cards.nth(1).locator('[data-execution-node]'), '归属待刷新')
         await node_details(page, cards.nth(1).locator('[data-execution-node]'), 'b' * 32)
+        await expect(agy.locator('[data-execution-node]')).to_have_text('本机执行节点')
         fixture.node_failed = False
-        await cards.first.locator('[data-execution-node]').click()
+        fixture.local_node_failed = True
+        await page.reload()
+        await expect(agy.locator('[data-execution-node]')).to_have_text('默认本机')
+        await expect(cards.nth(1).locator('[data-execution-node]')).to_have_text('上海 · 工程执行节点')
+        fixture.local_node_failed = False
+        await agy.locator('[data-execution-node]').click()
         await expect(page).to_have_url(BASE + '/nodes')
         await page.goto(BASE + '/environments')
         environments = page.locator('.environment-rich')
