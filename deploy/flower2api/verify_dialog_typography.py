@@ -13,8 +13,10 @@ async def main():
  async with async_playwright() as p:
   b=await p.chromium.launch();ref=await b.new_page(viewport={'width':1440,'height':1000});await ref.goto((ROOT/'doc/design/flower2api-concept.html').as_uri());await ref.evaluate("navigate('proxies');editProxy(previewProxies[0].id)")
   context=await b.new_context(viewport={'width':1440,'height':1000});await context.route('**/*',WorkspaceFixture().route);await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','light')");actual=await context.new_page();await actual.goto(BASE+'/proxies');await actual.get_by_role('button',name='添加代理',exact=True).click()
+  # 弹窗标题为关闭按钮预留的右内边距属于组件库（verify_ui_kit.py 核对），不再与旧原型比对。
+  component_keys={'proxy-title':{'padding'}}
   for name,rs,ac in [('proxy-title','.dialog h2','.proxy-editor [data-slot=dialog-title]'),('proxy-header','.dialog-head','.proxy-editor [data-slot=dialog-header]'),('proxy-recognize','.proxy-recognize','.proxy-recognize'),('proxy-recognize-label','.proxy-recognize>label','.proxy-recognize>label'),('proxy-input','.proxy-recognize input','.proxy-recognize input')]:
-   a=await sample(ref.locator(rs).last);z=await sample(actual.locator(ac));r[name]={'reference':a,'actual':z,'difference':{k:[a[k],z[k]] for k in KEYS if a[k]!=z[k]}}
+   a=await sample(ref.locator(rs).last);z=await sample(actual.locator(ac));r[name]={'reference':a,'actual':z,'difference':{k:[a[k],z[k]] for k in KEYS if a[k]!=z[k] and k not in component_keys.get(name,())}}
   width=await actual.locator('.proxy-editor').evaluate('e=>e.getBoundingClientRect().width');assert width==680,width
   await actual.screenshot(animations='disabled',path=str(out/'proxy-editor-1440.png'));await ref.screenshot(animations='disabled',path=str(out/'proxy-editor-reference-1440.png'));await actual.get_by_role('button',name='关闭',exact=True).click()
   await actual.goto(BASE+'/tasks?tab=runs');f=actual.locator('.task-runtime');await f.locator('#work-capture-new').click();await ref.reload();await ref.evaluate("navigate('tasks');createWorkCapture()")

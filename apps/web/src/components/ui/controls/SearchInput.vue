@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, useId } from 'vue';
 import { Search, X } from '@/components/ui/icon';
-import './controls.css';
 
 /** 搜索输入仅管理文本，查询时机交由调用方决定。 */
 interface Props {

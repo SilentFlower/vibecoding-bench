@@ -47,24 +47,25 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* 旧层：未迁移页面仍引用的 shadcn 变量与旧控件 token，取值冻结为原层叠生效值，不随主题变化；页面迁移到 --ui-* 新 token 后删除。 */
 :root {
   --radius: 0.75rem;
-  --background: oklch(0.995 0.001 258);
-  --foreground: oklch(0.21 0.008 258);
+  --background: #f6f7fb;
+  --foreground: #0e1726;
   --card: #ffffff;
   --card-foreground: var(--foreground);
   --popover: #ffffff;
   --popover-foreground: var(--foreground);
-  --primary: oklch(0.52 0.115 157);
+  --primary: #0e1726;
   --primary-foreground: #ffffff;
   --secondary: oklch(0.968 0.003 258);
   --secondary-foreground: var(--foreground);
-  --muted: var(--secondary);
-  --muted-foreground: oklch(0.5 0.014 258);
+  --muted: #f6f7fb;
+  --muted-foreground: #848894;
   --accent: var(--secondary);
   --accent-foreground: var(--foreground);
   --destructive: #dc2626;
-  --border: oklch(0.916 0.005 258);
+  --border: #e9e8ed;
   --input: var(--border);
   --ring: var(--primary);
   --chart-1: var(--primary);
@@ -72,7 +73,7 @@
   --chart-3: #3b82f6;
   --chart-4: #f59e0b;
   --chart-5: #8b5cf6;
-  --sidebar: #ffffff;
+  --sidebar: #202235;
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: #ffffff;
@@ -82,6 +83,18 @@
   --sidebar-ring: var(--primary);
   --font-body: 'Inter Variable', 'Microsoft YaHei UI', 'PingFang SC', 'Noto Sans CJK SC', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+  --ui-surface: #fff;
+  --ui-field-surface: #fbfcfe;
+  --ui-text: #46546b;
+  --ui-muted: #7d879a;
+  --ui-border: #e2e6ed;
+  --ui-border-hover: #cfd5df;
+  --ui-accent: #856b9e;
+  --ui-focus: #ad9bc4;
+  --ui-focus-shadow: 0 0 0 3px #a28eb414;
+  --ui-selected: #f5f2fa;
+  --ui-danger: #b45b67;
+  --ui-font: 'Inter Variable', 'Microsoft YaHei UI', 'PingFang SC', 'Noto Sans CJK SC', system-ui, sans-serif;
 }
 
 body {
@@ -104,37 +117,24 @@ code, pre { font-family: var(--font-mono); }
 }
 
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in oklch, var(--muted-foreground) 25%, transparent);
+  background: var(--ui-color-scrollbar);
   border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in oklch, var(--muted-foreground) 45%, transparent);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklch, var(--muted-foreground) 25%, transparent) transparent;
+  scrollbar-color: var(--ui-color-scrollbar) transparent;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  /* 没有自定义焦点样式的交互元素兜底；放在 base 层，组件库的焦点样式优先。 */
+  :where(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 }
 
 /* 控制台的空间层次：导航、工作区、内容表面分别承载不同职责。 */
-:root {
-  --background: #f6f7fb;
-  --foreground: #0e1726;
-  --muted: #f6f7fb;
-  --muted-foreground: #75849a;
-  --border: #e3e8f1;
-  --primary: #0e1726;
-  --ring: var(--primary);
-  --sidebar: #202235;
-  --radius: .75rem;
-}
 .console-shell { --navigation-width: 252px; min-height: 100dvh; }
 .console-shell.sidebar-collapsed { --navigation-width: 76px; }
 .console-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 40; width: var(--navigation-width); display: flex; flex-direction: column; background: var(--sidebar); border-right: 1px solid var(--border); padding: 24px 14px 16px; }
@@ -170,10 +170,9 @@ code, pre { font-family: var(--font-mono); }
 .resource-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 18px; }
 .resource-grid > [data-slot="card"] { padding: 0; gap: 0; box-shadow: 0 2px 6px #182d3504; }
 .resource-grid > [data-slot="card"]:hover { border-color: #becfc8; box-shadow: 0 5px 18px #182d3508; }
-[data-slot="dialog-content"] { max-height: calc(100dvh - 32px); overflow-y: auto; background: var(--card); }
+[data-slot="dialog-content"] { max-height: calc(100dvh - 32px); overflow-y: auto; }
 [data-slot="card"] { min-width: 0; }
 button, a, input, select, textarea { scroll-margin: 80px; }
-:where(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 .settings-index { display: flex; gap: 6px; flex-wrap: wrap; padding: 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
 .settings-index a { padding: 6px 10px; border-radius: 6px; font-size: var(--ui-font-small); color: var(--muted-foreground); }
 .settings-index a:hover { background: var(--muted); color: var(--primary); }
@@ -354,14 +353,13 @@ body { font-size: var(--ui-font-body); -webkit-font-smoothing: antialiased; }
 
 /* 固定轨道宽度，滚动期间显示滑块；高对比模式交给系统绘制。 */
 * { scrollbar-color: transparent transparent; }
-[data-active-scroll] { scrollbar-color: #aab2c2 transparent; }
+[data-active-scroll] { scrollbar-color: var(--ui-color-scrollbar) transparent; }
 *::-webkit-scrollbar-thumb { background: transparent; }
-[data-active-scroll]::-webkit-scrollbar-thumb { background: #aab2c2; }
+[data-active-scroll]::-webkit-scrollbar-thumb { background: var(--ui-color-scrollbar); }
 @media (forced-colors: active) { * { scrollbar-color: auto; } }
 .usage-window-bar .bg-emerald-400 { background: #348b73; }
 .usage-window-bar .bg-amber-400 { background: #d4a659; }
 .usage-window-bar .bg-red-400 { background: #cf5964; }
-:where(input,textarea)[data-slot]:focus-visible { outline: 0; border-color: #ad9bc4; box-shadow: 0 0 0 3px #a28eb414; }
 .scheduling-dialog { display: flex !important; flex-direction: column; width: calc(100vw - 32px); max-width: 1080px !important; max-height: calc(100dvh - 48px); border-radius: 16px; padding: 0 !important; gap: 0 !important; overflow: hidden !important; }
 .scheduling-dialog > [data-slot="dialog-header"] { padding: 24px 28px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .scheduling-scroll { padding: 24px 28px; overflow-y: auto; min-height: 0; }
@@ -379,7 +377,6 @@ body { font-size: var(--ui-font-body); -webkit-font-smoothing: antialiased; }
  .scheduling-dialog > [data-slot="dialog-header"] { padding: 22px 20px; }
 }
 
-[data-slot="dialog-overlay"] { background: #20223566; backdrop-filter: blur(4px); }
 .account-editor-dialog [data-slot="button"], .account-oauth-dialog [data-slot="button"], .page-heading [data-slot="button"] { border-radius: 8px; }
 
 /* 定稿更新工作区：品牌入口打开，发布说明与平台信息分栏。 */
@@ -530,19 +527,7 @@ body { font-size: var(--ui-font-body); -webkit-font-smoothing: antialiased; }
 @media(max-width:767px){.proxy-summary{gap:14px;flex-wrap:wrap}.proxy-summary>span:last-child{margin-left:0}.proxy-toolbar{padding:16px;flex-wrap:wrap;gap:12px}.proxy-toolbar>.fui-search{max-width:none;flex-basis:calc(100% - 130px);order:2;margin:0}.proxy-toolbar>button{order:3}.proxy-toolbar h3{width:100%}.proxy-form-scroll{padding:20px}.proxy-editor>[data-slot=dialog-header]{padding:22px 20px}.proxy-form-footer{padding:16px 20px;flex-wrap:wrap}.proxy-form-footer>span{width:100%}.proxy-form-grid{gap:16px}.proxy-users{grid-template-columns:1fr}.proxy-note{align-items:flex-start;line-height:1.6}.proxy-pagination{padding:14px;gap:8px}.proxy-pagination button{padding:0 9px}.proxy-recognize{padding:13px}.proxy-recognize>div{flex-wrap:wrap}.proxy-recognize input{width:100%}}
 .account-proxy-picker>p{font-size:var(--ui-font-small);color:#8a97aa;margin:6px 0 12px}.proxy-picker-trigger{display:flex;align-items:center;gap:12px;width:100%;padding:12px;background:#fbfcfe;border:1px solid #e2e7ef;border-radius:8px;text-align:left;color:#8a76a3}.proxy-picker-trigger>span{flex:1;min-width:0}.proxy-picker-trigger strong,.proxy-picker-options strong{font-size:var(--ui-font-body);font-weight:500;color:#46546b;display:block}.proxy-picker-trigger small,.proxy-picker-options small{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:var(--ui-font-body);color:#8a97aa;margin-top:4px}.proxy-picker-popup{z-index:100;background:white;border:1px solid #e2e7ef;border-radius:12px;box-shadow:0 12px 40px #26344a20;padding:12px;width:var(--reka-popover-trigger-width);max-width:calc(100vw - 32px)}.proxy-picker-options{max-height:280px;overflow:auto;margin-top:10px}.proxy-picker-options>button{width:100%;display:flex;align-items:center;gap:10px;padding:11px 10px;border-radius:7px;text-align:left;color:#8a76a3}.proxy-picker-options>button:hover,.proxy-picker-options>button:focus-visible{background:#f7f4fb;outline:0}.proxy-picker-options>button>span{flex:1;min-width:0}.proxy-picker-options>p{padding:14px 10px;font-size:var(--ui-font-body);color:#8a97aa}.proxy-picker-popup footer{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 4px 2px;border-top:1px solid #edf0f5;font-size:var(--ui-font-small);color:#8a76a3}.proxy-picker-popup footer small{color:#8a97aa}
 
-/* 按定稿统一按钮状态，变体只控制视觉，不改操作语义。 */
-:root{--button-surface:#fff;--button-border:#e0dfe6;--button-text:#0e1726;--button-hover:#f6f4fa;--button-hover-border:#c6bbdf;--button-primary:#0e1726;--button-primary-hover:#494057}
-[data-slot=button]{border-radius:8px;box-shadow:none;transition:background-color .15s,border-color .15s,color .15s;transform:none}
-[data-slot=button][data-variant=default]{background:var(--button-primary);color:#fff;border:1px solid var(--button-primary)}
-[data-slot=button][data-variant=outline]{background:var(--button-surface);color:var(--button-text);border:1px solid var(--button-border)}
-[data-slot=button][data-variant=ghost]{background:transparent;border:1px solid transparent;box-shadow:none}
-[data-slot=button]:focus-visible{outline:2px solid #ad9bc4;outline-offset:3px;box-shadow:none}
-[data-slot=button]:disabled{cursor:default;opacity:.45;box-shadow:none;transform:none}
-[data-slot=button][aria-busy=true]{cursor:wait}
 @media(hover:hover){
- [data-slot=button][data-variant=default]:hover:not(:disabled){background:var(--button-primary-hover);border-color:var(--button-primary);box-shadow:none}
- [data-slot=button][data-variant=outline]:hover:not(:disabled){background:var(--button-hover);border-color:var(--button-hover-border);color:var(--button-text);box-shadow:none}
- [data-slot=button][data-variant=ghost]:hover:not(:disabled){background:var(--button-hover);color:var(--button-text)}
  .navigation-item:hover{background:#303246;color:#fff}
  .sidebar-exit:hover,.desktop-sidebar-toggle:hover{background:#36364c;color:#eee8ff}
  .account-card-actions button:hover:not(:disabled){background:#eef1f8;color:#485e8e}
@@ -550,7 +535,7 @@ body { font-size: var(--ui-font-body); -webkit-font-smoothing: antialiased; }
  .account-routing button:hover strong{color:#78649d}
  .account-live-metrics>button:nth-child(3):hover{background:#faf7f0}
  .proxy-table tr:not(.proxy-expanded):hover>td{background:#fcfbfe}
- .proxy-picker-trigger:hover,.fui-date-trigger:hover{border-color:#cfd5df;background:#fff}
+ .proxy-picker-trigger:hover{border-color:#cfd5df;background:#fff}
 }
 .account-oauth-dialog.approved-oauth-dialog{width:440px;max-width:calc(100vw - 28px)!important;padding:0!important;border-radius:18px;background:#fff}
 .approved-oauth-dialog>[data-slot=dialog-header]{padding:23px 28px;border-bottom:1px solid #e9edf4}
@@ -567,7 +552,6 @@ body { font-size: var(--ui-font-body); -webkit-font-smoothing: antialiased; }
 .oauth-link-panel{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;background:#f8f6fc;border:1px solid #e9e2f1;border-radius:9px}
 .oauth-link-panel>a{font-size:var(--ui-font-small);color:#806399;text-decoration:underline;text-underline-offset:3px}.oauth-link-details,.oauth-result-details{font-size:var(--ui-font-small);color:#8290a4;margin-top:16px}.oauth-link-details>summary,.oauth-result-details>summary{cursor:pointer;padding:6px 0}.oauth-link-details textarea{margin-top:8px;font-size:var(--ui-font-body)}.oauth-error{color:#b45667;font-size:var(--ui-font-small);margin-top:14px;line-height:1.6}.oauth-success{color:#328d73;background:#eff8f4;border:1px solid #dceee5;padding:12px;border-radius:8px;margin-bottom:16px;font-size:var(--ui-font-body)}.oauth-result-fields{display:grid;grid-template-columns:100px minmax(0,1fr);gap:14px 12px;font-size:var(--ui-font-small)}.oauth-result-fields dt{color:#8290a4}.oauth-result-fields dd{overflow-wrap:anywhere;color:#43546e}.oauth-result-fields dd button{margin-left:8px}.oauth-result-details .oauth-result-fields{padding:16px 0}.account-score-explanation p{margin:7px 0;font-size:var(--ui-font-small)}.account-score-explanation small{display:block;color:#8290a4;line-height:1.6}
 @media(max-width:520px){.approved-oauth-dialog>[data-slot=dialog-header]{padding:20px}.approved-oauth-body{padding:22px 20px}.approved-oauth-dialog>[data-slot=dialog-close]{right:20px;top:18px}}
-@media(prefers-reduced-motion:reduce){[data-slot=button]{transition:none}}
 
 /* Teleport根容器由全局类设置尺寸，避免子组件作用域丢失后回退到默认小弹窗。 */
 .approved-run-dialog[data-slot=dialog-content]{width:900px;max-width:calc(100vw - 28px);height:min(740px,calc(100dvh - 28px));max-height:calc(100dvh - 28px);display:flex;flex-direction:column;gap:0;padding:0;border-radius:18px;overflow:hidden;background:#fff}

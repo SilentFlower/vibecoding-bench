@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref, useId } from 'vue';
-import './controls.css';
 
 /** 数字输入契约：清空产生空字符串，范围校验由原生输入与业务提交共同负责。 */
 interface Props {

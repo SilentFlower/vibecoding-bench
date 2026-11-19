@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, useId } from 'vue';
-import { Check, ChevronDown } from 'lucide-vue-next';
+import { Check, ChevronDown } from '../icon';
 import { SelectRoot, SelectTrigger, SelectValue, SelectIcon, SelectPortal, SelectContent, SelectViewport, SelectItem, SelectItemText, SelectItemIndicator } from 'reka-ui';
 import type { ChoiceOption } from './types';
-import './controls.css';
 
 /** 单选控件的表单与浮层属性；空字符串可作为合法选项值。 */
 interface Props {

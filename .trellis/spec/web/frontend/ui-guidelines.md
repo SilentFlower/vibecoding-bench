@@ -3,8 +3,8 @@
 ## 1. Scope / Trigger
 
 - 修改账号、代理、令牌、任务、环境、授权登录的布局、表单、菜单、气泡或滚动行为时读取本规范。
-- 设计基准：`doc/design/flower2api-concept.html`。用户已基本认可账号页，后续增量以任务记录的最新决定为准。
-- 已实现的 Vue 通用控件：`apps/web/src/components/ui/controls/`。实际运行示例：`apps/web/ui-preview.html`、`apps/web/src/previews/UiPreview.vue`。
+- 设计基准（过渡期两套并存）：组件库与已迁移页面以 `doc/design/console-v2/mock.html`（第二版定稿，`#<画面>` 切换）为准；尚未迁移的页面在迁移前仍以 `doc/design/flower2api-concept.html` 为准。用户已基本认可账号页，后续增量以任务记录的最新决定为准。
+- 组件库：`apps/web/src/components/ui/`（样式集中在 `components/ui/kit.css`）；主题运行时：`apps/web/src/theme/`。实际运行示例：`apps/web/ui-preview.html`、`apps/web/src/previews/UiPreview.vue` 与 `KitShowcase.vue`。
 - 静态稿中的代理检测、到期配置和授权步骤是本地模拟。其业务页面与后端的正式迁移仍属当前任务后续实施，不能把视觉预览作为生产能力证据。
 - 本规范规定新设计及逐页迁移的视觉/交互合同。现有 API、权限、错误恢复、原生页面生命周期规则继续遵守 [frontend-guidelines.md](./frontend-guidelines.md) 和 [原生组件规范](../../legacy-web/frontend/component-guidelines.md)。
 
@@ -24,6 +24,22 @@ import type { ChoiceOption } from '@/components/ui/controls';
 | `InfoTooltip` | `label: string`，`title?`，`delay?: number = 150`，`portalTarget?`；`trigger`插槽与默认内容插槽 | 只读完整统计、字段口径说明 |
 | `SearchInput` | `modelValue: string`，`label`，`placeholder?`，`disabled?`；`update:modelValue(string)`、`search(string)` | 列表或会话搜索，业务方决定请求时机 |
 
+新增组件（`@/components/ui/<目录>` 导入）：
+
+| 组件 | 输入与事件 | 说明 |
+| --- | --- | --- |
+| `Segmented` | `modelValue: string`，`options: readonly SegmentedOption[]`（`value/label/count?/icon?/disabled?`），`label`（无障碍名），`disabled?`；`update:modelValue(string)` | reka RadioGroup；托盘加白色滑块，可带计数 |
+| `Switch` | `modelValue: boolean`，`label?`，`disabled?`，`id?`；`update:modelValue(boolean)` | 无关联可见文字时必须传 `label` |
+| `Checkbox` | `modelValue: boolean \| 'indeterminate'`，`disabled?`，`id?`；默认插槽为文字；`update:modelValue(boolean)` | |
+| `RadioCardGroup` | `modelValue?: string`，`options: readonly RadioCardOption[]`（`value/label/description?/disabled?`），`label`，`name?`，`disabled?` | 单选卡 |
+| `InputGroup` | `prefix` / 默认 / `suffix` 插槽，内部放 `Input` | 整组 `:focus-within` 一个焦点框 |
+| `Empty` | `title`，`description?`；`icon`、`actions` 插槽 | 空态 |
+| `Skeleton` | 尺寸由 class 决定 | 减少动效时静止 |
+
+既有组件只做增量扩展：`Button` 新增 variant `soft`、`destructive-ghost`（`outline`/`secondary` 为次要填充、`ghost` 为文字、`destructive` 为危险浅底）；`Badge` 新增 variant `success/warning/info/cc/agy` 与 `dot` prop。表格单元格内「主值下一行」的辅助值用 `fui-table-sub`，字段说明用 `fui-field-help`。
+
+主题运行时（`@/theme`）：`createTheme(seed): ThemeVars`、`parseThemeSeed(value): ThemeSeed | null`、`readStoredTheme()`、`writeStoredTheme(seed | null): boolean`、`applyTheme(element, vars)`、`initTheme()`，以及 `DEFAULT_THEME_SEED`、`THEME_PRESETS`、`THEME_SEED_LIMITS`。
+
 `ChoiceOption = { value: string; label: string; disabled?: boolean }`。同一菜单的 `value` 必须唯一。空字符串是合法的业务选项值；`undefined` 表示尚未选择。
 
 `NumberInput` 的 `name`、`required`、`aria-describedby` 等原生属性透传到内部输入框。`SearchInput` 同样向内部输入框透传原生属性。调用方负责业务字段规整与提交，不在控件内部请求 API。
@@ -34,27 +50,31 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 ### 视觉 Token 与层次
 
-控件颜色 token 的唯一代码源是 `apps/web/src/components/ui/controls/controls.css`。阅读尺寸与反馈表面来自 `apps/legacy-web/ui-foundation.css`，Vue、独立文档及原型共同引用。`--ui-*` 前缀隔离存量主题，页面不逐个写死控件颜色。
+新 token 的默认值在 `apps/legacy-web/ui-foundation.css`（Vue 由 `main.ts` 全局引入，独立 `/runtime/` 文档以 `<link>` 引用，已在运行时桥接白名单），与 `apps/web/src/theme/tokens.ts` 的 `createTheme(DEFAULT_THEME_SEED)` 逐项一致，由 `apps/web/tests/theme.test.mjs` 校验。命名带分类前缀：
 
-| Token | 当前值 | 用途 |
+| 分类 | 前缀 / 名称 | 默认取值（第二版浅色） |
 | --- | --- | --- |
-| `--ui-surface` | `#fff` | 菜单、气泡、内容表面 |
-| `--ui-field-surface` | `#fbfcfe` | 表单输入背景 |
-| `--ui-text` | `#46546b` | 控件正文 |
-| `--ui-muted` | `#7d879a` | 标签及次要信息 |
-| `--ui-border` | `#e2e6ed` | 默认边框 |
-| `--ui-border-hover` | `#cfd5df` | 悬停边框 |
-| `--ui-accent` | `#856b9e` | 选中项及辅助强调 |
-| `--ui-focus` | `#ad9bc4` | 焦点细边框 |
-| `--ui-focus-shadow` | `0 0 0 3px #a28eb414` | 轻量焦点光晕 |
-| `--ui-selected` | `#f5f2fa` | 选项高亮背景 |
-| `--ui-danger` | `#b45b67` | 错误边界 |
+| 颜色 | `--ui-color-*`：`layout/surface/fill/fill-hover/fill-muted/fill-subtle/fill-strong/track/line/mask/scrollbar`、`text/text-2/text-3/text-4`、`table-head/table-stripe/table-hover`、`primary/primary-hover/primary-container/primary-text/primary-ring/on-primary`、`success\|warning\|danger\|info` 及其 `-text`、`-bg`、`neutral-text/neutral-bg`、`cc-*/agy-*`、`brand/ink`、`feedback-surface/feedback-text` | 主色 #6c54b4，正文 #0f1527，页面底 #f5f6fa |
+| 字号 | `--ui-font-size-xs/sm/meta/md/title/card/heading/page` | 11.5 / 12 / 12.5 / 13 / 14 / 16 / 20 / 28px |
+| 控件高 | `--ui-control-sm/md/lg` | 32 / 38 / 44px |
+| 圆角 | `--ui-radius-btn/control/block/card` | 6 / 8 / 12 / 18px |
+| 阴影 | `--ui-shadow-card/pop/modal/raised/knob` | 见 ui-foundation.css |
+| 其它 | `--ui-space-unit`（4px）、`--ui-font-family`、`--ui-font-family-mono` | |
 
-- 按CSS视口采用三档阅读尺寸：小于1920px、1920～2559px、2560px及以上。正文/输入/主要按钮14/15/16px，辅助文字12/13/14px，卡片标题16/17/18px，分区标题18/20/22px，页标题28/30/32px；标准控件高40/42/44px，紧凑控件34/36/38px。控件圆角8px、菜单9px、气泡12px。禁止整页zoom或按物理像素缩放。
+- 字号与控件高 = 种子 + 阅读档位（`--ui-tier` 由三档媒体查询设为 0/1/2）。派生块挂在 `:root, [data-ui-theme]` 上，局部主题容器能独立重算。
+- 页面与组件只引用新 token，不写死颜色和圆角；悬停、按下等设计稿未给的状态色用 `color-mix()` 由 token 混合。`theme.test.mjs` 静态校验 `components/ui`、`kit.css`、`ui-foundation.css`、`pagination.css` 中颜色字面量只出现在 `--ui-color-*`/`--ui-shadow-*` 定义里，`border-radius` 只取 token。
+- **旧层（过渡期冻结）**：未迁移页面仍引用的 shadcn 变量（`--primary/--border/--muted-foreground…`）、旧控件 token（`--ui-accent/--ui-border/--ui-text…`）与阅读尺寸（`--ui-font-body/--ui-control-height…`）合并在 `style.css` 与 `ui-foundation.css` 的旧层块，取值不变、不跟主题变化；页面迁移时改用新 token，父任务最终复核时按旧名清零删除。
+  - 组件换新使未迁移页面外观倒退时（例：`SystemUpdates.vue` 的 Card 传 `shadow-none`，组件又去掉了描边，卡片失去边界），在页面层用旧层 token 或工具类恢复原外观（该例加 `border`），并随页面迁移删除；不回改组件。
+- **层叠**：组件样式在 `kit.css` 的 `@layer components`；业务传入的 Tailwind 工具类可覆盖组件默认值，未分层的页面规则在页面迁移前仍压过组件。不得新增未限定页面作用域的 `[data-slot=…]`、`.fui-*` 全局覆盖。全局兜底焦点框在 `@layer base`。
+- 卡片、弹窗、表格的根元素不设颜色、行高、字体等可继承属性，内部内容由页面基准决定；组件自带的文字部件（标题、说明、表头、辅助值）显式设置。第二版页面基准为 13px / 1.55 / `--ui-color-text`。
+- **主题运行时**：浏览器只保存种子（`localStorage['flower2api.theme']`，`version: 1`），任一字段非法、存储读取抛错时整体回退默认；`main.ts` 在 `createApp` 前调用 `initTheme()`，首次渲染即为用户主题。`applyTheme(el, vars)` 写内联变量并标记 `data-ui-theme`，用在容器上只影响子树；弹层默认 Teleport 到 body，局部主题内需传 `portalTarget`。派生文字色与按钮文字对比度不低于 4.5（白字不足时改深色字，两者都不足时压暗主色）。
+
+- 按CSS视口采用三档阅读尺寸：小于1920px、1920～2559px、2560px及以上。新组件：正文/按钮/输入 13/14/15px，辅助文字 12/13/14px，弹窗标题 20/22/24px，页标题 28/30/32px；控件高 38/40/42px（小号 32/34/36px）。旧层阅读尺寸（正文 14/15/16px、控件 40/42/44px）在页面迁移前保持不变，html 根字号仍取旧层 `--ui-font-body`。禁止整页zoom或按物理像素缩放。
 - 常用间距采用4/8/12/16/24px，页面容器24–40px；窄屏16–20px。页面主内容使用柔和浅底，内容卡片使用白色和轻边框。
 - 字体采用 Inter Variable 与明确的中文系统回退；关键数字使用等宽数字或 JetBrains Mono Variable。字体资源本地托管，许可证参考 `doc/design/font-licenses.txt`。控件当前通过 `--ui-font` 使用字体栈，实际字体资产接入由页面迁移完成。
 - 成功/执行状态用绿色，等待/临近到期用琥珀色，失败/已过期用红色，紫色用于选中与偏好。颜色同时配文字含义。
 - 焦点只画在完整交互容器上：数字输入、带图标的搜索栏用 `:focus-within`；内部输入框去掉重复 outline/shadow。键盘焦点必须可见，强制颜色模式保留系统高亮。
+- 组件状态约定：键盘焦点为 2px 主色外框（输入类为主色细环加 `primary-ring` 外圈）；禁用不透明度 .45、`not-allowed`；加载沿用 `aria-busy`；过渡 .15s，`prefers-reduced-motion` 下无过渡与动画；`forced-colors` 下保留系统高亮。
 
 ### 控件行为
 
@@ -240,10 +260,17 @@ const query = ref('');
 ## 6. Tests Required
 
 ```bash
+node --experimental-strip-types --test apps/web/tests/theme.test.mjs
 npm --prefix apps/web run build
 npm --prefix apps/web run dev -- --host 127.0.0.1 --port 4187 --strictPort
 python3 deploy/flower2api/verify_ui_controls.py --url http://127.0.0.1:4187/ui-preview.html
+python3 deploy/flower2api/verify_ui_kit.py --url http://127.0.0.1:4187/ui-preview.html
 ```
+
+- `theme.test.mjs`：默认主题与 ui-foundation.css 双向一致、预设与边界色对比度、尺寸派生、种子校验与存储失败矩阵、组件样式不写死颜色与圆角。
+- `verify_ui_kit.py`：与 `doc/design/console-v2/mock.html` 逐项比对计算样式（结构等价项在脚本白名单中注明原因），组件各状态取值、预设与自定义主色、柔光材质、局部主题隔离、刷新保持、存储缺失/损坏/越界/抛错回退、减少动效，以及真实构建入口首屏即为保存的主题（需先 `npm --prefix apps/web run build`）。
+- 迁移期改造旧原型对比脚本：组件库负责的属性在脚本内用 `component_keys`（采样名 → 属性集合）跳过，并注明已由 `verify_ui_kit.py` 覆盖；页面级属性继续与旧原型比对。写死的组件颜色改为在被测节点内插入探针元素读取 token 实际渲染值（`verify_shared_pagination.py::token`），不得把旧色值改成新色值再写死。业务断言不放宽。
+- 运行环境：`verify_shared_pagination.py`、`verify_page_sizes.py`、`verify_task_account_config.py` 会导入 `services/orchestrator` 的测试夹具，需先安装 `services/orchestrator/requirements.txt`（含 `docker`、`sse-starlette`）；`verify_task_account_config.py` 另需 `PYTHONPATH=services/orchestrator`。`verify_management_polish.py` 必须传 `--output`，`verify_system_update_browser.py` 同样需要 `--output`。
 
 - `verify_ui_controls.py`验证真实Vue组件：数字上下界、空值、小数步长、禁用；空选项原值、菜单键盘与禁用选项；搜索焦点、输入法、清空；气泡和原生dialog浮层；720/390px与触屏。测试不得发业务API请求。
 - `verify_account_queue_layout.py`使用真实构建与合成接口，在 2248/1440/390px 下切换排队数 0→1→8→0，比较全部卡片的宽高和坐标，验证页面横向边界及排队按钮打开调度详情。
@@ -254,7 +281,7 @@ python3 deploy/flower2api/verify_ui_controls.py --url http://127.0.0.1:4187/ui-p
 
 ## 正式组件交互细节补充
 
-- Button的默认variant显式为default。主按钮默认#0e1726、悬停#494057；描边按钮白底、#e0dfe6边框，悬停#f6f4fa底、#c6bbdf边框。默认及悬停都不加阴影和位移，8px圆角；禁用和键盘焦点独立，减少动效偏好关闭过渡。不可用旧页面的橙色按钮类覆盖已确认流程。
+- Button的默认variant显式为default。外观取 token：主要为 `primary` 填充、悬停 `primary-hover`；次要为 `fill` 填充无描边、悬停 `fill-hover`；6px 圆角、38/32px 两档，默认及悬停都不加阴影和位移。禁用和键盘焦点独立，减少动效偏好关闭过渡。页面迁移前，带页面级覆盖的按钮仍是旧外观。
 - `DateTimeControl`使用reka-ui日历及现有NumberInput，`modelValue:string|null`为ISO瞬时，界面为浏览器本地时间。打开建立草稿，确定才提交，Esc只关闭日期浮层；清除返回null。日历通过`@internationalized/date`真实日期类型处理。
 - `ProxyPicker`接收`ProxyRoute|null|undefined`；undefined保留原配置，null直连，具体记录表示草稿选择。20条分批搜索、取消与迟到响应隔离，提交由账号边界写proxy_id/proxy_revision。
 - 授权登录第一步440px，普通表单标签、代理输入和右对齐主按钮。真实交换成功后填入配置；关闭中止客户端读取并拒绝旧代次回填。授权结果默认隐藏凭据，仅原复制操作可主动获取。
@@ -264,7 +291,7 @@ python3 deploy/flower2api/verify_ui_controls.py --url http://127.0.0.1:4187/ui-p
 
 ## 一比一迁移的取值与验收
 
-`apps/web/src/approved-design.css`集中存放对照定稿后的页面排版规则；参考为`doc/design/flower2api-concept.html`渲染结果。`ui/icon`复用原型SVG路径，符号表通过Vite `?url&no-inline`发布到已有assets路由；不要把SVG符号表内联为data URL后用于use引用。快照导出必须把外部use改写为快照内符号。
+`apps/web/src/approved-design.css`集中存放对照定稿后的页面排版规则；参考为`doc/design/flower2api-concept.html`渲染结果。`ui/icon`使用第二版设计稿图标路径（`doc/design/console-v2/icons.js`，描边1.8），`apps/web/src/assets/approved-icons.svg` 与 `apps/legacy-web/approved-icons.svg` 保持同一内容；符号表通过Vite `?url&no-inline`发布到已有assets路由；不要把SVG符号表内联为data URL后用于use引用。快照导出必须把外部use改写为快照内符号。
 
 `AccountScopePicker`接收modelValue CSV、accounts、label与help，只更新表单草稿。历史已选ID不在当前资料时显示账号编号并保留移除能力。父页负责完整分页、取消和保存。
 
@@ -289,7 +316,7 @@ html根字号与原型共用`--ui-font-body`的14/15/16px三档规则，font-fam
 
 ## 完整视口弹窗与跨文档组件复用
 
-- 唯一视觉基准为 `doc/design/flower2api-concept.html` 的实际渲染结果。逐页核对内部结构、字重、字号、字体、行高、控件默认/悬停/焦点/选中状态与关键弹窗。仅采样外层容器不能作为一比一还原的验收证据。
+- 未迁移页面的视觉基准为 `doc/design/flower2api-concept.html` 的实际渲染结果；组件库与已迁移页面以 `doc/design/console-v2/mock.html` 为准。逐页核对内部结构、字重、字号、字体、行高、控件默认/悬停/焦点/选中状态与关键弹窗。仅采样外层容器不能作为一比一还原的验收证据。
 - 原生文档的按钮、输入、选择和文本域必须显式继承 `--body-font`，防止用户代理样式回退到 Arial。字体资源与主后台同源、自托管。
 - 原生Vue环境与任务模块在主文档展示弹窗，遮罩覆盖完整视口。任务局部观察器只同步Vue控件宿主；弹窗打开保持背景位置，关闭返回原入口，卸载清理观察器。原独立文档保留自身弹窗。
 - 跨文档复用使用 Vue `Teleport` 挂入明确的专属宿主。原生代码仅管理宿主之外的状态文案，不得用 `textContent/innerHTML/replaceChildren` 删除由 Vue 管理的子树。
@@ -304,7 +331,7 @@ html根字号与原型共用`--ui-font-body`的14/15/16px三档规则，font-fam
 
 ### 深层弹窗排版约束
 
-通用原生工作区、运行详情与令牌编辑标题共用`--ui-font-heading`的18/20/22px，沿原650字重、行高及字距。代理编辑宽度680px，表单提示位于控件之后，同排输入保持共同基线。关闭图标使用同一SVG；原生委托事件通过closest定位按钮，沿原清理入口退出。共享输入框焦点采用#AD9BC4边框及浅紫外圈，避免残留默认黑色焦点框。
+通用原生工作区、运行详情与令牌编辑标题共用`--ui-font-heading`的18/20/22px，沿原650字重、行高及字距。代理编辑宽度680px，表单提示位于控件之后，同排输入保持共同基线。关闭图标使用同一SVG；原生委托事件通过closest定位按钮，沿原清理入口退出。共享输入框焦点由组件库提供（主色细环加 `primary-ring` 外圈），避免残留默认黑色焦点框。
 
 系统更新正文共用`--ui-font-body`，头部22×28px、内容28px；真实发布说明按段落呈现摘要，完整原文、安装计划、取消、历史回退及维护信息保持可达。样式回归使用verify_dialog_typography.py与verify_update_design.py逐控件读取原型实际计算样式，并覆盖说明收起、文本转义和取消零写入。
 
@@ -327,7 +354,7 @@ html根字号与原型共用`--ui-font-body`的14/15/16px三档规则，font-fam
 ### Pagination
 
 - 导出位置：`components/ui/controls/Pagination.vue`。受控属性`page/pageSize/total/pageSizes/disabled/label/unit`；默认条数选项10/20/50/100，账号显式传12/24/48/96。事件`update:page`和`update:pageSize`分别表达一次意图。
-- 当前页使用`#77648f`背景、白字及`aria-current=page`。普通页白底深色字，禁用项独立浅色底。长页码保留首尾与当前邻页、省略号；窄屏前后按钮使用图标及无障碍名称，禁止横向溢出。
+- 当前页使用 `--ui-color-primary` 背景、`--ui-color-on-primary` 文字及`aria-current=page`；普通页 `fill-subtle` 底、正文色，禁用项 `fill-muted` 底、`text-4` 文字；上一页 / 下一页为 32px 纯图标方块，文字只保留在无障碍名称。长页码保留首尾与当前邻页、省略号；禁止横向溢出。各宿主（含任务工作区）不得再写死分页颜色。
 - 条数改变由列表所有者回到第一页、保留筛选、取消旧请求及丢弃迟到响应；组件不请求接口。首尾、零记录、加载中及当前页点击保持有效边界。
 - `mode=cursor`用于工程历史和交互记录：传`hasPrevious/hasNext/canLatest`，监听`latest`；只显示真实当前页，不伪造总数或通过数字计算游标。原项目控制器保留快照、上一页栈、新记录提示与条数失败恢复。
 - 账号、代理、请求、绑定会话、抓包索引、工程历史、交互记录共用组件。禁止再次复制页码/上一页/下一页HTML。菜单沿最近dialog投射，关闭菜单保持父窗口。

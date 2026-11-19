@@ -107,6 +107,6 @@ onUnmounted(()=>{alive=false;observer?.disconnect();controller?.dispose();scope?
   </section>
 </template>
 <style>
-.console-native-tasks .console-content{padding:0;max-width:none}.task-runtime{min-width:0;width:100%}.runtime-connecting>.task-runtime{min-height:320px}.task-connect-loading,.task-connect-error{padding:12px 40px;background:#f6f4fb;border-bottom:1px solid #e8e4ef;font-size:var(--ui-font-small)}.task-runtime [data-vue-pagination=true]>:not(.native-pagination-host){display:none!important}.task-runtime .native-pagination-host{width:100%;min-width:0}.task-runtime .projects-pagination{padding-block:16px}.task-runtime .fui-pagination-controls [data-slot=button][aria-current=page]{background:#77648f;border-color:#77648f;color:white}.task-runtime .runtime-body{min-height:calc(100dvh - 24px)}
+.console-native-tasks .console-content{padding:0;max-width:none}.task-runtime{min-width:0;width:100%}.runtime-connecting>.task-runtime{min-height:320px}.task-connect-loading,.task-connect-error{padding:12px 40px;background:#f6f4fb;border-bottom:1px solid #e8e4ef;font-size:var(--ui-font-small)}.task-runtime [data-vue-pagination=true]>:not(.native-pagination-host){display:none!important}.task-runtime .native-pagination-host{width:100%;min-width:0}.task-runtime .projects-pagination{padding-block:16px}.task-runtime .runtime-body{min-height:calc(100dvh - 24px)}
 .task-runtime .work-proxy-compact>.fui-info-trigger{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%;font-size:var(--ui-font-small)}
 </style>

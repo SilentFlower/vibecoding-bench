@@ -2,7 +2,6 @@
 import type { HTMLAttributes } from 'vue';
 import { ref } from 'vue';
 import { TooltipProvider, TooltipRoot, TooltipTrigger, TooltipPortal, TooltipContent } from 'reka-ui';
-import './controls.css';
 
 /** 只读说明气泡；原生dialog内传入portalTarget以保持正确焦点层级。 */
 interface Props {

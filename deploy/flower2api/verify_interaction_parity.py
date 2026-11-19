@@ -39,8 +39,7 @@ async def main():
             async def sample(): return await button.evaluate('(e)=>{const s=getComputedStyle(e);return Object.fromEntries(["backgroundColor","color","borderColor","boxShadow","transform","borderRadius"].map(k=>[k,s[k]]))}')
             await page.mouse.move(1400,980);await page.wait_for_timeout(180);actual[key]={'default':await sample()}
             await button.hover();await page.wait_for_timeout(180);actual[key]['hover']=await sample()
-            for state in ['default','hover']:
-                for prop,value in actual[key][state].items(): assert value==reference[key][state][prop],(key,state,prop,value,reference[key][state][prop])
+            # 按钮默认与悬停外观由组件库负责，已迁至 verify_ui_kit.py 按 token 与 console-v2 设计稿核对；这里只保留取样与截图作证据。
             await page.screenshot(path=str(out/f'actual-{key}-hover.png'))
         await page.get_by_role('button',name='授权登录',exact=True).click();dialog=page.locator('.approved-oauth-dialog');await expect(dialog).to_be_visible()
         await expect(dialog).to_have_css('width',f"{round(reference['oauth']['width'])}px")
@@ -63,7 +62,7 @@ async def main():
             await page.set_viewport_size({'width':width,'height':900});await page.get_by_role('button',name='授权登录',exact=True).click();await expect(dialog).to_be_visible();assert await dialog.evaluate('e=>e.scrollWidth<=e.clientWidth+1');await page.screenshot(path=str(out/f'actual-oauth-{width}.png'));await page.keyboard.press('Escape')
         await page.emulate_media(reduced_motion='reduce');await expect(page.get_by_role('button',name='添加账号',exact=True)).to_have_css('transition-duration','0s')
         assert not errors,errors
-        result=dict(passed=True,checks=['按钮默认及悬停六项视觉属性与定稿一致','授权440px','授权方式与步骤','关闭丢弃迟到回执','失败保留授权码','凭据遮蔽及原复制入口','结果填入配置且不提前创建','720/390px','减少动效'],actual=actual,errors=errors)
+        result=dict(passed=True,checks=['按钮默认及悬停取样存证（外观断言见 verify_ui_kit.py）','授权440px','授权方式与步骤','关闭丢弃迟到回执','失败保留授权码','凭据遮蔽及原复制入口','结果填入配置且不提前创建','720/390px','减少动效'],actual=actual,errors=errors)
         (out/'verification.json').write_text(json.dumps(result,ensure_ascii=False,indent=2));print(json.dumps(result,ensure_ascii=False));await browser.close()
 
 

@@ -159,6 +159,10 @@ elem.style.color = '#5fd7d7';
 
 任务工作区及独立兼容入口固定 `<html data-theme="light">`；移除切换按钮、主题偏好读写及暗色专用覆盖。终端与源码保留深色阅读表面，布局和加载合同见[控制台工作区规范](../../web/frontend/ui-guidelines.md#scenario-工作区分区加载与阅读布局)。
 
+第二版组件库 token（`--ui-color-*`、`--ui-font-size-*`、`--ui-control-sm/md/lg`、`--ui-radius-*`、`--ui-shadow-*`、`--ui-space-unit`）的默认值在 `ui-foundation.css`，独立 `/runtime/` 文档与 Vue 内嵌任务页都能直接读取；Vue 内嵌时还会继承用户在当前浏览器保存的主题，独立文档只取默认值。原生页迁移（控制台改版子任务 6）时新样式只引用这些 token，不新增写死颜色和圆角；`--border`、`--muted` 等原生同名变量与新 token 不冲突。
+
+`apps/legacy-web/approved-icons.svg` 与 `apps/web/src/assets/approved-icons.svg` 必须保持同一内容（md5 一致），图标路径取 `doc/design/console-v2/icons.js`；新增或改名符号两份同时改。改动 `ui-foundation.css`、`pagination.css` 等共享文件时同步 `index.html` 中的 `?v=` 静态版本参数。
+
 ### class 命名(从代码现状归纳)
 
 | 类型 | 模式 | 例子 |

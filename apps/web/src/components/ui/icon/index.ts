@@ -1,7 +1,7 @@
 import { defineComponent, h } from 'vue';
 import sprite from '@/assets/approved-icons.svg?url&no-inline';
 
-/** 创建确认稿的SVG图标，复用相同路径与1.7描边。
+/** 创建第二版设计稿的SVG图标，路径来自 doc/design/console-v2/icons.js，描边 1.8。
  * @param name 确认稿中的图标名称。
  * @return 支持size及普通SVG属性的Vue组件。
  */
@@ -11,7 +11,7 @@ function icon(name: string) {
     props: { size: { type: [Number, String], default: 19 } },
     setup: props => () => h('svg', {
       width: props.size, height: props.size, viewBox:'0 0 24 24', fill:'none',
-      stroke:'currentColor', 'stroke-width':1.7, 'stroke-linecap':'round', 'stroke-linejoin':'round',
+      stroke:'currentColor', 'stroke-width':1.8, 'stroke-linecap':'round', 'stroke-linejoin':'round',
       'aria-hidden':'true',
     }, [h('use', { href:`${sprite}#i-${name}` })]),
   });
@@ -50,3 +50,30 @@ export const Search = icon('search');
 
 export const AlertCircle = icon('alert');
 export const Clock = icon('clock');
+
+// 第二版设计稿新增图标，路径取自 doc/design/console-v2/icons.js。
+export const ChevronDown = icon('chevron-down');
+export const ChevronLeft = icon('chevron-left');
+export const Filter = icon('filter');
+export const List = icon('list');
+export const Zap = icon('zap');
+export const Terminal = icon('terminal');
+export const Pause = icon('pause');
+export const Calendar = icon('calendar');
+export const Lock = icon('lock');
+export const Route = icon('route');
+export const Info = icon('info');
+export const Cpu = icon('cpu');
+export const Eye = icon('eye');
+export const Upload = icon('upload');
+export const Palette = icon('palette');
+export const Sun = icon('sun');
+export const Moon = icon('moon');
+export const Monitor = icon('monitor');
+export const ArrowUpCircle = icon('arrow-up-circle');
+export const Undo = icon('undo');
+export const RotateCcw = icon('rotate');
+export const History = icon('history');
+export const Save = icon('save');
+export const Minus = icon('minus');
+export const Fit = icon('fit');

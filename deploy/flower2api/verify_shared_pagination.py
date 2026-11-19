@@ -5,19 +5,25 @@ from verify_page_sizes import PageFixture
 from verify_environment_ui import BASE,ROOT
 
 
+async def token(nav,name):
+    """读取主题 token 在分页所在位置的实际渲染色，分页配色随主题变化。@param nav 分页导航。@param name token 名。@return rgb 字符串。"""
+    return await nav.evaluate("(e,n)=>{const probe=document.createElement('i');probe.style.color='var('+n+')';e.append(probe);const value=getComputedStyle(probe).color;probe.remove();return value}",name)
+
+
 async def verify(page,label):
     """核对真实页码与计算样式。@param page 页面或原生宿主。@param label 分页名称。@return 无。"""
     nav=page.get_by_role('navigation',name=label)
     await expect(nav).to_be_visible()
     current=nav.locator('[aria-current=page]')
     await expect(current).to_have_count(1)
-    await expect(current).to_have_css('background-color','rgb(119, 100, 143)')
-    await expect(current).to_have_css('color','rgb(255, 255, 255)')
+    primary=await token(nav,'--ui-color-primary')
+    await expect(current).to_have_css('background-color',primary)
+    await expect(current).to_have_css('color',await token(nav,'--ui-color-on-primary'))
     await expect(nav.get_by_role('button',name='上一页',exact=True)).to_be_disabled()
     await nav.get_by_role('button',name='下一页',exact=True).click()
     await expect(current).to_have_text('2')
-    await expect(current).to_have_css('background-color','rgb(119, 100, 143)')
-    await expect(nav.get_by_role('button',name='第 1 页',exact=True)).to_have_css('color','rgb(82, 100, 126)')
+    await expect(current).to_have_css('background-color',primary)
+    await expect(nav.get_by_role('button',name='第 1 页',exact=True)).to_have_css('color',await token(nav,'--ui-color-text'))
 
 
 async def main():
@@ -40,7 +46,7 @@ async def main():
             for kind,label in [('history','工程记录分页'),('events','交互记录分页')]:
                 await frame.locator('[data-project-pane='+('history' if kind=='history' else 'overview')+']').click()
                 if kind=='events':await frame.locator('#projects-tab-events').click()
-                nav=frame.get_by_role('navigation',name=label);await expect(nav).to_be_visible();await expect(nav.locator('[aria-current=page]')).to_have_css('background-color','rgb(119, 100, 143)');await expect(nav.locator('[aria-current=page]')).to_have_css('height','32px');await expect(nav.get_by_role('button',name='上一页',exact=True)).to_be_disabled();await expect(nav.get_by_role('button',name='最新一页',exact=True)).to_be_disabled()
+                nav=frame.get_by_role('navigation',name=label);await expect(nav).to_be_visible();await expect(nav.locator('[aria-current=page]')).to_have_css('background-color',await token(nav,'--ui-color-primary'));await expect(nav.locator('[aria-current=page]')).to_have_css('height','32px');await expect(nav.get_by_role('button',name='上一页',exact=True)).to_be_disabled();await expect(nav.get_by_role('button',name='最新一页',exact=True)).to_be_disabled()
             assert not errors,errors
             print(json.dumps({'passed':True,'checks':['七入口共享选中对比','首尾禁用','55页省略与直达','720/390px页码不溢出','抓包宿主样式'],'errors':errors},ensure_ascii=False));await browser.close()
     finally:fixture.fixture.doCleanups()

@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch, useId } from 'vue';
 import { CalendarDate, type DateValue } from '@internationalized/date';
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { Calendar, ChevronLeft, ChevronRight } from '../icon';
 import { PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent, CalendarRoot, CalendarHeader, CalendarHeading, CalendarPrev, CalendarNext, CalendarGrid, CalendarGridHead, CalendarHeadCell, CalendarGridBody, CalendarGridRow, CalendarCell, CalendarCellTrigger } from 'reka-ui';
 import NumberInput from './NumberInput.vue';
-import './controls.css';
 
 /** 统一日期时间选择，输入输出使用ISO瞬时，界面按浏览器本地时间展示。 */
 const props = defineProps<{ modelValue: string | null; label: string; disabled?: boolean; portalTarget?: HTMLElement | string }>();
@@ -43,7 +42,7 @@ function escape(event: KeyboardEvent): void { event.preventDefault(); event.stop
   <div class="fui-field">
     <label :for="id" class="fui-label">{{ label }}</label>
     <PopoverRoot v-model:open="open">
-      <PopoverTrigger :id="id" class="fui-date-trigger" :aria-label="label" :disabled="disabled"><CalendarDays :size="16" /><span>{{ display }}</span></PopoverTrigger>
+      <PopoverTrigger :id="id" class="fui-date-trigger" :aria-label="label" :disabled="disabled"><Calendar :size="16" /><span>{{ display }}</span></PopoverTrigger>
       <PopoverPortal :to="portalTarget"><PopoverContent class="fui-calendar" align="start" :side-offset="6" :collision-padding="12" @escape-key-down="escape">
         <CalendarRoot v-slot="{ grid, weekDays }" v-model="day" locale="zh-CN" :week-starts-on="1" :fixed-weeks="true" :prevent-deselect="true" :calendar-label="label">
           <CalendarHeader class="fui-calendar-header"><CalendarPrev aria-label="上个月"><ChevronLeft :size="16" /></CalendarPrev><CalendarHeading /><CalendarNext aria-label="下个月"><ChevronRight :size="16" /></CalendarNext></CalendarHeader>

@@ -36,6 +36,6 @@ function retry(): void { open.value = false; emit('action'); }
 </template>
 
 <style scoped>
-.fui-operation-trigger[data-slot=button][data-status=success] > * { color: #258269; }
-.fui-operation-trigger[data-slot=button][data-status=error] > * { color: var(--destructive); }
+.fui-operation-trigger[data-slot=button][data-status=success] > * { color: var(--ui-color-success-text); }
+.fui-operation-trigger[data-slot=button][data-status=error] > * { color: var(--ui-color-danger-text); }
 </style>

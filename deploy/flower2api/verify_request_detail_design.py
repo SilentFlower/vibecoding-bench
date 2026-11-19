@@ -16,9 +16,11 @@ async def main():
         collect='(e)=>{const c=getComputedStyle(e);return Object.fromEntries('+json.dumps(properties)+'.map(k=>[k,c[k]]))}'
         mappings=[('.request-detail-head','.request-detail-head'),('.request-detail-head h2','.request-detail-head h2'),('.request-detail-tabs button','.request-detail-tabs button'),('.request-detail-hero h3','.request-detail-hero h3'),('.request-detail-hero strong','.request-detail-hero strong'),('.request-definitions','.request-definitions'),('.request-attempt-summary','.request-attempt-summary'),('.request-attempt-summary strong','.request-attempt-summary strong')]
         differences=[]
+        # 弹窗标题为关闭按钮预留的右内边距属于组件库（verify_ui_kit.py 核对），不再与旧原型比对。
+        component_keys={'.request-detail-head h2':{'padding'}}
         for expected,actual in mappings:
             left=await ref.locator(expected).first.evaluate(collect);right=await dialog.locator(actual).first.evaluate(collect)
-            delta={k:[left[k],right[k]] for k in properties if left[k]!=right[k]}
+            delta={k:[left[k],right[k]] for k in properties if left[k]!=right[k] and k not in component_keys.get(actual,())}
             if delta:differences.append({'selector':actual,'differences':delta})
         (out/'styles.json').write_text(json.dumps(differences,ensure_ascii=False,indent=2))
         await page.screenshot(animations='disabled',path=str(out/'overview-1440.png'));await ref.screenshot(animations='disabled',path=str(out/'overview-reference-1440.png'))

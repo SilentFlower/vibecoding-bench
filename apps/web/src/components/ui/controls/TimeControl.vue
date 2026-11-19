@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Clock } from 'lucide-vue-next';
+import { Clock } from '../icon';
 import { PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent } from 'reka-ui';
 import NumberInput from './NumberInput.vue';
 import { Button } from '../button';
-import './controls.css';
 
 /** 当地时分选择，无日期或时区换算；取消保留原值。 */
 const props = defineProps<{ modelValue: string; label: string; disabled?: boolean }>();

@@ -1,0 +1,217 @@
+/* 控制台组件库样式：只引用 --ui-* 新 token（默认值见 legacy-web/ui-foundation.css），颜色、圆角、尺寸不写死。
+   放在 components 层：业务传入的 Tailwind 工具类可覆盖；未分层的页面旧规则在页面迁移前仍会压过这里。 */
+@layer components {
+  /* ---------- 按钮：无描边，填充区分层级 ---------- */
+  .fui-button { display: inline-flex; align-items: center; justify-content: center; gap: calc(var(--ui-space-unit) * 1.5); flex-shrink: 0; height: var(--ui-control-md); padding: 0 calc(var(--ui-space-unit) * 4); border: 0; border-radius: var(--ui-radius-btn); background: var(--ui-color-fill); color: var(--ui-color-text); font: 700 var(--ui-font-size-md)/1 var(--ui-font-family); white-space: nowrap; cursor: pointer; outline: none; transition: background-color .15s, color .15s, box-shadow .15s; }
+  .fui-button svg { flex-shrink: 0; pointer-events: none; }
+  .fui-button svg:not([class*='size-']) { width: 16px; height: 16px; }
+  .fui-button:hover:not(:disabled) { background: var(--ui-color-fill-hover); }
+  .fui-button-default { background: var(--ui-color-primary); color: var(--ui-color-on-primary); }
+  .fui-button-default:hover:not(:disabled) { background: var(--ui-color-primary-hover); }
+  .fui-button-soft { background: var(--ui-color-primary-container); color: var(--ui-color-primary-text); }
+  .fui-button-soft:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-color-primary-container), var(--ui-color-primary) 10%); }
+  .fui-button-destructive { background: var(--ui-color-danger-bg); color: var(--ui-color-danger-text); }
+  .fui-button-destructive:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-color-danger-bg), var(--ui-color-danger) 10%); }
+  .fui-button-ghost, .fui-button-destructive-ghost, .fui-button-link { padding-inline: calc(var(--ui-space-unit) * 2); background: transparent; color: var(--ui-color-text-2); }
+  .fui-button-ghost:hover:not(:disabled) { background: var(--ui-color-fill); color: var(--ui-color-text); }
+  .fui-button-destructive-ghost { color: var(--ui-color-danger-text); }
+  .fui-button-destructive-ghost:hover:not(:disabled) { background: var(--ui-color-danger-bg); }
+  .fui-button-link { color: var(--ui-color-primary-text); text-underline-offset: 4px; }
+  .fui-button-link:hover:not(:disabled) { background: transparent; text-decoration: underline; }
+  .fui-button-sm { height: var(--ui-control-sm); padding-inline: calc(var(--ui-space-unit) * 3); font-size: var(--ui-font-size-sm); }
+  .fui-button-sm svg:not([class*='size-']) { width: 14px; height: 14px; }
+  .fui-button-lg { height: var(--ui-control-lg); padding-inline: calc(var(--ui-space-unit) * 5); }
+  .fui-button-icon { width: var(--ui-control-md); padding: 0; }
+  .fui-button-icon.fui-button-sm { width: var(--ui-control-sm); }
+  .fui-button-icon.fui-button-lg { width: var(--ui-control-lg); }
+  .fui-button:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
+  .fui-button:disabled { opacity: .45; cursor: not-allowed; }
+  .fui-button[aria-busy=true] { cursor: wait; }
+  .fui-button[aria-invalid=true] { box-shadow: 0 0 0 1px var(--ui-color-danger); }
+
+  /* ---------- 输入：静止填充无描边，聚焦白底加主色细环与外圈 ---------- */
+  .fui-input, .fui-textarea { width: 100%; min-width: 0; border: 0; border-radius: var(--ui-radius-control); background: var(--ui-color-fill); color: var(--ui-color-text); font: 400 var(--ui-font-size-md)/1.55 var(--ui-font-family); outline: none; transition: background-color .15s, box-shadow .15s; }
+  .fui-input { height: var(--ui-control-md); padding: 0 calc(var(--ui-space-unit) * 3); }
+  .fui-textarea { display: flex; min-height: calc(var(--ui-control-md) * 2); padding: calc(var(--ui-space-unit) * 2) calc(var(--ui-space-unit) * 3); field-sizing: content; }
+  .fui-input::placeholder, .fui-textarea::placeholder { color: var(--ui-color-text-4); }
+  .fui-input::selection, .fui-textarea::selection { background: var(--ui-color-primary-container); color: var(--ui-color-text); }
+  .fui-input:hover:not(:focus):not(:disabled), .fui-textarea:hover:not(:focus):not(:disabled) { background: var(--ui-color-fill-hover); }
+  .fui-input:focus, .fui-textarea:focus { background: var(--ui-color-surface); box-shadow: 0 0 0 1px var(--ui-color-primary), 0 0 0 4px var(--ui-color-primary-ring); }
+  .fui-input[aria-invalid=true], .fui-textarea[aria-invalid=true] { box-shadow: 0 0 0 1px var(--ui-color-danger); }
+  .fui-input[aria-invalid=true]:focus, .fui-textarea[aria-invalid=true]:focus { box-shadow: 0 0 0 1px var(--ui-color-danger), 0 0 0 4px color-mix(in srgb, var(--ui-color-danger) 18%, transparent); }
+  .fui-input[readonly], .fui-textarea[readonly] { background: var(--ui-color-fill-muted); color: var(--ui-color-text-3); }
+  .fui-input:disabled, .fui-textarea:disabled { opacity: .45; cursor: not-allowed; }
+  .fui-input[type=file] { padding-block: calc(var(--ui-space-unit) * 2); }
+  .fui-input-group { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2); min-width: 0; height: var(--ui-control-md); padding: 0 calc(var(--ui-space-unit) * 3); border-radius: var(--ui-radius-control); background: var(--ui-color-fill); color: var(--ui-color-text); font-size: var(--ui-font-size-md); transition: background-color .15s, box-shadow .15s; }
+  .fui-input-group > .fui-input { flex: 1; height: 100%; padding: 0; background: transparent; box-shadow: none; }
+  .fui-input-group > svg { flex-shrink: 0; width: 14px; height: 14px; color: var(--ui-color-text-3); }
+  .fui-input-group:hover:not(:focus-within) { background: var(--ui-color-fill-hover); }
+  .fui-input-group:focus-within { background: var(--ui-color-surface); box-shadow: 0 0 0 1px var(--ui-color-primary), 0 0 0 4px var(--ui-color-primary-ring); }
+
+  /* ---------- 表单控件：数字输入、选择、搜索、日期时间 ---------- */
+  .fui-field, .fui-search, .fui-info-content, .fui-choice-menu, .fui-info-trigger, .fui-calendar { font-family: var(--ui-font-family); }
+  .fui-field { min-width: 0; display: grid; align-content: start; gap: calc(var(--ui-space-unit) * 1.75); }
+  .fui-label { font-size: var(--ui-font-size-sm); font-weight: 700; line-height: 1.55; color: var(--ui-color-text-2); }
+  .fui-field-help { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 500; line-height: 1.55; }
+  .fui-number, .fui-choice, .fui-search, .fui-date-trigger { display: flex; align-items: center; min-width: 0; width: 100%; min-height: var(--ui-control-md); border: 0; border-radius: var(--ui-radius-control); background: var(--ui-color-fill); color: var(--ui-color-text); font-size: var(--ui-font-size-md); transition: background-color .15s, box-shadow .15s; }
+  .fui-number:hover:not(:focus-within), .fui-choice:hover:not([data-state=open]):not(:disabled), .fui-search:hover:not(:focus-within), .fui-date-trigger:hover:not([data-state=open]):not(:disabled) { background: var(--ui-color-fill-hover); }
+  .fui-number:focus-within, .fui-choice:focus-visible, .fui-choice[data-state=open], .fui-search:focus-within, .fui-date-trigger:focus-visible, .fui-date-trigger[data-state=open] { outline: none; background: var(--ui-color-surface); box-shadow: 0 0 0 1px var(--ui-color-primary), 0 0 0 4px var(--ui-color-primary-ring); }
+  .fui-number input, .fui-search input { flex: 1; min-width: 0; width: 100%; height: var(--ui-control-md); padding: 0 calc(var(--ui-space-unit) * 3); border: 0; background: transparent; font: inherit; color: inherit; }
+  .fui-number input:focus, .fui-search input:focus, .fui-number input:focus-visible, .fui-search input:focus-visible { outline: none; box-shadow: none; }
+  .fui-number input::placeholder, .fui-search input::placeholder { color: var(--ui-color-text-4); }
+  .fui-number input { appearance: textfield; -moz-appearance: textfield; font-variant-numeric: tabular-nums; }
+  .fui-number input::-webkit-inner-spin-button, .fui-number input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .fui-number input[readonly] { color: var(--ui-color-text-3); }
+  .fui-stepper { display: flex; flex: none; gap: calc(var(--ui-space-unit) * .5); padding-right: calc(var(--ui-space-unit) * 1.5); }
+  .fui-stepper button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: var(--ui-radius-btn); background: transparent; color: var(--ui-color-text-3); font-size: var(--ui-font-size-title); line-height: 1; cursor: pointer; }
+  .fui-stepper button:hover:not(:disabled) { background: var(--ui-color-surface); color: var(--ui-color-primary-text); box-shadow: var(--ui-shadow-raised); }
+  .fui-stepper button:focus-visible, .fui-search button:focus-visible, .fui-info-trigger:focus-visible, .fui-calendar button:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 1px; }
+  .fui-stepper button:disabled { opacity: .3; cursor: not-allowed; }
+  .fui-number[data-disabled], .fui-search[data-disabled], .fui-choice:disabled, .fui-date-trigger:disabled { opacity: .45; cursor: not-allowed; }
+  .fui-number[data-invalid], .fui-choice[aria-invalid=true] { box-shadow: 0 0 0 1px var(--ui-color-danger); }
+  .fui-choice { justify-content: space-between; gap: calc(var(--ui-space-unit) * 2.5); padding: 0 calc(var(--ui-space-unit) * 3); text-align: left; cursor: pointer; }
+  .fui-choice > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fui-choice[data-placeholder] > span:first-child { color: var(--ui-color-text-4); }
+  .fui-choice svg, .fui-date-trigger svg, .fui-search > svg { flex-shrink: 0; color: var(--ui-color-text-3); }
+  .fui-search { gap: calc(var(--ui-space-unit) * 1.75); padding: 0 calc(var(--ui-space-unit) * 2.5); }
+  .fui-search input { padding-inline: 0; }
+  .fui-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+  .fui-search button { display: grid; place-items: center; padding: calc(var(--ui-space-unit) * 1); border: 0; border-radius: var(--ui-radius-btn); background: transparent; color: var(--ui-color-text-3); cursor: pointer; }
+  .fui-search button:hover { background: var(--ui-color-fill); color: var(--ui-color-text); }
+  .fui-date-trigger { gap: calc(var(--ui-space-unit) * 2.5); height: var(--ui-control-md); padding: 0 calc(var(--ui-space-unit) * 3); text-align: left; cursor: pointer; }
+
+  /* ---------- 浮层：选择菜单、说明气泡、日历共用同一表面 ---------- */
+  .fui-popover, .fui-choice-menu, .fui-info-content, .fui-calendar { line-height: 1.55; border: 0; border-radius: var(--ui-radius-block); background: var(--ui-color-surface); color: var(--ui-color-text-2); box-shadow: var(--ui-shadow-pop); }
+  .fui-choice-menu { width: var(--reka-select-trigger-width); min-width: 180px; max-width: calc(100vw - 24px); max-height: min(260px, var(--reka-select-content-available-height)); overflow-y: auto; padding: calc(var(--ui-space-unit) * 1.25); z-index: 100; }
+  .fui-choice-option { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--ui-space-unit) * 4); min-height: var(--ui-control-sm); padding: calc(var(--ui-space-unit) * 1.5) calc(var(--ui-space-unit) * 2.5); border-radius: var(--ui-radius-btn); font-size: var(--ui-font-size-md); line-height: 1.55; cursor: pointer; outline: none; }
+  .fui-choice-option[data-highlighted] { background: var(--ui-color-fill); color: var(--ui-color-text); }
+  .fui-choice-option[data-state=checked] { color: var(--ui-color-primary-text); font-weight: 650; }
+  .fui-choice-option[data-disabled] { opacity: .4; pointer-events: none; }
+  .fui-empty { margin: 0; padding: calc(var(--ui-space-unit) * 3.5); color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); }
+  .fui-info-trigger { padding: 0; border: 0; background: transparent; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); text-align: left; cursor: help; }
+  .fui-info-content { width: 300px; max-width: calc(100vw - 24px); padding: calc(var(--ui-space-unit) * 4) calc(var(--ui-space-unit) * 4.5); z-index: 110; font-size: var(--ui-font-size-sm); line-height: 1.6; overflow-wrap: anywhere; }
+  .fui-info-title { margin: 0 0 calc(var(--ui-space-unit) * 2.5); color: var(--ui-color-text); font-size: var(--ui-font-size-md); font-weight: 700; }
+  .fui-calendar { z-index: 100; width: 296px; max-width: calc(100vw - 24px); padding: calc(var(--ui-space-unit) * 4); }
+  .fui-calendar button { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+  .fui-calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: calc(var(--ui-space-unit) * 3); color: var(--ui-color-text); font-size: var(--ui-font-size-md); font-weight: 700; }
+  .fui-calendar-header button { display: grid; place-items: center; padding: calc(var(--ui-space-unit) * 1.5); border-radius: var(--ui-radius-btn); }
+  .fui-calendar table { width: 100%; border-collapse: collapse; }
+  .fui-calendar th { height: 30px; color: var(--ui-color-text-4); font-size: var(--ui-font-size-sm); font-weight: 600; }
+  .fui-calendar td { padding: 1px; text-align: center; }
+  .fui-calendar td button { width: var(--ui-control-sm); height: var(--ui-control-sm); border-radius: var(--ui-radius-btn); color: var(--ui-color-text); font-size: var(--ui-font-size-sm); }
+  .fui-calendar button:hover:not(:disabled) { background: var(--ui-color-fill); }
+  .fui-calendar td button[data-outside-view] { color: var(--ui-color-text-4); }
+  .fui-calendar td button[data-selected], .fui-calendar td button[data-selected]:hover { background: var(--ui-color-primary); color: var(--ui-color-on-primary); }
+  .fui-calendar td button[data-today]:not([data-selected]) { box-shadow: inset 0 0 0 1px var(--ui-color-primary); }
+  .fui-calendar button:disabled { opacity: .45; cursor: not-allowed; }
+  .fui-time-inputs { display: flex; align-items: flex-end; gap: calc(var(--ui-space-unit) * 2.5); margin-top: calc(var(--ui-space-unit) * 2.5); padding-top: calc(var(--ui-space-unit) * 3); border-top: 1px solid var(--ui-color-line); }
+  .fui-time-inputs > .fui-field { flex: 1; min-width: 0; }
+  .fui-time-inputs > span { padding-bottom: calc(var(--ui-space-unit) * 2.5); }
+  .fui-calendar-footer { display: flex; align-items: center; justify-content: space-between; margin-top: calc(var(--ui-space-unit) * 3.5); font-size: var(--ui-font-size-sm); }
+  .fui-calendar-footer small { color: var(--ui-color-text-3); }
+  .fui-calendar-footer button { padding: calc(var(--ui-space-unit) * 1.5) calc(var(--ui-space-unit) * 3); border-radius: var(--ui-radius-btn); background: var(--ui-color-fill); color: var(--ui-color-text); font-weight: 650; }
+  .fui-calendar-footer button:last-child, .fui-calendar-footer button:last-child:hover:not(:disabled) { background: var(--ui-color-primary); color: var(--ui-color-on-primary); }
+  .fui-date-error { margin-top: calc(var(--ui-space-unit) * 2.5); color: var(--ui-color-danger-text); font-size: var(--ui-font-size-sm); line-height: 1.6; }
+
+  /* ---------- 分段：填充托盘 + 白色滑块，可带计数 ---------- */
+  .fui-segmented { display: inline-flex; gap: calc(var(--ui-space-unit) * .5); padding: calc((var(--ui-control-md) - var(--ui-control-sm)) / 2); border-radius: var(--ui-radius-control); background: var(--ui-color-fill); }
+  .fui-segmented-item { display: inline-flex; align-items: center; justify-content: center; gap: calc(var(--ui-space-unit) * 1.75); height: var(--ui-control-sm); padding: 0 calc(var(--ui-space-unit) * 3.5); border: 0; border-radius: max(calc(var(--ui-radius-control) - 1px), 0px); background: transparent; color: var(--ui-color-text-2); font: 650 var(--ui-font-size-meta)/1 var(--ui-font-family); white-space: nowrap; cursor: pointer; transition: background-color .15s, color .15s, box-shadow .15s; }
+  .fui-segmented-item svg { flex-shrink: 0; width: 14px; height: 14px; }
+  .fui-segmented-item:hover:not([data-state=checked]):not(:disabled) { color: var(--ui-color-text); }
+  .fui-segmented-item[data-state=checked] { background: var(--ui-color-surface); color: var(--ui-color-text); box-shadow: var(--ui-shadow-raised); }
+  .fui-segmented-count { color: var(--ui-color-text-4); font: 700 calc(var(--ui-font-size-xs) - .5px) var(--ui-font-family-mono); font-style: normal; }
+  .fui-segmented-item[data-state=checked] .fui-segmented-count { color: var(--ui-color-primary-text); }
+  .fui-segmented-item:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 1px; }
+  .fui-segmented-item:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* ---------- 标签 / 状态徽标：语义色文字 + 浅底，可带圆点 ---------- */
+  .fui-badge { display: inline-flex; align-items: center; gap: calc(var(--ui-space-unit) * 1.25); flex-shrink: 0; width: fit-content; height: 22px; padding: 0 calc(var(--ui-space-unit) * 2); overflow: hidden; border-radius: var(--ui-radius-control); font: 650 var(--ui-font-size-xs)/1 var(--ui-font-family); white-space: nowrap; }
+  .fui-badge > svg { width: 12px; height: 12px; pointer-events: none; }
+  .fui-badge[data-dot]::before { content: ''; flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .fui-badge-default { background: var(--ui-color-primary-container); color: var(--ui-color-primary-text); }
+  .fui-badge-secondary, .fui-badge-outline { background: var(--ui-color-neutral-bg); color: var(--ui-color-neutral-text); }
+  .fui-badge-outline { background: transparent; box-shadow: inset 0 0 0 1px var(--ui-color-line); }
+  .fui-badge-destructive { background: var(--ui-color-danger-bg); color: var(--ui-color-danger-text); }
+  .fui-badge-success { background: var(--ui-color-success-bg); color: var(--ui-color-success-text); }
+  .fui-badge-warning { background: var(--ui-color-warning-bg); color: var(--ui-color-warning-text); }
+  .fui-badge-info { background: var(--ui-color-info-bg); color: var(--ui-color-info-text); }
+  .fui-badge-cc { background: var(--ui-color-cc-bg); color: var(--ui-color-cc-text); }
+  .fui-badge-agy { background: var(--ui-color-agy-bg); color: var(--ui-color-agy-text); }
+  a.fui-badge:focus-visible, button.fui-badge:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
+
+  /* ---------- 开关、复选、单选卡 ---------- */
+  .fui-switch { position: relative; flex: none; width: 36px; height: 20px; padding: 0; border: 0; border-radius: 999px; background: var(--ui-color-fill-strong); cursor: pointer; transition: background-color .15s; }
+  .fui-switch[data-state=checked] { background: var(--ui-color-primary); }
+  .fui-switch-thumb { position: absolute; top: 2px; left: 2px; display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--ui-color-surface); box-shadow: var(--ui-shadow-knob); transition: transform .15s; }
+  .fui-switch-thumb[data-state=checked] { transform: translateX(16px); }
+  .fui-switch:focus-visible, .fui-checkbox-box:focus-visible, .fui-radio-card:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
+  .fui-switch:disabled, .fui-checkbox-box:disabled, .fui-radio-card:disabled { opacity: .45; cursor: not-allowed; }
+  .fui-checkbox { line-height: 1.55; display: inline-flex; align-items: center; gap: calc(var(--ui-space-unit) * 2); color: var(--ui-color-text); font-size: var(--ui-font-size-md); cursor: pointer; }
+  .fui-checkbox:has(.fui-checkbox-box:disabled) { color: var(--ui-color-text-3); cursor: not-allowed; }
+  .fui-checkbox-box { display: grid; place-items: center; flex: none; width: 16px; height: 16px; padding: 0; border: 1.5px solid var(--ui-color-text-4); border-radius: max(calc(var(--ui-radius-btn) - 2px), 2px); background: var(--ui-color-surface); color: var(--ui-color-on-primary); cursor: pointer; transition: background-color .15s, border-color .15s; }
+  .fui-checkbox-box:hover:not(:disabled) { border-color: var(--ui-color-primary); }
+  .fui-checkbox-box[data-state=checked], .fui-checkbox-box[data-state=indeterminate] { border-color: var(--ui-color-primary); background: var(--ui-color-primary); }
+  .fui-checkbox-box svg { width: 12px; height: 12px; stroke-width: 3; }
+  .fui-radio-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: calc(var(--ui-space-unit) * 2.5); }
+  .fui-radio-card { line-height: 1.55; display: flex; align-items: flex-start; gap: calc(var(--ui-space-unit) * 2.5); padding: calc(var(--ui-space-unit) * 3) calc(var(--ui-space-unit) * 3.5); border: 0; border-radius: var(--ui-radius-block); background: var(--ui-color-fill-subtle); color: var(--ui-color-text); text-align: left; cursor: pointer; transition: background-color .15s, box-shadow .15s; }
+  .fui-radio-card:hover:not(:disabled):not([data-state=checked]) { background: var(--ui-color-fill-muted); }
+  .fui-radio-card[data-state=checked] { background: var(--ui-color-primary-container); box-shadow: inset 0 0 0 1.5px var(--ui-color-primary); }
+  .fui-radio-card-dot { flex: none; width: 16px; height: 16px; margin-top: 2px; border: 1.5px solid var(--ui-color-text-4); border-radius: 50%; background: var(--ui-color-surface); transition: border-width .15s, border-color .15s; }
+  .fui-radio-card[data-state=checked] .fui-radio-card-dot { border: 5px solid var(--ui-color-primary); }
+  .fui-radio-card-label { display: block; font-size: calc(var(--ui-font-size-md) + .5px); font-weight: 720; }
+  .fui-radio-card-description { display: block; margin-top: 2px; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; }
+
+  /* ---------- 弹窗：18px 圆角、柔和阴影，标题 20 / 780 ---------- */
+  /* 卡片、弹窗、表格的根元素不设颜色、行高、字体等可继承属性：内部是页面内容，由页面基准决定，避免未迁移页面被连带改变。 */
+  .fui-dialog-overlay { background: var(--ui-color-mask); backdrop-filter: blur(2px); }
+  .fui-dialog { gap: calc(var(--ui-space-unit) * 4); padding: calc(var(--ui-space-unit) * 5.5) calc(var(--ui-space-unit) * 6) calc(var(--ui-space-unit) * 5); border: 0; border-radius: var(--ui-radius-card); background: var(--ui-color-surface); box-shadow: var(--ui-shadow-modal); }
+  .fui-dialog-header { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * .75); text-align: left; }
+  .fui-dialog-title { margin: 0; padding-right: calc(var(--ui-space-unit) * 8); color: var(--ui-color-text); font-size: var(--ui-font-size-heading); font-weight: 780; line-height: 1.55; }
+  .fui-dialog-description { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-md); font-weight: 550; line-height: 1.55; }
+  .fui-dialog-footer { gap: calc(var(--ui-space-unit) * 2.5); }
+  .fui-dialog-close { position: absolute; top: calc(var(--ui-space-unit) * 5); right: calc(var(--ui-space-unit) * 5); display: grid; place-items: center; width: var(--ui-control-sm); height: var(--ui-control-sm); padding: 0; border: 0; border-radius: var(--ui-radius-btn); background: transparent; color: var(--ui-color-text-3); cursor: pointer; transition: background-color .15s, color .15s; }
+  .fui-dialog-close:hover { background: var(--ui-color-fill); color: var(--ui-color-text); }
+  .fui-dialog-close:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
+  .fui-dialog-close:disabled { opacity: .45; cursor: not-allowed; }
+  .fui-dialog-close svg { width: 16px; height: 16px; }
+
+  /* ---------- 卡片：无描边，柔和阴影 ---------- */
+  .fui-card { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 3.5); padding-block: calc(var(--ui-space-unit) * 4.5); border-radius: var(--ui-radius-card); background: var(--ui-color-surface); box-shadow: var(--ui-shadow-card); }
+  .fui-card-header { gap: calc(var(--ui-space-unit) * 1); padding-inline: calc(var(--ui-space-unit) * 5); }
+  .fui-card-title { margin: 0; color: var(--ui-color-text); font-size: var(--ui-font-size-card); font-weight: 760; line-height: 1.55; }
+  .fui-card-description { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-meta); font-weight: 550; }
+  .fui-card-content, .fui-card-footer { padding-inline: calc(var(--ui-space-unit) * 5); }
+
+  /* ---------- 表格：圆角表头条 + 斑马行 ---------- */
+  .fui-table { width: 100%; border-collapse: separate; border-spacing: 0; caption-side: bottom; font-size: var(--ui-font-size-md); }
+  .fui-table-head { height: 40px; padding: 0 calc(var(--ui-space-unit) * 3); background: var(--ui-color-table-head); color: var(--ui-color-text-2); font-size: var(--ui-font-size-sm); font-weight: 700; text-align: left; vertical-align: middle; white-space: nowrap; }
+  .fui-table-head:first-child, .fui-table-row > .fui-table-cell:first-child { border-radius: var(--ui-radius-control) 0 0 var(--ui-radius-control); }
+  .fui-table-head:last-child, .fui-table-row > .fui-table-cell:last-child { border-radius: 0 var(--ui-radius-control) var(--ui-radius-control) 0; }
+  .fui-table-head:only-child, .fui-table-row > .fui-table-cell:only-child { border-radius: var(--ui-radius-control); }
+  .fui-table-cell { height: 60px; padding: 0 calc(var(--ui-space-unit) * 3); vertical-align: middle; white-space: nowrap; transition: background-color .15s; }
+  .fui-table-body > .fui-table-row:nth-child(even) > .fui-table-cell { background: var(--ui-color-table-stripe); }
+  .fui-table-body > .fui-table-row:hover > .fui-table-cell { background: var(--ui-color-table-hover); }
+  .fui-table-row[data-state=selected] > .fui-table-cell { background: var(--ui-color-primary-container); }
+  .fui-table-footer > .fui-table-row > .fui-table-cell { background: var(--ui-color-fill-subtle); font-weight: 650; }
+  .fui-table-sub { display: block; margin-top: 2px; overflow: hidden; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 500; line-height: 1.55; text-overflow: ellipsis; }
+  .fui-table-caption { margin-top: calc(var(--ui-space-unit) * 4); color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); }
+
+  /* ---------- 空态与骨架 ---------- */
+  .fui-empty-state { line-height: 1.55; display: flex; flex-direction: column; align-items: center; gap: calc(var(--ui-space-unit) * 2); padding: calc(var(--ui-space-unit) * 10) calc(var(--ui-space-unit) * 6); color: var(--ui-color-text-3); text-align: center; }
+  .fui-empty-state-icon { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: calc(var(--ui-space-unit) * 1); border-radius: var(--ui-radius-block); background: var(--ui-color-fill-subtle); color: var(--ui-color-text-3); }
+  .fui-empty-state-icon svg { width: 20px; height: 20px; }
+  .fui-empty-state-title { margin: 0; color: var(--ui-color-text); font-size: var(--ui-font-size-title); font-weight: 720; }
+  .fui-empty-state-description { max-width: 420px; margin: 0; font-size: var(--ui-font-size-meta); font-weight: 550; line-height: 1.55; }
+  .fui-empty-state-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: calc(var(--ui-space-unit) * 2); margin-top: calc(var(--ui-space-unit) * 2); }
+  .fui-skeleton { display: block; min-height: 1em; border-radius: var(--ui-radius-btn); background: linear-gradient(90deg, var(--ui-color-fill-muted) 25%, var(--ui-color-fill-subtle) 50%, var(--ui-color-fill-muted) 75%) 0 0 / 200% 100%; animation: fui-shimmer 1.4s ease-in-out infinite; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fui-button, .fui-input, .fui-textarea, .fui-input-group, .fui-number, .fui-choice, .fui-search, .fui-date-trigger, .fui-segmented-item, .fui-switch, .fui-switch-thumb, .fui-checkbox-box, .fui-radio-card, .fui-radio-card-dot, .fui-dialog-close, .fui-table-cell { transition: none; }
+    .fui-skeleton { animation: none; }
+  }
+  @media (forced-colors: active) {
+    .fui-number:focus-within, .fui-choice:focus-visible, .fui-search:focus-within, .fui-input:focus, .fui-textarea:focus, .fui-input-group:focus-within { outline: 2px solid Highlight; }
+    .fui-switch, .fui-checkbox-box, .fui-radio-card, .fui-segmented-item[data-state=checked] { border: 1px solid CanvasText; }
+  }
+}
+@keyframes fui-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight } from '../icon';
 import { Button } from '../button';
 import PageSizeSelect from './PageSizeSelect.vue';
 
