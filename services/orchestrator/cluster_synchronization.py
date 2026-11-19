@@ -128,6 +128,7 @@ class NodeSynchronization:
             raise ValueError('节点同步期间配置已变化')
 
     def _historical_environment(self, node, control: str, node_id: int, environment_id: str) -> bool:
+        """核对终态迁移留下的停止副本。:param node: SSH连接。:param control: 原控制容器。:param node_id: 当前节点。:param environment_id: 历史环境。:return: 收据及实际停止证明是否一致。"""
         if not isinstance(environment_id, str) or not re.fullmatch('[a-f0-9]{32}', environment_id):
             return False
         connection = self.service.store.database()
@@ -142,23 +143,60 @@ class NodeSynchronization:
                 if self._paused_environment(migration, node_id):
                     return True
         script = ('import json,sys;from pathlib import Path;from account_runtime import _read_json;'
-            'v=json.load(sys.stdin);print(json.dumps(_read_json(Path("/data/environments")/v["environment_id"]/"runtime/node-fence.json")))')
+            'v=json.load(sys.stdin);print(json.dumps(_read_json(Path(v["root"])/"environments"/v["environment_id"]/"runtime/node-fence.json")))')
         try:
             fence = json.loads(node._command(shlex.join(['docker', 'exec', '-i', control, 'python3', '-c', script]),
-                data=json.dumps({'environment_id': environment_id}).encode(), timeout=15, maximum_output=16384))
+                data=json.dumps({'root': '/data', 'environment_id': environment_id}).encode(), timeout=15, maximum_output=16384))
             connection = self.service.store.database()
             try:
-                stored = connection.execute('SELECT * FROM node_migrations WHERE operation_id=? AND source_node_id=? AND phase=?',
-                    (fence.get('operation_id'), node_id, 'completed')).fetchone()
+                stored = connection.execute("SELECT * FROM node_migrations WHERE operation_id=? AND "
+                    "((source_node_id=? AND phase='completed') OR (target_node_id=? AND phase='cancelled'))",
+                    (fence.get('operation_id'), node_id, node_id)).fetchone()
             finally:
                 connection.close()
             if stored is None:
                 return False
             record = json.loads(stored['record_json'])
-            return (fence.get('phase') == 'fenced' and fence.get('environment_id') == environment_id
+            if not (fence.get('phase') == 'fenced' and fence.get('environment_id') == environment_id
                 and fence.get('account_id') == stored['account_id'] and record.get('environment_id') == environment_id
-                and fence.get('generation') == record.get('source_generation')
-                and fence.get('assignment_revision') == record.get('source_revision'))
+                and fence.get('node_key') == node.node_key):
+                return False
+            if stored['phase'] == 'completed':
+                return (fence.get('generation') == record.get('source_generation')
+                    and fence.get('assignment_revision') == record.get('source_revision'))
+            # 取消会保留已停止的目标及资料，中央零归属不表示这些副本缺少所有者。
+            revision = record['source_revision'] + 1
+            receipt = {'operation_id': stored['operation_id'], 'account_id': stored['account_id'],
+                'environment_id': environment_id, 'revision': revision, 'phase': 'revoked'}
+            if (record.get('last_confirmed_phase') != 'cancelled'
+                    or record.get('receipts', {}).get('target_revoked') != {**receipt, 'node_id': node_id}
+                    or fence.get('assignment_revision') != revision):
+                return False
+            script = ('import json,sys;from pathlib import Path;from account_runtime import _read_json;'
+                'v=json.load(sys.stdin);p=Path(v["root"]);print(json.dumps({'
+                '"target":_read_json(p/"environments"/v["environment_id"]/"runtime/node-migration-target.json"),'
+                '"revoked":_read_json(p/"node-migrations"/v["operation_id"]/"revoked.json")}))')
+            proof = json.loads(node._command(shlex.join(['docker', 'exec', '-i', control, 'python3', '-c', script]),
+                data=json.dumps({'root': '/data', 'environment_id': environment_id, 'operation_id': stored['operation_id']}).encode(),
+                timeout=15, maximum_output=16384))
+            expected = {**receipt, 'protocol': 1, 'node_key': node.node_key}
+            if (not isinstance(proof, dict) or not isinstance(proof.get('target'), dict)
+                    or proof.get('revoked') != expected
+                    or any(proof['target'].get(key) != value for key, value in {
+                        **expected, 'source_generation': record['source_generation']}.items())):
+                return False
+            labels = ['vibebench.product=v3', 'vibebench.deployment=' + self.runtime.deployment,
+                'vibebench.cluster-node=' + node.node_key, 'vibebench.environment=' + environment_id]
+            stopped = fence.get('stopped_containers')
+            if not isinstance(stopped, list) or not all(isinstance(value, str) for value in stopped):
+                return False
+            for container in self.service.docker(node_id).containers.list(all=True, filters={'label': labels}):
+                container.reload()
+                state = container.attrs.get('State', {})
+                if (container.id not in stopped or container.labels.get('vibebench.role') not in ROLE_LABELS.values()
+                        or state.get('Running') is not False or state.get('Pid') != 0):
+                    return False
+            return True
         except (ValueError, OSError, RuntimeError):
             return False
 

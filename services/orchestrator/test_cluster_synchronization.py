@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import json
+import shlex
+import subprocess
+import sys
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -11,6 +14,7 @@ from docker.errors import NotFound
 from cluster_deployment import node_container_name
 from cluster_nodes import NodeCreate
 from cluster_synchronization import NodeSynchronization, NodeSynchronizationWait
+from runtime_files import atomic_json
 import test_cluster_nodes
 
 
@@ -104,6 +108,137 @@ class NodeSynchronizationTests(unittest.TestCase):
             self.sync.install(self.installer,self.row['id'],1)
         self.old.stop.assert_not_called()
         self.installer.prepare.assert_not_called()
+
+    def _cancelled_target(self) -> dict:
+        """建立与线上取消现场相同的停止目标及撤销收据。:return: 测试标记路径与角色。"""
+        operation, environment = 'e' * 32, 'f' * 32
+        receipt = {'operation_id': operation, 'account_id': 1, 'environment_id': environment,
+            'revision': 2, 'phase': 'revoked'}
+        record = {'environment_id': environment, 'source_revision': 1, 'source_generation': 61,
+            'last_confirmed_phase': 'cancelled', 'receipts': {'target_revoked': {**receipt, 'node_id': self.row['id']}}}
+        with self.fixture.database() as connection:
+            connection.execute("INSERT INTO accounts(id,name,profile_path) VALUES(1,'synthetic','profiles/synthetic')")
+            connection.execute("INSERT INTO node_migrations(operation_id,account_id,source_node_id,target_node_id,phase,record_json,created_at,updated_at) "
+                "VALUES(?,1,1,?,'cancelled',?,0,0)", (operation, self.row['id'], json.dumps(record)))
+        data = self.fixture.root / 'cancelled-target'
+        root = data / 'environments' / environment
+        expected = {**receipt, 'protocol': 1, 'node_key': self.row['node_key']}
+        target = root / 'runtime/node-migration-target.json'
+        revoked = data / 'node-migrations' / operation / 'revoked.json'
+        fence = root / 'runtime/node-fence.json'
+        atomic_json(target, {**expected, 'source_generation': 61})
+        atomic_json(revoked, expected)
+        atomic_json(fence, {'protocol': 1, 'operation_id': operation, 'node_key': self.row['node_key'],
+            'account_id': 1, 'environment_id': environment, 'assignment_revision': 2, 'generation': 62,
+            'phase': 'fenced', 'stopped_containers': ['cancelled-network']})
+        atomic_json(root / 'home/project.json', {'data': '保留原资料'})
+        role = Mock(id='cancelled-network', labels={'vibebench.environment': environment, 'vibebench.role': 'account-network'})
+        role.attrs = {'State': {'Running': False, 'Pid': 0}}
+        self.remote.containers.list.side_effect = lambda **options: (
+            [role] if 'vibebench.environment=' + environment in options.get('filters', {}).get('label', [])
+            else [self.old, role]) if options.get('all') else []
+
+        def read(command, *, data, **options):
+            value = json.loads(data)
+            value['root'] = str(root.parent.parent)
+            result = subprocess.run([sys.executable, '-c', shlex.split(command)[-1]],
+                input=json.dumps(value).encode(), capture_output=True)
+            if result.returncode:
+                raise ValueError('节点只读标记核对失败')
+            return result.stdout
+
+        self.node._command = Mock(side_effect=read)
+        return {'environment': environment, 'operation': operation, 'root': root,
+            'target': target, 'revoked': revoked, 'fence': fence, 'role': role}
+
+    def test_cancelled_target_is_backed_up_and_component_upgrade_resumes(self) -> None:
+        """取消目标残留网络角色时，自动核对后完成原同步并保留全部资料。:return: None。"""
+        target = self._cancelled_target()
+        original = {path: path.read_bytes() for path in target['root'].rglob('*') if path.is_file()}
+        revoked = target['revoked'].read_bytes()
+        target['revoked'].unlink()
+        with self.assertRaises(NodeSynchronizationWait):
+            self.sync.install(self.installer, self.row['id'], 1)
+        pending = json.loads((self.node.private / 'maintenance/current.json').read_text())
+        target['revoked'].write_bytes(revoked)
+        result = self.sync.install(self.installer, self.row['id'], 1)
+        self.assertEqual('prepared', result['state'])
+        self.assertEqual(['stop', 'backup', 'rename', 'install'], self.events)
+        job = json.loads((self.node.private / 'maintenance/current.json').read_text())
+        self.assertEqual(pending['job_id'], job['job_id'])
+        self.assertEqual('completed', job['phase'])
+        self.assertEqual([target['environment']], job['historical_environments'])
+        self.assertEqual(original, {path: path.read_bytes() for path in original})
+        target['role'].remove.assert_not_called()
+        with self.fixture.database() as connection:
+            self.assertEqual('cancelled', connection.execute('SELECT phase FROM node_migrations').fetchone()[0])
+            self.assertEqual(1, connection.execute('SELECT node_id FROM account_node_assignments').fetchone()[0])
+
+    def test_cancelled_target_requires_matching_terminal_receipts_and_markers(self) -> None:
+        """外来操作、节点、代次或缺失撤销证明保持原控制运行。:return: None。"""
+        target = self._cancelled_target()
+        for name, key, value in (
+                ('target', 'operation_id', 'a' * 32), ('target', 'source_generation', 99),
+                ('target', 'phase', 'published'), ('revoked', 'node_key', 'b' * 32),
+                ('fence', 'assignment_revision', 3), ('fence', 'account_id', 2)):
+            with self.subTest(file=name, key=key):
+                path = target[name]
+                original = path.read_bytes()
+                atomic_json(path, {**json.loads(original), key: value})
+                try:
+                    with self.assertRaises(NodeSynchronizationWait):
+                        self.sync.install(self.installer, self.row['id'], 1)
+                finally:
+                    path.write_bytes(original)
+        target['revoked'].unlink()
+        with self.assertRaises(NodeSynchronizationWait):
+            self.sync.install(self.installer, self.row['id'], 1)
+        self.old.stop.assert_not_called()
+
+    def test_completed_source_keeps_original_generation_proof(self) -> None:
+        """已完成迁移的旧源继续按原代次识别，与取消目标分别核对。:return: None。"""
+        target = self._cancelled_target()
+        with self.fixture.database() as connection:
+            record = json.loads(connection.execute('SELECT record_json FROM node_migrations').fetchone()[0])
+            record.update(source_generation=62, source_revision=2, last_confirmed_phase='completed')
+            connection.execute("UPDATE node_migrations SET phase='completed',source_node_id=?,target_node_id=1,record_json=?",
+                (self.row['id'], json.dumps(record)))
+        self.assertTrue(self.sync._historical_environment(self.node, self.name, self.row['id'], target['environment']))
+        marker = json.loads(target['fence'].read_text())
+        atomic_json(target['fence'], {**marker, 'generation': 99})
+        self.assertFalse(self.sync._historical_environment(self.node, self.name, self.row['id'], target['environment']))
+        self.installer.prepare.assert_not_called()
+
+    def test_cancelled_target_requires_actual_stopped_registered_roles(self) -> None:
+        """撤销证明齐全时仍逐个核对实际角色、PID及停止登记。:return: None。"""
+        target = self._cancelled_target()
+        role = target['role']
+        for state in ({'Running': True, 'Pid': 99}, {'Running': False, 'Pid': 99}):
+            with self.subTest(state=state):
+                role.attrs['State'] = state
+                with self.assertRaises(NodeSynchronizationWait):
+                    self.sync.install(self.installer, self.row['id'], 1)
+        role.attrs['State'] = {'Running': False, 'Pid': 0}
+        role.id = 'foreign-network'
+        with self.assertRaises(NodeSynchronizationWait):
+            self.sync.install(self.installer, self.row['id'], 1)
+        role.id = 'cancelled-network'
+        role.labels['vibebench.role'] = 'unknown'
+        with self.assertRaises(NodeSynchronizationWait):
+            self.sync.install(self.installer, self.row['id'], 1)
+        self.old.stop.assert_not_called()
+        self.installer.prepare.assert_not_called()
+
+    def test_cancelled_target_requires_central_cancellation_receipt(self) -> None:
+        """节点自报撤销不能代替中央原操作完成收据。:return: None。"""
+        self._cancelled_target()
+        with self.fixture.database() as connection:
+            record = json.loads(connection.execute('SELECT record_json FROM node_migrations').fetchone()[0])
+            record['receipts']['target_revoked']['node_id'] = 1
+            connection.execute('UPDATE node_migrations SET record_json=?', (json.dumps(record),))
+        with self.assertRaises(NodeSynchronizationWait):
+            self.sync.install(self.installer, self.row['id'], 1)
+        self.old.stop.assert_not_called()
 
     def test_source_or_target_pending_migration_blocks_empty_node(self) -> None:
         """目标尚无归属账号时，未完成迁移仍阻止组件切换。:return: None。"""
