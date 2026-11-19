@@ -158,12 +158,22 @@ def inside() -> dict:
         database=sqlite3.connect('/state/gateway.sqlite')
         with database:
             database.execute("INSERT INTO accounts(id,name,email,platform,token,device_id,auth_type,access_token,refresh_token,oauth_expires_at,concurrency,auto_telemetry,auto_poll_usage,usage_data) VALUES(1,'synthetic','synthetic@example.test','antigravity','','','oauth','synthetic-at-1','synthetic-rt','2099-01-01T00:00:00Z',1,0,0,?)",
-                (json.dumps({'capabilities':{'model_mappings':{'gemini-synthetic':'MODEL_PLACEHOLDER_M36','claude-synthetic':'MODEL_PLACEHOLDER_M320'}}}),))
+                (json.dumps({'capabilities':{'model_mappings':{
+                    'gemini-synthetic':'MODEL_PLACEHOLDER_M36','gemini-synthetic-low':'MODEL_PLACEHOLDER_M37',
+                    'claude-synthetic':'MODEL_PLACEHOLDER_M320','claude-synthetic-high':'MODEL_SYNTHETIC_CLAUDE_HIGH',
+                    'gemini-4-neon-low':'MODEL_SYNTHETIC_NEON_LOW','gemini-4-neon-high':'MODEL_SYNTHETIC_NEON_HIGH',
+                    'gemini-4-hydrogen-medium':'MODEL_SYNTHETIC_HYDROGEN_MEDIUM',
+                }}}),))
             database.execute("INSERT INTO account_credential_states(account_id,generation,phase,updated_at_ms) VALUES(1,1,'ready',1)")
             database.executemany("INSERT INTO api_tokens(name,token,allowed_accounts,status) VALUES('synthetic',?,'1','active')",[('synthetic-key',),('synthetic-other',)])
         base='/v1beta/models/gemini-synthetic:'
         body={'contents':[{'role':'user','parts':[{'text':'合成问题'}]}],'generationConfig':{'temperature':.2,'topP':.8,'maxOutputTokens':128}}
-        status,raw=request('/v1beta/models');require(status==200 and len(json.loads(raw)['models'])==2,'真实模型目录失败')
+        status,raw=request('/v1beta/models')
+        names=[item['name'] for item in json.loads(raw)['models']]
+        require(status==200 and names==[
+            'models/claude-synthetic','models/claude-synthetic-high',
+            'models/gemini-4-hydrogen','models/gemini-4-neon','models/gemini-synthetic',
+        ],'公开目录未按 Gemini 基础名称聚合')
         before=len(Fixture.calls)
         for action in ('generateContent','streamGenerateContent?alt=sse'):
             status,raw=request('/v1beta/models/gemini-unknown:'+action,body)
@@ -182,28 +192,61 @@ def inside() -> dict:
             database.execute("UPDATE account_credential_states SET phase='ready' WHERE account_id=1")
         status,raw=request(base+'generateContent',body);require(status==200 and json.loads(raw)['usageMetadata']['totalTokenCount']==7,'真实非流式聚合失败')
         status,raw=request(base+'streamGenerateContent?alt=sse',body);require(status==200 and raw.startswith(b'data: ') and b'[DONE]' not in raw,'真实SSE协议失败')
+        cases=[
+            ('gemini-4-neon',{'thinkingLevel':'LOW','thinkingBudget':-1,'includeThoughts':True},'generateContent','gemini-4-neon-low','MODEL_SYNTHETIC_NEON_LOW'),
+            ('gemini-4-neon',None,'streamGenerateContent?alt=sse','gemini-4-neon-high','MODEL_SYNTHETIC_NEON_HIGH'),
+            ('gemini-4-hydrogen',{'thinkingBudget':1025},'generateContent','gemini-4-hydrogen-medium','MODEL_SYNTHETIC_HYDROGEN_MEDIUM'),
+            ('gemini-4-hydrogen',None,'generateContent','gemini-4-hydrogen-medium','MODEL_SYNTHETIC_HYDROGEN_MEDIUM'),
+            ('gemini-4-neon-low',{'thinkingLevel':'HIGH'},'generateContent','gemini-4-neon-low','MODEL_SYNTHETIC_NEON_LOW'),
+            ('gemini-synthetic',{'thinkingLevel':'LOW'},'generateContent','gemini-synthetic-low','MODEL_PLACEHOLDER_M37'),
+            ('gemini-synthetic',{'thinkingLevel':'HIGH'},'generateContent','gemini-synthetic','MODEL_PLACEHOLDER_M36'),
+        ]
+        for model,thinking,action,resolved,native_model in cases:
+            candidate=copy.deepcopy(body)
+            if thinking is not None:candidate['generationConfig']['thinkingConfig']=thinking
+            status,_=request('/v1beta/models/'+model+':'+action,candidate)
+            sent=Fixture.calls[-1]
+            require(status==200 and (sent['model'],sent['native_model'])==(resolved,native_model),'Gemini 目录型号与执行ID不匹配')
+            require(sent['body']==body,'档位字段进入了原生正文或改动其他入站参数')
+        before=len(Fixture.calls)
+        for model,thinking,expected in [
+            ('gemini-4-neon',{'thinkingLevel':'MEDIUM'},404),
+            ('gemini-4-neon-medium',None,404),
+            ('gemini-4-neon',{'thinkingLevel':'broken'},400),
+            ('gemini-4-neon',{'thinkingBudget':True},400),
+        ]:
+            candidate=copy.deepcopy(body)
+            if thinking is not None:candidate['generationConfig']['thinkingConfig']=thinking
+            status,_=request('/v1beta/models/'+model+':generateContent',candidate)
+            require(status==expected,'Gemini 无可用档位或无效参数的错误不符')
+        require(len(Fixture.calls)==before,'未匹配的型号进入发送边界')
+
+        tool_base='/v1beta/models/gemini-4-neon:generateContent'
         tool=copy.deepcopy(body);tool['tools']=[{'functionDeclarations':[{'name':'synthetic_tool','parameters':{'type':'OBJECT','properties':{'x':{'type':'INTEGER'}}}}]}]
-        status,raw=request(base+'generateContent',tool);require(status==200,'首工具轮失败')
+        tool['generationConfig']['thinkingConfig']={'thinkingLevel':'LOW'}
+        status,raw=request(tool_base,tool);require(status==200 and Fixture.calls[-1]['model']=='gemini-4-neon-low','首工具轮失败')
         response=json.loads(raw)
         require(Fixture.waiting.wait(2),'原工具轮归属缺失')
         continuation=copy.deepcopy(tool)
+        continuation['generationConfig']['thinkingConfig']={'thinkingLevel':'HIGH'}
         continuation['contents']+=[response['candidates'][0]['content'],{'role':'user','parts':[{'functionResponse':{'id':'synthetic-call','name':'synthetic_tool','response':{'value':'真实合成结果'}}}]}]
         previous=len(Fixture.calls)
-        require(request(base+'generateContent',continuation,key='synthetic-other')[0]==400,'跨调用方结果被接纳')
+        require(request(tool_base,continuation,key='synthetic-other')[0]==400,'跨调用方结果被接纳')
         wrong=copy.deepcopy(continuation);wrong['contents'][-1]['parts'][0]['functionResponse']['id']='other'
-        require(request(base+'generateContent',wrong)[0]==400,'错误工具ID被接纳')
+        require(request(tool_base,wrong)[0]==400,'错误工具ID被接纳')
         require(len(Fixture.calls)==previous,'错误结果进入模型发送边界')
         with database:
             database.execute("UPDATE account_credential_states SET phase='reconcile' WHERE account_id=1")
-        require(request(base+'generateContent',continuation)[0]==503,'待对账凭据被发布')
+        require(request(tool_base,continuation)[0]==503,'待对账凭据被发布')
         require(Fixture.tool_drained.is_set() and len(Fixture.calls)==previous,'待对账期间旧工具没有独立收口')
         with database:
             database.execute("UPDATE account_credential_states SET phase='ready',generation=2 WHERE account_id=1")
             database.execute("UPDATE accounts SET access_token='synthetic-at-2' WHERE id=1")
-        status,raw=request(base+'generateContent',continuation)
+        status,raw=request(tool_base,continuation)
         require(status==200 and json.loads(raw)['candidates'][0]['content']['parts'][0]['text']=='合成回复','concurrency=1续轮失败')
+        require(Fixture.calls[-1]['model']=='gemini-4-neon-low','续轮改变了已绑定的型号')
         require(Fixture.tool_finished.is_set(),'真实工具回填未完成')
-        require(request(base+'generateContent',continuation)[0]==400,'重复工具结果被接纳')
+        require(request(tool_base,continuation)[0]==400,'重复工具结果被接纳')
         for mode,expected,attempts,refreshes in [('auth-recover',200,2,1),('capacity-error',503,1,0),('auth-always',503,2,1),('auth-after-frame',200,1,0)]:
             current=copy.deepcopy(body);current['contents'][0]['parts'][0]['text']=mode
             before=len(Fixture.calls);before_refresh=Fixture.refreshes
@@ -221,14 +264,32 @@ def inside() -> dict:
         require(request('/v1beta/models',key='synthetic-other')[0]==401,'禁用令牌被接纳')
         with database:
             database.execute("INSERT INTO accounts(id,name,email,platform,token,device_id,auth_type,access_token,refresh_token,oauth_expires_at,concurrency,auto_telemetry,auto_poll_usage,usage_data) VALUES(2,'synthetic-two','two@example.test','antigravity','','','oauth','synthetic-two-at','synthetic-two-rt','2099-01-01T00:00:00Z',1,0,0,?)",
-                (json.dumps({'capabilities':{'model_mappings':{'gemini-synthetic':'MODEL_PLACEHOLDER_M36'}}}),))
+                (json.dumps({'capabilities':{'model_mappings':{
+                    'gemini-synthetic':'MODEL_PLACEHOLDER_M36','gemini-4-hydrogen-high':'MODEL_SYNTHETIC_HYDROGEN_HIGH',
+                }}}),))
             database.execute("INSERT INTO account_credential_states(account_id,generation,phase,updated_at_ms) VALUES(2,1,'ready',1)")
             database.execute("INSERT INTO api_tokens(name,token,allowed_accounts,status) VALUES('two','synthetic-two-key','2','active')")
+            database.execute("INSERT INTO api_tokens(name,token,allowed_accounts,status) VALUES('both','synthetic-both-key','1,2','active')")
             database.execute('UPDATE accounts SET agy_system_prompt_homoglyph_enabled=1 WHERE id=1')
         before=len(Fixture.calls)
+        status,raw=request('/v1beta/models',key='synthetic-two-key')
+        require(status==200 and [item['name'] for item in json.loads(raw)['models']]==[
+            'models/gemini-4-hydrogen','models/gemini-synthetic',
+        ],'公开目录包含令牌范围外的模型')
+        status,raw=request('/v1beta/models',key='synthetic-both-key')
+        require(status==200 and [item['name'] for item in json.loads(raw)['models']]==names,
+            '同一模型的多账号档位未聚合')
+        require(request('/v1beta/models/gemini-4-hydrogen:generateContent',
+            {**body,'generationConfig':{'thinkingConfig':{'thinkingLevel':'MEDIUM'}}},key='synthetic-two-key')[0]==404,
+            '指定档位缺失时使用了令牌范围外的账号或改用其他档位')
         require(request('/v1beta/models/claude-synthetic:generateContent',body,key='synthetic-two-key')[0]==404,
             '其他账号的模型目录进入当前令牌范围')
+        require(request('/v1beta/models/gemini-4-neon:generateContent',body,key='synthetic-two-key')[0]==404,
+            'Gemini 档位匹配使用了其他账号的目录')
         require(len(Fixture.calls)==before,'令牌范围外的模型进入发送边界')
+        status,_=request('/v1beta/models/gemini-4-hydrogen:generateContent',body,key='synthetic-both-key')
+        require(status==200 and Fixture.calls[-1]['request']['account_id']==2
+            and Fixture.calls[-1]['model']=='gemini-4-hydrogen-high','默认档位优先级未跨账号生效')
         candidate=copy.deepcopy(body);candidate['systemInstruction']={'parts':[{'text':'ABC system 中文'}]}
         for key,account,enabled in [('synthetic-key',1,True),('synthetic-two-key',2,False)]:
             require(request(base+'generateContent',candidate,key=key)[0]==200,'账号独立策略请求失败')
@@ -271,6 +332,8 @@ def inside() -> dict:
             require(context.get('credential_generation')==source['credential_snapshot']['credential_generation'],'尝试凭据代次漂移')
             require(attempt['account_id']==source['request']['account_id'],'持久尝试跨账号')
         require(any(a.get('context',{}).get('requested_model')=='claude-synthetic' for a in attempts),'Claude模型记录缺失')
+        require(any(a.get('context',{}).get('requested_model')=='gemini-4-neon'
+            and a['context'].get('submitted_model')=='MODEL_SYNTHETIC_NEON_LOW' for a in attempts),'档位匹配覆盖了原始请求名')
         recovered=[a for a in attempts if a.get('retry_reason')=='oauth_recovery']
         require(len(recovered)>=3,'401恢复尝试原因缺失')
         roots={row[0]:json.loads(row[1]) for row in database.execute('SELECT request_id,summary_json FROM request_diagnostics')}
@@ -280,7 +343,7 @@ def inside() -> dict:
             require(same[0]['context']['credential_generation']!=same[1]['context']['credential_generation'],'401恢复代次未分别记录')
         database.close()
         return {'passed':True,'evidence':'real_http_sqlite_synthetic_sender','network':'none','real_model_submissions':0,
-            'synthetic_submissions':len(Fixture.calls),'checks':['真实Gemini目录与令牌','非流式源usage','SSE','函数签名和结果','错调用方和ID拒绝',
+            'synthetic_submissions':len(Fixture.calls),'checks':['真实Gemini目录与令牌','按档位匹配目录、保留精确型号与令牌范围','非流式源usage','SSE','函数签名和结果','错调用方和ID拒绝',
                 '待对账期间旧工具独立收口和新模型拒绝','concurrency=1原许可接续','新AT代次','重复结果拒绝','禁用令牌',
                 '明确401仅恢复一次','容量错误零恢复','SSE首帧后零重放','SSE断连关闭原发送和释放许可',
                 '两账号策略隔离','认证恢复冻结策略','后续HTTP采用新开关','缺失和错误策略回执拒绝','原始入站视图保持',

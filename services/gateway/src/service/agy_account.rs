@@ -174,12 +174,12 @@ impl AccountService {
         Err(AppError::ServiceUnavailable("AGY凭据解析等待超时".into()))
     }
 
-    /// 按令牌权限和真实模型映射读取候选；已观测目录中缺少指定模型时返回未找到。@param token 当前令牌。@param model 可选公开模型。@return 合资格AGY账号或目录错误。
+    /// 按令牌权限和真实模型映射读取候选。@param token 当前令牌。@param models 按优先级排列的公开名，空列表用于读取目录。@return 合资格账号及命中的模型位置。
     pub async fn agy_candidates(
         &self,
         token: &ApiToken,
-        model: Option<&str>,
-    ) -> Result<Vec<Account>, AppError> {
+        models: &[String],
+    ) -> Result<Vec<(usize, Account)>, AppError> {
         let allowed = token.allowed_account_ids();
         let blocked = token.blocked_account_ids();
         let mut result = Vec::new();
@@ -192,16 +192,22 @@ impl AccountService {
             {
                 continue;
             }
-            if let Some(name) = model {
+            let model_index = if models.is_empty() {
+                0
+            } else {
                 // 先核对令牌可见目录，停用或冷却中的已知模型仍走原可用性判断。
-                if Self::agy_model(&account, name).is_none() {
+                let Some(index) = models
+                    .iter()
+                    .position(|name| Self::agy_model(&account, name).is_some())
+                else {
                     has_catalog |= account.usage_data["capabilities"]["model_mappings"]
                         .as_object()
                         .is_some_and(|mapping| !mapping.is_empty());
                     continue;
-                }
+                };
                 has_model = true;
-            }
+                index
+            };
             if account.status != AccountStatus::Active
                 || account
                     .rate_limit_reset_at
@@ -210,14 +216,20 @@ impl AccountService {
                 continue;
             }
             if self.store.agy_credential_state(account.id).await?.phase == "ready" {
-                result.push(account);
+                result.push((model_index, account));
             }
         }
         if has_catalog && !has_model {
             return Err(AppError::NotFound);
         }
         let counts = self.active_request_counts().await;
-        result.sort_by_key(|account| (counts.get(&account.id).copied().unwrap_or(0), account.id));
+        result.sort_by_key(|(model_index, account)| {
+            (
+                *model_index,
+                counts.get(&account.id).copied().unwrap_or(0),
+                account.id,
+            )
+        });
         Ok(result)
     }
 

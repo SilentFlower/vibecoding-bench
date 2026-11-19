@@ -1,5 +1,5 @@
 //! Gemini入口的账号许可、原生帧保真与跨HTTP工具轮归属。
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::io::Error as IoError;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
@@ -48,10 +48,17 @@ struct Admission {
     _maintenance: UpdateActivity,
 }
 
+/// 区分客户端名称和发送器实际执行的目录型号。
+#[derive(Clone)]
+struct RoutedModel {
+    requested: String,
+    resolved: String,
+}
+
 struct ToolTurn {
     token_id: i64,
     account: Account,
-    model: String,
+    model: RoutedModel,
     contents: Value,
     calls: Vec<Value>,
     deadline: Instant,
@@ -66,6 +73,7 @@ struct ToolTurn {
 struct ContinuationClaim {
     service: Arc<GeminiService>,
     key: Option<String>,
+    resolved_model: String,
 }
 
 impl Drop for ContinuationClaim {
@@ -221,25 +229,113 @@ async fn authenticate(
     Ok(token)
 }
 
-/// 列出当前令牌可见账号的真实模型映射。@param state 应用。@param request 原请求。@return Gemini模型目录。
+/// 按当前令牌可见的真实目录聚合 Gemini 档位。@param state 应用。@param request 原请求。@return 可请求的模型目录。
 pub async fn models(State(state): State<AppState>, request: Request) -> Response {
     let (parts, _) = request.into_parts();
     let result = async {
-        let token = authenticate(&state,&parts.headers,parts.uri.query()).await?;
-        let accounts = state.account_svc.agy_candidates(&token,None).await?;
-        let mut models = Vec::new();
-        for account in accounts {
-            if let Some(mapping) = account.usage_data["capabilities"]["model_mappings"].as_object() {
+        let token = authenticate(&state, &parts.headers, parts.uri.query()).await?;
+        let accounts = state.account_svc.agy_candidates(&token, &[]).await?;
+        let mut names = BTreeSet::new();
+        for (_, account) in &accounts {
+            if let Some(mapping) = account.usage_data["capabilities"]["model_mappings"].as_object()
+            {
                 for name in mapping.keys() {
-                    if AccountService::agy_model(&account,name).is_some() && !models.contains(name) { models.push(name.clone()); }
+                    if AccountService::agy_model(account, name).is_some() {
+                        names.insert(gemini_variant_base(name).unwrap_or(name));
+                    }
                 }
             }
         }
-        models.sort();
-        Ok::<_,AppError>(Json(json!({"models":models.into_iter().map(|name| json!({"name":format!("models/{name}"),"displayName":name,
-            "version":"1.5.9","supportedGenerationMethods":["generateContent","streamGenerateContent"]})).collect::<Vec<_>>()})).into_response())
-    }.await;
+        let models: Vec<_> = names
+            .into_iter()
+            .map(|name| {
+                json!({
+                    "name": format!("models/{name}"),
+                    "displayName": name,
+                    "version": "1.5.9",
+                    "supportedGenerationMethods": ["generateContent", "streamGenerateContent"],
+                })
+            })
+            .collect();
+        Ok::<_, AppError>(Json(json!({"models": models})).into_response())
+    }
+    .await;
     result.unwrap_or_else(gemini_error)
+}
+
+const GEMINI_DEFAULT_TIERS: [&str; 5] = ["high", "medium", "low", "tiered", "xhigh"];
+
+fn gemini_has_tier(model: &str) -> bool {
+    model
+        .rsplit_once('-')
+        .is_some_and(|(_, tail)| GEMINI_DEFAULT_TIERS.contains(&tail))
+}
+
+fn gemini_variant_base(model: &str) -> Option<&str> {
+    let (base, tier) = model.rsplit_once('-')?;
+    let name = base.strip_prefix("gemini-")?;
+    // 只公开选号时能够还原的基础名称，避免合并已经带档位的名称。
+    (!name.is_empty() && GEMINI_DEFAULT_TIERS.contains(&tier) && !gemini_has_tier(base))
+        .then_some(base)
+}
+
+fn gemini_thinking_tier(config: &Value) -> Result<Option<&'static str>, AppError> {
+    let config = config
+        .as_object()
+        .ok_or_else(|| invalid("Gemini thinkingConfig 必须为对象"))?;
+    if config.keys().any(|key| {
+        !matches!(
+            key.as_str(),
+            "thinkingLevel" | "thinkingBudget" | "includeThoughts"
+        )
+    }) || config
+        .get("includeThoughts")
+        .is_some_and(|value| !value.is_boolean())
+    {
+        return Err(invalid("Gemini thinkingConfig 包含无效字段"));
+    }
+    let level = config
+        .get("thinkingLevel")
+        .map(
+            |value| match value.as_str().map(str::to_ascii_lowercase).as_deref() {
+                Some("minimal" | "low") => Ok("low"),
+                Some("medium") => Ok("medium"),
+                Some("high") => Ok("high"),
+                Some("xhigh") => Ok("xhigh"),
+                _ => Err(invalid("Gemini thinkingLevel 无效")),
+            },
+        )
+        .transpose()?;
+    let budget_tier = config
+        .get("thinkingBudget")
+        .map(|value| {
+            // 沿用 Sub2API 的预算区间，只选择档位，原生执行仍由目录型号决定。
+            match value.as_i64() {
+                Some(-1 | 8193..) => Ok("high"),
+                Some(0..=1024) => Ok("low"),
+                Some(1025..=8192) => Ok("medium"),
+                _ => Err(invalid("Gemini thinkingBudget 无效")),
+            }
+        })
+        .transpose()?;
+    Ok(level.or(budget_tier))
+}
+
+fn gemini_model_names(model: &str, tier: Option<&str>) -> Vec<String> {
+    if !model.starts_with("gemini-") || gemini_has_tier(model) {
+        return vec![model.to_string()];
+    }
+    if let Some(tier) = tier {
+        return vec![format!("{model}-{tier}"), model.to_string()];
+    }
+    // 未指定档位时优先实际存在的同名型号，再按默认顺序找变体。
+    let mut names = vec![model.to_string()];
+    names.extend(
+        GEMINI_DEFAULT_TIERS
+            .iter()
+            .map(|tier| format!("{model}-{tier}")),
+    );
+    names
 }
 
 fn has_tool_result(body: &Value) -> bool {
@@ -261,7 +357,7 @@ fn matches_turn(turn: &ToolTurn, model: &str, body: &Value) -> bool {
     let Some(new) = body["contents"].as_array() else {
         return false;
     };
-    if turn.model != model || new.len() != old.len() + 2 || new[..old.len()] != old[..] {
+    if turn.model.requested != model || new.len() != old.len() + 2 || new[..old.len()] != old[..] {
         return false;
     }
     let calls: Vec<_> = new[old.len()]["parts"]
@@ -375,6 +471,7 @@ impl GeminiService {
             ContinuationClaim {
                 service: self.clone(),
                 key: Some(matches[0].clone()),
+                resolved_model: turn.model.resolved.clone(),
             },
         )))
     }
@@ -462,56 +559,76 @@ async fn generate_inner(
     let raw = axum::body::to_bytes(request.into_body(), BODY_LIMIT)
         .await
         .map_err(|_| invalid("Gemini正文超过上限"))?;
-    let body: Value = serde_json::from_slice(&raw).map_err(|_| invalid("Gemini正文必须为JSON"))?;
+    let mut body: Value =
+        serde_json::from_slice(&raw).map_err(|_| invalid("Gemini正文必须为JSON"))?;
     if !body.is_object() || !body["contents"].is_array() {
         return Err(invalid("Gemini contents无效"));
     }
+    let thinking_config = body
+        .pointer("/generationConfig/thinkingConfig")
+        .filter(|_| model.starts_with("gemini-"));
+    let requested_tier = thinking_config
+        .map(gemini_thinking_tier)
+        .transpose()?
+        .flatten();
+    let has_thinking_config = thinking_config.is_some();
     diagnostics::error_stage("account_selection");
     let continuation = state.gemini_svc.continuation(&token, model, &body)?;
     let deadline = continuation
         .as_ref()
         .map(|(_, _, deadline, _)| *deadline)
         .unwrap_or(started + Duration::from_secs(AGY_REQUEST_SECONDS as u64));
-    let (account, admission, mut claim) = if let Some((account, admission, _, claim)) = continuation
-    {
-        (account, admission, Some(claim))
-    } else {
-        let accounts = state
-            .account_svc
-            .agy_candidates(&token, Some(model))
-            .await?;
-        let mut selected = None;
-        for account in accounts {
-            if state
+    let (account, admission, mut claim, resolved_model) =
+        if let Some((account, admission, _, claim)) = continuation {
+            let resolved_model = claim.resolved_model.clone();
+            (account, admission, Some(claim), resolved_model)
+        } else {
+            let mut model_names = gemini_model_names(model, requested_tier);
+            let accounts = state
                 .account_svc
-                .get_account_rpm_status(&account)
-                .await?
-                .saturated
-            {
-                continue;
+                .agy_candidates(&token, &model_names)
+                .await?;
+            let mut selected = None;
+            for (model_index, account) in accounts {
+                if state
+                    .account_svc
+                    .get_account_rpm_status(&account)
+                    .await?
+                    .saturated
+                {
+                    continue;
+                }
+                selected = Some((model_index, account));
+                break;
             }
-            selected = Some(account);
-            break;
-        }
-        let account = selected
-            .ok_or_else(|| AppError::ServiceUnavailable("没有支持该模型的AGY账号".into()))?;
-        let queue = state
-            .account_svc
-            .get_or_create_queue(account.id, account.concurrency)
-            .await;
-        let slot = queue
-            .acquire(
-                deadline.saturating_duration_since(Instant::now()),
-                DEFAULT_REQUEST_SLOT_UNITS,
+            let (model_index, account) = selected
+                .ok_or_else(|| AppError::ServiceUnavailable("没有支持该模型的AGY账号".into()))?;
+            let queue = state
+                .account_svc
+                .get_or_create_queue(account.id, account.concurrency)
+                .await;
+            let slot = queue
+                .acquire(
+                    deadline.saturating_duration_since(Instant::now()),
+                    DEFAULT_REQUEST_SLOT_UNITS,
+                )
+                .await
+                .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })?;
+            let admission = Arc::new(Admission {
+                _slot: slot,
+                _credentials: state.account_svc.upstream_activity(account.id).await?,
+                _maintenance: system_update::admission()?,
+            });
+            (
+                account,
+                admission,
+                None,
+                model_names.swap_remove(model_index),
             )
-            .await
-            .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })?;
-        let admission = Arc::new(Admission {
-            _slot: slot,
-            _credentials: state.account_svc.upstream_activity(account.id).await?,
-            _maintenance: system_update::admission()?,
-        });
-        (account, admission, None)
+        };
+    let model = RoutedModel {
+        requested: model.to_string(),
+        resolved: resolved_model,
     };
     diagnostics::selected_account(account.id);
     // 原工具收尾复用原许可和原进程；新AT发布单独检查ready，待对账期间也能完成旧工具。
@@ -534,9 +651,19 @@ async fn generate_inner(
         &body,
         &snapshot.access_token,
     );
+    // 发送器直接执行已选的目录型号。只在原始入站采集后消费路由字段，兼容现有运行镜像。
+    if has_thinking_config {
+        if let Some(config) = body
+            .get_mut("generationConfig")
+            .and_then(Value::as_object_mut)
+        {
+            config.remove("thinkingConfig");
+        }
+    }
     let system_prompt_policy =
         AgySystemPromptPolicy::new(current.agy_system_prompt_homoglyph_enabled);
-    let native_model = AccountService::agy_model(&current, model).ok_or(AppError::NotFound)?;
+    let native_model =
+        AccountService::agy_model(&current, &model.resolved).ok_or(AppError::NotFound)?;
     diagnostics::error_stage("runtime_prepare");
     let transport = Arc::new(
         timeout_at(
@@ -572,7 +699,7 @@ async fn generate_inner(
     let mut observation = AgyAttemptTrace::begin(
         trace.as_ref(),
         &current,
-        model,
+        &model.requested,
         &native_model,
         transport.execution_location(),
         snapshot.credential_generation,
@@ -591,7 +718,7 @@ async fn generate_inner(
             &request_id,
             token.id,
             snapshot.clone(),
-            model,
+            &model.resolved,
             native_model.clone(),
             body.clone(),
             system_prompt_policy.clone(),
@@ -627,7 +754,6 @@ async fn generate_inner(
     }
     let (sender, mut receiver) = mpsc::channel(2);
     let service = state.gemini_svc.clone();
-    let model = model.to_string();
     tokio::spawn(async move {
         let mut sender = Some(sender);
         let result = drive(
@@ -749,7 +875,7 @@ async fn drive(
     ingress: Option<Value>,
     token_id: i64,
     account: Account,
-    model: String,
+    model: RoutedModel,
     body: Value,
     deadline: Instant,
     admission: Arc<Admission>,
@@ -829,7 +955,8 @@ async fn drive(
             account_id = account.id,
             request_id,
             attempt_id,
-            model,
+            model = model.requested.as_str(),
+            resolved_model = model.resolved.as_str(),
             credential_generation = event["credential_generation"].as_i64(),
             environment_id = event["environment_id"].as_str(),
             environment_generation = event["environment_generation"].as_u64(),
@@ -934,7 +1061,7 @@ async fn drive(
                     observation = AgyAttemptTrace::begin(
                         trace.as_ref(),
                         &account,
-                        &model,
+                        &model.requested,
                         &native_model,
                         transport.execution_location(),
                         refreshed.credential_generation,
@@ -956,7 +1083,7 @@ async fn drive(
                             &attempt_id,
                             token_id,
                             refreshed.clone(),
-                            &model,
+                            &model.resolved,
                             native_model.clone(),
                             body.clone(),
                             system_prompt_policy.clone(),
