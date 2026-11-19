@@ -11,6 +11,9 @@ from pathlib import Path
 
 from source_layout import source_path
 
+# 使用监督器既有请求上限，覆盖换代时的旧进程收尾和新进程准备。
+PREPARE_SECONDS = 120
+
 
 def _failure_evidence(container, phase: str, generation: int) -> dict:
     """收集固定合成探针的白名单证据。@param container 本次容器。@param phase 等待阶段。@param generation 合成代次。@return 有界脱敏摘要。"""
@@ -121,7 +124,7 @@ def native_probe(image: str, *, crash: bool = False, image_package: bool = False
         path=temporary/'supervisor.json'
         path.write_text(json.dumps(config));path.chmod(0o600);os.chown(path,1001,1001)
         # PID1保留在容器内，监督器异常退出后仍能独立观察worker及Go进程的终止。
-        wrapper="import subprocess,time; subprocess.Popen(['python3','-m','agy_runtime.supervisor','--config','/state/supervisor.json']); time.sleep(180)"
+        wrapper="import subprocess,time; subprocess.Popen(['python3','-m','agy_runtime.supervisor','--config','/state/supervisor.json']); time.sleep(600)"
         mounts={str(temporary):{'bind':'/state','mode':'rw'}}
         if not image_package:
             mounts.update({str(package/'agy_runtime'):{'bind':'/opt/orchestrator/agy_runtime','mode':'ro'},
@@ -140,10 +143,10 @@ def native_probe(image: str, *, crash: bool = False, image_package: bool = False
                 try:result.append(json.loads(line))
                 except ValueError:continue
             return result
-        def wait(kind, request=None):
+        def wait(kind, request=None, timeout=50):
             nonlocal phase
             phase=kind
-            until=time.monotonic()+50
+            until=time.monotonic()+timeout
             while time.monotonic()<until:
                 for event in events():
                     if event.get('type')==kind and (request is None or event.get('request_id')==request):return event
@@ -151,14 +154,16 @@ def native_probe(image: str, *, crash: bool = False, image_package: bool = False
                 time.sleep(.1)
             raise ValueError('固定AGY断网探针超时')
         wait('supervisor_ready')
-        ready=[]
+        ready=[];prepare_seconds=[]
         for generation in (1,2):
             request=str(uuid.uuid4())
+            started=time.monotonic()
             send({'schema_version':1,'type':'prepare','request_id':request,'account_id':17,'environment_id':'synthetic-env',
                 'environment_generation':2,'api_token_id':4,'credential_snapshot':{'account_id':17,'credential_generation':generation,
                     'access_token':'synthetic-offline-'+str(generation),'expires_at':4070908800000,'email':'synthetic@example.test'},
-                'model':'gemini-synthetic','native_model':'MODEL_PLACEHOLDER_M36','body':{},'deadline_unix_ms':int((time.time()+45)*1000)})
-            ready.append(wait('prepared',request)['native'])
+                'model':'gemini-synthetic','native_model':'MODEL_PLACEHOLDER_M36','body':{},'deadline_unix_ms':int((time.time()+PREPARE_SECONDS)*1000)})
+            ready.append(wait('prepared',request,timeout=PREPARE_SECONDS+5)['native'])
+            prepare_seconds.append(round(time.monotonic()-started,3))
             wait('job_finalized',request)
         request=str(uuid.uuid4());send({'schema_version':1,'type':'status','request_id':request})
         status=wait('status',request)['status']
@@ -188,6 +193,7 @@ print(json.dumps({'terminated':not any(running(pid) for pid in pids)}))
         return {'passed':True,'evidence':'native_offline','package_source':'image' if image_package else 'source_mount',
             'network':'none','model_submissions':count,
             'source_sha256':ready[-1]['source_sha256'],'credential_generations':[1,2], 'image_scope':status['image_scope'],
+            'prepare_seconds':prepare_seconds,'prepare_deadline_seconds':PREPARE_SECONDS,
             'image_bytes':status['image_bytes'],'image_decode_calls':status['image_decode_calls'],
             'controller':{key:value for key,value in status['controller'].items() if key!='pid'},
             'worker':[{name:{key:value for key,value in values.items() if key!='pid'} for name,values in process.items()

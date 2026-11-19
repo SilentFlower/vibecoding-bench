@@ -1,10 +1,13 @@
 """验证合成探针失败证据的隐私、边界与首错清理。"""
 import io
 import json
+import time
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from agy_auth import SOURCE_BYTES, SOURCE_SHA256
+from agy_runtime.supervisor import validate_submission
 import verify_agy_runtime as probe
 
 
@@ -108,3 +111,40 @@ class ProbeFailureTests(unittest.TestCase):
         self.assertIs(original, caught.exception)
         cleanup.assert_called_once()
         self.assertFalse(cleanup.call_args.args[0].exists())
+
+    def test_prepare_envelopes_fit_runtime_deadline_and_startup_budget(self) -> None:
+        """实际探针信封通过真实运行时校验，预算覆盖既有启动窗口。@return 无。"""
+        import docker
+        client, container, connection = Mock(), Mock(), Mock()
+        client.containers.run.return_value = container
+        container.attach_socket.return_value = connection
+        events = [{'type': 'supervisor_ready'}]
+        submissions = []
+
+        def transmit(raw):
+            """模拟版本化响应并以真实合同核对准备输入。@param raw 原始探针信封。@return 无。"""
+            value = json.loads(raw)
+            if value['type'] == 'prepare':
+                validate_submission(value, {'account_id': 17, 'environment_id': 'synthetic-env', 'environment_generation': 2})
+                remaining = value['deadline_unix_ms'] / 1000 - time.time()
+                self.assertGreater(remaining, 90)
+                self.assertLessEqual(remaining, 120)
+                submissions.append(value)
+                events.extend([{'type': 'prepared', 'request_id': value['request_id'], 'native': {
+                    'observer_pid': 4, 'native_pid': 5, 'source_sha256': SOURCE_SHA256}},
+                    {'type': 'job_finalized', 'request_id': value['request_id']}])
+            elif value['type'] == 'status':
+                events.append({'type': 'status', 'request_id': value['request_id'], 'status': {
+                    'image_decode_calls': 1, 'workers': 1, 'active': 0,
+                    'controller': {'pid': 2}, 'processes': [{'controller': {'pid': 3}}],
+                    'image_scope': 'account_workers', 'image_bytes': SOURCE_BYTES, 'cgroup_memory': {}}})
+
+        connection._sock.sendall.side_effect = transmit
+        container.logs.side_effect = lambda **kwargs: b'\n'.join(json.dumps(event).encode() for event in events)
+        container.exec_run.return_value = SimpleNamespace(exit_code=0, output=b'{"terminated":true}')
+        with patch.object(docker, 'from_env', return_value=client), patch.object(probe.os, 'chown'):
+            result = probe.native_probe('synthetic-image', image_package=True)
+        self.assertEqual([1, 2], [value['credential_snapshot']['credential_generation'] for value in submissions])
+        self.assertEqual(2, len(result['prepare_seconds']))
+        self.assertTrue(result['passed'])
+        self.assertTrue(result['terminated'])

@@ -56,7 +56,8 @@ class ReleaseSpeedTests(unittest.TestCase):
         self.assertIn('test_system_update*.py', commands['orchestrator'])
         self.assertEqual(commands['publication'][3:], ['test_publication', 'test_database_definitions',
             'test_database_migrations', 'test_database_compatibility', 'test_source_layout',
-            'test_legacy_packages', 'test_scratchpad_update_compatibility'])
+            'test_legacy_packages', 'test_scratchpad_update_compatibility', 'test_agy_supervisor',
+            'test_agy_artifact', 'test_agy_images'])
 
 
 if __name__ == '__main__':

@@ -679,6 +679,7 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - 自动构建及完整手动构建共用只读附件准备action；候选复用跳过准备和构建。两条发布路径均在交付前执行镜像验收，可信候选的必需成功步骤包含“验收镜像内AGY能力”。
 - 正式候选、镜像发布及系统签发使用 `require_auth_asset` 要求 `agy_auth.available=true` 及固定身份。`inspect_images` 对声明可用能力的两个角色核对 `agy-runtime-protocol=1`，account的auth/runtime源摘要须与清单一致。历史读取及通用本地可选构建沿原边界处理缺省能力。
 - CI宿主通过sudo调用同一虚拟环境解释器，以改属私有合成状态目录和配置。实际容器继续UID1001、断网、只读根、cap-drop及有限内存；只使用镜像自带包，验收两代凭据、单次共享解码和正常/异常物理退出。外部模型调用预算为0。
+- 每代准备请求使用既有120秒截止，prepared等待125秒，其他控制事件保持50秒；PID1观察窗口600秒覆盖两代准备与退出验证。成功结果增加两项 `prepare_seconds` 和 `prepare_deadline_seconds=120`，退役耗时计入该代准备。
 - 失败诊断只投影固定协议分类、Running/OOMKilled/ExitCode、进程角色、阶段及资源计数。日志最多取末32行并在解析前截为末32768字节；固定容器诊断输出上限8192字节，宿主再次按字段白名单和非负整数投影。私有启动错误仅提取固定异常类型及已登记原因；worker提前回收后的文件阶段计数按实际为0，字段缺省表示未知。
 - 连接、容器、临时状态及Docker客户端独立尝试清理；诊断或清理异常保留原验证错误。原验证成功而清理失败时返回非零状态。诊断中间提交保留后续根因验收和实际CI运行记录。
 
@@ -693,6 +694,7 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 | 镜像模块、资源或零模型退出验收失败 | 阻止候选交付及正式发布 |
 | 普通runner直接调用需改属状态的探针 | PermissionError；工作流必须通过sudo调用同一解释器 |
 | 探针启动/准备超时，或诊断采集失败 | 输出有界分类及采集失败步骤，原异常继续抛出 |
+| 旧代退役后原请求截止已过 | `request_deadline_exceeded`，停止新代创建及原生启动 |
 | 单项清理失败 | 后续清理继续；保留首错，原成功路径转为清理失败 |
 
 ### 5. Scenarios and Examples
@@ -701,6 +703,7 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - 边界：同源码候选复用通过来源与归档检查、换批后，仍执行实际镜像验收；历史已签发行读取保持原合同。
 - 错误用法：仅挂当前源码做探针就认定镜像完整，或在root本地验证后直接让普通runner执行改属。正确处理：正式探针使用 `image_package=True`，工作流以sudo调用原虚拟环境，容器身份及权限约束继续核对。
 - 故障定位：正式CI准备失败时先保留受控阶段与资源摘要，再删除临时根。错误用法是把完整HOME或原生日志直接打印；正确处理是先做白名单投影，再依据正式CI证据定位根因。
+- 预算边界：旧代退役45秒、新代启动约8秒仍可处于原有生命周期预算内。错误用法是给整代准备45秒截止；正确处理是使用现有120秒请求上限，并在退役后及Popen前复核原截止。
 
 ### 6. Tests Required
 
@@ -708,4 +711,6 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - `test_agy_images`、`test_publication`、`test_system_candidate_build`、`test_system_publish`：能力缺失在副作用前拒绝、实际标签匹配、候选换批与历史兼容。
 - `test_system_workflow`：真实YAML准备→构建→镜像验收→交付顺序、候选复用条件、两个验收步骤的sudo及同一解释器。全部run步骤执行 `bash -n`。
 - `test_system_agy_probe`：敏感/未知字段排除、字节及数值预算、诊断失败、首错保留、各项清理独立执行及客户端建立失败时的状态回收；测试由CI现有 `test_system*.py` 宿主发现覆盖。
+- `test_system_agy_probe`核对实际提交信封覆盖90秒启动窗口且不超过120秒，并断言两项准备耗时。`verify_release_tests.py`的publication组包含 `test_agy_supervisor`、`test_agy_artifact`、`test_agy_images`，`test_system_release_speed`同步核对模块集合。
+- 慢退役受控对照显式标记源码挂载夹具，核对45秒旧截止失败、120秒准备通过和零模型调用；正式完整镜像由独立CI验收，两类证据分别记录。
 - 真实Docker复现旧白名单COPY缺失；修正版镜像只读导入、资源身份及断网正常/异常退出均通过。隔离夹具与正式完整镜像CI结果分别记录。

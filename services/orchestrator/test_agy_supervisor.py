@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from agy_runtime.contract import InputError
 from agy_runtime.process_memory import cgroup_memory
-from agy_runtime.supervisor import Supervisor, deadline, validate_submission
+from agy_runtime.supervisor import Supervisor, Worker as NativeWorker, deadline, validate_submission
 
 
 class OutputFixture:
@@ -228,6 +228,39 @@ class AgySupervisorTests(unittest.TestCase):
         with self.assertRaises(InputError):
             deadline(True)
         self.assertEqual(WorkerFixture.order, [])
+
+    def test_expired_acquisition_never_creates_a_worker(self):
+        """排队后已过期的请求在建代之前拒绝。@return 无。"""
+        with self.assertRaisesRegex(InputError, 'request_deadline_exceeded'):
+            self.supervisor.acquire(self.submission(), time.monotonic() - 1)
+        self.assertEqual(WorkerFixture.order, [])
+
+    def test_retirement_consuming_deadline_never_starts_next_generation(self):
+        """旧代退役耗尽截止后保持零新代启动。@return 无。"""
+        clock = [100.0]
+        with patch('agy_runtime.supervisor.time.monotonic', side_effect=lambda: clock[0]):
+            worker = self.supervisor.acquire(self.submission(), 110.0)
+            worker.busy = False
+            original_close = worker.close
+
+            def slow_close():
+                """模拟合法退役过程跨越原请求截止。@return 无。"""
+                clock[0] = 111.0
+                original_close()
+
+            with patch.object(worker, 'close', side_effect=slow_close):
+                with self.assertRaisesRegex(InputError, 'request_deadline_exceeded'):
+                    self.supervisor.acquire(self.submission(generation=2), 110.0)
+        self.assertEqual([('start', 1), ('close', 1)], WorkerFixture.order)
+
+    def test_worker_start_rechecks_deadline_before_subprocess(self):
+        """建代文件准备后重新核对截止，过期时保持零子进程。@return 无。"""
+        worker = NativeWorker(self.supervisor, self.submission())
+        self.addCleanup(worker.close)
+        with patch('agy_runtime.supervisor.subprocess.Popen') as launch:
+            with self.assertRaisesRegex(InputError, 'request_deadline_exceeded'):
+                worker.start(time.monotonic() - 1)
+            launch.assert_not_called()
 
 
 if __name__ == '__main__':

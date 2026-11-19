@@ -24,7 +24,8 @@ def suite_commands(python: str) -> dict[str, list[str]]:
         'orchestrator': [python, '-m', 'unittest', 'discover', '-s', 'services/orchestrator', '-p', 'test_system_update*.py'],
         'publication': [python, '-m', 'unittest', 'test_publication', 'test_database_definitions',
             'test_database_migrations', 'test_database_compatibility', 'test_source_layout',
-            'test_legacy_packages', 'test_scratchpad_update_compatibility'],
+            'test_legacy_packages', 'test_scratchpad_update_compatibility', 'test_agy_supervisor',
+            'test_agy_artifact', 'test_agy_images'],
     }
 
 

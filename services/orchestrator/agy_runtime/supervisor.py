@@ -113,6 +113,8 @@ class Worker:
         with self.lifecycle_lock:
             if self.closed or self.owner.closed:
                 raise InputError('supervisor_closed')
+            if time.monotonic() >= until:
+                raise InputError('request_deadline_exceeded')
             self.process = subprocess.Popen([sys.executable, '-m', 'agy_runtime.kernel',
                 '--config', str(self.folder / 'config.json'), '--state-dir', str(self.folder / 'state')],
                 env=environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
@@ -292,6 +294,9 @@ class Supervisor:
             with self.condition:
                 if self.closed:
                     raise InputError('supervisor_closed')
+                # 旧代退役也消费原请求预算，截止后禁止复用或启动下一代。
+                if time.monotonic() >= until:
+                    raise InputError('request_deadline_exceeded')
                 for worker in self.workers:
                     if not worker.busy and not worker.closed and worker.key == key:
                         worker.busy = True
