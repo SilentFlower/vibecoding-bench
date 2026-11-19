@@ -1,0 +1,43 @@
+{
+  "id": "execution-node-visibility",
+  "name": "execution-node-visibility",
+  "title": "账号、运行环境与请求日志展示执行节点",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-19",
+  "completedAt": "2026-11-19",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-19T08:39:40Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-19-account-work-controls",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-19T08:39:40.696074+00:00",
+    "completedSteps": [
+      "账号控制解耦与正常收尾已交付",
+      "账号、环境与请求日志的执行节点展示已交付",
+      "新基线兼容、后端及浏览器验证通过",
+      "业务变更已提交并推送"
+    ],
+    "partialStep": null,
+    "nextStep": "无",
+    "notes": "完成本子任务与控制解耦的联合验收；共享工作区其它差异按精确提交计划保留。"
+  }
+}
