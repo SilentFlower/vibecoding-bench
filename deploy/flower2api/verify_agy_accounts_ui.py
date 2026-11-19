@@ -22,7 +22,23 @@ class PlatformFixture(AccountDesignFixture):
                 'capabilities':{'source':'agy:1.5.9:native','observed_at_ms':int(time.time()*1000),
                     'models':['gemini-synthetic'], 'provider':{'userTier':{'name':'合成分级'}}}}) for i in [1,2]]
         self.accounts.append(dict(copy.deepcopy(self.account_template), id=3, name='CC兼容账号', platform='claude_code'))
-        self.sessions = {}
+        now = int(time.time() * 1000)
+        self.accounts[0]['usage_data']['platform_quota'] = {
+            'status': 'ok', 'plan': '演示 Pro', 'checked_at_ms': now,
+            'groups': {'observed_at_ms': now, 'items': [{'name': 'Gemini Pro', 'windows': [
+                {'id': 'pro-5h', 'period': '5h', 'remaining_fraction': 0, 'reset_at': '2099-01-01T05:00:00Z'},
+                {'id': 'pro-week', 'period': 'weekly', 'remaining_fraction': None, 'reset_at': None},
+            ]}]},
+            'models': {'observed_at_ms': now, 'items': [
+                {'model': 'gemini-synthetic', 'remaining_fraction': 0.4, 'reset_at': None},
+            ]},
+        }
+        self.accounts[0]['agy_request_usage'] = {
+            'five_hour': {'requests': 1, 'tokens': 0, 'partial_requests': 0},
+            'seven_day': {'requests': 2, 'tokens': 1200, 'partial_requests': 1},
+        }
+        self.accounts[0].update(current_concurrency=1, active_requests=1, rpm_current=5, queued_requests=2)
+        self.oauth_sessions = {}
         self.held_generate = None
 
     async def route(self, route):
@@ -32,7 +48,7 @@ class PlatformFixture(AccountDesignFixture):
             body = route.request.post_data_json
             self.writes.append(dict(path=path, method='POST', body=body))
             identity = ('a' if body.get('account_id') else 'b')*32
-            self.sessions[identity] = body
+            self.oauth_sessions[identity] = body
             if self.held_generate:
                 await self.held_generate.wait()
             return await self.respond(route, {'session_id':identity,'auth_url':'https://accounts.google.com/synthetic-only'})
@@ -42,7 +58,7 @@ class PlatformFixture(AccountDesignFixture):
         if path == '/admin/oauth/exchange-code':
             body = route.request.post_data_json
             self.writes.append(dict(path=path,method='POST',body=body))
-            target = self.sessions[body['session_id']].get('account_id')
+            target = self.oauth_sessions[body['session_id']].get('account_id')
             email = f'agy{target}@example.test' if target else 'new-agy@example.test'
             return await self.respond(route, dict(access_token='synthetic-at',refresh_token='synthetic-rt',
                 expires_at=4070908800,expires_in=3600,email_address=email))
@@ -65,6 +81,20 @@ async def main():
         first = page.locator('.account-card').filter(has_text='AGY账号1')
         second = page.locator('.account-card').filter(has_text='AGY账号2')
         await expect(first.locator('.account-usage-windows')).to_have_count(0)
+        windows = first.locator('.agy-quota-window')
+        await expect(windows.first).to_contain_text('5 小时')
+        await expect(windows.first.locator('.agy-quota-value')).to_have_text('已用 100% · 剩余 0%')
+        assert await windows.first.locator('.usage-window-bar i').evaluate('e=>e.style.width') == '100%'
+        await expect(windows.first.locator('.usage-window-bar i')).to_have_css('background-color', 'rgb(207, 89, 100)')
+        await expect(windows.nth(1)).to_contain_text('额度未知')
+        await expect(windows.nth(1).locator('.usage-window-bar')).to_have_count(0)
+        await expect(first.locator('.agy-gateway-windows')).to_have_count(0)
+        await expect(first.locator('.account-work-status')).to_have_count(0)
+        await expect(second.locator('.agy-account-usage')).to_contain_text('未刷新')
+        await expect(first.locator('.account-routing')).to_contain_text('低负载优先')
+        await expect(first.locator('.account-live-metrics button')).to_have_count(4)
+        await expect(first.locator('.account-live-metrics button').nth(1)).to_contain_text('5')
+        await expect(first.locator('.account-live-metrics button').nth(3)).to_contain_text('在途请求')
         await first.get_by_role('button',name='编辑',exact=True).click()
         dialog = page.get_by_role('dialog')
         switch = dialog.get_by_role('checkbox',name='系统提示词同形体转换')
@@ -80,9 +110,21 @@ async def main():
         await expect(switch).not_to_be_checked()
         await dialog.get_by_role('button',name='取消',exact=True).click()
         await first.get_by_role('button',name='详情',exact=True).click()
-        await expect(dialog).to_contain_text('gemini-synthetic')
-        await expect(dialog).to_contain_text('额度未观测')
-        await expect(dialog.get_by_role('button',name='环境与诊断',exact=True)).to_have_count(0)
+        await expect(dialog.locator('.account-model-list')).to_be_hidden()
+        await dialog.locator('.account-capabilities summary').filter(has_text='可用模型').click()
+        await expect(dialog.locator('.account-model-list')).to_contain_text('gemini-synthetic')
+        await expect(dialog).to_contain_text('平台额度')
+        await expect(dialog.locator('.agy-gateway-windows')).to_contain_text('0 Token')
+        await expect(dialog.locator('.agy-gateway-windows')).to_contain_text('部分记录')
+        await expect(dialog.locator('.account-overview-control .account-overview-note')).to_have_count(0)
+        await dialog.locator('summary').filter(has_text='按模型查看').click()
+        await expect(dialog.locator('.agy-model-quotas')).to_contain_text('已用 60% · 剩余 40%')
+        await expect(dialog.locator('.agy-model-quotas .usage-window-bar i')).to_have_css('background-color', 'rgb(212, 166, 89)')
+        await dialog.locator('summary').filter(has_text='套餐与来源').click()
+        await expect(dialog.locator('.account-provider-details')).to_contain_text('演示 Pro')
+        await expect(dialog.locator('.account-provider-details')).to_contain_text('合成分级')
+        await expect(dialog.locator('.account-provider-details pre')).to_have_count(0)
+        await expect(dialog.get_by_role('button',name='环境与诊断',exact=True)).to_have_count(1)
         await page.keyboard.press('Escape')
         await first.get_by_role('button',name='编辑',exact=True).click()
         await dialog.get_by_role('button',name='重新授权',exact=True).click()
@@ -90,7 +132,7 @@ async def main():
         await expect(oauth.get_by_role('combobox',name='授权平台')).to_contain_text('Antigravity')
         await oauth.get_by_role('button',name='生成授权链接',exact=True).click()
         await expect(oauth.get_by_role('link',name='点击打开授权页面 ↗')).to_be_visible()
-        assert fixture.sessions['a'*32]['account_id']==1
+        assert fixture.oauth_sessions['a'*32]['account_id']==1
         await oauth.get_by_role('textbox',name='授权码',exact=True).fill('synthetic-code')
         await oauth.get_by_role('button',name='完成授权',exact=True).click()
         await expect(oauth).to_contain_text('已保存到原账号')
@@ -102,7 +144,7 @@ async def main():
         await page.get_by_role('option',name='Antigravity',exact=True).click()
         await oauth.get_by_role('button',name='生成授权链接',exact=True).click()
         for _ in range(100):
-            if 'b'*32 in fixture.sessions: break
+            if 'b'*32 in fixture.oauth_sessions: break
             await asyncio.sleep(.05)
         else: raise AssertionError('原生成请求尚未进入')
         await page.keyboard.press('Escape')

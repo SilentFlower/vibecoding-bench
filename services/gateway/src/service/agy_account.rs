@@ -71,6 +71,15 @@ fn verify_identity(account: &Account, result: &Value) -> Result<(), AppError> {
     Ok(())
 }
 
+fn apply_capabilities(account: &mut Account, capabilities: &Value) {
+    // 原生凭据续期不查询平台额度，保留最近一次管理侧读数。
+    let mut usage = json!({"platform":"antigravity","capabilities":capabilities});
+    if let Some(quota) = account.usage_data.get("platform_quota") {
+        usage["platform_quota"] = quota.clone();
+    }
+    account.usage_data = usage;
+}
+
 /// 采用同一次原生观测的身份、凭据、线路及能力。
 fn apply_observation(account: &mut Account, result: &Value) -> Result<(), AppError> {
     verify_identity(account, result)?;
@@ -83,7 +92,7 @@ fn apply_observation(account: &mut Account, result: &Value) -> Result<(), AppErr
         };
     }
     if let Some(capabilities) = result.get("capabilities").filter(|value| !value.is_null()) {
-        account.usage_data = json!({"platform":"antigravity","capabilities":capabilities});
+        apply_capabilities(account, capabilities);
     }
     Ok(())
 }
@@ -348,9 +357,61 @@ impl AccountService {
         )
         .await?;
         verify_identity(account, &result)?;
-        account.usage_data =
-            json!({"platform":"antigravity","capabilities":result["capabilities"]});
+        apply_capabilities(account, &result["capabilities"]);
+        if let Some(reading) = result["platform_quota"].as_object() {
+            let mut snapshot = account.usage_data["platform_quota"]
+                .as_object()
+                .cloned()
+                .unwrap_or_default();
+            // 共享额度和单模型额度独立刷新，缺失的部分继续保留上次观测。
+            snapshot.extend(reading.clone());
+            account.usage_data["platform_quota"] = Value::Object(snapshot);
+        }
         Ok(())
+    }
+
+    /// 刷新账号能力与平台额度。@param id 原账号。@return 同次持久化的用量视图。
+    pub(super) async fn refresh_agy_usage(&self, id: i64) -> Result<Value, AppError> {
+        let state = self.store.agy_credential_state(id).await?;
+        let mut account = self.store.get_by_id(id).await?;
+        let original_proxy = account.proxy_url.clone();
+        self.verify_agy_account(&mut account).await?;
+        let (key, owner) = self.acquire_oauth_credential_lock(id).await?;
+        let result = async {
+            // 网络等待留在锁外，提交前复核原代次和出口，避免迟到观测覆盖后来的刷新。
+            let state_now = self.store.agy_credential_state(id).await?;
+            let current = self.store.get_by_id(id).await?;
+            if state_now.phase != "ready"
+                || state_now.generation != state.generation
+                || current.access_token != account.access_token
+                || current.proxy_url != original_proxy
+            {
+                return Err(AppError::ServiceUnavailable(
+                    "账号凭据或出口已更新，请重新刷新".into(),
+                ));
+            }
+            if current.usage_data["capabilities"]["observed_at_ms"].as_i64()
+                > account.usage_data["capabilities"]["observed_at_ms"].as_i64()
+            {
+                return Ok(current.usage_data);
+            }
+            // 较晚发起的局部失败仍须保留前一次并发刷新成功的独立读数。
+            for source in ["groups", "models"] {
+                let latest = &current.usage_data["platform_quota"][source];
+                if latest["observed_at_ms"].as_i64()
+                    > account.usage_data["platform_quota"][source]["observed_at_ms"].as_i64()
+                {
+                    account.usage_data["platform_quota"][source] = latest.clone();
+                }
+            }
+            self.store
+                .update_usage(id, &account.usage_data.to_string())
+                .await?;
+            Ok(account.usage_data)
+        }
+        .await;
+        self.cache.release_lock(&key, &owner).await;
+        result
     }
 
     /// 按提交差异修改 AGY 账号，当前凭据在锁内重读。@param id 账号。@param updates 已解析代理的字段差异。@return 当前账号。

@@ -118,6 +118,7 @@ async def main():
         await page.evaluate('document.fonts.ready')
         assert await page.evaluate('document.fonts.check(\'14px "Inter Variable"\')')
         await expect(card).to_contain_text('排队')
+        await expect(card.locator('.account-work-status')).to_have_count(0)
         await expect(card).not_to_contain_text('demo-secret')
         await expect(card).not_to_contain_text('7 天 Sonnet')
         await card.get_by_role('button', name='查看5h完整费用统计').click()
@@ -163,11 +164,11 @@ async def main():
         assert fixture.writes[-1]['body'] == {'api_accepting': False, 'expected_revision': 0}
         assert fixture.accounts[0]['status'] == 'active' and fixture.accounts[0]['work_control']['work_enabled']
         await card.get_by_role('button', name='停用账号', exact=True).click()
-        await expect(card).to_contain_text('正在收尾')
+        await expect(card.locator('.account-work-status')).to_have_text('正在收尾 · 剩余 2 个请求')
         await expect(card.get_by_role('switch')).to_have_attribute('aria-checked', 'false')
         assert fixture.accounts[0]['status'] == 'active'
         await card.get_by_role('button', name='启用账号', exact=True).click()
-        await expect(card).to_contain_text('账号已启用')
+        await expect(card.locator('.account-work-status')).to_have_count(0)
         await expect(card.get_by_role('switch')).to_have_attribute('aria-checked', 'false')
         await card.get_by_role('button', name='用量', exact=True).click()
         assert fixture.writes[-1]['path'].endswith('/usage')

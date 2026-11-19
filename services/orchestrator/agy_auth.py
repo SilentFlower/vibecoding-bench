@@ -376,8 +376,8 @@ class AgyAuthManager:
                 time.sleep(.1)
             raise ValueError('AGY 原生认证仍待完成，请查询原会话')
 
-    def verify(self, document: dict, proxy_url: str) -> dict:
-        """使用 AT-only 原生进程取得真实账号状态。@param document 原生凭据。@param proxy_url 固定代理。@return 账号身份及能力原始来源。"""
+    def verify(self, document: dict, proxy_url: str, *, include_quota: bool = False) -> dict:
+        """使用 AT-only 原生进程读取账号状态。@param document 原生凭据。@param proxy_url 固定代理。@param include_quota 同时读取平台额度。@return 真实身份、能力和可选额度。"""
         document = native_document(document)
         expiry = datetime.fromisoformat(document['token']['expiry'].replace('Z', '+00:00')).timestamp()
         if expiry <= time.time() + 60:
@@ -403,18 +403,35 @@ class AgyAuthManager:
                 time.sleep(.1)
             if not port:
                 raise ValueError('AGY 账号状态服务未就绪')
-            code = '''from http.client import HTTPConnection
-import json,os
-c=HTTPConnection('127.0.0.1',PORT,timeout=15)
-c.request('POST','/exa.language_server_pb.LanguageServerService/GetUserStatus',b'{}',{'Content-Type':'application/json','x-codeium-csrf-token':os.environ['ANTIGRAVITY_SERVER_CSRF_TOKEN']})
-r=c.getresponse();b=r.read(1048577)
-if r.status!=200 or len(b)>1048576:raise SystemExit(2)
-print(b.decode())
-'''.replace('PORT', str(port))
-            result = container.exec_run(['python3', '-c', code], user='1001:1001')
-            if result.exit_code != 0:
+            code = '''from concurrent.futures import ThreadPoolExecutor
+from http.client import HTTPConnection, HTTPException
+import json,os,sys
+
+def read(method):
+    connection = HTTPConnection('127.0.0.1',int(sys.argv[1]),timeout=15)
+    try:
+        connection.request('POST','/exa.language_server_pb.LanguageServerService/'+method,sys.argv[2].encode(),
+            {'Content-Type':'application/json','x-codeium-csrf-token':os.environ['ANTIGRAVITY_SERVER_CSRF_TOKEN']})
+        response = connection.getresponse()
+        body = response.read(1048577)
+        if response.status==200 and len(body)<=1048576:
+            return json.loads(body)
+    except (OSError,HTTPException,ValueError):
+        pass
+    finally:
+        connection.close()
+    return None
+
+with ThreadPoolExecutor(max_workers=len(sys.argv[3:])) as pool:
+    print(json.dumps(dict(zip(sys.argv[3:],pool.map(read,sys.argv[3:])))))
+'''
+            rpc = ['python3', '-c', code, str(port)]
+            observed_at_ms = int(time.time() * 1000)
+            result = container.exec_run([*rpc, '{}', 'GetUserStatus'], user='1001:1001')
+            status_response = json.loads(result.output).get('GetUserStatus') if result.exit_code == 0 else None
+            if not isinstance(status_response, dict) or not isinstance(status_response.get('userStatus'), dict):
                 raise ValueError('AGY 已认证状态读取失败')
-            status = json.loads(result.output)['userStatus']
+            status = status_response['userStatus']
             email = status.get('email')
             if not isinstance(email, str) or not email.strip() or len(email) > 320:
                 raise ValueError('AGY 已认证身份缺失')
@@ -424,21 +441,29 @@ print(b.decode())
                 raise ValueError('AGY 原生模型目录读取失败')
             names = sorted(set(re.findall(r'\b(?:gemini|claude|gpt)-[A-Za-z0-9_.-]+', models.output.decode(errors='replace'))))
             # CLI名称和原生枚举分别观测，运行层只使用两者已核对的交集。
-            catalog_code = code.replace('GetUserStatus', 'GetAvailableModels')
-            catalog = container.exec_run(['python3', '-c', catalog_code], user='1001:1001')
+            methods = ['GetAvailableModels', 'RetrieveUserQuotaSummary'] if include_quota else ['GetAvailableModels']
+            catalog = container.exec_run([*rpc, '{"forceRefresh":true}' if include_quota else '{}', *methods],
+                user='1001:1001')
             mapping = {}
+            responses = {}
             if catalog.exit_code == 0:
                 try:
                     from agy_runtime.models import decode_catalog
-                    observed = decode_catalog(json.loads(catalog.output))
+                    responses = json.loads(catalog.output)
+                    observed = decode_catalog(responses.get('GetAvailableModels'))
                     mapping = {name: observed[name] for name in names if name in observed}
                 except (ValueError, TypeError, KeyError):
                     # 身份核验仍独立成立；未知模型映射保持未就绪，不猜测枚举发送业务。
                     mapping = {}
-            return {'email_address': email.strip(), 'capabilities': {'source': 'agy:1.5.9:native',
-                'observed_at_ms': int(time.time() * 1000), 'models': names,
+            verified = {'email_address': email.strip(), 'capabilities': {'source': 'agy:1.5.9:native',
+                'observed_at_ms': observed_at_ms, 'models': names,
                 'model_mappings': mapping, 'model_mapping_status': 'observed' if mapping else 'unavailable',
                 'provider': {key: status[key] for key in ('planStatus', 'userTier') if key in status}}}
+            if include_quota:
+                from agy_runtime.models import decode_quota
+                verified['platform_quota'] = decode_quota(responses.get('RetrieveUserQuotaSummary'),
+                    responses.get('GetAvailableModels'), status, observed_at_ms)
+            return verified
         finally:
             self._stop(state)
             state['phase'] = 'stopped'
@@ -585,7 +610,7 @@ print(b.decode())
         if action == 'cancel':
             return self.cancel(value['session_id'])
         if action == 'verify':
-            return self.verify(value['document'], value['proxy_url'])
+            return self.verify(value['document'], value['proxy_url'], include_quota=True)
         if action == 'refresh':
             return self.refresh(value['operation_id'], value['account_id'], value['generation'], value['document'], value['proxy_url'])
         if action == 'retire':

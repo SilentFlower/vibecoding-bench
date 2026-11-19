@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -12,8 +12,9 @@ use tracing::warn;
 
 use crate::error::AppError;
 use crate::model::request_diagnostics::{
-    AttemptDiagnostic, DiagnosticCounts, DiagnosticDetail, DiagnosticHealth, DiagnosticPage,
-    DiagnosticQuery, RequestDiagnostic, ToolTurnDiagnostic, normalize_correlation_id,
+    AgyRequestUsage, AgyUsageWindow, AttemptDiagnostic, DiagnosticCounts, DiagnosticDetail,
+    DiagnosticHealth, DiagnosticPage, DiagnosticQuery, RequestDiagnostic, ToolTurnDiagnostic,
+    normalize_correlation_id,
 };
 
 const QUEUE_CAPACITY: usize = 1024;
@@ -164,6 +165,94 @@ impl DiagnosticsStore {
         };
         super::request_records_schema::apply(&mut tx, driver).await?;
         tx.commit().await
+    }
+
+    /// 汇总反重力账号已落库的用量。@param accounts 当前页反重力账号。@param now 固定查询时刻。@return 以账号 ID 为键的滚动窗口。
+    pub async fn agy_request_usage(
+        &self,
+        accounts: &[i64],
+        now: DateTime<Utc>,
+    ) -> Result<HashMap<i64, AgyRequestUsage>, AppError> {
+        let mut result = accounts
+            .iter()
+            .map(|&id| (id, AgyRequestUsage::default()))
+            .collect::<HashMap<_, _>>();
+        if accounts.is_empty() {
+            return Ok(result);
+        }
+        let (source, tokens, partial) = if self.pool.connect_options().database_url.scheme()
+            == "sqlite"
+        {
+            (
+                "json_extract(a.summary_json,'$.context.usage.source')",
+                "CASE WHEN json_type(a.summary_json,'$.context.usage.total_tokens')='integer'
+                  AND typeof(json_extract(a.summary_json,'$.context.usage.total_tokens'))='integer'
+                  AND json_extract(a.summary_json,'$.context.usage.total_tokens')>=0
+                  THEN json_extract(a.summary_json,'$.context.usage.total_tokens') END",
+                "COALESCE(json_extract(a.summary_json,'$.partial'),1)<>0
+                  OR COALESCE(json_extract(a.summary_json,'$.context.usage.complete'),0)<>1",
+            )
+        } else {
+            (
+                "a.summary_json::jsonb #>> '{context,usage,source}'",
+                "CASE WHEN jsonb_typeof(a.summary_json::jsonb #> '{context,usage,total_tokens}')='number'
+                  AND (a.summary_json::jsonb #>> '{context,usage,total_tokens}') ~ '^[0-9]{1,20}$'
+                  THEN (a.summary_json::jsonb #>> '{context,usage,total_tokens}')::numeric END",
+                "(a.summary_json::jsonb -> 'partial') IS DISTINCT FROM 'false'::jsonb
+                  OR (a.summary_json::jsonb #> '{context,usage,complete}') IS DISTINCT FROM 'true'::jsonb",
+            )
+        };
+        let ids = (4..4 + accounts.len())
+            .map(|index| format!("${index}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        // 同账号的 HTTP 请求合并为一行，每次已终结尝试的源总量各计一次。
+        let sql = format!(
+            "WITH attempts AS (
+               SELECT a.account_id,r.request_id,r.started_at,
+                 CASE WHEN ({source})='gemini_usage_metadata' THEN ({tokens}) END AS tokens,
+                 CASE WHEN ({partial}) THEN 1 ELSE 0 END AS partial
+               FROM request_diagnostics r JOIN request_diagnostic_attempts a ON a.request_id=r.request_id
+               WHERE r.platform='antigravity' AND r.entry_protocol='gemini' AND r.finished_at IS NOT NULL
+                 AND r.started_at >= $1 AND r.started_at < $2 AND a.platform='antigravity'
+                 AND a.finished_at IS NOT NULL AND a.account_id IN ({ids})
+             ), requests AS (
+               SELECT account_id,request_id,started_at,SUM(tokens) AS tokens,
+                 MAX(CASE WHEN tokens IS NULL THEN 1 ELSE partial END) AS partial
+               FROM attempts GROUP BY account_id,request_id,started_at
+             )
+             SELECT CAST(account_id AS BIGINT) AS account_id,
+               CAST(SUM(CASE WHEN started_at >= $3 THEN 1 ELSE 0 END) AS TEXT) AS short_requests,
+               CAST(SUM(CASE WHEN started_at >= $3 THEN tokens END) AS TEXT) AS short_tokens,
+               CAST(SUM(CASE WHEN started_at >= $3 THEN partial ELSE 0 END) AS TEXT) AS short_partial,
+               CAST(COUNT(*) AS TEXT) AS long_requests,CAST(SUM(tokens) AS TEXT) AS long_tokens,
+               CAST(SUM(partial) AS TEXT) AS long_partial
+             FROM requests GROUP BY account_id"
+        );
+        let mut query = sqlx::query(&sql)
+            .bind(retention_cutoff(now))
+            .bind(now.to_rfc3339_opts(SecondsFormat::Millis, true))
+            .bind((now - ChronoDuration::hours(5)).to_rfc3339_opts(SecondsFormat::Millis, true));
+        for id in accounts {
+            query = query.bind(*id);
+        }
+        for row in query.fetch_all(&self.pool).await? {
+            let window = |requests, tokens, partial| {
+                Ok::<_, AppError>(AgyUsageWindow {
+                    requests: usage_count(&row, requests)?.unwrap_or(0),
+                    tokens: usage_count(&row, tokens)?,
+                    partial_requests: usage_count(&row, partial)?.unwrap_or(0),
+                })
+            };
+            result.insert(
+                row.try_get("account_id")?,
+                AgyRequestUsage {
+                    five_hour: window("short_requests", "short_tokens", "short_partial")?,
+                    seven_day: window("long_requests", "long_tokens", "long_partial")?,
+                },
+            );
+        }
+        Ok(result)
     }
 
     /// 尝试入队，队列饱和时只记录失败计数，不阻塞转发。
@@ -582,6 +671,17 @@ fn retention_cutoff(now: DateTime<Utc>) -> String {
     (now - ChronoDuration::days(7)).to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
+fn usage_count(row: &AnyRow, key: &str) -> Result<Option<u64>, AppError> {
+    // 通过十进制字符串读取，避开 SQLx Any 在两库上的 NUMERIC 类型差异。
+    row.try_get::<Option<String>, _>(key)?
+        .map(|value| {
+            value
+                .parse()
+                .map_err(|_| AppError::Internal("反重力用量统计数值超出范围".into()))
+        })
+        .transpose()
+}
+
 fn active_json(active: &Mutex<HashSet<String>>) -> String {
     // 请求 ID 为内部标准 UUID；JSON 引号分隔成员，SQL 参数保持固定字符串类型。
     serde_json::to_string(&*active.lock().unwrap_or_else(|error| error.into_inner()))
@@ -614,7 +714,8 @@ mod tests {
     use crate::error::AppError;
     use crate::model::request_diagnostics::{
         AttemptDiagnostic, DiagnosticContext, DiagnosticParameters, DiagnosticQuery,
-        DiagnosticSessions, DiagnosticTokens, RequestDiagnostic, ToolTurnDiagnostic,
+        DiagnosticSessions, DiagnosticTokens, GeminiDiagnosticUsage, RequestDiagnostic,
+        ToolTurnDiagnostic,
     };
     use crate::store::db::migrate;
     use chrono::{DateTime, Duration as ChronoDuration, SecondsFormat, Utc};
@@ -1158,8 +1259,75 @@ mod tests {
         );
         assert!(unknown.request.original_session_id.is_none());
         assert!(unknown.request.account_id.is_none() && unknown.request.account_name.is_none());
+        agy_usage_contract(&reopened, &reader, now).await;
         drop(reopened);
         reader.close().await;
+    }
+
+    async fn agy_usage_contract(
+        store: &DiagnosticsStore,
+        pool: &sqlx::AnyPool,
+        now: DateTime<Utc>,
+    ) {
+        let agy_request = |at| {
+            let mut root = request(at);
+            root.context = Some(DiagnosticContext {
+                platform: Some("antigravity".into()),
+                entry_protocol: Some("gemini".into()),
+                ..Default::default()
+            });
+            root
+        };
+        let recent = agy_request(now - ChronoDuration::hours(5));
+        let older = agy_request(now - ChronoDuration::days(7));
+        let future = agy_request(now);
+        let empty = agy_request(now - ChronoDuration::hours(1));
+        for (root, account_id, total) in [
+            (&recent, 71, Some(3_000_000_000)),
+            (&recent, 71, None),
+            (&recent, 72, Some(0)),
+            (&older, 71, Some(11)),
+            (&future, 71, Some(500)),
+        ] {
+            let mut a = attempt(root);
+            a.account_id = account_id;
+            a.context = Some(DiagnosticContext {
+                platform: Some("antigravity".into()),
+                usage: Some(GeminiDiagnosticUsage {
+                    source: "gemini_usage_metadata".into(),
+                    total_tokens: total,
+                    thoughts_tokens: Some(700),
+                    complete: total.is_some(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+            let event = DiagnosticEvent {
+                request: root.clone(),
+                attempt: Some(a),
+            };
+            write_event(pool, &event).await.unwrap();
+            write_event(pool, &event).await.unwrap();
+        }
+        write_event(
+            pool,
+            &DiagnosticEvent {
+                request: empty,
+                attempt: None,
+            },
+        )
+        .await
+        .unwrap();
+        let stats = store.agy_request_usage(&[71, 72, 73], now).await.unwrap();
+        assert_eq!(stats[&71].five_hour.requests, 1);
+        assert_eq!(stats[&71].five_hour.tokens, Some(3_000_000_000));
+        assert_eq!(stats[&71].five_hour.partial_requests, 1);
+        assert_eq!(stats[&71].seven_day.requests, 2);
+        assert_eq!(stats[&71].seven_day.tokens, Some(3_000_000_011));
+        assert_eq!(stats[&72].five_hour.requests, 1);
+        assert_eq!(stats[&72].five_hour.tokens, Some(0));
+        assert_eq!(stats[&73].seven_day.requests, 0);
+        assert_eq!(stats[&73].seven_day.tokens, None);
     }
 
     /// 验证 SQLite 独立连接、重启、重复终结、查询和七天保留。

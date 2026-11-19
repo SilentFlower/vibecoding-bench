@@ -332,6 +332,21 @@ pub struct GeminiDiagnosticUsage {
     pub complete: bool,
 }
 
+/// 反重力账号在两个滚动窗口内已记录的网关用量。
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct AgyRequestUsage {
+    pub five_hour: AgyUsageWindow,
+    pub seven_day: AgyUsageWindow,
+}
+
+/// 请求按 HTTP 根去重，总 Token 采用实际尝试的上游读数。
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct AgyUsageWindow {
+    pub requests: u64,
+    pub tokens: Option<u64>,
+    pub partial_requests: u64,
+}
+
 /// 本次冻结策略与内核处理回执，正文保持在受控内容视图。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemPromptDiagnostic {

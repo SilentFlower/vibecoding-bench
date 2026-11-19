@@ -2045,12 +2045,7 @@ impl AccountService {
         }
         if account.is_antigravity() {
             self.resolve_oauth_credentials(id, 60, false).await?;
-            let mut verified = self.store.get_by_id(id).await?;
-            self.verify_agy_account(&mut verified).await?;
-            self.store
-                .update_usage(id, &verified.usage_data.to_string())
-                .await?;
-            return Ok(verified.usage_data);
+            return self.refresh_agy_usage(id).await;
         }
         if !account.is_claude_code() {
             return Err(AppError::BadRequest("未知账号平台".into()));

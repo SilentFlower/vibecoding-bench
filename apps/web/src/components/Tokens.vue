@@ -53,7 +53,7 @@ async function loadAccounts(): Promise<void> {
   accountError.value = '';
   try {
     const values: Account[] = []; let page = 1;
-    do { const result = await api.listAccounts(page,100); values.push(...result.data); if (page >= result.total_pages || !alive) break; page++; } while (alive);
+    do { const result = await api.listAccounts(page,100,'','',undefined,'all'); values.push(...result.data); if (page >= result.total_pages || !alive) break; page++; } while (alive);
     if (alive) allAccounts.value = values;
   } catch (cause) { if (alive) accountError.value = (cause as Error).message || '账号范围读取失败'; }
 }
@@ -193,9 +193,9 @@ function formatAccountIds(ids: string): string {
       </article><p v-if="!tokens.length" class="token-empty">{{ loading ? '正在读取令牌…' : '还没有令牌，可创建客户端凭据。' }}</p>
     </section>
     <Dialog v-model:open="showForm"><DialogContent class="approved-token-editor"><DialogHeader><DialogTitle>{{ editing ? '编辑令牌权限' : '创建令牌' }}</DialogTitle><DialogDescription class="sr-only">选择允许与排除的账号，保存后生效。</DialogDescription></DialogHeader>
-      <form @submit.prevent="save"><div class="token-form-scroll"><div class="token-editor-intro"><span class="token-icon"><KeyRound :size="17" /></span><div><strong>客户端访问权限</strong><p>按用途命名，方便日后管理。</p></div></div><label class="token-name"><span>名称</span><Input v-model="form.name" placeholder="例如：开发客户端" /></label>
+      <form @submit.prevent="save"><div class="token-form-scroll"><label class="token-name"><span>名称</span><Input v-model="form.name" placeholder="例如：开发客户端" /></label>
       <p v-if="accountError" class="token-load-error" role="alert">{{ accountError }} <button type="button" @click="loadAccounts">重试</button></p><AccountScopePicker v-model="form.allowed_accounts" :accounts="allAccounts" label="允许的账号" help="留空允许使用全部可用账号。" /><AccountScopePicker v-model="form.blocked_accounts" :accounts="allAccounts" label="排除的账号" help="排除的账号不会用于此令牌。" />
-      </div><footer class="token-editor-footer"><span>保存后应用到此令牌</span><Button type="button" variant="outline" @click="showForm = false">取消</Button><Button type="submit">{{ editing ? '保存权限' : '创建令牌' }}</Button></footer></form>
+      </div><footer class="token-editor-footer"><Button type="button" variant="outline" @click="showForm = false">取消</Button><Button type="submit">{{ editing ? '保存权限' : '创建令牌' }}</Button></footer></form>
     </DialogContent></Dialog>
 
     <ConfirmationDialog :open="showDeleteConfirm" title="确认删除令牌" message="此操作不可撤销，删除后使用该令牌的客户端将无法访问。" confirm-label="删除" danger :busy="deletingAccount" :error="deleteError" @confirm="executeDelete" @cancel="showDeleteConfirm=false" />

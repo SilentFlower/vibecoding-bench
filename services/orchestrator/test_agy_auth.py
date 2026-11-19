@@ -41,6 +41,46 @@ class AgyAuthTests(unittest.TestCase):
         atomic_json(path, value)
         os.chown(path, 1001, 1001)
 
+    def test_management_verify_reads_quota_on_native_loopback(self):
+        """管理刷新复用原生进程与绑定出口，并区分已知零和缺失。@return 无。"""
+        driver = Mock()
+        driver.exec_run.side_effect = [
+            SimpleNamespace(exit_code=0, output=json.dumps({'GetUserStatus': {'userStatus': {
+                'email': 'synthetic@example.test', 'planStatus': {'planInfo': {'planName': 'Pro'}}}}})),
+            SimpleNamespace(exit_code=0, output=b'gemini-synthetic'),
+            SimpleNamespace(exit_code=0, output=json.dumps({
+                'GetAvailableModels': {'response': json.dumps({'models': {
+                    'gemini-synthetic': {'model': 36, 'quotaInfo': {'remainingFraction': 0.25}}}})},
+                'RetrieveUserQuotaSummary': {'response': {'groups': [{'displayName': 'Gemini', 'buckets': [
+                    {'bucketId': 'synthetic-5h', 'window': '5h', 'remainingFraction': 0,
+                        'resetTime': '2030-01-01T00:00:00Z'},
+                    {'bucketId': 'synthetic-week', 'window': 'weekly'},
+                ]}]}}
+            })),
+        ]
+
+        def launch(folder, state, *, interactive, document):
+            """为本地语言服务提供合成监听记录。@param folder 当前私有目录。@return 驱动替身。"""
+            self.assertEqual('socks5h://synthetic.test:1080', state['proxy_url'])
+            self.assertNotIn('refresh_token', document['token'])
+            logs = folder / 'home/.gemini/antigravity-cli/log'
+            logs.mkdir(parents=True)
+            (logs / 'synthetic.log').write_text('Language server listening on random port at 12345 for HTTP')
+            return driver
+
+        with patch.object(self.manager, '_launch', side_effect=launch), patch.object(
+                self.manager, 'verify', wraps=AgyAuthManager.verify.__get__(self.manager)):
+            result = self.manager.handle('verify', {'document': document(), 'proxy_url': 'socks5h://synthetic.test:1080'})
+        self.assertEqual(['12345', '{"forceRefresh":true}', 'GetAvailableModels', 'RetrieveUserQuotaSummary'],
+            driver.exec_run.call_args_list[-1].args[0][-4:])
+        self.assertEqual({'gemini-synthetic': 36}, result['capabilities']['model_mappings'])
+        snapshot = result['platform_quota']
+        self.assertEqual(('ok', 'Pro'), (snapshot['status'], snapshot['plan']))
+        self.assertEqual(0.25, snapshot['models']['items'][0]['remaining_fraction'])
+        windows = snapshot['groups']['items'][0]['windows']
+        self.assertEqual(0, windows[0]['remaining_fraction'])
+        self.assertIsNone(windows[1]['remaining_fraction'])
+
     def test_pkce_url_rejects_origin_callback_duplicates_and_fragment(self):
         """只接纳固定 Google PKCE 合同。@return 无。"""
         query = dict(client_id='synthetic', response_type='code', redirect_uri='https://antigravity.google/oauth-callback',

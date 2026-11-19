@@ -1,7 +1,7 @@
 use crate::handler::proxies;
 use crate::handler::session_policy_blocks;
 use crate::model::proxy::ProxyConnection;
-use crate::service::account::AccountQueue;
+use crate::service::account::{AccountCapacityInfo, AccountQueue};
 use crate::service::oauth_flow::GenerateAuthUrlRequest;
 use crate::service::proxy::ProxyService;
 use crate::service::runtime_lease::RuntimeLease;
@@ -15,10 +15,11 @@ use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
-use chrono::TimeZone;
+use chrono::{TimeZone, Utc};
 use rust_embed::Embed;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use std::collections::HashMap;
 use std::sync::Arc;
 use subtle::ConstantTimeEq;
 use tracing::warn;
@@ -36,7 +37,7 @@ use crate::model::account::{
 use crate::model::api_token::{self, ApiToken};
 use crate::model::credential_ownership::CredentialOwnershipInput;
 use crate::model::request_diagnostics::{
-    DiagnosticDetail, DiagnosticPage, DiagnosticQuery, RequestLogMode,
+    AgyRequestUsage, DiagnosticDetail, DiagnosticPage, DiagnosticQuery, RequestLogMode,
 };
 use crate::service::access_policy::{
     DEFAULT_ALLOWED_CLAUDE_CODE_VERSIONS, DEFAULT_ALLOWED_USER_AGENTS,
@@ -460,6 +461,12 @@ async fn list_accounts(
             None
         }
     };
+    let agy_ids = accounts
+        .iter()
+        .filter(|account| account.is_antigravity())
+        .map(|account| account.id)
+        .collect::<Vec<_>>();
+    let agy_usage = agy_account_usage(&state, &agy_ids).await;
     let profile_selection_mode = match profile_config.mode {
         ClaudeCodeProfileSelectionMode::ClientVersion => "client_version",
         ClaudeCodeProfileSelectionMode::Account => "account",
@@ -506,6 +513,8 @@ async fn list_accounts(
         if !a.is_claude_code() {
             if a.is_antigravity() {
                 obj["credential_state"] = state.account_svc.agy_state(a.id).await?;
+                obj["agy_request_usage"] = json!(agy_usage.get(&a.id));
+                append_account_live_metrics(&state.account_svc, a, &mut obj).await;
             }
             data.push(obj);
             continue;
@@ -524,7 +533,7 @@ async fn list_accounts(
             obj["telemetry_expires_at"] = serde_json::json!(expires.to_rfc3339());
         }
         // 附加实时调度评分和并发/排队状态
-        let si = state.account_svc.get_account_capacity_info(a).await;
+        let si = append_account_live_metrics(&state.account_svc, a, &mut obj).await;
         if state.account_svc.scheduler().is_some() {
             match binding_counts.as_ref() {
                 Some(counts) => match state
@@ -539,21 +548,6 @@ async fn list_accounts(
                 },
                 None => obj["v3_scheduling_error"] = serde_json::json!("调度观测不可用"),
             }
-        }
-        obj["current_concurrency"] = serde_json::json!(si.current_concurrency);
-        obj["current_concurrency_units"] = serde_json::json!(si.current_concurrency_units);
-        obj["max_concurrency_units"] = serde_json::json!(si.max_concurrency_units);
-        obj["active_requests"] = serde_json::json!(si.active_requests);
-        obj["queued_requests"] = serde_json::json!(si.queued);
-        obj["queued_request_units"] = serde_json::json!(si.queued_request_units);
-        obj["transient_backoff_waiting"] = serde_json::json!(si.transient_backoff_waiting);
-        obj["transient_backoff_remaining_ms"] =
-            serde_json::json!(si.transient_backoff_remaining_ms);
-        if let Ok(rpm) = state.account_svc.get_account_rpm_status(a).await {
-            obj["rpm_current"] = serde_json::json!(rpm.current);
-            obj["rpm_remaining"] = serde_json::json!(rpm.remaining);
-            obj["rpm_window_reset_at"] = serde_json::json!(rpm.window_reset_at.to_rfc3339());
-            obj["rpm_saturated"] = serde_json::json!(rpm.saturated);
         }
         match state.account_svc.get_upstream_session_pool_status(a).await {
             Ok(pool) => {
@@ -981,6 +975,44 @@ fn validate_request_backend(value: &str) -> Result<String, AppError> {
     }
 }
 
+/// 附加两平台共用的实时容量和速率数据。@param service 账号服务。@param account 当前账号。@param view 账号视图。@return 调度摘要可复用的容量快照。
+async fn append_account_live_metrics(
+    service: &AccountService,
+    account: &Account,
+    view: &mut Value,
+) -> AccountCapacityInfo {
+    let capacity = service.get_account_capacity_info(account).await;
+    view["current_concurrency"] = json!(capacity.current_concurrency);
+    view["current_concurrency_units"] = json!(capacity.current_concurrency_units);
+    view["max_concurrency_units"] = json!(capacity.max_concurrency_units);
+    view["active_requests"] = json!(capacity.active_requests);
+    view["queued_requests"] = json!(capacity.queued);
+    view["queued_request_units"] = json!(capacity.queued_request_units);
+    view["transient_backoff_waiting"] = json!(capacity.transient_backoff_waiting);
+    view["transient_backoff_remaining_ms"] = json!(capacity.transient_backoff_remaining_ms);
+    if let Ok(rpm) = service.get_account_rpm_status(account).await {
+        view["rpm_current"] = json!(rpm.current);
+        view["rpm_remaining"] = json!(rpm.remaining);
+        view["rpm_window_reset_at"] = json!(rpm.window_reset_at.to_rfc3339());
+        view["rpm_saturated"] = json!(rpm.saturated);
+    }
+    capacity
+}
+
+/// 读取当前账号视图的已记录用量。@param state 网关状态。@param ids 反重力账号。@return 缺失表示诊断统计不可用。
+async fn agy_account_usage(state: &AppState, ids: &[i64]) -> HashMap<i64, AgyRequestUsage> {
+    let Some(store) = state.gateway_svc.diagnostics_store() else {
+        return HashMap::new();
+    };
+    match store.agy_request_usage(ids, Utc::now()).await {
+        Ok(stats) => stats,
+        Err(error) => {
+            warn!(%error, "反重力网关用量统计读取失败");
+            HashMap::new()
+        }
+    }
+}
+
 /// 按身份读取配置供跨页直达编辑。@param state 服务。@param id 身份。@return 账号配置。
 async fn get_account(
     State(state): State<AppState>,
@@ -990,6 +1022,8 @@ async fn get_account(
     let mut value = json!(account);
     if account.is_antigravity() {
         value["credential_state"] = state.account_svc.agy_state(id).await?;
+        value["agy_request_usage"] = json!(agy_account_usage(&state, &[id]).await.get(&id));
+        append_account_live_metrics(&state.account_svc, &account, &mut value).await;
     }
     value["work_control"] =
         serde_json::to_value(state.account_svc.work_controls.snapshot(id).await?)
@@ -3769,6 +3803,59 @@ mod tests {
                 assert!(usage[key]["estimated_total_cost_usd"].is_null());
             }
             assert!(value["data"][0]["usage_fetched_at"].is_null());
+        }
+    }
+
+    /// 反重力账号列表和详情复用实际网关槽位与 RPM。@return 无。
+    #[tokio::test]
+    async fn agy_account_views_report_live_capacity() {
+        let (app, _, _, pool, service) = test_router_with_scheduling(true).await;
+        let (status, saved) = account_admin_json(
+            &app,
+            Method::POST,
+            "/admin/accounts",
+            json!({"email":"agy-capacity@example.invalid","setup_token":"synthetic","rpm_limit":16}),
+        )
+        .await;
+        assert!(status.is_success());
+        let id = saved["id"].as_i64().unwrap();
+        sqlx::query("UPDATE accounts SET platform='antigravity',auth_type='oauth' WHERE id=$1")
+            .bind(id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO account_credential_states(account_id,generation,phase,updated_at_ms) VALUES($1,1,'ready',0)")
+            .bind(id).execute(&pool).await.unwrap();
+        let account = service.get_account(id).await.unwrap();
+        let queue = service.get_or_create_queue(id, account.concurrency).await;
+        let _held = queue.acquire(Duration::from_secs(1), 2).await.unwrap();
+        service
+            .acquire_account_rpm(&account, false, "")
+            .await
+            .unwrap();
+        let (status, listed) = account_admin_json(
+            &app,
+            Method::GET,
+            "/admin/accounts?platform=antigravity",
+            Value::Null,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, detail) = account_admin_json(
+            &app,
+            Method::GET,
+            &format!("/admin/accounts/{id}"),
+            Value::Null,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        for view in [&listed["data"][0], &detail] {
+            assert_eq!(view["current_concurrency"].as_f64(), Some(1.0));
+            assert_eq!(view["active_requests"], 1);
+            assert_eq!(view["queued_requests"], 0);
+            assert_eq!(view["rpm_current"], 1);
+            assert_eq!(view["agy_request_usage"]["seven_day"]["requests"], 0);
+            assert!(view.get("v3_scheduling").is_none());
         }
     }
 

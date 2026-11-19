@@ -8,9 +8,10 @@ import ExecutionNodeBadge from './runtime/ExecutionNodeBadge.vue';
 import PlatformBadge from './PlatformBadge.vue';
 import type { AccountNodeSummary } from './runtime/nodeApi';
 import { api, type ProxyRoute, type Account, type OAuthExchangeResult, type UsageWindow, type RuntimeEnvironmentSummary, type OverallWorkStatus } from '../api';
+import AgyAccountUsage from './AgyAccountUsage.vue';
 import UsageWindowStats from './UsageWindowStats.vue';
 import SchedulingDetails from './SchedulingDetails.vue';
-import { subscriptionLabel, fiveHourLabel } from '../lib/subscription';
+import { subscriptionLabel, fiveHourLabel, usageBarColor } from '../lib/subscription';
 import { schedulingReasonLabel } from '../lib/scheduling';
 import { accountUpdateDelta } from '../lib/accountUpdate';
 import { Card } from '@/components/ui/card';
@@ -123,10 +124,16 @@ async function loadOverallStates(rows: Account[]): Promise<void> {
   } catch { if (generation === accountLoadGeneration) for (const account of targets) overallStates.set(account.id, {phase:'reconcile',message:'整体工作状态待核对'}); }
 }
 
-/** 按实际协调结果说明整体状态。@param account 账号。@return 显示文本。 */
-function overallLabel(account: Account): string {
+/** 提示需要关注的整体状态。@param account 账号。@return 状态提示，正常启用时为空。 */
+function overallWorkNote(account: Account): string {
   const phase = overallStates.get(account.id)?.phase ?? account.work_control?.phase;
-  return ({enabled:'账号已启用',draining:'正在收尾',disabled:'账号已停用',reconcile:'状态待核对'} as Record<string,string>)[phase ?? ''] ?? '状态读取中';
+  if (phase === 'draining') {
+    const remaining = account.work_control?.admitted_requests ?? 0;
+    return remaining > 0 ? `正在收尾 · 剩余 ${remaining} 个请求` : '正在收尾';
+  }
+  if (phase === 'reconcile') return '状态待核对';
+  if (phase === 'disabled') return '账号已停用';
+  return '';
 }
 
 /** 优先采用关联任务账号的整体状态。@param account 账号。@return 是否整体启用。 */
@@ -282,6 +289,28 @@ function changeWorkspaceTab(tab: typeof workspaceTab.value): void {
 }
 
 const detailAccount = computed(() => accounts.value.find(account => account.id === detailAccountId.value) ?? null);
+const overviewCapabilities = computed(() => detailAccount.value?.usage_data?.capabilities);
+const overviewQuota = computed(() => detailAccount.value?.usage_data?.platform_quota);
+const overviewAgyTier = computed(() => {
+  const tier = overviewCapabilities.value?.provider?.userTier;
+  const name = typeof tier === 'string' ? tier : tier && typeof tier === 'object' && 'name' in tier ? tier.name : null;
+  return overviewQuota.value?.tier ?? (typeof name === 'string' && name.trim() ? name.trim() : null);
+});
+const overviewAgySource = computed(() => {
+  const nativeVersion = detailAccount.value && agyVersion(detailAccount.value);
+  return nativeVersion ? `Antigravity ${nativeVersion} 原生观测` : '未观测';
+});
+
+/** 从受信能力来源读取原生版本。@param account 当前账号。@return 已观测版本。 */
+function agyVersion(account: Account): string | undefined {
+  return account.usage_data?.capabilities?.source?.match(/^agy:([\d.]+):native$/)?.[1];
+}
+
+/** 使用平台实际可读的套餐标签。@param account 当前账号。@return 精简标签。 */
+function cardPlan(account: Account): string | null {
+  if (account.platform !== 'antigravity') return subscriptionLabel(account.subscription_type, account.rate_limit_tier);
+  return account.usage_data?.platform_quota?.plan?.replace(/^Google AI /i, '') || null;
+}
 
 /** 格式化当前调度模式的评分。@param account 账号调度快照。@return 带模式的紧凑评分文字。 */
 function activeSchedulingScore(account: Account): string {
@@ -366,6 +395,18 @@ function openScheduling(account: Account) {
   workspaceTab.value = 'scheduling';
   schedulingAccount.value = account;
   showScheduling.value = true;
+}
+
+/** 进入账号支持的容量视图。@param account 当前账号。@return 无。 */
+function openAccountCapacity(account: Account): void {
+  if (account.platform === 'antigravity') openAccountDetails(account);
+  else openScheduling(account);
+}
+
+/** 读取卡片口径的速率。@param account 当前账号。@return 未计量时为空。 */
+function cardRpm(account: Account): number | undefined {
+  if (account.platform === 'antigravity') return account.rpm_limit > 0 ? account.rpm_current : undefined;
+  return account.v3_scheduling?.submissions_last_60s ?? account.rpm_current ?? 0;
 }
 
 /** 翻页 */
@@ -775,16 +816,6 @@ function hasFutureReset(window?: UsageWindow): boolean {
   if (!window?.resets_at) return false;
   const reset = Date.parse(window.resets_at);
   return Number.isFinite(reset) && reset > Date.now();
-}
-
-/**
- * 获取用量进度条颜色
- * @param pct 使用百分比 (0-100)
- */
-function usageBarColor(pct: number): string {
-  if (pct >= 80) return 'bg-red-400';
-  if (pct >= 50) return 'bg-amber-400';
-  return 'bg-emerald-400';
 }
 
 /**
@@ -1211,41 +1242,54 @@ async function copyText(text: string) {
       >
         <div class="account-card-body">
           <div class="account-card-topline">
-            <PlatformBadge :platform="a.platform || 'claude_code'" />
+            <div class="account-identity">
+              <span class="account-avatar">{{ (a.name || a.email || '?')[0]?.toUpperCase() }}<i class="account-avatar-state" :class="a.status" /></span>
+              <button type="button" class="account-identity-text" @click="openAccountDetails(a)">
+                <div class="account-card-title">
+                  <h3>{{ a.name || a.email }}</h3>
+                  <span class="account-card-badges">
+                    <PlatformBadge :platform="a.platform || 'claude_code'" />
+                    <span v-if="cardPlan(a)" class="account-plan">{{ cardPlan(a) }}</span>
+                  </span>
+                </div>
+                <p>{{ a.email }}</p>
+              </button>
+            </div>
             <div class="account-work-controls">
               <label class="account-admission"><span>接收请求</span><button type="button" role="switch" class="account-status-switch" :disabled="!a.work_control || workPending.has(a.id)" :aria-checked="a.work_control?.api_accepting === true" :aria-label="`${a.work_control?.api_accepting ? '关闭' : '开启'}接收请求 ${a.name || a.email}`" @click="toggleScheduling(a)"><span /></button></label>
-              <button type="button" class="account-work-toggle" :disabled="!a.work_control || workPending.has(a.id)" @click="changeOverall(a, !overallEnabled(a))">{{ overallEnabled(a) ? '停用账号' : '启用账号' }}</button>
+              <button type="button" class="account-work-toggle" :class="{ 'account-stop-action': overallEnabled(a) }" :disabled="!a.work_control || workPending.has(a.id)" @click="changeOverall(a, !overallEnabled(a))">{{ overallEnabled(a) ? '停用账号' : '启用账号' }}</button>
             </div>
-          </div>
-          <div class="account-identity">
-            <span class="account-avatar">{{ (a.name || a.email || '?')[0]?.toUpperCase() }}<i class="account-avatar-state" :class="a.status" /></span>
-            <button type="button" class="account-identity-text" @click="openAccountDetails(a)">
-              <div><h3>{{ a.name || a.email }}<span v-if="!a.platform || a.platform === 'claude_code'" class="account-plan">{{ subscriptionLabel(a.subscription_type, a.rate_limit_tier) }}</span></h3></div>
-              <p>{{ a.email }}</p>
-            </button>
           </div>
           <div class="account-network">
             <button type="button" @click="openEdit(a)"><Globe :size="13" /><span>{{ a.proxy_name || publicProxy(a.proxy_url) }}</span></button>
             <ExecutionNodeBadge :node="accountNodes.get(a.id)?.node" :status="nodeStatus(a.id)" :attention="nodeAttention(a.id)" />
-            <router-link v-if="!a.platform || a.platform === 'claude_code'" :to="{ name: 'environments', query: { gateway_account: String(a.id) } }"><Box :size="13" />运行环境</router-link>
+            <router-link :to="{ name: 'environments', query: { gateway_account: String(a.id) } }"><Box :size="13" />运行环境</router-link>
           </div>
-          <div v-if="!overallEnabled(a) || overallStates.get(a.id)?.phase==='reconcile' || a.work_control?.admitted_requests" class="account-work-status"><span>{{ overallLabel(a) }}<template v-if="a.work_control?.admitted_requests"> · 已接纳 {{ a.work_control.admitted_requests }} 个请求</template></span><button v-if="overallStates.get(a.id)?.phase==='reconcile'" type="button" :disabled="workPending.has(a.id)" @click="changeOverall(a, false)">继续停用</button></div>
+          <div v-if="overallWorkNote(a)" class="account-work-status">
+            <span>{{ overallWorkNote(a) }}</span>
+            <button v-if="overallStates.get(a.id)?.phase==='reconcile'" type="button" :disabled="workPending.has(a.id)" @click="changeOverall(a, false)">继续停用</button>
+          </div>
           <p v-if="overallStates.get(a.id)?.message" class="text-xs text-muted-foreground" role="status">{{ overallStates.get(a.id)?.message }}</p>
           <div class="account-health" :class="a.status === 'disabled' ? 'is-disabled' : (isRateLimited(a) || a.auth_error || a.v3_scheduling_error) ? 'is-warning' : ''">
-            <span class="account-health-message"><Check v-if="a.status !== 'disabled' && !isRateLimited(a) && !a.auth_error && !a.v3_scheduling_error" :size="13" /><i v-else /><span>{{ a.status === 'disabled' ? '已停用' : a.v3_scheduling ? schedulingReasonLabel(a.v3_scheduling.capacity.reason) : statusStyle(a).label }}<template v-if="a.v3_scheduling"> · {{ a.v3_scheduling.phases.running > 0 ? `正在处理 ${a.v3_scheduling.phases.running} 个请求` : '当前空闲' }}</template></span></span>
-            <button v-if="(a.queued_requests ?? 0)>0" class="account-queue-alert" @click="openScheduling(a)">排队 {{ a.queued_requests }}</button>
+            <span class="account-health-message"><Check v-if="a.status !== 'disabled' && !isRateLimited(a) && !a.auth_error && !a.v3_scheduling_error" :size="13" /><i v-else /><span>{{ a.status === 'disabled' ? '已停用' : a.v3_scheduling ? schedulingReasonLabel(a.v3_scheduling.capacity.reason) : statusStyle(a).label }}<template v-if="a.v3_scheduling"> · {{ a.v3_scheduling.phases.running > 0 ? `正在处理 ${a.v3_scheduling.phases.running} 个请求` : '当前空闲' }}</template><template v-else-if="a.platform === 'antigravity' && a.status === 'active' && a.active_requests != null"> · {{ a.active_requests > 0 ? `在途 ${a.active_requests} 个请求` : '当前空闲' }}</template></span></span>
+            <button v-if="(a.queued_requests ?? 0)>0" class="account-queue-alert" @click="openAccountCapacity(a)">排队 {{ a.queued_requests }}</button>
           </div>
           <p v-if="a.auth_error" role="alert" class="rounded-lg bg-red-50 p-3 text-xs text-red-700 break-words">{{ a.auth_error }}</p>
           <p v-if="a.v3_scheduling_error" class="text-xs text-amber-700">{{ a.v3_scheduling_error }}，调度观测待更新。</p>
           <p v-if="a.credential_ownership" class="text-xs text-muted-foreground" role="status">{{ a.credential_ownership.phase === 'ready' ? (a.credential_ownership.owner === 'local' ? '本地管理凭据 · 网关已暂停' : '网关管理凭据') : (a.credential_ownership.phase === 'reauth' ? '重新授权中 · 上游活动暂停' : '凭据交接待确认 · 请在账号环境页对账') }}</p>
-          <p v-if="a.platform === 'antigravity'" class="form-help">凭据{{ a.credential_state?.phase === 'ready' ? '已就绪' : '待核对' }} · 模型服务待接入 · 额度未观测</p><div v-if="!a.platform || a.platform === 'claude_code'" class="account-routing">
-            <div><span>转发方式</span><strong><template v-if="a.request_backend === 'native293'">原生运行时 <small>280 / 293 自动匹配</small></template><template v-else>原有转发</template></strong></div>
-            <button type="button" @click="openScheduling(a)">
+          <div v-if="!a.platform || a.platform === 'claude_code' || a.platform === 'antigravity'" class="account-routing">
+            <div><span>转发方式</span><strong><template v-if="a.platform === 'antigravity'">原生运行时 <small v-if="agyVersion(a)">Antigravity {{ agyVersion(a) }}</small></template><template v-else-if="a.request_backend === 'native293'">原生运行时 <small>280 / 293 自动匹配</small></template><template v-else>原有转发</template></strong></div>
+            <button v-if="a.platform === 'antigravity'" type="button" @click="openAccountCapacity(a)">
+              <span>调度方式</span><strong>低负载优先<ArrowRight :size="13" /></strong>
+              <small>{{ a.credential_state?.phase === 'ready' && a.usage_data?.capabilities?.models ? `${a.usage_data.capabilities.models.length} 个模型` : agyPhaseLabel(a) }}</small>
+            </button>
+            <button v-else type="button" @click="openScheduling(a)">
               <span>调度优先级</span><strong>{{ a.priority }}<ArrowRight :size="13" /></strong>
               <small class="account-score">{{ activeSchedulingScore(a) }}</small>
             </button>
           </div>
 
+          <AgyAccountUsage v-if="a.platform === 'antigravity'" :account="a" />
           <section v-if="a.platform !== 'antigravity'" class="account-usage-windows">
             <header><span>用量</span><small>{{ a.usage_fetched_at ? new Date(a.usage_fetched_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' 更新' : '未刷新' }}</small><button type="button" @click="refreshUsage(a.id)" :disabled="refreshingUsage === a.id" aria-label="刷新用量"><RefreshCw :size="12" />刷新</button></header>
             <p v-if="a.request_usage" class="usage-record-start">网关记录始于 {{ new Date(a.request_usage.recorded_since).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) }}</p>
@@ -1256,11 +1300,11 @@ async function copyText(text: string) {
               <div v-if="hasFutureReset(usageWindow(a.usage_data, window.key))" class="usage-window-reset"><span>{{ formatTimeLeft(usageWindow(a.usage_data, window.key)?.resets_at) }} 后重置</span><span>{{ new Date(usageWindow(a.usage_data, window.key)!.resets_at!).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) }}</span></div>
             </div>
           </section>
-          <div v-if="!a.platform || a.platform === 'claude_code'" class="account-live-metrics">
-            <button type="button" @click="openScheduling(a)"><span>并发</span><strong :class="concurrencyClass(a)">{{ formatConcurrencySlots(a.current_concurrency) }}<small>/ {{ formatConcurrencySlots(a.concurrency) }}</small></strong><i class="metric-track"><i :style="{width:Math.min(100,(a.current_concurrency??0)/Math.max(1,a.concurrency)*100)+'%'}" /></i></button>
-            <button type="button" @click="openScheduling(a)"><span>RPM</span><strong :class="rpmClass(a)">{{ a.v3_scheduling?.submissions_last_60s ?? a.rpm_current ?? 0 }}<small>/ {{ a.rpm_limit>0?a.rpm_limit:'∞' }}</small></strong><i class="metric-track"><i :style="{width:a.rpm_limit>0?Math.min(100,(a.v3_scheduling?.submissions_last_60s??a.rpm_current??0)/a.rpm_limit*100)+'%':'0%'}" /></i></button>
-            <button type="button" @click="openScheduling(a)"><span>排队 <ChevronRight :size="12" /></span><strong :class="(a.queued_requests ?? 0) > 0 ? 'text-amber-600' : ''">{{ a.queued_requests ?? 0 }}</strong></button>
-            <button type="button" @click="openScheduling(a)"><span>活跃会话</span><strong>{{ a.v3_scheduling?.active_sessions ?? '—' }}</strong></button>
+          <div v-if="!a.platform || a.platform === 'claude_code' || a.platform === 'antigravity'" class="account-live-metrics">
+            <button type="button" @click="openAccountCapacity(a)"><span>并发</span><strong :class="concurrencyClass(a)">{{ a.platform === 'antigravity' && a.current_concurrency == null ? '—' : formatConcurrencySlots(a.current_concurrency) }}<small>/ {{ formatConcurrencySlots(a.concurrency) }}</small></strong><i class="metric-track"><i :style="{width:Math.min(100,(a.current_concurrency??0)/Math.max(1,a.concurrency)*100)+'%'}" /></i></button>
+            <button type="button" @click="openAccountCapacity(a)"><span>RPM</span><strong :class="rpmClass(a)">{{ cardRpm(a) ?? '—' }}<small>/ {{ a.rpm_limit>0?a.rpm_limit:'∞' }}</small></strong><i class="metric-track"><i :style="{width:a.rpm_limit>0?Math.min(100,(cardRpm(a)??0)/a.rpm_limit*100)+'%':'0%'}" /></i></button>
+            <button type="button" @click="openAccountCapacity(a)"><span>排队 <ChevronRight :size="12" /></span><strong :class="(a.queued_requests ?? 0) > 0 ? 'text-amber-600' : ''">{{ a.queued_requests ?? (a.platform === 'antigravity' ? '—' : 0) }}</strong></button>
+            <button type="button" @click="openAccountCapacity(a)"><span>{{ a.platform === 'antigravity' ? '在途请求' : '活跃会话' }}</span><strong>{{ (a.platform === 'antigravity' ? a.active_requests : a.v3_scheduling?.active_sessions) ?? '—' }}</strong></button>
           </div>
 
           <!-- 停用原因 -->
@@ -1315,30 +1359,44 @@ async function copyText(text: string) {
     <Dialog v-model:open="workspaceOpen">
       <DialogContent class="account-workspace translate-x-0 translate-y-0" :class="{'account-workspace-wide': workspaceTab === 'configuration' || workspaceTab === 'scheduling'}">
         <DialogHeader><DialogTitle>{{ detailAccount?.name || detailAccount?.email || '添加账号' }}</DialogTitle><DialogDescription>{{ detailAccount?.email || '填写账号配置与认证信息' }}</DialogDescription></DialogHeader>
-        <nav v-if="detailAccount" class="account-workspace-tabs" aria-label="账号工作区"><button v-for="tab in workspaceTabs.filter(item => detailAccount?.platform !== 'antigravity' || ['overview','configuration'].includes(item.value))" :key="tab.value" type="button" :class="{active:workspaceTab===tab.value}" :aria-pressed="workspaceTab===tab.value" @click="changeWorkspaceTab(tab.value)">{{ tab.label }}</button></nav>
+        <nav v-if="detailAccount" class="account-workspace-tabs" aria-label="账号工作区"><button v-for="tab in workspaceTabs.filter(item => detailAccount?.platform !== 'antigravity' || item.value !== 'scheduling')" :key="tab.value" type="button" :class="{active:workspaceTab===tab.value}" :aria-pressed="workspaceTab===tab.value" @click="changeWorkspaceTab(tab.value)">{{ tab.label }}</button></nav>
         <div v-if="detailAccount" v-show="workspaceTab === 'overview'" class="account-workspace-scroll">
-          <div class="account-overview-identity"><span class="account-avatar">{{ (detailAccount.name || detailAccount.email)[0] }}</span><div><strong>{{ detailAccount.name || detailAccount.email }}</strong><p>{{ detailAccount.email }}</p></div></div>
-          <div class="account-overview-status">
+          <div class="account-overview-context"><div class="account-overview-status">
             <PlatformBadge :platform="detailAccount.platform || 'claude_code'" />
             <span>{{ statusStyle(detailAccount).label }}</span>
+            <span v-if="cardPlan(detailAccount)" class="account-plan">{{ cardPlan(detailAccount) }}</span>
             <small v-if="detailAccount.platform !== 'antigravity'" class="account-score">{{ activeSchedulingScore(detailAccount) }}</small>
           </div>
-          <ExecutionNodeBadge :node="accountNodes.get(detailAccount.id)?.node" :status="nodeStatus(detailAccount.id)" :attention="nodeAttention(detailAccount.id)" />
+          <ExecutionNodeBadge :node="accountNodes.get(detailAccount.id)?.node" :status="nodeStatus(detailAccount.id)" :attention="nodeAttention(detailAccount.id)" /></div>
           <section v-if="detailAccount.platform !== 'antigravity'" class="account-usage-windows"><header><span>用量</span><small>{{ detailAccount.usage_fetched_at ? new Date(detailAccount.usage_fetched_at).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}) + ' 更新' : '未刷新' }}</small></header>
             <div v-for="window in usageWindows" :key="window.key" class="account-usage-window"><UsageWindowStats v-if="window.key!=='seven_day_fable'" :stats="detailAccount.request_usage?.[window.key]" :label="window.key==='five_hour'?'5h':'7d'" /><div class="usage-window-label"><span>{{ window.label }}</span><strong>{{ usagePercentLabel(usageWindow(detailAccount.usage_data,window.key)) }}</strong></div><div class="usage-window-bar"><i :class="usageBarColor(effectiveUtil(usageWindow(detailAccount.usage_data,window.key)))" :style="{width:Math.min(100,effectiveUtil(usageWindow(detailAccount.usage_data,window.key)))+'%'}" /></div><p v-if="hasFutureReset(usageWindow(detailAccount.usage_data,window.key))" class="usage-window-reset">{{ formatTimeLeft(usageWindow(detailAccount.usage_data,window.key)?.resets_at) }} 后重置</p></div>
           </section>
-          <section v-if="detailAccount.platform === 'antigravity'" class="account-form-section"><h3>Antigravity 能力</h3><Button v-if="detailAccount.credential_state?.phase === 'reauth'" variant="outline" @click="cancelAgyReauth(detailAccount)">结束原授权</Button><p>{{ agyPhaseLabel(detailAccount) }} · 额度未观测</p><p v-if="detailAccount.usage_data?.capabilities">{{ Date.now() - detailAccount.usage_data.capabilities.observed_at_ms > 300000 ? '观测已过期，请刷新能力' : '最近已观测' }}</p><p>{{ detailAccount.usage_data?.capabilities?.source || '能力未观测' }}</p><p>{{ detailAccount.usage_data?.capabilities?.observed_at_ms ? new Date(detailAccount.usage_data.capabilities.observed_at_ms).toLocaleString('zh-CN') : '观测时间未提供' }}</p><p>{{ detailAccount.usage_data?.capabilities?.models?.join('、') || '模型目录未观测' }}</p><details><summary>上游套餐与分级</summary><pre>{{ JSON.stringify(detailAccount.usage_data?.capabilities?.provider ?? {}, null, 2) }}</pre></details><Button v-if="detailAccount.credential_state?.phase !== 'ready'" variant="outline" @click="recoverAgy(detailAccount.id)">核对原凭据操作</Button></section>
-          <dl class="account-overview-settings"><div v-if="detailAccount.platform !== 'antigravity'"><dt>订阅方案</dt><dd>{{ subscriptionLabel(detailAccount.subscription_type,detailAccount.rate_limit_tier) }}</dd></div><div><dt>并发上限</dt><dd>{{ detailAccount.concurrency }}</dd></div><div><dt>RPM 上限</dt><dd>{{ detailAccount.rpm_limit || '不限' }}</dd></div><div><dt>调度优先级</dt><dd>{{ detailAccount.priority }}</dd></div></dl>
+          <template v-if="detailAccount.platform === 'antigravity'">
+            <AgyAccountUsage :account="detailAccount" expanded />
+            <section class="account-capabilities">
+              <header><h3>平台能力</h3><span :class="{'is-warning':detailAccount.credential_state?.phase !== 'ready'}">{{ agyPhaseLabel(detailAccount) }}</span></header>
+              <dl><div><dt>模型目录</dt><dd>{{ overviewCapabilities?.models ? `${overviewCapabilities.models.length} 个模型` : '未观测' }}</dd></div><div><dt>能力快照</dt><dd>{{ !overviewCapabilities ? '未观测' : Date.now() - overviewCapabilities.observed_at_ms > 300000 ? '待刷新' : '已更新' }}</dd></div><div class="capability-observed"><dt>观测时间</dt><dd>{{ overviewCapabilities?.observed_at_ms ? new Date(overviewCapabilities.observed_at_ms).toLocaleString('zh-CN') : '未提供' }}</dd></div></dl>
+              <details class="account-capability-details"><summary>可用模型<ChevronRight :size="14" /></summary><div class="account-model-list"><code v-for="model in overviewCapabilities?.models" :key="model">{{ model }}</code><p v-if="!overviewCapabilities?.models?.length">{{ overviewCapabilities?.models ? '目录为空' : '模型目录未观测' }}</p></div></details>
+              <details class="account-capability-details">
+                <summary>套餐与来源<ChevronRight :size="14" /></summary>
+                <dl class="account-provider-details">
+                  <div><dt>套餐</dt><dd>{{ overviewQuota?.plan || '未提供' }}</dd></div>
+                  <div><dt>账号分级</dt><dd>{{ overviewAgyTier || '未提供' }}</dd></div>
+                  <div><dt>来源</dt><dd>{{ overviewAgySource }}</dd></div>
+                </dl>
+              </details>
+              <div v-if="detailAccount.credential_state?.phase !== 'ready'" class="account-credential-actions"><Button v-if="detailAccount.credential_state?.phase === 'reauth'" variant="outline" @click="cancelAgyReauth(detailAccount)">结束原授权</Button><Button variant="outline" @click="recoverAgy(detailAccount.id)">核对凭据</Button></div>
+            </section>
+          </template>
+          <div class="account-overview-section-head"><h3>请求配置</h3><button v-if="detailAccount.platform !== 'antigravity'" type="button" @click="changeWorkspaceTab('scheduling')">调度详情<ArrowRight :size="13" /></button></div>
+          <dl v-if="detailAccount.platform === 'antigravity'" class="account-overview-settings"><div><dt>并发</dt><dd>{{ detailAccount.current_concurrency ?? '—' }} / {{ detailAccount.concurrency }}</dd></div><div><dt>RPM</dt><dd>{{ cardRpm(detailAccount) ?? '—' }} / {{ detailAccount.rpm_limit || '不限' }}</dd></div><div><dt>调度方式</dt><dd>低负载优先</dd></div></dl>
+          <dl v-else class="account-overview-settings"><div><dt>并发上限</dt><dd>{{ detailAccount.concurrency }}</dd></div><div><dt>RPM 上限</dt><dd>{{ detailAccount.rpm_limit || '不限' }}</dd></div><div><dt>调度优先级</dt><dd>{{ detailAccount.priority }}</dd></div></dl>
           <div class="account-overview-actions">
-            <OperationFeedback label="测试连接" button-variant="default" :status="testStates.get(detailAccount.id)?.status" :message="testStates.get(detailAccount.id)?.message" :identity="detailAccount.name || detailAccount.email" @action="test(detailAccount.id)" />
+            <OperationFeedback label="测试连接" button-variant="outline" :status="testStates.get(detailAccount.id)?.status" :message="testStates.get(detailAccount.id)?.message" :identity="detailAccount.name || detailAccount.email" @action="test(detailAccount.id)" />
             <Button type="button" variant="outline" @click="refreshUsage(detailAccount.id)" :disabled="refreshingUsage === detailAccount.id"><RefreshCw :size="14" />{{ refreshingUsage === detailAccount.id ? '刷新中' : '刷新用量' }}</Button>
-            <Button v-if="detailAccount.platform !== 'antigravity'" type="button" variant="ghost" @click="changeWorkspaceTab('scheduling')"><ArrowRight :size="14" />调度详情</Button>
-            <Button type="button" variant="outline" :disabled="!detailAccount.work_control || workPending.has(detailAccount.id)" @click="toggleScheduling(detailAccount)">{{ detailAccount.work_control?.api_accepting ? '关闭 API 接单' : '开启 API 接单' }}</Button>
-            <Button v-if="detailAccount.status !== 'active' || isRateLimited(detailAccount)" type="button" variant="outline" :disabled="workPending.has(detailAccount.id)" @click="restoreAvailability(detailAccount)">恢复账号资格</Button>
-            <Button type="button" :variant="overallEnabled(detailAccount) ? 'destructive' : 'outline'" :disabled="!detailAccount.work_control || workPending.has(detailAccount.id)" @click="changeOverall(detailAccount, !overallEnabled(detailAccount))">{{ overallEnabled(detailAccount) ? '整体停用' : '整体启用' }}</Button>
           </div>
-          <p class="text-xs text-muted-foreground" role="status">{{ overallLabel(detailAccount) }}。关闭 API 接单后已接纳请求正常收尾。整体停用会停止养号和工程的新工作，并等待原请求收尾。</p>
-          <p v-if="overallStates.get(detailAccount.id)?.message" role="status">{{ overallStates.get(detailAccount.id)?.message }}</p>
+          <section class="account-overview-control"><header><h3>账号控制</h3><InfoTooltip label="账号控制说明"><template #trigger><span>控制说明</span></template><p>关闭接收请求后，已接纳的请求正常收尾。</p><p>停用账号会停止全部新工作，并等待已接纳的请求收尾。</p></InfoTooltip></header><div class="account-overview-control-row"><label class="account-admission"><span>接收请求</span><button type="button" role="switch" class="account-status-switch" :disabled="!detailAccount.work_control || workPending.has(detailAccount.id)" :aria-checked="detailAccount.work_control?.api_accepting === true" :aria-label="`${detailAccount.work_control?.api_accepting ? '关闭' : '开启'}接收请求 ${detailAccount.name || detailAccount.email}`" @click="toggleScheduling(detailAccount)"><span /></button></label><Button v-if="detailAccount.status !== 'active' || isRateLimited(detailAccount)" type="button" variant="outline" :disabled="workPending.has(detailAccount.id)" @click="restoreAvailability(detailAccount)">恢复资格</Button><Button type="button" variant="outline" :class="{'account-stop-action':overallEnabled(detailAccount)}" :disabled="!detailAccount.work_control || workPending.has(detailAccount.id)" @click="changeOverall(detailAccount, !overallEnabled(detailAccount))">{{ overallEnabled(detailAccount) ? '停用账号' : '启用账号' }}</Button></div><p v-if="overallWorkNote(detailAccount)" class="account-overview-note" role="status">{{ overallWorkNote(detailAccount) }}</p></section>
+          <p v-if="overallStates.get(detailAccount.id)?.message" class="account-overview-note" role="status">{{ overallStates.get(detailAccount.id)?.message }}</p>
         </div>
         <form v-show="workspaceTab === 'configuration'" @submit.prevent="save" class="account-editor-form">
           <div class="account-editor-scroll complete-account-form">

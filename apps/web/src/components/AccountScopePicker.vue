@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { ChevronRight, Search, X } from '@/components/ui/icon';
 import type { Account } from '../api';
+import PlatformBadge from './PlatformBadge.vue';
 /** 令牌权限范围选择器，保留CSV接口及暂时不可见的已选账号。 */
 const props = defineProps<{ modelValue: string; accounts: Account[]; label: string; help: string }>();
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
@@ -17,6 +18,6 @@ function name(id: string): string { const account = props.accounts.find(value =>
 <template>
   <fieldset class="account-picker"><legend class="picker-label">{{ label }}<span class="picker-count">{{ selected.length ? `${selected.length} 个已选` : '未限制' }}</span></legend><div class="picker-selected"><span v-for="id in selected" :key="id" class="account-chip">{{ name(id) }}<button type="button" :aria-label="`移除${label}中的${name(id)}`" @click="toggle(id)"><X :size="12" /></button></span></div>
     <button type="button" class="picker-trigger" :aria-expanded="open" @click="open = !open"><span>{{ open ? '收起账号列表' : '选择账号' }}</span><ChevronRight :size="12" /></button><p class="picker-help">{{ help }}</p>
-    <div v-if="open" class="picker-options"><label class="picker-search"><Search :size="14" /><input v-model="query" :aria-label="`搜索${label}`" placeholder="搜索名称或邮箱" type="search" @keydown.esc.stop.prevent="open = false" /></label><div class="picker-list"><label v-for="account in options" :key="account.id" class="picker-option"><input type="checkbox" :checked="selected.includes(String(account.id))" @change="toggle(String(account.id))" /><span class="picker-avatar">{{ (account.name || account.email).slice(0,1) }}</span><span><strong>{{ account.name || account.email }}</strong><small>{{ account.email }}</small></span></label><p v-if="!options.length" class="picker-empty">没有匹配的账号</p></div></div>
+    <div v-if="open" class="picker-options"><label class="picker-search"><Search :size="14" /><input v-model="query" :aria-label="`搜索${label}`" placeholder="搜索名称或邮箱" type="search" @keydown.esc.stop.prevent="open = false" /></label><div class="picker-list"><label v-for="account in options" :key="account.id" class="picker-option"><input type="checkbox" :checked="selected.includes(String(account.id))" @change="toggle(String(account.id))" /><span class="picker-avatar">{{ (account.name || account.email).slice(0,1) }}</span><span><strong>{{ account.name || account.email }}</strong><small>{{ account.email }}</small><PlatformBadge :platform="account.platform || 'claude_code'" /></span></label><p v-if="!options.length" class="picker-empty">没有匹配的账号</p></div></div>
   </fieldset>
 </template>

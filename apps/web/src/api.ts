@@ -156,6 +156,7 @@ export interface Account {
   usage_data?: UsageData
   usage_fetched_at?: string
   request_usage?: RequestUsage | null
+  agy_request_usage?: AgyRequestUsage | null
   created_at: string
   updated_at: string
 }
@@ -265,9 +266,43 @@ export interface UsageLimit {
   } | null
 }
 
+/** 反重力已记录的网关用量窗口。 */
+export interface AgyUsageWindow {
+  requests: number
+  tokens: number | null
+  partial_requests: number
+}
+
+/** 基于请求记录的滚动用量。 */
+export interface AgyRequestUsage {
+  five_hour: AgyUsageWindow
+  seven_day: AgyUsageWindow
+}
+
+/** 上游返回的剩余比例和重置时间。 */
+export interface AgyQuotaReading {
+  remaining_fraction: number | null
+  remaining_amount?: number | null
+  reset_at: string | null
+}
+
+/** 共享额度查询和逐模型查询各自保留独立观测时间。 */
+export interface AgyPlatformQuota {
+  checked_at_ms: number
+  status: 'ok' | 'partial' | 'unavailable'
+  plan?: string | null
+  tier?: string | null
+  groups?: {observed_at_ms: number; items: {
+    name: string
+    windows: (AgyQuotaReading & { id: string; period: '5h' | 'weekly' })[]
+  }[]}
+  models?: {observed_at_ms: number; items: (AgyQuotaReading & { model: string })[]}
+}
+
 export interface UsageData {
   platform?: string
   capabilities?: {source:string; observed_at_ms:number; models:string[]; provider?:Record<string,unknown>}
+  platform_quota?: AgyPlatformQuota
   five_hour?: UsageWindow | null
   seven_day?: UsageWindow
   seven_day_sonnet?: UsageWindow
