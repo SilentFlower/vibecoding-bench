@@ -532,12 +532,18 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
             _ => false,
         };
     }
-    if let Some(environment) = api_path.strip_prefix("environments/").and_then(|value| {
-        value
-            .strip_suffix("/content-capture")
-            .or_else(|| value.strip_suffix("/agy-kernel"))
-    }) {
+    if let Some((environment, operation)) = api_path
+        .strip_prefix("environments/")
+        .and_then(|value| value.split_once('/'))
+        .filter(|(_, operation)| {
+            matches!(
+                operation.split('/').next(),
+                Some("content-capture" | "agy-kernel")
+            )
+        })
+    {
         return matches!(*method, Method::GET | Method::POST)
+            && matches!(operation, "content-capture" | "agy-kernel")
             && environment.len() == 32
             && environment.bytes().all(|value| value.is_ascii_hexdigit());
     }
