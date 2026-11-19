@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/platform/deploy/platform-online-update.md", "reason": "核对 steps 字段、冻结请求 UUID 与 409 不重放、取消边界及必需验证"}
+{"file": ".trellis/spec/web/frontend/ui-guidelines.md", "reason": "核对 token 与层叠、组合组件签名、更新弹窗合同与测试命令"}
+{"file": ".trellis/tasks/11-19-console-ui-shell/design.md", "reason": "核对 ModalDialog 用法、类名契约与脚本分诊规则"}
+{"file": ".trellis/tasks/11-19-console-ui-revamp/design.md", "reason": "父任务 §4 与验证策略"}

@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/platform/deploy/platform-online-update.md", "reason": "更新器公开操作字段、冻结请求、取消与恢复合同；本任务新增 steps 字段"}
+{"file": ".trellis/spec/web/frontend/ui-guidelines.md", "reason": "组件库层叠与 token 规则、组合组件签名、系统更新弹窗与工作区合同、测试命令"}
+{"file": ".trellis/spec/web/frontend/frontend-guidelines.md", "reason": "apps/web 技术栈与通用前端约定"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "搬迁 SystemUpdates 逻辑与复用 ModalDialog、ConfirmationDialog，避免重复实现"}
+{"file": ".trellis/tasks/11-19-console-ui-shell/design.md", "reason": "子任务 2 的 ModalDialog、类名契约、脚本分诊与回归方法，本任务沿用"}
+{"file": ".trellis/tasks/11-19-console-ui-revamp/prd.md", "reason": "父任务需求 R4、R5 与跨子任务验收"}
+{"file": ".trellis/tasks/11-19-console-ui-revamp/design.md", "reason": "父任务 §4 系统更新改造方案、步骤记录与前端步骤展示约定"}

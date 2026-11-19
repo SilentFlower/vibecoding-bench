@@ -1,0 +1,50 @@
+{
+  "id": "console-update-dialog",
+  "name": "console-update-dialog",
+  "title": "系统更新弹窗与步骤记录",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "web",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-19",
+  "completedAt": "2026-11-19",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-19T18:51:46Z",
+    "blockers": []
+  },
+  "branch": "feat/console-ui-revamp",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-19-console-ui-revamp",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-19T18:51:45+00:00",
+    "completedSteps": [
+      "规划评审",
+      "基线",
+      "步骤记录与单测",
+      "步骤推导纯函数",
+      "提示条组件",
+      "更新弹窗",
+      "外壳与路由接入",
+      "脚本改写与分诊",
+      "回归",
+      "规范与文档同步",
+      "Check-All（含 CHK-001 修复）通过"
+    ],
+    "partialStep": null,
+    "nextStep": "子任务 4（Vue 业务页迁移）、5（主题设置）或 6（原生页对齐）的规划评审",
+    "notes": ""
+  }
+}
