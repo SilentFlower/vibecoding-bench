@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/orchestrator/backend/index.md", "reason": "按索引和研究锚点读取环境生命周期、隔离、资源与发送归属，避免大规范注入截断"}
+{"file": ".trellis/spec/platform/deploy/agy-credential-contract.md", "reason": "固定原版、AT-only、常驻缓存与零模型预算边界"}
+{"file": ".trellis/spec/gateway/backend/index.md", "reason": "按索引和研究锚点读取平台账号、凭据代次、准入和CC兼容合同"}
+{"file": ".trellis/tasks/11-18-agy-account-runtime/research/current-contracts.md", "reason": "现有路由、原生原型、下游参数差异和本轮接入范围研究"}

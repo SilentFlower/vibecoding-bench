@@ -110,6 +110,11 @@ class RemoteEnvironmentControl:
             self._rpc(context, context[0], 'environment-state')
             context = self._context(row['account_id'], row['environment_id'])
             scope, account, current, _, _ = context
+            # 页面冻结代次必须在领取维护租约前核对，避免旧弹窗操作新建的环境。
+            if (operation == 'environment-maintenance' and 'expected_generation' in body
+                    and (type(body['expected_generation']) is not int
+                        or body['expected_generation'] != current['generation'])):
+                raise ValueError('环境代次已变化，请重新读取')
             reference = {**scope.model_dump(), 'generation': current['generation'], 'observation': body.get('observation')}
             proof, path, owner = None, None, None
             recovering, stopped = False, False

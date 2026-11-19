@@ -49,6 +49,13 @@ COPY images/v3/criu/ /source/criu/
 RUN python3 /source/criu/package.py --source /source/criu --out /opt/ccrb-criu \
     && chmod -R go-w /opt/ccrb-criu
 
+FROM python:3.12-slim-bookworm AS agy-runtime-build
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+COPY orchestrator/agy_runtime/ /opt/v3/python/agy_runtime/
+RUN PYTHONPATH=/opt/v3/python python3 -m agy_runtime.build --root /opt/v3/python/agy_runtime \
+    && chmod -R go-w /opt/v3/python/agy_runtime
+
 FROM python:3.12-slim-bookworm AS control
 RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates openssl openssh-client sshpass \
     && rm -rf /var/lib/apt/lists/*
@@ -63,6 +70,7 @@ COPY orchestrator/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 RUN python -c "from zoneinfo import ZoneInfo; [ZoneInfo(name) for name in ('UTC','Asia/Tokyo','Asia/Singapore','Asia/Seoul','Australia/Sydney','Europe/London','Europe/Berlin','Europe/Paris','America/Los_Angeles','America/New_York','America/Chicago')]"
 COPY orchestrator/*.py ./
+COPY orchestrator/agy_runtime/ ./agy_runtime/
 COPY orchestrator/native_tls_seccomp.json ./
 COPY orchestrator/database-migration-registry.json ./
 COPY topics.md /repo/topics.md
@@ -88,6 +96,8 @@ ARG V3_RELEASE
 ARG V3_PARENT_REV
 ARG V3_GATEWAY_REV
 LABEL vibebench.product="v3" vibebench.role="control" vibebench.release=$V3_RELEASE \
+    vibebench.agy-runtime-protocol="1" \
+    vibebench.account-platforms="1" \
     vibebench.system-update-protocol="1" \
     vibebench.credential-ownership-protocol="1" \
     vibebench.isolation-version="2" \
@@ -98,6 +108,7 @@ ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/v3-control"]
 
 FROM python:3.12-slim-bookworm AS account
 ARG HEV_VERSION=2.15.0
+ARG V3_AGY_AUTH_SHA256=""
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential pkg-config git curl wget unzip \
@@ -110,6 +121,13 @@ COPY --from=frontend /usr/local/lib/node_modules/npm /usr/local/lib/node_modules
 RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
     && groupadd --gid 1000 node && useradd --uid 1000 --gid node --create-home --shell /bin/bash node
+RUN groupadd --gid 1001 agy && useradd --uid 1001 --gid agy --create-home --shell /bin/bash agy
+COPY agy-auth/ /usr/local/bin/
+RUN if [ -n "$V3_AGY_AUTH_SHA256" ]; then \
+      test "$V3_AGY_AUTH_SHA256" = '39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43' \
+      && echo "$V3_AGY_AUTH_SHA256  /usr/local/bin/agy-1.5.9" | sha256sum -c - \
+      && chmod 755 /usr/local/bin/agy-1.5.9; \
+    else test -f /usr/local/bin/agy-auth-unavailable; fi
 RUN python3 -m venv /opt/mitm && /opt/mitm/bin/pip install --no-cache-dir mitmproxy==11.1.3
 ENV PATH="/opt/mitm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 RUN case "$(uname -m)" in x86_64) arch=x86_64;; aarch64) arch=arm64;; *) exit 1;; esac \
@@ -137,6 +155,7 @@ COPY orchestrator/cli_quota.py /usr/local/bin/v3-cli-quota
 COPY orchestrator/process_metrics.py /usr/local/bin/process_metrics.py
 COPY orchestrator/process_metrics.py /usr/local/bin/v3-process-metrics
 COPY --from=backend /out/account-sender /usr/local/bin/account-sender
+COPY --from=agy-runtime-build /opt/v3/python/agy_runtime/ /opt/v3/python/agy_runtime/
 COPY --from=tls-observer-build /opt/ccrb-tls-observer/ /opt/ccrb-tls-observer/
 COPY --from=criu-build /opt/ccrb-criu/ /opt/ccrb-criu/
 # iproute2已有libbpf运行依赖；在镜像内验证真实动态库，避免重复刷新整层系统依赖。
@@ -157,6 +176,8 @@ ARG V3_RELEASE
 ARG V3_PARENT_REV
 ARG V3_GATEWAY_REV
 LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELEASE \
+    vibebench.agy-runtime-protocol="1" vibebench.agy-runtime-source-sha256=$V3_AGY_AUTH_SHA256 \
+    vibebench.account-platforms="1" vibebench.agy-auth-source-sha256=$V3_AGY_AUTH_SHA256 \
     vibebench.system-update-protocol="1" vibebench.account-runtime-protocol="1" \
     vibebench.credential-ownership-protocol="1" \
     vibebench.isolation-version="2" \

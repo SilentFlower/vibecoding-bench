@@ -13,6 +13,7 @@ use reqwest::{Client, Error as ReqwestError};
 use serde_json::{Value, json};
 use std::sync::LazyLock;
 use std::time::Duration;
+use tokio::sync::Semaphore;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message as UpstreamMessage;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
@@ -83,6 +84,37 @@ static MANAGEMENT_CLIENT: LazyLock<Result<Client, ReqwestError>> = LazyLock::new
         .connect_timeout(SESSION_TIMEOUT)
         .build()
 });
+
+static AGY_INGRESS_WRITERS: Semaphore = Semaphore::const_new(2);
+
+/// 独立发布已脱敏入口，缺口仅记录诊断。@param account_id 已确认账号。@param attempt_id 实际尝试。@param generation 原环境代次。@param ingress 有界脱敏预览。@return 无。
+pub(crate) fn publish_agy_ingress(
+    account_id: i64,
+    attempt_id: &str,
+    generation: u64,
+    ingress: Value,
+) {
+    let Ok(permit) = AGY_INGRESS_WRITERS.try_acquire() else {
+        return;
+    };
+    let Ok((base, token, client)) = config() else {
+        return;
+    };
+    let path = format!("{base}/internal/v3/agy-ingress/{account_id}/{attempt_id}");
+    tokio::spawn(async move {
+        let _permit = permit;
+        let result = client
+            .post(path)
+            .bearer_auth(token)
+            .timeout(Duration::from_millis(250))
+            .json(&json!({"environment_generation":generation,"ingress":ingress}))
+            .send()
+            .await;
+        if !result.is_ok_and(|response| response.status().is_success()) {
+            tracing::warn!("AGY入站采集不可用");
+        }
+    });
+}
 
 /// 配置事务持有门禁时收口对应账号实例，阻止已解析的旧请求跨过修改。
 /// @param account_id 修改的账号 ID。
@@ -169,6 +201,51 @@ fn config() -> Result<(String, String, reqwest::Client), AppError> {
     Ok((base.trim_end_matches('/').into(), token, client))
 }
 
+/// 调用受信管理侧的 AGY 原生适配。@param action 固定操作名。@param input 私有请求。@return 有界原生结果或脱敏错误。
+pub async fn agy_request(action: &str, input: &Value) -> Result<Value, AppError> {
+    if ![
+        "start", "exchange", "cancel", "verify", "refresh", "recover", "prepare", "retire",
+    ]
+    .contains(&action)
+    {
+        return Err(AppError::BadRequest("AGY 管理操作无效".into()));
+    }
+    let (base, token, client) = config()?;
+    let response = client
+        .post(format!("{base}/internal/v3/agy-auth/{action}"))
+        .bearer_auth(token)
+        .json(input)
+        .timeout(Duration::from_secs(90))
+        .send()
+        .await
+        .map_err(|_| AppError::ServiceUnavailable("AGY 管理结果待核对".into()))?;
+    if !response.status().is_success() {
+        return Err(AppError::ServiceUnavailable(
+            "AGY 原生授权或凭据操作未完成，请查询原会话".into(),
+        ));
+    }
+    if response
+        .content_length()
+        .is_some_and(|length| length > 2 * 1024 * 1024)
+    {
+        return Err(AppError::ServiceUnavailable("AGY 管理响应超限".into()));
+    }
+    let mut response = response;
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| AppError::ServiceUnavailable("AGY 管理响应未完整接收".into()))?
+    {
+        if bytes.len() + chunk.len() > 2 * 1024 * 1024 {
+            return Err(AppError::ServiceUnavailable("AGY 管理响应超限".into()));
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    serde_json::from_slice(&bytes)
+        .map_err(|_| AppError::ServiceUnavailable("AGY 管理响应格式无效".into()))
+}
+
 fn cookie(headers: &HeaderMap) -> &str {
     headers
         .get(header::COOKIE)
@@ -237,10 +314,24 @@ pub async fn native_capture(
     account_id: i64,
     attempt_id: &str,
 ) -> Result<serde_json::Value, AppError> {
+    read_native_capture(account_id, attempt_id, false).await
+}
+
+/// 按持久平台读取AGY快照。@param account_id 已确认账号。@param attempt_id 已确认尝试。@return 有界快照。
+pub async fn agy_capture(account_id: i64, attempt_id: &str) -> Result<Value, AppError> {
+    read_native_capture(account_id, attempt_id, true).await
+}
+
+async fn read_native_capture(
+    account_id: i64,
+    attempt_id: &str,
+    agy: bool,
+) -> Result<Value, AppError> {
     let (base, token, client) = config()?;
     let mut response = client
         .get(format!(
-            "{base}/internal/v3/native-captures/{account_id}/{attempt_id}"
+            "{base}/internal/v3/native-captures/{account_id}/{attempt_id}{}",
+            if agy { "?platform=antigravity" } else { "" }
         ))
         .bearer_auth(token)
         .timeout(STATUS_TIMEOUT)
@@ -273,10 +364,14 @@ pub async fn native_capture(
         .map_err(|_| AppError::ServiceUnavailable("采集文件格式无效".into()))?;
     if snapshot["account_id"] != account_id
         || snapshot["attempt_id"] != attempt_id
-        || !matches!(
-            snapshot["stage"].as_str(),
-            Some("cc_prepared" | "ingress_rejected")
-        )
+        || !(if agy {
+            snapshot["stage"] == "agy_prepared"
+        } else {
+            matches!(
+                snapshot["stage"].as_str(),
+                Some("cc_prepared" | "ingress_rejected")
+            )
+        })
     {
         return Err(AppError::ServiceUnavailable("采集文件归属无效".into()));
     }

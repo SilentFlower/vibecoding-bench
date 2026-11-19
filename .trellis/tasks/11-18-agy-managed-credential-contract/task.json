@@ -1,0 +1,44 @@
+{
+  "id": "agy-managed-credential-contract",
+  "name": "agy-managed-credential-contract",
+  "title": "AGY 受管凭据与原生更新合同验证",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "gateway",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-18",
+  "completedAt": "2026-11-18",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-18T05:17:21Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-18-multi-platform-account-runtime",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "AGY 1.5.9 原生凭据研究与统一接入合同完成",
+      "CHK-001、CHK-002、FBK-001 修复并通过全面重检",
+      "部署目录全量 220 项通过，CC 所有权 13 项证据有效",
+      "AGY 研究规范与索引更新完成并校验通过",
+      "凭据验证器、回归修复和规范已交付远端分支"
+    ],
+    "partialStep": null,
+    "nextStep": "按统一接入合同推进多平台账号及凭据生命周期子任务规划",
+    "notes": "真实模型预算预留 8/8。原生认证恢复、SSE 首包后换代、工具跨 AT 实际到期等后续门槛保留在 research/credential-contract.md。",
+    "updatedAt": "2026-11-18T05:17:21Z"
+  }
+}

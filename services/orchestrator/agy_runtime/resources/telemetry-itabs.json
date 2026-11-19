@@ -1,0 +1,26 @@
+[
+  {
+    "itab": "0xcb24118",
+    "concrete": "telemetryinterface.CompositeTelemetryClient",
+    "element_type": "0xc6fe878",
+    "interface": "trajectorystore.StepTelemetryRecorder"
+  },
+  {
+    "itab": "0xcb9bc40",
+    "concrete": "telemetryinterface.CompositeTelemetryClient",
+    "element_type": "0xc6fe878",
+    "interface": "sharedenv.ProductTelemetry"
+  },
+  {
+    "itab": "0xcba83d8",
+    "concrete": "telemetry.Client",
+    "element_type": "0xc6032d0",
+    "interface": "telemetryinterface.Client"
+  },
+  {
+    "itab": "0xcba8588",
+    "concrete": "telemetryinterface.CompositeTelemetryClient",
+    "element_type": "0xc6fe878",
+    "interface": "telemetryinterface.Client"
+  }
+]

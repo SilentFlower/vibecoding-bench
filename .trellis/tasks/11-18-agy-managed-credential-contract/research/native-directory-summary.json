@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "evidence": "native_oauth",
+  "scope": "model_directory",
+  "source_sha256": "39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43",
+  "model_submissions": 0,
+  "cases": [
+    {
+      "status": "completed",
+      "exit_code": 0,
+      "stdout_bytes": 838,
+      "stderr_bytes": 29,
+      "model_names_present": true,
+      "auth_error_present": false,
+      "mode": "missing",
+      "refresh_present": false,
+      "access_unchanged": true,
+      "passed": true
+    },
+    {
+      "status": "completed",
+      "exit_code": 0,
+      "stdout_bytes": 838,
+      "stderr_bytes": 29,
+      "model_names_present": true,
+      "auth_error_present": false,
+      "mode": "empty",
+      "refresh_present": false,
+      "access_unchanged": true,
+      "passed": true
+    },
+    {
+      "status": "completed",
+      "exit_code": 1,
+      "stdout_bytes": 0,
+      "stderr_bytes": 299,
+      "model_names_present": false,
+      "auth_error_present": true,
+      "mode": "invalid-access",
+      "refresh_present": false,
+      "access_unchanged": true,
+      "passed": true
+    }
+  ],
+  "original_restored": true,
+  "phase": "completed",
+  "passed": true,
+  "pending": [
+    "原生模型文本与SSE",
+    "常驻进程实际换代",
+    "工具回填与遥测排空"
+  ],
+  "manager": {
+    "status": "completed",
+    "exit_code": 0,
+    "stdout_bytes": 838,
+    "stderr_bytes": 29,
+    "model_names_present": true,
+    "auth_error_present": false,
+    "access_changed": false
+  }
+}

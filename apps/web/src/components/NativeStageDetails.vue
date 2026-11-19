@@ -5,9 +5,9 @@ import type { NativeCapture, NativeCaptureStage } from '../api';
 
 const props = defineProps<{ snapshot: NonNullable<NativeCapture['snapshot']> }>();
 const action = ref('all');
-const rawStage = ref<'ingress' | 'cc_prepared' | 'wire_final'>(props.snapshot.stage === 'ingress_rejected' ? 'ingress' : props.snapshot.wire_final ? 'wire_final' : 'cc_prepared');
+const rawStage = ref<'ingress' | 'decoded_gemini' | 'cc_prepared' | 'wire_final'>(props.snapshot.stage === 'ingress_rejected' ? 'ingress' : props.snapshot.wire_final ? 'wire_final' : 'cc_prepared');
 const decisions = computed(() => (props.snapshot.header_policy?.decisions ?? []).filter(item => action.value === 'all' || item.action === action.value));
-const preview = computed(() => rawStage.value === 'ingress' ? props.snapshot.ingress : rawStage.value === 'wire_final' ? props.snapshot.wire_final : props.snapshot.stage === 'ingress_rejected' ? undefined : props.snapshot);
+const preview = computed(() => rawStage.value === 'ingress' ? props.snapshot.ingress : rawStage.value === 'decoded_gemini' ? props.snapshot.decoded_gemini : rawStage.value === 'wire_final' ? props.snapshot.wire_final : props.snapshot.stage === 'ingress_rejected' ? undefined : props.snapshot);
 const finalReason = computed(() => {
   const reason = props.snapshot.wire_final?.reason;
   if (!reason) return '';
@@ -31,7 +31,8 @@ function actionLabel(value: string): string {
 
 /** 展示阶段及证据完整性。@param value 持久状态或阶段。@return 中文标签。 */
 function label(value: string): string {
-  return ({ ingress: '入口原文', header_policy: '头部处理', cc_prepared: '原生组装后', wire_final: '最终TLS写出', complete: '完整', truncated: '已截断', unavailable: '未采集', failed: '采集失败', incomplete: '采集不完整' } as Record<string, string>)[value] ?? value;
+  if(value==='cc_prepared' && props.snapshot.stage==='agy_prepared')return 'AGY原生提交';
+  return ({ decoded_gemini: '已解码Gemini', agy_prepared:'AGY原生提交', ingress: '入口原文', header_policy: '头部处理', cc_prepared: '原生组装后', wire_final: '最终TLS写出', complete: '完整', truncated: '已截断', unavailable: '未采集', failed: '采集失败', incomplete: '采集不完整' } as Record<string, string>)[value] ?? value;
 }
 
 /** 只格式化完整JSON，截断预览保持原始表示。@return 脱敏展示文本。 */
@@ -77,7 +78,7 @@ function bodyText(): string {
         <p v-if="snapshot.final_body_changes.status === 'complete' && !snapshot.final_body_changes.items.length" class="text-muted-foreground">同次观察到的JSON字段保持一致。</p>
       </div>
     </div></details>
-    <section class="request-section"><div class="request-section-head"><h3>脱敏原文</h3><div class="request-stage-tabs" role="group" aria-label="原文阶段"><button v-for="stage in (['ingress','cc_prepared','wire_final'] as const)" :key="stage" type="button" :class="{active:rawStage===stage}" :aria-pressed="rawStage===stage" @click="rawStage=stage">{{ label(stage) }}</button></div></div>
+    <section class="request-section"><div class="request-section-head"><h3>脱敏原文</h3><div class="request-stage-tabs" role="group" aria-label="原文阶段"><button v-for="stage in (snapshot.stage==='agy_prepared' ? (['ingress','decoded_gemini','cc_prepared','wire_final'] as const) : (['ingress','cc_prepared','wire_final'] as const))" :key="stage" type="button" :class="{active:rawStage===stage}" :aria-pressed="rawStage===stage" @click="rawStage=stage">{{ label(stage) }}</button></div></div>
       <template v-if="preview"><p class="form-help request-evidence-hash">原正文 {{ preview.original_body_bytes ?? '未观测' }} 字节 · SHA256 {{ preview.original_body_sha256 ?? '未观测' }}</p><p v-if="preview.body_truncated || preview.headers_truncated" role="status" class="form-help">内容已截断。正文：{{ preview.body_truncated ? '已截断' : '完整' }}，请求头：{{ preview.headers_truncated ? '已截断' : '完整' }}。</p><details open class="request-code-block"><summary>请求头</summary><pre>{{ preview.headers.map(([name,value])=>name+': '+value).join('\n') }}</pre></details><details open class="request-code-block"><summary>请求正文</summary><pre>{{ bodyText() }}</pre></details></template><div v-else class="request-empty-capture"><strong>本次未保存所选阶段的原文</strong><p>组装中间值与最终 TLS 观测分别展示。</p></div>
     </section>
   </div>

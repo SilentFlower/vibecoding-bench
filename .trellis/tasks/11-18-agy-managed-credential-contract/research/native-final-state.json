@@ -1,0 +1,118 @@
+{
+  "exits": {
+    "rpc-efd57b8bd309": {
+      "native_exits": [
+        {
+          "code": 0,
+          "signal": 0
+        }
+      ]
+    },
+    "rpc-cc2b923cf193": {
+      "native_exits": [
+        {
+          "code": 0,
+          "signal": 0
+        }
+      ]
+    },
+    "rpc-433c2d4d76b1": {
+      "native_exits": []
+    }
+  },
+  "faults": [
+    {
+      "evidence": "native_oauth",
+      "scope": "native_credential_faults",
+      "model_submissions": 0,
+      "cases": [
+        {
+          "mode": "expired",
+          "exit_code": 1,
+          "model_names_present": false,
+          "expired_token_error": false,
+          "missing_refresh_error": false,
+          "json_error": false
+        },
+        {
+          "mode": "missing-expiry",
+          "exit_code": 0,
+          "model_names_present": true,
+          "expired_token_error": false,
+          "missing_refresh_error": false,
+          "json_error": false
+        },
+        {
+          "mode": "bad-json",
+          "exit_code": 1,
+          "model_names_present": false,
+          "expired_token_error": false,
+          "missing_refresh_error": false,
+          "json_error": false
+        },
+        {
+          "mode": "identity-label",
+          "exit_code": 0,
+          "model_names_present": true,
+          "expired_token_error": false,
+          "missing_refresh_error": false,
+          "json_error": false
+        }
+      ],
+      "user_status_http_status": 200,
+      "user_status_fields": [
+        "userStatus"
+      ],
+      "nested_status_fields": {
+        "userStatus": [
+          "disableTelemetry",
+          "name",
+          "email",
+          "planStatus",
+          "cascadeModelConfigData",
+          "acceptedLatestTermsOfService",
+          "userTier",
+          "profilePictureUrl"
+        ]
+      }
+    }
+  ],
+  "budget": {
+    "limit": 8,
+    "reserved": 8,
+    "experiments": [
+      {
+        "experiment": "rpc-191c8459a0fe",
+        "reserved": 1
+      },
+      {
+        "experiment": "rpc-00b57e0c8ed8",
+        "reserved": 1
+      },
+      {
+        "experiment": "rpc-433c2d4d76b1",
+        "reserved": 1,
+        "initial_reserved": 2,
+        "verified_model_calls": 1
+      },
+      {
+        "experiment": "rpc-efd57b8bd309",
+        "reserved": 2
+      },
+      {
+        "experiment": "rpc-cc2b923cf193",
+        "reserved": 1
+      }
+    ],
+    "uncertain_attempt_reservation": 2,
+    "completed_case_releases": [
+      {
+        "experiment": "rpc-433c2d4d76b1",
+        "released": 1,
+        "basis": "native_model_start_1_planner_1_http_200"
+      }
+    ]
+  },
+  "test_running": true,
+  "experiment_containers": []
+}

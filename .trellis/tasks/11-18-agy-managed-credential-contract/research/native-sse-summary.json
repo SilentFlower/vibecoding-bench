@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "evidence": "native_oauth",
+  "scope": "native_scanner_sse_blocks",
+  "experiment": "rpc-cc2b923cf193",
+  "model_starts": 1,
+  "frames": [
+    {
+      "bytes": 328,
+      "sha256": "aca01e8ee8d2b817d750853b8638fe67824fdd8aea2920874c92a1aece8a99a4",
+      "caller_offset": 157326170,
+      "source": "codeassist_to_stream_response_chunk",
+      "event_names": [],
+      "data_lines": 1,
+      "root_fields": [
+        "response",
+        "traceId",
+        "metadata"
+      ],
+      "candidate_frame": true,
+      "usage_fields": [
+        "promptTokenCount",
+        "candidatesTokenCount",
+        "totalTokenCount"
+      ]
+    },
+    {
+      "bytes": 551,
+      "sha256": "462461a1d563611151dc790f85e8b3d67720fe74ad868f61cb81b720c291f916",
+      "caller_offset": 157326170,
+      "source": "codeassist_to_stream_response_chunk",
+      "event_names": [],
+      "data_lines": 1,
+      "root_fields": [
+        "response",
+        "traceId",
+        "metadata"
+      ],
+      "candidate_frame": true,
+      "usage_fields": [
+        "promptTokenCount",
+        "candidatesTokenCount",
+        "totalTokenCount"
+      ],
+      "finish_reasons": [
+        "STOP"
+      ]
+    }
+  ],
+  "expected_marker_observed": true,
+  "lifecycle": {
+    "observer_exit_code": 0,
+    "events_closed": true,
+    "drain": {
+      "state": "business_queues_empty",
+      "clients": 3,
+      "layers": 1
+    }
+  },
+  "native_exits": [
+    {
+      "code": 0,
+      "signal": 0
+    }
+  ]
+}

@@ -53,7 +53,7 @@ class NodeLoginDraftSchemaTests(unittest.TestCase):
 
     def test_version_four_preserves_old_markers_null_environment_and_old_program_writes(self) -> None:
         """追加第四步后原NULL环境和前三步身份保持，旧程序继续兼容账号写入。:return: None。"""
-        result=apply_migrations(self.connection)
+        result=apply_migrations(self.connection,target=4)
         self.assertEqual(4,result['current_version'])
         self.assertEqual(self.markers,[tuple(row) for row in self.connection.execute(
             'SELECT * FROM system_schema_migrations WHERE version<=3 ORDER BY version')])
@@ -66,7 +66,7 @@ class NodeLoginDraftSchemaTests(unittest.TestCase):
         self.assertEqual('local',self.connection.execute('SELECT n.node_key FROM account_node_assignments b '
             'JOIN cluster_nodes n ON n.id=b.node_id').fetchone()[0])
         current=[tuple(row) for row in self.connection.execute('SELECT * FROM system_schema_migrations ORDER BY version')]
-        apply_migrations(self.connection)
+        apply_migrations(self.connection,target=4)
         self.assertEqual(current,[tuple(row) for row in self.connection.execute('SELECT * FROM system_schema_migrations ORDER BY version')])
 
     def test_null_draft_scope_unique_operations_and_real_saved_account_reference(self) -> None:
@@ -115,7 +115,7 @@ class NodeLoginDraftSchemaTests(unittest.TestCase):
             raise RuntimeError('合成第四步DDL中断')
         runners['bench.node-login-drafts.4']=(fail,lambda:self.registry['steps'][3]['checksum'])
         with self.assertRaisesRegex(RuntimeError,'DDL中断'):
-            apply_migrations(self.connection,runners=runners)
+            apply_migrations(self.connection,target=4,runners=runners)
         self.assertIsNone(self.connection.execute("SELECT name FROM sqlite_master WHERE name='node_login_drafts'").fetchone())
         self.assertEqual(self.markers,[tuple(row) for row in self.connection.execute('SELECT * FROM system_schema_migrations ORDER BY version')])
         self.assertEqual(3,migration_plan(self.connection)['current_version'])

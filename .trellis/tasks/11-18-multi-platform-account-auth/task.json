@@ -1,0 +1,45 @@
+{
+  "id": "multi-platform-account-auth",
+  "name": "multi-platform-account-auth",
+  "title": "多平台账号管理与统一凭据生命周期",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "gateway",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-18",
+  "completedAt": "2026-11-18",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-18T07:42:29Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-18-multi-platform-account-runtime",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "在现有账号、授权与凭据链路接入AGY平台，保持CC兼容",
+      "完成追加迁移、平台隔离、原生OOB授权适配、凭据唯一所有者和按账号同形体开关",
+      "修复账号筛选布局与组合交互，完成四项Check-All修复及重检",
+      "Rust完整957项通过，驱动18项、存储5项、PG/HTTP/浏览器专项及部署独立复验通过",
+      "固定原版启动、真实授权链接与取消验证通过，模型提交0",
+      "同步可执行规范并完成业务提交与推送"
+    ],
+    "partialStep": null,
+    "nextStep": "交接AGY运行环境子任务；真实Google登录、身份与刷新由后续运行环境任务或发布执行方在授权测试账号条件下补验",
+    "notes": "用户明确取消本轮人工验收前置。真实Google登录、身份和刷新保持未验证，登记为外部系统上线后验证，模型提交预算0。部署超时项与编排行尾夹具项的原始记录和独立通过证据保留。",
+    "updatedAt": "2026-11-18T07:42:29Z"
+  }
+}

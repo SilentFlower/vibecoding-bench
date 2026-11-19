@@ -1,0 +1,49 @@
+{
+  "id": "multi-platform-account-runtime",
+  "name": "multi-platform-account-runtime",
+  "title": "Flower2API 多平台账号、运行环境与请求记录改造",
+  "description": "接入 AGY 原生 OAuth 与 Google 直连，统一多平台账号、受管凭据、运行环境和请求记录，保持既有 UI 与交互。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-18",
+  "completedAt": "2026-11-18",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-18T13:53:51Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "11-18-agy-managed-credential-contract",
+    "11-18-multi-platform-account-auth",
+    "11-18-agy-account-runtime",
+    "11-18-multi-platform-request-records",
+    "11-18-agy-system-prompt-homoglyph"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "本轮恢复父任务工程总验收与收尾。五子任务均completed/closed。AC01—AC09的真实供应商部分单列上线后待验；当前真实外部模型调用预算0。",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "五子任务完成态、Close及提交归属核对",
+      "AC01—AC10工程验收矩阵与23批证据复核",
+      "EXT01—EXT07真实供应商及发布验收交接",
+      "父任务工程Check-All通过，Spec评估no-op"
+    ],
+    "partialStep": null,
+    "nextStep": "按独立授权、测试账号和预算开展真实供应商及发布验收",
+    "notes": "父任务完成态表示本轮工程交付闭环。原AC真实供应商部分沿EXT01—EXT07保留待验。既有python-dateutil种子摘要错误单列。真实外部模型调用预算0。",
+    "updatedAt": "2026-11-18T13:53:51.864940+00:00"
+  }
+}

@@ -108,6 +108,8 @@ impl Fixture {
     /// @return 已入库账号。
     async fn account(&self, name: &str) -> Account {
         let mut account = Account {
+            platform: "claude_code".into(),
+            agy_system_prompt_homoglyph_enabled: false,
             id: 0,
             name: name.into(),
             email: format!("{}@example.invalid", Uuid::new_v4()),

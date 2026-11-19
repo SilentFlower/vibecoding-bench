@@ -152,6 +152,7 @@ python3 deploy/flower2api/upgrade_system_updater.py --policy <原策略> --servi
 system_schema_migrations(migration_id TEXT PRIMARY KEY, version INTEGER NOT NULL UNIQUE,
   checksum TEXT NOT NULL, applied_at TEXT NOT NULL, operation_id TEXT NOT NULL)
 system_release.migration_registries(root: Path) -> dict
+system_release.BENCH_SCHEMA_SOURCES: dict[str, str]
 system_release.GATEWAY_SCHEMA_SOURCES: dict[str, str]
 ```
 
@@ -161,8 +162,10 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 - 两库登记为 `{schema_version:1,database,steps}`；每步固定 `id,version,predecessor,checksum,engine,kind,rollback_mode`，要求连续前驱、`engine=sqlite`、`kind=schema|data`、`rollback_mode=compatible`。冻结各自`baseline.1`，当前登记以源码版本链为准。增加版本需同时实现对应执行分支及演练。
 - 合同为按 key 排序、紧凑 UTF-8 JSON 登记的 SHA256。Python 冻结定义使用忽略文档/注释的 AST 摘要，Rust 使用测试段之前的纯定义原字节摘要。冻结 SQL、默认值、历史画像及命名空间依赖归纯迁移模块所有，普通业务查询和页面改动保持合同。
-- 发布校验与DDL扫描共用步骤ID到精确源路径的映射：gateway.baseline.1→database_schema.rs、gateway.proxies.2→proxy_schema.rs、gateway.proxy-sync.3→proxy_sync_schema.rs、gateway.session-policy-blocks.4→session_policy_block_schema.rs，均位于网关src/store。仅当前登记中的对应路径拥有DDL定义；同名业务文件不豁免。每个网关步骤都核对源码摘要，未知步骤、缺失来源和摘要漂移在签发前拒绝。
-- bench映射为`bench.baseline.1→database_schema.py`、`bench.cluster.2→cluster_schema.py`、`bench.node-executions.3→node_execution_schema.py`、`bench.node-login-drafts.4→node_login_draft_schema.py`，均位于编排服务根。`system_release.BENCH_SCHEMA_SOURCES`与定义扫描共用该来源，每个已登记步骤均核对摘要；集群离线备份/换批沿[账号环境共同合同](../../orchestrator/backend/account-runtime-v3.md)及`deploy/flower2api/CLUSTER.md`。
+- 发布校验与DDL扫描共用步骤ID到精确源路径的映射：gateway.baseline.1→database_schema.rs、gateway.proxies.2→proxy_schema.rs、gateway.proxy-sync.3→proxy_sync_schema.rs、gateway.session-policy-blocks.4→session_policy_block_schema.rs、gateway.account-platforms.5→account_platform_schema.rs、gateway.request-records.6→request_records_schema.rs，均位于网关src/store。仅当前登记中的对应路径拥有DDL定义；同名业务文件不豁免。每个网关步骤都核对源码摘要，未知步骤、缺失来源和摘要漂移在签发前拒绝。
+- bench映射为`bench.baseline.1→database_schema.py`、`bench.cluster.2→cluster_schema.py`、`bench.node-executions.3→node_execution_schema.py`、`bench.node-login-drafts.4→node_login_draft_schema.py`、`bench.agy-environments.5→agy_environment_schema.py`，均位于编排服务根。`system_release.BENCH_SCHEMA_SOURCES`与定义扫描共用该唯一来源表，每个已登记步骤均核对摘要；集群离线备份/换批沿[账号环境共同合同](../../orchestrator/backend/account-runtime-v3.md)及`deploy/flower2api/CLUSTER.md`。
+- AGY与集群共存时保留已发布bench1—4的身份与摘要，AGY环境增量位于版本5。旧开发分支`bench.agy-environments.2`与正式版本2存在身份分叉，继续在写入前受控拒绝；不得自动覆盖原台账。
+- 固定宿主源码包须在仓库外以`python -I`导入`manage/system_updater/system_release`。`install_system_updater.SOURCE_FILES`包含迁移执行器的全部纯定义依赖，AGY环境步骤对应`orchestrator/agy_environment_schema.py`；开发树的PYTHONPATH不能补足交付包漏项。
 - 临时迁移磁盘清单定义限`services/orchestrator/cluster_archive_schema.py`纯模块，由定义扫描核验；它在每次迁移私有临时目录建立和删除，不进入bench业务版本链。同名业务文件及业务模块中的DDL继续拒绝。
 - 自哈希Rust模块使用 `concat!("#[cfg(", "test)]")` 构造测试分隔标记，保证迁移执行和结构校验也进入摘要。源码内直接写完整分隔字符串会使字节切分提前停止。首次发布前修正新增定义需同步登记摘要；已发布步骤继续冻结。
 - CLI 返回 `database,contract,current_version,target_version,steps,state,reason`；执行完成保留原台账 operation_id。已知台账摘要冲突或版本断链拒绝；旧程序读取兼容新增版本返回 `compatible_newer`。
@@ -183,6 +186,7 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 | --- | --- |
 | 缺稳定核心字段、已登记库缺必要字段、类型/主键异常 | CLI 非零，拒绝登记成功 |
 | 重复 ID、前驱断链、校验和改变、未登记结构定义 | 构建或维护验证失败 |
+| 旧开发AGY版本2与正式集群版本2身份分叉 | 迁移CLI非零，保留原数据及原台账 |
 | 迁移步骤无对应源码、来源缺失、同名文件冒充所有者、增量定义依赖业务模块 | 来源或所有权校验失败，禁止签发 |
 | 同合同仅历史许可列表变化 | 允许常规兼容安装 |
 | v2 附件、来源清单或实际镜像证据不符 | 阻止准备/安装及兼容发布 |
@@ -206,11 +210,14 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 
 错误用法：只复制基线源码的夹具通过后，直接把新迁移加入发行；或仅按文件名跳过DDL扫描。正确处理：真实仓库执行所有权检查，夹具覆盖全部已登记定义，并同时验证来源路径、纯定义及每步摘要。
 
+错误用法：合并AGY时覆盖已发布的`bench.cluster.2`，或重复赋值迁移来源表。正确处理：保持集群1—4并追加`bench.agy-environments.5`，所有步骤进入同一来源映射；旧开发分支台账保持受控拒绝。
+
 ### 6. Tests Required
 
 - `verify_database_definitions.py`：DDL 所有权和冻结摘要；业务模块 DDL、触发器/视图及纯定义外部依赖必须被拒绝。
 - `test_database_definitions.py`：真实仓库入口通过；修改任一增量文件的后续DDL使扫描验收及data_contracts都失败；同名文件、业务依赖、未知步骤和缺失来源分别拒绝。历史发行已经登记的步骤须与发布附件逐字段一致。
 - 两库迁移测试：空库、旧库、重复执行、台账冲突、兼容新增；缺列/类型/主键异常拒绝登记。Python 增量事务失败保持数据与台账。
+- AGY集成回归覆盖bench4→5和gateway4→6、原账号/节点归属与历史台账保持、旧程序读写、重跑幂等及AGY开发版本2整库不变的受控拒绝。`test_system_workflow.test_frozen_updater_can_import_build_helpers`复制实际SOURCE_FILES并在仓库外导入全部三个助手，防止纯迁移模块漏包。
 - `test_system_database.py`、`test_system_migrations.py`：WAL、空间、损坏/外来快照、部分复制/替换恢复、保留轮换、同合同准入及开放后的数据保护。
 - `test_system_upgrade.py`：来源/服务归属、失败恢复、源码/策略/状态替换真实进程终止、按 UUID 预览、恢复再次中断、重复恢复及后来状态保护。
 - `verify_database_compatibility.py`：真实旧库→候选→原程序读写、重复迁移及快照恢复；结果绑定精确镜像及合同。默认环境独立入口必须工作。

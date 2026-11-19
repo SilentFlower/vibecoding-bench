@@ -1,0 +1,120 @@
+{
+  "executorConfig": {
+    "maxGeneratorInvocations": 1,
+    "disableEmptyOutputContinuation": true
+  },
+  "plannerConfig": {
+    "planModel": "MODEL_PLACEHOLDER_M36",
+    "retryConfig": {
+      "apiRetry": {
+        "maxRetries": 0
+      }
+    },
+    "customizationConfig": {
+      "mcpServers": [],
+      "skipToolNamePrefix": true,
+      "skipToolDescriptionPrefix": true
+    },
+    "toolConfig": {
+      "mcp": {
+        "forceDisable": false,
+        "enableLazyLoad": false,
+        "nonBlockingTurnLoad": false
+      },
+      "descriptionOverrideMap": {
+        "toolOverrides": {
+          "phase7_external_tool": {
+            "argumentValueOverrides": {
+              "toolSummary": {
+                "omit": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "declarativeMixinConfig": {
+      "providers": [],
+      "tools": [],
+      "promptSections": [
+        {
+          "custom": {
+            "content": "PHASE8_SYSTEM"
+          }
+        }
+      ],
+      "forceDisableFundamentalComponents": true,
+      "preInvocationHooks": [
+        {
+          "name": "message_delivery",
+          "builtin": true
+        },
+        {
+          "name": "battle_mode_max_turns",
+          "builtin": true
+        },
+        {
+          "name": "context_summary",
+          "builtin": true
+        }
+      ],
+      "postInvocationHooks": [
+        {
+          "name": "chain_check",
+          "builtin": true
+        },
+        {
+          "name": "message_continue_check",
+          "builtin": true
+        },
+        {
+          "name": "no_tool_call_check",
+          "builtin": true
+        },
+        {
+          "name": "max_generator_invocations_check",
+          "builtin": true
+        }
+      ],
+      "preToolHooks": [
+        {
+          "name": "battle_mode_tool_args",
+          "builtin": true
+        },
+        {
+          "name": "command_assessor",
+          "builtin": true
+        },
+        {
+          "name": "auto_run_safety_gate",
+          "builtin": true
+        },
+        {
+          "name": "citc_top_level_write_guard",
+          "builtin": true
+        }
+      ],
+      "postToolHooks": [
+        {
+          "name": "stained_creds_guidance",
+          "builtin": true
+        },
+        {
+          "name": "command_assessor",
+          "builtin": true
+        }
+      ],
+      "toolDecorators": [
+        {
+          "name": "output_truncation",
+          "builtin": true
+        }
+      ]
+    }
+  },
+  "trajectoryConversionConfig": {
+    "useRawUserMessage": true,
+    "ignoreUserInputTimestamp": true,
+    "disableStepId": true
+  }
+}

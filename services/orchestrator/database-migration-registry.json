@@ -37,6 +37,15 @@
       "predecessor": 3,
       "rollback_mode": "compatible",
       "version": 4
+    },
+    {
+      "checksum": "e3b0ff0d39d39dd55e8d362328ee088ebbb15c2f2e0a2779b04fb669dc2f4f76",
+      "engine": "sqlite",
+      "id": "bench.agy-environments.5",
+      "kind": "schema",
+      "predecessor": 4,
+      "rollback_mode": "compatible",
+      "version": 5
     }
   ]
 }

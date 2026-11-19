@@ -1,0 +1,43 @@
+{
+  "id": "agy-system-prompt-homoglyph",
+  "name": "agy-system-prompt-homoglyph",
+  "title": "AGY 系统提示词同形体替换与记录",
+  "description": "参考 new-api 固定同形字映射，为 AGY 增加默认关闭的系统提示词替换，验证文本边界、幂等性、真实出站及请求记录。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "orchestrator",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-18",
+  "completedAt": "2026-11-18",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-18T10:58:48Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-18-multi-platform-account-runtime",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "完成按账号冻结的系统文本策略、固定映射、实际处理回执与视图来源",
+      "完成Rust、定向Python、部署、浏览器及断网原生TLS验证",
+      "完成Check-All和权威账号运行合同更新",
+      "业务交付已推送"
+    ],
+    "partialStep": null,
+    "nextStep": "推进多平台请求记录任务",
+    "notes": "真实外部模型调用为0；真实Google分词、缓存和计费留待授权账号及独立预算验收。编排全量回归保留既有python-dateutil资源摘要错误，HEAD隔离证据一致。",
+    "updatedAt": "2026-11-18T10:58:48Z"
+  }
+}

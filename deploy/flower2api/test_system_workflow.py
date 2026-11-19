@@ -139,7 +139,7 @@ class WorkflowTests(unittest.TestCase):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(source_path(ROOT, name), target)
             result = subprocess.run([sys.executable, '-I', '-c',
-                'import sys; sys.path.insert(0, sys.argv[1]); import manage, system_updater',
+                'import sys; sys.path.insert(0, sys.argv[1]); import manage, system_updater, system_release',
                 str(root / 'deploy/v3')], cwd=root, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
 

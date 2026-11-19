@@ -1,0 +1,15 @@
+{
+  "purpose": "规划时只读源码身份，非正式运行制品清单",
+  "root": "/root/.local/state/agy-deployment/preserved/package",
+  "files": {
+    "kernel.py": "5b0b2c17bb1baa7149ead9acfac0c047fe925f44d9b789b32a290d4d67e9fe22",
+    "contract.py": "04a4e87bf98cb21ec013cd53a085dfe93e7b6f896ff5647fd2b92dd42a90a6a7",
+    "gemini_contract.py": "0429ba981a63fddafacb23002060c6b68fb856ae59a632921dbd32aa6357ce23",
+    "gemini_frames.py": "c5d5e71f26197b8bffebc59123d0956dddbf93e996f8f022971d47116452fe92",
+    "native_bridge.py": "22e8a3d64c434315ca365c8459406b3ab6fee4371241c271c0d6cd2428e56513",
+    "image_pool.py": "341659e71f27f7a602dc020be7f8493684e77f6f8b254626f139717a8e0c2ff9",
+    "storage.py": "67e444d0daaa046f29b506e0be9d9dd6268f81fc80dd7b717fc621b82f5c77d6",
+    "tool_broker.py": "29b4ea62c067465425592c5bc9d0c077a566421bb4897fba5b1078092dc0bd62",
+    "stream_controller.py": "afe124c3d60d3064d101fc0fd7970ad99727edfc391f019a4530841a2e312e75"
+  }
+}
