@@ -38,3 +38,7 @@ Python使用/root/project/vibecoding-bench/.venv/bin/python；PYTHONPATH=service
 
 - 根因修复提交4b4266da已推送；运行44475828322在host测试导入阶段失败。sudo清除PYTHONPATH后，新测试先导入agy_auth，尚未设置编排源码路径；镜像步骤保持未执行。
 - 本地预设PYTHONPATH的验证未覆盖该入口。后续按源码布局合同初始化测试导入路径，并通过原三组正式入口验证。AC3、AC4及任务保持进行中。
+
+- 导入增量已沿既有source_path模式修复。清除PYTHONPATH后的独立探针测试7项通过；原verify_release_tests.py三组实际入口全部通过：host143项（跳过1项）、orchestrator25项、publication86项。正式新源码CI待精确推送后核对。
+
+- 导入修复c462479a的正式运行44476665812通过合同、处理产物、两个镜像构建及两代prepared/job_finalized；正常退出在15秒物理观察窗口失败。现场supervisor/kernel/observer/native仍存活，OOM为0。当前转向退出窗口与真实收尾流程，任务保持进行中。

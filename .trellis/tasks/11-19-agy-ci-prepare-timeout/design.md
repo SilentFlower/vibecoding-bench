@@ -39,3 +39,7 @@
 预算对照为源码挂载的受控夹具，正常/异常验证仍需最终镜像自身及正式CI。独立记录原45秒与对齐120秒的结果，保留各模式零模型和物理退出事实。
 
 现有发行校验入口同时接纳test_agy_supervisor、test_agy_artifact、test_agy_images，覆盖截止护栏、固定处理产物和镜像验收接线。原三组并行、宿主root及失败收口合同保持。
+
+## 宿主测试导入增量
+
+运行44475828322证实sudo宿主测试入口清除外部PYTHONPATH。新增探针测试沿现有test_system_platform_version模式，通过source_layout.source_path解析编排源码目录，在导入agy_auth及监督器前加入搜索路径。只调整测试导入；实际探针与镜像生命周期合同保持。先以未设置PYTHONPATH的独立发现命令验证，再执行verify_release_tests.py原三组入口。
