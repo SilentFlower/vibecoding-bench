@@ -85,6 +85,7 @@ class MigrationCoordinatorTests(unittest.TestCase):
         self.coordinator = MigrationCoordinator(service, runtime, self.gateway, lambda account: 'synthetic-quota', self.guard)
         self.request = MigrationStart(operation_id=self.operation, node_id=fixture.target, revision=1, version='2.1.293')
         self.commands = []
+        self.target_account_release = 'synthetic-release'
         self.fail_operation = None
         self.coordinator.io = Mock()
         self.coordinator.io.command.side_effect = self.command
@@ -139,7 +140,7 @@ class MigrationCoordinatorTests(unittest.TestCase):
                 'transfer_id': stage['transfer_id'], 'phase': 'prepared', 'assignment_revision': 2,
                 'environment': self.fixture.target_environment, 'sender_address': '172.28.0.4',
                 'binding': {'account_id': 7, 'environment_id': 'e' * 32, 'generation': 5,
-                    'secret': 's' * 64, 'release_id': 'synthetic-release'}}
+                    'secret': 's' * 64, 'release_id': self.target_account_release}}
         if operation == 'activate-import':
             return {'protocol': 1, **payload, 'phase': 'activated'}
         if operation == 'revoke-import':
@@ -174,6 +175,49 @@ class MigrationCoordinatorTests(unittest.TestCase):
         self.coordinator.begin(1, self.request)
         self.assertEqual('completed', self.coordinator.run(self.operation)['phase'])
         self.coordinator.service.prepare_node.assert_called_once_with(self.fixture.target, 1, automatic=True)
+
+    def test_reused_account_image_can_complete_migration_under_new_control(self) -> None:
+        """控制组件换批而账号镜像复用时，按账号来源核对并完成激活。:return: None。"""
+        self.coordinator.runtime.account_release_id = 'synthetic-account'
+        self.target_account_release = 'synthetic-account'
+        with patch.dict('os.environ', {'V3_UPDATE_GATE_DIR': str(self.root / 'gate')}):
+            self.coordinator.begin(1, self.request)
+            result = self.coordinator.run(self.operation)
+        self.assertEqual('completed', result['phase'])
+        self.assertEqual((self.fixture.target, 2, 'ready'),
+            (self.store.assignment(1)['node_id'], self.store.assignment(1)['revision'], self.store.assignment(1)['phase']))
+        self.assertEqual([], self.gateway.holders)
+        self.assertEqual(['fence', 'export', 'verify-import', 'prepare-import', 'activate-import'], [item[1] for item in self.commands])
+
+    def test_reused_account_image_resumes_old_rejected_receipt_without_reexport(self) -> None:
+        """旧校验留下待核对操作时，修复后沿原尝试完成迁移并释放原租约。:return: None。"""
+        self.coordinator.runtime.account_release_id = 'synthetic-account'
+        self.target_account_release = 'synthetic-account'
+        with patch.dict('os.environ', {'V3_UPDATE_GATE_DIR': str(self.root / 'gate')}):
+            self.coordinator.begin(1, self.request)
+            with patch.object(self.coordinator, '_prepared', side_effect=ValueError('合成旧控制端批次校验失败')):
+                with self.assertRaises(ValueError):
+                    self.coordinator.run(self.operation)
+            self.assertEqual('importing', self.coordinator.ledger.get(self.operation)['record']['last_confirmed_phase'])
+            self.assertEqual((1, 'reconcile'), (self.store.assignment(1)['node_id'], self.store.assignment(1)['phase']))
+            self.assertTrue(self.gateway.holders)
+            self.assertEqual('completed', self.coordinator.run(self.operation)['phase'])
+        for operation in ('fence', 'export', 'activate-import'):
+            self.assertEqual(1, [item[1] for item in self.commands].count(operation))
+        stages = [item[2]['stage'] for item in self.commands if item[1] == 'prepare-import']
+        self.assertEqual(stages[0], stages[1])
+        self.assertEqual([], self.gateway.holders)
+
+    def test_control_batch_cannot_replace_expected_account_batch(self) -> None:
+        """账号镜像复用时，仅与控制批次一致的绑定继续拒绝并保留源归属。:return: None。"""
+        self.coordinator.runtime.account_release_id = 'synthetic-account'
+        with patch.dict('os.environ', {'V3_UPDATE_GATE_DIR': str(self.root / 'gate')}):
+            self.coordinator.begin(1, self.request)
+            with self.assertRaisesRegex(ValueError, '发送器身份'):
+                self.coordinator.run(self.operation)
+        self.assertEqual((1, 'reconcile'), (self.store.assignment(1)['node_id'], self.store.assignment(1)['phase']))
+        self.assertTrue(self.gateway.holders)
+        self.assertNotIn('activate-import', [item[1] for item in self.commands])
 
     def test_node_display_and_authentication_changes_keep_original_data_location(self) -> None:
         """显示名和认证方式变化继续原操作，实际数据根变化仍须核对。:return: None。"""

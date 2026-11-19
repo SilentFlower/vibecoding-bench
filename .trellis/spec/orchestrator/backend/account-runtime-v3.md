@@ -1931,6 +1931,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 本机源核对原fenced标记和全部角色Running=false/Pid=0。SSH源核对同标记、实际角色ID集合及停止状态；已发布的目标核对原operation、node、account、environment、revision和source_generation及published/prepared标记。无目标目录时不得存在目标角色。凭据交接、中央执行及连接继续排空。暂停账号从组件重建名单排除，全部资料纳入完整备份，原租约和迁移游标保持。
 - 目标创建失败留下reconcile时，prepare_import仅凭原published标记与相同import_intent恢复。原登记角色必须均已停止、没有外来角色或实际作业；收口这些角色后恢复stopped并按原身份重建，HOME、profile和迁移尝试保持。
 - 已取消迁移的目标副本可随组件同步完整备份并保留：中央phase及last_confirmed_phase均为cancelled，target_revoked收据精确匹配操作、目标节点、账号、环境及source_revision+1；节点node-fence同范围且为fenced，node-migration-target和原操作revoked.json同范围且为revoked，目标标记source_generation匹配原记录。实际剩余角色须属于fence.stopped_containers及已登记角色类型，全部Running=false/Pid=0。核对通过后沿原同步日志继续；保留HOME、工程、标记、取消状态和中央归属。
+- 迁移prepare-import回执的binding.release_id按configured_release(runtime)核对账号镜像来源，组件健康继续核对runtime.release_id。启用更新底座时允许V3_ACCOUNT_RELEASE与V3_RELEASE不同；账号、环境、代次、绑定秘密及原操作范围继续核验。旧控制端批次误判留下的importing/reconcile沿原操作和transfer_id续接，保持单次源隔离/导出，成功激活后释放原租约。
 - 已保存CPU/机型画像随账号保留；目标硬件能力保持实际值。旧版仍使用各自的CPU和模板校验，跨代迁移后回退应选择包含该兼容能力的版本，或先按原迁移流程迁回旧版支持的节点。
 
 ### 4. Validation & Error Matrix
@@ -1944,11 +1945,13 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 | 外来holder、活动请求/导入、未知角色或标记不符 | 继续阻断维护 |
 | 目标本次创建失败且全部角色已停止 | 收口本次失败角色，继续同次迁移 |
 | 已取消迁移目标残留停止角色且双端撤销证明一致 | 自动识别历史副本，沿原同步完成备份和组件换批 |
+| 控制组件已更新且账号镜像沿用原批次 | 按配置账号批次接纳准备回执；仅匹配控制批次的错误绑定继续拒绝 |
 | 固定画像损坏/组件不符/位置变化/Docker创建失败 | system_profile/component_version/node_configuration/runtime_preparation固定公开原因 |
 
 ### 5. Scenarios and Examples
 
 - 正常：Naples画像迁入Cezanne或Turin节点，保留设备、机型、HOME及工程资料，目标实际flags及核心数按宿主渲染。
+- 正常：V3_RELEASE为新控制批次、V3_ACCOUNT_RELEASE为复用账号批次时，目标binding使用账号批次，完成原迁移并激活。错误：把binding改成控制批次来通过校验；正确处理：沿账号来源核对并续接原操作。
 - 边界：目标已有本次迁移的停止角色和发布目录；原迁移暂停后升级控制组件，完整备份并保留目标目录，随后继续原操作。
 - 边界：取消后目标仅剩停止的account-network，中央归属账号为0；核对原取消收据、目标撤销标记及实际停止登记后自动继续原同步。缺失撤销证明或额外角色须核对原操作，不能仅凭零账号计数或exited状态放行。
 - 错误用法：按租约TTL删除占用、把reconcile直接改ready，或删除画像重新随机。正确处理：核对原持久操作、双端实际停止和原代次，保留迁移关闭状态并继续原收口路径。
@@ -1959,5 +1962,6 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - test_cluster_migration_runner/migrations/nodes/synchronization：自动准备先于源隔离、名称/认证变更与位置保护、源停止镜像、未准备节点首次选择及自动纳管。
 - test_cluster_migration_maintenance/execution：真实SQLite原租约及过期/外来/活动矩阵、源隔离证明、SSH磁盘标记、失败角色恢复保留身份与资料；未知或运行角色保持阻断。
 - test_cluster_synchronization：取消目标残留停止网络角色时沿原job_id恢复并完成备份/换批，资料字节、取消状态和中央归属保持；中央收据、撤销文件、节点/账号/操作/分配/源代次错配及外来/运行/PID非零角色继续阻断；已完成迁移旧源仍核对原代次。
+- test_cluster_migration_runner：控制/账号不同批次完成归属CAS和激活；旧批次误判后的importing/reconcile复用原stage，源只隔离和导出一次；错误控制批次绑定保留源归属、reconcile及原租约。
 - verify_cluster_ui：未准备目标可选并可提交迁移，既有确认、未知结果、恢复及窄屏交互保持。
 - 隔离SSH/Docker验收：跨代画像完整迁移后读取目标实际CLI；暂停迁移目标完整备份/控制换批，原停止角色、标记、资料和中央游标保持。

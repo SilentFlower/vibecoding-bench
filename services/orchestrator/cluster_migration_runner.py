@@ -9,6 +9,7 @@ import threading
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 
+from account_update_identity import configured_release
 from cluster_archive import ArchiveIdentity
 from cluster_environment import EnvironmentFence
 from cluster_execution import ImportActivation, ImportPreparation, ImportRevocation, NodeInspection
@@ -365,10 +366,11 @@ class MigrationCoordinator:
             if binding is not None:
                 raise ValueError('独立迁移目标不能发布Gateway绑定')
             return
+        # 控制组件可独立换批；目标新建角色按受信配置的账号镜像发布来源核对。
         if (not isinstance(binding, dict) or actual.get('account_id') != account['id']
                 or actual.get('environment_id') != stage.archive.identity.environment_id or actual.get('name') != account['name']
                 or binding.get('account_id') != account['cc2api_account_id'] or binding.get('environment_id') != actual['environment_id']
-                or binding.get('generation') != actual.get('generation') or binding.get('release_id') != self.runtime.release_id
+                or binding.get('generation') != actual.get('generation') or binding.get('release_id') != configured_release(self.runtime)
                 or not isinstance(binding.get('secret'), str) or not 32 <= len(binding['secret']) <= 256):
             raise ValueError('迁移目标准备回执与原环境或发送器身份不一致')
         ipaddress.ip_address(peer.get('sender_address', ''))
