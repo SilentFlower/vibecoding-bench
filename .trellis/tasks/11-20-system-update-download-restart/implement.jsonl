@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/platform/deploy/index.md", "reason": "读取 platform-online-update.md 的「中央快速换版与节点独立更新」与「Flower2API 单部署名称切换与完整快照」。"}
+{"file": ".trellis/spec/orchestrator/backend/index.md", "reason": "读取 account-runtime-v3.md 的「独立接单与账号整体停用」及运行环境来源合同。"}
+{"file": ".trellis/spec/web/frontend/index.md", "reason": "读取 ui-guidelines.md 的系统更新页面和深层弹窗规则。"}
