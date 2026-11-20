@@ -24,7 +24,7 @@ from database_migrations import apply_migrations
 from cluster_environment import EnvironmentFence, fence_environment, restore_fenced_source
 from cluster_deployment import node_network_name
 from cluster_owner_state import validate_owner_preparation
-from cluster_archive import ArchiveIdentity
+from cluster_archive import AgyArchiveIdentity, ArchiveIdentity
 from cluster_migration_profiles import PROFILE_NAMES, ProfileReference, read_profile
 from cluster_migration_files import ArchiveExport, ImportStage, MigrationCliIdentity, MigrationFiles
 from cluster_verification import pending_run_programs
@@ -167,7 +167,7 @@ class ImportRevocation(BaseModel):
     model_config = ConfigDict(extra='forbid')
     node_key: StrictStr = Field(pattern=r'^(local|[a-f0-9]{32})$')
     target_revision: StrictInt = Field(ge=2)
-    identity: ArchiveIdentity
+    identity: AgyArchiveIdentity | ArchiveIdentity
 
 
 class NodeExecution:
@@ -516,6 +516,8 @@ class NodeExecution:
         if request.node_key != self.node_key or request.target_revision != request.identity.assignment_revision + 1:
             raise ValueError('目标撤销节点或分配版本不一致')
         identity = request.identity
+        if isinstance(identity, AgyArchiveIdentity):
+            raise ValueError('AGY 撤销必须使用平台专用操作')
         with self._locked(environment_id=identity.environment_id):
             files = MigrationFiles(self.data, self.node_key, self.deployment)
             operation = files._operation(identity, 'import')
@@ -591,6 +593,8 @@ class NodeExecution:
         :return: 私有目标环境和发送器绑定，归属切换由中央CAS提交。
         """
         stage, preparation = request.stage, request.preparation
+        if isinstance(stage.archive.identity, AgyArchiveIdentity):
+            raise ValueError('AGY 归档必须使用平台专用准备操作')
         if request.profile_references:
             if preparation.profile_files or set(request.profile_references) - set(PROFILE_NAMES):
                 raise ValueError('迁移profile引用范围无效')
@@ -684,11 +688,20 @@ class NodeExecution:
             fence = _read_json(root / 'runtime/node-fence.json')
         except FileNotFoundError:
             raise ValueError('目标环境包含其他操作资料，请先核对原隔离回执') from None
+        same_revoked = False
+        if (intent.get('platform') == 'antigravity' and isinstance(fence, dict)
+                and fence.get('assignment_revision') == intent['revision']
+                and isinstance(fence.get('operation_id'), str) and re.fullmatch('[a-f0-9]{32}', fence['operation_id'])):
+            tombstone = self.data / 'node-migrations' / fence['operation_id'] / 'revoked.json'
+            expected = {key: intent[key] for key in ('node_key', 'account_id', 'environment_id', 'revision')}
+            same_revoked = _read_json(tombstone) == {'protocol': 1, **expected,
+                'operation_id': fence['operation_id'], 'phase': 'revoked'}
         if (not isinstance(fence, dict) or fence.get('protocol') != 1 or fence.get('phase') != 'fenced'
                 or fence.get('node_key') != self.node_key or fence.get('environment_id') != intent['environment_id']
                 or fence.get('account_id') != intent['account_id'] or fence.get('operation_id') == intent['operation_id']
                 or not isinstance(fence.get('operation_id'), str) or not re.fullmatch('[a-f0-9]{32}', fence['operation_id'])
-                or type(fence.get('assignment_revision')) is not int or not 1 <= fence['assignment_revision'] < intent['revision']
+                or type(fence.get('assignment_revision')) is not int
+                or not (1 <= fence['assignment_revision'] < intent['revision'] or same_revoked)
                 or type(fence.get('generation')) is not int or fence['generation'] < 0
                 or not isinstance(fence.get('stopped_containers'), list)
                 or any(not isinstance(value, str) for value in fence['stopped_containers'])):

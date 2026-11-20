@@ -177,6 +177,13 @@ def catalog(runtime, row: dict) -> dict:
     return {'generation': row['generation'], 'kernel': current, 'candidates': candidates}
 
 
+def verify_candidate(root: Path, identifier: str) -> None:
+    """在源隔离或目标发布时校验选中候选的实际字节。@param root 环境根。@param identifier 候选摘要。@return 校验通过。"""
+    if not IDENTIFIER.fullmatch(identifier):
+        raise ValueError('AGY 内核制品标识无效')
+    _receipt(root / 'runtime/sender' / KERNEL_FOLDER / identifier, verify=True)
+
+
 def activate(runtime, row: dict, change: dict, running_sender) -> dict:
     """在环境锁和网关排空许可内热切换。@param runtime 运行时。@param row 最新环境记录。@param change 前端冻结选择。@param running_sender 当前发送器或空。@return 更新后的选择。"""
     if (set(change) != {'expected_generation', 'expected_kernel', 'kernel'}

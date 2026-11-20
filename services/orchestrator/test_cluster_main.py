@@ -60,7 +60,7 @@ class ClusterMainTests(unittest.TestCase):
         runner=Mock()
         runner.for_run.return_value={'node_id':3,'record':{'scope':{'node_key':'a'*32,
             'environment_id':'e'*32,'assignment_revision':2,'generation':5,'secret':'synthetic-private'}}}
-        runner.sessions.service.store.get.return_value={'name':'原执行节点','config_json':'synthetic-private'}
+        runner.sessions.service.store.history_identity.return_value={'name':'原执行节点','config_json':'synthetic-private'}
         with patch.object(main,'cluster_runner',runner):
             value=main._public_run_node('original-run')
         self.assertEqual({'id':3,'key':'a'*32,'name':'原执行节点','environment_id':'e'*32,

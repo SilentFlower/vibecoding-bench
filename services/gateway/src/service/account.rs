@@ -1102,6 +1102,7 @@ impl AccountService {
         if account.is_antigravity() {
             let (key, owner) = self.acquire_oauth_credential_lock(id).await?;
             let result = async {
+                self.require_agy_configuration_open(&account).await?;
                 if self.store.agy_credential_state(id).await?.phase != "ready" {
                     return Err(AppError::BadRequest("请先结束或核对原凭据操作".into()));
                 }
@@ -4712,6 +4713,63 @@ mod tests {
             credentials: None,
         };
         (store, settings, service, account, input)
+    }
+
+    /// AGY 排空时原请求可以继续读取凭据，新活动和其他账号许可继续受限。
+    #[tokio::test]
+    async fn agy_migration_only_continues_the_original_admission() {
+        let (store, _, service) = setup_account_service_with_settings().await;
+        let mut account = test_account_with_usage(json!({}));
+        account.id = 0;
+        account.email = "migration-agy@example.invalid".into();
+        account.platform = "antigravity".into();
+        store.create(&mut account).await.unwrap();
+        let mut other = test_account_with_usage(json!({}));
+        other.id = 0;
+        other.email = "migration-other@example.invalid".into();
+        store.create(&mut other).await.unwrap();
+        let foreign = service.upstream_activity(other.id).await.unwrap();
+        let original = service.upstream_activity(account.id).await.unwrap();
+        let queue = service.get_or_create_queue(account.id, account.concurrency).await;
+        let slot = queue
+            .acquire(Duration::from_secs(1), DEFAULT_REQUEST_SLOT_UNITS)
+            .await
+            .unwrap();
+        let owner = format!("node-migration:{}", Uuid::new_v4().simple());
+        let lease = queue.runtime_gate.prepare(&owner).unwrap();
+        assert!(service.upstream_activity(account.id).await.is_err());
+        assert!(service
+            .upstream_activity_with_admission(account.id, Some(&foreign))
+            .await
+            .is_err());
+        assert!(service
+            .upstream_activity_with_admission(account.id, Some(&original))
+            .await
+            .is_ok());
+        drop(slot);
+        assert!(service
+            .upstream_activity_with_admission(account.id, Some(&original))
+            .await
+            .is_err());
+        queue
+            .runtime_gate
+            .update(&owner, &lease.generation, "release")
+            .unwrap();
+
+        let slot = queue
+            .acquire(Duration::from_secs(1), DEFAULT_REQUEST_SLOT_UNITS)
+            .await
+            .unwrap();
+        let maintenance = queue.runtime_gate.prepare("maintenance:fixture").unwrap();
+        assert!(service
+            .upstream_activity_with_admission(account.id, Some(&original))
+            .await
+            .is_err());
+        drop(slot);
+        queue
+            .runtime_gate
+            .update(&maintenance.owner, &maintenance.generation, "release")
+            .unwrap();
     }
 
     #[tokio::test]

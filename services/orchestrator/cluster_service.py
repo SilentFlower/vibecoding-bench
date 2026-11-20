@@ -362,6 +362,15 @@ class ClusterService:
         """
         if row.get('account_id') is None:
             try:
+                connection = self.store.database()
+                try:
+                    agy = connection.execute('SELECT p.gateway_account_id FROM platform_api_environments p '
+                        'WHERE p.environment_id=?', (row['environment_id'],)).fetchone() if self.store.has_agy_nodes(connection) else None
+                finally:
+                    connection.close()
+                if agy is not None:
+                    assignment = self.store.agy_assignment(agy['gateway_account_id'])
+                    return assignment['kind'] == 'local' and assignment['node_key'] == 'local'
                 return self.draft_node(environment_id=row['environment_id']) is None
             except Exception:
                 return False
@@ -816,8 +825,11 @@ class ClusterService:
                         "AND phase NOT IN ('completed','cancelled')", (node_id, node_id)).fetchall()
                     previous = json.loads(row['preparation_json']) if row['preparation_json'] else {}
                     original = previous.get('original_preparation') or previous
-                    if any(not pristine_target_migration(dict(migration), node_id)
-                            and paused_migration_record(dict(migration)) is None for migration in migrations) and original.get('state') == 'prepared':
+                    agy_migration = self.store.has_agy_nodes(connection) and connection.execute(
+                        "SELECT 1 FROM agy_node_migrations WHERE (source_node_id=? OR target_node_id=?) "
+                        "AND phase NOT IN ('completed','cancelled')", (node_id, node_id)).fetchone()
+                    if (agy_migration or any(not pristine_target_migration(dict(migration), node_id)
+                            and paused_migration_record(dict(migration)) is None for migration in migrations)) and original.get('state') == 'prepared':
                         waiting = {**original, 'phase': 'waiting', 'target_release': installer.release,
                             'retry_at': time.time() + 15, 'reason': '原迁移正在进行，完成后自动同步节点组件'}
                         with connection:

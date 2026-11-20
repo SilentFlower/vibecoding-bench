@@ -33,6 +33,10 @@ class ClusterStore:
             counts = {row[0]: row[1] for row in connection.execute(
                 'SELECT b.node_id,COUNT(*) FROM account_node_assignments b JOIN accounts a ON a.id=b.account_id '
                 'WHERE a.deleted_at IS NULL GROUP BY b.node_id')}
+            if self.has_agy_nodes(connection):
+                for node_id, count in connection.execute("SELECT node_id,COUNT(*) FROM agy_node_assignments "
+                        "WHERE phase<>'retired' GROUP BY node_id"):
+                    counts[node_id] = counts.get(node_id, 0) + count
             return [self._public(dict(row), counts.get(row['id'], 0)) for row in rows]
         finally:
             connection.close()
@@ -234,6 +238,73 @@ class ClusterStore:
         finally:
             connection.close()
 
+    @staticmethod
+    def has_agy_nodes(connection) -> bool:
+        """识别增量前的节点库。@param connection 本库连接。@return 归属增量是否存在。"""
+        return connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='agy_node_assignments'").fetchone() is not None
+
+    def agy_assignment(self, account_id: int) -> dict:
+        """读取已登记的 AGY 网关账号归属。@param account_id 网关账号。@return 节点及分配版本。"""
+        connection = self.database()
+        try:
+            row = connection.execute('SELECT b.account_id,b.node_id,b.revision,b.phase,n.node_key,n.name AS node_name,n.kind,n.enabled '
+                'FROM agy_node_assignments b JOIN platform_api_environments p ON p.gateway_account_id=b.account_id '
+                "JOIN cluster_nodes n ON n.id=b.node_id WHERE p.gateway_account_id=? AND (n.deleted_at IS NULL OR b.phase='retired')",
+                (account_id,)).fetchone()
+            if row is None:
+                raise ValueError('AGY 账号尚无节点归属')
+            return {**dict(row), 'enabled': bool(row['enabled'])}
+        finally:
+            connection.close()
+
+    def agy_assignments(self) -> list[dict]:
+        """批量返回后台账号卡片的持久归属。@return 已登记 AGY 的实际节点。"""
+        connection = self.database()
+        try:
+            rows = connection.execute('SELECT b.account_id,b.node_id,b.revision,b.phase,n.node_key,n.name AS node_name,n.kind,n.enabled '
+                'FROM agy_node_assignments b JOIN cluster_nodes n ON n.id=b.node_id '
+                "WHERE n.deleted_at IS NULL AND b.phase<>'retired' ORDER BY b.account_id")
+            return [{**dict(row), 'enabled': bool(row['enabled'])} for row in rows]
+        finally:
+            connection.close()
+
+    def agy_retirement_candidates(self) -> list[dict]:
+        """读取已经静默且保留资料的 SSH 环境。@return 原归属和静默代次。"""
+        connection = self.database()
+        try:
+            return [dict(row) for row in connection.execute('SELECT b.account_id,b.node_id,b.revision,e.environment_id,e.generation '
+                'FROM agy_node_assignments b JOIN cluster_nodes n ON n.id=b.node_id '
+                'JOIN platform_api_environments p ON p.gateway_account_id=b.account_id '
+                "JOIN account_environments e ON e.environment_id=p.environment_id WHERE n.kind='ssh' AND b.phase='ready' "
+                "AND e.state='stopped' AND e.container_id IS NULL AND e.network_container_id IS NULL AND e.sender_container_id IS NULL")]
+        finally:
+            connection.close()
+
+    def retire_agy_assignment(self, candidate: dict) -> None:
+        """网关确认删除后归档原分配，资料和迁移历史继续关联原节点。@param candidate 原静默范围。@return 无。"""
+        with self.lock:
+            connection = self.database()
+            try:
+                with connection:
+                    connection.execute("UPDATE agy_node_assignments SET phase='retired' "
+                        "WHERE account_id=:account_id AND node_id=:node_id AND revision=:revision AND phase='ready' AND EXISTS ("
+                        'SELECT 1 FROM platform_api_environments p JOIN account_environments e ON e.environment_id=p.environment_id '
+                        "WHERE p.gateway_account_id=:account_id AND e.environment_id=:environment_id AND e.generation=:generation "
+                        "AND e.state='stopped' AND e.container_id IS NULL AND e.network_container_id IS NULL AND e.sender_container_id IS NULL)",
+                        candidate)
+            finally:
+                connection.close()
+
+    def agy_draining(self, account_id: int, revision: int) -> bool:
+        """判断原分配是否仍处于排空。@param account_id 网关账号。@param revision 来源分配。@return 原发送器仍可收尾。"""
+        connection = self.database()
+        try:
+            return connection.execute("SELECT 1 FROM agy_node_migrations WHERE account_id=? "
+                "AND phase IN ('requested','reconcile') AND json_extract(record_json,'$.last_confirmed_phase')='requested' "
+                "AND json_extract(record_json,'$.source_revision')=?", (account_id, revision)).fetchone() is not None
+        finally:
+            connection.close()
+
     def assign_unstarted(self, account_id: int, node_id: int, revision: int) -> dict:
         """在短事务内分配尚未产生运行资料的账号，已有实例须迁移。
 
@@ -274,6 +345,11 @@ class ClusterStore:
         if connection.execute("SELECT 1 FROM node_migrations WHERE (source_node_id=? OR target_node_id=?) "
                 "AND phase NOT IN ('completed','cancelled')", (node_id, node_id)).fetchone():
             raise ValueError('节点仍有未结束迁移，请先完成原迁移')
+        if ClusterStore.has_agy_nodes(connection) and (
+                connection.execute("SELECT 1 FROM agy_node_assignments WHERE node_id=? AND phase<>'retired'", (node_id,)).fetchone()
+                or connection.execute("SELECT 1 FROM agy_node_migrations WHERE (source_node_id=? OR target_node_id=?) "
+                    "AND phase NOT IN ('completed','cancelled')", (node_id, node_id)).fetchone()):
+            raise ValueError('节点仍有关联 AGY 账号或未结束迁移')
         if connection.execute("SELECT 1 FROM node_executions WHERE node_id=? AND phase<>'closed'", (node_id,)).fetchone():
             raise ValueError('节点仍有未结束执行记录，请先收口原执行')
         if connection.execute("SELECT 1 FROM node_login_drafts WHERE node_id=? AND phase<>'closed'", (node_id,)).fetchone():

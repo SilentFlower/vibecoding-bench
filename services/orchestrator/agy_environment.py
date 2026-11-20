@@ -13,8 +13,8 @@ from urllib.request import ProxyHandler, Request, build_opener
 from docker.errors import NotFound
 
 from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, create_environment, role_container
-from account_update_identity import compatible_account_origin, configured_release, image_origin, role_release
-from agy_kernel import kernel_id, module_root, selection, work_root
+from account_update_identity import compatible_account_origin, configured_release, role_release
+from agy_kernel import kernel_id, module_root, selection, verify_candidate, work_root
 from native_capture_policy import capture_enabled
 from native_criu_settings import read_settings as read_criu
 from resource_budget import account_limits, agy_worker_limits, default_account_memory
@@ -180,13 +180,27 @@ def account_input(configuration: dict, row: dict) -> dict:
 
 
 def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance: bool = False,
-              capacity_reserved: bool = False) -> dict | None:
-    """准备 AGY 角色并返回绑定。@param runtime 运行时。@param gateway_id 网关账号。@param wake 是否唤醒。@param system_maintenance 受证系统维护。@param capacity_reserved 已保留容量。@return 私有绑定。"""
+              capacity_reserved: bool = False, allow_eviction: bool = True, selected_kernel: str | None = None,
+              import_preparation: bool = False) -> dict | None:
+    """准备 AGY 角色并返回绑定。
+
+    @param runtime 所属节点运行时。
+    @param gateway_id 网关账号。
+    @param wake 是否唤醒。
+    @param system_maintenance 受证系统维护。
+    @param capacity_reserved 已保留容量。
+    @param allow_eviction 是否允许回收其它空闲环境。
+    @param selected_kernel 原归档核验的内核。
+    @param import_preparation 本次为原迁移目标的隔离准备。
+    @return 私有绑定。
+    """
     def gateway_configuration():
         configuration = runtime.gateway._request('GET', f'/admin/runtime/accounts/{gateway_id}/config')
         if configuration.get('platform') != 'antigravity' or configuration.get('auth_type') != 'oauth':
             raise ValueError('AGY平台归属无效')
-        if wake and (configuration.get('status') != 'active' or configuration.get('credential_state',{}).get('phase') != 'ready' or (not update_open() and not system_maintenance)):
+        if wake and (configuration.get('status') != 'active' and not import_preparation
+                or configuration.get('credential_state',{}).get('phase') != 'ready'
+                or not update_open() and not system_maintenance):
             raise ValueError('AGY账号凭据或维护状态尚未就绪')
         return configuration
     row = lookup(runtime,gateway_id)
@@ -202,6 +216,7 @@ def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance
         row = lookup(runtime,gateway_id)
         if row is None or row['environment_id'] != environment_id:
             raise ValueError('AGY原环境归属已变化')
+        runtime._check_node_fence(row)
         configuration = gateway_configuration()
         if capacity_reserved and row['environment_id'] not in runtime.rollout_capacity_reservations:
             raise ValueError('账号更新尚未保留环境容量')
@@ -216,6 +231,11 @@ def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance
             raise ValueError('AGY账号镜像身份或批次不一致')
         desired = sender_config(configuration,json.loads(row['fingerprint_json']),labels)
         current_kernel = selection(runtime, row, release=release)
+        if selected_kernel is not None:
+            verify_candidate(runtime._root(row), selected_kernel)
+            if any(row.get(column) for column in ROLE_COLUMNS.values()) and current_kernel != selected_kernel:
+                raise ValueError('目标 AGY 角色选择与归档内核身份不一致')
+            current_kernel = selected_kernel
         desired.update(module_root=module_root(current_kernel), work_root=work_root(current_kernel))
         present = [bool(row.get(column)) for column in ROLE_COLUMNS.values()]
         if any(present) and not all(present):
@@ -232,7 +252,7 @@ def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance
                 runtime._update(row,state='reconcile')
                 raise ValueError('AGY环境角色缺失') from None
             config = runtime.read_sender_configuration(row)
-            old_image = image_origin(runtime,row)['image_id']!=image.attrs['Id']
+            old_image = any(container.attrs.get('Image') != image.attrs['Id'] for container in containers.values())
             running = [container.status == 'running' for container in containers.values()]
             from agy_capacity import pending_layout
             layout_current = config.get('agy') == desired or pending_layout(runtime, row, config.get('agy'), desired)
@@ -248,7 +268,7 @@ def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance
                     raise ValueError('原AGY环境尚未恢复，等待后台更新')
                 with nullcontext() if capacity_reserved else runtime.capacity_lock:
                     if not capacity_reserved:
-                        runtime._make_room(row)
+                        runtime._make_room(row, allow_eviction=allow_eviction)
                     for role in ('network','cli','sender'):
                         containers[role].start()
         if not any(present):
@@ -256,7 +276,7 @@ def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance
                 return None
             with nullcontext() if capacity_reserved else runtime.capacity_lock:
                 if not capacity_reserved:
-                    runtime._make_room(row)
+                    runtime._make_room(row, allow_eviction=allow_eviction)
                 root=runtime._root(row)
                 root.mkdir(parents=True,exist_ok=True,mode=0o700)
                 for name in ('home','projects','workspaces','flows','controls','ca','cli','runtime'):
@@ -264,7 +284,8 @@ def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance
                 for name in ('home','projects'):
                     os.chown(root/name,1000,1000,follow_symlinks=False)
                 account['agy_sender']=desired
-                create_environment(runtime,row,account,account_container_prefix(runtime.deployment)+row['environment_id'],atomic_json)
+                create_environment(runtime,row,account,account_container_prefix(runtime.deployment,
+                    node_key=runtime.node_key)+row['environment_id'],atomic_json)
         if wake:
             runtime._wait_network(row)
             until=time.monotonic()+30

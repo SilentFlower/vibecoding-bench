@@ -58,7 +58,7 @@ class AgyEnvironmentTests(unittest.TestCase):
         connection=self.database()
         try:
             self.assertEqual(connection.execute('SELECT COUNT(*) FROM accounts').fetchone()[0],1)
-            self.assertEqual(migration_plan(connection)['current_version'],5)
+            self.assertEqual(migration_plan(connection)['current_version'],6)
         finally:
             connection.close()
 
@@ -127,8 +127,9 @@ class AgyEnvironmentTests(unittest.TestCase):
         folder=self.runtime._root(row)/'runtime/sender';folder.mkdir(parents=True)
         atomic_json(folder/'sender.json',{'binding':binding,'agy':sender_config(config,json.loads(row['fingerprint_json']),labels),'proxy_source':config['proxy_url']})
         self.runtime._make_room=Mock();self.runtime._wait_network=Mock();self.runtime._sender_active=Mock(return_value=0)
+        container = SimpleNamespace(status='running', attrs={'Image': 'synthetic-image'}, reload=lambda:None)
         with patch('agy_environment.configured_release',return_value='synthetic-release'),patch('agy_environment.role_release',return_value='synthetic-release'), \
-                patch('agy_environment.image_origin',return_value={'image_id':'synthetic-image'}),patch('agy_environment.role_container',return_value=SimpleNamespace(status='running',reload=lambda:None)):
+                patch('agy_environment.role_container',return_value=container):
             self.assertEqual(transport(self.runtime,17),binding)
             self.assertEqual(transport(self.runtime,17),binding)
             self.assertEqual(transport(self.runtime,17,wake=False),binding)

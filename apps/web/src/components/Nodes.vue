@@ -77,18 +77,12 @@ async function loadAgyAccounts(): Promise<void> {
     if (alive && !controller.signal.aborted) agyError.value = '反重力账号归属读取失败，请刷新列表';
   }
 }
-/** 使用同一份正式账号列表更新归属选择和节点计数。@return 无。 */
+/** 刷新节点与正式账号选项。@return 无。 */
 function refresh(): void {
   void load();
   void loadAgyAccounts();
 }
-/** 汇总本机反重力账号和已有任务账号归属。@param node 节点。@return 归属数量或待核对占位。 */
-function accountCount(node: ExecutionNode): number | string {
-  if (node.kind !== 'local') return node.account_count;
-  return agyAccounts.value === null ? '—' : node.account_count + agyAccounts.value.length;
-}
-const totalAccounts = computed(() => agyAccounts.value === null ? '—'
-  : rows.value.reduce((total, node) => total + node.account_count, agyAccounts.value.length));
+const totalAccounts = computed(() => rows.value.reduce((total, node) => total + node.account_count, 0));
 /** 地址变化使旧公钥确认失效。@return 无。 */
 function resetProbe(): void {
   probeGeneration++; probeRequest?.abort(); probing.value = false;
@@ -241,7 +235,7 @@ onUnmounted(() => { alive = false; loadGeneration++; if (refreshTimer) clearTime
     <div class="nodes-grid">
       <article v-for="node in rows" :key="node.id" class="node-card">
         <header><span class="node-icon"><Server :size="20" /></span><div><h2>{{ node.name }}</h2><p>{{ node.kind === 'local' ? '默认本机节点' : `${node.username}@${node.host}:${node.port}` }}</p></div><span class="node-state" :class="{ failed: node.observation?.state === 'unreachable', muted: !node.enabled || node.observation?.stale }">{{ state(node) }}</span></header>
-        <dl class="node-resources"><div><dt>CPU</dt><dd>{{ node.observation?.host_cpus ?? '未采集' }}<small v-if="node.observation?.host_cpus != null"> 核</small></dd></div><div><dt>可用内存</dt><dd>{{ bytes(node.observation?.memory?.MemAvailable) }}</dd></div><div><dt>可用磁盘</dt><dd>{{ bytes(node.observation?.disk_available_bytes) }}</dd></div><div><dt>归属账号</dt><dd>{{ accountCount(node) }}</dd></div></dl>
+        <dl class="node-resources"><div><dt>CPU</dt><dd>{{ node.observation?.host_cpus ?? '未采集' }}<small v-if="node.observation?.host_cpus != null"> 核</small></dd></div><div><dt>可用内存</dt><dd>{{ bytes(node.observation?.memory?.MemAvailable) }}</dd></div><div><dt>可用磁盘</dt><dd>{{ bytes(node.observation?.disk_available_bytes) }}</dd></div><div><dt>归属账号</dt><dd>{{ node.account_count }}</dd></div></dl>
         <p v-if="node.observation?.reason" class="nodes-error" role="status">{{ node.observation.reason }}</p>
         <div class="node-meta"><span>最近检查</span><time>{{ node.observation && node.observation.observed_at > 0 ? new Date(node.observation.observed_at * 1000).toLocaleString('zh-CN') : '尚未检查' }}</time><span>Docker</span><span>{{ node.observation?.docker_version ?? '未采集' }}</span><template v-if="node.kind === 'ssh'"><span>运行组件</span><span>{{ preparationState(node) }}</span></template></div>
         <p v-if="node.preparation?.target_release && node.preparation.target_release !== (node.preparation.current_release || node.preparation.release)" class="node-note">{{ node.preparation.current_release || node.preparation.release || '首次安装' }} → {{ node.preparation.target_release }}</p>

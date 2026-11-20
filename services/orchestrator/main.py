@@ -50,6 +50,8 @@ from native_capture import CaptureExpired, read_capture
 from agy_runtime.capture import read_snapshot as read_agy_snapshot, save_ingress as save_agy_ingress
 from native_capture_policy import capture_enabled as native_capture_enabled
 from agy_environment import lookup as lookup_agy_environment
+from agy_migration import AgyMigrationCoordinator
+from agy_placement import AgyPlacement
 from native_kernel_upgrade import status as native_kernel_status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response, StreamingResponse
@@ -7991,6 +7993,8 @@ cluster_bound_logins: Optional[ClusterBoundAccountLogins] = None
 cluster_draft_logins: Optional[ClusterDraftLogins] = None
 cluster_continues: Optional[ClusterContinues] = None
 migration_operations: Optional[MigrationOperations] = None
+agy_migrations: Optional[MigrationOperations] = None
+agy_placement: Optional[AgyPlacement] = None
 credential_ownership: Optional[CredentialOwnership] = None
 project_iterations: Optional[ProjectIterationManager] = None
 project_iteration_error: Optional[str] = None
@@ -8448,6 +8452,7 @@ def _complete_remote_continue_recovery(operation_id: str) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global agy_placement, agy_migrations
     global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler, quota_guard, account_runtime, cluster_service, cluster_terminal_sessions, cluster_runner, cluster_logins, cluster_bound_logins, cluster_draft_logins, cluster_continues, migration_operations, credential_ownership, project_iterations, project_iteration_error, project_requester_settings, projects_service, warmup_pi_service, pi_owners
     if V3_ENABLED and os.environ.get('V3_UPDATE_GATE_DIR') and UPDATE_GATE.state()['phase'] not in ('idle', 'blocked'):
         raise RuntimeError('平台维护状态需要先对账，暂停初始化')
@@ -8466,6 +8471,7 @@ async def lifespan(app: FastAPI):
     cluster_draft_logins = None
     cluster_continues = None
     migration_operations = None
+    agy_migrations = agy_placement = None
     if V3_ENABLED:
         account_runtime = AccountRuntime(runner.client, BENCH_DATA, HOST_BENCH_DATA, get_db, derive_v3_fingerprint, cc2api_client,
             _quota_identity, placement=cluster_service.admit_local, locality=cluster_service.owns_local)
@@ -8484,6 +8490,8 @@ async def lifespan(app: FastAPI):
         account_runtime.cluster_service = cluster_service
         migration_operations = MigrationOperations(MigrationCoordinator(cluster_service, account_runtime,
             cc2api_client, _quota_identity, _node_migration_guard))
+        agy_placement = AgyPlacement(cluster_service, account_runtime)
+        agy_migrations = MigrationOperations(AgyMigrationCoordinator(agy_placement))
         account_runtime.reconcile()
         account_runtime.start()
     scheduler = Scheduler(runner)
@@ -8627,6 +8635,8 @@ async def lifespan(app: FastAPI):
                 pass
         if migration_operations:
             migration_operations.close()
+        if agy_migrations:
+            agy_migrations.close()
         warmup_scheduler.stop()
         if warmup_pi_service:
             warmup_pi_service.close()
@@ -8657,6 +8667,7 @@ app.include_router(projects_router(lambda: projects_service))
 app.include_router(warmup_pi_router(lambda: warmup_pi_service))
 app.include_router(cluster_router(lambda: cluster_service))
 app.include_router(migration_router(lambda: migration_operations))
+app.include_router(migration_router(lambda: agy_migrations, agy=True))
 app.include_router(node_transport_router(lambda: cluster_service.transports if cluster_service else None))
 app.add_middleware(
     CORSMiddleware,
@@ -9705,6 +9716,28 @@ def account_node_assignment(aid: int) -> dict:
         return cluster_service.store.assignment(aid)
     except ValueError as error:
         raise HTTPException(404, str(error)) from None
+
+
+@app.get('/api/agy-accounts/nodes')
+def agy_node_assignments() -> dict:
+    """读取已登记 AGY 的归属。@return 已登记账号和固定节点。"""
+    if agy_placement is None:
+        raise HTTPException(503, 'AGY 节点服务尚未就绪')
+    return {'items': agy_placement.store.agy_assignments()}
+
+
+@app.get('/api/agy-accounts/{account_id}/node')
+def agy_node_assignment(account_id: int) -> dict:
+    """读取一个 AGY 网关账号的持久节点。@param account_id 网关账号。@return 原分配及版本。"""
+    if agy_placement is None:
+        raise HTTPException(503, 'AGY 节点服务尚未就绪')
+    try:
+        result = agy_placement.store.agy_assignment(account_id)
+    except ValueError as error:
+        raise HTTPException(404, str(error)) from None
+    row = lookup_agy_environment(account_runtime, account_id)
+    return {**result, 'migration_ready': result['phase'] == 'ready' and row['generation'] > 0
+        and row['state'] in ('ready', 'stopped')}
 
 
 @contextmanager
@@ -13948,6 +13981,9 @@ async def _agy_auth_cleanup_loop():
                         if account_runtime:
                             from agy_capacity import reconcile_pending
                             reconcile_pending(account_runtime)
+                            if agy_placement:
+                                agy_placement.reconcile_capacities()
+                                agy_placement.reconcile_retired()
             await asyncio.to_thread(cleanup)
         except Exception:
             # 失败保留私有材料，下一周期按原归属重试。
@@ -14060,7 +14096,10 @@ def v3_quiesce(account_id: int, body: dict):
     agy=agy_lookup(account_runtime,account_id)
     if agy:
         try:
-            agy_quiesce(account_runtime,agy,body)
+            with account_runtime.environment_lock(agy['environment_id']):
+                handled, _ = agy_placement.control(agy, 'quiesce', body) if agy_placement else (False, None)
+                if not handled:
+                    agy_quiesce(account_runtime,agy,body)
         except (ValueError,RuntimeError,OSError):
             raise HTTPException(409,'AGY环境仍有原生工作或配置许可已变化') from None
         return {'ok':True}
@@ -14122,7 +14161,10 @@ def v3_agy_capacity(account_id: int, body: AgyCapacityIn) -> dict:
         raise HTTPException(400, 'capacity_changed')
     try:
         with UPDATE_GATE.admission('agy-capacity'):
-            change_capacity(account_runtime, account_id, body.operation_id, body.before, body.target, body.phase)
+            if agy_placement:
+                agy_placement.capacity(account_id, body.operation_id, body.before, body.target, body.phase)
+            else:
+                change_capacity(account_runtime, account_id, body.operation_id, body.before, body.target, body.phase)
     except CapacityError as error:
         raise HTTPException(409, str(error)) from None
     except (ValueError, KeyError, OSError, RuntimeError, DockerException):
@@ -14147,10 +14189,24 @@ def v3_native_capture(account_id: int, attempt_id: str, platform: str = 'claude_
         try:
             row=lookup_agy_environment(account_runtime,account_id)
             if not row:raise HTTPException(404,'AGY账号环境未登记')
+            if agy_placement:
+                with agy_placement.current(account_id) as (current, assignment):
+                    if assignment['kind'] == 'ssh':
+                        result = agy_placement.exact(current, assignment, 'agy-capture-read', attempt_id=attempt_id)
+                        if result.get('attempt_id') != attempt_id:
+                            raise ValueError('AGY 节点采集尝试已变化')
+                        if result.get('state') == 'missing':
+                            raise FileNotFoundError
+                        if result.get('state') == 'expired':
+                            raise TimeoutError
+                        if result.get('state') != 'available' or not isinstance(result.get('snapshot'), dict):
+                            raise ValueError('AGY 节点采集回执待核对')
+                        return result['snapshot']
+                    return read_agy_snapshot(account_runtime._root(current),account_id,attempt_id)
             return read_agy_snapshot(account_runtime._root(row),account_id,attempt_id)
         except TimeoutError:raise HTTPException(410,'采集文件已超过七天保留期')
         except FileNotFoundError:raise HTTPException(404,'采集文件缺失、尚未生成或已清理')
-        except (ValueError,OSError):raise HTTPException(503,'采集文件读取失败')
+        except (ValueError,RuntimeError,OSError):raise HTTPException(503,'采集文件读取失败')
     connection = get_db()
     try:
         rows = connection.execute("SELECT e.* FROM account_environments e JOIN accounts a ON a.id=e.account_id "
@@ -14192,11 +14248,22 @@ def v3_agy_ingress(account_id: int, attempt_id: str, body: AgyIngressIn):
     try:
         row=lookup_agy_environment(account_runtime,account_id)
         if not row:raise HTTPException(404,'AGY账号环境未登记')
-        if row['generation']!=body.environment_generation:raise HTTPException(409,'采集环境代次已改变')
-        fingerprint=json.loads(row['fingerprint_json'])
-        if not native_capture_enabled(fingerprint):raise HTTPException(409,'账号内容采集已关闭')
-        save_agy_ingress(account_runtime._root(row)/'flows/api/agy-prepared',account_id,attempt_id,body.ingress)
-    except (ValueError,OSError,TypeError):raise HTTPException(503,'AGY入口快照保存失败')
+        with account_runtime.environment_lock(row['environment_id']):
+            row=lookup_agy_environment(account_runtime,account_id)
+            if row['generation']!=body.environment_generation:raise HTTPException(409,'采集环境代次已改变')
+            fingerprint=json.loads(row['fingerprint_json'])
+            if not native_capture_enabled(fingerprint):raise HTTPException(409,'账号内容采集已关闭')
+            if agy_placement:
+                assignment = agy_placement.store.agy_assignment(account_id)
+                if assignment['phase'] != 'ready' and not agy_placement.store.agy_draining(account_id, assignment['revision']):
+                    raise HTTPException(409,'采集环境正在迁移收口')
+                if assignment['kind'] == 'ssh':
+                    result = agy_placement.exact(row, assignment, 'agy-ingress', attempt_id=attempt_id, ingress=body.ingress)
+                    if result.get('attempt_id') != attempt_id or result.get('state') != 'saved':
+                        raise ValueError('AGY 节点入站采集未确认')
+                    return {'state':'saved'}
+            save_agy_ingress(account_runtime._root(row)/'flows/api/agy-prepared',account_id,attempt_id,body.ingress)
+    except (ValueError,RuntimeError,OSError,TypeError):raise HTTPException(503,'AGY入口快照保存失败')
     return {'state':'saved'}
 
 
@@ -14209,8 +14276,8 @@ def v3_transport(account_id: int, wake: bool = True):
     if configuration.get('platform') == 'antigravity':
         from agy_environment import transport as agy_transport
         try:
-            return agy_transport(account_runtime, account_id, wake=wake)
-        except (ValueError, RuntimeError, OSError):
+            return agy_placement.transport(account_id, wake=wake) if agy_placement else agy_transport(account_runtime, account_id, wake=wake)
+        except (ValueError, RuntimeError, OSError, DockerException):
             raise HTTPException(503, 'AGY账号环境未就绪或需要维护') from None
     connection = get_db()
     try:
@@ -14251,7 +14318,7 @@ def _v3_environment_summary(row: dict, ownerships: dict, native_preparations: di
     from agy_environment import lookup_environment, summary as agy_summary
     agy = lookup_environment(account_runtime, row['environment_id'])
     if agy:
-        return agy_summary(account_runtime, agy)
+        return agy_placement.summary(agy) if agy_placement else agy_summary(account_runtime, agy)
     account = None
     row['credential_ownership'] = ownerships.get(row['account_id'])
     if cluster_service and row['account_id'] is None:
@@ -14510,7 +14577,11 @@ def v3_content_capture(environment_id: str) -> dict:
     with account_runtime.environment_lock(environment_id):
         agy = lookup_environment(account_runtime, environment_id)
         if agy:
-            return agy_capture(account_runtime, agy)
+            try:
+                handled, value = agy_placement.control(agy, 'capture-read') if agy_placement else (False, None)
+                return value if handled else agy_capture(account_runtime, agy)
+            except (ValueError, RuntimeError, OSError):
+                raise HTTPException(409, 'AGY 采集配置暂不可读取') from None
     snapshots, _ = account_runtime.native_preparation_snapshots()
     try:
         with account_runtime.environment_lock(environment_id):
@@ -14541,8 +14612,9 @@ def v3_set_content_capture(environment_id: str, body: ContentCaptureOperation) -
         if agy:
             try:
                 with UPDATE_GATE.admission('agy-content-capture'):
-                    return agy_capture(account_runtime, agy, body.model_dump())
-            except ValueError as error:
+                    handled, value = agy_placement.control(agy, 'capture-set', body.model_dump()) if agy_placement else (False, None)
+                    return value if handled else agy_capture(account_runtime, agy, body.model_dump())
+            except (ValueError, RuntimeError) as error:
                 raise HTTPException(409, str(error)) from None
     _, original = _content_capture_account(environment_id)
     try:
@@ -14637,6 +14709,12 @@ def _remote_environment_result(row: dict, operation: str, body: dict | None = No
     :param body: 原公共接口的冻结参数。
     :return: 所属Node结果；本机和原NULL草稿返回None。
     """
+    if agy_placement and operation in ('environment-cpu-read', 'environment-cpu-set') and row.get('account_id') is None:
+        from agy_environment import lookup_environment
+        agy = lookup_environment(account_runtime, row['environment_id'])
+        if agy:
+            handled, result = agy_placement.control(agy, operation.removeprefix('environment-'), body)
+            return result if handled else None
     if (cluster_service and account_runtime and row.get('account_id') is not None
             and cluster_service.store.assignment(row['account_id'])['kind']=='ssh'):
         if operation in ('environment-capture-set','environment-criu-set') and credential_ownership:
@@ -14729,9 +14807,9 @@ def _agy_kernel_environment(environment_id: str) -> dict:
 
     if V3_ENABLED and account_runtime and re.fullmatch(r'[0-9a-f]{32}', environment_id):
         row = lookup_environment(account_runtime, environment_id)
-        if row and account_runtime.owns_environment(row):
+        if row:
             return row
-    raise HTTPException(404, '本机反重力环境不存在')
+    raise HTTPException(404, '反重力环境不存在')
 
 
 @app.get('/api/environments/{environment_id}/agy-kernel')
@@ -14740,8 +14818,11 @@ def v3_agy_kernel_catalog(environment_id: str) -> dict:
     from agy_kernel import catalog
 
     try:
-        return catalog(account_runtime, _agy_kernel_environment(environment_id))
-    except (OSError, ValueError):
+        row = _agy_kernel_environment(environment_id)
+        with account_runtime.environment_lock(environment_id):
+            handled, value = agy_placement.control(row, 'kernel-read') if agy_placement else (False, None)
+            return value if handled else catalog(account_runtime, row)
+    except (OSError, ValueError, RuntimeError):
         raise HTTPException(409, '当前环境的内核登记需要核对') from None
 
 
@@ -14753,8 +14834,11 @@ def v3_select_agy_kernel(environment_id: str, body: AgyKernelSelection) -> dict:
 
     _agy_kernel_environment(environment_id)
     try:
-        with account_runtime.environment_lock(environment_id):
+        with UPDATE_GATE.admission('agy-kernel'), account_runtime.environment_lock(environment_id):
             row = _agy_kernel_environment(environment_id)
+            handled, value = agy_placement.control(row, 'kernel-set', body.model_dump()) if agy_placement else (False, None)
+            if handled:
+                return value
             sender = None
             if row.get('sender_container_id'):
                 sender = role_container(account_runtime, row, 'sender')
@@ -14779,11 +14863,18 @@ def v3_environment_maintenance(environment_id: str, body: dict):
     if not account_runtime:
         raise HTTPException(404)
     from agy_environment import lookup_environment
-    if lookup_environment(account_runtime, environment_id):
+    agy = lookup_environment(account_runtime, environment_id)
+    if agy:
         try:
-            if type(body.get('expected_generation')) is not int:
+            if (type(body.get('expected_generation')) is not int or body['expected_generation'] != agy['generation']
+                    or body.get('operation') not in ('stop', 'rebuild', 'reconcile')):
                 raise ValueError('AGY维护请求缺少冻结环境代次')
             with UPDATE_GATE.admission('agy-environment-maintenance'):
+                if agy_placement:
+                    with account_runtime.environment_lock(environment_id):
+                        handled, _ = agy_placement.control(agy, body['operation'], body)
+                        if handled:
+                            return {'ok':True}
                 account_runtime.maintenance(environment_id, body.get('operation',''), body.get('expected_generation'))
             return {'ok':True}
         except (ValueError,RuntimeError,OSError):

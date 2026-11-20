@@ -21,6 +21,8 @@ _METHODS = {'internal/send': 'POST', 'internal/native/status': 'GET', 'internal/
     'internal/native/readiness': 'POST', 'internal/native/idle-policy': 'POST',
     'internal/native/prepare-switch': 'POST', 'internal/native/prepare/cancel': 'POST',
     'internal/native/messages': 'POST', 'internal/status': 'GET'}
+_AGY_METHODS = {'internal/agy/prepare': 'POST', 'internal/agy/generate': 'POST',
+    'internal/agy/tools': 'POST', 'internal/agy/cancel': 'POST', 'internal/status': 'GET'}
 _HOP_HEADERS = {b'connection', b'keep-alive', b'proxy-authenticate', b'proxy-authorization',
     b'te', b'trailer', b'transfer-encoding', b'upgrade', b'host', b'x-v3-relay-token'}
 
@@ -61,6 +63,7 @@ class NodeTransport:
     generation: int
     socket_path: Path
     secret: str = field(repr=False)
+    agy: bool = False
 
 
 class NodeTransports:
@@ -74,7 +77,7 @@ class NodeTransports:
         self.store, self.lock = store, threading.RLock()
         self.entries: dict[tuple[str, str, int], NodeTransport] = {}
         self.active: dict[int, int] = {}
-        self.account_active: dict[int, int] = {}
+        self.account_active: dict[tuple[bool, int], int] = {}
 
     def register(self, entry: NodeTransport) -> None:
         """登记本次已核对通道，拒绝较旧 sender 覆盖。
@@ -104,14 +107,21 @@ class NodeTransports:
             entry = self.entries.get((node_key, environment_id, revision))
         if entry is None or not secrets.compare_digest(authorization, 'Bearer ' + entry.secret):
             raise ValueError('节点传输认证或运行绑定无效')
-        assignment = self.store.assignment(entry.account_id)
+        assignment = self.store.agy_assignment(entry.account_id) if entry.agy else self.store.assignment(entry.account_id)
+        draining = entry.agy and assignment['phase'] != 'ready' and self.store.agy_draining(entry.account_id, revision)
         if (assignment['node_id'] != entry.node_id or assignment['node_key'] != node_key
-                or assignment['revision'] != revision or assignment['phase'] != 'ready' or not assignment['enabled']):
+                or assignment['revision'] != revision
+                or not draining and (assignment['phase'] != 'ready' or not assignment['enabled'])):
             raise ValueError('账号节点归属已变化或正在维护')
         connection = self.store.database()
         try:
-            row = connection.execute('SELECT account_id,generation FROM account_environments WHERE environment_id=?',
-                (environment_id,)).fetchone()
+            if entry.agy:
+                row = connection.execute('SELECT p.gateway_account_id AS account_id,e.generation FROM account_environments e '
+                    'JOIN platform_api_environments p ON p.environment_id=e.environment_id '
+                    'WHERE e.environment_id=? AND e.account_id IS NULL', (environment_id,)).fetchone()
+            else:
+                row = connection.execute('SELECT account_id,generation FROM account_environments WHERE environment_id=?',
+                    (environment_id,)).fetchone()
             if row is None or row['account_id'] != entry.account_id or row['generation'] != entry.generation:
                 raise ValueError('账号环境代次已变化')
         finally:
@@ -131,23 +141,24 @@ class NodeTransports:
             entry = self.authorize(node_key, environment_id, revision, authorization)
             with self.lock:
                 self.active[entry.node_id] = self.active.get(entry.node_id, 0) + 1
-                self.account_active[entry.account_id] = self.account_active.get(entry.account_id, 0) + 1
+                key = entry.agy, entry.account_id
+                self.account_active[key] = self.account_active.get(key, 0) + 1
         return entry
 
     def end(self, entry: NodeTransport) -> None:
         """释放一个实际流及账号排空计数。:param entry: 原已取得通道。:return: None。"""
         with self.lock:
-            for counts, key in ((self.active, entry.node_id), (self.account_active, entry.account_id)):
+            for counts, key in ((self.active, entry.node_id), (self.account_active, (entry.agy, entry.account_id))):
                 remaining = counts.get(key, 0) - 1
                 if remaining > 0:
                     counts[key] = remaining
                 else:
                     counts.pop(key, None)
 
-    def account_streams(self, account_id: int) -> int:
-        """读取账号仍在传输的实际流数。:param account_id: 中央账号。:return: 实际活动计数。"""
+    def account_streams(self, account_id: int, *, agy: bool = False) -> int:
+        """读取账号仍在传输的实际流数。@param account_id 中央账号。@param agy 网关账号域。@return 实际活动计数。"""
         with self.lock:
-            return self.account_active.get(account_id, 0)
+            return self.account_active.get((agy, account_id), 0)
 
 
 def _forward_headers(headers: list[tuple[bytes, bytes]]) -> list[tuple[bytes, bytes]]:
@@ -180,7 +191,7 @@ def node_transport_router(registry) -> APIRouter:
         """
         deployment = os.environ.get('V3_DEPLOYMENT_ID', '')
         if (not deployment or deployment_key != hashlib.sha256(deployment.encode()).hexdigest()[:12]
-                or _METHODS.get(path) != request.method or request.url.query):
+                or request.method not in (_METHODS.get(path), _AGY_METHODS.get(path)) or request.url.query):
             raise HTTPException(404, '节点转发路径无效', headers={'x-v3-transport-error': 'before-send'})
         transports = registry()
         if transports is None:
@@ -208,6 +219,10 @@ def node_transport_router(registry) -> APIRouter:
             if activity is not None:
                 UPDATE_GATE.release_reserved(activity)
             raise HTTPException(503, '节点传输绑定已失效或正在维护', headers={'x-v3-transport-error': 'before-send'}) from None
+        if (_AGY_METHODS if entry.agy else _METHODS).get(path) != request.method:
+            transports.end(entry)
+            UPDATE_GATE.release_reserved(activity)
+            raise HTTPException(404, '节点转发路径无效', headers={'x-v3-transport-error': 'before-send'})
         client = None
         upstream = None
         cleanup_task = None

@@ -268,7 +268,7 @@ def reconcile_pending(runtime) -> None:
     for account_id in ids:
         try:
             row = lookup(runtime, account_id)
-            if row is None or not _receipt_path(runtime, row).is_file():
+            if row is None or not runtime.owns_environment(row) or not _receipt_path(runtime, row).is_file():
                 continue
             with runtime.environment_lock(row['environment_id']):
                 environment_id = row['environment_id']

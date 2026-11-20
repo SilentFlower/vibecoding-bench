@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use super::{
-    AccountService, DEFAULT_REQUEST_SLOT_UNITS, OAUTH_LOCK_TTL, OAUTH_WAIT_ATTEMPTS,
+    AccountService, CredentialActivity, DEFAULT_REQUEST_SLOT_UNITS, OAUTH_LOCK_TTL, OAUTH_WAIT_ATTEMPTS,
     OAUTH_WAIT_RETRY, build_oauth_credential_snapshot, validate_account_usage_limits,
 };
 use crate::error::AppError;
@@ -136,13 +136,23 @@ fn verify_retirement(
 }
 
 impl AccountService {
-    /// 在原刷新锁内读取同代AT与代次，业务侧仅取得AT。@param id 原账号。@param force 是否请求一次认证恢复。@return AT-only快照。
+    /// 在原刷新锁内读取同代 AT 与代次。@param id 原账号。@param force 是否请求一次认证恢复。@return AT 快照。
     pub async fn resolve_agy_access(
         &self,
         id: i64,
         force: bool,
     ) -> Result<AgyAccessSnapshot, AppError> {
-        let _activity = self.upstream_activity(id).await?;
+        self.resolve_agy_access_with_admission(id, force, None).await
+    }
+
+    /// 读取 AGY 凭据并核对原请求的准入许可。@param id 原账号。@param force 是否请求一次认证恢复。@param admission 原 API 凭据许可。@return AT 快照。
+    pub(crate) async fn resolve_agy_access_with_admission(
+        &self,
+        id: i64,
+        force: bool,
+        admission: Option<&CredentialActivity>,
+    ) -> Result<AgyAccessSnapshot, AppError> {
+        let _activity = self.upstream_activity_with_admission(id, admission).await?;
         let initial = self.store.agy_credential_state(id).await?;
         let key = format!("oauth:refresh:account:{id}");
         let owner = Uuid::new_v4().to_string();
@@ -592,6 +602,52 @@ impl AccountService {
         result
     }
 
+    /// 在与账号配置相同的锁内关闭新准入。@param id 网关账号。@param migration 原迁移。@return 持久门禁已登记。
+    pub(crate) async fn prepare_agy_migration(
+        &self,
+        id: i64,
+        migration: &str,
+    ) -> Result<(), AppError> {
+        let (key, owner) = self.acquire_oauth_credential_lock(id).await?;
+        let result = async {
+            let account = self.store.get_by_id(id).await?;
+            if !account.is_antigravity()
+                || self.store.agy_credential_state(id).await?.phase != "ready"
+            {
+                return Err(AppError::BadRequest("原反重力账号凭据需要核对".into()));
+            }
+            self.get_or_create_queue(id, account.concurrency)
+                .await
+                .runtime_gate
+                .prepare(migration)?;
+            Ok(())
+        }
+        .await;
+        self.cache.release_lock(&key, &owner).await;
+        result
+    }
+
+    /// 核对原账号可安全保存配置。@param account 正式账号。@return 当前迁移没有持有门禁。
+    pub(super) async fn require_agy_configuration_open(
+        &self,
+        account: &Account,
+    ) -> Result<(), AppError> {
+        let snapshot = self
+            .get_or_create_queue(account.id, account.concurrency)
+            .await
+            .runtime_gate
+            .snapshot();
+        if snapshot["lease"]["owner"]
+            .as_str()
+            .is_some_and(|owner| owner.starts_with("node-migration:"))
+        {
+            return Err(AppError::BadRequest(
+                "反重力账号正在迁移，请在原操作收口后保存配置".into(),
+            ));
+        }
+        Ok(())
+    }
+
     async fn update_agy_fields_locked(
         &self,
         id: i64,
@@ -621,6 +677,7 @@ impl AccountService {
         if !current.is_antigravity() || fields.keys().any(|key| !allowed.contains(&key.as_str())) {
             return Err(AppError::BadRequest("该字段不属于 AGY 账号配置".into()));
         }
+        self.require_agy_configuration_open(&current).await?;
         if fields
             .get("platform")
             .is_some_and(|value| value.as_str() != Some("antigravity"))

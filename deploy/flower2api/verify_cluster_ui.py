@@ -23,10 +23,11 @@ class ClusterUiFixture(Fixture):
         super().__init__(gateway)
         self.assignments = {number: {'account_id': number, 'node_id': 1, 'node_key': 'local', 'node_name': '默认节点',
             'kind': 'local', 'enabled': True, 'revision': 1, 'phase': 'ready'} for number in (1, 2)}
-        self.histories = {1: [], 2: []}
+        self.assignments['agy:1'] = {**self.assignments[1], 'migration_ready': True}
+        self.histories = {1: [], 2: [], 'agy:1': []}
         self.nodes = [{'id': number, 'node_key': 'local' if number == 1 else 'a' * 32,
             'name': '默认节点' if number == 1 else '上海执行节点', 'kind': 'local' if number == 1 else 'ssh',
-            'revision': 1, 'enabled': True, 'account_count': 1, 'host': None if number == 1 else 'node.example.invalid',
+            'revision': 1, 'enabled': True, 'account_count': 2 if number == 1 else 1, 'host': None if number == 1 else 'node.example.invalid',
             'port': 22, 'username': 'synthetic', 'data_root': '/srv/synthetic', 'host_key_sha256': 'SHA256:synthetic',
             'observation': None, 'preparation': None if number == 1 else {'state': 'prepared', 'updated_at': time.time()}}
             for number in (1, 2)]
@@ -98,9 +99,14 @@ class ClusterUiFixture(Fixture):
         elif match := re.fullmatch(r'/runtime/api/accounts/([12])/node', path):
             self.assignment_reads.append(int(match[1]))
             payload = self.assignments[int(match[1])]
-        elif match := re.fullmatch(r'/runtime/api/accounts/([12])/node-migrations(?:/([a-f0-9]{32})(?:/(resume|cancel))?)?', path):
+        elif path == '/runtime/api/agy-accounts/1/node':
+            self.assignment_reads.append('agy:1')
+            payload = self.assignments['agy:1']
+        elif match := re.fullmatch(r'/runtime/api/(?:accounts|agy-accounts)/([12])/node-migrations(?:/([a-f0-9]{32})(?:/(resume|cancel))?)?', path):
             account_id = int(match[1])
-            history = self.histories[account_id]
+            agy = '/agy-accounts/' in path
+            key = f'agy:{account_id}' if agy else account_id
+            history, assignment = self.histories[key], self.assignments[key]
             if request.method == 'GET':
                 if match[2]:
                     self.operation_reads += 1
@@ -112,9 +118,10 @@ class ClusterUiFixture(Fixture):
                 self.writes.append({'path': path, 'body': body})
                 if not match[2]:
                     assert re.fullmatch('[a-f0-9]{32}', body['operation_id'])
-                    assert body['revision'] == self.assignments[account_id]['revision']
+                    assert body['revision'] == assignment['revision']
+                    assert body['version'] == ('1.5.9' if agy else '2.1.293')
                     target = next(row for row in self.nodes if row['id'] == body['node_id'])
-                    source = next(row for row in self.nodes if row['id'] == self.assignments[account_id]['node_id'])
+                    source = next(row for row in self.nodes if row['id'] == assignment['node_id'])
                     payload = {'operation_id': body['operation_id'], 'account_id': account_id,
                         'source': {'id': source['id'], 'name': source['name']}, 'target': {'id': target['id'], 'name': target['name']},
                         'phase': 'reconcile', 'last_confirmed_phase': 'importing', 'message': '迁移需要核对',
@@ -122,7 +129,10 @@ class ClusterUiFixture(Fixture):
                         'running': False, 'can_resume': True, 'can_cancel': True, 'source_revision': body['revision'],
                         'target_revision': None, 'cancelling': False, 'created_at': time.time(), 'updated_at': time.time()}
                     history.insert(0, payload)
-                    self.assignments[account_id]['phase'] = 'maintenance'
+                    assignment['phase'] = 'maintenance'
+                    if agy:
+                        payload.update(phase='requested', last_confirmed_phase='requested', message='等待原工作完成',
+                            failure=None, running=True, can_resume=False)
                     self.start_entered.set()
                     if self.start_gate is not None:
                         await self.start_gate.wait()
@@ -135,8 +145,8 @@ class ClusterUiFixture(Fixture):
                     if match[3] == 'cancel':
                         assert payload['can_cancel']
                         payload.update(phase='cancelled', last_confirmed_phase='cancelled', message='迁移已取消',
-                            can_resume=False, can_cancel=False, cancelling=True)
-                        self.assignments[account_id]['phase'] = 'ready'
+                            can_resume=False, can_cancel=False, cancelling=True, running=False)
+                        assignment['phase'] = 'ready'
                     elif payload['phase'] == 'reconcile':
                         payload.update(failure=None, phase='committed', last_confirmed_phase='committed', message='归属已切换，正在激活目标', can_cancel=False)
                         self.assignments[account_id].update(node_id=payload['target']['id'], node_name=payload['target']['name'],
@@ -176,17 +186,27 @@ async def run(output: Path, gateway: Path) -> dict:
         node_card = page.locator('.node-card').filter(has=page.get_by_role('heading', name='上海执行节点', exact=True))
         local_card = page.locator('.node-card').filter(has=page.get_by_role('heading', name='默认节点', exact=True))
         await expect(page.get_by_role('alert')).to_contain_text('反重力账号归属读取失败')
-        await expect(local_card.locator('dd').last).to_have_text('—')
+        await expect(local_card.locator('dd').last).to_have_text('2')
         await expect(node_card.locator('dd').last).to_have_text('1')
         fixture.fail_agy_response = False
         await page.get_by_role('button', name='刷新列表', exact=True).click()
         await expect(local_card.locator('dd').last).to_have_text('2')
         await expect(page.locator('.nodes-summary')).to_contain_text('3 个归属账号')
         await select(page, '账号', '合成反重力（反重力 · 已停用）')
-        await expect(page.get_by_role('combobox', name='执行节点')).to_be_disabled()
-        await expect(page.locator('.account-node-selector')).to_contain_text('当前节点：默认节点 · 反重力 API 目前仅支持本机执行')
+        await expect(page.get_by_role('combobox', name='执行节点')).to_be_enabled()
+        await expect(page.locator('.account-node-selector')).to_contain_text('当前节点：默认节点 · 归属已保存')
         await expect(page.get_by_role('button', name='保存首次执行节点')).to_have_count(0)
-        assert not fixture.assignment_reads and not fixture.writes
+        assert fixture.assignment_reads == ['agy:1'] and not fixture.writes
+        await select(page, '执行节点', '上海执行节点')
+        await page.get_by_role('button', name='迁移到所选节点', exact=True).click()
+        await page.get_by_role('dialog', name='迁移账号环境', exact=True).get_by_role('button', name='开始迁移').click()
+        await expect(page.locator('.migration-status')).to_contain_text('等待原工作完成')
+        await page.get_by_role('button', name='取消迁移', exact=True).click()
+        await page.get_by_role('dialog', name='取消原迁移', exact=True).get_by_role('button', name='确认取消迁移').click()
+        await expect(page.locator('.migration-status')).to_contain_text('迁移已取消')
+        assert all('/agy-accounts/1/node-migrations' in write['path'] for write in fixture.writes)
+        assert len(fixture.writes) == 2 and fixture.assignments[1]['phase'] == 'ready'
+        fixture.writes.clear()
         await node_card.get_by_role('button', name='检查并同步组件', exact=True).click()
         installation = page.get_by_role('dialog', name='准备节点运行组件', exact=True)
         await installation.get_by_role('button', name='开始准备', exact=True).click()
@@ -306,7 +326,7 @@ async def run(output: Path, gateway: Path) -> dict:
         assert fixture.removal_attempts == 2
         assert not errors and not fixture.unexpected and not fixture.external, (errors, fixture.unexpected, fixture.external)
         await browser.close()
-    return {'passed': True, 'scenes': ['反重力本机归属与同数字身份隔离', '反重力列表失败及刷新恢复', '后台安装提交后关闭弹窗', '刷新页面恢复安装状态及轮询完成', '安装提交响应中断后只读核对', '冻结确认与取消零写入', '提交未知只核对原操作', '提交后继续目标激活',
+    return {'passed': True, 'scenes': ['反重力独立归属、迁移和排空取消', '反重力列表失败及刷新恢复', '后台安装提交后关闭弹窗', '刷新页面恢复安装状态及轮询完成', '安装提交响应中断后只读核对', '冻结确认与取消零写入', '提交未知只核对原操作', '提交后继续目标激活',
         '提交前取消保持源分配版本', '账号切换隔离', '停用独立账号迁移入口', '1440和390视口', '统一同步后台受理与阶段显示', '迁移固定原因与恢复动作', '未准备节点可选择并直接提交迁移',
         '改名后更新节点标题', '有归属账号时禁用移除', '确认清理范围及取消零写入', '移除进度、断线后续接与完成归档'], 'errors': errors, 'real_model_requests': 0}
 

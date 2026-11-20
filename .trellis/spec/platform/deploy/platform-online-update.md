@@ -164,7 +164,8 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 - 合同为按 key 排序、紧凑 UTF-8 JSON 登记的 SHA256。Python 冻结定义使用忽略文档/注释的 AST 摘要，Rust 使用测试段之前的纯定义原字节摘要。冻结 SQL、默认值、历史画像及命名空间依赖归纯迁移模块所有，普通业务查询和页面改动保持合同。
 - 发布校验与DDL扫描共用步骤ID到精确源路径的映射：gateway.baseline.1→database_schema.rs、gateway.proxies.2→proxy_schema.rs、gateway.proxy-sync.3→proxy_sync_schema.rs、gateway.session-policy-blocks.4→session_policy_block_schema.rs、gateway.account-platforms.5→account_platform_schema.rs、gateway.request-records.6→request_records_schema.rs，均位于网关src/store。仅当前登记中的对应路径拥有DDL定义；同名业务文件不豁免。每个网关步骤都核对源码摘要，未知步骤、缺失来源和摘要漂移在签发前拒绝。
 - bench映射为`bench.baseline.1→database_schema.py`、`bench.cluster.2→cluster_schema.py`、`bench.node-executions.3→node_execution_schema.py`、`bench.node-login-drafts.4→node_login_draft_schema.py`、`bench.agy-environments.5→agy_environment_schema.py`，均位于编排服务根。`system_release.BENCH_SCHEMA_SOURCES`与定义扫描共用该唯一来源表，每个已登记步骤均核对摘要；集群离线备份/换批沿[账号环境共同合同](../../orchestrator/backend/account-runtime-v3.md)及`deploy/flower2api/CLUSTER.md`。
-- AGY与集群共存时保留已发布bench1—4的身份与摘要，AGY环境增量位于版本5。旧开发分支`bench.agy-environments.2`与正式版本2存在身份分叉，继续在写入前受控拒绝；不得自动覆盖原台账。
+- AGY与集群共存时保留已发布bench1—5的身份与摘要。AGY节点分配增量 `bench.agy-nodes.6` 映射到 `orchestrator/agy_node_schema.py`，同一路径进入 `install_system_updater.SOURCE_FILES`。旧开发分支`bench.agy-environments.2`与正式版本2存在身份分叉，继续在写入前受控拒绝。
+- 安装或回退在冻结和排空快照检查 `agy_update_blockers`。当前远程 AGY 归属和未收口迁移会在切换中央或节点组件前给出处理原因。已验证停止且归档的远程环境保留历史。详见[反重力账号节点迁移](../../orchestrator/backend/agy-node-migration.md)。
 - 固定宿主源码包须在仓库外以`python -I`导入`manage/system_updater/system_release`。`install_system_updater.SOURCE_FILES`包含迁移执行器的全部纯定义依赖，AGY环境步骤对应`orchestrator/agy_environment_schema.py`；开发树的PYTHONPATH不能补足交付包漏项。
 - 临时迁移磁盘清单定义限`services/orchestrator/cluster_archive_schema.py`纯模块，由定义扫描核验；它在每次迁移私有临时目录建立和删除，不进入bench业务版本链。同名业务文件及业务模块中的DDL继续拒绝。
 - 自哈希Rust模块使用 `concat!("#[cfg(", "test)]")` 构造测试分隔标记，保证迁移执行和结构校验也进入摘要。源码内直接写完整分隔字符串会使字节切分提前停止。首次发布前修正新增定义需同步登记摘要；已发布步骤继续冻结。

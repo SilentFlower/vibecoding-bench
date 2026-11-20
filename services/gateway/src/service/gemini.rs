@@ -47,7 +47,7 @@ const AGY_TOOL_WAIT_LIMIT: Duration = Duration::from_secs(3600);
 /// 随原生工具轮保留的许可，下一HTTP请求共享同一份所有权。
 struct Admission {
     _slot: AccountSlotPermit,
-    _credentials: CredentialActivity,
+    credentials: CredentialActivity,
     _maintenance: UpdateActivity,
 }
 
@@ -880,7 +880,7 @@ async fn generate_inner(
                 .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })?;
             let admission = Arc::new(Admission {
                 _slot: slot,
-                _credentials: state.account_svc.upstream_activity(account.id).await?,
+                credentials: state.account_svc.upstream_activity(account.id).await?,
                 _maintenance: system_update::admission()?,
             });
             (
@@ -906,7 +906,11 @@ async fn generate_inner(
     diagnostics::error_stage("credentials");
     let snapshot = timeout_at(
         deadline,
-        state.account_svc.resolve_agy_access(account.id, false),
+        state.account_svc.resolve_agy_access_with_admission(
+            account.id,
+            false,
+            Some(&admission.credentials),
+        ),
     )
     .await
     .map_err(|_| AppError::ServiceUnavailable("AGY凭据等待超时".into()))??;
@@ -1320,6 +1324,9 @@ async fn drive(
                     account.id,
                     &attempt_id,
                     generation,
+                    transport
+                        .execution_location()
+                        .is_some_and(|location| location.assignment_revision.is_some()),
                     ingress.clone(),
                 );
                 ingress_sent = true;
@@ -1428,7 +1435,11 @@ async fn drive(
                     }
                     let refreshed = timeout_at(
                         deadline,
-                        account_service.resolve_agy_access(account.id, true),
+                        account_service.resolve_agy_access_with_admission(
+                            account.id,
+                            true,
+                            Some(&admission.credentials),
+                        ),
                     )
                     .await
                     .map_err(|_| AppError::ServiceUnavailable("AGY认证恢复到期".into()))??;

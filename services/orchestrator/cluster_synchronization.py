@@ -180,6 +180,10 @@ class NodeSynchronization:
                 stored = connection.execute("SELECT * FROM node_migrations WHERE operation_id=? AND "
                     "((source_node_id=? AND phase='completed') OR (target_node_id=? AND phase='cancelled'))",
                     (fence.get('operation_id'), node_id, node_id)).fetchone()
+                if stored is None and self.service.store.has_agy_nodes(connection):
+                    stored = connection.execute("SELECT * FROM agy_node_migrations WHERE operation_id=? AND "
+                        "((source_node_id=? AND phase='completed') OR (target_node_id=? AND phase='cancelled'))",
+                        (fence.get('operation_id'), node_id, node_id)).fetchone()
             finally:
                 connection.close()
             if stored is None:
@@ -302,6 +306,10 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
     def _rows(self, node_id: int) -> list[dict]:
         connection = self.service.store.database()
         try:
+            if self.service.store.has_agy_nodes(connection) and connection.execute(
+                    "SELECT 1 FROM agy_node_assignments WHERE node_id=? AND phase<>'retired'", (node_id,)).fetchone():
+                # 现有换批作业只能重新准备 CC 环境，保留 AGY 的所属节点继续提供服务。
+                raise NodeSynchronizationWait('节点仍有 AGY 执行归属，请迁回本机后同步组件')
             migrations = [dict(value) for value in connection.execute("SELECT * FROM node_migrations WHERE (source_node_id=? OR target_node_id=?) "
                 "AND phase NOT IN ('completed','cancelled')", (node_id, node_id))]
             paused = [value for value in migrations if paused_migration_record(value) is not None

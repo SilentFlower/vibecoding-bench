@@ -42,6 +42,13 @@ class ArchiveIdentity(BaseModel):
     assignment_revision: StrictInt = Field(ge=1)
 
 
+class AgyArchiveIdentity(ArchiveIdentity):
+    """给 AGY 归档绑定独立网关账号域。@param platform 固定平台。"""
+
+    platform: Literal['antigravity']
+    kernel: StrictStr | None = Field(default=None, pattern=r'^[a-f0-9]{64}$')
+
+
 class _HashReader:
     """对实际读取的字节计算摘要，并限制不可信包的总读取量。"""
     def __init__(self, source, maximum: int | None = None) -> None:
@@ -66,7 +73,28 @@ def _relative(value: str) -> None:
         raise ValueError('迁移清单包含非法相对路径')
 
 
-def _inventory(entries: dict) -> int:
+def _agy_archive_path(name: str, kernel: str | None) -> bool:
+    if name in ('.', 'runtime', 'runtime/cpu-resources.json', 'flows', 'flows/api',
+            'flows/api/observations.jsonl', 'flows/api/observations.jsonl.previous'):
+        return True
+    if name.split('/')[0] in ('projects', 'workspaces'):
+        return True
+    if kernel:
+        folder = 'runtime/sender/agy-kernels/' + kernel
+        if name in ('runtime/sender', 'runtime/sender/agy-kernels', folder) or name.startswith(folder + '/'):
+            return True
+    base = 'flows/api/agy-prepared'
+    if name in (base, base + '/ingress', base + '/egress'):
+        return True
+    for directory in (base, base + '/ingress', base + '/egress'):
+        snapshots = directory + '/snapshots'
+        if name == snapshots or name.startswith(snapshots + '/') and re.fullmatch(
+                r'[a-f0-9-]{36}\.json', name[len(snapshots) + 1:]):
+            return True
+    return False
+
+
+def _inventory(entries: dict, identity: ArchiveIdentity) -> int:
     if not isinstance(entries, Mapping) or not entries:
         raise ValueError('迁移文件清单大小无效')
     total = 0
@@ -76,6 +104,10 @@ def _inventory(entries: dict) -> int:
         if not isinstance(item, dict):
             raise ValueError('迁移文件条目无效')
         kind = item.get('kind')
+        if isinstance(identity, AgyArchiveIdentity) and (
+                not _agy_archive_path(name, identity.kernel)
+                or kind == 'symlink' and name.split('/')[0] not in ('projects', 'workspaces')):
+            raise ValueError('AGY 迁移清单包含派生状态或不受信文件类型')
         extra = {'directory': set(), 'file': {'size', 'sha256'}, 'symlink': {'target'}}.get(kind) if isinstance(kind, str) else None
         if extra is None or set(item) != {'kind', 'mode', 'uid', 'gid'} | extra:
             raise ValueError('迁移文件条目类型无效')
@@ -144,9 +176,10 @@ def create_environment_archive(root: Path, target: Path, identity: ArchiveIdenti
 
 
 def _create(root, target, identity, excluded, entries, manifest_path):
-    for name, item in iter_tree_inventory(root, set(excluded)):
+    include = (lambda name: _agy_archive_path(name, identity.kernel)) if isinstance(identity, AgyArchiveIdentity) else None
+    for name, item in iter_tree_inventory(root, set(excluded), include=include):
         entries.add(name, item)
-    total = _inventory(entries)
+    total = _inventory(entries, identity)
     with manifest_path.open('wb') as manifest:
         manifest_size = entries.write(manifest, identity.model_dump(), excluded)
     descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
@@ -179,7 +212,7 @@ def _create(root, target, identity, excluded, entries, manifest_path):
                         archive.addfile(member, reader)
                         if reader.digest.hexdigest() != item['sha256']:
                             raise ValueError('迁移期间源文件内容发生变化')
-            if not entries.compare(iter_tree_inventory(root, set(excluded))):
+            if not entries.compare(iter_tree_inventory(root, set(excluded), include=include)):
                 raise ValueError('迁移期间源环境发生变化')
         with target.open('rb') as output:
             os.fsync(output.fileno())
@@ -231,7 +264,7 @@ def _restore(reader: _HashReader, target: Path, identity: ArchiveIdentity, check
             raise ValueError('迁移包与本次源隔离身份不一致')
         _exclusions(manifest['excluded'])
         entries = manifest['entries']
-        total = _inventory(entries)
+        total = _inventory(entries, identity)
         if total > maximum_bytes or total > shutil.disk_usage(target.parent).free:
             raise ValueError('目标节点迁移暂存空间不足')
         target.mkdir(mode=0o700)

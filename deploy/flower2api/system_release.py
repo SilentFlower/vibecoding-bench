@@ -27,6 +27,7 @@ BENCH_SCHEMA_SOURCES = {
     'bench.node-executions.3': 'orchestrator/node_execution_schema.py',
     'bench.node-login-drafts.4': 'orchestrator/node_login_draft_schema.py',
     'bench.agy-environments.5': 'orchestrator/agy_environment_schema.py',
+    'bench.agy-nodes.6': 'orchestrator/agy_node_schema.py',
 }
 GATEWAY_SCHEMA_SOURCES = {
     'gateway.agy-safety.9': 'cc2api/src/store/agy_safety_schema.rs',

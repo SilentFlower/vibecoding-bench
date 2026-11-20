@@ -87,11 +87,12 @@ static MANAGEMENT_CLIENT: LazyLock<Result<Client, ReqwestError>> = LazyLock::new
 
 static AGY_INGRESS_WRITERS: Semaphore = Semaphore::const_new(2);
 
-/// 独立发布已脱敏入口，缺口仅记录诊断。@param account_id 已确认账号。@param attempt_id 实际尝试。@param generation 原环境代次。@param ingress 有界脱敏预览。@return 无。
+/// 独立发布已脱敏入口，缺口仅记录诊断。@param account_id 已确认账号。@param attempt_id 实际尝试。@param generation 原环境代次。@param remote 采集是否经过节点。@param ingress 有界脱敏预览。@return 无。
 pub(crate) fn publish_agy_ingress(
     account_id: i64,
     attempt_id: &str,
     generation: u64,
+    remote: bool,
     ingress: Value,
 ) {
     let Ok(permit) = AGY_INGRESS_WRITERS.try_acquire() else {
@@ -106,7 +107,11 @@ pub(crate) fn publish_agy_ingress(
         let result = client
             .post(path)
             .bearer_auth(token)
-            .timeout(Duration::from_millis(250))
+            .timeout(if remote {
+                SESSION_TIMEOUT
+            } else {
+                Duration::from_millis(250)
+            })
             .json(&json!({"environment_generation":generation,"ingress":ingress}))
             .send()
             .await;
@@ -530,11 +535,18 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
                 && matches!(*method, Method::GET | Method::PUT)
         });
     }
-    if let Some(account) = api_path.strip_prefix("accounts/") {
+    if api_path == "agy-accounts/nodes" {
+        return *method == Method::GET;
+    }
+    let agy = api_path.starts_with("agy-accounts/");
+    if let Some(account) = api_path
+        .strip_prefix("accounts/")
+        .or_else(|| api_path.strip_prefix("agy-accounts/"))
+    {
         let mut parts = account.split('/');
         let id = parts.next().unwrap_or_default();
         let resource = parts.next();
-        if resource == Some("work-control") {
+        if resource == Some("work-control") && !agy {
             return parts.next().is_none()
                 && id.bytes().all(|value| value.is_ascii_digit())
                 && id.parse::<i64>().is_ok_and(|value| value > 0)
@@ -548,7 +560,8 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
                 return false;
             }
             if resource == Some("node") {
-                return parts.next().is_none() && matches!(*method, Method::GET | Method::PUT);
+                return parts.next().is_none()
+                    && (*method == Method::GET || !agy && *method == Method::PUT);
             }
             let Some(operation) = parts.next() else {
                 return matches!(*method, Method::GET | Method::POST);
@@ -565,6 +578,9 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
                 Some("resume" | "cancel") => *method == Method::POST && parts.next().is_none(),
                 _ => false,
             };
+        }
+        if agy {
+            return false;
         }
     }
     if api_path == "nodes" {
@@ -655,10 +671,14 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
 /// @param path 不含查询字符串的管理路径。
 /// @return 普通状态读取的期限，其它请求沿用既有生命周期。
 fn status_timeout(method: &Method, path: &str) -> Option<Duration> {
-    let account_node_status = path.strip_prefix("/api/accounts/").is_some_and(|value| {
-        matches!(value.split('/').nth(1), Some("node" | "node-migrations"))
-            && browser_path_allowed(method, path)
-    });
+    let account_node_status = path == "/api/agy-accounts/nodes"
+        || path
+            .strip_prefix("/api/accounts/")
+            .or_else(|| path.strip_prefix("/api/agy-accounts/"))
+            .is_some_and(|value| {
+                matches!(value.split('/').nth(1), Some("node" | "node-migrations"))
+                    && browser_path_allowed(method, path)
+            });
     let account_work_status = path.ends_with("/work-control") && browser_path_allowed(method, path);
     if *method == Method::GET
         && (path.starts_with("/api/system-updates/") || account_node_status || account_work_status)
@@ -1196,6 +1216,25 @@ mod tests {
             ),
         ] {
             assert!(!browser_path_allowed(&method, &invalid), "{invalid}");
+        }
+        let agy = format!("/api/agy-accounts/1/node-migrations/{operation}");
+        for (method, path) in [
+            (Method::GET, "/api/agy-accounts/nodes".to_owned()),
+            (Method::GET, "/api/agy-accounts/1/node".to_owned()),
+            (Method::POST, "/api/agy-accounts/1/node-migrations".to_owned()),
+            (Method::GET, agy.clone()),
+            (Method::POST, format!("{agy}/cancel")),
+            (Method::POST, format!("{agy}/resume")),
+        ] {
+            assert!(browser_path_allowed(&method, &path), "{path}");
+        }
+        for (method, path) in [
+            (Method::PUT, "/api/agy-accounts/1/node".to_owned()),
+            (Method::GET, "/api/agy-accounts/1/work-control".to_owned()),
+            (Method::GET, "/api/agy-accounts/0/node".to_owned()),
+            (Method::POST, format!("{agy}/cancel/extra")),
+        ] {
+            assert!(!browser_path_allowed(&method, &path), "{path}");
         }
     }
 

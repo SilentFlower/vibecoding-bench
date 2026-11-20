@@ -23,6 +23,8 @@ from starlette.concurrency import run_in_threadpool
 from uvicorn import Config, Server
 
 from cluster_execution import NodeExecution, NodeLocation, execute_operation
+from agy_node import AgyNode
+from agy_node_contract import AGY_NODE_OPERATIONS, AGY_NODE_SHORT
 from cluster_quiesce import NodeQuiesce, quiesce_node
 from cluster_execution_grants import ExecutionGrant, ExecutionGrants, ExecutionScope
 from cluster_draft_login import NodeDraftLogins
@@ -77,6 +79,9 @@ def create_node_app(executor: NodeExecution, host: NodeRuntimeHost, token: str, 
         raise ValueError('节点私有服务安装范围或认证无效')
     grants = ExecutionGrants(executor.data, executor.node_key, executor.deployment, executor.database)
     host.attach_grants(grants)
+    # AGY 请求本身由发送器持有；节点配置按单次操作注入，避免写入工程账号的长驻快照。
+    agy = AgyNode(NodeExecution(executor.data, executor.host_data, executor.node_key, executor.deployment,
+        executor.client, runtime_factory=host.runtime_factory))
     terminals = NodeTerminals(executor, host, grants)
     snapshots = NodeWorkspaceSnapshots(terminals)
     quotas = NodeTerminalQuota(terminals)
@@ -125,6 +130,8 @@ def create_node_app(executor: NodeExecution, host: NodeRuntimeHost, token: str, 
                     raise ValueError('节点健康检查输入无效')
                 value = {'protocol': 1, 'node_key': executor.node_key, 'deployment': executor.deployment,
                     'release': release, 'state': 'ready'}
+            elif operation in AGY_NODE_OPERATIONS:
+                value = agy.call(operation, strict_json(raw, 2 * 1024 * 1024))
             elif operation in ('stage-preparation-files', 'prepare-files'):
                 request = PreparationFiles.model_validate(strict_json(raw, 2 * 1024 * 1024))
                 value = (stage_preparation_files if operation == 'stage-preparation-files' else prepare_from_files)(executor, request)
@@ -294,6 +301,9 @@ def create_node_app(executor: NodeExecution, host: NodeRuntimeHost, token: str, 
             result = {'ok': False, 'reason': 'node_preparation_failed', 'error_type': type(error).__name__}
             if operation in ('fence', 'export', 'verify-import', 'prepare-import', 'revoke-import', 'restore-source', 'stage-import'):
                 result['failure'] = migration_failure(error, operation)
+            elif operation in AGY_NODE_OPERATIONS and operation.removeprefix('agy-') in (
+                    'preflight', 'fence', 'export', 'verify-import', 'prepare-import', 'activate-import', 'revoke-import', 'restore-source'):
+                result['failure'] = migration_failure(error, operation.removeprefix('agy-'))
             return result
 
     @app.post('/operations/{operation}')
@@ -307,7 +317,7 @@ def create_node_app(executor: NodeExecution, host: NodeRuntimeHost, token: str, 
         supplied = request.headers.get('x-v3-node-token', '')
         if not re.fullmatch('[a-f0-9]{64}', supplied) or not compare_digest(token, supplied):
             return JSONResponse({'ok': False, 'reason': 'node_authentication_failed'}, status_code=401)
-        control = operation in DRAFT_LOGIN_SHORT_OPERATIONS or operation in ('health', 'grant-renew', 'grant-close', 'grant-get', 'terminal-get', 'terminal-input',
+        control = operation in AGY_NODE_SHORT or operation in DRAFT_LOGIN_SHORT_OPERATIONS or operation in ('health', 'grant-renew', 'grant-close', 'grant-get', 'terminal-get', 'terminal-input',
             'terminal-quota-state', 'terminal-verification-get', 'run-get', 'run-poll', 'run-quota-state', 'run-refresh-get',
             'continue-get', 'continue-input', 'continue-quota-state', 'credential-refresh-get', 'credential-status',
             'credential-material','credential-identity','credential-usage-get','credential-owner-get',

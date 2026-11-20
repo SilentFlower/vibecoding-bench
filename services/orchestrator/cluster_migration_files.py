@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 
 from account_runtime import _read_json
 from cli_scratchpad import SCRATCHPAD_RUNTIME, scratchpad_runtime_registered
-from cluster_archive import ArchiveIdentity, _checksum, create_environment_archive, restore_environment_archive
+from cluster_archive import AgyArchiveIdentity, ArchiveIdentity, _checksum, create_environment_archive, restore_environment_archive
 from cluster_environment import EnvironmentFence
 from cluster_owner_state import pending_owner_transition
 from runtime_files import atomic_json, private_directory
@@ -70,7 +70,7 @@ class ArchiveDescriptor(BaseModel):
     """
 
     model_config = ConfigDict(extra='forbid')
-    identity: ArchiveIdentity
+    identity: AgyArchiveIdentity | ArchiveIdentity
     attempt_id: StrictStr = Field(pattern=r'^[a-f0-9]{32}$')
     sha256: StrictStr = Field(pattern=r'^[a-f0-9]{64}$')
     bytes: StrictInt = Field(ge=0)
@@ -166,6 +166,11 @@ class MigrationFiles:
                 raise ValueError('原导出回执或文件已变化')
             return result
         excluded = dict(ENVIRONMENT_EXCLUSIONS)
+        if isinstance(identity, AgyArchiveIdentity):
+            # 归档白名单仅保留已核验的内核候选，发送器绑定及宿主工作副本由目标生成。
+            excluded.pop('runtime/sender')
+            excluded.update({name: '目标按当前网关配置和节点证书重建' for name in (
+                'home', 'controls', 'ca', 'cli', 'runtime/agy-capacity.json', 'runtime/sender/sender.json')})
         # 仅双份协议已核验的宿主挂载工作目录可重建，未知同名资料继续随包保全。
         if scratchpad_runtime_registered(root, identity.environment_id):
             excluded[SCRATCHPAD_RUNTIME] = '目标按原持久临时文件布局重建私有挂载目录，源宿主工作目录保留'

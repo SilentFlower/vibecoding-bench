@@ -441,6 +441,8 @@ class HostDeployment:
                     {**current['selection']['control'], 'digest': current['selection']['control']['config_digest']}):
                 raise ValueError('实际控制服务与当前安装记录不符')
         evidence = self._runtime_snapshot(central_only, control_only=True) if control_only else self._runtime_snapshot(central_only)
+        if evidence.get('agy_update_blockers'):
+            raise ValueError('。'.join(evidence['agy_update_blockers']))
         deadline = time.monotonic() + 5
         while evidence.get('phase') == 'blocked' and evidence.get('ready') is not True:
             # 已排空后的冻结必须使用完整快照；历史程序的只读占锁不能变成缺失角色来源。
@@ -476,6 +478,8 @@ class HostDeployment:
         """
         rolling = operation.get('rolling_accounts') is True
         runtime = self._runtime_snapshot(True, control_only=True) if rolling else self._runtime_snapshot(operation.get('fast_transition', False))
+        if runtime.get('agy_update_blockers'):
+            raise ValueError('。'.join(runtime['agy_update_blockers']))
         gateway = self.request('gateway', '/admin/runtime/system-update/status')
         if any(value.get('phase') != 'blocked' or value.get('epoch') != operation['epoch'] for value in (gateway, runtime)):
             raise ValueError('部署维护接管代次不一致')

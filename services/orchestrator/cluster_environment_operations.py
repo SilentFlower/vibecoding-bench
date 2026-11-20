@@ -14,4 +14,4 @@ def response_limit(operation: str) -> int:
     :param operation: 固定私有操作名。
     :return: 请求快照允许原6MiB文件及JSON信封，其余容纳原2MiB列表及JSON信封。
     """
-    return 8 * 1024 * 1024 if operation == 'environment-capture-read' else 4 * 1024 * 1024
+    return 8 * 1024 * 1024 if operation in ('environment-capture-read', 'agy-capture-read') else 4 * 1024 * 1024

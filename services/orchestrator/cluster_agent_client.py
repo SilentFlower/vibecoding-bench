@@ -12,6 +12,7 @@ from pathlib import Path
 from cluster_draft_login_operations import DRAFT_LOGIN_OPERATIONS, DRAFT_LOGIN_SHORT_OPERATIONS
 from cluster_owner_operations import OWNER_OPERATIONS
 from cluster_environment_operations import ENVIRONMENT_OPERATIONS, response_limit
+from agy_node_contract import AGY_NODE_LONG, AGY_NODE_OPERATIONS, AGY_NODE_SHORT
 from system_update_contract import strict_json
 
 
@@ -53,6 +54,7 @@ def node_agent_request(data: Path, token: str, operation: str, raw: bytes) -> di
     allowed.update(DRAFT_LOGIN_OPERATIONS)
     allowed.update(OWNER_OPERATIONS)
     allowed.update(ENVIRONMENT_OPERATIONS)
+    allowed.update(AGY_NODE_OPERATIONS)
     if operation not in allowed or not re.fullmatch('[a-f0-9]{64}', token) or len(raw) > 2 * 1024 * 1024:
         raise ValueError('节点私有操作或认证格式无效')
     timeout = 15 if operation in DRAFT_LOGIN_SHORT_OPERATIONS else 600 if operation in ('export', 'verify-import', 'terminal-assets', 'terminal-snapshot', 'terminal-snapshot-get', 'run-snapshot', 'run-snapshot-get') else 15 if operation in (
@@ -62,6 +64,10 @@ def node_agent_request(data: Path, token: str, operation: str, raw: bytes) -> di
         'terminal-capture', 'terminal-reconcile', 'terminal-verification-get', 'run-verification-get', 'run-project-facts', 'run-project-native', 'run-get', 'run-poll', 'run-quota-state', 'run-quota-read', 'run-artifact', 'run-files', 'run-file', 'run-stats', 'run-capture', 'run-session', 'run-refresh', 'run-refresh-get', 'run-owner-refresh-defer', 'continue-get', 'continue-input', 'continue-quota-state', 'continue-quota-read', 'continue-quota-control', 'continue-credentials') else 115
     if operation in ('export', 'verify-import', 'prepare-import', 'prepare-files'):
         timeout = None
+    if operation in AGY_NODE_LONG:
+        timeout = None
+    elif operation in AGY_NODE_SHORT:
+        timeout = 15
     connection = _NodeConnection(data / 'node-agent/control.sock', timeout)
     try:
         connection.request('POST', '/operations/' + operation, body=raw,

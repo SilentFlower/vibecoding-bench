@@ -924,8 +924,18 @@ async fn runtime_lease_update(
         None
     };
     let account = state.account_svc.get_account(id).await?;
+    let agy_migration = account.is_antigravity()
+        && input
+            .owner
+            .strip_prefix("node-migration:")
+            .is_some_and(|operation| {
+                operation.len() == 32
+                    && operation
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            });
     if account.is_antigravity()
-        && (!input.owner.starts_with("maintenance:")
+        && (!(input.owner.starts_with("maintenance:") || agy_migration)
             || !matches!(
                 input.operation.as_str(),
                 "prepare" | "claim" | "heartbeat" | "release"
@@ -953,7 +963,11 @@ async fn runtime_lease_update(
         .get_or_create_queue(id, account.concurrency)
         .await;
     if input.operation == "prepare" {
-        queue.runtime_gate.prepare(&input.owner)?;
+        if agy_migration {
+            state.account_svc.prepare_agy_migration(id, &input.owner).await?;
+        } else {
+            queue.runtime_gate.prepare(&input.owner)?;
+        }
     } else if input.operation == "prepare-cli" {
         queue.runtime_gate.prepare_cli(&input.owner)?;
     } else if input.operation == "prepare-cli-shared" {
