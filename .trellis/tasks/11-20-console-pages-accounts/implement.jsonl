@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/web/frontend/ui-guidelines.md", "reason": "组件库层叠与 token 规则、组合组件签名、账号卡片与工作区合同、响应式列数合同、测试命令"}
+{"file": ".trellis/spec/web/frontend/frontend-guidelines.md", "reason": "apps/web 技术栈与通用前端约定"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "复用 Toolbar、Segmented、ModalDialog、NoticeStrip 等现有组件，避免页面内重复实现"}
+{"file": ".trellis/tasks/11-19-console-ui-shell/design.md", "reason": "子任务 2 的组合组件 API、类名契约、脚本分诊与回归方法，本任务沿用"}
+{"file": ".trellis/tasks/11-19-console-ui-pages/prd.md", "reason": "上级需求与分批边界"}
+{"file": ".trellis/tasks/11-19-console-ui-revamp/prd.md", "reason": "父任务 R7 与跨子任务验收"}
