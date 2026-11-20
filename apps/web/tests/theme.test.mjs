@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 import { contrast } from '../src/theme/color.ts';
 import { DEFAULT_THEME_SEED, THEME_PRESETS, createTheme, parseThemeSeed } from '../src/theme/tokens.ts';
-import { THEME_STORAGE_KEY, readStoredTheme, writeStoredTheme } from '../src/theme/runtime.ts';
+import { THEME_MODE_STORAGE_KEY, THEME_STORAGE_KEY, readStoredTheme, readThemeMode, resolveScheme, writeStoredTheme, writeThemeMode } from '../src/theme/runtime.ts';
 import { THEME_SEED_KEYS, changedSeedKeys, normalizeHexInput, parseSeedNumber, presetIdOf } from '../src/theme/editor.ts';
 
 const foundation = readFileSync(new URL('../../legacy-web/ui-foundation.css', import.meta.url), 'utf8');
@@ -14,10 +14,122 @@ const hexOf = (vars, name) => {
   return vars[name];
 };
 
+/** 取出 ui-foundation.css 中指定选择器块的正文（块内没有嵌套花括号）。 */
+const block = selector => {
+  const start = foundation.indexOf(`${selector} {`);
+  assert.ok(start >= 0, selector);
+  return foundation.slice(foundation.indexOf('{', start) + 1, foundation.indexOf('}', start));
+};
+const themeVars = css => Object.fromEntries([...css.matchAll(themable)].map(([, name, value]) => [name, normalize(value)]));
+const normalized = vars => Object.fromEntries(Object.entries(vars).map(([name, value]) => [name, normalize(value)]));
+const lightBlock = block(':root');
+const darkBlock = block(':root[data-ui-scheme=dark]');
+
 test('默认主题与 ui-foundation.css 默认值逐项一致（双向）', () => {
-  const css = Object.fromEntries([...foundation.matchAll(themable)].map(([, name, value]) => [name, normalize(value)]));
-  const vars = Object.fromEntries(Object.entries(createTheme(DEFAULT_THEME_SEED)).map(([name, value]) => [name, normalize(value)]));
-  assert.deepEqual(css, vars);
+  assert.deepEqual(themeVars(lightBlock), normalized(createTheme(DEFAULT_THEME_SEED)));
+  assert.match(lightBlock, /color-scheme:\s*light;/);
+});
+
+test('深色默认主题与 ui-foundation.css 深色块逐项一致（双向，深色块只写与浅色不同的值）', () => {
+  const dark = themeVars(darkBlock);
+  assert.deepEqual({ ...themeVars(lightBlock), ...dark }, normalized(createTheme(DEFAULT_THEME_SEED, 'dark')));
+  for (const [name, value] of Object.entries(dark)) assert.notEqual(value, themeVars(lightBlock)[name], `${name} 与浅色相同，不应重复写入`);
+  assert.match(darkBlock, /color-scheme:\s*dark;/);
+});
+
+test('深色派生与确认稿 palette.js 逐值一致（六个预设与四个功能色）', () => {
+  const source = readFileSync(new URL('../../../doc/design/console-v2/palette.js', import.meta.url), 'utf8');
+  const palette = JSON.parse(source.slice(source.indexOf('{'), source.lastIndexOf('}') + 1));
+  assert.deepEqual(palette.presets.map(preset => preset.seed), THEME_PRESETS.map(preset => preset.primary));
+  for (const preset of palette.presets) {
+    const vars = createTheme({ ...DEFAULT_THEME_SEED, primary: preset.seed }, 'dark');
+    for (const [key, name] of [['base', ''], ['hover', '-hover'], ['container', '-container'], ['text', '-text'], ['ring', '-ring']]) {
+      assert.equal(vars[`--ui-color-primary${name}`], preset[key], `${preset.id} ${key}`);
+    }
+    assert.equal(vars['--ui-color-on-primary'], preset.on, `${preset.id} on`);
+  }
+  for (const tone of palette.tones) {
+    const vars = createTheme({ ...DEFAULT_THEME_SEED, [tone.id]: tone.seed }, 'dark');
+    assert.deepEqual([vars[`--ui-color-${tone.id}`], vars[`--ui-color-${tone.id}-text`], vars[`--ui-color-${tone.id}-bg`]], [tone.base, tone.text, tone.bg], tone.id);
+  }
+});
+
+test('深色下预设与边界色：按钮文字 ≥ 4.5、实色对卡片底 ≥ 3、派生文字 ≥ 5.5，中性正文 ≥ 4.5', () => {
+  const colors = [...THEME_PRESETS.map(preset => preset.primary), '#ffee00', '#111111', '#000000', '#ff00ff', '#00ffff', '#808080', '#ffffff'];
+  for (const color of colors) {
+    for (const surface of ['default', 'soft']) {
+      const vars = createTheme({ ...DEFAULT_THEME_SEED, primary: color, success: color, warning: color, danger: color, info: color, surface }, 'dark');
+      const card = hexOf(vars, '--ui-color-surface');
+      const primary = hexOf(vars, '--ui-color-primary');
+      assert.ok(contrast(hexOf(vars, '--ui-color-on-primary'), primary) >= 4.5, `${color} 按钮文字`);
+      assert.ok(contrast(primary, card) >= 3, `${color} 实色/卡片底`);
+      for (const background of ['--ui-color-primary-container', '--ui-color-surface']) {
+        assert.ok(contrast(hexOf(vars, '--ui-color-primary-text'), hexOf(vars, background)) >= 5.5, `${color} 主色文字/${background}`);
+      }
+      for (const tone of ['success', 'warning', 'danger', 'info']) {
+        assert.ok(contrast(hexOf(vars, `--ui-color-${tone}`), card) >= 3, `${color} ${tone} 实色`);
+        for (const background of [`--ui-color-${tone}-bg`, '--ui-color-surface']) {
+          assert.ok(contrast(hexOf(vars, `--ui-color-${tone}-text`), hexOf(vars, background)) >= 5.5, `${color} ${tone}/${background}`);
+        }
+      }
+      for (const [text, background] of [['text', 'surface'], ['text-2', 'surface'], ['text-3', 'surface'], ['text', 'layout'], ['text-3', 'layout'], ['text-3', 'fill-subtle'],
+        ['neutral-text', 'neutral-bg'], ['cc-text', 'cc-bg'], ['agy-text', 'agy-bg'], ['feedback-text', 'feedback-surface'], ['ink-text', 'ink']]) {
+        assert.ok(contrast(hexOf(vars, `--ui-color-${text}`), hexOf(vars, `--ui-color-${background}`)) >= 4.5, `${color} ${surface} ${text}/${background}`);
+      }
+    }
+  }
+});
+
+test('新增 token：开关滑块随深浅变化，终端配色两种模式相同，深浅输出键集合一致', () => {
+  const light = createTheme(DEFAULT_THEME_SEED);
+  const dark = createTheme(DEFAULT_THEME_SEED, 'dark');
+  assert.equal(light['--ui-color-knob'], '#ffffff');
+  assert.equal(dark['--ui-color-knob'], '#eceef6');
+  const terminal = ['fg', 'dim', 'cursor', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan'].map(name => `--ui-color-term-${name}`);
+  assert.deepEqual(terminal.map(name => light[name]), ['#d9dbe8', '#8a8ea6', '#ed6ea7', '#f47174', '#4cd6a3', '#f7b94d', '#8fadf8', '#c3a6f5', '#5fd1d7']);
+  assert.deepEqual(terminal.map(name => dark[name]), terminal.map(name => light[name]));
+  // 终端文字在两种模式的墨底上都可读。
+  for (const vars of [light, dark]) for (const name of terminal.filter(name => !name.endsWith('dim'))) assert.ok(contrast(vars[name], vars['--ui-color-ink']) >= 4.5, name);
+  assert.deepEqual(Object.keys(dark).sort(), Object.keys(light).sort());
+  assert.deepEqual(Object.keys(createTheme({ ...DEFAULT_THEME_SEED, surface: 'soft', primary: '#2f6bd8' }, 'dark')).sort(), Object.keys(light).sort());
+});
+
+test('主题模式：缺失、非法、读取抛错按跟随系统；保存跟随系统删除键；解析深浅', () => {
+  const memory = new Map();
+  const storage = { getItem: key => memory.get(key) ?? null, setItem: (key, value) => memory.set(key, value), removeItem: key => memory.delete(key) };
+  assert.equal(THEME_MODE_STORAGE_KEY, 'flower2api.theme-mode');
+  assert.equal(readThemeMode(storage), 'system');
+  for (const raw of ['', 'Dark', 'auto', '{"mode":"dark"}', 'system ']) {
+    memory.set(THEME_MODE_STORAGE_KEY, raw);
+    assert.equal(readThemeMode(storage), 'system', raw);
+  }
+  for (const mode of ['light', 'dark']) {
+    assert.equal(writeThemeMode(mode, storage), true);
+    assert.equal(memory.get(THEME_MODE_STORAGE_KEY), mode);
+    assert.equal(readThemeMode(storage), mode);
+  }
+  assert.equal(writeThemeMode('system', storage), true);
+  assert.equal(memory.has(THEME_MODE_STORAGE_KEY), false);
+  const broken = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); }, removeItem() { throw new Error('denied'); } };
+  assert.equal(readThemeMode(broken), 'system');
+  assert.equal(writeThemeMode('dark', broken), false);
+  assert.equal(readThemeMode(undefined), 'system');
+  assert.equal(writeThemeMode('dark', undefined), false);
+  assert.deepEqual([['system', false], ['system', true], ['light', true], ['dark', false]].map(([mode, prefersDark]) => resolveScheme(mode, prefersDark)), ['light', 'dark', 'light', 'dark']);
+});
+
+test('首帧内联脚本：两份入口读取同一模式键并写 data-ui-scheme', () => {
+  for (const path of ['../index.html', '../../legacy-web/index.html']) {
+    const html = readFileSync(new URL(path, import.meta.url), 'utf8');
+    const head = html.slice(0, html.indexOf('</head>'));
+    const inline = [...head.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => match[1]).find(script => script.includes('uiScheme'));
+    assert.ok(inline, `${path} 缺少首帧脚本`);
+    assert.ok(inline.includes(`'${THEME_MODE_STORAGE_KEY}'`), `${path} 模式键`);
+    assert.ok(inline.includes('prefers-color-scheme: dark'), `${path} 系统偏好`);
+    // 首帧脚本必须在任何样式表与模块脚本之前执行。
+    assert.ok(head.indexOf(inline) < Math.min(...['<link rel="stylesheet"', '<script type="module"', '<script src'].map(tag => head.indexOf(tag)).filter(index => index >= 0), Infinity), `${path} 脚本顺序`);
+    assert.doesNotMatch(html, /dataset\.theme\s*=/, `${path} 仍写死 data-theme`);
+  }
 });
 
 test('默认主题取第二版设计稿手调值', () => {
@@ -168,6 +280,9 @@ test('组件样式不写死颜色，圆角只取 token', () => {
     new URL('../src/settings.css', import.meta.url),
     new URL('../src/theme-settings.css', import.meta.url),
     new URL('../src/native-environment.css', import.meta.url),
+    // 旧层与全局排版：shadcn 变量改指第二版 token，全仓颜色字面量只剩 token 定义处。
+    new URL('../src/style.css', import.meta.url),
+    new URL('../src/approved-design.css', import.meta.url),
     ...legacySheets,
   ];
   // 外壳组件、系统更新弹窗、账号页、请求 / 代理 / 令牌 / 会话封禁四页、节点管理、系统设置、主题设置、任务与工程宿主、运行环境及其子组件与组件库同样只取 token。

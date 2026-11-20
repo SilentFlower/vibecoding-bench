@@ -652,29 +652,29 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 /* xterm 把主题底色写在 viewport 的行内样式上，这里必须用 !important 才能让容器底色透出来。 */
 .xterm-host .xterm-viewport { background: transparent !important; }
 
-/* 浅色模式下终端仍保持深色（终端配色不应被主题影响） */
-[data-theme="light"] .xterm-host {
+/* 终端两种模式都是墨色底；xterm 自身配色由 app.js 从 --ui-color-term-* 读取，背景透明，由这里的墨色给出。 */
+.xterm-host {
   background: var(--ui-color-ink);
   border-color: var(--ui-color-ink);
 }
 
 /* ============================================================
-   [data-theme="light"] 补充规则（任务工作区与独立入口固定浅色）
+   阅读表面、选区与滚动条补充规则（两种深浅通用，取值都是 token）
    ============================================================ */
 
 /* 详情面板的 transcript 与文件树用浅色阅读表面 */
-[data-theme="light"] .detail-section pre,
-[data-theme="light"] .file-tree {
+.detail-section pre,
+.file-tree {
   background-color: var(--ui-color-warning-bg);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ui-color-warning) 28%, var(--ui-color-surface));
 }
 
 /* 选区取主色 */
-[data-theme="light"] ::selection { background: var(--ui-color-primary); color: var(--ui-color-on-primary); }
+::selection { background: var(--ui-color-primary); color: var(--ui-color-on-primary); }
 
-/* 滚动条 thumb 在浅底要更暗才看得清 */
-[data-theme="light"] *::-webkit-scrollbar-thumb { background: var(--ui-color-line); }
-[data-theme="light"] *::-webkit-scrollbar-thumb:hover { background: var(--ui-color-primary); }
+/* 滚动条 thumb 取分隔线色，悬停取主色 */
+*::-webkit-scrollbar-thumb { background: var(--ui-color-line); }
+*::-webkit-scrollbar-thumb:hover { background: var(--ui-color-primary); }
 
 /* ============================================================
    Auth · 登录模态框 + 状态行用户 pill
@@ -795,17 +795,17 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 }
 
 /* ============================================================
-   Auth 与粘贴助手的 [data-theme="light"] 补充规则
+   Auth 与粘贴助手的补充规则
    ============================================================ */
-[data-theme="light"] .auth-banner { background: var(--ui-color-fill-subtle); }
-[data-theme="light"] .auth-error {
+.auth-banner { background: var(--ui-color-fill-subtle); }
+.auth-error {
   background: var(--ui-color-danger-bg);
   border-color: color-mix(in srgb, var(--ui-color-danger) 28%, var(--ui-color-surface));
 }
-[data-theme="light"] .auth-pill {
+.auth-pill {
   background: var(--ui-color-warning-bg);
 }
-[data-theme="light"] .paste-helper .hint code {
+.paste-helper .hint code {
   background: var(--ui-color-warning-bg);
   border-color: var(--ui-color-line);
 }

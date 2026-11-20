@@ -74,11 +74,11 @@ function openModal() / closeModal() + 全局点击委托
 // ============ utils ============
 function escapeHTML() / formatSize()
 
-// ============ chrome(theme / clock / shortcuts)============
-function setupTheme() / startClock() / bindShortcuts()
+// ============ chrome(clock / shortcuts)============
+function startClock() / bindShortcuts()
 
 // ============ 启动 ============
-navigate(); setupTheme(); startClock(); bindShortcuts();
+navigate(); startClock(); bindShortcuts();
 ```
 
 **何时新增节** vs **何时塞进现有节**:
@@ -121,4 +121,4 @@ navigate(); setupTheme(); startClock(); bindShortcuts();
 - **新增一个 tab 的全套改动**:`renderTasks()` 的实现 + `ROUTES.tasks` 注册 + `<template id="tpl-tasks">` + `.tabs <a data-tab="tasks">`
 - **典型列表渲染**:`paintRuns()` 展示了"`map(item => template-literal HTML).join('') || empty-state HTML`"的标准写法
 - **modal 两步流**:`openAccLoginModal → startAccLogin → attachAccLoginTerminal → commitAccLogin → endAccLogin` 是"前端两步流 + 后端 session 容器"的完整范式
-- **CSS 主题切换**:`:root { ... }` 暗色为默认,`[data-theme="light"] { --bg: ...; ... }` 在 line 942+ 仅覆写颜色变量,组件 CSS 全部走 `var(--xxx)`,无须为浅色重写组件
+- **CSS 深浅切换**:原生 CSS 只引用 `--ui-*` token,浅色默认值在 `ui-foundation.css` 的 `:root`,深色在 `:root[data-ui-scheme=dark]`(只写与浅色不同的值);文档根 `data-ui-scheme` 由 `index.html` 首帧脚本写入,组件 CSS 无须为深色重写或加限定

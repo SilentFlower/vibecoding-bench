@@ -9,7 +9,7 @@
 前端代码质量目标按优先级:
 
 1. **零构建保活**(不引 npm / 构建工具,改完保存浏览器刷新即可)
-2. **跟随主题**(保存的主题对原生页生效;深色模式由控制台改版子任务 7 接入)
+2. **跟随主题**(保存的主题与深浅对原生页生效;独立 `/runtime/` 文档跟随深浅、只用默认配色)
 3. **无 XSS**(任何用户数据进 DOM 必过 `escapeHTML`)
 4. **快捷键 + Esc 不断**(原生工作区的键盘可达性)
 5. **可被未来 AI 看懂**(命名一致、节顺序固定、中文注释 WHY)
@@ -60,7 +60,7 @@
 | 提交按钮点了立即 `btn.disabled = true`,失败再恢复 | 防止重复提交,见 `commitAccLogin` |
 | 多入口可达的 modal 关闭走一个收口函数(`endAccLogin`),释放所有资源 | WebSocket / xterm / interval 不能漏 |
 | 切 tab(`navigate()`)时关掉不属于当前 tab 的长连(`EventSource`) | 避免后台流持续耗流量 |
-| 主题选择持久化到 `localStorage('vibebench-theme')`,并在 `<head>` 防 FOUC 内联脚本中先读 | 否则刷新时会出现"先暗后亮"的闪烁 |
+| 主题模式持久化到 `localStorage('flower2api.theme-mode')`,`<head>` 内在任何样式与脚本之前的内联脚本先读并写 `data-ui-scheme` | 否则刷新时会先闪一下浅色;键名由 `theme.test.mjs` 校验与 Vue 运行时一致 |
 | 中文注释解释 WHY(为什么这里 `try {} catch {}`、为什么这里加 setTimeout) | 全局指令 §3 |
 | API helper 检测 401 → 自动 `showAuthModal()` + 抛 `'auth required'` Error | session 过期时任何调用都触发重登,无需每个 caller 自己写;`/api/auth/*` 自身豁免不递归弹框 |
 | 启动时 `bootstrapAuth()` 探一次 `/api/auth/me`,401 时**只显示登录框,不调 navigate()** | 未登录就 navigate → 每个 render 都 401 → 一堆 alert 堆叠 |
@@ -75,8 +75,8 @@
 | 场景 | 验法 |
 |------|------|
 | 4 个 tab 切换 | 点导航 / 按 `1-4` / 改 hash → 视图正确切换 + 旧的 SSE 关掉 |
-| 暗 / 明主题切换 | 点右上角 ☀/☾ → 颜色立刻切换 → 刷新仍保持 |
-| 主题防 FOUC | 硬刷 / 系统首选浅色 → 第一帧就是正确主题,不闪暗 |
+| 深 / 浅切换 | 控制台侧栏底部 ☾/☀ 或系统切换深浅 → 任务页与独立文档颜色立刻切换 → 刷新仍保持(自动化见 `verify_dark_mode.py`) |
+| 主题防 FOUC | 硬刷 / 系统首选深色或已选深色 → 第一帧就是正确深浅,不先闪浅色 |
 | 题库过滤 | `/` 聚焦 → 输入 → 实时过滤(title / category / 编号) |
 | 添加账号两步流 | + 添加账号 → 填表 → start login → 看到 PTY 终端 → cancel / commit / 关 modal 三条路径都不漏资源(打开 devtools Network 看 ws 是否关、Application 看 session 是否清)|
 | 创建任务 | 题库 → 卡片 → 选账号 + repeat → create → 跳到 tasks tab |

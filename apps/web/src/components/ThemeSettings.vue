@@ -8,12 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Segmented } from '@/components/ui/segmented';
 import { NumberInput } from '@/components/ui/controls';
 import { ConfirmationDialog } from '@/components/ui/feedback';
-import { Check, RotateCcw, Save, Undo } from '@/components/ui/icon';
+import { Check, Monitor, Moon, RotateCcw, Save, Sun, Undo } from '@/components/ui/icon';
 import {
-  DEFAULT_THEME_SEED, THEME_PRESETS, THEME_SEED_LIMITS, applyTheme, changedSeedKeys, createTheme, normalizeHexInput, parseSeedNumber, presetIdOf, readStoredTheme, writeStoredTheme,
-  type ColorSeed, type NumericSeed, type ThemeSeed, type ThemeSeedKey, type ThemeSurface,
+  DEFAULT_THEME_SEED, THEME_PRESETS, THEME_SEED_LIMITS, applyThemeMode, changedSeedKeys, createTheme, normalizeHexInput, parseSeedNumber, presetIdOf, readStoredTheme, resolveScheme,
+  writeStoredTheme, writeThemeMode,
+  type ColorSeed, type NumericSeed, type ThemeMode, type ThemeSeed, type ThemeSeedKey, type ThemeSurface,
 } from '@/theme';
 import { useToast } from '../composables/useToast';
+import { useThemeMode } from '../composables/useThemeMode';
 import ThemePreview from './theme/ThemePreview.vue';
 import '../theme-settings.css';
 
@@ -42,6 +44,7 @@ const numberFields: Readonly<Record<Exclude<Category, 'color'>, readonly NumberF
   ],
 };
 const surfaceOptions = [{ value: 'default', label: '默认' }, { value: 'soft', label: '柔光' }] as const;
+const modeOptions = [{ value: 'system', label: '跟随系统', icon: Monitor }, { value: 'light', label: '浅色', icon: Sun }, { value: 'dark', label: '深色', icon: Moon }] as const;
 const categories: readonly { value: Category; label: string; keys: readonly EditableField[] }[] = [
   { value: 'color', label: '颜色', keys: colorFields.map(field => field.key) },
   { value: 'size', label: '尺寸', keys: numberFields.size.map(field => field.key) },
@@ -55,16 +58,29 @@ const draft = reactive<ThemeSeed>({ ...saved.value });
 const inputs = reactive<Partial<Record<EditableField, string | number>>>({});
 const errors = reactive<Partial<Record<EditableField, string>>>({});
 const category = ref<Category>('color');
+// 主题模式与种子同属草稿：已保存的模式取自共享状态（侧栏切换会更新它），草稿模式在画板中预览，保存后生效。
+const { mode: savedMode, scheme } = useThemeMode();
+const draftMode = ref<ThemeMode>(savedMode.value);
+const systemQuery = matchMedia('(prefers-color-scheme: dark)');
+const systemDark = ref(systemQuery.matches);
+// 草稿为跟随系统时，画板随系统深浅切换。
+const previewScheme = computed(() => resolveScheme(draftMode.value, systemDark.value));
 
 const changed = computed(() => changedSeedKeys(draft, saved.value));
+const modeChanged = computed(() => draftMode.value !== savedMode.value);
+const pending = computed(() => changed.value.length + (modeChanged.value ? 1 : 0));
 const invalidCount = computed(() => Object.keys(errors).length);
 const invalid = computed(() => invalidCount.value > 0);
-const dirty = computed(() => changed.value.length > 0 || invalid.value);
-const atDefault = computed(() => changedSeedKeys(draft, DEFAULT_THEME_SEED).length === 0);
+const dirty = computed(() => pending.value > 0 || invalid.value);
+const seedAtDefault = computed(() => changedSeedKeys(draft, DEFAULT_THEME_SEED).length === 0);
+const atDefault = computed(() => seedAtDefault.value && draftMode.value === 'system');
 const activePreset = computed(() => presetIdOf(draft.primary));
+// 预设色块展示主色在当前深浅下的实际取值：深色下按派生规则提亮（同设计稿 #theme 深色画面），浅色沿用种子色。
+const presetSwatches = computed(() => Object.fromEntries(THEME_PRESETS.map(preset => [preset.id,
+  scheme.value === 'dark' ? createTheme({ ...DEFAULT_THEME_SEED, primary: preset.primary }, 'dark')['--ui-color-primary'] : preset.primary])));
 // 无效输入不进草稿也不计入待应用数，单独说明，否则只有无效输入时会出现「已同步」却不能保存。
 const syncLabel = computed(() => [
-  changed.value.length ? `${changed.value.length} 处修改待应用` : '',
+  pending.value ? `${pending.value} 处修改待应用` : '',
   invalidCount.value ? `${invalidCount.value} 项输入无效` : '',
 ].filter(Boolean).join(' · ') || '已同步');
 // 分类计数与系统设置分类计数同理：切到其它分类后仍能看出哪个分类有已修改或无效的字段。
@@ -139,31 +155,50 @@ function restoreField(key: ThemeSeedKey): void {
   }
 }
 
-/** 撤销草稿，回到已保存主题。@return 无。 */
+/** 撤销草稿，回到已保存的主题与模式。@return 无。 */
 function discardDraft(): void {
   Object.assign(draft, saved.value);
+  draftMode.value = savedMode.value;
   clearInputs();
 }
 
-/** 草稿回到第二版默认主题；仍需保存才生效。@return 无。 */
+/** 草稿回到第二版默认主题与跟随系统；仍需保存才生效。@return 无。 */
 function resetDefault(): void {
   Object.assign(draft, DEFAULT_THEME_SEED);
+  draftMode.value = 'system';
   clearInputs();
 }
 
-/** 保存草稿并应用到整个控制台；存储写入失败时控制台不变、草稿保留。@return 无。 */
+/**
+ * 保存草稿并应用到整个控制台：先写种子再写模式，两者都成功才应用；任一失败时提示、控制台不变、草稿保留，
+ * 模式写入失败时把已写入的种子恢复为原值，避免刷新后只生效一半。
+ * @return 无。
+ */
 function save(): void {
-  if (!changed.value.length || invalid.value) return;
+  if (!pending.value || invalid.value) return;
   const seed: ThemeSeed = { ...draft };
+  const previous = readStoredTheme();
   // 默认主题不占存储：清除后由 CSS 默认值生效，存储损坏的旧值也随之消失。
-  if (!writeStoredTheme(atDefault.value ? null : seed)) {
+  const seedSaved = !changed.value.length || writeStoredTheme(seedAtDefault.value ? null : seed);
+  if (!seedSaved || (modeChanged.value && !writeThemeMode(draftMode.value))) {
+    if (seedSaved && changed.value.length) writeStoredTheme(previous);
     toast.show('当前浏览器无法保存主题，请检查站点存储权限后重试');
     return;
   }
-  applyTheme(document.documentElement, createTheme(seed));
   saved.value = seed;
+  applyThemeMode(draftMode.value);
   toast.show('主题已保存并应用', 'success');
 }
+
+// 在本页用侧栏切换深浅会更新已保存的模式：草稿模式原本与已保存一致时同步跟随，原本不同则保留为待应用修改。
+watch(savedMode, (next, previous) => {
+  if (draftMode.value === previous) draftMode.value = next;
+});
+/** 系统深浅变化时更新画板预览。@param event 媒体查询变化事件。@return 无。 */
+function onSystemChange(event: MediaQueryListEvent): void {
+  systemDark.value = event.matches;
+}
+systemQuery.addEventListener('change', onSystemChange);
 
 // 站内离开：有草稿时由确认框决定；去往登录页的退出流程已先撤销会话，拦截会让页面停在失去凭据的状态，所以直接放行。
 const leaveOpen = ref(false);
@@ -189,7 +224,10 @@ watch(dirty, value => {
   if (value) window.addEventListener('beforeunload', warnUnload);
   else window.removeEventListener('beforeunload', warnUnload);
 });
-onBeforeUnmount(() => window.removeEventListener('beforeunload', warnUnload));
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', warnUnload);
+  systemQuery.removeEventListener('change', onSystemChange);
+});
 </script>
 
 <template>
@@ -199,7 +237,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', warnUnload));
       <template #actions>
         <Button variant="ghost" size="sm" :disabled="!dirty" @click="discardDraft"><Undo :size="14" />撤销草稿</Button>
         <Button variant="outline" size="sm" :disabled="atDefault && !invalid" @click="resetDefault"><RotateCcw :size="14" />恢复默认</Button>
-        <Button size="sm" :disabled="!changed.length || invalid" @click="save"><Save :size="14" />保存并应用</Button>
+        <Button size="sm" :disabled="!pending || invalid" @click="save"><Save :size="14" />保存并应用</Button>
       </template>
     </PageHeader>
     <!-- 窄屏页头说明仅读屏可见，这里补一行可见状态。 -->
@@ -207,9 +245,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', warnUnload));
     <div class="theme-layout">
       <aside class="fui-card theme-panel" aria-label="主题参数">
         <section class="theme-group">
+          <div class="theme-group-head">
+            <h2>主题模式</h2>
+            <template v-if="modeChanged"><Badge>已修改</Badge><button type="button" class="theme-restore" aria-label="恢复已保存的主题模式" title="恢复已保存值" @click="draftMode = savedMode"><Undo :size="14" /></button></template>
+          </div>
+          <Segmented class="theme-mode" :model-value="draftMode" :options="modeOptions" label="主题模式" @update:model-value="value => draftMode = value as ThemeMode" />
+        </section>
+        <section class="theme-group">
           <h2>主题预设</h2>
           <div class="theme-presets">
-            <button v-for="preset in THEME_PRESETS" :key="preset.id" type="button" :aria-pressed="activePreset === preset.id" :data-preset="preset.id" :style="{ '--theme-preset': preset.primary }" @click="choosePreset(preset.primary)">
+            <button v-for="preset in THEME_PRESETS" :key="preset.id" type="button" :aria-pressed="activePreset === preset.id" :data-preset="preset.id" :style="{ '--theme-preset': presetSwatches[preset.id] }" @click="choosePreset(preset.primary)">
               <i aria-hidden="true" /><b>{{ preset.name }}</b><small>{{ preset.description }}</small><Check v-if="activePreset === preset.id" :size="12" />
             </button>
           </div>
@@ -243,7 +288,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', warnUnload));
           </div>
         </div>
       </aside>
-      <ThemePreview :seed="draft" />
+      <ThemePreview :seed="draft" :scheme="previewScheme" />
     </div>
     <ConfirmationDialog :open="leaveOpen" title="放弃未保存的主题修改？" message="草稿只在本页有效，离开后丢失。" confirm-label="放弃并离开" danger @confirm="answerLeave(true)" @cancel="answerLeave(false)" />
   </div>

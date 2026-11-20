@@ -121,7 +121,8 @@ async def main():
                 await page.set_viewport_size({'width': width, 'height': 1000})
                 assert await modal.locator('.modal-card').evaluate('e=>e.scrollWidth<=e.clientWidth')
                 await page.screenshot(path=str(output / f'config-{width}.png'))
-            assert await root.get_attribute('data-theme') == 'light'
+            # 任务宿主跟随主题模式：系统浅色、未保存模式时文档根为浅色。
+            assert await page.locator('html').get_attribute('data-ui-scheme') == 'light'
             colors = await modal.evaluate("""e=>['.field','.work-note','summary','.work-account-links button','input'].map(selector=>{
                 const node=e.querySelector(selector),s=getComputedStyle(node);
                 return {selector,color:s.color,background:selector==='input'?s.backgroundColor:getComputedStyle(e.querySelector('.modal-card')).backgroundColor};

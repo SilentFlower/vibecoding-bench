@@ -111,3 +111,22 @@ export function darkenUntil(color: string, backgrounds: readonly string[], targe
   }
   return result;
 }
+
+/**
+ * 逐步提亮直到对全部背景都达到目标对比度（深色底上的实色与文字）；明度升到 1 为白色，循环有界。
+ * @param color 起始色。
+ * @param backgrounds 需满足对比度的颜色。
+ * @param target 目标对比度。
+ * @return 满足要求的最暗颜色。
+ */
+export function lightenUntil(color: string, backgrounds: readonly string[], target: number): string {
+  let result = color;
+  let delta = 0.02;
+  for (let step = 0; step < 50 && backgrounds.some(background => contrast(result, background) < target); step++) {
+    const next = shiftLightness(result, delta);
+    // 接近纯黑时 0.02 的明度增量会被 8 位舍入吞掉、原地不动；此时累加增量直到颜色变化，其余情况逐步提亮。
+    delta = next === result ? delta + 0.02 : 0.02;
+    result = next;
+  }
+  return result;
+}

@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { Fit, Minus, Plus } from '@/components/ui/icon';
-import { applyTheme, createTheme, type ThemeSeed } from '@/theme';
+import { applyTheme, createTheme, type ThemeScheme, type ThemeSeed } from '@/theme';
 
 /**
  * 主题预览画板：同源 iframe 按 1440×900 渲染真实控制台首页，草稿只写进 iframe 的文档根，
  * 弹层、固定定位与媒体查询都留在画板内。iframe 不接收指针与焦点，指针事件交给画布缩放与平移。
  * @prop seed 草稿种子（响应式，深度变化即重新注入）。
+ * @prop scheme 草稿模式解析出的深浅；画板文档根的 data-ui-scheme 与变量都按它写入。
  */
-const props = defineProps<{ seed: ThemeSeed }>();
+const props = defineProps<{ seed: ThemeSeed; scheme: ThemeScheme }>();
 
 const BOARD_WIDTH = 1440;
 const BOARD_HEIGHT = 900;
@@ -30,10 +31,16 @@ let observer: ResizeObserver | undefined;
 const percent = computed(() => `${Math.round(view.scale * 100)}%`);
 const transform = computed(() => `translate(${view.x}px, ${view.y}px) scale(${view.scale})`);
 
-/** 把草稿写进 iframe 文档根；iframe 自身的 initTheme 先应用了已保存主题，整组覆盖后不残留。@return 无。 */
+/**
+ * 把草稿写进 iframe 文档根：深浅标记加整组变量。iframe 自身的 initTheme 先应用了已保存的主题与模式，整组覆盖后不残留；
+ * 嵌在画板里时它不跟随系统偏好，深浅只由这里写入。
+ * @return 无。
+ */
 function inject(): void {
   const root = frame.value?.contentDocument?.documentElement;
-  if (root) applyTheme(root, createTheme(props.seed));
+  if (!root) return;
+  root.dataset.uiScheme = props.scheme;
+  applyTheme(root, createTheme(props.seed, props.scheme));
 }
 
 /** iframe 加载完成：模块脚本已在 load 之前执行，此时注入不会被首页初始化反向覆盖。@return 无。 */
@@ -106,7 +113,7 @@ function onPointerEnd(event: PointerEvent): void {
   dragging.value = false;
 }
 
-watch(() => props.seed, inject, { deep: true });
+watch(() => [props.seed, props.scheme], inject, { deep: true });
 onMounted(() => {
   fit();
   observer = new ResizeObserver(() => { if (fitted) fit(); });

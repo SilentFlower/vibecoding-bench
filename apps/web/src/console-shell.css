@@ -44,7 +44,9 @@
 
   .sidebar-footer { display: flex; flex-shrink: 0; align-items: center; gap: calc(var(--ui-space-unit) * 1.5); margin-top: calc(var(--ui-space-unit) * 3); padding: calc(var(--ui-space-unit) * 2); border-radius: var(--ui-radius-block); background: var(--ui-color-fill-subtle); }
   .sidebar-avatar { display: grid; flex: none; place-items: center; width: 30px; height: 30px; border-radius: calc(var(--ui-radius-control) + 1px); background: var(--ui-color-primary-container); color: var(--ui-color-primary-text); font-weight: 750; }
-  .sidebar-identity { display: grid; flex: 1; min-width: 0; }
+  /* 三个工具按钮时「本地管理控制台」宽 80.5px、可用 80px（设计稿同尺寸，文字溢出半像素不可见）：
+     右侧伸进间距 1px，工具按钮位置不变，半像素不再触发省略号；更窄的断点仍按省略号截断。 */
+  .sidebar-identity { display: grid; flex: 1; min-width: 0; margin-right: -1px; }
   .sidebar-identity strong { overflow: hidden; font-size: var(--ui-font-size-md); font-weight: 720; text-overflow: ellipsis; white-space: nowrap; }
   .sidebar-identity small { overflow: hidden; color: var(--ui-color-text-3); font-size: var(--ui-font-size-xs); text-overflow: ellipsis; white-space: nowrap; }
   .sidebar-tools { display: flex; flex: none; gap: 2px; margin-left: auto; }
@@ -54,7 +56,7 @@
   .sidebar-tool:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 1px; }
   .sidebar-tool:disabled { opacity: .45; cursor: not-allowed; }
 
-  /* 折叠：只留标志、版本图标、导航图标与两个工具按钮；分组名仅读屏可见（AppNavigation 加 sr-only）。 */
+  /* 折叠：只留标志、版本图标、导航图标与三个工具按钮（主题切换、展开、退出）纵向排列；分组名仅读屏可见（AppNavigation 加 sr-only）。 */
   .sidebar-collapsed .sidebar-label { display: none; }
   .sidebar-collapsed .console-brand-row { grid-template-areas: 'mark' 'version'; grid-template-columns: minmax(0, 1fr); justify-items: center; row-gap: 10px; padding: 0; }
   .sidebar-collapsed .console-brand-mark { margin-right: 0; }

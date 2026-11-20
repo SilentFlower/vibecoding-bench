@@ -102,11 +102,12 @@ async def run(output):
         await frame.locator('[data-tab="warmup"]').click()
         await expect(page).to_have_url(BASE + '/tasks?tab=warmup')
         assert await page.locator('.task-runtime').evaluate("node=>node.__navigationIdentity==='stable'")
-        # 任务页原生宿主固定浅色（主题切换按钮已移除，深色模式由子任务 7 统一接入），刷新后保持。
+        # 任务页原生宿主不再写死深浅，随文档根的 data-ui-scheme 跟随主题模式（系统浅色、未保存模式时为浅色），刷新后保持。
         await expect(frame.locator('#theme-toggle')).to_have_count(0)
         await page.reload()
-        await expect(frame).to_have_attribute('data-theme', 'light')
-        scenes.append('侧栏折叠与六个任务域页面保持文档身份，任务宿主固定浅色并跨刷新保持')
+        await expect(page.locator('html')).to_have_attribute('data-ui-scheme', 'light')
+        assert await frame.get_attribute('data-theme') is None
+        scenes.append('侧栏折叠与六个任务域页面保持文档身份，任务宿主跟随主题模式并跨刷新保持')
         await page.screenshot(path=str(output / 'tasks-light.png'), full_page=True)
         # 控制台外壳每次挂载自动检查一次系统更新（frontend-guidelines「系统更新」），其余页面不得写入。
         writes = [write for write in fixture.writes if write['path'] != '/runtime/api/system-updates/check']

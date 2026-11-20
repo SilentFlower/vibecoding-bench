@@ -33,7 +33,6 @@ function setup<Thing>() {
 
 实际实例:
 
-- `setupTheme()`:读 `localStorage('vibebench-theme')` → 设 `<html data-theme>` → 绑 toggle 按钮点击
 - `startClock()`:定时刷新 `#clock` 文本(每秒一次)
 - `bindShortcuts()`:全局 keydown 监听,处理 Esc / `/` / `1-4`
 
@@ -41,7 +40,6 @@ function setup<Thing>() {
 
 ```js
 navigate();         // 路由首次渲染
-setupTheme();
 startClock();
 bindShortcuts();
 ```
@@ -118,7 +116,7 @@ async function renderX() {
 
 | 角色 | 前缀 | 例子 |
 |------|------|------|
-| 初始化(一次性,无清理需求) | `setup<X>` / `start<X>` / `bind<X>` | `setupTheme / startClock / bindShortcuts` |
+| 初始化(一次性,无清理需求) | `setup<X>` / `start<X>` / `bind<X>` | `startClock / bindShortcuts` |
 | 副作用挂载(有对应清理) | `attach<X>` | `attachAccLoginTerminal` |
 | 副作用收口 | `end<X>` / `cleanup<X>` / `detach<X>` | `endAccLogin` |
 | 视图渲染 | `render<Tab>` | `renderAccounts / renderTopics / renderTasks / renderRuns` |

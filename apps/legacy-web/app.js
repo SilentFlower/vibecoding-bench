@@ -1572,6 +1572,25 @@ async function queryAccCodeReceipt() {
 }
 
 /**
+ * 从终端容器的计算样式读取终端配色 token。两种深浅的 ANSI 色相同；背景透明，由容器的墨色给出，
+ * 所以切换深浅时容器底色随 CSS 改变，已打开的终端不需要重建。
+ * @param {HTMLElement} host 终端容器。
+ * @return {object} xterm 主题。
+ */
+function terminalTheme(host) {
+  const style = window.getComputedStyle(host);
+  const token = name => style.getPropertyValue(`--ui-color-${name}`).trim();
+  const ink = token('ink');
+  return {
+    background: 'transparent',
+    foreground: token('term-fg'), cursor: token('term-cursor'), cursorAccent: ink,
+    black: ink, red: token('term-red'), green: token('term-green'), yellow: token('term-yellow'),
+    blue: token('term-blue'), magenta: token('term-magenta'), cyan: token('term-cyan'), white: token('term-fg'),
+    brightBlack: token('term-dim'),
+  };
+}
+
+/**
  * 挂载终端；登录可重连原 tmux，续聊保持原行为。
  * @param {string} hostSelector 终端宿主。
  * @param {string} wsPath 原会话路径，不保存旧票据。
@@ -1598,13 +1617,8 @@ async function attachTerminal(hostSelector, wsPath, initialStatus = 'running', o
     cursorBlink: true,
     disableStdin: Boolean(options.readOnly),
     convertEol: true,
-    theme: {
-      background: '#0a0b09',
-      foreground: '#e8e1cf',
-      cursor: '#ffb649',
-      black: '#0a0b09', red: '#ff6b58', green: '#7cd97c', yellow: '#ffc164',
-      blue: '#5fa8d7', magenta: '#d77cd7', cyan: '#5fd7d7', white: '#e8e1cf',
-    },
+    allowTransparency: true,
+    theme: terminalTheme(host),
   });
   const fit = new FitAddon.FitAddon();
   term.loadAddon(fit);

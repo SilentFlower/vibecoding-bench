@@ -89,7 +89,8 @@ async def main():
         fixture.release.set()
         await expect(root.locator('.work-account')).to_have_count(1)
         await page.locator('.system-update-dialog').get_by_role('button', name='关闭', exact=True).click()
-        assert await root.get_attribute('data-theme') == 'light'
+        # 上下文为系统深色、未保存模式：任务宿主随文档根跟随为深色（旧键 vibebench-theme 已不读取）。
+        assert await page.locator('html').get_attribute('data-ui-scheme') == 'dark'
         assert await page.locator('#theme-toggle').count() == 0
         await page.goto(BASE + '/environments')
         await expect(page.locator('.environment-rich').first).to_be_visible()
@@ -233,7 +234,8 @@ async def main():
             fixture.fixture.doCleanups()
         context, page = await page_for(WorkspaceFixture(), '/runtime/#accounts')
         await expect(page.locator('.work-account')).to_have_count(1)
-        assert await page.locator('html').get_attribute('data-theme') == 'light'
+        # 独立文档同样跟随系统深色。
+        assert await page.locator('html').get_attribute('data-ui-scheme') == 'dark'
         assert await page.locator('#theme-toggle').count() == 0
         await context.close()
         fixture = TaskFeedbackFixture()

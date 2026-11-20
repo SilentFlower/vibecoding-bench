@@ -166,7 +166,7 @@ elem.style.color = '#5fd7d7';
   - Vue 内嵌任务页会继承用户在当前浏览器保存的主题；独立 `/runtime/` 文档只取默认值。
   - 不再定义旧变量（`--ink`、`--line`、`--muted`、`--border`、`--amber`、`--running` 等）。它们挂在原生作用域根上会被内嵌的 Vue 组件继承，`--border` / `--muted` 还与 shadcn 同名而语义不同。`theme.test.mjs` 断言原生 CSS 中不出现旧变量定义。
   - 颜色字面量与圆角字面量由 `theme.test.mjs` 静态校验；设计稿未给的悬停色用 `color-mix()` 由 token 混合。
-- 任务工作区及独立兼容入口固定 `<html data-theme="light">`（深色模式由控制台改版子任务 7 接入）。终端与源码保留深色阅读表面，容器取 `--ui-color-ink` / `--ui-color-ink-text`。
+- 任务工作区及独立兼容入口跟随主题模式：深浅由文档根 `data-ui-scheme` 与 `ui-foundation.css` 的深色块决定，原生样式不写 `[data-theme]` 限定、宿主不写 `data-theme`；独立 `/runtime/` 文档由 `index.html` 首帧脚本读 `flower2api.theme-mode` 写深浅并在跟随系统时订阅系统偏好，只用默认配色。终端与源码两种深浅都保留墨色阅读表面，容器取 `--ui-color-ink`，文字取 `--ui-color-ink-text`（不要用 `text-4`，深色下会变暗）；xterm 配色由 `terminalTheme(host)` 从 `--ui-color-term-*` 读取、背景透明。开关滑块取 `--ui-color-knob`。
 - `!important` 只用于以下例外，新规则靠选择器特异性取胜：`.xterm-host .xterm-viewport` 透明底（覆盖 xterm 行内底色）、`.hidden` 与全局 `[hidden]`、`prefers-reduced-motion` 全局重置（一份）、原始 `select.native-choice-source` / `input.native-time-source` 的视觉隐藏。布局和加载合同见[控制台工作区规范](../../web/frontend/ui-guidelines.md#scenario-工作区分区加载与阅读布局)。
 - 原生规则不分层，会压过组件库的 `@layer components`：
   - 元素级规则（`input`、`select`、`textarea`、`button`）必须排除组件库控件：`:not([class*='fui-'], [class*='fui-'] *)`。
@@ -248,7 +248,7 @@ P1 阶段做到的:
 
 ### 3. Contracts
 
-- `:root.environment-page`（仅独立 `/runtime/` 文档的环境页签）与其余原生页一样只取第二版 token，按钮、输入、弹窗沿用「第二版通用部件」；页签专用样式不按新稿重排。保留 `data-theme` 和 `vibebench-theme` 原值，离开环境路由移除作用域后恢复原页面主题。作用域选择器需与旧 `:root[data-theme=light]` 具有足够优先级。
+- `:root.environment-page`（仅独立 `/runtime/` 文档的环境页签）与其余原生页一样只取第二版 token，按钮、输入、弹窗沿用「第二版通用部件」；页签专用样式不按新稿重排。环境页签只切换根上的 `environment-page` 类，深浅仍由 `data-ui-scheme` 决定，离开环境路由移除该类即回到原页面样式。
 - `index.html` 按 `projects.js`、`environments.js`、`app.js` 装载。环境模块仅定义函数及常量，实际调用继续使用 `app.js` 的 API/state；资源修改同步静态版本参数。
 - `state.environmentUI` 保存服务器 rows、搜索、筛选、展开集合、操作中集合、只读请求序号及定时器。搜索筛选只派生当前 rows，不发送写请求；详情按环境 ID 和区块恢复。
 - 列表读取同时检查 `viewGeneration` 与请求序号，旧页面或旧请求结果不得覆盖新视图。工具栏与弹窗位于列表重绘区外，输入、光标和焦点不被进度刷新重置。

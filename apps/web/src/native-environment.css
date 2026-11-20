@@ -124,7 +124,7 @@
   /* 开关（同 .fui-switch）：原生 checkbox[role=switch] 与按钮式 .environment-switch 两种写法。 */
   .runtime-setting-row > input[role=switch], .environment-switch { position: relative; flex: none; width: 36px; height: 20px; margin: 0; padding: 0; border: 0; border-radius: 999px; background: var(--ui-color-fill-strong); appearance: none; cursor: pointer; transition: background-color .15s; }
   .runtime-setting-row > input[role=switch]:checked, .environment-switch[aria-checked=true] { background: var(--ui-color-primary); }
-  .runtime-setting-row > input[role=switch]::after, .environment-switch > span { content: ''; position: absolute; top: 2px; left: 2px; display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--ui-color-surface); box-shadow: var(--ui-shadow-knob); transition: transform .15s; }
+  .runtime-setting-row > input[role=switch]::after, .environment-switch > span { content: ''; position: absolute; top: 2px; left: 2px; display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--ui-color-knob); box-shadow: var(--ui-shadow-knob); transition: transform .15s; }
   .runtime-setting-row > input[role=switch]:checked::after, .environment-switch[aria-checked=true] > span { transform: translateX(16px); }
   :is(.runtime-setting-row > input[role=switch], .environment-switch):focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
   :is(.runtime-setting-row > input[role=switch], .environment-switch):disabled { opacity: .45; cursor: not-allowed; }

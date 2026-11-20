@@ -4,13 +4,20 @@
 <meta charset="utf-8">
 <title>flower2api v2 mock</title>
 <link rel="stylesheet" href="mock.css">
+<script>
+  // 深色稿：?mode=dark 为深色（夜幕紫灰），不带参数为第二版浅色。
+  const params = new URLSearchParams(location.search);
+  const DARK = params.get('mode') === 'dark';
+  document.documentElement.dataset.mode = DARK ? 'dark' : 'light';
+</script>
+<script src="palette.js"></script>
 </head>
 <body>
 <div id="root"></div>
 <script src="icons.js"></script>
 <script>
 // 第二版设计稿：信息结构沿用原稿，视觉延续浅色柔和风格；全部为示例数据。登录页沿用第一版截图。
-const flower = (s = 22, center = '#191b2c') => `<svg width="${s}" height="${s}" viewBox="0 0 256 256" aria-hidden="true"><defs><path id="pt" d="M128 121C116 103 94 79 94 58C94 37 109 21 128 21S162 37 162 58C162 79 140 103 128 121Z"/></defs><g fill="#ED6EA7">${[0, 72, 144, 216, 288].map(r => `<use href="#pt" transform="rotate(${r} 128 128)"/>`).join('')}</g><circle cx="128" cy="128" r="15" fill="${center}"/></svg>`;
+const flower = (s = 22, center = 'var(--ink)') => `<svg width="${s}" height="${s}" viewBox="0 0 256 256" aria-hidden="true"><defs><path id="pt" d="M128 121C116 103 94 79 94 58C94 37 109 21 128 21S162 37 162 58C162 79 140 103 128 121Z"/></defs><g fill="#ED6EA7">${[0, 72, 144, 216, 288].map(r => `<use href="#pt" transform="rotate(${r} 128 128)"/>`).join('')}</g><circle cx="128" cy="128" r="15" style="fill:${center}"/></svg>`;
 const tag = (tone, text, dot = false) => `<span class="tag tg-${tone}${dot ? ' dot' : ''}">${text}</span>`;
 const plat = p => p === 'agy' ? tag('agy', '反重力') : tag('cc', 'Claude Code');
 const seg = items => `<div class="seg">${items.map(([l, n, on]) => `<span class="${on ? 'on' : ''}">${l}${n !== undefined ? `<em>${n}</em>` : ''}</span>`).join('')}</div>`;
@@ -30,7 +37,7 @@ function shell(active, content, overlay = '') {
     <div class="sb-brand"><span class="sb-mark">${flower(24)}</span><div><b>flower2api<span class="sb-ver up" title="发现新版本，打开系统更新">v1.0.0${ic('upCircle', 's12')}</span></b><small>让每一次调用井然有序</small></div></div>
     ${nav.map(([g, items]) => `<div class="sb-label">${g}</div>${items.map(([k, i, l, x = '']) => `<div class="sb-item${k === active ? ' on' : ''}">${ic(i, 's18')}${l}${x}</div>`).join('')}`).join('')}
     <div style="height:14px"></div>${[['theme', 'palette', '主题设置'], ['settings', 'sliders', '系统设置']].map(([k, i, l]) => `<div class="sb-item${k === active ? ' on' : ''}">${ic(i, 's18')}${l}</div>`).join('')}
-    <div class="sb-foot"><div class="av">管</div><div><b>管理员</b><span>本地管理控制台</span></div><div class="tools"><span title="切换深色模式">${ic('moon', 's14')}</span><span>${ic('panel', 's14')}</span><span>${ic('logout', 's14')}</span></div></div>
+    <div class="sb-foot"><div class="av">管</div><div><b>管理员</b><span>本地管理控制台</span></div><div class="tools"><span title="${DARK ? '切换到浅色' : '切换到深色'}">${ic(DARK ? 'sun' : 'moon', 's14')}</span><span>${ic('panel', 's14')}</span><span>${ic('logout', 's14')}</span></div></div>
   </aside><main class="main"><div class="page">${content}</div>${overlay}</main></div>`;
 }
 
@@ -159,13 +166,14 @@ pages.nodes = () => {
 };
 
 /* ---------------- 任务与工程 ---------------- */
-pages.tasks = () => {
+// 任务页内容单独成函数，终端画面复用它作弹窗背景。
+const tasksContent = () => {
   const T = [
     ['合成任务账号', '任务账号 #1', ['success', '整体已启用'], '直连', [['网关关联', '网关账号 #11'], ['环境时区', '未提供'], ['Claude Code', '继承全局']], true],
     ['工程任务账号', '任务账号 #2', ['info', '运行中'], '线路 2', [['网关关联', '网关账号 #12'], ['环境时区', 'Asia/Shanghai'], ['Claude Code', '2.1.293']], false],
     ['养号账号 3', '任务账号 #3', ['neutral', '空闲'], '线路 4', [['网关关联', '未关联'], ['环境时区', 'America/Los_Angeles'], ['Claude Code', '继承全局']], false],
   ];
-  return shell('tasks', ph('任务与工程', '从任务准备到执行与交付，在一个工作区内完成。')
+  return ph('任务与工程', '从任务准备到执行与交付，在一个工作区内完成。')
     + `<div>${seg([[`${ic('users', 's14')}任务账号`, 3, 1], [`${ic('box', 's14')}工程迭代`], [`${ic('zap', 's14')}养号迭代`], [`${ic('todo', 's14')}普通任务`], [`${ic('activity', 's14')}运行记录`], [`${ic('list', 's14')}题库`]])}</div>
     <div class="tb"><div><div class="sec-t" style="font-size:18px">任务账号</div><p style="margin:3px 0 0;font-size:12.5px;color:var(--text-3);font-weight:550">授权、CLI 设置、额度与网关关联集中管理。</p></div><div class="tb-spacer"></div>${input('搜索账号、邮箱、代理或出口 IP', 'search', 300)}<span class="btn btn-primary">${ic('plus', 's14')}添加任务账号</span></div>
     <div class="grid g3">${T.map(t => `<article class="card ent" style="padding-bottom:16px"><div class="ent-head"><span class="tile">${ic('users', 's18')}</span><div><h4>${t[0]}</h4><p>${t[1]}</p></div>${tag(t[2][0], t[2][1], true)}</div>
@@ -173,7 +181,63 @@ pages.tasks = () => {
       <div class="block" style="padding:10px 12px;display:flex;gap:8px;align-items:center;font-size:12.5px;font-weight:650">${ic('box', 's14')}<div>节点未观测<div class="t3" style="font-weight:550;font-size:12px">当前归属未观测</div></div></div>
       <div style="display:flex;flex-direction:column;gap:8px">${t[4].map(([k, v]) => `<div class="meta-row" style="font-size:12.5px;font-weight:600"><span>${k}</span><b style="color:var(--text)">${v}</b></div>`).join('')}</div>
       <div class="links" style="color:var(--primary-text)"><span>工程迭代 →</span><span>Pi 养号 →</span></div>
-      ${t[5] ? `<div class="block" style="padding:12px;display:flex;flex-direction:column;gap:10px"><div class="meta-row" style="font-weight:650"><span>网关账号</span><b class="mono" style="color:var(--text)">#11</b></div><div style="display:flex;gap:8px"><span class="btn btn-sm">${ic('key', 's14')}重新授权并同步</span><span class="btn btn-sm btn-danger">解绑</span></div><div class="strip d" style="height:auto;padding:8px 10px;font-size:12px">${ic('alert', 's14')}invalid_grant：账号异常，需要重新授权或人工核实</div></div>` : `<div class="strip s">${ic('check', 's14')}网关凭据正常 · 最近同步 3 分钟前</div>`}</article>`).join('')}</div>`);
+      ${t[5] ? `<div class="block" style="padding:12px;display:flex;flex-direction:column;gap:10px"><div class="meta-row" style="font-weight:650"><span>网关账号</span><b class="mono" style="color:var(--text)">#11</b></div><div style="display:flex;gap:8px"><span class="btn btn-sm">${ic('key', 's14')}重新授权并同步</span><span class="btn btn-sm btn-danger">解绑</span></div><div class="strip d" style="height:auto;padding:8px 10px;font-size:12px">${ic('alert', 's14')}invalid_grant：账号异常，需要重新授权或人工核实</div></div>` : `<div class="strip s">${ic('check', 's14')}网关凭据正常 · 最近同步 3 分钟前</div>`}</article>`).join('')}</div>`;
+};
+pages.tasks = () => shell('tasks', tasksContent());
+
+/* ---------------- 终端（深色稿新增）：任务账号授权弹窗里的登录终端，示例输出 ---------------- */
+pages.terminal = () => shell('tasks', tasksContent(), `<div class="mask"></div><section class="modal" style="width:860px">
+  <div class="mh"><span class="tile">${ic('key', 's18')}</span><div><h2>任务账号授权</h2><p>合成任务账号 · 任务账号 #1 · 直连</p></div><span class="btn btn-icon btn-sm x">${ic('x', 's14')}</span></div>
+  <div class="mb" style="gap:14px">
+    <ol class="steps"><li class="done"><i>${ic('check', 's12')}</i>准备环境</li><li class="on"><i>2</i>浏览器授权</li><li><i>3</i>提交保存</li></ol>
+    <div class="strip s">${ic('check', 's14')}终端已连接 · 等待在浏览器中完成授权<span class="tag tg-neutral" style="margin-left:auto">剩余 9:41</span></div>
+    <section class="term"><header><span>${ic('terminal', 's14')}登录终端</span><span class="btn btn-sm">${ic('refresh', 's14')}重新连接</span></header>
+<pre><span class="d">$</span> claude auth login
+<span class="m">✻</span> Welcome to <b>Claude Code</b>
+
+<span class="g">✓</span> 代理线路已应用：直连 <span class="d">(出口 203.0.113.24)</span>
+Select login method:
+ <span class="c">❯ 1. Claude account with subscription</span>
+   2. Anthropic Console account <span class="d">· API usage billing</span>
+
+<span class="y">!</span> Browser didn't open? Use the url below to sign in:
+<span class="b u">https://claude.ai/oauth/authorize?code=true&amp;client_id=9d1c…&amp;state=synthetic</span>
+
+<span class="r">✗</span> 上一次授权已过期，已重新生成链接
+Paste code here if prompted <span class="d">›</span> <i class="cur"></i></pre></section>
+    <div class="field"><label>授权码</label><div style="display:flex;gap:8px"><div class="input" style="flex:1"><span class="ph-t">粘贴浏览器返回的授权码</span></div><span class="btn btn-primary">发送到终端</span></div><span class="help">授权码优先填入此处；CLI 的其它提示可直接在终端里操作。</span></div>
+  </div>
+  <div class="mf"><span class="t3" style="font-weight:600">认证检查通过后提交保存</span><span style="margin-left:auto" class="btn btn-danger">取消登录</span><span class="btn btn-primary" disabled>提交保存</span></div>
+</section>`);
+
+/* ---------------- 色板（深色稿新增）：浅 / 深取值、对比度与预设派生，仅在 ?mode=dark 下查看 ---------------- */
+const LIGHT = { layout: '#f5f6fa', surface: '#ffffff', 'fill-2': '#f1f2f7', 'fill-3': '#f7f8fb', 'fill-active': '#eceef5', 'fill-strong': '#d8dce8', track: '#e9ebf3', line: '#e6e8f0',
+  text: '#0f1527', 'text-2': '#414a5c', 'text-3': '#5f6878', 'text-4': '#97a0b2', 'table-head': '#eff1f8', 'table-stripe': '#f8f9fc', ink: '#191b2c', knob: '#ffffff',
+  'neutral-text': '#535b67', 'neutral-bg': '#f1f3f7', 'cc-text': '#9a5634', 'cc-bg': '#fbf1ea', 'agy-text': '#3f62b0', 'agy-bg': '#eef3fd' };
+const USE = { layout: '页面底', surface: '卡片、侧栏、弹窗', 'fill-2': '静止控件底（实色）', 'fill-3': '信息块、弹窗底栏', 'fill-active': '侧栏选中', 'fill-strong': '开关关闭、待执行圆点', track: '进度轨道', line: '分隔线',
+  text: '正文、标题', 'text-2': '次要正文、表头', 'text-3': '说明、辅助值', 'text-4': '占位、禁用（不计入正文）', 'table-head': '表头条', 'table-stripe': '斑马行', ink: '标志底、终端、代码块', knob: '开关滑块',
+  'neutral-text': '中性徽标文字', 'neutral-bg': '中性徽标底', 'cc-text': 'Claude Code 徽标', 'cc-bg': 'Claude Code 徽标底', 'agy-text': '反重力徽标', 'agy-bg': '反重力徽标底' };
+const lum = hex => { const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return ((x + 0.05) / (y + 0.05)).toFixed(2); };
+const sw = hex => `<i class="sw" style="background:${hex}"></i><code>${hex}</code>`;
+pages.palette = () => {
+  const css = getComputedStyle(document.documentElement);
+  const v = name => css.getPropertyValue(`--${name}`).trim();
+  const P = PALETTE;
+  const rows = Object.keys(LIGHT).map(k => {
+    const textual = k.startsWith('text') || k.endsWith('-text');
+    const bg = k.endsWith('-text') && !k.startsWith('text') ? k.replace('-text', '-bg') : 'surface';
+    return `<tr><td><b>--${k}</b><small>${USE[k]}</small></td><td>${sw(LIGHT[k])}</td><td>${sw(v(k))}</td><td class="num">${textual ? `${ratio(v(k), v(bg))}<small> 对 ${bg}</small>` : ''}</td></tr>`;
+  }).join('');
+  const presets = P.presets.map(p => `<tr><td><b>${p.name}</b><small>种子 <code>${p.seed}</code></small></td><td>${sw(p.base)}</td><td><span class="btn btn-sm" style="background:${p.base};color:${p.on}">保存并应用</span><small class="num">${p.contrastOn}</small></td>
+    <td><span class="tag" style="background:${p.container};color:${p.text}">已修改</span><small class="num">${p.contrastText}</small></td><td>${sw(p.hover)}</td><td class="num">${p.contrastBase}</td></tr>`).join('');
+  const tones = P.tones.map(t => `<tr><td><b>${t.id}</b><small>种子 <code>${t.seed}</code></small></td><td>${sw(t.base)}</td><td><span class="tag dot" style="background:${t.bg};color:${t.text}">示例状态</span></td><td>${sw(t.text)}</td><td>${sw(t.bg)}</td><td class="num">${t.contrastText}</td></tr>`).join('');
+  return `<div class="pal"><header><h1>深色色板 · 夜幕紫灰</h1><p>中性色手调；主色与功能色按派生规则由种子推导，六个预设与自定义主色同一规则。对比度为 WCAG 2 计算值，正文要求 ≥ 4.5，实色（按钮、进度）对卡片底 ≥ 3。</p></header>
+    <section class="card"><h2>中性色与平台色</h2><table class="pt"><thead><tr><th>Token</th><th>浅色</th><th>深色</th><th>对比度</th></tr></thead><tbody>${rows}</tbody></table></section>
+    <section class="card"><h2>主色派生（六个预设）</h2><p class="t3">实色提亮到对卡片底 ≥ 3.2；按钮文字先白后深，都不足 4.5 时继续提亮直到深色字达标；主色文字提亮到 ≥ 5.5；浅底 = 实色 20% 压进卡片底。</p>
+      <table class="pt"><thead><tr><th>预设</th><th>深色实色</th><th>按钮</th><th>浅底与文字</th><th>悬停</th><th>实色对卡片底</th></tr></thead><tbody>${presets}</tbody></table></section>
+    <section class="card"><h2>功能色</h2><table class="pt"><thead><tr><th>功能</th><th>实色</th><th>徽标</th><th>文字</th><th>浅底</th><th>文字对浅底</th></tr></thead><tbody>${tones}</tbody></table></section>
+    <section class="card"><h2>终端配色（ANSI 色两种模式相同，底色取当前模式的墨色）</h2><div class="ansi">${['bg', 'fg', 'dim', 'cursor', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan'].map(n => `<div>${sw(v(`term-${n}`) || v('ink'))}<small>${n}</small></div>`).join('')}</div></section></div>`;
 };
 
 /* ---------------- 访问令牌 ---------------- */
@@ -251,14 +315,20 @@ pages['update-progress'] = () => {
 
 /* ---------------- 主题设置（新增页面，草稿只在当前浏览器生效） ---------------- */
 pages.theme = () => {
-  const presets = [['花瓣紫', '品牌默认', '#6c54b4'], ['深海蓝', '冷静专业', '#2f6bd8', 1], ['松石绿', '清爽自然', '#0f9f8f'], ['暮光橙', '温暖醒目', '#e2742b'], ['玫瑰红', '柔和亲切', '#d64a7b'], ['石墨', '克制中性', '#3d4352']];
+  const derived = PALETTE;
+  const presets = [['花瓣紫', '品牌默认', '#6c54b4'], ['深海蓝', '冷静专业', '#2f6bd8', 1], ['松石绿', '清爽自然', '#0f9f8f'], ['暮光橙', '温暖醒目', '#e2742b'], ['玫瑰红', '柔和亲切', '#d64a7b'], ['石墨', '克制中性', '#3d4352']]
+    .map(([n, d, c, on], i) => [n, d, DARK ? derived.presets[i].base : c, on]);
   const colors = [['品牌主色', 'colorPrimary', '#2f6bd8', '完整色阶与界面基调', 1], ['成功色', 'colorSuccess', '#12b981', '成功反馈与状态'], ['警告色', 'colorWarning', '#f59e0b', '额度与风险提醒'], ['错误色', 'colorError', '#ef4444', '失败与破坏性操作'], ['信息色', 'colorInfo', '#5983f4', '系统与请求信息']];
-  const draft = '--primary:#2f6bd8;--primary-hover:#2559b8;--primary-container:#edf3fd;--primary-text:#2556b0;--primary-ring:rgba(47,107,216,.18)';
-  return shell('theme', ph('主题设置', `自定义当前浏览器中的控制台主题<span class="dirty">1 处修改待应用</span>`, `<span class="btn btn-sm btn-text">${ic('undo', 's14')}撤销草稿</span><span class="btn btn-sm">${ic('rotate', 's14')}恢复默认</span><span class="btn btn-sm btn-primary">${ic('save', 's14')}保存并应用</span>`)
+  // 草稿为深海蓝：浅色取设计稿手调值，深色取派生值。
+  const ocean = derived.presets[1];
+  const draft = DARK
+    ? `--primary:${ocean.base};--primary-hover:${ocean.hover};--primary-container:${ocean.container};--primary-text:${ocean.text};--primary-ring:${ocean.ring};--on-primary:${ocean.on}`
+    : '--primary:#2f6bd8;--primary-hover:#2559b8;--primary-container:#edf3fd;--primary-text:#2556b0;--primary-ring:rgba(47,107,216,.18)';
+  return shell('theme', ph('主题设置', `自定义当前浏览器中的控制台主题<span class="dirty">${DARK ? 2 : 1} 处修改待应用</span>`, `<span class="btn btn-sm btn-text">${ic('undo', 's14')}撤销草稿</span><span class="btn btn-sm">${ic('rotate', 's14')}恢复默认</span><span class="btn btn-sm btn-primary">${ic('save', 's14')}保存并应用</span>`)
     + `<div class="th"><aside class="card th-panel">
       ${seg([['全局', undefined, 1], ['组件']])}${input('搜索主题、颜色或组件 Token')}
-      <div class="th-group"><h5>主题模式</h5>${seg([[`${ic('monitor', 's14')}跟随系统`], [`${ic('sun', 's14')}浅色`, undefined, 1], [`${ic('moon', 's14')}深色`]])}</div>
-      <div class="th-group"><h5>主题预设</h5><div class="th-presets">${presets.map(([n, d, c, on]) => `<div class="${on ? 'on' : ''}" style="--c:${c}"><i style="background:linear-gradient(135deg, ${c} 0 38%, color-mix(in srgb, ${c} 22%, #fff) 38% 66%, #f3f4f8 66%)"></i><b>${n}</b><small>${d}</small>${on ? ic('check', 's12') : ''}</div>`).join('')}</div></div>
+      <div class="th-group"><h5>主题模式</h5>${seg([[`${ic('monitor', 's14')}跟随系统`], [`${ic('sun', 's14')}浅色`, undefined, !DARK], [`${ic('moon', 's14')}深色`, undefined, DARK]])}</div>
+      <div class="th-group"><h5>主题预设</h5><div class="th-presets">${presets.map(([n, d, c, on]) => `<div class="${on ? 'on' : ''}" style="--c:${c}"><i style="background:linear-gradient(135deg, ${c} 0 38%, color-mix(in srgb, ${c} 22%, var(--surface)) 38% 66%, var(--fill-2) 66%)"></i><b>${n}</b><small>${d}</small>${on ? ic('check', 's12') : ''}</div>`).join('')}</div></div>
       <div class="th-group"><h5>表面材质</h5>${seg([['默认', undefined, 1], ['柔光']])}</div>
       ${seg([['颜色', undefined, 1], ['尺寸'], ['风格']])}
       <div class="th-group">${colors.map(([l, t, c, d, mod]) => `<div class="tf"><i style="background:${c}"></i><div style="min-width:0"><b>${l}${mod ? tag('primary', '已修改') : ''}</b><small>${d}</small></div><code>${c}</code></div>`).join('')}</div>

@@ -169,7 +169,7 @@
   /* ---------- 开关、复选、单选卡 ---------- */
   .fui-switch { position: relative; flex: none; width: 36px; height: 20px; padding: 0; border: 0; border-radius: 999px; background: var(--ui-color-fill-strong); cursor: pointer; transition: background-color .15s; }
   .fui-switch[data-state=checked] { background: var(--ui-color-primary); }
-  .fui-switch-thumb { position: absolute; top: 2px; left: 2px; display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--ui-color-surface); box-shadow: var(--ui-shadow-knob); transition: transform .15s; }
+  .fui-switch-thumb { position: absolute; top: 2px; left: 2px; display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--ui-color-knob); box-shadow: var(--ui-shadow-knob); transition: transform .15s; }
   .fui-switch-thumb[data-state=checked] { transform: translateX(16px); }
   .fui-switch:focus-visible, .fui-checkbox-box:focus-visible, .fui-radio-card:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
   .fui-switch:disabled, .fui-checkbox-box:disabled, .fui-radio-card:disabled { opacity: .45; cursor: not-allowed; }

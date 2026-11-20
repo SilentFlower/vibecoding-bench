@@ -40,8 +40,8 @@
 :root.console-design .work-screen-tabs{display: flex; gap: 20px;}
 :root.console-design .work-screen-tabs button, :root.console-design .work-panel > header .work-screen-tabs button{color: var(--ui-color-text-4);}
 :root.console-design .work-screen-tabs button.active, :root.console-design .work-panel > header .work-screen-tabs button.active{color: var(--ui-color-primary-text); font-weight: 600;}
-:root.console-design .work-terminal-meta{display: flex; justify-content: space-between; padding: 14px 20px 0px; background: var(--ui-color-ink); color: var(--ui-color-text-4); font-size: var(--ui-font-size-sm);}
-:root.console-design .work-terminal{background: var(--ui-color-ink); color: var(--ui-color-text-4); font: var(--ui-font-size-sm) / 1.85 "JetBrains Mono Variable", monospace; padding: 20px; margin: 0px; min-height: 350px; white-space: pre-wrap; overflow-wrap: anywhere;}
+:root.console-design .work-terminal-meta{display: flex; justify-content: space-between; padding: 14px 20px 0px; background: var(--ui-color-ink); color: var(--ui-color-ink-text); font-size: var(--ui-font-size-sm);}
+:root.console-design .work-terminal{background: var(--ui-color-ink); color: var(--ui-color-ink-text); font: var(--ui-font-size-sm) / 1.85 "JetBrains Mono Variable", monospace; padding: 20px; margin: 0px; min-height: 350px; white-space: pre-wrap; overflow-wrap: anywhere;}
 :root.console-design .work-live > footer{display: flex; align-items: center; justify-content: space-between; padding: 15px 20px; gap: 12px;}
 :root.console-design .work-live > footer code{font-size: var(--ui-font-size-sm); color: var(--ui-color-text-4);}
 :root.console-design .work-side-stack{display: grid; gap: 20px;}
@@ -226,7 +226,7 @@
 :root.console-design .run-file-browser .work-file button > span{flex: 1 1 0%; min-width: 0px; overflow-wrap: anywhere;}
 :root.console-design .run-file-browser .work-file button svg{width: 14px; flex: 0 0 auto;}
 :root.console-design .run-file-browser .work-file button.selected{background: var(--ui-color-primary-container); color: var(--ui-color-primary-text);}
-:root.console-design .run-file-reader .work-file-preview{flex: 1 1 0%; border: 0px; border-radius: 0; margin: 0px; padding: 20px; background: var(--ui-color-ink); color: var(--ui-color-text-4); font-size: var(--ui-font-size-sm); min-height: 250px;}
+:root.console-design .run-file-reader .work-file-preview{flex: 1 1 0%; border: 0px; border-radius: 0; margin: 0px; padding: 20px; background: var(--ui-color-ink); color: var(--ui-color-ink-text); font-size: var(--ui-font-size-sm); min-height: 250px;}
 @media (max-width: 520px) {
 :root.console-design .run-file-browser .work-file button{padding: 11px 14px;}}
 :root.console-design .upgrade-help{font-size: var(--ui-font-size-sm); line-height: 1.7; color: var(--ui-color-text-4);}
@@ -280,11 +280,11 @@
 :root.console-design .upgrade-report-state svg{width: 15px; flex: 0 0 auto;}
 :root.console-design .upgrade-report-state.warning{background: var(--ui-color-warning-bg); color: var(--ui-color-warning-text);}
 :root.console-design .upgrade-card-body .run-config-list{padding: 0px;}
-:root.console-design .upgrade-code-panel{margin-top: 20px; background: var(--ui-color-ink); color: var(--ui-color-text-4); border-radius: var(--ui-radius-block); overflow: hidden;}
+:root.console-design .upgrade-code-panel{margin-top: 20px; background: var(--ui-color-ink); color: var(--ui-color-ink-text); border-radius: var(--ui-radius-block); overflow: hidden;}
 :root.console-design .upgrade-code-panel > header{display: flex; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--ui-color-ink); font-size: var(--ui-font-size-sm); overflow-wrap: anywhere;}
-:root.console-design .upgrade-code-panel small{font-size: var(--ui-font-size-sm); color: var(--ui-color-text-4); flex: 0 0 auto;}
-:root.console-design .upgrade-code-panel .work-file-preview{margin: 0px; border: 0px; border-radius: 0; background: none; color: var(--ui-color-text-4); font-size: var(--ui-font-size-sm); min-height: 160px;}
-:root.console-design .upgrade-code-panel > p{padding: 26px 20px; color: var(--ui-color-text-4); font-size: var(--ui-font-size-sm); min-height: 100px;}
+:root.console-design .upgrade-code-panel small{font-size: var(--ui-font-size-sm); color: var(--ui-color-ink-text); flex: 0 0 auto;}
+:root.console-design .upgrade-code-panel .work-file-preview{margin: 0px; border: 0px; border-radius: 0; background: none; color: var(--ui-color-ink-text); font-size: var(--ui-font-size-sm); min-height: 160px;}
+:root.console-design .upgrade-code-panel > p{padding: 26px 20px; color: var(--ui-color-ink-text); font-size: var(--ui-font-size-sm); min-height: 100px;}
 :root.console-design .upgrade-reading-tabs{display: flex; gap: 24px; padding: 0px 25px; border-bottom: 1px solid var(--ui-color-line); flex-shrink: 0; overflow-x: auto;}
 :root.console-design .upgrade-reading-tabs button{border-width: 0px 0px 2px; border-style: none none solid; border-color: currentcolor currentcolor transparent; border-image: none; background: none; padding: 14px 0px; font-size: var(--ui-font-size-sm); color: var(--ui-color-text-4); white-space: nowrap;}
 :root.console-design .upgrade-reading-tabs button.active{border-color: var(--ui-color-primary); color: var(--ui-color-primary-text);}
@@ -312,7 +312,7 @@
 :root.console-design .upgrade-auth-code{display: grid; grid-template-columns: 1fr auto; gap: 0px 12px; align-items: end; margin: 20px 0px;}
 :root.console-design .upgrade-auth-code .field{margin: 0px;}
 :root.console-design .upgrade-auth-code .work-form-error{grid-column: 1 / -1; margin: 8px 0px 0px;}
-:root.console-design .upgrade-terminal{background: var(--ui-color-ink); border-radius: var(--ui-radius-block); overflow: hidden; color: var(--ui-color-text-4);}
+:root.console-design .upgrade-terminal{background: var(--ui-color-ink); border-radius: var(--ui-radius-block); overflow: hidden; color: var(--ui-color-ink-text);}
 :root.console-design .upgrade-terminal header{display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--ui-color-ink); font-size: var(--ui-font-size-sm);}
 :root.console-design .upgrade-terminal header > span{display: flex; align-items: center; gap: 8px;}
 :root.console-design .upgrade-terminal header svg{width: 14px;}
@@ -460,7 +460,7 @@
 :root.console-design #projects-delivery-files:empty::before{content:'选择验收提交后查看文件';display:block;padding:24px;font-size:var(--ui-font-size-sm);color:var(--ui-color-text-4)}
 :root.console-design #projects-delivery-files button{display:block;width:100%;padding:15px 18px;border:0;border-bottom:1px solid var(--ui-color-line);border-radius:0;background:none;font-size:var(--ui-font-size-sm);color:var(--ui-color-text-3);text-align:left;overflow-wrap:anywhere}
 :root.console-design #projects-delivery-files button.selected{background:var(--ui-color-primary-container);color:var(--ui-color-primary-text)}
-:root.console-design #projects-delivery-preview{margin:0;background:var(--ui-color-ink);color:var(--ui-color-text-4);border:0;border-radius:0;padding:20px;font:var(--ui-font-size-sm)/1.9 var(--ui-font-family-mono);overflow-wrap:anywhere;min-width:0}
+:root.console-design #projects-delivery-preview{margin:0;background:var(--ui-color-ink);color:var(--ui-color-ink-text);border:0;border-radius:0;padding:20px;font:var(--ui-font-size-sm)/1.9 var(--ui-font-family-mono);overflow-wrap:anywhere;min-width:0}
 :root.console-design #projects-submissions{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
 :root.console-design #projects-submissions .selected{background:var(--ui-color-primary-container);color:var(--ui-color-primary-text);border-color:color-mix(in srgb, var(--ui-color-primary) 28%, var(--ui-color-surface))}
 :root.console-design .work-research-workspace #projects-research-body{margin:0;border:0;overflow:auto;overflow-wrap:anywhere;font:var(--ui-font-size-sm)/1.9 var(--ui-font-family);color:var(--ui-color-text-3)}

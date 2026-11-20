@@ -3,7 +3,7 @@
 ## 1. Scope / Trigger
 
 - 修改账号、代理、令牌、任务、环境、授权登录的布局、表单、菜单、气泡或滚动行为时读取本规范。
-- 设计基准（过渡期两套并存）：组件库、外壳与已迁移页面以 `doc/design/console-v2/mock.html`（第二版定稿，`#<画面>` 切换）为准；登录页以 `doc/design/console-v2/v1/mock.html#login`（第一版，仅该画面有效）为准；尚未迁移的页面主体在迁移前仍以 `doc/design/flower2api-concept.html` 为准。用户已基本认可账号页，后续增量以任务记录的最新决定为准。
+- 设计基准（过渡期两套并存）：组件库、外壳与已迁移页面以 `doc/design/console-v2/mock.html`（第二版定稿，`#<画面>` 切换；`?mode=dark#<画面>` 为深色「夜幕紫灰」，另有 `#terminal` 授权登录终端与 `#palette` 色板画面，深色派生取值在同目录 `palette.js`）为准；登录页以 `doc/design/console-v2/v1/mock.html#login`（第一版，仅该画面有效）为准；尚未迁移的页面主体在迁移前仍以 `doc/design/flower2api-concept.html` 为准。用户已基本认可账号页，后续增量以任务记录的最新决定为准。
 - 组件库：`apps/web/src/components/ui/`（样式集中在 `components/ui/kit.css`）；主题运行时：`apps/web/src/theme/`。实际运行示例：`apps/web/ui-preview.html`、`apps/web/src/previews/UiPreview.vue`、`KitShowcase.vue` 与 `CompositeShowcase.vue`（组合组件）。外壳样式：`apps/web/src/console-shell.css`。
 - 静态稿中的代理检测、到期配置和授权步骤是本地模拟。其业务页面与后端的正式迁移仍属当前任务后续实施，不能把视觉预览作为生产能力证据。
 - 本规范规定新设计及逐页迁移的视觉/交互合同。现有 API、权限、错误恢复、原生页面生命周期规则继续遵守 [frontend-guidelines.md](./frontend-guidelines.md) 和 [原生组件规范](../../legacy-web/frontend/component-guidelines.md)。
@@ -52,7 +52,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 既有组件只做增量扩展：`Button` 新增 variant `soft`、`destructive-ghost`（`outline`/`secondary` 为次要填充、`ghost` 为文字、`destructive` 为危险浅底）；`Badge` 新增 variant `success/warning/info/cc/agy` 与 `dot` prop。表格单元格内「主值下一行」的辅助值用 `fui-table-sub`，字段说明用 `fui-field-help`。
 
-主题运行时（`@/theme`）：`createTheme(seed): ThemeVars`、`parseThemeSeed(value): ThemeSeed | null`、`isValidSeedNumber(value, key)`、`readStoredTheme()`、`writeStoredTheme(seed | null): boolean`、`applyTheme(element, vars)`、`initTheme()`，以及 `DEFAULT_THEME_SEED`、`THEME_PRESETS`、`THEME_SEED_LIMITS`。主题设置页的编辑器纯函数（`theme/editor.ts`）：`THEME_SEED_KEYS`（12 个可编辑字段，界面与计数顺序）、`changedSeedKeys(draft, saved): ThemeSeedKey[]`、`normalizeHexInput(text): string | null`（大小写 `#rgb` / `#rrggbb` → 6 位小写）、`parseSeedNumber(key, input): number | null`（空串、非数、越界、步长不齐为 null，不钳制）、`presetIdOf(primary): ThemePresetId | null`。
+主题运行时（`@/theme`）：`createTheme(seed, scheme: ThemeScheme = 'light'): ThemeVars`（两种深浅输出键集合相同）、`parseThemeSeed(value): ThemeSeed | null`、`isValidSeedNumber(value, key)`、`readStoredTheme()`、`writeStoredTheme(seed | null): boolean`、`applyTheme(element, vars)`、`initTheme()`，以及 `DEFAULT_THEME_SEED`、`THEME_PRESETS`、`THEME_SEED_LIMITS`。主题设置页的编辑器纯函数（`theme/editor.ts`）：`THEME_SEED_KEYS`（12 个可编辑字段，界面与计数顺序）、`changedSeedKeys(draft, saved): ThemeSeedKey[]`、`normalizeHexInput(text): string | null`（大小写 `#rgb` / `#rrggbb` → 6 位小写）、`parseSeedNumber(key, input): number | null`（空串、非数、越界、步长不齐为 null，不钳制）、`presetIdOf(primary): ThemePresetId | null`。主题模式（`theme/runtime.ts`）：`ThemeMode = 'system' | 'light' | 'dark'`、`ThemeScheme = 'light' | 'dark'`、`THEME_MODE_STORAGE_KEY`（`'flower2api.theme-mode'`）、`readThemeMode(storage?): ThemeMode`（缺失、非法、抛错均为 `system`）、`writeThemeMode(mode, storage?): boolean`（`system` 删除键）、`resolveScheme(mode, prefersDark): ThemeScheme`、`setThemeMode(mode): boolean`（保存并应用，失败仍按本次选择显示）、`applyThemeMode(mode)`（只应用不保存）、`currentThemeMode()`、`currentScheme()`（读文档根 `data-ui-scheme`）、`onThemeModeChange(listener)`。组合式 `useThemeMode()`（`composables/useThemeMode.ts`）返回只读 `mode`、`scheme` 与 `setMode(mode): boolean`（写入失败时提示 warning）；`scheme` 以文档根 `data-ui-scheme` 为准（MutationObserver），主题画板由父页面改写 iframe 根时同样同步。
 
 `ChoiceOption = { value: string; label: string; disabled?: boolean }`。同一菜单的 `value` 必须唯一。空字符串是合法的业务选项值；`undefined` 表示尚未选择。
 
@@ -68,7 +68,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 | 分类 | 前缀 / 名称 | 默认取值（第二版浅色） |
 | --- | --- | --- |
-| 颜色 | `--ui-color-*`：`layout/surface/fill/fill-hover/fill-muted/fill-subtle/fill-strong/track/line/mask/scrollbar`、`text/text-2/text-3/text-4`、`table-head/table-stripe/table-hover`、`primary/primary-hover/primary-container/primary-text/primary-ring/on-primary`、`success\|warning\|danger\|info` 及其 `-text`、`-bg`、`neutral-text/neutral-bg`、`cc-*/agy-*`、`brand/ink`、`on-ink/ink-text/ink-muted`（墨底文字，不随主题）、`fill-active`（侧栏选中底，柔光材质下随主色偏移）、`feedback-surface/feedback-text` | 主色 #6c54b4，正文 #0f1527，页面底 #f5f6fa |
+| 颜色 | `--ui-color-*`：`layout/surface/fill/fill-hover/fill-muted/fill-subtle/fill-strong/track/line/mask/scrollbar`、`text/text-2/text-3/text-4`、`table-head/table-stripe/table-hover`、`primary/primary-hover/primary-container/primary-text/primary-ring/on-primary`、`success\|warning\|danger\|info` 及其 `-text`、`-bg`、`neutral-text/neutral-bg`、`cc-*/agy-*`、`brand/ink`、`on-ink/ink-text/ink-muted`（墨底文字，不随主题与深浅；墨底区块的文字取 `ink-text`，不要用 `text-4`）、`fill-active`（侧栏选中底，柔光材质下随主色偏移）、`feedback-surface/feedback-text`、`knob`（开关滑块，深色下不能用卡片底）、`term-fg/term-dim/term-cursor/term-red/term-green/term-yellow/term-blue/term-magenta/term-cyan`（终端配色，两种深浅相同，底色取当前 `ink`） | 主色 #6c54b4，正文 #0f1527，页面底 #f5f6fa；深色见 `:root[data-ui-scheme=dark]` 块（页面底 #0f1018、卡片 #171824、正文 #eceef6） |
 | 字号 | `--ui-font-size-xs/sm/meta/md/title/card/heading/page` | 11.5 / 12 / 12.5 / 13 / 14 / 16 / 20 / 28px |
 | 控件高 | `--ui-control-sm/md/lg` | 32 / 38 / 44px |
 | 圆角 | `--ui-radius-btn/control/block/card` | 6 / 8 / 12 / 18px |
@@ -81,7 +81,14 @@ import type { ChoiceOption } from '@/components/ui/controls';
   - 组件换新使未迁移页面外观倒退时（例：`SystemUpdates.vue` 的 Card 传 `shadow-none`，组件又去掉了描边，卡片失去边界），在页面层用旧层 token 或工具类恢复原外观（该例加 `border`），并随页面迁移删除；不回改组件。
 - **层叠**：组件样式在 `kit.css` 的 `@layer components`；业务传入的 Tailwind 工具类可覆盖组件默认值，未分层的页面规则在页面迁移前仍压过组件。不得新增未限定页面作用域的 `[data-slot=…]`、`.fui-*` 全局覆盖。全局兜底焦点框在 `@layer base`。
 - 卡片、弹窗、表格的根元素不设颜色、行高、字体等可继承属性，内部内容由页面基准决定；组件自带的文字部件（标题、说明、表头、辅助值）显式设置。第二版页面基准为 13px / 1.55 / `--ui-color-text`。
-- **主题运行时**：浏览器只保存种子（`localStorage['flower2api.theme']`，`version: 1`），任一字段非法、存储读取抛错时整体回退默认；`main.ts` 在 `createApp` 前调用 `initTheme()`，首次渲染即为用户主题。`applyTheme(el, vars)` 写内联变量并标记 `data-ui-theme`，用在容器上只影响子树；弹层默认 Teleport 到 body，局部主题内需传 `portalTarget`。派生文字色与按钮文字对比度不低于 4.5（白字不足时改深色字，两者都不足时压暗主色）。
+- **主题模式与深浅**：
+  - 三种模式（跟随系统 / 浅色 / 深色）存在 `localStorage['flower2api.theme-mode']`，与种子分开：种子保持 `version: 1`，种子损坏不影响模式；没有保存值（含升级后的现有用户）为跟随系统。
+  - 文档根 `data-ui-scheme="light|dark"` 决定深浅：`ui-foundation.css` 的 `:root` 为浅色默认值并设 `color-scheme: light`，`:root[data-ui-scheme=dark]` 只写与浅色不同的深色默认值并设 `color-scheme: dark`（原生控件、滚动条、日期面板一起变深）。`theme.test.mjs` 断言两块与 `createTheme(默认种子, 'light' | 'dark')` 双向一致。
+  - 首帧：`apps/web/index.html` 与 `apps/legacy-web/index.html` 的 `<head>` 在任何样式与脚本之前各有一段同步内联脚本，读模式键并结合 `matchMedia('(prefers-color-scheme: dark)')` 写 `data-ui-scheme`；键名由单测校验与 `THEME_MODE_STORAGE_KEY` 一致。开发服务器靠脚本注入样式会闪一下，防闪烁以构建产物为准。
+  - `initTheme()` 按同一规则再解析一次：有保存种子或文档根已有内联变量（本次会话保存过默认主题）时整组写 `createTheme(seed ?? 默认, scheme)`，否则由 CSS 默认值生效；模式为跟随系统时订阅系统偏好、整组重写，无需刷新。嵌在主题画板 iframe 内（`window.parent !== window`）时不订阅，深浅与变量由父页面按草稿写入。
+  - 侧栏快捷切换按当前实际深浅切到另一种，并保存为明确的浅色 / 深色；回到跟随系统在主题设置页选择。
+- **深色派生**（`createTheme(seed, 'dark')`，规则与确认稿 `palette.js` 同源，单测逐值比对六个预设与四个功能色）：中性色为手调常量 `NEUTRALS_DARK`；主色实色用 `lightenUntil` 提亮到对卡片底 ≥ 3.2，按钮文字先白，白字不足 4.5 改 `#0f1527`，仍不足继续提亮实色；`hover` 明度 +0.05、`container` = 实色 20% 混入卡片底、`text` 明度 +0.1 后提亮到对 `container` 与卡片底 ≥ 5.5、`ring` 35% 透明；功能色实色同样 ≥ 3.2，`bg` = 实色 14% 混入卡片底，`text` ≥ 5.5；柔光同样把底色组向主色偏移 4%；阴影底色取纯黑并加深，`pop`/`modal` 加 `rgba(255,255,255,.07)` 细描边，`side`/`bar` 为 1px 亮线。`lightenUntil` 遇到纯黑等被 8 位舍入吞掉的增量时累加增量，其余情况逐步 +0.02，循环有界。
+- **主题种子**：浏览器只保存种子（`localStorage['flower2api.theme']`，`version: 1`），任一字段非法、存储读取抛错时整体回退默认；`main.ts` 在 `createApp` 前调用 `initTheme()`，首次渲染即为用户主题与所选深浅。`applyTheme(el, vars)` 写内联变量并标记 `data-ui-theme`，用在容器上只影响子树；弹层默认 Teleport 到 body，局部主题内需传 `portalTarget`。派生文字色与按钮文字对比度不低于 4.5（白字不足时改深色字，两者都不足时压暗主色）。
 
 - 按CSS视口采用三档阅读尺寸：小于1920px、1920～2559px、2560px及以上。新组件：正文/按钮/输入 13/14/15px，辅助文字 12/13/14px，弹窗标题 20/22/24px，页标题 28/30/32px；控件高 38/40/42px（小号 32/34/36px）。旧层阅读尺寸（正文 14/15/16px、控件 40/42/44px）在页面迁移前保持不变，html 根字号仍取旧层 `--ui-font-body`。禁止整页zoom或按物理像素缩放。
 - 常用间距采用4/8/12/16/24px，页面容器24–40px；窄屏16–20px。页面主内容使用柔和浅底，内容卡片使用白色和轻边框。
@@ -182,9 +189,9 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 ### 外壳与登录页（第二版）
 
-- **类名契约**：行为脚本与业务代码依赖以下类名与无障碍名称，改外壳时保留，只改样式：`.console-shell`（`.sidebar-collapsed`、`.console-native-tasks`）、`.console-sidebar`、`.console-brand-row`、`.brand-update`（有新版本时类名恰为 `brand-update has-update`）、`.navigation-item.is-active`、`.navigation-count`、`.navigation-running`、`.sidebar-exit`、`.desktop-sidebar-toggle`、`.mobile-navigation-panel`、`.toolbar-page`、`#console-content`、`#admin-password`、`.settings-save-bar`；「flower2api 首页」「系统更新」「打开主导航」「收起侧边栏 / 展开侧边栏」「退出」「显示密码 / 隐藏密码」。
+- **类名契约**：行为脚本与业务代码依赖以下类名与无障碍名称，改外壳时保留，只改样式：`.console-shell`（`.sidebar-collapsed`、`.console-native-tasks`）、`.console-sidebar`、`.console-brand-row`、`.brand-update`（有新版本时类名恰为 `brand-update has-update`）、`.navigation-item.is-active`、`.navigation-count`、`.navigation-running`、`.sidebar-exit`、`.desktop-sidebar-toggle`、`.sidebar-theme-toggle`（桌面侧栏与移动端抽屉工具区首位）、`.mobile-navigation-panel`、`.toolbar-page`、`#console-content`、`#admin-password`、`.settings-save-bar`；「flower2api 首页」「系统更新」「打开主导航」「收起侧边栏 / 展开侧边栏」「退出」「切换到深色 / 切换到浅色」（浅色显示 Moon、深色显示 Sun）「显示密码 / 隐藏密码」。
 - **尺寸与断点**：侧栏宽 248px（761–1000px 为 224px，≥1920px 为 264px，≥2560px 为 280px），折叠 76px；≤760px 隐藏侧栏，显示应用栏（标志、页面标题、菜单按钮）与抽屉。内容区内边距 24 / 28 / 48px（按 `--ui-space-unit`），任务页（`.console-native-tasks`）为 0。
-- **侧栏**：`position: fixed` 占满视口高；品牌行与底部管理员区不收缩，只有导航区 `overflow-y: auto`。品牌行只有标志方块是首页链接（名称与版本号同一行，不能嵌套链接）。标志沿用品牌合同（[frontend-guidelines.md](./frontend-guidelines.md)）的 `public/favicon.svg?v=flower2api-pink-04`，放在 `ink` 方块上，透明的花心与通道透出墨色；只有侧栏与登录品牌区的图片带 `alt="flower2api 标志"`，应用栏、抽屉等装饰位置为空 alt。版本号常态 `fill` 底、`text-2`；有新版本 `success-bg` / `success-text` 并带 `arrow-up-circle`；折叠后只显示图标。运行中徽标为 0 时用中性色（`data-idle=true`）。底部单独一组为「主题设置」（`Palette`）与「系统设置」。
+- **侧栏**：`position: fixed` 占满视口高；品牌行与底部管理员区不收缩，只有导航区 `overflow-y: auto`。品牌行只有标志方块是首页链接（名称与版本号同一行，不能嵌套链接）。标志沿用品牌合同（[frontend-guidelines.md](./frontend-guidelines.md)）的 `public/favicon.svg?v=flower2api-pink-04`，放在 `ink` 方块上，透明的花心与通道透出墨色；只有侧栏与登录品牌区的图片带 `alt="flower2api 标志"`，应用栏、抽屉等装饰位置为空 alt。版本号常态 `fill` 底、`text-2`；有新版本 `success-bg` / `success-text` 并带 `arrow-up-circle`；折叠后只显示图标。运行中徽标为 0 时用中性色（`data-idle=true`）。底部单独一组为「主题设置」（`Palette`）与「系统设置」。底部管理员区工具按钮依次为主题切换、折叠、退出（抽屉为主题切换、退出）；三个按钮时「本地管理控制台」宽 80.5px、可用 80px，`.sidebar-identity` 右外边距 -1px 伸进间距，工具按钮位置不变、半像素不触发省略号。
 - **移动端抽屉**：继续用 `Dialog`（焦点圈定、Esc、路由切换关闭）。定位通过传入工具类覆盖 `DialogContent` 的居中定位，`console-shell.css` 末尾用未分层、更具体的 `[data-slot=dialog-content].mobile-navigation-panel` 铺满视口高——全局弹窗高度规则未分层，层内规则压不过它。不用 `!important`。
 - **应用栏标题**：取 `Dashboard.vue` 的标题表，与各页页头一致（账号为「账号管理」）；新增路由时同步补表。
 - **应用栏页面操作位**：`#console-toolbar-page-actions`（`display: contents`，位于 `.console-toolbar-actions` 内、菜单按钮之前，间距 6px）。页面用 `<Teleport defer to="#console-toolbar-page-actions">` 放 36px 图标按钮，类名 `.console-toolbar-action`（外观同菜单按钮，`aria-expanded=true` 时主色浅底）；外壳不感知业务。桌面应用栏隐藏，按钮随之不可见；嵌入模式（如 `workspace-account-id`）不放。目前只有账号页的「搜索账号」。
@@ -204,16 +211,19 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - **入口**：`/theme`（`name: 'theme'`，`ThemeSettings.vue`）。网关 `router.rs` 的 SPA 列表与 `frontend_routes_support_direct_navigation_and_reload` 同步登记 `/theme`、`/theme/`；应用栏标题表 `theme: '主题设置'`。
 - **草稿语义**：
   - `saved = readStoredTheme() ?? DEFAULT_THEME_SEED`；`draft` 是可编辑种子。只有通过 `normalizeHexInput` / `parseSeedNumber` 的值写进 `draft`；无效输入只记错误（`#theme-<键>-error`），画板不变，保存禁用。
-  - 页头 `[data-theme-sync]` 显示「N 处修改待应用」（N = `changedSeedKeys(draft, saved).length`）；有无效输入时追加「M 项输入无效」（`data-invalid=true`，错误色）；都没有时为「已同步」。分类分段的 `count` 为该分类已修改或无效的字段数（同系统设置分类计数），无效输入藏在其它分类时也能定位。≤760px 时页头说明仅读屏可见，由 `.theme-mobile-state` 补一行可见状态。
-  - 「已修改」与单项恢复（「恢复已保存的<字段>」）都相对已保存值；撤销草稿回到已保存；恢复默认只改草稿，仍需保存。
-  - 保存：先 `writeStoredTheme(等于默认 ? null : draft)`；返回 false 时提示失败，控制台不变。成功后 `applyTheme(document.documentElement, createTheme(draft))`。
+  - 主题模式属于草稿：编辑面板顶部「主题模式」分段（`Segmented.theme-mode`，跟随系统 `Monitor` / 浅色 `Sun` / 深色 `Moon`，脚本用 `.theme-mode [role=radio][value=<模式>]` 定位）。`draftMode` 初值为 `useThemeMode().mode`；与已保存不同时带「已修改」与单项恢复，计入待应用数与离开保护。
+  - 页头 `[data-theme-sync]` 显示「N 处修改待应用」（N = `changedSeedKeys(draft, saved).length` + 模式是否不同）；有无效输入时追加「M 项输入无效」（`data-invalid=true`，错误色）；都没有时为「已同步」。分类分段的 `count` 为该分类已修改或无效的字段数（同系统设置分类计数），无效输入藏在其它分类时也能定位。≤760px 时页头说明仅读屏可见，由 `.theme-mobile-state` 补一行可见状态。
+  - 「已修改」与单项恢复（「恢复已保存的<字段>」）都相对已保存值；撤销草稿回到已保存的种子与模式；恢复默认把种子与模式（跟随系统）都只改草稿，仍需保存。
+  - 保存：种子有改动时先 `writeStoredTheme(种子等于默认 ? null : draft)`，再在模式有改动时 `writeThemeMode(draftMode)`；任一失败提示失败、控制台不变，模式失败时把已写入的种子恢复为原值。都成功后 `applyThemeMode(draftMode)` 按新深浅整组重写文档根。
+  - 在本页用侧栏切换：已保存模式更新；草稿模式原本与已保存一致时同步跟随，原本不同则保留为待应用修改。
+  - 预设色块 `--theme-preset` 在深色下取 `createTheme({ ...默认, primary }, 'dark')` 的主色（同设计稿深色 `#theme`），浅色沿用种子色。
   - 预设只写主色，选中态由 `presetIdOf(draft.primary)` 反查（`[data-preset=<id>][aria-pressed]`）。
 - **预览画板**（`theme/ThemePreview.vue`）：
-  - 同源 `<iframe src="/?theme-preview=1">` 固定 1440×900。`load` 与草稿深度变化时，把 `createTheme(draft)` 写进 iframe 文档根，覆盖它自己 `initTheme` 应用的保存值。
+  - 同源 `<iframe src="/?theme-preview=1">` 固定 1440×900。`ThemePreview` 的 `scheme` 属性由 `resolveScheme(draftMode, 系统偏好)` 得出（页面订阅系统偏好，草稿为跟随系统时画板随系统切换）。`load`、草稿或 `scheme` 变化时写 iframe 根的 `data-ui-scheme` 与 `createTheme(draft, scheme)`，覆盖它自己 `initTheme` 应用的保存值。
   - iframe 设 `inert`、`tabindex=-1`、`pointer-events: none`。画布负责缩放（10%–150%：按钮以中心为锚 ±10 个百分点，滚轮以指针为锚、每 100px ±10）、拖动平移与「适应画布」（`[data-theme-zoom]` 显示百分比）。
   - `Dashboard.vue` 读到 `route.query['theme-preview'] === '1'` 时以 `checkUpdates=false` 挂载，画板内不发 `POST /runtime/api/system-updates/check`，只读摘要照常读取。
 - **离开保护**：`onBeforeRouteLeave` 在有改动或有无效输入时打开 `ConfirmationDialog`（「放弃未保存的主题修改？」/「放弃并离开」）；去往 `login` 直接放行，因为 `logout()` 已先撤销会话。有改动时登记 `beforeunload`。
-- **主题范围**：任务与工程、运行环境随保存的主题变化（见「第二版原生页」）；独立 `/runtime/` 文档与终端配色不应用用户主题。
+- **主题范围**：任务与工程、运行环境随保存的主题与深浅变化（见「第二版原生页」）；独立 `/runtime/` 文档跟随所选模式但只用默认配色；终端配色只取 `term-*` token，不受用户种子影响。
 - **示例**：
   - 错误用法：在当前文档里直接渲染 `Accounts.vue` 做预览，Teleport、固定定位和媒体查询都会逃出画板，外壳也按真实视口排版。正确处理：用 iframe 隔离。
   - 错误用法：`Number('')` 得 0 后写进草稿（圆角 0 合法，会悄悄改值）。正确处理：经 `parseSeedNumber`，空串为 null。
@@ -239,7 +249,8 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
   - 原生规则不分层，会压过 `@layer components`。元素级规则用 `:not([class*='fui-'], [class*='fui-'] *, …)` 排除组件库控件；不得为挂进原生宿主的 Vue 控件写原生覆盖（`.proxy-picker-*` 覆盖已删除，只保留弹层 `z-index: 1000`）。
   - 旧变量（`--ink`、`--line`、`--muted`、`--border`、`--amber` 等）定义块全部删除，与 shadcn 同名变量的冲突随之消失。`[hidden]` 对整份文档生效，因为独立文档的环境页签会去掉 body 上的 `.work-console`。
-  - 终端容器取墨色 token（`--ui-color-ink` / `--ui-color-ink-text`）。xterm 自身配色由深色模式子任务统一。
+  - 任务宿主不写 `data-theme`，原生样式没有 `[data-theme]` 限定，深浅随文档根 `data-ui-scheme` 与继承的变量（`runtimeModule.ts` 把原生选择器限定在 `.task-runtime` 内，去掉限定不会漏到其它页面）。
+  - 终端容器取墨色 token（`--ui-color-ink` / `--ui-color-ink-text`），两种深浅都是墨底。xterm 配色由 `app.js` 的 `terminalTheme(host)` 从容器计算样式读取 `--ui-color-term-*`：`foreground`/`white` 取 `term-fg`、`cursor` 取 `term-cursor`、`cursorAccent`/`black` 取 `ink`、`brightBlack` 取 `term-dim`、其余 ANSI 色对应取值；`background` 透明并开启 `allowTransparency`，底色由容器给出，切换深浅时已打开的终端不需要重建。
   - `!important` 只保留以下例外，其余靠选择器特异性：
     - `.xterm-host .xterm-viewport` 的透明底，用来覆盖 xterm 写在行内的底色；
     - `.hidden` 工具类与全局 `[hidden]`；
@@ -270,9 +281,9 @@ import type { ChoiceOption } from '@/components/ui/controls';
     - 操作栏是四个 `EntityAction`，「环境详情」为 primary。
   - 定位契约（脚本依赖）：`.environment-rich`、`.fui-entity-card-head`、`.fui-entity-card-name`、`.fui-entity-card-actions button`、`.environment-readiness strong`、`.environment-resources-grid`、`.runtime-environment-dialog`、`.environment-sections button`。
 - **独立 `/runtime/` 文档**：
-  - 读同一组 legacy CSS 和 `ui-foundation.css` 的默认值，显示第二版默认主题，不应用用户主题。
+  - 读同一组 legacy CSS 和 `ui-foundation.css` 的默认值，不应用用户主题种子；深浅跟随所选模式：`index.html` 首帧脚本读模式键写 `data-ui-scheme`，并在跟随系统时订阅系统偏好（独立文档不运行 Vue 的 `initTheme`）。
   - 环境页签专用的 `environments.css`、`environment-design.css` 只做 token 化，不按新稿重排。
-  - 改动原生资源时更新 `index.html` 的 `?v=`（本次为 `20261120-native-pages`）。
+  - 改动原生资源时更新 `index.html` 的 `?v=`（本次为 `20261121-dark-mode`）。
 - **示例**：
   - 错误用法：原生 `button {…}`、`input {…}` 这类元素级规则不加排除，或者给 `ProxyPicker` 写原生覆盖。不分层的原生规则会压过组件库，选线控件变回旧外观。
     - 正确处理：元素级规则排除 `[class*='fui-']` 及其后代，Vue 控件外观只由组件库定义。`verify_native_pages_design.py` 会比对宿主内外的计算样式。
@@ -358,6 +369,11 @@ import type { ChoiceOption } from '@/components/ui/controls';
 | 单行统计超宽 | 省略显示，预计费用仍在数据中且完整内容可访问 |
 | 账号排队数在 0、1、8 间切换 | 卡片宽高及相邻位置稳定；排队入口可打开调度详情 |
 | 识别失败/取消编辑 | 业务草稿或原配置保持，不提交请求 |
+| 模式键缺失、非 `light`/`dark`、读取抛错 | 按跟随系统；首帧脚本与 `readThemeMode` 同一规则 |
+| 模式键写入失败（侧栏切换） | 界面仍切到所选深浅，warning 提示「当前浏览器无法保存主题模式」，刷新后不保持 |
+| 主题设置页保存：种子写入成功、模式写入失败 | 种子恢复为原值，提示失败，控制台与草稿不变 |
+| 跟随系统时系统切换深浅 | 控制台、内嵌任务页、独立 `/runtime/` 无需刷新即切换；明确选择浅色 / 深色后不再跟随 |
+| 主题画板 iframe 内系统切换深浅 | iframe 不自行跟随，只按父页面草稿解析出的深浅写入 |
 
 ## 5. Scenarios and Examples
 
@@ -390,6 +406,11 @@ const query = ref('');
 - 错误：搜索栏外框和内部input各画一层强焦点框。正确：统一由外框`:focus-within`承担焦点。
 - 错误：直接复制静态稿的全局事件委托到Vue组件。正确：复用reka-ui处理菜单/气泡生命周期，并由Vue组件管理状态。
 - 错误：在原生dialog中将浮层一律portal到body，再用超大z-index补救。正确：传入父dialog作为`portalTarget`，并验证Esc层级与焦点。
+- 深色适配：
+  - 错误：墨底区块（终端、代码预览）文字取 `--ui-color-text-4`。深色下 text-4 变暗，对深色墨底只有约 4.1，低于正文 4.5。正确：取 `--ui-color-ink-text` / `--ui-color-on-ink`，两种深浅不变。
+  - 错误：开关滑块取 `--ui-color-surface`，深色下变成深色滑块。正确：取 `--ui-color-knob`。
+  - 错误：为深色单独写 `[data-ui-scheme=dark] .xxx { … }` 覆盖，或在原生样式里加 `[data-theme]` 限定。正确：只引用语义 token，深色值只在 `ui-foundation.css` 的深色块与 `createTheme(seed, 'dark')` 里定义。
+  - 错误：在主题设置页保存后 `applyTheme(root, createTheme(seed))`（丢了深浅，深色下写回浅色值）。正确：先写存储，再 `applyThemeMode(draftMode)` 按当前深浅整组重写。
 
 ## 6. Tests Required
 
@@ -405,12 +426,19 @@ python3 deploy/flower2api/verify_records_pages_design.py
 python3 deploy/flower2api/verify_nodes_settings_design.py
 python3 deploy/flower2api/verify_theme_settings.py
 python3 deploy/flower2api/verify_native_pages_design.py
+python3 deploy/flower2api/verify_dark_mode.py
 node --experimental-strip-types --test apps/web/tests/update-steps.test.mjs
 python3 deploy/flower2api/verify_update_design.py
 python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录>
 ```
 
-- `theme.test.mjs`：默认主题与 ui-foundation.css 双向一致、预设与边界色对比度、尺寸派生、种子校验与存储失败矩阵、编辑器纯函数（差异、hex 规整、数值校验、预设反查）、组件与已迁移页面样式不写死颜色与圆角。
+- `theme.test.mjs`：默认主题与 ui-foundation.css 浅色块、深色块（只写与浅色不同的值）分别双向一致；深色派生与 `doc/design/console-v2/palette.js` 逐值一致；预设与边界色（含 `#ffee00`、`#111111`、`#000000`）浅色对比度 ≥ 4.5，深色按钮文字 ≥ 4.5、实色对卡片底 ≥ 3、派生文字 ≥ 5.5、中性正文 ≥ 4.5；`knob` 与 `term-*` 取值、深浅输出键集合相同；模式存储矩阵（缺失、非法、抛错、写 `system` 删除键）与 `resolveScheme`；两份 `index.html` 的首帧脚本键名一致、位于样式与脚本之前、不再写 `data-theme`；尺寸派生、种子校验与存储失败矩阵、编辑器纯函数；组件、已迁移页面、`style.css` 旧层与 `approved-design.css` 样式不写死颜色与圆角。
+- `verify_dark_mode.py`（需先构建）：
+  - 深色设计稿（`mock.html?mode=dark`）对深色产品比对：外壳（`ShellFixture` 有新版本与运行中任务）、账号、账号编辑、390 应用栏与账号页、请求、系统更新与进度、任务与工程（含部件一致性）、运行环境、主题设置（深海蓝草稿 + 深色模式 = 2 处修改，预设色块取深色派生值）、授权登录终端（容器墨色、七种 ANSI 色取 `term-*`、视口透明、切换深浅不重建）。只导入各设计脚本的对照表，设计稿以 `?mode=dark&s=<画面>` 打开。
+  - 颜色：六个页签 `tokens_only`；`DarkBrowser` 代理让 `verify_native_pages_design.dialogs()` 的 21 个深层弹窗在系统深色下复跑外壳、颜色、底栏与控件一致性；正文类文字色对逐层合成的实际底色抽样 ≥ 4.5；气泡、通知取深色 token。
+  - 模式行为：跟随系统切换控制台与内嵌任务页（文档身份不变、不写模式键）；侧栏切换写明确模式并刷新保持、明确模式不再跟随系统；首帧拦截入口模块后 body 插入前根标记与页面底色已是所选深浅、篡改模式键按跟随系统；写入失败提示且界面仍切换；独立 `/runtime/` 跟随系统与保存模式、深色主色为默认派生值；主题设置页模式草稿的待应用数、画板隔离、撤销、跟随系统、保存、侧栏同步、恢复默认与离开保护。
+  - 结果与截图在 `.deploy/console-ui-revamp/dark-mode/verify/`。
+- 在系统深色下运行的脚本会看到深色：断言任务宿主深浅的脚本改为断言文档根 `data-ui-scheme` 跟随模式（`verify_workspace_experience.py` 在系统深色下期望 `dark`）；按 `('dark','light')` 循环、点击已不存在的 `#theme-toggle` 的旧脚本路径与基线相同，不迁移。
 - `verify_ui_kit.py`：与 `doc/design/console-v2/mock.html` 逐项比对计算样式（结构等价项在脚本白名单中注明原因），组件各状态取值、预设与自定义主色、柔光材质、局部主题隔离、刷新保持、存储缺失/损坏/越界/抛错回退、减少动效，以及真实构建入口首屏即为保存的主题（需先 `npm --prefix apps/web run build`）。
 - `verify_ui_shell.py`（需先构建）：真实构建加合成夹具，1440 下侧栏、品牌行、版本号两态、导航、计数徽标、底部区、内容区与页头对 `mock.html#accounts` 逐项比对；9 个页面页头无分组名且样式一致；系统设置保存栏比对与「1 项待保存 / 配置已同步」；折叠保持、1440×560 导航内部滚动；390 应用栏比对、抽屉贴左铺满并在导航后关闭；登录页对 `v1/mock.html#login` 比对及空密码、错误密码、成功、显示密码四条路径；零控制台错误。
 - `verify_account_page_design.py`（需先构建）：`InteractionFixture` 的 13 个账号（第 4–6 号设为限流、认证错误、停用）。1440×900 对 `#accounts`、`#account-edit` 比对 79 项计算样式（白名单：设计稿 `.acc-name span` 误命中徽标的文字色与字号、99px 全圆）；三列、间距 16、首行三张卡片操作栏底边 ≤ 900；健康条四种色调与 36px；工作区 820 视口居中、滚动内容区时页签带不动、切换页签外框不变、新建无页签带；授权登录 440；390 对 `#mobile` 比对，搜索行展开、聚焦、有搜索词时不收起，其它页面无搜索按钮；零控制台错误；设计稿未画的画面截图存 `--output`。
@@ -554,7 +582,7 @@ CPU首屏摘要回归：`verify_environment_cpu_summary.py`覆盖自动读取、
 ### 任务深层弹窗与工程现场一致性
 
 - 任务账号配置按原型采用920px宽、17px圆角，名称、版本、网关/环境/额度三个入口和默认折叠的高级维护。名称使用独立display_name，原身份字段沿[账号CLI设置契约](../../orchestrator/backend/account-runtime-v3.md#scenario-账号-cli-版本与迭代抓包)。取消零写入；额度子窗关闭保留父草稿，网关及环境使用局部工作区并保持任务路由。工程执行配置只写版本及本空间抓包字段。
-- `verify_task_account_config.py`核对第二版弹窗外壳与标题取 token、颜色只取 token，并覆盖1440/720/390px。旧dark偏好及系统深色下仍固定亮色，正文、标签和操作文字对比度至少4.5；成功状态与错误状态分别着色。
+- `verify_task_account_config.py`核对第二版弹窗外壳与标题取 token、颜色只取 token，并覆盖1440/720/390px。任务宿主跟随主题模式（系统浅色、未保存模式时为浅色），正文、标签和操作文字对比度至少4.5；成功状态与错误状态分别着色。
 - 额度详情复用原型`work-quota-*`结构：600px宽、身份栏、5小时/7天双卡38px主值、横跨的Fable25px主值、剩余值与北京时间重置、底部查询时间和显式刷新。真实0、窗口缺失和重置未提供分别表达；关闭、重开、导航使旧刷新回执失效。
 - 任务账号的运行时段使用`RuntimeEnvironments`局部环境工作区，自动选择时段分区并保持任务路由；按任务账号ID定位真实环境。养号额度及独立旧入口的时段表单使用920px表单、固定标题/操作栏与可滚动正文。switch-field显式横向排版，避免旧form label的列布局覆盖。星期、最多8区间、环境时区及关闭时保留原配置沿用原合同。工程养号仅提交阈值；worker分支保留开关与小时区间。
 - 任务账号切换代理使用专用`TaskProxyDialog`，复用`ProxyPicker`；关联与独立任务均可选目录或直连。主URL、任务根、卡片节点及焦点保持；保存后发送`runtime:accounts-refresh`局部回读，禁止触发整个navigate。目录选择提交ID/revision及任务快照版本，沿原服务端维护门禁。完整账号编辑继续使用局部Accounts工作区。
@@ -620,7 +648,7 @@ CPU首屏摘要回归：`verify_environment_cpu_summary.py`覆盖自动读取、
 - `openRuntime`仅合并当前在途Promise，成功/失败后释放；鉴权凭据改变清除旧引用。后续入口重新交换，禁止将成功结果作为长期会话缓存。
 - 正式账号与登录草稿独立完成和重试；草稿不能进入正式账号选择。工程主状态、目录、模型、历史分别加载；目录/模型未初始化时相应表单inert，模型读取完成前禁止启动。历史失败重试保留配置输入。
 - 初始重试、页面、账号、空间、候选及文件读取均核对本轮归属。每次空间挂载清空上个空间的摘要；主状态和历史更新继续保留原表单草稿、节点与焦点。
-- 任务及独立入口固定亮色，移除主题偏好和切换逻辑。六入口采用内容宽度页签、aria-current和focus-visible；窄屏局部横向滚动，选中项可达。
+- 任务及独立入口跟随主题模式（`data-ui-scheme`），旧主题偏好 `vibebench-theme` 与原切换逻辑已移除。六入口采用内容宽度页签、aria-current和focus-visible；窄屏局部横向滚动，选中项可达。
 - 终端底栏的重复交付历史按钮移除。当前/最近目标提供交付入口，历史分区继续可达；两者共用冻结读取。完成、停止、待复验标签放入目标卡片，未知状态保留实际值。
 - 交付弹窗位于各分区共同父层，禁止放在可隐藏的历史分区内。桌面宽度min(1440px,视口-32px)，高度视口-32px；窄屏边距8px。标题与候选固定，文件导航与源码/报告分区滚动，保留关闭、Esc、焦点恢复及旧回执失效。
 - 系统更新弹窗优先呈现当前 / 可用状态与检查动作；有新版时显示安装方式并可直接安装。完整说明、组件维护和版本历史在弹窗内独立展开或进入二级视图。活动维护与需恢复的操作先于发布说明（直接显示进度），已结束操作在概览紧凑呈现；原 UUID / revision / SHA、取消、恢复和回退合同保持。
@@ -633,7 +661,7 @@ CPU首屏摘要回归：`verify_environment_cpu_summary.py`覆盖自动读取、
 | 字体、草稿、模型、目录或历史慢 | 已完成区域可用，等待/错误归属本区域 |
 | 草稿或历史失败后重试 | 正式账号可用，配置草稿保留 |
 | 账号/空间切换或窗口关闭 | 原读取回执失效，后台工作保持原许可 |
-| 旧dark偏好、窄屏与长内容 | 固定亮色，局部滚动，页面不横向溢出 |
+| 旧dark偏好、窄屏与长内容 | 旧键不读取、跟随主题模式，局部滚动，页面不横向溢出 |
 | 更新已最新/陈旧/检查中/失败 | 主状态正确，原安装准入与恢复动作保持 |
 
 ### 5. Scenarios and Examples

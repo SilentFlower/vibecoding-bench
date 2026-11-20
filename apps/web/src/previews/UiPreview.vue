@@ -11,6 +11,7 @@ import { Segmented, type SegmentedOption } from '@/components/ui/segmented';
 import { Switch } from '@/components/ui/switch';
 import { Check, Save, RotateCcw } from '@/components/ui/icon';
 import { DEFAULT_THEME_SEED, THEME_PRESETS, applyTheme, createTheme, readStoredTheme, writeStoredTheme, type ThemeSeed } from '@/theme';
+import { useThemeMode } from '../composables/useThemeMode';
 import KitShowcase from './KitShowcase.vue';
 import CompositeShowcase from './CompositeShowcase.vue';
 
@@ -42,11 +43,12 @@ function save(event: Event): void {
   submitted.value = JSON.stringify(Object.fromEntries(new FormData(form)), null, 2);
 }
 
-// 主题草稿直接作用于整页，便于逐项核对；保存才写入浏览器存储，刷新后由 initTheme 恢复。
+// 主题草稿直接作用于整页，便于逐项核对；保存才写入浏览器存储，刷新后由 initTheme 恢复。整页与局部示例都按当前深浅派生。
+const { scheme } = useThemeMode();
 const seed = ref<ThemeSeed>({ ...(readStoredTheme() ?? DEFAULT_THEME_SEED) });
 const themeStatus = ref('');
 const surfaceOptions: SegmentedOption[] = [{ value: 'default', label: '默认' }, { value: 'soft', label: '柔光' }];
-watch(seed, value => applyTheme(document.documentElement, createTheme(value)), { deep: true });
+watch([seed, scheme], ([value, current]) => applyTheme(document.documentElement, createTheme(value, current)), { deep: true });
 
 /** 读取颜色选择器的值作为自定义主色。@param event 输入事件。@return 无。 */
 function pickPrimary(event: Event): void {
@@ -72,7 +74,12 @@ function resetTheme(): void {
 
 // 局部主题示例：只给该容器写变量，验证主题设置画板的隔离能力。
 const localTheme = ref<HTMLElement>();
-onMounted(() => { if (localTheme.value) applyTheme(localTheme.value, createTheme({ ...DEFAULT_THEME_SEED, primary: '#0f9f8f', radius: 4 })); });
+/** 按当前深浅给局部容器写入松石绿示例主题。@return 无。 */
+function applyLocalTheme(): void {
+  if (localTheme.value) applyTheme(localTheme.value, createTheme({ ...DEFAULT_THEME_SEED, primary: '#0f9f8f', radius: 4 }, scheme.value));
+}
+onMounted(applyLocalTheme);
+watch(scheme, applyLocalTheme);
 const localFilter = ref('on');
 const localOptions: SegmentedOption[] = [{ value: 'on', label: '启用', count: 3 }, { value: 'off', label: '停用', count: 1 }];
 const localSwitch = ref(true);

@@ -81,7 +81,7 @@ async function connect():Promise<void>{
   const host=root.value;
   controller?.dispose();scope?.dispose();observer?.disconnect();
   const body=host.ownerDocument.createElement('div');body.className='runtime-body work-console';body.innerHTML=template;
-  host.replaceChildren(body);host.dataset.theme='light';host.inert=true;
+  host.replaceChildren(body);host.inert=true;
   try{
     await api.openRuntime();
     if(!alive)return;

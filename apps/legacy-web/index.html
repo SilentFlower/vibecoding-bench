@@ -4,24 +4,36 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>flower2api / terminal</title>
+  <script>
+    // 首帧：在样式与脚本之前按保存的主题模式写 data-ui-scheme，避免先闪一下浅色；键名与 apps/web/src/theme/runtime.ts 的
+    // THEME_MODE_STORAGE_KEY 一致（单测校验）。独立文档不运行 Vue 的 initTheme，跟随系统时在这里订阅系统偏好；配色只用默认主题。
+    (function () {
+      var root = document.documentElement;
+      var query = matchMedia('(prefers-color-scheme: dark)');
+      function apply() {
+        var mode = null;
+        try { mode = localStorage.getItem('flower2api.theme-mode'); } catch (error) { mode = null; }
+        root.dataset.uiScheme = mode === 'dark' || (mode !== 'light' && query.matches) ? 'dark' : 'light';
+      }
+      apply();
+      query.addEventListener('change', apply);
+      // 独立环境入口继续使用自身的样式作用域。
+      root.classList.toggle('environment-page', location.hash.split('?')[0] === '#environments');
+    })();
+  </script>
   <!-- xterm.js: 浏览器端终端，渲染 worker 容器里 `claude auth login` 的 PTY -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261120-native-pages" />
+  <link rel="stylesheet" href="style.css?v=20261121-dark-mode" />
   <link rel="stylesheet" href="environments.css?v=20261120-native-pages" />
   <link rel="stylesheet" href="console.css?v=20261120-native-pages" />
   <link rel="stylesheet" href="approved-design.css?v=20261120-native-pages" />
-  <link rel="stylesheet" href="work-design.css?v=20261120-native-pages" />
+  <link rel="stylesheet" href="work-design.css?v=20261121-dark-mode" />
   <link rel="stylesheet" href="environment-design.css?v=20261120-native-pages" />
   <link rel="stylesheet" href="capture-workspace.css?v=20261120-native-pages" />
   <link rel="stylesheet" href="pagination.css?v=20261119-console-ui-kit" />
-  <link rel="stylesheet" href="ui-foundation.css?v=20261120-console-ui-shell" />
-  <script>
-    // 工作区固定亮色，独立环境入口继续使用自身的样式作用域。
-    document.documentElement.dataset.theme = 'light';
-    document.documentElement.classList.toggle('environment-page', location.hash.split('?')[0] === '#environments');
-  </script>
+  <link rel="stylesheet" href="ui-foundation.css?v=20261121-dark-mode" />
 </head>
 <body class="work-console">
 
@@ -595,6 +607,6 @@
   <script src="ui-controls.js?v=20261116-workspace-experience"></script>
   <script src="projects.js?v=20261116-workspace-experience"></script>
   <script src="environments.js?v=20261118-platform-kernel-node-drafts"></script>
-  <script src="app.js?v=20261120-native-pages"></script>
+  <script src="app.js?v=20261121-dark-mode"></script>
 </body>
 </html>

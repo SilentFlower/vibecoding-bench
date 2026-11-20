@@ -5,6 +5,16 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=flower2api-pink-04" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>flower2api</title>
+    <script>
+      // 首帧：在样式与模块脚本之前按保存的主题模式写 data-ui-scheme，避免先闪一下浅色；键名与 src/theme/runtime.ts 的
+      // THEME_MODE_STORAGE_KEY 一致（单测校验）。之后由 initTheme 按同一规则接管并跟随系统偏好。
+      (function () {
+        var mode = null;
+        try { mode = localStorage.getItem('flower2api.theme-mode'); } catch (error) { mode = null; }
+        var dark = mode === 'dark' || (mode !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.uiScheme = dark ? 'dark' : 'light';
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, defineAsyncComponent, onMounted, onUnmounted } from 'vue';
-import { Menu, PanelLeftClose, PanelLeftOpen, ChevronRight, LogOut, ArrowUpCircle } from '@/components/ui/icon';
+import { Menu, PanelLeftClose, PanelLeftOpen, ChevronRight, LogOut, ArrowUpCircle, Moon, Sun } from '@/components/ui/icon';
 import AppNavigation from './AppNavigation.vue';
 import { api } from '../api';
 import { releaseVersion } from '../lib/platformVersion';
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } 
 import { useRoute, useRouter } from 'vue-router';
 import { logout } from '../router';
 import { useToast } from '../composables/useToast';
+import { useThemeMode } from '../composables/useThemeMode';
 
 const route = useRoute();
 const nativeTasks = computed(() => route.name === 'tasks');
@@ -17,6 +18,10 @@ function savedCollapsed(): boolean { try { return localStorage.getItem('flower2a
 const collapsed = ref(savedCollapsed());
 watch(collapsed, value => { try { localStorage.setItem('flower2api-sidebar-collapsed', String(value)); } catch { /* 隐私模式仍保持本次会话选择。 */ } });
 const mobileOpen = ref(false);
+const { scheme, setMode } = useThemeMode();
+const themeToggleLabel = computed(() => scheme.value === 'dark' ? '切换到浅色' : '切换到深色');
+/** 按当前实际深浅切到另一种，并保存为明确的浅色或深色；回到跟随系统在主题设置页选择。@return 无。 */
+function toggleScheme(): void { setMode(scheme.value === 'dark' ? 'light' : 'dark'); }
 const { version: runtimeVersion, refresh: refreshPlatformVersion } = usePlatformVersion();
 const installedVersion = ref<string | null>(null);
 const currentVersion = computed(() => runtimeVersion.value ?? installedVersion.value);
@@ -125,6 +130,7 @@ watch(updatesOpen, value => {
         <span class="sidebar-avatar" aria-hidden="true">管</span>
         <div class="sidebar-label sidebar-identity"><strong>管理员</strong><small>本地管理控制台</small></div>
         <div class="sidebar-tools">
+          <button type="button" class="sidebar-tool sidebar-theme-toggle" :aria-label="themeToggleLabel" :title="themeToggleLabel" @click="toggleScheme"><Sun v-if="scheme === 'dark'" /><Moon v-else /></button>
           <button type="button" class="sidebar-tool desktop-sidebar-toggle" :aria-label="collapsed ? '展开侧边栏' : '收起侧边栏'" :aria-expanded="!collapsed" :title="collapsed ? '展开侧边栏' : '收起侧边栏'" @click="collapsed = !collapsed">
             <PanelLeftOpen v-if="collapsed" /><PanelLeftClose v-else />
           </button>
@@ -154,7 +160,10 @@ watch(updatesOpen, value => {
             <div class="sidebar-footer">
               <span class="sidebar-avatar" aria-hidden="true">管</span>
               <div class="sidebar-identity"><strong>管理员</strong><small>本地管理控制台</small></div>
-              <div class="sidebar-tools"><button type="button" class="sidebar-tool" :disabled="loggingOut" aria-label="退出" title="退出" @click="handleLogout"><LogOut /></button></div>
+              <div class="sidebar-tools">
+                <button type="button" class="sidebar-tool sidebar-theme-toggle" :aria-label="themeToggleLabel" :title="themeToggleLabel" @click="toggleScheme"><Sun v-if="scheme === 'dark'" /><Moon v-else /></button>
+                <button type="button" class="sidebar-tool" :disabled="loggingOut" aria-label="退出" title="退出" @click="handleLogout"><LogOut /></button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>

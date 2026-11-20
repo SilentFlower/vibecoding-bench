@@ -22,8 +22,7 @@ function scopedStyles(source: string): string {
         selector.walkClasses(node => { if (node.value === 'task-runtime') rooted = true; });
         if (rooted) return;
         const first = selector.first;
-        const sameRoot = first?.type === 'class' && first.value === 'console-design'
-          || first?.type === 'attribute' && first.attribute === 'data-theme';
+        const sameRoot = first?.type === 'class' && first.value === 'console-design';
         // 逗号分组后的前导空格属于序列化格式，不能把同一根类变成后代选择器。
         if (sameRoot && first) first.spaces.before = '';
         if (!sameRoot) selector.prepend(selectorParser.combinator({value:' '}));

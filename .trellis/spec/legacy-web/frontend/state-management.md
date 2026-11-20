@@ -39,7 +39,7 @@ const state = {
 | **UI 临时态** | `state.<feature>` | `state.topicFilter`(搜索框文字)、`state.accLogin`(登录两步流上下文) |
 | **副作用句柄** | `state.<feature>(EventSource\|.ws\|.term\|...)` | `state.runsEventSource`、`state.accLogin.ws` 等 |
 | **路由状态** | URL hash | `location.hash`(`#accounts / #topics / #tasks / #runs`),不复制到 `state` |
-| **主题** | 根节点 `data-theme="light"` | 任务及独立兼容入口固定亮色，旧主题偏好不再读取或写入 |
+| **主题** | 文档根 `data-ui-scheme="light\|dark"` | 跟随 `localStorage['flower2api.theme-mode']`（缺失为跟随系统）；独立入口由首帧脚本写入并订阅系统偏好，Vue 内由 `initTheme` 管理；旧键 `vibebench-theme` 不再读取或写入 |
 | **数据派生** | 局部变量 | render 内 `const accMap = Object.fromEntries(state.accounts.map(a => [a.id, a.name]))`;**不缓存进 state** |
 
 **禁止**:

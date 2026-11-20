@@ -32,69 +32,31 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/* 旧层：未迁移页面仍引用的 shadcn 变量与旧控件 token，取值冻结为原层叠生效值，不随主题变化；页面迁移到 --ui-* 新 token 后删除。 */
+/* 旧层：shadcn 组件（Tabs、Separator）与少数页面仍引用的变量，指向浅色下最接近的第二版 token，随主题与深浅变化。 */
 :root {
   --radius: 0.75rem;
-  --background: #f6f7fb;
-  --foreground: #0e1726;
-  --card: #ffffff;
+  --background: var(--ui-color-layout);
+  --foreground: var(--ui-color-text);
+  --card: var(--ui-color-surface);
   --card-foreground: var(--foreground);
-  --popover: #ffffff;
+  --popover: var(--ui-color-surface);
   --popover-foreground: var(--foreground);
-  --primary: #0e1726;
-  --primary-foreground: #ffffff;
-  --secondary: oklch(0.968 0.003 258);
+  --primary: var(--ui-color-text);
+  --primary-foreground: var(--ui-color-surface);
+  --secondary: var(--ui-color-fill-muted);
   --secondary-foreground: var(--foreground);
-  --muted: #f6f7fb;
-  --muted-foreground: #848894;
-  --accent: var(--secondary);
+  --muted: var(--ui-color-fill-subtle);
+  --muted-foreground: var(--ui-color-text-3);
+  --accent: var(--ui-color-fill-muted);
   --accent-foreground: var(--foreground);
-  --destructive: #dc2626;
-  --border: #e9e8ed;
-  --input: var(--border);
-  --ring: var(--primary);
-  --chart-1: var(--primary);
-  --chart-2: #22c55e;
-  --chart-3: #3b82f6;
-  --chart-4: #f59e0b;
-  --chart-5: #8b5cf6;
-  --sidebar: #202235;
-  --sidebar-foreground: var(--foreground);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: var(--accent);
-  --sidebar-accent-foreground: var(--foreground);
-  --sidebar-border: var(--border);
-  --sidebar-ring: var(--primary);
+  --destructive: var(--ui-color-danger);
+  --border: var(--ui-color-line);
+  --input: var(--ui-color-line);
+  --ring: var(--ui-color-text);
   --font-body: 'Inter Variable', 'Microsoft YaHei UI', 'PingFang SC', 'Noto Sans CJK SC', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
-  --ui-surface: #fff;
-  --ui-field-surface: #fbfcfe;
-  --ui-text: #46546b;
-  --ui-muted: #7d879a;
-  --ui-border: #e2e6ed;
-  --ui-border-hover: #cfd5df;
-  --ui-accent: #856b9e;
-  --ui-focus: #ad9bc4;
-  --ui-focus-shadow: 0 0 0 3px #a28eb414;
-  --ui-selected: #f5f2fa;
-  --ui-danger: #b45b67;
-  --ui-font: 'Inter Variable', 'Microsoft YaHei UI', 'PingFang SC', 'Noto Sans CJK SC', system-ui, sans-serif;
 }
 
 body {
@@ -118,7 +80,7 @@ code, pre { font-family: var(--font-mono); }
 
 ::-webkit-scrollbar-thumb {
   background: var(--ui-color-scrollbar);
-  border-radius: 3px;
+  border-radius: 999px;
 }
 
 * {
@@ -134,9 +96,6 @@ code, pre { font-family: var(--font-mono); }
   :where(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 }
 
-.resource-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 18px; }
-.resource-grid > [data-slot="card"] { padding: 0; gap: 0; box-shadow: 0 2px 6px #182d3504; }
-.resource-grid > [data-slot="card"]:hover { border-color: #becfc8; box-shadow: 0 5px 18px #182d3508; }
 [data-slot="dialog-content"] { max-height: calc(100dvh - 32px); overflow-y: auto; }
 [data-slot="card"] { min-width: 0; }
 button, a, input, select, textarea { scroll-margin: 80px; }
@@ -152,8 +111,8 @@ body { font-size: var(--ui-font-body); -webkit-font-smoothing: antialiased; }
 @media (forced-colors: active) { * { scrollbar-color: auto; } }
 
 /* Teleport根容器由全局类设置尺寸，避免子组件作用域丢失后回退到默认小弹窗。 */
-.approved-run-dialog[data-slot=dialog-content]{width:900px;max-width:calc(100vw - 28px);height:min(740px,calc(100dvh - 28px));max-height:calc(100dvh - 28px);display:flex;flex-direction:column;gap:0;padding:0;border-radius:18px;overflow:hidden;background:#fff}
-.approved-run-dialog>[data-slot=dialog-header]{padding:22px 26px;flex-shrink:0;border-bottom:1px solid #e9edf4;text-align:left}
+.approved-run-dialog[data-slot=dialog-content]{width:900px;max-width:calc(100vw - 28px);height:min(740px,calc(100dvh - 28px));max-height:calc(100dvh - 28px);display:flex;flex-direction:column;gap:0;padding:0;border-radius:var(--ui-radius-card);overflow:hidden;background:var(--ui-color-surface)}
+.approved-run-dialog>[data-slot=dialog-header]{padding:22px 26px;flex-shrink:0;border-bottom:1px solid var(--ui-color-line);text-align:left}
 .approved-run-dialog [data-slot=dialog-title]{font-size:var(--ui-font-heading);font-weight:650;line-height:27px;letter-spacing:-.4px}
-.approved-run-dialog>[data-slot=dialog-close]{top:22px;right:26px;width:28px;height:28px;display:grid;place-items:center;border-radius:7px;background:#f2eff6;color:#8b8499;opacity:1}
+.approved-run-dialog>[data-slot=dialog-close]{top:22px;right:26px;width:28px;height:28px;display:grid;place-items:center;border-radius:var(--ui-radius-btn);background:var(--ui-color-fill-muted);color:var(--ui-color-text-3);opacity:1}
 @media(max-width:520px){.approved-run-dialog>[data-slot=dialog-header]{padding:18px 20px}.approved-run-dialog>[data-slot=dialog-close]{right:18px;top:17px}.approved-run-dialog [data-slot=dialog-title]{font-size:var(--ui-font-card)}}

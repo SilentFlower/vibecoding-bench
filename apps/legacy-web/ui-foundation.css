@@ -1,6 +1,8 @@
 /* 第二版主题 token：默认值与 apps/web/src/theme/tokens.ts 的 createTheme(默认种子) 逐项一致（单测校验）。
-   用户主题由运行时写成 <html> 或局部容器的内联变量；组件与已迁移页面只引用这一组变量。 */
+   用户主题由运行时写成 <html> 或局部容器的内联变量；组件与已迁移页面只引用这一组变量。
+   深浅由文档根的 data-ui-scheme 决定（index.html 首帧脚本与 initTheme 写入），深色块见下方。 */
 :root {
+  color-scheme: light;
   --ui-color-layout: #f5f6fa;
   --ui-color-surface: #ffffff;
   --ui-color-fill: rgba(98, 96, 158, 0.075);
@@ -33,6 +35,16 @@
   --ui-color-ink-muted: #6c708e;
   --ui-color-feedback-surface: #191b2c;
   --ui-color-feedback-text: #ffffff;
+  --ui-color-knob: #ffffff;
+  --ui-color-term-fg: #d9dbe8;
+  --ui-color-term-dim: #8a8ea6;
+  --ui-color-term-cursor: #ed6ea7;
+  --ui-color-term-red: #f47174;
+  --ui-color-term-green: #4cd6a3;
+  --ui-color-term-yellow: #f7b94d;
+  --ui-color-term-blue: #8fadf8;
+  --ui-color-term-magenta: #c3a6f5;
+  --ui-color-term-cyan: #5fd1d7;
   --ui-color-primary: #6c54b4;
   --ui-color-primary-hover: #5f479f;
   --ui-color-primary-container: #f3f0fb;
@@ -69,6 +81,60 @@
   --ui-font-family: 'Inter Variable', 'Microsoft YaHei UI', 'PingFang SC', 'Noto Sans CJK SC', system-ui, sans-serif;
   --ui-font-family-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
   --ui-tier: 0;
+}
+/* 深色默认值「夜幕紫灰」：与 createTheme(默认种子, 'dark') 逐项一致，只写与浅色不同的值。
+   color-scheme 让原生控件、滚动条与日期面板一起变深。 */
+:root[data-ui-scheme=dark] {
+  color-scheme: dark;
+  --ui-color-layout: #0f1018;
+  --ui-color-surface: #171824;
+  --ui-color-fill: rgba(160, 162, 220, 0.085);
+  --ui-color-fill-hover: rgba(160, 162, 220, 0.13);
+  --ui-color-fill-muted: #1f2130;
+  --ui-color-fill-subtle: #1c1d2b;
+  --ui-color-fill-strong: #3a3c52;
+  --ui-color-fill-active: #252738;
+  --ui-color-track: #292b3c;
+  --ui-color-line: #272938;
+  --ui-color-mask: rgba(3, 4, 10, 0.62);
+  --ui-color-scrollbar: #4a4d63;
+  --ui-color-text: #eceef6;
+  --ui-color-text-2: #c5c8d6;
+  --ui-color-text-3: #9a9eb2;
+  --ui-color-text-4: #6d7188;
+  --ui-color-table-head: #20222f;
+  --ui-color-table-stripe: #1a1b28;
+  --ui-color-table-hover: #232537;
+  --ui-color-neutral-text: #b4b8c8;
+  --ui-color-neutral-bg: #252736;
+  --ui-color-cc-text: #eaa985;
+  --ui-color-cc-bg: #2f231f;
+  --ui-color-agy-text: #9db6f5;
+  --ui-color-agy-bg: #1e2541;
+  --ui-color-ink: #0a0b12;
+  --ui-color-feedback-surface: #272a3c;
+  --ui-color-feedback-text: #f3f4fa;
+  --ui-color-knob: #eceef6;
+  --ui-color-primary: #725abb;
+  --ui-color-primary-hover: #8069cc;
+  --ui-color-primary-container: #27253f;
+  --ui-color-primary-text: #a790f8;
+  --ui-color-primary-ring: rgba(114, 90, 187, 0.35);
+  --ui-color-success-text: #38cd93;
+  --ui-color-success-bg: #1d2c31;
+  --ui-color-warning-text: #ffb133;
+  --ui-color-warning-bg: #31292a;
+  --ui-color-danger-text: #ff6f68;
+  --ui-color-danger-bg: #32212a;
+  --ui-color-info-text: #709cff;
+  --ui-color-info-bg: #20263d;
+  --ui-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 22px -18px rgba(0, 0, 0, 0.7);
+  --ui-shadow-pop: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 8px 24px -8px rgba(0, 0, 0, 0.65);
+  --ui-shadow-modal: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 24px 60px -20px rgba(0, 0, 0, 0.8);
+  --ui-shadow-raised: 0 1px 3px rgba(0, 0, 0, 0.45);
+  --ui-shadow-knob: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --ui-shadow-side: 1px 0 0 rgba(255, 255, 255, 0.045);
+  --ui-shadow-bar: 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 @media (min-width: 1920px) { :root { --ui-tier: 1; } }
 @media (min-width: 2560px) { :root { --ui-tier: 2; } }
