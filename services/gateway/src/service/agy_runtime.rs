@@ -193,6 +193,30 @@ impl Drop for CancelOnDrop {
 }
 
 impl AgyPool {
+    /// 请求监督器取消原私有请求。@param request_id 原尝试身份。@param api_token_id 原调用方。@return 取消指令是否已登记。
+    pub(crate) async fn cancel(&self, request_id: &str, api_token_id: i64) -> Result<(), AppError> {
+        let controller = self.controller.lock().await.clone();
+        let Some(controller) = controller else {
+            return Ok(());
+        };
+        {
+            let requests = controller.requests.lock().await;
+            if !controller.active.lock().await.contains(request_id) {
+                return Ok(());
+            }
+            if requests
+                .get(request_id)
+                .is_none_or(|request| request.api_token_id != api_token_id)
+            {
+                return Err(AppError::Unauthorized);
+            }
+        }
+        controller
+            .send(&json!({"schema_version":1,"type":"cancel",
+            "request_id":request_id,"api_token_id":api_token_id}))
+            .await
+    }
+
     /// 沿原监督器完成工具回填，保持零模型发送。@param input 原归属和真实结果。@param deadline 原单调截止。@return 已核验的收口回执。
     pub async fn finish_tools(
         &self,
@@ -530,5 +554,48 @@ async fn read_bounded_line<R: AsyncBufRead + Unpin>(reader: &mut R) -> IoResult<
         if end.is_some() {
             return Ok(Some(line));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 取消只交给原监督器，活动直到真实终态才释放。@return 无。
+    #[tokio::test]
+    async fn cancel_checks_owner_and_keeps_activity_until_supervisor_finalizes() {
+        let mut child = Command::new("cat")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+        let input = child.stdin.take().unwrap();
+        let mut output = BufReader::new(child.stdout.take().unwrap());
+        let (sender, mut receiver) = mpsc::channel(1);
+        let request_id = Uuid::new_v4().to_string();
+        let controller = Arc::new(Controller {
+            identity: "synthetic".into(),
+            module_root: "synthetic".into(),
+            input: Mutex::new(input),
+            child: Mutex::new(child),
+            requests: Mutex::new(HashMap::from([(request_id.clone(), Subscriber { sender, api_token_id: 7 })])),
+            active: Mutex::new(HashSet::from([request_id.clone()])),
+            closed: AtomicBool::new(false),
+            byte_budget: Arc::new(Semaphore::new(1)),
+        });
+        let pool = AgyPool { controller: Mutex::new(Some(controller.clone())) };
+
+        assert!(matches!(pool.cancel(&request_id, 8).await, Err(AppError::Unauthorized)));
+        pool.cancel(&request_id, 7).await.unwrap();
+        let line = timeout(Duration::from_secs(1), read_bounded_line(&mut output)).await.unwrap().unwrap().unwrap();
+        assert_eq!(serde_json::from_slice::<Value>(&line).unwrap(),
+            json!({"schema_version":1,"type":"cancel","request_id":request_id,"api_token_id":7}));
+        assert_eq!(pool.active().await, 1);
+
+        let finalized = json!({"type":"job_finalized","request_id":request_id,"status":"cancelled"});
+        controller.dispatch(finalized.clone(), 128).await.unwrap();
+        assert_eq!(pool.active().await, 0);
+        assert_eq!(receiver.recv().await.unwrap().0, finalized);
     }
 }

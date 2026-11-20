@@ -61,7 +61,7 @@ class NodeSynchronizationTests(unittest.TestCase):
         self.remote.containers.run.side_effect=lambda *args,**kwargs:self.events.append('backup') or helper
         self.service.docker=Mock(return_value=self.remote)
         self.installer=Mock(release='new')
-        self.installer.prepare.side_effect=lambda *args: self.events.append('install') or {'state':'prepared','release':'new','protocol':1}
+        self.installer.prepare.side_effect=lambda *args,**kwargs: self.events.append('install') or {'state':'prepared','release':'new','protocol':1}
         context=patch('cluster_synchronization.DockerClient',return_value=self.remote)
         context.start();self.addCleanup(context.stop)
         self.node.docker_socket=Mock(return_value=self.fixture.root/'docker.sock')
@@ -69,9 +69,18 @@ class NodeSynchronizationTests(unittest.TestCase):
 
     def test_old_running_control_is_stopped_and_replaced_in_place(self) -> None:
         """旧控制原地停止并换批，保留数据与接单偏好。:return: None。"""
+        images = ('new', Mock())
+
+        def prefetch(node):
+            """镜像预取时验证原组件尚未停止。:param node: 原节点。:return: 已核对镜像。"""
+            self.assertEqual(self.old.status, 'running')
+            return images
+
+        self.installer.prefetch_images.side_effect = prefetch
         result=self.sync.install(self.installer,self.row['id'],1)
         self.assertEqual('prepared',result['state'])
         self.assertEqual(['stop','rename','install'],self.events)
+        self.installer.prepare.assert_called_once_with(self.row['id'], 1, prefetched=images)
         self.old.remove.assert_called_once()
         job=json.loads((self.node.private/'maintenance/current.json').read_text())
         self.assertEqual('completed',job['phase'])

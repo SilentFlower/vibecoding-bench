@@ -122,6 +122,7 @@ class EnvironmentUpdate(BaseModel):
     :param generation: 预期当前环境代次。
     :param action: inspect、rebuild、stop、restore 或 retire。
     :param allowed_image_ids: 原操作重建意图固化的镜像集合，用于部分恢复及回退收口。
+    :param central_only: 沿已核对的中央快速换版范围执行。
     """
     model_config = ConfigDict(extra='forbid')
     operation_id: StrictStr
@@ -130,6 +131,14 @@ class EnvironmentUpdate(BaseModel):
     generation: StrictInt
     action: StrictStr
     allowed_image_ids: list[StrictStr] = []
+    central_only: StrictBool = False
+
+
+class RuntimeSnapshotInput(BaseModel):
+    """受信更新器的环境快照范围。:param central_only: 中央本机范围。"""
+
+    model_config = ConfigDict(extra='forbid')
+    central_only: StrictBool = False
 
 
 
@@ -173,13 +182,16 @@ def updater_request(method: str, path: str, body: dict | None = None) -> dict:
         raise HTTPException(503, '系统更新服务暂不可用，请核对首次接入状态') from error
 
 
-def runtime_snapshot(runtime) -> dict:
+def runtime_snapshot(runtime, central_only: bool = False) -> dict:
     """收集环境、实际进程及全部已有租约的只读排空证据。
 
     :param runtime: 已初始化 AccountRuntime。
+    :param central_only: 只采集中央，本次快照仍检查中央所有活动。
     :return: 门禁及有限脱敏阻塞项。
     """
     gate = UPDATE_GATE.state()
+    if central_only:
+        gate = {**gate, 'active': gate.get('central_active', gate['active'])}
     if runtime is None:
         return {**gate, 'ready': False, 'environments': [], 'blockers': ['账号运行时未初始化']}
     connection = runtime.database()
@@ -206,6 +218,17 @@ def runtime_snapshot(runtime) -> dict:
             environments.append({**item, 'node_kind': 'ssh', 'roles': {}, 'origin': None, 'blockers': []})
             continue
         if locality is not None and not locality(row):
+            if central_only:
+                try:
+                    # 只从本地分配表核对归属。新控制的版本门禁会隔离尚未换版的节点。
+                    assignment = (service.store.assignment(row['account_id']) if row.get('account_id') is not None
+                        else service.draft_node(environment_id=row['environment_id']))
+                    if assignment and assignment.get('kind') == 'ssh':
+                        continue
+                except (ValueError, RuntimeError, AttributeError):
+                    pass
+                blockers.append(row['name'] + ': 环境归属待核对')
+                continue
             try:
                 if service is None or service.synchronization is None or accounts.get(row['account_id']) is None:
                     raise ValueError('远程维护尚未接入')
@@ -292,7 +315,7 @@ def runtime_snapshot(runtime) -> dict:
         environments.append(item)
     nodes = [row for row in node_rows if row['kind'] == 'ssh' and not row.get('removal')
         and ((row.get('preparation') or {}).get('release') or (row.get('preparation') or {}).get('current_release'))]
-    return {**gate, 'ready': gate['phase'] == 'blocked' and not blockers,
+    return {**gate, 'scope': 'central' if central_only else 'full', 'ready': gate['phase'] == 'blocked' and not blockers,
         'environments': environments, 'nodes': nodes, 'node_removals': node_removals, 'blockers': blockers[:256]}
 
 
@@ -508,10 +531,10 @@ def system_updates_router(runtime_provider) -> APIRouter:
         return UPDATE_GATE.state()
 
     @router.post('/internal/v3/system-updates/snapshot')
-    def snapshot(request: Request):
-        """读取真实排空快照。:param request: 内部证明。@return 快照。"""
+    def snapshot(request: Request, body: RuntimeSnapshotInput | None = None):
+        """读取真实排空快照。:param request: 内部证明。:param body: 快照范围。@return 快照。"""
         internal_proof(request)
-        return runtime_snapshot(runtime_provider())
+        return runtime_snapshot(runtime_provider(), body.central_only if body else False)
 
     @router.post('/internal/v3/system-updates/nodes')
     def nodes(request: Request, body: ClusterUpdate) -> dict:
@@ -540,7 +563,7 @@ def system_updates_router(runtime_provider) -> APIRouter:
         if gate.get('phase') != 'blocked' or gate.get('operation_id') != body.operation_id or gate.get('epoch') != body.epoch:
             raise HTTPException(409, '维护操作或代次已经变化')
         runtime = runtime_provider()
-        evidence = runtime_snapshot(runtime)
+        evidence = runtime_snapshot(runtime, body.central_only)
         if body.action not in ('restore', 'retire') and not evidence['ready']:
             raise HTTPException(409, '平台在途工作尚未排空')
         if body.action not in ('inspect', 'rebuild', 'stop', 'restore', 'retire'):
@@ -554,6 +577,9 @@ def system_updates_router(runtime_provider) -> APIRouter:
         if not stored or stored['generation'] != body.generation:
             raise HTTPException(409, '环境身份或代次已经变化')
         row = dict(stored)
+        locality = getattr(runtime, 'locality', None)
+        if body.central_only and locality is not None and not locality(row):
+            raise HTTPException(409, '中央快速换版仅操作本机环境')
         with runtime.environment_lock(row['environment_id']):
             if body.action in ('restore', 'retire'):
                 if evidence['active'] or (body.action == 'restore' and any(item['blockers']

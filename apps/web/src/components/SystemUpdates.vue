@@ -44,6 +44,22 @@ const phases: Record<string, string> = {
   failed: '本次更新失败', cancelled: '本次更新已取消', reconcile: '等待恢复与对账',
 };
 const progress = computed(() => status.value?.operation);
+const progressLabel = computed(() => {
+  const operation = progress.value;
+  if (!operation) return '';
+  if (operation.phase === 'draining' && operation.fast_transition) return '正在关闭推理连接';
+  return phases[operation.phase] ?? operation.phase;
+});
+const maintenanceMessage = computed(() => {
+  const operation = progress.value;
+  if (!operation) return '';
+  if (operation.phase === 'preparing') return '后台下载并校验候选镜像，平台继续接单。';
+  if (operation.phase === 'cleaning' && operation.admission_reopened_at) return '平台已恢复接单。';
+  if (operation.phase === 'draining') return operation.fast_transition
+    ? '新请求暂缓。系统正在关闭旧推理连接，并等待资源释放。'
+    : '新请求暂缓，等待在途工作结束。';
+  return '正在切换或验收平台服务，新请求暂缓。';
+});
 const nodePhases: Record<string, string> = { registering: '等待同步', checking: '核对组件', draining: '等待原工作完成', fenced: '原环境已停止', stopping: '停止原组件', backing_up: '备份资料', backed_up: '已停止，等待切换', switching: '切换组件', restoring: '恢复账号', completed: '同步完成', rolled_back: '已恢复原组件', rolling_back_control: '恢复原组件', platform_restoring: '恢复原组件', platform_restored: '恢复完成', waiting: '等待重试', needs_check: '等待核对' };
 
 const cancelAllowed = computed(() => status.value?.busy && ['preparing', 'draining'].includes(progress.value?.phase ?? ''));
@@ -73,6 +89,8 @@ const releaseHighlights = computed(() => releaseNotes(latestRelease.value?.chang
   return { title: heading ? (lines[0] ?? '').replace(/^#{1,6}\s+/, '') : '', description: heading ? lines.slice(1).join('\n') : part.trim() };
 }));
 const updateSummary = computed(() => {
+  if (status.value?.busy && progress.value?.phase === 'preparing') return '正在后台准备';
+  if (status.value?.busy && progress.value?.phase === 'cleaning' && progress.value.admission_reopened_at) return '平台已恢复接单';
   if (status.value?.busy) return '正在执行维护';
   if (checking.value || catalog.value?.checking) return '正在检查更新';
   if (catalog.value?.check_error || status.value?.check_error) return '检查遇到问题';
@@ -257,15 +275,19 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); ver
         <aside class="update-platform-stack"><div class="approved-platform"><h3 class="approved-section-title">你的平台</h3><dl><div><dt>当前版本</dt><dd>{{ currentVersion }}</dd></div><div><dt>最新版本</dt><dd>{{ latestRelease ? releaseLabel(latestRelease.release) : '等待检查' }}</dd></div><div><dt>发布于</dt><dd>{{ latestRelease ? formatLocalTime(latestRelease.published_at) : '—' }}</dd></div><div><dt>最近检查</dt><dd>{{ catalog?.checked_at ? formatLocalTime(catalog.checked_at) : '尚未检查' }}</dd></div></dl></div><div class="approved-platform approved-compatibility"><p>{{ !catalog?.fresh ? '版本目录待刷新' : latestRelease?.data_compatible ? '兼容性检查通过' : '兼容性待核对' }}</p><small>{{ latestRelease?.account_changed ? `预计更新 ${runningEnvironments} 个运行环境` : '兼容的运行环境可以继续复用' }}<br>安装前自动保存数据快照</small></div></aside>
       </div>
       <section v-if="progress" class="update-operation rounded-xl border bg-card" :class="{'update-operation-priority': status.busy || progress.error || progress.blockers?.length}" aria-live="polite">
-        <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div class="flex min-w-0 items-center gap-3"><span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Check v-if="progress.phase === 'succeeded'" class="size-4" /><RefreshCw v-else class="size-4" :class="status.busy ? 'animate-spin motion-reduce:animate-none' : ''" /></span><div><h2 class="text-sm font-semibold">{{ phases[progress.phase] ?? progress.phase }}</h2><p class="mt-1 text-xs text-muted-foreground">{{ releaseLabel(progress.target_release) }}</p></div></div><div class="flex gap-2"><Button v-if="cancelAllowed" variant="outline" size="sm" :disabled="writing || progress.cancel_requested" @click="cancel">{{ progress.cancel_requested ? '正在取消…' : '取消等待' }}</Button><Button v-if="recoveryAllowed" variant="outline" size="sm" :disabled="writing" @click="confirm('recover', progress.target_release, '', true)">恢复操作</Button></div></div>
-        <div v-if="status.busy || progress.error || progress.blockers?.length" class="space-y-3 border-t px-5 py-4 text-sm"><p v-if="status.busy" class="text-muted-foreground">维护期间新工作暂缓，在途工作自然结束后继续。</p><ul v-if="progress.blockers?.length" class="space-y-1 rounded-lg bg-muted p-3"><li v-for="blocker in progress.blockers" :key="blocker" class="break-words">{{ blocker }}</li></ul><p v-if="progress.error" role="alert" class="text-amber-800">{{ progress.error }}</p></div>
-        <ul v-if="progress.cluster_nodes?.nodes.length" class="space-y-2 border-t px-5 py-4 text-sm" aria-label="节点同步进度">
+        <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div class="flex min-w-0 items-center gap-3"><span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Check v-if="progress.phase === 'succeeded'" class="size-4" /><RefreshCw v-else class="size-4" :class="status.busy ? 'animate-spin motion-reduce:animate-none' : ''" /></span><div><h2 class="text-sm font-semibold">{{ progressLabel }}</h2><p class="mt-1 text-xs text-muted-foreground">{{ releaseLabel(progress.target_release) }}</p></div></div><div class="flex gap-2"><Button v-if="cancelAllowed" variant="outline" size="sm" :disabled="writing || progress.cancel_requested" @click="cancel">{{ progress.cancel_requested ? '正在取消…' : '取消等待' }}</Button><Button v-if="recoveryAllowed" variant="outline" size="sm" :disabled="writing" @click="confirm('recover', progress.target_release, '', true)">恢复操作</Button></div></div>
+        <div v-if="status.busy || progress.error || progress.blockers?.length" class="space-y-3 border-t px-5 py-4 text-sm"><p v-if="status.busy" class="text-muted-foreground">{{ maintenanceMessage }}</p><ul v-if="progress.blockers?.length" class="space-y-1 rounded-lg bg-muted p-3"><li v-for="blocker in progress.blockers" :key="blocker" class="break-words">{{ blocker }}</li></ul><p v-if="progress.error" role="alert" class="text-amber-800">{{ progress.error }}</p></div>
+        <div v-if="progress.cluster_nodes?.phase === 'background'" class="flex flex-wrap items-center justify-between gap-2 border-t px-5 py-3 text-sm">
+          <p>{{ progress.admission_reopened_at ? '远程节点独立更新' : '远程节点将在中央切换后独立更新' }}</p>
+          <router-link :to="{ name: 'nodes' }" class="text-primary">查看节点进度 →</router-link>
+        </div>
+        <ul v-else-if="progress.cluster_nodes?.nodes.length" class="space-y-2 border-t px-5 py-4 text-sm" aria-label="节点同步进度">
           <li v-for="node in progress.cluster_nodes.nodes" :key="node.node_id" class="rounded-lg bg-muted p-3">
             <div class="flex justify-between gap-3"><span class="min-w-0 break-words font-medium">{{ node.name ?? `节点 ${node.node_id}` }}</span><span class="shrink-0">{{ nodePhases[node.preparation?.phase ?? node.phase] ?? nodePhases[node.phase] ?? '正在核对' }}</span></div>
             <p v-if="node.preparation?.reason" class="mt-1 text-xs text-muted-foreground">{{ node.preparation.reason }}</p>
           </li>
         </ul>
-        <details class="border-t px-5 py-3 text-xs text-muted-foreground"><summary class="cursor-pointer">操作详情与数据库快照</summary><div class="mt-3 space-y-2"><p class="break-all">目标发行：<code>{{ progress.target_release }}</code></p><p class="break-all">操作 ID：<code>{{ progress.operation_id }}</code></p><p :title="progress.updated_at">更新时间：{{ formatLocalTime(progress.updated_at) }}</p><p v-if="progress.database_snapshot">数据库快照{{ progress.database_snapshot.state === 'verified' ? '已校验' : '状态：' + progress.database_snapshot.state }} · {{ (progress.database_snapshot.bytes / 1024 / 1024).toFixed(1) }} MiB</p><p v-for="(migration, database) in progress.database_migrations ?? {}" :key="database">{{ database === 'bench' ? '平台数据库' : '网关数据库' }} · 目标版本 {{ migration.target_version }} · {{ migration.state === 'completed' ? '迁移完成' : migration.state === 'running' ? '正在迁移' : migration.state }}</p></div></details>
+        <details class="border-t px-5 py-3 text-xs text-muted-foreground"><summary class="cursor-pointer">操作详情与数据库快照</summary><div class="mt-3 space-y-2"><p class="break-all">目标发行：<code>{{ progress.target_release }}</code></p><p class="break-all">操作 ID：<code>{{ progress.operation_id }}</code></p><p :title="progress.updated_at">更新时间：{{ formatLocalTime(progress.updated_at) }}</p><p v-if="progress.admission_blocked_at">暂停接单 {{ formatLocalTime(progress.admission_blocked_at) }}</p><p v-if="progress.admission_reopened_at">恢复接单 {{ formatLocalTime(progress.admission_reopened_at) }}</p><p v-if="progress.database_snapshot">数据库快照{{ progress.database_snapshot.state === 'verified' ? '已校验' : '状态：' + progress.database_snapshot.state }} · {{ (progress.database_snapshot.bytes / 1024 / 1024).toFixed(1) }} MiB</p><p v-for="(migration, database) in progress.database_migrations ?? {}" :key="database">{{ database === 'bench' ? '平台数据库' : '网关数据库' }} · 目标版本 {{ migration.target_version }} · {{ migration.state === 'completed' ? '迁移完成' : migration.state === 'running' ? '正在迁移' : migration.state }}</p></div></details>
       </section>
       <details class="approved-maintenance update-disclosure"><summary>运行组件与维护详情</summary>
       <div class="update-context-grid">
@@ -287,6 +309,6 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); ver
       </section>
       </details>
     </template>
-    <dialog ref="dialog" class="m-auto max-h-[calc(100dvh_-_2rem)] overflow-y-auto w-[calc(100%_-_2rem)] max-w-lg rounded-xl border bg-card p-0 text-foreground shadow-xl backdrop:bg-black/40" @cancel.prevent="closeConfirm" @click="event => { if (event.target === dialog) closeConfirm(); }"><div v-if="frozen" class="space-y-5 p-6"><h2 class="text-lg font-semibold">{{ frozen.action === 'recover' ? '恢复本次操作' : frozen.action === 'rollback' ? '确认版本回退' : '确认安装更新' }}</h2><p class="text-xl font-semibold">{{ frozen.label }}</p><code class="block break-all text-xs text-muted-foreground">{{ frozen.body.target_release }}</code><p class="text-sm text-muted-foreground">系统会暂停新接单，等待在途工作结束，再执行维护切换。</p><p v-if="frozen.action !== 'recover'" class="text-sm text-muted-foreground">{{ frozen.accountChanged ? '将按计划核对并更新受影响的账号环境。' : '兼容的账号容器继续复用。' }}</p><ChoiceSelect v-if="frozen.action !== 'recover'" :model-value="String(minutes)" @update:model-value="value => minutes = Number(value)" label="等待在途完成" :options="[1,5,15,30,60,120].map(value => ({value: String(value), label: value + ' 分钟'}))" :disabled="writing || sent" :portal-target="dialog ?? undefined" /><p v-if="conflicted" role="alert" class="text-sm text-amber-800">现场版本已经变化，请关闭窗口并刷新后重新选择。</p><div class="flex justify-end gap-3"><Button variant="outline" :disabled="writing" @click="closeConfirm">取消</Button><Button :disabled="writing || conflicted" @click="execute">{{ writing ? '正在登记…' : frozen.action === 'recover' ? '开始恢复' : '确认执行' }}</Button></div></div></dialog>
+    <dialog ref="dialog" class="m-auto max-h-[calc(100dvh_-_2rem)] overflow-y-auto w-[calc(100%_-_2rem)] max-w-lg rounded-xl border bg-card p-0 text-foreground shadow-xl backdrop:bg-black/40" @cancel.prevent="closeConfirm" @click="event => { if (event.target === dialog) closeConfirm(); }"><div v-if="frozen" class="space-y-5 p-6"><h2 class="text-lg font-semibold">{{ frozen.action === 'recover' ? '恢复本次操作' : frozen.action === 'rollback' ? '确认版本回退' : '确认安装更新' }}</h2><p class="text-xl font-semibold">{{ frozen.label }}</p><code class="block break-all text-xs text-muted-foreground">{{ frozen.body.target_release }}</code><p class="text-sm text-muted-foreground">镜像准备期间继续接单。支持快速切换时，切换会结束正在执行的推理，受影响的请求需要重试。</p><p v-if="frozen.action !== 'recover'" class="text-sm text-muted-foreground">{{ frozen.accountChanged ? '将按计划核对并更新受影响的账号环境。' : '兼容的账号容器继续复用。' }}</p><ChoiceSelect v-if="frozen.action !== 'recover'" :model-value="String(minutes)" @update:model-value="value => minutes = Number(value)" label="等待在途完成" :options="[1,5,15,30,60,120].map(value => ({value: String(value), label: value + ' 分钟'}))" :disabled="writing || sent" :portal-target="dialog ?? undefined" /><p v-if="conflicted" role="alert" class="text-sm text-amber-800">现场版本已经变化，请关闭窗口并刷新后重新选择。</p><div class="flex justify-end gap-3"><Button variant="outline" :disabled="writing" @click="closeConfirm">取消</Button><Button :disabled="writing || conflicted" @click="execute">{{ writing ? '正在登记…' : frozen.action === 'recover' ? '开始恢复' : '确认执行' }}</Button></div></div></dialog>
   </section>
 </template>

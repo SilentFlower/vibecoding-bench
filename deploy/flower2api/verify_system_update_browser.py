@@ -271,6 +271,22 @@ async def verify(output: Path) -> dict:
         await context.close()
 
         fixture = UpdateFixture()
+        fixture.state.update(busy=True, operation={
+            'operation_id': str(uuid.uuid4()), 'phase': 'draining', 'action': 'install',
+            'target_release': 'system-ci-101-1', 'fast_transition': True, 'blockers': [],
+            'admission_blocked_at': '2026-11-11T00:00:00Z', 'updated_at': '2026-11-11T00:00:00Z',
+            'cluster_nodes': {'phase': 'background', 'nodes': [{'node_id': 2, 'name': 'main', 'phase': 'background', 'running': False}]},
+        })
+        context, page = await page_for(fixture, 390)
+        await expect(page.get_by_role('heading', name='正在关闭推理连接')).to_be_visible()
+        fixture.state['operation'].update(phase='cleaning', admission_reopened_at='2026-11-11T00:00:10Z')
+        await expect(page.get_by_text('平台已恢复接单。', exact=True)).to_be_visible(timeout=7000)
+        await expect(page.get_by_role('link', name='查看节点进度')).to_have_attribute('href', '/nodes')
+        await expect(page.get_by_text('远程节点独立更新', exact=True)).to_be_visible()
+        cases.append('中央恢复接单后，远程节点继续独立更新')
+        await context.close()
+
+        fixture = UpdateFixture()
         operation_id = str(uuid.uuid4())
         fixture.state.update(busy=True, operation={'operation_id': operation_id, 'phase': 'reconcile',
             'action': 'install', 'target_release': 'system-ci-101-1'})

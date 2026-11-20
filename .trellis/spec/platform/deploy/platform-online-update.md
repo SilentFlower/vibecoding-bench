@@ -174,8 +174,8 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 - v2 使用独立 `updates/v3-migrations` 通道，首发继承旧受信发行。`updates/v3` 保留 v1 及原最高序号，仅刷新时间和签名。受信新通道 ref 404 才允许读取旧通道；已有通道资产缺失直接失败。正式证据要求干净同批镜像。
 - 从空闲现场关闭门禁并排空，停止双端并确认数据库 FD 退出后，保存同操作私有双库快照。回执绑定 deployment、operation_id、epoch、原发行、权限/归属及每库文件/逻辑摘要；空间预算先于迁移。默认保留最近两组完成快照，另外保护活动恢复引用，异常目录保留并报告。
 - `database_snapshot` 仅公开 `state,completed_at,bytes`；`database_migrations` 按库公开 state 和 target_version。页面显示快照、迁移、数据恢复及具体阻断原因，未知值保留可见。
-- 托管Node加入原维护范围：最终排空快照冻结节点集合，`prepare_nodes`在中央切换和双库快照前收齐同epoch实际停止回执，Node作业采用data_policy=in_place保留当前资料；`resume_nodes`在新控制就绪后恢复同一作业，最终健康核验后才开放接单。内部`POST /internal/v3/system-updates/nodes`沿原更新凭据、operation_id和epoch，仅接受prepare/status/resume/restore/rollback/cancel-preparation。普通管理准入继续遵守全局门禁；内部活动由`reserve_maintenance`按原维护身份登记。
-- `cluster_nodes={phase,nodes}`公开逐节点名称、阶段、运行标记和受控preparation；原控制配置及小型恢复日志保留在节点私有目录。取消先等待原辅助进程收口，再恢复原组件；新中央重启须由原宿主明确resume授予本次boot身份，防止排空后提前切换。后台断线沿同一操作重试。
+- 兼容维护流程将托管节点加入原维护范围。最终排空快照冻结节点集合，`prepare_nodes`在中央切换和双库快照前收齐同 epoch 停止回执，`resume_nodes`在新控制就绪后恢复同一作业，最终健康核验后开放接单。节点原地作业以 `data_policy=in_place` 保留当前资料。内部 `POST /internal/v3/system-updates/nodes` 沿原更新凭据、operation_id 和 epoch，只接受 prepare/status/resume/restore/rollback/cancel-preparation。内部活动由 `reserve_maintenance` 按原维护身份登记。快速维护流程见[中央快速换版合同](#scenario-中央快速换版与节点独立更新)。
+- `cluster_nodes={phase,nodes}` 公开节点进度。兼容维护流程返回受控 preparation 及运行标记。原控制配置和恢复日志保留在节点私有目录。取消先等原辅助进程收口，再恢复原组件。兼容流程中，新中央重启须由原宿主明确 resume 授予本次 boot 身份。后台断线沿同一操作重试。
 - `release_started`前的失败恢复原中央数据；新Node原地作业只切回旧控制与账号组件，保留当前HOME、工程和节点执行库，不生成全量副本或隔离目录。历史Node快照作业继续沿原成组快照恢复，持久完成边界先于程序恢复。已重新接单后的恢复沿当前资料反向切换组件。历史中央缺少内部节点维护接口时首次接入按集群离线SOP执行；后续同能力版本可统一维护。
 - `release_started` 先于实际释放准入持久化。此前失败按原 UUID 恢复同组两库和原程序；恢复意图先于暂存复制和替换，支持部分两库完成。账号重建后的六项生命周期登记以原身份和 CAS 续接，再恢复原环境。`database_restored` 先于原程序启动落盘，重启收口保护原程序后来写入。重新接单后的显式回退保留当前数据。
 - 底座首次能力接入默认预览，持有独立接入锁；完整备份后发布 `updater-upgrades/<UUID>/upgrade.json`。未完成日志阻止新接入。`--recover` 默认预览，允许服务 inactive，按精确原/新源码 SHA、原策略/状态副本摘要、空闲门禁及服务归属验收，持有服务锁和存储锁后恢复原版并验证 socket。恢复再次中断继续原 UUID；后来状态、外来源码及后续接入日志触发现场保护。
@@ -720,3 +720,47 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - 慢退役受控对照显式标记源码挂载夹具，核对45秒旧截止失败、120秒准备通过和零模型调用；正式完整镜像由独立CI验收，两类证据分别记录。
 - 探针测试执行真实物理观察脚本，以虚拟时钟覆盖25秒退出；受控慢退出对照覆盖旧15秒失败摘要、新90秒窗口内全部PID终止及零模型。正常和异常退出另外验收镜像自带源码，并分别记录实际耗时。
 - 真实Docker复现旧白名单COPY缺失；修正版镜像只读导入、资源身份及断网正常/异常退出均通过。隔离夹具与正式完整镜像CI结果分别记录。
+
+## Scenario: 中央快速换版与节点独立更新
+
+### 1. Scope / Trigger
+
+修改宿主切换、推理取消、原生预热、远程节点后台换版或更新进度时适用。原签名、数据快照、迁移和回退合同同时适用。
+
+### 2. Signatures
+
+- `GET /admin/runtime/system-update/status` 返回 `inference_cutover` 能力。
+- `POST /admin/runtime/system-update/cutover` 使用原管理凭据及 `X-V3-Service-Token`，正文为 `{operation_id, epoch}`，成功返回 `{accepted:true, operation_id, epoch}`。
+- `POST /internal/agy/cancel` 使用原发送器鉴权，正文为 `{account_id, environment_id, generation, request_id, api_token_id}`，合格的定向取消返回 HTTP 204。
+- `POST /internal/v3/system-updates/snapshot` 及 `/internal/v3/system-updates/environment` 接受布尔字段 `central_only`，缺省为 false。快照返回 `scope=central|full`，环境动作沿原操作和环境代次核对。
+
+### 3. Contracts
+
+- 预检校验原组合和候选的实际 control、account 镜像标签 `vibebench.fast-system-update=1`，并核对当前网关能力。旧版和能力混合的组合沿兼容流程。下载和验签在关闭准入前完成。
+- 同一门禁发布后才触发快切。原普通推理在入口和响应体持有关闭订阅。Claude Code 流实际被切换中断时，原请求及发送尝试保存 `outcome=cancelled`、`error_stage=system_update`。已发出的 HTTP 状态保留。
+- 后台预热沿原身份向发送器取消本次 prepare，状态回到 `maintenance/system_maintenance`。已开始的凭据刷新沿原事务结清。AGY 工具等待按原请求、调用方和环境代次取消，发送端实际活动以 `job_finalized` 为终结依据。
+- 宿主为快切资源收尾使用 30 秒窗口。中央快照保留本机环境、未收口持久作业和未知归属阻塞。已从中央分配记录核对的远程环境不触发同步 SSH 验收。节点镜像预取可从中央活动中剔除，节点实际写入继续持有准入且在预取后重新核对门禁。
+- 中央恢复接单后，节点同步器沿持久作业、配置 revision 和实际目标发行继续。未就绪节点使用原版本准入保护。快速操作公开 `fast_transition`、`admission_blocked_at`、`admission_reopened_at` 和可选 `cluster_nodes.phase=background`。节点管理页读取实际节点进度，镜像回收可以在中央开放后重试。
+
+### 4. Validation & Error Matrix
+
+| 场景 | 结果 |
+| --- | --- |
+| 快切请求缺少内部服务证明 | 拒绝并保持原活动 |
+| 门禁 operation_id 或 epoch 不匹配 | 拒绝切换请求 |
+| AGY 原请求、调用方或绑定不匹配 | 拒绝该定向取消 |
+| 快切前取消或资源收尾超时 | 核对原中央后释放本次门禁，独立节点作业继续 |
+| 切换后验收失败且准入尚未恢复 | 沿原操作恢复两库快照与原程序 |
+| 已恢复接单后显式回退 | 沿原快照边界保留后来写入 |
+
+### 5. Scenarios and Examples
+
+- 正常。中央中断挂起推理，核对本机并恢复接单。离线节点保持待更新，恢复连接后由同步器继续同一归属。
+- 边界。首次接入遇到旧镜像，先走兼容换版。后续原组合与候选均支持时启用快切。
+- 错误用法。将独立节点预取算作本次中央快切的节点备份。正确处理。快速取消只收尾中央门禁，兼容维护沿原节点备份账本恢复。
+
+### 6. Tests Required
+
+- 网关测试断言同代关闭挂起响应体、原预热定向取消和活动归还，并区分客户端断连与维护中断。
+- 宿主测试断言旧回退路径与快速取消分支，快切期间远程待更新不阻塞中央提交。
+- `verify_system_update.py --fast-transition` 验证实际 SSH 离线节点、真实挂起请求关断、中央先恢复和节点续跑。结合 `--migration-manifest` 验证双库迁移、只完成第一库后掉电恢复、显式回退及后来写入保留。

@@ -38,7 +38,7 @@ from cluster_profile_reader import profile_reader_source
 from cluster_execution import NodeInspection, NodePreparation, NodeReviewAdmission
 from cluster_transport import NodeTransport, NodeTransports
 from runtime_files import atomic_json
-from system_update_gate import UPDATE_GATE
+from system_update_gate import NodeImageFetchPaused, UPDATE_GATE
 from system_update_contract import safe_read, strict_json
 
 logger = logging.getLogger(__name__)
@@ -874,10 +874,13 @@ class ClusterService:
         try:
             context = UPDATE_GATE.continue_reserved(activity) if activity is not None else nullcontext()
             with context:
-                result = (self.synchronization.install(installer, node_id, revision, maintenance=maintenance, stage_only=stage_only) if self.synchronization
+                result = (self.synchronization.install(installer, node_id, revision, maintenance=maintenance, stage_only=stage_only, activity=activity) if self.synchronization
                     else installer.prepare(node_id, revision))
                 if not self.store.save_preparation(node_id, revision, result):
                     raise ValueError('安装期间节点配置已变化，请重新检查节点能力')
+        except NodeImageFetchPaused:
+            # 等待更新的节点保留进入下载前的持久状态，由原同步器恢复。
+            pass
         except NodeSynchronizationWait as error:
             row = self.store.get(node_id)
             previous = json.loads(row['preparation_json']) if row['preparation_json'] else {}

@@ -51,6 +51,7 @@ use crate::service::native_contract::validate_idle_timeout;
 use crate::service::native_error::{REJECTION_CAPTURE_HEADER, REJECTION_HEADER, rejection_reason};
 use crate::service::native_prewarm::NativePrewarmer;
 use crate::service::native_runtime::NativeSubmission;
+use crate::service::system_update::InferenceCutover;
 #[path = "native_signature_repair.rs"]
 mod native_signature_repair;
 
@@ -1769,7 +1770,7 @@ impl GatewayService {
                 }
             };
         };
-        let trace = TraceContext::new(store.clone());
+        let trace = TraceContext::new(store.clone()).with_cutover(req.extensions().get().cloned());
         trace.remember_ingress(
             req.headers(),
             api_token.map_or("", |token| token.token.as_str()),
@@ -5733,6 +5734,7 @@ struct StreamForwardState<S> {
     upstream: S,
     account_id: String,
     request_id: Option<String>,
+    cutover: Option<InferenceCutover>,
     upstream_request_id: Option<String>,
     config: StreamStabilityConfig,
     stream_start: std::time::Instant,
@@ -5764,7 +5766,16 @@ impl<S> StreamForwardState<S> {
 impl<S> Drop for StreamForwardState<S> {
     fn drop(&mut self) {
         if !self.done {
-            self.log_end("downstream_body_dropped", None);
+            let reason = if self
+                .cutover
+                .as_ref()
+                .is_some_and(InferenceCutover::interrupted)
+            {
+                "system_update"
+            } else {
+                "downstream_body_dropped"
+            };
+            self.log_end(reason, None);
         }
     }
 }
@@ -5784,6 +5795,7 @@ where
             upstream,
             account_id,
             request_id: diagnostics::current_request_id(),
+            cutover: diagnostics::current_cutover(),
             upstream_request_id,
             config,
             stream_start: std::time::Instant::now(),

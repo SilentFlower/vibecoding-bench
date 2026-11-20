@@ -24,6 +24,7 @@ use crate::model::request_diagnostics::{
 };
 use crate::service::native_capture;
 use crate::service::rewriter::extract_session_id_from_body;
+use crate::service::system_update::InferenceCutover;
 use crate::service::usage::UsageCapture;
 use crate::service::v3_scheduling::SchedulingRequest;
 use crate::service::version_profile::profile_for_version;
@@ -60,6 +61,14 @@ pub(crate) fn current_request_id() -> Option<String> {
         .ok()
 }
 
+/// 将当前请求的切换原因传给转发流。@return 未登记诊断时为空。
+pub(super) fn current_cutover() -> Option<InferenceCutover> {
+    CURRENT_TRACE
+        .try_with(|trace| trace.cutover.clone())
+        .ok()
+        .flatten()
+}
+
 struct TraceState {
     retention: Option<ActiveDiagnostic>,
     request: RequestDiagnostic,
@@ -84,6 +93,7 @@ struct PendingIngress {
 pub(crate) struct TraceContext {
     store: Arc<DiagnosticsStore>,
     state: Arc<Mutex<TraceState>>,
+    cutover: Option<InferenceCutover>,
 }
 
 impl TraceContext {
@@ -104,6 +114,7 @@ impl TraceContext {
         let retention = store.track_request(&request_id);
         let trace = Self {
             store,
+            cutover: None,
             state: Arc::new(Mutex::new(TraceState {
                 retention: Some(retention),
                 request: RequestDiagnostic {
@@ -139,6 +150,20 @@ impl TraceContext {
         };
         trace.emit(None);
         trace
+    }
+
+    /// 关联当前 HTTP 请求的实际切换原因。@param cutover 入口订阅。@return 原诊断上下文。
+    pub(super) fn with_cutover(mut self, cutover: Option<InferenceCutover>) -> Self {
+        self.cutover = cutover;
+        self
+    }
+
+    fn interrupted_by_update(&self, end: &str) -> bool {
+        end == "cancelled"
+            && self
+                .cutover
+                .as_ref()
+                .is_some_and(InferenceCutover::interrupted)
     }
 
     /// 仅在 Debug 保留已鉴权入站，终态若为本地拒绝才写入证据。@param headers 原始头。@param token 入口密钥。@param full 是否保存完整拒绝正文。
@@ -212,6 +237,10 @@ impl TraceContext {
             let mut state = self.lock();
             if state.request.finished_at.is_some() {
                 return;
+            }
+            if self.interrupted_by_update(end) {
+                state.request.error_stage = Some("system_update".into());
+                state.request.status_code.get_or_insert(503);
             }
             let success = state
                 .request
@@ -796,6 +825,7 @@ impl AttemptTrace {
         };
         record.error_stage = match record.outcome.as_str() {
             "success" => None,
+            "cancelled" if self.trace.interrupted_by_update(end) => Some("system_update".into()),
             "transport_error" => Some("transport".into()),
             "upstream_rejected" => Some("upstream_headers".into()),
             _ => Some("upstream_body".into()),
@@ -1391,8 +1421,10 @@ mod tests {
     #[tokio::test]
     async fn diagnostics_record_stream_errors_and_cancellation_once() {
         let store = store().await;
-        for end in ["sse_error", "read_error", "cancelled"] {
-            let trace = TraceContext::new(store.clone());
+        for end in ["sse_error", "read_error", "cancelled", "system_update"] {
+            let (epoch, receiver) = tokio::sync::watch::channel(None);
+            let mut cutover = super::InferenceCutover::new(receiver);
+            let trace = TraceContext::new(store.clone()).with_cutover(Some(cutover.clone()));
             let guard = RequestTraceGuard::new(trace.clone());
             let response=CURRENT_TRACE.scope(trace,async {
                 let mut attempt=begin_attempt(&account(),br#"{"model":"claude-sonnet-5","stream":true}"#).unwrap();
@@ -1414,8 +1446,12 @@ mod tests {
                 .unwrap()
                 .to_owned();
             let mut body = response.into_body();
-            if end == "cancelled" {
+            if matches!(end, "cancelled" | "system_update") {
                 assert!(body.frame().await.unwrap().is_ok());
+                if end == "system_update" {
+                    epoch.send_replace(Some(uuid::Uuid::new_v4()));
+                    cutover.interrupt().await;
+                }
                 drop(body);
             } else {
                 assert_eq!(to_bytes(body, 65536).await.is_err(), end == "read_error");
@@ -1435,6 +1471,19 @@ mod tests {
             );
             if end == "read_error" {
                 assert_eq!(detail.request.error_stage.as_deref(), Some("upstream_body"));
+            }
+            if matches!(end, "cancelled" | "system_update") {
+                let (request_stage, attempt_stage) = if end == "system_update" {
+                    ("system_update", "system_update")
+                } else {
+                    ("downstream_body", "upstream_body")
+                };
+                assert_eq!(detail.request.error_stage.as_deref(), Some(request_stage));
+                assert_eq!(
+                    detail.attempts[0].error_stage.as_deref(),
+                    Some(attempt_stage)
+                );
+                assert_eq!(detail.request.status_code, Some(200));
             }
             assert!(
                 !serde_json::to_string(&detail)

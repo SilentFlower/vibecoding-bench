@@ -259,6 +259,39 @@ pub struct PreparedTransport {
 }
 
 impl PreparedTransport {
+    /// 向原发送器登记取消，原事件流负责接收实际收口。@param request_id 原尝试。@param api_token_id 原调用方。@param deadline 截止。@return 取消已登记。
+    pub(crate) async fn cancel_agy(
+        &self,
+        request_id: &str,
+        api_token_id: i64,
+        deadline: Instant,
+    ) -> Result<(), AppError> {
+        let PreparedRoute::V3 { client, binding } = &self.route else {
+            return Err(AppError::ServiceUnavailable("原AGY环境不可用".into()));
+        };
+        let response = timeout_at(
+            deadline,
+            client
+                .post(format!("{}/internal/agy/cancel", binding.endpoint))
+                .bearer_auth(&binding.secret)
+                .json(&AgyCancellation {
+                    account_id: self.account_id,
+                    environment_id: binding.environment_id.clone(),
+                    generation: binding.generation,
+                    request_id: request_id.into(),
+                    api_token_id,
+                })
+                .send(),
+        )
+        .await
+        .map_err(|_| AppError::ServiceUnavailable("AGY取消登记超时".into()))?
+        .map_err(|_| AppError::ServiceUnavailable("AGY取消登记待核对".into()))?;
+        if response.status() != StatusCode::NO_CONTENT {
+            return Err(AppError::ServiceUnavailable("AGY发送器拒绝取消登记".into()));
+        }
+        Ok(())
+    }
+
     /// 无新凭据地回填原工具轮，并等待真实收口。@param previous 原私有请求。@param api_token_id 原调用方。@param body 真实工具结果。@param deadline 原冻结截止。@param gif_frames 下一轮 GIF 预检策略。@return 原工具已结束。
     pub async fn finish_agy_tools(
         &self,
@@ -1670,6 +1703,40 @@ async fn agy_generate(
     agy_operation(state, headers, submission, false).await
 }
 
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct AgyCancellation {
+    account_id: i64,
+    environment_id: String,
+    generation: u64,
+    request_id: String,
+    api_token_id: i64,
+}
+
+/// 核对原发送器、尝试及调用方，再向原监督器登记取消。
+/// @param state 发送器。@param headers 服务证明。@param input 原请求归属。@return 已接受取消登记。
+async fn agy_cancel(
+    State(state): State<SenderState>,
+    headers: HeaderMap,
+    Json(input): Json<AgyCancellation>,
+) -> Result<StatusCode, AppError> {
+    let config = read_config(&state.config_path)?;
+    authenticate(&headers, &config)?;
+    if config.agy.is_none()
+        || input.account_id != config.binding.account_id
+        || input.environment_id != config.binding.environment_id
+        || input.generation != config.binding.generation
+        || Uuid::parse_str(&input.request_id).is_err()
+    {
+        return Err(AppError::BadRequest("AGY取消归属无效".into()));
+    }
+    state
+        .agy_pool
+        .cancel(&input.request_id, input.api_token_id)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 async fn native_forward(
     State(state): State<SenderState>,
     headers: HeaderMap,
@@ -1764,6 +1831,7 @@ pub fn sender_router(config_path: String) -> Router {
         .route("/internal/agy/prepare", post(agy_prepare))
         .route("/internal/agy/generate", post(agy_generate))
         .route("/internal/agy/tools", post(agy_tools))
+        .route("/internal/agy/cancel", post(agy_cancel))
         .route("/internal/native/status", get(native_status))
         .route("/internal/native/prepare", post(native_prepare))
         .route("/internal/native/readiness", post(native_readiness))

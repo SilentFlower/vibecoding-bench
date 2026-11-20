@@ -209,7 +209,7 @@ function preparationState(node: ExecutionNode): string {
     checking: '核对远程归属', retiring_components: '移除远程组件', clearing_data: '清理远程数据', completed: '已移除',
   }[node.removal.phase];
   const phase = node.preparation?.phase;
-  const labels: Record<string, string> = { checking: '核对现有组件', draining: '等待原工作完成',
+  const labels: Record<string, string> = { checking: '核对现有组件', prefetching: '准备新镜像', draining: '等待原工作完成',
     waiting: '等待同步', waiting_for_platform: '已停止，等待平台切换', stopping: '停止原组件', backing_up: '备份节点资料', switching: '切换组件', restoring: '恢复原账号环境', ready: '已就绪' };
   return (phase && labels[phase]) || (node.preparation ?
     { preparing: '后台同步中', prepared: '已就绪', failed: '同步失败', needs_check: '待核对' }[node.preparation.state] : '待安装');

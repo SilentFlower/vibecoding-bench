@@ -6,6 +6,7 @@ import tempfile
 import unittest
 import uuid
 import gc
+import hashlib
 import io
 from contextlib import closing
 from urllib.error import HTTPError
@@ -21,6 +22,33 @@ from runtime_names import account_container_prefix
 
 class HostNetworkNamesTests(unittest.TestCase):
     """宿主控制连接在单部署迁移前后使用真实受控网络。"""
+
+    def test_fast_abandon_reopens_gate_without_rolling_back_independent_node(self) -> None:
+        """节点预取中，快速取消恢复中央门禁，旧版仍按原账本回退。@return 无。"""
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            host = HostDeployment({'state_root': str(root), 'data_root': str(root / 'data'),
+                'env_file': str(root / 'v3.env'), 'deployment': 'test'})
+            host.gate.mkdir()
+            atomic_text(host.env, 'synthetic=1\n')
+            controls = {'gateway': {'Id': 'original', 'Image': 'trusted', 'State': {'Status': 'running'}}}
+            operation = {'operation_id': str(uuid.uuid4()), 'epoch': str(uuid.uuid4()),
+                'revision': str(uuid.uuid4()), 'created_at': '2026-11-20T00:00:00Z',
+                'target': {'release': 'system-ci-125-1'}, 'before': {
+                    'env_sha256': hashlib.sha256(host.env.read_bytes()).hexdigest(),
+                    'controls': {'gateway': {'id': 'original', 'image_id': 'trusted'}}, 'nodes': [{'id': 1}]}}
+            atomic_json(host.gate / 'admission.json', {'schema_version': 1, 'deployment': 'test',
+                'phase': 'idle', 'epoch': operation['epoch'], 'operation_id': None, 'target_release': None,
+                'revision': operation['revision'], 'created_at': operation['created_at']})
+            with patch.object(host, 'controls', return_value=controls), patch.object(host, 'request') as request:
+                host.block(operation)
+                host.abandon({**operation, 'fast_transition': True})
+                self.assertEqual(read_gate(host.gate, 'test')['phase'], 'idle')
+                request.assert_not_called()
+                host.block(operation)
+                host.abandon(operation)
+                self.assertEqual(read_gate(host.gate, 'test')['phase'], 'idle')
+                self.assertEqual(request.call_args.args[2]['action'], 'rollback')
 
     def test_capture_retries_blocked_partial_snapshot_before_freezing_role_sources(self) -> None:
         """只读竞争后的完整证明才进入冻结记录，持续未知时拒绝冻结。@return None。"""

@@ -185,6 +185,10 @@ pub fn build_router(
             "/admin/runtime/system-update/ack",
             post(system_update_status),
         )
+        .route(
+            "/admin/runtime/system-update/cutover",
+            post(system_update_cutover),
+        )
         .route("/admin/accounts", get(list_accounts).post(create_account))
         .route(
             "/admin/accounts/:id",
@@ -340,6 +344,26 @@ pub fn build_router(
 /// @return 精确 epoch 和完整响应生命周期内的进程活动数。
 async fn system_update_status() -> Result<Json<Value>, AppError> {
     Ok(Json(system_update::snapshot()?))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SystemUpdateCutover {
+    operation_id: String,
+    epoch: String,
+}
+
+/// 通知本代网关结束普通推理，凭据事务继续沿原活动证明收口。
+/// @param state 应用。@param headers 内部服务证明。@param input 原维护身份。@return 同代接管回执。
+async fn system_update_cutover(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(input): Json<SystemUpdateCutover>,
+) -> Result<Json<Value>, AppError> {
+    require_v3_credential_service(&headers)?;
+    let receipt = system_update::cutover(&input.operation_id, &input.epoch)?;
+    state.gemini_svc.release_tools_for_cutover();
+    Ok(Json(receipt))
 }
 
 const CLAUDE_CODE_HELLO_BODY: &[u8] = br#"{"message": "hello"}"#;

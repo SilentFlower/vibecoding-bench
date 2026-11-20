@@ -12,6 +12,7 @@ import tarfile
 
 from docker import DockerClient
 from docker.errors import NotFound
+from docker.models.images import Image
 
 from cluster_nodes import NodeConfiguration
 from runtime_files import atomic_text
@@ -146,11 +147,24 @@ class NodeDeployment:
         self.control_image, self.account_image = control_image, account_image
         self.account_release = account_release
 
-    def prepare(self, node_id: int, revision: int) -> dict:
+    def prefetch_images(self, node) -> tuple[str, Image]:
+        """核对并预取同批镜像。:param node: 已由节点作业核对的连接。:return: 账号批次和实际控制镜像。"""
+        account_release = self.account_release or os.environ.get('V3_ACCOUNT_RELEASE') or self.release
+        # 导入解包可能超过日常控制请求期限，使用独立客户端。
+        transfer = DockerClient(base_url='unix://' + str(node.docker_socket()), version='auto', timeout=600)
+        try:
+            control = self._ensure_image(transfer, self.control_image, 'control', self.release)
+            self._ensure_image(transfer, self.account_image, 'account', account_release)
+            return account_release, control
+        finally:
+            transfer.close()
+
+    def prepare(self, node_id: int, revision: int, *, prefetched: tuple[str, Image] | None = None) -> dict:
         """检查平台后流式交付镜像并创建私有控制容器。
 
         :param node_id: 管理员指定的节点。
         :param revision: 请求发起时节点版本。
+        :param prefetched: 同一节点作业之前核验的镜像。
         :return: 本次安装回执。
         """
         row = self.service.store.get(node_id)
@@ -160,14 +174,7 @@ class NodeDeployment:
         config = NodeConfiguration.model_validate(json.loads(row['config_json']))
         node.observe()
         node.bootstrap(self.deployment)
-        account_release = self.account_release or os.environ.get('V3_ACCOUNT_RELEASE') or self.release
-        # 镜像导入可能在最后一块之后长时间解包，使用独立长等待客户端，保持日常控制请求的短期限。
-        transfer = DockerClient(base_url='unix://' + str(node.docker_socket()), version='auto', timeout=600)
-        try:
-            control = self._ensure_image(transfer, self.control_image, 'control', self.release)
-            self._ensure_image(transfer, self.account_image, 'account', account_release)
-        finally:
-            transfer.close()
+        account_release, control = prefetched or self.prefetch_images(node)
         # 首次创建容器可能超过日常查询期限；安装使用独立客户端，不延长共享控制请求。
         remote = DockerClient(base_url='unix://' + str(node.docker_socket()), version='auto', timeout=120)
         try:

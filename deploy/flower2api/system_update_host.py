@@ -122,6 +122,8 @@ class HostDeployment:
             token = values['V3_INTERNAL_TOKEN']
         headers = {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json',
             'X-V3-Update-Token': safe_read(self.root / 'socket/token', 128, private=True).decode().strip()}
+        if service == 'gateway' and path == '/admin/runtime/system-update/cutover':
+            headers['X-V3-Service-Token'] = values['V3_INTERNAL_TOKEN']
         request = Request(base + path, data=json.dumps(body).encode() if body is not None else None, headers=headers)
         with self.opener.open(request, timeout=timeout) as response:
             return strict_json(response.read(131073))
@@ -300,7 +302,23 @@ class HostDeployment:
                 temporary.unlink(missing_ok=True)
         load_bundle(folder / release['build_manifests']['control']['name'], destination)
 
-    def capture(self, current: dict) -> dict:
+    def fast_transition(self, original: dict, selected: dict) -> bool:
+        """核对原程序与候选同具中央快速换版能力。:param original: 原组合。:param selected: 候选组合。:return: 能力可用。"""
+        for entry in (original, selected):
+            images = self.verify_images(entry['selection'])
+            if any((image['Config'].get('Labels') or {}).get('vibebench.fast-system-update') != '1' for image in images.values()):
+                return False
+        return self.request('gateway', '/admin/runtime/system-update/status').get('inference_cutover') is True
+
+    def _runtime_snapshot(self, central_only: bool = False, timeout: int = 15) -> dict:
+        """读取当前换版范围的实际证据。:param central_only: 仅中央已隔离范围。:param timeout: 调用期限。:return: 快照。"""
+        body = {'central_only': True} if central_only else {}
+        evidence = self.request('orchestrator', '/internal/v3/system-updates/snapshot', body, timeout=timeout)
+        if central_only and evidence.get('scope') != 'central':
+            raise ValueError('编排服务没有返回中央快速换版证据')
+        return evidence
+
+    def capture(self, current: dict, central_only: bool = False) -> dict:
         """冻结当前实际部署及身份，后续动作逐项对照。
 
         :param current: 当前安装记录。
@@ -313,14 +331,14 @@ class HostDeployment:
             if not _container_image_matches(item['Image'], images['control']['Id'],
                     {**current['selection']['control'], 'digest': current['selection']['control']['config_digest']}):
                 raise ValueError('实际控制服务与当前安装记录不符')
-        evidence = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+        evidence = self._runtime_snapshot(central_only)
         deadline = time.monotonic() + 5
         while evidence.get('phase') == 'blocked' and evidence.get('ready') is not True:
             # 已排空后的冻结必须使用完整快照；历史程序的只读占锁不能变成缺失角色来源。
             if time.monotonic() >= deadline:
                 raise ValueError('维护冻结快照仍有未收口活动或未知证据')
             time.sleep(0.1)
-            evidence = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+            evidence = self._runtime_snapshot(central_only)
         return {'controls': {role: {'id': item['Id'], 'image_id': item['Image']} for role, item in controls.items()},
             'env_sha256': hashlib.sha256(safe_read(self.env, private=True)).hexdigest(),
             'metadata': self.metadata(), 'environments': evidence['environments'], 'nodes': evidence.get('nodes', [])}
@@ -344,7 +362,7 @@ class HostDeployment:
         :param operation: 本次冻结操作。
         :return: ready、阻塞项及环境快照。
         """
-        runtime = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+        runtime = self._runtime_snapshot(operation.get('fast_transition', False))
         gateway = self.request('gateway', '/admin/runtime/system-update/status')
         if any(value.get('phase') != 'blocked' or value.get('epoch') != operation['epoch'] for value in (gateway, runtime)):
             raise ValueError('部署维护接管代次不一致')
@@ -357,6 +375,13 @@ class HostDeployment:
         return {'ready': gateway.get('active') == 0 and runtime.get('ready') is True,
             'blockers': (['网关仍有在途活动'] if gateway.get('active') else []) + runtime.get('blockers', []),
             'environments': runtime['environments']}
+
+    def cancel_inference(self, operation: dict) -> None:
+        """通知原网关关闭推理并核对接管归属。:param operation: 冻结的更新操作。:return: 无。"""
+        body = {key: operation[key] for key in ('operation_id', 'epoch')}
+        receipt = self.request('gateway', '/admin/runtime/system-update/cutover', body, timeout=5)
+        if receipt.get('accepted') is not True or any(receipt.get(key) != value for key, value in body.items()):
+            raise ValueError('网关推理取消回执归属无效')
 
     def prepare_nodes(self, operation: dict, selected: dict, save, cancelled) -> None:
         """冻结并收齐同代Node备份，长备份在原后台操作中等待。
@@ -438,6 +463,9 @@ class HostDeployment:
         :param save: 持久回调。
         :return: None；未知结果保留原平台维护。
         """
+        if operation.get('fast_transition'):
+            # 独立节点作业从当前中央已提交版本获取目标，切换前无需恢复节点进程。
+            return
         expected = {row['id'] for row in operation['before'].get('nodes', [])}
         if not expected:
             return
@@ -482,13 +510,15 @@ class HostDeployment:
                 return evidence
             time.sleep(0.1)
 
-    def _environment_request(self, body: dict) -> dict:
+    def _environment_request(self, body: dict, central_only: bool = False) -> dict:
         """仅重试服务明确在副作用前拒绝的排空冲突，沿用原身份和代次。
 
         :param body: 原操作、环境、代次和动作的冻结请求。
         :return: 实际维护回执；其它错误直接保留原失败路径。
         """
         deadline = time.monotonic() + 5
+        if central_only:
+            body = {**body, 'central_only': True}
         while True:
             try:
                 return self.request('orchestrator', '/internal/v3/system-updates/environment', body, timeout=180)
@@ -638,16 +668,17 @@ class HostDeployment:
         self._compose('up', '-d', '--no-deps', 'gateway', 'orchestrator')
         self._connect_legacy_environments(operation)
 
-    def wait_controls(self, deadline: float) -> None:
+    def wait_controls(self, deadline: float, central_only: bool = False) -> None:
         """等待实际双端服务可读，保留总截止期限。
 
         :param deadline: 单调截止。
+        :param central_only: 中央快速换版时只探测中央。
         :return: None。
         """
         while time.monotonic() < deadline:
             try:
                 self.request('gateway', '/admin/runtime/system-update/status', timeout=5)
-                self.request('orchestrator', '/internal/v3/system-updates/snapshot', {}, timeout=5)
+                self._runtime_snapshot(central_only, timeout=5)
                 return
             except (OSError, ValueError, RuntimeError, KeyError):
                 time.sleep(0.5)
@@ -902,6 +933,7 @@ class HostDeployment:
         """
         if not account_rebuild_required(operation['original']['selection']['account'], selected['selection']['account']):
             return
+        central_only = operation.get('fast_transition', False)
         for original in operation['before']['environments']:
             if original.get('node_kind') == 'ssh':
                 continue
@@ -933,8 +965,8 @@ class HostDeployment:
                     self.verify_images(selected['selection'])['account']['Id']})}
             save()
             result = self._environment_request({'operation_id': operation['operation_id'], 'epoch': operation['epoch'],
-                'environment_id': current['environment_id'], 'generation': current['generation'], 'action': 'rebuild'})
-            fresh = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+                'environment_id': current['environment_id'], 'generation': current['generation'], 'action': 'rebuild'}, central_only)
+            fresh = self._runtime_snapshot(central_only)
             rebuilt = next(item for item in fresh['environments'] if item['environment_id'] == current['environment_id'])
             frozen = operation['environment_cpu_before'].get(current['environment_id'])
             if frozen is not None:
@@ -1029,7 +1061,8 @@ class HostDeployment:
             actual = controls[role]
             if actual['Id'] != original['id'] or actual['Image'] != original['image_id'] or actual['State']['Status'] != 'running':
                 raise ValueError('取消维护时原控制服务状态已经变化')
-        if operation['before'].get('nodes') and operation.get('node_backup_requested', True):
+        if (not operation.get('fast_transition') and operation['before'].get('nodes')
+                and operation.get('node_backup_requested', True)):
             self.request('orchestrator', '/internal/v3/system-updates/nodes',
                 {'operation_id': operation['operation_id'], 'epoch': operation['epoch'], 'action': 'rollback'}, timeout=180)
         self.release(operation)
@@ -1062,6 +1095,7 @@ class HostDeployment:
         """
         folder = self.root / 'operations' / operation['operation_id']
         original = operation['original']
+        central_only = operation.get('fast_transition', False)
         # 释放门禁后的持久化故障也可能进入恢复；先重新接管并复核新接单，避免中断后来活动。
         released = read_gate(self.gate, self.policy['deployment'])['phase'] == 'idle'
         if released and not operation.get('release_started'):
@@ -1076,7 +1110,7 @@ class HostDeployment:
             # 首次兼容阶段沿用原账号，激活阶段的原版必须已经能恢复磁盘布局。
             raise ValueError('原版本缺少CLI临时文件恢复能力，保留维护现场并要求兼容版本恢复')
         if released:
-            runtime = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+            runtime = self._runtime_snapshot(central_only)
             gateway = self.request('gateway', '/admin/runtime/system-update/status')
             if (runtime.get('active') != 0 or gateway.get('active') != 0
                     or any(item['blockers'] for item in runtime['environments']
@@ -1113,19 +1147,19 @@ class HostDeployment:
         self._retire_legacy_controls(operation)
         self._compose('up', '-d', '--no-deps', 'gateway', 'orchestrator')
         self._connect_legacy_environments(operation)
-        self.wait_controls(time.monotonic() + 180)
+        self.wait_controls(time.monotonic() + 180, central_only)
         self.restore_nodes(operation, save)
         if account_rebuild_required(original['selection']['account'], operation['selected']['selection']['account']):
             # 已持久登记的重建意图允许收口本操作造成的部分角色，未知活动仍拒绝。
             for environment_id, intent in operation.get('environment_intents', {}).items():
-                evidence = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+                evidence = self._runtime_snapshot(central_only)
                 current = next(item for item in evidence['environments'] if item['environment_id'] == environment_id)
                 result = self._environment_request({'operation_id': operation['operation_id'], 'epoch': operation['epoch'],
                         'environment_id': environment_id, 'generation': current['generation'],
-                        'action': 'restore', 'allowed_image_ids': intent['allowed_image_ids']})
+                        'action': 'restore', 'allowed_image_ids': intent['allowed_image_ids']}, central_only)
                 frozen = operation.get('environment_cpu_before', {}).get(environment_id)
                 if frozen is not None:
-                    fresh = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+                    fresh = self._runtime_snapshot(central_only)
                     restored = next(item for item in fresh['environments'] if item['environment_id'] == environment_id)
                     self.environment_cpu(restored, frozen)
                 operation.setdefault('environment_restored', {})[environment_id] = result

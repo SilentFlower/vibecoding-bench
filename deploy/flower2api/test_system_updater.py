@@ -186,6 +186,38 @@ class SystemUpdaterTests(unittest.TestCase):
         with self.assertRaises(UpdateConflict):
             self.engine.submit('install', body)
 
+    def test_fast_switch_cancels_inference_and_finishes_with_pending_node(self) -> None:
+        """长流由切换动作取消，远程节点等待后台换版。@return 无。"""
+        self.backend.ready = False
+        self.backend.fast_transition = lambda original, selected: True
+        original_capture = self.backend.capture
+
+        def cancel(operation):
+            self.assertTrue(self.backend.blocked)
+            self.backend.calls.append('cancel_inference')
+            self.backend.ready = True
+
+        def unsupported(*args):
+            self.fail('中央快速换版不得等待远程节点')
+
+        def capture(current, central_only):
+            self.assertTrue(central_only)
+            return {**original_capture(current), 'nodes': [{'id': 2, 'name': 'main'}]}
+
+        self.backend.capture = capture
+        self.backend.cancel_inference = cancel
+        self.backend.prepare_nodes = self.backend.resume_nodes = unsupported
+        self.engine.submit('install', self.request())
+        state = self.join()
+        operation = state['operation']
+        self.assertEqual(operation['phase'], 'succeeded')
+        self.assertEqual(operation['cluster_nodes']['phase'], 'background')
+        self.assertEqual(operation['cluster_nodes']['nodes'][0]['name'], 'main')
+        self.assertIsNotNone(operation['admission_reopened_at'])
+        self.assertTrue(operation['fast_transition'])
+        self.assertLess(self.backend.calls.index('cancel_inference'), self.backend.calls.index('switch'))
+        self.assertFalse(self.backend.blocked)
+
     def test_equal_content_repository_migration_selects_new_account_source(self) -> None:
         """同内容跨仓库也展示重建，并选择新签名来源。@return None。"""
         self.fixture.build['release'] = 'ci-125-1'

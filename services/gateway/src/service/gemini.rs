@@ -35,7 +35,7 @@ use crate::service::diagnostics::{
     self, CURRENT_LOG_MODE, CURRENT_TRACE, RequestTraceGuard, TraceContext,
 };
 use crate::service::runtime_transport::{self, PreparedTransport};
-use crate::service::system_update::{self, UpdateActivity};
+use crate::service::system_update::{self, InferenceCutover, UpdateActivity};
 use crate::service::v3_scheduling::{RequestPhase, SchedulingRequest};
 use crate::service::{native_capture, runtime_bridge};
 
@@ -70,6 +70,7 @@ struct ToolTurn {
     receipt_body: Option<Value>,
     retained: bool,
     claimed: bool,
+    cutover: Option<InferenceCutover>,
 }
 
 struct ContinuationClaim {
@@ -148,6 +149,22 @@ impl ContinuationClaim {
 #[derive(Default)]
 pub struct GeminiService {
     turns: Mutex<HashMap<String, ToolTurn>>,
+}
+
+impl GeminiService {
+    /// 清理切换时仍保留在网关的工具归属。私有流的取消信号独立释放发送端作业。
+    /// @return 已登记的工具归属在当前进程中释放。
+    pub(crate) fn release_tools_for_cutover(&self) {
+        self.turns
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .retain(|_, turn| {
+                !turn
+                    .cutover
+                    .as_ref()
+                    .is_some_and(InferenceCutover::is_cancelled)
+            });
+    }
 }
 
 fn invalid(message: &str) -> AppError {
@@ -664,6 +681,7 @@ async fn generate_inner(
     full_egress: bool,
 ) -> Result<Response, AppError> {
     let started = Instant::now();
+    let cutover = request.extensions().get::<InferenceCutover>().cloned();
     diagnostics::request_context("antigravity", "gemini", None);
     let (model, action) = action
         .rsplit_once(':')
@@ -920,6 +938,7 @@ async fn generate_inner(
     let service = state.gemini_svc.clone();
     tokio::spawn(async move {
         let mut sender = Some(sender);
+        let closing = cutover.clone();
         let result = drive(
             upstream,
             service.clone(),
@@ -945,6 +964,7 @@ async fn generate_inner(
             gif_frames,
             disable_safety_filtering,
             scheduling,
+            cutover,
             &mut sender,
         )
         .await;
@@ -957,9 +977,10 @@ async fn generate_inner(
             .turns
             .lock()
             .unwrap_or_else(|error| error.into_inner());
-        if turns
-            .get(&http_request_id)
-            .is_none_or(|turn| !turn.retained)
+        if closing.as_ref().is_some_and(InferenceCutover::is_cancelled)
+            || turns
+                .get(&http_request_id)
+                .is_none_or(|turn| !turn.retained)
         {
             turns.remove(&http_request_id);
         }
@@ -1090,6 +1111,7 @@ async fn drive(
     gif_frames: bool,
     disable_safety_filtering: bool,
     scheduling: SchedulingRequest,
+    mut cutover: Option<InferenceCutover>,
     sender: &mut Option<mpsc::Sender<Result<Value, AppError>>>,
 ) -> Result<(), AppError> {
     let mut reader = EventReader {
@@ -1106,11 +1128,38 @@ async fn drive(
     let mut forwarded = 0;
     let mut policy_acknowledged = !system_prompt_policy.enabled;
     let mut ingress_sent = false;
+    let mut cutting_over = false;
     loop {
-        let event = if let Some(channel) = sender.as_ref() {
-            tokio::select! {event=reader.next()=>event?, _=channel.closed()=>{if let Some(observer)=observation.as_mut(){observer.finish("cancelled",Some("downstream_body"));}return Err(AppError::BadGateway("客户端已取消".into()));}}
-        } else {
-            reader.next().await?
+        let event = tokio::select! {
+            biased;
+            _ = async {
+                match cutover.as_mut() {
+                    Some(signal) => signal.cancelled().await,
+                    None => std::future::pending().await,
+                }
+            }, if !cutting_over => {
+                if let Some(observer) = observation.as_mut() {
+                    observer.finish("cancelled", Some("system_update"));
+                }
+                sender.take();
+                // 先断开客户端。保留原私有流核对 job_finalized，给宿主最后的状态核对留出时间。
+                reader.deadline = Instant::now() + Duration::from_secs(25);
+                transport.cancel_agy(&attempt_id, token_id, reader.deadline).await?;
+                cutting_over = true;
+                continue;
+            }
+            _ = async {
+                match sender.as_ref() {
+                    Some(channel) => channel.closed().await,
+                    None => std::future::pending().await,
+                }
+            } => {
+                if let Some(observer) = observation.as_mut() {
+                    observer.finish("cancelled", Some("downstream_body"));
+                }
+                return Err(AppError::BadGateway("客户端已取消".into()));
+            }
+            event = reader.next() => event?,
         };
         let Some(event) = event else {
             break;
@@ -1122,10 +1171,19 @@ async fn drive(
             if let Some(observer) = observation.as_mut() {
                 observer.finalized(event["status"].as_str().unwrap_or("error"));
             }
-            if !completed {
+            if !completed && !cutting_over {
                 return Err(AppError::BadGateway("AGY缺少原生终态".into()));
             }
             return Ok(());
+        }
+        if cutting_over {
+            if event["type"] == "native_event"
+                && event["event"]["type"] == "tool_turn_finalized"
+                && let Some(observer) = observation.as_mut()
+            {
+                observer.tool_finalized(event["event"]["status"].as_str().unwrap_or("error"));
+            }
+            continue;
         }
         if event["type"] == "rejected" {
             if event["code"] == "stale_credential_generation" {
@@ -1392,6 +1450,7 @@ async fn drive(
                                 receipt_body: None,
                                 retained: false,
                                 claimed: false,
+                                cutover: cutover.clone(),
                             },
                         );
                     let weak = Arc::downgrade(&service);

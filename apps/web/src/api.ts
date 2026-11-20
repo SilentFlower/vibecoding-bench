@@ -372,6 +372,9 @@ export interface SystemUpdateOperation {
   error?: string | null
   blockers?: string[]
   cancel_requested?: boolean
+  fast_transition?: boolean | null
+  admission_blocked_at?: string | null
+  admission_reopened_at?: string | null
   cluster_nodes?: { phase: string; nodes: Array<{ node_id: number; name?: string; phase: string; running: boolean; preparation?: { phase?: string; reason?: string; state?: string } }> } | null
   database_snapshot?: { state: string; completed_at: string; bytes: number } | null
   database_migrations?: Record<string, { state: string; target_version: number }> | null

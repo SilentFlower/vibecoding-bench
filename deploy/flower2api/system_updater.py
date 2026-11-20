@@ -34,6 +34,7 @@ from system_update_host import HostDeployment
 
 DONE = TERMINAL | {'prepared'}
 STATE_LIMIT = 8 * 1024 * 1024
+FAST_CUTOVER_SETTLE_SECONDS = 30
 
 
 class UpdateConflict(ValueError):
@@ -232,7 +233,8 @@ class SystemUpdater:
 
     def _public_operation(self, operation: dict) -> dict:
         return {key: copy.deepcopy(operation.get(key)) for key in ('operation_id', 'action', 'phase', 'created_at',
-            'updated_at', 'target_release', 'error', 'blockers', 'cancel_requested', 'cleanup', 'environment_results', 'database_snapshot', 'database_migrations', 'cluster_nodes')}
+            'updated_at', 'target_release', 'error', 'blockers', 'cancel_requested', 'cleanup', 'environment_results',
+            'database_snapshot', 'database_migrations', 'cluster_nodes', 'fast_transition', 'admission_blocked_at', 'admission_reopened_at')}
 
     def operation(self, identifier: str) -> dict:
         """读取指定操作的脱敏进度。
@@ -385,6 +387,8 @@ class SystemUpdater:
 
     def _finish(self, operation: dict, phase: str, **fields) -> None:
         with self.lock:
+            if phase in ('cancelled', 'failed', 'restored') and (operation.get('cluster_nodes') or {}).get('phase') == 'background':
+                operation.pop('cluster_nodes')
             self.state['active_operation'] = None
             operation['completion_revision'] = self.state['revision']
             self._phase(operation, phase, **fields)
@@ -401,26 +405,40 @@ class SystemUpdater:
                 self._finish(operation, 'prepared')
                 return
             descriptor = acquire_storage_lock(Path(self.policy['data_root']))
-            operation['before'] = self.backend.capture(operation['original'])
+            capability = getattr(self.backend, 'fast_transition', None)
+            fast = capability(operation['original'], selected) if capability else False
+            operation['fast_transition'] = fast
+            capture_args = (operation['original'], True) if fast else (operation['original'],)
+            operation['before'] = self.backend.capture(*capture_args)
             self._phase(operation, 'draining')
             self.backend.block(operation)
-            deadline = time.monotonic() + operation['request']['drain_timeout_seconds']
+            operation['admission_blocked_at'] = utc_now()
+            self._record(operation)
+            timeout = FAST_CUTOVER_SETTLE_SECONDS if fast else operation['request']['drain_timeout_seconds']
+            deadline = time.monotonic() + timeout
+            if fast and not self._cancelled(operation):
+                self.backend.cancel_inference(operation)
             while True:
                 evidence = self.backend.drained(operation)
                 if self._cancelled(operation):
                     self.backend.abandon(operation)
-                    self._finish(operation, 'cancelled')
+                    self._finish(operation, 'cancelled', admission_reopened_at=utc_now())
                     return
                 if evidence['ready']:
                     break
                 self._phase(operation, 'draining', blockers=evidence['blockers'])
                 if time.monotonic() >= deadline:
-                    raise TimeoutError('在途工作排空超时')
+                    raise TimeoutError('切换收尾超过时限' if fast else '在途工作排空超时')
                 time.sleep(0.5)
             # 以在途自然结束后的身份和环境为切换基线，接纳原工作合法完成的变化。
-            operation['before'] = self.backend.capture(operation['original'])
+            operation['before'] = self.backend.capture(*capture_args)
             prepare_nodes = getattr(self.backend, 'prepare_nodes', None)
-            if prepare_nodes is not None and operation['before'].get('nodes'):
+            nodes = operation['before'].get('nodes', [])
+            if fast and nodes:
+                operation['cluster_nodes'] = {'phase': 'background', 'nodes': [
+                    {'node_id': row['id'], 'name': row['name'], 'phase': 'background', 'running': False} for row in nodes]}
+                self._record(operation)
+            elif prepare_nodes is not None and nodes:
                 prepare_nodes(operation, selected, lambda: self._record(operation), lambda: self._cancelled(operation))
             # 与取消接口共用锁，使最后一次取消核对和进入切换成为同一个边界。
             with self.lock:
@@ -429,7 +447,7 @@ class SystemUpdater:
                     self._phase(operation, 'switching', blockers=[])
             if cancelled:
                 self.backend.abandon(operation)
-                self._finish(operation, 'cancelled')
+                self._finish(operation, 'cancelled', admission_reopened_at=utc_now())
                 return
             if self.policy['schema_version'] == 2:
                 self._phase(operation, 'snapshotting')
@@ -441,9 +459,13 @@ class SystemUpdater:
                 self._phase(operation, 'switching')
             self.backend.switch(operation, selected)
             self._phase(operation, 'verifying')
-            self.backend.wait_controls(time.monotonic() + 180)
+            control_deadline = time.monotonic() + 180
+            if fast:
+                self.backend.wait_controls(control_deadline, True)
+            else:
+                self.backend.wait_controls(control_deadline)
             resume_nodes = getattr(self.backend, 'resume_nodes', None)
-            if resume_nodes is not None and operation['before'].get('nodes'):
+            if not fast and resume_nodes is not None and nodes:
                 resume_nodes(operation, selected, lambda: self._record(operation))
             self.backend.update_environments(operation, selected, lambda: self._record(operation))
             self.backend.health(operation, selected)
@@ -459,7 +481,7 @@ class SystemUpdater:
             operation['release_started'] = True
             self._record(operation)
             self.backend.release(operation)
-            self._phase(operation, 'cleaning')
+            self._phase(operation, 'cleaning', admission_reopened_at=utc_now())
             self._clean(operation)
         except Exception as error:
             phase = operation['phase']
@@ -470,7 +492,7 @@ class SystemUpdater:
             elif phase == 'draining':
                 try:
                     self.backend.abandon(operation)
-                    self._finish(operation, 'failed', error=reason)
+                    self._finish(operation, 'failed', error=reason, admission_reopened_at=utc_now())
                 except Exception:
                     self._phase(operation, 'reconcile', error='排空失败，维护门禁及原版状态需要对账')
             elif phase == 'cleaning':
@@ -482,7 +504,7 @@ class SystemUpdater:
                     with self.lock:
                         self.state['current'] = operation['original']
                         self.state['history'] = [item for item in self.state['history'] if item['release']['release'] != operation['original']['release']['release']]
-                    self._finish(operation, 'restored', error=reason)
+                    self._finish(operation, 'restored', error=reason, admission_reopened_at=utc_now())
                 except Exception:
                     self._phase(operation, 'reconcile', error='切换恢复尚未完成，维护门禁保持关闭')
         finally:
@@ -535,7 +557,7 @@ class SystemUpdater:
         try:
             descriptor = acquire_storage_lock(Path(self.policy['data_root']))
             if operation['phase'] in ('cleaning', 'succeeded_cleanup_pending'):
-                self._phase(operation, 'cleaning')
+                self._phase(operation, 'cleaning', admission_reopened_at=operation.get('admission_reopened_at') or utc_now())
                 self._clean(operation)
                 return
             self.load_release(operation['original']['release']['release'])
@@ -559,10 +581,10 @@ class SystemUpdater:
                 with self.lock:
                     self.state['current'] = operation['original']
                     self.state['history'] = [item for item in self.state['history'] if item['release']['release'] != operation['original']['release']['release']]
-                self._finish(operation, 'restored', error='已按实际部署恢复原版本')
+                self._finish(operation, 'restored', error='已按实际部署恢复原版本', admission_reopened_at=utc_now())
             elif 'before' in operation:
                 self.backend.abandon(operation)
-                self._finish(operation, 'failed', error='执行在切换前中断，原版本保持')
+                self._finish(operation, 'failed', error='执行在切换前中断，原版本保持', admission_reopened_at=utc_now())
         except Exception:
             self._phase(operation, 'reconcile', error='更新恢复证据仍不完整，需要继续对账')
         finally:

@@ -416,12 +416,14 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
     def _save(self, job: dict) -> None:
         atomic_json(Path(job['journal']), job)
 
-    def install(self, installer, node_id: int, revision: int, *, maintenance: dict | None = None, stage_only: bool = False, late_restore: bool = False) -> dict:
+    def install(self, installer, node_id: int, revision: int, *, maintenance: dict | None = None, stage_only: bool = False,
+                late_restore: bool = False, activity: str | None = None) -> dict:
         """自动识别同批、首次与需要换批的节点并执行原恢复流程。
 
         :param installer: 同批安装器。
         :param node_id: 原节点。
         :param revision: 冻结配置版本。
+        :param activity: 原节点作业的中央活动，供预取期间释放占用。
         :return: 健康安装回执。
         """
         with self.slots:
@@ -480,6 +482,11 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
                 raise ValueError('原节点维护目标或配置已变化，请核对原任务')
             if job.get('platform_operation'):
                 self._check_platform(job)
+            prefetched = None
+            if job['phase'] == 'draining' and maintenance is None:
+                self.status(node_id, revision, 'prefetching', current_release=job['old_release'])
+                with UPDATE_GATE.node_image_fetch(activity):
+                    prefetched = installer.prefetch_images(node)
             with ExitStack() as leases:
                 checks = []
                 if job['phase'] == 'draining':
@@ -588,7 +595,10 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
                     self._save(job)
                 self.status(node_id, revision, 'switching', current_release=job['old_release'])
                 try:
-                    result = installer.prepare(node_id, revision)
+                    if prefetched is None:
+                        result = installer.prepare(node_id, revision)
+                    else:
+                        result = installer.prepare(node_id, revision, prefetched=prefetched)
                 except Exception:
                     self._rollback_control(remote, node, name, job)
                     raise
