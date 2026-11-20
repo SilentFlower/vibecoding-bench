@@ -2,6 +2,7 @@
 import base64
 import copy
 import json
+from uuid import uuid4
 
 
 class Frames:
@@ -10,6 +11,7 @@ class Frames:
     def __init__(self):
         """创建独立帧状态。@return 无。"""
         self.calls=[];self.sequence=0;self.terminal=False;self.finish_reason=None
+        self.call_ids=set()
         self.source_error=False;self.usage_complete=False;self.visible_text=False
 
     def recovery_blocker(self):
@@ -56,11 +58,22 @@ class Frames:
         if not isinstance(parts,list):raise RuntimeError('invalid_native_gemini_parts')
         self.visible_text |= any(isinstance(part.get('text'),str) and bool(part['text']) and part.get('thought') is not True for part in parts)
         calls=[p['functionCall'] for p in parts if 'functionCall' in p]
-        names=[c['name'] for c in self.calls+calls]
-        # 网关会去掉函数 ID；同名并发调用的回填归属因此必须显式拒绝。
-        if len(names)!=len(set(names)):raise RuntimeError('ambiguous_parallel_function_calls')
+        assigned_id=False
+        for call in calls:
+            identifier=call.get('id')
+            if identifier is None or identifier=='':
+                identifier='call_'+uuid4().hex
+                call['id']=identifier
+                assigned_id=True
+            if not isinstance(identifier,str) or identifier in self.call_ids:
+                raise RuntimeError('ambiguous_parallel_function_calls')
+            self.call_ids.add(identifier)
         self.calls.extend(copy.deepcopy(calls))
-        if len(parts)<2:return [copy.deepcopy(event)]
+        if len(parts)<2:
+            if assigned_id:
+                raw=json.dumps(body,ensure_ascii=False,separators=(',',':')).encode()
+                event={**event,'data_base64':base64.b64encode(raw).decode(),'bytes':len(raw)}
+            return [copy.deepcopy(event)]
         projected=[]
         for index,part in enumerate(parts):
             value=copy.deepcopy(body);target=value['candidates'][0];target['content']['parts']=[copy.deepcopy(part)]

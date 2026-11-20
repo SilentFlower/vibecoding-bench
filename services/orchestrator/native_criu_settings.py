@@ -28,9 +28,11 @@ def read_settings(runtime, row: dict, observation: dict | None = None) -> dict:
     sender = role_container(runtime, row, 'sender')
     sender.reload()
     details = sender.attrs['Config']
-    installed = (details.get('Labels') or {}).get('vibebench.native-criu') == '1'
+    agy = configuration.get('agy')
+    label = 'vibebench.agy-criu' if isinstance(agy, dict) else 'vibebench.native-criu'
+    installed = (details.get('Labels') or {}).get(label) == '1'
     actual = details.get('Entrypoint') == ENTRY
-    native = configuration.get('native')
+    native = agy if isinstance(agy, dict) else configuration.get('native')
     supported = isinstance(native, dict)
     policy = restore_policy(native, fingerprint, installed)
     binding = configuration.get('binding') if isinstance(configuration.get('binding'), dict) else {}
@@ -58,6 +60,7 @@ def read_settings(runtime, row: dict, observation: dict | None = None) -> dict:
         checked = observation.get('checked_at_ms')
         if (observation.get('environment_id') != row['environment_id'] or observation.get('generation') != row['generation']
                 or observation.get('kernel_generation') != native.get('kernel_generation')
+                or isinstance(agy, dict) and observation.get('module_root') != agy.get('module_root')
                 or type(checked) is not int or not 0 <= time.time() * 1000 - checked <= 45000):
             result['reason'] = 'telemetry_stale'
         else:

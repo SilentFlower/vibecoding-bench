@@ -60,7 +60,7 @@ class Broker:
             if ident in self.pending:raise RuntimeError('duplicate_native_tool_call')
             self.pending[ident]=pending
             if scope.value.get('request_format')=='gemini':
-                if self.gemini_results is not None:pending['result']=self.gemini_result(params['name'])
+                if self.gemini_results is not None:pending['result']=self.gemini_result(ident)
                 self.owner.emit('tool_waiting',**scope.identity(),tool_call_id=ident,tool_execution_id=execution,
                     native_cascade_id=scope.root,native_trajectory_id=trajectory_id)
                 scope.tool_wait_ready.set()
@@ -73,19 +73,23 @@ class Broker:
                 raise RuntimeError('tool_request_cancelled')
             return pending['result']
 
-    def gemini_result(self, name):
-        """构造来自真实调用方结果的 MCP 响应。@param name 已核对函数名。@return MCP 结果。"""
-        value=self.gemini_results[name]
+    def gemini_result(self, identifier):
+        """构造来自真实调用方结果的 MCP 响应。@param identifier 已核对原生调用 ID。@return MCP 结果。"""
+        value=self.gemini_results[identifier]
         result_text=value['content'] if set(value)=={'content'} and isinstance(value['content'],str) else json.dumps(value,ensure_ascii=False,separators=(',',':'))
         return {'content':[{'type':'text','text':result_text}],'structuredContent':copy.deepcopy(value),'isError':False}
 
     def complete_gemini(self, values):
-        """为已经绑定的工具轮缓存一次真实回填。@param values 函数名到结果的映射。@return 无。"""
+        """为已经绑定的工具轮缓存一次真实回填。@param values 按原调用顺序排列的结果。@return 无。"""
         with self.condition:
             if self.closed or self.scope.cancel.is_set() or self.gemini_results is not None:raise InputError('gemini_tool_turn_closed')
-            self.gemini_results=copy.deepcopy(values)
+            # 发布工具轮时已逐项核对原生和公开调用的顺序、名称及参数。
+            identities=self.scope.tool_native_ids
+            if len(identities)!=len(values) or not self.pending.keys()<=set(identities):
+                raise InputError('gemini_pending_results_mismatch')
+            self.gemini_results=copy.deepcopy(dict(zip(identities,values)))
             self.record({'gemini_results':values,'request_id':self.scope.value['request_id']})
-            for item in self.pending.values():item['result']=self.gemini_result(item['native_call']['name'])
+            for identifier,item in self.pending.items():item['result']=self.gemini_result(identifier)
             self.condition.notify_all()
 
     def complete(self, raw):

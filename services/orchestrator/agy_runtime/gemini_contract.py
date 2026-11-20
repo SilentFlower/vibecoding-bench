@@ -138,7 +138,7 @@ def native_history(contents, tool_names=(), gif=None):
     """将多 Part 和完整函数结果映射为原生步骤。@param contents Gemini 内容。@param tool_names 已声明工具名称。@param gif 可选 GIF 转换预算。@return 原生步骤。"""
     if not isinstance(contents,list) or not contents:raise InputError('invalid_gemini_contents')
     contents = _legacy_tool_history(contents, tool_names)
-    steps=[];pending=[];used=set()
+    steps=[];pending=[];used=set();tool_steps={}
     for i,content in enumerate(contents):
         path='/body/contents/'+str(i);checked_fields(content,{'role','parts'},path)
         role=content.get('role','user');parts=content.get('parts')
@@ -176,7 +176,11 @@ def native_history(contents, tool_names=(), gif=None):
                 pending.remove(call)
                 # 结果使用原生 ResultValue，避免把 Gemini 对象再次包成 output 文本。
                 args=json.loads(call['argumentsJson']);native_args={k:v if isinstance(v,str) else encode(v) for k,v in args.items()}
-                steps.append({'type':'CORTEX_STEP_TYPE_GENERIC','status':'CORTEX_STEP_STATUS_DONE','metadata':{'toolCall':copy.deepcopy(call)},'generic':{'args':native_args,'result':{'resultValue':native_value(result)}}})
+                tool_steps[call['id']]={'type':'CORTEX_STEP_TYPE_GENERIC','status':'CORTEX_STEP_STATUS_DONE','metadata':{'toolCall':copy.deepcopy(call)},'generic':{'args':native_args,'result':{'resultValue':native_value(result)}}}
+        if tool_steps and not pending:
+            # 原生轨迹按 planner 的调用顺序导入，客户端仍可反序提交结果。
+            steps.extend(tool_steps[call['id']] for call in planner['toolCalls'])
+            tool_steps.clear()
         if role=='model':
             if pending:raise InputError('missing_function_response:'+path)
             planner={'response':'\n'.join(response),'modifiedResponse':'\n'.join(response),'stopReason':'STOP_REASON_STOP_PATTERN'}
@@ -268,14 +272,14 @@ def decode_request(raw):
         'request_format':'gemini','gemini_body':copy.deepcopy(body),'native_completion':completion,'native_steps':steps,'schema_changes':changes,'compatibility_notes':notices,
         'safety_egress_rules':safety_egress_rules,'full_egress':full_egress}
 def continuation_results(previous, calls, incoming):
-    """把续轮结果绑定到本 worker 唯一待回填工具轮。@param previous 原始入站正文。@param calls 实际模型调用。@param incoming 新正文。@return 按函数名索引的真实结果。"""
+    """把续轮结果绑定到本 worker 唯一待回填工具轮。@param previous 原始入站正文。@param calls 实际模型调用。@param incoming 新正文。@return 按原调用顺序排列的真实结果。"""
     original=previous['contents'];contents=incoming['contents'];count=len(original)
     if len(contents)!=count+2 or contents[:count]!=original:raise InputError('gemini_pending_history_mismatch')
     model,user=contents[count:]
     if model.get('role')!='model' or user.get('role','user')!='user':raise InputError('gemini_pending_turn_mismatch')
     expected=[{'name':c['name'],'args':c.get('args',{})} for c in calls]
     observed=[{'name':p['functionCall']['name'],'args':p['functionCall'].get('args',{})} for p in model['parts'] if 'functionCall' in p]
-    if expected!=observed or len({c['name'] for c in expected})!=len(expected):raise InputError('gemini_pending_call_mismatch')
+    if expected!=observed:raise InputError('gemini_pending_call_mismatch')
     for part, call in zip([p['functionCall'] for p in model['parts'] if 'functionCall' in p], calls):
         if 'id' in part and part['id'] != call.get('id'):raise InputError('gemini_pending_call_mismatch')
     # 拒绝坏图后才能领取原工具轮，避免输入修正时发现结果已被消费。
@@ -283,11 +287,13 @@ def continuation_results(previous, calls, incoming):
         if isinstance(part, dict):
             media_part(part, f'/body/contents/{count + 1}/parts/{index}', 'user')
     values=[p['functionResponse'] for p in user['parts'] if 'functionResponse' in p]
+    indices={id(call):index for index,call in enumerate(calls)}
     results = {}
     for value in values:
         call = _matching_call(calls, value)
-        if call is None or call['name'] in results or not isinstance(value.get('response'), dict):
+        index = indices.get(id(call))
+        if index is None or index in results or not isinstance(value.get('response'), dict):
             raise InputError('gemini_pending_results_mismatch')
-        results[call['name']] = copy.deepcopy(value['response'])
+        results[index] = copy.deepcopy(value['response'])
     if len(results)!=len(calls):raise InputError('gemini_pending_results_mismatch')
-    return results
+    return [results[index] for index in range(len(calls))]

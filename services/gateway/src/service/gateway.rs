@@ -4938,6 +4938,9 @@ fn count_tokens_app_error_response(err: AppError) -> Response {
         error @ AppError::AgyControl(status) => {
             anthropic_error_response(status, "upstream_error", &error.to_string())
         }
+        error @ AppError::AgyToolTurnFailed => {
+            anthropic_error_response(StatusCode::BAD_GATEWAY, "upstream_error", &error.to_string())
+        }
         AppError::BadGateway(_) => anthropic_error_response(
             StatusCode::BAD_GATEWAY,
             "upstream_error",

@@ -3,6 +3,7 @@
 __asm__(".symver __isoc23_sscanf,__isoc99_sscanf@GLIBC_2.7");
 __asm__(".symver __isoc23_strtol,strtol@GLIBC_2.2.5");
 #include <errno.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <openssl/evp.h>
 #include <signal.h>
@@ -35,6 +36,8 @@ static char current_job[97], decode_error[128];
 static unsigned call_number;
 static unsigned diagnostic_pause_count;
 static int capture_tls;
+static pid_t controller_pid;
+static volatile sig_atomic_t checkpoint_requested;
 static const unsigned long tls_write_site = 0x73819bfUL;
 static const unsigned char tls_write_signature[] = {0x48,0x8b,0x44,0x24,0x30,0x48,0x8b,0x5c,0x24,0x60,0x48,0x8b,0x4c,0x24,0x68,0xc9};
 static const size_t tls_sample_limit = 32UL * 1024 * 1024;
@@ -442,6 +445,85 @@ static int verify_image(void) {
     return 1;
 }
 
+/** 父进程持有独占空闲许可后，请求使用线程组停态交接。 */
+static void request_checkpoint(int number, siginfo_t *information, void *context) {
+    (void)number; (void)context;
+    if (information->si_pid != controller_pid) return;
+    checkpoint_requested = 1;
+    if (root_pid > 0) kill(root_pid, SIGSTOP);
+}
+
+/** 按真实线程表确认全部线程已离开 ptrace 并仍处于线程组停止状态。 */
+static size_t stopped_threads(pid_t tids[], size_t capacity) {
+    char path[128];
+    snprintf(path, sizeof(path), "/proc/%d/task", root_pid);
+    DIR *directory = opendir(path);
+    if (!directory) return 0;
+    size_t count = 0;
+    struct dirent *entry;
+    while ((entry = readdir(directory))) {
+        char *end;
+        long tid = strtol(entry->d_name, &end, 10);
+        if (!tid || *end) continue;
+        if (count == capacity) { count = 0; break; }
+        snprintf(path, sizeof(path), "/proc/%d/task/%ld/status", root_pid, tid);
+        FILE *status = fopen(path, "r");
+        if (!status) { count = 0; break; }
+        int stopped = 0, untraced = 0;
+        char line[256], state;
+        unsigned tracer;
+        while (fgets(line, sizeof(line), status)) {
+            if (sscanf(line, "State: %c", &state) == 1) stopped = state == 'T';
+            if (sscanf(line, "TracerPid: %u", &tracer) == 1) untraced = tracer == 0;
+        }
+        fclose(status);
+        if (!stopped || !untraced) { count = 0; break; }
+        tids[count++] = (pid_t)tid;
+    }
+    closedir(directory);
+    return count;
+}
+
+/** 从停态取回所有线程，执行体和硬件断点核验通过后才允许续跑。 */
+static int checkpoint_handoff(unsigned long options, const sigset_t *resume_signal) {
+    pid_t tids[sizeof(tasks) / sizeof(tasks[0])];
+    size_t count = 0;
+    const struct timespec retry = {0, 5000000};
+    /* 最后一项 detach 返回时，SIGSTOP 仍可能在内核向线程组分发。 */
+    for (unsigned attempt = 0; attempt < 200 && !(count = stopped_threads(tids, sizeof(tids) / sizeof(tids[0]))); attempt++)
+        nanosleep(&retry, NULL);
+    if (!count) return 0;
+    begin_event("observer_checkpoint_stopped", NULL);
+    fprintf(events, ",\"native_pid\":%d,\"threads\":%zu}\n", root_pid, count);
+    for (;;) {
+        siginfo_t sender;
+        int received = sigwaitinfo(resume_signal, &sender);
+        if (received < 0 && errno != EINTR) return 0;
+        if (received == SIGUSR2 && sender.si_pid == controller_pid) break;
+    }
+    count = stopped_threads(tids, sizeof(tids) / sizeof(tids[0]));
+    if (!count) return 0;
+    for (size_t index = 0; index < count; index++) {
+        int status;
+        pid_t tid = tids[index], waited;
+        if (!task(tid) || ptrace(PTRACE_SEIZE, tid, NULL, (void *)options) < 0
+                || ptrace(PTRACE_INTERRUPT, tid, NULL, NULL) < 0) return 0;
+        do { waited = waitpid(tid, &status, __WALL); } while (waited < 0 && errno == EINTR);
+        if (waited != tid || !WIFSTOPPED(status)) return 0;
+    }
+    image_base = 0;
+    if (!verify_image()) return 0;
+    for (size_t index = 0; index < count; index++)
+        if (!configure(tids[index])) return 0;
+    checkpoint_requested = 0;
+    for (size_t index = 0; index < count; index++)
+        if (ptrace(PTRACE_CONT, tids[index], NULL, NULL) < 0) return 0;
+    if (kill(root_pid, SIGCONT) < 0) return 0;
+    begin_event("observer_checkpoint_resumed", NULL);
+    fprintf(events, ",\"native_pid\":%d,\"threads\":%zu}\n", root_pid, count);
+    return 1;
+}
+
 /**
  * 启动固定执行体并观察其原生线程，信号继续交给原程序处理。
  * @param argc 启动参数数量。
@@ -451,8 +533,8 @@ static int verify_image(void) {
 int main(int argc, char **argv) {
     if (argc < 2) return 2;
     /* 监督层异常退出时回收本观察器；原生子进程继续沿已有父退出信号收口。 */
-    pid_t controller = getppid();
-    if (prctl(PR_SET_PDEATHSIG, SIGKILL) != 0 || getppid() != controller) return 2;
+    controller_pid = getppid();
+    if (prctl(PR_SET_PDEATHSIG, SIGKILL) != 0 || getppid() != controller_pid) return 2;
     folder = getenv("AGY_BRIDGE_FOLDER"); generation = getenv("AGY_BRIDGE_GENERATION"); binary = getenv("AGY_BRIDGE_BINARY");
     capture_tls = getenv("AGY_BRIDGE_CAPTURE_TLS") != NULL;
     const char *fd_env = getenv("AGY_BRIDGE_EVENT_FD"), *input = getenv("AGY_BRIDGE_STDIN");
@@ -463,11 +545,20 @@ int main(int argc, char **argv) {
     if (root_pid < 0) return 2;
     if (root_pid == 0) {
         unsetenv("AGY_BRIDGE_CAPTURE_TLS");
+        unsetenv("AGY_BRIDGE_CHECKPOINT");
         prctl(PR_SET_PDEATHSIG, SIGKILL);
         int fd = open(input, O_RDONLY); if (fd < 0 || dup2(fd, STDIN_FILENO) < 0) _exit(126);
         if (fd != STDIN_FILENO) close(fd);
         if (ptrace(PTRACE_TRACEME, 0, NULL, NULL) < 0) _exit(126);
         raise(SIGSTOP); execv(argv[1], argv+1); _exit(127);
+    }
+    sigset_t resume_signal;
+    if (getenv("AGY_BRIDGE_CHECKPOINT")) {
+        struct sigaction checkpoint = {.sa_sigaction = request_checkpoint, .sa_flags = SA_SIGINFO};
+        sigemptyset(&checkpoint.sa_mask);
+        sigemptyset(&resume_signal);
+        sigaddset(&resume_signal, SIGUSR2);
+        if (sigprocmask(SIG_BLOCK, &resume_signal, NULL) < 0 || sigaction(SIGUSR1, &checkpoint, NULL) < 0) return 2;
     }
     task(root_pid);
     int status, verified = 0;
@@ -498,6 +589,26 @@ int main(int argc, char **argv) {
             unsigned long child = 0; ptrace(PTRACE_GETEVENTMSG, tid, NULL, &child);
             Task *new_entry = task((pid_t)child);
             if (new_entry) new_entry->detach = event != PTRACE_EVENT_CLONE;
+            if (checkpoint_requested) {
+                /* 先消费新线程事件再停止父线程，避免漏掉仍挂在观察器上的子线程。 */
+                kill(root_pid, SIGSTOP);
+            }
+            ptrace(PTRACE_CONT, tid, NULL, NULL); continue;
+        }
+        if (checkpoint_requested) {
+            if (!verified || (ptrace(PTRACE_DETACH, tid, NULL, (void *)(long)SIGSTOP) < 0 && errno != ESRCH)) {
+                error_event("checkpoint_detach_failed"); kill(root_pid, SIGKILL); return 2;
+            }
+            entry->tid = 0;
+            int attached = 0;
+            for (size_t index = 0; index < sizeof(tasks) / sizeof(tasks[0]); index++) attached |= tasks[index].tid != 0;
+            if (!attached && !checkpoint_handoff(options, &resume_signal)) {
+                error_event("checkpoint_reattach_failed"); kill(root_pid, SIGKILL); return 2;
+            }
+            continue;
+        }
+        if (event == PTRACE_EVENT_STOP) {
+            if (verified && !configure(tid)) { error_event("thread_reattach_failed"); kill(root_pid, SIGKILL); return 2; }
             ptrace(PTRACE_CONT, tid, NULL, NULL); continue;
         }
         if (sig == SIGSTOP) {

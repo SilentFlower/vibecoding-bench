@@ -57,7 +57,8 @@ class AgyRuntimeTests(unittest.TestCase):
                 worker=Worker.__new__(Worker)
                 recorded=[]
                 worker.owner=SimpleNamespace(emit=lambda kind, **fields: recorded.append(kind))
-                scope=SimpleNamespace(worker=worker,route='r-1',root='owned',isolated_call_id=None,
+                scope=SimpleNamespace(worker=worker,route='r-1',root='owned',isolated_call_ids=set(),
+                    broker=SimpleNamespace(gemini_results=None),tool_wait_published=False,
                     value={'request_format':'gemini'},frames=Frames(),identity=lambda: {},tls_trace=None,safety_egress=None)
                 worker.owner.active=scope
                 bridge.worker=worker
@@ -80,11 +81,20 @@ class AgyRuntimeTests(unittest.TestCase):
                 bridge._emit({**extra,'event':'model_end','native_error_present':None})
                 self.assertEqual(recorded,['model_start','gemini_response','model_end',isolation])
                 self.assertEqual((scope.job.calls,scope.job.ends),(1,1))
-                self.assertEqual(scope.frames.calls,[call])
+                self.assertEqual(scope.frames.calls[0]['name'],call['name'])
+                self.assertTrue(scope.frames.calls[0]['id'].startswith('call_'))
                 self.assertTrue(scope.job.ended.is_set())
                 with self.assertRaisesRegex(RuntimeError,'native_root_identity.call_reused'):
                     bridge._emit({**owned,'call_id':extra['call_id']})
-                bridge._emit({**owned,'call_id':'r-1.3'})
+                another={**extra,'call_id':'r-1.3'}
+                with self.assertRaisesRegex(RuntimeError,'native_root_identity.additional_call'):
+                    bridge._emit(another)
+                scope.tool_wait_published=True
+                scope.broker.gemini_results={'synthetic-native':{'value':1}}
+                bridge._emit(another)
+                bridge._emit({**another,'event':'model_end','native_error_present':None})
+                self.assertEqual((scope.job.calls,scope.job.ends),(1,1))
+                bridge._emit({**owned,'call_id':'r-1.4'})
                 self.assertEqual(scope.job.calls,2)
 
     def test_model_result_survives_only_post_stream_control_failure(self):
@@ -327,6 +337,7 @@ class AgyRuntimeTests(unittest.TestCase):
                     'native_model':'MODEL_PLACEHOLDER_M36','capture_enabled':False}
                 supervisor=Supervisor.__new__(Supervisor)
                 supervisor.condition=threading.Condition();supervisor.closed=False
+                supervisor.restore_enabled=False
                 supervisor.config={'max_workers':1 if mode=='capacity' else 3,'proxy_url':'synthetic'}
                 supervisor.credential_generation=value['credential_snapshot']['credential_generation']
                 key=supervisor.worker_key(value)
@@ -397,28 +408,45 @@ class AgyRuntimeTests(unittest.TestCase):
             thread.join(2)
 
     def test_kernel_completion_reaches_real_tool_broker_once(self):
-        """真实Kernel与Broker方法接线把结果交还原待处理项，错误ID和重复回填拒绝。@return 无。"""
+        """两个同名工具反序回填时仍交给各自原生调用，错误和重复 ID 拒绝。@return 无。"""
         body={'contents':[{'role':'user','parts':[{'text':'合成问题'}]}]}
         call={'id':'synthetic-call','name':'synthetic_tool','args':{'x':1}}
+        frames=Frames()
+        parts=[{'functionCall':call,'thoughtSignature':'synthetic-signature'},
+            {'functionCall':{'name':'synthetic_tool','args':{'x':2}}}]
+        source={'candidates':[{'content':{'parts':parts},'finishReason':'STOP'}]}
+        projected=frames.project({'data_base64':base64.b64encode(json.dumps(source).encode()).decode()})
+        public_parts=[json.loads(base64.b64decode(frame['data_base64']))['candidates'][0]['content']['parts'][0]
+            for frame in projected]
+        self.assertEqual(public_parts[0],parts[0])
+        self.assertTrue(public_parts[1]['functionCall']['id'].startswith('call_'))
         incoming=copy.deepcopy(body)
-        incoming['contents']+=[{'role':'model','parts':[{'functionCall':call}]},
-            {'role':'user','parts':[{'functionResponse':{'id':'synthetic-call','name':'synthetic_tool','response':{'result':9}}}]}]
+        incoming['contents']+=[{'role':'model','parts':public_parts},
+            {'role':'user','parts':[
+                {'functionResponse':{'id':frames.calls[1]['id'],'name':'synthetic_tool','response':{'result':10}}},
+                {'functionResponse':{'id':'synthetic-call','name':'synthetic_tool','response':{'result':9}}},
+            ]}]
         identity={'request_id':'synthetic-request','request_seq':1,'generation':'synthetic-generation'}
         service=Kernel.__new__(Kernel)
         service.lock=threading.RLock();service.cfg={'capture_enabled':False};service.worker_id='synthetic-worker'
         emitted=[];service.output=SimpleNamespace(emit=emitted.append)
         scope=SimpleNamespace(tool_wait_published=True,resume_claimed=False,cancel=threading.Event(),
-            value={'gemini_body':body,'request_id':identity['request_id'],'tools':[]},frames=SimpleNamespace(calls=[call]),identity=lambda:identity)
+            tool_native_ids=('synthetic-native-call-1','synthetic-native-call-2'),
+            value={'gemini_body':body,'request_id':identity['request_id'],'tools':[]},frames=frames,identity=lambda:identity)
         scope.broker=Broker(service,scope,self.root)
         self.addCleanup(scope.broker.close)
-        scope.broker.pending['synthetic-native-call']={'native_call':{'name':'synthetic_tool'},'result':None}
+        scope.broker.pending['synthetic-native-call-2']={'result':None}
+        scope.broker.pending['synthetic-native-call-1']={'result':None}
         service.active=scope
         value={'schema_version':1,'type':'finish_tool_turn',**identity,'body':incoming}
         wrong=copy.deepcopy(value);wrong['body']['contents'][-1]['parts'][0]['functionResponse']['id']='other'
         with self.assertRaises(InputError):service.finish_tool_turn(wrong)
+        ambiguous=copy.deepcopy(value);ambiguous['body']['contents'][-1]['parts'][0]['functionResponse'].pop('id')
+        with self.assertRaises(InputError):service.finish_tool_turn(ambiguous)
         self.assertFalse(scope.resume_claimed)
         service.finish_tool_turn(value)
-        self.assertEqual(scope.broker.pending['synthetic-native-call']['result']['structuredContent'],{'result':9})
+        self.assertEqual(scope.broker.pending['synthetic-native-call-1']['result']['structuredContent'],{'result':9})
+        self.assertEqual(scope.broker.pending['synthetic-native-call-2']['result']['structuredContent'],{'result':10})
         self.assertEqual(emitted[-1]['type'],'tool_continuation_accepted')
         with self.assertRaises(InputError):service.finish_tool_turn(value)
 
@@ -637,15 +665,15 @@ class AgyRuntimeTests(unittest.TestCase):
             {'role': 'user', 'parts': [{'functionResponse': {'name': 'synthetic_tool', 'id': 'synthetic-call',
                 'response': {'value': '合成结果'}}}]}]
         self.assertEqual(gemini_contract.continuation_results(previous, [call], incoming),
-            {'synthetic_tool': {'value': '合成结果'}})
+            [{'value': '合成结果'}])
         incoming['contents'][-1]['parts'][0]['functionResponse']['name'] = 'old-result-name'
         self.assertEqual(gemini_contract.continuation_results(previous, [call], incoming),
-            {'synthetic_tool': {'value': '合成结果'}})
+            [{'value': '合成结果'}])
         result = incoming['contents'][-1]['parts'][0]['functionResponse']
         result.pop('id')
         result['name'] = 'synthetic-call'
         self.assertEqual(gemini_contract.continuation_results(previous, [call], incoming),
-            {'synthetic_tool': {'value': '合成结果'}})
+            [{'value': '合成结果'}])
         incoming['contents'][-1]['parts'][0]['functionResponse']['id'] = 'wrong-call'
         with self.assertRaises(InputError):
             gemini_contract.continuation_results(previous, [call], incoming)

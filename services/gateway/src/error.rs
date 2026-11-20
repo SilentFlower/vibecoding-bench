@@ -27,6 +27,9 @@ pub enum AppError {
     /// AGY 本地控制接口实际返回的 HTTP 错误状态。
     #[error("AGY 控制接口请求失败")]
     AgyControl(StatusCode),
+    /// 已经接纳回填的原生工具轮未能正常收尾。
+    #[error("AGY已接纳回填，但原工具轮收尾失败")]
+    AgyToolTurnFailed,
     /// 本地准入拒绝，携带保守重试提示，保持账号绑定。
     #[error("本地准入容量不足或等待超时")]
     AdmissionLimited { retry_after: u64 },
@@ -70,7 +73,7 @@ impl IntoResponse for AppError {
             AppError::TooManyRequests(_) | AppError::AgyUpstreamQuota => {
                 (StatusCode::TOO_MANY_REQUESTS, "")
             }
-            AppError::BadGateway(_) => (StatusCode::BAD_GATEWAY, ""),
+            AppError::BadGateway(_) | AppError::AgyToolTurnFailed => (StatusCode::BAD_GATEWAY, ""),
             AppError::AgyControl(status) => (*status, ""),
             AppError::ServiceUnavailable(_) => (StatusCode::SERVICE_UNAVAILABLE, ""),
             AppError::PermanentCredential(_) => (StatusCode::SERVICE_UNAVAILABLE, ""),

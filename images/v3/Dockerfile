@@ -202,6 +202,7 @@ LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELE
     vibebench.native-platform-managed="1" \
     vibebench.native-tls-observer="1" \
     vibebench.native-criu="1" \
+    vibebench.agy-criu="1" \
     vibebench.system-profile-version="1" \
     vibebench.computer-profile-version="1" \
     vibebench.parent-revision=$V3_PARENT_REV vibebench.gateway-revision=$V3_GATEWAY_REV \

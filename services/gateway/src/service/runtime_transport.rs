@@ -53,6 +53,7 @@ use crate::tlsfp::{
 };
 
 const AGY_TOOL_INPUT_REJECTION: &str = "x-flower2api-agy-input-rejection";
+const AGY_TOOL_FINALIZATION_FAILED: &str = "x-flower2api-agy-finalization-failed";
 
 const META_HEADER: &str = "x-v3-request";
 const ERROR_HEADER: &str = "x-v3-transport-error";
@@ -348,6 +349,14 @@ impl PreparedTransport {
                 {
                     return Err(agy_input_rejection(code));
                 }
+            }
+            if response.status() == StatusCode::BAD_GATEWAY
+                && response.headers().contains_key(AGY_TOOL_FINALIZATION_FAILED)
+            {
+                return Err(AppError::AgyToolTurnFailed);
+            }
+            if response.status().is_server_error() {
+                return Err(AppError::ServiceUnavailable("AGY原工具轮状态暂时不可用".into()));
             }
             return Err(AppError::BadRequest("AGY原工具轮拒绝回填".into()));
         }
@@ -1681,7 +1690,16 @@ async fn agy_tools(
     }
     state.active.fetch_add(1, Ordering::SeqCst);
     let _guard = ActiveRequest(state.active.clone());
-    let result = state.agy_pool.finish_tools(input, deadline).await?;
+    let result = match state.agy_pool.finish_tools(input, deadline).await {
+        Err(error @ AppError::AgyToolTurnFailed) => {
+            let mut response = error.into_response();
+            response
+                .headers_mut()
+                .insert(AGY_TOOL_FINALIZATION_FAILED, HeaderValue::from_static("1"));
+            return Ok(response);
+        }
+        result => result?,
+    };
     if let Some(code) = result["input_rejection"].as_str() {
         let mut response = AppError::BadRequest("AGY原工具轮拒绝回填".into()).into_response();
         if let Ok(value) = HeaderValue::from_str(code) {

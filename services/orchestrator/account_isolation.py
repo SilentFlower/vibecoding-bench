@@ -150,13 +150,15 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     resolved_proxy = urlunsplit((parsed.scheme, f'{userinfo}{address}:{parsed.port}', parsed.path, parsed.query, ''))
     image_labels = runtime.client.images.get(runtime.image).attrs['Config'].get('Labels') or {}
     observer_protocol = 1 if native and image_labels.get('vibebench.native-tls-observer') == '1' else None
-    restore = restore_policy(native, fingerprint, image_labels.get('vibebench.native-criu') == '1')
+    restore_label = 'vibebench.agy-criu' if agy else 'vibebench.native-criu'
+    restore_installed = image_labels.get(restore_label) == '1'
+    restore = restore_policy(execution, fingerprint, restore_installed)
     sender_file = paths['sender'] / 'sender.json'
     write_json(sender_file, {'binding': binding, 'proxy_url': resolved_proxy, 'proxy_source': proxy,
         'native': native, 'agy': agy, 'native_capture_dir': ('/flows/api/agy-prepared' if agy else '/flows/api/cc-prepared') if execution and capture_enabled(fingerprint) else None,
         'native_tls_observer_protocol': observer_protocol,
         'native_criu_enabled': restore['eligible'], 'native_criu_reason': restore['reason'],
-        'native_criu_protocol': 1 if native and image_labels.get('vibebench.native-criu') == '1' else None,
+        'native_criu_protocol': 1 if execution and restore_installed else None,
         'allowed_origin': 'https://cloudcode-pa.googleapis.com' if agy else 'https://api.anthropic.com', 'evidence_file': '/flows/api/observations.jsonl', 'quota_identity': ''}, 0o640)
     os.chown(sender_file, 0, 1001)
     write_json(paths['network'] / 'context.json', {'NETWORK_INSPECTION_MODE': 'passthrough', 'QUOTA_SOURCE': ''})

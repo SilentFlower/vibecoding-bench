@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import signal
 import shutil
+import subprocess
 import sys
 import threading
 import time
@@ -26,6 +27,7 @@ from .models import configure_model
 from .capture import save_egress, save_submission
 from .wire_capture import NativeTlsTrace
 from .credentials import read_access_document
+from .criu import Template
 from .safety_egress import CLOUD_CODE, SafetyEgress
 
 SNAPSHOT_WRITERS=threading.BoundedSemaphore(2)
@@ -60,7 +62,7 @@ class RPC:
         def run():
             """归档实际原生结果。@return 无返回值。"""
             connection=http.client.HTTPConnection('127.0.0.1',worker.port,timeout=timeout)
-            record={'method':method,'body':body,'request_seq':scope.seq,'generation':worker.bridge.generation,'history_step_count':scope.history_count}
+            record={'method':method,'body':body,'request_seq':scope.seq if scope else None,'generation':worker.bridge.generation,'history_step_count':scope.history_count if scope else 0}
             if method=='SetCloudCodeURL' and body.get('url','').startswith('http://127.0.0.1:'):
                 record['body']={'target':'request_scoped_loopback'}
             try:
@@ -87,7 +89,8 @@ class Scope:
         self.frames=Frames();self.native_tool_calls=None;self.compatibility_error=None;self.tool_wait_ready=threading.Event();self.tool_wait_published=False;self.resume_claimed=False;self.final_status=None;self.yield_tools=threading.Event();self.yield_cancelled=threading.Event();self.yield_started=None;self.yield_rpc=None
         self.broker=None;self.cancel=threading.Event();self.cancel_started=None;self.cancel_sent=False;self.finished=threading.Event()
         self.safety_egress=None;self.tls_trace=None
-        self.isolated_call_id=None
+        self.isolated_call_ids=set()
+        self.tool_native_ids=()
 
     def identity(self):
         """返回公开协议身份。@return 身份字段。"""
@@ -148,12 +151,13 @@ class Worker:
         self.bridge=Bridge(owner.state/'workers'/str(uuid.uuid4()),self)
         self.bridge.native_home=private_dir(owner.cfg['home']);self.bridge.binary=owner.binary;self.bridge.ca_file=owner.cfg.get('ca_file');self.bridge.proxy_url=owner.cfg['proxy_url']
         self.bridge.capture_enabled=owner.cfg['capture_enabled'];
+        self.bridge.checkpoint_enabled=owner.template_enabled
         # 单环境候选可运行在旧发送器上。只有新平台声明支持快照格式后才启用原生 TLS。
         self.bridge.capture_tls=bool(owner.cfg.get('capture_root')) and os.environ.get('AGY_CAPTURE_NATIVE_TLS')=='1'
         if self.bridge.capture_enabled:
             self.bridge.events.close();self.bridge.events=(self.bridge.folder/'bridge-events.jsonl').open('w')
         self.bridge.runtime_env=dict(owner.cfg['runtime_env']);self.bridge.startup_timeout=owner.cfg['startup_timeout'];self.bridge.retire_timeout=owner.cfg['retire_timeout']
-        self.port=None;self.ready=False
+        self.port=None;self.ready=False;self.template=None
 
     def start(self):
         """按真实init与PID套接字绑定就绪。@return 无返回值。"""
@@ -207,7 +211,7 @@ class Worker:
             if kind=='model_tls_write':return False
             raise RuntimeError('source_request_identity')
         job=scope.job;call_id=event.get('call_id')
-        if scope.isolated_call_id and call_id==scope.isolated_call_id:
+        if call_id in scope.isolated_call_ids:
             if kind=='model_start':raise RuntimeError('native_root_identity.call_reused')
             return False
         if kind!='model_start':
@@ -219,14 +223,16 @@ class Worker:
             raise RuntimeError('native_root_identity.invalid_context')
         if job and call_id==job.call_id:raise RuntimeError('native_root_identity.call_reused')
         if conversation==scope.root:return True
-        if scope.isolated_call_id:raise RuntimeError('native_root_identity.additional_call')
+        if scope.isolated_call_ids and not (scope.tool_wait_published and scope.broker
+                and scope.broker.gemini_results is not None):
+            raise RuntimeError('native_root_identity.additional_call')
         if (scope.value.get('request_format')!='gemini' or not job or job.calls!=1 or job.ends!=1
                 or not job.ended.is_set() or scope.frames.finish_reason!='STOP'):
             raise RuntimeError('native_root_identity.unfinished_stream')
         if not conversation and not scope.frames.calls:
             raise RuntimeError('native_root_identity.missing_cascade')
-        # 等待工具回调时，空会话的独立调用不进入已结束的模型流。工具归属仍由原 MCP 回调确认。
-        scope.isolated_call_id=call_id
+        # 旧轮已接纳结果后，独立调用仍与原根不同。隔离其全部帧，并在原轮收尾后退役进程。
+        scope.isolated_call_ids.add(call_id)
         self.owner.emit('foreign_model_observed' if conversation else 'unassigned_model_observed',**scope.identity())
         return False
 
@@ -270,12 +276,55 @@ class Worker:
             raise RuntimeError('native_transport_error')
         return future.value
 
+    def park(self, until):
+        """封存尚未发出模型请求的工作进程。@param until 原单调截止。@return 保存耗时，普通启动时为空。"""
+        self.template=Template(self.bridge)
+        try:
+            return self.template.park(until)
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            self.template.close()
+            if self.template.suspended:
+                self.abort_template()
+                raise
+            self.template=None
+            return None
+
+    def restore(self, until):
+        """重新核对观察和原控制端点，之后才准入模型请求。@param until 原单调截止。@return 恢复耗时。"""
+        if not self.template or not self.template.parked:
+            raise InputError('agy_criu_not_parked')
+        try:
+            elapsed=self.template.restore(until)
+            remaining=until-time.monotonic()
+            if remaining<=0 or self.bridge.reader_error or self.bridge.errors:
+                raise RuntimeError('agy_criu_observer')
+            response=self.call('GetCapabilities',{},None,min(.5,remaining))
+            if response['status']!=200 or not isinstance(response['response'],dict):
+                raise RuntimeError('agy_criu_listener')
+            return elapsed
+        except Exception:
+            self.abort_template()
+            raise
+
+    def abort_template(self):
+        """业务投递前撤销控制器租约并快速收回停态原进程。@return 无。"""
+        self.template.close()
+        self.template.suspended=True
+        process=self.bridge.proc
+        if isinstance(process, subprocess.Popen) and process.poll() is None:
+            os.killpg(process.pid,signal.SIGKILL)
+            process.wait(timeout=2)
+        self.bridge.retire_timeout=0
+
     def retire(self, reason):
         """先观察业务队列再交还原生关闭，等待物理退出。@param reason 退役原因。@return 退出证据。"""
         self.ready=False
         self.owner.emit('retirement_start',generation=self.bridge.generation,reason=reason)
         reader=None;drain={'state':'unknown'};started=time.monotonic()
         try:
+            if self.template and self.template.suspended:
+                self.template.close()
+                raise RuntimeError('agy_criu_parked')
             reader=LayerReader(self.bridge);reader.discover();empty_since=None
             deadline=started+max(1,self.owner.cfg['retire_timeout']-15)
             while time.monotonic()<deadline:
@@ -293,6 +342,8 @@ class Worker:
         finally:
             if reader:reader.close()
         self.bridge.stop_reader();self.bridge.retire_timeout=max(1,self.owner.cfg['retire_timeout']-(time.monotonic()-started))
+        if self.template and self.template.suspended and not self.ready:
+            self.bridge.retire_timeout=1
         process=self.bridge.close_worker();self.bridge.events.close()
         evidence={'process':process,'pre_shutdown':drain,'telemetry':copy.deepcopy(self.telemetry),'seconds':time.monotonic()-started}
         self.owner.emit('worker_retired',generation=self.bridge.generation,reason=reason,**evidence)
@@ -307,6 +358,7 @@ class Kernel:
         global MODEL
         MODEL = configure_model(cfg['public_model'], cfg['native_model'])
         self.cfg=cfg;self.state=state;self.queued=None;self.queued_thread=None;self.lock=threading.RLock();self.active=None;self.closing=False;self.seq=0;self.worker_id=str(uuid.uuid4())
+        self.template_enabled=os.environ.get('AGY_CRIU_TEMPLATE')=='1'
         self.sequence_file=state/'request-sequence.json'
         if self.sequence_file.is_symlink():raise ValueError('序号状态类型错误')
         if self.sequence_file.exists():
@@ -342,6 +394,7 @@ class Kernel:
         value['system']=value['system'] if value['system'] is not None else ''
         with self.lock:
             if self.closing:raise InputError('closing')
+            if self.worker.template and self.worker.template.parked:raise InputError('agy_criu_not_restored')
             if self.queued is not None and not _queued:raise InputError('busy')
             if self.active:
                 previous=self.active
@@ -372,7 +425,13 @@ class Kernel:
         """完成公开响应并保留原生工具轮直到真实结果到达。@param scope 当前轮次。@return 无。"""
         source=[(c['name'],c.get('args',{})) for c in scope.frames.calls]
         native=[(c['name'],json.loads(c['argumentsJson'])) for c in scope.native_tool_calls]
-        if source!=native:raise RuntimeError('tool_protocol_error')
+        ids=tuple(c['id'] for c in scope.native_tool_calls)
+        known_ids=set(ids)
+        if (source!=native or len(known_ids)!=len(ids)
+                or any(call['id'] in known_ids and call['id']!=identifier
+                       for call,identifier in zip(scope.frames.calls,ids))):
+            raise RuntimeError('tool_protocol_error')
+        scope.tool_native_ids=ids
         scope.tool_wait_published=True
         self.emit('completed',**scope.identity(),finish_reason='tool_calls',history_id=None,history_error=None,native_cascade_id=scope.root,native_trajectory_id=scope.broker.trajectory_id,native_model_calls=scope.job.calls,native_empty=False,native_tool_pending=True)
 
@@ -515,7 +574,7 @@ class Kernel:
             except Exception:
                 ident=None;history_error='native_history_export_failed'
                 with (folder/'history-error.log').open('a') as stream:traceback.print_exc(file=stream)
-            worker.jobs+=1;retire=retire or scope.isolated_call_id is not None or self.cfg['rotate_after'] is not None and worker.jobs>=self.cfg['rotate_after']
+            worker.jobs+=1;retire=retire or bool(scope.isolated_call_ids) or self.cfg['rotate_after'] is not None and worker.jobs>=self.cfg['rotate_after']
             if scope.safety_egress and not retire and not self.closing:
                 # 空值不能恢复原生端点。恢复失败时退役当前进程，避免影响下一次请求。
                 try:retire=worker.call('SetCloudCodeURL',{'url':CLOUD_CODE},scope)['status']!=200
@@ -646,6 +705,9 @@ def main():
     service=None
     try:
         service=Kernel(config(args.config),state);service.boot()
+        if service.template_enabled:
+            elapsed=service.worker.park(float(os.environ['AGY_CRIU_DEADLINE']))
+            service.emit('criu_prepared',template_ready=elapsed is not None,dump_ms=elapsed)
         for line in sys.stdin:
             raw=None
             try:
@@ -653,6 +715,10 @@ def main():
                 if not isinstance(raw,dict) or type(raw.get('schema_version')) is not int or raw.get('schema_version')!=1:raise InputError('invalid_schema')
                 kind=raw.get('type')
                 if kind=='gemini_request':service.accept(raw)
+                elif kind=='criu_restore':
+                    fields(raw,{'schema_version','type','until'})
+                    elapsed=service.worker.restore(raw['until'])
+                    service.emit('criu_restored',restore_ms=elapsed)
                 elif kind=='cancel':service.cancel(raw)
                 elif kind=='finish_tool_turn':service.finish_tool_turn(raw)
                 elif kind=='tool_result':

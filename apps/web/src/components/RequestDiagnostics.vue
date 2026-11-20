@@ -84,7 +84,8 @@ function rejectionLabel(reason?: string | null): string {
     unsupported_system_block: 'system 内容块暂不支持', invalid_message_role: '消息角色不符合当前接入格式（messages.role）',
     session_policy_block: '会话被本地策略拦截', request_policy: '请求被本地策略拦截',
     access_policy: '请求被准入策略拦截', request: '入站请求校验失败', admission: '请求未获准入',
-    account_selection: '账号选择阶段返回', credentials: '账号凭据检查失败', runtime_prepare: '运行环境准备失败',
+    account_selection: '账号选择阶段返回', tool_continuation: '原工具轮回填或收尾失败',
+    credentials: '账号凭据检查失败', runtime_prepare: '运行环境准备失败',
     gateway: '网关本地处理失败' } as Record<string, string>)[reason ?? ''] ?? reason ?? '具体拒绝原因未记录';
 }
 /** 计算完整成功尝试的平均输出速率。@param attempt 实际尝试摘要。@return 一位小数的 token/s 或未观测。 */

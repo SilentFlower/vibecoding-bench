@@ -221,6 +221,11 @@ fn gemini_error_body(error: AppError) -> (StatusCode, Value) {
             "RESOURCE_EXHAUSTED",
             error.to_string(),
         ),
+        error @ AppError::AgyToolTurnFailed => (
+            StatusCode::BAD_GATEWAY,
+            "UNAVAILABLE",
+            error.to_string(),
+        ),
         error @ AppError::AgyControl(code) => {
             let status = match code {
                 StatusCode::BAD_REQUEST => "INVALID_ARGUMENT",
@@ -817,6 +822,7 @@ async fn generate_inner(
     diagnostics::selected_account(account.id);
     // 原工具收尾复用原许可和原进程；新AT发布单独检查ready，待对账期间也能完成旧工具。
     if let Some(claim) = &claim {
+        diagnostics::error_stage("tool_continuation");
         claim.finish(token.id, &body, deadline, gif_frames).await?;
     }
     diagnostics::error_stage("credentials");
@@ -1554,6 +1560,9 @@ pub(crate) fn agy_input_rejection(code: &str) -> AppError {
         | "invalid_function_response"
         | "invalid_gemini_function_call"
         | "invalid_gemini_function_call_order"
+        | "gemini_pending_history_mismatch"
+        | "gemini_pending_turn_mismatch"
+        | "gemini_pending_call_mismatch"
         | "gemini_pending_results_mismatch" => {
             ("AGY_TOOL_RESULT_MISMATCH", "工具调用和回填结果无法对应")
         }

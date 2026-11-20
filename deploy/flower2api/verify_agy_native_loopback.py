@@ -126,6 +126,9 @@ class Upstream(BaseHTTPRequestHandler):
             arguments = SCHEMA_TOOL_ARGS if 'TLS_SYNTHETIC_TOOL_SCHEMA' in encoded else {'x':1}
             part={'functionCall':{'name':'synthetic_tool','args':arguments,'id':tool_id},'thoughtSignature':'c3ludGhldGljLXNpZw=='} if tool else {'text':'本地TLS回复'}
             frames=[{'candidates':[{'index':0,'content':{'role':'model','parts':[part]}}]}]
+            if tool and 'TLS_SYNTHETIC_TOOL_PARALLEL' in encoded:
+                frames[0]['candidates'][0]['content']['parts'].append(
+                    {'functionCall':{'name':'synthetic_tool','args':{'x':2}}})
             if repeated:frames*=64
             if capacity:
                 error={'error':{'code':429,'status':'RESOURCE_EXHAUSTED','message':'private synthetic detail'}}
@@ -899,8 +902,38 @@ def verify_tool_deadlines(request, wait_idle, base):
         'elapsed_seconds':round(time.monotonic()-started,2)}
 
 
-def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,kernel_selection=False,tool_deadlines=False):
-    """执行真实公共业务。@param homoglyph 检验系统策略。@param capture_off 验证关闭采集。@param png 核对图片与工具历史。@param installed_adapter 使用镜像内适配器。@param kernel_selection 验证内核切换。@param tool_deadlines 验证跨首轮期限的工具链。@return 脱敏验证摘要。"""
+def verify_parallel_tools(request, wait_idle, base):
+    """通过真实 AGY 回环验证同名调用和反序结果。@param request 公共入口。@param wait_idle 实际排空。@param base 模型路径。@return 验证摘要。"""
+    body={'contents':[{'role':'user','parts':[{'text':'TLS_SYNTHETIC_TOOL_PARALLEL'}]}],
+        'tools':[{'functionDeclarations':[{'name':'synthetic_tool','parameters':{'type':'OBJECT',
+            'properties':{'x':{'type':'INTEGER'}}}}]}]}
+    status,raw=request(base+'streamGenerateContent?alt=sse',body)
+    require(status==200,'同名工具流失败：'+str(status)+' '+raw.decode()[:220])
+    frames=[json.loads(line[6:]) for line in raw.decode().splitlines() if line.startswith('data: ')]
+    parts=[part for frame in frames for candidate in frame.get('candidates',[])
+        for part in candidate.get('content',{}).get('parts',[]) if 'functionCall' in part]
+    calls=[part['functionCall'] for part in parts]
+    require(len(calls)==2 and len({call['id'] for call in calls})==2,'同名工具缺少独立调用 ID')
+    replies=[{'functionResponse':{'id':call['id'],'name':call['name'],
+        'response':{'value':call['args']['x']}}} for call in reversed(calls)]
+    body['contents'].extend([{'role':'model','parts':parts},{'role':'user','parts':replies}])
+    status,raw=request(base+'generateContent',body)
+    wait_idle()
+    require(status==200 and '本地TLS回复'.encode() in raw and len(Upstream.calls)==2,
+        '同名工具回填失败或发生了额外模型发送：'+str(status)+' '+raw.decode()[:220])
+    submitted_parts=[part for message in Upstream.calls[-1]['body']['request']['contents']
+        for part in message['parts']]
+    submitted_calls={part['functionCall']['id']:part['functionCall']['args']['x']
+        for part in submitted_parts if 'functionCall' in part}
+    submitted_results={part['functionResponse']['id']:json.loads(part['functionResponse']['response']['output'])['value']
+        for part in submitted_parts if 'functionResponse' in part}
+    require(len(submitted_calls)==2 and submitted_results==submitted_calls,'续轮出站交换或遗漏了同名工具结果')
+    require(request(base+'generateContent',body)[0]==400 and len(Upstream.calls)==2,'重复回填产生了额外模型发送')
+    return {'passed':True,'parallel_calls':len(calls),'model_calls':len(Upstream.calls)}
+
+
+def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,kernel_selection=False,tool_deadlines=False,parallel_tools=False):
+    """执行真实公共业务。@param homoglyph 检验系统策略。@param capture_off 验证关闭采集。@param png 核对图片与工具历史。@param installed_adapter 使用镜像内适配器。@param kernel_selection 验证内核切换。@param tool_deadlines 验证跨首轮期限的工具链。@param parallel_tools 验证同名工具。@return 脱敏验证摘要。"""
     require(os.geteuid()==1001,'原生业务探针必须使用UID1001')
     os.umask(0o077)
     Upstream.png_support=png
@@ -964,6 +997,10 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
             database.execute("INSERT INTO api_tokens(name,token,allowed_accounts,status) VALUES('synthetic','synthetic-key','1','active')")
         require(request('/admin/settings',{'request_diagnostics_log_mode':'debug'},admin=True)[0]==200,'测试日志模式设置失败')
         base='/v1beta/models/'+MODEL+':'
+        if parallel_tools:
+            result=verify_parallel_tools(request,wait_idle,base)
+            database.close()
+            return result
         if tool_deadlines:
             result=verify_tool_deadlines(request,wait_idle,base)
             database.close()
@@ -1152,10 +1189,11 @@ def main():
     parser.add_argument('--installed-adapter',action='store_true')
     parser.add_argument('--kernel-selection',action='store_true')
     parser.add_argument('--tool-deadlines',action='store_true')
+    parser.add_argument('--parallel-tools',action='store_true')
     args=parser.parse_args()
     installed_adapter=args.installed_adapter or args.png or args.kernel_selection
     if args.inside:
-        print(json.dumps(inside(args.homoglyph,args.capture_off,args.png,installed_adapter,args.kernel_selection,args.tool_deadlines),ensure_ascii=False));return
+        print(json.dumps(inside(args.homoglyph,args.capture_off,args.png,installed_adapter,args.kernel_selection,args.tool_deadlines,args.parallel_tools),ensure_ascii=False));return
     require(bool(args.image),'需要明确的固定原版测试镜像')
     import docker
     root=Path(__file__).resolve().parents[2]
@@ -1202,7 +1240,7 @@ def main():
                 volumes[str(library)]={'bind':'/opt/verify-lib/'+name,'mode':'ro'}
         probe=['/opt/probe.py','--inside']
         for flag,enabled in (('--homoglyph',args.homoglyph),('--capture-off',args.capture_off),('--png',args.png),
-                ('--installed-adapter',installed_adapter),('--kernel-selection',args.kernel_selection),
+                ('--installed-adapter',installed_adapter),('--kernel-selection',args.kernel_selection),('--parallel-tools',args.parallel_tools),
                 ('--tool-deadlines',args.tool_deadlines)):
             if enabled:probe.append(flag)
         container=client.containers.run(args.image,probe,entrypoint=['python3'],detach=True,
@@ -1215,7 +1253,7 @@ def main():
             labels={'vibebench.test-task':'agy-request-records'})
         result=container.wait(timeout=540)
         logs=container.logs().decode(errors='replace')
-        evidence=root/('.trellis/.runtime/agy-tool-deadlines-private' if args.tool_deadlines else '.trellis/.runtime/agy-kernel-selection-private' if args.kernel_selection else '.trellis/.runtime/agy-png-loopback-private' if args.png else '.trellis/.runtime/agy-homoglyph-capture-off-private' if args.capture_off else '.trellis/.runtime/agy-homoglyph-loopback-private' if args.homoglyph else '.trellis/.runtime/agy-runtime-loopback-private')
+        evidence=root/('.trellis/.runtime/agy-parallel-tools-private' if args.parallel_tools else '.trellis/.runtime/agy-tool-deadlines-private' if args.tool_deadlines else '.trellis/.runtime/agy-kernel-selection-private' if args.kernel_selection else '.trellis/.runtime/agy-png-loopback-private' if args.png else '.trellis/.runtime/agy-homoglyph-capture-off-private' if args.capture_off else '.trellis/.runtime/agy-homoglyph-loopback-private' if args.homoglyph else '.trellis/.runtime/agy-runtime-loopback-private')
         if evidence.exists():shutil.rmtree(evidence)
         shutil.copytree(folder,evidence,ignore=lambda directory,names:[name for name in names
             if not (Path(directory)/name).is_file() and not (Path(directory)/name).is_dir()])

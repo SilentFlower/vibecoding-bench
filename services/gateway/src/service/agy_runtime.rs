@@ -262,8 +262,19 @@ impl AgyPool {
             if event["type"] == "control_error" {
                 if let Some(code) = event["code"].as_str() {
                     let kind = code.split(':').next().unwrap_or_default();
-                    if matches!(kind, "invalid_gemini_png" | "invalid_gemini_media" | "unsupported_gemini_media_type" | "unsupported_gemini_image_type" | "gif_conversion_limit" | "gemini_pending_results_mismatch") {
-                        return Ok(json!({"input_rejection":code}));
+                    match kind {
+                        "invalid_gemini_png" | "invalid_gemini_media"
+                        | "unsupported_gemini_media_type" | "unsupported_gemini_image_type"
+                        | "gif_conversion_limit" | "gemini_pending_history_mismatch"
+                        | "gemini_pending_turn_mismatch" | "gemini_pending_call_mismatch"
+                        | "gemini_pending_results_mismatch" => {
+                            return Ok(json!({"input_rejection":code}));
+                        }
+                        "previous_tool_turn_failed" => return Err(AppError::AgyToolTurnFailed),
+                        "tool_completion_failed" | "tool_completion_pending" => {
+                            return Err(unavailable());
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -325,6 +336,14 @@ impl AgyPool {
             .env("PATH", "/usr/local/bin:/usr/bin:/bin")
             .env("TMPDIR", &generation_root)
             .env("AGY_CAPTURE_NATIVE_TLS", "1")
+            .env(
+                "AGY_CRIU",
+                if std::env::var("AGY_CRIU").as_deref() == Ok("1") {
+                    "1"
+                } else {
+                    "0"
+                },
+            )
             .env(
                 "PYTHONPATH",
                 format!("{}:/opt/v3/python:/usr/local/bin", native.module_root),

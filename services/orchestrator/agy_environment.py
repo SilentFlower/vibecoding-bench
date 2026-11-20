@@ -15,6 +15,7 @@ from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, create_environmen
 from account_update_identity import configured_release, image_origin, role_release
 from agy_kernel import kernel_id, module_root, selection, work_root
 from native_capture_policy import capture_enabled
+from native_criu_settings import read_settings as read_criu
 from resource_budget import account_limits, default_account_memory, isolated_account_limits
 from runtime_files import atomic_json
 from runtime_names import account_container_prefix
@@ -112,9 +113,11 @@ def summary(runtime, row: dict) -> dict:
         native_preparation=None,native_kernel=None,native_kernels=None,cli_versions=[],criu=None,
         platform_release=runtime.release_id,content_capture=capture(runtime,row),busy=False)
     result['agy_runtime']={'version':'1.5.9','source_sha256':SOURCE_SHA256,'state':'sleeping' if row['state']=='stopped' else 'unknown'}
+    criu_observation = None
     if result['role_status'].get('sender')=='running':
         try:
-            binding=runtime.read_sender_configuration(row)['binding']
+            configuration=runtime.read_sender_configuration(row)
+            binding=configuration['binding']
             request=Request(binding['endpoint']+'/internal/status',headers={'Authorization':'Bearer '+binding['secret']})
             with build_opener(ProxyHandler({})).open(request,timeout=3) as response:
                 value=json.loads(response.read(1048577))
@@ -123,6 +126,9 @@ def summary(runtime, row: dict) -> dict:
             result['busy']=value['active']>0
             if isinstance(value.get('agy'),dict):
                 observed = dict(value['agy'])
+                criu_observation = {'environment_id':row['environment_id'],'generation':row['generation'],
+                    'module_root':observed.get('module_root'),'restore':observed.pop('restore',None),
+                    'checked_at_ms':time.time_ns()//1_000_000}
                 loaded = observed.pop('module_root', None)
                 result['agy_runtime'].update(observed)
                 if loaded is not None:
@@ -132,6 +138,13 @@ def summary(runtime, row: dict) -> dict:
                     result['reconcile_allowed']=True
         except (ValueError,OSError):
             result['agy_runtime']['state']='unknown'
+    if row.get(ROLE_COLUMNS['sender']):
+        try:
+            criu = read_criu(runtime,row,criu_observation)
+            if criu['installed']:
+                result['criu'] = criu
+        except (ValueError,OSError,NotFound):
+            pass
     return result
 
 

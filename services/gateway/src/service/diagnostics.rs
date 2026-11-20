@@ -894,6 +894,7 @@ impl RequestTraceGuard {
             AppError::TooManyRequests(_) => "admission",
             AppError::AgyUpstreamQuota => "upstream_model",
             AppError::AgyControl(_) => "native_control",
+            AppError::AgyToolTurnFailed => "tool_continuation",
             AppError::BadGateway(_) => "transport",
             // 503 可来自凭据、环境或原生准备，具体阶段由失败边界记录。
             AppError::ServiceUnavailable(_) => "gateway",
