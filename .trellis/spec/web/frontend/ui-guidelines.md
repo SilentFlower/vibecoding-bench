@@ -52,7 +52,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 既有组件只做增量扩展：`Button` 新增 variant `soft`、`destructive-ghost`（`outline`/`secondary` 为次要填充、`ghost` 为文字、`destructive` 为危险浅底）；`Badge` 新增 variant `success/warning/info/cc/agy` 与 `dot` prop。表格单元格内「主值下一行」的辅助值用 `fui-table-sub`，字段说明用 `fui-field-help`。
 
-主题运行时（`@/theme`）：`createTheme(seed): ThemeVars`、`parseThemeSeed(value): ThemeSeed | null`、`readStoredTheme()`、`writeStoredTheme(seed | null): boolean`、`applyTheme(element, vars)`、`initTheme()`，以及 `DEFAULT_THEME_SEED`、`THEME_PRESETS`、`THEME_SEED_LIMITS`。
+主题运行时（`@/theme`）：`createTheme(seed): ThemeVars`、`parseThemeSeed(value): ThemeSeed | null`、`isValidSeedNumber(value, key)`、`readStoredTheme()`、`writeStoredTheme(seed | null): boolean`、`applyTheme(element, vars)`、`initTheme()`，以及 `DEFAULT_THEME_SEED`、`THEME_PRESETS`、`THEME_SEED_LIMITS`。主题设置页的编辑器纯函数（`theme/editor.ts`）：`THEME_SEED_KEYS`（12 个可编辑字段，界面与计数顺序）、`changedSeedKeys(draft, saved): ThemeSeedKey[]`、`normalizeHexInput(text): string | null`（大小写 `#rgb` / `#rrggbb` → 6 位小写）、`parseSeedNumber(key, input): number | null`（空串、非数、越界、步长不齐为 null，不钳制）、`presetIdOf(primary): ThemePresetId | null`。
 
 `ChoiceOption = { value: string; label: string; disabled?: boolean }`。同一菜单的 `value` 必须唯一。空字符串是合法的业务选项值；`undefined` 表示尚未选择。
 
@@ -184,7 +184,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 - **类名契约**：行为脚本与业务代码依赖以下类名与无障碍名称，改外壳时保留，只改样式：`.console-shell`（`.sidebar-collapsed`、`.console-native-tasks`）、`.console-sidebar`、`.console-brand-row`、`.brand-update`（有新版本时类名恰为 `brand-update has-update`）、`.navigation-item.is-active`、`.navigation-count`、`.navigation-running`、`.sidebar-exit`、`.desktop-sidebar-toggle`、`.mobile-navigation-panel`、`.toolbar-page`、`#console-content`、`#admin-password`、`.settings-save-bar`；「flower2api 首页」「系统更新」「打开主导航」「收起侧边栏 / 展开侧边栏」「退出」「显示密码 / 隐藏密码」。
 - **尺寸与断点**：侧栏宽 248px（761–1000px 为 224px，≥1920px 为 264px，≥2560px 为 280px），折叠 76px；≤760px 隐藏侧栏，显示应用栏（标志、页面标题、菜单按钮）与抽屉。内容区内边距 24 / 28 / 48px（按 `--ui-space-unit`），任务页（`.console-native-tasks`）为 0。
-- **侧栏**：`position: fixed` 占满视口高；品牌行与底部管理员区不收缩，只有导航区 `overflow-y: auto`。品牌行只有标志方块是首页链接（名称与版本号同一行，不能嵌套链接）。标志沿用品牌合同（[frontend-guidelines.md](./frontend-guidelines.md)）的 `public/favicon.svg?v=flower2api-pink-04`，放在 `ink` 方块上，透明的花心与通道透出墨色；只有侧栏与登录品牌区的图片带 `alt="flower2api 标志"`，应用栏、抽屉等装饰位置为空 alt。版本号常态 `fill` 底、`text-2`；有新版本 `success-bg` / `success-text` 并带 `arrow-up-circle`；折叠后只显示图标。运行中徽标为 0 时用中性色（`data-idle=true`）。「系统设置」单独成组位于底部；「主题设置」入口随其页面加入同组。
+- **侧栏**：`position: fixed` 占满视口高；品牌行与底部管理员区不收缩，只有导航区 `overflow-y: auto`。品牌行只有标志方块是首页链接（名称与版本号同一行，不能嵌套链接）。标志沿用品牌合同（[frontend-guidelines.md](./frontend-guidelines.md)）的 `public/favicon.svg?v=flower2api-pink-04`，放在 `ink` 方块上，透明的花心与通道透出墨色；只有侧栏与登录品牌区的图片带 `alt="flower2api 标志"`，应用栏、抽屉等装饰位置为空 alt。版本号常态 `fill` 底、`text-2`；有新版本 `success-bg` / `success-text` 并带 `arrow-up-circle`；折叠后只显示图标。运行中徽标为 0 时用中性色（`data-idle=true`）。底部单独一组为「主题设置」（`Palette`）与「系统设置」。
 - **移动端抽屉**：继续用 `Dialog`（焦点圈定、Esc、路由切换关闭）。定位通过传入工具类覆盖 `DialogContent` 的居中定位，`console-shell.css` 末尾用未分层、更具体的 `[data-slot=dialog-content].mobile-navigation-panel` 铺满视口高——全局弹窗高度规则未分层，层内规则压不过它。不用 `!important`。
 - **应用栏标题**：取 `Dashboard.vue` 的标题表，与各页页头一致（账号为「账号管理」）；新增路由时同步补表。
 - **应用栏页面操作位**：`#console-toolbar-page-actions`（`display: contents`，位于 `.console-toolbar-actions` 内、菜单按钮之前，间距 6px）。页面用 `<Teleport defer to="#console-toolbar-page-actions">` 放 36px 图标按钮，类名 `.console-toolbar-action`（外观同菜单按钮，`aria-expanded=true` 时主色浅底）；外壳不感知业务。桌面应用栏隐藏，按钮随之不可见；嵌入模式（如 `workspace-account-id`）不放。目前只有账号页的「搜索账号」。
@@ -198,6 +198,26 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - **步骤表**：`lib/updateSteps.ts` 的 `updateSteps(operation, { snapshot, migrate, busy })` 返回 `{ rows, done, total, outcome }`。规范顺序 `preparing → draining → [snapshotting → migrating] → switching → verifying → committing → cleaning`（`snapshot` 取 `status.migration_capability`，`migrate` 取目录中目标版本的 `migrations` 或记录中出现过 `migrating`）。结局阶段（succeeded、succeeded_cleanup_pending、failed、cancelled、restored、reconcile、prepared）不成行；带快照部署越过取消边界的第一次 `switching` 不成行，进行中仍显示「等待在途完成」；重复阶段只留最后一次；维护中补「待执行」；无 `steps` 的旧操作按当前阶段推出（时间显示「—」）。行内说明只取真实数据（阻塞数、快照、各库迁移状态）。行为 `[data-update-step][data-state=done|active|pending]`。
 - **钩子**：摘要格 `[data-update-tile=current|latest|published|checked|target|operation|updated]`，版本卡 `[data-release-card]`、展开详情 `[data-release-details]`；关闭按钮名「关闭」。样式在 `src/system-update.css`（`@layer components`，类名前缀 `su-`，只取 token）。
 - **示例**：带快照部署的记录 `preparing, draining, switching, snapshotting, migrating, switching, verifying` 已记录部分显示为 `preparing, draining, snapshotting, migrating, switching, verifying` 6 行（维护中再补 `committing, cleaning` 待执行），第一次 `switching` 并入真正的切换。错误用法：把 `steps` 原样逐条成行，越过取消边界的切换会显示成「切换平台服务」已完成、快照仍待执行；正确处理：一律经 `updateSteps` 推导。错误用法：自动化脚本 `goto('/updates')` 后直接点背景页导航（被模态挡住）；正确处理：先关闭弹窗，等地址回到 `/`。
+
+### 主题设置页
+
+- **入口**：`/theme`（`name: 'theme'`，`ThemeSettings.vue`）。网关 `router.rs` 的 SPA 列表与 `frontend_routes_support_direct_navigation_and_reload` 同步登记 `/theme`、`/theme/`；应用栏标题表 `theme: '主题设置'`。
+- **草稿语义**：
+  - `saved = readStoredTheme() ?? DEFAULT_THEME_SEED`；`draft` 是可编辑种子。只有通过 `normalizeHexInput` / `parseSeedNumber` 的值写进 `draft`；无效输入只记错误（`#theme-<键>-error`），画板不变，保存禁用。
+  - 页头 `[data-theme-sync]` 显示「N 处修改待应用」（N = `changedSeedKeys(draft, saved).length`）；有无效输入时追加「M 项输入无效」（`data-invalid=true`，错误色）；都没有时为「已同步」。分类分段的 `count` 为该分类已修改或无效的字段数（同系统设置分类计数），无效输入藏在其它分类时也能定位。≤760px 时页头说明仅读屏可见，由 `.theme-mobile-state` 补一行可见状态。
+  - 「已修改」与单项恢复（「恢复已保存的<字段>」）都相对已保存值；撤销草稿回到已保存；恢复默认只改草稿，仍需保存。
+  - 保存：先 `writeStoredTheme(等于默认 ? null : draft)`；返回 false 时提示失败，控制台不变。成功后 `applyTheme(document.documentElement, createTheme(draft))`。
+  - 预设只写主色，选中态由 `presetIdOf(draft.primary)` 反查（`[data-preset=<id>][aria-pressed]`）。
+- **预览画板**（`theme/ThemePreview.vue`）：
+  - 同源 `<iframe src="/?theme-preview=1">` 固定 1440×900。`load` 与草稿深度变化时，把 `createTheme(draft)` 写进 iframe 文档根，覆盖它自己 `initTheme` 应用的保存值。
+  - iframe 设 `inert`、`tabindex=-1`、`pointer-events: none`。画布负责缩放（10%–150%：按钮以中心为锚 ±10 个百分点，滚轮以指针为锚、每 100px ±10）、拖动平移与「适应画布」（`[data-theme-zoom]` 显示百分比）。
+  - `Dashboard.vue` 读到 `route.query['theme-preview'] === '1'` 时以 `checkUpdates=false` 挂载，画板内不发 `POST /runtime/api/system-updates/check`，只读摘要照常读取。
+- **离开保护**：`onBeforeRouteLeave` 在有改动或有无效输入时打开 `ConfirmationDialog`（「放弃未保存的主题修改？」/「放弃并离开」）；去往 `login` 直接放行，因为 `logout()` 已先撤销会话。有改动时登记 `beforeunload`。
+- **过渡态**：任务与工程、运行环境在子任务 6 前写死颜色，不随主题变化。
+- **示例**：
+  - 错误用法：在当前文档里直接渲染 `Accounts.vue` 做预览，Teleport、固定定位和媒体查询都会逃出画板，外壳也按真实视口排版。正确处理：用 iframe 隔离。
+  - 错误用法：`Number('')` 得 0 后写进草稿（圆角 0 合法，会悄悄改值）。正确处理：经 `parseSeedNumber`，空串为 null。
+  - 错误用法：用 `fixture.checks` 判断画板是否检查更新（刷新后顶层外壳会合法地再检查一次）。正确处理：按 `request.frame.parent_frame` 归属记录子框架请求。
 
 ### 布局与信息组织
 
@@ -323,17 +343,29 @@ python3 deploy/flower2api/verify_ui_shell.py
 python3 deploy/flower2api/verify_account_page_design.py
 python3 deploy/flower2api/verify_records_pages_design.py
 python3 deploy/flower2api/verify_nodes_settings_design.py
+python3 deploy/flower2api/verify_theme_settings.py
 node --experimental-strip-types --test apps/web/tests/update-steps.test.mjs
 python3 deploy/flower2api/verify_update_design.py
 python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录>
 ```
 
-- `theme.test.mjs`：默认主题与 ui-foundation.css 双向一致、预设与边界色对比度、尺寸派生、种子校验与存储失败矩阵、组件样式不写死颜色与圆角。
+- `theme.test.mjs`：默认主题与 ui-foundation.css 双向一致、预设与边界色对比度、尺寸派生、种子校验与存储失败矩阵、编辑器纯函数（差异、hex 规整、数值校验、预设反查）、组件与已迁移页面样式不写死颜色与圆角。
 - `verify_ui_kit.py`：与 `doc/design/console-v2/mock.html` 逐项比对计算样式（结构等价项在脚本白名单中注明原因），组件各状态取值、预设与自定义主色、柔光材质、局部主题隔离、刷新保持、存储缺失/损坏/越界/抛错回退、减少动效，以及真实构建入口首屏即为保存的主题（需先 `npm --prefix apps/web run build`）。
-- `verify_ui_shell.py`（需先构建）：真实构建加合成夹具，1440 下侧栏、品牌行、版本号两态、导航、计数徽标、底部区、内容区与页头对 `mock.html#accounts` 逐项比对；8 个页面页头无分组名且样式一致；系统设置保存栏比对与「1 项待保存 / 配置已同步」；折叠保持、1440×560 导航内部滚动；390 应用栏比对、抽屉贴左铺满并在导航后关闭；登录页对 `v1/mock.html#login` 比对及空密码、错误密码、成功、显示密码四条路径；零控制台错误。
+- `verify_ui_shell.py`（需先构建）：真实构建加合成夹具，1440 下侧栏、品牌行、版本号两态、导航、计数徽标、底部区、内容区与页头对 `mock.html#accounts` 逐项比对；9 个页面页头无分组名且样式一致；系统设置保存栏比对与「1 项待保存 / 配置已同步」；折叠保持、1440×560 导航内部滚动；390 应用栏比对、抽屉贴左铺满并在导航后关闭；登录页对 `v1/mock.html#login` 比对及空密码、错误密码、成功、显示密码四条路径；零控制台错误。
 - `verify_account_page_design.py`（需先构建）：`InteractionFixture` 的 13 个账号（第 4–6 号设为限流、认证错误、停用）。1440×900 对 `#accounts`、`#account-edit` 比对 79 项计算样式（白名单：设计稿 `.acc-name span` 误命中徽标的文字色与字号、99px 全圆）；三列、间距 16、首行三张卡片操作栏底边 ≤ 900；健康条四种色调与 36px；工作区 820 视口居中、滚动内容区时页签带不动、切换页签外框不变、新建无页签带；授权登录 440；390 对 `#mobile` 比对，搜索行展开、聚焦、有搜索词时不收起，其它页面无搜索按钮；零控制台错误；设计稿未画的画面截图存 `--output`。
 - `verify_records_pages_design.py`（需先构建）：`RemainingPagesFixture`（第 2 条代理已过期、第 3 条未设到期）与 `BlockFixture`。1440×900 对 `#requests`、`#proxies`、`#tokens`、`#blocks` 比对 63 项计算样式（白名单：99px 全圆开关）；日志卡点击写 PUT、保存中禁用与新值；快捷分段 `outcome=errors`；详情抽屉宽 1020、上右下 14px、面板 `overflow:hidden` 而 `.fui-modal-body` 滚动、四个页签切换外框不变；代理第 4 卡 19 /「另有 1 条已过期」与旧网关缺字段时「—」；代理编辑 680 居中、令牌编辑 760；令牌名称搜索无结果；封禁四段计数与切换；四页 390 无横向滚动及保留列数（请求 4、代理 3、令牌 4、封禁 3），代理 390 点击使用摘要后展开行与账号入口可见；零控制台错误；截图存 `--output`（默认 `.deploy/console-ui-revamp/records/verify`）。
 - `verify_nodes_settings_design.py`（需先构建）：1440×900 对 `#nodes`、`#settings` 逐项比对 55 组计算样式（白名单为空）；`StatesFixture` 八种节点状态断言待处理为 5、说明「3 台需检查连接 · 1 台组件异常 · 1 台移除待重试」、远程服务器「5 台待处理」与各状态徽标色，单节点时为「全部正常 / 尚未添加」；节点添加 640、改名 420 居中，改名按 Escape 后淡出期间说明始终为原地址；设置页修改数字与开关后「已修改」、分类计数与保存栏计数递增，撤销清零且零写入，搜索结果行与分类标签、草稿保留、搜索空态、预热记录；两页 390 无横向滚动、节点卡单列、设置搜索满宽与导航横向滚动；零控制台错误。截图在 `.deploy/console-ui-revamp/nodes-settings/verify/`。
+- `verify_theme_settings.py`（需先构建）：`ThemeFixture`（`ShellFixture` 加 `/theme` 页面地址与子框架写请求记录）。覆盖以下内容：
+  - 侧栏底部组顺序与选中；
+  - 6 个预设逐个切换后，iframe 根 `--ui-color-primary` 变化、页面根不变，画板主按钮背景（等过渡结束）；
+  - 1440×900 对 `#theme` 比对 21 组计算样式（白名单为空），面板宽 340、两列同行、不超出视口；
+  - 字号改值、单项恢复、越界 / 清空 / 小数拒绝（页头「1 处修改待应用 · 1 项输入无效」，切到颜色分类后尺寸分段计数 1、恢复后消失），阴影步长 0.3 拒绝、1.25 生效；hex `#12` 拒绝、`#ABC` 规整，取色器写入；
+  - 撤销草稿；保存后存储种子正确，刷新到 `domcontentloaded` 时根上已有内联主色；恢复默认后保存清除存储；
+  - 缩放按钮、滚轮、拖动 60/40、适应，iframe 不可命中、`inert`；子框架写请求只有 `POST /admin/runtime/session`；
+  - 离开确认的取消 / 放弃 / 无草稿直达，`beforeunload` 有草稿触发、无草稿不触发；有草稿时退出登录不拦截；
+  - 存储损坏、越界回退默认，`setItem` 抛错时提示失败且根不变；
+  - 390 应用栏标题、可见同步状态、单列、画布 320 高、无横向溢出；零控制台错误。
+  - 截图在 `.deploy/console-ui-revamp/theme-settings/verify/`。
 - `update-steps.test.mjs`：正向含迁移、维护中进行中与待执行、越过取消边界的切换合并、无快照部署、恢复路径、旧操作无 `steps`、未知阶段、截断记录。
 - `verify_update_design.py`、`verify_system_update_browser.py`（需先构建）：前者对设计稿 `#update`、`#update-progress` 比对 45 项计算样式并检查说明展开、转义与零写入；后者覆盖版本记录与嵌套确认 Esc、居中与矮视口、直接安装默认 60 秒 / 30 分钟 1800 秒 / 双击幂等、步骤与时间、断线重连、快照与迁移、数据恢复、完成与刷新、409、未接入、回退与取消等待、等待对账与恢复。
 - 迁移期改造旧原型对比脚本：组件库负责的属性在脚本内用 `component_keys`（采样名 → 属性集合）跳过，并注明已由 `verify_ui_kit.py` 覆盖；页面级属性继续与旧原型比对。写死的组件颜色改为在被测节点内插入探针元素读取 token 实际渲染值（`verify_shared_pagination.py::token`），不得把旧色值改成新色值再写死。业务断言不放宽。外壳尺寸（侧栏宽、内容区边距）推算出的页面宽度断言改为读取实际值（如卡片区铺满 `#console-content` 内容宽度、右边距等于其实际 `padding-right`），外壳本身由 `verify_ui_shell.py` 对照设计稿核对。

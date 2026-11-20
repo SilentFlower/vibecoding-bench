@@ -45,6 +45,7 @@ const router = createRouter({
         { path: 'requests', name: 'requests', component: () => import('./components/RequestDiagnostics.vue') },
         { path: 'session-blocks', name: 'session-blocks', component: () => import('./components/SessionPolicyBlocks.vue') },
         { path: 'tokens', name: 'tokens', component: () => import('./components/Tokens.vue') },
+        { path: 'theme', name: 'theme', component: () => import('./components/ThemeSettings.vue') },
         { path: 'settings', name: 'settings', component: () => import('./components/Settings.vue') },
         // 系统更新是外壳上的弹窗：/updates 渲染账号页作背景，由 Dashboard 自动打开弹窗。
         { path: 'updates', name: 'updates', component: () => import('./components/Accounts.vue') },

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router';
-import { Users, Activity, KeyRound, Boxes, Server, ListTodo, Settings2, Globe, ShieldCheck } from '@/components/ui/icon';
+import { Users, Activity, KeyRound, Boxes, Server, ListTodo, Settings2, Globe, ShieldCheck, Palette } from '@/components/ui/icon';
 
-/** 主导航复用于桌面侧栏与移动抽屉，保证两个入口集合一致；「系统设置」单独成组位于底部（主题设置随其页面加入同组）。 */
+/** 主导航复用于桌面侧栏与移动抽屉，保证两个入口集合一致；「主题设置」与「系统设置」单独成组位于底部。 */
 defineProps<{ collapsed?: boolean; accountCount?: number | null; runningCount?: number | null }>();
 const emit = defineEmits<{ navigate: [] }>();
 const route = useRoute();
@@ -10,7 +10,7 @@ const groups = [
   { label: '网关', items: [{ name: 'accounts', label: '账号', icon: Users }, { name: 'requests', label: '请求记录', icon: Activity }, { name: 'session-blocks', label: '会话封禁', icon: ShieldCheck }, { name: 'tokens', label: '访问令牌', icon: KeyRound }] },
   { label: '资源', items: [{ name: 'proxies', label: '代理管理', icon: Globe }, { name: 'environments', label: '运行环境', icon: Boxes }, { name: 'nodes', label: '节点管理', icon: Server }] },
   { label: '工作区', items: [{ name: 'tasks', label: '任务与工程', icon: ListTodo }] },
-  { label: '', items: [{ name: 'settings', label: '系统设置', icon: Settings2 }] },
+  { label: '', items: [{ name: 'theme', label: '主题设置', icon: Palette }, { name: 'settings', label: '系统设置', icon: Settings2 }] },
 ];
 </script>
 

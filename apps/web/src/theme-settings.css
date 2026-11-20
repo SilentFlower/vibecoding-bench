@@ -1,0 +1,80 @@
+/* 主题设置页与预览画板（第二版设计稿 doc/design/console-v2/mock.html 的 #theme）。由 ThemeSettings.vue 引入。
+   颜色、圆角只取 token；预设色经内联 --theme-preset 传入，属于数据而非样式字面量。 */
+@layer components {
+  /* 桌面占满内容区可视高度（内容区上下内边距 24 + 48），面板内部滚动、画布缩放，不拉长整页。 */
+  .theme-page { display: flex; flex-direction: column; min-width: 0; height: calc(100dvh - var(--ui-space-unit) * 18); min-height: 640px; color: var(--ui-color-text); }
+  .theme-sync-state { display: inline-flex; align-items: center; gap: calc(var(--ui-space-unit) * 1.5); margin-left: calc(var(--ui-space-unit) * 3); color: var(--ui-color-text-3); font-size: var(--ui-font-size-meta); font-weight: 750; }
+  .theme-sync-state::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--ui-color-success); }
+  .theme-sync-state[data-dirty=true] { color: var(--ui-color-primary-text); }
+  .theme-sync-state[data-dirty=true]::before { background: currentColor; }
+  .theme-sync-state[data-invalid=true] { color: var(--ui-color-danger-text); }
+  .theme-mobile-state { display: none; }
+
+  .theme-layout { display: grid; flex: 1; grid-template-columns: 340px minmax(0, 1fr); gap: calc(var(--ui-space-unit) * 4); min-height: 0; }
+
+  /* 编辑面板 */
+  .theme-panel.fui-card { gap: calc(var(--ui-space-unit) * 3.5); padding: calc(var(--ui-space-unit) * 3.5); overflow-y: auto; }
+  .theme-panel .fui-segmented { display: flex; flex-shrink: 0; }
+  .theme-panel .fui-segmented-item { flex: 1; padding-inline: calc(var(--ui-space-unit) * 2); }
+  .theme-group { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 2); }
+  .theme-group h2 { margin: 0; padding: 0 2px; color: var(--ui-color-text); font-size: var(--ui-font-size-md); font-weight: 760; line-height: 1.55; }
+  .theme-group-head { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 1.5); min-height: 22px; }
+  .theme-fields { gap: calc(var(--ui-space-unit) * 2); }
+
+  .theme-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 2); }
+  .theme-presets button { position: relative; display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 7px 7px 8px; border: 0; border-radius: var(--ui-radius-block); background: var(--ui-color-fill-subtle); color: var(--ui-color-text); font-family: var(--ui-font-family); text-align: left; cursor: pointer; transition: background-color .15s, box-shadow .15s; }
+  .theme-presets button:hover:not([aria-pressed=true]) { background: var(--ui-color-fill-muted); }
+  .theme-presets button[aria-pressed=true] { background: var(--ui-color-surface); box-shadow: 0 0 0 1.5px var(--theme-preset), var(--ui-shadow-pop); }
+  .theme-presets button:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
+  .theme-presets i { display: block; height: 30px; margin-bottom: 5px; border-radius: calc(var(--ui-radius-control) - 1px); background: linear-gradient(135deg, var(--theme-preset) 0 38%, color-mix(in srgb, var(--theme-preset) 22%, var(--ui-color-surface)) 38% 66%, var(--ui-color-fill-muted) 66%); }
+  .theme-presets b { overflow: hidden; font-size: var(--ui-font-size-sm); font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+  .theme-presets small { overflow: hidden; color: var(--ui-color-text-4); font-size: calc(var(--ui-font-size-xs) - 1px); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+  .theme-presets svg { position: absolute; right: 8px; bottom: 10px; color: var(--theme-preset); stroke-width: 3; }
+
+  /* 颜色字段：色块（原生取色器）· 名称与用途 · hex 输入 */
+  .theme-color-field { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: calc(var(--ui-space-unit) * 1.5) calc(var(--ui-space-unit) * 2.5); padding: calc(var(--ui-space-unit) * 2) calc(var(--ui-space-unit) * 2.5); border-radius: calc(var(--ui-radius-block) - 2px); background: var(--ui-color-fill-subtle); }
+  .theme-swatch { appearance: none; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--ui-radius-control); background: none; cursor: pointer; }
+  .theme-swatch::-webkit-color-swatch-wrapper { padding: 0; }
+  .theme-swatch::-webkit-color-swatch { border: 1px solid var(--ui-color-line); border-radius: var(--ui-radius-control); }
+  .theme-swatch::-moz-color-swatch { border: 1px solid var(--ui-color-line); border-radius: var(--ui-radius-control); }
+  .theme-swatch:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
+  .theme-field-text { min-width: 0; }
+  .theme-field-label { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 1.5); min-height: 20px; }
+  .theme-field-label label { color: var(--ui-color-text); font-size: var(--ui-font-size-meta); font-weight: 720; }
+  .theme-field-label .fui-badge, .theme-number-field .fui-badge { height: 18px; padding-inline: calc(var(--ui-space-unit) * 1.5); font-size: calc(var(--ui-font-size-xs) - 1px); }
+  .theme-field-text small { display: block; overflow: hidden; color: var(--ui-color-text-3); font-size: var(--ui-font-size-xs); font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+  .theme-color-field input.theme-hex { width: 84px; height: var(--ui-control-sm); padding-inline: calc(var(--ui-space-unit) * 2); font: 650 var(--ui-font-size-xs)/1 var(--ui-font-family-mono); }
+  .theme-field-error { grid-column: 1 / -1; margin: 0; color: var(--ui-color-danger-text); font-size: var(--ui-font-size-xs); font-weight: 600; line-height: 1.55; }
+  .theme-number-field { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 1); }
+  .theme-restore { display: inline-grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: var(--ui-radius-btn); background: transparent; color: var(--ui-color-text-3); cursor: pointer; }
+  .theme-restore:hover { background: var(--ui-color-fill); color: var(--ui-color-text); }
+  .theme-restore:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 1px; }
+
+  /* 预览：标题与缩放条 · 点阵画布 · 1440×900 画板 */
+  .theme-preview.fui-card { gap: calc(var(--ui-space-unit) * 3); min-height: 0; padding: calc(var(--ui-space-unit) * 4); }
+  .theme-preview-head { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); }
+  .theme-preview-head h2 { margin: 0; font-size: calc(var(--ui-font-size-title) + 1px); font-weight: 760; line-height: 1.55; }
+  .theme-preview-head p { margin: 2px 0 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; }
+  .theme-zoom { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; padding: 3px; border-radius: var(--ui-radius-control); background: var(--ui-color-fill); }
+  .theme-zoom button, .theme-zoom output { display: grid; place-items: center; min-width: 30px; height: 30px; border-radius: var(--ui-radius-btn); color: var(--ui-color-text-2); font: 700 var(--ui-font-size-sm)/1 var(--ui-font-family-mono); }
+  .theme-zoom output { min-width: 44px; }
+  .theme-zoom button { padding: 0; border: 0; background: transparent; cursor: pointer; transition: background-color .15s; }
+  .theme-zoom button:hover:not(:disabled) { background: var(--ui-color-surface); color: var(--ui-color-text); }
+  .theme-zoom button:disabled { opacity: .45; cursor: not-allowed; }
+  .theme-zoom button:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 1px; }
+  .theme-canvas { position: relative; flex: 1; min-height: 0; overflow: hidden; border-radius: var(--ui-radius-block); background: radial-gradient(circle, var(--ui-color-fill-strong) 1px, transparent 1.3px) 0 0 / 16px 16px, var(--ui-color-fill-subtle); cursor: grab; touch-action: none; user-select: none; }
+  .theme-canvas.is-dragging { cursor: grabbing; }
+  .theme-artboard { position: absolute; top: 0; left: 0; width: 1440px; height: 900px; overflow: hidden; border-radius: var(--ui-radius-card); background: var(--ui-color-surface); box-shadow: 0 0 0 1px var(--ui-color-line), var(--ui-shadow-modal); transform-origin: 0 0; }
+  .theme-artboard iframe { display: block; width: 100%; height: 100%; border: 0; pointer-events: none; }
+  .theme-canvas-loading { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-meta); font-weight: 600; pointer-events: none; }
+  .theme-canvas-hint { position: absolute; bottom: 12px; left: 14px; color: var(--ui-color-text-4); font-size: var(--ui-font-size-xs); font-weight: 600; pointer-events: none; }
+
+  @media (max-width: 760px) {
+    .theme-page { height: auto; min-height: 0; }
+    .theme-mobile-state { display: block; margin: 0 0 calc(var(--ui-space-unit) * 3); }
+    .theme-mobile-state .theme-sync-state { margin-left: 0; }
+    .theme-layout { grid-template-columns: minmax(0, 1fr); }
+    .theme-panel.fui-card { overflow: visible; }
+    .theme-canvas { flex: none; height: 320px; }
+  }
+}

@@ -150,6 +150,7 @@ pub fn build_router(
         "/session-blocks",
         "/tasks",
         "/settings",
+        "/theme",
         "/proxies",
         "/updates",
         "/environments",
@@ -4343,6 +4344,7 @@ mod tests {
             "/session-blocks",
             "/tasks",
             "/settings",
+            "/theme",
             "/proxies",
             "/updates",
             "/environments",
@@ -4351,6 +4353,7 @@ mod tests {
             "/tasks/",
             "/environments/",
             "/settings/",
+            "/theme/",
             "/tasks?tab=warmup&account=42",
         ] {
             let response = app

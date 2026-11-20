@@ -23,7 +23,8 @@ export interface ThemeSeed {
 /** CSS 自定义属性名到取值的映射。 */
 export type ThemeVars = Record<string, string>;
 
-type NumericSeed = 'fontSize' | 'spaceUnit' | 'controlHeight' | 'sizeStep' | 'radius' | 'shadow';
+/** 数值种子字段。 */
+export type NumericSeed = 'fontSize' | 'spaceUnit' | 'controlHeight' | 'sizeStep' | 'radius' | 'shadow';
 
 /** 数值种子的取值范围，校验与主题设置界面共用。 */
 export const THEME_SEED_LIMITS: Readonly<Record<NumericSeed, { min: number; max: number; step: number }>> = {
@@ -182,8 +183,8 @@ export function createTheme(seed: ThemeSeed): ThemeVars {
   return vars;
 }
 
-/** 判断数值是否落在范围内且对齐步长。@param value 输入。@param key 种子字段。@return 是否合法。 */
-function validNumber(value: unknown, key: NumericSeed): value is number {
+/** 判断数值是否落在范围内且对齐步长，种子校验与主题设置页共用。@param value 输入。@param key 种子字段。@return 是否合法。 */
+export function isValidSeedNumber(value: unknown, key: NumericSeed): value is number {
   const { min, max, step } = THEME_SEED_LIMITS[key];
   if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) return false;
   return Math.abs(Math.round((value - min) / step) * step + min - value) < 1e-9;
@@ -201,7 +202,7 @@ export function parseThemeSeed(value: unknown): ThemeSeed | null {
   const colors = ['primary', 'success', 'warning', 'danger', 'info'] as const;
   if (!colors.every(key => isHexColor(input[key]))) return null;
   const numbers = Object.keys(THEME_SEED_LIMITS) as NumericSeed[];
-  if (!numbers.every(key => validNumber(input[key], key))) return null;
+  if (!numbers.every(key => isValidSeedNumber(input[key], key))) return null;
   const seed = { version: 1, surface: input.surface } as ThemeSeed;
   for (const key of colors) seed[key] = input[key] as string;
   for (const key of numbers) seed[key] = input[key] as number;

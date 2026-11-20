@@ -63,11 +63,13 @@ async function refreshMetadata(force=false,checkUpdates=false): Promise<void> {
  }
  metadataLoading=false;
 }
-onMounted(()=>{void refreshMetadata(false,true);});
+// 主题设置的预览画板以 ?theme-preview=1 嵌入首页，只读展示，不重复发起自动检查更新；只读摘要照常读取。
+const themePreview = route.query['theme-preview'] === '1';
+onMounted(()=>{void refreshMetadata(false,!themePreview);});
 onUnmounted(()=>{clearTimeout(updateTimer);metadataController.abort();});
 watch(()=>route.fullPath,()=>{void refreshMetadata();});
 // 移动端应用栏显示的页面标题，与各页页头一致。
-const titles: Record<string, string> = { accounts: '账号管理', requests: '请求记录', 'session-blocks': '会话封禁', tokens: '访问令牌', proxies: '代理管理', environments: '运行环境', nodes: '节点管理', tasks: '任务与工程', settings: '系统设置', updates: '系统更新' };
+const titles: Record<string, string> = { accounts: '账号管理', requests: '请求记录', 'session-blocks': '会话封禁', tokens: '访问令牌', proxies: '代理管理', environments: '运行环境', nodes: '节点管理', tasks: '任务与工程', theme: '主题设置', settings: '系统设置', updates: '系统更新' };
 const pageTitle = computed(() => titles[String(route.name)] ?? '管理控制台');
 watch(() => route.fullPath, () => { mobileOpen.value = false; });
 const toast = useToast();

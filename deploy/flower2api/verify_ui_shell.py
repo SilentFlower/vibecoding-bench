@@ -87,7 +87,7 @@ KNOWN = {
     '.login-form .btn-primary': {'height'},  # 同上
 }
 PAGES = [('账号', '账号管理'), ('请求记录', '请求记录'), ('会话封禁', '会话封禁'), ('访问令牌', '访问令牌'),
-         ('代理管理', '代理管理'), ('运行环境', '运行环境'), ('节点管理', '节点管理'), ('系统设置', '系统设置')]
+         ('代理管理', '代理管理'), ('运行环境', '运行环境'), ('节点管理', '节点管理'), ('主题设置', '主题设置'), ('系统设置', '系统设置')]
 SAMPLE = '(e, names) => Object.fromEntries(names.map(n => [n, n === "font-family" ? getComputedStyle(e).fontFamily.split(",")[0].trim().replaceAll(\'"\', "") : getComputedStyle(e).getPropertyValue(n)]))'
 
 
@@ -144,7 +144,7 @@ async def open_console(browser, scenario: str, width: int, height: int, errors: 
 
 
 async def verify_desktop(browser, output: Path, problems: list, errors: list) -> dict:
-    """1440 桌面：侧栏与页头比对、版本号两态、悬停、折叠保持、矮视口滚动、8 个页头、保存栏。@return 摘要。"""
+    """1440 桌面：侧栏与页头比对、版本号两态、悬停、折叠保持、矮视口滚动、9 个页头、保存栏。@return 摘要。"""
     mock = await open_mock(browser, MOCK, 'accounts', 1440, 900)
     context, page = await open_console(browser, 'normal', 1440, 900, errors)
     await page.goto(BASE + '/')
@@ -190,7 +190,7 @@ async def verify_desktop(browser, output: Path, problems: list, errors: list) ->
     await page.screenshot(path=str(output / 'shell-short-1440.png'))
     await page.set_viewport_size({'width': 1440, 'height': 900})
 
-    # 8 个页面的页头：无分组名、单个 h1、样式等于设计稿。
+    # 9 个页面的页头：无分组名、单个 h1、样式等于设计稿。
     title_style = await sample(mock, '.ph h1', TEXT + ['letter-spacing'])
     headers = []
     for label, title in PAGES:

@@ -4,6 +4,7 @@ import test from 'node:test';
 import { contrast } from '../src/theme/color.ts';
 import { DEFAULT_THEME_SEED, THEME_PRESETS, createTheme, parseThemeSeed } from '../src/theme/tokens.ts';
 import { THEME_STORAGE_KEY, readStoredTheme, writeStoredTheme } from '../src/theme/runtime.ts';
+import { THEME_SEED_KEYS, changedSeedKeys, normalizeHexInput, parseSeedNumber, presetIdOf } from '../src/theme/editor.ts';
 
 const foundation = readFileSync(new URL('../../legacy-web/ui-foundation.css', import.meta.url), 'utf8');
 const themable = /(--ui-(?:color|shadow|radius)-[a-z0-9-]+|--ui-(?:font-size-base|control-base|size-step|space-unit))\s*:\s*([^;]+);/g;
@@ -99,6 +100,37 @@ test('存储读取：缺失、损坏、越界、抛错都回退为空，合法�
   assert.equal(readStoredTheme(undefined), null);
 });
 
+test('编辑器：草稿差异按字段顺序列出', () => {
+  assert.deepEqual(changedSeedKeys(DEFAULT_THEME_SEED, { ...DEFAULT_THEME_SEED }), []);
+  assert.deepEqual(changedSeedKeys({ ...DEFAULT_THEME_SEED, radius: 4, primary: '#2f6bd8' }, DEFAULT_THEME_SEED), ['primary', 'radius']);
+  const all = { version: 1, primary: '#2f6bd8', success: '#000001', warning: '#000002', danger: '#000003', info: '#000004', surface: 'soft', fontSize: 14, controlHeight: 40, sizeStep: 7, spaceUnit: 5, radius: 4, shadow: 1.5 };
+  assert.deepEqual(changedSeedKeys(all, DEFAULT_THEME_SEED), [...THEME_SEED_KEYS]);
+  assert.deepEqual([...THEME_SEED_KEYS].sort(), Object.keys(DEFAULT_THEME_SEED).filter(key => key !== 'version').sort());
+});
+
+test('编辑器：hex 输入规整为 6 位小写，格式不符拒绝', () => {
+  assert.equal(normalizeHexInput('#ABC'), '#aabbcc');
+  assert.equal(normalizeHexInput('#2F6BD8'), '#2f6bd8');
+  assert.equal(normalizeHexInput('  #2f6bd8 '), '#2f6bd8');
+  for (const text of ['2f6bd8', '#12345', '#ggg', '#12', '', '#2f6bd8ff', 'red']) assert.equal(normalizeHexInput(text), null, text);
+});
+
+test('编辑器：数值输入按种子范围与步长校验，不钳制', () => {
+  assert.equal(parseSeedNumber('fontSize', '12'), 12);
+  assert.equal(parseSeedNumber('fontSize', 16), 16);
+  assert.equal(parseSeedNumber('radius', '0'), 0);
+  assert.equal(parseSeedNumber('shadow', '1.25'), 1.25);
+  for (const [key, input] of [['fontSize', '11'], ['fontSize', 17], ['fontSize', '13.5'], ['shadow', '0.3'], ['radius', ''], ['radius', '  '], ['controlHeight', 'abc'], ['spaceUnit', '7']]) {
+    assert.equal(parseSeedNumber(key, input), null, `${key}=${input}`);
+  }
+});
+
+test('编辑器：主色反查预设，自定义色无预设', () => {
+  for (const preset of THEME_PRESETS) assert.equal(presetIdOf(preset.primary), preset.id);
+  assert.equal(presetIdOf(DEFAULT_THEME_SEED.primary), 'petal');
+  assert.equal(presetIdOf('#123456'), null);
+});
+
 const uiRoot = new URL('../src/components/ui/', import.meta.url);
 const colorLiteral = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab)\(|\b(?:white|black)\b/;
 const paletteUtility = /\b(?:bg|text|border|ring|fill|stroke|outline|from|via|to)-(?:black|white|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)\b/;
@@ -130,11 +162,12 @@ test('组件样式不写死颜色，圆角只取 token', () => {
     new URL('../src/session-blocks.css', import.meta.url),
     new URL('../src/nodes.css', import.meta.url),
     new URL('../src/settings.css', import.meta.url),
+    new URL('../src/theme-settings.css', import.meta.url),
   ];
-  // 外壳组件、系统更新弹窗、账号页、请求 / 代理 / 令牌 / 会话封禁四页、节点管理与系统设置及其子组件与组件库同样只取 token。
+  // 外壳组件、系统更新弹窗、账号页、请求 / 代理 / 令牌 / 会话封禁四页、节点管理、系统设置、主题设置及其子组件与组件库同样只取 token。
   const shell = ['Dashboard.vue', 'AppNavigation.vue', 'Login.vue', 'SystemUpdateDialog.vue', 'Accounts.vue', 'AgyAccountUsage.vue', 'AgyQuotaRow.vue', 'UsageWindowStats.vue', 'SchedulingDetails.vue', 'ProxyPicker.vue', 'PlatformBadge.vue', 'runtime/ExecutionNodeBadge.vue',
     'RequestDiagnostics.vue', 'NativeStageDetails.vue', 'AccountFilterSelect.vue', 'Proxies.vue', 'Tokens.vue', 'AccountScopePicker.vue', 'SessionPolicyBlocks.vue',
-    'Nodes.vue', 'runtime/AccountNodeSelector.vue', 'runtime/AccountNodeMigration.vue', 'Settings.vue'].map(name => new URL(`../src/components/${name}`, import.meta.url));
+    'Nodes.vue', 'runtime/AccountNodeSelector.vue', 'runtime/AccountNodeMigration.vue', 'Settings.vue', 'ThemeSettings.vue', 'theme/ThemePreview.vue'].map(name => new URL(`../src/components/${name}`, import.meta.url));
   const problems = [];
   for (const file of [...sheets, ...shell, ...sourceFiles(uiRoot)]) {
     const text = readFileSync(file, 'utf8');
