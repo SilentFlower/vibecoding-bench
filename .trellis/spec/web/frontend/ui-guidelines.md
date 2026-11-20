@@ -337,6 +337,10 @@ python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录
 - `update-steps.test.mjs`：正向含迁移、维护中进行中与待执行、越过取消边界的切换合并、无快照部署、恢复路径、旧操作无 `steps`、未知阶段、截断记录。
 - `verify_update_design.py`、`verify_system_update_browser.py`（需先构建）：前者对设计稿 `#update`、`#update-progress` 比对 45 项计算样式并检查说明展开、转义与零写入；后者覆盖版本记录与嵌套确认 Esc、居中与矮视口、直接安装默认 60 秒 / 30 分钟 1800 秒 / 双击幂等、步骤与时间、断线重连、快照与迁移、数据恢复、完成与刷新、409、未接入、回退与取消等待、等待对账与恢复。
 - 迁移期改造旧原型对比脚本：组件库负责的属性在脚本内用 `component_keys`（采样名 → 属性集合）跳过，并注明已由 `verify_ui_kit.py` 覆盖；页面级属性继续与旧原型比对。写死的组件颜色改为在被测节点内插入探针元素读取 token 实际渲染值（`verify_shared_pagination.py::token`），不得把旧色值改成新色值再写死。业务断言不放宽。外壳尺寸（侧栏宽、内容区边距）推算出的页面宽度断言改为读取实际值（如卡片区铺满 `#console-content` 内容宽度、右边距等于其实际 `padding-right`），外壳本身由 `verify_ui_shell.py` 对照设计稿核对。
+- 脚本读取气泡与弹窗的约定：
+  - `InfoTooltip`、`ExecutionNodeBadge` 的气泡内容先悬停触发器，再读 `.fui-info-content`（例如请求列表 `tbody .request-account-identity button` 后的账号邮箱、执行节点徽标后的 `code` 节点键），读完用 `Escape` 加 `page.mouse.move(0, 0)` 收起。不要用 `get_by_role('tooltip')`：reka 的 `role=tooltip` 只是视觉隐藏的纯文本副本，不含 `code` 等子元素。
+  - `ModalDialog` 的内容层带 `duration-200`（`DialogContent.vue`，0.2s 且不限定属性），`set_viewport_size` 后立即截图会拍到弹窗宽度与位置变化的中途，须传 `animations='disabled'`。
+  - 夹具数量会被继承链改写（如 `TokenDesignFixture` 把账号补到 101 个），分页期望从 `len(fixture.accounts)` 等实际数据算出，不写死条数。
 - 运行环境：`verify_shared_pagination.py`、`verify_page_sizes.py`、`verify_task_account_config.py` 会导入 `services/orchestrator` 的测试夹具，需先安装 `services/orchestrator/requirements.txt`（含 `docker`、`sse-starlette`）；`verify_task_account_config.py` 另需 `PYTHONPATH=services/orchestrator`。`verify_management_polish.py` 必须传 `--output`，`verify_system_update_browser.py` 同样需要 `--output`。合成夹具（`verify_environment_ui.Fixture` 一系）只响应已登记的页面地址：`/session-blocks`、`/nodes` 等页面须从 `/` 经侧栏链接进入，直接 `goto` 会因 `dist/<路径>` 不存在而超时；夹具缺的接口在脚本内的子类夹具补齐（如 `verify_ui_shell.py::ShellFixture` 补 `/admin/session-policy-blocks`、`/runtime/api/nodes`）。
 
 - `verify_ui_controls.py`验证真实Vue组件：数字上下界、空值、小数步长、禁用；空选项原值、菜单键盘与禁用选项；搜索焦点、输入法、清空；气泡和原生dialog浮层；720/390px与触屏。测试不得发业务API请求。

@@ -55,13 +55,14 @@ async def main():
         assert await edit.evaluate(get,['backgroundColor','color'])=={'backgroundColor':await token(page,'--ui-color-fill'),'color':await token(page,'--ui-color-text')};hover.append('卡片编辑')
         routing=page.locator('.account-routing button').first;await routing.hover()
         assert await routing.locator('strong svg').evaluate("e=>getComputedStyle(e).color")==await token(page,'--ui-color-primary-text');hover.append('调度优先级')
+        # 新建账号授权按多平台合同总带授权平台（默认 Claude Code）；未绑定账号时不带 account_id。
         await page.get_by_role('button',name='授权登录',exact=True).click();dialog=page.locator('.approved-oauth-dialog')
         await dialog.locator('.proxy-picker-trigger').click();popup=page.locator('.proxy-picker-popup');await popup.get_by_role('searchbox',name='搜索代理线路',exact=True).fill('线路 21');await popup.get_by_role('button',name=re.compile('线路 21')).click()
         assert not fixture.writes
-        await dialog.get_by_role('button',name='生成授权链接',exact=True).click();await expect(dialog.get_by_role('link',name='点击打开授权页面 ↗')).to_be_visible();assert fixture.writes[-1]['body']=={'proxy_id':'proxy-21','proxy_revision':'revision-1'}
+        await dialog.get_by_role('button',name='生成授权链接',exact=True).click();await expect(dialog.get_by_role('link',name='点击打开授权页面 ↗')).to_be_visible();assert fixture.writes[-1]['body']=={'proxy_id':'proxy-21','proxy_revision':'revision-1','platform':'claude_code'}
         await dialog.get_by_label('授权码',exact=True).fill('synthetic-code');await dialog.get_by_role('button',name='完成授权',exact=True).click();await dialog.get_by_role('button',name='填入账号配置',exact=True).click();workspace=page.locator('.account-workspace');await expect(workspace.locator('.proxy-picker-trigger')).to_contain_text('线路 21')
         assert not any(item['path']=='/admin/accounts' and item['method']=='POST' for item in fixture.writes)
-        await page.keyboard.press('Escape');await page.get_by_role('button',name='授权登录',exact=True).click();await dialog.get_by_role('button',name='生成授权链接',exact=True).click();assert fixture.writes[-1]['body']=={};await page.keyboard.press('Escape')
+        await page.keyboard.press('Escape');await page.get_by_role('button',name='授权登录',exact=True).click();await dialog.get_by_role('button',name='生成授权链接',exact=True).click();assert fixture.writes[-1]['body']=={'platform':'claude_code'};await page.keyboard.press('Escape')
         assert not errors,errors
         result={'passed':True,'layout':layout,'bubble_styles':actual,'hover':hover,'oauth':['跨页搜索','目录ID提交','授权后回填','取消零创建','直连'],'errors':errors}
         (out/'verification.json').write_text(json.dumps(result,ensure_ascii=False,indent=2));print(json.dumps(result,ensure_ascii=False));await browser.close()

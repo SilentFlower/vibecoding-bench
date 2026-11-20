@@ -472,7 +472,11 @@ async def run(output):
             await expect(page.locator('tbody time')).not_to_contain_text(zone)
             await verify_request_metadata(page, fixture, expect)
             await expect(page.locator('tbody')).to_contain_text('主用演示账号')
-            await expect(page.locator('tbody')).to_contain_text('primary@example.test')
+            # 列表只显示账号名称，邮箱在资料气泡里（frontend-guidelines「请求账号保留当前名称和邮箱」）。
+            await page.locator('tbody .request-account-identity button').first.hover()
+            await expect(page.locator('.fui-info-content')).to_contain_text('primary@example.test')
+            await page.keyboard.press('Escape')
+            await page.mouse.move(0, 0)
             await page.get_by_role('button', name='详情', exact=True).click()
             await expect(page.get_by_role('tabpanel')).to_contain_text(zone)
             await expect(page.locator('.request-attempt-summary')).to_contain_text('采集已关闭')
@@ -485,11 +489,15 @@ async def run(output):
             for width in [1280, 390]:
                 await page.set_viewport_size({'width': width, 'height': 1000})
                 assert await page.locator('html').evaluate('node=>node.scrollWidth<=innerWidth')
-                await page.screenshot(path=str(output / f'request-detail-{width}-{theme}.png'))
+                await page.screenshot(path=str(output / f'request-detail-{width}-{theme}.png'), animations='disabled')
             await page.get_by_role('tab', name='概览', exact=True).click()
             await page.get_by_role('link', name='内容采集设置',exact=True).click()
             await expect(page.locator('.environment-rich')).to_have_count(1)
-            await expect(page.locator('.environment-rich h2')).to_have_text('演示环境 A')
+            # 环境标题后带平台徽标：标题自身文字与卡片无障碍名称都精确等于环境名，徽标单独核对。
+            await expect(page.locator('.environment-rich')).to_have_attribute('aria-label', '演示环境 A')
+            heading = page.locator('.environment-rich h2')
+            assert await heading.evaluate("node=>[...node.childNodes].filter(child=>child.nodeType===Node.TEXT_NODE).map(child=>child.textContent).join('').trim()") == '演示环境 A'
+            await expect(heading.locator('[data-platform-badge]')).to_have_text('Claude Code')
             assert 'gateway_account=11' in page.url
             await page.get_by_role('button', name='显示全部环境').click()
             await expect(page.locator('.environment-rich')).to_have_count(4)
@@ -535,7 +543,10 @@ async def run(output):
             for width in [1280, 390]:
                 await page.set_viewport_size({'width': width, 'height': 1000})
                 await expect(page.locator('tbody')).to_contain_text(fixture.diagnostic_account['account_name'])
-                await expect(page.locator('tbody')).to_contain_text(fixture.diagnostic_account['account_email'])
+                await page.locator('tbody .request-account-identity button').first.hover()
+                await expect(page.locator('.fui-info-content')).to_contain_text(fixture.diagnostic_account['account_email'])
+                await page.keyboard.press('Escape')
+                await page.mouse.move(0, 0)
                 assert await page.locator('html').evaluate('node=>node.scrollWidth<=innerWidth')
                 await page.get_by_role('button', name='详情', exact=True).click()
                 for tab in ['概览', '请求链路', '性能']:
