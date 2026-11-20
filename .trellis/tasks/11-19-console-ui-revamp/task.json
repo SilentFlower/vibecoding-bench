@@ -1,0 +1,51 @@
+{
+  "id": "console-ui-revamp",
+  "name": "console-ui-revamp",
+  "title": "控制台 UI 改版（第二版定稿落地）",
+  "description": "按已定稿的第二版设计稿（research/design-v2/）统一控制台视觉与组件：token 收敛、白色侧栏与通用组件、系统更新改弹窗、新增主题设置、各页迁移与原生页对齐。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "web",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-19",
+  "completedAt": "2026-11-20",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-20T13:33:54Z",
+    "blockers": []
+  },
+  "branch": "feat/console-ui-revamp",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "11-19-console-ui-kit",
+    "11-19-console-ui-shell",
+    "11-19-console-update-dialog",
+    "11-19-console-ui-pages",
+    "11-19-console-theme-settings",
+    "11-19-console-ui-native-pages",
+    "11-19-console-dark-mode"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-20T13:33:54Z",
+    "completedSteps": [
+      "清除旧原型、旧 token 层、lucide 依赖与死类，代理图标改用 sprite",
+      "规范改为单一第二版基准并写入 6 条设计决定与旧层删除合同",
+      "69 个 UI 脚本回归、浅色深色逐像素比对与截图矩阵对照完成",
+      "Check-All full 严格通过，规范同步完成"
+    ],
+    "partialStep": null,
+    "nextStep": "决定 feat/console-ui-revamp 合并回 flower2api 与发版；部署后在深色下核对真实 Claude CLI 授权终端",
+    "notes": "控制台 UI 改版 7 个子任务与父任务最终复核均已完成；8 个旧任务的归档移动保留未提交。"
+  }
+}
