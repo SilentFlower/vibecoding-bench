@@ -80,7 +80,7 @@ onUnmounted(() => { alive = false; generation++; request?.abort(); lifecycle.abo
       <ChoiceSelect :model-value="selectedAccount || undefined" label="账号" :options="accountOptions" :disabled="saving || migrationBusy" placeholder="选择账号" @update:model-value="selectedAccount = $event" />
       <ChoiceSelect :model-value="displayedNode" label="执行节点" :options="nodeOptions" :disabled="selectedAgy || saving || migrationBusy || loading || !assignment" placeholder="选择已准备的节点" @update:model-value="selectedNode = $event" />
     </div>
-    <p v-if="selectedAgy">当前节点：{{ localNode?.name ?? '默认本机' }} · 反重力 API 执行</p>
+    <p v-if="selectedAgy">当前节点：{{ localNode?.name ?? '默认本机' }} · 反重力 API 目前仅支持本机执行</p>
     <p v-if="assignment">当前节点：{{ assignment.node_name }} · {{ assignment.phase === 'ready' ? '归属已保存' : '正在维护核对' }}<span v-if="!assignment.enabled"> · 已暂停接单</span></p>
     <p v-if="loading" role="status">正在读取当前归属…</p>
     <p v-if="message" role="status">{{ message }}</p>

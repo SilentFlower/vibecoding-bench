@@ -97,6 +97,16 @@ def summary(runtime, row: dict) -> dict:
     """复用环境卡片并只读实际发送器观测。@param runtime 现有运行时。@param row AGY归属环境。@return 脱敏环境投影。"""
     result=dict(row)
     result['fingerprint']=json.loads(result.pop('fingerprint_json'))
+    connection = runtime.database()
+    try:
+        # 网关账号 ID 与任务账号 ID 各自独立。AGY 的执行归属取固定本机节点。
+        local = connection.execute("SELECT id AS node_id,node_key,name AS node_name,kind,enabled FROM cluster_nodes "
+            "WHERE node_key='local' AND kind='local' AND deleted_at IS NULL").fetchone()
+    finally:
+        connection.close()
+    if local is not None:
+        result['node'] = {**dict(local), 'enabled': bool(local['enabled'])}
+        result['node_message'] = '反重力 API 在本机执行'
     result.update(role_status=runtime.role_status(row),request_backend='agy159',run_window=None,
         can_reprofile=False,reprofile_message='AGY环境按网关账号管理',identity_status='AGY账号独立OAuth HOME',
         native_preparation=None,native_kernel=None,native_kernels=None,cli_versions=[],criu=None,

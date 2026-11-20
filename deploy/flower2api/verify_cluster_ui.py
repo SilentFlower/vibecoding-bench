@@ -184,7 +184,7 @@ async def run(output: Path, gateway: Path) -> dict:
         await expect(page.locator('.nodes-summary')).to_contain_text('3 个归属账号')
         await select(page, '账号', '合成反重力（反重力 · 已停用）')
         await expect(page.get_by_role('combobox', name='执行节点')).to_be_disabled()
-        await expect(page.locator('.account-node-selector')).to_contain_text('当前节点：默认节点 · 反重力 API 执行')
+        await expect(page.locator('.account-node-selector')).to_contain_text('当前节点：默认节点 · 反重力 API 目前仅支持本机执行')
         await expect(page.get_by_role('button', name='保存首次执行节点')).to_have_count(0)
         assert not fixture.assignment_reads and not fixture.writes
         await node_card.get_by_role('button', name='检查并同步组件', exact=True).click()

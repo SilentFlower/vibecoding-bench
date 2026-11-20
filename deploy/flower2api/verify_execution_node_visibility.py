@@ -33,7 +33,9 @@ class ExecutionNodeFixture(AccountDesignFixture):
             account = self.task_accounts[min(index, 2)]
             row.update(gateway_account_id=index + 1, node=account['node'], node_observed=index == 0)
             if index == 1:
-                row.update(state='node_unreachable', node_message='所属节点暂不可达，保留已保存归属')
+                row.pop('node_observed')
+                row.update(account_id=None, node=dict(node_id=1, node_key='local', node_name='本机执行节点',
+                    kind='local', enabled=True), node_message='反重力 API 在本机执行')
         self.attempts = [dict(attempt_id=f'{index}' * 8 + '-1111-4111-8111-' + f'{index}' * 12,
             ordinal=index, account_id=1, account_name='迁移前请求', account_email='history@example.test',
             profile_selection='native293_cc_prepared', status_code=200, outcome='success', capture_status='disabled',
@@ -161,12 +163,12 @@ async def main():
         await page.goto(BASE + '/environments')
         environments = page.locator('.environment-rich')
         await expect(environments).to_have_count(4)
-        await node_details(page, environments.nth(1).locator('[data-execution-node]'), '所属节点暂不可达')
+        await node_details(page, environments.nth(1).locator('[data-execution-node]'), '反重力 API 在本机执行')
         await expect(environments.nth(1).locator('.environment-card-head [data-platform-badge]')).to_have_text('反重力')
-        await expect(environments.nth(1).locator('.environment-card-head [data-execution-node]')).to_have_count(1)
+        await expect(environments.nth(1).locator('.environment-card-head [data-execution-node]')).to_have_text('本机执行节点')
         await snapshot(page, output, 'environments')
         await environments.nth(1).get_by_role('button', name='环境详情', exact=True).click()
-        await node_details(page, page.locator('.runtime-environment-dialog [data-execution-node]'), 'b' * 32)
+        await node_details(page, page.locator('.runtime-environment-dialog [data-execution-node]'), '反重力 API 在本机执行')
         await expect(page.locator('.runtime-environment-dialog')).to_be_visible()
         await snapshot(page, output, 'environment-detail')
         await page.get_by_role('button', name='关闭环境详情', exact=True).click()

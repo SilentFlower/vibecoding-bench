@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from account_runtime import AccountRuntime, derive_v3_fingerprint
-from agy_environment import SOURCE_SHA256, capture, lookup, lookup_environment, maintenance, quiesce, register, sender_config, transport
+from agy_environment import SOURCE_SHA256, capture, lookup, lookup_environment, maintenance, quiesce, register, sender_config, summary, transport
 from agy_kernel import activate, catalog, module_root, selection, stage, work_root
 from cluster_service import ClusterService
 from cluster_store import ClusterStore
@@ -61,6 +61,22 @@ class AgyEnvironmentTests(unittest.TestCase):
             self.assertEqual(migration_plan(connection)['current_version'],5)
         finally:
             connection.close()
+
+    def test_stopped_environment_shows_configured_local_node(self):
+        """停止的环境也显示本机归属，实际进程状态沿原取值。@return 无。"""
+        row = register(self.runtime, 17)
+        connection = self.database()
+        try:
+            connection.execute("UPDATE cluster_nodes SET name=? WHERE node_key='local'", ('合成中央节点',))
+            node_id = connection.execute("SELECT id FROM cluster_nodes WHERE node_key='local'").fetchone()['id']
+            connection.commit()
+        finally:
+            connection.close()
+        with patch.object(self.runtime, 'role_status', return_value={'sender': 'stopped'}):
+            result = summary(self.runtime, row)
+        self.assertEqual(result['node'], {'node_id': node_id, 'node_key': 'local',
+            'node_name': '合成中央节点', 'kind': 'local', 'enabled': True})
+        self.assertEqual(result['agy_runtime']['state'], 'sleeping')
 
     def test_finite_resources_stay_inside_original_total(self):
         """AGY物理进程上限沿账号并发，有限RAM不足在创建前拒绝。@return 无。"""
