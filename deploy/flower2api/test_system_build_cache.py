@@ -29,7 +29,7 @@ class BuildCacheTests(unittest.TestCase):
         self.assertNotIn('--cache-to', arguments)
 
     def test_roles_import_separately_and_only_trusted_jobs_export(self) -> None:
-        """PR与非受信事件只读缓存，两个角色分别导入并导出。@return None。"""
+        """PR与非受信事件只读缓存，编译和两类镜像分开导入与导出。@return None。"""
         environment = {'FLOWER2API_BUILDX_BUILDER': 'synthetic',
             'FLOWER2API_BUILD_CACHE_SCOPE': 'synthetic-scope',
             'FLOWER2API_BUILD_CACHE_WRITE': 'true', 'ACTIONS_RUNTIME_TOKEN': 'synthetic-secret',
@@ -43,16 +43,18 @@ class BuildCacheTests(unittest.TestCase):
                 ({'GITHUB_REF': 'refs/heads/untrusted'}, False),
                 ({'FLOWER2API_BUILD_CACHE_WRITE': 'false'}, False)):
             with self.subTest(changes=changes), patch.dict(os.environ, environment | changes, clear=True):
-                for role in ('control', 'account'):
+                for role in ('control', 'account', 'compiled-artifacts'):
                     arguments = manage._build_arguments(role)
                     cache = arguments[arguments.index('--cache-from') + 1]
                     self.assertIn('version=2', cache)
                     self.assertIn('scope=synthetic-scope-' + role, cache)
+                    self.assertEqual('--load' in arguments, role != 'compiled-artifacts')
                     self.assertEqual('--cache-to' in arguments, writable)
                     self.assertNotIn('--push', arguments)
                     self.assertNotIn('synthetic-secret', ' '.join(arguments))
                     if writable:
                         exported = arguments[arguments.index('--cache-to') + 1]
+                        self.assertIn('scope=synthetic-scope-' + role, exported)
                         self.assertIn('ignore-error=true', exported)
 
     def test_invalid_configuration_stops_before_snapshot_or_docker(self) -> None:

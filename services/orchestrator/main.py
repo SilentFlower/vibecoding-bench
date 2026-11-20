@@ -14347,7 +14347,18 @@ def v3_environments() -> list[dict]:
     with ThreadPoolExecutor(max_workers=min(3, len(rows)), thread_name_prefix='environment-summary') as pool:
         futures = [pool.submit(copy_context().run, _v3_environment_summary, row, ownerships,
             native_preparations, native_preparation_error) for row in rows]
-        return [future.result() for future in futures]
+        environments = [future.result() for future in futures]
+    agy_environments = [row for row in environments if row.get('platform') == 'antigravity']
+    if agy_environments and cc2api_client:
+        try:
+            names = {account['id']: account['name'] for account in cc2api_client.list_accounts()
+                if account.get('platform') == 'antigravity' and type(account.get('id')) is int
+                and isinstance(account.get('name'), str) and account['name']}
+        except (ConnectionError, ValueError):
+            names = {}
+        for row in agy_environments:
+            row['gateway_account_name'] = names.get(row['gateway_account_id'])
+    return environments
 
 
 @app.post("/api/environments/{environment_id}/physical-features/refresh")

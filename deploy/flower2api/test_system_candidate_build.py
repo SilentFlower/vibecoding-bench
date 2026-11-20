@@ -336,6 +336,15 @@ class CandidateBuildTests(unittest.TestCase):
             subprocess.run(['docker', 'image', 'rm', entry['reference']], check=True, capture_output=True)
             self.assertIsNone(inspect(entry['reference']))
         self.folder = self.root / 'exported'
+        from system_release import data_contracts
+
+        contracts = data_contracts(manage.REPO)
+        evidence = {'schema_version': 1, 'revision': self.manifest['parent_revision'],
+            'images': {role: entry['config_digest'] for role, entry in self.manifest['images'].items()},
+            'target_contracts': contracts, 'sources': [{'release': 'system-ci-123-1', 'manifest_sha256': 'b' * 64,
+                'control_digest': 'sha256:' + 'c' * 64, 'contracts': contracts, 'checks': {
+                    'upgrade': True, 'candidate_read_write': True, 'previous_read_write': True, 'idempotent': True}}]}
+        (self.folder / images.EVIDENCE_NAME).write_text(json.dumps(evidence))
         self.run['id'] = origin
         self.artifact['name'] = f'v3-candidate-{origin}-1'
         self.artifact['workflow_run']['id'] = origin
@@ -345,10 +354,13 @@ class CandidateBuildTests(unittest.TestCase):
             path.write_bytes(raw)
         with patch.dict(os.environ, {'GITHUB_RUN_ID': str(target)}):
             output = self.root / 'adopted.json'
+            migrated = self.root / 'formal-evidence.json'
             with patch.object(artifacts, 'check_checkout'), patch.object(artifacts, 'github_json', side_effect=self.api), \
                     patch.object(artifacts, 'download_archive', side_effect=download):
-                self.assertTrue(artifacts.resolve_candidate(output, 0))
+                self.assertTrue(artifacts.resolve_candidate(output, 0, evidence_path=migrated))
             adopted = json.loads(output.read_text())
+            self.assertEqual(json.loads(migrated.read_text()), {**evidence,
+                'images': {role: entry['config_digest'] for role, entry in adopted['images'].items()}})
             self.assertEqual(f'ci-{target}-2', adopted['release'])
             self.assertEqual(self.manifest['source_content_sha256'], adopted['source_content_sha256'])
             for role in ('control', 'account'):

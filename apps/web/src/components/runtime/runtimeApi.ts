@@ -49,6 +49,7 @@ export interface RuntimeEnvironment {
   node?: Pick<AccountNodeAssignment, 'node_id' | 'node_key' | 'node_name' | 'kind' | 'enabled'>; node_observed?: boolean; node_message?: string;
   login_draft?: boolean;
   environment_id: string; name: string; account_id: number | null; gateway_account_id?: number | null;
+  gateway_account_name?: string | null;
   generation: number; state: string; busy: boolean; isolation_version?: number; identity_status?: string;
   fingerprint?: { tz?: string; mem?: string; hostname?: string; lang?: string; profile_version?: number };
   role_status?: Partial<Record<'cli' | 'sender' | 'network', string>>; cli_versions?: string[];

@@ -62,6 +62,38 @@ class CompatibilitySourceTests(unittest.TestCase):
 class CompatibilityConcurrencyTests(unittest.TestCase):
     """通过真实线程调度核验并发、结果顺序和失败收口。"""
 
+    def test_reuses_only_evidence_matching_current_signed_sources(self) -> None:
+        """同批同目录复用，目录变化或验收失败时走真实演练入口。@return 无。"""
+        contracts = {'bench': 'a' * 64, 'gateway': 'b' * 64}
+        digests = {'control': 'sha256:' + 'c' * 64, 'account': 'sha256:' + 'd' * 64}
+        revision = 'f' * 40
+        release = {'release': 'system-ci-123-1', 'control': {'config_digest': 'sha256:' + 'e' * 64},
+            'data_compatibility': {name: {'contract': value} for name, value in contracts.items()}}
+        raw = b'synthetic signed source'
+        proof = {**verifier._source_identity(release, raw),
+            'checks': {'upgrade': True, 'candidate_read_write': True, 'previous_read_write': True, 'idempotent': True}}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest, candidate, output = (root / name for name in ('build.json', 'candidate.json', 'result.json'))
+            manifest.write_text(json.dumps({'parent_revision': revision, 'images': {
+                role: {'reference': role, 'config_digest': digest} for role, digest in digests.items()}}))
+            for entry, images, reused in [(proof, digests, True), (dict(proof, manifest_sha256='0' * 64), digests, False),
+                    (dict(proof, checks={**proof['checks'], 'idempotent': False}), digests, False),
+                    (proof, {**digests, 'account': digests['control']}, False)]:
+                evidence = {'schema_version': 1, 'revision': revision, 'images': images,
+                    'target_contracts': contracts, 'sources': [entry]}
+                candidate.write_text(json.dumps(evidence))
+                with patch.object(verifier, '_sources', return_value=[(release, raw)]), \
+                        patch.object(verifier, 'data_contracts', return_value=contracts), \
+                        patch.object(verifier, 'migration_registries', return_value={}), \
+                        patch.object(verifier, 'image_identity', return_value='synthetic'), \
+                        patch.object(verifier, '_verify_source', return_value=(proof, 0)) as run:
+                    result = verifier.verify(manifest, 'synthetic', output, history_root=root, reuse=candidate)
+                self.assertEqual(run.call_count, int(not reused))
+                self.assertEqual(result['images'], digests)
+                self.assertEqual(result['sources'], [proof])
+                self.assertEqual(json.loads(output.read_text()), result)
+
     def run_verification(self, root: Path, worker, *, workers: int | None = None) -> dict:
         """隔离外部来源和Docker操作，运行真实协调逻辑。
 

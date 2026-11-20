@@ -271,12 +271,23 @@ class Supervisor:
         self.reaper.start()
 
     def reap_idle(self):
-        """只回收闲置五分钟的物理worker，工具等待保持原截止。@return 无。"""
+        """回收重复或过期的空闲进程，保留同身份最近使用的热进程。@return 无。"""
         while True:
             with self.condition:
                 if self.closed:
                     return
-                idle=[worker for worker in self.workers if not worker.busy and time.monotonic()-worker.last_used>=300]
+                now = time.monotonic()
+                idle = []
+                retained = set()
+                # 工具等待和正在预热的 worker 仍持有独占标志；仅回收已归还的空闲进程。
+                for worker in sorted(self.workers, key=lambda item: item.last_used, reverse=True):
+                    if worker.busy:
+                        continue
+                    if (now - worker.last_used >= 300 or worker.key in retained
+                            or worker.process is None or worker.process.poll() is not None):
+                        idle.append(worker)
+                    else:
+                        retained.add(worker.key)
                 for worker in idle:
                     worker.busy=True
                 if not idle:

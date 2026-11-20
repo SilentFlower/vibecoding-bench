@@ -292,6 +292,34 @@ class AgyRuntimeTests(unittest.TestCase):
                         if mode=='capacity':factory.assert_not_called()
                         else:self.assertTrue(spare.closed)
 
+    def test_reaper_keeps_one_recent_idle_worker_per_identity(self):
+        """同身份保留一个较新热进程，工具轮和其他模型各自保留。@return 无。"""
+        supervisor = Supervisor.__new__(Supervisor)
+        supervisor.condition = threading.Condition()
+        supervisor.closed = False
+        released = threading.Event()
+        now = time.monotonic()
+
+        def worker(key, age, busy=False):
+            """构造活进程或占用中的原工具进程。@param key 复用键。@param age 空闲时长。@param busy 是否独占。@return 测试进程。"""
+            return SimpleNamespace(key=key, last_used=now-age, busy=busy, process=SimpleNamespace(poll=lambda: None),
+                close=released.set)
+
+        old, current, tool, other = worker('same', 2), worker('same', 1), worker('same', 0, True), worker('other', 3)
+        supervisor.workers = [old, current, tool, other]
+        thread = threading.Thread(target=supervisor.reap_idle, daemon=True)
+        thread.start()
+        try:
+            self.assertTrue(released.wait(2))
+            with supervisor.condition:
+                self.assertTrue(supervisor.condition.wait_for(lambda: old not in supervisor.workers, timeout=2))
+                self.assertEqual(supervisor.workers, [current, tool, other])
+        finally:
+            with supervisor.condition:
+                supervisor.closed = True
+                supervisor.condition.notify_all()
+            thread.join(2)
+
     def test_kernel_completion_reaches_real_tool_broker_once(self):
         """真实Kernel与Broker方法接线把结果交还原待处理项，错误ID和重复回填拒绝。@return 无。"""
         body={'contents':[{'role':'user','parts':[{'text':'合成问题'}]}]}

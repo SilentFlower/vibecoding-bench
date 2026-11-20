@@ -457,11 +457,11 @@ def restore_upstream_checkout_bytes(root: Path) -> list[str]:
 def _build_arguments(role: str) -> list[str]:
     """选择本地或 CI 构建驱动，缓存鉴权仅从进程环境读取。
 
-    :param role: control 或 account，用于隔离两类镜像的层缓存。
+    :param role: control、account 或 compiled-artifacts，用于隔离不同构建目标的层缓存。
     :return: 不含源快照、标签及秘密的构建命令前缀。
     """
-    if role not in ('control', 'account'):
-        raise ValueError('构建角色无效')
+    if role not in ('control', 'account', 'compiled-artifacts'):
+        raise ValueError('构建目标无效')
     builder = os.environ.get('FLOWER2API_BUILDX_BUILDER', '')
     scope = os.environ.get('FLOWER2API_BUILD_CACHE_SCOPE', '')
     write = os.environ.get('FLOWER2API_BUILD_CACHE_WRITE', 'false')
@@ -472,13 +472,15 @@ def _build_arguments(role: str) -> list[str]:
         raise ValueError('构建缓存写入开关无效')
     if not builder:
         return ['docker', 'build']
-    arguments = ['docker', 'buildx', 'build', '--builder', builder, '--load', '--progress', 'plain']
+    arguments = ['docker', 'buildx', 'build', '--builder', builder, '--progress', 'plain']
+    if role != 'compiled-artifacts':
+        arguments.append('--load')
     if not scope:
         return arguments
     if not all(os.environ.get(name) for name in ('ACTIONS_RUNTIME_TOKEN', 'ACTIONS_RESULTS_URL')):
         print('GitHub缓存上下文不可用，本次构建使用本机缓存。', file=sys.stderr)
         return arguments
-    # 镜像角色分开保存，避免 account 的导出覆盖 control 专属构建层。
+    # 编译与镜像封装分开保存，避免封装缓存覆盖编译层。
     cache = f'type=gha,version=2,scope={scope}-{role}'
     arguments += ['--cache-from', cache + ',timeout=2m']
     trusted = (os.environ.get('GITHUB_ACTIONS') == 'true'
@@ -490,25 +492,29 @@ def _build_arguments(role: str) -> list[str]:
     return arguments
 
 
-def build(release: str, manifest_path: Path) -> None:
+def build(release: str, manifest_path: Path, *, prebuilt: bool = True) -> None:
     """构建两个最终镜像，完成后生成可核对的联合清单。
 
     :param release: 仅用于 v3 的唯一批次名
     :param manifest_path: 新清单路径
+    :param prebuilt: 从当次源码快照先导出编译产物，再封装两个镜像。
     :return: None
     """
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", release):
         raise ValueError("批次名不合法")
     # 先校验缓存设置，配置错误不能在快照或 Docker 操作之后才暴露。
     build_commands = {role: _build_arguments(role) for role in ('control', 'account')}
+    compiler = _build_arguments('compiled-artifacts') if prebuilt else []
     parent = command("git", "rev-parse", "HEAD", capture=True).strip()
     platform_version = read_version(source_path(REPO, 'deploy/v3/platform-release.json'))['version']
     gateway = parent
     dirty = bool(command("git", "status", "--porcelain", capture=True).strip())
     if manifest_path.exists():
         raise ValueError("版本清单已经存在，禁止覆盖批次")
+    build_started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="vibebench-v3-source-") as temporary:
-        snapshot = Path(temporary)
+        snapshot = Path(temporary) / 'source'
+        snapshot.mkdir()
         folders = ("cc2api/src", "cc2api/vendor", "cc2api/craftls", "cc2api/web", "images/account",
             "images/sidecar", "images/worker", "images/v3", "images/pi-agent", "orchestrator", "webui", "project_library",
             "research/github-projects")
@@ -533,6 +539,17 @@ def build(release: str, manifest_path: Path) -> None:
         source_hash = digest.hexdigest()
         # 在 COPY 前去重，避免先写入镜像层再删除仍保留完整下层副本。
         deduplicate_immutable_tree(snapshot / 'project_library')
+        dockerfile = str(snapshot / 'images/v3/Dockerfile')
+        contexts = []
+        if prebuilt:
+            # 编译结果只在当次构建使用，和封装共用同一份快照，不接受外部传入的目录。
+            artifacts = snapshot.parent / 'compiled-artifacts'
+            started = time.monotonic()
+            command(*compiler, '-f', dockerfile, '--target', 'compiled-artifacts',
+                '--output', f'type=local,dest={artifacts}', str(snapshot))
+            contexts = ['--build-context', f'compiled-artifacts={artifacts}']
+            print(json.dumps({'event': 'flower2api-build-precompiled',
+                'seconds': round(time.monotonic() - started, 3)}), flush=True)
         images = {}
         for role in ("control", "account"):
             reference = image_reference(role, release)
@@ -541,7 +558,7 @@ def build(release: str, manifest_path: Path) -> None:
             started = time.monotonic()
             control_labels = (['--label', 'vibebench.cli-scratchpad-storage=1']
                 if role == 'control' and (snapshot / 'orchestrator/cli_scratchpad.py').is_file() else [])
-            command(*build_commands[role], *control_labels, "-f", str(snapshot / "images/v3/Dockerfile"), "--target", role,
+            command(*build_commands[role], *control_labels, *contexts, "-f", dockerfile, "--target", role,
                 "--build-arg", f"V3_RELEASE={release}", "--build-arg", f"V3_PARENT_REV={parent}",
                 "--build-arg", f"V3_GATEWAY_REV={gateway}",
                 "--build-arg", f"V3_AGY_AUTH_SHA256={agy_auth['sha256']}",
@@ -564,6 +581,9 @@ def build(release: str, manifest_path: Path) -> None:
             "release": release, "parent_revision": parent, "gateway_revision": gateway,
             "dirty_worktree": dirty, "source_content_sha256": source_hash, "native_runtime": native_runtime, "agy_auth": agy_auth, "images": images}, output, indent=2)
         output.write("\n")
+    print(json.dumps({'event': 'flower2api-build-complete', 'prebuilt': prebuilt,
+        'revision': parent, 'source_content_sha256': source_hash,
+        'seconds': round(time.monotonic() - build_started, 3)}), flush=True)
 
 
 def _manifest_values(manifest_path: Path) -> dict:
@@ -1240,6 +1260,8 @@ def main() -> None:
     parser.add_argument("--env", type=Path)
     parser.add_argument("--release")
     parser.add_argument("--manifest", type=Path)
+    parser.add_argument('--prebuilt', action=argparse.BooleanOptionalAction, default=True,
+        help='默认先编译同源前端和二进制，再封装镜像；使用 --no-prebuilt 切回普通构建')
     parser.add_argument("--output", type=Path)
     parser.add_argument("--bundle", type=Path)
     parser.add_argument("--namespace", default="ghcr.io/silentflower")
@@ -1251,7 +1273,7 @@ def main() -> None:
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     if args.action == "build":
-        build(args.release or uuid.uuid4().hex, args.manifest or REPO / "releases" / "v3.json")
+        build(args.release or uuid.uuid4().hex, args.manifest or REPO / "releases" / "v3.json", prebuilt=args.prebuilt)
         return
     if args.action in ("publish", "pull", "load"):
         if not args.manifest:

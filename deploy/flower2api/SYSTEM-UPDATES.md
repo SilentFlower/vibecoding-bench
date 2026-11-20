@@ -15,11 +15,11 @@
    python3 -c "from pathlib import Path; print(Path('platform-release-public.der').read_bytes()[-32:].hex())"
    ```
 
-2. 将完整 PEM 私钥配置为仓库 Actions secret `V3_SYSTEM_RELEASE_PRIVATE_KEY`。宿主仅安装上述 64 字符公钥。密钥配置由运维单独执行。
+2. 将完整 PEM 私钥配置为仓库 Actions secret `V3_SYSTEM_RELEASE_PRIVATE_KEY`。将同一把 64 字符公钥配置为仓库 Actions variable `V3_SYSTEM_RELEASE_PUBLIC_KEY`，用于受信候选构建的兼容演练。宿主安装同一公钥。
 3. 手动运行 `v3-release.yml`，选择 v3 或 flower2api 并勾选 `publish`。流程联合构建两类镜像，在合成旧库上执行真实候选迁移、重复执行、新旧程序读写和快照恢复演练。证据通过后发布 `system-ci-<run_id>-<attempt>`。v2 发行附件包括 `system-release.json`、`system-release.sig`、`v3.json`、联合镜像包、`database-migrations.json` 和 `database-compatibility.json`。完整附件发布后，CI 原子推进 `updates/v3-migrations` 分支的签名目录。
 4. 保持发行附件与批次不可覆盖。目录有效期为三十天。发布前必须配置有效 Ed25519 签名 secret，流程在构建前核验。
 
-v1 的 `updates/v3` 保持原发行格式并续签三十天有效期。新通道首发承接旧发行引用。每次手动发布对受支持的最近八个来源执行演练，来源清单摘要、实际镜像配置摘要和目标迁移合同一起绑定到签名发行。证据失败会阻断签名发布。
+v1 的 `updates/v3` 保持原发行格式并续签三十天有效期。新通道首发承接旧发行引用。发行证据覆盖受支持的最近八个来源，来源清单摘要、实际镜像配置摘要和目标迁移合同一起绑定到签名发行。真实演练失败会阻断签名发布。
 
 两库合同来自固定迁移登记。普通查询、日志及页面修改保持合同稳定。登记字段为 `id/version/predecessor/checksum/engine/kind/rollback_mode`，当前初始版本为 1。已发布迁移定义及校验和保持不可变。新增建表、补列、索引和回填应增加顺序迁移及固定执行实现，并经 CI 兼容演练。`verify_database_definitions.py` 检查数据库定义所有权和登记摘要。未知及破坏性迁移沿专项维护处理。
 
@@ -39,9 +39,9 @@ v1 的 `updates/v3` 保持原发行格式并续签三十天有效期。新通道
 
 ### 受信候选与发布完成边界
 
-发布侧使用 `actions:read` 读取构建来源和归档。复用仅接受 `v3-build.yml` 中合同校验、镜像构建、AGY 镜像验收、候选导出和候选上传均成功的同一 attempt。仓库、原始仓库ID、分支、SHA、工作流路径、归档ID及GitHub ZIP摘要逐项核对；解包只接受 `candidate.json`、`v3-local.json` 和 `candidate-images.tar.gz` 三份普通文件。候选文件自身的大小和摘要继续独立核对，工作区必须保持同一干净源码。
+发布侧使用 `actions:read` 读取构建来源和归档。复用仅接受 `v3-build.yml` 中合同校验、镜像构建、AGY 镜像验收、候选导出和候选上传均成功的同一 attempt。仓库、原始仓库 ID、分支、SHA、工作流路径、归档 ID 及 GitHub ZIP 摘要逐项核对。解包接受 `candidate.json`、`v3-local.json`、`candidate-images.tar.gz` 及可选的 `database-compatibility.json`。候选镜像和清单的大小与摘要继续独立核对，工作区必须保持同一干净源码。
 
-候选上传完成即可供发布端复用，构建 job 的缓存 post 可继续后台执行。正式发布复用时跳过重复的合同测试、Rust/前端编译、缓存恢复、原生运行时下载和 AGY 镜像验收。完整构建路径会执行实际 AGY 镜像验收。两条路径都对当前镜像运行真实旧库兼容演练。候选换批只允许修改 `vibebench.release`，文件层、平台、环境变量、启动参数和其余标签须完整一致，含 ONBUILD 触发器的镜像拒绝复用。
+候选构建在 AGY 镜像验收期间并行跑真实旧库兼容演练。候选上传完成即可供发布端复用，构建 job 的缓存 post 可继续后台执行。候选换批只允许修改 `vibebench.release`，文件层、平台、环境变量、启动参数和其余标签须完整一致。含 ONBUILD 触发器的镜像拒绝复用。正式发布按当前签名目录核对来源、镜像和合同。有效候选证据随换批重新绑定镜像摘要。证据缺失、演练失败或签名目录变化时，正式发布执行完整演练。线上安装验签并执行升级，演练发生在 CI。
 
 兼容演练通过后，两路镜像推送与离线归档并行执行。任一路失败会等待其余作业退出，保留本attempt的已开始标记；全部通过后才发布完整交付清单。大镜像包只进入正式Release，Actions发行artifact保留诊断清单和兼容证据。签名发行及原子目录发布完成即具备安装条件，构建缓存的后续保存独立收尾。
 
@@ -49,7 +49,7 @@ v1 的 `updates/v3` 保持原发行格式并续签三十天有效期。新通道
 
 ### 构建缓存与兼容演练提速
 
-两个 workflow 共用 `.github/actions/flower2api-build-cache`。Docker 层缓存按平台和 control／account 分开保存；Cargo 的 registry、git 和 target 挂载通过独立缓存恢复。缓存键包含平台、依赖配方和源码指纹，恢复前缀限定同一依赖配方。可信目标分支的 push／手动构建可以保存缓存，PR 采用只读恢复。
+两个 workflow 共用 `.github/actions/flower2api-build-cache`。Docker 层缓存按平台和编译产物、control、account 三个构建目标分开保存。Cargo 的 registry、git 和 target 挂载通过独立缓存恢复。缓存键包含平台、依赖配方和源码指纹，恢复前缀限定同一依赖配方。可信目标分支的 push／手动构建可以保存缓存，PR 采用只读恢复。
 
 缓存准备失败时，工作流记录告警并沿普通 Docker 构建执行。未命中时完整构建。层缓存导入和导出各限两分钟，导出错误单独告警；实际编译、迁移或发布失败继续阻断流程。
 
@@ -62,6 +62,8 @@ v1 的 `updates/v3` 保持原发行格式并续签三十天有效期。新通道
 | `FLOWER2API_BUILD_CACHE_WRITE` | `true`／`false`，默认只读；写入还需满足受信 CI 来源 |
 
 builder 和 scope 仅接受最长 64 字符的字母、数字、下划线、点和连字符名称，首字符须为字母或数字。GHA 鉴权由当前 job 的 runtime 环境提供。缺少缓存 runtime 环境时使用本地 builder 缓存。
+
+`manage.py build` 默认预构建。它从同一源码快照导出 Vue、网关和发送器产物，两类镜像使用这次导出的产物封装。候选和正式发布使用同一默认路径。需要回退或做对照时，使用 `manage.py build --no-prebuilt`。冷暖缓存对照使用两个新建的 Buildx builder，每个 builder 连续跑两次，四次使用不同的 `--release` 和 `--manifest`，保持同一提交及制品，关闭共享 GHA 层缓存。对比 `flower2api-build-complete` 的总耗时、源码版本和源码摘要。预构建路径另用 `flower2api-build-precompiled` 标记编译耗时。
 
 历史双库演练支持 `--workers 1|2|4`，默认串行，正式发布显式使用 `--workers 4`。每路分别拥有独立容器、临时目录、数据库和操作 ID，每个来源保留升级、两次迁移、新旧程序读写及快照恢复。单容器继续限制 768 MiB 内存和 128 个进程，沿用无网络、只读和最小权限参数。任一来源失败后停止排队项，等待已启动项收口，再传播带来源标记的错误。全部成功后按原来源顺序写入证据。
 
