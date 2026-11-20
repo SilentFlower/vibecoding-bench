@@ -2716,6 +2716,7 @@ impl NativePool {
                         .as_ref()
                         .and_then(|native| native.kernel_generation.clone()),
                     warm_hit: worker.ready_at <= received,
+                    start_source: None,
                     preparation_wait_ms,
                     checkout_ms: checkout_started.elapsed().as_millis() as u64,
                     worker_start_ms: (worker.started_at >= checkout_started)
@@ -3319,6 +3320,7 @@ mod tests {
                         worker_pid: pid,
                         kernel_generation: None,
                         warm_hit: true,
+                        start_source: None,
                         preparation_wait_ms: 0,
                         checkout_ms: 0,
                         worker_start_ms: None,
@@ -4314,6 +4316,7 @@ mod tests {
                         worker_pid: 1,
                         kernel_generation: None,
                         warm_hit: true,
+                        start_source: None,
                         preparation_wait_ms: 0,
                         checkout_ms: 0,
                         worker_start_ms: None,

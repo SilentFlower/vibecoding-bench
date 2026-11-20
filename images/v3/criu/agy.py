@@ -1,5 +1,6 @@
 """恢复同一 AGY 内核持有的零业务快照，根权限仅用于固定进程树。"""
 import asyncio
+from contextlib import AsyncExitStack
 import fcntl
 import hashlib
 import json
@@ -126,10 +127,11 @@ class AgyController:
         try:
             if self.template.locked():
                 return
-            async with self.template:
+            async with AsyncExitStack() as reservation:
+                await reservation.enter_async_context(self.template)
                 value = await asyncio.wait_for(receive(connection), 2)
                 kernel, observer, native = await asyncio.to_thread(self.validate, connection, value)
-                await self.transaction(connection, kernel, observer, native)
+                await self.transaction(connection, kernel, observer, native, reservation)
         except (ValueError, OSError, TimeoutError, KeyError, TypeError) as error:
             if str(error) == 'RESTORE_CONNECTION_CLOSED':
                 return
@@ -144,8 +146,9 @@ class AgyController:
             connection.close()
             self.clients.discard(task)
 
-    async def transaction(self, connection: socket.socket, kernel: int, observer: int, native: int) -> None:
-        """保留事件FD，恢复后继续同一个观察器。@param connection 内核连接。@param kernel 原私有进程。@param observer 观察器。@param native 原生进程。@return 无。"""
+    async def transaction(self, connection: socket.socket, kernel: int, observer: int, native: int,
+                          reservation: AsyncExitStack) -> None:
+        """保留事件FD并恢复同一观察器。@param connection 内核连接。@param kernel 内核PID。@param observer 观察器PID。@param native 原生PID。@param reservation 单模板名额。@return 无。"""
         pipes = {}
         source_fd = os.pidfd_open(observer)
         native_fd = None
@@ -205,6 +208,8 @@ class AgyController:
             for descriptor in pipes.values():
                 os.close(descriptor)
             pipes.clear()
+            # 已消费的模板退出竞争。连接继续持有恢复进程的退出责任，避免中断后留下原生进程。
+            await reservation.aclose()
             await send(connection, {'type': 'restored', 'observer': observer, 'native': native, 'restore_ms': restore_ms})
             await asyncio.get_running_loop().sock_recv(connection, 1)
         finally:

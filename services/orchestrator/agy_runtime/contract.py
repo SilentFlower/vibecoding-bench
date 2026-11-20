@@ -5,7 +5,6 @@ import json
 import re
 import uuid
 
-MODEL = None
 CAPABILITIES = {
     'protocol': 'agy-native-stdio', 'schema_version': 1, 'model': None,
     'request': 'gemini_request', 'max_generations': 1,
@@ -58,8 +57,8 @@ def signature(value):
     return value
 
 
-def history_steps(messages):
-    """把受限历史实体映射为已验证的原生步骤。@param messages 历史消息数组。@return 原生步骤。"""
+def history_steps(messages, *, native_model):
+    """把受限历史映射为原生步骤。@param messages 历史消息。@param native_model 本轮执行ID。@return 原生步骤。"""
     if not isinstance(messages,list):raise InputError('invalid_history')
     steps=[];pending={};finished=set()
     for msg in messages:
@@ -90,7 +89,7 @@ def history_steps(messages):
                 planner.update(response=response,modifiedResponse=response)
                 if thinking:planner.update(thinking=thinking,thinkingSignature=signature(msg.get('thinking_signature')))
                 elif 'thinking_signature' in msg:raise InputError('signature_without_thinking')
-            step.update(type='CORTEX_STEP_TYPE_PLANNER_RESPONSE',metadata={'source':'CORTEX_STEP_SOURCE_MODEL','generatorModel':MODEL},plannerResponse=planner)
+            step.update(type='CORTEX_STEP_TYPE_PLANNER_RESPONSE',metadata={'source':'CORTEX_STEP_SOURCE_MODEL','generatorModel':native_model},plannerResponse=planner)
         elif role=='tool':
             fields(msg,{'role','tool_call_id','text'});ident=text(msg.get('tool_call_id'))
             if ident not in pending or ident in finished:raise InputError('unknown_tool_result')
@@ -103,19 +102,21 @@ def history_steps(messages):
     return steps
 
 
-def request(value):
-    """校验私有请求实体。@param value 原始JSON对象。@return 规范化对象。"""
+def request(value, *, fixed_model: tuple[str, str | int] | None = None):
+    """校验私有请求实体。@param value 原始JSON对象。@param fixed_model 独立内核的固定映射。@return 规范化对象。"""
     if isinstance(value,dict) and value.get('type')=='gemini_request':
         from .gemini_contract import decode_request
-        return decode_request(value)
+        return decode_request(value, fixed_model=fixed_model)
     fields(value,{'schema_version','type','request_id','prompt','history','history_id','model','system','tools','max_generations'})
     if type(value.get('schema_version')) is not int or value.get('schema_version')!=1 or value.get('type')!='request':raise InputError('invalid_schema')
     ident=text(value.get('request_id'))
     if not ident or len(ident)>128:raise InputError('invalid_request_id')
     prompt=text(value.get('prompt'))
-    if value.get('model',MODEL)!=MODEL:raise InputError('unsupported_model')
+    if fixed_model is None:raise InputError('unsupported_model')
+    native_model = fixed_model[1]
+    if value.get('model',native_model)!=native_model:raise InputError('unsupported_model')
     if 'history' in value and 'history_id' in value:raise InputError('conflicting_history')
-    messages=value.get('history',[]);history_steps(messages)
+    messages=value.get('history',[]);history_steps(messages,native_model=native_model)
     history_id=value.get('history_id')
     if history_id is not None:
         try:
@@ -126,7 +127,7 @@ def request(value):
     generations=value.get('max_generations',2 if definitions else 1)
     if type(generations) is not int or not 1<=generations<=32:raise InputError('invalid_max_generations')
     return {'schema_changes':changes,'tools':definitions,'max_generations':generations,'request_id':ident,'prompt':prompt,'messages':copy.deepcopy(messages),'history_id':history_id,
-        'system':value.get('system'),'model':MODEL}
+        'system':value.get('system'),'model':native_model}
 
 
 def tools(value, changes=None):

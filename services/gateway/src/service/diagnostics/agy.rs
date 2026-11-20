@@ -734,6 +734,37 @@ mod tests {
         (observer, store, trace)
     }
 
+    /// 保存 AGY 真实恢复观测，兼容版本较旧的执行记录。@return 无。
+    #[tokio::test]
+    async fn keeps_verified_runtime_start_source() {
+        for source in [None, Some("criu_restore"), Some("unverified")] {
+            let (mut observer, store, _) = fixture().await;
+            let worker = Uuid::new_v4().to_string();
+            let generation = Uuid::new_v4().to_string();
+            let mut event = json!({
+                "type": "request_prepared", "worker_id": worker, "generation": generation,
+                "runtime": {"worker_id": worker, "worker_pid": 12, "kernel_generation": generation,
+                    "warm_hit": false, "preparation_wait_ms": 2, "checkout_ms": 310,
+                    "worker_start_ms": 300, "prepared_ms": 330}
+            });
+            if let Some(source) = source {
+                event["runtime"]["start_source"] = json!(source);
+            }
+            observer.native(&event, &json!({}));
+            observer.finish("success", None);
+            store.flush().await.unwrap();
+            let detail = store.detail(&observer.record.request_id).await.unwrap();
+            let runtime = serde_json::to_value(&detail.attempts[0].runtime).unwrap();
+            if source == Some("unverified") {
+                assert!(runtime.is_null());
+            } else {
+                assert_eq!(runtime["worker_pid"], 12);
+                assert_eq!(runtime["checkout_ms"], 310);
+                assert_eq!(runtime["start_source"].as_str(), source);
+            }
+        }
+    }
+
     /// 重复累计帧保留真实零值，异常扩展保持缺口并拒绝字符串。@return 无。
     #[tokio::test]
     async fn source_usage_keeps_zero_maximum_and_unknown_separate() {

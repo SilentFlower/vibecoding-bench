@@ -59,25 +59,34 @@ class WorkerFixture:
         self.process = None
         self.key = owner.worker_key(value)
         self.generation = value['credential_snapshot']['credential_generation']
+        self.credential_expires_at = value['credential_snapshot']['expires_at']
+        self.config = {'credential_generation': self.generation}
         self.events = queue.Queue()
         self.closed = False
         self.busy = True
         self.prewarming = False
+        self.parked = False
+        self.seed_template = False
+        self.start_source = 'exec'
+        self.submissions = []
         self.finish_status = 'completed'
         self.confirm_tool_results = True
         self.criu_failure = None
-        self.ready = {'source_sha256': owner.image_sha, 'native_pid': 123}
+        self.ready = {'source_sha256': owner.image_sha, 'native_pid': 123, 'observer_pid': 124}
         self.last_used = time.monotonic()
 
     def start(self, until):
         """记录真实建代顺序。@param until 截止。@return 无。"""
         self.order.append(('start', self.generation))
+        self.process = SimpleNamespace(pid=125, poll=lambda: 0 if self.closed else None)
+        self.started_at = self.ready_at = time.monotonic()
 
     def send(self, value):
         """按原生工具等待协议产生确定事件。@param value 指令。@return 无。"""
         kind = value['type']
         if kind == 'gemini_request':
             self.current = value['request_id']
+            self.submissions.append((value['model'], value['native_model']))
             self.order.append(('model', self.generation))
             identity = {'request_id': self.current, 'request_seq': 1, 'generation': 'native-generation'}
             self.events.put({'type': 'request_accepted', **identity})
@@ -211,6 +220,19 @@ class AgySupervisorTests(unittest.TestCase):
         with self.assertRaises(InputError):self.supervisor.submit(mutated)
         self.assertEqual(sum(item[0]=='model' for item in WorkerFixture.order),1)
 
+    def test_switching_models_reuses_worker_and_sends_each_frozen_mapping(self):
+        """同账号交替请求不同模型时，进程与请求模型分别复用和校验。@return 无。"""
+        mappings = [('gemini-synthetic', 'MODEL_PLACEHOLDER_M36'), ('claude-synthetic', 320),
+            ('gemini-synthetic', 'MODEL_PLACEHOLDER_M36')]
+        for public, native in mappings:
+            value = self.submission()
+            value.update(model=public, native_model=native)
+            value['body']['contents'] *= 2
+            self.supervisor.submit(value)
+            self.assertEqual(self.output.wait(value['request_id'], 'job_finalized')['status'], 'completed')
+        self.assertEqual(WorkerFixture.order.count(('start', 1)), 1)
+        self.assertEqual(self.supervisor.workers[0].submissions, mappings)
+
     def test_template_credential_rotation_and_restore_fallback_do_not_repeat_generation(self):
         """验证模板换代、回退与唯一投递。@return 无。"""
         for new_generation, should_fail in ((2,False),(2,True),(3,False)):
@@ -232,7 +254,8 @@ class AgySupervisorTests(unittest.TestCase):
                         if should_fail:
                             self.criu_failure={'stage':'checkpoint_restore','reason':'AGY_CRIU_RESTORE'}
                             raise InputError('worker_restore_failed')
-                        self.parked=False
+                        self.events.put({'type': 'criu_restored'})
+                        NativeWorker.resume(self, until)
 
                 # 先回收上一分支的工作进程，避免夹具复用正在检验的池身份。
                 with self.supervisor.condition:
@@ -248,6 +271,7 @@ class AgySupervisorTests(unittest.TestCase):
                     self.assertTrue(self.output.wait(seed['request_id'],'prepared')['native']['template_ready'])
                     self.output.wait(seed['request_id'],'job_finalized')
                     live=self.submission(generation=new_generation)
+                    live.update(model='claude-synthetic', native_model=320)
                     live['body']['contents']*=2
                     self.supervisor.submit(live)
                     self.assertEqual(self.output.wait(live['request_id'],'job_finalized')['status'],'completed')
@@ -255,12 +279,15 @@ class AgySupervisorTests(unittest.TestCase):
                     self.assertEqual(restored,[('restore',2)] if new_generation==2 else [])
                     self.assertEqual([item for item in WorkerFixture.order if item[0]=='model'],[('model',new_generation)])
                     self.assertEqual(WorkerFixture.order.count(('start',2)),2 if should_fail else 1)
+                    self.assertFalse(self.supervisor.workers[0].seed_template)
                     self.assertEqual(self.supervisor.template_failure,
                         {'stage':'checkpoint_restore','reason':'AGY_CRIU_RESTORE'} if should_fail else None)
 
-    def test_background_template_survives_idle_hot_worker_of_same_identity(self):
-        """请求先收尾、池中已有热进程时，后台仍可准备并保留同身份模板。@return 无。"""
+    def test_extra_worker_expires_at_120_seconds_with_template_ready(self):
+        """核对额外热进程的 120 秒边界和同身份模板的可用性。@return 无。"""
         discarded = threading.Event()
+        scanned = threading.Event()
+        current = time.monotonic()
 
         class PoolFixture(WorkerFixture):
             """构造无需启动原生执行体的可回收池成员。"""
@@ -289,21 +316,71 @@ class AgySupervisorTests(unittest.TestCase):
         value = self.submission()
         self.config['max_workers'] = 3
         with patch('agy_runtime.supervisor.Worker', PoolFixture), patch.object(
-                self.supervisor, 'restore_available', return_value=True):
+                self.supervisor, 'restore_available', return_value=True), patch(
+                'agy_runtime.supervisor.time', wraps=time) as clock:
+            clock.monotonic.side_effect = lambda: current
             with self.supervisor.condition:
                 self.supervisor.credential_generation = 1
                 duplicate, source = [PoolFixture(self.supervisor, value) for _ in range(2)]
                 duplicate.discarded = discarded
-                duplicate.last_used = source.last_used - 1
+                source.last_used = current
+                duplicate.last_used = current - 119
                 duplicate.busy = source.busy = False
                 self.supervisor.workers.extend([duplicate, source])
                 self.assertEqual(self.supervisor.status()['restore']['state'], 'waiting')
-                self.supervisor.prewarm_replacement(source, value, time.monotonic() + 30, template=True)
+                self.supervisor.prewarm_replacement(source, value, current + 30, template=True)
                 self.assertEqual(self.supervisor.status()['restore']['state'], 'ready')
+                poll = duplicate.process.poll
+
+                def observed_poll():
+                    """记录回收线程已经扫描额外进程。@return 夹具进程状态。"""
+                    scanned.set()
+                    return poll()
+
+                duplicate.process.poll = observed_poll
+                self.supervisor.condition.notify_all()
+            self.assertTrue(scanned.wait(3))
+            with self.supervisor.condition:
+                self.assertIn(duplicate, self.supervisor.workers)
+                self.assertFalse(duplicate.busy)
+                source.busy = True
+                self.assertIs(self.supervisor.acquire(value, current + 30), duplicate)
+                source.busy = duplicate.busy = False
+                current += 1
+                self.supervisor.condition.notify_all()
             self.assertTrue(discarded.wait(3))
             self.assertEqual(self.supervisor.status()['restore']['state'], 'ready')
             self.assertFalse(source.closed)
-            self.assertIs(self.supervisor.acquire(value, time.monotonic() + 30), source)
+            self.assertIs(self.supervisor.acquire(value, current + 30), source)
+
+    def test_last_idle_worker_and_template_follow_credential_lifetime(self):
+        """基础热进程与模板保留到凭据失效，跨启动配置也只保留一个基础进程。@return 无。"""
+        with self.supervisor.condition:
+            self.supervisor.credential_generation = 1
+            value = self.submission()
+            extra = WorkerFixture(self.supervisor, {**value, 'capture_enabled': True})
+            warm = WorkerFixture(self.supervisor, value)
+            template = WorkerFixture(self.supervisor, value)
+            for worker, elapsed in ((extra, 302), (warm, 301), (template, 301)):
+                worker.start(time.monotonic() + 3)
+                worker.busy = False
+                worker.last_used = time.monotonic() - elapsed
+            template.parked = template.seed_template = True
+            self.supervisor.workers = [extra, warm, template]
+            self.supervisor.condition.notify_all()
+            self.assertTrue(self.supervisor.condition.wait_for(lambda: self.supervisor.workers == [warm, template], 3))
+            self.assertTrue(extra.closed)
+            self.assertFalse(warm.closed)
+            self.assertFalse(template.closed)
+            warm.credential_expires_at = time.time_ns() // 1_000_000
+            self.supervisor.condition.notify_all()
+            self.assertTrue(self.supervisor.condition.wait_for(lambda: self.supervisor.workers == [template], 3))
+            self.assertTrue(warm.closed)
+            self.assertFalse(template.closed)
+            template.credential_expires_at = time.time_ns() // 1_000_000
+            self.supervisor.condition.notify_all()
+            self.assertTrue(self.supervisor.condition.wait_for(lambda: not self.supervisor.workers, 3))
+            self.assertTrue(template.closed)
 
     def test_old_tool_failure_distinguishes_native_acceptance(self):
         """旧轮失败时只根据原生接纳事件报告回填已接纳。@return 无。"""

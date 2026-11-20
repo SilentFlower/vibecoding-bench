@@ -389,7 +389,23 @@ onUnmounted(() => { mounted = false; listGeneration++; detailGeneration++; listC
             </template>
             <template v-else-if="activeTab === 'performance'">
               <section v-for="attempt in attempts" :key="attempt.attempt_id" class="request-performance-card"><header><h3><InfoTooltip :label="'账号 ' + accountLabel(attempt)" title="尝试账号" portal-target=".request-workspace"><template #trigger>尝试 {{ attempt.ordinal }} · {{ attempt.account_name || attempt.account_email || accountLabel(attempt) }}</template><p>{{ attempt.account_name || '名称未提供' }}</p><p>{{ attempt.account_email || '邮箱未提供' }}</p><p>账号 ID：{{ attempt.account_id ?? '未知' }}</p></InfoTooltip></h3><span>{{ attempt.response_model || '模型未观测' }}</span></header><div class="request-performance-metrics"><div><span>{{ attempt.context?.kernel === 'agy' ? '发送器响应头耗时' : '响应头耗时' }}</span><strong>{{ milliseconds(attempt.ttft_ms) }}</strong></div><div><span>首次有效输出</span><strong>{{ milliseconds(attempt.first_output_ms) }}</strong></div><div><span>本次尝试耗时</span><strong>{{ milliseconds(attempt.duration_ms) }}</strong></div><div :title="tpsDescription"><span>平均 TPS</span><strong data-average-tps>{{ averageTps(attempt) }}</strong></div></div>
-                <div v-if="attempt.runtime" class="request-runtime" data-native-runtime><div><strong>{{ attempt.runtime.warm_hit ? '命中热进程' : '本次等待初始化' }}</strong><span>PID {{ attempt.runtime.worker_pid }}</span></div><div class="request-runtime-metrics"><span>准备等待<b>{{ milliseconds(attempt.runtime.preparation_wait_ms) }}</b></span><span>获取进程<b>{{ milliseconds(attempt.runtime.checkout_ms) }}</b></span><span>进程启动<b>{{ attempt.runtime.worker_start_ms == null ? '沿用现有进程' : milliseconds(attempt.runtime.worker_start_ms) }}</b></span><span>本地准备合计<b>{{ milliseconds(attempt.runtime.prepared_ms) }}</b></span></div><p>本地准备包含等待与获取进程，各项存在包含关系。</p></div><p v-else class="form-help">原生进程与本地阶段：未观测</p>
+                <div v-if="attempt.runtime" class="request-runtime" data-native-runtime>
+                  <div>
+                    <strong v-if="attempt.runtime.warm_hit">命中热进程</strong>
+                    <strong v-else-if="attempt.runtime.start_source === 'criu_restore'">本次 CRIU 恢复</strong>
+                    <strong v-else-if="attempt.runtime.start_source === 'exec'">本次普通启动</strong>
+                    <strong v-else>本次等待初始化</strong>
+                    <span>PID {{ attempt.runtime.worker_pid }}<template v-if="attempt.runtime.warm_hit && attempt.runtime.start_source"> · {{ attempt.runtime.start_source === 'criu_restore' ? 'CRIU 恢复启动' : '普通启动' }}</template></span>
+                  </div>
+                  <div class="request-runtime-metrics">
+                    <span>准备等待<b>{{ milliseconds(attempt.runtime.preparation_wait_ms) }}</b></span>
+                    <span>获取进程<b>{{ milliseconds(attempt.runtime.checkout_ms) }}</b></span>
+                    <span>{{ !attempt.runtime.warm_hit && attempt.runtime.start_source === 'criu_restore' ? '进程恢复' : '进程启动' }}<b>{{ attempt.runtime.worker_start_ms == null ? '沿用现有进程' : milliseconds(attempt.runtime.worker_start_ms) }}</b></span>
+                    <span>本地准备合计<b>{{ milliseconds(attempt.runtime.prepared_ms) }}</b></span>
+                  </div>
+                  <p>本地准备包含等待与获取进程，各项存在包含关系。</p>
+                </div>
+                <p v-else class="form-help">原生进程与本地阶段：未观测</p>
                 <div class="request-token-metrics"><div><span>输入 Token</span><strong>{{ attempt.tokens?.input_tokens?.toLocaleString('zh-CN') ?? '未观测' }}</strong></div><div><span>输出 Token</span><strong>{{ attempt.tokens?.output_tokens?.toLocaleString('zh-CN') ?? '未观测' }}</strong></div><div><span>缓存读取</span><strong>{{ attempt.tokens?.cache_read_tokens?.toLocaleString('zh-CN') ?? '未观测' }}</strong></div><div><span>缓存写入</span><strong>{{ attempt.tokens?.cache_write_tokens?.toLocaleString('zh-CN') ?? '未观测' }}</strong></div></div><div v-if="attempt.context?.usage" class="request-token-metrics" data-gemini-usage><div><span>源总 Token</span><strong>{{ attempt.context.usage.total_tokens ?? '未观测' }}</strong></div><div><span>思考 Token</span><strong>{{ attempt.context.usage.thoughts_tokens ?? '未观测' }}</strong></div><div><span>来源</span><strong>Gemini usageMetadata</strong></div></div><details v-if="attempt.context?.usage" class="request-code-block"><summary>平台原始用量 · {{ attempt.context.usage.complete ? '完整' : '有界观察存在缺口' }}</summary><pre>{{ JSON.stringify(attempt.context.usage.usage_metadata,null,2) }}</pre></details>
               </section>
               <div v-if="!attempts.length && !detailLoading" class="request-empty-capture">没有已记录的性能数据。</div>

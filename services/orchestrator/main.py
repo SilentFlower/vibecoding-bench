@@ -924,17 +924,22 @@ class Cc2ApiClient:
             raise ValueError("cc2api 响应必须是 JSON object")
         return data
 
-    def list_accounts(self, *, require_complete: bool = False) -> list[dict]:
+    def list_accounts(self, *, require_complete: bool = False,
+                      platform: Literal["claude_code", "antigravity", "all"] | None = None) -> list[dict]:
         """
-        分页读取全部 cc2api 账号。
+        分页读取网关账号。
 
         :param require_complete: 缺失证明要求完整分页与有效 ID，不能把坏响应当作空列表
+        :param platform: 账号平台筛选，省略时沿用网关默认平台
         :return: cc2api Account object 列表
         """
         page = 1
         accounts: list[dict] = []
         while True:
-            data = self._request("GET", f"/admin/accounts?page={page}&page_size=100")
+            query: dict[str, int | str] = {"page": page, "page_size": 100}
+            if platform is not None:
+                query["platform"] = platform
+            data = self._request("GET", "/admin/accounts?" + urllib.parse.urlencode(query))
             rows = data.get("data")
             if not isinstance(rows, list):
                 raise ValueError("cc2api 账号列表响应无效")
@@ -14359,7 +14364,7 @@ def v3_environments() -> list[dict]:
     agy_environments = [row for row in environments if row.get('platform') == 'antigravity']
     if agy_environments and cc2api_client:
         try:
-            names = {account['id']: account['name'] for account in cc2api_client.list_accounts()
+            names = {account['id']: account['name'] for account in cc2api_client.list_accounts(platform='antigravity')
                 if account.get('platform') == 'antigravity' and type(account.get('id')) is int
                 and isinstance(account.get('name'), str) and account['name']}
         except (ConnectionError, ValueError):

@@ -106,6 +106,14 @@ pub(crate) struct NativeRequestObservation {
     pub runtime: Option<NativeRuntimeObservation>,
 }
 
+/// 原生工作进程的实际启动来源。
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeStartSource {
+    Exec,
+    CriuRestore,
+}
+
 /// 原生请求实际使用的进程与本地阶段计时，所有耗时来自单调时钟。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -114,6 +122,8 @@ pub struct NativeRuntimeObservation {
     pub worker_pid: u32,
     pub kernel_generation: Option<String>,
     pub warm_hit: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_source: Option<NativeStartSource>,
     pub preparation_wait_ms: u64,
     pub checkout_ms: u64,
     pub worker_start_ms: Option<u64>,

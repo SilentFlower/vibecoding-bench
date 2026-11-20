@@ -11,6 +11,13 @@ def native_identifier(value) -> bool:
     return type(value) is int and 0 < value <= 2147483647 or isinstance(value, str) and 6 < len(value) <= 128 and bool(re.fullmatch(r'MODEL_[A-Z0-9_]+', value))
 
 
+def valid_model_mapping(public_model, native_model) -> bool:
+    """核对受信目录映射的形状。@param public_model 公开名。@param native_model 原生ID。@return 两项是否有效。"""
+    return (isinstance(public_model, str) and len(public_model) <= 128
+        and re.fullmatch(r'(?:gemini|claude|gpt)-[A-Za-z0-9_.-]+', public_model) is not None
+        and native_identifier(native_model))
+
+
 def _response(value: dict | None) -> dict:
     root = value.get('response') if isinstance(value, dict) else None
     try:
@@ -135,16 +142,3 @@ def decode_quota(summary: dict | None, catalog: dict | None, user_status: dict, 
     sources = sum(key in snapshot for key in ('groups', 'models'))
     snapshot['status'] = ('unavailable', 'partial', 'ok')[sources]
     return snapshot
-
-
-def configure_model(public_model: str, native_model):
-    """在单模型进程启动时冻结目录映射。@param public_model 已观测公开名。@param native_model 对应原生ID。@return 冻结的执行ID。"""
-    from . import contract, gemini_contract
-    if not isinstance(public_model, str) or not re.fullmatch(r'(?:gemini|claude|gpt)-[A-Za-z0-9_.-]+', public_model) or not native_identifier(native_model):
-        raise ValueError('AGY模型映射无效')
-    contract.MODEL = native_model
-    gemini_contract.MODEL = native_model
-    gemini_contract.GEMINI_MODEL = public_model
-    contract.CAPABILITIES['model'] = native_model
-    contract.CAPABILITIES['gemini']['model'] = public_model
-    return native_model

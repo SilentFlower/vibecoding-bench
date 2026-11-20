@@ -17,11 +17,11 @@ from unittest.mock import patch
 from types import SimpleNamespace
 
 from agy_runtime import gemini_contract
-from agy_runtime.contract import InputError
+from agy_runtime.contract import InputError, request
 from agy_runtime.credentials import TOKEN_PATH, publish_access_document, read_access_document, read_private
 from agy_runtime.criu import read_failure
 from agy_runtime.gemini_frames import Frames
-from agy_runtime.models import configure_model, decode_catalog, decode_media_support, decode_png_support
+from agy_runtime.models import decode_catalog, decode_media_support, decode_png_support
 from agy_runtime.native_bridge import NativeBridge
 from agy_runtime.process_memory import cgroup_memory
 from agy_runtime.safety_egress import MODEL_PATH, SafetyEgress, _Request
@@ -42,7 +42,7 @@ class AgyRuntimeTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
-        configure_model('gemini-synthetic', 'MODEL_PLACEHOLDER_M36')
+        self.fixed_model = ('gemini-synthetic', 'MODEL_PLACEHOLDER_M36')
 
     def snapshot(self):
         """创建同代AT-only管理快照。@return 合成快照。"""
@@ -118,7 +118,9 @@ class AgyRuntimeTests(unittest.TestCase):
                 worker.retire=lambda reason:retirements.append(reason)
                 def control(method, body, scope):
                     """投影真实控制入口的合成结果。@param method 控制方法。@param body 输入。@param scope 作业。@return 控制回应。"""
-                    if method=='StartCascade':return {'status':200,'response':{'cascadeId':'owned'}}
+                    if method=='StartCascade':
+                        self.assertEqual(body['requestedModel'], self.fixed_model[1])
+                        return {'status':200,'response':{'cascadeId':'owned'}}
                     self.assertEqual(method,'GetCascadeTrajectory')
                     state='CASCADE_RUN_STATUS_RUNNING' if mode=='not_idle' else 'CASCADE_RUN_STATUS_IDLE'
                     return {'status':200,'response':{'status':state}}
@@ -127,12 +129,13 @@ class AgyRuntimeTests(unittest.TestCase):
                 bridge.events=io.StringIO();bridge.errors=[];bridge.source_events=0;bridge.reader_error=None
                 bridge.generation='synthetic-generation';bridge.capture_tls=False;worker.bridge=bridge
                 value={'request_id':'synthetic','request_format':'gemini','native_steps':[],
-                    'prompt':'fixture','system':'','max_generations':1,'tools':[]}
+                    'prompt':'fixture','system':'','model':self.fixed_model[1],'max_generations':1,'tools':[]}
                 scope=Scope(value,1,worker);kernel.worker=worker;kernel.active=scope
 
                 def submit(worker, method, body, scope):
                     """交付原始帧后注入控制异常。@param worker 进程。@param method 方法。@param body 提交。@param scope 作业。@return 异步结果。"""
                     self.assertEqual(method,'SendUserCascadeMessage');submissions.append(body['cascadeId'])
+                    self.assertEqual(body['cascadeConfig']['plannerConfig']['planModel'], self.fixed_model[1])
                     event={'request_id':scope.route,'call_id':'r-1.1','ns':1,
                         'native_context':{'ConversationID':'owned'}}
                     bridge._emit({**event,'event':'model_start'})
@@ -203,15 +206,15 @@ class AgyRuntimeTests(unittest.TestCase):
         """确认显式文本输出沿用默认行为，图片和音频仍保留字段级错误。@return 无。"""
         raw = {'schema_version': 1, 'type': 'gemini_request', 'request_id': 'modalities',
                'model': 'gemini-synthetic', 'body': {'contents': [{'parts': [{'text': '合成请求'}]}]}}
-        expected = gemini_contract.decode_request(raw)['native_completion']
+        expected = gemini_contract.decode_request(raw, fixed_model=self.fixed_model)['native_completion']
         for modalities in ([], ['TEXT']):
             raw['body']['generationConfig'] = {'responseModalities': modalities}
-            self.assertEqual(gemini_contract.decode_request(raw)['native_completion'], expected)
+            self.assertEqual(gemini_contract.decode_request(raw, fixed_model=self.fixed_model)['native_completion'], expected)
         for modalities in (None, 'TEXT', ['IMAGE'], ['TEXT', 'AUDIO']):
             raw['body']['generationConfig'] = {'responseModalities': modalities}
             with self.subTest(modalities=modalities), self.assertRaisesRegex(
                     InputError, 'unsupported_gemini_output_modality:/body/generationConfig/responseModalities'):
-                gemini_contract.decode_request(raw)
+                gemini_contract.decode_request(raw, fixed_model=self.fixed_model)
 
     def test_gemini_normalizes_nested_array_items_and_string_const(self):
         """从 Gemini 两类工具声明保留已知类型，并记录真实缺项与常量改写位置。@return 无。"""
@@ -226,7 +229,7 @@ class AgyRuntimeTests(unittest.TestCase):
                 'tools': [{'functionDeclarations': [{'name': 'tool_' + key, key: schema}
                     for key in ('parameters', 'parametersJsonSchema')]}]}}
         original = copy.deepcopy(raw)
-        decoded = gemini_contract.decode_request(raw)
+        decoded = gemini_contract.decode_request(raw, fixed_model=self.fixed_model)
         for tool in decoded['tools']:
             query = tool['input_schema']['properties']['query']['properties']
             self.assertEqual(query['where']['items']['items'], {'anyOf': [{}]})
@@ -342,9 +345,10 @@ class AgyRuntimeTests(unittest.TestCase):
                 supervisor.config={'max_workers':1 if mode=='capacity' else 3,'proxy_url':'synthetic'}
                 supervisor.credential_generation=value['credential_snapshot']['credential_generation']
                 key=supervisor.worker_key(value)
-                original=SimpleNamespace(key=key,busy=True,closed=False,prewarming=False)
+                original=SimpleNamespace(key=key,busy=True,closed=False,prewarming=False,parked=False)
                 supervisor.workers=[original]
-                spare=SimpleNamespace(key=key,busy=True,closed=False,process=None)
+                spare=SimpleNamespace(key=key,busy=True,closed=False,parked=False,start_source='exec',
+                    credential_expires_at=value['credential_snapshot']['expires_at'],process=None)
                 entered=threading.Event();release=threading.Event();checked_out=[]
                 until=time.monotonic()+5
 
@@ -354,6 +358,7 @@ class AgyRuntimeTests(unittest.TestCase):
                     if mode=='stale':supervisor.credential_generation+=1
                     if mode=='ready':
                         entered.set();release.wait(3)
+                        spare.process=SimpleNamespace(poll=lambda: None)
 
                 spare.start=start
                 spare.close=lambda: setattr(spare,'closed',True)
@@ -414,20 +419,22 @@ class AgyRuntimeTests(unittest.TestCase):
             supervisor.record_template_attempt(template,False)
         self.assertIsNone(supervisor.template_failure)
 
-    def test_reaper_keeps_one_recent_idle_worker_per_identity(self):
-        """同身份保留一个较新热进程，工具轮和其他模型各自保留。@return 无。"""
+    def test_reaper_keeps_busy_workers_and_extra_workers_before_idle_deadline(self):
+        """回收超期额外进程，保留未过空闲期限的进程及活动工具轮。@return 无。"""
         supervisor = Supervisor.__new__(Supervisor)
         supervisor.condition = threading.Condition()
         supervisor.closed = False
+        supervisor.credential_generation = 1
         released = threading.Event()
         now = time.monotonic()
 
         def worker(key, age, busy=False):
             """构造活进程或占用中的原工具进程。@param key 复用键。@param age 空闲时长。@param busy 是否独占。@return 测试进程。"""
-            return SimpleNamespace(key=key, last_used=now-age, busy=busy, process=SimpleNamespace(poll=lambda: None),
+            return SimpleNamespace(key=(1, key), last_used=now-age, busy=busy, parked=False,
+                credential_expires_at=4070908800000, process=SimpleNamespace(poll=lambda: None),
                 close=released.set)
 
-        old, current, tool, other = worker('same', 2), worker('same', 1), worker('same', 0, True), worker('other', 3)
+        old, current, tool, other = worker('same', 121), worker('same', 1), worker('same', 300, True), worker('other', 3)
         supervisor.workers = [old, current, tool, other]
         thread = threading.Thread(target=supervisor.reap_idle, daemon=True)
         thread.start()
@@ -526,7 +533,7 @@ class AgyRuntimeTests(unittest.TestCase):
             'generationConfig': {'temperature': 0.2, 'topP': 0.8, 'maxOutputTokens': 128}}
         original = copy.deepcopy(body)
         result = gemini_contract.decode_request({'schema_version': 1, 'type': 'gemini_request',
-            'request_id': 'synthetic-request', 'model': 'gemini-synthetic', 'body': body})
+            'request_id': 'synthetic-request', 'model': 'gemini-synthetic', 'body': body}, fixed_model=self.fixed_model)
         self.assertEqual(body, original)
         self.assertEqual(result['native_completion'], {'maxTokens': 128})
         self.assertEqual({item['field'] for item in result['compatibility_notes']},
@@ -537,13 +544,44 @@ class AgyRuntimeTests(unittest.TestCase):
         mapping = decode_catalog({'response': json.dumps({'models': {
             'claude-synthetic': {'model': 'MODEL_PLACEHOLDER_M320'},
             'gemini-synthetic': {'model': 'MODEL_PLACEHOLDER_M36'}}})})
-        configure_model('claude-synthetic', mapping['claude-synthetic'])
         value = gemini_contract.decode_request({'schema_version': 1, 'type': 'gemini_request',
-            'request_id': 'claude-request', 'model': 'claude-synthetic',
+            'request_id': 'claude-request', 'model': 'claude-synthetic', 'native_model': mapping['claude-synthetic'],
             'body': {'contents': [{'parts': [{'text': '合成输入'}]}]}})
         self.assertEqual(value['model'], 'MODEL_PLACEHOLDER_M320')
         with self.assertRaises(ValueError):
             decode_catalog({'response': {'models': {'claude-unknown': {}}}})
+
+    def test_fixed_model_history_reference_roundtrip(self):
+        """独立内核以固定映射保存并读回旧协议的历史引用。@return 无。"""
+        (self.root / 'histories').mkdir()
+        kernel = Kernel.__new__(Kernel)
+        kernel.state = self.root
+        kernel.fixed_model = self.fixed_model
+        kernel.sequence_file = self.root / 'request-sequence.json'
+        kernel.cfg = {}
+        kernel.lock = threading.RLock()
+        kernel.closing = False
+        kernel.queued = None
+        kernel.active = None
+        kernel.seq = 1
+        kernel.worker = SimpleNamespace(template=None, bridge=SimpleNamespace(generation='synthetic'))
+        kernel.emit = lambda *args, **kwargs: None
+        raw = {'schema_version': 1, 'type': 'request', 'request_id': 'fixed-history',
+            'prompt': '第二问', 'system': '合成系统提示', 'history': [{'role': 'user', 'text': '第一问'}]}
+        first = Scope(request(raw, fixed_model=self.fixed_model), 1, kernel.worker)
+        ident, error = kernel.export_history(first, {'trajectoryId': 'fixture', 'steps': [
+            {'userInput': {'userResponse': '第一问'}},
+            {'plannerResponse': {'response': '第一答'}},
+        ]})
+        self.assertIsNone(error)
+        followup = {'schema_version': 1, 'type': 'request', 'request_id': 'fixed-next',
+            'prompt': '第二问', 'history_id': ident}
+        with patch('agy_runtime.kernel.threading.Thread'):
+            kernel.accept(followup)
+        self.assertEqual(kernel.active.value['model'], self.fixed_model[1])
+        self.assertEqual(kernel.active.value['system'], raw['system'])
+        self.assertEqual(kernel.active.history_count, 2)
+        self.assertEqual(kernel.active.value['messages'][-1], {'role': 'assistant', 'text': '第一答'})
 
     def test_png_directory_uses_verified_model_and_known_flags(self):
         """目录只为已核对的模型报告明确能力。@return 无。"""
@@ -580,10 +618,10 @@ class AgyRuntimeTests(unittest.TestCase):
         user = {'role': 'user', 'parts': [media]}
         raw = {'schema_version': 1, 'type': 'gemini_request', 'request_id': 'gif-trial', 'model': 'gemini-synthetic',
                'body': {'contents': [user, user]}}
-        output = gemini_contract.decode_request(raw)['native_steps']
+        output = gemini_contract.decode_request(raw, fixed_model=self.fixed_model)['native_steps']
         self.assertEqual(output[0]['userInput']['media'][0]['inlineData'], media['inlineData']['data'])
         raw['gif_frames'] = True
-        output = gemini_contract.decode_request(raw)['native_steps']
+        output = gemini_contract.decode_request(raw, fixed_model=self.fixed_model)['native_steps']
         for step in output:
             images = step['userInput']['media']
             self.assertEqual([image['mimeType'] for image in images], ['image/png'] * 8)
@@ -592,7 +630,7 @@ class AgyRuntimeTests(unittest.TestCase):
                     self.assertEqual(frame.convert('RGB').getpixel((0, 0)), original.getpixel((0, 0)))
         raw['body']['contents'] = [user] * 17
         with self.assertRaisesRegex(InputError, 'gif_conversion_limit'):
-            gemini_contract.decode_request(raw)
+            gemini_contract.decode_request(raw, fixed_model=self.fixed_model)
 
     def test_legacy_letter_ids_require_prior_history_evidence(self):
         """已观测旧式编号可恢复，普通纯字母名称单独出现时仍拒绝。@return 无。"""
@@ -600,10 +638,10 @@ class AgyRuntimeTests(unittest.TestCase):
         ids = ['V7rd5Z9q', 'QvKrmPax', 'call_' + 'a1f0' * 8]
         replies = [{'role': 'user', 'parts': [{'functionResponse': {'name': alias, 'response': {}}}]} for alias in ids]
         turns = [turn for reply in replies for turn in (call, reply)]
-        steps = gemini_contract.native_history(turns)
+        steps = gemini_contract.native_history(turns, native_model=self.fixed_model[1])
         self.assertEqual([step['metadata']['toolCall']['id'] for step in steps if 'generic' in step], ids)
         with self.assertRaisesRegex(InputError, 'ambiguous_or_unknown_function_response'):
-            gemini_contract.native_history(turns[2:4])
+            gemini_contract.native_history(turns[2:4], native_model=self.fixed_model[1])
 
     def test_legacy_tool_history_reconstructs_unambiguous_calls_and_keeps_input(self):
         """旧格式按相邻单轮恢复，多个或冲突的历史给出拒绝。@return 无。"""
@@ -611,7 +649,7 @@ class AgyRuntimeTests(unittest.TestCase):
         reply = {'functionResponse': {'name': 'call_123', 'response': {'success': True}}}
         contents = [{'role': 'model', 'parts': [call]}, {'role': 'user', 'parts': [reply]}]
         original = copy.deepcopy(contents)
-        steps = gemini_contract.native_history(contents)
+        steps = gemini_contract.native_history(contents, native_model=self.fixed_model[1])
         self.assertEqual(contents, original)
         original_call = steps[0]['plannerResponse']['toolCalls'][0]
         self.assertEqual(original_call['id'], 'call_123')
@@ -620,9 +658,9 @@ class AgyRuntimeTests(unittest.TestCase):
         for invalid in (contents * 2, [{**contents[0], 'parts': [call, call]}, contents[1]],
                 [contents[0], {'role': 'user', 'parts': [{'text': '间隔'}]}, contents[1]]):
             with self.assertRaisesRegex(InputError, 'function_response'):
-                gemini_contract.native_history(invalid)
+                gemini_contract.native_history(invalid, native_model=self.fixed_model[1])
         with self.assertRaisesRegex(InputError, 'ambiguous_or_unknown_function_response'):
-            gemini_contract.native_history(contents, ['call_123'])
+            gemini_contract.native_history(contents, ['call_123'], native_model=self.fixed_model[1])
 
     def test_split_frames_preserve_parts_signature_extensions_and_single_usage(self):
         """兼容投影保留所有Part，并只在最后一帧发布终态与用量。@return 无。"""
@@ -652,7 +690,7 @@ class AgyRuntimeTests(unittest.TestCase):
                     }}]},
                 ]
                 original = copy.deepcopy(turns)
-                plan, reply = gemini_contract.native_history(turns)
+                plan, reply = gemini_contract.native_history(turns, native_model=self.fixed_model[1])
                 planner = plan['plannerResponse']
                 self.assertEqual(planner['thinkingSignature'], '+/8=')
                 self.assertEqual(planner['toolCalls'][0]['thinkingSignature'], '+/8=')
@@ -727,7 +765,7 @@ class AgyRuntimeTests(unittest.TestCase):
             for value in values]}
         incoming = {'contents': [*previous['contents'], model, results]}
         self.assertEqual(gemini_contract.continuation_results(previous, calls, incoming), values)
-        generic = [step for step in gemini_contract.native_history(incoming['contents']) if 'generic' in step]
+        generic = [step for step in gemini_contract.native_history(incoming['contents'], native_model=self.fixed_model[1]) if 'generic' in step]
         self.assertEqual([step['generic']['args']['path'] for step in generic], ['0.txt', '1.txt'])
         self.assertEqual([step['generic']['result']['resultValue'] for step in generic],
             [gemini_contract.native_value(value) for value in values])

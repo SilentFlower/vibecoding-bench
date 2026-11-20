@@ -17,13 +17,12 @@ import threading
 import time
 import traceback
 import uuid
-from .contract import CAPABILITIES, InputError, MODEL, fields, history_steps, request
+from .contract import CAPABILITIES, InputError, fields, history_steps, request
 from .storage import ROOT, SOURCE_SHA, Output, binary, config, private_dir
 from .stream_controller import DrainBridge, NativeJob, DeliverySpool
 from .layer_reader import LayerReader
 from .tool_broker import Broker
 from .gemini_frames import Frames
-from .models import configure_model
 from .capture import save_egress, save_submission
 from .wire_capture import NativeTlsTrace
 from .credentials import read_access_document
@@ -85,7 +84,8 @@ class Scope:
 
     def __init__(self, value, seq, worker):
         """创建请求归属。@param value 已验证请求。@param seq 内核序号。@param worker 工作进程。@return 无返回值。"""
-        self.history_count=len(value['native_steps']) if 'native_steps' in value else len(history_steps(value['messages']));self.value=value;self.seq=seq;self.worker=worker;self.route=f'r-{seq}';self.root=None;self.job=None
+        steps = value['native_steps'] if 'native_steps' in value else history_steps(value['messages'], native_model=value['model'])
+        self.history_count=len(steps);self.value=value;self.seq=seq;self.worker=worker;self.route=f'r-{seq}';self.root=None;self.job=None
         self.frames=Frames();self.native_tool_calls=None;self.compatibility_error=None;self.tool_wait_ready=threading.Event();self.tool_wait_published=False;self.resume_claimed=False;self.final_status=None;self.yield_tools=threading.Event();self.yield_cancelled=threading.Event();self.yield_started=None;self.yield_rpc=None
         self.broker=None;self.cancel=threading.Event();self.cancel_started=None;self.cancel_sent=False;self.finished=threading.Event()
         self.safety_egress=None;self.tls_trace=None
@@ -201,7 +201,7 @@ class Worker:
         if self.port is None:raise RuntimeError('native_listener_identity_timeout')
         self.ready=True;self.bridge.start_reader()
         self.owner.emit('worker_ready',generation=self.bridge.generation,native_pid=self.bridge.native_pid,observer_pid=self.bridge.proc.pid,
-            source_sha256=SOURCE_SHA,capabilities=CAPABILITIES,runtime_policy={'runtime_env':self.bridge.runtime_env,'rotate_after':self.owner.cfg['rotate_after']})
+            source_sha256=SOURCE_SHA,capabilities=self.owner.capabilities,runtime_policy={'runtime_env':self.bridge.runtime_env,'rotate_after':self.owner.cfg['rotate_after']})
 
     def owns_source(self, event):
         """在调用计数前核对作业与 Cascade。@param event 原生观察。@return 是否属于当前作业。"""
@@ -367,8 +367,11 @@ class Kernel:
 
     def __init__(self, cfg, state):
         """建立当前账号的独立内核。@param cfg 固定配置。@param state 私有根。@return 无返回值。"""
-        global MODEL
-        MODEL = configure_model(cfg['public_model'], cfg['native_model'])
+        self.fixed_model = (cfg['public_model'], cfg['native_model']) if 'public_model' in cfg else None
+        self.capabilities = CAPABILITIES
+        if self.fixed_model is not None:
+            self.capabilities = {**CAPABILITIES, 'model': self.fixed_model[1],
+                'gemini': {**CAPABILITIES['gemini'], 'model': self.fixed_model[0]}}
         self.cfg=cfg;self.state=state;self.queued=None;self.queued_thread=None;self.lock=threading.RLock();self.active=None;self.closing=False;self.seq=0;self.worker_id=str(uuid.uuid4())
         self.template_enabled=os.environ.get('AGY_CRIU_TEMPLATE')=='1'
         self.sequence_file=state/'request-sequence.json'
@@ -396,7 +399,7 @@ class Kernel:
 
     def accept(self, raw, _queued=False):
         """验证请求或绑定待回填续轮。@param raw JSON 输入。@param _queued 内部已保留的续轮。@return 无。"""
-        value=request(raw)
+        value=request(raw, fixed_model=self.fixed_model)
         if value['history_id']:
             path=self.state/'histories'/(value['history_id']+'.json')
             if path.is_symlink():raise InputError('invalid_history_id')
@@ -404,7 +407,7 @@ class Kernel:
             except OSError as exc:raise InputError('unknown_history_id') from exc
             value['messages']=stored['messages']
             if value['system'] is None:value['system']=stored['system']
-            history_steps(value['messages'])
+            history_steps(value['messages'], native_model=value['model'])
         value['system']=value['system'] if value['system'] is not None else ''
         with self.lock:
             if self.closing:raise InputError('closing')
@@ -490,7 +493,7 @@ class Kernel:
                 if not isinstance(result.get('result'),str):return None,'unsupported_native_export'
                 messages.append({'role':'tool','tool_call_id':call['id'],'text':result['result']})
             else:return None,'unsupported_native_export'
-        try:history_steps(messages)
+        try:history_steps(messages, native_model=scope.value['model'])
         except InputError:return None,'unsupported_native_export'
         ident=str(uuid.uuid4());path=self.state/'histories'/(ident+'.json')
         path.write_text(json.dumps({'messages':messages,'system':scope.value['system'],'native_cascade':scope.root,'native_trajectory':trajectory['trajectoryId']},ensure_ascii=False))
@@ -503,9 +506,10 @@ class Kernel:
         folder=private_dir(self.state/'requests'/scope.route)
         try:
             if scope.value.get('gemini_body') is not None:(folder/'gemini-input.json').write_text(json.dumps(scope.value['gemini_body'],ensure_ascii=False))
-            steps=copy.deepcopy(scope.value['native_steps']) if 'native_steps' in scope.value else history_steps(scope.value['messages']);cfg=copy.deepcopy(self.base_config)
+            native_model = scope.value['model']
+            steps=copy.deepcopy(scope.value['native_steps']) if 'native_steps' in scope.value else history_steps(scope.value['messages'], native_model=native_model);cfg=copy.deepcopy(self.base_config)
             (folder/'input-mapping.json').write_text(json.dumps({'schema_changes':scope.value.get('schema_changes',[]),'completion':scope.value.get('native_completion',{}),'history_steps':len(steps),'compatibility_notes':scope.value.get('compatibility_notes',[]),'system_prompt_policy':scope.value.get('system_prompt_policy'),'input_view':'decoded_gemini_input','submission_view':'native_cascade_prompt_sections'},ensure_ascii=False))
-            cfg['plannerConfig']['planModel']=MODEL
+            cfg['plannerConfig']['planModel']=native_model
             cfg['plannerConfig']['declarativeMixinConfig']['promptSections']=[{'custom':{'content':scope.value['system']}}]
             if scope.value.get('request_format')=='gemini':cfg['plannerConfig']['retryConfig']['modelOutputRetry']={'maxRetries':0}
             if scope.value.get('native_completion'):cfg['plannerConfig']['completionConfigOverride']=scope.value['native_completion']
@@ -524,7 +528,7 @@ class Kernel:
                 if switched['status']!=200:
                     control_status=switched['status']
                     raise RuntimeError('native_safety_endpoint_rejected')
-            root=worker.call('StartCascade',{'source':'CORTEX_TRAJECTORY_SOURCE_AGENT_API','requestedModel':MODEL},scope)
+            root=worker.call('StartCascade',{'source':'CORTEX_TRAJECTORY_SOURCE_AGENT_API','requestedModel':native_model},scope)
             control_status=root['status']
             if root['status']!=200:raise RuntimeError('native_start_rejected')
             scope.root=root['response']['cascadeId']

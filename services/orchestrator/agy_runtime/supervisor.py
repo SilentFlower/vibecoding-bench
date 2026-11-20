@@ -23,13 +23,14 @@ from .criu import CONTROL as CRIU_CONTROL, failure_detail, read_failure
 from .gemini_contract import continuation_results
 from .input_media import preflight_gif
 from .image_pool import Broker, ImagePool
-from .models import native_identifier
+from .models import valid_model_mapping
 from .process_memory import cgroup_memory, memory
 from .storage import Output, private_dir, verify_resources
 from .system_prompt import decode_policy, default_policy
 
 
 TOOL_WAIT_SECONDS = 3600
+EXTRA_WORKER_IDLE_SECONDS = 120
 
 
 def deadline(value: int) -> float:
@@ -64,7 +65,7 @@ def validate_submission(value: dict, config: dict) -> dict:
     access = snapshot['access_token']
     if not isinstance(access,str) or not 1<=len(access)<=16384 or any(ord(c)<=32 or ord(c)>=127 for c in access) or type(snapshot['expires_at']) is not int or snapshot['expires_at']<=time.time()*1000 or not isinstance(snapshot['email'],str):
         raise InputError('invalid_access_snapshot')
-    if not isinstance(value['model'], str) or not native_identifier(value['native_model']) or not isinstance(value['body'], dict):
+    if not valid_model_mapping(value['model'], value['native_model']) or not isinstance(value['body'], dict):
         raise InputError('invalid_model_or_body')
     if type(value.get('capture_enabled',False)) is not bool:
         raise InputError('invalid_capture_policy')
@@ -97,7 +98,6 @@ class Worker:
         publish_access_document(self.home, value['credential_snapshot'])
         self.config = dict(home=str(self.home), account_id=value['account_id'],
             credential_generation=value['credential_snapshot']['credential_generation'],
-            public_model=value['model'], native_model=value['native_model'],
             binary_path=owner.config['binary_path'], proxy_url=owner.config['proxy_url'],
             capture_enabled=False, startup_timeout=90,
             retire_timeout=60, cancel_timeout=10)
@@ -171,6 +171,7 @@ class Worker:
             event = self.next(until)
             if event.get('type') == 'criu_restored':
                 self.parked = False
+                self.seed_template = False
                 self.start_source = 'criu_restore'
                 self.ready_at = time.monotonic()
                 return
@@ -306,28 +307,33 @@ class Supervisor:
         self.reaper.start()
 
     def reap_idle(self):
-        """回收重复或过期的空闲进程，保留同身份最近使用的热进程。@return 无。"""
+        """保留一个基础热进程，按各自寿命回收额外热进程和模板。@return 无。"""
         while True:
             with self.condition:
                 if self.closed:
                     return
                 now = time.monotonic()
+                now_ms = time.time_ns() // 1_000_000
                 idle = []
-                retained = set()
+                retained_warm = False
+                retained_templates = set()
                 # 工具等待和正在预热的 worker 仍持有独占标志；仅回收已归还的空闲进程。
                 for worker in sorted(self.workers, key=lambda item: item.last_used, reverse=True):
                     if worker.busy:
                         continue
-                    parked = getattr(worker,'parked',False)
-                    # 同身份的热进程和磁盘模板用途不同。模板不占用原生进程内存，仍受物理池上限约束。
-                    identity = (worker.key, parked)
-                    if (now - worker.last_used >= 300 or identity in retained
-                            or (getattr(worker,'parked',False) and (worker.key[0]!=self.credential_generation
-                                or worker.credential_expires_at<=time.time_ns()//1_000_000))
+                    parked = worker.parked
+                    # 基础热进程服务下一笔请求，额外热进程覆盖短间隔的连续并发。
+                    if parked:
+                        idle_expired = worker.key in retained_templates
+                    else:
+                        idle_expired = retained_warm and now - worker.last_used >= EXTRA_WORKER_IDLE_SECONDS
+                    if (idle_expired or worker.key[0] < self.credential_generation or worker.credential_expires_at <= now_ms
                             or worker.process is None or worker.process.poll() is not None):
                         idle.append(worker)
+                    elif parked:
+                        retained_templates.add(worker.key)
                     else:
-                        retained.add(identity)
+                        retained_warm = True
                 for worker in idle:
                     worker.busy=True
                 if not idle:
@@ -349,7 +355,7 @@ class Supervisor:
         """冻结进程复用身份。@param value 已核验提交。@return 含代次和私有AT摘要的池键。"""
         snapshot = value['credential_snapshot']
         return (snapshot['credential_generation'], hashlib.sha256(snapshot['access_token'].encode()).digest(),
-            value['model'], str(value['native_model']), self.config['proxy_url'], value.get('capture_enabled',False))
+            self.config['proxy_url'], value.get('capture_enabled',False))
 
     def acquire(self, value, until, seed=True):
         """在物理上限内选择或建立当前代次进程。@param value 提交。@param until 截止。@param seed 是否尝试建模板。@return 独占worker。"""
@@ -363,8 +369,11 @@ class Supervisor:
                 if time.monotonic() >= until:
                     raise InputError('request_deadline_exceeded')
                 # 优先复用已经启动的进程，把单次快照留给需要扩容的请求。
-                for worker in sorted(self.workers, key=lambda item: getattr(item,'parked',False)):
-                    if not worker.busy and not worker.closed and worker.key == key:
+                now_ms = time.time_ns() // 1_000_000
+                for worker in sorted(self.workers, key=lambda item: item.parked):
+                    if (not worker.busy and not worker.closed and worker.key == key
+                            and worker.credential_expires_at > now_ms and worker.process is not None
+                            and worker.process.poll() is None):
                         worker.busy = True
                         return worker
                 if any(worker.prewarming and worker.key==key for worker in self.workers):
@@ -418,7 +427,7 @@ class Supervisor:
             self.template_failure=None if ready else worker.criu_failure or failure_detail(stage)
 
     def prewarm_replacement(self, source, value, until, template=False):
-        """用空余名额预热替代进程。@param source 原工作进程。@param value 同代模型及凭据。@param until 原生成截止。@param template 是否保存启动模板。@return 无返回值。"""
+        """用空余名额预热替代进程。@param source 原工作进程。@param value 同代凭据及启动配置。@param until 原生成截止。@param template 是否保存启动模板。@return 无返回值。"""
         worker=None
         snapshot=value['credential_snapshot']
         try:
@@ -443,6 +452,8 @@ class Supervisor:
                         and snapshot['expires_at']>time.time_ns()//1_000_000):
                     if template:
                         self.record_template_attempt(worker,worker.parked)
+                    else:
+                        self.last_start_source = worker.start_source
                     worker.prewarming=False
                     worker.busy=False
                     worker.last_used=time.monotonic()
@@ -585,17 +596,22 @@ class Supervisor:
             self.continuation(value, until)
             checkout_started = time.monotonic()
             worker = self.acquire(value, until)
-            checkout_finished = time.monotonic()
             job['worker'] = worker
             if job['cancelled'].is_set():
                 raise InputError('request_cancelled')
             if value['type'] == 'prepare':
-                self.emit('prepared', value['request_id'], native={**worker.ready,'template_ready':getattr(worker,'parked',False)})
+                with self.condition:
+                    if not worker.parked and worker.started_at >= checkout_started and worker.key[0] == self.credential_generation:
+                        self.last_start_source = worker.start_source
+                self.emit('prepared', value['request_id'], native={**worker.ready,'template_ready':worker.parked})
                 return
-            if getattr(worker,'parked',False):
+            restore_started = None
+            if worker.parked:
                 try:
-                    worker.resume(min(until,time.monotonic()+25))
+                    restore_started = time.monotonic()
+                    worker.resume(min(until, restore_started + 25))
                 except (InputError, OSError, ValueError):
+                    restore_started = None
                     with self.condition:
                         self.record_template_attempt(worker,False,'checkpoint_restore')
                     worker.close()
@@ -604,22 +620,24 @@ class Supervisor:
                         self.condition.notify_all()
                     worker = self.acquire(value,until,seed=False)
                     job['worker']=worker
+            checkout_finished = time.monotonic()
+            started_at = worker.started_at if restore_started is None else restore_started
             if job['cancelled'].is_set() or time.monotonic()>=until:
                 raise InputError('request_cancelled' if job['cancelled'].is_set() else 'request_deadline_exceeded')
             with self.condition:
-                if worker.key[0]==self.credential_generation:
-                    self.last_start_source=getattr(worker,'start_source','exec')
-            with self.condition:
+                if started_at >= checkout_started and worker.key[0] == self.credential_generation:
+                    self.last_start_source = worker.start_source
                 should_seed=self.can_seed_template()
             if should_seed:
-                seed={key:value[key] for key in ('account_id','credential_snapshot','model','native_model','capture_enabled')}
+                seed={key:value[key] for key in ('account_id','credential_snapshot','capture_enabled')}
                 try:
                     threading.Thread(target=self.prewarm_replacement,args=(worker,seed,until,True),daemon=True).start()
                 except RuntimeError:
                     # 背景预热失败时优先完成已接纳的模型请求。
                     pass
             payload={'schema_version': 1, 'type': 'gemini_request', 'request_id': value['request_id'],
-                'model': value['model'], 'body': value['body'], 'system_prompt_policy':value['system_prompt_policy']}
+                'model': value['model'], 'native_model': value['native_model'],
+                'body': value['body'], 'system_prompt_policy':value['system_prompt_policy']}
             if value.get('gif_frames'):payload['gif_frames']=True
             if value.get('disable_safety_filtering'):payload['disable_safety_filtering']=True
             if value.get('capture_enabled') and value.get('full_egress'):payload['full_egress']=True
@@ -638,11 +656,10 @@ class Supervisor:
                 if kind == 'request_prepared':
                     # 以同一单调时钟覆盖原生组装。进程启动属于获取进程的一部分。
                     received = job['received']
-                    started_at = worker.started_at
                     event['runtime'] = {
                         'worker_id': event['worker_id'], 'worker_pid': worker.ready['native_pid'],
                         'kernel_generation': event['generation'], 'warm_hit': worker.ready_at <= received,
-                        'start_source': getattr(worker,'start_source','exec'),
+                        'start_source': worker.start_source,
                         'preparation_wait_ms': int((checkout_started - received) * 1000),
                         'checkout_ms': int((checkout_finished - checkout_started) * 1000),
                         'worker_start_ms': int((worker.ready_at - started_at) * 1000) if started_at >= checkout_started else None,
@@ -679,7 +696,7 @@ class Supervisor:
                     credential_generation=value['credential_snapshot']['credential_generation'])
                 if replacement_required and job['waiting'] and not replacement_scheduled and not job['cancelled'].is_set():
                     replacement_scheduled = True
-                    seed={key:value[key] for key in ('account_id','credential_snapshot','model','native_model','capture_enabled')}
+                    seed={key:value[key] for key in ('account_id','credential_snapshot','capture_enabled')}
                     try:
                         threading.Thread(target=self.prewarm_replacement,args=(worker,seed,preparation_deadline),daemon=True).start()
                     except RuntimeError:
@@ -727,10 +744,11 @@ class Supervisor:
             idle=[worker for worker in self.workers if not worker.busy and not worker.closed and worker.ready is not None
                 and not getattr(worker,'parked',False) and worker.process is not None and worker.process.poll() is None]
             available=self.restore_available()
-            template=available and any(getattr(worker,'parked',False) and not worker.closed and not worker.busy
+            template=available and any(worker.parked and not worker.closed and not worker.busy
+                and worker.process is not None and worker.process.poll() is None
                 and worker.key[0]==self.credential_generation and worker.credential_expires_at>time.time_ns()//1_000_000
                 for worker in self.workers)
-            preparing=available and any(worker.prewarming and getattr(worker,'seed_template',False)
+            preparing=available and any(worker.busy and worker.seed_template and not worker.parked
                 for worker in self.workers)
             if not available:
                 restore_state, restore_reason = 'unavailable', 'controller_unavailable'

@@ -5,7 +5,6 @@ import unittest
 
 from agy_runtime.contract import InputError
 from agy_runtime.gemini_contract import decode_request
-from agy_runtime.models import configure_model
 from agy_runtime.system_prompt import RULE_VERSION, decode_policy, default_policy, transform_system
 
 
@@ -13,8 +12,7 @@ class AgySystemPromptTests(unittest.TestCase):
     """覆盖原生提交前的独立系统段与固定映射合同。"""
 
     def setUp(self):
-        """冻结合成模型。@return 无。"""
-        configure_model('gemini-synthetic', 'MODEL_PLACEHOLDER_M36')
+        """准备合成账号策略。@return 无。"""
         self.enabled = {**default_policy(), 'enabled': True}
 
     def test_reference_golden_vectors_and_idempotence(self):
@@ -50,7 +48,7 @@ class AgySystemPromptTests(unittest.TestCase):
                 {'role': 'user', 'parts': [{'functionResponse': {'id': 'ABC-id', 'name': 'ABC_tool', 'response': {'ABC': 'ABC system'}}}]}]}
         original = copy.deepcopy(body)
         raw = {'schema_version': 1, 'type': 'gemini_request', 'request_id': 'synthetic',
-            'model': 'gemini-synthetic', 'body': body}
+            'model': 'gemini-synthetic', 'native_model': 'MODEL_PLACEHOLDER_M36', 'body': body}
         before = decode_request(raw)
         after = decode_request({**raw, 'system_prompt_policy': self.enabled})
         self.assertEqual(body, original)
@@ -75,7 +73,7 @@ class AgySystemPromptTests(unittest.TestCase):
     def test_public_body_cannot_override_account_policy(self):
         """用户载荷不能把内部策略字段作为公开开关。@return 无。"""
         raw = {'schema_version': 1, 'type': 'gemini_request', 'request_id': 'synthetic',
-            'model': 'gemini-synthetic', 'body': {'contents': [{'parts': [{'text': 'ABC'}]}],
+            'model': 'gemini-synthetic', 'native_model': 'MODEL_PLACEHOLDER_M36', 'body': {'contents': [{'parts': [{'text': 'ABC'}]}],
                 'system_prompt_policy': self.enabled}}
         with self.assertRaises(InputError):
             decode_request(raw)

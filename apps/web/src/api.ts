@@ -524,6 +524,7 @@ export interface NativeRuntimeObservation {
   worker_pid: number
   kernel_generation: string | null
   warm_hit: boolean
+  start_source?: 'exec' | 'criu_restore'
   preparation_wait_ms: number
   checkout_ms: number
   worker_start_ms: number | null

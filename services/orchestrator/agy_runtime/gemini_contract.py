@@ -3,12 +3,12 @@ import copy
 import json
 import re
 from collections import Counter
-from .contract import InputError, MODEL, decode_gemini_bytes, text, tools
+from .contract import InputError, decode_gemini_bytes, text, tools
 from .tool_schema import normalize
 from .input_media import gif_budget, media_part
+from .models import valid_model_mapping
 from .system_prompt import decode_policy, default_policy, transform_system
 
-GEMINI_MODEL=None
 BYPASS_SIGNATURE='context_engineering_is_the_way_to_go'
 SAFETY_CATEGORIES={'HARM_CATEGORY_HARASSMENT','HARM_CATEGORY_HATE_SPEECH','HARM_CATEGORY_SEXUALLY_EXPLICIT','HARM_CATEGORY_DANGEROUS_CONTENT'}
 LEGACY_TOOL_ID = re.compile(r'call_[0-9]+')
@@ -139,8 +139,8 @@ def _matching_call(calls, value, position):
     return None
 
 
-def native_history(contents, tool_names=(), gif=None):
-    """将多 Part 和完整函数结果映射为原生步骤。@param contents Gemini 内容。@param tool_names 已声明工具名称。@param gif 可选 GIF 转换预算。@return 原生步骤。"""
+def native_history(contents, tool_names=(), gif=None, *, native_model):
+    """映射多 Part 和完整函数结果。@param contents Gemini 内容。@param tool_names 工具名。@param gif GIF 预算。@param native_model 本轮执行ID。@return 原生步骤。"""
     if not isinstance(contents,list) or not contents:raise InputError('invalid_gemini_contents')
     contents = _legacy_tool_history(contents, tool_names)
     steps=[];pending=[];used=set();tool_steps={}
@@ -195,7 +195,7 @@ def native_history(contents, tool_names=(), gif=None):
                 if 'thinkingSignature' in native:planner['thinkingSignature']=native['thinkingSignature']
                 elif 'thoughtSignature' in native:planner['signature']=native['thoughtSignature']
             if calls:planner['toolCalls']=calls;pending=copy.deepcopy(calls)
-            steps.append({'type':'CORTEX_STEP_TYPE_PLANNER_RESPONSE','status':'CORTEX_STEP_STATUS_DONE','metadata':{'source':'CORTEX_STEP_SOURCE_MODEL','generatorModel':MODEL},'plannerResponse':planner})
+            steps.append({'type':'CORTEX_STEP_TYPE_PLANNER_RESPONSE','status':'CORTEX_STEP_STATUS_DONE','metadata':{'source':'CORTEX_STEP_SOURCE_MODEL','generatorModel':native_model},'plannerResponse':planner})
         elif response or media:
             if pending:raise InputError('missing_function_response:'+path)
             user_input = {'userResponse':'\n'.join(response)}
@@ -206,13 +206,20 @@ def native_history(contents, tool_names=(), gif=None):
     return steps
 
 
-def decode_request(raw):
-    """校验 Gemini 业务正文并给出原生执行参数。@param raw 控制信封。@return 内部请求。"""
-    checked_fields(raw,{'schema_version','type','request_id','model','body','system_prompt_policy','gif_frames','disable_safety_filtering','full_egress'},'')
+def decode_request(raw, *, fixed_model: tuple[str, str | int] | None = None):
+    """校验 Gemini 业务输入。@param raw 私有信封。@param fixed_model 独立内核的固定映射。@return 本轮原生执行参数。"""
+    checked_fields(raw,{'schema_version','type','request_id','model','native_model','body','system_prompt_policy','gif_frames','disable_safety_filtering','full_egress'},'')
     if type(raw.get('schema_version')) is not int or raw['schema_version']!=1 or raw.get('type')!='gemini_request':raise InputError('invalid_schema')
     ident=text(raw.get('request_id'))
     if not ident or len(ident)>128:raise InputError('invalid_request_id')
-    if raw.get('model')!=GEMINI_MODEL:raise InputError('unsupported_gemini_model')
+    if fixed_model is None:
+        native_model = raw.get('native_model')
+        if not valid_model_mapping(raw.get('model'), native_model):
+            raise InputError('invalid_model_mapping')
+    else:
+        public_model, native_model = fixed_model
+        if raw.get('model') != public_model or 'native_model' in raw:
+            raise InputError('unsupported_gemini_model')
     body=raw.get('body');checked_fields(body,{'contents','systemInstruction','generationConfig','tools','safetySettings','toolConfig'},'/body')
     enabled=raw.get('gif_frames',False)
     if type(enabled) is not bool:raise InputError('invalid_media_policy')
@@ -221,7 +228,7 @@ def decode_request(raw):
     full_egress=raw.get('full_egress',False)
     if type(full_egress) is not bool:raise InputError('invalid_capture_policy')
     changes=[];notices=[];declared=definitions(body,changes)
-    steps=native_history(body.get('contents'), (tool['name'] for tool in declared), gif_budget(body,enabled));system=[]
+    steps=native_history(body.get('contents'), (tool['name'] for tool in declared), gif_budget(body,enabled), native_model=native_model);system=[]
     if 'systemInstruction' in body:
         value=body['systemInstruction'];checked_fields(value,{'role','parts'},'/body/systemInstruction')
         if value.get('role','user') not in ['user','system']:raise InputError('unsupported_system_role')
@@ -273,7 +280,7 @@ def decode_request(raw):
         notices.append({'field':'parallel_tool_calls','policy':'native_disable_requested;ordered_same_name_results','reason':'new-api removes function IDs'})
     policy=decode_policy(raw.get('system_prompt_policy',default_policy()))
     submitted,report=transform_system('\n'.join(system),policy)
-    return {'request_id':ident,'prompt':'','messages':[],'history_id':None,'system':submitted,'system_prompt_policy':report,'model':MODEL,'tools':declared,'max_generations':1,
+    return {'request_id':ident,'prompt':'','messages':[],'history_id':None,'system':submitted,'system_prompt_policy':report,'model':native_model,'tools':declared,'max_generations':1,
         'request_format':'gemini','gemini_body':copy.deepcopy(body),'native_completion':completion,'native_steps':steps,'schema_changes':changes,'compatibility_notes':notices,
         'safety_egress_rules':safety_egress_rules,'full_egress':full_egress}
 def continuation_results(previous, calls, incoming):

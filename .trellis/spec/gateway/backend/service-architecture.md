@@ -174,6 +174,50 @@ src/tlsfp/
 - `native_real_gateway`另核候选激活/回滚后首次补写quota_identity保持预热PID；设置强制1h经真实SettingsStore和能力声明到达回环出站。`stream_error`及流日志测试覆盖截断、超时、EOF、Drop、秘密过滤与关联字段。
 - 诊断与历史记录单测覆盖缺字段、非法 PID/UUID 和计时越界；前端构建及合成浏览器覆盖历史未观测、实际暖命中与阶段口径。
 
+## Scenario: AGY 跨模型进程复用与 CRIU 启动
+
+### 1. Scope / Trigger
+
+- 修改 AGY 的已授权模型提交、工作进程选择、CRIU 模板补位、请求详情或运行环境账号名称时适用。账号和内部传输的现有归属校验见 [AGY账号运行环境与Gemini业务接入](../../orchestrator/backend/account-runtime-v3.md#scenario-agy账号运行环境与gemini业务接入)。
+
+### 2. Signatures
+
+- 网关以 `AgySubmission.model: String` 和 `native_model: AgyModelId` 传递同一次已核验的目录映射。受管监督器在私有 `gemini_request` 信封中传入这对字段。公有 Gemini 正文继续按原字段集合验证。
+- `GET /admin/request-diagnostics/:request_id` 的每次尝试可带 `runtime.start_source: "exec" | "criu_restore"`。字段缺省代表未观测。沿用现有运行观察和持久化结构。
+- 编排的 `GET /api/environments` 可返回 `gateway_account_name: string | null`。反重力环境从 `GET /admin/accounts?platform=antigravity` 分页查询后按 `gateway_account_id` 投影名称。
+
+### 3. Contracts
+
+- 每个账号和环境的监督器按凭据代次、AT 摘要、代理与实际启动采集配置选择工作进程。池内优先选择热进程。作业自身冻结原生执行 ID，并用于 `StartCascade.requestedModel`、`plannerConfig.planModel` 和历史步骤的模型字段。原工具结果沿原作业身份回填。
+- 每个账号保留一个最近使用且仍有效的空闲热进程。额外热进程空闲 120 秒后回收。凭据过期、换代或进程退出时回收对应空闲资源。停放的模板保留到凭据过期、换代、环境变更或退役。模板与业务共用物理池上限。恢复交接释放模板名额，原控制连接继续负责恢复进程的退出清理。监督器清除已消费标记，并在原请求截止与池容量内补位。
+- `warm_hit` 表示此次请求入池前进程已就绪。恢复及失败回退计入 `checkout_ms`，首次启动或恢复到就绪的阶段计入 `worker_start_ms`。环境 `last_start_source` 记录当前凭据代次最近的实际扩容来源。热命中保持该记录。
+- `restore.state` 依据监督器的实际状态表示等待模板、准备中、模板就绪或不可用。保存与恢复失败沿可见的白名单阶段和原因，普通回退继续使用原截止。
+- 运行环境卡片和详情优先展示 `gateway_account_name`。网关名称缺失、平台或绑定不匹配、查询失败时使用环境原名。账号编号和环境归属沿原字段读取。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 模型字段缺失或超出可信目录映射形状 | 受管私有请求在调用原生 RPC 前拒绝 |
+| 旧独立内核的启动配置提供固定模型 | 旧信封可省略 `native_model`，采用固定执行 ID |
+| 模板换代、过期或进程已退出 | 模板失去可用状态，业务凭当前已准入凭据获取进程 |
+| 保存或恢复失败 | 记录受控失败，普通回退沿原截止，模型至多发送一次 |
+| 诊断缺来源或来源非法 | 缺省保留其余已核验字段，非法值拒绝该进程观察 |
+
+### 5. Scenarios and Examples
+
+- 同一账号收到 A、B、A 三次请求。热进程的 PID 可保持一致，每次 RPC 使用对应的原生型号。
+- 连续两批并发的间隔少于 120 秒时可复用额外热进程。空闲超时后保留最近使用的有效热进程，最后一个热进程可在 300 秒后继续接单。
+- 容量为 1 时，恢复进程占住唯一名额，后续准备在空位可用时继续。容量允许时，原恢复进程在线期间可补下一份模板。
+- 若将 `warm_hit=true` 计为普通启动，统计会把已有进程重复算作扩容。按 `warm_hit` 判断复用，按 `start_source` 展示该进程的启动来源。
+
+### 6. Tests Required
+
+- `test_agy_supervisor` 核对跨模型复用、额外进程的 120 秒边界、基础热进程与快照寿命、凭据换代、满槽和单次回退。固定配置与历史引用由 `test_agy_runtime` 覆盖。
+- `verify_agy_native_loopback.py --shared-models` 检查真实网关的目录映射、TLS 回环出站模型、同 PID 和热命中。Linux 6.1 隔离 OCI 验证同 PID 恢复、第二份模板保存和保存或恢复失败时的单次模型发送。
+- `keeps_verified_runtime_start_source` 验证实际 PID 与来源持久化、历史缺省及非法值拒绝。浏览器核对性能页的 CRIU 恢复、普通启动和热命中。
+- `test_environment_summary` 核对分页平台、账号 ID、环境原名和网关失败。 `verify_agy_environment_ui.py` 验证浏览器中的反重力账号名称、详情和原账号编号。
+
 ## Gateway 热路径规则
 
 `GatewayService::handle_request` / `handle_request_inner` 是最高风险路径。修改前必须明确：

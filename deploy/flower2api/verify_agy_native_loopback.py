@@ -29,6 +29,7 @@ from source_layout import source_path
 ENVIRONMENT='a'*32
 SECRET='synthetic-internal-proof-at-least-32-bytes'
 MODEL='gemini-3.1-pro-preview'
+SHARED_MODELS = {MODEL: 'MODEL_PLACEHOLDER_M36', 'gemini-3.8-flash-low': 'MODEL_PLACEHOLDER_M320'}
 SOURCE_SHA='39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43'
 SCHEMA_TOOL_ARGS = {'x': 1, 'action': 'query', 'where': [['count', '>=', 7], ['ready', '==', True]]}
 
@@ -49,6 +50,7 @@ class Upstream(BaseHTTPRequestHandler):
     cancelled=threading.Event()
     png_support=False
     model_catalog_host=None
+    model_mappings = {MODEL: SHARED_MODELS[MODEL]}
 
     def log_message(self,*args):
         """避免将请求头体输出到公共日志。@param args 日志参数。@return 无。"""
@@ -176,7 +178,7 @@ class Upstream(BaseHTTPRequestHandler):
         if ':loadCodeAssist' in self.path:
             value={'cloudaicompanionProject':'synthetic-project','currentTier':{'id':'standard-tier','name':'Standard'}}
         elif ':fetchAvailableModels' in self.path:
-            value={'models':{MODEL:{'model':'MODEL_PLACEHOLDER_M36','displayName':MODEL}}}
+            value = {'models': {name: {'model': native, 'displayName': name} for name, native in self.model_mappings.items()}}
             if self.png_support:
                 value['models'][MODEL]['supportedMimeTypes']={mime:True for mime in ('image/png','image/jpeg','image/gif','audio/wav')}
                 value['defaultAgentModelId']=MODEL
@@ -993,11 +995,47 @@ def verify_parallel_tools(request, wait_idle, base):
     return {'passed':True,'parallel_calls':2,'round_sizes':[6,4,3],'first_tool_sse':True,'model_calls':len(Upstream.calls)}
 
 
-def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,kernel_selection=False,tool_deadlines=False,parallel_tools=False):
+def verify_shared_models(request, request_ids, wait_idle):
+    """交替调用两个目录模型。@param request 真实网关入口。@param request_ids 根请求记录。@param wait_idle 实际收口。@return 上游和进程证据。"""
+    runtime = []
+    submitted = []
+    body = {'contents': [{'role': 'user', 'parts': [{'text': '合成跨模型验证'}]}]}
+    expected = [*SHARED_MODELS, MODEL]
+    for model in expected:
+        status, raw = request('/v1beta/models/' + model + ':generateContent', body)
+        require(status == 200 and json.loads(raw)['usageMetadata']['totalTokenCount'] == 7,
+            '跨模型请求失败：' + model + ' ' + str(status) + ' ' + raw.decode()[:350])
+        wait_idle()
+        request_id = request_ids[-1]
+        until = time.monotonic() + 10
+        while True:
+            status, raw = request('/admin/request-diagnostics/' + request_id, admin=True)
+            detail = json.loads(raw)
+            if status == 200 and detail['request']['finished_at']:
+                break
+            require(time.monotonic() < until, '跨模型请求诊断尚未收口')
+            time.sleep(.1)
+        attempt, = detail['attempts']
+        require(attempt['context']['submitted_model'] == SHARED_MODELS[model], '提交的原生模型与目录不一致')
+        runtime.append(attempt['runtime'])
+        submitted.append(Upstream.calls[-1]['body']['model'])
+    require(len(Upstream.calls) == len(expected) and submitted == expected, '实际上游模型或调用次数不符')
+    require(len({item['worker_pid'] for item in runtime}) == 1
+        and len({item['worker_id'] for item in runtime}) == 1, '切换模型造成热进程重建')
+    require([item['warm_hit'] for item in runtime] == [False, True, True]
+        and all(item['start_source'] == 'exec' for item in runtime), '请求诊断与实际热复用不一致')
+    return {'passed': True, 'same_pid': runtime[0]['worker_pid'], 'upstream_models': submitted,
+        'warm_hits': [item['warm_hit'] for item in runtime], 'synthetic_native_model_submissions': len(Upstream.calls)}
+
+
+def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,kernel_selection=False,tool_deadlines=False,parallel_tools=False,
+           *, shared_models=False):
     """执行真实公共业务。@param homoglyph 检验系统策略。@param capture_off 验证关闭采集。@param png 核对图片与工具历史。@param installed_adapter 使用镜像内适配器。@param kernel_selection 验证内核切换。@param tool_deadlines 验证跨首轮期限的工具链。@param parallel_tools 验证同名工具。@return 脱敏验证摘要。"""
     require(os.geteuid()==1001,'原生业务探针必须使用UID1001')
     os.umask(0o077)
     Upstream.png_support=png
+    if shared_models:
+        Upstream.model_mappings = SHARED_MODELS
     context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain('/state/server.crt','/state/server.key')
     proxy=ThreadingHTTPServer(('127.0.0.1',19090),Proxy)
@@ -1062,11 +1100,15 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
         database=sqlite3.connect('/state/gateway.sqlite')
         with database:
             database.execute("INSERT INTO accounts(id,name,email,platform,token,device_id,auth_type,access_token,refresh_token,oauth_expires_at,concurrency,auto_telemetry,auto_poll_usage,usage_data) VALUES(1,'synthetic','synthetic@example.test','antigravity','','','oauth','synthetic-at-1','synthetic-rt','2099-01-01T00:00:00Z',1,0,0,?)",
-                (json.dumps({'capabilities':{'model_mappings':{MODEL:'MODEL_PLACEHOLDER_M36'}}}),))
+                (json.dumps({'capabilities':{'model_mappings':Upstream.model_mappings}}),))
             database.execute("INSERT INTO account_credential_states(account_id,generation,phase,updated_at_ms) VALUES(1,1,'ready',1)")
             database.execute("INSERT INTO api_tokens(name,token,allowed_accounts,status) VALUES('synthetic','synthetic-key','1','active')")
         require(request('/admin/settings',{'request_diagnostics_log_mode':'debug'},admin=True)[0]==200,'测试日志模式设置失败')
         base='/v1beta/models/'+MODEL+':'
+        if shared_models:
+            result = verify_shared_models(request, request_ids, wait_idle)
+            database.close()
+            return result
         if parallel_tools:
             result=verify_parallel_tools(request,wait_idle,base)
             database.close()
@@ -1260,10 +1302,14 @@ def main():
     parser.add_argument('--kernel-selection',action='store_true')
     parser.add_argument('--tool-deadlines',action='store_true')
     parser.add_argument('--parallel-tools',action='store_true')
+    parser.add_argument('--shared-models', action='store_true')
     args=parser.parse_args()
     installed_adapter=args.installed_adapter or args.png or args.kernel_selection
     if args.inside:
-        print(json.dumps(inside(args.homoglyph,args.capture_off,args.png,installed_adapter,args.kernel_selection,args.tool_deadlines,args.parallel_tools),ensure_ascii=False));return
+        result = inside(args.homoglyph,args.capture_off,args.png,installed_adapter,args.kernel_selection,args.tool_deadlines,args.parallel_tools,
+            shared_models=args.shared_models)
+        print(json.dumps(result, ensure_ascii=False))
+        return
     require(bool(args.image),'需要明确的固定原版测试镜像')
     import docker
     root=Path(__file__).resolve().parents[2]
@@ -1311,7 +1357,7 @@ def main():
         probe=['/opt/probe.py','--inside']
         for flag,enabled in (('--homoglyph',args.homoglyph),('--capture-off',args.capture_off),('--png',args.png),
                 ('--installed-adapter',installed_adapter),('--kernel-selection',args.kernel_selection),('--parallel-tools',args.parallel_tools),
-                ('--tool-deadlines',args.tool_deadlines)):
+                ('--tool-deadlines',args.tool_deadlines),('--shared-models',args.shared_models)):
             if enabled:probe.append(flag)
         container=client.containers.run(args.image,probe,entrypoint=['python3'],detach=True,
             user='1001:1001',network_mode='none',read_only=True,cap_drop=['ALL'],security_opt=['no-new-privileges:true'],
@@ -1323,7 +1369,7 @@ def main():
             labels={'vibebench.test-task':'agy-request-records'})
         result=container.wait(timeout=540)
         logs=container.logs().decode(errors='replace')
-        evidence=root/('.trellis/.runtime/agy-parallel-tools-private' if args.parallel_tools else '.trellis/.runtime/agy-tool-deadlines-private' if args.tool_deadlines else '.trellis/.runtime/agy-kernel-selection-private' if args.kernel_selection else '.trellis/.runtime/agy-png-loopback-private' if args.png else '.trellis/.runtime/agy-homoglyph-capture-off-private' if args.capture_off else '.trellis/.runtime/agy-homoglyph-loopback-private' if args.homoglyph else '.trellis/.runtime/agy-runtime-loopback-private')
+        evidence=root/('.trellis/.runtime/agy-shared-models-private' if args.shared_models else '.trellis/.runtime/agy-parallel-tools-private' if args.parallel_tools else '.trellis/.runtime/agy-tool-deadlines-private' if args.tool_deadlines else '.trellis/.runtime/agy-kernel-selection-private' if args.kernel_selection else '.trellis/.runtime/agy-png-loopback-private' if args.png else '.trellis/.runtime/agy-homoglyph-capture-off-private' if args.capture_off else '.trellis/.runtime/agy-homoglyph-loopback-private' if args.homoglyph else '.trellis/.runtime/agy-runtime-loopback-private')
         if evidence.exists():shutil.rmtree(evidence)
         shutil.copytree(folder,evidence,ignore=lambda directory,names:[name for name in names
             if not (Path(directory)/name).is_file() and not (Path(directory)/name).is_dir()])

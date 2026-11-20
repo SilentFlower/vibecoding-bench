@@ -3,7 +3,7 @@ import threading
 import time
 import unittest
 from contextvars import ContextVar
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import main
 
@@ -77,19 +77,25 @@ class EnvironmentSummaryTests(unittest.TestCase):
         connection.execute.return_value = rows
         runtime = Mock()
         runtime.native_preparation_snapshots.return_value = ({}, None)
-        gateway = Mock()
-        gateway.list_accounts.side_effect = [[{'id': 14, 'name': '测试', 'platform': 'antigravity'},
-            {'id': 15, 'name': '其他平台', 'platform': 'claude_code'}], ConnectionError('网关不可用')]
+        gateway = main.Cc2ApiClient('http://synthetic.invalid', 'synthetic-only', 1)
+        pages = [
+            {'data': [{'id': 15, 'name': '其他平台', 'platform': 'claude_code'}], 'total_pages': 2},
+            {'data': [{'id': 14, 'name': '反重力测试账号', 'platform': 'antigravity'}], 'total_pages': 2},
+            ConnectionError('网关不可用'),
+        ]
         with patch.multiple(main, account_runtime=runtime, credential_ownership=None, cc2api_client=gateway), \
                 patch.object(main, 'get_db', return_value=connection), \
-                patch.object(main, '_v3_environment_summary', side_effect=lambda row, *_: row):
+                patch.object(main, '_v3_environment_summary', side_effect=lambda row, *_: row), \
+                patch.object(gateway, '_request', side_effect=pages) as request:
             result = main.v3_environments()
-            self.assertEqual(result[0]['gateway_account_name'], '测试')
+            self.assertEqual(result[0]['gateway_account_name'], '反重力测试账号')
             self.assertEqual(result[0]['name'], 'agy:14')
             self.assertEqual(result[0]['gateway_account_id'], 14)
             self.assertIsNone(result[1]['gateway_account_name'])
-            gateway.list_accounts.assert_called_once()
             self.assertTrue(all(row['gateway_account_name'] is None for row in main.v3_environments()))
+            first = call('GET', '/admin/accounts?page=1&page_size=100&platform=antigravity')
+            second = call('GET', '/admin/accounts?page=2&page_size=100&platform=antigravity')
+            self.assertEqual(request.call_args_list, [first, second, first])
 
 
 if __name__ == '__main__':
