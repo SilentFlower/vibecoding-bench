@@ -1,0 +1,49 @@
+{
+  "id": "console-pages-nodes-settings",
+  "name": "console-pages-nodes-settings",
+  "title": "节点管理与系统设置页迁移",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "web",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-20",
+  "completedAt": "2026-11-20",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-20T04:31:39Z",
+    "blockers": []
+  },
+  "branch": "feat/console-ui-revamp",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-19-console-ui-pages",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-20T12:31:39+08:00",
+    "completedSteps": [
+      "基线",
+      "组件库扩展",
+      "节点管理",
+      "系统设置",
+      "token 检查",
+      "新验证脚本",
+      "回归",
+      "规范同步",
+      "收尾检查",
+      "CHK-001 修复"
+    ],
+    "partialStep": null,
+    "nextStep": "子任务 4（控制台 Vue 业务页迁移）整体验收与规划目录提交",
+    "notes": ""
+  }
+}
