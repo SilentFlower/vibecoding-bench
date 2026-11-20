@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 from docker.errors import NotFound
 
-from cluster_deployment import node_container_name
+from cluster_deployment import NodeImagePreparationError, node_container_name
 from cluster_nodes import NodeCreate
 from cluster_synchronization import NodeSynchronization, NodeSynchronizationWait
 from runtime_files import atomic_json
@@ -354,6 +354,31 @@ class NodeSynchronizationTests(unittest.TestCase):
         self.assertEqual(0, self.events.count('backup'))
         self.remote.containers.run.assert_not_called()
         self.assertEqual(1, self.events.count('install'))
+
+    def test_prefetch_failure_preserves_running_node_in_both_upgrade_entries(self) -> None:
+        """镜像准备失败保留旧节点，后续正常预取可继续原地换版。:return: None。"""
+        maintenance = {'operation_id': 'a' * 32, 'epoch': 'b' * 32}
+        gate = {**maintenance, 'phase': 'blocked', 'active': 0}
+        self.sync.gateway._request.return_value = gate
+        self.installer.prefetch_images.side_effect = NodeImagePreparationError('节点control镜像内容不完整')
+        with self.assertRaises(NodeImagePreparationError):
+            self.sync.install(self.installer, self.row['id'], 1)
+        with patch('cluster_synchronization.UPDATE_GATE.state', return_value=gate):
+            with self.assertRaises(NodeImagePreparationError):
+                self.sync.install(self.installer, self.row['id'], 1, maintenance=maintenance, stage_only=True)
+        self.sync.recover_original(self.row['id'])
+        self.assertEqual([], self.events)
+        journal = self.node.private / 'maintenance/current.json'
+        self.assertFalse(journal.exists())
+
+        self.installer.prefetch_images.side_effect = None
+        self.installer.prefetch_images.return_value = ('new', Mock())
+        with patch('cluster_synchronization.UPDATE_GATE.state', return_value=gate):
+            result = self.sync.install(self.installer, self.row['id'], 1, maintenance=maintenance, stage_only=True)
+            self.assertEqual('waiting_for_platform', result['phase'])
+            result = self.sync.install(self.installer, self.row['id'], 1, maintenance=maintenance)
+        self.assertEqual('prepared', result['state'])
+        self.assertEqual(['stop', 'rename', 'install'], self.events)
 
     def test_platform_restart_requires_original_host_resume_for_current_boot(self) -> None:
         """重启核对保留已冻结备份，宿主明确恢复后才换批。:return: None。"""

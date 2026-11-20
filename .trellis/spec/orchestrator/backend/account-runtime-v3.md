@@ -1768,6 +1768,7 @@ POST /api/nodes/{node_id}/prepare -> 202，返回已登记的公开安装状态
 POST /api/nodes/synchronize -> 202，服务端选择当前可信批次并返回 {items}
 ArchiveIndex(path): Mapping，临时磁盘清单
 ProfileReference={sha256:HEX64,bytes:int>=2}
+NodeDeployment.prefetch_images(node) -> tuple[str, Image]，返回账号批次和已核验的节点控制镜像
 NodeSynchronization.install(installer,node_id,revision,maintenance=None,stage_only=False,late_restore=False) -> dict
 GET /nodes、已登记管理页面及其尾斜杠地址 -> SPA HTML
 PUT /api/nodes/{node_id}/enabled
@@ -1812,6 +1813,8 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - 环境摘要从Node原读取器取得采集/CRIU设置，Gateway观察仍核对环境、代次、内核及采样时效。缺失或失联显示未知。请求诊断的可选`execution_location={node_key,environment_id,generation,assignment_revision?}`来自同次已验证传输并沿原JSON持久化；历史缺字段保持未观测。Run详情使用原执行账本定位。
 - AGY尝试同样从已核验TransportBinding冻结execution_location；当前本机执行的node_key为local、assignment_revision为空，与平台/凭据/工具轮的context独立共存。字段缺失保持未知，禁止根据当前账号归属补写历史位置。
 - Node从首次安装保存自己的更新目录与实际镜像来源。来源校验沿原`image_reference`命名合同支持自定义批次；正式签名发行仍使用原独立规则。已托管节点后台自动识别当前目标；同批幂等复核，跨批经原工作排空、停止、原地切换组件后恢复，保持原HOME和身份。历史中央首次能力接入及离线应急沿集群停机SOP。
+- 节点镜像预取以中央的实际 OCI 平台、根文件系统 `RootFS` 和 `vibebench.product/role/release` 标签为准。Docker 返回平台清单时，所选平台的 `Available` 必须为 true。节点现有引用可凭完整内容复用，跨 daemon 的不同 ID 需核对原始配置摘要。对同 ID 的残缺镜像，沿固定 SSH 通道从中央流式导入，随后重读平台、层、角色和发布身份。Docker API 1.48 起在导出和导入时传递选定平台。旧 API 使用已有单平台归档接口。
+- 自动同步与兼容维护先核验两类镜像，再登记新切换日志并开始排空。普通同步的镜像预取可让位于中央切换，兼容维护在预取前后复核原 `operation_id` 和 `epoch`。预取失败保留尚在运行的原角色，公开原目标及固定失败原因。已有切换日志的作业沿原阶段收口。
 - 原迁移使用磁盘SQLite索引逐条读取和写出兼容的`{identity,entries,excluded}`清单，取消清单16MiB及100000条业务上限。临时定义由`cluster_archive_schema.py`纯模块所有，索引随当前临时目录删除；业务库版本台账保持原链。单条元数据解析预算128KiB，路径、类型、权限、逐文件/整包摘要、冻结实际字节与真实剩余磁盘继续核验。
 - 迁移export/verify-import/prepare-import及大profile prepare-files取消UDS/SSH总时限。迁移包和profile取消600秒总传输时限，HTTP逐次读写15秒、SSH连接与存活检测保持。排空默认沿原操作等待并续约，服务关闭或租约变化终止推进。
 - 普通profile准备以1MiB作为通路选择阈值，大文件进入私有摘要文件；迁移同样使用`profile_references`。固定文件名仅`.credentials.json/.claude.json/settings.json`，实际长度、SHA256、0600权限、单链接和归属逐次核验；绑定账号先去除RT。历史端通过固定受限适配复用其原锁、类型和准备器，身份算法沿原版本。
@@ -1847,6 +1850,8 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 | 源导出暂停且目标无副本 | 空目标可先同步；原迁移随后按同一操作继续 |
 | 工作或凭据维护未完成 | 保存等待原因，按原目标自动重试 |
 | 同批组件 | 幂等核验，账号状态沿原生命周期保持 |
+| 同 ID 的目标平台内容残缺 | 定向导入后重读确认两类镜像，成功后才切换。导入或复核失败时保留原目标供重试 |
+| 同名目标内容冲突或残缺引用归属未知 | 拒绝覆盖，保留原组件并提示核对节点制品 |
 | 组合备份缺Node、错epoch或错安装归属 | 完整性校验拒绝，保留已生成快照 |
 | 节点不可达、观察过期或账号列表读取失败 | 保留已保存归属，分别显示不可达、过期或待刷新 |
 | 旧请求缺执行位置或请求无上游尝试 | 分别显示节点未观测或无执行尝试，原记录保持可读 |
@@ -1861,6 +1866,7 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - 错误用法：对已有环境直接PUT换节点。正确处理是`POST /api/accounts/1/node-migrations`，冻结`{"operation_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","node_id":2,"revision":1,"version":"2.1.293"}`并按原操作查询/恢复。
 - 错误用法：SSH断连后重新发送模型、OAuth或另起输入。正确处理是先查询原Scope/回执，未知状态保持隔离，明确实际停止后再按原业务恢复。
 - 错误用法：合并诊断时用AGY context替换执行位置字段。正确处理是保留两个可选字段，并在同一真实尝试上分别记录平台上下文和冻结的执行位置。
+- 镜像检查示例：节点 `Id` 和中央相同，`Architecture` 为空且 `RootFS` 缺少 `Type`。直接复用该引用会让容器创建失败。由 `prefetch_images` 补齐选定平台后，再读取完整的配置和层信息。
 
 - 正常：账号已迁移到Node B，历史请求仍显示原尝试的Node A；跨节点重试逐次显示各自环境和代次。错误用法：用账号当前归属填补旧请求。正确处理：旧记录缺字段时保持未观测。
 
@@ -1874,6 +1880,7 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - `test_cluster_node_docker`按开关运行随机隔离部署：同一真实Rust网关的双账号双Node JSON/SSE及并发、冻结诊断、原管理HTTP/WS、完整所有权、零代删除、独立迁移故障隔离、Node停机换批及HOME身份保留。上游及凭据均使用合成夹具。
 - `test_cluster_recovery_limits`核对大于16MiB且超过100000条的原JSON清单、大profile、摘要/权限/路径限制及固定错误投影。规模演练须实际导出、恢复并核对原树，不以元数据样本代替完整恢复。
 - `test_cluster_synchronization`核对旧控制自动停止原地换批、同批幂等、原容器回退、未知角色、未完成迁移、空目标先升级、互斥及平台重启续接。`test_cluster_system_update`核对宿主排空/取消/恢复及真实更新状态机先停止再原地切换的顺序。
+- `test_cluster_deployment` 覆盖同 ID 缺配置、导入后内容仍残缺、同名冲突、归属未知和导入错误。`test_cluster_synchronization` 覆盖普通同步及兼容维护在预取失败时保留原角色，以及恢复后按原目标切换。隔离 Docker 同 ID 缺配置的换版验证需要核对两种镜像的补齐、节点健康和原账号资料。
 - `verify_cluster_node_upgrade.py`的隔离Docker开关覆盖自动控制更新保持原代次、账号镜像变化重建、组件恢复与最新资料保留、历史端大profile。`verify_cluster_ui.py`覆盖统一同步、明确失败动作及390px布局。
 - `test_cluster_backup`及原备份测试核对真实SQLite隔离复制、清单/逻辑摘要、同批组合对应和pending恢复事实。`verify_database_definitions.py`核对当前bench5/gateway7及原步骤1—4冻结来源。
 - 前端生产构建及`verify_cluster_ui.py`、`verify_cluster_draft_ui.py`、`verify_cluster_request_ui.py`覆盖冻结确认、迟到响应、独立/停用账号、原草稿/WS、历史未观测及390/1440布局；Rust执行fmt与全量测试。

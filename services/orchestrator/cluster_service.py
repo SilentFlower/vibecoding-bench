@@ -26,7 +26,7 @@ from account_update_identity import configured_release
 from cluster_nodes import NodeConfiguration, NodeCreate
 from cluster_ssh import NodeSshError, SshNode
 from cluster_store import ClusterStore
-from cluster_deployment import NodeDeployment, node_container_name
+from cluster_deployment import NodeDeployment, NodeImagePreparationError, node_container_name
 from cluster_synchronization import NodeSynchronization, NodeSynchronizationWait
 from cluster_preparation_files import PreparationFiles, PreparationFileScope
 from cluster_removal import NodeRemoval, NodeRemovalError
@@ -892,7 +892,7 @@ class ClusterService:
             self.store.save_preparation(node_id, revision, {**previous, 'state': 'preparing', 'phase': 'waiting',
                 'target_release': previous.get('target_release') or os.environ.get('V3_RELEASE'), 'retry_at': time.time() + 30,
                 'reason': str(error), 'reason_code': error.reason})
-        except Exception:
+        except Exception as error:
             if self.synchronization is not None:
                 try:
                     self.synchronization.recover_original(node_id)
@@ -901,9 +901,11 @@ class ClusterService:
                     pass
             previous = self.store.get(node_id)
             previous = json.loads(previous['preparation_json']) if previous['preparation_json'] else {}
+            reason = (str(error) if isinstance(error, NodeImagePreparationError)
+                else '节点同步未完成，原维护与备份已保留，请重试核对原任务')
             self.store.save_preparation(node_id, revision, {**previous, 'state': 'failed', 'phase': 'needs_check',
                 'target_release': previous.get('target_release') or os.environ.get('V3_RELEASE'), 'retry_at': time.time() + 60,
-                'reason': '节点同步未完成，原维护与备份已保留，请重试核对原任务'})
+                'reason': reason})
         finally:
             UPDATE_GATE.release_reserved(activity)
             with self.lock:
