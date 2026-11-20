@@ -76,8 +76,16 @@ class AgyController:
         directories = [Path(os.fsdecode(item[7:])) for item in environment if item.startswith(b'TMPDIR=')]
         if len(directories) != 1:
             raise ValueError('AGY_CRIU_DUMP')
+        supervisor = process_identity(kernel)[0]
+        environment = Path(f'/proc/{supervisor}/environ').read_bytes().split(b'\0')
+        generations = [Path(os.fsdecode(item[7:])) for item in environment if item.startswith(b'TMPDIR=')]
+        if len(generations) != 1:
+            raise ValueError('AGY_CRIU_DUMP')
+        generation = generations[0]
         directory = directories[0]
-        if (directory.parent != self.work_root / 'workers' or not re.fullmatch(r'[0-9a-f]{32}', directory.name)
+        # Rust 发送器按监督代次隔离 state；扫描范围须绑定当前父监督器，避免跨代选目录。
+        if (generation.parent != self.work_root or not re.fullmatch(r'[0-9a-f]{32}', generation.name)
+                or directory.parent != generation / 'state/workers' or not re.fullmatch(r'[0-9a-f]{32}', directory.name)
                 or directory.resolve(strict=True) != directory or not directory.is_dir()):
             raise ValueError('AGY_CRIU_DUMP')
         return directory

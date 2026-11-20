@@ -2073,7 +2073,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 账号内共享完整265700040字节封存映像，核对SHA和四封存，decode计数、分发大小、控制/内核/观察器/原生RSS/PSS/USS与cgroup独立展示。max_workers等于账号concurrency，范围1..64，跨模型和凭据代次共用物理上限。有限sender RAM为512+256×workers MiB，network 256MiB、CLI至少512MiB，总量受原预算约束；零沿明确无限策略。
 - AGY 启动快照与同身份热进程分别回收。快照占用原缓存池名额，优先复用正在运行的热进程。控制器在线时，`restore.state` 的 `waiting` 表示尚无快照，`preparing` 表示后台准备中，`ready` 以当前代次的可恢复快照为准。准备失败以 `unavailable` 和 `template_failed` 表达，普通启动继续可用。
 - 文件型模板观察器使用同一个 `/proc/PID/exe` 文件描述符核对实际文件身份和完整 SHA256。通过短暂的私有不可读映射取得内核报告的背板设备号和 inode，再按该组合核对目标进程映射。封存 memfd 按原设备号和 inode 核验。启动和恢复均要求唯一零偏移基址、非可写共享映射和四个固定指令指纹。模板启动固定 `GODEBUG=multipathtcp=0`，使当前 CRIU 4.2 能保存 AGY 的监听套接字。
-- 保存时从已核验内核进程的 `TMPDIR` 读取监督器分配的 `<work_root>/workers/<32 位小写十六进制 ID>`。工作目录须为实际目录且路径解析结果一致。将该目录传给 CRIU `--irmap-scan-path`，以定位绑定挂载里的 inotify 对象。快照保存后通过原生进程的 pidfd 回收由本容器 PID 1 接管的退出子进程，使原进程组 ID 可用于恢复。
+- 保存时从已核验内核的实际父监督进程读取 `TMPDIR`，要求其为 `<agy.work_root>/<代次ID>`。内核的 `TMPDIR` 必须是该代次下的 `state/workers/<worker ID>`。两个 ID 均为 32 位小写十六进制，worker 工作目录须为实际目录且路径解析结果一致。将该目录传给 CRIU `--irmap-scan-path`，以定位绑定挂载里的 inotify 对象。快照保存后通过原生进程的 pidfd 回收由本容器 PID 1 接管的退出子进程，使原进程组 ID 可用于恢复。
 - 模板和恢复失败在原 worker 清理前记录阶段和白名单原因，普通回退继承原单调截止。仅同一凭据代次的真实失败进入监督器状态，模板成功或凭据换代清除旧诊断。管理端在环境、代次、模块根和新鲜度核验后投影白名单诊断。原始异常路径、令牌及正文留在诊断字段之外。
 - cgroup v2读取memory.max、memory.current、memory.peak和memory.swap.current；v1支持memory子目录或挂载根的memory.limit_in_bytes、memory.usage_in_bytes、memory.max_usage_in_bytes，memory.memsw.usage_in_bytes减RAM占用才是swap。v1限制大于等于2^60沿既有规则按无限处理；缺失/损坏为未知，监督器与冻结RAM不一致时拒绝，不能把未知当作无限。
 - 正式模块根为/opt/v3/python，共享runtime_files位于/usr/local/bin。监督器和worker都冻结这两个搜索路径。AT HOME随worker私有发布，退役删除；采集复用账号开关与HTTP日志模式，长期有界脱敏快照位于flows/api/agy-prepared，原始执行材料沿临时worker目录和关闭清理。历史已退役采集保留七天；统一容量、内部旁路及读取合同由网关settings-database的AGY请求记录场景持有。普通输出采用有界匿名暂存，私有事件读取按帧及总字节控制背压。
@@ -2096,7 +2096,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 | 准入时、旧代收尾后或Popen前原截止已过 | `request_deadline_exceeded`，停止后续建代或启动副作用 |
 | 监督器异常或旧镜像缺协议 | 待对账或拒绝升级，不自动重放未知请求 |
 | 文件型映像的 `stat` 与目标映射设备号不同 | 依据已核验文件描述符的实际背板身份核对映射。无法确认背板、出现多个零偏移基址或可写共享映射时拒绝模板 |
-| 工作目录越界、同名链接或无法核对 | 拒绝本次快照，沿原普通启动路径处理 |
+| worker 目录越界、跨父监督代次、使用同名链接或无法核对 | 拒绝本次快照，沿原普通启动路径处理 |
 | 当前代次模板保存或恢复失败 | 保留受控阶段，沿原截止普通启动。原生业务仍只提交一次 |
 
 ### 5. Scenarios and Examples
@@ -2119,7 +2119,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 
 诊断示例。实际观察器未取得合格的目标映射时，可报告 `{"stage":"observer_start","reason":"execution_mapping_missing"}`。单凭 inode 或 `stat` 的设备号判断 OverlayFS 映射会产生错误准入判断。使用同一已核验文件描述符取得实际映射身份。
 
-绑定挂载中的文件句柄无法直接打开时，将当前 worker 目录交给 CRIU 查找 inode。恢复需复用原进程组 ID。保留已退出的原生子进程会占用原进程组 ID，退出时按保存前取得的 pidfd 回收。
+绑定挂载中的文件句柄无法直接打开时，将当前代次的 `state/workers/<worker ID>` 交给 CRIU 查找 inode。按平铺的 `<agy.work_root>/workers/<worker ID>` 校验会拒绝正式发送器创建的目录。恢复需复用原进程组 ID。保留已退出的原生子进程会占用原进程组 ID，退出时按保存前取得的 pidfd 回收。
 
 ### 6. Tests Required
 
@@ -2128,7 +2128,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `test_agy_runtime` 验证已观测控制状态、非法 JSON 响应与成功结果保留。`verify_agy_gemini.py` 验证普通 HTTP、SSE 首帧前后与尝试记录的状态，覆盖 200 和旧内核字段缺失的503兜底。固定原版回环验证非法工具正则导致的控制500及零模型提交。
 - `test_agy_supervisor`覆盖已过期准入、旧代关闭耗尽截止以及真实Worker.start过期；分别断言worker创建为0、新代启动为0及Popen调用为0，均返回 `request_deadline_exceeded`。
 - AGY 文件型模板应在普通业务权限的隔离 OverlayFS 上实际保存并恢复，核对首笔合成请求、原生 PID 和唯一提交。另验普通 memfd、错误文件身份、恢复失败及凭据换代。`test_agy_runtime`、`test_agy_supervisor` 和 `test_native_criu_settings` 核对阶段、原请求回退及旧代或非白名单原因的投影。
-- `native/criu/test_agy.py` 核对工作目录约束、链接拒绝和文件句柄失败的脱敏摘要。在 Linux 6.1 的隔离 OCI 容器中使用账号工作目录与 CRIU 目录的绑定挂载，验证基线保存失败、修复后从同一 PID 恢复，以及保存失败、恢复失败、凭据换代各自只投递一次合成请求。
+- `native/criu/test_agy.py` 核对正式监督代次布局、跨代目录和链接拒绝、文件句柄失败的脱敏摘要。在 Linux 6.1 的隔离 OCI 容器中使用账号工作目录与 CRIU 目录的绑定挂载，验证基线保存失败、修复后从同一 PID 恢复，以及保存失败、恢复失败、凭据换代各自只投递一次合成请求。授权现场验收时，用正式发送器的代次布局验证快照保存成功，实际模型请求须记录 `criu_restore` 并正常返回。
 - Rust的runtime_transport单测覆盖精确AGY目标及CC路径隔离；agy_sender_test、gemini_account_test、gemini_contract_test、runtime_transport_test覆盖鉴权、绑定、权限、源聚合与取消。
 - `verify_agy_gemini.py` 覆盖未知模型在流式和非流式入口返回 404、令牌范围外模型和未观测目录、已知模型暂不可用时的 503、临期凭据单次续期及有效期充足时继续复用。
 - 同一断网探针核对公开 Gemini 目录跨账号去重、异平台名称保持、基础名和旧档位名实际发送的目录型号及原生 ID、显式档位隔离、工具续轮沿用型号和请求诊断保留原名。
