@@ -156,6 +156,7 @@ class Worker:
                     return
             if event.get('type') == 'criu_prepared' and self.seed_template and self.ready:
                 self.parked = event['template_ready'] is True
+                self.seed_template = self.parked
                 return
             if event.get('type') in ['worker_error', 'process_closed']:
                 raise InputError('worker_start_failed')
@@ -282,6 +283,7 @@ class Supervisor:
         self.credential_identity=None
         self.restore_enabled=(os.environ.get('AGY_CRIU')=='1'
             and Path(__file__).resolve().parent==Path('/opt/v3/python/agy_runtime'))
+        self.template_failed=False
         self.last_start_source=None
         self.controls = {}
         self.closed = False
@@ -312,13 +314,16 @@ class Supervisor:
                 for worker in sorted(self.workers, key=lambda item: item.last_used, reverse=True):
                     if worker.busy:
                         continue
-                    if (now - worker.last_used >= 300 or worker.key in retained
+                    parked = getattr(worker,'parked',False)
+                    # 同身份的热进程和磁盘模板用途不同。模板不占用原生进程内存，仍受物理池上限约束。
+                    identity = (worker.key, parked)
+                    if (now - worker.last_used >= 300 or identity in retained
                             or (getattr(worker,'parked',False) and (worker.key[0]!=self.credential_generation
                                 or worker.credential_expires_at<=time.time_ns()//1_000_000))
                             or worker.process is None or worker.process.poll() is not None):
                         idle.append(worker)
                     else:
-                        retained.add(worker.key)
+                        retained.add(identity)
                 for worker in idle:
                     worker.busy=True
                 if not idle:
@@ -353,7 +358,8 @@ class Supervisor:
                 # 旧代退役也消费原请求预算，截止后禁止复用或启动下一代。
                 if time.monotonic() >= until:
                     raise InputError('request_deadline_exceeded')
-                for worker in self.workers:
+                # 优先复用已经启动的进程，把单次快照留给需要扩容的请求。
+                for worker in sorted(self.workers, key=lambda item: getattr(item,'parked',False)):
                     if not worker.busy and not worker.closed and worker.key == key:
                         worker.busy = True
                         return worker
@@ -366,8 +372,8 @@ class Supervisor:
                     stale.busy = True
                 elif len(self.workers) < self.config['max_workers']:
                     worker = Worker(self, value)
-                    worker.seed_template=(seed and value['type']=='prepare' and self.restore_available()
-                        and not any(getattr(item,'seed_template',False) for item in self.workers))
+                    worker.seed_template=seed and value['type']=='prepare' and self.can_seed_template()
+                    requested_template=worker.seed_template
                     self.workers.append(worker)
                     break
                 else:
@@ -382,13 +388,19 @@ class Supervisor:
                     self.condition.notify_all()
         try:
             worker.start(until)
+            if requested_template:
+                with self.condition:
+                    if worker.key[0]==self.credential_generation:
+                        self.template_failed=not worker.parked
             return worker
         except Exception:
             worker.close()
             with self.condition:
+                if requested_template and worker.key[0]==self.credential_generation:
+                    self.template_failed=True
                 self.workers.remove(worker)
                 self.condition.notify_all()
-            if worker.seed_template and time.monotonic()<until:
+            if requested_template and time.monotonic()<until:
                 return self.acquire(value,until,seed=False)
             raise
 
@@ -402,26 +414,35 @@ class Supervisor:
         snapshot=value['credential_snapshot']
         try:
             with self.condition:
-                if (self.closed or self.config['max_workers']<2 or self.workers!=[source] or not source.busy
-                        or source.closed or snapshot['credential_generation']!=self.credential_generation
+                if (self.closed or source not in self.workers or source.closed
+                        or snapshot['credential_generation']!=self.credential_generation
                         or time.monotonic()>=until or snapshot['expires_at']<=time.time_ns()//1_000_000):
+                    return
+                if template:
+                    if not self.can_seed_template():
+                        return
+                elif self.config['max_workers']<2 or self.workers!=[source] or not source.busy:
                     return
                 # 暖进程先登记到同一个物理池，业务与后台同时启动时共用并发上限。
                 worker=Worker(self, value)
-                worker.seed_template=template and self.restore_available() and not getattr(source,'seed_template',False)
+                worker.seed_template=template
                 worker.prewarming=True
                 self.workers.append(worker)
             worker.start(until)
             with self.condition:
                 if (not self.closed and not worker.closed and snapshot['credential_generation']==self.credential_generation
                         and snapshot['expires_at']>time.time_ns()//1_000_000):
+                    if template:
+                        self.template_failed=not worker.parked
                     worker.prewarming=False
                     worker.busy=False
                     worker.last_used=time.monotonic()
                     self.condition.notify_all()
         except Exception:
             # 补位失败后允许普通 checkout 按原路径恢复，原工具轮仍由原进程完成。
-            pass
+            with self.condition:
+                if template and snapshot['credential_generation']==self.credential_generation:
+                    self.template_failed=True
         finally:
             if worker and worker.prewarming:
                 try:
@@ -432,6 +453,11 @@ class Supervisor:
                             self.workers.remove(worker)
                         worker.prewarming=False
                         self.condition.notify_all()
+
+    def can_seed_template(self):
+        """在池锁内检查模板租约和剩余进程名额。@return 是否可启动零业务模板。"""
+        return (self.restore_available() and len(self.workers)<self.config['max_workers']
+            and not any(getattr(worker,'seed_template',False) for worker in self.workers))
 
     def continuation(self, value, until):
         """先完成原worker工具收尾，再允许下一次模型生成。@param value 新请求。@param until 截止。@return 无。"""
@@ -480,6 +506,7 @@ class Supervisor:
             if generation<self.credential_generation or generation==self.credential_generation and identity!=self.credential_identity:
                 raise InputError('stale_credential_generation')
             if generation>self.credential_generation:
+                self.template_failed=False
                 self.last_start_source=None
                 self.condition.notify_all()
             self.credential_generation=generation
@@ -560,6 +587,8 @@ class Supervisor:
                 except (InputError, OSError, ValueError):
                     worker.close()
                     with self.condition:
+                        if worker.key[0]==self.credential_generation:
+                            self.template_failed=True
                         self.workers.remove(worker)
                         self.condition.notify_all()
                     worker = self.acquire(value,until,seed=False)
@@ -569,16 +598,15 @@ class Supervisor:
             with self.condition:
                 if worker.key[0]==self.credential_generation:
                     self.last_start_source=getattr(worker,'start_source','exec')
-            if self.restore_available() and not worker.seed_template:
-                with self.condition:
-                    should_seed=self.config['max_workers']>1 and self.workers==[worker]
-                if should_seed:
-                    seed={key:value[key] for key in ('account_id','credential_snapshot','model','native_model','capture_enabled')}
-                    try:
-                        threading.Thread(target=self.prewarm_replacement,args=(worker,seed,until,True),daemon=True).start()
-                    except RuntimeError:
-                        # 背景预热失败时优先完成已接纳的模型请求。
-                        pass
+            with self.condition:
+                should_seed=self.can_seed_template()
+            if should_seed:
+                seed={key:value[key] for key in ('account_id','credential_snapshot','model','native_model','capture_enabled')}
+                try:
+                    threading.Thread(target=self.prewarm_replacement,args=(worker,seed,until,True),daemon=True).start()
+                except RuntimeError:
+                    # 背景预热失败时优先完成已接纳的模型请求。
+                    pass
             payload={'schema_version': 1, 'type': 'gemini_request', 'request_id': value['request_id'],
                 'model': value['model'], 'body': value['body'], 'system_prompt_policy':value['system_prompt_policy']}
             if value.get('gif_frames'):payload['gif_frames']=True
@@ -691,6 +719,18 @@ class Supervisor:
             template=available and any(getattr(worker,'parked',False) and not worker.closed and not worker.busy
                 and worker.key[0]==self.credential_generation and worker.credential_expires_at>time.time_ns()//1_000_000
                 for worker in self.workers)
+            preparing=available and any(worker.prewarming and getattr(worker,'seed_template',False)
+                for worker in self.workers)
+            if not available:
+                restore_state, restore_reason = 'unavailable', 'controller_unavailable'
+            elif template:
+                restore_state, restore_reason = 'ready', None
+            elif preparing:
+                restore_state, restore_reason = 'preparing', 'template_preparing'
+            elif self.template_failed:
+                restore_state, restore_reason = 'unavailable', 'template_failed'
+            else:
+                restore_state, restore_reason = 'waiting', None
             return {'state': 'busy' if active else 'ready',
                 'workers': sum(not getattr(worker,'parked',False) for worker in self.workers), 'active': active, 'idle_workers': len(idle),
                 'idle_pid': idle[0].ready['native_pid'] if idle else None,
@@ -699,8 +739,8 @@ class Supervisor:
                 'controller': memory(os.getpid()), 'image_bytes': self.pool.decoded_bytes,
                 'cgroup_memory':cgroup_memory(),
                 'image_decode_calls': self.pool.decode_calls, 'image_scope': 'account_workers',
-                'restore': {'schema_version':1,'state':'ready' if template else 'unknown' if available else 'unavailable',
-                    'reason':None if available else 'controller_unavailable','template_ready':template,
+                'restore': {'schema_version':1,'state':restore_state,
+                    'reason':restore_reason,'template_ready':template,
                     'last_start_source':self.last_start_source},
                 'processes': [{'controller': memory(worker.process.pid), 'native': memory(worker.ready['native_pid']) if worker.ready else None,
                     'observer': memory(worker.ready['observer_pid']) if worker.ready else None,

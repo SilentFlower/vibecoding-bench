@@ -501,7 +501,7 @@ fn requested_media(body: &Value) -> Result<BTreeSet<&str>, AppError> {
     Ok(media)
 }
 
-fn matching_tool_call(calls: &[Value], response: &Value) -> Option<usize> {
+fn matching_tool_call(calls: &[Value], response: &Value, position: usize) -> Option<usize> {
     let name = response["name"].as_str().filter(|name| !name.is_empty())?;
     let has_name = calls.iter().any(|call| call["name"] == name);
     let mut identifier = match response.get("id") {
@@ -519,7 +519,30 @@ fn matching_tool_call(calls: &[Value], response: &Value) -> Option<usize> {
         }
     });
     let result = matches.next()?.0;
-    matches.next().is_none().then_some(result)
+    if matches.next().is_none() {
+        return Some(result);
+    }
+    // 中转可能删除并行工具的 ID。回填顺序只用于同名项，并且整轮调用与结果数量仍须一致。
+    (identifier.is_none() && calls.get(position).is_some_and(|call| call["name"] == name))
+        .then_some(position)
+}
+
+#[cfg(test)]
+#[test]
+fn parallel_same_name_results_use_ids_or_the_original_order() {
+    let calls = [
+        json!({"name": "Read", "id": "first", "args": {"path": "a.txt"}}),
+        json!({"name": "Read", "id": "second", "args": {"path": "b.txt"}}),
+        json!({"name": "List", "id": "third"}),
+    ];
+    let read = json!({"name": "Read", "response": {}});
+    assert_eq!(matching_tool_call(&calls, &read, 0), Some(0));
+    assert_eq!(matching_tool_call(&calls, &read, 1), Some(1));
+    assert_eq!(matching_tool_call(&calls, &read, 2), None);
+    let id = json!({"name": "Read", "id": "second", "response": {}});
+    assert_eq!(matching_tool_call(&calls, &id, 0), Some(1));
+    let wrong_id = json!({"name": "Read", "id": "third", "response": {}});
+    assert_eq!(matching_tool_call(&calls, &wrong_id, 0), None);
 }
 
 fn matches_turn(turn: &ToolTurn, model: &str, body: &Value) -> bool {
@@ -564,7 +587,8 @@ fn matches_turn(turn: &ToolTurn, model: &str, body: &Value) -> bool {
     }
     let matched: Option<BTreeSet<_>> = responses
         .iter()
-        .map(|response| matching_tool_call(&turn.calls, response))
+        .enumerate()
+        .map(|(position, response)| matching_tool_call(&turn.calls, response, position))
         .collect();
     if matched.is_none_or(|indices| indices.len() != turn.calls.len()) {
         return false;

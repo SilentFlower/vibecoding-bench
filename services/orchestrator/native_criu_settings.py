@@ -67,7 +67,7 @@ def read_settings(runtime, row: dict, observation: dict | None = None) -> dict:
             value = observation.get('restore')
             # 仅白名单枚举及精确布尔值进入页面，旧/畸形遥测不能伪装成模板就绪。
             if (isinstance(value, dict) and type(value.get('schema_version')) is int and value['schema_version'] == 1
-                    and value.get('state') in ('ready', 'preparing', 'unavailable', 'unknown')
+                    and value.get('state') in ('ready', 'preparing', 'waiting', 'unavailable', 'unknown')
                     and type(value.get('template_ready')) is bool
                     and (value.get('reason') is None or isinstance(value['reason'], str) and value['reason'] in REASONS)
                     and (value['state'] == 'ready') == value['template_ready']):

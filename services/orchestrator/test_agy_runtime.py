@@ -681,6 +681,31 @@ class AgyRuntimeTests(unittest.TestCase):
         with self.assertRaises(InputError):
             gemini_contract.continuation_results(previous, [call], incoming)
 
+    def test_parallel_same_name_gemini_results_keep_original_call_order(self):
+        """双 Read 的 ID 被中转移除后，历史和活跃工具轮仍按原参数绑定。@return 无。"""
+        calls = [{'name': 'Read', 'id': f'call-{i}', 'args': {'path': f'{i}.txt'}} for i in range(2)]
+        previous = {'contents': [{'role': 'user', 'parts': [{'text': '读取两个文件'}]}]}
+        model = {'role': 'model', 'parts': [{'functionCall': {'name': call['name'], 'args': call['args']}}
+            for call in calls]}
+        values = [{'content': '文件甲'}, {'content': '文件乙'}]
+        results = {'role': 'user', 'parts': [{'functionResponse': {'name': 'Read', 'response': value}}
+            for value in values]}
+        incoming = {'contents': [*previous['contents'], model, results]}
+        self.assertEqual(gemini_contract.continuation_results(previous, calls, incoming), values)
+        generic = [step for step in gemini_contract.native_history(incoming['contents']) if 'generic' in step]
+        self.assertEqual([step['generic']['args']['path'] for step in generic], ['0.txt', '1.txt'])
+        self.assertEqual([step['generic']['result']['resultValue'] for step in generic],
+            [gemini_contract.native_value(value) for value in values])
+
+        for index, part in enumerate(results['parts']):
+            part['functionResponse']['id'] = calls[index]['id']
+            model['parts'][index]['functionCall']['id'] = calls[index]['id']
+        results['parts'].reverse()
+        self.assertEqual(gemini_contract.continuation_results(previous, calls, incoming), values)
+        results['parts'][0]['functionResponse']['id'] = calls[0]['id']
+        with self.assertRaisesRegex(InputError, 'gemini_pending_results_mismatch'):
+            gemini_contract.continuation_results(previous, calls, incoming)
+
     def test_oauth_startup_has_no_test_api_key_or_custom_ca_and_closes_failed_launch(self):
         """正式启动采用OAuth HOME，Popen失败也收回管道与FIFO。@return 无。"""
         bridge = NativeBridge(self.root / 'worker')

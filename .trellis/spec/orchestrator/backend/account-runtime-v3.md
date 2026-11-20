@@ -2051,11 +2051,13 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 数组 `items` 缺失、为 `null`、`true` 或裸 `{}` 时，规范化为 `{"anyOf":[{}]}`，使 AGY 1.5.9 出站包含 `items:{}`。`items:false` 以 `maxItems:0` 表示。`prefixItems` 与旧式 `items:[]` 投影为单个元素 Schema，闭合元组保留 `maxItems` 上限，已有更小上限优先。原生接口按统一元素 Schema 表达元组，位置约束会丢失。工具调用和结果仍使用原 JSON 值。字符串 `const` 与已有 `enum` 取交集并输出单值 `enum`。
 - 正式OAuth观察器核对完整原版SHA、映像身份及四个指令指纹。原生路由为0xa098532，channelModelResponseStream.Receive接收返回位置0x95d1e90，遥测0x89ed91f，codeassist Scanner栈检查后0x95f3212。Receive在AL给出接收结果、RCX给出已核对的GetChatMessageResponse；Scanner原块先私有归档，再解开SSE及response信封。EOF保留错误未知标记，业务成功同时要求源finishReason/安全拦截终态及真实控制RPC成功。部分文本、usage或通道关闭单独出现均不算成功。
 - 管理侧锁内冻结ready状态和AT-only快照。新代采用新worker，最高代次单调，同代不同AT拒绝；旧在途及原工具轮保留归属。工具结果匹配调用方、账号、原历史和函数身份，先回填原MCP并收口，再读当前ready快照开始下一模型轮。concurrency=1复用原许可；pending/reconcile期间可独立收口旧工具，普通发布继续关闭。同结果回执仅在原截止内幂等，副作用只回填一次。
+- 同轮多个 `functionCall` 可使用同一函数名。`functionResponse.id` 存在时按 ID 配对，允许反序回填。ID 省略且函数名重复时按该轮调用位置配对，要求对应位置名称相同、整轮数量一致并且每个调用只回填一次。活跃续轮仍须匹配完整原历史与调用参数。网关、原生续轮校验和历史导入使用同一规则。
 - 公共生成在原账号刷新锁内要求 AT 剩余有效期超过 430 秒。该值保留 AGY 1.5.9 的 310 秒断网启动实测余量和原生请求最长 120 秒预算。有效期不足时，由管理侧按原代次流程续期后再发布 AT-only 快照；在途工作继续使用自己的快照。
 - 监督器将请求墙钟截止转换为单调截止，接收剩余时间范围 `(0,125]` 秒并限制原请求预算最多120秒。`Supervisor.acquire(value, until)`在选择及创建worker前复核截止，旧代关闭后重新检查；`Worker.start(until)`在Popen前再次复核。退役计入原请求耗时，过期返回 `request_deadline_exceeded`，停止新代创建及原生启动。
 - 仅源错误code=401/status=UNAUTHENTICATED且没有候选及usage时参与有界恢复；须尚未交付、无工具结果历史、原作业实际收口、同账号ready新代且AT改变，最多一次。容量/控制失败、SSE首帧后、取消或过期均不重放。
 - 控制响应头已返回 4xx/5xx 时保留状态码，错误正文解析失败时同样适用。普通 HTTP 和 SSE 首帧前用该状态结束请求，已开始的 SSE 通过尾帧 `error.code` 交付同一状态。尝试记录使用真实控制状态和 `native_control` 阶段，根记录保留实际客户端 HTTP 状态。已确证的上游配额 429 优先，已保留的成功结果继续按成功收尾。
 - 账号内共享完整265700040字节封存映像，核对SHA和四封存，decode计数、分发大小、控制/内核/观察器/原生RSS/PSS/USS与cgroup独立展示。max_workers等于账号concurrency，范围1..64，跨模型和凭据代次共用物理上限。有限sender RAM为512+256×workers MiB，network 256MiB、CLI至少512MiB，总量受原预算约束；零沿明确无限策略。
+- AGY 启动快照与同身份热进程分别回收。快照占用原缓存池名额，优先复用正在运行的热进程。控制器在线时，`restore.state` 的 `waiting` 表示尚无快照，`preparing` 表示后台准备中，`ready` 以当前代次的可恢复快照为准。准备失败以 `unavailable` 和 `template_failed` 表达，普通启动继续可用。
 - cgroup v2读取memory.max、memory.current、memory.peak和memory.swap.current；v1支持memory子目录或挂载根的memory.limit_in_bytes、memory.usage_in_bytes、memory.max_usage_in_bytes，memory.memsw.usage_in_bytes减RAM占用才是swap。v1限制大于等于2^60沿既有规则按无限处理；缺失/损坏为未知，监督器与冻结RAM不一致时拒绝，不能把未知当作无限。
 - 正式模块根为/opt/v3/python，共享runtime_files位于/usr/local/bin。监督器和worker都冻结这两个搜索路径。AT HOME随worker私有发布，退役删除；采集复用账号开关与HTTP日志模式，长期有界脱敏快照位于flows/api/agy-prepared，原始执行材料沿临时worker目录和关闭清理。历史已退役采集保留七天；统一容量、内部旁路及读取合同由网关settings-database的AGY请求记录场景持有。普通输出采用有界匿名暂存，私有事件读取按帧及总字节控制背压。
 - 旧工具和实际Root active纳入维护/升级排空。未知退出阻止新准备，显式对账停止本环境三角色后只清派生缓存和AT副本，保留权威凭据及身份。环境维护回执核对expected_generation；读取不唤醒，UI轮询保留草稿和焦点。存在AGY映射时目标control/account都须声明agy-runtime-protocol=1。
@@ -2087,6 +2089,8 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 
 正常：Gemini工具首轮返回真实functionCall并保留原许可；管理侧发布AT2后，调用方带原历史和functionResponse续轮，原AT1 worker完成真实MCP回填，下一模型由AT2 worker执行。边界：管理侧reconcile时先完成旧工具并保留原截止内回执，恢复ready后继续；资源无限必须有真实cgroup依据。
 
+同轮调用 `Read(a)`、`Read(b)`、`Lookup(c)` 时，保留 ID 可按 `c`、`b`、`a` 交结果。若中转省略 ID，按原顺序提交三条结果。重复使用同一 ID 或缺少一条结果时返回 400。
+
 错误用法：以HTTP 200、Go RPC返回或EOF认定部分文本成功；正确处理是同时验证源终态和控制终态。错误用法：用发送器替身的通过结果宣称原生OAuth业务已验证；正确处理是独立运行固定原版、本地TLS及真实MCP闭环。真实Google身份、目录接受性及跨实际到期仍由具备授权账号和独立预算的后续验收承接。
 
 截止边界：旧代退役消耗剩余时间后，应使用原单调截止拒绝下一代。错误用法是收尾后重新给满预算或启动已过期进程；正确处理是继续沿用原 `until`，在建代和Popen前独立复核。
@@ -2103,6 +2107,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_agy_gemini.py` 覆盖未知模型在流式和非流式入口返回 404、令牌范围外模型和未观测目录、已知模型暂不可用时的 503、临期凭据单次续期及有效期充足时继续复用。
 - 同一断网探针核对公开 Gemini 目录跨账号去重、异平台名称保持、基础名和旧档位名实际发送的目录型号及原生 ID、显式档位隔离、工具续轮沿用型号和请求诊断保留原名。
 - `verify_agy_native_loopback.py --image <明确测试镜像> [--loader-root <显式glibc目录>]`使用真实网关/SQLite/account-sender/监督器/原版和本地TLS/MCP；容器network=none、UID1001、根只读、零真实外部生成。一次性CA只挂验证容器系统信任根，正式配置无测试CA或跳过校验开关。断言参数实际出站、源usage、两代AT、并发1工具回填、重复拒绝、64重复帧与SIGURG、截断/容量失败、断连取消、实际许可释放和共享映像。
+- `verify_agy_native_loopback.py --parallel-tools` 断言双同名调用省略 ID，以及按 3、4、3 个调用连续三轮回填时，每一轮实际出站的调用参数与结果逐项一致，重复回填零模型发送。`test_agy_supervisor` 断言空闲回收同时保留同身份热进程和就绪模板。
 - `verify_agy_runtime.py --native-image <明确镜像> [--crash]`保持零模型准备、两代、单次映像解码及正常/异常物理退出；`verify_agy_gemini.py`继续单独标记发送器替身证据；`verify_agy_environment_ui.py`覆盖1440/720/390px及实际控件边界、草稿、焦点和离页清理。制品资源须从当前受管理源码构建。
 
 ## Scenario: AGY账号系统文本同形体策略

@@ -117,7 +117,7 @@ def _legacy_tool_history(contents, tool_names):
     return normalized
 
 
-def _matching_call(calls, value):
+def _matching_call(calls, value, position):
     name = value.get('name')
     if not isinstance(name, str) or not name:
         return None
@@ -131,7 +131,12 @@ def _matching_call(calls, value):
         matches = [call for call in (named or calls) if call.get('id') == identifier]
     else:
         matches = named
-    return matches[0] if len(matches) == 1 else None
+    if len(matches) == 1:
+        return matches[0]
+    # 只在中转省略同名调用的 ID 时使用原顺序。整轮仍须全部匹配且每项只消费一次。
+    if identifier is None and len(named) > 1 and position < len(calls) and calls[position]['name'] == name:
+        return calls[position]
+    return None
 
 
 def native_history(contents, tool_names=(), gif=None):
@@ -171,7 +176,7 @@ def native_history(contents, tool_names=(), gif=None):
                 text(value.get('name'));result=value.get('response')
                 if not isinstance(result,dict):raise InputError('invalid_function_response:'+location)
                 # 保留本轮完整名称集合，避免第二个结果借其他工具名认领剩余调用。
-                call = _matching_call(planner['toolCalls'], value) if pending else None
+                call = _matching_call(planner['toolCalls'], value, len(tool_steps)) if pending else None
                 if call is None or call not in pending:raise InputError('ambiguous_or_unknown_function_response:'+location)
                 pending.remove(call)
                 # 结果使用原生 ResultValue，避免把 Gemini 对象再次包成 output 文本。
@@ -265,7 +270,7 @@ def decode_request(raw):
     if declared:
         # 现有 new-api 会丢弃历史函数 ID；请求单工具生成可避免同名并发结果错配。
         completion['disableParallelToolCalls']=True
-        notices.append({'field':'parallel_tool_calls','policy':'native_disable_requested;duplicate_names_rejected','reason':'new-api removes function IDs'})
+        notices.append({'field':'parallel_tool_calls','policy':'native_disable_requested;ordered_same_name_results','reason':'new-api removes function IDs'})
     policy=decode_policy(raw.get('system_prompt_policy',default_policy()))
     submitted,report=transform_system('\n'.join(system),policy)
     return {'request_id':ident,'prompt':'','messages':[],'history_id':None,'system':submitted,'system_prompt_policy':report,'model':MODEL,'tools':declared,'max_generations':1,
@@ -289,8 +294,8 @@ def continuation_results(previous, calls, incoming):
     values=[p['functionResponse'] for p in user['parts'] if 'functionResponse' in p]
     indices={id(call):index for index,call in enumerate(calls)}
     results = {}
-    for value in values:
-        call = _matching_call(calls, value)
+    for position, value in enumerate(values):
+        call = _matching_call(calls, value, position)
         index = indices.get(id(call))
         if index is None or index in results or not isinstance(value.get('response'), dict):
             raise InputError('gemini_pending_results_mismatch')
