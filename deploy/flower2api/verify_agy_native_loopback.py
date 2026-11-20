@@ -7,6 +7,7 @@ import io
 import hashlib
 import json
 import os
+import random
 import shutil
 import signal
 import sqlite3
@@ -303,8 +304,8 @@ def homoglyph_cases(database, request, base, wait_idle):
     return ['固定同形映射实际出站','普通和SSE一致','用户及历史保护','重复经过幂等','预算内大文本及超限零提交','暖worker复用','工具下一HTTP策略','源缓存及思考用量','策略账本与入站视图']
 
 
-def verify_png(request, wait_idle, database, base):
-    """验证历史恢复、工具续轮与真实图片出站。@param request 真实网关入口。@param wait_idle 排空观察。@param database 合成账号库。@param base Gemini 路径。@return 脱敏结果。"""
+def verify_png(request, request_ids, wait_idle, database, base):
+    """验证历史恢复、工具续轮与真实图片出站。@param request 真实网关入口。@param request_ids 公共请求标识。@param wait_idle 排空观察。@param database 合成账号库。@param base Gemini 路径。@return 脱敏结果。"""
     def image(color):
         def chunk(kind, data):
             return struct.pack('>I', len(data))+kind+data+struct.pack('>I', zlib.crc32(kind+data))
@@ -334,11 +335,33 @@ def verify_png(request, wait_idle, database, base):
         ])
     body['contents'].append(last)
     set_support(True)
+    observed_pid=None
     for count,operation in enumerate(('generateContent','streamGenerateContent?alt=sse'),1):
         status,raw=request(base+operation,body)
         require(status==200,'含工具历史及 PNG 的公共请求失败：'+str(status)+' '+raw.decode()[:350])
         wait_idle()
         require(len(Upstream.calls)==count,'合法请求的上游提交次数错误')
+        rid=request_ids[-1]
+        deadline=time.monotonic()+8
+        while True:
+            code,raw=request('/admin/request-diagnostics/'+rid,admin=True)
+            if code==200 and (attempts:=json.loads(raw)['attempts']):
+                attempt=attempts[-1]
+                code,raw=request(f'/admin/request-diagnostics/{rid}/captures/{attempt["attempt_id"]}',admin=True)
+                if code==200 and (tls:=(json.loads(raw).get('snapshot') or {}).get('wire_final')):
+                    break
+            require(time.monotonic()<deadline,'普通AGY请求缺少原生TLS写入快照');time.sleep(.1)
+        require(tls['source']=='agy_native_tls' and tls['complete']
+            and tls['original_body_sha256']==Upstream.calls[-1]['entity_sha256'], '原生TLS接受实体与回环实收不符')
+        require('synthetic-at-1' not in json.dumps(tls),'原生TLS快照包含未脱敏凭据')
+        runtime=attempt['runtime']
+        require(runtime and runtime['prepared_ms']>=runtime['preparation_wait_ms']+runtime['checkout_ms']
+            and runtime['warm_hit']==(count==2),'原生冷、热准备阶段无有效耗时')
+        if count==1:
+            require(runtime['worker_start_ms'] is not None,'冷启动计时缺失')
+            observed_pid=runtime['worker_pid']
+        else:
+            require(runtime['worker_start_ms'] is None and runtime['worker_pid']==observed_pid,'热进程记录错误')
         wire=Upstream.calls[-1]['body']['request']['contents']
         parts=[part for message in wire for part in message.get('parts',[])]
         photos=[part['inlineData'] for part in parts if 'inlineData' in part]
@@ -577,6 +600,63 @@ def verify_rejection_body_modes(request, request_ids, base):
     return ['antigravity','claude_code']
 
 
+def verify_egress_body_modes(request, request_ids, wait_idle, base):
+    """用真实出站验证完整、预览和摘要。@param request HTTP 入口。@param request_ids 入口关联 ID。@param wait_idle 原生排空。@param base Gemini 模型路径。@return 验证的采集来源。"""
+    from PIL import Image
+
+    def image(side, seed):
+        # 原生运行时会缩减长纯文本，使用真实 PNG 保留足够大的出站字节。
+        raw=io.BytesIO()
+        Image.frombytes('RGB',(side,side),random.Random(seed).randbytes(side*side*3)).save(raw,format='PNG')
+        return {'inlineData':{'mimeType':'image/png','data':base64.b64encode(raw.getvalue()).decode()}}
+
+    marker={'text':'合成完整正文 synthetic-at-1'}
+    body={'contents':[{'parts':[marker,image(700,1)]}]}
+    large={'contents':[{'parts':[marker,image(1040,2),image(1040,3)]}]}
+    adapted={**body,'safetySettings':[{'category':'HARM_CATEGORY_HARASSMENT','threshold':'BLOCK_MEDIUM_AND_ABOVE'}]}
+    sources=[]
+    for mode,setting,payload,source in [('debug','preview',body,'agy_native_tls'),
+            ('debug','full',large,'agy_native_tls'),('debug','full',adapted,'agy_http_transport'),
+            ('info','full',body,None)]:
+        require(request('/admin/settings',{'request_diagnostics_log_mode':mode,
+            'request_diagnostics_rejected_body':setting},admin=True)[0]==200,'出站设置保存失败')
+        count=len(Upstream.calls)
+        status,raw=request(base+'generateContent',payload)
+        require(status==200,'大正文实际出站失败：'+str(status)+' '+raw.decode()[:240])
+        wait_idle()
+        require(len(Upstream.calls)==count+1,'正文策略改变模型实际提交次数')
+        rid=request_ids[-1]
+        deadline=time.monotonic()+10
+        while True:
+            status,raw=request('/admin/request-diagnostics/'+rid,admin=True)
+            if status==200 and (attempts:=json.loads(raw)['attempts']):
+                status,raw=request(f'/admin/request-diagnostics/{rid}/captures/{attempts[-1]["attempt_id"]}',admin=True)
+                if status==200:
+                    capture=json.loads(raw)
+                    if mode=='info' or (capture.get('snapshot') or {}).get('wire_final'):break
+            require(time.monotonic()<deadline,'大正文出站快照缺失');time.sleep(.1)
+        if mode=='info':
+            require(attempts[-1]['log_mode']=='info' and capture['state'] in ('summary','disabled')
+                and 'snapshot' not in capture,'摘要模式仍发布出站正文')
+            continue
+        snapshot=capture['snapshot'];wire=snapshot['wire_final']
+        require(wire['source']==source and wire['complete'] and wire['original_body_sha256']==Upstream.calls[-1]['entity_sha256'],
+            '大正文采集来源或哈希不符')
+        stage=next(stage for stage in snapshot['stages'] if stage['stage']=='wire_final')
+        if setting=='full':
+            require(not wire['body_truncated'] and stage['status']=='complete' and '合成完整正文 [redacted]' in wire['body']
+                and 'synthetic-at-1' not in wire['body'],'完整模式缺少尾部或泄露凭据')
+            parts=[part for content in json.loads(wire['body'])['request']['contents'] for part in content['parts']]
+            require([part['inlineData'] for part in parts if 'inlineData' in part]
+                ==[part['inlineData'] for part in payload['contents'][0]['parts'] if 'inlineData' in part], '出站图片数据不完整')
+            require(len(wire['body'].encode())>(8 if payload is large else 1)*1024*1024,'测试未覆盖读写预算边界')
+            sources.append(source)
+        else:
+            require(wire['body_truncated'] and stage['status']=='truncated' and wire['original_body_bytes']>1024*1024,
+                '预览模式没有按原预算标记截断')
+    return sources
+
+
 def verify_native_safety(request, request_ids, wait_idle, base):
     """核对原生 AGY 组装、逐类阈值出站及回到普通路径。@param request HTTP 入口。@param request_ids 入口关联ID。@param wait_idle 原生排空。@param base 模型路径。@return 校验范围。"""
     require(request('/admin/settings',{'request_diagnostics_log_mode':'debug'},admin=True)[0]==200,
@@ -727,7 +807,7 @@ def verify_native_account_safety(request, request_ids, wait_idle, base, body):
                     require(time.monotonic()<end,'账号开关的原生提交回执未就绪');time.sleep(.1)
                 prepared=json.loads(snapshot['body'])
                 require(prepared['cascadeConfig']['plannerConfig']['completionConfigOverride']['disableSafetyFiltering'] is True
-                    and 'wire_final' not in snapshot,'账号开关缺少原生布尔值或进入出站改写')
+                    and (snapshot.get('wire_final') or {}).get('source')!='agy_http_transport','账号开关缺少原生布尔值或进入出站改写')
             else:
                 require(sent==body['safetySettings'],'关闭开关后未恢复客户端逐类阈值')
     return True
@@ -831,7 +911,7 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
         'secret':SECRET,'release_id':'synthetic-release'},'proxy_url':'http://127.0.0.1:19090',
         'allowed_origin':'https://cloudcode-pa.googleapis.com','native_capture_dir':'/state/capture',
         'agy':{'protocol_version':1,'source_sha256':SOURCE_SHA,'module_root':'/opt/v3/python' if installed_adapter else '/opt/orchestrator',
-            'binary_path':'/usr/local/bin/agy-1.5.9','work_root':'/state/native','max_workers':1,'memory_mib':768}}
+            'binary_path':'/usr/local/bin/agy-1.5.9','work_root':'/state/native','max_workers':1,'memory_mib':1536 if png else 768}}
     if capture_off:config.pop('native_capture_dir')
     Path('/state/sender.json').write_text(json.dumps(config))
     outputs=[];children=[]
@@ -889,10 +969,12 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
             database.close()
             return result
         if png:
-            result=verify_png(request,wait_idle,database,base)
+            result=verify_png(request,request_ids,wait_idle,database,base)
+            result['native_tls_and_runtime']=True
             result['claude_gateway_rejected_ingress']=verify_gateway_rejections(request)
             result['rejection_body_modes']=verify_rejection_body_modes(request,request_ids,base)
             result['native_safety_settings']=verify_native_safety(request,request_ids,wait_idle,base)
+            result['full_egress_sources']=verify_egress_body_modes(request,request_ids,wait_idle,base)
             database.close()
             return result
         body={'contents':[{'role':'user','parts':[{'text':'TLS_SYNTHETIC_TEXT'}]}],
@@ -905,6 +987,18 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
             require(len(Upstream.calls)==1,'关闭采集场景实际提交次数错误')
             wire=Upstream.calls[0]['body']['request']
             require(''.join(part.get('text','') for part in wire['systemInstruction']['parts'])=='ΑΒС ѕуѕtеm 中文','关闭采集时系统转换失效')
+            request_id=request_ids[-1]
+            until=time.monotonic()+10
+            while True:
+                status,raw=request(f'/admin/request-diagnostics/{request_id}',admin=True)
+                if status==200 and (attempts:=json.loads(raw)['attempts']) and attempts[-1]['finished_at']:break
+                require(time.monotonic()<until,'关闭采集时请求诊断尚未入账');time.sleep(.1)
+            attempt=attempts[-1]
+            require(attempt['runtime'] and attempt['runtime']['prepared_ms']>0,'关闭正文采集丢失本地准备耗时')
+            status,raw=request(f'/admin/request-diagnostics/{request_id}/captures/{attempt["attempt_id"]}',admin=True)
+            capture=json.loads(raw)
+            require(status==200 and capture['state']=='disabled' and 'snapshot' not in capture,
+                '关闭采集时快照接口未报告已关闭')
             for name in ['gemini-input.json','input-mapping.json','rpc.ndjson','native-stream.ndjson','protocol-output.ndjson']:
                 require(not list(Path('/state').rglob(name)),'关闭采集仍保留请求正文归档：'+name)
             require(request('/admin/settings',{'request_diagnostics_rejected_body':'full'},admin=True)[0]==200,
@@ -923,7 +1017,7 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
                 '完整正文绕过了账号内容采集开关')
             database.close()
             return {'passed':True,'evidence':'real_gateway_sender_native_tls_capture_off','network':'none',
-                'real_model_submissions':0,'synthetic_native_model_submissions':1,'checks':['采集关闭仍实际转换','收口后无请求正文归档','完整正文遵循账号内容采集开关']}
+                'real_model_submissions':0,'synthetic_native_model_submissions':1,'checks':['采集关闭仍实际转换','采集关闭保留本地准备耗时','收口后无请求正文归档','完整正文遵循账号内容采集开关']}
         status,raw=request(base+'generateContent',body)
         require(status==200,'固定原版非流式生成失败：'+str(status)+' '+raw.decode()[:500])
         result=json.loads(raw)
@@ -1080,7 +1174,7 @@ def main():
             if enabled:probe.append(flag)
         container=client.containers.run(args.image,probe,entrypoint=['python3'],detach=True,
             user='1001:1001',network_mode='none',read_only=True,cap_drop=['ALL'],security_opt=['no-new-privileges:true'],
-            mem_limit='768m',pids_limit=512,extra_hosts={host:'127.0.0.1'},tmpfs={'/tmp':'rw,nosuid,nodev,size=128m'},
+            mem_limit='1536m' if args.png else '768m',pids_limit=512,extra_hosts={host:'127.0.0.1'},tmpfs={'/tmp':'rw,nosuid,nodev,size=128m'},
             volumes=volumes,environment={'PYTHONPATH':python_package+':/usr/local/bin','DATABASE_DRIVER':'sqlite',
                 'DATABASE_DSN':'/state/gateway.sqlite','ADMIN_PASSWORD':'synthetic-admin','V3_SENDER_CONFIG':'/state/sender.json',
                 'V3_RUNTIME_URL':'http://127.0.0.1:8765','V3_INTERNAL_TOKEN':SECRET,'V3_DEPLOYMENT_ID':'synthetic',

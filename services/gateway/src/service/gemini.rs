@@ -36,6 +36,7 @@ use crate::service::diagnostics::{
 };
 use crate::service::runtime_transport::{self, PreparedTransport};
 use crate::service::system_update::{self, UpdateActivity};
+use crate::service::v3_scheduling::{RequestPhase, SchedulingRequest};
 use crate::service::{native_capture, runtime_bridge};
 
 pub(crate) const BODY_LIMIT: usize = 16 * 1024 * 1024;
@@ -176,8 +177,10 @@ fn gemini_error_body(error: AppError) -> (StatusCode, Value) {
             details.push(json!({"@type":"type.googleapis.com/google.rpc.BadRequest",
                 "fieldViolations":[{"field":field,"description":message}]}));
         }
-        return (StatusCode::BAD_REQUEST,
-            json!({"error":{"code":400,"status":"INVALID_ARGUMENT","message":message,"details":details}}));
+        return (
+            StatusCode::BAD_REQUEST,
+            json!({"error":{"code":400,"status":"INVALID_ARGUMENT","message":message,"details":details}}),
+        );
     }
     let (code, status, message) = match error {
         AppError::Unauthorized => (
@@ -628,7 +631,8 @@ pub async fn generate(
             let guard = trace
                 .as_ref()
                 .map(|trace| RequestTraceGuard::new(trace.clone()));
-            let future = generate_inner(state, action, request, token);
+            let future =
+                generate_inner(state, action, request, token, config.full_rejected_ingress);
             let result = if let Some(trace) = trace {
                 CURRENT_TRACE.scope(trace, future).await
             } else {
@@ -657,6 +661,7 @@ async fn generate_inner(
     action: String,
     request: Request,
     token: ApiToken,
+    full_egress: bool,
 ) -> Result<Response, AppError> {
     let started = Instant::now();
     diagnostics::request_context("antigravity", "gemini", None);
@@ -709,7 +714,7 @@ async fn generate_inner(
     let continuation = state.gemini_svc.continuation(&token, model, &body)?;
     // 原工具轮按原截止完成。新一轮模型生成使用本次 HTTP 的时间预算。
     let deadline = started + Duration::from_secs(AGY_REQUEST_SECONDS as u64);
-    let (account, admission, mut claim, resolved_model) =
+    let (account, admission, mut claim, resolved_model, scheduling) =
         if let Some((account, admission, claim)) = continuation {
             let resolved_model = claim.resolved_model.clone();
             let current = if media.is_empty() {
@@ -726,28 +731,22 @@ async fn generate_inner(
             if support != Some(true) {
                 return Err(AccountService::agy_media_error(&media, support.is_none()));
             }
-            (current, admission, Some(claim), resolved_model)
+            let scheduling =
+                state
+                    .account_svc
+                    .begin_agy_scheduling(token.id, &resolved_model, streaming);
+            scheduling.selected(&current, None);
+            (current, admission, Some(claim), resolved_model, scheduling)
         } else {
             let mut model_names = gemini_model_names(model, requested_tier);
             let accounts = state
                 .account_svc
                 .agy_candidates(&token, &model_names, &media)
                 .await?;
-            let mut selected = None;
-            for (model_index, account) in accounts {
-                if state
-                    .account_svc
-                    .get_account_rpm_status(&account)
-                    .await?
-                    .saturated
-                {
-                    continue;
-                }
-                selected = Some((model_index, account));
-                break;
-            }
-            let (model_index, account) = selected
-                .ok_or_else(|| AppError::ServiceUnavailable("没有支持该模型的AGY账号".into()))?;
+            let (model_index, account, scheduling) = state
+                .account_svc
+                .select_agy_smart(token.id, &model_names, accounts, streaming)
+                .await?;
             let queue = state
                 .account_svc
                 .get_or_create_queue(account.id, account.concurrency)
@@ -769,8 +768,10 @@ async fn generate_inner(
                 admission,
                 None,
                 model_names.swap_remove(model_index),
+                scheduling,
             )
         };
+    scheduling.phase(RequestPhase::Preparing);
     let model = RoutedModel {
         requested: model.to_string(),
         resolved: resolved_model,
@@ -798,6 +799,7 @@ async fn generate_inner(
         ));
     }
     let capture_requested = diagnostics::current_log_mode() == RequestLogMode::Debug;
+    let full_egress = capture_requested && full_egress;
     let ingress = native_capture::ingress(
         diagnostics::current_log_mode(),
         &ingress_headers,
@@ -863,6 +865,9 @@ async fn generate_inner(
         &body,
         streaming,
     );
+    if let Some(observer) = observation.as_mut() {
+        observer.track_scheduling(scheduling.clone());
+    }
     if let (Some(observer), Some((root, attempt))) = (observation.as_mut(), previous_turn) {
         observer.continuation(&root, &attempt);
     }
@@ -879,6 +884,7 @@ async fn generate_inner(
             system_prompt_policy.clone(),
             deadline,
             capture_requested,
+            full_egress,
             gif_frames,
             disable_safety_filtering,
         )
@@ -923,6 +929,7 @@ async fn generate_inner(
             observation,
             streaming,
             capture_requested,
+            full_egress,
             ingress,
             token.id,
             current,
@@ -937,6 +944,7 @@ async fn generate_inner(
             system_prompt_policy,
             gif_frames,
             disable_safety_filtering,
+            scheduling,
             &mut sender,
         )
         .await;
@@ -1066,6 +1074,7 @@ async fn drive(
     mut observation: Option<AgyAttemptTrace>,
     streaming: bool,
     capture_requested: bool,
+    full_egress: bool,
     ingress: Option<Value>,
     token_id: i64,
     account: Account,
@@ -1080,6 +1089,7 @@ async fn drive(
     system_prompt_policy: AgySystemPromptPolicy,
     gif_frames: bool,
     disable_safety_filtering: bool,
+    scheduling: SchedulingRequest,
     sender: &mut Option<mpsc::Sender<Result<Value, AppError>>>,
 ) -> Result<(), AppError> {
     let mut reader = EventReader {
@@ -1278,6 +1288,9 @@ async fn drive(
                         &body,
                         streaming,
                     );
+                    if let Some(observer) = observation.as_mut() {
+                        observer.track_scheduling(scheduling.clone());
+                    }
                     tracing::info!(
                         platform = "antigravity",
                         account_id = account.id,
@@ -1297,6 +1310,7 @@ async fn drive(
                             system_prompt_policy.clone(),
                             deadline,
                             capture_requested,
+                            full_egress,
                             gif_frames,
                             disable_safety_filtering,
                         )

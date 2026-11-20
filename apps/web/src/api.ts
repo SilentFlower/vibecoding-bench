@@ -608,10 +608,10 @@ export interface NativeTlsCapture extends Omit<NativeCapturePreview, 'original_b
   binding_generation?: number
 }
 
-/** AGY 账号出站适配层观察到的 HTTP 请求。 */
+/** AGY 实际 HTTP 传输或 TLS 接受写入中的 HTTP 请求。 */
 export interface AgyWireCapture extends NativeCapturePreview {
-  source: 'agy_http_transport'
-  representation: 'http_entity_from_transport_trace'
+  source: 'agy_http_transport' | 'agy_native_tls'
+  representation: 'http_entity_from_transport_trace' | 'http_entity_from_tls_accepted_write'
   status: 'complete' | 'incomplete'
   reason: string | null
   http_status: number | null

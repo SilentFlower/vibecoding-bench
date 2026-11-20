@@ -92,6 +92,8 @@ class NativeBridge:
                'AGY_BRIDGE_TYPES': str(ROOT/'resources/admission.json'), 'AGY_BRIDGE_BINARY': str(binary),
                'AGY_BRIDGE_GENERATION': self.generation, 'AGY_BRIDGE_EVENT_FD': str(event_w)}
         env.update(self.runtime_env)
+        if getattr(self, 'capture_tls', False):
+            env['AGY_BRIDGE_CAPTURE_TLS'] = '1'
         if self.ca_file:
             env['SSL_CERT_FILE'] = str(self.ca_file)
         if self.proxy_url:
@@ -162,6 +164,10 @@ class NativeBridge:
                     event = json.loads(line)
                     if event['generation'] != self.generation:
                         raise RuntimeError('观察器代次不匹配')
+                    if event['event'] == 'model_tls_write':
+                        # 头部可能含凭据，仅交给当前作业的脱敏路径。
+                        self._emit(event)
+                        continue
                     if event['event'] == 'observer_ready':
                         if event['source_sha256'] != EXPECTED_SHA:
                             raise RuntimeError('观察器执行体身份不匹配')

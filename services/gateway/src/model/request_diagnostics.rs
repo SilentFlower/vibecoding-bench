@@ -120,6 +120,23 @@ pub struct NativeRuntimeObservation {
     pub prepared_ms: u64,
 }
 
+impl NativeRuntimeObservation {
+    /// 校验发送器报告的进程身份和阶段包含关系。@return 是否可进入持久诊断。
+    pub(crate) fn is_valid(&self) -> bool {
+        Uuid::parse_str(&self.worker_id).is_ok()
+            && self.worker_pid != 0
+            && self
+                .kernel_generation
+                .as_ref()
+                .is_none_or(|id| Uuid::parse_str(id).is_ok())
+            && self.preparation_wait_ms.saturating_add(self.checkout_ms)
+                <= self.prepared_ms.saturating_add(2)
+            && self
+                .worker_start_ms
+                .is_none_or(|elapsed| elapsed <= self.checkout_ms.saturating_add(2))
+    }
+}
+
 /// 仅在网关与 sender 之间传递的原生观察头，消费后移除。
 pub(crate) const NATIVE_OBSERVATION_HEADER: &str = "x-v3-native-observation";
 

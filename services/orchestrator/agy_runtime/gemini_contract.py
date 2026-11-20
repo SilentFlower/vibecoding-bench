@@ -199,7 +199,7 @@ def native_history(contents, tool_names=(), gif=None):
 
 def decode_request(raw):
     """校验 Gemini 业务正文并给出原生执行参数。@param raw 控制信封。@return 内部请求。"""
-    checked_fields(raw,{'schema_version','type','request_id','model','body','system_prompt_policy','gif_frames','disable_safety_filtering'},'')
+    checked_fields(raw,{'schema_version','type','request_id','model','body','system_prompt_policy','gif_frames','disable_safety_filtering','full_egress'},'')
     if type(raw.get('schema_version')) is not int or raw['schema_version']!=1 or raw.get('type')!='gemini_request':raise InputError('invalid_schema')
     ident=text(raw.get('request_id'))
     if not ident or len(ident)>128:raise InputError('invalid_request_id')
@@ -209,6 +209,8 @@ def decode_request(raw):
     if type(enabled) is not bool:raise InputError('invalid_media_policy')
     native_safety=raw.get('disable_safety_filtering',False)
     if type(native_safety) is not bool:raise InputError('invalid_safety_policy')
+    full_egress=raw.get('full_egress',False)
+    if type(full_egress) is not bool:raise InputError('invalid_capture_policy')
     changes=[];notices=[];declared=definitions(body,changes)
     steps=native_history(body.get('contents'), (tool['name'] for tool in declared), gif_budget(body,enabled));system=[]
     if 'systemInstruction' in body:
@@ -264,7 +266,7 @@ def decode_request(raw):
     submitted,report=transform_system('\n'.join(system),policy)
     return {'request_id':ident,'prompt':'','messages':[],'history_id':None,'system':submitted,'system_prompt_policy':report,'model':MODEL,'tools':declared,'max_generations':1,
         'request_format':'gemini','gemini_body':copy.deepcopy(body),'native_completion':completion,'native_steps':steps,'schema_changes':changes,'compatibility_notes':notices,
-        'safety_egress_rules':safety_egress_rules}
+        'safety_egress_rules':safety_egress_rules,'full_egress':full_egress}
 def continuation_results(previous, calls, incoming):
     """把续轮结果绑定到本 worker 唯一待回填工具轮。@param previous 原始入站正文。@param calls 实际模型调用。@param incoming 新正文。@return 按函数名索引的真实结果。"""
     original=previous['contents'];contents=incoming['contents'];count=len(original)

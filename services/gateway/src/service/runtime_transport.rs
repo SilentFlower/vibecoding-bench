@@ -330,7 +330,7 @@ impl PreparedTransport {
         }
         Ok(())
     }
-    /// 在既有受信绑定中提交AGY请求。@param request_id 公共请求身份。@param api_token_id 调用方。@param snapshot AT-only快照。@param model 公开模型。@param native_model 观测枚举。@param body Gemini正文。@param system_prompt_policy 本HTTP冻结的账号策略。@param deadline 原单调截止。@param capture 采集策略。@param gif_frames 冻结的 GIF 策略。@param disable_safety_filtering 冻结的原生安全策略。@return 持续到原生作业收口的私有事件流。
+    /// 在既有受信绑定中提交AGY请求。@param request_id 公共请求身份。@param api_token_id 调用方。@param snapshot AT-only快照。@param model 公开模型。@param native_model 观测枚举。@param body Gemini正文。@param system_prompt_policy 本HTTP冻结的账号策略。@param deadline 原单调截止。@param capture 采集策略。@param full_egress 保存完整脱敏出站正文。@param gif_frames 冻结的 GIF 策略。@param disable_safety_filtering 冻结的原生安全策略。@return 持续到原生作业收口的私有事件流。
     pub async fn send_agy(
         &self,
         request_id: &str,
@@ -342,6 +342,7 @@ impl PreparedTransport {
         system_prompt_policy: AgySystemPromptPolicy,
         deadline: Instant,
         capture: bool,
+        full_egress: bool,
         gif_frames: bool,
         disable_safety_filtering: bool,
     ) -> Result<reqwest::Response, AppError> {
@@ -375,20 +376,21 @@ impl PreparedTransport {
             body,
             system_prompt_policy,
             capture_enabled: capture,
+            full_egress: false,
             gif_frames,
             disable_safety_filtering,
         };
-        timeout_at(
-            deadline,
-            client
-                .post(format!("{}/internal/agy/generate", binding.endpoint))
-                .bearer_auth(&binding.secret)
-                .json(&submission)
-                .send(),
-        )
-        .await
-        .map_err(|_| AppError::ServiceUnavailable("AGY发送等待超时".into()))?
-        .map_err(|_| AppError::BadGateway("AGY提交状态待对账".into()))
+        let mut request = client
+            .post(format!("{}/internal/agy/generate", binding.endpoint))
+            .bearer_auth(&binding.secret)
+            .json(&submission);
+        if full_egress {
+            request = request.header("x-v3-agy-egress-body", "full");
+        }
+        timeout_at(deadline, request.send())
+            .await
+            .map_err(|_| AppError::ServiceUnavailable("AGY发送等待超时".into()))?
+            .map_err(|_| AppError::BadGateway("AGY提交状态待对账".into()))
     }
 }
 
@@ -1579,6 +1581,11 @@ async fn agy_operation(
         let guard = ActiveRequest(state.active.clone());
         submission.capture_enabled =
             submission.capture_enabled && config.native_capture_dir.is_some();
+        submission.full_egress = !prepare
+            && submission.capture_enabled
+            && headers
+                .get("x-v3-agy-egress-body")
+                .is_some_and(|value| value == "full");
         started = true;
         let response = state
             .agy_pool

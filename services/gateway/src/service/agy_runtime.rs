@@ -300,6 +300,7 @@ impl AgyPool {
             .env_clear()
             .env("PATH", "/usr/local/bin:/usr/bin:/bin")
             .env("TMPDIR", &generation_root)
+            .env("AGY_CAPTURE_NATIVE_TLS", "1")
             .env(
                 "PYTHONPATH",
                 format!("{}:/opt/v3/python:/usr/local/bin", native.module_root),
@@ -419,6 +420,9 @@ impl AgyPool {
         }
         if submission.gif_frames {
             value["gif_frames"] = Value::Bool(true);
+        }
+        if submission.full_egress {
+            value["full_egress"] = Value::Bool(true);
         }
         if submission.disable_safety_filtering {
             value["disable_safety_filtering"] = Value::Bool(true);

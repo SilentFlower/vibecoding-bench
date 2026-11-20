@@ -515,7 +515,7 @@ async fn list_accounts(
             if a.is_antigravity() {
                 obj["credential_state"] = state.account_svc.agy_state(a.id).await?;
                 obj["agy_request_usage"] = json!(agy_usage.get(&a.id));
-                append_account_live_metrics(&state.account_svc, a, &mut obj).await;
+                append_agy_account_metrics(&state.account_svc, a, &mut obj).await;
             }
             data.push(obj);
             continue;
@@ -1002,6 +1002,17 @@ async fn append_account_live_metrics(
     capacity
 }
 
+/// 附加反重力账号的实时容量和评分。@param service 账号服务。@param account 当前账号。@param view 账号视图。@return 无。
+async fn append_agy_account_metrics(service: &AccountService, account: &Account, view: &mut Value) {
+    let capacity = append_account_live_metrics(service, account, view).await;
+    if service.scheduler().is_some() {
+        match service.v3_summary(account, &capacity, 0).await {
+            Ok(summary) => view["v3_scheduling"] = json!(summary),
+            Err(_) => view["v3_scheduling_error"] = json!("调度观测不可用"),
+        }
+    }
+}
+
 /// 读取当前账号视图的已记录用量。@param state 网关状态。@param ids 反重力账号。@return 缺失表示诊断统计不可用。
 async fn agy_account_usage(state: &AppState, ids: &[i64]) -> HashMap<i64, AgyRequestUsage> {
     let Some(store) = state.gateway_svc.diagnostics_store() else {
@@ -1026,7 +1037,7 @@ async fn get_account(
     if account.is_antigravity() {
         value["credential_state"] = state.account_svc.agy_state(id).await?;
         value["agy_request_usage"] = json!(agy_account_usage(&state, &[id]).await.get(&id));
-        append_account_live_metrics(&state.account_svc, &account, &mut value).await;
+        append_agy_account_metrics(&state.account_svc, &account, &mut value).await;
     }
     value["work_control"] =
         serde_json::to_value(state.account_svc.work_controls.snapshot(id).await?)
@@ -3848,7 +3859,7 @@ mod tests {
         }
     }
 
-    /// 反重力账号列表和详情复用实际网关槽位与 RPM。@return 无。
+    /// 反重力账号列表和详情复用实际网关槽位、RPM 和评分。@return 无。
     #[tokio::test]
     async fn agy_account_views_report_live_capacity() {
         let (app, _, _, pool, service) = test_router_with_scheduling(true).await;
@@ -3897,7 +3908,9 @@ mod tests {
             assert_eq!(view["queued_requests"], 0);
             assert_eq!(view["rpm_current"], 1);
             assert_eq!(view["agy_request_usage"]["seven_day"]["requests"], 0);
-            assert!(view.get("v3_scheduling").is_none());
+            let summary = &view["v3_scheduling"];
+            assert_eq!(summary["config"]["weights"][1], 0.0);
+            assert_eq!(summary["config"]["reset_weight"], 0.0);
         }
     }
 

@@ -347,7 +347,7 @@ onUnmounted(() => { mounted = false; listGeneration++; detailGeneration++; listC
       <div class="page-heading"><div><p class="page-eyebrow">观测与诊断</p><h1>请求记录</h1><p class="page-description">从请求结果、用量到处理链路，快速找到需要关注的调用。</p></div></div>
       <div class="request-diagnostics-settings">
         <div class="request-mode"><ChoiceSelect :model-value="mode" label="后续请求日志" :options="[{value:'unknown',label:'读取中',disabled:true},{value:'info',label:'info · 摘要'},{value:'debug',label:'debug · 脱敏内容'}]" :disabled="modeSaving || mode === 'unknown'" @update:model-value="saveDiagnostics" /></div>
-        <div v-if="mode === 'debug'" class="request-mode"><ChoiceSelect :model-value="rejectedBody" label="本地拒绝入站正文" :options="[{value:'preview',label:'限长预览'},{value:'full',label:'完整正文 · 脱敏'}]" :disabled="modeSaving" @update:model-value="saveDiagnostics" /></div>
+        <div v-if="mode === 'debug'" class="request-mode"><ChoiceSelect :model-value="rejectedBody" label="正文采集范围" :options="[{value:'preview',label:'限长预览'},{value:'full',label:'完整正文 · 脱敏'}]" :disabled="modeSaving" @update:model-value="saveDiagnostics" /></div>
       </div>
     </header>
     <p v-if="modeError" role="alert" class="text-destructive">{{ modeError }}</p>

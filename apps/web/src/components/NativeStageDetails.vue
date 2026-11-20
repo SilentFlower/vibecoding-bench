@@ -17,7 +17,10 @@ const rawStages = computed<RawStage[]>(() => {
   return props.snapshot.wire_final ? ['ingress', 'decoded_gemini', 'cc_prepared', 'wire_final'] : ['ingress', 'decoded_gemini', 'cc_prepared'];
 });
 const tlsWire = computed(() => props.snapshot.wire_final?.source === 'native_tls_uprobe' ? props.snapshot.wire_final : undefined);
-const agyWire = computed(() => props.snapshot.wire_final?.source === 'agy_http_transport' ? props.snapshot.wire_final : undefined);
+const agyWire = computed(() => {
+  const wire = props.snapshot.wire_final;
+  return wire?.source === 'agy_http_transport' || wire?.source === 'agy_native_tls' ? wire : undefined;
+});
 const decisions = computed(() => (props.snapshot.header_policy?.decisions ?? []).filter(item => action.value === 'all' || item.action === action.value));
 const preview = computed(() => {
   const snapshot = props.snapshot;
@@ -50,6 +53,7 @@ function actionLabel(value: string): string {
 /** 展示阶段及证据完整性。@param value 持久状态或阶段。@return 中文标签。 */
 function label(value: string): string {
   if(value==='cc_prepared' && props.snapshot.stage==='agy_prepared')return 'AGY原生提交';
+  if(value==='wire_final' && props.snapshot.wire_final?.source==='agy_native_tls')return '最终 TLS 写出';
   if(value==='wire_final' && (props.snapshot.stage==='agy_prepared' || props.snapshot.stage==='agy_egress'))return '实际出站';
   return ({ decoded_gemini: '已解码Gemini', agy_prepared:'AGY原生提交', ingress: '入口原文', header_policy: '头部处理', cc_prepared: '原生组装后', wire_final: '最终TLS写出', complete: '完整', truncated: '已截断', unavailable: '未采集', failed: '采集失败', incomplete: '采集不完整' } as Record<string, string>)[value] ?? value;
 }
@@ -99,7 +103,7 @@ function bodyText(): string {
     </div></details>
     <details v-if="agyWire" class="request-code-block request-wire-evidence" data-agy-wire-final>
       <summary>实际出站证据</summary>
-      <div class="request-wire-content"><p>实体完整性 {{ label(agyWire.status) }} · 上游 HTTP {{ agyWire.http_status ?? '未观测' }}</p><p class="text-muted-foreground">请求头和正文来自账号出站适配层的实际 HTTP 传输记录。</p></div>
+      <div class="request-wire-content"><p>实体完整性 {{ label(agyWire.status) }}<template v-if="agyWire.http_status != null"> · 上游 HTTP {{ agyWire.http_status }}</template></p><p class="text-muted-foreground">{{ agyWire.source === 'agy_native_tls' ? '请求头和正文来自 AGY 原生 TLS 写入实际接受的 HTTP 字节。' : '请求头和正文来自账号出站适配层的实际 HTTP 传输记录。' }}</p></div>
     </details>
     <section class="request-section"><div class="request-section-head"><h3>脱敏原文</h3><div class="request-stage-tabs" role="group" aria-label="原文阶段"><button v-for="stage in rawStages" :key="stage" type="button" :class="{active:rawStage===stage}" :aria-pressed="rawStage===stage" @click="rawStage=stage">{{ label(stage) }}</button></div></div>
       <template v-if="preview"><p class="form-help request-evidence-hash">原正文 {{ preview.original_body_bytes ?? '未观测' }} 字节 · SHA256 {{ preview.original_body_sha256 ?? '未观测' }}</p><p v-if="preview.body_truncated || preview.headers_truncated" role="status" class="form-help">内容已截断。正文：{{ preview.body_truncated ? '已截断' : '完整' }}，请求头：{{ preview.headers_truncated ? '已截断' : '完整' }}。</p><details open class="request-code-block"><summary>请求头</summary><pre>{{ preview.headers.map(([name,value])=>name+': '+value).join('\n') }}</pre></details><details :open="preview.body.length <= 1024 * 1024" class="request-code-block"><summary>请求正文</summary><pre>{{ bodyText() }}</pre></details></template><div v-else class="request-empty-capture"><strong>本次未保存所选阶段的原文</strong><p>组装中间值与最终 TLS 观测分别展示。</p></div>

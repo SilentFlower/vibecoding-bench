@@ -18,12 +18,16 @@ from runtime_files import atomic_json, directory_fd
 
 BODY_LIMIT = 2 * 1024 * 1024
 FILE_LIMIT = 6 * 1024 * 1024
+FULL_EGRESS_BODY_LIMIT = 64 * 1024 * 1024
+EGRESS_FILE_LIMIT = 2 * FULL_EGRESS_BODY_LIMIT + FILE_LIMIT
 STORAGE_LIMIT = 1024 * 1024 * 1024
 RETENTION_MS = 7 * 86400 * 1000
 SENSITIVE = re.compile(r'authorization|cookie|token|api[-_]?key|password|secret', re.I)
 PREVIEW_KEYS = {'source','representation','headers','body','body_truncated','headers_truncated','original_body_bytes','original_body_sha256','captured_at_ms'}
 EGRESS_SOURCE = 'agy_http_transport'
 EGRESS_REPRESENTATION = 'http_entity_from_transport_trace'
+NATIVE_TLS_SOURCE = 'agy_native_tls'
+NATIVE_TLS_REPRESENTATION = 'http_entity_from_tls_accepted_write'
 EGRESS_KEYS = PREVIEW_KEYS | {'status','http_status','complete','reason'}
 HEADER_TOKEN = re.compile(r"[!#$%&'*+.^_\x60|~0-9A-Za-z-]{1,128}")
 
@@ -87,7 +91,16 @@ def _save(folder, value):
         metadata=os.fstat(lock)
         if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink!=1:raise ValueError('采集写入锁无效')
         if os.geteuid()==0:os.fchown(lock,owner.st_uid,owner.st_gid)
-        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        # 三阶段共享容量锁。后台写入短暂等待，避免 TLS 快照挤掉紧随其后的拒绝入站。
+        lock_deadline = time.monotonic() + .15
+        while True:
+            try:
+                fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= lock_deadline:
+                    raise
+                time.sleep(.005)
         target,unused=_snapshot_directory(folder)
         os.close(target)
         # 同一账号的入站、提交快照和历史调试材料共同占用预算；路径逐级拒绝链接。
@@ -111,7 +124,8 @@ def _save(folder, value):
                         elif stat.S_ISLNK(metadata.st_mode):raise ValueError('采集存储包含链接')
             finally:os.close(source)
         raw_size=len(json.dumps(value,ensure_ascii=False).encode())
-        if raw_size>FILE_LIMIT:raise ValueError('AGY快照超过上限')
+        limit=EGRESS_FILE_LIMIT if value.get('full_body') else FILE_LIMIT
+        if raw_size>limit:raise ValueError('AGY快照超过上限')
         for _,parent,name,previous in sorted(entries):
             if total+raw_size<=STORAGE_LIMIT:break
             source=directory_fd(Path(parent))
@@ -164,8 +178,8 @@ def _channel(root, name):
     return root/name
 
 
-def save_egress(root, account_id, attempt_id, trace, expected, incoming, forwarded, bearer):
-    """保存实际传输观察及逐头处理。@param root 采集根。@param account_id 账号。@param attempt_id 尝试。@param trace 实际传输观察。@param expected 本次发送实体。@param incoming AGY 交给适配层的头。@param forwarded 适配层保留的头。@param bearer 当前访问凭据。@return 无。"""
+def save_egress(root, account_id, attempt_id, trace, expected, incoming, forwarded, bearer, *, native_tls=False, full_body=False):
+    """保存实际传输观察及逐头处理。@param root 采集根。@param account_id 账号。@param attempt_id 尝试。@param trace 实际传输观察。@param expected 本次发送实体。@param incoming AGY 交给适配层的头。@param forwarded 适配层保留的头。@param bearer 当前访问凭据。@param native_tls 是否原生TLS接受字节。@param full_body 是否保存完整脱敏正文。@return 无。"""
     raw=trace.body(expected)
     headers=trace.headers or []
     original_headers={name.lower() for name,_ in incoming if HEADER_TOKEN.fullmatch(name)}
@@ -190,21 +204,25 @@ def save_egress(root, account_id, attempt_id, trace, expected, incoming, forward
             entity=raw
             if ['content-encoding','gzip'] in headers:
                 with gzip.GzipFile(fileobj=BytesIO(raw)) as stream:
-                    entity=stream.read(64*1024*1024+1)
-            if len(entity)>64*1024*1024:raise ValueError('出站预览过大')
+                    entity=stream.read(FULL_EGRESS_BODY_LIMIT+1)
+            if len(entity)>FULL_EGRESS_BODY_LIMIT:raise ValueError('出站正文过大')
             related=({name:value} for name,value in (*incoming,*headers))
             cleaned=_redacted(json.loads(entity),bearer,related).encode()
-            body=cleaned[:BODY_LIMIT//2].decode('utf-8',errors='ignore')
-            truncated=len(cleaned)>BODY_LIMIT//2
+            budget=FULL_EGRESS_BODY_LIMIT if full_body else BODY_LIMIT//2
+            body=cleaned[:budget].decode('utf-8',errors='ignore')
+            truncated=len(cleaned)>budget
         except (ValueError,OSError,EOFError,zlib.error):truncated=True
-    wire={'source':EGRESS_SOURCE,'representation':EGRESS_REPRESENTATION,'status':'complete' if raw is not None else 'incomplete',
+    source,representation=(NATIVE_TLS_SOURCE,NATIVE_TLS_REPRESENTATION) if native_tls else (EGRESS_SOURCE,EGRESS_REPRESENTATION)
+    wire={'source':source,'representation':representation,'status':'complete' if raw is not None else 'incomplete',
         'complete':raw is not None,'reason':None if raw is not None else 'HTTP_PARTIAL','http_status':trace.status,
         'body':body,'body_truncated':truncated,'headers':display,'headers_truncated':len(display)<len(headers),
         'original_body_bytes':len(raw) if raw is not None else None,
         'original_body_sha256':hashlib.sha256(raw).hexdigest() if raw is not None else None}
     decisions=[]
     for name in sorted(original_headers|sent_values.keys()):
-        if name in sent_values and name in forwarded_values and sent_values[name]==forwarded_values[name]:
+        if native_tls:
+            action,reason='runtime','AGY 原生 TLS 写入观察'
+        elif name in sent_values and name in forwarded_values and sent_values[name]==forwarded_values[name]:
             action,reason='keep','出站适配沿用 AGY 原生值'
         elif name in sent_values:
             action,reason='runtime','按实际目标或正文重新生成'
@@ -216,18 +234,20 @@ def save_egress(root, account_id, attempt_id, trace, expected, incoming, forward
     value={'schema_version':1,'stage':'agy_egress','account_id':account_id,'attempt_id':_identifier(attempt_id),
         'captured_at_ms':int(time.time()*1000),'wire_final':wire,'decisions':decisions[:128],
         'observed_count':len(decisions)}
+    if full_body:value['full_body']=True
     _save(_channel(root,'egress'), value)
 
 
 def _read(root, account_id, attempt_id, stage, allow_expired=False):
+    file_limit=EGRESS_FILE_LIMIT if stage=='agy_egress' else FILE_LIMIT
     directory = directory_fd(Path(root) / 'snapshots')
     try:
         descriptor = os.open(_identifier(attempt_id) + '.json', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
         with os.fdopen(descriptor, 'rb') as stream:
             metadata = os.fstat(stream.fileno())
-            if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1 or metadata.st_mode & 0o077 or metadata.st_size > FILE_LIMIT:
+            if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1 or metadata.st_mode & 0o077 or metadata.st_size > file_limit:
                 raise ValueError('AGY快照文件无效')
-            value = json.loads(stream.read(FILE_LIMIT + 1))
+            value = json.loads(stream.read(metadata.st_size + 1))
     finally: os.close(directory)
     if not isinstance(value,dict) or type(value.get('schema_version')) is not int or value['schema_version'] != 1 or type(value.get('account_id')) is not int or value['account_id'] != account_id or value.get('attempt_id') != attempt_id or value.get('stage') != stage:
         raise ValueError('AGY快照归属无效')
@@ -340,14 +360,14 @@ def _validate_preview(value,budget):
 def _validate_egress(value):
     keys={'schema_version','stage','account_id','attempt_id','captured_at_ms','wire_final','decisions','observed_count'}
     wire=value.get('wire_final')
-    if set(value)!=keys or not isinstance(wire,dict) or set(wire)!=EGRESS_KEYS-{'captured_at_ms'}:
+    if set(value)-{'full_body'}!=keys or type(value.get('full_body',False)) is not bool or not isinstance(wire,dict) or set(wire)!=EGRESS_KEYS-{'captured_at_ms'}:
         raise ValueError('出站采集字段无效')
-    if wire.get('source')!=EGRESS_SOURCE or wire.get('representation')!=EGRESS_REPRESENTATION:
+    if (wire.get('source'),wire.get('representation')) not in ((EGRESS_SOURCE,EGRESS_REPRESENTATION),(NATIVE_TLS_SOURCE,NATIVE_TLS_REPRESENTATION)):
         raise ValueError('出站采集来源无效')
     status=wire.get('http_status')
     if status is not None and (type(status) is not int or not 100<=status<=599):raise ValueError('上游状态无效')
     if wire.get('complete') is True and wire.get('status')=='complete' and wire.get('reason') is None:
-        _validate_preview(wire,BODY_LIMIT//2)
+        _validate_preview(wire,FULL_EGRESS_BODY_LIMIT if value.get('full_body') else BODY_LIMIT//2)
     elif (wire.get('complete') is False and wire.get('status')=='incomplete' and wire.get('reason')=='HTTP_PARTIAL'
           and wire.get('original_body_bytes') is None and wire.get('original_body_sha256') is None and wire.get('body')==''):
         _validate_preview({**wire,'original_body_bytes':0,'original_body_sha256':'0'*64},BODY_LIMIT//2)
@@ -428,7 +448,8 @@ def read_snapshot(root, account_id, attempt_id):
         for row in value['stages']:
             section=sections.get(row['stage'])
             if section and section.get('body_truncated'):row['status']='truncated'
-        value['stages'].append({'stage':'wire_final','source':EGRESS_SOURCE,'representation':EGRESS_REPRESENTATION,'status':wire['status']})
+        status='truncated' if wire['complete'] and wire['body_truncated'] else wire['status']
+        value['stages'].append({'stage':'wire_final','source':wire['source'],'representation':wire['representation'],'status':status})
         decisions.extend({**row,'stage':'egress'} for row in egress['decisions'])
         count+=egress['observed_count']
     if decisions and value['stage']!='agy_ingress':

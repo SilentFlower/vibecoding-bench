@@ -6,15 +6,17 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use super::{
-    AccountService, OAUTH_LOCK_TTL, OAUTH_WAIT_ATTEMPTS, OAUTH_WAIT_RETRY,
-    build_oauth_credential_snapshot, validate_account_usage_limits,
+    AccountService, DEFAULT_REQUEST_SLOT_UNITS, OAUTH_LOCK_TTL, OAUTH_WAIT_ATTEMPTS,
+    OAUTH_WAIT_RETRY, build_oauth_credential_snapshot, validate_account_usage_limits,
 };
 use crate::error::AppError;
 use crate::model::account::{Account, AccountAuthType, AccountStatus};
 use crate::model::api_token::ApiToken;
 use crate::model::proxy::ProxyConnection;
+use crate::model::request_diagnostics::DiagnosticParameters;
 use crate::service::agy_contract::{AGY_REQUEST_SECONDS, AgyAccessSnapshot, AgyModelId};
 use crate::service::runtime_bridge::agy_request;
+use crate::service::v3_scheduling::{SchedulingCandidate, SchedulingRequest};
 use tokio::time::sleep;
 
 // AGY 1.5.9 离线启动实测在剩余 299 秒时要求登录，310 秒时可就绪。
@@ -261,15 +263,68 @@ impl AccountService {
         if result.is_empty() && media_rejected {
             return Err(Self::agy_media_error(media, media_unknown));
         }
-        let counts = self.active_request_counts().await;
-        result.sort_by_key(|(model_index, account)| {
-            (
-                *model_index,
-                counts.get(&account.id).copied().unwrap_or(0),
-                account.id,
-            )
-        });
+        result.sort_by_key(|(model_index, _)| *model_index);
         Ok(result)
+    }
+
+    /// 为反重力实际选定的模型冻结同类延迟分组。@param token_id 调用方。@param model 实际公开档位。@param streaming 是否流式。@return 请求调度租约。
+    pub(crate) fn begin_agy_scheduling(
+        &self,
+        token_id: i64,
+        model: &str,
+        streaming: bool,
+    ) -> SchedulingRequest {
+        self.selection_scheduler.begin_with_parameters(
+            token_id,
+            None,
+            &DiagnosticParameters {
+                model: Some(model.into()),
+                stream: Some(streaming),
+                ..Default::default()
+            },
+        )
+    }
+
+    /// 先选仍可接单的模型档位，再沿共享的优先级、容量和智能评分择号。@param token_id 调用方。@param models 已排序模型名。@param accounts 已通过模型和权限校验的候选。@param streaming 是否流式。@return 实际档位、账号和调度租约。
+    pub(crate) async fn select_agy_smart(
+        &self,
+        token_id: i64,
+        models: &[String],
+        accounts: Vec<(usize, Account)>,
+        streaming: bool,
+    ) -> Result<(usize, Account, SchedulingRequest), AppError> {
+        let mut tier = None;
+        let mut candidates = Vec::new();
+        for (index, account) in accounts {
+            if tier.is_some_and(|first| first != index) {
+                break;
+            }
+            let control = self.work_controls.snapshot(account.id).await?;
+            if !control.api_accepting
+                || !control.work_enabled
+                || self.get_account_rpm_status(&account).await?.saturated
+            {
+                continue;
+            }
+            tier = Some(index);
+            let capacity = self.get_account_capacity_info(&account).await;
+            candidates.push(SchedulingCandidate {
+                account,
+                active_units: capacity.current_concurrency_units,
+                max_units: capacity.max_concurrency_units,
+                queued: capacity.queued,
+                queued_units: capacity.queued_request_units,
+                next_send_ms: 0,
+            });
+        }
+        let index =
+            tier.ok_or_else(|| AppError::ServiceUnavailable("没有支持该模型的AGY账号".into()))?;
+        let request = self.begin_agy_scheduling(token_id, &models[index], streaming);
+        let account =
+            self.selection_scheduler
+                .choose(candidates, &request, DEFAULT_REQUEST_SLOT_UNITS)?;
+        request.selected(&account, None);
+        Ok((index, account, request))
     }
 
     /// 读取已观测的公开模型和原生枚举对应。@param account 原账号。@param model 公开名。@return 经结构校验的原生ID。

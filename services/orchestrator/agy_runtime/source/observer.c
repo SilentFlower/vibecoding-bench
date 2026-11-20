@@ -34,6 +34,15 @@ static const char *folder, *generation, *binary;
 static char current_job[97], decode_error[128];
 static unsigned call_number;
 static unsigned diagnostic_pause_count;
+static int capture_tls;
+static const unsigned long tls_write_site = 0x73819bfUL;
+static const unsigned char tls_write_signature[] = {0x48,0x8b,0x44,0x24,0x30,0x48,0x8b,0x5c,0x24,0x60,0x48,0x8b,0x4c,0x24,0x68,0xc9};
+static const size_t tls_sample_limit = 32UL * 1024 * 1024;
+static char tls_job[97];
+static uint64_t tls_connection;
+static uint64_t tls_write_progress;
+static size_t tls_bytes;
+typedef struct { Call *call; unsigned char *data; size_t size; } TlsSample;
 #ifndef DIAG_PAUSE_US
 #define DIAG_PAUSE_US 0
 #endif
@@ -192,6 +201,84 @@ static int active_job(char *out) {
     return 1;
 }
 
+/** 从固定 Go TLS 返回处复制已经接受的模型 HTTP 字节，普通遥测流量不进入采集。 */
+static TlsSample tls_sample(pid_t tid, const struct user_regs_struct *regs) {
+    TlsSample result = {0};
+    char job[97];
+    if (!active_job(job)) return result;
+    if (strcmp(tls_job, job)) {
+        strcpy(tls_job, job);
+        tls_connection = 0;
+        tls_write_progress = 0;
+        tls_bytes = 0;
+    }
+    Call *owner = NULL;
+    for (size_t i = 0; i < 128; i++) {
+        if (calls[i].g && !calls[i].ended && !strcmp(calls[i].job, job)) {
+            if (owner) return result;
+            owner = &calls[i];
+        }
+    }
+    if (!owner || tls_bytes > tls_sample_limit) return result;
+    decode_error[0] = 0;
+    uint64_t count = word(tid, regs->rsp + 0x30, 8);
+    uint64_t conn = word(tid, regs->rsp + 0xa8, 8);
+    uint64_t data = word(tid, regs->rsp + 0xd8, 8);
+    uint64_t requested = word(tid, regs->rsp + 0xe0, 8);
+    if (decode_error[0] || !conn || !count || count > requested) return result;
+    if (tls_connection && conn != tls_connection) return result;
+    uint64_t progress = word(tid, conn + 0x318, 8);
+    if (decode_error[0] || !progress) return result;
+    if (!tls_connection) {
+        const char expected[] = "POST /v1internal:streamGenerateContent";
+        char prefix[sizeof(expected) - 1];
+        if (count < sizeof(prefix) || !remote(tid, data, prefix, sizeof(prefix)) || memcmp(prefix, expected, sizeof(prefix))) return result;
+        tls_connection = conn;
+    }
+    /* 原生偶尔重复到达同一返回断点。连接的 bytesSent 只随真实写入递增。 */
+    if (progress == tls_write_progress) return result;
+    result.call = owner;
+    if (progress < tls_write_progress || count > tls_sample_limit - tls_bytes) {
+        tls_bytes = tls_sample_limit + 1;
+        return result;
+    }
+    tls_write_progress = progress;
+    result.data = malloc((size_t)count);
+    if (!result.data || !remote(tid, data, result.data, (size_t)count)) {
+        free(result.data);
+        result.data = NULL;
+        tls_bytes = tls_sample_limit + 1;
+        return result;
+    }
+    result.size = (size_t)count;
+    tls_bytes += result.size;
+    return result;
+}
+
+/** 恢复原生线程后才向私有观察管道交付采集副本。 */
+static void emit_tls_sample(TlsSample sample) {
+    if (!sample.call) return;
+    /* 分段交给 Python，避免大正文变成一行多 MiB 的管道消息。 */
+    const size_t block = 64 * 1024;
+    unsigned char *encoded = sample.data ? malloc(4 * ((block + 2) / 3) + 1) : NULL;
+    if (encoded) {
+        for (size_t offset = 0; offset < sample.size; offset += block) {
+            size_t size = sample.size - offset;
+            if (size > block) size = block;
+            int bytes = EVP_EncodeBlock(encoded, sample.data + offset, (int)size);
+            begin_event("model_tls_write", sample.call);
+            fprintf(events, ",\"bytes\":%zu,\"data_base64\":", size);
+            json_string(events, (char *)encoded, (size_t)bytes);
+            fputs("}\n", events);
+        }
+    } else {
+        begin_event("model_tls_write", sample.call);
+        fputs(",\"bytes\":0,\"data_base64\":null}\n", events);
+    }
+    free(encoded);
+    free(sample.data);
+}
+
 /** 保存断点与信号现场，诊断事件和业务返回片段分别归档。 */
 static void diagnostic_stop(pid_t tid, int sig, unsigned event) {
     if (!image_base || !OBSERVE_ALL_STOPS) return;
@@ -297,7 +384,11 @@ static void observe(pid_t tid, unsigned site, struct user_regs_struct *regs) {
 
 /** 为每个原生线程配置执行观察；代码页保持原内容。 */
 static int configure(pid_t tid) {
-    for (unsigned i = 0; i < 4; i++) if (ptrace(PTRACE_POKEUSER, tid, (void *)offsetof(struct user, u_debugreg[i]), (void *)(image_base+sites[i])) < 0) return 0;
+    /* 四个硬件槽中，Debug 复用遥测观察槽记录 TLS。原生发送及队列不经过观察器重写。 */
+    for (unsigned i = 0; i < 4; i++) {
+        unsigned long site = i == 2 && capture_tls ? tls_write_site : sites[i];
+        if (ptrace(PTRACE_POKEUSER, tid, (void *)offsetof(struct user, u_debugreg[i]), (void *)(image_base+site)) < 0) return 0;
+    }
     if (ptrace(PTRACE_POKEUSER, tid, (void *)offsetof(struct user, u_debugreg[6]), NULL) < 0) return 0;
     return ptrace(PTRACE_POKEUSER, tid, (void *)offsetof(struct user, u_debugreg[7]), (void *)0x55UL) == 0;
 }
@@ -344,6 +435,10 @@ static int verify_image(void) {
         unsigned char actual[16];
         if (!remote(root_pid, image_base+sites[i], actual, sizes[i]) || memcmp(actual, expected[i], sizes[i])) { char reason[64]; snprintf(reason, sizeof(reason), "execution_site_%u", i); error_event(reason); return 0; }
     }
+    if (capture_tls) {
+        unsigned char actual[sizeof(tls_write_signature)];
+        if (!remote(root_pid, image_base + tls_write_site, actual, sizeof(actual)) || memcmp(actual, tls_write_signature, sizeof(actual))) capture_tls = 0;
+    }
     return 1;
 }
 
@@ -359,6 +454,7 @@ int main(int argc, char **argv) {
     pid_t controller = getppid();
     if (prctl(PR_SET_PDEATHSIG, SIGKILL) != 0 || getppid() != controller) return 2;
     folder = getenv("AGY_BRIDGE_FOLDER"); generation = getenv("AGY_BRIDGE_GENERATION"); binary = getenv("AGY_BRIDGE_BINARY");
+    capture_tls = getenv("AGY_BRIDGE_CAPTURE_TLS") != NULL;
     const char *fd_env = getenv("AGY_BRIDGE_EVENT_FD"), *input = getenv("AGY_BRIDGE_STDIN");
     if (!folder || !generation || !binary || !fd_env || !input) return 2;
     events = fdopen(atoi(fd_env), "w"); if (!events) return 2;
@@ -366,6 +462,7 @@ int main(int argc, char **argv) {
     root_pid = fork();
     if (root_pid < 0) return 2;
     if (root_pid == 0) {
+        unsetenv("AGY_BRIDGE_CAPTURE_TLS");
         prctl(PR_SET_PDEATHSIG, SIGKILL);
         int fd = open(input, O_RDONLY); if (fd < 0 || dup2(fd, STDIN_FILENO) < 0) _exit(126);
         if (fd != STDIN_FILENO) close(fd);
@@ -412,7 +509,15 @@ int main(int argc, char **argv) {
             struct user_regs_struct regs;
             if (ptrace(PTRACE_GETREGS, tid, NULL, &regs) == 0) {
                 int handled = 0;
-                for (unsigned i = 0; i < 4; i++) if (regs.rip == image_base+sites[i]) { observe(tid, i, &regs); handled = 1; break; }
+                TlsSample sample = {0};
+                for (unsigned i = 0; i < 4; i++) {
+                    int tls = i == 2 && capture_tls;
+                    if (regs.rip != image_base + (tls ? tls_write_site : sites[i])) continue;
+                    if (tls) sample = tls_sample(tid, &regs);
+                    else observe(tid, i, &regs);
+                    handled = 1;
+                    break;
+                }
                 if (handled) {
                     /* 只在首个成功接收的观察位置暂停，用于定位并发信号与恢复的关系。 */
                     if (regs.rip == image_base+sites[1] && DIAG_PAUSE_US && diagnostic_pause_count++ == 0) usleep(DIAG_PAUSE_US);
@@ -420,7 +525,9 @@ int main(int argc, char **argv) {
                     regs.eflags |= 1UL << 16;
                     ptrace(PTRACE_SETREGS, tid, NULL, &regs);
                     ptrace(PTRACE_POKEUSER, tid, (void *)offsetof(struct user, u_debugreg[6]), NULL);
-                    ptrace(PTRACE_CONT, tid, NULL, NULL); continue;
+                    ptrace(PTRACE_CONT, tid, NULL, NULL);
+                    emit_tls_sample(sample);
+                    continue;
                 }
             }
         }

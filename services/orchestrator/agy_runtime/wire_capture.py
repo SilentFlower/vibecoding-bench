@@ -1,9 +1,10 @@
-"""从 libcurl 实际出站事件读取同一次模型请求。"""
+"""读取同一次模型请求的实际 HTTP 传输或原生 TLS 写入。"""
+import base64
 from io import BytesIO
 import re
 
 
-TRACE_LIMIT = 8 * 1024 * 1024
+TRACE_LIMIT = 32 * 1024 * 1024
 HEADER_LIMIT = 128 * 1024
 _EVENT = re.compile(rb'=> Send (header|data), ([0-9]+) bytes ')
 _LINE = re.compile(rb'[0-9a-f]+: ')
@@ -121,3 +122,60 @@ class WireTrace:
         else:
             observed = self.data
         return expected if observed == expected else None
+
+
+class NativeTlsTrace:
+    """只接收当前模型作业的 TLS 接受字节，按实际 HTTP 边界判定完整性。"""
+
+    def __init__(self):
+        """初始化有界作业副本。@return 无。"""
+        self.data = bytearray()
+        self.headers = None
+        self.status = None
+        self.failed = False
+        self.call_id = None
+
+    def append(self, event):
+        """累积观察器同一调用的本地 TLS 接受字节。@param event 已绑定的观察事件。@return 无。"""
+        if self.failed:
+            return
+        if self.call_id is None:
+            self.call_id = event['call_id']
+        try:
+            raw = base64.b64decode(event['data_base64'], validate=True)
+            if self.call_id != event['call_id'] or not raw or len(raw) != event['bytes'] or len(self.data) + len(raw) > TRACE_LIMIT:
+                raise ValueError('原生写入观察归属或长度无效')
+            self.data.extend(raw)
+        except (KeyError, TypeError, ValueError):
+            self.failed = True
+            self.data.clear()
+
+    def body(self, _expected):
+        """依据捕获的头验证完整实体。@param _expected 兼容实际传输观察的接口。@return 已核对的实体或空。"""
+        if self.failed:
+            return None
+        end = self.data.find(b'\r\n\r\n', 0, HEADER_LIMIT)
+        if end < 0:
+            return None
+        try:
+            raw_headers = bytes(self.data[:end + 4])
+            request_line = raw_headers.split(b'\r\n', 1)[0]
+            if not re.fullmatch(rb'POST /v1internal:streamGenerateContent(?:\?[^ ]*)? HTTP/1\.1', request_line):
+                return None
+            headers = WireTrace._headers(raw_headers)
+            lengths = [value for name, value in headers if name == 'content-length']
+            transfers = [value.lower() for name, value in headers if name == 'transfer-encoding']
+            body = bytes(self.data[end + 4:])
+            if not lengths and transfers == ['chunked']:
+                stream = BytesIO(body)
+                body = bytes(read_chunks(stream, TRACE_LIMIT))
+                if stream.read(1):
+                    return None
+            elif not transfers and len(lengths) == 1 and lengths[0].isascii() and lengths[0].isdigit() and int(lengths[0]) == len(body):
+                pass
+            else:
+                return None
+            self.headers = headers
+            return body
+        except (ValueError, OverflowError):
+            return None

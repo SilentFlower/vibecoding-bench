@@ -9,7 +9,7 @@ class Frames:
 
     def __init__(self):
         """创建独立帧状态。@return 无。"""
-        self.calls=[];self.sequence=0;self.terminal=False
+        self.calls=[];self.sequence=0;self.terminal=False;self.finish_reason=None
 
     def project(self, event):
         """拆分候选 Part，保留终态和用量。@param event 原生源事件。@return 兼容事件数组。"""
@@ -35,7 +35,8 @@ class Frames:
         if not candidates:return [copy.deepcopy(event)]
         candidate=candidates[0];parts=candidate.get('content',{}).get('parts',[])
         reason=candidate.get('finishReason')
-        self.terminal=self.terminal or isinstance(reason,str) and reason not in ['','FINISH_REASON_UNSPECIFIED']
+        if isinstance(reason,str) and reason not in ['','FINISH_REASON_UNSPECIFIED']:
+            self.finish_reason=reason;self.terminal=True
         if not isinstance(parts,list):raise RuntimeError('invalid_native_gemini_parts')
         calls=[p['functionCall'] for p in parts if 'functionCall' in p]
         names=[c['name'] for c in self.calls+calls]

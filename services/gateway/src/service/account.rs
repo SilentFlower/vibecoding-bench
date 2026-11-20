@@ -1751,10 +1751,22 @@ impl AccountService {
             .as_ref()
             .ok_or_else(|| AppError::ServiceUnavailable("v3 调度未启用".into()))?;
         let now = now_ms();
-        let next = scheduler
-            .store
-            .next_send(account.id, send_interval_ms(account.rpm_limit))
-            .await?;
+        let agy = account.is_antigravity();
+        let rpm_blocked = if agy {
+            let rpm = self.get_account_rpm_status(account).await?;
+            rpm.saturated
+                .then_some(rpm.window_reset_at.timestamp_millis())
+        } else {
+            None
+        };
+        let next = if agy {
+            rpm_blocked.unwrap_or(0)
+        } else {
+            scheduler
+                .store
+                .next_send(account.id, send_interval_ms(account.rpm_limit))
+                .await?
+        };
         let candidate = SchedulingCandidate {
             account: account.clone(),
             active_units: score.current_concurrency_units,
@@ -1763,7 +1775,7 @@ impl AccountService {
             queued_units: score.queued_request_units,
             next_send_ms: next,
         };
-        let config = scheduler.config();
+        let config = scheduler.config().for_account(account);
         let factors = scheduler.factors(&candidate, &config, now);
         let mut capacity = scheduler.capacity(
             &candidate,
@@ -1772,14 +1784,22 @@ impl AccountService {
             now,
         );
         let control = self.work_controls.snapshot(account.id).await?;
-        if !account.is_schedulable()
-            || !control.api_accepting
-            || !control.work_enabled
-            || account_usage_limit_reached(account)
-        {
+        let available = if agy {
+            account.status == AccountStatus::Active
+                && account
+                    .rate_limit_reset_at
+                    .is_none_or(|reset| reset <= Utc::now())
+                && self.store.agy_credential_state(account.id).await?.phase == "ready"
+        } else {
+            account.is_schedulable() && !account_usage_limit_reached(account)
+        };
+        if !available || !control.api_accepting || !control.work_enabled {
             capacity.immediate = false;
             capacity.can_queue = false;
             capacity.reason = "account_unavailable".into();
+        } else if rpm_blocked.is_some() {
+            capacity.immediate = false;
+            capacity.can_queue = false;
         }
         let snapshot = scheduler.snapshot(account.id);
         let phases = PhaseCounts::of(snapshot.requests.iter());

@@ -24,6 +24,7 @@ from .tool_broker import Broker
 from .gemini_frames import Frames
 from .models import configure_model
 from .capture import save_egress, save_submission
+from .wire_capture import NativeTlsTrace
 from .credentials import read_access_document
 from .safety_egress import CLOUD_CODE, SafetyEgress
 
@@ -64,7 +65,8 @@ class Scope:
         self.history_count=len(value['native_steps']) if 'native_steps' in value else len(history_steps(value['messages']));self.value=value;self.seq=seq;self.worker=worker;self.route=f'r-{seq}';self.root=None;self.job=None
         self.frames=Frames();self.native_tool_calls=None;self.compatibility_error=None;self.tool_wait_ready=threading.Event();self.tool_wait_published=False;self.resume_claimed=False;self.final_status=None;self.yield_tools=threading.Event();self.yield_cancelled=threading.Event();self.yield_started=None;self.yield_rpc=None
         self.broker=None;self.cancel=threading.Event();self.cancel_started=None;self.cancel_sent=False;self.finished=threading.Event()
-        self.safety_egress=None
+        self.safety_egress=None;self.tls_trace=None
+        self.foreign_call_id=None
 
     def identity(self):
         """返回公开协议身份。@return 身份字段。"""
@@ -79,8 +81,12 @@ class Bridge(DrainBridge):
         super().__init__(folder,True);self.worker=worker
 
     def _emit(self, event):
-        """先归档原始事件，再路由到协议输出。@param event 源事件。@return 无返回值。"""
-        super()._emit(event);self.worker.on_source(event)
+        """先校验原生归属，再归档、计数和转发。@param event 源事件。@return 无返回值。"""
+        if not self.worker.owns_source(event):
+            return
+        if event['event'] != 'model_tls_write':
+            super()._emit(event)
+        self.worker.on_source(event)
 
 
 class Worker:
@@ -92,6 +98,8 @@ class Worker:
         self.bridge=Bridge(owner.state/'workers'/str(uuid.uuid4()),self)
         self.bridge.native_home=private_dir(owner.cfg['home']);self.bridge.binary=owner.binary;self.bridge.ca_file=owner.cfg.get('ca_file');self.bridge.proxy_url=owner.cfg['proxy_url']
         self.bridge.capture_enabled=owner.cfg['capture_enabled'];
+        # 单环境候选可运行在旧发送器上。只有新平台声明支持快照格式后才启用原生 TLS。
+        self.bridge.capture_tls=bool(owner.cfg.get('capture_root')) and os.environ.get('AGY_CAPTURE_NATIVE_TLS')=='1'
         if self.bridge.capture_enabled:
             self.bridge.events.close();self.bridge.events=(self.bridge.folder/'bridge-events.jsonl').open('w')
         self.bridge.runtime_env=dict(owner.cfg['runtime_env']);self.bridge.startup_timeout=owner.cfg['startup_timeout'];self.bridge.retire_timeout=owner.cfg['retire_timeout']
@@ -139,9 +147,37 @@ class Worker:
         self.owner.emit('worker_ready',generation=self.bridge.generation,native_pid=self.bridge.native_pid,observer_pid=self.bridge.proc.pid,
             source_sha256=SOURCE_SHA,capabilities=CAPABILITIES,runtime_policy={'runtime_env':self.bridge.runtime_env,'rotate_after':self.owner.cfg['rotate_after']})
 
+    def owns_source(self, event):
+        """在调用计数前核对作业与 Cascade。@param event 原生观察。@return 是否属于当前作业。"""
+        kind=event['event']
+        if kind not in ('model_start','response_chunk','model_end','gemini_response','model_tls_write'):
+            return True
+        scope=self.owner.active
+        if scope is None or scope.worker is not self or event['request_id']!=scope.route:
+            if kind=='model_tls_write':return False
+            raise RuntimeError('source_request_identity')
+        if scope.foreign_call_id and event['call_id']==scope.foreign_call_id:
+            return False
+        if kind=='model_start' and event['native_context']['ConversationID']!=scope.root:
+            # 只有当前 Cascade 已完整 STOP 后，才允许隔离确定来自另一个会话的事件。
+            if (event['native_context']['ConversationID'] and event['call_id']!=scope.job.call_id
+                    and scope.value.get('request_format')=='gemini' and scope.job.calls==scope.job.ends==1
+                    and scope.job.ended.is_set() and scope.frames.finish_reason=='STOP' and not scope.frames.calls
+                    and scope.foreign_call_id is None):
+                scope.foreign_call_id=event['call_id']
+                self.owner.emit('foreign_model_observed',**scope.identity())
+                return False
+            raise RuntimeError('native_root_identity')
+        return True
+
     def on_source(self, event):
         """核对来源并输出独立协议事件。@param event 实际观察事件。@return 无返回值。"""
         kind=event['event']
+        if kind == 'model_tls_write':
+            scope = self.owner.active
+            if scope and scope.worker is self and scope.route == event.get('request_id') and scope.tls_trace:
+                scope.tls_trace.append(event)
+            return
         if kind=='telemetry_upload_sample':
             source=str(event['source'])
             state=self.telemetry.setdefault(source,{'permanent_error_observed':False,'retry_error_observed':False,'successful_nonempty_return_observed':False})
@@ -153,8 +189,6 @@ class Worker:
             self.owner.emit('telemetry',generation=self.bridge.generation,data=event,state=copy.deepcopy(state))
         if kind in ['model_start','response_chunk','model_end','gemini_response']:
             scope=self.owner.active
-            if scope is None or scope.worker is not self or event['request_id']!=scope.route:raise RuntimeError('source_request_identity')
-            if kind=='model_start' and event['native_context']['ConversationID']!=scope.root:raise RuntimeError('native_root_identity')
             if kind=='gemini_response' and scope.value.get('request_format')=='gemini':
                 if scope.safety_egress and not scope.safety_egress.model_started:
                     scope.compatibility_error='native_safety_egress_unobserved';scope.yield_tools.set();return
@@ -341,6 +375,8 @@ class Kernel:
             if scope.value['tools']:
                 scope.broker=Broker(self,scope,folder);scope.broker.configure(cfg)
             cfg['trajectoryConversionConfig'].update(useStructuredToolResponses=True,wrapToolResponses=False)
+            if worker.bridge.capture_tls and not scope.value.get('safety_egress_rules'):
+                scope.tls_trace = NativeTlsTrace()
             active=worker.bridge.run_folder/'active.json';temporary=active.with_suffix('.new');temporary.write_text(json.dumps({'request_id':scope.route}));temporary.replace(active)
             if rules:=scope.value.get('safety_egress_rules'):
                 token=read_access_document(worker.bridge.native_home)['token']['access_token']
@@ -362,6 +398,7 @@ class Kernel:
             body={'cascadeId':scope.root,'items':items,'additionalSteps':steps,'cascadeConfig':cfg,'blocking':True,'propagateError':True}
             if self.cfg.get('capture_root'):
                 self.capture_submission(scope,body)
+            self.emit('request_prepared', **scope.identity())
             future=RPC(worker,'SendUserCascadeMessage',body,scope)
             while not future.done.wait(.05):
                 if scope.value.get('request_format')=='gemini' and scope.job.ended.is_set() and not scope.frames.terminal:
@@ -386,11 +423,14 @@ class Kernel:
                 scope.yield_cancelled.set();retire=True
             elif future.value['status']!=200:raise RuntimeError('native_request_failed')
             if scope.compatibility_error:raise RuntimeError(scope.compatibility_error)
-            if not scope.job.ended.wait(3) or scope.job.calls<1 or scope.job.calls!=scope.job.ends or scope.job.calls>scope.value['max_generations'] or scope.job.native_error:raise RuntimeError('native_stream_incomplete')
-            if scope.value.get('request_format')=='gemini' and not scope.frames.terminal:raise RuntimeError('native_stream_incomplete')
-            if spool.overflow or spool.failure:raise RuntimeError('native_delivery_error')
+            if not scope.job.ended.wait(3):raise RuntimeError('native_stream_incomplete')
             current=worker.call('GetCascadeTrajectory',{'cascadeId':scope.root},scope)
             if current['status']!=200 or current['response']['status']!='CASCADE_RUN_STATUS_IDLE':raise RuntimeError('native_not_idle')
+            # 收尾 RPC 期间仍可能到达观察事件，确认轨迹空闲后再冻结本次计数。
+            if worker.bridge.reader_error or worker.bridge.errors:raise RuntimeError('native_protocol_error')
+            if scope.job.calls<1 or scope.job.calls!=scope.job.ends or scope.job.calls>scope.value['max_generations'] or scope.job.native_error:raise RuntimeError('native_stream_incomplete')
+            if scope.value.get('request_format')=='gemini' and not scope.frames.terminal:raise RuntimeError('native_stream_incomplete')
+            if spool.overflow or spool.failure:raise RuntimeError('native_delivery_error')
             trajectory=current['response']['trajectory'];(folder/'trajectory.json').write_text(json.dumps(trajectory,ensure_ascii=False))
             try:
                 if scope.value.get('request_format')=='gemini':ident,history_error=None,None
@@ -398,7 +438,7 @@ class Kernel:
             except Exception:
                 ident=None;history_error='native_history_export_failed'
                 with (folder/'history-error.log').open('a') as stream:traceback.print_exc(file=stream)
-            worker.jobs+=1;retire=retire or self.cfg['rotate_after'] is not None and worker.jobs>=self.cfg['rotate_after']
+            worker.jobs+=1;retire=retire or scope.foreign_call_id is not None or self.cfg['rotate_after'] is not None and worker.jobs>=self.cfg['rotate_after']
             if scope.safety_egress and not retire and not self.closing:
                 # 空值不能恢复原生端点。恢复失败时退役当前进程，避免影响下一次请求。
                 try:retire=worker.call('SetCloudCodeURL',{'url':CLOUD_CODE},scope)['status']!=200
@@ -422,6 +462,12 @@ class Kernel:
             try:
                 if scope.broker:scope.broker.close()
                 if scope.safety_egress:scope.safety_egress.close()
+                if scope.tls_trace and scope.tls_trace.call_id:
+                    try:
+                        token = read_access_document(self.cfg['home'])['token']['access_token']
+                        self.capture_egress(scope, token, scope.tls_trace, None, [], [], native_tls=True)
+                    except (OSError, ValueError, KeyError):
+                        pass
                 if retire or self.closing:
                     worker.retire('shutdown' if self.closing else 'request_error' if failed else 'gemini_tool_yield' if scope.yield_tools.is_set() else 'rotation')
                 if spool:
@@ -457,12 +503,12 @@ class Kernel:
                 self.emit('capture_status',**scope.identity(),capture_status=status)
         threading.Thread(target=save,daemon=True).start()
 
-    def capture_egress(self, scope, token, trace, raw, incoming, forwarded):
-        """后台保存同一作业的出站观察。@param scope 原请求。@param token 访问凭据。@param trace 实际观察。@param raw 提交实体。@param incoming 原生头。@param forwarded 适配头。@return 无。"""
+    def capture_egress(self, scope, token, trace, raw, incoming, forwarded, *, native_tls=False):
+        """后台保存同一作业的出站观察。@param scope 原请求。@param token 访问凭据。@param trace 实际观察。@param raw 提交实体。@param incoming 原生头。@param forwarded 适配头。@param native_tls 来源为原生TLS。@return 无。"""
         if not SNAPSHOT_WRITERS.acquire(blocking=False):return
         def save():
             try:
-                save_egress(self.cfg['capture_root'],self.cfg['account_id'],scope.value['request_id'],trace,raw,incoming,forwarded,token)
+                save_egress(self.cfg['capture_root'],self.cfg['account_id'],scope.value['request_id'],trace,raw,incoming,forwarded,token,native_tls=native_tls,full_body=scope.value.get('full_egress',False))
             except (OSError,ValueError):pass
             finally:SNAPSHOT_WRITERS.release()
         threading.Thread(target=save,daemon=True).start()

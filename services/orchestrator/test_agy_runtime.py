@@ -23,7 +23,8 @@ from agy_runtime.models import configure_model, decode_catalog, decode_media_sup
 from agy_runtime.native_bridge import NativeBridge
 from agy_runtime.process_memory import cgroup_memory
 from agy_runtime.safety_egress import MODEL_PATH, SafetyEgress, _Request
-from agy_runtime.kernel import Kernel
+from agy_runtime.kernel import Bridge, Kernel, Worker
+from agy_runtime.stream_controller import NativeJob
 from agy_runtime.tool_broker import Broker
 from agy_runtime.storage import Output, config
 from runtime_files import atomic_json
@@ -44,6 +45,36 @@ class AgyRuntimeTests(unittest.TestCase):
         return {'account_id': 17, 'credential_generation': 4, 'access_token': 'synthetic-at',
             'expires_at': int((datetime.now(timezone.utc) + timedelta(hours=2)).timestamp() * 1000),
             'email': 'synthetic@example.test'}
+
+    def test_foreign_cascade_does_not_change_completed_model_stream(self):
+        """不同 Cascade 的迟到事件隔离，同 Cascade 的第二次启动仍计数。@return 无。"""
+        bridge=Bridge.__new__(Bridge)
+        worker=Worker.__new__(Worker)
+        recorded=[]
+        worker.owner=SimpleNamespace(emit=lambda kind, **fields: recorded.append(kind))
+        scope=SimpleNamespace(worker=worker,route='r-1',root='owned',foreign_call_id=None,
+            value={'request_format':'gemini'},frames=Frames(),identity=lambda: {},tls_trace=None,safety_egress=None)
+        worker.owner.active=scope
+        bridge.worker=worker
+        bridge.events=io.StringIO();bridge.errors=[];bridge.source_events=0
+        bridge.active_job=scope.job=NativeJob(scope.route,SimpleNamespace(offer=lambda event: True))
+        owned={'event':'model_start','request_id':scope.route,'call_id':'r-1.1','ns':1,
+            'native_context':{'ConversationID':'owned'}}
+        foreign={**owned,'call_id':'r-1.2','native_context':{'ConversationID':'other'}}
+        bridge._emit(owned)
+        with self.assertRaisesRegex(RuntimeError,'native_root_identity'):
+            bridge._emit(foreign)
+        frame=json.dumps({'candidates':[{'finishReason':'STOP'}]}).encode()
+        bridge._emit({**owned,'event':'gemini_response','data_base64':base64.b64encode(frame).decode()})
+        bridge._emit({**owned,'event':'model_end','native_error_present':None})
+        bridge._emit(foreign)
+        bridge._emit({**foreign,'event':'gemini_response','data_base64':'外部帧禁止解析'})
+        bridge._emit({**foreign,'event':'model_end','native_error_present':None})
+        self.assertEqual(recorded,['model_start','gemini_response','model_end','foreign_model_observed'])
+        self.assertEqual((scope.job.calls,scope.job.ends),(1,1))
+        self.assertTrue(scope.job.ended.is_set())
+        bridge._emit({**owned,'call_id':'r-1.3'})
+        self.assertEqual(scope.job.calls,2)
 
     def test_gemini_text_modality_uses_native_default(self):
         """确认显式文本输出沿用默认行为，图片和音频仍保留字段级错误。@return 无。"""

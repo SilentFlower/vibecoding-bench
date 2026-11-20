@@ -44,7 +44,7 @@ def validate_submission(value: dict, config: dict) -> dict:
     expected = {'schema_version', 'type', 'request_id', 'account_id', 'environment_id',
         'environment_generation', 'api_token_id', 'credential_snapshot', 'model', 'native_model',
         'body', 'deadline_unix_ms'}
-    if not isinstance(value, dict) or set(value)-{'capture_enabled','system_prompt_policy','gif_frames','disable_safety_filtering'} != expected or type(value['schema_version']) is not int or value['schema_version'] != 1 or value['type'] not in ['submit', 'prepare']:
+    if not isinstance(value, dict) or set(value)-{'capture_enabled','system_prompt_policy','gif_frames','disable_safety_filtering','full_egress'} != expected or type(value['schema_version']) is not int or value['schema_version'] != 1 or value['type'] not in ['submit', 'prepare']:
         raise InputError('invalid_submission')
     for key in ['account_id', 'environment_id', 'environment_generation']:
         if type(value[key]) is not type(config[key]) or value[key] != config[key]:
@@ -66,6 +66,8 @@ def validate_submission(value: dict, config: dict) -> dict:
     if not isinstance(value['model'], str) or not native_identifier(value['native_model']) or not isinstance(value['body'], dict):
         raise InputError('invalid_model_or_body')
     if type(value.get('capture_enabled',False)) is not bool:
+        raise InputError('invalid_capture_policy')
+    if type(value.get('full_egress',False)) is not bool:
         raise InputError('invalid_capture_policy')
     if type(value.get('gif_frames',False)) is not bool:
         raise InputError('invalid_media_policy')
@@ -119,6 +121,9 @@ class Worker:
         # 与发送器的冻结模块路径一致，共享私有文件助手由正式镜像放在/usr/local/bin。
         environment = {'PATH': '/usr/local/bin:/usr/bin:/bin', 'PYTHONPATH': str(Path(__file__).resolve().parents[1])+':/opt/v3/python:/usr/local/bin',
             'AGY_RUNTIME_IMAGE_SOCKET': str(self.owner.socket_path), 'AGY_RUNTIME_SUPERVISOR_PID':str(os.getpid()), 'TMPDIR':str(self.folder)}
+        if self.config.get('capture_root') and os.environ.get('AGY_CAPTURE_NATIVE_TLS')=='1':
+            environment['AGY_CAPTURE_NATIVE_TLS']='1'
+        self.started_at = time.monotonic()
         with self.lifecycle_lock:
             if self.closed or self.owner.closed:
                 raise InputError('supervisor_closed')
@@ -136,6 +141,7 @@ class Worker:
                 if event.get('source_sha256') != self.owner.image_sha or type(event.get('native_pid')) is not int:
                     raise InputError('worker_identity_mismatch')
                 self.ready = event
+                self.ready_at = time.monotonic()
                 return
             if event.get('type') in ['worker_error', 'process_closed']:
                 raise InputError('worker_start_failed')
@@ -384,7 +390,7 @@ class Supervisor:
                 raise InputError('stale_credential_generation')
             self.credential_generation=generation
             self.credential_identity=identity
-            self.jobs[value['request_id']] = {'value': value, 'until': until, 'finished': threading.Event(),
+            self.jobs[value['request_id']] = {'value': value, 'until': until, 'received': time.monotonic(), 'finished': threading.Event(),
                 'cancelled': threading.Event(), 'worker': None, 'calls': [], 'waiting': False}
         threading.Thread(target=self.execute, args=(value, until), daemon=True).start()
 
@@ -435,7 +441,9 @@ class Supervisor:
         failed = False
         try:
             self.continuation(value, until)
+            checkout_started = time.monotonic()
             worker = self.acquire(value, until)
+            checkout_finished = time.monotonic()
             job['worker'] = worker
             if job['cancelled'].is_set():
                 raise InputError('request_cancelled')
@@ -446,6 +454,7 @@ class Supervisor:
                 'model': value['model'], 'body': value['body'], 'system_prompt_policy':value['system_prompt_policy']}
             if value.get('gif_frames'):payload['gif_frames']=True
             if value.get('disable_safety_filtering'):payload['disable_safety_filtering']=True
+            if value.get('capture_enabled') and value.get('full_egress'):payload['full_egress']=True
             worker.send(payload)
             while True:
                 event = worker.next(until)
@@ -456,6 +465,18 @@ class Supervisor:
                     continue
                 if kind == 'request_accepted':
                     job['identity'] = {key: event[key] for key in ['request_id', 'request_seq', 'generation']}
+                if kind == 'request_prepared':
+                    # 以同一单调时钟覆盖原生组装。进程启动属于获取进程的一部分。
+                    received = job['received']
+                    started_at = worker.started_at
+                    event['runtime'] = {
+                        'worker_id': event['worker_id'], 'worker_pid': worker.ready['native_pid'],
+                        'kernel_generation': event['generation'], 'warm_hit': worker.ready_at <= received,
+                        'preparation_wait_ms': int((checkout_started - received) * 1000),
+                        'checkout_ms': int((checkout_finished - checkout_started) * 1000),
+                        'worker_start_ms': int((worker.ready_at - started_at) * 1000) if started_at >= checkout_started else None,
+                        'prepared_ms': int((time.monotonic() - received) * 1000),
+                    }
                 if job['cancelled'].is_set() and 'identity' in job and not job.get('cancel_sent'):
                     worker.send({'schema_version': 1, 'type': 'cancel', **job['identity']})
                     job['cancel_sent'] = True

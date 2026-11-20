@@ -697,9 +697,9 @@ export const settingsGroups:SettingsGroup[] = [
           },
           {
             "key": "request_diagnostics_rejected_body",
-            "label": "本地拒绝入站正文",
+            "label": "正文采集范围",
             "kind": "select",
-            "help": "仅在 Debug 下生效。完整正文仍会脱敏，并保留原有保留期。",
+            "help": "适用于本地拒绝的入站正文和反重力实际出站正文。仅在 Debug 下生效，完整正文仍会脱敏。",
             "options": [
               ["preview", "限长预览"],
               ["full", "完整正文 · 脱敏"]

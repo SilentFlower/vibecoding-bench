@@ -349,13 +349,19 @@ async fn read_native_capture(
     if !response.status().is_success() {
         return Err(AppError::ServiceUnavailable("采集文件读取失败".into()));
     }
+    // AGY 完整正文允许 64 MiB 脱敏 JSON，HTTP 封套会再次转义引号和反斜线。
+    let capture_limit = if agy {
+        134 * 1024 * 1024
+    } else {
+        6 * 1024 * 1024
+    };
     let mut bytes = Vec::new();
     while let Some(chunk) = response
         .chunk()
         .await
         .map_err(|_| AppError::ServiceUnavailable("采集文件读取失败".into()))?
     {
-        if bytes.len() + chunk.len() > 6 * 1024 * 1024 {
+        if bytes.len() + chunk.len() > capture_limit {
             return Err(AppError::ServiceUnavailable("采集文件超出读取上限".into()));
         }
         bytes.extend_from_slice(&chunk);
@@ -367,7 +373,7 @@ async fn read_native_capture(
         || !(if agy {
             matches!(
                 snapshot["stage"].as_str(),
-                Some("agy_prepared" | "agy_ingress")
+                Some("agy_prepared" | "agy_ingress" | "agy_egress")
             )
         } else {
             matches!(

@@ -418,8 +418,7 @@ function openScheduling(account: Account) {
 
 /** 进入账号支持的容量视图。@param account 当前账号。@return 无。 */
 function openAccountCapacity(account: Account): void {
-  if (account.platform === 'antigravity') openAccountDetails(account);
-  else openScheduling(account);
+  openScheduling(account);
 }
 
 /** 读取卡片口径的速率。@param account 当前账号。@return 未计量时为空。 */
@@ -1306,11 +1305,7 @@ async function copyText(text: string) {
           <p v-if="a.credential_ownership" class="text-xs text-muted-foreground" role="status">{{ a.credential_ownership.phase === 'ready' ? (a.credential_ownership.owner === 'local' ? '本地管理凭据 · 网关已暂停' : '网关管理凭据') : (a.credential_ownership.phase === 'reauth' ? '重新授权中 · 上游活动暂停' : '凭据交接待确认 · 请在账号环境页对账') }}</p>
           <div v-if="!a.platform || a.platform === 'claude_code' || a.platform === 'antigravity'" class="account-routing">
             <div><span>转发方式</span><strong><template v-if="a.platform === 'antigravity'">原生运行时 <small v-if="agyVersion(a)">Antigravity {{ agyVersion(a) }}</small></template><template v-else-if="a.request_backend === 'native293'">原生运行时 <small>280 / 293 自动匹配</small></template><template v-else>原有转发</template></strong></div>
-            <button v-if="a.platform === 'antigravity'" type="button" @click="openAccountCapacity(a)">
-              <span>调度方式</span><strong>低负载优先<ArrowRight :size="13" /></strong>
-              <small>{{ a.credential_state?.phase === 'ready' && a.usage_data?.capabilities?.models ? `${a.usage_data.capabilities.models.length} 个模型` : agyPhaseLabel(a) }}</small>
-            </button>
-            <button v-else type="button" @click="openScheduling(a)">
+            <button type="button" @click="openScheduling(a)">
               <span>调度优先级</span><strong>{{ a.priority }}<ArrowRight :size="13" /></strong>
               <small class="account-score">{{ activeSchedulingScore(a) }}</small>
             </button>
@@ -1386,7 +1381,7 @@ async function copyText(text: string) {
     <Dialog v-model:open="workspaceOpen">
       <DialogContent class="account-workspace translate-x-0 translate-y-0" :class="{'account-workspace-wide': workspaceTab === 'configuration' || workspaceTab === 'scheduling'}">
         <DialogHeader><DialogTitle>{{ detailAccount?.name || detailAccount?.email || '添加账号' }}</DialogTitle><DialogDescription>{{ detailAccount?.email || '填写账号配置与认证信息' }}</DialogDescription></DialogHeader>
-        <nav v-if="detailAccount" class="account-workspace-tabs" aria-label="账号工作区"><button v-for="tab in workspaceTabs.filter(item => detailAccount?.platform !== 'antigravity' || item.value !== 'scheduling')" :key="tab.value" type="button" :class="{active:workspaceTab===tab.value}" :aria-pressed="workspaceTab===tab.value" @click="changeWorkspaceTab(tab.value)">{{ tab.label }}</button></nav>
+        <nav v-if="detailAccount" class="account-workspace-tabs" aria-label="账号工作区"><button v-for="tab in workspaceTabs" :key="tab.value" type="button" :class="{active:workspaceTab===tab.value}" :aria-pressed="workspaceTab===tab.value" @click="changeWorkspaceTab(tab.value)">{{ tab.label }}</button></nav>
         <div v-if="detailAccount" v-show="workspaceTab === 'overview'" class="account-workspace-scroll">
           <div class="account-overview-context"><div class="account-overview-status">
             <PlatformBadge :platform="detailAccount.platform || 'claude_code'" />
@@ -1415,8 +1410,8 @@ async function copyText(text: string) {
               <div v-if="detailAccount.credential_state?.phase !== 'ready'" class="account-credential-actions"><Button v-if="detailAccount.credential_state?.phase === 'reauth'" variant="outline" @click="cancelAgyReauth(detailAccount)">结束原授权</Button><Button variant="outline" @click="recoverAgy(detailAccount.id)">核对凭据</Button></div>
             </section>
           </template>
-          <div class="account-overview-section-head"><h3>请求配置</h3><button v-if="detailAccount.platform !== 'antigravity'" type="button" @click="changeWorkspaceTab('scheduling')">调度详情<ArrowRight :size="13" /></button></div>
-          <dl v-if="detailAccount.platform === 'antigravity'" class="account-overview-settings"><div><dt>并发</dt><dd>{{ detailAccount.current_concurrency ?? '—' }} / {{ detailAccount.concurrency }}</dd></div><div><dt>RPM</dt><dd>{{ cardRpm(detailAccount) ?? '—' }} / {{ detailAccount.rpm_limit || '不限' }}</dd></div><div><dt>调度方式</dt><dd>低负载优先</dd></div></dl>
+          <div class="account-overview-section-head"><h3>请求配置</h3><button type="button" @click="changeWorkspaceTab('scheduling')">调度详情<ArrowRight :size="13" /></button></div>
+          <dl v-if="detailAccount.platform === 'antigravity'" class="account-overview-settings"><div><dt>并发</dt><dd>{{ detailAccount.current_concurrency ?? '—' }} / {{ detailAccount.concurrency }}</dd></div><div><dt>RPM</dt><dd>{{ cardRpm(detailAccount) ?? '—' }} / {{ detailAccount.rpm_limit || '不限' }}</dd></div><div><dt>调度优先级</dt><dd>{{ detailAccount.priority }}</dd></div></dl>
           <dl v-else class="account-overview-settings"><div><dt>并发上限</dt><dd>{{ detailAccount.concurrency }}</dd></div><div><dt>RPM 上限</dt><dd>{{ detailAccount.rpm_limit || '不限' }}</dd></div><div><dt>调度优先级</dt><dd>{{ detailAccount.priority }}</dd></div></dl>
           <div class="account-overview-actions">
             <OperationFeedback label="测试连接" button-variant="outline" :status="testStates.get(detailAccount.id)?.status" :message="testStates.get(detailAccount.id)?.message" :identity="detailAccount.name || detailAccount.email" @action="test(detailAccount.id)" />
@@ -1448,7 +1443,7 @@ async function copyText(text: string) {
           </div>
           <DialogFooter class="account-save-footer"><span>修改后统一保存</span><Button type="button" variant="outline" @click="workspaceOpen = false">取消</Button><Button type="submit" :disabled="savingAccount">{{ savingAccount ? '保存中…' : '保存修改' }}</Button></DialogFooter>
         </form>
-        <SchedulingDetails v-show="workspaceTab === 'scheduling'" embedded :open="workspaceOpen && workspaceTab === 'scheduling'" :account-id="detailAccount?.id ?? 0" :account-name="detailAccount?.name || detailAccount?.email || ''" />
+        <SchedulingDetails v-show="workspaceTab === 'scheduling'" embedded :open="workspaceOpen && workspaceTab === 'scheduling'" :account-id="detailAccount?.id ?? 0" :account-name="detailAccount?.name || detailAccount?.email || ''" :antigravity="detailAccount?.platform === 'antigravity'" />
         <div v-show="workspaceTab === 'diagnostics'" class="account-workspace-scroll account-diagnostics">
           <template v-if="detailAccount">
             <dl class="account-diagnostic-summary">

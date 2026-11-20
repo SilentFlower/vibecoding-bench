@@ -39,6 +39,15 @@ pub struct SchedulingConfig {
 }
 
 impl SchedulingConfig {
+    /// 反重力使用独立额度观测，额度及重置偏好暂时不参与选号。@param account 候选账号。@return 实际生效的配置。
+    pub(crate) fn for_account(mut self, account: &Account) -> Self {
+        if account.is_antigravity() {
+            self.weights[1] = 0.0;
+            self.reset_weight = 0.0;
+        }
+        self
+    }
+
     /// 从完整字符串设置解析一个原子快照。
     /// @param values 已合并本次更新的完整设置。
     /// @return 合法配置；非法值在持久化前拒绝。
@@ -337,7 +346,7 @@ struct RuntimeState {
     buckets: HashMap<i64, VecDeque<(i64, u64)>>,
     dropped: HashMap<i64, u64>,
     feedback: HashMap<i64, Feedback>,
-    rotations: HashMap<i32, i64>,
+    rotations: HashMap<(bool, i32), i64>,
 }
 
 /// 发送队首独占的单调时钟，释放后继续保留一个最大间隔。
@@ -637,6 +646,7 @@ impl V3Scheduler {
         class: Option<&LatencyClass>,
         slot_units: u32,
     ) -> SmartFactors {
+        let config = &config.clone().for_account(&candidate.account);
         let pressure = (candidate.active_units + candidate.queued_units).max(0) as f64
             / candidate.max_units.max(1) as f64;
         let wait = (candidate.next_send_ms - now_ms).max(0) as f64;
@@ -812,6 +822,7 @@ impl V3Scheduler {
         // 彻底没有等待容量的账号不阻挡低优先组；可接纳时仍遵守人工优先级。
         let priority = candidates.iter().map(|c| c.account.priority).min().unwrap();
         candidates.retain(|c| c.account.priority == priority);
+        let rotation = (candidates[0].account.is_antigravity(), priority);
         let immediate = candidates
             .iter()
             .any(|c| self.capacity(c, slot_units, remaining, now).immediate);
@@ -843,20 +854,20 @@ impl V3Scheduler {
         scored.retain(|(_, score)| best - score <= 0.05);
         scored.sort_by_key(|(a, _)| a.id);
         let mut state = self.runtime();
-        let previous = state.rotations.get(&priority).copied().unwrap_or(0);
+        let previous = state.rotations.get(&rotation).copied().unwrap_or(0);
         let index = scored
             .iter()
             .position(|(a, _)| a.id > previous)
             .unwrap_or(0);
         let account = scored.swap_remove(index).0;
         if state.rotations.len() >= MAX_OBSERVED_ACCOUNTS
-            && !state.rotations.contains_key(&priority)
+            && !state.rotations.contains_key(&rotation)
         {
             if let Some(oldest) = state.rotations.keys().next().copied() {
                 state.rotations.remove(&oldest);
             }
         }
-        state.rotations.insert(priority, account.id);
+        state.rotations.insert(rotation, account.id);
         Ok(account)
     }
 
@@ -1345,6 +1356,58 @@ mod tests {
 
             next_send_ms: 0,
         }
+    }
+
+    /// 反重力同档位遵守人工优先级，实际评分与任何额度窗口无关。@return 无。
+    #[tokio::test]
+    async fn antigravity_priority_and_score_ignore_quota() {
+        let scheduler = scheduler();
+        let config = SchedulingConfig {
+            weights: [1.0, 100.0, 1.0, 1.0],
+            reset_weight: 100.0,
+            ..Default::default()
+        };
+        scheduler.apply_config(config.clone());
+        let mut first = candidate(1);
+        let mut second = candidate(2);
+        first.account.platform = "antigravity".into();
+        second.account.platform = "antigravity".into();
+        first.account.usage_data = json!({"five_hour":{"utilization":99,"resets_at":Utc::now()+ChronoDuration::minutes(1)}});
+        second.account.usage_data =
+            json!({"five_hour":{"utilization":1,"resets_at":Utc::now()+ChronoDuration::hours(4)}});
+        let now = now_ms();
+        let first_score = scheduler.factors(&first, &config, now).score;
+        let second_score = scheduler.factors(&second, &config, now).score;
+        assert!((first_score - second_score).abs() < f64::EPSILON);
+        let request = scheduler.begin(4, None);
+        request.finish_observed_attempt(
+            first.account.id,
+            Some(200),
+            "success",
+            None,
+            Some(10_000),
+            Some(11_000),
+        );
+        request.finish_observed_attempt(
+            second.account.id,
+            Some(200),
+            "success",
+            None,
+            Some(200),
+            Some(300),
+        );
+        assert!(
+            scheduler.factors(&first, &config, now).score
+                < scheduler.factors(&second, &config, now).score
+        );
+        first.account.priority = 20;
+        assert_eq!(
+            scheduler
+                .choose(vec![second, first], &request, DEFAULT_REQUEST_SLOT_UNITS)
+                .unwrap()
+                .id,
+            1
+        );
     }
 
     /// 新权重兼容历史配置，非法值拒绝；仅排队权重也形成有效策略。

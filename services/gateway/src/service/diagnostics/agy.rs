@@ -9,10 +9,11 @@ use crate::error::AppError;
 use crate::model::account::Account;
 use crate::model::request_diagnostics::{
     AttemptDiagnostic, DiagnosticContext, DiagnosticParameters, DiagnosticSessions,
-    DiagnosticTokens, ExecutionLocation, GeminiDiagnosticUsage, SystemPromptDiagnostic,
-    ToolTurnDiagnostic,
+    DiagnosticTokens, ExecutionLocation, GeminiDiagnosticUsage, NativeRuntimeObservation,
+    SystemPromptDiagnostic, ToolTurnDiagnostic,
 };
 use crate::service::agy_contract::{AGY_SOURCE_SHA256, AgyModelId, AgySystemPromptPolicy};
+use crate::service::v3_scheduling::SchedulingRequest;
 
 /// 持有一次真实AGY提交的观察归属，HTTP结束后仅补工具收口。
 pub(crate) struct AgyAttemptTrace {
@@ -23,6 +24,8 @@ pub(crate) struct AgyAttemptTrace {
     source_terminal: bool,
     source_error: bool,
     policy: AgySystemPromptPolicy,
+    scheduling: Option<SchedulingRequest>,
+    model_started_ms: Option<u64>,
 }
 
 impl AgyAttemptTrace {
@@ -125,6 +128,8 @@ impl AgyAttemptTrace {
             source_terminal: false,
             source_error: false,
             policy: policy.clone(),
+            scheduling: None,
+            model_started_ms: None,
         })
     }
 
@@ -145,6 +150,32 @@ impl AgyAttemptTrace {
         }
         if self.finished {
             return;
+        }
+        match native["type"].as_str() {
+            Some("request_prepared") => {
+                if let Ok(runtime) =
+                    serde_json::from_value::<NativeRuntimeObservation>(native["runtime"].clone())
+                {
+                    if runtime.is_valid()
+                        && native["worker_id"].as_str() == Some(runtime.worker_id.as_str())
+                        && native["generation"].as_str() == runtime.kernel_generation.as_deref()
+                    {
+                        self.record.runtime = Some(runtime);
+                        self.publish();
+                    }
+                }
+                return;
+            }
+            Some("model_start") => {
+                if self.model_started_ms.is_none() {
+                    self.model_started_ms = Some(self.elapsed());
+                    if let Some(request) = &self.scheduling {
+                        request.submitted(self.record.account_id);
+                    }
+                }
+                return;
+            }
+            _ => {}
         }
         if !matches!(
             native["type"].as_str(),
@@ -450,6 +481,29 @@ impl AgyAttemptTrace {
                 .as_ref()
                 .and_then(|c| c.usage.as_ref())
                 .is_none_or(|u| !u.complete);
+        if let (Some(request), Some(model_started)) =
+            (self.scheduling.as_ref(), self.model_started_ms)
+        {
+            // 预算不足是请求自己的终止原因。进程准备时间也不计入模型首输出样本。
+            if self.record.error_type.as_deref() == Some("RESOURCE_EXHAUSTED") {
+                request.capacity_rejected(self.record.account_id);
+            } else if self.record.stop_reason.as_deref() != Some("MAX_TOKENS")
+                || outcome == "success"
+            {
+                request.finish_observed_attempt(
+                    self.record.account_id,
+                    None,
+                    outcome,
+                    self.record.error_type.as_deref(),
+                    self.record
+                        .first_output_ms
+                        .and_then(|ms| ms.checked_sub(model_started)),
+                    self.record
+                        .duration_ms
+                        .and_then(|ms| ms.checked_sub(model_started)),
+                );
+            }
+        }
         let mut state = self.trace.lock();
         if state
             .last_attempt
@@ -464,6 +518,11 @@ impl AgyAttemptTrace {
         }
         drop(state);
         self.publish();
+    }
+
+    /// 将本次可核验的原生模型终态反馈给选号器。@param request 当前调度租约。@return 无。
+    pub(crate) fn track_scheduling(&mut self, request: SchedulingRequest) {
+        self.scheduling = Some(request);
     }
 
     fn elapsed(&self) -> u64 {
