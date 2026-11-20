@@ -1,0 +1,2190 @@
+{
+  "id": "merge-flower2api-console-ui",
+  "name": "merge-flower2api-console-ui",
+  "title": "合并 flower2api 主线并把新功能移植到第二版控制台",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-20",
+  "completedAt": "2026-11-20",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-20T14:50:52Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-11-20T13:41:11Z",
+      "contextKey": "claude_392f17ba-1c97-4ce0-9e32-e82361c96ef4",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "b08588105c8dff98e9d98dc926a8cdbb7d86c7a1",
+        "status": [
+          {
+            "status": "M ",
+            "path": ".github/workflows/v3-build.yml"
+          },
+          {
+            "status": "M ",
+            "path": ".github/workflows/v3-release.yml"
+          },
+          {
+            "status": "M ",
+            "path": ".trellis/spec/orchestrator/backend/account-runtime-v3.md"
+          },
+          {
+            "status": "M ",
+            "path": ".trellis/spec/platform/deploy/platform-online-update.md"
+          },
+          {
+            "status": "M ",
+            "path": ".trellis/spec/runtime/backend/logging-guidelines.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-agy-criu-template-start-repair/brief.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/11-20-agy-criu-template-start-repair/check.jsonl",
+            "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/check.jsonl"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-agy-criu-template-start-repair/design.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/11-20-agy-criu-template-start-repair/implement.jsonl",
+            "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/implement.jsonl"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-agy-criu-template-start-repair/implement.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-agy-criu-template-start-repair/prd.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-agy-criu-template-start-repair/task.json"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-fast-system-update/brief.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-fast-system-update/check.jsonl"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-fast-system-update/design.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-fast-system-update/implement.jsonl"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-fast-system-update/implement.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-fast-system-update/prd.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-fast-system-update/research/packaging.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-fast-system-update/task.json"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-node-incomplete-image-sync/brief.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-node-incomplete-image-sync/check.jsonl"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-node-incomplete-image-sync/design.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-node-incomplete-image-sync/implement.jsonl"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-node-incomplete-image-sync/implement.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-node-incomplete-image-sync/prd.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-node-incomplete-image-sync/task.json"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-system-update-candidate-readiness/brief.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-system-update-candidate-readiness/check.jsonl"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-system-update-candidate-readiness/design.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-system-update-candidate-readiness/implement.jsonl"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-system-update-candidate-readiness/implement.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-system-update-candidate-readiness/prd.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-system-update-candidate-readiness/task.json"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-system-update-download-restart/brief.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-system-update-download-restart/check.jsonl"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-system-update-download-restart/design.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-system-update-download-restart/implement.jsonl"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-system-update-download-restart/implement.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-system-update-download-restart/prd.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/11-20-system-update-download-restart/task.json"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-16-request-original-session-id/brief.md",
+            "originalPath": ".trellis/tasks/11-16-request-original-session-id/brief.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-16-request-original-session-id/check.jsonl",
+            "originalPath": ".trellis/tasks/11-16-request-original-session-id/check.jsonl"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-16-request-original-session-id/design.md",
+            "originalPath": ".trellis/tasks/11-16-request-original-session-id/design.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-16-request-original-session-id/implement.jsonl",
+            "originalPath": ".trellis/tasks/11-16-request-original-session-id/implement.jsonl"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-16-request-original-session-id/implement.md",
+            "originalPath": ".trellis/tasks/11-16-request-original-session-id/implement.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-16-request-original-session-id/prd.md",
+            "originalPath": ".trellis/tasks/11-16-request-original-session-id/prd.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-16-request-original-session-id/task.json",
+            "originalPath": ".trellis/tasks/11-16-request-original-session-id/task.json"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-disabled-thinking-compat/brief.md",
+            "originalPath": ".trellis/tasks/11-17-native-disabled-thinking-compat/brief.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-disabled-thinking-compat/check.jsonl",
+            "originalPath": ".trellis/tasks/11-17-native-disabled-thinking-compat/check.jsonl"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-disabled-thinking-compat/design.md",
+            "originalPath": ".trellis/tasks/11-17-native-disabled-thinking-compat/design.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-disabled-thinking-compat/implement.jsonl",
+            "originalPath": ".trellis/tasks/11-17-native-disabled-thinking-compat/implement.jsonl"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-disabled-thinking-compat/implement.md",
+            "originalPath": ".trellis/tasks/11-17-native-disabled-thinking-compat/implement.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-disabled-thinking-compat/prd.md",
+            "originalPath": ".trellis/tasks/11-17-native-disabled-thinking-compat/prd.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-disabled-thinking-compat/research/evidence-inventory.md",
+            "originalPath": ".trellis/tasks/11-17-native-disabled-thinking-compat/research/evidence-inventory.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-disabled-thinking-compat/task.json",
+            "originalPath": ".trellis/tasks/11-17-native-disabled-thinking-compat/task.json"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-fable-429-fallback/brief.md",
+            "originalPath": ".trellis/tasks/11-17-native-fable-429-fallback/brief.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-fable-429-fallback/check.jsonl",
+            "originalPath": ".trellis/tasks/11-17-native-fable-429-fallback/check.jsonl"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-fable-429-fallback/design.md",
+            "originalPath": ".trellis/tasks/11-17-native-fable-429-fallback/design.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-fable-429-fallback/implement.jsonl",
+            "originalPath": ".trellis/tasks/11-17-native-fable-429-fallback/implement.jsonl"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-fable-429-fallback/implement.md",
+            "originalPath": ".trellis/tasks/11-17-native-fable-429-fallback/implement.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-fable-429-fallback/prd.md",
+            "originalPath": ".trellis/tasks/11-17-native-fable-429-fallback/prd.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-fable-429-fallback/task.json",
+            "originalPath": ".trellis/tasks/11-17-native-fable-429-fallback/task.json"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-kernel-platform-managed/brief.md",
+            "originalPath": ".trellis/tasks/11-17-native-kernel-platform-managed/brief.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-kernel-platform-managed/check.jsonl",
+            "originalPath": ".trellis/tasks/11-17-native-kernel-platform-managed/check.jsonl"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-kernel-platform-managed/design.md",
+            "originalPath": ".trellis/tasks/11-17-native-kernel-platform-managed/design.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-kernel-platform-managed/implement.jsonl",
+            "originalPath": ".trellis/tasks/11-17-native-kernel-platform-managed/implement.jsonl"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-kernel-platform-managed/implement.md",
+            "originalPath": ".trellis/tasks/11-17-native-kernel-platform-managed/implement.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-kernel-platform-managed/prd.md",
+            "originalPath": ".trellis/tasks/11-17-native-kernel-platform-managed/prd.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-kernel-platform-managed/research/current-state.md",
+            "originalPath": ".trellis/tasks/11-17-native-kernel-platform-managed/research/current-state.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-kernel-platform-managed/task.json",
+            "originalPath": ".trellis/tasks/11-17-native-kernel-platform-managed/task.json"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-message-cache-policy/brief.md",
+            "originalPath": ".trellis/tasks/11-17-native-message-cache-policy/brief.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-message-cache-policy/check.jsonl",
+            "originalPath": ".trellis/tasks/11-17-native-message-cache-policy/check.jsonl"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-message-cache-policy/design.md",
+            "originalPath": ".trellis/tasks/11-17-native-message-cache-policy/design.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-message-cache-policy/implement.jsonl",
+            "originalPath": ".trellis/tasks/11-17-native-message-cache-policy/implement.jsonl"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-message-cache-policy/implement.md",
+            "originalPath": ".trellis/tasks/11-17-native-message-cache-policy/implement.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-message-cache-policy/prd.md",
+            "originalPath": ".trellis/tasks/11-17-native-message-cache-policy/prd.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-message-cache-policy/task.json",
+            "originalPath": ".trellis/tasks/11-17-native-message-cache-policy/task.json"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-peak-prime-routing/brief.md",
+            "originalPath": ".trellis/tasks/11-17-native-peak-prime-routing/brief.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-peak-prime-routing/check.jsonl",
+            "originalPath": ".trellis/tasks/11-17-native-peak-prime-routing/check.jsonl"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-peak-prime-routing/design.md",
+            "originalPath": ".trellis/tasks/11-17-native-peak-prime-routing/design.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-peak-prime-routing/implement.jsonl",
+            "originalPath": ".trellis/tasks/11-17-native-peak-prime-routing/implement.jsonl"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-peak-prime-routing/implement.md",
+            "originalPath": ".trellis/tasks/11-17-native-peak-prime-routing/implement.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-peak-prime-routing/prd.md",
+            "originalPath": ".trellis/tasks/11-17-native-peak-prime-routing/prd.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-native-peak-prime-routing/task.json",
+            "originalPath": ".trellis/tasks/11-17-native-peak-prime-routing/task.json"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-proxy-pool-setting-scope/brief.md",
+            "originalPath": ".trellis/tasks/11-17-proxy-pool-setting-scope/brief.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-proxy-pool-setting-scope/check.jsonl",
+            "originalPath": ".trellis/tasks/11-17-proxy-pool-setting-scope/check.jsonl"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-proxy-pool-setting-scope/implement.jsonl",
+            "originalPath": ".trellis/tasks/11-17-proxy-pool-setting-scope/implement.jsonl"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-proxy-pool-setting-scope/prd.md",
+            "originalPath": ".trellis/tasks/11-17-proxy-pool-setting-scope/prd.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-proxy-pool-setting-scope/task.json",
+            "originalPath": ".trellis/tasks/11-17-proxy-pool-setting-scope/task.json"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/brief.md",
+            "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/brief.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/check.jsonl"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/design.md",
+            "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/design.md"
+          },
+          {
+            "status": "A ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/implement.jsonl"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/implement.md",
+            "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/implement.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/prd.md",
+            "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/prd.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/research.md",
+            "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/research.md"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/task.json",
+            "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/task.json"
+          },
+          {
+            "status": "R ",
+            "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/verification/group-performance.md",
+            "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/verification/group-performance.md"
+          },
+          {
+            "status": "M ",
+            "path": "README.md"
+          },
+          {
+            "status": "M ",
+            "path": "apps/legacy-web/environments.js"
+          },
+          {
+            "status": "M ",
+            "path": "apps/web/src/api.ts"
+          },
+          {
+            "status": "UU",
+            "path": "apps/web/src/components/Accounts.vue"
+          },
+          {
+            "status": "M ",
+            "path": "apps/web/src/components/AgyAccountUsage.vue"
+          },
+          {
+            "status": "UU",
+            "path": "apps/web/src/components/NativeStageDetails.vue"
+          },
+          {
+            "status": "M ",
+            "path": "apps/web/src/components/Nodes.vue"
+          },
+          {
+            "status": "UU",
+            "path": "apps/web/src/components/RequestDiagnostics.vue"
+          },
+          {
+            "status": "UU",
+            "path": "apps/web/src/components/RuntimeEnvironments.vue"
+          },
+          {
+            "status": "UU",
+            "path": "apps/web/src/components/SchedulingDetails.vue"
+          },
+          {
+            "status": "M ",
+            "path": "apps/web/src/components/Settings.vue"
+          },
+          {
+            "status": "DU",
+            "path": "apps/web/src/components/SystemUpdates.vue"
+          },
+          {
+            "status": "M ",
+            "path": "apps/web/src/components/runtime/AccountNodeSelector.vue"
+          },
+          {
+            "status": "M ",
+            "path": "apps/web/src/components/runtime/EnvironmentKernel.vue"
+          },
+          {
+            "status": "M ",
+            "path": "apps/web/src/components/runtime/EnvironmentResources.vue"
+          },
+          {
+            "status": "M ",
+            "path": "apps/web/src/components/runtime/environmentLabels.ts"
+          },
+          {
+            "status": "M ",
+            "path": "apps/web/src/components/runtime/runtimeApi.ts"
+          },
+          {
+            "status": "M ",
+            "path": "apps/web/src/lib/settingsSchema.ts"
+          },
+          {
+            "status": "UU",
+            "path": "apps/web/src/native-environment.css"
+          },
+          {
+            "status": "DU",
+            "path": "apps/web/src/request-design.css"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/README.md"
+          },
+          {
+            "status": "UU",
+            "path": "deploy/flower2api/SYSTEM-UPDATES.md"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/candidate_artifacts.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/candidate_images.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/compose-updates.yml"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/install_system_updater.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/manage.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/platform-release.json"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/system_release.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/system_update_host.py"
+          },
+          {
+            "status": "UU",
+            "path": "deploy/flower2api/system_updater.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/test_database_compatibility.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/test_source_layout.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/test_system_build_cache.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/test_system_candidate_build.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/test_system_host.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/test_system_platform_version.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/test_system_updater.py"
+          },
+          {
+            "status": "A ",
+            "path": "deploy/flower2api/verify_agy_criu_observer.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/verify_agy_gemini.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/verify_agy_native_loopback.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/verify_cluster_ui.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/verify_database_compatibility.py"
+          },
+          {
+            "status": "UU",
+            "path": "deploy/flower2api/verify_execution_node_visibility.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/verify_system_update.py"
+          },
+          {
+            "status": "M ",
+            "path": "deploy/flower2api/verify_system_update_browser.py"
+          },
+          {
+            "status": "M ",
+            "path": "images/v3/Dockerfile"
+          },
+          {
+            "status": "A ",
+            "path": "images/v3/criu/agy.py"
+          },
+          {
+            "status": "M ",
+            "path": "images/v3/criu/diagnostics.py"
+          },
+          {
+            "status": "M ",
+            "path": "images/v3/criu/entry.py"
+          },
+          {
+            "status": "M ",
+            "path": "images/v3/criu/package.py"
+          },
+          {
+            "status": "M ",
+            "path": "images/v3/criu/source-manifest.json"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/error.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/handler/router.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/main.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/model/account.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/model/identity.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/model/request_diagnostics.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/account.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/agy_account.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/agy_contract.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/agy_runtime.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/diagnostics.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/diagnostics/agy.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/gateway.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/gemini.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/mod.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/native_capture.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/native_prewarm.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/native_prewarm_tests.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/prime_poller.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/rewriter.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/runtime_bridge.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/runtime_transport.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/session_hello_probe.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/system_update.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/telemetry.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/service/v3_scheduling.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/store/account_store.rs"
+          },
+          {
+            "status": "A ",
+            "path": "services/gateway/src/store/agy_media_schema.rs"
+          },
+          {
+            "status": "A ",
+            "path": "services/gateway/src/store/agy_safety_schema.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/store/database-migration-registry.json"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/store/database_migrations.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/store/diagnostics_store.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/store/mod.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/src/store/settings_store.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/tests/account_scheduler_test.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/tests/account_store_timestamp_test.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/tests/gateway_429_retry_test.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/gateway/tests/v3_scheduling_test.rs"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/account_isolation.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/account_runtime.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/account_update_identity.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/agy_auth.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/agy_environment.py"
+          },
+          {
+            "status": "A ",
+            "path": "services/orchestrator/agy_kernel.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/agy_runtime/capture.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/agy_runtime/contract.py"
+          },
+          {
+            "status": "A ",
+            "path": "services/orchestrator/agy_runtime/criu.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/agy_runtime/gemini_contract.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/agy_runtime/gemini_frames.py"
+          },
+          {
+            "status": "A ",
+            "path": "services/orchestrator/agy_runtime/input_media.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/agy_runtime/kernel.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/agy_runtime/models.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/agy_runtime/native_bridge.py"
+          },
+          {
+            "status": "A ",
+            "path": "services/orchestrator/agy_runtime/safety_egress.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/agy_runtime/source/observer.c"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/agy_runtime/supervisor.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/agy_runtime/tool_broker.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/agy_runtime/tool_schema.py"
+          },
+          {
+            "status": "A ",
+            "path": "services/orchestrator/agy_runtime/wire_capture.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/cluster_deployment.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/cluster_service.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/cluster_synchronization.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/main.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/native_criu_settings.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/project_iteration.py"
+          },
+          {
+            "status": "A ",
+            "path": "services/orchestrator/project_library_preparation.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/requirements.txt"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/system_update_contract.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/system_update_gate.py"
+          },
+          {
+            "status": "A ",
+            "path": "services/orchestrator/system_update_rollout.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/system_updates.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/test_account_runtime.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/test_account_update_identity.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/test_agy_capture.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/test_agy_capture_api.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/test_agy_environment.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/test_agy_runtime.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/test_agy_supervisor.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/test_cluster_deployment.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/test_cluster_synchronization.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/test_environment_summary.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/test_native_criu_settings.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/test_project_scenario_content.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/test_system_update_gate.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/test_system_update_recovery.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/test_system_update_retirement.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/orchestrator/test_system_update_snapshot_lock.py"
+          },
+          {
+            "status": "A ",
+            "path": "services/runtime/native/criu/agy.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/runtime/native/criu/diagnostics.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/runtime/native/criu/entry.py"
+          },
+          {
+            "status": "A ",
+            "path": "services/runtime/native/criu/test_agy.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/runtime/scripts/criu/export_bundle.py"
+          },
+          {
+            "status": "M ",
+            "path": "services/runtime/scripts/criu/package.py"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "b08588105c8dff98e9d98dc926a8cdbb7d86c7a1",
+            "status": [
+              {
+                "status": "M ",
+                "path": ".github/workflows/v3-build.yml"
+              },
+              {
+                "status": "M ",
+                "path": ".github/workflows/v3-release.yml"
+              },
+              {
+                "status": "M ",
+                "path": ".trellis/spec/orchestrator/backend/account-runtime-v3.md"
+              },
+              {
+                "status": "M ",
+                "path": ".trellis/spec/platform/deploy/platform-online-update.md"
+              },
+              {
+                "status": "M ",
+                "path": ".trellis/spec/runtime/backend/logging-guidelines.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-agy-criu-template-start-repair/brief.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/11-20-agy-criu-template-start-repair/check.jsonl",
+                "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/check.jsonl"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-agy-criu-template-start-repair/design.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/11-20-agy-criu-template-start-repair/implement.jsonl",
+                "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/implement.jsonl"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-agy-criu-template-start-repair/implement.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-agy-criu-template-start-repair/prd.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-agy-criu-template-start-repair/task.json"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-fast-system-update/brief.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-fast-system-update/check.jsonl"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-fast-system-update/design.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-fast-system-update/implement.jsonl"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-fast-system-update/implement.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-fast-system-update/prd.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-fast-system-update/research/packaging.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-fast-system-update/task.json"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-node-incomplete-image-sync/brief.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-node-incomplete-image-sync/check.jsonl"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-node-incomplete-image-sync/design.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-node-incomplete-image-sync/implement.jsonl"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-node-incomplete-image-sync/implement.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-node-incomplete-image-sync/prd.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-node-incomplete-image-sync/task.json"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-system-update-candidate-readiness/brief.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-system-update-candidate-readiness/check.jsonl"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-system-update-candidate-readiness/design.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-system-update-candidate-readiness/implement.jsonl"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-system-update-candidate-readiness/implement.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-system-update-candidate-readiness/prd.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-system-update-candidate-readiness/task.json"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-system-update-download-restart/brief.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-system-update-download-restart/check.jsonl"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-system-update-download-restart/design.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-system-update-download-restart/implement.jsonl"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-system-update-download-restart/implement.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-system-update-download-restart/prd.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/11-20-system-update-download-restart/task.json"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-16-request-original-session-id/brief.md",
+                "originalPath": ".trellis/tasks/11-16-request-original-session-id/brief.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-16-request-original-session-id/check.jsonl",
+                "originalPath": ".trellis/tasks/11-16-request-original-session-id/check.jsonl"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-16-request-original-session-id/design.md",
+                "originalPath": ".trellis/tasks/11-16-request-original-session-id/design.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-16-request-original-session-id/implement.jsonl",
+                "originalPath": ".trellis/tasks/11-16-request-original-session-id/implement.jsonl"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-16-request-original-session-id/implement.md",
+                "originalPath": ".trellis/tasks/11-16-request-original-session-id/implement.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-16-request-original-session-id/prd.md",
+                "originalPath": ".trellis/tasks/11-16-request-original-session-id/prd.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-16-request-original-session-id/task.json",
+                "originalPath": ".trellis/tasks/11-16-request-original-session-id/task.json"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-disabled-thinking-compat/brief.md",
+                "originalPath": ".trellis/tasks/11-17-native-disabled-thinking-compat/brief.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-disabled-thinking-compat/check.jsonl",
+                "originalPath": ".trellis/tasks/11-17-native-disabled-thinking-compat/check.jsonl"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-disabled-thinking-compat/design.md",
+                "originalPath": ".trellis/tasks/11-17-native-disabled-thinking-compat/design.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-disabled-thinking-compat/implement.jsonl",
+                "originalPath": ".trellis/tasks/11-17-native-disabled-thinking-compat/implement.jsonl"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-disabled-thinking-compat/implement.md",
+                "originalPath": ".trellis/tasks/11-17-native-disabled-thinking-compat/implement.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-disabled-thinking-compat/prd.md",
+                "originalPath": ".trellis/tasks/11-17-native-disabled-thinking-compat/prd.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-disabled-thinking-compat/research/evidence-inventory.md",
+                "originalPath": ".trellis/tasks/11-17-native-disabled-thinking-compat/research/evidence-inventory.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-disabled-thinking-compat/task.json",
+                "originalPath": ".trellis/tasks/11-17-native-disabled-thinking-compat/task.json"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-fable-429-fallback/brief.md",
+                "originalPath": ".trellis/tasks/11-17-native-fable-429-fallback/brief.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-fable-429-fallback/check.jsonl",
+                "originalPath": ".trellis/tasks/11-17-native-fable-429-fallback/check.jsonl"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-fable-429-fallback/design.md",
+                "originalPath": ".trellis/tasks/11-17-native-fable-429-fallback/design.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-fable-429-fallback/implement.jsonl",
+                "originalPath": ".trellis/tasks/11-17-native-fable-429-fallback/implement.jsonl"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-fable-429-fallback/implement.md",
+                "originalPath": ".trellis/tasks/11-17-native-fable-429-fallback/implement.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-fable-429-fallback/prd.md",
+                "originalPath": ".trellis/tasks/11-17-native-fable-429-fallback/prd.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-fable-429-fallback/task.json",
+                "originalPath": ".trellis/tasks/11-17-native-fable-429-fallback/task.json"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-kernel-platform-managed/brief.md",
+                "originalPath": ".trellis/tasks/11-17-native-kernel-platform-managed/brief.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-kernel-platform-managed/check.jsonl",
+                "originalPath": ".trellis/tasks/11-17-native-kernel-platform-managed/check.jsonl"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-kernel-platform-managed/design.md",
+                "originalPath": ".trellis/tasks/11-17-native-kernel-platform-managed/design.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-kernel-platform-managed/implement.jsonl",
+                "originalPath": ".trellis/tasks/11-17-native-kernel-platform-managed/implement.jsonl"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-kernel-platform-managed/implement.md",
+                "originalPath": ".trellis/tasks/11-17-native-kernel-platform-managed/implement.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-kernel-platform-managed/prd.md",
+                "originalPath": ".trellis/tasks/11-17-native-kernel-platform-managed/prd.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-kernel-platform-managed/research/current-state.md",
+                "originalPath": ".trellis/tasks/11-17-native-kernel-platform-managed/research/current-state.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-kernel-platform-managed/task.json",
+                "originalPath": ".trellis/tasks/11-17-native-kernel-platform-managed/task.json"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-message-cache-policy/brief.md",
+                "originalPath": ".trellis/tasks/11-17-native-message-cache-policy/brief.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-message-cache-policy/check.jsonl",
+                "originalPath": ".trellis/tasks/11-17-native-message-cache-policy/check.jsonl"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-message-cache-policy/design.md",
+                "originalPath": ".trellis/tasks/11-17-native-message-cache-policy/design.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-message-cache-policy/implement.jsonl",
+                "originalPath": ".trellis/tasks/11-17-native-message-cache-policy/implement.jsonl"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-message-cache-policy/implement.md",
+                "originalPath": ".trellis/tasks/11-17-native-message-cache-policy/implement.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-message-cache-policy/prd.md",
+                "originalPath": ".trellis/tasks/11-17-native-message-cache-policy/prd.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-message-cache-policy/task.json",
+                "originalPath": ".trellis/tasks/11-17-native-message-cache-policy/task.json"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-peak-prime-routing/brief.md",
+                "originalPath": ".trellis/tasks/11-17-native-peak-prime-routing/brief.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-peak-prime-routing/check.jsonl",
+                "originalPath": ".trellis/tasks/11-17-native-peak-prime-routing/check.jsonl"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-peak-prime-routing/design.md",
+                "originalPath": ".trellis/tasks/11-17-native-peak-prime-routing/design.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-peak-prime-routing/implement.jsonl",
+                "originalPath": ".trellis/tasks/11-17-native-peak-prime-routing/implement.jsonl"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-peak-prime-routing/implement.md",
+                "originalPath": ".trellis/tasks/11-17-native-peak-prime-routing/implement.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-peak-prime-routing/prd.md",
+                "originalPath": ".trellis/tasks/11-17-native-peak-prime-routing/prd.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-native-peak-prime-routing/task.json",
+                "originalPath": ".trellis/tasks/11-17-native-peak-prime-routing/task.json"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-proxy-pool-setting-scope/brief.md",
+                "originalPath": ".trellis/tasks/11-17-proxy-pool-setting-scope/brief.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-proxy-pool-setting-scope/check.jsonl",
+                "originalPath": ".trellis/tasks/11-17-proxy-pool-setting-scope/check.jsonl"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-proxy-pool-setting-scope/implement.jsonl",
+                "originalPath": ".trellis/tasks/11-17-proxy-pool-setting-scope/implement.jsonl"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-proxy-pool-setting-scope/prd.md",
+                "originalPath": ".trellis/tasks/11-17-proxy-pool-setting-scope/prd.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-proxy-pool-setting-scope/task.json",
+                "originalPath": ".trellis/tasks/11-17-proxy-pool-setting-scope/task.json"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/brief.md",
+                "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/brief.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/check.jsonl"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/design.md",
+                "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/design.md"
+              },
+              {
+                "status": "A ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/implement.jsonl"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/implement.md",
+                "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/implement.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/prd.md",
+                "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/prd.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/research.md",
+                "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/research.md"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/task.json",
+                "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/task.json"
+              },
+              {
+                "status": "R ",
+                "path": ".trellis/tasks/archive/2026-11/11-17-smart-scheduling-reset-queue/verification/group-performance.md",
+                "originalPath": ".trellis/tasks/11-17-smart-scheduling-reset-queue/verification/group-performance.md"
+              },
+              {
+                "status": "M ",
+                "path": "README.md"
+              },
+              {
+                "status": "M ",
+                "path": "apps/legacy-web/environments.js"
+              },
+              {
+                "status": "M ",
+                "path": "apps/web/src/api.ts"
+              },
+              {
+                "status": "UU",
+                "path": "apps/web/src/components/Accounts.vue"
+              },
+              {
+                "status": "M ",
+                "path": "apps/web/src/components/AgyAccountUsage.vue"
+              },
+              {
+                "status": "UU",
+                "path": "apps/web/src/components/NativeStageDetails.vue"
+              },
+              {
+                "status": "M ",
+                "path": "apps/web/src/components/Nodes.vue"
+              },
+              {
+                "status": "UU",
+                "path": "apps/web/src/components/RequestDiagnostics.vue"
+              },
+              {
+                "status": "UU",
+                "path": "apps/web/src/components/RuntimeEnvironments.vue"
+              },
+              {
+                "status": "UU",
+                "path": "apps/web/src/components/SchedulingDetails.vue"
+              },
+              {
+                "status": "M ",
+                "path": "apps/web/src/components/Settings.vue"
+              },
+              {
+                "status": "DU",
+                "path": "apps/web/src/components/SystemUpdates.vue"
+              },
+              {
+                "status": "M ",
+                "path": "apps/web/src/components/runtime/AccountNodeSelector.vue"
+              },
+              {
+                "status": "M ",
+                "path": "apps/web/src/components/runtime/EnvironmentKernel.vue"
+              },
+              {
+                "status": "M ",
+                "path": "apps/web/src/components/runtime/EnvironmentResources.vue"
+              },
+              {
+                "status": "M ",
+                "path": "apps/web/src/components/runtime/environmentLabels.ts"
+              },
+              {
+                "status": "M ",
+                "path": "apps/web/src/components/runtime/runtimeApi.ts"
+              },
+              {
+                "status": "M ",
+                "path": "apps/web/src/lib/settingsSchema.ts"
+              },
+              {
+                "status": "UU",
+                "path": "apps/web/src/native-environment.css"
+              },
+              {
+                "status": "DU",
+                "path": "apps/web/src/request-design.css"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/README.md"
+              },
+              {
+                "status": "UU",
+                "path": "deploy/flower2api/SYSTEM-UPDATES.md"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/candidate_artifacts.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/candidate_images.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/compose-updates.yml"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/install_system_updater.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/manage.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/platform-release.json"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/system_release.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/system_update_host.py"
+              },
+              {
+                "status": "UU",
+                "path": "deploy/flower2api/system_updater.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/test_database_compatibility.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/test_source_layout.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/test_system_build_cache.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/test_system_candidate_build.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/test_system_host.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/test_system_platform_version.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/test_system_updater.py"
+              },
+              {
+                "status": "A ",
+                "path": "deploy/flower2api/verify_agy_criu_observer.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/verify_agy_gemini.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/verify_agy_native_loopback.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/verify_cluster_ui.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/verify_database_compatibility.py"
+              },
+              {
+                "status": "UU",
+                "path": "deploy/flower2api/verify_execution_node_visibility.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/verify_system_update.py"
+              },
+              {
+                "status": "M ",
+                "path": "deploy/flower2api/verify_system_update_browser.py"
+              },
+              {
+                "status": "M ",
+                "path": "images/v3/Dockerfile"
+              },
+              {
+                "status": "A ",
+                "path": "images/v3/criu/agy.py"
+              },
+              {
+                "status": "M ",
+                "path": "images/v3/criu/diagnostics.py"
+              },
+              {
+                "status": "M ",
+                "path": "images/v3/criu/entry.py"
+              },
+              {
+                "status": "M ",
+                "path": "images/v3/criu/package.py"
+              },
+              {
+                "status": "M ",
+                "path": "images/v3/criu/source-manifest.json"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/error.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/handler/router.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/main.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/model/account.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/model/identity.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/model/request_diagnostics.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/account.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/agy_account.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/agy_contract.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/agy_runtime.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/diagnostics.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/diagnostics/agy.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/gateway.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/gemini.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/mod.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/native_capture.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/native_prewarm.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/native_prewarm_tests.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/prime_poller.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/rewriter.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/runtime_bridge.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/runtime_transport.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/session_hello_probe.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/system_update.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/telemetry.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/service/v3_scheduling.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/store/account_store.rs"
+              },
+              {
+                "status": "A ",
+                "path": "services/gateway/src/store/agy_media_schema.rs"
+              },
+              {
+                "status": "A ",
+                "path": "services/gateway/src/store/agy_safety_schema.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/store/database-migration-registry.json"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/store/database_migrations.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/store/diagnostics_store.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/store/mod.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/src/store/settings_store.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/tests/account_scheduler_test.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/tests/account_store_timestamp_test.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/tests/gateway_429_retry_test.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/gateway/tests/v3_scheduling_test.rs"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/account_isolation.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/account_runtime.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/account_update_identity.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/agy_auth.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/agy_environment.py"
+              },
+              {
+                "status": "A ",
+                "path": "services/orchestrator/agy_kernel.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/agy_runtime/capture.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/agy_runtime/contract.py"
+              },
+              {
+                "status": "A ",
+                "path": "services/orchestrator/agy_runtime/criu.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/agy_runtime/gemini_contract.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/agy_runtime/gemini_frames.py"
+              },
+              {
+                "status": "A ",
+                "path": "services/orchestrator/agy_runtime/input_media.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/agy_runtime/kernel.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/agy_runtime/models.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/agy_runtime/native_bridge.py"
+              },
+              {
+                "status": "A ",
+                "path": "services/orchestrator/agy_runtime/safety_egress.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/agy_runtime/source/observer.c"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/agy_runtime/supervisor.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/agy_runtime/tool_broker.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/agy_runtime/tool_schema.py"
+              },
+              {
+                "status": "A ",
+                "path": "services/orchestrator/agy_runtime/wire_capture.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/cluster_deployment.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/cluster_service.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/cluster_synchronization.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/main.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/native_criu_settings.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/project_iteration.py"
+              },
+              {
+                "status": "A ",
+                "path": "services/orchestrator/project_library_preparation.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/requirements.txt"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/system_update_contract.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/system_update_gate.py"
+              },
+              {
+                "status": "A ",
+                "path": "services/orchestrator/system_update_rollout.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/system_updates.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/test_account_runtime.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/test_account_update_identity.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/test_agy_capture.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/test_agy_capture_api.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/test_agy_environment.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/test_agy_runtime.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/test_agy_supervisor.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/test_cluster_deployment.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/test_cluster_synchronization.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/test_environment_summary.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/test_native_criu_settings.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/test_project_scenario_content.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/test_system_update_gate.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/test_system_update_recovery.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/test_system_update_retirement.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/orchestrator/test_system_update_snapshot_lock.py"
+              },
+              {
+                "status": "A ",
+                "path": "services/runtime/native/criu/agy.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/runtime/native/criu/diagnostics.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/runtime/native/criu/entry.py"
+              },
+              {
+                "status": "A ",
+                "path": "services/runtime/native/criu/test_agy.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/runtime/scripts/criu/export_bundle.py"
+              },
+              {
+                "status": "M ",
+                "path": "services/runtime/scripts/criu/package.py"
+              }
+            ],
+            "worktreeDiffSha256": "45b3259a29fdd38b7359af0e4a1931dfa2040252567f7c12bbd1008bb5baad74",
+            "indexDiffSha256": "1deb6f9d6a12b569ac01f56e341ae7ea96a0d9233dd28b55459e55677c9b6378",
+            "untracked": [],
+            "conflicts": [
+              {
+                "status": "UU",
+                "path": "apps/web/src/components/Accounts.vue"
+              },
+              {
+                "status": "UU",
+                "path": "apps/web/src/components/NativeStageDetails.vue"
+              },
+              {
+                "status": "UU",
+                "path": "apps/web/src/components/RequestDiagnostics.vue"
+              },
+              {
+                "status": "UU",
+                "path": "apps/web/src/components/RuntimeEnvironments.vue"
+              },
+              {
+                "status": "UU",
+                "path": "apps/web/src/components/SchedulingDetails.vue"
+              },
+              {
+                "status": "DU",
+                "path": "apps/web/src/components/SystemUpdates.vue"
+              },
+              {
+                "status": "UU",
+                "path": "apps/web/src/native-environment.css"
+              },
+              {
+                "status": "DU",
+                "path": "apps/web/src/request-design.css"
+              },
+              {
+                "status": "UU",
+                "path": "deploy/flower2api/SYSTEM-UPDATES.md"
+              },
+              {
+                "status": "UU",
+                "path": "deploy/flower2api/system_updater.py"
+              },
+              {
+                "status": "UU",
+                "path": "deploy/flower2api/verify_execution_node_visibility.py"
+              }
+            ],
+            "integration": [
+              "merge"
+            ],
+            "fingerprint": "b017ed8140f76804edd7b0010e62fba86fb7b0ba8d0cefe4115b25efbbd72520"
+          }
+        ],
+        "fingerprint": "774ad2d2e2a8b31b19101f9f09f13aef794608943944955bae8d8b899f777680"
+      }
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-11-20T14:50:51+00:00",
+    "completedSteps": [
+      "基线与合并现场记录",
+      "后端与文档并集合并",
+      "系统更新弹窗移植两步更新、账号后台更新与健康探测",
+      "账号、调度、请求记录、请求证据、运行环境冲突重放",
+      "自动合并文件核对",
+      "规范同步",
+      "全量验证与像素对照",
+      "Check-All 修复 CHK-001 并重检通过",
+      "合并提交 6fb1a04a 并推送 feat/console-ui-revamp"
+    ],
+    "partialStep": null,
+    "nextStep": "如需上线，另行把 feat/console-ui-revamp 合入 flower2api 并发版",
+    "notes": "主线遗留：legacy environments.js 改动未更新 index.html 的 ?v=，留给主线处理。"
+  }
+}
