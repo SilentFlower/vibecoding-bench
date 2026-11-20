@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/web/frontend/ui-guidelines.md", "reason": "token 与主题运行时合同、组件签名、侧栏与系统设置草稿约定、静态样式规则与测试清单"}
+{"file": ".trellis/spec/web/frontend/frontend-guidelines.md", "reason": "Vue 页面、路由与品牌合同，新页面与入口按此落地"}
+{"file": ".trellis/tasks/11-19-console-ui-kit/design.md", "reason": "种子字段、取值范围、预设与 applyTheme 局部主题的设计依据（§2.4、§3）"}
+{"file": ".trellis/tasks/11-19-console-ui-revamp/prd.md", "reason": "父任务 R6 与跨子任务验收口径"}

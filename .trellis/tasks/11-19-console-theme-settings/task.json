@@ -1,0 +1,48 @@
+{
+  "id": "console-theme-settings",
+  "name": "console-theme-settings",
+  "title": "主题设置页",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "web",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-19",
+  "completedAt": "2026-11-20",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-20T06:27:35Z",
+    "blockers": []
+  },
+  "branch": "feat/console-ui-revamp",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-19-console-ui-revamp",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-20T06:27:35Z",
+    "completedSteps": [
+      "规划与 Brief",
+      "编辑器纯函数与单测",
+      "路由与入口",
+      "页面与编辑面板",
+      "预览画板",
+      "离开保护",
+      "浏览器验证与全量复核",
+      "规范",
+      "Check-All（CHK-001 已修复）"
+    ],
+    "partialStep": null,
+    "nextStep": "父任务后续子任务（6 原生页对齐 / 7 深色模式）规划评审",
+    "notes": ""
+  }
+}
