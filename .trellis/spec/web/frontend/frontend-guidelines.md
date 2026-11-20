@@ -189,7 +189,7 @@ const isValidLimit = computed(() => {
 
 ### 3. Contracts
 
-- 目标管理页面采用 vm2api 实际亮色参考：中性表面、绿色强调、系统中文字体和等宽数字。现有 token 保名换值，App 背景使用 token。环境页仅在 `environment-page` 作用域映射色板；任务页保留原 `vibebench-theme` 偏好。
+- 管理页面视觉以第二版设计稿与 [控制台 UI 与复用控件](./ui-guidelines.md) 为准，颜色只取 `--ui-*` token；任务页与环境页跟随主题模式（文档根 `data-ui-scheme`）。
 - 品牌文字为小写 flower2api；登录、主导航和 favicon 共用粉红五瓣节点花图形 `public/favicon.svg`，颜色 `#ED6EA7`，通道透明。三个消费者同步版本参数 `?v=flower2api-pink-04`，资源更新时共同更新缓存标识。
 - SystemUpdates 的原生 `dialog.showModal()` 显式设置 `margin:auto`，避免 Tailwind preflight 的零外边距覆盖浏览器居中；最大高度为视口减 2rem，内容超高时内部滚动。安装、回退和恢复继续沿用冻结操作、冲突保护及取消/Esc/遮罩收口。
 - 系统安装与回退确认每次打开默认一分钟，冻结请求为60秒；可选1/5/15/30/60/120分钟，已登记操作与恢复继续使用原参数。后端默认及冲突合同见[平台在线更新](../../platform/deploy/platform-online-update.md)。

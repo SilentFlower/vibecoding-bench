@@ -217,7 +217,8 @@ async def main(output: Path) -> None:
         # 关闭淡出期间说明仍是原地址，不出现空字段拼出的 undefined。
         closing = []
         while await rename.count():
-            closing.append(await rename.locator('.fui-modal-description').inner_text())
+            # 不等待的读取：淡出结束时弹窗可能在 count 与读取之间被移除，等待式 inner_text 会一直等到超时。
+            closing += await rename.locator('.fui-modal-description').all_inner_texts()
             await page.wait_for_timeout(20)
         assert closing and set(closing) == {'synthetic@node.example.invalid:22'}, closing
         await context.close()

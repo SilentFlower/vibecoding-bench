@@ -40,7 +40,7 @@ async def main():
     """覆盖六个入口、分区草稿、子窗层级、数字和选择控件及窄屏。@return 无。"""
     out=ROOT/'.deploy/frontend-sidebar-refresh/all-pages/runtime';out.mkdir(parents=True,exist_ok=True);fixture=WorkspaceFixture();errors=[]
     async with async_playwright() as p:
-        browser=await p.chromium.launch();context=await browser.new_context(viewport={'width':1440,'height':1000});await context.route('**/*',fixture.route);await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','light')")
+        browser=await p.chromium.launch();context=await browser.new_context(viewport={'width':1440,'height':1000});await context.route('**/*',fixture.route);await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only')")
         page=await context.new_page();page.on('pageerror',lambda error:errors.append(error.stack));await page.goto(BASE+'/tasks');frame=page.locator('.task-runtime');await expect(frame.locator('.work-account')).to_have_count(1)
         for action in ['data-cli-settings','data-quota','data-warmup-config','data-run-window-config','data-relogin','data-cc2-unbind','data-del']:await expect(frame.locator(f'[{action}]')).to_be_visible()
         await frame.locator('[data-account-details]').click();await expect(frame.locator('#modal .modal-titlebar-name')).to_have_text('账号详情');await frame.locator('#modal-close').click()

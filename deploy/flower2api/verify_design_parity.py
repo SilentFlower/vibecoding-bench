@@ -1,4 +1,4 @@
-"""对照已确认原型验证正式账号的结构及交互；工作区外框按第二版设计稿（mock.html#account-edit，820px 居中弹窗）核对，
+"""核对正式账号页的结构及交互：分组与页签沿用定稿名称，工作区外框按第二版设计稿（mock.html#account-edit，820px 居中弹窗）核对，
 样式逐项比对见 verify_account_page_design.py。系统更新弹窗只核对入口与关闭（样式与安装流程见 verify_update_design.py、verify_system_update_browser.py）。"""
 import asyncio
 import json
@@ -6,6 +6,10 @@ from pathlib import Path
 from playwright.async_api import async_playwright, expect
 from verify_accounts_design import AccountDesignFixture
 from verify_environment_ui import BASE, ROOT
+
+# 账号工作区的分组与页签名称。第二版设计稿只画出前两个分组，不能作为完整来源，所以固定为已确认的完整清单。
+REF_SECTIONS = ['基础配置', '用量与调度', '请求与模型', '上游 Session 池']
+REF_TABS = ['概览', '配置', '调度', '环境与诊断']
 
 
 async def main():
@@ -15,12 +19,7 @@ async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         reference = await browser.new_page(viewport={'width': 1440, 'height': 1000})
-        await reference.goto((ROOT/'doc/design/flower2api-concept.html').as_uri())
-        await reference.locator('[data-account-action="edit"]').first.click()
-        ref_sections = await reference.locator('#account-drawer .account-form-section > h3').all_text_contents()
-        ref_tabs = await reference.locator('#account-drawer [data-detail]').all_text_contents()
-        await reference.screenshot(path=str(out/'reference-editor.png'))
-        await reference.keyboard.press('Escape')
+        ref_sections, ref_tabs = REF_SECTIONS, REF_TABS
         # 第二版把右侧抽屉改为居中弹窗：宽度取设计稿 .modal，位置在视口内水平居中。
         await reference.goto((ROOT/'doc/design/console-v2/mock.html').as_uri()+'#account-edit')
         ref_width = (await reference.locator('.modal').bounding_box())['width']

@@ -100,7 +100,7 @@ async def export(output):
         context = await browser.new_context(viewport={'width': 1440, 'height': 1000}, timezone_id='Asia/Shanghai')
         fixture = PreviewFixture()
         await context.route('**/*', fixture.route)
-        await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','light');")
+        await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');")
         page = await context.new_page()
         page.on('pageerror', lambda error: errors.append(str(error)))
         for path, label in routes:

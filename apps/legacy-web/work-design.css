@@ -177,7 +177,6 @@
 :root.console-design .work-pool-item button{font-size: var(--ui-font-size-sm);}
 :root.console-design .work-pool-item strong{font-size: var(--ui-font-size-sm);}}
 :root.console-design .work-login-drafts{margin-bottom: 22px;}
-:root.console-design .work-context .choice-compact{margin: 0px;}
 @media (max-width: 600px) {:root.console-design .work-context{gap: 10px;}
 :root.console-design .work-context > div:first-child{flex: 1 1 0%; width: auto; min-width: 0px;}
 :root.console-design .work-context > .btn{flex: 0 0 auto;}

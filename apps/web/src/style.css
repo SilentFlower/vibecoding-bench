@@ -4,70 +4,22 @@
 @font-face { font-family: 'Inter Variable'; font-style: normal; font-weight: 100 900; font-display: swap; src: url('./assets/fonts/inter-variable.woff2') format('woff2'); }
 @font-face { font-family: 'JetBrains Mono Variable'; font-style: normal; font-weight: 100 900; font-display: swap; src: url('./assets/fonts/jetbrains-mono-variable.woff2') format('woff2'); }
 
-@custom-variant dark (&:is(.dark *));
-
+/* Tailwind 自身的字体名指向第二版字体 token：预检（html、code/kbd/pre/samp）与 font-sans / font-mono 工具类都取同一字体栈。
+   颜色、圆角只用 --ui-* token，不再映射 shadcn 色名（这类工具类已全部改掉，theme.test.mjs 静态拦截）。 */
 @theme inline {
-  --font-sans: var(--font-body);
-  --text-xs: var(--ui-font-small);
-  --text-sm: var(--ui-font-body);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-}
-
-/* 旧层：shadcn 组件（Tabs、Separator）与少数页面仍引用的变量，指向浅色下最接近的第二版 token，随主题与深浅变化。 */
-:root {
-  --radius: 0.75rem;
-  --background: var(--ui-color-layout);
-  --foreground: var(--ui-color-text);
-  --card: var(--ui-color-surface);
-  --card-foreground: var(--foreground);
-  --popover: var(--ui-color-surface);
-  --popover-foreground: var(--foreground);
-  --primary: var(--ui-color-text);
-  --primary-foreground: var(--ui-color-surface);
-  --secondary: var(--ui-color-fill-muted);
-  --secondary-foreground: var(--foreground);
-  --muted: var(--ui-color-fill-subtle);
-  --muted-foreground: var(--ui-color-text-3);
-  --accent: var(--ui-color-fill-muted);
-  --accent-foreground: var(--foreground);
-  --destructive: var(--ui-color-danger);
-  --border: var(--ui-color-line);
-  --input: var(--ui-color-line);
-  --ring: var(--ui-color-text);
-  --font-body: 'Inter Variable', 'Microsoft YaHei UI', 'PingFang SC', 'Noto Sans CJK SC', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+  --font-sans: var(--ui-font-family);
+  --font-mono: var(--ui-font-family-mono);
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-body);
+  background: var(--ui-color-layout);
+  color: var(--ui-color-text);
+  font-family: var(--ui-font-family);
 }
 
-code, pre { font-family: var(--font-mono); }
+code, pre { font-family: var(--ui-font-family-mono); }
 
 ::-webkit-scrollbar {
   width: 6px;
@@ -90,10 +42,11 @@ code, pre { font-family: var(--font-mono); }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: var(--ui-color-line);
+    outline-color: color-mix(in oklab, var(--ui-color-text) 50%, transparent);
   }
   /* 没有自定义焦点样式的交互元素兜底；放在 base 层，组件库的焦点样式优先。 */
-  :where(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+  :where(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--ui-color-text); outline-offset: 3px; }
 }
 
 [data-slot="dialog-content"] { max-height: calc(100dvh - 32px); overflow-y: auto; }
@@ -101,7 +54,7 @@ code, pre { font-family: var(--font-mono); }
 button, a, input, select, textarea { scroll-margin: 80px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0s !important; animation-duration: 0s !important; } }
 
-body { font-size: var(--ui-font-body); -webkit-font-smoothing: antialiased; }
+body { -webkit-font-smoothing: antialiased; }
 
 /* 固定轨道宽度，滚动期间显示滑块；高对比模式交给系统绘制。 */
 * { scrollbar-color: transparent transparent; }
@@ -113,6 +66,6 @@ body { font-size: var(--ui-font-body); -webkit-font-smoothing: antialiased; }
 /* Teleport根容器由全局类设置尺寸，避免子组件作用域丢失后回退到默认小弹窗。 */
 .approved-run-dialog[data-slot=dialog-content]{width:900px;max-width:calc(100vw - 28px);height:min(740px,calc(100dvh - 28px));max-height:calc(100dvh - 28px);display:flex;flex-direction:column;gap:0;padding:0;border-radius:var(--ui-radius-card);overflow:hidden;background:var(--ui-color-surface)}
 .approved-run-dialog>[data-slot=dialog-header]{padding:22px 26px;flex-shrink:0;border-bottom:1px solid var(--ui-color-line);text-align:left}
-.approved-run-dialog [data-slot=dialog-title]{font-size:var(--ui-font-heading);font-weight:650;line-height:27px;letter-spacing:-.4px}
+.approved-run-dialog [data-slot=dialog-title]{font-size:calc(var(--ui-font-size-heading) - 2px);font-weight:650;line-height:27px;letter-spacing:-.4px}
 .approved-run-dialog>[data-slot=dialog-close]{top:22px;right:26px;width:28px;height:28px;display:grid;place-items:center;border-radius:var(--ui-radius-btn);background:var(--ui-color-fill-muted);color:var(--ui-color-text-3);opacity:1}
-@media(max-width:520px){.approved-run-dialog>[data-slot=dialog-header]{padding:18px 20px}.approved-run-dialog>[data-slot=dialog-close]{right:18px;top:17px}.approved-run-dialog [data-slot=dialog-title]{font-size:var(--ui-font-card)}}
+@media(max-width:520px){.approved-run-dialog>[data-slot=dialog-header]{padding:18px 20px}.approved-run-dialog>[data-slot=dialog-close]{right:18px;top:17px}.approved-run-dialog [data-slot=dialog-title]{font-size:var(--ui-font-size-card)}}

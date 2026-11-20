@@ -4,5 +4,5 @@ import { useActiveScrollbars } from './composables/useActiveScrollbars';
 useActiveScrollbars();
 </script>
 <template>
-  <div class="min-h-screen bg-background"><router-view /><FeedbackHost /></div>
+  <div class="min-h-screen"><router-view /><FeedbackHost /></div>
 </template>

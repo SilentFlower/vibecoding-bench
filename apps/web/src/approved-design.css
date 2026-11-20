@@ -1,5 +1,5 @@
-/* 全局排版与交互指针合同；页面样式已迁到各自的第二版样式文件（accounts.css、tokens.css 等）。 */
-html{color:var(--ui-color-text);font-family:var(--font-body);font-size:var(--ui-font-body);font-weight:400;line-height:normal;font-synthesis:none}
+/* 全局排版与交互指针合同；页面样式已迁到各自的第二版样式文件（accounts.css、tokens.css 等）。根字号三档在 ui-foundation.css。 */
+html{color:var(--ui-color-text);font-family:var(--ui-font-family);font-weight:400;line-height:normal;font-synthesis:none}
 body{line-height:normal;font-synthesis:none}
 
 /* 交互指针属于共享控件合同，所有页面和Portal浮层统一应用。 */

@@ -12,7 +12,7 @@ async def main():
  out=ROOT/'.deploy/frontend-sidebar-refresh/full-design-audit';r={}
  async with async_playwright() as p:
   b=await p.chromium.launch()
-  context=await b.new_context(viewport={'width':1440,'height':1000});await context.route('**/*',WorkspaceFixture().route);await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','light')");actual=await context.new_page();await actual.goto(BASE+'/proxies');await actual.get_by_role('button',name='添加代理',exact=True).click()
+  context=await b.new_context(viewport={'width':1440,'height':1000});await context.route('**/*',WorkspaceFixture().route);await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only')");actual=await context.new_page();await actual.goto(BASE+'/proxies');await actual.get_by_role('button',name='添加代理',exact=True).click()
   # 代理编辑已换成第二版居中弹窗（ModalDialog，外框由 verify_ui_kit.py 对设计稿核对、页面由 verify_records_pages_design.py 截图目视），旧原型逐项比对移除，只保留宽度。
   # 读布局宽度，入场缩放动画不影响结果。
   width=await actual.locator('.proxy-editor').evaluate('e=>e.offsetWidth');assert width==680,width

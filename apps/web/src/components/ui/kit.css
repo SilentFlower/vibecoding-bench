@@ -83,7 +83,7 @@
   .fui-date-trigger { gap: calc(var(--ui-space-unit) * 2.5); height: var(--ui-control-md); padding: 0 calc(var(--ui-space-unit) * 3); text-align: left; cursor: pointer; }
 
   /* ---------- 浮层：选择菜单、说明气泡、日历共用同一表面 ---------- */
-  .fui-popover, .fui-choice-menu, .fui-info-content, .fui-calendar { line-height: 1.55; border: 0; border-radius: var(--ui-radius-block); background: var(--ui-color-surface); color: var(--ui-color-text-2); box-shadow: var(--ui-shadow-pop); }
+  .fui-choice-menu, .fui-info-content, .fui-calendar { line-height: 1.55; border: 0; border-radius: var(--ui-radius-block); background: var(--ui-color-surface); color: var(--ui-color-text-2); box-shadow: var(--ui-shadow-pop); }
   /* 代理选线（ProxyPicker，账号编辑、授权登录与任务选线共用）：触发器同下拉控件，弹层同下拉弹层（设计稿 #account-edit 代理线路）。 */
   .account-proxy-picker { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
   .account-proxy-picker > p { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 500; }

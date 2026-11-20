@@ -318,10 +318,10 @@ async def run(output):
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch()
         for zone, theme in [('Asia/Shanghai', 'light'), ('America/Los_Angeles', 'dark')]:
-            context = await browser.new_context(viewport={'width': 1280, 'height': 1000}, timezone_id=zone)
+            context = await browser.new_context(viewport={'width': 1280, 'height': 1000}, timezone_id=zone, color_scheme=theme)
             fixture = ManagementFixture(source_path(ROOT, 'cc2api/web/dist'))
             await context.route('**/*', fixture.route)
-            await context.add_init_script(f"localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','{theme}');")
+            await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');")
             page = await context.new_page()
             page.on('pageerror', lambda error: errors.append(str(error)))
             # 从版本号打开系统更新弹窗（/updates 背后是账号页，本夹具未声明账号接口；深链接由 verify_system_update_browser.py 覆盖）。

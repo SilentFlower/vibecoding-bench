@@ -153,42 +153,9 @@
   --ui-control-lg: calc(var(--ui-control-base) + var(--ui-size-step) + var(--ui-tier) * 2px);
 }
 
-/* 旧层：全站阅读尺寸，按 CSS 视口适配，浏览器缩放继续由用户控制。未迁移页面与原生页仍在使用，页面迁移完成后删除。 */
-:root {
-  --ui-font-small: 12px;
-  --ui-font-body: 14px;
-  font-size: var(--ui-font-body);
-  --ui-font-card: 16px;
-  --ui-font-heading: 18px;
-  --ui-font-page: 28px;
-  --ui-control-height: 40px;
-  --ui-control-compact: 34px;
-  --ui-control-space: 12px;
-}
-@media (min-width: 1920px) {
-  :root {
-    --ui-font-small: 13px;
-    --ui-font-body: 15px;
-    --ui-font-card: 17px;
-    --ui-font-heading: 20px;
-    --ui-font-page: 30px;
-    --ui-control-height: 42px;
-    --ui-control-compact: 36px;
-    --ui-control-space: 13px;
-  }
-}
-@media (min-width: 2560px) {
-  :root {
-    --ui-font-small: 14px;
-    --ui-font-body: 16px;
-    --ui-font-card: 18px;
-    --ui-font-heading: 22px;
-    --ui-font-page: 32px;
-    --ui-control-height: 44px;
-    --ui-control-compact: 38px;
-    --ui-control-space: 14px;
-  }
-}
+/* 根字号按 CSS 视口三档（14 / 15 / 16px，断点同 --ui-tier），浏览器缩放继续由用户控制。
+   Tailwind 间距与少量 rem 尺寸以它为基准，故固定为三档、不随主题种子的基础字号变化。 */
+:root { font-size: calc(14px + var(--ui-tier) * 1px); }
 
 /* Vue 与独立文档共享反馈表面；正文按文本渲染，消息容器不阻挡其它区域。颜色、圆角全部取第二版 token。 */
 .fui-toast-stack { position: fixed; z-index: 2200; left: 50%; bottom: 24px; transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); display: grid; gap: 10px; pointer-events: none; }

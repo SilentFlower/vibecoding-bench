@@ -34,7 +34,7 @@ async def main():
     fixture=PageFixture();errors=[];out=ROOT/'.deploy/frontend-sidebar-refresh/pagination';out.mkdir(parents=True,exist_ok=True)
     try:
         async with async_playwright() as p:
-            browser=await p.chromium.launch();context=await browser.new_context(viewport={'width':1440,'height':1000});await context.route('**/*',fixture.route);await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','light')");page=await context.new_page();page.on('pageerror',lambda e:errors.append(e.stack))
+            browser=await p.chromium.launch();context=await browser.new_context(viewport={'width':1440,'height':1000});await context.route('**/*',fixture.route);await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only')");page=await context.new_page();page.on('pageerror',lambda e:errors.append(e.stack))
             # 账号总数取夹具实际数据（令牌夹具补齐到第二页之后），末页条数与切换条数后的首页条数都由它算出。
             total=len(fixture.accounts);last=(total-1)//12+1;cards=page.locator('.account-card-grid>.account-card')
             await page.goto(BASE);await expect(cards).to_have_count(min(12,total));await page.get_by_role('button',name='下一页',exact=True).click();await expect(cards).to_have_count(min(12,total-12));assert any(path=='/admin/accounts' and q.get('page')==['2'] and q.get('page_size')==['12'] for path,q in fixture.page_queries)

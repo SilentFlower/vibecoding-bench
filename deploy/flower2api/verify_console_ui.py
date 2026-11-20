@@ -63,7 +63,7 @@ async def main():
     async with async_playwright() as p:
         browser=await p.chromium.launch();context=await browser.new_context(viewport={'width':1440,'height':1000})
         await context.route('**/*',fixture.route)
-        await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','light')")
+        await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only')")
         page=await context.new_page();page.on('pageerror',lambda e:errors.append(e.stack))
         await page.goto(BASE+'/tasks');await expect(page.locator('.work-account')).to_have_count(2)
         root=await page.locator('.task-runtime').element_handle()

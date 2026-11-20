@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue';
-import { Globe, ChevronDown, Check } from 'lucide-vue-next';
+import { Globe, ChevronDown, Check } from '@/components/ui/icon';
 import { PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent } from 'reka-ui';
 import { api, type ProxyRoute } from '../api';
 import { SearchInput } from './ui/controls';

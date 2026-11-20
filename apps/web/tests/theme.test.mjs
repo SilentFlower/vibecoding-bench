@@ -313,6 +313,29 @@ test('原生样式不再定义旧变量，只引用第二版 token', () => {
   assert.deepEqual(problems, []);
 });
 
+test('旧层已删除：旧变量名、shadcn 色名工具类与 lucide 图标不再出现', () => {
+  // 删除 @theme 色名映射后，残留的 bg-background 等工具类不会报错，只是静默不生成样式，所以必须静态拦截。
+  const oldVariable = /(?<![\w-])--(?:background|foreground|card|card-foreground|popover|popover-foreground|primary|primary-foreground|secondary|secondary-foreground|muted|muted-foreground|accent|accent-foreground|destructive|border|input|ring|radius|font-body|body-font|ui-font|ui-accent|ui-border|ui-text|ui-surface|ui-font-(?:small|body|card|heading|page)|ui-control-(?:height|compact|space))(?![\w-])/;
+  // fill / stroke 前缀不列入：第二版 token 自身有 fill-muted 等键名。
+  const oldUtility = /(?<![\w-])(?:bg|text|border|ring|outline|divide|placeholder|from|via|to|shadow|caret|accent|decoration)-(?:background|foreground|card|popover|primary|secondary|muted|accent|destructive|border|input|ring)(?:-foreground)?(?:\/\d+)?(?![\w-])/;
+  const legacyFiles = readdirSync(new URL('../../legacy-web/', import.meta.url)).filter(name => /\.(?:css|js|html)$/.test(name))
+    .map(name => new URL(`../../legacy-web/${name}`, import.meta.url));
+  const files = [...sourceFiles(new URL('../src/', import.meta.url)), new URL('../index.html', import.meta.url), new URL('../ui-preview.html', import.meta.url), ...legacyFiles];
+  const problems = [];
+  for (const file of files) {
+    const lines = readFileSync(file, 'utf8').split('\n');
+    lines.forEach((line, index) => {
+      const where = `${file.pathname}:${index + 1}`;
+      if (oldVariable.test(line)) problems.push(`${where} 旧变量 ${line.match(oldVariable)[0]}`);
+      if (oldUtility.test(line)) problems.push(`${where} 旧工具类 ${line.match(oldUtility)[0]}`);
+      if (line.includes('lucide-vue-next')) problems.push(`${where} lucide 图标`);
+    });
+  }
+  const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  if ('lucide-vue-next' in { ...manifest.dependencies, ...manifest.devDependencies }) problems.push('package.json 仍依赖 lucide-vue-next');
+  assert.deepEqual(problems, []);
+});
+
 test('原生页与 Vue 的图标 sprite 保持同一份内容', () => {
   const legacy = readFileSync(new URL('../../legacy-web/approved-icons.svg', import.meta.url), 'utf8');
   const vue = readFileSync(new URL('../src/assets/approved-icons.svg', import.meta.url), 'utf8');

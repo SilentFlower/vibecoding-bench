@@ -90,7 +90,7 @@ async def run(output: Path, gateway: Path) -> dict:
         browser = await playwright.chromium.launch()
         context = await browser.new_context(viewport={'width': 1280, 'height': 1000}, service_workers='block')
         await context.route('**/*', fixture.route)
-        await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','dark');")
+        await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');")
         page = await context.new_page()
         page.on('pageerror', lambda error: errors.append(str(error)))
         try:

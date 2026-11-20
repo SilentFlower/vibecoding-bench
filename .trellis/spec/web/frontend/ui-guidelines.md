@@ -3,7 +3,7 @@
 ## 1. Scope / Trigger
 
 - 修改账号、代理、令牌、任务、环境、授权登录的布局、表单、菜单、气泡或滚动行为时读取本规范。
-- 设计基准（过渡期两套并存）：组件库、外壳与已迁移页面以 `doc/design/console-v2/mock.html`（第二版定稿，`#<画面>` 切换；`?mode=dark#<画面>` 为深色「夜幕紫灰」，另有 `#terminal` 授权登录终端与 `#palette` 色板画面，深色派生取值在同目录 `palette.js`）为准；登录页以 `doc/design/console-v2/v1/mock.html#login`（第一版，仅该画面有效）为准；尚未迁移的页面主体在迁移前仍以 `doc/design/flower2api-concept.html` 为准。用户已基本认可账号页，后续增量以任务记录的最新决定为准。
+- 设计基准：组件库、外壳与全部页面以 `doc/design/console-v2/mock.html`（第二版定稿，`#<画面>` 切换；`?mode=dark#<画面>` 为深色「夜幕紫灰」，另有 `#terminal` 授权登录终端与 `#palette` 色板画面，深色派生取值在同目录 `palette.js`）为准；登录页以 `doc/design/console-v2/v1/mock.html#login`（第一版，仅该画面有效）为准。旧原型 `flower2api-concept.html` 已删除，不再作为对照。用户已基本认可账号页，后续增量以任务记录的最新决定为准。
 - 组件库：`apps/web/src/components/ui/`（样式集中在 `components/ui/kit.css`）；主题运行时：`apps/web/src/theme/`。实际运行示例：`apps/web/ui-preview.html`、`apps/web/src/previews/UiPreview.vue`、`KitShowcase.vue` 与 `CompositeShowcase.vue`（组合组件）。外壳样式：`apps/web/src/console-shell.css`。
 - 静态稿中的代理检测、到期配置和授权步骤是本地模拟。其业务页面与后端的正式迁移仍属当前任务后续实施，不能把视觉预览作为生产能力证据。
 - 本规范规定新设计及逐页迁移的视觉/交互合同。现有 API、权限、错误恢复、原生页面生命周期规则继续遵守 [frontend-guidelines.md](./frontend-guidelines.md) 和 [原生组件规范](../../legacy-web/frontend/component-guidelines.md)。
@@ -62,6 +62,17 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 ## 3. Contracts
 
+### 第二版设计决定
+
+用户确认第二版时，有 6 条决定与此前规范不同，以下列实现为准：
+
+1. **白色侧栏**：`.console-sidebar` 底色取 `--ui-color-surface`，配 `--ui-shadow-side`。选中项 `.navigation-item.is-active` 用 `--ui-color-fill-active` 浅底，图标取 `--ui-color-primary`。
+2. **紫色填充主按钮**：`.fui-button-default` 底色取 `--ui-color-primary`，文字取 `--ui-color-on-primary`。原生 `.btn-primary` 取同一规格。
+3. **卡片去边框改阴影**：`.fui-card`、实体卡与原生 `.work-panel` 不画描边，用 `--ui-shadow-card` 区分层次，圆角取 `--ui-radius-card`。
+4. **页头去分组名**：`PageHeader` 与原生 `.runtime-heading` 只有标题、一行说明和右侧操作，不显示所属分组。
+5. **更紧凑的字号与控件高**：正文基准 13px（`--ui-font-size-md`），控件高 32 / 38 / 44px（`--ui-control-sm/md/lg`）。两者都按阅读档位递增，取值见下方 token 表。
+6. **系统更新改弹窗**：品牌旁的版本号是系统更新入口，打开 `SystemUpdateDialog`，地址不变；直接访问 `/updates` 时打开控制台并自动弹出该弹窗。
+
 ### 视觉 Token 与层次
 
 新 token 的默认值在 `apps/legacy-web/ui-foundation.css`（Vue 由 `main.ts` 全局引入，独立 `/runtime/` 文档以 `<link>` 引用，已在运行时桥接白名单），与 `apps/web/src/theme/tokens.ts` 的 `createTheme(DEFAULT_THEME_SEED)` 逐项一致，由 `apps/web/tests/theme.test.mjs` 校验。命名带分类前缀：
@@ -77,8 +88,18 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 - 字号与控件高 = 种子 + 阅读档位（`--ui-tier` 由三档媒体查询设为 0/1/2）。派生块挂在 `:root, [data-ui-theme]` 上，局部主题容器能独立重算。
 - 页面与组件只引用新 token，不写死颜色和圆角；悬停、按下等设计稿未给的状态色用 `color-mix()` 由 token 混合。`theme.test.mjs` 静态校验 `components/ui`、`kit.css`、`console-shell.css`、`ui-foundation.css`、`pagination.css`、已迁移页面的样式文件与组件，以及原生页（`apps/legacy-web` 的 7 份 CSS、`native-environment.css`、`TasksWorkspace.vue`、`RuntimeEnvironments.vue` 与 `runtime/` 下的弹窗和分区组件）中颜色字面量只出现在 `--ui-color-*`/`--ui-shadow-*` 定义里，`border-radius` 只取 token；原生 CSS 不再定义旧变量；两份图标 sprite 逐字节一致。
-- **旧层（过渡期冻结）**：未迁移页面仍引用的 shadcn 变量（`--primary/--border/--muted-foreground…`）、旧控件 token（`--ui-accent/--ui-border/--ui-text…`）与阅读尺寸（`--ui-font-body/--ui-control-height…`）合并在 `style.css` 与 `ui-foundation.css` 的旧层块，取值不变、不跟主题变化；页面迁移时改用新 token，父任务最终复核时按旧名清零删除。
-  - 组件换新使未迁移页面外观倒退时（例：`SystemUpdates.vue` 的 Card 传 `shadow-none`，组件又去掉了描边，卡片失去边界），在页面层用旧层 token 或工具类恢复原外观（该例加 `border`），并随页面迁移删除；不回改组件。
+- **旧层已删除**：以下名称已全部删除，不得再引用：
+  - shadcn 变量（`--background/--primary/--border/--muted-foreground…`、`--radius`）及 `@theme` 里对应的 `--color-*`、`--radius-*`、`--text-xs/sm` 映射；
+  - 旧控件 token（`--ui-accent/--ui-border/--ui-text…`）；
+  - 阅读尺寸（`--ui-font-body/--ui-control-height…`）；
+  - `--font-body/--font-mono`；
+  - `@custom-variant dark`（深浅由 `data-ui-scheme` 决定）。
+  - `style.css` 的 `@theme inline` 只把 Tailwind 自身的 `--font-sans/--font-mono` 指向 `--ui-font-family(-mono)`，让预检与 `font-sans/font-mono` 工具类取同一字体栈。全局默认描边色取 `--ui-color-line`，轮廓色取 `color-mix(in oklab, var(--ui-color-text) 50%, transparent)`。
+  - `theme.test.mjs` 静态断言 `apps/web/src`、两份入口 HTML 与 `apps/legacy-web` 的样式和脚本中不出现以下内容：
+    - 这些旧名；
+    - shadcn 色名工具类（`bg-background`、`text-muted-foreground`、`border-border` 等）。删除映射后这类工具类不会报错，只是静默不生成样式；
+    - `lucide-vue-next`。图标只用 `@/components/ui/icon` 的 sprite，依赖已移除。
+  - 错误：`<p class="text-muted-foreground">`。正确：在页面样式文件里定义取 `--ui-color-text-3` 的类（如 `request-records.css` 的 `.request-wire-note`）。
 - **层叠**：组件样式在 `kit.css` 的 `@layer components`；业务传入的 Tailwind 工具类可覆盖组件默认值，未分层的页面规则在页面迁移前仍压过组件。不得新增未限定页面作用域的 `[data-slot=…]`、`.fui-*` 全局覆盖。全局兜底焦点框在 `@layer base`。
 - 卡片、弹窗、表格的根元素不设颜色、行高、字体等可继承属性，内部内容由页面基准决定；组件自带的文字部件（标题、说明、表头、辅助值）显式设置。第二版页面基准为 13px / 1.55 / `--ui-color-text`。
 - **主题模式与深浅**：
@@ -92,7 +113,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 - 按CSS视口采用三档阅读尺寸：小于1920px、1920～2559px、2560px及以上。新组件：正文/按钮/输入 13/14/15px，辅助文字 12/13/14px，弹窗标题 20/22/24px，页标题 28/30/32px；控件高 38/40/42px（小号 32/34/36px）。旧层阅读尺寸（正文 14/15/16px、控件 40/42/44px）在页面迁移前保持不变，html 根字号仍取旧层 `--ui-font-body`。禁止整页zoom或按物理像素缩放。
 - 常用间距采用4/8/12/16/24px，页面容器24–40px；窄屏16–20px。页面主内容使用柔和浅底，内容卡片使用白色和轻边框。
-- 字体采用 Inter Variable 与明确的中文系统回退；关键数字使用等宽数字或 JetBrains Mono Variable。字体资源本地托管，许可证参考 `doc/design/font-licenses.txt`。控件当前通过 `--ui-font` 使用字体栈，实际字体资产接入由页面迁移完成。
+- 字体采用 Inter Variable 与明确的中文系统回退；关键数字使用等宽数字或 JetBrains Mono Variable。字体资源本地托管，许可证参考 `doc/design/font-licenses.txt`。页面与控件通过 `--ui-font-family` / `--ui-font-family-mono` 使用字体栈，字体资产在 `apps/web/src/assets/fonts/`。
 - 成功/执行状态用绿色，等待/临近到期用琥珀色，失败/已过期用红色，紫色用于选中与偏好。颜色同时配文字含义。
 - 焦点只画在完整交互容器上：数字输入、带图标的搜索栏用 `:focus-within`；内部输入框去掉重复 outline/shadow。键盘焦点必须可见，强制颜色模式保留系统高亮。
 - 组件状态约定：键盘焦点为 2px 主色外框（输入类为主色细环加 `primary-ring` 外圈）；禁用不透明度 .45、`not-allowed`；加载沿用 `aria-busy`；过渡 .15s，`prefers-reduced-motion` 下无过渡与动画；`forced-colors` 下保留系统高亮。
@@ -311,7 +332,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 - 节点管理导航和卡片使用共用SVG sprite的i-server；运行环境继续使用i-box。节点页先显示概览卡和节点实体卡，账号归属/迁移区保持原确认与轮询（第二版合同见下方「第二版节点管理与系统设置」）。主机指纹、认证方式、路径及批次收进详情；同批已就绪节点隐藏相同来源到目标的箭头。stopping显示停止原组件，旧协议backed_up显示已停止待切换。
 
-- `apps/web/src/style.css` 保留旧层主题变量名（过渡期冻结）；外壳为第二版白色侧栏与浅色内容区（`console-shell.css`）。字体来自 `src/assets/fonts/` 中的本地 WOFF2，许可一并保留；离线导出须把同源字体内嵌，不能依赖构建目录外链。
+- `apps/web/src/style.css` 只放 Tailwind 入口、本地字体、全局排版与滚动条，旧层已删除（见「视觉 Token 与层次」）；外壳为第二版白色侧栏与浅色内容区（`console-shell.css`）。字体来自 `src/assets/fonts/` 中的本地 WOFF2，许可一并保留；离线导出须把同源字体内嵌，不能依赖构建目录外链。
 - `Dashboard.vue` 在品牌旁保留 `/updates` 入口：普通点击打开系统更新弹窗、地址不变，按住修饰键在新标签打开 `/updates`（见「系统更新弹窗」节）。版本优先使用 `usePlatformVersion` 读取的当前控制镜像版本；旧端回退到已验签目录精确匹配的current_release，缺省显示“版本”。移动入口缺省显示“系统更新”。桌面折叠位于管理员区域，偏好键为 `flower2api-sidebar-collapsed`，存储失败仍保持本次会话选择。移动导航保留原七个模块。
 - 正式账号仍使用既有分页及每5秒读取。卡片显示三种额度窗口，7天Sonnet数据类型继续兼容；完整旧配置/画像/评分等信息位于详情。代理公共摘要仅含protocol/host，编辑及OAuth代理输入默认遮蔽认证信息。
 - 账号数字草稿由 `numberDrafts` 保存 `number|string`，`applyNumberDrafts()` 在提交边界检查非空整数再写入原数字字段；原范围校验与 `accountUpdateDelta` 继续生效。认证编辑默认收起，新建默认展开，全部旧字段保留。
@@ -432,7 +453,7 @@ python3 deploy/flower2api/verify_update_design.py
 python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录>
 ```
 
-- `theme.test.mjs`：默认主题与 ui-foundation.css 浅色块、深色块（只写与浅色不同的值）分别双向一致；深色派生与 `doc/design/console-v2/palette.js` 逐值一致；预设与边界色（含 `#ffee00`、`#111111`、`#000000`）浅色对比度 ≥ 4.5，深色按钮文字 ≥ 4.5、实色对卡片底 ≥ 3、派生文字 ≥ 5.5、中性正文 ≥ 4.5；`knob` 与 `term-*` 取值、深浅输出键集合相同；模式存储矩阵（缺失、非法、抛错、写 `system` 删除键）与 `resolveScheme`；两份 `index.html` 的首帧脚本键名一致、位于样式与脚本之前、不再写 `data-theme`；尺寸派生、种子校验与存储失败矩阵、编辑器纯函数；组件、已迁移页面、`style.css` 旧层与 `approved-design.css` 样式不写死颜色与圆角。
+- `theme.test.mjs`：默认主题与 ui-foundation.css 浅色块、深色块（只写与浅色不同的值）分别双向一致；深色派生与 `doc/design/console-v2/palette.js` 逐值一致；预设与边界色（含 `#ffee00`、`#111111`、`#000000`）浅色对比度 ≥ 4.5，深色按钮文字 ≥ 4.5、实色对卡片底 ≥ 3、派生文字 ≥ 5.5、中性正文 ≥ 4.5；`knob` 与 `term-*` 取值、深浅输出键集合相同；模式存储矩阵（缺失、非法、抛错、写 `system` 删除键）与 `resolveScheme`；两份 `index.html` 的首帧脚本键名一致、位于样式与脚本之前、不再写 `data-theme`；尺寸派生、种子校验与存储失败矩阵、编辑器纯函数；组件、已迁移页面、`style.css` 与 `approved-design.css` 样式不写死颜色与圆角；旧层变量名、shadcn 色名工具类与 `lucide-vue-next`（含 `package.json` 依赖）不再出现。
 - `verify_dark_mode.py`（需先构建）：
   - 深色设计稿（`mock.html?mode=dark`）对深色产品比对：外壳（`ShellFixture` 有新版本与运行中任务）、账号、账号编辑、390 应用栏与账号页、请求、系统更新与进度、任务与工程（含部件一致性）、运行环境、主题设置（深海蓝草稿 + 深色模式 = 2 处修改，预设色块取深色派生值）、授权登录终端（容器墨色、七种 ANSI 色取 `term-*`、视口透明、切换深浅不重建）。只导入各设计脚本的对照表，设计稿以 `?mode=dark&s=<画面>` 打开。
   - 颜色：六个页签 `tokens_only`；`DarkBrowser` 代理让 `verify_native_pages_design.dialogs()` 的 21 个深层弹窗在系统深色下复跑外壳、颜色、底栏与控件一致性；正文类文字色对逐层合成的实际底色抽样 ≥ 4.5；气泡、通知取深色 token。
@@ -443,7 +464,7 @@ python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录
 - `verify_ui_shell.py`（需先构建）：真实构建加合成夹具，1440 下侧栏、品牌行、版本号两态、导航、计数徽标、底部区、内容区与页头对 `mock.html#accounts` 逐项比对；9 个页面页头无分组名且样式一致；系统设置保存栏比对与「1 项待保存 / 配置已同步」；折叠保持、1440×560 导航内部滚动；390 应用栏比对、抽屉贴左铺满并在导航后关闭；登录页对 `v1/mock.html#login` 比对及空密码、错误密码、成功、显示密码四条路径；零控制台错误。
 - `verify_account_page_design.py`（需先构建）：`InteractionFixture` 的 13 个账号（第 4–6 号设为限流、认证错误、停用）。1440×900 对 `#accounts`、`#account-edit` 比对 79 项计算样式（白名单：设计稿 `.acc-name span` 误命中徽标的文字色与字号、99px 全圆）；三列、间距 16、首行三张卡片操作栏底边 ≤ 900；健康条四种色调与 36px；工作区 820 视口居中、滚动内容区时页签带不动、切换页签外框不变、新建无页签带；授权登录 440；390 对 `#mobile` 比对，搜索行展开、聚焦、有搜索词时不收起，其它页面无搜索按钮；零控制台错误；设计稿未画的画面截图存 `--output`。
 - `verify_records_pages_design.py`（需先构建）：`RemainingPagesFixture`（第 2 条代理已过期、第 3 条未设到期）与 `BlockFixture`。1440×900 对 `#requests`、`#proxies`、`#tokens`、`#blocks` 比对 63 项计算样式（白名单：99px 全圆开关）；日志卡点击写 PUT、保存中禁用与新值；快捷分段 `outcome=errors`；详情抽屉宽 1020、上右下 14px、面板 `overflow:hidden` 而 `.fui-modal-body` 滚动、四个页签切换外框不变；代理第 4 卡 19 /「另有 1 条已过期」与旧网关缺字段时「—」；代理编辑 680 居中、令牌编辑 760；令牌名称搜索无结果；封禁四段计数与切换；四页 390 无横向滚动及保留列数（请求 4、代理 3、令牌 4、封禁 3），代理 390 点击使用摘要后展开行与账号入口可见；零控制台错误；截图存 `--output`（默认 `.deploy/console-ui-revamp/records/verify`）。
-- `verify_nodes_settings_design.py`（需先构建）：1440×900 对 `#nodes`、`#settings` 逐项比对 55 组计算样式（白名单为空）；`StatesFixture` 八种节点状态断言待处理为 5、说明「3 台需检查连接 · 1 台组件异常 · 1 台移除待重试」、远程服务器「5 台待处理」与各状态徽标色，单节点时为「全部正常 / 尚未添加」；节点添加 640、改名 420 居中，改名按 Escape 后淡出期间说明始终为原地址；设置页修改数字与开关后「已修改」、分类计数与保存栏计数递增，撤销清零且零写入，搜索结果行与分类标签、草稿保留、搜索空态、预热记录；两页 390 无横向滚动、节点卡单列、设置搜索满宽与导航横向滚动；零控制台错误。截图在 `.deploy/console-ui-revamp/nodes-settings/verify/`。
+- `verify_nodes_settings_design.py`（需先构建）：1440×900 对 `#nodes`、`#settings` 逐项比对 55 组计算样式（白名单为空）；`StatesFixture` 八种节点状态断言待处理为 5、说明「3 台需检查连接 · 1 台组件异常 · 1 台移除待重试」、远程服务器「5 台待处理」与各状态徽标色，单节点时为「全部正常 / 尚未添加」；节点添加 640、改名 420 居中，改名按 Escape 后淡出期间说明始终为原地址（轮询用不等待的 `all_inner_texts()` 读取：弹窗可能在 `count()` 与读取之间被移除，等待式 `inner_text()` 会一直等到 30 秒超时，并发回归下偶发失败）；设置页修改数字与开关后「已修改」、分类计数与保存栏计数递增，撤销清零且零写入，搜索结果行与分类标签、草稿保留、搜索空态、预热记录；两页 390 无横向滚动、节点卡单列、设置搜索满宽与导航横向滚动；零控制台错误。截图在 `.deploy/console-ui-revamp/nodes-settings/verify/`。
 - `verify_theme_settings.py`（需先构建）：`ThemeFixture`（`ShellFixture` 加 `/theme` 页面地址与子框架写请求记录）。覆盖以下内容：
   - 侧栏底部组顺序与选中；
   - 6 个预设逐个切换后，iframe 根 `--ui-color-primary` 变化、页面根不变，画板主按钮背景（等过渡结束）；
@@ -466,7 +487,10 @@ python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录
   - 截图在 `.deploy/console-ui-revamp/native-pages/verify/`。
 - `update-steps.test.mjs`：正向含迁移、维护中进行中与待执行、越过取消边界的切换合并、无快照部署、恢复路径、旧操作无 `steps`、未知阶段、截断记录。
 - `verify_update_design.py`、`verify_system_update_browser.py`（需先构建）：前者对设计稿 `#update`、`#update-progress` 比对 45 项计算样式并检查说明展开、转义与零写入；后者覆盖版本记录与嵌套确认 Esc、居中与矮视口、直接安装默认 60 秒 / 30 分钟 1800 秒 / 双击幂等、步骤与时间、断线重连、快照与迁移、数据恢复、完成与刷新、409、未接入、回退与取消等待、等待对账与恢复。
-- 迁移期改造旧原型对比脚本：组件库负责的属性在脚本内用 `component_keys`（采样名 → 属性集合）跳过，并注明已由 `verify_ui_kit.py` 覆盖；页面级属性继续与旧原型比对。写死的组件颜色改为在被测节点内插入探针元素读取 token 实际渲染值（`verify_shared_pagination.py::token`），不得把旧色值改成新色值再写死。业务断言不放宽。外壳尺寸（侧栏宽、内容区边距）推算出的页面宽度断言改为读取实际值（如卡片区铺满 `#console-content` 内容宽度、右边距等于其实际 `padding-right`），外壳本身由 `verify_ui_shell.py` 对照设计稿核对。
+- 旧原型对比脚本已全部改写或退役，新脚本对第二版设计稿比对计算样式：
+  - 最后一个 `audit_full_design.py` 在父任务最终复核时退役；
+  - `verify_design_parity.py` 的分组与页签改为常量（第二版设计稿只画出部分分组，不能当来源）。
+- 写死的组件颜色改为在被测节点内插入探针元素读取 token 实际渲染值（`verify_shared_pagination.py::token`），不得把旧色值改成新色值再写死。业务断言不放宽。外壳尺寸（侧栏宽、内容区边距）推算出的页面宽度断言改为读取实际值（如卡片区铺满 `#console-content` 内容宽度、右边距等于其实际 `padding-right`），外壳本身由 `verify_ui_shell.py` 对照设计稿核对。
 - 脚本读取气泡与弹窗的约定：
   - `InfoTooltip`、`ExecutionNodeBadge` 的气泡内容先悬停触发器，再读 `.fui-info-content`（例如请求列表 `tbody .request-account-identity button` 后的账号邮箱、执行节点徽标后的 `code` 节点键），读完用 `Escape` 加 `page.mouse.move(0, 0)` 收起。不要用 `get_by_role('tooltip')`：reka 的 `role=tooltip` 只是视觉隐藏的纯文本副本，不含 `code` 等子元素。
   - `ModalDialog` 的内容层带 `duration-200`（`DialogContent.vue`，0.2s 且不限定属性），`set_viewport_size` 后立即截图会拍到弹窗宽度与位置变化的中途，须传 `animations='disabled'`。
@@ -502,13 +526,13 @@ python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录
 
 应用与内容区铺满视口，账号卡片最小320px、间隔16px（第二版设计稿 `.grid`）；760px及以下强制单列，1680px及以上四列。侧栏在1920px/2560px断点为264px/280px，折叠宽度仍76px。验证需包含列数切换附近1340/1680px与1920/2560/3440px，不能只验1440/390px。
 
-html根字号与原型共用`--ui-font-body`的14/15/16px三档规则，font-family为同一字体栈、font-synthesis:none。仅body字体相同不能保证rem控件一致。字体验收需核对浏览器实际平台字体，不能只看CSS声明。费用气泡专用class使用足够的选择器优先级，避免异步加载的通用控件样式覆盖。
+html根字号为 `ui-foundation.css` 的 `calc(14px + var(--ui-tier) * 1px)`，即14/15/16px三档（断点同 `--ui-tier`：1920 / 2560）。它固定不随主题种子的基础字号变化，因为 Tailwind 间距按 rem 计，接到主题字号会让布局跟着缩放。font-family为同一字体栈、font-synthesis:none。仅body字体相同不能保证rem控件一致。字体验收需核对浏览器实际平台字体，不能只看CSS声明。费用气泡专用class使用足够的选择器优先级，避免异步加载的通用控件样式覆盖。
 
 授权登录选择代理与账号编辑共用ProxyPicker；代理选择在生成链接时冻结，成功后账号草稿沿用同一目录ID与revision。服务端处理目录凭据，浏览器只接触公开投影。
 
 ### 令牌与任务原型对齐（2026-11-15）
 
-- 令牌页已换成第二版数据表（见「正式控制台与账号首批迁移」中的四页合同），不再与旧原型对齐。Tailwind的`--muted`是背景色，次要文字使用`--muted-foreground`；原生工作区的同名变量单独限定作用域。
+- 令牌页已换成第二版数据表（见「正式控制台与账号首批迁移」中的四页合同），不再与旧原型对齐。次要文字取 `--ui-color-text-3`。
 - 任务工作区已换成第二版（见「第二版原生页」）。主路由断点按实际浏览器视口响应，主区域宽度由侧栏占位确定。桌面1440px下任务账号三列。
 - 新布局保留原表单ID、字段name与API处理，工程和养号空间继续分别维护配置、草稿及SSE清理。新增搜索仅过滤列表；题库的创建任务只预选题目并打开批次表单，提交前保持零写入。
 - 旧`.view`的flex间距、旧页签底色以及高优先级按钮规则不能叠加进新工作区；校验卡片底栏按钮自身样式与宽度，不能只校验父容器。
@@ -517,8 +541,8 @@ html根字号与原型共用`--ui-font-body`的14/15/16px三档规则，font-fam
 
 ## 完整视口弹窗与跨文档组件复用
 
-- 未迁移页面的视觉基准为 `doc/design/flower2api-concept.html` 的实际渲染结果；组件库与已迁移页面以 `doc/design/console-v2/mock.html` 为准。逐页核对内部结构、字重、字号、字体、行高、控件默认/悬停/焦点/选中状态与关键弹窗。仅采样外层容器不能作为一比一还原的验收证据。
-- 原生文档的按钮、输入、选择和文本域必须显式继承 `--body-font`，防止用户代理样式回退到 Arial。字体资源与主后台同源、自托管。
+- 视觉基准为 `doc/design/console-v2/mock.html`（登录页为 `v1/mock.html#login`）的实际渲染结果。逐页核对内部结构、字重、字号、字体、行高、控件默认/悬停/焦点/选中状态与关键弹窗。仅采样外层容器不能作为一比一还原的验收证据。
+- 原生文档的按钮、输入、选择和文本域必须显式取 `--ui-font-family`，防止用户代理样式回退到 Arial。字体资源与主后台同源、自托管。
 - 原生Vue环境与任务模块在主文档展示弹窗，遮罩覆盖完整视口。任务局部观察器只同步Vue控件宿主；弹窗打开保持背景位置，关闭返回原入口，卸载清理观察器。原独立文档保留自身弹窗。
 - 跨文档复用使用 Vue `Teleport` 挂入明确的专属宿主。原生代码仅管理宿主之外的状态文案，不得用 `textContent/innerHTML/replaceChildren` 删除由 Vue 管理的子树。
 - `ProxyPicker` 增加 `portalTarget?: HTMLElement`，支持任务授权与账号编辑复用。跨文档浮层同时处理内容节点的 Esc，保留父授权窗口。目录只同步公开 ID/revision，手动连接保持独立折叠入口。
@@ -532,7 +556,7 @@ html根字号与原型共用`--ui-font-body`的14/15/16px三档规则，font-fam
 
 ### 深层弹窗排版约束
 
-通用原生工作区、运行详情与令牌编辑标题共用`--ui-font-heading`的18/20/22px，沿原650字重、行高及字距。代理编辑宽度680px，表单提示位于控件之后，同排输入保持共同基线。关闭图标使用同一SVG；原生委托事件通过closest定位按钮，沿原清理入口退出。共享输入框焦点由组件库提供（主色细环加 `primary-ring` 外圈），避免残留默认黑色焦点框。
+运行详情弹窗标题为 `calc(var(--ui-font-size-heading) - 2px)`（默认18/20/22px），沿用原来的650字重、行高及字距（设计稿未画该弹窗）；其余原生弹窗标题同 `.fui-dialog-title`（见「第二版原生页」）。代理编辑宽度680px，表单提示位于控件之后，同排输入保持共同基线。关闭图标使用同一SVG；原生委托事件通过closest定位按钮，沿原清理入口退出。共享输入框焦点由组件库提供（主色细环加 `primary-ring` 外圈），避免残留默认黑色焦点框。
 
 系统更新弹窗的排版以第二版设计稿 `mock.html#update`、`#update-progress` 为基准（见「系统更新弹窗」节），由 `verify_update_design.py` 逐项比对计算样式，并覆盖说明展开 / 收起、文本转义与浏览零安装写入。
 

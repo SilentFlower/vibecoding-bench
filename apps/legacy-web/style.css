@@ -341,14 +341,6 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 }
 /* the form gets its own padding */
 .modal-card > .form { padding-bottom: 18px; }
-.warmup-quota-panel {
-  flex: 1;
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid var(--ui-color-line);
-}
-.warmup-quota-panel > label { display: flex; flex-direction: column; }
-.warmup-quota-panel .hint { margin-top: 8px; }
 
 /* ===== detail panel ===== */
 #modal-content h3 {
@@ -840,31 +832,18 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .project-view ol { padding-left: 24px; }
 .project-view li { margin-block: 8px; }
 /* Pi 项目页先展示执行事实，配置与大型项目池收起保留编辑位置。 */
-.projects-header { align-items: center; }
-.projects-account-picker { display: grid; gap: 5px; width: min(100%, 300px); color: var(--ui-color-text-2); }
-.projects-account-picker .lbl, .projects-summary-card > .lbl, .projects-overview-head > div > .lbl { color: var(--ui-color-text-2); font-size: var(--ui-font-size-sm); letter-spacing: .08em; }
-.projects-account-picker select { width: 100%; min-width: 0; font: inherit; }
 .projects-feedback { margin: 14px 0; padding: 10px 14px; border-left: 3px solid var(--ui-color-primary); background: var(--ui-color-surface); }
 .projects-overview { margin-bottom: 18px; }
-.projects-overview-head { display: flex; align-items: flex-start; justify-content: space-between; }
-.projects-overview-head > div, .projects-summary-card, .projects-quota { min-width: 0; }
+.projects-quota { min-width: 0; }
 .projects-overview h3 { margin: 5px 0 6px; font-size: 24px; line-height: 1.35; color: var(--ui-color-primary-text); }
 .projects-overview[data-state="running"] { border-top-color: color-mix(in srgb, var(--ui-color-success) 28%, var(--ui-color-surface)); }
 .projects-overview[data-state="running"] h3 { color: var(--ui-color-success-text); }
 .projects-overview[data-state="blocked"] { border-top-color: color-mix(in srgb, var(--ui-color-danger) 28%, var(--ui-color-surface)); }
 .projects-overview[data-state="blocked"] h3 { color: var(--ui-color-danger-text); }
 .projects-overview p, .projects-overview strong { overflow-wrap: anywhere; }
-.projects-controls { flex-shrink: 0; justify-content: flex-end; }
 .projects-admission { padding: 9px 12px; margin: 14px 0; border-left: 2px solid var(--ui-color-line); }
-.projects-overview-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1.15fr); border-block: 1px solid var(--ui-color-line); }
-.projects-summary-card { border-right: 1px solid var(--ui-color-line); }
-.projects-summary-card:first-child { padding-left: 0; }
-.projects-summary-card:last-child { padding-right: 0; border-right: 0; }
-.projects-target-state { margin: 9px 0 6px; color: var(--ui-color-success-text); font-size: var(--ui-font-size-sm); }
-.projects-target strong { display: block; font-size: var(--ui-font-size-card); line-height: 1.6; }
 /* 总览只保留三行摘要，避免长报告挤占运行信息；全文仍在 Pi 交互中查看。 */
 #projects-activity { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
-.projects-metric { display: block; margin: 12px 0; font-size: 22px; line-height: 1.4; }
 .projects-progress { width: 100%; height: 6px; border: 0; background: var(--ui-color-fill-subtle); accent-color: var(--ui-color-success); }
 .projects-progress::-webkit-progress-bar { background: var(--ui-color-fill-subtle); }
 .projects-progress::-webkit-progress-value { background: var(--ui-color-success); }
@@ -891,22 +870,12 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .projects-verification li > span:first-child { margin-right: 12px; }
 .projects-verification li > span:last-child { color: var(--ui-color-text-2); white-space: nowrap; }
 .projects-verification li[data-active="true"] { color: var(--ui-color-success-text); }
-.projects-tabs { display: flex; margin-bottom: 10px; }
-.projects-tabs button { background: transparent; border-bottom: 2px solid transparent; cursor: pointer; }
-.projects-tabs button[aria-selected="true"] { border-bottom-color: var(--ui-color-primary); }
-.projects-settings { margin-bottom: 18px; }
-.projects-settings > details { min-width: 0; }
-.projects-settings-title { cursor: pointer; color: var(--ui-color-text); }
-.projects-settings-title .hint { margin-left: 12px; }
-.projects-settings .form { padding-top: 16px; }
-.projects-settings .form > label, .projects-settings .row, .projects-settings .row > label { min-width: 0; }
-.projects-settings .form input, .projects-settings .form textarea, .projects-settings .form select { min-width: 0; max-width: 100%; }
 .projects-choices { max-height: 320px; overflow: auto; }
 .projects-choice { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--ui-color-line); }
 .projects-choice label { display: flex; flex-direction: row; align-items: center; gap: 9px; min-width: 0; }
 .projects-choice input { width: auto; }
 .projects-choice small { display: block; margin-top: 4px; }
-.projects-screen, .projects-document { white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; padding: 14px; max-height: 520px; }
+.projects-screen { white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; padding: 14px; max-height: 520px; }
 .projects-screen { margin: 0; }
 .projects-events { list-style: none; margin: 0; min-height: 280px; }
 .projects-events li { padding: 10px 0; border-bottom: 1px solid var(--ui-color-line); }
@@ -918,25 +887,13 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .projects-failure strong { font-weight: 500; }
 .projects-failure small { color: var(--ui-color-text-3); }
 .projects-failure.is-resolved { border-left-color: var(--ui-color-text-3); }
-.projects-history-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--ui-color-line); }
-.projects-history-row > span:nth-child(2) { flex: 1; min-width: 150px; overflow-wrap: anywhere; }
-.projects-history-row small { display: block; margin-top: 4px; }
 #projects-delivery-files .btn, #projects-submissions .btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; margin-block: 4px; }
 @media (max-width: 760px) {
-  .projects-header { flex-direction: column; align-items: stretch; }
-  .projects-account-picker { width: 100%; }
-  .projects-overview-head { flex-direction: column; gap: 10px; }
-  .projects-controls { justify-content: flex-start; flex-wrap: wrap; }
   .projects-overview h3 { font-size: 22px; }
-  .projects-overview-grid, .projects-quota-grid { grid-template-columns: minmax(0, 1fr); }
-  .projects-summary-card, .projects-summary-card:first-child, .projects-summary-card:last-child { padding: 14px 0; border-right: 0; border-bottom: 1px solid var(--ui-color-line); }
-  .projects-summary-card:last-child { border-bottom: 0; }
+  .projects-quota-grid { grid-template-columns: minmax(0, 1fr); }
   .projects-quota-grid { gap: 12px; }
-  .projects-settings-title .hint { display: block; margin: 5px 0 0; }
   .projects-choices { max-height: 260px; }
   #projects-model-form > .row { flex-direction: column; align-items: stretch; }
-  .projects-tabs { gap: 16px; }
-  .projects-tabs button { font-size: var(--ui-font-size-sm); text-align: left; }
 }
 
 /* ============================================================

@@ -150,6 +150,7 @@
   .request-wire-content p { margin: 0; }
   .request-wire-content table { width: 100%; }
   .request-wire-reason { color: var(--ui-color-warning-text); }
+  .request-wire-note { color: var(--ui-color-text-3); }
 
   @media (max-width: 1000px) {
     .request-filter-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }

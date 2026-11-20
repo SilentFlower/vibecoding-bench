@@ -24,23 +24,15 @@
 .console-design .stat-label { font: var(--ui-font-size-sm) var(--ui-font-family); color: var(--ui-color-text-3); }
 .console-design .stat-value { font-size: 24px; color: var(--ui-color-text); }
 .console-design .projects-overview { border-top: 3px solid var(--ui-color-primary); }
-.console-design .projects-overview-grid { border: 0; margin-top: 20px; }
-.console-design .projects-summary-card { border: 0; }
-.console-design .projects-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 14px; }
-.console-design .projects-settings > :last-child { grid-column: 1 / -1; }
-.console-design .projects-tabs { border-bottom: 1px solid var(--ui-color-line); }
-.console-design .projects-tabs button[aria-selected="true"] { background: var(--ui-color-surface); color: var(--ui-color-primary-text); box-shadow: var(--ui-shadow-card); }
-.console-design .projects-settings-title { padding: 4px 0; font-size: var(--ui-font-size-md); }
 .console-design .env-card { border-radius: var(--ui-radius-block); box-shadow: var(--ui-shadow-card); }
 .console-design .env-summary > * { border-radius: var(--ui-radius-block); }
-.console-design .env-toolbar { border-radius: var(--ui-radius-block); }
 .console-design.embedded-tasks .brand { display: none; }
 .console-design .run-config-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
 .console-design .run-config-grid > * { margin: 0; }
 .console-design :where(button, a, summary):focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 3px; }
 @media (max-width: 900px) {
   .console-design .statline { margin-left: auto; }
-  .console-design .projects-overview-grid, .console-design .projects-settings, .console-design .run-config-grid { grid-template-columns: minmax(0, 1fr); }
+  .console-design .run-config-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 600px) {
   .console-design .view-head { flex-wrap: wrap; }

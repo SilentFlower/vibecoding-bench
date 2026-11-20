@@ -10,7 +10,7 @@ async def run(output=None,gateway=None):
     """覆盖旧环境验收的边界行为。@param output 证据目录。@param gateway 构建路径。@return 验证记录。"""
     fixture=DiagnosticsCpuFixture(gateway or ROOT/'apps/web/dist');errors=[];checks=[];original=copy.deepcopy(fixture.rows)
     async with async_playwright() as p:
-        browser=await p.chromium.launch();context=await browser.new_context(viewport={'width':1280,'height':1000});await context.route('**/*',fixture.route);await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','dark')")
+        browser=await p.chromium.launch();context=await browser.new_context(viewport={'width':1280,'height':1000});await context.route('**/*',fixture.route);await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only')")
         page=await context.new_page();page.on('pageerror',lambda e:errors.append(e.stack));await page.goto(BASE+'/environments');cards=page.locator('.environment-rich');await expect(cards).to_have_count(4);assert fixture.sessions==1 and not fixture.writes;await expect(cards.last).to_contain_text('未知状态：future-state');search=page.get_by_role('searchbox',name='搜索运行环境');await search.fill(ENVIRONMENT);await expect(cards).to_have_count(1);await search.fill('');await page.get_by_role('radio',name='需要关注 1',exact=True).click();await expect(cards).to_have_count(1);await page.get_by_role('radio',name='全部环境 4',exact=True).click();checks.append('统一会话首屏只读、名称ID筛选和未知状态')
         workspace=page.locator('.runtime-environment-dialog')
         async def refresh():

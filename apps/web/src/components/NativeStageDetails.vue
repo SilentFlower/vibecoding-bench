@@ -61,22 +61,22 @@ function bodyText(): string {
 
       <p>实体完整性：{{ label(snapshot.wire_final.status) }} · 网络刷出：未独立观测</p>
       <p v-if="finalReason" role="status" class="break-words request-wire-reason">{{ finalReason }}（{{ snapshot.wire_final.reason }}）</p>
-      <p class="break-all text-muted-foreground">进程 {{ snapshot.wire_final.worker_pid ?? '未观测' }} · 连接 {{ snapshot.wire_final.connection_id ?? '未观测' }} · 环境代次 {{ snapshot.wire_final.binding_generation ?? '未观测' }}</p>
-      <p v-if="snapshot.wire_final.http_sha256" class="break-all text-muted-foreground">整体HTTP {{ snapshot.wire_final.observed_http_bytes }} 字节 · SHA256 {{ snapshot.wire_final.http_sha256 }}</p>
+      <p class="break-all request-wire-note">进程 {{ snapshot.wire_final.worker_pid ?? '未观测' }} · 连接 {{ snapshot.wire_final.connection_id ?? '未观测' }} · 环境代次 {{ snapshot.wire_final.binding_generation ?? '未观测' }}</p>
+      <p v-if="snapshot.wire_final.http_sha256" class="break-all request-wire-note">整体HTTP {{ snapshot.wire_final.observed_http_bytes }} 字节 · SHA256 {{ snapshot.wire_final.http_sha256 }}</p>
       <p v-if="snapshot.wire_final.complete">正文与组装阶段的SHA256：{{ snapshot.wire_final.body_sha256 === snapshot.original_body_sha256 ? '一致' : '不同' }}。比较依据为同次实际观测摘要。</p>
-      <p class="text-muted-foreground">此处记录原生TLS接受的HTTP明文。上游接收与模型执行分别由对应响应证据说明。</p>
+      <p class="request-wire-note">此处记录原生TLS接受的HTTP明文。上游接收与模型执行分别由对应响应证据说明。</p>
       <div v-if="snapshot.final_header_changes" class="overflow-auto">
-        <p class="text-muted-foreground">头部变化分析：{{ label(snapshot.final_header_changes.status) }}</p>
+        <p class="request-wire-note">头部变化分析：{{ label(snapshot.final_header_changes.status) }}</p>
         <table class="w-full text-left"><thead><tr class="border-b"><th class="p-2">组装至TLS的头部变化</th><th class="p-2">动作</th></tr></thead><tbody>
           <tr v-for="(item, index) in snapshot.final_header_changes.items" :key="index" class="border-b"><td class="p-2 break-all font-mono">{{ item.name }}</td><td class="p-2">{{ actionLabel(item.action) }}</td></tr>
         </tbody></table>
       </div>
       <div v-if="snapshot.final_body_changes" class="overflow-auto">
-        <p class="text-muted-foreground">正文变化分析：{{ label(snapshot.final_body_changes.status) }}</p>
+        <p class="request-wire-note">正文变化分析：{{ label(snapshot.final_body_changes.status) }}</p>
         <table class="w-full text-left"><thead><tr class="border-b"><th class="p-2">组装至TLS的正文变化</th><th class="p-2">动作</th></tr></thead><tbody>
           <tr v-for="(item, index) in snapshot.final_body_changes.items" :key="index" class="border-b"><td class="p-2 break-all font-mono">{{ item.path || '/' }}</td><td class="p-2">{{ actionLabel(item.action) }}</td></tr>
         </tbody></table>
-        <p v-if="snapshot.final_body_changes.status === 'complete' && !snapshot.final_body_changes.items.length" class="text-muted-foreground">同次观察到的JSON字段保持一致。</p>
+        <p v-if="snapshot.final_body_changes.status === 'complete' && !snapshot.final_body_changes.items.length" class="request-wire-note">同次观察到的JSON字段保持一致。</p>
       </div>
     </div></details>
     <section class="request-section"><div class="request-section-head"><h3>脱敏原文</h3><div class="request-stage-tabs" role="group" aria-label="原文阶段"><button v-for="stage in (snapshot.stage==='agy_prepared' ? (['ingress','decoded_gemini','cc_prepared','wire_final'] as const) : (['ingress','cc_prepared','wire_final'] as const))" :key="stage" type="button" :class="{active:rawStage===stage}" :aria-pressed="rawStage===stage" @click="rawStage=stage">{{ label(stage) }}</button></div></div>
