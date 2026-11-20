@@ -2040,7 +2040,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 ### 2. Signatures
 
 - 公共GET `/v1beta/models`，POST `/v1beta/models/:model:generateContent`及`:streamGenerateContent?alt=sse`。令牌接受x-api-key、x-goog-api-key、Bearer或query key；不同来源冲突及重复query key拒绝。
-- Gemini生成可用基础模型名配 `generationConfig.thinkingConfig`。`thinkingLevel` 接受 `MINIMAL`、`LOW`、`MEDIUM`、`HIGH`、`XHIGH`，大小写不敏感。`thinkingBudget` 接受整数 `-1` 或非负值。`includeThoughts` 接受布尔值，响应保持原生帧。
+- Gemini生成可用基础模型名配 `generationConfig.thinkingConfig`。`thinkingLevel` 接受 `MINIMAL`、`LOW`、`MEDIUM`、`HIGH`、`XHIGH`，大小写不敏感。`thinkingBudget` 接受整数 `-1` 或非负值。`includeThoughts` 接受布尔值，响应保留原生 Part。
 - 账号发送器POST `/internal/agy/prepare`、`/internal/agy/generate`、`/internal/agy/tools`，复用Bearer、TransportBinding、原请求ID和截止校验；只接受冻结的POST `https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent`目标。
 - `AgyAccessSnapshot`为account_id、credential_generation、access_token、expires_at、email，拒绝refresh_token。`AgyToolCompletion`为request、api_token_id、previous_request_id、body；旧工具控制不携带凭据。
 - `agy_runtime.tool_schema.normalize(schema, path='', changes=None)` 返回独立工具 Schema，接收 `functionDeclarations[].parameters` 与 `parametersJsonSchema`。`changes` 可记录 `{path, action}`，原工具定义保持原样。
@@ -2054,11 +2054,12 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 公共目录把令牌可见且可用的 `gemini-*` 模型的 `low`、`medium`、`high`、`tiered`、`xhigh` 后缀版本合并为一条基础名称。相同基础名称跨账号去重。Claude、GPT 和管理端账号原生目录保留实际名称。
 - 带档位的 Gemini 名称仍按完整名称匹配。基础名称显式给出有效档位时先匹配该档位，再匹配真实的同名无后缀型号。`thinkingLevel` 优先于 `thinkingBudget`，`MINIMAL` 视为 `low`，预算 `0–1024`、`1025–8192`、`-1` 或 `8193` 及以上分别对应 `low`、`medium`、`high`。省略档位时先找真实同名型号，再按 `high`、`medium`、`low`、`tiered`、`xhigh` 匹配目录。相同优先级继续按原账号负载排序。
 - 基础名称和变体都只从令牌权限内账号的真实目录映射到原生执行 ID。目录存在且没有有效映射返回 Gemini 404。当前令牌无可见目录或已知模型暂不可用时沿原 503 路径。网关在原始入站采集后消费 `thinkingConfig`，通过已有私有协议发送目录型号及其执行 ID。请求诊断保留客户端模型名和实际提交的原生 ID，认证恢复和工具续轮沿用选定型号。
-- temperature/topP兼容接收后忽略，记录字段及policy=native_default；maxOutputTokens映射原生maxTokens。工具、签名及其他输入继续按实际能力校验。SSE交付源JSON逻辑帧，非流式沿同一执行路径聚合Parts、未知扩展及usage；禁止伪造STOP、[DONE]或成功用量。
+- temperature/topP兼容接收后忽略，记录字段及policy=native_default；maxOutputTokens映射原生maxTokens。工具、签名及其他输入继续按实际能力校验。SSE即时交付首个 `functionCall` 前的源帧。原生确认工具轮待回填后，网关登记归属，将缓冲的后续帧聚合成一条 SSE 事件，按原顺序保留 Part、签名、终态和用量。非流式沿同一执行路径聚合 Parts、未知扩展及 usage；禁止伪造 STOP、[DONE] 或成功用量。
 - 数组 `items` 缺失、为 `null`、`true` 或裸 `{}` 时，规范化为 `{"anyOf":[{}]}`，使 AGY 1.5.9 出站包含 `items:{}`。`items:false` 以 `maxItems:0` 表示。`prefixItems` 与旧式 `items:[]` 投影为单个元素 Schema，闭合元组保留 `maxItems` 上限，已有更小上限优先。原生接口按统一元素 Schema 表达元组，位置约束会丢失。工具调用和结果仍使用原 JSON 值。字符串 `const` 与已有 `enum` 取交集并输出单值 `enum`。
 - 正式OAuth观察器核对完整原版SHA、映像身份及四个指令指纹。原生路由为0xa098532，channelModelResponseStream.Receive接收返回位置0x95d1e90，遥测0x89ed91f，codeassist Scanner栈检查后0x95f3212。Receive在AL给出接收结果、RCX给出已核对的GetChatMessageResponse；Scanner原块先私有归档，再解开SSE及response信封。EOF保留错误未知标记，业务成功同时要求源finishReason/安全拦截终态及真实控制RPC成功。部分文本、usage或通道关闭单独出现均不算成功。
 - 管理侧锁内冻结ready状态和AT-only快照。新代采用新worker，最高代次单调，同代不同AT拒绝；旧在途及原工具轮保留归属。工具结果匹配调用方、账号、原历史和函数身份，先回填原MCP并收口，再读当前ready快照开始下一模型轮。concurrency=1复用原许可；pending/reconcile期间可独立收口旧工具，普通发布继续关闭。同结果回执仅在原截止内幂等，副作用只回填一次。
 - 同轮多个 `functionCall` 可使用同一函数名。`functionResponse.id` 存在时按 ID 配对，允许反序回填。ID 省略且函数名重复时按该轮调用位置配对，要求对应位置名称相同、整轮数量一致并且每个调用只回填一次。活跃续轮仍须匹配完整原历史与调用参数。网关、原生续轮校验和历史导入使用同一规则。
+- 结果省略 `id` 且 `name` 等于原工具轮的真实调用 ID 时，若没有同名函数，网关按该 ID 匹配。确认完整原工具轮后，向发送器提交的历史为对应调用和结果补真实 ID，并为结果恢复函数名。已归一化的前缀跨轮复用，公开入站诊断、网关归属和幂等回执比较使用客户端原始正文。
 - 公共生成在原账号刷新锁内要求 AT 剩余有效期超过 430 秒。该值保留 AGY 1.5.9 的 310 秒断网启动实测余量和原生请求最长 120 秒预算。有效期不足时，由管理侧按原代次流程续期后再发布 AT-only 快照；在途工作继续使用自己的快照。
 - 监督器将请求墙钟截止转换为单调截止，接收剩余时间范围 `(0,125]` 秒并限制原请求预算最多120秒。`Supervisor.acquire(value, until)`在选择及创建worker前复核截止，旧代关闭后重新检查；`Worker.start(until)`在Popen前再次复核。退役计入原请求耗时，过期返回 `request_deadline_exceeded`，停止新代创建及原生启动。
 - 仅源错误code=401/status=UNAUTHENTICATED且没有候选及usage时参与有界恢复；须尚未交付、无工具结果历史、原作业实际收口、同账号ready新代且AT改变，最多一次。容量/控制失败、SSE首帧后、取消或过期均不重放。
@@ -2096,7 +2097,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 
 正常：Gemini工具首轮返回真实functionCall并保留原许可；管理侧发布AT2后，调用方带原历史和functionResponse续轮，原AT1 worker完成真实MCP回填，下一模型由AT2 worker执行。边界：管理侧reconcile时先完成旧工具并保留原截止内回执，恢复ready后继续；资源无限必须有真实cgroup依据。
 
-同轮调用 `Read(a)`、`Read(b)`、`Lookup(c)` 时，保留 ID 可按 `c`、`b`、`a` 交结果。若中转省略 ID，按原顺序提交三条结果。重复使用同一 ID 或缺少一条结果时返回 400。
+同轮调用 `Read(a)`、`Read(b)`、`Lookup(c)` 时，首条工具 SSE 的候选内容包含全部三个调用。保留 ID 可按 `c`、`b`、`a` 交结果。若中转省略 ID，按原顺序提交三条结果。客户端把真实 ID 放在结果的 `name` 时，网关可以从已登记的工具轮恢复对应函数。重复使用同一 ID 或缺少一条结果时返回 400。
 
 错误用法：以HTTP 200、Go RPC返回或EOF认定部分文本成功；正确处理是同时验证源终态和控制终态。错误用法：用发送器替身的通过结果宣称原生OAuth业务已验证；正确处理是独立运行固定原版、本地TLS及真实MCP闭环。真实Google身份、目录接受性及跨实际到期仍由具备授权账号和独立预算的后续验收承接。
 
@@ -2114,7 +2115,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `verify_agy_gemini.py` 覆盖未知模型在流式和非流式入口返回 404、令牌范围外模型和未观测目录、已知模型暂不可用时的 503、临期凭据单次续期及有效期充足时继续复用。
 - 同一断网探针核对公开 Gemini 目录跨账号去重、异平台名称保持、基础名和旧档位名实际发送的目录型号及原生 ID、显式档位隔离、工具续轮沿用型号和请求诊断保留原名。
 - `verify_agy_native_loopback.py --image <明确测试镜像> [--loader-root <显式glibc目录>]`使用真实网关/SQLite/account-sender/监督器/原版和本地TLS/MCP；容器network=none、UID1001、根只读、零真实外部生成。一次性CA只挂验证容器系统信任根，正式配置无测试CA或跳过校验开关。断言参数实际出站、源usage、两代AT、并发1工具回填、重复拒绝、64重复帧与SIGURG、截断/容量失败、断连取消、实际许可释放和共享映像。
-- `verify_agy_native_loopback.py --parallel-tools` 断言双同名调用省略 ID，以及按 3、4、3 个调用连续三轮回填时，每一轮实际出站的调用参数与结果逐项一致，重复回填零模型发送。`test_agy_supervisor` 断言空闲回收同时保留同身份热进程和就绪模板。
+- `verify_agy_native_loopback.py --parallel-tools` 模拟客户端读到首条工具 SSE 后断开，断言双同名调用以及 6、4、3 个调用连续三轮均完整交付，覆盖结果名称使用 ID、显式 ID 反序和省略 ID 顺序回填。核对签名、源终态、用量和实际出站的调用参数与结果，缺项或重复回填返回 400 且零额外模型发送。`test_agy_supervisor` 断言空闲回收同时保留同身份热进程和就绪模板。
 - `verify_agy_runtime.py --native-image <明确镜像> [--crash]`保持零模型准备、两代、单次映像解码及正常/异常物理退出；`verify_agy_gemini.py`继续单独标记发送器替身证据；`verify_agy_environment_ui.py`覆盖1440/720/390px及实际控件边界、草稿、焦点和离页清理。制品资源须从当前受管理源码构建。
 
 ## Scenario: AGY账号系统文本同形体策略

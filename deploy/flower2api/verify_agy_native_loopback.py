@@ -115,7 +115,7 @@ class Upstream(BaseHTTPRequestHandler):
             if parallel_chain:
                 returned=sum('functionResponse' in part for content in body['request']['contents']
                     for part in content['parts'])
-                tool=returned<10
+                tool=returned<13
             cancel='TLS_SYNTHETIC_CANCEL' in encoded
             repeated='TLS_SYNTHETIC_REPEAT' in encoded
             truncated='TLS_SYNTHETIC_TRUNCATED' in encoded
@@ -134,11 +134,14 @@ class Upstream(BaseHTTPRequestHandler):
             if tool and parallel_chain:
                 part['functionCall']['id']=f'call_{returned+1:032x}'
                 part['functionCall']['args']={'x':returned+1}
-                count={0:3,3:4,7:3}[returned]
-                frames[0]['candidates'][0]['content']['parts'].extend(
-                    {'functionCall':{'name':'synthetic_lookup' if i==count-1 else 'synthetic_tool',
-                        'args':{'x':returned+i+1},'id':f'call_{returned+i+1:032x}'}}
-                    for i in range(1,count))
+                count={0:6,6:4,10:3}[returned]
+                parts=[part]+[{'functionCall':{'name':'synthetic_lookup' if i==count-1 else 'synthetic_tool',
+                    'args':{'x':returned+i+1},'id':f'call_{returned+i+1:032x}'}}
+                    for i in range(1,count)]
+                frames=[
+                    {'candidates':[{'index':0,'content':{'role':'model','parts':batch}}]}
+                    for batch in ([{'text':'准备工具'}],parts[:2],parts[2:])
+                ]
             elif tool and 'TLS_SYNTHETIC_TOOL_PARALLEL' in encoded:
                 frames[0]['candidates'][0]['content']['parts'].append(
                     {'functionCall':{'name':'synthetic_tool','args':{'x':2}}})
@@ -915,20 +918,23 @@ def verify_tool_deadlines(request, wait_idle, base):
         'elapsed_seconds':round(time.monotonic()-started,2)}
 
 
-def verify_parallel_tool_turn(parts, keep_ids, expected_count):
-    """从一轮流式调用构造客户端回填。@param parts 模型输出。@param keep_ids 是否保留 ID 并反序回填。@param expected_count 预期调用数。@return 用户回填。"""
+def verify_parallel_tool_turn(parts, id_mode, expected_count):
+    """从一轮流式调用构造客户端回填。@param parts 模型输出。@param id_mode 回填 ID 的表示。@param expected_count 预期调用数。@return 用户回填。"""
     calls=[part['functionCall'] for part in parts]
     require(len(calls)==expected_count and len({call['id'] for call in calls})==expected_count,
-        '同名工具缺少独立调用 ID')
+        '首条工具 SSE 缺少完整调用或独立 ID')
+    require([part.get('thoughtSignature') for part in parts]==['c3ludGhldGljLXNpZw==']+[None]*(expected_count-1),
+        '聚合改变了调用签名的归属')
     replies=[{'functionResponse':{'name':call['name'],'response':{'value':call['args']['x']}}}
         for call in calls]
-    if keep_ids:
+    if id_mode=='explicit':
         for call, reply in zip(calls, replies):
             reply['functionResponse']['id']=call['id']
         replies.reverse()
     else:
-        # 模拟中转同时移除历史调用和回填的 ID，并保留签名与调用顺序。
-        for call in calls:
+        for call, reply in zip(calls,replies):
+            # AstrBot 省略专用 ID 字段，并可能把 ID 放进结果名称。
+            if id_mode=='alias':reply['functionResponse']['name']=call['id']
             del call['id']
     return replies
 
@@ -946,23 +952,34 @@ def verify_parallel_tool_mapping(expected_count):
 
 
 def verify_parallel_tools(request, wait_idle, base):
-    """通过真实 AGY 回环覆盖双工具复现和连续三轮并行回填。@param request 公共入口。@param wait_idle 实际排空。@param base 模型路径。@return 验证摘要。"""
-    for counts, keep_ids in [((2,), (False,)), ((3,4,3), (True,False,False))]:
+    """首条工具 SSE 后断开，按真实 AGY 回环覆盖连续并行回填。@param request 公共入口。@param wait_idle 实际排空。@param base 模型路径。@return 验证摘要。"""
+    for counts, id_modes in [((2,), ('ordered',)), ((6,4,3), ('alias','explicit','ordered'))]:
         initial_count=len(Upstream.calls)
         marker='TLS_SYNTHETIC_TOOL_PARALLEL' + ('_CHAIN' if len(counts)>1 else '')
         body={'contents':[{'role':'user','parts':[{'text':marker}]}], 'tools':[{'functionDeclarations':[
             {'name':name,'parameters':{'type':'OBJECT','properties':{'x':{'type':'INTEGER'}}}}
             for name in ('synthetic_tool','synthetic_lookup')]}]}
         previous_count=0
-        for count, ids in zip(counts,keep_ids):
-            status,raw=request(base+'streamGenerateContent?alt=sse',body)
+        for count, id_mode in zip(counts,id_modes):
+            status,raw=request(base+'streamGenerateContent?alt=sse',body,first_tool_frame=True)
             require(status==200,'同名工具流失败：'+str(status)+' '+raw.decode()[:220])
             if previous_count:
                 verify_parallel_tool_mapping(previous_count)
             frames=[json.loads(line[6:]) for line in raw.decode().splitlines() if line.startswith('data: ')]
-            parts=[part for frame in frames for candidate in frame.get('candidates',[])
-                for part in candidate.get('content',{}).get('parts',[]) if 'functionCall' in part]
-            replies=verify_parallel_tool_turn(parts,ids,count)
+            final=frames[-1]
+            require(final['candidates'][0]['finishReason']=='STOP' and final['usageMetadata']['totalTokenCount']==7,
+                '首条工具 SSE 缺少原生终态或用量')
+            if len(counts)>1:
+                require(any(part.get('text')=='准备工具' for frame in frames[:-1]
+                    for part in frame['candidates'][0]['content']['parts']),'工具前文本没有单独流式发送')
+            parts=[part for part in final['candidates'][0]['content']['parts'] if 'functionCall' in part]
+            replies=verify_parallel_tool_turn(parts,id_mode,count)
+            if id_mode=='alias':
+                partial={**body,'contents':body['contents']+[
+                    {'role':'model','parts':parts[:1]},{'role':'user','parts':replies[:1]}]}
+                status,raw=request(base+'generateContent',partial)
+                require(status==400 and b'AGY_TOOL_RESULT_MISMATCH' in raw and len(Upstream.calls)==initial_count+1,
+                    '缺失结果没有在上游提交前拒绝')
             body['contents'].extend([{'role':'model','parts':parts},{'role':'user','parts':replies}])
             previous_count+=count
         status,raw=request(base+'generateContent',body)
@@ -973,7 +990,7 @@ def verify_parallel_tools(request, wait_idle, base):
         verify_parallel_tool_mapping(previous_count)
         require(request(base+'generateContent',body)[0]==400 and len(Upstream.calls)==expected_requests,
             '重复回填产生了额外模型发送')
-    return {'passed':True,'parallel_calls':2,'round_sizes':[3,4,3],'model_calls':len(Upstream.calls)}
+    return {'passed':True,'parallel_calls':2,'round_sizes':[6,4,3],'first_tool_sse':True,'model_calls':len(Upstream.calls)}
 
 
 def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,kernel_selection=False,tool_deadlines=False,parallel_tools=False):
@@ -1003,8 +1020,8 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
             command=['/opt/verify-lib/ld-linux-x86-64.so.2','--library-path','/opt/verify-lib',executable]
         children.append(subprocess.Popen(command,stdout=output,stderr=subprocess.STDOUT))
     request_ids=[]
-    def request(path,body=None,admin=False):
-        """通过真实公共HTTP执行一次请求。@param path 路径。@param body Gemini正文。@return 状态与正文。"""
+    def request(path,body=None,admin=False,first_tool_frame=False):
+        """通过真实公共 HTTP 执行一次请求。@param path 路径。@param body Gemini 正文。@param admin 是否管理调用。@param first_tool_frame 是否在首条工具事件后退出。@return 状态与正文。"""
         headers={'x-api-key':'synthetic-admin' if admin else 'synthetic-key','content-type':'application/json'}
         if not admin:headers['X-Synthetic-Ingress']='never-upstream'
         value=Request('http://127.0.0.1:5674'+path,data=json.dumps(body).encode() if body is not None else None,headers=headers,
@@ -1012,6 +1029,15 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
         try:
             with urlopen(value,timeout=125) as response:
                 if response.headers.get('x-cc2api-request-id'):request_ids.append(response.headers['x-cc2api-request-id'])
+                if first_tool_frame:
+                    received=[]
+                    for line in response:
+                        received.append(line)
+                        if line.startswith(b'data: ') and any('functionCall' in part
+                            for candidate in json.loads(line[6:]).get('candidates',[])
+                            for part in candidate.get('content',{}).get('parts',[])):
+                            break
+                    return response.status,b''.join(received)
                 return response.status,response.read()
         except HTTPError as error:
             if error.headers.get('x-cc2api-request-id'):request_ids.append(error.headers['x-cc2api-request-id'])

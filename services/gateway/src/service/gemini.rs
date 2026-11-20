@@ -1,6 +1,7 @@
 //! Gemini入口的账号许可、原生帧保真与跨HTTP工具轮归属。
 use std::collections::{BTreeSet, HashMap};
 use std::io::Error as IoError;
+use std::mem::replace;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -62,6 +63,7 @@ struct ToolTurn {
     account: Account,
     model: RoutedModel,
     contents: Value,
+    runtime_contents: Option<Value>,
     calls: Vec<Value>,
     deadline: Instant,
     admission: Arc<Admission>,
@@ -77,6 +79,7 @@ struct ContinuationClaim {
     service: Arc<GeminiService>,
     key: Option<String>,
     resolved_model: String,
+    runtime_contents: Option<Value>,
 }
 
 impl Drop for ContinuationClaim {
@@ -122,11 +125,15 @@ impl ContinuationClaim {
             )
         };
         if !finished {
+            let mut runtime_body = body.clone();
+            if let Some(contents) = &self.runtime_contents {
+                runtime_body["contents"] = contents.clone();
+            }
             transport
                 .finish_agy_tools(
                     &previous,
                     token_id,
-                    body.clone(),
+                    runtime_body,
                     deadline.min(previous_deadline),
                     gif_frames,
                 )
@@ -602,6 +609,52 @@ fn matches_turn(turn: &ToolTurn, model: &str, body: &Value) -> bool {
     })
 }
 
+/// 用已校验工具轮的真实 ID 修正原生历史。@param turn 原工具归属。@param body 已匹配的客户端正文。@return 有变更时的原生历史。
+fn runtime_tool_contents(turn: &ToolTurn, body: &Value) -> Option<Value> {
+    let contents = body["contents"].as_array()?;
+    let start = contents.len().checked_sub(2)?;
+    let aliases: Vec<_> = contents[start + 1]["parts"]
+        .as_array()?
+        .iter()
+        .enumerate()
+        .filter_map(|(part_index, part)| {
+            let response = part.get("functionResponse")?;
+            let alias = response["name"].as_str()?;
+            if response.get("id").is_some() || turn.calls.iter().any(|call| call["name"] == alias) {
+                return None;
+            }
+            let call_index = matching_tool_call(&turn.calls, response, 0)?;
+            Some((part_index, call_index))
+        })
+        .collect();
+    if aliases.is_empty() && turn.runtime_contents.is_none() {
+        return None;
+    }
+
+    // 已确认的原生前缀跨轮复用。客户端归属和重试回执继续使用原始内容。
+    let mut runtime = turn
+        .runtime_contents
+        .as_ref()
+        .unwrap_or(&turn.contents)
+        .clone();
+    let mut model = contents[start].clone();
+    let mut user = contents[start + 1].clone();
+    let mut calls: Vec<_> = model["parts"]
+        .as_array_mut()?
+        .iter_mut()
+        .filter_map(|part| part.get_mut("functionCall"))
+        .collect();
+    for (part_index, call_index) in aliases {
+        let expected = &turn.calls[call_index];
+        calls[call_index]["id"] = expected["id"].clone();
+        let response = &mut user["parts"][part_index]["functionResponse"];
+        response["id"] = expected["id"].clone();
+        response["name"] = expected["name"].clone();
+    }
+    runtime.as_array_mut()?.extend([model, user]);
+    Some(runtime)
+}
+
 impl GeminiService {
     fn continuation(
         self: &Arc<Self>,
@@ -664,6 +717,7 @@ impl GeminiService {
                 service: self.clone(),
                 key: Some(matches[0].clone()),
                 resolved_model: turn.model.resolved.clone(),
+                runtime_contents: runtime_tool_contents(turn, body),
             },
         )))
     }
@@ -938,6 +992,10 @@ async fn generate_inner(
     if let (Some(observer), Some((root, attempt))) = (observation.as_mut(), previous_turn) {
         observer.continuation(&root, &attempt);
     }
+    let client_contents = claim
+        .as_mut()
+        .and_then(|claim| claim.runtime_contents.take())
+        .map(|contents| replace(&mut body["contents"], contents));
     // 从此刻起提交状态可能未知；只允许原监督器确认结果，禁止自动重新领取工具回填。
     let completed_turn = claim.as_mut().and_then(|claim| claim.key.take());
     let upstream = transport
@@ -1003,6 +1061,7 @@ async fn generate_inner(
             current,
             model,
             body,
+            client_contents,
             deadline,
             admission,
             transport,
@@ -1150,6 +1209,7 @@ async fn drive(
     account: Account,
     model: RoutedModel,
     body: Value,
+    mut client_contents: Option<Value>,
     deadline: Instant,
     admission: Arc<Admission>,
     transport: Arc<PreparedTransport>,
@@ -1453,7 +1513,7 @@ async fn drive(
                     }
                 }
                 if !calls.is_empty() {
-                    // 先登记同次原生工具轮，再把客户端可执行的调用和后续帧按原顺序交付。
+                    // 首个调用后的帧须等整轮归属确认，之前的内容继续即时发送。
                     pending_tool_bytes += raw.len();
                     if pending_tool_bytes > FRAME_LIMIT {
                         return Err(AppError::BadGateway("AGY工具响应超过聚合上限".into()));
@@ -1475,6 +1535,14 @@ async fn drive(
                 let tool_deadline = tool_pending
                     .then(|| tool_wait_deadline(native, deadline))
                     .transpose()?;
+                if streaming && pending_tool_frames.len() > 1 {
+                    // AstrBot 在首条工具事件后停止读取，必须一次交付本轮的全部调用。
+                    let mut response = Value::Null;
+                    for frame in pending_tool_frames.drain(..) {
+                        aggregate(&mut response, frame)?;
+                    }
+                    pending_tool_frames.push(response);
+                }
                 if let Some(observer) = observation.as_mut() {
                     observer.completed(tool_pending, &calls);
                 }
@@ -1490,7 +1558,12 @@ async fn drive(
                                 token_id,
                                 account: account.clone(),
                                 model: model.clone(),
-                                contents: body["contents"].clone(),
+                                runtime_contents: client_contents
+                                    .as_ref()
+                                    .map(|_| body["contents"].clone()),
+                                contents: client_contents
+                                    .take()
+                                    .unwrap_or_else(|| body["contents"].clone()),
                                 calls: calls.clone(),
                                 deadline: tool_deadline,
                                 admission: admission.clone(),
