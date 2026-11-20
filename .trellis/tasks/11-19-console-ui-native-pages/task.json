@@ -1,0 +1,50 @@
+{
+  "id": "console-ui-native-pages",
+  "name": "console-ui-native-pages",
+  "title": "原生页视觉对齐",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "legacy-web",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-19",
+  "completedAt": "2026-11-20",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-20T09:37:52Z",
+    "blockers": []
+  },
+  "branch": "feat/console-ui-revamp",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-19-console-ui-revamp",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-20T09:37:52Z",
+    "completedSteps": [
+      "规划与 Brief",
+      "死规则与覆盖清理",
+      "图标 sprite",
+      "token 化",
+      "任务与工程画面",
+      "运行环境",
+      "独立入口与静态资源",
+      "验证脚本",
+      "规范",
+      "全量验证与对照页",
+      "Check-All（CHK-001～006 已修复）"
+    ],
+    "partialStep": null,
+    "nextStep": "父任务子任务 7（深色模式）规划评审",
+    "notes": ""
+  }
+}
