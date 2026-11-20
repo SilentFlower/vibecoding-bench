@@ -764,3 +764,43 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - 网关测试断言同代关闭挂起响应体、原预热定向取消和活动归还，并区分客户端断连与维护中断。
 - 宿主测试断言旧回退路径与快速取消分支，快切期间远程待更新不阻塞中央提交。
 - `verify_system_update.py --fast-transition` 验证实际 SSH 离线节点、真实挂起请求关断、中央先恢复和节点续跑。结合 `--migration-manifest` 验证双库迁移、只完成第一库后掉电恢复、显式回退及后来写入保留。
+
+## Scenario: 候选项目库准备与控制端验收
+
+### 1. Scope / Trigger
+
+调整签名候选的项目库准备、控制服务健康检查或旧版兼容安装重试时适用。
+
+### 2. Signatures
+
+- 声明 `vibebench.project-library-prepare=1` 的控制镜像支持 `python3 -m project_library_preparation <source> /data`。默认内容源为 `/repo/project_library`。
+- 私有回执位于更新状态根的 `socket/project-library-<control-release>.json`。`binding` 固定部署、控制镜像批次、配置摘要、引用和内容源。`entry` 保存冻结摘要、目录身份和各清单摘要。Compose 通过 `V3_PREPARED_PROJECT_LIBRARY_IMAGE` 将预期配置摘要传给调度器。
+- 操作投影的 `control_health` 可含 `candidate`、`restore`。每组分别返回 `gateway` 和 `orchestrator` 的 `state`、`attempts`、可选 `http_status` 和 `duration_ms`。历史记录允许无该字段。
+
+### 3. Contracts
+
+- 宿主验签并核对候选镜像后，在暂停接单前用精确镜像启动准备容器。容器无网络、根文件系统只读，仅挂载项目库目录和内容对象。只有完整校验及注册通过才发布私有回执。准备过程不登记业务库行。
+- 候选启动核对回执归属、冻结目录身份和各清单字节。项目管理器复用已注册对象，种子和离线制品使用时继续按原摘要合同读取。无准备标记的历史镜像和普通启动沿原注册路径。
+- 健康探测分别记录两端最后结果，HTTP 头已收到时保留状态码，探测时限共享原操作窗口。失败回退前先保存候选结果，恢复结果另存。公开字段只包含探测摘要。
+- 兼容重试时，宿主仅归档已核对为 `platform_restored` 的 SSH 终态日志。须匹配当前已准备的节点及原已恢复操作的 ID、epoch 和节点回执。归档保留原字节。同一任务的在途日志留给原恢复流程。新编排器也把 `platform_restored` 识别为终态。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 项目库准备失败 | 原版继续接单 |
+| 候选启动遇到回执不匹配或冻结清单变化 | 维护期间启动失败，沿原操作回退 |
+| 任一端返回 HTTP 错误或未响应 | 保存该端状态和尝试次数，另一端继续探测 |
+| 已恢复节点记录无法核对归属 | 中止新兼容安装，保留原记录 |
+
+### 5. Scenarios and Examples
+
+- 正常。已有冻结版本可在准备阶段核对后复用。新调度器启动直接加载已注册的索引。
+- 边界。候选网关返回 503，调度器返回 200。回退两端返回 200，候选 503 仍显示在原操作中。
+- 错误用法。重用上一次已恢复作业的 epoch。正确处理。核对并归档终态记录，由原作业入口登记本次维护身份。
+
+### 6. Tests Required
+
+- `test_project_scenario_content` 覆盖候选摘要不匹配、冻结目录替换、清单变化及启动期间无种子树和制品重读。
+- `test_system_host`、`test_system_updater` 和 `test_cluster_synchronization` 覆盖探测失败、回退证据保留、以原记录归档及拒绝未恢复的作业。
+- `verify_system_update_browser.py` 验证两组探测在同一更新详情独立显示。隔离发行验收覆盖真实旧版镜像、合成 SSH 节点、连续故障回退与最终成功安装。

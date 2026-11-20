@@ -30,7 +30,7 @@ from storage_maintenance import acquire_storage_lock
 from system_update_contract import (DEPLOYMENT_RE, DOWNLOAD_ROOT, INDEX_LIMIT, MANIFEST_LIMIT,
     RELEASE_RE, REPOSITORY, SHA_RE, TERMINAL, compatible_data, compatible_scratchpad, fetch_bytes, fetch_repository_file, safe_read, strict_json,
     utc_now, validate_index, validate_operation, validate_release, verify_signed, validate_migration_plan, validate_migration_evidence)
-from system_update_host import HostDeployment
+from system_update_host import ControlHealthTimeout, HostDeployment
 
 DONE = TERMINAL | {'prepared'}
 STATE_LIMIT = 8 * 1024 * 1024
@@ -234,7 +234,8 @@ class SystemUpdater:
     def _public_operation(self, operation: dict) -> dict:
         return {key: copy.deepcopy(operation.get(key)) for key in ('operation_id', 'action', 'phase', 'created_at',
             'updated_at', 'target_release', 'error', 'blockers', 'cancel_requested', 'cleanup', 'environment_results',
-            'database_snapshot', 'database_migrations', 'cluster_nodes', 'fast_transition', 'admission_blocked_at', 'admission_reopened_at')}
+            'database_snapshot', 'database_migrations', 'cluster_nodes', 'control_health',
+            'fast_transition', 'admission_blocked_at', 'admission_reopened_at')}
 
     def operation(self, identifier: str) -> dict:
         """读取指定操作的脱敏进度。
@@ -460,10 +461,10 @@ class SystemUpdater:
             self.backend.switch(operation, selected)
             self._phase(operation, 'verifying')
             control_deadline = time.monotonic() + 180
-            if fast:
-                self.backend.wait_controls(control_deadline, True)
-            else:
-                self.backend.wait_controls(control_deadline)
+            checks = self.backend.wait_controls(control_deadline, True) if fast else self.backend.wait_controls(control_deadline)
+            if isinstance(checks, dict):
+                operation.setdefault('control_health', {})['candidate'] = checks
+                self._record(operation)
             resume_nodes = getattr(self.backend, 'resume_nodes', None)
             if not fast and resume_nodes is not None and nodes:
                 resume_nodes(operation, selected, lambda: self._record(operation))
@@ -485,7 +486,11 @@ class SystemUpdater:
             self._clean(operation)
         except Exception as error:
             phase = operation['phase']
+            if isinstance(error, ControlHealthTimeout):
+                operation.setdefault('control_health', {})['candidate'] = error.probes
             reason = str(error) if isinstance(error, (ValueError, TimeoutError)) else '更新执行失败，需要核对运行状态'
+            if isinstance(error, ControlHealthTimeout):
+                reason = '候选' + reason
             reason = reason[:300]
             if phase == 'preparing':
                 self._finish(operation, 'failed', error=reason)

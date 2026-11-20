@@ -287,6 +287,24 @@ async def verify(output: Path) -> dict:
         await context.close()
 
         fixture = UpdateFixture()
+        fixture.state['operation'] = {'operation_id': str(uuid.uuid4()), 'phase': 'restored', 'action': 'install',
+            'target_release': 'system-ci-101-1', 'updated_at': '2026-11-11T00:00:00Z',
+            'error': '候选控制服务健康验收超时', 'control_health': {
+                'candidate': {'gateway': {'state': 'ready', 'attempts': 2, 'http_status': 200, 'duration_ms': 12},
+                    'orchestrator': {'state': 'http_error', 'attempts': 2, 'http_status': 503, 'duration_ms': 104}},
+                'restore': {'gateway': {'state': 'ready', 'attempts': 1, 'http_status': 200},
+                    'orchestrator': {'state': 'ready', 'attempts': 1, 'http_status': 200}}}}
+        context, page = await page_for(fixture, 390)
+        await expect(page.get_by_role('heading', name='已恢复原版本')).to_be_visible()
+        await page.get_by_text('操作详情与数据库快照', exact=True).click()
+        await expect(page.get_by_text('调度器 · 响应错误 · HTTP 503 · 0.10 秒 · 第 2 次')).to_be_visible()
+        await expect(page.get_by_role('heading', name='恢复原版本健康检查')).to_be_visible()
+        await expect(page.get_by_text('调度器 · 就绪 · HTTP 200 · 第 1 次')).to_be_visible()
+        assert not fixture.writes
+        cases.append('候选失败与恢复探测分别展示，保留状态码及耗时')
+        await context.close()
+
+        fixture = UpdateFixture()
         operation_id = str(uuid.uuid4())
         fixture.state.update(busy=True, operation={'operation_id': operation_id, 'phase': 'reconcile',
             'action': 'install', 'target_release': 'system-ci-101-1'})

@@ -445,7 +445,7 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
             private_directory(directory)
             journal = directory / 'current.json'
             job = json.loads(journal.read_text()) if journal.exists() else None
-            if job and job.get('phase') in ('completed', 'rolled_back'):
+            if job and job.get('phase') in ('completed', 'rolled_back', 'platform_restored'):
                 job = None
             if job and job.get('phase') == 'rolling_back_control':
                 self._rollback_control(remote, node, name, job)

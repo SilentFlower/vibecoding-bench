@@ -165,10 +165,10 @@ def worker(policy_path: Path, fault: str | None) -> None:
                 atomic_json(root / 'worker-error.json', {'phase': 'drained', 'evidence': evidence})
             return evidence
 
-        def request(self, service, path, body=None, timeout=15):
+        def request(self, service, path, body=None, timeout=15, *, on_status=None):
             """保留隔离夹具的 HTTP 失败证据。:param service: 服务。:param path: 路径。:param body: 载荷。:param timeout: 秒。@return 实际响应。"""
             try:
-                return super().request(service, path, body, timeout)
+                return super().request(service, path, body, timeout, on_status=on_status)
             except HTTPError as error:
                 detail = error.read(4096)
                 logs = {}

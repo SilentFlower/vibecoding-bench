@@ -110,6 +110,7 @@ from proxy_sync import synchronize_proxy
 from physical_features import physical_features_summary
 from run_windows import normalize_run_window, run_window_snapshot
 from project_library import ProjectLibrary, safe_relative
+from project_library_preparation import load_prepared_library
 from run_artifacts import list_workspace_files, read_workspace_file
 from run_usage import native_session_usage, run_usage, usage_input_tokens
 from project_requester_settings import ProjectRequesterSettings
@@ -8494,9 +8495,15 @@ async def lifespan(app: FastAPI):
     project_requester_settings = ProjectRequesterSettings(BENCH_DATA / 'settings/project-requester.json')
     if account_runtime:
         library = None
+        expects_prepared_library = bool(os.environ.get('V3_PREPARED_PROJECT_LIBRARY_IMAGE'))
         try:
-            library = ProjectLibrary(PROJECT_LIBRARY_DIR).install(BENCH_DATA)
+            if expects_prepared_library:
+                library = load_prepared_library(PROJECT_LIBRARY_DIR, BENCH_DATA)
+            else:
+                library = ProjectLibrary(PROJECT_LIBRARY_DIR).install(BENCH_DATA)
         except (ValueError, OSError) as error:
+            if expects_prepared_library and UPDATE_GATE.state()['phase'] == 'blocked':
+                raise RuntimeError('候选项目库准备结果不可用') from error
             # 当前内容准入失败不能遮住已冻结的历史发布、实例与成果。
             project_iteration_error = "项目内容库不可用：" + str(error)[:300]
         try:
@@ -8504,7 +8511,8 @@ async def lifespan(app: FastAPI):
                 scheduler.submit, _project_execution_settings, _quota_identity, _stop_project_run,
                 ProjectVerifier(runner.client, BENCH_DATA, HOST_BENCH_DATA, account_runtime.image), scheduler.is_executing,
                 admission=_project_admission, execution_control=_project_execution_control,
-                schedule_admission=_project_schedule_admission, concurrency_limit=PER_ACCOUNT_CONCURRENCY)
+                schedule_admission=_project_schedule_admission, concurrency_limit=PER_ACCOUNT_CONCURRENCY,
+                library_installed=True)
             project_iterations.dialogue = project_requester_settings.client()
             account_runtime.set_project_iterations(project_iterations)
             project_iterations.review_admission=_project_review_admission

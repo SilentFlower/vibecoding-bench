@@ -33,6 +33,10 @@ MANIFEST_LIMIT = 131072
 INDEX_LIMIT = 262144
 MAX_BUNDLE_BYTES = 16 * 1024 ** 3
 TERMINAL = {'succeeded', 'succeeded_cleanup_pending', 'failed', 'restored', 'cancelled'}
+PROJECT_LIBRARY_PREPARATION = 'vibebench.project-library-prepare'
+PROJECT_LIBRARY_RECEIPT_LIMIT = 128 * 1024
+_PROJECT_LIBRARY_DOCUMENT_LIMIT = 4 * 1024 * 1024
+_PROJECT_LIBRARY_KEY = re.compile(r'[a-z][a-z0-9-]{0,79}')
 
 
 def strict_json(raw: bytes, limit: int = MANIFEST_LIMIT) -> dict:
@@ -85,6 +89,64 @@ def safe_read(path: Path, limit: int = MANIFEST_LIMIT, *, private: bool = False)
         if len(raw) > limit:
             raise ValueError('更新文件读取超过限制')
         return raw
+
+
+def project_library_receipt_name(release: str) -> str:
+    """返回本地发布记录名。:param release: 控制镜像批次。:return: 安全文件名。"""
+    if not BUILD_RE.fullmatch(release):
+        raise ValueError('项目库准备记录批次无效')
+    return f'project-library-{release}.json'
+
+
+def read_prepared_project_document(root: Path, path: Path | str) -> bytes:
+    """固定读取冻结清单。:param root: 内容寻址根。:param path: 清单相对路径。:return: 原始字节。"""
+    path = root / path
+    if not path.is_relative_to(root) or path.resolve() != path:
+        raise ValueError('冻结项目库目录或元数据含有链接')
+    return safe_read(path, limit=_PROJECT_LIBRARY_DOCUMENT_LIMIT)
+
+
+def _prepared_project_metadata(root: Path, entry: dict) -> tuple[dict, dict, dict]:
+    fields = ('catalog', 'projects', 'environments', 'digest', 'source', 'inode', 'device')
+    if not isinstance(entry, dict) or set(entry) != set(fields) or not isinstance(entry['digest'], str) or not SHA_RE.fullmatch(entry['digest']):
+        raise ValueError('项目库准备结果格式无效')
+    if not root.is_dir() or root.resolve() != root:
+        raise ValueError('冻结项目库目录无效')
+    identity = root.stat()
+    if (entry['device'], entry['inode']) != (identity.st_dev, identity.st_ino):
+        raise ValueError('冻结项目库目录已替换')
+
+    def read(path, digest):
+        raw = read_prepared_project_document(root, path)
+        if hashlib.sha256(raw).hexdigest() != digest:
+            raise ValueError('冻结项目库元数据已变化')
+        return strict_json(raw, _PROJECT_LIBRARY_DOCUMENT_LIMIT)
+
+    catalog = read('catalog.json', entry['catalog'])
+    manifest = catalog.get('project_manifest', 'project.json')
+    if manifest not in ('project.json', 'development.json') or catalog.get('schema') not in (1, 2, 3):
+        raise ValueError('冻结项目库入口无效')
+    for group in ('projects', 'environments'):
+        values = entry[group]
+        if not isinstance(values, dict) or any(not _PROJECT_LIBRARY_KEY.fullmatch(key) or not isinstance(value, str)
+                or not SHA_RE.fullmatch(value) for key, value in values.items()):
+            raise ValueError('冻结项目库键无效')
+    keys = catalog.get('projects')
+    if (not isinstance(keys, list) or any(not isinstance(key, str) for key in keys)
+            or set(keys) != set(entry['projects'])):
+        raise ValueError('冻结项目目录与准备结果不符')
+    projects = {key: read(Path('projects') / key / manifest, entry['projects'][key]) for key in keys}
+    environments = {key: read(Path('environments') / key / 'profile/profile.json', digest)
+        for key, digest in entry['environments'].items()}
+    return catalog, projects, environments
+
+
+def verify_prepared_metadata(data: Path, entry: dict) -> tuple[dict, dict, dict]:
+    """核对冻结目录及其小体积元数据。:param data: 调度器数据根。:param entry: 已封存准备结果。:return: 目录和定义。"""
+    digest = entry.get('digest') if isinstance(entry, dict) else None
+    if not isinstance(digest, str) or not SHA_RE.fullmatch(digest):
+        raise ValueError('项目库冻结版本摘要无效')
+    return _prepared_project_metadata(data / 'project-library' / 'releases' / digest, entry)
 
 
 def verify_signed(raw: bytes, signature: bytes, public_key: str, limit: int = MANIFEST_LIMIT) -> dict:

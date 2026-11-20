@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 import system_updater
 from system_release import create_index, create_release, sign_file
+from system_update_host import ControlHealthTimeout
 from system_updater import SystemUpdater, UpdateConflict, UpdateHTTPHandler, UpdateServer
 from system_updates import UnixUpdateConnection
 from runtime_files import atomic_json, atomic_text
@@ -216,6 +217,27 @@ class SystemUpdaterTests(unittest.TestCase):
         self.assertIsNotNone(operation['admission_reopened_at'])
         self.assertTrue(operation['fast_transition'])
         self.assertLess(self.backend.calls.index('cancel_inference'), self.backend.calls.index('switch'))
+        self.assertFalse(self.backend.blocked)
+
+    def test_retains_candidate_probe_results_after_restoring_original(self) -> None:
+        """原版恢复后按操作保留候选和恢复的独立证据。@return 无。"""
+        candidate = {'gateway': {'state': 'ready', 'http_status': 200, 'attempts': 3},
+            'orchestrator': {'state': 'http_error', 'http_status': 503, 'attempts': 3}}
+        original = {role: {'state': 'ready', 'http_status': 200, 'attempts': 1} for role in candidate}
+
+        def restore(operation, save):
+            operation['control_health']['restore'] = original
+            save()
+            self.backend.blocked = False
+
+        with patch.object(self.backend, 'wait_controls', side_effect=ControlHealthTimeout(candidate)), \
+                patch.object(self.backend, 'restore', side_effect=restore):
+            self.engine.submit('install', self.request())
+            state = self.join()
+        self.assertEqual(state['current_release'], self.old['release'])
+        self.assertEqual(state['operation']['phase'], 'restored')
+        self.assertEqual(state['operation']['control_health'], {'candidate': candidate, 'restore': original})
+        self.assertEqual(state['operation']['error'], '候选控制服务健康验收超时')
         self.assertFalse(self.backend.blocked)
 
     def test_equal_content_repository_migration_selects_new_account_source(self) -> None:

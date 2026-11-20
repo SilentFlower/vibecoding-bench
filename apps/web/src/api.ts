@@ -361,6 +361,14 @@ export interface PrimeLogEntry {
 
 export type SettingsMap = Record<string, string>
 
+/** 控制服务最后一次健康探测的公开结果。 */
+export interface SystemUpdateControlProbe {
+  state: string
+  attempts: number
+  duration_ms?: number
+  http_status?: number
+}
+
 /** 一次持久系统更新操作的公开进度。 */
 export interface SystemUpdateOperation {
   operation_id: string
@@ -378,6 +386,7 @@ export interface SystemUpdateOperation {
   cluster_nodes?: { phase: string; nodes: Array<{ node_id: number; name?: string; phase: string; running: boolean; preparation?: { phase?: string; reason?: string; state?: string } }> } | null
   database_snapshot?: { state: string; completed_at: string; bytes: number } | null
   database_migrations?: Record<string, { state: string; target_version: number }> | null
+  control_health?: Partial<Record<'candidate' | 'restore', Record<'gateway' | 'orchestrator', SystemUpdateControlProbe>>> | null
   cleanup?: { status: string; removed: string[]; retained?: string[] } | null
 }
 

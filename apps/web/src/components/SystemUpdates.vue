@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
-import { ApiError, api, type SystemUpdateCatalog, type SystemUpdateRequest, type SystemUpdateStatus, type SystemUpdateRelease } from '../api';
+import { ApiError, api, type SystemUpdateCatalog, type SystemUpdateControlProbe, type SystemUpdateRequest, type SystemUpdateStatus, type SystemUpdateRelease } from '../api';
 import { Download, ChevronDown, ChevronRight, RefreshCw, Layers, Cpu, Check, ArrowRight } from 'lucide-vue-next';
 import { formatLocalTime } from '../lib/time';
 import { releaseNotes, releaseVersion } from '../lib/platformVersion';
@@ -44,6 +44,19 @@ const phases: Record<string, string> = {
   failed: '本次更新失败', cancelled: '本次更新已取消', reconcile: '等待恢复与对账',
 };
 const progress = computed(() => status.value?.operation);
+const controlChecks = { candidate: '新版本', restore: '恢复原版本' } as const;
+const controlServices = { gateway: '网关', orchestrator: '调度器' } as const;
+const probeStates: Record<string, string> = {
+  pending: '等待探测', ready: '就绪', timeout: '超时', http_error: '响应错误',
+  connection_failed: '连接失败', invalid_response: '响应无效', request_failed: '探测失败',
+};
+
+/** 格式化最近一次探测。@param probe 已记录的服务状态。@return 探测摘要。 */
+function probeResult(probe: SystemUpdateControlProbe): string {
+  return [probeStates[probe.state] ?? probe.state, probe.http_status && `HTTP ${probe.http_status}`,
+    probe.duration_ms != null && `${(probe.duration_ms / 1000).toFixed(2)} 秒`,
+    probe.attempts > 0 && `第 ${probe.attempts} 次`].filter(Boolean).join(' · ');
+}
 const progressLabel = computed(() => {
   const operation = progress.value;
   if (!operation) return '';
@@ -53,7 +66,7 @@ const progressLabel = computed(() => {
 const maintenanceMessage = computed(() => {
   const operation = progress.value;
   if (!operation) return '';
-  if (operation.phase === 'preparing') return '后台下载并校验候选镜像，平台继续接单。';
+  if (operation.phase === 'preparing') return '后台准备候选镜像与项目库，平台继续接单。';
   if (operation.phase === 'cleaning' && operation.admission_reopened_at) return '平台已恢复接单。';
   if (operation.phase === 'draining') return operation.fast_transition
     ? '新请求暂缓。系统正在关闭旧推理连接，并等待资源释放。'
@@ -287,7 +300,26 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); ver
             <p v-if="node.preparation?.reason" class="mt-1 text-xs text-muted-foreground">{{ node.preparation.reason }}</p>
           </li>
         </ul>
-        <details class="border-t px-5 py-3 text-xs text-muted-foreground"><summary class="cursor-pointer">操作详情与数据库快照</summary><div class="mt-3 space-y-2"><p class="break-all">目标发行：<code>{{ progress.target_release }}</code></p><p class="break-all">操作 ID：<code>{{ progress.operation_id }}</code></p><p :title="progress.updated_at">更新时间：{{ formatLocalTime(progress.updated_at) }}</p><p v-if="progress.admission_blocked_at">暂停接单 {{ formatLocalTime(progress.admission_blocked_at) }}</p><p v-if="progress.admission_reopened_at">恢复接单 {{ formatLocalTime(progress.admission_reopened_at) }}</p><p v-if="progress.database_snapshot">数据库快照{{ progress.database_snapshot.state === 'verified' ? '已校验' : '状态：' + progress.database_snapshot.state }} · {{ (progress.database_snapshot.bytes / 1024 / 1024).toFixed(1) }} MiB</p><p v-for="(migration, database) in progress.database_migrations ?? {}" :key="database">{{ database === 'bench' ? '平台数据库' : '网关数据库' }} · 目标版本 {{ migration.target_version }} · {{ migration.state === 'completed' ? '迁移完成' : migration.state === 'running' ? '正在迁移' : migration.state }}</p></div></details>
+        <details class="border-t px-5 py-3 text-xs text-muted-foreground">
+          <summary class="cursor-pointer">操作详情与数据库快照</summary>
+          <div class="mt-3 space-y-2">
+            <template v-for="(label, check) in controlChecks" :key="check">
+              <section v-if="progress.control_health?.[check]" class="space-y-1">
+                <h3 class="font-medium text-foreground">{{ label }}健康检查</h3>
+                <p v-for="(probe, service) in progress.control_health[check]" :key="service">
+                  {{ controlServices[service] }} · {{ probeResult(probe) }}
+                </p>
+              </section>
+            </template>
+            <p class="break-all">目标发行：<code>{{ progress.target_release }}</code></p>
+            <p class="break-all">操作 ID：<code>{{ progress.operation_id }}</code></p>
+            <p :title="progress.updated_at">更新时间：{{ formatLocalTime(progress.updated_at) }}</p>
+            <p v-if="progress.admission_blocked_at">暂停接单 {{ formatLocalTime(progress.admission_blocked_at) }}</p>
+            <p v-if="progress.admission_reopened_at">恢复接单 {{ formatLocalTime(progress.admission_reopened_at) }}</p>
+            <p v-if="progress.database_snapshot">数据库快照{{ progress.database_snapshot.state === 'verified' ? '已校验' : '状态：' + progress.database_snapshot.state }} · {{ (progress.database_snapshot.bytes / 1024 / 1024).toFixed(1) }} MiB</p>
+            <p v-for="(migration, database) in progress.database_migrations ?? {}" :key="database">{{ database === 'bench' ? '平台数据库' : '网关数据库' }} · 目标版本 {{ migration.target_version }} · {{ migration.state === 'completed' ? '迁移完成' : migration.state === 'running' ? '正在迁移' : migration.state }}</p>
+          </div>
+        </details>
       </section>
       <details class="approved-maintenance update-disclosure"><summary>运行组件与维护详情</summary>
       <div class="update-context-grid">

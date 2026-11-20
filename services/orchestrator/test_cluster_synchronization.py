@@ -117,6 +117,13 @@ class NodeSynchronizationTests(unittest.TestCase):
         client.assert_not_called()
         self.remote.containers.run.assert_not_called()
 
+        restored = json.loads(journal.read_text())
+        result = self.sync.install(self.installer, self.row['id'], 1)
+        self.assertEqual('prepared', result['state'])
+        self.assertNotEqual(restored['job_id'], json.loads(journal.read_text())['job_id'])
+        self.assertEqual(restored, json.loads(journal.with_name(restored['job_id'] + '.json').read_text()))
+        self.assertEqual(inode, project.stat().st_ino)
+
     def test_legacy_backup_worker_is_stopped_before_in_place_switch(self) -> None:
         """历史在途复制仅在原作业和镜像匹配后停止，沿同一日志切换。:return: None。"""
         maintenance = {'operation_id': 'a' * 32, 'epoch': 'b' * 32}

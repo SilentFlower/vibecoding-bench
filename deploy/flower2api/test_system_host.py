@@ -2,6 +2,7 @@
 import copy
 import json
 import sqlite3
+import subprocess
 import tempfile
 import unittest
 import uuid
@@ -9,11 +10,11 @@ import gc
 import hashlib
 import io
 from contextlib import closing
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from system_update_host import HostDeployment
+from system_update_host import ControlHealthTimeout, HostDeployment
 from runtime_files import atomic_json, atomic_text
 from system_update_gate import read_gate
 from system_update_database import assert_quiescent, create_snapshot, restore_snapshot
@@ -22,6 +23,96 @@ from runtime_names import account_container_prefix
 
 class HostNetworkNamesTests(unittest.TestCase):
     """宿主控制连接在单部署迁移前后使用真实受控网络。"""
+
+    def test_legacy_retry_archives_only_a_restored_node_job(self) -> None:
+        """旧编排服务重试前归档原终态，未恢复的记录留给原操作。@return 无。"""
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            host = HostDeployment({'state_root': str(root), 'data_root': str(root / 'data'),
+                'env_file': str(root / 'v3.env'), 'deployment': 'test'})
+            old_id, epoch, new_id = (str(uuid.uuid4()) for _ in range(3))
+            node_key, job_id = 'a' * 32, 'b' * 32
+            previous = root / 'operations' / old_id / 'operation.json'
+            journal = host.data / 'bench/cluster-private' / node_key / 'maintenance/current.json'
+            job = {'node_id': 2, 'node_key': node_key, 'job_id': job_id, 'old_release': 'ci-1-1',
+                'platform_operation': old_id, 'platform_epoch': epoch, 'phase': 'platform_restored'}
+            prior = {'operation_id': old_id, 'phase': 'restored', 'epoch': epoch,
+                'cluster_nodes': {'nodes': [{'node_id': 2, 'node_key': node_key,
+                    'job_id': job_id, 'phase': 'platform_restored'}]}}
+            operation = {'operation_id': new_id, 'before': {'nodes': [{'id': 2, 'node_key': node_key,
+                'kind': 'ssh', 'preparation': {'state': 'prepared', 'release': 'ci-1-1'}}]}}
+            atomic_json(journal, job)
+            atomic_json(previous, {**prior, 'phase': 'reconcile'})
+            with self.assertRaisesRegex(ValueError, '恢复归属需要核对'):
+                host._archive_restored_node_jobs(operation)
+            raw = journal.read_bytes()
+            atomic_json(previous, prior)
+            host._archive_restored_node_jobs(operation)
+            self.assertFalse(journal.exists())
+            self.assertEqual(journal.with_name(job_id + '.json').read_bytes(), raw)
+            host._archive_restored_node_jobs(operation)
+
+    def test_control_probe_retains_independent_http_and_connection_failures(self) -> None:
+        """网关错误不能遮住调度器超时，原始响应正文保持私有。@return 无。"""
+        host = HostDeployment({'state_root': '/test', 'data_root': '/test/data',
+            'env_file': '/test/v3.env', 'deployment': 'test'})
+        failure = HTTPError('http://127.0.0.1', 503, 'private-body', {}, io.BytesIO(b'private-body'))
+        with patch.object(host, 'request', side_effect=[failure, URLError(TimeoutError())]) as request, \
+                patch('system_update_host.time.monotonic', side_effect=[0.0, 0.1, 0.2, 0.3, 0.9, 1.0, 1.0]), \
+                patch('system_update_host.time.sleep'):
+            with self.assertRaises(ControlHealthTimeout) as failure:
+                host.wait_controls(1.0)
+            recorded = failure.exception.probes
+            self.assertEqual(recorded['gateway']['state'], 'http_error')
+            self.assertEqual(recorded['gateway']['http_status'], 503)
+            self.assertEqual(recorded['orchestrator']['state'], 'timeout')
+            self.assertNotIn('private-body', str(recorded))
+            self.assertEqual([call.args[0] for call in request.call_args_list], ['gateway', 'orchestrator'])
+            self.assertAlmostEqual(request.call_args.kwargs['timeout'], 0.7)
+
+    def test_interrupted_project_preparation_stops_only_its_worker(self) -> None:
+        """准备超时仅停止本候选容器，保留原版且没有发布回执。@return 无。"""
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            host = HostDeployment({'state_root': str(root), 'data_root': str(root / 'data'),
+                'env_file': str(root / 'v3.env'), 'deployment': 'test'})
+            binding = {'deployment': 'test', 'release': 'ci-12-1', 'source': '/repo/project_library'}
+            name = 'test-project-library-ci-12-1'
+            containers = [{'Name': '/' + name, 'Image': 'candidate-image', 'Id': 'owned',
+                'Config': {'Labels': {'vibebench.project-library-owner': name}}},
+                {'Name': '/foreign', 'Image': 'candidate-image', 'Id': 'foreign',
+                    'Config': {'Labels': {'vibebench.project-library-owner': name}}}]
+            with patch.object(host, 'values'), patch('system_update_host.docker', side_effect=[
+                    '', subprocess.TimeoutExpired(['docker', 'run'], 1800), 'owned foreign', json.dumps(containers), '']) as docker:
+                with self.assertRaisesRegex(TimeoutError, '候选项目库准备超时'):
+                    host._prepare_project_library(binding, 'candidate-image')
+            self.assertEqual(docker.call_args.args, ('stop', 'owned'))
+            self.assertFalse((host.root / 'socket/project-library-ci-12-1.json').exists())
+
+    def test_control_probe_retains_http_status_for_invalid_json(self) -> None:
+        """无效响应仍显示真实 HTTP 状态，下一次探测可成功。@return 无。"""
+        host = HostDeployment({'state_root': '/test', 'data_root': '/test/data',
+            'env_file': '/test/v3.env', 'deployment': 'test'})
+
+        def reply(role, path, body=None, *, timeout, on_status):
+            on_status(200)
+            if role == 'orchestrator' and host.request.call_count == 2:
+                raise ValueError('无效 JSON')
+            return {'scope': 'central'}
+
+        with patch.object(host, 'request', side_effect=reply), \
+                patch('system_update_host.time.monotonic', side_effect=[0.0, 0.1, 0.2, 0.3, 0.9, 1.0, 1.0]), \
+                patch('system_update_host.time.sleep'):
+            with self.assertRaises(ControlHealthTimeout) as failure:
+                host.wait_controls(1.0, central_only=True)
+            self.assertEqual(failure.exception.probes['orchestrator']['state'], 'invalid_response')
+            self.assertEqual(failure.exception.probes['orchestrator']['http_status'], 200)
+        with patch.object(host, 'request', side_effect=reply) as request, patch('system_update_host.time.sleep'), \
+                patch('system_update_host.time.monotonic', return_value=0.0):
+            result = host.wait_controls(1.0, central_only=True)
+            self.assertEqual(result['orchestrator']['state'], 'ready')
+            self.assertEqual(result['orchestrator']['attempts'], 2)
+            self.assertEqual(request.call_args.args[2], {'central_only': True})
 
     def test_fast_abandon_reopens_gate_without_rolling_back_independent_node(self) -> None:
         """节点预取中，快速取消恢复中央门禁，旧版仍按原账本回退。@return 无。"""
