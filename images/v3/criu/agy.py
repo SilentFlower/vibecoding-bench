@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import select
 import signal
 import socket
@@ -13,6 +14,7 @@ import tempfile
 import time
 
 from controller import process_identity, restricted
+from diagnostics import log_evidence
 from protocol import receive, send
 
 CONTROL = Path('/run/ccrb-criu/agy.sock')
@@ -32,11 +34,12 @@ def same_executable(pid: int, executable: Path) -> None:
 class AgyController:
     """持有同一账号的单份模板和已恢复进程租约。"""
 
-    def __init__(self, sender: int, root: Path, criu: Path):
-        """绑定账号根及固定工具。@param sender 真实发送器。@param root 私有数据根。@param criu 固定工具路径。@return 无。"""
+    def __init__(self, sender: int, root: Path, criu: Path, work_root: Path):
+        """绑定账号根及固定工具。@param sender 真实发送器。@param root 私有数据根。@param criu 固定工具路径。@param work_root 受信配置中的工作根。@return 无。"""
         self.sender = sender
         self.root = root
         self.criu = criu
+        self.work_root = work_root
         self.clients = set()
         self.template = asyncio.Lock()
 
@@ -67,16 +70,40 @@ class AgyController:
                 raise ValueError('AGY_CRIU_IMAGE')
         return kernel, observer, native
 
+    def _worker_directory(self, kernel: int) -> Path:
+        """核对监督器为该内核分配的工作目录。@param kernel 已核验的内核进程。@return 单个工作进程的目录。"""
+        environment = Path(f'/proc/{kernel}/environ').read_bytes().split(b'\0')
+        directories = [Path(os.fsdecode(item[7:])) for item in environment if item.startswith(b'TMPDIR=')]
+        if len(directories) != 1:
+            raise ValueError('AGY_CRIU_DUMP')
+        directory = directories[0]
+        if (directory.parent != self.work_root / 'workers' or not re.fullmatch(r'[0-9a-f]{32}', directory.name)
+                or directory.resolve(strict=True) != directory or not directory.is_dir()):
+            raise ValueError('AGY_CRIU_DUMP')
+        return directory
+
     async def run(self, stage: str, root: Path, arguments: list, descriptors: tuple = ()) -> int:
         """只执行固定工具。@param stage dump或restore。@param root 单次模板。@param arguments 内部参数。@param descriptors 保留的输出管道。@return 实测毫秒。"""
         start = time.monotonic()
+        log = root / f'{stage}.log'
         # 启动探测可能留下代理连接。模板阶段没有模型业务，恢复后由原生客户端重新连接。
         process = await asyncio.create_subprocess_exec(str(self.criu), '--no-default-config', stage,
-            '--images-dir', str(root), '--shell-job', '--file-locks', '--tcp-close', '--log-file', str(root / f'{stage}.log'),
+            '--images-dir', str(root), '--shell-job', '--file-locks', '--tcp-close', '--log-file', str(log),
             *arguments, pass_fds=descriptors, stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
         try:
-            if await asyncio.wait_for(process.wait(), 25):
+            returncode = await asyncio.wait_for(process.wait(), 25)
+            if returncode:
+                # 快照目录随事务回收，此处仅留下定位所需的固定字段。
+                try:
+                    evidence = log_evidence(log)
+                    status = 'available_tail'
+                except FileNotFoundError:
+                    evidence, status = [], 'missing'
+                except (OSError, ValueError):
+                    evidence, status = [], 'invalid'
+                print(json.dumps({'layer': 'agy_criu_controller', 'stage': stage,
+                    'criu_returncode': returncode, 'log_status': status, 'log_evidence': evidence}), flush=True)
                 raise ValueError(f'AGY_CRIU_{stage.upper()}')
         finally:
             if process.returncode is None:
@@ -113,9 +140,11 @@ class AgyController:
         """保留事件FD，恢复后继续同一个观察器。@param connection 内核连接。@param kernel 原私有进程。@param observer 观察器。@param native 原生进程。@return 无。"""
         pipes = {}
         source_fd = os.pidfd_open(observer)
+        native_fd = None
         restored = None
         restored_fd = None
         try:
+            native_fd = os.pidfd_open(native)
             for path in Path(f'/proc/{observer}/fd').iterdir():
                 target = os.readlink(path)
                 if target.startswith('pipe:') and target not in pipes:
@@ -136,7 +165,15 @@ class AgyController:
                         or process_identity(native)[0] != observer
                         or any(fields['State'].split()[0] != 'T' or int(fields['TracerPid']) for fields in states)):
                     raise ValueError('AGY_CRIU_STOP')
-                dump_ms = await self.run('dump', root, ['--tree', str(observer)])
+                # 绑定挂载上的 inotify 句柄可能无法直接打开，按当前工作目录解析实际 inode。
+                directory = self._worker_directory(kernel)
+                dump_ms = await self.run('dump', root, ['--tree', str(observer), '--irmap-scan-path', str(directory)])
+                # 快照结束后 PID 1 可能接管已退出的原生子进程。只回收原 pidfd，以便恢复同一进程组。
+                try:
+                    os.waitid(os.P_PIDFD, native_fd, os.WEXITED | os.WNOHANG)
+                except ChildProcessError:
+                    # 外层 init 收养的子进程由其收尾。
+                    pass
                 await send(connection, {'type': 'template_ready', 'dump_ms': dump_ms})
                 if await receive(connection) != {'type': 'restore'}:
                     raise ValueError('AGY_CRIU_SEQUENCE')
@@ -176,6 +213,8 @@ class AgyController:
                 except ChildProcessError:
                     pass
             os.close(source_fd)
+            if native_fd is not None:
+                os.close(native_fd)
             for descriptor in pipes.values():
                 os.close(descriptor)
 

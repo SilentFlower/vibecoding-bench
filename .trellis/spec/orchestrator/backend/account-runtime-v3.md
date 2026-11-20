@@ -1813,7 +1813,8 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - 环境摘要从Node原读取器取得采集/CRIU设置，Gateway观察仍核对环境、代次、内核及采样时效。缺失或失联显示未知。请求诊断的可选`execution_location={node_key,environment_id,generation,assignment_revision?}`来自同次已验证传输并沿原JSON持久化；历史缺字段保持未观测。Run详情使用原执行账本定位。
 - AGY尝试同样从已核验TransportBinding冻结execution_location；当前本机执行的node_key为local、assignment_revision为空，与平台/凭据/工具轮的context独立共存。字段缺失保持未知，禁止根据当前账号归属补写历史位置。
 - Node从首次安装保存自己的更新目录与实际镜像来源。来源校验沿原`image_reference`命名合同支持自定义批次；正式签名发行仍使用原独立规则。已托管节点后台自动识别当前目标；同批幂等复核，跨批经原工作排空、停止、原地切换组件后恢复，保持原HOME和身份。历史中央首次能力接入及离线应急沿集群停机SOP。
-- 节点镜像预取以中央的实际 OCI 平台、根文件系统 `RootFS` 和 `vibebench.product/role/release` 标签为准。Docker 返回平台清单时，所选平台的 `Available` 必须为 true。节点现有引用可凭完整内容复用，跨 daemon 的不同 ID 需核对原始配置摘要。对同 ID 的残缺镜像，沿固定 SSH 通道从中央流式导入，随后重读平台、层、角色和发布身份。Docker API 1.48 起在导出和导入时传递选定平台。旧 API 使用已有单平台归档接口。
+- 节点镜像预取按中央的实际 OCI 平台、根文件系统 `RootFS` 和 `vibebench.product/role/release` 标签核对目标。Docker 返回平台清单时，以所选平台的 `Available=true` 确认可导出性。节点现有引用完整时先复用。跨 daemon 的不同 ID 以原始配置摘要核对；中央不可导出时，核对两端同库同摘要和平台配置。
+- 节点缺完整副本时，优先从中央流式导出并沿固定 SSH 通道导入。中央不可导出时，用其实际 OCI descriptor 或镜像 ID 与同库 `RepoDigests` 共同固定摘要，先在中央补齐。中央仍无法导出时，节点可匿名按该摘要拉取，核对仓库摘要、平台、层及角色批次后才绑定目标标签。Docker API 1.48 起在导出和导入时传递选定平台。旧 API 沿单平台归档接口。
 - 自动同步与兼容维护先核验两类镜像，再登记新切换日志并开始排空。普通同步的镜像预取可让位于中央切换，兼容维护在预取前后复核原 `operation_id` 和 `epoch`。预取失败保留尚在运行的原角色，公开原目标及固定失败原因。已有切换日志的作业沿原阶段收口。
 - 原迁移使用磁盘SQLite索引逐条读取和写出兼容的`{identity,entries,excluded}`清单，取消清单16MiB及100000条业务上限。临时定义由`cluster_archive_schema.py`纯模块所有，索引随当前临时目录删除；业务库版本台账保持原链。单条元数据解析预算128KiB，路径、类型、权限、逐文件/整包摘要、冻结实际字节与真实剩余磁盘继续核验。
 - 迁移export/verify-import/prepare-import及大profile prepare-files取消UDS/SSH总时限。迁移包和profile取消600秒总传输时限，HTTP逐次读写15秒、SSH连接与存活检测保持。排空默认沿原操作等待并续约，服务关闭或租约变化终止推进。
@@ -1851,6 +1852,7 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 | 工作或凭据维护未完成 | 保存等待原因，按原目标自动重试 |
 | 同批组件 | 幂等核验，账号状态沿原生命周期保持 |
 | 同 ID 的目标平台内容残缺 | 定向导入后重读确认两类镜像，成功后才切换。导入或复核失败时保留原目标供重试 |
+| 中央运行镜像的目标平台 `Available=false` | 先核验并复用节点完整副本。无副本时按已冻结摘要补齐。摘要不匹配或仓库缺内容时在排空前失败 |
 | 同名目标内容冲突或残缺引用归属未知 | 拒绝覆盖，保留原组件并提示核对节点制品 |
 | 组合备份缺Node、错epoch或错安装归属 | 完整性校验拒绝，保留已生成快照 |
 | 节点不可达、观察过期或账号列表读取失败 | 保留已保存归属，分别显示不可达、过期或待刷新 |
@@ -1867,6 +1869,7 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - 错误用法：SSH断连后重新发送模型、OAuth或另起输入。正确处理是先查询原Scope/回执，未知状态保持隔离，明确实际停止后再按原业务恢复。
 - 错误用法：合并诊断时用AGY context替换执行位置字段。正确处理是保留两个可选字段，并在同一真实尝试上分别记录平台上下文和冻结的执行位置。
 - 镜像检查示例：节点 `Id` 和中央相同，`Architecture` 为空且 `RootFS` 缺少 `Type`。直接复用该引用会让容器创建失败。由 `prefetch_images` 补齐选定平台后，再读取完整的配置和层信息。
+- 中央镜像正在运行且 `Available=false` 时，运行状态只说明已有快照可以启动。按实际 descriptor 与同库摘要核对后获取完整制品。用可变的仓库标签补齐可能取得另一份镜像。
 
 - 正常：账号已迁移到Node B，历史请求仍显示原尝试的Node A；跨节点重试逐次显示各自环境和代次。错误用法：用账号当前归属填补旧请求。正确处理：旧记录缺字段时保持未观测。
 
@@ -1881,6 +1884,7 @@ node_backup.py verify-cluster --central-backup PATH --node-backup PATH [--node-b
 - `test_cluster_recovery_limits`核对大于16MiB且超过100000条的原JSON清单、大profile、摘要/权限/路径限制及固定错误投影。规模演练须实际导出、恢复并核对原树，不以元数据样本代替完整恢复。
 - `test_cluster_synchronization`核对旧控制自动停止原地换批、同批幂等、原容器回退、未知角色、未完成迁移、空目标先升级、互斥及平台重启续接。`test_cluster_system_update`核对宿主排空/取消/恢复及真实更新状态机先停止再原地切换的顺序。
 - `test_cluster_deployment` 覆盖同 ID 缺配置、导入后内容仍残缺、同名冲突、归属未知和导入错误。`test_cluster_synchronization` 覆盖普通同步及兼容维护在预取失败时保留原角色，以及恢复后按原目标切换。隔离 Docker 同 ID 缺配置的换版验证需要核对两种镜像的补齐、节点健康和原账号资料。
+- 中央不可导出回归覆盖节点完整副本复用、中央按摘要补齐、节点匿名按摘要补齐及不匹配拒绝。隔离 containerd 删除测试镜像的压缩层后，应同时观察中央容器仍可运行、镜像 `Available=false`、节点完成补齐。仓库缺层时确认拒绝绑定和原组件仍可用。
 - `verify_cluster_node_upgrade.py`的隔离Docker开关覆盖自动控制更新保持原代次、账号镜像变化重建、组件恢复与最新资料保留、历史端大profile。`verify_cluster_ui.py`覆盖统一同步、明确失败动作及390px布局。
 - `test_cluster_backup`及原备份测试核对真实SQLite隔离复制、清单/逻辑摘要、同批组合对应和pending恢复事实。`verify_database_definitions.py`核对当前bench5/gateway7及原步骤1—4冻结来源。
 - 前端生产构建及`verify_cluster_ui.py`、`verify_cluster_draft_ui.py`、`verify_cluster_request_ui.py`覆盖冻结确认、迟到响应、独立/停用账号、原草稿/WS、历史未观测及390/1440布局；Rust执行fmt与全量测试。
@@ -2046,6 +2050,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `agy_runtime.tool_schema.normalize(schema, path='', changes=None)` 返回独立工具 Schema，接收 `functionDeclarations[].parameters` 与 `parametersJsonSchema`。`changes` 可记录 `{path, action}`，原工具定义保持原样。
 - `AgySenderConfig`包含protocol_version=1、完整source_sha256、module_root、binary_path、work_root、max_workers和memory_mib。内部监督协议schema_version=1，命令submit/prepare/finish_tools/status/cancel/shutdown，事件持续到job_finalized。
 - AGY 监督器 `restore.failure` 和环境摘要 `criu.failure` 可包含 `{stage:string,reason:string}`。`agy_runtime.criu.read_failure` 核对允许的阶段和原因组合。历史回执可省略该字段。
+- `AgyController(sender, root, criu, work_root)` 由可信入口传入 `agy.work_root`，在账号发送器容器内处理已核验的观察器与原生进程。
 - `native_event.event.control_http_status` 是可选整数，记录失败终态已收到的 AGY 控制 HTTP 4xx/5xx。旧内核可省略该字段。Gemini 公开 `error.code` 使用已核对的状态码。
 - 追加`bench.agy-environments.5`：platform_api_environments以唯一gateway_account_id及唯一environment_id绑定现有account_environments，platform固定antigravity。AGY环境account_id为空，名称采用`agy:<gateway-id>`；历史基线保持冻结。
 
@@ -2068,6 +2073,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 账号内共享完整265700040字节封存映像，核对SHA和四封存，decode计数、分发大小、控制/内核/观察器/原生RSS/PSS/USS与cgroup独立展示。max_workers等于账号concurrency，范围1..64，跨模型和凭据代次共用物理上限。有限sender RAM为512+256×workers MiB，network 256MiB、CLI至少512MiB，总量受原预算约束；零沿明确无限策略。
 - AGY 启动快照与同身份热进程分别回收。快照占用原缓存池名额，优先复用正在运行的热进程。控制器在线时，`restore.state` 的 `waiting` 表示尚无快照，`preparing` 表示后台准备中，`ready` 以当前代次的可恢复快照为准。准备失败以 `unavailable` 和 `template_failed` 表达，普通启动继续可用。
 - 文件型模板观察器使用同一个 `/proc/PID/exe` 文件描述符核对实际文件身份和完整 SHA256。通过短暂的私有不可读映射取得内核报告的背板设备号和 inode，再按该组合核对目标进程映射。封存 memfd 按原设备号和 inode 核验。启动和恢复均要求唯一零偏移基址、非可写共享映射和四个固定指令指纹。模板启动固定 `GODEBUG=multipathtcp=0`，使当前 CRIU 4.2 能保存 AGY 的监听套接字。
+- 保存时从已核验内核进程的 `TMPDIR` 读取监督器分配的 `<work_root>/workers/<32 位小写十六进制 ID>`。工作目录须为实际目录且路径解析结果一致。将该目录传给 CRIU `--irmap-scan-path`，以定位绑定挂载里的 inotify 对象。快照保存后通过原生进程的 pidfd 回收由本容器 PID 1 接管的退出子进程，使原进程组 ID 可用于恢复。
 - 模板和恢复失败在原 worker 清理前记录阶段和白名单原因，普通回退继承原单调截止。仅同一凭据代次的真实失败进入监督器状态，模板成功或凭据换代清除旧诊断。管理端在环境、代次、模块根和新鲜度核验后投影白名单诊断。原始异常路径、令牌及正文留在诊断字段之外。
 - cgroup v2读取memory.max、memory.current、memory.peak和memory.swap.current；v1支持memory子目录或挂载根的memory.limit_in_bytes、memory.usage_in_bytes、memory.max_usage_in_bytes，memory.memsw.usage_in_bytes减RAM占用才是swap。v1限制大于等于2^60沿既有规则按无限处理；缺失/损坏为未知，监督器与冻结RAM不一致时拒绝，不能把未知当作无限。
 - 正式模块根为/opt/v3/python，共享runtime_files位于/usr/local/bin。监督器和worker都冻结这两个搜索路径。AT HOME随worker私有发布，退役删除；采集复用账号开关与HTTP日志模式，长期有界脱敏快照位于flows/api/agy-prepared，原始执行材料沿临时worker目录和关闭清理。历史已退役采集保留七天；统一容量、内部旁路及读取合同由网关settings-database的AGY请求记录场景持有。普通输出采用有界匿名暂存，私有事件读取按帧及总字节控制背压。
@@ -2090,6 +2096,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 | 准入时、旧代收尾后或Popen前原截止已过 | `request_deadline_exceeded`，停止后续建代或启动副作用 |
 | 监督器异常或旧镜像缺协议 | 待对账或拒绝升级，不自动重放未知请求 |
 | 文件型映像的 `stat` 与目标映射设备号不同 | 依据已核验文件描述符的实际背板身份核对映射。无法确认背板、出现多个零偏移基址或可写共享映射时拒绝模板 |
+| 工作目录越界、同名链接或无法核对 | 拒绝本次快照，沿原普通启动路径处理 |
 | 当前代次模板保存或恢复失败 | 保留受控阶段，沿原截止普通启动。原生业务仍只提交一次 |
 
 ### 5. Scenarios and Examples
@@ -2112,6 +2119,8 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 
 诊断示例。实际观察器未取得合格的目标映射时，可报告 `{"stage":"observer_start","reason":"execution_mapping_missing"}`。单凭 inode 或 `stat` 的设备号判断 OverlayFS 映射会产生错误准入判断。使用同一已核验文件描述符取得实际映射身份。
 
+绑定挂载中的文件句柄无法直接打开时，将当前 worker 目录交给 CRIU 查找 inode。恢复需复用原进程组 ID。保留已退出的原生子进程会占用原进程组 ID，退出时按保存前取得的 pidfd 回收。
+
 ### 6. Tests Required
 
 - `test_agy_runtime`、`test_agy_supervisor`、`test_agy_environment`覆盖AT-only、参数、目录、帧/签名、终态、代次/工具、v1/v2有限/无限/未知预算、环境归属与维护。
@@ -2119,6 +2128,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `test_agy_runtime` 验证已观测控制状态、非法 JSON 响应与成功结果保留。`verify_agy_gemini.py` 验证普通 HTTP、SSE 首帧前后与尝试记录的状态，覆盖 200 和旧内核字段缺失的503兜底。固定原版回环验证非法工具正则导致的控制500及零模型提交。
 - `test_agy_supervisor`覆盖已过期准入、旧代关闭耗尽截止以及真实Worker.start过期；分别断言worker创建为0、新代启动为0及Popen调用为0，均返回 `request_deadline_exceeded`。
 - AGY 文件型模板应在普通业务权限的隔离 OverlayFS 上实际保存并恢复，核对首笔合成请求、原生 PID 和唯一提交。另验普通 memfd、错误文件身份、恢复失败及凭据换代。`test_agy_runtime`、`test_agy_supervisor` 和 `test_native_criu_settings` 核对阶段、原请求回退及旧代或非白名单原因的投影。
+- `native/criu/test_agy.py` 核对工作目录约束、链接拒绝和文件句柄失败的脱敏摘要。在 Linux 6.1 的隔离 OCI 容器中使用账号工作目录与 CRIU 目录的绑定挂载，验证基线保存失败、修复后从同一 PID 恢复，以及保存失败、恢复失败、凭据换代各自只投递一次合成请求。
 - Rust的runtime_transport单测覆盖精确AGY目标及CC路径隔离；agy_sender_test、gemini_account_test、gemini_contract_test、runtime_transport_test覆盖鉴权、绑定、权限、源聚合与取消。
 - `verify_agy_gemini.py` 覆盖未知模型在流式和非流式入口返回 404、令牌范围外模型和未观测目录、已知模型暂不可用时的 503、临期凭据单次续期及有效期充足时继续复用。
 - 同一断网探针核对公开 Gemini 目录跨账号去重、异平台名称保持、基础名和旧档位名实际发送的目录型号及原生 ID、显式档位隔离、工具续轮沿用型号和请求诊断保留原名。

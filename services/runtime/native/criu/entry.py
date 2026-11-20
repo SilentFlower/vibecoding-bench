@@ -107,7 +107,7 @@ async def main() -> None:
         if agy is not None:
             from agy import AgyController, CONTROL as AGY_CONTROL
             control = AGY_CONTROL
-            controller = AgyController(sender.pid, ROOT / 'templates', TOOLS / 'criu')
+            controller = AgyController(sender.pid, ROOT / 'templates', TOOLS / 'criu', Path(agy['work_root']))
         else:
             controller = Controller(sender.pid, maximum, native['work_root'], profile)
     listener = None

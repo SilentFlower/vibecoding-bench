@@ -38,12 +38,13 @@ PYTHON_MODULES = frozenset(('controller.py', 'supervisor.py', 'protocol.py', 'sh
 CRIU_MODULES = frozenset(('memfd.c', 'mem.c', 'files.c', 'files-reg.c', 'cr-restore.c',
     'cr-dump.c', 'pstree.c', 'namespaces.c', 'cgroup.c', 'util.c', 'proc_parse.c',
     'kerndat.c', 'image.c', 'protobuf.c', 'crtools.c', 'parasite-syscall.c', 'restorer.c',
-    'sk-inet.c', 'sk-unix.c', 'cpu.c'))
+    'sk-inet.c', 'sk-unix.c', 'cpu.c', 'fsnotify.c'))
 CATEGORIES = {'permission_denied': 'permission denied', 'operation_denied': 'operation not permitted',
     'file_missing': 'no such file', 'file_exists': 'file exists', 'bad_fd': 'bad file descriptor',
     'no_memory': 'cannot allocate memory', 'resource_busy': 'device or resource busy',
     'not_supported': 'not supported', 'unexpected_eof': 'unexpected eof',
-    'image_identity': 'shared executable memfd identity mismatch'}
+    'image_identity': 'shared executable memfd identity mismatch',
+    'file_handle_unresolved': "can't dump that handle"}
 FIELDS = frozenset(('schema_version', 'at_ms', 'operation', 'stage', 'exception_type', 'errno',
     'reason', 'template', 'worker', 'instance', 'criu_returncode', 'process_returncode',
     'source', 'log_status', 'log_evidence', 'upstream_status', 'upstream'))
@@ -201,7 +202,8 @@ def _store(root: Path, raw: bytes) -> None:
         os.close(parent)
 
 
-def _log_evidence(path: Path) -> list[dict]:
+def log_evidence(path: Path) -> list[dict]:
+    """读取固定 CRIU 模块及错误分类。@param path 私有诊断日志。@return 有界的白名单证据。"""
     directory = _directory(path.parent)
     try:
         text = _read(directory, path.name, LOG_LIMIT, tail=True).decode('utf-8', errors='replace')
@@ -273,7 +275,7 @@ class FailureDiagnostic:
             value['process_returncode'] = code if _integer(code, -255, 255) else None
             if self.log:
                 try:
-                    value['log_evidence'] = _log_evidence(self.log)
+                    value['log_evidence'] = log_evidence(self.log)
                     value['log_status'] = 'available_tail'
                 except FileNotFoundError:
                     value['log_status'] = 'missing'

@@ -10,6 +10,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
+from docker.auth import encode_header
 from docker.errors import NotFound
 from docker.models.images import Image
 
@@ -56,6 +57,109 @@ class ClusterDeploymentTests(unittest.TestCase):
         return Image(attrs={'Id': identifier, 'Os': 'linux', 'Architecture': 'amd64',
             'RootFS': {'Type': 'layers', 'Layers': ['layer']}, 'Config': {'Labels': {
                 'vibebench.product': 'v3', 'vibebench.role': 'control', 'vibebench.release': 'synthetic'}}})
+
+    def registry_image(self, available: bool) -> tuple[Image, str, str]:
+        """构造实际 OCI 摘要与可导出状态。:param available: 当前内容是否完整。:return: 镜像、批次标签与固定仓库摘要。"""
+        reference = 'registry.example.test/flower2api-control:synthetic'
+        digest = 'sha256:' + 'a' * 64
+        pinned = 'registry.example.test/flower2api-control@' + digest
+        image = self.image(digest)
+        image.attrs.update(Descriptor={'digest': digest}, RepoDigests=[pinned],
+            Manifests=[{'Kind': 'image', 'Available': available,
+                        'ImageData': {'Platform': {'os': 'linux', 'architecture': 'amd64'}}}])
+        return image, reference, pinned
+
+    def test_complete_node_image_is_reused_even_when_central_cannot_export(self) -> None:
+        """已有同源镜像时，中央无需下载或导出。:return: 无。"""
+        original, reference, _ = self.registry_image(False)
+        ready, _, _ = self.registry_image(True)
+        local, remote = Mock(), Mock()
+        for client, image in ((local, original), (remote, ready)):
+            client.api.api_version = '1.44'
+            client.images.get.return_value = image
+        deployment = NodeDeployment(SimpleNamespace(local_client=local), 'synthetic', 'synthetic', reference, 'account')
+        self.assertIs(ready, deployment._ensure_image(remote, reference, 'control', 'synthetic'))
+        local.api._post.assert_not_called()
+        local.api.get_image.assert_not_called()
+        remote.api._post.assert_not_called()
+
+    def test_central_missing_content_rehydrates_the_pinned_image_before_export(self) -> None:
+        """中央补齐后继续通过既有 SSH 镜像流传输。:return: 无。"""
+        original, reference, pinned = self.registry_image(False)
+        ready, _, _ = self.registry_image(True)
+        local, remote = Mock(), Mock()
+        local.api.api_version = remote.api.api_version = '1.44'
+        local.images.get.side_effect = (original, ready)
+        local.api._post.return_value = MagicMock()
+        local.api._stream_helper.return_value = iter([{'status': '合成拉取完成'}])
+        local.api.get_image.return_value = (item for item in [b'archive'])
+        remote.images.get.side_effect = (NotFound('合成节点缺少镜像'), ready)
+        remote.api.load_image.return_value = iter([{'stream': '合成镜像已导入'}])
+        deployment = NodeDeployment(SimpleNamespace(local_client=local), 'synthetic', 'synthetic', reference, 'account')
+        with patch('cluster_deployment.get_config_header', return_value='synthetic-central-auth'):
+            self.assertIs(ready, deployment._ensure_image(remote, reference, 'control', 'synthetic'))
+        repository, digest = pinned.split('@')
+        local.api._post.assert_called_once_with(local.api._url.return_value, stream=True,
+            headers={'X-Registry-Auth': 'synthetic-central-auth'},
+            params={'fromImage': repository, 'tag': digest, 'platform': 'linux/amd64'})
+        remote.api.load_image.assert_called_once()
+        remote.api._post.assert_not_called()
+
+    def test_node_pulls_same_digest_when_central_still_cannot_export(self) -> None:
+        """节点按摘要拉取且验证后才绑定批次标签。:return: 无。"""
+        original, reference, pinned = self.registry_image(False)
+        ready, _, _ = self.registry_image(True)
+        local, remote = Mock(), Mock()
+        local.api.api_version = remote.api.api_version = '1.44'
+        local.images.get.return_value = original
+        local.api._post.return_value = MagicMock()
+        local.api._stream_helper.return_value = iter([{'status': '合成中央仍无内容'}])
+        remote.api._post.return_value = MagicMock()
+        remote.api._stream_helper.return_value = iter([{'status': '合成节点拉取完成'}])
+        remote.images.get.side_effect = (NotFound('节点缺少标签'), ready, NotFound('尚未绑定'), ready)
+        deployment = NodeDeployment(SimpleNamespace(local_client=local), 'synthetic', 'synthetic', reference, 'account')
+        with patch.object(ready, 'tag', return_value=True) as tag, \
+                patch('cluster_deployment.get_config_header', return_value='synthetic-central-auth'):
+            self.assertIs(ready, deployment._ensure_image(remote, reference, 'control', 'synthetic'))
+        repository, digest = pinned.split('@')
+        remote.api._post.assert_called_once_with(remote.api._url.return_value, stream=True,
+            headers={'X-Registry-Auth': encode_header({})},
+            params={'fromImage': repository, 'tag': digest, 'platform': 'linux/amd64'})
+        tag.assert_called_once_with('registry.example.test/flower2api-control', 'synthetic')
+        remote.api.load_image.assert_not_called()
+
+    def test_unverified_repository_digest_does_not_trigger_any_pull(self) -> None:
+        """摘要与中央实际镜像不符时不从仓库补齐。:return: 无。"""
+        original, reference, _ = self.registry_image(False)
+        original.attrs['RepoDigests'] = ['registry.example.test/flower2api-control@sha256:' + 'b' * 64]
+        local, remote = Mock(), Mock()
+        local.api.api_version = remote.api.api_version = '1.44'
+        local.images.get.return_value = original
+        remote.images.get.side_effect = NotFound('合成节点缺少镜像')
+        deployment = NodeDeployment(SimpleNamespace(local_client=local), 'synthetic', 'synthetic', reference, 'account')
+        with self.assertRaisesRegex(ValueError, '缺少可导出内容与受信仓库摘要'):
+            deployment._ensure_image(remote, reference, 'control', 'synthetic')
+        local.api._post.assert_not_called()
+        remote.api._post.assert_not_called()
+
+    def test_node_rejects_mismatched_digest_before_the_target_tag_is_written(self) -> None:
+        """按摘要返回的节点镜像也须证明制品身份。:return: 无。"""
+        original, reference, _ = self.registry_image(False)
+        foreign, _, _ = self.registry_image(True)
+        foreign.attrs['RepoDigests'] = []
+        local, remote = Mock(), Mock()
+        local.api.api_version = remote.api.api_version = '1.44'
+        local.images.get.return_value = original
+        local.api._post.return_value = MagicMock()
+        local.api._stream_helper.return_value = iter([{'error': '合成中央拉取失败'}])
+        remote.api._post.return_value = MagicMock()
+        remote.api._stream_helper.return_value = iter([{'status': '合成节点拉取完成'}])
+        remote.images.get.side_effect = (NotFound('节点缺少标签'), foreign)
+        deployment = NodeDeployment(SimpleNamespace(local_client=local), 'synthetic', 'synthetic', reference, 'account')
+        with patch.object(foreign, 'tag') as tag, patch('cluster_deployment.get_config_header', return_value=None), \
+                self.assertRaisesRegex(ValueError, '按摘要拉取后未通过核验'):
+            deployment._ensure_image(remote, reference, 'control', 'synthetic')
+        tag.assert_not_called()
 
     def test_streaming_archive_uses_original_config_and_closes_response(self) -> None:
         """跨任意块边界读取原始配置，跳过大型镜像层并释放来源。:return: None。"""
