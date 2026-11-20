@@ -99,6 +99,19 @@ class SourceLayoutTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 source_path(root, root / 'deploy/v3/manage.py')
 
+    def test_criu_image_bundle_matches_the_source_export(self) -> None:
+        """在镜像构建前核对 CRIU 源码与冻结清单。@return 无。"""
+        repository = Path(__file__).resolve().parents[2]
+        exporter = repository / 'services/runtime/scripts/criu/export_bundle.py'
+        image_source = repository / 'images/v3/criu'
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'criu'
+            subprocess.run([sys.executable, str(exporter), '--output', str(output)], check=True, timeout=10)
+            for path in sorted(output.iterdir()):
+                with self.subTest(file=path.name):
+                    self.assertTrue((image_source / path.name).read_bytes() == path.read_bytes(),
+                        '账号镜像使用的 CRIU 源码束与当前导出不一致')
+
     def test_stack_alias_preserves_arguments_and_exit_status(self) -> None:
         """两个脚本从外部目录转发空参数、空格与退出状态。@return None。"""
         repository = Path(__file__).resolve().parents[2]
