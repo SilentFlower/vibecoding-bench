@@ -22,14 +22,26 @@ impl AgyPool {
             "AGY内核需要Linux x86_64环境".into(),
         ))
     }
-    /// 拒绝不支持的平台执行。@param config 账号配置。@param submission 原请求。@param deadline 原截止。@param prepare 是否准备。@return 固定不可用错误。
+    /// 拒绝不支持的平台执行。@param config 账号配置。@param config_path 私有配置。@param submission 原请求。@param deadline 原截止。@param prepare 是否准备。@return 固定不可用错误。
     pub async fn submit(
         &self,
         _config: &SenderConfig,
+        _config_path: &str,
         _submission: AgySubmission,
         _deadline: Instant,
         _prepare: bool,
     ) -> Result<Response, AppError> {
+        Err(AppError::ServiceUnavailable(
+            "AGY内核需要Linux x86_64环境".into(),
+        ))
+    }
+
+    /// 拒绝非目标平台的容量操作。@param config_path 私有配置入口。@param authorize 原鉴权。@return 固定不可用错误。
+    pub(super) async fn apply_capacity(
+        &self,
+        _config_path: &str,
+        _authorize: impl FnOnce(&SenderConfig) -> Result<(), AppError>,
+    ) -> Result<usize, AppError> {
         Err(AppError::ServiceUnavailable(
             "AGY内核需要Linux x86_64环境".into(),
         ))

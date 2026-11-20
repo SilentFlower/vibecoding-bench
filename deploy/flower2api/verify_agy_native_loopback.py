@@ -19,6 +19,7 @@ import threading
 import time
 import wave
 import zlib
+from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError
@@ -51,6 +52,7 @@ class Upstream(BaseHTTPRequestHandler):
     png_support=False
     model_catalog_host=None
     model_mappings = {MODEL: SHARED_MODELS[MODEL]}
+    held_requests = {}
 
     def log_message(self,*args):
         """避免将请求头体输出到公共日志。@param args 日志参数。@return 无。"""
@@ -92,6 +94,11 @@ class Upstream(BaseHTTPRequestHandler):
             record['entity_sha256']=entity_sha256
             self.calls.append(record)
             encoded=json.dumps(body)
+            for marker, (entered, release) in self.held_requests.items():
+                if marker in encoded:
+                    entered.set()
+                    require(release.wait(90), '隔离容量实验未释放请求')
+                    break
             rejected=next((result for marker,result in (
                 ('TLS_SYNTHETIC_UPSTREAM_UNAVAILABLE',(503,'UNAVAILABLE')),
                 ('TLS_SYNTHETIC_UPSTREAM_QUOTA',(429,'RESOURCE_EXHAUSTED')),
@@ -253,12 +260,45 @@ class Binding(BaseHTTPRequestHandler):
         """通过产品写入器核对独立入口旁路，不触发模型。@return 无。"""
         from agy_runtime.capture import save_ingress
         require(self.headers.get('authorization')=='Bearer '+SECRET,'入口旁路鉴权错误')
+        if self.path == '/internal/v3/agy-capacity/1' and Upstream.held_requests:
+            self.capacity_edit()
+            return
         parts=self.path.split('/')
         require(len(parts)==6 and parts[1:5]==['internal','v3','agy-ingress','1'],'入口旁路路径错误')
         value=json.loads(self.rfile.read(int(self.headers['content-length'])))
         require(value['environment_generation']==1,'入口旁路代次错误')
         save_ingress(Path('/state/capture/api/agy-prepared'),1,parts[5],value['ingress'])
         raw=b'{"state":"saved"}';self.send_response(200);self.send_header('content-length',str(len(raw)));self.end_headers();self.wfile.write(raw)
+
+    def capacity_edit(self):
+        """用预留的隔离容器额度检验真实网关和发送器的生效顺序。@return 无。"""
+        from runtime_files import atomic_json
+        value = json.loads(self.rfile.read(int(self.headers['content-length'])))
+        operation = value['operation_id']
+        state = Request('http://127.0.0.1:5674/admin/runtime/accounts/1/config?capacity_operation=' + operation,
+            headers={'x-api-key': 'synthetic-admin'})
+        with urlopen(state, timeout=5) as response:
+            account = json.load(response)
+        require(account['capacity_edit_active'] is True, '网关没有持有原容量操作')
+        phase = value['phase']
+        if phase == 'prepare':
+            require(account['concurrency'] == value['before'], '网关在资源准备前写入了新额度')
+        target = value['target'] if phase == 'prepare' else account['concurrency']
+        if phase == 'settle' or target > value['before']:
+            path = Path('/state/sender.json')
+            config = json.loads(path.read_text())
+            config['agy']['max_workers'] = target
+            atomic_json(path, config)
+            body = {'account_id': 1, 'environment_id': ENVIRONMENT, 'generation': 1, 'max_workers': target}
+            control = Request('http://127.0.0.1:8091/internal/agy/capacity', data=json.dumps(body).encode(),
+                headers={'authorization': 'Bearer ' + SECRET, 'content-type': 'application/json'})
+            with urlopen(control, timeout=10) as response:
+                require(json.load(response)['max_workers'] == target, '实际发送器额度不符')
+        raw = json.dumps({'ok': True, 'operation_id': operation}).encode()
+        self.send_response(200)
+        self.send_header('Content-Length', str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
 
 
 def homoglyph_cases(database, request, base, wait_idle):
@@ -1028,8 +1068,69 @@ def verify_shared_models(request, request_ids, wait_idle):
         'warm_hits': [item['warm_hit'] for item in runtime], 'synthetic_native_model_submissions': len(Upstream.calls)}
 
 
+def verify_live_capacity(request, wait_idle, base):
+    """在真实流仍打开时验证 3→4→3。@param request 公共入口。@param wait_idle 真实退役观察。@param base 模型地址。@return 脱敏结果。"""
+    def generate(marker):
+        """提交一个被合成上游暂停的流。@param marker 测试标记。@return HTTP 结果。"""
+        body = {'contents': [{'role': 'user', 'parts': [{'text': marker}]}]}
+        return request(base + 'streamGenerateContent?alt=sse', body)
+
+    def sender_status():
+        """读取实际同代监督器和进程数。@return 当前状态。"""
+        call = Request('http://127.0.0.1:8091/internal/status', headers={'authorization': 'Bearer ' + SECRET})
+        with urlopen(call, timeout=5) as response:
+            return json.load(response)['agy']
+
+    def wait_queued():
+        """确认网关实际登记了一笔排队。@return 无。"""
+        until = time.monotonic() + 10
+        while time.monotonic() < until:
+            status, raw = request('/admin/runtime/accounts/1/lease', admin=True)
+            if status == 200 and json.loads(raw)['waiting']:
+                return
+            time.sleep(.05)
+        raise ValueError('网关未登记待执行请求')
+
+    markers = [f'AGY_LIVE_RESIZE_PROBE_{index}' for index in range(1, 6)]
+    Upstream.held_requests.update((marker, (threading.Event(), threading.Event())) for marker in markers)
+    events = [Upstream.held_requests[marker] for marker in markers]
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        try:
+            runs = [pool.submit(generate, marker) for marker in markers[:3]]
+            require(all(event.wait(30) for event, _ in events[:3]), '原三路未到达合成上游')
+            original = sender_status()
+            runs.append(pool.submit(generate, markers[3]))
+            wait_queued()
+            require(not events[3][0].is_set(), '扩容前第四笔已经发送')
+            status, raw = request('/admin/accounts/1', {'concurrency': 4}, admin=True)
+            require(status == 200 and json.loads(raw)['concurrency'] == 4, '在线扩容失败：'+raw.decode()[:300])
+            require(events[3][0].wait(30), '扩容后第四笔未到达合成上游')
+            grown = sender_status()
+            require(grown['max_workers'] == grown['allocated_workers'] == 4, '扩容后的实际物理进程不符')
+            status, raw = request('/admin/accounts/1', {'concurrency': 3}, admin=True)
+            require(status == 200 and json.loads(raw)['concurrency'] == 3, '在线缩容失败：'+raw.decode()[:300])
+            shrunk = sender_status()
+            require(shrunk['max_workers'] == 3 and shrunk['allocated_workers'] == 4, '缩容中断了既有进程')
+            require(shrunk['controller']['pid'] == original['controller']['pid'], '监督器在调整中更换')
+            runs.append(pool.submit(generate, markers[4]))
+            wait_queued()
+            events[0][1].set()
+            require(runs[0].result(timeout=15)[0] == 200, '缩容后原请求失败')
+            require(not events[4][0].is_set(), '缩容后新流抢占在途容量')
+            events[1][1].set()
+            require(events[4][0].wait(30), '在途收口后新流仍未执行')
+            require(sender_status()['allocated_workers'] == 3, '缩容后实际进程未收敛')
+        finally:
+            for _, release in events:
+                release.set()
+        require(all(run.result(timeout=20)[0] == 200 for run in runs), '存在未完成的请求')
+    wait_idle()
+    require(len(Upstream.calls) == 5, '模型提交次数不符')
+    return {'passed': True, 'capacity': [3, 4, 3], 'same_supervisor': True, 'model_submissions': len(Upstream.calls)}
+
+
 def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,kernel_selection=False,tool_deadlines=False,parallel_tools=False,
-           *, shared_models=False):
+           *, shared_models=False, live_capacity=False):
     """执行真实公共业务。@param homoglyph 检验系统策略。@param capture_off 验证关闭采集。@param png 核对图片与工具历史。@param installed_adapter 使用镜像内适配器。@param kernel_selection 验证内核切换。@param tool_deadlines 验证跨首轮期限的工具链。@param parallel_tools 验证同名工具。@return 脱敏验证摘要。"""
     require(os.geteuid()==1001,'原生业务探针必须使用UID1001')
     os.umask(0o077)
@@ -1047,7 +1148,8 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
         'secret':SECRET,'release_id':'synthetic-release'},'proxy_url':'http://127.0.0.1:19090',
         'allowed_origin':'https://cloudcode-pa.googleapis.com','native_capture_dir':'/state/capture',
         'agy':{'protocol_version':1,'source_sha256':SOURCE_SHA,'module_root':'/opt/v3/python' if installed_adapter else '/opt/orchestrator',
-            'binary_path':'/usr/local/bin/agy-1.5.9','work_root':'/state/native','max_workers':1,'memory_mib':1536 if png else 768}}
+            'binary_path':'/usr/local/bin/agy-1.5.9','work_root':'/state/native',
+            'max_workers':3 if live_capacity else 1,'memory_mib':1536 if png or live_capacity else 768}}
     if capture_off:config.pop('native_capture_dir')
     Path('/state/sender.json').write_text(json.dumps(config))
     outputs=[];children=[]
@@ -1103,8 +1205,13 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
                 (json.dumps({'capabilities':{'model_mappings':Upstream.model_mappings}}),))
             database.execute("INSERT INTO account_credential_states(account_id,generation,phase,updated_at_ms) VALUES(1,1,'ready',1)")
             database.execute("INSERT INTO api_tokens(name,token,allowed_accounts,status) VALUES('synthetic','synthetic-key','1','active')")
+            if live_capacity:
+                database.execute('UPDATE accounts SET concurrency=3 WHERE id=1')
         require(request('/admin/settings',{'request_diagnostics_log_mode':'debug'},admin=True)[0]==200,'测试日志模式设置失败')
         base='/v1beta/models/'+MODEL+':'
+        if live_capacity:
+            database.close()
+            return verify_live_capacity(request, wait_idle, base)
         if shared_models:
             result = verify_shared_models(request, request_ids, wait_idle)
             database.close()
@@ -1303,11 +1410,12 @@ def main():
     parser.add_argument('--tool-deadlines',action='store_true')
     parser.add_argument('--parallel-tools',action='store_true')
     parser.add_argument('--shared-models', action='store_true')
+    parser.add_argument('--live-capacity', action='store_true')
     args=parser.parse_args()
     installed_adapter=args.installed_adapter or args.png or args.kernel_selection
     if args.inside:
         result = inside(args.homoglyph,args.capture_off,args.png,installed_adapter,args.kernel_selection,args.tool_deadlines,args.parallel_tools,
-            shared_models=args.shared_models)
+            shared_models=args.shared_models,live_capacity=args.live_capacity)
         print(json.dumps(result, ensure_ascii=False))
         return
     require(bool(args.image),'需要明确的固定原版测试镜像')
@@ -1357,11 +1465,12 @@ def main():
         probe=['/opt/probe.py','--inside']
         for flag,enabled in (('--homoglyph',args.homoglyph),('--capture-off',args.capture_off),('--png',args.png),
                 ('--installed-adapter',installed_adapter),('--kernel-selection',args.kernel_selection),('--parallel-tools',args.parallel_tools),
-                ('--tool-deadlines',args.tool_deadlines),('--shared-models',args.shared_models)):
+                ('--tool-deadlines',args.tool_deadlines),('--shared-models',args.shared_models),
+                ('--live-capacity',args.live_capacity)):
             if enabled:probe.append(flag)
         container=client.containers.run(args.image,probe,entrypoint=['python3'],detach=True,
             user='1001:1001',network_mode='none',read_only=True,cap_drop=['ALL'],security_opt=['no-new-privileges:true'],
-            mem_limit='1536m' if args.png else '768m',pids_limit=512,extra_hosts={host:'127.0.0.1'},tmpfs={'/tmp':'rw,nosuid,nodev,size=128m'},
+            mem_limit='1536m' if args.png or args.live_capacity else '768m',pids_limit=512,extra_hosts={host:'127.0.0.1'},tmpfs={'/tmp':'rw,nosuid,nodev,size=128m'},
             volumes=volumes,environment={'PYTHONPATH':python_package+':/usr/local/bin','DATABASE_DRIVER':'sqlite',
                 'DATABASE_DSN':'/state/gateway.sqlite','ADMIN_PASSWORD':'synthetic-admin','V3_SENDER_CONFIG':'/state/sender.json',
                 'V3_RUNTIME_URL':'http://127.0.0.1:8765','V3_INTERNAL_TOKEN':SECRET,'V3_DEPLOYMENT_ID':'synthetic',
@@ -1369,7 +1478,7 @@ def main():
             labels={'vibebench.test-task':'agy-request-records'})
         result=container.wait(timeout=540)
         logs=container.logs().decode(errors='replace')
-        evidence=root/('.trellis/.runtime/agy-shared-models-private' if args.shared_models else '.trellis/.runtime/agy-parallel-tools-private' if args.parallel_tools else '.trellis/.runtime/agy-tool-deadlines-private' if args.tool_deadlines else '.trellis/.runtime/agy-kernel-selection-private' if args.kernel_selection else '.trellis/.runtime/agy-png-loopback-private' if args.png else '.trellis/.runtime/agy-homoglyph-capture-off-private' if args.capture_off else '.trellis/.runtime/agy-homoglyph-loopback-private' if args.homoglyph else '.trellis/.runtime/agy-runtime-loopback-private')
+        evidence=root/('.trellis/.runtime/agy-live-capacity-private' if args.live_capacity else '.trellis/.runtime/agy-shared-models-private' if args.shared_models else '.trellis/.runtime/agy-parallel-tools-private' if args.parallel_tools else '.trellis/.runtime/agy-tool-deadlines-private' if args.tool_deadlines else '.trellis/.runtime/agy-kernel-selection-private' if args.kernel_selection else '.trellis/.runtime/agy-png-loopback-private' if args.png else '.trellis/.runtime/agy-homoglyph-capture-off-private' if args.capture_off else '.trellis/.runtime/agy-homoglyph-loopback-private' if args.homoglyph else '.trellis/.runtime/agy-runtime-loopback-private')
         if evidence.exists():shutil.rmtree(evidence)
         shutil.copytree(folder,evidence,ignore=lambda directory,names:[name for name in names
             if not (Path(directory)/name).is_file() and not (Path(directory)/name).is_dir()])

@@ -1651,6 +1651,47 @@ transport.submit(prepared, body, ttfb_timeout).await
 - `account_store_timestamp_test` 的 SQLite／独立 PostgreSQL 共享合同：选列保存保留并行状态、凭据和指标，未知字段整次拒绝，可空套餐文本／清除反复切换。
 - `node --experimental-strip-types --test web/tests/accountUpdate.test.mjs` 验证增量载荷、凭据空值和清除；前端 build 与完整 Rust 回归通过。
 
+## Scenario: 反重力账号并发上限在线调整
+
+### 1. Scope / Trigger
+
+- 适用于反重力账号编辑、网关队列容量、原生工作池及 Docker 角色额度变更。三角色初始分配见[账号运行环境合同](../../orchestrator/backend/account-runtime-v3.md#scenario-agy账号运行环境与gemini业务接入)。
+
+### 2. Signatures
+
+- 原管理入口 `PUT /admin/accounts/{id}` 接收整数 `concurrency`，反重力范围为 1 至 64。
+- 受信 `POST /internal/v3/agy-capacity/{account_id}` 接收 `{operation_id,before,target,phase}`。操作 ID 为 32 位小写十六进制，`phase` 为 `prepare|settle|reconcile`。成功回执为 `{ok:true,operation_id}`。
+- `GET /admin/runtime/accounts/{id}/config?capacity_operation=<id>` 可返回 `capacity_edit_active` 布尔值。省略查询参数保持既有配置响应。
+- 发送器 `POST /internal/agy/capacity` 接收 `{account_id,environment_id,generation,max_workers}`，通过账号私有 Bearer 鉴权后核对当前配置并回传相同四字段。监督器命令 `capacity` 携带 `max_workers`、`restore_allowed`，对应 `capacity_applied` 回执。状态提供 `capacity_protocol=1`、`allocated_workers` 和生效的 `max_workers`。
+
+### 3. Contracts
+
+- 网关在原账号更新路径登记操作。扩容核对并实际应用角色及工作池额度后按列保存，在原 `AccountQueue` 增加容量。缩容先保存网关上限，原队列通过归还许可收紧准入。真实代理或组合凭据变更沿原维护边界。
+- 监督器身份继续绑定账号、环境、代次、内核和代理。容量字段由原监督器在池锁内应用。已接单和待回填的实例继续运行，超出的空闲实例先回收，基础热进程保留到可用名额耗尽或原失效条件成立。CRIU 继续按当前额度准入。
+- 编排器按同一资源计算更新角色 `Memory`、`MemorySwap` 和发送器 `PidsLimit`，核对实际容量和角色主进程。有限 RAM 在账号总额内分配，发送器额度为 `512 + 256 × max_workers` MiB，进程数额度为 `128 + 64 × max_workers`。缩容时在途数量或实际占用高于新额度则暂留原角色额度。
+- 私有 `runtime/agy-capacity.json` 记录 schema 版本、账号、环境、代次、操作 ID 和原目标容量。准备中的合法差异继续使用原传输绑定。原操作结束后按持久 `concurrency` 收口；未知回包先查询实际资源及原回执，确认后清记录。新准备读取权威上限，停止环境保存容量时保持停止。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 容量非法、环境代次不符、原操作未持有 | 拒绝写入或应用该容量 |
+| 旧运行发送器缺少容量协议 | 显示升级提示，保留原运行容量 |
+| 内存不足或资源暂不可安全划拨 | 返回对应的资源原因，保留原网关上限 |
+| 4 路在途时缩到 3 | 保留原许可和在途实例。继续按新目标归还许可和回收资源 |
+| Docker 或发送器的应用结果未知 | 读取同代实例和已保存的网关上限后继续原操作 |
+
+### 5. Scenarios and Examples
+
+- 执行 3 路时提交 `{"concurrency":4}`。先确认发送器容纳第 4 个进程，再由原队列放行等待者。
+- 缩容后仍有工具结果待回填时，回填沿原账号和进程执行。对应角色额度在实际占用允许时调低。
+- 仅修改 `sender.json` 会漏过监督器回执与网关队列更新。通过原管理入口执行，按同一个操作 ID 比较角色和工作池实际状态。
+
+### 6. Tests Required
+
+- `test_agy_capacity` 覆盖有限额度、停止环境、连续缩扩、旧发送器以及 Docker 回包丢失恢复。`test_agy_supervisor` 核对动态进程数和原工具续接。
+- `agy_sender_test` 核对鉴权、过时代次与配置不符的容量拒绝。`verify_agy_native_loopback.py --live-capacity` 验证同一监督器下 3→4→3、五笔请求各提交一次。
+
 ## Scenario: Claude 会话策略封禁
 
 ### 1. Scope / Trigger

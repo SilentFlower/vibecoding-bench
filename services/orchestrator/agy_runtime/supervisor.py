@@ -288,6 +288,7 @@ class Supervisor:
         self.credential_identity=None
         self.restore_enabled=(os.environ.get('AGY_CRIU')=='1'
             and Path(__file__).resolve().parent==Path('/opt/v3/python/agy_runtime'))
+        self.restore_allowed = config.get('restore_allowed', True) is True
         self.template_failure=None
         self.last_start_source=None
         self.controls = {}
@@ -324,7 +325,7 @@ class Supervisor:
                     parked = worker.parked
                     # 基础热进程服务下一笔请求，额外热进程覆盖短间隔的连续并发。
                     if parked:
-                        idle_expired = worker.key in retained_templates
+                        idle_expired = not self.restore_allowed or worker.key in retained_templates
                     else:
                         idle_expired = retained_warm and now - worker.last_used >= EXTRA_WORKER_IDLE_SECONDS
                     if (idle_expired or worker.key[0] < self.credential_generation or worker.credential_expires_at <= now_ms
@@ -334,6 +335,11 @@ class Supervisor:
                         retained_templates.add(worker.key)
                     else:
                         retained_warm = True
+                excess = len(self.workers) - len(idle) - self.config['max_workers']
+                if excess > 0:
+                    # 缩容优先回收模板和最久未使用的空闲实例，保留执行和待回填实例。
+                    available = [worker for worker in self.workers if not worker.busy and worker not in idle]
+                    idle.extend(sorted(available, key=lambda worker: (not worker.parked, worker.last_used))[:excess])
                 for worker in idle:
                     worker.busy=True
                 if not idle:
@@ -368,10 +374,14 @@ class Supervisor:
                 # 旧代退役也消费原请求预算，截止后禁止复用或启动下一代。
                 if time.monotonic() >= until:
                     raise InputError('request_deadline_exceeded')
+                if len(self.workers) > self.config['max_workers']:
+                    self.condition.wait(until - time.monotonic())
+                    continue
                 # 优先复用已经启动的进程，把单次快照留给需要扩容的请求。
                 now_ms = time.time_ns() // 1_000_000
                 for worker in sorted(self.workers, key=lambda item: item.parked):
                     if (not worker.busy and not worker.closed and worker.key == key
+                            and (not worker.parked or self.restore_allowed)
                             and worker.credential_expires_at > now_ms and worker.process is not None
                             and worker.process.poll() is None):
                         worker.busy = True
@@ -419,7 +429,7 @@ class Supervisor:
 
     def restore_available(self):
         """只认实际挂载的可信控制入口。@return 能否登记启动模板。"""
-        return self.restore_enabled and Path(CRIU_CONTROL).exists()
+        return self.restore_enabled and self.restore_allowed and Path(CRIU_CONTROL).exists()
 
     def record_template_attempt(self, worker: Worker, ready: bool, stage: str = 'worker_start') -> None:
         """在池锁内保存同代结果。@param worker 原进程。@param ready 模板是否就绪。@param stage 未收到细节时的阶段。@return 无。"""
@@ -760,7 +770,8 @@ class Supervisor:
                 restore_state, restore_reason = 'unavailable', 'template_failed'
             else:
                 restore_state, restore_reason = 'waiting', None
-            return {'state': 'busy' if active else 'ready',
+            return {'state': 'busy' if active else 'ready', 'capacity_protocol': 1,
+                'allocated_workers': len(self.workers),
                 'workers': sum(not getattr(worker,'parked',False) for worker in self.workers), 'active': active, 'idle_workers': len(idle),
                 'idle_pid': idle[0].ready['native_pid'] if idle else None,
                 'warming_workers': sum(worker.prewarming for worker in self.workers),
@@ -775,6 +786,16 @@ class Supervisor:
                 'processes': [{'controller': memory(worker.process.pid), 'native': memory(worker.ready['native_pid']) if worker.ready else None,
                     'observer': memory(worker.ready['observer_pid']) if worker.ready else None,
                     'busy': worker.busy, 'credential_generation':worker.config['credential_generation']} for worker in self.workers if worker.process]}
+
+    def set_capacity(self, max_workers: int, restore_allowed: bool) -> int:
+        """应用同一代次的新上限。@param max_workers 已核验的进程上限。@param restore_allowed 当前恢复预算是否允许。@return 已生效上限。"""
+        if type(max_workers) is not int or not 1 <= max_workers <= 64 or type(restore_allowed) is not bool:
+            raise InputError('invalid_worker_capacity')
+        with self.condition:
+            self.config['max_workers'] = max_workers
+            self.restore_allowed = restore_allowed
+            self.condition.notify_all()
+            return max_workers
 
     def cancel(self, request_id, api_token_id):
         """撤销同调用方的原请求。@param request_id 原HTTP请求。@param api_token_id 原调用方。@return 是否登记。"""
@@ -851,6 +872,11 @@ def main():
                     if set(value) != {'schema_version', 'type', 'request_id'}:
                         raise InputError('invalid_supervisor_input')
                     supervisor.emit('status', value.get('request_id'), status=supervisor.status())
+                elif kind == 'capacity':
+                    if set(value) != {'schema_version', 'type', 'request_id', 'max_workers', 'restore_allowed'}:
+                        raise InputError('invalid_supervisor_input')
+                    supervisor.emit('capacity_applied', value['request_id'],
+                        max_workers=supervisor.set_capacity(value['max_workers'], value['restore_allowed']))
                 elif kind == 'cancel':
                     if set(value) != {'schema_version', 'type', 'request_id', 'api_token_id'} or type(value['api_token_id']) is not int:
                         raise InputError('invalid_supervisor_input')

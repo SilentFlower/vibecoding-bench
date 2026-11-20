@@ -608,6 +608,7 @@ pub struct AccountService {
     pub work_controls: AccountWorkControls,
     native_changes: broadcast::Sender<(i64, bool, bool)>,
     credential_gates: Mutex<HashMap<i64, Arc<CredentialGate>>>,
+    agy_capacity_edits: Mutex<HashMap<i64, String>>,
     scheduler: Option<Arc<V3Scheduler>>,
     v3_settings_lock: AsyncMutex<()>,
     store: Arc<AccountStore>,
@@ -752,6 +753,7 @@ impl AccountService {
             cache,
             oauth_token_url,
             credential_gates: Mutex::new(HashMap::new()),
+            agy_capacity_edits: Mutex::new(HashMap::new()),
             scheduler: None,
             v3_settings_lock: AsyncMutex::new(()),
             selection_scheduler: Arc::new(V3Scheduler::new(Arc::new(SchedulingStore::new(

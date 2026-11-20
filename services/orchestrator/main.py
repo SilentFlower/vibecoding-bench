@@ -13928,7 +13928,7 @@ _agy_auth_manager_lock = threading.Lock()
 
 
 async def _agy_auth_cleanup_loop():
-    """重启及运行期间回收到期原生授权，清理失败保留原操作等待重试。@return 无。"""
+    """回收到期原生授权并收口容量操作，失败保留原操作等待重试。@return 无。"""
     while True:
         try:
             def cleanup():
@@ -13941,8 +13941,13 @@ async def _agy_auth_cleanup_loop():
                             _agy_auth_manager = AgyAuthManager(account_runtime.client, BENCH_DATA, HOST_BENCH_DATA,
                                 account_runtime.image, account_runtime.network)
                         manager = _agy_auth_manager
-                    if manager:
-                        manager.cleanup()
+                    try:
+                        if manager:
+                            manager.cleanup()
+                    finally:
+                        if account_runtime:
+                            from agy_capacity import reconcile_pending
+                            reconcile_pending(account_runtime)
             await asyncio.to_thread(cleanup)
         except Exception:
             # 失败保留私有材料，下一周期按原归属重试。
@@ -14094,6 +14099,35 @@ def v3_quiesce(account_id: int, body: dict):
                 pass
         account_runtime._update(row, state="stopped")
     return {"ok": True}
+
+
+class AgyCapacityIn(BaseModel):
+    """受信网关冻结的 AGY 容量操作。"""
+
+    model_config = ConfigDict(extra='forbid')
+    operation_id: StrictStr
+    before: StrictInt
+    target: StrictInt
+    phase: Literal['prepare', 'settle', 'reconcile']
+
+
+@app.post('/internal/v3/agy-capacity/{account_id}')
+def v3_agy_capacity(account_id: int, body: AgyCapacityIn) -> dict:
+    """在所属环境应用或收口容量变更。@param account_id 网关账号。@param body 原操作。@return 同操作回执。"""
+    from agy_capacity import CapacityError, change_capacity
+    if not account_runtime:
+        raise HTTPException(503, 'capacity_pending')
+    if (account_id < 1 or not re.fullmatch(r'[a-f0-9]{32}', body.operation_id)
+            or not 1 <= body.before <= 64 or not 1 <= body.target <= 64):
+        raise HTTPException(400, 'capacity_changed')
+    try:
+        with UPDATE_GATE.admission('agy-capacity'):
+            change_capacity(account_runtime, account_id, body.operation_id, body.before, body.target, body.phase)
+    except CapacityError as error:
+        raise HTTPException(409, str(error)) from None
+    except (ValueError, KeyError, OSError, RuntimeError, DockerException):
+        raise HTTPException(503, 'capacity_pending') from None
+    return {'ok': True, 'operation_id': body.operation_id}
 
 
 @app.get("/internal/v3/native-captures/{account_id}/{attempt_id}")

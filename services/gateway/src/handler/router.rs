@@ -775,17 +775,26 @@ async fn runtime_lease_status(
 /// 提供账号配置的唯一来源，避免调度器使用已经漂移的代理。
 /// @param id 绑定账号 ID。
 /// @return 不包含 OAuth 凭据的配置。
+#[derive(Deserialize)]
+struct RuntimeConfigQuery {
+    capacity_operation: Option<String>,
+}
+
 async fn runtime_account_config(
     State(state): State<AppState>,
     Path(id): Path<i64>,
+    Query(query): Query<RuntimeConfigQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let account = state.account_svc.get_account(id).await?;
     if account.is_antigravity() {
-        return Ok(Json(
-            json!({"account_id":account.id,"platform":account.platform,"proxy_url":account.proxy_url,
+        let mut configuration = json!({"account_id":account.id,"platform":account.platform,"proxy_url":account.proxy_url,
             "auth_type":account.auth_type,"status":account.status,"email":account.email,"concurrency":account.concurrency,
-            "request_backend":"agy159","credential_state":state.account_svc.agy_state(id).await?}),
-        ));
+            "request_backend":"agy159","credential_state":state.account_svc.agy_state(id).await?});
+        if let Some(operation) = query.capacity_operation {
+            configuration["capacity_edit_active"] =
+                json!(state.account_svc.agy_capacity_edit_active(id, &operation));
+        }
+        return Ok(Json(configuration));
     }
     Ok(Json(
         serde_json::json!({"account_id": account.id, "proxy_url": account.proxy_url,
@@ -1439,12 +1448,17 @@ async fn update_account(
         return Err(AppError::BadRequest("未知账号平台，请核对原记录".into()));
     }
     if existing.is_antigravity() {
-        let runtime_changed = updates
+        let proxy_changed = updates
             .get("proxy_url")
-            .is_some_and(|value| value.as_str() != Some(existing.proxy_url.as_str()))
-            || updates
-                .get("concurrency")
-                .is_some_and(|value| value.as_i64() != Some(existing.concurrency as i64));
+            .is_some_and(|value| value.as_str() != Some(existing.proxy_url.as_str()));
+        let capacity_changed = updates
+            .get("concurrency")
+            .and_then(Value::as_i64)
+            .is_some_and(|value| value != i64::from(existing.concurrency));
+        let credential_edit = ["access_token", "refresh_token", "expires_at"]
+            .iter()
+            .any(|key| updates.get(*key).is_some());
+        let runtime_changed = proxy_changed || (capacity_changed && credential_edit);
         let _runtime_permit = if runtime_changed {
             config_permit(&state, &existing, false).await?
         } else {

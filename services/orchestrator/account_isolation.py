@@ -17,7 +17,7 @@ from cli_scratchpad import SCRATCHPAD_STORE, prepare_scratchpad_mount, restore_c
 from native_kernel_upgrade import migrate_records
 from native_capture_policy import capture_enabled
 from native_criu_policy import restore_policy
-from resource_budget import isolated_account_limits, scenario_account_limits
+from resource_budget import isolated_account_limits, scenario_account_limits, sender_pid_limit
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_VERSION, SYSTEM_PROFILE_DIRECTORY,
     SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_VERSION)
 
@@ -177,7 +177,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
 
     def launch(role, **options):
         memory, total = limits[role]
-        role_pids = 128 + (64 if agy else 32) * execution['max_workers'] if role == 'sender' and execution else 512 if role == 'cli' else 128
+        role_pids = sender_pid_limit(execution['max_workers'], agy=bool(agy)) if role == 'sender' and execution else 512 if role == 'cli' else 128
         options.update(name=name if role == 'network' else name + '-' + role,
             labels=role_labels(runtime, row, role), detach=True, auto_remove=False, read_only=True,
             mem_limit=memory, memswap_limit=total, nano_cpus=default_cpus[role],

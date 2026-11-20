@@ -189,6 +189,44 @@ class AgySupervisorTests(unittest.TestCase):
                 'name': 'synthetic_tool', 'response': {'value': '合成结果'}}}]}]
         return body
 
+    def test_live_capacity_expands_waiter_and_shrinks_after_existing_tools_finish(self):
+        """验证同一监督器的 3→4→3，工具轮在原进程上收尾。@return 无。"""
+        self.supervisor.set_capacity(3, True)
+        first = [self.submission(caller=index) for index in range(1, 4)]
+        for value in first:
+            self.supervisor.submit(value)
+            self.output.wait(value['request_id'], 'completed')
+        workers = [self.supervisor.jobs[value['request_id']]['worker'] for value in first]
+        self.assertTrue(all(worker.busy for worker in workers))
+
+        fourth = self.submission(caller=4)
+        self.supervisor.submit(fourth)
+        self.assertEqual(self.supervisor.status()['allocated_workers'], 3)
+        self.assertIsNone(self.supervisor.jobs[fourth['request_id']]['worker'])
+        self.supervisor.set_capacity(4, True)
+        self.output.wait(fourth['request_id'], 'completed')
+        self.assertEqual(self.supervisor.status()['allocated_workers'], 4)
+        self.assertEqual([self.supervisor.jobs[value['request_id']]['worker'] for value in first], workers)
+
+        self.supervisor.set_capacity(3, True)
+        fifth = self.submission(caller=5)
+        self.supervisor.submit(fifth)
+        for index, value in enumerate(first[:2]):
+            completion_id = str(uuid.uuid4())
+            self.supervisor.finish_tools_command({'schema_version': 1, 'type': 'finish_tools',
+                'request_id': completion_id, 'previous_request_id': value['request_id'],
+                'account_id': 17, 'environment_id': 'synthetic-env', 'environment_generation': 2,
+                'api_token_id': value['api_token_id'], 'body': self.continue_body(value)})
+            self.output.wait(completion_id, 'tools_finished')
+            self.output.wait(value['request_id'], 'job_finalized')
+            if index == 0:
+                self.assertIsNone(self.supervisor.jobs[fifth['request_id']]['worker'])
+        self.output.wait(fifth['request_id'], 'completed')
+        self.assertEqual(self.supervisor.status()['max_workers'], 3)
+        self.assertEqual(self.supervisor.status()['allocated_workers'], 3)
+        self.assertFalse(workers[2].closed)
+        self.assertTrue(workers[2].busy)
+
     def test_old_tools_finish_without_publishing_new_credentials(self):
         """原工具结果在独立控制路径收口，幂等确认保持零额外模型。@return 无。"""
         first=self.submission()
@@ -355,6 +393,7 @@ class AgySupervisorTests(unittest.TestCase):
 
     def test_last_idle_worker_and_template_follow_credential_lifetime(self):
         """基础热进程与模板保留到凭据失效，跨启动配置也只保留一个基础进程。@return 无。"""
+        self.supervisor.set_capacity(3, True)
         with self.supervisor.condition:
             self.supervisor.credential_generation = 1
             value = self.submission()

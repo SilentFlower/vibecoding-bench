@@ -425,6 +425,8 @@ class AgyRuntimeTests(unittest.TestCase):
         supervisor.condition = threading.Condition()
         supervisor.closed = False
         supervisor.credential_generation = 1
+        supervisor.config = {'max_workers': 4}
+        supervisor.restore_allowed = True
         released = threading.Event()
         now = time.monotonic()
 

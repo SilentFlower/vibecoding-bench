@@ -1234,7 +1234,8 @@ impl Drop for ActiveRequest {
     }
 }
 
-fn read_config(path: &str) -> Result<SenderConfig, AppError> {
+/// 读取账号角色当前冻结的私有发送配置。@param path 私有路径。@return 已校验配置。
+pub(super) fn read_config(path: &str) -> Result<SenderConfig, AppError> {
     let bytes = std::fs::read(path)
         .map_err(|_| AppError::ServiceUnavailable("sender configuration unavailable".into()))?;
     let mut config: SenderConfig = serde_json::from_slice(&bytes)
@@ -1686,7 +1687,7 @@ async fn agy_operation(
         started = true;
         let response = state
             .agy_pool
-            .submit(&config, submission, deadline, prepare)
+            .submit(&config, &state.config_path, submission, deadline, prepare)
             .await?;
         let (parts, body) = response.into_parts();
         let stream = unfold(
@@ -1810,6 +1811,42 @@ async fn agy_cancel(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// 受信配置生效时核对当前环境与期望的上限。
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AgyCapacityControl {
+    account_id: i64,
+    environment_id: String,
+    generation: u64,
+    max_workers: usize,
+}
+
+/// 将当前文件的容量应用到此发送器的原监督器。@param state 发送器。@param headers 服务证明。@param input 已冻结的归属与上限。@return 实际生效回执。
+async fn agy_capacity(
+    State(state): State<SenderState>,
+    headers: HeaderMap,
+    Json(input): Json<AgyCapacityControl>,
+) -> Result<Json<Value>, AppError> {
+    let max_workers = state
+        .agy_pool
+        .apply_capacity(&state.config_path, |config| {
+            authenticate(&headers, config)?;
+            if input.account_id != config.binding.account_id
+                || input.environment_id != config.binding.environment_id
+                || input.generation != config.binding.generation
+                || config.agy.as_ref().map(|agy| agy.max_workers) != Some(input.max_workers)
+            {
+                return Err(AppError::BadRequest("AGY容量配置或发送器代次已变化".into()));
+            }
+            Ok(())
+        })
+        .await?;
+    Ok(Json(
+        json!({"account_id":input.account_id,"environment_id":input.environment_id,
+        "generation":input.generation,"max_workers":max_workers}),
+    ))
+}
+
 async fn native_forward(
     State(state): State<SenderState>,
     headers: HeaderMap,
@@ -1905,6 +1942,7 @@ pub fn sender_router(config_path: String) -> Router {
         .route("/internal/agy/generate", post(agy_generate))
         .route("/internal/agy/tools", post(agy_tools))
         .route("/internal/agy/cancel", post(agy_cancel))
+        .route("/internal/agy/capacity", post(agy_capacity))
         .route("/internal/native/status", get(native_status))
         .route("/internal/native/prepare", post(native_prepare))
         .route("/internal/native/readiness", post(native_readiness))

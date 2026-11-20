@@ -138,6 +138,55 @@ pub async fn quiesce(account_id: i64, lease: &RuntimeLease) -> Result<(), AppErr
     Ok(())
 }
 
+/// 在所属编排器准备或收口并发变更。@param account_id 网关账号。@param operation_id 固定操作。@param before 原上限。@param target 新上限。@param phase 准备或收口。@return 同操作的生效回执。
+pub(super) async fn agy_capacity(
+    account_id: i64,
+    operation_id: &str,
+    before: i32,
+    target: i32,
+    phase: &str,
+) -> Result<(), AppError> {
+    let (base, token, client) = config()?;
+    let pending =
+        || AppError::ServiceUnavailable("反重力并发调整结果待核对，请重新读取账号".into());
+    let mut response = client
+        .post(format!("{base}/internal/v3/agy-capacity/{account_id}"))
+        .bearer_auth(token)
+        .json(&json!({"operation_id":operation_id,"before":before,"target":target,"phase":phase}))
+        .timeout(Duration::from_secs(20))
+        .send()
+        .await
+        .map_err(|_| pending())?;
+    let status = response.status();
+    if status == reqwest::StatusCode::NOT_FOUND {
+        return Err(AppError::BadRequest(
+            "反重力运行环境暂不支持在线调整，请先升级".into(),
+        ));
+    }
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|_| pending())? {
+        if body.len() + chunk.len() > 4096 {
+            return Err(pending());
+        }
+        body.extend_from_slice(&chunk);
+    }
+    let value: Value = serde_json::from_slice(&body).map_err(|_| pending())?;
+    if status.is_success()
+        && value["ok"] == true
+        && value["operation_id"].as_str() == Some(operation_id)
+    {
+        return Ok(());
+    }
+    let detail = match value["detail"].as_str() {
+        Some("capacity_unsupported") => "反重力发送器暂不支持在线调整，请先升级运行环境",
+        Some("capacity_memory") => "反重力账号内存预算不足，请先调整资源配置",
+        Some("capacity_busy") => "反重力环境的现有资源暂无法安全划拨，请稍后重试",
+        Some("capacity_changed") => "反重力账号配置或环境代次已变化，请重读后重试",
+        _ => return Err(pending()),
+    };
+    Err(AppError::BadRequest(detail.into()))
+}
+
 /// 只读聚合任务账号及登录草稿的代理引用。
 /// @return 内部摘要；未配置运行时的独立网关返回空引用。
 pub async fn proxy_references() -> Result<Value, AppError> {

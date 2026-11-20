@@ -1,5 +1,6 @@
 //! 在既有账号服务中按平台适配原生凭据，CC 调用保持原路径。
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap, hash_map::Entry};
+use std::sync::Mutex;
 
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
@@ -15,13 +16,27 @@ use crate::model::api_token::ApiToken;
 use crate::model::proxy::ProxyConnection;
 use crate::model::request_diagnostics::DiagnosticParameters;
 use crate::service::agy_contract::{AGY_REQUEST_SECONDS, AgyAccessSnapshot, AgyModelId};
-use crate::service::runtime_bridge::agy_request;
+use crate::service::runtime_bridge::{agy_capacity, agy_request};
 use crate::service::v3_scheduling::{SchedulingCandidate, SchedulingRequest};
 use tokio::time::sleep;
 
 // AGY 1.5.9 离线启动实测在剩余 299 秒时要求登录，310 秒时可就绪。
 // 预留原请求预算，避免无刷新令牌的业务进程在准备或执行时触及该窗口。
 const AGY_ACCESS_VALIDITY_SECONDS: i64 = 310 + AGY_REQUEST_SECONDS;
+
+/// 在网关提交期间持有本账号操作，丢失调用方或进程重启后可按已保存值收口。
+struct AgyCapacityEdit<'a> {
+    edits: &'a Mutex<HashMap<i64, String>>,
+    account_id: i64,
+    operation_id: String,
+}
+
+impl Drop for AgyCapacityEdit<'_> {
+    fn drop(&mut self) {
+        let mut edits = self.edits.lock().unwrap_or_else(|error| error.into_inner());
+        edits.remove(&self.account_id);
+    }
+}
 
 /// 将权威账号转换为原生私有输入。@param account 原账号。@return 严格原生凭据对象。
 pub(super) fn native_document(account: &Account) -> Result<Value, AppError> {
@@ -641,9 +656,10 @@ impl AccountService {
         if state.phase != "ready" {
             return Err(AppError::ServiceUnavailable("AGY 原凭据操作待核对".into()));
         }
-        let credentials_changed = ["access_token", "refresh_token", "expires_at", "proxy_url"]
+        let credentials_changed = ["access_token", "refresh_token", "expires_at"]
             .iter()
-            .any(|key| fields.contains_key(*key));
+            .any(|key| fields.contains_key(*key))
+            || current.proxy_url != candidate.proxy_url;
         let options: Vec<&str> = fields
             .keys()
             .map(String::as_str)
@@ -697,13 +713,98 @@ impl AccountService {
                 self.store.reconcile_agy_credentials(id, &operation).await?;
                 return Err(error);
             }
+        } else if candidate.concurrency != current.concurrency {
+            self.update_agy_capacity(&current, &candidate, &options)
+                .await?;
         } else {
+            if fields.contains_key("concurrency")
+                && !std::env::var("V3_RUNTIME_URL")
+                    .unwrap_or_default()
+                    .is_empty()
+            {
+                agy_capacity(
+                    id,
+                    &Uuid::new_v4().simple().to_string(),
+                    current.concurrency,
+                    current.concurrency,
+                    "reconcile",
+                )
+                .await?;
+            }
             self.store.update_options(&candidate, &options).await?;
         }
         if fields.contains_key("status") {
             self.store.update_status(id, candidate.status).await?;
         }
         self.store.get_by_id(id).await
+    }
+
+    /// 判断编排侧的原操作是否仍有网关持有者。@param id 账号 ID。@param operation_id 冻结操作。@return 是否仍在提交。
+    pub(crate) fn agy_capacity_edit_active(&self, id: i64, operation_id: &str) -> bool {
+        self.agy_capacity_edits
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .get(&id)
+            .is_some_and(|operation| operation == operation_id)
+    }
+
+    async fn update_agy_capacity(
+        &self,
+        current: &Account,
+        candidate: &Account,
+        fields: &[&str],
+    ) -> Result<(), AppError> {
+        if std::env::var("V3_RUNTIME_URL")
+            .unwrap_or_default()
+            .is_empty()
+        {
+            return self.update_account_options(candidate, fields).await;
+        }
+        let operation_id = Uuid::new_v4().simple().to_string();
+        {
+            let mut edits = self
+                .agy_capacity_edits
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            match edits.entry(current.id) {
+                Entry::Vacant(entry) => {
+                    entry.insert(operation_id.clone());
+                }
+                Entry::Occupied(_) => {
+                    return Err(AppError::BadRequest(
+                        "反重力并发调整仍在进行，请稍后重读".into(),
+                    ));
+                }
+            }
+        }
+        let edit = AgyCapacityEdit {
+            edits: &self.agy_capacity_edits,
+            account_id: current.id,
+            operation_id,
+        };
+        let prepare = agy_capacity(
+            current.id,
+            &edit.operation_id,
+            current.concurrency,
+            candidate.concurrency,
+            "prepare",
+        )
+        .await;
+        // 扩容先确认实际容量。缩容先保存网关上限，再收回发送器容量。
+        let saved = match prepare {
+            Ok(()) => self.update_account_options(candidate, fields).await,
+            Err(error) => Err(error),
+        };
+        let settled = agy_capacity(
+            current.id,
+            &edit.operation_id,
+            current.concurrency,
+            candidate.concurrency,
+            "settle",
+        )
+        .await;
+        saved?;
+        settled
     }
 
     /// 在已持有的账号刷新锁内解析 AGY 凭据。@param account 当前账号。@param validity 最小有效期。@param force 是否强制刷新。@return 最终权威快照。

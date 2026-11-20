@@ -3,6 +3,11 @@ import os
 import re
 
 
+def sender_pid_limit(max_workers: int, *, agy: bool = False) -> int:
+    """取得发送器实例的进程额度。@param max_workers 物理进程上限。@param agy 是否反重力。@return 角色 PID 限制。"""
+    return 128 + (64 if agy else 32) * max_workers
+
+
 def default_account_memory(values: dict | None = None) -> str:
     """解析部署的默认账号RAM，缺省及空值使用无限额。
 
@@ -63,6 +68,17 @@ def isolated_account_limits(memory: str, swap: str = "0", native_sender_memory: 
     if cli < 512 * 1024 ** 2:
         raise ValueError("账号内存不足以容纳隔离网络、发送器和 CLI，请先明确调整资源预算")
     return {"network": (network, network), "sender": (sender, sender), "cli": (cli, cli + total - ram)}
+
+
+def agy_worker_limits(workers: int, fingerprint: dict) -> tuple[int, dict[str, tuple[int, int]]]:
+    """使用同一 AGY RAM 预算准备和在线调整角色。@param workers 物理进程上限。@param fingerprint 原账号预算。@return sender MiB 和各角色字节额度。"""
+    if type(workers) is not int or not 1 <= workers <= 64:
+        raise ValueError('AGY账号并发必须在1至64之间')
+    # 共享映像、监督进程和事件缓存保留512MiB，每个额外的物理名额计入256MiB。
+    sender_mib = 512 + 256 * workers
+    memory = fingerprint['mem']
+    limits = isolated_account_limits(memory, fingerprint.get('swap', '0'), f'{sender_mib}m')
+    return 0 if memory == 'unlimited' else sender_mib, limits
 
 
 def scenario_account_limits(memory: str, swap: str = '0', native_sender_memory: str | None = None) -> dict[str, tuple[int, int]]:
