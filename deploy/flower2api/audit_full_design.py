@@ -11,16 +11,14 @@ COLLECT='''(root)=>[...root.querySelectorAll('button,th,h1,h2,h3,label')].filter
 async def main():
     """输出逐页截图、控件差异及未覆盖入口。@return 无。"""
     out=ROOT/'.deploy/frontend-sidebar-refresh/full-design-audit';out.mkdir(parents=True,exist_ok=True);results={};errors=[]
-    cases=[('accounts','/','accounts',None),('proxies','/proxies','proxies',None),('requests','/requests','requests',None),('tokens','/tokens','tokens',None),('settings','/settings','settings',None),('environments','/environments','environments',None)]+[(f'tasks-{tab}','/tasks'+('' if tab=='accounts' else '?tab='+tab),'tasks',tab) for tab in ['accounts','projects','warmup','tasks','runs','topics']]
+    # 运行环境与任务与工程六个页签已换成第二版，由 verify_native_pages_design.py 对 console-v2 设计稿核对，旧原型采样移除。
+    cases=[('accounts','/','accounts',None),('proxies','/proxies','proxies',None),('requests','/requests','requests',None),('tokens','/tokens','tokens',None),('settings','/settings','settings',None)]
     async with async_playwright() as p:
         browser=await p.chromium.launch();ref=await browser.new_page(viewport={'width':1440,'height':1000});await ref.goto((ROOT/'doc/design/flower2api-concept.html').as_uri());await ref.add_style_tag(content='.preview-bar{display:none!important}:root{--preview-visible-height:0px}.app{min-height:100dvh}.sidebar{height:100dvh}')
         fixture=WorkspaceFixture();context=await browser.new_context(viewport={'width':1440,'height':1000});await context.route('**/*',fixture.route);await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','light')");actual=await context.new_page();actual.on('pageerror',lambda e:errors.append(e.stack))
         for name,path,page,tab in cases:
             await ref.evaluate('(page)=>navigate(page)',page)
-            if tab:await ref.evaluate('(tab)=>{taskTab=tab;workView.pane="overview";repaintWork()}',tab)
-            await actual.goto(BASE+path);target=actual;root=actual.locator('.task-runtime' if page=='tasks' else '.runtime-environments' if page=='environments' else '#console-content');await root.wait_for();await target.locator('h1:visible,h2:visible').first.wait_for();await target.locator('body').evaluate('()=>document.fonts.ready');await ref.evaluate('document.fonts.ready')
-            if page=='tasks':await target.locator('.work-navigation').wait_for()
-            if page=='environments':await target.locator('.environment-rich').first.wait_for()
+            await actual.goto(BASE+path);target=actual;root=actual.locator('#console-content');await root.wait_for();await target.locator('h1:visible,h2:visible').first.wait_for();await target.locator('body').evaluate('()=>document.fonts.ready');await ref.evaluate('document.fonts.ready')
             expected=await ref.locator('#page').evaluate(COLLECT);observed=await root.evaluate(COLLECT);matches=[]
             used=set()
             for item in expected:

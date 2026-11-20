@@ -143,48 +143,55 @@ function renderTopicCard(t) {
 
 ## Styling Patterns
 
-**所有样式集中在 `apps/legacy-web/style.css`**,**不写 inline `style="..."` 属性**(全文极少例外:`tlab` 系列 `style="text-align:center;padding:24px"` 是空状态行,日后应抽成 class `.empty-row`)。
+**不写 inline `style="..."` 属性**（极少例外：`tlab` 系列空状态行，日后抽成 class `.empty-row`）。样式按职责分布在 `runtimeModule.ts` 列出的 legacy CSS 中：
 
-### 主题 / 状态全部通过 CSS variable
+- `style.css`：reset、基础排版，以及末尾的「第二版通用部件」——按钮、输入、选择、数字、时间、搜索、弹窗外壳、徽标、表格、行内代码、提示条的权威定义。
+- `work-design.css`：任务工作区各页签与深层弹窗；末尾的「第二版任务工作区」是页头、页签托盘、区块头、任务账号卡、面板与空态的权威定义。
+- `environments.css`、`environment-design.css`：只服务独立 `/runtime/` 文档的环境页签（Vue 内该页签跳转到 `/environments`）。
 
-不要在 JS 里改颜色。状态变化通过**改 class**:
+### 主题 / 状态全部通过 token
+
+不要在 JS 里改颜色。状态变化通过**改 class 或 `data-*`**：
 
 ```js
 // ✓ 正确
-elem.classList.add('pill-running');     // CSS 里 .pill-running { color: var(--running); ... }
+elem.classList.add('pill-running');     // CSS 里 .pill-running 取 --ui-color-info-bg / -text
+strip.dataset.tone = 'danger';          // .work-strip[data-tone=danger] 取 --ui-color-danger-*
 
 // ✗ 错误
 elem.style.color = '#5fd7d7';
 ```
 
-任务工作区及独立兼容入口固定 `<html data-theme="light">`；移除切换按钮、主题偏好读写及暗色专用覆盖。终端与源码保留深色阅读表面，布局和加载合同见[控制台工作区规范](../../web/frontend/ui-guidelines.md#scenario-工作区分区加载与阅读布局)。
+- 原生 CSS 只引用第二版 token：`--ui-color-*`、`--ui-font-size-*`、`--ui-control-sm/md/lg`、`--ui-radius-*`、`--ui-shadow-*`、`--ui-space-unit`、`--ui-font-family(-mono)`。默认值在 `ui-foundation.css`。
+  - Vue 内嵌任务页会继承用户在当前浏览器保存的主题；独立 `/runtime/` 文档只取默认值。
+  - 不再定义旧变量（`--ink`、`--line`、`--muted`、`--border`、`--amber`、`--running` 等）。它们挂在原生作用域根上会被内嵌的 Vue 组件继承，`--border` / `--muted` 还与 shadcn 同名而语义不同。`theme.test.mjs` 断言原生 CSS 中不出现旧变量定义。
+  - 颜色字面量与圆角字面量由 `theme.test.mjs` 静态校验；设计稿未给的悬停色用 `color-mix()` 由 token 混合。
+- 任务工作区及独立兼容入口固定 `<html data-theme="light">`（深色模式由控制台改版子任务 7 接入）。终端与源码保留深色阅读表面，容器取 `--ui-color-ink` / `--ui-color-ink-text`。
+- `!important` 只用于以下例外，新规则靠选择器特异性取胜：`.xterm-host .xterm-viewport` 透明底（覆盖 xterm 行内底色）、`.hidden` 与全局 `[hidden]`、`prefers-reduced-motion` 全局重置（一份）、原始 `select.native-choice-source` / `input.native-time-source` 的视觉隐藏。布局和加载合同见[控制台工作区规范](../../web/frontend/ui-guidelines.md#scenario-工作区分区加载与阅读布局)。
+- 原生规则不分层，会压过组件库的 `@layer components`：
+  - 元素级规则（`input`、`select`、`textarea`、`button`）必须排除组件库控件：`:not([class*='fui-'], [class*='fui-'] *)`。
+  - 不为挂进原生宿主的 Vue 控件（`ProxyPicker`、`Pagination`、`InfoTooltip`、`CaptureWorkspace`）写原生覆盖，它们的外观只由组件库定义。
+- `apps/legacy-web/approved-icons.svg` 与 `apps/web/src/assets/approved-icons.svg` 逐字节一致（`theme.test.mjs` 断言），图标路径取 `doc/design/console-v2/icons.js`；新增或改名符号两份同时改。改动原生 CSS / JS 或共享文件时，同步 `index.html` 中的 `?v=` 静态版本参数。
 
-第二版组件库 token（`--ui-color-*`、`--ui-font-size-*`、`--ui-control-sm/md/lg`、`--ui-radius-*`、`--ui-shadow-*`、`--ui-space-unit`）的默认值在 `ui-foundation.css`，独立 `/runtime/` 文档与 Vue 内嵌任务页都能直接读取；Vue 内嵌时还会继承用户在当前浏览器保存的主题，独立文档只取默认值。原生页迁移（控制台改版子任务 6）时新样式只引用这些 token，不新增写死颜色和圆角；`--border`、`--muted` 等原生同名变量与新 token 不冲突。
+### class 命名与组件库对应
 
-`apps/legacy-web/approved-icons.svg` 与 `apps/web/src/assets/approved-icons.svg` 必须保持同一内容（md5 一致），图标路径取 `doc/design/console-v2/icons.js`；新增或改名符号两份同时改。改动 `ui-foundation.css`、`pagination.css` 等共享文件时同步 `index.html` 中的 `?v=` 静态版本参数。
+原生类名保留不变（JS 字符串与验证脚本依赖它们），外观与组件库同名部件取同一组 token 和尺寸，由 `verify_native_pages_design.py` 在同一页上比对计算样式：
 
-### class 命名(从代码现状归纳)
-
-| 类型 | 模式 | 例子 |
+| 类型 | 原生类名 | 对应组件库部件 |
 |------|------|------|
-| 视图布局 | `.view / .view-head / .view-title / .hint` | 每个 tab 顶部都有 |
-| 表格 | `.table-frame / table.data / .right`(右对齐数字列) | accounts / tasks / runs 三个 tab 共用 |
-| 按钮 | `.btn / .btn-primary / .btn-danger / .btn-sm` | 大小:默认 / sm;变体:default / primary / danger |
-| 状态徽章 | `.pill / .pill-<status>` | `pill-queued / pill-running / pill-success / pill-failed / pill-timeout` |
-| 表单 | `.form / .lbl / .row / .row-end / .hint.inline` | acc-form / task-form |
-| modal | `.modal / .modal-card / .modal-card-sm / .modal-card-md / .modal-titlebar / .modal-frame / .modal-close` | 弹窗框 |
-| 终端饰物 | `.bracket(▌)`、`.prompt($)`、`.caret(_)`、`.scanlines`、`.frame-tl/tr/bl/br(┌┐└┘)` | 终端实验室皮肤元素,不要乱用 |
-| 详情面板 | `.detail-section / .stats-grid / .stat-box / .stat-label / .stat-value / .file-tree` | run 详情弹窗 |
-| 辅助 | `.muted / .hidden` | 弱化文字 / 隐藏元素 |
+| 按钮 | `.btn / .btn-primary / .btn-danger / .btn-sm`；表格行内、选择列表里为文字按钮 | `.fui-button / -default / -destructive / -sm / -link` |
+| 表单 | `.form / label.field > .lbl / .row / .row-end / .hint.inline`；文本输入、`select`、`textarea` | `.fui-field / .fui-label / .fui-input / .fui-textarea` |
+| 增强控件 | `.native-choice-trigger / .native-number / .native-time-trigger / .work-search` | `.fui-choice / .fui-number / .fui-date-trigger / .fui-search` |
+| 模块页签 | `nav.work-navigation > a(.active)`，计数 `.work-tab-count` | `.fui-segmented / .fui-segmented-item / .fui-segmented-count` |
+| 状态徽章 | `.pill / .pill-<status>`、`.work-badge(.good / .warning)` | `.fui-badge`（带圆点） |
+| 提示条 | `p.work-strip[data-tone]` | `.fui-strip[data-tone]` |
+| 表格 | `table.data / .work-table / .right` | `.fui-table` |
+| 卡片 | `.work-panel / .work-account`，底部 `footer .btn` | `.fui-card / .fui-entity-card / .fui-entity-action` |
+| modal | `.modal / .modal-card / .modal-card-sm / .modal-card-md / .modal-titlebar(-name) / .modal-close` | `.fui-dialog / .fui-dialog-title / .fui-dialog-close` |
+| 详情面板 | `.detail-section / .stats-grid / .stat-box / .stat-label / .stat-value / .file-tree` | — |
+| 辅助 | `.muted / .hidden / [hidden]` | 弱化文字 / 隐藏元素（`[hidden]` 对整份文档生效） |
 
-### 终端皮肤硬约束
-
-本段适用于终端皮肤页面。环境路由使用文末环境页场景规定的主后台视觉作用域，保留其它页面的原主题。
-
-- 全局 `border-radius: 0 !important`,**任何新组件都不要圆角**
-- 颜色必须用 CSS variable,**不写 hex 字面量**(`<input type="color">` 除外)
-- 状态色(`--running` 等)在皮肤上有 `*-glow` 阴影变体,运行中元素带 `box-shadow: 0 0 X var(--running-glow)`
-- 等宽字体优先(`var(--mono)`),只有 banner / 大标题用 `var(--display)`
+终端实验室皮肤（直角 reset、扫描线、角框 `┌┐└┘`、`*-glow` 阴影、`.bracket` 等饰物）已随第二版移除，新组件按上表取组件库规格，不再使用。
 
 ---
 
@@ -193,8 +200,8 @@ elem.style.color = '#5fd7d7';
 P1 阶段做到的:
 
 - 所有 `<button>` 用真 `<button type="button">` 或 `type="submit">`,**不用 `<div onclick>` 模拟**
-- 关键交互按钮带 `aria-label`(`#theme-toggle / #modal-close / #acc-modal-close`)
-- modal 框架元素带 `aria-hidden="true"`(`.modal-frame / .scanlines / .hintbar`)
+- 关键交互按钮带 `aria-label`(`#modal-close / #acc-modal-close`)
+- 装饰元素带 `aria-hidden="true"`(`.hintbar`、`svg.runtime-icon`)
 - 表单 `<input>` 都有外层 `<label>`(`<label><span class="lbl">$ name</span><input .../></label>`)
 - Esc 关 modal(`bindShortcuts` 里实现)
 - 焦点不被偷:输入框聚焦时,数字快捷键 `1-4` 不切 tab(`if (inField) return;`)
@@ -229,7 +236,7 @@ P1 阶段做到的:
 ### 1. Scope / Trigger
 
 - 修改 `#environments`、`apps/legacy-web/environments.js`、`apps/legacy-web/environments.css` 或内核弹窗时适用。
-- 本页保持零构建与原生 JS，通过 gateway 的统一会话嵌入；其它业务页继续使用终端主题。
+- 本页保持零构建与原生 JS，通过 gateway 的统一会话嵌入；与任务与工程页一样只取第二版 token（见 Styling Patterns）。
 
 ### 2. Signatures
 
@@ -241,7 +248,7 @@ P1 阶段做到的:
 
 ### 3. Contracts
 
-- `:root.environment-page` 使用主后台中性亮色、绿色强调色与正文层级；只有该作用域可覆盖旧直角 reset、扫描线、内层导航与弹窗。保留 `data-theme` 和 `vibebench-theme` 原值，离开环境路由移除作用域后恢复原页面主题。作用域选择器需与旧 `:root[data-theme=light]` 具有足够优先级。
+- `:root.environment-page`（仅独立 `/runtime/` 文档的环境页签）与其余原生页一样只取第二版 token，按钮、输入、弹窗沿用「第二版通用部件」；页签专用样式不按新稿重排。保留 `data-theme` 和 `vibebench-theme` 原值，离开环境路由移除作用域后恢复原页面主题。作用域选择器需与旧 `:root[data-theme=light]` 具有足够优先级。
 - `index.html` 按 `projects.js`、`environments.js`、`app.js` 装载。环境模块仅定义函数及常量，实际调用继续使用 `app.js` 的 API/state；资源修改同步静态版本参数。
 - `state.environmentUI` 保存服务器 rows、搜索、筛选、展开集合、操作中集合、只读请求序号及定时器。搜索筛选只派生当前 rows，不发送写请求；详情按环境 ID 和区块恢复。
 - 列表读取同时检查 `viewGeneration` 与请求序号，旧页面或旧请求结果不得覆盖新视图。工具栏与弹窗位于列表重绘区外，输入、光标和焦点不被进度刷新重置。

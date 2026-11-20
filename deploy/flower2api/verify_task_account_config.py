@@ -1,4 +1,4 @@
-"""以真实账号配置 API 和独立 SQLite 验证原生任务配置及原型计算样式。"""
+"""以真实账号配置 API 和独立 SQLite 验证原生任务配置，并核对第二版弹窗外观只取 token。"""
 import asyncio
 import json
 import re
@@ -8,14 +8,17 @@ from playwright.async_api import async_playwright, expect
 
 from test_account_cli_settings import AccountCliSettingsTests
 from verify_environment_ui import BASE, ROOT
+from verify_native_pages_design import shell, tokens_only
 from verify_task_feedback import TaskFeedbackFixture
 
 
 def contrast(foreground, background):
     """计算文字与背景对比度。@param foreground 前景RGB。@param background 背景RGB。@return 对比度。"""
     def luminance(value):
-        """计算线性相对亮度。@param value CSS颜色。@return 亮度。"""
-        channels = [int(channel) / 255 for channel in re.findall(r'\d+', value)[:3]]
+        """计算线性相对亮度；半透明颜色（如输入框的填充底）先叠在白色弹窗表面上。@param value CSS颜色。@return 亮度。"""
+        numbers = [float(number) for number in re.findall(r'[\d.]+', value)]
+        alpha = numbers[3] if len(numbers) > 3 else 1
+        channels = [(number * alpha + 255 * (1 - alpha)) / 255 for number in numbers[:3]]
         return sum(weight * (channel / 12.92 if channel <= .04045 else ((channel + .055) / 1.055) ** 2.4)
             for weight, channel in zip([.2126, .7152, .0722], channels))
     first, second = luminance(foreground), luminance(background)
@@ -59,13 +62,13 @@ class AccountConfigFixture(TaskFeedbackFixture):
 
 
 async def main():
-    """验证保存、取消、子窗草稿、局部路由、迟到响应和原型一致性。@return 无。"""
+    """验证保存、取消、子窗草稿、局部路由、迟到响应和第二版外观。@return 无。"""
     backend = AccountCliSettingsTests()
     backend.setUp()
     output = ROOT / '.deploy/frontend-sidebar-refresh/task-account-config'
     output.mkdir(parents=True, exist_ok=True)
     fixture = AccountConfigFixture(backend)
-    differences, errors = {}, []
+    differences, errors = [], []
     try:
         async with async_playwright() as playwright:
             browser = await playwright.chromium.launch()
@@ -84,27 +87,10 @@ async def main():
             await expect(name).to_have_value('main')
             await expect(modal.locator('#cli-settings-capture')).to_be_hidden()
             await expect(modal.locator('#cli-settings-process')).to_be_hidden()
-            reference = await browser.new_page(viewport={'width': 1440, 'height': 1000})
-            await reference.goto((ROOT / 'doc/design/flower2api-concept.html').as_uri())
-            await reference.evaluate("navigate('tasks');taskTab='accounts';repaintWork();configureWorkAccount(101)")
-            await reference.evaluate('document.fonts.ready')
+            # 外观已换成第二版：外壳圆角与阴影、标题字重、颜色只取 token（对照组件库规格，旧原型逐项比对移除）。
             await page.evaluate('document.fonts.ready')
-            box_keys = ['width', 'padding', 'borderWidth', 'borderRadius']
-            box_script = '(e,keys)=>{const s=getComputedStyle(e);return Object.fromEntries(keys.map(k=>[k,s[k]]))}'
-            expected_box = await reference.locator('dialog[open]').evaluate(box_script, box_keys)
-            actual_box = await modal.locator('.modal-card').evaluate(box_script, box_keys)
-            differences['弹窗'] = {key: [expected_box[key], actual_box[key]] for key in box_keys if expected_box[key] != actual_box[key]}
-            keys = ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'padding', 'margin', 'gap', 'color', 'borderRadius']
-            for label, left, right in [('标题', 'h2', '#cli-settings-title'), ('内容', '.dialog-body', '.dialog-body'),
-                    ('标签', '.field', '.field'), ('输入框', '[name=name]', '[name=display_name]'),
-                    ('操作', '.work-account-links', '.work-account-links'), ('页脚', '.work-form-footer', '.work-form-footer'),
-                    ('维护', '.work-advanced-maintenance', '.work-advanced-maintenance'),
-                    ('保存按钮', 'button[type=submit]', 'button[type=submit]'),
-                    ('快捷操作', '.work-account-links button', '.work-account-links button')]:
-                script = '(e,keys)=>{const s=getComputedStyle(e);return Object.fromEntries(keys.map(k=>[k,s[k]]))}'
-                expected = await reference.locator('dialog[open]').locator(left).first.evaluate(script, keys)
-                observed = await modal.locator(right).first.evaluate(script, keys)
-                differences[label] = {key: [expected[key], observed[key]] for key in keys if expected[key] != observed[key]}
+            await shell(page, '#cli-settings-modal .modal-card', '.modal-titlebar-name', '任务账号配置', differences)
+            await tokens_only(page, '#cli-settings-modal .modal-card', '任务账号配置', differences)
             await name.fill('未保存的草稿')
             await modal.locator('#cli-settings-quota').click()
             policy = root.locator('#warmup-modal')
@@ -166,8 +152,8 @@ async def main():
             (output / 'verification.json').write_text(json.dumps({'style_differences': differences,
                 'config_writes': fixture.config_writes, 'process_writes': fixture.process_writes,
                 'errors': errors}, ensure_ascii=False, indent=2))
-            assert all(not value for value in differences.values()), differences
-            print('任务账号配置：原型样式、真实 API/SQLite、草稿层级、路由保持、维护操作和迟到响应验证通过')
+            assert not differences, differences
+            print('任务账号配置：第二版外观、真实 API/SQLite、草稿层级、路由保持、维护操作和迟到响应验证通过')
             await browser.close()
     finally:
         backend.doCleanups()

@@ -233,7 +233,8 @@ async function navigate() {
     const active=a.dataset.tab===tab;
     a.classList.toggle('active',active);
     if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');
-    if(active)a.scrollIntoView({block:'nearest',inline:'nearest'});
+    // 只在页签条内横向滚动：scrollIntoView 会顺带纵向滚动整页，移动端把应用栏滚出视口。
+    if(active){const nav=a.parentElement,box=a.getBoundingClientRect(),view=nav.getBoundingClientRect();if(box.left<view.left)nav.scrollLeft-=view.left-box.left;else if(box.right>view.right)nav.scrollLeft+=box.right-view.right;}
   });
   const view = $('#view');
   view.innerHTML = '';
@@ -671,13 +672,14 @@ async function renderAccounts() {
   const owns=()=>currentTab()==='accounts'&&generation===state.viewGeneration&&request===state.accountListRequest;
   bindAccountActions();
   void loadLoginDrafts(owns);
-  const status=$('#accounts-load-status');status.hidden=false;status.textContent='正在读取任务账号…';
+  const status=$('#accounts-load-status');status.hidden=false;status.textContent='正在读取任务账号…';status.dataset.tone='neutral';status.setAttribute('role','status');
   try {
     const accounts=await API('/accounts');
     if (!owns()) return;
     state.accounts=accounts;status.hidden=true;
+    const count=$('#work-account-count');if(count){count.textContent=String(accounts.length);count.hidden=false;}
   } catch (e) {
-    if (owns()) { status.textContent='任务账号读取失败：'+e.message;status.setAttribute('role','alert');const retry=document.createElement('button');retry.type='button';retry.className='btn btn-sm';retry.textContent='重试任务账号';retry.onclick=()=>renderAccounts();status.append(retry); }
+    if (owns()) { const count=$('#work-account-count');if(count)count.hidden=true;status.textContent='任务账号读取失败：'+e.message;status.dataset.tone='danger';status.setAttribute('role','alert');const retry=document.createElement('button');retry.type='button';retry.className='btn btn-sm';retry.textContent='重试任务账号';retry.onclick=()=>renderAccounts();status.append(retry); }
     return;
   }
 
@@ -690,6 +692,8 @@ async function renderAccounts() {
     const bound=a.cc2api_account_id!=null,worker=a.warmup_engine!=='projects';
     const workerAction=Number(a.warmup_enabled||0)===1?`<button type="button" data-warmup-now="${a.id}">立即运行养号 ${runtimeIcon('play')}</button>`:(bound||a.warmup_last_status==='paused')?`<button type="button" data-warmup-resume="${a.id}">恢复养号 ${runtimeIcon('play')}</button>`:`<button type="button" data-warmup-config="${a.id}">配置养号 ${runtimeIcon('arrow')}</button>`;
     const message=a.passive_quota?.account_error?a.passive_quota.message:a.passive_quota?.source==='manual'?'额度已手动更新。':bound?'重新授权提交后，同步更新关联账号的凭据。':'从已有网关账号关联，或创建新的网关账号。';
+    // 提示条语义与文案同源：凭据异常为危险色，手动额度为信息色，其余为中性提示。
+    const tone=a.passive_quota?.account_error?'danger':a.passive_quota?.source==='manual'?'info':'neutral';
     return `<article class="work-panel work-account" data-work-account-card="${a.id}">
       <header><span class="initial">${runtimeIcon('users')}</span><div><h3><button type="button" class="work-title-button" data-account-details="${a.id}">${escapeHTML(accountDisplayName(a))}</button></h3><small>任务账号 #${a.id}</small></div><span class="work-badge ${a.enabled?'good':''}">${a.enabled?'整体已启用':'新工作已关闭'}</span></header>
       <div class="work-proxy-row"><span class="work-proxy-compact" data-task-proxy-id="${a.id}" data-proxy-label="${escapeHTML(a.proxy_selection?.name||(a.upstream_socks5_host?'自定义线路':'直连'))}" data-proxy-url="${escapeHTML(a.proxy_selection?.public_url||'')}">${runtimeIcon('globe')}<span class="work-proxy-name">${escapeHTML(a.proxy_selection?.name||(a.upstream_socks5_host?'自定义线路':'直连'))}</span></span><button type="button" class="work-proxy-switch" data-proxy-config="${a.id}">切换代理</button></div>
@@ -698,7 +702,7 @@ async function renderAccounts() {
       <div class="work-condition"><span>环境时区</span><strong>${escapeHTML(a.effective_timezone||a.timezone||'未提供')}</strong></div>
       <div class="work-condition"><span>Claude Code</span><strong>${escapeHTML(a.claude_code_version||'继承全局')}</strong></div>
       <div class="work-account-links"><a href="#projects?account=${a.id}">工程迭代 ${runtimeIcon('arrow')}</a>${worker?workerAction:`<a href="#warmup?account=${a.id}">Pi 养号 ${runtimeIcon('arrow')}</a>`}</div>
-      <section class="work-gateway-actions" aria-label="${escapeHTML(accountDisplayName(a))}的网关账号操作"><div class="work-gateway-heading"><span>${runtimeIcon('key')}网关账号</span><strong>${bound?'#'+escapeHTML(a.cc2api_account_id):'尚未关联'}</strong></div><div class="work-gateway-buttons">${!bound?`<button type="button" class="btn btn-sm" data-cc2-create="${a.id}">${runtimeIcon('plus')}创建网关账号</button><button type="button" class="btn btn-sm" data-cc2-bind="${a.id}">关联已有账号</button>`:''}${!bound||RUNTIME_BASE?`<button type="button" class="btn btn-sm" data-relogin="${a.id}">${runtimeIcon('key')}${bound?'重新授权并同步':'重新授权'}</button>`:''}${bound?`<button type="button" class="btn btn-sm btn-danger danger" data-cc2-unbind="${a.id}">解绑</button>`:''}${a.credential_ownership?.phase&&a.credential_ownership.phase!=='ready'?'<a class="btn btn-sm" href="#environments">凭据交接对账</a>':''}</div><p role="status">${escapeHTML(message||'')}</p></section>
+      <section class="work-gateway-actions" aria-label="${escapeHTML(accountDisplayName(a))}的网关账号操作"><div class="work-gateway-heading"><span>${runtimeIcon('key')}网关账号</span><strong>${bound?'#'+escapeHTML(a.cc2api_account_id):'尚未关联'}</strong></div><div class="work-gateway-buttons">${!bound?`<button type="button" class="btn btn-sm" data-cc2-create="${a.id}">${runtimeIcon('plus')}创建网关账号</button><button type="button" class="btn btn-sm" data-cc2-bind="${a.id}">关联已有账号</button>`:''}${!bound||RUNTIME_BASE?`<button type="button" class="btn btn-sm" data-relogin="${a.id}">${runtimeIcon('key')}${bound?'重新授权并同步':'重新授权'}</button>`:''}${bound?`<button type="button" class="btn btn-sm btn-danger danger" data-cc2-unbind="${a.id}">解绑</button>`:''}${a.credential_ownership?.phase&&a.credential_ownership.phase!=='ready'?'<a class="btn btn-sm" href="#environments">凭据交接对账</a>':''}</div><p class="work-strip" data-tone="${tone}" role="status">${runtimeIcon(tone==='danger'?'alert':'info')}<span>${escapeHTML(message||'')}</span></p></section>
       <footer><button type="button" class="btn btn-sm" data-account-work="${a.id}">${a.enabled?'整体停用':'整体启用'}</button><button type="button" class="btn btn-sm" data-account-work-status="${a.id}">收尾进度</button><button type="button" class="btn btn-sm" data-cli-settings="${a.id}">CLI 配置</button><button type="button" class="btn btn-sm" data-quota="${a.id}">额度</button><button type="button" class="btn btn-sm" data-warmup-config="${a.id}">养号 / 额度设置</button>${RUNTIME_BASE?`<button type="button" class="btn btn-sm" data-run-window-config="${a.id}">运行时段</button>`:''}<button type="button" class="btn btn-sm btn-danger danger" data-del="${a.id}">删除</button></footer>
     </article>`;
   }).join('') || '<div class="work-empty"><h3>暂无任务账号</h3><p>添加账号后可以授权并开始任务。</p></div>');

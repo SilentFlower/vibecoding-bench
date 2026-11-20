@@ -76,7 +76,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 | 其它 | `--ui-space-unit`（4px）、`--ui-font-family`、`--ui-font-family-mono` | |
 
 - 字号与控件高 = 种子 + 阅读档位（`--ui-tier` 由三档媒体查询设为 0/1/2）。派生块挂在 `:root, [data-ui-theme]` 上，局部主题容器能独立重算。
-- 页面与组件只引用新 token，不写死颜色和圆角；悬停、按下等设计稿未给的状态色用 `color-mix()` 由 token 混合。`theme.test.mjs` 静态校验 `components/ui`、`kit.css`、`console-shell.css`、`ui-foundation.css`、`pagination.css` 及 `Dashboard.vue`、`AppNavigation.vue`、`Login.vue` 中颜色字面量只出现在 `--ui-color-*`/`--ui-shadow-*` 定义里，`border-radius` 只取 token。
+- 页面与组件只引用新 token，不写死颜色和圆角；悬停、按下等设计稿未给的状态色用 `color-mix()` 由 token 混合。`theme.test.mjs` 静态校验 `components/ui`、`kit.css`、`console-shell.css`、`ui-foundation.css`、`pagination.css`、已迁移页面的样式文件与组件，以及原生页（`apps/legacy-web` 的 7 份 CSS、`native-environment.css`、`TasksWorkspace.vue`、`RuntimeEnvironments.vue` 与 `runtime/` 下的弹窗和分区组件）中颜色字面量只出现在 `--ui-color-*`/`--ui-shadow-*` 定义里，`border-radius` 只取 token；原生 CSS 不再定义旧变量；两份图标 sprite 逐字节一致。
 - **旧层（过渡期冻结）**：未迁移页面仍引用的 shadcn 变量（`--primary/--border/--muted-foreground…`）、旧控件 token（`--ui-accent/--ui-border/--ui-text…`）与阅读尺寸（`--ui-font-body/--ui-control-height…`）合并在 `style.css` 与 `ui-foundation.css` 的旧层块，取值不变、不跟主题变化；页面迁移时改用新 token，父任务最终复核时按旧名清零删除。
   - 组件换新使未迁移页面外观倒退时（例：`SystemUpdates.vue` 的 Card 传 `shadow-none`，组件又去掉了描边，卡片失去边界），在页面层用旧层 token 或工具类恢复原外观（该例加 `border`），并随页面迁移删除；不回改组件。
 - **层叠**：组件样式在 `kit.css` 的 `@layer components`；业务传入的 Tailwind 工具类可覆盖组件默认值，未分层的页面规则在页面迁移前仍压过组件。不得新增未限定页面作用域的 `[data-slot=…]`、`.fui-*` 全局覆盖。全局兜底焦点框在 `@layer base`。
@@ -213,11 +213,71 @@ import type { ChoiceOption } from '@/components/ui/controls';
   - iframe 设 `inert`、`tabindex=-1`、`pointer-events: none`。画布负责缩放（10%–150%：按钮以中心为锚 ±10 个百分点，滚轮以指针为锚、每 100px ±10）、拖动平移与「适应画布」（`[data-theme-zoom]` 显示百分比）。
   - `Dashboard.vue` 读到 `route.query['theme-preview'] === '1'` 时以 `checkUpdates=false` 挂载，画板内不发 `POST /runtime/api/system-updates/check`，只读摘要照常读取。
 - **离开保护**：`onBeforeRouteLeave` 在有改动或有无效输入时打开 `ConfirmationDialog`（「放弃未保存的主题修改？」/「放弃并离开」）；去往 `login` 直接放行，因为 `logout()` 已先撤销会话。有改动时登记 `beforeunload`。
-- **过渡态**：任务与工程、运行环境在子任务 6 前写死颜色，不随主题变化。
+- **主题范围**：任务与工程、运行环境随保存的主题变化（见「第二版原生页」）；独立 `/runtime/` 文档与终端配色不应用用户主题。
 - **示例**：
   - 错误用法：在当前文档里直接渲染 `Accounts.vue` 做预览，Teleport、固定定位和媒体查询都会逃出画板，外壳也按真实视口排版。正确处理：用 iframe 隔离。
   - 错误用法：`Number('')` 得 0 后写进草稿（圆角 0 合法，会悄悄改值）。正确处理：经 `parseSeedNumber`，空串为 null。
   - 错误用法：用 `fixture.checks` 判断画板是否检查更新（刷新后顶层外壳会合法地再检查一次）。正确处理：按 `request.frame.parent_frame` 归属记录子框架请求。
+
+### 第二版原生页（任务与工程、运行环境）
+
+- **样式架构**：
+  - 任务与工程模板（`apps/legacy-web/index.html`）与 JS 字符串保留原类名，原生 CSS 只引用 `--ui-*`，不在原生模板里使用 `.fui-*`。原因：独立 `/runtime/` 文档读不到组件库 `kit.css`；模板与 JS 里约 125 处 `.btn` 和大量验证脚本依赖原类名。
+  - 原生部件与组件库同名部件取同一组 token 与尺寸。权威定义在 `style.css` 末尾「第二版通用部件」，页面区域在 `work-design.css` 末尾「第二版任务工作区」：
+
+    | 原生 | 组件库 |
+    | --- | --- |
+    | `.btn` / `.btn-sm` / `.btn-primary` / `.btn-danger` | `.fui-button` / `-sm` / `-default` / `-destructive` |
+    | 文本输入、`select`、`textarea` | `.fui-input` / `.fui-textarea`（静止填充、聚焦主色环） |
+    | `.native-choice-trigger` / `.native-number` / `.native-time-trigger` / `.work-search` | `.fui-choice` / `.fui-number` / `.fui-date-trigger` / `.fui-search` |
+    | `.work-navigation` / `a.active` | `.fui-segmented` / `.fui-segmented-item[data-state=checked]` |
+    | `.pill` / `.pill-<状态>` / `.work-badge`（`good` / `warning`） | `.fui-badge`（带圆点；运行中 info，成功 success，失败 danger，等待类 warning） |
+    | `.work-strip[data-tone]` | `.fui-strip[data-tone]` |
+    | `table.data` / `.work-table` | `.fui-table`（圆角表头条、斑马行） |
+    | `.work-panel` / `.work-account` / 底部 `.btn` | `.fui-card` / `.fui-entity-card` / `.fui-entity-action` |
+    | `.modal-card` / `.modal-titlebar-name` / `.modal-close` | `.fui-dialog` / `.fui-dialog-title` / `.fui-dialog-close` |
+
+  - 原生规则不分层，会压过 `@layer components`。元素级规则用 `:not([class*='fui-'], [class*='fui-'] *, …)` 排除组件库控件；不得为挂进原生宿主的 Vue 控件写原生覆盖（`.proxy-picker-*` 覆盖已删除，只保留弹层 `z-index: 1000`）。
+  - 旧变量（`--ink`、`--line`、`--muted`、`--border`、`--amber` 等）定义块全部删除，与 shadcn 同名变量的冲突随之消失。`[hidden]` 对整份文档生效，因为独立文档的环境页签会去掉 body 上的 `.work-console`。
+  - 终端容器取墨色 token（`--ui-color-ink` / `--ui-color-ink-text`）。xterm 自身配色由深色模式子任务统一。
+  - `!important` 只保留以下例外，其余靠选择器特异性：
+    - `.xterm-host .xterm-viewport` 的透明底，用来覆盖 xterm 写在行内的底色；
+    - `.hidden` 工具类与全局 `[hidden]`；
+    - `prefers-reduced-motion` 全局重置（一份）；
+    - 原始 `select.native-choice-source` / `input.native-time-source` 的视觉隐藏；
+    - Vue 运行环境侧抽屉分区的 `[hidden]`。
+- **任务与工程**：
+  - 页头 `.runtime-heading` 无分组名，规格同 `PageHeader`。内边距同 `.console-content`（24 / 28 / 48；≤1000 横向 20）。≤760 时标题由应用栏显示，页头视觉隐藏。
+  - 模块页签 `nav.work-navigation` 是分段托盘：按内容排列，≤760 横向滚动。
+    - 图标依次为 users / box / zap / todo / activity / list。
+    - `#work-account-count` 在任务账号读取成功后显示数量，读取前和失败时为 `hidden`。
+    - 激活页签只在托盘内横向滚动，不得用 `scrollIntoView`：它会纵向滚动整页，把移动端应用栏滚出视口。
+  - 区块头 `.work-list-head` 由 `.work-list-title`（标题、说明）和 `.work-list-toolbar`（搜索 300、筛选、主按钮）组成一行；id 与事件不变。≤760 时工具栏占满一行，搜索与主按钮同排、放不下换行。
+  - 任务账号加载状态 `#accounts-load-status` 是 `work-strip`：读取中 `data-tone=neutral`，读取失败 `data-tone=danger`、`role=alert`，重试按钮靠右。
+  - 任务账号卡 `.work-panel.work-account` 同 `EntityCard`：
+    - 组成：`.initial`（40px 主色图标块）、`.work-badge`（`good` 为成功色）、代理行、节点块 `.work-account-node`、键值行 `.work-condition`、链接、网关块 `.work-gateway-actions`。
+    - 网关状态为 `p.work-strip[data-tone][role=status]`：`passive_quota.account_error` 为 danger（文案为原因），`source=manual` 为 info，其余为 neutral。
+    - 底部 7 个按钮组成操作栏：按内容自适应宽度，放不下换行，删除为危险色。
+  - 原生弹窗 `.modal-card` 同 `.fui-dialog`：圆角 card、`--ui-shadow-modal`、无描边；标题为 `--ui-font-size-heading` / 780，宽度不变。终端风角框和扫描线已删除，续聊弹窗标题为「继续运行」。
+  - 弹窗底部按钮行（`.work-form-footer`、表单末尾的 `.row-end`）同 `.fui-modal-foot`：满宽 `--ui-color-fill-subtle` 底栏、无上边线、贴住弹窗左右与底边。贴底的底栏直接改底色；内缩在表单末尾的，按该表单的内边距用负外边距铺满。
+- **运行环境**（`RuntimeEnvironments.vue` 加 `src/native-environment.css`，`@layer components`）：
+  - 侧抽屉外壳的 `[data-slot=dialog-content]` 尺寸规则放在层外，用来压过全局不分层的高度限制。
+  - 工具栏 `Toolbar.environment-toolbar`：`Segmented`（全部环境 / 就绪 / 需要关注 / 已停止，`role=radio`，名称形如「需要关注 1」）、`.runtime-result-count`、`SearchInput`（280）。
+  - 卡片 `EntityCard.environment-rich`，保留 `data-environment`、`aria-label`：
+    - 头部：`IconTile` 取平台色；标题 `.fui-entity-card-name` 后接 `PlatformBadge`；副标题含 `ExecutionNodeBadge`；状态为 `Badge dot.environment-status`，`tone(row)` 映射为 healthy→success、muted→secondary、warning→warning。
+    - 三组件托盘 `.environment-role-strip`：运行中为成功色，其余置灰。
+    - 预热块 `.environment-readiness[data-tone]` 由 `preparationTone(row)` 决定：ready→success，failed→warning，其余 neutral。它与 `preparationLabel` 同源，不跟环境状态。
+    - 操作栏是四个 `EntityAction`，「环境详情」为 primary。
+  - 定位契约（脚本依赖）：`.environment-rich`、`.fui-entity-card-head`、`.fui-entity-card-name`、`.fui-entity-card-actions button`、`.environment-readiness strong`、`.environment-resources-grid`、`.runtime-environment-dialog`、`.environment-sections button`。
+- **独立 `/runtime/` 文档**：
+  - 读同一组 legacy CSS 和 `ui-foundation.css` 的默认值，显示第二版默认主题，不应用用户主题。
+  - 环境页签专用的 `environments.css`、`environment-design.css` 只做 token 化，不按新稿重排。
+  - 改动原生资源时更新 `index.html` 的 `?v=`（本次为 `20261120-native-pages`）。
+- **示例**：
+  - 错误用法：原生 `button {…}`、`input {…}` 这类元素级规则不加排除，或者给 `ProxyPicker` 写原生覆盖。不分层的原生规则会压过组件库，选线控件变回旧外观。
+    - 正确处理：元素级规则排除 `[class*='fui-']` 及其后代，Vue 控件外观只由组件库定义。`verify_native_pages_design.py` 会比对宿主内外的计算样式。
+  - 错误用法：按「`.work-console` 总在祖先链上」删除不带它的同名声明。
+    - 正确处理：独立文档的环境页签会移除这个类，要按实际 DOM 判断。
 
 ### 布局与信息组织
 
@@ -344,6 +404,7 @@ python3 deploy/flower2api/verify_account_page_design.py
 python3 deploy/flower2api/verify_records_pages_design.py
 python3 deploy/flower2api/verify_nodes_settings_design.py
 python3 deploy/flower2api/verify_theme_settings.py
+python3 deploy/flower2api/verify_native_pages_design.py
 node --experimental-strip-types --test apps/web/tests/update-steps.test.mjs
 python3 deploy/flower2api/verify_update_design.py
 python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录>
@@ -366,6 +427,15 @@ python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录
   - 存储损坏、越界回退默认，`setItem` 抛错时提示失败且根不变；
   - 390 应用栏标题、可见同步状态、单列、画布 320 高、无横向溢出；零控制台错误。
   - 截图在 `.deploy/console-ui-revamp/theme-settings/verify/`。
+- `verify_native_pages_design.py`（需先构建）：`WorkspaceFixture`、`TaskFeedbackFixture`、`SettingsFixture`、`CaptureFixture`、`DiagnosticsCpuFixture`，以及脚本内的 `ContinueFixture`（续聊回执与 WebSocket 空桩）和 `BindingFixture`（可关联网关账号列表）。覆盖以下内容：
+  - 1440×900 对 `#tasks`、`#environments` 逐项比对计算样式（白名单 1 项：设计稿给网关提示条写了更紧凑的内联字号与内边距）；
+  - 部件一致性：原生部件与组件库探针逐项一致，包括主按钮、小按钮、危险按钮、搜索、页签托盘与选中项、徽标、提示条、实体卡、操作栏，以及弹窗里的文本输入、下拉、数字输入；挂进原生弹窗的选线控件与组件库探针一致；
+  - 颜色与外壳：六个页签、运行环境列表与侧抽屉五个分区、R4 全部 21 个深层弹窗（独立文档的运行时段、环境工作区、内容采集、登录在 `/runtime/` 下打开）内，页面自有元素的文字色与背景色只取 `--ui-color-*`；弹窗外壳圆角、阴影取 token、无描边、标题 780；
+  - 弹窗底栏为满宽 `fill-subtle` 底栏、无上边线；任务账号读取失败时加载状态为危险提示条（`role=alert`）并保留重试；
+  - 预热块按准备状态着色、任务账号计数、无分组名与终端装饰、抽屉 940 贴右；
+  - 保存非默认主题后原生页主色、圆角、字号随之变化，独立 `/runtime/#accounts` 保持默认；
+  - 390 单列无横向溢出、打开时不纵向滚动整页；前端与原生资源无 4xx、零页面错误。等待动画时跳过无限循环动画（在线圆点、加载转圈）。
+  - 截图在 `.deploy/console-ui-revamp/native-pages/verify/`。
 - `update-steps.test.mjs`：正向含迁移、维护中进行中与待执行、越过取消边界的切换合并、无快照部署、恢复路径、旧操作无 `steps`、未知阶段、截断记录。
 - `verify_update_design.py`、`verify_system_update_browser.py`（需先构建）：前者对设计稿 `#update`、`#update-progress` 比对 45 项计算样式并检查说明展开、转义与零写入；后者覆盖版本记录与嵌套确认 Esc、居中与矮视口、直接安装默认 60 秒 / 30 分钟 1800 秒 / 双击幂等、步骤与时间、断线重连、快照与迁移、数据恢复、完成与刷新、409、未接入、回退与取消等待、等待对账与恢复。
 - 迁移期改造旧原型对比脚本：组件库负责的属性在脚本内用 `component_keys`（采样名 → 属性集合）跳过，并注明已由 `verify_ui_kit.py` 覆盖；页面级属性继续与旧原型比对。写死的组件颜色改为在被测节点内插入探针元素读取 token 实际渲染值（`verify_shared_pagination.py::token`），不得把旧色值改成新色值再写死。业务断言不放宽。外壳尺寸（侧栏宽、内容区边距）推算出的页面宽度断言改为读取实际值（如卡片区铺满 `#console-content` 内容宽度、右边距等于其实际 `padding-right`），外壳本身由 `verify_ui_shell.py` 对照设计稿核对。
@@ -411,11 +481,11 @@ html根字号与原型共用`--ui-font-body`的14/15/16px三档规则，font-fam
 ### 令牌与任务原型对齐（2026-11-15）
 
 - 令牌页已换成第二版数据表（见「正式控制台与账号首批迁移」中的四页合同），不再与旧原型对齐。Tailwind的`--muted`是背景色，次要文字使用`--muted-foreground`；原生工作区的同名变量单独限定作用域。
-- 任务工作区的定稿声明集中在`apps/legacy-web/work-design.css`，按原型CSSOM取值。主路由断点按实际浏览器视口响应，主区域宽度由侧栏占位确定。桌面1440px下任务账号三列。
+- 任务工作区已换成第二版（见「第二版原生页」）。主路由断点按实际浏览器视口响应，主区域宽度由侧栏占位确定。桌面1440px下任务账号三列。
 - 新布局保留原表单ID、字段name与API处理，工程和养号空间继续分别维护配置、草稿及SSE清理。新增搜索仅过滤列表；题库的创建任务只预选题目并打开批次表单，提交前保持零写入。
 - 旧`.view`的flex间距、旧页签底色以及高优先级按钮规则不能叠加进新工作区；校验卡片底栏按钮自身样式与宽度，不能只校验父容器。
 - 运行配置与新建抓包使用两个独立入口。账号名称提供完整技术详情，登录草稿单独呈现；额度窗口区分真实0与未提供，不展示7天Sonnet。
-- 增量验证：`audit_token_task_design.py`断言任务六入口和工程五分区的渲染样式并保存截图（令牌用例已移除，改由 `verify_records_pages_design.py` 对第二版设计稿核对）；`verify_runtime_workspace_design.py`覆盖原操作、详情、搜索、草稿、题目预选、独立抓包创建、响应式与键盘层级；`verify_tokens_design.py`覆盖令牌真实载荷与取消语义。
+- 增量验证：`audit_token_task_design.py`断言任务六入口和工程五分区的结构节点存在、颜色只取 token 并保存截图（令牌页由 `verify_records_pages_design.py`、任务页由 `verify_native_pages_design.py` 对第二版设计稿核对）；`verify_runtime_workspace_design.py`覆盖原操作、详情、搜索、草稿、题目预选、独立抓包创建、响应式与键盘层级；`verify_tokens_design.py`覆盖令牌真实载荷与取消语义。
 
 ## 完整视口弹窗与跨文档组件复用
 
@@ -484,13 +554,13 @@ CPU首屏摘要回归：`verify_environment_cpu_summary.py`覆盖自动读取、
 ### 任务深层弹窗与工程现场一致性
 
 - 任务账号配置按原型采用920px宽、17px圆角，名称、版本、网关/环境/额度三个入口和默认折叠的高级维护。名称使用独立display_name，原身份字段沿[账号CLI设置契约](../../orchestrator/backend/account-runtime-v3.md#scenario-账号-cli-版本与迭代抓包)。取消零写入；额度子窗关闭保留父草稿，网关及环境使用局部工作区并保持任务路由。工程执行配置只写版本及本空间抓包字段。
-- `verify_task_account_config.py`直接比对原型的窗口、标题、字段、按钮、页脚等十组计算样式，并覆盖1440/720/390px。旧dark偏好及系统深色下仍固定亮色，正文、标签和操作文字对比度至少4.5；成功状态与错误状态分别着色。
+- `verify_task_account_config.py`核对第二版弹窗外壳与标题取 token、颜色只取 token，并覆盖1440/720/390px。旧dark偏好及系统深色下仍固定亮色，正文、标签和操作文字对比度至少4.5；成功状态与错误状态分别着色。
 - 额度详情复用原型`work-quota-*`结构：600px宽、身份栏、5小时/7天双卡38px主值、横跨的Fable25px主值、剩余值与北京时间重置、底部查询时间和显式刷新。真实0、窗口缺失和重置未提供分别表达；关闭、重开、导航使旧刷新回执失效。
 - 任务账号的运行时段使用`RuntimeEnvironments`局部环境工作区，自动选择时段分区并保持任务路由；按任务账号ID定位真实环境。养号额度及独立旧入口的时段表单使用920px表单、固定标题/操作栏与可滚动正文。switch-field显式横向排版，避免旧form label的列布局覆盖。星期、最多8区间、环境时区及关闭时保留原配置沿用原合同。工程养号仅提交阈值；worker分支保留开关与小时区间。
 - 任务账号切换代理使用专用`TaskProxyDialog`，复用`ProxyPicker`；关联与独立任务均可选目录或直连。主URL、任务根、卡片节点及焦点保持；保存后发送`runtime:accounts-refresh`局部回读，禁止触发整个navigate。目录选择提交ID/revision及任务快照版本，沿原服务端维护门禁。完整账号编辑继续使用局部Accounts工作区。
 - 工程/养号的交互记录共用work-events/upgrade-events结构，分页位于记录后；独立验收的阶段取agent.verification，空态呈现三步待开始。计时仅替换文本并保留节点。
 - 运行条件按真实admission展示状态；缺少CLI占用投影时显示未采集。目标列表读取当前work、passed、available_objectives和waiting_objectives，按项目与目标去重；禁止从目录排序推断完成/可执行状态。空交付记录采用带图标、标题与说明的居中空态。
-- 验证：verify_task_feedback.py覆盖保存与取消、0/未知值、刷新迟到、局部代理、两空间及390/720px；verify_task_feedback_styles.py直接比对原型关键节点计算样式。
+- 验证：verify_task_feedback.py覆盖保存与取消、0/未知值、刷新迟到、局部代理、两空间及390/720px；verify_task_feedback_styles.py核对额度、养号额度设置、交互记录、运行条件与验收的第二版外观只取 token。
 
 ## Scenario: 共享操作反馈与任务选线
 

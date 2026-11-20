@@ -9,14 +9,14 @@
 前端代码质量目标按优先级:
 
 1. **零构建保活**(不引 npm / 构建工具,改完保存浏览器刷新即可)
-2. **跨主题正常**(暗 / 明两套都要看着合理)
+2. **跟随主题**(保存的主题对原生页生效;深色模式由控制台改版子任务 7 接入)
 3. **无 XSS**(任何用户数据进 DOM 必过 `escapeHTML`)
-4. **快捷键 + Esc 不断**(终端实验室皮肤的灵魂)
+4. **快捷键 + Esc 不断**(原生工作区的键盘可达性)
 5. **可被未来 AI 看懂**(命名一致、节顺序固定、中文注释 WHY)
 
 **故意没有**:lint 配置、Prettier、单元测试、Storybook、e2e。质量靠人工 review + 真跑(浏览器点全路径)。
 
-环境路由采用主后台中性亮色与圆角风格，是下列终端皮肤约束的明确例外；其色板作用域、保留原主题及合成浏览器验证以 [组件规范](component-guidelines.md) 的环境页场景为准。其余页面继续遵循原终端风格。
+原生页面统一使用第二版 `--ui-*` token 与组件库部件规格，终端实验室皮肤已移除；样式约定以 [组件规范](component-guidelines.md) 的 Styling Patterns 为准。
 
 ---
 
@@ -26,22 +26,22 @@
 |------|-----------|
 | 引入 npm / package.json / 构建工具(webpack / vite / rollup / parcel) | 零构建是本项目的核心约束;真要引必须先在团队拉齐 |
 | 引入框架(React / Vue / Svelte / lit-html) | 三个文件 + 4 个 tab 不值得引框架 |
-| 引入 CSS 框架(Tailwind / Bootstrap / Bulma) | 风格已锁定为"终端实验室皮肤",外来工具类会破坏一致性 |
+| 引入 CSS 框架(Tailwind / Bootstrap / Bulma) | 样式统一取第二版 `--ui-*` token 与组件库部件规格,外来工具类会破坏一致性 |
 | 引入打包 CSS 处理器(Sass / Less / PostCSS) | 同上,且需要构建 |
 | 引入 JavaScript 工具库(jQuery / Lodash / Underscore) | 需要的工具(`$ / $$ / escapeHTML / formatSize`)就 5 行,自己写 |
 | `console.log` 留到提交 | 噪音,且暴露 internals 给打开 devtools 的用户 | 调试完删,真要留就接 `console.warn/error` 且加 `[bench]` 前缀 |
 | `console.error` 当唯一错误反馈 | 用户看不到 devtools | 用户可见错误一定要 `alert(...)` 或更好的 toast(P2) |
 | 在 render 字符串里嵌入用户输入不 escape | XSS | `escapeHTML(...)`,见 type-safety.md |
 | `document.write` / `eval` / `new Function(str)()` | 危险 / 已废 / 性能差 | 用 DOM API 或 JSON.parse |
-| 直接写颜色 hex(`color: #ffb649`)在新 CSS 规则里 | 主题切换失效,且重复定义颜色 | 永远用 `var(--amber)` 等 CSS variable |
-| 给元素加 `border-radius` | 全局 `border-radius: 0 !important` 已强制,但新组件别在 `style` 里硬上 | 跟随终端皮肤,无圆角 |
+| 直接写颜色 hex(`color: #ffb649`)在新 CSS 规则里 | 主题切换失效,且重复定义颜色;`theme.test.mjs` 静态校验 | 用 `var(--ui-color-*)`;设计稿未给的混合色用 `color-mix()` 由 token 混合 |
+| `border-radius` 写字面量 | 圆角不随主题变化;`theme.test.mjs` 静态校验 | 按部件角色取 `var(--ui-radius-btn / -control / -block / -card)` |
 | inline `style="..."` | 难维护、覆盖 CSS variable | 抽 class 到 style.css |
 | 用 `<div onclick>` 模拟按钮 | a11y 差、键盘不友好、无 type | 用真 `<button type="button">` |
 | 在 SSE / WebSocket 消息回调里 `await API(...)` | 1Hz 推 × 嵌套请求 = 流量灾难 | 推送已是全量,直接渲染 |
 | 用 `setInterval` 轮询替代 SSE | 浪费 + 状态可能漏 | runs 走 `/api/runs/stream` |
 | `addEventListener` 在 render 函数里反复绑 | 累积 listener,触发 N 倍 | 用 `el.onclick = ...` 覆盖式;或委托到一次绑定的父级 |
 | 给现有 modal 写独立 close handler 而不走全局委托 | 多入口关一个忘了一个 | 全局 click handler + `data-close` 属性 |
-| 鉴权用浏览器原生 `WWW-Authenticate: Basic` 弹窗 | 弹窗样式破坏终端实验室主题 | 走 cookie session(后端 `/api/auth/*` + 前端 `#auth-modal` 自定义 UI),详见 [deploy/auth-design.md](../../platform/deploy/auth-design.md) |
+| 鉴权用浏览器原生 `WWW-Authenticate: Basic` 弹窗 | 浏览器原生弹窗无法套用控制台样式 | 走 cookie session(后端 `/api/auth/*` + 前端 `#auth-modal` 自定义 UI),详见 [deploy/auth-design.md](../../platform/deploy/auth-design.md) |
 | 登录 form / 任何"必须看到才能继续"的 modal 走 Esc 关 | 用户 Esc 一下解锁所有内容 | 在 modal 上标 `data-no-esc`,`bindShortcuts` 跳过它 |
 | API helper 不带 `credentials: 'same-origin'` | 跨主题前的 fetch 不发 cookie,永远 401 | 全局 `fetch('/api'..., { credentials: 'same-origin', ... })` |
 
@@ -97,8 +97,8 @@
 
 - [ ] **XSS**:每个新写的 `innerHTML = ...` 里所有字符串变量是否过了 `escapeHTML`?
 - [ ] **数字字段**:从 `FormData` 取出送给后端的字段是否用 `Number(...)` 显式转?
-- [ ] **CSS variable**:新加的颜色 / 边框 / 字体都走 `var(--xxx)`?新主题 token 是否在 `:root` + `[data-theme=light]` 都定义?
-- [ ] **无圆角 / 无 inline style**:新组件遵守终端皮肤约束?
+- [ ] **token**:新加的颜色 / 圆角 / 字号 / 阴影都取第二版 `--ui-*` token,不新增旧变量?`theme.test.mjs` 静态规则通过?
+- [ ] **组件规格 / 无 inline style**:新部件按「class 命名与组件库对应」取组件库同名部件规格?元素级规则排除了 `[class*='fui-']`?
 - [ ] **资源释放**:新加的 `EventSource` / `WebSocket` / `setInterval` / `addEventListener` 是否在 modal 关闭 / 切 tab / endXXX 路径中显式释放?
 - [ ] **`btn.disabled` 双向**:危险 / 不可重复提交按钮在点击时 disable、失败时恢复?
 - [ ] **错误兜底**:`await API(...)` 全都包了 `try/catch`?失败有 `alert(...)` 或更友好提示?
@@ -107,7 +107,7 @@
 - [ ] **CDN 版本**:新引外部 CDN 包**带版本号**(`xterm@5.3.0` 而非 `xterm@latest`)?
 - [ ] **a11y**:`<button>` 有 `aria-label`(图标按钮)?`<input>` 在 `<label>` 里?form 提交回车键能用?
 - [ ] **快捷键**:新视图不影响 `Esc / / / 1-4`?新输入框是否在 `bindShortcuts` 的"in field 不响应"集合里(`INPUT/TEXTAREA/SELECT`)?
-- [ ] **跨主题**:暗 / 明两种主题切到该视图都看起来正常?
+- [ ] **跟随主题**:在主题设置保存非默认主题后,该视图的主色、圆角、字号随之变化?
 - [ ] **后端契约**:新加的 API 路径 / 字段在 `services/orchestrator/main.py` 都对得上?字段名拼写一致?
 - [ ] **console.log / debugger**:全部删掉?
 - [ ] **中文注释**:复杂逻辑(为什么 sleep、为什么 try-catch、为什么这里 setState)说明 WHY?

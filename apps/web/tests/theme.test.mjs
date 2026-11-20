@@ -136,6 +136,10 @@ const colorLiteral = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab)\(|\b(?:w
 const paletteUtility = /\b(?:bg|text|border|ring|fill|stroke|outline|from|via|to)-(?:black|white|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)\b/;
 const radiusLiteral = /^(?:0|50%|999px|inherit)$/;
 
+// 原生任务页与独立 /runtime/ 文档共用的样式（ui-foundation.css、pagination.css 另列）。
+const legacySheets = ['style.css', 'environments.css', 'console.css', 'approved-design.css', 'work-design.css', 'environment-design.css', 'capture-workspace.css']
+  .map(name => new URL(`../../legacy-web/${name}`, import.meta.url));
+
 /** 递归列出 components/ui 下的源码文件。 */
 function sourceFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry => entry.isDirectory()
@@ -163,11 +167,14 @@ test('组件样式不写死颜色，圆角只取 token', () => {
     new URL('../src/nodes.css', import.meta.url),
     new URL('../src/settings.css', import.meta.url),
     new URL('../src/theme-settings.css', import.meta.url),
+    new URL('../src/native-environment.css', import.meta.url),
+    ...legacySheets,
   ];
-  // 外壳组件、系统更新弹窗、账号页、请求 / 代理 / 令牌 / 会话封禁四页、节点管理、系统设置、主题设置及其子组件与组件库同样只取 token。
+  // 外壳组件、系统更新弹窗、账号页、请求 / 代理 / 令牌 / 会话封禁四页、节点管理、系统设置、主题设置、任务与工程宿主、运行环境及其子组件与组件库同样只取 token。
   const shell = ['Dashboard.vue', 'AppNavigation.vue', 'Login.vue', 'SystemUpdateDialog.vue', 'Accounts.vue', 'AgyAccountUsage.vue', 'AgyQuotaRow.vue', 'UsageWindowStats.vue', 'SchedulingDetails.vue', 'ProxyPicker.vue', 'PlatformBadge.vue', 'runtime/ExecutionNodeBadge.vue',
     'RequestDiagnostics.vue', 'NativeStageDetails.vue', 'AccountFilterSelect.vue', 'Proxies.vue', 'Tokens.vue', 'AccountScopePicker.vue', 'SessionPolicyBlocks.vue',
-    'Nodes.vue', 'runtime/AccountNodeSelector.vue', 'runtime/AccountNodeMigration.vue', 'Settings.vue', 'ThemeSettings.vue', 'theme/ThemePreview.vue'].map(name => new URL(`../src/components/${name}`, import.meta.url));
+    'Nodes.vue', 'runtime/AccountNodeSelector.vue', 'runtime/AccountNodeMigration.vue', 'Settings.vue', 'ThemeSettings.vue', 'theme/ThemePreview.vue',
+    'TasksWorkspace.vue', 'RuntimeEnvironments.vue', 'runtime/CaptureWorkspace.vue', 'runtime/RunDetails.vue', 'runtime/TaskProxyDialog.vue', 'runtime/EnvironmentResources.vue', 'runtime/EnvironmentKernel.vue', 'runtime/RunWindowForm.vue'].map(name => new URL(`../src/components/${name}`, import.meta.url));
   const problems = [];
   for (const file of [...sheets, ...shell, ...sourceFiles(uiRoot)]) {
     const text = readFileSync(file, 'utf8');
@@ -181,4 +188,18 @@ test('组件样式不写死颜色，圆角只取 token', () => {
     if (/#[0-9a-fA-F]{6}\b|\brgba?\(/.test(script) || paletteUtility.test(script)) problems.push(`${file.pathname}: 模板或脚本含写死颜色`);
   }
   assert.deepEqual(problems, []);
+});
+
+test('原生样式不再定义旧变量，只引用第二版 token', () => {
+  // 旧变量（--ink、--line、--muted、--border 等）挂在原生作用域根上会被内嵌的 Vue 组件继承，迁移后一律删除。
+  const problems = [...legacySheets, new URL('../src/native-environment.css', import.meta.url)].flatMap(file => declarations(readFileSync(file, 'utf8'))
+    .filter(([name]) => name.startsWith('--') && !name.startsWith('--ui-'))
+    .map(([name]) => `${file.pathname}: ${name}`));
+  assert.deepEqual(problems, []);
+});
+
+test('原生页与 Vue 的图标 sprite 保持同一份内容', () => {
+  const legacy = readFileSync(new URL('../../legacy-web/approved-icons.svg', import.meta.url), 'utf8');
+  const vue = readFileSync(new URL('../src/assets/approved-icons.svg', import.meta.url), 'utf8');
+  assert.equal(legacy, vue);
 });

@@ -18,14 +18,14 @@
 
 ```
 apps/legacy-web/
-├── index.html        所有视图模板 + 三个 modal + 外部依赖(xterm.js / Google Fonts CDN)
+├── index.html        所有视图模板 + modal + 外部依赖(xterm.js CDN)
 ├── app.js            路由 + state + 4 个 render* + login 两步流 + 主题/时钟/快捷键
-└── style.css         终端实验室皮肤(暗色主) + [data-theme=light] override
+└── style.css         基础样式 + 末尾「第二版通用部件」(只引用 `--ui-*` token)
 ```
 
 外部依赖通过 CDN 引,**不打包**,**不本地化**:
 - `xterm@5.3.0` + `xterm-addon-fit@0.8.0`:OAuth 登录 step 2 的内嵌 PTY 终端
-- Google Fonts:`JetBrains Mono`(等宽主)+ `Fraunces`(展示)
+- 字体取 `--ui-font-family` / `--ui-font-family-mono`(定义在 `ui-foundation.css`),不再单独引入 Google Fonts
 
 后端 `services/orchestrator/main.py` 把 `apps/legacy-web/` 挂到 `/`:
 
@@ -90,7 +90,7 @@ navigate(); setupTheme(); startClock(); bindShortcuts();
 - 真要 ES Module → 改 `<script type="module">`,但要承担"CORS 必须走 http 不能 file://"的代价
 - **不要为"工程美感"提前拆**
 
-`style.css` 也按节组织,顺序见文件顶部注释:reset → scanline → topbar → main/view → buttons → tables → forms → topic cards → pills → modal → detail panel → hintbar → scrollbar → responsive → 内嵌 OAuth 登录 → theme toggle → `[data-theme=light]` override 区。
+`style.css` 也按节组织,节标题为 `/* ===== <节名> ===== */`:reset → 模块栏(品牌与状态行) → main/view → buttons → tables → forms → status pills → modal → detail panel → batch scheduler → hintbar → scrollbar → responsive → 内嵌 OAuth 登录 → `[data-theme=light]` 补充规则 → Auth → Paste-helper → Auth 与粘贴助手的 `[data-theme=light]` 补充规则 → 物理特征、运行时段与工程页 → 末尾「第二版通用部件」。
 
 `index.html` 内的 `<template>` 命名约定 `tpl-<tab>`,modal 命名 `<feature>-modal`(`#modal` 是通用详情弹窗、`#acc-modal` 是账号登录两步流弹窗、`#task-modal` 是创建任务弹窗)。
 
@@ -104,13 +104,11 @@ navigate(); setupTheme(); startClock(); bindShortcuts();
 - **JS 临时常量**:`UPPER_SNAKE`,如 `TAB_KEYS`
 - **HTML id**:`kebab-case`,如 `#topic-filter` / `#acc-login-cancel` / `#runs-body`
 - **HTML class**:语义优先 + kebab-case,如 `.view-head` / `.topic-card` / `.modal-card-md` / `.pill-running`
-- **CSS variable**:`--<purpose>` 全部小写 + 短横线,主题相关变量分组:
-  - 表面:`--bg / --bg-soft / --surface / --surface-2 / --surface-3`
-  - 边框:`--border / --border-bright / --border-amber`
-  - 文本:`--text / --text-dim / --text-faint / --text-muted`
-  - 强调色:`--amber / --amber-soft / --amber-deep / --amber-glow`
-  - 状态:`--running / --success / --failed / --timeout / --queued`(各自带 `*-glow` 变体)
-  - 字体:`--mono / --display`
+- **CSS variable**:原生 CSS 不再定义自己的变量,只引用 `ui-foundation.css` 中的第二版 token(取值规则见 [组件规范](component-guidelines.md) 的 Styling Patterns):
+  - 颜色:`--ui-color-*`(表面 `surface / layout / fill-*`、文字 `text / text-2..4`、线 `line`、主色 `primary*`、状态 `success / warning / danger / info` 及其 `-bg / -text`、墨色 `ink*`)
+  - 字号与字体:`--ui-font-size-*`、`--ui-font-family` / `--ui-font-family-mono`
+  - 尺寸:`--ui-control-sm / md / lg`、`--ui-space-unit`
+  - 圆角与阴影:`--ui-radius-btn / control / block / card`、`--ui-shadow-*`
 - **状态徽章**:`.pill.pill-<status>`,status 取值 `queued | running | success | failed | timeout`,后端 `runs.status` 列直接拼进 class
 - **template id**:`tpl-<tabname>`,如 `tpl-accounts` / `tpl-topics` / `tpl-tasks` / `tpl-runs`
 - **modal id**:`<feature>-modal` 或通用 `#modal`

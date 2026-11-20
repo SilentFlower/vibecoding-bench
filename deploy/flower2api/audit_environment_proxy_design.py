@@ -1,29 +1,30 @@
-"""采样运行环境的定稿字体、布局及工作区，保存实际渲染对照（代理页已迁至第二版，见 verify_records_pages_design.py）。"""
+"""运行环境页与环境管理抽屉的第二版外观：结构节点存在、页面自有元素的颜色只取 token，保存桌面与窄屏截图
+（代理页见 verify_records_pages_design.py，环境页对 console-v2 设计稿的逐项比对见 verify_native_pages_design.py）。"""
 import asyncio,json
 from playwright.async_api import async_playwright
 from verify_runtime_workspace_design import WorkspaceFixture
 from verify_environment_ui import ROOT,BASE
-from audit_token_task_design import sample
+from verify_native_pages_design import tokens_only
 
 
 async def main():
-    """输出桌面与窄屏证据，严格核对所选组件的渲染样式。@return 无。"""
-    out=ROOT/'.deploy/frontend-sidebar-refresh/environment-proxy-audit';out.mkdir(parents=True,exist_ok=True)
+    """输出桌面与窄屏证据，核对所选节点存在且颜色只取 token。@return 无。"""
+    out=ROOT/'.deploy/frontend-sidebar-refresh/environment-proxy-audit';out.mkdir(parents=True,exist_ok=True);problems=[]
+    # 旧原型用例已移除：环境页换成第二版实体卡（EntityCard），节点按新结构定位。
+    nodes={'卡片':'.environment-rich','卡片头部':'.environment-rich .fui-entity-card-head','环境名称':'.environment-rich .fui-entity-card-name','组件状态':'.environment-role-strip','资源':'.environment-resources-grid','预热':'.environment-readiness','操作栏':'.environment-rich .fui-entity-card-actions'}
     async with async_playwright() as p:
-        browser=await p.chromium.launch();ref=await browser.new_page(viewport={'width':1440,'height':1000});await ref.goto((ROOT/'doc/design/flower2api-concept.html').as_uri());await ref.add_style_tag(content='.preview-bar{display:none!important}:root{--preview-visible-height:0px}.app{min-height:100dvh}.sidebar{height:100dvh}')
-        fixture=WorkspaceFixture();context=await browser.new_context(viewport={'width':1440,'height':1000});await context.route('**/*',fixture.route);await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','light')");actual=await context.new_page();results={}
-        # 代理页已换成第二版数据表，由 verify_records_pages_design.py 对 console-v2 设计稿核对，旧原型用例移除；环境页用例留到原生页迁移。
-        cases=[('environments','/environments',"navigate('environments')",{'卡片':('.environment-rich','.environment-rich'),'卡片标题':('.environment-card-head','.environment-card-head'),'环境名称':('.environment-identity h2','.environment-identity h2'),'组件状态':('.environment-role-strip','.environment-role-strip'),'资源':('.environment-resources-grid','.environment-resources-grid'),'准备状态':('.environment-readiness','.environment-readiness'),'操作栏':('.environment-card-actions','.environment-card-actions')})]
-        for name,path,script,mapping in cases:
-            await ref.evaluate(script);await actual.goto(BASE+path);target=actual;await target.locator('.environment-rich').first.wait_for();await target.locator('body').evaluate('()=>document.fonts.ready');await ref.evaluate('document.fonts.ready')
-            data={}
-            for label,(left,right) in mapping.items():
-                if not await target.locator(right).count():data[label]={'missing':right};continue
-                expected,observed=await sample(ref,left),await sample(target,right);data[label]={'reference':expected,'actual':observed,'differences':{key:[expected[key],observed[key]] for key in expected if key!='borderColor' and expected[key]!=observed[key]}}
-            results[name]=data;await ref.screenshot(animations='disabled',path=str(out/f'{name}-reference.png'));await actual.screenshot(animations='disabled',path=str(out/f'{name}-actual.png'))
-            if name=='environments':
-                await ref.evaluate('selected=accounts[0].id;openEnvironmentWorkspace()');await target.locator('.environment-rich').first.get_by_role('button',name='环境详情',exact=True).click();await target.locator('.runtime-environment-dialog').wait_for();await actual.screenshot(animations='disabled',path=str(out/'workspace-actual.png'));await ref.screenshot(animations='disabled',path=str(out/'workspace-reference.png'))
-        (out/'styles.json').write_text(json.dumps(results,ensure_ascii=False,indent=2));print(json.dumps({name:{key:value.get('differences',value) for key,value in data.items()} for name,data in results.items()},ensure_ascii=False,indent=2));await browser.close()
+        browser=await p.chromium.launch()
+        for width in (1440,390):
+            fixture=WorkspaceFixture();context=await browser.new_context(viewport={'width':width,'height':1000});await context.route('**/*',fixture.route);await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only')");page=await context.new_page()
+            await page.goto(BASE+'/environments');await page.locator('.environment-rich').first.wait_for();await page.evaluate('document.fonts.ready')
+            for label,selector in nodes.items():
+                if not await page.locator(selector).count():problems.append(f'{width} 缺少节点：{label} {selector}')
+            await tokens_only(page,'.runtime-environments',f'environments-{width}',problems)
+            await page.screenshot(animations='disabled',path=str(out/f'environments-{width}.png'))
+            await page.locator('.environment-rich').first.get_by_role('button',name='环境详情',exact=True).click();await page.locator('.runtime-environment-workspace').wait_for()
+            await tokens_only(page,'.runtime-environment-workspace',f'environment-drawer-{width}',problems)
+            await page.screenshot(animations='disabled',path=str(out/f'environment-workspace-{width}.png'));await context.close()
+        (out/'styles.json').write_text(json.dumps(problems,ensure_ascii=False,indent=2));print(json.dumps(problems,ensure_ascii=False,indent=2));await browser.close();assert not problems,problems
 
 
 if __name__=='__main__':asyncio.run(main())

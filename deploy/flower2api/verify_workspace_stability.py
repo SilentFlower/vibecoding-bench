@@ -49,12 +49,12 @@ async def main():
         await expect(page.locator('iframe')).to_have_count(0)
         fixture.environment_gate.set();fixture.environment_gate=None
         await expect(page.locator('.environment-rich')).to_have_count(25)
-        await page.evaluate("""()=>{window.stableEnvironment=document.querySelector('.environment-rich');window.stableButton=stableEnvironment.querySelector('.environment-card-actions button');window.scrollTo(0,500)}""")
+        await page.evaluate("""()=>{window.stableEnvironment=document.querySelector('.environment-rich');window.stableButton=stableEnvironment.querySelector('.fui-entity-card-actions button');window.scrollTo(0,500)}""")
         before=await page.evaluate('scrollY')
         fixture.rows[0]['native_preparation']['idle_workers']=2
         await page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
         await expect(page.locator('.runtime-environments .fui-page-header button')).to_be_enabled()
-        assert await page.evaluate("stableEnvironment===document.querySelector('.environment-rich')&&stableButton===stableEnvironment.querySelector('.environment-card-actions button')")
+        assert await page.evaluate("stableEnvironment===document.querySelector('.environment-rich')&&stableButton===stableEnvironment.querySelector('.fui-entity-card-actions button')")
         assert await page.evaluate('scrollY')==before
         await page.set_viewport_size({'width':1440,'height':620})
         await page.locator('.environment-rich').first.get_by_role('button',name='资源与采集',exact=True).click()

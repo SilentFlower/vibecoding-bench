@@ -495,8 +495,8 @@ async def run(output):
             await expect(page.locator('.environment-rich')).to_have_count(1)
             # 环境标题后带平台徽标：标题自身文字与卡片无障碍名称都精确等于环境名，徽标单独核对。
             await expect(page.locator('.environment-rich')).to_have_attribute('aria-label', '演示环境 A')
-            heading = page.locator('.environment-rich h2')
-            assert await heading.evaluate("node=>[...node.childNodes].filter(child=>child.nodeType===Node.TEXT_NODE).map(child=>child.textContent).join('').trim()") == '演示环境 A'
+            heading = page.locator('.environment-rich .fui-entity-card-title')
+            await expect(heading.locator('.fui-entity-card-name')).to_have_text('演示环境 A')
             await expect(heading.locator('[data-platform-badge]')).to_have_text('Claude Code')
             assert 'gateway_account=11' in page.url
             await page.get_by_role('button', name='显示全部环境').click()

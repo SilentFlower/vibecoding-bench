@@ -76,7 +76,7 @@ async def verify_warmup_ui(rpc, evaluate, wait_for, session_id: str) -> None:
     await evaluate("document.querySelector('#modal-close').click()")
     await evaluate("document.querySelector('.console-sidebar a[href=\"/environments\"]').click()")
     await wait_for('Boolean(document.querySelector(".environment-rich"))')
-    await click_text(evaluate,'.environment-card-actions button','维护')
+    await click_text(evaluate,'.fui-entity-card-actions button','维护')
     await wait_for('Boolean(document.querySelector(".runtime-environment-dialog"))')
     assert not await evaluate("[...document.querySelectorAll('.maintenance-option button')].find(e=>e.textContent.trim()==='校正画像').disabled")
     before=await evaluate('fetch("/runtime/api/environments").then(r=>r.json())')

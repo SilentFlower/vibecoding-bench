@@ -8,13 +8,13 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261116-workspace-experience" />
-  <link rel="stylesheet" href="environments.css?v=20261114-console-redesign" />
-  <link rel="stylesheet" href="console.css?v=20261116-workspace-experience" />
-  <link rel="stylesheet" href="approved-design.css?v=20261116-workspace-experience" />
-  <link rel="stylesheet" href="work-design.css?v=20261116-workspace-experience" />
-  <link rel="stylesheet" href="environment-design.css?v=20261116-workspace-experience" />
-  <link rel="stylesheet" href="capture-workspace.css?v=20261116-workspace-experience" />
+  <link rel="stylesheet" href="style.css?v=20261120-native-pages" />
+  <link rel="stylesheet" href="environments.css?v=20261120-native-pages" />
+  <link rel="stylesheet" href="console.css?v=20261120-native-pages" />
+  <link rel="stylesheet" href="approved-design.css?v=20261120-native-pages" />
+  <link rel="stylesheet" href="work-design.css?v=20261120-native-pages" />
+  <link rel="stylesheet" href="environment-design.css?v=20261120-native-pages" />
+  <link rel="stylesheet" href="capture-workspace.css?v=20261120-native-pages" />
   <link rel="stylesheet" href="pagination.css?v=20261119-console-ui-kit" />
   <link rel="stylesheet" href="ui-foundation.css?v=20261120-console-ui-shell" />
   <script>
@@ -24,16 +24,15 @@
   </script>
 </head>
 <body class="work-console">
-  <div class="scanlines" aria-hidden="true"></div>
 
-  <header class="runtime-heading"><p class="page-eyebrow">工作区</p><h1>任务与工程</h1><p>从任务准备到执行与交付，在一个工作区内完成。</p></header>
+  <header class="runtime-heading"><h1>任务与工程</h1><p>从任务准备到执行与交付，在一个工作区内完成。</p></header>
   <header class="runtime-module-bar">
     <div class="brand">
       <span class="prompt">flower2api</span><span class="caret">_</span>
       <span class="brand-sub">工程工作区</span>
     </div>
     <nav class="tabs work-navigation" aria-label="任务与工程模块">
-<a href="#accounts" data-tab="accounts"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-users"></use></svg><span class="tab-cn">任务账号</span></a><a href="#projects" data-tab="projects" data-iteration-mode="projects"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-box"></use></svg><span class="tab-cn">工程迭代</span></a><a href="#warmup" data-tab="warmup" data-iteration-mode="warmup"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-spark"></use></svg><span class="tab-cn">养号迭代</span></a><a href="#tasks" data-tab="tasks"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-task"></use></svg><span class="tab-cn">普通任务</span></a><a href="#runs" data-tab="runs"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-wave"></use></svg><span class="tab-cn">运行记录</span></a><a href="#topics" data-tab="topics"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-task"></use></svg><span class="tab-cn">题库</span></a><a href="#environments" data-tab="environments"><span class="tab-cn">运行环境</span></a>
+<a href="#accounts" data-tab="accounts"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-users"></use></svg><span class="tab-cn">任务账号</span><em class="work-tab-count" id="work-account-count" hidden></em></a><a href="#projects" data-tab="projects" data-iteration-mode="projects"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-box"></use></svg><span class="tab-cn">工程迭代</span></a><a href="#warmup" data-tab="warmup" data-iteration-mode="warmup"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-zap"></use></svg><span class="tab-cn">养号迭代</span></a><a href="#tasks" data-tab="tasks"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-todo"></use></svg><span class="tab-cn">普通任务</span></a><a href="#runs" data-tab="runs"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-activity"></use></svg><span class="tab-cn">运行记录</span></a><a href="#topics" data-tab="topics"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-list"></use></svg><span class="tab-cn">题库</span></a><a href="#environments" data-tab="environments"><span class="tab-cn">运行环境</span></a>
     </nav>
     <div class="statline">
 
@@ -65,13 +64,13 @@
   <template id="tpl-environments">
     <section class="env-page" aria-labelledby="environment-title">
       <header class="env-page-head">
-        <div><p class="page-eyebrow">资源</p><h2 id="environment-title">运行环境</h2><p>运行组件、资源与准备状态，一眼掌握。</p></div>
+        <div><h2 id="environment-title">运行环境</h2><p>运行组件、资源与准备状态，一眼掌握。</p></div>
         <button type="button" class="btn" id="environment-refresh"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-refresh"></use></svg>刷新状态</button>
       </header>
       <div id="environment-feedback" class="env-error" role="alert"></div>
       <div class="environment-toolbar">
         <section id="environment-summary" class="env-summary tabs" aria-label="环境状态筛选"></section>
-        <label class="search"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-search"></use></svg><span class="env-sr-only">搜索账号名称或环境 ID</span><input type="search" id="environment-search" placeholder="搜索账号名称或环境 ID" /></label>
+        <label class="search work-search"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-search"></use></svg><span class="env-sr-only">搜索账号名称或环境 ID</span><input type="search" id="environment-search" placeholder="搜索账号名称或环境 ID" /></label>
       </div>
       <div id="environment-list" class="env-list"><p class="env-empty" role="status">正在读取环境…</p></div>
       <div class="environment-extra-tools">
@@ -116,22 +115,22 @@
 
   <template id="tpl-accounts">
     <section class="view">
-      <div class="work-list-title"><div><h2>任务账号</h2><p>授权、CLI 设置、额度与网关关联集中管理。</p></div><button class="btn btn-primary" type="button" id="add-account"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-plus"></use></svg>添加任务账号</button></div><div class="work-list-toolbar"><label class="work-search"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-search"></use></svg><input type="search" id="work-account-search" aria-label="搜索当前列表" placeholder="搜索账号、邮箱、代理或出口 IP"></label><div class="buttons"></div></div>
+      <div class="work-list-head"><div class="work-list-title"><div><h2>任务账号</h2><p>授权、CLI 设置、额度与网关关联集中管理。</p></div></div><div class="work-list-toolbar"><label class="work-search"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-search"></use></svg><input type="search" id="work-account-search" aria-label="搜索当前列表" placeholder="搜索账号、邮箱、代理或出口 IP"></label><div class="buttons"></div><button class="btn btn-primary" type="button" id="add-account"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-plus"></use></svg>添加任务账号</button></div></div>
       <p class="hint hidden" id="account-login-result" role="status"></p>
-      <section id="work-login-drafts" class="work-panel work-login-drafts" hidden></section><p id="accounts-load-status" class="work-note" role="status">正在读取任务账号…</p><div id="accounts-body" class="work-account-grid"></div>
+      <section id="work-login-drafts" class="work-panel work-login-drafts" hidden></section><p id="accounts-load-status" class="work-strip" data-tone="neutral" role="status">正在读取任务账号…</p><div id="accounts-body" class="work-account-grid"></div>
     </section>
   </template>
 
   <template id="tpl-topics">
     <section class="view">
-      <div class="work-list-title"><div><h2>题库 <small id="topics-count"></small></h2><p>管理初始需求与自动补充，创建可重复的任务。</p></div><button class="btn btn-primary" type="button" id="add-topic"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-plus"></use></svg>新建题目</button></div><div class="work-list-toolbar"><label class="work-search"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-search"></use></svg><input type="search" id="topic-filter" aria-label="搜索当前列表" placeholder="搜索标题、分类或题号"></label><div class="buttons"></div></div>
+      <div class="work-list-head"><div class="work-list-title"><div><h2>题库 <small id="topics-count"></small></h2><p>管理初始需求与自动补充，创建可重复的任务。</p></div></div><div class="work-list-toolbar"><label class="work-search"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-search"></use></svg><input type="search" id="topic-filter" aria-label="搜索当前列表" placeholder="搜索标题、分类或题号"></label><div class="buttons"></div><button class="btn btn-primary" type="button" id="add-topic"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-plus"></use></svg>新建题目</button></div></div>
       <div id="topics-list" class="work-topic-grid"></div>
     </section>
   </template>
 
   <template id="tpl-tasks">
     <section class="view">
-      <div class="work-list-title"><div><h2>普通任务</h2><p>按账号组织执行批次，保留并发与随机间隔。</p></div><button class="btn btn-primary" type="button" id="open-batch-form"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-plus"></use></svg>新建批次</button></div><div class="work-list-toolbar"><label class="work-search"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-search"></use></svg><input type="search" id="work-batch-search" aria-label="搜索当前列表" placeholder="搜索账号或批次 ID"></label><div class="buttons"></div></div>
+      <div class="work-list-head"><div class="work-list-title"><div><h2>普通任务</h2><p>按账号组织执行批次，保留并发与随机间隔。</p></div></div><div class="work-list-toolbar"><label class="work-search"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-search"></use></svg><input type="search" id="work-batch-search" aria-label="搜索当前列表" placeholder="搜索账号或批次 ID"></label><div class="buttons"></div><button class="btn btn-primary" type="button" id="open-batch-form"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-plus"></use></svg>新建批次</button></div></div>
       <div id="batch-create-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="batch-create-title"><div class="modal-card task-batch-editor"><div class="modal-titlebar"><h2 id="batch-create-title">新建任务批次</h2><button type="button" class="modal-close" data-close="#batch-create-modal" aria-label="关闭批次编辑"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button></div>      <form id="batch-form" class="upgrade-sheet"><div class="upgrade-sheet-body"><div class="upgrade-intro"><span><svg class="runtime-icon"><use href="approved-icons.svg#i-task"></use></svg></span><div><h3>准备本次执行</h3><p>选择题目和账号，确认执行节奏后启动。</p></div></div><div class="upgrade-batch-grid"><section class="upgrade-card"><header><h3>选择题目</h3><span class="hint" id="batch-selected-count">0 selected</span></header><div class="upgrade-topic-tools"><label class="work-search"><svg class="runtime-icon"><use href="approved-icons.svg#i-search"></use></svg><input type="search" id="batch-topic-search" aria-label="搜索批次题目" placeholder="题号、标题或分类"></label><div data-selection-actions=""><button class="btn btn-sm" type="button" id="batch-select-all">全选搜索结果</button><button class="btn btn-sm" type="button" id="batch-clear-all">清空全部</button></div></div><div id="batch-topic-list" class="upgrade-topic-list"></div></section><section class="upgrade-card"><header><h3>执行配置</h3><span>仅作用于本次批次</span></header><div class="upgrade-card-body"><label class="field"><span class="lbl">运行账号</span>
             <select name="account_id" required=""></select>
           </label><div class="work-form-grid"><label class="field"><span class="lbl">任务并发</span>
@@ -157,7 +156,7 @@
 
   <template id="tpl-runs">
     <section class="view">
-      <div class="work-list-title"><div><h2>运行记录</h2><p>查看执行结果、文件产物与诊断记录。</p></div><button class="btn btn-primary" type="button" id="runtime-open-settings"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-settings"></use></svg>运行配置</button></div><div class="work-list-toolbar"><label class="work-search"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-search"></use></svg><input type="search" id="work-run-search" aria-label="搜索当前列表" placeholder="搜索名称、账号或记录 ID"></label><div class="buttons"><div class="work-filter" id="work-run-status"><button type="button" data-run-status="all" class="active">全部</button><button type="button" data-run-status="running">执行中</button><button type="button" data-run-status="failed">失败</button></div><button type="button" class="btn btn-sm" id="work-capture-new">启动抓包</button></div></div>
+      <div class="work-list-head"><div class="work-list-title"><div><h2>运行记录</h2><p>查看执行结果、文件产物与诊断记录。</p></div></div><div class="work-list-toolbar"><label class="work-search"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-search"></use></svg><input type="search" id="work-run-search" aria-label="搜索当前列表" placeholder="搜索名称、账号或记录 ID"></label><div class="buttons"><div class="work-filter" id="work-run-status"><button type="button" data-run-status="all" class="active">全部</button><button type="button" data-run-status="running">执行中</button><button type="button" data-run-status="failed">失败</button></div><button type="button" class="btn btn-sm" id="work-capture-new">启动抓包</button></div><button class="btn btn-primary" type="button" id="runtime-open-settings"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-settings"></use></svg>运行配置</button></div></div>
       <div class="modal hidden" id="runtime-settings-modal" role="dialog" aria-modal="true" aria-labelledby="runtime-settings-title"><div class="modal-card runtime-settings-workspace"><div class="modal-titlebar"><h2 id="runtime-settings-title">后续运行配置</h2><button type="button" class="modal-close" data-close="#runtime-settings-modal" aria-label="关闭运行配置"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button></div><div class="runtime-settings-scroll">      <div class="run-config-grid">
 
 
@@ -261,10 +260,6 @@
   <!-- 详情弹窗 -->
   <div class="modal hidden" id="modal">
     <div class="modal-card">
-      <div class="modal-frame" aria-hidden="true">
-        <span class="frame-tl">┌</span><span class="frame-tr">┐</span>
-        <span class="frame-bl">└</span><span class="frame-br">┘</span>
-      </div>
       <div class="modal-titlebar">
         <span class="modal-titlebar-name">run · detail</span>
         <button class="modal-close" id="modal-close" aria-label="关闭"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button>
@@ -384,10 +379,6 @@
   <!-- Topic 查看 / 编辑弹窗 -->
   <div class="modal hidden" id="topic-modal">
     <div class="modal-card modal-card-sm">
-      <div class="modal-frame" aria-hidden="true">
-        <span class="frame-tl">┌</span><span class="frame-tr">┐</span>
-        <span class="frame-bl">└</span><span class="frame-br">┘</span>
-      </div>
       <div class="modal-titlebar">
         <span class="modal-titlebar-name">题目编辑 <span class="muted" id="topic-modal-title"></span></span>
         <button class="modal-close" data-close="#topic-modal" aria-label="关闭"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button>
@@ -417,10 +408,6 @@
   <!-- 添加账号弹窗：两步流，step 1=配置 / step 2=PTY 终端登录 -->
   <div class="modal hidden" id="acc-modal">
     <div class="modal-card modal-card-md task-login-workspace">
-      <div class="modal-frame" aria-hidden="true">
-        <span class="frame-tl">┌</span><span class="frame-tr">┐</span>
-        <span class="frame-bl">└</span><span class="frame-br">┘</span>
-      </div>
       <div class="modal-titlebar">
         <span class="modal-titlebar-name">添加任务账号 <span class="muted" id="acc-modal-stage">配置账号与代理</span></span>
         <button class="modal-close" id="acc-modal-close" aria-label="关闭"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button>
@@ -520,10 +507,6 @@
   <!-- 创建任务弹窗 -->
   <div class="modal hidden" id="task-modal">
     <div class="modal-card modal-card-sm">
-      <div class="modal-frame" aria-hidden="true">
-        <span class="frame-tl">┌</span><span class="frame-tr">┐</span>
-        <span class="frame-bl">└</span><span class="frame-br">┘</span>
-      </div>
       <div class="modal-titlebar">
         <span class="modal-titlebar-name">新建任务 <span class="muted" id="task-modal-title"></span></span>
         <button class="modal-close" data-close="#task-modal" aria-label="关闭"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button>
@@ -557,12 +540,8 @@
   <!-- run 继续对话终端 -->
   <div class="modal hidden" id="continue-modal">
     <div class="modal-card modal-card-md">
-      <div class="modal-frame" aria-hidden="true">
-        <span class="frame-tl">┌</span><span class="frame-tr">┐</span>
-        <span class="frame-bl">└</span><span class="frame-br">┘</span>
-      </div>
       <div class="modal-titlebar">
-        <span class="modal-titlebar-name">run / continue <span class="muted" id="continue-modal-title"></span></span>
+        <span class="modal-titlebar-name">继续运行 <span class="muted" id="continue-modal-title"></span></span>
         <button class="modal-close" data-close="#continue-modal" aria-label="关闭"><svg class="runtime-icon" aria-hidden="true"><use href="approved-icons.svg#i-close"></use></svg></button>
       </div>
       <div class="acc-step-terminal">
@@ -580,10 +559,6 @@
   <!-- 鉴权登录弹窗:首次访问 / 401 时显示;Esc 不可关 -->
   <div class="modal hidden" id="auth-modal" data-no-esc>
     <div class="modal-card modal-card-sm auth-card">
-      <div class="modal-frame" aria-hidden="true">
-        <span class="frame-tl">┌</span><span class="frame-tr">┐</span>
-        <span class="frame-bl">└</span><span class="frame-br">┘</span>
-      </div>
       <div class="modal-titlebar">
         <span class="modal-titlebar-name">auth / login <span class="muted">// session · 7d</span></span>
       </div>
@@ -620,6 +595,6 @@
   <script src="ui-controls.js?v=20261116-workspace-experience"></script>
   <script src="projects.js?v=20261116-workspace-experience"></script>
   <script src="environments.js?v=20261118-platform-kernel-node-drafts"></script>
-  <script src="app.js?v=20261118-node-login-drafts"></script>
+  <script src="app.js?v=20261120-native-pages"></script>
 </body>
 </html>

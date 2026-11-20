@@ -102,13 +102,15 @@ async def run(output):
         await frame.locator('[data-tab="warmup"]').click()
         await expect(page).to_have_url(BASE + '/tasks?tab=warmup')
         assert await page.locator('.task-runtime').evaluate("node=>node.__navigationIdentity==='stable'")
-        await frame.locator('#theme-toggle').click()
-        await expect(frame).to_have_attribute('data-theme', 'dark')
+        # 任务页原生宿主固定浅色（主题切换按钮已移除，深色模式由子任务 7 统一接入），刷新后保持。
+        await expect(frame.locator('#theme-toggle')).to_have_count(0)
         await page.reload()
-        await expect(frame).to_have_attribute('data-theme', 'dark')
-        scenes.append('侧栏折叠与六个任务域页面保持文档身份，明暗偏好跨刷新保留')
-        await page.screenshot(path=str(output / 'tasks-dark.png'), full_page=True)
-        assert not fixture.writes, fixture.writes
+        await expect(frame).to_have_attribute('data-theme', 'light')
+        scenes.append('侧栏折叠与六个任务域页面保持文档身份，任务宿主固定浅色并跨刷新保持')
+        await page.screenshot(path=str(output / 'tasks-light.png'), full_page=True)
+        # 控制台外壳每次挂载自动检查一次系统更新（frontend-guidelines「系统更新」），其余页面不得写入。
+        writes = [write for write in fixture.writes if write['path'] != '/runtime/api/system-updates/check']
+        assert not writes, writes
         assert not errors, errors
         await context.close()
         # 静态文件必须离线加载，实际业务脚本不会进入导出文件。
