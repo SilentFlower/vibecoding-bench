@@ -2065,6 +2065,8 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 正式OAuth观察器核对完整原版SHA、映像身份及四个指令指纹。原生路由为0xa098532，channelModelResponseStream.Receive接收返回位置0x95d1e90，遥测0x89ed91f，codeassist Scanner栈检查后0x95f3212。Receive在AL给出接收结果、RCX给出已核对的GetChatMessageResponse；Scanner原块先私有归档，再解开SSE及response信封。EOF保留错误未知标记，业务成功同时要求源finishReason/安全拦截终态及真实控制RPC成功。部分文本、usage或通道关闭单独出现均不算成功。
 - 管理侧锁内冻结ready状态和AT-only快照。新代采用新worker，最高代次单调，同代不同AT拒绝；旧在途及原工具轮保留归属。工具结果匹配调用方、账号、原历史和函数身份，先回填原MCP并收口，再读当前ready快照开始下一模型轮。concurrency=1复用原许可；pending/reconcile期间可独立收口旧工具，普通发布继续关闭。同结果回执仅在原截止内幂等，副作用只回填一次。
 - 同轮多个 `functionCall` 可使用同一函数名。`functionResponse.id` 存在时按 ID 配对，允许反序回填。ID 省略且函数名重复时按该轮调用位置配对，要求对应位置名称相同、整轮数量一致并且每个调用只回填一次。活跃续轮仍须匹配完整原历史与调用参数。网关、原生续轮校验和历史导入使用同一规则。
+- 唯一领取原工具轮时同时登记接续轮响应。重读须使用相同鉴权令牌 ID、公开模型和完整入站 JSON，并通过原账号的当前令牌范围检查。摘要对 JSON 对象键排序，保持数组顺序。若同时匹配不同的已登记工具轮，返回 `AGY_TOOL_RESULT_MISMATCH`。
+- 并发重读跟随原生成，从首帧读取同一有序响应和终态。后续工具调用的归属先于工具帧登记。重读沿首次接续 HTTP 的 120 秒生成预算，独立于原生工具等待。共享帧缓存预算为 64 MiB，到期或维护排空清理，不持有账号许可、原生作业及凭据。发送前失败释放重读登记，原 MCP 回执可按原截止复用。进入原生发送边界后，状态未知也沿已登记响应收口。
 - 结果省略 `id` 且 `name` 等于原工具轮的真实调用 ID 时，若没有同名函数，网关按该 ID 匹配。确认完整原工具轮后，向发送器提交的历史为对应调用和结果补真实 ID，并为结果恢复函数名。已归一化的前缀跨轮复用，公开入站诊断、网关归属和幂等回执比较使用客户端原始正文。
 - 公共生成在原账号刷新锁内要求 AT 剩余有效期超过 430 秒。该值保留 AGY 1.5.9 的 310 秒断网启动实测余量和原生请求最长 120 秒预算。有效期不足时，由管理侧按原代次流程续期后再发布 AT-only 快照；在途工作继续使用自己的快照。
 - 监督器将请求墙钟截止转换为单调截止，接收剩余时间范围 `(0,125]` 秒并限制原请求预算最多120秒。`Supervisor.acquire(value, until)`在选择及创建worker前复核截止，旧代关闭后重新检查；`Worker.start(until)`在Popen前再次复核。退役计入原请求耗时，过期返回 `request_deadline_exceeded`，停止新代创建及原生启动。
@@ -2084,7 +2086,9 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 | 条件 | 结果 |
 | --- | --- |
 | 缺失/禁用令牌 | 401，账号许可不进入业务 |
-| 冲突key、未知输入、错工具调用方/ID或重复续轮 | 受控400，拒绝发送或回填 |
+| 冲突key、未知输入、错工具调用方或 ID、找不到唯一归属 | 受控 400，拒绝发送或回填 |
+| 完整正文相同且响应仍在原截止内 | SSE 或 JSON 交付原响应，零额外回填和发送 |
+| 已受理响应无法保留完整帧 | 重读返回 503 或 SSE 错误帧，首笔交付继续 |
 | Gemini `thinkingConfig` 形状、档位、预算或字段无效 | 400 `INVALID_ARGUMENT`，零发送 |
 | 字符串 `const` 不在同字段的 `enum` 内 | 400 `AGY_UNSUPPORTED_INPUT`，私有校验为 `invalid_tool_schema`，零发送 |
 | 已有令牌可见目录，公开模型无对应映射 | 404 `NOT_FOUND`，提示读取 `GET /v1beta/models`，零发送 |
@@ -2111,6 +2115,8 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 
 同轮调用 `Read(a)`、`Read(b)`、`Lookup(c)` 时，首条工具 SSE 的候选内容包含全部三个调用。保留 ID 可按 `c`、`b`、`a` 交结果。若中转省略 ID，按原顺序提交三条结果。客户端把真实 ID 放在结果的 `name` 时，网关可以从已登记的工具轮恢复对应函数。重复使用同一 ID 或缺少一条结果时返回 400。
 
+重试边界：客户端使用同一份工具回填正文并发重试，重读原响应中的下一轮工具 ID。对象字段重排仍匹配同一响应。将同一正文转给新的模型生成会产生不同的工具轮归属，重试应在原截止内读取已登记响应。
+
 错误用法：以HTTP 200、Go RPC返回或EOF认定部分文本成功；正确处理是同时验证源终态和控制终态。错误用法：用发送器替身的通过结果宣称原生OAuth业务已验证；正确处理是独立运行固定原版、本地TLS及真实MCP闭环。真实Google身份、目录接受性及跨实际到期仍由具备授权账号和独立预算的后续验收承接。
 
 截止边界：旧代退役消耗剩余时间后，应使用原单调截止拒绝下一代。错误用法是收尾后重新给满预算或启动已过期进程；正确处理是继续沿用原 `until`，在建代和Popen前独立复核。
@@ -2132,8 +2138,9 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - Rust的runtime_transport单测覆盖精确AGY目标及CC路径隔离；agy_sender_test、gemini_account_test、gemini_contract_test、runtime_transport_test覆盖鉴权、绑定、权限、源聚合与取消。
 - `verify_agy_gemini.py` 覆盖未知模型在流式和非流式入口返回 404、令牌范围外模型和未观测目录、已知模型暂不可用时的 503、临期凭据单次续期及有效期充足时继续复用。
 - 同一断网探针核对公开 Gemini 目录跨账号去重、异平台名称保持、基础名和旧档位名实际发送的目录型号及原生 ID、显式档位隔离、工具续轮沿用型号和请求诊断保留原名。
-- `verify_agy_native_loopback.py --image <明确测试镜像> [--loader-root <显式glibc目录>]`使用真实网关/SQLite/account-sender/监督器/原版和本地TLS/MCP；容器network=none、UID1001、根只读、零真实外部生成。一次性CA只挂验证容器系统信任根，正式配置无测试CA或跳过校验开关。断言参数实际出站、源usage、两代AT、并发1工具回填、重复拒绝、64重复帧与SIGURG、截断/容量失败、断连取消、实际许可释放和共享映像。
-- `verify_agy_native_loopback.py --parallel-tools` 模拟客户端读到首条工具 SSE 后断开，断言双同名调用以及 6、4、3 个调用连续三轮均完整交付，覆盖结果名称使用 ID、显式 ID 反序和省略 ID 顺序回填。核对签名、源终态、用量和实际出站的调用参数与结果，缺项或重复回填返回 400 且零额外模型发送。`test_agy_supervisor` 断言空闲回收同时保留同身份热进程和就绪模板。
+- `verify_agy_native_loopback.py --image <明确测试镜像> [--loader-root <显式glibc目录>]`使用真实网关/SQLite/account-sender/监督器/原版和本地TLS/MCP；容器network=none、UID1001、根只读、零真实外部生成。一次性CA只挂验证容器系统信任根，正式配置无测试CA或跳过校验开关。断言参数实际出站、源usage、两代AT、并发1工具回填、同正文重读、64重复帧与SIGURG、截断/容量失败、断连取消、实际许可释放和共享映像。
+- `verify_agy_native_loopback.py --parallel-tools` 模拟客户端读到首条工具 SSE 后断开，断言双同名调用以及 6、4、3 个调用连续三轮均完整交付，覆盖结果名称使用 ID、显式 ID 反序和省略 ID 顺序回填。核对签名、源终态、用量和实际出站的调用参数与结果。四项同名回填覆盖并发重读、对象键重排及重读后下一轮。缺项、冲突归属、跨令牌与原账号授权撤销返回 400，模型提交数保持不变。`test_agy_supervisor` 断言空闲回收同时保留同身份热进程和就绪模板。
+- `verify_agy_native_loopback.py --tool-deadlines` 验证生成响应到期后重读返回 400，下一轮长工具仍按原监督器等待完成。`verify_agy_gemini.py` 核对发送前凭据对账、单次 MCP 回填与原失败终态。`gemini::replay` 单测核对原终态、有序多读者与容量回收。
 - `verify_agy_runtime.py --native-image <明确镜像> [--crash]`保持零模型准备、两代、单次映像解码及正常/异常物理退出；`verify_agy_gemini.py`继续单独标记发送器替身证据；`verify_agy_environment_ui.py`覆盖1440/720/390px及实际控件边界、草稿、焦点和离页清理。制品资源须从当前受管理源码构建。
 
 ## Scenario: AGY账号系统文本同形体策略

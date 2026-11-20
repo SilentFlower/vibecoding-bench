@@ -354,6 +354,9 @@ pub struct DiagnosticContext {
     pub usage: Option<GeminiDiagnosticUsage>,
     pub system_prompt_policy: Option<SystemPromptDiagnostic>,
     pub tool_turn: Option<ToolTurnDiagnostic>,
+    /// 读取原工具续轮响应时关联的 HTTP 根，历史记录默认缺省。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub replay_of_request_id: Option<String>,
     pub response_headers_source: Option<String>,
 }
 

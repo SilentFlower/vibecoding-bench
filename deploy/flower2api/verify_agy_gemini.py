@@ -31,6 +31,7 @@ class Fixture(BaseHTTPRequestHandler):
     waiting=threading.Event()
     tool_finished=threading.Event()
     tool_drained=threading.Event()
+    tool_completions=[]
     refreshes=0
     cancelled=threading.Event()
     policy_failed=False
@@ -63,6 +64,7 @@ class Fixture(BaseHTTPRequestHandler):
             value=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
             require('credential_snapshot' not in value,'工具收口意外发布凭据')
             require(any(item['request']['request_id']==value['previous_request_id'] and item['api_token_id']==value['api_token_id'] for item in Fixture.calls),'工具控制归属错误')
+            Fixture.tool_completions.append(value['previous_request_id'])
             Fixture.tool_finished.set();require(Fixture.tool_drained.wait(5),'原工具物理收口失败')
             self.send_response(200);self.send_header('content-type','application/json');self.end_headers()
             self.wfile.write(json.dumps({'finished':True,'request_id':value['request']['request_id'],'previous_request_id':value['previous_request_id']}).encode())
@@ -97,6 +99,8 @@ class Fixture(BaseHTTPRequestHandler):
             emit('job_finalized',status='error');return
         control_cases = {'control-400': 400, 'control-502': 502, 'control-200': 200,
             'control-legacy': None, 'control-after-frame': 400}
+        if results and mode.startswith('replay-control-'):
+            mode = mode.removeprefix('replay-')
         if mode in control_cases:
             after_frame = mode == 'control-after-frame'
             if after_frame:
@@ -258,7 +262,24 @@ def inside() -> dict:
         require(status==200 and json.loads(raw)['candidates'][0]['content']['parts'][0]['text']=='合成回复','concurrency=1续轮失败')
         require(Fixture.calls[-1]['model']=='gemini-4-neon-low','续轮改变了已绑定的型号')
         require(Fixture.tool_finished.is_set(),'真实工具回填未完成')
-        require(request(tool_base,continuation)[0]==400,'重复工具结果被接纳')
+        require(request(tool_base,continuation)==(status,raw) and len(Fixture.calls)==previous+1,
+            '重复工具结果未返回原响应或再次提交模型')
+        require(len(Fixture.tool_completions)==1,'原生工具结果重复回填')
+        for mode,operation,expected in [('control-502','generateContent',502),
+                ('control-after-frame','streamGenerateContent?alt=sse',200)]:
+            Fixture.tool_finished.clear()
+            Fixture.tool_drained.clear()
+            failed=copy.deepcopy(tool)
+            failed['contents'][0]['parts'][0]['text']='replay-'+mode
+            status,raw=request(tool_base,failed)
+            require(status==200,'错误终态用例缺少原工具轮')
+            failed['contents']+=[json.loads(raw)['candidates'][0]['content'], continuation['contents'][-1]]
+            before,before_tools=len(Fixture.calls),len(Fixture.tool_completions)
+            path=tool_base.rsplit(':',1)[0]+':'+operation
+            first=request(path,failed)
+            require(first[0]==expected and b'AGY' in first[1],'接续错误未返回实际原生终态')
+            require(request(path,failed)==first and len(Fixture.calls)==before+1
+                and len(Fixture.tool_completions)==before_tools+1,'失败续轮重试改变终态或重复发送')
         for mode,expected,attempts,refreshes in [('auth-recover',200,2,1),('capacity-error',429,1,0),('auth-always',503,2,1),('auth-after-frame',200,1,0)]:
             current=copy.deepcopy(body);current['contents'][0]['parts'][0]['text']=mode
             before=len(Fixture.calls);before_refresh=Fixture.refreshes
@@ -380,7 +401,7 @@ def inside() -> dict:
         database.close()
         return {'passed':True,'evidence':'real_http_sqlite_synthetic_sender','network':'none','real_model_submissions':0,
             'synthetic_submissions':len(Fixture.calls),'checks':['真实Gemini目录与令牌','按档位匹配目录、保留精确型号与令牌范围','非流式源usage','SSE','函数签名和结果','错调用方和ID拒绝',
-                '待对账期间旧工具独立收口和新模型拒绝','concurrency=1原许可接续','新AT代次','重复结果拒绝','禁用令牌',
+                '待对账期间旧工具独立收口和新模型拒绝','concurrency=1原许可接续','新AT代次','重复回填复用原响应','禁用令牌',
                 '明确401仅恢复一次','容量错误零恢复','SSE首帧后零重放','SSE断连关闭原发送和释放许可',
                 '原生控制状态在HTTP、SSE尾帧及诊断中一致',
                 '两账号策略隔离','认证恢复冻结策略','后续HTTP采用新开关','缺失和错误策略回执拒绝','原始入站视图保持',

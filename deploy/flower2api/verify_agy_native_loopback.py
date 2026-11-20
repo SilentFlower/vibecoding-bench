@@ -121,10 +121,12 @@ class Upstream(BaseHTTPRequestHandler):
                     for part in content['parts'])
                 tool=returned<6
             parallel_chain='TLS_SYNTHETIC_TOOL_PARALLEL_CHAIN' in encoded
-            if parallel_chain:
+            replay_chain='TLS_SYNTHETIC_TOOL_REPLAY' in encoded
+            if parallel_chain or replay_chain:
                 returned=sum('functionResponse' in part for content in body['request']['contents']
                     for part in content['parts'])
-                tool=returned<13
+                count=({0:1,1:1,2:4,6:2} if replay_chain else {0:6,6:4,10:3}).get(returned,0)
+                tool=count>0
             cancel='TLS_SYNTHETIC_CANCEL' in encoded
             repeated='TLS_SYNTHETIC_REPEAT' in encoded
             truncated='TLS_SYNTHETIC_TRUNCATED' in encoded
@@ -140,16 +142,15 @@ class Upstream(BaseHTTPRequestHandler):
             arguments = SCHEMA_TOOL_ARGS if 'TLS_SYNTHETIC_TOOL_SCHEMA' in encoded else {'x':1}
             part={'functionCall':{'name':'synthetic_tool','args':arguments,'id':tool_id},'thoughtSignature':'c3ludGhldGljLXNpZw=='} if tool else {'text':'本地TLS回复'}
             frames=[{'candidates':[{'index':0,'content':{'role':'model','parts':[part]}}]}]
-            if tool and parallel_chain:
+            if tool and (parallel_chain or replay_chain):
                 part['functionCall']['id']=f'call_{returned+1:032x}'
                 part['functionCall']['args']={'x':returned+1}
-                count={0:6,6:4,10:3}[returned]
-                parts=[part]+[{'functionCall':{'name':'synthetic_lookup' if i==count-1 else 'synthetic_tool',
+                parts=[part]+[{'functionCall':{'name':'synthetic_lookup' if parallel_chain and i==count-1 else 'synthetic_tool',
                     'args':{'x':returned+i+1},'id':f'call_{returned+i+1:032x}'}}
                     for i in range(1,count)]
                 frames=[
                     {'candidates':[{'index':0,'content':{'role':'model','parts':batch}}]}
-                    for batch in ([{'text':'准备工具'}],parts[:2],parts[2:])
+                    for batch in ([{'text':'准备工具'}],parts[:2],parts[2:]) if batch
                 ]
             elif tool and 'TLS_SYNTHETIC_TOOL_PARALLEL' in encoded:
                 frames[0]['candidates'][0]['content']['parts'].append(
@@ -481,7 +482,7 @@ def verify_png(request, request_ids, wait_idle, database, base):
     require(any(part.get('inlineData',{}).get('data')==current for part in parts)
         and any(part.get('functionResponse',{}).get('name')=='synthetic_tool' for part in parts),
         '原工具续轮缺少 PNG 或工具结果')
-    require(request(base+'generateContent',valid_live)[0]==400 and len(Upstream.calls)==4,'重复工具结果产生额外模型提交')
+    require(request(base+'generateContent',valid_live)==(status,raw) and len(Upstream.calls)==4,'重复 PNG 回填产生额外模型提交或响应变化')
 
     from PIL import Image
 
@@ -534,10 +535,11 @@ def verify_png(request, request_ids, wait_idle, database, base):
     require(status==400 and json.loads(raw)['error']['details'][0]['reason']=='AGY_INVALID_MEDIA'
         and len(Upstream.calls)==7,'坏 GIF 提交或错误分类异常')
     valid_live={**tool,'contents':history+[{'role':'user','parts':[result,media_parts[1]]}]}
-    require(request(base+'generateContent',valid_live)[0]==200,'修正 GIF 后原工具轮未能完成')
+    status,raw=request(base+'generateContent',valid_live)
+    require(status==200,'修正 GIF 后原工具轮未能完成')
     wait_idle()
     require(native_media()==sent[1:3] and len(Upstream.calls)==8,'工具续轮的 GIF 转换结果错误')
-    require(request(base+'generateContent',valid_live)[0]==400 and len(Upstream.calls)==8,'重复 GIF 工具结果产生额外模型提交')
+    require(request(base+'generateContent',valid_live)==(status,raw) and len(Upstream.calls)==8,'重复 GIF 回填产生额外模型提交或响应变化')
 
     invalid_config={'contents':[{'parts':[{'text':'合成拒绝诊断'}]}],'generationConfig':{'topK':10}}
     status,raw=request(base+'generateContent',invalid_config)
@@ -929,7 +931,7 @@ def verify_tool_deadlines(request, wait_idle, base):
         'tools':[{'functionDeclarations':[{'name':'synthetic_tool','parameters':{'type':'OBJECT',
             'properties':{'x':{'type':'INTEGER'}}}}]}]}
     started=time.monotonic()
-    first_tool_wait_seconds=0
+    tool_wait_seconds=0
     for round_number in range(6):
         streaming=round_number%2==0
         operation='streamGenerateContent?alt=sse' if streaming else 'generateContent'
@@ -944,20 +946,23 @@ def verify_tool_deadlines(request, wait_idle, base):
         if 'id' in call:result['id']=call['id']
         body['contents'].extend([{'role':'model','parts':parts},
             {'role':'user','parts':[{'functionResponse':result}]}])
-        if round_number==0:
-            # 模拟一个耗时超过整个生成预算的工具，验证原监督器仍能接收真实结果。
+        if round_number==1:
+            # 等待超过生成预算。已交付的响应到期，下一轮工具仍能正常回填。
+            expired={**body,'contents':body['contents'][:-2]}
             delivered=time.monotonic()
             time.sleep(125)
-            first_tool_wait_seconds=round(time.monotonic()-delivered,2)
-            require(len(Upstream.calls)==1,'等待客户端工具期间触发了额外模型调用')
+            tool_wait_seconds=round(time.monotonic()-delivered,2)
+            status,raw=request(base+operation,expired)
+            require(status==400 and b'AGY_TOOL_RESULT_MISMATCH' in raw and len(Upstream.calls)==2,
+                '到期续轮仍可重读或产生了新模型提交')
     status,raw=request(base+'generateContent',body)
     wait_idle()
     require(status==200 and '本地TLS回复'.encode() in raw and len(Upstream.calls)==7,
         '跨首轮截止的工具结果未完成或触发了额外模型调用')
-    require(request(base+'generateContent',body)[0]==400 and len(Upstream.calls)==7,
-        '重复回填触发了额外模型调用')
-    return {'passed':True,'tool_rounds':6,'model_calls':7,'first_tool_wait_seconds':first_tool_wait_seconds,
-        'elapsed_seconds':round(time.monotonic()-started,2)}
+    require(request(base+'generateContent',body)==(status,raw) and len(Upstream.calls)==7,
+        '长工具链重试产生额外模型调用或响应变化')
+    return {'passed':True,'tool_rounds':6,'model_calls':7,'tool_wait_seconds':tool_wait_seconds,
+        'expired_replay_status':400,'elapsed_seconds':round(time.monotonic()-started,2)}
 
 
 def verify_parallel_tool_turn(parts, id_mode, expected_count):
@@ -1030,9 +1035,126 @@ def verify_parallel_tools(request, wait_idle, base):
         require(status==200 and '本地TLS回复'.encode() in raw and len(Upstream.calls)==expected_requests,
             '工具回填失败或发生了额外模型发送：'+str(status)+' '+raw.decode()[:220])
         verify_parallel_tool_mapping(previous_count)
-        require(request(base+'generateContent',body)[0]==400 and len(Upstream.calls)==expected_requests,
-            '重复回填产生了额外模型发送')
-    return {'passed':True,'parallel_calls':2,'round_sizes':[6,4,3],'first_tool_sse':True,'model_calls':len(Upstream.calls)}
+        require(request(base+'generateContent',body)==(status,raw) and len(Upstream.calls)==expected_requests,
+            '并行工具重试产生额外模型发送或响应变化')
+        if len(counts)==1:
+            # 同样的初始历史可以启动独立原生请求。裸工具结果此时同时匹配两个归属。
+            second={**body,'contents':body['contents'][:1]}
+            status,raw=request(base+'streamGenerateContent?alt=sse',second,first_tool_frame=True)
+            require(status==200,'无法建立相同历史的新工具归属')
+            frame=[json.loads(line[6:]) for line in raw.splitlines() if line.startswith(b'data: ')][-1]
+            status,raw=request(base+'generateContent',body)
+            require(status==400 and b'AGY_TOOL_RESULT_MISMATCH' in raw and len(Upstream.calls)==expected_requests+1,
+                '另一个活跃归属被已缓存的响应覆盖')
+            parts=[part for part in frame['candidates'][0]['content']['parts'] if 'functionCall' in part]
+            replies=verify_parallel_tool_turn(parts,'explicit',2)
+            second['contents'].extend([{'role':'model','parts':parts},{'role':'user','parts':replies}])
+            status,raw=request(base+'generateContent',second)
+            wait_idle()
+            require(status==200 and '本地TLS回复'.encode() in raw and len(Upstream.calls)==expected_requests+2,
+                '指定真实调用 ID 后独立工具轮仍无法完成')
+    return {'passed':True,'parallel_calls':2,'round_sizes':[6,4,3],'first_tool_sse':True,
+        'ambiguous_replay_status':400,'model_calls':len(Upstream.calls)}
+
+
+def verify_tool_result_retries(request, wait_idle, base, database, request_ids):
+    """重现九条消息的重复回填。@param request 网关入口。@param wait_idle 原生排空。@param base 模型路径。@param database 测试库。@param request_ids 网关根 ID。@return 实际模型次数。"""
+    initial_count=len(Upstream.calls)
+    stream=base+'streamGenerateContent?alt=sse'
+    body={'contents':[
+        {'role':'user','parts':[{'text':'合成历史问题'}]},
+        {'role':'model','parts':[{'text':'合成历史回复'}]},
+        {'role':'user','parts':[{'text':'TLS_SYNTHETIC_TOOL_REPLAY'}]},
+    ], 'tools':[{'functionDeclarations':[{'name':'synthetic_tool','parameters':{
+        'type':'OBJECT','properties':{'x':{'type':'INTEGER'}}}}]}]}
+
+    def append_results(raw, count):
+        """按中转省略 ID 的形状追加工具结果。@param raw 首条工具 SSE。@param count 调用数。@return 本轮回填 Part。"""
+        frame=[json.loads(line[6:]) for line in raw.splitlines() if line.startswith(b'data: ')][-1]
+        parts=[part for part in frame['candidates'][0]['content']['parts'] if 'functionCall' in part]
+        replies=verify_parallel_tool_turn(parts,'ordered',count)
+        body['contents'].extend([{'role':'model','parts':parts},{'role':'user','parts':replies}])
+        return replies
+
+    for count in (1,1,4):
+        status, raw=request(stream,body,first_tool_frame=True)
+        require(status==200,'准备重复回填的前驱工具轮失败')
+        replies=append_results(raw,count)
+    require(len(body['contents'])==9,'重复回填必须覆盖 contents[8]')
+    marker='synthetic-replay-barrier'
+    replies[-1]['functionResponse']['response']['marker']=marker
+    entered, release=threading.Event(), threading.Event()
+    Upstream.held_requests[marker]=(entered,release)
+    replay_count_query=("SELECT COUNT(*) FROM request_diagnostics "
+        "WHERE json_extract(summary_json,'$.context.replay_of_request_id') IS NOT NULL")
+    previous_replays=database.execute(replay_count_query).fetchone()[0]
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first=pool.submit(request,stream,body,first_tool_frame=True)
+            try:
+                require(entered.wait(20),'四项回填未实际进入新模型')
+                concurrent=pool.submit(request,stream,body,first_tool_frame=True)
+                # 检查重试在解除真实上游阻塞前已绑定原根，而不是晚到后的缓存命中。
+                until=time.monotonic()+5
+                while time.monotonic()<until and not concurrent.done():
+                    if database.execute(replay_count_query).fetchone()[0]>previous_replays:
+                        break
+                    time.sleep(.03)
+                require(database.execute(replay_count_query).fetchone()[0]>previous_replays,
+                    '并发重试没有在原模型继续前关联同一生成')
+            finally:
+                release.set()
+            original=first.result(timeout=20)
+            require(original[0]==200,'首次四项回填失败')
+            observed=concurrent.result(timeout=20)
+            reordered=copy.deepcopy(dict(reversed(list(body.items()))))
+            result=reordered['contents'][8]['parts'][-1]['functionResponse']
+            result['response']=dict(reversed(list(result['response'].items())))
+            replay=request(stream,reordered,first_tool_frame=True)
+            require(observed==replay==original,
+                f'重复工具回填应接回原响应，并发状态 {observed[0]}，完成后状态 {replay[0]}')
+        replay_id=request_ids[-1]
+        until=time.monotonic()+5
+        source_id=None
+        while time.monotonic()<until:
+            status, raw=request('/admin/request-diagnostics/'+replay_id,admin=True)
+            if status==200:
+                detail=json.loads(raw)
+                source_id=detail['request']['context'].get('replay_of_request_id')
+                if source_id:
+                    break
+            time.sleep(.03)
+        require(source_id,'重试诊断缺少原生成关联')
+        require(status==200 and replay_id!=source_id and detail['request']['attempt_count']==0 and not detail['attempts'],
+            '重复请求的 HTTP 根或上游尝试诊断错误')
+        status, raw=request('/admin/request-diagnostics/'+source_id,admin=True)
+        detail=json.loads(raw)
+        require(status==200 and detail['request']['attempt_count']==1 and len(detail['attempts'])==1,
+            '原接续轮缺少唯一模型尝试')
+        changed=copy.deepcopy(body)
+        changed['contents'][-1]['parts'][0]['functionResponse']['response']['value']=-1
+        for payload, key in ((changed,'synthetic-key'),(body,'synthetic-other')):
+            status,raw=request(stream,payload,token=key)
+            require(status==400 and b'AGY_TOOL_RESULT_MISMATCH' in raw,'不同结果或令牌接回了私有响应')
+        with database:
+            database.execute("UPDATE api_tokens SET blocked_accounts='1' WHERE token='synthetic-key'")
+        try:
+            require(request(stream,body)[0]==400,'撤销账号权限后仍可接回响应')
+        finally:
+            with database:
+                database.execute("UPDATE api_tokens SET blocked_accounts='' WHERE token='synthetic-key'")
+        require(len(Upstream.calls)==initial_count+4,'重复回填产生了新模型提交')
+        verify_parallel_tool_mapping(6)
+        append_results(original[1],2)
+        status,raw=request(base+'generateContent',body)
+        wait_idle()
+        require(status==200 and '本地TLS回复'.encode() in raw and len(Upstream.calls)==initial_count+5,
+            '重复响应的下一轮工具调用无法回填')
+        require(request(base+'generateContent',body)==(status,raw) and len(Upstream.calls)==initial_count+5,
+            '普通 JSON 重试产生了新生成或变更结果')
+    finally:
+        Upstream.held_requests.pop(marker,None)
+    return len(Upstream.calls)-initial_count
 
 
 def verify_shared_models(request, request_ids, wait_idle):
@@ -1160,9 +1282,9 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
             command=['/opt/verify-lib/ld-linux-x86-64.so.2','--library-path','/opt/verify-lib',executable]
         children.append(subprocess.Popen(command,stdout=output,stderr=subprocess.STDOUT))
     request_ids=[]
-    def request(path,body=None,admin=False,first_tool_frame=False):
-        """通过真实公共 HTTP 执行一次请求。@param path 路径。@param body Gemini 正文。@param admin 是否管理调用。@param first_tool_frame 是否在首条工具事件后退出。@return 状态与正文。"""
-        headers={'x-api-key':'synthetic-admin' if admin else 'synthetic-key','content-type':'application/json'}
+    def request(path,body=None,admin=False,first_tool_frame=False,token='synthetic-key'):
+        """通过真实公共 HTTP 执行一次请求。@param path 路径。@param body Gemini 正文。@param admin 是否管理调用。@param first_tool_frame 是否在首条工具事件后退出。@param token 合成入口令牌。@return 状态与正文。"""
+        headers={'x-api-key':'synthetic-admin' if admin else token,'content-type':'application/json'}
         if not admin:headers['X-Synthetic-Ingress']='never-upstream'
         value=Request('http://127.0.0.1:5674'+path,data=json.dumps(body).encode() if body is not None else None,headers=headers,
             method='PUT' if body is not None and (path=='/admin/settings' or path.startswith('/admin/accounts/')) else None)
@@ -1205,6 +1327,8 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
                 (json.dumps({'capabilities':{'model_mappings':Upstream.model_mappings}}),))
             database.execute("INSERT INTO account_credential_states(account_id,generation,phase,updated_at_ms) VALUES(1,1,'ready',1)")
             database.execute("INSERT INTO api_tokens(name,token,allowed_accounts,status) VALUES('synthetic','synthetic-key','1','active')")
+            if parallel_tools:
+                database.execute("INSERT INTO api_tokens(name,token,allowed_accounts,status) VALUES('other','synthetic-other','1','active')")
             if live_capacity:
                 database.execute('UPDATE accounts SET concurrency=3 WHERE id=1')
         require(request('/admin/settings',{'request_diagnostics_log_mode':'debug'},admin=True)[0]==200,'测试日志模式设置失败')
@@ -1218,6 +1342,7 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
             return result
         if parallel_tools:
             result=verify_parallel_tools(request,wait_idle,base)
+            result['replay_model_calls']=verify_tool_result_retries(request,wait_idle,base,database,request_ids)
             database.close()
             return result
         if tool_deadlines:
@@ -1317,7 +1442,7 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
             database.execute("UPDATE accounts SET access_token='synthetic-at-2' WHERE id=1")
         status,raw=request(base+'generateContent',continuation)
         require(status==200,'固定原版工具新代续轮失败：'+str(status)+' '+raw.decode()[:500])
-        require(request(base+'generateContent',continuation)[0]==400,'重复工具回填被接纳')
+        require(request(base+'generateContent',continuation)==(status,raw),'重复工具回填未返回原响应')
         require(len(Upstream.calls)==4,'原生业务发生额外模型提交')
         require([call['authorization'] for call in Upstream.calls]==['Bearer synthetic-at-1']*3+['Bearer synthetic-at-2'],'原生AT代次错误')
         for call in Upstream.calls:
@@ -1385,7 +1510,7 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
             'synthetic_native_model_submissions':len(Upstream.calls),'credential_generations':[1,2],
             'cgroup_memory':state['agy']['cgroup_memory'],
             'checks':['公共Gemini非流式与SSE','原版TLS与证书校验','源响应及usage','实际出站参数','原生MCP结果回填',
-                'concurrency=1新代续轮','重复回填拒绝','64个重复源帧','截断及容量错误终态','控制 HTTP 500 原样交付','公共断连取消原生上游','真实收口及账号许可释放']}
+                'concurrency=1新代续轮','重复回填复用原响应','64个重复源帧','截断及容量错误终态','控制 HTTP 500 原样交付','公共断连取消原生上游','真实收口及账号许可释放']}
     finally:
         for child in children:
             child.terminate()

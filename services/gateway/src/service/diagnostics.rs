@@ -185,6 +185,25 @@ impl TraceContext {
         self.state.lock().unwrap_or_else(|error| error.into_inner())
     }
 
+    /// 为重试保留本地 HTTP 根和原生成关联，零次上游尝试。
+    /// @param account_id 原账号。@param request_id 原生成根。@return 无。
+    pub(super) fn agy_replayed(&self, account_id: i64, request_id: &str) {
+        let mut state = self.lock();
+        state.local_outcome = Some("cache_hit");
+        state.request.account_id = Some(account_id);
+        state.request.error_stage = Some("tool_continuation".into());
+        if let Some(context) = state.request.context.as_mut() {
+            context.replay_of_request_id = Some(request_id.to_owned());
+        }
+        drop(state);
+        self.emit(None);
+    }
+
+    /// SSE 已发头时保留原响应的失败终态。@return 无。
+    pub(super) fn agy_replay_failed(&self) {
+        self.lock().local_outcome = Some("incomplete");
+    }
+
     fn save_rejected_ingress(
         &self,
         state: &mut TraceState,
@@ -894,7 +913,7 @@ impl RequestTraceGuard {
             AppError::TooManyRequests(_) => "admission",
             AppError::AgyUpstreamQuota => "upstream_model",
             AppError::AgyControl(_) => "native_control",
-            AppError::AgyToolTurnFailed => "tool_continuation",
+            AppError::AgyToolTurnFailed | AppError::AgyToolReplayUnavailable => "tool_continuation",
             AppError::BadGateway(_) => "transport",
             // 503 可来自凭据、环境或原生准备，具体阶段由失败边界记录。
             AppError::ServiceUnavailable(_) => "gateway",
