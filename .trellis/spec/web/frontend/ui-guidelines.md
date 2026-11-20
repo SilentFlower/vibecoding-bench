@@ -19,8 +19,8 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 | 组件 | 输入与事件 | 使用范围 |
 | --- | --- | --- |
-| `NumberInput` | `modelValue?: number \| string`，`label: string`，`id?`，`min?`，`max?`，`step?: number = 1`，`disabled?`，`readonly?`，`invalid?`；`update:modelValue(number \| string)` | 并发、RPM、百分比、端口、TTL等数值 |
-| `ChoiceSelect` | `modelValue?: string`，`options: readonly ChoiceOption[]`，`label`，`name?`，`placeholder?`，`disabled?`，`required?`，`invalid?`，`portalTarget?: HTMLElement \| string`；`update:modelValue(string)` | 有限枚举单选，如认证、Billing、订阅类型 |
+| `NumberInput` | `modelValue?: number \| string`，`label: string`，`id?`，`min?`，`max?`，`step?: number = 1`，`disabled?`，`readonly?`，`invalid?`；`update:modelValue(number \| string)`；`label-extra` 插槽 | 并发、RPM、百分比、端口、TTL等数值 |
+| `ChoiceSelect` | `modelValue?: string`，`options: readonly ChoiceOption[]`，`label`，`name?`，`placeholder?`，`disabled?`，`required?`，`invalid?`，`portalTarget?: HTMLElement \| string`；`update:modelValue(string)`；`label-extra` 插槽 | 有限枚举单选，如认证、Billing、订阅类型 |
 | `InfoTooltip` | `label: string`，`title?`，`delay?: number = 150`，`portalTarget?`；`trigger`插槽与默认内容插槽 | 只读完整统计、字段口径说明 |
 | `SearchInput` | `modelValue: string`，`label`，`placeholder?`，`disabled?`；`update:modelValue(string)`、`search(string)` | 列表或会话搜索，业务方决定请求时机 |
 
@@ -56,7 +56,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 `ChoiceOption = { value: string; label: string; disabled?: boolean }`。同一菜单的 `value` 必须唯一。空字符串是合法的业务选项值；`undefined` 表示尚未选择。
 
-`NumberInput` 的 `name`、`required`、`aria-describedby` 等原生属性透传到内部输入框。`SearchInput` 同样向内部输入框透传原生属性。调用方负责业务字段规整与提交，不在控件内部请求 API。
+`NumberInput` / `ChoiceSelect` 的 `label-extra` 插槽（如「已修改」徽标）渲染在 `<label>` 元素之后的 `.fui-label-row` 内（flex，间距 3px，最小高 22px，徽标出现不跳动），不进入控件的无障碍名称；未传插槽时结构不变。`NumberInput` 的 `name`、`required`、`aria-describedby` 等原生属性透传到内部输入框。`SearchInput` 同样向内部输入框透传原生属性。调用方负责业务字段规整与提交，不在控件内部请求 API。
 
 原生/静态稿当前复用入口：`renderNumberControl()`、`renderChoiceSelect(name, label, options, value, compact=false, searchable=false)`、`showUsageBubble()`、`renderDateTimeControl(name, label, value)`、`refreshDateControl(input)`。原生页面保持自身渲染和事件清理模式，不通过复制 Vue 的生命周期实现复用。
 
@@ -158,7 +158,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 ### 系统设置表单与草稿
 
 - `.settings-inline-note` 统一使用块级布局，链接与段落共享顶部分隔线和垂直间距；行内链接的顶部边框会覆盖上一行说明。`verify_session_policy_blocks_ui.py` 在390/1440/1920/2560px断言封禁记录链接的边框顶部不小于时长说明底部，避免仅检查 `text-decoration:none` 漏掉相邻元素覆盖。
-- 以现有 `Settings.vue::saveSettings` 的真实键集合核对完整性，按用途分组。新增分组或换肤不能删除字段、访问预设或预热记录入口。
+- 以现有 `Settings.vue::saveSettings` 的真实键集合核对完整性，按用途分组。保存载荷为 `fieldBindings` 全部键（`settingsSchema` 57 项加会话封禁 2 项，共 59，与页头「59 项配置」一致）；新增字段时同步 `verify_remaining_pages.py` 的计数断言。新增分组或换肤不能删除字段、访问预设或预热记录入口。
 - 静态实现使用 `settingsFields` 定义控件与约束，`settingsSaved` / `settingsDraft` 分别维护已保存值和草稿。搜索、分类切换与页面往返保留草稿，保存栏显示全局待保存项数。
 - 所有设置提交值规整为字符串；数字清空保留空值并在保存时校验。非法字段定位到实际分类，搜索条件清空后让错误控件可见。
 - 依赖项禁用只阻止编辑，不清除已有值：Hello探测关闭后保留严格模式/TTL；后台分类为mock时保留身份注入开关，切回放行后恢复。
@@ -218,7 +218,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - 反重力账号卡片和账号概览展示固定的本机 API 执行归属。名称读取 `/runtime/api/nodes` 中 `kind=local` 的节点。目录暂不可用时保留已取得的名称，首次读取失败时显示「默认本机」。Claude Code 账号继续按任务账号绑定及缓存观察展示。浏览器回归覆盖无任务账号绑定的反重力、本机名称、读取失败、详情和节点管理跳转。
 - 账号与环境卡片使用 `PlatformBadge(platform)` 独立标注 Claude Code／反重力，分别为棕色／蓝色，套餐独立展示。请求列表使用发生时 `context.platform`，缺失显示“平台未记录”；账号名称单行省略，资料气泡保留完整名称和邮箱。`verify_execution_node_visibility.py` 覆盖三入口跳转、历史节点、平台未知、顶部独立控制、提示框关闭与1440/720/390px布局。
 
-- 节点管理导航和卡片使用共用SVG sprite的i-server；运行环境继续使用i-box。节点页先显示汇总和紧凑服务器卡片，账号归属/迁移区保持原确认与轮询。页头使用 `PageHeader`，页面留白由 console-content 统一提供；卡片、辅助文字和资源数字使用ui-font-card/ui-font-small/ui-font-heading，沿390/1440/1920/2560px核对与账号页的页头计算样式及坐标一致。主机指纹、认证方式、路径及批次收进详情；同批已就绪节点隐藏相同来源到目标的箭头。stopping显示停止原组件，旧协议backed_up显示已停止待切换。
+- 节点管理导航和卡片使用共用SVG sprite的i-server；运行环境继续使用i-box。节点页先显示概览卡和节点实体卡，账号归属/迁移区保持原确认与轮询（第二版合同见下方「第二版节点管理与系统设置」）。主机指纹、认证方式、路径及批次收进详情；同批已就绪节点隐藏相同来源到目标的箭头。stopping显示停止原组件，旧协议backed_up显示已停止待切换。
 
 - `apps/web/src/style.css` 保留旧层主题变量名（过渡期冻结）；外壳为第二版白色侧栏与浅色内容区（`console-shell.css`）。字体来自 `src/assets/fonts/` 中的本地 WOFF2，许可一并保留；离线导出须把同源字体内嵌，不能依赖构建目录外链。
 - `Dashboard.vue` 在品牌旁保留 `/updates` 入口：普通点击打开系统更新弹窗、地址不变，按住修饰键在新标签打开 `/updates`（见「系统更新弹窗」节）。版本优先使用 `usePlatformVersion` 读取的当前控制镜像版本；旧端回退到已验签目录精确匹配的current_release，缺省显示“版本”。移动入口缺省显示“系统更新”。桌面折叠位于管理员区域，偏好键为 `flower2api-sidebar-collapsed`，存储失败仍保持本次会话选择。移动导航保留原七个模块。
@@ -239,6 +239,12 @@ import type { ChoiceOption } from '@/components/ui/controls';
   - 令牌页：名称搜索只过滤已读取的令牌，计数「m / N 个令牌」，无结果「没有匹配的令牌」；启停为 `Switch`（名称「{令牌名}启用状态」）。`AccountScopePicker` 样式在 `tokens.css`。
   - 定位契约（脚本与组件逻辑依赖，只改样式）：`.request-records`（表头 9 个 `th`、详情关闭时页面只有一个 `tbody`）、`.request-extra`、`.request-account-identity`（内容恰为账号名）、`.request-workspace`（`InfoTooltip` 的 `portal-target`）、`request-tab-* / request-panel-*`、`data-request-copy`、`.request-definitions`、`.request-attempt-summary`、`.request-chain-card`、`.request-performance-card`、`.request-token-metrics`、`[data-native-stages]` 及 `NativeStageDetails` 的 `request-*` 类；`.proxy-page`、`.proxy-panel`、`tr[data-proxy-id]`、`.proxy-row-actions`、`.proxy-user-chips`、`.proxy-expand`、`.proxy-expanded`、`.proxy-account-identity`、`.proxy-editor`；`tr.token-row`、`.approved-token-editor`、`.token-name`；`.session-block-panel`、`.session-block-records[aria-busy]`、`.session-block-empty`、`tr[data-block-id]`。
   - ≤760px：请求表只留时间、账号、结果、操作；代理表只留线路、到期、操作，状态徽标与可点击的使用摘要 `.proxy-mobile-usage` 移到线路名称下方，后者是展开使用账号的入口（使用情况列收起后不能丢失该入口），行操作只显示图标、文字留给读屏；令牌表隐藏可用账号与创建时间（范围移到名称下）；封禁表隐藏令牌、封禁时间与本地拦截（补充行显示在首列与状态列）。单元格改为可换行、高度随内容，页面无横向滚动。
+- **第二版节点管理与系统设置（`src/nodes.css` 由 `Nodes.vue` 引入，承载 `AccountNodeSelector` / `AccountNodeMigration` 与两个节点弹窗；`src/settings.css` 由 `Settings.vue` 引入，替代已删除的 `settings-design.css`；均为 `@layer components`，只取 token）**：
+  - 节点概览卡（`OverviewGrid.nodes-overview`，全部由已读取的节点列表计算）：节点（说明「N 台本机 · N 台远程」）、远程服务器（远程节点中待处理数 >0 为「N 台待处理」，否则「全部正常」，无远程节点为「尚未添加」）、归属账号（`totalAccounts`，反重力归属读取失败为「—」）、待处理。待处理按 `attention(node)` 每台只计一类原因：有 `removal` 时仅 `needs_check` 计「移除待重试」；`enabled=false` 不计；无观测、`stale` 或 `unreachable` 计「需检查连接」；`preparation.state` 为 `failed / needs_check` 计「组件异常」。说明行只有一类原因时为「需检查连接 / 组件同步异常 / 移除待重试」，多类时按该顺序「N 台需检查连接 · N 台组件异常 · N 台移除待重试」，为 0 时「全部正常」；说明允许换行。
+  - 节点卡为 `EntityCard.node-card`（`IconTile size=lg`；远程副标题 `.node-address` 等宽），状态文案沿 `state()` 不变，徽标 `Badge dot` 色调 `stateVariant(node)`：连接正常 success；待检查、观测已过期 warning；连接异常、移除待重试 destructive；移除中 info；已暂停接单、已移除 secondary。资源 `dl.node-resources` 四列（「未采集」为 `.is-empty` 弱化色），最近检查 / Docker / 运行组件在 `EntityBlock.node-meta`（用 `span / time / b`，不用 `dd`，卡内 `dd` 末项保持「归属账号」）。操作为 `.node-actions` 一行 `Button size=sm`（不用等分底栏），「改名」ghost、「移除」`destructive-ghost` 靠右；按钮名称与禁用条件不变。添加 SSH 节点 `ModalDialog` 640（`form#node-editor-form`），修改名称 420（`form#node-rename-form`；说明取打开时冻结的 `renameAddress`——`ModalDialog` 关闭淡出期间内容仍在渲染，从已清空的 `renaming` 用模板字符串拼接会显示 `undefined@undefined:undefined`），保存中不可关闭靠 `show-close-button`、`escape-key-down`、`interact-outside` 透传到弹窗面板。
+  - 设置页：搜索框（`.settings-header-tools > .fui-search`，宽 320；`SearchInput` 的 class 落在内部 input 上，宽度规则须写在包装元素上）与「N 项配置」（`.settings-total`）在页头操作区；分类导航 `.system-settings-nav` 选中项为表面色加卡片阴影，有待保存字段的分类尾部 `em.is-dirty`（琥珀色，`aria-hidden`，分类按钮名称保持分类名），预热记录尾部为条数；分类模式没有工作区标题行，搜索时显示 `.settings-search-result`「搜索结果 · 找到 N 项配置」，段落卡头部带 `Badge.settings-result-category`。段落卡头部为 `IconTile size=lg` + h3 + 说明。被修改字段（`dirtyKeys`）在标签行显示 `Badge warning`「已修改」：数字与下拉用 `label-extra` 插槽，文本 / 文本域为 `label for="setting-{key}"` + 徽标，布尔字段为标签 + `Switch :label="field.label"`（`id="setting-{key}"`，点击标签可切换）。预设按钮为 `Button size=sm variant=soft`。预热记录结果为 `Badge dot`：成功 success、跳过 secondary、失败 destructive。
+  - 定位契约（脚本与组件逻辑依赖，只改样式）：`.node-card`、`.node-state`、`.node-actions`、`.node-editor`、`.node-rename`、`.account-node-selector`、`.node-migration`、`.migration-status`；`.system-settings-nav`、`.settings-total`、`.settings-section-card`、`.settings-save-bar`、`.settings-prime-records`、`.setting-help`、`.setting-error`、`[data-settings-field]`、字段 `name`。
+  - ≤760px：节点卡单列，资源保持四列，按钮行换行；设置页搜索框占满内容宽，分类导航横向滚动，字段单列；页面无横向滚动。概览卡沿用组件库断点。
 - 验证入口：`deploy/flower2api/verify_account_page_design.py` 对设计稿 `#accounts`、`#account-edit`、`#mobile` 逐项比对计算样式并覆盖首屏、健康条、工作区外框与移动端搜索行；`deploy/flower2api/verify_accounts_design.py`，覆盖真实Vue组件与合成管理接口的字段保存、取消、分页、OAuth、调度筛选、费用气泡、字体、侧栏和1440/720/390px布局；沿用管理/环境/导航回归。
 
 ### 预览状态与连续操作合同
@@ -316,6 +322,7 @@ python3 deploy/flower2api/verify_ui_kit.py --url http://127.0.0.1:4187/ui-previe
 python3 deploy/flower2api/verify_ui_shell.py
 python3 deploy/flower2api/verify_account_page_design.py
 python3 deploy/flower2api/verify_records_pages_design.py
+python3 deploy/flower2api/verify_nodes_settings_design.py
 node --experimental-strip-types --test apps/web/tests/update-steps.test.mjs
 python3 deploy/flower2api/verify_update_design.py
 python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录>
@@ -326,6 +333,7 @@ python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录
 - `verify_ui_shell.py`（需先构建）：真实构建加合成夹具，1440 下侧栏、品牌行、版本号两态、导航、计数徽标、底部区、内容区与页头对 `mock.html#accounts` 逐项比对；8 个页面页头无分组名且样式一致；系统设置保存栏比对与「1 项待保存 / 配置已同步」；折叠保持、1440×560 导航内部滚动；390 应用栏比对、抽屉贴左铺满并在导航后关闭；登录页对 `v1/mock.html#login` 比对及空密码、错误密码、成功、显示密码四条路径；零控制台错误。
 - `verify_account_page_design.py`（需先构建）：`InteractionFixture` 的 13 个账号（第 4–6 号设为限流、认证错误、停用）。1440×900 对 `#accounts`、`#account-edit` 比对 79 项计算样式（白名单：设计稿 `.acc-name span` 误命中徽标的文字色与字号、99px 全圆）；三列、间距 16、首行三张卡片操作栏底边 ≤ 900；健康条四种色调与 36px；工作区 820 视口居中、滚动内容区时页签带不动、切换页签外框不变、新建无页签带；授权登录 440；390 对 `#mobile` 比对，搜索行展开、聚焦、有搜索词时不收起，其它页面无搜索按钮；零控制台错误；设计稿未画的画面截图存 `--output`。
 - `verify_records_pages_design.py`（需先构建）：`RemainingPagesFixture`（第 2 条代理已过期、第 3 条未设到期）与 `BlockFixture`。1440×900 对 `#requests`、`#proxies`、`#tokens`、`#blocks` 比对 63 项计算样式（白名单：99px 全圆开关）；日志卡点击写 PUT、保存中禁用与新值；快捷分段 `outcome=errors`；详情抽屉宽 1020、上右下 14px、面板 `overflow:hidden` 而 `.fui-modal-body` 滚动、四个页签切换外框不变；代理第 4 卡 19 /「另有 1 条已过期」与旧网关缺字段时「—」；代理编辑 680 居中、令牌编辑 760；令牌名称搜索无结果；封禁四段计数与切换；四页 390 无横向滚动及保留列数（请求 4、代理 3、令牌 4、封禁 3），代理 390 点击使用摘要后展开行与账号入口可见；零控制台错误；截图存 `--output`（默认 `.deploy/console-ui-revamp/records/verify`）。
+- `verify_nodes_settings_design.py`（需先构建）：1440×900 对 `#nodes`、`#settings` 逐项比对 55 组计算样式（白名单为空）；`StatesFixture` 八种节点状态断言待处理为 5、说明「3 台需检查连接 · 1 台组件异常 · 1 台移除待重试」、远程服务器「5 台待处理」与各状态徽标色，单节点时为「全部正常 / 尚未添加」；节点添加 640、改名 420 居中，改名按 Escape 后淡出期间说明始终为原地址；设置页修改数字与开关后「已修改」、分类计数与保存栏计数递增，撤销清零且零写入，搜索结果行与分类标签、草稿保留、搜索空态、预热记录；两页 390 无横向滚动、节点卡单列、设置搜索满宽与导航横向滚动；零控制台错误。截图在 `.deploy/console-ui-revamp/nodes-settings/verify/`。
 - `update-steps.test.mjs`：正向含迁移、维护中进行中与待执行、越过取消边界的切换合并、无快照部署、恢复路径、旧操作无 `steps`、未知阶段、截断记录。
 - `verify_update_design.py`、`verify_system_update_browser.py`（需先构建）：前者对设计稿 `#update`、`#update-progress` 比对 45 项计算样式并检查说明展开、转义与零写入；后者覆盖版本记录与嵌套确认 Esc、居中与矮视口、直接安装默认 60 秒 / 30 分钟 1800 秒 / 双击幂等、步骤与时间、断线重连、快照与迁移、数据恢复、完成与刷新、409、未接入、回退与取消等待、等待对账与恢复。
 - 迁移期改造旧原型对比脚本：组件库负责的属性在脚本内用 `component_keys`（采样名 → 属性集合）跳过，并注明已由 `verify_ui_kit.py` 覆盖；页面级属性继续与旧原型比对。写死的组件颜色改为在被测节点内插入探针元素读取 token 实际渲染值（`verify_shared_pagination.py::token`），不得把旧色值改成新色值再写死。业务断言不放宽。外壳尺寸（侧栏宽、内容区边距）推算出的页面宽度断言改为读取实际值（如卡片区铺满 `#console-content` 内容宽度、右边距等于其实际 `padding-right`），外壳本身由 `verify_ui_shell.py` 对照设计稿核对。

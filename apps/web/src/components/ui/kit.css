@@ -52,6 +52,8 @@
   .fui-field, .fui-search, .fui-info-content, .fui-choice-menu, .fui-info-trigger, .fui-calendar { font-family: var(--ui-font-family); }
   .fui-field { min-width: 0; display: grid; align-content: start; gap: calc(var(--ui-space-unit) * 1.75); }
   .fui-label { font-size: var(--ui-font-size-sm); font-weight: 700; line-height: 1.55; color: var(--ui-color-text-2); }
+  /* 标签行与徽标同高（22px），徽标出现或消失时字段不跳动。 */
+  .fui-label-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px calc(var(--ui-space-unit) * .75); min-width: 0; min-height: 22px; }
   .fui-field-help { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 500; line-height: 1.55; }
   .fui-number, .fui-choice, .fui-search, .fui-date-trigger { display: flex; align-items: center; min-width: 0; width: 100%; min-height: var(--ui-control-md); border: 0; border-radius: var(--ui-radius-control); background: var(--ui-color-fill); color: var(--ui-color-text); font-size: var(--ui-font-size-md); transition: background-color .15s, box-shadow .15s; }
   .fui-number:hover:not(:focus-within), .fui-choice:hover:not([data-state=open]):not(:disabled), .fui-search:hover:not(:focus-within), .fui-date-trigger:hover:not([data-state=open]):not(:disabled) { background: var(--ui-color-fill-hover); }

@@ -6,12 +6,17 @@ import { Button } from './ui/button';
 import { PageHeader } from './ui/page-header';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { Server, Plus, RefreshCw, ShieldCheck, Trash2, Pencil } from './ui/icon';
+import { Server, Plus, RefreshCw, ShieldCheck, Trash2, Pencil, Globe, Users, AlertCircle } from './ui/icon';
 import { ChoiceSelect, NumberInput } from './ui/controls';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
+import { ModalDialog } from './ui/modal';
+import { OverviewCard, OverviewGrid } from './ui/overview';
+import { EntityBlock, EntityCard } from './ui/entity-card';
+import { IconTile } from './ui/icon-tile';
+import { Badge } from './ui/badge';
 import { ConfirmationDialog } from './ui/feedback';
 import { nodeApi, type ExecutionNode, type NodeHostKey } from './runtime/nodeApi';
 import AccountNodeSelector from './runtime/AccountNodeSelector.vue';
+import '../nodes.css';
 
 const { show: toast } = useToast();
 const rows = ref<ExecutionNode[]>([]), loading = ref(false), error = ref('');
@@ -27,6 +32,8 @@ const authenticationOptions = [{ value: 'private_key', label: 'SSH 私钥' }, { 
 const keys = ref<NodeHostKey[]>([]), deleting = ref<ExecutionNode | null>(null), deleteError = ref('');
 const installing = ref<ExecutionNode | null>(null), installError = ref('');
 const renaming = ref<ExecutionNode | null>(null), newName = ref(''), renameError = ref('');
+// 关闭淡出期间 renaming 已清空，说明沿用打开时的地址，避免显示空字段。
+const renameAddress = ref('');
 const options = computed(() => keys.value.map(key => ({ value: key.key, label: `${key.algorithm} · ${key.sha256}` })));
 const selectedFingerprint = computed(() => keys.value.find(key => key.key === selectedKey.value)?.sha256);
 let alive = true, loadGeneration = 0, probeGeneration = 0;
@@ -90,6 +97,40 @@ function accountCount(node: ExecutionNode): number | string {
 }
 const totalAccounts = computed(() => agyAccounts.value === null ? '—'
   : rows.value.reduce((total, node) => total + node.account_count, agyAccounts.value.length));
+type Attention = 'connection' | 'component' | 'removal';
+/** 待处理原因的单独说明与计数说明，顺序即说明行顺序。 */
+const attentionLabels: Record<Attention, [string, string]> = {
+  connection: ['需检查连接', '台需检查连接'], component: ['组件同步异常', '台组件异常'], removal: ['移除待重试', '台移除待重试'],
+};
+/**
+ * 需管理员处理的原因，按 state() 的判定顺序取第一类。暂停接单是主动操作，同步中、移除中仍在后台推进，均不计入。
+ * @param node 节点。@return 原因；无需处理时为 null。
+ */
+function attention(node: ExecutionNode): Attention | null {
+  if (node.removal) return node.removal.state === 'needs_check' ? 'removal' : null;
+  if (!node.enabled) return null;
+  if (!node.observation || node.observation.stale || node.observation.state === 'unreachable') return 'connection';
+  return node.preparation?.state === 'failed' || node.preparation?.state === 'needs_check' ? 'component' : null;
+}
+const remoteNodes = computed(() => rows.value.filter(node => node.kind === 'ssh'));
+const attentionNodes = computed(() => rows.value.filter(node => attention(node)));
+/** 只有一类原因时直接写原因，多类时逐类计数。 */
+const attentionCaption = computed(() => {
+  const counts = new Map<Attention, number>();
+  for (const node of attentionNodes.value) {
+    const reason = attention(node)!;
+    counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  }
+  if (!counts.size) return '全部正常';
+  if (counts.size === 1) return attentionLabels[[...counts.keys()][0]!][0];
+  return (Object.keys(attentionLabels) as Attention[]).filter(reason => counts.has(reason))
+    .map(reason => `${counts.get(reason)} ${attentionLabels[reason][1]}`).join(' · ');
+});
+const remoteCaption = computed(() => {
+  if (!remoteNodes.value.length) return '尚未添加';
+  const count = remoteNodes.value.filter(node => attention(node)).length;
+  return count ? `${count} 台待处理` : '全部正常';
+});
 /** 地址变化使旧公钥确认失效。@return 无。 */
 function resetProbe(): void {
   probeGeneration++; probeRequest?.abort(); probing.value = false;
@@ -143,7 +184,7 @@ async function operate(node: ExecutionNode, operation: 'check' | 'enable'): Prom
 }
 /** 打开改名表单并冻结当前配置版本。@param node 当前节点。@return 无。 */
 function openRename(node: ExecutionNode): void {
-  newName.value = node.name; renameError.value = ''; renaming.value = node;
+  newName.value = node.name; renameError.value = ''; renameAddress.value = `${node.username}@${node.host}:${node.port}`; renaming.value = node;
 }
 /** 保存节点显示名称。@return 更新完成。 */
 async function rename(): Promise<void> {
@@ -228,6 +269,13 @@ function state(node: ExecutionNode): string {
   if (node.observation.stale) return '观测已过期';
   return node.observation.state === 'reachable' ? '连接正常' : '连接异常';
 }
+/** 状态徽标色调，与 state() 的判定顺序一致：待检查与观测过期为琥珀色。@param node 节点。@return Badge 变体。 */
+function stateVariant(node: ExecutionNode): 'success' | 'warning' | 'destructive' | 'info' | 'secondary' {
+  if (node.removal) return ({ removing: 'info', needs_check: 'destructive', completed: 'secondary' } as const)[node.removal.state];
+  if (!node.enabled) return 'secondary';
+  if (!node.observation || node.observation.stale) return 'warning';
+  return node.observation.state === 'reachable' ? 'success' : 'destructive';
+}
 onMounted(refresh);
 onUnmounted(() => { alive = false; loadGeneration++; if (refreshTimer) clearTimeout(refreshTimer); listRequest?.abort(); agyRequest?.abort(); resetProbe(); privateKey.value = ''; password.value = ''; });
 </script>
@@ -237,55 +285,68 @@ onUnmounted(() => { alive = false; loadGeneration++; if (refreshTimer) clearTime
     <PageHeader title="节点管理" description="管理执行服务器、组件状态与账号运行位置。"><template #actions><div class="nodes-actions"><Button variant="outline" :disabled="synchronizing" @click="synchronize">{{ synchronizing ? '提交中…' : '同步全部节点' }}</Button><Button variant="outline" :disabled="loading" @click="refresh"><RefreshCw :size="16" />刷新列表</Button><Button @click="setEditor(true)"><Plus :size="16" />添加节点</Button></div></template></PageHeader>
     <p v-if="error" class="nodes-error" role="alert">{{ error }}</p>
     <p v-if="agyError" class="nodes-error" role="alert">{{ agyError }}</p>
-    <p v-if="loading && !rows.length" role="status">正在读取节点…</p>
-    <div v-if="rows.length" class="nodes-summary"><span><strong>{{ rows.length }}</strong> 个节点</span><span><strong>{{ rows.filter(node => node.kind === 'ssh').length }}</strong> 台远程服务器</span><span><strong>{{ totalAccounts }}</strong> 个归属账号</span></div>
+    <p v-if="loading && !rows.length" class="nodes-loading" role="status">正在读取节点…</p>
+    <OverviewGrid v-if="rows.length" class="nodes-overview">
+      <OverviewCard label="节点" :value="rows.length" :caption="`${rows.length - remoteNodes.length} 台本机 · ${remoteNodes.length} 台远程`"><template #icon><Server /></template></OverviewCard>
+      <OverviewCard label="远程服务器" :value="remoteNodes.length" :caption="remoteCaption" tone="info"><template #icon><Globe /></template></OverviewCard>
+      <OverviewCard label="归属账号" :value="totalAccounts" caption="已分配执行位置" tone="success"><template #icon><Users /></template></OverviewCard>
+      <OverviewCard label="待处理" :value="attentionNodes.length" :caption="attentionCaption" tone="warning"><template #icon><AlertCircle /></template></OverviewCard>
+    </OverviewGrid>
     <div class="nodes-grid">
-      <article v-for="node in rows" :key="node.id" class="node-card">
-        <header><span class="node-icon"><Server :size="20" /></span><div><h2>{{ node.name }}</h2><p>{{ node.kind === 'local' ? '默认本机节点' : `${node.username}@${node.host}:${node.port}` }}</p></div><span class="node-state" :class="{ failed: node.observation?.state === 'unreachable', muted: !node.enabled || node.observation?.stale }">{{ state(node) }}</span></header>
-        <dl class="node-resources"><div><dt>CPU</dt><dd>{{ node.observation?.host_cpus ?? '未采集' }}<small v-if="node.observation?.host_cpus != null"> 核</small></dd></div><div><dt>可用内存</dt><dd>{{ bytes(node.observation?.memory?.MemAvailable) }}</dd></div><div><dt>可用磁盘</dt><dd>{{ bytes(node.observation?.disk_available_bytes) }}</dd></div><div><dt>归属账号</dt><dd>{{ accountCount(node) }}</dd></div></dl>
-        <p v-if="node.observation?.reason" class="nodes-error" role="status">{{ node.observation.reason }}</p>
-        <div class="node-meta"><span>最近检查</span><time>{{ node.observation && node.observation.observed_at > 0 ? new Date(node.observation.observed_at * 1000).toLocaleString('zh-CN') : '尚未检查' }}</time><span>Docker</span><span>{{ node.observation?.docker_version ?? '未采集' }}</span><template v-if="node.kind === 'ssh'"><span>运行组件</span><span>{{ preparationState(node) }}</span></template></div>
+      <EntityCard v-for="node in rows" :key="node.id" class="node-card" :title="node.name">
+        <template #media><IconTile size="lg"><Server /></IconTile></template>
+        <template #subtitle><span :class="{ 'node-address': node.kind === 'ssh' }">{{ node.kind === 'local' ? '默认本机节点' : `${node.username}@${node.host}:${node.port}` }}</span></template>
+        <template #status><Badge dot :variant="stateVariant(node)" class="node-state">{{ state(node) }}</Badge></template>
+        <dl class="node-resources">
+          <div><dt>CPU</dt><dd :class="{ 'is-empty': node.observation?.host_cpus == null }">{{ node.observation?.host_cpus != null ? `${node.observation.host_cpus} 核` : '未采集' }}</dd></div>
+          <div><dt>可用内存</dt><dd :class="{ 'is-empty': node.observation?.memory?.MemAvailable == null }">{{ bytes(node.observation?.memory?.MemAvailable) }}</dd></div>
+          <div><dt>可用磁盘</dt><dd :class="{ 'is-empty': node.observation?.disk_available_bytes == null }">{{ bytes(node.observation?.disk_available_bytes) }}</dd></div>
+          <div><dt>归属账号</dt><dd>{{ accountCount(node) }}</dd></div>
+        </dl>
+        <EntityBlock class="node-meta">
+          <div><span>最近检查</span><time>{{ node.observation && node.observation.observed_at > 0 ? new Date(node.observation.observed_at * 1000).toLocaleString('zh-CN') : '尚未检查' }}</time></div>
+          <div><span>Docker</span><b>{{ node.observation?.docker_version ?? '未采集' }}</b></div>
+          <div v-if="node.kind === 'ssh'"><span>运行组件</span><b>{{ preparationState(node) }}</b></div>
+        </EntityBlock>
         <p v-if="node.preparation?.target_release && node.preparation.target_release !== (node.preparation.current_release || node.preparation.release)" class="node-note">{{ node.preparation.current_release || node.preparation.release || '首次安装' }} → {{ node.preparation.target_release }}</p>
-        <p v-if="node.removal?.reason || (!node.removal && node.preparation?.reason)" class="nodes-error" role="status">{{ node.removal?.reason || node.preparation?.reason }}</p>
-        <details v-if="node.kind === 'ssh'" class="node-identity"><summary><ShieldCheck :size="14" />主机身份与版本</summary><p>组件版本：<code>{{ node.preparation?.release || '待安装' }}</code></p><p><code>{{ node.host_key_sha256 }}</code></p><p>认证方式：{{ node.auth_method === 'password' ? 'SSH 密码' : 'SSH 私钥' }}</p><p>节点数据目录：<code>{{ node.data_root }}</code></p></details>
-        <footer>
+        <p v-if="node.observation?.reason" class="node-alert" role="status">{{ node.observation.reason }}</p>
+        <p v-if="node.removal?.reason || (!node.removal && node.preparation?.reason)" class="node-alert" role="status">{{ node.removal?.reason || node.preparation?.reason }}</p>
+        <details v-if="node.kind === 'ssh'" class="node-identity"><summary><ShieldCheck :size="14" />主机身份与版本 ›</summary><p>组件版本：<code>{{ node.preparation?.release || '待安装' }}</code></p><p><code>{{ node.host_key_sha256 }}</code></p><p>认证方式：{{ node.auth_method === 'password' ? 'SSH 密码' : 'SSH 私钥' }}</p><p>节点数据目录：<code>{{ node.data_root }}</code></p></details>
+        <div class="node-actions">
           <template v-if="!node.removal">
-            <Button variant="outline" :disabled="pending.has(node.id)" @click="operate(node, 'check')"><RefreshCw :size="14" />检查连接</Button>
-            <Button v-if="node.kind === 'ssh'" variant="outline" :disabled="pending.has(node.id) || !node.enabled || node.preparation?.state === 'preparing'" @click="installError = ''; installing = node">{{ node.preparation?.state === 'preparing' ? '后台同步中…' : node.preparation?.state === 'prepared' ? '检查并同步组件' : '准备运行组件' }}</Button>
-            <Button variant="outline" :disabled="pending.has(node.id)" @click="operate(node, 'enable')">{{ node.enabled ? '暂停接单' : '恢复接单' }}</Button>
-            <Button v-if="node.kind === 'ssh'" variant="ghost" :disabled="pending.has(node.id) || node.preparation?.state === 'preparing'" @click="openRename(node)"><Pencil :size="14" />改名</Button>
-            <Button v-if="node.kind === 'ssh'" variant="ghost" :title="node.account_count ? '请先迁移归属账号' : undefined" :disabled="pending.has(node.id) || node.account_count > 0 || node.preparation?.state === 'preparing'" @click="deleteError = ''; deleting = node"><Trash2 :size="14" />移除</Button>
+            <Button variant="outline" size="sm" :disabled="pending.has(node.id)" @click="operate(node, 'check')"><RefreshCw :size="14" />检查连接</Button>
+            <Button v-if="node.kind === 'ssh'" variant="outline" size="sm" :disabled="pending.has(node.id) || !node.enabled || node.preparation?.state === 'preparing'" @click="installError = ''; installing = node">{{ node.preparation?.state === 'preparing' ? '后台同步中…' : node.preparation?.state === 'prepared' ? '检查并同步组件' : '准备运行组件' }}</Button>
+            <Button variant="outline" size="sm" :disabled="pending.has(node.id)" @click="operate(node, 'enable')">{{ node.enabled ? '暂停接单' : '恢复接单' }}</Button>
+            <Button v-if="node.kind === 'ssh'" variant="ghost" size="sm" :disabled="pending.has(node.id) || node.preparation?.state === 'preparing'" @click="openRename(node)"><Pencil :size="14" />改名</Button>
+            <Button v-if="node.kind === 'ssh'" variant="destructive-ghost" size="sm" class="node-remove" :title="node.account_count ? '请先迁移归属账号' : undefined" :disabled="pending.has(node.id) || node.account_count > 0 || node.preparation?.state === 'preparing'" @click="deleteError = ''; deleting = node"><Trash2 :size="14" />移除</Button>
           </template>
-          <Button v-else-if="node.removal.state === 'needs_check'" variant="outline" :disabled="pending.has(node.id)" @click="remove(node)"><RefreshCw :size="14" />重试移除</Button>
+          <Button v-else-if="node.removal.state === 'needs_check'" variant="outline" size="sm" :disabled="pending.has(node.id)" @click="remove(node)"><RefreshCw :size="14" />重试移除</Button>
           <span v-else class="node-note" role="status">{{ node.removal.state === 'removing' ? '正在后台移除，可离开此页面' : '已清理远程组件和数据' }}</span>
-        </footer>
-      </article>
+        </div>
+      </EntityCard>
     </div>
     <AccountNodeSelector v-if="rows.length" :nodes="rows" :agy-accounts="agyAccounts ?? []" @changed="load" />
-    <Dialog :open="editor" @update:open="setEditor"><DialogContent class="node-editor" :show-close-button="!saving" @escape-key-down="event => { if (saving) event.preventDefault(); }" @interact-outside="event => { if (saving) event.preventDefault(); }"><DialogHeader><DialogTitle>添加 SSH 节点</DialogTitle><DialogDescription>服务器需要具备 SSH、Python 3 和 Docker。使用具有对应 Docker 权限的专用账号。</DialogDescription></DialogHeader>
-      <form class="node-form" @submit.prevent="save"><div class="node-form-grid"><label>节点名称<Input v-model="name" required maxlength="80" :disabled="saving" /></label><label>服务器地址<Input v-model="host" required placeholder="IP 或主机名" :disabled="saving" /></label><NumberInput v-model="port" label="SSH 端口" :min="1" :max="65535" required :disabled="saving" /><label>SSH 用户<Input v-model="username" required autocomplete="off" :disabled="saving" /></label></div><label>独立数据目录<Input v-model="dataRoot" required :disabled="saving" /></label>
+    <ModalDialog :open="editor" class="node-editor" title="添加 SSH 节点" description="服务器需要具备 SSH、Python 3 和 Docker。使用具有对应 Docker 权限的专用账号。" :width="640" :show-close-button="!saving" @update:open="setEditor" @escape-key-down="(event: Event) => { if (saving) event.preventDefault(); }" @interact-outside="(event: Event) => { if (saving) event.preventDefault(); }">
+      <form id="node-editor-form" class="node-form" @submit.prevent="save">
+        <div class="node-form-grid"><label class="node-field" for="node-name">节点名称<Input id="node-name" v-model="name" required maxlength="80" :disabled="saving" /></label><label class="node-field" for="node-host">服务器地址<Input id="node-host" v-model="host" required placeholder="IP 或主机名" :disabled="saving" /></label><NumberInput v-model="port" label="SSH 端口" :min="1" :max="65535" required :disabled="saving" /><label class="node-field" for="node-username">SSH 用户<Input id="node-username" v-model="username" required autocomplete="off" :disabled="saving" /></label></div>
+        <label class="node-field" for="node-data-root">独立数据目录<Input id="node-data-root" v-model="dataRoot" required :disabled="saving" /></label>
         <div class="node-fingerprint"><Button type="button" variant="outline" :disabled="saving || probing || !host.trim() || !port" @click="probe">{{ probing ? '正在探测…' : '探测主机公钥' }}</Button><ChoiceSelect v-if="keys.length" v-model="selectedKey" label="服务器主机公钥" :options="options" :disabled="saving" placeholder="选择已核对的公钥" /><code v-if="selectedFingerprint">{{ selectedFingerprint }}</code><label v-if="selectedFingerprint" class="node-verify"><input v-model="verified" type="checkbox" :disabled="saving" />我已通过可信渠道核对这个主机指纹</label></div>
         <ChoiceSelect v-model="authMethod" label="SSH 认证方式" :options="authenticationOptions" :disabled="saving" />
-        <label v-if="authMethod === 'private_key'">专用 SSH 私钥<Textarea v-model="privateKey" required autocomplete="off" :spellcheck="false" :disabled="saving" rows="5" placeholder="粘贴专用无口令私钥" /></label>
-        <label v-else>SSH 密码<Input v-model="password" type="password" required maxlength="4096" autocomplete="new-password" :disabled="saving" /></label><p class="node-note">认证材料由管理中心以受保护文件保存，关闭此窗口后清空输入。</p><p v-if="formError" class="nodes-error" role="alert">{{ formError }}</p><footer><Button type="button" variant="outline" :disabled="saving" @click="setEditor(false)">取消</Button><Button type="submit" :disabled="saving || !verified">{{ saving ? '正在登记…' : '登记节点' }}</Button></footer>
+        <label v-if="authMethod === 'private_key'" class="node-field" for="node-private-key">专用 SSH 私钥<Textarea id="node-private-key" v-model="privateKey" required autocomplete="off" :spellcheck="false" :disabled="saving" rows="5" placeholder="粘贴专用无口令私钥" /></label>
+        <label v-else class="node-field" for="node-password">SSH 密码<Input id="node-password" v-model="password" type="password" required maxlength="4096" autocomplete="new-password" :disabled="saving" /></label>
+        <p class="node-note">认证材料由管理中心以受保护文件保存，关闭此窗口后清空输入。</p>
+        <p v-if="formError" class="nodes-error" role="alert">{{ formError }}</p>
       </form>
-    </DialogContent></Dialog>
-    <Dialog :open="!!renaming" @update:open="open => { if (!open && renaming && !pending.has(renaming.id)) renaming = null; }">
-      <DialogContent class="node-rename" :show-close-button="!renaming || !pending.has(renaming.id)">
-        <DialogHeader><DialogTitle>修改节点名称</DialogTitle><DialogDescription>{{ renaming?.username }}@{{ renaming?.host }}:{{ renaming?.port }}</DialogDescription></DialogHeader>
-        <form class="node-form" @submit.prevent="rename">
-          <label>节点名称<Input v-model="newName" required maxlength="80" :disabled="!!renaming && pending.has(renaming.id)" /></label>
-          <p v-if="renameError" class="nodes-error" role="alert">{{ renameError }}</p>
-          <footer><Button type="button" variant="outline" :disabled="!!renaming && pending.has(renaming.id)" @click="renaming = null">取消</Button><Button type="submit" :disabled="!newName.trim() || (!!renaming && pending.has(renaming.id))">保存名称</Button></footer>
-        </form>
-      </DialogContent>
-    </Dialog>
+      <template #footer><Button type="button" variant="outline" :disabled="saving" @click="setEditor(false)">取消</Button><Button type="submit" form="node-editor-form" :disabled="saving || !verified">{{ saving ? '正在登记…' : '登记节点' }}</Button></template>
+    </ModalDialog>
+    <ModalDialog :open="!!renaming" class="node-rename" title="修改节点名称" :description="renameAddress" :width="420" :show-close-button="!renaming || !pending.has(renaming.id)" @update:open="(open: boolean) => { if (!open && renaming && !pending.has(renaming.id)) renaming = null; }">
+      <form id="node-rename-form" class="node-form" @submit.prevent="rename">
+        <label class="node-field" for="node-new-name">节点名称<Input id="node-new-name" v-model="newName" required maxlength="80" :disabled="!!renaming && pending.has(renaming.id)" /></label>
+        <p v-if="renameError" class="nodes-error" role="alert">{{ renameError }}</p>
+      </form>
+      <template #footer><Button type="button" variant="outline" :disabled="!!renaming && pending.has(renaming.id)" @click="renaming = null">取消</Button><Button type="submit" form="node-rename-form" :disabled="!newName.trim() || (!!renaming && pending.has(renaming.id))">保存名称</Button></template>
+    </ModalDialog>
     <ConfirmationDialog :open="!!deleting" title="移除节点" :message="`将停止并删除「${deleting?.name ?? ''}」的远程组件，清空 ${deleting?.data_root ?? ''} 中本节点的日志、产物和其他专属数据。中央操作历史会保留。`" confirm-label="移除节点" danger :busy="!!deleting && pending.has(deleting.id)" :error="deleteError" @confirm="remove()" @cancel="deleting = null" />
     <ConfirmationDialog :open="!!installing" title="准备节点运行组件" :message="`将在「${installing?.name ?? ''}」核对现有组件与当前批次，自动完成首次安装或更新。需要换批时先等待原工作完成，再原地切换组件并恢复账号。任务在后台执行，可离开页面后查看进度。`" confirm-label="开始准备" :busy="!!installing && pending.has(installing.id)" :error="installError" @confirm="install" @cancel="installing = null" />
   </section>
 </template>
-
-<style scoped>
-.nodes-page{color:var(--foreground)}.nodes-actions,.node-card>header,.node-card>footer,.node-form>footer{display:flex;align-items:center;gap:12px}.nodes-actions{flex-wrap:wrap;max-width:100%}.node-card p{color:var(--muted-foreground);font-size:var(--ui-font-small)}.nodes-grid{margin-bottom:24px;display:grid;align-items:start;grid-template-columns:repeat(auto-fit,minmax(min(100%,390px),1fr));gap:20px}.node-card{background:var(--ui-surface,#fff);border:1px solid var(--ui-border,#e2e6ed);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px}.node-card h2{font-size:var(--ui-font-card);font-weight:650}.node-card>header>div{min-width:0}.node-card>header p{overflow-wrap:anywhere}.node-icon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--ui-accent-soft,#eee8f7);color:var(--ui-accent,#856b9e);flex-shrink:0}.node-state{margin-left:auto;padding:4px 8px;border-radius:6px;font-size:var(--ui-font-small);color:#39836a;background:#edf6f1;white-space:nowrap}.node-state.failed,.nodes-error{color:var(--ui-danger,#b45b67)}.node-state.muted{color:var(--ui-muted,#7d879a);background:var(--ui-field-surface,#f6f7fa)}.nodes-summary{display:flex;align-items:center;flex-wrap:wrap;gap:12px 24px;margin-bottom:24px;font-size:var(--ui-font-small);color:var(--muted-foreground)}.nodes-summary strong{font:650 var(--ui-font-heading) var(--font-mono);color:var(--foreground);margin-right:5px;font-variant-numeric:tabular-nums}.node-resources{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}.node-resources dt,.node-meta{font-size:var(--ui-font-small);color:var(--ui-muted,#7d879a)}.node-resources dd{font-size:var(--ui-font-heading);margin-top:5px;font-variant-numeric:tabular-nums}.node-resources small{font-size:var(--ui-font-small)}.node-meta{display:grid;grid-template-columns:auto 1fr;gap:8px 16px}.node-meta>span:nth-child(even),.node-meta time{text-align:right;overflow-wrap:anywhere}.node-identity{font-size:var(--ui-font-small);border-top:1px solid var(--ui-border,#e2e6ed);padding-top:12px}.node-identity summary{cursor:pointer;display:flex;align-items:center;gap:8px}.node-identity p{margin-top:8px}.node-identity code,.node-fingerprint code{overflow-wrap:anywhere}.node-card>footer{flex-wrap:wrap;border-top:1px solid var(--ui-border,#e2e6ed);padding-top:16px}.node-form,.node-form label,.node-fingerprint{display:grid;gap:8px}.node-form{gap:18px}.node-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.node-form label{font-size:var(--ui-font-body)}.node-fingerprint{padding:14px;border:1px solid var(--ui-border,#e2e6ed);border-radius:8px}.node-fingerprint>button{justify-self:start}.node-form .node-verify{display:flex;align-items:flex-start;gap:8px}.node-verify input{margin-top:3px;accent-color:var(--ui-accent,#856b9e)}.node-note{overflow-wrap:anywhere;font-size:var(--ui-font-small);color:var(--ui-muted,#7d879a)}.node-form>footer{justify-content:flex-end}.nodes-error{font-size:var(--ui-font-body);overflow-wrap:anywhere}@media(max-width:600px){.node-form-grid{grid-template-columns:1fr}.node-card{padding:18px}}
-</style>
-<style>.node-editor,.node-rename{width:calc(100% - 32px);max-height:90dvh;overflow-y:auto}.node-editor{max-width:640px}.node-rename{max-width:420px}</style>

@@ -90,7 +90,3 @@ onUnmounted(() => { alive = false; generation++; request?.abort(); lifecycle.abo
     <ConfirmationDialog :open="confirming" title="设置首次执行节点" :message="`将「${accountName}」的首次执行节点设为「${nodeName}」。后续账号环境和工程资料保存在该节点。`" confirm-label="保存节点" :busy="saving" :error="error" @confirm="save" @cancel="confirming = false" />
   </section>
 </template>
-
-<style scoped>
-.account-node-selector{display:grid;gap:16px;padding:22px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-surface)}h2{font-size:var(--ui-font-card-title,16px);font-weight:600}p{font-size:var(--ui-font-small,13px);color:var(--ui-muted);overflow-wrap:anywhere}.assignment-fields{display:grid;grid-template-columns:1fr 1fr;gap:16px}footer{display:flex;justify-content:flex-end;gap:12px;flex-wrap:wrap}.assignment-error{color:var(--ui-danger)}@media(max-width:600px){.assignment-fields{grid-template-columns:1fr}.account-node-selector{padding:18px}}
-</style>

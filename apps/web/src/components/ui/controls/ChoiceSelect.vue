@@ -4,7 +4,7 @@ import { Check, ChevronDown } from '../icon';
 import { SelectRoot, SelectTrigger, SelectValue, SelectIcon, SelectPortal, SelectContent, SelectViewport, SelectItem, SelectItemText, SelectItemIndicator } from 'reka-ui';
 import type { ChoiceOption } from './types';
 
-/** 单选控件的表单与浮层属性；空字符串可作为合法选项值。 */
+/** 单选控件的表单与浮层属性；空字符串可作为合法选项值。插槽 label-extra 放在标签元素之后，不进入无障碍名称。 */
 interface Props {
   modelValue?: string;
   options: readonly ChoiceOption[];
@@ -43,7 +43,8 @@ function closeOnEscape(event: KeyboardEvent): void {
 
 <template>
   <div class="fui-field">
-    <label :id="`choice-label-${id}`" :for="`choice-${id}`" class="fui-label">{{ label }}</label>
+    <div v-if="$slots['label-extra']" class="fui-label-row"><label :id="`choice-label-${id}`" :for="`choice-${id}`" class="fui-label">{{ label }}</label><slot name="label-extra" /></div>
+    <label v-else :id="`choice-label-${id}`" :for="`choice-${id}`" class="fui-label">{{ label }}</label>
     <input v-if="name" type="hidden" :name="name" :value="modelValue" :disabled="disabled">
     <SelectRoot v-model:open="open" :model-value="encodedValue" :disabled="disabled" :required="required" @update:model-value="update">
       <SelectTrigger :id="`choice-${id}`" class="fui-choice" :aria-labelledby="`choice-label-${id}`" :aria-invalid="invalid || undefined">

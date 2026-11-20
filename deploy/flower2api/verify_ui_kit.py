@@ -106,6 +106,7 @@ DESIGN_PAIRS = [
     ('settings', '.input.focus', '[data-testid=input-default]', ['background-color', 'box-shadow'], 'focus'),
     ('settings', '.input .end span', '.fui-stepper button', ['width', 'height', 'border-top-left-radius', 'color'], None),
     ('settings', '.field .help', '[data-testid=field-help]', TEXT, None),
+    ('settings', '.field label .tag', '[data-testid=label-extra-badge]', ['height', 'padding-left', 'border-top-left-radius', 'background-color', 'color', 'font-size', 'font-weight'], None),
     # 组合组件（子任务 2）：页头、概览卡、数据表卡片、工具栏、实体卡、浮动保存栏、居中弹窗。
     ('accounts', '.ph', '[data-testid=page-header]', ['column-gap', 'align-items'], None),
     ('accounts', '.ph h1', '[data-testid=page-header] .fui-page-header-title', TEXT + ['letter-spacing'], None),

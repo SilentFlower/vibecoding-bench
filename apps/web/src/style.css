@@ -140,11 +140,6 @@ code, pre { font-family: var(--font-mono); }
 [data-slot="dialog-content"] { max-height: calc(100dvh - 32px); overflow-y: auto; }
 [data-slot="card"] { min-width: 0; }
 button, a, input, select, textarea { scroll-margin: 80px; }
-.settings-index { display: flex; gap: 6px; flex-wrap: wrap; padding: 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
-.settings-index a { padding: 6px 10px; border-radius: 6px; font-size: var(--ui-font-small); color: var(--muted-foreground); }
-.settings-index a:hover { background: var(--muted); color: var(--primary); }
-.settings-page > [data-slot="card"] { scroll-margin-top: 24px; padding: 0; box-shadow: none; }
-.settings-page > [data-slot="card"] h3 { font-size: var(--ui-font-card); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0s !important; animation-duration: 0s !important; } }
 
 body { font-size: var(--ui-font-body); -webkit-font-smoothing: antialiased; }

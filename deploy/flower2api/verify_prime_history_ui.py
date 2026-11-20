@@ -78,6 +78,8 @@ async def run(output: Path, gateway: Path) -> dict:
             fixture.rows = []
             fixture.delay = 0.6
             refresh = page.get_by_role('button', name='刷新', exact=True)
+            # Escape 关闭气泡后鼠标仍停在模型触发器上，悬停延迟会重新打开气泡并挡住按钮，先移开鼠标。
+            await page.mouse.move(0, 0)
             await refresh.click()
             await expect(page.get_by_role('button', name='加载中…', exact=True)).to_be_disabled()
             await expect(records.locator('tbody tr')).to_have_count(3)

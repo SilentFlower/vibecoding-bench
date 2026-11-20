@@ -112,7 +112,3 @@ onUnmounted(() => { alive = false; generation++; controller?.abort(); if (timer)
       :confirm-label="failed ? '核对原操作' : frozen?.action === 'cancel' ? '确认取消迁移' : '开始迁移'" :busy="sending" :error="error" @confirm="submit()" @cancel="close" />
   </section>
 </template>
-
-<style scoped>
-.node-migration{display:grid;gap:12px;border-top:1px solid var(--ui-border);padding-top:18px}.migration-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}h3{font-size:var(--ui-font-body,14px);font-weight:600}p{font-size:var(--ui-font-small,13px);color:var(--ui-muted);overflow-wrap:anywhere}.migration-status{display:grid;gap:8px;padding:16px;background:var(--ui-field-surface);border:1px solid var(--ui-border);border-radius:8px}strong{font-size:var(--ui-font-body,14px);overflow-wrap:anywhere}.migration-actions{display:flex;flex-wrap:wrap;gap:10px}.migration-error{color:var(--ui-danger)}@media(max-width:600px){.migration-heading{align-items:stretch;flex-direction:column}}
-</style>

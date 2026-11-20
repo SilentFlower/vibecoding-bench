@@ -181,7 +181,7 @@ async def run(output: Path, gateway: Path) -> dict:
         fixture.fail_agy_response = False
         await page.get_by_role('button', name='刷新列表', exact=True).click()
         await expect(local_card.locator('dd').last).to_have_text('2')
-        await expect(page.locator('.nodes-summary')).to_contain_text('3 个归属账号')
+        await expect(page.locator('.nodes-overview .fui-overview-card').filter(has_text='归属账号').locator('.fui-overview-card-value')).to_have_text('3')
         await select(page, '账号', '合成反重力（反重力 · 已停用）')
         await expect(page.get_by_role('combobox', name='执行节点')).to_be_disabled()
         await expect(page.locator('.account-node-selector')).to_contain_text('当前节点：默认节点 · 反重力 API 执行')

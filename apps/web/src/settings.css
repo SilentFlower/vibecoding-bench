@@ -1,0 +1,102 @@
+/* 系统设置页（第二版设计稿 doc/design/console-v2/mock.html 的 #settings）。由 Settings.vue 引入，替代旧 settings-design.css。
+   颜色、圆角只取 token；字段控件用组件库 NumberInput / ChoiceSelect / Input / Textarea / Switch，「已修改」放在标签行。 */
+@layer components {
+  .settings-page { min-width: 0; color: var(--ui-color-text); font-size: var(--ui-font-size-md); line-height: 1.55; }
+  .settings-header-tools { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2); min-width: 0; }
+  .settings-header-tools > .fui-search { width: 320px; max-width: 100%; }
+  .settings-total { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 650; white-space: nowrap; }
+
+  .system-settings-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: calc(var(--ui-space-unit) * 5); align-items: start; }
+  .system-settings-nav { position: sticky; top: calc(var(--ui-space-unit) * 5); display: flex; flex-direction: column; gap: 2px; max-height: calc(100dvh - 40px); overflow: auto; }
+  .system-settings-nav button { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); height: 40px; padding: 0 calc(var(--ui-space-unit) * 3); border: 0; border-radius: var(--ui-radius-control); background: transparent; color: var(--ui-color-text-2); font: 600 calc(var(--ui-font-size-md) + .5px)/1.55 var(--ui-font-family); text-align: left; white-space: nowrap; cursor: pointer; transition: background-color .15s, color .15s; }
+  .system-settings-nav button svg { flex: none; width: 14px; height: 14px; color: var(--ui-color-text-3); }
+  .system-settings-nav button:hover:not(.active) { background: var(--ui-color-fill); }
+  .system-settings-nav button:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: -2px; }
+  .system-settings-nav button.active { background: var(--ui-color-surface); color: var(--ui-color-text); font-weight: 720; box-shadow: var(--ui-shadow-card); }
+  .system-settings-nav button.active svg { color: var(--ui-color-primary); }
+  .system-settings-nav em { margin-left: auto; color: var(--ui-color-text-4); font: 700 calc(var(--ui-font-size-xs) - .5px)/1 var(--ui-font-family-mono); font-style: normal; font-variant-numeric: tabular-nums; }
+  .system-settings-nav em.is-dirty { color: var(--ui-color-warning-text); }
+  .system-settings-nav > p { margin: calc(var(--ui-space-unit) * 3.5) calc(var(--ui-space-unit) * 3) 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; line-height: 1.7; }
+
+  .settings-workspace { min-width: 0; }
+  #settings-content { display: grid; gap: calc(var(--ui-space-unit) * 4.5); }
+  .settings-search-result { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; }
+  .settings-search-result strong { color: var(--ui-color-text); font-weight: 720; }
+  .settings-section-card { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 4.5); min-width: 0; padding: calc(var(--ui-space-unit) * 5.5) calc(var(--ui-space-unit) * 6); border-radius: var(--ui-radius-card); background: var(--ui-color-surface); box-shadow: var(--ui-shadow-card); }
+  .settings-section-card > header { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 3); min-width: 0; }
+  .settings-section-card > header > div { flex: 1; min-width: 0; }
+  .settings-section-card h3 { margin: 0; color: var(--ui-color-text); font-size: calc(var(--ui-font-size-card) + 1px); font-weight: 760; line-height: 1.55; }
+  .settings-section-card > header p { margin: 3px 0 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-meta); font-weight: 550; }
+  .settings-result-category { margin-bottom: var(--ui-space-unit); }
+
+  .settings-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 4.5) calc(var(--ui-space-unit) * 5); }
+  .setting-field { display: grid; align-content: start; gap: calc(var(--ui-space-unit) * 1.75); min-width: 0; }
+  .setting-field.wide { grid-column: 1 / -1; }
+  .setting-field textarea[name="bootstrap_additional_model_options"] { font-family: var(--ui-font-family-mono); }
+  .setting-help { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 500; line-height: 1.55; overflow-wrap: anywhere; }
+  .setting-field[data-settings-field="session_policy_block_duration_minutes"] .setting-help { white-space: pre-line; }
+  .setting-switch-row { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--ui-space-unit) * 6); min-width: 0; }
+  .setting-switch-text { display: grid; gap: var(--ui-space-unit); flex: 1; min-width: 0; }
+  .setting-switch-text .fui-label { cursor: pointer; }
+  .setting-switch-text small { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 500; line-height: 1.55; overflow-wrap: anywhere; }
+  .setting-field.is-disabled .fui-label-row, .setting-field.is-disabled .setting-switch-text small, .setting-field.is-disabled .setting-help { opacity: .55; }
+  .setting-field.is-disabled .setting-switch-text .fui-label { cursor: not-allowed; }
+  .setting-presets { display: flex; flex-wrap: wrap; gap: calc(var(--ui-space-unit) * 1.5); }
+  .setting-error { margin: 0; color: var(--ui-color-danger-text); font-size: var(--ui-font-size-sm); }
+  .settings-inline-note { display: block; margin: 0; padding-top: calc(var(--ui-space-unit) * 4); border-top: 1px solid var(--ui-color-line); color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); line-height: 1.7; overflow-wrap: anywhere; }
+  a.settings-inline-note { color: var(--ui-color-primary-text); font-weight: 650; text-decoration: none; }
+  a.settings-inline-note:hover { text-decoration: underline; }
+  .settings-empty { display: grid; justify-items: center; gap: calc(var(--ui-space-unit) * 2); padding: calc(var(--ui-space-unit) * 11) calc(var(--ui-space-unit) * 5); border-radius: var(--ui-radius-card); background: var(--ui-color-surface); box-shadow: var(--ui-shadow-card); color: var(--ui-color-text-3); text-align: center; }
+  .settings-empty h3 { margin: 0; color: var(--ui-color-text); font-size: var(--ui-font-size-card); font-weight: 720; }
+  .settings-empty p { margin: 0 0 calc(var(--ui-space-unit) * 2); font-size: var(--ui-font-size-sm); }
+
+  /* 预热记录：桌面六列，窄屏把触发时点、模型、耗时并入核心列。 */
+  .settings-prime-history > header > [data-slot=button] { flex: none; }
+  .prime-preparation-link { display: inline-block; margin-top: var(--ui-space-unit); color: var(--ui-color-primary-text); font-size: var(--ui-font-size-sm); font-weight: 650; text-decoration: none; }
+  .prime-preparation-link:hover { text-decoration: underline; }
+  .settings-prime-records { min-width: 0; }
+  .settings-prime-records table { table-layout: fixed; }
+  .settings-log-table th, .settings-log-table td { padding: calc(var(--ui-space-unit) * 3.5) calc(var(--ui-space-unit) * 2.5); font-size: var(--ui-font-size-sm); }
+  .settings-log-table td { color: var(--ui-color-text-2); vertical-align: middle; overflow-wrap: anywhere; }
+  .settings-log-table td small { display: block; max-width: 240px; margin-top: calc(var(--ui-space-unit) * 1.5); color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); white-space: normal; overflow-wrap: anywhere; }
+  .settings-prime-records th:first-child { width: 23%; }
+  .settings-prime-records th:nth-child(2) { width: 20%; }
+  .settings-prime-records .prime-hour-column { width: 10%; }
+  .settings-prime-records .prime-model-column { width: 20%; }
+  .settings-prime-records .prime-duration-column { width: 10%; }
+  .prime-time { font-variant-numeric: tabular-nums; }
+  .prime-account-name { color: var(--ui-color-text); font-weight: 600; }
+  .prime-model-value { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .settings-prime-records .fui-info-trigger { max-width: 100%; color: var(--ui-color-text); cursor: pointer; }
+  .prime-result { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 1.5) calc(var(--ui-space-unit) * 2.5); }
+  .prime-reason-link { color: var(--ui-color-primary-text); font-weight: 600; white-space: nowrap; }
+  .prime-reason-content { max-height: 45vh; margin: 0; overflow: auto; white-space: pre-wrap; }
+  .settings-prime-records .prime-mobile-detail { display: none; }
+  .prime-empty { display: flex; flex-direction: column; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); padding: calc(var(--ui-space-unit) * 9.5) calc(var(--ui-space-unit) * 3); color: var(--ui-color-text-3); text-align: center; }
+  .prime-empty svg { color: var(--ui-color-primary); }
+  .prime-empty strong { color: var(--ui-color-text); font-size: var(--ui-font-size-md); font-weight: 650; }
+  .prime-empty p { margin: 0; font-size: var(--ui-font-size-sm); line-height: 1.7; }
+
+  @media (max-width: 1000px) {
+    .system-settings-layout { grid-template-columns: 170px minmax(0, 1fr); gap: calc(var(--ui-space-unit) * 4); }
+    .settings-section-card { padding: calc(var(--ui-space-unit) * 5); }
+    .settings-field-grid { gap: calc(var(--ui-space-unit) * 4.5) calc(var(--ui-space-unit) * 4); }
+  }
+  @media (max-width: 760px) {
+    .settings-page .fui-page-header-actions { width: 100%; margin-left: 0; }
+    .settings-header-tools { flex-wrap: wrap; width: 100%; }
+    .settings-header-tools > .fui-search { width: 100%; }
+    .system-settings-layout { display: block; }
+    .system-settings-nav { position: static; flex-direction: row; max-height: none; margin-bottom: calc(var(--ui-space-unit) * 4); padding-bottom: var(--ui-space-unit); overflow-x: auto; }
+    .system-settings-nav button { flex: none; height: 36px; padding: 0 calc(var(--ui-space-unit) * 2.5); font-size: var(--ui-font-size-sm); }
+    .system-settings-nav > p { display: none; }
+    .settings-section-card { padding: calc(var(--ui-space-unit) * 4.5) calc(var(--ui-space-unit) * 4); }
+    .settings-field-grid { grid-template-columns: minmax(0, 1fr); }
+    .settings-prime-records .prime-hour-column, .settings-prime-records .prime-model-column, .settings-prime-records .prime-duration-column { display: none; }
+    .settings-prime-records th:first-child { width: 32%; }
+    .settings-prime-records th:nth-child(2) { width: 38%; }
+    .settings-prime-records th:last-child { width: 30%; }
+    .settings-log-table th, .settings-log-table td { padding: calc(var(--ui-space-unit) * 3.25) calc(var(--ui-space-unit) * 1.5); white-space: normal; }
+    .settings-prime-records .prime-mobile-detail { display: block; margin-top: calc(var(--ui-space-unit) * 1.5); }
+  }
+}

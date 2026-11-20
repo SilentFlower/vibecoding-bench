@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input, InputGroup } from '@/components/ui/input';
 import { Segmented, type SegmentedOption } from '@/components/ui/segmented';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Pagination } from '@/components/ui/controls';
+import { NumberInput, Pagination } from '@/components/ui/controls';
 import { PageHeader } from '@/components/ui/page-header';
 import { OverviewCard, OverviewGrid } from '@/components/ui/overview';
 import { IconTile } from '@/components/ui/icon-tile';
@@ -35,6 +35,7 @@ const proxies = [
 const page = ref(1);
 const pageSize = ref(20);
 const pending = ref(1);
+const admissionWait = ref<number | string>(99);
 const modalOpen = ref(false);
 const modalTab = ref('configuration');
 const sideOpen = ref(false);
@@ -49,7 +50,7 @@ const modalTabs: SegmentedOption[] = [
 
 <template>
   <section class="preview-card" data-testid="kit-composites">
-    <div class="preview-section-title"><h2>组合组件</h2><span>页头 · 概览卡 · 工具栏 · 实体卡 · 数据表卡片 · 浮动保存栏</span></div>
+    <div class="preview-section-title"><h2>组合组件</h2><span>页头 · 概览卡 · 工具栏 · 实体卡 · 数据表卡片 · 标签旁徽标 · 浮动保存栏</span></div>
 
     <PageHeader title="账号管理" description="状态、用量和调度集中展示，常用操作直接可达。" data-testid="page-header">
       <template #actions>
@@ -155,6 +156,10 @@ const modalTabs: SegmentedOption[] = [
       </ModalDialog>
     </div>
 
+    <div class="composite-fields composite-gap" data-testid="label-extra-field">
+      <NumberInput v-model="admissionWait" label="准入等待上限（秒）" :min="1" :max="120"><template #label-extra><Badge v-if="admissionWait !== 120" variant="warning" data-testid="label-extra-badge">已修改</Badge></template></NumberInput>
+    </div>
+
     <FloatingSaveBar :count="pending" hint="修改将统一应用到网关" clean-label="配置已同步" data-testid="save-bar">
       <template #actions>
         <Button variant="outline" :disabled="!pending" @click="pending = 0"><RefreshCw />撤销修改</Button>
@@ -178,6 +183,7 @@ const modalTabs: SegmentedOption[] = [
 .composite-modal-section b { font-size: var(--ui-font-size-title); font-weight: 760; }
 .composite-modal-section p { margin: 2px 0 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); }
 .composite-push { margin-left: auto; }
+.composite-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 4.5) calc(var(--ui-space-unit) * 5); max-width: 860px; }
 .composite-ops { display: flex; justify-content: flex-end; gap: calc(var(--ui-space-unit) * 1); }
-@media (max-width: 760px) { .composite-entities { grid-template-columns: minmax(0, 1fr); } .composite-search { width: 100%; } }
+@media (max-width: 760px) { .composite-entities, .composite-fields { grid-template-columns: minmax(0, 1fr); } .composite-search { width: 100%; } }
 </style>

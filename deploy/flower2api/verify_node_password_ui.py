@@ -11,6 +11,9 @@ class NodeFixture(Fixture):
         path=urlsplit(route.request.url).path
         if path=='/nodes':
             return await route.fulfill(content_type='text/html',body=(self.gateway/'index.html').read_text())
+        if path=='/admin/accounts':
+            # 节点页读取反重力账号以统计本机归属，本场景没有反重力账号。
+            return await route.fulfill(content_type='application/json',body=json.dumps({'data':[],'total':0,'page':1,'page_size':100,'total_pages':1}))
         if path.startswith('/runtime/api/nodes'):
             if path.endswith('/host-keys'):
                 value={'items':[{'key':'ssh-ed25519 synthetic','algorithm':'ssh-ed25519','sha256':'SHA256:synthetic'}]}

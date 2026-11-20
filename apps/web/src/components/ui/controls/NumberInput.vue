@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useId } from 'vue';
 
-/** 数字输入契约：清空产生空字符串，范围校验由原生输入与业务提交共同负责。 */
+/** 数字输入契约：清空产生空字符串，范围校验由原生输入与业务提交共同负责。插槽 label-extra 放在标签元素之后（如「已修改」），不进入无障碍名称。 */
 interface Props {
   modelValue?: number | string;
   label: string;
@@ -39,7 +39,8 @@ function increment(direction: number): void {
 
 <template>
   <div class="fui-field">
-    <label :for="inputId" class="fui-label">{{ label }}</label>
+    <div v-if="$slots['label-extra']" class="fui-label-row"><label :for="inputId" class="fui-label">{{ label }}</label><slot name="label-extra" /></div>
+    <label v-else :for="inputId" class="fui-label">{{ label }}</label>
     <div class="fui-number" :data-invalid="invalid || undefined" :data-disabled="disabled || undefined">
       <input
         v-bind="$attrs" :id="inputId" ref="input" type="number" inputmode="decimal"
