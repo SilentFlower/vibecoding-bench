@@ -1,0 +1,43 @@
+{
+  "id": "agy-criu-template-start-repair",
+  "name": "agy-criu-template-start-repair",
+  "title": "修复 AGY CRIU 模板启动失败",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "runtime",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-20",
+  "completedAt": "2026-11-20",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-20T11:39:45Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-20-criu-node-sync-repair",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-20T11:39:45+00:00",
+    "completedSteps": [
+      "复现 OverlayFS 文件型观察器拒绝与 MPTCP 保存失败",
+      "修复映射身份校验和模板监听配置",
+      "保留同代白名单失败诊断",
+      "通过真实 CRIU 保存恢复、失败回退、凭据换代与 88 项回归"
+    ],
+    "partialStep": null,
+    "nextStep": "修复版本上线后核对 US AGY #14 当前代次模板与实际 CRIU 恢复来源",
+    "notes": "隔离 VM 固定 AGY 1.5.9 和 CRIU 4.2，使用受限业务 UID、真实控制器及本地合成 TLS。恢复、故障回退及换代均只提交一次模型请求。"
+  }
+}
