@@ -112,6 +112,25 @@ class CriuSettingsTests(unittest.TestCase):
         self.assertTrue(self.apply(True)['applied'])
         self.runtime.ensure.assert_called_once()
 
+    def test_agy_failure_detail_is_visible_only_for_current_valid_observation(self):
+        """保留同代受控失败，旧观测和原始异常不得进入公开状态。@return 无。"""
+        self.row['fingerprint_json']=json.dumps({'mem':'unlimited','native_criu_enabled':True})
+        native={**self.config['native'],'module_root':'synthetic-agy'}
+        self.config={**self.config,'agy':native,'native_criu_enabled':True}
+        atomic_json(self.path,self.config)
+        self.sender.attrs['Config'].update(Labels={'vibebench.agy-criu':'1'},Entrypoint=ENTRY)
+        failure={'stage':'observer_start','reason':'execution_mapping_missing'}
+        restore={'schema_version':1,'state':'unavailable','reason':'template_failed','template_ready':False,
+            'last_start_source':'exec','failure':failure}
+        observation={'environment_id':self.row['environment_id'],'generation':self.row['generation'],
+            'kernel_generation':native['kernel_generation'],'module_root':native['module_root'],
+            'checked_at_ms':int(time.time()*1000),'restore':restore}
+        self.assertEqual(failure,read_settings(self.runtime,self.row,observation)['failure'])
+        stale={**observation,'generation':self.row['generation']-1}
+        self.assertNotIn('failure',read_settings(self.runtime,self.row,stale))
+        restore['failure']={**failure,'reason':'raw-synthetic-secret'}
+        self.assertNotIn('failure',read_settings(self.runtime,self.row,observation))
+
     def test_retired_download_allows_criu_and_real_maintenance_still_blocks(self):
         """两版旧下载标记释放设置门禁，未完成切换仍保护租约。@return None。"""
         for name in ('native-kernel-upgrade.json', 'native-kernel-upgrade-280.json'):

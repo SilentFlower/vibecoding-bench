@@ -99,6 +99,8 @@ class NativeBridge:
         env.update(self.runtime_env)
         if self.checkpoint_enabled:
             env['AGY_BRIDGE_CHECKPOINT'] = '1'
+            # CRIU 4.2 无法保存原生 Go 默认创建的 MPTCP 监听套接字。
+            env['GODEBUG'] = 'multipathtcp=0'
         if getattr(self, 'capture_tls', False):
             env['AGY_BRIDGE_CAPTURE_TLS'] = '1'
         if self.ca_file:

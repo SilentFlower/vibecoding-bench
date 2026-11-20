@@ -65,6 +65,7 @@ class WorkerFixture:
         self.prewarming = False
         self.finish_status = 'completed'
         self.confirm_tool_results = True
+        self.criu_failure = None
         self.ready = {'source_sha256': owner.image_sha, 'native_pid': 123}
         self.last_used = time.monotonic()
 
@@ -229,6 +230,7 @@ class AgySupervisorTests(unittest.TestCase):
                         """记录恢复并按测试分支模拟本地失败。@param until 原截止。@return 无。"""
                         self.order.append(('restore',self.generation))
                         if should_fail:
+                            self.criu_failure={'stage':'checkpoint_restore','reason':'AGY_CRIU_RESTORE'}
                             raise InputError('worker_restore_failed')
                         self.parked=False
 
@@ -253,6 +255,8 @@ class AgySupervisorTests(unittest.TestCase):
                     self.assertEqual(restored,[('restore',2)] if new_generation==2 else [])
                     self.assertEqual([item for item in WorkerFixture.order if item[0]=='model'],[('model',new_generation)])
                     self.assertEqual(WorkerFixture.order.count(('start',2)),2 if should_fail else 1)
+                    self.assertEqual(self.supervisor.template_failure,
+                        {'stage':'checkpoint_restore','reason':'AGY_CRIU_RESTORE'} if should_fail else None)
 
     def test_background_template_survives_idle_hot_worker_of_same_identity(self):
         """请求先收尾、池中已有热进程时，后台仍可准备并保留同身份模板。@return 无。"""

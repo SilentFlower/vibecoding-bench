@@ -19,7 +19,7 @@ from runtime_files import atomic_json
 
 from .contract import InputError
 from .credentials import publish_access_document, read_private
-from .criu import CONTROL as CRIU_CONTROL
+from .criu import CONTROL as CRIU_CONTROL, failure_detail, read_failure
 from .gemini_contract import continuation_results
 from .input_media import preflight_gif
 from .image_pool import Broker, ImagePool
@@ -121,6 +121,7 @@ class Worker:
         self.seed_template = False
         self.parked = False
         self.start_source = 'exec'
+        self.criu_failure = None
 
     def start(self, until):
         """在同UID隔离角色中启动并核对真实就绪。@param until 原单调截止。@return 无。"""
@@ -156,9 +157,11 @@ class Worker:
                     return
             if event.get('type') == 'criu_prepared' and self.seed_template and self.ready:
                 self.parked = event['template_ready'] is True
+                self.criu_failure = read_failure(event.get('failure'))
                 self.seed_template = self.parked
                 return
             if event.get('type') in ['worker_error', 'process_closed']:
+                self.criu_failure = read_failure(event.get('failure'))
                 raise InputError('worker_start_failed')
 
     def resume(self, until):
@@ -172,6 +175,7 @@ class Worker:
                 self.ready_at = time.monotonic()
                 return
             if event.get('type') in {'worker_error','process_closed','rejected'}:
+                self.criu_failure = read_failure(event.get('failure'))
                 raise InputError('worker_restore_failed')
 
     def read(self):
@@ -283,7 +287,7 @@ class Supervisor:
         self.credential_identity=None
         self.restore_enabled=(os.environ.get('AGY_CRIU')=='1'
             and Path(__file__).resolve().parent==Path('/opt/v3/python/agy_runtime'))
-        self.template_failed=False
+        self.template_failure=None
         self.last_start_source=None
         self.controls = {}
         self.closed = False
@@ -390,14 +394,14 @@ class Supervisor:
             worker.start(until)
             if requested_template:
                 with self.condition:
-                    if worker.key[0]==self.credential_generation:
-                        self.template_failed=not worker.parked
+                    self.record_template_attempt(worker,worker.parked)
             return worker
         except Exception:
+            if requested_template:
+                with self.condition:
+                    self.record_template_attempt(worker,False)
             worker.close()
             with self.condition:
-                if requested_template and worker.key[0]==self.credential_generation:
-                    self.template_failed=True
                 self.workers.remove(worker)
                 self.condition.notify_all()
             if requested_template and time.monotonic()<until:
@@ -407,6 +411,11 @@ class Supervisor:
     def restore_available(self):
         """只认实际挂载的可信控制入口。@return 能否登记启动模板。"""
         return self.restore_enabled and Path(CRIU_CONTROL).exists()
+
+    def record_template_attempt(self, worker: Worker, ready: bool, stage: str = 'worker_start') -> None:
+        """在池锁内保存同代结果。@param worker 原进程。@param ready 模板是否就绪。@param stage 未收到细节时的阶段。@return 无。"""
+        if worker.key[0]==self.credential_generation and worker.credential_expires_at>time.time_ns()//1_000_000:
+            self.template_failure=None if ready else worker.criu_failure or failure_detail(stage)
 
     def prewarm_replacement(self, source, value, until, template=False):
         """用空余名额预热替代进程。@param source 原工作进程。@param value 同代模型及凭据。@param until 原生成截止。@param template 是否保存启动模板。@return 无返回值。"""
@@ -433,7 +442,7 @@ class Supervisor:
                 if (not self.closed and not worker.closed and snapshot['credential_generation']==self.credential_generation
                         and snapshot['expires_at']>time.time_ns()//1_000_000):
                     if template:
-                        self.template_failed=not worker.parked
+                        self.record_template_attempt(worker,worker.parked)
                     worker.prewarming=False
                     worker.busy=False
                     worker.last_used=time.monotonic()
@@ -441,8 +450,10 @@ class Supervisor:
         except Exception:
             # 补位失败后允许普通 checkout 按原路径恢复，原工具轮仍由原进程完成。
             with self.condition:
-                if template and snapshot['credential_generation']==self.credential_generation:
-                    self.template_failed=True
+                if template and worker:
+                    self.record_template_attempt(worker,False)
+                elif template and snapshot['credential_generation']==self.credential_generation:
+                    self.template_failure=failure_detail('worker_start')
         finally:
             if worker and worker.prewarming:
                 try:
@@ -506,7 +517,7 @@ class Supervisor:
             if generation<self.credential_generation or generation==self.credential_generation and identity!=self.credential_identity:
                 raise InputError('stale_credential_generation')
             if generation>self.credential_generation:
-                self.template_failed=False
+                self.template_failure=None
                 self.last_start_source=None
                 self.condition.notify_all()
             self.credential_generation=generation
@@ -585,10 +596,10 @@ class Supervisor:
                 try:
                     worker.resume(min(until,time.monotonic()+25))
                 except (InputError, OSError, ValueError):
+                    with self.condition:
+                        self.record_template_attempt(worker,False,'checkpoint_restore')
                     worker.close()
                     with self.condition:
-                        if worker.key[0]==self.credential_generation:
-                            self.template_failed=True
                         self.workers.remove(worker)
                         self.condition.notify_all()
                     worker = self.acquire(value,until,seed=False)
@@ -727,7 +738,7 @@ class Supervisor:
                 restore_state, restore_reason = 'ready', None
             elif preparing:
                 restore_state, restore_reason = 'preparing', 'template_preparing'
-            elif self.template_failed:
+            elif self.template_failure:
                 restore_state, restore_reason = 'unavailable', 'template_failed'
             else:
                 restore_state, restore_reason = 'waiting', None
@@ -741,7 +752,8 @@ class Supervisor:
                 'image_decode_calls': self.pool.decode_calls, 'image_scope': 'account_workers',
                 'restore': {'schema_version':1,'state':restore_state,
                     'reason':restore_reason,'template_ready':template,
-                    'last_start_source':self.last_start_source},
+                    'last_start_source':self.last_start_source,
+                    **({'failure':self.template_failure.copy()} if restore_reason=='template_failed' else {})},
                 'processes': [{'controller': memory(worker.process.pid), 'native': memory(worker.ready['native_pid']) if worker.ready else None,
                     'observer': memory(worker.ready['observer_pid']) if worker.ready else None,
                     'busy': worker.busy, 'credential_generation':worker.config['credential_generation']} for worker in self.workers if worker.process]}

@@ -27,7 +27,7 @@ from .models import configure_model
 from .capture import save_egress, save_submission
 from .wire_capture import NativeTlsTrace
 from .credentials import read_access_document
-from .criu import Template
+from .criu import Template, failure_detail
 from .safety_egress import CLOUD_CODE, SafetyEgress
 
 SNAPSHOT_WRITERS=threading.BoundedSemaphore(2)
@@ -158,6 +158,7 @@ class Worker:
             self.bridge.events.close();self.bridge.events=(self.bridge.folder/'bridge-events.jsonl').open('w')
         self.bridge.runtime_env=dict(owner.cfg['runtime_env']);self.bridge.startup_timeout=owner.cfg['startup_timeout'];self.bridge.retire_timeout=owner.cfg['retire_timeout']
         self.port=None;self.ready=False;self.template=None
+        self.start_stage='observer_start';self.criu_failure=None
 
     def start(self):
         """按真实init与PID套接字绑定就绪。@return 无返回值。"""
@@ -166,6 +167,7 @@ class Worker:
         for path in logdir.glob('*.log'):
             info=path.stat();previous[str(path)]=(info.st_dev,info.st_ino,info.st_size)
         self.bridge._start();attempts=[];deadline=started+self.owner.cfg['startup_timeout']
+        self.start_stage='native_listener'
         while time.monotonic()<deadline and self.bridge.proc.poll() is None:
             inodes=set()
             for path in Path(f'/proc/{self.bridge.native_pid}/fd').iterdir():
@@ -281,7 +283,8 @@ class Worker:
         self.template=Template(self.bridge)
         try:
             return self.template.park(until)
-        except (OSError, ValueError, subprocess.TimeoutExpired):
+        except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+            self.criu_failure=self._criu_failure_detail(self.template.stage,error)
             self.template.close()
             if self.template.suspended:
                 self.abort_template()
@@ -293,18 +296,27 @@ class Worker:
         """重新核对观察和原控制端点，之后才准入模型请求。@param until 原单调截止。@return 恢复耗时。"""
         if not self.template or not self.template.parked:
             raise InputError('agy_criu_not_parked')
+        self.criu_failure=None
         try:
             elapsed=self.template.restore(until)
             remaining=until-time.monotonic()
             if remaining<=0 or self.bridge.reader_error or self.bridge.errors:
                 raise RuntimeError('agy_criu_observer')
+            self.template.stage='restore_listener'
             response=self.call('GetCapabilities',{},None,min(.5,remaining))
             if response['status']!=200 or not isinstance(response['response'],dict):
                 raise RuntimeError('agy_criu_listener')
             return elapsed
-        except Exception:
+        except Exception as error:
+            self.criu_failure=self._criu_failure_detail(self.template.stage,error)
             self.abort_template()
             raise
+
+    def _criu_failure_detail(self, stage: str, error: BaseException) -> dict[str, str]:
+        """在清理前保留首个观察器错误。@param stage 原失败阶段。@param error 当前异常。@return 脱敏诊断。"""
+        if stage in ('observer_start','observer_resume') and self.bridge.errors:
+            return failure_detail(stage,self.bridge.errors[0].get('error'))
+        return failure_detail(stage,str(error))
 
     def abort_template(self):
         """业务投递前撤销控制器租约并快速收回停态原进程。@return 无。"""
@@ -376,7 +388,9 @@ class Kernel:
         """启动新物理代次。@return 无返回值。"""
         self.worker=Worker(self)
         try:self.worker.start()
-        except Exception:
+        except Exception as error:
+            if self.template_enabled:
+                self.worker.criu_failure=self.worker._criu_failure_detail(self.worker.start_stage,error)
             if self.worker.bridge.proc:self.worker.retire('startup_failed')
             raise
 
@@ -707,9 +721,10 @@ def main():
         service=Kernel(config(args.config),state);service.boot()
         if service.template_enabled:
             elapsed=service.worker.park(float(os.environ['AGY_CRIU_DEADLINE']))
-            service.emit('criu_prepared',template_ready=elapsed is not None,dump_ms=elapsed)
+            service.emit('criu_prepared',template_ready=elapsed is not None,dump_ms=elapsed,
+                failure=service.worker.criu_failure)
         for line in sys.stdin:
-            raw=None
+            raw=None;kind=None
             try:
                 raw=json.loads(line)
                 if not isinstance(raw,dict) or type(raw.get('schema_version')) is not int or raw.get('schema_version')!=1:raise InputError('invalid_schema')
@@ -729,11 +744,16 @@ def main():
                     fields(raw,{'schema_version','type'});service.emit('status',generation=service.worker.bridge.generation,native=service.worker.bridge.snapshot(),active=service.active.identity() if service.active else None,telemetry=service.worker.telemetry)
                 elif kind=='shutdown':fields(raw,{'schema_version','type'});break
                 else:raise InputError('unsupported_command')
-            except (InputError,ValueError,TypeError) as exc:service.emit('rejected',code=str(exc) if isinstance(exc,InputError) else 'invalid_or_unsupported_input',request_id=raw.get('request_id') if isinstance(raw,dict) else None)
+            except (InputError,ValueError,TypeError) as exc:
+                detail={'failure':service.worker.criu_failure} if kind=='criu_restore' and service.worker.criu_failure else {}
+                service.emit('rejected',code=str(exc) if isinstance(exc,InputError) else 'invalid_or_unsupported_input',
+                    request_id=raw.get('request_id') if isinstance(raw,dict) else None,**detail)
     except Exception as error:
         if service and service.cfg['capture_enabled']:
             with (state/'kernel-error.log').open('a') as stream:traceback.print_exc(file=stream)
-        if service:service.emit('worker_error',code='kernel_startup_or_protocol_failed',error_type=type(error).__name__)
+        if service:
+            detail={'failure':service.worker.criu_failure} if service.worker and service.worker.criu_failure else {}
+            service.emit('worker_error',code='kernel_startup_or_protocol_failed',error_type=type(error).__name__,**detail)
         else:print(json.dumps({'schema_version':1,'protocol':'agy-native-stdio','type':'worker_error','code':'native_configuration'}),flush=True)
         return 2
     finally:

@@ -19,6 +19,7 @@ from types import SimpleNamespace
 from agy_runtime import gemini_contract
 from agy_runtime.contract import InputError
 from agy_runtime.credentials import TOKEN_PATH, publish_access_document, read_access_document, read_private
+from agy_runtime.criu import read_failure
 from agy_runtime.gemini_frames import Frames
 from agy_runtime.models import configure_model, decode_catalog, decode_media_support, decode_png_support
 from agy_runtime.native_bridge import NativeBridge
@@ -379,6 +380,40 @@ class AgyRuntimeTests(unittest.TestCase):
                         if mode=='capacity':factory.assert_not_called()
                         else:self.assertTrue(spare.closed)
 
+    def test_template_failure_survives_fallback_and_stays_with_current_credentials(self):
+        """同代模板失败后保留首个受控原因，普通回退仍取得原物理名额。@return 无。"""
+        snapshot=self.snapshot()
+        value={'type':'prepare','credential_snapshot':snapshot,'model':'gemini-synthetic',
+            'native_model':'MODEL_PLACEHOLDER_M36'}
+        supervisor=Supervisor.__new__(Supervisor)
+        supervisor.condition=threading.Condition();supervisor.closed=False
+        supervisor.config={'max_workers':1,'proxy_url':'synthetic'}
+        supervisor.credential_generation=snapshot['credential_generation']
+        supervisor.workers=[];supervisor.template_failure=None
+        supervisor.restore_available=lambda: True
+        failure={'stage':'observer_start','reason':'execution_mapping_missing'}
+        key=supervisor.worker_key(value)
+        template=SimpleNamespace(key=key,credential_expires_at=snapshot['expires_at'],parked=False,
+            criu_failure=read_failure(failure),close=lambda: None)
+        normal=SimpleNamespace(key=key,parked=False,start=lambda until: None)
+
+        def fail_start(until):
+            """按原截止模拟首个模板错误。@param until 原请求截止。@return 无。"""
+            raise InputError('worker_start_failed')
+
+        template.start=fail_start
+        with patch('agy_runtime.supervisor.Worker',side_effect=[template,normal]) as factory:
+            self.assertIs(supervisor.acquire(value,time.monotonic()+5),normal)
+            self.assertEqual(factory.call_count,2)
+        self.assertEqual(supervisor.workers,[normal])
+        self.assertEqual(supervisor.template_failure,failure)
+        self.assertIsNone(read_failure({**failure,'reason':'synthetic-secret'}))
+        with supervisor.condition:
+            supervisor.record_template_attempt(template,True)
+            supervisor.credential_generation+=1
+            supervisor.record_template_attempt(template,False)
+        self.assertIsNone(supervisor.template_failure)
+
     def test_reaper_keeps_one_recent_idle_worker_per_identity(self):
         """同身份保留一个较新热进程，工具轮和其他模型各自保留。@return 无。"""
         supervisor = Supervisor.__new__(Supervisor)
@@ -721,8 +756,12 @@ class AgyRuntimeTests(unittest.TestCase):
             raise OSError('合成启动失败')
 
         with patch('agy_runtime.native_bridge.verify_binary'), patch('agy_runtime.native_bridge.subprocess.Popen', side_effect=launch):
-            with self.assertRaises(OSError):
-                bridge._start()
+            for checkpoint in (False,True):
+                bridge.checkpoint_enabled=checkpoint
+                observed.clear()
+                with self.assertRaises(OSError):
+                    bridge._start()
+                self.assertEqual(observed.get('GODEBUG'),'multipathtcp=0' if checkpoint else None)
         self.assertNotIn('GEMINI_API_KEY', observed)
         self.assertNotIn('SSL_CERT_FILE', observed)
         self.assertEqual(observed['HOME'], str(bridge.native_home))

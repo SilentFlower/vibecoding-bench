@@ -9,6 +9,36 @@ import subprocess
 import time
 
 CONTROL = '/run/ccrb-criu/agy.sock'
+_IMAGE_FAILURES = ('execution_file_identity', 'execution_source_checksum', 'execution_mapping_reference',
+    'execution_mapping_missing', 'execution_mapping_writable_shared', 'execution_mapping_ambiguous',
+    'execution_site_0', 'execution_site_1', 'execution_site_2', 'execution_site_3')
+_FAILURE_REASONS = {
+    'worker_start': ('worker_start_failed',),
+    'observer_start': ('observer_start_failed', *_IMAGE_FAILURES),
+    'native_listener': ('listener_failed', 'native_listener_identity_timeout', 'native_listener_identity_conflict'),
+    'controller_connect': ('controller_unavailable', 'AGY_CRIU_PEER', 'AGY_CRIU_OWNER', 'AGY_CRIU_IMAGE', 'AGY_CRIU_PIPES'),
+    'checkpoint_stop': ('stop_failed', 'agy_criu_stop'),
+    'checkpoint_dump': ('dump_failed', 'AGY_CRIU_DUMP', 'AGY_CRIU_STOP'),
+    'checkpoint_restore': ('restore_failed', 'AGY_CRIU_RESTORE', 'AGY_CRIU_OWNER', 'AGY_CRIU_IMAGE', 'agy_criu_identity'),
+    'observer_resume': ('observer_resume_failed', *_IMAGE_FAILURES),
+    'restore_listener': ('listener_failed', 'agy_criu_listener'),
+}
+
+
+def failure_detail(stage: str, reason: object = None) -> dict[str, str]:
+    """投影当前阶段的受控失败原因。@param stage 已核对阶段。@param reason 内部候选错误。@return 脱敏阶段和原因。"""
+    allowed = _FAILURE_REASONS[stage]
+    return {'stage': stage, 'reason': reason if isinstance(reason, str) and reason in allowed else allowed[0]}
+
+
+def read_failure(value: object) -> dict[str, str] | None:
+    """核对来自私有事件或状态的诊断。@param value 原投影。@return 白名单诊断或空。"""
+    if not isinstance(value, dict) or set(value) != {'stage', 'reason'}:
+        return None
+    stage, reason = value['stage'], value['reason']
+    if isinstance(stage, str) and isinstance(reason, str) and reason in _FAILURE_REASONS.get(stage, ()):
+        return {'stage': stage, 'reason': reason}
+    return None
 
 
 class RestoredObserver:
@@ -54,6 +84,7 @@ class Template:
         self.connection = socket.socket(socket.AF_UNIX)
         self.parked = False
         self.suspended = False
+        self.stage = 'controller_connect'
 
     def read(self, kind, until):
         """核对控制器单帧答复。@param kind 期待状态。@param until 原单调截止。@return 受控回执。"""
@@ -71,6 +102,8 @@ class Template:
                 value = json.loads(data)
                 if isinstance(value, dict) and value.get('type') == kind:
                     return value
+                if isinstance(value, dict) and value.get('type') == 'unavailable':
+                    raise ValueError(failure_detail(self.stage, value.get('reason'))['reason'])
                 break
         raise ValueError('agy_criu_receipt')
 
@@ -93,10 +126,12 @@ class Template:
             raise ValueError('agy_criu_owner')
         self.send({'type': 'template', 'observer': bridge.proc.pid, 'native': bridge.native_pid}, until)
         self.read('accepted', until)
+        self.stage = 'checkpoint_stop'
         self.suspended = True
         os.kill(bridge.proc.pid, signal.SIGUSR1)
         if not bridge.checkpoint_stopped.wait(max(0, until - time.monotonic())):
             raise TimeoutError('agy_criu_stop')
+        self.stage = 'checkpoint_dump'
         self.send({'type': 'dump'}, until)
         receipt = self.read('template_ready', until)
         bridge.proc.wait(timeout=max(0, until - time.monotonic()))
@@ -106,10 +141,12 @@ class Template:
     def restore(self, until):
         """重新确认真实观察后返回。@param until 原单调截止。@return 恢复耗时。"""
         bridge = self.bridge
+        self.stage = 'checkpoint_restore'
         self.send({'type': 'restore'}, until)
         receipt = self.read('restored', until)
         if receipt['observer'] != bridge.proc.pid or receipt['native'] != bridge.native_pid:
             raise ValueError('agy_criu_identity')
+        self.stage = 'observer_resume'
         bridge.proc = RestoredObserver(receipt['observer'], bridge.proc.stdout, self.connection)
         signal.pidfd_send_signal(bridge.proc.descriptor, signal.SIGUSR2)
         signal.pidfd_send_signal(bridge.proc.descriptor, signal.SIGCONT)

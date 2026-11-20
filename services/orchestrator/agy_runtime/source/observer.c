@@ -12,6 +12,7 @@ __asm__(".symver __isoc23_strtol,strtol@GLIBC_2.2.5");
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <sys/prctl.h>
@@ -396,42 +397,85 @@ static int configure(pid_t tid) {
     return ptrace(PTRACE_POKEUSER, tid, (void *)offsetof(struct user, u_debugreg[7]), (void *)0x55UL) == 0;
 }
 
+typedef struct {
+    unsigned long first, last, offset;
+    dev_t device;
+    unsigned long long inode;
+    char permissions[5];
+} ImageMapping;
+
+/** 解析内核报告的映射区间与背板身份。 */
+static int read_image_mapping(const char *line, ImageMapping *value) {
+    unsigned major_number, minor_number;
+    if (sscanf(line, "%lx-%lx %4s %lx %x:%x %llu", &value->first, &value->last, value->permissions,
+               &value->offset, &major_number, &minor_number, &value->inode) != 7) return 0;
+    value->device = makedev(major_number, minor_number);
+    return 1;
+}
+
+/** 用同一已验证文件描述符取得内核实际映射的设备号和 inode。 */
+static int mapped_image_identity(int descriptor, ImageMapping *identity) {
+    /* OverlayFS 的 stat 与 VMA 可报告不同设备。私有映射一页只取身份，不读取或提交页面。 */
+    void *probe = mmap(NULL, 1, PROT_NONE, MAP_PRIVATE, descriptor, 0);
+    if (probe == MAP_FAILED) return 0;
+    FILE *maps = fopen("/proc/self/maps", "r");
+    char line[8192];
+    int found = 0;
+    if (maps) {
+        while (fgets(line, sizeof(line), maps)) {
+            if (read_image_mapping(line, identity) && identity->first == (uintptr_t)probe &&
+                identity->offset == 0 && identity->inode != 0) { found = 1; break; }
+        }
+        fclose(maps);
+    }
+    return munmap(probe, 1) == 0 && found;
+}
+
 /** 从实际执行映像验证完整身份、映射及固定指令。 */
 static int verify_image(void) {
     char path[128], line[8192];
     snprintf(path, sizeof(path), "/proc/%d/exe", root_pid);
     struct stat expected_image, actual_image;
-    if (stat(binary, &expected_image) != 0 || stat(path, &actual_image) != 0 ||
-        !S_ISREG(actual_image.st_mode) || actual_image.st_dev != expected_image.st_dev ||
-        actual_image.st_ino != expected_image.st_ino || actual_image.st_size != expected_image.st_size) { error_event("execution_file_identity"); return 0; }
     FILE *file = fopen(path, "rb");
-    if (!file) return 0;
-    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
-    if (!ctx) { fclose(file); return 0; }
-    EVP_DigestInit_ex(ctx, EVP_sha256(), NULL);
-    unsigned char block[65536], digest[32]; size_t size; unsigned int digest_size;
-    while ((size = fread(block, 1, sizeof(block), file))) EVP_DigestUpdate(ctx, block, size);
-    int failed = ferror(file); fclose(file);
-    EVP_DigestFinal_ex(ctx, digest, &digest_size); EVP_MD_CTX_free(ctx);
-    char hex[65]; for (unsigned i = 0; i < 32; i++) snprintf(hex+i*2, 3, "%02x", digest[i]);
-    if (failed || digest_size != 32 || strcmp(hex, SOURCE_SHA)) { error_event("execution_source_checksum"); return 0; }
-    snprintf(path, sizeof(path), "/proc/%d/maps", root_pid);
-    file = fopen(path, "r"); if (!file) return 0;
-    unsigned parsed_maps = 0, matching_inodes = 0, matching_devices = 0;
-    while (fgets(line, sizeof(line), file)) {
-        unsigned long first, last, offset;
-        unsigned major_number, minor_number; unsigned long long inode; char permissions[5];
-        if (sscanf(line, "%lx-%lx %4s %lx %x:%x %llu", &first, &last, permissions, &offset,
-                   &major_number, &minor_number, &inode) != 7) continue;
-        parsed_maps++;
-        if (inode == actual_image.st_ino) matching_inodes++;
-        if (makedev(major_number, minor_number) == actual_image.st_dev) matching_devices++;
-        if (makedev(major_number, minor_number) != actual_image.st_dev || inode != actual_image.st_ino) continue;
-        /* 按实际背板识别映像；共享代码的可写映射保持每进程私有。 */
-        if (permissions[1] == 'w' && permissions[3] == 's') { fclose(file); return 0; }
-        if (offset == 0) image_base = first;
+    if (!file || stat(binary, &expected_image) != 0 || fstat(fileno(file), &actual_image) != 0 ||
+        !S_ISREG(actual_image.st_mode) || actual_image.st_dev != expected_image.st_dev ||
+        actual_image.st_ino != expected_image.st_ino || actual_image.st_size != expected_image.st_size) {
+        if (file) fclose(file);
+        error_event("execution_file_identity"); return 0;
     }
-    fclose(file); if (!image_base) { char reason[128]; snprintf(reason, sizeof(reason), "execution_base_missing_maps_%u_inode_%u_device_%u", parsed_maps, matching_inodes, matching_devices); error_event(reason); return 0; }
+    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+    int hashed = ctx && EVP_DigestInit_ex(ctx, EVP_sha256(), NULL) == 1;
+    unsigned char block[65536], digest[32]; size_t size; unsigned int digest_size = 0;
+    while (hashed && (size = fread(block, 1, sizeof(block), file))) hashed = EVP_DigestUpdate(ctx, block, size) == 1;
+    hashed = hashed && !ferror(file) && EVP_DigestFinal_ex(ctx, digest, &digest_size) == 1;
+    EVP_MD_CTX_free(ctx);
+    if (!hashed || digest_size != 32) { fclose(file); error_event("execution_source_checksum"); return 0; }
+    char hex[65]; for (unsigned i = 0; i < 32; i++) snprintf(hex+i*2, 3, "%02x", digest[i]);
+    if (strcmp(hex, SOURCE_SHA)) { fclose(file); error_event("execution_source_checksum"); return 0; }
+    ImageMapping identity = {.device = actual_image.st_dev, .inode = actual_image.st_ino};
+    if (actual_image.st_nlink && !mapped_image_identity(fileno(file), &identity)) {
+        fclose(file); error_event("execution_mapping_reference"); return 0;
+    }
+    fclose(file);
+    snprintf(path, sizeof(path), "/proc/%d/maps", root_pid);
+    file = fopen(path, "r"); if (!file) { error_event("execution_mapping_missing"); return 0; }
+    unsigned long base = 0;
+    while (fgets(line, sizeof(line), file)) {
+        ImageMapping mapping;
+        if (!read_image_mapping(line, &mapping) || mapping.device != identity.device || mapping.inode != identity.inode) continue;
+        /* 按实际背板识别映像；共享代码的可写映射保持每进程私有。 */
+        if (mapping.permissions[1] == 'w' && mapping.permissions[3] == 's') {
+            fclose(file); error_event("execution_mapping_writable_shared"); return 0;
+        }
+        if (mapping.offset == 0) {
+            if (base) { fclose(file); error_event("execution_mapping_ambiguous"); return 0; }
+            base = mapping.first;
+        }
+    }
+    int map_failed = ferror(file);
+    fclose(file);
+    if (map_failed || !base) { error_event("execution_mapping_missing"); return 0; }
+    image_base = base;
     const unsigned char *expected[] = {expected_0, expected_1, expected_2, expected_3};
     const size_t sizes[] = {sizeof(expected_0), sizeof(expected_1), sizeof(expected_2), sizeof(expected_3)};
     for (unsigned i = 0; i < 4; i++) {

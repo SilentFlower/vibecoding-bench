@@ -4,6 +4,7 @@ import json
 import time
 
 from account_isolation import role_container
+from agy_runtime.criu import read_failure
 from native_criu_policy import restore_policy
 from native_kernel_upgrade import pending_upgrade
 from native_settings_operation import apply_settings
@@ -74,6 +75,9 @@ def read_settings(runtime, row: dict, observation: dict | None = None) -> dict:
                 result.update(state=value['state'], reason=value.get('reason'), template_ready=value['template_ready'], checked_at_ms=checked)
                 if value.get('last_start_source') in ('exec', 'criu_restore'):
                     result['last_start_source'] = value['last_start_source']
+                if isinstance(agy, dict) and value.get('reason') == 'template_failed':
+                    if failure := read_failure(value.get('failure')):
+                        result['failure'] = failure
             else:
                 result['reason'] = 'telemetry_missing'
     return result

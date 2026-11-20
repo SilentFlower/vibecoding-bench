@@ -2045,6 +2045,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `AgyAccessSnapshot`为account_id、credential_generation、access_token、expires_at、email，拒绝refresh_token。`AgyToolCompletion`为request、api_token_id、previous_request_id、body；旧工具控制不携带凭据。
 - `agy_runtime.tool_schema.normalize(schema, path='', changes=None)` 返回独立工具 Schema，接收 `functionDeclarations[].parameters` 与 `parametersJsonSchema`。`changes` 可记录 `{path, action}`，原工具定义保持原样。
 - `AgySenderConfig`包含protocol_version=1、完整source_sha256、module_root、binary_path、work_root、max_workers和memory_mib。内部监督协议schema_version=1，命令submit/prepare/finish_tools/status/cancel/shutdown，事件持续到job_finalized。
+- AGY 监督器 `restore.failure` 和环境摘要 `criu.failure` 可包含 `{stage:string,reason:string}`。`agy_runtime.criu.read_failure` 核对允许的阶段和原因组合。历史回执可省略该字段。
 - `native_event.event.control_http_status` 是可选整数，记录失败终态已收到的 AGY 控制 HTTP 4xx/5xx。旧内核可省略该字段。Gemini 公开 `error.code` 使用已核对的状态码。
 - 追加`bench.agy-environments.5`：platform_api_environments以唯一gateway_account_id及唯一environment_id绑定现有account_environments，platform固定antigravity。AGY环境account_id为空，名称采用`agy:<gateway-id>`；历史基线保持冻结。
 
@@ -2066,6 +2067,8 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 控制响应头已返回 4xx/5xx 时保留状态码，错误正文解析失败时同样适用。普通 HTTP 和 SSE 首帧前用该状态结束请求，已开始的 SSE 通过尾帧 `error.code` 交付同一状态。尝试记录使用真实控制状态和 `native_control` 阶段，根记录保留实际客户端 HTTP 状态。已确证的上游配额 429 优先，已保留的成功结果继续按成功收尾。
 - 账号内共享完整265700040字节封存映像，核对SHA和四封存，decode计数、分发大小、控制/内核/观察器/原生RSS/PSS/USS与cgroup独立展示。max_workers等于账号concurrency，范围1..64，跨模型和凭据代次共用物理上限。有限sender RAM为512+256×workers MiB，network 256MiB、CLI至少512MiB，总量受原预算约束；零沿明确无限策略。
 - AGY 启动快照与同身份热进程分别回收。快照占用原缓存池名额，优先复用正在运行的热进程。控制器在线时，`restore.state` 的 `waiting` 表示尚无快照，`preparing` 表示后台准备中，`ready` 以当前代次的可恢复快照为准。准备失败以 `unavailable` 和 `template_failed` 表达，普通启动继续可用。
+- 文件型模板观察器使用同一个 `/proc/PID/exe` 文件描述符核对实际文件身份和完整 SHA256。通过短暂的私有不可读映射取得内核报告的背板设备号和 inode，再按该组合核对目标进程映射。封存 memfd 按原设备号和 inode 核验。启动和恢复均要求唯一零偏移基址、非可写共享映射和四个固定指令指纹。模板启动固定 `GODEBUG=multipathtcp=0`，使当前 CRIU 4.2 能保存 AGY 的监听套接字。
+- 模板和恢复失败在原 worker 清理前记录阶段和白名单原因，普通回退继承原单调截止。仅同一凭据代次的真实失败进入监督器状态，模板成功或凭据换代清除旧诊断。管理端在环境、代次、模块根和新鲜度核验后投影白名单诊断。原始异常路径、令牌及正文留在诊断字段之外。
 - cgroup v2读取memory.max、memory.current、memory.peak和memory.swap.current；v1支持memory子目录或挂载根的memory.limit_in_bytes、memory.usage_in_bytes、memory.max_usage_in_bytes，memory.memsw.usage_in_bytes减RAM占用才是swap。v1限制大于等于2^60沿既有规则按无限处理；缺失/损坏为未知，监督器与冻结RAM不一致时拒绝，不能把未知当作无限。
 - 正式模块根为/opt/v3/python，共享runtime_files位于/usr/local/bin。监督器和worker都冻结这两个搜索路径。AT HOME随worker私有发布，退役删除；采集复用账号开关与HTTP日志模式，长期有界脱敏快照位于flows/api/agy-prepared，原始执行材料沿临时worker目录和关闭清理。历史已退役采集保留七天；统一容量、内部旁路及读取合同由网关settings-database的AGY请求记录场景持有。普通输出采用有界匿名暂存，私有事件读取按帧及总字节控制背压。
 - 旧工具和实际Root active纳入维护/升级排空。未知退出阻止新准备，显式对账停止本环境三角色后只清派生缓存和AT副本，保留权威凭据及身份。环境维护回执核对expected_generation；读取不唤醒，UI轮询保留草稿和焦点。存在AGY映射时目标control/account都须声明agy-runtime-protocol=1。
@@ -2086,6 +2089,8 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 | 公共断连、原截止到期 | 精确取消原作业，活动保持到实际收口后释放 |
 | 准入时、旧代收尾后或Popen前原截止已过 | `request_deadline_exceeded`，停止后续建代或启动副作用 |
 | 监督器异常或旧镜像缺协议 | 待对账或拒绝升级，不自动重放未知请求 |
+| 文件型映像的 `stat` 与目标映射设备号不同 | 依据已核验文件描述符的实际背板身份核对映射。无法确认背板、出现多个零偏移基址或可写共享映射时拒绝模板 |
+| 当前代次模板保存或恢复失败 | 保留受控阶段，沿原截止普通启动。原生业务仍只提交一次 |
 
 ### 5. Scenarios and Examples
 
@@ -2105,12 +2110,15 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 
 凭据边界：AT 剩余 299 秒时，固定原版断网启动报需要登录，剩余 310 秒时实测就绪。公共入口通过管理侧提前换代，首次模型提交使用新快照。
 
+诊断示例。实际观察器未取得合格的目标映射时，可报告 `{"stage":"observer_start","reason":"execution_mapping_missing"}`。单凭 inode 或 `stat` 的设备号判断 OverlayFS 映射会产生错误准入判断。使用同一已核验文件描述符取得实际映射身份。
+
 ### 6. Tests Required
 
 - `test_agy_runtime`、`test_agy_supervisor`、`test_agy_environment`覆盖AT-only、参数、目录、帧/签名、终态、代次/工具、v1/v2有限/无限/未知预算、环境归属与维护。
 - `test_agy_runtime` 覆盖两种工具声明、嵌套缺项、两种元组、字符串常量与 `enum` 冲突及重复归一化。固定原版回环断言实际出站的内层 `items`、元组长度上限、单值 `enum`，并核对工具调用保留数字及布尔值、结果完成回填。
 - `test_agy_runtime` 验证已观测控制状态、非法 JSON 响应与成功结果保留。`verify_agy_gemini.py` 验证普通 HTTP、SSE 首帧前后与尝试记录的状态，覆盖 200 和旧内核字段缺失的503兜底。固定原版回环验证非法工具正则导致的控制500及零模型提交。
 - `test_agy_supervisor`覆盖已过期准入、旧代关闭耗尽截止以及真实Worker.start过期；分别断言worker创建为0、新代启动为0及Popen调用为0，均返回 `request_deadline_exceeded`。
+- AGY 文件型模板应在普通业务权限的隔离 OverlayFS 上实际保存并恢复，核对首笔合成请求、原生 PID 和唯一提交。另验普通 memfd、错误文件身份、恢复失败及凭据换代。`test_agy_runtime`、`test_agy_supervisor` 和 `test_native_criu_settings` 核对阶段、原请求回退及旧代或非白名单原因的投影。
 - Rust的runtime_transport单测覆盖精确AGY目标及CC路径隔离；agy_sender_test、gemini_account_test、gemini_contract_test、runtime_transport_test覆盖鉴权、绑定、权限、源聚合与取消。
 - `verify_agy_gemini.py` 覆盖未知模型在流式和非流式入口返回 404、令牌范围外模型和未观测目录、已知模型暂不可用时的 503、临期凭据单次续期及有效期充足时继续复用。
 - 同一断网探针核对公开 Gemini 目录跨账号去重、异平台名称保持、基础名和旧档位名实际发送的目录型号及原生 ID、显式档位隔离、工具续轮沿用型号和请求诊断保留原名。
