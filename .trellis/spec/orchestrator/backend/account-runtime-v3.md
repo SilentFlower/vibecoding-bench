@@ -2036,6 +2036,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - Gemini生成可用基础模型名配 `generationConfig.thinkingConfig`。`thinkingLevel` 接受 `MINIMAL`、`LOW`、`MEDIUM`、`HIGH`、`XHIGH`，大小写不敏感。`thinkingBudget` 接受整数 `-1` 或非负值。`includeThoughts` 接受布尔值，响应保持原生帧。
 - 账号发送器POST `/internal/agy/prepare`、`/internal/agy/generate`、`/internal/agy/tools`，复用Bearer、TransportBinding、原请求ID和截止校验；只接受冻结的POST `https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent`目标。
 - `AgyAccessSnapshot`为account_id、credential_generation、access_token、expires_at、email，拒绝refresh_token。`AgyToolCompletion`为request、api_token_id、previous_request_id、body；旧工具控制不携带凭据。
+- `agy_runtime.tool_schema.normalize(schema, path='', changes=None)` 返回独立工具 Schema，接收 `functionDeclarations[].parameters` 与 `parametersJsonSchema`。`changes` 可记录 `{path, action}`，原工具定义保持原样。
 - `AgySenderConfig`包含protocol_version=1、完整source_sha256、module_root、binary_path、work_root、max_workers和memory_mib。内部监督协议schema_version=1，命令submit/prepare/finish_tools/status/cancel/shutdown，事件持续到job_finalized。
 - 追加`bench.agy-environments.5`：platform_api_environments以唯一gateway_account_id及唯一environment_id绑定现有account_environments，platform固定antigravity。AGY环境account_id为空，名称采用`agy:<gateway-id>`；历史基线保持冻结。
 
@@ -2046,6 +2047,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 带档位的 Gemini 名称仍按完整名称匹配。基础名称显式给出有效档位时先匹配该档位，再匹配真实的同名无后缀型号。`thinkingLevel` 优先于 `thinkingBudget`，`MINIMAL` 视为 `low`，预算 `0–1024`、`1025–8192`、`-1` 或 `8193` 及以上分别对应 `low`、`medium`、`high`。省略档位时先找真实同名型号，再按 `high`、`medium`、`low`、`tiered`、`xhigh` 匹配目录。相同优先级继续按原账号负载排序。
 - 基础名称和变体都只从令牌权限内账号的真实目录映射到原生执行 ID。目录存在且没有有效映射返回 Gemini 404。当前令牌无可见目录或已知模型暂不可用时沿原 503 路径。网关在原始入站采集后消费 `thinkingConfig`，通过已有私有协议发送目录型号及其执行 ID。请求诊断保留客户端模型名和实际提交的原生 ID，认证恢复和工具续轮沿用选定型号。
 - temperature/topP兼容接收后忽略，记录字段及policy=native_default；maxOutputTokens映射原生maxTokens。工具、签名及其他输入继续按实际能力校验。SSE交付源JSON逻辑帧，非流式沿同一执行路径聚合Parts、未知扩展及usage；禁止伪造STOP、[DONE]或成功用量。
+- 数组 `items` 缺失、为 `null`、`true` 或裸 `{}` 时，规范化为 `{"anyOf":[{}]}`，使 AGY 1.5.9 出站包含 `items:{}`。`items:false` 以 `maxItems:0` 表示。`prefixItems` 与旧式 `items:[]` 投影为单个元素 Schema，闭合元组保留 `maxItems` 上限，已有更小上限优先。原生接口按统一元素 Schema 表达元组，位置约束会丢失。工具调用和结果仍使用原 JSON 值。字符串 `const` 与已有 `enum` 取交集并输出单值 `enum`。
 - 正式OAuth观察器核对完整原版SHA、映像身份及四个指令指纹。原生路由为0xa098532，channelModelResponseStream.Receive接收返回位置0x95d1e90，遥测0x89ed91f，codeassist Scanner栈检查后0x95f3212。Receive在AL给出接收结果、RCX给出已核对的GetChatMessageResponse；Scanner原块先私有归档，再解开SSE及response信封。EOF保留错误未知标记，业务成功同时要求源finishReason/安全拦截终态及真实控制RPC成功。部分文本、usage或通道关闭单独出现均不算成功。
 - 管理侧锁内冻结ready状态和AT-only快照。新代采用新worker，最高代次单调，同代不同AT拒绝；旧在途及原工具轮保留归属。工具结果匹配调用方、账号、原历史和函数身份，先回填原MCP并收口，再读当前ready快照开始下一模型轮。concurrency=1复用原许可；pending/reconcile期间可独立收口旧工具，普通发布继续关闭。同结果回执仅在原截止内幂等，副作用只回填一次。
 - 公共生成在原账号刷新锁内要求 AT 剩余有效期超过 430 秒。该值保留 AGY 1.5.9 的 310 秒断网启动实测余量和原生请求最长 120 秒预算。有效期不足时，由管理侧按原代次流程续期后再发布 AT-only 快照；在途工作继续使用自己的快照。
@@ -2063,6 +2065,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 | 缺失/禁用令牌 | 401，账号许可不进入业务 |
 | 冲突key、未知输入、错工具调用方/ID或重复续轮 | 受控400，拒绝发送或回填 |
 | Gemini `thinkingConfig` 形状、档位、预算或字段无效 | 400 `INVALID_ARGUMENT`，零发送 |
+| 字符串 `const` 不在同字段的 `enum` 内 | 400 `AGY_UNSUPPORTED_INPUT`，私有校验为 `invalid_tool_schema`，零发送 |
 | 已有令牌可见目录，公开模型无对应映射 | 404 `NOT_FOUND`，提示读取 `GET /v1beta/models`，零发送 |
 | pending/reconcile、旧凭据代次、容量或原生失败 | 受控503，保留原请求归属及实际入口计数 |
 | 源只有文本或usage、缺少源终态 | 原生流不完整；非流式503，已开始SSE按失败收尾 |
@@ -2075,6 +2078,8 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 
 模型聚合示例。账号目录中的 `gemini-4-neon-low` 和 `gemini-4-neon-high` 对外列为 `models/gemini-4-neon`。客户端向 `/v1beta/models/gemini-4-neon:generateContent` 提交 `"thinkingConfig":{"thinkingLevel":"LOW"}`（放在 `generationConfig` 内），网关从该令牌允许的账号中查找 `gemini-4-neon-low`。如果目录只有两个带后缀的条目，`MEDIUM` 请求返回 404，客户端可选择目录实际支持的档位。
 
+嵌套筛选数组示例。`{"type":"array","items":{"type":"array"}}` 的内层数组需经归一化补 `items`。直接补裸 `{}` 会被 AGY 序列化省略。使用 `{"anyOf":[{}]}` 可保留出站字段，`["count",">=",7]` 和 `["ready","==",true]` 的值类型维持原样。
+
 正常：Gemini工具首轮返回真实functionCall并保留原许可；管理侧发布AT2后，调用方带原历史和functionResponse续轮，原AT1 worker完成真实MCP回填，下一模型由AT2 worker执行。边界：管理侧reconcile时先完成旧工具并保留原截止内回执，恢复ready后继续；资源无限必须有真实cgroup依据。
 
 错误用法：以HTTP 200、Go RPC返回或EOF认定部分文本成功；正确处理是同时验证源终态和控制终态。错误用法：用发送器替身的通过结果宣称原生OAuth业务已验证；正确处理是独立运行固定原版、本地TLS及真实MCP闭环。真实Google身份、目录接受性及跨实际到期仍由具备授权账号和独立预算的后续验收承接。
@@ -2086,6 +2091,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 ### 6. Tests Required
 
 - `test_agy_runtime`、`test_agy_supervisor`、`test_agy_environment`覆盖AT-only、参数、目录、帧/签名、终态、代次/工具、v1/v2有限/无限/未知预算、环境归属与维护。
+- `test_agy_runtime` 覆盖两种工具声明、嵌套缺项、两种元组、字符串常量与 `enum` 冲突及重复归一化。固定原版回环断言实际出站的内层 `items`、元组长度上限、单值 `enum`，并核对工具调用保留数字及布尔值、结果完成回填。
 - `test_agy_supervisor`覆盖已过期准入、旧代关闭耗尽截止以及真实Worker.start过期；分别断言worker创建为0、新代启动为0及Popen调用为0，均返回 `request_deadline_exceeded`。
 - Rust的runtime_transport单测覆盖精确AGY目标及CC路径隔离；agy_sender_test、gemini_account_test、gemini_contract_test、runtime_transport_test覆盖鉴权、绑定、权限、源聚合与取消。
 - `verify_agy_gemini.py` 覆盖未知模型在流式和非流式入口返回 404、令牌范围外模型和未观测目录、已知模型暂不可用时的 503、临期凭据单次续期及有效期充足时继续复用。

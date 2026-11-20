@@ -28,6 +28,7 @@ from agy_runtime.kernel import Bridge, Kernel, Scope, Worker
 from agy_runtime.stream_controller import NativeJob
 from agy_runtime.supervisor import Supervisor
 from agy_runtime.tool_broker import Broker
+from agy_runtime.tool_schema import normalize
 from agy_runtime.storage import Output, config
 from runtime_files import atomic_json
 
@@ -181,6 +182,62 @@ class AgyRuntimeTests(unittest.TestCase):
             with self.subTest(modalities=modalities), self.assertRaisesRegex(
                     InputError, 'unsupported_gemini_output_modality:/body/generationConfig/responseModalities'):
                 gemini_contract.decode_request(raw)
+
+    def test_gemini_normalizes_nested_array_items_and_string_const(self):
+        """从 Gemini 两类工具声明保留已知类型，并记录真实缺项与常量改写位置。@return 无。"""
+        schema = {'type': 'OBJECT', 'properties': {'query': {'type': 'OBJECT', 'properties': {
+            'where': {'type': 'ARRAY', 'items': {'type': 'ARRAY'}},
+            'tags': {'type': 'ARRAY', 'items': {'type': 'STRING'}},
+            'action': {'const': 'query', 'enum': ['query', 'list']},
+            'revision': {'type': 'INTEGER', 'const': 7},
+        }}}}
+        raw = {'schema_version': 1, 'type': 'gemini_request', 'request_id': 'tool-schema',
+            'model': 'gemini-synthetic', 'body': {'contents': [{'parts': [{'text': '合成请求'}]}],
+                'tools': [{'functionDeclarations': [{'name': 'tool_' + key, key: schema}
+                    for key in ('parameters', 'parametersJsonSchema')]}]}}
+        original = copy.deepcopy(raw)
+        decoded = gemini_contract.decode_request(raw)
+        for tool in decoded['tools']:
+            query = tool['input_schema']['properties']['query']['properties']
+            self.assertEqual(query['where']['items']['items'], {'anyOf': [{}]})
+            self.assertEqual(query['tags']['items'], {'type': 'string'})
+            self.assertEqual(query['action'], {'type': 'string', 'enum': ['query']})
+            self.assertEqual(query['revision'], {'type': 'integer', 'const': 7})
+            changes = []
+            self.assertEqual(normalize(tool['input_schema'], changes=changes), tool['input_schema'])
+            self.assertEqual(changes, [])
+        self.assertEqual(raw, original)
+        for action, suffix in (('array_items_as_schema', '/properties/query/properties/where/items/items'),
+                ('string_const_as_enum', '/properties/query/properties/action/const')):
+            self.assertEqual(sum(item['action'] == action and item['path'].endswith(suffix)
+                for item in decoded['schema_changes']), 2)
+
+    def test_schema_preserves_tuple_types_and_closed_length(self):
+        """新版和旧版闭合元组保留候选类型与长度，显式允许的尾部仍可传递。@return 无。"""
+        elements = [{'type': 'string'}, {'const': 'eq'}, {'type': 'number'}, {'type': 'boolean'}]
+        expected = {'type': 'array', 'minItems': 2, 'maxItems': 4, 'items': {'anyOf': [
+            {'type': 'string'}, {'type': 'string', 'enum': ['eq']}, {'type': 'number'}, {'type': 'boolean'}]}}
+        for tuple_schema in ({'prefixItems': elements, 'items': False},
+                {'items': elements, 'additionalItems': False}):
+            changes = []
+            actual = normalize({'type': 'array', 'minItems': 2, 'maxItems': 9, **tuple_schema},
+                '/where/items', changes)
+            self.assertEqual(actual, expected)
+            self.assertTrue(any(item['action'] == 'tuple_as_array_items' for item in changes))
+            self.assertEqual(normalize(actual), actual)
+        self.assertEqual(normalize({'type': 'ARRAY', 'prefixItems': [{'type': 'STRING'}],
+            'items': {'type': 'BOOLEAN'}})['items'], {'anyOf': [{'type': 'string'}, {'type': 'boolean'}]})
+        self.assertEqual(normalize({'type': 'array', 'prefixItems': elements, 'maxItems': 1})['items'], {'type': 'string'})
+        self.assertEqual(normalize({'type': 'array', 'prefixItems': elements, 'items': False, 'maxItems': '1'}),
+            {'type': 'array', 'maxItems': 1, 'items': {'type': 'string'}})
+        self.assertEqual(normalize({'type': 'array', 'prefixItems': elements})['items'], {'anyOf': [{}]})
+        self.assertEqual(normalize({'type': 'array', 'items': False}),
+            {'type': 'array', 'maxItems': 0, 'items': {'anyOf': [{}]}})
+
+    def test_schema_rejects_conflicting_string_const_and_enum(self):
+        """不扩大互相矛盾的约束，并保留实际拒绝路径。@return 无。"""
+        with self.assertRaisesRegex(InputError, 'invalid_tool_schema:/action/const'):
+            normalize({'const': 'query', 'enum': ['list']}, '/action')
 
     def test_safety_egress_validates_binding_and_sends_model_once(self):
         """覆盖口令、随机路径、压缩正文和重复模型提交。@return 无。"""

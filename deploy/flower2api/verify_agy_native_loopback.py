@@ -30,6 +30,7 @@ ENVIRONMENT='a'*32
 SECRET='synthetic-internal-proof-at-least-32-bytes'
 MODEL='gemini-3.1-pro-preview'
 SOURCE_SHA='39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43'
+SCHEMA_TOOL_ARGS = {'x': 1, 'action': 'query', 'where': [['count', '>=', 7], ['ready', '==', True]]}
 
 
 def require(condition, message):
@@ -122,7 +123,8 @@ class Upstream(BaseHTTPRequestHandler):
             self.close_connection=True
             tool_id='call_'+('a1b2'*8) if self.png_support else 'synthetic-call'
             if deadline_chain:tool_id=f'call_{returned+1:032x}'
-            part={'functionCall':{'name':'synthetic_tool','args':{'x':1},'id':tool_id},'thoughtSignature':'c3ludGhldGljLXNpZw=='} if tool else {'text':'本地TLS回复'}
+            arguments = SCHEMA_TOOL_ARGS if 'TLS_SYNTHETIC_TOOL_SCHEMA' in encoded else {'x':1}
+            part={'functionCall':{'name':'synthetic_tool','args':arguments,'id':tool_id},'thoughtSignature':'c3ludGhldGljLXNpZw=='} if tool else {'text':'本地TLS回复'}
             frames=[{'candidates':[{'index':0,'content':{'role':'model','parts':[part]}}]}]
             if repeated:frames*=64
             if capacity:
@@ -1024,12 +1026,31 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
         require(result['usageMetadata']['totalTokenCount']==7 and result['candidates'][0]['content']['parts'][0]['text']=='本地TLS回复','原生响应或usage错误')
         status,raw=request(base+'streamGenerateContent?alt=sse',body)
         require(status==200 and raw.startswith(b'data: ') and b'[DONE]' not in raw,'固定原版SSE失败')
-        tool=copy.deepcopy(body);tool['contents'][0]['parts'][0]['text']='TLS_SYNTHETIC_TOOL'
-        tool['tools']=[{'functionDeclarations':[{'name':'synthetic_tool','parameters':{'type':'OBJECT','properties':{'x':{'type':'INTEGER'}}}}]}]
+        tool=copy.deepcopy(body);tool['contents'][0]['parts'][0]['text']='TLS_SYNTHETIC_TOOL_SCHEMA'
+        elements = [{'type': 'STRING'}, {'type': 'STRING'}, {'type': 'NUMBER'}, {'type': 'BOOLEAN'}]
+        tool['tools'] = [{'functionDeclarations': [{'name': 'synthetic_tool', 'parameters': {
+            'type': 'OBJECT', 'properties': {
+                'x': {'type': 'INTEGER'}, 'action': {'const': 'query'},
+                'where': {'type': 'ARRAY', 'items': {'type': 'ARRAY'}},
+                'prefix': {'type': 'ARRAY', 'prefixItems': elements, 'items': False, 'maxItems': '3'},
+                'legacy': {'type': 'ARRAY', 'items': elements, 'additionalItems': False},
+            },
+        }}]}]
         status,raw=request(base+'generateContent',tool)
         require(status==200,'固定原版工具首轮失败：'+str(status)+' '+raw.decode()[:500])
         result=json.loads(raw);content=result['candidates'][0]['content']
-        require(any('functionCall' in part for part in content['parts']),'原生工具源帧缺失')
+        calls = [part['functionCall'] for part in content['parts'] if 'functionCall' in part]
+        require(len(calls) == 1 and calls[0]['args'] == SCHEMA_TOOL_ARGS
+            and calls[0]['args']['where'][1][2] is True, '原生工具源帧缺失或筛选值类型改变')
+        native_request = Upstream.calls[2]['body'].get('request', Upstream.calls[2]['body'])
+        declarations = [declaration for group in native_request['tools']
+            for declaration in group.get('functionDeclarations', []) if declaration.get('name') == 'synthetic_tool']
+        require(len(declarations) == 1, '原生出站工具定义缺失或重复')
+        properties = declarations[0]['parameters']['properties']
+        require(isinstance(properties['where']['items'].get('items'), dict), '原生出站遗漏嵌套数组的 items')
+        require(all(isinstance(properties[name].get('items'), dict) and str(properties[name].get('maxItems')) == maximum
+            for name, maximum in (('prefix', '3'), ('legacy', '4'))), '原生出站遗漏新版或旧版元组的 items 或长度上限')
+        require(properties['action'].get('enum') == ['query'], '原生出站遗失字符串常量约束')
         continuation=copy.deepcopy(tool)
         continuation['contents']+=[content,{'role':'user','parts':[{'functionResponse':{
             'id':'synthetic-call','name':'synthetic_tool','response':{'value':'TLS_SYNTHETIC_RESULT'}}}]}]
