@@ -394,8 +394,13 @@ def validate_operation(value: dict) -> dict:
     :param value: 原始操作对象。
     :return: 原对象；未知字段或非法 ID 拒绝。
     """
-    _fields(value, {'operation_id', 'expected_revision', 'target_release', 'target_manifest_sha256', 'drain_timeout_seconds'}, '更新操作')
-    for field in ('operation_id', 'expected_revision'):
+    fields = {'operation_id', 'expected_revision', 'target_release', 'target_manifest_sha256', 'drain_timeout_seconds'}
+    if isinstance(value, dict) and 'prepared_operation_id' in value:
+        fields.add('prepared_operation_id')
+    _fields(value, fields, '更新操作')
+    for field in ('operation_id', 'expected_revision', 'prepared_operation_id'):
+        if field not in fields:
+            continue
         try:
             if str(uuid.UUID(value[field])) != value[field]:
                 raise ValueError('更新操作身份格式无效')

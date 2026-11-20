@@ -2084,6 +2084,29 @@ class AccountRuntimeTests(unittest.TestCase):
             installer.assert_not_called()
         self.assertEqual(self.runtime._row("synthetic", 1)["state"], "cli_reconcile")
 
+    def test_compatible_rollout_binding_initializes_the_quota_identity(self) -> None:
+        """旧账号首次接单同步原额度身份，保持已核验的发送器与代次。@return 无。"""
+        row = self.runtime._row("synthetic", 1)
+        self.runtime._update(row, isolation_version=2, generation=3, state="ready",
+            **{column: role for role, column in ROLE_COLUMNS.items()})
+        binding = {"account_id": 7, "environment_id": row["environment_id"], "generation": 3, "release_id": "ci-1-1"}
+        configuration = {"proxy_url": "", "binding": binding, "quota_identity": ""}
+        self.runtime._write_sender_config(row, configuration)
+        self.runtime.quota_identity = lambda account: "synthetic-quota-owner"
+        self.gateway._request.return_value = {"proxy_url": "", "auth_type": "oauth", "status": "active"}
+        account = {"id": 1, "name": "synthetic", "cc2api_account_id": 7,
+            "upstream_socks5_host": "", "upstream_socks5_port": 1080}
+        with (
+            patch.dict(os.environ, {"V3_UPDATE_GATE_DIR": str(self.root)}),
+            patch("account_runtime.compatible_account_origin", return_value={"release": "ci-1-1"}),
+            patch("account_runtime.role_container", return_value=Mock(status="running")),
+            patch("account_runtime.role_release", return_value="ci-1-1"),
+            patch.object(self.runtime, "ensure") as ensure,
+        ):
+            self.assertEqual(binding, self.runtime.transport(account, "1.0.0"))
+            self.assertEqual("synthetic-quota-owner", self.runtime.read_sender_configuration(row)["quota_identity"])
+            ensure.assert_not_called()
+
     def test_default_memory_is_unlimited_for_missing_and_empty_configuration(self) -> None:
         """默认及空部署值创建无限角色，身份与CPU/PID保持有效。@return None。"""
         self._isolated_docker()

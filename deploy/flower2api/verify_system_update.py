@@ -239,6 +239,21 @@ def worker(policy_path: Path, fault: str | None) -> None:
                         raise ValueError('隔离夹具账号部分角色故障')
                 finally:
                     client.close()
+
+        def supports_local_rollout(self, original, selected) -> bool:
+            """兼容路径另行验收部分重建故障恢复。@param original 原版。@param selected 目标。@return 后台更新能力。"""
+            return fault != 'partial-account' and super().supports_local_rollout(original, selected)
+
+        def rollout_environment(self, operation, item) -> dict:
+            """隔离场景在账号 RPC 前注入延迟和一次超时。@param operation 原切换。@param item 本机账号。@return 实际回执。"""
+            if fault == 'rolling-accounts':
+                if item['name'] == 'synthetic-running':
+                    atomic_json(root / 'rollout-delayed.json', {'environment_id': item['environment_id']})
+                    wait_for(lambda: (root / 'rollout-continue').exists(), '慢账号未收到测试放行', timeout=30)
+                if item['name'] == 'synthetic-second' and not (root / 'rollout-second-failed').exists():
+                    (root / 'rollout-second-failed').touch()
+                    raise TimeoutError('隔离夹具单账号更新超时')
+            return super().rollout_environment(operation, item)
     engine = SystemUpdater(policy, FaultHost(policy))
     path = root / 'socket/updater.sock'
     path.unlink(missing_ok=True)
@@ -308,8 +323,10 @@ ENV PROJECT_LIBRARY_DIR=/isolated-empty-library
 ARG RELEASE
 ARG REVISION
 ARG FAST_SWITCH=0
+ARG LOCAL_ROLLOUT=0
 LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.system-update-protocol="1" vibebench.verification="platform-update"
 LABEL vibebench.fast-system-update=$FAST_SWITCH
+LABEL vibebench.local-account-rollout=$LOCAL_ROLLOUT
 FROM ${ACCOUNT_BASE} AS account
 COPY sender /usr/local/bin/account-sender
 ARG RELEASE
@@ -408,12 +425,14 @@ LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.v
             child = subprocess.Popen(arguments, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             wait_for(lambda: status().get('installed'), '独立更新服务未就绪')
 
-        def submit(index, action='install'):
+        def submit(index, action='install', prepared=None):
             """冻结实际 revision 和签名摘要提交。:param index: 夹具版本。:param action: 操作。@return 冻结请求。"""
             body = {'operation_id': str(uuid.uuid4()), 'expected_revision': status()['revision'],
                 'target_release': releases[index]['release'],
                 'target_manifest_sha256': hashlib.sha256((folders[index] / 'system-release.json').read_bytes()).hexdigest(),
                 'drain_timeout_seconds': 60}
+            if prepared is not None:
+                body['prepared_operation_id'] = prepared
             response = request('POST', '/runtime/api/system-updates/' + action, json=body)
             assert response.status_code == 202, response.text[:512]
             return body
@@ -518,7 +537,7 @@ LABEL vibebench.release=$RELEASE vibebench.parent-revision=$REVISION vibebench.v
 from account_runtime import AccountRuntime
 r=AccountRuntime(docker.from_env(),main.BENCH_DATA,main.HOST_BENCH_DATA,main.get_db,main.derive_v3_fingerprint,main.cc2api_client)
 try:
- for name in ('synthetic-running','synthetic-second','synthetic-stopped'):
+ for name in ACCOUNT_NAMES:
   with main.get_db() as db:
    aid=db.execute('INSERT INTO accounts(name,profile_path,timezone,upstream_proxy_scheme,upstream_socks5_host,upstream_socks5_port,enabled,warmup_enabled) VALUES(?,?,?,?,?,?,0,0)',(name,'profiles/'+name,'Asia/Tokyo','http',PROXY,PROXY_PORT)).lastrowid
    account=dict(db.execute('SELECT * FROM accounts WHERE id=?',(aid,)).fetchone())
@@ -539,7 +558,9 @@ try:
   else:
    row=r._row(name,aid,'Asia/Tokyo');r._update(row,state='stopped')
 finally:r.heartbeat_pool.shutdown()
-'''.replace('NATIVE', repr(bool(native_root))).replace('PROXY_PORT', str(proxy_port)).replace('PROXY', repr(address)).replace('REMOTE', str(gateway_account_id)).replace('CERTIFICATE', repr(base64.b64encode((proxy_data / 'ca.der').read_bytes()).decode()))
+'''.replace('ACCOUNT_NAMES', repr(('synthetic-running', 'synthetic-second', 'synthetic-slow', 'synthetic-stopped')
+    if fast_transition and not candidate else ('synthetic-running', 'synthetic-second', 'synthetic-stopped'))
+    ).replace('NATIVE', repr(bool(native_root))).replace('PROXY_PORT', str(proxy_port)).replace('PROXY', repr(address)).replace('REMOTE', str(gateway_account_id)).replace('CERTIFICATE', repr(base64.b64encode((proxy_data / 'ca.der').read_bytes()).decode()))
             result = runtime.exec_run(['python', '-c', code])
             assert result.exit_code == 0, result.output.decode(errors='replace')[-2000:]
             rows = account_rows()
@@ -552,7 +573,8 @@ finally:r.heartbeat_pool.shutdown()
                 images = {}
                 extra_arguments = ['--build-arg', 'CONTROL_BASE=' + control_base, '--build-arg', 'ACCOUNT_BASE=' + account_base]
                 if fast_transition and not candidate:
-                    extra_arguments += ['--build-arg', 'FAST_SWITCH=' + str(int(index > 0))]
+                    extra_arguments += ['--build-arg', 'FAST_SWITCH=' + str(int(index > 0)),
+                        '--build-arg', 'LOCAL_ROLLOUT=' + str(int(index in (1, 2)))]
                 if native_root:
                     extra_arguments += ['--build-arg', 'NATIVE_VERSIONS=' + ('2.1.293' if index == 0 else '2.1.280,2.1.293')]
                 if candidate:
@@ -621,7 +643,8 @@ finally:r.heartbeat_pool.shutdown()
                 'V3_RELEASE': releases[0]['control']['release'],
                 'V3_CONTROL_IMAGE': releases[0]['control']['reference'], 'V3_ACCOUNT_IMAGE': releases[0]['account']['reference'],
                 'V3_ADMIN_PASSWORD': uuid.uuid4().hex * 2, 'V3_INTERNAL_TOKEN': uuid.uuid4().hex * 2,
-                'V3_SESSION_SECRET': uuid.uuid4().hex * 2, 'V3_ACCOUNT_MEMORY': 'unlimited' if native_root else '1536m', 'V3_MAX_ACTIVE_ACCOUNTS': '2'}
+                'V3_SESSION_SECRET': uuid.uuid4().hex * 2, 'V3_ACCOUNT_MEMORY': 'unlimited' if native_root else '1536m',
+                'V3_MAX_ACTIVE_ACCOUNTS': '3' if fast_transition and not candidate else '2'}
             atomic_text(env, ''.join(key + '=' + value + '\n' for key, value in values.items()))
             for directory in (data, data / 'gateway', data / 'bench'):
                 directory.mkdir(mode=0o700, exist_ok=True)
@@ -789,6 +812,13 @@ assert engine.status()['migration_capability'] is True
                 assert response.status_code == 202, response.text[:512]
                 wait_for(lambda: prepared_node(node['id'], releases[1]['control']['release']), '原节点组件未就绪')
                 os.killpg(node_process.pid, signal.SIGSTOP)
+                start_worker('rolling-accounts')
+                downloaded = submit(2, 'prepare')
+                prepared = wait_for(lambda: status().get('prepared_candidate'), '候选下载未就绪')
+                assert prepared['operation_id'] == downloaded['operation_id'] and prepared['fast_transition'] is True
+                assert read_gate(update_root / 'gate', deployment)['phase'] == 'idle'
+                start_worker('rolling-accounts')
+                assert status()['prepared_candidate'] == prepared
                 with closing(HTTPConnection('127.0.0.1', values['V3_HOST_PORT'], timeout=60)) as hung:
                     hung.putrequest('POST', '/v1/messages')
                     hung.putheader('Authorization', 'Bearer ' + business_token)
@@ -798,7 +828,7 @@ assert engine.status()['migration_capability'] is True
                     hung.endheaders(b'{')
                     wait_for(lambda: request('GET', '/admin/runtime/system-update/status').json().get('active') == 1,
                         '挂起推理未登记', timeout=15)
-                    submit(2)
+                    submit(2, prepared=prepared['operation_id'])
                     assert hung.getresponse().status == 503
                 result = wait_for(finished, '节点离线时中央快速更新未完成')
                 assert result['phase'] == 'succeeded' and result['fast_transition'] is True, result
@@ -806,6 +836,34 @@ assert engine.status()['migration_capability'] is True
                 assert any(item['node_id'] == node['id'] for item in result['cluster_nodes']['nodes']), result
                 assert not prepared_node(node['id'], releases[2]['control']['release'])
                 assert request('GET', '/v1beta/models', headers={'Authorization': 'Bearer ' + business_token}).status_code == 200
+                wait_for(lambda: (update_root / 'rollout-delayed.json').exists(), '慢账号未进入后台更新')
+                unchanged = next(row for row in account_rows() if row['name'] == 'synthetic-running')
+                assert unchanged == before_accounts[0]
+                response = request('POST', '/api/v3-verification', headers={'Authorization': 'Bearer ' + business_token,
+                    'User-Agent': 'python-httpx/0.28.1'}, json={'marker': 'account-source-before-rollout'})
+                assert response.status_code == 200, response.text[:512]
+                assert read_gate(update_root / 'gate', deployment)['phase'] == 'idle'
+                # 重新启动独立执行器，持久中间态继续本次账号更新。
+                child.terminate()
+                child.wait(timeout=10)
+                (update_root / 'rollout-continue').touch()
+                start_worker('rolling-accounts')
+
+                def rollout_settled():
+                    """读取全部后台账号的实际结果。@return 已收口的账号状态。"""
+                    pending = status().get('account_rollout')
+                    return pending if pending and all(item['state'] not in ('queued', 'updating') for item in pending['accounts']) else None
+
+                batch = wait_for(rollout_settled, '账号后台更新未结束')
+                assert {item['name']: item['state'] for item in batch['accounts']} == {
+                    'synthetic-running': 'updated', 'synthetic-second': 'needs_check', 'synthetic-slow': 'updated'}, batch
+                failed = next(item for item in batch['accounts'] if item['state'] == 'needs_check')
+                response = request('POST', f"/runtime/api/system-updates/operations/{batch['operation_id']}/retry-account",
+                    json={'environment_id': failed['environment_id'], 'expected_revision': status()['revision']})
+                assert response.status_code == 202, response.text[:512]
+                batch = wait_for(rollout_settled, '单个账号重试未收口')
+                assert all(item['state'] == 'updated' for item in batch['accounts']), batch
+                passed('准备回执在重启后保留，旧账号继续接单，账号故障隔离并重试', account_rollout=batch)
                 passed('离线节点独立于中央切换，真实悬挂请求中断且恢复准入', operation=result,
                     admission_seconds=(datetime.fromisoformat(result['admission_reopened_at'])
                         - datetime.fromisoformat(result['admission_blocked_at'])).total_seconds())
@@ -970,7 +1028,7 @@ def main() -> None:
     parser.add_argument('--fast-transition', action='store_true', help='验收首次兼容换版、推理关断和离线节点恢复')
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
     parser.add_argument('--policy', type=Path, help=argparse.SUPPRESS)
-    parser.add_argument('--fault', choices=('health', 'switched-crash', 'partial-account', 'first-database-crash', 'restoring-crash'), help=argparse.SUPPRESS)
+    parser.add_argument('--fault', choices=('health', 'switched-crash', 'partial-account', 'first-database-crash', 'restoring-crash', 'rolling-accounts'), help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.worker:
         worker(args.policy, args.fault)

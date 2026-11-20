@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import os
 import re
+from pathlib import Path
 
 from runtime_files import atomic_json
 from runtime_names import matches_image_reference
 from system_update_contract import strict_json, safe_read
+from system_update_rollout import read_rollout
 
 
 def configured_release(runtime) -> str:
@@ -72,3 +74,24 @@ def role_release(runtime, row: dict) -> str:
     """
     origin = image_origin(runtime, row)
     return origin['release'] if origin else configured_release(runtime)
+
+
+def compatible_account_origin(runtime, row: dict, gateway_account_id: int | None) -> dict | None:
+    """核对该环境的旧镜像过渡授权。@param runtime 账号运行时。@param row 环境。@param gateway_account_id 网关归属。@return 与实际来源及角色一致的授权来源。"""
+    if not (directory := os.environ.get('V3_UPDATE_GATE_DIR')) or row['state'] not in ('ready', 'cli_reconcile'):
+        return None
+    source = image_origin(runtime, row)
+    target = configured_release(runtime)
+    if not source or source['release'] == target:
+        return None
+    record = read_rollout(Path(directory), runtime.deployment, runtime.release_id, target)
+    if record is None:
+        return None
+    entry = record['environments'].get(row['environment_id'])
+    roles = {'cli': row.get('container_id'), 'network': row.get('network_container_id'),
+        'sender': row.get('sender_container_id')}
+    if (not isinstance(entry, dict) or entry.get('generation') != row['generation']
+            or entry.get('account_id') != row.get('account_id') or entry.get('gateway_account_id') != gateway_account_id
+            or entry.get('origin') != source or entry.get('roles') != roles or not all(roles.values())):
+        return None
+    return source

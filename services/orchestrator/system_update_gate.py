@@ -82,6 +82,8 @@ class DeploymentGate:
                 except (ValueError, OSError):
                     value = {'phase': 'reconcile', 'epoch': None, 'enabled': True}
             return {**value, 'active': len(self.active), 'central_active': len(self.active.keys() - self.node_image_fetches),
+                'control_active': sum(identifier not in self.node_image_fetches and not source.startswith('job:node-stream:')
+                    for identifier, source in self.active.items()),
                 'activities': list(self.active.values())}
 
     @contextmanager

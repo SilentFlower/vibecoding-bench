@@ -1037,6 +1037,60 @@ fn configured_account_release() -> String {
     std::env::var("V3_RELEASE").unwrap_or_default()
 }
 
+#[cfg(unix)]
+fn authorized_previous_release(binding: &TransportBinding, deployment: &str, release: &str) -> bool {
+    let Ok(directory) = std::env::var("V3_UPDATE_GATE_DIR") else {
+        return false;
+    };
+    let Ok(control) = std::env::var("V3_RELEASE") else {
+        return false;
+    };
+    let valid_build = control
+        .strip_prefix("ci-")
+        .and_then(|build| build.split_once('-'))
+        .is_some_and(|(run, attempt)| {
+            [run, attempt].into_iter().all(|part| {
+                part.as_bytes()
+                    .first()
+                    .is_some_and(|byte| (b'1'..=b'9').contains(byte))
+                    && part.bytes().all(|byte| byte.is_ascii_digit())
+            })
+        });
+    if directory.is_empty() || !valid_build {
+        return false;
+    }
+    let path = Path::new(&directory).join(format!("account-rollout-{control}.json"));
+    let Ok(record) = crate::service::system_update::read_update_record::<Value>(&path, 8 * 1024 * 1024) else {
+        return false;
+    };
+    rollout_matches(&record, binding, deployment, &control, release)
+}
+
+#[cfg(any(unix, test))]
+fn rollout_matches(
+    record: &Value,
+    binding: &TransportBinding,
+    deployment: &str,
+    control: &str,
+    release: &str,
+) -> bool {
+    let entry = &record["environments"][&binding.environment_id];
+    record["schema_version"] == 1
+        && record["deployment"] == deployment
+        && record["control_release"] == control
+        && record["account_release"] == release
+        && entry["gateway_account_id"].as_i64() == Some(binding.account_id)
+        && entry["generation"].as_u64() == Some(binding.generation)
+        && entry["origin"]["release"] == binding.release_id
+        && entry["origin"]["environment_id"] == binding.environment_id
+        && entry["origin"]["protocol"] == 1
+}
+
+#[cfg(not(unix))]
+fn authorized_previous_release(_binding: &TransportBinding, _deployment: &str, _release: &str) -> bool {
+    false
+}
+
 /// 按调度器的短 DNS 名核对部署归属，防止旧前缀条件拒绝合法账号环境。
 fn validate_binding(
     binding: &TransportBinding,
@@ -1079,7 +1133,6 @@ fn validate_binding(
         });
     if deployment.is_empty()
         || release.is_empty()
-        || binding.release_id != release
         || binding.environment_id.len() != 32
         || !binding
             .environment_id
@@ -1092,6 +1145,8 @@ fn validate_binding(
         || endpoint.password().is_some()
         || endpoint.query().is_some()
         || endpoint.fragment().is_some()
+        || (binding.release_id != release
+            && !(local_endpoint && authorized_previous_release(binding, deployment, release)))
     {
         return Err(AppError::ServiceUnavailable(
             "runtime binding mismatch".into(),
@@ -2404,6 +2459,36 @@ mod tests {
         ] {
             assert!(!matches(&invalid), "accepted {invalid}");
         }
+    }
+
+    #[test]
+    fn previous_account_source_requires_the_same_environment_and_generation() {
+        let mut binding = TransportBinding {
+            account_id: 7,
+            environment_id: "a".repeat(32),
+            generation: 2,
+            endpoint: String::new(),
+            secret: String::new(),
+            release_id: "ci-1-1".into(),
+        };
+        let record = json!({
+            "schema_version": 1, "deployment": "isolated", "control_release": "ci-2-1", "account_release": "ci-2-1",
+            "environments": { (&binding.environment_id): { "gateway_account_id": 7, "generation": 2,
+                "origin": { "environment_id": &binding.environment_id, "release": "ci-1-1", "protocol": 1 } } }
+        });
+        let matches = |binding: &TransportBinding| {
+            rollout_matches(&record, binding, "isolated", "ci-2-1", "ci-2-1")
+        };
+        assert!(matches(&binding));
+        assert!(!rollout_matches(&record, &binding, "isolated", "ci-3-1", "ci-2-1"));
+        binding.generation = 3;
+        assert!(!matches(&binding));
+        binding.generation = 2;
+        binding.account_id = 8;
+        assert!(!matches(&binding));
+        binding.account_id = 7;
+        binding.environment_id = "b".repeat(32);
+        assert!(!matches(&binding));
     }
 
     #[test]

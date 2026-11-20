@@ -30,7 +30,7 @@ const sent = ref(false);
 const dialog = ref<HTMLDialogElement | null>(null);
 const DEFAULT_DRAIN_MINUTES = 1;
 const minutes = ref(DEFAULT_DRAIN_MINUTES);
-const frozen = ref<{ action: 'install' | 'rollback' | 'recover'; body: SystemUpdateRequest; accountChanged: boolean; label: string } | null>(null);
+const frozen = ref<{ action: 'prepare' | 'install' | 'rollback' | 'recover'; body: SystemUpdateRequest; accountChanged: boolean; label: string; restart: boolean } | null>(null);
 let alive = true;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let controller: AbortController | undefined;
@@ -38,12 +38,18 @@ let failures = 0;
 
 const phases: Record<string, string> = {
   snapshotting: '保存数据库快照', migrating: '执行数据库迁移', restoring_data: '正在恢复数据库',
-  preparing: '下载与校验', prepared: '候选已准备', draining: '等待在途完成', switching: '切换平台服务',
+  preparing: '下载与校验', prepared: '待重启', draining: '等待在途完成', switching: '切换平台服务',
   verifying: '验证新版本', committing: '保存安装结果', cleaning: '回收旧制品', succeeded: '更新完成',
   succeeded_cleanup_pending: '更新完成，清理待重试', restoring: '正在恢复原版本', restored: '已恢复原版本',
   failed: '本次更新失败', cancelled: '本次更新已取消', reconcile: '等待恢复与对账',
 };
 const progress = computed(() => status.value?.operation);
+const rollout = computed(() => status.value?.account_rollout);
+const rolloutActive = computed(() => rollout.value?.accounts.some(item => item.state === 'queued' || item.state === 'updating'));
+const rolloutStates = {
+  queued: '待更新', updating: '更新中', updated: '已更新', stopped: '保留启停状态',
+  waiting: '等待空闲', needs_check: '待核对',
+};
 const controlChecks = { candidate: '新版本', restore: '恢复原版本' } as const;
 const controlServices = { gateway: '网关', orchestrator: '调度器' } as const;
 const probeStates: Record<string, string> = {
@@ -61,13 +67,15 @@ const progressLabel = computed(() => {
   const operation = progress.value;
   if (!operation) return '';
   if (operation.phase === 'draining' && operation.fast_transition) return '正在关闭推理连接';
+  if (operation.phase === 'prepared' && !operation.fast_transition) return '已下载更新';
   return phases[operation.phase] ?? operation.phase;
 });
 const maintenanceMessage = computed(() => {
   const operation = progress.value;
   if (!operation) return '';
   if (operation.phase === 'preparing') return '后台准备候选镜像与项目库，平台继续接单。';
-  if (operation.phase === 'cleaning' && operation.admission_reopened_at) return '平台已恢复接单。';
+  if (operation.phase === 'prepared') return '候选下载和校验已完成，平台继续接单。';
+  if (operation.admission_reopened_at) return '平台已恢复接单。';
   if (operation.phase === 'draining') return operation.fast_transition
     ? '新请求暂缓。系统正在关闭旧推理连接，并等待资源释放。'
     : '新请求暂缓，等待在途工作结束。';
@@ -95,6 +103,27 @@ const currentVersion = computed(() => runtimeVersion.value ?? (catalog.value?.re
 
 /** 根据现有目录和现场显示检查结果，不用构建序号推断升级关系。 */
 const latestRelease = computed(() => catalog.value?.releases[0]);
+/** 核对该发行的下载回执。@param release 受信发行。@return 回执或空。 */
+function preparedFor(release: SystemUpdateRelease) {
+  const prepared = status.value?.prepared_candidate;
+  return prepared && prepared.target_release === release.release
+    && prepared.manifest_sha256 === release.manifest_sha256 ? prepared : null;
+}
+const preparedCandidate = computed(() => latestRelease.value ? preparedFor(latestRelease.value) : null);
+
+/** 调用入口依目标与宿主回执选择下一步。@param release 受信发行。@return 页面动作。 */
+function updateAction(release: SystemUpdateRelease): 'prepare' | 'install' {
+  return status.value?.staged_updates && !preparedFor(release) ? 'prepare' : 'install';
+}
+
+/** 显示当前目标下一步操作。@param release 受信发行。@param legacy 旧底座入口文案。@return 按钮文字。 */
+function updateButton(release: SystemUpdateRelease, legacy = '查看更新计划'): string {
+  if (catalog.value?.fresh === false) return '先检查更新';
+  if (!release.data_compatible) return '待验证兼容';
+  if (updateAction(release) === 'prepare') return '下载更新';
+  const prepared = preparedFor(release);
+  return prepared?.fast_transition ? '立即重启' : prepared ? '安装更新' : legacy;
+}
 /** 从真实发布文本提取前三段概览，完整原文由版本详情继续展示。 */
 const releaseHighlights = computed(() => releaseNotes(latestRelease.value?.changes ?? '').split(/\n\s*\n/).filter(part => part.trim()).slice(0, 3).map(part => {
   const lines = part.trim().split('\n');
@@ -109,6 +138,7 @@ const updateSummary = computed(() => {
   if (catalog.value?.check_error || status.value?.check_error) return '检查遇到问题';
   if (!catalog.value?.fresh) return '等待检查版本';
   if (!latestRelease.value) return '暂无可用发行';
+  if (preparedCandidate.value) return preparedCandidate.value.fast_transition ? '待重启' : '已下载更新';
   return latestRelease.value.release === status.value?.current_release ? '当前已是最新版本' : '发现可用版本';
 });
 
@@ -162,7 +192,8 @@ async function refresh(): Promise<void> {
     controller = undefined;
     if (alive) {
       loading.value = false;
-      timer = setTimeout(refresh, failures ? Math.min(30000, 2000 * 2 ** Math.min(failures, 4)) : status.value?.busy || catalog.value?.checking ? 2000 : 10000);
+      timer = setTimeout(refresh, failures ? Math.min(30000, 2000 * 2 ** Math.min(failures, 4))
+        : status.value?.busy || catalog.value?.checking || rolloutActive.value ? 2000 : 10000);
     }
   }
 }
@@ -183,13 +214,26 @@ async function check(): Promise<void> {
 }
 
 /** 冻结现场及目标后显示确认，轮询保持原参数。@param action 动作。@param release 版本。@param digest 摘要。@param accountChanged 环境影响。@return 弹窗就绪。 */
-async function confirm(action: 'install' | 'rollback' | 'recover', release: string, digest: string, accountChanged = true): Promise<void> {
+async function confirm(action: 'prepare' | 'install' | 'rollback' | 'recover', release: string, digest: string, accountChanged = true): Promise<void> {
   if (!status.value?.revision || writing.value || (status.value.busy && action !== 'recover')) return;
+  if (action === 'prepare' && frozen.value?.action === 'prepare' && !conflicted.value
+      && frozen.value.body.target_release === release && frozen.value.body.target_manifest_sha256 === digest) {
+    await execute();
+    return;
+  }
   minutes.value = DEFAULT_DRAIN_MINUTES;
   conflicted.value = false;
   sent.value = false;
-  frozen.value = { action, accountChanged, label: releaseLabel(release), body: { operation_id: action === 'recover' ? progress.value!.operation_id : operationId(),
-    expected_revision: status.value.revision, target_release: release, target_manifest_sha256: digest, drain_timeout_seconds: DEFAULT_DRAIN_MINUTES * 60 } };
+  const candidate = status.value.prepared_candidate;
+  const prepared = action === 'install' && candidate?.target_release === release && candidate.manifest_sha256 === digest ? candidate : null;
+  frozen.value = { action, accountChanged, restart: prepared?.fast_transition === true, label: releaseLabel(release),
+    body: { operation_id: action === 'recover' ? progress.value!.operation_id : operationId(),
+      expected_revision: status.value.revision, target_release: release, target_manifest_sha256: digest,
+      drain_timeout_seconds: DEFAULT_DRAIN_MINUTES * 60, ...(prepared && { prepared_operation_id: prepared.operation_id }) } };
+  if (action === 'prepare') {
+    await execute();
+    return;
+  }
   await nextTick();
   dialog.value?.showModal();
 }
@@ -225,7 +269,7 @@ async function execute(): Promise<void> {
     if (alive) {
       dialog.value?.close();
       frozen.value = null;
-      toast.show('操作已登记，进度会持续保存', 'success');
+      toast.show(selected.action === 'prepare' ? '已开始下载更新' : '操作已登记', 'success');
       await refresh();
     }
   } catch (cause) {
@@ -249,6 +293,20 @@ async function cancel(): Promise<void> {
     await refresh();
   } catch (cause) {
     if (alive) toast.show(cause instanceof Error ? cause.message : '取消结果待核对');
+  } finally {
+    writing.value = false;
+  }
+}
+
+/** 重新排队一个账号。@param environmentId 该账号环境。@return 提交完成。 */
+async function retryAccount(environmentId: string): Promise<void> {
+  if (!rollout.value || !status.value?.revision || status.value.busy || writing.value) return;
+  writing.value = true;
+  try {
+    await api.systemUpdateRetryAccount(rollout.value.operation_id, environmentId, status.value.revision);
+    if (alive) await refresh();
+  } catch (cause) {
+    if (alive) toast.show(cause instanceof Error ? cause.message : '账号重试提交失败');
   } finally {
     writing.value = false;
   }
@@ -280,8 +338,8 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); ver
     <Card v-if="!loading && status && !status.installed" class="gap-3 p-5 shadow-none"><h2 class="font-semibold">首次接入系统更新</h2><p class="text-sm text-muted-foreground">{{ status.message }}</p><p class="text-sm text-muted-foreground">接入独立更新服务及维护底座后，即可安装后续版本。</p></Card>
     <template v-if="status?.installed">
       <div class="approved-update-banner">
-        <div><p class="eyebrow" role="status">{{ updateSummary }}</p><div class="approved-version">{{ latestRelease ? releaseLabel(latestRelease.release) : currentVersion }}</div><h2>{{ !catalog?.fresh ? '等待检查版本' : !latestRelease ? '暂无可用发行' : latestRelease.release !== status.current_release ? '新版本已就绪' : '当前已是最新版本' }}</h2><p>{{ latestRelease && latestRelease.release !== status.current_release ? '阅读发布说明，选择合适的时间安装。' : '查看本次发布说明与平台维护记录。' }}</p></div>
-        <div class="update-status-actions"><Button variant="outline" :disabled="checking || catalog?.checking" @click="check"><RefreshCw :size="14" :class="checking || catalog?.checking ? 'animate-spin motion-reduce:animate-none' : ''" />{{ checking || catalog?.checking ? '正在检查…' : '重新检查' }}</Button><Button v-if="latestRelease && latestRelease.release !== status.current_release" :disabled="status.busy || writing || !catalog?.fresh || !latestRelease.data_compatible" @click="confirm('install', latestRelease.release, latestRelease.manifest_sha256, latestRelease.account_changed)">查看更新计划<ArrowRight :size="14" /></Button></div>
+        <div><p class="eyebrow" role="status">{{ updateSummary }}</p><div class="approved-version">{{ latestRelease ? releaseLabel(latestRelease.release) : currentVersion }}</div><h2>{{ !catalog?.fresh ? '等待检查版本' : !latestRelease ? '暂无可用发行' : latestRelease.release !== status.current_release ? (preparedCandidate ? '更新已下载' : '发现新版本') : '当前已是最新版本' }}</h2><p>{{ preparedCandidate?.fast_transition ? '重启会结束仍在运行的推理。' : latestRelease && latestRelease.release !== status.current_release ? '当前版本 ' + currentVersion : '查看发布说明与平台维护记录。' }}</p></div>
+        <div class="update-status-actions"><Button variant="outline" :disabled="checking || catalog?.checking" @click="check"><RefreshCw :size="14" :class="checking || catalog?.checking ? 'animate-spin motion-reduce:animate-none' : ''" />{{ checking || catalog?.checking ? '正在检查…' : '重新检查' }}</Button><Button v-if="latestRelease && latestRelease.release !== status.current_release" :disabled="status.busy || writing || !catalog?.fresh || !latestRelease.data_compatible" @click="confirm(updateAction(latestRelease), latestRelease.release, latestRelease.manifest_sha256, latestRelease.account_changed)">{{ updateButton(latestRelease) }}<ArrowRight :size="14" /></Button></div>
       </div>
       <div class="approved-update-columns">
         <section class="update-notes-card"><h3 class="approved-section-title">这次更新带来了什么</h3><div v-if="latestRelease" class="approved-release-notes"><article v-for="(highlight, index) in releaseHighlights" :key="index" class="approved-change-item"><span class="approved-change-icon"><component :is="[Users, FileText, ShieldCheck][index]" :size="14" /></span><div><h3 v-if="highlight.title">{{ highlight.title }}</h3><p v-if="highlight.description">{{ highlight.description }}</p></div></article><p v-if="!releaseHighlights.length">该发行未提供额外说明。</p></div><p v-else class="text-sm text-muted-foreground">等待检查可用版本</p><button v-if="latestRelease" type="button" class="approved-text-action" :aria-expanded="notesOpen" aria-controls="latest-release-notes" @click="toggleLatestNotes">{{ notesOpen ? '收起完整发布说明' : '查看完整发布说明' }} <ArrowRight :size="13" /></button><div v-if="notesOpen && latestRelease" id="latest-release-notes" class="update-full-notes" data-release-details>{{ releaseNotes(latestRelease.changes) }}</div></section>
@@ -289,7 +347,7 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); ver
       </div>
       <section v-if="progress" class="update-operation rounded-xl border bg-card" :class="{'update-operation-priority': status.busy || progress.error || progress.blockers?.length}" aria-live="polite">
         <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div class="flex min-w-0 items-center gap-3"><span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"><Check v-if="progress.phase === 'succeeded'" class="size-4" /><RefreshCw v-else class="size-4" :class="status.busy ? 'animate-spin motion-reduce:animate-none' : ''" /></span><div><h2 class="text-sm font-semibold">{{ progressLabel }}</h2><p class="mt-1 text-xs text-muted-foreground">{{ releaseLabel(progress.target_release) }}</p></div></div><div class="flex gap-2"><Button v-if="cancelAllowed" variant="outline" size="sm" :disabled="writing || progress.cancel_requested" @click="cancel">{{ progress.cancel_requested ? '正在取消…' : '取消等待' }}</Button><Button v-if="recoveryAllowed" variant="outline" size="sm" :disabled="writing" @click="confirm('recover', progress.target_release, '', true)">恢复操作</Button></div></div>
-        <div v-if="status.busy || progress.error || progress.blockers?.length" class="space-y-3 border-t px-5 py-4 text-sm"><p v-if="status.busy" class="text-muted-foreground">{{ maintenanceMessage }}</p><ul v-if="progress.blockers?.length" class="space-y-1 rounded-lg bg-muted p-3"><li v-for="blocker in progress.blockers" :key="blocker" class="break-words">{{ blocker }}</li></ul><p v-if="progress.error" role="alert" class="text-amber-800">{{ progress.error }}</p></div>
+        <div v-if="status.busy || progress.admission_reopened_at || progress.error || progress.blockers?.length" class="space-y-3 border-t px-5 py-4 text-sm"><p v-if="status.busy || progress.admission_reopened_at" class="text-muted-foreground">{{ maintenanceMessage }}</p><ul v-if="progress.blockers?.length" class="space-y-1 rounded-lg bg-muted p-3"><li v-for="blocker in progress.blockers" :key="blocker" class="break-words">{{ blocker }}</li></ul><p v-if="progress.error" role="alert" class="text-amber-800">{{ progress.error }}</p></div>
         <div v-if="progress.cluster_nodes?.phase === 'background'" class="flex flex-wrap items-center justify-between gap-2 border-t px-5 py-3 text-sm">
           <p>{{ progress.admission_reopened_at ? '远程节点独立更新' : '远程节点将在中央切换后独立更新' }}</p>
           <router-link :to="{ name: 'nodes' }" class="text-primary">查看节点进度 →</router-link>
@@ -321,6 +379,24 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); ver
           </div>
         </details>
       </section>
+      <section v-if="rollout?.accounts.length" class="rounded-xl border bg-card" aria-label="账号后台更新">
+        <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-4">
+          <h2 class="text-sm font-semibold">账号后台更新</h2>
+          <span class="text-xs text-muted-foreground">{{ releaseLabel(rollout.target_release) }} 已生效</span>
+        </div>
+        <ul class="divide-y border-t text-sm">
+          <li v-for="item in rollout.accounts" :key="item.environment_id" class="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+            <div class="min-w-0">
+              <p class="break-words font-medium">{{ item.name }}</p>
+              <p v-if="item.error" class="mt-1 text-xs text-muted-foreground">{{ item.error }}</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-xs" :class="item.state === 'needs_check' || item.state === 'waiting' ? 'text-amber-800' : 'text-muted-foreground'">{{ rolloutStates[item.state] }}</span>
+              <Button v-if="item.retryable !== false && (item.state === 'waiting' || item.state === 'needs_check')" variant="outline" size="sm" :disabled="status.busy || writing" @click="retryAccount(item.environment_id)">重试</Button>
+            </div>
+          </li>
+        </ul>
+      </section>
       <details class="approved-maintenance update-disclosure"><summary>运行组件与维护详情</summary>
       <div class="update-context-grid">
         <Card class="min-w-0 gap-0 p-5 shadow-none"><div class="flex items-center gap-2 text-xs text-muted-foreground"><Layers class="size-4" /><h2>账号运行环境</h2></div><p class="mt-4 text-3xl font-semibold tabular-nums">{{ runningEnvironments }}<span class="ml-2 text-sm font-normal text-muted-foreground">个运行中</span></p><router-link :to="{name: 'environments'}" class="mt-3 w-fit text-xs text-primary">管理环境 →</router-link><details class="mt-3 text-xs text-muted-foreground"><summary class="cursor-pointer">镜像来源</summary><p class="mt-2 break-all font-mono">所选：{{ status.components?.account.release }}</p><p v-for="source in environmentSources" :key="source.release" class="mt-2 break-all">{{ source.release }} · {{ source.count }} 个</p></details></Card>
@@ -332,7 +408,7 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); ver
         <div class="flex flex-wrap items-center justify-between gap-2"><h2 class="text-sm font-semibold">可用版本</h2><time class="text-xs text-muted-foreground" :title="catalog?.checked_at ?? undefined">最近检查：{{ catalog?.checked_at ? formatLocalTime(catalog.checked_at) : '等待首次检查' }}</time></div>
         <p v-if="catalog?.check_error" role="status" class="text-sm text-amber-800">{{ catalog.check_error }}</p>
         <article v-for="(release, index) in displayed" :key="release.release" class="update-release overflow-hidden rounded-xl border bg-card" :class="{ 'update-release-latest': index === 0 }" data-release-card>
-          <div class="flex flex-wrap items-center gap-3 px-5 py-4"><button type="button" class="flex min-w-0 flex-1 items-start gap-3 text-left" :aria-expanded="expanded === release.release" :aria-controls="`release-detail-${release.release}`" @click="toggleDetails(release.release)"><component :is="expanded === release.release ? ChevronDown : ChevronRight" class="mt-1 size-4 shrink-0 text-muted-foreground" /><span class="min-w-0"><span class="flex flex-wrap items-center gap-2"><strong class="break-words text-sm font-semibold">{{ releaseLabel(release.release) }}</strong><span v-if="release.release === status.current_release" class="rounded-md bg-primary/10 px-2 py-0.5 text-[length:var(--ui-font-small)] text-primary">当前版本</span><span v-else-if="index === 0" class="rounded-md bg-muted px-2 py-0.5 text-[length:var(--ui-font-small)] text-muted-foreground">最新可用</span></span><span class="mt-1 block text-xs text-muted-foreground" :title="release.published_at">{{ formatLocalTime(release.published_at) }}</span><span class="mt-2 block whitespace-pre-wrap text-sm text-muted-foreground">{{ summary(release) }}</span></span></button><Button v-if="release.release !== status.current_release" size="sm" :disabled="status.busy || writing || catalog?.fresh === false || !release.data_compatible" @click="confirm('install', release.release, release.manifest_sha256, release.account_changed)"><Download class="size-3.5" />{{ catalog?.fresh === false ? '先检查更新' : release.data_compatible ? '安装更新' : '待验证兼容' }}</Button></div>
+          <div class="flex flex-wrap items-center gap-3 px-5 py-4"><button type="button" class="flex min-w-0 flex-1 items-start gap-3 text-left" :aria-expanded="expanded === release.release" :aria-controls="`release-detail-${release.release}`" @click="toggleDetails(release.release)"><component :is="expanded === release.release ? ChevronDown : ChevronRight" class="mt-1 size-4 shrink-0 text-muted-foreground" /><span class="min-w-0"><span class="flex flex-wrap items-center gap-2"><strong class="break-words text-sm font-semibold">{{ releaseLabel(release.release) }}</strong><span v-if="release.release === status.current_release" class="rounded-md bg-primary/10 px-2 py-0.5 text-[length:var(--ui-font-small)] text-primary">当前版本</span><span v-else-if="index === 0" class="rounded-md bg-muted px-2 py-0.5 text-[length:var(--ui-font-small)] text-muted-foreground">最新可用</span></span><span class="mt-1 block text-xs text-muted-foreground" :title="release.published_at">{{ formatLocalTime(release.published_at) }}</span><span class="mt-2 block whitespace-pre-wrap text-sm text-muted-foreground">{{ summary(release) }}</span></span></button><Button v-if="release.release !== status.current_release" size="sm" :disabled="status.busy || writing || catalog?.fresh === false || !release.data_compatible" @click="confirm(updateAction(release), release.release, release.manifest_sha256, release.account_changed)"><Download class="size-3.5" />{{ updateButton(release, '安装更新') }}</Button></div>
           <div v-if="expanded === release.release" :id="`release-detail-${release.release}`" class="space-y-3 border-t bg-muted/20 px-5 py-4 text-sm" data-release-details><p class="whitespace-pre-wrap break-words">{{ releaseNotes(release.changes) }}</p><p v-if="release.compatibility_reason" class="text-amber-800">{{ release.compatibility_reason === 'migration_evidence_missing' ? '此来源版本的升级与回退演练证据待发布端补齐。' : '此版本的数据兼容声明待发布端验证。' }}</p><p v-if="release.migrations?.length" class="text-xs text-muted-foreground">包含已验证的数据库迁移，安装前自动保存两库快照。</p><p v-for="migration in release.migrations ?? []" :key="migration.database" class="text-xs text-muted-foreground">{{ migration.database === 'bench' ? '平台数据库' : '网关数据库' }} → 版本 {{ migration.target_version }} · {{ migration.steps }} 项登记</p><p class="text-xs text-muted-foreground">{{ release.account_changed ? `预计重建 ${runningEnvironments} 个运行环境，已停止环境保留原状态。` : '兼容的账号运行环境继续复用。' }}</p><dl class="grid gap-1 border-t pt-3 text-xs"><dt class="text-muted-foreground">发行标识</dt><dd class="break-all font-mono">{{ release.release }}</dd><dt class="mt-2 text-muted-foreground">清单 SHA256</dt><dd class="break-all font-mono">{{ release.manifest_sha256 }}</dd></dl></div>
         </article>
         <p v-if="!catalog?.releases.length" class="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">{{ catalog?.checking ? '正在检查受信版本…' : '等待检查可用版本' }}</p>
@@ -341,6 +417,6 @@ onUnmounted(() => { alive = false; clearTimeout(timer); controller?.abort(); ver
       </section>
       </details>
     </template>
-    <dialog ref="dialog" class="m-auto max-h-[calc(100dvh_-_2rem)] overflow-y-auto w-[calc(100%_-_2rem)] max-w-lg rounded-xl border bg-card p-0 text-foreground shadow-xl backdrop:bg-black/40" @cancel.prevent="closeConfirm" @click="event => { if (event.target === dialog) closeConfirm(); }"><div v-if="frozen" class="space-y-5 p-6"><h2 class="text-lg font-semibold">{{ frozen.action === 'recover' ? '恢复本次操作' : frozen.action === 'rollback' ? '确认版本回退' : '确认安装更新' }}</h2><p class="text-xl font-semibold">{{ frozen.label }}</p><code class="block break-all text-xs text-muted-foreground">{{ frozen.body.target_release }}</code><p class="text-sm text-muted-foreground">镜像准备期间继续接单。支持快速切换时，切换会结束正在执行的推理，受影响的请求需要重试。</p><p v-if="frozen.action !== 'recover'" class="text-sm text-muted-foreground">{{ frozen.accountChanged ? '将按计划核对并更新受影响的账号环境。' : '兼容的账号容器继续复用。' }}</p><ChoiceSelect v-if="frozen.action !== 'recover'" :model-value="String(minutes)" @update:model-value="value => minutes = Number(value)" label="等待在途完成" :options="[1,5,15,30,60,120].map(value => ({value: String(value), label: value + ' 分钟'}))" :disabled="writing || sent" :portal-target="dialog ?? undefined" /><p v-if="conflicted" role="alert" class="text-sm text-amber-800">现场版本已经变化，请关闭窗口并刷新后重新选择。</p><div class="flex justify-end gap-3"><Button variant="outline" :disabled="writing" @click="closeConfirm">取消</Button><Button :disabled="writing || conflicted" @click="execute">{{ writing ? '正在登记…' : frozen.action === 'recover' ? '开始恢复' : '确认执行' }}</Button></div></div></dialog>
+    <dialog ref="dialog" class="m-auto max-h-[calc(100dvh_-_2rem)] overflow-y-auto w-[calc(100%_-_2rem)] max-w-lg rounded-xl border bg-card p-0 text-foreground shadow-xl backdrop:bg-black/40" @cancel.prevent="closeConfirm" @click="event => { if (event.target === dialog) closeConfirm(); }"><div v-if="frozen" class="space-y-5 p-6"><h2 class="text-lg font-semibold">{{ frozen.action === 'recover' ? '恢复本次操作' : frozen.action === 'rollback' ? '确认版本回退' : frozen.restart ? '重启并切换版本' : '确认安装更新' }}</h2><p class="text-xl font-semibold">{{ frozen.label }}</p><code class="block break-all text-xs text-muted-foreground">{{ frozen.body.target_release }}</code><p class="text-sm text-muted-foreground">{{ frozen.restart ? '重启会断开正在执行的推理。控制服务就绪后可重新请求。' : '镜像准备期间继续接单。支持快速切换时，正在执行的推理会断开。' }}</p><p v-if="frozen.action !== 'recover'" class="text-sm text-muted-foreground">{{ frozen.accountChanged ? '将按计划核对并更新受影响的账号环境。' : '兼容的账号容器继续复用。' }}</p><ChoiceSelect v-if="!frozen.restart && frozen.action !== 'recover'" :model-value="String(minutes)" @update:model-value="value => minutes = Number(value)" label="等待在途完成" :options="[1,5,15,30,60,120].map(value => ({value: String(value), label: value + ' 分钟'}))" :disabled="writing || sent" :portal-target="dialog ?? undefined" /><p v-if="conflicted" role="alert" class="text-sm text-amber-800">现场版本已经变化，请关闭窗口并刷新后重新选择。</p><div class="flex justify-end gap-3"><Button variant="outline" :disabled="writing" @click="closeConfirm">取消</Button><Button :disabled="writing || conflicted" @click="execute">{{ writing ? '正在登记…' : frozen.action === 'recover' ? '开始恢复' : frozen.restart ? '立即重启' : '确认执行' }}</Button></div></div></dialog>
   </section>
 </template>

@@ -111,6 +111,7 @@ LABEL vibebench.product="v3" vibebench.role="control" vibebench.release=$V3_RELE
     vibebench.account-platforms="1" \
     vibebench.system-update-protocol="1" \
     vibebench.fast-system-update="1" \
+    vibebench.local-account-rollout="1" \
     vibebench.project-library-prepare="1" \
     vibebench.credential-ownership-protocol="1" \
     vibebench.isolation-version="2" \

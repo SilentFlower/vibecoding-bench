@@ -90,6 +90,16 @@ class UpdateGateTests(unittest.TestCase):
             self.gate.release_reserved(identifier)
         self.assertEqual(self.gate.state()['central_active'], 0)
 
+    def test_control_cutover_distinguishes_node_stream_from_central_work(self) -> None:
+        """节点流只读取中央归属，中央实际写入仍由门禁收口。@return 无。"""
+        stream = self.gate.reserve('node-stream:synthetic')
+        with self.gate.admission('job:local-system-rollout'):
+            status = self.gate.state()
+            self.assertEqual(2, status['central_active'])
+            self.assertEqual(1, status['control_active'])
+        self.assertEqual(0, self.gate.state()['control_active'])
+        self.gate.release_reserved(stream)
+
     def test_missing_corrupt_or_wrong_deployment_is_not_idle(self) -> None:
         """缺失、损坏和跨部署事实均进入对账。
 

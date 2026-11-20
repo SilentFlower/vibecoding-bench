@@ -141,7 +141,11 @@ impl Drop for UpdateActivity {
 }
 
 #[cfg(unix)]
-fn read_gate(path: &Path, deployment: &str) -> Result<DeploymentGate, AppError> {
+/// 读取由宿主发布的私有更新记录。@param path 固定路径。@param limit 最大字节数。@return 校验后的记录。
+pub(crate) fn read_update_record<T: serde::de::DeserializeOwned>(
+    path: &Path,
+    limit: u64,
+) -> Result<T, AppError> {
     let error = || AppError::ServiceUnavailable("平台维护状态需要对账".into());
     let mut file = OpenOptions::new()
         .read(true)
@@ -150,7 +154,7 @@ fn read_gate(path: &Path, deployment: &str) -> Result<DeploymentGate, AppError> 
         .map_err(|_| error())?;
     let info = file.metadata().map_err(|_| error())?;
     if !info.is_file()
-        || info.len() > 8192
+        || info.len() > limit
         || info.mode() & 0o077 != 0
         || info.nlink() != 1
         || info.uid() != unsafe { libc::geteuid() }
@@ -159,13 +163,18 @@ fn read_gate(path: &Path, deployment: &str) -> Result<DeploymentGate, AppError> 
     }
     let mut raw = Vec::new();
     file.by_ref()
-        .take(8193)
+        .take(limit + 1)
         .read_to_end(&mut raw)
         .map_err(|_| error())?;
-    if raw.len() > 8192 {
+    if raw.len() as u64 > limit {
         return Err(error());
     }
-    let gate: DeploymentGate = serde_json::from_slice(&raw).map_err(|_| error())?;
+    serde_json::from_slice(&raw).map_err(|_| error())
+}
+
+#[cfg(unix)]
+fn read_gate(path: &Path, deployment: &str) -> Result<DeploymentGate, AppError> {
+    let gate: DeploymentGate = read_update_record(path, 8192)?;
     if gate.schema_version != 1
         || deployment.is_empty()
         || gate.deployment != deployment
@@ -179,7 +188,7 @@ fn read_gate(path: &Path, deployment: &str) -> Result<DeploymentGate, AppError> 
                 .is_none_or(|value| Uuid::parse_str(value).is_err()))
         || (gate.phase == "idle" && (gate.operation_id.is_some() || gate.target_release.is_some()))
     {
-        return Err(error());
+        return Err(AppError::ServiceUnavailable("平台维护状态需要对账".into()));
     }
     Ok(gate)
 }

@@ -568,7 +568,7 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
                 matches!(rest, "check" | "prepare" | "install" | "rollback")
                     || rest.strip_prefix("operations/").is_some_and(|value| {
                         value.split_once('/').is_some_and(|(id, action)| {
-                            Uuid::parse_str(id).is_ok() && matches!(action, "cancel" | "recover")
+                            Uuid::parse_str(id).is_ok() && matches!(action, "cancel" | "recover" | "retry-account")
                         })
                     })
             }

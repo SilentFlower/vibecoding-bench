@@ -395,10 +395,26 @@ export interface SystemPlatformVersion {
   version: string | null
 }
 
+/** 已生效版本的本机账号后台进度。 */
+export interface SystemAccountRollout {
+  operation_id: string
+  target_release: string
+  accounts: Array<{
+    environment_id: string
+    name: string
+    state: 'queued' | 'updating' | 'updated' | 'stopped' | 'waiting' | 'needs_check'
+    error?: string | null
+    retryable?: boolean
+  }>
+}
+
 /** 已安装底座的实际组件及恢复入口。 */
 export interface SystemUpdateStatus {
   installed: boolean
   migration_capability?: boolean
+  staged_updates?: boolean
+  prepared_candidate?: { operation_id: string; target_release: string; manifest_sha256: string; fast_transition: boolean } | null
+  account_rollout?: SystemAccountRollout | null
   message?: string
   revision?: string
   current_release?: string
@@ -441,6 +457,7 @@ export interface SystemUpdateRequest {
   target_release: string
   target_manifest_sha256: string
   drain_timeout_seconds: number
+  prepared_operation_id?: string
 }
 
 type RawSettingsMap = Record<string, unknown>
@@ -719,9 +736,10 @@ export const api = {
   /** 请求后台检查，安装由独立操作触发。@return 检查状态。 */
   systemUpdateCheck: () => request<{ checking: boolean }>('POST', '/runtime/api/system-updates/check', {}),
   /** 提交冻结组合。@param action 受支持动作。@param body 冻结参数。@return 持久操作。 */
-  systemUpdateInstall: (action: 'install' | 'rollback', body: SystemUpdateRequest) => request<SystemUpdateOperation>('POST', `/runtime/api/system-updates/${action}`, body),
+  systemUpdateInstall: (action: 'prepare' | 'install' | 'rollback', body: SystemUpdateRequest) => request<SystemUpdateOperation>('POST', `/runtime/api/system-updates/${action}`, body),
   /** 原操作取消或恢复。@param id 原操作。@param action 受控动作。@param revision 当前现场版本。@return 操作状态。 */
   systemUpdateControl: (id: string, action: 'cancel' | 'recover', revision: string) => request<SystemUpdateOperation>('POST', `/runtime/api/system-updates/operations/${encodeURIComponent(id)}/${action}`, { expected_revision: revision }),
+  systemUpdateRetryAccount: (id: string, environment: string, revision: string) => request<SystemAccountRollout>('POST', `/runtime/api/system-updates/operations/${encodeURIComponent(id)}/retry-account`, { environment_id: environment, expected_revision: revision }),
   /** 查询会话封禁。@param query 已编码条件。@param signal 取消信号。@return 安全分页。 */
   sessionPolicyBlocks: (query: string, signal?: AbortSignal) => request<SessionPolicyBlockPage>('GET', `/admin/session-policy-blocks?${query}`, undefined, signal),
   /** 提前解除单轮封禁。@param id 记录标识。@return 最新摘要。 */

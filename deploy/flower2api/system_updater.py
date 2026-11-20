@@ -80,6 +80,7 @@ class SystemUpdater:
         self.backend = backend or HostDeployment(policy)
         self.lock = threading.RLock()
         self.worker = None
+        self.rollout_worker = None
         self.checking = False
         self._verified = {}
         self.state = strict_json(safe_read(self.root / 'state.json', STATE_LIMIT, private=True), STATE_LIMIT)
@@ -227,15 +228,105 @@ class SystemUpdater:
                 'components': {role: {key: value for key, value in entry.items() if key in ('release', 'reference', 'content_sha256')}
                     for role, entry in current['selection'].items()},
                 'operation': self._public_operation(operation) if operation else None,
+                'staged_updates': True, 'prepared_candidate': self._prepared_candidate(operation),
+                'account_rollout': self._public_rollout(),
                 'busy': bool(self.state.get('active_operation')), 'history': history,
                 'checked_at': self.state.get('checked_at'), 'check_error': self.state.get('check_error'),
                 'migration_capability': self.policy['schema_version'] == 2}
+
+    def _prepared_candidate(self, operation: dict | None) -> dict | None:
+        """从当前修订投影已完成的准备操作。@param operation 最近的持久操作。@return 可消费的候选摘要。"""
+        if (not operation or operation['phase'] != 'prepared'
+                or operation['revision'] != self.state['revision']):
+            return None
+        return {'operation_id': operation['operation_id'], 'target_release': operation['target_release'],
+            'manifest_sha256': operation['request']['target_manifest_sha256'],
+            'fast_transition': operation.get('fast_transition') is True}
 
     def _public_operation(self, operation: dict) -> dict:
         return {key: copy.deepcopy(operation.get(key)) for key in ('operation_id', 'action', 'phase', 'created_at',
             'updated_at', 'target_release', 'error', 'blockers', 'cancel_requested', 'cleanup', 'environment_results',
             'database_snapshot', 'database_migrations', 'cluster_nodes', 'control_health',
             'fast_transition', 'admission_blocked_at', 'admission_reopened_at')}
+
+    def _current_rollout(self) -> dict | None:
+        identifier = self.state.get('account_rollout_operation')
+        if identifier:
+            operation = self._operation(identifier)
+            if operation['selected']['release']['release'] == self.state['current']['release']['release']:
+                return operation
+        return None
+
+    def _public_rollout(self) -> dict | None:
+        operation = self._current_rollout()
+        if not operation or not operation.get('admission_reopened_at'):
+            return None
+        return {'operation_id': operation['operation_id'], 'target_release': operation['target_release'],
+            'accounts': list(operation['account_rollout'].values())}
+
+    def _start_rollout(self) -> None:
+        with self.lock:
+            if self.state.get('active_operation') or (self.rollout_worker and self.rollout_worker.is_alive()):
+                return
+            operation = self._current_rollout()
+            if not operation or not operation.get('admission_reopened_at'):
+                return
+            if any(item['state'] in ('queued', 'updating') for item in operation['account_rollout'].values()):
+                self.rollout_worker = threading.Thread(target=self._run_rollout, daemon=True, name='v3-update-account-rollout')
+                self.rollout_worker.start()
+
+    def _run_rollout(self) -> None:
+        completed = False
+        try:
+            while True:
+                with self.lock:
+                    operation = self._current_rollout()
+                    if self.state.get('active_operation') or not operation:
+                        completed = True
+                        return
+                    item = next((value for value in operation['account_rollout'].values()
+                        if value['state'] in ('queued', 'updating')), None)
+                    if item is None:
+                        completed = True
+                        return
+                    item.update(state='updating', error=None)
+                    self._record(operation)
+                try:
+                    result = self.backend.rollout_environment(operation, item)
+                    state = result.get('state')
+                    if result.get('environment_id') != item['environment_id'] or state not in ('updated', 'stopped', 'waiting', 'needs_check'):
+                        raise ValueError('账号更新回执无效')
+                    error = {'waiting': '账号仍有活动或维护占用', 'needs_check': '账号归属或重建结果待核对'}.get(state)
+                except Exception:
+                    state, error = 'needs_check', '账号更新结果待核对，可重试'
+                with self.lock:
+                    current = self._current_rollout()
+                    if current and current['operation_id'] == operation['operation_id']:
+                        current['account_rollout'][item['environment_id']].update(state=state, error=error)
+                        self._record(current)
+        finally:
+            with self.lock:
+                self.rollout_worker = None
+                if completed:
+                    self._start_rollout()
+
+    def retry_account(self, identifier: str, body: dict) -> dict:
+        """重试已生效版本下的单个环境。@param identifier 原更新操作。@param body 当前修订和环境 ID。@return 后台状态。"""
+        if set(body) != {'expected_revision', 'environment_id'}:
+            raise ValueError('账号重试参数无效')
+        with self.lock:
+            operation = self._current_rollout()
+            if (self.state.get('active_operation') or self.state['revision'] != body['expected_revision']
+                    or not operation or operation['operation_id'] != identifier or not operation.get('admission_reopened_at')):
+                raise UpdateConflict('当前版本或账号更新操作已经变化')
+            environment_id = body['environment_id']
+            item = operation['account_rollout'].get(environment_id) if isinstance(environment_id, str) else None
+            if not item or item.get('retryable') is False or item['state'] not in ('waiting', 'needs_check'):
+                raise UpdateConflict('账号当前无需重试')
+            item.update(state='queued', error=None)
+            self._record(operation)
+            self._start_rollout()
+            return self._public_rollout()
 
     def operation(self, identifier: str) -> dict:
         """读取指定操作的脱敏进度。
@@ -328,6 +419,9 @@ class SystemUpdater:
         if action not in ('prepare', 'install', 'rollback'):
             raise ValueError('更新动作无效')
         validate_operation(body)
+        prepared_id = body.get('prepared_operation_id')
+        if prepared_id is not None and action != 'install':
+            raise ValueError('仅安装可消费已准备候选')
         with self.lock:
             path = self.root / 'operations' / body['operation_id'] / 'operation.json'
             if path.exists():
@@ -360,6 +454,12 @@ class SystemUpdater:
                 self._migration_path(original, target)
             if action != 'rollback' and not account_rebuild_required(original['selection']['account'], target['account']):
                 selected['selection']['account'] = copy.deepcopy(original['selection']['account'])
+            if prepared_id is not None:
+                last_id = self.state.get('last_operation')
+                prepared = self._operation(last_id) if last_id == prepared_id else None
+                if (self._prepared_candidate(prepared) is None or prepared['selected'] != selected
+                        or prepared['request']['target_manifest_sha256'] != body['target_manifest_sha256']):
+                    raise UpdateConflict('已准备候选已经变化，请重新下载更新')
             if (action != 'prepare' and selected['release']['release'] == original['release']['release']
                     and selected['selection'] == original['selection']):
                 raise UpdateConflict('目标组合已经安装')
@@ -398,19 +498,28 @@ class SystemUpdater:
         descriptor = None
         try:
             selected = operation['selected']
-            self.backend.prepare(operation['target'], selected['selection'], self.root / 'releases' / operation['target_release'])
+            folder = self.root / 'releases' / operation['target_release']
+            if operation['request'].get('prepared_operation_id'):
+                self.backend.verify_prepared(operation['target'], selected['selection'], folder)
+            else:
+                self.backend.prepare(operation['target'], selected['selection'], folder)
             if self._cancelled(operation):
                 self._finish(operation, 'cancelled')
                 return
+            capability = getattr(self.backend, 'fast_transition', None)
+            fast = bool(capability and capability(operation['original'], selected))
+            supports_rollout = getattr(self.backend, 'supports_local_rollout', None)
+            rolling = bool(fast and supports_rollout and supports_rollout(operation['original'], selected))
             if operation['action'] == 'prepare':
+                operation['fast_transition'] = rolling
                 self._finish(operation, 'prepared')
                 return
             descriptor = acquire_storage_lock(Path(self.policy['data_root']))
-            capability = getattr(self.backend, 'fast_transition', None)
-            fast = capability(operation['original'], selected) if capability else False
             operation['fast_transition'] = fast
+            operation['rolling_accounts'] = rolling and operation['action'] == 'install'
             capture_args = (operation['original'], True) if fast else (operation['original'],)
-            operation['before'] = self.backend.capture(*capture_args)
+            capture_options = {'control_only': True} if operation['rolling_accounts'] else {}
+            operation['before'] = self.backend.capture(*capture_args, **capture_options)
             self._phase(operation, 'draining')
             self.backend.block(operation)
             operation['admission_blocked_at'] = utc_now()
@@ -432,7 +541,7 @@ class SystemUpdater:
                     raise TimeoutError('切换收尾超过时限' if fast else '在途工作排空超时')
                 time.sleep(0.5)
             # 以在途自然结束后的身份和环境为切换基线，接纳原工作合法完成的变化。
-            operation['before'] = self.backend.capture(*capture_args)
+            operation['before'] = self.backend.capture(*capture_args, **capture_options)
             prepare_nodes = getattr(self.backend, 'prepare_nodes', None)
             nodes = operation['before'].get('nodes', [])
             if fast and nodes:
@@ -468,7 +577,11 @@ class SystemUpdater:
             resume_nodes = getattr(self.backend, 'resume_nodes', None)
             if not fast and resume_nodes is not None and nodes:
                 resume_nodes(operation, selected, lambda: self._record(operation))
-            self.backend.update_environments(operation, selected, lambda: self._record(operation))
+            if operation['rolling_accounts']:
+                operation['account_rollout'] = self.backend.stage_local_rollout(operation, selected)
+                self._record(operation)
+            else:
+                self.backend.update_environments(operation, selected, lambda: self._record(operation))
             self.backend.health(operation, selected)
             self._phase(operation, 'committing')
             with self.lock:
@@ -478,6 +591,8 @@ class SystemUpdater:
                 self.state['history'] = [operation['original'], *[item for item in self.state['history']
                     if item['release']['release'] != selected['release']['release']]][:64]
                 self.state['current'] = selected
+                operation['previous_rollout'] = self.state.get('account_rollout_operation')
+                self.state['account_rollout_operation'] = operation['operation_id'] if operation['rolling_accounts'] else None
                 self._record(operation)
             operation['release_started'] = True
             self._record(operation)
@@ -502,12 +617,16 @@ class SystemUpdater:
                     self._phase(operation, 'reconcile', error='排空失败，维护门禁及原版状态需要对账')
             elif phase == 'cleaning':
                 self._finish(operation, 'succeeded_cleanup_pending', error='新版本已生效，旧制品回收需要重试')
+            elif phase == 'committing' and operation.get('rolling_accounts') and operation.get('release_started'):
+                self._phase(operation, 'reconcile', error='新版本开放准入结果待核对')
             else:
                 try:
                     self._phase(operation, 'restoring', error=reason)
                     self.backend.restore(operation, lambda: self._record(operation))
                     with self.lock:
                         self.state['current'] = operation['original']
+                        if 'previous_rollout' in operation:
+                            self.state['account_rollout_operation'] = operation['previous_rollout']
                         self.state['history'] = [item for item in self.state['history'] if item['release']['release'] != operation['original']['release']['release']]
                     self._finish(operation, 'restored', error=reason, admission_reopened_at=utc_now())
                 except Exception:
@@ -515,6 +634,7 @@ class SystemUpdater:
         finally:
             if descriptor is not None:
                 os.close(descriptor)
+            self._start_rollout()
 
     def _clean(self, operation: dict) -> None:
         try:
@@ -574,17 +694,23 @@ class SystemUpdater:
             if operation['phase'] == 'committing' and self.state['current']['release']['release'] == operation['target_release']:
                 operation['release_started'] = True
                 self._record(operation)
-            if (operation['phase'] == 'committing' and self.state['current']['release']['release'] == operation['target_release']
-                    and self.backend.committed(operation)):
-                self._phase(operation, 'cleaning')
-                self._clean(operation)
-                return
+            committing = operation['phase'] == 'committing'
+            released_rolling = operation['phase'] == 'reconcile' and operation.get('rolling_accounts') and operation.get('release_started')
+            if (committing or released_rolling) and self.state['current']['release']['release'] == operation['target_release']:
+                if self.backend.committed(operation):
+                    self._phase(operation, 'cleaning', admission_reopened_at=operation.get('admission_reopened_at') or utc_now())
+                    self._clean(operation)
+                    return
+                if operation.get('rolling_accounts'):
+                    raise ValueError('新版本已提交，实际控制组件或门禁需要对账')
             self.backend.block(operation)
             if (folder / 'before.env').exists():
                 self._phase(operation, 'restoring')
                 self.backend.restore(operation, lambda: self._record(operation))
                 with self.lock:
                     self.state['current'] = operation['original']
+                    if 'previous_rollout' in operation:
+                        self.state['account_rollout_operation'] = operation['previous_rollout']
                     self.state['history'] = [item for item in self.state['history'] if item['release']['release'] != operation['original']['release']['release']]
                 self._finish(operation, 'restored', error='已按实际部署恢复原版本', admission_reopened_at=utc_now())
             elif 'before' in operation:
@@ -595,6 +721,7 @@ class SystemUpdater:
         finally:
             if descriptor is not None:
                 os.close(descriptor)
+            self._start_rollout()
 
     def resume(self) -> None:
         """重启后依持久阶段续接恢复，未知结果保留门禁。
@@ -604,11 +731,13 @@ class SystemUpdater:
         with self.lock:
             identifier = self.state.get('active_operation')
             if not identifier:
+                self._start_rollout()
                 return
             operation = self._operation(identifier)
             if operation['phase'] in DONE:
                 self.state['active_operation'] = None
                 self._persist()
+                self._start_rollout()
                 return
             self.worker = threading.Thread(target=self._recover, args=(operation,), daemon=True, name='v3-update-startup-recovery')
             self.worker.start()
@@ -653,6 +782,8 @@ class UpdateHTTPHandler(BaseHTTPRequestHandler):
             elif re.fullmatch(r'/operations/[a-f0-9-]{36}/(cancel|recover)', self.path) and self.command == 'POST':
                 _, _, identifier, action = self.path.split('/')
                 result = engine.control(identifier, action, body)
+            elif re.fullmatch(r'/operations/[a-f0-9-]{36}/retry-account', self.path) and self.command == 'POST':
+                result = engine.retry_account(self.path.split('/')[2], body)
             else:
                 self._reply(404, {'detail': '更新接口不存在'})
                 return

@@ -85,13 +85,17 @@ class UpdateFixture:
                 await self.hold.wait()
             if self.conflict or body.get('expected_revision') != self.state['revision']:
                 status, payload = 409, {'detail': '现场版本已经变化，请刷新后确认'}
-            elif path.endswith(('/install', '/rollback')):
+            elif path.endswith(('/prepare', '/install', '/rollback')):
                 self.state.update(busy=True, revision=str(uuid.uuid4()), operation={
                     'operation_id': body['operation_id'], 'action': path.rsplit('/', 1)[1],
-                    'phase': 'draining', 'target_release': body['target_release'],
+                    'phase': 'preparing' if path.endswith('/prepare') else 'draining', 'target_release': body['target_release'],
                     'created_at': '2026-11-11T00:00:00Z', 'updated_at': '2026-11-11T00:00:00Z',
                     'blockers': ['合成账号：等待原 CLI 作业自然完成'], 'error': None})
                 payload = self.state['operation']
+            elif path.endswith('/retry-account'):
+                account = next(item for item in self.state['account_rollout']['accounts'] if item['environment_id'] == body['environment_id'])
+                account.update(state='updated', error=None)
+                payload = self.state['account_rollout']
             elif path.endswith('/cancel'):
                 self.state['operation']['cancel_requested'] = True
                 payload = self.state['operation']
@@ -284,6 +288,41 @@ async def verify(output: Path) -> dict:
         await expect(page.get_by_role('link', name='查看节点进度')).to_have_attribute('href', '/nodes')
         await expect(page.get_by_text('远程节点独立更新', exact=True)).to_be_visible()
         cases.append('中央恢复接单后，远程节点继续独立更新')
+        await context.close()
+
+        fixture = UpdateFixture()
+        fixture.state['staged_updates'] = True
+        context, page = await page_for(fixture, 390)
+        await page.get_by_role('button', name='下载更新', exact=True).first.click()
+        await expect(page.get_by_role('heading', name='下载与校验', exact=True)).to_be_visible()
+        download = fixture.writes[0]['body']
+        fixture.state.update(busy=False, prepared_candidate={'operation_id': download['operation_id'],
+            'target_release': download['target_release'], 'manifest_sha256': download['target_manifest_sha256'],
+            'fast_transition': True})
+        fixture.state['operation'].update(phase='prepared', fast_transition=True, blockers=[])
+        await page.reload()
+        await page.get_by_role('button', name='立即重启', exact=True).first.click()
+        modal = page.get_by_role('dialog')
+        await expect(modal.get_by_text('重启会断开正在执行的推理。控制服务就绪后可重新请求。')).to_be_visible()
+        await expect(modal.get_by_role('combobox')).to_have_count(0)
+        await page.screenshot(path=str(output / 'restart-390.png'), full_page=True)
+        await modal.get_by_role('button', name='立即重启').click()
+        assert fixture.writes[-1]['body']['prepared_operation_id'] == download['operation_id']
+        active = fixture.state['operation']
+        active.update(phase='succeeded', admission_reopened_at='2026-11-11T00:00:10Z', blockers=[])
+        fixture.state.update(busy=False, current_release=active['target_release'], prepared_candidate=None,
+            account_rollout={'operation_id': active['operation_id'], 'target_release': active['target_release'], 'accounts': [
+                {'environment_id': 'retry-environment', 'name': '账号 A', 'state': 'waiting', 'error': '账号仍有活动'},
+                {'environment_id': 'settled-environment', 'name': '账号 B', 'state': 'updated'}]})
+        await page.reload()
+        await expect(page.get_by_text('平台已恢复接单。', exact=True)).to_be_visible()
+        await page.get_by_role('button', name='重试', exact=True).click()
+        assert fixture.writes[-1]['path'].endswith('/' + active['operation_id'] + '/retry-account')
+        assert fixture.writes[-1]['body']['environment_id'] == 'retry-environment'
+        await expect(page.get_by_text('已更新', exact=True)).to_have_count(2)
+        await page.screenshot(path=str(output / 'account-rollout-390.png'), full_page=True)
+        total_writes += len(fixture.writes)
+        cases.append('下载后刷新继续重启，先恢复接单，再独立重试单账号更新')
         await context.close()
 
         fixture = UpdateFixture()

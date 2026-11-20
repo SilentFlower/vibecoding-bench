@@ -765,6 +765,49 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - 宿主测试断言旧回退路径与快速取消分支，快切期间远程待更新不阻塞中央提交。
 - `verify_system_update.py --fast-transition` 验证实际 SSH 离线节点、真实挂起请求关断、中央先恢复和节点续跑。结合 `--migration-manifest` 验证双库迁移、只完成第一库后掉电恢复、显式回退及后来写入保留。
 
+## Scenario: 分步下载与本机账号后台更新
+
+### 1. Scope / Trigger
+
+调整下载回执、立即重启、旧账号来源授权或单账号重试时适用。继续使用本文件的签名发行、数据库快照和失败恢复合同。
+
+### 2. Signatures
+
+- `POST /runtime/api/system-updates/prepare` 沿原冻结更新请求。状态响应提供 `staged_updates`、`prepared_candidate`，回执含 `operation_id`、`target_release`、`manifest_sha256`、`fast_transition`。
+- `POST /runtime/api/system-updates/install` 接受可选规范 UUID `prepared_operation_id`。`POST /runtime/api/system-updates/operations/{id}/retry-account` 接受 `expected_revision` 与 `environment_id`。
+- 内部 `snapshot` 接受 `control_only=true`，返回 `scope=control`。内部 `environment` 接受 `action=rollout`，按原操作 UUID、epoch、环境身份与冻结代次执行。状态响应的 `account_rollout` 含生效目标发行、原操作 UUID 和各环境进度。
+
+### 3. Contracts
+
+- 下载阶段校验签名、原始构建清单、镜像与项目库。管理页以服务端持久回执展示「待重启」。安装重新核对当前修订、目标摘要与本地材料。
+- 原版和候选控制镜像均声明 `vibebench.local-account-rollout=1` 且原快切能力成立时，安装可使用后台滚动。快切结束原推理，保留会影响控制状态和数据库快照的写入收尾。节点转发流只读中央归属，中央快照通过控制范围与节点连接收尾解耦。
+- 宿主在只读挂载的门禁目录生成 `account-rollout-<control-release>.json`。文件锚定当前部署、控制和账号目标批次、原操作和 epoch。过渡来源按账号、环境 ID、代次、原镜像及三角色登记逐项固定。网关只允许对应本机地址、账号和代次的原发送器绑定。
+- 控制和数据验收通过后，宿主提交生效发行并开放全局准入。本机账号随后使用各自的环境锁、排他租约和预留容量重建。原发送器首次恢复请求时沿现有接口同步额度身份。租约快照中同一排他租约可同时出现在 `lease` 和 `holders`。匹配维护所有者及租约代次后视为同一许可。
+- 后台进度使用 `queued/updating/updated/stopped/waiting/needs_check`。更新器重启继续本次生效发行的待处理事项。单环境重试固定原操作、当前修订和环境身份。重建尝试在环境私有目录保留原代次、下一代次、CPU 额度及完成标记。用户个人的整体启停及 API 准入依旧由账号开关控制。
+- 固定宿主交付包包含 `orchestrator/system_update_rollout.py`。现有 v2 安装沿同协议源码刷新。较旧宿主和组件组合使用其支持的安装入口。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 回执修订、目标或清单摘要变化 | 返回冲突并刷新候选 |
+| 已下载的镜像、清单或项目库失效 | 安装前返回重下载提示 |
+| 原镜像、账号、角色或环境代次不匹配 | 隔离该账号并展示待核对 |
+| 账号仍有独立工作或租约 | 该账号等待空闲，其余事项继续 |
+| 已恢复接单后执行器中断 | 续接已生效发行的后台事项并保护后来业务写入 |
+
+### 5. Scenarios and Examples
+
+- 正常。下载完成后刷新页面，继续使用原准备回执。点击「立即重启」后，控制服务先恢复接单，兼容账号继续使用原环境。
+- 边界。本地候选材料失效时重新下载。账号独立活动无法立即收尾时通过账号后台进度重试。
+- 错误用法。用最近一次下载回执替换其他目标的回执。正确处理。安装请求携带该目标与清单摘要对应的准备操作 UUID。
+
+### 6. Tests Required
+
+- `test_system_updater` 覆盖持久准备回执、缓存失效时原版继续服务、开放准入与账号更新顺序、单账号故障和重试。
+- `test_system_update_recovery`、`test_account_update_identity` 及网关绑定测试覆盖原排他许可、外来占用、跨账号、角色、环境和代次拒绝。
+- `verify_system_update.py --fast-transition` 覆盖旧账号请求、后台延迟、失败重试、运行环境代次、SSH 节点独立换版和中断恢复。`verify_system_update_browser.py` 覆盖下载后刷新、重启确认、恢复接单和单账号重试。
+
 ## Scenario: 候选项目库准备与控制端验收
 
 ### 1. Scope / Trigger
