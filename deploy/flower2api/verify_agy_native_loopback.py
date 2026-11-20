@@ -285,7 +285,9 @@ def homoglyph_cases(database, request, base, wait_idle):
     large=copy.deepcopy(body);large['systemInstruction']={'parts':[{'text':'ABC 中文 😀\n'*65536}]}
     enabled(True)
     before=len(Upstream.calls)
-    require(request(base+'generateContent',large)[0]==503,'超过原生上下文预算的系统文本被接纳')
+    status, raw = request(base + 'generateContent', large)
+    require(400 <= status < 600 and json.loads(raw)['error']['code'] == status,
+        '超过原生上下文预算的系统文本未返回对应错误：' + str(status))
     wait_idle()
     require(len(Upstream.calls)==before,'超过原生上下文预算仍产生模型提交')
     large['systemInstruction']={'parts':[{'text':'ABC 中文 😀\n'*4096}]}
@@ -1074,6 +1076,16 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
             expected=429 if mode=='TLS_SYNTHETIC_CAPACITY' else 503
             require(request(base+'generateContent',failure)[0]==expected,'原生错误或截断流被误分类：'+mode)
             wait_idle()
+        invalid_schema = copy.deepcopy(body)
+        invalid_schema['tools'] = [{'functionDeclarations': [{'name': 'synthetic_tool', 'parameters': {
+            'type': 'OBJECT', 'properties': {'value': {'type': 'STRING', 'pattern': '('}},
+        }}]}]
+        before = len(Upstream.calls)
+        status, raw = request(base + 'generateContent', invalid_schema)
+        error = json.loads(raw)['error']
+        require((status, error['code'], error['status']) == (500, 500, 'INTERNAL')
+            and len(Upstream.calls) == before, '原版拒绝非法工具正则时未保留控制 HTTP 500')
+        wait_idle()
         cancel=copy.deepcopy(body);cancel['contents'][0]['parts'][0]['text']='TLS_SYNTHETIC_CANCEL'
         value=Request('http://127.0.0.1:5674'+base+'streamGenerateContent?alt=sse',
             data=json.dumps(cancel).encode(),headers={'x-api-key':'synthetic-key','content-type':'application/json'})
@@ -1117,7 +1129,7 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
             'synthetic_native_model_submissions':len(Upstream.calls),'credential_generations':[1,2],
             'cgroup_memory':state['agy']['cgroup_memory'],
             'checks':['公共Gemini非流式与SSE','原版TLS与证书校验','源响应及usage','实际出站参数','原生MCP结果回填',
-                'concurrency=1新代续轮','重复回填拒绝','64个重复源帧','截断及容量错误终态','公共断连取消原生上游','真实收口及账号许可释放']}
+                'concurrency=1新代续轮','重复回填拒绝','64个重复源帧','截断及容量错误终态','控制 HTTP 500 原样交付','公共断连取消原生上游','真实收口及账号许可释放']}
     finally:
         for child in children:
             child.terminate()

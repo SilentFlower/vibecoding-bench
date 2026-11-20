@@ -221,6 +221,25 @@ fn gemini_error_body(error: AppError) -> (StatusCode, Value) {
             "RESOURCE_EXHAUSTED",
             error.to_string(),
         ),
+        error @ AppError::AgyControl(code) => {
+            let status = match code {
+                StatusCode::BAD_REQUEST => "INVALID_ARGUMENT",
+                StatusCode::UNAUTHORIZED => "UNAUTHENTICATED",
+                StatusCode::FORBIDDEN => "PERMISSION_DENIED",
+                StatusCode::NOT_FOUND => "NOT_FOUND",
+                StatusCode::CONFLICT => "ABORTED",
+                StatusCode::PRECONDITION_FAILED => "FAILED_PRECONDITION",
+                StatusCode::PAYLOAD_TOO_LARGE | StatusCode::TOO_MANY_REQUESTS => {
+                    "RESOURCE_EXHAUSTED"
+                }
+                StatusCode::NOT_IMPLEMENTED => "UNIMPLEMENTED",
+                StatusCode::BAD_GATEWAY | StatusCode::SERVICE_UNAVAILABLE => "UNAVAILABLE",
+                StatusCode::GATEWAY_TIMEOUT => "DEADLINE_EXCEEDED",
+                code if code.is_server_error() => "INTERNAL",
+                _ => "UNKNOWN",
+            };
+            (code, status, error.to_string())
+        }
         _ => (
             StatusCode::SERVICE_UNAVAILABLE,
             "UNAVAILABLE",
@@ -995,7 +1014,7 @@ async fn generate_inner(
             .map(|event| {
                 let value = match event {
                     Ok(value) => value,
-                    Err(error @ AppError::AgyUpstreamQuota) => gemini_error_body(error).1,
+                    Err(error @ (AppError::AgyUpstreamQuota | AppError::AgyControl(_))) => gemini_error_body(error).1,
                     Err(_) => json!({"error":{"code":503,"status":"UNAVAILABLE","message":"AGY原生请求失败"}}),
                 };
                 Ok::<Bytes, IoError>(Bytes::from(format!("data: {value}\n\n")))
@@ -1487,21 +1506,23 @@ async fn drive(
                 }
             }
             Some("error" | "cancelled") => {
-                if native["type"] == "error" && native["upstream_http_status"] == 429 {
+                let cancelled = native["type"] == "cancelled";
+                if !cancelled && native["upstream_http_status"] == 429 {
                     if let Some(observer) = observation.as_mut() {
                         observer.upstream_quota();
                     }
                     return Err(AppError::AgyUpstreamQuota);
                 }
+                // 只有失败终态附带的 4xx/5xx 才能覆盖网关的兜底状态。
+                let status = native["control_http_status"]
+                    .as_u64()
+                    .filter(|status| !cancelled && (400..600).contains(status))
+                    .and_then(|status| StatusCode::from_u16(status as u16).ok());
                 if let Some(observer) = observation.as_mut() {
-                    observer.finish(
-                        if native["type"] == "cancelled" {
-                            "cancelled"
-                        } else {
-                            "upstream_error"
-                        },
-                        Some("native_control"),
-                    );
+                    observer.control_failed(status.map(|code| code.as_u16()), cancelled);
+                }
+                if let Some(status) = status {
+                    return Err(AppError::AgyControl(status));
                 }
                 return Err(AppError::BadGateway("AGY原生请求失败".into()));
             }

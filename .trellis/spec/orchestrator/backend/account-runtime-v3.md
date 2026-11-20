@@ -2038,6 +2038,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `AgyAccessSnapshot`为account_id、credential_generation、access_token、expires_at、email，拒绝refresh_token。`AgyToolCompletion`为request、api_token_id、previous_request_id、body；旧工具控制不携带凭据。
 - `agy_runtime.tool_schema.normalize(schema, path='', changes=None)` 返回独立工具 Schema，接收 `functionDeclarations[].parameters` 与 `parametersJsonSchema`。`changes` 可记录 `{path, action}`，原工具定义保持原样。
 - `AgySenderConfig`包含protocol_version=1、完整source_sha256、module_root、binary_path、work_root、max_workers和memory_mib。内部监督协议schema_version=1，命令submit/prepare/finish_tools/status/cancel/shutdown，事件持续到job_finalized。
+- `native_event.event.control_http_status` 是可选整数，记录失败终态已收到的 AGY 控制 HTTP 4xx/5xx。旧内核可省略该字段。Gemini 公开 `error.code` 使用已核对的状态码。
 - 追加`bench.agy-environments.5`：platform_api_environments以唯一gateway_account_id及唯一environment_id绑定现有account_environments，platform固定antigravity。AGY环境account_id为空，名称采用`agy:<gateway-id>`；历史基线保持冻结。
 
 ### 3. Contracts
@@ -2053,6 +2054,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 公共生成在原账号刷新锁内要求 AT 剩余有效期超过 430 秒。该值保留 AGY 1.5.9 的 310 秒断网启动实测余量和原生请求最长 120 秒预算。有效期不足时，由管理侧按原代次流程续期后再发布 AT-only 快照；在途工作继续使用自己的快照。
 - 监督器将请求墙钟截止转换为单调截止，接收剩余时间范围 `(0,125]` 秒并限制原请求预算最多120秒。`Supervisor.acquire(value, until)`在选择及创建worker前复核截止，旧代关闭后重新检查；`Worker.start(until)`在Popen前再次复核。退役计入原请求耗时，过期返回 `request_deadline_exceeded`，停止新代创建及原生启动。
 - 仅源错误code=401/status=UNAUTHENTICATED且没有候选及usage时参与有界恢复；须尚未交付、无工具结果历史、原作业实际收口、同账号ready新代且AT改变，最多一次。容量/控制失败、SSE首帧后、取消或过期均不重放。
+- 控制响应头已返回 4xx/5xx 时保留状态码，错误正文解析失败时同样适用。普通 HTTP 和 SSE 首帧前用该状态结束请求，已开始的 SSE 通过尾帧 `error.code` 交付同一状态。尝试记录使用真实控制状态和 `native_control` 阶段，根记录保留实际客户端 HTTP 状态。已确证的上游配额 429 优先，已保留的成功结果继续按成功收尾。
 - 账号内共享完整265700040字节封存映像，核对SHA和四封存，decode计数、分发大小、控制/内核/观察器/原生RSS/PSS/USS与cgroup独立展示。max_workers等于账号concurrency，范围1..64，跨模型和凭据代次共用物理上限。有限sender RAM为512+256×workers MiB，network 256MiB、CLI至少512MiB，总量受原预算约束；零沿明确无限策略。
 - cgroup v2读取memory.max、memory.current、memory.peak和memory.swap.current；v1支持memory子目录或挂载根的memory.limit_in_bytes、memory.usage_in_bytes、memory.max_usage_in_bytes，memory.memsw.usage_in_bytes减RAM占用才是swap。v1限制大于等于2^60沿既有规则按无限处理；缺失/损坏为未知，监督器与冻结RAM不一致时拒绝，不能把未知当作无限。
 - 正式模块根为/opt/v3/python，共享runtime_files位于/usr/local/bin。监督器和worker都冻结这两个搜索路径。AT HOME随worker私有发布，退役删除；采集复用账号开关与HTTP日志模式，长期有界脱敏快照位于flows/api/agy-prepared，原始执行材料沿临时worker目录和关闭清理。历史已退役采集保留七天；统一容量、内部旁路及读取合同由网关settings-database的AGY请求记录场景持有。普通输出采用有界匿名暂存，私有事件读取按帧及总字节控制背压。
@@ -2067,8 +2069,9 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 | Gemini `thinkingConfig` 形状、档位、预算或字段无效 | 400 `INVALID_ARGUMENT`，零发送 |
 | 字符串 `const` 不在同字段的 `enum` 内 | 400 `AGY_UNSUPPORTED_INPUT`，私有校验为 `invalid_tool_schema`，零发送 |
 | 已有令牌可见目录，公开模型无对应映射 | 404 `NOT_FOUND`，提示读取 `GET /v1beta/models`，零发送 |
-| pending/reconcile、旧凭据代次、容量或原生失败 | 受控503，保留原请求归属及实际入口计数 |
-| 源只有文本或usage、缺少源终态 | 原生流不完整；非流式503，已开始SSE按失败收尾 |
+| pending/reconcile、旧凭据代次或无确证错误状态的原生失败 | 受控503，保留原请求归属及实际入口计数 |
+| 原生终态失败，控制 HTTP 状态为 4xx/5xx | 保留原码。SSE 已发首帧时 HTTP 状态保持 200，尾帧 `error.code` 为原码 |
+| 源只有文本或usage、缺少源终态 | 原生流不完整。已有控制错误码时保留原码，其他情况沿503路径 |
 | v1/v2合法有限或明确无限预算 | 按冻结值准入；未知/不匹配拒绝 |
 | 公共断连、原截止到期 | 精确取消原作业，活动保持到实际收口后释放 |
 | 准入时、旧代收尾后或Popen前原截止已过 | `request_deadline_exceeded`，停止后续建代或启动副作用 |
@@ -2079,6 +2082,8 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 模型聚合示例。账号目录中的 `gemini-4-neon-low` 和 `gemini-4-neon-high` 对外列为 `models/gemini-4-neon`。客户端向 `/v1beta/models/gemini-4-neon:generateContent` 提交 `"thinkingConfig":{"thinkingLevel":"LOW"}`（放在 `generationConfig` 内），网关从该令牌允许的账号中查找 `gemini-4-neon-low`。如果目录只有两个带后缀的条目，`MEDIUM` 请求返回 404，客户端可选择目录实际支持的档位。
 
 嵌套筛选数组示例。`{"type":"array","items":{"type":"array"}}` 的内层数组需经归一化补 `items`。直接补裸 `{}` 会被 AGY 序列化省略。使用 `{"anyOf":[{}]}` 可保留出站字段，`["count",">=",7]` 和 `["ready","==",true]` 的值类型维持原样。
+
+控制错误示例。`SendUserCascadeMessage` 在源首帧前返回 HTTP 400 时，网关返回 `{"error":{"code":400,"status":"INVALID_ARGUMENT","message":"AGY 控制接口请求失败"}}`。原生流在成功控制响应后断开且缺少模型终态时，按未知错误路径返回 503。
 
 正常：Gemini工具首轮返回真实functionCall并保留原许可；管理侧发布AT2后，调用方带原历史和functionResponse续轮，原AT1 worker完成真实MCP回填，下一模型由AT2 worker执行。边界：管理侧reconcile时先完成旧工具并保留原截止内回执，恢复ready后继续；资源无限必须有真实cgroup依据。
 
@@ -2092,6 +2097,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 
 - `test_agy_runtime`、`test_agy_supervisor`、`test_agy_environment`覆盖AT-only、参数、目录、帧/签名、终态、代次/工具、v1/v2有限/无限/未知预算、环境归属与维护。
 - `test_agy_runtime` 覆盖两种工具声明、嵌套缺项、两种元组、字符串常量与 `enum` 冲突及重复归一化。固定原版回环断言实际出站的内层 `items`、元组长度上限、单值 `enum`，并核对工具调用保留数字及布尔值、结果完成回填。
+- `test_agy_runtime` 验证已观测控制状态、非法 JSON 响应与成功结果保留。`verify_agy_gemini.py` 验证普通 HTTP、SSE 首帧前后与尝试记录的状态，覆盖 200 和旧内核字段缺失的503兜底。固定原版回环验证非法工具正则导致的控制500及零模型提交。
 - `test_agy_supervisor`覆盖已过期准入、旧代关闭耗尽截止以及真实Worker.start过期；分别断言worker创建为0、新代启动为0及Popen调用为0，均返回 `request_deadline_exceeded`。
 - Rust的runtime_transport单测覆盖精确AGY目标及CC路径隔离；agy_sender_test、gemini_account_test、gemini_contract_test、runtime_transport_test覆盖鉴权、绑定、权限、源聚合与取消。
 - `verify_agy_gemini.py` 覆盖未知模型在流式和非流式入口返回 404、令牌范围外模型和未观测目录、已知模型暂不可用时的 503、临期凭据单次续期及有效期充足时继续复用。
@@ -2129,7 +2135,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 | 启用、空系统文本、已经转换 | 确定性处理；无替换时changed=false |
 | 畸形策略、未知规则或资源摘要失配 | 在模型发送前拒绝；旧严格消费者拒绝未知启用扩展 |
 | 启用请求缺失或错误回执 | 公共请求受控失败，拒绝交付源帧 |
-| 超出固定原版上下文预算 | 保留原生失败边界；本地验收503且零模型提交，后续预算内请求可用 |
+| 超出固定原版上下文预算 | 保留原生失败边界，公开状态与 `error.code` 一致。零模型提交，后续预算内请求可用 |
 | 关闭账号开关 | 后续HTTP恢复原文；同HTTP恢复和旧工具归属继续冻结合同 |
 
 ### 5. Scenarios and Examples

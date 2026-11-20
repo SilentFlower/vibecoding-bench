@@ -24,6 +24,9 @@ pub enum AppError {
     /// AGY 模型返回的确证限流或配额耗尽。
     #[error("AGY 上游额度不足或触发限流")]
     AgyUpstreamQuota,
+    /// AGY 本地控制接口实际返回的 HTTP 错误状态。
+    #[error("AGY 控制接口请求失败")]
+    AgyControl(StatusCode),
     /// 本地准入拒绝，携带保守重试提示，保持账号绑定。
     #[error("本地准入容量不足或等待超时")]
     AdmissionLimited { retry_after: u64 },
@@ -68,6 +71,7 @@ impl IntoResponse for AppError {
                 (StatusCode::TOO_MANY_REQUESTS, "")
             }
             AppError::BadGateway(_) => (StatusCode::BAD_GATEWAY, ""),
+            AppError::AgyControl(status) => (*status, ""),
             AppError::ServiceUnavailable(_) => (StatusCode::SERVICE_UNAVAILABLE, ""),
             AppError::PermanentCredential(_) => (StatusCode::SERVICE_UNAVAILABLE, ""),
             AppError::Internal(detail) => {

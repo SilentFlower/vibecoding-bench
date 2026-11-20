@@ -90,7 +90,7 @@ class AgyRuntimeTests(unittest.TestCase):
     def test_model_result_survives_only_post_stream_control_failure(self):
         """通过真实执行入口区分已结束的结果、断流、工具和取消。@return 无。"""
         usage={'promptTokenCount':12,'candidatesTokenCount':2,'totalTokenCount':14}
-        cases=[('rpc_503','completed'),('not_idle','completed'),('late_observer_error','completed'),
+        cases=[('rpc_503','completed'),('rpc_400','error'),('not_idle','completed'),('late_observer_error','completed'),
             ('missing_stop','error'),('missing_usage','error'),('pending_tool','error'),('unregistered_tool','error'),
             ('early_observer_error','error'),('second_model_call','error'),('cancelled','cancelled')]
         for mode,expected in cases:
@@ -126,7 +126,7 @@ class AgyRuntimeTests(unittest.TestCase):
                         'native_context':{'ConversationID':'owned'}}
                     bridge._emit({**event,'event':'model_start'})
                     candidate={'content':{'parts':[{'text':'合成模型结果'}]}}
-                    if mode!='missing_stop':candidate['finishReason']='STOP'
+                    if mode not in ('missing_stop','rpc_400'):candidate['finishReason']='STOP'
                     if mode in ('pending_tool','unregistered_tool'):
                         candidate['content']['parts'].append({'functionCall':{'name':'fixture'}})
                     frame={'candidates':[candidate]}
@@ -139,8 +139,8 @@ class AgyRuntimeTests(unittest.TestCase):
                     if mode=='second_model_call':bridge._emit({**event,'event':'model_start','call_id':'r-1.2'})
                     if mode=='cancelled':scope.cancel.set()
                     done=threading.Event();done.set()
-                    status=200 if mode in ('not_idle','late_observer_error','unregistered_tool') else 503
-                    return SimpleNamespace(done=done,error=None,value={'status':status})
+                    status={'not_idle':200,'late_observer_error':200,'unregistered_tool':200,'rpc_400':400}.get(mode,503)
+                    return SimpleNamespace(done=done,error=None,value={'status':status},response_status=status)
 
                 with patch('agy_runtime.kernel.RPC',side_effect=submit):kernel.execute(scope)
                 terminal=[(kind,fields) for kind,fields in events if kind in ('completed','error','cancelled')]
@@ -150,7 +150,7 @@ class AgyRuntimeTests(unittest.TestCase):
                 self.assertEqual(events[-1][0],'idle')
                 self.assertIsNone(events[-1][1]['next_generation'])
                 diagnostic=[kind for kind,_ in events if kind.startswith('native_control.')]
-                reasons={'rpc_503':'kept','not_idle':'kept','late_observer_error':'kept',
+                reasons={'rpc_503':'kept','rpc_400':'missing_stop','not_idle':'kept','late_observer_error':'kept',
                     'missing_stop':'missing_stop','missing_usage':'missing_usage','pending_tool':'tool_pending',
                     'unregistered_tool':'ineligible_error',
                     'early_observer_error':'observer_before_eof','second_model_call':'model_call_count','cancelled':'ineligible_error'}
@@ -159,15 +159,34 @@ class AgyRuntimeTests(unittest.TestCase):
                 self.assertEqual(terminal[0][1]['control_recovery'],reasons[mode])
                 if mode=='rpc_503':
                     self.assertEqual(diagnostic[0],'native_control.submission.native_request_failed.503.RuntimeError.kept')
+                if mode=='rpc_400':
+                    self.assertEqual(terminal[0][1]['control_http_status'],400)
+                    self.assertEqual(terminal[0][1]['code'],'native_request_failed')
                 if mode=='late_observer_error':
                     self.assertIn('native_protocol.observer.sdk_call_missing',[kind for kind,_ in events])
                 if mode=='unregistered_tool':
                     self.assertEqual(terminal[0][1]['code'],'tool_protocol_error')
+                    self.assertNotIn('control_http_status',terminal[0][1])
                 if expected=='completed':
                     expected_code={'rpc_503':'native_request_failed','not_idle':'native_not_idle',
                         'late_observer_error':'native_protocol_error'}[mode]
                     self.assertEqual(terminal[0][1]['control_error_code'],expected_code)
                     self.assertFalse(terminal[0][1]['native_tool_pending'])
+                    self.assertNotIn('control_http_status',terminal[0][1])
+
+    def test_control_rpc_retains_http_error_with_non_json_body(self):
+        """保留实际错误状态，成功或缺失状态时仍按传输失败处理。@return 无。"""
+        worker = Worker.__new__(Worker)
+        done = threading.Event()
+        done.set()
+        future = SimpleNamespace(done=done, error='JSONDecodeError', response_status=502)
+        with patch('agy_runtime.kernel.RPC', return_value=future):
+            self.assertEqual(worker.call('StartCascade', {}, None), {'status': 502, 'response': None})
+            for status in (200, None):
+                with self.subTest(status=status):
+                    future.response_status = status
+                    with self.assertRaisesRegex(RuntimeError, 'native_transport_error'):
+                        worker.call('StartCascade', {}, None)
 
     def test_gemini_text_modality_uses_native_default(self):
         """确认显式文本输出沿用默认行为，图片和音频仍保留字段级错误。@return 无。"""

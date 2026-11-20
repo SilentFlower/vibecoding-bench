@@ -519,6 +519,22 @@ impl AgyAttemptTrace {
         }
     }
 
+    /// 将控制错误记为实际尝试状态。@param status 已核对的控制 HTTP 状态。@param cancelled 是否取消。@return 无。
+    pub(crate) fn control_failed(&mut self, status: Option<u16>, cancelled: bool) {
+        if self.finished {
+            return;
+        }
+        if let Some(status) = status {
+            self.record.status_code = Some(status);
+        }
+        let outcome = if cancelled {
+            "cancelled"
+        } else {
+            "upstream_error"
+        };
+        self.finish(outcome, Some("native_control"));
+    }
+
     /// 终结异常尝试，重复终结保持首次结果。@param outcome 受控结果。@param stage 实际阶段。@return 无。
     pub(crate) fn finish(&mut self, outcome: &str, stage: Option<&str>) {
         if self.finished {

@@ -263,7 +263,11 @@ class Worker:
         """完成控制RPC。@param method 方法。@param body 正文。@param scope 归属。@param timeout 秒。@return 实际响应。"""
         future=RPC(self,method,body,scope,timeout)
         if not future.done.wait(timeout+1):raise RuntimeError('native_control_timeout')
-        if future.error:raise RuntimeError('native_transport_error')
+        if future.error:
+            # 错误正文可能不是 JSON，实际收到的 HTTP 错误状态仍然有效。
+            if future.response_status is not None and 400 <= future.response_status < 600:
+                return {'status': future.response_status, 'response': None}
+            raise RuntimeError('native_transport_error')
         return future.value
 
     def retire(self, reason):
@@ -444,7 +448,9 @@ class Kernel:
                 capture=partial(self.capture_egress,scope,token) if self.cfg.get('capture_root') else None
                 scope.safety_egress=SafetyEgress(rules,token,worker.bridge.proxy_url,worker.bridge.ca_file,capture)
                 switched=worker.call('SetCloudCodeURL',{'url':scope.safety_egress.url},scope)
-                if switched['status']!=200:raise RuntimeError('native_safety_endpoint_rejected')
+                if switched['status']!=200:
+                    control_status=switched['status']
+                    raise RuntimeError('native_safety_endpoint_rejected')
             root=worker.call('StartCascade',{'source':'CORTEX_TRAJECTORY_SOURCE_AGENT_API','requestedModel':MODEL},scope)
             control_status=root['status']
             if root['status']!=200:raise RuntimeError('native_start_rejected')
@@ -523,8 +529,8 @@ class Kernel:
             if code not in NATIVE_ERRORS:code='kernel_internal_error'
             blocker=scope.result_recovery_blocker(code,spool)
             recovery=blocker or 'kept'
-            if phase=='submission' and future and future.done.is_set():
-                control_status=future.value['status'] if future.value is not None else future.response_status
+            if phase=='submission' and future:
+                control_status=future.response_status
             status=control_status if type(control_status) is int and 100<=control_status<=599 else 'unknown'
             exception=type(exc).__name__
             if exception not in CONTROL_EXCEPTION_TYPES:exception='other'
@@ -545,12 +551,15 @@ class Kernel:
             else:
                 kind='cancelled' if scope.cancel.is_set() else 'error'
                 scope.final_status=kind
-                upstream={}
-                if kind=='error' and scope.safety_egress and scope.safety_egress.model_status==429:
-                    upstream['upstream_http_status']=429
+                failure_status={}
+                if kind=='error':
+                    if type(control_status) is int and 400<=control_status<600:
+                        failure_status['control_http_status']=control_status
+                    if scope.safety_egress and scope.safety_egress.model_status==429:
+                        failure_status['upstream_http_status']=429
                 self.emit('tool_turn_finalized' if scope.tool_wait_published else kind,**scope.identity(),status=kind,code=code,control_recovery=recovery,
                     native_stream_complete=bool(scope.job and scope.job.ended.is_set()),native_model_calls=scope.job.calls if scope.job else 0,
-                    native_cascade_id=scope.root,native_trajectory_id=scope.broker.trajectory_id if scope.broker else None,**upstream)
+                    native_cascade_id=scope.root,native_trajectory_id=scope.broker.trajectory_id if scope.broker else None,**failure_status)
         finally:
             try:
                 if scope.broker:scope.broker.close()
