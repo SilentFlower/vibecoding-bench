@@ -18,7 +18,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from socket import SHUT_WR
@@ -30,7 +30,7 @@ from urllib.parse import quote, unquote, urlsplit
 
 from docker.errors import DockerException, NotFound
 from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, ROLE_LABELS, create_environment, role_container
-from account_update_identity import configured_release, image_origin, role_release
+from account_update_identity import compatible_account_origin, configured_release, image_origin, role_release
 from capture_artifacts import capture_context_json
 from run_artifacts import ordinary_run_alias
 from cli_telemetry_policy import cli_telemetry_environment
@@ -240,6 +240,7 @@ class AccountRuntime:
         self.credential_locks_guard = threading.Lock()
         self.credential_locks: dict[str, threading.RLock] = {}
         self.capacity_lock = threading.RLock()
+        self.rollout_capacity_reservations: set[str] = set()
         self.heartbeat_pool = ThreadPoolExecutor(max_workers=self.limit * self.cli_limit + 1, thread_name_prefix="v3-lease")
         self.jobs: dict[str, dict] = {}
         self._native_notified: dict[int, tuple[str, int]] = {}
@@ -746,7 +747,7 @@ class AccountRuntime:
                allow_login_recovery: bool = False, preserve_proxy: bool = False,
                scenario_resources: bool = False, ownership_source: str | None = None,
                require_quota_mount: bool = True, startup_prewarm: bool = False,
-               prepare_sender: bool = True, native_migration: bool = False) -> tuple[dict, object]:
+               prepare_sender: bool = True, native_migration: bool = False, capacity_reserved: bool = False) -> tuple[dict, object]:
         """创建或唤醒固定环境，沿用首次固化参数。
 
         :param account: bench 账号或登录草稿
@@ -760,6 +761,7 @@ class AccountRuntime:
         :param startup_prewarm: 后台启动只使用空余容量，且不重建现有容器
         :param prepare_sender: API 准备目标发送器；CLI/管理操作只使用已生效布局
         :param native_migration: 仅环境对账在原维护租约中恢复内置布局。
+        :param capacity_reserved: 调用方已在生命周期锁内使用 rollout_capacity 保留本账号容量。
         :return: 环境记录与 Docker container
         """
         if self.placement:
@@ -837,7 +839,9 @@ class AccountRuntime:
             if native and image_labels.get("vibebench.native-runtime") != "293-raw-1":
                 raise ValueError("账号镜像缺少固定 293 原生能力")
             configuration = None
-            with self.capacity_lock:
+            if capacity_reserved and row['environment_id'] not in self.rollout_capacity_reservations:
+                raise ValueError('账号更新尚未保留环境容量')
+            with nullcontext() if capacity_reserved else self.capacity_lock:
                 present = [bool(row.get(column)) for column in ROLE_COLUMNS.values()]
                 if any(present) and not all(present):
                     self._update(row, state="reconcile")
@@ -890,7 +894,8 @@ class AccountRuntime:
                         self._stop_environment(row, remove=True)
                         present = [False]
                     elif not any(current.status == "running" for current in containers.values()):
-                        self._make_room(row, allow_eviction=not startup_prewarm)
+                        if not capacity_reserved:
+                            self._make_room(row, allow_eviction=not startup_prewarm)
                         generation = int(row["generation"]) + 1
                         configuration["binding"].update(generation=generation, secret=secrets.token_hex(32))
                         self._write_sender_config(row, configuration)
@@ -917,7 +922,8 @@ class AccountRuntime:
                     else:
                         fingerprint.pop("native_sender_memory", None)
                     self._update(row, fingerprint_json=json.dumps(fingerprint))
-                    self._make_room(row, allow_eviction=not startup_prewarm)
+                    if not capacity_reserved:
+                        self._make_room(row, allow_eviction=not startup_prewarm)
                     name = account_container_prefix(self.deployment, node_key=self.node_key) + row['environment_id']
                     create_environment(self, row, account, name, atomic_json)
                     configuration = None
@@ -1108,10 +1114,11 @@ class AccountRuntime:
                 if self._native_notified.get(int(account_id)) == key:
                     self._native_notified.pop(int(account_id), None)
 
-    def existing_transport(self, account: dict) -> dict | None:
+    def existing_transport(self, account: dict, *, rollout_only: bool = False) -> dict | None:
         """只读取当前运行绑定，保持休眠和停止环境的生命周期。
 
         :param account: 唯一绑定的 bench 账号
+        :param rollout_only: 只采用宿主授权且正在运行的旧发送器。
         :return: 已运行环境的受限绑定；停止或休眠时为空
         """
         if self.placement:
@@ -1127,6 +1134,8 @@ class AccountRuntime:
         with self.environment_lock(row["environment_id"]):
             self._check_node_fence(row)
             if row["state"] not in ("ready", "cli_reconcile") or row.get("isolation_version") != ISOLATION_VERSION:
+                return None
+            if rollout_only and not compatible_account_origin(self, row, account['cc2api_account_id']):
                 return None
             if self.credential_ownership:
                 self.credential_ownership.guard(account)
@@ -1146,6 +1155,17 @@ class AccountRuntime:
                     or binding.get("release_id") != role_release(self, row)
                     or config.get("proxy_source", config["proxy_url"]) != self._proxy(account)):
                 raise ValueError("运行绑定归属或配置不一致")
+            if rollout_only:
+                current = self.gateway._request('GET', f"/admin/runtime/accounts/{account['cc2api_account_id']}/config")
+                if (current['status'] != 'active' or current['auth_type'] != 'oauth'
+                        or current['proxy_url'] != self._proxy(account)
+                        or bool(config.get('native')) != (current.get('request_backend') == 'native293')):
+                    raise ValueError('原账号环境与当前配置不兼容，等待后台更新')
+                # 旧实例可能尚未服务过 API，首次绑定仍须沿正常入口同步额度身份。
+                identity = self.quota_identity(account) if self.quota_identity else ''
+                if config.get('quota_identity') != identity:
+                    config['quota_identity'] = identity
+                    self._write_sender_config(row, config)
             return binding
 
     def _network_has_quota_mount(self, account_id: int, network) -> bool:
@@ -1405,6 +1425,11 @@ class AccountRuntime:
         :param version: 兼容旧调用方的 CLI 版本，不参与 API 环境准备
         :return: 当前账号传输绑定，含受限服务秘密
         """
+        # 旧发送器只在宿主明确授权期间复用，重建始终使用当前配置的目标镜像。
+        if os.environ.get('V3_UPDATE_GATE_DIR'):
+            binding = self.existing_transport(account, rollout_only=True)
+            if binding:
+                return binding
         # API 已持有自己的并发许可，不能在这里等待排空自己；它也不读取 CLI 的额度文件。
         row, _ = self.ensure(account, require_quota_mount=False)
         config_path = self._sender_config(row)
@@ -2925,6 +2950,19 @@ class AccountRuntime:
             return self.data / "missing-run-artifact" / run_id / name
         return self.data / "environments" / row["environment_id"] / "runtime" / "runs" / run_id / name
 
+    @contextmanager
+    def rollout_capacity(self, row: dict):
+        """保留正在滚动的单账号容量。@param row 已持有其生命周期锁的环境。@return 可在全局容量锁之外重建的上下文。"""
+        identifier = row['environment_id']
+        with self.capacity_lock:
+            self._make_room(row, allow_eviction=False)
+            self.rollout_capacity_reservations.add(identifier)
+        try:
+            yield
+        finally:
+            with self.capacity_lock:
+                self.rollout_capacity_reservations.remove(identifier)
+
     def _make_room(self, requested: dict, *, allow_eviction: bool = True) -> None:
         running = self.client.containers.list(filters={"label": ["vibebench.product=v3",
             f"vibebench.deployment={self.deployment}"]})
@@ -2932,6 +2970,7 @@ class AccountRuntime:
             in ("account", "account-network", "account-sender")
             and container.labels.get('vibebench.cluster-node') == self.node_key]
         active_environments = {container.labels.get("vibebench.environment") or container.id for container in running}
+        active_environments.update(self.rollout_capacity_reservations)
         if requested["environment_id"] in active_environments or len(active_environments) < self.limit:
             return
         if not allow_eviction:

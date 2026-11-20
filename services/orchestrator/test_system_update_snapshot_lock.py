@@ -103,6 +103,28 @@ class SnapshotLockTests(unittest.TestCase):
         self.assertEqual(2, snapshot['nodes'][0]['id'])
         synchronization.environment_snapshot.assert_called_once()
 
+    def test_central_snapshot_uses_persisted_remote_ownership_without_connecting(self) -> None:
+        """失联节点只能凭已知归属从中央切换范围移出。@return 无。"""
+        self.runtime.locality = lambda row: False
+        self.runtime._root = lambda row: self.fail('中央不能对远程环境执行本机维护')
+        store = Mock()
+        store.list.return_value = [{'kind': 'ssh', 'id': 2, 'name': 'main', 'preparation': {'release': 'old'}}]
+        store.removed_draft_environments.return_value = set()
+        synchronization = Mock()
+        service = self.runtime.cluster_service = SimpleNamespace(synchronization=synchronization, store=store,
+            draft_node=Mock(return_value={'kind': 'ssh', 'node_id': 2}))
+        snapshot = runtime_snapshot(self.runtime, central_only=True)
+        self.assertTrue(snapshot['ready'])
+        self.assertEqual(snapshot['scope'], 'central')
+        self.assertEqual(snapshot['environments'], [])
+        self.assertEqual(snapshot['nodes'][0]['id'], 2)
+        synchronization.environment_snapshot.assert_not_called()
+
+        service.draft_node.side_effect = ValueError('冻结归属损坏')
+        snapshot = runtime_snapshot(self.runtime, central_only=True)
+        self.assertFalse(snapshot['ready'])
+        self.assertIn('环境归属待核对', snapshot['blockers'][0])
+
     def test_pending_removal_blocks_upgrade_and_rollback_before_node_capture(self) -> None:
         """旧版切换用同一排空门禁，未收口移除不会进入待备份节点集合。:return: 无。"""
         store = Mock()

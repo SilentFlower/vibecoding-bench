@@ -74,8 +74,10 @@ async def main() -> None:
     # 恢复工具会读取账号内存；禁用继承链的core文件，保持其与私有快照相同的保密边界。
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     configuration = json.loads(Path('/run/v3/sender.json').read_text())
-    native = configuration['native']
-    maximum = native['max_workers']
+    agy = configuration.get('agy')
+    native = configuration.get('native')
+    execution = agy if agy is not None else native
+    maximum = execution['max_workers']
     if type(maximum) is not int or not 1 <= maximum <= 4096:
         raise SystemExit('原生物理预算无效')
     profile = None
@@ -96,24 +98,33 @@ async def main() -> None:
     environment = dict(os.environ)
     environment['CCRB_CRIU'] = '1' if profile else '0'
     environment['CCRB_CRIU_REASON'] = '' if profile else 'controller_preflight_failed'
+    environment['AGY_CRIU'] = '1' if profile and agy is not None else '0'
     sender = await asyncio.create_subprocess_exec(str(TOOLS / 'launch'), 'sender', env=environment)
     sender_fd = os.pidfd_open(sender.pid)
-    controller = Controller(sender.pid, maximum, native['work_root'], profile) if profile else None
+    control = CONTROL
+    controller = None
+    if profile:
+        if agy is not None:
+            from agy import AgyController, CONTROL as AGY_CONTROL
+            control = AGY_CONTROL
+            controller = AgyController(sender.pid, ROOT / 'templates', TOOLS / 'criu', Path(agy['work_root']))
+        else:
+            controller = Controller(sender.pid, maximum, native['work_root'], profile)
     listener = None
     serving = None
     observer_server = None
     broker = None
     if controller:
-        socket_directory(CONTROL.parent)
-        CONTROL.unlink(missing_ok=True)
+        socket_directory(control.parent)
+        control.unlink(missing_ok=True)
         listener = socket.socket(socket.AF_UNIX)
-        listener.bind(str(CONTROL))
+        listener.bind(str(control))
         listener.listen(min(maximum + 4, 128))
         listener.setblocking(False)
-        os.chown(CONTROL, 0, 1001)
-        CONTROL.chmod(0o660)
+        os.chown(control, 0, 1001)
+        control.chmod(0o660)
         serving = asyncio.create_task(controller.serve(listener))
-    if environment.get('CCRB_TLS_OBSERVER'):
+    if not agy and environment.get('CCRB_TLS_OBSERVER'):
         sys.path.insert(0, '/opt/ccrb-tls-observer')
         from broker import Broker, SOCKET
         socket_directory(SOCKET.parent)
@@ -137,7 +148,7 @@ async def main() -> None:
             await asyncio.gather(serving, return_exceptions=True)
         if listener:
             listener.close()
-            CONTROL.unlink(missing_ok=True)
+            control.unlink(missing_ok=True)
         if observer_server:
             observer_server.close()
             await observer_server.wait_closed()

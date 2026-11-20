@@ -40,6 +40,7 @@ struct Subscriber {
 
 struct Controller {
     identity: String,
+    module_root: String,
     input: Mutex<ChildStdin>,
     child: Mutex<Child>,
     requests: Mutex<HashMap<String, Subscriber>>,
@@ -192,6 +193,30 @@ impl Drop for CancelOnDrop {
 }
 
 impl AgyPool {
+    /// 请求监督器取消原私有请求。@param request_id 原尝试身份。@param api_token_id 原调用方。@return 取消指令是否已登记。
+    pub(crate) async fn cancel(&self, request_id: &str, api_token_id: i64) -> Result<(), AppError> {
+        let controller = self.controller.lock().await.clone();
+        let Some(controller) = controller else {
+            return Ok(());
+        };
+        {
+            let requests = controller.requests.lock().await;
+            if !controller.active.lock().await.contains(request_id) {
+                return Ok(());
+            }
+            if requests
+                .get(request_id)
+                .is_none_or(|request| request.api_token_id != api_token_id)
+            {
+                return Err(AppError::Unauthorized);
+            }
+        }
+        controller
+            .send(&json!({"schema_version":1,"type":"cancel",
+            "request_id":request_id,"api_token_id":api_token_id}))
+            .await
+    }
+
     /// 沿原监督器完成工具回填，保持零模型发送。@param input 原归属和真实结果。@param deadline 原单调截止。@return 已核验的收口回执。
     pub async fn finish_tools(
         &self,
@@ -227,11 +252,32 @@ impl AgyPool {
             );
         }
         let result=async {
-            controller.send(&json!({"schema_version":1,"type":"finish_tools","request_id":id,
+            let mut value = json!({"schema_version":1,"type":"finish_tools","request_id":id,
                 "account_id":input.request.account_id,"environment_id":input.request.environment_id,
                 "environment_generation":input.request.generation,"api_token_id":input.api_token_id,
-                "previous_request_id":input.previous_request_id,"body":input.body})).await?;
+                "previous_request_id":input.previous_request_id,"body":input.body});
+            if input.gif_frames { value["gif_frames"] = Value::Bool(true); }
+            controller.send(&value).await?;
             let (event,_permit)=timeout_at(deadline,receiver.recv()).await.map_err(|_|unavailable())?.ok_or_else(unavailable)?;
+            if event["type"] == "control_error" {
+                if let Some(code) = event["code"].as_str() {
+                    let kind = code.split(':').next().unwrap_or_default();
+                    match kind {
+                        "invalid_gemini_png" | "invalid_gemini_media"
+                        | "unsupported_gemini_media_type" | "unsupported_gemini_image_type"
+                        | "gif_conversion_limit" | "gemini_pending_history_mismatch"
+                        | "gemini_pending_turn_mismatch" | "gemini_pending_call_mismatch"
+                        | "gemini_pending_results_mismatch" => {
+                            return Ok(json!({"input_rejection":code}));
+                        }
+                        "previous_tool_turn_failed" => return Err(AppError::AgyToolTurnFailed),
+                        "tool_completion_failed" | "tool_completion_pending" => {
+                            return Err(unavailable());
+                        }
+                        _ => {}
+                    }
+                }
+            }
             if event["type"]!="tools_finished" {return Err(AppError::BadRequest("AGY原工具轮回填失败".into()));}
             Ok(json!({"finished":true,"request_id":id,"previous_request_id":input.previous_request_id}))
         }.await;
@@ -284,14 +330,23 @@ impl AgyPool {
             "proxy_url":config.proxy_url,"capture_enabled":false,"capture_root":"/flows/api/agy-prepared"}),
         )?;
         let mut child = Command::new("python3")
-            .args(["-m", "agy_runtime.supervisor", "--config"])
+            .args(["-P", "-m", "agy_runtime.supervisor", "--config"])
             .arg(&path)
             .env_clear()
             .env("PATH", "/usr/local/bin:/usr/bin:/bin")
             .env("TMPDIR", &generation_root)
+            .env("AGY_CAPTURE_NATIVE_TLS", "1")
+            .env(
+                "AGY_CRIU",
+                if std::env::var("AGY_CRIU").as_deref() == Ok("1") {
+                    "1"
+                } else {
+                    "0"
+                },
+            )
             .env(
                 "PYTHONPATH",
-                format!("{}:/usr/local/bin", native.module_root),
+                format!("{}:/opt/v3/python:/usr/local/bin", native.module_root),
             )
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -303,6 +358,7 @@ impl AgyPool {
         let output = child.stdout.take().ok_or_else(unavailable)?;
         let controller = Arc::new(Controller {
             identity,
+            module_root: native.module_root.clone(),
             input: Mutex::new(input),
             child: Mutex::new(child),
             requests: Mutex::new(HashMap::new()),
@@ -405,6 +461,15 @@ impl AgyPool {
             value["system_prompt_policy"] = serde_json::to_value(&submission.system_prompt_policy)
                 .map_err(|_| unavailable())?;
         }
+        if submission.gif_frames {
+            value["gif_frames"] = Value::Bool(true);
+        }
+        if submission.full_egress {
+            value["full_egress"] = Value::Bool(true);
+        }
+        if submission.disable_safety_filtering {
+            value["disable_safety_filtering"] = Value::Bool(true);
+        }
         if let Err(error) = controller.send(&value).await {
             controller.requests.lock().await.remove(&request_id);
             return Err(error);
@@ -473,9 +538,13 @@ impl AgyPool {
         }
         .await;
         controller.requests.lock().await.remove(&id);
-        result
+        let mut status = result
             .map(|(event, _permit)| event["status"].clone())
-            .unwrap_or(json!({"state":"unknown"}))
+            .unwrap_or(json!({"state":"unknown"}));
+        if let Some(fields) = status.as_object_mut() {
+            fields.insert("module_root".into(), json!(controller.module_root));
+        }
+        status
     }
 }
 
@@ -504,5 +573,48 @@ async fn read_bounded_line<R: AsyncBufRead + Unpin>(reader: &mut R) -> IoResult<
         if end.is_some() {
             return Ok(Some(line));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 取消只交给原监督器，活动直到真实终态才释放。@return 无。
+    #[tokio::test]
+    async fn cancel_checks_owner_and_keeps_activity_until_supervisor_finalizes() {
+        let mut child = Command::new("cat")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+        let input = child.stdin.take().unwrap();
+        let mut output = BufReader::new(child.stdout.take().unwrap());
+        let (sender, mut receiver) = mpsc::channel(1);
+        let request_id = Uuid::new_v4().to_string();
+        let controller = Arc::new(Controller {
+            identity: "synthetic".into(),
+            module_root: "synthetic".into(),
+            input: Mutex::new(input),
+            child: Mutex::new(child),
+            requests: Mutex::new(HashMap::from([(request_id.clone(), Subscriber { sender, api_token_id: 7 })])),
+            active: Mutex::new(HashSet::from([request_id.clone()])),
+            closed: AtomicBool::new(false),
+            byte_budget: Arc::new(Semaphore::new(1)),
+        });
+        let pool = AgyPool { controller: Mutex::new(Some(controller.clone())) };
+
+        assert!(matches!(pool.cancel(&request_id, 8).await, Err(AppError::Unauthorized)));
+        pool.cancel(&request_id, 7).await.unwrap();
+        let line = timeout(Duration::from_secs(1), read_bounded_line(&mut output)).await.unwrap().unwrap().unwrap();
+        assert_eq!(serde_json::from_slice::<Value>(&line).unwrap(),
+            json!({"schema_version":1,"type":"cancel","request_id":request_id,"api_token_id":7}));
+        assert_eq!(pool.active().await, 1);
+
+        let finalized = json!({"type":"job_finalized","request_id":request_id,"status":"cancelled"});
+        controller.dispatch(finalized.clone(), 128).await.unwrap();
+        assert_eq!(pool.active().await, 0);
+        assert_eq!(receiver.recv().await.unwrap().0, finalized);
     }
 }

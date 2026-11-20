@@ -1,5 +1,7 @@
 # 同一源码批次构建两个最终镜像，gateway 与 sender 共享 Rust 发送实现。
-FROM node:22-bookworm-slim AS frontend
+FROM node:22-bookworm-slim AS node-runtime
+
+FROM node-runtime AS frontend
 WORKDIR /source/cc2api/web
 COPY cc2api/web/package.json cc2api/web/package-lock.json ./
 RUN npm ci
@@ -52,16 +54,25 @@ RUN python3 /source/criu/package.py --source /source/criu --out /opt/ccrb-criu \
 FROM python:3.12-slim-bookworm AS agy-runtime-build
 RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev libssl-dev \
     && rm -rf /var/lib/apt/lists/*
+COPY orchestrator/requirements.txt /tmp/agy-requirements.txt
+RUN requirement="$(grep '^Pillow==' /tmp/agy-requirements.txt)" \
+    && python3 -m pip install --no-cache-dir --no-deps --target /opt/v3/python "$requirement"
 COPY orchestrator/agy_runtime/ /opt/v3/python/agy_runtime/
 RUN PYTHONPATH=/opt/v3/python python3 -m agy_runtime.build --root /opt/v3/python/agy_runtime \
     && chmod -R go-w /opt/v3/python/agy_runtime
+
+FROM scratch AS compiled-artifacts
+COPY --from=backend /out/ /out/
+COPY --from=frontend /source/cc2api/web/dist/ /web/dist/
+COPY --from=frontend /terminal/xterm/ /terminal/xterm/
+COPY --from=frontend /terminal/fit/ /terminal/fit/
 
 FROM python:3.12-slim-bookworm AS control
 RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates openssl openssh-client sshpass \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY --from=frontend /usr/local/bin/node /usr/local/bin/node
-COPY --from=frontend /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
+COPY --from=node-runtime /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
 RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 COPY images/pi-agent/package.json images/pi-agent/package-lock.json /opt/pi-agent/
 RUN cd /opt/pi-agent && npm ci --ignore-scripts --no-audit --no-fund
@@ -81,14 +92,14 @@ COPY images/worker/entrypoint.sh /opt/v3/worker.sh
 COPY images/account/projects_cli.py /opt/v3/projects-cli.py
 COPY images/worker/task_followups.py /app/task_followups.py
 COPY webui /webui
-COPY --from=frontend /terminal/xterm/lib/xterm.js /webui/vendor/xterm.js
-COPY --from=frontend /terminal/xterm/css/xterm.css /webui/vendor/xterm.css
-COPY --from=frontend /terminal/xterm/LICENSE /webui/vendor/xterm-LICENSE
-COPY --from=frontend /terminal/fit/lib/xterm-addon-fit.js /webui/vendor/xterm-addon-fit.js
-COPY --from=frontend /terminal/fit/LICENSE /webui/vendor/xterm-addon-fit-LICENSE
+COPY --from=compiled-artifacts /terminal/xterm/lib/xterm.js /webui/vendor/xterm.js
+COPY --from=compiled-artifacts /terminal/xterm/css/xterm.css /webui/vendor/xterm.css
+COPY --from=compiled-artifacts /terminal/xterm/LICENSE /webui/vendor/xterm-LICENSE
+COPY --from=compiled-artifacts /terminal/fit/lib/xterm-addon-fit.js /webui/vendor/xterm-addon-fit.js
+COPY --from=compiled-artifacts /terminal/fit/LICENSE /webui/vendor/xterm-addon-fit-LICENSE
 RUN python -c "from pathlib import Path; p=Path('/webui/index.html'); s=p.read_text(); s=s.replace('https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css','vendor/xterm.css').replace('https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js','vendor/xterm.js').replace('https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js','vendor/xterm-addon-fit.js'); p.write_text(s)"
-COPY --from=backend /out/claude-code-gateway /app/claude-code-gateway
-COPY --from=frontend /source/cc2api/web/dist /app/web/dist
+COPY --from=compiled-artifacts /out/claude-code-gateway /app/claude-code-gateway
+COPY --from=compiled-artifacts /web/dist /app/web/dist
 COPY images/v3/control-entrypoint.sh /usr/local/bin/v3-control
 RUN chmod 755 /usr/local/bin/v3-control
 COPY runtime-build/platform-version.json /app/platform-version.json
@@ -99,6 +110,9 @@ LABEL vibebench.product="v3" vibebench.role="control" vibebench.release=$V3_RELE
     vibebench.agy-runtime-protocol="1" \
     vibebench.account-platforms="1" \
     vibebench.system-update-protocol="1" \
+    vibebench.fast-system-update="1" \
+    vibebench.local-account-rollout="1" \
+    vibebench.project-library-prepare="1" \
     vibebench.credential-ownership-protocol="1" \
     vibebench.isolation-version="2" \
     vibebench.parent-revision=$V3_PARENT_REV vibebench.gateway-revision=$V3_GATEWAY_REV \
@@ -116,8 +130,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     proxychains4 unbound dnsutils procps libprotobuf-c1 libnet1 libnl-3-200 libuuid1 \
     && sed -i -E 's/^# (en_US|en_GB|ja_JP|ko_KR|de_DE|fr_FR)\.UTF-8 UTF-8/\1.UTF-8 UTF-8/' /etc/locale.gen \
     && locale-gen && rm -rf /var/lib/apt/lists/*
-COPY --from=frontend /usr/local/bin/node /usr/local/bin/node
-COPY --from=frontend /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
+COPY --from=node-runtime /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
 RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
     && groupadd --gid 1000 node && useradd --uid 1000 --gid node --create-home --shell /bin/bash node
@@ -154,8 +168,8 @@ RUN cc -shared -fPIC -O2 -Wall -Wextra -Werror -Wl,-z,relro,-z,now \
 COPY orchestrator/cli_quota.py /usr/local/bin/v3-cli-quota
 COPY orchestrator/process_metrics.py /usr/local/bin/process_metrics.py
 COPY orchestrator/process_metrics.py /usr/local/bin/v3-process-metrics
-COPY --from=backend /out/account-sender /usr/local/bin/account-sender
-COPY --from=agy-runtime-build /opt/v3/python/agy_runtime/ /opt/v3/python/agy_runtime/
+COPY --from=compiled-artifacts /out/account-sender /usr/local/bin/account-sender
+COPY --from=agy-runtime-build /opt/v3/python/ /opt/v3/python/
 COPY --from=tls-observer-build /opt/ccrb-tls-observer/ /opt/ccrb-tls-observer/
 COPY --from=criu-build /opt/ccrb-criu/ /opt/ccrb-criu/
 # iproute2已有libbpf运行依赖；在镜像内验证真实动态库，避免重复刷新整层系统依赖。
@@ -179,6 +193,7 @@ LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELE
     vibebench.agy-runtime-protocol="1" vibebench.agy-runtime-source-sha256=$V3_AGY_AUTH_SHA256 \
     vibebench.account-platforms="1" vibebench.agy-auth-source-sha256=$V3_AGY_AUTH_SHA256 \
     vibebench.system-update-protocol="1" vibebench.account-runtime-protocol="1" \
+    vibebench.fast-system-update="1" \
     vibebench.credential-ownership-protocol="1" \
     vibebench.isolation-version="2" \
     vibebench.cli-install-version="2" \
@@ -188,6 +203,7 @@ LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELE
     vibebench.native-platform-managed="1" \
     vibebench.native-tls-observer="1" \
     vibebench.native-criu="1" \
+    vibebench.agy-criu="1" \
     vibebench.system-profile-version="1" \
     vibebench.computer-profile-version="1" \
     vibebench.parent-revision=$V3_PARENT_REV vibebench.gateway-revision=$V3_GATEWAY_REV \

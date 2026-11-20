@@ -1,14 +1,19 @@
 """解析 Gemini 工具与调用方持有的历史，构造独立 Cortex 输入。"""
-import base64
 import copy
 import json
-from .contract import InputError, MODEL, text, tools
+import re
+from collections import Counter
+from .contract import InputError, MODEL, decode_gemini_bytes, text, tools
 from .tool_schema import normalize
+from .input_media import gif_budget, media_part
 from .system_prompt import decode_policy, default_policy, transform_system
 
 GEMINI_MODEL=None
 BYPASS_SIGNATURE='context_engineering_is_the_way_to_go'
 SAFETY_CATEGORIES={'HARM_CATEGORY_HARASSMENT','HARM_CATEGORY_HATE_SPEECH','HARM_CATEGORY_SEXUALLY_EXPLICIT','HARM_CATEGORY_DANGEROUS_CONTENT'}
+LEGACY_TOOL_ID = re.compile(r'call_[0-9]+')
+LEGACY_SHORT_ID = re.compile(r'[0-9A-Za-z]{8}')
+LEGACY_UUID_ID = re.compile(r'call_[0-9a-f]{32}')
 
 
 def checked_fields(value, allowed, path):
@@ -44,14 +49,14 @@ def definitions(body, changes):
 
 
 def call_signature(value, native):
-    """分别承载原生字节签名与网关的显式绕过标记。@param value 签名文本。@param native 原生调用。@return 无。"""
+    """保留签名字节并统一原生序列化格式。@param value 签名文本。@param native 原生调用。@return 无。"""
     if value is None:return
     value=text(value)
     if value==BYPASS_SIGNATURE:native['thoughtSignature']=value;return
     try:
-        if not base64.b64decode(value,validate=True):raise ValueError()
+        _, encoded = decode_gemini_bytes(value)
     except (ValueError,TypeError) as exc:raise InputError('invalid_gemini_thought_signature') from exc
-    native['thinkingSignature']=value
+    native['thinkingSignature']=encoded
 
 
 def native_value(value):
@@ -65,17 +70,91 @@ def native_value(value):
     raise InputError('invalid_function_response_value')
 
 
-def native_history(contents):
-    """将多 Part 和完整函数结果映射为已定义的原生步骤。@param contents Gemini 内容。@return 原生步骤。"""
+def _turn_parts(content, field):
+    if isinstance(content, dict) and isinstance(content.get('parts'), list):
+        return [(index, part[field]) for index, part in enumerate(content['parts'])
+                if isinstance(part, dict) and isinstance(part.get(field), dict)]
+    return []
+
+
+def _legacy_tool_history(contents, tool_names):
+    calls = [_turn_parts(content, 'functionCall') for content in contents]
+    results = [_turn_parts(content, 'functionResponse') for content in contents]
+    names = set(tool_names)
+    names.update(call['name'] for group in calls for _, call in group if isinstance(call.get('name'), str))
+    ids = {part['id'] for groups in (calls, results) for group in groups for _, part in group
+           if isinstance(part.get('id'), str)}
+    aliases = Counter(result['name'] for group in results for _, result in group if isinstance(result.get('name'), str))
+    normalized = list(contents)
+    legacy_history = False
+    for index in range(len(contents) - 1):
+        if len(calls[index]) != 1 or len(results[index + 1]) != 1:
+            continue
+        left, right = contents[index:index + 2]
+        if left.get('role') != 'model' or right.get('role', 'user') != 'user':
+            continue
+        call_index, call = calls[index][0]
+        result_index, result = results[index + 1][0]
+        alias = result.get('name')
+        if ('id' in call or 'id' in result or not isinstance(alias, str)
+                or alias in names or alias in ids or aliases[alias] != 1):
+            continue
+        short = LEGACY_SHORT_ID.fullmatch(alias)
+        anchored = (LEGACY_TOOL_ID.fullmatch(alias) or LEGACY_UUID_ID.fullmatch(alias)
+                    or short and any(character.isdigit() for character in alias))
+        # 纯字母短码也可能是真实函数名，只有此前已识别出同一请求的旧式回填才恢复。
+        if not anchored and not (short and legacy_history):
+            continue
+        legacy_history |= bool(anchored)
+        # 只有观测到的一对一旧格式能恢复；公开入站和活跃工具轮的原始身份继续保留。
+        for offset, part_index, field, value in (
+            (index, call_index, 'functionCall', {**call, 'id': alias}),
+            (index + 1, result_index, 'functionResponse', {**result, 'id': alias, 'name': call.get('name')}),
+        ):
+            parts = list(contents[offset]['parts'])
+            parts[part_index] = {**parts[part_index], field: value}
+            normalized[offset] = {**contents[offset], 'parts': parts}
+    return normalized
+
+
+def _matching_call(calls, value, position):
+    name = value.get('name')
+    if not isinstance(name, str) or not name:
+        return None
+    identifier = value.get('id')
+    named = [call for call in calls if call['name'] == name]
+    if 'id' in value and (not isinstance(identifier, str) or not identifier):
+        return None
+    if identifier is None and not named and any(call.get('id') == name for call in calls):
+        identifier = name
+    if identifier is not None:
+        matches = [call for call in (named or calls) if call.get('id') == identifier]
+    else:
+        matches = named
+    if len(matches) == 1:
+        return matches[0]
+    # 只在中转省略同名调用的 ID 时使用原顺序。整轮仍须全部匹配且每项只消费一次。
+    if identifier is None and len(named) > 1 and position < len(calls) and calls[position]['name'] == name:
+        return calls[position]
+    return None
+
+
+def native_history(contents, tool_names=(), gif=None):
+    """将多 Part 和完整函数结果映射为原生步骤。@param contents Gemini 内容。@param tool_names 已声明工具名称。@param gif 可选 GIF 转换预算。@return 原生步骤。"""
     if not isinstance(contents,list) or not contents:raise InputError('invalid_gemini_contents')
-    steps=[];pending=[];used=set()
+    contents = _legacy_tool_history(contents, tool_names)
+    steps=[];pending=[];used=set();tool_steps={}
     for i,content in enumerate(contents):
         path='/body/contents/'+str(i);checked_fields(content,{'role','parts'},path)
         role=content.get('role','user');parts=content.get('parts')
         if role not in ['user','model'] or not isinstance(parts,list) or not parts:raise InputError('invalid_gemini_content:'+path)
-        response=[];thinking=[];calls=[];thinking_signature=None
+        response=[];thinking=[];calls=[];thinking_signature=None;media=[]
         for j,part in enumerate(parts):
-            location=path+'/parts/'+str(j);checked_fields(part,{'text','thought','thoughtSignature','functionCall','functionResponse'},location)
+            location=path+'/parts/'+str(j);checked_fields(part,{'text','thought','thoughtSignature','functionCall','functionResponse','inlineData','inline_data'},location)
+            image = media_part(part, location, role, gif)
+            if image is not None:
+                media.extend(image)
+                continue
             if type(part.get('thought',False)) is not bool:raise InputError('invalid_gemini_thought:'+location)
             kinds=set(part)&{'text','functionCall','functionResponse'}
             if len(kinds)!=1:raise InputError('invalid_gemini_part:'+location)
@@ -94,14 +173,19 @@ def native_history(contents):
             else:
                 if role!='user' or response:raise InputError('invalid_gemini_function_response_order:'+location)
                 value=part['functionResponse'];checked_fields(value,{'name','response','id'},location+'/functionResponse')
-                name=text(value.get('name'));result=value.get('response')
+                text(value.get('name'));result=value.get('response')
                 if not isinstance(result,dict):raise InputError('invalid_function_response:'+location)
-                matches=[call for call in pending if call['name']==name and ('id' not in value or call['id']==value['id'])]
-                if len(matches)!=1:raise InputError('ambiguous_or_unknown_function_response:'+location)
-                call=matches[0];pending.remove(call)
+                # 保留本轮完整名称集合，避免第二个结果借其他工具名认领剩余调用。
+                call = _matching_call(planner['toolCalls'], value, len(tool_steps)) if pending else None
+                if call is None or call not in pending:raise InputError('ambiguous_or_unknown_function_response:'+location)
+                pending.remove(call)
                 # 结果使用原生 ResultValue，避免把 Gemini 对象再次包成 output 文本。
                 args=json.loads(call['argumentsJson']);native_args={k:v if isinstance(v,str) else encode(v) for k,v in args.items()}
-                steps.append({'type':'CORTEX_STEP_TYPE_GENERIC','status':'CORTEX_STEP_STATUS_DONE','metadata':{'toolCall':copy.deepcopy(call)},'generic':{'args':native_args,'result':{'resultValue':native_value(result)}}})
+                tool_steps[call['id']]={'type':'CORTEX_STEP_TYPE_GENERIC','status':'CORTEX_STEP_STATUS_DONE','metadata':{'toolCall':copy.deepcopy(call)},'generic':{'args':native_args,'result':{'resultValue':native_value(result)}}}
+        if tool_steps and not pending:
+            # 原生轨迹按 planner 的调用顺序导入，客户端仍可反序提交结果。
+            steps.extend(tool_steps[call['id']] for call in planner['toolCalls'])
+            tool_steps.clear()
         if role=='model':
             if pending:raise InputError('missing_function_response:'+path)
             planner={'response':'\n'.join(response),'modifiedResponse':'\n'.join(response),'stopReason':'STOP_REASON_STOP_PATTERN'}
@@ -112,9 +196,11 @@ def native_history(contents):
                 elif 'thoughtSignature' in native:planner['signature']=native['thoughtSignature']
             if calls:planner['toolCalls']=calls;pending=copy.deepcopy(calls)
             steps.append({'type':'CORTEX_STEP_TYPE_PLANNER_RESPONSE','status':'CORTEX_STEP_STATUS_DONE','metadata':{'source':'CORTEX_STEP_SOURCE_MODEL','generatorModel':MODEL},'plannerResponse':planner})
-        elif response:
+        elif response or media:
             if pending:raise InputError('missing_function_response:'+path)
-            steps.append({'type':'CORTEX_STEP_TYPE_USER_INPUT','status':'CORTEX_STEP_STATUS_DONE','metadata':{},'userInput':{'userResponse':'\n'.join(response)}})
+            user_input = {'userResponse':'\n'.join(response)}
+            if media:user_input['media'] = media
+            steps.append({'type':'CORTEX_STEP_TYPE_USER_INPUT','status':'CORTEX_STEP_STATUS_DONE','metadata':{},'userInput':user_input})
     if pending:raise InputError('missing_function_response')
     if contents[-1].get('role','user')!='user':raise InputError('unsupported_gemini_last_role')
     return steps
@@ -122,13 +208,20 @@ def native_history(contents):
 
 def decode_request(raw):
     """校验 Gemini 业务正文并给出原生执行参数。@param raw 控制信封。@return 内部请求。"""
-    checked_fields(raw,{'schema_version','type','request_id','model','body','system_prompt_policy'},'')
+    checked_fields(raw,{'schema_version','type','request_id','model','body','system_prompt_policy','gif_frames','disable_safety_filtering','full_egress'},'')
     if type(raw.get('schema_version')) is not int or raw['schema_version']!=1 or raw.get('type')!='gemini_request':raise InputError('invalid_schema')
     ident=text(raw.get('request_id'))
     if not ident or len(ident)>128:raise InputError('invalid_request_id')
     if raw.get('model')!=GEMINI_MODEL:raise InputError('unsupported_gemini_model')
     body=raw.get('body');checked_fields(body,{'contents','systemInstruction','generationConfig','tools','safetySettings','toolConfig'},'/body')
-    changes=[];notices=[];declared=definitions(body,changes);steps=native_history(body.get('contents'));system=[]
+    enabled=raw.get('gif_frames',False)
+    if type(enabled) is not bool:raise InputError('invalid_media_policy')
+    native_safety=raw.get('disable_safety_filtering',False)
+    if type(native_safety) is not bool:raise InputError('invalid_safety_policy')
+    full_egress=raw.get('full_egress',False)
+    if type(full_egress) is not bool:raise InputError('invalid_capture_policy')
+    changes=[];notices=[];declared=definitions(body,changes)
+    steps=native_history(body.get('contents'), (tool['name'] for tool in declared), gif_budget(body,enabled));system=[]
     if 'systemInstruction' in body:
         value=body['systemInstruction'];checked_fields(value,{'role','parts'},'/body/systemInstruction')
         if value.get('role','user') not in ['user','system']:raise InputError('unsupported_system_role')
@@ -136,7 +229,9 @@ def decode_request(raw):
         for part in value['parts']:checked_fields(part,{'text'},'/body/systemInstruction/parts');system.append(text(part.get('text')))
     completion={}
     if 'generationConfig' in body:
-        value=body['generationConfig'];checked_fields(value,{'maxOutputTokens','temperature','topP'},'/body/generationConfig')
+        value=body['generationConfig'];checked_fields(value,{'maxOutputTokens','temperature','topP','responseModalities'},'/body/generationConfig')
+        if value.get('responseModalities',[]) not in ([],['TEXT']):
+            raise InputError('unsupported_gemini_output_modality:/body/generationConfig/responseModalities')
         for name in ['temperature','topP']:
             if name in value:
                 notices.append({'field':'generationConfig.'+name,'policy':'native_default'})
@@ -144,15 +239,26 @@ def decode_request(raw):
             tokens=value['maxOutputTokens']
             if type(tokens) is not int or not 1<=tokens<=2147483647:raise InputError('invalid_gemini_max_output_tokens')
             completion['maxTokens']=tokens
+    safety_egress_rules=[]
+    if native_safety:
+        completion['disableSafetyFiltering']=True
+        notices.append({'field':'safetySettings','policy':'account_native_safety','native_field':'disableSafetyFiltering'})
     if 'safetySettings' in body:
         values=body['safetySettings']
         if not isinstance(values,list):raise InputError('invalid_gemini_safety_settings')
-        categories=set()
+        categories=set();thresholds=set()
         for value in values:
             checked_fields(value,{'category','threshold'},'/body/safetySettings')
-            if value.get('category') in categories or value.get('category') not in SAFETY_CATEGORIES or value.get('threshold') not in ['OFF','BLOCK_NONE']:raise InputError('unsupported_gemini_safety_settings')
-            categories.add(value['category'])
-        if categories:
+            category,threshold=value.get('category'),value.get('threshold')
+            if not isinstance(category,str) or category not in SAFETY_CATEGORIES or category in categories or threshold not in (
+                    'OFF','BLOCK_NONE','BLOCK_LOW_AND_ABOVE','BLOCK_MEDIUM_AND_ABOVE','BLOCK_ONLY_HIGH','HARM_BLOCK_THRESHOLD_UNSPECIFIED'):
+                raise InputError('unsupported_gemini_safety_settings')
+            categories.add(category);thresholds.add(threshold)
+        if not native_safety and thresholds-{'OFF','BLOCK_NONE'}:
+            # 原生布尔开关表达不了逐类阈值，保留全部规则到同次原生请求的出站边界。
+            safety_egress_rules=copy.deepcopy(values)
+            notices.append({'field':'safetySettings','policy':'native_safety_egress','requested_categories':sorted(categories)})
+        elif not native_safety and categories:
             if categories!=SAFETY_CATEGORIES:raise InputError('unsupported_partial_safety_settings')
             completion['disableSafetyFiltering']=True
             notices.append({'field':'safetySettings','policy':'native_completion_mapping','native_field':'disableSafetyFiltering','native_wire_categories':['HARM_CATEGORY_DANGEROUS_CONTENT'],'requested_categories':sorted(categories)})
@@ -164,30 +270,35 @@ def decode_request(raw):
     if declared:
         # 现有 new-api 会丢弃历史函数 ID；请求单工具生成可避免同名并发结果错配。
         completion['disableParallelToolCalls']=True
-        notices.append({'field':'parallel_tool_calls','policy':'native_disable_requested;duplicate_names_rejected','reason':'new-api removes function IDs'})
+        notices.append({'field':'parallel_tool_calls','policy':'native_disable_requested;ordered_same_name_results','reason':'new-api removes function IDs'})
     policy=decode_policy(raw.get('system_prompt_policy',default_policy()))
     submitted,report=transform_system('\n'.join(system),policy)
     return {'request_id':ident,'prompt':'','messages':[],'history_id':None,'system':submitted,'system_prompt_policy':report,'model':MODEL,'tools':declared,'max_generations':1,
-        'request_format':'gemini','gemini_body':copy.deepcopy(body),'native_completion':completion,'native_steps':steps,'schema_changes':changes,'compatibility_notes':notices}
+        'request_format':'gemini','gemini_body':copy.deepcopy(body),'native_completion':completion,'native_steps':steps,'schema_changes':changes,'compatibility_notes':notices,
+        'safety_egress_rules':safety_egress_rules,'full_egress':full_egress}
 def continuation_results(previous, calls, incoming):
-    """把续轮结果绑定到本 worker 唯一待回填工具轮。@param previous 原始入站正文。@param calls 实际模型调用。@param incoming 新正文。@return 按函数名索引的真实结果。"""
+    """把续轮结果绑定到本 worker 唯一待回填工具轮。@param previous 原始入站正文。@param calls 实际模型调用。@param incoming 新正文。@return 按原调用顺序排列的真实结果。"""
     original=previous['contents'];contents=incoming['contents'];count=len(original)
-    def stable(values):
-        """保持原始历史、签名、文本和参数身份。@param values Content 列表。@return 独立对象。"""
-        values=copy.deepcopy(values)
-        return values
-    if len(contents)!=count+2 or stable(contents[:count])!=stable(original):raise InputError('gemini_pending_history_mismatch')
+    if len(contents)!=count+2 or contents[:count]!=original:raise InputError('gemini_pending_history_mismatch')
     model,user=contents[count:]
     if model.get('role')!='model' or user.get('role','user')!='user':raise InputError('gemini_pending_turn_mismatch')
     expected=[{'name':c['name'],'args':c.get('args',{})} for c in calls]
     observed=[{'name':p['functionCall']['name'],'args':p['functionCall'].get('args',{})} for p in model['parts'] if 'functionCall' in p]
-    if expected!=observed or len({c['name'] for c in expected})!=len(expected):raise InputError('gemini_pending_call_mismatch')
+    if expected!=observed:raise InputError('gemini_pending_call_mismatch')
     for part, call in zip([p['functionCall'] for p in model['parts'] if 'functionCall' in p], calls):
         if 'id' in part and part['id'] != call.get('id'):raise InputError('gemini_pending_call_mismatch')
+    # 拒绝坏图后才能领取原工具轮，避免输入修正时发现结果已被消费。
+    for index, part in enumerate(user['parts']):
+        if isinstance(part, dict):
+            media_part(part, f'/body/contents/{count + 1}/parts/{index}', 'user')
     values=[p['functionResponse'] for p in user['parts'] if 'functionResponse' in p]
-    names=[v['name'] for v in values]
-    if len(names)!=len(set(names)) or set(names)!={c['name'] for c in expected}:raise InputError('gemini_pending_results_mismatch')
-    by_name = {call['name']:call for call in calls}
-    for value in values:
-        if 'id' in value and value['id'] != by_name[value['name']].get('id'):raise InputError('gemini_pending_results_mismatch')
-    return {v['name']:copy.deepcopy(v['response']) for v in values}
+    indices={id(call):index for index,call in enumerate(calls)}
+    results = {}
+    for position, value in enumerate(values):
+        call = _matching_call(calls, value, position)
+        index = indices.get(id(call))
+        if index is None or index in results or not isinstance(value.get('response'), dict):
+            raise InputError('gemini_pending_results_mismatch')
+        results[index] = copy.deepcopy(value['response'])
+    if len(results)!=len(calls):raise InputError('gemini_pending_results_mismatch')
+    return [results[index] for index in range(len(calls))]

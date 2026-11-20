@@ -1,6 +1,7 @@
 """冻结场景内容、隐藏投影、发布摘要与旧历史读取的回归。"""
 import hashlib
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +12,9 @@ from fastapi.testclient import TestClient
 import main
 from project_iteration import ProjectIterationManager
 from project_library import ProjectLibrary, materialize_snapshot, snapshot_tree, write_document
+from project_library_preparation import load_prepared_library, prepare_library
+from system_update_contract import project_library_receipt_name
+from runtime_files import atomic_json
 from test_project_iterations import ProjectIterationFixture
 
 
@@ -68,6 +72,36 @@ class ScenarioContentTests(unittest.TestCase):
         """保存当前修改并加载。@return 内容库。"""
         write_document(self.path, self.manifest)
         return ProjectLibrary(self.root)
+
+    def test_prepared_library_reuses_verified_content_and_rejects_changed_identity(self) -> None:
+        """校验候选镜像归属及冻结元数据，启动阶段直接复用树内容。@return 无。"""
+        data = self.root.parent / 'data'
+        socket = self.root.parent / 'socket'
+        socket.mkdir()
+        entry = prepare_library(self.root, data)
+        binding = {'deployment': 'test', 'release': 'ci-124-1', 'reference': 'control:test',
+            'image_digest': 'sha256:' + 'b' * 64, 'source': str(self.root)}
+        receipt = socket / project_library_receipt_name(binding['release'])
+        atomic_json(receipt, {'binding': binding, 'entry': entry})
+        environment = {'V3_RELEASE': binding['release'], 'V3_DEPLOYMENT_ID': binding['deployment'],
+            'V3_CONTROL_IMAGE': binding['reference'], 'V3_UPDATE_SOCKET_DIR': str(socket),
+            'V3_PREPARED_PROJECT_LIBRARY_IMAGE': binding['image_digest']}
+        with patch.dict(os.environ, environment), patch('project_library.snapshot_tree', side_effect=AssertionError('启动阶段重读项目树')), \
+                patch.object(ProjectLibrary, '_artifact_digest', side_effect=AssertionError('启动阶段重读离线制品')):
+            loaded = load_prepared_library(self.root, data)
+            self.assertEqual(loaded.digest, entry['digest'])
+            self.assertEqual(loaded.projects['example'].manifest, self.manifest)
+            self.assertEqual(loaded.environments['python-test']['adapter'], 'python-native')
+            with patch.dict(os.environ, {'V3_PREPARED_PROJECT_LIBRARY_IMAGE': 'sha256:' + 'c' * 64}):
+                with self.assertRaisesRegex(ValueError, '与当前候选不符'):
+                    load_prepared_library(self.root, data)
+            atomic_json(receipt, {'binding': binding, 'entry': {**entry, 'inode': entry['inode'] + 1}})
+            with self.assertRaisesRegex(ValueError, '目录已替换'):
+                load_prepared_library(self.root, data)
+            atomic_json(receipt, {'binding': binding, 'entry': entry})
+            write_document(loaded.root / 'catalog.json', {**loaded.catalog_document, 'version': 'changed'})
+            with self.assertRaisesRegex(ValueError, '元数据已变化'):
+                load_prepared_library(self.root, data)
 
     def test_variable_tasks_and_nonadjacent_dependency(self) -> None:
         """三个任务与非相邻回答依赖均合法。@return None。"""

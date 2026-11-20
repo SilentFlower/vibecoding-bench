@@ -47,13 +47,15 @@ class ProjectIterationManager:
     :param schedule_admission: 创建新计划前的只读账号门禁。
     :param concurrency_limit: 实际账号 CLI 容量。
     :param dialogue: 可选外接需求方客户端，旧内容不依赖该配置。
+    :param library_installed: 内容是否已注册到当前调度器数据根。
     """
 
     def __init__(self, data: Path, library: ProjectLibrary | None, database: Callable, write_lock,
                  submit: Callable, settings: Callable, identity: Callable, stop_run: Callable,
                  verifier, is_executing: Callable, admission: Callable | None = None,
                  execution_control: Callable | None = None, schedule_admission: Callable | None = None,
-                 concurrency_limit: int = 2, dialogue: ProjectDialogueClient | None = None) -> None:
+                 concurrency_limit: int = 2, dialogue: ProjectDialogueClient | None = None, *,
+                 library_installed: bool = False) -> None:
         """注册内容版本并初始化推进依赖；参数契约见类说明。@return None。"""
         self.data, self.database, self.write_lock = data, database, write_lock
         self.submit, self.settings, self.identity, self.stop_run = submit, settings, identity, stop_run
@@ -63,7 +65,7 @@ class ProjectIterationManager:
         self.review_admission = None
         self.review_refresh = None
         self.dialogue = dialogue
-        self.library = library.install(data) if library is not None else None
+        self.library = library if library is None or library_installed else library.install(data)
         self.objects = data/'project-artifacts/objects'
         self.manifests = data/'project-artifacts/manifests'
         self._stop = threading.Event()

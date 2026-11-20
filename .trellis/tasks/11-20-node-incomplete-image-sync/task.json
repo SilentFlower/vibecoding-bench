@@ -1,0 +1,43 @@
+{
+  "id": "node-incomplete-image-sync",
+  "name": "node-incomplete-image-sync",
+  "title": "修复 SSH 节点同步复用残缺镜像",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "orchestrator",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-20",
+  "completedAt": "2026-11-20",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-20T10:37:54Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-20-criu-node-sync-repair",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-20T10:37:54+00:00",
+    "completedSteps": [
+      "确认同 ID 目标镜像配置缺失",
+      "修复双镜像预取、内容核验及失败恢复",
+      "通过同 ID 缺配置的真实 SSH 换版与资料核验",
+      "补齐节点镜像验收规范"
+    ],
+    "partialStep": null,
+    "nextStep": "修复版本上线后核对 main 节点同步，并推进 AGY CRIU 模板修复",
+    "notes": "扩展集共 630 项。624 项通过，5 项按条件跳过，1 项历史运行定位错误在提交基线同样复现。"
+  }
+}

@@ -9,6 +9,7 @@ import queue
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import uuid
@@ -18,12 +19,17 @@ from runtime_files import atomic_json
 
 from .contract import InputError
 from .credentials import publish_access_document, read_private
+from .criu import CONTROL as CRIU_CONTROL, failure_detail, read_failure
 from .gemini_contract import continuation_results
+from .input_media import preflight_gif
 from .image_pool import Broker, ImagePool
 from .models import native_identifier
 from .process_memory import cgroup_memory, memory
 from .storage import Output, private_dir, verify_resources
 from .system_prompt import decode_policy, default_policy
+
+
+TOOL_WAIT_SECONDS = 3600
 
 
 def deadline(value: int) -> float:
@@ -39,7 +45,7 @@ def validate_submission(value: dict, config: dict) -> dict:
     expected = {'schema_version', 'type', 'request_id', 'account_id', 'environment_id',
         'environment_generation', 'api_token_id', 'credential_snapshot', 'model', 'native_model',
         'body', 'deadline_unix_ms'}
-    if not isinstance(value, dict) or set(value)-{'capture_enabled','system_prompt_policy'} != expected or type(value['schema_version']) is not int or value['schema_version'] != 1 or value['type'] not in ['submit', 'prepare']:
+    if not isinstance(value, dict) or set(value)-{'capture_enabled','system_prompt_policy','gif_frames','disable_safety_filtering','full_egress'} != expected or type(value['schema_version']) is not int or value['schema_version'] != 1 or value['type'] not in ['submit', 'prepare']:
         raise InputError('invalid_submission')
     for key in ['account_id', 'environment_id', 'environment_generation']:
         if type(value[key]) is not type(config[key]) or value[key] != config[key]:
@@ -62,6 +68,12 @@ def validate_submission(value: dict, config: dict) -> dict:
         raise InputError('invalid_model_or_body')
     if type(value.get('capture_enabled',False)) is not bool:
         raise InputError('invalid_capture_policy')
+    if type(value.get('full_egress',False)) is not bool:
+        raise InputError('invalid_capture_policy')
+    if type(value.get('gif_frames',False)) is not bool:
+        raise InputError('invalid_media_policy')
+    if type(value.get('disable_safety_filtering',False)) is not bool:
+        raise InputError('invalid_safety_policy')
     deadline(value['deadline_unix_ms'])
     result=copy.deepcopy(value)
     result.setdefault('capture_enabled',False)
@@ -100,22 +112,35 @@ class Worker:
         self.event_budget = threading.Condition()
         self.event_bytes = 0
         self.busy = True
+        self.prewarming = False
         self.closed = False
         self.ready = None
         self.reader = None
         self.last_used = time.monotonic()
+        self.credential_expires_at = value['credential_snapshot']['expires_at']
+        self.seed_template = False
+        self.parked = False
+        self.start_source = 'exec'
+        self.criu_failure = None
 
     def start(self, until):
         """在同UID隔离角色中启动并核对真实就绪。@param until 原单调截止。@return 无。"""
         # 与发送器的冻结模块路径一致，共享私有文件助手由正式镜像放在/usr/local/bin。
-        environment = {'PATH': '/usr/local/bin:/usr/bin:/bin', 'PYTHONPATH': str(Path(__file__).resolve().parents[1])+':/usr/local/bin',
+        environment = {'PATH': '/usr/local/bin:/usr/bin:/bin', 'PYTHONPATH': str(Path(__file__).resolve().parents[1])+':/opt/v3/python:/usr/local/bin',
             'AGY_RUNTIME_IMAGE_SOCKET': str(self.owner.socket_path), 'AGY_RUNTIME_SUPERVISOR_PID':str(os.getpid()), 'TMPDIR':str(self.folder)}
+        if self.seed_template:
+            # 镜像文件可由 CRIU 稳定打开，旧候选和普通启动继续使用封存 memfd。
+            environment.pop('AGY_RUNTIME_IMAGE_SOCKET')
+            environment.update(AGY_CRIU_TEMPLATE='1', AGY_CRIU_DEADLINE=str(until))
+        if self.config.get('capture_root') and os.environ.get('AGY_CAPTURE_NATIVE_TLS')=='1':
+            environment['AGY_CAPTURE_NATIVE_TLS']='1'
+        self.started_at = time.monotonic()
         with self.lifecycle_lock:
             if self.closed or self.owner.closed:
                 raise InputError('supervisor_closed')
             if time.monotonic() >= until:
                 raise InputError('request_deadline_exceeded')
-            self.process = subprocess.Popen([sys.executable, '-m', 'agy_runtime.kernel',
+            self.process = subprocess.Popen([sys.executable, '-P', '-m', 'agy_runtime.kernel',
                 '--config', str(self.folder / 'config.json'), '--state-dir', str(self.folder / 'state')],
                 env=environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                 start_new_session=True)
@@ -127,9 +152,31 @@ class Worker:
                 if event.get('source_sha256') != self.owner.image_sha or type(event.get('native_pid')) is not int:
                     raise InputError('worker_identity_mismatch')
                 self.ready = event
+                self.ready_at = time.monotonic()
+                if not self.seed_template:
+                    return
+            if event.get('type') == 'criu_prepared' and self.seed_template and self.ready:
+                self.parked = event['template_ready'] is True
+                self.criu_failure = read_failure(event.get('failure'))
+                self.seed_template = self.parked
                 return
             if event.get('type') in ['worker_error', 'process_closed']:
+                self.criu_failure = read_failure(event.get('failure'))
                 raise InputError('worker_start_failed')
+
+    def resume(self, until):
+        """恢复本进程持有的同代模板。@param until 本次请求原截止。@return 无。"""
+        self.send({'schema_version':1,'type':'criu_restore','until':until})
+        while True:
+            event = self.next(until)
+            if event.get('type') == 'criu_restored':
+                self.parked = False
+                self.start_source = 'criu_restore'
+                self.ready_at = time.monotonic()
+                return
+            if event.get('type') in {'worker_error','process_closed','rejected'}:
+                self.criu_failure = read_failure(event.get('failure'))
+                raise InputError('worker_restore_failed')
 
     def read(self):
         """唯一读取器持续消费原生事件，积压时关闭该进程。@return 无。"""
@@ -230,13 +277,7 @@ class Supervisor:
             raise ValueError('AGY监督器环境身份无效')
         self.root = private_dir(config['work_root'])
         self.capture_root=private_dir(config['capture_root']) if config.get('capture_root') else None
-        if self.capture_root:
-            for folder in self.capture_root.iterdir():
-                marker=folder/'retired.json'
-                if folder.is_dir() and not folder.is_symlink() and marker.is_file() and not marker.is_symlink():
-                    retired=read_private(marker)
-                    if type(retired.get('retired_at')) in (int,float) and time.time()-retired['retired_at']>7*86400:
-                        shutil.rmtree(folder)
+        # 编排端独立按归属清理历史采集。发送器启动只依赖当前监督器的私有状态。
         private_dir(self.root / 'workers')
         verify_resources()
         self.condition = threading.Condition(threading.RLock())
@@ -244,25 +285,49 @@ class Supervisor:
         self.jobs = {}
         self.credential_generation=0
         self.credential_identity=None
+        self.restore_enabled=(os.environ.get('AGY_CRIU')=='1'
+            and Path(__file__).resolve().parent==Path('/opt/v3/python/agy_runtime'))
+        self.template_failure=None
+        self.last_start_source=None
         self.controls = {}
         self.closed = False
         self.output = output or Output()
         self.pool = ImagePool(config['binary_path'])
         self.image_sha = '39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43'
-        self.socket_path = self.root / 'image.sock'
-        if self.socket_path.exists():
-            raise ValueError('AGY映像端点仍被原监督器持有')
-        self.broker = Broker(self.socket_path, self.pool, {os.getuid()})
+        # 候选摘要与监督代次叠加后会超过 Unix socket 路径上限。端点使用发送器私有临时目录。
+        self.socket_directory = tempfile.TemporaryDirectory(prefix='agy-image-', dir='/tmp')
+        self.socket_path = Path(self.socket_directory.name) / 'image.sock'
+        try:
+            self.broker = Broker(self.socket_path, self.pool, {os.getuid()})
+        except Exception:
+            self.socket_directory.cleanup()
+            raise
         self.reaper = threading.Thread(target=self.reap_idle, daemon=True)
         self.reaper.start()
 
     def reap_idle(self):
-        """只回收闲置五分钟的物理worker，工具等待保持原截止。@return 无。"""
+        """回收重复或过期的空闲进程，保留同身份最近使用的热进程。@return 无。"""
         while True:
             with self.condition:
                 if self.closed:
                     return
-                idle=[worker for worker in self.workers if not worker.busy and time.monotonic()-worker.last_used>=300]
+                now = time.monotonic()
+                idle = []
+                retained = set()
+                # 工具等待和正在预热的 worker 仍持有独占标志；仅回收已归还的空闲进程。
+                for worker in sorted(self.workers, key=lambda item: item.last_used, reverse=True):
+                    if worker.busy:
+                        continue
+                    parked = getattr(worker,'parked',False)
+                    # 同身份的热进程和磁盘模板用途不同。模板不占用原生进程内存，仍受物理池上限约束。
+                    identity = (worker.key, parked)
+                    if (now - worker.last_used >= 300 or identity in retained
+                            or (getattr(worker,'parked',False) and (worker.key[0]!=self.credential_generation
+                                or worker.credential_expires_at<=time.time_ns()//1_000_000))
+                            or worker.process is None or worker.process.poll() is not None):
+                        idle.append(worker)
+                    else:
+                        retained.add(identity)
                 for worker in idle:
                     worker.busy=True
                 if not idle:
@@ -286,8 +351,8 @@ class Supervisor:
         return (snapshot['credential_generation'], hashlib.sha256(snapshot['access_token'].encode()).digest(),
             value['model'], str(value['native_model']), self.config['proxy_url'], value.get('capture_enabled',False))
 
-    def acquire(self, value, until):
-        """在物理上限内选择或建立当前代次进程。@param value 提交。@param until 截止。@return 独占worker。"""
+    def acquire(self, value, until, seed=True):
+        """在物理上限内选择或建立当前代次进程。@param value 提交。@param until 截止。@param seed 是否尝试建模板。@return 独占worker。"""
         key = self.worker_key(value)
         while True:
             stale = None
@@ -297,15 +362,22 @@ class Supervisor:
                 # 旧代退役也消费原请求预算，截止后禁止复用或启动下一代。
                 if time.monotonic() >= until:
                     raise InputError('request_deadline_exceeded')
-                for worker in self.workers:
+                # 优先复用已经启动的进程，把单次快照留给需要扩容的请求。
+                for worker in sorted(self.workers, key=lambda item: getattr(item,'parked',False)):
                     if not worker.busy and not worker.closed and worker.key == key:
                         worker.busy = True
                         return worker
+                if any(worker.prewarming and worker.key==key for worker in self.workers):
+                    # 当前身份已有进程在握手，后续请求沿自己的截止等待同一次准备。
+                    self.condition.wait(max(0, until-time.monotonic()))
+                    continue
                 stale = next((worker for worker in self.workers if not worker.busy), None)
                 if stale:
                     stale.busy = True
                 elif len(self.workers) < self.config['max_workers']:
                     worker = Worker(self, value)
+                    worker.seed_template=seed and value['type']=='prepare' and self.can_seed_template()
+                    requested_template=worker.seed_template
                     self.workers.append(worker)
                     break
                 else:
@@ -320,13 +392,83 @@ class Supervisor:
                     self.condition.notify_all()
         try:
             worker.start(until)
+            if requested_template:
+                with self.condition:
+                    self.record_template_attempt(worker,worker.parked)
             return worker
         except Exception:
+            if requested_template:
+                with self.condition:
+                    self.record_template_attempt(worker,False)
             worker.close()
             with self.condition:
                 self.workers.remove(worker)
                 self.condition.notify_all()
+            if requested_template and time.monotonic()<until:
+                return self.acquire(value,until,seed=False)
             raise
+
+    def restore_available(self):
+        """只认实际挂载的可信控制入口。@return 能否登记启动模板。"""
+        return self.restore_enabled and Path(CRIU_CONTROL).exists()
+
+    def record_template_attempt(self, worker: Worker, ready: bool, stage: str = 'worker_start') -> None:
+        """在池锁内保存同代结果。@param worker 原进程。@param ready 模板是否就绪。@param stage 未收到细节时的阶段。@return 无。"""
+        if worker.key[0]==self.credential_generation and worker.credential_expires_at>time.time_ns()//1_000_000:
+            self.template_failure=None if ready else worker.criu_failure or failure_detail(stage)
+
+    def prewarm_replacement(self, source, value, until, template=False):
+        """用空余名额预热替代进程。@param source 原工作进程。@param value 同代模型及凭据。@param until 原生成截止。@param template 是否保存启动模板。@return 无返回值。"""
+        worker=None
+        snapshot=value['credential_snapshot']
+        try:
+            with self.condition:
+                if (self.closed or source not in self.workers or source.closed
+                        or snapshot['credential_generation']!=self.credential_generation
+                        or time.monotonic()>=until or snapshot['expires_at']<=time.time_ns()//1_000_000):
+                    return
+                if template:
+                    if not self.can_seed_template():
+                        return
+                elif self.config['max_workers']<2 or self.workers!=[source] or not source.busy:
+                    return
+                # 暖进程先登记到同一个物理池，业务与后台同时启动时共用并发上限。
+                worker=Worker(self, value)
+                worker.seed_template=template
+                worker.prewarming=True
+                self.workers.append(worker)
+            worker.start(until)
+            with self.condition:
+                if (not self.closed and not worker.closed and snapshot['credential_generation']==self.credential_generation
+                        and snapshot['expires_at']>time.time_ns()//1_000_000):
+                    if template:
+                        self.record_template_attempt(worker,worker.parked)
+                    worker.prewarming=False
+                    worker.busy=False
+                    worker.last_used=time.monotonic()
+                    self.condition.notify_all()
+        except Exception:
+            # 补位失败后允许普通 checkout 按原路径恢复，原工具轮仍由原进程完成。
+            with self.condition:
+                if template and worker:
+                    self.record_template_attempt(worker,False)
+                elif template and snapshot['credential_generation']==self.credential_generation:
+                    self.template_failure=failure_detail('worker_start')
+        finally:
+            if worker and worker.prewarming:
+                try:
+                    worker.close()
+                finally:
+                    with self.condition:
+                        if worker.closed and (not worker.process or worker.process.poll() is not None):
+                            self.workers.remove(worker)
+                        worker.prewarming=False
+                        self.condition.notify_all()
+
+    def can_seed_template(self):
+        """在池锁内检查模板租约和剩余进程名额。@return 是否可启动零业务模板。"""
+        return (self.restore_available() and len(self.workers)<self.config['max_workers']
+            and not any(getattr(worker,'seed_template',False) for worker in self.workers))
 
     def continuation(self, value, until):
         """先完成原worker工具收尾，再允许下一次模型生成。@param value 新请求。@param until 截止。@return 无。"""
@@ -361,8 +503,7 @@ class Supervisor:
             job['claimed'] = True
             identity = job['identity']
             job['worker'].send({'schema_version': 1, 'type': 'finish_tool_turn', **identity, 'body': value['body']})
-        if not job['finished'].wait(max(0, min(until, job['until']) - time.monotonic())) or job.get('final_status') != 'completed':
-            raise InputError('previous_tool_turn_failed')
+        self.await_tools_finalized(job, min(until, job['until']))
 
     def submit(self, raw):
         """登记唯一HTTP请求并在线程中执行。@param raw 受信提交。@return 无。"""
@@ -375,16 +516,20 @@ class Supervisor:
             identity=hashlib.sha256(value['credential_snapshot']['access_token'].encode()).digest()
             if generation<self.credential_generation or generation==self.credential_generation and identity!=self.credential_identity:
                 raise InputError('stale_credential_generation')
+            if generation>self.credential_generation:
+                self.template_failure=None
+                self.last_start_source=None
+                self.condition.notify_all()
             self.credential_generation=generation
             self.credential_identity=identity
-            self.jobs[value['request_id']] = {'value': value, 'until': until, 'finished': threading.Event(),
+            self.jobs[value['request_id']] = {'value': value, 'until': until, 'received': time.monotonic(), 'finished': threading.Event(),
                 'cancelled': threading.Event(), 'worker': None, 'calls': [], 'waiting': False}
         threading.Thread(target=self.execute, args=(value, until), daemon=True).start()
 
     def finish_tools_command(self, value):
         """只投递原工具结果，保持零模型发送和原截止。@param value 无凭据控制信封。@return 无。"""
         expected={'schema_version','type','request_id','account_id','environment_id','environment_generation','api_token_id','previous_request_id','body'}
-        if set(value)!=expected or value['type']!='finish_tools' or type(value['api_token_id']) is not int or value['api_token_id']<1 or not isinstance(value['body'],dict):
+        if set(value)-{'gif_frames'}!=expected or type(value.get('gif_frames',False)) is not bool or value['type']!='finish_tools' or type(value['api_token_id']) is not int or value['api_token_id']<1 or not isinstance(value['body'],dict):
             raise InputError('invalid_tool_completion')
         for key in ['account_id','environment_id','environment_generation']:
             if type(value[key]) is not type(self.config[key]) or value[key]!=self.config[key]:raise InputError('submission_binding_mismatch')
@@ -401,6 +546,8 @@ class Supervisor:
         """等待原工具轮真实收口，并保存幂等回填凭据。@param value 控制输入。@param done 控制完成通知。@return 无。"""
         try:
             digest=hashlib.sha256(json.dumps(value['body'],sort_keys=True,separators=(',',':')).encode()).hexdigest()
+            if value.get('gif_frames'):
+                preflight_gif(value['body'])
             with self.condition:
                 job=self.jobs.get(value['previous_request_id'])
                 if not job or job['value']['api_token_id']!=value['api_token_id'] or job['until']<=time.monotonic():raise InputError('tool_continuation_identity')
@@ -411,7 +558,7 @@ class Supervisor:
                     continuation_results(job['value']['body'],job['calls'],value['body'])
                     job['claimed']=True;job['continuation_digest']=digest
                     job['worker'].send({'schema_version':1,'type':'finish_tool_turn',**job['identity'],'body':value['body']})
-            if not job['finished'].wait(max(0,job['until']-time.monotonic())) or job.get('final_status')!='completed':raise InputError('previous_tool_turn_failed')
+            self.await_tools_finalized(job,job['until'])
             self.emit('tools_finished',value['request_id'],previous_request_id=value['previous_request_id'])
         except Exception as error:
             self.emit('control_error',value['request_id'],code=str(error) if isinstance(error,InputError) else 'tool_completion_failed')
@@ -419,22 +566,64 @@ class Supervisor:
             done.set()
             with self.condition:self.controls.pop(value['request_id'],None)
 
+    def await_tools_finalized(self, job, until):
+        """区分原生已接纳后的失败与回执暂未确认。@param job 原生作业。@param until 单调截止。@return 正常收口时无返回值。"""
+        if not job['finished'].wait(max(0,until-time.monotonic())):
+            raise InputError('tool_completion_pending')
+        if job.get('final_status')!='completed':
+            raise InputError('previous_tool_turn_failed' if job.get('tool_results_accepted') else 'tool_completion_failed')
+
     def execute(self, value, until):
         """持有进程直到真实idle，HTTP工具完成时保留原工具归属。@param value 提交。@param until 原截止。@return 无。"""
         job = self.jobs[value['request_id']]
         worker = None
         failed = False
+        replacement_required = False
+        replacement_scheduled = False
+        preparation_deadline = until
         try:
             self.continuation(value, until)
+            checkout_started = time.monotonic()
             worker = self.acquire(value, until)
+            checkout_finished = time.monotonic()
             job['worker'] = worker
             if job['cancelled'].is_set():
                 raise InputError('request_cancelled')
             if value['type'] == 'prepare':
-                self.emit('prepared', value['request_id'], native=worker.ready)
+                self.emit('prepared', value['request_id'], native={**worker.ready,'template_ready':getattr(worker,'parked',False)})
                 return
-            worker.send({'schema_version': 1, 'type': 'gemini_request', 'request_id': value['request_id'],
-                'model': value['model'], 'body': value['body'], 'system_prompt_policy':value['system_prompt_policy']})
+            if getattr(worker,'parked',False):
+                try:
+                    worker.resume(min(until,time.monotonic()+25))
+                except (InputError, OSError, ValueError):
+                    with self.condition:
+                        self.record_template_attempt(worker,False,'checkpoint_restore')
+                    worker.close()
+                    with self.condition:
+                        self.workers.remove(worker)
+                        self.condition.notify_all()
+                    worker = self.acquire(value,until,seed=False)
+                    job['worker']=worker
+            if job['cancelled'].is_set() or time.monotonic()>=until:
+                raise InputError('request_cancelled' if job['cancelled'].is_set() else 'request_deadline_exceeded')
+            with self.condition:
+                if worker.key[0]==self.credential_generation:
+                    self.last_start_source=getattr(worker,'start_source','exec')
+            with self.condition:
+                should_seed=self.can_seed_template()
+            if should_seed:
+                seed={key:value[key] for key in ('account_id','credential_snapshot','model','native_model','capture_enabled')}
+                try:
+                    threading.Thread(target=self.prewarm_replacement,args=(worker,seed,until,True),daemon=True).start()
+                except RuntimeError:
+                    # 背景预热失败时优先完成已接纳的模型请求。
+                    pass
+            payload={'schema_version': 1, 'type': 'gemini_request', 'request_id': value['request_id'],
+                'model': value['model'], 'body': value['body'], 'system_prompt_policy':value['system_prompt_policy']}
+            if value.get('gif_frames'):payload['gif_frames']=True
+            if value.get('disable_safety_filtering'):payload['disable_safety_filtering']=True
+            if value.get('capture_enabled') and value.get('full_egress'):payload['full_egress']=True
+            worker.send(payload)
             while True:
                 event = worker.next(until)
                 kind = event.get('type')
@@ -442,8 +631,23 @@ class Supervisor:
                     raise InputError('native_worker_closed')
                 if event.get('request_id') != value['request_id']:
                     continue
+                if kind in ('foreign_model_observed', 'unassigned_model_observed'):
+                    replacement_required = True
                 if kind == 'request_accepted':
                     job['identity'] = {key: event[key] for key in ['request_id', 'request_seq', 'generation']}
+                if kind == 'request_prepared':
+                    # 以同一单调时钟覆盖原生组装。进程启动属于获取进程的一部分。
+                    received = job['received']
+                    started_at = worker.started_at
+                    event['runtime'] = {
+                        'worker_id': event['worker_id'], 'worker_pid': worker.ready['native_pid'],
+                        'kernel_generation': event['generation'], 'warm_hit': worker.ready_at <= received,
+                        'start_source': getattr(worker,'start_source','exec'),
+                        'preparation_wait_ms': int((checkout_started - received) * 1000),
+                        'checkout_ms': int((checkout_finished - checkout_started) * 1000),
+                        'worker_start_ms': int((worker.ready_at - started_at) * 1000) if started_at >= checkout_started else None,
+                        'prepared_ms': int((time.monotonic() - received) * 1000),
+                    }
                 if job['cancelled'].is_set() and 'identity' in job and not job.get('cancel_sent'):
                     worker.send({'schema_version': 1, 'type': 'cancel', **job['identity']})
                     job['cancel_sent'] = True
@@ -452,14 +656,34 @@ class Supervisor:
                     for candidate in frame.get('candidates', []):
                         job['calls'].extend(part['functionCall'] for part in candidate.get('content', {}).get('parts', []) if 'functionCall' in part)
                 if kind == 'completed':
-                    job['waiting'] = event.get('native_tool_pending') is True
-                    if not job['waiting']:
-                        job['final_status'] = 'completed'
+                    with self.condition:
+                        if event.get('native_tool_pending') is True:
+                            # 只有已确认的原生工具调用进入独立等待期，普通生成仍遵守提交截止。
+                            expires_at_ms = time.time_ns() // 1_000_000 + TOOL_WAIT_SECONDS * 1000
+                            until = time.monotonic() + TOOL_WAIT_SECONDS
+                            job['until'] = until
+                            event['tool_wait_expires_at_ms'] = expires_at_ms
+                            job['waiting'] = True
+                        else:
+                            job['waiting'] = False
+                            job['final_status'] = 'error' if event.get('control_error_code') else 'completed'
+                if kind == 'tool_continuation_accepted':
+                    job['tool_results_accepted'] = True
                 if kind == 'tool_turn_finalized':
                     job['waiting'] = False
                     job['final_status'] = event.get('status')
+                if kind == 'rejected' and value.get('capture_enabled'):
+                    # 解析拒绝没有原生提交，仍让网关保存同次脱敏入站。
+                    event['capture_status'] = 'queued'
                 self.emit('native_event', value['request_id'], event=event,
                     credential_generation=value['credential_snapshot']['credential_generation'])
+                if replacement_required and job['waiting'] and not replacement_scheduled and not job['cancelled'].is_set():
+                    replacement_scheduled = True
+                    seed={key:value[key] for key in ('account_id','credential_snapshot','model','native_model','capture_enabled')}
+                    try:
+                        threading.Thread(target=self.prewarm_replacement,args=(worker,seed,preparation_deadline),daemon=True).start()
+                    except RuntimeError:
+                        pass
                 if kind in ['error', 'cancelled', 'rejected']:
                     failed = True
                 if kind == 'rejected':
@@ -499,12 +723,37 @@ class Supervisor:
     def status(self):
         """返回实际进程、工具等待与资源分项，读取不唤醒。@return 脱敏状态。"""
         with self.condition:
-            return {'state': 'busy' if any(worker.busy for worker in self.workers) else 'ready',
-                'workers': len(self.workers), 'active': sum(worker.busy for worker in self.workers),
+            active=sum(worker.busy for worker in self.workers)
+            idle=[worker for worker in self.workers if not worker.busy and not worker.closed and worker.ready is not None
+                and not getattr(worker,'parked',False) and worker.process is not None and worker.process.poll() is None]
+            available=self.restore_available()
+            template=available and any(getattr(worker,'parked',False) and not worker.closed and not worker.busy
+                and worker.key[0]==self.credential_generation and worker.credential_expires_at>time.time_ns()//1_000_000
+                for worker in self.workers)
+            preparing=available and any(worker.prewarming and getattr(worker,'seed_template',False)
+                for worker in self.workers)
+            if not available:
+                restore_state, restore_reason = 'unavailable', 'controller_unavailable'
+            elif template:
+                restore_state, restore_reason = 'ready', None
+            elif preparing:
+                restore_state, restore_reason = 'preparing', 'template_preparing'
+            elif self.template_failure:
+                restore_state, restore_reason = 'unavailable', 'template_failed'
+            else:
+                restore_state, restore_reason = 'waiting', None
+            return {'state': 'busy' if active else 'ready',
+                'workers': sum(not getattr(worker,'parked',False) for worker in self.workers), 'active': active, 'idle_workers': len(idle),
+                'idle_pid': idle[0].ready['native_pid'] if idle else None,
+                'warming_workers': sum(worker.prewarming for worker in self.workers),
                 'tool_waiting': sum(job['waiting'] for job in self.jobs.values()), 'max_workers': self.config['max_workers'],
                 'controller': memory(os.getpid()), 'image_bytes': self.pool.decoded_bytes,
                 'cgroup_memory':cgroup_memory(),
                 'image_decode_calls': self.pool.decode_calls, 'image_scope': 'account_workers',
+                'restore': {'schema_version':1,'state':restore_state,
+                    'reason':restore_reason,'template_ready':template,
+                    'last_start_source':self.last_start_source,
+                    **({'failure':self.template_failure.copy()} if restore_reason=='template_failed' else {})},
                 'processes': [{'controller': memory(worker.process.pid), 'native': memory(worker.ready['native_pid']) if worker.ready else None,
                     'observer': memory(worker.ready['observer_pid']) if worker.ready else None,
                     'busy': worker.busy, 'credential_generation':worker.config['credential_generation']} for worker in self.workers if worker.process]}
@@ -544,7 +793,10 @@ class Supervisor:
         for done in list(self.controls.values()):
             done.wait(max(0,until-time.monotonic()))
         self.reaper.join(timeout=max(0, until-time.monotonic()))
-        self.broker.close()
+        try:
+            self.broker.close()
+        finally:
+            self.socket_directory.cleanup()
         self.pool.close()
         self.output.close()
         if all(job['finished'].is_set() for job in self.jobs.values()) and all(not worker.process or worker.process.poll() is not None for worker in workers):

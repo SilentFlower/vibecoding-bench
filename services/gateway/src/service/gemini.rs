@@ -1,6 +1,7 @@
 //! Gemini入口的账号许可、原生帧保真与跨HTTP工具轮归属。
 use std::collections::{BTreeSet, HashMap};
 use std::io::Error as IoError;
+use std::mem::replace;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -35,11 +36,13 @@ use crate::service::diagnostics::{
     self, CURRENT_LOG_MODE, CURRENT_TRACE, RequestTraceGuard, TraceContext,
 };
 use crate::service::runtime_transport::{self, PreparedTransport};
-use crate::service::system_update::{self, UpdateActivity};
+use crate::service::system_update::{self, InferenceCutover, UpdateActivity};
+use crate::service::v3_scheduling::{RequestPhase, SchedulingRequest};
 use crate::service::{native_capture, runtime_bridge};
 
-const BODY_LIMIT: usize = 16 * 1024 * 1024;
+pub(crate) const BODY_LIMIT: usize = 16 * 1024 * 1024;
 const FRAME_LIMIT: usize = 64 * 1024 * 1024;
+const AGY_TOOL_WAIT_LIMIT: Duration = Duration::from_secs(3600);
 
 /// 随原生工具轮保留的许可，下一HTTP请求共享同一份所有权。
 struct Admission {
@@ -60,6 +63,7 @@ struct ToolTurn {
     account: Account,
     model: RoutedModel,
     contents: Value,
+    runtime_contents: Option<Value>,
     calls: Vec<Value>,
     deadline: Instant,
     admission: Arc<Admission>,
@@ -68,12 +72,14 @@ struct ToolTurn {
     receipt_body: Option<Value>,
     retained: bool,
     claimed: bool,
+    cutover: Option<InferenceCutover>,
 }
 
 struct ContinuationClaim {
     service: Arc<GeminiService>,
     key: Option<String>,
     resolved_model: String,
+    runtime_contents: Option<Value>,
 }
 
 impl Drop for ContinuationClaim {
@@ -93,12 +99,18 @@ impl Drop for ContinuationClaim {
 }
 
 impl ContinuationClaim {
-    async fn finish(&self, token_id: i64, body: &Value, deadline: Instant) -> Result<(), AppError> {
+    async fn finish(
+        &self,
+        token_id: i64,
+        body: &Value,
+        deadline: Instant,
+        gif_frames: bool,
+    ) -> Result<(), AppError> {
         let key = self
             .key
             .as_ref()
             .ok_or_else(|| invalid("原工具归属已释放"))?;
-        let (transport, previous, finished) = {
+        let (transport, previous, finished, previous_deadline) = {
             let turns = self
                 .service
                 .turns
@@ -109,11 +121,22 @@ impl ContinuationClaim {
                 turn.transport.clone(),
                 turn.previous_request_id.clone(),
                 turn.receipt_body.is_some(),
+                turn.deadline,
             )
         };
         if !finished {
+            let mut runtime_body = body.clone();
+            if let Some(contents) = &self.runtime_contents {
+                runtime_body["contents"] = contents.clone();
+            }
             transport
-                .finish_agy_tools(&previous, token_id, body.clone(), deadline)
+                .finish_agy_tools(
+                    &previous,
+                    token_id,
+                    runtime_body,
+                    deadline.min(previous_deadline),
+                    gif_frames,
+                )
                 .await?;
             let mut turns = self
                 .service
@@ -135,11 +158,54 @@ pub struct GeminiService {
     turns: Mutex<HashMap<String, ToolTurn>>,
 }
 
+impl GeminiService {
+    /// 清理切换时仍保留在网关的工具归属。私有流的取消信号独立释放发送端作业。
+    /// @return 已登记的工具归属在当前进程中释放。
+    pub(crate) fn release_tools_for_cutover(&self) {
+        self.turns
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .retain(|_, turn| {
+                !turn
+                    .cutover
+                    .as_ref()
+                    .is_some_and(InferenceCutover::is_cancelled)
+            });
+    }
+}
+
 fn invalid(message: &str) -> AppError {
     AppError::BadRequest(message.into())
 }
 
 fn gemini_error(error: AppError) -> Response {
+    let (status, body) = gemini_error_body(error);
+    (status, Json(body)).into_response()
+}
+
+/// 普通响应与 SSE 错误帧使用同一个公开错误合同。@param error 已分类错误。@return HTTP 状态及安全正文。
+fn gemini_error_body(error: AppError) -> (StatusCode, Value) {
+    if let AppError::AgyInput {
+        reason,
+        message,
+        field,
+    } = &error
+    {
+        let message = match field {
+            Some(field) => format!("{message}（{field}，{reason}）"),
+            None => format!("{message}（{reason}）"),
+        };
+        let mut details = vec![json!({"@type":"type.googleapis.com/google.rpc.ErrorInfo",
+            "reason":reason,"domain":"flower2api"})];
+        if let Some(field) = field {
+            details.push(json!({"@type":"type.googleapis.com/google.rpc.BadRequest",
+                "fieldViolations":[{"field":field,"description":message}]}));
+        }
+        return (
+            StatusCode::BAD_REQUEST,
+            json!({"error":{"code":400,"status":"INVALID_ARGUMENT","message":message,"details":details}}),
+        );
+    }
     let (code, status, message) = match error {
         AppError::Unauthorized => (
             StatusCode::UNAUTHORIZED,
@@ -157,6 +223,35 @@ fn gemini_error(error: AppError) -> Response {
             "RESOURCE_EXHAUSTED",
             "账号当前容量不足".into(),
         ),
+        error @ AppError::AgyUpstreamQuota => (
+            StatusCode::TOO_MANY_REQUESTS,
+            "RESOURCE_EXHAUSTED",
+            error.to_string(),
+        ),
+        error @ AppError::AgyToolTurnFailed => (
+            StatusCode::BAD_GATEWAY,
+            "UNAVAILABLE",
+            error.to_string(),
+        ),
+        error @ AppError::AgyControl(code) => {
+            let status = match code {
+                StatusCode::BAD_REQUEST => "INVALID_ARGUMENT",
+                StatusCode::UNAUTHORIZED => "UNAUTHENTICATED",
+                StatusCode::FORBIDDEN => "PERMISSION_DENIED",
+                StatusCode::NOT_FOUND => "NOT_FOUND",
+                StatusCode::CONFLICT => "ABORTED",
+                StatusCode::PRECONDITION_FAILED => "FAILED_PRECONDITION",
+                StatusCode::PAYLOAD_TOO_LARGE | StatusCode::TOO_MANY_REQUESTS => {
+                    "RESOURCE_EXHAUSTED"
+                }
+                StatusCode::NOT_IMPLEMENTED => "UNIMPLEMENTED",
+                StatusCode::BAD_GATEWAY | StatusCode::SERVICE_UNAVAILABLE => "UNAVAILABLE",
+                StatusCode::GATEWAY_TIMEOUT => "DEADLINE_EXCEEDED",
+                code if code.is_server_error() => "INTERNAL",
+                _ => "UNKNOWN",
+            };
+            (code, status, error.to_string())
+        }
         _ => (
             StatusCode::SERVICE_UNAVAILABLE,
             "UNAVAILABLE",
@@ -165,9 +260,8 @@ fn gemini_error(error: AppError) -> Response {
     };
     (
         code,
-        Json(json!({"error":{"code":code.as_u16(),"status":status,"message":message}})),
+        json!({"error":{"code":code.as_u16(),"status":status,"message":message}}),
     )
-        .into_response()
 }
 
 /// 仅在Gemini入口解析四种令牌来源，拒绝冲突和重复查询密钥。@param headers 原头。@param query 原查询。@return 唯一密钥。
@@ -234,7 +328,10 @@ pub async fn models(State(state): State<AppState>, request: Request) -> Response
     let (parts, _) = request.into_parts();
     let result = async {
         let token = authenticate(&state, &parts.headers, parts.uri.query()).await?;
-        let accounts = state.account_svc.agy_candidates(&token, &[]).await?;
+        let accounts = state
+            .account_svc
+            .agy_candidates(&token, &[], &BTreeSet::new())
+            .await?;
         let mut names = BTreeSet::new();
         for (_, account) in &accounts {
             if let Some(mapping) = account.usage_data["capabilities"]["model_mappings"].as_object()
@@ -350,6 +447,111 @@ fn has_tool_result(body: &Value) -> bool {
     })
 }
 
+fn requested_media(body: &Value) -> Result<BTreeSet<&str>, AppError> {
+    let supported = [
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/gif",
+        "image/webp",
+        "image/bmp",
+        "image/tiff",
+        "image/avif",
+        "audio/wav",
+        "audio/x-wav",
+        "audio/mpeg",
+        "audio/ogg",
+        "audio/flac",
+        "video/mp4",
+        "video/webm",
+        "application/pdf",
+    ];
+    let mut media = BTreeSet::new();
+    for (index, content) in body["contents"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .enumerate()
+    {
+        for (part_index, part) in content["parts"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .enumerate()
+        {
+            for name in ["inlineData", "inline_data"] {
+                if let Some(value) = part.get(name) {
+                    let mime = value
+                        .get("mimeType")
+                        .or_else(|| value.get("mime_type"))
+                        .and_then(Value::as_str);
+                    let field = Some(format!("contents[{index}].parts[{part_index}].{name}"));
+                    let Some(mime) = mime else {
+                        return Err(AppError::AgyInput {
+                            reason: "AGY_INVALID_MEDIA",
+                            message: "内嵌媒体缺少 MIME 类型",
+                            field,
+                        });
+                    };
+                    if !supported.contains(&mime) {
+                        return Err(AppError::AgyInput {
+                            reason: "AGY_UNSUPPORTED_MEDIA_TYPE",
+                            message: "AGY 入口不支持该媒体类型",
+                            field,
+                        });
+                    }
+                    media.insert(mime);
+                }
+            }
+        }
+    }
+    Ok(media)
+}
+
+fn matching_tool_call(calls: &[Value], response: &Value, position: usize) -> Option<usize> {
+    let name = response["name"].as_str().filter(|name| !name.is_empty())?;
+    let has_name = calls.iter().any(|call| call["name"] == name);
+    let mut identifier = match response.get("id") {
+        Some(id) => Some(id.as_str().filter(|id| !id.is_empty())?),
+        None => None,
+    };
+    if identifier.is_none() && !has_name && calls.iter().any(|call| call["id"] == name) {
+        identifier = Some(name);
+    }
+    let mut matches = calls.iter().enumerate().filter(|(_, call)| {
+        if let Some(identifier) = identifier {
+            (!has_name || call["name"] == name) && call["id"] == identifier
+        } else {
+            call["name"] == name
+        }
+    });
+    let result = matches.next()?.0;
+    if matches.next().is_none() {
+        return Some(result);
+    }
+    // 中转可能删除并行工具的 ID。回填顺序只用于同名项，并且整轮调用与结果数量仍须一致。
+    (identifier.is_none() && calls.get(position).is_some_and(|call| call["name"] == name))
+        .then_some(position)
+}
+
+#[cfg(test)]
+#[test]
+fn parallel_same_name_results_use_ids_or_the_original_order() {
+    let calls = [
+        json!({"name": "Read", "id": "first", "args": {"path": "a.txt"}}),
+        json!({"name": "Read", "id": "second", "args": {"path": "b.txt"}}),
+        json!({"name": "List", "id": "third"}),
+    ];
+    let read = json!({"name": "Read", "response": {}});
+    assert_eq!(matching_tool_call(&calls, &read, 0), Some(0));
+    assert_eq!(matching_tool_call(&calls, &read, 1), Some(1));
+    assert_eq!(matching_tool_call(&calls, &read, 2), None);
+    let id = json!({"name": "Read", "id": "second", "response": {}});
+    assert_eq!(matching_tool_call(&calls, &id, 0), Some(1));
+    let wrong_id = json!({"name": "Read", "id": "third", "response": {}});
+    assert_eq!(matching_tool_call(&calls, &wrong_id, 0), None);
+}
+
 fn matches_turn(turn: &ToolTurn, model: &str, body: &Value) -> bool {
     let Some(old) = turn.contents.as_array() else {
         return false;
@@ -386,22 +588,16 @@ fn matches_turn(turn: &ToolTurn, model: &str, body: &Value) -> bool {
     if responses.len() != turn.calls.len()
         || responses
             .iter()
-            .any(|response| response.get("response").is_none())
+            .any(|response| !response["response"].is_object())
     {
         return false;
     }
-    if !turn.calls.iter().all(|call| {
-        responses
-            .iter()
-            .filter(|response| {
-                response["name"] == call["name"]
-                    && response
-                        .get("id")
-                        .is_none_or(|id| Some(id) == call.get("id"))
-            })
-            .count()
-            == 1
-    }) {
+    let matched: Option<BTreeSet<_>> = responses
+        .iter()
+        .enumerate()
+        .map(|(position, response)| matching_tool_call(&turn.calls, response, position))
+        .collect();
+    if matched.is_none_or(|indices| indices.len() != turn.calls.len()) {
         return false;
     }
     calls.iter().zip(&turn.calls).all(|(call, expected)| {
@@ -413,26 +609,72 @@ fn matches_turn(turn: &ToolTurn, model: &str, body: &Value) -> bool {
     })
 }
 
+/// 用已校验工具轮的真实 ID 修正原生历史。@param turn 原工具归属。@param body 已匹配的客户端正文。@return 有变更时的原生历史。
+fn runtime_tool_contents(turn: &ToolTurn, body: &Value) -> Option<Value> {
+    let contents = body["contents"].as_array()?;
+    let start = contents.len().checked_sub(2)?;
+    let aliases: Vec<_> = contents[start + 1]["parts"]
+        .as_array()?
+        .iter()
+        .enumerate()
+        .filter_map(|(part_index, part)| {
+            let response = part.get("functionResponse")?;
+            let alias = response["name"].as_str()?;
+            if response.get("id").is_some() || turn.calls.iter().any(|call| call["name"] == alias) {
+                return None;
+            }
+            let call_index = matching_tool_call(&turn.calls, response, 0)?;
+            Some((part_index, call_index))
+        })
+        .collect();
+    if aliases.is_empty() && turn.runtime_contents.is_none() {
+        return None;
+    }
+
+    // 已确认的原生前缀跨轮复用。客户端归属和重试回执继续使用原始内容。
+    let mut runtime = turn
+        .runtime_contents
+        .as_ref()
+        .unwrap_or(&turn.contents)
+        .clone();
+    let mut model = contents[start].clone();
+    let mut user = contents[start + 1].clone();
+    let mut calls: Vec<_> = model["parts"]
+        .as_array_mut()?
+        .iter_mut()
+        .filter_map(|part| part.get_mut("functionCall"))
+        .collect();
+    for (part_index, call_index) in aliases {
+        let expected = &turn.calls[call_index];
+        calls[call_index]["id"] = expected["id"].clone();
+        let response = &mut user["parts"][part_index]["functionResponse"];
+        response["id"] = expected["id"].clone();
+        response["name"] = expected["name"].clone();
+    }
+    runtime.as_array_mut()?.extend([model, user]);
+    Some(runtime)
+}
+
 impl GeminiService {
     fn continuation(
         self: &Arc<Self>,
         token: &ApiToken,
         model: &str,
         body: &Value,
-    ) -> Result<Option<(Account, Arc<Admission>, Instant, ContinuationClaim)>, AppError> {
-        if !body["contents"]
+    ) -> Result<Option<(Account, Arc<Admission>, ContinuationClaim)>, AppError> {
+        let Some((index, _)) = body["contents"]
             .as_array()
-            .and_then(|contents| contents.last())
-            .is_some_and(|content| {
+            .and_then(|contents| contents.last().map(|content| (contents.len() - 1, content)))
+            .filter(|(_, content)| {
                 content["parts"].as_array().is_some_and(|parts| {
                     parts
                         .iter()
                         .any(|part| part.get("functionResponse").is_some())
                 })
             })
-        {
+        else {
             return Ok(None);
-        }
+        };
         let mut turns = self.turns.lock().unwrap_or_else(|error| error.into_inner());
         let allowed = token.allowed_account_ids();
         let blocked = token.blocked_account_ids();
@@ -447,7 +689,11 @@ impl GeminiService {
             .map(|(key, _)| key.clone())
             .collect();
         if matches.len() != 1 {
-            return Err(invalid("工具结果缺少唯一原请求归属"));
+            return Err(AppError::AgyInput {
+                reason: "AGY_TOOL_RESULT_MISMATCH",
+                message: "工具结果缺少唯一原请求归属",
+                field: Some(format!("contents[{index}]")),
+            });
         }
         let turn = turns
             .get_mut(&matches[0])
@@ -467,11 +713,11 @@ impl GeminiService {
         Ok(Some((
             turn.account.clone(),
             turn.admission.clone(),
-            turn.deadline,
             ContinuationClaim {
                 service: self.clone(),
                 key: Some(matches[0].clone()),
                 resolved_model: turn.model.resolved.clone(),
+                runtime_contents: runtime_tool_contents(turn, body),
             },
         )))
     }
@@ -487,17 +733,25 @@ pub async fn generate(
         Ok(token) => token,
         Err(error) => return gemini_error(error),
     };
-    let mode = state.gateway_svc.request_log_mode().await;
+    let config = state.gateway_svc.request_diagnostics_config().await;
     CURRENT_LOG_MODE
-        .scope(mode, async move {
+        .scope(config.mode, async move {
             let trace = state
                 .gateway_svc
                 .diagnostics_store()
                 .map(|store| TraceContext::for_protocol(store.clone(), "antigravity", "gemini"));
+            if let Some(trace) = trace.as_ref() {
+                trace.remember_ingress(
+                    request.headers(),
+                    &token.token,
+                    config.full_rejected_ingress,
+                );
+            }
             let guard = trace
                 .as_ref()
                 .map(|trace| RequestTraceGuard::new(trace.clone()));
-            let future = generate_inner(state, action, request, token);
+            let future =
+                generate_inner(state, action, request, token, config.full_rejected_ingress);
             let result = if let Some(trace) = trace {
                 CURRENT_TRACE.scope(trace, future).await
             } else {
@@ -526,8 +780,10 @@ async fn generate_inner(
     action: String,
     request: Request,
     token: ApiToken,
+    full_egress: bool,
 ) -> Result<Response, AppError> {
     let started = Instant::now();
+    let cutover = request.extensions().get::<InferenceCutover>().cloned();
     diagnostics::request_context("antigravity", "gemini", None);
     let (model, action) = action
         .rsplit_once(':')
@@ -559,11 +815,13 @@ async fn generate_inner(
     let raw = axum::body::to_bytes(request.into_body(), BODY_LIMIT)
         .await
         .map_err(|_| invalid("Gemini正文超过上限"))?;
+    diagnostics::remember_ingress_body(&raw);
     let mut body: Value =
         serde_json::from_slice(&raw).map_err(|_| invalid("Gemini正文必须为JSON"))?;
     if !body.is_object() || !body["contents"].is_array() {
         return Err(invalid("Gemini contents无效"));
     }
+    let media = requested_media(&body)?;
     let thinking_config = body
         .pointer("/generationConfig/thinkingConfig")
         .filter(|_| model.starts_with("gemini-"));
@@ -574,35 +832,41 @@ async fn generate_inner(
     let has_thinking_config = thinking_config.is_some();
     diagnostics::error_stage("account_selection");
     let continuation = state.gemini_svc.continuation(&token, model, &body)?;
-    let deadline = continuation
-        .as_ref()
-        .map(|(_, _, deadline, _)| *deadline)
-        .unwrap_or(started + Duration::from_secs(AGY_REQUEST_SECONDS as u64));
-    let (account, admission, mut claim, resolved_model) =
-        if let Some((account, admission, _, claim)) = continuation {
+    // 原工具轮按原截止完成。新一轮模型生成使用本次 HTTP 的时间预算。
+    let deadline = started + Duration::from_secs(AGY_REQUEST_SECONDS as u64);
+    let (account, admission, mut claim, resolved_model, scheduling) =
+        if let Some((account, admission, claim)) = continuation {
             let resolved_model = claim.resolved_model.clone();
-            (account, admission, Some(claim), resolved_model)
+            let current = if media.is_empty() {
+                account
+            } else {
+                state.account_svc.get_account(account.id).await?
+            };
+            let support = AccountService::agy_media_support(
+                &current,
+                &resolved_model,
+                &media,
+                current.agy_gif_frames_enabled,
+            );
+            if support != Some(true) {
+                return Err(AccountService::agy_media_error(&media, support.is_none()));
+            }
+            let scheduling =
+                state
+                    .account_svc
+                    .begin_agy_scheduling(token.id, &resolved_model, streaming);
+            scheduling.selected(&current, None);
+            (current, admission, Some(claim), resolved_model, scheduling)
         } else {
             let mut model_names = gemini_model_names(model, requested_tier);
             let accounts = state
                 .account_svc
-                .agy_candidates(&token, &model_names)
+                .agy_candidates(&token, &model_names, &media)
                 .await?;
-            let mut selected = None;
-            for (model_index, account) in accounts {
-                if state
-                    .account_svc
-                    .get_account_rpm_status(&account)
-                    .await?
-                    .saturated
-                {
-                    continue;
-                }
-                selected = Some((model_index, account));
-                break;
-            }
-            let (model_index, account) = selected
-                .ok_or_else(|| AppError::ServiceUnavailable("没有支持该模型的AGY账号".into()))?;
+            let (model_index, account, scheduling) = state
+                .account_svc
+                .select_agy_smart(token.id, &model_names, accounts, streaming)
+                .await?;
             let queue = state
                 .account_svc
                 .get_or_create_queue(account.id, account.concurrency)
@@ -624,16 +888,20 @@ async fn generate_inner(
                 admission,
                 None,
                 model_names.swap_remove(model_index),
+                scheduling,
             )
         };
+    scheduling.phase(RequestPhase::Preparing);
     let model = RoutedModel {
         requested: model.to_string(),
         resolved: resolved_model,
     };
+    let gif_frames = account.agy_gif_frames_enabled && media.contains("image/gif");
     diagnostics::selected_account(account.id);
     // 原工具收尾复用原许可和原进程；新AT发布单独检查ready，待对账期间也能完成旧工具。
     if let Some(claim) = &claim {
-        claim.finish(token.id, &body, deadline).await?;
+        diagnostics::error_stage("tool_continuation");
+        claim.finish(token.id, &body, deadline, gif_frames).await?;
     }
     diagnostics::error_stage("credentials");
     let snapshot = timeout_at(
@@ -643,7 +911,16 @@ async fn generate_inner(
     .await
     .map_err(|_| AppError::ServiceUnavailable("AGY凭据等待超时".into()))??;
     let current = state.account_svc.get_account(account.id).await?;
+    let media_support =
+        AccountService::agy_media_support(&current, &model.resolved, &media, gif_frames);
+    if media_support != Some(true) {
+        return Err(AccountService::agy_media_error(
+            &media,
+            media_support.is_none(),
+        ));
+    }
     let capture_requested = diagnostics::current_log_mode() == RequestLogMode::Debug;
+    let full_egress = capture_requested && full_egress;
     let ingress = native_capture::ingress(
         diagnostics::current_log_mode(),
         &ingress_headers,
@@ -662,6 +939,7 @@ async fn generate_inner(
     }
     let system_prompt_policy =
         AgySystemPromptPolicy::new(current.agy_system_prompt_homoglyph_enabled);
+    let disable_safety_filtering = current.agy_disable_safety_filtering;
     let native_model =
         AccountService::agy_model(&current, &model.resolved).ok_or(AppError::NotFound)?;
     diagnostics::error_stage("runtime_prepare");
@@ -708,9 +986,16 @@ async fn generate_inner(
         &body,
         streaming,
     );
+    if let Some(observer) = observation.as_mut() {
+        observer.track_scheduling(scheduling.clone());
+    }
     if let (Some(observer), Some((root, attempt))) = (observation.as_mut(), previous_turn) {
         observer.continuation(&root, &attempt);
     }
+    let client_contents = claim
+        .as_mut()
+        .and_then(|claim| claim.runtime_contents.take())
+        .map(|contents| replace(&mut body["contents"], contents));
     // 从此刻起提交状态可能未知；只允许原监督器确认结果，禁止自动重新领取工具回填。
     let completed_turn = claim.as_mut().and_then(|claim| claim.key.take());
     let upstream = transport
@@ -724,8 +1009,20 @@ async fn generate_inner(
             system_prompt_policy.clone(),
             deadline,
             capture_requested,
+            full_egress,
+            gif_frames,
+            disable_safety_filtering,
         )
         .await;
+    if let Some(key) = completed_turn {
+        // 回填已经收口，本次发送即使状态待对账，也不再保留原工具轮的并发许可。
+        state
+            .gemini_svc
+            .turns
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .remove(&key);
+    }
     let upstream = match upstream {
         Ok(response) => response,
         Err(error) => {
@@ -744,18 +1041,11 @@ async fn generate_inner(
         }
         return Err(AppError::ServiceUnavailable("AGY账号发送器拒绝请求".into()));
     }
-    if let Some(key) = completed_turn {
-        state
-            .gemini_svc
-            .turns
-            .lock()
-            .unwrap_or_else(|error| error.into_inner())
-            .remove(&key);
-    }
     let (sender, mut receiver) = mpsc::channel(2);
     let service = state.gemini_svc.clone();
     tokio::spawn(async move {
         let mut sender = Some(sender);
+        let closing = cutover.clone();
         let result = drive(
             upstream,
             service.clone(),
@@ -765,11 +1055,13 @@ async fn generate_inner(
             observation,
             streaming,
             capture_requested,
+            full_egress,
             ingress,
             token.id,
             current,
             model,
             body,
+            client_contents,
             deadline,
             admission,
             transport,
@@ -777,6 +1069,10 @@ async fn generate_inner(
             snapshot,
             native_model,
             system_prompt_policy,
+            gif_frames,
+            disable_safety_filtering,
+            scheduling,
+            cutover,
             &mut sender,
         )
         .await;
@@ -789,9 +1085,10 @@ async fn generate_inner(
             .turns
             .lock()
             .unwrap_or_else(|error| error.into_inner());
-        if turns
-            .get(&http_request_id)
-            .is_none_or(|turn| !turn.retained)
+        if closing.as_ref().is_some_and(InferenceCutover::is_cancelled)
+            || turns
+                .get(&http_request_id)
+                .is_none_or(|turn| !turn.retained)
         {
             turns.remove(&http_request_id);
         }
@@ -801,10 +1098,16 @@ async fn generate_inner(
         .map_err(|_| AppError::ServiceUnavailable("AGY响应超时".into()))?
         .ok_or_else(|| AppError::BadGateway("AGY响应提前结束".into()))??;
     if streaming {
-        let stream=futures_util::stream::once(async {Ok(first)}).chain(ReceiverStream::new(receiver)).map(|event| {
-            let value=match event {Ok(value)=>value,Err(_)=>json!({"error":{"code":503,"status":"UNAVAILABLE","message":"AGY原生请求失败"}})};
-            Ok::<Bytes,IoError>(Bytes::from(format!("data: {}\n\n",value)))
-        });
+        let stream = futures_util::stream::once(async { Ok(first) })
+            .chain(ReceiverStream::new(receiver))
+            .map(|event| {
+                let value = match event {
+                    Ok(value) => value,
+                    Err(error @ (AppError::AgyUpstreamQuota | AppError::AgyControl(_))) => gemini_error_body(error).1,
+                    Err(_) => json!({"error":{"code":503,"status":"UNAVAILABLE","message":"AGY原生请求失败"}}),
+                };
+                Ok::<Bytes, IoError>(Bytes::from(format!("data: {value}\n\n")))
+            });
         return Ok((
             [
                 ("content-type", "text/event-stream"),
@@ -862,6 +1165,34 @@ impl EventReader {
     }
 }
 
+/// 将私有工具等待回执换算为本机截止。@param event 原生完成事件。@param request_deadline 旧发送器使用的生成截止。@return 工具等待截止。
+fn tool_wait_deadline(event: &Value, request_deadline: Instant) -> Result<Instant, AppError> {
+    let Some(expires) = event.get("tool_wait_expires_at_ms") else {
+        return Ok(request_deadline);
+    };
+    let now = Instant::now();
+    let unix_ms = runtime_transport::now_ms();
+    let remaining = expires
+        .as_u64()
+        .and_then(|value| value.checked_sub(unix_ms))
+        .filter(|value| *value > 0)
+        .ok_or_else(|| AppError::BadGateway("AGY工具等待回执无效或已到期".into()))?;
+    // 远程发送器的时钟偏差不能扩大本地保留窗口。
+    Ok(now + Duration::from_millis(remaining).min(AGY_TOOL_WAIT_LIMIT))
+}
+
+/// 在同一请求截止内把帧交给下游。@param sender 下游通道。@param frame 已核验帧。@param deadline 请求截止。@return 交付结果。
+async fn send_gemini_frame(
+    sender: &mpsc::Sender<Result<Value, AppError>>,
+    frame: Value,
+    deadline: Instant,
+) -> Result<(), AppError> {
+    timeout_at(deadline, sender.send(Ok(frame)))
+        .await
+        .map_err(|_| AppError::BadGateway("客户端背压超时".into()))?
+        .map_err(|_| AppError::BadGateway("客户端已取消".into()))
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn drive(
     upstream: reqwest::Response,
@@ -872,11 +1203,13 @@ async fn drive(
     mut observation: Option<AgyAttemptTrace>,
     streaming: bool,
     capture_requested: bool,
+    full_egress: bool,
     ingress: Option<Value>,
     token_id: i64,
     account: Account,
     model: RoutedModel,
     body: Value,
+    mut client_contents: Option<Value>,
     deadline: Instant,
     admission: Arc<Admission>,
     transport: Arc<PreparedTransport>,
@@ -884,6 +1217,10 @@ async fn drive(
     mut snapshot: AgyAccessSnapshot,
     native_model: AgyModelId,
     system_prompt_policy: AgySystemPromptPolicy,
+    gif_frames: bool,
+    disable_safety_filtering: bool,
+    scheduling: SchedulingRequest,
+    mut cutover: Option<InferenceCutover>,
     sender: &mut Option<mpsc::Sender<Result<Value, AppError>>>,
 ) -> Result<(), AppError> {
     let mut reader = EventReader {
@@ -892,17 +1229,46 @@ async fn drive(
         deadline,
     };
     let mut calls = Vec::new();
+    let mut pending_tool_frames = Vec::new();
+    let mut pending_tool_bytes = 0;
     let mut completed = false;
     let mut attempt_id = initial_attempt_id;
     let mut attempted_recovery = false;
     let mut forwarded = 0;
     let mut policy_acknowledged = !system_prompt_policy.enabled;
     let mut ingress_sent = false;
+    let mut cutting_over = false;
     loop {
-        let event = if let Some(channel) = sender.as_ref() {
-            tokio::select! {event=reader.next()=>event?, _=channel.closed()=>{if let Some(observer)=observation.as_mut(){observer.finish("cancelled",Some("downstream_body"));}return Err(AppError::BadGateway("客户端已取消".into()));}}
-        } else {
-            reader.next().await?
+        let event = tokio::select! {
+            biased;
+            _ = async {
+                match cutover.as_mut() {
+                    Some(signal) => signal.cancelled().await,
+                    None => std::future::pending().await,
+                }
+            }, if !cutting_over => {
+                if let Some(observer) = observation.as_mut() {
+                    observer.finish("cancelled", Some("system_update"));
+                }
+                sender.take();
+                // 先断开客户端。保留原私有流核对 job_finalized，给宿主最后的状态核对留出时间。
+                reader.deadline = Instant::now() + Duration::from_secs(25);
+                transport.cancel_agy(&attempt_id, token_id, reader.deadline).await?;
+                cutting_over = true;
+                continue;
+            }
+            _ = async {
+                match sender.as_ref() {
+                    Some(channel) => channel.closed().await,
+                    None => std::future::pending().await,
+                }
+            } => {
+                if let Some(observer) = observation.as_mut() {
+                    observer.finish("cancelled", Some("downstream_body"));
+                }
+                return Err(AppError::BadGateway("客户端已取消".into()));
+            }
+            event = reader.next() => event?,
         };
         let Some(event) = event else {
             break;
@@ -914,10 +1280,19 @@ async fn drive(
             if let Some(observer) = observation.as_mut() {
                 observer.finalized(event["status"].as_str().unwrap_or("error"));
             }
-            if !completed {
+            if !completed && !cutting_over {
                 return Err(AppError::BadGateway("AGY缺少原生终态".into()));
             }
             return Ok(());
+        }
+        if cutting_over {
+            if event["type"] == "native_event"
+                && event["event"]["type"] == "tool_turn_finalized"
+                && let Some(observer) = observation.as_mut()
+            {
+                observer.tool_finalized(event["event"]["status"].as_str().unwrap_or("error"));
+            }
+            continue;
         }
         if event["type"] == "rejected" {
             if event["code"] == "stale_credential_generation" {
@@ -1009,6 +1384,16 @@ async fn drive(
                     observer.frame(&frame);
                 }
                 if frame.get("error").is_some() {
+                    if frame["error"]["code"] == 429
+                        && frame["error"]["status"] == "RESOURCE_EXHAUSTED"
+                        && frame.get("candidates").is_none()
+                        && frame.get("usageMetadata").is_none()
+                    {
+                        if let Some(observer) = observation.as_mut() {
+                            observer.upstream_quota();
+                        }
+                        return Err(AppError::AgyUpstreamQuota);
+                    }
                     if !verified_auth_failure(&frame)
                         || attempted_recovery
                         || completed
@@ -1070,6 +1455,9 @@ async fn drive(
                         &body,
                         streaming,
                     );
+                    if let Some(observer) = observation.as_mut() {
+                        observer.track_scheduling(scheduling.clone());
+                    }
                     tracing::info!(
                         platform = "antigravity",
                         account_id = account.id,
@@ -1089,6 +1477,9 @@ async fn drive(
                             system_prompt_policy.clone(),
                             deadline,
                             capture_requested,
+                            full_egress,
+                            gif_frames,
+                            disable_safety_filtering,
                         )
                         .await?;
                     if let Some(observer) = observation.as_mut() {
@@ -1121,22 +1512,42 @@ async fn drive(
                         }
                     }
                 }
+                if !calls.is_empty() {
+                    // 首个调用后的帧须等整轮归属确认，之前的内容继续即时发送。
+                    pending_tool_bytes += raw.len();
+                    if pending_tool_bytes > FRAME_LIMIT {
+                        return Err(AppError::BadGateway("AGY工具响应超过聚合上限".into()));
+                    }
+                    pending_tool_frames.push(frame);
+                    continue;
+                }
                 if let Some(sender) = sender.as_ref() {
-                    timeout_at(deadline, sender.send(Ok(frame)))
-                        .await
-                        .map_err(|_| AppError::BadGateway("客户端背压超时".into()))?
-                        .map_err(|_| AppError::BadGateway("客户端已取消".into()))?;
+                    send_gemini_frame(sender, frame, deadline).await?;
                     forwarded += 1;
                 }
             }
             Some("completed") => {
-                if let Some(observer) = observation.as_mut() {
-                    observer.completed(native["native_tool_pending"] == true, &calls);
+                let tool_pending = native["native_tool_pending"] == true;
+                let has_calls = !calls.is_empty();
+                if tool_pending != has_calls {
+                    return Err(AppError::BadGateway("AGY工具调用归属未确认".into()));
                 }
-                if native["native_tool_pending"] == true {
-                    if calls.is_empty() {
-                        return Err(AppError::BadGateway("工具调用归属缺失".into()));
+                let tool_deadline = tool_pending
+                    .then(|| tool_wait_deadline(native, deadline))
+                    .transpose()?;
+                if streaming && pending_tool_frames.len() > 1 {
+                    // AstrBot 在首条工具事件后停止读取，必须一次交付本轮的全部调用。
+                    let mut response = Value::Null;
+                    for frame in pending_tool_frames.drain(..) {
+                        aggregate(&mut response, frame)?;
                     }
+                    pending_tool_frames.push(response);
+                }
+                if let Some(observer) = observation.as_mut() {
+                    observer.completed(tool_pending, &calls);
+                }
+                if let Some(tool_deadline) = tool_deadline {
+                    reader.deadline = tool_deadline;
                     service
                         .turns
                         .lock()
@@ -1147,21 +1558,27 @@ async fn drive(
                                 token_id,
                                 account: account.clone(),
                                 model: model.clone(),
-                                contents: body["contents"].clone(),
+                                runtime_contents: client_contents
+                                    .as_ref()
+                                    .map(|_| body["contents"].clone()),
+                                contents: client_contents
+                                    .take()
+                                    .unwrap_or_else(|| body["contents"].clone()),
                                 calls: calls.clone(),
-                                deadline,
+                                deadline: tool_deadline,
                                 admission: admission.clone(),
                                 transport: transport.clone(),
                                 previous_request_id: attempt_id.clone(),
                                 receipt_body: None,
                                 retained: false,
                                 claimed: false,
+                                cutover: cutover.clone(),
                             },
                         );
                     let weak = Arc::downgrade(&service);
                     let id = request_id.to_string();
                     tokio::spawn(async move {
-                        sleep_until(deadline).await;
+                        sleep_until(tool_deadline).await;
                         if let Some(service) = weak.upgrade() {
                             service
                                 .turns
@@ -1170,26 +1587,45 @@ async fn drive(
                                 .remove(&id);
                         }
                     });
+                    if let Some(sender) = sender.as_ref() {
+                        for frame in pending_tool_frames.drain(..) {
+                            send_gemini_frame(sender, frame, deadline).await?;
+                        }
+                    }
                 }
                 completed = true;
                 sender.take();
             }
-            Some("rejected") => return Err(invalid("AGY请求包含当前内核不支持的结构")),
+            Some("rejected") => {
+                let error = agy_input_rejection(native["code"].as_str().unwrap_or_default());
+                if let Some(observer) = observation.as_mut() {
+                    observer.input_rejected(&error);
+                }
+                return Err(error);
+            }
             Some("tool_turn_finalized") => {
                 if let Some(observer) = observation.as_mut() {
                     observer.tool_finalized(native["status"].as_str().unwrap_or("error"));
                 }
             }
             Some("error" | "cancelled") => {
+                let cancelled = native["type"] == "cancelled";
+                if !cancelled && native["upstream_http_status"] == 429 {
+                    if let Some(observer) = observation.as_mut() {
+                        observer.upstream_quota();
+                    }
+                    return Err(AppError::AgyUpstreamQuota);
+                }
+                // 只有失败终态附带的 4xx/5xx 才能覆盖网关的兜底状态。
+                let status = native["control_http_status"]
+                    .as_u64()
+                    .filter(|status| !cancelled && (400..600).contains(status))
+                    .and_then(|status| StatusCode::from_u16(status as u16).ok());
                 if let Some(observer) = observation.as_mut() {
-                    observer.finish(
-                        if native["type"] == "cancelled" {
-                            "cancelled"
-                        } else {
-                            "upstream_error"
-                        },
-                        Some("native_control"),
-                    );
+                    observer.control_failed(status.map(|code| code.as_u16()), cancelled);
+                }
+                if let Some(status) = status {
+                    return Err(AppError::AgyControl(status));
                 }
                 return Err(AppError::BadGateway("AGY原生请求失败".into()));
             }
@@ -1197,6 +1633,115 @@ async fn drive(
         }
     }
     Err(AppError::BadGateway("AGY原生作业提前结束".into()))
+}
+
+/// 投影受信发送器的输入错误。@param code 私有分类和字段。@return 允许公开的错误。
+pub(crate) fn agy_input_rejection(code: &str) -> AppError {
+    let (kind, field) = code.split_once(':').map_or((code, ""), |parts| parts);
+    let (reason, message) = match kind {
+        "invalid_gemini_media" => ("AGY_INVALID_MEDIA", "内嵌媒体的结构或数据无效"),
+        "unsupported_gemini_media_type" => {
+            ("AGY_UNSUPPORTED_MEDIA_TYPE", "AGY 入口不支持该媒体类型")
+        }
+        "gif_conversion_limit" => (
+            "AGY_GIF_CONVERSION_LIMIT",
+            "GIF 抽帧超过帧数、像素或请求大小上限",
+        ),
+        "invalid_gemini_png" => ("AGY_INVALID_PNG", "内嵌 PNG 的结构或数据无效"),
+        "unsupported_gemini_image_type" => {
+            ("AGY_UNSUPPORTED_IMAGE_TYPE", "AGY 内嵌图片仅支持 image/png")
+        }
+        "ambiguous_or_unknown_function_response"
+        | "missing_function_response"
+        | "invalid_gemini_function_response_order"
+        | "invalid_function_response"
+        | "invalid_gemini_function_call"
+        | "invalid_gemini_function_call_order"
+        | "gemini_pending_history_mismatch"
+        | "gemini_pending_turn_mismatch"
+        | "gemini_pending_call_mismatch"
+        | "gemini_pending_results_mismatch" => {
+            ("AGY_TOOL_RESULT_MISMATCH", "工具调用和回填结果无法对应")
+        }
+        _ => ("AGY_UNSUPPORTED_INPUT", "AGY请求包含当前内核不支持的结构"),
+    };
+    // 私有异常可能含调用方自定义字段，公开路径仅投影固定前缀和数组位置。
+    let content_field = field.strip_prefix("/body/contents/").and_then(|rest| {
+        let mut parts = rest.split('/');
+        let index = parts.next()?.parse::<usize>().ok()?;
+        let mut field = format!("contents[{index}]");
+        if parts.next() == Some("parts") {
+            let part = parts.next()?.parse::<usize>().ok()?;
+            field.push_str(&format!(".parts[{part}]"));
+            if let Some(
+                key @ ("inlineData" | "inline_data" | "functionCall" | "functionResponse"),
+            ) = parts.next()
+            {
+                field.push('.');
+                field.push_str(key);
+            }
+        }
+        Some(field)
+    });
+    let field = content_field.or_else(|| {
+        let mut parts = field.strip_prefix("/body/").unwrap_or_default().split('/');
+        let known = match parts.next().unwrap_or_default() {
+            "generationConfig" => match parts.next() {
+                Some(
+                    key @ ("candidateCount"
+                    | "enableEnhancedCivicAnswers"
+                    | "frequencyPenalty"
+                    | "imageConfig"
+                    | "logprobs"
+                    | "maxOutputTokens"
+                    | "mediaResolution"
+                    | "presencePenalty"
+                    | "responseJsonSchema"
+                    | "responseLogprobs"
+                    | "responseMimeType"
+                    | "responseModalities"
+                    | "responseSchema"
+                    | "seed"
+                    | "speechConfig"
+                    | "stopSequences"
+                    | "temperature"
+                    | "thinkingConfig"
+                    | "thinking_config"
+                    | "topK"
+                    | "topP"),
+                ) => {
+                    return Some(format!("generationConfig.{key}"));
+                }
+                _ => "generationConfig",
+            },
+            "cachedContent" => "cachedContent",
+            "contents" => "contents",
+            "requests" => "requests",
+            "safetySettings" => "safetySettings",
+            "systemInstruction" => "systemInstruction",
+            "toolConfig" => "toolConfig",
+            "tools" => "tools",
+            _ => match kind {
+                "invalid_gemini_max_output_tokens" => "generationConfig.maxOutputTokens",
+                "invalid_gemini_safety_settings"
+                | "unsupported_gemini_safety_settings"
+                | "unsupported_partial_safety_settings" => "safetySettings",
+                "unsupported_gemini_tool_mode" => "toolConfig.functionCallingConfig.mode",
+                "invalid_system_parts" | "unsupported_system_role" => "systemInstruction",
+                "invalid_gemini_tools" => "tools",
+                "invalid_gemini_contents"
+                | "invalid_gemini_thought_signature"
+                | "unsupported_gemini_last_role" => "contents",
+                _ => return None,
+            },
+        };
+        Some(known.into())
+    });
+    AppError::AgyInput {
+        reason,
+        message,
+        field,
+    }
 }
 
 /// 只识别原生Google源帧的完整认证错误。@param frame 原始Gemini逻辑帧。@return 是否明确401认证失败。

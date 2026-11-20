@@ -139,6 +139,7 @@ const primeLogs = ref<PrimeLogEntry[]>([]);
 const logsLoading = ref(false);
 
 const requestDiagnosticsMode = ref('info');
+const requestDiagnosticsRejectedBody = ref('preview');
 const saving = ref(false);
 const loaded = ref(false);
 
@@ -559,6 +560,7 @@ async function loadSettings() {
     interceptCliBgStatusClassifierIdentityInjectionEnabled.value =
       (data.intercept_cli_bg_status_classifier_identity_injection_enabled ?? 'false') === 'true';
     requestDiagnosticsMode.value = data.request_diagnostics_log_mode === 'debug' ? 'debug' : 'info';
+    requestDiagnosticsRejectedBody.value = data.request_diagnostics_rejected_body === 'full' ? 'full' : 'preview';
     savedValues.value = readValues();
     loaded.value = true;
   } catch (e) {
@@ -752,6 +754,7 @@ const fieldBindings: Record<string, {get: () => string;set: (value: string) => v
   session_policy_block_enabled: {get: () => sessionPolicyBlockEnabled.value ? 'true' : 'false', set: value => {sessionPolicyBlockEnabled.value = value==='true';}},
   session_policy_block_duration_minutes: {get: () => formString(sessionPolicyBlockMinutes.value), set: value => {sessionPolicyBlockMinutes.value=value;}},
   request_diagnostics_log_mode: {get: () => requestDiagnosticsMode.value, set: value => {requestDiagnosticsMode.value = value;}},
+  request_diagnostics_rejected_body: {get: () => requestDiagnosticsRejectedBody.value, set: value => {requestDiagnosticsRejectedBody.value = value;}},
 };
 const savedValues = ref<Record<string,string>>({});
 const settingsQuery = ref('');

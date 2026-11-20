@@ -11,6 +11,7 @@ services:
       V3_ACCOUNT_RELEASE: ${V3_ACCOUNT_RELEASE:?需要精确账号镜像来源}
       V3_UPDATE_GATE_DIR: /run/v3-updates/gate
       V3_UPDATE_SOCKET_DIR: /run/v3-updates/socket
+      V3_PREPARED_PROJECT_LIBRARY_IMAGE: ${V3_PREPARED_PROJECT_LIBRARY_IMAGE:-}
     volumes:
       - ${V3_UPDATE_ROOT}/gate:/run/v3-updates/gate:ro
       - ${V3_UPDATE_ROOT}/socket:/run/v3-updates/socket:ro

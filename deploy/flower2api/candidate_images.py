@@ -11,11 +11,12 @@ import manage
 from agy_auth import require_auth_asset
 from release_ci import validate_publish_source
 from runtime_names import image_reference
-from system_update_contract import MANIFEST_LIMIT, MAX_BUNDLE_BYTES, REPOSITORY, safe_read, strict_json
+from system_update_contract import MANIFEST_LIMIT, MAX_BUNDLE_BYTES, REPOSITORY, safe_read, strict_json, validate_migration_evidence
 
 MANIFEST_NAME = 'v3-local.json'
 BUNDLE_NAME = 'candidate-images.tar.gz'
 METADATA_NAME = 'candidate.json'
+EVIDENCE_NAME = 'database-compatibility.json'
 
 
 def build_identity() -> dict:
@@ -115,12 +116,13 @@ def validate_candidate_files(folder: Path, identity: dict) -> dict:
     return manifest
 
 
-def adopt_candidate(folder: Path, identity: dict, manifest_path: Path) -> dict:
+def adopt_candidate(folder: Path, identity: dict, manifest_path: Path, *, evidence_path: Path | None = None) -> dict:
     """加载已核对来源和归档摘要的候选，仅修改本次手动发行的批次标签。
 
     :param folder: 已完成来源和文件摘要核验的候选目录。
     :param identity: 从GitHub工作流元数据核对的原构建身份。
     :param manifest_path: 全新正式本地清单路径。
+    :param evidence_path: 可选的换批后候选演练证据输出。
     :return: 当前手动发布批次的完整本地清单。
     """
     release = validate_publish_source()
@@ -165,4 +167,20 @@ def adopt_candidate(folder: Path, identity: dict, manifest_path: Path) -> dict:
         manage._write_new_json(staged, current)
         manage.inspect_images(manage._manifest_values(staged))
         os.link(staged, manifest_path)
+    if evidence_path is not None and (folder / EVIDENCE_NAME).exists():
+        from system_release import data_contracts
+
+        try:
+            evidence = strict_json(safe_read(folder / EVIDENCE_NAME, MANIFEST_LIMIT), MANIFEST_LIMIT)
+            validate_migration_evidence(evidence, {
+                'control': {**manifest['images']['control'], 'revision': manifest['parent_revision']},
+                'account': manifest['images']['account'],
+                'data_compatibility': {name: {'contract': contract} for name, contract in data_contracts(manage.REPO).items()},
+            })
+        except ValueError as error:
+            print(f'候选兼容证据不匹配，正式发布将重新演练：{error}')
+        else:
+            # 文件层与执行配置已经逐项核对，仅重新绑定发行标签产生的新摘要。
+            evidence['images'] = {role: entry['config_digest'] for role, entry in current['images'].items()}
+            manage._write_new_json(evidence_path, evidence)
     return current

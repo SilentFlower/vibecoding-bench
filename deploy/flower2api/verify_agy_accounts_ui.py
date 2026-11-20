@@ -96,7 +96,8 @@ async def main():
         await expect(first.locator('.agy-gateway-windows')).to_have_count(0)
         await expect(first.locator('.account-work-status')).to_have_count(0)
         await expect(second.locator('.agy-account-usage')).to_contain_text('未刷新')
-        await expect(first.locator('.account-routing')).to_contain_text('低负载优先')
+        # 反重力账号与 CC 账号同样按调度优先级展示并进入调度详情（主线 aa2ad36e 起不再显示「低负载优先」）。
+        await expect(first.locator('.account-routing')).to_contain_text('调度优先级')
         await expect(first.locator('.account-live-metrics button')).to_have_count(4)
         await expect(first.locator('.account-live-metrics button').nth(1)).to_contain_text('5')
         await expect(first.locator('.account-live-metrics button').nth(3)).to_contain_text('在途请求')
@@ -129,9 +130,10 @@ async def main():
         await expect(dialog.locator('.account-provider-details')).to_contain_text('演示 Pro')
         await expect(dialog.locator('.account-provider-details')).to_contain_text('合成分级')
         await expect(dialog.locator('.account-provider-details pre')).to_have_count(0)
-        # 工作区页签为分段控件（role=radio）；反重力账号没有调度页签。
+        # 工作区页签为分段控件（role=radio）；反重力账号同样有调度页签，概览「调度详情」可进入。
         await expect(dialog.locator('.account-workspace-tabs').get_by_role('radio',name='环境与诊断',exact=True)).to_have_count(1)
-        await expect(dialog.locator('.account-workspace-tabs').get_by_role('radio',name='调度')).to_have_count(0)
+        await expect(dialog.locator('.account-workspace-tabs').get_by_role('radio',name='调度')).to_have_count(1)
+        await expect(dialog.get_by_role('button',name='调度详情')).to_have_count(1)
         await page.keyboard.press('Escape')
         await first.get_by_role('button',name='编辑',exact=True).click()
         await dialog.get_by_role('button',name='重新授权',exact=True).click()

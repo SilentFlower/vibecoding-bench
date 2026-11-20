@@ -1,4 +1,5 @@
 """使用真实SQLite验证AGY环境归属、预算、采集CAS与维护门禁。"""
+import hashlib
 import json
 import os
 import sqlite3
@@ -10,7 +11,8 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from account_runtime import AccountRuntime, derive_v3_fingerprint
-from agy_environment import SOURCE_SHA256, capture, lookup, lookup_environment, maintenance, quiesce, register, sender_config, transport
+from agy_environment import SOURCE_SHA256, capture, lookup, lookup_environment, maintenance, quiesce, register, sender_config, summary, transport
+from agy_kernel import activate, catalog, module_root, selection, stage, work_root
 from cluster_service import ClusterService
 from cluster_store import ClusterStore
 from database_migrations import apply_migrations, migration_plan
@@ -59,6 +61,22 @@ class AgyEnvironmentTests(unittest.TestCase):
             self.assertEqual(migration_plan(connection)['current_version'],5)
         finally:
             connection.close()
+
+    def test_stopped_environment_shows_configured_local_node(self):
+        """停止的环境也显示本机归属，实际进程状态沿原取值。@return 无。"""
+        row = register(self.runtime, 17)
+        connection = self.database()
+        try:
+            connection.execute("UPDATE cluster_nodes SET name=? WHERE node_key='local'", ('合成中央节点',))
+            node_id = connection.execute("SELECT id FROM cluster_nodes WHERE node_key='local'").fetchone()['id']
+            connection.commit()
+        finally:
+            connection.close()
+        with patch.object(self.runtime, 'role_status', return_value={'sender': 'stopped'}):
+            result = summary(self.runtime, row)
+        self.assertEqual(result['node'], {'node_id': node_id, 'node_key': 'local',
+            'node_name': '合成中央节点', 'kind': 'local', 'enabled': True})
+        self.assertEqual(result['agy_runtime']['state'], 'sleeping')
 
     def test_finite_resources_stay_inside_original_total(self):
         """AGY物理进程上限沿账号并发，有限RAM不足在创建前拒绝。@return 无。"""
@@ -115,6 +133,83 @@ class AgyEnvironmentTests(unittest.TestCase):
             self.assertEqual(transport(self.runtime,17),binding)
             self.assertEqual(transport(self.runtime,17,wake=False),binding)
         self.runtime._make_room.assert_not_called()
+
+    def test_kernel_stage_activation_and_rollback_are_bound_to_one_environment(self):
+        """验证另一环境隔离、旧代次、活动工具及失败探测均保持原选择。@return 无。"""
+        first = register(self.runtime, 17)
+        second = register(self.runtime, 18)
+        self.runtime._update(first, generation=3)
+        folders = {}
+        for row in (first, second):
+            folder = self.runtime._root(row) / 'runtime/sender'
+            folder.mkdir(parents=True)
+            folders[row['environment_id']] = folder
+            atomic_json(folder / 'sender.json', {'binding': {
+                'account_id': row['gateway_account_id'], 'environment_id': row['environment_id'],
+                'generation': row['generation'], 'release_id': 'original'},
+                'agy': {'module_root': module_root(None), 'work_root': work_root(None)}})
+        source = self.root / 'candidate'
+        resources = source / 'resources'
+        resources.mkdir(parents=True)
+        for name in ('__init__.py', 'kernel.py', 'supervisor.py', 'storage.py'):
+            (source / name).write_text('# 合成候选\n')
+        hashes = {}
+        for name in ('observer-c', 'relocation_reclaim.so'):
+            (resources / name).write_bytes(b'synthetic')
+            hashes['resources/' + name] = hashlib.sha256(b'synthetic').hexdigest()
+        atomic_json(resources / 'admission.json', {'source_sha256': SOURCE_SHA256, 'resource_hashes': hashes})
+        folder = folders[first['environment_id']]
+        candidate = stage(source, folder)
+        self.assertEqual(stage(source, folder), candidate)
+        self.assertEqual(catalog(self.runtime, first)['candidates'], [candidate])
+        self.assertEqual(catalog(self.runtime, second)['candidates'], [])
+        self.assertIsNone(selection(self.runtime, first))
+        change = {'expected_generation': 3, 'expected_kernel': None, 'kernel': candidate}
+        with self.assertRaisesRegex(ValueError, '代次'):
+            activate(self.runtime, first, {**change, 'expected_generation': 2}, None)
+        with self.assertRaisesRegex(ValueError, '不存在'):
+            activate(self.runtime, second, {**change, 'expected_generation': second['generation']}, None)
+        self.runtime.gateway._request.assert_not_called()
+
+        def lease(method, path, body):
+            self.assertEqual((method, path), ('POST', '/admin/runtime/accounts/17/lease'))
+            return {'lease': {'owner': body['owner'], 'generation': 'lease-3',
+                'phase': 'claimed' if body['operation'] == 'claim' else 'preparing'}, 'active': 0, 'waiting': 0}
+
+        self.runtime.gateway._request.side_effect = lease
+        self.runtime._running_sender_active = Mock(return_value=1)
+        self.runtime._write_sender_config = Mock(side_effect=lambda row, config: atomic_json(
+            folders[row['environment_id']] / 'sender.json', config))
+        sender = Mock()
+        with self.assertRaisesRegex(ValueError, '工具'):
+            activate(self.runtime, first, change, sender)
+        sender.exec_run.assert_not_called()
+        self.assertEqual(self.runtime.gateway._request.call_args.args[2]['operation'], 'release')
+        self.runtime._running_sender_active.return_value = 0
+        sender.exec_run.return_value.exit_code = 1
+        with self.assertRaisesRegex(ValueError, '启动检查'):
+            activate(self.runtime, first, change, sender)
+        self.runtime._write_sender_config.assert_not_called()
+        self.assertEqual(self.runtime.gateway._request.call_args.args[2]['operation'], 'release')
+
+        sender.exec_run.return_value.exit_code = 0
+        self.assertEqual(activate(self.runtime, first, change, sender)['kernel'], candidate)
+        self.assertEqual(sender.exec_run.call_args.kwargs['user'], '1001:1001')
+        self.assertEqual(self.runtime.read_sender_configuration(first)['agy']['work_root'], work_root(candidate))
+        self.assertEqual(selection(self.runtime, first, release='original'), candidate)
+        self.assertIsNone(selection(self.runtime, first, release='new-platform'))
+        self.assertIsNone(selection(self.runtime, second))
+        with self.assertRaisesRegex(ValueError, '内核已变化'):
+            activate(self.runtime, first, change, sender)
+        self.assertIsNone(activate(self.runtime, first, {**change, 'expected_kernel': candidate, 'kernel': None}, sender)['kernel'])
+        self.assertEqual(self.runtime.read_sender_configuration(first)['agy']['work_root'], work_root(None))
+
+        target = folder / 'agy-kernels' / candidate / 'agy_runtime/kernel.py'
+        target.chmod(0o644)
+        target.write_text('# 已变更\n')
+        with self.assertRaisesRegex(ValueError, '校验失败'):
+            activate(self.runtime, first, change, sender)
+        self.assertIsNone(selection(self.runtime, first))
 
     def test_configuration_quiesce_checks_native_activity_before_stopping(self):
         """配置事务沿原网关门禁，并用物理活动补充重启后计数。@return 无。"""

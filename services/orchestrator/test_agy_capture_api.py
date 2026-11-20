@@ -65,6 +65,13 @@ class AgyCaptureApiTests(unittest.TestCase):
         self.assertEqual(response.status_code,200,response.text)
         value=self.client.get(f'/internal/v3/native-captures/17/{self.attempt}?platform=antigravity',headers=self.headers).json()
         self.assertEqual(value['ingress']['source'],'gateway_http_ingress')
+        (self.capture/'snapshots'/(self.attempt+'.json')).unlink()
+        response=self.client.get(f'/internal/v3/native-captures/17/{self.attempt}?platform=antigravity',headers=self.headers)
+        self.assertEqual(response.status_code,200,response.text)
+        value=response.json()
+        self.assertEqual(value['stage'],'agy_ingress')
+        self.assertEqual(value['ingress'],ingress)
+        self.assertEqual([stage['stage'] for stage in value['stages']],['ingress'])
         self.runtime.client.containers.run.assert_not_called()
 
 

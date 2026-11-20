@@ -1,18 +1,22 @@
 //! 在既有账号服务中按平台适配原生凭据，CC 调用保持原路径。
+use std::collections::BTreeSet;
+
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
 use super::{
-    AccountService, OAUTH_LOCK_TTL, OAUTH_WAIT_ATTEMPTS, OAUTH_WAIT_RETRY,
-    build_oauth_credential_snapshot, validate_account_usage_limits,
+    AccountService, DEFAULT_REQUEST_SLOT_UNITS, OAUTH_LOCK_TTL, OAUTH_WAIT_ATTEMPTS,
+    OAUTH_WAIT_RETRY, build_oauth_credential_snapshot, validate_account_usage_limits,
 };
 use crate::error::AppError;
 use crate::model::account::{Account, AccountAuthType, AccountStatus};
 use crate::model::api_token::ApiToken;
 use crate::model::proxy::ProxyConnection;
+use crate::model::request_diagnostics::DiagnosticParameters;
 use crate::service::agy_contract::{AGY_REQUEST_SECONDS, AgyAccessSnapshot, AgyModelId};
 use crate::service::runtime_bridge::agy_request;
+use crate::service::v3_scheduling::{SchedulingCandidate, SchedulingRequest};
 use tokio::time::sleep;
 
 // AGY 1.5.9 离线启动实测在剩余 299 秒时要求登录，310 秒时可就绪。
@@ -174,17 +178,20 @@ impl AccountService {
         Err(AppError::ServiceUnavailable("AGY凭据解析等待超时".into()))
     }
 
-    /// 按令牌权限和真实模型映射读取候选。@param token 当前令牌。@param models 按优先级排列的公开名，空列表用于读取目录。@return 合资格账号及命中的模型位置。
+    /// 按令牌权限和真实模型映射读取候选。@param token 当前令牌。@param models 按优先级排列的公开名，空列表用于读取目录。@param media 请求包含的内嵌媒体类型。@return 合资格账号及命中的模型位置。
     pub async fn agy_candidates(
         &self,
         token: &ApiToken,
         models: &[String],
+        media: &BTreeSet<&str>,
     ) -> Result<Vec<(usize, Account)>, AppError> {
         let allowed = token.allowed_account_ids();
         let blocked = token.blocked_account_ids();
         let mut result = Vec::new();
         let mut has_catalog = false;
         let mut has_model = false;
+        let mut media_rejected = false;
+        let mut media_unknown = false;
         for account in self.store.list_all_platforms().await? {
             if !account.is_antigravity()
                 || blocked.contains(&account.id)
@@ -215,22 +222,109 @@ impl AccountService {
             {
                 continue;
             }
-            if self.store.agy_credential_state(account.id).await?.phase == "ready" {
-                result.push((model_index, account));
+            if self.store.agy_credential_state(account.id).await?.phase != "ready" {
+                continue;
             }
+            let model_index = if !media.is_empty() {
+                let supported =
+                    models
+                        .iter()
+                        .enumerate()
+                        .skip(model_index)
+                        .find_map(|(index, name)| {
+                            Self::agy_model(&account, name)?;
+                            match Self::agy_media_support(
+                                &account,
+                                name,
+                                media,
+                                account.agy_gif_frames_enabled,
+                            ) {
+                                Some(true) => Some(index),
+                                Some(false) => None,
+                                None => {
+                                    media_unknown = true;
+                                    None
+                                }
+                            }
+                        });
+                let Some(index) = supported else {
+                    media_rejected = true;
+                    continue;
+                };
+                index
+            } else {
+                model_index
+            };
+            result.push((model_index, account));
         }
         if has_catalog && !has_model {
             return Err(AppError::NotFound);
         }
-        let counts = self.active_request_counts().await;
-        result.sort_by_key(|(model_index, account)| {
-            (
-                *model_index,
-                counts.get(&account.id).copied().unwrap_or(0),
-                account.id,
-            )
-        });
+        if result.is_empty() && media_rejected {
+            return Err(Self::agy_media_error(media, media_unknown));
+        }
+        result.sort_by_key(|(model_index, _)| *model_index);
         Ok(result)
+    }
+
+    /// 为反重力实际选定的模型冻结同类延迟分组。@param token_id 调用方。@param model 实际公开档位。@param streaming 是否流式。@return 请求调度租约。
+    pub(crate) fn begin_agy_scheduling(
+        &self,
+        token_id: i64,
+        model: &str,
+        streaming: bool,
+    ) -> SchedulingRequest {
+        self.selection_scheduler.begin_with_parameters(
+            token_id,
+            None,
+            &DiagnosticParameters {
+                model: Some(model.into()),
+                stream: Some(streaming),
+                ..Default::default()
+            },
+        )
+    }
+
+    /// 先选仍可接单的模型档位，再沿共享的优先级、容量和智能评分择号。@param token_id 调用方。@param models 已排序模型名。@param accounts 已通过模型和权限校验的候选。@param streaming 是否流式。@return 实际档位、账号和调度租约。
+    pub(crate) async fn select_agy_smart(
+        &self,
+        token_id: i64,
+        models: &[String],
+        accounts: Vec<(usize, Account)>,
+        streaming: bool,
+    ) -> Result<(usize, Account, SchedulingRequest), AppError> {
+        let mut tier = None;
+        let mut candidates = Vec::new();
+        for (index, account) in accounts {
+            if tier.is_some_and(|first| first != index) {
+                break;
+            }
+            let control = self.work_controls.snapshot(account.id).await?;
+            if !control.api_accepting
+                || !control.work_enabled
+                || self.get_account_rpm_status(&account).await?.saturated
+            {
+                continue;
+            }
+            tier = Some(index);
+            let capacity = self.get_account_capacity_info(&account).await;
+            candidates.push(SchedulingCandidate {
+                account,
+                active_units: capacity.current_concurrency_units,
+                max_units: capacity.max_concurrency_units,
+                queued: capacity.queued,
+                queued_units: capacity.queued_request_units,
+                next_send_ms: 0,
+            });
+        }
+        let index =
+            tier.ok_or_else(|| AppError::ServiceUnavailable("没有支持该模型的AGY账号".into()))?;
+        let request = self.begin_agy_scheduling(token_id, &models[index], streaming);
+        let account =
+            self.selection_scheduler
+                .choose(candidates, &request, DEFAULT_REQUEST_SLOT_UNITS)?;
+        request.selected(&account, None);
+        Ok((index, account, request))
     }
 
     /// 读取已观测的公开模型和原生枚举对应。@param account 原账号。@param model 公开名。@return 经结构校验的原生ID。
@@ -242,6 +336,55 @@ impl AccountService {
             .get(model)?;
         let identifier: AgyModelId = serde_json::from_value(value.clone()).ok()?;
         identifier.is_valid().then_some(identifier)
+    }
+
+    /// 核对同一实际型号是否识别所有将发送的附件。@param account 已绑定账号。@param model 实际型号。@param media 输入 MIME。@param gif_frames 是否转换 GIF。@return 支持、拒绝或未知。
+    pub(crate) fn agy_media_support(
+        account: &Account,
+        model: &str,
+        media: &BTreeSet<&str>,
+        gif_frames: bool,
+    ) -> Option<bool> {
+        let capabilities = &account.usage_data["capabilities"];
+        let mut known = true;
+        for &input in media {
+            let mime = if input == "image/gif" && gif_frames {
+                "image/png"
+            } else {
+                input
+            };
+            let mut support = capabilities["media_inputs"][model][mime].as_bool();
+            if support.is_none() && mime == "image/png" {
+                support = capabilities["png_inputs"][model].as_bool();
+            }
+            match support {
+                Some(false) => return Some(false),
+                None => known = false,
+                Some(true) => {}
+            }
+        }
+        known.then_some(true)
+    }
+
+    /// 构造型号媒体能力错误。@param media 原始请求 MIME。@param unknown 能力缺少观测。@return 允许公开的拒绝分类。
+    pub(crate) fn agy_media_error(media: &BTreeSet<&str>, unknown: bool) -> AppError {
+        let (reason, message) = match (media.len() == 1 && media.contains("image/png"), unknown) {
+            (true, true) => (
+                "AGY_PNG_CAPABILITY_UNKNOWN",
+                "AGY 模型的 PNG 能力尚未观测，请刷新账号能力",
+            ),
+            (true, false) => ("AGY_PNG_UNSUPPORTED", "AGY 模型不支持内嵌 PNG"),
+            (false, true) => (
+                "AGY_MEDIA_CAPABILITY_UNKNOWN",
+                "AGY 模型的媒体能力尚未观测，请刷新账号能力",
+            ),
+            (false, false) => ("AGY_MEDIA_UNSUPPORTED", "AGY 模型不支持请求中的媒体类型"),
+        };
+        AppError::AgyInput {
+            reason,
+            message,
+            field: Some("contents".into()),
+        }
     }
     /// 查询不含令牌的 AGY 管理状态。@param id 账号。@return 持久代次与阶段。
     pub async fn agy_state(&self, id: i64) -> Result<Value, AppError> {
@@ -457,6 +600,8 @@ impl AccountService {
             "priority",
             "rpm_limit",
             "agy_system_prompt_homoglyph_enabled",
+            "agy_gif_frames_enabled",
+            "agy_disable_safety_filtering",
         ];
         if !current.is_antigravity() || fields.keys().any(|key| !allowed.contains(&key.as_str())) {
             return Err(AppError::BadRequest("该字段不属于 AGY 账号配置".into()));

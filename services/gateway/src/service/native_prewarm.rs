@@ -355,8 +355,10 @@ async fn check_one(
     wake: bool,
     idle_timeout_secs: Option<u64>,
 ) -> Result<Value, AppError> {
+    let mut cutover = system_update::InferenceCutover::subscribe();
+    let system_maintenance = || json!({"state":"maintenance","reason":"system_maintenance"});
     let Some(_update_activity) = system_update::background_admission()? else {
-        return Ok(json!({"state":"maintenance","reason":"system_maintenance"}));
+        return Ok(system_maintenance());
     };
     let deadline = Instant::now() + Duration::from_secs(120);
     let account = accounts.get_account(id).await?;
@@ -378,6 +380,7 @@ async fn check_one(
         // 明确切换才可创建环境；普通巡检与读取始终只解析运行绑定。
         let prepared = tokio::select! {
             biased;
+            _ = cutover.cancelled() => return Ok(system_maintenance()),
             _ = &mut cancellation => return Ok(json!({"state":"cancelled","reason":"invalidated"})),
             _ = queue.runtime_gate.wait_exclusive() => return Ok(json!({"state":"maintenance","reason":"maintenance"})),
             result = prepare(&account, deadline.saturating_duration_since(Instant::now())) => result,
@@ -397,12 +400,20 @@ async fn check_one(
             Err(error) => return Err(error),
         }
     } else {
-        let Some(transport) = prepare_existing(&account).await? else {
+        let existing = tokio::select! {
+            biased;
+            _ = cutover.cancelled() => return Ok(system_maintenance()),
+            result = prepare_existing(&account) => result?,
+        };
+        let Some(transport) = existing else {
             return Ok(json!({"state":"sleeping"}));
         };
         transport
     };
     let activity = accounts.upstream_activity(id).await?;
+    if cutover.is_cancelled() {
+        return Ok(system_maintenance());
+    }
     // 凭据刷新由现有所有者完整完成；取消不能打断 RT 的持久归属事务。
     let bearer = accounts.resolve_upstream_token(id).await?;
     let account = accounts.get_account(id).await?;
@@ -434,8 +445,13 @@ async fn check_one(
         return Ok(json!({"state":"cancelled","reason":"identity_changed"}));
     }
     let mut last_readiness = None;
+    let mut interrupted_by_update = false;
     let result = tokio::select! {
         biased;
+        _ = cutover.cancelled() => {
+            interrupted_by_update = true;
+            None
+        }
         _ = &mut cancellation => None,
         _ = queue.runtime_gate.wait_exclusive() => None,
         _ = activity.closed() => None,
@@ -478,6 +494,9 @@ async fn check_one(
             let cancelled = other.is_none();
             if allow_prepare {
                 transport.cancel_native_preparation(&preparation_id).await?;
+            }
+            if interrupted_by_update {
+                return Ok(system_maintenance());
             }
             let mut failure = json!({"state":if cancelled {"cancelled"} else if allow_prepare {"failed"} else {"unknown"},
                 "reason":if cancelled {"invalidated"} else if allow_prepare {"preparation_failed"} else {"check_failed"}});

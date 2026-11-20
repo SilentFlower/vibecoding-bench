@@ -2,10 +2,11 @@
 
 use std::env::{current_exe, set_var, temp_dir, var_os};
 use std::fs;
+use std::future::pending;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use axum::Json;
@@ -13,7 +14,7 @@ use axum::Router;
 use axum::extract::Query;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::serve;
 use serde_json::{Value, from_value, json};
 use sqlx::any::{AnyPoolOptions, install_default_drivers};
@@ -26,7 +27,10 @@ use tokio::time::{Instant, sleep, timeout};
 use uuid::Uuid;
 
 use super::NativePrewarmer;
-use crate::model::account::Account;
+use sha2::{Digest, Sha256};
+use tokio::sync::Notify;
+
+use crate::model::account::{Account, AccountAuthType};
 use crate::service::account::AccountService;
 use crate::service::system_update;
 use crate::store::account_store::AccountStore;
@@ -292,6 +296,111 @@ async fn maintenance_waits_without_failure_and_reopens_promptly() {
     accounts.request_native_wake(account.id);
     wait_state(&prewarmer, account.id, "disabled", None).await;
     assert_eq!(wake_calls.load(Ordering::SeqCst), 2);
+    drop(prewarmer);
+    server.abort();
+    account.auth_type = AccountAuthType::SetupToken;
+    account.request_backend = "native293".into();
+    // 重新设定合成夹具时避免向刚进入关闭的原协调器发送一次实际唤醒。
+    store.update(&account).await.unwrap();
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let environment_id = "a".repeat(32);
+    let scope = format!(
+        "/cluster-transports/v2/{}/{}/{environment_id}/1",
+        &format!("{:x}", Sha256::digest(b"synthetic-maintenance"))[..12],
+        "b".repeat(32),
+    );
+    let binding = json!({"account_id":account.id,"environment_id":environment_id,"generation":7,
+        "endpoint":format!("{base}{scope}"),"secret":"synthetic-sender-authentication-token",
+        "release_id":"system-ci-1-1"});
+    let submitted = Arc::new(Mutex::new(None::<Value>));
+    let confirmed_cancel = Arc::new(AtomicBool::new(false));
+    let submitted_signal = Arc::new(Notify::new());
+    let router = Router::new()
+        .route(
+            "/internal/v3/transport/:id",
+            get(move || {
+                let binding = binding.clone();
+                async move { Json(binding) }
+            }),
+        )
+        .route(
+            &format!("{scope}/internal/native/readiness"),
+            post(|Json(input): Json<Value>| async move {
+                Json(
+                    json!({"state":"unprepared","account_id":input["account_id"],
+                "environment_id":input["environment_id"],"generation":input["generation"],
+                "checked_at_ms":1,"idle_workers":0,"live_workers":0}),
+                )
+            }),
+        )
+        .route(
+            &format!("{scope}/internal/native/prepare"),
+            post({
+                let submitted = submitted.clone();
+                let signal = submitted_signal.clone();
+                move |Json(input): Json<Value>| {
+                    let submitted = submitted.clone();
+                    let signal = signal.clone();
+                    async move {
+                        *submitted.lock().unwrap() = Some(input);
+                        signal.notify_one();
+                        pending::<StatusCode>().await
+                    }
+                }
+            }),
+        )
+        .route(
+            &format!("{scope}/internal/native/prepare/cancel"),
+            post({
+                let confirmed = confirmed_cancel.clone();
+                move |Json(input): Json<Value>| {
+                    // 被取消的上一步也可能还未提交准备，发送器允许该确认幂等返回。
+                    let mut submitted = submitted.lock().unwrap();
+                    if submitted.as_ref().is_some_and(|original| {
+                        [
+                            "account_id",
+                            "environment_id",
+                            "generation",
+                            "preparation_id",
+                        ]
+                        .into_iter()
+                        .all(|key| input[key] == original[key])
+                    }) {
+                        submitted.take();
+                        confirmed.store(true, Ordering::SeqCst);
+                    }
+                    async { StatusCode::OK }
+                }
+            }),
+        );
+    unsafe {
+        set_var("V3_RUNTIME_URL", base);
+        set_var("V3_RELEASE", "system-ci-1-1");
+        set_var("V3_ACCOUNT_RELEASE", "system-ci-1-1");
+    }
+    let server = spawn(async move { serve(listener, router).await.unwrap() });
+    let prewarmer = NativePrewarmer::new(accounts.clone());
+    prewarmer.start_with_retries([3600, 7200, 10800]);
+    timeout(Duration::from_secs(10), submitted_signal.notified())
+        .await
+        .unwrap();
+    assert_eq!(system_update::snapshot().unwrap()["active"], 1);
+    gate["phase"] = json!("blocked");
+    gate["operation_id"] = json!(Uuid::new_v4().to_string());
+    gate["epoch"] = json!(Uuid::new_v4().to_string());
+    gate["target_release"] = json!("system-ci-1-1");
+    publish_gate(&root, &gate);
+    system_update::cutover(
+        gate["operation_id"].as_str().unwrap(),
+        gate["epoch"].as_str().unwrap(),
+    )
+    .unwrap();
+    let status = wait_state(&prewarmer, account.id, "maintenance", None).await;
+    assert_eq!(status["reason"], "system_maintenance");
+    assert!(confirmed_cancel.load(Ordering::SeqCst));
+    assert_eq!(system_update::snapshot().unwrap()["active"], 0);
     drop(prewarmer);
     server.abort();
     pool.close().await;

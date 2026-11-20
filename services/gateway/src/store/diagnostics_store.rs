@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -16,6 +17,7 @@ use crate::model::request_diagnostics::{
     DiagnosticHealth, DiagnosticPage, DiagnosticQuery, RequestDiagnostic, ToolTurnDiagnostic,
     normalize_correlation_id,
 };
+use crate::service::native_capture;
 
 const QUEUE_CAPACITY: usize = 1024;
 const MAX_RECORD_BYTES: usize = 16 * 1024;
@@ -79,6 +81,7 @@ pub struct DiagnosticsStore {
     failures: Arc<AtomicU64>,
     observation_failures: AtomicU64,
     active: Arc<Mutex<HashSet<String>>>,
+    rejected_ingress_dir: Option<PathBuf>,
 }
 
 impl DiagnosticsStore {
@@ -86,6 +89,11 @@ impl DiagnosticsStore {
     /// @param pool 已迁移的共享数据库连接池。
     /// @return 可供网关与管理查询共享的存储。
     pub fn new(pool: AnyPool) -> Self {
+        Self::with_rejected_ingress_dir(pool, None)
+    }
+
+    /// 创建诊断写入器并装配本地拒绝归档。@param pool 已迁移的连接池。@param directory 与摘要分离的私有目录。@return 可用的诊断存储。
+    pub fn with_rejected_ingress_dir(pool: AnyPool, directory: Option<PathBuf>) -> Self {
         let (sender, mut receiver) = mpsc::channel(QUEUE_CAPACITY);
         let dropped = Arc::new(AtomicU64::new(0));
         let failures = Arc::new(AtomicU64::new(0));
@@ -93,6 +101,7 @@ impl DiagnosticsStore {
         let writer_failures = failures.clone();
         let active = Arc::new(Mutex::new(HashSet::new()));
         let writer_active = active.clone();
+        let writer_directory = directory.clone();
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(3600));
             loop {
@@ -124,6 +133,9 @@ impl DiagnosticsStore {
                             writer_failures.fetch_add(1, Ordering::Relaxed);
                             warn!("请求诊断历史清理失败");
                         }
+                        if let Some(directory) = &writer_directory {
+                            native_capture::prune_gateway_rejections(directory.clone());
+                        }
                     }
                 }
             }
@@ -135,7 +147,13 @@ impl DiagnosticsStore {
             failures,
             observation_failures: AtomicU64::new(0),
             active,
+            rejected_ingress_dir: directory,
         }
+    }
+
+    /// 返回可写入或读取的本地拒绝目录。@return 缺省未装配。
+    pub(crate) fn rejected_ingress_dir(&self) -> Option<&Path> {
+        self.rejected_ingress_dir.as_deref()
     }
 
     /// 在首条记录入队前登记真实请求，历史 unfinished 记录不产生许可。

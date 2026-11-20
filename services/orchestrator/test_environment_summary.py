@@ -69,6 +69,28 @@ class EnvironmentSummaryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, '合成核对失败'):
                 main.v3_environments()
 
+    def test_agy_environment_uses_current_gateway_name_by_account_id(self):
+        """环境保留内部名，同时按平台批量读取最新显示名称。@return 无。"""
+        rows = [{'environment_id': 'synthetic', 'platform': 'antigravity', 'name': 'agy:14', 'gateway_account_id': 14},
+            {'environment_id': 'other', 'platform': 'antigravity', 'name': 'agy:15', 'gateway_account_id': 15}]
+        connection = Mock()
+        connection.execute.return_value = rows
+        runtime = Mock()
+        runtime.native_preparation_snapshots.return_value = ({}, None)
+        gateway = Mock()
+        gateway.list_accounts.side_effect = [[{'id': 14, 'name': '测试', 'platform': 'antigravity'},
+            {'id': 15, 'name': '其他平台', 'platform': 'claude_code'}], ConnectionError('网关不可用')]
+        with patch.multiple(main, account_runtime=runtime, credential_ownership=None, cc2api_client=gateway), \
+                patch.object(main, 'get_db', return_value=connection), \
+                patch.object(main, '_v3_environment_summary', side_effect=lambda row, *_: row):
+            result = main.v3_environments()
+            self.assertEqual(result[0]['gateway_account_name'], '测试')
+            self.assertEqual(result[0]['name'], 'agy:14')
+            self.assertEqual(result[0]['gateway_account_id'], 14)
+            self.assertIsNone(result[1]['gateway_account_name'])
+            gateway.list_accounts.assert_called_once()
+            self.assertTrue(all(row['gateway_account_name'] is None for row in main.v3_environments()))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -4,6 +4,7 @@ import json
 import time
 
 from account_isolation import role_container
+from agy_runtime.criu import read_failure
 from native_criu_policy import restore_policy
 from native_kernel_upgrade import pending_upgrade
 from native_settings_operation import apply_settings
@@ -28,9 +29,11 @@ def read_settings(runtime, row: dict, observation: dict | None = None) -> dict:
     sender = role_container(runtime, row, 'sender')
     sender.reload()
     details = sender.attrs['Config']
-    installed = (details.get('Labels') or {}).get('vibebench.native-criu') == '1'
+    agy = configuration.get('agy')
+    label = 'vibebench.agy-criu' if isinstance(agy, dict) else 'vibebench.native-criu'
+    installed = (details.get('Labels') or {}).get(label) == '1'
     actual = details.get('Entrypoint') == ENTRY
-    native = configuration.get('native')
+    native = agy if isinstance(agy, dict) else configuration.get('native')
     supported = isinstance(native, dict)
     policy = restore_policy(native, fingerprint, installed)
     binding = configuration.get('binding') if isinstance(configuration.get('binding'), dict) else {}
@@ -58,19 +61,23 @@ def read_settings(runtime, row: dict, observation: dict | None = None) -> dict:
         checked = observation.get('checked_at_ms')
         if (observation.get('environment_id') != row['environment_id'] or observation.get('generation') != row['generation']
                 or observation.get('kernel_generation') != native.get('kernel_generation')
+                or isinstance(agy, dict) and observation.get('module_root') != agy.get('module_root')
                 or type(checked) is not int or not 0 <= time.time() * 1000 - checked <= 45000):
             result['reason'] = 'telemetry_stale'
         else:
             value = observation.get('restore')
             # 仅白名单枚举及精确布尔值进入页面，旧/畸形遥测不能伪装成模板就绪。
             if (isinstance(value, dict) and type(value.get('schema_version')) is int and value['schema_version'] == 1
-                    and value.get('state') in ('ready', 'preparing', 'unavailable', 'unknown')
+                    and value.get('state') in ('ready', 'preparing', 'waiting', 'unavailable', 'unknown')
                     and type(value.get('template_ready')) is bool
                     and (value.get('reason') is None or isinstance(value['reason'], str) and value['reason'] in REASONS)
                     and (value['state'] == 'ready') == value['template_ready']):
                 result.update(state=value['state'], reason=value.get('reason'), template_ready=value['template_ready'], checked_at_ms=checked)
                 if value.get('last_start_source') in ('exec', 'criu_restore'):
                     result['last_start_source'] = value['last_start_source']
+                if isinstance(agy, dict) and value.get('reason') == 'template_failed':
+                    if failure := read_failure(value.get('failure')):
+                        result['failure'] = failure
             else:
                 result['reason'] = 'telemetry_missing'
     return result

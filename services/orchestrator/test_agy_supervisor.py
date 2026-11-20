@@ -9,6 +9,7 @@ import time
 import unittest
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from agy_runtime.contract import InputError
@@ -61,6 +62,10 @@ class WorkerFixture:
         self.events = queue.Queue()
         self.closed = False
         self.busy = True
+        self.prewarming = False
+        self.finish_status = 'completed'
+        self.confirm_tool_results = True
+        self.criu_failure = None
         self.ready = {'source_sha256': owner.image_sha, 'native_pid': 123}
         self.last_used = time.monotonic()
 
@@ -87,7 +92,9 @@ class WorkerFixture:
                 self.events.put({'type': 'idle', **identity, 'next_generation': 'native-generation'})
         elif kind == 'finish_tool_turn':
             self.order.append(('tools_finalized', self.generation))
-            self.events.put({'type': 'tool_turn_finalized', 'request_id': self.current, 'status': 'completed'})
+            if self.confirm_tool_results:
+                self.events.put({'type': 'tool_continuation_accepted', 'request_id': self.current})
+            self.events.put({'type': 'tool_turn_finalized', 'request_id': self.current, 'status': self.finish_status})
             self.events.put({'type': 'idle', 'request_id': self.current, 'next_generation': 'native-generation'})
         elif kind == 'cancel':
             self.events.put({'type': 'cancelled', 'request_id': self.current})
@@ -147,6 +154,23 @@ class AgySupervisorTests(unittest.TestCase):
                 supervisor=Supervisor(config,OutputFixture())
             supervisor.close()
 
+    def test_existing_capture_retirement_markers_do_not_block_startup(self):
+        """上一版写入采集目录的错误标记与当前发送生命周期隔离。@return 无。"""
+        captures = Path(self.temporary.name) / 'agy-prepared'
+        for name in ('snapshots', 'ingress'):
+            path = captures / name
+            path.mkdir(parents=True, mode=0o700)
+            (path / 'retired.json').write_text('上一版遗留的不可读标记')
+            (path / 'sample.json').write_text('{}')
+        captures.chmod(0o700)
+        config = {**self.config, 'capture_root': str(captures),
+            'work_root': str(Path(self.temporary.name) / 'next-generation')}
+        supervisor = Supervisor(config, OutputFixture())
+        self.addCleanup(supervisor.close)
+        self.assertEqual(supervisor.status()['state'], 'ready')
+        for name in ('snapshots', 'ingress'):
+            self.assertEqual((captures / name / 'sample.json').read_text(), '{}')
+
     def continue_body(self, value):
         """构造真实函数回填历史。@param value 原请求。@return 新正文。"""
         body = copy.deepcopy(value['body'])
@@ -160,7 +184,9 @@ class AgySupervisorTests(unittest.TestCase):
         """原工具结果在独立控制路径收口，幂等确认保持零额外模型。@return 无。"""
         first=self.submission()
         self.supervisor.submit(first)
-        self.output.wait(first['request_id'],'completed')
+        completed=self.output.wait(first['request_id'],'completed')['event']
+        self.assertAlmostEqual(completed['tool_wait_expires_at_ms']/1000-time.time(),3600,delta=3)
+        self.assertAlmostEqual(self.supervisor.jobs[first['request_id']]['until']-time.monotonic(),3600,delta=3)
         body=self.continue_body(first)
         value={'schema_version':1,'type':'finish_tools','request_id':str(uuid.uuid4()),'previous_request_id':first['request_id'],
             'account_id':17,'environment_id':'synthetic-env','environment_generation':2,'api_token_id':4,'body':body}
@@ -184,6 +210,116 @@ class AgySupervisorTests(unittest.TestCase):
         mutated['credential_snapshot']['access_token']='different-at-same-generation'
         with self.assertRaises(InputError):self.supervisor.submit(mutated)
         self.assertEqual(sum(item[0]=='model' for item in WorkerFixture.order),1)
+
+    def test_template_credential_rotation_and_restore_fallback_do_not_repeat_generation(self):
+        """验证模板换代、回退与唯一投递。@return 无。"""
+        for new_generation, should_fail in ((2,False),(2,True),(3,False)):
+            with self.subTest(generation=new_generation,restore_failure=should_fail):
+                class TemplateFixture(WorkerFixture):
+                    """构造可保存且由一次恢复消费的零模型进程。"""
+
+                    def start(self, until):
+                        """保留原生命周期观察并模拟模板登记。@param until 原截止。@return 无。"""
+                        super().start(until)
+                        self.parked=self.seed_template
+                        if self.parked:
+                            self.credential_expires_at=4070908800000
+                            self.process=SimpleNamespace(pid=123,poll=lambda: 0 if self.closed else None)
+
+                    def resume(self, until):
+                        """记录恢复并按测试分支模拟本地失败。@param until 原截止。@return 无。"""
+                        self.order.append(('restore',self.generation))
+                        if should_fail:
+                            self.criu_failure={'stage':'checkpoint_restore','reason':'AGY_CRIU_RESTORE'}
+                            raise InputError('worker_restore_failed')
+                        self.parked=False
+
+                # 先回收上一分支的工作进程，避免夹具复用正在检验的池身份。
+                with self.supervisor.condition:
+                    for worker in self.supervisor.workers:
+                        worker.close()
+                    self.supervisor.workers.clear()
+                WorkerFixture.order.clear()
+                with patch('agy_runtime.supervisor.Worker',TemplateFixture), patch.object(
+                        self.supervisor,'restore_available',return_value=True):
+                    seed=self.submission(generation=2)
+                    seed['type']='prepare'
+                    self.supervisor.submit(seed)
+                    self.assertTrue(self.output.wait(seed['request_id'],'prepared')['native']['template_ready'])
+                    self.output.wait(seed['request_id'],'job_finalized')
+                    live=self.submission(generation=new_generation)
+                    live['body']['contents']*=2
+                    self.supervisor.submit(live)
+                    self.assertEqual(self.output.wait(live['request_id'],'job_finalized')['status'],'completed')
+                    restored=[item for item in WorkerFixture.order if item[0]=='restore']
+                    self.assertEqual(restored,[('restore',2)] if new_generation==2 else [])
+                    self.assertEqual([item for item in WorkerFixture.order if item[0]=='model'],[('model',new_generation)])
+                    self.assertEqual(WorkerFixture.order.count(('start',2)),2 if should_fail else 1)
+                    self.assertEqual(self.supervisor.template_failure,
+                        {'stage':'checkpoint_restore','reason':'AGY_CRIU_RESTORE'} if should_fail else None)
+
+    def test_background_template_survives_idle_hot_worker_of_same_identity(self):
+        """请求先收尾、池中已有热进程时，后台仍可准备并保留同身份模板。@return 无。"""
+        discarded = threading.Event()
+
+        class PoolFixture(WorkerFixture):
+            """构造无需启动原生执行体的可回收池成员。"""
+
+            def __init__(self, owner, value):
+                """记录恢复候选和真实存活替身。@param owner 监督器。@param value 原请求。@return 无。"""
+                super().__init__(owner, value)
+                self.seed_template = False
+                self.parked = False
+                self.ready['observer_pid'] = 124
+                self.config = {'credential_generation': self.generation}
+                self.credential_expires_at = value['credential_snapshot']['expires_at']
+                self.process = SimpleNamespace(pid=123, poll=lambda: 0 if self.closed else None)
+                self.discarded = None
+
+            def start(self, until):
+                """模拟入盘成功。@param until 原截止。@return 无。"""
+                self.parked = self.seed_template
+
+            def close(self):
+                """通知重复热进程已经经历回收轮询。@return 无。"""
+                super().close()
+                if self.discarded:
+                    self.discarded.set()
+
+        value = self.submission()
+        self.config['max_workers'] = 3
+        with patch('agy_runtime.supervisor.Worker', PoolFixture), patch.object(
+                self.supervisor, 'restore_available', return_value=True):
+            with self.supervisor.condition:
+                self.supervisor.credential_generation = 1
+                duplicate, source = [PoolFixture(self.supervisor, value) for _ in range(2)]
+                duplicate.discarded = discarded
+                duplicate.last_used = source.last_used - 1
+                duplicate.busy = source.busy = False
+                self.supervisor.workers.extend([duplicate, source])
+                self.assertEqual(self.supervisor.status()['restore']['state'], 'waiting')
+                self.supervisor.prewarm_replacement(source, value, time.monotonic() + 30, template=True)
+                self.assertEqual(self.supervisor.status()['restore']['state'], 'ready')
+            self.assertTrue(discarded.wait(3))
+            self.assertEqual(self.supervisor.status()['restore']['state'], 'ready')
+            self.assertFalse(source.closed)
+            self.assertIs(self.supervisor.acquire(value, time.monotonic() + 30), source)
+
+    def test_old_tool_failure_distinguishes_native_acceptance(self):
+        """旧轮失败时只根据原生接纳事件报告回填已接纳。@return 无。"""
+        for accepted,code in [(True,'previous_tool_turn_failed'),(False,'tool_completion_failed')]:
+            with self.subTest(accepted=accepted):
+                first=self.submission()
+                self.supervisor.submit(first)
+                self.output.wait(first['request_id'],'completed')
+                worker=self.supervisor.jobs[first['request_id']]['worker']
+                worker.confirm_tool_results=accepted
+                worker.finish_status='error'
+                control={'schema_version':1,'type':'finish_tools','request_id':str(uuid.uuid4()),
+                    'previous_request_id':first['request_id'],'account_id':17,'environment_id':'synthetic-env',
+                    'environment_generation':2,'api_token_id':4,'body':self.continue_body(first)}
+                self.supervisor.finish_tools_command(control)
+                self.assertEqual(self.output.wait(control['request_id'],'control_error')['code'],code)
 
     def test_tool_result_finishes_original_worker_before_starting_new_generation(self):
         """单进程上限下，旧工具回填先收尾，再以新AT启动下一轮。@return 无。"""

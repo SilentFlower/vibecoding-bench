@@ -7,15 +7,125 @@ import json
 import os
 import re
 import secrets
-import time
 import tarfile
+import time
+from collections.abc import Iterator
+from contextlib import closing
 
 from docker import DockerClient
-from docker.errors import NotFound
+from docker.auth import encode_header, get_config_header, resolve_repository_name
+from docker.constants import DEFAULT_DATA_CHUNK_SIZE
+from docker.errors import DockerException, NotFound
+from docker.models.images import Image
+from docker.utils import parse_repository_tag, version_gte
+from requests.exceptions import RequestException
 
 from cluster_nodes import NodeConfiguration
 from runtime_files import atomic_text
 from system_update_contract import safe_read
+
+
+class NodeImagePreparationError(ValueError):
+    """携带可以公开的节点镜像准备失败阶段。"""
+
+
+def _inspect_image(client: DockerClient, reference: str) -> Image:
+    """读取镜像以及可用的平台清单。:param client: 当前Docker宿主。:param reference: 固定镜像引用。:return: 实际镜像记录。"""
+    api = client.api
+    if not version_gte(api.api_version, '1.48'):
+        return client.images.get(reference)
+    # SDK尚未暴露清单参数，沿其状态校验和镜像模型读取原Docker响应。
+    with api._get(api._url('/images/{0}/json', reference), params={'manifests': 'true'}) as response:
+        return client.images.prepare_model(api._result(response, True))
+
+
+def _image_platform(attrs: dict) -> dict:
+    """提取OCI平台。:param attrs: Docker镜像检查结果。:return: 系统、架构及实际变体。"""
+    platform = {'os': attrs.get('Os'), 'architecture': attrs.get('Architecture')}
+    if attrs.get('Variant'):
+        platform['variant'] = attrs['Variant']
+    return platform
+
+
+def _has_image_configuration(attrs: dict) -> bool:
+    """检查已读取的平台配置。:param attrs: Docker镜像检查结果。:return: 实际平台和根文件系统是否已知。"""
+    return all(_image_platform(attrs).values()) and (attrs.get('RootFS') or {}).get('Type') == 'layers'
+
+
+def _has_image_content(attrs: dict) -> bool:
+    """判断选中平台的实际内容是否到达。:param attrs: Docker镜像检查结果。:return: 配置与平台内容是否完整。"""
+    if not _has_image_configuration(attrs):
+        return False
+    manifests = attrs.get('Manifests')
+    if manifests is None:
+        # 经典镜像存储没有独立索引，检查返回的配置与层登记来自实际镜像。
+        return True
+    platform = _image_platform(attrs)
+    return any(manifest.get('Available') is True
+               and (manifest.get('ImageData') or {}).get('Platform') == platform
+               for manifest in manifests)
+
+
+def _pinned_image_reference(image: Image, reference: str) -> str | None:
+    """从已安装镜像绑定仓库与实际 OCI 摘要。:param image: 中央镜像。:param reference: 原部署引用。:return: 受信摘要引用。"""
+    repository, version = parse_repository_tag(reference)
+    digest = (image.attrs.get('Descriptor') or {}).get('digest') or image.id
+    if not isinstance(digest, str) or not re.fullmatch(r'sha256:[0-9a-f]{64}', digest):
+        return None
+    if '@' in reference and version != digest:
+        return None
+    pinned = f'{repository}@{digest}'
+    return pinned if pinned in (image.attrs.get('RepoDigests') or ()) else None
+
+
+def _matches_image_configuration(image: Image, original: Image, expected: dict) -> bool:
+    """核对相同平台、层及发布标签。:param image: 待检查镜像。:param original: 中央冻结镜像。:param expected: 发布标签。:return: 平台配置是否一致。"""
+    attrs = image.attrs
+    labels = (attrs.get('Config') or {}).get('Labels') or {}
+    return (_image_platform(attrs) == _image_platform(original.attrs)
+            and attrs.get('RootFS') == original.attrs.get('RootFS')
+            and all(labels.get(key) == value for key, value in expected.items()))
+
+
+def _pull_pinned_image(client: DockerClient, pinned: str, platform: dict, *, anonymous: bool = False) -> None:
+    """补齐已固定摘要的制品。:param client: 目标Docker宿主。:param pinned: 固定仓库摘要。:param platform: 实际平台。:param anonymous: 禁止传递中央仓库凭据。:return: 无。"""
+    api = client.api
+    repository, digest = parse_repository_tag(pinned)
+    registry, _ = resolve_repository_name(repository)
+    auth = encode_header({}) if anonymous else get_config_header(api, registry)
+    headers = {'X-Registry-Auth': auth} if auth else {}
+    # 直接消费 Docker 进度流，保留客户端的传输超时。SDK 的 pull 固定取消该超时。
+    with api._post(api._url('/images/create'), stream=True, headers=headers,
+                   params={'fromImage': repository, 'tag': digest, 'platform': '/'.join(platform.values())}) as response:
+        api._raise_for_status(response)
+        for event in api._stream_helper(response, decode=True):
+            if event.get('error') or event.get('errorDetail'):
+                raise DockerException('固定摘要镜像拉取失败')
+
+
+def _export_image(client: DockerClient, reference: str, platform: dict | None) -> Iterator[bytes]:
+    """逐块导出指定平台。:param client: 中央镜像宿主。:param reference: 固定镜像引用。:param platform: 可选OCI平台。:return: 归档字节迭代器。"""
+    api = client.api
+    if platform is None or not version_gte(api.api_version, '1.48'):
+        with closing(api.get_image(reference)) as source:
+            yield from source
+        return
+    # 仅导出实际选中的平台，避免镜像索引中的其他制品影响节点导入。
+    with api._get(api._url('/images/{0}/get', reference), stream=True,
+                  params={'platform': json.dumps(platform)}) as response:
+        yield from api._stream_raw_result(response, DEFAULT_DATA_CHUNK_SIZE, False)
+
+
+def _load_image(client: DockerClient, source: Iterator[bytes], platform: dict) -> Iterator[dict]:
+    """逐块导入指定平台。:param client: 节点Docker宿主。:param source: 中央归档流。:param platform: 已核对OCI平台。:return: 导入进度迭代器。"""
+    api = client.api
+    if not version_gte(api.api_version, '1.48'):
+        yield from api.load_image(source, quiet=True)
+        return
+    with api._post(api._url('/images/load'), data=source, stream=True,
+                   params={'quiet': True, 'platform': json.dumps(platform)}) as response:
+        api._raise_for_status(response)
+        yield from api._stream_helper(response, decode=True)
 
 
 class _ArchiveReader(io.RawIOBase):
@@ -49,15 +159,16 @@ class _ArchiveReader(io.RawIOBase):
         super().close()
 
 
-def image_config_digest(client, reference: str) -> str:
+def image_config_digest(client, reference: str, platform: dict | None = None) -> str:
     """从镜像归档原始配置计算跨 Docker daemon 稳定的身份。
 
     :param client: 对应宿主 Docker SDK 客户端。
     :param reference: 固定批次标签或精确镜像 ID。
+    :param platform: 可选实际运行平台。
     :return: 绑定 rootfs 和运行配置的 SHA256。
     """
     configurations, manifests = {}, []
-    source = _ArchiveReader(client.api.get_image(reference))
+    source = _ArchiveReader(_export_image(client, reference, platform))
     try:
         with tarfile.open(fileobj=source, mode='r|') as archive:
             for member in archive:
@@ -146,11 +257,24 @@ class NodeDeployment:
         self.control_image, self.account_image = control_image, account_image
         self.account_release = account_release
 
-    def prepare(self, node_id: int, revision: int) -> dict:
+    def prefetch_images(self, node) -> tuple[str, Image]:
+        """核对并预取同批镜像。:param node: 已由节点作业核对的连接。:return: 账号批次和实际控制镜像。"""
+        account_release = self.account_release or os.environ.get('V3_ACCOUNT_RELEASE') or self.release
+        # 导入解包可能超过日常控制请求期限，使用独立客户端。
+        transfer = DockerClient(base_url='unix://' + str(node.docker_socket()), version='auto', timeout=600)
+        try:
+            control = self._ensure_image(transfer, self.control_image, 'control', self.release)
+            self._ensure_image(transfer, self.account_image, 'account', account_release)
+            return account_release, control
+        finally:
+            transfer.close()
+
+    def prepare(self, node_id: int, revision: int, *, prefetched: tuple[str, Image] | None = None) -> dict:
         """检查平台后流式交付镜像并创建私有控制容器。
 
         :param node_id: 管理员指定的节点。
         :param revision: 请求发起时节点版本。
+        :param prefetched: 同一节点作业之前核验的镜像。
         :return: 本次安装回执。
         """
         row = self.service.store.get(node_id)
@@ -160,14 +284,7 @@ class NodeDeployment:
         config = NodeConfiguration.model_validate(json.loads(row['config_json']))
         node.observe()
         node.bootstrap(self.deployment)
-        account_release = self.account_release or os.environ.get('V3_ACCOUNT_RELEASE') or self.release
-        # 镜像导入可能在最后一块之后长时间解包，使用独立长等待客户端，保持日常控制请求的短期限。
-        transfer = DockerClient(base_url='unix://' + str(node.docker_socket()), version='auto', timeout=600)
-        try:
-            control = self._ensure_image(transfer, self.control_image, 'control', self.release)
-            self._ensure_image(transfer, self.account_image, 'account', account_release)
-        finally:
-            transfer.close()
+        account_release, control = prefetched or self.prefetch_images(node)
         # 首次创建容器可能超过日常查询期限；安装使用独立客户端，不延长共享控制请求。
         remote = DockerClient(base_url='unix://' + str(node.docker_socket()), version='auto', timeout=120)
         try:
@@ -258,24 +375,99 @@ class NodeDeployment:
             'state': 'prepared', 'account_reference': self.account_image, 'account_release': account_release,
             'account_image_id': remote.images.get(self.account_image).attrs['Id']}
 
-    def _ensure_image(self, remote, reference: str, role: str, release: str):
-        original = self.service.local_client.images.get(reference)
-        labels = original.attrs.get('Config', {}).get('Labels') or {}
-        if (labels.get('vibebench.product') != 'v3' or labels.get('vibebench.role') != role
-                or labels.get('vibebench.release') != release):
-            raise ValueError('当前平台镜像角色或发布身份无效')
+    def _ensure_image(self, remote: DockerClient, reference: str, role: str, release: str) -> Image:
+        """补齐并核验节点目标镜像。:param remote: 节点Docker宿主。:param reference: 固定镜像。:param role: 预期角色。:param release: 预期批次。:return: 可用于安装的远端镜像。"""
+        local = self.service.local_client
+        component = '控制' if role == 'control' else '账号'
         try:
-            image = remote.images.get(reference)
+            original = _inspect_image(local, reference)
+        except (DockerException, RequestException) as error:
+            raise NodeImagePreparationError(f'读取中央{component}镜像失败') from error
+        expected = {'vibebench.product': 'v3', 'vibebench.role': role, 'vibebench.release': release}
+        labels = (original.attrs.get('Config') or {}).get('Labels') or {}
+        if not _has_image_configuration(original.attrs) or any(labels.get(key) != value for key, value in expected.items()):
+            raise NodeImagePreparationError(f'中央{component}镜像的平台或发布身份无效')
+        can_export = _has_image_content(original.attrs)
+        pinned = _pinned_image_reference(original, reference)
+        platform = _image_platform(original.attrs)
+        try:
+            image = _inspect_image(remote, reference)
         except NotFound:
-            source = self.service.local_client.api.get_image(reference)
+            image = None
+        except (DockerException, RequestException) as error:
+            raise NodeImagePreparationError(f'读取节点{component}镜像失败') from error
+
+        if image is None or not _has_image_content(image.attrs):
+            # 索引可以与中央同ID但缺失真实配置或层；归属不明的同名引用仍需核对。
+            if image is not None and image.id != original.id:
+                raise NodeImagePreparationError(f'节点{component}镜像的同名引用归属待核对')
+            if not can_export:
+                if not pinned:
+                    raise NodeImagePreparationError(f'中央{component}镜像缺少可导出内容与受信仓库摘要')
+                try:
+                    _pull_pinned_image(local, pinned, platform)
+                    repaired = _inspect_image(local, reference)
+                except (DockerException, RequestException):
+                    # 部分镜像存储保留运行层却不能补齐可导出的压缩内容，由节点核对同一摘要。
+                    repaired = None
+                if repaired is not None:
+                    if repaired.id != original.id or not _matches_image_configuration(repaired, original, expected):
+                        raise NodeImagePreparationError(f'中央{component}镜像在补齐期间发生变化')
+                    can_export = _has_image_content(repaired.attrs)
+                if not can_export:
+                    return self._pull_on_node(remote, reference, pinned, original, expected, component)
             try:
-                for progress in remote.api.load_image(source, quiet=True):
-                    if progress.get('error'):
-                        raise ValueError('节点镜像导入失败')
-            finally:
-                source.close()
-            image = remote.images.get(reference)
-        if original.attrs['Id'] != image.attrs['Id']:
-            if image_config_digest(self.service.local_client, reference) != image_config_digest(remote, reference):
-                raise ValueError('节点存在不同内容的同名镜像，请核对节点制品')
+                with closing(_export_image(local, reference, platform)) as source:
+                    for progress in _load_image(remote, source, platform):
+                        if progress.get('error') or progress.get('errorDetail'):
+                            raise NodeImagePreparationError(f'节点{component}镜像导入失败')
+            except (DockerException, RequestException) as error:
+                raise NodeImagePreparationError(f'节点{component}镜像传输或导入失败') from error
+            try:
+                image = _inspect_image(remote, reference)
+            except (DockerException, RequestException) as error:
+                raise NodeImagePreparationError(f'节点{component}镜像导入后无法复核') from error
+            if not _has_image_content(image.attrs):
+                raise NodeImagePreparationError(f'节点{component}镜像导入后内容仍不完整')
+
+        if not _matches_image_configuration(image, original, expected):
+            raise NodeImagePreparationError(f'节点存在不同内容的同名{component}镜像，请核对节点制品')
+        if original.id != image.id:
+            if not can_export:
+                if pinned and pinned in (image.attrs.get('RepoDigests') or ()):
+                    return image
+                raise NodeImagePreparationError(f'中央{component}镜像无法导出配置，节点同名镜像归属待核对')
+            try:
+                same_configuration = image_config_digest(local, reference, platform) == image_config_digest(remote, reference, platform)
+            except (DockerException, RequestException, ValueError, tarfile.TarError) as error:
+                raise NodeImagePreparationError(f'节点{component}镜像无法核对原始配置') from error
+            if not same_configuration:
+                raise NodeImagePreparationError(f'节点存在不同内容的同名{component}镜像，请核对节点制品')
+        return image
+
+    def _pull_on_node(self, remote: DockerClient, reference: str, pinned: str, original: Image,
+                      expected: dict, component: str) -> Image:
+        """补齐节点镜像。:param remote: 节点Docker宿主。:param reference: 冻结标签。:param pinned: 冻结仓库摘要。:param original: 中央镜像。:param expected: 发布标签。:param component: 组件名称。:return: 已验证节点镜像。"""
+        try:
+            _pull_pinned_image(remote, pinned, _image_platform(original.attrs), anonymous=True)
+            pulled = _inspect_image(remote, pinned)
+            if (pinned not in (pulled.attrs.get('RepoDigests') or ()) or not _has_image_content(pulled.attrs)
+                    or not _matches_image_configuration(pulled, original, expected)):
+                raise NodeImagePreparationError(f'节点{component}镜像按摘要拉取后未通过核验')
+            try:
+                current = _inspect_image(remote, reference)
+            except NotFound:
+                current = None
+            if current is not None and current.id not in (original.id, pulled.id):
+                raise NodeImagePreparationError(f'节点{component}镜像的同名引用归属待核对')
+            if reference != pinned:
+                repository, tag = parse_repository_tag(reference)
+                if not pulled.tag(repository, tag):
+                    raise NodeImagePreparationError(f'节点{component}镜像无法绑定目标标签')
+            image = _inspect_image(remote, reference)
+        except (DockerException, RequestException) as error:
+            raise NodeImagePreparationError(f'中央{component}镜像无法导出，节点按摘要补齐失败') from error
+        if (image.id != pulled.id or not _has_image_content(image.attrs)
+                or not _matches_image_configuration(image, original, expected)):
+            raise NodeImagePreparationError(f'节点{component}镜像补齐后内容或归属发生变化')
         return image

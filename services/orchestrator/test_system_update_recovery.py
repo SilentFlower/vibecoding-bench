@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from system_updates import partial_restore_ready
+from system_updates import _rollout_lease, partial_restore_ready
 
 
 class PartialRecoveryTests(unittest.TestCase):
@@ -58,6 +58,23 @@ class PartialRecoveryTests(unittest.TestCase):
         self.runtime._running_sender_active = lambda row: 1
         with self.assertRaisesRegex(ValueError, '发送器活动'):
             partial_restore_ready(self.runtime, self.row, None, [self.image])
+
+    def test_rolling_lease_accepts_its_own_holder_and_rejects_foreign_activity(self) -> None:
+        """租约快照同时在 lease 和 holders 投影排他租约。@return 无。"""
+        own = {'owner': 'maintenance:system-update:synthetic', 'generation': 'original', 'exclusive': True}
+        replacement = {**own, 'generation': 'renewed', 'phase': 'claimed'}
+        original = {'lease': own, 'holders': [own]}
+        current = {'lease': replacement, 'holders': [replacement]}
+        self.runtime.gateway = Mock()
+        self.runtime.gateway._request.side_effect = [original, {}, current, current, current, {}]
+        with _rollout_lease(self.runtime, 7, own['owner']) as proof:
+            partial_restore_ready(self.runtime, self.row, {'cc2api_account_id': 7},
+                [self.image], lease_proof=proof, rolling=True)
+        self.runtime.gateway._request.side_effect = None
+        self.runtime.gateway._request.return_value = {**current, 'holders': [replacement, {**own, 'owner': 'other'}]}
+        with self.assertRaisesRegex(ValueError, '账号租约'):
+            partial_restore_ready(self.runtime, self.row, {'cc2api_account_id': 7},
+                [self.image], lease_proof=proof, rolling=True)
 
 
 if __name__ == '__main__':

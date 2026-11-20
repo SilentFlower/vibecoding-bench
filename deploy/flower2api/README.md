@@ -192,7 +192,7 @@ python3 deploy/flower2api/verify_forwarding.py --manifest /absolute/path/v3-veri
 
 账号固化配置 `native_capture_enabled` 控制私有 CC 组装后头与正文采集。缺省开启，显式 `false` 保持关闭。管理员在「请求记录 → 详情」读取已脱敏内容。每账号保留至多 50 份、100 MiB，单份正文 2 MiB、请求头 128 KiB，超限截断及采集失败单独显示。原始凭据和完整正文均不进入普通服务日志。
 
-## 请求内核随平台版本管理
+## Claude Code 请求内核随平台版本管理
 
 每个 flower2api 版本交付固定的 2.1.280／2.1.293 请求内核。账号按请求画像自动匹配源版本，升级或回退平台时采用目标镜像配套的组合。环境页只读展示配套版本、固定摘要及实际原生准备观察。
 
@@ -203,3 +203,16 @@ python3 deploy/flower2api/verify_forwarding.py --manifest /absolute/path/v3-veri
 构建时通过本仓库 `services/runtime/scripts/prepare-ci-runtime.py --source-version 2.1.280|2.1.293 --directory <目录>` 准备两版固定制品。CI核对官方来源、分发与映像摘要、构建报告及当前源码输入。镜像staging读取 `V3_NATIVE_RUNTIME_280_ASSET` 和 `V3_NATIVE_RUNTIME_ASSET`。历史 `V3_NATIVE_RELEASE_PUBLIC_KEY` 字段保留配置兼容读取，内核交付由平台镜像及既有平台签名流程负责。
 
 历史 `bench/native-releases/` 目录继续保留供旧发行读取及审计。历史制品清理按独立维护流程执行。
+
+## 单个反重力环境验证候选内核
+
+从可信的候选账号镜像取出 `/opt/v3/python/agy_runtime` 目录。制品包含 Python 适配、原生观察器和与 AGY 1.5.9 执行体配套的资源。使用目标账号镜像的 Linux 架构和运行库构建。
+
+```bash
+sudo scripts/flower2api-stack stage-agy-kernel \
+  --env /srv/flower2api/.env \
+  --environment-id <运行环境的32位ID> \
+  --source /srv/candidates/agy_runtime
+```
+
+在「运行环境 → 请求内核」刷新候选并选择命令返回的摘要。切换需要当前环境空闲，原有工具会话完成后才可操作。下一条请求使用所选内核，页面随后显示实际加载的摘要。选择「平台内置」可恢复随平台交付的内核。重建同一平台批次时保留选择，升级至其他批次时采用目标镜像的内置版。

@@ -75,6 +75,8 @@ export interface Account {
   id: number
   platform?: string
   agy_system_prompt_homoglyph_enabled?: boolean
+  agy_gif_frames_enabled?: boolean
+  agy_disable_safety_filtering?: boolean
   credential_state?: {generation:number; phase:string; operation_id?:string | null}
   name: string
   email: string
@@ -359,6 +361,14 @@ export interface PrimeLogEntry {
 
 export type SettingsMap = Record<string, string>
 
+/** 控制服务最后一次健康探测的公开结果。 */
+export interface SystemUpdateControlProbe {
+  state: string
+  attempts: number
+  duration_ms?: number
+  http_status?: number
+}
+
 /** 一次持久系统更新操作的公开进度。 */
 export interface SystemUpdateOperation {
   operation_id: string
@@ -370,9 +380,13 @@ export interface SystemUpdateOperation {
   error?: string | null
   blockers?: string[]
   cancel_requested?: boolean
+  fast_transition?: boolean | null
+  admission_blocked_at?: string | null
+  admission_reopened_at?: string | null
   cluster_nodes?: { phase: string; nodes: Array<{ node_id: number; name?: string; phase: string; running: boolean; preparation?: { phase?: string; reason?: string; state?: string } }> } | null
   database_snapshot?: { state: string; completed_at: string; bytes: number } | null
   database_migrations?: Record<string, { state: string; target_version: number }> | null
+  control_health?: Partial<Record<'candidate' | 'restore', Record<'gateway' | 'orchestrator', SystemUpdateControlProbe>>> | null
   cleanup?: { status: string; removed: string[]; retained?: string[] } | null
   /** 按实际顺序记录的阶段与进入时间；旧操作没有记录时为空。 */
   steps?: Array<{ phase: string; at: string }> | null
@@ -383,10 +397,26 @@ export interface SystemPlatformVersion {
   version: string | null
 }
 
+/** 已生效版本的本机账号后台进度。 */
+export interface SystemAccountRollout {
+  operation_id: string
+  target_release: string
+  accounts: Array<{
+    environment_id: string
+    name: string
+    state: 'queued' | 'updating' | 'updated' | 'stopped' | 'waiting' | 'needs_check'
+    error?: string | null
+    retryable?: boolean
+  }>
+}
+
 /** 已安装底座的实际组件及恢复入口。 */
 export interface SystemUpdateStatus {
   installed: boolean
   migration_capability?: boolean
+  staged_updates?: boolean
+  prepared_candidate?: { operation_id: string; target_release: string; manifest_sha256: string; fast_transition: boolean } | null
+  account_rollout?: SystemAccountRollout | null
   message?: string
   revision?: string
   current_release?: string
@@ -429,6 +459,7 @@ export interface SystemUpdateRequest {
   target_release: string
   target_manifest_sha256: string
   drain_timeout_seconds: number
+  prepared_operation_id?: string
 }
 
 type RawSettingsMap = Record<string, unknown>
@@ -560,6 +591,10 @@ export interface DiagnosticContext {
   native_model_calls?: number | null
   control_state?: string | null
   control_observed_at?: string | null
+  control_error_code?: string | null
+  control_recovery?: string | null
+  input_rejection_reason?: string | null
+  input_rejection_field?: string | null
   response_headers_source?: string | null
   usage?: { source: string; usage_metadata: unknown; total_tokens: number | null; thoughts_tokens: number | null; complete: boolean } | null
   system_prompt_policy?: { enabled: boolean; rule_version: string; rule_sha256: string | null; source: string | null;
@@ -583,8 +618,8 @@ export interface NativeCapturePreview {
   body: string
   body_truncated: boolean
   headers_truncated: boolean
-  original_body_bytes: number
-  original_body_sha256: string
+  original_body_bytes: number | null
+  original_body_sha256: string | null
 }
 
 /** 原生TLS实际接受的实体证据；未知范围与网络刷出单独表示。 */
@@ -608,15 +643,24 @@ export interface NativeTlsCapture extends Omit<NativeCapturePreview, 'original_b
   binding_generation?: number
 }
 
-/** 已脱敏的 CC 组装后快照。 */
+/** AGY 实际 HTTP 传输或 TLS 接受写入中的 HTTP 请求。 */
+export interface AgyWireCapture extends NativeCapturePreview {
+  source: 'agy_http_transport' | 'agy_native_tls'
+  representation: 'http_entity_from_transport_trace' | 'http_entity_from_tls_accepted_write'
+  status: 'complete' | 'incomplete'
+  reason: string | null
+  http_status: number | null
+  complete: boolean
+}
+
+/** 已脱敏的请求阶段快照。 */
 export interface NativeCapture {
   state: string
   message?: string
   snapshot?: {
-    stage: 'cc_prepared' | 'ingress_rejected' | 'agy_prepared'
     decoded_gemini?: NativeCapturePreview
     ingress?: NativeCapturePreview
-    wire_final?: NativeTlsCapture
+    wire_final?: NativeTlsCapture | AgyWireCapture
     final_body_changes?: {
       source: string
       status: string
@@ -634,7 +678,7 @@ export interface NativeCapture {
       observed_count?: number
       stored_count?: number
       note?: string
-      decisions: { name: string; action: 'keep' | 'drop' | 'runtime' | 'context'; reason: string }[]
+      decisions: { name: string; action: 'keep' | 'drop' | 'runtime' | 'context'; reason: string; stage?: 'ingress' | 'egress' }[]
     }
     body_changes?: {
       source: string
@@ -642,13 +686,10 @@ export interface NativeCapture {
       note?: string
       items: { path: string; action: 'added' | 'removed' | 'changed'; reason: string }[]
     }
-    headers: [string, string][]
-    body: string
-    body_truncated: boolean
-    headers_truncated: boolean
-    original_body_bytes: number | null
-    original_body_sha256: string | null
-  }
+  } & (
+    | ({ stage: 'cc_prepared' | 'agy_prepared' } & NativeCapturePreview)
+    | ({ stage: 'ingress_rejected' | 'agy_ingress' | 'agy_egress' } & Partial<NativeCapturePreview>)
+  )
 }
 
 /** 代理目录全量计数；used 在引用不完整时为 null；expiring（7 天内到期）与 expired 由新版网关提供。 */
@@ -702,9 +743,10 @@ export const api = {
   /** 请求后台检查，安装由独立操作触发。@return 检查状态。 */
   systemUpdateCheck: () => request<{ checking: boolean }>('POST', '/runtime/api/system-updates/check', {}),
   /** 提交冻结组合。@param action 受支持动作。@param body 冻结参数。@return 持久操作。 */
-  systemUpdateInstall: (action: 'install' | 'rollback', body: SystemUpdateRequest) => request<SystemUpdateOperation>('POST', `/runtime/api/system-updates/${action}`, body),
+  systemUpdateInstall: (action: 'prepare' | 'install' | 'rollback', body: SystemUpdateRequest) => request<SystemUpdateOperation>('POST', `/runtime/api/system-updates/${action}`, body),
   /** 原操作取消或恢复。@param id 原操作。@param action 受控动作。@param revision 当前现场版本。@return 操作状态。 */
   systemUpdateControl: (id: string, action: 'cancel' | 'recover', revision: string) => request<SystemUpdateOperation>('POST', `/runtime/api/system-updates/operations/${encodeURIComponent(id)}/${action}`, { expected_revision: revision }),
+  systemUpdateRetryAccount: (id: string, environment: string, revision: string) => request<SystemAccountRollout>('POST', `/runtime/api/system-updates/operations/${encodeURIComponent(id)}/retry-account`, { environment_id: environment, expected_revision: revision }),
   /** 查询会话封禁。@param query 已编码条件。@param signal 取消信号。@return 安全分页。 */
   sessionPolicyBlocks: (query: string, signal?: AbortSignal) => request<SessionPolicyBlockPage>('GET', `/admin/session-policy-blocks?${query}`, undefined, signal),
   /** 提前解除单轮封禁。@param id 记录标识。@return 最新摘要。 */

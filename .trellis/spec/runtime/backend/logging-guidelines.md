@@ -519,6 +519,7 @@ bun run collect:pool-incidents --run manual-001 --run-dir artifacts/local-pool-r
 - `diagnostics.FailureDiagnostic(root:Path, operation:str, template:str|None=None, worker:str|None=None, instance:Path|None=None, stage:str='unknown', criu_returncode:int|None=None, log:Path|None=None)`跟踪实际操作边界。
 - `FailureDiagnostic.report(error:BaseException, *, supervisor:bool=False)->None`尽力保存受控摘要；supervisor模式写本实例副摘要，controller模式聚合并留存。
 - `Controller.run(arguments:list[str], timeout:float, diagnostic:FailureDiagnostic|None=None)->None`为异步内部方法，可将实际CRIU退出码写入上下文，原非零退出错误保持`RESTORE_CRIU_FAILED`。
+- `log_evidence(path:Path)->list[dict]` 读取固定操作日志并生成白名单摘要。AGY 控制器在真实 `dump` 或 `restore` 非零退出时调用同一解析器。
 
 ### 3. Contracts
 
@@ -526,6 +527,7 @@ bun run collect:pool-incidents --run manual-001 --run-dir artifacts/local-pool-r
 - `stage`、异常名称及reason按`diagnostics.py`中的`STAGES/EXCEPTIONS/REASONS`白名单投影；未知阶段为unknown，未知异常为UnknownError，非白名单原因为RESTORE_OPERATION_FAILED。标识仅接受规范UUID，其余为null。errno仅接受严格整数1至4095，其余为null；两个退出码字段为null或严格整数-255至255，非法副摘要拒绝。
 - `source`仅为null或`{module,line}`，模块来自`PYTHON_MODULES`，行号为1至10^7严格整数。禁止复制异常原文、命令、stderr、traceback正文、完整路径、环境、配置、凭据及业务正文。
 - 固定当前操作的dump.log或restore.log只读取最多16KiB尾部。`log_status`为not_applicable/available_tail/missing/invalid；`log_evidence`最多8项，精确字段为`{level,category,module,line}`。level为error/warning，去重后错误优先；category来自`CATEGORIES`或unknown，模块来自`CRIU_MODULES`或null，未知模块的行号为null。分类只表示日志线索。
+- AGY 固定输出 `{layer:'agy_criu_controller',stage:'dump'|'restore',criu_returncode,log_status,log_evidence}`，在临时快照目录回收前写一条日志。原 `AGY_CRIU_DUMP` 或 `AGY_CRIU_RESTORE` 仍沿私有连接投影。`fsnotify.c` 的 `Can't dump that handle` 归类为 `file_handle_unresolved`。
 - supervisor在原异常继续传播前排他写`<instance>/failure.json`。controller在原finally清理前读取并验证副摘要，记录自身阶段与异常，并以`upstream`保留首个上游摘要。`upstream_status`为not_applicable/available/missing/invalid；最多一层，必须为同instance的restore摘要，内部upstream_status必须为not_applicable；拒绝额外字段、重复JSON键、跨实例及递归嵌套。
 - controller留存至`/var/lib/ccrb-criu/failures/<UUID>.json`，最多32条、每条8192字节。写前验证既有记录，满32条时先删除at_ms最旧的受控记录。目录0700、文件0600且归当前受信任UID，生产为root；逐级O_NOFOLLOW打开目录，文件要求常规、单链接、受控名称与有效内容。外来或损坏内容使本次留存失败，保留原文件。
 - 发布使用同目录排他临时文件、完整写入和排他硬链接，随后清理临时文件。controller普通日志为`{layer:'criu_failure',persistence:'saved'|'DIAGNOSTIC_STORE_FAILED',diagnostic:<摘要>}`；提取失败仅输出固定`DIAGNOSTIC_CAPTURE_FAILED`。正常成功路径保持原流程。
@@ -557,5 +559,6 @@ bun run collect:pool-incidents --run manual-001 --run-dir artifacts/local-pool-r
 
 - `native/criu/test_diagnostics.py`：敏感消息、路径、命令与输出过滤，未知值/严格整数范围，真实CRIU EOF分类、16KiB尾部与最多8项、32条轮换和权限、排他副摘要、损坏/重复键/嵌套/跨实例、链接/硬链接/FIFO/归属、父目录链接、写入失败与FD清理、正常取消及日志输出故障。
 - `native/criu/test_controller.py`：模板失败、部分管道/launch失败、报告EOF与监督进程首错关联、诊断写入失败后原errno和FD清理、模板撤销及实际退出收口。
+- `native/criu/test_agy.py`：真实子进程非零退出时保留阶段、原退出码、`file_handle_unresolved` 和白名单行号，日志中的合成秘密不进入输出。
 - `scripts/criu/test_build.py`：新增模块进入导出、镜像source-manifest及打包画像，正式源码与分发输入逐文件摘要一致。
 - 隔离链路：真实CRIU非零退出与空报告，实例清理后仍有上游摘要；后续成功恢复、独立会话/TLS、取消、控制器强退与重启清理，以及普通exec回退每笔一次模拟POST。生产部署后核对自然故障事件及私有摘要。

@@ -110,6 +110,7 @@ from proxy_sync import synchronize_proxy
 from physical_features import physical_features_summary
 from run_windows import normalize_run_window, run_window_snapshot
 from project_library import ProjectLibrary, safe_relative
+from project_library_preparation import load_prepared_library
 from run_artifacts import list_workspace_files, read_workspace_file
 from run_usage import native_session_usage, run_usage, usage_input_tokens
 from project_requester_settings import ProjectRequesterSettings
@@ -8494,9 +8495,15 @@ async def lifespan(app: FastAPI):
     project_requester_settings = ProjectRequesterSettings(BENCH_DATA / 'settings/project-requester.json')
     if account_runtime:
         library = None
+        expects_prepared_library = bool(os.environ.get('V3_PREPARED_PROJECT_LIBRARY_IMAGE'))
         try:
-            library = ProjectLibrary(PROJECT_LIBRARY_DIR).install(BENCH_DATA)
+            if expects_prepared_library:
+                library = load_prepared_library(PROJECT_LIBRARY_DIR, BENCH_DATA)
+            else:
+                library = ProjectLibrary(PROJECT_LIBRARY_DIR).install(BENCH_DATA)
         except (ValueError, OSError) as error:
+            if expects_prepared_library and UPDATE_GATE.state()['phase'] == 'blocked':
+                raise RuntimeError('候选项目库准备结果不可用') from error
             # 当前内容准入失败不能遮住已冻结的历史发布、实例与成果。
             project_iteration_error = "项目内容库不可用：" + str(error)[:300]
         try:
@@ -8504,7 +8511,8 @@ async def lifespan(app: FastAPI):
                 scheduler.submit, _project_execution_settings, _quota_identity, _stop_project_run,
                 ProjectVerifier(runner.client, BENCH_DATA, HOST_BENCH_DATA, account_runtime.image), scheduler.is_executing,
                 admission=_project_admission, execution_control=_project_execution_control,
-                schedule_admission=_project_schedule_admission, concurrency_limit=PER_ACCOUNT_CONCURRENCY)
+                schedule_admission=_project_schedule_admission, concurrency_limit=PER_ACCOUNT_CONCURRENCY,
+                library_installed=True)
             project_iterations.dialogue = project_requester_settings.client()
             account_runtime.set_project_iterations(project_iterations)
             project_iterations.review_admission=_project_review_admission
@@ -14347,7 +14355,18 @@ def v3_environments() -> list[dict]:
     with ThreadPoolExecutor(max_workers=min(3, len(rows)), thread_name_prefix='environment-summary') as pool:
         futures = [pool.submit(copy_context().run, _v3_environment_summary, row, ownerships,
             native_preparations, native_preparation_error) for row in rows]
-        return [future.result() for future in futures]
+        environments = [future.result() for future in futures]
+    agy_environments = [row for row in environments if row.get('platform') == 'antigravity']
+    if agy_environments and cc2api_client:
+        try:
+            names = {account['id']: account['name'] for account in cc2api_client.list_accounts()
+                if account.get('platform') == 'antigravity' and type(account.get('id')) is int
+                and isinstance(account.get('name'), str) and account['name']}
+        except (ConnectionError, ValueError):
+            names = {}
+        for row in agy_environments:
+            row['gateway_account_name'] = names.get(row['gateway_account_id'])
+    return environments
 
 
 @app.post("/api/environments/{environment_id}/physical-features/refresh")
@@ -14655,6 +14674,59 @@ def v3_native_kernel(environment_id: str) -> dict:
     :return: HTTP410及平台统一管理说明。
     """
     raise HTTPException(410, '请求内核由平台版本统一管理，请通过系统更新升级或回退平台')
+
+
+class AgyKernelSelection(BaseModel):
+    """绑定原环境代次、原选择及目标制品摘要。"""
+
+    model_config = ConfigDict(extra='forbid')
+    expected_generation: StrictInt
+    expected_kernel: StrictStr | None
+    kernel: StrictStr | None
+
+
+def _agy_kernel_environment(environment_id: str) -> dict:
+    from agy_environment import lookup_environment
+
+    if V3_ENABLED and account_runtime and re.fullmatch(r'[0-9a-f]{32}', environment_id):
+        row = lookup_environment(account_runtime, environment_id)
+        if row and account_runtime.owns_environment(row):
+            return row
+    raise HTTPException(404, '本机反重力环境不存在')
+
+
+@app.get('/api/environments/{environment_id}/agy-kernel')
+def v3_agy_kernel_catalog(environment_id: str) -> dict:
+    """查询目标环境的候选摘要。@param environment_id 固定环境。@return 当前选择及同环境候选。"""
+    from agy_kernel import catalog
+
+    try:
+        return catalog(account_runtime, _agy_kernel_environment(environment_id))
+    except (OSError, ValueError):
+        raise HTTPException(409, '当前环境的内核登记需要核对') from None
+
+
+@app.post('/api/environments/{environment_id}/agy-kernel')
+def v3_select_agy_kernel(environment_id: str, body: AgyKernelSelection) -> dict:
+    """切换指定反重力环境的请求内核。@param environment_id 固定环境。@param body 冻结选择。@return 新选择。"""
+    from account_isolation import role_container
+    from agy_kernel import activate
+
+    _agy_kernel_environment(environment_id)
+    try:
+        with account_runtime.environment_lock(environment_id):
+            row = _agy_kernel_environment(environment_id)
+            sender = None
+            if row.get('sender_container_id'):
+                sender = role_container(account_runtime, row, 'sender')
+                sender.reload()
+                if sender.status != 'running':
+                    sender = None
+            return activate(account_runtime, row, body.model_dump(), sender)
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(409, str(error)) from None
+    except (DockerException, RequestException, OSError):
+        raise HTTPException(503, '内核切换状态待核对，请刷新当前环境') from None
 
 
 @app.post("/api/environments/{environment_id}/maintenance")

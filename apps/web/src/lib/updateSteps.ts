@@ -3,7 +3,7 @@ import type { SystemUpdateOperation } from '../api';
 /** 更新阶段的中文名称；未登记的阶段由调用方显示原值。 */
 export const UPDATE_PHASE_LABELS: Record<string, string> = {
   snapshotting: '保存数据库快照', migrating: '执行数据库迁移', restoring_data: '正在恢复数据库',
-  preparing: '下载与校验', prepared: '候选已准备', draining: '等待在途完成', switching: '切换平台服务',
+  preparing: '下载与校验', prepared: '待重启', draining: '等待在途完成', switching: '切换平台服务',
   verifying: '验证新版本', committing: '保存安装结果', cleaning: '回收旧制品', succeeded: '更新完成',
   succeeded_cleanup_pending: '更新完成，清理待重试', restoring: '正在恢复原版本', restored: '已恢复原版本',
   failed: '本次更新失败', cancelled: '本次更新已取消', reconcile: '等待恢复与对账',

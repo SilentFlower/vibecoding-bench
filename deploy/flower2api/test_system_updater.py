@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 import system_updater
 from system_release import create_index, create_release, sign_file
+from system_update_host import ControlHealthTimeout
 from system_updater import SystemUpdater, UpdateConflict, UpdateHTTPHandler, UpdateServer
 from system_updates import UnixUpdateConnection
 from runtime_files import atomic_json, atomic_text
@@ -37,6 +38,12 @@ class FakeDeployment:
         self.calls.append('prepare')
         if self.fail == 'prepare':
             raise ValueError('合成下载失败')
+
+    def verify_prepared(self, *args):
+        """记录本地材料的只读校验。@param args 冻结来源。@return 校验完成。"""
+        self.calls.append('verify_prepared')
+        if self.fail == 'verify_prepared':
+            raise ValueError('本地准备材料已失效，请重新下载更新')
 
     def capture(self, *args):
         """冻结合成现场。:param args: 原版。@return 现场。"""
@@ -185,6 +192,149 @@ class SystemUpdaterTests(unittest.TestCase):
         self.assertEqual(self.join()['current_release'], self.old['release'])
         with self.assertRaises(UpdateConflict):
             self.engine.submit('install', body)
+
+    def test_fast_switch_cancels_inference_and_finishes_with_pending_node(self) -> None:
+        """长流由切换动作取消，远程节点等待后台换版。@return 无。"""
+        self.backend.ready = False
+        self.backend.fast_transition = lambda original, selected: True
+        original_capture = self.backend.capture
+
+        def cancel(operation):
+            self.assertTrue(self.backend.blocked)
+            self.backend.calls.append('cancel_inference')
+            self.backend.ready = True
+
+        def unsupported(*args):
+            self.fail('中央快速换版不得等待远程节点')
+
+        def capture(current, central_only):
+            self.assertTrue(central_only)
+            return {**original_capture(current), 'nodes': [{'id': 2, 'name': 'main'}]}
+
+        self.backend.capture = capture
+        self.backend.cancel_inference = cancel
+        self.backend.prepare_nodes = self.backend.resume_nodes = unsupported
+        self.engine.submit('install', self.request())
+        state = self.join()
+        operation = state['operation']
+        self.assertEqual(operation['phase'], 'succeeded')
+        self.assertEqual(operation['cluster_nodes']['phase'], 'background')
+        self.assertEqual(operation['cluster_nodes']['nodes'][0]['name'], 'main')
+        self.assertIsNotNone(operation['admission_reopened_at'])
+        self.assertTrue(operation['fast_transition'])
+        self.assertLess(self.backend.calls.index('cancel_inference'), self.backend.calls.index('switch'))
+        self.assertFalse(self.backend.blocked)
+
+    def test_prepared_install_reuses_candidate_after_updater_restart(self) -> None:
+        """下载结果在执行器重启后仍可消费，切换无第二次下载。@return 无。"""
+        download = self.request()
+        self.engine.submit('prepare', download)
+        prepared = self.join()['prepared_candidate']
+        self.assertEqual(prepared['operation_id'], download['operation_id'])
+        self.assertNotIn('block', self.backend.calls)
+        self.engine = SystemUpdater(self.engine.policy, self.backend)
+        self.assertEqual(self.engine.status()['prepared_candidate'], prepared)
+        with self.assertRaises(UpdateConflict):
+            self.engine.submit('install', {**self.request(), 'prepared_operation_id': str(uuid.uuid4())})
+        self.engine.submit('install', {**self.request(), 'prepared_operation_id': prepared['operation_id']})
+        self.assertEqual(self.join()['current_release'], self.target['release'])
+        self.assertEqual(self.backend.calls.count('prepare'), 1)
+        self.assertLess(self.backend.calls.index('verify_prepared'), self.backend.calls.index('block'))
+
+    def test_missing_prepared_material_keeps_original_in_service(self) -> None:
+        """候选失效在关闭准入前返回重下载入口。@return 无。"""
+        download = self.request()
+        self.engine.submit('prepare', download)
+        self.join()
+        self.backend.fail = 'verify_prepared'
+        self.engine.submit('install', {**self.request(), 'prepared_operation_id': download['operation_id']})
+        status = self.join()
+        self.assertEqual(status['current_release'], self.old['release'])
+        self.assertIsNone(status['prepared_candidate'])
+        self.assertIn('重新下载', status['operation']['error'])
+        self.assertNotIn('block', self.backend.calls)
+
+    def test_local_rollout_starts_after_release_and_retries_only_selected_account(self) -> None:
+        """中央接单与后台账号耗时无关，等待和故障独立记录。@return 无。"""
+        accounts = {'a': '慢账号', 'b': '故障账号', 'c': '正常账号'}
+        entered, release_slow, other_done = threading.Event(), threading.Event(), threading.Event()
+        attempts = []
+        self.backend.fast_transition = lambda *_: True
+        self.backend.supports_local_rollout = lambda *_: True
+        self.backend.cancel_inference = lambda *_: None
+        original_capture = self.backend.capture
+
+        def capture(current, central_only, *, control_only):
+            self.assertTrue(central_only and control_only)
+            return original_capture(current)
+
+        self.backend.capture = capture
+        self.backend.stage_local_rollout = lambda *_: {key: {
+            'environment_id': key, 'name': name, 'generation': 1, 'state': 'queued'} for key, name in accounts.items()}
+
+        def rollout(operation, item):
+            key = item['environment_id']
+            attempts.append(key)
+            if key == 'a' and attempts.count(key) == 1:
+                entered.set()
+                release_slow.wait(10)
+                return {'environment_id': key, 'state': 'waiting'}
+            if key == 'b':
+                raise TimeoutError('合成账号超时')
+            other_done.set()
+            return {'environment_id': key, 'state': 'updated'}
+
+        self.backend.rollout_environment = rollout
+        self.engine.submit('prepare', self.request())
+        candidate = self.join()['prepared_candidate']
+        self.assertTrue(candidate['fast_transition'])
+        install = self.request()
+        self.engine.submit('install', {**install, 'prepared_operation_id': candidate['operation_id']})
+        try:
+            self.assertTrue(entered.wait(10))
+            status = self.engine.status()
+            self.assertEqual(status['current_release'], self.target['release'])
+            self.assertFalse(status['busy'])
+            self.assertFalse(self.backend.blocked)
+            self.assertIsNotNone(status['operation']['admission_reopened_at'])
+            self.assertEqual(status['account_rollout']['accounts'][0]['state'], 'updating')
+        finally:
+            release_slow.set()
+        self.assertTrue(other_done.wait(10))
+        worker = self.engine.rollout_worker
+        if worker:
+            worker.join(10)
+        status = self.engine.status()
+        self.assertEqual([item['state'] for item in status['account_rollout']['accounts']], ['waiting', 'needs_check', 'updated'])
+        self.engine = SystemUpdater(self.engine.policy, self.backend)
+        self.engine.resume()
+        self.engine.retry_account(install['operation_id'], {'expected_revision': status['revision'], 'environment_id': 'a'})
+        worker = self.engine.rollout_worker
+        if worker:
+            worker.join(10)
+        self.assertEqual([item['state'] for item in self.engine.status()['account_rollout']['accounts']], ['updated', 'needs_check', 'updated'])
+        self.assertEqual(attempts, ['a', 'b', 'c', 'a'])
+
+    def test_retains_candidate_probe_results_after_restoring_original(self) -> None:
+        """原版恢复后按操作保留候选和恢复的独立证据。@return 无。"""
+        candidate = {'gateway': {'state': 'ready', 'http_status': 200, 'attempts': 3},
+            'orchestrator': {'state': 'http_error', 'http_status': 503, 'attempts': 3}}
+        original = {role: {'state': 'ready', 'http_status': 200, 'attempts': 1} for role in candidate}
+
+        def restore(operation, save):
+            operation['control_health']['restore'] = original
+            save()
+            self.backend.blocked = False
+
+        with patch.object(self.backend, 'wait_controls', side_effect=ControlHealthTimeout(candidate)), \
+                patch.object(self.backend, 'restore', side_effect=restore):
+            self.engine.submit('install', self.request())
+            state = self.join()
+        self.assertEqual(state['current_release'], self.old['release'])
+        self.assertEqual(state['operation']['phase'], 'restored')
+        self.assertEqual(state['operation']['control_health'], {'candidate': candidate, 'restore': original})
+        self.assertEqual(state['operation']['error'], '候选控制服务健康验收超时')
+        self.assertFalse(self.backend.blocked)
 
     def test_equal_content_repository_migration_selects_new_account_source(self) -> None:
         """同内容跨仓库也展示重建，并选择新签名来源。@return None。"""

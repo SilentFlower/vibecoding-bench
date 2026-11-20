@@ -7,6 +7,9 @@
   .requests-page { min-width: 0; color: var(--ui-color-text); font-size: var(--ui-font-size-md); line-height: 1.55; }
   .requests-page > * + * { margin-top: calc(var(--ui-space-unit) * 4.5); }
   .request-mode-card .fui-overview-card-value { font-size: var(--ui-font-size-heading); }
+  /* debug 模式下页头右侧的「正文采集范围」；宽度沿主线 .request-mode。 */
+  .request-diagnostics-settings { display: flex; flex-wrap: wrap; gap: calc(var(--ui-space-unit) * 3); }
+  .request-diagnostics-settings > .fui-field { width: 190px; }
   .request-query { flex: 1; min-width: 0; }
   .request-query .fui-toolbar-end > .fui-search { width: 380px; max-width: 100%; }
   .request-query .fui-toolbar-end > [aria-expanded] { position: relative; }

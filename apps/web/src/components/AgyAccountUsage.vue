@@ -4,7 +4,7 @@ import { ArrowRight, ChevronRight } from '@/components/ui/icon';
 import type { Account, AgyUsageWindow } from '../api';
 import AgyQuotaRow from './AgyQuotaRow.vue';
 
-const props = defineProps<{ account: Account; expanded?: boolean }>();
+const props = defineProps<{ account: Account; expanded?: boolean; refreshing?: boolean; refreshError?: string }>();
 const quota = computed(() => props.account.usage_data?.platform_quota);
 const groups = computed(() => quota.value?.groups?.items ?? []);
 const models = computed(() => quota.value?.models?.items ?? []);
@@ -27,7 +27,9 @@ function tokenLabel(stats: AgyUsageWindow): string {
       <router-link :to="{name:'requests',query:{account:String(account.id)}}">请求记录<ArrowRight :size="12" /></router-link>
     </header>
     <div class="agy-usage-section agy-platform-quota">
-      <p v-if="!quota">未刷新</p>
+      <p v-if="refreshing" class="agy-quota-note" role="status">正在刷新额度</p>
+      <p v-else-if="refreshError" class="agy-quota-note" role="status">{{ refreshError }}</p>
+      <p v-else-if="!quota">未刷新</p>
       <p v-else-if="!groups.length && !models.length">{{ quota.status === 'unavailable' ? '读取失败' : '未提供额度' }}</p>
       <p v-else-if="quota.status === 'unavailable'" class="agy-quota-note">刷新失败 · 显示上次读数</p>
       <p v-else-if="quota.groups && quota.groups.observed_at_ms < quota.checked_at_ms" class="agy-quota-note">共享额度为上次读数</p>

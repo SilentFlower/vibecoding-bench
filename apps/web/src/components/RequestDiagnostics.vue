@@ -68,6 +68,7 @@ const dialogOpen = ref(false);
 const detailLoading = ref(false);
 const detailError = ref('');
 const mode = ref<'info' | 'debug' | 'unknown'>('unknown');
+const rejectedBody = ref<'preview' | 'full'>('preview');
 const modeSaving = ref(false);
 const modeError = ref('');
 let listController: AbortController | null = null;
@@ -93,7 +94,12 @@ function rejectionLabel(reason?: string | null): string {
   return ({ native_entrypoint_unsupported: '调用入口不支持（billing.cc_entrypoint）', native_version_mismatch: '原生版本冲突（billing.cc_version）',
     native_billing_invalid: 'billing 结构错误（system 首段）', native_metadata_invalid: '身份结构错误（metadata）',
     unsupported_body_field: '正文根字段暂不支持', unsupported_message_field: '消息扩展字段暂不支持（messages）',
-    unsupported_system_block: 'system 内容块暂不支持', invalid_message_role: '消息角色不符合当前接入格式（messages.role）' } as Record<string, string>)[reason ?? ''] ?? '具体拒绝原因未记录';
+    unsupported_system_block: 'system 内容块暂不支持', invalid_message_role: '消息角色不符合当前接入格式（messages.role）',
+    session_policy_block: '会话被本地策略拦截', request_policy: '请求被本地策略拦截',
+    access_policy: '请求被准入策略拦截', request: '入站请求校验失败', admission: '请求未获准入',
+    account_selection: '账号选择阶段返回', tool_continuation: '原工具轮回填或收尾失败',
+    credentials: '账号凭据检查失败', runtime_prepare: '运行环境准备失败',
+    gateway: '网关本地处理失败' } as Record<string, string>)[reason ?? ''] ?? reason ?? '具体拒绝原因未记录';
 }
 /** 计算完整成功尝试的平均输出速率。@param attempt 实际尝试摘要。@return 一位小数的 token/s 或未观测。 */
 function averageTps(attempt?: DiagnosticAttempt | null): string {
@@ -203,21 +209,29 @@ function restoreFocus(event: Event): void {
 async function loadMode(): Promise<void> {
   try {
     const settings = await api.getSettings(settingsController.signal);
-    if (mounted) mode.value = settings.request_diagnostics_log_mode === 'debug' ? 'debug' : 'info';
+    if (mounted) {
+      mode.value = settings.request_diagnostics_log_mode === 'debug' ? 'debug' : 'info';
+      rejectedBody.value = settings.request_diagnostics_rejected_body === 'full' ? 'full' : 'preview';
+    }
   } catch (cause) {
     if (mounted && !settingsController.signal.aborted) modeError.value = cause instanceof Error ? cause.message : '日志模式读取失败';
   }
 }
 
-/** 保存后续请求使用的模式。@param value 日志模式。@return 保存结束。 */
-async function saveMode(value: string): Promise<void> {
-  if (value !== 'info' && value !== 'debug') return;
+/** 保存后续请求使用的诊断设置。@param value 日志模式或拒绝正文范围。@return 保存结束。 */
+async function saveDiagnostics(value: string): Promise<void> {
+  const logMode = value === 'info' || value === 'debug';
+  if (!logMode && value !== 'preview' && value !== 'full') return;
   modeSaving.value = true; modeError.value = '';
   try {
-    await api.updateSettings({ request_diagnostics_log_mode: value });
-    if (mounted) mode.value = value;
+    const key = logMode ? 'request_diagnostics_log_mode' : 'request_diagnostics_rejected_body';
+    await api.updateSettings({ [key]: value });
+    if (mounted) {
+      if (value === 'info' || value === 'debug') mode.value = value;
+      else rejectedBody.value = value;
+    }
   } catch (cause) {
-    if (mounted) modeError.value = cause instanceof Error ? cause.message : '日志模式保存失败';
+    if (mounted) modeError.value = cause instanceof Error ? cause.message : '诊断设置保存失败';
   } finally {
     if (mounted) { modeSaving.value = false; }
   }
@@ -348,12 +362,14 @@ onUnmounted(() => { mounted = false; listGeneration++; detailGeneration++; listC
 
 <template>
   <section class="requests-page" aria-label="请求记录">
-    <PageHeader title="请求记录" description="从请求结果、用量到处理链路，快速找到需要关注的调用。" />
+    <PageHeader title="请求记录" description="从请求结果、用量到处理链路，快速找到需要关注的调用。">
+      <template v-if="mode === 'debug'" #actions><div class="request-diagnostics-settings"><ChoiceSelect :model-value="rejectedBody" label="正文采集范围" :options="[{value:'preview',label:'限长预览'},{value:'full',label:'完整正文 · 脱敏'}]" :disabled="modeSaving" @update:model-value="saveDiagnostics" /></div></template>
+    </PageHeader>
     <OverviewGrid class="request-overview">
       <OverviewCard label="全部记录" :value="counts?.all ?? '—'" caption="保留 7 天"><template #icon><Activity /></template></OverviewCard>
       <OverviewCard label="错误" :value="counts?.errors ?? '—'" caption="六类错误集合" tone="danger"><template #icon><AlertCircle /></template></OverviewCard>
       <OverviewCard label="处理中" :value="counts?.processing ?? '—'" caption="按当前筛选统计" tone="info"><template #icon><Clock /></template></OverviewCard>
-      <OverviewCard interactive class="request-mode-card" label="后续请求日志" :value="modeValue" :caption="modeSaving ? '保存中…' : '仅影响后续请求 · 点击切换'" tone="warning" :disabled="modeSaving || mode === 'unknown'" :aria-label="modeLabelText" @click="saveMode(mode === 'info' ? 'debug' : 'info')"><template #icon><SlidersHorizontal /></template></OverviewCard>
+      <OverviewCard interactive class="request-mode-card" label="后续请求日志" :value="modeValue" :caption="modeSaving ? '保存中…' : '仅影响后续请求 · 点击切换'" tone="warning" :disabled="modeSaving || mode === 'unknown'" :aria-label="modeLabelText" @click="saveDiagnostics(mode === 'info' ? 'debug' : 'info')"><template #icon><SlidersHorizontal /></template></OverviewCard>
     </OverviewGrid>
     <NoticeStrip v-if="modeError" tone="danger" role="alert"><AlertCircle />{{ modeError }}</NoticeStrip>
     <NoticeStrip v-if="Object.values(health).some(value=>value>0)" tone="warning" role="status" class="request-health"><AlertCircle />诊断采集健康：{{ health }}</NoticeStrip>
@@ -403,8 +419,9 @@ onUnmounted(() => { mounted = false; listGeneration++; detailGeneration++; listC
       <section v-if="selected" :id="`request-panel-${activeTab}`" role="tabpanel" :aria-labelledby="`request-tab-${activeTab}`" tabindex="0" class="request-panel">
         <template v-if="activeTab === 'overview'">
           <div class="request-detail-hero"><div class="request-detail-hero-main"><span class="request-detail-outcome"><Badge as="span" :variant="outcomeVariant(selected.outcome)" dot>{{ outcomeLabel(selected.outcome) }}</Badge><code class="fui-table-mono">{{ selected.status_code ?? '待终结' }}</code></span><h3>{{ selected.account_name || selected.account_email || accountLabel(selected) }}</h3><p>{{ selected.account_email || '暂无账号邮箱' }}</p></div><div class="request-detail-hero-metric"><span>请求总耗时</span><strong>{{ milliseconds(elapsed(selected)) }}</strong></div></div>
-          <NoticeStrip v-if="selected.error_stage" tone="danger" class="request-error-explanation"><AlertCircle /><span><strong>{{ outcomeLabel(selected.outcome) }}</strong> · 错误阶段：{{ selected.error_stage }}{{ selected.status_code===200?' · HTTP 200，响应未完整结束':'' }}</span></NoticeStrip>
-          <NoticeStrip v-if="selected.native_rejection" tone="danger" class="request-error-explanation"><AlertCircle /><span><strong>{{ rejectionLabel(selected.native_rejection.reason) }}</strong> · 本次在上游发送前拒绝。入口采集状态：{{ captureLabel(selected.native_rejection.capture_status) }}</span><template #end><Button type="button" variant="outline" size="sm" :disabled="detailLoading" @click="inspect()">查看入站请求</Button></template></NoticeStrip>
+          <NoticeStrip v-if="selected.error_stage" tone="danger" class="request-error-explanation"><AlertCircle /><span><strong>{{ outcomeLabel(selected.outcome) }}</strong><template v-if="attempts.at(-1)?.error_type === 'RESOURCE_EXHAUSTED'"> · 上游额度不足或触发限流（RESOURCE_EXHAUSTED）</template> · 错误阶段：{{ selected.error_stage === 'system_update' ? '系统更新中断' : selected.error_stage === 'upstream_model' ? '上游模型' : selected.error_stage }}{{ selected.status_code===200 ? (attempts.at(-1)?.partial === false ? ' · HTTP 200，模型响应已结束' : ' · HTTP 200，响应未完整结束') : '' }}</span></NoticeStrip>
+          <NoticeStrip v-if="selected.native_rejection" tone="danger" class="request-error-explanation"><AlertCircle /><span><strong>{{ rejectionLabel(selected.native_rejection.reason) }}</strong> · 本次在上游发送前拒绝。入口采集状态：{{ captureLabel(selected.native_rejection.capture_status) }}<template v-if="selected.context?.input_rejection_field"> · <code>{{ selected.context.input_rejection_field }}</code></template></span><template #end><Button type="button" variant="outline" size="sm" :disabled="detailLoading" @click="inspect()">查看入站请求</Button></template></NoticeStrip>
+          <NoticeStrip v-else-if="selected.context?.input_rejection_reason" tone="danger" class="request-error-explanation"><AlertCircle /><span><strong>请求在上游发送前被拒绝</strong> · <code>{{ selected.context.input_rejection_reason }}</code><template v-if="selected.context.input_rejection_field"> · <code>{{ selected.context.input_rejection_field }}</code></template></span><template v-if="currentAttempt && canInspect(currentAttempt)" #end><Button type="button" variant="outline" size="sm" :disabled="detailLoading" @click="inspect(currentAttempt)">查看入站请求</Button></template></NoticeStrip>
           <dl class="request-definitions"><dt>开始时间</dt><dd :title="selected.started_at">{{ formatLocalTime(selected.started_at) }}</dd><dt>结束时间</dt><dd :title="selected.finished_at ?? undefined">{{ formatLocalTime(selected.finished_at) }}</dd><dt>原始 Session ID</dt><dd><div v-if="selected.original_session_id" class="request-session request-session-full"><code>{{ selected.original_session_id }}</code><button type="button" class="request-copy" :aria-label="`复制原始 Session ID ${selected.original_session_id}`" @click="copy(selected.original_session_id,$event)"><Copy :size="12" /></button></div><span v-else>未提供</span></dd><dt>账号平台</dt><dd>{{ platformLabel(selected.context?.platform) }}</dd><dt>入口协议</dt><dd>{{ selected.context?.entry_protocol ?? '历史未记录' }}</dd><dt>请求模型</dt><dd>{{ selected.context?.requested_model ?? '历史未记录' }}</dd><dt>响应关联 ID</dt><dd><code>{{ selected.response_request_id ?? '未观测' }}</code></dd><dt>发生时日志</dt><dd>{{ selected.log_mode || '历史模式未知' }}</dd><dt>尝试次数</dt><dd>{{ selected.attempt_count }}</dd><dt>末次执行节点</dt><dd><ExecutionNodeBadge compact :node="latestExecution" :empty-label="selected.attempt_count===0 ? '无执行尝试' : '节点未观测'" /></dd><dt>显示时区</dt><dd>{{ Intl.DateTimeFormat().resolvedOptions().timeZone }}</dd></dl>
           <section class="request-section"><div class="request-section-head"><h3>上游尝试</h3><span>{{ attempts.length }} 次</span></div>
             <article v-for="attempt in attempts" :key="attempt.attempt_id" class="request-attempt-summary"><span class="request-attempt-icon">{{ attempt.ordinal }}</span><div class="request-attempt-text"><strong>{{ attempt.account_name || attempt.account_email || accountLabel(attempt) }}</strong><small>{{ attempt.account_email || '暂无账号邮箱' }} · {{ attempt.parameters?.model || attempt.response_model || '模型未观测' }}</small><span>{{ captureLabel(attempt.capture_status) }} · {{ modeLabel(attempt.log_mode) }}</span><ExecutionNodeBadge compact :node="attempt.execution_location" /></div><div class="request-attempt-actions"><Button type="button" variant="outline" size="sm" @click="activeTab='chain'">查看链路<ArrowRight :size="13" /></Button><Button v-if="canInspect(attempt)" type="button" variant="outline" size="sm" :disabled="detailLoading" @click="inspect(attempt)">阶段证据</Button><router-link :to="{name:'environments',query:{gateway_account:String(attempt.account_id)}}" class="request-text-button">内容采集设置</router-link></div></article>
@@ -413,7 +430,7 @@ onUnmounted(() => { mounted = false; listGeneration++; detailGeneration++; listC
         </template>
         <template v-else-if="activeTab === 'chain'">
           <div class="request-chain-heading"><h3>请求处理链路</h3><p>按实际提交顺序展示，每次尝试保留自己的账号与结果。</p></div>
-          <article v-for="attempt in attempts" :key="attempt.attempt_id" class="request-chain-card"><header><span class="request-attempt-icon">{{ attempt.ordinal }}</span><div><h3>{{ attempt.account_name || attempt.account_email || accountLabel(attempt) }}</h3><p>{{ attempt.account_email || '暂无账号邮箱' }}</p></div><span class="request-detail-outcome"><Badge as="span" :variant="outcomeVariant(attempt.outcome)" dot>{{ outcomeLabel(attempt.outcome) }}</Badge><code class="fui-table-mono">{{ attempt.status_code ?? '未观测' }}</code></span></header><dl class="request-definitions"><dt>执行节点</dt><dd><ExecutionNodeBadge compact :node="attempt.execution_location" /></dd><dt v-if="attempt.execution_location">环境代次</dt><dd v-if="attempt.execution_location">{{ attempt.execution_location.environment_id }} · {{ attempt.execution_location.generation }}</dd><dt>转发方式</dt><dd>{{ attempt.profile_selection }}</dd><dt>画像版本</dt><dd>{{ attempt.profile_version ?? '未观测' }}</dd><dt>上游模型</dt><dd>{{ attempt.response_model ?? '未观测' }}</dd><dt>上游请求 ID</dt><dd>{{ attempt.upstream_request_id ?? '未观测' }}</dd><dt>重试原因</dt><dd>{{ attempt.retry_reason ?? '未记录重试' }}</dd><dt>错误阶段</dt><dd>{{ attempt.error_stage ?? '未记录错误阶段' }}</dd><dt>账号平台 / 内核</dt><dd>{{ platformLabel(attempt.context?.platform) }} · {{ attempt.context?.kernel ?? '历史未记录' }} {{ attempt.context?.kernel_version ?? '' }}</dd><dt>实际提交模型</dt><dd>{{ attempt.context?.submitted_model ?? '历史未记录' }}</dd><dt>凭据代次</dt><dd>{{ attempt.context?.credential_generation ?? '未观测' }}</dd><dt>工作进程</dt><dd>{{ attempt.context?.worker_id ?? '未观测' }}</dd><dt>原生会话</dt><dd>{{ attempt.context?.conversation_id ?? '未观测' }}</dd><dt>原生控制收口</dt><dd>{{ ({completed:'已收口',cancelled:'已取消',error:'收口异常'} as Record<string,string>)[attempt.context?.control_state ?? ''] ?? '未观测' }} · {{ formatLocalTime(attempt.context?.control_observed_at) }}</dd><dt>系统提示词转换</dt><dd>{{ policyLabel(attempt) }}</dd><dt v-if="attempt.context?.system_prompt_policy">规则 / 来源</dt><dd v-if="attempt.context?.system_prompt_policy">{{ attempt.context.system_prompt_policy.rule_version }} · {{ attempt.context.system_prompt_policy.source ?? '未观测' }}</dd><template v-if="attempt.context?.tool_turn"><dt>工具最近观测</dt><dd>{{ ({waiting:'等待结果',completed:'已收口',cancelled:'已取消',error:'收口异常',continuation:'后续HTTP'} as Record<string,string>)[attempt.context.tool_turn.state] ?? '未观测' }} · {{ formatLocalTime(attempt.context.tool_turn.observed_at) }}</dd><dt>前驱HTTP请求</dt><dd>{{ attempt.context.tool_turn.continuation_of_request_id ?? '首轮' }}</dd></template><dt>真实会话摘要</dt><dd>{{ attempt.sessions?.real_session_hash ?? '未观测' }}</dd><dt>上游会话摘要</dt><dd>{{ attempt.sessions?.upstream_session_hash ?? '未观测' }}</dd></dl></article>
+          <article v-for="attempt in attempts" :key="attempt.attempt_id" class="request-chain-card"><header><span class="request-attempt-icon">{{ attempt.ordinal }}</span><div><h3>{{ attempt.account_name || attempt.account_email || accountLabel(attempt) }}</h3><p>{{ attempt.account_email || '暂无账号邮箱' }}</p></div><span class="request-detail-outcome"><Badge as="span" :variant="outcomeVariant(attempt.outcome)" dot>{{ outcomeLabel(attempt.outcome) }}</Badge><code class="fui-table-mono">{{ attempt.status_code ?? '未观测' }}</code></span></header><dl class="request-definitions"><dt>执行节点</dt><dd><ExecutionNodeBadge compact :node="attempt.execution_location" /></dd><dt v-if="attempt.execution_location">环境代次</dt><dd v-if="attempt.execution_location">{{ attempt.execution_location.environment_id }} · {{ attempt.execution_location.generation }}</dd><dt>转发方式</dt><dd>{{ attempt.profile_selection }}</dd><dt>画像版本</dt><dd>{{ attempt.profile_version ?? '未观测' }}</dd><dt>上游模型</dt><dd>{{ attempt.response_model ?? '未观测' }}</dd><dt>上游请求 ID</dt><dd>{{ attempt.upstream_request_id ?? '未观测' }}</dd><dt>重试原因</dt><dd>{{ attempt.retry_reason ?? '未记录重试' }}</dd><dt>错误阶段</dt><dd>{{ attempt.error_stage ?? '未记录错误阶段' }}</dd><dt>账号平台 / 内核</dt><dd>{{ platformLabel(attempt.context?.platform) }} · {{ attempt.context?.kernel ?? '历史未记录' }} {{ attempt.context?.kernel_version ?? '' }}</dd><dt>实际提交模型</dt><dd>{{ attempt.context?.submitted_model ?? '历史未记录' }}</dd><dt>凭据代次</dt><dd>{{ attempt.context?.credential_generation ?? '未观测' }}</dd><dt>工作进程</dt><dd>{{ attempt.context?.worker_id ?? '未观测' }}</dd><dt>原生会话</dt><dd>{{ attempt.context?.conversation_id ?? '未观测' }}</dd><dt>原生控制收口</dt><dd>{{ ({completed:'已收口',cancelled:'已取消',error:'收口异常'} as Record<string,string>)[attempt.context?.control_state ?? ''] ?? '未观测' }} · {{ formatLocalTime(attempt.context?.control_observed_at) }}<span v-if="attempt.context?.control_error_code"> · <code>{{ attempt.context.control_error_code }}</code></span><span v-if="attempt.context?.control_recovery"> · 恢复判定 <code>{{ attempt.context.control_recovery }}</code></span></dd><dt>系统提示词转换</dt><dd>{{ policyLabel(attempt) }}</dd><dt v-if="attempt.context?.system_prompt_policy">规则 / 来源</dt><dd v-if="attempt.context?.system_prompt_policy">{{ attempt.context.system_prompt_policy.rule_version }} · {{ attempt.context.system_prompt_policy.source ?? '未观测' }}</dd><template v-if="attempt.context?.tool_turn"><dt>工具最近观测</dt><dd>{{ ({waiting:'等待结果',completed:'已收口',cancelled:'已取消',error:'收口异常',continuation:'后续HTTP'} as Record<string,string>)[attempt.context.tool_turn.state] ?? '未观测' }} · {{ formatLocalTime(attempt.context.tool_turn.observed_at) }}</dd><dt>前驱HTTP请求</dt><dd>{{ attempt.context.tool_turn.continuation_of_request_id ?? '首轮' }}</dd></template><dt>真实会话摘要</dt><dd>{{ attempt.sessions?.real_session_hash ?? '未观测' }}</dd><dt>上游会话摘要</dt><dd>{{ attempt.sessions?.upstream_session_hash ?? '未观测' }}</dd></dl></article>
           <div v-if="!attempts.length && !detailLoading" class="request-empty-capture">没有已记录的上游尝试。</div>
         </template>
         <template v-else-if="activeTab === 'performance'">
@@ -427,7 +444,7 @@ onUnmounted(() => { mounted = false; listGeneration++; detailGeneration++; listC
           <div v-if="selected.native_rejection" class="request-raw-controls"><Button type="button" variant="outline" :disabled="detailLoading" @click="inspect()"><RefreshCw :size="14" />{{ detailLoading ? '读取中…' : '读取拒绝请求的入站证据' }}</Button><span>{{ rejectionLabel(selected.native_rejection.reason) }}</span></div>
           <div class="request-raw-controls"><ChoiceSelect :model-value="currentAttempt?.attempt_id" label="当前尝试" :options="attempts.map(attempt=>({value:attempt.attempt_id,label:`尝试 ${attempt.ordinal} · ${accountLabel(attempt)}`}))" @update:model-value="value=>{selectedAttempt=value;changeAttempt()}" /><Button v-if="currentAttempt && canInspect(currentAttempt)" type="button" variant="outline" :disabled="detailLoading" @click="inspect(currentAttempt)"><RefreshCw :size="14" />{{ detailLoading ? '读取中…' : capture ? '刷新阶段证据' : '读取阶段证据' }}</Button></div>
           <div v-if="currentAttempt && !canInspect(currentAttempt)" class="request-empty-capture"><ShieldCheck :size="20" /><strong>{{ currentAttempt.log_mode === 'info' ? '本次仅保存摘要' : captureLabel(currentAttempt.capture_status) }}</strong><p>完整阶段原文需要账号内容采集开启及 debug 日志模式。设置对后续请求生效。</p><Button as-child variant="outline" size="sm"><router-link :to="{name:'environments',query:{gateway_account:String(currentAttempt.account_id)}}">前往该账号环境配置<ArrowRight :size="13" /></router-link></Button></div>
-          <section v-else-if="capture"><p v-if="capture.state!=='available' || capture.message" role="status" class="form-help">阶段证据 · {{ capture.state === 'missing' ? '文件缺失或已清理' : capture.state === 'expired' ? '已超过保留期' : capture.state === 'available' ? '已读取' : capture.state }}{{ capture.message ? ' · '+capture.message : '' }}</p><NativeStageDetails v-if="capture.snapshot" :key="selectedAttempt" :snapshot="capture.snapshot" /></section>
+          <section v-else-if="capture"><p v-if="!['available', 'saved'].includes(capture.state) || capture.message" role="status" class="form-help">阶段证据 · {{ capture.state === 'missing' ? '文件缺失或已清理' : capture.state === 'expired' ? '已超过保留期' : ['available', 'saved'].includes(capture.state) ? '已读取' : capture.state }}{{ capture.message ? ' · '+capture.message : '' }}</p><NativeStageDetails v-if="capture.snapshot" :key="selectedAttempt" :snapshot="capture.snapshot" /></section>
           <div v-else-if="!detailLoading" class="request-empty-capture"><strong>按需读取阶段证据</strong><p>选择上方尝试后读取脱敏处理信息。</p></div>
           <details class="request-code-block"><summary>已脱敏诊断字段 · 原始时间</summary><pre>{{ JSON.stringify({request:selected,attempts},null,2) }}</pre></details>
         </template>

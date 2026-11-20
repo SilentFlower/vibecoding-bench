@@ -22,7 +22,9 @@ use crate::model::request_diagnostics::{
     DiagnosticTokens, ExecutionLocation, NativeRejection, NativeRequestObservation,
     RequestDiagnostic, RequestLogMode, normalize_correlation_id, safe_model,
 };
+use crate::service::native_capture;
 use crate::service::rewriter::extract_session_id_from_body;
+use crate::service::system_update::InferenceCutover;
 use crate::service::usage::UsageCapture;
 use crate::service::v3_scheduling::SchedulingRequest;
 use crate::service::version_profile::profile_for_version;
@@ -30,6 +32,13 @@ use crate::store::cache::UpstreamSessionPoolResolve;
 use crate::store::diagnostics_store::{ActiveDiagnostic, DiagnosticEvent, DiagnosticsStore};
 
 pub(crate) mod agy;
+
+/// 在同一请求入口冻结日志级别与拒绝正文范围。
+#[derive(Clone, Copy, Default)]
+pub(crate) struct RequestDiagnosticsConfig {
+    pub(crate) mode: RequestLogMode,
+    pub(crate) full_rejected_ingress: bool,
+}
 
 tokio::task_local! {
     /// 独立于诊断存储的请求模式，保证旁路故障时内容策略仍生效。
@@ -52,6 +61,14 @@ pub(crate) fn current_request_id() -> Option<String> {
         .ok()
 }
 
+/// 将当前请求的切换原因传给转发流。@return 未登记诊断时为空。
+pub(super) fn current_cutover() -> Option<InferenceCutover> {
+    CURRENT_TRACE
+        .try_with(|trace| trace.cutover.clone())
+        .ok()
+        .flatten()
+}
+
 struct TraceState {
     retention: Option<ActiveDiagnostic>,
     request: RequestDiagnostic,
@@ -61,6 +78,14 @@ struct TraceState {
     local_outcome: Option<&'static str>,
     next_retry: Option<&'static str>,
     last_attempt: Option<(u32, String, Option<String>)>,
+    pending_ingress: Option<PendingIngress>,
+}
+
+struct PendingIngress {
+    headers: HeaderMap,
+    body: Option<Bytes>,
+    token: String,
+    full: bool,
 }
 
 /// 可跨响应生命周期持有的请求上下文，只存白名单摘要。
@@ -68,6 +93,7 @@ struct TraceState {
 pub(crate) struct TraceContext {
     store: Arc<DiagnosticsStore>,
     state: Arc<Mutex<TraceState>>,
+    cutover: Option<InferenceCutover>,
 }
 
 impl TraceContext {
@@ -88,6 +114,7 @@ impl TraceContext {
         let retention = store.track_request(&request_id);
         let trace = Self {
             store,
+            cutover: None,
             state: Arc::new(Mutex::new(TraceState {
                 retention: Some(retention),
                 request: RequestDiagnostic {
@@ -118,15 +145,84 @@ impl TraceContext {
                 local_outcome: None,
                 next_retry: None,
                 last_attempt: None,
+                pending_ingress: None,
             })),
         };
         trace.emit(None);
         trace
     }
 
+    /// 关联当前 HTTP 请求的实际切换原因。@param cutover 入口订阅。@return 原诊断上下文。
+    pub(super) fn with_cutover(mut self, cutover: Option<InferenceCutover>) -> Self {
+        self.cutover = cutover;
+        self
+    }
+
+    fn interrupted_by_update(&self, end: &str) -> bool {
+        end == "cancelled"
+            && self
+                .cutover
+                .as_ref()
+                .is_some_and(InferenceCutover::interrupted)
+    }
+
+    /// 仅在 Debug 保留已鉴权入站，终态若为本地拒绝才写入证据。@param headers 原始头。@param token 入口密钥。@param full 是否保存完整拒绝正文。
+    pub(crate) fn remember_ingress(&self, headers: &HeaderMap, token: &str, full: bool) {
+        if current_log_mode() == RequestLogMode::Debug
+            && self.store.rejected_ingress_dir().is_some()
+        {
+            self.lock().pending_ingress = Some(PendingIngress {
+                headers: headers.clone(),
+                body: None,
+                token: token.into(),
+                full,
+            });
+        }
+    }
+
     fn lock(&self) -> MutexGuard<'_, TraceState> {
         // 观测锁不包裹 await；即使异常展开污染锁，也不能中断业务转发。
         self.state.lock().unwrap_or_else(|error| error.into_inner())
+    }
+
+    fn save_rejected_ingress(
+        &self,
+        state: &mut TraceState,
+        reason: Option<String>,
+        full_only: bool,
+    ) -> bool {
+        if full_only
+            && !state
+                .pending_ingress
+                .as_ref()
+                .is_some_and(|entry| entry.full)
+        {
+            return false;
+        }
+        let Some(directory) = self.store.rejected_ingress_dir() else {
+            return false;
+        };
+        let Some(pending) = state.pending_ingress.take() else {
+            return false;
+        };
+        let id = &state.request.request_id;
+        let status = native_capture::record_gateway_rejection(
+            directory,
+            id,
+            pending.headers,
+            pending.body,
+            pending.token,
+            pending.full,
+        );
+        if full_only && status == "dropped" {
+            return false;
+        }
+        state.request.native_rejection = Some(NativeRejection {
+            capture_id: id.clone(),
+            reason,
+            capture_status: status.into(),
+        });
+        true
     }
 
     fn emit(&self, attempt: Option<AttemptDiagnostic>) {
@@ -141,6 +237,10 @@ impl TraceContext {
             let mut state = self.lock();
             if state.request.finished_at.is_some() {
                 return;
+            }
+            if self.interrupted_by_update(end) {
+                state.request.error_stage = Some("system_update".into());
+                state.request.status_code.get_or_insert(503);
             }
             let success = state
                 .request
@@ -317,12 +417,37 @@ pub(crate) fn native_rejection(
     capture_status: &str,
 ) {
     let _ = CURRENT_TRACE.try_with(|trace| {
-        trace.lock().request.native_rejection = Some(NativeRejection {
+        let mut state = trace.lock();
+        // 发送器只有在对应账号允许内容采集时才回执 queued。
+        if capture_status == "queued"
+            && trace.save_rejected_ingress(&mut state, reason.map(str::to_owned), true)
+        {
+            return;
+        }
+        state.request.native_rejection = Some(NativeRejection {
             reason: reason.map(str::to_owned),
             capture_id: capture_id.to_owned(),
             capture_status: capture_status.to_owned(),
         });
     });
+}
+
+/// 记录已经完成读取的逻辑正文，清理和脱敏延后到本地拒绝终态。@param bytes 原逻辑正文。
+pub(crate) fn remember_ingress_body(bytes: &Bytes) {
+    if current_log_mode() == RequestLogMode::Debug {
+        let _ = CURRENT_TRACE.try_with(|trace| {
+            if let Some(ingress) = trace.lock().pending_ingress.as_mut() {
+                ingress.body = Some(bytes.clone());
+            }
+        });
+    }
+}
+
+/// 检查是否已打开本地拒绝入站采集。@return 仅已装配的 Debug 请求返回真。
+pub(crate) fn observes_rejected_ingress() -> bool {
+    CURRENT_TRACE
+        .try_with(|trace| trace.lock().pending_ingress.is_some())
+        .unwrap_or(false)
 }
 
 /// 记录既有 session 解析结果，绝不额外解析或刷新池 TTL。
@@ -460,21 +585,10 @@ pub(crate) fn prepare_native_attempt(
     attempt_id: &str,
 ) -> Option<AttemptTrace> {
     if Uuid::parse_str(attempt_id).is_err()
-        || observation.runtime.as_ref().is_some_and(|runtime| {
-            Uuid::parse_str(&runtime.worker_id).is_err()
-                || runtime.worker_pid == 0
-                || runtime
-                    .kernel_generation
-                    .as_ref()
-                    .is_some_and(|id| Uuid::parse_str(id).is_err())
-                || runtime
-                    .preparation_wait_ms
-                    .saturating_add(runtime.checkout_ms)
-                    > runtime.prepared_ms.saturating_add(2)
-                || runtime
-                    .worker_start_ms
-                    .is_some_and(|elapsed| elapsed > runtime.checkout_ms.saturating_add(2))
-        })
+        || observation
+            .runtime
+            .as_ref()
+            .is_some_and(|runtime| !runtime.is_valid())
         || observation.schema_version != 1
         || observation.body_sha256.len() != 64
         || !observation
@@ -711,6 +825,7 @@ impl AttemptTrace {
         };
         record.error_stage = match record.outcome.as_str() {
             "success" => None,
+            "cancelled" if self.trace.interrupted_by_update(end) => Some("system_update".into()),
             "transport_error" => Some("transport".into()),
             "upstream_rejected" => Some("upstream_headers".into()),
             _ => Some("upstream_body".into()),
@@ -774,15 +889,24 @@ impl RequestTraceGuard {
     pub(crate) fn error(&self, error: &AppError) {
         let stage = match error {
             AppError::AdmissionLimited { .. } | AppError::SchedulingConflict => "admission",
-            AppError::BadRequest(_) => "request",
+            AppError::BadRequest(_) | AppError::AgyInput { .. } => "request",
             AppError::Unauthorized | AppError::PermanentCredential(_) => "credentials",
             AppError::TooManyRequests(_) => "admission",
+            AppError::AgyUpstreamQuota => "upstream_model",
+            AppError::AgyControl(_) => "native_control",
+            AppError::AgyToolTurnFailed => "tool_continuation",
             AppError::BadGateway(_) => "transport",
             // 503 可来自凭据、环境或原生准备，具体阶段由失败边界记录。
             AppError::ServiceUnavailable(_) => "gateway",
             AppError::Internal(_) | AppError::NotFound => "gateway",
         };
         let mut state = self.trace.lock();
+        if let (AppError::AgyInput { reason, field, .. }, Some(context)) =
+            (error, state.request.context.as_mut())
+        {
+            context.input_rejection_reason = Some((*reason).into());
+            context.input_rejection_field = field.clone();
+        }
         if state.request.error_stage.is_none() {
             state.request.error_stage = Some(stage.into());
         }
@@ -809,6 +933,19 @@ impl RequestTraceGuard {
                 .get("x-request-id")
                 .and_then(|v| v.to_str().ok())
                 .map(normalize_correlation_id);
+            if (response.status().is_client_error() || response.status().is_server_error())
+                && state.request.attempt_count == 0
+                && state.request.native_rejection.is_none()
+            {
+                let reason = state
+                    .request
+                    .context
+                    .as_ref()
+                    .and_then(|context| context.input_rejection_reason.clone())
+                    .or_else(|| state.request.error_stage.clone());
+                self.trace.save_rejected_ingress(&mut state, reason, false);
+            }
+            state.pending_ingress = None;
         }
         let (parts, body) = response.into_parts();
         Response::from_parts(
@@ -1286,8 +1423,10 @@ mod tests {
     #[tokio::test]
     async fn diagnostics_record_stream_errors_and_cancellation_once() {
         let store = store().await;
-        for end in ["sse_error", "read_error", "cancelled"] {
-            let trace = TraceContext::new(store.clone());
+        for end in ["sse_error", "read_error", "cancelled", "system_update"] {
+            let (epoch, receiver) = tokio::sync::watch::channel(None);
+            let mut cutover = super::InferenceCutover::new(receiver);
+            let trace = TraceContext::new(store.clone()).with_cutover(Some(cutover.clone()));
             let guard = RequestTraceGuard::new(trace.clone());
             let response=CURRENT_TRACE.scope(trace,async {
                 let mut attempt=begin_attempt(&account(),br#"{"model":"claude-sonnet-5","stream":true}"#).unwrap();
@@ -1309,8 +1448,12 @@ mod tests {
                 .unwrap()
                 .to_owned();
             let mut body = response.into_body();
-            if end == "cancelled" {
+            if matches!(end, "cancelled" | "system_update") {
                 assert!(body.frame().await.unwrap().is_ok());
+                if end == "system_update" {
+                    epoch.send_replace(Some(uuid::Uuid::new_v4()));
+                    cutover.interrupt().await;
+                }
                 drop(body);
             } else {
                 assert_eq!(to_bytes(body, 65536).await.is_err(), end == "read_error");
@@ -1330,6 +1473,19 @@ mod tests {
             );
             if end == "read_error" {
                 assert_eq!(detail.request.error_stage.as_deref(), Some("upstream_body"));
+            }
+            if matches!(end, "cancelled" | "system_update") {
+                let (request_stage, attempt_stage) = if end == "system_update" {
+                    ("system_update", "system_update")
+                } else {
+                    ("downstream_body", "upstream_body")
+                };
+                assert_eq!(detail.request.error_stage.as_deref(), Some(request_stage));
+                assert_eq!(
+                    detail.attempts[0].error_stage.as_deref(),
+                    Some(attempt_stage)
+                );
+                assert_eq!(detail.request.status_code, Some(200));
             }
             assert!(
                 !serde_json::to_string(&detail)

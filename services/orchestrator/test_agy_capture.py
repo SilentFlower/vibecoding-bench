@@ -1,5 +1,6 @@
 """使用合成文本和真实文件校验AGY阶段预览及归属保护。"""
 import hashlib
+from io import BytesIO
 import json
 import os
 import tempfile
@@ -9,7 +10,9 @@ import uuid
 from pathlib import Path
 from unittest.mock import patch
 
-from agy_runtime.capture import BODY_LIMIT, RETENTION_MS, cleanup_snapshot_steps, read_snapshot, save_ingress, save_submission
+from agy_runtime.capture import BODY_LIMIT, RETENTION_MS, cleanup_snapshot_steps, read_snapshot, save_egress, save_ingress, save_submission
+from agy_runtime.safety_egress import MODEL_PATH
+from agy_runtime.wire_capture import WireTrace
 from runtime_files import atomic_json
 
 
@@ -47,6 +50,39 @@ class AgyCaptureTests(unittest.TestCase):
         value=read_snapshot(self.root,7,self.attempt)
         self.assertTrue(value['ingress']['body_truncated'])
         self.assertLessEqual(sum(len(item['body'].encode()) for item in [value,value['decoded_gemini'],value['ingress']]),BODY_LIMIT)
+
+    def test_transport_trace_preserves_entity_digest_and_scrubs_repeated_secrets(self):
+        """仅保存模型上传事件，核对分块摘要、真实状态和跨字段脱敏。@return 无。"""
+        entity=b'{"text":"synthetic-at repeated-secret"}'
+        headers=(f'POST {MODEL_PATH} HTTP/1.1\r\nHost: cloud.test\r\nTransfer-Encoding: chunked\r\n'
+                 'Authorization: Bearer synthetic-at\r\nX-Other: repeated-secret\r\n\r\n').encode()
+        chunk=f'{len(entity):x}\r\n'.encode()+entity+b'\r\n0\r\n\r\n'
+
+        def event(kind, data):
+            """生成发送事件的十六进制表示。@param kind 事件类型。@param data 实际字节。@return 观察行。"""
+            lines=[f'=> Send {kind}, {len(data)} bytes (0x{len(data):x})\n'.encode()]
+            for offset in range(0,len(data),16):
+                lines.append(f'{offset:04x}: {data[offset:offset+16].hex(" ")}\n'.encode())
+            return b''.join(lines)
+
+        trace=WireTrace(MODEL_PATH)
+        trace.read(BytesIO(event('header',b'CONNECT cloud.test:443 HTTP/1.1\r\n\r\n')
+            +event('header',headers)+event('data',chunk[:20])+event('data',chunk[20:])))
+        trace.status=503
+        self.save()
+        save_egress(str(self.capture),7,self.attempt,trace,entity,
+            [('X-Secret','repeated-secret'),('Authorization','Bearer synthetic-at')],
+            ['Authorization: Bearer synthetic-at'],'synthetic-at')
+        snapshot=read_snapshot(self.root,7,self.attempt)
+        wire=snapshot['wire_final']
+        self.assertEqual(wire['http_status'],503)
+        self.assertEqual(wire['original_body_sha256'],hashlib.sha256(entity).hexdigest())
+        self.assertEqual(wire['headers'][-1],['x-other','[redacted]'])
+        self.assertNotIn('repeated-secret',wire['body'])
+        self.assertNotIn('synthetic-at',wire['body'])
+        self.assertEqual({row['name']:row['action'] for row in snapshot['header_policy']['decisions']},
+            {'authorization':'keep','host':'runtime','transfer-encoding':'runtime','x-other':'runtime','x-secret':'drop'})
+        self.assertIsNone(trace.body(entity+b' '))
 
     def test_file_and_identity_boundaries(self):
         """错账号、穿越、链接、共享权限和硬链接均拒绝。@return 无。"""

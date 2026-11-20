@@ -41,7 +41,7 @@ pub struct RequestDiagnostic {
     /// 入口冻结的跨平台事实，旧记录保持未知。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<DiagnosticContext>,
-    /// 原生发送前拒绝的原因与入口采集归属；不增加上游尝试数。
+    /// 发送前本地拒绝的原因与入站采集归属；不增加上游尝试数。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native_rejection: Option<NativeRejection>,
     /// 本次实际模式；旧记录保持未知。
@@ -69,7 +69,7 @@ pub struct RequestDiagnostic {
     pub last_attempt: Option<Box<AttemptDiagnostic>>,
 }
 
-/// 本地原生拒绝的受控摘要，正文仍保存于账号私有采集文件。
+/// 本地拒绝的受控摘要，正文存于独立的私有采集文件。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NativeRejection {
     pub reason: Option<String>,
@@ -118,6 +118,23 @@ pub struct NativeRuntimeObservation {
     pub checkout_ms: u64,
     pub worker_start_ms: Option<u64>,
     pub prepared_ms: u64,
+}
+
+impl NativeRuntimeObservation {
+    /// 校验发送器报告的进程身份和阶段包含关系。@return 是否可进入持久诊断。
+    pub(crate) fn is_valid(&self) -> bool {
+        Uuid::parse_str(&self.worker_id).is_ok()
+            && self.worker_pid != 0
+            && self
+                .kernel_generation
+                .as_ref()
+                .is_none_or(|id| Uuid::parse_str(id).is_ok())
+            && self.preparation_wait_ms.saturating_add(self.checkout_ms)
+                <= self.prepared_ms.saturating_add(2)
+            && self
+                .worker_start_ms
+                .is_none_or(|elapsed| elapsed <= self.checkout_ms.saturating_add(2))
+    }
 }
 
 /// 仅在网关与 sender 之间传递的原生观察头，消费后移除。
@@ -314,8 +331,16 @@ pub struct DiagnosticContext {
     pub conversation_id: Option<String>,
     pub trajectory_id: Option<String>,
     pub native_model_calls: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_rejection_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_rejection_field: Option<String>,
     pub control_state: Option<String>,
     pub control_observed_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub control_error_code: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub control_recovery: Option<String>,
     pub usage: Option<GeminiDiagnosticUsage>,
     pub system_prompt_policy: Option<SystemPromptDiagnostic>,
     pub tool_turn: Option<ToolTurnDiagnostic>,

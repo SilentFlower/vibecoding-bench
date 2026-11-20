@@ -51,6 +51,7 @@ use crate::service::gateway::{
     parse_bootstrap_additional_model_options,
 };
 use crate::service::gemini::{self, GeminiService};
+use crate::service::native_capture;
 use crate::service::native_contract::validate_idle_timeout;
 use crate::service::oauth::TokenTester;
 use crate::service::oauth_flow::OAuthFlowService;
@@ -184,6 +185,10 @@ pub fn build_router(
         .route(
             "/admin/runtime/system-update/ack",
             post(system_update_status),
+        )
+        .route(
+            "/admin/runtime/system-update/cutover",
+            post(system_update_cutover),
         )
         .route("/admin/accounts", get(list_accounts).post(create_account))
         .route(
@@ -340,6 +345,26 @@ pub fn build_router(
 /// @return 精确 epoch 和完整响应生命周期内的进程活动数。
 async fn system_update_status() -> Result<Json<Value>, AppError> {
     Ok(Json(system_update::snapshot()?))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SystemUpdateCutover {
+    operation_id: String,
+    epoch: String,
+}
+
+/// 通知本代网关结束普通推理，凭据事务继续沿原活动证明收口。
+/// @param state 应用。@param headers 内部服务证明。@param input 原维护身份。@return 同代接管回执。
+async fn system_update_cutover(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(input): Json<SystemUpdateCutover>,
+) -> Result<Json<Value>, AppError> {
+    require_v3_credential_service(&headers)?;
+    let receipt = system_update::cutover(&input.operation_id, &input.epoch)?;
+    state.gemini_svc.release_tools_for_cutover();
+    Ok(Json(receipt))
 }
 
 const CLAUDE_CODE_HELLO_BODY: &[u8] = br#"{"message": "hello"}"#;
@@ -515,7 +540,7 @@ async fn list_accounts(
             if a.is_antigravity() {
                 obj["credential_state"] = state.account_svc.agy_state(a.id).await?;
                 obj["agy_request_usage"] = json!(agy_usage.get(&a.id));
-                append_account_live_metrics(&state.account_svc, a, &mut obj).await;
+                append_agy_account_metrics(&state.account_svc, a, &mut obj).await;
             }
             data.push(obj);
             continue;
@@ -590,6 +615,8 @@ async fn list_accounts(
 struct CreateAccountRequest {
     platform: Option<String>,
     agy_system_prompt_homoglyph_enabled: Option<bool>,
+    agy_gif_frames_enabled: Option<bool>,
+    agy_disable_safety_filtering: Option<bool>,
     cli_identity: Option<CliIdentityImport>,
     credential_ownership: Option<CredentialOwnershipInput>,
     name: Option<String>,
@@ -1000,6 +1027,17 @@ async fn append_account_live_metrics(
     capacity
 }
 
+/// 附加反重力账号的实时容量和评分。@param service 账号服务。@param account 当前账号。@param view 账号视图。@return 无。
+async fn append_agy_account_metrics(service: &AccountService, account: &Account, view: &mut Value) {
+    let capacity = append_account_live_metrics(service, account, view).await;
+    if service.scheduler().is_some() {
+        match service.v3_summary(account, &capacity, 0).await {
+            Ok(summary) => view["v3_scheduling"] = json!(summary),
+            Err(_) => view["v3_scheduling_error"] = json!("调度观测不可用"),
+        }
+    }
+}
+
 /// 读取当前账号视图的已记录用量。@param state 网关状态。@param ids 反重力账号。@return 缺失表示诊断统计不可用。
 async fn agy_account_usage(state: &AppState, ids: &[i64]) -> HashMap<i64, AgyRequestUsage> {
     let Some(store) = state.gateway_svc.diagnostics_store() else {
@@ -1024,7 +1062,7 @@ async fn get_account(
     if account.is_antigravity() {
         value["credential_state"] = state.account_svc.agy_state(id).await?;
         value["agy_request_usage"] = json!(agy_account_usage(&state, &[id]).await.get(&id));
-        append_account_live_metrics(&state.account_svc, &account, &mut value).await;
+        append_agy_account_metrics(&state.account_svc, &account, &mut value).await;
     }
     value["work_control"] =
         serde_json::to_value(state.account_svc.work_controls.snapshot(id).await?)
@@ -1110,6 +1148,12 @@ async fn create_account(
             "AGY 账号配置包含 Claude Code 专用字段".into(),
         ));
     }
+    if platform != "antigravity" && req.agy_gif_frames_enabled == Some(true) {
+        return Err(AppError::BadRequest("GIF 抽帧仅适用于 AGY 账号".into()));
+    }
+    if platform != "antigravity" && req.agy_disable_safety_filtering == Some(true) {
+        return Err(AppError::BadRequest("原生安全开关仅适用于 AGY 账号".into()));
+    }
     let auth_type = req.auth_type.unwrap_or_else(|| "setup_token".into()).into();
     let setup_token = req.setup_token.or(req.token).unwrap_or_default();
     let mut account = Account {
@@ -1117,6 +1161,8 @@ async fn create_account(
         agy_system_prompt_homoglyph_enabled: req
             .agy_system_prompt_homoglyph_enabled
             .unwrap_or(false),
+        agy_gif_frames_enabled: req.agy_gif_frames_enabled.unwrap_or_default(),
+        agy_disable_safety_filtering: req.agy_disable_safety_filtering.unwrap_or_default(),
         id: 0,
         name: req.name.unwrap_or_default(),
         email: req.email,
@@ -1418,6 +1464,12 @@ async fn update_account(
     }
     if let Some(fields) = updates.as_object_mut() {
         fields.remove("platform");
+    }
+    if updates.get("agy_gif_frames_enabled").is_some() {
+        return Err(AppError::BadRequest("GIF 抽帧仅适用于 AGY 账号".into()));
+    }
+    if updates.get("agy_disable_safety_filtering").is_some() {
+        return Err(AppError::BadRequest("原生安全开关仅适用于 AGY 账号".into()));
     }
     if let Some(value) = updates.get("agy_system_prompt_homoglyph_enabled") {
         if !existing.is_antigravity() {
@@ -2386,9 +2438,19 @@ async fn get_settings(State(state): State<AppState>) -> Result<Json<serde_json::
     settings
         .entry("intercept_assistant_prefill_models".into())
         .or_insert_with(|| DEFAULT_INTERCEPT_ASSISTANT_PREFILL_MODELS.to_string());
+    let request_diagnostics = state.gateway_svc.request_diagnostics_config().await;
     settings.insert(
         "request_diagnostics_log_mode".into(),
-        state.gateway_svc.request_log_mode().await.as_str().into(),
+        request_diagnostics.mode.as_str().into(),
+    );
+    settings.insert(
+        "request_diagnostics_rejected_body".into(),
+        if request_diagnostics.full_rejected_ingress {
+            "full"
+        } else {
+            "preview"
+        }
+        .into(),
     );
     settings
         .entry("log_429_request_enabled".into())
@@ -2556,6 +2618,13 @@ async fn update_settings(
                 "request_diagnostics_log_mode 必须是 info 或 debug".into(),
             ));
         }
+    }
+    if let Some(value) = body.get("request_diagnostics_rejected_body")
+        && !matches!(value.as_str(), "preview" | "full")
+    {
+        return Err(AppError::BadRequest(
+            "本地拒绝入站正文必须选择限长预览或完整正文".into(),
+        ));
     }
     if let Some(val) = body.get("message_cache_control_rewrite") {
         MessageCacheControlRewrite::parse_setting(val)?;
@@ -2748,7 +2817,9 @@ async fn update_settings(
             .reload_assistant_prefill_intercept_config()
             .await?;
     }
-    if body.contains_key("request_diagnostics_log_mode") {
+    if body.contains_key("request_diagnostics_log_mode")
+        || body.contains_key("request_diagnostics_rejected_body")
+    {
         state.gateway_svc.reload_request_log_mode().await?;
     }
     if body.contains_key("log_429_request_enabled")
@@ -2964,6 +3035,12 @@ async fn request_native_capture(
             serde_json::json!({"state":"summary", "message":"本次请求仅保存摘要"})
         } else if rejected.capture_status == "disabled" {
             serde_json::json!({"state":"disabled", "message":"本次请求发生时内容采集已关闭"})
+        } else if rejected.capture_id == detail.request.request_id {
+            if let Some(directory) = store.rejected_ingress_dir() {
+                native_capture::read_gateway_rejection(directory, &rejected.capture_id).await
+            } else {
+                serde_json::json!({"state":"missing", "message":"本地入站快照不可用"})
+            }
         } else {
             let account_id = detail.request.account_id.ok_or(AppError::NotFound)?;
             runtime_bridge::native_capture(account_id, &rejected.capture_id).await?
@@ -3853,7 +3930,7 @@ mod tests {
         }
     }
 
-    /// 反重力账号列表和详情复用实际网关槽位与 RPM。@return 无。
+    /// 反重力账号列表和详情复用实际网关槽位、RPM 和评分。@return 无。
     #[tokio::test]
     async fn agy_account_views_report_live_capacity() {
         let (app, _, _, pool, service) = test_router_with_scheduling(true).await;
@@ -3902,7 +3979,9 @@ mod tests {
             assert_eq!(view["queued_requests"], 0);
             assert_eq!(view["rpm_current"], 1);
             assert_eq!(view["agy_request_usage"]["seven_day"]["requests"], 0);
-            assert!(view.get("v3_scheduling").is_none());
+            let summary = &view["v3_scheduling"];
+            assert_eq!(summary["config"]["weights"][1], 0.0);
+            assert_eq!(summary["config"]["reset_weight"], 0.0);
         }
     }
 

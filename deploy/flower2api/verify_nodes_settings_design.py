@@ -261,7 +261,7 @@ async def main(output: Path) -> None:
         page, context = await open_page(browser, fixture, '/settings', 1440, 900, errors)
         save = page.get_by_role('button', name='保存配置', exact=True)
         await expect(save).to_be_disabled()
-        await expect(page.locator('.settings-total')).to_have_text('59 项配置')
+        await expect(page.locator('.settings-total')).to_have_text('60 项配置')
         await expect(page.locator('.fui-badge-warning')).to_have_count(0)
         await page.locator('[name=v3_admission_wait_seconds]').fill('99')
         field = page.locator('[data-settings-field=v3_admission_wait_seconds]')

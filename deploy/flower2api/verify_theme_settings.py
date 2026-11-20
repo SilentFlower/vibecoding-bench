@@ -54,6 +54,8 @@ class ThemeFixture(ShellFixture):
         """初始化常规更新场景。@return None。"""
         super().__init__('normal')
         self.frame_writes = []
+        # 首页第一页放一个可用的反重力账号：直接打开账号页会自动刷新它的额度，预览画板里不得刷新。
+        self.accounts[11].update(platform='antigravity', name='画板反重力账号', credential_state={'phase': 'ready', 'generation': 1})
 
     async def route(self, route):
         """提供 /theme 页面并记录子框架写请求。@param route 浏览器路由。@return None。"""

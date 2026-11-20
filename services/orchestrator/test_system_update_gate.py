@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 
 from runtime_files import atomic_json
-from system_update_gate import DeploymentGate
+from system_update_gate import DeploymentGate, NodeImageFetchPaused
 
 
 class UpdateGateTests(unittest.TestCase):
@@ -71,6 +71,34 @@ class UpdateGateTests(unittest.TestCase):
                 self.fail('恢复旧作业不能开放维护期准入')
         self.gate.release_reserved(identifier)
         self.assertEqual(0, self.gate.state()['active'])
+
+    def test_node_image_fetch_does_not_hold_central_cutover(self) -> None:
+        """镜像传输独立执行，中央切换后作业不会开始换版写入。@return 无。"""
+        identifier = self.gate.reserve('cluster-node-install:2')
+        try:
+            with self.gate.continue_reserved(identifier):
+                self.assertEqual(self.gate.state()['central_active'], 2)
+                with self.assertRaises(NodeImageFetchPaused):
+                    with self.gate.node_image_fetch(identifier):
+                        report = self.gate.state()
+                        self.assertEqual(report['active'], 2)
+                        self.assertEqual(report['central_active'], 0)
+                        self.value.update(phase='blocked', operation_id=str(uuid.uuid4()), target_release='system-ci-1-1')
+                        atomic_json(self.root / 'admission.json', self.value)
+                self.assertEqual(self.gate.state()['central_active'], 2)
+        finally:
+            self.gate.release_reserved(identifier)
+        self.assertEqual(self.gate.state()['central_active'], 0)
+
+    def test_control_cutover_distinguishes_node_stream_from_central_work(self) -> None:
+        """节点流只读取中央归属，中央实际写入仍由门禁收口。@return 无。"""
+        stream = self.gate.reserve('node-stream:synthetic')
+        with self.gate.admission('job:local-system-rollout'):
+            status = self.gate.state()
+            self.assertEqual(2, status['central_active'])
+            self.assertEqual(1, status['control_active'])
+        self.assertEqual(0, self.gate.state()['control_active'])
+        self.gate.release_reserved(stream)
 
     def test_missing_corrupt_or_wrong_deployment_is_not_idle(self) -> None:
         """缺失、损坏和跨部署事实均进入对账。

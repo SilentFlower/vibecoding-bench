@@ -176,8 +176,8 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 - v2 使用独立 `updates/v3-migrations` 通道，首发继承旧受信发行。`updates/v3` 保留 v1 及原最高序号，仅刷新时间和签名。受信新通道 ref 404 才允许读取旧通道；已有通道资产缺失直接失败。正式证据要求干净同批镜像。
 - 从空闲现场关闭门禁并排空，停止双端并确认数据库 FD 退出后，保存同操作私有双库快照。回执绑定 deployment、operation_id、epoch、原发行、权限/归属及每库文件/逻辑摘要；空间预算先于迁移。默认保留最近两组完成快照，另外保护活动恢复引用，异常目录保留并报告。
 - `database_snapshot` 仅公开 `state,completed_at,bytes`；`database_migrations` 按库公开 state 和 target_version。页面显示快照、迁移、数据恢复及具体阻断原因，未知值保留可见。
-- 托管Node加入原维护范围：最终排空快照冻结节点集合，`prepare_nodes`在中央切换和双库快照前收齐同epoch实际停止回执，Node作业采用data_policy=in_place保留当前资料；`resume_nodes`在新控制就绪后恢复同一作业，最终健康核验后才开放接单。内部`POST /internal/v3/system-updates/nodes`沿原更新凭据、operation_id和epoch，仅接受prepare/status/resume/restore/rollback/cancel-preparation。普通管理准入继续遵守全局门禁；内部活动由`reserve_maintenance`按原维护身份登记。
-- `cluster_nodes={phase,nodes}`公开逐节点名称、阶段、运行标记和受控preparation；原控制配置及小型恢复日志保留在节点私有目录。取消先等待原辅助进程收口，再恢复原组件；新中央重启须由原宿主明确resume授予本次boot身份，防止排空后提前切换。后台断线沿同一操作重试。
+- 兼容维护流程将托管节点加入原维护范围。最终排空快照冻结节点集合，`prepare_nodes`在中央切换和双库快照前收齐同 epoch 停止回执，`resume_nodes`在新控制就绪后恢复同一作业，最终健康核验后开放接单。节点原地作业以 `data_policy=in_place` 保留当前资料。内部 `POST /internal/v3/system-updates/nodes` 沿原更新凭据、operation_id 和 epoch，只接受 prepare/status/resume/restore/rollback/cancel-preparation。内部活动由 `reserve_maintenance` 按原维护身份登记。快速维护流程见[中央快速换版合同](#scenario-中央快速换版与节点独立更新)。
+- `cluster_nodes={phase,nodes}` 公开节点进度。兼容维护流程返回受控 preparation 及运行标记。原控制配置和恢复日志保留在节点私有目录。取消先等原辅助进程收口，再恢复原组件。兼容流程中，新中央重启须由原宿主明确 resume 授予本次 boot 身份。后台断线沿同一操作重试。
 - `release_started`前的失败恢复原中央数据；新Node原地作业只切回旧控制与账号组件，保留当前HOME、工程和节点执行库，不生成全量副本或隔离目录。历史Node快照作业继续沿原成组快照恢复，持久完成边界先于程序恢复。已重新接单后的恢复沿当前资料反向切换组件。历史中央缺少内部节点维护接口时首次接入按集群离线SOP执行；后续同能力版本可统一维护。
 - `release_started` 先于实际释放准入持久化。此前失败按原 UUID 恢复同组两库和原程序；恢复意图先于暂存复制和替换，支持部分两库完成。账号重建后的六项生命周期登记以原身份和 CAS 续接，再恢复原环境。`database_restored` 先于原程序启动落盘，重启收口保护原程序后来写入。重新接单后的显式回退保留当前数据。
 - 底座首次能力接入默认预览，持有独立接入锁；完整备份后发布 `updater-upgrades/<UUID>/upgrade.json`。未完成日志阻止新接入。`--recover` 默认预览，允许服务 inactive，按精确原/新源码 SHA、原策略/状态副本摘要、空闲门禁及服务归属验收，持有服务锁和存储锁后恢复原版并验证 socket。恢复再次中断继续原 UUID；后来状态、外来源码及后续接入日志触发现场保护。
@@ -722,3 +722,130 @@ sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_image
 - 慢退役受控对照显式标记源码挂载夹具，核对45秒旧截止失败、120秒准备通过和零模型调用；正式完整镜像由独立CI验收，两类证据分别记录。
 - 探针测试执行真实物理观察脚本，以虚拟时钟覆盖25秒退出；受控慢退出对照覆盖旧15秒失败摘要、新90秒窗口内全部PID终止及零模型。正常和异常退出另外验收镜像自带源码，并分别记录实际耗时。
 - 真实Docker复现旧白名单COPY缺失；修正版镜像只读导入、资源身份及断网正常/异常退出均通过。隔离夹具与正式完整镜像CI结果分别记录。
+
+## Scenario: 中央快速换版与节点独立更新
+
+### 1. Scope / Trigger
+
+修改宿主切换、推理取消、原生预热、远程节点后台换版或更新进度时适用。原签名、数据快照、迁移和回退合同同时适用。
+
+### 2. Signatures
+
+- `GET /admin/runtime/system-update/status` 返回 `inference_cutover` 能力。
+- `POST /admin/runtime/system-update/cutover` 使用原管理凭据及 `X-V3-Service-Token`，正文为 `{operation_id, epoch}`，成功返回 `{accepted:true, operation_id, epoch}`。
+- `POST /internal/agy/cancel` 使用原发送器鉴权，正文为 `{account_id, environment_id, generation, request_id, api_token_id}`，合格的定向取消返回 HTTP 204。
+- `POST /internal/v3/system-updates/snapshot` 及 `/internal/v3/system-updates/environment` 接受布尔字段 `central_only`，缺省为 false。快照返回 `scope=central|full`，环境动作沿原操作和环境代次核对。
+
+### 3. Contracts
+
+- 预检校验原组合和候选的实际 control、account 镜像标签 `vibebench.fast-system-update=1`，并核对当前网关能力。旧版和能力混合的组合沿兼容流程。下载和验签在关闭准入前完成。
+- 同一门禁发布后才触发快切。原普通推理在入口和响应体持有关闭订阅。Claude Code 流实际被切换中断时，原请求及发送尝试保存 `outcome=cancelled`、`error_stage=system_update`。已发出的 HTTP 状态保留。
+- 后台预热沿原身份向发送器取消本次 prepare，状态回到 `maintenance/system_maintenance`。已开始的凭据刷新沿原事务结清。AGY 工具等待按原请求、调用方和环境代次取消，发送端实际活动以 `job_finalized` 为终结依据。
+- 宿主为快切资源收尾使用 30 秒窗口。中央快照保留本机环境、未收口持久作业和未知归属阻塞。已从中央分配记录核对的远程环境不触发同步 SSH 验收。节点镜像预取可从中央活动中剔除，节点实际写入继续持有准入且在预取后重新核对门禁。
+- 中央恢复接单后，节点同步器沿持久作业、配置 revision 和实际目标发行继续。未就绪节点使用原版本准入保护。快速操作公开 `fast_transition`、`admission_blocked_at`、`admission_reopened_at` 和可选 `cluster_nodes.phase=background`。节点管理页读取实际节点进度，镜像回收可以在中央开放后重试。
+
+### 4. Validation & Error Matrix
+
+| 场景 | 结果 |
+| --- | --- |
+| 快切请求缺少内部服务证明 | 拒绝并保持原活动 |
+| 门禁 operation_id 或 epoch 不匹配 | 拒绝切换请求 |
+| AGY 原请求、调用方或绑定不匹配 | 拒绝该定向取消 |
+| 快切前取消或资源收尾超时 | 核对原中央后释放本次门禁，独立节点作业继续 |
+| 切换后验收失败且准入尚未恢复 | 沿原操作恢复两库快照与原程序 |
+| 已恢复接单后显式回退 | 沿原快照边界保留后来写入 |
+
+### 5. Scenarios and Examples
+
+- 正常。中央中断挂起推理，核对本机并恢复接单。离线节点保持待更新，恢复连接后由同步器继续同一归属。
+- 边界。首次接入遇到旧镜像，先走兼容换版。后续原组合与候选均支持时启用快切。
+- 错误用法。将独立节点预取算作本次中央快切的节点备份。正确处理。快速取消只收尾中央门禁，兼容维护沿原节点备份账本恢复。
+
+### 6. Tests Required
+
+- 网关测试断言同代关闭挂起响应体、原预热定向取消和活动归还，并区分客户端断连与维护中断。
+- 宿主测试断言旧回退路径与快速取消分支，快切期间远程待更新不阻塞中央提交。
+- `verify_system_update.py --fast-transition` 验证实际 SSH 离线节点、真实挂起请求关断、中央先恢复和节点续跑。结合 `--migration-manifest` 验证双库迁移、只完成第一库后掉电恢复、显式回退及后来写入保留。
+
+## Scenario: 分步下载与本机账号后台更新
+
+### 1. Scope / Trigger
+
+调整下载回执、立即重启、旧账号来源授权或单账号重试时适用。继续使用本文件的签名发行、数据库快照和失败恢复合同。
+
+### 2. Signatures
+
+- `POST /runtime/api/system-updates/prepare` 沿原冻结更新请求。状态响应提供 `staged_updates`、`prepared_candidate`，回执含 `operation_id`、`target_release`、`manifest_sha256`、`fast_transition`。
+- `POST /runtime/api/system-updates/install` 接受可选规范 UUID `prepared_operation_id`。`POST /runtime/api/system-updates/operations/{id}/retry-account` 接受 `expected_revision` 与 `environment_id`。
+- 内部 `snapshot` 接受 `control_only=true`，返回 `scope=control`。内部 `environment` 接受 `action=rollout`，按原操作 UUID、epoch、环境身份与冻结代次执行。状态响应的 `account_rollout` 含生效目标发行、原操作 UUID 和各环境进度。
+
+### 3. Contracts
+
+- 下载阶段校验签名、原始构建清单、镜像与项目库。系统更新弹窗以服务端持久回执展示「待重启」。安装重新核对当前修订、目标摘要与本地材料。
+- 原版和候选控制镜像均声明 `vibebench.local-account-rollout=1` 且原快切能力成立时，安装可使用后台滚动。快切结束原推理，保留会影响控制状态和数据库快照的写入收尾。节点转发流只读中央归属，中央快照通过控制范围与节点连接收尾解耦。
+- 宿主在只读挂载的门禁目录生成 `account-rollout-<control-release>.json`。文件锚定当前部署、控制和账号目标批次、原操作和 epoch。过渡来源按账号、环境 ID、代次、原镜像及三角色登记逐项固定。网关只允许对应本机地址、账号和代次的原发送器绑定。
+- 控制和数据验收通过后，宿主提交生效发行并开放全局准入。本机账号随后使用各自的环境锁、排他租约和预留容量重建。原发送器首次恢复请求时沿现有接口同步额度身份。租约快照中同一排他租约可同时出现在 `lease` 和 `holders`。匹配维护所有者及租约代次后视为同一许可。
+- 后台进度使用 `queued/updating/updated/stopped/waiting/needs_check`。更新器重启继续本次生效发行的待处理事项。单环境重试固定原操作、当前修订和环境身份。重建尝试在环境私有目录保留原代次、下一代次、CPU 额度及完成标记。用户个人的整体启停及 API 准入依旧由账号开关控制。
+- 固定宿主交付包包含 `orchestrator/system_update_rollout.py`。现有 v2 安装沿同协议源码刷新。较旧宿主和组件组合使用其支持的安装入口。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 回执修订、目标或清单摘要变化 | 返回冲突并刷新候选 |
+| 已下载的镜像、清单或项目库失效 | 安装前返回重下载提示 |
+| 原镜像、账号、角色或环境代次不匹配 | 隔离该账号并展示待核对 |
+| 账号仍有独立工作或租约 | 该账号等待空闲，其余事项继续 |
+| 已恢复接单后执行器中断 | 续接已生效发行的后台事项并保护后来业务写入 |
+
+### 5. Scenarios and Examples
+
+- 正常。下载完成后刷新页面，继续使用原准备回执。点击「立即重启」后，控制服务先恢复接单，兼容账号继续使用原环境。
+- 边界。本地候选材料失效时重新下载。账号独立活动无法立即收尾时通过账号后台进度重试。
+- 错误用法。用最近一次下载回执替换其他目标的回执。正确处理。安装请求携带该目标与清单摘要对应的准备操作 UUID。
+
+### 6. Tests Required
+
+- `test_system_updater` 覆盖持久准备回执、缓存失效时原版继续服务、开放准入与账号更新顺序、单账号故障和重试。
+- `test_system_update_recovery`、`test_account_update_identity` 及网关绑定测试覆盖原排他许可、外来占用、跨账号、角色、环境和代次拒绝。
+- `verify_system_update.py --fast-transition` 覆盖旧账号请求、后台延迟、失败重试、运行环境代次、SSH 节点独立换版和中断恢复。`verify_system_update_browser.py` 覆盖下载后刷新、重启确认、恢复接单和单账号重试。
+
+## Scenario: 候选项目库准备与控制端验收
+
+### 1. Scope / Trigger
+
+调整签名候选的项目库准备、控制服务健康检查或旧版兼容安装重试时适用。
+
+### 2. Signatures
+
+- 声明 `vibebench.project-library-prepare=1` 的控制镜像支持 `python3 -m project_library_preparation <source> /data`。默认内容源为 `/repo/project_library`。
+- 私有回执位于更新状态根的 `socket/project-library-<control-release>.json`。`binding` 固定部署、控制镜像批次、配置摘要、引用和内容源。`entry` 保存冻结摘要、目录身份和各清单摘要。Compose 通过 `V3_PREPARED_PROJECT_LIBRARY_IMAGE` 将预期配置摘要传给调度器。
+- 操作投影的 `control_health` 可含 `candidate`、`restore`。每组分别返回 `gateway` 和 `orchestrator` 的 `state`、`attempts`、可选 `http_status` 和 `duration_ms`。历史记录允许无该字段。
+
+### 3. Contracts
+
+- 宿主验签并核对候选镜像后，在暂停接单前用精确镜像启动准备容器。容器无网络、根文件系统只读，仅挂载项目库目录和内容对象。只有完整校验及注册通过才发布私有回执。准备过程不登记业务库行。
+- 候选启动核对回执归属、冻结目录身份和各清单字节。项目管理器复用已注册对象，种子和离线制品使用时继续按原摘要合同读取。无准备标记的历史镜像和普通启动沿原注册路径。
+- 健康探测分别记录两端最后结果，HTTP 头已收到时保留状态码，探测时限共享原操作窗口。失败回退前先保存候选结果，恢复结果另存。公开字段只包含探测摘要。
+- 兼容重试时，宿主仅归档已核对为 `platform_restored` 的 SSH 终态日志。须匹配当前已准备的节点及原已恢复操作的 ID、epoch 和节点回执。归档保留原字节。同一任务的在途日志留给原恢复流程。新编排器也把 `platform_restored` 识别为终态。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 项目库准备失败 | 原版继续接单 |
+| 候选启动遇到回执不匹配或冻结清单变化 | 维护期间启动失败，沿原操作回退 |
+| 任一端返回 HTTP 错误或未响应 | 保存该端状态和尝试次数，另一端继续探测 |
+| 已恢复节点记录无法核对归属 | 中止新兼容安装，保留原记录 |
+
+### 5. Scenarios and Examples
+
+- 正常。已有冻结版本可在准备阶段核对后复用。新调度器启动直接加载已注册的索引。
+- 边界。候选网关返回 503，调度器返回 200。回退两端返回 200，候选 503 仍显示在原操作中。
+- 错误用法。重用上一次已恢复作业的 epoch。正确处理。核对并归档终态记录，由原作业入口登记本次维护身份。
+
+### 6. Tests Required
+
+- `test_project_scenario_content` 覆盖候选摘要不匹配、冻结目录替换、清单变化及启动期间无种子树和制品重读。
+- `test_system_host`、`test_system_updater` 和 `test_cluster_synchronization` 覆盖探测失败、回退证据保留、以原记录归档及拒绝未恢复的作业。
+- `verify_system_update_browser.py` 验证两组探测在同一更新详情独立显示。隔离发行验收覆盖真实旧版镜像、合成 SSH 节点、连续故障回退与最终成功安装。

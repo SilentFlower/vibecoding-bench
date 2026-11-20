@@ -1,18 +1,22 @@
 """把网关AGY账号接入现有隔离角色和环境生命周期。"""
 import json
 import hashlib
+import re
 import shutil
 import os
 import time
 import uuid
+from contextlib import nullcontext
 from urllib.parse import unquote, urlsplit
 from urllib.request import ProxyHandler, Request, build_opener
 
 from docker.errors import NotFound
 
 from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, create_environment, role_container
-from account_update_identity import configured_release, image_origin, role_release
+from account_update_identity import compatible_account_origin, configured_release, image_origin, role_release
+from agy_kernel import kernel_id, module_root, selection, work_root
 from native_capture_policy import capture_enabled
+from native_criu_settings import read_settings as read_criu
 from resource_budget import account_limits, default_account_memory, isolated_account_limits
 from runtime_files import atomic_json
 from runtime_names import account_container_prefix
@@ -95,14 +99,26 @@ def summary(runtime, row: dict) -> dict:
     """复用环境卡片并只读实际发送器观测。@param runtime 现有运行时。@param row AGY归属环境。@return 脱敏环境投影。"""
     result=dict(row)
     result['fingerprint']=json.loads(result.pop('fingerprint_json'))
+    connection = runtime.database()
+    try:
+        # 网关账号 ID 与任务账号 ID 各自独立。AGY 的执行归属取固定本机节点。
+        local = connection.execute("SELECT id AS node_id,node_key,name AS node_name,kind,enabled FROM cluster_nodes "
+            "WHERE node_key='local' AND kind='local' AND deleted_at IS NULL").fetchone()
+    finally:
+        connection.close()
+    if local is not None:
+        result['node'] = {**dict(local), 'enabled': bool(local['enabled'])}
+        result['node_message'] = '反重力 API 在本机执行'
     result.update(role_status=runtime.role_status(row),request_backend='agy159',run_window=None,
         can_reprofile=False,reprofile_message='AGY环境按网关账号管理',identity_status='AGY账号独立OAuth HOME',
         native_preparation=None,native_kernel=None,native_kernels=None,cli_versions=[],criu=None,
         platform_release=runtime.release_id,content_capture=capture(runtime,row),busy=False)
     result['agy_runtime']={'version':'1.5.9','source_sha256':SOURCE_SHA256,'state':'sleeping' if row['state']=='stopped' else 'unknown'}
+    criu_observation = None
     if result['role_status'].get('sender')=='running':
         try:
-            binding=runtime.read_sender_configuration(row)['binding']
+            configuration=runtime.read_sender_configuration(row)
+            binding=configuration['binding']
             request=Request(binding['endpoint']+'/internal/status',headers={'Authorization':'Bearer '+binding['secret']})
             with build_opener(ProxyHandler({})).open(request,timeout=3) as response:
                 value=json.loads(response.read(1048577))
@@ -110,12 +126,26 @@ def summary(runtime, row: dict) -> dict:
                 raise ValueError('AGY观测代次不一致')
             result['busy']=value['active']>0
             if isinstance(value.get('agy'),dict):
-                result['agy_runtime'].update(value['agy'])
+                observed = dict(value['agy'])
+                criu_observation = {'environment_id':row['environment_id'],'generation':row['generation'],
+                    'module_root':observed.get('module_root'),'restore':observed.pop('restore',None),
+                    'checked_at_ms':time.time_ns()//1_000_000}
+                loaded = observed.pop('module_root', None)
+                result['agy_runtime'].update(observed)
+                if loaded is not None:
+                    result['agy_runtime']['loaded_kernel'] = kernel_id(loaded)
                 if value['agy'].get('state') in ('unknown','reconcile'):
                     result['state']='reconcile'
                     result['reconcile_allowed']=True
         except (ValueError,OSError):
             result['agy_runtime']['state']='unknown'
+    if row.get(ROLE_COLUMNS['sender']):
+        try:
+            criu = read_criu(runtime,row,criu_observation)
+            if criu['installed']:
+                result['criu'] = criu
+        except (ValueError,OSError,NotFound):
+            pass
     return result
 
 
@@ -155,8 +185,9 @@ def account_input(configuration: dict, row: dict) -> dict:
         'upstream_socks5_user':unquote(proxy.username or ''), 'upstream_socks5_pass':unquote(proxy.password or '')}
 
 
-def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance: bool = False) -> dict | None:
-    """沿现有环境预算准备AGY角色并返回受信绑定。@param runtime 现有运行时。@param gateway_id 网关ID。@param wake 是否允许启动。@return 私有传输绑定。"""
+def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance: bool = False,
+              capacity_reserved: bool = False) -> dict | None:
+    """准备 AGY 角色并返回绑定。@param runtime 运行时。@param gateway_id 网关账号。@param wake 是否唤醒。@param system_maintenance 受证系统维护。@param capacity_reserved 已保留容量。@return 私有绑定。"""
     configuration = runtime.gateway._request('GET', f'/admin/runtime/accounts/{gateway_id}/config')
     if configuration.get('platform') != 'antigravity' or configuration.get('auth_type') != 'oauth':
         raise ValueError('AGY平台归属无效')
@@ -167,16 +198,22 @@ def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance
         return None
     if not wake and row['state']=='stopped':
         return None
-    with runtime.environment_lock(row['environment_id']), runtime.capacity_lock:
+    with runtime.environment_lock(row['environment_id']):
         row = lookup(runtime,gateway_id)
+        if capacity_reserved and row['environment_id'] not in runtime.rollout_capacity_reservations:
+            raise ValueError('账号更新尚未保留环境容量')
         account = account_input(configuration,row)
-        image = runtime.client.images.get(runtime.image)
+        previous = compatible_account_origin(runtime,row,gateway_id)
+        release = previous['release'] if previous else configured_release(runtime)
+        image = runtime.client.images.get(previous['image_id'] if previous else runtime.image)
         labels = image.attrs['Config'].get('Labels') or {}
-        if not configured_release(runtime) or any(labels.get(key)!=value for key,value in {
-                'vibebench.product':'v3','vibebench.role':'account','vibebench.release':configured_release(runtime),
+        if not release or any(labels.get(key)!=value for key,value in {
+                'vibebench.product':'v3','vibebench.role':'account','vibebench.release':release,
                 'vibebench.isolation-version':str(ISOLATION_VERSION)}.items()):
             raise ValueError('AGY账号镜像身份或批次不一致')
         desired = sender_config(configuration,json.loads(row['fingerprint_json']),labels)
+        current_kernel = selection(runtime, row, release=release)
+        desired.update(module_root=module_root(current_kernel), work_root=work_root(current_kernel))
         present = [bool(row.get(column)) for column in ROLE_COLUMNS.values()]
         if any(present) and not all(present):
             runtime._update(row,state='reconcile')
@@ -192,26 +229,37 @@ def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance
                 runtime._update(row,state='reconcile')
                 raise ValueError('AGY环境角色缺失') from None
             config = runtime.read_sender_configuration(row)
-            if config.get('agy')!=desired or config.get('proxy_source')!=runtime._proxy(account) or image_origin(runtime,row)['image_id']!=image.attrs['Id']:
+            old_image = image_origin(runtime,row)['image_id']!=image.attrs['Id']
+            running = [container.status == 'running' for container in containers.values()]
+            if old_image and wake and row['state']=='stopped' and not any(running):
+                stop_environment(runtime,row,remove=True)
+                present = [False] * len(ROLE_COLUMNS)
+            elif old_image or config.get('agy')!=desired or config.get('proxy_source')!=runtime._proxy(account):
                 raise ValueError('AGY资源或镜像已变化，请空闲重建环境')
-            if any(container.status!='running' for container in containers.values()):
+            elif not all(running):
                 if not wake:
                     return None
-                runtime._make_room(row)
-                for role in ('network','cli','sender'):
-                    containers[role].start()
-        elif wake:
-            runtime._make_room(row)
-            root=runtime._root(row)
-            root.mkdir(parents=True,exist_ok=True,mode=0o700)
-            for name in ('home','projects','workspaces','flows','controls','ca','cli','runtime'):
-                (root/name).mkdir(exist_ok=True,mode=0o700)
-            for name in ('home','projects'):
-                os.chown(root/name,1000,1000,follow_symlinks=False)
-            account['agy_sender']=desired
-            create_environment(runtime,row,account,account_container_prefix(runtime.deployment)+row['environment_id'],atomic_json)
-        else:
-            return None
+                if previous:
+                    raise ValueError('原AGY环境尚未恢复，等待后台更新')
+                with nullcontext() if capacity_reserved else runtime.capacity_lock:
+                    if not capacity_reserved:
+                        runtime._make_room(row)
+                    for role in ('network','cli','sender'):
+                        containers[role].start()
+        if not any(present):
+            if not wake:
+                return None
+            with nullcontext() if capacity_reserved else runtime.capacity_lock:
+                if not capacity_reserved:
+                    runtime._make_room(row)
+                root=runtime._root(row)
+                root.mkdir(parents=True,exist_ok=True,mode=0o700)
+                for name in ('home','projects','workspaces','flows','controls','ca','cli','runtime'):
+                    (root/name).mkdir(exist_ok=True,mode=0o700)
+                for name in ('home','projects'):
+                    os.chown(root/name,1000,1000,follow_symlinks=False)
+                account['agy_sender']=desired
+                create_environment(runtime,row,account,account_container_prefix(runtime.deployment)+row['environment_id'],atomic_json)
         if wake:
             runtime._wait_network(row)
             until=time.monotonic()+30
@@ -233,13 +281,28 @@ def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance
 
 def clear_work_copies(runtime, row: dict) -> None:
     """在角色实际停止后清理派生进程与AT副本，保留采集。@param runtime 现有运行时。@param row 原环境。@return 无。"""
-    shutil.rmtree(runtime._root(row)/'runtime/native/agy',ignore_errors=True)
-    captures=runtime._root(row)/'flows/api/agy-prepared'
+    root=runtime._root(row)
+    try:
+        shutil.rmtree(root/'runtime/native/agy')
+    except FileNotFoundError:
+        pass
+    captures=root/'flows/api/agy-prepared'
     if captures.is_dir() and not captures.is_symlink():
         for folder in captures.iterdir():
-            if folder.is_dir() and not folder.is_symlink():
-                shutil.rmtree(folder/'home',ignore_errors=True)
+            # 旧工作目录用 UUID hex 命名。共享采集目录由快照保留策略独立管理。
+            if not re.fullmatch('[0-9a-f]{32}',folder.name) or folder.is_symlink() or not folder.is_dir():
+                continue
+            shutil.rmtree(folder/'home',ignore_errors=True)
+            if not (folder/'retired.json').is_file():
                 atomic_json(folder/'retired.json',{'retired_at':time.time()})
+
+
+def stop_environment(runtime, row: dict, *, remove: bool) -> None:
+    """在实际停止反重力角色后清理该环境的派生状态。@param runtime 现有运行时。@param row 已排空的环境。@param remove 是否移除已停止角色。@return 无。"""
+    runtime._stop_environment(row,remove=remove)
+    # Docker 停机可能直接终止监督进程。旧启动记录属于已停止的进程，会误拦后续唤醒。
+    clear_work_copies(runtime,row)
+    runtime._update(row,state='stopped')
 
 
 def quiesce(runtime, row: dict, proof: dict) -> None:
@@ -251,9 +314,7 @@ def quiesce(runtime, row: dict, proof: dict) -> None:
             raise ValueError('AGY配置事务许可已变化')
         if runtime._running_sender_active(row):
             raise ValueError('AGY原生请求或工具轮仍在执行')
-        runtime._stop_environment(row,remove=True)
-        clear_work_copies(runtime,row)
-        runtime._update(row,state='stopped')
+        stop_environment(runtime,row,remove=True)
 
 
 def maintenance(runtime, row: dict, operation: str) -> None:
@@ -276,10 +337,6 @@ def maintenance(runtime, row: dict, operation: str) -> None:
             if actual.get('reconcile_allowed') is not True:
                 raise ValueError('AGY原生控制仍有有效工作，等待原截止收口')
         runtime.gateway._request('POST',path,{'operation':'claim','owner':owner,'generation':proof['generation']})
-        runtime._stop_environment(row,remove=operation in ('rebuild','reconcile'))
-        if operation in ('rebuild','reconcile'):
-            # 角色已经实际停止，原工具轮随故障终止；只清理派生worker与AT工作副本。
-            clear_work_copies(runtime,row)
-        runtime._update(row,state='stopped')
+        stop_environment(runtime,row,remove=operation in ('rebuild','reconcile'))
     finally:
         runtime.gateway._request('POST',path,{'operation':'release','owner':owner,'generation':proof['generation']})

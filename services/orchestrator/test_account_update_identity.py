@@ -5,8 +5,9 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from account_update_identity import image_origin, save_image_origin
+from account_update_identity import compatible_account_origin, image_origin, save_image_origin
 from runtime_files import atomic_json
+from system_update_rollout import rollout_path
 
 
 class ImageOriginTests(unittest.TestCase):
@@ -35,3 +36,23 @@ class ImageOriginTests(unittest.TestCase):
                 atomic_json(root / 'runtime/account-image.json', {**original, **change})
                 with self.subTest(change=change), self.assertRaises(ValueError):
                     image_origin(runtime, row)
+
+    def test_rollout_rejects_a_different_role_generation_or_gateway_account(self) -> None:
+        """同一原环境的本机旧来源才可继续接单。@return 无。"""
+        with tempfile.TemporaryDirectory() as folder, patch.dict('os.environ', {'V3_UPDATE_GATE_DIR': folder}):
+            root = Path(folder)
+            runtime = SimpleNamespace(deployment='test', release_id='ci-2-1', account_release_id='ci-2-1', _root=lambda row: root)
+            row = {'environment_id': 'e' * 32, 'account_id': 1, 'generation': 3, 'state': 'ready',
+                'container_id': 'cli', 'network_container_id': 'net', 'sender_container_id': 'sender'}
+            origin = {'schema_version': 1, 'environment_id': row['environment_id'], 'release': 'ci-1-1',
+                'reference': 'ghcr.io/silentflower/flower2api-account:v3-ci-1-1', 'image_id': 'sha256:' + 'a' * 64, 'protocol': 1}
+            atomic_json(root / 'runtime/account-image.json', origin)
+            atomic_json(rollout_path(root, runtime.release_id), {'schema_version': 1, 'deployment': 'test',
+                'control_release': runtime.release_id, 'account_release': runtime.account_release_id,
+                'environments': {row['environment_id']: {'account_id': 1, 'generation': 3, 'gateway_account_id': 17,
+                    'origin': origin, 'roles': {'cli': 'cli', 'network': 'net', 'sender': 'sender'}}}})
+            self.assertEqual(origin, compatible_account_origin(runtime, row, 17))
+            self.assertIsNone(compatible_account_origin(runtime, row, 18))
+            for shift in ({'generation': 4}, {'sender_container_id': 'foreign'}, {'account_id': 2}, {'state': 'stopped'}):
+                with self.subTest(shift=shift):
+                    self.assertIsNone(compatible_account_origin(runtime, {**row, **shift}, 17))

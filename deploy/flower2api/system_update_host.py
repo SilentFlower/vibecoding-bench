@@ -5,27 +5,43 @@ import hashlib
 import ipaddress
 import json
 import os
+import re
 import shlex
 import shutil
 import sqlite3
 import subprocess
 import time
+import uuid
 from contextlib import closing
+from http.client import HTTPException
 from pathlib import Path
 from urllib.parse import quote
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import ProxyHandler, Request, build_opener
 
 from manage import _check_local_reference, _local_image_matches, _container_image_matches, load_bundle, load_environment
-from runtime_files import atomic_json, atomic_text
+from runtime_files import atomic_json, atomic_text, directory_fd
 from runtime_names import account_container_prefix, account_rebuild_required, deployment_network_names, image_reference
-from system_update_contract import DOWNLOAD_ROOT, ROLES, ReleaseRedirect, compatible_scratchpad, fetch_bytes, safe_read, strict_json, validate_migration_plan
+from system_update_contract import (DOWNLOAD_ROOT, PROJECT_LIBRARY_PREPARATION, PROJECT_LIBRARY_RECEIPT_LIMIT,
+    ROLES, ReleaseRedirect, compatible_scratchpad, fetch_bytes, project_library_receipt_name, safe_read,
+    strict_json, validate_migration_plan, verify_prepared_metadata)
 from system_update_gate import read_gate
+from system_update_rollout import read_rollout, rollout_path
 from system_update_database import assert_quiescent, create_snapshot, restore_snapshot, rotate_snapshots, assert_gateway_platform_support
 
 SOFTWARE_FIELDS = ('version', 'version_base', 'build_time', 'node_version')
 ENVIRONMENT_IDENTITY = ('environment_id', 'name', 'account_id', 'fingerprint_json')
 ENVIRONMENT_BINDINGS = ('generation', 'container_id', 'network_container_id', 'sender_container_id', 'state', 'isolation_version')
+NODE_MAINTENANCE_JOURNAL_LIMIT = 8 * 1024 * 1024
+
+
+class ControlHealthTimeout(TimeoutError):
+    """候选或恢复验收超时，持有可公开的双端探测摘要。"""
+
+    def __init__(self, probes: dict) -> None:
+        """保留实际探测。:param probes: 固定字段的双端摘要。:return: 无。"""
+        super().__init__('控制服务健康验收超时')
+        self.probes = probes
 
 
 def docker(*arguments: str, timeout: int = 120) -> str:
@@ -97,13 +113,14 @@ class HostDeployment:
             raise ValueError('部署控制服务缺失')
         return result
 
-    def request(self, service: str, path: str, body: dict | None = None, timeout: int = 15) -> dict:
+    def request(self, service: str, path: str, body: dict | None = None, timeout: float = 15, *, on_status=None) -> dict:
         """向本部署的实际控制服务发送受证管理请求。
 
         :param service: gateway 或 orchestrator。
         :param path: 固定内部路径。
         :param body: 有界协议载荷。
         :param timeout: 单次期限。
+        :param on_status: 可选的 HTTP 状态观察回调。
         :return: 有界 JSON 对象。
         """
         values = self.values()
@@ -122,8 +139,12 @@ class HostDeployment:
             token = values['V3_INTERNAL_TOKEN']
         headers = {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json',
             'X-V3-Update-Token': safe_read(self.root / 'socket/token', 128, private=True).decode().strip()}
+        if service == 'gateway' and path == '/admin/runtime/system-update/cutover':
+            headers['X-V3-Service-Token'] = values['V3_INTERNAL_TOKEN']
         request = Request(base + path, data=json.dumps(body).encode() if body is not None else None, headers=headers)
         with self.opener.open(request, timeout=timeout) as response:
+            if on_status is not None:
+                on_status(response.status)
             return strict_json(response.read(131073))
 
     def metadata(self) -> dict:
@@ -234,24 +255,7 @@ class HostDeployment:
         needed = sum(entry['unpacked_bytes'] for entry in selection.values()) + release['bundle']['size'] + 512 * 1024 ** 2
         if shutil.disk_usage(self.data).free < needed:
             raise ValueError('磁盘空间不足以保留当前及恢复制品')
-        # 原始联合清单也逐字节核对，外层签名不能替代构建来源证据。
-        for role in ROLES:
-            asset = release['build_manifests'][role]
-            path = folder / asset['name']
-            if not path.exists():
-                raw = fetch_bytes(f'{DOWNLOAD_ROOT}/{release["release"]}/{asset["name"]}', asset['size'])
-                if len(raw) != asset['size'] or hashlib.sha256(raw).hexdigest() != asset['sha256']:
-                    raise ValueError('原始构建清单摘要不符')
-                atomic_text(path, raw.decode())
-            raw = safe_read(path)
-            if len(raw) != asset['size'] or hashlib.sha256(raw).hexdigest() != asset['sha256']:
-                raise ValueError('缓存构建清单摘要不符')
-            source = strict_json(raw)
-            entry = release[role]
-            if (source.get('schema') != 3 or source.get('release') != entry['release']
-                    or source.get('parent_revision') != entry['revision']
-                    or any(source['images'][role].get(key) != entry[key] for key in ('reference', 'registry_digest', 'config_digest'))):
-                raise ValueError('平台组件与原始构建清单不一致')
+        self._verify_build_manifests(release, folder, download=True)
         existing = self.verify_images(selection, require_local=False)
         for role in ROLES:
             if role in existing:
@@ -269,7 +273,105 @@ class HostDeployment:
             if not _local_image_matches(pinned, image, expected):
                 raise ValueError('拉取镜像内容不匹配')
             docker('tag', pinned, entry['reference'])
-        self.verify_images(selection)
+        images = self.verify_images(selection)
+        binding = self._project_library_binding(selection['control'], images['control'])
+        if binding:
+            self._prepare_project_library(binding, images['control']['Id'])
+
+    def verify_prepared(self, release: dict, selection: dict, folder: Path) -> None:
+        """在关闭准入前核对已下载候选。@param release 已验签发行。@param selection 冻结组件。@param folder 本地缓存。@return 缓存仍有效时返回。"""
+        try:
+            self._verify_build_manifests(release, folder, download=False)
+            images = self.verify_images(selection)
+            binding = self._project_library_binding(selection['control'], images['control'])
+            if binding:
+                self._prepared_project_library(binding)
+        except (OSError, ValueError, RuntimeError) as error:
+            raise ValueError('本地准备材料已失效，请重新下载更新') from error
+
+    def _verify_build_manifests(self, release: dict, folder: Path, *, download: bool) -> None:
+        # 原始联合清单也逐字节核对，外层签名不能替代构建来源证据。
+        for role in ROLES:
+            asset = release['build_manifests'][role]
+            path = folder / asset['name']
+            if download and not path.exists():
+                raw = fetch_bytes(f'{DOWNLOAD_ROOT}/{release["release"]}/{asset["name"]}', asset['size'])
+                if len(raw) != asset['size'] or hashlib.sha256(raw).hexdigest() != asset['sha256']:
+                    raise ValueError('原始构建清单摘要不符')
+                atomic_text(path, raw.decode())
+            raw = safe_read(path)
+            if len(raw) != asset['size'] or hashlib.sha256(raw).hexdigest() != asset['sha256']:
+                raise ValueError('缓存构建清单摘要不符')
+            source = strict_json(raw)
+            entry = release[role]
+            if (source.get('schema') != 3 or source.get('release') != entry['release']
+                    or source.get('parent_revision') != entry['revision']
+                    or any(source['images'][role].get(key) != entry[key] for key in ('reference', 'registry_digest', 'config_digest'))):
+                raise ValueError('平台组件与原始构建清单不一致')
+
+    def _project_library_binding(self, control: dict, image: dict) -> dict | None:
+        config = image['Config']
+        if (config.get('Labels') or {}).get(PROJECT_LIBRARY_PREPARATION) != '1':
+            return None
+        source = next((item.partition('=')[2] for item in (config.get('Env') or [])
+            if item.startswith('PROJECT_LIBRARY_DIR=')), '/repo/project_library')
+        return {'deployment': self.policy['deployment'], 'release': control['release'],
+            'image_digest': control['config_digest'], 'reference': control['reference'], 'source': source}
+
+    def _prepared_project_library(self, binding: dict) -> dict:
+        path = self.root / 'socket' / project_library_receipt_name(binding['release'])
+        receipt = strict_json(safe_read(path, PROJECT_LIBRARY_RECEIPT_LIMIT, private=True), PROJECT_LIBRARY_RECEIPT_LIMIT)
+        entry = receipt.get('entry')
+        if (receipt.get('binding') != binding or not isinstance(entry, dict)
+                or entry.get('source') != binding['source']):
+            raise ValueError('项目库准备记录与候选镜像不符')
+        verify_prepared_metadata(self.data / 'bench', entry)
+        return receipt
+
+    def _prepare_project_library(self, binding: dict, image_id: str) -> None:
+        self.values()
+        try:
+            self._prepared_project_library(binding)
+            return
+        except (ValueError, OSError):
+            # 准备记录丢失或冻结目录变化时，用已核验的镜像重新校验。
+            pass
+        bench = self.data / 'bench'
+        mounts = []
+        for relative in ('project-library', 'project-artifacts/objects'):
+            host = bench / relative
+            host.mkdir(parents=True, exist_ok=True, mode=0o700)
+            if host.resolve() != host:
+                raise ValueError('项目库准备数据目录必须为真实路径')
+            mounts.extend(('--mount', f'type=bind,src={host},dst=/data/{relative}'))
+        name = f"{binding['deployment']}-project-library-{binding['release']}"
+        label = 'vibebench.project-library-owner=' + name
+
+        def remove_interrupted():
+            ids = docker('ps', '-aq', '--filter', 'label=' + label).split()
+            if not ids:
+                return
+            containers = json.loads(docker('inspect', *ids))
+            for item in containers:
+                if (item['Name'] == '/' + name and item['Image'] == image_id
+                        and (item['Config'].get('Labels') or {}).get('vibebench.project-library-owner') == name):
+                    docker('stop', item['Id'], timeout=20)
+
+        remove_interrupted()
+        try:
+            raw = docker('run', '--rm', '--name', name, '--label', label, '--network', 'none',
+                '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', *mounts,
+                '--entrypoint', 'python3', image_id, '-m', 'project_library_preparation', binding['source'], '/data', timeout=1800)
+        except subprocess.TimeoutExpired as error:
+            remove_interrupted()
+            raise TimeoutError('候选项目库准备超时，原版继续接单') from error
+        except RuntimeError as error:
+            raise ValueError('候选项目库完整校验或注册失败，原版继续接单') from error
+        entry = strict_json(raw.encode(), PROJECT_LIBRARY_RECEIPT_LIMIT)
+        if entry.get('source') != binding['source']:
+            raise ValueError('项目库准备来源与候选镜像不符')
+        verify_prepared_metadata(bench, entry)
+        atomic_json(self.root / 'socket' / project_library_receipt_name(binding['release']), {'binding': binding, 'entry': entry})
 
     def _load_release_bundle(self, release: dict, folder: Path) -> None:
         if release['build_manifests']['control'] != release['build_manifests']['account']:
@@ -300,7 +402,32 @@ class HostDeployment:
                 temporary.unlink(missing_ok=True)
         load_bundle(folder / release['build_manifests']['control']['name'], destination)
 
-    def capture(self, current: dict) -> dict:
+    def fast_transition(self, original: dict, selected: dict) -> bool:
+        """核对原程序与候选同具中央快速换版能力。:param original: 原组合。:param selected: 候选组合。:return: 能力可用。"""
+        for entry in (original, selected):
+            images = self.verify_images(entry['selection'])
+            if any((image['Config'].get('Labels') or {}).get('vibebench.fast-system-update') != '1' for image in images.values()):
+                return False
+        return self.request('gateway', '/admin/runtime/system-update/status').get('inference_cutover') is True
+
+    def supports_local_rollout(self, original: dict, selected: dict) -> bool:
+        """核对双端控制能解释账号后台记录。@param original 原组合。@param selected 候选组合。@return 可分步切换。"""
+        return all((self.verify_images(value['selection'])['control']['Config'].get('Labels') or {})
+                   .get('vibebench.local-account-rollout') == '1' for value in (original, selected))
+
+    def _runtime_snapshot(self, central_only: bool = False, timeout: float = 15, *, on_status=None,
+                          control_only: bool = False) -> dict:
+        """读取实际证据。:param central_only: 中央范围。:param timeout: 调用期限。:param on_status: 状态观察。:return: 快照。"""
+        body = {'central_only': True} if central_only else {}
+        if control_only:
+            body['control_only'] = True
+        options = {} if on_status is None else {'on_status': on_status}
+        evidence = self.request('orchestrator', '/internal/v3/system-updates/snapshot', body, timeout=timeout, **options)
+        if central_only and evidence.get('scope') != ('control' if control_only else 'central'):
+            raise ValueError('编排服务没有返回中央快速换版证据')
+        return evidence
+
+    def capture(self, current: dict, central_only: bool = False, *, control_only: bool = False) -> dict:
         """冻结当前实际部署及身份，后续动作逐项对照。
 
         :param current: 当前安装记录。
@@ -313,15 +440,18 @@ class HostDeployment:
             if not _container_image_matches(item['Image'], images['control']['Id'],
                     {**current['selection']['control'], 'digest': current['selection']['control']['config_digest']}):
                 raise ValueError('实际控制服务与当前安装记录不符')
-        evidence = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+        evidence = self._runtime_snapshot(central_only, control_only=True) if control_only else self._runtime_snapshot(central_only)
         deadline = time.monotonic() + 5
         while evidence.get('phase') == 'blocked' and evidence.get('ready') is not True:
             # 已排空后的冻结必须使用完整快照；历史程序的只读占锁不能变成缺失角色来源。
             if time.monotonic() >= deadline:
                 raise ValueError('维护冻结快照仍有未收口活动或未知证据')
             time.sleep(0.1)
-            evidence = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
-        return {'controls': {role: {'id': item['Id'], 'image_id': item['Image']} for role, item in controls.items()},
+            evidence = self._runtime_snapshot(central_only, control_only=True) if control_only else self._runtime_snapshot(central_only)
+        network = deployment_network_names(self.policy['deployment'])[0] if control_only else None
+        return {'controls': {role: {'id': item['Id'], 'image_id': item['Image'],
+            **({'management_address': item['NetworkSettings']['Networks'].get(network, {}).get('IPAddress')} if network else {})}
+            for role, item in controls.items()},
             'env_sha256': hashlib.sha256(safe_read(self.env, private=True)).hexdigest(),
             'metadata': self.metadata(), 'environments': evidence['environments'], 'nodes': evidence.get('nodes', [])}
 
@@ -344,11 +474,12 @@ class HostDeployment:
         :param operation: 本次冻结操作。
         :return: ready、阻塞项及环境快照。
         """
-        runtime = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+        rolling = operation.get('rolling_accounts') is True
+        runtime = self._runtime_snapshot(True, control_only=True) if rolling else self._runtime_snapshot(operation.get('fast_transition', False))
         gateway = self.request('gateway', '/admin/runtime/system-update/status')
         if any(value.get('phase') != 'blocked' or value.get('epoch') != operation['epoch'] for value in (gateway, runtime)):
             raise ValueError('部署维护接管代次不一致')
-        node_removals = runtime.get('node_removals', [])
+        node_removals = [] if rolling else runtime.get('node_removals', [])
         removal_retries = [item['name'] for item in node_removals if item['state'] == 'needs_check']
         if removal_retries:
             raise ValueError('请在节点管理重试移除后再更新平台：' + '、'.join(removal_retries[:3]))
@@ -357,6 +488,60 @@ class HostDeployment:
         return {'ready': gateway.get('active') == 0 and runtime.get('ready') is True,
             'blockers': (['网关仍有在途活动'] if gateway.get('active') else []) + runtime.get('blockers', []),
             'environments': runtime['environments']}
+
+    def cancel_inference(self, operation: dict) -> None:
+        """通知原网关关闭推理并核对接管归属。:param operation: 冻结的更新操作。:return: 无。"""
+        body = {key: operation[key] for key in ('operation_id', 'epoch')}
+        receipt = self.request('gateway', '/admin/runtime/system-update/cutover', body, timeout=5)
+        if receipt.get('accepted') is not True or any(receipt.get(key) != value for key, value in body.items()):
+            raise ValueError('网关推理取消回执归属无效')
+
+    def _archive_restored_node_jobs(self, operation: dict) -> None:
+        """归档旧编排器不能重用的已恢复节点记录。"""
+        for node in operation['before'].get('nodes', []):
+            node_key = node.get('node_key', '')
+            preparation = node.get('preparation') or {}
+            if (node.get('kind') != 'ssh' or not isinstance(node_key, str)
+                    or not re.fullmatch('[a-f0-9]{32}', node_key) or preparation.get('state') != 'prepared'):
+                continue
+            current = self.data / 'bench' / 'cluster-private' / node_key / 'maintenance/current.json'
+            try:
+                raw = safe_read(current, NODE_MAINTENANCE_JOURNAL_LIMIT, private=True)
+            except FileNotFoundError:
+                continue
+            job = strict_json(raw, NODE_MAINTENANCE_JOURNAL_LIMIT)
+            if job.get('phase') != 'platform_restored':
+                continue
+            prior_id = job.get('platform_operation', '')
+            job_id = job.get('job_id', '')
+            try:
+                if str(uuid.UUID(prior_id)) != prior_id or prior_id == operation['operation_id']:
+                    raise ValueError('旧节点恢复记录操作身份无效')
+            except (TypeError, AttributeError) as error:
+                raise ValueError('旧节点恢复记录操作身份无效') from error
+            previous = self.root / 'operations' / prior_id / 'operation.json'
+            try:
+                prior = strict_json(safe_read(previous, NODE_MAINTENANCE_JOURNAL_LIMIT, private=True), NODE_MAINTENANCE_JOURNAL_LIMIT)
+            except (OSError, ValueError) as error:
+                raise ValueError('旧节点恢复记录缺少可核对的宿主回执') from error
+            restored_nodes = (prior.get('cluster_nodes') or {}).get('nodes', [])
+            if (prior.get('phase') != 'restored' or prior.get('operation_id') != prior_id or prior.get('epoch') != job.get('platform_epoch')
+                    or job.get('node_id') != node['id'] or job.get('node_key') != node_key
+                    or job.get('old_release') != preparation.get('release') or not isinstance(job_id, str)
+                    or not re.fullmatch('[a-f0-9]{32}', job_id)
+                    or not any(item.get('node_id') == node['id'] and item.get('node_key') == node_key
+                        and item.get('job_id') == job_id and item.get('phase') == 'platform_restored' for item in restored_nodes)):
+                raise ValueError('旧节点恢复归属需要核对')
+            archive = current.with_name(job_id + '.json')
+            if archive.exists() and safe_read(archive, NODE_MAINTENANCE_JOURNAL_LIMIT, private=True) != raw:
+                raise ValueError('旧节点维护归档与恢复记录不一致')
+            # 旧版仍会读取 current.json。只移动已恢复记录，保留原字节供后续核对。
+            directory = directory_fd(current.parent)
+            try:
+                os.replace(current.name, archive.name, src_dir_fd=directory, dst_dir_fd=directory)
+                os.fsync(directory)
+            finally:
+                os.close(directory)
 
     def prepare_nodes(self, operation: dict, selected: dict, save, cancelled) -> None:
         """冻结并收齐同代Node备份，长备份在原后台操作中等待。
@@ -370,6 +555,7 @@ class HostDeployment:
         expected = {row['id'] for row in operation['before'].get('nodes', [])}
         if not expected:
             return
+        self._archive_restored_node_jobs(operation)
         body = {'operation_id': operation['operation_id'], 'epoch': operation['epoch'], 'action': 'prepare',
             'target_release': selected['release']['release'], 'control_release': selected['selection']['control']['release'], 'control_image': selected['selection']['control']['reference'],
             'account_image': selected['selection']['account']['reference'], 'account_release': selected['selection']['account']['release']}
@@ -438,6 +624,9 @@ class HostDeployment:
         :param save: 持久回调。
         :return: None；未知结果保留原平台维护。
         """
+        if operation.get('fast_transition'):
+            # 独立节点作业从当前中央已提交版本获取目标，切换前无需恢复节点进程。
+            return
         expected = {row['id'] for row in operation['before'].get('nodes', [])}
         if not expected:
             return
@@ -482,13 +671,15 @@ class HostDeployment:
                 return evidence
             time.sleep(0.1)
 
-    def _environment_request(self, body: dict) -> dict:
+    def _environment_request(self, body: dict, central_only: bool = False) -> dict:
         """仅重试服务明确在副作用前拒绝的排空冲突，沿用原身份和代次。
 
         :param body: 原操作、环境、代次和动作的冻结请求。
         :return: 实际维护回执；其它错误直接保留原失败路径。
         """
         deadline = time.monotonic() + 5
+        if central_only:
+            body = {**body, 'central_only': True}
         while True:
             try:
                 return self.request('orchestrator', '/internal/v3/system-updates/environment', body, timeout=180)
@@ -547,11 +738,17 @@ class HostDeployment:
             raise ValueError('目标网络归属无效')
         managers = {str(ipaddress.IPv4Address(item['Gateway'])) for item in network.get('IPAM', {}).get('Config') or []
             if item.get('Gateway')}
+        control_addresses = set()
         for control in self.controls().values():
             address = control['NetworkSettings']['Networks'].get(target, {}).get('IPAddress')
             if not control['State']['Running'] or not address:
                 raise ValueError('新控制角色的管理地址尚未就绪')
-            managers.add(str(ipaddress.IPv4Address(address)))
+            control_addresses.add(str(ipaddress.IPv4Address(address)))
+        managers.update(control_addresses)
+        rolling = operation.get('rolling_accounts') is True
+        if rolling and control_addresses == {item.get('management_address') for item in operation['before']['controls'].values()}:
+            # 同一网络及管理 IP 集合保留原防火墙授权，无需逐账号进入网络容器。
+            return
         if not managers:
             raise ValueError('新网络管理地址缺失')
         frozen = {item['environment_id']: item for item in operation['before']['environments']}
@@ -564,7 +761,7 @@ class HostDeployment:
             # 部分角色重建可能已移除原网络，恢复路径继续由既有环境意图核对其余角色。
             present = docker('ps', '-aq', '--filter', 'id=' + identifier).split()
             if not present:
-                if environment_id in operation.get('environment_intents', {}):
+                if rolling or environment_id in operation.get('environment_intents', {}):
                     continue
                 raise ValueError('原账号网络角色缺失')
             item = json.loads(docker('inspect', identifier))[0]
@@ -576,6 +773,8 @@ class HostDeployment:
             if (item['Id'] != identifier or item['Image'] not in (original.get('image_id'), candidate)
                     or any(labels.get(key) != value for key, value in expected.items())
                     or item['Name'].lstrip('/') not in names):
+                if rolling:
+                    continue
                 raise ValueError('账号网络角色的来源或名称不符')
             if not item['State']['Running']:
                 # 原停止环境保持停止，后续由原生命周期按候选配置唤醒。
@@ -587,14 +786,19 @@ class HostDeployment:
                 # 次级网络不能接管默认网关；账号出口继续由原 tun0 与代理链持有。
                 docker('network', 'connect', '--gw-priority=-1', '--alias', item['Name'].lstrip('/'), target, identifier)
             # 新网段的控制 IP 必须经原默认拒绝入口授权，单纯接网不能穿过旧管理白名单。
-            docker('exec', '--env', 'V3_MANAGEMENT_ADDRESSES=' + json.dumps(sorted(managers)), identifier,
-                'python3', '/usr/local/bin/v3-network-guard')
+            try:
+                docker('exec', '--env', 'V3_MANAGEMENT_ADDRESSES=' + json.dumps(sorted(managers)), identifier,
+                    'python3', '/usr/local/bin/v3-network-guard', timeout=5 if rolling else 120)
+            except (RuntimeError, TimeoutError):
+                if not rolling:
+                    raise
 
-    def _stage_selection(self, operation: dict, selected: dict) -> None:
+    def _stage_selection(self, operation: dict, selected: dict, image: dict | None = None) -> None:
         """仅切换两个控制服务，所有账号操作继续由目标运行时执行。
 
         :param operation: 已持久操作。
         :param selected: 目标安装记录。
+        :param image: 切换阶段已读取的控制镜像。
         :return: None。
         """
         folder = self.root / 'operations' / operation['operation_id']
@@ -606,10 +810,15 @@ class HostDeployment:
         if any(actual[role]['Id'] != old['id'] or actual[role]['Image'] != old['image_id']
                 for role, old in operation['before']['controls'].items()):
             raise ValueError('维护期间控制容器身份已经变化')
-        if not (folder / 'before.env').exists():
-            atomic_text(folder / 'before.env', original.decode())
+        control = selected['selection']['control']
+        if image is None:
+            image = json.loads(docker('image', 'inspect', control['reference']))[0]
+        if not _local_image_matches(control['reference'], image, {**control, 'digest': control['config_digest']}):
+            raise ValueError('切换前控制镜像身份已变化')
+        binding = self._project_library_binding(control, image)
         updates = {'V3_RELEASE': selected['selection']['control']['release'],
             'V3_CONTROL_IMAGE': selected['selection']['control']['reference'],
+            'V3_PREPARED_PROJECT_LIBRARY_IMAGE': binding['image_digest'] if binding else '',
             'V3_ACCOUNT_IMAGE': selected['selection']['account']['reference'],
             'V3_ACCOUNT_RELEASE': selected['selection']['account']['release'],
             'V3_SYSTEM_RELEASE': selected['release']['release'], 'V3_UPDATE_ROOT': str(self.root),
@@ -624,11 +833,14 @@ class HostDeployment:
         lines.extend(key + '=' + shlex.quote(value) for key, value in updates.items())
         candidate = '\n'.join(lines) + '\n'
         atomic_text(folder / 'candidate.env', candidate)
+        # 恢复以 before.env 的存在为界，发布该标记之前先保留完整候选配置。
+        if not (folder / 'before.env').exists():
+            atomic_text(folder / 'before.env', original.decode())
     def switch(self, operation: dict, selected: dict) -> None:
         """按冻结来源切换两个控制服务。:param operation: 持久操作。:param selected: 目标组合。:return: None。"""
         image = json.loads(docker('image', 'inspect', selected['selection']['control']['reference']))[0]
         assert_gateway_platform_support(self.data, image['Config'].get('Labels') or {})
-        self._stage_selection(operation, selected)
+        self._stage_selection(operation, selected, image)
         folder = self.root / 'operations' / operation['operation_id']
         candidate = safe_read(folder / 'candidate.env', private=True).decode()
         # 原门禁和排空证明仍被持有；通用 stop 会影响账号容器，所以仅指定控制服务。
@@ -638,20 +850,48 @@ class HostDeployment:
         self._compose('up', '-d', '--no-deps', 'gateway', 'orchestrator')
         self._connect_legacy_environments(operation)
 
-    def wait_controls(self, deadline: float) -> None:
+    def wait_controls(self, deadline: float, central_only: bool = False) -> dict:
         """等待实际双端服务可读，保留总截止期限。
 
         :param deadline: 单调截止。
-        :return: None。
+        :param central_only: 中央快速换版时只探测中央。
+        :return: 两端最后一次探测的受控摘要。
         """
+        probes = {role: {'state': 'pending', 'attempts': 0} for role in ('gateway', 'orchestrator')}
         while time.monotonic() < deadline:
-            try:
-                self.request('gateway', '/admin/runtime/system-update/status', timeout=5)
-                self.request('orchestrator', '/internal/v3/system-updates/snapshot', {}, timeout=5)
-                return
-            except (OSError, ValueError, RuntimeError, KeyError):
-                time.sleep(0.5)
-        raise TimeoutError('候选控制服务健康验收超时')
+            for role, previous in probes.items():
+                started = time.monotonic()
+                if started >= deadline:
+                    break
+                probe = {'state': 'ready', 'attempts': previous['attempts'] + 1}
+                def record_status(status):
+                    probe['http_status'] = status
+                try:
+                    timeout = min(5, deadline - started)
+                    if role == 'gateway':
+                        self.request(role, '/admin/runtime/system-update/status', timeout=timeout, on_status=record_status)
+                    else:
+                        self._runtime_snapshot(central_only, timeout=timeout, on_status=record_status)
+                except HTTPError as error:
+                    probe.update(state='http_error', http_status=error.code)
+                    error.close()
+                except (OSError, ValueError, RuntimeError, KeyError, HTTPException, subprocess.TimeoutExpired) as error:
+                    cause = error.reason if isinstance(error, URLError) else error
+                    if isinstance(cause, (TimeoutError, subprocess.TimeoutExpired)):
+                        probe['state'] = 'timeout'
+                    elif isinstance(error, OSError):
+                        probe['state'] = 'connection_failed'
+                    elif isinstance(error, (ValueError, KeyError, HTTPException)):
+                        probe['state'] = 'invalid_response'
+                    else:
+                        probe['state'] = 'request_failed'
+                probe['duration_ms'] = int((time.monotonic() - started) * 1000)
+                probes[role] = probe
+            else:
+                if all(probe['state'] == 'ready' for probe in probes.values()):
+                    return probes
+            time.sleep(max(0, min(0.5, deadline - time.monotonic())))
+        raise ControlHealthTimeout(probes)
 
     def snapshot_databases(self, operation: dict, selected: dict, save) -> None:
         """停止写入服务后保存同组双库快照。
@@ -902,6 +1142,7 @@ class HostDeployment:
         """
         if not account_rebuild_required(operation['original']['selection']['account'], selected['selection']['account']):
             return
+        central_only = operation.get('fast_transition', False)
         for original in operation['before']['environments']:
             if original.get('node_kind') == 'ssh':
                 continue
@@ -933,14 +1174,59 @@ class HostDeployment:
                     self.verify_images(selected['selection'])['account']['Id']})}
             save()
             result = self._environment_request({'operation_id': operation['operation_id'], 'epoch': operation['epoch'],
-                'environment_id': current['environment_id'], 'generation': current['generation'], 'action': 'rebuild'})
-            fresh = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+                'environment_id': current['environment_id'], 'generation': current['generation'], 'action': 'rebuild'}, central_only)
+            fresh = self._runtime_snapshot(central_only)
             rebuilt = next(item for item in fresh['environments'] if item['environment_id'] == current['environment_id'])
             frozen = operation['environment_cpu_before'].get(current['environment_id'])
             if frozen is not None:
                 self.environment_cpu(rebuilt, frozen)
             operation.setdefault('environment_results', {})[current['environment_id']] = result
             save()
+
+    def stage_local_rollout(self, operation: dict, selected: dict) -> dict:
+        """在释放全局门禁前发布逐环境的旧来源授权。@param operation 已冻结的更新。@param selected 目标组合。@return 公共后台进度。"""
+        original = operation['original']['selection']
+        target = selected['selection']
+        deployment = self.policy['deployment']
+        previous = read_rollout(self.gate, deployment, original['control']['release'], original['account']['release'])
+        prior_entries = previous['environments'] if previous else {}
+        original_id = self.verify_images(original)['account']['Id']
+        target_id = self.verify_images(target)['account']['Id']
+        accounts, entries = {}, {}
+        for item in operation['before']['environments']:
+            identifier = item['environment_id']
+            roles = item.get('roles', {})
+            if item['state'] in ('stopped', 'retired') and not any(role['state'] == 'running' for role in roles.values()):
+                continue
+            origin = item.get('origin') or {}
+            if (origin.get('release') == target['account']['release'] and origin.get('image_id') == target_id
+                    and origin.get('reference') == target['account']['reference']):
+                continue
+            entry = {key: item.get(key) for key in ('account_id', 'gateway_account_id', 'generation')}
+            entry.update(origin=origin, roles={role: value['id'] for role, value in roles.items()})
+            account = {'environment_id': identifier, 'name': item['name'], 'generation': item['generation'], 'state': 'queued'}
+            accounts[identifier] = account
+            valid_origin = (origin.get('release') == original['account']['release']
+                            and origin.get('reference') == original['account']['reference']
+                            and origin.get('image_id') == original_id) or prior_entries.get(identifier) == entry
+            if (not valid_origin or set(roles) != {'cli', 'sender', 'network'} or origin.get('protocol') != 1
+                    or any(role['image_id'] != origin.get('image_id') for role in roles.values())
+                    or (entry['account_id'] is None and entry['gateway_account_id'] is None)):
+                account.update(state='needs_check', error='旧环境镜像或账号归属待核对', retryable=False)
+                continue
+            entries[identifier] = entry
+        record = {'schema_version': 1, 'deployment': deployment,
+            'operation_id': operation['operation_id'], 'epoch': operation['epoch'],
+            'control_release': target['control']['release'], 'account_release': target['account']['release'],
+            'target_image_id': target_id, 'environments': entries}
+        atomic_json(rollout_path(self.gate, record['control_release']), record)
+        return accounts
+
+    def rollout_environment(self, operation: dict, item: dict) -> dict:
+        """请求新编排服务更新一个本机账号。@param operation 控制切换凭证。@param item 账号及原代次。@return 实际更新回执。"""
+        body = {key: operation[key] for key in ('operation_id', 'epoch')}
+        body.update({key: item[key] for key in ('environment_id', 'generation')}, action='rollout')
+        return self.request('orchestrator', '/internal/v3/system-updates/environment', body, timeout=180)
 
     def health(self, operation: dict, selected: dict, *, restoring: bool = False) -> None:
         """核对镜像、身份、环境及明确允许的软件字段变化。
@@ -1029,7 +1315,8 @@ class HostDeployment:
             actual = controls[role]
             if actual['Id'] != original['id'] or actual['Image'] != original['image_id'] or actual['State']['Status'] != 'running':
                 raise ValueError('取消维护时原控制服务状态已经变化')
-        if operation['before'].get('nodes') and operation.get('node_backup_requested', True):
+        if (not operation.get('fast_transition') and operation['before'].get('nodes')
+                and operation.get('node_backup_requested', True)):
             self.request('orchestrator', '/internal/v3/system-updates/nodes',
                 {'operation_id': operation['operation_id'], 'epoch': operation['epoch'], 'action': 'rollback'}, timeout=180)
         self.release(operation)
@@ -1062,6 +1349,7 @@ class HostDeployment:
         """
         folder = self.root / 'operations' / operation['operation_id']
         original = operation['original']
+        central_only = operation.get('fast_transition', False)
         # 释放门禁后的持久化故障也可能进入恢复；先重新接管并复核新接单，避免中断后来活动。
         released = read_gate(self.gate, self.policy['deployment'])['phase'] == 'idle'
         if released and not operation.get('release_started'):
@@ -1076,7 +1364,7 @@ class HostDeployment:
             # 首次兼容阶段沿用原账号，激活阶段的原版必须已经能恢复磁盘布局。
             raise ValueError('原版本缺少CLI临时文件恢复能力，保留维护现场并要求兼容版本恢复')
         if released:
-            runtime = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+            runtime = self._runtime_snapshot(central_only)
             gateway = self.request('gateway', '/admin/runtime/system-update/status')
             if (runtime.get('active') != 0 or gateway.get('active') != 0
                     or any(item['blockers'] for item in runtime['environments']
@@ -1113,19 +1401,27 @@ class HostDeployment:
         self._retire_legacy_controls(operation)
         self._compose('up', '-d', '--no-deps', 'gateway', 'orchestrator')
         self._connect_legacy_environments(operation)
-        self.wait_controls(time.monotonic() + 180)
+        try:
+            probes = self.wait_controls(time.monotonic() + 180, central_only)
+        except ControlHealthTimeout as error:
+            operation.setdefault('control_health', {})['restore'] = error.probes
+            save()
+            raise
+        if isinstance(probes, dict):
+            operation.setdefault('control_health', {})['restore'] = probes
+            save()
         self.restore_nodes(operation, save)
         if account_rebuild_required(original['selection']['account'], operation['selected']['selection']['account']):
             # 已持久登记的重建意图允许收口本操作造成的部分角色，未知活动仍拒绝。
             for environment_id, intent in operation.get('environment_intents', {}).items():
-                evidence = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+                evidence = self._runtime_snapshot(central_only)
                 current = next(item for item in evidence['environments'] if item['environment_id'] == environment_id)
                 result = self._environment_request({'operation_id': operation['operation_id'], 'epoch': operation['epoch'],
                         'environment_id': environment_id, 'generation': current['generation'],
-                        'action': 'restore', 'allowed_image_ids': intent['allowed_image_ids']})
+                        'action': 'restore', 'allowed_image_ids': intent['allowed_image_ids']}, central_only)
                 frozen = operation.get('environment_cpu_before', {}).get(environment_id)
                 if frozen is not None:
-                    fresh = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
+                    fresh = self._runtime_snapshot(central_only)
                     restored = next(item for item in fresh['environments'] if item['environment_id'] == environment_id)
                     self.environment_cpu(restored, frozen)
                 operation.setdefault('environment_restored', {})[environment_id] = result

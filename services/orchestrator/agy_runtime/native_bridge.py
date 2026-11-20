@@ -14,6 +14,8 @@ import threading
 import time
 import uuid
 
+from .criu import RestoredObserver
+
 ROOT = Path(__file__).parent
 PARENT = ROOT
 FIXTURE = ROOT/'resources'
@@ -58,6 +60,9 @@ class NativeBridge:
         self.partial = {}
         self.log = None
         self.capture_enabled = False
+        self.checkpoint_enabled = False
+        self.checkpoint_stopped = threading.Event()
+        self.checkpoint_resumed = threading.Event()
         self.events = open(os.devnull, 'w')
 
     def _emit(self, event):
@@ -92,6 +97,12 @@ class NativeBridge:
                'AGY_BRIDGE_TYPES': str(ROOT/'resources/admission.json'), 'AGY_BRIDGE_BINARY': str(binary),
                'AGY_BRIDGE_GENERATION': self.generation, 'AGY_BRIDGE_EVENT_FD': str(event_w)}
         env.update(self.runtime_env)
+        if self.checkpoint_enabled:
+            env['AGY_BRIDGE_CHECKPOINT'] = '1'
+            # CRIU 4.2 无法保存原生 Go 默认创建的 MPTCP 监听套接字。
+            env['GODEBUG'] = 'multipathtcp=0'
+        if getattr(self, 'capture_tls', False):
+            env['AGY_BRIDGE_CAPTURE_TLS'] = '1'
         if self.ca_file:
             env['SSL_CERT_FILE'] = str(self.ca_file)
         if self.proxy_url:
@@ -162,6 +173,10 @@ class NativeBridge:
                     event = json.loads(line)
                     if event['generation'] != self.generation:
                         raise RuntimeError('观察器代次不匹配')
+                    if event['event'] == 'model_tls_write':
+                        # 头部可能含凭据，仅交给当前作业的脱敏路径。
+                        self._emit(event)
+                        continue
                     if event['event'] == 'observer_ready':
                         if event['source_sha256'] != EXPECTED_SHA:
                             raise RuntimeError('观察器执行体身份不匹配')
@@ -169,6 +184,11 @@ class NativeBridge:
                         self.current_process['native_pid'] = self.native_pid
                     if event['event'] == 'native_ready':
                         self.native_ready = True
+                    if event['event'] in ('observer_checkpoint_stopped', 'observer_checkpoint_resumed'):
+                        if event.get('native_pid') != self.native_pid:
+                            raise RuntimeError('观察器交接PID不匹配')
+                        receipt = self.checkpoint_stopped if event['event'].endswith('_stopped') else self.checkpoint_resumed
+                        receipt.set()
                     self.native_events.append(event)
                     self._emit(event)
                 elif line.startswith(b'{"event":'):
@@ -311,16 +331,23 @@ class NativeBridge:
             self._pump()
         if self.proc.poll() is None:
             self.current_process['forced_cleanup'] = True
-            os.killpg(self.proc.pid, signal.SIGTERM)
-            try:
-                self.proc.wait(timeout=1)
-            except subprocess.TimeoutExpired:
-                os.killpg(self.proc.pid, signal.SIGKILL)
-                self.proc.wait()
+            if isinstance(self.proc, RestoredObserver):
+                self.proc.release()
+                self.proc.wait(timeout=2)
+            else:
+                os.killpg(self.proc.pid, signal.SIGTERM)
+                try:
+                    self.proc.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    os.killpg(self.proc.pid, signal.SIGKILL)
+                    self.proc.wait()
         self._pump(0)
         self.current_process['observer_exit_code'] = self.proc.returncode
         self.log.close()
         os.close(self.event_r)
+        if isinstance(self.proc, RestoredObserver):
+            self.proc.close()
+            self.proc.stdout.close()
         (self.folder/'processes.json').write_text(json.dumps(self.processes, ensure_ascii=False, indent=2))
         self.proc = None
         self.native_pid = None

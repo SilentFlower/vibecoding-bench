@@ -3,6 +3,7 @@
 __asm__(".symver __isoc23_sscanf,__isoc99_sscanf@GLIBC_2.7");
 __asm__(".symver __isoc23_strtol,strtol@GLIBC_2.2.5");
 #include <errno.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <openssl/evp.h>
 #include <signal.h>
@@ -11,6 +12,7 @@ __asm__(".symver __isoc23_strtol,strtol@GLIBC_2.2.5");
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <sys/prctl.h>
@@ -34,6 +36,17 @@ static const char *folder, *generation, *binary;
 static char current_job[97], decode_error[128];
 static unsigned call_number;
 static unsigned diagnostic_pause_count;
+static int capture_tls;
+static pid_t controller_pid;
+static volatile sig_atomic_t checkpoint_requested;
+static const unsigned long tls_write_site = 0x73819bfUL;
+static const unsigned char tls_write_signature[] = {0x48,0x8b,0x44,0x24,0x30,0x48,0x8b,0x5c,0x24,0x60,0x48,0x8b,0x4c,0x24,0x68,0xc9};
+static const size_t tls_sample_limit = 32UL * 1024 * 1024;
+static char tls_job[97];
+static uint64_t tls_connection;
+static uint64_t tls_write_progress;
+static size_t tls_bytes;
+typedef struct { Call *call; unsigned char *data; size_t size; } TlsSample;
 #ifndef DIAG_PAUSE_US
 #define DIAG_PAUSE_US 0
 #endif
@@ -192,6 +205,84 @@ static int active_job(char *out) {
     return 1;
 }
 
+/** 从固定 Go TLS 返回处复制已经接受的模型 HTTP 字节，普通遥测流量不进入采集。 */
+static TlsSample tls_sample(pid_t tid, const struct user_regs_struct *regs) {
+    TlsSample result = {0};
+    char job[97];
+    if (!active_job(job)) return result;
+    if (strcmp(tls_job, job)) {
+        strcpy(tls_job, job);
+        tls_connection = 0;
+        tls_write_progress = 0;
+        tls_bytes = 0;
+    }
+    Call *owner = NULL;
+    for (size_t i = 0; i < 128; i++) {
+        if (calls[i].g && !calls[i].ended && !strcmp(calls[i].job, job)) {
+            if (owner) return result;
+            owner = &calls[i];
+        }
+    }
+    if (!owner || tls_bytes > tls_sample_limit) return result;
+    decode_error[0] = 0;
+    uint64_t count = word(tid, regs->rsp + 0x30, 8);
+    uint64_t conn = word(tid, regs->rsp + 0xa8, 8);
+    uint64_t data = word(tid, regs->rsp + 0xd8, 8);
+    uint64_t requested = word(tid, regs->rsp + 0xe0, 8);
+    if (decode_error[0] || !conn || !count || count > requested) return result;
+    if (tls_connection && conn != tls_connection) return result;
+    uint64_t progress = word(tid, conn + 0x318, 8);
+    if (decode_error[0] || !progress) return result;
+    if (!tls_connection) {
+        const char expected[] = "POST /v1internal:streamGenerateContent";
+        char prefix[sizeof(expected) - 1];
+        if (count < sizeof(prefix) || !remote(tid, data, prefix, sizeof(prefix)) || memcmp(prefix, expected, sizeof(prefix))) return result;
+        tls_connection = conn;
+    }
+    /* 原生偶尔重复到达同一返回断点。连接的 bytesSent 只随真实写入递增。 */
+    if (progress == tls_write_progress) return result;
+    result.call = owner;
+    if (progress < tls_write_progress || count > tls_sample_limit - tls_bytes) {
+        tls_bytes = tls_sample_limit + 1;
+        return result;
+    }
+    tls_write_progress = progress;
+    result.data = malloc((size_t)count);
+    if (!result.data || !remote(tid, data, result.data, (size_t)count)) {
+        free(result.data);
+        result.data = NULL;
+        tls_bytes = tls_sample_limit + 1;
+        return result;
+    }
+    result.size = (size_t)count;
+    tls_bytes += result.size;
+    return result;
+}
+
+/** 恢复原生线程后才向私有观察管道交付采集副本。 */
+static void emit_tls_sample(TlsSample sample) {
+    if (!sample.call) return;
+    /* 分段交给 Python，避免大正文变成一行多 MiB 的管道消息。 */
+    const size_t block = 64 * 1024;
+    unsigned char *encoded = sample.data ? malloc(4 * ((block + 2) / 3) + 1) : NULL;
+    if (encoded) {
+        for (size_t offset = 0; offset < sample.size; offset += block) {
+            size_t size = sample.size - offset;
+            if (size > block) size = block;
+            int bytes = EVP_EncodeBlock(encoded, sample.data + offset, (int)size);
+            begin_event("model_tls_write", sample.call);
+            fprintf(events, ",\"bytes\":%zu,\"data_base64\":", size);
+            json_string(events, (char *)encoded, (size_t)bytes);
+            fputs("}\n", events);
+        }
+    } else {
+        begin_event("model_tls_write", sample.call);
+        fputs(",\"bytes\":0,\"data_base64\":null}\n", events);
+    }
+    free(encoded);
+    free(sample.data);
+}
+
 /** 保存断点与信号现场，诊断事件和业务返回片段分别归档。 */
 static void diagnostic_stop(pid_t tid, int sig, unsigned event) {
     if (!image_base || !OBSERVE_ALL_STOPS) return;
@@ -297,9 +388,47 @@ static void observe(pid_t tid, unsigned site, struct user_regs_struct *regs) {
 
 /** 为每个原生线程配置执行观察；代码页保持原内容。 */
 static int configure(pid_t tid) {
-    for (unsigned i = 0; i < 4; i++) if (ptrace(PTRACE_POKEUSER, tid, (void *)offsetof(struct user, u_debugreg[i]), (void *)(image_base+sites[i])) < 0) return 0;
+    /* 四个硬件槽中，Debug 复用遥测观察槽记录 TLS。原生发送及队列不经过观察器重写。 */
+    for (unsigned i = 0; i < 4; i++) {
+        unsigned long site = i == 2 && capture_tls ? tls_write_site : sites[i];
+        if (ptrace(PTRACE_POKEUSER, tid, (void *)offsetof(struct user, u_debugreg[i]), (void *)(image_base+site)) < 0) return 0;
+    }
     if (ptrace(PTRACE_POKEUSER, tid, (void *)offsetof(struct user, u_debugreg[6]), NULL) < 0) return 0;
     return ptrace(PTRACE_POKEUSER, tid, (void *)offsetof(struct user, u_debugreg[7]), (void *)0x55UL) == 0;
+}
+
+typedef struct {
+    unsigned long first, last, offset;
+    dev_t device;
+    unsigned long long inode;
+    char permissions[5];
+} ImageMapping;
+
+/** 解析内核报告的映射区间与背板身份。 */
+static int read_image_mapping(const char *line, ImageMapping *value) {
+    unsigned major_number, minor_number;
+    if (sscanf(line, "%lx-%lx %4s %lx %x:%x %llu", &value->first, &value->last, value->permissions,
+               &value->offset, &major_number, &minor_number, &value->inode) != 7) return 0;
+    value->device = makedev(major_number, minor_number);
+    return 1;
+}
+
+/** 用同一已验证文件描述符取得内核实际映射的设备号和 inode。 */
+static int mapped_image_identity(int descriptor, ImageMapping *identity) {
+    /* OverlayFS 的 stat 与 VMA 可报告不同设备。私有映射一页只取身份，不读取或提交页面。 */
+    void *probe = mmap(NULL, 1, PROT_NONE, MAP_PRIVATE, descriptor, 0);
+    if (probe == MAP_FAILED) return 0;
+    FILE *maps = fopen("/proc/self/maps", "r");
+    char line[8192];
+    int found = 0;
+    if (maps) {
+        while (fgets(line, sizeof(line), maps)) {
+            if (read_image_mapping(line, identity) && identity->first == (uintptr_t)probe &&
+                identity->offset == 0 && identity->inode != 0) { found = 1; break; }
+        }
+        fclose(maps);
+    }
+    return munmap(probe, 1) == 0 && found;
 }
 
 /** 从实际执行映像验证完整身份、映射及固定指令。 */
@@ -307,43 +436,135 @@ static int verify_image(void) {
     char path[128], line[8192];
     snprintf(path, sizeof(path), "/proc/%d/exe", root_pid);
     struct stat expected_image, actual_image;
-    if (stat(binary, &expected_image) != 0 || stat(path, &actual_image) != 0 ||
-        !S_ISREG(actual_image.st_mode) || actual_image.st_dev != expected_image.st_dev ||
-        actual_image.st_ino != expected_image.st_ino || actual_image.st_size != expected_image.st_size) { error_event("execution_file_identity"); return 0; }
     FILE *file = fopen(path, "rb");
-    if (!file) return 0;
-    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
-    if (!ctx) { fclose(file); return 0; }
-    EVP_DigestInit_ex(ctx, EVP_sha256(), NULL);
-    unsigned char block[65536], digest[32]; size_t size; unsigned int digest_size;
-    while ((size = fread(block, 1, sizeof(block), file))) EVP_DigestUpdate(ctx, block, size);
-    int failed = ferror(file); fclose(file);
-    EVP_DigestFinal_ex(ctx, digest, &digest_size); EVP_MD_CTX_free(ctx);
-    char hex[65]; for (unsigned i = 0; i < 32; i++) snprintf(hex+i*2, 3, "%02x", digest[i]);
-    if (failed || digest_size != 32 || strcmp(hex, SOURCE_SHA)) { error_event("execution_source_checksum"); return 0; }
-    snprintf(path, sizeof(path), "/proc/%d/maps", root_pid);
-    file = fopen(path, "r"); if (!file) return 0;
-    unsigned parsed_maps = 0, matching_inodes = 0, matching_devices = 0;
-    while (fgets(line, sizeof(line), file)) {
-        unsigned long first, last, offset;
-        unsigned major_number, minor_number; unsigned long long inode; char permissions[5];
-        if (sscanf(line, "%lx-%lx %4s %lx %x:%x %llu", &first, &last, permissions, &offset,
-                   &major_number, &minor_number, &inode) != 7) continue;
-        parsed_maps++;
-        if (inode == actual_image.st_ino) matching_inodes++;
-        if (makedev(major_number, minor_number) == actual_image.st_dev) matching_devices++;
-        if (makedev(major_number, minor_number) != actual_image.st_dev || inode != actual_image.st_ino) continue;
-        /* 按实际背板识别映像；共享代码的可写映射保持每进程私有。 */
-        if (permissions[1] == 'w' && permissions[3] == 's') { fclose(file); return 0; }
-        if (offset == 0) image_base = first;
+    if (!file || stat(binary, &expected_image) != 0 || fstat(fileno(file), &actual_image) != 0 ||
+        !S_ISREG(actual_image.st_mode) || actual_image.st_dev != expected_image.st_dev ||
+        actual_image.st_ino != expected_image.st_ino || actual_image.st_size != expected_image.st_size) {
+        if (file) fclose(file);
+        error_event("execution_file_identity"); return 0;
     }
-    fclose(file); if (!image_base) { char reason[128]; snprintf(reason, sizeof(reason), "execution_base_missing_maps_%u_inode_%u_device_%u", parsed_maps, matching_inodes, matching_devices); error_event(reason); return 0; }
+    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+    int hashed = ctx && EVP_DigestInit_ex(ctx, EVP_sha256(), NULL) == 1;
+    unsigned char block[65536], digest[32]; size_t size; unsigned int digest_size = 0;
+    while (hashed && (size = fread(block, 1, sizeof(block), file))) hashed = EVP_DigestUpdate(ctx, block, size) == 1;
+    hashed = hashed && !ferror(file) && EVP_DigestFinal_ex(ctx, digest, &digest_size) == 1;
+    EVP_MD_CTX_free(ctx);
+    if (!hashed || digest_size != 32) { fclose(file); error_event("execution_source_checksum"); return 0; }
+    char hex[65]; for (unsigned i = 0; i < 32; i++) snprintf(hex+i*2, 3, "%02x", digest[i]);
+    if (strcmp(hex, SOURCE_SHA)) { fclose(file); error_event("execution_source_checksum"); return 0; }
+    ImageMapping identity = {.device = actual_image.st_dev, .inode = actual_image.st_ino};
+    if (actual_image.st_nlink && !mapped_image_identity(fileno(file), &identity)) {
+        fclose(file); error_event("execution_mapping_reference"); return 0;
+    }
+    fclose(file);
+    snprintf(path, sizeof(path), "/proc/%d/maps", root_pid);
+    file = fopen(path, "r"); if (!file) { error_event("execution_mapping_missing"); return 0; }
+    unsigned long base = 0;
+    while (fgets(line, sizeof(line), file)) {
+        ImageMapping mapping;
+        if (!read_image_mapping(line, &mapping) || mapping.device != identity.device || mapping.inode != identity.inode) continue;
+        /* 按实际背板识别映像；共享代码的可写映射保持每进程私有。 */
+        if (mapping.permissions[1] == 'w' && mapping.permissions[3] == 's') {
+            fclose(file); error_event("execution_mapping_writable_shared"); return 0;
+        }
+        if (mapping.offset == 0) {
+            if (base) { fclose(file); error_event("execution_mapping_ambiguous"); return 0; }
+            base = mapping.first;
+        }
+    }
+    int map_failed = ferror(file);
+    fclose(file);
+    if (map_failed || !base) { error_event("execution_mapping_missing"); return 0; }
+    image_base = base;
     const unsigned char *expected[] = {expected_0, expected_1, expected_2, expected_3};
     const size_t sizes[] = {sizeof(expected_0), sizeof(expected_1), sizeof(expected_2), sizeof(expected_3)};
     for (unsigned i = 0; i < 4; i++) {
         unsigned char actual[16];
         if (!remote(root_pid, image_base+sites[i], actual, sizes[i]) || memcmp(actual, expected[i], sizes[i])) { char reason[64]; snprintf(reason, sizeof(reason), "execution_site_%u", i); error_event(reason); return 0; }
     }
+    if (capture_tls) {
+        unsigned char actual[sizeof(tls_write_signature)];
+        if (!remote(root_pid, image_base + tls_write_site, actual, sizeof(actual)) || memcmp(actual, tls_write_signature, sizeof(actual))) capture_tls = 0;
+    }
+    return 1;
+}
+
+/** 父进程持有独占空闲许可后，请求使用线程组停态交接。 */
+static void request_checkpoint(int number, siginfo_t *information, void *context) {
+    (void)number; (void)context;
+    if (information->si_pid != controller_pid) return;
+    checkpoint_requested = 1;
+    if (root_pid > 0) kill(root_pid, SIGSTOP);
+}
+
+/** 按真实线程表确认全部线程已离开 ptrace 并仍处于线程组停止状态。 */
+static size_t stopped_threads(pid_t tids[], size_t capacity) {
+    char path[128];
+    snprintf(path, sizeof(path), "/proc/%d/task", root_pid);
+    DIR *directory = opendir(path);
+    if (!directory) return 0;
+    size_t count = 0;
+    struct dirent *entry;
+    while ((entry = readdir(directory))) {
+        char *end;
+        long tid = strtol(entry->d_name, &end, 10);
+        if (!tid || *end) continue;
+        if (count == capacity) { count = 0; break; }
+        snprintf(path, sizeof(path), "/proc/%d/task/%ld/status", root_pid, tid);
+        FILE *status = fopen(path, "r");
+        if (!status) { count = 0; break; }
+        int stopped = 0, untraced = 0;
+        char line[256], state;
+        unsigned tracer;
+        while (fgets(line, sizeof(line), status)) {
+            if (sscanf(line, "State: %c", &state) == 1) stopped = state == 'T';
+            if (sscanf(line, "TracerPid: %u", &tracer) == 1) untraced = tracer == 0;
+        }
+        fclose(status);
+        if (!stopped || !untraced) { count = 0; break; }
+        tids[count++] = (pid_t)tid;
+    }
+    closedir(directory);
+    return count;
+}
+
+/** 从停态取回所有线程，执行体和硬件断点核验通过后才允许续跑。 */
+static int checkpoint_handoff(unsigned long options, const sigset_t *resume_signal) {
+    pid_t tids[sizeof(tasks) / sizeof(tasks[0])];
+    size_t count = 0;
+    const struct timespec retry = {0, 5000000};
+    /* 最后一项 detach 返回时，SIGSTOP 仍可能在内核向线程组分发。 */
+    for (unsigned attempt = 0; attempt < 200 && !(count = stopped_threads(tids, sizeof(tids) / sizeof(tids[0]))); attempt++)
+        nanosleep(&retry, NULL);
+    if (!count) return 0;
+    begin_event("observer_checkpoint_stopped", NULL);
+    fprintf(events, ",\"native_pid\":%d,\"threads\":%zu}\n", root_pid, count);
+    for (;;) {
+        siginfo_t sender;
+        int received = sigwaitinfo(resume_signal, &sender);
+        if (received < 0 && errno != EINTR) return 0;
+        if (received == SIGUSR2 && sender.si_pid == controller_pid) break;
+    }
+    count = stopped_threads(tids, sizeof(tids) / sizeof(tids[0]));
+    if (!count) return 0;
+    for (size_t index = 0; index < count; index++) {
+        int status;
+        pid_t tid = tids[index], waited;
+        if (!task(tid) || ptrace(PTRACE_SEIZE, tid, NULL, (void *)options) < 0
+                || ptrace(PTRACE_INTERRUPT, tid, NULL, NULL) < 0) return 0;
+        do { waited = waitpid(tid, &status, __WALL); } while (waited < 0 && errno == EINTR);
+        if (waited != tid || !WIFSTOPPED(status)) return 0;
+    }
+    image_base = 0;
+    if (!verify_image()) return 0;
+    for (size_t index = 0; index < count; index++)
+        if (!configure(tids[index])) return 0;
+    checkpoint_requested = 0;
+    for (size_t index = 0; index < count; index++)
+        if (ptrace(PTRACE_CONT, tids[index], NULL, NULL) < 0) return 0;
+    if (kill(root_pid, SIGCONT) < 0) return 0;
+    begin_event("observer_checkpoint_resumed", NULL);
+    fprintf(events, ",\"native_pid\":%d,\"threads\":%zu}\n", root_pid, count);
     return 1;
 }
 
@@ -356,9 +577,10 @@ static int verify_image(void) {
 int main(int argc, char **argv) {
     if (argc < 2) return 2;
     /* 监督层异常退出时回收本观察器；原生子进程继续沿已有父退出信号收口。 */
-    pid_t controller = getppid();
-    if (prctl(PR_SET_PDEATHSIG, SIGKILL) != 0 || getppid() != controller) return 2;
+    controller_pid = getppid();
+    if (prctl(PR_SET_PDEATHSIG, SIGKILL) != 0 || getppid() != controller_pid) return 2;
     folder = getenv("AGY_BRIDGE_FOLDER"); generation = getenv("AGY_BRIDGE_GENERATION"); binary = getenv("AGY_BRIDGE_BINARY");
+    capture_tls = getenv("AGY_BRIDGE_CAPTURE_TLS") != NULL;
     const char *fd_env = getenv("AGY_BRIDGE_EVENT_FD"), *input = getenv("AGY_BRIDGE_STDIN");
     if (!folder || !generation || !binary || !fd_env || !input) return 2;
     events = fdopen(atoi(fd_env), "w"); if (!events) return 2;
@@ -366,11 +588,21 @@ int main(int argc, char **argv) {
     root_pid = fork();
     if (root_pid < 0) return 2;
     if (root_pid == 0) {
+        unsetenv("AGY_BRIDGE_CAPTURE_TLS");
+        unsetenv("AGY_BRIDGE_CHECKPOINT");
         prctl(PR_SET_PDEATHSIG, SIGKILL);
         int fd = open(input, O_RDONLY); if (fd < 0 || dup2(fd, STDIN_FILENO) < 0) _exit(126);
         if (fd != STDIN_FILENO) close(fd);
         if (ptrace(PTRACE_TRACEME, 0, NULL, NULL) < 0) _exit(126);
         raise(SIGSTOP); execv(argv[1], argv+1); _exit(127);
+    }
+    sigset_t resume_signal;
+    if (getenv("AGY_BRIDGE_CHECKPOINT")) {
+        struct sigaction checkpoint = {.sa_sigaction = request_checkpoint, .sa_flags = SA_SIGINFO};
+        sigemptyset(&checkpoint.sa_mask);
+        sigemptyset(&resume_signal);
+        sigaddset(&resume_signal, SIGUSR2);
+        if (sigprocmask(SIG_BLOCK, &resume_signal, NULL) < 0 || sigaction(SIGUSR1, &checkpoint, NULL) < 0) return 2;
     }
     task(root_pid);
     int status, verified = 0;
@@ -401,6 +633,26 @@ int main(int argc, char **argv) {
             unsigned long child = 0; ptrace(PTRACE_GETEVENTMSG, tid, NULL, &child);
             Task *new_entry = task((pid_t)child);
             if (new_entry) new_entry->detach = event != PTRACE_EVENT_CLONE;
+            if (checkpoint_requested) {
+                /* 先消费新线程事件再停止父线程，避免漏掉仍挂在观察器上的子线程。 */
+                kill(root_pid, SIGSTOP);
+            }
+            ptrace(PTRACE_CONT, tid, NULL, NULL); continue;
+        }
+        if (checkpoint_requested) {
+            if (!verified || (ptrace(PTRACE_DETACH, tid, NULL, (void *)(long)SIGSTOP) < 0 && errno != ESRCH)) {
+                error_event("checkpoint_detach_failed"); kill(root_pid, SIGKILL); return 2;
+            }
+            entry->tid = 0;
+            int attached = 0;
+            for (size_t index = 0; index < sizeof(tasks) / sizeof(tasks[0]); index++) attached |= tasks[index].tid != 0;
+            if (!attached && !checkpoint_handoff(options, &resume_signal)) {
+                error_event("checkpoint_reattach_failed"); kill(root_pid, SIGKILL); return 2;
+            }
+            continue;
+        }
+        if (event == PTRACE_EVENT_STOP) {
+            if (verified && !configure(tid)) { error_event("thread_reattach_failed"); kill(root_pid, SIGKILL); return 2; }
             ptrace(PTRACE_CONT, tid, NULL, NULL); continue;
         }
         if (sig == SIGSTOP) {
@@ -412,7 +664,15 @@ int main(int argc, char **argv) {
             struct user_regs_struct regs;
             if (ptrace(PTRACE_GETREGS, tid, NULL, &regs) == 0) {
                 int handled = 0;
-                for (unsigned i = 0; i < 4; i++) if (regs.rip == image_base+sites[i]) { observe(tid, i, &regs); handled = 1; break; }
+                TlsSample sample = {0};
+                for (unsigned i = 0; i < 4; i++) {
+                    int tls = i == 2 && capture_tls;
+                    if (regs.rip != image_base + (tls ? tls_write_site : sites[i])) continue;
+                    if (tls) sample = tls_sample(tid, &regs);
+                    else observe(tid, i, &regs);
+                    handled = 1;
+                    break;
+                }
                 if (handled) {
                     /* 只在首个成功接收的观察位置暂停，用于定位并发信号与恢复的关系。 */
                     if (regs.rip == image_base+sites[1] && DIAG_PAUSE_US && diagnostic_pause_count++ == 0) usleep(DIAG_PAUSE_US);
@@ -420,7 +680,9 @@ int main(int argc, char **argv) {
                     regs.eflags |= 1UL << 16;
                     ptrace(PTRACE_SETREGS, tid, NULL, &regs);
                     ptrace(PTRACE_POKEUSER, tid, (void *)offsetof(struct user, u_debugreg[6]), NULL);
-                    ptrace(PTRACE_CONT, tid, NULL, NULL); continue;
+                    ptrace(PTRACE_CONT, tid, NULL, NULL);
+                    emit_tls_sample(sample);
+                    continue;
                 }
             }
         }

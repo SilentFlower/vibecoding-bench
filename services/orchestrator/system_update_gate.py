@@ -14,6 +14,10 @@ from system_update_contract import DEPLOYMENT_RE, safe_read, strict_json
 ADMISSIONS = ContextVar('v3_update_admissions', default=())
 
 
+class NodeImageFetchPaused(RuntimeError):
+    """中央维护期间，已准备镜像的节点等待下一次同步。"""
+
+
 def read_gate(directory: Path, deployment: str) -> dict:
     """读取双方共用的维护记录，损坏或缺失一律拒绝准入。
 
@@ -61,6 +65,7 @@ class DeploymentGate:
         self.directory, self.deployment = directory, deployment
         self.lock = threading.RLock()
         self.active = {}
+        self.node_image_fetches = set()
 
     def state(self) -> dict:
         """在实际准入锁内取得维护状态及在途计数。
@@ -76,7 +81,33 @@ class DeploymentGate:
                     value = {**read_gate(path, self.deployment or os.environ.get('V3_DEPLOYMENT_ID', '')), 'enabled': True}
                 except (ValueError, OSError):
                     value = {'phase': 'reconcile', 'epoch': None, 'enabled': True}
-            return {**value, 'active': len(self.active), 'activities': list(self.active.values())}
+            return {**value, 'active': len(self.active), 'central_active': len(self.active.keys() - self.node_image_fetches),
+                'control_active': sum(identifier not in self.node_image_fetches and not source.startswith('job:node-stream:')
+                    for identifier, source in self.active.items()),
+                'activities': list(self.active.values())}
+
+    @contextmanager
+    def node_image_fetch(self, identifier: str | None):
+        """节点仅传输制品时释放中央排空占用。:param identifier: 已持久节点安装的活动。:return: 正常返回时可继续节点写入。"""
+        if identifier is None:
+            yield
+            return
+        with self.lock:
+            if self.state()['phase'] != 'idle':
+                raise NodeImageFetchPaused('中央正在切换，节点等待续跑')
+            scope = {*ADMISSIONS.get(), identifier}
+            if (len(scope) != 2 or not self.active.get(identifier, '').startswith('job:cluster-node-install:')
+                    or any(key not in self.active for key in scope)):
+                raise RuntimeError('节点制品传输活动归属无效')
+            self.node_image_fetches.update(scope)
+        try:
+            yield
+        finally:
+            with self.lock:
+                self.node_image_fetches.difference_update(scope)
+                if self.state()['phase'] != 'idle':
+                    # 传输只修改节点镜像缓存。中央关闭后禁止把它转成新的节点写入。
+                    raise NodeImageFetchPaused('中央正在切换，节点等待续跑')
 
     @contextmanager
     def admission(self, source: str):

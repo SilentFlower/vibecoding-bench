@@ -9,7 +9,7 @@ import shlex
 import threading
 import time
 import uuid
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack, contextmanager, nullcontext
 from pathlib import Path
 
 from docker import DockerClient
@@ -416,12 +416,14 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
     def _save(self, job: dict) -> None:
         atomic_json(Path(job['journal']), job)
 
-    def install(self, installer, node_id: int, revision: int, *, maintenance: dict | None = None, stage_only: bool = False, late_restore: bool = False) -> dict:
+    def install(self, installer, node_id: int, revision: int, *, maintenance: dict | None = None, stage_only: bool = False,
+                late_restore: bool = False, activity: str | None = None) -> dict:
         """自动识别同批、首次与需要换批的节点并执行原恢复流程。
 
         :param installer: 同批安装器。
         :param node_id: 原节点。
         :param revision: 冻结配置版本。
+        :param activity: 原节点作业的中央活动，供预取期间释放占用。
         :return: 健康安装回执。
         """
         with self.slots:
@@ -443,7 +445,7 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
             private_directory(directory)
             journal = directory / 'current.json'
             job = json.loads(journal.read_text()) if journal.exists() else None
-            if job and job.get('phase') in ('completed', 'rolled_back'):
+            if job and job.get('phase') in ('completed', 'rolled_back', 'platform_restored'):
                 job = None
             if job and job.get('phase') == 'rolling_back_control':
                 self._rollback_control(remote, node, name, job)
@@ -451,10 +453,8 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
             if control is None or control.labels.get('vibebench.release') == installer.release:
                 if job is None and not stage_only:
                     return installer.prepare(node_id, revision)
-            if job is None:
-                if journal.exists():
-                    previous_job = json.loads(journal.read_text())
-                    atomic_json(directory / (previous_job['job_id'] + '.json'), previous_job)
+            new_job = job is None
+            if new_job:
                 control.reload()
                 expected = {'vibebench.product': 'v3', 'vibebench.deployment': self.runtime.deployment,
                     'vibebench.cluster-node': row['node_key'], 'vibebench.role': 'node-control'}
@@ -473,13 +473,26 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
                 if maintenance is not None:
                     job.update(platform_operation=maintenance['operation_id'], platform_epoch=maintenance['epoch'])
                 job['backup_epoch'] = uuid.UUID(job['platform_epoch']).hex if job.get('platform_epoch') else job['job_id']
-                atomic_json(directory / (job['job_id'] + '-container.json'), control.attrs)
-                self._save(job)
             if (job['node_key'] != row['node_key'] or job['target_release'] != installer.release
                     or job['config_sha256'] != hashlib.sha256(row['config_json'].encode()).hexdigest()):
                 raise ValueError('原节点维护目标或配置已变化，请核对原任务')
             if job.get('platform_operation'):
                 self._check_platform(job)
+            prefetched = None
+            if job['phase'] in ('draining', 'fenced', 'backed_up', 'switching'):
+                self.status(node_id, revision, 'prefetching', current_release=job['old_release'])
+                # 平台已阻断时沿原维护证明预取，普通预取仍可让位于中央切换。
+                with UPDATE_GATE.node_image_fetch(activity) if maintenance is None else nullcontext():
+                    prefetched = installer.prefetch_images(node)
+                if job.get('platform_operation'):
+                    self._check_platform(job)
+            if new_job:
+                # 两类镜像核验前尚无需回退，避免预取失败后重启健康旧组件。
+                if journal.exists():
+                    previous_job = json.loads(journal.read_text())
+                    atomic_json(directory / (previous_job['job_id'] + '.json'), previous_job)
+                atomic_json(directory / (job['job_id'] + '-container.json'), control.attrs)
+                self._save(job)
             with ExitStack() as leases:
                 checks = []
                 if job['phase'] == 'draining':
@@ -588,7 +601,10 @@ print(json.dumps({'paused':valid,'environment':root.exists()}))
                     self._save(job)
                 self.status(node_id, revision, 'switching', current_release=job['old_release'])
                 try:
-                    result = installer.prepare(node_id, revision)
+                    if prefetched is None:
+                        result = installer.prepare(node_id, revision)
+                    else:
+                        result = installer.prepare(node_id, revision, prefetched=prefetched)
                 except Exception:
                     self._rollback_control(remote, node, name, job)
                     raise

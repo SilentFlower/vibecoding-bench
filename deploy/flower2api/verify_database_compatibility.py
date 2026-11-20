@@ -20,7 +20,7 @@ from manage import _local_image_matches
 from runtime_files import atomic_json
 from system_release import REPO, data_contracts, migration_registries
 from system_update_contract import (DOWNLOAD_ROOT, INDEX_LIMIT, MANIFEST_LIMIT, REPOSITORY, fetch_bytes,
-    fetch_repository_file, strict_json, validate_index, validate_release, verify_signed)
+    fetch_repository_file, safe_read, strict_json, validate_index, validate_migration_evidence, validate_release, verify_signed)
 from system_update_database import create_snapshot, restore_snapshot
 from verification_resources import VerificationResources
 
@@ -195,6 +195,13 @@ def _sources(public_key: str, history_root: Path | None) -> list[tuple[dict, byt
     return sources
 
 
+def _source_identity(release: dict, raw: bytes) -> dict:
+    """绑定实际旧版本清单和数据合同。@param release 已验签发行。@param raw 原始清单。@return 兼容证据的来源字段。"""
+    return {'release': release['release'], 'manifest_sha256': hashlib.sha256(raw).hexdigest(),
+        'control_digest': release['control']['config_digest'],
+        'contracts': {name: release['data_compatibility'][name]['contract'] for name in ('bench', 'gateway')}}
+
+
 def _verify_source(release: dict, raw: bytes, candidate: str, registries: dict,
         contracts: dict, history_root: Path | None, stopped: Event) -> tuple[dict, float]:
     """在独立双库和容器中验证一个历史来源。
@@ -260,8 +267,7 @@ def _verify_source(release: dict, raw: bytes, candidate: str, registries: dict,
             restore_snapshot(root, snapshot, 'database-proof', operation, lambda: None)
             python_probe(original, bench, BENCH_PROBE)
             gateway_probe(original, gateway)
-        proof = {'release': release['release'], 'manifest_sha256': hashlib.sha256(raw).hexdigest(),
-            'control_digest': source['config_digest'], 'contracts': {name: release['data_compatibility'][name]['contract'] for name in ('bench', 'gateway')},
+        proof = {**_source_identity(release, raw),
             'checks': {'upgrade': True, 'candidate_read_write': True, 'previous_read_write': True, 'idempotent': True}}
         return proof, time.monotonic() - started
     except Exception as error:
@@ -272,7 +278,7 @@ def _verify_source(release: dict, raw: bytes, candidate: str, registries: dict,
 
 
 def verify(manifest: Path, public_key: str, output: Path, *, history_root: Path | None = None,
-        workers: int = 1) -> dict:
+        workers: int = 1, reuse: Path | None = None) -> dict:
     """用有限并发执行完整旧库升级与回退，全部成功后写入证据。
 
     :param manifest: 实际候选联合镜像清单。
@@ -280,6 +286,7 @@ def verify(manifest: Path, public_key: str, output: Path, *, history_root: Path 
     :param output: 完整证据输出路径。
     :param history_root: 可选本地合成签名历史，生产CI从固定受信目录读取。
     :param workers: 同时验证的来源数，限定1、2或4，默认沿用串行。
+    :param reuse: 来自受信候选且已换批绑定的可选证据。
     :return: 按原来源顺序排列、绑定来源及镜像摘要的完整证据。
     """
     if type(workers) is not int or workers not in (1, 2, 4):
@@ -289,10 +296,28 @@ def verify(manifest: Path, public_key: str, output: Path, *, history_root: Path 
     if history_root is None and (build.get('dirty_worktree') is not False or build.get('verification_only')):
         raise ValueError('正式迁移证据需要干净同批生产镜像')
     control = build['images']['control']
-    candidate = image_identity(control['reference'], control['config_digest'], control.get('registry_digest', control.get('digest')))
-    registries = migration_registries(REPO)
     contracts = data_contracts(REPO)
     sources = _sources(public_key, history_root)
+    if reuse is not None and reuse.exists():
+        try:
+            evidence = strict_json(safe_read(reuse, MANIFEST_LIMIT), MANIFEST_LIMIT)
+            validate_migration_evidence(evidence, {
+                'control': {**control, 'revision': build['parent_revision']}, 'account': build['images']['account'],
+                'data_compatibility': {name: {'contract': contract} for name, contract in contracts.items()},
+            })
+            observed = [{key: item[key] for key in item if key != 'checks'} for item in evidence['sources']]
+            if observed != [_source_identity(release, raw) for release, raw in sources]:
+                raise ValueError('当前签名目录的演练来源已变化')
+        except (OSError, ValueError) as error:
+            print(f'候选兼容证据不可复用，继续完整演练：{error}', file=sys.stderr)
+        else:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            atomic_json(output, evidence)
+            print(json.dumps({'event': 'flower2api-database-reused', 'sources': len(sources),
+                'seconds': round(time.monotonic() - started, 3)}), file=sys.stderr, flush=True)
+            return evidence
+    candidate = image_identity(control['reference'], control['config_digest'], control.get('registry_digest', control.get('digest')))
+    registries = migration_registries(REPO)
     proofs = [None] * len(sources)
     stopped = Event()
     failure = None
@@ -343,6 +368,7 @@ def main() -> None:
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--public-key')
     parser.add_argument('--history-root', type=Path)
+    parser.add_argument('--reuse', type=Path)
     parser.add_argument('--workers', type=int, choices=(1, 2, 4), default=1, help='同时验证的历史来源数，默认串行')
     args = parser.parse_args()
     public_key = args.public_key
@@ -354,7 +380,7 @@ def main() -> None:
         if result.returncode or len(result.stdout) < 32:
             raise ValueError('兼容验证的发行公钥无效')
         public_key = result.stdout[-32:].hex()
-    evidence = verify(args.manifest, public_key, args.output, history_root=args.history_root, workers=args.workers)
+    evidence = verify(args.manifest, public_key, args.output, history_root=args.history_root, workers=args.workers, reuse=args.reuse)
     print(json.dumps({'status': 'passed', 'sources': len(evidence['sources']), 'real_model_requests': 0}))
 
 

@@ -255,6 +255,8 @@ const savingAccount = ref(false);
 const form = ref({
   platform: 'claude_code',
   agy_system_prompt_homoglyph_enabled: false,
+  agy_gif_frames_enabled: false,
+  agy_disable_safety_filtering: false,
   name: '',
   email: '',
   auth_type: 'setup_token',
@@ -291,18 +293,18 @@ function selectAccountPlatform(value:string): void {
   form.value.auth_type=value==='antigravity'?'oauth':'setup_token';
   form.value.setup_token=''; form.value.access_token=''; form.value.refresh_token=''; form.value.expires_at='';
   form.value.agy_system_prompt_homoglyph_enabled=false;
+  form.value.agy_gif_frames_enabled=false;
+  form.value.agy_disable_safety_filtering=false;
 }
 /** 详情始终读取当前列表快照，列表刷新后不保留过期对象。 */
 const detailAccountId = ref<number | null>(null);
 const showAccountDetails = ref(false);
 const workspaceTabs = [{value:'overview',label:'概览'},{value:'configuration',label:'配置'},{value:'scheduling',label:'调度'},{value:'diagnostics',label:'环境与诊断'}] as const;
 const workspaceTab = ref<'overview' | 'configuration' | 'scheduling' | 'diagnostics'>('overview');
-/** 反重力没有调度页签；有排队时调度页签显示排队数（设计稿「调度 4」）。 */
+/** 有排队时调度页签显示排队数（设计稿「调度 4」）；反重力账号同样有调度页签（优先级口径）。 */
 const workspaceTabOptions = computed<SegmentedOption[]>(() => {
   const account = detailAccount.value;
-  return workspaceTabs
-    .filter(item => account?.platform !== 'antigravity' || item.value !== 'scheduling')
-    .map(item => ({ ...item, count: item.value === 'scheduling' && (account?.queued_requests ?? 0) > 0 ? account?.queued_requests : undefined }));
+  return workspaceTabs.map(item => ({ ...item, count: item.value === 'scheduling' && (account?.queued_requests ?? 0) > 0 ? account?.queued_requests : undefined }));
 });
 const workspaceOpen = computed({
   get: () => showForm.value || showAccountDetails.value || showScheduling.value,
@@ -378,7 +380,11 @@ function activeSchedulingScore(account: Account): string {
   return '评分待更新';
 }
 /** 打开账号完整信息。@param account 账号。@return 无。 */
-function openAccountDetails(account: Account): void { detailAccountId.value = account.id; showAccountDetails.value = true; workspaceTab.value = 'overview'; }
+function openAccountDetails(account: Account): void {
+  detailAccountId.value = account.id;
+  showAccountDetails.value = true;
+  workspaceTab.value = 'overview';
+}
 /** 公开代理摘要只显示协议与主机，认证信息仅在配置中编辑。@param value 原始地址。@return 脱敏摘要。 */
 function publicProxy(value: string): string { if (!value) return '直连'; try { const url = new URL(value); return `${url.protocol}//${url.host}`; } catch { return '代理地址待核对'; } }
 /** 数字草稿保留清空状态，提交边界才转换成后端数字字段。 */
@@ -397,10 +403,12 @@ function applyNumberDrafts(): void {
 /** 各账号测试状态独立；列表和详情读取同一结果。 */
 const testStates = ref(new Map<number, { status: 'loading' | 'success' | 'error'; message: string }>());
 const testRequests = new Map<number, AbortController>();
-let testAlive = true;
-onUnmounted(() => { testAlive = false; for (const controller of testRequests.values()) controller.abort(); testRequests.clear(); });
-/** 正在刷新用量的账号 ID */
-const refreshingUsage = ref<number | null>(null);
+let accountAlive = true;
+onUnmounted(() => { accountAlive = false; for (const controller of testRequests.values()) controller.abort(); testRequests.clear(); });
+const refreshingUsage = reactive(new Set<number>());
+const usageRefreshErrors = reactive(new Map<number, string>());
+// 主题设置的预览画板以 ?theme-preview=1 嵌入首页，只读展示，不自动读取反重力上游额度；手动刷新不受影响。
+let refreshUsageOnListEntry = route.query['theme-preview'] !== '1';
 type UsageWindowKey = 'five_hour' | 'seven_day' | 'seven_day_sonnet' | 'seven_day_fable';
 const usageWindows = [{ key: 'five_hour', label: '5 小时' }, { key: 'seven_day', label: '7 天' }, { key: 'seven_day_fable', label: '7 天 Fable' }] as const;
 
@@ -432,6 +440,10 @@ async function load() {
     defaultVersionProfile.value = res.claude_code_version_profile ?? null;
     totalPages.value = res.total_pages;
     totalCount.value = res.total;
+    if (refreshUsageOnListEntry) {
+      refreshUsageOnListEntry = false;
+      void refreshEntryUsage(accounts.value);
+    }
   } catch {
     // 读取失败不把原有负载伪装成空列表；旧快照保留并明确标记。
     if (generation === accountLoadGeneration) accountLoadFailed.value = true;
@@ -456,8 +468,7 @@ function openScheduling(account: Account) {
 
 /** 进入账号支持的容量视图。@param account 当前账号。@return 无。 */
 function openAccountCapacity(account: Account): void {
-  if (account.platform === 'antigravity') openAccountDetails(account);
-  else openScheduling(account);
+  openScheduling(account);
 }
 
 /** 读取卡片口径的速率。@param account 当前账号。@return 未计量时为空。 */
@@ -507,6 +518,8 @@ function openCreate() {
   form.value = {
     platform: 'claude_code',
     agy_system_prompt_homoglyph_enabled: false,
+    agy_gif_frames_enabled: false,
+    agy_disable_safety_filtering: false,
     name: '',
     email: '',
     auth_type: 'setup_token',
@@ -552,6 +565,8 @@ function openEdit(a: Account) {
   form.value = {
     platform: a.platform ?? 'claude_code',
     agy_system_prompt_homoglyph_enabled: a.agy_system_prompt_homoglyph_enabled ?? false,
+    agy_gif_frames_enabled: a.agy_gif_frames_enabled ?? false,
+    agy_disable_safety_filtering: a.agy_disable_safety_filtering ?? false,
     name: a.name,
     email: a.email,
     auth_type: a.auth_type || 'setup_token',
@@ -602,7 +617,7 @@ function usageLimitInput(value: unknown, label: string): number {
   return number;
 }
 
-const agyFormKeys = ['platform','agy_system_prompt_homoglyph_enabled','name','email','auth_type','access_token','refresh_token','expires_at','proxy_url','proxy_id','proxy_revision','concurrency','priority','rpm_limit'];
+const agyFormKeys = ['platform','agy_system_prompt_homoglyph_enabled','agy_gif_frames_enabled','agy_disable_safety_filtering','name','email','auth_type','access_token','refresh_token','expires_at','proxy_url','proxy_id','proxy_revision','concurrency','priority','rpm_limit'];
 
 /** 保存账号（新建或更新）。@return 保存完成后的空结果。 */
 async function save() {
@@ -648,6 +663,8 @@ async function save() {
       const payload: Record<string, unknown> = {
         platform: form.value.platform,
         agy_system_prompt_homoglyph_enabled: form.value.agy_system_prompt_homoglyph_enabled,
+        agy_gif_frames_enabled: form.value.agy_gif_frames_enabled,
+        agy_disable_safety_filtering: form.value.agy_disable_safety_filtering,
         name: form.value.name,
         email: form.value.email,
         auth_type: form.value.auth_type,
@@ -730,10 +747,10 @@ async function test(id: number) {
   testStates.value.set(id, { status: 'loading', message: '' });
   try {
     const result = await api.testAccount(id, controller.signal);
-    if (!testAlive || testRequests.get(id) !== controller) return;
+    if (!accountAlive || testRequests.get(id) !== controller) return;
     testStates.value.set(id, { status: result.status === 'ok' ? 'success' : 'error', message: result.message || (result.status === 'ok' ? '账号连接正常。' : '测试失败，请重试。') });
   } catch (cause) {
-    if (!testAlive || controller.signal.aborted || testRequests.get(id) !== controller) return;
+    if (!accountAlive || controller.signal.aborted || testRequests.get(id) !== controller) return;
     testStates.value.set(id, { status: 'error', message: (cause as Error).message || '测试请求失败' });
   } finally {
     if (testRequests.get(id) === controller) testRequests.delete(id);
@@ -743,21 +760,45 @@ async function test(id: number) {
 /**
  * 刷新账号用量数据
  * @param id 账号 ID
+ * @param automatic 是否属于进入列表时的一次性批次
+ * @return 用量读取是否成功
  */
-async function refreshUsage(id: number) {
-  refreshingUsage.value = id;
+async function refreshUsage(id: number, automatic = false): Promise<boolean> {
+  if (refreshingUsage.has(id)) return false;
+  refreshingUsage.add(id);
+  usageRefreshErrors.delete(id);
   try {
     const res = await api.refreshUsage(id);
+    if (!accountAlive) return false;
     if (res.status === 'ok' && res.usage) {
-      // 官方 reset 可能已推进，立即重读后端汇总以同步切换费用窗口。
-      await load();
-    } else if (res.status === 'error') {
-      toast(res.message || '刷新用量失败');
+      // 自动批次收尾时统一回读，手动刷新立即同步新的用量窗口。
+      if (!automatic) await load();
+      return true;
+    } else {
+      throw new Error(res.message || '刷新用量失败');
     }
   } catch (e: unknown) {
-    toast((e as Error).message || '刷新用量失败');
+    if (accountAlive) {
+      const message = (e as Error).message || '刷新用量失败';
+      if (automatic) usageRefreshErrors.set(id, message);
+      else toast(message);
+    }
+  } finally {
+    refreshingUsage.delete(id);
   }
-  refreshingUsage.value = null;
+  return false;
+}
+
+/** 首次进入列表后逐个读取当前页的反重力额度。@param rows 首次加载的账号。@return 批次结束。 */
+async function refreshEntryUsage(rows: Account[]): Promise<void> {
+  const eligible = rows.filter(account => account.platform === 'antigravity' && account.status === 'active'
+    && account.work_control?.work_enabled !== false && (account.credential_state?.phase ?? 'ready') === 'ready');
+  let updated = false;
+  for (const account of eligible) {
+    if (!accountAlive) return;
+    if (await refreshUsage(account.id, true)) updated = true;
+  }
+  if (updated && accountAlive) await load();
 }
 
 /**
@@ -1209,6 +1250,8 @@ function applyOAuthResult() {
   form.value = {
     platform: oauthPlatform.value,
     agy_system_prompt_homoglyph_enabled: false,
+    agy_gif_frames_enabled: false,
+    agy_disable_safety_filtering: false,
     name: '',
     email: r.email_address || '',
     auth_type: isSetupToken ? 'setup_token' : 'oauth',
@@ -1359,19 +1402,16 @@ async function copyText(text: string) {
           <p v-if="a.credential_ownership" class="account-note" role="status">{{ a.credential_ownership.phase === 'ready' ? (a.credential_ownership.owner === 'local' ? '本地管理凭据 · 网关已暂停' : '网关管理凭据') : (a.credential_ownership.phase === 'reauth' ? '重新授权中 · 上游活动暂停' : '凭据交接待确认 · 请在账号环境页对账') }}</p>
           <EntityBlock v-if="!a.platform || a.platform === 'claude_code' || a.platform === 'antigravity'" class="account-routing">
             <div><span>转发方式</span><strong><template v-if="a.platform === 'antigravity'">原生运行时 <small v-if="agyVersion(a)">Antigravity {{ agyVersion(a) }}</small></template><template v-else-if="a.request_backend === 'native293'">原生运行时 <small>280 / 293 自动匹配</small></template><template v-else>原有转发</template></strong></div>
-            <button v-if="a.platform === 'antigravity'" type="button" @click="openAccountCapacity(a)">
-              <span>调度方式</span><strong>低负载优先<ArrowRight :size="14" /></strong>
-              <small>{{ a.credential_state?.phase === 'ready' && a.usage_data?.capabilities?.models ? `${a.usage_data.capabilities.models.length} 个模型` : agyPhaseLabel(a) }}</small>
-            </button>
-            <button v-else type="button" @click="openScheduling(a)">
+            <button type="button" @click="openScheduling(a)">
               <span>调度优先级</span><strong>{{ a.priority }}<ArrowRight :size="14" /></strong>
               <Badge :variant="a.v3_scheduling ? 'default' : 'secondary'" class="account-score">{{ activeSchedulingScore(a) }}</Badge>
             </button>
           </EntityBlock>
 
-          <AgyAccountUsage v-if="a.platform === 'antigravity'" :account="a" />
+          <AgyAccountUsage v-if="a.platform === 'antigravity'" :account="a" :refreshing="refreshingUsage.has(a.id)"
+            :refresh-error="usageRefreshErrors.get(a.id)" />
           <section v-if="a.platform !== 'antigravity'" class="account-usage-windows">
-            <header><span>用量</span><small>{{ a.usage_fetched_at ? new Date(a.usage_fetched_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' 更新' : '未刷新' }}</small><button type="button" @click="refreshUsage(a.id)" :disabled="refreshingUsage === a.id" aria-label="刷新用量"><RefreshCw :size="14" />刷新</button></header>
+            <header><span>用量</span><small>{{ a.usage_fetched_at ? new Date(a.usage_fetched_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' 更新' : '未刷新' }}</small><button type="button" @click="refreshUsage(a.id)" :disabled="refreshingUsage.has(a.id)" aria-label="刷新用量"><RefreshCw :size="14" />刷新</button></header>
             <p v-if="a.request_usage" class="usage-record-start">网关记录始于 {{ new Date(a.request_usage.recorded_since).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) }}</p>
             <div v-for="window in usageWindows" :key="window.key" class="account-usage-window">
               <UsageWindowStats v-if="window.key !== 'seven_day_fable'" :stats="a.request_usage?.[window.key]" :label="window.key === 'five_hour' ? '5h' : '7d'" />
@@ -1399,7 +1439,7 @@ async function copyText(text: string) {
         </div>
         <footer class="account-card-actions">
           <button type="button" @click="openEdit(a)"><Pencil :size="14" />编辑</button>
-          <button type="button" @click="refreshUsage(a.id)" :disabled="refreshingUsage === a.id"><RefreshCw :size="14" />{{ refreshingUsage === a.id ? '刷新中' : '用量' }}</button>
+          <button type="button" @click="refreshUsage(a.id)" :disabled="refreshingUsage.has(a.id)"><RefreshCw :size="14" />{{ refreshingUsage.has(a.id) ? '刷新中' : '用量' }}</button>
           <OperationFeedback :status="testStates.get(a.id)?.status" :message="testStates.get(a.id)?.message" :identity="a.name" @action="test(a.id)" />
           <button type="button" @click="openAccountDetails(a)"><ArrowRight :size="14" />详情</button>
           <button type="button" @click="confirmDelete(a.id)" class="danger"><Trash2 :size="14" />删除</button>
@@ -1445,14 +1485,14 @@ async function copyText(text: string) {
             <div v-if="detailAccount.credential_state?.phase !== 'ready'" class="account-credential-actions"><Button v-if="detailAccount.credential_state?.phase === 'reauth'" size="sm" variant="outline" @click="cancelAgyReauth(detailAccount)">结束原授权</Button><Button size="sm" variant="outline" @click="recoverAgy(detailAccount.id)">核对凭据</Button></div>
           </EntityBlock>
         </template>
-        <div class="account-overview-section-head"><h3>请求配置</h3><button v-if="detailAccount.platform !== 'antigravity'" type="button" @click="changeWorkspaceTab('scheduling')">调度详情<ArrowRight :size="14" /></button></div>
+        <div class="account-overview-section-head"><h3>请求配置</h3><button type="button" @click="changeWorkspaceTab('scheduling')">调度详情<ArrowRight :size="14" /></button></div>
         <EntityBlock class="account-overview-block">
-          <dl v-if="detailAccount.platform === 'antigravity'" class="account-overview-settings"><div><dt>并发</dt><dd>{{ detailAccount.current_concurrency ?? '—' }} / {{ detailAccount.concurrency }}</dd></div><div><dt>RPM</dt><dd>{{ cardRpm(detailAccount) ?? '—' }} / {{ detailAccount.rpm_limit || '不限' }}</dd></div><div><dt>调度方式</dt><dd>低负载优先</dd></div></dl>
+          <dl v-if="detailAccount.platform === 'antigravity'" class="account-overview-settings"><div><dt>并发</dt><dd>{{ detailAccount.current_concurrency ?? '—' }} / {{ detailAccount.concurrency }}</dd></div><div><dt>RPM</dt><dd>{{ cardRpm(detailAccount) ?? '—' }} / {{ detailAccount.rpm_limit || '不限' }}</dd></div><div><dt>调度优先级</dt><dd>{{ detailAccount.priority }}</dd></div></dl>
           <dl v-else class="account-overview-settings"><div><dt>并发上限</dt><dd>{{ detailAccount.concurrency }}</dd></div><div><dt>RPM 上限</dt><dd>{{ detailAccount.rpm_limit || '不限' }}</dd></div><div><dt>调度优先级</dt><dd>{{ detailAccount.priority }}</dd></div></dl>
         </EntityBlock>
         <div class="account-overview-actions">
           <OperationFeedback label="测试连接" button-variant="outline" :status="testStates.get(detailAccount.id)?.status" :message="testStates.get(detailAccount.id)?.message" :identity="detailAccount.name || detailAccount.email" @action="test(detailAccount.id)" />
-          <Button type="button" variant="outline" @click="refreshUsage(detailAccount.id)" :disabled="refreshingUsage === detailAccount.id"><RefreshCw :size="14" />{{ refreshingUsage === detailAccount.id ? '刷新中' : '刷新用量' }}</Button>
+          <Button type="button" variant="outline" @click="refreshUsage(detailAccount.id)" :disabled="refreshingUsage.has(detailAccount.id)"><RefreshCw :size="14" />{{ refreshingUsage.has(detailAccount.id) ? '刷新中' : '刷新用量' }}</Button>
         </div>
         <section class="account-overview-control"><header><h3>账号控制</h3><InfoTooltip label="账号控制说明"><template #trigger><span>控制说明</span></template><p>关闭接收请求后，已接纳的请求正常收尾。</p><p>停用账号会停止全部新工作，并等待已接纳的请求收尾。</p></InfoTooltip></header><div class="account-overview-control-row"><label class="account-admission"><span>接收请求</span><Switch class="account-status-switch" :model-value="detailAccount.work_control?.api_accepting === true" :disabled="!detailAccount.work_control || workPending.has(detailAccount.id)" :label="`${detailAccount.work_control?.api_accepting ? '关闭' : '开启'}接收请求 ${detailAccount.name || detailAccount.email}`" @update:model-value="toggleScheduling(detailAccount)" /></label><Button v-if="detailAccount.status !== 'active' || isRateLimited(detailAccount)" type="button" size="sm" variant="outline" :disabled="workPending.has(detailAccount.id)" @click="restoreAvailability(detailAccount)">恢复资格</Button><Button type="button" size="sm" :variant="overallEnabled(detailAccount) ? 'destructive' : 'secondary'" :class="{'account-stop-action':overallEnabled(detailAccount)}" :disabled="!detailAccount.work_control || workPending.has(detailAccount.id)" @click="changeOverall(detailAccount, !overallEnabled(detailAccount))">{{ overallEnabled(detailAccount) ? '停用账号' : '启用账号' }}</Button></div><p v-if="overallWorkNote(detailAccount)" class="account-overview-note" role="status">{{ overallWorkNote(detailAccount) }}</p></section>
         <p v-if="overallStates.get(detailAccount.id)?.message" class="account-overview-note" role="status">{{ overallStates.get(detailAccount.id)?.message }}</p>
@@ -1470,6 +1510,8 @@ async function copyText(text: string) {
           <section v-if="isAgyForm" class="account-form-section">
             <h3>Antigravity 配置</h3><p class="form-help">账号能力来自最近的原生观测。模型服务等待运行环境接入。</p>
             <Checkbox v-model="form.agy_system_prompt_homoglyph_enabled" class="account-check"><strong>系统提示词同形体转换</strong><small>按当前账号保存，开启后转换系统提示词文本。</small></Checkbox>
+            <Checkbox v-model="form.agy_gif_frames_enabled" class="account-check"><strong>GIF 抽帧兼容</strong><small>开启后每张 GIF 最多抽取 8 帧 PNG。</small></Checkbox>
+            <Checkbox v-model="form.agy_disable_safety_filtering" class="account-check"><strong>使用 AGY 原生安全开关</strong><small>启用 disableSafetyFiltering，由 AGY 生成安全字段。客户端逐类阈值在关闭时应用。</small></Checkbox>
             <div class="account-edit-grid three"><NumberInput v-model="numberDrafts.concurrency" label="并发上限" :min="1" required /><NumberInput v-model="numberDrafts.rpm_limit" label="RPM 上限" :min="0" required /><NumberInput v-model="numberDrafts.priority" label="调度优先级" :min="1" required /></div>
             <div v-if="editing" class="account-form-actions">
               <Button type="button" size="sm" variant="outline" @click="openOAuthFlow(editing)">重新授权</Button>
@@ -1479,7 +1521,7 @@ async function copyText(text: string) {
           </section>
         </div>
       </form>
-      <SchedulingDetails v-show="workspaceTab === 'scheduling'" embedded :open="workspaceOpen && workspaceTab === 'scheduling'" :account-id="detailAccount?.id ?? 0" :account-name="detailAccount?.name || detailAccount?.email || ''" />
+      <SchedulingDetails v-show="workspaceTab === 'scheduling'" embedded :open="workspaceOpen && workspaceTab === 'scheduling'" :account-id="detailAccount?.id ?? 0" :account-name="detailAccount?.name || detailAccount?.email || ''" :antigravity="detailAccount?.platform === 'antigravity'" />
       <div v-show="workspaceTab === 'diagnostics'" class="account-workspace-scroll account-diagnostics">
         <template v-if="detailAccount">
           <EntityBlock class="account-diagnostic-block">

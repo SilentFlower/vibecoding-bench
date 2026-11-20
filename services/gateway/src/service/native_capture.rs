@@ -1,4 +1,4 @@
-//! 按账号保存有界的 CC 组装后快照，完整内容只通过管理员接口读取。
+//! 保存有界的 CC 组装与网关拒绝快照，预览只通过管理员接口读取。
 
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
@@ -6,7 +6,7 @@ use std::fs::{self, OpenOptions};
 use std::io::{self, Read, Write};
 #[cfg(unix)]
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -21,11 +21,19 @@ use tokio::task::{JoinHandle, spawn_blocking};
 use uuid::Uuid;
 
 use crate::model::request_diagnostics::RequestLogMode;
+use crate::service::gemini::BODY_LIMIT as GEMINI_BODY_LIMIT;
 use crate::service::native_contract::NativeSubmission;
+use axum::body::Bytes;
+use axum::http::HeaderMap;
 
 const BODY_LIMIT: usize = 2 * 1024 * 1024;
+const INGRESS_PREVIEW_LIMIT: usize = 1024 * 1024;
+const SNAPSHOT_LIMIT: usize = 6 * 1024 * 1024;
+// 完整入站只存一份正文，为脱敏替换、JSON 字符串转义及请求头预留空间。
+const REJECTED_SNAPSHOT_LIMIT: usize = 4 * GEMINI_BODY_LIMIT;
 const HEADER_LIMIT: usize = 128 * 1024;
 const STORAGE_LIMIT: u64 = 1024 * 1024 * 1024;
+const GATEWAY_RETENTION: Duration = Duration::from_secs(7 * 86400);
 static WRITERS: Semaphore = Semaphore::const_new(2);
 static STORAGE: Mutex<()> = Mutex::new(());
 
@@ -144,6 +152,26 @@ fn collect(value: &Value, secrets: &mut Vec<String>) {
     }
 }
 
+fn redact_sensitive_fields(value: &mut Value) {
+    match value {
+        Value::Object(fields) => {
+            for (name, field) in fields {
+                if sensitive(name) {
+                    *field = json!("[REDACTED]");
+                } else {
+                    redact_sensitive_fields(field);
+                }
+            }
+        }
+        Value::Array(values) => {
+            for value in values {
+                redact_sensitive_fields(value);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn add_secret(value: &str, secrets: &mut Vec<String>) {
     if value.len() >= 4 {
         secrets.push(value.to_owned());
@@ -222,6 +250,16 @@ pub(crate) fn ingress(
     if mode != RequestLogMode::Debug {
         return None;
     }
+    ingress_snapshot(headers, raw, parsed, bearer, false)
+}
+
+fn ingress_snapshot(
+    headers: &[(String, String)],
+    raw: &[u8],
+    parsed: &Value,
+    bearer: &str,
+    full: bool,
+) -> Option<Value> {
     let original = std::str::from_utf8(raw).ok()?;
     let mut secrets = vec![bearer.to_owned()];
     collect(parsed, &mut secrets);
@@ -233,11 +271,24 @@ pub(crate) fn ingress(
     secrets.retain(|secret| secret.len() >= 4);
     secrets.sort_by_key(|secret| Reverse(secret.len()));
     secrets.dedup();
-    let body = redact_body(original, &secrets).ok()?;
-    let (body, body_truncated) = prefix(&body, 1024 * 1024);
+    let (body, representation) = if full && !raw.is_empty() {
+        let mut safe = parsed.clone();
+        redact_sensitive_fields(&mut safe);
+        (
+            redact_body(&serde_json::to_string(&safe).ok()?, &secrets).ok()?,
+            "redacted_json",
+        )
+    } else {
+        (redact_body(original, &secrets).ok()?, "http_logical_bytes")
+    };
+    let (body, body_truncated) = if full {
+        (body.as_str(), false)
+    } else {
+        prefix(&body, INGRESS_PREVIEW_LIMIT)
+    };
     let (headers, headers_truncated) = redact_headers(headers, &secrets);
     Some(
-        json!({"source":"gateway_http_ingress","representation":"http_logical_bytes",
+        json!({"source":"gateway_http_ingress","representation":representation,
         "captured_at_ms":SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
         "headers":headers,"body":body,"body_truncated":body_truncated,"headers_truncated":headers_truncated,
         "original_body_bytes":raw.len(),"original_body_sha256":format!("{:x}",Sha256::digest(raw))}),
@@ -775,10 +826,19 @@ fn save(directory: &Path, submission: &NativeSubmission, payload: &Value) -> io:
     let id =
         Uuid::parse_str(&submission.request.request_id).map_err(|_| io::ErrorKind::InvalidInput)?;
     let value = snapshot(submission, payload)?;
+    save_snapshot(directory, id, &value)
+}
+
+fn save_snapshot(directory: &Path, id: Uuid, value: &Value) -> io::Result<()> {
     let rejected = value["stage"] == "ingress_rejected";
     let suffix = if rejected { ".rejected.json" } else { ".json" };
+    let limit = if rejected {
+        REJECTED_SNAPSHOT_LIMIT
+    } else {
+        SNAPSHOT_LIMIT
+    };
     let bytes = serde_json::to_vec(&value)?;
-    if bytes.len() > 6 * 1024 * 1024 {
+    if bytes.len() > limit {
         return Err(io::ErrorKind::InvalidData.into());
     }
     let _guard = STORAGE.lock().map_err(|_| io::ErrorKind::Other)?;
@@ -801,8 +861,8 @@ fn save(directory: &Path, submission: &NativeSubmission, payload: &Value) -> io:
                     return Err(io::ErrorKind::InvalidData.into());
                 }
                 let mut previous = Vec::new();
-                file.take(6 * 1024 * 1024 + 1).read_to_end(&mut previous)?;
-                if previous.len() <= 6 * 1024 * 1024 {
+                file.take(limit as u64 + 1).read_to_end(&mut previous)?;
+                if previous.len() <= limit {
                     if let Ok(previous) = serde_json::from_slice::<Value>(&previous) {
                         let rank = |wire: &Value| match wire["status"].as_str() {
                             Some("complete") => 3,
@@ -810,9 +870,9 @@ fn save(directory: &Path, submission: &NativeSubmission, payload: &Value) -> io:
                             Some("unavailable") => 1,
                             _ => 0,
                         };
-                        if previous["account_id"] == submission.request.account_id
-                            && previous["attempt_id"] == submission.request.request_id
-                            && rank(&previous["wire_final"]) > rank(&payload["_wire_final"])
+                        if previous["account_id"] == value["account_id"]
+                            && previous["attempt_id"] == value["attempt_id"]
+                            && rank(&previous["wire_final"]) > rank(&value["wire_final"])
                         {
                             return Ok(());
                         }
@@ -893,6 +953,158 @@ fn save(directory: &Path, submission: &NativeSubmission, payload: &Value) -> io:
         let _ = fs::remove_file(temporary);
     }
     result
+}
+
+/// 后台保存已鉴权的本地拒绝入站。@param directory 私有网关目录。@param id 根请求。@param headers 原始头。@param raw 已读取的正文。@param token 需要脱敏的入口密钥。@param full 是否保存完整正文。@return 采集队列状态。
+pub(crate) fn record_gateway_rejection(
+    directory: &Path,
+    id: &str,
+    headers: HeaderMap,
+    raw: Option<Bytes>,
+    token: String,
+    full: bool,
+) -> &'static str {
+    let Ok(id) = Uuid::parse_str(id) else {
+        return "dropped";
+    };
+    let Ok(permit) = WRITERS.try_acquire() else {
+        return "dropped";
+    };
+    let directory = directory.to_path_buf();
+    spawn_blocking(move || {
+        let _permit = permit;
+        let headers: Vec<(String, String)> = headers
+            .iter()
+            .filter_map(|(name, value)| Some((name.as_str().into(), value.to_str().ok()?.into())))
+            .collect();
+        let json_body = raw
+            .as_ref()
+            .and_then(|raw| serde_json::from_slice::<Value>(raw).ok());
+        let (body, parsed) = json_body
+            .as_ref()
+            .map_or((&[][..], &Value::Null), |parsed| {
+                (raw.as_deref().unwrap_or_default(), parsed)
+            });
+        let Some(mut preview) = ingress_snapshot(&headers, body, parsed, &token, full) else {
+            return;
+        };
+        let available = json_body.is_some();
+        if !available {
+            preview["original_body_bytes"] = json!(raw.as_ref().map(Bytes::len));
+            preview["original_body_sha256"] =
+                json!(raw.as_ref().map(|raw| format!("{:x}", Sha256::digest(raw))));
+        }
+        let status = if !available {
+            "unavailable"
+        } else if preview["body_truncated"] == true {
+            "truncated"
+        } else {
+            "complete"
+        };
+        let mut stage = json!({"stage":"ingress","source":"gateway_http_ingress","representation":preview["representation"],"status":status});
+        if !available {
+            stage["note"] = json!("已保存入站头部，正文读取、解码或 JSON 解析未完成");
+        }
+        let mut snapshot = if full { json!({}) } else { preview.clone() };
+        snapshot["schema_version"] = json!(1);
+        snapshot["stage"] = json!("ingress_rejected");
+        snapshot["attempt_id"] = json!(id.to_string());
+        snapshot["ingress"] = preview;
+        snapshot["stages"] = json!([stage]);
+        if let Err(error) = save_snapshot(&directory, id, &snapshot) {
+            tracing::warn!(request_id=%id, reason=?error.kind(), "网关拒绝的入站采集保存失败");
+        }
+    });
+    "queued"
+}
+
+/// 读取有界且匹配根请求的网关拒绝快照。@param directory 私有网关目录。@param id 根请求。@return 状态及脱敏证据。
+pub(crate) async fn read_gateway_rejection(directory: &Path, id: &str) -> Value {
+    let Ok(id) = Uuid::parse_str(id) else {
+        return json!({"state":"missing"});
+    };
+    let path = directory.join(format!("{id}.rejected.json"));
+    spawn_blocking(move || {
+        let mut options = OpenOptions::new();
+        options.read(true);
+        #[cfg(unix)]
+        options.custom_flags(O_NOFOLLOW | O_NONBLOCK);
+        let Ok(file) = options.open(path) else {
+            return json!({"state":"missing"});
+        };
+        let Ok(metadata) = file.metadata() else {
+            return json!({"state":"missing"});
+        };
+        if !metadata.is_file() || metadata.len() > REJECTED_SNAPSHOT_LIMIT as u64 {
+            return json!({"state":"missing"});
+        }
+        if metadata
+            .modified()
+            .ok()
+            .and_then(|at| at.elapsed().ok())
+            .is_some_and(|age| age >= GATEWAY_RETENTION)
+        {
+            return json!({"state":"expired"});
+        }
+        let mut bytes = Vec::new();
+        if file
+            .take(REJECTED_SNAPSHOT_LIMIT as u64 + 1)
+            .read_to_end(&mut bytes)
+            .is_err()
+            || bytes.len() > REJECTED_SNAPSHOT_LIMIT
+        {
+            return json!({"state":"missing"});
+        }
+        let Ok(value) = serde_json::from_slice::<Value>(&bytes) else {
+            return json!({"state":"missing"});
+        };
+        if value["stage"] != "ingress_rejected" || value["attempt_id"] != id.to_string() {
+            return json!({"state":"missing"});
+        }
+        let mut result = json!({"state":"saved"});
+        result["snapshot"] = value;
+        result
+    })
+    .await
+    .unwrap_or_else(|_| json!({"state":"missing"}))
+}
+
+/// 随诊断保留周期清理过期正文。@param directory 网关私有目录。
+pub(crate) fn prune_gateway_rejections(directory: PathBuf) {
+    spawn_blocking(move || {
+        let Ok(_guard) = STORAGE.lock() else { return };
+        let Ok(info) = fs::symlink_metadata(&directory) else {
+            return;
+        };
+        if !info.is_dir() {
+            return;
+        }
+        let Ok(entries) = fs::read_dir(&directory) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            if !name
+                .to_str()
+                .and_then(|name| name.strip_suffix(".rejected.json"))
+                .is_some_and(|id| Uuid::parse_str(id).is_ok())
+            {
+                continue;
+            }
+            let path = entry.path();
+            if fs::symlink_metadata(&path).is_ok_and(|info| {
+                info.is_file()
+                    && info
+                        .modified()
+                        .ok()
+                        .and_then(|at| at.elapsed().ok())
+                        .is_some_and(|age| age >= GATEWAY_RETENTION)
+            }) && let Err(error) = fs::remove_file(path)
+            {
+                tracing::warn!(reason=?error.kind(), "过期入站快照清理失败");
+            }
+        }
+    });
 }
 
 /// 有界保存已验证事件；失败只影响采集状态。

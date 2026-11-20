@@ -26,7 +26,7 @@ from account_update_identity import configured_release
 from cluster_nodes import NodeConfiguration, NodeCreate
 from cluster_ssh import NodeSshError, SshNode
 from cluster_store import ClusterStore
-from cluster_deployment import NodeDeployment, node_container_name
+from cluster_deployment import NodeDeployment, NodeImagePreparationError, node_container_name
 from cluster_synchronization import NodeSynchronization, NodeSynchronizationWait
 from cluster_preparation_files import PreparationFiles, PreparationFileScope
 from cluster_removal import NodeRemoval, NodeRemovalError
@@ -38,7 +38,7 @@ from cluster_profile_reader import profile_reader_source
 from cluster_execution import NodeInspection, NodePreparation, NodeReviewAdmission
 from cluster_transport import NodeTransport, NodeTransports
 from runtime_files import atomic_json
-from system_update_gate import UPDATE_GATE
+from system_update_gate import NodeImageFetchPaused, UPDATE_GATE
 from system_update_contract import safe_read, strict_json
 
 logger = logging.getLogger(__name__)
@@ -874,10 +874,13 @@ class ClusterService:
         try:
             context = UPDATE_GATE.continue_reserved(activity) if activity is not None else nullcontext()
             with context:
-                result = (self.synchronization.install(installer, node_id, revision, maintenance=maintenance, stage_only=stage_only) if self.synchronization
+                result = (self.synchronization.install(installer, node_id, revision, maintenance=maintenance, stage_only=stage_only, activity=activity) if self.synchronization
                     else installer.prepare(node_id, revision))
                 if not self.store.save_preparation(node_id, revision, result):
                     raise ValueError('安装期间节点配置已变化，请重新检查节点能力')
+        except NodeImageFetchPaused:
+            # 等待更新的节点保留进入下载前的持久状态，由原同步器恢复。
+            pass
         except NodeSynchronizationWait as error:
             row = self.store.get(node_id)
             previous = json.loads(row['preparation_json']) if row['preparation_json'] else {}
@@ -889,7 +892,7 @@ class ClusterService:
             self.store.save_preparation(node_id, revision, {**previous, 'state': 'preparing', 'phase': 'waiting',
                 'target_release': previous.get('target_release') or os.environ.get('V3_RELEASE'), 'retry_at': time.time() + 30,
                 'reason': str(error), 'reason_code': error.reason})
-        except Exception:
+        except Exception as error:
             if self.synchronization is not None:
                 try:
                     self.synchronization.recover_original(node_id)
@@ -898,9 +901,11 @@ class ClusterService:
                     pass
             previous = self.store.get(node_id)
             previous = json.loads(previous['preparation_json']) if previous['preparation_json'] else {}
+            reason = (str(error) if isinstance(error, NodeImagePreparationError)
+                else '节点同步未完成，原维护与备份已保留，请重试核对原任务')
             self.store.save_preparation(node_id, revision, {**previous, 'state': 'failed', 'phase': 'needs_check',
                 'target_release': previous.get('target_release') or os.environ.get('V3_RELEASE'), 'retry_at': time.time() + 60,
-                'reason': '节点同步未完成，原维护与备份已保留，请重试核对原任务'})
+                'reason': reason})
         finally:
             UPDATE_GATE.release_reserved(activity)
             with self.lock:

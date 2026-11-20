@@ -45,15 +45,38 @@ jobs:
       - name: 构建两个镜像并生成版本清单
         run: python3 deploy/flower2api/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3-local.json
       - name: 验收镜像内AGY能力
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V3_SYSTEM_RELEASE_PUBLIC_KEY: ${{ vars.V3_SYSTEM_RELEASE_PUBLIC_KEY }}
+          TRUSTED_CANDIDATE: ${{ github.repository == 'SilentFlower/vibecoding-bench' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/v3' || github.ref == 'refs/heads/flower2api') }}
         run: |
+          if [[ "$TRUSTED_CANDIDATE" == 'true' && -n "$V3_SYSTEM_RELEASE_PUBLIC_KEY" ]]; then
+            sudo --preserve-env=GITHUB_ACTIONS,GH_TOKEN "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_database_compatibility.py --manifest releases/v3-local.json --output "$RUNNER_TEMP/v3-database-compatibility.json" --public-key "$V3_SYSTEM_RELEASE_PUBLIC_KEY" --workers 4 &
+            proof_pid=$!
+            trap 'wait "$proof_pid" || true' EXIT
+          elif [[ "$TRUSTED_CANDIDATE" == 'true' ]]; then
+            printf '%s\n' '::warning::配置 V3_SYSTEM_RELEASE_PUBLIC_KEY 后可以在候选构建阶段演练，本批由正式发布补跑。'
+          fi
           # 合成状态目录须归属容器UID 1001，沿宿主验证权限调用同一虚拟环境。
           sudo "$RUNNER_TEMP/v3-update-venv/bin/python" deploy/flower2api/verify_agy_images.py --manifest releases/v3-local.json
+          if [[ -n "${proof_pid:-}" ]]; then
+            if wait "$proof_pid"; then
+              sudo install -m 600 -o "$(id -u)" -g "$(id -g)" "$RUNNER_TEMP/v3-database-compatibility.json" releases/database-compatibility.json
+            else
+              printf '%s\n' '::warning::候选兼容演练失败，正式发布将重新演练。'
+            fi
+            trap - EXIT
+          fi
       - name: 导出可信候选镜像
         if: >-
           github.repository == 'SilentFlower/vibecoding-bench' &&
           (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
           (github.ref == 'refs/heads/v3' || github.ref == 'refs/heads/flower2api')
-        run: python3 deploy/flower2api/candidate_artifacts.py export --manifest releases/v3-local.json --output releases/candidate
+        run: |
+          python3 deploy/flower2api/candidate_artifacts.py export --manifest releases/v3-local.json --output releases/candidate
+          if [[ -f releases/database-compatibility.json ]]; then
+            mv -- releases/database-compatibility.json releases/candidate/database-compatibility.json
+          fi
       - name: 上传可信候选产物
         if: >-
           github.repository == 'SilentFlower/vibecoding-bench' &&

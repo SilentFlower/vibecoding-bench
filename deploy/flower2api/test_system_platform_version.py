@@ -97,17 +97,27 @@ class PlatformVersionTests(unittest.TestCase):
                 stack.enter_context(patch.object(manage, '_image_config_digest', return_value='sha256:' + 'b' * 64))
                 stack.enter_context(patch.object(manage, 'command', side_effect=command))
                 stack.enter_context(patch.object(manage.subprocess, 'run', return_value=SimpleNamespace(returncode=1)))
-                for index, version in enumerate(('v1.17.2', 'v1.17.3')):
+                for index, version in enumerate(('v1.17.2', 'v1.17.3', 'v1.17.3')):
                     metadata.write_text(json.dumps({'schema_version': 1, 'version': version, 'changes': '合成版本说明'}))
                     output = root / ('manifest-' + str(index) + '.json')
-                    manage.build('ci-' + str(index + 1) + '-1', output)
+                    build_options = {} if index == 2 else {'prebuilt': False}
+                    manage.build('ci-' + str(index + 1) + '-1', output, **build_options)
                     manifests.append(json.loads(output.read_text()))
-            self.assertEqual([value['version']['version'] for value in seen], ['v1.17.2'] * 2 + ['v1.17.3'] * 2)
+            self.assertEqual([value['version']['version'] for value in seen], ['v1.17.2'] * 2 + ['v1.17.3'] * 5)
             self.assertTrue(all(value['version']['version'] == value['metadata'] for value in seen))
             self.assertEqual(len({value['frontend'] for value in seen}), 1)
             self.assertEqual(len({value['backend'] for value in seen}), 1)
             self.assertTrue(all(not any('VITE_PLATFORM_VERSION' in argument for argument in value['arguments']) for value in seen))
             self.assertNotEqual(manifests[0]['source_content_sha256'], manifests[1]['source_content_sha256'])
+            self.assertEqual(manifests[1]['source_content_sha256'], manifests[2]['source_content_sha256'])
+            compiler, control, account = (entry['arguments'] for entry in seen[-3:])
+            self.assertEqual([arguments[arguments.index('--target') + 1] for arguments in (compiler, control, account)],
+                ['compiled-artifacts', 'control', 'account'])
+            compiled_path = compiler[compiler.index('--output') + 1].removeprefix('type=local,dest=')
+            self.assertEqual(compiler[-1], control[-1])
+            self.assertEqual(compiler[-1], account[-1])
+            for arguments in (control, account):
+                self.assertEqual(arguments[arguments.index('--build-context') + 1], f'compiled-artifacts={compiled_path}')
 
 
 if __name__ == '__main__':

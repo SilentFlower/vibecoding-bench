@@ -1,0 +1,43 @@
+{
+  "id": "system-update-download-restart",
+  "name": "system-update-download-restart",
+  "title": "系统更新分步重启与账号后台滚动",
+  "description": "按 codex-proxy-rs 拆分下载和重启。控制服务先恢复接单，兼容账号继续服务，受影响的本机账号独立后台更新。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-20",
+  "completedAt": "2026-11-20",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-20T10:25:03Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "分步下载、待重启回执和本地候选校验",
+      "中央恢复准入与本机账号后台滚动",
+      "固定宿主包、浏览器和隔离换版恢复验收",
+      "代码规范更新"
+    ],
+    "partialStep": null,
+    "nextStep": "按实际部署计划刷新固定宿主包并验收系统更新入口",
+    "notes": "隔离 Docker 14 场景通过，中央准入恢复用时 19 秒，兼容路径用时 65 秒。",
+    "updatedAt": "2026-11-20T10:25:03Z"
+  }
+}

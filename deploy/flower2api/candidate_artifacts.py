@@ -12,7 +12,7 @@ import zipfile
 from pathlib import Path
 
 import manage
-from candidate_images import BUNDLE_NAME, MANIFEST_NAME, METADATA_NAME, adopt_candidate, export_candidate
+from candidate_images import BUNDLE_NAME, EVIDENCE_NAME, MANIFEST_NAME, METADATA_NAME, adopt_candidate, export_candidate
 from release_ci import validate_publish_source
 from system_update_contract import MANIFEST_LIMIT, MAX_BUNDLE_BYTES, REPOSITORY, strict_json
 
@@ -123,7 +123,7 @@ def download_archive(artifact: dict, target: Path) -> None:
 
 
 def unpack_archive(path: Path, folder: Path) -> None:
-    """只提取固定三份普通文件，拒绝路径穿越、重复成员与膨胀归档。
+    """提取三份固定文件及可选演练证据，拒绝危险路径或超限成员。
 
     :param path: 已完成GitHub摘要核验的ZIP。
     :param folder: 当前进程的私有候选目录。
@@ -132,8 +132,10 @@ def unpack_archive(path: Path, folder: Path) -> None:
     limits = {METADATA_NAME: MANIFEST_LIMIT, MANIFEST_NAME: MANIFEST_LIMIT, BUNDLE_NAME: MAX_BUNDLE_BYTES}
     with zipfile.ZipFile(path) as archive:
         members = archive.infolist()
-        if len(members) != 3 or {item.filename for item in members} != set(limits):
+        names = {item.filename for item in members}
+        if len(members) != len(names) or names - {EVIDENCE_NAME} != set(limits):
             raise ValueError('候选归档包含未知或重复路径')
+        limits[EVIDENCE_NAME] = MANIFEST_LIMIT
         for item in members:
             mode = item.external_attr >> 16
             if (item.is_dir() or stat.S_ISLNK(mode) or (stat.S_IFMT(mode) not in (0, stat.S_IFREG))
@@ -153,11 +155,12 @@ def unpack_archive(path: Path, folder: Path) -> None:
                     raise ValueError('候选归档成员超过声明大小')
 
 
-def resolve_candidate(manifest_path: Path, wait_seconds: int = 1200) -> bool:
+def resolve_candidate(manifest_path: Path, wait_seconds: int = 1200, *, evidence_path: Path | None = None) -> bool:
     """查找或等待同源码候选，缺失时返回原完整构建路径。
 
     :param manifest_path: 本次正式本地清单的全新路径。
     :param wait_seconds: 在途候选的最长等待时间。
+    :param evidence_path: 可选的候选兼容证据输出路径。
     :return: 已验证并换批复用时为真；无可用候选时为假。
     """
     validate_publish_source()
@@ -199,7 +202,7 @@ def resolve_candidate(manifest_path: Path, wait_seconds: int = 1200) -> bool:
         if (not trusted_run(current, revision, ref) or current['run_attempt'] != attempt
                 or (current['status'] == 'completed' and current.get('conclusion') != 'success')):
             raise ValueError('候选下载期间来源已变化')
-        adopt_candidate(folder, identity, manifest_path)
+        adopt_candidate(folder, identity, manifest_path, evidence_path=evidence_path)
     print(json.dumps({'event': 'flower2api-candidate-reused', 'run_id': run_id, 'attempt': attempt,
         'revision': revision}), flush=True)
     return True
@@ -211,6 +214,7 @@ def main() -> None:
     parser.add_argument('action', choices=('export', 'resolve'))
     parser.add_argument('--manifest', type=Path, required=True)
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--evidence', type=Path)
     parser.add_argument('--wait-seconds', type=int, default=1200)
     args = parser.parse_args()
     if args.wait_seconds < 0 or args.wait_seconds > 3600:
@@ -220,7 +224,7 @@ def main() -> None:
             parser.error('候选导出需要--output')
         export_candidate(args.manifest, args.output)
         return
-    reused = resolve_candidate(args.manifest, args.wait_seconds)
+    reused = resolve_candidate(args.manifest, args.wait_seconds, evidence_path=args.evidence)
     print(json.dumps({'event': 'flower2api-candidate-result', 'reused': reused}), flush=True)
     if os.environ.get('GITHUB_OUTPUT'):
         with Path(os.environ['GITHUB_OUTPUT']).open('a') as stream:

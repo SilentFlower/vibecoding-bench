@@ -95,6 +95,18 @@ class Fixture(BaseHTTPRequestHandler):
             **({} if mode=='policy-no-receipt' else {'system_prompt_policy':report}))
         if mode in ['policy-no-receipt','policy-wrong-receipt']:
             emit('job_finalized',status='error');return
+        control_cases = {'control-400': 400, 'control-502': 502, 'control-200': 200,
+            'control-legacy': None, 'control-after-frame': 400}
+        if mode in control_cases:
+            after_frame = mode == 'control-after-frame'
+            if after_frame:
+                frame = {'candidates': [{'content': {'role': 'model', 'parts': [{'text': '合成首帧'}]}}]}
+                native('gemini_response', data={'data_base64': base64.b64encode(json.dumps(frame).encode()).decode()})
+            status = control_cases[mode]
+            http_status = {} if status is None else {'control_http_status': status}
+            native('error', code='native_request_failed', native_model_calls=int(after_frame), **http_status)
+            emit('job_finalized', status='error')
+            return
         policy_auth=mode=='policy-auth-recover' and not Fixture.policy_failed
         if policy_auth:
             Fixture.policy_failed=True
@@ -247,13 +259,33 @@ def inside() -> dict:
         require(Fixture.calls[-1]['model']=='gemini-4-neon-low','续轮改变了已绑定的型号')
         require(Fixture.tool_finished.is_set(),'真实工具回填未完成')
         require(request(tool_base,continuation)[0]==400,'重复工具结果被接纳')
-        for mode,expected,attempts,refreshes in [('auth-recover',200,2,1),('capacity-error',503,1,0),('auth-always',503,2,1),('auth-after-frame',200,1,0)]:
+        for mode,expected,attempts,refreshes in [('auth-recover',200,2,1),('capacity-error',429,1,0),('auth-always',503,2,1),('auth-after-frame',200,1,0)]:
             current=copy.deepcopy(body);current['contents'][0]['parts'][0]['text']=mode
             before=len(Fixture.calls);before_refresh=Fixture.refreshes
             action='streamGenerateContent?alt=sse' if mode=='auth-after-frame' else 'generateContent'
             status,raw=request(base+action,current)
             require(status==expected and len(Fixture.calls)-before==attempts and Fixture.refreshes-before_refresh==refreshes,
                 '认证恢复预算或首帧门禁错误：'+mode+' '+str((status,len(Fixture.calls)-before,Fixture.refreshes-before_refresh)))
+        for mode, operation, expected, code, reason in [
+            ('control-400', 'generateContent', 400, 400, 'INVALID_ARGUMENT'),
+            ('control-400', 'streamGenerateContent?alt=sse', 400, 400, 'INVALID_ARGUMENT'),
+            ('control-502', 'generateContent', 502, 502, 'UNAVAILABLE'),
+            ('control-200', 'generateContent', 503, 503, 'UNAVAILABLE'),
+            ('control-legacy', 'generateContent', 503, 503, 'UNAVAILABLE'),
+            ('control-after-frame', 'streamGenerateContent?alt=sse', 200, 400, 'INVALID_ARGUMENT'),
+        ]:
+            current = copy.deepcopy(body)
+            current['contents'][0]['parts'][0]['text'] = mode
+            before = len(Fixture.calls)
+            status, raw = request(base + operation, current)
+            if mode == 'control-after-frame':
+                frames = [json.loads(line[6:]) for line in raw.decode().splitlines() if line.startswith('data: ')]
+                require(len(frames) == 2 and frames[0].get('candidates'), '控制错误前已交付的 SSE 首帧丢失')
+                error = frames[-1]['error']
+            else:
+                error = json.loads(raw)['error']
+            require((status, error['code'], error['status']) == (expected, code, reason)
+                and len(Fixture.calls) == before + 1, '原生控制状态投影或提交次数错误：' + mode)
         current=copy.deepcopy(body);current['contents'][0]['parts'][0]['text']='cancel-stream'
         stream=Request('http://127.0.0.1:5674'+base+'streamGenerateContent?alt=sse',data=json.dumps(current).encode(),
             headers={'x-api-key':'synthetic-key','content-type':'application/json'})
@@ -331,6 +363,10 @@ def inside() -> dict:
             require(context.get('platform')=='antigravity' and context.get('entry_protocol')=='gemini','持久平台或协议被模型名覆盖')
             require(context.get('credential_generation')==source['credential_snapshot']['credential_generation'],'尝试凭据代次漂移')
             require(attempt['account_id']==source['request']['account_id'],'持久尝试跨账号')
+            mode = source['body']['contents'][0]['parts'][0].get('text')
+            if mode in ('control-400', 'control-502', 'control-after-frame'):
+                require(attempt['status_code'] == (502 if mode == 'control-502' else 400)
+                    and attempt['error_stage'] == 'native_control', '请求记录遗漏控制状态或阶段')
         require(any(a.get('context',{}).get('requested_model')=='claude-synthetic' for a in attempts),'Claude模型记录缺失')
         require(any(a.get('context',{}).get('requested_model')=='gemini-4-neon'
             and a['context'].get('submitted_model')=='MODEL_SYNTHETIC_NEON_LOW' for a in attempts),'档位匹配覆盖了原始请求名')
@@ -346,6 +382,7 @@ def inside() -> dict:
             'synthetic_submissions':len(Fixture.calls),'checks':['真实Gemini目录与令牌','按档位匹配目录、保留精确型号与令牌范围','非流式源usage','SSE','函数签名和结果','错调用方和ID拒绝',
                 '待对账期间旧工具独立收口和新模型拒绝','concurrency=1原许可接续','新AT代次','重复结果拒绝','禁用令牌',
                 '明确401仅恢复一次','容量错误零恢复','SSE首帧后零重放','SSE断连关闭原发送和释放许可',
+                '原生控制状态在HTTP、SSE尾帧及诊断中一致',
                 '两账号策略隔离','认证恢复冻结策略','后续HTTP采用新开关','缺失和错误策略回执拒绝','原始入站视图保持',
                 '真实SQLite尝试计数和凭据代次','401同根两尝试及恢复原因','AGY调用Claude平台保持']}
     finally:

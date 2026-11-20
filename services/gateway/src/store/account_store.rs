@@ -174,6 +174,10 @@ impl AccountStore {
                 .try_get::<i32, _>("agy_system_prompt_homoglyph_enabled")
                 .unwrap_or(0)
                 != 0,
+            agy_gif_frames_enabled: row.try_get::<i32, _>("agy_gif_frames_enabled").unwrap_or(0)
+                != 0,
+            agy_disable_safety_filtering: row.try_get::<i32, _>("agy_disable_safety_filtering").unwrap_or(0)
+                != 0,
             id: row.try_get::<i64, _>("id").unwrap_or_default(),
             name: row.try_get::<String, _>("name").unwrap_or_default(),
             email: row.try_get::<String, _>("email").unwrap_or_default(),
@@ -310,8 +314,8 @@ impl AccountStore {
                 billing_mode, account_uuid, organization_uuid, subscription_type,
                 concurrency, priority, rpm_limit, auto_telemetry, auto_poll_usage, allow_1m_models,
                 allow_fast_mode, upstream_session_pool_enabled, upstream_session_pool_size, upstream_session_ttl_minutes,
-                upstream_session_refresh_policy, five_hour_usage_limit_percent, seven_day_usage_limit_percent, rate_limit_tier, request_backend, platform, agy_system_prompt_homoglyph_enabled)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,{},{},{},$12,{},{},{},$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36)
+                upstream_session_refresh_policy, five_hour_usage_limit_percent, seven_day_usage_limit_percent, rate_limit_tier, request_backend, platform, agy_system_prompt_homoglyph_enabled, agy_gif_frames_enabled, agy_disable_safety_filtering)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,{},{},{},$12,{},{},{},$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38)
             RETURNING id, CAST(created_at AS TEXT) AS created_at, CAST(updated_at AS TEXT) AS updated_at"#,
             self.ts(9),
             self.ts(10),
@@ -360,6 +364,8 @@ impl AccountStore {
             .bind(&a.request_backend)
             .bind(&a.platform)
             .bind(i32::from(a.agy_system_prompt_homoglyph_enabled))
+            .bind(i32::from(a.agy_gif_frames_enabled))
+            .bind(i32::from(a.agy_disable_safety_filtering))
             .fetch_all(&mut *transaction)
             .await?;
         let row = rows.first().ok_or(AppError::NotFound)?;
@@ -411,7 +417,7 @@ impl AccountStore {
                 allow_1m_models=$21, allow_fast_mode=$22, upstream_session_pool_enabled=$23,
                 upstream_session_pool_size=$24, upstream_session_ttl_minutes=$25,
                 upstream_session_refresh_policy=$26, five_hour_usage_limit_percent=$27,
-                seven_day_usage_limit_percent=$28, rate_limit_tier=$29, request_backend=$30, agy_system_prompt_homoglyph_enabled=$32, updated_at={}
+                seven_day_usage_limit_percent=$28, rate_limit_tier=$29, request_backend=$30, agy_system_prompt_homoglyph_enabled=$32, agy_gif_frames_enabled=$33, agy_disable_safety_filtering=$34, updated_at={}
             WHERE id=$31"#,
             self.ts(8),
             self.ts(9),
@@ -451,6 +457,8 @@ impl AccountStore {
             .bind(&a.request_backend)
             .bind(a.id)
             .bind(i32::from(a.agy_system_prompt_homoglyph_enabled))
+            .bind(i32::from(a.agy_gif_frames_enabled))
+            .bind(i32::from(a.agy_disable_safety_filtering))
             .execute(&self.pool)
             .await?;
         Ok(())
@@ -496,6 +504,8 @@ impl AccountStore {
                 "agy_system_prompt_homoglyph_enabled" => {
                     i32::from(account.agy_system_prompt_homoglyph_enabled)
                 }
+                "agy_gif_frames_enabled" => i32::from(account.agy_gif_frames_enabled),
+                "agy_disable_safety_filtering" => i32::from(account.agy_disable_safety_filtering),
                 "auto_telemetry" => i32::from(account.auto_telemetry),
                 "auto_poll_usage" => i32::from(account.auto_poll_usage),
                 "allow_fast_mode" => i32::from(account.allow_fast_mode),
@@ -1178,7 +1188,7 @@ impl AccountStore {
 }
 
 // 将原生 JSON/时间列统一投影为文本，避免 SQLx Any 无法解码 PostgreSQL 类型。
-const ACCOUNT_COLS: &str = r#"id, platform, agy_system_prompt_homoglyph_enabled, name, email, status, token, auth_type, access_token, refresh_token,
+const ACCOUNT_COLS: &str = r#"id, platform, agy_system_prompt_homoglyph_enabled, agy_gif_frames_enabled, agy_disable_safety_filtering, name, email, status, token, auth_type, access_token, refresh_token,
     CAST(oauth_expires_at AS TEXT) AS oauth_expires_at,
     CAST(oauth_refreshed_at AS TEXT) AS oauth_refreshed_at, auth_error, proxy_url, device_id,
     CAST(canonical_env AS TEXT) AS canonical_env,

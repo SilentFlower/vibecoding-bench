@@ -83,6 +83,25 @@
   .su-nodes li > div svg { flex: none; width: 14px; height: 14px; color: var(--ui-color-text-3); }
   .su-nodes li > div span { margin-left: auto; flex: none; color: var(--ui-color-text-3); }
   .su-nodes p { margin: calc(var(--ui-space-unit) * 1) 0 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); }
+  /* 远程节点后台独立更新：一行说明与节点页入口，取节点行同一底色。 */
+  .su-background { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 2); padding: calc(var(--ui-space-unit) * 2.5) calc(var(--ui-space-unit) * 3); border-radius: calc(var(--ui-radius-control) + 1px); background: var(--ui-color-surface); color: var(--ui-color-text-2); font-size: var(--ui-font-size-meta); font-weight: 550; }
+  .su-background > svg { flex: none; width: 14px; height: 14px; color: var(--ui-color-text-3); }
+  .su-background span { flex: 1; min-width: 0; }
+
+  /* ---------- 账号后台更新 ---------- */
+  /* 版本标题较长时「x 已生效」换到下一行，分区标题不折行。 */
+  .su-rollout .su-head { flex-wrap: wrap; row-gap: calc(var(--ui-space-unit) * 1); }
+  .su-rollout .su-head h4 { flex: none; }
+  .su-rollout-list { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 1.5); margin: 0; padding: 0; list-style: none; }
+  .su-rollout-list li { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 3); padding: calc(var(--ui-space-unit) * 2.5) calc(var(--ui-space-unit) * 3); border-radius: calc(var(--ui-radius-control) + 1px); background: var(--ui-color-surface); }
+  .su-rollout-list li > div { flex: 1; min-width: 0; }
+  .su-rollout-list b { color: var(--ui-color-text); font-size: var(--ui-font-size-meta); font-weight: 700; overflow-wrap: anywhere; }
+  .su-rollout-list p { margin: calc(var(--ui-space-unit) * 1) 0 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; overflow-wrap: anywhere; }
+
+  /* ---------- 操作详情：健康探测 ---------- */
+  .su-health { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 1); padding: calc(var(--ui-space-unit) * 2.5) calc(var(--ui-space-unit) * 3); border-radius: calc(var(--ui-radius-control) + 1px); background: var(--ui-color-surface); }
+  .su-health h5 { margin: 0; color: var(--ui-color-text); font-size: var(--ui-font-size-meta); font-weight: 700; }
+  .su-health p { margin: 0; color: var(--ui-color-text-2); font-size: var(--ui-font-size-sm); font-weight: 550; overflow-wrap: anywhere; }
 
   /* ---------- 版本记录与回退 ---------- */
   .su-release { overflow: hidden; border-radius: calc(var(--ui-radius-control) + 2px); background: var(--ui-color-surface); }

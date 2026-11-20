@@ -5,13 +5,15 @@ use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
 use super::{TraceContext, identity_hash, now};
+use crate::error::AppError;
 use crate::model::account::Account;
 use crate::model::request_diagnostics::{
     AttemptDiagnostic, DiagnosticContext, DiagnosticParameters, DiagnosticSessions,
-    DiagnosticTokens, ExecutionLocation, GeminiDiagnosticUsage, SystemPromptDiagnostic,
-    ToolTurnDiagnostic,
+    DiagnosticTokens, ExecutionLocation, GeminiDiagnosticUsage, NativeRuntimeObservation,
+    SystemPromptDiagnostic, ToolTurnDiagnostic,
 };
 use crate::service::agy_contract::{AGY_SOURCE_SHA256, AgyModelId, AgySystemPromptPolicy};
+use crate::service::v3_scheduling::SchedulingRequest;
 
 /// 持有一次真实AGY提交的观察归属，HTTP结束后仅补工具收口。
 pub(crate) struct AgyAttemptTrace {
@@ -22,6 +24,8 @@ pub(crate) struct AgyAttemptTrace {
     source_terminal: bool,
     source_error: bool,
     policy: AgySystemPromptPolicy,
+    scheduling: Option<SchedulingRequest>,
+    model_started_ms: Option<u64>,
 }
 
 impl AgyAttemptTrace {
@@ -124,6 +128,8 @@ impl AgyAttemptTrace {
             source_terminal: false,
             source_error: false,
             policy: policy.clone(),
+            scheduling: None,
+            model_started_ms: None,
         })
     }
 
@@ -144,6 +150,32 @@ impl AgyAttemptTrace {
         }
         if self.finished {
             return;
+        }
+        match native["type"].as_str() {
+            Some("request_prepared") => {
+                if let Ok(runtime) =
+                    serde_json::from_value::<NativeRuntimeObservation>(native["runtime"].clone())
+                {
+                    if runtime.is_valid()
+                        && native["worker_id"].as_str() == Some(runtime.worker_id.as_str())
+                        && native["generation"].as_str() == runtime.kernel_generation.as_deref()
+                    {
+                        self.record.runtime = Some(runtime);
+                        self.publish();
+                    }
+                }
+                return;
+            }
+            Some("model_start") => {
+                if self.model_started_ms.is_none() {
+                    self.model_started_ms = Some(self.elapsed());
+                    if let Some(request) = &self.scheduling {
+                        request.submitted(self.record.account_id);
+                    }
+                }
+                return;
+            }
+            _ => {}
         }
         if !matches!(
             native["type"].as_str(),
@@ -171,6 +203,62 @@ impl AgyAttemptTrace {
         }
         if let Some(calls) = native["native_model_calls"].as_u64() {
             context.native_model_calls = Some(calls);
+        }
+        let control_code = match native["type"].as_str() {
+            Some("completed") => native["control_error_code"].as_str(),
+            Some("error" | "cancelled" | "tool_turn_finalized") => native["code"].as_str(),
+            _ => None,
+        };
+        if let Some(code) = control_code.filter(|code| {
+            matches!(
+                *code,
+                "cancelled"
+                    | "cancel_timeout"
+                    | "native_request_failed"
+                    | "native_transport_error"
+                    | "native_control_timeout"
+                    | "native_not_idle"
+                    | "native_process_exited"
+                    | "native_protocol_error"
+                    | "native_stream_incomplete"
+                    | "native_delivery_error"
+                    | "native_start_rejected"
+                    | "tool_protocol_error"
+                    | "native_tool_yield_timeout"
+                    | "native_tool_yield_failed"
+                    | "ambiguous_parallel_function_calls"
+                    | "unsupported_gemini_candidate_count"
+                    | "invalid_native_gemini_parts"
+                    | "native_safety_endpoint_rejected"
+                    | "native_safety_egress_unobserved"
+                    | "kernel_internal_error"
+            )
+        }) {
+            context.control_error_code = Some(code.into());
+            context.control_recovery = native["control_recovery"]
+                .as_str()
+                .filter(|reason| {
+                    matches!(
+                        *reason,
+                        "kept"
+                            | "ineligible_error"
+                            | "unsupported_protocol"
+                            | "cancelled"
+                            | "compatibility_error"
+                            | "model_call_count"
+                            | "missing_model_eof"
+                            | "model_error"
+                            | "tool_pending"
+                            | "source_error"
+                            | "missing_stop"
+                            | "missing_text"
+                            | "missing_usage"
+                            | "delivery_error"
+                            | "model_http_status"
+                            | "observer_before_eof"
+                    )
+                })
+                .map(str::to_owned);
         }
         let report = &native["system_prompt_policy"];
         if self.policy.matches_report(report) {
@@ -399,6 +487,54 @@ impl AgyAttemptTrace {
         );
     }
 
+    /// 记录模型提交前的受控输入拒绝。@param error 已投影的错误。@return 无。
+    pub(crate) fn input_rejected(&mut self, error: &AppError) {
+        if let (AppError::AgyInput { reason, field, .. }, Some(context)) =
+            (error, self.record.context.as_mut())
+        {
+            self.record.error_type = Some((*reason).into());
+            context.input_rejection_reason = Some((*reason).into());
+            context.input_rejection_field = field.clone();
+            context.native_model_calls = Some(0);
+            // 账号侧确认内容采集后，才允许网关持久化该次完整入口。
+            if matches!(
+                self.record.capture_status.as_deref(),
+                Some("queued" | "saved")
+            ) {
+                self.trace.save_rejected_ingress(
+                    &mut self.trace.lock(),
+                    Some((*reason).into()),
+                    true,
+                );
+            }
+        }
+        self.finish("local_rejected", Some("native_input"));
+    }
+
+    /// 保存已核实的上游额度或限流标记。@return 无。
+    pub(crate) fn upstream_quota(&mut self) {
+        if !self.finished {
+            self.record.error_type = Some("RESOURCE_EXHAUSTED".into());
+            self.finish("upstream_error", Some("upstream_model"));
+        }
+    }
+
+    /// 将控制错误记为实际尝试状态。@param status 已核对的控制 HTTP 状态。@param cancelled 是否取消。@return 无。
+    pub(crate) fn control_failed(&mut self, status: Option<u16>, cancelled: bool) {
+        if self.finished {
+            return;
+        }
+        if let Some(status) = status {
+            self.record.status_code = Some(status);
+        }
+        let outcome = if cancelled {
+            "cancelled"
+        } else {
+            "upstream_error"
+        };
+        self.finish(outcome, Some("native_control"));
+    }
+
     /// 终结异常尝试，重复终结保持首次结果。@param outcome 受控结果。@param stage 实际阶段。@return 无。
     pub(crate) fn finish(&mut self, outcome: &str, stage: Option<&str>) {
         if self.finished {
@@ -417,6 +553,29 @@ impl AgyAttemptTrace {
                 .as_ref()
                 .and_then(|c| c.usage.as_ref())
                 .is_none_or(|u| !u.complete);
+        if let (Some(request), Some(model_started)) =
+            (self.scheduling.as_ref(), self.model_started_ms)
+        {
+            // 预算不足是请求自己的终止原因。进程准备时间也不计入模型首输出样本。
+            if self.record.error_type.as_deref() == Some("RESOURCE_EXHAUSTED") {
+                request.capacity_rejected(self.record.account_id);
+            } else if self.record.stop_reason.as_deref() != Some("MAX_TOKENS")
+                || outcome == "success"
+            {
+                request.finish_observed_attempt(
+                    self.record.account_id,
+                    None,
+                    outcome,
+                    self.record.error_type.as_deref(),
+                    self.record
+                        .first_output_ms
+                        .and_then(|ms| ms.checked_sub(model_started)),
+                    self.record
+                        .duration_ms
+                        .and_then(|ms| ms.checked_sub(model_started)),
+                );
+            }
+        }
         let mut state = self.trace.lock();
         if state
             .last_attempt
@@ -431,6 +590,11 @@ impl AgyAttemptTrace {
         }
         drop(state);
         self.publish();
+    }
+
+    /// 将本次可核验的原生模型终态反馈给选号器。@param request 当前调度租约。@return 无。
+    pub(crate) fn track_scheduling(&mut self, request: SchedulingRequest) {
+        self.scheduling = Some(request);
     }
 
     fn elapsed(&self) -> u64 {
@@ -678,6 +842,46 @@ mod tests {
                 before.attempts[0].duration_ms
             );
         }
+    }
+
+    /// 保存白名单控制码，并在收到退役回执后保留真实的模型成功结果。@return 无。
+    #[tokio::test]
+    async fn completed_source_preserves_control_failure_independently() {
+        let (mut observer, store, trace) = fixture().await;
+        observer.native(
+            &json!({"type":"error","code":"opaque-credential"}),
+            &json!({}),
+        );
+        assert!(
+            observer
+                .record
+                .context
+                .as_ref()
+                .unwrap()
+                .control_error_code
+                .is_none()
+        );
+        observer.frame(&json!({"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"合成模型结果"}]}}],
+            "usageMetadata":{"promptTokenCount":12,"candidatesTokenCount":2,"totalTokenCount":14}}));
+        observer.native(&json!({"type":"completed","control_error_code":"native_request_failed","control_recovery":"kept","native_model_calls":1}), &json!({}));
+        observer.completed(false, &[]);
+        let response = RequestTraceGuard::new(trace).wrap(Response::new(Body::empty()));
+        to_bytes(response.into_body(), 1024).await.unwrap();
+        observer.finalized("error");
+        store.flush().await.unwrap();
+        let detail = store.detail(&observer.record.request_id).await.unwrap();
+        let attempt = &detail.attempts[0];
+        let context = attempt.context.as_ref().unwrap();
+        assert_eq!(detail.request.outcome, "success");
+        assert_eq!(attempt.outcome, "success");
+        assert!(!attempt.partial);
+        assert_eq!(context.control_state.as_deref(), Some("error"));
+        assert_eq!(
+            context.control_error_code.as_deref(),
+            Some("native_request_failed")
+        );
+        assert_eq!(context.native_model_calls, Some(1));
+        assert_eq!(context.control_recovery.as_deref(), Some("kept"));
     }
 
     /// 原生取消先于idle时，只记录已观测的尝试取消。@return 无。

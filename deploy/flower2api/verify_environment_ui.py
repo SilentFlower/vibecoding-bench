@@ -196,6 +196,9 @@ class Fixture:
                 payload = copy.deepcopy(self.rows[0]['content_capture'])
             elif api.endswith('/run-window'):
                 payload = self.rows[0]['run_window']
+            elif api.endswith('/agy-kernel'):
+                # 反重力环境的内核候选只读目录：宿主机尚未准备候选，沿用平台内置。
+                payload = {'generation': self.rows[0]['generation'], 'kernel': None, 'candidates': []}
             elif api in ('accounts', 'accounts/login-drafts', 'topics', 'task-batches'):
                 payload = []
             elif api == 'auth/me':

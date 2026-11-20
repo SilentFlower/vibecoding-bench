@@ -349,13 +349,19 @@ async fn read_native_capture(
     if !response.status().is_success() {
         return Err(AppError::ServiceUnavailable("采集文件读取失败".into()));
     }
+    // AGY 完整正文允许 64 MiB 脱敏 JSON，HTTP 封套会再次转义引号和反斜线。
+    let capture_limit = if agy {
+        134 * 1024 * 1024
+    } else {
+        6 * 1024 * 1024
+    };
     let mut bytes = Vec::new();
     while let Some(chunk) = response
         .chunk()
         .await
         .map_err(|_| AppError::ServiceUnavailable("采集文件读取失败".into()))?
     {
-        if bytes.len() + chunk.len() > 6 * 1024 * 1024 {
+        if bytes.len() + chunk.len() > capture_limit {
             return Err(AppError::ServiceUnavailable("采集文件超出读取上限".into()));
         }
         bytes.extend_from_slice(&chunk);
@@ -365,7 +371,10 @@ async fn read_native_capture(
     if snapshot["account_id"] != account_id
         || snapshot["attempt_id"] != attempt_id
         || !(if agy {
-            snapshot["stage"] == "agy_prepared"
+            matches!(
+                snapshot["stage"].as_str(),
+                Some("agy_prepared" | "agy_ingress" | "agy_egress")
+            )
         } else {
             matches!(
                 snapshot["stage"].as_str(),
@@ -532,11 +541,18 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
             _ => false,
         };
     }
-    if let Some(environment) = api_path
+    if let Some((environment, operation)) = api_path
         .strip_prefix("environments/")
-        .and_then(|value| value.strip_suffix("/content-capture"))
+        .and_then(|value| value.split_once('/'))
+        .filter(|(_, operation)| {
+            matches!(
+                operation.split('/').next(),
+                Some("content-capture" | "agy-kernel")
+            )
+        })
     {
         return matches!(*method, Method::GET | Method::POST)
+            && matches!(operation, "content-capture" | "agy-kernel")
             && environment.len() == 32
             && environment.bytes().all(|value| value.is_ascii_hexdigit());
     }
@@ -552,7 +568,7 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
                 matches!(rest, "check" | "prepare" | "install" | "rollback")
                     || rest.strip_prefix("operations/").is_some_and(|value| {
                         value.split_once('/').is_some_and(|(id, action)| {
-                            Uuid::parse_str(id).is_ok() && matches!(action, "cancel" | "recover")
+                            Uuid::parse_str(id).is_ok() && matches!(action, "cancel" | "recover" | "retry-account")
                         })
                     })
             }
@@ -1164,19 +1180,25 @@ mod tests {
         }
     }
 
-    /// 采集开关只开放精确环境资源和读写方法。
+    /// 环境采集和反重力内核只开放精确的读写入口。
     #[test]
-    fn content_capture_bridge_is_scoped_to_one_environment() {
-        let path = format!("/api/environments/{}/content-capture", "a".repeat(32));
-        assert!(browser_path_allowed(&Method::GET, &path));
-        assert!(browser_path_allowed(&Method::POST, &path));
-        for method in [Method::PUT, Method::DELETE, Method::PATCH] {
-            assert!(!browser_path_allowed(&method, &path));
-        }
-        for environment in ["short", "../internal", "invalid-environment-identifier-xx"] {
+    fn environment_controls_are_scoped_to_one_environment() {
+        for action in ["content-capture", "agy-kernel"] {
+            let path = format!("/api/environments/{}/{action}", "a".repeat(32));
+            assert!(browser_path_allowed(&Method::GET, &path));
+            assert!(browser_path_allowed(&Method::POST, &path));
+            for method in [Method::PUT, Method::DELETE, Method::PATCH] {
+                assert!(!browser_path_allowed(&method, &path));
+            }
+            for environment in ["short", "../internal", "invalid-environment-identifier-xx"] {
+                assert!(!browser_path_allowed(
+                    &Method::POST,
+                    &format!("/api/environments/{environment}/{action}")
+                ));
+            }
             assert!(!browser_path_allowed(
                 &Method::POST,
-                &format!("/api/environments/{environment}/content-capture")
+                &format!("{path}/upload")
             ));
         }
     }

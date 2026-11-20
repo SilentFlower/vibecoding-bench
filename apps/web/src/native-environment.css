@@ -53,16 +53,18 @@
   .environment-readiness p { margin: 0; color: var(--ui-color-text-2); font-size: var(--ui-font-size-sm); font-weight: 550; }
   .environment-readiness b { font-weight: 700; }
   .environment-feature-row { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--ui-space-unit) * 3.5); }
-  .environment-feature-row button { display: flex; justify-content: space-between; gap: calc(var(--ui-space-unit) * 2); min-width: 0; padding: 0; border: 0; background: none; color: var(--ui-color-text-3); font: 600 var(--ui-font-size-meta) var(--ui-font-family); text-align: left; cursor: pointer; }
+  /* 反重力账号没有 CRIU 时只剩内容采集一项，占满整行。 */
+  .environment-feature-row:has(> button:only-child) { grid-template-columns: 1fr; }
+  .environment-feature-row > button { display: flex; justify-content: space-between; gap: calc(var(--ui-space-unit) * 2); min-width: 0; padding: 0; border: 0; background: none; color: var(--ui-color-text-3); font: 600 var(--ui-font-size-meta) var(--ui-font-family); text-align: left; cursor: pointer; }
   .environment-feature-row strong { color: var(--ui-color-text); font-weight: 700; }
-  .environment-feature-row button:hover strong { color: var(--ui-color-primary-text); }
+  .environment-feature-row > button:hover strong { color: var(--ui-color-primary-text); }
   .environment-schedule-summary { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2); width: 100%; padding: calc(var(--ui-space-unit) * 2.5) 0 0; border: 0; border-top: 1px solid var(--ui-color-line); background: none; color: var(--ui-color-text-2); font: 650 var(--ui-font-size-meta) var(--ui-font-family); text-align: left; cursor: pointer; }
   .environment-schedule-summary > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
   .environment-schedule-summary small { margin-left: calc(var(--ui-space-unit) * 2); color: var(--ui-color-text-3); font-size: inherit; font-weight: 550; }
   .environment-schedule-summary svg { flex: none; }
   .environment-schedule-summary svg:last-child { color: var(--ui-color-text-4); }
   .environment-empty { grid-column: 1 / -1; margin: 0; padding: calc(var(--ui-space-unit) * 10) calc(var(--ui-space-unit) * 6); color: var(--ui-color-text-3); font-size: var(--ui-font-size-meta); font-weight: 550; text-align: center; }
-  :is(.environment-feature-row button, .environment-schedule-summary, .environment-version-line button, .runtime-result-count button):focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; border-radius: var(--ui-radius-btn); }
+  :is(.environment-feature-row > button, .environment-schedule-summary, .environment-version-line button, .runtime-result-count button):focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; border-radius: var(--ui-radius-btn); }
 
   /* ---------- 环境管理侧抽屉 ---------- */
   .runtime-environment-workspace { display: flex; flex-direction: column; height: 100%; }
@@ -110,6 +112,9 @@
   .kernel-version > span:first-child { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 600; }
   .kernel-version > strong { font: 700 var(--ui-font-size-card) var(--ui-font-family-mono); }
   .kernel-version > button { margin-left: auto; }
+  /* 反重力内核切换：选择框与两个按钮底边对齐。 */
+  .environment-kernel .workspace-inline-actions { align-items: flex-end; }
+  .environment-kernel-select { width: 220px; max-width: 100%; }
   .maintenance-option { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 4); padding: calc(var(--ui-space-unit) * 5) 0; border-bottom: 1px solid var(--ui-color-line); }
   .maintenance-option > div { flex: 1; }
   .maintenance-option strong { color: var(--ui-color-text); font-size: var(--ui-font-size-md); font-weight: 700; }

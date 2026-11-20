@@ -2,6 +2,7 @@
 import base64
 import copy
 import json
+from uuid import uuid4
 
 
 class Frames:
@@ -9,7 +10,18 @@ class Frames:
 
     def __init__(self):
         """创建独立帧状态。@return 无。"""
-        self.calls=[];self.sequence=0;self.terminal=False
+        self.calls=[];self.sequence=0;self.terminal=False;self.finish_reason=None
+        self.call_ids=set()
+        self.source_error=False;self.usage_complete=False;self.visible_text=False
+
+    def recovery_blocker(self):
+        """报告源帧阻止保留结果的首个条件。@return 受控代码，完整普通结果返回空。"""
+        if self.source_error:return 'source_error'
+        if self.calls:return 'tool_pending'
+        if self.finish_reason!='STOP':return 'missing_stop'
+        if not self.visible_text:return 'missing_text'
+        if not self.usage_complete:return 'missing_usage'
+        return None
 
     def project(self, event):
         """拆分候选 Part，保留终态和用量。@param event 原生源事件。@return 兼容事件数组。"""
@@ -26,23 +38,42 @@ class Frames:
             event.update(data_base64=base64.b64encode(normalized).decode(),bytes=len(normalized),source_format='gemini_json')
         else:
             body=json.loads(raw)
+        self.source_error |= 'error' in body
+        usage=body.get('usageMetadata')
+        if isinstance(usage,dict):
+            fields=('promptTokenCount','candidatesTokenCount','totalTokenCount')
+            self.usage_complete=all(type(usage.get(key)) is int and 0<=usage[key]<2**64 for key in fields)
         candidates=body.get('candidates',[])
         # 官方控制RPC和通道EOF都可能在截断后正常返回，业务成功还须有源终态。
         feedback=body.get('promptFeedback',{})
         block=feedback.get('blockReason') if isinstance(feedback,dict) else None
-        self.terminal=self.terminal or isinstance(block,str) and block not in ['','BLOCK_REASON_UNSPECIFIED']
+        if isinstance(block,str) and block not in ['','BLOCK_REASON_UNSPECIFIED']:
+            self.terminal=True;self.source_error=True
         if len(candidates)>1:raise RuntimeError('unsupported_gemini_candidate_count')
         if not candidates:return [copy.deepcopy(event)]
         candidate=candidates[0];parts=candidate.get('content',{}).get('parts',[])
         reason=candidate.get('finishReason')
-        self.terminal=self.terminal or isinstance(reason,str) and reason not in ['','FINISH_REASON_UNSPECIFIED']
+        if isinstance(reason,str) and reason not in ['','FINISH_REASON_UNSPECIFIED']:
+            self.finish_reason=reason;self.terminal=True
         if not isinstance(parts,list):raise RuntimeError('invalid_native_gemini_parts')
+        self.visible_text |= any(isinstance(part.get('text'),str) and bool(part['text']) and part.get('thought') is not True for part in parts)
         calls=[p['functionCall'] for p in parts if 'functionCall' in p]
-        names=[c['name'] for c in self.calls+calls]
-        # 网关会去掉函数 ID；同名并发调用的回填归属因此必须显式拒绝。
-        if len(names)!=len(set(names)):raise RuntimeError('ambiguous_parallel_function_calls')
+        assigned_id=False
+        for call in calls:
+            identifier=call.get('id')
+            if identifier is None or identifier=='':
+                identifier='call_'+uuid4().hex
+                call['id']=identifier
+                assigned_id=True
+            if not isinstance(identifier,str) or identifier in self.call_ids:
+                raise RuntimeError('ambiguous_parallel_function_calls')
+            self.call_ids.add(identifier)
         self.calls.extend(copy.deepcopy(calls))
-        if len(parts)<2:return [copy.deepcopy(event)]
+        if len(parts)<2:
+            if assigned_id:
+                raw=json.dumps(body,ensure_ascii=False,separators=(',',':')).encode()
+                event={**event,'data_base64':base64.b64encode(raw).decode(),'bytes':len(raw)}
+            return [copy.deepcopy(event)]
         projected=[]
         for index,part in enumerate(parts):
             value=copy.deepcopy(body);target=value['candidates'][0];target['content']['parts']=[copy.deepcopy(part)]

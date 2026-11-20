@@ -9,7 +9,7 @@ import { NoticeStrip } from '@/components/ui/notice-strip';
 import { EntityBlock } from '@/components/ui/entity-card';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-const props = defineProps<{ open: boolean; accountId: number; accountName: string; embedded?: boolean }>();
+const props = defineProps<{ open: boolean; accountId: number; accountName: string; embedded?: boolean; antigravity?: boolean }>();
 const emit = defineEmits<{ 'update:open': [value: boolean] }>();
 const detail = ref<SchedulingDetail | null>(null);
 const sessions = ref<SchedulingSessions | null>(null);
@@ -35,6 +35,8 @@ const stale = computed(() => Boolean(error.value) || (receivedAt.value > 0 && lo
 const nextLabel = computed(() => {
   if (!summary.value || stale.value) return '待刷新';
   const next = summary.value.next_send_at_ms;
+  if (props.antigravity && !summary.value.capacity.can_queue && (next == null || next <= estimatedServerNow.value)) return schedulingReasonLabel(summary.value.capacity.reason);
+  if (props.antigravity && (next == null || next <= estimatedServerNow.value)) return '当前可接单';
   if (next == null) return '未配置发送间隔';
   const remaining = next - estimatedServerNow.value;
   return remaining > 0 ? `${(remaining / 1000).toFixed(1)} 秒后（预计）` : '已到预计时刻，待刷新';
@@ -43,7 +45,8 @@ const chartStart = computed(() => (detail.value?.snapshot.observed_at_ms ?? 0) -
 const chartEnd = computed(() => (detail.value?.snapshot.observed_at_ms ?? 0) + 60000);
 const events = computed(() => detail.value?.snapshot.events.filter(event => event.submitted_at_ms >= chartStart.value) ?? []);
 const factors = computed(() => summary.value ? [
-  ['负载', summary.value.factors.load], ['额度', summary.value.factors.quota],
+  ['负载', summary.value.factors.load],
+  ...(!props.antigravity ? [['额度', summary.value.factors.quota] as const] : []),
   ['健康', summary.value.factors.health], ['首输出延迟（汇总）', summary.value.factors.latency],
   ...(summary.value.config.reset_weight && summary.value.factors.reset != null ? [['重置偏好', summary.value.factors.reset] as const] : []),
   ...(summary.value.config.queue_weight && summary.value.factors.queue != null ? [['排队偏好', summary.value.factors.queue] as const] : []),
@@ -80,11 +83,11 @@ async function refresh(): Promise<void> {
   try {
     let [snapshot, rows] = await Promise.all([
       api.accountScheduling(accountId, currentController.signal),
-      api.accountSchedulingSessions(accountId, requestedPage, requestedState, requestedPrefix, currentController.signal, requestedPageSize),
+      props.antigravity ? Promise.resolve(null) : api.accountSchedulingSessions(accountId, requestedPage, requestedState, requestedPrefix, currentController.signal, requestedPageSize),
     ]);
     if (current !== generation || !props.open || accountId !== props.accountId) return;
     let resolvedPage = requestedPage;
-    if (requestedPage > 1 && (requestedPage - 1) * rows.page_size >= rows.total) {
+    if (rows && requestedPage > 1 && (requestedPage - 1) * rows.page_size >= rows.total) {
       // 会话随到期或状态变化减少；最多回读一次第一页，避免留在无法返回的空页。
       rows = await api.accountSchedulingSessions(accountId, 1, requestedState, requestedPrefix, currentController.signal, requestedPageSize);
       if (current !== generation || !props.open || accountId !== props.accountId) return;
@@ -176,7 +179,7 @@ onUnmounted(() => { stop(); document.removeEventListener('visibilitychange', syn
           <span>{{ stale ? '快照已陈旧' : '观测于 ' + timeLabel(summary.observed_at_ms) }}</span>
         </div>
         <div class="scheduling-metrics">
-          <EntityBlock><p>已绑定／活跃会话</p><strong>{{ summary.bound_sessions }} / {{ summary.active_sessions }}</strong></EntityBlock>
+          <EntityBlock v-if="!antigravity"><p>已绑定／活跃会话</p><strong>{{ summary.bound_sessions }} / {{ summary.active_sessions }}</strong></EntityBlock>
           <EntityBlock><p>正在执行的请求</p><strong>{{ summary.phases.running }}</strong></EntityBlock>
           <EntityBlock><p>最近 60 秒提交</p><strong>{{ summary.submissions_last_60s }}</strong><small v-if="summary.observed_at_ms - summary.history_available_from_ms < 60000" class="is-warning">采集不足 60 秒</small></EntityBlock>
           <EntityBlock><p>按上次快照最早可发</p><span>{{ nextLabel }}</span></EntityBlock>
@@ -199,18 +202,19 @@ onUnmounted(() => { stop(); document.removeEventListener('visibilitychange', syn
             </template>
             <text class="scheduling-label" x="30" y="100" font-size="12">{{ rangeMs / 60000 }} 分钟前</text><text class="scheduling-label" :x="x(detail.snapshot.observed_at_ms)" y="100" font-size="12" text-anchor="middle">快照时刻</text><text class="scheduling-label" x="970" y="100" font-size="12" text-anchor="end">未来许可参考</text>
           </svg></div>
-          <p class="scheduling-note">实心点＝Gateway 向 sender 发起提交；空心点＝预计最早许可，不是未来预订。历史从 {{ timeLabel(detail.snapshot.history_available_from_ms) }} 起采集，重启后留空。</p>
+          <p class="scheduling-note">实心点表示{{ antigravity ? '已观测到原生模型启动' : 'Gateway 向 sender 发起提交' }}。空心点表示预计最早许可。历史从 {{ timeLabel(detail.snapshot.history_available_from_ms) }} 起采集，重启后留空。</p>
           <p v-if="detail.snapshot.history_truncated" class="scheduling-note is-warning">事件缓冲已截断 {{ detail.snapshot.dropped_events }} 条，时间轴不是完整历史；60 秒统计使用独立时间桶。</p>
           <p v-if="events.length === 0" class="scheduling-note">当前采集窗口内没有记录到提交点。</p>
         </div>
         <div class="scheduling-factors">
           <div v-for="factor in factors" :key="factor[0]"><div class="scheduling-factor-label"><span>{{ factor[0] }}</span><span>{{ (factor[1] * 100).toFixed(0) }}</span></div><div class="scheduling-factor-bar"><i :style="{ width: Math.max(0, Math.min(100, factor[1] * 100)) + '%' }" /></div></div>
         </div>
-        <p class="scheduling-note">归一化偏好越高越优，仅影响新会话。延迟取成功请求的首个有效文字、思考或工具输出；图中为账号汇总，实际选号按模型、思考参数和流式方式分别比较。未知健康与延迟按满分起步，额度未知按中性计算。</p>
+        <p v-if="antigravity" class="scheduling-note">优先级数值越小越先接单。同优先级比较负载、健康和首输出延迟。额度不计分，工具回填保留原账号。</p>
+        <p v-else class="scheduling-note">归一化偏好越高越优，仅影响新会话。延迟取成功请求的首个有效文字、思考或工具输出；图中为账号汇总，实际选号按模型、思考参数和流式方式分别比较。未知健康与延迟按满分起步，额度未知按中性计算。</p>
         <p v-if="summary.config.queue_weight && summary.factors.wait_score != null" class="scheduling-note">基础偏好 {{ (summary.factors.score * 100).toFixed(1) }} · 等待排序偏好 {{ (summary.factors.wait_score * 100).toFixed(1) }} · {{ waitBasisLabel }}<span v-if="summary.factors.estimated_wait_ms != null"> · 预计等待 {{ (summary.factors.estimated_wait_ms / 1000).toFixed(1) }} 秒</span>。等待排序单独计算运行负载和等待代价。</p>
-        <p v-if="summary.factors.quota_state === 'reset_pending'" class="scheduling-note is-warning">旧额度周期已结束，等待自动刷新用量。</p>
-        <p v-else-if="summary.factors.quota_state === 'unknown'" class="scheduling-note">尚无有效额度观测，额度分暂按中性计算。</p>
-        <div class="scheduling-section scheduling-sessions">
+        <p v-if="!antigravity && summary.factors.quota_state === 'reset_pending'" class="scheduling-note is-warning">旧额度周期已结束，等待自动刷新用量。</p>
+        <p v-else-if="!antigravity && summary.factors.quota_state === 'unknown'" class="scheduling-note">尚无有效额度观测，额度分暂按中性计算。</p>
+        <div v-if="!antigravity" class="scheduling-section scheduling-sessions">
           <h3>网关绑定会话</h3>
           <div class="scheduling-filters">
             <ChoiceSelect :model-value="state" @update:model-value="value => { state = value; applyFilter(); }" label="会话活跃状态" :options="[{value:'all',label:'全部绑定'},{value:'active',label:'活跃'},{value:'idle',label:'闲置'}]" />

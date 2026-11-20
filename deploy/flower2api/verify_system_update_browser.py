@@ -85,14 +85,19 @@ class UpdateFixture:
                 await self.hold.wait()
             if self.conflict or body.get('expected_revision') != self.state['revision']:
                 status, payload = 409, {'detail': '现场版本已经变化，请刷新后确认'}
-            elif path.endswith(('/install', '/rollback')):
+            elif path.endswith(('/prepare', '/install', '/rollback')):
                 self.state.update(busy=True, revision=str(uuid.uuid4()), operation={
                     'operation_id': body['operation_id'], 'action': path.rsplit('/', 1)[1],
-                    'phase': 'draining', 'target_release': body['target_release'],
+                    'phase': 'preparing' if path.endswith('/prepare') else 'draining', 'target_release': body['target_release'],
                     'created_at': '2026-11-11T00:00:00Z', 'updated_at': '2026-11-11T00:00:00Z',
                     'blockers': ['合成账号：等待原 CLI 作业自然完成'], 'error': None,
-                    'steps': [{'phase': 'preparing', 'at': '2026-11-11T00:00:00Z'}, {'phase': 'draining', 'at': '2026-11-11T00:00:05Z'}]})
+                    'steps': [{'phase': 'preparing', 'at': '2026-11-11T00:00:00Z'}] + ([] if path.endswith('/prepare')
+                        else [{'phase': 'draining', 'at': '2026-11-11T00:00:05Z'}])})
                 payload = self.state['operation']
+            elif path.endswith('/retry-account'):
+                account = next(item for item in self.state['account_rollout']['accounts'] if item['environment_id'] == body['environment_id'])
+                account.update(state='updated', error=None)
+                payload = self.state['account_rollout']
             elif path.endswith('/cancel'):
                 self.state['operation']['cancel_requested'] = True
                 payload = self.state['operation']
@@ -336,7 +341,158 @@ async def verify(output: Path) -> dict:
         cases.append('二次确认 409 保留确认框、禁用确认并阻止自动重放')
         await context.close()
 
-        # 7. 等待对账：打开即进度视图；旧操作无步骤记录正常显示；恢复确认居中并沿用原操作身份。
+        # 7. 快速切换：等待在途改称关闭推理连接；中央恢复接单后提示随轮询更新，远程节点后台独立更新并可进入节点页。
+        fixture = UpdateFixture()
+        fixture.state.update(busy=True, operation={
+            'operation_id': str(uuid.uuid4()), 'phase': 'draining', 'action': 'install',
+            'target_release': 'system-ci-101-1', 'fast_transition': True, 'blockers': [],
+            'admission_blocked_at': '2026-11-11T00:00:00Z', 'updated_at': '2026-11-11T00:00:00Z',
+            'cluster_nodes': {'phase': 'background', 'nodes': [{'node_id': 2, 'name': 'main', 'phase': 'background', 'running': False}]},
+        })
+        context, page, dialog = await page_for(fixture, 390)
+        progress = dialog.locator('[data-update-view=progress]')
+        await expect(progress.locator('[data-update-step][data-state=active]')).to_contain_text('正在关闭推理连接')
+        await expect(progress.locator('[data-update-maintenance]')).to_have_text('新请求暂缓。系统正在关闭旧推理连接，并等待资源释放。')
+        await expect(progress.get_by_text('远程节点将在中央切换后独立更新', exact=True)).to_be_visible()
+        await expect(progress.locator('.su-nodes')).to_have_count(0)
+        fixture.state['operation'].update(phase='cleaning', admission_reopened_at='2026-11-11T00:00:10Z')
+        await expect(progress.get_by_text('平台已恢复接单。', exact=True)).to_be_visible(timeout=7000)
+        await expect(progress.locator('.su-pill')).to_have_text('平台已恢复接单')
+        await expect(progress.get_by_role('link', name='查看节点进度')).to_have_attribute('href', '/nodes')
+        await expect(progress.get_by_text('远程节点独立更新', exact=True)).to_be_visible()
+        assert not fixture.writes
+        cases.append('快速切换关闭推理连接；中央恢复接单后，远程节点继续独立更新并可进入节点页')
+        await context.close()
+
+        # 8. 分步更新：下载直接提交并继续接单；下载完成后刷新，安装方式改为立即重启，不问等待上限并带下载操作 ID；
+        #    恢复接单后在账号后台更新中单项重试。
+        fixture = UpdateFixture()
+        fixture.state['staged_updates'] = True
+        context, page, dialog = await page_for(fixture, 390)
+        plan = dialog.locator('[data-update-plan]')
+        await expect(plan).to_have_attribute('data-update-plan', 'prepare')
+        await expect(plan).to_contain_text('先在后台下载并校验')
+        await expect(await install_plan(dialog)).to_have_count(0)
+        await dialog.get_by_role('button', name='下载更新', exact=True).click()
+        progress = dialog.locator('[data-update-view=progress]')
+        await expect(progress.locator('[data-update-step][data-state=active]')).to_contain_text('下载与校验')
+        await expect(progress.locator('.su-pill')).to_have_text('正在后台准备')
+        await expect(progress.locator('[data-update-maintenance]')).to_have_text('后台准备候选镜像与项目库，平台继续接单。')
+        assert len(fixture.writes) == 1 and fixture.writes[0]['path'].endswith('/prepare')
+        download = fixture.writes[0]['body']
+        assert download['drain_timeout_seconds'] == 60 and 'prepared_operation_id' not in download, download
+        fixture.state.update(busy=False, prepared_candidate={'operation_id': download['operation_id'],
+            'target_release': download['target_release'], 'manifest_sha256': download['target_manifest_sha256'],
+            'fast_transition': True})
+        fixture.state['operation'].update(phase='prepared', fast_transition=True, blockers=[])
+        await expect(progress.locator('.su-pill')).to_have_text('待重启', timeout=7000)
+        await page.reload()
+        await expect(dialog.locator('[data-update-view=overview] .su-head .su-pill')).to_have_text('待重启')
+        await expect(plan).to_have_attribute('data-update-plan', 'restart')
+        await expect(plan).to_contain_text('重启会断开正在执行的推理。控制服务就绪后可重新请求。')
+        await expect(await install_plan(dialog)).to_have_count(0)
+        await page.screenshot(path=str(output / 'restart-390.png'), full_page=True)
+        await dialog.get_by_role('button', name='立即重启', exact=True).click()
+        restart = fixture.writes[-1]
+        assert len(fixture.writes) == 2 and restart['path'].endswith('/install'), fixture.writes
+        assert restart['body']['prepared_operation_id'] == download['operation_id'] and restart['body']['drain_timeout_seconds'] == 60
+        assert restart['body']['operation_id'] != download['operation_id']
+        active = fixture.state['operation']
+        active.update(phase='succeeded', admission_reopened_at='2026-11-11T00:00:10Z', blockers=[])
+        fixture.state.update(busy=False, current_release=active['target_release'], prepared_candidate=None,
+            account_rollout={'operation_id': active['operation_id'], 'target_release': active['target_release'], 'accounts': [
+                {'environment_id': 'retry-environment', 'name': '账号 A', 'state': 'waiting', 'error': '账号仍有活动'},
+                {'environment_id': 'settled-environment', 'name': '账号 B', 'state': 'updated'}]})
+        await page.reload()
+        rollout = dialog.locator('.su-rollout')
+        await expect(rollout).to_contain_text('账号后台更新')
+        await expect(rollout.locator('[data-rollout-state=waiting]')).to_contain_text('账号仍有活动')
+        await rollout.get_by_role('button', name='重试', exact=True).click()
+        assert fixture.writes[-1]['path'].endswith('/' + active['operation_id'] + '/retry-account')
+        assert fixture.writes[-1]['body'] == {'environment_id': 'retry-environment', 'expected_revision': fixture.state['revision']}
+        await expect(rollout.get_by_text('已更新', exact=True)).to_have_count(2)
+        await expect(rollout.get_by_role('button', name='重试', exact=True)).to_have_count(0)
+        await page.screenshot(path=str(output / 'account-rollout-390.png'), full_page=True)
+        await dialog.get_by_role('button', name='查看记录', exact=True).click()
+        await expect(dialog.locator('[data-update-view=progress]').get_by_text('平台已恢复接单。', exact=True)).to_be_visible()
+        await expect(rollout).to_be_visible()
+        total_writes += len(fixture.writes)
+        cases.append('下载直接提交并继续接单，下载后刷新继续重启（带下载操作 ID、不问期限），恢复接单后独立重试单账号更新')
+        await context.close()
+
+        # 8b. 已下载但不支持快速切换：兼容安装保留在途等待上限并带下载操作 ID；版本记录里下载直接提交、重启走重启确认框。
+        fixture = UpdateFixture()
+        fixture.state.update(staged_updates=True, prepared_candidate={'operation_id': 'prepared-compatible',
+            'target_release': 'system-ci-101-1', 'manifest_sha256': 'b' * 64, 'fast_transition': False})
+        context, page, dialog = await page_for(fixture, 390)
+        await expect(dialog.locator('[data-update-view=overview] .su-head .su-pill')).to_have_text('已下载更新')
+        await expect(dialog.locator('[data-update-plan]')).to_have_attribute('data-update-plan', 'install')
+        await (await install_plan(dialog)).fill('5')
+        await dialog.get_by_role('button', name='安装更新', exact=True).click()
+        await expect(dialog.locator('[data-update-view=progress]')).to_be_visible()
+        assert len(fixture.writes) == 1 and fixture.writes[0]['path'].endswith('/install'), fixture.writes
+        assert fixture.writes[0]['body']['prepared_operation_id'] == 'prepared-compatible'
+        assert fixture.writes[0]['body']['drain_timeout_seconds'] == 300
+        total_writes += len(fixture.writes)
+        await context.close()
+
+        fixture = UpdateFixture()
+        fixture.state['staged_updates'] = True
+        context, page, dialog = await page_for(fixture)
+        await dialog.get_by_role('button', name='版本记录与回退', exact=True).click()
+        latest_card = dialog.locator('[data-release-card]').first
+        await latest_card.get_by_role('button', name='下载更新', exact=True).click()
+        await expect(dialog.locator('[data-update-view=progress]')).to_be_visible()
+        await expect(page.get_by_role('dialog', name='确认安装更新')).to_have_count(0)
+        assert len(fixture.writes) == 1 and fixture.writes[0]['path'].endswith('/prepare'), fixture.writes
+        download = fixture.writes[0]['body']
+        fixture.state.update(busy=False, prepared_candidate={'operation_id': download['operation_id'],
+            'target_release': download['target_release'], 'manifest_sha256': download['target_manifest_sha256'], 'fast_transition': True})
+        fixture.state['operation'].update(phase='prepared', fast_transition=True, blockers=[])
+        await page.reload()
+        await dialog.get_by_role('button', name='版本记录与回退', exact=True).click()
+        await latest_card.get_by_role('button', name='立即重启', exact=True).click()
+        confirm = page.get_by_role('dialog', name='重启并切换版本')
+        await expect(confirm).to_contain_text('重启会断开正在执行的推理。控制服务就绪后可重新请求。')
+        await expect(confirm.get_by_role('spinbutton')).to_have_count(0)
+        await confirm.get_by_role('button', name='立即重启', exact=True).click()
+        await expect(confirm).to_be_hidden()
+        assert len(fixture.writes) == 2 and fixture.writes[1]['path'].endswith('/install'), fixture.writes
+        assert fixture.writes[1]['body']['prepared_operation_id'] == download['operation_id'] and fixture.writes[1]['body']['drain_timeout_seconds'] == 60
+        total_writes += len(fixture.writes)
+        cases.append('已下载的兼容安装带期限与下载操作 ID；版本记录中下载直接提交，重启走重启确认框且不问期限')
+        await context.close()
+
+        # 9. 候选失败与恢复两组健康探测分别展示，保留状态码、耗时与次数；暂停 / 恢复接单时间进入操作详情。
+        fixture = UpdateFixture()
+        fixture.state['operation'] = {'operation_id': str(uuid.uuid4()), 'phase': 'restored', 'action': 'install',
+            'target_release': 'system-ci-101-1', 'updated_at': '2026-11-11T00:00:00Z',
+            'admission_blocked_at': '2026-11-11T00:00:00Z', 'admission_reopened_at': '2026-11-11T00:00:20Z',
+            'error': '候选控制服务健康验收超时', 'control_health': {
+                'candidate': {'gateway': {'state': 'ready', 'attempts': 2, 'http_status': 200, 'duration_ms': 12},
+                    'orchestrator': {'state': 'http_error', 'attempts': 2, 'http_status': 503, 'duration_ms': 104}},
+                'restore': {'gateway': {'state': 'ready', 'attempts': 1, 'http_status': 200},
+                    'orchestrator': {'state': 'ready', 'attempts': 1, 'http_status': 200}}}}
+        context, page, dialog = await page_for(fixture, 390)
+        await expect(dialog.locator('[data-update-view=overview]')).to_contain_text('上次操作 · 已恢复原版本')
+        await dialog.get_by_role('button', name='查看记录', exact=True).click()
+        progress = dialog.locator('[data-update-view=progress]')
+        await expect(progress.locator('.su-pill')).to_have_text('已恢复原版本')
+        await expect(progress.get_by_role('alert')).to_contain_text('候选控制服务健康验收超时')
+        await dialog.get_by_role('button', name='操作详情与数据库快照', exact=True).click()
+        details = dialog.locator('[data-update-view=details]')
+        await expect(details.get_by_role('heading', name='新版本健康检查', exact=True)).to_be_visible()
+        await expect(details.get_by_text('网关 · 就绪 · HTTP 200 · 0.01 秒 · 第 2 次', exact=True)).to_be_visible()
+        await expect(details.get_by_text('调度器 · 响应错误 · HTTP 503 · 0.10 秒 · 第 2 次', exact=True)).to_be_visible()
+        await expect(details.get_by_role('heading', name='恢复原版本健康检查', exact=True)).to_be_visible()
+        await expect(details.get_by_text('调度器 · 就绪 · HTTP 200 · 第 1 次', exact=True)).to_be_visible()
+        await expect(details.locator('.su-ids dt')).to_contain_text(['目标发行', '操作 ID', '更新时间', '暂停接单', '恢复接单'])
+        await page.screenshot(path=str(output / 'control-health-390.png'), full_page=True)
+        assert not fixture.writes
+        cases.append('候选失败与恢复探测分别展示，保留状态码及耗时；操作详情含暂停与恢复接单时间')
+        await context.close()
+
+        # 10. 等待对账：打开即进度视图；旧操作无步骤记录正常显示；恢复确认居中并沿用原操作身份。
         fixture = UpdateFixture()
         operation_id = str(uuid.uuid4())
         fixture.state.update(busy=True, operation={'operation_id': operation_id, 'phase': 'reconcile',

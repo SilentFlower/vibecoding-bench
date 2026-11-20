@@ -175,6 +175,8 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - 详情与列表采用清晰对比度：主值用 `--ui-color-text`，辅助标签用 `--ui-color-text-3`，不对内容容器使用透明度统一弱化正文。
 - 头部处理保留动作文字：删除行 `danger-bg` 底、左侧 3px `danger` 竖线与危险色标签，保留为 `success`、运行时处理为 `primary-container`、提取上下文为 `info`。筛选动作时高亮继续生效，不能只靠颜色传达含义。
 - 采集按发生时模式和capture_status判断，模式切换只影响后续请求；组装中间值与最终TLS证据分开。空字段展示未观测，0毫秒/0Token保留真实零值。
+- **诊断设置与拒绝说明**（主线移植）：`saveDiagnostics(value)` 同时保存日志模式（`info|debug`，概览卡「后续请求日志」点击切换）与拒绝正文范围（`preview|full`）。debug 时 `PageHeader` 的 actions 显示 `ChoiceSelect`「正文采集范围」（限长预览 / 完整正文 · 脱敏，`.request-diagnostics-settings`，宽 190），info 时隐藏。详情概览的 `NoticeStrip.request-error-explanation`：错误阶段 `system_update` / `upstream_model` 显示「系统更新中断 / 上游模型」，末次尝试 `error_type=RESOURCE_EXHAUSTED` 时追加「上游额度不足或触发限流（RESOURCE_EXHAUSTED）」，HTTP 200 且末次 `partial === false` 为「模型响应已结束」；本地拒绝显示 `input_rejection_field`，无 `native_rejection` 但有 `context.input_rejection_reason` 时为「请求在上游发送前被拒绝」并可「查看入站请求」。阶段证据 `saved` 与 `available` 同为已读取。
+- **AGY 实际出站证据**（`NativeStageDetails.vue`）：`wire_final.source` 为 `native_tls_uprobe` 时显示原生 TLS 接受证据（`tlsWire`），为 `agy_http_transport` / `agy_native_tls` 时显示 `details[data-agy-wire-final]`「实际出站证据」（实体完整性、上游 HTTP 码、来源说明），头部处理表增加「阶段」列（网关入口 / 出站适配）。`agy_ingress` 或只有入口阶段的拒绝快照不显示头部处理与正文变化；原文阶段按 `rawStages` 取值。说明文字用 `.request-wire-note`、原因用 `.request-wire-reason`，不得用 `text-muted-foreground` / `text-amber-*`。
 
 ### 会话封禁列表
 
@@ -186,7 +188,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 ### 系统设置表单与草稿
 
 - `.settings-inline-note` 统一使用块级布局，链接与段落共享顶部分隔线和垂直间距；行内链接的顶部边框会覆盖上一行说明。`verify_session_policy_blocks_ui.py` 在390/1440/1920/2560px断言封禁记录链接的边框顶部不小于时长说明底部，避免仅检查 `text-decoration:none` 漏掉相邻元素覆盖。
-- 以现有 `Settings.vue::saveSettings` 的真实键集合核对完整性，按用途分组。保存载荷为 `fieldBindings` 全部键（`settingsSchema` 57 项加会话封禁 2 项，共 59，与页头「59 项配置」一致）；新增字段时同步 `verify_remaining_pages.py` 的计数断言。新增分组或换肤不能删除字段、访问预设或预热记录入口。
+- 以现有 `Settings.vue::saveSettings` 的真实键集合核对完整性，按用途分组。保存载荷为 `fieldBindings` 全部键（`settingsSchema` 58 项加会话封禁 2 项，共 60，与页头「60 项配置」一致；第 58 项为请求记录的 `request_diagnostics_rejected_body`）；新增字段时同步 `verify_remaining_pages.py` 的计数断言。新增分组或换肤不能删除字段、访问预设或预热记录入口。
 - 静态实现使用 `settingsFields` 定义控件与约束，`settingsSaved` / `settingsDraft` 分别维护已保存值和草稿。搜索、分类切换与页面往返保留草稿，保存栏显示全局待保存项数。
 - 所有设置提交值规整为字符串；数字清空保留空值并在保存时校验。非法字段定位到实际分类，搜索条件清空后让错误控件可见。
 - 依赖项禁用只阻止编辑，不清除已有值：Hello探测关闭后保留严格模式/TTL；后台分类为mock时保留身份注入开关，切回放行后恢复。
@@ -222,10 +224,18 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 - **入口与路由**：`SystemUpdateDialog.vue`（基于 `ModalDialog`，宽 768，面板类名 `.system-update-dialog`）由 `Dashboard.vue` 在 `updatesOpen` 为真时挂载，关闭即卸载并停止轮询。`router.ts` 的 `updates` 子路由渲染 `Accounts.vue` 作背景；`route.fullPath` 变化时 `updatesOpen = route.name === 'updates'`。关闭时若仍在 `updates` 则 `router.replace({ name: 'accounts' })`，并刷新版本号角标。弹窗内 router-link 跳转后自然关闭。
 - **视图**：`[data-update-view=overview|progress|history|maintenance|details]`；未接入或更新服务不可用时为 `uninstalled`，始终显示「当前版本：x」。主视图规则：没有操作记录→概览；`busy`、`reconcile`、`succeeded_cleanup_pending`，或本次弹窗内观察到该操作在维护中（`followed`）→进度；其余已结束操作在概览显示一行「上次操作 · 阶段 · 版本 · 时间」，「查看记录」进入进度。版本记录、维护详情、操作详情是带「返回」的二级视图（返回栈）。
-- **写请求**：冻结合同同 [平台在线更新](../../platform/deploy/platform-online-update.md)。概览底栏「安装更新」直接冻结并提交最新版本，等待上限取安装方式区的 `NumberInput`（「在途等待上限（分钟）」，1～120，默认 1）；提交后锁定输入，网络不确定时重发同一冻结对象；409 显示「现场版本已经变化…」并禁用安装，不自动重放。版本记录列表中的安装（含最新）、回退、恢复都先打开 `ConfirmationDialog`（「确认安装更新 / 确认版本回退 / 恢复本次操作」），前两者带等待上限，默认 1。
+- **写请求**：冻结合同同 [平台在线更新](../../platform/deploy/platform-online-update.md)。
+  - **动作选择**（与主线 `SystemUpdates.vue` 同名同义）：`preparedFor(release)` 只认 `status.prepared_candidate` 的 `target_release` 与 `manifest_sha256` 都匹配的下载回执；`updateAction(release)` 在 `status.staged_updates` 为真且无匹配回执时为 `prepare`，否则为 `install`；`updateButton(release, legacy)` 依次为「先检查更新 / 待验证兼容 / 下载更新 / 立即重启（回执 `fast_transition`）/ 安装更新（非快速回执）/ legacy」。概览底栏与版本记录的按钮文字都取它（legacy 均为「安装更新」）。
+  - **冻结**：`freeze()` 为匹配回执的 `install` 加 `prepared_operation_id`，并置 `Frozen.restart = fast_transition === true`。`prepare` 与 `restart` 不询问、不写入等待上限，请求体保持冻结时的 `drain_timeout_seconds = 60`；兼容安装取等待上限（1～120，默认 1），首次发送后锁定。成功提示：`prepare` 为「已开始下载更新」，其余「操作已登记」。网络不确定时重发同一冻结对象；409 显示「现场版本已经变化…」并禁用安装，不自动重放。
+  - **概览**：底栏主按钮直接冻结并提交最新版本，「安装方式」区（`.su-plan[data-update-plan=prepare|restart|install]`）即确认：`prepare` 为「先在后台下载并校验」（平台继续接单，无等待上限）；`restart` 为「重启并切换版本」与 `RESTART_NOTICE`「重启会断开正在执行的推理。控制服务就绪后可重新请求。」（无等待上限）；`install` 保留「安装时暂停新接单」与 `NumberInput`「在途等待上限（分钟）」。状态标签在有匹配回执时为「待重启 / 已下载更新」。
+  - **版本记录**：`installRelease(release)` 遇 `prepare` 直接提交（不开确认框），否则与回退、恢复一样先开 `ConfirmationDialog`。标题依次为「恢复本次操作 / 确认版本回退 / 重启并切换版本（restart）/ 确认安装更新」，正文 restart 为 `RESTART_NOTICE`、其余为「镜像准备期间继续接单。支持快速切换时，正在执行的推理会断开。」；restart 与恢复不显示等待上限，restart 的确认按钮为「立即重启」。
+- **进度文案**：`phaseLabel` 在快速切换的 `draining` 显示「正在关闭推理连接」、非快速的 `prepared` 显示「已下载更新」，`UPDATE_PHASE_LABELS.prepared` 为「待重启」；状态标签、步骤行、结局提示与「上次操作」共用。维护中的状态标签：`preparing` 为「正在后台准备」（info），`cleaning` 且已有 `admission_reopened_at` 为「平台已恢复接单」（success），其余「更新中」。维护提示 `[data-update-maintenance]` 在维护中或已有 `admission_reopened_at` 时显示主线 `maintenanceMessage` 的五种文案（后台准备 / 下载完成 / 平台已恢复接单 / 等待在途或关闭旧推理连接 / 切换或验收）。
+- **远程节点**：`cluster_nodes.phase === 'background'` 时节点列表换成一行 `[data-update-nodes=background]`：「远程节点将在中央切换后独立更新」（恢复接单后为「远程节点独立更新」）加 `router-link` 到 `nodes` 的「查看节点进度」。
+- **账号后台更新**：`status.account_rollout.accounts` 非空时，概览与进度两个主视图末尾显示 `.su-rollout`（分区头「账号后台更新」与「<版本> 已生效」）。每行 `[data-rollout-state]`：名称、错误说明、`.su-pill` 状态（queued「待更新」/ updating「更新中」为 info，updated「已更新」success，stopped「保留启停状态」neutral，waiting「等待空闲」/ needs_check「待核对」warning）；`retryable !== false` 且为 waiting / needs_check 时显示「重试」，调用 `api.systemUpdateRetryAccount(operation_id, environment_id, revision)`，维护中或写入中禁用。有 queued / updating 时 2 秒轮询。
+- **操作详情**：字段前按 `control_health.candidate|restore` 显示「新版本健康检查 / 恢复原版本健康检查」（`[data-update-health]`，`h5`），每个服务一行「网关|调度器 · 状态 · HTTP 码 · 秒数（两位小数）· 第 N 次」，缺项省略；字段表追加「暂停接单 / 恢复接单」时间。
 - **步骤表**：`lib/updateSteps.ts` 的 `updateSteps(operation, { snapshot, migrate, busy })` 返回 `{ rows, done, total, outcome }`。规范顺序 `preparing → draining → [snapshotting → migrating] → switching → verifying → committing → cleaning`（`snapshot` 取 `status.migration_capability`，`migrate` 取目录中目标版本的 `migrations` 或记录中出现过 `migrating`）。结局阶段（succeeded、succeeded_cleanup_pending、failed、cancelled、restored、reconcile、prepared）不成行；带快照部署越过取消边界的第一次 `switching` 不成行，进行中仍显示「等待在途完成」；重复阶段只留最后一次；维护中补「待执行」；无 `steps` 的旧操作按当前阶段推出（时间显示「—」）。行内说明只取真实数据（阻塞数、快照、各库迁移状态）。行为 `[data-update-step][data-state=done|active|pending]`。
-- **钩子**：摘要格 `[data-update-tile=current|latest|published|checked|target|operation|updated]`，版本卡 `[data-release-card]`、展开详情 `[data-release-details]`；关闭按钮名「关闭」。样式在 `src/system-update.css`（`@layer components`，类名前缀 `su-`，只取 token）。
-- **示例**：带快照部署的记录 `preparing, draining, switching, snapshotting, migrating, switching, verifying` 已记录部分显示为 `preparing, draining, snapshotting, migrating, switching, verifying` 6 行（维护中再补 `committing, cleaning` 待执行），第一次 `switching` 并入真正的切换。错误用法：把 `steps` 原样逐条成行，越过取消边界的切换会显示成「切换平台服务」已完成、快照仍待执行；正确处理：一律经 `updateSteps` 推导。错误用法：自动化脚本 `goto('/updates')` 后直接点背景页导航（被模态挡住）；正确处理：先关闭弹窗，等地址回到 `/`。
+- **钩子**：摘要格 `[data-update-tile=current|latest|published|checked|target|operation|updated]`，版本卡 `[data-release-card]`、展开详情 `[data-release-details]`，以及上文的 `[data-update-plan]`、`[data-update-maintenance]`、`[data-update-nodes]`、`[data-rollout-state]`、`[data-update-health]`；关闭按钮名「关闭」。样式在 `src/system-update.css`（`@layer components`，类名前缀 `su-`，只取 token）。
+- **示例**：带快照部署的记录 `preparing, draining, switching, snapshotting, migrating, switching, verifying` 已记录部分显示为 `preparing, draining, snapshotting, migrating, switching, verifying` 6 行（维护中再补 `committing, cleaning` 待执行），第一次 `switching` 并入真正的切换。错误用法：「立即重启」沿用兼容安装的等待上限或确认框里的期限输入（重启不等在途，期限无意义）；正确处理：`restart` 与 `prepare` 不询问期限，请求体保持冻结默认 60 秒，`verify_system_update_browser.py` 断言三条路径的请求体（`prepare` 无 `prepared_operation_id`、重启带下载操作 ID 且 60 秒、已下载的兼容安装带 ID 与所选期限）。错误用法：把 `steps` 原样逐条成行，越过取消边界的切换会显示成「切换平台服务」已完成、快照仍待执行；正确处理：一律经 `updateSteps` 推导。错误用法：自动化脚本 `goto('/updates')` 后直接点背景页导航（被模态挡住）；正确处理：先关闭弹窗，等地址回到 `/`。
 
 ### 主题设置页
 
@@ -242,7 +252,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - **预览画板**（`theme/ThemePreview.vue`）：
   - 同源 `<iframe src="/?theme-preview=1">` 固定 1440×900。`ThemePreview` 的 `scheme` 属性由 `resolveScheme(draftMode, 系统偏好)` 得出（页面订阅系统偏好，草稿为跟随系统时画板随系统切换）。`load`、草稿或 `scheme` 变化时写 iframe 根的 `data-ui-scheme` 与 `createTheme(draft, scheme)`，覆盖它自己 `initTheme` 应用的保存值。
   - iframe 设 `inert`、`tabindex=-1`、`pointer-events: none`。画布负责缩放（10%–150%：按钮以中心为锚 ±10 个百分点，滚轮以指针为锚、每 100px ±10）、拖动平移与「适应画布」（`[data-theme-zoom]` 显示百分比）。
-  - `Dashboard.vue` 读到 `route.query['theme-preview'] === '1'` 时以 `checkUpdates=false` 挂载，画板内不发 `POST /runtime/api/system-updates/check`，只读摘要照常读取。
+  - `Dashboard.vue` 读到 `route.query['theme-preview'] === '1'` 时以 `checkUpdates=false` 挂载，画板内不发 `POST /runtime/api/system-updates/check`，只读摘要照常读取。画板里的账号页同样不做进入列表的反重力额度自动刷新（`Accounts.vue` 读同一查询参数，不发 `POST /admin/accounts/:id/usage`）；`verify_theme_settings.py` 在首页第一页放可用反重力账号，断言子框架只有会话签发一个写请求。
 - **离开保护**：`onBeforeRouteLeave` 在有改动或有无效输入时打开 `ConfirmationDialog`（「放弃未保存的主题修改？」/「放弃并离开」）；去往 `login` 直接放行，因为 `logout()` 已先撤销会话。有改动时登记 `beforeunload`。
 - **主题范围**：任务与工程、运行环境随保存的主题与深浅变化（见「第二版原生页」）；独立 `/runtime/` 文档跟随所选模式但只用默认配色；终端配色只取 `term-*` token，不受用户种子影响。
 - **示例**：
@@ -300,6 +310,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
     - 三组件托盘 `.environment-role-strip`：运行中为成功色，其余置灰。
     - 预热块 `.environment-readiness[data-tone]` 由 `preparationTone(row)` 决定：ready→success，failed→warning，其余 neutral。它与 `preparationLabel` 同源，不跟环境状态。
     - 操作栏是四个 `EntityAction`，「环境详情」为 primary。
+    - 反重力环境（主线移植）：名称取 `environmentName(row)`（网关账号名 → 环境名 → 未命名环境），搜索同时匹配网关账号名；版本行为「AGY 版本」，内核取 `kernelLabel(row)`（已加载候选前 8 位或「AGY 原生」）；预热块显示「AGY 热进程 空闲 / 总数 · 预热中 N」，状态含「正在预热 / 等待准备 / 待对账」；没有 CRIU 时特性行只剩内容采集，`.environment-feature-row:has(> button:only-child)` 单列；不显示运行时段。详情概览以「空闲热进程」替代 CRIU 统计。请求内核分区用 `ChoiceSelect`「请求内核」（`.environment-kernel-select`）选择平台内置或宿主机已准备的候选，按 `expected_generation` / `expected_kernel` 提交。
   - 定位契约（脚本依赖）：`.environment-rich`、`.fui-entity-card-head`、`.fui-entity-card-name`、`.fui-entity-card-actions button`、`.environment-readiness strong`、`.environment-resources-grid`、`.runtime-environment-dialog`、`.environment-sections button`。
 - **独立 `/runtime/` 文档**：
   - 读同一组 legacy CSS 和 `ui-foundation.css` 的默认值，不应用用户主题种子；深浅跟随所选模式：`index.html` 首帧脚本读模式键写 `data-ui-scheme`，并在跟随系统时订阅系统偏好（独立文档不运行 Vue 的 `initTheme`）。
@@ -326,6 +337,10 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 - 账号卡片顶部展示平台徽标（名称旁），其下控制行右对齐展示“接收请求”开关与“停用账号／启用账号”按钮；开关只改变 API 准入，账号按钮沿整体工作控制。卡片及概览在正常启用时省略整体状态提示。收尾时显示「正在收尾」及尚未结束的已接纳请求数，已停用和待核对各自显示对应状态。
 - 反重力卡片展示平台额度及重置时间。网关请求数和 Token 在账号概览的「网关用量」展示。记录缺口随实际窗口标识，真实零保留为零。
+- 反重力账号（主线移植）：
+  - 首次 `load()` 后 `refreshEntryUsage` 逐个刷新当前页可用（active、未停用工作、凭据 ready）的反重力账号额度，批次结束有成功才回读一次；失败只经 `AgyAccountUsage` 的 `refresh-error` 在卡片 `.agy-quota-note` 提示，不弹提示。`refreshingUsage` 为 `Set`，手动刷新可并发。
+  - 调度入口与 Claude Code 一致：卡片「调度优先级」、概览「调度详情」、工作区「调度」页签；`SchedulingDetails` 传 `:antigravity`，不读会话列表、不显示额度分、已绑定会话与额度提示，说明改为「优先级数值越小越先接单…」，提交点说明为「已观测到原生模型启动」。
+  - 反重力配置分区新增 `Checkbox`「GIF 抽帧兼容」（`agy_gif_frames_enabled`）与「使用 AGY 原生安全开关」（`agy_disable_safety_filtering`），默认值、编辑回填、`agyFormKeys` 与保存载荷同步。
 - `ExecutionNodeBadge` 统一为 `i-server` 图标加单行节点名称的 `/nodes` 链接。账号页并入代理与环境信息栏，环境卡片并入标题下的账号信息栏。节点 key、类型与观察说明放入提示框，异常图标保留提醒。历史请求沿自身 `execution_location` 展示；本机缺名称时显示“默认本机”，其它节点缺名称时使用原节点 key；缺节点时保留未观测或无执行尝试。
 - 反重力账号卡片和账号概览展示固定的本机 API 执行归属。名称读取 `/runtime/api/nodes` 中 `kind=local` 的节点。目录暂不可用时保留已取得的名称，首次读取失败时显示「默认本机」。Claude Code 账号继续按任务账号绑定及缓存观察展示。浏览器回归覆盖无任务账号绑定的反重力、本机名称、读取失败、详情和节点管理跳转。
 - 账号与环境卡片使用 `PlatformBadge(platform)` 独立标注 Claude Code／反重力，分别为棕色／蓝色，套餐独立展示。请求列表使用发生时 `context.platform`，缺失显示“平台未记录”；账号名称单行省略，资料气泡保留完整名称和邮箱。`verify_execution_node_visibility.py` 覆盖三入口跳转、历史节点、平台未知、顶部独立控制、提示框关闭与1440/720/390px布局。

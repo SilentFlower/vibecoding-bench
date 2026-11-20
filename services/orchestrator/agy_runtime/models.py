@@ -3,6 +3,8 @@ import json
 import re
 from datetime import datetime, timezone
 
+from .input_media import IMAGE_MIMES, INPUT_MIMES
+
 
 def native_identifier(value) -> bool:
     """校验原生JSON支持的模型标识。@param value 目录返回的枚举名或数字。@return 标识结构是否合法。"""
@@ -33,6 +35,34 @@ def decode_catalog(value: dict) -> dict:
     if not models:
         raise ValueError('AGY原生账号模型目录为空')
     return models
+
+
+def decode_media_support(value: dict, models: dict) -> dict[str, dict[str, bool]]:
+    """提取已核对型号的内嵌媒体能力。@param value 原生目录响应。@param models 已验证的模型映射。@return 型号对应的 MIME 能力。"""
+    observed = _response(value).get('models', {})
+    support = {}
+    for name, native in models.items():
+        entry = observed.get(name) if isinstance(observed, dict) else None
+        if not isinstance(entry, dict) or entry.get('model') != native:
+            continue
+        formats = entry.get('supportedMimeTypes')
+        images = entry.get('supportsImages')
+        enabled = {}
+        for mime in sorted(INPUT_MIMES):
+            declared = formats.get(mime) if isinstance(formats, dict) else None
+            image_support = images if mime in IMAGE_MIMES else None
+            if type(declared) is bool or type(image_support) is bool:
+                # 原生仅将通用图片能力用于 image/*，其余媒体核对对应 MIME。
+                enabled[mime] = declared is True or image_support is True
+        if enabled:
+            support[name] = enabled
+    return support
+
+
+def decode_png_support(value: dict, models: dict) -> dict[str, bool]:
+    """读取兼容旧网关的 PNG 能力。@param value 原生目录响应。@param models 已验证的模型映射。@return PNG 能力。"""
+    return {name: formats['image/png'] for name, formats in decode_media_support(value, models).items()
+            if 'image/png' in formats}
 
 
 def _label(value) -> str | None:
