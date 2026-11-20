@@ -29,6 +29,26 @@ from .credentials import read_access_document
 from .safety_egress import CLOUD_CODE, SafetyEgress
 
 SNAPSHOT_WRITERS=threading.BoundedSemaphore(2)
+CONTROL_CLOSE_ERRORS={'native_request_failed','native_transport_error','native_control_timeout','native_not_idle',
+    'native_process_exited','native_protocol_error'}
+NATIVE_ERRORS=CONTROL_CLOSE_ERRORS|{'cancelled','cancel_timeout','native_stream_incomplete','native_delivery_error',
+    'native_start_rejected','tool_protocol_error','native_tool_yield_timeout','native_tool_yield_failed',
+    'ambiguous_parallel_function_calls','unsupported_gemini_candidate_count','invalid_native_gemini_parts',
+    'native_safety_endpoint_rejected','native_safety_egress_unobserved'}
+CONTROL_EXCEPTION_TYPES={'AssertionError','AttributeError','IndexError','JSONDecodeError','KeyError',
+    'OSError','RuntimeError','TimeoutError','TypeError','ValueError'}
+PROTOCOL_READER_ERRORS={'native_root_identity.unfinished_stream':'native_root_identity.unfinished_stream',
+    'native_root_identity.call_reused':'native_root_identity.call_reused',
+    'native_root_identity.additional_call':'native_root_identity.additional_call',
+    'native_root_identity.invalid_context':'native_root_identity.invalid_context',
+    'native_root_identity.missing_cascade':'native_root_identity.missing_cascade',
+    'source_request_identity':'source_request_identity','source_call_identity':'source_call_identity',
+    '源事件活动作业归属冲突':'active_job_mismatch'}
+PROTOCOL_OBSERVER_ERRORS={'活动作业缺失':'active_job_missing','活动原生调用数量越界':'active_call_limit',
+    'SDK原始帧缺少活动作业':'sdk_job_missing','SDK原始帧存在多个活动模型调用':'sdk_multiple_calls',
+    'SDK原始帧缺少模型调用':'sdk_call_missing','SDK原始帧采集长度越界':'sdk_frame_limit',
+    'SDK原始帧读取失败':'sdk_frame_unreadable','原生返回缺少调用归属':'receive_call_missing',
+    '结束后原生返回发生变化':'receive_after_eof','原生成功接收缺少消息对象':'receive_message_missing'}
 
 
 class RPC:
@@ -36,7 +56,7 @@ class RPC:
 
     def __init__(self, worker, method, body, scope, timeout=None):
         """启动RPC。@param worker 物理工作进程。@param method 原生方法。@param body 正文。@param scope 归属。@param timeout 连接预算。@return 无返回值。"""
-        self.done=threading.Event();self.value=None;self.error=None
+        self.done=threading.Event();self.value=None;self.error=None;self.response_status=None
         def run():
             """归档实际原生结果。@return 无返回值。"""
             connection=http.client.HTTPConnection('127.0.0.1',worker.port,timeout=timeout)
@@ -46,7 +66,8 @@ class RPC:
             try:
                 connection.request('POST','/exa.language_server_pb.LanguageServerService/'+method,json.dumps(body,ensure_ascii=False).encode(),
                     {'Content-Type':'application/json','x-codeium-csrf-token':worker.bridge.csrf})
-                response=connection.getresponse();self.value={'status':response.status,'response':json.loads(response.read())};record.update(self.value)
+                response=connection.getresponse();self.response_status=response.status
+                self.value={'status':self.response_status,'response':json.loads(response.read())};record.update(self.value)
             except Exception as exc:self.error=type(exc).__name__;record['transport_error']=self.error
             finally:
                 connection.close()
@@ -66,11 +87,31 @@ class Scope:
         self.frames=Frames();self.native_tool_calls=None;self.compatibility_error=None;self.tool_wait_ready=threading.Event();self.tool_wait_published=False;self.resume_claimed=False;self.final_status=None;self.yield_tools=threading.Event();self.yield_cancelled=threading.Event();self.yield_started=None;self.yield_rpc=None
         self.broker=None;self.cancel=threading.Event();self.cancel_started=None;self.cancel_sent=False;self.finished=threading.Event()
         self.safety_egress=None;self.tls_trace=None
-        self.foreign_call_id=None
+        self.isolated_call_id=None
 
     def identity(self):
         """返回公开协议身份。@return 身份字段。"""
         return {'request_id':self.value['request_id'],'request_seq':self.seq,'generation':self.worker.bridge.generation}
+
+    def result_recovery_blocker(self, code, spool):
+        """诊断阻止保留已交付结果的首个条件。@param code 原生失败码。@param spool 已交付观察。@return 受控代码，允许保留时返回空。"""
+        job=self.job
+        if code not in CONTROL_CLOSE_ERRORS:return 'ineligible_error'
+        if self.value.get('request_format')!='gemini':return 'unsupported_protocol'
+        if self.cancel.is_set():return 'cancelled'
+        if self.compatibility_error:return 'compatibility_error'
+        if not job or job.calls!=1:return 'model_call_count'
+        if job.ends!=1 or not job.ended.is_set():return 'missing_model_eof'
+        if job.native_error:return 'model_error'
+        if self.native_tool_calls or self.tool_wait_ready.is_set() or self.yield_tools.is_set():return 'tool_pending'
+        if blocker:=self.frames.recovery_blocker():return blocker
+        if not spool or spool.overflow or spool.failure:return 'delivery_error'
+        if self.safety_egress and self.safety_egress.model_status!=200:
+            return 'model_http_status'
+        # 读取器在第一个异常后退出。观察器仍可排空，必须核对较早的错误没有破坏已交付的结果。
+        if any(type(event.get('ns')) is not int or event['ns']<=job.end_ns for event in self.worker.bridge.errors):
+            return 'observer_before_eof'
+        return None
 
 
 class Bridge(DrainBridge):
@@ -87,6 +128,15 @@ class Bridge(DrainBridge):
         if event['event'] != 'model_tls_write':
             super()._emit(event)
         self.worker.on_source(event)
+
+    def protocol_failure(self):
+        """归类原生协议失败。@return 允许写入网关日志的来源与错误码。"""
+        if self.errors:
+            return 'observer.'+PROTOCOL_OBSERVER_ERRORS.get(self.errors[0].get('error'),'other')
+        error=self.reader_error or {}
+        exception=error.get('type')
+        return 'reader.'+PROTOCOL_READER_ERRORS.get(error.get('message'),
+            exception if exception in CONTROL_EXCEPTION_TYPES else 'other')
 
 
 class Worker:
@@ -156,19 +206,29 @@ class Worker:
         if scope is None or scope.worker is not self or event['request_id']!=scope.route:
             if kind=='model_tls_write':return False
             raise RuntimeError('source_request_identity')
-        if scope.foreign_call_id and event['call_id']==scope.foreign_call_id:
+        job=scope.job;call_id=event.get('call_id')
+        if scope.isolated_call_id and call_id==scope.isolated_call_id:
+            if kind=='model_start':raise RuntimeError('native_root_identity.call_reused')
             return False
-        if kind=='model_start' and event['native_context']['ConversationID']!=scope.root:
-            # 只有当前 Cascade 已完整 STOP 后，才允许隔离确定来自另一个会话的事件。
-            if (event['native_context']['ConversationID'] and event['call_id']!=scope.job.call_id
-                    and scope.value.get('request_format')=='gemini' and scope.job.calls==scope.job.ends==1
-                    and scope.job.ended.is_set() and scope.frames.finish_reason=='STOP' and not scope.frames.calls
-                    and scope.foreign_call_id is None):
-                scope.foreign_call_id=event['call_id']
-                self.owner.emit('foreign_model_observed',**scope.identity())
-                return False
-            raise RuntimeError('native_root_identity')
-        return True
+        if kind!='model_start':
+            if call_id and job and call_id==job.call_id:return True
+            if kind=='model_tls_write':return False
+            raise RuntimeError('source_call_identity')
+        conversation=event['native_context'].get('ConversationID')
+        if not isinstance(conversation,str) or not isinstance(call_id,str) or not call_id:
+            raise RuntimeError('native_root_identity.invalid_context')
+        if job and call_id==job.call_id:raise RuntimeError('native_root_identity.call_reused')
+        if conversation==scope.root:return True
+        if scope.isolated_call_id:raise RuntimeError('native_root_identity.additional_call')
+        if (scope.value.get('request_format')!='gemini' or not job or job.calls!=1 or job.ends!=1
+                or not job.ended.is_set() or scope.frames.finish_reason!='STOP'):
+            raise RuntimeError('native_root_identity.unfinished_stream')
+        if not conversation and not scope.frames.calls:
+            raise RuntimeError('native_root_identity.missing_cascade')
+        # 等待工具回调时，空会话的独立调用不进入已结束的模型流。工具归属仍由原 MCP 回调确认。
+        scope.isolated_call_id=call_id
+        self.owner.emit('foreign_model_observed' if conversation else 'unassigned_model_observed',**scope.identity())
+        return False
 
     def on_source(self, event):
         """核对来源并输出独立协议事件。@param event 实际观察事件。@return 无返回值。"""
@@ -362,6 +422,7 @@ class Kernel:
     def execute(self, scope):
         """执行唯一模型发送并公开唯一终态及空闲。@param scope 已受理请求。@return 无返回值。"""
         worker=scope.worker;retire=False;failed=False;spool=None;future=None
+        phase='prepare';control_status=None
         folder=private_dir(self.state/'requests'/scope.route)
         try:
             if scope.value.get('gemini_body') is not None:(folder/'gemini-input.json').write_text(json.dumps(scope.value['gemini_body'],ensure_ascii=False))
@@ -385,6 +446,7 @@ class Kernel:
                 switched=worker.call('SetCloudCodeURL',{'url':scope.safety_egress.url},scope)
                 if switched['status']!=200:raise RuntimeError('native_safety_endpoint_rejected')
             root=worker.call('StartCascade',{'source':'CORTEX_TRAJECTORY_SOURCE_AGENT_API','requestedModel':MODEL},scope)
+            control_status=root['status']
             if root['status']!=200:raise RuntimeError('native_start_rejected')
             scope.root=root['response']['cascadeId']
             if scope.cancel.is_set():raise RuntimeError('cancelled')
@@ -399,18 +461,23 @@ class Kernel:
             if self.cfg.get('capture_root'):
                 self.capture_submission(scope,body)
             self.emit('request_prepared', **scope.identity())
+            phase='submission';control_status=None
             future=RPC(worker,'SendUserCascadeMessage',body,scope)
             while not future.done.wait(.05):
                 if scope.value.get('request_format')=='gemini' and scope.job.ended.is_set() and not scope.frames.terminal:
                     raise RuntimeError('native_stream_incomplete')
-                if scope.tool_wait_ready.is_set() and scope.job.ended.is_set() and scope.native_tool_calls is not None and len(scope.frames.calls)==len(scope.native_tool_calls) and not scope.tool_wait_published and not scope.compatibility_error:self.publish_tool_wait(scope)
+                if scope.broker and scope.broker.failure:raise RuntimeError('tool_protocol_error')
+                if worker.bridge.reader_error or worker.bridge.errors:raise RuntimeError('native_protocol_error')
+                if (scope.tool_wait_ready.is_set() and not scope.tool_wait_published and not scope.cancel.is_set()
+                        and scope.job.calls==scope.job.ends==1 and scope.job.ended.is_set() and not scope.job.native_error
+                        and not scope.frames.source_error and not scope.compatibility_error
+                        and scope.native_tool_calls is not None and len(scope.frames.calls)==len(scope.native_tool_calls)):
+                    self.publish_tool_wait(scope)
                 if scope.yield_tools.is_set() and scope.yield_rpc is None:
                     # 客户端负责工具执行；使用原生取消收回当前 RPC，再由下一请求导入真实结果。
                     scope.cancel_sent=True;scope.yield_started=time.monotonic();scope.yield_rpc=RPC(worker,'CancelCascadeInvocation',{'cascadeId':scope.root,'killBackgroundTasks':True,'notifyParent':False},scope,10)
                 if scope.yield_rpc and scope.yield_rpc.done.is_set():scope.yield_cancelled.set()
                 if scope.yield_started and time.monotonic()-scope.yield_started>self.cfg['cancel_timeout']:raise RuntimeError('native_tool_yield_timeout')
-                if scope.broker and scope.broker.failure:raise RuntimeError('tool_protocol_error')
-                if worker.bridge.reader_error or worker.bridge.errors:raise RuntimeError('native_protocol_error')
                 if scope.cancel.is_set() and not scope.cancel_sent:
                     scope.cancel_sent=True;RPC(worker,'CancelCascadeInvocation',{'cascadeId':scope.root,'killBackgroundTasks':True,'notifyParent':False},scope,10)
                 if scope.cancel_started and time.monotonic()-scope.cancel_started>self.cfg['cancel_timeout']:raise RuntimeError('cancel_timeout')
@@ -424,13 +491,17 @@ class Kernel:
             elif future.value['status']!=200:raise RuntimeError('native_request_failed')
             if scope.compatibility_error:raise RuntimeError(scope.compatibility_error)
             if not scope.job.ended.wait(3):raise RuntimeError('native_stream_incomplete')
+            phase='trajectory'
             current=worker.call('GetCascadeTrajectory',{'cascadeId':scope.root},scope)
+            control_status=current['status']
             if current['status']!=200 or current['response']['status']!='CASCADE_RUN_STATUS_IDLE':raise RuntimeError('native_not_idle')
             # 收尾 RPC 期间仍可能到达观察事件，确认轨迹空闲后再冻结本次计数。
             if worker.bridge.reader_error or worker.bridge.errors:raise RuntimeError('native_protocol_error')
             if scope.job.calls<1 or scope.job.calls!=scope.job.ends or scope.job.calls>scope.value['max_generations'] or scope.job.native_error:raise RuntimeError('native_stream_incomplete')
             if scope.value.get('request_format')=='gemini' and not scope.frames.terminal:raise RuntimeError('native_stream_incomplete')
+            if scope.frames.calls and not scope.tool_wait_published:raise RuntimeError('tool_protocol_error')
             if spool.overflow or spool.failure:raise RuntimeError('native_delivery_error')
+            phase='finalize'
             trajectory=current['response']['trajectory'];(folder/'trajectory.json').write_text(json.dumps(trajectory,ensure_ascii=False))
             try:
                 if scope.value.get('request_format')=='gemini':ident,history_error=None,None
@@ -438,7 +509,7 @@ class Kernel:
             except Exception:
                 ident=None;history_error='native_history_export_failed'
                 with (folder/'history-error.log').open('a') as stream:traceback.print_exc(file=stream)
-            worker.jobs+=1;retire=retire or scope.foreign_call_id is not None or self.cfg['rotate_after'] is not None and worker.jobs>=self.cfg['rotate_after']
+            worker.jobs+=1;retire=retire or scope.isolated_call_id is not None or self.cfg['rotate_after'] is not None and worker.jobs>=self.cfg['rotate_after']
             if scope.safety_egress and not retire and not self.closing:
                 # 空值不能恢复原生端点。恢复失败时退役当前进程，避免影响下一次请求。
                 try:retire=worker.call('SetCloudCodeURL',{'url':CLOUD_CODE},scope)['status']!=200
@@ -449,15 +520,37 @@ class Kernel:
             self.emit('tool_turn_finalized' if scope.tool_wait_published else 'completed',**scope.identity(),finish_reason=finish_reason,status='completed',history_id=ident,history_error=history_error,native_cascade_id=scope.root,native_trajectory_id=trajectory['trajectoryId'],native_empty=scope.job.chunks==0,native_model_calls=scope.job.calls,native_tool_pending=False)
         except Exception as exc:
             retire=True;failed=True;code=str(exc) if isinstance(exc,RuntimeError) else 'kernel_internal_error'
-            with (folder/'error.log').open('a') as stream:traceback.print_exc(file=stream)
-            kind='cancelled' if scope.cancel.is_set() else 'error'
-            scope.final_status=kind
-            upstream={}
-            if kind=='error' and scope.safety_egress and scope.safety_egress.model_status==429:
-                upstream['upstream_http_status']=429
-            self.emit('tool_turn_finalized' if scope.tool_wait_published else kind,**scope.identity(),status=kind,code=code if code in {'cancelled','cancel_timeout','native_transport_error','native_request_failed','native_stream_incomplete','native_delivery_error','native_not_idle','native_start_rejected','native_process_exited','native_protocol_error','tool_protocol_error','native_tool_yield_timeout','native_tool_yield_failed','ambiguous_parallel_function_calls','unsupported_gemini_candidate_count','invalid_native_gemini_parts','native_safety_endpoint_rejected','native_safety_egress_unobserved'} else 'kernel_internal_error',
-                native_stream_complete=bool(scope.job and scope.job.ended.is_set()),native_model_calls=scope.job.calls if scope.job else 0,
-                native_cascade_id=scope.root,native_trajectory_id=scope.broker.trajectory_id if scope.broker else None,**upstream)
+            if code not in NATIVE_ERRORS:code='kernel_internal_error'
+            blocker=scope.result_recovery_blocker(code,spool)
+            recovery=blocker or 'kept'
+            if phase=='submission' and future and future.done.is_set():
+                control_status=future.value['status'] if future.value is not None else future.response_status
+            status=control_status if type(control_status) is int and 100<=control_status<=599 else 'unknown'
+            exception=type(exc).__name__
+            if exception not in CONTROL_EXCEPTION_TYPES:exception='other'
+            # 旧网关只输出事件类型。固定枚举和状态码进入类型，保留请求关联并避免输出原生错误正文。
+            if code=='native_protocol_error':
+                self.emit('native_protocol.'+worker.bridge.protocol_failure(),**scope.identity())
+            self.emit(f'native_control.{phase}.{code}.{status}.{exception}.{recovery}',**scope.identity())
+            try:
+                with (folder/'error.log').open('a') as stream:traceback.print_exc(file=stream)
+            except OSError:
+                pass
+            if blocker is None:
+                # 已按顺序交付原始 STOP 和用量。控制失败由真实退役收口，原模型结果不重放。
+                scope.final_status='completed'
+                self.emit('completed',**scope.identity(),finish_reason='stop',status='completed',
+                    native_cascade_id=scope.root,native_model_calls=1,native_empty=False,native_tool_pending=False,
+                    control_error_code=code,control_recovery=recovery)
+            else:
+                kind='cancelled' if scope.cancel.is_set() else 'error'
+                scope.final_status=kind
+                upstream={}
+                if kind=='error' and scope.safety_egress and scope.safety_egress.model_status==429:
+                    upstream['upstream_http_status']=429
+                self.emit('tool_turn_finalized' if scope.tool_wait_published else kind,**scope.identity(),status=kind,code=code,control_recovery=recovery,
+                    native_stream_complete=bool(scope.job and scope.job.ended.is_set()),native_model_calls=scope.job.calls if scope.job else 0,
+                    native_cascade_id=scope.root,native_trajectory_id=scope.broker.trajectory_id if scope.broker else None,**upstream)
         finally:
             try:
                 if scope.broker:scope.broker.close()

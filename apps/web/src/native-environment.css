@@ -105,7 +105,8 @@
 .native-runtime .environment-readiness.muted{background: rgb(246, 247, 249); border-color: rgb(233, 236, 241);}
 .native-runtime .environment-readiness.muted strong,.native-runtime .environment-readiness.muted p{color: rgb(104, 114, 136);}
 .native-runtime .environment-feature-row{display: grid; grid-template-columns: 1fr 1fr; margin: 18px 24px 0px; gap: 22px;}
-.native-runtime .environment-feature-row button{display: flex; justify-content: space-between; gap: 8px; padding: 0px; border: 0px; background: none; font-size: var(--ui-font-small); color: rgb(99, 112, 138);}
+.native-runtime .environment-feature-row:has(> .environment-feature-status){margin-bottom: 18px;}
+.native-runtime .environment-feature-row > :is(button,.environment-feature-status){display: flex; justify-content: space-between; gap: 8px; padding: 0px; border: 0px; background: none; font-size: var(--ui-font-small); color: rgb(99, 112, 138);}
 .native-runtime .environment-feature-row strong{font-weight: 500; color: rgb(56, 70, 94);}
 .native-runtime .environment-feature-row .pending{color: rgb(163, 118, 53);}
 .native-runtime .environment-schedule-summary{display: flex; gap: 8px; align-items: center; width: calc(100% - 48px); margin: 16px 24px 20px; padding: 13px 0px 0px; border-width: 1px 0px 0px; border-style: solid none none; border-color: rgb(237, 240, 245) currentcolor currentcolor; border-image: none; background: none; text-align: left; font-size: var(--ui-font-small); color: rgb(81, 97, 123);}
@@ -160,14 +161,14 @@
 .native-runtime .environment-rich .environment-id,.native-runtime .environment-rich .environment-version-line,.native-runtime .environment-rich .environment-version-line button{font-size: var(--ui-font-small);}
 .native-runtime .environment-rich .environment-id code{font-size: var(--ui-font-small);}
 .native-runtime .environment-rich .environment-role-strip > div{font-size: var(--ui-font-small);}
-.native-runtime .environment-rich .environment-resources-grid span,.native-runtime .environment-rich .environment-readiness p,.native-runtime .environment-rich .environment-feature-row button,.native-runtime .environment-rich .environment-schedule-summary,.native-runtime .environment-rich .environment-card-actions button{font-size: var(--ui-font-small);}
+.native-runtime .environment-rich .environment-resources-grid span,.native-runtime .environment-rich .environment-readiness p,.native-runtime .environment-rich .environment-feature-row > :is(button,.environment-feature-status),.native-runtime .environment-rich .environment-schedule-summary,.native-runtime .environment-rich .environment-card-actions button{font-size: var(--ui-font-small);}
 .native-runtime .environment-rich .environment-readiness strong{font-size: var(--ui-font-body);}
 .native-runtime .environment-rich .environment-job{font-size: var(--ui-font-small);}
 .native-runtime .environment-rich .environment-identity h2{font-weight: 600;}
 .native-runtime .environment-workspace button:disabled{opacity: 0.45; cursor: not-allowed;}
 @media (max-width: 600px) {.native-runtime .environment-toolbar .tab{font-size: var(--ui-font-small); gap: 4px; padding: 8px 6px;}
 .native-runtime .environment-rich .environment-role-strip > div,.native-runtime .environment-rich .environment-resources-grid span{font-size: var(--ui-font-small);}
-.native-runtime .environment-rich .environment-version-line,.native-runtime .environment-rich .environment-version-line button,.native-runtime .environment-rich .environment-feature-row button,.native-runtime .environment-rich .environment-card-actions button{font-size: var(--ui-font-small);}
+.native-runtime .environment-rich .environment-version-line,.native-runtime .environment-rich .environment-version-line button,.native-runtime .environment-rich .environment-feature-row > :is(button,.environment-feature-status),.native-runtime .environment-rich .environment-card-actions button{font-size: var(--ui-font-small);}
 .native-runtime .environment-rich .environment-readiness strong{font-size: var(--ui-font-small);}
 .native-runtime .environment-rich .environment-job{font-size: var(--ui-font-small);}}
 /* 原生事件与定稿结构的适配。 */

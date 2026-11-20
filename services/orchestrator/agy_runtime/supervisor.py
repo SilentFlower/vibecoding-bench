@@ -111,6 +111,7 @@ class Worker:
         self.event_budget = threading.Condition()
         self.event_bytes = 0
         self.busy = True
+        self.prewarming = False
         self.closed = False
         self.ready = None
         self.reader = None
@@ -314,6 +315,10 @@ class Supervisor:
                     if not worker.busy and not worker.closed and worker.key == key:
                         worker.busy = True
                         return worker
+                if any(worker.prewarming and worker.key==key for worker in self.workers):
+                    # 当前身份已有进程在握手，后续请求沿自己的截止等待同一次准备。
+                    self.condition.wait(max(0, until-time.monotonic()))
+                    continue
                 stale = next((worker for worker in self.workers if not worker.busy), None)
                 if stale:
                     stale.busy = True
@@ -340,6 +345,42 @@ class Supervisor:
                 self.workers.remove(worker)
                 self.condition.notify_all()
             raise
+
+    def prewarm_replacement(self, source, value, until):
+        """用空余名额预热隔离工具轮的替代进程。@param source 原工具进程。@param value 同代模型及凭据。@param until 原生成截止。@return 无返回值。"""
+        worker=None
+        snapshot=value['credential_snapshot']
+        try:
+            with self.condition:
+                if (self.closed or self.config['max_workers']<2 or self.workers!=[source] or not source.busy
+                        or source.closed or snapshot['credential_generation']!=self.credential_generation
+                        or time.monotonic()>=until or snapshot['expires_at']<=time.time_ns()//1_000_000):
+                    return
+                # 暖进程先登记到同一个物理池，业务与后台同时启动时共用并发上限。
+                worker=Worker(self, value)
+                worker.prewarming=True
+                self.workers.append(worker)
+            worker.start(until)
+            with self.condition:
+                if (not self.closed and not worker.closed and snapshot['credential_generation']==self.credential_generation
+                        and snapshot['expires_at']>time.time_ns()//1_000_000):
+                    worker.prewarming=False
+                    worker.busy=False
+                    worker.last_used=time.monotonic()
+                    self.condition.notify_all()
+        except Exception:
+            # 补位失败后允许普通 checkout 按原路径恢复，原工具轮仍由原进程完成。
+            pass
+        finally:
+            if worker and worker.prewarming:
+                try:
+                    worker.close()
+                finally:
+                    with self.condition:
+                        if worker.closed and (not worker.process or worker.process.poll() is not None):
+                            self.workers.remove(worker)
+                        worker.prewarming=False
+                        self.condition.notify_all()
 
     def continuation(self, value, until):
         """先完成原worker工具收尾，再允许下一次模型生成。@param value 新请求。@param until 截止。@return 无。"""
@@ -439,6 +480,9 @@ class Supervisor:
         job = self.jobs[value['request_id']]
         worker = None
         failed = False
+        replacement_required = False
+        replacement_scheduled = False
+        preparation_deadline = until
         try:
             self.continuation(value, until)
             checkout_started = time.monotonic()
@@ -463,6 +507,8 @@ class Supervisor:
                     raise InputError('native_worker_closed')
                 if event.get('request_id') != value['request_id']:
                     continue
+                if kind in ('foreign_model_observed', 'unassigned_model_observed'):
+                    replacement_required = True
                 if kind == 'request_accepted':
                     job['identity'] = {key: event[key] for key in ['request_id', 'request_seq', 'generation']}
                 if kind == 'request_prepared':
@@ -495,7 +541,7 @@ class Supervisor:
                             job['waiting'] = True
                         else:
                             job['waiting'] = False
-                            job['final_status'] = 'completed'
+                            job['final_status'] = 'error' if event.get('control_error_code') else 'completed'
                 if kind == 'tool_turn_finalized':
                     job['waiting'] = False
                     job['final_status'] = event.get('status')
@@ -504,6 +550,13 @@ class Supervisor:
                     event['capture_status'] = 'queued'
                 self.emit('native_event', value['request_id'], event=event,
                     credential_generation=value['credential_snapshot']['credential_generation'])
+                if replacement_required and job['waiting'] and not replacement_scheduled and not job['cancelled'].is_set():
+                    replacement_scheduled = True
+                    seed={key:value[key] for key in ('account_id','credential_snapshot','model','native_model','capture_enabled')}
+                    try:
+                        threading.Thread(target=self.prewarm_replacement,args=(worker,seed,preparation_deadline),daemon=True).start()
+                    except RuntimeError:
+                        pass
                 if kind in ['error', 'cancelled', 'rejected']:
                     failed = True
                 if kind == 'rejected':
@@ -543,8 +596,13 @@ class Supervisor:
     def status(self):
         """返回实际进程、工具等待与资源分项，读取不唤醒。@return 脱敏状态。"""
         with self.condition:
-            return {'state': 'busy' if any(worker.busy for worker in self.workers) else 'ready',
-                'workers': len(self.workers), 'active': sum(worker.busy for worker in self.workers),
+            active=sum(worker.busy for worker in self.workers)
+            idle=[worker for worker in self.workers if not worker.busy and not worker.closed and worker.ready is not None
+                and worker.process is not None and worker.process.poll() is None]
+            return {'state': 'busy' if active else 'ready',
+                'workers': len(self.workers), 'active': active, 'idle_workers': len(idle),
+                'idle_pid': idle[0].ready['native_pid'] if idle else None,
+                'warming_workers': sum(worker.prewarming for worker in self.workers),
                 'tool_waiting': sum(job['waiting'] for job in self.jobs.values()), 'max_workers': self.config['max_workers'],
                 'controller': memory(os.getpid()), 'image_bytes': self.pool.decoded_bytes,
                 'cgroup_memory':cgroup_memory(),

@@ -558,6 +558,8 @@ export interface DiagnosticContext {
   native_model_calls?: number | null
   control_state?: string | null
   control_observed_at?: string | null
+  control_error_code?: string | null
+  control_recovery?: string | null
   input_rejection_reason?: string | null
   input_rejection_field?: string | null
   response_headers_source?: string | null

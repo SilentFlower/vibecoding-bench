@@ -7,6 +7,7 @@ import io
 import os
 import tempfile
 import threading
+import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -23,8 +24,9 @@ from agy_runtime.models import configure_model, decode_catalog, decode_media_sup
 from agy_runtime.native_bridge import NativeBridge
 from agy_runtime.process_memory import cgroup_memory
 from agy_runtime.safety_egress import MODEL_PATH, SafetyEgress, _Request
-from agy_runtime.kernel import Bridge, Kernel, Worker
+from agy_runtime.kernel import Bridge, Kernel, Scope, Worker
 from agy_runtime.stream_controller import NativeJob
+from agy_runtime.supervisor import Supervisor
 from agy_runtime.tool_broker import Broker
 from agy_runtime.storage import Output, config
 from runtime_files import atomic_json
@@ -46,35 +48,125 @@ class AgyRuntimeTests(unittest.TestCase):
             'expires_at': int((datetime.now(timezone.utc) + timedelta(hours=2)).timestamp() * 1000),
             'email': 'synthetic@example.test'}
 
-    def test_foreign_cascade_does_not_change_completed_model_stream(self):
-        """不同 Cascade 的迟到事件隔离，同 Cascade 的第二次启动仍计数。@return 无。"""
-        bridge=Bridge.__new__(Bridge)
-        worker=Worker.__new__(Worker)
-        recorded=[]
-        worker.owner=SimpleNamespace(emit=lambda kind, **fields: recorded.append(kind))
-        scope=SimpleNamespace(worker=worker,route='r-1',root='owned',foreign_call_id=None,
-            value={'request_format':'gemini'},frames=Frames(),identity=lambda: {},tls_trace=None,safety_egress=None)
-        worker.owner.active=scope
-        bridge.worker=worker
-        bridge.events=io.StringIO();bridge.errors=[];bridge.source_events=0
-        bridge.active_job=scope.job=NativeJob(scope.route,SimpleNamespace(offer=lambda event: True))
-        owned={'event':'model_start','request_id':scope.route,'call_id':'r-1.1','ns':1,
-            'native_context':{'ConversationID':'owned'}}
-        foreign={**owned,'call_id':'r-1.2','native_context':{'ConversationID':'other'}}
-        bridge._emit(owned)
-        with self.assertRaisesRegex(RuntimeError,'native_root_identity'):
-            bridge._emit(foreign)
-        frame=json.dumps({'candidates':[{'finishReason':'STOP'}]}).encode()
-        bridge._emit({**owned,'event':'gemini_response','data_base64':base64.b64encode(frame).decode()})
-        bridge._emit({**owned,'event':'model_end','native_error_present':None})
-        bridge._emit(foreign)
-        bridge._emit({**foreign,'event':'gemini_response','data_base64':'外部帧禁止解析'})
-        bridge._emit({**foreign,'event':'model_end','native_error_present':None})
-        self.assertEqual(recorded,['model_start','gemini_response','model_end','foreign_model_observed'])
-        self.assertEqual((scope.job.calls,scope.job.ends),(1,1))
-        self.assertTrue(scope.job.ended.is_set())
-        bridge._emit({**owned,'call_id':'r-1.3'})
-        self.assertEqual(scope.job.calls,2)
+    def test_isolated_calls_do_not_change_completed_tool_stream(self):
+        """待回填时隔离后续调用，同会话的第二次启动仍计入原作业。@return 无。"""
+        for conversation, isolation in [('other','foreign_model_observed'), ('','unassigned_model_observed')]:
+            with self.subTest(conversation=conversation):
+                bridge=Bridge.__new__(Bridge)
+                worker=Worker.__new__(Worker)
+                recorded=[]
+                worker.owner=SimpleNamespace(emit=lambda kind, **fields: recorded.append(kind))
+                scope=SimpleNamespace(worker=worker,route='r-1',root='owned',isolated_call_id=None,
+                    value={'request_format':'gemini'},frames=Frames(),identity=lambda: {},tls_trace=None,safety_egress=None)
+                worker.owner.active=scope
+                bridge.worker=worker
+                bridge.events=io.StringIO();bridge.errors=[];bridge.source_events=0
+                bridge.active_job=scope.job=NativeJob(scope.route,SimpleNamespace(offer=lambda event: True))
+                owned={'event':'model_start','request_id':scope.route,'call_id':'r-1.1','ns':1,
+                    'native_context':{'ConversationID':'owned'}}
+                extra={**owned,'call_id':'r-1.2','native_context':{'ConversationID':conversation}}
+                bridge._emit(owned)
+                with self.assertRaisesRegex(RuntimeError,'native_root_identity.unfinished_stream'):
+                    bridge._emit(extra)
+                call={'name':'fixture','args':{'x':1}}
+                frame=json.dumps({'candidates':[{'content':{'parts':[{'functionCall':call}]},'finishReason':'STOP'}]}).encode()
+                bridge._emit({**owned,'event':'gemini_response','data_base64':base64.b64encode(frame).decode()})
+                with self.assertRaisesRegex(RuntimeError,'source_call_identity'):
+                    bridge._emit({**extra,'event':'model_end','native_error_present':None})
+                bridge._emit({**owned,'event':'model_end','native_error_present':None})
+                bridge._emit(extra)
+                bridge._emit({**extra,'event':'gemini_response','data_base64':'外部帧禁止解析'})
+                bridge._emit({**extra,'event':'model_end','native_error_present':None})
+                self.assertEqual(recorded,['model_start','gemini_response','model_end',isolation])
+                self.assertEqual((scope.job.calls,scope.job.ends),(1,1))
+                self.assertEqual(scope.frames.calls,[call])
+                self.assertTrue(scope.job.ended.is_set())
+                with self.assertRaisesRegex(RuntimeError,'native_root_identity.call_reused'):
+                    bridge._emit({**owned,'call_id':extra['call_id']})
+                bridge._emit({**owned,'call_id':'r-1.3'})
+                self.assertEqual(scope.job.calls,2)
+
+    def test_model_result_survives_only_post_stream_control_failure(self):
+        """通过真实执行入口区分已结束的结果、断流、工具和取消。@return 无。"""
+        usage={'promptTokenCount':12,'candidatesTokenCount':2,'totalTokenCount':14}
+        cases=[('rpc_503','completed'),('not_idle','completed'),('late_observer_error','completed'),
+            ('missing_stop','error'),('missing_usage','error'),('pending_tool','error'),('unregistered_tool','error'),
+            ('early_observer_error','error'),('second_model_call','error'),('cancelled','cancelled')]
+        for mode,expected in cases:
+            with self.subTest(mode=mode):
+                kernel=Kernel.__new__(Kernel)
+                kernel.state=self.root/mode;kernel.state.mkdir()
+                kernel.cfg={'capture_enabled':False,'rotate_after':None}
+                kernel.base_config={'plannerConfig':{'declarativeMixinConfig':{},'retryConfig':{}},
+                    'executorConfig':{},'trajectoryConversionConfig':{}}
+                kernel.lock=threading.Lock();kernel.closing=False
+                events=[];retirements=[];submissions=[]
+                kernel.emit=lambda kind,**fields:events.append((kind,fields))
+                worker=Worker.__new__(Worker);worker.owner=kernel;worker.jobs=0;worker.ready=True
+                worker.retire=lambda reason:retirements.append(reason)
+                def control(method, body, scope):
+                    """投影真实控制入口的合成结果。@param method 控制方法。@param body 输入。@param scope 作业。@return 控制回应。"""
+                    if method=='StartCascade':return {'status':200,'response':{'cascadeId':'owned'}}
+                    self.assertEqual(method,'GetCascadeTrajectory')
+                    state='CASCADE_RUN_STATUS_RUNNING' if mode=='not_idle' else 'CASCADE_RUN_STATUS_IDLE'
+                    return {'status':200,'response':{'status':state}}
+                worker.call=control
+                bridge=Bridge.__new__(Bridge);bridge.worker=worker;bridge.run_folder=kernel.state
+                bridge.events=io.StringIO();bridge.errors=[];bridge.source_events=0;bridge.reader_error=None
+                bridge.generation='synthetic-generation';bridge.capture_tls=False;worker.bridge=bridge
+                value={'request_id':'synthetic','request_format':'gemini','native_steps':[],
+                    'prompt':'fixture','system':'','max_generations':1,'tools':[]}
+                scope=Scope(value,1,worker);kernel.worker=worker;kernel.active=scope
+
+                def submit(worker, method, body, scope):
+                    """交付原始帧后注入控制异常。@param worker 进程。@param method 方法。@param body 提交。@param scope 作业。@return 异步结果。"""
+                    self.assertEqual(method,'SendUserCascadeMessage');submissions.append(body['cascadeId'])
+                    event={'request_id':scope.route,'call_id':'r-1.1','ns':1,
+                        'native_context':{'ConversationID':'owned'}}
+                    bridge._emit({**event,'event':'model_start'})
+                    candidate={'content':{'parts':[{'text':'合成模型结果'}]}}
+                    if mode!='missing_stop':candidate['finishReason']='STOP'
+                    if mode in ('pending_tool','unregistered_tool'):
+                        candidate['content']['parts'].append({'functionCall':{'name':'fixture'}})
+                    frame={'candidates':[candidate]}
+                    if mode!='missing_usage':frame['usageMetadata']=usage
+                    encoded=base64.b64encode(json.dumps(frame).encode()).decode()
+                    bridge._emit({**event,'event':'gemini_response','data_base64':encoded})
+                    if mode=='early_observer_error':bridge._emit({'event':'observer_error','ns':2})
+                    bridge._emit({**event,'event':'model_end','ns':3,'native_error_present':None})
+                    if mode=='late_observer_error':bridge._emit({'event':'observer_error','ns':4,'error':'SDK原始帧缺少模型调用'})
+                    if mode=='second_model_call':bridge._emit({**event,'event':'model_start','call_id':'r-1.2'})
+                    if mode=='cancelled':scope.cancel.set()
+                    done=threading.Event();done.set()
+                    status=200 if mode in ('not_idle','late_observer_error','unregistered_tool') else 503
+                    return SimpleNamespace(done=done,error=None,value={'status':status})
+
+                with patch('agy_runtime.kernel.RPC',side_effect=submit):kernel.execute(scope)
+                terminal=[(kind,fields) for kind,fields in events if kind in ('completed','error','cancelled')]
+                self.assertEqual([kind for kind,_ in terminal],[expected])
+                self.assertEqual(submissions,['owned'])
+                self.assertEqual(retirements,['request_error'])
+                self.assertEqual(events[-1][0],'idle')
+                self.assertIsNone(events[-1][1]['next_generation'])
+                diagnostic=[kind for kind,_ in events if kind.startswith('native_control.')]
+                reasons={'rpc_503':'kept','not_idle':'kept','late_observer_error':'kept',
+                    'missing_stop':'missing_stop','missing_usage':'missing_usage','pending_tool':'tool_pending',
+                    'unregistered_tool':'ineligible_error',
+                    'early_observer_error':'observer_before_eof','second_model_call':'model_call_count','cancelled':'ineligible_error'}
+                self.assertEqual(len(diagnostic),1)
+                self.assertEqual(diagnostic[0].rsplit('.',1)[-1],reasons[mode])
+                self.assertEqual(terminal[0][1]['control_recovery'],reasons[mode])
+                if mode=='rpc_503':
+                    self.assertEqual(diagnostic[0],'native_control.submission.native_request_failed.503.RuntimeError.kept')
+                if mode=='late_observer_error':
+                    self.assertIn('native_protocol.observer.sdk_call_missing',[kind for kind,_ in events])
+                if mode=='unregistered_tool':
+                    self.assertEqual(terminal[0][1]['code'],'tool_protocol_error')
+                if expected=='completed':
+                    expected_code={'rpc_503':'native_request_failed','not_idle':'native_not_idle',
+                        'late_observer_error':'native_protocol_error'}[mode]
+                    self.assertEqual(terminal[0][1]['control_error_code'],expected_code)
+                    self.assertFalse(terminal[0][1]['native_tool_pending'])
 
     def test_gemini_text_modality_uses_native_default(self):
         """确认显式文本输出沿用默认行为，图片和音频仍保留字段级错误。@return 无。"""
@@ -145,12 +237,60 @@ class AgyRuntimeTests(unittest.TestCase):
 
     def test_supervisor_rejects_unknown_or_mismatched_memory_before_launch(self):
         """未知限制不能冒充无限，失败必须发生在启动映像池之前。@return 无。"""
-        from agy_runtime.supervisor import Supervisor
         for budget,actual in [(0,None),(768,None),(768,1024),(0,805306368)]:
             with patch('agy_runtime.supervisor.cgroup_memory',return_value={'max_bytes':actual}), patch('agy_runtime.supervisor.ImagePool') as pool:
                 with self.assertRaisesRegex(ValueError,'冻结RAM预算'):
                     Supervisor({'memory_mib':budget})
                 pool.assert_not_called()
+
+    def test_supervisor_reserves_and_reuses_one_prepared_replacement(self):
+        """同身份续轮等待已有的预热，失败或过时代次归还物理名额。@return 无。"""
+        for mode in ('ready','failure','stale','capacity'):
+            with self.subTest(mode=mode):
+                value={'credential_snapshot':self.snapshot(),'model':'gemini-synthetic',
+                    'native_model':'MODEL_PLACEHOLDER_M36','capture_enabled':False}
+                supervisor=Supervisor.__new__(Supervisor)
+                supervisor.condition=threading.Condition();supervisor.closed=False
+                supervisor.config={'max_workers':1 if mode=='capacity' else 3,'proxy_url':'synthetic'}
+                supervisor.credential_generation=value['credential_snapshot']['credential_generation']
+                key=supervisor.worker_key(value)
+                original=SimpleNamespace(key=key,busy=True,closed=False,prewarming=False)
+                supervisor.workers=[original]
+                spare=SimpleNamespace(key=key,busy=True,closed=False,process=None)
+                entered=threading.Event();release=threading.Event();checked_out=[]
+                until=time.monotonic()+5
+
+                def start(_until):
+                    """控制准备握手的观察顺序。@param _until 截止。@return 无。"""
+                    if mode=='failure':raise InputError('worker_start_failed')
+                    if mode=='stale':supervisor.credential_generation+=1
+                    if mode=='ready':
+                        entered.set();release.wait(3)
+
+                spare.start=start
+                spare.close=lambda: setattr(spare,'closed',True)
+                with patch('agy_runtime.supervisor.Worker',return_value=spare) as factory:
+                    if mode=='ready':
+                        warming=threading.Thread(target=supervisor.prewarm_replacement,args=(original,value,until),daemon=True)
+                        warming.start()
+                        try:
+                            self.assertTrue(entered.wait(2))
+                            self.assertEqual(supervisor.workers,[original,spare])
+                            self.assertTrue(spare.prewarming)
+                            checkout=threading.Thread(target=lambda: checked_out.append(supervisor.acquire(value,until)),daemon=True)
+                            checkout.start()
+                        finally:
+                            release.set();warming.join(3)
+                        checkout.join(3)
+                        self.assertEqual(checked_out,[spare])
+                        self.assertFalse(spare.prewarming)
+                        self.assertTrue(original.busy)
+                        factory.assert_called_once()
+                    else:
+                        supervisor.prewarm_replacement(original,value,until)
+                        self.assertEqual(supervisor.workers,[original])
+                        if mode=='capacity':factory.assert_not_called()
+                        else:self.assertTrue(spare.closed)
 
     def test_kernel_completion_reaches_real_tool_broker_once(self):
         """真实Kernel与Broker方法接线把结果交还原待处理项，错误ID和重复回填拒绝。@return 无。"""

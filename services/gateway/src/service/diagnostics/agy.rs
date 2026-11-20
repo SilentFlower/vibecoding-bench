@@ -204,6 +204,62 @@ impl AgyAttemptTrace {
         if let Some(calls) = native["native_model_calls"].as_u64() {
             context.native_model_calls = Some(calls);
         }
+        let control_code = match native["type"].as_str() {
+            Some("completed") => native["control_error_code"].as_str(),
+            Some("error" | "cancelled" | "tool_turn_finalized") => native["code"].as_str(),
+            _ => None,
+        };
+        if let Some(code) = control_code.filter(|code| {
+            matches!(
+                *code,
+                "cancelled"
+                    | "cancel_timeout"
+                    | "native_request_failed"
+                    | "native_transport_error"
+                    | "native_control_timeout"
+                    | "native_not_idle"
+                    | "native_process_exited"
+                    | "native_protocol_error"
+                    | "native_stream_incomplete"
+                    | "native_delivery_error"
+                    | "native_start_rejected"
+                    | "tool_protocol_error"
+                    | "native_tool_yield_timeout"
+                    | "native_tool_yield_failed"
+                    | "ambiguous_parallel_function_calls"
+                    | "unsupported_gemini_candidate_count"
+                    | "invalid_native_gemini_parts"
+                    | "native_safety_endpoint_rejected"
+                    | "native_safety_egress_unobserved"
+                    | "kernel_internal_error"
+            )
+        }) {
+            context.control_error_code = Some(code.into());
+            context.control_recovery = native["control_recovery"]
+                .as_str()
+                .filter(|reason| {
+                    matches!(
+                        *reason,
+                        "kept"
+                            | "ineligible_error"
+                            | "unsupported_protocol"
+                            | "cancelled"
+                            | "compatibility_error"
+                            | "model_call_count"
+                            | "missing_model_eof"
+                            | "model_error"
+                            | "tool_pending"
+                            | "source_error"
+                            | "missing_stop"
+                            | "missing_text"
+                            | "missing_usage"
+                            | "delivery_error"
+                            | "model_http_status"
+                            | "observer_before_eof"
+                    )
+                })
+                .map(str::to_owned);
+        }
         let report = &native["system_prompt_policy"];
         if self.policy.matches_report(report) {
             context.system_prompt_policy = Some(SystemPromptDiagnostic {
@@ -770,6 +826,46 @@ mod tests {
                 before.attempts[0].duration_ms
             );
         }
+    }
+
+    /// 保存白名单控制码，并在收到退役回执后保留真实的模型成功结果。@return 无。
+    #[tokio::test]
+    async fn completed_source_preserves_control_failure_independently() {
+        let (mut observer, store, trace) = fixture().await;
+        observer.native(
+            &json!({"type":"error","code":"opaque-credential"}),
+            &json!({}),
+        );
+        assert!(
+            observer
+                .record
+                .context
+                .as_ref()
+                .unwrap()
+                .control_error_code
+                .is_none()
+        );
+        observer.frame(&json!({"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"合成模型结果"}]}}],
+            "usageMetadata":{"promptTokenCount":12,"candidatesTokenCount":2,"totalTokenCount":14}}));
+        observer.native(&json!({"type":"completed","control_error_code":"native_request_failed","control_recovery":"kept","native_model_calls":1}), &json!({}));
+        observer.completed(false, &[]);
+        let response = RequestTraceGuard::new(trace).wrap(Response::new(Body::empty()));
+        to_bytes(response.into_body(), 1024).await.unwrap();
+        observer.finalized("error");
+        store.flush().await.unwrap();
+        let detail = store.detail(&observer.record.request_id).await.unwrap();
+        let attempt = &detail.attempts[0];
+        let context = attempt.context.as_ref().unwrap();
+        assert_eq!(detail.request.outcome, "success");
+        assert_eq!(attempt.outcome, "success");
+        assert!(!attempt.partial);
+        assert_eq!(context.control_state.as_deref(), Some("error"));
+        assert_eq!(
+            context.control_error_code.as_deref(),
+            Some("native_request_failed")
+        );
+        assert_eq!(context.native_model_calls, Some(1));
+        assert_eq!(context.control_recovery.as_deref(), Some("kept"));
     }
 
     /// 原生取消先于idle时，只记录已观测的尝试取消。@return 无。

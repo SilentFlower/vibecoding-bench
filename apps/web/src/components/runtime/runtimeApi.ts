@@ -43,6 +43,7 @@ export interface NativePreparationSnapshot {
 export interface RuntimeEnvironment {
   platform?: 'claude_code' | 'antigravity';
   agy_runtime?: { version: string; source_sha256: string; state: string; workers?: number; active?: number;
+    idle_workers?: number; idle_pid?: number | null; warming_workers?: number;
     tool_waiting?: number; max_workers?: number; image_bytes?: number; image_decode_calls?: number;
     controller?: { Rss?: number; Pss?: number; USS?: number }; processes?: unknown[]; loaded_kernel?: string | null };
   node?: Pick<AccountNodeAssignment, 'node_id' | 'node_key' | 'node_name' | 'kind' | 'enabled'>; node_observed?: boolean; node_message?: string;

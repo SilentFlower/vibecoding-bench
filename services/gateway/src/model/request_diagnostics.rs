@@ -337,6 +337,10 @@ pub struct DiagnosticContext {
     pub input_rejection_field: Option<String>,
     pub control_state: Option<String>,
     pub control_observed_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub control_error_code: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub control_recovery: Option<String>,
     pub usage: Option<GeminiDiagnosticUsage>,
     pub system_prompt_policy: Option<SystemPromptDiagnostic>,
     pub tool_turn: Option<ToolTurnDiagnostic>,

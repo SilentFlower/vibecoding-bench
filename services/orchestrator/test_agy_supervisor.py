@@ -61,6 +61,7 @@ class WorkerFixture:
         self.events = queue.Queue()
         self.closed = False
         self.busy = True
+        self.prewarming = False
         self.ready = {'source_sha256': owner.image_sha, 'native_pid': 123}
         self.last_used = time.monotonic()
 
