@@ -74,6 +74,7 @@ pub(super) struct ToolReplay {
     pub(super) account_id: i64,
     pub(super) request_id: String,
     pub(super) previous_turn: String,
+    pub(super) derived_session_id: Option<String>,
     pub(super) deadline: Instant,
     pub(super) cutover: Option<InferenceCutover>,
     budget: Arc<Semaphore>,
@@ -84,13 +85,14 @@ pub(super) struct ToolReplay {
 impl ToolReplay {
     /// 在工具轮领取时冻结响应归属和预算。
     /// @param account_id 原账号。@param request_id 接续轮 HTTP 根。@param previous_turn 原工具轮。
-    /// @param deadline 接续轮截止。
+    /// @param derived_session_id 工具原归属的派生会话。@param deadline 接续轮截止。
     /// @param cutover 维护清理信号。@param budget 共享帧缓存预算。
     /// @return 等待发送的响应记录。
     pub(super) fn new(
         account_id: i64,
         request_id: String,
         previous_turn: String,
+        derived_session_id: Option<String>,
         deadline: Instant,
         cutover: Option<InferenceCutover>,
         budget: Arc<Semaphore>,
@@ -99,6 +101,7 @@ impl ToolReplay {
             account_id,
             request_id,
             previous_turn,
+            derived_session_id,
             deadline,
             cutover,
             budget,
@@ -230,6 +233,7 @@ mod tests {
             1,
             "request".into(),
             "previous".into(),
+            None,
             deadline,
             None,
             budget,

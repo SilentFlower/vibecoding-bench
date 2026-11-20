@@ -1666,22 +1666,7 @@ impl AccountService {
             .as_ref()
             .ok_or_else(|| AppError::ServiceUnavailable("v3 调度未装配".into()))?;
         request.check_deadline()?;
-        let binding = match request.key() {
-            Some(key) => {
-                let mut binding = scheduler.store.binding(key, now_ms()).await?;
-                if binding.is_none() {
-                    // 活动流在短暂存储故障后仍可能持有旧期限；先 CAS 续租，不能用内存猜权威绑定。
-                    for hint in scheduler.live_bindings(key) {
-                        if scheduler.store.renew(&hint, now_ms(), true).await? {
-                            break;
-                        }
-                    }
-                    binding = scheduler.store.binding(key, now_ms()).await?;
-                }
-                binding
-            }
-            None => None,
-        };
+        let binding = scheduler.lookup_binding(request.key()).await?;
         if let Some(bound) = &binding {
             if (allowed_ids.is_empty() || allowed_ids.contains(&bound.account_id))
                 && self

@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError
@@ -35,6 +36,9 @@ class Fixture(BaseHTTPRequestHandler):
     refreshes=0
     cancelled=threading.Event()
     policy_failed=False
+    binding_gate = None
+    binding_prepared = threading.Event()
+    binding_candidates = []
 
     def log_message(self,*args):
         """避免把查询密钥和私有正文打印到测试日志。@param args HTTP日志参数。@return 无。"""
@@ -43,6 +47,12 @@ class Fixture(BaseHTTPRequestHandler):
         """返回唯一合成账号的受信运行绑定。@return 无。"""
         require(self.path in ['/internal/v3/transport/1','/internal/v3/transport/2'],'请求偏离合成运行时')
         account=int(self.path.rsplit('/',1)[1]);environment=ENVIRONMENT if account==1 else 'b'*32
+        gate = Fixture.binding_gate
+        if gate is not None:
+            Fixture.binding_candidates.append(account)
+            Fixture.binding_prepared.set()
+            gate.wait(timeout=5)
+            Fixture.binding_gate = None
         host='flower2api-'+hashlib.sha256(b'synthetic').hexdigest()[:12]+'-'+environment
         value={'account_id':account,'environment_id':environment,'generation':1,'endpoint':f'http://{host}:8091',
             'secret':SECRET,'release_id':'synthetic-release'}
@@ -149,6 +159,84 @@ class Fixture(BaseHTTPRequestHandler):
         if tools:Fixture.tool_drained.set()
 
 
+def verify_session_affinity(database, request, base, body):
+    """验证双账号真实发送与持久会话一致。@param database 隔离 SQLite。@param request HTTP 夹具。@param base 生成入口。@param body 请求模板。@return 无。"""
+    def send(payload, key='synthetic-both-key', session_id=None, streaming=False):
+        request_ids = []
+        action = 'streamGenerateContent?alt=sse' if streaming else 'generateContent'
+        status, _ = request(base + action, payload, key=key, session_id=session_id, request_ids=request_ids)
+        require(status == 200, '会话测试请求失败：' + str(status))
+        until = time.monotonic() + 5
+        while time.monotonic() < until:
+            row = database.execute('SELECT summary_json FROM request_diagnostics WHERE request_id=? AND finished_at IS NOT NULL', (request_ids[0],)).fetchone()
+            if row:
+                return json.loads(row[0])
+            time.sleep(.02)
+        raise ValueError('会话测试请求缺少持久诊断')
+
+    with database:
+        database.execute('UPDATE accounts SET priority=id')
+    opening = copy.deepcopy(body)
+    opening['contents'][0]['parts'][0]['text'] = '合成粘性会话开场'
+    continued = copy.deepcopy(opening)
+    continued['contents'].extend([{'role':'model','parts':[{'text':'合成回复'}]},
+        {'role':'user','parts':[{'text':'合成粘性会话下一轮'}]}])
+    first = send(opening)
+    key = first.get('derived_session_id')
+    require(first['account_id'] == 1 and key and len(key) == 64 and 'original_session_id' not in first,
+        '首轮没有记录派生会话或没有提交到优先账号')
+    with database:
+        database.execute('UPDATE accounts SET priority=0 WHERE id=2')
+    next_turn = send(continued, streaming=True)
+    require(next_turn['account_id'] == 1 and next_turn.get('derived_session_id') == key,
+        '切换流式或账号优先级后有效粘性失效')
+    other = send(opening, key='synthetic-two-key')
+    require(other['account_id'] == 2 and other.get('derived_session_id') != key, '不同 API Token 共用派生键')
+
+    require(request('/admin/accounts/1/work-control', {'api_accepting':False}, admin=True, method='PUT')[0] == 200,
+        '合成账号暂停接单失败')
+    try:
+        before = len(Fixture.calls)
+        require(request(base+'generateContent', continued, key='synthetic-both-key')[0] == 503
+            and len(Fixture.calls) == before, '原账号暂停后错误切号')
+        require(database.execute('SELECT account_id FROM gateway_session_bindings WHERE session_key=?', (key,)).fetchone() == (1,),
+            '暂停接单改写会话账号')
+    finally:
+        require(request('/admin/accounts/1/work-control', {'api_accepting':True}, admin=True, method='PUT')[0] == 200,
+            '合成账号恢复接单失败')
+    with database:
+        database.execute('UPDATE gateway_session_bindings SET expires_at_ms=0 WHERE session_key=?', (key,))
+    expired = send(continued)
+    require(expired['account_id'] == 2 and expired.get('derived_session_id') == key, '过期后未重新绑定')
+
+    explicit = 'synthetic-agy-session-header'
+    explicit_first = send(opening, session_id=explicit)
+    with database:
+        database.execute('UPDATE accounts SET priority=0 WHERE id=1')
+        database.execute('UPDATE accounts SET priority=1 WHERE id=2')
+    explicit_next = send(continued, session_id=explicit)
+    for root in (explicit_first, explicit_next):
+        require(root['account_id'] == 2 and root.get('original_session_id') == explicit and 'derived_session_id' not in root,
+            '显式会话头的优先级、显示或账号归属错误')
+
+    with database:
+        database.execute('UPDATE accounts SET priority=0')
+    simultaneous = copy.deepcopy(opening)
+    simultaneous['contents'][0]['parts'][0]['text'] = '合成并发首轮'
+    Fixture.binding_candidates.clear()
+    Fixture.binding_prepared.clear()
+    Fixture.binding_gate = threading.Barrier(2)
+    before = len(Fixture.calls)
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        one = workers.submit(request, base+'generateContent', simultaneous, key='synthetic-both-key')
+        require(Fixture.binding_prepared.wait(5), '并发首轮没有进入发送准备')
+        two = workers.submit(request, base+'generateContent', simultaneous, key='synthetic-both-key')
+        require(all(call.result()[0] == 200 for call in (one, two)), '绑定竞争后请求未恢复')
+    require(set(Fixture.binding_candidates) == {1, 2}, '并发测试需要两个不同的初选账号')
+    sent = Fixture.calls[before:]
+    require(len(sent) == 2 and len({call['request']['account_id'] for call in sent}) == 1, '并发首轮提交到了多个账号')
+
+
 def inside() -> dict:
     """在隔离容器执行真实HTTP、数据库及工具许可场景。@return 测试摘要。"""
     for port in (8765,8091):
@@ -156,12 +244,15 @@ def inside() -> dict:
         threading.Thread(target=server.serve_forever,daemon=True).start()
     output=open('/state/gateway.log','wb')
     child=subprocess.Popen(['/opt/gateway'],stdout=output,stderr=subprocess.STDOUT)
-    def request(path,body=None,key='synthetic-key',admin=False):
+    def request(path,body=None,key='synthetic-key',admin=False,*,method=None,session_id=None,request_ids=None):
         headers={'x-api-key':'synthetic-admin' if admin else key}
         if body is not None:headers['content-type']='application/json'
-        value=Request('http://127.0.0.1:5674'+path,data=json.dumps(body).encode() if body is not None else None,headers=headers)
+        if session_id is not None:headers['x-session-id']=session_id
+        value=Request('http://127.0.0.1:5674'+path,data=json.dumps(body).encode() if body is not None else None,headers=headers,method=method)
         try:
-            with urlopen(value,timeout=8) as response:return response.status,response.read()
+            with urlopen(value,timeout=8) as response:
+                if request_ids is not None:request_ids.append(response.headers['x-cc2api-request-id'])
+                return response.status,response.read()
         except HTTPError as error:return error.code,error.read()
     try:
         until=time.monotonic()+30
@@ -371,6 +462,7 @@ def inside() -> dict:
             database.execute("UPDATE accounts SET oauth_expires_at=strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '+650 seconds') WHERE id=1")
         require(request(base+'generateContent',body)[0]==200 and Fixture.refreshes==refreshes+1,
             '有效期充足的凭据被重复刷新')
+        verify_session_affinity(database, request, base, body)
         # 从真实持久摘要按私有attempt关联，避免用当前账号资料替代历史事实。
         until=time.monotonic()+10
         while time.monotonic()<until:
@@ -394,6 +486,12 @@ def inside() -> dict:
         recovered=[a for a in attempts if a.get('retry_reason')=='oauth_recovery']
         require(len(recovered)>=3,'401恢复尝试原因缺失')
         roots={row[0]:json.loads(row[1]) for row in database.execute('SELECT request_id,summary_json FROM request_diagnostics')}
+        replayed = [root for root in roots.values() if root.get('context', {}).get('replay_of_request_id')]
+        require(bool(replayed), '工具重放根记录缺失')
+        for root in replayed:
+            original = roots[root['context']['replay_of_request_id']]
+            require(root.get('derived_session_id') and root['derived_session_id'] == original.get('derived_session_id'),
+                '工具重放诊断丢失已验证的会话归属')
         for attempt in recovered:
             same=[a for a in attempts if a['request_id']==attempt['request_id']]
             require(len(same)==2 and roots[attempt['request_id']]['attempt_count']==2,'401恢复未保留同根两尝试')
@@ -405,7 +503,8 @@ def inside() -> dict:
                 '明确401仅恢复一次','容量错误零恢复','SSE首帧后零重放','SSE断连关闭原发送和释放许可',
                 '原生控制状态在HTTP、SSE尾帧及诊断中一致',
                 '两账号策略隔离','认证恢复冻结策略','后续HTTP采用新开关','缺失和错误策略回执拒绝','原始入站视图保持',
-                '真实SQLite尝试计数和凭据代次','401同根两尝试及恢复原因','AGY调用Claude平台保持']}
+                '真实SQLite尝试计数和凭据代次','401同根两尝试及恢复原因','AGY调用Claude平台保持',
+                '双账号会话绑定、并发首轮、显式头、Token隔离、暂停和过期','工具重放保留派生会话']}
     finally:
         child.terminate()
         try:child.wait(timeout=5)

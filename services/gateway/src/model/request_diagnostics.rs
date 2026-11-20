@@ -51,6 +51,9 @@ pub struct RequestDiagnostic {
     /// 客户端入站、映射前的完整会话；历史记录保持未知。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub original_session_id: Option<String>,
+    /// 缺少客户端会话时用于选号的匿名派生键。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub derived_session_id: Option<String>,
     pub started_at: String,
     pub finished_at: Option<String>,
     pub status_code: Option<u16>,

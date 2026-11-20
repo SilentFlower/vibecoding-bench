@@ -1492,17 +1492,19 @@ AccountService::create_cli_account(&mut Account) -> Result<(), AppError>
 ### 1. Scope / Trigger
 
 - 修改 `v3_scheduling`、`SchedulingStore`、Gateway 最终发送准入或管理端调度可视化时适用。`main` 在 `V3_RUNTIME_URL` 或 `V3_DEPLOYMENT_ID` 非空时装配；部分配置缺失仍由传输层失败关闭。
-- 仅接管 API Gateway 的精确 `/v1/messages` 到账号 sender。原生 CLI、项目、养号、Hello、count_tokens 和后台独立请求不共享本预算；非 v3 保留原调度行为。
+- 平滑发送预算只接管 API Gateway 的精确 `/v1/messages` 到账号 sender。反重力的 `generateContent`、`streamGenerateContent` 共用持久绑定，发送准入沿反重力原 RPM。原生 CLI、项目、养号、Hello、count_tokens 和后台独立请求不共享 Claude 发送预算；非 v3 Claude 保留原调度行为。
 
 ### 2. Signatures
 
 ```rust
 V3Scheduler::begin(self: &Arc<Self>, token_id: i64, session_id: Option<&str>) -> SchedulingRequest
 V3Scheduler::begin_with_parameters(self: &Arc<Self>, token_id: i64, session_id: Option<&str>, parameters: &DiagnosticParameters) -> SchedulingRequest
+V3Scheduler::begin_with_key(self: &Arc<Self>, key: Option<&str>, parameters: &DiagnosticParameters) -> SchedulingRequest
 AccountService::select_v3_account(&self, request: &SchedulingRequest, exclude_ids: &[i64], allowed_ids: &[i64], context: &AccountSelectionContext, slot_units: u32) -> Result<SelectedAccount, AppError> // 异步
 SchedulingRequest::admit(&self, account: &Account) -> Result<SendPermit, AppError> // 异步
 SendPermit::submitted(self)
 SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expected: Option<&SessionBinding>, last_released_at: Option<Instant>) -> Result<SendClaim, AppError> // 异步
+SchedulingStore::claim_binding(&self, account_id: i64, key: &str, expected: Option<&SessionBinding>) -> Result<Option<SessionBinding>, AppError> // 异步
 ```
 
 - `SchedulingStore::claim(account_id, interval_ms, now_ms, key, expected)` 是受控时钟验证入口；生产使用 `claim_current`，不能从选号快照传入旧 RPM／旧时间。
@@ -1512,12 +1514,14 @@ SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expect
 
 ### 3. Contracts
 
-- 绑定 key 是固定域、Token ID 与改写前显式 SID 的 SHA256；不存原 SID／提示词／凭据，不与原协议 `session_hash` 混用。无 SID 不制造稳定会话；不同 Token 不串号。
+- 网关在入站正文改写前解析会话。Claude V3 依次读取 `metadata.user_id` 的既有 session ID、`X-Claude-Code-Session-Id`、`X-Session-Id`，保留既有显式键域。反重力 Gemini 读取 `X-Session-Id`，使用独立显式键域。头只接受单值、非空白、无控制字符且最多 256 字节；通用头由网关消费。
+- 无显式会话时，使用按平台和版本分域的 SHA256，输入包含 Token ID、入站模型、工具、系统指令和首个有效用户内容。对象键按序编码，数组维持输入顺序，Claude 已知协议块的 `cache_control` 不参与计算。后续轮次、客户端 UA、流式开关和上游身份不参与计算。没有可用的模型或首轮输入时沿无绑定路径。绑定表保存摘要，原协议 `session_hash`、上游池会话及策略封禁键各沿自身合同。
 - 硬资格保留 Token 范围、账号状态、真实 5h／7d 控制线、Fable 门禁及既有故障排除。有效老绑定遇到本地并发繁忙、队满、发送等待或超时不迁移；新 v3 路径不再读写旧缓存绑定。
 - 新会话先剔除完全无有界容量的账号，再保留人工优先级，组内优先即时容量。没有即时候选时仅进入可容纳且预计等待不超预算的队列；最终真实许可裁决竞争，排队不扣发送名额。
 - 普通请求 2 单位、Haiku 1 单位及 `2 × concurrency` 个等待请求的 FIFO 保持。请求租约随并发许可和响应流存活，取消／结束 Drop 回收；不把长流与准入超时混为一类。
 - 配置和绝对准入期限在请求开始时冻结。默认 120 秒，可配置 1–120；并发、退避、凭据、池／Hello、环境准备、发送及既有重试共用期限，不重置。实际提交后使用原 TTFB／流生命周期。
 - 环境与身份验证完成后才进发送 FIFO；绑定 CAS 与当前发送许可同事务。CAS 冲突回滚预算、释放当前资源并跟随最新绑定；响应结束不把旧账号写回。
+- 反重力普通生成先按 Token、模型档位和附件资格筛选，在可接单档位内优先使用原绑定。原账号临时繁忙时等待其并发和 RPM，暂停接单时返回 503 并保留绑定。准备凭据及传输后调用 `claim_binding`，获胜后进入原 RPM；CAS 冲突释放候选资源，在同一请求截止前重新选号。已核验的工具接续或重读沿原工具轮账号和许可处理，不用会话键重新选号。
 - 取得发送行写锁后读取账号表当前 RPM 并采样时间。间隔 `ceil(60000/RPM)` 毫秒，非正值不限；绑定 CAS 后、提交事务前记录认领时间。等待不持数据库锁，不积攒空闲名额或分钟补发。
 - `SendPermit` 持有公平队首至真实提交记点，释放时保存单调时钟；下一裁决同时检查持久时间和真实已过间隔。不能把数据库／提交准备耗时抵扣后一个请求的间隔。已认领但取消／发送失败保守消耗名额，不生成假提交点；空闲队列至少保留最大间隔 60 秒后才可回收。
 - `AccountService::update_account`／`update_account_options` 成功保存后通知对应发送队首；等待者重新读取 RPM，支持调低和调高，但原截止时间、协议身份快照不变。仅重新传入旧 `Account` 不能覆盖当前 RPM。
@@ -1561,6 +1565,7 @@ SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expect
 | 有效老绑定但并发繁忙／队满／等待到期 | 原账号等待或本地 429，保留绑定，`Retry-After: 1` |
 | 新会话没有有界容量 | 本地 429，不提前绑定或消费发送名额 |
 | 同 key 并发认领不同账号 | CAS 唯一赢家，失败事务预算回滚 |
+| 反重力首次绑定竞争／原绑定暂停接单 | 冲突候选释放资源并跟随现绑定／返回 503，保留绑定 |
 | 写锁／环境同批就绪／分钟切换／重启 | 不积攒许可；持久与单调时钟共同控制提交间隔 |
 | 等待中调整 RPM | 当前值参与下一裁决，唤醒等待但不重置期限 |
 | 调度状态不可读写／数值非法 | 固定 503，停止新增提交，不泄露底层错误 |
@@ -1576,7 +1581,8 @@ SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expect
 ### 5. Scenarios and Examples
 
 - 正常：A 已绑定且繁忙、B 空闲时，老会话留 A，新会话可进 B；50 RPM 的发送间隔至少 1200ms。
-- 基础：无显式 SID 只按新请求准入；网关重启恢复有效绑定与许可时间，时间轴从新进程采集起点开始。
+- 基础：无显式 SID 且无有效首轮输入时按无绑定请求准入；网关重启恢复有效绑定与许可时间，时间轴从新进程采集起点开始。
+- 正常：同一 Token 的两个 API 请求保留相同模型、工具、系统指令和首轮用户内容，第二次追加历史并切换流式，仍查到同一绑定。单轮客户端可用 `X-Session-Id: chat-42` 关联后续不同输入。直接以全文或 UA 派生会使追加历史或更换客户端时的关联丢失，应使用冻结的入站会话键。
 - 正常：同等条件下 1 小时后重置的窗口获得高于 3 小时窗口的偏好；等待模式中，较快账号即使排队单位更多，也可因较短的成功总耗时估计获选。错误用法是用首输出替代并发槽释放耗时；正确处理是分别保存成功总耗时与首输出。
 - 边界：旧 5h 到期且 7d 已用 4% 时，状态为 `reset_pending`，额度分沿用有效 7d 的 0.96。刷新取得 5h 零用量且无 reset 后，状态为 `observed`，额度分仍为 0.96；错误做法是把明确零用量也当未知，正确处理是接受该官方观测。
 - 边界：头部 100ms、首个有效思考 3000ms 时，调度使用 3000ms；错误做法是沿用 `ttft_ms=100`，正确处理是读取成功终态的 `first_output_ms` 并写入请求冻结分组。
@@ -1596,6 +1602,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 
 - `unknown_feedback_baseline_allows_near_best_rotation`、`health_feedback_starts_from_healthy_baseline_and_decays`：未知健康／延迟为 1.0、额度为 0.5；实际近优轮换、首次成功／失败／容量拒绝、十五分钟半衰期及成功恢复。分组隔离与 SSE 错误反馈回归沿用满分未知基线。
 - `tests/v3_scheduling_test.rs`：SQLite／隔离 PG 共用 CAS、回滚、完整 UTC 毫秒、续租、清理、账号删除及跨分钟／重启合同；不得只用小于 i32 上限的模拟时间证明持久精度。
+- `service::request_session` 和 `v3_messages_routes_and_records_derived_sessions` 覆盖首轮内容稳定性、非法头、Token／平台隔离、显式旧绑定及双账号优先级变化。`verify_agy_gemini.py::verify_session_affinity` 以真实 HTTP 验证两次首轮先选不同账号、实际提交同账号，以及暂停和过期后的行为。
 - `sqlite_write_lock_and_held_permit_cannot_bank_send_time`：写锁延迟后才采样；持有许可时后续不抢跑，提交后仍符合间隔。
 - `waiting_requests_reload_current_rpm_without_resetting_deadline` 及 PG `current_rpm_contract`：300→60、1→300，旧快照不能绕过新 RPM，唤醒及时，期限不变。
 - `capacity_reason_matches_pending_work_and_wait_budget`：无容量时非 ready，前方请求和超期各有原因；原有绑定、Token 隔离、近优轮转、取消、状态故障与只读查询回归保持。

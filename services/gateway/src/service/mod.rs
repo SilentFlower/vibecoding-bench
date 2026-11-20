@@ -33,6 +33,7 @@ pub mod oauth;
 pub mod oauth_flow;
 pub mod prime_poller;
 pub(crate) mod request_body_codec;
+mod request_session;
 pub(crate) mod response_body_codec;
 pub mod rewriter;
 pub(crate) mod runtime_background;

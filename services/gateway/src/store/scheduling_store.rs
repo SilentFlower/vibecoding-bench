@@ -4,7 +4,7 @@ use std::time::Duration;
 use chrono::Utc;
 use serde::Serialize;
 use sqlx::any::AnyRow;
-use sqlx::{AnyPool, Error as SqlxError, Row};
+use sqlx::{Any, AnyPool, Error as SqlxError, Row, Transaction};
 use tokio::time::Instant;
 use uuid::Uuid;
 
@@ -194,26 +194,12 @@ impl SchedulingStore {
             return Ok(SendClaim::WaitUntil(ready_at));
         }
         let binding = if let Some(key) = key {
-            let revision = Uuid::new_v4().to_string();
-            let expected_revision = expected.map(|b| b.revision.as_str()).unwrap_or("");
-            let sql = format!(
-                "INSERT INTO gateway_session_bindings(session_key,account_id,revision,created_at_ms,last_seen_at_ms,expires_at_ms) VALUES($1,$2,$3,$4,$4,$5) ON CONFLICT(session_key) DO UPDATE SET account_id=excluded.account_id, revision=CASE WHEN gateway_session_bindings.account_id=excluded.account_id AND gateway_session_bindings.expires_at_ms>$4 THEN gateway_session_bindings.revision ELSE excluded.revision END, created_at_ms=CASE WHEN gateway_session_bindings.account_id=excluded.account_id AND gateway_session_bindings.expires_at_ms>$4 THEN gateway_session_bindings.created_at_ms ELSE excluded.created_at_ms END, last_seen_at_ms=CASE WHEN gateway_session_bindings.last_seen_at_ms>excluded.last_seen_at_ms THEN gateway_session_bindings.last_seen_at_ms ELSE excluded.last_seen_at_ms END, expires_at_ms=CASE WHEN gateway_session_bindings.expires_at_ms>excluded.expires_at_ms AND gateway_session_bindings.account_id=excluded.account_id THEN gateway_session_bindings.expires_at_ms ELSE excluded.expires_at_ms END WHERE gateway_session_bindings.expires_at_ms<=$4 OR gateway_session_bindings.revision=$6 OR gateway_session_bindings.account_id=excluded.account_id RETURNING {BINDING_COLUMNS}"
-            );
-            let rows = sqlx::query(&sql)
-                .bind(key)
-                .bind(account_id)
-                .bind(revision)
-                .bind(now_ms)
-                .bind(now_ms.saturating_add(BINDING_TTL_MS))
-                .bind(expected_revision)
-                .fetch_all(&mut *tx)
-                .await
-                .map_err(unavailable)?;
-            let Some(row) = rows.into_iter().next() else {
+            let Some(binding) = write_binding(&mut tx, account_id, key, expected, now_ms).await?
+            else {
                 tx.rollback().await.map_err(unavailable)?;
                 return Ok(SendClaim::BindingConflict);
             };
-            Some(binding_from_row(row)?)
+            Some(binding)
         } else {
             None
         };
@@ -231,6 +217,23 @@ impl SchedulingStore {
         .map_err(unavailable)?;
         tx.commit().await.map_err(unavailable)?;
         Ok(SendClaim::Acquired(binding))
+    }
+
+    /// 原子认领反重力会话绑定，发送计数仍走现有反重力准入。
+    /// @param account_id 选中的账号。@param key 匿名会话键。@param expected 选号时读取的版本。
+    /// @return 当前绑定，若已被其他账号认领则为空。
+    pub(crate) async fn claim_binding(
+        &self,
+        account_id: i64,
+        key: &str,
+        expected: Option<&SessionBinding>,
+    ) -> Result<Option<SessionBinding>, AppError> {
+        let mut tx = self.pool.begin().await.map_err(unavailable)?;
+        // 直接写入裁决，避免 SQLite 先读后写形成快照竞争。
+        let now_ms = Utc::now().timestamp_millis();
+        let binding = write_binding(&mut tx, account_id, key, expected, now_ms).await?;
+        tx.commit().await.map_err(unavailable)?;
+        Ok(binding)
     }
 
     /// 仅对当前版本续租；监控查询不得调用此方法。
@@ -468,6 +471,42 @@ impl SchedulingStore {
             .map_err(unavailable)?
             .rows_affected())
     }
+}
+
+async fn write_binding(
+    tx: &mut Transaction<'_, Any>,
+    account_id: i64,
+    key: &str,
+    expected: Option<&SessionBinding>,
+    now_ms: i64,
+) -> Result<Option<SessionBinding>, AppError> {
+    let revision = Uuid::new_v4().to_string();
+    let expected_revision = expected
+        .map(|binding| binding.revision.as_str())
+        .unwrap_or("");
+    let sql = format!(
+        "INSERT INTO gateway_session_bindings(session_key,account_id,revision,created_at_ms,last_seen_at_ms,expires_at_ms)
+         VALUES($1,$2,$3,$4,$4,$5)
+         ON CONFLICT(session_key) DO UPDATE SET
+            account_id=excluded.account_id,
+            revision=CASE WHEN gateway_session_bindings.account_id=excluded.account_id AND gateway_session_bindings.expires_at_ms>$4 THEN gateway_session_bindings.revision ELSE excluded.revision END,
+            created_at_ms=CASE WHEN gateway_session_bindings.account_id=excluded.account_id AND gateway_session_bindings.expires_at_ms>$4 THEN gateway_session_bindings.created_at_ms ELSE excluded.created_at_ms END,
+            last_seen_at_ms=CASE WHEN gateway_session_bindings.last_seen_at_ms>excluded.last_seen_at_ms THEN gateway_session_bindings.last_seen_at_ms ELSE excluded.last_seen_at_ms END,
+            expires_at_ms=CASE WHEN gateway_session_bindings.expires_at_ms>excluded.expires_at_ms AND gateway_session_bindings.account_id=excluded.account_id THEN gateway_session_bindings.expires_at_ms ELSE excluded.expires_at_ms END
+         WHERE gateway_session_bindings.expires_at_ms<=$4 OR gateway_session_bindings.revision=$6 OR gateway_session_bindings.account_id=excluded.account_id
+         RETURNING {BINDING_COLUMNS}"
+    );
+    let row = sqlx::query(&sql)
+        .bind(key)
+        .bind(account_id)
+        .bind(revision)
+        .bind(now_ms)
+        .bind(now_ms.saturating_add(BINDING_TTL_MS))
+        .bind(expected_revision)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(unavailable)?;
+    row.map(binding_from_row).transpose()
 }
 
 /// 根据账号 RPM 计算最小间隔，供持久裁决和管理展示共用。

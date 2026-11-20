@@ -292,16 +292,15 @@ impl AccountService {
         Ok(result)
     }
 
-    /// 为反重力实际选定的模型冻结同类延迟分组。@param token_id 调用方。@param model 实际公开档位。@param streaming 是否流式。@return 请求调度租约。
+    /// 为反重力实际选定的模型冻结同类延迟分组。@param session_key 匿名会话。@param model 实际公开档位。@param streaming 是否流式。@return 请求调度租约。
     pub(crate) fn begin_agy_scheduling(
         &self,
-        token_id: i64,
+        session_key: Option<&str>,
         model: &str,
         streaming: bool,
     ) -> SchedulingRequest {
-        self.selection_scheduler.begin_with_parameters(
-            token_id,
-            None,
+        self.selection_scheduler.begin_with_key(
+            session_key,
             &DiagnosticParameters {
                 model: Some(model.into()),
                 stream: Some(streaming),
@@ -310,25 +309,40 @@ impl AccountService {
         )
     }
 
-    /// 先选仍可接单的模型档位，再沿共享的优先级、容量和智能评分择号。@param token_id 调用方。@param models 已排序模型名。@param accounts 已通过模型和权限校验的候选。@param streaming 是否流式。@return 实际档位、账号和调度租约。
+    /// 在可接单的模型档位内优先使用原绑定，再按优先级、容量和智能评分择号。
+    /// @param session_key 匿名会话。@param models 已排序模型名。@param accounts 已通过模型和权限校验的候选。
+    /// @param streaming 是否流式。@return 实际档位、账号和调度租约。
     pub(crate) async fn select_agy_smart(
         &self,
-        token_id: i64,
+        session_key: Option<&str>,
         models: &[String],
         accounts: Vec<(usize, Account)>,
         streaming: bool,
     ) -> Result<(usize, Account, SchedulingRequest), AppError> {
+        let binding = self.selection_scheduler.lookup_binding(session_key).await?;
         let mut tier = None;
         let mut candidates = Vec::new();
         for (index, account) in accounts {
             if tier.is_some_and(|first| first != index) {
                 break;
             }
+            let bound = binding
+                .as_ref()
+                .is_some_and(|bound| bound.account_id == account.id);
             let control = self.work_controls.snapshot(account.id).await?;
-            if !control.api_accepting
-                || !control.work_enabled
-                || self.get_account_rpm_status(&account).await?.saturated
-            {
+            if !control.api_accepting || !control.work_enabled {
+                if bound {
+                    return Err(AppError::ServiceUnavailable("原会话账号暂停接单".into()));
+                }
+                continue;
+            }
+            if bound {
+                // 既有会话在绑定账号等并发和 RPM，临时负载不应造成换号。
+                let request = self.begin_agy_scheduling(session_key, &models[index], streaming);
+                request.selected(&account, binding);
+                return Ok((index, account, request));
+            }
+            if self.get_account_rpm_status(&account).await?.saturated {
                 continue;
             }
             tier = Some(index);
@@ -344,11 +358,11 @@ impl AccountService {
         }
         let index =
             tier.ok_or_else(|| AppError::ServiceUnavailable("没有支持该模型的AGY账号".into()))?;
-        let request = self.begin_agy_scheduling(token_id, &models[index], streaming);
+        let request = self.begin_agy_scheduling(session_key, &models[index], streaming);
         let account =
             self.selection_scheduler
                 .choose(candidates, &request, DEFAULT_REQUEST_SLOT_UNITS)?;
-        request.selected(&account, None);
+        request.selected(&account, binding);
         Ok((index, account, request))
     }
 

@@ -29,6 +29,7 @@ class ManagementFixture(Fixture):
         self.diagnostic_account_id = 11
         self.extra_attempt = False
         self.original_session = '55555555-5555-4555-8555-555555555555'
+        self.derived_session = None
         self.diagnostic_metrics = {'profile_version': '2.1.293', 'partial': False,
             'tokens': {'input_tokens': 0, 'output_tokens': 100}, 'duration_ms': 2000}
         self.task_accounts = [{'id': 1, 'name': '合成任务账号', 'enabled': 1, 'cc2api_account_id': 11,
@@ -138,6 +139,8 @@ class ManagementFixture(Fixture):
             root.update(account_id=self.diagnostic_account_id, **self.diagnostic_account)
             if self.original_session is not None:
                 root['original_session_id'] = self.original_session
+            if self.derived_session is not None:
+                root['derived_session_id'] = self.derived_session
             if self.diagnostic_account_id is None:
                 root['attempt_count'] = 0
             if '/captures/' in path:
@@ -212,9 +215,11 @@ async def verify_request_metadata(page, fixture, expect):
         await page.keyboard.press('Escape')
     fixture.diagnostic_metrics = copy.deepcopy(metrics)
     fixture.original_session = 's' * 256
+    fixture.derived_session = 'd' * 64
     await page.get_by_role('button', name='刷新', exact=True).click()
     await page.get_by_role('button', name='复制原始 Session ID ' + fixture.original_session, exact=True).click()
     assert await page.evaluate('window.__copiedSession') == fixture.original_session
+    await expect(page.locator('tbody .request-session-source')).to_have_count(0)
     for width in [1280, 390]:
         await page.set_viewport_size({'width': width, 'height': 1000})
         await page.get_by_role('button', name='详情', exact=True).click()
@@ -226,6 +231,21 @@ async def verify_request_metadata(page, fixture, expect):
         await page.keyboard.press('Escape')
     await page.set_viewport_size({'width': 1280, 'height': 1000})
     fixture.original_session = None
+    await page.get_by_role('button', name='刷新', exact=True).click()
+    await expect(page.locator('tbody .request-session')).to_contain_text('网关派生')
+    copy_label = '复制派生 Session ID ' + fixture.derived_session
+    await page.get_by_role('button', name=copy_label, exact=True).click()
+    assert await page.evaluate('window.__copiedSession') == fixture.derived_session
+    await page.set_viewport_size({'width': 390, 'height': 1000})
+    await page.get_by_role('button', name='详情', exact=True).click()
+    panel = page.get_by_role('tabpanel')
+    await expect(panel.locator('.request-session')).to_contain_text('网关派生')
+    await panel.get_by_role('button', name=copy_label, exact=True).click()
+    assert await page.evaluate('window.__copiedSession') == fixture.derived_session
+    assert await panel.evaluate('node=>node.scrollWidth<=node.clientWidth')
+    await page.keyboard.press('Escape')
+    await page.set_viewport_size({'width': 1280, 'height': 1000})
+    fixture.derived_session = None
     fixture.diagnostic_metrics = {'tokens': {}, 'partial': None}
     await page.get_by_role('button', name='刷新', exact=True).click()
     await expect(page.locator('tbody')).to_contain_text('原生运行时 · 未观测')

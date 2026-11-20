@@ -23,6 +23,7 @@ use crate::model::request_diagnostics::{
     RequestDiagnostic, RequestLogMode, normalize_correlation_id, safe_model,
 };
 use crate::service::native_capture;
+use crate::service::request_session::RequestSession;
 use crate::service::rewriter::extract_session_id_from_body;
 use crate::service::system_update::InferenceCutover;
 use crate::service::usage::UsageCapture;
@@ -72,7 +73,7 @@ pub(super) fn current_cutover() -> Option<InferenceCutover> {
 struct TraceState {
     retention: Option<ActiveDiagnostic>,
     request: RequestDiagnostic,
-    original_session_recorded: bool,
+    request_session_recorded: bool,
     profile_selection: String,
     sessions: DiagnosticSessions,
     local_outcome: Option<&'static str>,
@@ -128,6 +129,7 @@ impl TraceContext {
                     log_mode: Some(current_log_mode()),
                     request_id,
                     original_session_id: None,
+                    derived_session_id: None,
                     started_at: now(),
                     finished_at: None,
                     status_code: None,
@@ -140,7 +142,7 @@ impl TraceContext {
                     attempt_count: 0,
                 },
                 profile_selection: "unresolved".into(),
-                original_session_recorded: false,
+                request_session_recorded: false,
                 sessions: DiagnosticSessions::default(),
                 local_outcome: None,
                 next_retry: None,
@@ -338,11 +340,11 @@ pub(crate) fn request_context(platform: &str, protocol: &str, model: Option<&str
     });
 }
 
-/// 冻结客户端入站会话，正文优先，缺省时读取唯一会话头。
-/// @param headers 原始多值请求头。
+/// 记录 Claude 入口及该次请求的会话。
+/// @param session 入站解析结果。
 /// @param body 已解码且尚未映射的请求正文。
-/// @return 无返回值；异常标识保持未知，业务转发沿原链路。
-pub(crate) fn original_session(headers: &HeaderMap, body: &Value) {
+/// @return 无。
+pub(super) fn claude_request_session(session: &RequestSession, body: &Value) {
     request_context(
         "claude_code",
         "anthropic_messages",
@@ -351,28 +353,25 @@ pub(crate) fn original_session(headers: &HeaderMap, body: &Value) {
             .and_then(safe_model)
             .as_deref(),
     );
+    record_request_session(session.original(), session.derived());
+}
+
+/// 冻结根记录的客户端值或已有归属校验的派生值。
+/// @param original 合法的入站会话。@param derived 当前路由所用派生键。@return 无。
+pub(super) fn record_request_session(original: Option<&str>, derived: Option<&str>) {
     let _ = CURRENT_TRACE.try_with(|trace| {
         let mut state = trace.lock();
-        if state.original_session_recorded {
+        if state.request_session_recorded {
             return;
         }
-        state.original_session_recorded = true;
-        let session = extract_session_id_from_body(body).or_else(|| {
-            let mut values = headers.get_all("x-claude-code-session-id").iter();
-            let value = values.next()?;
-            // 重复单值头不合并，避免记录一个客户端未实际提供的会话。
-            if values.next().is_some() {
-                return None;
-            }
-            value.to_str().ok().map(str::to_owned)
-        });
-        state.request.original_session_id = session.filter(|value| {
-            value.len() <= 256 && !value.trim().is_empty() && !value.chars().any(char::is_control)
-        });
+        state.request_session_recorded = true;
         // 缺失值已随入口记录入队，避免额外写入相同摘要。
-        if state.request.original_session_id.is_none() {
+        if original.is_none() && derived.is_none() {
             return;
         }
+        state.request.original_session_id = original.map(str::to_owned);
+        state.request.derived_session_id =
+            derived.filter(|_| original.is_none()).map(str::to_owned);
         drop(state);
         trace.emit(None);
     });
@@ -1065,12 +1064,13 @@ fn identity_hash(account: i64, kind: &str, value: &str) -> String {
 mod tests {
     use super::{
         CURRENT_LOG_MODE, CURRENT_TRACE, RequestTraceGuard, TraceContext, begin_attempt,
-        error_stage, local_outcome, native_rejection, now, original_session, profile_selection,
-        selected_account, session_context,
+        claude_request_session, error_stage, local_outcome, native_rejection, now,
+        profile_selection, selected_account, session_context,
     };
     use crate::error::AppError;
     use crate::model::account::Account;
     use crate::model::request_diagnostics::{AttemptDiagnostic, DiagnosticQuery, RequestLogMode};
+    use crate::service::request_session::RequestSession;
     use crate::service::usage::USAGE_BUFFER_LIMIT;
     use crate::service::v3_scheduling::{SchedulingCandidate, V3Scheduler, now_ms};
     use crate::store::cache::{UpstreamSessionPoolAction, UpstreamSessionPoolResolve};
@@ -1248,9 +1248,10 @@ mod tests {
                     }
                     let body = session.as_ref().map(|session| json!({"metadata":{"user_id":json!({"session_id":session}).to_string()}})).unwrap_or_else(|| json!({}));
                     let response = CURRENT_TRACE.scope(trace, async {
-                        original_session(&headers, &body);
+                        claude_request_session(&RequestSession::claude(None, &headers, &body), &body);
                         // 后续解析与映射只能补充匿名尝试，不能改写入口原值或未知结果。
-                        original_session(&HeaderMap::new(), &json!({"metadata":{"user_id":"user_session_later-session"}}));
+                        let later = json!({"metadata":{"user_id":"user_session_later-session"}});
+                        claude_request_session(&RequestSession::claude(None, &HeaderMap::new(), &later), &later);
                         session_context(7, Some("mapped-session"), None);
                         local_outcome("mock");
                         guard.wrap(Response::new(Body::empty()))
@@ -1285,7 +1286,7 @@ mod tests {
             let trace = TraceContext::new(store.clone());
             CURRENT_TRACE
                 .scope(trace.clone(), async {
-                    original_session(&headers, &body);
+                    claude_request_session(&RequestSession::claude(None, &headers, &body), &body);
                 })
                 .await;
             assert_eq!(

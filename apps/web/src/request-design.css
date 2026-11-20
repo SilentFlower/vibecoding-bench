@@ -354,6 +354,7 @@
 
 .request-session { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .request-session code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ui-font-small); }
+.request-session .request-session-source { flex: none; color: #68788e; font-size: var(--ui-font-small); }
 .request-session button { flex: none; display: flex; padding: 2px; border: 0; background: transparent; color: rgb(107, 123, 145); cursor: pointer; }
 .request-session-full { align-items: flex-start; }
 .request-session-full code { white-space: normal; overflow-wrap: anywhere; }

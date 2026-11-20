@@ -103,7 +103,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - 既有请求页同时展示CC及AGY，平台与模型分别表达；AGY上的Claude模型保持Antigravity标记。高级筛选追加平台、协议、内核版本、请求模型和实际模型，沿用服务端计数与分页。账号选择器仅该入口显式platform=all并展示平台标记。
 - 四页签复用现有布局，展示源usageMetadata、冻结策略、工具前驱及独立控制收口。历史事实未知、真实0和采集缺口分别展示；已解码Gemini、Cortex提交与最终TLS阶段按来源区分。具体字段及权限沿网关settings-database的AGY请求记录合同。
 - 列表核心字段包括时间/请求ID、账号、模型/转发、持久结果/响应码、总耗时/首输出、Token及尝试数。模型、Token与首输出注明末次尝试口径；总耗时只按请求起止观测计算。
-- 增加“原始 Session ID”列，直接读取根记录 `original_session_id`，支持完整值复制，详情概览同步展示。缺失和旧记录显示“未提供”，长值可省略并通过详情查看完整值；复制始终使用原始完整字符串。
+- “原始 Session ID”列和详情概览优先显示根记录 `original_session_id`，缺省时显示 `derived_session_id` 并标记“网关派生”。两字段都缺失显示“未提供”。列表长值可省略，详情展示完整值，两处复制均使用当前展示字段的完整字符串。
 - “模型 / 转发方式”沿现有列显示“原生运行时 · 2.1.280”或“原有转发 · 2.1.293”，版本取 `last_attempt.profile_version`，缺失显示“未观测”。账号基础版本、客户端 UA 或配置默认值不作为实际尝试版本的替代来源。
 - “Token（末次）”列下方及性能详情展示平均 TPS：`output_tokens * 1000 / duration_ms`，包含该次尝试首输出等待，一位小数并注明 token/s。仅 success、partial=false、有效非负安全整数输出 token 和有限正耗时时展示；真实零输出保留 0.0，缺失、处理中或不完整记录为“未观测”。列表与详情共用计算入口。
 - “Token（末次）”列同步展示缓存读与缓存写，分别读取`last_attempt.tokens.cache_read_tokens/cache_write_tokens`；真实0显示0，null或历史缺失显示“—”，性能详情沿同次尝试显示“未观测”。`verify_management_ui.py::verify_request_metadata`覆盖2400、0、null及缺失四种缓存写值，并保留Session ID、版本和TPS回归。

@@ -503,6 +503,7 @@ export interface DiagnosticRequest {
   context?: DiagnosticContext | null
   native_rejection?: { reason: string | null; capture_id: string; capture_status: string } | null
   original_session_id?: string | null
+  derived_session_id?: string | null
   account_name?: string | null
   account_email?: string | null
   log_mode?: 'info' | 'debug' | null

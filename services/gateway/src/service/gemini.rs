@@ -37,6 +37,7 @@ use crate::service::diagnostics::agy::AgyAttemptTrace;
 use crate::service::diagnostics::{
     self, CURRENT_LOG_MODE, CURRENT_TRACE, RequestTraceGuard, TraceContext,
 };
+use crate::service::request_session::RequestSession;
 use crate::service::runtime_transport::{self, PreparedTransport};
 use crate::service::system_update::{self, InferenceCutover, UpdateActivity};
 use crate::service::v3_scheduling::{RequestPhase, SchedulingRequest};
@@ -61,9 +62,24 @@ struct RoutedModel {
     resolved: String,
 }
 
+/// 完成账号、凭据与发送器准备的生成请求。
+struct PreparedGeneration {
+    account: Account,
+    admission: Arc<Admission>,
+    claim: Option<ContinuationClaim>,
+    model: RoutedModel,
+    scheduling: SchedulingRequest,
+    snapshot: AgyAccessSnapshot,
+    native_model: AgyModelId,
+    transport: Arc<PreparedTransport>,
+    gif_frames: bool,
+    ingress: Option<Value>,
+}
+
 /// 仍在等待客户端工具结果的原生请求归属。
 struct ToolTurn {
     token_id: i64,
+    derived_session_id: Option<String>,
     account: Account,
     model: RoutedModel,
     contents: Value,
@@ -804,6 +820,7 @@ impl GeminiService {
             turn.account.id,
             request_id.to_owned(),
             matches[0].clone(),
+            turn.derived_session_id.clone(),
             deadline,
             cutover,
             self.replay_budget.clone(),
@@ -904,8 +921,9 @@ async fn generate_inner(
         _ => return Err(AppError::NotFound),
     };
     diagnostics::request_context("antigravity", "gemini", Some(model));
-    let ingress_headers = request
-        .headers()
+    let (parts, ingress_body) = request.into_parts();
+    let ingress_headers = parts
+        .headers
         .iter()
         .filter_map(|(name, value)| {
             value
@@ -914,7 +932,7 @@ async fn generate_inner(
                 .map(|value| (name.as_str().to_string(), value.to_string()))
         })
         .collect::<Vec<_>>();
-    let raw = axum::body::to_bytes(request.into_body(), BODY_LIMIT)
+    let raw = axum::body::to_bytes(ingress_body, BODY_LIMIT)
         .await
         .map_err(|_| invalid("Gemini正文超过上限"))?;
     diagnostics::remember_ingress_body(&raw);
@@ -923,6 +941,7 @@ async fn generate_inner(
     if !body.is_object() || !body["contents"].is_array() {
         return Err(invalid("Gemini contents无效"));
     }
+    let session = RequestSession::gemini(token.id, &parts.headers, model, &body);
     let media = requested_media(&body)?;
     let thinking_config = body
         .pointer("/generationConfig/thinkingConfig")
@@ -944,8 +963,14 @@ async fn generate_inner(
         &http_request_id,
         deadline,
         cutover.clone(),
-    )?;
-    let tool_turn = match continuation {
+    );
+    let derived_session_id = match &continuation {
+        Ok(Some(Continuation::Replay(replay))) => replay.derived_session_id.clone(),
+        Ok(Some(Continuation::Generate(_, _, claim))) => claim.replay.derived_session_id.clone(),
+        _ => session.derived().map(str::to_owned),
+    };
+    diagnostics::record_request_session(session.original(), derived_session_id.as_deref());
+    let mut tool_turn = match continuation? {
         Some(Continuation::Replay(replay)) => {
             let trace = diagnostics::current_trace();
             if let Some(trace) = trace.as_ref() {
@@ -966,104 +991,167 @@ async fn generate_inner(
         None => None,
     };
 
-    let (account, admission, mut claim, resolved_model, scheduling) =
-        if let Some((account, admission, claim)) = tool_turn {
-            let resolved_model = claim.resolved_model.clone();
-            let current = if media.is_empty() {
-                account
-            } else {
-                state.account_svc.get_account(account.id).await?
-            };
-            let support = AccountService::agy_media_support(
-                &current,
-                &resolved_model,
-                &media,
-                current.agy_gif_frames_enabled,
-            );
-            if support != Some(true) {
-                return Err(AccountService::agy_media_error(&media, support.is_none()));
-            }
-            let scheduling =
-                state
-                    .account_svc
-                    .begin_agy_scheduling(token.id, &resolved_model, streaming);
-            scheduling.selected(&current, None);
-            (current, admission, Some(claim), resolved_model, scheduling)
-        } else {
-            let mut model_names = gemini_model_names(model, requested_tier);
-            let accounts = state
-                .account_svc
-                .agy_candidates(&token, &model_names, &media)
-                .await?;
-            let (model_index, account, scheduling) = state
-                .account_svc
-                .select_agy_smart(token.id, &model_names, accounts, streaming)
-                .await?;
-            let queue = state
-                .account_svc
-                .get_or_create_queue(account.id, account.concurrency)
-                .await;
-            let slot = queue
-                .acquire(
-                    deadline.saturating_duration_since(Instant::now()),
-                    DEFAULT_REQUEST_SLOT_UNITS,
-                )
-                .await
-                .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })?;
-            let admission = Arc::new(Admission {
-                _slot: slot,
-                credentials: state.account_svc.upstream_activity(account.id).await?,
-                _maintenance: system_update::admission()?,
-            });
-            (
-                account,
-                admission,
-                None,
-                model_names.swap_remove(model_index),
-                scheduling,
-            )
-        };
-    scheduling.phase(RequestPhase::Preparing);
-    let model = RoutedModel {
-        requested: model.to_string(),
-        resolved: resolved_model,
-    };
-    let gif_frames = account.agy_gif_frames_enabled && media.contains("image/gif");
-    diagnostics::selected_account(account.id);
-    // 原工具收尾复用原许可和原进程；新AT发布单独检查ready，待对账期间也能完成旧工具。
-    if let Some(claim) = &claim {
-        diagnostics::error_stage("tool_continuation");
-        claim.finish(token.id, &body, deadline, gif_frames).await?;
-    }
-    diagnostics::error_stage("credentials");
-    let snapshot = timeout_at(
-        deadline,
-        state.account_svc.resolve_agy_access_with_admission(
-            account.id,
-            false,
-            Some(&admission.credentials),
-        ),
-    )
-    .await
-    .map_err(|_| AppError::ServiceUnavailable("AGY凭据等待超时".into()))??;
-    let current = state.account_svc.get_account(account.id).await?;
-    let media_support =
-        AccountService::agy_media_support(&current, &model.resolved, &media, gif_frames);
-    if media_support != Some(true) {
-        return Err(AccountService::agy_media_error(
-            &media,
-            media_support.is_none(),
-        ));
-    }
-    let capture_requested = diagnostics::current_log_mode() == RequestLogMode::Debug;
+    let model_names = gemini_model_names(model, requested_tier);
+    let log_mode = diagnostics::current_log_mode();
+    let capture_requested = log_mode == RequestLogMode::Debug;
     let full_egress = capture_requested && full_egress;
-    let ingress = native_capture::ingress(
-        diagnostics::current_log_mode(),
-        &ingress_headers,
-        &raw,
-        &body,
-        &snapshot.access_token,
-    );
+    let PreparedGeneration {
+        account: current,
+        admission,
+        mut claim,
+        model,
+        scheduling,
+        snapshot,
+        native_model,
+        transport,
+        gif_frames,
+        ingress,
+    } = loop {
+        diagnostics::error_stage("account_selection");
+        let (account, admission, claim, resolved_model, scheduling) =
+            if let Some((account, admission, claim)) = tool_turn.take() {
+                let resolved_model = claim.resolved_model.clone();
+                let current = if media.is_empty() {
+                    account
+                } else {
+                    state.account_svc.get_account(account.id).await?
+                };
+                let support = AccountService::agy_media_support(
+                    &current,
+                    &resolved_model,
+                    &media,
+                    current.agy_gif_frames_enabled,
+                );
+                if support != Some(true) {
+                    return Err(AccountService::agy_media_error(&media, support.is_none()));
+                }
+                let scheduling =
+                    state
+                        .account_svc
+                        .begin_agy_scheduling(None, &resolved_model, streaming);
+                scheduling.selected(&current, None);
+                (current, admission, Some(claim), resolved_model, scheduling)
+            } else {
+                let (model_index, account, scheduling) = timeout_at(deadline, async {
+                    let accounts = state
+                        .account_svc
+                        .agy_candidates(&token, &model_names, &media)
+                        .await?;
+                    state
+                        .account_svc
+                        .select_agy_smart(session.key(), &model_names, accounts, streaming)
+                        .await
+                })
+                .await
+                .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })??;
+                let queue = state
+                    .account_svc
+                    .get_or_create_queue(account.id, account.concurrency)
+                    .await;
+                let slot = queue
+                    .acquire(
+                        deadline.saturating_duration_since(Instant::now()),
+                        DEFAULT_REQUEST_SLOT_UNITS,
+                    )
+                    .await
+                    .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })?;
+                let admission = Arc::new(Admission {
+                    _slot: slot,
+                    credentials: state.account_svc.upstream_activity(account.id).await?,
+                    _maintenance: system_update::admission()?,
+                });
+                (
+                    account,
+                    admission,
+                    None,
+                    model_names[model_index].clone(),
+                    scheduling,
+                )
+            };
+        scheduling.phase(RequestPhase::Preparing);
+        let gif_frames = account.agy_gif_frames_enabled && media.contains("image/gif");
+        diagnostics::selected_account(account.id);
+        // 原工具轮先完成收尾，续接模型仍使用原请求保留的许可。
+        if let Some(claim) = &claim {
+            diagnostics::error_stage("tool_continuation");
+            claim.finish(token.id, &body, deadline, gif_frames).await?;
+        }
+        diagnostics::error_stage("credentials");
+        let snapshot = timeout_at(
+            deadline,
+            state.account_svc.resolve_agy_access_with_admission(
+                account.id,
+                false,
+                Some(&admission.credentials),
+            ),
+        )
+        .await
+        .map_err(|_| AppError::ServiceUnavailable("AGY凭据等待超时".into()))??;
+        let current = state.account_svc.get_account(account.id).await?;
+        let media_support =
+            AccountService::agy_media_support(&current, &resolved_model, &media, gif_frames);
+        if media_support != Some(true) {
+            return Err(AccountService::agy_media_error(
+                &media,
+                media_support.is_none(),
+            ));
+        }
+        let ingress = native_capture::ingress(
+            log_mode,
+            &ingress_headers,
+            &raw,
+            &body,
+            &snapshot.access_token,
+        );
+        let native_model =
+            AccountService::agy_model(&current, &resolved_model).ok_or(AppError::NotFound)?;
+        diagnostics::error_stage("runtime_prepare");
+        let transport = Arc::new(
+            timeout_at(
+                deadline,
+                runtime_transport::prepare(
+                    &current,
+                    deadline.saturating_duration_since(Instant::now()),
+                ),
+            )
+            .await
+            .map_err(|_| AppError::ServiceUnavailable("AGY环境准备超时".into()))??,
+        );
+        let sticky = scheduling.key().is_some();
+        if sticky {
+            diagnostics::error_stage("account_selection");
+            scheduling.phase(RequestPhase::WaitingSend);
+            match timeout_at(deadline, scheduling.claim_binding(current.id)).await {
+                Ok(Err(AppError::SchedulingConflict)) => continue,
+                Ok(result) => result?,
+                Err(_) => return Err(AppError::AdmissionLimited { retry_after: 1 }),
+            }
+        }
+        // 绑定竞争失败的候选不会占用发送次数，已有绑定等本账号的临时限流。
+        timeout_at(
+            deadline,
+            state
+                .account_svc
+                .acquire_account_rpm(&current, sticky, scheduling.key().unwrap_or("")),
+        )
+        .await
+        .map_err(|_| AppError::AdmissionLimited { retry_after: 1 })??;
+        break PreparedGeneration {
+            account: current,
+            admission,
+            claim,
+            model: RoutedModel {
+                requested: model.to_owned(),
+                resolved: resolved_model,
+            },
+            scheduling,
+            snapshot,
+            native_model,
+            transport,
+            gif_frames,
+            ingress,
+        };
+    };
     // 发送器直接执行已选的目录型号。只在原始入站采集后消费路由字段，兼容现有运行镜像。
     if has_thinking_config {
         if let Some(config) = body
@@ -1076,24 +1164,6 @@ async fn generate_inner(
     let system_prompt_policy =
         AgySystemPromptPolicy::new(current.agy_system_prompt_homoglyph_enabled);
     let disable_safety_filtering = current.agy_disable_safety_filtering;
-    let native_model =
-        AccountService::agy_model(&current, &model.resolved).ok_or(AppError::NotFound)?;
-    diagnostics::error_stage("runtime_prepare");
-    let transport = Arc::new(
-        timeout_at(
-            deadline,
-            runtime_transport::prepare(
-                &current,
-                deadline.saturating_duration_since(Instant::now()),
-            ),
-        )
-        .await
-        .map_err(|_| AppError::ServiceUnavailable("AGY环境准备超时".into()))??,
-    );
-    state
-        .account_svc
-        .acquire_account_rpm(&current, false, "")
-        .await?;
     let request_id = Uuid::new_v4().to_string();
     let trace = diagnostics::current_trace();
     let previous_turn = claim
@@ -1196,6 +1266,7 @@ async fn generate_inner(
                 gif_frames,
                 disable_safety_filtering,
                 scheduling,
+                derived_session_id,
                 cutover,
                 &mut output,
             )
@@ -1388,6 +1459,7 @@ async fn replay_reader_keeps_the_original_output_alive_after_disconnect() {
         1,
         "request".into(),
         "previous".into(),
+        None,
         deadline,
         None,
         Arc::new(Semaphore::new(8192)),
@@ -1439,6 +1511,7 @@ async fn drive(
     gif_frames: bool,
     disable_safety_filtering: bool,
     scheduling: SchedulingRequest,
+    derived_session_id: Option<String>,
     mut cutover: Option<InferenceCutover>,
     output: &mut GeminiOutput,
 ) -> Result<(), AppError> {
@@ -1773,6 +1846,7 @@ async fn drive(
                         request_id.into(),
                         ToolTurn {
                             token_id,
+                            derived_session_id: derived_session_id.clone(),
                             account: account.clone(),
                             model: model.clone(),
                             runtime_contents: client_contents
