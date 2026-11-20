@@ -145,6 +145,8 @@ class Upstream(BaseHTTPRequestHandler):
             if tool and (parallel_chain or replay_chain):
                 part['functionCall']['id']=f'call_{returned+1:032x}'
                 part['functionCall']['args']={'x':returned+1}
+                if replay_chain and count==4:
+                    part['functionCall']['name']='synthetic_lookup'
                 parts=[part]+[{'functionCall':{'name':'synthetic_lookup' if parallel_chain and i==count-1 else 'synthetic_tool',
                     'args':{'x':returned+i+1},'id':f'call_{returned+i+1:032x}'}}
                     for i in range(1,count)]
@@ -979,6 +981,11 @@ def verify_parallel_tool_turn(parts, id_mode, expected_count):
             reply['functionResponse']['id']=call['id']
         replies.reverse()
     else:
+        if id_mode=='mixed':
+            # 先回填第二个同名调用，并仅在第一个调用的结果上保留真实 ID。
+            require(calls[0]['name']==calls[1]['name'],'混合回填需要两个同名调用')
+            replies[0]['functionResponse']['id']=calls[0]['id']
+            replies[0],replies[1]=replies[1],replies[0]
         for call, reply in zip(calls,replies):
             # AstrBot 省略专用 ID 字段，并可能把 ID 放进结果名称。
             if id_mode=='alias':reply['functionResponse']['name']=call['id']
@@ -1000,7 +1007,7 @@ def verify_parallel_tool_mapping(expected_count):
 
 def verify_parallel_tools(request, wait_idle, base):
     """首条工具 SSE 后断开，按真实 AGY 回环覆盖连续并行回填。@param request 公共入口。@param wait_idle 实际排空。@param base 模型路径。@return 验证摘要。"""
-    for counts, id_modes in [((2,), ('ordered',)), ((6,4,3), ('alias','explicit','ordered'))]:
+    for counts, id_modes in [((2,), ('ordered',)), ((6,4,3), ('alias','explicit','mixed'))]:
         initial_count=len(Upstream.calls)
         marker='TLS_SYNTHETIC_TOOL_PARALLEL' + ('_CHAIN' if len(counts)>1 else '')
         body={'contents':[{'role':'user','parts':[{'text':marker}]}], 'tools':[{'functionDeclarations':[
@@ -1058,21 +1065,26 @@ def verify_parallel_tools(request, wait_idle, base):
 
 
 def verify_tool_result_retries(request, wait_idle, base, database, request_ids):
-    """重现九条消息的重复回填。@param request 网关入口。@param wait_idle 原生排空。@param base 模型路径。@param database 测试库。@param request_ids 网关根 ID。@return 实际模型次数。"""
+    """重现无 ID 混排工具结果和并发重复回填。@param request 网关入口。@param wait_idle 原生排空。@param base 模型路径。@param database 测试库。@param request_ids 网关根 ID。@return 实际模型次数。"""
     initial_count=len(Upstream.calls)
     stream=base+'streamGenerateContent?alt=sse'
     body={'contents':[
         {'role':'user','parts':[{'text':'合成历史问题'}]},
         {'role':'model','parts':[{'text':'合成历史回复'}]},
         {'role':'user','parts':[{'text':'TLS_SYNTHETIC_TOOL_REPLAY'}]},
-    ], 'tools':[{'functionDeclarations':[{'name':'synthetic_tool','parameters':{
-        'type':'OBJECT','properties':{'x':{'type':'INTEGER'}}}}]}]}
+    ], 'tools':[{'functionDeclarations':[{'name':name,'parameters':{
+        'type':'OBJECT','properties':{'x':{'type':'INTEGER'}}}}
+        for name in ('synthetic_tool','synthetic_lookup')]}]}
 
     def append_results(raw, count):
         """按中转省略 ID 的形状追加工具结果。@param raw 首条工具 SSE。@param count 调用数。@return 本轮回填 Part。"""
         frame=[json.loads(line[6:]) for line in raw.splitlines() if line.startswith(b'data: ')][-1]
         parts=[part for part in frame['candidates'][0]['content']['parts'] if 'functionCall' in part]
         replies=verify_parallel_tool_turn(parts,'ordered',count)
+        if count==4:
+            require([reply['functionResponse']['name'] for reply in replies]
+                ==['synthetic_lookup','synthetic_tool','synthetic_tool','synthetic_tool'], '四项调用形状与现场不符')
+            replies=replies[1:]+replies[:1]
         body['contents'].extend([{'role':'model','parts':parts},{'role':'user','parts':replies}])
         return replies
 
@@ -1110,8 +1122,9 @@ def verify_tool_result_retries(request, wait_idle, base, database, request_ids):
             reordered=copy.deepcopy(dict(reversed(list(body.items()))))
             result=reordered['contents'][8]['parts'][-1]['functionResponse']
             result['response']=dict(reversed(list(result['response'].items())))
-            replay=request(stream,reordered,first_tool_frame=True)
-            require(observed==replay==original,
+            # 完成后的重读消费到 EOF，让诊断按正常 HTTP 收口。
+            replay=request(stream,reordered)
+            require(observed==original and replay[0]==original[0] and replay[1].rstrip(b'\n')==original[1].rstrip(b'\n'),
                 f'重复工具回填应接回原响应，并发状态 {observed[0]}，完成后状态 {replay[0]}')
         replay_id=request_ids[-1]
         until=time.monotonic()+5

@@ -593,59 +593,89 @@ fn requested_media(body: &Value) -> Result<BTreeSet<&str>, AppError> {
     Ok(media)
 }
 
-fn matching_tool_call(calls: &[Value], response: &Value, position: usize) -> Option<usize> {
-    let name = response["name"].as_str().filter(|name| !name.is_empty())?;
-    let has_name = calls.iter().any(|call| call["name"] == name);
-    let mut identifier = match response.get("id") {
-        Some(id) => Some(id.as_str().filter(|id| !id.is_empty())?),
-        None => None,
-    };
-    if identifier.is_none() && !has_name && calls.iter().any(|call| call["id"] == name) {
-        identifier = Some(name);
+fn pair_tool_responses(calls: &[Value], responses: &[&Value]) -> Option<Vec<usize>> {
+    if calls.len() != responses.len() {
+        return None;
     }
-    let mut matches = calls.iter().enumerate().filter(|(_, call)| {
-        if let Some(identifier) = identifier {
-            (!has_name || call["name"] == name) && call["id"] == identifier
-        } else {
-            call["name"] == name
+    let mut claimed = vec![false; calls.len()];
+    let mut indices = vec![None; responses.len()];
+    // 先保留可由 ID 唯一核对的位置，避免较早到达的无 ID 结果占用它。
+    for (response, index) in responses.iter().zip(&mut indices) {
+        let name = response["name"].as_str().filter(|name| !name.is_empty())?;
+        if !response["response"].is_object() {
+            return None;
         }
-    });
-    let result = matches.next()?.0;
-    if matches.next().is_none() {
-        return Some(result);
+        let has_name = calls.iter().any(|call| call["name"] == name);
+        let identifier = match response.get("id") {
+            Some(id) => id.as_str().filter(|id| !id.is_empty())?,
+            None if !has_name => name,
+            None => continue,
+        };
+        let mut matches = calls
+            .iter()
+            .enumerate()
+            .filter(|(_, call)| (!has_name || call["name"] == name) && call["id"] == identifier);
+        let call_index = matches.next()?.0;
+        if matches.next().is_some() || claimed[call_index] {
+            return None;
+        }
+        claimed[call_index] = true;
+        *index = Some(call_index);
     }
-    // 中转可能删除并行工具的 ID。回填顺序只用于同名项，并且整轮调用与结果数量仍须一致。
-    (identifier.is_none() && calls.get(position).is_some_and(|call| call["name"] == name))
-        .then_some(position)
+    // 不同工具可交错完成，无 ID 的结果只跟随同名调用的相对顺序。
+    for (response, index) in responses.iter().zip(&mut indices) {
+        if index.is_some() {
+            continue;
+        }
+        let call_index = calls
+            .iter()
+            .zip(&claimed)
+            .position(|(call, used)| !used && call["name"] == response["name"])?;
+        claimed[call_index] = true;
+        *index = Some(call_index);
+    }
+    indices.into_iter().collect()
 }
 
 #[cfg(test)]
 #[test]
-fn parallel_same_name_results_use_ids_or_the_original_order() {
+fn parallel_results_reserve_ids_and_follow_order_within_each_name() {
     let calls = [
+        json!({"name": "List", "id": "list"}),
         json!({"name": "Read", "id": "first", "args": {"path": "a.txt"}}),
         json!({"name": "Read", "id": "second", "args": {"path": "b.txt"}}),
-        json!({"name": "List", "id": "third"}),
+        json!({"name": "Read", "id": "third", "args": {"path": "c.txt"}}),
     ];
     let read = json!({"name": "Read", "response": {}});
-    assert_eq!(matching_tool_call(&calls, &read, 0), Some(0));
-    assert_eq!(matching_tool_call(&calls, &read, 1), Some(1));
-    assert_eq!(matching_tool_call(&calls, &read, 2), None);
-    let id = json!({"name": "Read", "id": "second", "response": {}});
-    assert_eq!(matching_tool_call(&calls, &id, 0), Some(1));
-    let wrong_id = json!({"name": "Read", "id": "third", "response": {}});
-    assert_eq!(matching_tool_call(&calls, &wrong_id, 0), None);
+    let list = json!({"name": "List", "response": {}});
+    let first = json!({"name": "Read", "id": "first", "response": {}});
+    let second = json!({"name": "second", "response": {}});
+    assert_eq!(
+        pair_tool_responses(&calls, &[&read, &read, &read, &list]),
+        Some(vec![1, 2, 3, 0])
+    );
+    assert_eq!(
+        pair_tool_responses(&calls, &[&read, &list, &second, &first]),
+        Some(vec![3, 0, 2, 1])
+    );
+    let wrong_id = json!({"name": "Read", "id": "list", "response": {}});
+    let unknown_id = json!({"name": "Read", "id": "unknown", "response": {}});
+    for responses in [
+        [&read, &read, &read, &read],
+        [&read, &first, &first, &list],
+        [&read, &read, &wrong_id, &list],
+        [&read, &read, &unknown_id, &list],
+    ] {
+        assert_eq!(pair_tool_responses(&calls, &responses), None);
+    }
+    assert_eq!(pair_tool_responses(&calls, &[&read, &read, &list]), None);
 }
 
-fn matches_turn(turn: &ToolTurn, model: &str, body: &Value) -> bool {
-    let Some(old) = turn.contents.as_array() else {
-        return false;
-    };
-    let Some(new) = body["contents"].as_array() else {
-        return false;
-    };
+fn match_tool_turn(turn: &ToolTurn, model: &str, body: &Value) -> Option<Vec<usize>> {
+    let old = turn.contents.as_array()?;
+    let new = body["contents"].as_array()?;
     if turn.model.requested != model || new.len() != old.len() + 2 || new[..old.len()] != old[..] {
-        return false;
+        return None;
     }
     let calls: Vec<_> = new[old.len()]["parts"]
         .as_array()
@@ -653,66 +683,60 @@ fn matches_turn(turn: &ToolTurn, model: &str, body: &Value) -> bool {
         .flatten()
         .filter_map(|part| part.get("functionCall"))
         .collect();
-    if calls.len() != turn.calls.len() {
-        return false;
-    }
-    let empty = json!({});
-    if new[old.len()]["role"] != "model"
+    if calls.len() != turn.calls.len()
+        || new[old.len()]["role"] != "model"
         || new[old.len() + 1]
             .get("role")
             .is_some_and(|role| role != "user")
     {
-        return false;
+        return None;
     }
-    let responses: Vec<_> = new[old.len() + 1]["parts"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|part| part.get("functionResponse"))
-        .collect();
-    if responses.len() != turn.calls.len()
-        || responses
-            .iter()
-            .any(|response| !response["response"].is_object())
-    {
-        return false;
-    }
-    let matched: Option<BTreeSet<_>> = responses
-        .iter()
-        .enumerate()
-        .map(|(position, response)| matching_tool_call(&turn.calls, response, position))
-        .collect();
-    if matched.is_none_or(|indices| indices.len() != turn.calls.len()) {
-        return false;
-    }
-    calls.iter().zip(&turn.calls).all(|(call, expected)| {
+    let empty = json!({});
+    if !calls.iter().zip(&turn.calls).all(|(call, expected)| {
         call["name"] == expected["name"]
             && call.get("args").unwrap_or(&empty) == expected.get("args").unwrap_or(&empty)
             && call
                 .get("id")
                 .is_none_or(|id| Some(id) == expected.get("id"))
-    })
+    }) {
+        return None;
+    }
+    let responses: Vec<_> = new[old.len() + 1]["parts"]
+        .as_array()?
+        .iter()
+        .filter_map(|part| part.get("functionResponse"))
+        .collect();
+    pair_tool_responses(&turn.calls, &responses)
 }
 
-/// 用已校验工具轮的真实 ID 修正原生历史。@param turn 原工具归属。@param body 已匹配的客户端正文。@return 有变更时的原生历史。
-fn runtime_tool_contents(turn: &ToolTurn, body: &Value) -> Option<Value> {
+/// 将已校验的 ID 补入原生历史。@param turn 原工具归属。@param body 客户端正文。
+/// @param indices 按结果顺序给出的调用位置。@return 有变更时的原生历史。
+fn runtime_tool_contents(turn: &ToolTurn, body: &Value, indices: &[usize]) -> Option<Value> {
     let contents = body["contents"].as_array()?;
     let start = contents.len().checked_sub(2)?;
-    let aliases: Vec<_> = contents[start + 1]["parts"]
+    let client_calls: Vec<_> = contents[start]["parts"]
+        .as_array()?
+        .iter()
+        .filter_map(|part| part.get("functionCall"))
+        .collect();
+    let corrections: Vec<_> = contents[start + 1]["parts"]
         .as_array()?
         .iter()
         .enumerate()
-        .filter_map(|(part_index, part)| {
-            let response = part.get("functionResponse")?;
-            let alias = response["name"].as_str()?;
-            if response.get("id").is_some() || turn.calls.iter().any(|call| call["name"] == alias) {
-                return None;
-            }
-            let call_index = matching_tool_call(&turn.calls, response, 0)?;
-            Some((part_index, call_index))
+        .filter_map(|(index, part)| {
+            part.get("functionResponse")
+                .map(|response| (index, response))
+        })
+        .zip(indices.iter().copied())
+        .filter_map(|((part_index, response), call_index)| {
+            let call = &turn.calls[call_index];
+            // 原生历史也需要能用回填携带的真实 ID 找到该次调用。
+            let missing_id =
+                response.get("id").is_some() && client_calls[call_index].get("id").is_none();
+            (missing_id || response["name"] != call["name"]).then_some((part_index, call_index))
         })
         .collect();
-    if aliases.is_empty() && turn.runtime_contents.is_none() {
+    if corrections.is_empty() && turn.runtime_contents.is_none() {
         return None;
     }
 
@@ -729,7 +753,7 @@ fn runtime_tool_contents(turn: &ToolTurn, body: &Value) -> Option<Value> {
         .iter_mut()
         .filter_map(|part| part.get_mut("functionCall"))
         .collect();
-    for (part_index, call_index) in aliases {
+    for (part_index, call_index) in corrections {
         let expected = &turn.calls[call_index];
         calls[call_index]["id"] = expected["id"].clone();
         let response = &mut user["parts"][part_index]["functionResponse"];
@@ -773,12 +797,12 @@ impl GeminiService {
         let matches: Vec<_> = registry
             .turns
             .iter()
-            .filter(|(_, turn)| {
-                turn.token_id == token.id
-                    && eligible(turn.account.id)
-                    && matches_turn(turn, model, body)
+            .filter_map(|(key, turn)| {
+                if turn.token_id != token.id || !eligible(turn.account.id) {
+                    return None;
+                }
+                match_tool_turn(turn, model, body).map(|indices| (key.clone(), indices))
             })
-            .map(|(key, _)| key.clone())
             .collect();
         let mismatch = || AppError::AgyInput {
             reason: "AGY_TOOL_RESULT_MISMATCH",
@@ -791,18 +815,18 @@ impl GeminiService {
             .filter(|entry| entry.deadline > Instant::now())
         {
             if !eligible(replay.account_id)
-                || matches.iter().any(|key| key != &replay.previous_turn)
+                || matches.iter().any(|(key, _)| key != &replay.previous_turn)
             {
                 return Err(mismatch());
             }
             return Ok(Some(Continuation::Replay(replay.clone())));
         }
-        if matches.len() != 1 {
+        let [(key, indices)] = matches.as_slice() else {
             return Err(mismatch());
-        }
+        };
         let turn = registry
             .turns
-            .get_mut(&matches[0])
+            .get_mut(key)
             .ok_or_else(|| invalid("工具轮已结束"))?;
         if turn.claimed || turn.deadline <= Instant::now() {
             return Err(invalid("工具轮已领取或到期"));
@@ -819,7 +843,7 @@ impl GeminiService {
         let replay = Arc::new(ToolReplay::new(
             turn.account.id,
             request_id.to_owned(),
-            matches[0].clone(),
+            key.clone(),
             turn.derived_session_id.clone(),
             deadline,
             cutover,
@@ -830,9 +854,9 @@ impl GeminiService {
             turn.admission.clone(),
             ContinuationClaim {
                 service: self.clone(),
-                key: Some(matches[0].clone()),
+                key: Some(key.clone()),
                 resolved_model: turn.model.resolved.clone(),
-                runtime_contents: runtime_tool_contents(turn, body),
+                runtime_contents: runtime_tool_contents(turn, body, indices),
                 replay_key: replay_key.clone(),
                 replay: replay.clone(),
             },

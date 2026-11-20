@@ -117,33 +117,49 @@ def _legacy_tool_history(contents, tool_names):
     return normalized
 
 
-def _matching_call(calls, value, position):
-    name = value.get('name')
-    if not isinstance(name, str) or not name:
+def _ordered_tool_results(calls, values):
+    """按原调用顺序配对一轮结果。@param calls 实际调用。@param values 客户端结果。@return 排好序的结果或空。"""
+    if len(values) != len(calls):
         return None
-    identifier = value.get('id')
-    named = [call for call in calls if call['name'] == name]
-    if 'id' in value and (not isinstance(identifier, str) or not identifier):
-        return None
-    if identifier is None and not named and any(call.get('id') == name for call in calls):
-        identifier = name
-    if identifier is not None:
-        matches = [call for call in (named or calls) if call.get('id') == identifier]
-    else:
-        matches = named
-    if len(matches) == 1:
-        return matches[0]
-    # 只在中转省略同名调用的 ID 时使用原顺序。整轮仍须全部匹配且每项只消费一次。
-    if identifier is None and len(named) > 1 and position < len(calls) and calls[position]['name'] == name:
-        return calls[position]
-    return None
+    results = [None] * len(calls)
+    deferred = []
+    # 先保留可由 ID 核对的位置，再处理可能早于它到达的无 ID 结果。
+    for value in values:
+        if not isinstance(value, dict):
+            return None
+        name, result = value.get('name'), value.get('response')
+        if not isinstance(name, str) or not name or not isinstance(result, dict):
+            return None
+        has_name = any(call['name'] == name for call in calls)
+        if 'id' in value:
+            identifier = value['id']
+            if not isinstance(identifier, str) or not identifier:
+                return None
+        elif has_name:
+            deferred.append((name, result))
+            continue
+        else:
+            identifier = name
+        matches = [index for index, call in enumerate(calls)
+            if (not has_name or call['name'] == name) and call.get('id') == identifier]
+        if len(matches) != 1 or results[matches[0]] is not None:
+            return None
+        results[matches[0]] = result
+    # 不同工具的完成次序可变化，同名组内用原顺序补齐尚未认领的位置。
+    for name, result in deferred:
+        index = next((index for index, call in enumerate(calls)
+            if results[index] is None and call['name'] == name), None)
+        if index is None:
+            return None
+        results[index] = result
+    return results
 
 
 def native_history(contents, tool_names=(), gif=None, *, native_model):
     """映射多 Part 和完整函数结果。@param contents Gemini 内容。@param tool_names 工具名。@param gif GIF 预算。@param native_model 本轮执行ID。@return 原生步骤。"""
     if not isinstance(contents,list) or not contents:raise InputError('invalid_gemini_contents')
     contents = _legacy_tool_history(contents, tool_names)
-    steps=[];pending=[];used=set();tool_steps={}
+    steps=[];pending=[];used=set();tool_results=[]
     for i,content in enumerate(contents):
         path='/body/contents/'+str(i);checked_fields(content,{'role','parts'},path)
         role=content.get('role','user');parts=content.get('parts')
@@ -175,17 +191,23 @@ def native_history(contents, tool_names=(), gif=None, *, native_model):
                 value=part['functionResponse'];checked_fields(value,{'name','response','id'},location+'/functionResponse')
                 text(value.get('name'));result=value.get('response')
                 if not isinstance(result,dict):raise InputError('invalid_function_response:'+location)
-                # 保留本轮完整名称集合，避免第二个结果借其他工具名认领剩余调用。
-                call = _matching_call(planner['toolCalls'], value, len(tool_steps)) if pending else None
-                if call is None or call not in pending:raise InputError('ambiguous_or_unknown_function_response:'+location)
-                pending.remove(call)
+                if not pending or len(tool_results) == len(pending):
+                    raise InputError('ambiguous_or_unknown_function_response:'+location)
+                tool_results.append(value)
+        if pending and len(tool_results) == len(pending):
+            # 一个历史工具轮可跨多条用户内容，收齐才能保留较晚出现的显式 ID。
+            ordered = _ordered_tool_results(pending, tool_results)
+            if ordered is None:
+                raise InputError('ambiguous_or_unknown_function_response:'+path)
+            for call, result in zip(pending, ordered):
                 # 结果使用原生 ResultValue，避免把 Gemini 对象再次包成 output 文本。
-                args=json.loads(call['argumentsJson']);native_args={k:v if isinstance(v,str) else encode(v) for k,v in args.items()}
-                tool_steps[call['id']]={'type':'CORTEX_STEP_TYPE_GENERIC','status':'CORTEX_STEP_STATUS_DONE','metadata':{'toolCall':copy.deepcopy(call)},'generic':{'args':native_args,'result':{'resultValue':native_value(result)}}}
-        if tool_steps and not pending:
-            # 原生轨迹按 planner 的调用顺序导入，客户端仍可反序提交结果。
-            steps.extend(tool_steps[call['id']] for call in planner['toolCalls'])
-            tool_steps.clear()
+                args = json.loads(call['argumentsJson'])
+                native_args = {key: value if isinstance(value, str) else encode(value) for key, value in args.items()}
+                steps.append({'type': 'CORTEX_STEP_TYPE_GENERIC', 'status': 'CORTEX_STEP_STATUS_DONE',
+                    'metadata': {'toolCall': copy.deepcopy(call)},
+                    'generic': {'args': native_args, 'result': {'resultValue': native_value(result)}}})
+            pending = []
+            tool_results.clear()
         if role=='model':
             if pending:raise InputError('missing_function_response:'+path)
             planner={'response':'\n'.join(response),'modifiedResponse':'\n'.join(response),'stopReason':'STOP_REASON_STOP_PATTERN'}
@@ -194,7 +216,9 @@ def native_history(contents, tool_names=(), gif=None, *, native_model):
                 native={};call_signature(thinking_signature,native)
                 if 'thinkingSignature' in native:planner['thinkingSignature']=native['thinkingSignature']
                 elif 'thoughtSignature' in native:planner['signature']=native['thoughtSignature']
-            if calls:planner['toolCalls']=calls;pending=copy.deepcopy(calls)
+            if calls:
+                planner['toolCalls'] = calls
+                pending = calls
             steps.append({'type':'CORTEX_STEP_TYPE_PLANNER_RESPONSE','status':'CORTEX_STEP_STATUS_DONE','metadata':{'source':'CORTEX_STEP_SOURCE_MODEL','generatorModel':native_model},'plannerResponse':planner})
         elif response or media:
             if pending:raise InputError('missing_function_response:'+path)
@@ -299,13 +323,7 @@ def continuation_results(previous, calls, incoming):
         if isinstance(part, dict):
             media_part(part, f'/body/contents/{count + 1}/parts/{index}', 'user')
     values=[p['functionResponse'] for p in user['parts'] if 'functionResponse' in p]
-    indices={id(call):index for index,call in enumerate(calls)}
-    results = {}
-    for position, value in enumerate(values):
-        call = _matching_call(calls, value, position)
-        index = indices.get(id(call))
-        if index is None or index in results or not isinstance(value.get('response'), dict):
-            raise InputError('gemini_pending_results_mismatch')
-        results[index] = copy.deepcopy(value['response'])
-    if len(results)!=len(calls):raise InputError('gemini_pending_results_mismatch')
-    return [results[index] for index in range(len(calls))]
+    ordered = _ordered_tool_results(calls, values)
+    if ordered is None:
+        raise InputError('gemini_pending_results_mismatch')
+    return copy.deepcopy(ordered)

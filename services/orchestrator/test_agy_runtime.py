@@ -452,7 +452,7 @@ class AgyRuntimeTests(unittest.TestCase):
             thread.join(2)
 
     def test_kernel_completion_reaches_real_tool_broker_once(self):
-        """两个同名工具反序回填时仍交给各自原生调用，错误和重复 ID 拒绝。@return 无。"""
+        """两个同名工具反序混合回填时各完成一次。@return 无。"""
         body={'contents':[{'role':'user','parts':[{'text':'合成问题'}]}]}
         call={'id':'synthetic-call','name':'synthetic_tool','args':{'x':1}}
         frames=Frames()
@@ -485,14 +485,17 @@ class AgyRuntimeTests(unittest.TestCase):
         value={'schema_version':1,'type':'finish_tool_turn',**identity,'body':incoming}
         wrong=copy.deepcopy(value);wrong['body']['contents'][-1]['parts'][0]['functionResponse']['id']='other'
         with self.assertRaises(InputError):service.finish_tool_turn(wrong)
-        ambiguous=copy.deepcopy(value);ambiguous['body']['contents'][-1]['parts'][0]['functionResponse'].pop('id')
-        with self.assertRaises(InputError):service.finish_tool_turn(ambiguous)
+        duplicate = copy.deepcopy(value)
+        duplicate['body']['contents'][-1]['parts'][0]['functionResponse']['id'] = call['id']
+        with self.assertRaises(InputError):service.finish_tool_turn(duplicate)
         self.assertFalse(scope.resume_claimed)
-        service.finish_tool_turn(value)
+        mixed = copy.deepcopy(value)
+        mixed['body']['contents'][-1]['parts'][0]['functionResponse'].pop('id')
+        service.finish_tool_turn(mixed)
         self.assertEqual(scope.broker.pending['synthetic-native-call-1']['result']['structuredContent'],{'result':9})
         self.assertEqual(scope.broker.pending['synthetic-native-call-2']['result']['structuredContent'],{'result':10})
         self.assertEqual(emitted[-1]['type'],'tool_continuation_accepted')
-        with self.assertRaises(InputError):service.finish_tool_turn(value)
+        with self.assertRaises(InputError):service.finish_tool_turn(mixed)
 
     def test_access_only_document_is_private_and_cannot_overwrite_a_generation(self):
         """业务发布只保存AT，原代次和权威RT保持隔离。@return 无。"""
@@ -663,6 +666,35 @@ class AgyRuntimeTests(unittest.TestCase):
                 gemini_contract.native_history(invalid, native_model=self.fixed_model[1])
         with self.assertRaisesRegex(InputError, 'ambiguous_or_unknown_function_response'):
             gemini_contract.native_history(contents, ['call_123'], native_model=self.fixed_model[1])
+
+    def test_mixed_tool_history_pairs_results_across_user_contents(self):
+        """历史和实时回填按工具名补齐，并保留稍后收到的显式 ID。@return 无。"""
+        names = ('synthetic_lookup', 'synthetic_tool', 'synthetic_tool', 'synthetic_tool')
+        calls = [{'name': name, 'id': f'call-{index}', 'args': {'index': index}}
+            for index, name in enumerate(names)]
+        previous = {'contents': [{'role': 'user', 'parts': [{'text': '合成问题'}]}]}
+        expected = [{'value': index} for index in range(len(calls))]
+        for sequence, with_id in (((1, 2, 3, 0), False), ((2, 1, 3, 0), True)):
+            with self.subTest(with_id=with_id):
+                model_parts = [{'functionCall': {'name': call['name'], 'args': copy.deepcopy(call['args'])}}
+                    for call in calls]
+                replies = [{'functionResponse': {'name': names[index], 'response': copy.deepcopy(expected[index])}}
+                    for index in sequence]
+                if with_id:
+                    model_parts[1]['functionCall']['id'] = calls[1]['id']
+                    replies[1]['functionResponse']['id'] = calls[1]['id']
+                model = {'role': 'model', 'parts': model_parts}
+                contents = [*previous['contents'], model, {'role': 'user', 'parts': replies}]
+                original = copy.deepcopy(contents)
+                self.assertEqual(gemini_contract.continuation_results(previous, calls, {'contents': contents}), expected)
+                history = [*contents[:-1], {'role': 'user', 'parts': replies[:1]},
+                    {'role': 'user', 'parts': replies[1:]}]
+                steps = gemini_contract.native_history(history, native_model=self.fixed_model[1])
+                generic = [step['generic'] for step in steps if 'generic' in step]
+                self.assertEqual([step['args']['index'] for step in generic], ['0', '1', '2', '3'])
+                self.assertEqual([step['result']['resultValue'] for step in generic],
+                    [gemini_contract.native_value(value) for value in expected])
+                self.assertEqual(contents, original)
 
     def test_split_frames_preserve_parts_signature_extensions_and_single_usage(self):
         """兼容投影保留所有Part，并只在最后一帧发布终态与用量。@return 无。"""
