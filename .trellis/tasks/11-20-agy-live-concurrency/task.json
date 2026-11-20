@@ -1,0 +1,42 @@
+{
+  "id": "agy-live-concurrency",
+  "name": "agy-live-concurrency",
+  "title": "反重力账号并发上限在线调整",
+  "description": "参照 Claude Code，让反重力在有在途和排队时也能修改并发上限。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "platform",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-20",
+  "completedAt": "2026-11-20",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-20T15:58:51Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-20-agy-runtime-followups",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "实现 AGY 并发上限在线调整",
+      "通过 3→4→3 流式回环、角色预算与失败恢复验收",
+      "同步并发容量合同与业务代码"
+    ],
+    "partialStep": null,
+    "nextStep": "按同批计划接续节点迁移",
+    "notes": "本机隔离验收覆盖同一监督器的真实并发和工具回填。正式版本部署后复核目标账号。",
+    "updatedAt": "2026-11-20T15:58:51Z"
+  }
+}
