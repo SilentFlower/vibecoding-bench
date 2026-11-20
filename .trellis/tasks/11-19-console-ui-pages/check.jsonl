@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/web/frontend/ui-guidelines.md", "reason": "三批页面合同、类名契约与测试命令，脚本修复按此定位与断言"}
+{"file": ".trellis/spec/web/frontend/frontend-guidelines.md", "reason": "请求账号名称与邮箱展示、请求详情页签与分页合同，判断期望是否过时"}
+{"file": ".trellis/tasks/11-19-console-ui-revamp/prd.md", "reason": "父任务 R7 与跨子任务验收口径"}
+{"file": ".trellis/tasks/11-20-console-pages-nodes-settings/design.md", "reason": "回归运行器、基线对照与设计稿比对脚本做法，本任务沿用"}

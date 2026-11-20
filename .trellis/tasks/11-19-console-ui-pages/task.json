@@ -1,0 +1,49 @@
+{
+  "id": "console-ui-pages",
+  "name": "console-ui-pages",
+  "title": "控制台 Vue 业务页迁移",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "web",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-19",
+  "completedAt": "2026-11-20",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-20T05:22:20Z",
+    "blockers": []
+  },
+  "branch": "feat/console-ui-revamp",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "11-20-console-pages-accounts",
+    "11-20-console-pages-records",
+    "11-20-console-pages-nodes-settings"
+  ],
+  "parent": "11-19-console-ui-revamp",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-20T05:22:20.264717+00:00",
+    "completedSteps": [
+      "三个子任务完成态、Close与提交归属核对",
+      "四个既有失败脚本按现合同修好并全部断言跑通",
+      "全量回归、设计稿比对与组件库外壳复核",
+      "七页1440与390截图矩阵",
+      "页面样式检查与验收矩阵",
+      "Check-All通过（CHK-001已修），Spec written"
+    ],
+    "partialStep": null,
+    "nextStep": "父任务后续子任务（5 主题设置页 / 6 原生页对齐）规划评审",
+    "notes": "回归仍有7个既有失败（真实发行物2、原生页4、系统更新检查写入1），失败点不变，留给子任务6或父任务最终复核。父任务规划目录留到其最终复核时提交。"
+  }
+}
