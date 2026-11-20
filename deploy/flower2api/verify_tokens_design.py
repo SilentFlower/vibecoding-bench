@@ -15,6 +15,7 @@ class TokenDesignFixture(RunDetailFixture):
         """将反重力账号放在第二页，验证完整平台范围。@return 无。"""
         super().__init__()
         self.scope_queries = []
+        self.token_reads = 0
         for identity in range(14, 102):
             self.accounts.append(dict(copy.deepcopy(self.account_template), id=identity,
                 name='反重力开发' if identity == 101 else f'合成账号 {identity}',
@@ -25,6 +26,8 @@ class TokenDesignFixture(RunDetailFixture):
         req=route.request;path=urlsplit(req.url).path
         if path == '/admin/accounts' and req.method == 'GET':
             self.scope_queries.append(parse_qs(urlsplit(req.url).query))
+        if path == '/admin/tokens' and req.method == 'GET':
+            self.token_reads += 1
         if path.startswith('/admin/tokens') and req.method!='GET':
             body=req.post_data_json if req.post_data else {}
             self.writes.append(dict(path=path,method=req.method,body=body))
@@ -58,11 +61,18 @@ async def main():
         blocked=dialog.get_by_role('group',name='排除的账号');await blocked.get_by_role('button',name='选择账号',exact=True).click();await blocked.get_by_role('searchbox',name='搜索排除的账号',exact=True).fill('design2@');await blocked.get_by_role('checkbox').check()
         await dialog.get_by_role('button',name='保存权限',exact=True).click();await expect(dialog).to_have_count(0);assert fixture.writes[-1]['body']==dict(name='开发客户端',allowed_accounts='13,101',blocked_accounts='2')
         await expect(page.locator('.token-row')).to_contain_text('正式账号 13');await page.get_by_role('switch').click();await expect(page.get_by_role('switch')).to_have_attribute('aria-checked','false')
+        # 名称搜索只在已读取的令牌中过滤，不发请求，计数显示「匹配 / 全部」。
+        reads=fixture.token_reads
+        search=page.get_by_role('searchbox',name='搜索令牌',exact=True);await search.fill('不存在的令牌');await expect(page.locator('.token-row')).to_have_count(0);await expect(page.get_by_text('没有匹配的令牌',exact=True)).to_be_visible();await expect(page.locator('.token-panel .fui-table-card-count')).to_have_text('0 / 1 个令牌')
+        await search.fill('开发');await expect(page.locator('.token-row')).to_have_count(1);await expect(page.locator('.token-panel .fui-table-card-count')).to_have_text('1 / 1 个令牌')
+        await search.fill('');await expect(page.locator('.token-panel .fui-table-card-count')).to_have_text('1 个令牌')
+        assert fixture.token_reads==reads
         for width in [1440,720,390]:
             await page.set_viewport_size({'width':width,'height':1000});await page.screenshot(path=str(out/f'actual-tokens-{width}.png'));assert await page.evaluate('document.documentElement.scrollWidth<=innerWidth')
             await page.get_by_role('button',name='编辑权限',exact=True).click()
             # 同一渲染帧读取按钮，避免入场动画造成分次测量坐标漂移。
-            bounds = await dialog.locator('.token-editor-footer').evaluate('e=>({footer:e.getBoundingClientRect().toJSON(),cancel:e.children[0].getBoundingClientRect().toJSON(),submit:e.children[1].getBoundingClientRect().toJSON()})')
+            # 底栏为 ModalDialog 的通栏 .fui-modal-foot，取消与保存按无障碍名称定位。
+            bounds = await dialog.locator('.fui-modal-foot').evaluate('e=>({footer:e.getBoundingClientRect().toJSON(),cancel:[...e.querySelectorAll("button")].find(b=>b.textContent.trim()==="取消").getBoundingClientRect().toJSON(),submit:[...e.querySelectorAll("button")].find(b=>b.textContent.trim()==="保存权限").getBoundingClientRect().toJSON()})')
             footer, cancel, submit = bounds['footer'], bounds['cancel'], bounds['submit']
             assert cancel['x'] > footer['x'] and submit['x'] + submit['width'] < footer['x'] + footer['width'] - 15
             assert abs(cancel['y'] - submit['y']) < 1
@@ -70,7 +80,7 @@ async def main():
         await page.get_by_role('button',name='删除',exact=True).click();confirm=page.get_by_role('dialog');await confirm.get_by_role('button',name='取消',exact=True).click();assert len(fixture.tokens)==1
         await page.get_by_role('button',name='删除',exact=True).click();await confirm.get_by_role('button',name='删除',exact=True).click();await expect(page.locator('.token-row')).to_have_count(0)
         assert not errors,errors
-        result=dict(passed=True,checks=['行布局与直接操作','跨页账号搜索','取消零写入','允许排除CSV载荷','启停','删除确认','1440/720/390px'],errors=errors);(out/'token-verification.json').write_text(json.dumps(result,ensure_ascii=False,indent=2));print(json.dumps(result,ensure_ascii=False));await browser.close()
+        result=dict(passed=True,checks=['行布局与直接操作','跨页账号搜索','取消零写入','允许排除CSV载荷','启停','名称搜索','删除确认','1440/720/390px'],errors=errors);(out/'token-verification.json').write_text(json.dumps(result,ensure_ascii=False,indent=2));print(json.dumps(result,ensure_ascii=False));await browser.close()
 
 
 if __name__=='__main__':asyncio.run(main())

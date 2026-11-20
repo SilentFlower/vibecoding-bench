@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { ChoiceSelect } from './ui/controls';
 import type { NativeCapture, NativeCaptureStage } from '../api';
+import '../request-records.css';
 
 const props = defineProps<{ snapshot: NonNullable<NativeCapture['snapshot']> }>();
 const action = ref('all');
@@ -59,7 +60,7 @@ function bodyText(): string {
     <details v-if="snapshot.wire_final" class="request-code-block request-wire-evidence" data-native-wire-final><summary>原生TLS接受证据</summary><div class="request-wire-content">
 
       <p>实体完整性：{{ label(snapshot.wire_final.status) }} · 网络刷出：未独立观测</p>
-      <p v-if="finalReason" role="status" class="break-words text-amber-700">{{ finalReason }}（{{ snapshot.wire_final.reason }}）</p>
+      <p v-if="finalReason" role="status" class="break-words request-wire-reason">{{ finalReason }}（{{ snapshot.wire_final.reason }}）</p>
       <p class="break-all text-muted-foreground">进程 {{ snapshot.wire_final.worker_pid ?? '未观测' }} · 连接 {{ snapshot.wire_final.connection_id ?? '未观测' }} · 环境代次 {{ snapshot.wire_final.binding_generation ?? '未观测' }}</p>
       <p v-if="snapshot.wire_final.http_sha256" class="break-all text-muted-foreground">整体HTTP {{ snapshot.wire_final.observed_http_bytes }} 字节 · SHA256 {{ snapshot.wire_final.http_sha256 }}</p>
       <p v-if="snapshot.wire_final.complete">正文与组装阶段的SHA256：{{ snapshot.wire_final.body_sha256 === snapshot.original_body_sha256 ? '一致' : '不同' }}。比较依据为同次实际观测摘要。</p>

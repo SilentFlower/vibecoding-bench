@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 use axum::Json;
 use axum::extract::{Path, Query, State};
+use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -231,7 +232,7 @@ pub async fn list(
     let counts = if query.usage == Some(false) {
         Value::Null
     } else {
-        directory_counts(&summary?, &refs)
+        directory_counts(&summary?, &refs, Utc::now())
     };
     Ok(Json(
         json!({"data": records.iter().map(|record| public(record, &refs)).collect::<Vec<_>>(),
@@ -241,10 +242,19 @@ pub async fn list(
 }
 
 /// 按完整目录聚合，未知引用保持null，私有连接不进入返回对象。
-fn directory_counts(index: &[(String, String)], refs: &References) -> Value {
+/// 到期统计只看到期时间，不受引用完整性影响：已过期为 t<=now，7 天内到期为 now<t<now+7天，
+/// 与控制台行内着色的判定一致；未设置或无法解析的到期时间不计入。
+/// @param index 私有连接、状态与到期时间。@param refs 账号引用。@param now 服务端当前时间。@return 公开计数。
+fn directory_counts(
+    index: &[(String, String, Option<String>)],
+    refs: &References,
+    now: DateTime<Utc>,
+) -> Value {
     let mut used = 0;
     let mut complete = refs.complete;
-    for (raw, _) in index {
+    let (mut expiring, mut expired) = (0, 0);
+    let horizon = now + Duration::days(7);
+    for (raw, _, expires_at) in index {
         match ProxyConnection::parse(raw) {
             Ok(connection) => {
                 if !users_for(&connection.fingerprint(), refs).is_empty() {
@@ -253,15 +263,25 @@ fn directory_counts(index: &[(String, String)], refs: &References) -> Value {
             }
             Err(_) => complete = false,
         }
+        let deadline = expires_at
+            .as_deref()
+            .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+            .map(|value| value.with_timezone(&Utc));
+        match deadline {
+            Some(value) if value <= now => expired += 1,
+            Some(value) if value < horizon => expiring += 1,
+            _ => {}
+        }
     }
-    json!({"all":index.len(),"available":index.iter().filter(|(_,status)|status=="ready").count(),
-        "used":complete.then_some(used)})
+    json!({"all":index.len(),"available":index.iter().filter(|(_,status,_)|status=="ready").count(),
+        "used":complete.then_some(used),"expiring":expiring,"expired":expired})
 }
 
 #[cfg(test)]
 mod summary_tests {
     use super::{References, directory_counts};
     use crate::model::proxy::ProxyConnection;
+    use chrono::{DateTime, Duration, Utc};
     use serde_json::json;
     use std::collections::HashMap;
 
@@ -278,14 +298,55 @@ mod summary_tests {
         refs.by_connection
             .insert(connection.fingerprint(), vec![json!({"status":"disabled"})]);
         let index = vec![
-            (connection.private_url.clone(), "ready".into()),
-            ("http://second.invalid:80".into(), "unknown".into()),
+            (connection.private_url.clone(), "ready".into(), None),
+            ("http://second.invalid:80".into(), "unknown".into(), None),
         ];
-        let value = directory_counts(&index, &refs);
-        assert_eq!(value, json!({"all":2,"available":1,"used":1}));
+        let value = directory_counts(&index, &refs, Utc::now());
+        assert_eq!(
+            value,
+            json!({"all":2,"available":1,"used":1,"expiring":0,"expired":0})
+        );
         assert!(!value.to_string().contains("private-pass"));
         refs.complete = false;
-        assert!(directory_counts(&index, &refs)["used"].is_null());
+        assert!(directory_counts(&index, &refs, Utc::now())["used"].is_null());
+    }
+
+    /// 到期统计按服务端时间划分边界，未设置与非法时间不计入，引用不完整时仍给出数字。
+    #[test]
+    fn counts_split_expiry_at_now_and_seven_days() {
+        let now = DateTime::parse_from_rfc3339("2026-11-20T08:00:00.500+00:00")
+            .unwrap()
+            .with_timezone(&Utc);
+        let deadlines = [
+            Some(now.to_rfc3339()),
+            Some((now - Duration::seconds(1)).to_rfc3339()),
+            Some((now + Duration::seconds(1)).to_rfc3339()),
+            Some((now + Duration::days(7) - Duration::milliseconds(1)).to_rfc3339()),
+            Some((now + Duration::days(7)).to_rfc3339()),
+            None,
+            Some("not-a-time".to_string()),
+        ];
+        let index: Vec<_> = deadlines
+            .into_iter()
+            .enumerate()
+            .map(|(id, deadline)| {
+                (
+                    format!("http://line{id}.invalid:80"),
+                    "ready".into(),
+                    deadline,
+                )
+            })
+            .collect();
+        let refs = References {
+            by_connection: HashMap::new(),
+            previous: HashMap::new(),
+            complete: false,
+        };
+        let value = directory_counts(&index, &refs, now);
+        assert_eq!(value["expired"], json!(2));
+        assert_eq!(value["expiring"], json!(2));
+        assert_eq!(value["all"], json!(7));
+        assert!(value["used"].is_null());
     }
 }
 

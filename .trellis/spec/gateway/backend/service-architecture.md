@@ -1632,8 +1632,8 @@ transport.submit(prepared, body, ttfb_timeout).await
 - 仅识别结构化错误、SSE error、refusal 内容块及 `stop_reason=refusal`；`reasoning_extraction`、safeguards flagged、Usage Policy 等匹配限定错误字段，普通回答引用保持正常处理。HTTP 401/429 保留原分类，明确策略拒答不进入账号停用或签名修复重试。
 - 响应观察独立于诊断，复用有界解码与增量解析。SSE 拒答在当前帧交付前等待持久写入，原协议字节及 trailers 保留；完整 JSON 在结束观察时登记。观察上下文由响应流持有，不能依赖请求 task-local 在流读取时仍存在。
 - 有效封禁返回 HTTP 400 Anthropic error，`error.type=invalid_request_error`、`error.code=session_policy_blocked`，`error.details` 含 `retryable=false`、RFC3339 `expires_at` 与向上取整的 `remaining_seconds`；封禁查询失败返回本地 503。`count_tokens` 只查已有封禁。
-- 列表返回 `items,total,page,page_size,observed_at_ms`；条目包含匿名会话、令牌/账号摘要、模型、原因、诊断关联、起止及解除时间、本地拦截次数/最近命中与 `active|expired|released`。时间字段为 UTC 毫秒。`state` 接受 `all|active|expired|released`，默认 active；前缀最多 64 位十六进制，page≥1，page_size 为 1–100，默认20。列表仅读取，解除幂等并保留首次解除时间。
-- 页面 `/session-blocks` 位于“网关 → 请求记录”下方，设置位于“系统设置 → 会话与调度 → 会话策略封禁”。复用共享控件、确认与反馈；错误保留上次记录，离页取消并丢弃旧回包。可见且未读取、未打开解除确认时每5秒刷新；倒计时以 `observed_at_ms` 加本地单调耗时计算，避免浏览器时钟偏差。
+- 列表返回 `items,total,page,page_size,observed_at_ms,counts`；`counts {active,expired,released,all}` 与列表同一 `now`、同一会话前缀，不随 `state` 参数变化，三种状态判定与列表 `FILTER` 一致（聚合 SQL 的 `SUM(CASE …)` 与 `FILTER` 分支须同步修改；`all` 是保留字，列别名用 `all_count`；`SUM` 套 `COALESCE(…,0)`）。`total` 由同一聚合结果按 `state` 取值，与 `counts` 来自同一快照。条目包含匿名会话、令牌/账号摘要、模型、原因、诊断关联、起止及解除时间、本地拦截次数/最近命中与 `active|expired|released`。时间字段为 UTC 毫秒。`state` 接受 `all|active|expired|released`，默认 active；前缀最多 64 位十六进制，page≥1，page_size 为 1–100，默认20。列表仅读取，解除幂等并保留首次解除时间。
+- 页面 `/session-blocks` 位于“网关 → 请求记录”下方，设置位于“系统设置 → 会话与调度 → 会话策略封禁”。状态为带计数的分段（封禁中 / 已到期 / 已解除 / 全部记录），计数取接口 `counts`，旧网关缺失时显示「—」。复用共享控件、确认与反馈；错误保留上次记录，离页取消并丢弃旧回包。可见且未读取、未打开解除确认时每5秒刷新；倒计时以 `observed_at_ms` 加本地单调耗时计算，避免浏览器时钟偏差。
 
 ### 4. Validation & Error Matrix
 
@@ -1659,7 +1659,8 @@ transport.submit(prepared, body, ttfb_timeout).await
 - `session_policy_block_hit_is_visible_to_independent_reader`：连续命中后由独立连接池立即读取相同计数；排队复查用例同时断言 `session_policy_blocked` 与计数，避免其它400响应混入成功证据。
 - `session_policy_block_duration_reload_preserves_existing_expiry` 与配置/识别测试：默认值、非法值、进行中请求取最新时长、隔离、关闭、正文与认证排除。
 - `session_policy_block_gateway_stops_upstream_requests`、`session_policy_block_queued_request_rechecks_before_send`、`session_policy_block_v3_send_wait_has_no_attempt`、`session_policy_block_query_failure_is_local_503`：真实本地HTTP/SSE拒答、两后端前置拦截、计数入口、队列/发送复查、零上游调用和零attempt、许可回收及查询故障。
-- 响应观察测试覆盖压缩/分块SSE及完整JSON拒答，断言原字节保留、诊断关闭仍登记。`session_policy_block_admin_contract` 验证鉴权、参数、设置热刷新、历史及SPA入口；版本3迁移用例保留自定义值。
+- 响应观察测试覆盖压缩/分块SSE及完整JSON拒答，断言原字节保留、诊断关闭仍登记。`session_policy_block_admin_contract` 验证鉴权、参数、设置热刷新、历史、解除前后的 `counts` 及SPA入口；版本3迁移用例保留自定义值。
+- `session_policy_block_counts_match_list_filters`：多前缀（`""`、`a`、`ab`、`b`）、`expires_at_ms == now` 计入已到期、已解除优先于到期；每个前缀四种 state 的 `total == counts.<state>`、`items` 条数一致，且 `counts` 不随 state 变化。
 - `verify_session_policy_blocks_ui.py` 使用真实前端构建的离线fixture，覆盖1440px/390px、服务器时钟、筛选分页、搜索空态、解除取消/失败重试、读取失败保留、设置直达及字符串保存；完整Rust回归、前端build及数据库定义/发行测试通过。
 
 

@@ -54,6 +54,7 @@ export const Clock = icon('clock');
 // 第二版设计稿新增图标，路径取自 doc/design/console-v2/icons.js。
 export const ChevronDown = icon('chevron-down');
 export const ChevronLeft = icon('chevron-left');
+export const SlidersHorizontal = icon('sliders');
 export const Filter = icon('filter');
 export const List = icon('list');
 export const Zap = icon('zap');

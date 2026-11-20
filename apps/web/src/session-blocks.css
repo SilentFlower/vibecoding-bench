@@ -1,0 +1,42 @@
+/* 会话封禁页（第二版设计稿 doc/design/console-v2/mock.html 的 #blocks）。由 SessionPolicyBlocks.vue 引入。
+   颜色、圆角只取 token；列宽按设计稿 colgroup 24 / 15 / 19 / 15 / 15 / 12（%）。 */
+@layer components {
+  .session-block-page { color: var(--ui-color-text); font-size: var(--ui-font-size-md); line-height: 1.55; }
+  .session-block-toolbar { flex: 1; min-width: 0; }
+  .session-block-toolbar .fui-search { width: 320px; max-width: 100%; }
+  .session-block-note { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 600; }
+  .session-block-records { min-width: 0; }
+
+  .block-col-session { width: 24%; }
+  .block-col-source { width: 15%; }
+  .block-col-state { width: 19%; }
+  .block-col-time { width: 15%; }
+  .block-col-count { width: 15%; }
+  .block-col-actions { width: 12%; }
+  .session-block-records code { color: var(--ui-color-text); font-size: var(--ui-font-size-md); }
+  .session-block-records .fui-info-trigger { max-width: 100%; }
+  .block-time-link { color: var(--ui-color-text-3); text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
+  .block-actions { flex-wrap: wrap; }
+  .block-no-action { color: var(--ui-color-text-4); }
+  .block-mobile-source { display: none; }
+  .session-block-records .session-block-empty { height: auto; padding: 0; white-space: normal; text-align: center; }
+
+  @media (max-width: 1050px) {
+    .block-time-column { display: none; }
+    .block-col-session { width: 30%; }
+    .block-col-state { width: 25%; }
+  }
+  @media (max-width: 760px) {
+    .session-block-toolbar .fui-toolbar-end { margin-left: 0; }
+    .session-block-toolbar .fui-search { flex: 1 1 180px; width: auto; }
+    .block-source-column, .block-count-column { display: none; }
+    .block-mobile-source { display: block; }
+    .block-col-session { width: 38%; }
+    .block-col-state { width: 34%; }
+    .block-col-actions { width: 28%; }
+    .block-actions { flex-direction: column; align-items: flex-end; }
+    /* 窄屏列少，辅助值换行而不是省略，单元格随内容增高。 */
+    .session-block-records .fui-table-cell { height: auto; padding-block: calc(var(--ui-space-unit) * 2.5); padding-inline: calc(var(--ui-space-unit) * 2); white-space: normal; overflow-wrap: anywhere; }
+    .session-block-records .fui-table-head { padding-inline: calc(var(--ui-space-unit) * 2); }
+  }
+}

@@ -41,13 +41,13 @@ import type { ChoiceOption } from '@/components/ui/controls';
 | 组件 | 输入与插槽 | 说明 |
 | --- | --- | --- |
 | `PageHeader`（`page-header`） | `title`，`description?`；`actions`、`description` 插槽 | 页面唯一 h1；底边距 18px；≤760px 标题与说明仅读屏可见（应用栏显示标题），无操作时不占高度 |
-| `OverviewGrid` / `OverviewCard`（`overview`） | 卡片：`label`，`value?`，`unit?`，`caption?`，`tone?`（primary/success/warning/danger/info）；`icon`、`value`、`caption` 插槽 | 网格 4 列，≤1000px 2 列，≤600px 1 列 |
-| `IconTile`（`icon-tile`） | `tone?`（另含 cc/agy/neutral），`size?: 'md' \| 'lg'`（36 / 40px）；默认插槽为图标 | 装饰性，`aria-hidden` |
+| `OverviewGrid` / `OverviewCard`（`overview`） | 卡片：`label`，`value?`，`unit?`，`caption?`，`tone?`（primary/success/warning/danger/info），`interactive?`；`icon`、`value`、`caption` 插槽 | 网格 4 列，≤1000px 2 列，≤600px 1 列。`interactive` 时根元素为 `button type=button`（正文与标签改为 `span` 并显式成块，外观不变），带悬停底色、`primary` 聚焦环与禁用态，`disabled`、`aria-label` 与点击由调用方传入（请求页「后续请求日志」卡） |
+| `IconTile`（`icon-tile`） | `tone?`（另含 cc/agy/neutral），`size?: 'sm' \| 'md' \| 'lg'`（32 / 36 / 40px；sm 圆角 `block − 3px`、图标 14px，用于表格行内）；默认插槽为图标 | 装饰性，`aria-hidden` |
 | `Toolbar`（`toolbar`） | 默认插槽（左）、`end` 插槽（右） | 窄屏换行；直接子级的 `Segmented` 横向可滚动 |
 | `EntityCard` / `EntityBlock` / `EntityAction`（`entity-card`） | 卡片：`title`，`subtitle?`；`media`、`title-extra`、`subtitle`、`status`、默认、`actions` 插槽。操作：`tone?: 'default' \| 'primary' \| 'danger'`，`disabled?`，点击经属性透传 | 操作底栏按动作数等分，≤600px 按 96px 最小宽换行 |
-| `TableCard`（`table-card`） | `title`，`count?`；`toolbar`、默认（`Table`）、`footer`（分页）插槽 | 表格区横向滚动；最右列的 `TableHead` / `TableCell` 加 `fui-table-actions` 即固定在右侧，底色跟随行状态 |
+| `TableCard`（`table-card`） | `title?`，`count?`；`toolbar`、默认（`Table`）、`footer`（分页）插槽 | 表格区横向滚动；最右列的 `TableHead` / `TableCell` 加 `fui-table-actions` 即固定在右侧，底色跟随行状态。省略 `title` 时头部加 `.is-bare`、工具栏占满整行，放一个 `Toolbar`（分段在左、`end` 插槽靠右，设计稿 `#requests`、`#blocks`）。单元格工具类（`kit.css`）：`.fui-table-fixed`（`table-layout:fixed`，单元格超长省略；列宽写在 `TableHead` 的宽度类上，窄屏隐藏列连同表头一起隐藏）、`.fui-table-num`（等宽数字）、`.fui-table-mono`、`.fui-table-strong`（700）、`.fui-table-end`（右对齐）、`.fui-table-ops`（行操作 flex 靠右、间距 4px）、`.fui-table-sub`（辅助值） |
 | `FloatingSaveBar`（`save-bar`） | `count: number`，`hint?`，`cleanLabel?`（默认「已同步」）；`actions` 插槽 | 吸底；`count > 0` 显示「N 项待保存」并 `data-dirty=true` |
-| `ModalDialog`（`modal`） | `title`，`description?`，`width?`（默认 820）；`v-model:open`；`media`、`title-extra`、`nav`、默认、`footer` 插槽；其余属性透传到弹窗面板 | 头部、`nav` 页签带（`.fui-modal-nav`，内边距 0 / 24 / 18，放 `Segmented`）与通栏浅灰底栏固定，只有内容区（`.fui-modal-body`）滚动；`title-extra` 在 `DialogTitle` 内，窄屏整组换行（多个徽标请包一层）；最大高 `min(840px, 100dvh − 32px)`。`style.css` 的全局 `[data-slot=dialog-content] { max-height; overflow-y: auto }` 未分层，`kit.css` 末尾用未分层的 `[data-slot=dialog-content].fui-modal` 覆盖，层内规则做不到 |
+| `ModalDialog`（`modal`） | `title`，`description?`，`width?`（默认 820），`placement?: 'center' \| 'side'`；`v-model:open`；`media`、`title-extra`、`description`、`nav`、默认、`footer` 插槽；其余属性透传到弹窗面板 | 头部、`nav` 页签带（`.fui-modal-nav`，内边距 0 / 24 / 18，放 `Segmented`）与通栏浅灰底栏固定，只有内容区（`.fui-modal-body`）滚动；`title-extra` 在 `DialogTitle` 内，窄屏整组换行（多个徽标请包一层）；最大高 `min(840px, 100dvh − 32px)`。`placement=side` 为贴右抽屉：上下右各留 14px、高 `100dvh − 28px`、宽 `min(width, 100vw − 28px)`，定位用工具类覆盖 `DialogContent` 的居中定位（utilities 层压过组件层），高度由 `kit.css` 末尾未分层的 `[data-slot=dialog-content].fui-modal[data-placement=side]` 设置；`description` 插槽用于带按钮的说明（如完整请求 ID 与复制）。`style.css` 的全局 `[data-slot=dialog-content] { max-height; overflow-y: auto }` 未分层，`kit.css` 末尾用未分层的 `[data-slot=dialog-content].fui-modal` 覆盖，层内规则做不到 |
 | `NoticeStrip`（`notice-strip`） | `tone?: 'success' \| 'warning' \| 'danger' \| 'info' \| 'neutral'`（默认 neutral）；默认插槽（图标 + 文字）、`end` 插槽（靠右徽标） | 设计稿 `.strip`：单行高 36px（9px 上下内边距 + 18px 行高），长文本换行增高。类名 `.fui-strip`——`.fui-notice` 已被通知浮层占用；原生模板可直接用该类 |
 
 既有组件只做增量扩展：`Button` 新增 variant `soft`、`destructive-ghost`（`outline`/`secondary` 为次要填充、`ghost` 为文字、`destructive` 为危险浅底）；`Badge` 新增 variant `success/warning/info/cc/agy` 与 `dot` prop。表格单元格内「主值下一行」的辅助值用 `fui-table-sub`，字段说明用 `fui-field-help`。
@@ -142,16 +142,17 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - “Token（末次）”列下方及性能详情展示平均 TPS：`output_tokens * 1000 / duration_ms`，包含该次尝试首输出等待，一位小数并注明 token/s。仅 success、partial=false、有效非负安全整数输出 token 和有限正耗时时展示；真实零输出保留 0.0，缺失、处理中或不完整记录为“未观测”。列表与详情共用计算入口。
 - “Token（末次）”列同步展示缓存读与缓存写，分别读取`last_attempt.tokens.cache_read_tokens/cache_write_tokens`；真实0显示0，null或历史缺失显示“—”，性能详情沿同次尝试显示“未观测”。`verify_management_ui.py::verify_request_metadata`覆盖2400、0、null及缺失四种缓存写值，并保留Session ID、版本和TPS回归。
 - 时间列按浏览者时区显示日期时间，省略 IANA 时区后缀；详情保留时区与原始时间。窄屏继续保留核心列，其余信息由详情查看。
-- 使用“全部/错误/处理中”带图标的快捷选择，保留账号、时间与关联ID条件；具体结果与快捷结果属于同一维度，避免相互叠加成无意的空集合。
+- 使用“全部/错误/处理中”分段（`Segmented`，`radio` 角色，名称为标签加计数，如「错误 7」）快捷选择，保留账号、时间与关联ID条件；具体结果与快捷结果属于同一维度：选了具体结果时分段值为空（无选中项），避免相互叠加成无意的空集合。
 - 账号匹配覆盖请求账号与各次尝试账号；完整关联ID匹配请求、响应及上游ID。实际诊断接口支持 `outcome=errors` 六类错误集合；分页返回独立于当前结果维度的 `counts.all/errors/processing`，保留其余查询条件。每条记录的 `last_attempt` 由存储查询投影；不得在单页数据上伪造全量统计或制造逐行详情请求。
-- 详情与列表采用清晰对比度：主值采用深蓝灰（如`#405670`），辅助标签采用中蓝灰（如`#68788e`），关键耗时采用`#344f6d`。不对内容容器使用透明度统一弱化正文。
-- 头部处理保留动作文字：删除行浅红底（当前`#fff4f5`）与红色标签，保留绿色、运行时处理紫色、提取上下文蓝色。筛选动作时高亮继续生效，不能只靠颜色传达含义。
+- 详情与列表采用清晰对比度：主值用 `--ui-color-text`，辅助标签用 `--ui-color-text-3`，不对内容容器使用透明度统一弱化正文。
+- 头部处理保留动作文字：删除行 `danger-bg` 底、左侧 3px `danger` 竖线与危险色标签，保留为 `success`、运行时处理为 `primary-container`、提取上下文为 `info`。筛选动作时高亮继续生效，不能只靠颜色传达含义。
 - 采集按发生时模式和capture_status判断，模式切换只影响后续请求；组装中间值与最终TLS证据分开。空字段展示未观测，0毫秒/0Token保留真实零值。
 
 ### 会话封禁列表
 
 - `SessionPolicyBlocks.vue` 的每5秒轮询沿用已提交的会话前缀；搜索框草稿仅在显式查询时提交。后台读取使用独立请求状态防止重叠，保持刷新按钮文字、分页可用状态和已有空态；手动查询可取消后台读取，迟到回包沿代次丢弃。
-- 空态使用单层 `TableRow > TableCell`，居中显示图标、标题、说明与重置查询。`TableEmpty` 自带表格行，不能再包进 `TableRow`。表格排版通过页面容器的 `:deep(table/th/td)` 作用到组件内部，避免将父级 scoped 选择器绑定到内部 class 导致样式失效。
+- 空态使用单层 `TableRow > TableCell.session-block-empty` 内放 `Empty`（图标、标题、说明与重置查询）。`TableEmpty` 自带表格行，不能再包进 `TableRow`。页面样式在 `src/session-blocks.css`（`@layer components`），组件不再有 scoped 样式。
+- 状态为 `Segmented`（label「封禁状态」）四段：封禁中 / 已到期 / 已解除 / 全部记录，计数取接口 `counts.active/expired/released/all`（同一前缀、不随状态筛选变化），缺失显示「—」。表格单元格时间省略时区后缀，时区与 5 秒刷新只在工具栏末尾说明一次。
 - 验证入口 `python3 deploy/flower2api/verify_session_policy_blocks_ui.py`：覆盖390/1440/1920/2560px，慢读取期间按钮与面板尺寸稳定、轮询跳过未完成读取、搜索草稿保持、空态与重置、解除确认、分页及设置字符串保存。
 
 ### 系统设置表单与草稿
@@ -231,6 +232,13 @@ import type { ChoiceOption } from '@/components/ui/controls';
   - 进度条色调 `usageBarTone(pct)`（`lib/subscription.ts`）：≥80 danger，≥50 warning，否则 success；写作 `<i :data-tone>`，样式按 `data-tone` 取 token。数值文字色调函数（`rpmClass` 等）返回 `is-warning / is-danger / is-success / is-muted`。
   - 共用子组件：`PlatformBadge` 为 `Badge`（cc / agy / secondary，保留 `data-platform-badge`）；`ExecutionNodeBadge` 的 scoped 样式在 `@layer components` 内，字号默认 `--ui-font-size-sm`，所在区域可覆盖；`ProxyPicker`（账号编辑、授权登录、任务选线与请求筛选弹层共用 `.proxy-picker-*`）样式在 `kit.css`，帮助文字在触发器下方。
   - ≤760px：分段换短标签（全部 / 正常 / 关注 / 已停用，`useMediaQuery`）；平台筛选与搜索框组成的搜索行默认收起，由应用栏「搜索账号」展开并聚焦，搜索词非空或平台不是「全部平台」时保持展开。
+- **第二版请求记录、代理、令牌、会话封禁（各页一份 `@layer components` 样式：`src/request-records.css`、`proxies.css`、`tokens.css`、`session-blocks.css`，只取 token，由页面组件引入）**：
+  - 页面结构：概览卡（`OverviewGrid`，请求与代理）→ `TableCard`（请求、封禁无标题；代理「代理线路 total / all 条」、令牌「访问令牌 N 个令牌」）→ `Table.fui-table-fixed`，单元格主值加 `.fui-table-sub` 辅助值，分页在 `footer`。弹窗换 `ModalDialog`：代理编辑 680、批量导入 520、令牌编辑 760（底栏按钮用 `form` 属性提交）；请求详情为 `placement=side` 宽 1020 的抽屉，页签保留 `tablist / tab / tabpanel` 与方向键切换，外观借用 `.fui-segmented` / `.fui-segmented-item[data-state]`。
+  - 请求页：概览卡全部 / 错误 / 处理中取 `counts`，第 4 张「后续请求日志」为 `interactive` 卡，点击在 info / debug 间保存 `request_diagnostics_log_mode`，读取中或保存中禁用并显示「保存中…」，失败用 `NoticeStrip role=alert`；页头不再放日志下拉。列宽 15 / 13 / 13 / 13 / 10 / 15 / 5 / 9 / 7（账号列放平台与执行节点徽标，徽标不截断、放不下换行）；Token 列两行辅助值（缓存读 · `[data-cache-write]` 缓存写；`[data-average-tps]` 平均 TPS）。
+  - 代理页：第 4 张卡取 `counts.expiring`，说明「另有 N 条已过期」/「暂无已过期线路」，缺失为「—」与「按到期时间统计」；延迟 >120ms 为 `warning-text`、有值为 `success-text`；到期徽标已过期 danger、7 天内 warning、其余中性。列宽 16 / 13 / 9 / 9 / 13 / 20 / 20，使用情况列含前两位使用者（网关账号为按钮）、处理中请求数与展开图标按钮（无障碍名称「查看使用账号 / 收起账号」）。
+  - 令牌页：名称搜索只过滤已读取的令牌，计数「m / N 个令牌」，无结果「没有匹配的令牌」；启停为 `Switch`（名称「{令牌名}启用状态」）。`AccountScopePicker` 样式在 `tokens.css`。
+  - 定位契约（脚本与组件逻辑依赖，只改样式）：`.request-records`（表头 9 个 `th`、详情关闭时页面只有一个 `tbody`）、`.request-extra`、`.request-account-identity`（内容恰为账号名）、`.request-workspace`（`InfoTooltip` 的 `portal-target`）、`request-tab-* / request-panel-*`、`data-request-copy`、`.request-definitions`、`.request-attempt-summary`、`.request-chain-card`、`.request-performance-card`、`.request-token-metrics`、`[data-native-stages]` 及 `NativeStageDetails` 的 `request-*` 类；`.proxy-page`、`.proxy-panel`、`tr[data-proxy-id]`、`.proxy-row-actions`、`.proxy-user-chips`、`.proxy-expand`、`.proxy-expanded`、`.proxy-account-identity`、`.proxy-editor`；`tr.token-row`、`.approved-token-editor`、`.token-name`；`.session-block-panel`、`.session-block-records[aria-busy]`、`.session-block-empty`、`tr[data-block-id]`。
+  - ≤760px：请求表只留时间、账号、结果、操作；代理表只留线路、到期、操作，状态徽标与可点击的使用摘要 `.proxy-mobile-usage` 移到线路名称下方，后者是展开使用账号的入口（使用情况列收起后不能丢失该入口），行操作只显示图标、文字留给读屏；令牌表隐藏可用账号与创建时间（范围移到名称下）；封禁表隐藏令牌、封禁时间与本地拦截（补充行显示在首列与状态列）。单元格改为可换行、高度随内容，页面无横向滚动。
 - 验证入口：`deploy/flower2api/verify_account_page_design.py` 对设计稿 `#accounts`、`#account-edit`、`#mobile` 逐项比对计算样式并覆盖首屏、健康条、工作区外框与移动端搜索行；`deploy/flower2api/verify_accounts_design.py`，覆盖真实Vue组件与合成管理接口的字段保存、取消、分页、OAuth、调度筛选、费用气泡、字体、侧栏和1440/720/390px布局；沿用管理/环境/导航回归。
 
 ### 预览状态与连续操作合同
@@ -307,6 +315,7 @@ python3 deploy/flower2api/verify_ui_controls.py --url http://127.0.0.1:4187/ui-p
 python3 deploy/flower2api/verify_ui_kit.py --url http://127.0.0.1:4187/ui-preview.html
 python3 deploy/flower2api/verify_ui_shell.py
 python3 deploy/flower2api/verify_account_page_design.py
+python3 deploy/flower2api/verify_records_pages_design.py
 node --experimental-strip-types --test apps/web/tests/update-steps.test.mjs
 python3 deploy/flower2api/verify_update_design.py
 python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录>
@@ -316,6 +325,7 @@ python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录
 - `verify_ui_kit.py`：与 `doc/design/console-v2/mock.html` 逐项比对计算样式（结构等价项在脚本白名单中注明原因），组件各状态取值、预设与自定义主色、柔光材质、局部主题隔离、刷新保持、存储缺失/损坏/越界/抛错回退、减少动效，以及真实构建入口首屏即为保存的主题（需先 `npm --prefix apps/web run build`）。
 - `verify_ui_shell.py`（需先构建）：真实构建加合成夹具，1440 下侧栏、品牌行、版本号两态、导航、计数徽标、底部区、内容区与页头对 `mock.html#accounts` 逐项比对；8 个页面页头无分组名且样式一致；系统设置保存栏比对与「1 项待保存 / 配置已同步」；折叠保持、1440×560 导航内部滚动；390 应用栏比对、抽屉贴左铺满并在导航后关闭；登录页对 `v1/mock.html#login` 比对及空密码、错误密码、成功、显示密码四条路径；零控制台错误。
 - `verify_account_page_design.py`（需先构建）：`InteractionFixture` 的 13 个账号（第 4–6 号设为限流、认证错误、停用）。1440×900 对 `#accounts`、`#account-edit` 比对 79 项计算样式（白名单：设计稿 `.acc-name span` 误命中徽标的文字色与字号、99px 全圆）；三列、间距 16、首行三张卡片操作栏底边 ≤ 900；健康条四种色调与 36px；工作区 820 视口居中、滚动内容区时页签带不动、切换页签外框不变、新建无页签带；授权登录 440；390 对 `#mobile` 比对，搜索行展开、聚焦、有搜索词时不收起，其它页面无搜索按钮；零控制台错误；设计稿未画的画面截图存 `--output`。
+- `verify_records_pages_design.py`（需先构建）：`RemainingPagesFixture`（第 2 条代理已过期、第 3 条未设到期）与 `BlockFixture`。1440×900 对 `#requests`、`#proxies`、`#tokens`、`#blocks` 比对 63 项计算样式（白名单：99px 全圆开关）；日志卡点击写 PUT、保存中禁用与新值；快捷分段 `outcome=errors`；详情抽屉宽 1020、上右下 14px、面板 `overflow:hidden` 而 `.fui-modal-body` 滚动、四个页签切换外框不变；代理第 4 卡 19 /「另有 1 条已过期」与旧网关缺字段时「—」；代理编辑 680 居中、令牌编辑 760；令牌名称搜索无结果；封禁四段计数与切换；四页 390 无横向滚动及保留列数（请求 4、代理 3、令牌 4、封禁 3），代理 390 点击使用摘要后展开行与账号入口可见；零控制台错误；截图存 `--output`（默认 `.deploy/console-ui-revamp/records/verify`）。
 - `update-steps.test.mjs`：正向含迁移、维护中进行中与待执行、越过取消边界的切换合并、无快照部署、恢复路径、旧操作无 `steps`、未知阶段、截断记录。
 - `verify_update_design.py`、`verify_system_update_browser.py`（需先构建）：前者对设计稿 `#update`、`#update-progress` 比对 45 项计算样式并检查说明展开、转义与零写入；后者覆盖版本记录与嵌套确认 Esc、居中与矮视口、直接安装默认 60 秒 / 30 分钟 1800 秒 / 双击幂等、步骤与时间、断线重连、快照与迁移、数据恢复、完成与刷新、409、未接入、回退与取消等待、等待对账与恢复。
 - 迁移期改造旧原型对比脚本：组件库负责的属性在脚本内用 `component_keys`（采样名 → 属性集合）跳过，并注明已由 `verify_ui_kit.py` 覆盖；页面级属性继续与旧原型比对。写死的组件颜色改为在被测节点内插入探针元素读取 token 实际渲染值（`verify_shared_pagination.py::token`），不得把旧色值改成新色值再写死。业务断言不放宽。外壳尺寸（侧栏宽、内容区边距）推算出的页面宽度断言改为读取实际值（如卡片区铺满 `#console-content` 内容宽度、右边距等于其实际 `padding-right`），外壳本身由 `verify_ui_shell.py` 对照设计稿核对。
@@ -340,7 +350,7 @@ python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录
 
 ## 一比一迁移的取值与验收
 
-`apps/web/src/approved-design.css`集中存放对照定稿后的页面排版规则；参考为`doc/design/flower2api-concept.html`渲染结果。`ui/icon`使用第二版设计稿图标路径（`doc/design/console-v2/icons.js`，描边1.8），`apps/web/src/assets/approved-icons.svg` 与 `apps/legacy-web/approved-icons.svg` 保持同一内容；符号表通过Vite `?url&no-inline`发布到已有assets路由；不要把SVG符号表内联为data URL后用于use引用。快照导出必须把外部use改写为快照内符号。
+`apps/web/src/approved-design.css`只保留全局排版与交互指针合同；账号、请求、代理、令牌、会话封禁的页面样式已迁到各自的第二版样式文件。`ui/icon`使用第二版设计稿图标路径（`doc/design/console-v2/icons.js`，描边1.8），`apps/web/src/assets/approved-icons.svg` 与 `apps/legacy-web/approved-icons.svg` 保持同一内容；符号表通过Vite `?url&no-inline`发布到已有assets路由；不要把SVG符号表内联为data URL后用于use引用。快照导出必须把外部use改写为快照内符号。
 
 `AccountScopePicker`接收modelValue CSV、accounts、label与help，只更新表单草稿。历史已选ID不在当前资料时显示账号编号并保留移除能力。父页负责完整分页、取消和保存。
 
@@ -356,12 +366,12 @@ html根字号与原型共用`--ui-font-body`的14/15/16px三档规则，font-fam
 
 ### 令牌与任务原型对齐（2026-11-15）
 
-- 令牌桌面同行展示身份与直接操作；换行规则限定在窄屏媒体查询内。Tailwind的`--muted`是背景色，次要文字使用`--muted-foreground`；原生工作区的同名变量单独限定作用域。
+- 令牌页已换成第二版数据表（见「正式控制台与账号首批迁移」中的四页合同），不再与旧原型对齐。Tailwind的`--muted`是背景色，次要文字使用`--muted-foreground`；原生工作区的同名变量单独限定作用域。
 - 任务工作区的定稿声明集中在`apps/legacy-web/work-design.css`，按原型CSSOM取值。主路由断点按实际浏览器视口响应，主区域宽度由侧栏占位确定。桌面1440px下任务账号三列。
 - 新布局保留原表单ID、字段name与API处理，工程和养号空间继续分别维护配置、草稿及SSE清理。新增搜索仅过滤列表；题库的创建任务只预选题目并打开批次表单，提交前保持零写入。
 - 旧`.view`的flex间距、旧页签底色以及高优先级按钮规则不能叠加进新工作区；校验卡片底栏按钮自身样式与宽度，不能只校验父容器。
 - 运行配置与新建抓包使用两个独立入口。账号名称提供完整技术详情，登录草稿单独呈现；额度窗口区分真实0与未提供，不展示7天Sonnet。
-- 增量验证：`audit_token_task_design.py`断言令牌、任务六入口和工程五分区的渲染样式并保存截图；`verify_runtime_workspace_design.py`覆盖原操作、详情、搜索、草稿、题目预选、独立抓包创建、响应式与键盘层级；`verify_tokens_design.py`覆盖令牌真实载荷与取消语义。
+- 增量验证：`audit_token_task_design.py`断言任务六入口和工程五分区的渲染样式并保存截图（令牌用例已移除，改由 `verify_records_pages_design.py` 对第二版设计稿核对）；`verify_runtime_workspace_design.py`覆盖原操作、详情、搜索、草稿、题目预选、独立抓包创建、响应式与键盘层级；`verify_tokens_design.py`覆盖令牌真实载荷与取消语义。
 
 ## 完整视口弹窗与跨文档组件复用
 

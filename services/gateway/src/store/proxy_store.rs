@@ -88,18 +88,21 @@ impl ProxyStore {
         ))
     }
 
-    /// 只为目录总览读取连接指纹输入及状态，分页和搜索不影响总览口径。
-    /// @return 私有连接与状态，仅限服务端聚合使用。
-    pub async fn summary_index(&self) -> Result<Vec<(String, String)>, AppError> {
-        let rows = sqlx::query("SELECT connection,status FROM proxy_routes")
-            .fetch_all(&self.pool)
-            .await
-            .map_err(database_error)?;
+    /// 只为目录总览读取连接指纹输入、状态及到期时间，分页和搜索不影响总览口径。
+    /// @return 私有连接、状态与可选到期时间，仅限服务端聚合使用。
+    pub async fn summary_index(&self) -> Result<Vec<(String, String, Option<String>)>, AppError> {
+        let rows = sqlx::query(
+            "SELECT connection,status,COALESCE(expires_at,'') AS expires_at FROM proxy_routes",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(database_error)?;
         rows.iter()
             .map(|row| {
                 Ok((
                     row.try_get("connection").map_err(database_error)?,
                     row.try_get("status").map_err(database_error)?,
+                    optional_text(row, "expires_at")?,
                 ))
             })
             .collect()
@@ -544,5 +547,45 @@ mod tests {
         assert_eq!(store.list(1, 10, "").await.unwrap().1, 1);
         store.delete(&id, &changed.revision).await.unwrap();
         assert_eq!(store.list(1, 10, "").await.unwrap().1, 0);
+    }
+
+    /// 目录总览同时读回到期时间，未设置时还原为空值。
+    #[tokio::test]
+    async fn summary_index_reads_optional_expiry() {
+        install_default_drivers();
+        let pool = AnyPoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        database_migrations::apply(&pool, &Uuid::new_v4().to_string(), None)
+            .await
+            .unwrap();
+        let store = ProxyStore::new(pool);
+        let deadline = "2026-12-01T00:00:00+00:00".to_string();
+        store
+            .insert_many(&[
+                (
+                    "到期".into(),
+                    ProxyConnection::parse("http://expiring.test:8080").unwrap(),
+                    Some(deadline.clone()),
+                ),
+                (
+                    "长期".into(),
+                    ProxyConnection::parse("http://forever.test:8080").unwrap(),
+                    None,
+                ),
+            ])
+            .await
+            .unwrap();
+        let mut deadlines: Vec<_> = store
+            .summary_index()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|(_, _, expires_at)| expires_at)
+            .collect();
+        deadlines.sort();
+        assert_eq!(deadlines, vec![None, Some(deadline)]);
     }
 }

@@ -13,6 +13,15 @@ from verify_environment_ui import BASE, ROOT
 class ProxyDesignFixture(AccountDesignFixture):
     """提供分页目录、CAS与只读引用。"""
 
+    def directory_counts(self):
+        """按全量目录统计总览，到期口径与网关一致：已过期 t<=now，7 天内到期 now<t<now+7天，缺失或无法解析不计。@return 计数。"""
+        now=datetime.now(timezone.utc);deadlines=[]
+        for row in self.proxies:
+            try:deadlines.append(datetime.fromisoformat(str(row.get('expires_at') or '').replace('Z','+00:00')))
+            except ValueError:pass
+        return dict(all=len(self.proxies),available=sum(p['status']=='ready' for p in self.proxies),used=sum(bool(p['users']) for p in self.proxies),
+            expiring=sum(now<d<now+timedelta(days=7) for d in deadlines),expired=sum(d<=now for d in deadlines))
+
     def __init__(self):
         """初始化21条独立线路。@return 无。"""
         super().__init__()
@@ -73,7 +82,7 @@ class ProxyDesignFixture(AccountDesignFixture):
                 query=parse_qs(url.query); page=int(query.get('page',['1'])[0]); size=int(query.get('page_size',['20'])[0]); search=query.get('q',[''])[0].lower()
                 self.proxy_reads.append(query)
                 rows=[p for p in self.proxies if search in (p['name']+' '+p['public_url']+' '+(p.get('observation') or {}).get('ip','')+' '+(p.get('observation') or {}).get('country','')).lower()]
-                return await self.respond(route,dict(data=rows[(page-1)*size:page*size],total=len(rows),page=page,page_size=size,total_pages=(len(rows)+size-1)//size,references_complete=True,counts=dict(all=len(self.proxies),available=sum(p['status']=='ready' for p in self.proxies),used=sum(bool(p['users']) for p in self.proxies))))
+                return await self.respond(route,dict(data=rows[(page-1)*size:page*size],total=len(rows),page=page,page_size=size,total_pages=(len(rows)+size-1)//size,references_complete=True,counts=None if query.get('usage')==['false'] else self.directory_counts()))
             if path=='/admin/proxies' and req.method=='POST':
                 row=copy.deepcopy(self.proxy_template); row.update(body,id=f'proxy-{self.next_proxy_id}',users=[],observation=None,status='unknown',checked_at=None); self.next_proxy_id+=1
                 row['public_url']=f"{body['protocol']}://{body['host']}:{body['port']}"; row['has_username']=bool(row.pop('username','')); row['has_password']=bool(row.pop('password','')); self.proxies.append(row)

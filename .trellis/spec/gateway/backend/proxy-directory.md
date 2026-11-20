@@ -52,7 +52,12 @@ OAuth及Setup Token的generate接口增加proxy_id/proxy_revision；保留proxy_
 
 所选私有连接不返回浏览器。下游错误返回受控说明，成功响应仅允许原 `_login_response` 的会话公开字段，避免下游校验错误回显目录账密。已绑定任务重授权继续由编排服务采用权威关联配置。
 
-目录列表顶层 `counts` 独立于搜索和分页：`all/available/used`。引用不可核对时 `used:null`；选择组件的 `usage=false` 跳过引用和汇总查询。
+目录列表顶层 `counts` 独立于搜索和分页：`all/available/used/expiring/expired`。引用不可核对时 `used:null`；选择组件的 `usage=false` 跳过引用和汇总查询，`counts` 为 `null`。
+
+- 到期两项由 `summary_index()`（`connection,status,COALESCE(expires_at,'')`）读回全表后，在 `directory_counts(index, refs, now)` 内用 `DateTime::parse_from_rfc3339` 解析：`expired` 为 `t <= now`，`expiring` 为 `now < t < now + 7 天`（严格小于，与控制台行内「7 天内到期」着色一致）；未设置或无法解析的到期时间都不计入。`now` 取服务端 `Utc::now()`，每次请求只取一次。
+- 两项不受引用完整性影响：`refs.complete=false` 时 `used` 为 `null`，`expiring/expired` 仍为数字。不在 SQL 里比较：`expires_at` 是 TEXT（RFC3339，小数秒位数不定），字符串比较在 SQLite 与 PostgreSQL 排序规则下都不可靠。
+- 字段为纯增量；旧控制台忽略新字段，新控制台在字段缺失时显示「—」，不用当前页推算。
+- 测试：`handler::proxies::summary_tests`（整体相等断言含两项；`counts_split_expiry_at_now_and_seven_days` 覆盖 now、now−1s、now+1s、now+7d−1ms、now+7d、None、非法串与引用不完整）、`store::proxy_store::tests::summary_index_reads_optional_expiry`、`handler::router::tests::proxy_directory_counts_expiry`（已过期与 1 天后到期各一条，`usage=false` 时 `counts` 为 null）。
 
 ## 使用中连接的持久同步
 

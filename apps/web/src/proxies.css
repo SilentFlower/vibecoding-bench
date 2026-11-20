@@ -1,0 +1,107 @@
+/* 代理管理页与代理编辑、批量导入（第二版设计稿 doc/design/console-v2/mock.html 的 #proxies）。由 Proxies.vue 引入。
+   颜色、圆角只取 token；列宽在设计稿 20 / 13 / 9 / 9 / 14 / 13 / 22（%）基础上给使用情况列让出空间（16 / 13 / 9 / 9 / 13 / 20 / 20）。 */
+@layer components {
+  .proxy-page { min-width: 0; color: var(--ui-color-text); font-size: var(--ui-font-size-md); line-height: 1.55; }
+  .proxy-page > * + * { margin-top: calc(var(--ui-space-unit) * 4.5); }
+  .proxy-panel .fui-table-card-toolbar > .fui-search { width: 300px; max-width: 100%; }
+  .proxy-table-scroll { min-width: 0; }
+
+  .proxy-col-route { width: 16%; }
+  .proxy-col-exit { width: 13%; }
+  .proxy-col-latency { width: 9%; }
+  .proxy-col-status { width: 9%; }
+  .proxy-col-expiry { width: 13%; }
+  .proxy-col-usage { width: 20%; }
+  .proxy-col-actions { width: 20%; }
+
+  .proxy-identity { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); min-width: 0; }
+  .proxy-identity-text { min-width: 0; overflow: hidden; }
+  .proxy-identity strong { display: block; overflow: hidden; font-weight: 720; text-overflow: ellipsis; }
+  .proxy-country { color: var(--ui-color-text-2); font-weight: 700; }
+  .proxy-latency { display: inline-flex; align-items: baseline; gap: calc(var(--ui-space-unit) * 1); }
+  .proxy-latency b { font-size: var(--ui-font-size-card); font-weight: 700; }
+  .proxy-latency b[data-tone=fast] { color: var(--ui-color-success-text); }
+  .proxy-latency b[data-tone=slow] { color: var(--ui-color-warning-text); }
+  .proxy-latency b[data-tone=none] { color: var(--ui-color-text-4); }
+  .proxy-latency small { color: var(--ui-color-text-4); font-size: var(--ui-font-size-md); }
+
+  .proxy-usage { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 1.5); min-width: 0; }
+  .proxy-usage-text { flex: 1; min-width: 0; overflow: hidden; }
+  .proxy-usage-count { display: block; overflow: hidden; text-overflow: ellipsis; }
+  .proxy-user-chip { padding: 0; border: 0; background: none; color: inherit; font: inherit; }
+  button.proxy-user-chip { color: var(--ui-color-primary-text); text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+  button.proxy-user-chip:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 1px; border-radius: var(--ui-radius-btn); }
+  .proxy-user-chip + .proxy-user-chip::before { content: '、'; color: var(--ui-color-text-3); text-decoration: none; }
+  .proxy-expand svg, .proxy-mobile-usage svg { transition: transform .15s; }
+  .proxy-expand[aria-expanded=true] svg, .proxy-mobile-usage[aria-expanded=true] svg { transform: rotate(180deg); }
+  /* 窄屏使用情况入口：桌面隐藏，≤760px 显示在线路名称下方。 */
+  /* 窄屏状态徽标随线路名称显示；桌面由状态列展示，这里用 display:none 隐藏，两处不会同时出现，读屏不会重复朗读。 */
+  .proxy-table .proxy-mobile-status { display: none; }
+  .proxy-table .proxy-mobile-usage { display: none; align-items: center; gap: calc(var(--ui-space-unit) * 1); padding: 0; border: 0; background: none; color: var(--ui-color-primary-text); font-family: inherit; text-align: left; cursor: pointer; }
+  .proxy-mobile-usage:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 1px; border-radius: var(--ui-radius-btn); }
+  .proxy-mobile-usage svg { flex: none; }
+  .proxy-row-actions { align-items: center; }
+
+  /* 展开行：整行浅底块区，使用账号三列网格。 */
+  .proxy-table .proxy-expanded > .fui-table-cell { height: auto; padding: calc(var(--ui-space-unit) * 2) 0 calc(var(--ui-space-unit) * 3); background: var(--ui-color-surface); white-space: normal; }
+  .proxy-expanded-panel { padding: calc(var(--ui-space-unit) * 4) calc(var(--ui-space-unit) * 4.5); border-radius: var(--ui-radius-block); background: var(--ui-color-fill-subtle); }
+  .proxy-expanded-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: calc(var(--ui-space-unit) * 4); margin-bottom: calc(var(--ui-space-unit) * 3.5); }
+  .proxy-expanded-heading h3 { margin: 0; color: var(--ui-color-text); font-size: var(--ui-font-size-title); font-weight: 720; }
+  .proxy-expanded-heading p, .proxy-expanded-heading > span { margin: 2px 0 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; }
+  .proxy-accounts-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 3); }
+  .proxy-account-item { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); min-width: 0; padding: calc(var(--ui-space-unit) * 3); border-radius: var(--ui-radius-block); background: var(--ui-color-surface); }
+  .proxy-account-identity { display: flex; flex: 1; align-items: center; gap: calc(var(--ui-space-unit) * 2); min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; }
+  button.proxy-account-identity { cursor: pointer; }
+  button.proxy-account-identity:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; border-radius: var(--ui-radius-btn); }
+  .proxy-account-avatar { display: grid; flex: none; place-items: center; width: 28px; height: 28px; border-radius: calc(var(--ui-radius-control) - 1px); background: var(--ui-color-primary-container); color: var(--ui-color-primary-text); font-size: var(--ui-font-size-sm); font-weight: 700; }
+  .proxy-account-name { min-width: 0; }
+  .proxy-account-name strong { display: block; overflow-wrap: anywhere; font-size: var(--ui-font-size-meta); font-weight: 700; }
+  .proxy-account-item small { display: block; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); }
+  .proxy-account-state { display: flex; flex: none; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .proxy-account-config { display: inline-flex; align-items: center; gap: calc(var(--ui-space-unit) * 1); padding: 0; border: 0; background: none; color: var(--ui-color-primary-text); font-size: var(--ui-font-size-sm); font-weight: 650; text-decoration: none; }
+  .proxy-account-config:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .proxy-account-config:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 1px; border-radius: var(--ui-radius-btn); }
+  .proxy-account-empty { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); }
+  .proxy-table .proxy-empty { height: auto; padding: calc(var(--ui-space-unit) * 10) calc(var(--ui-space-unit) * 4); color: var(--ui-color-text-3); text-align: center; white-space: normal; }
+
+  .proxy-panel .fui-table-card-footer { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 3); }
+  .proxy-note { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 1.5); margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; }
+  .proxy-note svg { flex: none; }
+
+  /* 代理编辑与批量导入。 */
+  .proxy-form { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 4.5); }
+  .proxy-recognize { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 2); padding: calc(var(--ui-space-unit) * 4); border-radius: var(--ui-radius-block); background: var(--ui-color-fill-subtle); }
+  .proxy-recognize > div { display: flex; gap: calc(var(--ui-space-unit) * 2.5); }
+  .proxy-recognize .fui-input { flex: 1; min-width: 0; background: var(--ui-color-surface); }
+  .proxy-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 4) calc(var(--ui-space-unit) * 4.5); }
+  .proxy-full { grid-column: 1 / -1; }
+  .proxy-field { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 2); }
+  .proxy-expiry-editor { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 2.5); padding-top: calc(var(--ui-space-unit) * 4); border-top: 1px solid var(--ui-color-line); }
+  .proxy-expiry-actions { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 2); color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 600; }
+  .proxy-form-hint { margin-right: auto; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; }
+  .proxy-import-cancel { margin-left: auto; }
+
+  @media (max-width: 1000px) { .proxy-accounts-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 760px) {
+    /* 窄屏只留线路、到期、操作三列：状态移到线路名称下方，操作改为纯图标按钮（文字留给读屏），地址单行省略。 */
+    .proxy-exit-column, .proxy-latency-column, .proxy-usage-column, .proxy-status-column { display: none; }
+    .proxy-table .proxy-mobile-status { display: inline-flex; margin-top: calc(var(--ui-space-unit) * 1); }
+    .proxy-table .proxy-mobile-usage { display: inline-flex; margin-top: calc(var(--ui-space-unit) * 1); white-space: normal; }
+    .proxy-identity .fui-icon-tile { display: none; }
+    .proxy-identity-text .fui-table-mono { white-space: nowrap; overflow-wrap: normal; }
+    .proxy-col-route { width: 52%; }
+    .proxy-col-expiry { width: 30%; }
+    .proxy-col-actions { width: 18%; }
+    .proxy-row-actions { flex-direction: column; align-items: flex-end; }
+    .proxy-row-actions [data-slot=button] { width: var(--ui-control-sm); padding: 0; }
+    .proxy-action-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    .proxy-table td:nth-child(5) .fui-badge { height: auto; min-height: 22px; padding-block: 2px; white-space: normal; line-height: 1.3; }
+    .proxy-table .fui-table-cell { height: auto; padding-block: calc(var(--ui-space-unit) * 2.5); padding-inline: calc(var(--ui-space-unit) * 2); white-space: normal; overflow-wrap: anywhere; }
+    .proxy-table .fui-table-head { padding-inline: calc(var(--ui-space-unit) * 2); }
+    .proxy-accounts-grid { grid-template-columns: minmax(0, 1fr); }
+    .proxy-form-grid { grid-template-columns: minmax(0, 1fr); }
+    .proxy-recognize > div { flex-wrap: wrap; }
+    .proxy-form-hint { flex-basis: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) { .proxy-expand svg, .proxy-mobile-usage svg { transition: none; } }
+}

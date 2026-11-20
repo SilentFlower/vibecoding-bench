@@ -31,6 +31,16 @@ pub struct SessionPolicyBlockPage {
     pub page: i64,
     pub page_size: i64,
     pub observed_at_ms: i64,
+    pub counts: SessionPolicyBlockCounts,
+}
+
+/// 各状态计数：与列表同一时刻、同一会话前缀，不随当前状态筛选变化。
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
+pub struct SessionPolicyBlockCounts {
+    pub active: i64,
+    pub expired: i64,
+    pub released: i64,
+    pub all: i64,
 }
 
 /// 原始请求冻结的匿名身份与安全参数。

@@ -1,0 +1,83 @@
+/* 访问令牌页与令牌编辑（第二版设计稿 doc/design/console-v2/mock.html 的 #tokens）。由 Tokens.vue 与 AccountScopePicker.vue 引入。
+   颜色、圆角只取 token；列宽按设计稿 colgroup 20 / 20 / 20 / 11 / 10 / 19（%）。 */
+@layer components {
+  .tokens-page { color: var(--ui-color-text); font-size: var(--ui-font-size-md); line-height: 1.55; }
+  .tokens-page > * + * { margin-top: calc(var(--ui-space-unit) * 4.5); }
+  .token-panel .fui-search { width: 260px; max-width: 100%; }
+
+  .token-col-name { width: 20%; }
+  .token-col-token { width: 20%; }
+  .token-col-scope { width: 20%; }
+  .token-col-created { width: 11%; }
+  .token-col-status { width: 10%; }
+  .token-col-actions { width: 19%; }
+  .token-identity { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); min-width: 0; }
+  .token-identity-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .token-identity strong { font-weight: 720; }
+  .token-mobile-scope { display: none; }
+  .token-value { display: inline-flex; align-items: center; gap: calc(var(--ui-space-unit) * 1.5); max-width: 100%; }
+  .token-value code { overflow: hidden; text-overflow: ellipsis; }
+  .token-copy { border: 0; cursor: pointer; transition: background-color .15s, color .15s; }
+  .token-copy:hover { background: var(--ui-color-fill-hover); color: var(--ui-color-text); }
+  .token-copy:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 1px; }
+  .token-created { color: var(--ui-color-text-3); }
+  .token-status { display: inline-flex; align-items: center; gap: calc(var(--ui-space-unit) * 2); color: var(--ui-color-text-3); font-weight: 650; }
+  .token-status[data-active=true] { color: var(--ui-color-text); }
+  .token-panel .token-empty { height: auto; padding: 0; white-space: normal; }
+
+  /* 令牌编辑：名称占满一行，两个账号范围并排；底栏按钮靠右。 */
+  .token-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 5) calc(var(--ui-space-unit) * 6); align-items: start; }
+  .token-name, .token-account-error { grid-column: 1 / -1; }
+  .token-name { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 2); margin: 0; }
+  .token-editor-cancel { margin-left: auto; }
+
+  /* 账号范围选择（AccountScopePicker）。 */
+  .account-picker { min-width: 0; margin: 0; padding: 0; border: 0; }
+  .picker-label { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: calc(var(--ui-space-unit) * 2); color: var(--ui-color-text-2); font-size: var(--ui-font-size-meta); font-weight: 650; }
+  .picker-count { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; }
+  .picker-selected { display: flex; flex-wrap: wrap; gap: calc(var(--ui-space-unit) * 1.5); }
+  .picker-selected:not(:empty) { margin-bottom: calc(var(--ui-space-unit) * 2); }
+  .account-chip { display: inline-flex; align-items: center; gap: calc(var(--ui-space-unit) * 1.5); height: 26px; padding: 0 calc(var(--ui-space-unit) * 1.5) 0 calc(var(--ui-space-unit) * 2.5); border-radius: var(--ui-radius-control); background: var(--ui-color-primary-container); color: var(--ui-color-primary-text); font-size: var(--ui-font-size-sm); font-weight: 650; }
+  .account-chip button { display: grid; place-items: center; padding: 2px; border: 0; border-radius: var(--ui-radius-btn); background: transparent; color: inherit; }
+  .account-chip button:hover { background: var(--ui-color-fill-hover); }
+  .account-chip button:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 1px; }
+  .account-chip svg { width: 12px; height: 12px; }
+  .picker-trigger { display: flex; align-items: center; justify-content: space-between; width: 100%; height: var(--ui-control-md); padding: 0 calc(var(--ui-space-unit) * 3); border: 0; border-radius: var(--ui-radius-control); background: var(--ui-color-fill); color: var(--ui-color-text-2); font: 600 var(--ui-font-size-md) var(--ui-font-family); }
+  .picker-trigger:hover { background: var(--ui-color-fill-hover); }
+  .picker-trigger:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 1px; }
+  .picker-trigger > svg { width: 12px; height: 12px; transform: rotate(90deg); transition: transform .15s; }
+  .picker-trigger[aria-expanded=true] { background: var(--ui-color-primary-container); color: var(--ui-color-primary-text); }
+  .picker-trigger[aria-expanded=true] > svg { transform: rotate(-90deg); }
+  .picker-help { margin: calc(var(--ui-space-unit) * 1.5) 0 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; }
+  .picker-options { margin-top: calc(var(--ui-space-unit) * 2); padding: calc(var(--ui-space-unit) * 1.5); border-radius: var(--ui-radius-block); background: var(--ui-color-surface); box-shadow: var(--ui-shadow-pop); }
+  .picker-search { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2); height: var(--ui-control-sm); padding: 0 calc(var(--ui-space-unit) * 2.5); border-radius: var(--ui-radius-control); background: var(--ui-color-fill); color: var(--ui-color-text-3); }
+  .picker-search svg { flex: none; width: 14px; height: 14px; }
+  .picker-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: none; color: var(--ui-color-text); font-size: var(--ui-font-size-md); }
+  .picker-list { max-height: 214px; overflow: auto; padding-top: calc(var(--ui-space-unit) * 1.5); }
+  .picker-option { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); padding: calc(var(--ui-space-unit) * 2); border-radius: var(--ui-radius-control); cursor: pointer; }
+  .picker-option:hover { background: var(--ui-color-fill-subtle); }
+  .picker-option:has(input:checked) { background: var(--ui-color-primary-container); }
+  .picker-option input { flex: none; width: 15px; height: 15px; margin: 0; accent-color: var(--ui-color-primary); }
+  .picker-avatar { display: grid; flex: none; place-items: center; width: 28px; height: 28px; border-radius: calc(var(--ui-radius-control) - 1px); background: var(--ui-color-primary-container); color: var(--ui-color-primary-text); font-size: var(--ui-font-size-sm); font-weight: 700; }
+  .picker-option > span:last-of-type { flex: 1; min-width: 0; }
+  .picker-option strong { display: block; overflow-wrap: anywhere; color: var(--ui-color-text); font-size: var(--ui-font-size-md); font-weight: 650; }
+  .picker-option small { display: block; margin-top: 2px; overflow-wrap: anywhere; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); }
+  .picker-option .platform-badge { margin-top: calc(var(--ui-space-unit) * 1); }
+  .picker-empty { margin: 0; padding: calc(var(--ui-space-unit) * 4.5); color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); text-align: center; }
+
+  @media (max-width: 760px) {
+    .token-scope-column, .token-created-column { display: none; }
+    .token-mobile-scope { display: block; }
+    .token-col-name { width: 34%; }
+    .token-col-token { width: 30%; }
+    .token-col-status { width: 14%; }
+    .token-col-actions { width: 22%; }
+    .token-status-text { display: none; }
+    .token-actions { flex-direction: column; align-items: flex-end; }
+    .token-panel .fui-table-cell { height: auto; padding-block: calc(var(--ui-space-unit) * 2.5); padding-inline: calc(var(--ui-space-unit) * 2); }
+    .token-panel .fui-table-head { padding-inline: calc(var(--ui-space-unit) * 2); }
+    .token-value { flex-direction: column; align-items: flex-start; }
+    .token-form { grid-template-columns: minmax(0, 1fr); }
+    .picker-list { max-height: 180px; }
+  }
+}

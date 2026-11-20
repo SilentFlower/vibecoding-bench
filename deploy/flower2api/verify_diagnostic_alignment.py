@@ -10,9 +10,12 @@ async def main():
     fixture=StabilityFixture();errors=[];out=ROOT/'.deploy/frontend-sidebar-refresh/diagnostic-alignment';out.mkdir(parents=True,exist_ok=True)
     async with async_playwright() as p:
         browser=await p.chromium.launch();context=await browser.new_context(viewport={'width':1440,'height':1000});await context.route('**/*',fixture.route);await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','light')");page=await context.new_page();page.on('pageerror',lambda e:errors.append(e.stack));await page.goto(BASE+'/proxies');row=page.locator('[data-proxy-id=proxy-1]');buttons=row.locator('.proxy-row-actions button');await expect(buttons).to_have_count(3)
+        # 第二版：行操作为小号按钮，字号与删除悬停底色取 token 在当前主题下的实际渲染值，不写死色值。
+        probe="(e,[prop,value])=>{const i=document.createElement('i');i.style[prop]=value;e.append(i);const v=getComputedStyle(i)[prop];i.remove();return v}"
+        small=await row.evaluate(probe,['fontSize','var(--ui-font-size-sm)']);danger=await row.evaluate(probe,['backgroundColor','var(--ui-color-danger-bg)'])
         for button in await buttons.all():
-            assert await button.evaluate("e=>getComputedStyle(e).cursor")=='pointer';assert await button.evaluate("e=>getComputedStyle(e).fontSize")=='12px';assert await button.locator('svg').count()==1
-        delete=row.get_by_role('button',name='删除',exact=True);await delete.hover();await page.wait_for_timeout(200);assert await delete.evaluate("e=>getComputedStyle(e).backgroundColor")=='rgb(253, 240, 243)'
+            assert await button.evaluate("e=>getComputedStyle(e).cursor")=='pointer';assert await button.evaluate("e=>getComputedStyle(e).fontSize")==small;assert await button.locator('svg').count()==1
+        delete=row.get_by_role('button',name='删除',exact=True);await delete.hover();await page.wait_for_timeout(200);assert await delete.evaluate("e=>getComputedStyle(e).backgroundColor")==danger
         await row.locator('.proxy-user-chips button').click();workspace=page.locator('.account-workspace');await workspace.locator('.account-workspace-tabs').get_by_role('radio',name='环境与诊断').click();summary=workspace.locator('.account-diagnostic-summary');await expect(summary).to_contain_text('就绪')
         # 第二版：摘要为浅灰信息块内两列键值，三个跳转在其下方，技术详情默认收起（旧原型逐项比对已移除）。
         actions=workspace.locator('.account-diagnostic-actions');await expect(actions.locator('[data-slot=button]')).to_have_count(3);assert await actions.evaluate('e=>e.getBoundingClientRect().top')>await summary.evaluate('e=>e.getBoundingClientRect().bottom')

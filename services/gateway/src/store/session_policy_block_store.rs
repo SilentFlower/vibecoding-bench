@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::model::session_policy_block::{
-    SessionPolicyBlock, SessionPolicyBlockPage, SessionPolicyIdentity,
+    SessionPolicyBlock, SessionPolicyBlockCounts, SessionPolicyBlockPage, SessionPolicyIdentity,
 };
 
 const COLUMNS: &str = "b.id,b.session_key,CAST(b.api_token_id AS TEXT) AS api_token_id,
@@ -19,6 +19,11 @@ const FILTER: &str =
     "WHERE ($1='all' OR ($1='active' AND b.released_at_ms IS NULL AND b.expires_at_ms>$3)
     OR ($1='expired' AND b.released_at_ms IS NULL AND b.expires_at_ms<=$3)
     OR ($1='released' AND b.released_at_ms IS NOT NULL)) AND b.session_key LIKE $2";
+// 三个状态条件必须与 FILTER 的三个分支保持一致；`all` 是保留字，列别名加后缀。
+const COUNTS: &str = "CAST(COUNT(*) AS TEXT) AS all_count,
+    CAST(COALESCE(SUM(CASE WHEN b.released_at_ms IS NULL AND b.expires_at_ms>$3 THEN 1 ELSE 0 END),0) AS TEXT) AS active_count,
+    CAST(COALESCE(SUM(CASE WHEN b.released_at_ms IS NULL AND b.expires_at_ms<=$3 THEN 1 ELSE 0 END),0) AS TEXT) AS expired_count,
+    CAST(COALESCE(SUM(CASE WHEN b.released_at_ms IS NOT NULL THEN 1 ELSE 0 END),0) AS TEXT) AS released_count";
 
 /// 复用现有 SQLite 或 PostgreSQL 连接池。
 #[derive(Clone)]
@@ -112,13 +117,26 @@ impl SessionPolicyBlockStore {
         now: i64,
     ) -> Result<SessionPolicyBlockPage, AppError> {
         let pattern = format!("{prefix}%");
-        let total: String =
-            sqlx::query_scalar(&format!("SELECT CAST(COUNT(*) AS TEXT) {JOINS} {FILTER}"))
-                .bind(state)
-                .bind(&pattern)
-                .bind(now)
-                .fetch_one(&self.pool)
-                .await?;
+        // 计数固定以 all 过滤后按状态聚合，total 取自同一结果，避免与 counts 来自不同快照。
+        let summary = sqlx::query(&format!("SELECT {COUNTS} {JOINS} {FILTER}"))
+            .bind("all")
+            .bind(&pattern)
+            .bind(now)
+            .fetch_one(&self.pool)
+            .await?;
+        let counts = SessionPolicyBlockCounts {
+            active: integer(&summary, "active_count")?,
+            expired: integer(&summary, "expired_count")?,
+            released: integer(&summary, "released_count")?,
+            all: integer(&summary, "all_count")?,
+        };
+        let total = match state {
+            "active" => counts.active,
+            "expired" => counts.expired,
+            "released" => counts.released,
+            "all" => counts.all,
+            _ => 0,
+        };
         let rows = sqlx::query(&format!("SELECT {COLUMNS} {JOINS} {FILTER} ORDER BY b.blocked_at_ms DESC,b.id DESC LIMIT $4 OFFSET $5"))
             .bind(state).bind(&pattern).bind(now).bind(size).bind((page-1).checked_mul(size).ok_or_else(|| AppError::BadRequest("页码过大".into()))?)
             .fetch_all(&self.pool).await?;
@@ -127,12 +145,11 @@ impl SessionPolicyBlockStore {
                 .iter()
                 .map(|r| from_row(r, now))
                 .collect::<Result<_, _>>()?,
-            total: total
-                .parse()
-                .map_err(|_| AppError::Internal("封禁计数无效".into()))?,
+            total,
             page,
             page_size: size,
             observed_at_ms: now,
+            counts,
         })
     }
 
@@ -239,6 +256,61 @@ mod tests {
             api_token_id: 21,
             model: "claude-opus-5-5".into(),
             source_request_id: None,
+        }
+    }
+
+    /// 各状态计数沿用列表的前缀与时刻，到期边界计入已到期，已解除优先于到期，且不随状态筛选变化。
+    #[tokio::test]
+    async fn session_policy_block_counts_match_list_filters() {
+        let store = store().await;
+        let now = 1_800_000_000_000;
+        let keyed = |session_key: String| SessionPolicyIdentity {
+            session_key,
+            ..identity()
+        };
+        // 封禁中、恰好在查询时刻到期、解除后仍未到期、到期后才解除各一条。
+        let rounds = [
+            ("a".repeat(64), now - 10_000),
+            (format!("ab{}", "c".repeat(62)), now - 60_000),
+            ("b".repeat(64), now - 1_000),
+            (format!("bb{}", "d".repeat(62)), now - 200_000),
+        ];
+        for (key, blocked_at) in &rounds {
+            store
+                .remember(&keyed(key.clone()), 7, "usage_policy", *blocked_at, 60_000)
+                .await
+                .unwrap();
+        }
+        for prefix in ["bbb", "bbd"] {
+            let id = store.list("all", prefix, 1, 20, now).await.unwrap().items[0]
+                .id
+                .clone();
+            store.release(&id, now - 100).await.unwrap();
+        }
+        let expected = [
+            ("", [1, 1, 2, 4]),
+            ("a", [1, 1, 0, 2]),
+            ("ab", [0, 1, 0, 1]),
+            ("b", [0, 0, 2, 2]),
+        ];
+        for (prefix, [active, expired, released, all]) in expected {
+            let counts = SessionPolicyBlockCounts {
+                active,
+                expired,
+                released,
+                all,
+            };
+            for (state, total) in [
+                ("active", active),
+                ("expired", expired),
+                ("released", released),
+                ("all", all),
+            ] {
+                let page = store.list(state, prefix, 1, 20, now).await.unwrap();
+                assert_eq!(page.counts, counts, "prefix={prefix} state={state}");
+                assert_eq!(page.total, total, "prefix={prefix} state={state}");
+                assert_eq!(page.items.len() as i64, total);
+            }
         }
     }
 

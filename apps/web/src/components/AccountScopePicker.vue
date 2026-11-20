@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { ChevronRight, Search, X } from '@/components/ui/icon';
 import type { Account } from '../api';
 import PlatformBadge from './PlatformBadge.vue';
+import '../tokens.css';
 /** 令牌权限范围选择器，保留CSV接口及暂时不可见的已选账号。 */
 const props = defineProps<{ modelValue: string; accounts: Account[]; label: string; help: string }>();
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>();

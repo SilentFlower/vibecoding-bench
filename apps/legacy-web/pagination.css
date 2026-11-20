@@ -11,7 +11,7 @@
 .pagination-size-menu .fui-choice-option[data-state=checked]{color:var(--ui-color-primary-text);font-weight:650}
 .pagination-size-menu svg{width:14px;height:14px}
 @media(max-width:600px){.pagination-size .fui-label{font-size:var(--ui-font-size-sm)}.pagination-size .fui-choice{width:98px}.pagination-size{gap:6px}}
-.proxy-pagination,.capture-workspace .capture-pager,.request-list-footer>div{flex-wrap:wrap}
+.capture-workspace .capture-pager{flex-wrap:wrap}
 
 /* 共享分页在Vue路由及迁移期间的同源工作区保持同一外观：页码浅底方块，当前页主色填充。 */
 

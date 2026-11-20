@@ -1,4 +1,4 @@
-"""以同一视口读取定稿与实际模块的布局和样式，保存差异证据。"""
+"""以同一视口读取定稿与任务模块的布局和样式，保存差异证据（令牌页已迁至第二版，见 verify_records_pages_design.py）。"""
 import asyncio,json
 from playwright.async_api import async_playwright
 from verify_runtime_workspace_design import WorkspaceFixture
@@ -21,8 +21,8 @@ async def main():
         browser=await p.chromium.launch();reference=await browser.new_page(viewport={'width':1440,'height':1000});await reference.goto((ROOT/'doc/design/flower2api-concept.html').as_uri());await reference.add_style_tag(content='.preview-bar{display:none!important}:root{--preview-visible-height:0px}.app{min-height:100dvh}.sidebar{height:100dvh}')
         fixture=WorkspaceFixture();context=await browser.new_context(viewport={'width':1440,'height':1000});await context.route('**/*',fixture.route);await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only');localStorage.setItem('vibebench-theme','light')");actual=await context.new_page();results={}
         # 「权限按钮」等基础组件外观由组件库负责，已迁至 verify_ui_kit.py 按 token 与 console-v2 设计稿核对；这里只比对页面结构。
+        # 令牌页已换成第二版数据表，由 verify_records_pages_design.py 对 console-v2 设计稿核对，旧原型用例移除。
         for name,route,script,mapping in [
-            ('tokens','/tokens',"navigate('tokens')",{'面板':('.panel','.token-panel'),'面板标题':('.panel-head','.token-panel-head'),'行':('.token-row','.token-row'),'名称':('.token-identity>strong','.token-identity>strong'),'元数据':('.token-meta','.token-meta'),'操作区':('.token-actions','.token-actions')}),
             ('task-accounts','/tasks',"navigate('tasks');taskTab='accounts';repaintWork()",{'模块导航':('.work-navigation','.work-navigation'),'模块工具栏':('.work-list-toolbar','.work-list-toolbar'),'账号卡片':('.work-account','.work-account'),'账号标题':('.work-account>header','.work-account>header'),'卡片名称':('.work-account h3','.work-account h3'),'信息行':('.work-condition','.work-condition'),'网关关联':('.work-gateway-actions','.work-gateway-actions'),'卡片底栏':('.work-account>footer','.work-account>footer')}),
             *[(f'task-{tab}-{pane}',f'/tasks?tab={tab}',f"navigate('tasks');taskTab='{tab}';workView.pane='{pane}';repaintWork()",mapping) for tab,pane,mapping in [
                 ('projects','overview',{'上下文':('.work-context','.work-context'),'概览':('.work-hero','.work-hero'),'指标':('.work-summary-grid','.work-summary-grid'),'执行布局':('.work-execution-grid','.work-execution-grid'),'终端':('.work-terminal','.work-terminal')}),
@@ -36,7 +36,7 @@ async def main():
                 ('runs','overview',{'运行表格':('.work-table','.work-table')}),
             ]],
         ]:
-            await reference.evaluate(script);await actual.goto(BASE+route);target=actual;await target.locator('.work-navigation' if name.startswith('task') else '.token-row').first.wait_for();
+            await reference.evaluate(script);await actual.goto(BASE+route);target=actual;await target.locator('.work-navigation').first.wait_for();
             if name.startswith(('task-projects-','task-warmup-')):
                 await target.locator('#projects-cli-settings:not([disabled])').wait_for();await target.locator(f'[data-project-pane={name.split("-")[-1]}]').click()
             await actual.evaluate('document.fonts.ready');await reference.evaluate('document.fonts.ready');await target.locator('body').evaluate('()=>document.fonts.ready');await target.locator(next(iter(mapping.values()))[1]).first.wait_for()

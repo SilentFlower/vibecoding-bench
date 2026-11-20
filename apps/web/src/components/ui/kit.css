@@ -219,6 +219,14 @@
   .fui-table-row[data-state=selected] > .fui-table-cell { background: var(--ui-color-primary-container); }
   .fui-table-footer > .fui-table-row > .fui-table-cell { background: var(--ui-color-fill-subtle); font-weight: 650; }
   .fui-table-sub { display: block; margin-top: 2px; overflow: hidden; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 500; line-height: 1.55; text-overflow: ellipsis; }
+  /* 单元格工具类（设计稿 .t 的 table-layout、.num、.mono、.strong、.r、.ops）。固定列宽时单元格超长省略。 */
+  .fui-table-fixed { table-layout: fixed; }
+  .fui-table-fixed .fui-table-cell { overflow: hidden; text-overflow: ellipsis; }
+  .fui-table-num { font-variant-numeric: tabular-nums; }
+  .fui-table-mono { font-family: var(--ui-font-family-mono); font-variant-numeric: tabular-nums; }
+  .fui-table-strong { font-weight: 700; }
+  .fui-table-end { text-align: right; }
+  .fui-table-ops { display: flex; justify-content: flex-end; gap: calc(var(--ui-space-unit) * 1); }
   .fui-table-caption { margin-top: calc(var(--ui-space-unit) * 4); color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); }
 
   /* ---------- 空态与骨架 ---------- */
@@ -240,6 +248,8 @@
   .fui-icon-tile { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: calc(var(--ui-radius-block) - 2px); background: var(--ui-color-primary-container); color: var(--ui-color-primary-text); }
   .fui-icon-tile[data-size=lg] { width: 40px; height: 40px; border-radius: calc(var(--ui-radius-block) - 1px); }
   .fui-icon-tile svg { width: 18px; height: 18px; }
+  .fui-icon-tile[data-size=sm] { width: 32px; height: 32px; border-radius: calc(var(--ui-radius-block) - 3px); }
+  .fui-icon-tile[data-size=sm] svg { width: 14px; height: 14px; }
   .fui-icon-tile[data-tone=success] { background: var(--ui-color-success-bg); color: var(--ui-color-success-text); }
   .fui-icon-tile[data-tone=warning] { background: var(--ui-color-warning-bg); color: var(--ui-color-warning-text); }
   .fui-icon-tile[data-tone=danger] { background: var(--ui-color-danger-bg); color: var(--ui-color-danger-text); }
@@ -255,6 +265,13 @@
   .fui-overview-card-value { display: block; margin: 9px 0 7px; color: var(--ui-color-text); font: 800 calc(var(--ui-font-size-page) - 2px)/1 var(--ui-font-family-mono); letter-spacing: -.02em; }
   .fui-overview-card-value small { margin-left: 4px; color: var(--ui-color-text-4); font-size: var(--ui-font-size-md); font-weight: 650; }
   .fui-overview-card-caption { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; white-space: nowrap; }
+  /* 可点击形态：按钮去掉原生外观，正文与标签为 span，需显式成块。 */
+  .fui-overview-card.is-interactive { width: 100%; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color .15s, box-shadow .15s; }
+  .fui-overview-card.is-interactive .fui-overview-card-body, .fui-overview-card.is-interactive .fui-overview-card-label { display: block; }
+  .fui-overview-card.is-interactive .fui-overview-card-caption { display: block; }
+  .fui-overview-card.is-interactive:hover:not(:disabled) { background: var(--ui-color-fill-subtle); }
+  .fui-overview-card.is-interactive:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
+  .fui-overview-card.is-interactive:disabled { cursor: not-allowed; }
 
   .fui-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); }
   .fui-toolbar > .fui-segmented { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
@@ -282,6 +299,9 @@
   .fui-table-card-title { display: flex; align-items: baseline; gap: calc(var(--ui-space-unit) * 2); margin: 0 auto 0 0; color: var(--ui-color-text); font-size: var(--ui-font-size-card); font-weight: 760; line-height: 1.55; }
   .fui-table-card-count { color: var(--ui-color-text-4); font: 650 var(--ui-font-size-sm) var(--ui-font-family-mono); }
   .fui-table-card-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); }
+  /* 无标题头部：工具栏占满整行，内部 Toolbar 的 end 插槽靠右。 */
+  .fui-table-card-head.is-bare > .fui-table-card-toolbar { flex: 1; min-width: 0; }
+  .fui-table-card-head.is-bare > .fui-table-card-toolbar > .fui-toolbar { flex: 1; min-width: 0; }
   .fui-table-card-scroll { min-width: 0; overflow-x: auto; }
   /* 最右操作列横向滚动时固定；底色跟随行状态（斑马、悬停、选中规则选择器更具体，会覆盖这里的白底）。 */
   .fui-table-head.fui-table-actions, .fui-table-cell.fui-table-actions { position: sticky; right: 0; z-index: 1; text-align: right; }
@@ -341,3 +361,5 @@
 /* 未分层：style.css 的全局弹窗规则 [data-slot=dialog-content] { max-height; overflow-y: auto } 未分层，会压过层内规则；
    居中弹窗需同样未分层且更具体，才能只让内容区滚动、头部与底栏固定。 */
 [data-slot=dialog-content].fui-modal { max-height: min(840px, calc(100dvh - 32px)); overflow: hidden; }
+/* 靠右抽屉：上下右各留 14px，占满视口高。 */
+[data-slot=dialog-content].fui-modal[data-placement=side] { height: calc(100dvh - 28px); max-height: none; }

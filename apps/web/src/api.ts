@@ -467,7 +467,9 @@ export interface SessionPolicyBlock {
   state: 'active' | 'expired' | 'released'
 }
 /** 会话封禁分页与服务器观察时刻。 */
-export interface SessionPolicyBlockPage { items: SessionPolicyBlock[]; total: number; page: number; page_size: number; observed_at_ms: number }
+/** 会话封禁各状态计数：与列表同一时刻、同一会话前缀，不随状态筛选变化；旧网关不返回。 */
+export interface SessionPolicyBlockCounts { active: number; expired: number; released: number; all: number }
+export interface SessionPolicyBlockPage { items: SessionPolicyBlock[]; total: number; page: number; page_size: number; observed_at_ms: number; counts?: SessionPolicyBlockCounts }
 
 /** 管理端请求诊断列表行。 */
 export interface DiagnosticRequest {
@@ -649,6 +651,9 @@ export interface NativeCapture {
   }
 }
 
+/** 代理目录全量计数；used 在引用不完整时为 null；expiring（7 天内到期）与 expired 由新版网关提供。 */
+export interface ProxyDirectoryCounts { all: number; available: number; used: number | null; expiring?: number; expired?: number }
+
 /** 代理线路公开投影，认证字段仅显示是否已设置。 */
 export interface ProxyRoute {
   id: string; name: string; protocol: string; host: string; port: number; public_url: string;
@@ -673,7 +678,7 @@ export const api = {
   /** 批量只读账号节点归属，沿原同源管理会话。@param signal 取消读取。@return 公开账号摘要。 */
   runtimeAccountNodes: (signal: AbortSignal) => request<AccountNodeSummary[]>('GET', '/runtime/api/accounts', undefined, signal),
   /** 搜索公开线路。@param page 页码。@param q 公开搜索。@param signal 取消信号。@return 分页。 */
-  listProxies: (page = 1, q = '', signal?: AbortSignal, usage = true, pageSize = 20) => request<PagedResult<ProxyRoute> & { references_complete: boolean; counts?: { all:number; available:number; used:number|null } }>('GET', `/admin/proxies?page=${page}&page_size=${pageSize}&q=${encodeURIComponent(q)}&usage=${usage}`, undefined, signal),
+  listProxies: (page = 1, q = '', signal?: AbortSignal, usage = true, pageSize = 20) => request<PagedResult<ProxyRoute> & { references_complete: boolean; counts?: ProxyDirectoryCounts | null }>('GET', `/admin/proxies?page=${page}&page_size=${pageSize}&q=${encodeURIComponent(q)}&usage=${usage}`, undefined, signal),
   /** 保存线路。@param id 编辑身份，空为新建。@param input 草稿。@return 保存身份。 */
   saveProxy: (id: string | null, input: ProxyInput) => request<{id: string; sync_pending?: boolean}>(id ? 'PUT' : 'POST', id ? `/admin/proxies/${encodeURIComponent(id)}` : '/admin/proxies', input),
   /** 原子导入。@param text 多行连接。@return 创建条数。 */

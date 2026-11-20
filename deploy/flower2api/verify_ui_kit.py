@@ -146,6 +146,15 @@ DESIGN_PAIRS = [
     ('account-edit', '.modal .seg', '[data-testid=modal-nav]', ['background-color', 'padding-top', 'column-gap', 'border-top-left-radius'], 'modal'),
     ('account-edit', '.mb', '[data-testid=modal] .fui-modal-body', ['padding-top', 'padding-left', 'padding-bottom', 'row-gap', 'line-height'], 'modal'),
     ('account-edit', '.mf', '[data-testid=modal] .fui-modal-foot', ['background-color', 'padding-top', 'padding-left', 'column-gap'], 'modal'),
+    # 4-2 扩展：可点击概览卡、无标题表格卡片头部、32px 图标块、靠右抽屉外框。
+    ('requests', '.ov:last-child', '[data-testid=overview-card-interactive]', ['background-color', 'border-top-left-radius', 'box-shadow', 'padding-top', 'padding-left', 'column-gap'], None),
+    ('requests', '.ov:last-child p', '[data-testid=overview-card-interactive] .fui-overview-card-label', TEXT, None),
+    ('requests', '.ov:last-child > div > span', '[data-testid=overview-card-interactive] .fui-overview-card-caption', TEXT, None),
+    ('requests', '.tcard-h', '[data-testid=table-card-bare] .fui-table-card-head', ['column-gap', 'align-items'], None),
+    ('requests', '.tcard-h .seg', '[data-testid=table-card-bare] .fui-segmented', ['background-color', 'padding-top', 'column-gap', 'border-top-left-radius'], None),
+    ('proxies', '.t td .tile', '[data-testid=icon-tile-sm]', ['width', 'height', 'border-top-left-radius', 'background-color', 'color'], None),
+    ('account-edit', '.modal', '[data-testid=modal-side]', ['background-color', 'border-top-left-radius', 'box-shadow'], 'side'),
+    ('account-edit', '.mh', '[data-testid=modal-side] .fui-modal-head', ['padding-top', 'padding-left', 'padding-bottom', 'column-gap', 'align-items'], 'side'),
 ]
 # 结构写法不同但视觉等价、或已记录的有意偏差，比对时跳过对应属性。
 KNOWN = {
@@ -403,7 +412,7 @@ async def verify_design(browser, url: str) -> dict:
     await demo.goto(url)
     await demo.evaluate('document.fonts.ready')
     # 需要先打开示例弹窗的比对动作 → 演示页上的打开按钮。
-    openers = {'dialog': '打开弹窗示例', 'modal': '打开居中弹窗示例'}
+    openers = {'dialog': '打开弹窗示例', 'modal': '打开居中弹窗示例', 'side': '打开靠右抽屉示例'}
     problems, compared, opened = [], 0, None
     for screen, mock_selector, demo_selector, props, action in DESIGN_PAIRS:
         # 设计稿只在加载时读取 #画面，带不同查询参数强制重新渲染。

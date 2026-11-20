@@ -1,16 +1,23 @@
 <script setup lang="ts">
-import { KeyRound, Copy, Pencil, Trash2, Plus } from '@/components/ui/icon';
+import { KeyRound, Copy, Pencil, Trash2, Plus, AlertCircle } from '@/components/ui/icon';
 import AccountScopePicker from './AccountScopePicker.vue';
-import { ref, onMounted, onUnmounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { api, type ApiToken, type Account } from '../api';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/ui/page-header';
 import { Input } from '@/components/ui/input';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-} from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
+import { IconTile } from '@/components/ui/icon-tile';
+import { TableCard } from '@/components/ui/table-card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ModalDialog } from '@/components/ui/modal';
+import { NoticeStrip } from '@/components/ui/notice-strip';
+import { Empty } from '@/components/ui/empty';
+import { SearchInput } from '@/components/ui/controls';
 import { useToast } from '../composables/useToast';
 import { ConfirmationDialog } from './ui/feedback';
+import '../tokens.css';
 
 const { show: toast } = useToast();
 
@@ -34,6 +41,17 @@ const form = ref({ name: '', allowed_accounts: '', blocked_accounts: '' });
 const copiedId = ref<number | null>(null);
 const loading = ref(false);
 const loadError = ref('');
+/** 令牌名称搜索词，只在已读取的全部令牌中过滤 */
+const query = ref('');
+/** 按名称过滤后的令牌；未命名令牌按「未命名令牌」匹配 */
+const visibleTokens = computed(() => {
+  const keyword = query.value.trim().toLocaleLowerCase();
+  return keyword ? tokens.value.filter(t => (t.name || '未命名令牌').toLocaleLowerCase().includes(keyword)) : tokens.value;
+});
+/** 标题旁计数：搜索时显示「匹配 / 全部」 */
+const countLabel = computed(() => query.value.trim() ? `${visibleTokens.value.length} / ${tokens.value.length} 个令牌` : `${tokens.value.length} 个令牌`);
+/** 空状态文案：读取中、尚无令牌与搜索无结果三种 */
+const emptyTitle = computed(() => loading.value && !tokens.value.length ? '正在读取令牌…' : !tokens.value.length ? '还没有令牌，可创建客户端凭据。' : '没有匹配的令牌');
 const accountError = ref('');
 let alive = true;
 onUnmounted(() => { alive = false; });
@@ -171,6 +189,26 @@ function maskToken(token: string): string {
 }
 
 /**
+ * 可用账号范围说明：允许列表为空时为全部可用账号，有排除时追加
+ * @param t 令牌对象
+ * @return 范围文字
+ */
+function scopeLabel(t: ApiToken): string {
+  const allowed = t.allowed_accounts ? `仅允许 ${formatAccountIds(t.allowed_accounts)}` : '全部可用账号';
+  return t.blocked_accounts ? `${allowed} · 排除 ${formatAccountIds(t.blocked_accounts)}` : allowed;
+}
+
+/**
+ * 创建时间只显示本地日期
+ * @param value 接口时间戳
+ * @return yyyy/mm/dd，缺失或非法为「—」
+ */
+function createdDate(value: string): string {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date) : '—';
+}
+
+/**
  * 解析 ID 列表为账号名显示
  * @param ids 逗号分隔的 ID
  */
@@ -187,17 +225,33 @@ function formatAccountIds(ids: string): string {
 <template>
   <div class="tokens-page">
     <PageHeader title="访问令牌" description="管理客户端凭据和可用账号范围。"><template #actions><Button @click="openCreate"><Plus :size="15" />创建令牌</Button></template></PageHeader>
-    <p v-if="loadError" class="token-load-error" role="alert">{{ loadError }} <button type="button" @click="load">重试</button></p>
-    <section class="token-panel" :aria-busy="loading"><header class="token-panel-head"><h3>访问令牌</h3><span>{{ tokens.length }} 个令牌</span></header>
-      <article v-for="t in tokens" :key="t.id" class="token-row"><span class="token-icon"><KeyRound :size="19" /></span><div class="token-identity"><strong>{{ t.name || '未命名令牌' }}</strong><div class="token-meta"><code>{{ maskToken(t.token) }}</code><button type="button" class="token-copy" @click="copyToken(t)"><Copy :size="12" />{{ copiedId === t.id ? '已复制' : '复制' }}</button><span>{{ t.allowed_accounts ? `仅允许 ${formatAccountIds(t.allowed_accounts)}` : '全部可用账号' }}<template v-if="t.blocked_accounts"> · 排除 {{ formatAccountIds(t.blocked_accounts) }}</template></span></div></div>
-      <div class="token-actions"><button type="button" class="token-toggle" role="switch" :aria-checked="t.status === 'active'" :aria-label="`${t.name || '未命名令牌'}启用状态`" @click="toggleStatus(t)"><span class="switch-track"><i /></span>{{ t.status === 'active' ? '启用' : '停用' }}</button><span class="action-divider" /><Button variant="outline" size="sm" @click="openEdit(t)"><Pencil :size="13" />编辑权限</Button><button type="button" class="token-delete" @click="confirmDelete(t.id)"><Trash2 :size="14" />删除</button></div>
-      </article><p v-if="!tokens.length" class="token-empty">{{ loading ? '正在读取令牌…' : '还没有令牌，可创建客户端凭据。' }}</p>
-    </section>
-    <Dialog v-model:open="showForm"><DialogContent class="approved-token-editor"><DialogHeader><DialogTitle>{{ editing ? '编辑令牌权限' : '创建令牌' }}</DialogTitle><DialogDescription class="sr-only">选择允许与排除的账号，保存后生效。</DialogDescription></DialogHeader>
-      <form @submit.prevent="save"><div class="token-form-scroll"><label class="token-name"><span>名称</span><Input v-model="form.name" placeholder="例如：开发客户端" /></label>
-      <p v-if="accountError" class="token-load-error" role="alert">{{ accountError }} <button type="button" @click="loadAccounts">重试</button></p><AccountScopePicker v-model="form.allowed_accounts" :accounts="allAccounts" label="允许的账号" help="留空允许使用全部可用账号。" /><AccountScopePicker v-model="form.blocked_accounts" :accounts="allAccounts" label="排除的账号" help="排除的账号不会用于此令牌。" />
-      </div><footer class="token-editor-footer"><Button type="button" variant="outline" @click="showForm = false">取消</Button><Button type="submit">{{ editing ? '保存权限' : '创建令牌' }}</Button></footer></form>
-    </DialogContent></Dialog>
+    <NoticeStrip v-if="loadError" tone="danger" role="alert" class="token-load-error"><AlertCircle />{{ loadError }}<template #end><Button variant="outline" size="sm" @click="load">重试</Button></template></NoticeStrip>
+    <TableCard class="token-panel" title="访问令牌" :count="countLabel" :aria-busy="loading">
+      <template #toolbar><SearchInput v-model="query" label="搜索令牌" placeholder="搜索令牌名称" /></template>
+      <Table class="fui-table-fixed">
+        <TableHeader><TableRow><TableHead class="token-col-name">名称</TableHead><TableHead class="token-col-token">令牌</TableHead><TableHead class="token-col-scope token-scope-column">可用账号</TableHead><TableHead class="token-col-created token-created-column">创建时间</TableHead><TableHead class="token-col-status">状态</TableHead><TableHead class="token-col-actions fui-table-end">操作</TableHead></TableRow></TableHeader>
+        <TableBody>
+          <TableRow v-for="t in visibleTokens" :key="t.id" class="token-row" :data-token-id="t.id">
+            <TableCell><div class="token-identity"><IconTile size="sm"><KeyRound /></IconTile><span class="token-identity-text"><strong class="fui-table-strong">{{ t.name || '未命名令牌' }}</strong><span class="fui-table-sub token-mobile-scope">{{ scopeLabel(t) }}</span></span></div></TableCell>
+            <TableCell><span class="token-value"><code class="fui-table-mono">{{ maskToken(t.token) }}</code><Badge as="button" type="button" variant="secondary" class="token-copy" @click="copyToken(t)"><Copy :size="12" />{{ copiedId === t.id ? '已复制' : '复制' }}</Badge></span></TableCell>
+            <TableCell class="token-scope-column" :title="scopeLabel(t)">{{ scopeLabel(t) }}</TableCell>
+            <TableCell class="fui-table-num token-created token-created-column">{{ createdDate(t.created_at) }}</TableCell>
+            <TableCell><span class="token-status" :data-active="t.status === 'active'"><Switch :model-value="t.status === 'active'" :label="`${t.name || '未命名令牌'}启用状态`" @update:model-value="toggleStatus(t)" /><span class="token-status-text">{{ t.status === 'active' ? '启用' : '停用' }}</span></span></TableCell>
+            <TableCell><div class="fui-table-ops token-actions"><Button variant="outline" size="sm" @click="openEdit(t)"><Pencil :size="13" />编辑权限</Button><Button variant="destructive-ghost" size="sm" @click="confirmDelete(t.id)"><Trash2 :size="13" />删除</Button></div></TableCell>
+          </TableRow>
+          <TableRow v-if="!visibleTokens.length"><TableCell :colspan="6" class="token-empty"><Empty :title="emptyTitle"><template #icon><KeyRound /></template></Empty></TableCell></TableRow>
+        </TableBody>
+      </Table>
+    </TableCard>
+    <ModalDialog v-model:open="showForm" class="approved-token-editor" :title="editing ? '编辑令牌权限' : '创建令牌'" description="选择允许与排除的账号，保存后生效。" :width="760">
+      <form id="token-editor-form" class="token-form" @submit.prevent="save">
+        <label class="token-name"><span class="fui-label">名称</span><Input v-model="form.name" placeholder="例如：开发客户端" /></label>
+        <NoticeStrip v-if="accountError" tone="danger" role="alert" class="token-account-error"><AlertCircle />{{ accountError }}<template #end><Button type="button" variant="outline" size="sm" @click="loadAccounts">重试</Button></template></NoticeStrip>
+        <AccountScopePicker v-model="form.allowed_accounts" :accounts="allAccounts" label="允许的账号" help="留空允许使用全部可用账号。" />
+        <AccountScopePicker v-model="form.blocked_accounts" :accounts="allAccounts" label="排除的账号" help="排除的账号不会用于此令牌。" />
+      </form>
+      <template #footer><Button type="button" variant="outline" class="token-editor-cancel" @click="showForm = false">取消</Button><Button type="submit" form="token-editor-form">{{ editing ? '保存权限' : '创建令牌' }}</Button></template>
+    </ModalDialog>
 
     <ConfirmationDialog :open="showDeleteConfirm" title="确认删除令牌" message="此操作不可撤销，删除后使用该令牌的客户端将无法访问。" confirm-label="删除" danger :busy="deletingAccount" :error="deleteError" @confirm="executeDelete" @cancel="showDeleteConfirm=false" />
   </div>

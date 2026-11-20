@@ -15,7 +15,7 @@ import { TableCard } from '@/components/ui/table-card';
 import { FloatingSaveBar } from '@/components/ui/save-bar';
 import { ModalDialog } from '@/components/ui/modal';
 import { NoticeStrip } from '@/components/ui/notice-strip';
-import { Activity, Box, Calendar, Check, Globe, Info, KeyRound, Pencil, Plus, RefreshCw, Search, Server, Settings2, ShieldCheck, Trash2, Users, Zap } from '@/components/ui/icon';
+import { Activity, AlertCircle, Box, Calendar, Check, Clock, Filter, Globe, Info, KeyRound, Pencil, Plus, RefreshCw, Search, Server, Settings2, ShieldCheck, SlidersHorizontal, Trash2, Users, Zap } from '@/components/ui/icon';
 
 /** 组合组件演示：数据取自设计稿 accounts / proxies / environments / settings 画面，供 verify_ui_kit.py 逐项比对。 */
 const environmentFilter = ref('all');
@@ -37,6 +37,10 @@ const pageSize = ref(20);
 const pending = ref(1);
 const modalOpen = ref(false);
 const modalTab = ref('configuration');
+const sideOpen = ref(false);
+const logMode = ref<'info' | 'debug'>('info');
+const quick = ref('all');
+const quickOptions: SegmentedOption[] = [{ value: 'all', label: '全部', count: 53 }, { value: 'errors', label: '错误', count: 7 }, { value: 'processing', label: '处理中', count: 2 }];
 const modalTabs: SegmentedOption[] = [
   { value: 'overview', label: '概览' }, { value: 'configuration', label: '配置' },
   { value: 'scheduling', label: '调度', count: 4 }, { value: 'diagnostics', label: '环境与诊断' },
@@ -60,6 +64,27 @@ const modalTabs: SegmentedOption[] = [
       <OverviewCard label="被使用" value="6" caption="条线路有账号绑定" tone="info"><template #icon><Users /></template></OverviewCard>
       <OverviewCard label="7 天内到期" value="3" caption="另有 1 条已过期" tone="warning"><template #icon><Calendar /></template></OverviewCard>
     </OverviewGrid>
+
+    <OverviewGrid class="composite-gap">
+      <OverviewCard label="全部记录" value="53" caption="保留 7 天"><template #icon><Activity /></template></OverviewCard>
+      <OverviewCard label="错误" value="7" caption="六类错误集合" tone="danger"><template #icon><AlertCircle /></template></OverviewCard>
+      <OverviewCard label="处理中" value="2" caption="按当前筛选统计" tone="info"><template #icon><Clock /></template></OverviewCard>
+      <OverviewCard interactive label="后续请求日志" :value="logMode === 'info' ? 'info · 摘要' : 'debug · 脱敏内容'" caption="仅影响后续请求 · 点击切换" tone="warning" data-testid="overview-card-interactive" @click="logMode = logMode === 'info' ? 'debug' : 'info'"><template #icon><SlidersHorizontal /></template></OverviewCard>
+    </OverviewGrid>
+
+    <TableCard class="composite-gap" data-testid="table-card-bare">
+      <template #toolbar>
+        <Toolbar>
+          <Segmented v-model="quick" :options="quickOptions" label="请求快捷筛选" />
+          <template #end>
+            <InputGroup class="composite-search"><template #prefix><Search /></template><Input placeholder="输入完整请求 ID / 响应关联 ID / 上游请求 ID" /></InputGroup>
+            <Button variant="outline"><Filter />筛选</Button>
+            <Button><Search />查询</Button>
+            <Button variant="outline" size="icon" aria-label="刷新"><RefreshCw /></Button>
+          </template>
+        </Toolbar>
+      </template>
+    </TableCard>
 
     <Toolbar class="composite-gap" data-testid="toolbar">
       <Segmented v-model="environmentFilter" :options="environmentOptions" label="环境状态筛选" />
@@ -92,7 +117,7 @@ const modalTabs: SegmentedOption[] = [
         <TableHeader><TableRow><TableHead>代理线路</TableHead><TableHead>出口 IP / 地区</TableHead><TableHead>检测延迟</TableHead><TableHead>到期时间</TableHead><TableHead class="fui-table-actions">操作</TableHead></TableRow></TableHeader>
         <TableBody>
           <TableRow v-for="row in proxies" :key="row.name">
-            <TableCell><b>{{ row.name }}</b><span class="fui-table-sub">{{ row.url }}</span></TableCell>
+            <TableCell><div class="composite-identity"><IconTile size="sm" :data-testid="row.name === '线路 1' ? 'icon-tile-sm' : undefined"><Globe /></IconTile><div><b>{{ row.name }}</b><span class="fui-table-sub">{{ row.url }}</span></div></div></TableCell>
             <TableCell>{{ row.ip }}<span class="fui-table-sub">{{ row.region }}</span></TableCell>
             <TableCell>{{ row.latency }} ms</TableCell>
             <TableCell>{{ row.expiry }}<span class="fui-table-sub">{{ row.expiryAt }}</span></TableCell>
@@ -123,6 +148,11 @@ const modalTabs: SegmentedOption[] = [
           <Button @click="modalOpen = false">保存修改</Button>
         </template>
       </ModalDialog>
+      <Button variant="outline" @click="sideOpen = true">打开靠右抽屉示例</Button>
+      <ModalDialog v-model:open="sideOpen" title="请求详情" placement="side" :width="1020" data-testid="modal-side">
+        <template #description><code>11111111-1111-4111-8111-111111111111</code></template>
+        <div class="composite-modal-section"><b>上游尝试</b><p>按实际提交顺序展示，每次尝试保留自己的账号与结果。</p></div>
+      </ModalDialog>
     </div>
 
     <FloatingSaveBar :count="pending" hint="修改将统一应用到网关" clean-label="配置已同步" data-testid="save-bar">
@@ -138,6 +168,7 @@ const modalTabs: SegmentedOption[] = [
 .composite-gap { margin-bottom: calc(var(--ui-space-unit) * 4.5); }
 .composite-notices { display: grid; gap: calc(var(--ui-space-unit) * 2.5); max-width: 560px; }
 .composite-note { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 600; }
+.composite-identity { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); min-width: 0; }
 .composite-search { width: 280px; }
 .composite-entities { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 4); }
 .composite-block-title { color: var(--ui-color-success-text); font-size: var(--ui-font-size-md); font-weight: 720; }

@@ -53,7 +53,10 @@ class BlockFixture(Fixture):
                 page = int(query.get('page', ['1'])[0])
                 size = int(query.get('page_size', ['20'])[0])
                 rows = [row for row in self.blocks if (state == 'all' or row['state'] == state) and row['session_key'].startswith(prefix)]
-                payload = dict(items=rows[(page-1)*size:page*size], total=len(rows), page=page, page_size=size, observed_at_ms=int(time.time()*1000))
+                # 计数与网关一致：同一会话前缀，不受当前状态筛选影响。
+                scoped = [row for row in self.blocks if row['session_key'].startswith(prefix)]
+                counts = {name: sum(row['state'] == name for row in scoped) for name in ('active', 'expired', 'released')}
+                payload = dict(items=rows[(page-1)*size:page*size], total=len(rows), page=page, page_size=size, observed_at_ms=int(time.time()*1000), counts=dict(counts, all=len(scoped)))
         elif path.startswith('/admin/session-policy-blocks/') and path.endswith('/release'):
             assert request.method == 'POST'
             if self.release_fail:
@@ -145,18 +148,16 @@ async def run(output: Path, gateway: Path) -> dict:
             await page.get_by_role('button', name='重置查询', exact=True).click()
             await expect(search).to_have_value('')
             await expect(page.locator('tr[data-block-id]')).to_have_count(20)
-            picker = page.get_by_role('combobox', name='封禁状态', exact=True)
-            await picker.click()
-            await page.get_by_role('option', name='已到期', exact=True).click()
+            # 状态为分段单选，名称带接口计数（同一前缀、不随状态筛选变化）：解除一条后 20 / 1 / 1 / 22。
+            states = page.get_by_role('radiogroup', name='封禁状态', exact=True)
+            await expect(states.get_by_role('radio', name='封禁中 20', exact=True)).to_have_attribute('aria-checked', 'true')
+            await states.get_by_role('radio', name='已到期 1', exact=True).click()
             await expect(page.locator('tr[data-block-id]')).to_have_count(1)
-            await picker.click()
-            await page.get_by_role('option', name='已解除', exact=True).click()
+            await states.get_by_role('radio', name='已解除 1', exact=True).click()
             await expect(page.locator('tr[data-block-id]')).to_have_count(1)
-            await picker.click()
-            await page.get_by_role('option', name='全部记录', exact=True).click()
+            await states.get_by_role('radio', name='全部记录 22', exact=True).click()
             await expect(page.locator('tr[data-block-id]')).to_have_count(20)
-            await picker.click()
-            await page.get_by_role('option', name='封禁中', exact=True).click()
+            await states.get_by_role('radio', name='封禁中 20', exact=True).click()
             await expect(page.locator('tr[data-block-id]')).to_have_count(20)
             fixture.read_fail = True
             await page.get_by_role('button', name='刷新', exact=True).click()

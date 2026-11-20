@@ -3327,6 +3327,10 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert_eq!(page["total"], 1);
         assert_eq!(page["items"][0]["session_key"], key);
+        assert_eq!(
+            page["counts"],
+            json!({"active":1,"expired":0,"released":0,"all":1})
+        );
         for query in [
             "state=unknown",
             "page=0",
@@ -3360,6 +3364,48 @@ mod tests {
         )
         .await;
         assert_eq!(page["total"], 1);
+        assert_eq!(
+            page["counts"],
+            json!({"active":0,"expired":0,"released":1,"all":1})
+        );
+    }
+
+    /// 代理目录总览按服务端时间统计已过期与 7 天内到期，不读取使用情况时不返回总览。
+    #[tokio::test]
+    async fn proxy_directory_counts_expiry() {
+        let (app, _, _, _, _) = test_router_with_scheduling(false).await;
+        let now = Utc::now();
+        for (name, host, deadline) in [
+            (
+                "已过期线路",
+                "expired.invalid",
+                now - ChronoDuration::days(1),
+            ),
+            (
+                "即将到期线路",
+                "expiring.invalid",
+                now + ChronoDuration::days(1),
+            ),
+        ] {
+            let (status, _) = account_admin_json(
+                &app,
+                Method::POST,
+                "/admin/proxies",
+                json!({"name":name,"protocol":"http","host":host,"port":8080,"expires_at":deadline.to_rfc3339()}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+        }
+        let (status, page) =
+            account_admin_json(&app, Method::GET, "/admin/proxies", json!({})).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(page["counts"]["all"], 2);
+        assert_eq!(page["counts"]["expired"], 1);
+        assert_eq!(page["counts"]["expiring"], 1);
+        let (status, page) =
+            account_admin_json(&app, Method::GET, "/admin/proxies?usage=false", json!({})).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(page["counts"].is_null());
     }
 
     /// 授权从目录解析连接并保护未完成会话，公开回执不泄露账密。

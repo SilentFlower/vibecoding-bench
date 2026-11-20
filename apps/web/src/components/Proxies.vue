@@ -1,16 +1,24 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { Globe, Plus, Download, Activity, Pencil, Trash2, ArrowUpRight, ShieldCheck } from '@/components/ui/icon';
-import { ChevronDown, LoaderCircle } from 'lucide-vue-next';
-import { api, type ProxyRoute, type ProxyInput } from '../api';
+import { Globe, Plus, Download, Activity, Pencil, Trash2, ArrowUpRight, ShieldCheck, Check, Users, Calendar, ChevronDown, AlertCircle, Info } from '@/components/ui/icon';
+import { LoaderCircle } from 'lucide-vue-next';
+import { api, type ProxyRoute, type ProxyInput, type ProxyDirectoryCounts } from '../api';
 import { useToast } from '../composables/useToast';
 import { ConfirmationDialog } from './ui/feedback';
 import { Button } from './ui/button';
+import { Badge, type BadgeVariants } from './ui/badge';
 import { PageHeader } from './ui/page-header';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
+import { Checkbox } from './ui/checkbox';
+import { ModalDialog } from './ui/modal';
+import { OverviewCard, OverviewGrid } from './ui/overview';
+import { TableCard } from './ui/table-card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { IconTile } from './ui/icon-tile';
+import { NoticeStrip } from './ui/notice-strip';
 import { ChoiceSelect, DateTimeControl, NumberInput, SearchInput, Pagination } from './ui/controls';
+import '../proxies.css';
 
 const { show: toast } = useToast();
 const rows = ref<ProxyRoute[]>([]);
@@ -23,7 +31,9 @@ const total = ref(0);
 const loading = ref(false);
 const error = ref('');
 const complete = ref(true);
-const counts = ref<{ all:number; available:number; used:number|null } | null>(null);
+const counts = ref<ProxyDirectoryCounts | null>(null);
+/** 第 4 张概览卡说明：已过期数来自网关全量统计，旧网关不返回时不写数字。 */
+const expiredCaption = computed(() => counts.value?.expired == null ? '按到期时间统计' : counts.value.expired > 0 ? `另有 ${counts.value.expired} 条已过期` : '暂无已过期线路');
 const expanded = ref<string | null>(null);
 const AccountWorkspace = defineAsyncComponent(() => import('./Accounts.vue'));
 const workspaceAccountId = ref<number | null>(null);
@@ -36,7 +46,8 @@ function openUserAccount(user: ProxyRoute['users'][number], event: MouseEvent): 
   if (!Number.isSafeInteger(id) || id < 1) return;
   accountOpener = event.currentTarget as HTMLElement;
   const row = accountOpener.closest('tr[data-proxy-id]') ?? accountOpener.closest('.proxy-expanded')?.previousElementSibling;
-  accountReturnButton = row?.querySelector<HTMLElement>('.proxy-expand') ?? null;
+  // 桌面展开按钮在使用情况列，窄屏入口在线路列；取当前可见的那个作为焦点回退目标。
+  accountReturnButton = Array.from(row?.querySelectorAll<HTMLElement>('.proxy-expand, .proxy-mobile-usage') ?? []).find(element => element.getClientRects().length > 0) ?? null;
   workspaceAccountId.value = id;
 }
 /** 关闭局部工作区并恢复原使用者按钮焦点。@return 无。 */
@@ -172,6 +183,28 @@ function remaining(value: string | null): string {
   const duration = days ? `${days} 天${hours ? ` ${hours} 小时` : ''}` : hours ? `${hours} 小时${rest ? ` ${rest} 分钟` : ''}` : minutes ? `${minutes} 分钟` : '不足 1 分钟';
   return (delta <= 0 ? '已过期 ' : '剩余 ') + duration;
 }
+/** 到期徽标色：已过期为危险色，7 天内到期为警示色，其余（含未设置）中性。@param value ISO瞬时。@return 徽标变体。 */
+function expiryVariant(value: string | null): BadgeVariants['variant'] {
+  const deadline = value ? Date.parse(value) : NaN;
+  if (!Number.isFinite(deadline)) return 'secondary';
+  return deadline <= now.value ? 'destructive' : deadline - now.value < 7 * 86400000 ? 'warning' : 'secondary';
+}
+/** 连接状态徽标：检测中为信息色，可用为成功色，检测失败为危险色，其余中性。@param row 线路。@return 文字与变体。 */
+function connection(row: ProxyRoute): { label: string; variant: BadgeVariants['variant'] } {
+  if (probing.value.has(row.id)) return { label: '检测中…', variant: 'info' };
+  return row.status === 'ready' ? { label: '可用', variant: 'success' } : row.status === 'failed' ? { label: '检测失败', variant: 'destructive' } : { label: '待检测', variant: 'secondary' };
+}
+/** 延迟着色沿用 120ms 阈值：超过为警示色，其余有值为成功色，未检测为弱化色。@param row 线路。@return 色调。 */
+function latencyTone(row: ProxyRoute): 'slow' | 'fast' | 'none' {
+  if (!row.observation) return 'none';
+  return row.observation.latency_ms > 120 ? 'slow' : 'fast';
+}
+/** 展开或收起一条线路的使用账号。@param id 线路标识。@return 无。 */
+function toggleExpanded(id: string): void { expanded.value = expanded.value === id ? null : id; }
+/** 使用情况辅助行全文（悬停提示），窄列省略时仍可读到全部使用者与处理中请求数。@param row 线路。@return 文字。 */
+function usageSummary(row: ProxyRoute): string {
+  return `${row.users.length ? row.users.map(user => user.name).join('、') : '暂无账号'} · ${row.in_flight} 个处理中`;
+}
 /** 日期安全显示。@param value ISO瞬时。@return 本地时间。 */
 function date(value: string | null): string { return value ? new Date(value).toLocaleString('zh-CN', { year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false }) : '尚未检测'; }
 /** 引用入口归账号配置，目录不提供关联写入。@param user 使用者。@return 控制台地址。 */
@@ -183,36 +216,56 @@ onUnmounted(() => { alive = false; cancelBatch.value = true; generation++; reque
 <template>
   <div class="proxy-page">
     <PageHeader title="代理管理" description="出口位置、连接质量与账号使用情况，一处查看。"><template #actions><Button variant="outline" @click="importOpen = true; formError = ''"><Download :size="15" />批量导入</Button><Button @click="edit(null)"><Plus :size="15" />添加代理</Button></template></PageHeader>
-    <div class="proxy-summary"><span><strong>{{ counts?.all ?? total }}</strong> 条代理</span><span><strong>{{ counts?.available ?? '—' }}</strong> 条可用</span><span><strong>{{ counts?.used ?? '—' }}</strong> 条被使用</span><span v-if="!complete" class="text-amber-700">部分使用情况待核对</span><span>出口信息来自最近一次检测</span></div>
-    <section class="proxy-panel">
-      <header class="proxy-toolbar"><h3>代理线路 <small>{{ total }} / {{ counts?.all ?? total }} 条</small></h3><SearchInput v-model="query" label="搜索代理" placeholder="名称、地址、出口 IP 或地区" maxlength="256" @search="search" /><Button variant="outline" size="sm" :disabled="batch.running || !total || loading" @click="probeAll"><Activity :size="14" />批量检测</Button></header>
-      <div v-if="batch.running" class="proxy-batch" role="status">正在检测 {{ batch.done }} / {{ batch.total }}<button type="button" @click="cancelBatch = true">停止后续检测</button></div>
-      <p v-if="error" class="proxy-error" role="alert">{{ error }} <button type="button" @click="load">重试</button></p>
-      <div class="proxy-table-scroll" :aria-busy="loading"><table class="proxy-table"><thead><tr><th>代理线路</th><th>出口 IP / 地区</th><th>检测延迟</th><th>连接状态</th><th>到期时间</th><th>账号使用情况</th><th>操作</th></tr></thead><tbody>
-        <template v-for="row in rows" :key="row.id"><tr :data-proxy-id="row.id"><td><div class="proxy-identity"><span class="proxy-icon"><Globe :size="18" /></span><div><strong>{{ row.name }}</strong><small><code>{{ row.public_url }}</code></small></div></div></td>
-          <td><div class="proxy-exit"><code>{{ row.observation?.ip ?? '—' }}</code><span><template v-if="row.observation"><b>{{ row.observation.country_code || '—' }}</b>{{ [row.observation.country, row.observation.city !== row.observation.country ? row.observation.city || row.observation.region : ''].filter(Boolean).join(' · ') || '地区未知' }}</template><template v-else>等待检测</template></span><small v-if="row.observation && row.status !== 'ready'">上次成功结果</small></div></td>
-          <td><div class="proxy-latency"><strong :class="{ slow: row.observation && row.observation.latency_ms > 120 }">{{ row.observation?.latency_ms ?? '—' }} <small v-if="row.observation">ms</small></strong><span>{{ row.checked_at ? '最近检测 ' + new Date(row.observation?.observed_at ?? row.checked_at).toLocaleTimeString('zh-CN', { hour12:false }) : '尚未检测' }}</span></div></td>
-          <td><span class="proxy-status" :data-state="row.status"><LoaderCircle v-if="probing.has(row.id)" :size="13" class="animate-spin" />{{ probing.has(row.id) ? '检测中…' : row.status === 'ready' ? '可用' : row.status === 'failed' ? '检测失败' : '待检测' }}</span></td>
-          <td class="proxy-expiry-cell"><span class="proxy-expiry" :class="{ expired: row.expires_at && Date.parse(row.expires_at) <= now, soon: row.expires_at && Date.parse(row.expires_at) > now && Date.parse(row.expires_at) - now < 7 * 86400000, unset: !row.expires_at }">{{ remaining(row.expires_at) }}</span><small v-if="row.expires_at">{{ date(row.expires_at) }}</small></td>
-          <td><div class="proxy-usage"><div class="proxy-usage-count"><strong>{{ row.users.length }}</strong> 个使用 · <strong>{{ row.active_accounts }}</strong> 个活跃</div><span>{{ row.in_flight }} 个请求处理中</span><div class="proxy-user-chips"><component :is="user.kind === 'gateway' ? 'button' : 'span'" v-for="user in row.users.slice(0, 2)" :key="user.kind + user.id" :type="user.kind === 'gateway' ? 'button' : undefined" @click="openUserAccount(user,$event)">{{ user.name }}</component><span v-if="row.users.length > 2">+{{ row.users.length - 2 }}</span></div><button type="button" class="proxy-expand" :aria-expanded="expanded === row.id" @click="expanded = expanded === row.id ? null : row.id">{{ expanded === row.id ? '收起账号' : '查看使用账号' }}<ChevronDown :size="12" /></button></div></td>
-          <td><div class="proxy-row-actions"><span v-if="row.sync_pending" class="proxy-sync-status" role="status">关联同步中</span><Button size="sm" variant="outline" :disabled="probing.has(row.id) || batch.running" @click="probe(row)"><LoaderCircle v-if="probing.has(row.id)" :size="13" class="animate-spin" /><Activity v-else :size="13" />{{ probing.has(row.id) ? '检测中…' : '检测' }}</Button><Button size="sm" variant="outline" @click="edit(row)"><Pencil :size="13" />编辑</Button><Button type="button" size="sm" variant="ghost" class="proxy-delete" @click="deleting = row; formError = ''"><Trash2 :size="13" />删除</Button></div></td></tr>
-          <tr v-if="expanded === row.id" class="proxy-expanded"><td colspan="7"><section><header class="proxy-expanded-heading"><div><h3>使用此代理的账号</h3><p>代理由账号配置选择，这里展示当前使用情况</p></div><span>当前请求数来自最近一次读取</span></header><div class="proxy-accounts-grid"><article v-for="user in row.users" :key="user.kind + user.id" class="proxy-account-item"><component :is="user.kind === 'gateway' ? 'button' : 'div'" :type="user.kind === 'gateway' ? 'button' : undefined" class="proxy-account-identity" @click="openUserAccount(user,$event)"><span class="proxy-account-avatar">{{ Array.from(user.name)[0] || '账' }}</span><span><strong>{{ user.name }}</strong><small>{{ user.kind === 'gateway' ? '网关账号' : user.kind === 'task' ? '任务账号' : user.kind === 'authorization' ? '授权流程' : '登录草稿' }} · #{{ user.id }}</small></span></component><div class="proxy-account-state"><span class="proxy-status" :data-state="user.status === 'disabled' ? 'disabled' : user.kind === 'draft' ? 'pending' : 'ready'">{{ user.status === 'disabled' ? '已停用' : user.kind === 'draft' ? '登录草稿' : user.kind === 'authorization' ? '授权中' : '已关联' }}</span><small>{{ user.in_flight == null ? '请求数待核对' : user.in_flight + ' 个请求处理中' }}</small><button v-if="user.kind === 'gateway'" type="button" class="proxy-account-config" @click="openUserAccount(user,$event)">账号配置 <ArrowUpRight :size="12" /></button><router-link v-else-if="user.kind !== 'authorization'" :to="userLink(user)" class="proxy-account-config">{{ user.kind === 'draft' ? '继续登录' : user.kind === 'task' ? '任务账号配置' : '账号配置' }} <ArrowUpRight :size="12" /></router-link></div></article><p v-if="!row.users.length" class="proxy-account-empty">{{ row.references_complete ? '当前没有账号使用此线路' : '使用情况待核对' }}</p></div></section></td></tr>
-        </template><tr v-if="!rows.length"><td colspan="7" class="proxy-empty">{{ loading ? '正在读取代理…' : error ? '代理列表读取失败' : query ? '没有匹配的代理' : '还没有代理，可添加或批量导入' }}</td></tr>
-      </tbody></table></div>
-      <footer class="proxy-pagination"><Pagination v-model:page-size="pageSize" :page="page" :total="total" :disabled="loading" label="代理列表分页" @update:page="value => { page=value;load(); }" /></footer>
-    </section><p class="proxy-note"><ShieldCheck :size="14" />检测延迟为经该代理访问出口观测服务的往返耗时；到期提醒用于维护管理。</p>
+    <OverviewGrid class="proxy-overview">
+      <OverviewCard label="代理" :value="counts?.all ?? total" caption="条线路"><template #icon><Globe /></template></OverviewCard>
+      <OverviewCard label="可用" :value="counts?.available ?? '—'" :unit="`/ ${counts?.all ?? total}`" caption="出口信息来自最近一次检测" tone="success"><template #icon><Check /></template></OverviewCard>
+      <OverviewCard label="被使用" :value="counts?.used ?? '—'" :caption="complete ? '条线路有账号绑定' : '部分使用情况待核对'" tone="info"><template #icon><Users /></template></OverviewCard>
+      <OverviewCard label="7 天内到期" :value="counts?.expiring ?? '—'" :caption="expiredCaption" tone="warning"><template #icon><Calendar /></template></OverviewCard>
+    </OverviewGrid>
+    <TableCard class="proxy-panel" title="代理线路" :count="`${total} / ${counts?.all ?? total} 条`">
+      <template #toolbar><SearchInput v-model="query" label="搜索代理" placeholder="名称、地址、出口 IP 或地区" maxlength="256" @search="search" /><Button variant="outline" :disabled="batch.running || !total || loading" @click="probeAll"><Activity :size="14" />批量检测</Button></template>
+      <NoticeStrip v-if="batch.running" tone="info" role="status" class="proxy-batch"><Activity />正在检测 {{ batch.done }} / {{ batch.total }}<template #end><Button variant="outline" size="sm" @click="cancelBatch = true">停止后续检测</Button></template></NoticeStrip>
+      <NoticeStrip v-if="error" tone="danger" role="alert" class="proxy-error"><AlertCircle />{{ error }}<template #end><Button variant="outline" size="sm" @click="load">重试</Button></template></NoticeStrip>
+      <div class="proxy-table-scroll" :aria-busy="loading">
+        <Table class="proxy-table fui-table-fixed">
+          <!-- 列宽在设计稿 20/13/9/9/14/13/22 基础上给使用情况列让出空间，容纳使用者、处理中请求数与展开按钮。 -->
+          <TableHeader><TableRow><TableHead class="proxy-col-route">代理线路</TableHead><TableHead class="proxy-col-exit proxy-exit-column">出口 IP / 地区</TableHead><TableHead class="proxy-col-latency proxy-latency-column">检测延迟</TableHead><TableHead class="proxy-col-status proxy-status-column">连接状态</TableHead><TableHead class="proxy-col-expiry">到期时间</TableHead><TableHead class="proxy-col-usage proxy-usage-column">账号使用情况</TableHead><TableHead class="proxy-col-actions fui-table-end">操作</TableHead></TableRow></TableHeader>
+          <TableBody>
+            <template v-for="row in rows" :key="row.id">
+              <TableRow :data-proxy-id="row.id">
+                <TableCell><div class="proxy-identity"><IconTile size="sm"><Globe /></IconTile><div class="proxy-identity-text"><strong class="fui-table-strong">{{ row.name }}</strong><Badge as="span" :variant="connection(row).variant" :dot="!probing.has(row.id)" class="proxy-mobile-status">{{ connection(row).label }}</Badge><span class="fui-table-sub fui-table-mono" :title="row.public_url">{{ row.public_url }}</span><!-- 窄屏隐藏使用情况列，在此保留使用摘要与展开入口。 --><button type="button" class="fui-table-sub proxy-mobile-usage" :aria-expanded="expanded === row.id" :aria-label="`${expanded === row.id ? '收起账号' : '查看使用账号'}：${row.users.length} 个使用 · ${row.active_accounts} 个活跃 · ${row.in_flight} 个处理中`" @click="toggleExpanded(row.id)">{{ row.users.length }} 个使用 · {{ row.active_accounts }} 个活跃 · {{ row.in_flight }} 个处理中<ChevronDown :size="12" /></button></div></div></TableCell>
+                <TableCell class="proxy-exit-column"><code class="fui-table-mono">{{ row.observation?.ip ?? '—' }}</code><span class="fui-table-sub"><template v-if="row.observation"><b class="proxy-country">{{ row.observation.country_code || '—' }}</b> {{ [row.observation.country, row.observation.city !== row.observation.country ? row.observation.city || row.observation.region : ''].filter(Boolean).join(' · ') || '地区未知' }}<template v-if="row.status !== 'ready'"> · 上次成功结果</template></template><template v-else>等待检测</template></span></TableCell>
+                <TableCell class="proxy-latency-column"><span class="proxy-latency"><b class="fui-table-mono" :data-tone="latencyTone(row)">{{ row.observation?.latency_ms ?? '—' }}</b><small v-if="row.observation">ms</small></span><span class="fui-table-sub fui-table-num" :title="row.checked_at ? '最近检测时间' : undefined">{{ row.checked_at ? new Date(row.observation?.observed_at ?? row.checked_at).toLocaleTimeString('zh-CN', { hour12:false }) : '尚未检测' }}</span></TableCell>
+                <TableCell class="proxy-status-column"><Badge as="span" :variant="connection(row).variant" :dot="!probing.has(row.id)"><LoaderCircle v-if="probing.has(row.id)" :size="12" class="animate-spin" />{{ connection(row).label }}</Badge></TableCell>
+                <TableCell><Badge as="span" :variant="expiryVariant(row.expires_at)">{{ remaining(row.expires_at) }}</Badge><span v-if="row.expires_at" class="fui-table-sub fui-table-num">{{ date(row.expires_at) }}</span></TableCell>
+                <TableCell class="proxy-usage-column"><div class="proxy-usage"><div class="proxy-usage-text"><span class="proxy-usage-count">{{ row.users.length }} 个使用 · {{ row.active_accounts }} 个活跃</span><span class="fui-table-sub proxy-user-chips" :title="usageSummary(row)"><template v-if="row.users.length"><component :is="user.kind === 'gateway' ? 'button' : 'span'" v-for="user in row.users.slice(0, 2)" :key="user.kind + user.id" :type="user.kind === 'gateway' ? 'button' : undefined" class="proxy-user-chip" @click="openUserAccount(user,$event)">{{ user.name }}</component><span v-if="row.users.length > 2"> +{{ row.users.length - 2 }}</span> · </template><template v-else>暂无账号 · </template>{{ row.in_flight }} 个处理中</span></div><Button variant="ghost" size="icon-sm" class="proxy-expand" :aria-expanded="expanded === row.id" :aria-label="expanded === row.id ? '收起账号' : '查看使用账号'" :title="expanded === row.id ? '收起账号' : '查看使用账号'" @click="toggleExpanded(row.id)"><ChevronDown :size="14" /></Button></div></TableCell>
+                <TableCell><div class="fui-table-ops proxy-row-actions"><Badge v-if="row.sync_pending" as="span" variant="info" role="status" class="proxy-sync-status">关联同步中</Badge><Button size="sm" variant="outline" :disabled="probing.has(row.id) || batch.running" @click="probe(row)"><LoaderCircle v-if="probing.has(row.id)" :size="13" class="animate-spin" /><Activity v-else :size="13" /><span class="proxy-action-label">{{ probing.has(row.id) ? '检测中…' : '检测' }}</span></Button><Button size="sm" variant="outline" @click="edit(row)"><Pencil :size="13" /><span class="proxy-action-label">编辑</span></Button><Button type="button" size="sm" variant="destructive-ghost" class="proxy-delete" @click="deleting = row; formError = ''"><Trash2 :size="13" /><span class="proxy-action-label">删除</span></Button></div></TableCell>
+              </TableRow>
+              <TableRow v-if="expanded === row.id" class="proxy-expanded"><TableCell :colspan="7"><section class="proxy-expanded-panel"><header class="proxy-expanded-heading"><div><h3>使用此代理的账号</h3><p>代理由账号配置选择，这里展示当前使用情况</p></div><span>当前请求数来自最近一次读取</span></header><div class="proxy-accounts-grid"><article v-for="user in row.users" :key="user.kind + user.id" class="proxy-account-item"><component :is="user.kind === 'gateway' ? 'button' : 'div'" :type="user.kind === 'gateway' ? 'button' : undefined" class="proxy-account-identity" @click="openUserAccount(user,$event)"><span class="proxy-account-avatar">{{ Array.from(user.name)[0] || '账' }}</span><span class="proxy-account-name"><strong>{{ user.name }}</strong><small>{{ user.kind === 'gateway' ? '网关账号' : user.kind === 'task' ? '任务账号' : user.kind === 'authorization' ? '授权流程' : '登录草稿' }} · #{{ user.id }}</small></span></component><div class="proxy-account-state"><Badge as="span" :variant="user.status === 'disabled' ? 'secondary' : user.kind === 'draft' ? 'warning' : 'success'" dot>{{ user.status === 'disabled' ? '已停用' : user.kind === 'draft' ? '登录草稿' : user.kind === 'authorization' ? '授权中' : '已关联' }}</Badge><small>{{ user.in_flight == null ? '请求数待核对' : user.in_flight + ' 个请求处理中' }}</small><button v-if="user.kind === 'gateway'" type="button" class="proxy-account-config" @click="openUserAccount(user,$event)">账号配置 <ArrowUpRight :size="12" /></button><router-link v-else-if="user.kind !== 'authorization'" :to="userLink(user)" class="proxy-account-config">{{ user.kind === 'draft' ? '继续登录' : user.kind === 'task' ? '任务账号配置' : '账号配置' }} <ArrowUpRight :size="12" /></router-link></div></article><p v-if="!row.users.length" class="proxy-account-empty">{{ row.references_complete ? '当前没有账号使用此线路' : '使用情况待核对' }}</p></div></section></TableCell></TableRow>
+            </template>
+            <TableRow v-if="!rows.length"><TableCell :colspan="7" class="proxy-empty">{{ loading ? '正在读取代理…' : error ? '代理列表读取失败' : query ? '没有匹配的代理' : '还没有代理，可添加或批量导入' }}</TableCell></TableRow>
+          </TableBody>
+        </Table>
+      </div>
+      <template #footer><p class="proxy-note"><ShieldCheck :size="14" />检测延迟为经该代理访问出口观测服务的往返耗时；到期提醒用于维护管理。</p><Pagination v-model:page-size="pageSize" :page="page" :total="total" :disabled="loading" label="代理列表分页" @update:page="value => { page=value;load(); }" /></template>
+    </TableCard>
 
-    <Dialog v-model:open="editor"><DialogContent class="proxy-editor"><DialogHeader><DialogTitle>{{ editing ? '编辑代理' : '添加代理' }}</DialogTitle><DialogDescription class="sr-only">连接参数与有效期，保存后生效。</DialogDescription></DialogHeader>
-      <form class="proxy-form" @submit.prevent="save"><div class="proxy-form-scroll">
-        <section class="proxy-recognize"><label for="proxy-recognize">一键识别代理</label><div><Input id="proxy-recognize" v-model="raw" type="password" autocomplete="new-password" placeholder="粘贴代理地址，自动拆分类型与认证信息" :disabled="connectionLocked || recognizing" /><Button type="button" variant="outline" :disabled="recognizing || connectionLocked || !raw" @click="recognize"><Activity :size="14" />识别填入</Button></div><p>支持 协议://用户:密码@主机:端口、主机:端口:用户:密码 · 省略协议默认 HTTP</p></section>
-        <p v-if="connectionLocked" class="proxy-form-notice">正在向关联账号同步连接参数，空闲后自动应用。名称和到期时间可继续编辑。</p>
-        <p v-else-if="editing?.users.length" class="proxy-form-notice">保存后将同步 {{ editing.users.length }} 个关联账号或授权流程，正在使用的账号将在空闲后应用新连接。</p>
-        <div class="proxy-form-grid"><label class="proxy-full"><span>代理名称</span><Input v-model="form.name" required maxlength="100" placeholder="例如：新加坡主线路" /></label><ChoiceSelect v-model="form.protocol" label="代理类型" :disabled="connectionLocked || recognizing" :options="[{value:'http',label:'HTTP'},{value:'socks5',label:'SOCKS5'},{value:'socks5h',label:'SOCKS5H'}]" /><NumberInput v-model="port" label="端口" :min="1" :max="65535" required :disabled="connectionLocked || recognizing" /><label class="proxy-full"><span>主机 / IP 地址</span><Input v-model="form.host" required :disabled="connectionLocked || recognizing" placeholder="proxy.example.test 或 IPv4 / IPv6" /></label><label><span>用户名{{ editing?.has_username ? ' · 已设置' : '' }}</span><Input v-model="username" :disabled="connectionLocked || recognizing" autocomplete="off" :placeholder="editing ? '留空保留原值' : '可选'" /></label><label><span>密码{{ editing?.has_password ? ' · 已设置' : '' }}</span><Input v-model="password" :disabled="connectionLocked || recognizing" type="password" autocomplete="new-password" :placeholder="editing ? '留空保留原值' : '可选'" /></label><label v-if="editing && !connectionLocked" class="proxy-full proxy-checkbox"><input v-model="replaceAuth" type="checkbox" />替换认证信息（空字段将清除原值）</label>
-          <section class="proxy-full proxy-expiry-editor"><DateTimeControl v-model="form.expires_at" label="到期时间" /><div class="proxy-expiry-actions"><span>快速延长</span><button type="button" @click="extend(30)">延长 30 天</button><button type="button" @click="extend(90)">延长 90 天</button><button type="button" @click="form.expires_at = null">不设置</button></div><p>按浏览器本地时间填写。未到期从原时间延长，其余从现在延长。</p></section>
-        </div><p v-if="formError" class="proxy-error" role="alert">{{ formError }}</p>
-      <footer class="proxy-form-footer"><span>{{ editing ? '保存前会重新核对配置版本' : '支持 HTTP / SOCKS5 / SOCKS5H' }}</span><Button type="button" variant="outline" :disabled="saving" @click="editor = false">取消</Button><Button type="submit" :disabled="saving || recognizing">{{ saving ? '保存中…' : '保存代理' }}</Button></footer></div></form>
-    </DialogContent></Dialog>
-    <Dialog v-model:open="importOpen"><DialogContent class="proxy-import-dialog"><DialogHeader><DialogTitle>批量导入代理</DialogTitle><DialogDescription>每行一条，最多 200 条。格式全部通过后统一保存。</DialogDescription></DialogHeader><form @submit.prevent="importRows"><Textarea v-model="importText" aria-label="代理连接列表" rows="9" placeholder="http://user:password@host:port" autocomplete="off" spellcheck="false" /><p v-if="formError" class="proxy-error" role="alert">{{ formError }}</p><footer class="proxy-form-footer"><Button type="button" variant="outline" :disabled="saving" @click="importOpen = false">取消</Button><Button type="submit" :disabled="saving || !importText.trim()">导入代理</Button></footer></form></DialogContent></Dialog>
+    <ModalDialog v-model:open="editor" class="proxy-editor" :title="editing ? '编辑代理' : '添加代理'" description="连接参数与有效期，保存后生效。" :width="680">
+      <form id="proxy-editor-form" class="proxy-form" @submit.prevent="save">
+        <section class="proxy-recognize"><label for="proxy-recognize" class="fui-label">一键识别代理</label><div><Input id="proxy-recognize" v-model="raw" type="password" autocomplete="new-password" placeholder="粘贴代理地址，自动拆分类型与认证信息" :disabled="connectionLocked || recognizing" /><Button type="button" variant="outline" :disabled="recognizing || connectionLocked || !raw" @click="recognize"><Activity :size="14" />识别填入</Button></div><p class="fui-field-help">支持 协议://用户:密码@主机:端口、主机:端口:用户:密码 · 省略协议默认 HTTP</p></section>
+        <NoticeStrip v-if="connectionLocked" tone="warning" class="proxy-form-notice"><Info />正在向关联账号同步连接参数，空闲后自动应用。名称和到期时间可继续编辑。</NoticeStrip>
+        <NoticeStrip v-else-if="editing?.users.length" tone="info" class="proxy-form-notice"><Info />保存后将同步 {{ editing.users.length }} 个关联账号或授权流程，正在使用的账号将在空闲后应用新连接。</NoticeStrip>
+        <div class="proxy-form-grid"><label class="proxy-full proxy-field"><span class="fui-label">代理名称</span><Input v-model="form.name" required maxlength="100" placeholder="例如：新加坡主线路" /></label><ChoiceSelect v-model="form.protocol" label="代理类型" :disabled="connectionLocked || recognizing" :options="[{value:'http',label:'HTTP'},{value:'socks5',label:'SOCKS5'},{value:'socks5h',label:'SOCKS5H'}]" /><NumberInput v-model="port" label="端口" :min="1" :max="65535" required :disabled="connectionLocked || recognizing" /><label class="proxy-full proxy-field"><span class="fui-label">主机 / IP 地址</span><Input v-model="form.host" required :disabled="connectionLocked || recognizing" placeholder="proxy.example.test 或 IPv4 / IPv6" /></label><label class="proxy-field"><span class="fui-label">用户名{{ editing?.has_username ? ' · 已设置' : '' }}</span><Input v-model="username" :disabled="connectionLocked || recognizing" autocomplete="off" :placeholder="editing ? '留空保留原值' : '可选'" /></label><label class="proxy-field"><span class="fui-label">密码{{ editing?.has_password ? ' · 已设置' : '' }}</span><Input v-model="password" :disabled="connectionLocked || recognizing" type="password" autocomplete="new-password" :placeholder="editing ? '留空保留原值' : '可选'" /></label><Checkbox v-if="editing && !connectionLocked" v-model="replaceAuth" class="proxy-full proxy-checkbox">替换认证信息（空字段将清除原值）</Checkbox>
+          <section class="proxy-full proxy-expiry-editor"><DateTimeControl v-model="form.expires_at" label="到期时间" /><div class="proxy-expiry-actions"><span>快速延长</span><Button type="button" variant="outline" size="sm" @click="extend(30)">延长 30 天</Button><Button type="button" variant="outline" size="sm" @click="extend(90)">延长 90 天</Button><Button type="button" variant="ghost" size="sm" @click="form.expires_at = null">不设置</Button></div><p class="fui-field-help">按浏览器本地时间填写。未到期从原时间延长，其余从现在延长。</p></section>
+        </div>
+        <NoticeStrip v-if="formError" tone="danger" role="alert" class="proxy-form-error"><AlertCircle />{{ formError }}</NoticeStrip>
+      </form>
+      <template #footer><span class="proxy-form-hint">{{ editing ? '保存前会重新核对配置版本' : '支持 HTTP / SOCKS5 / SOCKS5H' }}</span><Button type="button" variant="outline" :disabled="saving" @click="editor = false">取消</Button><Button type="submit" form="proxy-editor-form" :disabled="saving || recognizing">{{ saving ? '保存中…' : '保存代理' }}</Button></template>
+    </ModalDialog>
+    <ModalDialog v-model:open="importOpen" class="proxy-import-dialog" title="批量导入代理" description="每行一条，最多 200 条。格式全部通过后统一保存。" :width="520">
+      <form id="proxy-import-form" class="proxy-form" @submit.prevent="importRows"><Textarea v-model="importText" aria-label="代理连接列表" rows="9" placeholder="http://user:password@host:port" autocomplete="off" spellcheck="false" /><NoticeStrip v-if="formError" tone="danger" role="alert" class="proxy-form-error"><AlertCircle />{{ formError }}</NoticeStrip></form>
+      <template #footer><Button type="button" variant="outline" class="proxy-import-cancel" :disabled="saving" @click="importOpen = false">取消</Button><Button type="submit" form="proxy-import-form" :disabled="saving || !importText.trim()">导入代理</Button></template>
+    </ModalDialog>
     <ConfirmationDialog :open="!!deleting" title="删除代理" :message="`确认删除「${deleting?.name || ''}」？账号和登录草稿正在使用的线路会保留。`" confirm-label="确认删除" danger :busy="saving" :error="formError" @confirm="remove" @cancel="deleting=null" />
     <AccountWorkspace v-if="workspaceAccountId" :key="workspaceAccountId" :workspace-account-id="workspaceAccountId" @close="closeUserAccount" @refresh="load" />
   </div>

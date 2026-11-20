@@ -124,9 +124,14 @@ test('组件样式不写死颜色，圆角只取 token', () => {
     new URL('../src/console-shell.css', import.meta.url),
     new URL('../src/system-update.css', import.meta.url),
     new URL('../src/accounts.css', import.meta.url),
+    new URL('../src/request-records.css', import.meta.url),
+    new URL('../src/proxies.css', import.meta.url),
+    new URL('../src/tokens.css', import.meta.url),
+    new URL('../src/session-blocks.css', import.meta.url),
   ];
-  // 外壳组件、系统更新弹窗、账号页及其子组件与组件库同样只取 token。
-  const shell = ['Dashboard.vue', 'AppNavigation.vue', 'Login.vue', 'SystemUpdateDialog.vue', 'Accounts.vue', 'AgyAccountUsage.vue', 'AgyQuotaRow.vue', 'UsageWindowStats.vue', 'SchedulingDetails.vue', 'ProxyPicker.vue', 'PlatformBadge.vue', 'runtime/ExecutionNodeBadge.vue'].map(name => new URL(`../src/components/${name}`, import.meta.url));
+  // 外壳组件、系统更新弹窗、账号页、请求 / 代理 / 令牌 / 会话封禁四页及其子组件与组件库同样只取 token。
+  const shell = ['Dashboard.vue', 'AppNavigation.vue', 'Login.vue', 'SystemUpdateDialog.vue', 'Accounts.vue', 'AgyAccountUsage.vue', 'AgyQuotaRow.vue', 'UsageWindowStats.vue', 'SchedulingDetails.vue', 'ProxyPicker.vue', 'PlatformBadge.vue', 'runtime/ExecutionNodeBadge.vue',
+    'RequestDiagnostics.vue', 'NativeStageDetails.vue', 'AccountFilterSelect.vue', 'Proxies.vue', 'Tokens.vue', 'AccountScopePicker.vue', 'SessionPolicyBlocks.vue'].map(name => new URL(`../src/components/${name}`, import.meta.url));
   const problems = [];
   for (const file of [...sheets, ...shell, ...sourceFiles(uiRoot)]) {
     const text = readFileSync(file, 'utf8');

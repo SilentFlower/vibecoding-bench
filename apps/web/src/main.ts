@@ -5,7 +5,6 @@ import './components/ui/kit.css';
 import './console-shell.css';
 import './system-update.css';
 import './approved-design.css';
-import './proxy-design.css';
 import App from './App.vue';
 import router from './router';
 import { initTheme } from './theme';
