@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/web/frontend/ui-guidelines.md", "reason": "核对 token 与层叠、四页第二版合同、组件扩展签名与测试命令"}
+{"file": ".trellis/spec/gateway/backend/proxy-directory.md", "reason": "核对代理目录 counts 新口径与测试"}
+{"file": ".trellis/spec/gateway/backend/service-architecture.md", "reason": "核对会话封禁 counts 合同与测试"}
+{"file": ".trellis/tasks/11-20-console-pages-accounts/design.md", "reason": "核对类名契约做法与脚本分诊规则"}
+{"file": ".trellis/tasks/11-19-console-ui-pages/prd.md", "reason": "核对上级需求与分批边界"}

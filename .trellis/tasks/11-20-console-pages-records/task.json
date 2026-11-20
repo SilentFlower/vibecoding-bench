@@ -1,0 +1,53 @@
+{
+  "id": "console-pages-records",
+  "name": "console-pages-records",
+  "title": "请求记录、代理、令牌与会话封禁页迁移",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "web",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-20",
+  "completedAt": "2026-11-20",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-20T03:24:40Z",
+    "blockers": []
+  },
+  "branch": "feat/console-ui-revamp",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-19-console-ui-pages",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-20T11:24:39+08:00",
+    "completedSteps": [
+      "基线",
+      "网关计数",
+      "组件库扩展",
+      "类型与夹具",
+      "会话封禁",
+      "访问令牌",
+      "代理管理",
+      "请求记录与详情",
+      "旧样式收尾",
+      "新验证脚本",
+      "回归",
+      "规范同步",
+      "收尾检查",
+      "CHK-001 修复"
+    ],
+    "partialStep": null,
+    "nextStep": "子任务 4-3（节点管理与系统设置迁移）规划评审",
+    "notes": ""
+  }
+}
