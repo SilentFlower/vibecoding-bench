@@ -10,9 +10,12 @@ export function fiveHourLabel(data: { five_hour?: unknown } | null | undefined, 
   return data?.five_hour === null ? '当前未返回5小时窗口' : fallback;
 }
 
-/** 按已用比例统一显示额度进度条。@param pct 已用百分比。@return 进度条颜色类。 */
-export function usageBarColor(pct: number): string {
-  if (pct >= 80) return 'bg-red-400';
-  if (pct >= 50) return 'bg-amber-400';
-  return 'bg-emerald-400';
+/** 额度进度条的语义色调，样式按 data-tone 取 token。 */
+export type UsageBarTone = 'success' | 'warning' | 'danger';
+
+/** 按已用比例统一额度进度条色调。@param pct 已用百分比。@return 语义色调：≥80 危险，≥50 警示，否则成功。 */
+export function usageBarTone(pct: number): UsageBarTone {
+  if (pct >= 80) return 'danger';
+  if (pct >= 50) return 'warning';
+  return 'success';
 }

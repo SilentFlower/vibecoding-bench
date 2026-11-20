@@ -65,9 +65,10 @@ async def run(output):
             await expect(page.get_by_role('dialog')).to_be_visible()
             await page.keyboard.press('Escape')
             await expect(page.get_by_role('dialog')).to_have_count(0)
-            card = page.locator('.resource-grid > [data-slot="card"]').first
+            # 账号网格不再沿用通用 .resource-grid（其未分层卡片规则会压过第二版卡片样式）。
+            card = page.locator('.account-card-grid > [data-slot="card"]').first
             await card.get_by_role('button', name='详情', exact=True).click()
-            await page.get_by_role('dialog').get_by_role('button',name='环境与诊断',exact=True).click()
+            await page.get_by_role('dialog').locator('.account-workspace-tabs').get_by_role('radio',name='环境与诊断',exact=True).click()
             await page.get_by_role('dialog').locator('.account-diagnostic-technical>summary').click()
             await expect(page.get_by_role('dialog').get_by_text('画像选择方式', exact=True)).to_be_visible()
             await page.keyboard.press('Escape')

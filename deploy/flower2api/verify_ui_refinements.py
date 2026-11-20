@@ -1,4 +1,4 @@
-"""核对账号列数、用量气泡、悬停反馈和授权选线的真实行为。"""
+"""核对账号列数、用量气泡、悬停反馈和授权选线的真实行为（第二版：列数按定稿规则、外观取 token）。"""
 import asyncio
 import json
 import re
@@ -7,47 +7,54 @@ from verify_interaction_parity import InteractionFixture
 from verify_environment_ui import ROOT,BASE
 
 
+async def token(page,name):
+    """读取主题 token 的计算色值。@param page 页面。@param name token 名。@return rgb() 字符串。"""
+    return await page.evaluate("n=>{const e=document.createElement('i');e.style.color=`var(${n})`;document.body.append(e);const c=getComputedStyle(e).color;e.remove();return c}",name)
+
+
+def expected_columns(viewport,width):
+    """账号网格列规则（ui-guidelines 定稿响应式合同）：≤760 单列，≥1680 四列，其余按卡片最小 320px、间距 16px 自动填充。
+    @param viewport 视口宽。@param width 网格实际宽。@return 期望列数。"""
+    if viewport<=760:return 1
+    if viewport>=1680:return 4
+    return max(1,int((width+16)//(320+16)))
+
+
 async def main():
-    """按同一断点与交互场景比较定稿。@return 无。"""
+    """核对第二版账号网格列数、用量气泡与悬停取 token，以及授权选线行为。@return 无。"""
     out=ROOT/'.deploy/frontend-sidebar-refresh/refinements';out.mkdir(parents=True,exist_ok=True)
     async with async_playwright() as p:
-        browser=await p.chromium.launch();reference=await browser.new_page()
-        await reference.goto((ROOT/'doc/design/flower2api-concept.html').as_uri());await reference.emulate_media(reduced_motion='reduce')
+        browser=await p.chromium.launch()
         context=await browser.new_context();fixture=InteractionFixture();await context.route('**/*',fixture.route);await context.add_init_script("localStorage.setItem('claude-code-gateway_auth','synthetic-only')")
         page=await context.new_page();errors=[];page.on('pageerror',lambda error:errors.append(str(error)));await page.emulate_media(reduced_motion='reduce');await page.goto(BASE+'/');await page.locator('.account-card').first.wait_for()
         widths=[390,720,760,761,767,768,1000,1280,1340,1440,1600,1680,1920,2560,3440];layout=[]
+        # 账号页按第二版设计稿迁移后不再对照旧原型：列数按定稿响应式规则逐档断言，卡片间距 16px（设计稿 .grid）。
         for width in widths:
-            result={'width':width}
-            for key,current,selector in [('reference',reference,'.account-card-grid'),('actual',page,'.account-card-grid')]:
-                await current.set_viewport_size({'width':width,'height':1000})
-                result[key]=await current.locator(selector).evaluate('(e)=>({columns:getComputedStyle(e).gridTemplateColumns.split(" ").length,width:e.getBoundingClientRect().width,card:e.firstElementChild.getBoundingClientRect().width})')
-            # 侧栏宽度与内容区边距属于外壳，已按第二版设计稿调整并由 verify_ui_shell.py 核对；这里改为核对卡片区铺满内容区，列数仍与定稿一致。
+            await page.set_viewport_size({'width':width,'height':1000})
+            result={'width':width,'actual':await page.locator('.account-card-grid').evaluate('(e)=>({columns:getComputedStyle(e).gridTemplateColumns.split(" ").length,width:e.getBoundingClientRect().width,gap:getComputedStyle(e).columnGap})')}
             result['content']=await page.locator('#console-content').evaluate('(e)=>{const s=getComputedStyle(e);return e.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)}')
-            assert result['reference']['columns']==result['actual']['columns'],result
-            if width>1762:
-                assert result['actual']['columns']==4,result
+            assert result['actual']['columns']==expected_columns(width,result['actual']['width']),result
+            assert result['actual']['gap']=='16px',result
             assert abs(result['content']-result['actual']['width'])<1,result
             layout.append(result)
         await page.set_viewport_size({'width':1680,'height':1000});await page.screenshot(path=str(out/'accounts-four-columns.png'))
-        await page.set_viewport_size({'width':1440,'height':1000});await reference.set_viewport_size({'width':1440,'height':1000})
-        await reference.locator('[data-usage-bubble]').first.hover();await page.get_by_role('button',name='查看5h完整费用统计',exact=True).first.hover()
-        original=reference.locator('#usage-bubble');bubble=page.locator('.usage-cost-bubble');await expect(original).to_be_visible();await expect(bubble).to_be_visible()
+        await page.set_viewport_size({'width':1440,'height':1000})
+        await page.get_by_role('button',name='查看5h完整费用统计',exact=True).first.hover()
+        bubble=page.locator('.usage-cost-bubble');await expect(bubble).to_be_visible()
         await expect(bubble.locator('header')).to_have_text('5 小时用量统计网关记录');await expect(bubble.locator('.usage-bubble-grid>div')).to_have_count(4)
-        # 气泡表面阴影属于组件库（.fui-popover 取 --ui-shadow-pop，由 verify_ui_kit.py 核对），不再与旧原型比对。
-        props=['width','padding','borderRadius','borderColor','backgroundColor','color','fontSize','lineHeight']
+        # 气泡外观取组件库气泡（.fui-info-content）与语义 token。
+        props=['width','padding','borderRadius','backgroundColor','color','fontSize']
         get='(e,keys)=>Object.fromEntries(keys.map(k=>[k,getComputedStyle(e)[k]]))'
-        expected=await original.evaluate(get,props);actual=await bubble.evaluate(get,props);assert expected==actual,(expected,actual)
-        await page.screenshot(path=str(out/'usage-bubble.png'));await page.keyboard.press('Escape');await reference.keyboard.press('Escape')
+        actual=await bubble.evaluate(get,props)
+        expected={'width':'300px','padding':'16px 18px','borderRadius':'12px','backgroundColor':await token(page,'--ui-color-surface'),'color':await token(page,'--ui-color-text-2'),'fontSize':'12px'}
+        assert actual==expected,(expected,actual)
+        await page.screenshot(path=str(out/'usage-bubble.png'));await page.keyboard.press('Escape')
         hover=[]
-        # 侧栏悬停已换为第二版外壳，由 verify_ui_shell.py 核对，这里只比对页面主体的悬停态。
-        for name,refsel,selector in [('卡片编辑','[data-account-action=edit]','.account-card-actions button:first-child'),('调度优先级','.scheduling-group','.account-routing button')]:
-            original=reference.locator(refsel).first;current=page.locator(selector).first
-            if not await original.count():continue
-            await original.hover();await current.hover()
-            target='strong' if name=='调度优先级' else None
-            left=await (original.locator(target) if target else original).evaluate(get,['backgroundColor','color'])
-            right=await (current.locator(target) if target else current).evaluate(get,['backgroundColor','color'])
-            assert left==right,(name,left,right);hover.append(name)
+        # 悬停：卡片操作取填充底与正文色，调度优先级的箭头转主色文字（设计稿未画悬停，按组件库约定）。
+        edit=page.locator('.account-card-actions button').first;await edit.hover();await page.wait_for_timeout(200)
+        assert await edit.evaluate(get,['backgroundColor','color'])=={'backgroundColor':await token(page,'--ui-color-fill'),'color':await token(page,'--ui-color-text')};hover.append('卡片编辑')
+        routing=page.locator('.account-routing button').first;await routing.hover()
+        assert await routing.locator('strong svg').evaluate("e=>getComputedStyle(e).color")==await token(page,'--ui-color-primary-text');hover.append('调度优先级')
         await page.get_by_role('button',name='授权登录',exact=True).click();dialog=page.locator('.approved-oauth-dialog')
         await dialog.locator('.proxy-picker-trigger').click();popup=page.locator('.proxy-picker-popup');await popup.get_by_role('searchbox',name='搜索代理线路',exact=True).fill('线路 21');await popup.get_by_role('button',name=re.compile('线路 21')).click()
         assert not fixture.writes

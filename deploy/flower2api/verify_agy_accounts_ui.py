@@ -10,6 +10,11 @@ from verify_accounts_design import AccountDesignFixture
 from verify_environment_ui import BASE, ROOT
 
 
+async def token_color(page, name):
+    """读取主题 token 的实际计算色值，进度条颜色改取语义 token 后不再写死。@param page 页面。@param name token 名。@return rgb() 字符串。"""
+    return await page.evaluate("n=>{const e=document.createElement('i');e.style.color=`var(${n})`;document.body.append(e);const c=getComputedStyle(e).color;e.remove();return c}", name)
+
+
 class PlatformFixture(AccountDesignFixture):
     """保留原CC夹具，增加独立AGY账号与授权会话。"""
 
@@ -85,7 +90,7 @@ async def main():
         await expect(windows.first).to_contain_text('5 小时')
         await expect(windows.first.locator('.agy-quota-value')).to_have_text('已用 100% · 剩余 0%')
         assert await windows.first.locator('.usage-window-bar i').evaluate('e=>e.style.width') == '100%'
-        await expect(windows.first.locator('.usage-window-bar i')).to_have_css('background-color', 'rgb(207, 89, 100)')
+        await expect(windows.first.locator('.usage-window-bar i')).to_have_css('background-color', await token_color(page, '--ui-color-danger'))
         await expect(windows.nth(1)).to_contain_text('额度未知')
         await expect(windows.nth(1).locator('.usage-window-bar')).to_have_count(0)
         await expect(first.locator('.agy-gateway-windows')).to_have_count(0)
@@ -119,12 +124,14 @@ async def main():
         await expect(dialog.locator('.account-overview-control .account-overview-note')).to_have_count(0)
         await dialog.locator('summary').filter(has_text='按模型查看').click()
         await expect(dialog.locator('.agy-model-quotas')).to_contain_text('已用 60% · 剩余 40%')
-        await expect(dialog.locator('.agy-model-quotas .usage-window-bar i')).to_have_css('background-color', 'rgb(212, 166, 89)')
+        await expect(dialog.locator('.agy-model-quotas .usage-window-bar i')).to_have_css('background-color', await token_color(page, '--ui-color-warning'))
         await dialog.locator('summary').filter(has_text='套餐与来源').click()
         await expect(dialog.locator('.account-provider-details')).to_contain_text('演示 Pro')
         await expect(dialog.locator('.account-provider-details')).to_contain_text('合成分级')
         await expect(dialog.locator('.account-provider-details pre')).to_have_count(0)
-        await expect(dialog.get_by_role('button',name='环境与诊断',exact=True)).to_have_count(1)
+        # 工作区页签为分段控件（role=radio）；反重力账号没有调度页签。
+        await expect(dialog.locator('.account-workspace-tabs').get_by_role('radio',name='环境与诊断',exact=True)).to_have_count(1)
+        await expect(dialog.locator('.account-workspace-tabs').get_by_role('radio',name='调度')).to_have_count(0)
         await page.keyboard.press('Escape')
         await first.get_by_role('button',name='编辑',exact=True).click()
         await dialog.get_by_role('button',name='重新授权',exact=True).click()

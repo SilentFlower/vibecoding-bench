@@ -7,7 +7,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../dialog
  * @prop title 标题。
  * @prop description 说明；省略时以标题作为读屏描述。
  * @prop width 最大宽度（px），默认 820；窄屏不超过视口宽减 32px。
- * v-model:open 控制打开状态。插槽 media：标题左侧的头像或图标块；title-extra：标题后的徽标；默认插槽：内容区；footer：底栏。
+ * v-model:open 控制打开状态。插槽 media：标题左侧的头像或图标块；title-extra：标题后的徽标；
+ * nav：头部下方不随内容滚动的页签带；默认插槽：内容区；footer：底栏。
  */
 // 根节点 Dialog 不渲染元素，class、data-* 等属性转给弹窗面板。
 defineOptions({ inheritAttrs: false });
@@ -26,6 +27,7 @@ const open = defineModel<boolean>('open', { default: false });
           <DialogDescription :class="description ? 'fui-modal-description' : 'sr-only'">{{ description ?? title }}</DialogDescription>
         </div>
       </header>
+      <div v-if="$slots.nav" class="fui-modal-nav"><slot name="nav" /></div>
       <div class="fui-modal-body"><slot /></div>
       <footer v-if="$slots.footer" class="fui-modal-foot"><slot name="footer" /></footer>
     </DialogContent>

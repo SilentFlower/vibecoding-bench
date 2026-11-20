@@ -1,0 +1,300 @@
+/* 账号页与账号工作区（第二版设计稿 doc/design/console-v2/mock.html 的 #accounts、#account-edit、#mobile）。
+   由 Accounts.vue 引入，代理管理、任务与工程嵌入账号工作区时随之加载。
+   颜色、圆角、阴影只取 token；字号不在档位上时用 token 加减像素表达（12.5px = meta，15px = card − 1px，18px = card + 2px）。 */
+@layer components {
+  /* ---------- 页面与工具栏 ---------- */
+  .accounts-page > * + * { margin-top: calc(var(--ui-space-unit) * 4.5); }
+  .account-toolbar > .account-platform-filter { flex: none; width: 150px; }
+  .account-toolbar > .account-platform-filter > .fui-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  .account-toolbar .fui-toolbar-end > .fui-search { width: 280px; }
+  .account-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); align-items: stretch; gap: calc(var(--ui-space-unit) * 4); }
+  .account-empty { grid-column: 1 / -1; }
+
+  /* ---------- 卡片（.card.acc） ---------- */
+  .account-card-grid > .account-card { gap: calc(var(--ui-space-unit) * 3); min-width: 0; padding: calc(var(--ui-space-unit) * 4.5) calc(var(--ui-space-unit) * 4.5) calc(var(--ui-space-unit) * 1.5); }
+  .account-card-body { display: flex; flex: 1; flex-direction: column; gap: calc(var(--ui-space-unit) * 3); min-width: 0; }
+  .account-card-topline { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 2); }
+  .account-identity { display: flex; align-items: flex-start; gap: calc(var(--ui-space-unit) * 3); min-width: 0; }
+  .account-avatar { position: relative; font-size: calc(var(--ui-font-size-card) - 1px); font-weight: 750; line-height: 1; }
+  .account-avatar-state { position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 50%; background: var(--ui-color-success); box-shadow: 0 0 0 2.5px var(--ui-color-surface); }
+  .account-avatar-state.disabled { background: var(--ui-color-text-4); }
+  .account-avatar-state.error { background: var(--ui-color-danger); }
+  .account-identity-text { flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .account-identity-text:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; border-radius: calc(var(--ui-radius-control) - 4px); }
+  .account-card-title { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 1.5); min-width: 0; }
+  .account-card-title h3 { min-width: 0; margin: 0; overflow: hidden; color: var(--ui-color-text); font-size: calc(var(--ui-font-size-card) - 1px); font-weight: 760; line-height: 1.55; text-overflow: ellipsis; white-space: nowrap; }
+  .account-card-badges { display: inline-flex; flex: none; gap: calc(var(--ui-space-unit) * 1.5); }
+  .account-identity-text > p { margin: 2px 0 0; overflow: hidden; color: var(--ui-color-text-3); font-size: var(--ui-font-size-meta); font-weight: 500; line-height: 1.55; text-overflow: ellipsis; white-space: nowrap; }
+  .account-work-controls { display: flex; align-items: center; justify-content: flex-end; gap: calc(var(--ui-space-unit) * 2.5); color: var(--ui-color-text-2); font-size: var(--ui-font-size-meta); font-weight: 600; }
+  .account-admission { display: inline-flex; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); cursor: pointer; }
+  .account-network { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 3.5); min-width: 0; color: var(--ui-color-text-2); font-size: var(--ui-font-size-meta); font-weight: 600; line-height: 1.55; white-space: nowrap; }
+  .account-network > button, .account-network > a { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-decoration: none; cursor: pointer; }
+  .account-network > button > span { overflow: hidden; text-overflow: ellipsis; }
+  /* 代理名与节点名可省略，运行环境链接保持完整，窄屏时不溢出卡片。 */
+  .account-network > a { flex: none; }
+  .account-network svg { flex: none; color: var(--ui-color-text-4); }
+  .account-network > :hover { color: var(--ui-color-primary-text); }
+  .account-card .account-network .execution-node { font-size: inherit; }
+  .account-work-status { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--ui-space-unit) * 2); color: var(--ui-color-text-2); font-size: var(--ui-font-size-sm); font-weight: 600; }
+  .account-note { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 500; line-height: 1.55; }
+  /* 设计稿 .strip 固定 36px：「排队 N」出现与否、数字变化都不改变卡片高度（verify_account_queue_layout）。 */
+  .account-card .account-health { height: 36px; padding-block: 0; }
+  .account-health-message { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .account-health-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  /* 「排队 N」：设计稿 .strip .tag，警示色文字配白底，不收缩，保持状态条高度稳定。 */
+  .account-queue-alert { display: inline-flex; align-items: center; height: 22px; padding: 0 calc(var(--ui-space-unit) * 2); border: 0; border-radius: var(--ui-radius-control); background: var(--ui-color-surface); color: var(--ui-color-warning-text); font: 650 var(--ui-font-size-xs) var(--ui-font-family); white-space: nowrap; cursor: pointer; }
+  .account-queue-alert:focus-visible, .account-strip-link:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
+  .account-strip-text { overflow-wrap: anywhere; }
+  .account-strip-link { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+
+  /* 转发方式与调度（.block.route） */
+  .account-card .account-routing { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: calc(var(--ui-space-unit) * 3); padding: 11px calc(var(--ui-space-unit) * 3.5); }
+  .account-routing > div, .account-routing > button { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .account-routing span { display: block; color: var(--ui-color-text-3); font-size: var(--ui-font-size-xs); font-weight: 650; line-height: 1.55; }
+  .account-routing strong { color: var(--ui-color-text); font-size: var(--ui-font-size-md); font-weight: 720; line-height: 1.55; }
+  .account-routing strong small { margin-left: 4px; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; }
+  .account-routing > button { align-items: flex-start; padding: 0 0 0 calc(var(--ui-space-unit) * 3.5); border: 0; border-left: 1px solid var(--ui-color-line); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .account-routing > button > strong { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 4.5); }
+  .account-routing > button > strong svg { color: var(--ui-color-text-4); }
+  .account-routing > button > small { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; }
+  .account-routing > button:hover > strong svg { color: var(--ui-color-primary-text); }
+  .account-routing > button:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
+
+  /* 用量（.usage-h / .since / .win） */
+  .account-usage-windows { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 3); min-width: 0; }
+  .account-usage-windows > header { display: flex; align-items: center; color: var(--ui-color-text-2); font-size: var(--ui-font-size-sm); font-weight: 700; line-height: 1.55; }
+  .account-usage-windows > header small { margin-left: auto; color: var(--ui-color-text-3); font-size: inherit; font-weight: 600; }
+  .account-usage-windows > header button { display: inline-flex; align-items: center; gap: 4px; margin-left: calc(var(--ui-space-unit) * 2.5); padding: 0; border: 0; background: transparent; color: var(--ui-color-primary-text); font: inherit; font-weight: 700; cursor: pointer; }
+  .account-usage-windows > header button:disabled { opacity: .45; cursor: not-allowed; }
+  .usage-record-start { margin: calc(var(--ui-space-unit) * -1.5) 0 0; color: var(--ui-color-text-4); font-size: var(--ui-font-size-sm); font-weight: 550; line-height: 1.55; }
+  .account-usage-window { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .account-usage-window > .usage-record-start { margin: 0; }
+  .usage-stats { min-width: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; line-height: 1.55; }
+  .usage-stats .fui-info-trigger { display: block; width: 100%; min-width: 0; color: inherit; font: inherit; }
+  .usage-stats-line { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .usage-window-label { display: flex; justify-content: space-between; gap: calc(var(--ui-space-unit) * 2); color: var(--ui-color-text-2); font-size: var(--ui-font-size-meta); font-weight: 650; line-height: 1.55; }
+  .usage-window-label strong { color: var(--ui-color-text); font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .usage-window-bar { height: 6px; overflow: hidden; border-radius: 999px; background: var(--ui-color-track); }
+  .usage-window-bar > i { display: block; height: 100%; border-radius: inherit; background: var(--ui-color-success); }
+  .usage-window-bar > i[data-tone=warning] { background: var(--ui-color-warning); }
+  .usage-window-bar > i[data-tone=danger] { background: var(--ui-color-danger); }
+  .usage-window-reset { display: flex; justify-content: space-between; gap: calc(var(--ui-space-unit) * 2); margin: 0; color: var(--ui-color-text-4); font-size: var(--ui-font-size-sm); font-weight: 550; line-height: 1.55; }
+  .usage-window-reset > span:last-child { font-variant-numeric: tabular-nums; }
+
+  /* 费用气泡（UsageWindowStats 的 InfoTooltip 内容） */
+  .usage-cost-bubble > header { display: flex; justify-content: space-between; gap: calc(var(--ui-space-unit) * 3); margin-bottom: calc(var(--ui-space-unit) * 3); color: var(--ui-color-text); font-size: var(--ui-font-size-md); font-weight: 700; }
+  .usage-cost-bubble > header small { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 500; }
+  .usage-bubble-grid { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--ui-space-unit) * 3) calc(var(--ui-space-unit) * 4.5); margin: 0; }
+  .usage-bubble-grid dt { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); }
+  .usage-bubble-grid dd { margin: 2px 0 0; color: var(--ui-color-text); font-size: var(--ui-font-size-md); font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .usage-cost-bubble > p { margin: calc(var(--ui-space-unit) * 3) 0 0; padding-top: calc(var(--ui-space-unit) * 2.5); border-top: 1px solid var(--ui-color-line); color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); }
+  .usage-cost-bubble > p.usage-bubble-estimate { margin-top: calc(var(--ui-space-unit) * 1.25); padding-top: 0; border: 0; }
+
+  /* 实时指标（.metrics） */
+  .account-live-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 2); padding-top: calc(var(--ui-space-unit) * 3); border-top: 1px solid var(--ui-color-line); }
+  .account-live-metrics > button { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--ui-color-text); font: inherit; text-align: left; cursor: pointer; }
+  .account-live-metrics > button:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
+  .account-live-metrics span { display: flex; align-items: center; gap: 2px; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 650; line-height: 1.55; }
+  .account-live-metrics strong { font: 800 calc(var(--ui-font-size-card) + 2px)/1 var(--ui-font-family-mono); white-space: nowrap; }
+  .account-live-metrics strong small { color: var(--ui-color-text-4); font-size: var(--ui-font-size-xs); font-weight: 600; }
+  .metric-track { display: block; width: 70%; height: 4px; overflow: hidden; border-radius: 999px; background: var(--ui-color-track); }
+  .metric-track > i { display: block; height: 100%; border-radius: inherit; background: var(--ui-color-primary); }
+  .metric-track.is-warning > i { background: var(--ui-color-warning); }
+  .metric-track.is-danger > i { background: var(--ui-color-danger); }
+
+  /* 操作栏（.acts 五列） */
+  .account-card-actions { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0 calc(var(--ui-space-unit) * -4.5); padding: calc(var(--ui-space-unit) * 1.5) calc(var(--ui-space-unit) * 2); border-top: 1px solid var(--ui-color-line); }
+  .account-card-actions > button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; height: calc(var(--ui-control-sm) + 2px); padding: 0 4px; border: 0; border-radius: var(--ui-radius-btn); background: transparent; color: var(--ui-color-text-2); font: 650 var(--ui-font-size-meta)/1 var(--ui-font-family); white-space: nowrap; cursor: pointer; transition: background-color .15s; }
+  .account-card-actions > button svg { flex: none; width: 14px; height: 14px; }
+  .account-card-actions > button:hover:not(:disabled) { background: var(--ui-color-fill); color: var(--ui-color-text); }
+  .account-card-actions > button:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: -2px; }
+  .account-card-actions > button:disabled { opacity: .45; cursor: not-allowed; }
+  .account-card-actions > button.danger { color: var(--ui-color-danger-text); }
+  .account-card-actions > button.danger:hover:not(:disabled) { background: var(--ui-color-danger-bg); }
+  .account-card-actions > .fui-operation-trigger { min-width: 0; min-height: 0; }
+  .account-card-actions > .fui-operation-trigger[data-status=success] { color: var(--ui-color-success-text); }
+  .account-card-actions > .fui-operation-trigger[data-status=error] { color: var(--ui-color-danger-text); }
+
+  /* 卡片与工作区共用的文字色调（rpmClass 等返回的语义类） */
+  :is(.account-card, .account-workspace) .is-warning { color: var(--ui-color-warning-text); }
+  :is(.account-card, .account-workspace) .is-danger { color: var(--ui-color-danger-text); }
+  :is(.account-card, .account-workspace) .is-success { color: var(--ui-color-success-text); }
+  :is(.account-card, .account-workspace) .is-muted { color: var(--ui-color-text-3); }
+
+  /* ---------- 反重力平台额度（AgyAccountUsage / AgyQuotaRow） ---------- */
+  .agy-account-usage { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 2.5); min-width: 0; }
+  .agy-account-usage > header { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--ui-space-unit) * 2); }
+  .agy-account-usage h3 { margin: 0; color: var(--ui-color-text-2); font-size: var(--ui-font-size-sm); font-weight: 700; line-height: 1.55; }
+  .agy-account-usage > header a { display: inline-flex; align-items: center; gap: 4px; color: var(--ui-color-primary-text); font-size: var(--ui-font-size-sm); font-weight: 700; text-decoration: none; }
+  .agy-usage-section { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 2); min-width: 0; }
+  .agy-usage-section > p, .agy-quota-note { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; }
+  .agy-quota-groups, .agy-quota-group { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 2); }
+  .agy-quota-group h4 { margin: 0; color: var(--ui-color-text-2); font-size: var(--ui-font-size-sm); font-weight: 650; }
+  .agy-quota-windows { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 2.5); margin: 0; padding: 0; list-style: none; }
+  .agy-quota-window { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px calc(var(--ui-space-unit) * 2); color: var(--ui-color-text-2); font-size: var(--ui-font-size-meta); font-weight: 650; line-height: 1.55; }
+  .agy-quota-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .agy-quota-value { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .agy-quota-value strong, strong.agy-quota-value { color: var(--ui-color-text); font-weight: 800; }
+  .agy-quota-reset { grid-column: 1 / -1; color: var(--ui-color-text-4); font-size: var(--ui-font-size-sm); font-weight: 550; }
+  .agy-quota-window > .usage-window-bar { grid-column: 1 / -1; }
+  .agy-gateway-windows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 2); }
+  .agy-gateway-windows > div { display: flex; flex-direction: column; gap: 4px; padding: calc(var(--ui-space-unit) * 2.5) calc(var(--ui-space-unit) * 3); border-radius: var(--ui-radius-control); background: var(--ui-color-fill-subtle); }
+  .agy-gateway-windows span { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 650; }
+  .agy-gateway-reading { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); }
+  .agy-gateway-reading strong { color: var(--ui-color-text); font: 800 calc(var(--ui-font-size-card) + 2px)/1 var(--ui-font-family-mono); }
+  .agy-gateway-reading small { display: block; margin-top: 4px; font-size: inherit; }
+
+  /* ---------- 账号工作区（居中弹窗 .modal） ---------- */
+  /* 有页签时固定高度：切换页签只换内容区，弹窗位置不跳动；新建账号无页签时按内容高度。 */
+  .account-workspace:has(> .fui-modal-nav) { height: min(840px, calc(100dvh - 32px)); }
+  .account-workspace-scroll, .account-editor-form, .account-editor-scroll, .account-form-section { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 4.5); min-width: 0; }
+  .account-workspace h3 { margin: 0; color: var(--ui-color-text); font-size: var(--ui-font-size-title); font-weight: 760; line-height: 1.55; }
+  .account-workspace .agy-account-usage h3 { color: var(--ui-color-text-2); font-size: var(--ui-font-size-sm); font-weight: 700; }
+  .account-workspace details > summary { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 1.5); color: var(--ui-color-text-2); font-size: var(--ui-font-size-meta); font-weight: 650; line-height: 1.55; list-style: none; cursor: pointer; }
+  .account-workspace details > summary::-webkit-details-marker { display: none; }
+  .account-workspace details > summary svg { flex: none; color: var(--ui-color-text-4); transition: transform .15s; }
+  .account-workspace details[open] > summary svg { transform: rotate(90deg); }
+  .account-workspace details > summary:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; border-radius: calc(var(--ui-radius-control) - 4px); }
+  .account-workspace details[open] > summary { margin-bottom: calc(var(--ui-space-unit) * 3.5); }
+  .account-workspace details > :not(summary) + :not(summary) { margin-top: calc(var(--ui-space-unit) * 3.5); }
+  .account-workspace .account-advanced > summary { color: var(--ui-color-text); font-size: var(--ui-font-size-title); font-weight: 760; }
+
+  /* 配置页（.sec-t / .fg / .field / .rc） */
+  .account-edit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 3.5) calc(var(--ui-space-unit) * 4); }
+  .account-edit-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .approved-field, .forwarding-field { display: grid; align-content: start; gap: calc(var(--ui-space-unit) * 1.75); min-width: 0; }
+  .approved-field > span { color: var(--ui-color-text-2); font-size: var(--ui-font-size-sm); font-weight: 700; line-height: 1.55; }
+  /* 编辑时平台不可改：按设计稿只读输入（.input.ro）呈现，而不是半透明禁用态。 */
+  .account-editor-form .fui-choice:disabled { opacity: 1; background: var(--ui-color-fill-muted); color: var(--ui-color-text-3); }
+  .account-workspace .forwarding-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 3.5) calc(var(--ui-space-unit) * 4); }
+  .form-help { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 500; line-height: 1.55; }
+  .model-presets { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 2); }
+  .model-presets > span { margin-right: calc(var(--ui-space-unit) * 1); color: var(--ui-color-text-2); font-size: var(--ui-font-size-sm); font-weight: 700; }
+  .account-check { align-items: flex-start; }
+  .account-check > .fui-checkbox-box { margin-top: 2px; }
+  .account-check strong { display: block; color: var(--ui-color-text); font-weight: 650; }
+  .account-check small { display: block; margin-top: 2px; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 500; }
+  .account-form-actions { display: flex; flex-wrap: wrap; gap: calc(var(--ui-space-unit) * 2); }
+  .account-save-hint { color: var(--ui-color-text-3); font-size: var(--ui-font-size-md); font-weight: 600; }
+  .account-save-cancel { margin-left: auto; }
+
+  /* 概览页 */
+  .account-overview-context { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: calc(var(--ui-space-unit) * 2); color: var(--ui-color-text-2); font-size: var(--ui-font-size-meta); font-weight: 600; }
+  .account-overview-status { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 1.5); }
+  .account-overview-section-head { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--ui-space-unit) * 2); margin-bottom: calc(var(--ui-space-unit) * -2); }
+  .account-overview-section-head button { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: var(--ui-color-primary-text); font: 700 var(--ui-font-size-sm) var(--ui-font-family); cursor: pointer; }
+  .account-overview-settings, .account-diagnostic-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 3) calc(var(--ui-space-unit) * 4); margin: 0; }
+  .account-diagnostic-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :is(.account-overview-settings, .account-diagnostic-summary, .account-capabilities dl, .account-detail-metrics, .account-detail-fields) dt { color: var(--ui-color-text-3); font-size: var(--ui-font-size-xs); font-weight: 650; line-height: 1.55; }
+  :is(.account-overview-settings, .account-diagnostic-summary, .account-capabilities dl) dd { margin: 2px 0 0; color: var(--ui-color-text); font-size: var(--ui-font-size-md); font-weight: 720; line-height: 1.55; overflow-wrap: anywhere; }
+  .account-overview-actions, .account-diagnostic-actions { display: flex; flex-wrap: wrap; gap: calc(var(--ui-space-unit) * 2); }
+  .account-overview-control { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 2.5); padding-top: calc(var(--ui-space-unit) * 4); border-top: 1px solid var(--ui-color-line); }
+  .account-overview-control > header { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--ui-space-unit) * 2); }
+  .account-overview-control-row { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); color: var(--ui-color-text-2); font-size: var(--ui-font-size-meta); font-weight: 600; }
+  .account-overview-control-row > .account-admission { margin-right: auto; }
+  .account-overview-note { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); }
+  .account-capabilities { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 3); }
+  .account-capabilities > header { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--ui-space-unit) * 2); }
+  .account-capabilities dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 3); margin: 0; }
+  .account-model-list { display: flex; flex-wrap: wrap; gap: calc(var(--ui-space-unit) * 1.5); }
+  .account-model-list code { padding: 2px calc(var(--ui-space-unit) * 1.5); border-radius: calc(var(--ui-radius-control) - 2px); background: var(--ui-color-surface); color: var(--ui-color-text-2); font: 600 var(--ui-font-size-xs) var(--ui-font-family-mono); }
+  .account-model-list p { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); }
+  .account-provider-details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 3); margin: 0; }
+  .account-credential-actions { display: flex; flex-wrap: wrap; gap: calc(var(--ui-space-unit) * 2); }
+
+  /* 环境与诊断 */
+  .account-diagnostic-technical { padding-top: calc(var(--ui-space-unit) * 4); border-top: 1px solid var(--ui-color-line); }
+  .account-detail-scroll { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 3.5); }
+  .account-detail-metrics { display: grid; gap: calc(var(--ui-space-unit) * 2); margin: 0; }
+  .account-detail-metrics.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .account-detail-metrics.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .account-detail-metrics > div, .account-detail-metrics > .fui-info-trigger { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: calc(var(--ui-space-unit) * 2.5) calc(var(--ui-space-unit) * 3); border-radius: var(--ui-radius-control); background: var(--ui-color-fill-subtle); }
+  .account-detail-metric { display: flex; flex-direction: column; gap: 2px; }
+  .account-detail-metric > span { color: var(--ui-color-text-3); font-size: var(--ui-font-size-xs); font-weight: 650; }
+  .account-detail-metrics dd, .account-detail-metric > strong { margin: 0; color: var(--ui-color-text); font-size: var(--ui-font-size-title); font-weight: 750; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .account-detail-scheduling { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 1.5); color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); }
+  .account-detail-scheduling p { display: flex; flex-wrap: wrap; gap: 4px calc(var(--ui-space-unit) * 4); margin: 0; }
+  .account-detail-row { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--ui-space-unit) * 2); }
+  .account-detail-row strong { color: var(--ui-color-text); font-size: var(--ui-font-size-md); font-weight: 700; }
+  .account-detail-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 3) calc(var(--ui-space-unit) * 4); margin: 0; }
+  .account-detail-fields dd { margin: 2px 0 0; color: var(--ui-color-text-2); font-size: var(--ui-font-size-meta); font-weight: 550; line-height: 1.55; overflow-wrap: anywhere; }
+  .account-detail-fields dd small { color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); }
+  .account-detail-fields .is-mono { font-family: var(--ui-font-family-mono); font-size: var(--ui-font-size-sm); }
+  .account-detail-fields .is-clamped { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .account-score-explanation p { margin: 0; }
+  .account-score-explanation small { color: var(--ui-color-text-3); }
+
+  /* ---------- 调度页签（SchedulingDetails embedded） ---------- */
+  .scheduling-scroll { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 4.5); min-width: 0; }
+  .scheduling-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: calc(var(--ui-space-unit) * 2); color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 550; }
+  .scheduling-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 3); }
+  .scheduling-metrics > .fui-entity-block { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .scheduling-metrics p { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 650; }
+  .scheduling-metrics strong { color: var(--ui-color-text); font: 800 calc(var(--ui-font-size-card) + 2px)/1.2 var(--ui-font-family-mono); }
+  .scheduling-metrics span { color: var(--ui-color-text); font-size: var(--ui-font-size-md); font-weight: 650; }
+  .scheduling-metrics small { font-size: var(--ui-font-size-sm); }
+  .scheduling-phases { display: flex; flex-wrap: wrap; gap: calc(var(--ui-space-unit) * 2) calc(var(--ui-space-unit) * 5); padding: calc(var(--ui-space-unit) * 2.5) calc(var(--ui-space-unit) * 3.5); border-radius: var(--ui-radius-block); background: var(--ui-color-fill-subtle); color: var(--ui-color-text-2); font-size: var(--ui-font-size-sm); font-weight: 600; }
+  .scheduling-section { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 2.5); min-width: 0; }
+  .scheduling-section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: calc(var(--ui-space-unit) * 2); }
+  .scheduling-range { display: flex; gap: 4px; }
+  .scheduling-range button { padding: 2px calc(var(--ui-space-unit) * 2); border: 0; border-radius: var(--ui-radius-btn); background: transparent; color: var(--ui-color-text-3); font: 650 var(--ui-font-size-sm) var(--ui-font-family); cursor: pointer; }
+  .scheduling-range button[aria-pressed=true] { background: var(--ui-color-primary-container); color: var(--ui-color-primary-text); }
+  .scheduling-range button:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 1px; }
+  .scheduling-timeline { overflow-x: auto; border-radius: var(--ui-radius-block); }
+  .scheduling-chart { display: block; width: 100%; min-width: 600px; border-radius: var(--ui-radius-block); background: var(--ui-color-fill-subtle); }
+  .scheduling-axis { stroke: var(--ui-color-line); }
+  .scheduling-now { stroke: var(--ui-color-text-4); }
+  .scheduling-event { fill: var(--ui-color-success); }
+  .scheduling-next { stroke: var(--ui-color-primary); }
+  .scheduling-next-dot { fill: var(--ui-color-surface); stroke: var(--ui-color-primary); }
+  .scheduling-label { fill: var(--ui-color-text-3); font-family: var(--ui-font-family); }
+  .scheduling-note { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); line-height: 1.55; }
+  .scheduling-factors { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(var(--ui-space-unit) * 3); }
+  .scheduling-factor-label { display: flex; justify-content: space-between; gap: calc(var(--ui-space-unit) * 2); margin-bottom: 4px; color: var(--ui-color-text-2); font-size: var(--ui-font-size-sm); font-weight: 600; }
+  .scheduling-factor-bar { height: 6px; overflow: hidden; border-radius: 999px; background: var(--ui-color-track); }
+  .scheduling-factor-bar > i { display: block; height: 100%; border-radius: inherit; background: var(--ui-color-primary); }
+  .scheduling-sessions { padding-top: calc(var(--ui-space-unit) * 4); border-top: 1px solid var(--ui-color-line); }
+  .scheduling-filters { display: grid; grid-template-columns: 170px minmax(0, 1fr) auto; align-items: end; gap: calc(var(--ui-space-unit) * 2.5); }
+  .scheduling-sessions .fui-table-cell { height: 40px; font-size: var(--ui-font-size-sm); }
+  .scheduling-session-key { font-family: var(--ui-font-family-mono); }
+
+  /* ---------- 授权登录（440px 居中弹窗） ---------- */
+  .approved-oauth-body { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 3.5); min-width: 0; }
+  .oauth-help { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 500; line-height: 1.55; }
+  .account-oauth-dialog .oauth-link-panel { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--ui-space-unit) * 3); }
+  .oauth-link-panel a { color: var(--ui-color-primary-text); font-size: var(--ui-font-size-md); font-weight: 700; text-decoration: none; }
+  .oauth-link-details, .oauth-result-details { display: block; }
+  .account-oauth-dialog details > summary { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 1.5); color: var(--ui-color-text-2); font-size: var(--ui-font-size-meta); font-weight: 650; list-style: none; cursor: pointer; }
+  .account-oauth-dialog details > summary::-webkit-details-marker { display: none; }
+  .account-oauth-dialog details > summary svg { color: var(--ui-color-text-4); transition: transform .15s; }
+  .account-oauth-dialog details[open] > summary svg { transform: rotate(90deg); }
+  .account-oauth-dialog details[open] > summary { margin-bottom: calc(var(--ui-space-unit) * 2.5); }
+  .oauth-result-fields { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: calc(var(--ui-space-unit) * 1.5) calc(var(--ui-space-unit) * 4); margin: 0; font-size: var(--ui-font-size-meta); }
+  .oauth-result-fields dt { color: var(--ui-color-text-3); font-weight: 650; }
+  .oauth-result-fields dd { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 2); margin: 0; color: var(--ui-color-text); overflow-wrap: anywhere; }
+  .account-oauth-dialog :is(.oauth-primary, .oauth-secondary) { margin-left: auto; }
+
+  /* ---------- 移动端（≤760px，设计稿 #mobile） ---------- */
+  @media (max-width: 760px) {
+    .account-card-grid { grid-template-columns: minmax(0, 1fr); }
+    /* 搜索行（平台筛选 + 搜索框）默认收起，由应用栏搜索按钮展开；分段独占一行。 */
+    .account-toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr); }
+    .account-toolbar > .account-platform-filter { grid-row: 1; grid-column: 1; width: 128px; }
+    .account-toolbar > .fui-toolbar-end { grid-row: 1; grid-column: 2; margin-left: 0; }
+    .account-toolbar > .account-filter-tabs { grid-row: 2; grid-column: 1 / -1; justify-self: start; }
+    .account-toolbar .fui-toolbar-end > .fui-search { width: 100%; }
+    .account-toolbar:not(.is-search-open) > :is(.account-platform-filter, .fui-toolbar-end) { display: none; }
+    .account-toolbar:not(.is-search-open) > .account-filter-tabs { grid-row: 1; }
+    .account-card-actions > button { gap: 3px; font-size: var(--ui-font-size-sm); }
+    .account-edit-grid, .account-edit-grid.three, .account-workspace .forwarding-options, .account-overview-settings, .account-diagnostic-summary, .account-capabilities dl, .account-provider-details, .account-detail-fields { grid-template-columns: minmax(0, 1fr); }
+    .account-detail-metrics.five, .account-detail-metrics.three, .scheduling-metrics, .scheduling-factors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .scheduling-filters { grid-template-columns: minmax(0, 1fr) auto; }
+    .scheduling-filters > .fui-field { grid-column: 1 / -1; }
+  }
+  @media (min-width: 1680px) {
+    .account-card-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .account-card-actions > button, .account-workspace details > summary svg, .account-oauth-dialog details > summary svg { transition: none; }
+  }
+}

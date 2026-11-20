@@ -142,6 +142,8 @@ DESIGN_PAIRS = [
     ('account-edit', '.mh', '[data-testid=modal] .fui-modal-head', ['padding-top', 'padding-left', 'padding-bottom', 'column-gap', 'align-items'], 'modal'),
     ('account-edit', '.mh h2', '[data-testid=modal] .fui-modal-title', TEXT + ['column-gap'], 'modal'),
     ('account-edit', '.mh p', '[data-testid=modal] .fui-modal-description', TEXT, 'modal'),
+    ('account-edit', '.modal > div[style*="padding:0 24px 18px"]', '[data-testid=modal] .fui-modal-nav', ['padding-top', 'padding-left', 'padding-right', 'padding-bottom'], 'modal'),
+    ('account-edit', '.modal .seg', '[data-testid=modal-nav]', ['background-color', 'padding-top', 'column-gap', 'border-top-left-radius'], 'modal'),
     ('account-edit', '.mb', '[data-testid=modal] .fui-modal-body', ['padding-top', 'padding-left', 'padding-bottom', 'row-gap', 'line-height'], 'modal'),
     ('account-edit', '.mf', '[data-testid=modal] .fui-modal-foot', ['background-color', 'padding-top', 'padding-left', 'column-gap'], 'modal'),
 ]

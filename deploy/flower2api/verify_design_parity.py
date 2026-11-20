@@ -1,4 +1,5 @@
-"""对照已确认原型验证正式账号的结构及交互；系统更新弹窗只核对入口与关闭（样式与安装流程见 verify_update_design.py、verify_system_update_browser.py）。"""
+"""对照已确认原型验证正式账号的结构及交互；工作区外框按第二版设计稿（mock.html#account-edit，820px 居中弹窗）核对，
+样式逐项比对见 verify_account_page_design.py。系统更新弹窗只核对入口与关闭（样式与安装流程见 verify_update_design.py、verify_system_update_browser.py）。"""
 import asyncio
 import json
 from pathlib import Path
@@ -18,9 +19,11 @@ async def main():
         await reference.locator('[data-account-action="edit"]').first.click()
         ref_sections = await reference.locator('#account-drawer .account-form-section > h3').all_text_contents()
         ref_tabs = await reference.locator('#account-drawer [data-detail]').all_text_contents()
-        ref_box = await reference.locator('#account-drawer').bounding_box()
         await reference.screenshot(path=str(out/'reference-editor.png'))
         await reference.keyboard.press('Escape')
+        # 第二版把右侧抽屉改为居中弹窗：宽度取设计稿 .modal，位置在视口内水平居中。
+        await reference.goto((ROOT/'doc/design/console-v2/mock.html').as_uri()+'#account-edit')
+        ref_width = (await reference.locator('.modal').bounding_box())['width']
         context = await browser.new_context(viewport={'width':1440,'height':1000})
         fixture = AccountDesignFixture()
         await context.route('**/*', fixture.route)
@@ -36,33 +39,35 @@ async def main():
         assert fixture.account_reads[-1]==1
         await page.get_by_role('button',name='清空搜索账号').click()
         await expect(page.locator('.account-card')).to_have_count(12)
-        await page.get_by_role('button',name='已停用',exact=False).first.click()
+        # 状态筛选与工作区页签为分段控件（role=radio）。
+        await page.get_by_role('radio',name='已停用',exact=False).first.click()
         await expect(page.locator('.account-card')).to_have_count(0)
-        await page.get_by_role('button',name='全部账号',exact=False).click()
+        await page.get_by_role('radio',name='全部账号',exact=False).click()
         await expect(page.locator('.account-card')).to_have_count(12)
         card=page.locator('.account-card').first
         await card.get_by_role('button',name='编辑',exact=True).click()
         workspace=page.locator('.account-workspace')
         await expect(workspace).to_have_css('opacity','1')
         assert await workspace.locator('.account-form-section > h3').all_text_contents()==ref_sections
-        assert await workspace.locator('.account-workspace-tabs button').all_text_contents()==ref_tabs
+        assert await workspace.locator('.account-workspace-tabs [role=radio] > span').all_text_contents()==ref_tabs
         rect=await workspace.bounding_box()
-        assert abs(rect['x']-ref_box['x'])<=4 and abs(rect['width']-ref_box['width'])<=4,(rect,ref_box)
-        await expect(workspace.locator('.forwarding-options input[type=radio]')).to_have_count(2)
+        assert abs(rect['width']-ref_width)<=1 and abs(rect['x']+rect['width']/2-720)<=1,(rect,ref_width)
+        await expect(workspace.locator('.forwarding-options [role=radio]')).to_have_count(2)
         for label in ['Billing 模式','TTL 刷新策略']:
             await expect(workspace.get_by_role('combobox',name=label,exact=True)).to_be_visible()
         await workspace.get_by_role('spinbutton',name='并发上限',exact=True).fill('7')
-        await workspace.get_by_role('button',name='概览',exact=True).click()
-        await workspace.get_by_role('button',name='调度',exact=True).click()
+        tabs=workspace.locator('.account-workspace-tabs')
+        await tabs.get_by_role('radio',name='概览',exact=True).click()
+        await tabs.get_by_role('radio',name='调度').click()
         await expect(workspace).to_contain_text('真实提交时间轴')
         await expect(page.get_by_role('dialog')).to_have_count(1)
-        await workspace.get_by_role('button',name='配置',exact=True).click()
+        await tabs.get_by_role('radio',name='配置',exact=True).click()
         await expect(workspace.get_by_role('spinbutton',name='并发上限',exact=True)).to_have_value('7')
         await page.screenshot(path=str(out/'actual-editor.png'))
         await workspace.get_by_role('button',name='取消',exact=True).click()
         assert not fixture.writes
         await card.get_by_role('button',name='详情',exact=True).click()
-        await workspace.get_by_role('button',name='配置',exact=True).click()
+        await tabs.get_by_role('radio',name='配置',exact=True).click()
         await expect(workspace.get_by_role('spinbutton',name='并发上限',exact=True)).to_have_value('3')
         await page.keyboard.press('Escape')
         before=page.url
@@ -91,7 +96,7 @@ async def main():
             await page.screenshot(path=str(out/f'actual-updates-{width}.png'))
             await page.keyboard.press('Escape')
         assert not errors,errors
-        result=dict(passed=True,sections=ref_sections,tabs=ref_tabs,checks=['移除旧统计区','四状态与跨页搜索','定稿分组与侧栏定位','单工作区与草稿保留/丢弃','品牌更新保持路由与零写入','720/390px'],errors=errors)
+        result=dict(passed=True,sections=ref_sections,tabs=ref_tabs,checks=['移除旧统计区','四状态与跨页搜索','定稿分组与居中弹窗','单工作区与草稿保留/丢弃','品牌更新保持路由与零写入','720/390px'],errors=errors)
         (out/'verification.json').write_text(json.dumps(result,ensure_ascii=False,indent=2));print(json.dumps(result,ensure_ascii=False))
         await browser.close()
 

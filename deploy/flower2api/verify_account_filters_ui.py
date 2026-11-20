@@ -61,9 +61,20 @@ async def main():
         await expect(cards).to_have_count(3)
         toolbar = page.locator('.account-toolbar')
         platform = toolbar.get_by_role('combobox', name='平台筛选')
-        states = toolbar.get_by_role('group', name='账号状态筛选')
+        # 状态筛选为分段控件（Segmented，role=radiogroup / radio）。
+        states = toolbar.get_by_role('radiogroup', name='账号状态筛选')
+        search_toggle = page.get_by_role('button', name='搜索账号', exact=True)
         for width in [1440, 720, 390, 1920]:
             await page.set_viewport_size({'width': width, 'height': 1000})
+            if width <= 760:
+                # 移动端（设计稿 #mobile）搜索行默认收起，由应用栏搜索按钮展开；分段独占一行。
+                await expect(platform).to_be_hidden()
+                await expect(states).to_be_visible()
+                await search_toggle.click()
+                await expect(search_toggle).to_have_attribute('aria-expanded', 'true')
+                await expect(toolbar.get_by_role('searchbox', name='搜索账号')).to_be_focused()
+            else:
+                await expect(search_toggle).to_be_hidden()
             sizes = await toolbar.evaluate('''e => {
                 const box = selector => {const r=e.querySelector(selector).getBoundingClientRect();
                     return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:r.height}};
@@ -74,12 +85,15 @@ async def main():
             assert sizes['label']['height'] <= 1, sizes
             assert abs(sizes['platform']['height'] - sizes['states']['height']) <= 1, sizes
             assert not sizes['overflow'], sizes
-            if width == 390:
+            if width <= 760:
                 assert abs(sizes['platform']['top'] - sizes['search']['top']) <= 1, sizes
                 assert sizes['states']['top'] >= sizes['platform']['bottom'], sizes
             elif width >= 1440:
                 assert abs(sizes['platform']['top'] - sizes['states']['top']) <= 1, sizes
             await toolbar.screenshot(path=str(output / f'account-filters-{width}.png'))
+            if width <= 760:
+                await search_toggle.click()
+                await expect(platform).to_be_hidden()
         await page.set_viewport_size({'width': 1440, 'height': 1000})
         await platform.focus()
         await page.keyboard.press('Enter')
@@ -90,8 +104,8 @@ async def main():
         await platform.click()
         await page.get_by_role('option', name='Antigravity', exact=True).click()
         await expect(cards).to_have_count(2)
-        await expect(states.get_by_role('button', name='全部账号 2', exact=True)).to_be_visible()
-        await states.get_by_role('button', name='已停用 1', exact=True).click()
+        await expect(states.get_by_role('radio', name='全部账号 2', exact=True)).to_be_visible()
+        await states.get_by_role('radio', name='已停用 1', exact=True).click()
         await expect(cards).to_have_count(1)
         await expect(cards).to_contain_text('AGY账号2')
         assert fixture.reads[-1] == dict(platform='antigravity', status='disabled', search='', page=1)
@@ -104,7 +118,7 @@ async def main():
         await expect(cards).to_have_count(0)
         assert fixture.reads[-1] == dict(platform='claude_code', status='disabled', search='agy2', page=1)
         await search.fill('')
-        await states.get_by_role('button', name='全部账号 1', exact=True).click()
+        await states.get_by_role('radio', name='全部账号 1', exact=True).click()
         await expect(cards).to_have_count(1)
         await expect(cards).to_contain_text('CC兼容账号')
         fixture.hold_platform = 'antigravity'

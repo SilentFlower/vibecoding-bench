@@ -18,7 +18,7 @@ function resetLabel(resetAt?: string | null): string {
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { usageBarColor } from '../lib/subscription';
+import { usageBarTone } from '../lib/subscription';
 
 const props = defineProps<{ label: string; reading: AgyQuotaReading }>();
 const used = computed(() => props.reading.remaining_fraction == null ? null : 1 - props.reading.remaining_fraction);
@@ -35,7 +35,7 @@ const reset = computed(() => resetLabel(props.reading.reset_at));
     <span v-else class="agy-quota-value">额度未知</span>
     <small v-if="reset" class="agy-quota-reset">{{ reset }}</small>
     <div v-if="used != null" class="usage-window-bar" aria-hidden="true">
-      <i :class="usageBarColor(used * 100)" :style="{width: used * 100 + '%'}" />
+      <i :data-tone="usageBarTone(used * 100)" :style="{width: used * 100 + '%'}" />
     </div>
   </li>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
-import { Pencil, RefreshCw, Activity, ArrowRight, Trash2, Globe, Box, Clock, ChevronRight, KeyRound, Plus, Check } from '@/components/ui/icon';
+import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { useMediaQuery } from '@vueuse/core';
+import { Pencil, RefreshCw, Activity, ArrowRight, Trash2, Globe, Box, Clock, ChevronRight, KeyRound, Plus, Check, AlertCircle, Search, Users } from '@/components/ui/icon';
 import { NumberInput, ChoiceSelect, SearchInput, InfoTooltip, Pagination } from '@/components/ui/controls';
 import { useRoute } from 'vue-router';
 import ProxyPicker from './ProxyPicker.vue';
@@ -11,7 +12,7 @@ import { api, type ProxyRoute, type Account, type OAuthExchangeResult, type Usag
 import AgyAccountUsage from './AgyAccountUsage.vue';
 import UsageWindowStats from './UsageWindowStats.vue';
 import SchedulingDetails from './SchedulingDetails.vue';
-import { subscriptionLabel, fiveHourLabel, usageBarColor } from '../lib/subscription';
+import { subscriptionLabel, fiveHourLabel, usageBarTone } from '../lib/subscription';
 import { schedulingReasonLabel } from '../lib/scheduling';
 import { accountUpdateDelta } from '../lib/accountUpdate';
 import { Card } from '@/components/ui/card';
@@ -19,11 +20,20 @@ import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
-} from '@/components/ui/dialog';
+import { Badge, type BadgeVariants } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Toolbar } from '@/components/ui/toolbar';
+import { Segmented, type SegmentedOption } from '@/components/ui/segmented';
+import { RadioCardGroup } from '@/components/ui/radio-card';
+import { NoticeStrip } from '@/components/ui/notice-strip';
+import { IconTile } from '@/components/ui/icon-tile';
+import { EntityBlock } from '@/components/ui/entity-card';
+import { Empty } from '@/components/ui/empty';
+import { ModalDialog } from '@/components/ui/modal';
 import { useToast } from '../composables/useToast';
 import { OperationFeedback, ConfirmationDialog } from './ui/feedback';
+import '../accounts.css';
 
 const route = useRoute();
 const props = defineProps<{ workspaceAccountId?: number }>();
@@ -199,6 +209,25 @@ watch(accountQuery, () => { clearTimeout(searchTimer); searchTimer = setTimeout(
 function chooseAccountFilter(value: string): void { accountFilter.value = value; applyAccountFilter(); }
 /** 先更新平台，再使用当前状态与搜索条件查询。@param value 已选平台。@return 无。 */
 function choosePlatformFilter(value: string): void { platformFilter.value = value; applyAccountFilter(); }
+/** 移动端（≤760px）分段用短标签，搜索行默认收起。 */
+const compactToolbar = useMediaQuery('(max-width: 760px)');
+const statusFilterOptions = computed<SegmentedOption[]>(() => [
+  { value: 'all', label: compactToolbar.value ? '全部' : '全部账号', count: accountCounts.value?.total ?? '—' },
+  { value: 'active', label: '正常', count: accountCounts.value?.active ?? '—' },
+  { value: 'error', label: compactToolbar.value ? '关注' : '需要关注', count: accountCounts.value?.error ?? '—' },
+  { value: 'disabled', label: '已停用', count: accountCounts.value?.disabled ?? '—' },
+]);
+const toolbarRef = ref<InstanceType<typeof Toolbar> | null>(null);
+const searchOpen = ref(false);
+/** 有生效中的搜索词或平台筛选时保持搜索行展开，避免筛选条件被藏起来。 */
+const filtersActive = computed(() => accountQuery.value !== '' || platformFilter.value !== 'all');
+const searchRowOpen = computed(() => searchOpen.value || filtersActive.value);
+/** 应用栏搜索按钮：收起空搜索行，否则展开并聚焦搜索框。@return 无。 */
+function toggleSearch(): void {
+  if (searchRowOpen.value && !filtersActive.value) { searchOpen.value = false; return; }
+  searchOpen.value = true;
+  void nextTick(() => (toolbarRef.value?.$el as HTMLElement | undefined)?.querySelector<HTMLInputElement>('input[type=search]')?.focus());
+}
 
 /** 只读调度详情，保留已有账号卡片布局。 */
 const schedulingAccount = ref<Account | null>(null);
@@ -268,6 +297,13 @@ const detailAccountId = ref<number | null>(null);
 const showAccountDetails = ref(false);
 const workspaceTabs = [{value:'overview',label:'概览'},{value:'configuration',label:'配置'},{value:'scheduling',label:'调度'},{value:'diagnostics',label:'环境与诊断'}] as const;
 const workspaceTab = ref<'overview' | 'configuration' | 'scheduling' | 'diagnostics'>('overview');
+/** 反重力没有调度页签；有排队时调度页签显示排队数（设计稿「调度 4」）。 */
+const workspaceTabOptions = computed<SegmentedOption[]>(() => {
+  const account = detailAccount.value;
+  return workspaceTabs
+    .filter(item => account?.platform !== 'antigravity' || item.value !== 'scheduling')
+    .map(item => ({ ...item, count: item.value === 'scheduling' && (account?.queued_requests ?? 0) > 0 ? account?.queued_requests : undefined }));
+});
 const workspaceOpen = computed({
   get: () => showForm.value || showAccountDetails.value || showScheduling.value,
   set: (open: boolean) => { if (!open) { showForm.value = false; showAccountDetails.value = false; showScheduling.value = false; } },
@@ -295,6 +331,11 @@ watch(() => workspaceOpen.value && workspaceTab.value === 'diagnostics' ? detail
     if (!controller.signal.aborted) diagnosticLoading.value = false;
   }
 });
+/** 分段控件选中页签，只接受已知页签值。@param value 页签值。@return 无。 */
+function selectWorkspaceTab(value: string): void {
+  const tab = workspaceTabs.find(item => item.value === value);
+  if (tab) changeWorkspaceTab(tab.value);
+}
 /** 在同一工作区切换，保留当前账号尚未提交的表单。@param tab 页签。@return 无。 */
 function changeWorkspaceTab(tab: typeof workspaceTab.value): void {
   const account = detailAccount.value;
@@ -842,19 +883,41 @@ function isRateLimited(a: Account): boolean {
 }
 
 /**
- * 获取状态徽章样式
+ * 获取状态文案。
+ * @param a 账号对象
+ * @return 状态标签
  */
-function statusStyle(a: Account): { class: string; label: string } {
+function statusStyle(a: Account): { label: string } {
   if (a.status === 'active' && isRateLimited(a)) {
     // 短冷却(瞬时速率限制,秒级)与真正撞墙(5h/7d 限额)区分显示,避免误以为账号被长时间限流
-    if ((a.disable_reason || '').includes('短冷却')) {
-      return { class: 'bg-sky-50 text-sky-600 border-sky-200', label: '短冷却' };
-    }
-    return { class: 'bg-amber-50 text-amber-700 border-amber-200', label: '限流中' };
+    if ((a.disable_reason || '').includes('短冷却')) return { label: '短冷却' };
+    return { label: '限流中' };
   }
-  if (a.status === 'active') return { class: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: '活跃' };
-  if (a.status === 'error') return { class: 'bg-red-50 text-red-600 border-red-200', label: '异常' };
-  return { class: 'bg-gray-100 text-gray-500 border-gray-200', label: '停用' };
+  if (a.status === 'active') return { label: '活跃' };
+  if (a.status === 'error') return { label: '异常' };
+  return { label: '停用' };
+}
+
+/**
+ * 健康条语义色调：停用为中性；异常与认证错误为危险；限流、短冷却与调度观测错误为警示；其余为成功。
+ * @param a 账号对象
+ * @return NoticeStrip 色调
+ */
+function accountHealthTone(a: Account): 'success' | 'warning' | 'danger' | 'neutral' {
+  if (a.status === 'disabled') return 'neutral';
+  if (a.status === 'error' || a.auth_error) return 'danger';
+  if (isRateLimited(a) || a.v3_scheduling_error) return 'warning';
+  return 'success';
+}
+
+/**
+ * 概览页状态徽标与健康条同色。
+ * @param a 账号对象
+ * @return 徽标变体
+ */
+function healthBadgeVariant(a: Account): BadgeVariants['variant'] {
+  const tone = accountHealthTone(a);
+  return tone === 'neutral' ? 'secondary' : tone === 'danger' ? 'destructive' : tone;
 }
 
 /**
@@ -886,17 +949,17 @@ function rpmLabel(account: Account): string {
 }
 
 /**
- * 获取 RPM 文本颜色。
+ * 获取 RPM 文本色调类（is-warning / is-danger / is-muted，见 accounts.css）。
  * @param account 账号对象
  */
 function rpmClass(account: Account): string {
-  if (account.v3_scheduling) return account.v3_scheduling.capacity.reason === 'pacing' ? 'text-amber-600' : 'text-foreground';
-  if (!account.rpm_limit || account.rpm_limit <= 0) return 'text-muted-foreground';
-  if (account.rpm_saturated) return 'text-red-500';
+  if (account.v3_scheduling) return account.v3_scheduling.capacity.reason === 'pacing' ? 'is-warning' : '';
+  if (!account.rpm_limit || account.rpm_limit <= 0) return 'is-muted';
+  if (account.rpm_saturated) return 'is-danger';
   const current = account.rpm_current ?? 0;
   const ratio = current / account.rpm_limit;
-  if (ratio >= 0.8) return 'text-amber-600';
-  return 'text-foreground';
+  if (ratio >= 0.8) return 'is-warning';
+  return '';
 }
 
 /**
@@ -911,13 +974,13 @@ function upstreamSessionPoolLabel(account: Account): string {
 }
 
 /**
- * 获取上游 session 池文本颜色。
+ * 获取上游 session 池文本色调类。
  * @param account 账号对象
  */
 function upstreamSessionPoolClass(account: Account): string {
-  if (!account.upstream_session_pool_enabled || account.upstream_session_pool_size <= 0) return 'text-muted-foreground';
+  if (!account.upstream_session_pool_enabled || account.upstream_session_pool_size <= 0) return 'is-muted';
   const active = account.upstream_session_pool_active_count ?? 0;
-  return active >= account.upstream_session_pool_size ? 'text-amber-600' : 'text-emerald-600';
+  return active >= account.upstream_session_pool_size ? 'is-warning' : 'is-success';
 }
 
 /**
@@ -941,13 +1004,13 @@ function transientBackoffLabel(account: Account): string {
 }
 
 /**
- * 获取瞬时 429 软退避文本颜色。
+ * 获取瞬时 429 软退避文本色调类。
  * @param account 账号对象
  */
 function transientBackoffClass(account: Account): string {
   return ((account.transient_backoff_waiting ?? 0) > 0 || (account.transient_backoff_remaining_ms ?? 0) > 0)
-    ? 'text-amber-600'
-    : 'text-foreground';
+    ? 'is-warning'
+    : '';
 }
 
 /**
@@ -979,13 +1042,13 @@ function concurrencyLabel(account: Account): string {
 }
 
 /**
- * 获取账号卡片并发文本颜色。
+ * 获取账号卡片并发文本色调类（满载为 is-danger）。
  * @param account 账号对象
  */
 function concurrencyClass(account: Account): string {
   return (account.current_concurrency ?? 0) >= account.concurrency
-    ? 'text-red-500'
-    : 'text-foreground';
+    ? 'is-danger'
+    : '';
 }
 
 /**
@@ -1220,7 +1283,7 @@ async function copyText(text: string) {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="accounts-page">
     <template v-if="!workspaceAccountId">
     <!-- 标题栏 -->
     <PageHeader title="账号管理" description="状态、用量和调度集中展示，常用操作直接可达。">
@@ -1238,15 +1301,19 @@ async function copyText(text: string) {
       </template>
     </PageHeader>
 
-    <div class="account-toolbar">
+    <!-- 移动端应用栏的搜索按钮：桌面上应用栏隐藏，按钮随之不可见。 -->
+    <Teleport defer to="#console-toolbar-page-actions">
+      <button type="button" class="console-toolbar-action account-search-toggle" aria-label="搜索账号" aria-controls="account-toolbar" :aria-expanded="searchRowOpen" @click="toggleSearch"><Search /></button>
+    </Teleport>
+    <Toolbar id="account-toolbar" ref="toolbarRef" class="account-toolbar" :class="{ 'is-search-open': searchRowOpen }">
       <ChoiceSelect class="account-platform-filter" :model-value="platformFilter" label="平台筛选" :options="[{value:'all',label:'全部平台'},...platformOptions]" @update:model-value="choosePlatformFilter" />
-      <div class="account-filter-tabs" role="group" aria-label="账号状态筛选"><button v-for="item in [{value:'all', label:'全部账号', count:accountCounts?.total},{value:'active',label:'正常',count:accountCounts?.active},{value:'error',label:'需要关注',count:accountCounts?.error},{value:'disabled',label:'已停用',count:accountCounts?.disabled}]" :key="item.value" type="button" :class="{active:accountFilter===item.value}" :aria-pressed="accountFilter===item.value" @click="chooseAccountFilter(item.value)">{{ item.label }}<span>{{ item.count ?? '—' }}</span></button></div>
-      <SearchInput v-model="accountQuery" label="搜索账号" placeholder="搜索名称或邮箱" :maxlength="256" @search="applyAccountFilter" />
-    </div>
+      <Segmented class="account-filter-tabs" :model-value="accountFilter" :options="statusFilterOptions" label="账号状态筛选" @update:model-value="chooseAccountFilter" />
+      <template #end><SearchInput v-model="accountQuery" label="搜索账号" placeholder="搜索名称或邮箱" :maxlength="256" @search="applyAccountFilter" /></template>
+    </Toolbar>
 
-    <p v-if="accountLoadFailed" role="alert" class="text-xs text-amber-700">账号刷新失败，当前展示上次快照；负载与调度状态可能已陈旧。</p>
+    <NoticeStrip v-if="accountLoadFailed" tone="warning" role="alert"><AlertCircle />账号刷新失败，当前展示上次快照；负载与调度状态可能已陈旧。</NoticeStrip>
     <!-- 账号卡片列表 -->
-    <div class="resource-grid account-card-grid">
+    <div class="account-card-grid">
       <Card
         v-for="a in accounts"
         :key="a.id"
@@ -1255,366 +1322,271 @@ async function copyText(text: string) {
         <div class="account-card-body">
           <div class="account-card-topline">
             <div class="account-identity">
-              <span class="account-avatar">{{ (a.name || a.email || '?')[0]?.toUpperCase() }}<i class="account-avatar-state" :class="a.status" /></span>
+              <IconTile size="lg" :tone="a.platform === 'antigravity' ? 'agy' : 'primary'" class="account-avatar">{{ (a.name || a.email || '?')[0]?.toUpperCase() }}<i class="account-avatar-state" :class="a.status" /></IconTile>
               <button type="button" class="account-identity-text" @click="openAccountDetails(a)">
                 <div class="account-card-title">
                   <h3>{{ a.name || a.email }}</h3>
                   <span class="account-card-badges">
                     <PlatformBadge :platform="a.platform || 'claude_code'" />
-                    <span v-if="cardPlan(a)" class="account-plan">{{ cardPlan(a) }}</span>
+                    <Badge v-if="cardPlan(a)" class="account-plan">{{ cardPlan(a) }}</Badge>
                   </span>
                 </div>
                 <p>{{ a.email }}</p>
               </button>
             </div>
             <div class="account-work-controls">
-              <label class="account-admission"><span>接收请求</span><button type="button" role="switch" class="account-status-switch" :disabled="!a.work_control || workPending.has(a.id)" :aria-checked="a.work_control?.api_accepting === true" :aria-label="`${a.work_control?.api_accepting ? '关闭' : '开启'}接收请求 ${a.name || a.email}`" @click="toggleScheduling(a)"><span /></button></label>
-              <button type="button" class="account-work-toggle" :class="{ 'account-stop-action': overallEnabled(a) }" :disabled="!a.work_control || workPending.has(a.id)" @click="changeOverall(a, !overallEnabled(a))">{{ overallEnabled(a) ? '停用账号' : '启用账号' }}</button>
+              <label class="account-admission"><span>接收请求</span><Switch class="account-status-switch" :model-value="a.work_control?.api_accepting === true" :disabled="!a.work_control || workPending.has(a.id)" :label="`${a.work_control?.api_accepting ? '关闭' : '开启'}接收请求 ${a.name || a.email}`" @update:model-value="toggleScheduling(a)" /></label>
+              <Button size="sm" :variant="overallEnabled(a) ? 'destructive' : 'secondary'" class="account-work-toggle" :class="{ 'account-stop-action': overallEnabled(a) }" :disabled="!a.work_control || workPending.has(a.id)" @click="changeOverall(a, !overallEnabled(a))">{{ overallEnabled(a) ? '停用账号' : '启用账号' }}</Button>
             </div>
           </div>
           <div class="account-network">
-            <button type="button" @click="openEdit(a)"><Globe :size="13" /><span>{{ a.proxy_name || publicProxy(a.proxy_url) }}</span></button>
+            <button type="button" @click="openEdit(a)"><Globe :size="14" /><span>{{ a.proxy_name || publicProxy(a.proxy_url) }}</span></button>
             <ExecutionNodeBadge :node="accountNode(a)" :status="nodeStatus(a)" :attention="nodeAttention(a)" />
-            <router-link :to="{ name: 'environments', query: { gateway_account: String(a.id) } }"><Box :size="13" />运行环境</router-link>
+            <router-link :to="{ name: 'environments', query: { gateway_account: String(a.id) } }"><Box :size="14" />运行环境</router-link>
           </div>
           <div v-if="overallWorkNote(a)" class="account-work-status">
             <span>{{ overallWorkNote(a) }}</span>
-            <button v-if="overallStates.get(a.id)?.phase==='reconcile'" type="button" :disabled="workPending.has(a.id)" @click="changeOverall(a, false)">继续停用</button>
+            <Button v-if="overallStates.get(a.id)?.phase==='reconcile'" size="sm" variant="secondary" :disabled="workPending.has(a.id)" @click="changeOverall(a, false)">继续停用</Button>
           </div>
-          <p v-if="overallStates.get(a.id)?.message" class="text-xs text-muted-foreground" role="status">{{ overallStates.get(a.id)?.message }}</p>
-          <div class="account-health" :class="a.status === 'disabled' ? 'is-disabled' : (isRateLimited(a) || a.auth_error || a.v3_scheduling_error) ? 'is-warning' : ''">
-            <span class="account-health-message"><Check v-if="a.status !== 'disabled' && !isRateLimited(a) && !a.auth_error && !a.v3_scheduling_error" :size="13" /><i v-else /><span>{{ a.status === 'disabled' ? '已停用' : a.v3_scheduling ? schedulingReasonLabel(a.v3_scheduling.capacity.reason) : statusStyle(a).label }}<template v-if="a.v3_scheduling"> · {{ a.v3_scheduling.phases.running > 0 ? `正在处理 ${a.v3_scheduling.phases.running} 个请求` : '当前空闲' }}</template><template v-else-if="a.platform === 'antigravity' && a.status === 'active' && a.active_requests != null"> · {{ a.active_requests > 0 ? `在途 ${a.active_requests} 个请求` : '当前空闲' }}</template></span></span>
-            <button v-if="(a.queued_requests ?? 0)>0" class="account-queue-alert" @click="openAccountCapacity(a)">排队 {{ a.queued_requests }}</button>
-          </div>
-          <p v-if="a.auth_error" role="alert" class="rounded-lg bg-red-50 p-3 text-xs text-red-700 break-words">{{ a.auth_error }}</p>
-          <p v-if="a.v3_scheduling_error" class="text-xs text-amber-700">{{ a.v3_scheduling_error }}，调度观测待更新。</p>
-          <p v-if="a.credential_ownership" class="text-xs text-muted-foreground" role="status">{{ a.credential_ownership.phase === 'ready' ? (a.credential_ownership.owner === 'local' ? '本地管理凭据 · 网关已暂停' : '网关管理凭据') : (a.credential_ownership.phase === 'reauth' ? '重新授权中 · 上游活动暂停' : '凭据交接待确认 · 请在账号环境页对账') }}</p>
-          <div v-if="!a.platform || a.platform === 'claude_code' || a.platform === 'antigravity'" class="account-routing">
+          <p v-if="overallStates.get(a.id)?.message" class="account-note" role="status">{{ overallStates.get(a.id)?.message }}</p>
+          <NoticeStrip class="account-health" :tone="accountHealthTone(a)">
+            <Check v-if="accountHealthTone(a) === 'success'" /><AlertCircle v-else-if="accountHealthTone(a) !== 'neutral'" /><i v-else class="account-health-dot" />
+            <span class="account-health-message">{{ a.status === 'disabled' ? '已停用' : a.v3_scheduling ? schedulingReasonLabel(a.v3_scheduling.capacity.reason) : statusStyle(a).label }}<template v-if="a.v3_scheduling"> · {{ a.v3_scheduling.phases.running > 0 ? `正在处理 ${a.v3_scheduling.phases.running} 个请求` : '当前空闲' }}</template><template v-else-if="a.platform === 'antigravity' && a.status === 'active' && a.active_requests != null"> · {{ a.active_requests > 0 ? `在途 ${a.active_requests} 个请求` : '当前空闲' }}</template></span>
+            <template v-if="(a.queued_requests ?? 0)>0" #end><button type="button" class="account-queue-alert" @click="openAccountCapacity(a)">排队 {{ a.queued_requests }}</button></template>
+          </NoticeStrip>
+          <NoticeStrip v-if="a.auth_error" tone="danger" role="alert" class="account-strip-text">{{ a.auth_error }}</NoticeStrip>
+          <NoticeStrip v-if="a.v3_scheduling_error" tone="warning" class="account-strip-text">{{ a.v3_scheduling_error }}，调度观测待更新。</NoticeStrip>
+          <p v-if="a.credential_ownership" class="account-note" role="status">{{ a.credential_ownership.phase === 'ready' ? (a.credential_ownership.owner === 'local' ? '本地管理凭据 · 网关已暂停' : '网关管理凭据') : (a.credential_ownership.phase === 'reauth' ? '重新授权中 · 上游活动暂停' : '凭据交接待确认 · 请在账号环境页对账') }}</p>
+          <EntityBlock v-if="!a.platform || a.platform === 'claude_code' || a.platform === 'antigravity'" class="account-routing">
             <div><span>转发方式</span><strong><template v-if="a.platform === 'antigravity'">原生运行时 <small v-if="agyVersion(a)">Antigravity {{ agyVersion(a) }}</small></template><template v-else-if="a.request_backend === 'native293'">原生运行时 <small>280 / 293 自动匹配</small></template><template v-else>原有转发</template></strong></div>
             <button v-if="a.platform === 'antigravity'" type="button" @click="openAccountCapacity(a)">
-              <span>调度方式</span><strong>低负载优先<ArrowRight :size="13" /></strong>
+              <span>调度方式</span><strong>低负载优先<ArrowRight :size="14" /></strong>
               <small>{{ a.credential_state?.phase === 'ready' && a.usage_data?.capabilities?.models ? `${a.usage_data.capabilities.models.length} 个模型` : agyPhaseLabel(a) }}</small>
             </button>
             <button v-else type="button" @click="openScheduling(a)">
-              <span>调度优先级</span><strong>{{ a.priority }}<ArrowRight :size="13" /></strong>
-              <small class="account-score">{{ activeSchedulingScore(a) }}</small>
+              <span>调度优先级</span><strong>{{ a.priority }}<ArrowRight :size="14" /></strong>
+              <Badge :variant="a.v3_scheduling ? 'default' : 'secondary'" class="account-score">{{ activeSchedulingScore(a) }}</Badge>
             </button>
-          </div>
+          </EntityBlock>
 
           <AgyAccountUsage v-if="a.platform === 'antigravity'" :account="a" />
           <section v-if="a.platform !== 'antigravity'" class="account-usage-windows">
-            <header><span>用量</span><small>{{ a.usage_fetched_at ? new Date(a.usage_fetched_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' 更新' : '未刷新' }}</small><button type="button" @click="refreshUsage(a.id)" :disabled="refreshingUsage === a.id" aria-label="刷新用量"><RefreshCw :size="12" />刷新</button></header>
+            <header><span>用量</span><small>{{ a.usage_fetched_at ? new Date(a.usage_fetched_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) + ' 更新' : '未刷新' }}</small><button type="button" @click="refreshUsage(a.id)" :disabled="refreshingUsage === a.id" aria-label="刷新用量"><RefreshCw :size="14" />刷新</button></header>
             <p v-if="a.request_usage" class="usage-record-start">网关记录始于 {{ new Date(a.request_usage.recorded_since).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) }}</p>
             <div v-for="window in usageWindows" :key="window.key" class="account-usage-window">
               <UsageWindowStats v-if="window.key !== 'seven_day_fable'" :stats="a.request_usage?.[window.key]" :label="window.key === 'five_hour' ? '5h' : '7d'" />
               <div class="usage-window-label"><span>{{ window.label }}<template v-if="window.key !== 'seven_day_fable'"> · {{ a[window.key === 'five_hour' ? 'five_hour_usage_limit_percent' : 'seven_day_usage_limit_percent'] > 0 ? '上限 ' + a[window.key === 'five_hour' ? 'five_hour_usage_limit_percent' : 'seven_day_usage_limit_percent'] + '%' : '未限制' }}</template></span><strong>{{ window.key === 'five_hour' ? fiveHourLabel(a.usage_data, usagePercentLabel(usageWindow(a.usage_data, window.key))) : usagePercentLabel(usageWindow(a.usage_data, window.key)) }}</strong></div>
-              <div class="usage-window-bar"><i :class="usageBarColor(effectiveUtil(usageWindow(a.usage_data, window.key)))" :style="{ width: Math.min(effectiveUtil(usageWindow(a.usage_data, window.key)), 100) + '%' }" /></div>
+              <div class="usage-window-bar"><i :data-tone="usageBarTone(effectiveUtil(usageWindow(a.usage_data, window.key)))" :style="{ width: Math.min(effectiveUtil(usageWindow(a.usage_data, window.key)), 100) + '%' }" /></div>
               <div v-if="hasFutureReset(usageWindow(a.usage_data, window.key))" class="usage-window-reset"><span>{{ formatTimeLeft(usageWindow(a.usage_data, window.key)?.resets_at) }} 后重置</span><span>{{ new Date(usageWindow(a.usage_data, window.key)!.resets_at!).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) }}</span></div>
             </div>
           </section>
           <div v-if="!a.platform || a.platform === 'claude_code' || a.platform === 'antigravity'" class="account-live-metrics">
-            <button type="button" @click="openAccountCapacity(a)"><span>并发</span><strong :class="concurrencyClass(a)">{{ a.platform === 'antigravity' && a.current_concurrency == null ? '—' : formatConcurrencySlots(a.current_concurrency) }}<small>/ {{ formatConcurrencySlots(a.concurrency) }}</small></strong><i class="metric-track"><i :style="{width:Math.min(100,(a.current_concurrency??0)/Math.max(1,a.concurrency)*100)+'%'}" /></i></button>
-            <button type="button" @click="openAccountCapacity(a)"><span>RPM</span><strong :class="rpmClass(a)">{{ cardRpm(a) ?? '—' }}<small>/ {{ a.rpm_limit>0?a.rpm_limit:'∞' }}</small></strong><i class="metric-track"><i :style="{width:a.rpm_limit>0?Math.min(100,(cardRpm(a)??0)/a.rpm_limit*100)+'%':'0%'}" /></i></button>
-            <button type="button" @click="openAccountCapacity(a)"><span>排队 <ChevronRight :size="12" /></span><strong :class="(a.queued_requests ?? 0) > 0 ? 'text-amber-600' : ''">{{ a.queued_requests ?? (a.platform === 'antigravity' ? '—' : 0) }}</strong></button>
+            <button type="button" @click="openAccountCapacity(a)"><span>并发</span><strong :class="concurrencyClass(a)">{{ a.platform === 'antigravity' && a.current_concurrency == null ? '—' : formatConcurrencySlots(a.current_concurrency) }}<small>/{{ formatConcurrencySlots(a.concurrency) }}</small></strong><i class="metric-track" :class="concurrencyClass(a)"><i :style="{width:Math.min(100,(a.current_concurrency??0)/Math.max(1,a.concurrency)*100)+'%'}" /></i></button>
+            <button type="button" @click="openAccountCapacity(a)"><span>RPM</span><strong :class="rpmClass(a)">{{ cardRpm(a) ?? '—' }}<small>/{{ a.rpm_limit>0?a.rpm_limit:'∞' }}</small></strong><i class="metric-track" :class="rpmClass(a)"><i :style="{width:a.rpm_limit>0?Math.min(100,(cardRpm(a)??0)/a.rpm_limit*100)+'%':'0%'}" /></i></button>
+            <button type="button" @click="openAccountCapacity(a)"><span>排队<ChevronRight :size="14" /></span><strong :class="(a.queued_requests ?? 0) > 0 ? 'is-warning' : ''">{{ a.queued_requests ?? (a.platform === 'antigravity' ? '—' : 0) }}</strong></button>
             <button type="button" @click="openAccountCapacity(a)"><span>{{ a.platform === 'antigravity' ? '在途请求' : '活跃会话' }}</span><strong>{{ (a.platform === 'antigravity' ? a.active_requests : a.v3_scheduling?.active_sessions) ?? '—' }}</strong></button>
           </div>
 
-          <!-- 停用原因 -->
-          <div
+          <!-- 停用 / 限流原因 -->
+          <NoticeStrip
             v-if="a.disable_reason && (a.status === 'disabled' || (a.rate_limit_reset_at && new Date(a.rate_limit_reset_at) > new Date()))"
-            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border"
-            :class="a.status === 'disabled' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'"
+            :tone="a.status === 'disabled' ? 'danger' : 'warning'"
+            class="account-strip-text account-disable-reason"
           >
-            <span class="text-xs font-medium" :class="a.status === 'disabled' ? 'text-red-600' : 'text-amber-700'">
-              {{ a.disable_reason }}
-            </span>
-            <span v-if="a.rate_limit_reset_at && new Date(a.rate_limit_reset_at) > new Date()" class="text-xs text-amber-500">
-              · 剩余 {{ formatTimeLeft(a.rate_limit_reset_at) }}
-            </span>
-          </div>
-
-
+            {{ a.disable_reason }}
+            <template v-if="a.rate_limit_reset_at && new Date(a.rate_limit_reset_at) > new Date()" #end>剩余 {{ formatTimeLeft(a.rate_limit_reset_at) }}</template>
+          </NoticeStrip>
         </div>
         <footer class="account-card-actions">
-          <button type="button" @click="openEdit(a)"><Pencil :size="13" />编辑</button>
-          <button type="button" @click="refreshUsage(a.id)" :disabled="refreshingUsage === a.id"><RefreshCw :size="13" />{{ refreshingUsage === a.id ? '刷新中' : '用量' }}</button>
+          <button type="button" @click="openEdit(a)"><Pencil :size="14" />编辑</button>
+          <button type="button" @click="refreshUsage(a.id)" :disabled="refreshingUsage === a.id"><RefreshCw :size="14" />{{ refreshingUsage === a.id ? '刷新中' : '用量' }}</button>
           <OperationFeedback :status="testStates.get(a.id)?.status" :message="testStates.get(a.id)?.message" :identity="a.name" @action="test(a.id)" />
-          <button type="button" @click="openAccountDetails(a)"><ArrowRight :size="13" />详情</button>
-          <button type="button" @click="confirmDelete(a.id)" class="danger"><Trash2 :size="13" />删除</button>
+          <button type="button" @click="openAccountDetails(a)"><ArrowRight :size="14" />详情</button>
+          <button type="button" @click="confirmDelete(a.id)" class="danger"><Trash2 :size="14" />删除</button>
         </footer>
       </Card>
 
       <!-- 空状态 -->
-      <div
-        v-if="accounts.length === 0"
-        class="col-span-full flex flex-col items-center justify-center py-16 text-muted-foreground"
-      >
-        <div class="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mb-3">
-          <svg class="w-6 h-6 text-primary/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
-          </svg>
-        </div>
-        <p class="text-sm">暂无账号，点击"添加账号"开始</p>
-      </div>
+      <Empty v-if="accounts.length === 0" class="account-empty" title="暂无账号" description="点击“添加账号”开始"><template #icon><Users /></template></Empty>
     </div>
 
     <!-- 分页 -->
     <Pagination v-if="totalCount > 0" v-model:page-size="pageSize" class="account-pagination" :page="currentPage" :total="totalCount" :page-sizes="[12,24,48,96]" label="账号列表分页" unit="个账号" @update:page="goToPage" />
-
-
-
     </template>
-    <!-- 新建/编辑账号弹窗 -->
 
-
-
-    <Dialog v-model:open="workspaceOpen">
-      <DialogContent class="account-workspace translate-x-0 translate-y-0" :class="{'account-workspace-wide': workspaceTab === 'configuration' || workspaceTab === 'scheduling'}">
-        <DialogHeader><DialogTitle>{{ detailAccount?.name || detailAccount?.email || '添加账号' }}</DialogTitle><DialogDescription>{{ detailAccount?.email || '填写账号配置与认证信息' }}</DialogDescription></DialogHeader>
-        <nav v-if="detailAccount" class="account-workspace-tabs" aria-label="账号工作区"><button v-for="tab in workspaceTabs.filter(item => detailAccount?.platform !== 'antigravity' || item.value !== 'scheduling')" :key="tab.value" type="button" :class="{active:workspaceTab===tab.value}" :aria-pressed="workspaceTab===tab.value" @click="changeWorkspaceTab(tab.value)">{{ tab.label }}</button></nav>
-        <div v-if="detailAccount" v-show="workspaceTab === 'overview'" class="account-workspace-scroll">
-          <div class="account-overview-context"><div class="account-overview-status">
-            <PlatformBadge :platform="detailAccount.platform || 'claude_code'" />
-            <span>{{ statusStyle(detailAccount).label }}</span>
-            <span v-if="cardPlan(detailAccount)" class="account-plan">{{ cardPlan(detailAccount) }}</span>
-            <small v-if="detailAccount.platform !== 'antigravity'" class="account-score">{{ activeSchedulingScore(detailAccount) }}</small>
-          </div>
-          <ExecutionNodeBadge :node="accountNode(detailAccount)" :status="nodeStatus(detailAccount)" :attention="nodeAttention(detailAccount)" /></div>
-          <section v-if="detailAccount.platform !== 'antigravity'" class="account-usage-windows"><header><span>用量</span><small>{{ detailAccount.usage_fetched_at ? new Date(detailAccount.usage_fetched_at).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}) + ' 更新' : '未刷新' }}</small></header>
-            <div v-for="window in usageWindows" :key="window.key" class="account-usage-window"><UsageWindowStats v-if="window.key!=='seven_day_fable'" :stats="detailAccount.request_usage?.[window.key]" :label="window.key==='five_hour'?'5h':'7d'" /><div class="usage-window-label"><span>{{ window.label }}</span><strong>{{ usagePercentLabel(usageWindow(detailAccount.usage_data,window.key)) }}</strong></div><div class="usage-window-bar"><i :class="usageBarColor(effectiveUtil(usageWindow(detailAccount.usage_data,window.key)))" :style="{width:Math.min(100,effectiveUtil(usageWindow(detailAccount.usage_data,window.key)))+'%'}" /></div><p v-if="hasFutureReset(usageWindow(detailAccount.usage_data,window.key))" class="usage-window-reset">{{ formatTimeLeft(usageWindow(detailAccount.usage_data,window.key)?.resets_at) }} 后重置</p></div>
-          </section>
-          <template v-if="detailAccount.platform === 'antigravity'">
-            <AgyAccountUsage :account="detailAccount" expanded />
-            <section class="account-capabilities">
-              <header><h3>平台能力</h3><span :class="{'is-warning':detailAccount.credential_state?.phase !== 'ready'}">{{ agyPhaseLabel(detailAccount) }}</span></header>
-              <dl><div><dt>模型目录</dt><dd>{{ overviewCapabilities?.models ? `${overviewCapabilities.models.length} 个模型` : '未观测' }}</dd></div><div><dt>能力快照</dt><dd>{{ !overviewCapabilities ? '未观测' : Date.now() - overviewCapabilities.observed_at_ms > 300000 ? '待刷新' : '已更新' }}</dd></div><div class="capability-observed"><dt>观测时间</dt><dd>{{ overviewCapabilities?.observed_at_ms ? new Date(overviewCapabilities.observed_at_ms).toLocaleString('zh-CN') : '未提供' }}</dd></div></dl>
-              <details class="account-capability-details"><summary>可用模型<ChevronRight :size="14" /></summary><div class="account-model-list"><code v-for="model in overviewCapabilities?.models" :key="model">{{ model }}</code><p v-if="!overviewCapabilities?.models?.length">{{ overviewCapabilities?.models ? '目录为空' : '模型目录未观测' }}</p></div></details>
-              <details class="account-capability-details">
-                <summary>套餐与来源<ChevronRight :size="14" /></summary>
-                <dl class="account-provider-details">
-                  <div><dt>套餐</dt><dd>{{ overviewQuota?.plan || '未提供' }}</dd></div>
-                  <div><dt>账号分级</dt><dd>{{ overviewAgyTier || '未提供' }}</dd></div>
-                  <div><dt>来源</dt><dd>{{ overviewAgySource }}</dd></div>
-                </dl>
-              </details>
-              <div v-if="detailAccount.credential_state?.phase !== 'ready'" class="account-credential-actions"><Button v-if="detailAccount.credential_state?.phase === 'reauth'" variant="outline" @click="cancelAgyReauth(detailAccount)">结束原授权</Button><Button variant="outline" @click="recoverAgy(detailAccount.id)">核对凭据</Button></div>
-            </section>
-          </template>
-          <div class="account-overview-section-head"><h3>请求配置</h3><button v-if="detailAccount.platform !== 'antigravity'" type="button" @click="changeWorkspaceTab('scheduling')">调度详情<ArrowRight :size="13" /></button></div>
+    <!-- 账号工作区：概览、配置、调度、环境与诊断共用同一居中弹窗，只有内容区滚动。 -->
+    <ModalDialog v-model:open="workspaceOpen" class="account-workspace" :title="detailAccount?.name || detailAccount?.email || '添加账号'" :description="detailAccount?.email || '填写账号配置与认证信息'" :width="820">
+      <template v-if="detailAccount" #media><IconTile size="lg" :tone="detailAccount.platform === 'antigravity' ? 'agy' : 'primary'" class="account-avatar">{{ (detailAccount.name || detailAccount.email || '?')[0]?.toUpperCase() }}<i class="account-avatar-state" :class="detailAccount.status" /></IconTile></template>
+      <template v-if="detailAccount" #title-extra><span class="account-card-badges"><PlatformBadge :platform="detailAccount.platform || 'claude_code'" /><Badge v-if="cardPlan(detailAccount)" class="account-plan">{{ cardPlan(detailAccount) }}</Badge></span></template>
+      <template v-if="detailAccount" #nav><Segmented class="account-workspace-tabs" :model-value="workspaceTab" :options="workspaceTabOptions" label="账号工作区" @update:model-value="selectWorkspaceTab" /></template>
+      <div v-if="detailAccount" v-show="workspaceTab === 'overview'" class="account-workspace-scroll account-overview">
+        <div class="account-overview-context"><div class="account-overview-status">
+          <Badge :variant="healthBadgeVariant(detailAccount)" dot>{{ statusStyle(detailAccount).label }}</Badge>
+          <Badge v-if="detailAccount.platform !== 'antigravity'" :variant="detailAccount.v3_scheduling ? 'default' : 'secondary'" class="account-score">{{ activeSchedulingScore(detailAccount) }}</Badge>
+        </div>
+        <ExecutionNodeBadge :node="accountNode(detailAccount)" :status="nodeStatus(detailAccount)" :attention="nodeAttention(detailAccount)" /></div>
+        <section v-if="detailAccount.platform !== 'antigravity'" class="account-usage-windows"><header><span>用量</span><small>{{ detailAccount.usage_fetched_at ? new Date(detailAccount.usage_fetched_at).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}) + ' 更新' : '未刷新' }}</small></header>
+          <div v-for="window in usageWindows" :key="window.key" class="account-usage-window"><UsageWindowStats v-if="window.key!=='seven_day_fable'" :stats="detailAccount.request_usage?.[window.key]" :label="window.key==='five_hour'?'5h':'7d'" /><div class="usage-window-label"><span>{{ window.label }}</span><strong>{{ usagePercentLabel(usageWindow(detailAccount.usage_data,window.key)) }}</strong></div><div class="usage-window-bar"><i :data-tone="usageBarTone(effectiveUtil(usageWindow(detailAccount.usage_data,window.key)))" :style="{width:Math.min(100,effectiveUtil(usageWindow(detailAccount.usage_data,window.key)))+'%'}" /></div><p v-if="hasFutureReset(usageWindow(detailAccount.usage_data,window.key))" class="usage-window-reset">{{ formatTimeLeft(usageWindow(detailAccount.usage_data,window.key)?.resets_at) }} 后重置</p></div>
+        </section>
+        <template v-if="detailAccount.platform === 'antigravity'">
+          <AgyAccountUsage :account="detailAccount" expanded />
+          <EntityBlock class="account-capabilities">
+            <header><h3>平台能力</h3><Badge :variant="detailAccount.credential_state?.phase !== 'ready' ? 'warning' : 'success'" :class="{'is-warning':detailAccount.credential_state?.phase !== 'ready'}">{{ agyPhaseLabel(detailAccount) }}</Badge></header>
+            <dl><div><dt>模型目录</dt><dd>{{ overviewCapabilities?.models ? `${overviewCapabilities.models.length} 个模型` : '未观测' }}</dd></div><div><dt>能力快照</dt><dd>{{ !overviewCapabilities ? '未观测' : Date.now() - overviewCapabilities.observed_at_ms > 300000 ? '待刷新' : '已更新' }}</dd></div><div class="capability-observed"><dt>观测时间</dt><dd>{{ overviewCapabilities?.observed_at_ms ? new Date(overviewCapabilities.observed_at_ms).toLocaleString('zh-CN') : '未提供' }}</dd></div></dl>
+            <details class="account-capability-details"><summary>可用模型<ChevronRight :size="14" /></summary><div class="account-model-list"><code v-for="model in overviewCapabilities?.models" :key="model">{{ model }}</code><p v-if="!overviewCapabilities?.models?.length">{{ overviewCapabilities?.models ? '目录为空' : '模型目录未观测' }}</p></div></details>
+            <details class="account-capability-details">
+              <summary>套餐与来源<ChevronRight :size="14" /></summary>
+              <dl class="account-provider-details">
+                <div><dt>套餐</dt><dd>{{ overviewQuota?.plan || '未提供' }}</dd></div>
+                <div><dt>账号分级</dt><dd>{{ overviewAgyTier || '未提供' }}</dd></div>
+                <div><dt>来源</dt><dd>{{ overviewAgySource }}</dd></div>
+              </dl>
+            </details>
+            <div v-if="detailAccount.credential_state?.phase !== 'ready'" class="account-credential-actions"><Button v-if="detailAccount.credential_state?.phase === 'reauth'" size="sm" variant="outline" @click="cancelAgyReauth(detailAccount)">结束原授权</Button><Button size="sm" variant="outline" @click="recoverAgy(detailAccount.id)">核对凭据</Button></div>
+          </EntityBlock>
+        </template>
+        <div class="account-overview-section-head"><h3>请求配置</h3><button v-if="detailAccount.platform !== 'antigravity'" type="button" @click="changeWorkspaceTab('scheduling')">调度详情<ArrowRight :size="14" /></button></div>
+        <EntityBlock class="account-overview-block">
           <dl v-if="detailAccount.platform === 'antigravity'" class="account-overview-settings"><div><dt>并发</dt><dd>{{ detailAccount.current_concurrency ?? '—' }} / {{ detailAccount.concurrency }}</dd></div><div><dt>RPM</dt><dd>{{ cardRpm(detailAccount) ?? '—' }} / {{ detailAccount.rpm_limit || '不限' }}</dd></div><div><dt>调度方式</dt><dd>低负载优先</dd></div></dl>
           <dl v-else class="account-overview-settings"><div><dt>并发上限</dt><dd>{{ detailAccount.concurrency }}</dd></div><div><dt>RPM 上限</dt><dd>{{ detailAccount.rpm_limit || '不限' }}</dd></div><div><dt>调度优先级</dt><dd>{{ detailAccount.priority }}</dd></div></dl>
-          <div class="account-overview-actions">
-            <OperationFeedback label="测试连接" button-variant="outline" :status="testStates.get(detailAccount.id)?.status" :message="testStates.get(detailAccount.id)?.message" :identity="detailAccount.name || detailAccount.email" @action="test(detailAccount.id)" />
-            <Button type="button" variant="outline" @click="refreshUsage(detailAccount.id)" :disabled="refreshingUsage === detailAccount.id"><RefreshCw :size="14" />{{ refreshingUsage === detailAccount.id ? '刷新中' : '刷新用量' }}</Button>
-          </div>
-          <section class="account-overview-control"><header><h3>账号控制</h3><InfoTooltip label="账号控制说明"><template #trigger><span>控制说明</span></template><p>关闭接收请求后，已接纳的请求正常收尾。</p><p>停用账号会停止全部新工作，并等待已接纳的请求收尾。</p></InfoTooltip></header><div class="account-overview-control-row"><label class="account-admission"><span>接收请求</span><button type="button" role="switch" class="account-status-switch" :disabled="!detailAccount.work_control || workPending.has(detailAccount.id)" :aria-checked="detailAccount.work_control?.api_accepting === true" :aria-label="`${detailAccount.work_control?.api_accepting ? '关闭' : '开启'}接收请求 ${detailAccount.name || detailAccount.email}`" @click="toggleScheduling(detailAccount)"><span /></button></label><Button v-if="detailAccount.status !== 'active' || isRateLimited(detailAccount)" type="button" variant="outline" :disabled="workPending.has(detailAccount.id)" @click="restoreAvailability(detailAccount)">恢复资格</Button><Button type="button" variant="outline" :class="{'account-stop-action':overallEnabled(detailAccount)}" :disabled="!detailAccount.work_control || workPending.has(detailAccount.id)" @click="changeOverall(detailAccount, !overallEnabled(detailAccount))">{{ overallEnabled(detailAccount) ? '停用账号' : '启用账号' }}</Button></div><p v-if="overallWorkNote(detailAccount)" class="account-overview-note" role="status">{{ overallWorkNote(detailAccount) }}</p></section>
-          <p v-if="overallStates.get(detailAccount.id)?.message" class="account-overview-note" role="status">{{ overallStates.get(detailAccount.id)?.message }}</p>
+        </EntityBlock>
+        <div class="account-overview-actions">
+          <OperationFeedback label="测试连接" button-variant="outline" :status="testStates.get(detailAccount.id)?.status" :message="testStates.get(detailAccount.id)?.message" :identity="detailAccount.name || detailAccount.email" @action="test(detailAccount.id)" />
+          <Button type="button" variant="outline" @click="refreshUsage(detailAccount.id)" :disabled="refreshingUsage === detailAccount.id"><RefreshCw :size="14" />{{ refreshingUsage === detailAccount.id ? '刷新中' : '刷新用量' }}</Button>
         </div>
-        <form v-show="workspaceTab === 'configuration'" @submit.prevent="save" class="account-editor-form">
-          <div class="account-editor-scroll complete-account-form">
-            <section class="account-form-section"><h3>基础配置</h3><ChoiceSelect :model-value="form.platform" @update:model-value="selectAccountPlatform" label="账号平台" :disabled="!!editing || savingAccount" :options="platformOptions" /><div class="account-edit-grid"><label class="approved-field"><span>备注名（选填）</span><Input v-model="form.name"  /></label><label class="approved-field"><span>邮箱</span><Input v-model="form.email" type="email" :readonly="!!editing && isAgyForm" required /></label></div>
-              <fieldset v-if="!isAgyForm" class="forwarding-field"><legend>转发方式</legend><div class="forwarding-options"><label><input type="radio" v-model="form.request_backend" value="native293"><span><strong>原生运行时</strong><small>280 / 293 自动匹配</small></span></label><label><input type="radio" v-model="form.request_backend" value="legacy"><span><strong>原有转发</strong><small>现有转发通道</small></span></label></div><p class="form-help">请在账号空闲时切换转发方式。</p></fieldset>
-              <ProxyPicker v-model="proxyChoice" :current-label="editing?.proxy_name || publicProxy(form.proxy_url)" /></section>
-            <section v-if="!isAgyForm" class="account-form-section"><h3>用量与调度</h3><div class="account-edit-grid three"><NumberInput v-model="numberDrafts.concurrency" label="并发上限" :min="1" required /><NumberInput v-model="numberDrafts.rpm_limit" label="RPM 上限" :min="0" required /><NumberInput v-model="numberDrafts.priority" label="调度优先级" :min="1" required /></div><div class="account-edit-grid"><NumberInput v-model="numberDrafts.five_hour_usage_limit_percent" label="5 小时用量上限（%）" :min="0" :max="100" required /><NumberInput v-model="numberDrafts.seven_day_usage_limit_percent" label="7 天用量上限（%）" :min="0" :max="100" required /></div><p class="form-help">RPM 和用量上限填 0 表示不限。达到任一用量上限后停止分配新消息，窗口重置后恢复。未知用量保持可用，单次或并发请求可能越线。</p></section>
-            <section v-if="!isAgyForm" class="account-form-section"><h3>请求与模型</h3><div class="account-edit-grid"><ChoiceSelect v-model="form.billing_mode" label="Billing 模式" :options="[{value:'strip',label:'清除（Strip）'},{value:'rewrite',label:'重写（Rewrite）'}]" /><label class="approved-field"><span>允许 1M 上下文的模型</span><Input v-model="form.allow_1m_models"  /></label></div><div class="model-presets"><span>模型预设</span><button type="button" @click="form.allow_1m_models = 'opus'">仅 Opus</button><button type="button" @click="form.allow_1m_models = DEFAULT_ALLOW_1M_MODELS">Opus + Sonnet 5</button><button type="button" @click="form.allow_1m_models = ''">全部关闭</button></div><p class="form-help">模型以逗号分隔，按子串匹配。留空关闭 1M 上下文。Sonnet 5 使用完整名称以区分 Sonnet 4.6。</p>
-              <label class="account-check"><span><strong>允许客户端 Fast Mode</strong><small>允许后保留客户端申请，可能增加计费和限流风险。</small></span><input type="checkbox" v-model="form.allow_fast_mode"></label><label class="account-check"><span><strong>自动遥测</strong><small>由网关代替客户端发送遥测请求。</small></span><input type="checkbox" v-model="form.auto_telemetry"></label><div v-if="form.auth_type==='oauth'"><label class="account-check"><span><strong>自动轮询用量</strong><small>后台定时拉取 OAuth 账号的用量数据。</small></span><input type="checkbox" v-model="form.auto_poll_usage"></label></div></section>
-            <section v-if="!isAgyForm" class="account-form-section"><h3>上游 Session 池</h3><label class="account-check"><span><strong>启用 Session 池</strong><small>仅改写发往上游的会话；内部绑定、RPM 与本地缓存仍按真实会话隔离。</small></span><input type="checkbox" v-model="form.upstream_session_pool_enabled"></label><div class="account-edit-grid"><NumberInput v-model="numberDrafts.upstream_session_pool_size" label="池容量（0 表示关闭）" :min="0" :max="20" required /><NumberInput v-model="numberDrafts.upstream_session_ttl_minutes" label="活跃 TTL（分钟）" :min="5" :max="1440" required /></div><ChoiceSelect v-model="form.upstream_session_refresh_policy" label="TTL 刷新策略" :options="[{value:'mapped_request',label:'映射请求刷新'},{value:'owner_only',label:'仅属主刷新'}]" /></section>
-            <details v-if="!isAgyForm" class="account-auth-fields account-advanced account-form-section" :open="!editing"><summary>认证与高级配置</summary><p class="form-help">认证通常由任务或工程创建流程提供。凭证留空保持原值；切换认证方式需要填写对应凭证。</p><ChoiceSelect v-model="form.auth_type" label="认证方式" :options="[{value:'oauth',label:'OAuth'},{value:'setup_token',label:'Setup Token'}]" /><div v-if="form.auth_type==='setup_token'"><label class="approved-field"><span>Setup Token</span><Input v-model="form.setup_token" type="password" autocomplete="new-password" :required="!editing" :placeholder="editing ? '留空保持不变' : 'sk-ant-oat01-...'" /></label></div><div v-else><div class="account-edit-grid"><label class="approved-field"><span>Access Token（选填）</span><Input v-model="form.access_token" type="password" autocomplete="new-password" placeholder="留空保持不变" /></label><label class="approved-field"><span>Refresh Token</span><Input v-model="form.refresh_token" type="password" autocomplete="new-password" :required="!editing" placeholder="留空保持不变" /></label></div><label class="approved-field"><span>过期时间（毫秒时间戳）</span><Input v-model="form.expires_at" inputmode="numeric" placeholder="留空清除到期时间" /></label><p v-if="editing?.expires_at" class="form-help">当前过期时间：{{ formatExpiresAt(editing.expires_at) }}</p><p v-if="editing?.auth_error" class="form-help text-red-600">最近认证错误：{{ editing.auth_error }}</p></div><div class="account-edit-grid"><ChoiceSelect :model-value="form.subscription_type" @update:model-value="selectSubscription" label="订阅类型" :options="[{value:'',label:'未设置'},{value:'max',label:'Max'},{value:'ultra',label:'Ultra'},{value:'pro',label:'Pro'},{value:'team',label:'Team'},{value:'enterprise',label:'Enterprise'}]" /><label class="approved-field"><span>官方分级</span><Input v-model="form.rate_limit_tier"  /></label></div><div class="account-edit-grid"><label class="approved-field"><span>Account UUID</span><Input v-model="form.account_uuid"  /></label><label class="approved-field"><span>Organization UUID</span><Input v-model="form.organization_uuid"  /></label></div><p class="form-help">修改订阅类型时清除旧分级，可填写新类型的官方分级。</p><Button type="button" variant="outline" @click="openOAuthFlow()">重新授权</Button></details>
-            <section v-if="isAgyForm" class="account-form-section">
-              <h3>Antigravity 配置</h3><p class="form-help">账号能力来自最近的原生观测。模型服务等待运行环境接入。</p>
-              <label class="account-check"><span><strong>系统提示词同形体转换</strong><small>按当前账号保存，开启后转换系统提示词文本。</small></span><input v-model="form.agy_system_prompt_homoglyph_enabled" type="checkbox"></label>
-              <div class="account-edit-grid three"><NumberInput v-model="numberDrafts.concurrency" label="并发上限" :min="1" required /><NumberInput v-model="numberDrafts.rpm_limit" label="RPM 上限" :min="0" required /><NumberInput v-model="numberDrafts.priority" label="调度优先级" :min="1" required /></div>
-              <Button v-if="editing" type="button" variant="outline" @click="openOAuthFlow(editing)">重新授权</Button>
-              <Button v-if="editing?.credential_state && editing.credential_state.phase !== 'ready'" type="button" variant="outline" @click="recoverAgy(editing.id)">核对原凭据操作</Button>
-              <details class="account-advanced" :open="!editing"><summary>OAuth 凭据</summary><p class="form-help">新账号需要有效的原生 OAuth 凭据。编辑时留空保持当前值。</p><label class="approved-field"><span>Access Token</span><Input v-model="form.access_token" type="password" autocomplete="new-password" :required="!editing" /></label><label class="approved-field"><span>Refresh Token</span><Input v-model="form.refresh_token" type="password" autocomplete="new-password" :required="!editing" /></label><label class="approved-field"><span>过期时间（毫秒时间戳）</span><Input v-model="form.expires_at" inputmode="numeric" :required="!editing" /></label></details>
-            </section>
-          </div>
-          <DialogFooter class="account-save-footer"><span>修改后统一保存</span><Button type="button" variant="outline" @click="workspaceOpen = false">取消</Button><Button type="submit" :disabled="savingAccount">{{ savingAccount ? '保存中…' : '保存修改' }}</Button></DialogFooter>
-        </form>
-        <SchedulingDetails v-show="workspaceTab === 'scheduling'" embedded :open="workspaceOpen && workspaceTab === 'scheduling'" :account-id="detailAccount?.id ?? 0" :account-name="detailAccount?.name || detailAccount?.email || ''" />
-        <div v-show="workspaceTab === 'diagnostics'" class="account-workspace-scroll account-diagnostics">
-          <template v-if="detailAccount">
+        <section class="account-overview-control"><header><h3>账号控制</h3><InfoTooltip label="账号控制说明"><template #trigger><span>控制说明</span></template><p>关闭接收请求后，已接纳的请求正常收尾。</p><p>停用账号会停止全部新工作，并等待已接纳的请求收尾。</p></InfoTooltip></header><div class="account-overview-control-row"><label class="account-admission"><span>接收请求</span><Switch class="account-status-switch" :model-value="detailAccount.work_control?.api_accepting === true" :disabled="!detailAccount.work_control || workPending.has(detailAccount.id)" :label="`${detailAccount.work_control?.api_accepting ? '关闭' : '开启'}接收请求 ${detailAccount.name || detailAccount.email}`" @update:model-value="toggleScheduling(detailAccount)" /></label><Button v-if="detailAccount.status !== 'active' || isRateLimited(detailAccount)" type="button" size="sm" variant="outline" :disabled="workPending.has(detailAccount.id)" @click="restoreAvailability(detailAccount)">恢复资格</Button><Button type="button" size="sm" :variant="overallEnabled(detailAccount) ? 'destructive' : 'secondary'" :class="{'account-stop-action':overallEnabled(detailAccount)}" :disabled="!detailAccount.work_control || workPending.has(detailAccount.id)" @click="changeOverall(detailAccount, !overallEnabled(detailAccount))">{{ overallEnabled(detailAccount) ? '停用账号' : '启用账号' }}</Button></div><p v-if="overallWorkNote(detailAccount)" class="account-overview-note" role="status">{{ overallWorkNote(detailAccount) }}</p></section>
+        <p v-if="overallStates.get(detailAccount.id)?.message" class="account-overview-note" role="status">{{ overallStates.get(detailAccount.id)?.message }}</p>
+      </div>
+      <form id="account-editor-form" v-show="workspaceTab === 'configuration'" @submit.prevent="save" class="account-editor-form">
+        <div class="account-editor-scroll complete-account-form">
+          <section class="account-form-section"><h3>基础配置</h3><div class="account-edit-grid three"><ChoiceSelect :model-value="form.platform" @update:model-value="selectAccountPlatform" label="账号平台" :disabled="!!editing || savingAccount" :options="platformOptions" /><label class="approved-field"><span>备注名（选填）</span><Input v-model="form.name"  /></label><label class="approved-field"><span>邮箱</span><Input v-model="form.email" type="email" :readonly="!!editing && isAgyForm" required /></label></div>
+            <div v-if="!isAgyForm" class="forwarding-field"><span class="fui-label">转发方式</span><RadioCardGroup :model-value="form.request_backend" class="forwarding-options" name="request_backend" label="转发方式" :options="[{value:'native293',label:'原生运行时',description:'280 / 293 自动匹配'},{value:'legacy',label:'原有转发',description:'现有转发通道'}]" @update:model-value="value => form.request_backend = value === 'native293' ? 'native293' : 'legacy'" /><p class="form-help">请在账号空闲时切换转发方式。</p></div>
+            <ProxyPicker v-model="proxyChoice" :current-label="editing?.proxy_name || publicProxy(form.proxy_url)" /></section>
+          <section v-if="!isAgyForm" class="account-form-section"><h3>用量与调度</h3><div class="account-edit-grid three"><NumberInput v-model="numberDrafts.concurrency" label="并发上限" :min="1" required /><NumberInput v-model="numberDrafts.rpm_limit" label="RPM 上限" :min="0" required /><NumberInput v-model="numberDrafts.priority" label="调度优先级" :min="1" required /></div><div class="account-edit-grid"><NumberInput v-model="numberDrafts.five_hour_usage_limit_percent" label="5 小时用量上限（%）" :min="0" :max="100" required /><NumberInput v-model="numberDrafts.seven_day_usage_limit_percent" label="7 天用量上限（%）" :min="0" :max="100" required /></div><p class="form-help">RPM 和用量上限填 0 表示不限。达到任一用量上限后停止分配新消息，窗口重置后恢复。未知用量保持可用，单次或并发请求可能越线。</p></section>
+          <section v-if="!isAgyForm" class="account-form-section"><h3>请求与模型</h3><div class="account-edit-grid"><ChoiceSelect v-model="form.billing_mode" label="Billing 模式" :options="[{value:'strip',label:'清除（Strip）'},{value:'rewrite',label:'重写（Rewrite）'}]" /><label class="approved-field"><span>允许 1M 上下文的模型</span><Input v-model="form.allow_1m_models"  /></label></div><div class="model-presets"><span>模型预设</span><Button type="button" size="sm" variant="secondary" @click="form.allow_1m_models = 'opus'">仅 Opus</Button><Button type="button" size="sm" variant="secondary" @click="form.allow_1m_models = DEFAULT_ALLOW_1M_MODELS">Opus + Sonnet 5</Button><Button type="button" size="sm" variant="secondary" @click="form.allow_1m_models = ''">全部关闭</Button></div><p class="form-help">模型以逗号分隔，按子串匹配。留空关闭 1M 上下文。Sonnet 5 使用完整名称以区分 Sonnet 4.6。</p>
+            <Checkbox v-model="form.allow_fast_mode" class="account-check"><strong>允许客户端 Fast Mode</strong><small>允许后保留客户端申请，可能增加计费和限流风险。</small></Checkbox><Checkbox v-model="form.auto_telemetry" class="account-check"><strong>自动遥测</strong><small>由网关代替客户端发送遥测请求。</small></Checkbox><Checkbox v-if="form.auth_type==='oauth'" v-model="form.auto_poll_usage" class="account-check"><strong>自动轮询用量</strong><small>后台定时拉取 OAuth 账号的用量数据。</small></Checkbox></section>
+          <section v-if="!isAgyForm" class="account-form-section"><h3>上游 Session 池</h3><Checkbox v-model="form.upstream_session_pool_enabled" class="account-check"><strong>启用 Session 池</strong><small>仅改写发往上游的会话；内部绑定、RPM 与本地缓存仍按真实会话隔离。</small></Checkbox><div class="account-edit-grid three"><NumberInput v-model="numberDrafts.upstream_session_pool_size" label="池容量（0 表示关闭）" :min="0" :max="20" required /><NumberInput v-model="numberDrafts.upstream_session_ttl_minutes" label="活跃 TTL（分钟）" :min="5" :max="1440" required /><ChoiceSelect v-model="form.upstream_session_refresh_policy" label="TTL 刷新策略" :options="[{value:'mapped_request',label:'映射请求刷新'},{value:'owner_only',label:'仅属主刷新'}]" /></div></section>
+          <details v-if="!isAgyForm" class="account-auth-fields account-advanced account-form-section" :open="!editing"><summary>认证与高级配置<ChevronRight :size="14" /></summary><p class="form-help">认证通常由任务或工程创建流程提供。凭证留空保持原值；切换认证方式需要填写对应凭证。</p><div class="account-edit-grid"><ChoiceSelect v-model="form.auth_type" label="认证方式" :options="[{value:'oauth',label:'OAuth'},{value:'setup_token',label:'Setup Token'}]" /><label v-if="form.auth_type==='setup_token'" class="approved-field"><span>Setup Token</span><Input v-model="form.setup_token" type="password" autocomplete="new-password" :required="!editing" :placeholder="editing ? '留空保持不变' : 'sk-ant-oat01-...'" /></label></div><template v-if="form.auth_type!=='setup_token'"><div class="account-edit-grid"><label class="approved-field"><span>Access Token（选填）</span><Input v-model="form.access_token" type="password" autocomplete="new-password" placeholder="留空保持不变" /></label><label class="approved-field"><span>Refresh Token</span><Input v-model="form.refresh_token" type="password" autocomplete="new-password" :required="!editing" placeholder="留空保持不变" /></label></div><label class="approved-field"><span>过期时间（毫秒时间戳）</span><Input v-model="form.expires_at" inputmode="numeric" placeholder="留空清除到期时间" /></label><p v-if="editing?.expires_at" class="form-help">当前过期时间：{{ formatExpiresAt(editing.expires_at) }}</p><p v-if="editing?.auth_error" class="form-help is-danger">最近认证错误：{{ editing.auth_error }}</p></template><div class="account-edit-grid"><ChoiceSelect :model-value="form.subscription_type" @update:model-value="selectSubscription" label="订阅类型" :options="[{value:'',label:'未设置'},{value:'max',label:'Max'},{value:'ultra',label:'Ultra'},{value:'pro',label:'Pro'},{value:'team',label:'Team'},{value:'enterprise',label:'Enterprise'}]" /><label class="approved-field"><span>官方分级</span><Input v-model="form.rate_limit_tier"  /></label></div><div class="account-edit-grid"><label class="approved-field"><span>Account UUID</span><Input v-model="form.account_uuid"  /></label><label class="approved-field"><span>Organization UUID</span><Input v-model="form.organization_uuid"  /></label></div><p class="form-help">修改订阅类型时清除旧分级，可填写新类型的官方分级。</p><div class="account-form-actions"><Button type="button" size="sm" variant="outline" @click="openOAuthFlow()">重新授权</Button></div></details>
+          <section v-if="isAgyForm" class="account-form-section">
+            <h3>Antigravity 配置</h3><p class="form-help">账号能力来自最近的原生观测。模型服务等待运行环境接入。</p>
+            <Checkbox v-model="form.agy_system_prompt_homoglyph_enabled" class="account-check"><strong>系统提示词同形体转换</strong><small>按当前账号保存，开启后转换系统提示词文本。</small></Checkbox>
+            <div class="account-edit-grid three"><NumberInput v-model="numberDrafts.concurrency" label="并发上限" :min="1" required /><NumberInput v-model="numberDrafts.rpm_limit" label="RPM 上限" :min="0" required /><NumberInput v-model="numberDrafts.priority" label="调度优先级" :min="1" required /></div>
+            <div v-if="editing" class="account-form-actions">
+              <Button type="button" size="sm" variant="outline" @click="openOAuthFlow(editing)">重新授权</Button>
+              <Button v-if="editing.credential_state && editing.credential_state.phase !== 'ready'" type="button" size="sm" variant="outline" @click="recoverAgy(editing.id)">核对原凭据操作</Button>
+            </div>
+            <details class="account-advanced" :open="!editing"><summary>OAuth 凭据<ChevronRight :size="14" /></summary><p class="form-help">新账号需要有效的原生 OAuth 凭据。编辑时留空保持当前值。</p><div class="account-edit-grid"><label class="approved-field"><span>Access Token</span><Input v-model="form.access_token" type="password" autocomplete="new-password" :required="!editing" /></label><label class="approved-field"><span>Refresh Token</span><Input v-model="form.refresh_token" type="password" autocomplete="new-password" :required="!editing" /></label></div><label class="approved-field"><span>过期时间（毫秒时间戳）</span><Input v-model="form.expires_at" inputmode="numeric" :required="!editing" /></label></details>
+          </section>
+        </div>
+      </form>
+      <SchedulingDetails v-show="workspaceTab === 'scheduling'" embedded :open="workspaceOpen && workspaceTab === 'scheduling'" :account-id="detailAccount?.id ?? 0" :account-name="detailAccount?.name || detailAccount?.email || ''" />
+      <div v-show="workspaceTab === 'diagnostics'" class="account-workspace-scroll account-diagnostics">
+        <template v-if="detailAccount">
+          <EntityBlock class="account-diagnostic-block">
             <dl class="account-diagnostic-summary">
               <div><dt>账号运行环境</dt><dd>{{ diagnosticLoading ? '正在读取…' : diagnosticEnvironment ? (diagnosticEnvironmentStates[diagnosticEnvironment.state] || diagnosticEnvironment.state) : '未观测到关联环境' }}</dd></div>
               <div><dt>CLI 版本</dt><dd>{{ diagnosticEnvironment?.cli_versions?.join(' / ') || '未采集' }}</dd></div>
               <div><dt>请求内核</dt><dd>{{ diagnosticEnvironment?.native_kernel?.current?.release || '未采集' }}</dd></div>
               <div><dt>运行时段</dt><dd>{{ diagnosticEnvironment?.run_window?.message || '未提供' }}</dd></div>
             </dl>
-            <p v-if="diagnosticError" class="account-diagnostic-error" role="alert">环境摘要读取失败：{{ diagnosticError }}</p>
-            <div class="account-diagnostic-actions"><Button as-child variant="outline"><router-link :to="{name:'environments',query:{gateway_account:String(detailAccount.id)}}"><Box :size="15" />管理环境</router-link></Button><Button as-child variant="outline"><router-link :to="{name:'requests',query:{account:String(detailAccount.id)}}"><Activity :size="15" />请求诊断</router-link></Button><Button as-child variant="outline"><router-link :to="{name:'environments',query:{gateway_account:String(detailAccount.id),section:'schedule'}}"><Clock :size="15" />运行时段</router-link></Button></div>
-          </template>
-          <details class="account-diagnostic-technical"><summary>技术与调度详情</summary>
-        <div v-if="detailAccount" class="account-detail-scroll space-y-5">
-            <div class="grid grid-cols-5 gap-2">
-              <div class="text-center"><span class="block text-[length:var(--ui-font-small)] text-muted-foreground">智能评分</span><strong class="text-sm font-medium">{{ detailAccount.v3_scheduling ? (detailAccount.v3_scheduling.factors.score * 100).toFixed(1) : '待更新' }}</strong></div>
-              <InfoTooltip label="查看并发详情" title="并发与排队"><template #trigger><span class="block text-center"><span class="block text-[length:var(--ui-font-small)] text-muted-foreground">并发</span><strong class="text-sm font-medium" :class="concurrencyClass(detailAccount)">{{ concurrencyLabel(detailAccount) }}</strong></span></template><div class="account-score-explanation"><p>标准槽位 {{ formatConcurrencySlots(detailAccount.current_concurrency) }} / {{ formatConcurrencySlots(detailAccount.concurrency) }}</p><p>内部单位 {{ formatConcurrencyUnits(detailAccount.current_concurrency_units) }} / {{ formatConcurrencyUnits(detailAccount.max_concurrency_units) }}</p><p>活跃请求 {{ detailAccount.active_requests ?? 0 }} · 排队请求 {{ detailAccount.queued_requests ?? 0 }}</p><p>排队单位 {{ formatConcurrencyUnits(detailAccount.queued_request_units) }}</p><small>普通请求占用 1 并发，Haiku 占用 0.5 并发。</small></div></InfoTooltip>
-              <div class="text-center">
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider">排队</p>
-                <p class="text-sm font-medium" :class="(detailAccount.queued_requests ?? 0) > 0 ? 'text-amber-600' : 'text-foreground'">
-                  {{ detailAccount.queued_requests ?? 0 }}
-                </p>
-              </div>
-              <div class="text-center">
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider">429 等待</p>
-                <p class="text-sm font-medium" :class="transientBackoffClass(detailAccount)">
-                  {{ transientBackoffLabel(detailAccount) }}
-                </p>
-              </div>
-              <div class="text-center">
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider">{{ detailAccount.v3_scheduling ? '60秒提交 / RPM' : 'RPM' }}</p>
-                <p class="text-sm font-medium" :class="rpmClass(detailAccount)">
-                  {{ rpmLabel(detailAccount) }}
-                </p>
-              </div>
-            </div>
-            <div v-if="detailAccount.v3_scheduling" class="rounded-lg border border-border bg-muted p-3 space-y-2">
-              <div class="flex justify-between items-center gap-2 text-xs"><span class="font-medium text-foreground">智能调度</span><span :class="detailAccount.v3_scheduling.capacity.immediate ? 'text-emerald-700' : 'text-amber-700'">{{ schedulingReasonLabel(detailAccount.v3_scheduling.capacity.reason) }}</span></div>
-              <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>绑定 {{ detailAccount.v3_scheduling.bound_sessions }} 个会话</span><span>活跃 {{ detailAccount.v3_scheduling.active_sessions }} 个</span><span>执行 {{ detailAccount.v3_scheduling.phases.running }} 个请求</span></div>
-              <p class="text-[length:var(--ui-font-small)] text-muted-foreground">等槽 {{ detailAccount.v3_scheduling.phases.waiting_concurrency }} · 准备 {{ detailAccount.v3_scheduling.phases.preparing }} · 等发 {{ detailAccount.v3_scheduling.phases.waiting_send }} · 退避 {{ detailAccount.v3_scheduling.phases.backoff }}</p>
-              <div class="flex justify-between items-center"><span class="text-[length:var(--ui-font-small)] text-muted-foreground">{{ '智能偏好 ' + (detailAccount.v3_scheduling.factors.score * 100).toFixed(1) + '（高优）' }}</span><Button variant="outline" size="sm" class="text-xs h-7" @click="changeWorkspaceTab('scheduling')">调度详情</Button></div>
-            </div>
-            <div v-else-if="detailAccount.v3_scheduling_error" class="rounded-lg bg-amber-50 p-3 text-xs text-amber-700">{{ detailAccount.v3_scheduling_error }}，不代表零负载。<button class="underline ml-2" @click="changeWorkspaceTab('scheduling')">查看详情</button></div>
-            <p class="text-xs text-muted-foreground">转发方式：{{ detailAccount.request_backend === 'native293' ? '原生运行时（280 / 293 自动匹配）' : '原有转发' }}</p>
-            <div class="grid grid-cols-3 gap-3">
-              <div class="text-center">
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider">优先级</p>
-                <p class="text-sm font-medium text-foreground">{{ detailAccount.priority }}</p>
-              </div>
-              <div class="text-center">
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider">Billing</p>
-                <p class="text-sm font-medium" :class="detailAccount.billing_mode === 'rewrite' ? 'text-amber-600' : 'text-foreground'">
-                  {{ detailAccount.billing_mode === 'rewrite' ? '重写' : '清除' }}
-                </p>
-              </div>
-              <div class="text-center">
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider">上游池槽位</p>
-                <p class="text-sm font-medium" :class="upstreamSessionPoolClass(detailAccount)">
-                  {{ upstreamSessionPoolLabel(detailAccount) }}
-                </p>
-              </div>
-            </div>
-            <div class="account-detail-fields">
+          </EntityBlock>
+          <NoticeStrip v-if="diagnosticError" tone="danger" class="account-diagnostic-error account-strip-text" role="alert">环境摘要读取失败：{{ diagnosticError }}</NoticeStrip>
+          <div class="account-diagnostic-actions"><Button as-child variant="outline"><router-link :to="{name:'environments',query:{gateway_account:String(detailAccount.id)}}"><Box :size="15" />管理环境</router-link></Button><Button as-child variant="outline"><router-link :to="{name:'requests',query:{account:String(detailAccount.id)}}"><Activity :size="15" />请求诊断</router-link></Button><Button as-child variant="outline"><router-link :to="{name:'environments',query:{gateway_account:String(detailAccount.id),section:'schedule'}}"><Clock :size="15" />运行时段</router-link></Button></div>
+        </template>
+        <details class="account-diagnostic-technical"><summary>技术与调度详情<ChevronRight :size="14" /></summary>
+          <div v-if="detailAccount" class="account-detail-scroll">
+            <dl class="account-detail-metrics five">
+              <div><dt>智能评分</dt><dd>{{ detailAccount.v3_scheduling ? (detailAccount.v3_scheduling.factors.score * 100).toFixed(1) : '待更新' }}</dd></div>
+              <InfoTooltip label="查看并发详情" title="并发与排队"><template #trigger><span class="account-detail-metric"><span>并发</span><strong :class="concurrencyClass(detailAccount)">{{ concurrencyLabel(detailAccount) }}</strong></span></template><div class="account-score-explanation"><p>标准槽位 {{ formatConcurrencySlots(detailAccount.current_concurrency) }} / {{ formatConcurrencySlots(detailAccount.concurrency) }}</p><p>内部单位 {{ formatConcurrencyUnits(detailAccount.current_concurrency_units) }} / {{ formatConcurrencyUnits(detailAccount.max_concurrency_units) }}</p><p>活跃请求 {{ detailAccount.active_requests ?? 0 }} · 排队请求 {{ detailAccount.queued_requests ?? 0 }}</p><p>排队单位 {{ formatConcurrencyUnits(detailAccount.queued_request_units) }}</p><small>普通请求占用 1 并发，Haiku 占用 0.5 并发。</small></div></InfoTooltip>
+              <div><dt>排队</dt><dd :class="(detailAccount.queued_requests ?? 0) > 0 ? 'is-warning' : ''">{{ detailAccount.queued_requests ?? 0 }}</dd></div>
+              <div><dt>429 等待</dt><dd :class="transientBackoffClass(detailAccount)">{{ transientBackoffLabel(detailAccount) }}</dd></div>
+              <div><dt>{{ detailAccount.v3_scheduling ? '60秒提交 / RPM' : 'RPM' }}</dt><dd :class="rpmClass(detailAccount)">{{ rpmLabel(detailAccount) }}</dd></div>
+            </dl>
+            <EntityBlock v-if="detailAccount.v3_scheduling" class="account-detail-scheduling">
+              <div class="account-detail-row"><strong>智能调度</strong><span :class="detailAccount.v3_scheduling.capacity.immediate ? 'is-success' : 'is-warning'">{{ schedulingReasonLabel(detailAccount.v3_scheduling.capacity.reason) }}</span></div>
+              <p><span>绑定 {{ detailAccount.v3_scheduling.bound_sessions }} 个会话</span><span>活跃 {{ detailAccount.v3_scheduling.active_sessions }} 个</span><span>执行 {{ detailAccount.v3_scheduling.phases.running }} 个请求</span></p>
+              <p>等槽 {{ detailAccount.v3_scheduling.phases.waiting_concurrency }} · 准备 {{ detailAccount.v3_scheduling.phases.preparing }} · 等发 {{ detailAccount.v3_scheduling.phases.waiting_send }} · 退避 {{ detailAccount.v3_scheduling.phases.backoff }}</p>
+              <div class="account-detail-row"><span>{{ '智能偏好 ' + (detailAccount.v3_scheduling.factors.score * 100).toFixed(1) + '（高优）' }}</span><Button variant="outline" size="sm" @click="changeWorkspaceTab('scheduling')">调度详情</Button></div>
+            </EntityBlock>
+            <NoticeStrip v-else-if="detailAccount.v3_scheduling_error" tone="warning" class="account-strip-text">{{ detailAccount.v3_scheduling_error }}，不代表零负载。<template #end><button type="button" class="account-strip-link" @click="changeWorkspaceTab('scheduling')">查看详情</button></template></NoticeStrip>
+            <p class="account-note">转发方式：{{ detailAccount.request_backend === 'native293' ? '原生运行时（280 / 293 自动匹配）' : '原有转发' }}</p>
+            <dl class="account-detail-metrics three">
+              <div><dt>优先级</dt><dd>{{ detailAccount.priority }}</dd></div>
+              <div><dt>Billing</dt><dd :class="detailAccount.billing_mode === 'rewrite' ? 'is-warning' : ''">{{ detailAccount.billing_mode === 'rewrite' ? '重写' : '清除' }}</dd></div>
+              <div><dt>上游池槽位</dt><dd :class="upstreamSessionPoolClass(detailAccount)">{{ upstreamSessionPoolLabel(detailAccount) }}</dd></div>
+            </dl>
+            <dl class="account-detail-fields">
+              <div><dt>代理</dt><dd>{{ publicProxy(detailAccount.proxy_url) }}</dd></div>
+              <div><dt>认证方式</dt><dd>{{ authTypeLabel(detailAccount.auth_type) }}</dd></div>
               <div>
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">代理</p>
-                <p class="text-sm text-muted-foreground truncate">{{ publicProxy(detailAccount.proxy_url) }}</p>
+                <dt>自动遥测</dt>
+                <dd :class="detailAccount.auto_telemetry ? 'is-success' : ''">{{ detailAccount.auto_telemetry ? '已开启' : '关闭' }}<small v-if="detailAccount.telemetry_count > 0"> · 已发送 {{ detailAccount.telemetry_count }} 次</small></dd>
+                <dd v-if="detailAccount.telemetry_expires_at" class="is-warning">遥测中 · 停止于 {{ new Date(detailAccount.telemetry_expires_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }}</dd>
+              </div>
+              <div v-if="detailAccount.upstream_session_pool_enabled && detailAccount.upstream_session_pool_size > 0"><dt>上游 Session 池</dt><dd>TTL {{ detailAccount.upstream_session_ttl_minutes }} 分钟 · {{ upstreamSessionPolicyLabel(detailAccount.upstream_session_refresh_policy) }}</dd></div>
+              <div v-if="detailAccount.auth_type === 'oauth'"><dt>自动轮询用量</dt><dd :class="detailAccount.auto_poll_usage ? 'is-success' : ''">{{ detailAccount.auto_poll_usage ? '已开启' : '关闭' }}</dd></div>
+              <div><dt>{{ detailAccount.auth_type === 'oauth' ? 'Refresh Token' : 'Setup Token' }}</dt><dd class="is-mono">{{ authSecretPreview(detailAccount) }}</dd></div>
+              <div v-if="detailAccount.auth_type === 'oauth'"><dt>过期时间</dt><dd>{{ formatExpiresAt(detailAccount.expires_at) }}</dd></div>
+              <div v-if="detailAccount.auth_type === 'oauth' && detailAccount.auth_error"><dt>认证错误</dt><dd class="is-danger is-clamped">{{ detailAccount.auth_error }}</dd></div>
+              <div>
+                <dt>环境指纹</dt>
+                <dd>{{ detailAccount.canonical_env?.platform || '—' }} / {{ detailAccount.canonical_env?.arch || '—' }}</dd>
+                <dd>账号基础版本：v{{ detailAccount.canonical_env?.version || '—' }}</dd>
               </div>
               <div>
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">认证方式</p>
-                <p class="text-sm text-muted-foreground truncate">{{ authTypeLabel(detailAccount.auth_type) }}</p>
+                <dt>画像选择方式</dt>
+                <dd>{{ profileSelectionMode === 'client_version' ? '按客户端 UA 适配' : profileSelectionMode === 'account' ? '使用账号画像' : '未提供画像配置' }}</dd>
+                <dd v-if="profileSelectionMode === 'client_version' && defaultVersionProfile">默认回退：v{{ defaultVersionProfile }}（准入通过后）</dd>
               </div>
+              <div><dt>提示词环境</dt><dd>{{ detailAccount.canonical_prompt_env?.platform || '—' }} · {{ detailAccount.canonical_prompt_env?.shell || '—' }} · {{ detailAccount.canonical_prompt_env?.working_dir || '—' }}</dd></div>
               <div>
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">自动遥测</p>
-                <p class="text-sm" :class="detailAccount.auto_telemetry ? 'text-emerald-600' : 'text-muted-foreground'">
-                  {{ detailAccount.auto_telemetry ? '已开启' : '关闭' }}
-                  <span v-if="detailAccount.telemetry_count > 0" class="text-muted-foreground text-xs">· 已发送 {{ detailAccount.telemetry_count }} 次</span>
-                </p>
-                <p v-if="detailAccount.telemetry_expires_at" class="text-xs text-amber-500 mt-0.5">
-                  遥测中 · 停止于 {{ new Date(detailAccount.telemetry_expires_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }}
-                </p>
-              </div>
-              <div v-if="detailAccount.upstream_session_pool_enabled && detailAccount.upstream_session_pool_size > 0">
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">上游 Session 池</p>
-                <p class="text-sm text-muted-foreground truncate">
-                  TTL {{ detailAccount.upstream_session_ttl_minutes }} 分钟 · {{ upstreamSessionPolicyLabel(detailAccount.upstream_session_refresh_policy) }}
-                </p>
-              </div>
-              <div v-if="detailAccount.auth_type === 'oauth'">
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">自动轮询用量</p>
-                <p class="text-sm" :class="detailAccount.auto_poll_usage ? 'text-emerald-600' : 'text-muted-foreground'">
-                  {{ detailAccount.auto_poll_usage ? '已开启' : '关闭' }}
-                </p>
-              </div>
-              <div>
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">
-                  {{ detailAccount.auth_type === 'oauth' ? 'Refresh Token' : 'Setup Token' }}
-                </p>
-                <p class="font-mono text-[length:var(--ui-font-small)] text-muted-foreground truncate">{{ authSecretPreview(detailAccount) }}</p>
-              </div>
-              <div v-if="detailAccount.auth_type === 'oauth'">
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">过期时间</p>
-                <p class="text-sm text-muted-foreground truncate">{{ formatExpiresAt(detailAccount.expires_at) }}</p>
-              </div>
-              <div v-if="detailAccount.auth_type === 'oauth' && detailAccount.auth_error">
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">认证错误</p>
-                <p class="text-xs text-red-500 line-clamp-2">{{ detailAccount.auth_error }}</p>
-              </div>
-              <div>
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">环境指纹</p>
-                <p class="text-xs text-muted-foreground truncate">
-                  {{ detailAccount.canonical_env?.platform || '—' }} / {{ detailAccount.canonical_env?.arch || '—' }}
-                </p>
-                <p class="text-xs text-muted-foreground mt-0.5">账号基础版本：v{{ detailAccount.canonical_env?.version || '—' }}</p>
-              </div>
-              <div>
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">画像选择方式</p>
-                <p class="text-xs text-muted-foreground">
-                  {{ profileSelectionMode === 'client_version' ? '按客户端 UA 适配' : profileSelectionMode === 'account' ? '使用账号画像' : '未提供画像配置' }}
-                </p>
-                <p v-if="profileSelectionMode === 'client_version' && defaultVersionProfile" class="text-xs text-muted-foreground mt-0.5">
-                  默认回退：v{{ defaultVersionProfile }}（准入通过后）
-                </p>
-              </div>
-              <div>
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">提示词环境</p>
-                <p class="text-xs text-muted-foreground truncate">
-                  {{ detailAccount.canonical_prompt_env?.platform || '—' }} · {{ detailAccount.canonical_prompt_env?.shell || '—' }} · {{ detailAccount.canonical_prompt_env?.working_dir || '—' }}
-                </p>
-              </div>
-              <div>
-                <p class="text-[length:var(--ui-font-small)] text-muted-foreground uppercase tracking-wider mb-0.5">进程指纹</p>
+                <dt>进程指纹</dt>
                 <template v-if="detailAccount.canonical_process?.observation?.source === 'v3:procfs:cli'">
-                  <p class="text-xs text-muted-foreground">
-                    容器内存上限 {{ detailAccount.canonical_process.constrained_memory === 0 ? '不限' : formatBytes(detailAccount.canonical_process.constrained_memory, 2) }}
-                  </p>
-                  <p class="text-xs text-muted-foreground">
-                    CLI RSS {{ detailAccount.canonical_process.observation.sample_count ? formatBytes(detailAccount.canonical_process.observation.rss_bytes ?? undefined, 2) : '未采集' }}
-                  </p>
-                  <p v-if="detailAccount.canonical_process.observation.sampled_at" class="text-[length:var(--ui-font-small)] text-muted-foreground">
-                    官方 CLI 进程采样 · {{ new Date(detailAccount.canonical_process.observation.sampled_at * 1000).toLocaleString('zh-CN') }}
-                  </p>
+                  <dd>容器内存上限 {{ detailAccount.canonical_process.constrained_memory === 0 ? '不限' : formatBytes(detailAccount.canonical_process.constrained_memory, 2) }}</dd>
+                  <dd>CLI RSS {{ detailAccount.canonical_process.observation.sample_count ? formatBytes(detailAccount.canonical_process.observation.rss_bytes ?? undefined, 2) : '未采集' }}</dd>
+                  <dd v-if="detailAccount.canonical_process.observation.sampled_at">官方 CLI 进程采样 · {{ new Date(detailAccount.canonical_process.observation.sampled_at * 1000).toLocaleString('zh-CN') }}</dd>
                 </template>
-                <p v-else class="text-xs text-muted-foreground truncate">内存 {{ formatBytes(detailAccount.canonical_process?.constrained_memory) }} · RSS {{ formatBytes(detailAccount.canonical_process?.rss_range?.[0]) }}–{{ formatBytes(detailAccount.canonical_process?.rss_range?.[1]) }}</p>
+                <dd v-else>内存 {{ formatBytes(detailAccount.canonical_process?.constrained_memory) }} · RSS {{ formatBytes(detailAccount.canonical_process?.rss_range?.[0]) }}–{{ formatBytes(detailAccount.canonical_process?.rss_range?.[1]) }}</dd>
               </div>
-            </div>
+            </dl>
           </div>
-          </details>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </details>
+      </div>
+      <template v-if="workspaceTab === 'configuration'" #footer>
+        <span class="account-save-hint">修改后统一保存</span>
+        <Button type="button" variant="outline" class="account-save-cancel" @click="workspaceOpen = false">取消</Button>
+        <Button type="submit" form="account-editor-form" :disabled="savingAccount">{{ savingAccount ? '保存中…' : '保存修改' }}</Button>
+      </template>
+    </ModalDialog>
 
     <ConfirmationDialog :open="showDeleteConfirm" title="确认删除账号" message="此操作不可撤销，确认要删除此账号吗？" confirm-label="删除" danger :busy="deletingAccount" :error="deleteError" @confirm="executeDelete" @cancel="showDeleteConfirm=false" />
 
-    <!-- 授权登录沿用定稿的紧凑表单，真实会话与凭据交接保持原接口。 -->
-    <Dialog v-model:open="showOAuthFlow">
-      <DialogContent class="account-oauth-dialog approved-oauth-dialog">
-        <DialogHeader><DialogTitle>授权登录</DialogTitle><DialogDescription class="sr-only">通过浏览器授权接入账号</DialogDescription></DialogHeader>
-        <div class="approved-oauth-body">
-          <form v-if="oauthStep === 'generate'" @submit.prevent="generateOAuthUrl">
-            <p class="oauth-context">将账号接入工作空间</p>
-            <ChoiceSelect v-model="oauthPlatform" label="授权平台" :options="platformOptions" :disabled="oauthLoading || !!oauthTarget" @update:model-value="oauthMode = 'oauth'" /><ChoiceSelect v-if="oauthPlatform === 'claude_code'" :model-value="oauthMode" @update:model-value="value => { if (value === 'oauth' || value === 'setup_token') oauthMode = value; }" label="授权方式" :disabled="oauthLoading" :options="[{value:'oauth',label:'OAuth'},{value:'setup_token',label:'Setup Token'}]" />
-            <ProxyPicker v-model="oauthProxy" current-label="直连" :disabled="oauthLoading || !!oauthTarget" help="选择本次授权使用的代理，后续账号配置沿用此线路。" />
-            <p class="oauth-help">{{ oauthMode === 'oauth' ? '授权后支持账号信息与用量查询。' : 'Setup Token 仅用于推理，有效期 1 年。' }}</p>
-            <p v-if="oauthError" class="oauth-error" role="alert">{{ oauthError }}</p>
-            <footer class="oauth-actions"><Button type="submit" :disabled="oauthLoading">{{ oauthLoading ? '生成中…' : '生成授权链接' }}</Button></footer>
-          </form>
-          <form v-else-if="oauthStep === 'exchange'" @submit.prevent="exchangeOAuthCode">
-            <p class="oauth-context">完成浏览器授权后，填写返回的授权码</p>
-            <section class="oauth-link-panel"><a :href="oauthAuthUrl" target="_blank" rel="noopener noreferrer">点击打开授权页面 ↗</a><Button type="button" variant="outline" size="sm" @click="copyText(oauthAuthUrl)">复制链接</Button></section>
-            <details class="oauth-link-details"><summary>查看完整授权链接</summary><Textarea :model-value="oauthAuthUrl" readonly :rows="3" aria-label="完整授权链接" /></details>
-            <label class="approved-field"><span>授权码</span><Textarea v-model="oauthCode" :rows="3" autocomplete="off" spellcheck="false" :disabled="oauthLoading" placeholder="粘贴回调页面提供的授权码" /></label>
-            <p class="oauth-help">在新页面完成 {{ oauthPlatform === 'antigravity' ? 'Google' : 'Claude' }} 登录授权，再将回调页面的授权码粘贴到这里。</p>
-            <p v-if="oauthError" class="oauth-error" role="alert">{{ oauthError }}</p>
-            <footer class="oauth-actions"><Button type="button" variant="outline" :disabled="oauthLoading" @click="restartOAuthFlow">返回</Button><Button type="submit" :disabled="oauthLoading || !oauthCode.trim()">{{ oauthLoading ? '授权中…' : '完成授权' }}</Button></footer>
-          </form>
-          <section v-else-if="oauthResult" class="oauth-result">
-            <p class="oauth-success">授权成功</p><p class="oauth-context">{{ oauthResult.email_address || '账号信息已获取' }} · {{ oauthTarget ? '已保存到原账号' : '继续填写账号配置' }}</p>
-            <dl class="oauth-result-fields"><dt>授权方式</dt><dd>{{ oauthMode === 'oauth' ? 'OAuth' : 'Setup Token' }}</dd><dt>过期时间</dt><dd>{{ oauthResult.expires_at ? new Date(oauthResult.expires_at * 1000).toLocaleString('zh-CN') : '未提供' }}</dd></dl>
-            <details v-if="oauthPlatform === 'claude_code'" class="oauth-result-details"><summary>查看授权详情</summary><dl class="oauth-result-fields"><dt>Account UUID</dt><dd>{{ oauthResult.account_uuid || '未提供' }}</dd><dt>Organization UUID</dt><dd>{{ oauthResult.organization_uuid || '未提供' }}</dd><dt>Scope</dt><dd>{{ oauthResult.scope || '未提供' }}</dd><dt>Access Token</dt><dd>已获取 <Button type="button" variant="outline" size="sm" aria-label="复制 Access Token" @click="copyText(oauthResult.access_token)">复制</Button></dd><template v-if="oauthResult.refresh_token"><dt>Refresh Token</dt><dd>已获取 <Button type="button" variant="outline" size="sm" aria-label="复制 Refresh Token" @click="copyText(oauthResult.refresh_token)">复制</Button></dd></template></dl></details>
-            <footer class="oauth-actions"><Button type="button" variant="outline" @click="showOAuthFlow = false">关闭</Button><Button type="button" @click="applyOAuthResult">{{ oauthTarget ? '完成' : '填入账号配置' }}</Button></footer>
-          </section>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <!-- 授权登录：三步表单，真实会话与凭据交接保持原接口；底栏按钮经 form 属性提交当前步骤。 -->
+    <ModalDialog v-model:open="showOAuthFlow" class="account-oauth-dialog approved-oauth-dialog" title="授权登录" :description="oauthStep === 'generate' ? '将账号接入工作空间' : oauthStep === 'exchange' ? '完成浏览器授权后，填写返回的授权码' : '授权成功'" :width="440">
+      <form v-if="oauthStep === 'generate'" id="account-oauth-step" class="approved-oauth-body" @submit.prevent="generateOAuthUrl">
+        <ChoiceSelect v-model="oauthPlatform" label="授权平台" :options="platformOptions" :disabled="oauthLoading || !!oauthTarget" @update:model-value="oauthMode = 'oauth'" /><ChoiceSelect v-if="oauthPlatform === 'claude_code'" :model-value="oauthMode" @update:model-value="value => { if (value === 'oauth' || value === 'setup_token') oauthMode = value; }" label="授权方式" :disabled="oauthLoading" :options="[{value:'oauth',label:'OAuth'},{value:'setup_token',label:'Setup Token'}]" />
+        <ProxyPicker v-model="oauthProxy" current-label="直连" :disabled="oauthLoading || !!oauthTarget" help="选择本次授权使用的代理，后续账号配置沿用此线路。" />
+        <p class="oauth-help">{{ oauthMode === 'oauth' ? '授权后支持账号信息与用量查询。' : 'Setup Token 仅用于推理，有效期 1 年。' }}</p>
+        <NoticeStrip v-if="oauthError" tone="danger" class="oauth-error account-strip-text" role="alert">{{ oauthError }}</NoticeStrip>
+      </form>
+      <form v-else-if="oauthStep === 'exchange'" id="account-oauth-step" class="approved-oauth-body" @submit.prevent="exchangeOAuthCode">
+        <EntityBlock class="oauth-link-panel"><a :href="oauthAuthUrl" target="_blank" rel="noopener noreferrer">点击打开授权页面 ↗</a><Button type="button" variant="outline" size="sm" @click="copyText(oauthAuthUrl)">复制链接</Button></EntityBlock>
+        <details class="oauth-link-details"><summary>查看完整授权链接<ChevronRight :size="14" /></summary><Textarea :model-value="oauthAuthUrl" readonly :rows="3" aria-label="完整授权链接" /></details>
+        <label class="approved-field"><span>授权码</span><Textarea v-model="oauthCode" :rows="3" autocomplete="off" spellcheck="false" :disabled="oauthLoading" placeholder="粘贴回调页面提供的授权码" /></label>
+        <p class="oauth-help">在新页面完成 {{ oauthPlatform === 'antigravity' ? 'Google' : 'Claude' }} 登录授权，再将回调页面的授权码粘贴到这里。</p>
+        <NoticeStrip v-if="oauthError" tone="danger" class="oauth-error account-strip-text" role="alert">{{ oauthError }}</NoticeStrip>
+      </form>
+      <section v-else-if="oauthResult" class="approved-oauth-body oauth-result">
+        <NoticeStrip tone="success" class="oauth-success"><Check />授权成功 · {{ oauthResult.email_address || '账号信息已获取' }} · {{ oauthTarget ? '已保存到原账号' : '继续填写账号配置' }}</NoticeStrip>
+        <EntityBlock><dl class="oauth-result-fields"><dt>授权方式</dt><dd>{{ oauthMode === 'oauth' ? 'OAuth' : 'Setup Token' }}</dd><dt>过期时间</dt><dd>{{ oauthResult.expires_at ? new Date(oauthResult.expires_at * 1000).toLocaleString('zh-CN') : '未提供' }}</dd></dl></EntityBlock>
+        <details v-if="oauthPlatform === 'claude_code'" class="oauth-result-details"><summary>查看授权详情<ChevronRight :size="14" /></summary><dl class="oauth-result-fields"><dt>Account UUID</dt><dd>{{ oauthResult.account_uuid || '未提供' }}</dd><dt>Organization UUID</dt><dd>{{ oauthResult.organization_uuid || '未提供' }}</dd><dt>Scope</dt><dd>{{ oauthResult.scope || '未提供' }}</dd><dt>Access Token</dt><dd>已获取 <Button type="button" variant="outline" size="sm" aria-label="复制 Access Token" @click="copyText(oauthResult.access_token)">复制</Button></dd><template v-if="oauthResult.refresh_token"><dt>Refresh Token</dt><dd>已获取 <Button type="button" variant="outline" size="sm" aria-label="复制 Refresh Token" @click="copyText(oauthResult.refresh_token)">复制</Button></dd></template></dl></details>
+      </section>
+      <template #footer>
+        <template v-if="oauthStep === 'generate'"><Button type="submit" form="account-oauth-step" class="oauth-primary" :disabled="oauthLoading">{{ oauthLoading ? '生成中…' : '生成授权链接' }}</Button></template>
+        <template v-else-if="oauthStep === 'exchange'"><Button type="button" variant="outline" class="oauth-secondary" :disabled="oauthLoading" @click="restartOAuthFlow">返回</Button><Button type="submit" form="account-oauth-step" :disabled="oauthLoading || !oauthCode.trim()">{{ oauthLoading ? '授权中…' : '完成授权' }}</Button></template>
+        <template v-else-if="oauthResult"><Button type="button" variant="outline" class="oauth-secondary" @click="showOAuthFlow = false">关闭</Button><Button type="button" @click="applyOAuthResult">{{ oauthTarget ? '完成' : '填入账号配置' }}</Button></template>
+      </template>
+    </ModalDialog>
   </div>
 
 </template>

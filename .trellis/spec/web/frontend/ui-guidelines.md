@@ -28,7 +28,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 
 | 组件 | 输入与事件 | 说明 |
 | --- | --- | --- |
-| `Segmented` | `modelValue: string`，`options: readonly SegmentedOption[]`（`value/label/count?/icon?/disabled?`），`label`（无障碍名），`disabled?`；`update:modelValue(string)` | reka RadioGroup；托盘加白色滑块，可带计数 |
+| `Segmented` | `modelValue: string`，`options: readonly SegmentedOption[]`（`value/label/count?/icon?/disabled?`；`count` 为数字或「—」等占位文字），`label`（无障碍名），`disabled?`；`update:modelValue(string)` | reka RadioGroup；托盘加白色滑块，可带计数 |
 | `Switch` | `modelValue: boolean`，`label?`，`disabled?`，`id?`；`update:modelValue(boolean)` | 无关联可见文字时必须传 `label` |
 | `Checkbox` | `modelValue: boolean \| 'indeterminate'`，`disabled?`，`id?`；默认插槽为文字；`update:modelValue(boolean)` | |
 | `RadioCardGroup` | `modelValue?: string`，`options: readonly RadioCardOption[]`（`value/label/description?/disabled?`），`label`，`name?`，`disabled?` | 单选卡 |
@@ -47,7 +47,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 | `EntityCard` / `EntityBlock` / `EntityAction`（`entity-card`） | 卡片：`title`，`subtitle?`；`media`、`title-extra`、`subtitle`、`status`、默认、`actions` 插槽。操作：`tone?: 'default' \| 'primary' \| 'danger'`，`disabled?`，点击经属性透传 | 操作底栏按动作数等分，≤600px 按 96px 最小宽换行 |
 | `TableCard`（`table-card`） | `title`，`count?`；`toolbar`、默认（`Table`）、`footer`（分页）插槽 | 表格区横向滚动；最右列的 `TableHead` / `TableCell` 加 `fui-table-actions` 即固定在右侧，底色跟随行状态 |
 | `FloatingSaveBar`（`save-bar`） | `count: number`，`hint?`，`cleanLabel?`（默认「已同步」）；`actions` 插槽 | 吸底；`count > 0` 显示「N 项待保存」并 `data-dirty=true` |
-| `ModalDialog`（`modal`） | `title`，`description?`，`width?`（默认 820）；`v-model:open`；`media`、`title-extra`、默认、`footer` 插槽；其余属性透传到弹窗面板 | 头部与通栏浅灰底栏固定，只有内容区滚动；最大高 `min(840px, 100dvh − 32px)`。`style.css` 的全局 `[data-slot=dialog-content] { max-height; overflow-y: auto }` 未分层，`kit.css` 末尾用未分层的 `[data-slot=dialog-content].fui-modal` 覆盖，层内规则做不到 |
+| `ModalDialog`（`modal`） | `title`，`description?`，`width?`（默认 820）；`v-model:open`；`media`、`title-extra`、`nav`、默认、`footer` 插槽；其余属性透传到弹窗面板 | 头部、`nav` 页签带（`.fui-modal-nav`，内边距 0 / 24 / 18，放 `Segmented`）与通栏浅灰底栏固定，只有内容区（`.fui-modal-body`）滚动；`title-extra` 在 `DialogTitle` 内，窄屏整组换行（多个徽标请包一层）；最大高 `min(840px, 100dvh − 32px)`。`style.css` 的全局 `[data-slot=dialog-content] { max-height; overflow-y: auto }` 未分层，`kit.css` 末尾用未分层的 `[data-slot=dialog-content].fui-modal` 覆盖，层内规则做不到 |
 | `NoticeStrip`（`notice-strip`） | `tone?: 'success' \| 'warning' \| 'danger' \| 'info' \| 'neutral'`（默认 neutral）；默认插槽（图标 + 文字）、`end` 插槽（靠右徽标） | 设计稿 `.strip`：单行高 36px（9px 上下内边距 + 18px 行高），长文本换行增高。类名 `.fui-strip`——`.fui-notice` 已被通知浮层占用；原生模板可直接用该类 |
 
 既有组件只做增量扩展：`Button` 新增 variant `soft`、`destructive-ghost`（`outline`/`secondary` 为次要填充、`ghost` 为文字、`destructive` 为危险浅底）；`Badge` 新增 variant `success/warning/info/cc/agy` 与 `dot` prop。表格单元格内「主值下一行」的辅助值用 `fui-table-sub`，字段说明用 `fui-field-help`。
@@ -186,6 +186,7 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - **侧栏**：`position: fixed` 占满视口高；品牌行与底部管理员区不收缩，只有导航区 `overflow-y: auto`。品牌行只有标志方块是首页链接（名称与版本号同一行，不能嵌套链接）。标志沿用品牌合同（[frontend-guidelines.md](./frontend-guidelines.md)）的 `public/favicon.svg?v=flower2api-pink-04`，放在 `ink` 方块上，透明的花心与通道透出墨色；只有侧栏与登录品牌区的图片带 `alt="flower2api 标志"`，应用栏、抽屉等装饰位置为空 alt。版本号常态 `fill` 底、`text-2`；有新版本 `success-bg` / `success-text` 并带 `arrow-up-circle`；折叠后只显示图标。运行中徽标为 0 时用中性色（`data-idle=true`）。「系统设置」单独成组位于底部；「主题设置」入口随其页面加入同组。
 - **移动端抽屉**：继续用 `Dialog`（焦点圈定、Esc、路由切换关闭）。定位通过传入工具类覆盖 `DialogContent` 的居中定位，`console-shell.css` 末尾用未分层、更具体的 `[data-slot=dialog-content].mobile-navigation-panel` 铺满视口高——全局弹窗高度规则未分层，层内规则压不过它。不用 `!important`。
 - **应用栏标题**：取 `Dashboard.vue` 的标题表，与各页页头一致（账号为「账号管理」）；新增路由时同步补表。
+- **应用栏页面操作位**：`#console-toolbar-page-actions`（`display: contents`，位于 `.console-toolbar-actions` 内、菜单按钮之前，间距 6px）。页面用 `<Teleport defer to="#console-toolbar-page-actions">` 放 36px 图标按钮，类名 `.console-toolbar-action`（外观同菜单按钮，`aria-expanded=true` 时主色浅底）；外壳不感知业务。桌面应用栏隐藏，按钮随之不可见；嵌入模式（如 `workspace-account-id`）不放。目前只有账号页的「搜索账号」。
 - **登录页**：两列（深墨品牌区 + 表单），品牌区纹理为内联 SVG（第一版 canvas 几何），表单控件为组件库大号控件 44px。登录行为、错误文案、凭据存储（`localStorage['claude-code-gateway_auth']`，退出清除）不变。品牌区不显示版本号：版本接口需登录后访问。≤760px 隐藏品牌区，表单上方显示标志与名称。
 
 ### 系统更新弹窗
@@ -203,14 +204,14 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - 品牌旁保留版本与系统更新入口；折叠后可见，图标入口有可访问名称。移动端保留紧凑导航按钮，所有模块仍可达。
 - 侧栏按视口高度布局；预览条滚出后释放对应高度。长菜单在侧栏内部滚动，不在页面底部露出侧栏背景缺口。
 - 详情/编辑工作区固定标题和页签，仅正文滚动；复杂表单在桌面扩宽并分组。保留草稿、取消和保存语义；不以删除字段或隐藏功能入口换取简洁。
-- 同一账号的概览、配置、调度、环境与诊断使用同一工作区。页内导航保持上下文，二级弹窗主要用于独立确认。
+- 同一账号的概览、配置、调度、环境与诊断使用同一工作区：820px 居中 `ModalDialog`（面板类 `.account-workspace`），页签为 `nav` 插槽中的 `Segmented.account-workspace-tabs`（role=radio，「调度」有排队时带排队数）。有页签时面板固定高 `min(840px, 100dvh − 32px)`，切页签只换内容区、外框不动；新建账号无页签、按内容高。页内导航保持上下文，二级弹窗主要用于独立确认。
 - 转发方式与代理选择属于主要配置；认证字段放在高级配置。排队数量直接可见。
 - 账号状态栏使用单行弹性布局，长状态文字省略显示，排队按钮保持可见且不收缩。徽标显隐和数字变化保持状态栏行高、卡片尺寸及相邻卡片位置稳定，避免轮询刷新引发布局跳动。
 - 滚动条在滚动时显示，停止800ms后250ms淡出，轨道宽度稳定。采用减少动画偏好时缩短动画，高对比模式采用系统颜色。这一行为目前在静态稿中实现，正式迁移时沿用同样验收。
 
 ### 正式控制台与账号首批迁移
 
-- 账号卡片顶部并排展示平台徽标、“接收请求”开关与“停用账号／启用账号”按钮；开关只改变 API 准入，账号按钮沿整体工作控制。卡片及概览在正常启用时省略整体状态提示。收尾时显示「正在收尾」及尚未结束的已接纳请求数，已停用和待核对各自显示对应状态。
+- 账号卡片顶部展示平台徽标（名称旁），其下控制行右对齐展示“接收请求”开关与“停用账号／启用账号”按钮；开关只改变 API 准入，账号按钮沿整体工作控制。卡片及概览在正常启用时省略整体状态提示。收尾时显示「正在收尾」及尚未结束的已接纳请求数，已停用和待核对各自显示对应状态。
 - 反重力卡片展示平台额度及重置时间。网关请求数和 Token 在账号概览的「网关用量」展示。记录缺口随实际窗口标识，真实零保留为零。
 - `ExecutionNodeBadge` 统一为 `i-server` 图标加单行节点名称的 `/nodes` 链接。账号页并入代理与环境信息栏，环境卡片并入标题下的账号信息栏。节点 key、类型与观察说明放入提示框，异常图标保留提醒。历史请求沿自身 `execution_location` 展示；本机缺名称时显示“默认本机”，其它节点缺名称时使用原节点 key；缺节点时保留未观测或无执行尝试。
 - 反重力账号卡片和账号概览展示固定的本机 API 执行归属。名称读取 `/runtime/api/nodes` 中 `kind=local` 的节点。目录暂不可用时保留已取得的名称，首次读取失败时显示「默认本机」。Claude Code 账号继续按任务账号绑定及缓存观察展示。浏览器回归覆盖无任务账号绑定的反重力、本机名称、读取失败、详情和节点管理跳转。
@@ -223,7 +224,14 @@ import type { ChoiceOption } from '@/components/ui/controls';
 - 正式账号仍使用既有分页及每5秒读取。卡片显示三种额度窗口，7天Sonnet数据类型继续兼容；完整旧配置/画像/评分等信息位于详情。代理公共摘要仅含protocol/host，编辑及OAuth代理输入默认遮蔽认证信息。
 - 账号数字草稿由 `numberDrafts` 保存 `number|string`，`applyNumberDrafts()` 在提交边界检查非空整数再写入原数字字段；原范围校验与 `accountUpdateDelta` 继续生效。认证编辑默认收起，新建默认展开，全部旧字段保留。
 - `useActiveScrollbars()` 由应用根调用一次，通过捕获真实scroll标记容器，800ms后清理；卸载清理监听器及全部计时器。窗口标题/页脚固定，正文独立滚动。
-- 验证入口：`deploy/flower2api/verify_accounts_design.py`，覆盖真实Vue组件与合成管理接口的字段保存、取消、分页、OAuth、调度筛选、费用气泡、字体、侧栏和1440/720/390px布局；沿用管理/环境/导航回归。
+- **第二版账号页（`Accounts.vue` + `src/accounts.css`，`@layer components`，只取 token，由 `Accounts.vue` 引入）**：
+  - 卡片用 `Card.account-card` 加原子组件，不套 `EntityCard`（设计稿 `.acc` 与 `.ent` 内边距、名称字号、操作栏尺寸不同，且名称区是打开详情的按钮）。网格 `.account-card-grid`（不再带 `.resource-grid`，其未分层卡片规则会压过新样式）。
+  - 类名契约（脚本与业务依赖，只改样式）：`.account-card-grid > [data-slot=card]`、`.account-card-topline`（纵向含身份行与 `.account-work-controls`）、`.account-identity-text h3 / p`、`.account-status-switch`（`Switch`，`aria-checked` 取 `work_control.api_accepting`）、`.account-work-toggle`、`.account-network`、`.account-health`（`NoticeStrip`，固定 36px）、`.account-queue-alert`、`.account-routing`、`.account-live-metrics button`、`.account-card-actions`、`.account-workspace`、`.account-workspace-tabs`、`.account-form-section > h3`、`.forwarding-options [role=radio]`、`.account-diagnostic-summary / -actions / -technical`、`.approved-oauth-dialog`（440px）。
+  - 健康条色调 `accountHealthTone(account)`：`status=disabled`→neutral；`status=error` 或 `auth_error`→danger；限流 / 短冷却 / `v3_scheduling_error`→warning；其余 success。文案逻辑不变。`statusStyle()` 只返回 `label`。
+  - 进度条色调 `usageBarTone(pct)`（`lib/subscription.ts`）：≥80 danger，≥50 warning，否则 success；写作 `<i :data-tone>`，样式按 `data-tone` 取 token。数值文字色调函数（`rpmClass` 等）返回 `is-warning / is-danger / is-success / is-muted`。
+  - 共用子组件：`PlatformBadge` 为 `Badge`（cc / agy / secondary，保留 `data-platform-badge`）；`ExecutionNodeBadge` 的 scoped 样式在 `@layer components` 内，字号默认 `--ui-font-size-sm`，所在区域可覆盖；`ProxyPicker`（账号编辑、授权登录、任务选线与请求筛选弹层共用 `.proxy-picker-*`）样式在 `kit.css`，帮助文字在触发器下方。
+  - ≤760px：分段换短标签（全部 / 正常 / 关注 / 已停用，`useMediaQuery`）；平台筛选与搜索框组成的搜索行默认收起，由应用栏「搜索账号」展开并聚焦，搜索词非空或平台不是「全部平台」时保持展开。
+- 验证入口：`deploy/flower2api/verify_account_page_design.py` 对设计稿 `#accounts`、`#account-edit`、`#mobile` 逐项比对计算样式并覆盖首屏、健康条、工作区外框与移动端搜索行；`deploy/flower2api/verify_accounts_design.py`，覆盖真实Vue组件与合成管理接口的字段保存、取消、分页、OAuth、调度筛选、费用气泡、字体、侧栏和1440/720/390px布局；沿用管理/环境/导航回归。
 
 ### 预览状态与连续操作合同
 
@@ -298,6 +306,7 @@ npm --prefix apps/web run dev -- --host 127.0.0.1 --port 4187 --strictPort
 python3 deploy/flower2api/verify_ui_controls.py --url http://127.0.0.1:4187/ui-preview.html
 python3 deploy/flower2api/verify_ui_kit.py --url http://127.0.0.1:4187/ui-preview.html
 python3 deploy/flower2api/verify_ui_shell.py
+python3 deploy/flower2api/verify_account_page_design.py
 node --experimental-strip-types --test apps/web/tests/update-steps.test.mjs
 python3 deploy/flower2api/verify_update_design.py
 python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录>
@@ -306,6 +315,7 @@ python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录
 - `theme.test.mjs`：默认主题与 ui-foundation.css 双向一致、预设与边界色对比度、尺寸派生、种子校验与存储失败矩阵、组件样式不写死颜色与圆角。
 - `verify_ui_kit.py`：与 `doc/design/console-v2/mock.html` 逐项比对计算样式（结构等价项在脚本白名单中注明原因），组件各状态取值、预设与自定义主色、柔光材质、局部主题隔离、刷新保持、存储缺失/损坏/越界/抛错回退、减少动效，以及真实构建入口首屏即为保存的主题（需先 `npm --prefix apps/web run build`）。
 - `verify_ui_shell.py`（需先构建）：真实构建加合成夹具，1440 下侧栏、品牌行、版本号两态、导航、计数徽标、底部区、内容区与页头对 `mock.html#accounts` 逐项比对；8 个页面页头无分组名且样式一致；系统设置保存栏比对与「1 项待保存 / 配置已同步」；折叠保持、1440×560 导航内部滚动；390 应用栏比对、抽屉贴左铺满并在导航后关闭；登录页对 `v1/mock.html#login` 比对及空密码、错误密码、成功、显示密码四条路径；零控制台错误。
+- `verify_account_page_design.py`（需先构建）：`InteractionFixture` 的 13 个账号（第 4–6 号设为限流、认证错误、停用）。1440×900 对 `#accounts`、`#account-edit` 比对 79 项计算样式（白名单：设计稿 `.acc-name span` 误命中徽标的文字色与字号、99px 全圆）；三列、间距 16、首行三张卡片操作栏底边 ≤ 900；健康条四种色调与 36px；工作区 820 视口居中、滚动内容区时页签带不动、切换页签外框不变、新建无页签带；授权登录 440；390 对 `#mobile` 比对，搜索行展开、聚焦、有搜索词时不收起，其它页面无搜索按钮；零控制台错误；设计稿未画的画面截图存 `--output`。
 - `update-steps.test.mjs`：正向含迁移、维护中进行中与待执行、越过取消边界的切换合并、无快照部署、恢复路径、旧操作无 `steps`、未知阶段、截断记录。
 - `verify_update_design.py`、`verify_system_update_browser.py`（需先构建）：前者对设计稿 `#update`、`#update-progress` 比对 45 项计算样式并检查说明展开、转义与零写入；后者覆盖版本记录与嵌套确认 Esc、居中与矮视口、直接安装默认 60 秒 / 30 分钟 1800 秒 / 双击幂等、步骤与时间、断线重连、快照与迁移、数据恢复、完成与刷新、409、未接入、回退与取消等待、等待对账与恢复。
 - 迁移期改造旧原型对比脚本：组件库负责的属性在脚本内用 `component_keys`（采样名 → 属性集合）跳过，并注明已由 `verify_ui_kit.py` 覆盖；页面级属性继续与旧原型比对。写死的组件颜色改为在被测节点内插入探针元素读取 token 实际渲染值（`verify_shared_pagination.py::token`），不得把旧色值改成新色值再写死。业务断言不放宽。外壳尺寸（侧栏宽、内容区边距）推算出的页面宽度断言改为读取实际值（如卡片区铺满 `#console-content` 内容宽度、右边距等于其实际 `padding-right`），外壳本身由 `verify_ui_shell.py` 对照设计稿核对。
@@ -334,11 +344,11 @@ python3 deploy/flower2api/verify_system_update_browser.py --output <证据目录
 
 `AccountScopePicker`接收modelValue CSV、accounts、label与help，只更新表单草稿。历史已选ID不在当前资料时显示账号编号并保留移除能力。父页负责完整分页、取消和保存。
 
-`verify_exact_design.py`通过原型提取同数据进行CSS属性对照和三档截图。通过的采样只证明对应元素；完成声明还需覆盖全部页面、弹窗、操作状态以及布局边界。
+账号页已按第二版设计稿迁移，旧原型逐项对照脚本 `verify_exact_design.py` 已删除（账号采样由 `verify_account_page_design.py` 接管，根字号与三档无溢出由 `verify_console_ui.py`、`verify_accounts_design.py` 覆盖）。逐项比对通过只证明对应元素；完成声明还需覆盖全部页面、弹窗、操作状态以及布局边界。
 
 ### 定稿响应式及字体根合同
 
-应用与内容区铺满视口，账号卡片最小320px、间隔18px；760px及以下强制单列，1680px及以上四列。侧栏在1920px/2560px断点为264px/280px，折叠宽度仍76px。验证需包含列数切换附近1340/1680px与1920/2560/3440px，不能只验1440/390px。
+应用与内容区铺满视口，账号卡片最小320px、间隔16px（第二版设计稿 `.grid`）；760px及以下强制单列，1680px及以上四列。侧栏在1920px/2560px断点为264px/280px，折叠宽度仍76px。验证需包含列数切换附近1340/1680px与1920/2560/3440px，不能只验1440/390px。
 
 html根字号与原型共用`--ui-font-body`的14/15/16px三档规则，font-family为同一字体栈、font-synthesis:none。仅body字体相同不能保证rem控件一致。字体验收需核对浏览器实际平台字体，不能只看CSS声明。费用气泡专用class使用足够的选择器优先级，避免异步加载的通用控件样式覆盖。
 

@@ -40,7 +40,7 @@ async def main():
             await page.goto(BASE+'/requests');nav=page.get_by_role('navigation',name='请求记录分页');await expect(nav.get_by_role('button',name='第 55 页',exact=True)).to_be_visible();await nav.get_by_role('button',name='第 55 页',exact=True).click();await expect(nav.locator('[aria-current=page]')).to_have_text('55');await expect(nav.get_by_role('button',name='下一页',exact=True)).to_be_disabled()
             for width in [720,390]:
                 await page.set_viewport_size({'width':width,'height':1000});await nav.scroll_into_view_if_needed();assert await nav.evaluate('e=>e.getBoundingClientRect().right<=innerWidth && e.scrollWidth<=e.clientWidth');await nav.screenshot(path=str(ROOT/f'.deploy/frontend-sidebar-refresh/pagination/shared-{width}.png'))
-            await page.goto(BASE+'/?account=1');workspace=page.locator('.account-workspace');await workspace.locator('.account-workspace-tabs').get_by_role('button',name='调度',exact=True).click();await verify(page,'绑定会话分页');await page.keyboard.press('Escape')
+            await page.goto(BASE+'/?account=1');workspace=page.locator('.account-workspace');await workspace.locator('.account-workspace-tabs').get_by_role('radio',name='调度').click();await verify(page,'绑定会话分页');await page.keyboard.press('Escape')
             await page.goto(BASE+'/tasks?tab=projects');frame=page.locator('.task-runtime');await frame.locator('#projects-capture').click();await verify(frame,'抓包索引分页')
             await frame.get_by_role('button',name='关闭抓包详情',exact=True).click();await page.set_viewport_size({'width':1440,'height':1000})
             for kind,label in [('history','工程记录分页'),('events','交互记录分页')]:

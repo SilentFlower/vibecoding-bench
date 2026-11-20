@@ -70,10 +70,14 @@
   .console-toolbar { display: none; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); padding: calc(var(--ui-space-unit) * 3) calc(var(--ui-space-unit) * 4); background: var(--ui-color-surface); box-shadow: var(--ui-shadow-bar); }
   .console-toolbar-mark { display: grid; flex: none; place-items: center; width: 34px; height: 34px; border-radius: calc(var(--ui-radius-control) + 1px); background: var(--ui-color-ink); }
   .toolbar-page { min-width: 0; overflow: hidden; color: var(--ui-color-text); font-size: calc(var(--ui-font-size-card) + 1px); font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-  .mobile-sidebar-toggle { display: grid; flex: none; place-items: center; width: 36px; height: 36px; margin-left: auto; padding: 0; border: 0; border-radius: calc(var(--ui-radius-control) + 1px); background: var(--ui-color-fill); color: var(--ui-color-text-2); cursor: pointer; transition: background-color .15s; }
-  .mobile-sidebar-toggle svg { width: 18px; height: 18px; }
-  .mobile-sidebar-toggle:hover { background: var(--ui-color-fill-hover); }
-  .mobile-sidebar-toggle:focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
+  /* 应用栏右侧：页面经 Teleport 放入的操作在前，菜单按钮在后，间距 6px（设计稿 .m-top .r）。 */
+  .console-toolbar-actions { display: flex; flex: none; align-items: center; gap: calc(var(--ui-space-unit) * 1.5); margin-left: auto; }
+  .console-toolbar-page-actions { display: contents; }
+  :is(.mobile-sidebar-toggle, .console-toolbar-action) { display: grid; flex: none; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: calc(var(--ui-radius-control) + 1px); background: var(--ui-color-fill); color: var(--ui-color-text-2); cursor: pointer; transition: background-color .15s; }
+  :is(.mobile-sidebar-toggle, .console-toolbar-action) svg { width: 18px; height: 18px; }
+  :is(.mobile-sidebar-toggle, .console-toolbar-action):hover { background: var(--ui-color-fill-hover); }
+  :is(.mobile-sidebar-toggle, .console-toolbar-action):focus-visible { outline: 2px solid var(--ui-color-primary); outline-offset: 2px; }
+  .console-toolbar-action[aria-expanded=true] { background: var(--ui-color-primary-container); color: var(--ui-color-primary-text); }
   /* 抽屉沿用 Dialog（焦点圈定、Esc 关闭），定位由模板传入的工具类覆盖居中定位；这里只定外观。 */
   .mobile-navigation-panel { display: flex; flex-direction: column; gap: calc(var(--ui-space-unit) * 4); padding: calc(var(--ui-space-unit) * 5) calc(var(--ui-space-unit) * 3.5) calc(var(--ui-space-unit) * 3.5); border-radius: 0; background: var(--ui-color-surface); box-shadow: var(--ui-shadow-modal); }
   .mobile-navigation-panel .console-brand-name { margin: 0; padding: 0; font-size: calc(var(--ui-font-size-title) + 1px); font-weight: 780; line-height: 1.55; }
@@ -128,7 +132,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .brand-update, .navigation-item, .sidebar-tool, .mobile-sidebar-toggle { transition: none; }
+    .brand-update, .navigation-item, .sidebar-tool, .mobile-sidebar-toggle, .console-toolbar-action { transition: none; }
   }
 }
 

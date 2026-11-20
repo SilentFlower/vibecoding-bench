@@ -138,14 +138,15 @@ async def main():
         await page.keyboard.press('Escape')
         await card.get_by_role('button', name='编辑', exact=True).click()
         dialog = page.get_by_role('dialog')
-        await expect(dialog.locator('input[type=radio][value=native293]')).to_be_checked()
+        # 转发方式为单选卡（RadioCardGroup，role=radio），不再是原生单选框。
+        await expect(dialog.get_by_role('radio', name='原生运行时')).to_be_checked()
         await expect(dialog.locator('.account-auth-fields')).not_to_have_attribute('open', '')
         before_edit = len(fixture.writes)
         await dialog.get_by_role('spinbutton', name='并发上限', exact=True).fill('')
         await dialog.get_by_role('button', name='保存修改', exact=True).click()
         assert len(fixture.writes) == before_edit, fixture.writes[before_edit:]
         await dialog.get_by_role('spinbutton', name='并发上限', exact=True).fill('4')
-        await dialog.locator('input[type=radio][value=legacy]').check()
+        await dialog.get_by_role('radio', name='原有转发').click()
         await dialog.get_by_role('button', name='保存修改', exact=True).click()
         await expect(dialog).to_have_count(0)
         assert fixture.writes[-1]['body'] == {'concurrency': 4, 'request_backend': 'legacy'}, fixture.writes[-1]
@@ -154,7 +155,7 @@ async def main():
         await dialog.get_by_role('button', name='取消', exact=True).click()
         assert len(fixture.writes) == before_edit + 1
         await card.get_by_role('button', name='详情', exact=True).click()
-        await dialog.get_by_role('button',name='环境与诊断',exact=True).click()
+        await dialog.locator('.account-workspace-tabs').get_by_role('radio',name='环境与诊断',exact=True).click()
         await expect(dialog).to_contain_text('画像选择方式')
         await expect(dialog).to_contain_text('上游池槽位')
         await expect(dialog).not_to_contain_text('demo-secret')
@@ -215,7 +216,8 @@ async def main():
             assert await dialog.evaluate('e=>e.scrollWidth<=e.clientWidth+1'), width
             await expect(dialog).to_have_css('opacity', '1')
             await page.screenshot(path=str(out / f'account-editor-{width}.png'))
-            scroll = dialog.locator('.account-editor-scroll')
+            # 账号工作区为居中弹窗，内容区（.fui-modal-body）是唯一滚动容器。
+            scroll = dialog.locator('.fui-modal-body')
             await scroll.evaluate('e=>e.scrollTop=500')
             await expect(scroll).to_have_attribute('data-active-scroll', '')
             await expect(scroll).not_to_have_attribute('data-active-scroll', '', timeout=2000)

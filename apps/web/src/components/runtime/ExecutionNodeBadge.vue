@@ -35,10 +35,13 @@ const name = computed(() => props.node?.node_name || (props.node?.node_key === '
 </template>
 
 <style scoped>
-.execution-node{display:inline-flex;align-items:center;gap:5px;min-width:0;max-width:100%;color:inherit;font-size:var(--ui-font-small,12px);line-height:1.5;text-decoration:none;}
-.execution-node svg{flex-shrink:0;}
-.execution-node>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.execution-node:hover{color:var(--ui-accent,#856b9e);}
-.execution-node:focus-visible{outline:2px solid var(--ui-focus,#ad9bc4);outline-offset:3px;border-radius:3px;}
-.execution-node-attention svg{color:var(--ui-danger,#b45b67);}
+/* 进组件层，页面可按所在区域调整字号（如账号卡链接行）。 */
+@layer components {
+  .execution-node{display:inline-flex;align-items:center;gap:5px;min-width:0;max-width:100%;color:inherit;font-size:var(--ui-font-size-sm);line-height:1.5;text-decoration:none;}
+  .execution-node svg{flex-shrink:0;}
+  .execution-node>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .execution-node:hover{color:var(--ui-color-primary-text);}
+  .execution-node:focus-visible{outline:2px solid var(--ui-color-primary);outline-offset:3px;border-radius:calc(var(--ui-radius-control) - 5px);}
+  .execution-node-attention svg{color:var(--ui-color-danger);}
+}
 </style>

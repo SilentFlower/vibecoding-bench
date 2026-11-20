@@ -36,6 +36,11 @@ const page = ref(1);
 const pageSize = ref(20);
 const pending = ref(1);
 const modalOpen = ref(false);
+const modalTab = ref('configuration');
+const modalTabs: SegmentedOption[] = [
+  { value: 'overview', label: '概览' }, { value: 'configuration', label: '配置' },
+  { value: 'scheduling', label: '调度', count: 4 }, { value: 'diagnostics', label: '环境与诊断' },
+];
 </script>
 
 <template>
@@ -109,6 +114,7 @@ const modalOpen = ref(false);
       <ModalDialog v-model:open="modalOpen" title="正式账号 1" description="design1@example.test" :width="820" data-testid="modal">
         <template #media><IconTile size="lg">正</IconTile></template>
         <template #title-extra><Badge variant="cc">Claude Code</Badge><Badge>Max</Badge></template>
+        <template #nav><Segmented v-model="modalTab" :options="modalTabs" label="账号工作区" data-testid="modal-nav" /></template>
         <div class="composite-modal-section"><b>转发方式</b><p>原生运行时按账号绑定的内核版本转发，修改后在空闲时生效。</p></div>
         <div class="composite-modal-section"><b>调度优先级</b><p>数值越大越优先，0–100。</p></div>
         <template #footer>

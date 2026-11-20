@@ -134,6 +134,9 @@ watch(updatesOpen, value => {
       <header class="console-toolbar">
         <span class="console-toolbar-mark" aria-hidden="true"><img src="/favicon.svg?v=flower2api-pink-04" alt="" width="20" height="20" /></span>
         <span class="toolbar-page">{{ pageTitle }}</span>
+        <!-- 页面级操作（如账号页搜索）由页面经 Teleport 放入，外壳不感知业务。 -->
+        <div class="console-toolbar-actions">
+        <div id="console-toolbar-page-actions" class="console-toolbar-page-actions" />
         <Dialog v-model:open="mobileOpen">
           <DialogTrigger as-child><button type="button" class="mobile-sidebar-toggle" aria-label="打开主导航"><Menu /></button></DialogTrigger>
           <!-- 抽屉：工具类覆盖 DialogContent 的居中定位与尺寸（cn 合并会去掉冲突类），外观见 console-shell.css。 -->
@@ -153,6 +156,7 @@ watch(updatesOpen, value => {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </header>
       <!-- 嵌入工作区沿用自己的滚动容器；折叠侧栏只改变宽度，保留文档身份。 -->
       <main id="console-content" class="console-content">

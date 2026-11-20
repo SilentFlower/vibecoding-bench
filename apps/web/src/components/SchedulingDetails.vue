@@ -5,6 +5,9 @@ import { schedulingReasonLabel } from '../lib/scheduling';
 import { Button } from '@/components/ui/button';
 import { ChoiceSelect, SearchInput, Pagination } from '@/components/ui/controls';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { NoticeStrip } from '@/components/ui/notice-strip';
+import { EntityBlock } from '@/components/ui/entity-card';
+import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 const props = defineProps<{ open: boolean; accountId: number; accountName: string; embedded?: boolean }>();
 const emit = defineEmits<{ 'update:open': [value: boolean] }>();
@@ -164,64 +167,65 @@ onUnmounted(() => { stop(); document.removeEventListener('visibilitychange', syn
         <DialogTitle>{{ accountName }} · 调度详情</DialogTitle>
         <DialogDescription>只读查看 API 网关绑定与真实提交，每 5 秒刷新。会话数、请求数和上游池槽位分别统计。</DialogDescription>
       </DialogHeader>
-      <div class="scheduling-scroll space-y-5">
-      <p v-if="error" role="alert" class="text-sm text-amber-700 bg-amber-50 rounded-lg p-3">{{ error }}<span v-if="detail"> · 保留上次快照，数据已陈旧</span></p>
-      <p v-if="!detail && loading" class="text-sm text-muted-foreground">正在读取调度快照…</p>
+      <div class="scheduling-scroll">
+      <NoticeStrip v-if="error" tone="warning" role="alert" class="scheduling-error">{{ error }}<span v-if="detail"> · 保留上次快照，数据已陈旧</span></NoticeStrip>
+      <p v-if="!detail && loading" class="scheduling-note">正在读取调度快照…</p>
       <template v-if="detail && summary">
-        <div class="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
+        <div class="scheduling-meta">
           <span>智能排序 · {{ schedulingReasonLabel(summary.capacity.reason) }} · 常规请求容量快照</span>
           <span>{{ stale ? '快照已陈旧' : '观测于 ' + timeLabel(summary.observed_at_ms) }}</span>
         </div>
-        <div class="scheduling-metrics grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div class="rounded-xl border border-border p-3"><p class="text-xs text-muted-foreground">已绑定／活跃会话</p><p class="text-xl mt-1">{{ summary.bound_sessions }} / {{ summary.active_sessions }}</p></div>
-          <div class="rounded-xl border border-border p-3"><p class="text-xs text-muted-foreground">正在执行的请求</p><p class="text-xl mt-1">{{ summary.phases.running }}</p></div>
-          <div class="rounded-xl border border-border p-3"><p class="text-xs text-muted-foreground">最近 60 秒提交</p><p class="text-xl mt-1">{{ summary.submissions_last_60s }}</p><p v-if="summary.observed_at_ms - summary.history_available_from_ms < 60000" class="text-[length:var(--ui-font-small)] text-amber-700">采集不足 60 秒</p></div>
-          <div class="rounded-xl border border-border p-3"><p class="text-xs text-muted-foreground">按上次快照最早可发</p><p class="text-sm mt-2">{{ nextLabel }}</p></div>
+        <div class="scheduling-metrics">
+          <EntityBlock><p>已绑定／活跃会话</p><strong>{{ summary.bound_sessions }} / {{ summary.active_sessions }}</strong></EntityBlock>
+          <EntityBlock><p>正在执行的请求</p><strong>{{ summary.phases.running }}</strong></EntityBlock>
+          <EntityBlock><p>最近 60 秒提交</p><strong>{{ summary.submissions_last_60s }}</strong><small v-if="summary.observed_at_ms - summary.history_available_from_ms < 60000" class="is-warning">采集不足 60 秒</small></EntityBlock>
+          <EntityBlock><p>按上次快照最早可发</p><span>{{ nextLabel }}</span></EntityBlock>
         </div>
-        <div class="rounded-xl bg-muted p-3 flex flex-wrap gap-x-5 gap-y-2 text-xs">
+        <div class="scheduling-phases">
           <span>等并发 {{ summary.phases.waiting_concurrency }}</span><span>准备环境 {{ summary.phases.preparing }}</span><span>等发送 {{ summary.phases.waiting_send }}</span><span>退避 {{ summary.phases.backoff }}</span><span>无当前绑定请求 {{ summary.unbound_requests }}</span>
         </div>
-        <div class="space-y-2">
-          <div class="flex flex-wrap justify-between gap-2 items-center">
-            <h3 class="text-sm font-semibold">真实提交时间轴</h3>
-            <div class="flex gap-2 text-xs"><button :class="rangeMs === 60000 ? 'text-primary' : 'text-muted-foreground'" @click="rangeMs = 60000">最近 1 分钟</button><button :class="rangeMs === 300000 ? 'text-primary' : 'text-muted-foreground'" @click="rangeMs = 300000">最近 5 分钟</button></div>
+        <div class="scheduling-section">
+          <div class="scheduling-section-head">
+            <h3>真实提交时间轴</h3>
+            <div class="scheduling-range"><button type="button" :aria-pressed="rangeMs === 60000" @click="rangeMs = 60000">最近 1 分钟</button><button type="button" :aria-pressed="rangeMs === 300000" @click="rangeMs = 300000">最近 5 分钟</button></div>
           </div>
-          <div class="scheduling-timeline"><svg viewBox="0 0 1000 115" role="img" aria-label="真实提交点和预计最早许可时刻" class="w-full rounded-xl border border-border bg-muted">
-            <line x1="30" y1="55" x2="970" y2="55" stroke="#dfe6f0" stroke-width="2" />
-            <line :x1="x(detail.snapshot.observed_at_ms)" y1="20" :x2="x(detail.snapshot.observed_at_ms)" y2="80" stroke="#8290a5" stroke-dasharray="4 4" />
-            <circle v-for="(event, index) in events" :key="event.request_id + ':' + event.submitted_at_ms + ':' + index" :cx="x(event.submitted_at_ms)" cy="55" r="3.5" fill="#059669"><title>{{ timeLabel(event.submitted_at_ms) }} · 已提交</title></circle>
+          <div class="scheduling-timeline"><svg viewBox="0 0 1000 115" role="img" aria-label="真实提交点和预计最早许可时刻" class="scheduling-chart">
+            <line class="scheduling-axis" x1="30" y1="55" x2="970" y2="55" stroke-width="2" />
+            <line class="scheduling-now" :x1="x(detail.snapshot.observed_at_ms)" y1="20" :x2="x(detail.snapshot.observed_at_ms)" y2="80" stroke-dasharray="4 4" />
+            <circle v-for="(event, index) in events" :key="event.request_id + ':' + event.submitted_at_ms + ':' + index" class="scheduling-event" :cx="x(event.submitted_at_ms)" cy="55" r="3.5"><title>{{ timeLabel(event.submitted_at_ms) }} · 已提交</title></circle>
             <template v-if="summary.next_send_at_ms != null && summary.next_send_at_ms > detail.snapshot.observed_at_ms">
-              <line :x1="x(summary.next_send_at_ms)" y1="25" :x2="x(summary.next_send_at_ms)" y2="80" stroke="#8b5cf6" stroke-dasharray="3 4" />
-              <circle :cx="x(summary.next_send_at_ms)" cy="55" r="6" fill="#fff" stroke="#8b5cf6" stroke-width="2"><title>预计最早可发，不代表已预订</title></circle>
+              <line class="scheduling-next" :x1="x(summary.next_send_at_ms)" y1="25" :x2="x(summary.next_send_at_ms)" y2="80" stroke-dasharray="3 4" />
+              <circle class="scheduling-next-dot" :cx="x(summary.next_send_at_ms)" cy="55" r="6" stroke-width="2"><title>预计最早可发，不代表已预订</title></circle>
             </template>
-            <text x="30" y="100" fill="#8290a5" font-size="12">{{ rangeMs / 60000 }} 分钟前</text><text :x="x(detail.snapshot.observed_at_ms)" y="100" fill="#8290a5" font-size="12" text-anchor="middle">快照时刻</text><text x="970" y="100" fill="#8290a5" font-size="12" text-anchor="end">未来许可参考</text>
+            <text class="scheduling-label" x="30" y="100" font-size="12">{{ rangeMs / 60000 }} 分钟前</text><text class="scheduling-label" :x="x(detail.snapshot.observed_at_ms)" y="100" font-size="12" text-anchor="middle">快照时刻</text><text class="scheduling-label" x="970" y="100" font-size="12" text-anchor="end">未来许可参考</text>
           </svg></div>
-          <p class="text-[length:var(--ui-font-small)] text-muted-foreground">实心点＝Gateway 向 sender 发起提交；空心点＝预计最早许可，不是未来预订。历史从 {{ timeLabel(detail.snapshot.history_available_from_ms) }} 起采集，重启后留空。</p>
-          <p v-if="detail.snapshot.history_truncated" class="text-xs text-amber-700">事件缓冲已截断 {{ detail.snapshot.dropped_events }} 条，时间轴不是完整历史；60 秒统计使用独立时间桶。</p>
-          <p v-if="events.length === 0" class="text-xs text-muted-foreground">当前采集窗口内没有记录到提交点。</p>
+          <p class="scheduling-note">实心点＝Gateway 向 sender 发起提交；空心点＝预计最早许可，不是未来预订。历史从 {{ timeLabel(detail.snapshot.history_available_from_ms) }} 起采集，重启后留空。</p>
+          <p v-if="detail.snapshot.history_truncated" class="scheduling-note is-warning">事件缓冲已截断 {{ detail.snapshot.dropped_events }} 条，时间轴不是完整历史；60 秒统计使用独立时间桶。</p>
+          <p v-if="events.length === 0" class="scheduling-note">当前采集窗口内没有记录到提交点。</p>
         </div>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div v-for="factor in factors" :key="factor[0]" class="text-xs"><div class="flex justify-between mb-1"><span>{{ factor[0] }}</span><span>{{ (factor[1] * 100).toFixed(0) }}</span></div><div class="h-1.5 rounded bg-border"><div class="h-full rounded bg-primary" :style="{ width: Math.max(0, Math.min(100, factor[1] * 100)) + '%' }" /></div></div>
+        <div class="scheduling-factors">
+          <div v-for="factor in factors" :key="factor[0]"><div class="scheduling-factor-label"><span>{{ factor[0] }}</span><span>{{ (factor[1] * 100).toFixed(0) }}</span></div><div class="scheduling-factor-bar"><i :style="{ width: Math.max(0, Math.min(100, factor[1] * 100)) + '%' }" /></div></div>
         </div>
-        <p class="text-[length:var(--ui-font-small)] text-muted-foreground">归一化偏好越高越优，仅影响新会话。延迟取成功请求的首个有效文字、思考或工具输出；图中为账号汇总，实际选号按模型、思考参数和流式方式分别比较。未知健康与延迟按满分起步，额度未知按中性计算。</p>
-        <p v-if="summary.config.queue_weight && summary.factors.wait_score != null" class="text-xs text-muted-foreground">基础偏好 {{ (summary.factors.score * 100).toFixed(1) }} · 等待排序偏好 {{ (summary.factors.wait_score * 100).toFixed(1) }} · {{ waitBasisLabel }}<span v-if="summary.factors.estimated_wait_ms != null"> · 预计等待 {{ (summary.factors.estimated_wait_ms / 1000).toFixed(1) }} 秒</span>。等待排序单独计算运行负载和等待代价。</p>
-        <p v-if="summary.factors.quota_state === 'reset_pending'" class="text-xs text-amber-700">旧额度周期已结束，等待自动刷新用量。</p>
-        <p v-else-if="summary.factors.quota_state === 'unknown'" class="text-xs text-muted-foreground">尚无有效额度观测，额度分暂按中性计算。</p>
-        <div class="space-y-3 border-t border-border pt-4">
-          <h3 class="text-sm font-semibold">网关绑定会话</h3>
+        <p class="scheduling-note">归一化偏好越高越优，仅影响新会话。延迟取成功请求的首个有效文字、思考或工具输出；图中为账号汇总，实际选号按模型、思考参数和流式方式分别比较。未知健康与延迟按满分起步，额度未知按中性计算。</p>
+        <p v-if="summary.config.queue_weight && summary.factors.wait_score != null" class="scheduling-note">基础偏好 {{ (summary.factors.score * 100).toFixed(1) }} · 等待排序偏好 {{ (summary.factors.wait_score * 100).toFixed(1) }} · {{ waitBasisLabel }}<span v-if="summary.factors.estimated_wait_ms != null"> · 预计等待 {{ (summary.factors.estimated_wait_ms / 1000).toFixed(1) }} 秒</span>。等待排序单独计算运行负载和等待代价。</p>
+        <p v-if="summary.factors.quota_state === 'reset_pending'" class="scheduling-note is-warning">旧额度周期已结束，等待自动刷新用量。</p>
+        <p v-else-if="summary.factors.quota_state === 'unknown'" class="scheduling-note">尚无有效额度观测，额度分暂按中性计算。</p>
+        <div class="scheduling-section scheduling-sessions">
+          <h3>网关绑定会话</h3>
           <div class="scheduling-filters">
             <ChoiceSelect :model-value="state" @update:model-value="value => { state = value; applyFilter(); }" label="会话活跃状态" :options="[{value:'all',label:'全部绑定'},{value:'active',label:'活跃'},{value:'idle',label:'闲置'}]" />
             <SearchInput v-model="prefix" placeholder="搜索脱敏摘要前缀" label="会话摘要前缀" @search="applyFilter" />
             <Button variant="outline" @click="applyFilter">筛选</Button>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-xs text-left whitespace-nowrap"><thead class="text-muted-foreground"><tr><th class="p-2">会话摘要</th><th class="p-2">等槽／准备／等发／执行／退避</th><th class="p-2">首次绑定</th><th class="p-2">最近活动</th><th class="p-2">闲置有效期</th></tr></thead><tbody>
-              <tr v-for="row in sessions?.items ?? []" :key="row.session_key" class="border-t border-muted"><td class="p-2 font-mono">{{ row.session_key.slice(0, 12) }}</td><td class="p-2">{{ row.phases.waiting_concurrency }} / {{ row.phases.preparing }} / {{ row.phases.waiting_send }} / {{ row.phases.running }} / {{ row.phases.backoff }}</td><td class="p-2">{{ timeLabel(row.created_at_ms) }}</td><td class="p-2">{{ timeLabel(row.last_seen_at_ms) }}</td><td class="p-2">{{ sessionState(row) }}</td></tr>
-              <tr v-if="sessions?.items.length === 0"><td colspan="5" class="p-5 text-center text-muted-foreground">当前筛选没有有效绑定</td></tr>
-            </tbody></table>
-          </div>
+          <Table>
+            <TableHeader><TableRow><TableHead>会话摘要</TableHead><TableHead>等槽／准备／等发／执行／退避</TableHead><TableHead>首次绑定</TableHead><TableHead>最近活动</TableHead><TableHead>闲置有效期</TableHead></TableRow></TableHeader>
+            <TableBody>
+              <TableRow v-for="row in sessions?.items ?? []" :key="row.session_key"><TableCell class="scheduling-session-key">{{ row.session_key.slice(0, 12) }}</TableCell><TableCell>{{ row.phases.waiting_concurrency }} / {{ row.phases.preparing }} / {{ row.phases.waiting_send }} / {{ row.phases.running }} / {{ row.phases.backoff }}</TableCell><TableCell>{{ timeLabel(row.created_at_ms) }}</TableCell><TableCell>{{ timeLabel(row.last_seen_at_ms) }}</TableCell><TableCell>{{ sessionState(row) }}</TableCell></TableRow>
+              <TableEmpty v-if="sessions?.items.length === 0" :colspan="5">当前筛选没有有效绑定</TableEmpty>
+            </TableBody>
+          </Table>
           <Pagination v-model:page-size="pageSize" :page="page" :total="sessions?.total ?? 0" :disabled="loading" unit="个绑定" label="绑定会话分页" @update:page="changePage" />
-          <p class="text-[length:var(--ui-font-small)] text-muted-foreground">摘要按 API Token 隔离；一个会话可有多个请求。无 ID、尚未绑定或已换绑定但仍在旧账号执行的请求计入无当前绑定请求；此处不展示官方聊天内容。</p>
+          <p class="scheduling-note">摘要按 API Token 隔离；一个会话可有多个请求。无 ID、尚未绑定或已换绑定但仍在旧账号执行的请求计入无当前绑定请求；此处不展示官方聊天内容。</p>
         </div>
       </template>
       </div>

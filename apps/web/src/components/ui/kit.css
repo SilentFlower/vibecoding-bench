@@ -82,6 +82,31 @@
 
   /* ---------- 浮层：选择菜单、说明气泡、日历共用同一表面 ---------- */
   .fui-popover, .fui-choice-menu, .fui-info-content, .fui-calendar { line-height: 1.55; border: 0; border-radius: var(--ui-radius-block); background: var(--ui-color-surface); color: var(--ui-color-text-2); box-shadow: var(--ui-shadow-pop); }
+  /* 代理选线（ProxyPicker，账号编辑、授权登录与任务选线共用）：触发器同下拉控件，弹层同下拉弹层（设计稿 #account-edit 代理线路）。 */
+  .account-proxy-picker { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+  .account-proxy-picker > p { margin: 0; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); font-weight: 500; }
+  .proxy-picker-trigger { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2); width: 100%; min-height: var(--ui-control-md); padding: 0 calc(var(--ui-space-unit) * 3); border: 0; border-radius: var(--ui-radius-control); background: var(--ui-color-fill); color: var(--ui-color-text); font: inherit; font-size: var(--ui-font-size-md); text-align: left; cursor: pointer; }
+  .proxy-picker-trigger:hover:not(:disabled):not([data-state=open]) { background: var(--ui-color-fill-hover); }
+  .proxy-picker-trigger:focus-visible, .proxy-picker-trigger[data-state=open] { outline: none; background: var(--ui-color-surface); box-shadow: 0 0 0 1px var(--ui-color-primary), 0 0 0 4px var(--ui-color-primary-ring); }
+  .proxy-picker-trigger:disabled { opacity: .45; cursor: not-allowed; }
+  .proxy-picker-trigger > svg { flex: none; width: 14px; height: 14px; color: var(--ui-color-text-3); }
+  .proxy-picker-trigger > span { display: flex; flex: 1; align-items: baseline; gap: calc(var(--ui-space-unit) * 2); min-width: 0; }
+  .proxy-picker-trigger strong { flex: none; font-weight: 700; }
+  .proxy-picker-trigger small { overflow: hidden; color: var(--ui-color-text-3); font-size: inherit; text-overflow: ellipsis; white-space: nowrap; }
+  .proxy-picker-popup { z-index: 100; width: var(--reka-popover-trigger-width); max-width: calc(100vw - 32px); padding: calc(var(--ui-space-unit) * 3); border-radius: var(--ui-radius-block); background: var(--ui-color-surface); color: var(--ui-color-text-2); box-shadow: var(--ui-shadow-pop); font-family: var(--ui-font-family); font-size: var(--ui-font-size-md); line-height: 1.55; }
+  .proxy-picker-options { max-height: 280px; margin-top: calc(var(--ui-space-unit) * 2.5); overflow: auto; }
+  .proxy-picker-options > button { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); width: 100%; padding: 9px 10px; border: 0; border-radius: var(--ui-radius-control); background: transparent; color: var(--ui-color-text-2); font: inherit; text-align: left; cursor: pointer; }
+  .proxy-picker-options > button:hover, .proxy-picker-options > button:focus-visible { outline: 0; background: var(--ui-color-fill); }
+  .proxy-picker-options > button > svg { flex: none; color: var(--ui-color-text-3); }
+  .proxy-picker-options > button > span { flex: 1; min-width: 0; }
+  .proxy-picker-options strong { display: block; color: var(--ui-color-text); font-weight: 650; }
+  .proxy-picker-options small { display: block; margin-top: 2px; overflow: hidden; color: var(--ui-color-text-3); font-size: var(--ui-font-size-sm); text-overflow: ellipsis; white-space: nowrap; }
+  .proxy-picker-options > p { margin: 0; padding: 12px 10px; color: var(--ui-color-text-3); }
+  .proxy-picker-options > p button { padding: 0; border: 0; background: transparent; color: var(--ui-color-primary-text); font: inherit; font-weight: 650; cursor: pointer; }
+  .proxy-picker-options > .proxy-picker-more { justify-content: center; color: var(--ui-color-primary-text); font-weight: 650; }
+  .proxy-picker-popup footer { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--ui-space-unit) * 3); margin-top: calc(var(--ui-space-unit) * 2); padding: 10px 4px 0; border-top: 1px solid var(--ui-color-line); font-size: var(--ui-font-size-sm); }
+  .proxy-picker-popup footer a { color: var(--ui-color-primary-text); font-weight: 650; text-decoration: none; }
+  .proxy-picker-popup footer small { color: var(--ui-color-text-4); font-size: inherit; }
   .fui-choice-menu { width: var(--reka-select-trigger-width); min-width: 180px; max-width: calc(100vw - 24px); max-height: min(260px, var(--reka-select-content-available-height)); overflow-y: auto; padding: calc(var(--ui-space-unit) * 1.25); z-index: 100; }
   .fui-choice-option { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--ui-space-unit) * 4); min-height: var(--ui-control-sm); padding: calc(var(--ui-space-unit) * 1.5) calc(var(--ui-space-unit) * 2.5); border-radius: var(--ui-radius-btn); font-size: var(--ui-font-size-md); line-height: 1.55; cursor: pointer; outline: none; }
   .fui-choice-option[data-highlighted] { background: var(--ui-color-fill); color: var(--ui-color-text); }
@@ -282,7 +307,11 @@
   .fui-modal-head { display: flex; align-items: flex-start; gap: calc(var(--ui-space-unit) * 3); padding: calc(var(--ui-space-unit) * 5.5) calc(var(--ui-space-unit) * 6) calc(var(--ui-space-unit) * 4); }
   .fui-modal-heading { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
   .fui-modal > .fui-dialog-close { top: calc(var(--ui-space-unit) * 5.5); right: calc(var(--ui-space-unit) * 6); }
-  .fui-modal-title { display: flex; align-items: center; gap: calc(var(--ui-space-unit) * 2); }
+  /* 窄屏时徽标整体换到下一行，标题文字不被挤断。 */
+  .fui-modal-title { display: flex; flex-wrap: wrap; align-items: center; gap: 2px calc(var(--ui-space-unit) * 2); }
+  .fui-modal-nav { flex: none; min-width: 0; padding: 0 calc(var(--ui-space-unit) * 6) calc(var(--ui-space-unit) * 4.5); }
+  /* 页签多于可用宽度时在页签带内横向滚动，规则同工具栏中的分段。 */
+  .fui-modal-nav > .fui-segmented { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
   .fui-modal-body { display: flex; flex: 1; flex-direction: column; gap: calc(var(--ui-space-unit) * 4.5); min-height: 0; overflow-y: auto; padding: calc(var(--ui-space-unit) * 1) calc(var(--ui-space-unit) * 6) calc(var(--ui-space-unit) * 5); line-height: 1.55; }
   .fui-modal-foot { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--ui-space-unit) * 2.5); padding: calc(var(--ui-space-unit) * 3.5) calc(var(--ui-space-unit) * 6); background: var(--ui-color-fill-subtle); line-height: 1.55; }
 
