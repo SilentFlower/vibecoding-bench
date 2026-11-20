@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/web/frontend/ui-guidelines.md", "reason": "token 分类与静态规则、主题运行时与主题设置页合同、外壳类名契约、第二版原生页与独立入口约定，本任务需改写其中主题与原生页章节"}
+{"file": ".trellis/spec/legacy-web/frontend/component-guidelines.md", "reason": "原生样式约定、!important 例外清单与终端约束；任务宿主固定浅色的条目需改为跟随模式"}
+{"file": ".trellis/spec/legacy-web/frontend/state-management.md", "reason": "主题状态行（根节点 data-theme 固定亮色）需改为 data-ui-scheme 跟随模式"}
+{"file": ".trellis/tasks/11-19-console-ui-revamp/design.md", "reason": "父任务 §1 颜色全部语义化为深色只换值、§3 终端配色留给子任务 7"}
+{"file": ".trellis/tasks/11-19-console-ui-revamp/prd.md", "reason": "父任务 R10 与跨子任务验收口径（深色截图矩阵）"}
+{"file": ".trellis/tasks/11-19-console-dark-mode/research/design-dark/mock.css", "reason": "用户确认的深色色板「夜幕紫灰」取值，实施的视觉基准"}

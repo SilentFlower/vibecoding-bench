@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>flower2api v2 mock</title>
+<link rel="stylesheet" href="mock.css">
+<script>
+  // 深色稿：?mode=dark 为深色（夜幕紫灰），不带参数为第二版浅色。
+  const params = new URLSearchParams(location.search);
+  const DARK = params.get('mode') === 'dark';
+  document.documentElement.dataset.mode = DARK ? 'dark' : 'light';
+</script>
+<script src="palette.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script src="icons.js"></script>
+<script>
+// 第二版设计稿：信息结构沿用原稿，视觉延续浅色柔和风格；全部为示例数据。登录页沿用第一版截图。
+const flower = (s = 22, center = 'var(--ink)') => `<svg width="${s}" height="${s}" viewBox="0 0 256 256" aria-hidden="true"><defs><path id="pt" d="M128 121C116 103 94 79 94 58C94 37 109 21 128 21S162 37 162 58C162 79 140 103 128 121Z"/></defs><g fill="#ED6EA7">${[0, 72, 144, 216, 288].map(r => `<use href="#pt" transform="rotate(${r} 128 128)"/>`).join('')}</g><circle cx="128" cy="128" r="15" style="fill:${center}"/></svg>`;
+const tag = (tone, text, dot = false) => `<span class="tag tg-${tone}${dot ? ' dot' : ''}">${text}</span>`;
+const plat = p => p === 'agy' ? tag('agy', '反重力') : tag('cc', 'Claude Code');
+const seg = items => `<div class="seg">${items.map(([l, n, on]) => `<span class="${on ? 'on' : ''}">${l}${n !== undefined ? `<em>${n}</em>` : ''}</span>`).join('')}</div>`;
+const input = (ph, icon = 'search', w = '') => `<div class="input" style="${w ? `width:${w}px` : ''}">${icon ? ic(icon, 's14').replace('class="i', 'class="i t3') : ''}<span class="ph-t">${ph}</span></div>`;
+const ph = (title, desc, actions = '') => `<header class="ph"><div><h1>${title}</h1><p>${desc}</p></div><div class="ph-actions">${actions}</div></header>`;
+const ov = items => `<div class="grid g4">${items.map(([label, value, cap, icon, tone, small = '']) => `<article class="card ov"><div><p>${label}</p><strong>${value}${small ? `<small>${small}</small>` : ''}</strong><span>${cap}</span></div><span class="ico ${tone}">${ic(icon, 's18')}</span></article>`).join('')}</div>`;
+const left = ic('right', 's14').replace('m9 18 6-6-6-6', 'm15 18-6-6 6-6');
+const pager = (total, pages = 3) => `<div class="tfoot"><span>共 ${total} 条</span><span class="psize">20 条/页${ic('down', 's14')}</span><div class="pager"><span class="dis">${left}</span>${Array.from({ length: pages }, (_, i) => `<span class="${i ? '' : 'on'}">${i + 1}</span>`).join('')}<span>${ic('right', 's14')}</span></div></div>`;
+
+function shell(active, content, overlay = '') {
+  const nav = [
+    ['网关', [['accounts', 'users', '账号', '<span class="sb-count">101</span>'], ['requests', 'activity', '请求记录'], ['blocks', 'shield', '会话封禁'], ['tokens', 'key', '访问令牌']]],
+    ['资源', [['proxies', 'globe', '代理管理'], ['environments', 'box', '运行环境'], ['nodes', 'server', '节点管理']]],
+    ['工作区', [['tasks', 'todo', '任务与工程', '<span class="sb-run">1</span>']]],
+  ];
+  return `<div class="app"><aside class="sb">
+    <div class="sb-brand"><span class="sb-mark">${flower(24)}</span><div><b>flower2api<span class="sb-ver up" title="发现新版本，打开系统更新">v1.0.0${ic('upCircle', 's12')}</span></b><small>让每一次调用井然有序</small></div></div>
+    ${nav.map(([g, items]) => `<div class="sb-label">${g}</div>${items.map(([k, i, l, x = '']) => `<div class="sb-item${k === active ? ' on' : ''}">${ic(i, 's18')}${l}${x}</div>`).join('')}`).join('')}
+    <div style="height:14px"></div>${[['theme', 'palette', '主题设置'], ['settings', 'sliders', '系统设置']].map(([k, i, l]) => `<div class="sb-item${k === active ? ' on' : ''}">${ic(i, 's18')}${l}</div>`).join('')}
+    <div class="sb-foot"><div class="av">管</div><div><b>管理员</b><span>本地管理控制台</span></div><div class="tools"><span title="${DARK ? '切换到浅色' : '切换到深色'}">${ic(DARK ? 'sun' : 'moon', 's14')}</span><span>${ic('panel', 's14')}</span><span>${ic('logout', 's14')}</span></div></div>
+  </aside><main class="main"><div class="page">${content}</div>${overlay}</main></div>`;
+}
+
+/* ---------------- 账号：卡片信息与原稿一致 ---------------- */
+const stats = '128 请求 · 845K Token · 折算 $4.85 · 预计总费用 $15.16';
+const A = [
+  { n: '正式账号 1', e: 'design1@example.test', p: 'cc', plan: 'Max', route: '线路 1', strip: ['s', '容量就绪 · 正在处理 1 个请求', '排队 4'], fw: ['原生运行时', '280 / 293 自动匹配'], pri: '50', score: tag('primary', '智能评分 67.5'), refresh: '未刷新', since: '网关记录始于 11/01',
+    w: [[stats, '5 小时 · 上限 90%', 32, '3小时 5分 后重置', '11/19 22:42'], [stats, '7 天 · 上限 90%', 18, '2天 7小时 59分 后重置', '11/22 03:36'], ['', '7 天 Fable', 9, '2天 7小时 59分 后重置', '11/22 03:36']],
+    m: [['并发', '0', '/3', 0], ['RPM', '8', '/20', 40], ['排队', '4', '', null, 'w'], ['活跃会话', '2', '', null]] },
+  { n: '正式账号 2', e: 'design2@example.test', p: 'cc', plan: 'Max', route: '直连', strip: ['s', '活跃'], fw: ['原有转发', ''], pri: '50', score: tag('neutral', '评分待更新'), refresh: '未刷新', since: '统计待更新',
+    w: [['统计待更新', '5 小时 · 上限 90%', 12, '4小时 12分 后重置', '11/19 23:49'], ['统计待更新', '7 天 · 上限 90%', 8, '5天 2小时 后重置', '11/24 22:10'], ['', '7 天 Fable', 3, '5天 2小时 后重置', '11/24 22:10']],
+    m: [['并发', '0', '/3', 0], ['RPM', '0', '/20', 0], ['排队', '0', '', null], ['活跃会话', '—', '', null]] },
+  { n: '正式账号 3', e: 'design3@example.test', p: 'cc', plan: 'Max', route: '线路 3', strip: ['w', '接近 5 小时上限 · 正在处理 3 个请求'], fw: ['原生运行时', '293'], pri: '50', score: tag('primary', '智能评分 41.2'), refresh: '20:39 更新', since: '网关记录始于 11/01',
+    w: [['512 请求 · 3.1M Token · 折算 $19.40 · 预计总费用 $21.08', '5 小时 · 上限 90%', 88, '41分 后重置', '11/19 21:20', 'w'], ['1K 请求 · 6.8M Token · 折算 $38.80', '7 天 · 上限 90%', 61, '1天 3小时 后重置', '11/20 23:40'], ['', '7 天 Fable', 40, '1天 3小时 后重置', '11/20 23:40']],
+    m: [['并发', '3', '/3', 100, 'w'], ['RPM', '18', '/20', 90], ['排队', '0', '', null], ['活跃会话', '3', '', null]] },
+];
+function accountCard(a, i) {
+  return `<article class="card acc">
+    <div class="acc-head"><div class="avatar ${a.p}">${a.n[0]}<i></i></div><div class="acc-name"><b>${a.n} ${plat(a.p)} ${tag('primary', a.plan)}</b><span>${a.e}</span></div></div>
+    <div class="acc-ctl">接收请求<i class="switch on"></i><span class="btn btn-sm btn-danger">停用账号</span></div>
+    <div class="links"><span>${ic('globe', 's14')}${a.route}</span><span>${ic('server', 's14')}节点未观测</span><span>${ic('box', 's14')}运行环境</span></div>
+    <div class="strip ${a.strip[0]}">${ic(a.strip[0] === 'w' ? 'alert' : 'check', 's14')}${a.strip[1]}${a.strip[2] ? tag('warning', a.strip[2]) : ''}</div>
+    <div class="block route"><div><label>转发方式</label><b>${a.fw[0]}<small>${a.fw[1]}</small></b></div><div class="pri"><label>调度优先级</label><b>${a.pri}<span class="t4">${ic('arrow', 's14')}</span></b>${a.score}</div></div>
+    <div class="usage-h">用量<span>${a.refresh}<b>${ic('refresh', 's14')}刷新</b></span></div><div class="since">${a.since}</div>
+    ${a.w.map(([s, l, v, r, t, tone]) => `<div class="win">${s ? `<div class="stat">${s}</div>` : ''}<div class="row"><span>${l}</span><b>${v}%</b></div><div class="bar ${tone || ''}"><i style="width:${v}%"></i></div><div class="rs"><span>${r}</span><span class="num">${t}</span></div></div>`).join('')}
+    <div class="metrics">${a.m.map(([l, v, s, bar, c = '']) => `<div class="${c}"><span>${l}${l === '排队' ? ic('right', 's14') : ''}</span><b>${v}<small>${s}</small></b>${bar != null ? `<div class="bar ${c === 'w' ? 'w' : 'p'}"><i style="width:${bar}%"></i></div>` : ''}</div>`).join('')}</div>
+    <div class="acts"><span>${ic('pencil', 's14')}编辑</span><span>${ic('refresh', 's14')}用量</span><span>${ic('activity', 's14')}测试</span><span class="${i === 0 ? 'hl' : ''}">${ic('arrow', 's14')}详情</span><span class="dg">${ic('trash', 's14')}删除</span></div>
+  </article>`;
+}
+const accountsTop = () => ph('账号管理', '状态、用量和调度集中展示，常用操作直接可达。', `<span class="btn">${ic('key', 's14')}授权登录</span><span class="btn btn-primary">${ic('plus', 's14')}添加账号</span>`)
+  + `<div class="tb"><div class="input" style="width:150px">全部平台<span class="end">${ic('down', 's14')}</span></div>${seg([['全部账号', 101, 1], ['正常', 101], ['需要关注', 0], ['已停用', 0]])}<div class="tb-spacer"></div>${input('搜索名称或邮箱', 'search', 280)}</div>`;
+const pages = {};
+pages.accounts = () => shell('accounts', accountsTop() + `<div class="grid g3">${A.map(accountCard).join('')}</div>`);
+
+/* ---------------- 账号编辑（沿用居中工作区） ---------------- */
+pages['account-edit'] = () => shell('accounts', accountsTop() + `<div class="grid g3">${A.map(accountCard).join('')}</div>`, `<div class="mask"></div><section class="modal">
+  <div class="mh"><div class="avatar cc">正<i></i></div><div><h2>正式账号 1 ${plat('cc')} ${tag('primary', 'Max')}</h2><p>design1@example.test</p></div><span class="btn btn-icon btn-sm x">${ic('x', 's14')}</span></div>
+  <div style="padding:0 24px 18px">${seg([['概览'], ['配置', undefined, 1], ['调度', 4], ['环境与诊断']])}</div>
+  <div class="mb">
+    <div class="sec-t">基础配置</div>
+    <div class="fg c3"><div class="field"><label>账号平台</label><div class="input ro">${ic('lock', 's14')}Claude Code</div></div><div class="field"><label>备注名（选填）</label><div class="input">正式账号 1</div></div><div class="field"><label>邮箱</label><div class="input">design1@example.test</div></div></div>
+    <div class="field"><label>转发方式</label><div class="fg"><div class="rc on"><i class="rd"></i><div><b>原生运行时</b><span>280 / 293 自动匹配</span></div></div><div class="rc"><i class="rd"></i><div><b>原有转发</b><span>现有转发通道</span></div></div></div><span class="help">请在账号空闲时切换转发方式。</span></div>
+    <div class="field"><label>代理线路</label><div class="input">${ic('globe', 's14')}<b style="font-weight:700">线路 1</b><span class="t3">点击搜索并选择线路</span><span class="end">${ic('down', 's14')}</span></div><span class="help">选择代理或直连，保存账号后应用</span></div>
+    <div class="sec-t">用量与调度</div>
+    <div class="fg c3"><div class="field"><label>并发上限</label><div class="input focus">3<span class="end"><span>−</span><span>+</span></span></div></div><div class="field"><label>RPM 上限</label><div class="input">20<span class="end"><span>−</span><span>+</span></span></div></div><div class="field"><label>调度优先级</label><div class="input">50<span class="end"><span>−</span><span>+</span></span></div></div></div>
+  </div>
+  <div class="mf"><span class="t3" style="font-weight:600">修改后统一保存</span><span style="margin-left:auto" class="btn">取消</span><span class="btn btn-primary">保存修改</span></div>
+</section>`);
+
+/* ---------------- 请求记录 ---------------- */
+pages.requests = () => {
+  const R = [
+    ['2026/11/19 19:42:08', '7f3a91c2…', 'debug', '正式账号 1', 'claude-opus-5-5', '原生运行时 · 2.1.293', ['success', '成功'], '200', '12.4 s', '首输出 1.2 s', '12,480 / 723', '缓存读 10,240 · 写 2,400', '1', 'a91f…c03e'],
+    ['2026/11/19 19:41:55', '1c2d8e07…', 'info', '正式账号 3', 'claude-sonnet-5-5', '原生运行时 · 2.1.293', ['info', '处理中'], '—', '8.1 s', '首输出 0.9 s', '— / —', '缓存读 — · 写 —', '1', '5be0…11af'],
+    ['2026/11/15 08:01:00', '11111111…', 'debug', '主用演示账号', 'claude-fable-5', '原生运行时 · 未观测', ['success', '成功'], '200', '2.00 s', '首输出 0 ms', '0 / 128', '缓存读 2,048 · 写 —', '2', '未提供'],
+    ['2026/11/19 19:40:12', '9e4b20d1…', 'info', '正式账号 1', 'claude-opus-5-5', '原生运行时 · 2.1.293', ['warning', '限流'], '429', '0.41 s', '首输出 —', '— / —', '缓存读 — · 写 —', '3', 'a91f…c03e'],
+    ['2026/11/19 19:38:02', 'b07c11e5…', 'info', '备用账号 5', 'claude-opus-5-5', '原生运行时 · 2.1.293', ['danger', '鉴权失败'], '401', '0.18 s', '首输出 —', '— / —', '缓存读 — · 写 —', '1', '未提供'],
+    ['2026/11/19 19:37:40', '62f1aa83…', 'info', '正式账号 3', 'claude-fable-5', '原有转发 · 2.1.280', ['success', '成功'], '200', '3.2 s', '首输出 0.5 s', '2,110 / 268', '缓存读 1,024 · 写 —', '1', '08ab…7d51'],
+  ];
+  return shell('requests', ph('请求记录', '从请求结果、用量到处理链路，快速找到需要关注的调用。')
+    + ov([['全部记录', '53', '保留 7 天', 'activity', 'p'], ['错误', '7', '六类错误集合', 'alert', 'd'], ['处理中', '2', '每页独立计数', 'clock', 'i'], ['后续请求日志', 'info · 摘要', '仅影响后续请求 · 点击切换', 'sliders', 'w']]).replace('<strong>info · 摘要</strong>', '<strong style="font-size:20px">info · 摘要</strong>')
+    + `<section class="card tcard"><div class="tcard-h">${seg([['全部', 53, 1], ['错误', 7], ['处理中', 2]])}<div class="tb-spacer"></div>${input('输入完整请求 ID / 响应关联 ID / 上游请求 ID', 'search', 380)}<span class="btn">${ic('filter', 's14')}筛选</span><span class="btn btn-primary">${ic('search', 's14')}查询</span><span class="btn btn-icon">${ic('refresh', 's14')}</span></div>
+    <table class="t"><colgroup><col style="width:15%"><col style="width:10%"><col style="width:15%"><col style="width:13%"><col style="width:10%"><col style="width:16%"><col style="width:5%"><col style="width:9%"><col style="width:7%"></colgroup>
+    <thead><tr><th>时间 / 请求</th><th>账号</th><th>模型 / 转发方式</th><th>结果</th><th>总耗时 / 首输出</th><th>Token（末次）</th><th class="r">尝试</th><th>原始 Session ID</th><th class="r">操作</th></tr></thead><tbody>
+    ${R.map((r, i) => `<tr class="${i === 3 ? 'hover' : ''}"><td class="num">${r[0]}<span class="sub"><span class="mono">${r[1]}</span> ${tag('neutral', r[2])}</span></td><td class="strong">${r[3]}<span class="sub">节点未观测</span></td><td>${r[4]}<span class="sub">${r[5]}</span></td><td>${tag(r[6][0], r[6][1], true)} <span class="mono t3">${r[7]}</span></td><td class="num strong">${r[8]}<span class="sub">${r[9]}</span></td><td class="num">${r[10]}<span class="sub">${r[11]}</span></td><td class="r num">${r[12]}</td><td><span class="mono ${r[13] === '未提供' ? 't4' : ''}">${r[13]}</span></td><td class="r"><span class="btn btn-sm btn-text">详情 ${ic('arrow', 's14')}</span></td></tr>`).join('')}
+    </tbody></table>${pager(53)}</section>`);
+};
+
+/* ---------------- 代理管理 ---------------- */
+pages.proxies = () => {
+  const R = [
+    ['线路 1', 'http://proxy1.example.test:8080', '203.0.113.1', 'SG 新加坡', '42', '可用', 'success', '剩余 4 天 23 小时', '2026/11/24 19:36', '1 个使用 · 0 个活跃', '正式账号 1'],
+    ['线路 2', 'http://proxy2.example.test:8080', '203.0.113.2', 'JP 东京', '88', '可用', 'success', '剩余 28 天', '2026/12/17 10:00', '2 个使用 · 1 个活跃', '反重力账号 4 等'],
+    ['线路 3', 'http://proxy3.example.test:8080', '203.0.113.3', 'US 洛杉矶', '186', '较慢', 'warning', '剩余 61 天', '2027/01/19 08:00', '1 个使用 · 1 个活跃', '正式账号 3'],
+    ['线路 4', 'http://proxy4.example.test:8080', '203.0.113.4', 'SG 新加坡', '—', '不可用', 'danger', '已过期 2 天', '2026/11/17 09:00', '0 个使用', ''],
+    ['线路 5', 'http://proxy5.example.test:8080', '203.0.113.5', 'HK 香港', '51', '可用', 'success', '剩余 6 天', '2026/11/26 12:00', '0 个使用', ''],
+    ['线路 6', 'http://proxy6.example.test:8080', '203.0.113.6', 'DE 法兰克福', '214', '可用', 'success', '长期有效', '—', '0 个使用', ''],
+  ];
+  const expTone = t => t.startsWith('已过期') ? 'danger' : /剩余 [1-6] 天/.test(t) ? 'warning' : 'neutral';
+  return shell('proxies', ph('代理管理', '出口位置、连接质量与账号使用情况，一处查看。', `<span class="btn">${ic('download', 's14')}批量导入</span><span class="btn btn-primary">${ic('plus', 's14')}添加代理</span>`)
+    + ov([['代理', '21', '条线路', 'globe', 'p'], ['可用', '19', '出口信息来自最近一次检测', 'check', 's', '/ 21'], ['被使用', '6', '条线路有账号绑定', 'users', 'i'], ['7 天内到期', '3', '另有 1 条已过期', 'calendar', 'w']])
+    + `<section class="card tcard"><div class="tcard-h"><h3>代理线路<small>21 / 21 条</small></h3><div class="tb-spacer"></div>${input('名称、地址、出口 IP 或地区', 'search', 300)}<span class="btn">${ic('activity', 's14')}批量检测</span></div>
+    <table class="t"><colgroup><col style="width:20%"><col style="width:13%"><col style="width:9%"><col style="width:9%"><col style="width:14%"><col style="width:13%"><col style="width:22%"></colgroup>
+    <thead><tr><th>代理线路</th><th>出口 IP / 地区</th><th>检测延迟</th><th>连接状态</th><th>到期时间</th><th>账号使用情况</th><th class="r">操作</th></tr></thead><tbody>
+    ${R.map((r, i) => `<tr class="${i === 3 ? 'hover' : ''}"><td><div style="display:flex;gap:10px;align-items:center"><span class="tile" style="width:32px;height:32px;border-radius:9px">${ic('globe', 's14')}</span><div style="min-width:0"><b style="font-weight:720">${r[0]}</b><span class="sub mono">${r[1]}</span></div></div></td><td><span class="mono">${r[2]}</span><span class="sub">${r[3]}</span></td><td><b class="mono" style="font-size:16px;color:${r[4] === '—' ? 'var(--text-4)' : +r[4] > 150 ? 'var(--warning-text)' : 'var(--success-text)'}">${r[4]}</b> <span class="t4">ms</span></td><td>${tag(r[6], r[5], true)}</td><td>${tag(expTone(r[7]), r[7])}<span class="sub num">${r[8]}</span></td><td>${r[9]}<span class="sub">${r[10] || '暂无账号'}</span></td><td><div class="ops"><span class="btn btn-sm">${ic('activity', 's14')}检测</span><span class="btn btn-sm">${ic('pencil', 's14')}编辑</span><span class="btn btn-sm btn-text dg">${ic('trash', 's14')}删除</span></div></td></tr>`).join('')}
+    </tbody></table></section>`);
+};
+
+/* ---------------- 运行环境（结构沿用原稿） ---------------- */
+pages.environments = () => {
+  const E = [
+    ['演示环境 A', '网关账号 #11', '111111…1111', '第 10 代', ['success', '就绪'], false, [['内存配置', '未限制'], ['CLI CPU', '2', '核'], ['发送器 CPU', '1', '核'], ['网络 CPU', '0.5', '核']], 'v0.1.0-beta.3', ['s', '热进程就绪', 'CLI 作业空闲', '293 空闲暖进程 1 / 存活 1 · 空闲 PID 27'], 'America/Los_Angeles'],
+    ['演示环境 2', '网关账号 #12', '222222…2222', '第 10 代', ['success', '就绪'], false, [['内存配置', '未限制'], ['CLI CPU', '未提供'], ['发送器 CPU', '未提供'], ['网络 CPU', '未提供']], '未提供', ['n', '准备状态待核对', 'CLI 作业空闲', '293 空闲暖进程 — / 存活 — · 空闲 PID 未观测'], 'America/Los_Angeles'],
+    ['演示环境 3', '网关账号 #13', '333333…3333', '第 10 代', ['neutral', '已停止'], true, [['内存配置', '4', 'GiB'], ['CLI CPU', '2', '核'], ['发送器 CPU', '1', '核'], ['网络 CPU', '0.5', '核']], 'v0.1.0-beta.3', ['n', '环境已停止', 'CLI 未运行', '启动后自动预热 293 进程'], 'Asia/Shanghai'],
+    ['演示环境 4', '网关账号 #14', '444444…4444', '第 10 代', ['warning', '未知状态：future-state'], false, [['内存配置', '未限制'], ['CLI CPU', '2', '核'], ['发送器 CPU', '1', '核'], ['网络 CPU', '0.5', '核']], 'v0.1.0-beta.3', ['w', '状态未识别', '需核对', '请升级控制台或检查节点版本'], 'Asia/Shanghai'],
+  ];
+  return shell('environments', ph('运行环境', '查看账号环境状态，管理资源、采集与请求内核。', `<span class="btn">${ic('refresh', 's14')}刷新</span>`)
+    + `<div class="tb">${seg([['全部环境', 4, 1], ['就绪', 2], ['需要关注', 1], ['已停止', 1]])}<span class="t3" style="font-weight:600;font-size:12px">显示 4 / 4 个环境</span><div class="tb-spacer"></div>${input('搜索账号名称或环境 ID', 'search', 280)}</div>
+    <div class="grid g2">${E.map(e => `<article class="card ent"><div class="ent-head"><span class="tile cc">${ic('box', 's18')}</span><div><h4>${e[0]} ${plat('cc')}</h4><p>${e[1]} · ${ic('server', 's14')}节点未观测</p></div>${tag(e[4][0], e[4][1], true)}</div>
+      <div class="meta-row"><span class="mono">${e[2]}</span><span>${e[3]}</span></div>
+      <div class="comp${e[5] ? ' off' : ''}"><span>CLI <em>${e[5] ? '已停止' : '运行中'}</em></span><span>发送器 <em>${e[5] ? '已停止' : '运行中'}</em></span><span>网络 <em>${e[5] ? '已停止' : '运行中'}</em></span></div>
+      <div class="res4">${e[6].map(([l, v, u = '']) => `<div><span>${l}</span><b>${v}${u ? `<small> ${u}</small>` : ''}</b></div>`).join('')}</div>
+      <div class="meta-row" style="font-weight:650"><span>CLI <b style="color:var(--text)">2.1.293</b></span><span>内核 <b style="color:var(--text)">${e[7]}</b> ›</span></div>
+      <div class="warm ${e[8][0]}"><div><b>${e[8][1]}</b><span>${e[8][2]}</span></div><p>${e[8][3]}</p></div>
+      <div class="kvl"><span>CRIU 加速</span><b>模板已就绪</b><span>内容采集</span><b>已关闭</b></div>
+      <div class="sched">${ic('clock', 's14')}全天可运行<span>${e[9]}</span>${ic('right', 's14')}</div>
+      <div class="ent-acts"><span>${ic('box', 's14')}环境详情</span><span>${ic('sliders', 's14')}资源与采集</span><span>${ic('zap', 's14')}请求内核</span><span>${ic('shield', 's14')}维护</span></div></article>`).join('')}</div>`);
+};
+
+/* ---------------- 节点管理 ---------------- */
+pages.nodes = () => {
+  const N = [
+    ['默认节点', '默认本机节点', false, [['CPU', '8 核'], ['可用内存', '9.4 GiB'], ['可用磁盘', '66 GiB'], ['归属账号', '2']], [['最近检查', '30 秒前'], ['Docker', '27.3'], ['运行组件', '已就绪']], ['success', '在线']],
+    ['上海执行节点', 'synthetic@node.example.invalid:22', true, [['CPU', '未采集'], ['可用内存', '未采集'], ['可用磁盘', '未采集'], ['归属账号', '1']], [['最近检查', '尚未检查'], ['Docker', '未采集'], ['运行组件', '已就绪']], ['warning', '待检查']],
+  ];
+  return shell('nodes', ph('节点管理', '管理执行服务器、组件状态与账号运行位置。', `<span class="btn">同步全部节点</span><span class="btn">${ic('refresh', 's14')}刷新列表</span><span class="btn btn-primary">${ic('plus', 's14')}添加节点</span>`)
+    + ov([['节点', '2', '1 台本机 · 1 台远程', 'server', 'p'], ['远程服务器', '1', '1 台待检查', 'globe', 'i'], ['归属账号', '3', '已分配执行位置', 'users', 's'], ['待处理', '1', '需检查连接', 'alert', 'w']])
+    + `<div class="grid g2">${N.map(n => `<article class="card ent" style="padding-bottom:16px"><div class="ent-head"><span class="tile">${ic('server', 's18')}</span><div><h4>${n[0]}</h4><p class="${n[2] ? 'mono' : ''}" style="font-size:12px">${n[1]}</p></div>${tag(n[5][0], n[5][1], true)}</div>
+      <div class="res4">${n[3].map(([l, v]) => `<div><span>${l}</span><b style="${v === '未采集' ? 'color:var(--text-4);font-size:15px' : ''}">${v}</b></div>`).join('')}</div>
+      <div class="block" style="padding:10px 14px;display:flex;flex-direction:column;gap:6px">${n[4].map(([k, v]) => `<div class="meta-row" style="font-weight:600"><span>${k}</span><b style="color:var(--text-2)">${v}</b></div>`).join('')}</div>
+      ${n[2] ? `<div class="links">${ic('shield', 's14')}主机身份与版本 ›</div>` : ''}
+      <div style="display:flex;gap:8px"><span class="btn btn-sm">${ic('refresh', 's14')}检查连接</span>${n[2] ? '<span class="btn btn-sm">检查并同步组件</span>' : ''}<span class="btn btn-sm">暂停接单</span>${n[2] ? `<span class="btn btn-sm btn-text dg" style="margin-left:auto">${ic('trash', 's14')}移除</span>` : ''}</div></article>`).join('')}</div>
+    <section class="card" style="padding:20px;display:flex;flex-direction:column;gap:14px"><div><div class="sec-t" style="font-size:16px">账号执行节点</div><p style="margin:4px 0 0;font-size:12.5px;color:var(--text-3);font-weight:550">为首次执行的账号选择服务器。已有运行资料的账号通过迁移变更节点。</p></div>
+      <div class="fg"><div class="field"><label>账号</label><div class="input">选择账号<span class="end">${ic('down', 's14')}</span></div></div><div class="field"><label>执行节点</label><div class="input ro">选择已准备的节点<span class="end">${ic('down', 's14')}</span></div></div></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><span class="btn" disabled>重新读取归属</span><span class="btn btn-primary" disabled>保存首次执行节点</span></div></section>`);
+};
+
+/* ---------------- 任务与工程 ---------------- */
+// 任务页内容单独成函数，终端画面复用它作弹窗背景。
+const tasksContent = () => {
+  const T = [
+    ['合成任务账号', '任务账号 #1', ['success', '整体已启用'], '直连', [['网关关联', '网关账号 #11'], ['环境时区', '未提供'], ['Claude Code', '继承全局']], true],
+    ['工程任务账号', '任务账号 #2', ['info', '运行中'], '线路 2', [['网关关联', '网关账号 #12'], ['环境时区', 'Asia/Shanghai'], ['Claude Code', '2.1.293']], false],
+    ['养号账号 3', '任务账号 #3', ['neutral', '空闲'], '线路 4', [['网关关联', '未关联'], ['环境时区', 'America/Los_Angeles'], ['Claude Code', '继承全局']], false],
+  ];
+  return ph('任务与工程', '从任务准备到执行与交付，在一个工作区内完成。')
+    + `<div>${seg([[`${ic('users', 's14')}任务账号`, 3, 1], [`${ic('box', 's14')}工程迭代`], [`${ic('zap', 's14')}养号迭代`], [`${ic('todo', 's14')}普通任务`], [`${ic('activity', 's14')}运行记录`], [`${ic('list', 's14')}题库`]])}</div>
+    <div class="tb"><div><div class="sec-t" style="font-size:18px">任务账号</div><p style="margin:3px 0 0;font-size:12.5px;color:var(--text-3);font-weight:550">授权、CLI 设置、额度与网关关联集中管理。</p></div><div class="tb-spacer"></div>${input('搜索账号、邮箱、代理或出口 IP', 'search', 300)}<span class="btn btn-primary">${ic('plus', 's14')}添加任务账号</span></div>
+    <div class="grid g3">${T.map(t => `<article class="card ent" style="padding-bottom:16px"><div class="ent-head"><span class="tile">${ic('users', 's18')}</span><div><h4>${t[0]}</h4><p>${t[1]}</p></div>${tag(t[2][0], t[2][1], true)}</div>
+      <div class="meta-row" style="font-weight:650;color:var(--text-2)"><span style="display:flex;gap:6px;align-items:center">${ic('globe', 's14')}${t[3]}</span><span style="color:var(--primary-text)">切换代理</span></div>
+      <div class="block" style="padding:10px 12px;display:flex;gap:8px;align-items:center;font-size:12.5px;font-weight:650">${ic('box', 's14')}<div>节点未观测<div class="t3" style="font-weight:550;font-size:12px">当前归属未观测</div></div></div>
+      <div style="display:flex;flex-direction:column;gap:8px">${t[4].map(([k, v]) => `<div class="meta-row" style="font-size:12.5px;font-weight:600"><span>${k}</span><b style="color:var(--text)">${v}</b></div>`).join('')}</div>
+      <div class="links" style="color:var(--primary-text)"><span>工程迭代 →</span><span>Pi 养号 →</span></div>
+      ${t[5] ? `<div class="block" style="padding:12px;display:flex;flex-direction:column;gap:10px"><div class="meta-row" style="font-weight:650"><span>网关账号</span><b class="mono" style="color:var(--text)">#11</b></div><div style="display:flex;gap:8px"><span class="btn btn-sm">${ic('key', 's14')}重新授权并同步</span><span class="btn btn-sm btn-danger">解绑</span></div><div class="strip d" style="height:auto;padding:8px 10px;font-size:12px">${ic('alert', 's14')}invalid_grant：账号异常，需要重新授权或人工核实</div></div>` : `<div class="strip s">${ic('check', 's14')}网关凭据正常 · 最近同步 3 分钟前</div>`}</article>`).join('')}</div>`;
+};
+pages.tasks = () => shell('tasks', tasksContent());
+
+/* ---------------- 终端（深色稿新增）：任务账号授权弹窗里的登录终端，示例输出 ---------------- */
+pages.terminal = () => shell('tasks', tasksContent(), `<div class="mask"></div><section class="modal" style="width:860px">
+  <div class="mh"><span class="tile">${ic('key', 's18')}</span><div><h2>任务账号授权</h2><p>合成任务账号 · 任务账号 #1 · 直连</p></div><span class="btn btn-icon btn-sm x">${ic('x', 's14')}</span></div>
+  <div class="mb" style="gap:14px">
+    <ol class="steps"><li class="done"><i>${ic('check', 's12')}</i>准备环境</li><li class="on"><i>2</i>浏览器授权</li><li><i>3</i>提交保存</li></ol>
+    <div class="strip s">${ic('check', 's14')}终端已连接 · 等待在浏览器中完成授权<span class="tag tg-neutral" style="margin-left:auto">剩余 9:41</span></div>
+    <section class="term"><header><span>${ic('terminal', 's14')}登录终端</span><span class="btn btn-sm">${ic('refresh', 's14')}重新连接</span></header>
+<pre><span class="d">$</span> claude auth login
+<span class="m">✻</span> Welcome to <b>Claude Code</b>
+
+<span class="g">✓</span> 代理线路已应用：直连 <span class="d">(出口 203.0.113.24)</span>
+Select login method:
+ <span class="c">❯ 1. Claude account with subscription</span>
+   2. Anthropic Console account <span class="d">· API usage billing</span>
+
+<span class="y">!</span> Browser didn't open? Use the url below to sign in:
+<span class="b u">https://claude.ai/oauth/authorize?code=true&amp;client_id=9d1c…&amp;state=synthetic</span>
+
+<span class="r">✗</span> 上一次授权已过期，已重新生成链接
+Paste code here if prompted <span class="d">›</span> <i class="cur"></i></pre></section>
+    <div class="field"><label>授权码</label><div style="display:flex;gap:8px"><div class="input" style="flex:1"><span class="ph-t">粘贴浏览器返回的授权码</span></div><span class="btn btn-primary">发送到终端</span></div><span class="help">授权码优先填入此处；CLI 的其它提示可直接在终端里操作。</span></div>
+  </div>
+  <div class="mf"><span class="t3" style="font-weight:600">认证检查通过后提交保存</span><span style="margin-left:auto" class="btn btn-danger">取消登录</span><span class="btn btn-primary" disabled>提交保存</span></div>
+</section>`);
+
+/* ---------------- 色板（深色稿新增）：浅 / 深取值、对比度与预设派生，仅在 ?mode=dark 下查看 ---------------- */
+const LIGHT = { layout: '#f5f6fa', surface: '#ffffff', 'fill-2': '#f1f2f7', 'fill-3': '#f7f8fb', 'fill-active': '#eceef5', 'fill-strong': '#d8dce8', track: '#e9ebf3', line: '#e6e8f0',
+  text: '#0f1527', 'text-2': '#414a5c', 'text-3': '#5f6878', 'text-4': '#97a0b2', 'table-head': '#eff1f8', 'table-stripe': '#f8f9fc', ink: '#191b2c', knob: '#ffffff',
+  'neutral-text': '#535b67', 'neutral-bg': '#f1f3f7', 'cc-text': '#9a5634', 'cc-bg': '#fbf1ea', 'agy-text': '#3f62b0', 'agy-bg': '#eef3fd' };
+const USE = { layout: '页面底', surface: '卡片、侧栏、弹窗', 'fill-2': '静止控件底（实色）', 'fill-3': '信息块、弹窗底栏', 'fill-active': '侧栏选中', 'fill-strong': '开关关闭、待执行圆点', track: '进度轨道', line: '分隔线',
+  text: '正文、标题', 'text-2': '次要正文、表头', 'text-3': '说明、辅助值', 'text-4': '占位、禁用（不计入正文）', 'table-head': '表头条', 'table-stripe': '斑马行', ink: '标志底、终端、代码块', knob: '开关滑块',
+  'neutral-text': '中性徽标文字', 'neutral-bg': '中性徽标底', 'cc-text': 'Claude Code 徽标', 'cc-bg': 'Claude Code 徽标底', 'agy-text': '反重力徽标', 'agy-bg': '反重力徽标底' };
+const lum = hex => { const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return ((x + 0.05) / (y + 0.05)).toFixed(2); };
+const sw = hex => `<i class="sw" style="background:${hex}"></i><code>${hex}</code>`;
+pages.palette = () => {
+  const css = getComputedStyle(document.documentElement);
+  const v = name => css.getPropertyValue(`--${name}`).trim();
+  const P = PALETTE;
+  const rows = Object.keys(LIGHT).map(k => {
+    const textual = k.startsWith('text') || k.endsWith('-text');
+    const bg = k.endsWith('-text') && !k.startsWith('text') ? k.replace('-text', '-bg') : 'surface';
+    return `<tr><td><b>--${k}</b><small>${USE[k]}</small></td><td>${sw(LIGHT[k])}</td><td>${sw(v(k))}</td><td class="num">${textual ? `${ratio(v(k), v(bg))}<small> 对 ${bg}</small>` : ''}</td></tr>`;
+  }).join('');
+  const presets = P.presets.map(p => `<tr><td><b>${p.name}</b><small>种子 <code>${p.seed}</code></small></td><td>${sw(p.base)}</td><td><span class="btn btn-sm" style="background:${p.base};color:${p.on}">保存并应用</span><small class="num">${p.contrastOn}</small></td>
+    <td><span class="tag" style="background:${p.container};color:${p.text}">已修改</span><small class="num">${p.contrastText}</small></td><td>${sw(p.hover)}</td><td class="num">${p.contrastBase}</td></tr>`).join('');
+  const tones = P.tones.map(t => `<tr><td><b>${t.id}</b><small>种子 <code>${t.seed}</code></small></td><td>${sw(t.base)}</td><td><span class="tag dot" style="background:${t.bg};color:${t.text}">示例状态</span></td><td>${sw(t.text)}</td><td>${sw(t.bg)}</td><td class="num">${t.contrastText}</td></tr>`).join('');
+  return `<div class="pal"><header><h1>深色色板 · 夜幕紫灰</h1><p>中性色手调；主色与功能色按派生规则由种子推导，六个预设与自定义主色同一规则。对比度为 WCAG 2 计算值，正文要求 ≥ 4.5，实色（按钮、进度）对卡片底 ≥ 3。</p></header>
+    <section class="card"><h2>中性色与平台色</h2><table class="pt"><thead><tr><th>Token</th><th>浅色</th><th>深色</th><th>对比度</th></tr></thead><tbody>${rows}</tbody></table></section>
+    <section class="card"><h2>主色派生（六个预设）</h2><p class="t3">实色提亮到对卡片底 ≥ 3.2；按钮文字先白后深，都不足 4.5 时继续提亮直到深色字达标；主色文字提亮到 ≥ 5.5；浅底 = 实色 20% 压进卡片底。</p>
+      <table class="pt"><thead><tr><th>预设</th><th>深色实色</th><th>按钮</th><th>浅底与文字</th><th>悬停</th><th>实色对卡片底</th></tr></thead><tbody>${presets}</tbody></table></section>
+    <section class="card"><h2>功能色</h2><table class="pt"><thead><tr><th>功能</th><th>实色</th><th>徽标</th><th>文字</th><th>浅底</th><th>文字对浅底</th></tr></thead><tbody>${tones}</tbody></table></section>
+    <section class="card"><h2>终端配色（ANSI 色两种模式相同，底色取当前模式的墨色）</h2><div class="ansi">${['bg', 'fg', 'dim', 'cursor', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan'].map(n => `<div>${sw(v(`term-${n}`) || v('ink'))}<small>${n}</small></div>`).join('')}</div></section></div>`;
+};
+
+/* ---------------- 访问令牌 ---------------- */
+pages.tokens = () => {
+  const R = [['开发客户端', 'sk-prev…only', '全部可用账号', '2026/11/14', true], ['CI 流水线', 'sk-ci7a…9f2e', '正式账号 1、2、3', '2026/11/10', true], ['个人笔记本', 'sk-lp3c…a01d', '排除：备用账号 5', '2026/11/02', true], ['旧版脚本', 'sk-old8…77c0', '全部可用账号', '2026/09/30', false]];
+  return shell('tokens', ph('访问令牌', '管理客户端凭据和可用账号范围。', `<span class="btn btn-primary">${ic('plus', 's14')}创建令牌</span>`)
+    + `<section class="card tcard"><div class="tcard-h"><h3>访问令牌<small>4 个令牌</small></h3><div class="tb-spacer"></div>${input('搜索令牌名称', 'search', 260)}</div>
+    <table class="t"><colgroup><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:11%"><col style="width:10%"><col style="width:19%"></colgroup>
+    <thead><tr><th>名称</th><th>令牌</th><th>可用账号</th><th>创建时间</th><th>状态</th><th class="r">操作</th></tr></thead><tbody>
+    ${R.map((r, i) => `<tr class="${i === 1 ? 'hover' : ''}"><td><div style="display:flex;gap:10px;align-items:center"><span class="tile" style="width:32px;height:32px;border-radius:9px">${ic('key', 's14')}</span><b style="font-weight:720">${r[0]}</b></div></td><td><span class="mono">${r[1]}</span> <span class="tag tg-neutral">${ic('copy', 's14')}复制</span></td><td>${r[2]}</td><td class="num t3">${r[3]}</td><td><span style="display:inline-flex;gap:8px;align-items:center;font-weight:650;color:${r[4] ? 'var(--text)' : 'var(--text-3)'}"><i class="switch ${r[4] ? 'on' : ''}"></i>${r[4] ? '启用' : '停用'}</span></td><td><div class="ops"><span class="btn btn-sm">${ic('pencil', 's14')}编辑权限</span><span class="btn btn-sm btn-text dg">${ic('trash', 's14')}删除</span></div></td></tr>`).join('')}
+    </tbody></table></section>`);
+};
+
+/* ---------------- 会话封禁 ---------------- */
+pages.blocks = () => {
+  const R = Array.from({ length: 7 }, (_, i) => [`${'0'.repeat(10)}${String(i + 1).padStart(2, '0')}`, i % 3 === 1 ? '工具前驱拦截' : '推理提取拦截', i % 4 === 2 ? 'claude-sonnet-5-5' : 'claude-opus-5-5', i % 2 ? '正式账号 3' : '演示账号', `剩余 ${23 - i} 小时 ${(i * 7) % 60} 分钟`, `11/19 19:${String(37 - i).padStart(2, '0')}:49`, `${3 + (i % 3)} 次`, `11/19 19:${String(38 - i).padStart(2, '0')}:48`]);
+  return shell('blocks', ph('会话封禁', '查看策略拒答触发的会话封禁，以及到期和解除记录。', `<span class="btn">${ic('sliders', 's14')}封禁设置</span>`)
+    + `<section class="card tcard"><div class="tcard-h">${seg([['封禁中', 21, 1], ['已过期', 1], ['全部', 22]])}${input('输入会话匿名标识前缀', 'search', 320)}<span class="btn btn-primary">${ic('search', 's14')}查询</span><span class="btn">${ic('refresh', 's14')}刷新</span><div class="tb-spacer"></div><span class="t3" style="font-size:12px;font-weight:600">时间按本地时区显示 · 每 5 秒刷新</span></div>
+    <table class="t"><colgroup><col style="width:24%"><col style="width:15%"><col style="width:19%"><col style="width:15%"><col style="width:15%"><col style="width:12%"></colgroup>
+    <thead><tr><th>会话 / 触发来源</th><th>访问令牌 / 账号</th><th>封禁状态</th><th>封禁时间</th><th>本地拦截</th><th class="r">操作</th></tr></thead><tbody>
+    ${R.map((r, i) => `<tr class="${i === 0 ? 'hover' : ''}"><td><span class="mono">${r[0]}…</span><span class="sub">${r[1]} · ${r[2]}</span></td><td>演示令牌<span class="sub">${r[3]}</span></td><td>${tag('danger', '封禁中', true)}<span class="sub">${r[4]}</span></td><td class="num">${r[5]}</td><td class="num"><b>${r[6]}</b><span class="sub">最近 ${r[7]}</span></td><td class="r"><span class="btn btn-sm">解除封禁</span></td></tr>`).join('')}
+    </tbody></table>${pager(21, 2)}</section>`);
+};
+
+/* ---------------- 系统设置（沿用原稿两列字段） ---------------- */
+pages.settings = () => {
+  const F = [['准入等待上限（秒）', '99', '并发、准备与发送阶段共用等待期限。', true], ['可用负载权重', '1', '0–10，最多一位小数。'], ['有效额度权重', '0.8', '0–10，最多一位小数。'], ['真实健康权重', '1', '0–10，最多一位小数。'], ['首输出延迟权重', '0.5', '0–10，最多一位小数。'], ['额度重置系数', '0', '0 关闭。其他条件相近时优先利用即将重置的额度。'], ['排队等待系数', '0', '0 关闭。账号都需要等待时，优先选择预计等待较短的队列。'], ['5 小时重置窗口权重', '1', '设置 5 小时窗口在重置偏好中的贡献，0 忽略此窗口。']];
+  return shell('settings', ph('系统设置', '按用途管理网关策略，修改后统一保存。', `${input('搜索配置名称、用途或关键词', 'search', 320)}<span class="t3" style="font-weight:650;font-size:12px">59 项配置</span>`)
+    + `<div class="set"><nav class="set-nav"><span class="on">${ic('activity', 's14')}会话与调度<em style="color:var(--warning-text)">1</em></span><span>${ic('box', 's14')}模型与缓存</span><span>${ic('shield', 's14')}客户端与画像</span><span>${ic('globe', 's14')}连接与稳定性</span><span>${ic('sliders', 's14')}预热与拦截</span><span>${ic('todo', 's14')}日志与观测</span><span>${ic('clock', 's14')}预热记录<em>0</em></span><p style="margin:14px 12px 0;font-size:12px;color:var(--text-3);font-weight:550;line-height:1.7">所有配置统一保存。<br>切换分类保留未保存内容。</p></nav>
+    <section class="card" style="padding:22px 24px;display:flex;flex-direction:column;gap:18px;overflow:hidden"><div style="display:flex;gap:12px;align-items:center"><span class="tile">${ic('activity', 's18')}</span><div><div class="sec-t" style="font-size:17px">会话与发送调度</div><p style="margin:3px 0 0;font-size:12.5px;color:var(--text-3);font-weight:550">老会话保持有效绑定，新会话根据资格与容量选择账号。</p></div></div>
+    <div class="fg" style="gap:18px 20px">${F.map(f => `<div class="field"><label>${f[0]}${f[3] ? ' ' + tag('warning', '已修改') : ''}</label><div class="input${f[3] ? ' focus' : ''}">${f[1]}<span class="end"><span>−</span><span>+</span></span></div><span class="help">${f[2]}</span></div>`).join('')}</div></section></div>`,
+    `<div class="savebar" style="position:absolute;left:258px;right:28px;bottom:20px"><b>1 项待保存</b><span class="hint">修改将统一应用到网关</span><span style="margin-left:auto" class="btn">撤销修改</span><span class="btn btn-primary">保存配置</span></div>`);
+};
+
+/* ---------------- 系统更新：版本号入口 + 弹窗（不再单独成页） ---------------- */
+const accountsBg = () => accountsTop() + `<div class="grid g3">${A.map(accountCard).join('')}</div>`;
+const updateTiles = items => `<div class="u-tiles">${items.map(([l, v, link = '']) => `<div><span>${l}${link ? `<a>${link}</a>` : ''}</span><b>${v}</b></div>`).join('')}</div>`;
+const updateModal = (pill, body, foot) => `<div class="mask"></div><section class="modal um">
+  <div class="mh"><span class="ico s" style="width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none">${ic('upCircle', 's18')}</span><div><h2>系统更新</h2><p>检查版本、阅读发布说明，选择合适的时间安装。</p></div><span class="btn btn-icon btn-sm x">${ic('x', 's14')}</span></div>
+  <div class="mb" style="gap:12px">
+    <section class="u-sec"><div class="u-head"><div><small>flower2api</small><b>平台与网关镜像</b></div>${pill}</div>${body[0]}</section>
+    ${body.slice(1).join('')}
+  </div>
+  <div class="mf">${foot}</div>
+</section>`;
+
+pages.update = () => shell('accounts', accountsBg(), updateModal(
+  `<span class="pill s">${ic('upCircle', 's14')}有可用更新</span>`,
+  [updateTiles([['当前版本', 'v1.0.0'], ['最新版本', 'v1.0.1'], ['发布于', '11/12 13:31'], ['最近检查', '2 分钟前']])
+    + `<div class="strip s">${ic('check', 's14')}兼容性检查通过 · 安装前自动保存平台与网关数据库快照</div>`,
+  `<section class="u-sec"><div class="u-head"><b style="font-size:14px;margin:0">发布说明</b><span class="mono t4" style="font-size:12px;font-weight:650">v1.0.1</span></div>
+    <ul class="u-notes"><li>管理后台交互与采集状态改进。</li><li>账号卡片的用量刷新更稳定，轮询时布局不再跳动。（示例）</li><li>运行环境详情补充预热进程信息。（示例）</li></ul>
+    <span style="color:var(--primary-text);font-weight:700;font-size:12.5px">查看完整发布说明 →</span></section>`,
+  `<section class="u-sec u-plan"><span class="ico i" style="width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none">${ic('pause', 's14')}</span>
+    <div style="flex:1;min-width:0"><b style="font-size:13.5px;font-weight:760">安装时暂停新接单</b><p style="margin:2px 0 0;font-size:12px;color:var(--text-3);font-weight:550">等待在途工作结束后切换平台服务；2 个账号运行环境运行中，兼容的运行环境继续复用。</p></div>
+    <div class="field" style="width:150px"><label>在途等待上限</label><div class="input" style="height:34px;background:var(--surface)">1<span class="t3" style="font-size:12px">分钟</span><span class="end"><span>−</span><span>+</span></span></div></div></section>`],
+  `<span class="btn btn-sm btn-text">${ic('history', 's14')}版本记录与回退</span><span class="btn btn-sm btn-text">${ic('box', 's14')}运行组件与维护详情</span><span style="margin-left:auto" class="btn">${ic('refresh', 's14')}检查更新</span><span class="btn btn-primary">${ic('download', 's14')}安装更新</span>`));
+
+pages['update-progress'] = () => {
+  const L = [
+    ['21:32:08', 'ok', '下载与校验', '镜像签名与摘要已核对'],
+    ['21:33:40', 'ok', '候选已准备', '候选服务已就绪'],
+    ['21:33:41', 'run', '等待在途完成', '仍有 2 个请求处理中，新工作已暂缓'],
+    ['', 'wait', '保存数据库快照', ''], ['', 'wait', '执行数据库迁移', ''], ['', 'wait', '切换平台服务', ''],
+    ['', 'wait', '验证新版本', ''], ['', 'wait', '保存安装结果', ''], ['', 'wait', '回收旧制品', ''],
+  ];
+  return shell('accounts', accountsBg(), updateModal(
+    `<span class="pill i">${ic('refresh', 's14')}更新中</span>`,
+    [updateTiles([['当前版本', 'v1.0.0'], ['目标版本', 'v1.0.1'], ['操作 ID', 'op-7f3a…91c2'], ['最近更新', '21:34:22']])
+      + `<div class="strip n">${ic('info', 's14')}维护期间新工作暂缓，在途工作自然结束后继续。</div>`,
+    `<section class="u-sec" style="gap:10px"><div class="u-head"><b style="font-size:14px;margin:0;display:flex;align-items:center;gap:8px">${ic('terminal', 's14').replace('class="i', 'class="i t3')}更新进度<span class="t4 mono" style="font-size:12px;font-weight:650">3 / 9</span></b><span class="live">实时</span></div>
+      <div class="u-log">${L.map(([t, st, step, msg]) => `<div class="${st}"><time>${t || '—'}</time><i></i><b>${step}</b><em>${msg}</em></div>`).join('')}</div></section>`],
+    `<span class="btn btn-sm btn-text">${ic('list', 's14')}操作详情与数据库快照</span><span style="margin-left:auto" class="btn">取消等待</span><span class="btn btn-primary" disabled>${ic('refresh', 's14')}更新中…</span>`));
+};
+
+/* ---------------- 主题设置（新增页面，草稿只在当前浏览器生效） ---------------- */
+pages.theme = () => {
+  const derived = PALETTE;
+  const presets = [['花瓣紫', '品牌默认', '#6c54b4'], ['深海蓝', '冷静专业', '#2f6bd8', 1], ['松石绿', '清爽自然', '#0f9f8f'], ['暮光橙', '温暖醒目', '#e2742b'], ['玫瑰红', '柔和亲切', '#d64a7b'], ['石墨', '克制中性', '#3d4352']]
+    .map(([n, d, c, on], i) => [n, d, DARK ? derived.presets[i].base : c, on]);
+  const colors = [['品牌主色', 'colorPrimary', '#2f6bd8', '完整色阶与界面基调', 1], ['成功色', 'colorSuccess', '#12b981', '成功反馈与状态'], ['警告色', 'colorWarning', '#f59e0b', '额度与风险提醒'], ['错误色', 'colorError', '#ef4444', '失败与破坏性操作'], ['信息色', 'colorInfo', '#5983f4', '系统与请求信息']];
+  // 草稿为深海蓝：浅色取设计稿手调值，深色取派生值。
+  const ocean = derived.presets[1];
+  const draft = DARK
+    ? `--primary:${ocean.base};--primary-hover:${ocean.hover};--primary-container:${ocean.container};--primary-text:${ocean.text};--primary-ring:${ocean.ring};--on-primary:${ocean.on}`
+    : '--primary:#2f6bd8;--primary-hover:#2559b8;--primary-container:#edf3fd;--primary-text:#2556b0;--primary-ring:rgba(47,107,216,.18)';
+  return shell('theme', ph('主题设置', `自定义当前浏览器中的控制台主题<span class="dirty">${DARK ? 2 : 1} 处修改待应用</span>`, `<span class="btn btn-sm btn-text">${ic('undo', 's14')}撤销草稿</span><span class="btn btn-sm">${ic('rotate', 's14')}恢复默认</span><span class="btn btn-sm btn-primary">${ic('save', 's14')}保存并应用</span>`)
+    + `<div class="th"><aside class="card th-panel">
+      ${seg([['全局', undefined, 1], ['组件']])}${input('搜索主题、颜色或组件 Token')}
+      <div class="th-group"><h5>主题模式</h5>${seg([[`${ic('monitor', 's14')}跟随系统`], [`${ic('sun', 's14')}浅色`, undefined, !DARK], [`${ic('moon', 's14')}深色`, undefined, DARK]])}</div>
+      <div class="th-group"><h5>主题预设</h5><div class="th-presets">${presets.map(([n, d, c, on]) => `<div class="${on ? 'on' : ''}" style="--c:${c}"><i style="background:linear-gradient(135deg, ${c} 0 38%, color-mix(in srgb, ${c} 22%, var(--surface)) 38% 66%, var(--fill-2) 66%)"></i><b>${n}</b><small>${d}</small>${on ? ic('check', 's12') : ''}</div>`).join('')}</div></div>
+      <div class="th-group"><h5>表面材质</h5>${seg([['默认', undefined, 1], ['柔光']])}</div>
+      ${seg([['颜色', undefined, 1], ['尺寸'], ['风格']])}
+      <div class="th-group">${colors.map(([l, t, c, d, mod]) => `<div class="tf"><i style="background:${c}"></i><div style="min-width:0"><b>${l}${mod ? tag('primary', '已修改') : ''}</b><small>${d}</small></div><code>${c}</code></div>`).join('')}</div>
+    </aside>
+    <section class="card th-preview"><div class="tb"><div><div class="sec-t" style="font-size:15px">实时预览</div><p style="margin:2px 0 0;font-size:12px;color:var(--text-3);font-weight:550">草稿在隔离画板中渲染，保存前不影响控制台。</p></div><div class="tb-spacer"></div>${seg([['首页画板', undefined, 1], ['组件校样']])}<div class="zoom"><span>${ic('minus', 's14')}</span><span>50%</span><span>${ic('plus', 's14')}</span><span>${ic('fit', 's14')}</span></div></div>
+      <div class="canvas"><div class="artboard"><div style="${draft}">${shell('accounts', accountsBg())}</div></div><span class="hint">拖动空白处平移 · 滚轮缩放</span></div>
+    </section></div>`);
+};
+
+/* ---------------- 移动端账号 ---------------- */
+pages.mobile = () => `<div class="m-app"><div class="m-top"><span class="sb-mark" style="width:34px;height:34px;border-radius:9px">${flower(20)}</span><b>账号管理</b><div class="r"><span>${ic('search', 's18')}</span><span>${ic('menu', 's18')}</span></div></div>
+  <div style="padding:12px 16px 0;overflow:hidden">${seg([['全部', 101, 1], ['正常', 101], ['关注', 0], ['已停用', 0]])}</div>
+  <div style="padding:12px 16px;display:flex;flex-direction:column;gap:12px">${accountCard(A[0], 0)}</div></div>`;
+
+const key = location.hash.slice(1) || 'accounts';
+document.getElementById('root').innerHTML = (pages[key] || pages.accounts)();
+</script>
+</body>
+</html>

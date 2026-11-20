@@ -1,0 +1,44 @@
+{
+  "id": "console-dark-mode",
+  "name": "console-dark-mode",
+  "title": "控制台深色模式",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "web",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-19",
+  "completedAt": "2026-11-20",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-20T12:45:28Z",
+    "blockers": []
+  },
+  "branch": "feat/console-ui-revamp",
+  "base_branch": "flower2api",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-19-console-ui-revamp",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-20T22:30:00+08:00",
+    "completedSteps": [
+      "深色稿「夜幕紫灰」入库，createTheme 深色派生与 ui-foundation.css 深色块（与确认稿 palette.js 逐值一致）",
+      "主题模式运行时、两份入口首帧脚本与跟随系统（含独立 /runtime/ 文档）",
+      "侧栏与移动端抽屉快捷切换，主题设置页模式草稿与画板预览",
+      "原生页、终端（xterm 取 term token）、样式旧层与墨底文字的深色适配",
+      "verify_dark_mode 通过、全量回归仅 3 个基线已登记失败、Check-All full 通过、规范同步，业务代码已提交推送"
+    ],
+    "partialStep": null,
+    "nextStep": "上线后在真实控制台深色下核对授权登录终端的 Claude CLI 输出；父任务 console-ui-revamp 七个子任务均已完成，待父任务收尾",
+    "notes": "浅色仅在登记区域变化（侧栏新增按钮、墨底文字、xterm 配色、运行详情弹窗与旧层变量改指 token）；对照页 .deploy/console-ui-revamp/dark-mode/index.html。"
+  }
+}
