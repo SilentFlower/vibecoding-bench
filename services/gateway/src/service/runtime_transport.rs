@@ -37,7 +37,7 @@ use crate::model::account::Account;
 use crate::model::request_diagnostics::{ExecutionLocation, RequestLogMode};
 use crate::service::agy_contract::{
     AgyAccessSnapshot, AgyModelId, AgyOperation, AgySenderConfig, AgySubmission,
-    AgySystemPromptPolicy, AgyToolCompletion,
+    AgySystemPromptPolicy, AgyToolCompletion, AgyToolContinuationMode,
 };
 use crate::service::agy_runtime::AgyPool;
 use crate::service::gemini::agy_input_rejection;
@@ -73,6 +73,17 @@ pub struct TransportBinding {
     pub secret: String,
     #[serde(default)]
     pub release_id: String,
+}
+
+/// 管理面返回的业务绑定，续轮策略在单次派发内冻结。
+#[derive(Deserialize)]
+struct RuntimeBinding {
+    #[serde(flatten)]
+    binding: TransportBinding,
+    #[serde(default)]
+    agy_tool_continuation_mode: AgyToolContinuationMode,
+    #[serde(default)]
+    agy_tool_continuation_protocol: u32,
 }
 
 /// 请求元信息与原始 body 分开传输，避免重新序列化改变协议字节。
@@ -257,9 +268,15 @@ async fn send_with_client(
 pub struct PreparedTransport {
     account_id: i64,
     route: PreparedRoute,
+    tool_continuation_mode: AgyToolContinuationMode,
 }
 
 impl PreparedTransport {
+    /// 读取管理面本次派发选择。@return 冻结的工具续轮策略。
+    pub(crate) fn tool_continuation_mode(&self) -> AgyToolContinuationMode {
+        self.tool_continuation_mode
+    }
+
     /// 向原发送器登记取消，原事件流负责接收实际收口。@param request_id 原尝试。@param api_token_id 原调用方。@param deadline 截止。@return 取消已登记。
     pub(crate) async fn cancel_agy(
         &self,
@@ -351,12 +368,16 @@ impl PreparedTransport {
                 }
             }
             if response.status() == StatusCode::BAD_GATEWAY
-                && response.headers().contains_key(AGY_TOOL_FINALIZATION_FAILED)
+                && response
+                    .headers()
+                    .contains_key(AGY_TOOL_FINALIZATION_FAILED)
             {
                 return Err(AppError::AgyToolTurnFailed);
             }
             if response.status().is_server_error() {
-                return Err(AppError::ServiceUnavailable("AGY原工具轮状态暂时不可用".into()));
+                return Err(AppError::ServiceUnavailable(
+                    "AGY原工具轮状态暂时不可用".into(),
+                ));
             }
             return Err(AppError::BadRequest("AGY原工具轮拒绝回填".into()));
         }
@@ -467,6 +488,7 @@ pub async fn prepare(
         return Ok(PreparedTransport {
             account_id: account.id,
             route: PreparedRoute::Direct(account.proxy_url.clone()),
+            tool_continuation_mode: AgyToolContinuationMode::Claim,
         });
     }
     let secret = std::env::var("V3_INTERNAL_TOKEN").map_err(|_| {
@@ -547,6 +569,7 @@ pub(crate) async fn prepare_existing(
     Ok(Some(PreparedTransport {
         account_id: account.id,
         route: PreparedRoute::V3 { client, binding },
+        tool_continuation_mode: AgyToolContinuationMode::Claim,
     }))
 }
 
@@ -596,15 +619,27 @@ async fn prepare_from_runtime(
             .unwrap_or("account environment not ready");
         return Err(AppError::ServiceUnavailable(reason.into()));
     }
-    let binding: TransportBinding = response
+    let RuntimeBinding {
+        binding,
+        agy_tool_continuation_mode,
+        agy_tool_continuation_protocol,
+    } = response
         .json()
         .await
         .map_err(|_| AppError::ServiceUnavailable("invalid runtime binding".into()))?;
     validate_binding(&binding, account.id, deployment, release)?;
+    if agy_tool_continuation_mode != AgyToolContinuationMode::Claim
+        && agy_tool_continuation_protocol != 1
+    {
+        return Err(AppError::ServiceUnavailable(
+            "当前 AGY 发送器或请求内核暂不支持所选续轮模式".into(),
+        ));
+    }
     let client = binding_client(client, &binding, secret)?;
     Ok(PreparedTransport {
         account_id: account.id,
         route: PreparedRoute::V3 { client, binding },
+        tool_continuation_mode: agy_tool_continuation_mode,
     })
 }
 
@@ -1039,7 +1074,11 @@ fn configured_account_release() -> String {
 }
 
 #[cfg(unix)]
-fn authorized_previous_release(binding: &TransportBinding, deployment: &str, release: &str) -> bool {
+fn authorized_previous_release(
+    binding: &TransportBinding,
+    deployment: &str,
+    release: &str,
+) -> bool {
     let Ok(directory) = std::env::var("V3_UPDATE_GATE_DIR") else {
         return false;
     };
@@ -1061,7 +1100,9 @@ fn authorized_previous_release(binding: &TransportBinding, deployment: &str, rel
         return false;
     }
     let path = Path::new(&directory).join(format!("account-rollout-{control}.json"));
-    let Ok(record) = crate::service::system_update::read_update_record::<Value>(&path, 8 * 1024 * 1024) else {
+    let Ok(record) =
+        crate::service::system_update::read_update_record::<Value>(&path, 8 * 1024 * 1024)
+    else {
         return false;
     };
     rollout_matches(&record, binding, deployment, &control, release)
@@ -1088,7 +1129,11 @@ fn rollout_matches(
 }
 
 #[cfg(not(unix))]
-fn authorized_previous_release(_binding: &TransportBinding, _deployment: &str, _release: &str) -> bool {
+fn authorized_previous_release(
+    _binding: &TransportBinding,
+    _deployment: &str,
+    _release: &str,
+) -> bool {
     false
 }
 
@@ -2148,6 +2193,7 @@ mod tests {
         );
         let server = tokio::spawn(axum::serve(listener, router).into_future());
         let transport = PreparedTransport {
+            tool_continuation_mode: AgyToolContinuationMode::Claim,
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -2209,6 +2255,7 @@ mod tests {
             axum::serve(listener, sender_router(path.to_string_lossy().into_owned())).into_future(),
         );
         let transport = PreparedTransport {
+            tool_continuation_mode: AgyToolContinuationMode::Claim,
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -2241,6 +2288,7 @@ mod tests {
             axum::serve(listener, Router::new()).await.unwrap();
         });
         let transport = PreparedTransport {
+            tool_continuation_mode: AgyToolContinuationMode::Claim,
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -2441,6 +2489,7 @@ mod tests {
             release_id: "synthetic-release".into(),
         };
         let mut transport = PreparedTransport {
+            tool_continuation_mode: AgyToolContinuationMode::Claim,
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -2470,6 +2519,7 @@ mod tests {
         assert_eq!(frozen.generation, 5);
         assert!(
             PreparedTransport {
+                tool_continuation_mode: AgyToolContinuationMode::Claim,
                 account_id: 7,
                 route: PreparedRoute::Direct(String::new())
             }
@@ -2531,7 +2581,9 @@ mod tests {
             rollout_matches(&record, binding, "isolated", "ci-2-1", "ci-2-1")
         };
         assert!(matches(&binding));
-        assert!(!rollout_matches(&record, &binding, "isolated", "ci-3-1", "ci-2-1"));
+        assert!(!rollout_matches(
+            &record, &binding, "isolated", "ci-3-1", "ci-2-1"
+        ));
         binding.generation = 3;
         assert!(!matches(&binding));
         binding.generation = 2;

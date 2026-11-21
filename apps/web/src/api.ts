@@ -591,6 +591,13 @@ export interface DiagnosticContext {
   control_observed_at?: string | null
   control_error_code?: string | null
   control_recovery?: string | null
+  observed_control_http_status?: number | null
+  control_error_detail?: string | null
+  native_receive_ended?: boolean | null
+  native_source_terminal?: boolean | null
+  tool_continuation_mode?: string | null
+  tool_continuation_path?: string | null
+  tool_continuation_reason?: string | null
   input_rejection_reason?: string | null
   input_rejection_field?: string | null
   response_headers_source?: string | null

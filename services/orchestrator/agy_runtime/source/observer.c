@@ -26,7 +26,7 @@ __asm__(".symver __isoc23_strtol,strtol@GLIBC_2.2.5");
 
 #define SOURCE_SHA "39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43"
 typedef struct { pid_t tid; int detach; } Task;
-typedef struct { uint64_t g, request, depth, receive_stream, receive_depth, receive_epoch, receive_object, raw_g, raw_ptr, raw_size, raw_epoch; int raw_pending; int ended, receive_state, receive_result; char job[97], id[128]; } Call;
+typedef struct { uint64_t g, goid, request, depth, receive_epoch, raw_epoch; int ended; char job[97], id[128]; } Call;
 static Task tasks[4096];
 static Call calls[128];
 static FILE *events;
@@ -39,6 +39,9 @@ static unsigned diagnostic_pause_count;
 static int capture_tls;
 static pid_t controller_pid;
 static volatile sig_atomic_t checkpoint_requested;
+/* 固定映像中 Go 的 g.goid 与 g.parentGoid。Scanner 由模型调用所在 goroutine 启动。 */
+static const unsigned long goid_offset = 0x98;
+static const unsigned long parent_goid_offset = 0x118;
 static const unsigned long tls_write_site = 0x73819bfUL;
 static const unsigned char tls_write_signature[] = {0x48,0x8b,0x44,0x24,0x30,0x48,0x8b,0x5c,0x24,0x60,0x48,0x8b,0x4c,0x24,0x68,0xc9};
 static const size_t tls_sample_limit = 32UL * 1024 * 1024;
@@ -309,14 +312,19 @@ static void observe(pid_t tid, unsigned site, struct user_regs_struct *regs) {
         char job[97];
         if (!active_job(job)) { error_event("活动作业缺失"); return; }
         uint64_t depth = word(tid, goroutine+8, 8)-regs->rsp;
+        uint64_t goid = word(tid, goroutine+goid_offset, 8);
+        if (!goid || decode_error[0]) { error_event("原生模型调用缺少 goroutine 身份"); return; }
         Call *call = find_call(goroutine);
-        if (call && !call->ended && call->request == regs->rdi && call->depth == depth && !strcmp(call->job, job)) {
-            begin_event("observer_repeat", call); fputs(",\"site\":\"route\"}\n", events); return;
+        if (call && !call->ended) {
+            if (call->goid == goid && call->request == regs->rdi && call->depth == depth && !strcmp(call->job, job)) {
+                begin_event("observer_repeat", call); fputs(",\"site\":\"route\"}\n", events); return;
+            }
+            error_event("原生模型 goroutine 调用归属冲突"); return;
         }
         if (!call) for (size_t i = 0; i < 128; i++) if (!calls[i].g || calls[i].ended) { call = &calls[i]; break; }
         if (!call) { error_event("活动原生调用数量越界"); return; }
         if (strcmp(current_job, job)) { strcpy(current_job, job); call_number = 0; }
-        memset(call, 0, sizeof(*call)); call->g = goroutine; call->request = regs->rdi; call->depth = depth;
+        memset(call, 0, sizeof(*call)); call->g = goroutine; call->goid = goid; call->request = regs->rdi; call->depth = depth;
         strcpy(call->job, job); snprintf(call->id, sizeof(call->id), "%s.%u", job, ++call_number);
         size_t conversation_size = 0, id_size = 0;
         char *conversation = go_bytes(tid, regs->rdi, &conversation_size), *id = go_bytes(tid, regs->rdi+136, &id_size);
@@ -340,8 +348,10 @@ static void observe(pid_t tid, unsigned site, struct user_regs_struct *regs) {
     if (site == 3) {
         char job[97];
         if (!active_job(job)) { error_event("SDK原始帧缺少活动作业"); return; }
+        uint64_t parent = word(tid, goroutine+parent_goid_offset, 8);
+        if (!parent || decode_error[0]) { error_event("SDK原始帧缺少模型调用"); return; }
         Call *owner = NULL;
-        for (size_t i=0;i<128;i++) if (calls[i].g && !calls[i].ended && !strcmp(calls[i].job,job)) {
+        for (size_t i=0;i<128;i++) if (calls[i].goid == parent && !calls[i].ended && !strcmp(calls[i].job,job)) {
             if (owner) { error_event("SDK原始帧存在多个活动模型调用"); return; }
             owner=&calls[i];
         }
@@ -351,17 +361,16 @@ static void observe(pid_t tid, unsigned site, struct user_regs_struct *regs) {
         unsigned char *data=malloc(size?size:1);
         unsigned char *encoded=malloc(4*((size+2)/3)+1);
         if (!data || !encoded || !remote(tid,regs->rax,data,size)) { free(data);free(encoded);error_event("SDK原始帧读取失败");return; }
-        owner->raw_g=goroutine;owner->raw_ptr=regs->rax;owner->raw_size=size;owner->raw_pending=1;owner->raw_epoch++;
+        owner->raw_epoch++;
         int bytes=EVP_EncodeBlock(encoded,data,(int)size);
         begin_event("gemini_response",owner);
         fprintf(events,",\"source\":\"codeassist_scanner_block\",\"raw_epoch\":%llu,\"bytes\":%zu,\"goroutine\":%llu,\"tid\":%d,\"data_base64\":",(unsigned long long)owner->raw_epoch,size,(unsigned long long)goroutine,tid);
         json_string(events,(char *)encoded,(size_t)bytes);fputs("}\n",events);free(data);free(encoded);return;
     }
     Call *call = find_call(goroutine);
-    if (!call) { error_event("原生返回缺少调用归属"); return; }
+    if (!call || call->goid != word(tid, goroutine+goid_offset, 8)) { error_event("原生返回缺少调用归属"); return; }
     if (site == 1) {
         /* 固定Receive的chanrecv返回处：AL为接收结果，RCX为GetChatMessageResponse。 */
-        uint64_t stream=word(tid,regs->rsp+0x38,8);
         int success=(regs->rax & 0xff) != 0;
         uint64_t value=regs->rcx;
         if (decode_error[0]) {error_event(decode_error);return;}
@@ -369,7 +378,6 @@ static void observe(pid_t tid, unsigned site, struct user_regs_struct *regs) {
             if (success) {error_event("结束后原生返回发生变化");return;}
             begin_event("observer_repeat",call);fputs(",\"site\":\"native_eof\"}\n",events);return;
         }
-        call->receive_stream=stream;call->receive_result=success;call->receive_object=value;call->raw_pending=0;
         if (!success) {
             call->ended=1;begin_event("model_end",call);
             /* EOF不代表业务成功；错误通道由官方Err稍后消费，最终还须核对真实控制RPC。 */

@@ -191,6 +191,7 @@ ARG V3_PARENT_REV
 ARG V3_GATEWAY_REV
 LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELEASE \
     vibebench.agy-runtime-protocol="1" vibebench.agy-runtime-source-sha256=$V3_AGY_AUTH_SHA256 \
+    vibebench.agy-tool-continuation-protocol="1" \
     vibebench.account-platforms="1" vibebench.agy-auth-source-sha256=$V3_AGY_AUTH_SHA256 \
     vibebench.system-update-protocol="1" vibebench.account-runtime-protocol="1" \
     vibebench.fast-system-update="1" \

@@ -695,6 +695,7 @@ class Supervisor:
         failed = False
         replacement_required = False
         replacement_scheduled = False
+        retired_generation = None
         preparation_deadline = until
         try:
             self.continuation(value, until)
@@ -751,6 +752,13 @@ class Supervisor:
                 kind = event.get('type')
                 if kind in ['worker_error', 'process_closed']:
                     raise InputError('native_worker_closed')
+                if (kind == 'worker_retired' and job.get('tool_wait_published')
+                        and event.get('generation') == job['identity']['generation']):
+                    process = event.get('process') or {}
+                    # 只有实际退出且原生观察器完成收口，才可证明旧轮无法再接收回填。
+                    exit_code = process.get('observer_exit_code')
+                    if type(exit_code) is int and exit_code == 0 and not process.get('forced_cleanup'):
+                        retired_generation = event['generation']
                 if event.get('request_id') != value['request_id']:
                     continue
                 if kind in ('foreign_model_observed', 'unassigned_model_observed'):
@@ -785,6 +793,7 @@ class Supervisor:
                             job['until'] = until
                             event['tool_wait_expires_at_ms'] = expires_at_ms
                             job['waiting'] = True
+                            job['tool_wait_published'] = True
                         else:
                             job['waiting'] = False
                             job['final_status'] = 'error' if event.get('control_error_code') else 'completed'
@@ -834,11 +843,15 @@ class Supervisor:
                     self.condition.notify_all()
             with self.condition:
                 job['waiting'] = False
+                # 已向旧轮发送真实工具结果时，无法用旧进程退出推断该结果的执行状态。
+                history_closed = (job['identity'] if retired_generation is not None
+                                  and not job.get('claimed') else None)
                 # 完成条目只保留有限的去重标识，不保留AT、提示词或工具结果。
                 job['value'] = {'request_id': value['request_id'], 'api_token_id': value['api_token_id'], 'model': value['model']}
                 job.pop('calls', None)
             try:
-                self.emit('job_finalized', value['request_id'], status=job.get('final_status', 'error' if failed else 'prepared'))
+                self.emit('job_finalized', value['request_id'], status=job.get('final_status', 'error' if failed else 'prepared'),
+                    **({'history_closed':history_closed} if history_closed else {}))
             finally:
                 self.record_finished(job)
 

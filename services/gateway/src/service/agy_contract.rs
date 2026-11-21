@@ -174,6 +174,27 @@ impl AgyModelId {
     }
 }
 
+/// 运行环境为新工具批次冻结的续轮策略。
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AgyToolContinuationMode {
+    #[default]
+    Claim,
+    History,
+    ClaimWithHistory,
+}
+
+impl AgyToolContinuationMode {
+    /// 给诊断记录提供固定标识。@return 策略标识。
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Claim => "claim",
+            Self::History => "history",
+            Self::ClaimWithHistory => "claim_with_history",
+        }
+    }
+}
+
 /// 同一账号锁内取得的AT-only运行快照；禁止派生Debug。
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

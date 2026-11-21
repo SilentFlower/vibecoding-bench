@@ -12,7 +12,9 @@ use crate::model::request_diagnostics::{
     DiagnosticTokens, ExecutionLocation, GeminiDiagnosticUsage, NativeRuntimeObservation,
     SystemPromptDiagnostic, ToolTurnDiagnostic,
 };
-use crate::service::agy_contract::{AGY_SOURCE_SHA256, AgyModelId, AgySystemPromptPolicy};
+use crate::service::agy_contract::{
+    AGY_SOURCE_SHA256, AgyModelId, AgySystemPromptPolicy, AgyToolContinuationMode,
+};
 use crate::service::v3_scheduling::SchedulingRequest;
 
 /// 持有一次真实AGY提交的观察归属，HTTP结束后仅补工具收口。
@@ -204,6 +206,21 @@ impl AgyAttemptTrace {
         if let Some(calls) = native["native_model_calls"].as_u64() {
             context.native_model_calls = Some(calls);
         }
+        if let Some(status) = native["observed_control_http_status"]
+            .as_u64()
+            .filter(|status| (100..=599).contains(status))
+        {
+            context.observed_control_http_status = Some(status as u16);
+        }
+        if native["control_error_detail"] == "unexpected_eof" {
+            context.control_error_detail = Some("unexpected_eof".into());
+        }
+        if let Some(ended) = native["native_receive_ended"].as_bool() {
+            context.native_receive_ended = Some(ended);
+        }
+        if let Some(terminal) = native["native_source_terminal"].as_bool() {
+            context.native_source_terminal = Some(terminal);
+        }
         let control_code = match native["type"].as_str() {
             Some("completed") => native["control_error_code"].as_str(),
             Some("error" | "cancelled" | "tool_turn_finalized") => native["code"].as_str(),
@@ -386,6 +403,23 @@ impl AgyAttemptTrace {
             call_hashes: vec![],
         });
         self.publish();
+    }
+
+    /// 保存本次续轮路径，后续工具批次使用自己的策略。
+    /// @param mode 配置策略。@param history 本次使用历史。@param reason 固定切换原因。@return 无返回值。
+    pub(crate) fn continuation_path(
+        &mut self,
+        mode: AgyToolContinuationMode,
+        history: bool,
+        reason: Option<&'static str>,
+    ) {
+        let context = self.record.context.as_mut().expect("AGY固定上下文");
+        if context.tool_continuation_path.is_none() {
+            context.tool_continuation_mode = Some(mode.as_str().into());
+            context.tool_continuation_path = Some(if history { "history" } else { "claim" }.into());
+            context.tool_continuation_reason = reason.map(str::to_owned);
+            self.publish();
+        }
     }
 
     /// 记录本次采集状态。@param status 受控采集结果。@return 无。

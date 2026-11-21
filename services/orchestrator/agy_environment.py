@@ -14,7 +14,7 @@ from docker.errors import NotFound
 
 from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, create_environment, role_container
 from account_update_identity import compatible_account_origin, configured_release, role_release
-from agy_kernel import kernel_id, module_root, selection, verify_candidate, work_root
+from agy_kernel import kernel_id, module_root, selection, supports_tool_continuation, verify_candidate, work_root
 from native_capture_policy import capture_enabled
 from native_criu_settings import read_settings as read_criu
 from resource_budget import account_limits, agy_worker_limits, default_account_memory
@@ -302,6 +302,8 @@ def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance
         binding=runtime.read_sender_configuration(row)['binding']
         if binding['account_id']!=gateway_id or binding['environment_id']!=row['environment_id'] or binding['generation']!=row['generation'] or binding['release_id']!=role_release(runtime,row):
             raise ValueError('AGY传输绑定代次不一致')
+        if supports_tool_continuation(runtime, row, current_kernel, labels):
+            return {**binding, 'agy_tool_continuation_protocol': 1}
         return binding
 
 

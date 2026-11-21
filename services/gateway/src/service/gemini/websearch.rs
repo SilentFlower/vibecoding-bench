@@ -339,13 +339,14 @@ impl GeminiService {
         {
             return Err(AppError::AgyControl(StatusCode::CONFLICT));
         }
+        let admission = turn.admission.clone().ok_or(AppError::AgyToolTurnFailed)?;
         let search = turn.search.as_mut().expect("已按搜索会话匹配");
         search.active += 1;
         Ok(Some(SearchClaim {
             service: self.clone(),
             turn_id: id.clone(),
             account: turn.account.clone(),
-            admission: turn.admission.clone(),
+            admission,
             resolved_model: turn.model.resolved.clone(),
             transport: turn.transport.clone(),
             previous_request_id: turn.previous_request_id.clone(),

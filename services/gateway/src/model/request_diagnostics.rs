@@ -354,12 +354,32 @@ pub struct DiagnosticContext {
     pub control_error_code: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub control_recovery: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed_control_http_status: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub control_error_detail: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_receive_ended: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_source_terminal: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_continuation_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_continuation_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_continuation_reason: Option<String>,
     pub usage: Option<GeminiDiagnosticUsage>,
     pub system_prompt_policy: Option<SystemPromptDiagnostic>,
     pub tool_turn: Option<ToolTurnDiagnostic>,
     /// 读取原工具续轮响应时关联的 HTTP 根，历史记录默认缺省。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub replay_of_request_id: Option<String>,
+    /// 已进入发送边界的原尝试 ID。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub replay_of_attempt_id: Option<String>,
+    /// 重读时观察到的回填提交状态。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub replay_submission_state: Option<String>,
     pub response_headers_source: Option<String>,
 }
 

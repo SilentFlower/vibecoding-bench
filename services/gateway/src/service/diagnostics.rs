@@ -192,14 +192,23 @@ impl TraceContext {
     }
 
     /// 为重试保留本地 HTTP 根和原生成关联，零次上游尝试。
-    /// @param account_id 原账号。@param request_id 原生成根。@return 无。
-    pub(super) fn agy_replayed(&self, account_id: i64, request_id: &str) {
+    /// @param account_id 原账号。@param request_id 原生成根。@param attempt_id 原尝试。
+    /// @param submission_state 已观察到的发送状态。@return 无。
+    pub(super) fn agy_replayed(
+        &self,
+        account_id: i64,
+        request_id: &str,
+        attempt_id: Option<&str>,
+        submission_state: &'static str,
+    ) {
         let mut state = self.lock();
         state.local_outcome = Some("cache_hit");
         state.request.account_id = Some(account_id);
         state.request.error_stage = Some("tool_continuation".into());
         if let Some(context) = state.request.context.as_mut() {
             context.replay_of_request_id = Some(request_id.to_owned());
+            context.replay_of_attempt_id = attempt_id.map(str::to_owned);
+            context.replay_submission_state = Some(submission_state.into());
         }
         drop(state);
         self.emit(None);
@@ -922,7 +931,9 @@ impl RequestTraceGuard {
             AppError::TooManyRequests(_) => "admission",
             AppError::AgyUpstreamQuota => "upstream_model",
             AppError::AgyControl(_) => "native_control",
-            AppError::AgyToolTurnFailed | AppError::AgyToolReplayUnavailable => "tool_continuation",
+            AppError::AgyToolTurnFailed
+            | AppError::AgyToolReplayUnavailable
+            | AppError::AgyToolResponseExpired => "tool_continuation",
             AppError::BadGateway(_) => "transport",
             // 503 可来自凭据、环境或原生准备，具体阶段由失败边界记录。
             AppError::ServiceUnavailable(_) => "gateway",

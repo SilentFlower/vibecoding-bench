@@ -14275,8 +14275,10 @@ def v3_transport(account_id: int, wake: bool = True):
     configuration = account_runtime.gateway._request('GET', f'/admin/runtime/accounts/{account_id}/config')
     if configuration.get('platform') == 'antigravity':
         from agy_environment import transport as agy_transport
+        from agy_tool_continuation import configured_binding
         try:
-            return agy_placement.transport(account_id, wake=wake) if agy_placement else agy_transport(account_runtime, account_id, wake=wake)
+            binding = agy_placement.transport(account_id, wake=wake) if agy_placement else agy_transport(account_runtime, account_id, wake=wake)
+            return configured_binding(account_runtime.data, binding)
         except (ValueError, RuntimeError, OSError, DockerException):
             raise HTTPException(503, 'AGY账号环境未就绪或需要维护') from None
     connection = get_db()
@@ -14822,7 +14824,7 @@ def v3_agy_kernel_catalog(environment_id: str) -> dict:
         with account_runtime.environment_lock(environment_id):
             handled, value = agy_placement.control(row, 'kernel-read') if agy_placement else (False, None)
             return value if handled else catalog(account_runtime, row)
-    except (OSError, ValueError, RuntimeError):
+    except (DockerException, OSError, ValueError, RuntimeError):
         raise HTTPException(409, '当前环境的内核登记需要核对') from None
 
 
@@ -14850,6 +14852,51 @@ def v3_select_agy_kernel(environment_id: str, body: AgyKernelSelection) -> dict:
         raise HTTPException(409, str(error)) from None
     except (DockerException, RequestException, OSError):
         raise HTTPException(503, '内核切换状态待核对，请刷新当前环境') from None
+
+
+class AgyToolContinuationSelection(BaseModel):
+    """绑定已展示环境代次与策略版本的工具续轮设置。"""
+
+    model_config = ConfigDict(extra='forbid')
+    expected_generation: StrictInt
+    expected_revision: StrictInt
+    mode: Literal['claim', 'history', 'claim_with_history']
+
+
+@app.get('/api/environments/{environment_id}/agy-tool-continuation')
+def v3_agy_tool_continuation(environment_id: str) -> dict:
+    """读取环境续轮设置。@param environment_id 固定逻辑环境。@return 当前策略和可用性。"""
+    from agy_tool_continuation import read_policy
+
+    _agy_kernel_environment(environment_id)
+    with account_runtime.environment_lock(environment_id):
+        catalog = v3_agy_kernel_catalog(environment_id)
+        try:
+            policy = read_policy(account_runtime.data, environment_id)
+        except (OSError, ValueError):
+            raise HTTPException(409, '工具续轮策略需要核对') from None
+        return {**policy, 'generation': catalog['generation'],
+            'supported': catalog.get('tool_continuation_supported') is True}
+
+
+@app.post('/api/environments/{environment_id}/agy-tool-continuation')
+def v3_select_agy_tool_continuation(environment_id: str, body: AgyToolContinuationSelection) -> dict:
+    """保存当前逻辑环境续轮策略。@param environment_id 固定逻辑环境。@param body 已展示范围和新策略。@return 保存后的策略。"""
+    from agy_tool_continuation import save_policy
+
+    _agy_kernel_environment(environment_id)
+    try:
+        with UPDATE_GATE.admission('agy-tool-continuation'), account_runtime.environment_lock(environment_id):
+            observed = v3_agy_tool_continuation(environment_id)
+            if observed['generation'] != body.expected_generation:
+                raise ValueError('环境代次已变化，请刷新后重试')
+            policy = save_policy(account_runtime.data, environment_id, body.expected_revision, body.mode,
+                supported=observed['supported'])
+            return {**observed, **policy}
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from None
+    except OSError:
+        raise HTTPException(503, '工具续轮模式保存失败，请刷新当前环境') from None
 
 
 @app.post("/api/environments/{environment_id}/maintenance")

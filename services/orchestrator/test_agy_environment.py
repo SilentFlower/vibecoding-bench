@@ -13,6 +13,7 @@ from unittest.mock import Mock, patch
 from account_runtime import AccountRuntime, derive_v3_fingerprint
 from agy_environment import SOURCE_SHA256, capture, lookup, lookup_environment, maintenance, quiesce, register, sender_config, summary, transport
 from agy_kernel import activate, catalog, module_root, selection, stage, work_root
+from agy_tool_continuation import configured_binding, read_policy, save_policy
 from cluster_service import ClusterService
 from cluster_store import ClusterStore
 from database_migrations import apply_migrations, migration_plan
@@ -61,6 +62,25 @@ class AgyEnvironmentTests(unittest.TestCase):
             self.assertEqual(migration_plan(connection)['current_version'],6)
         finally:
             connection.close()
+
+    def test_tool_continuation_is_frozen_per_environment_and_checked_on_save(self):
+        """核对默认值、旧版本写入拒绝、历史能力以及已派发的绑定。@return 无。"""
+        first=register(self.runtime,17)['environment_id']
+        second=register(self.runtime,18)['environment_id']
+        binding={'environment_id':first,'agy_tool_continuation_protocol':1}
+        original=configured_binding(self.root,binding)
+        self.assertEqual(read_policy(self.root,first),{'mode':'claim','revision':0})
+        with self.assertRaisesRegex(ValueError,'暂不支持'):
+            save_policy(self.root,first,0,'history',supported=False)
+        saved=save_policy(self.root,first,0,'history',supported=True)
+        self.assertEqual(saved,{'mode':'history','revision':1})
+        self.assertNotIn('agy_tool_continuation_mode',original)
+        self.assertEqual(configured_binding(self.root,binding)['agy_tool_continuation_mode'],'history')
+        self.assertEqual(read_policy(self.root,second),{'mode':'claim','revision':0})
+        with self.assertRaisesRegex(ValueError,'已变化'):
+            save_policy(self.root,first,0,'claim_with_history',supported=True)
+        self.assertEqual(save_policy(self.root,first,1,'claim_with_history',supported=True)['revision'],2)
+        self.assertEqual(configured_binding(self.root,binding)['agy_tool_continuation_mode'],'claim_with_history')
 
     def test_stopped_environment_shows_configured_local_node(self):
         """停止的环境也显示本机归属，实际进程状态沿原取值。@return 无。"""

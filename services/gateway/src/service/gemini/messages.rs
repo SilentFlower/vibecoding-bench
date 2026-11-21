@@ -22,13 +22,26 @@ use uuid::Uuid;
 
 use crate::error::AppError;
 
-use super::{AGY_IMAGE_MIME_TYPES, gemini_thinking_budget_tier, gemini_thinking_level_tier};
+use super::{
+    AGY_IMAGE_MIME_TYPES, gemini_thinking_budget_tier, gemini_thinking_level_tier, prompt_blocked,
+};
 
 const IMAGE_BASE64: GeneralPurpose = GeneralPurpose::new(
     &alphabet::STANDARD,
     GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
 );
 const USER_PROMPT_SUBMIT_CONTEXT_PREFIX: &str = "UserPromptSubmit hook additional context: ";
+const AGENT_SUMMARY_HEADER: &str = "Describe your most recent action in 3-5 words using present tense (-ing). Name the file or function, not the branch. Do not use tools.\n";
+const AGENT_SUMMARY_EXAMPLES: &str = r#"
+Good: "Reading runAgent.ts"
+Good: "Fixing null check in validate.ts"
+Good: "Running auth module tests"
+Good: "Adding retry logic to fetchUser"
+
+Bad (past tense): "Analyzed the branch diff"
+Bad (too vague): "Investigating the issue"
+Bad (too long): "Reviewing full branch diff and AgentTool.tsx integration"
+Bad (branch name): "Analyzed adam/background-summary branch diff""#;
 static READ_TRUNCATION_NOTICE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"^\[Truncated: .*\blines [0-9]+[-–][0-9]+ of [0-9]+ total\b.*\bRead with offset=[0-9]+ limit=[0-9]+\b.*\]$",
@@ -92,8 +105,8 @@ fn has_read_result_in_user_turn(contents: &[Value]) -> bool {
         .any(|part| part["functionResponse"]["name"] == "Read")
 }
 
-/// 投影已识别的 Messages 请求。@param request 原始请求。@return Gemini 正文。
-pub(super) fn convert_request(request: &Value) -> Result<Value, AppError> {
+/// 投影已识别的 Messages 请求。@param request 原始请求。@return Gemini 正文及可选的本地摘要。
+pub(super) fn convert_request(request: &Value) -> Result<(Value, Option<String>), AppError> {
     let messages = request["messages"]
         .as_array()
         .filter(|items| !items.is_empty())
@@ -206,6 +219,8 @@ pub(super) fn convert_request(request: &Value) -> Result<Value, AppError> {
         }
         contents.push(json!({"role": role, "parts": parts}));
     }
+    // 当轮系统补充文本会追加到用户消息尾部。先用已校验的客户端消息识别摘要。
+    let summary = agent_summary(&contents);
     append_turn_context(&mut contents, &mut turn_context);
 
     if contents.is_empty() {
@@ -252,7 +267,7 @@ pub(super) fn convert_request(request: &Value) -> Result<Value, AppError> {
     if !config.is_empty() {
         body["generationConfig"] = Value::Object(config);
     }
-    Ok(body)
+    Ok((body, summary))
 }
 
 /// 读取供原生目录选号的思考档位。@param request Claude 请求。@return 可映射的档位。
@@ -288,6 +303,78 @@ pub(super) fn message_id() -> String {
     format!("msg_{}", Uuid::new_v4().simple())
 }
 
+/// 识别已校验 Messages 历史中的后台动作摘要并描述最近的工具动作。
+/// @param contents 客户端消息投影。@return 精确匹配模板与整批工具结果时的简短状态。
+fn agent_summary(contents: &[Value]) -> Option<String> {
+    let (last, history) = contents.split_last()?;
+    let (prompt, parts) = last["parts"].as_array()?.split_last()?;
+    let previous = prompt["text"]
+        .as_str()?
+        .strip_prefix(AGENT_SUMMARY_HEADER)?
+        .strip_suffix(AGENT_SUMMARY_EXAMPLES)?;
+    if last["role"] != "user"
+        || (!previous.is_empty()
+            && !previous
+                .strip_prefix("\nPrevious: \"")
+                .and_then(|value| value.strip_suffix("\" — say something NEW.\n"))
+                .is_some_and(|value| !value.is_empty() && !value.contains('\n')))
+    {
+        return None;
+    }
+    // SDK 可把摘要追加到工具结果所在的 user 块，也可单独发送一个 user 块。
+    let (results, history) = if parts.is_empty() {
+        let (user, history) = history.split_last()?;
+        if user["role"] != "user" {
+            return None;
+        }
+        (user["parts"].as_array()?.as_slice(), history)
+    } else {
+        (parts, history)
+    };
+    let assistant = history.last().filter(|value| value["role"] == "model")?;
+    let mut calls: HashMap<_, _> = assistant["parts"]
+        .as_array()?
+        .iter()
+        .filter_map(|part| part.get("functionCall"))
+        .map(|call| (call["id"].as_str().unwrap_or_default(), call))
+        .collect();
+    if calls.is_empty() || calls.len() != results.len() {
+        return None;
+    }
+    let mut latest = None;
+    for part in results {
+        let response = part.get("functionResponse")?;
+        let call = calls.remove(response["id"].as_str()?)?;
+        latest = Some((call, response["response"]["is_error"] == true));
+    }
+    let (call, failed) = latest?;
+    let (action, fallback) = match (failed, call["name"].as_str()?) {
+        (true, _) => return Some("Checking a tool error".into()),
+        (_, "Read") => ("Reading", "Reading a local file"),
+        (_, "Edit" | "MultiEdit") => ("Editing", "Editing a local file"),
+        (_, "Write") => ("Writing", "Writing a local file"),
+        (_, "Bash") => return Some("Running a shell command".into()),
+        (_, "Grep" | "Glob" | "WebSearch" | "web_search") => {
+            return Some("Searching for matching results".into());
+        }
+        _ => return Some("Checking the tool result".into()),
+    };
+    let file = call["args"]["file_path"]
+        .as_str()
+        .and_then(|path| path.rsplit(['/', '\\']).next())
+        .filter(|file| {
+            !file.is_empty()
+                && file.len() <= 80
+                && file
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+        });
+    Some(match file {
+        Some(file) => format!("{action} file {file}"),
+        None => fallback.into(),
+    })
+}
+
 fn usage(source: &Value) -> Value {
     let count = |field: &str| source[field].as_u64().unwrap_or(0);
     let cached = count("cachedContentTokenCount");
@@ -311,6 +398,11 @@ fn response_text(part: &Value) -> Option<Cow<'_, str>> {
     if let Some(text) = part["text"].as_str() {
         return Some(Cow::Borrowed(text));
     }
+    let (mime, data) = response_image(part)?;
+    Some(Cow::Owned(format!("![image](data:{mime};base64,{data})")))
+}
+
+fn response_image(part: &Value) -> Option<(&str, &str)> {
     let image = part.get("inlineData").or_else(|| part.get("inline_data"))?;
     let mime = image
         .get("mimeType")
@@ -328,7 +420,21 @@ fn response_text(part: &Value) -> Option<Cow<'_, str>> {
         tracing::warn!("AGY Messages 收到格式无效或不支持的内嵌图片");
         return None;
     }
-    Some(Cow::Owned(format!("![image](data:{mime};base64,{data})")))
+    Some((mime, data))
+}
+
+/// 判断首个原生 Part 能否作为有效的 Messages 内容交付。
+/// @param part 原生消息部分。@return 有工具、签名、非空文本或有效图片时为真。
+pub(super) fn deliverable_part(part: &Value) -> bool {
+    part["functionCall"].is_object()
+        || (part["thought"] == true
+            && part["thoughtSignature"]
+                .as_str()
+                .is_some_and(|value| !value.is_empty()))
+        || part["text"]
+            .as_str()
+            .is_some_and(|value| !value.trim().is_empty())
+        || response_image(part).is_some()
 }
 
 fn content_block(part: &Value) -> Option<Value> {
@@ -349,6 +455,9 @@ fn content_block(part: &Value) -> Option<Value> {
 /// 输出原生结果对应的 Messages JSON。@param output 已聚合的 Gemini 帧。@param model 公开模型。@return Anthropic 响应。
 pub(super) fn json_response(output: &Value, model: &str) -> Response {
     let candidate = &output["candidates"][0];
+    let reason = candidate["finishReason"]
+        .as_str()
+        .or_else(|| prompt_blocked(output).then_some("SAFETY"));
     let content: Vec<_> = candidate["content"]["parts"]
         .as_array()
         .into_iter()
@@ -358,9 +467,10 @@ pub(super) fn json_response(output: &Value, model: &str) -> Response {
     let used_tool = content.iter().any(|block| block["type"] == "tool_use");
     Json(json!({
         "id": message_id(), "type": "message", "role": "assistant", "model": model,
-        "stop_reason": stop_reason(candidate["finishReason"].as_str(), used_tool), "stop_sequence": null,
+        "stop_reason": stop_reason(reason, used_tool), "stop_sequence": null,
         "content": content, "usage": usage(&output["usageMetadata"]),
-    })).into_response()
+    }))
+    .into_response()
 }
 
 /// 输出 Messages 入口的协议错误。@param status HTTP 状态。@param message 脱敏文案。@return 错误 JSON。
@@ -498,6 +608,8 @@ impl MessageStream {
         let candidate = &frame["candidates"][0];
         if let Some(reason) = candidate["finishReason"].as_str() {
             self.finish = Some(reason.to_owned());
+        } else if prompt_blocked(&frame) {
+            self.finish = Some("SAFETY".into());
         }
         for part in candidate["content"]["parts"]
             .as_array()
@@ -605,8 +717,81 @@ pub(super) fn stream_response(
 
 #[cfg(test)]
 mod tests {
-    use super::{convert_request, response_text, thinking_tier};
-    use serde_json::json;
+    use super::{AGENT_SUMMARY_EXAMPLES, AGENT_SUMMARY_HEADER, response_text, thinking_tier};
+    use crate::error::AppError;
+    use serde_json::{Value, json};
+
+    fn convert_request(request: &Value) -> Result<Value, AppError> {
+        super::convert_request(request).map(|(body, _)| body)
+    }
+
+    #[test]
+    fn agent_summary_requires_the_exact_prompt_and_a_complete_latest_tool_batch() {
+        let prompt = format!("{AGENT_SUMMARY_HEADER}{AGENT_SUMMARY_EXAMPLES}");
+        let previous = format!(
+            "{AGENT_SUMMARY_HEADER}\nPrevious: \"Reading project configuration\" — say something NEW.\n{AGENT_SUMMARY_EXAMPLES}"
+        );
+        let base = json!({"messages":[
+            {"role":"user","content":"读取合成文件。"},
+            {"role":"assistant","content":[
+                {"type":"tool_use","name":"Read","id":"r1","input":{"file_path":"/fixture/main.rs"}},
+                {"type":"tool_use","name":"Read","id":"r2","input":{"file_path":"/fixture/lib.rs"}}
+            ]},
+            {"role":"user","content":[
+                {"type":"tool_result","tool_use_id":"r2","content":"示例数据"},
+                {"type":"tool_result","tool_use_id":"r1","content":"示例数据"}
+            ]}
+        ]});
+        for (combined, prompt) in [(true, &prompt), (false, &previous)] {
+            let mut case = base.clone();
+            if combined {
+                case["messages"][2]["content"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!({"type":"text","text":prompt}));
+            } else {
+                case["messages"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!({"role":"user","content":prompt}));
+            }
+            let truncated =
+                "[Truncated: showing lines 1–5 of 8 total. Read with offset=6 limit=3.]";
+            let expected = Some("Reading file main.rs");
+            assert_eq!(
+                super::convert_request(&case).unwrap().1.as_deref(),
+                expected
+            );
+            let messages = case["messages"].as_array_mut().unwrap();
+            messages.insert(3, json!({"role":"system","content":truncated}));
+            let (body, summary) = super::convert_request(&case).unwrap();
+            assert_eq!(summary.as_deref(), expected);
+            assert_eq!(
+                body["contents"].as_array().unwrap().last().unwrap()["parts"]
+                    .as_array()
+                    .unwrap()
+                    .last()
+                    .unwrap()["text"],
+                truncated
+            );
+        }
+        let mut ordinary = base.clone();
+        ordinary["messages"][2]["content"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"type":"text","text":format!("{prompt}\n继续处理") }));
+        assert!(super::convert_request(&ordinary).unwrap().1.is_none());
+        let mut incomplete = base;
+        incomplete["messages"][2]["content"]
+            .as_array_mut()
+            .unwrap()
+            .pop();
+        incomplete["messages"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"role":"user","content":prompt}));
+        assert!(super::convert_request(&incomplete).unwrap().1.is_none());
+    }
 
     #[test]
     fn messages_prompt_hook_keeps_system_and_tool_continuation_prefix_stable() {

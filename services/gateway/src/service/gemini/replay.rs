@@ -1,4 +1,4 @@
-//! 已受理工具续轮的进程内响应缓存。
+//! 已受理工具续轮的提交回执和短期响应缓存。
 
 use std::mem::size_of;
 use std::sync::{Arc, Mutex};
@@ -12,6 +12,8 @@ use tokio::time::{Instant, timeout_at};
 
 use crate::error::AppError;
 use crate::service::system_update::InferenceCutover;
+
+use super::AGY_TOOL_WAIT_LIMIT;
 
 /// 重试比对使用入站 JSON，原生历史的归一化不改变它。
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -64,9 +66,18 @@ struct StoredFrame {
 }
 
 #[derive(Default)]
-struct ReplayFrames {
+struct ReplayState {
     frames: Vec<Arc<StoredFrame>>,
+    unavailable: bool,
     terminal: Option<Result<(), AppError>>,
+    attempt: Option<ReplayAttempt>,
+}
+
+/// 已进入发送边界的原尝试。观察到模型启动后才能确认原生已执行。
+#[derive(Clone)]
+pub(super) struct ReplayAttempt {
+    pub(super) id: String,
+    pub(super) model_observed: bool,
 }
 
 /// 同一生成的已交付帧、出站边界和读者进度。
@@ -75,10 +86,13 @@ pub(super) struct ToolReplay {
     pub(super) request_id: String,
     pub(super) previous_turn: String,
     pub(super) derived_session_id: Option<String>,
+    pub(super) session_scope: Option<String>,
     pub(super) deadline: Instant,
+    pub(super) receipt_deadline: Instant,
     pub(super) cutover: Option<InferenceCutover>,
     budget: Arc<Semaphore>,
-    frames: Mutex<ReplayFrames>,
+    _receipt_reservation: Option<OwnedSemaphorePermit>,
+    frames: Mutex<ReplayState>,
     changes: watch::Sender<()>,
 }
 
@@ -102,12 +116,75 @@ impl ToolReplay {
             request_id,
             previous_turn,
             derived_session_id,
+            session_scope: None,
             deadline,
+            receipt_deadline: deadline + AGY_TOOL_WAIT_LIMIT,
             cutover,
             budget,
-            frames: Mutex::new(ReplayFrames::default()),
+            _receipt_reservation: None,
+            frames: Mutex::new(ReplayState::default()),
             changes: watch::channel(()).0,
         }
+    }
+
+    /// 在领取原批次之前为提交回执保留共享内存预算。
+    /// @param key 规范化的重读键。@param budget 轻量回执独立预算。@return 可接纳回填时成功。
+    pub(super) fn reserve_receipt(
+        &mut self,
+        key: &ReplayKey,
+        budget: &Arc<Semaphore>,
+    ) -> Result<(), AppError> {
+        // 原尝试与 HTTP 根同为 UUID，键还需由到期任务保存一份。
+        let bytes = size_of::<Self>()
+            + 2 * (size_of::<ReplayKey>() + key.model.len() + self.request_id.len())
+            + self.previous_turn.len()
+            + self.derived_session_id.as_ref().map_or(0, String::len)
+            + self.session_scope.as_ref().map_or(0, String::len);
+        let bytes = u32::try_from(bytes).map_err(|_| AppError::AgyToolReplayUnavailable)?;
+        self._receipt_reservation = Some(
+            budget
+                .clone()
+                .try_acquire_many_owned(bytes)
+                .map_err(|_| AppError::AgyToolReplayUnavailable)?,
+        );
+        Ok(())
+    }
+
+    /// 在撤销原待续归属时登记原尝试。@param id 首次发送编号。@return 无。
+    pub(super) fn mark_sending(&self, id: &str) {
+        self.frames
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .attempt = Some(ReplayAttempt {
+            id: id.to_owned(),
+            model_observed: false,
+        });
+    }
+
+    /// 以受信原生事件确认已开始模型调用。@param id 原生尝试 ID。@return 无。
+    pub(super) fn mark_model_observed(&self, id: &str) {
+        let mut state = self
+            .frames
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        if let Some(attempt) = state.attempt.as_mut().filter(|attempt| attempt.id == id) {
+            attempt.model_observed = true;
+        }
+    }
+
+    /// 读取轻量的提交状态。@return 已进入发送边界的原尝试。
+    pub(super) fn attempt(&self) -> Option<ReplayAttempt> {
+        self.frames
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .attempt
+            .clone()
+    }
+
+    /// 在执行期限之外，仅保留已进入发送边界的回执。
+    /// @param now 当前单调时刻。@return 重试仍可定位原归属时为真。
+    pub(super) fn retained(&self, now: Instant) -> bool {
+        now < self.deadline || (now < self.receipt_deadline && self.attempt().is_some())
     }
 
     /// 保留一份紧凑帧。容量不足只关闭重读，首笔仍沿原通道交付。
@@ -117,7 +194,7 @@ impl ToolReplay {
             .frames
             .lock()
             .unwrap_or_else(|error| error.into_inner());
-        if state.terminal.is_some() {
+        if state.terminal.is_some() || state.unavailable || Instant::now() >= self.deadline {
             return;
         }
         let stored = serde_json::to_vec(frame).ok().and_then(|encoded| {
@@ -137,10 +214,8 @@ impl ToolReplay {
         if let Some(stored) = stored {
             state.frames.push(stored);
         } else {
-            *state = ReplayFrames {
-                frames: Vec::new(),
-                terminal: Some(Err(AppError::AgyToolReplayUnavailable)),
-            };
+            state.frames = Vec::new();
+            state.unavailable = true;
         }
         self.changes.send_replace(());
     }
@@ -157,17 +232,36 @@ impl ToolReplay {
         }
     }
 
-    /// 回收响应字节并通知仍在读取的连接。@return 无。
-    pub(super) fn expire(&self) {
+    /// 回收响应字节并通知读者。提交状态和原终态继续由回执持有。@return 无。
+    pub(super) fn expire_frames(&self) {
         let mut state = self
             .frames
             .lock()
             .unwrap_or_else(|error| error.into_inner());
-        *state = ReplayFrames {
-            frames: Vec::new(),
-            terminal: Some(Err(AppError::AgyToolReplayUnavailable)),
-        };
+        state.frames = Vec::new();
+        state.unavailable = true;
         self.changes.send_replace(());
+    }
+
+    fn unavailable_error(&self, state: &ReplayState) -> Option<AppError> {
+        let expired = Instant::now() >= self.deadline;
+        if !expired && !state.unavailable {
+            return None;
+        }
+        Some(match state.terminal.as_ref() {
+            Some(Err(error)) => error.clone(),
+            _ if expired => AppError::AgyToolResponseExpired,
+            _ => AppError::AgyToolReplayUnavailable,
+        })
+    }
+
+    /// 返回字节已回收时的公开结果。@return 原失败、明确过期或短期缓存故障。
+    pub(super) fn response_error(&self) -> Option<AppError> {
+        let state = self
+            .frames
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        self.unavailable_error(&state)
     }
 
     /// 检查首笔断开后是否仍有重试方在读取。@return 存在重试读者时为真。
@@ -187,14 +281,14 @@ impl ToolReplay {
         stream::unfold(Some(cursor), |cursor| async move {
             let (replay, mut changes, index) = cursor?;
             loop {
-                if Instant::now() >= replay.deadline {
-                    return Some((Err(AppError::AgyToolReplayUnavailable), None));
-                }
                 let (frame, terminal) = {
                     let state = replay
                         .frames
                         .lock()
                         .unwrap_or_else(|error| error.into_inner());
+                    if let Some(error) = replay.unavailable_error(&state) {
+                        return Some((Err(error), None));
+                    }
                     (state.frames.get(index).cloned(), state.terminal.clone())
                 };
                 if let Some(frame) = frame {
@@ -209,7 +303,12 @@ impl ToolReplay {
                     timeout_at(replay.deadline, changes.changed()).await,
                     Ok(Ok(()))
                 ) {
-                    return Some((Err(AppError::AgyToolReplayUnavailable), None));
+                    return Some((
+                        Err(replay
+                            .response_error()
+                            .unwrap_or(AppError::AgyToolReplayUnavailable)),
+                        None,
+                    ));
                 }
             }
         })
@@ -294,7 +393,7 @@ mod tests {
             blocked.next().await,
             Some(Err(AppError::AgyToolReplayUnavailable))
         ));
-        first.expire();
+        first.expire_frames();
         assert_eq!(budget.available_permits(), capacity);
         let third = response(budget.clone(), deadline);
         third.push(&frame);
@@ -306,7 +405,38 @@ mod tests {
         let mut reader = Box::pin(expired.read());
         assert!(matches!(
             reader.next().await,
-            Some(Err(AppError::AgyToolReplayUnavailable))
+            Some(Err(AppError::AgyToolResponseExpired))
+        ));
+    }
+
+    #[test]
+    fn committed_receipt_outlives_response_frames_and_preserves_the_actual_failure() {
+        let now = Instant::now();
+        let budget = Arc::new(Semaphore::new(8192));
+        let failed = response(budget.clone(), now - Duration::from_secs(1));
+        assert!(!failed.retained(now));
+        failed.mark_sending("first-attempt");
+        assert!(failed.retained(now));
+        failed.mark_model_observed("foreign-attempt");
+        assert!(!failed.attempt().unwrap().model_observed);
+        failed.mark_model_observed("first-attempt");
+        failed.finish(Err(AppError::AgyControl(StatusCode::INTERNAL_SERVER_ERROR)));
+        failed.expire_frames();
+        assert_eq!(failed.attempt().unwrap().id, "first-attempt");
+        assert!(failed.attempt().unwrap().model_observed);
+        assert!(matches!(
+            failed.response_error(),
+            Some(AppError::AgyControl(StatusCode::INTERNAL_SERVER_ERROR))
+        ));
+        assert!(!failed.retained(failed.receipt_deadline));
+
+        let succeeded = response(budget, now - Duration::from_secs(1));
+        succeeded.mark_sending("original-success");
+        succeeded.finish(Ok(()));
+        assert!(succeeded.retained(now));
+        assert!(matches!(
+            succeeded.response_error(),
+            Some(AppError::AgyToolResponseExpired)
         ));
     }
 }

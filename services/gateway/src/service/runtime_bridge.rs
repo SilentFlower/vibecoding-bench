@@ -612,12 +612,15 @@ fn browser_path_allowed(method: &Method, path: &str) -> bool {
         .filter(|(_, operation)| {
             matches!(
                 operation.split('/').next(),
-                Some("content-capture" | "agy-kernel")
+                Some("content-capture" | "agy-kernel" | "agy-tool-continuation")
             )
         })
     {
         return matches!(*method, Method::GET | Method::POST)
-            && matches!(operation, "content-capture" | "agy-kernel")
+            && matches!(
+                operation,
+                "content-capture" | "agy-kernel" | "agy-tool-continuation"
+            )
             && environment.len() == 32
             && environment.bytes().all(|value| value.is_ascii_hexdigit());
     }
@@ -1268,10 +1271,10 @@ mod tests {
         }
     }
 
-    /// 环境采集和反重力内核只开放精确的读写入口。
+    /// 环境采集、反重力内核和续轮策略只开放精确的读写入口。
     #[test]
     fn environment_controls_are_scoped_to_one_environment() {
-        for action in ["content-capture", "agy-kernel"] {
+        for action in ["content-capture", "agy-kernel", "agy-tool-continuation"] {
             let path = format!("/api/environments/{}/{action}", "a".repeat(32));
             assert!(browser_path_allowed(&Method::GET, &path));
             assert!(browser_path_allowed(&Method::POST, &path));

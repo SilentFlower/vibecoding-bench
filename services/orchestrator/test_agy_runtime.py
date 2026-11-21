@@ -51,7 +51,7 @@ class AgyRuntimeTests(unittest.TestCase):
             'email': 'synthetic@example.test'}
 
     def test_isolated_calls_do_not_change_completed_tool_stream(self):
-        """待回填时隔离后续调用，同会话的第二次启动仍计入原作业。@return 无。"""
+        """主轮 EOF 后隔离交错的独立调用，同会话的第二次启动仍计入原作业。@return 无。"""
         for conversation, isolation in [('other','foreign_model_observed'), ('','unassigned_model_observed')]:
             with self.subTest(conversation=conversation):
                 bridge=Bridge.__new__(Bridge)
@@ -77,24 +77,22 @@ class AgyRuntimeTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError,'source_call_identity'):
                     bridge._emit({**extra,'event':'model_end','native_error_present':None})
                 bridge._emit({**owned,'event':'model_end','native_error_present':None})
+                another={**extra,'call_id':'r-1.3'}
                 bridge._emit(extra)
+                bridge._emit(another)
                 bridge._emit({**extra,'event':'gemini_response','data_base64':'外部帧禁止解析'})
+                bridge._emit({**another,'event':'gemini_response','data_base64':'外部帧禁止解析'})
                 bridge._emit({**extra,'event':'model_end','native_error_present':None})
-                self.assertEqual(recorded,['model_start','gemini_response','model_end',isolation])
+                bridge._emit({**another,'event':'model_end','native_error_present':None})
+                self.assertEqual(recorded,['model_start','gemini_response','model_end',isolation,isolation])
                 self.assertEqual((scope.job.calls,scope.job.ends),(1,1))
                 self.assertEqual(scope.frames.calls[0]['name'],call['name'])
                 self.assertTrue(scope.frames.calls[0]['id'].startswith('call_'))
                 self.assertTrue(scope.job.ended.is_set())
                 with self.assertRaisesRegex(RuntimeError,'native_root_identity.call_reused'):
                     bridge._emit({**owned,'call_id':extra['call_id']})
-                another={**extra,'call_id':'r-1.3'}
-                with self.assertRaisesRegex(RuntimeError,'native_root_identity.additional_call'):
-                    bridge._emit(another)
-                scope.tool_wait_published=True
-                scope.broker.gemini_results={'synthetic-native':{'value':1}}
-                bridge._emit(another)
-                bridge._emit({**another,'event':'model_end','native_error_present':None})
-                self.assertEqual((scope.job.calls,scope.job.ends),(1,1))
+                with self.assertRaisesRegex(RuntimeError,'source_call_identity'):
+                    bridge._emit({**another,'event':'gemini_response','call_id':'r-1.unknown'})
                 bridge._emit({**owned,'call_id':'r-1.4'})
                 self.assertEqual(scope.job.calls,2)
 
@@ -103,7 +101,8 @@ class AgyRuntimeTests(unittest.TestCase):
         usage={'promptTokenCount':12,'candidatesTokenCount':2,'totalTokenCount':14}
         cases=[('rpc_503','completed'),('rpc_400','error'),('not_idle','completed'),('late_observer_error','completed'),
             ('missing_stop','error'),('missing_usage','error'),('pending_tool','error'),('unregistered_tool','error'),
-            ('early_observer_error','error'),('second_model_call','error'),('cancelled','cancelled')]
+            ('early_observer_error','error'),('second_model_call','error'),('cancelled','cancelled'),
+            ('late_eof_clean','error'),('late_eof_truncated','error')]
         for mode,expected in cases:
             with self.subTest(mode=mode):
                 kernel=Kernel.__new__(Kernel)
@@ -127,6 +126,7 @@ class AgyRuntimeTests(unittest.TestCase):
                 worker.call=control
                 bridge=Bridge.__new__(Bridge);bridge.worker=worker;bridge.run_folder=kernel.state
                 bridge.events=io.StringIO();bridge.errors=[];bridge.source_events=0;bridge.reader_error=None
+                bridge.proc=SimpleNamespace(poll=lambda:None)
                 bridge.generation='synthetic-generation';bridge.capture_tls=False;worker.bridge=bridge
                 value={'request_id':'synthetic','request_format':'gemini','native_steps':[],
                     'prompt':'fixture','system':'','model':self.fixed_model[1],'max_generations':1,'tools':[]}
@@ -144,6 +144,7 @@ class AgyRuntimeTests(unittest.TestCase):
                     if mode in ('pending_tool','unregistered_tool'):
                         candidate['content']['parts'].append({'functionCall':{'name':'fixture'}})
                     frame={'candidates':[candidate]}
+                    if mode.startswith('late_eof_'):frame={}
                     if mode!='missing_usage':frame['usageMetadata']=usage
                     encoded=base64.b64encode(json.dumps(frame).encode()).decode()
                     bridge._emit({**event,'event':'gemini_response','data_base64':encoded})
@@ -153,7 +154,20 @@ class AgyRuntimeTests(unittest.TestCase):
                     if mode=='second_model_call':bridge._emit({**event,'event':'model_start','call_id':'r-1.2'})
                     if mode=='cancelled':scope.cancel.set()
                     done=threading.Event();done.set()
-                    status={'not_idle':200,'late_observer_error':200,'unregistered_tool':200,'rpc_400':400}.get(mode,503)
+                    status={'not_idle':200,'late_observer_error':200,'unregistered_tool':200,'rpc_400':400,
+                        'late_eof_clean':200,'late_eof_truncated':500}.get(mode,503)
+                    if mode.startswith('late_eof_'):
+                        pending=SimpleNamespace(error=None,value=None,response_status=None)
+                        def wait(_timeout):
+                            """先交付接收通道关闭，再暴露下一拍到达的控制响应。@param _timeout 等待时间。@return 控制响应是否已到。"""
+                            if done.is_set():
+                                done.clear()
+                                return False
+                            pending.response_status=status
+                            pending.value={'status':status,'response':{'message':'stream reading error: unexpected EOF'} if status==500 else {}}
+                            return True
+                        pending.done=SimpleNamespace(wait=wait)
+                        return pending
                     return SimpleNamespace(done=done,error=None,value={'status':status},response_status=status)
 
                 with patch('agy_runtime.kernel.RPC',side_effect=submit):kernel.execute(scope)
@@ -167,7 +181,8 @@ class AgyRuntimeTests(unittest.TestCase):
                 reasons={'rpc_503':'kept','rpc_400':'missing_stop','not_idle':'kept','late_observer_error':'kept',
                     'missing_stop':'missing_stop','missing_usage':'missing_usage','pending_tool':'tool_pending',
                     'unregistered_tool':'ineligible_error',
-                    'early_observer_error':'observer_before_eof','second_model_call':'model_call_count','cancelled':'ineligible_error'}
+                    'early_observer_error':'observer_before_eof','second_model_call':'model_call_count','cancelled':'ineligible_error',
+                    'late_eof_clean':'ineligible_error','late_eof_truncated':'missing_stop'}
                 self.assertEqual(len(diagnostic),1)
                 self.assertEqual(diagnostic[0].rsplit('.',1)[-1],reasons[mode])
                 self.assertEqual(terminal[0][1]['control_recovery'],reasons[mode])
@@ -181,6 +196,16 @@ class AgyRuntimeTests(unittest.TestCase):
                 if mode=='unregistered_tool':
                     self.assertEqual(terminal[0][1]['code'],'tool_protocol_error')
                     self.assertNotIn('control_http_status',terminal[0][1])
+                if mode.startswith('late_eof_'):
+                    fields=terminal[0][1]
+                    self.assertTrue(fields['native_receive_ended'])
+                    self.assertFalse(fields['native_source_terminal'])
+                    if mode=='late_eof_clean':
+                        self.assertEqual(fields['observed_control_http_status'],200)
+                        self.assertEqual(fields['code'],'native_stream_incomplete')
+                    else:
+                        self.assertEqual(fields['control_http_status'],500)
+                        self.assertEqual(fields['control_error_detail'],'unexpected_eof')
                 if expected=='completed':
                     expected_code={'rpc_503':'native_request_failed','not_idle':'native_not_idle',
                         'late_observer_error':'native_protocol_error'}[mode]
