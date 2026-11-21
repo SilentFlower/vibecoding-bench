@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use std::fmt::Write;
 use std::io::{Error as IoError, copy, sink};
 use std::mem::replace;
-use std::sync::LazyLock;
 
 use axum::Json;
 use axum::body::{Body, Bytes};
@@ -16,7 +15,6 @@ use base64::engine::DecodePaddingMode;
 use base64::engine::general_purpose::{GeneralPurpose, GeneralPurposeConfig};
 use base64::read::DecoderReader;
 use futures_util::{Stream, StreamExt, stream};
-use regex::Regex;
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
@@ -42,13 +40,6 @@ Bad (past tense): "Analyzed the branch diff"
 Bad (too vague): "Investigating the issue"
 Bad (too long): "Reviewing full branch diff and AgentTool.tsx integration"
 Bad (branch name): "Analyzed adam/background-summary branch diff""#;
-static READ_TRUNCATION_NOTICE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"^\[Truncated: .*\blines [0-9]+[-–][0-9]+ of [0-9]+ total\b.*\bRead with offset=[0-9]+ limit=[0-9]+\b.*\]$",
-    )
-    .unwrap()
-});
-
 fn invalid(message: &str) -> AppError {
     AppError::BadRequest(message.into())
 }
@@ -96,15 +87,6 @@ fn append_turn_context(contents: &mut [Value], turn_context: &mut Vec<Value>) {
     }
 }
 
-fn has_read_result_in_user_turn(contents: &[Value]) -> bool {
-    contents
-        .iter()
-        .rev()
-        .take_while(|content| content["role"] == "user")
-        .flat_map(|content| content["parts"].as_array().into_iter().flatten())
-        .any(|part| part["functionResponse"]["name"] == "Read")
-}
-
 /// 投影已识别的 Messages 请求。@param request 原始请求。@return Gemini 正文及可选的本地摘要。
 pub(super) fn convert_request(request: &Value) -> Result<(Value, Option<String>), AppError> {
     let messages = request["messages"]
@@ -114,6 +96,7 @@ pub(super) fn convert_request(request: &Value) -> Result<(Value, Option<String>)
     let mut contents = Vec::with_capacity(messages.len());
     let mut call_names = HashMap::new();
     let mut turn_context = Vec::new();
+    let mut turn_has_tool_result = false;
     let mut system = request
         .get("system")
         .filter(|value| !value.is_null())
@@ -125,6 +108,7 @@ pub(super) fn convert_request(request: &Value) -> Result<(Value, Option<String>)
             Some("user") => "user",
             Some("assistant") => {
                 append_turn_context(&mut contents, &mut turn_context);
+                turn_has_tool_result = false;
                 "model"
             }
             Some("system") => {
@@ -133,13 +117,12 @@ pub(super) fn convert_request(request: &Value) -> Result<(Value, Option<String>)
                     .is_some_and(|content| content["role"] == "user");
                 for part in system_parts(&message["content"])? {
                     if has_user_turn
-                        && part["text"].as_str().is_some_and(|text| {
-                            text.starts_with(USER_PROMPT_SUBMIT_CONTEXT_PREFIX)
-                                || (READ_TRUNCATION_NOTICE.is_match(text)
-                                    && has_read_result_in_user_turn(&contents))
-                        })
+                        && (turn_has_tool_result
+                            || part["text"].as_str().is_some_and(|text| {
+                                text.starts_with(USER_PROMPT_SUBMIT_CONTEXT_PREFIX)
+                            }))
                     {
-                        // 当轮补充文本随工具结果发送，使旧的系统提示和对话前缀可继续复用。
+                        // 补充文本归到这一轮，在分批回填收齐后追加，避免重写此前已发送的前缀。
                         turn_context.push(part);
                     } else {
                         system.push(part);
@@ -207,6 +190,7 @@ pub(super) fn convert_request(request: &Value) -> Result<(Value, Option<String>)
                                     .ok_or_else(|| invalid("Messages 工具错误标记无效"))?
                             );
                         }
+                        turn_has_tool_result = true;
                         json!({"functionResponse": {"id": id, "name": name, "response": response}})
                     }
                     _ => return Err(invalid("反重力 Messages 暂不支持此类内容块")),
@@ -844,6 +828,7 @@ mod tests {
     #[test]
     fn messages_prompt_hook_follows_split_tool_results_in_history() {
         let context = "UserPromptSubmit hook additional context: 追加任务状态。";
+        let notification = "并行工具状态补充。";
         let request = json!({"messages": [
             {"role": "user", "content": "读取两份资料"},
             {"role": "assistant", "content": [
@@ -852,6 +837,7 @@ mod tests {
             ]},
             {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "first"}]},
             {"role": "system", "content": context},
+            {"role": "system", "content": notification},
             {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "second"}]},
             {"role": "assistant", "content": "已读取。"},
             {"role": "user", "content": "继续。"}
@@ -867,7 +853,85 @@ mod tests {
             "second"
         );
         assert_eq!(converted["contents"][3]["parts"][1]["text"], context);
+        assert_eq!(converted["contents"][3]["parts"][2]["text"], notification);
         assert_eq!(converted["contents"][4]["role"], "model");
+    }
+
+    #[test]
+    fn messages_tool_result_system_supplements_keep_the_cached_prefix() {
+        let supplemental_context = "本轮工具返回的附加状态。".repeat(500);
+        let task_notification = "<task-notification><status>completed</status></task-notification>";
+        let messages = json!([
+            {"role": "user", "content": "检查项目。"},
+            {"role": "system", "content": "项目环境"},
+            {"role": "assistant", "content": [
+                {"type": "tool_use", "id": "a1", "name": "Bash", "input": {}},
+                {"type": "tool_use", "id": "a2", "name": "Bash", "input": {}}
+            ]},
+            {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": "a2", "content": "结果二"},
+                {"type": "tool_result", "tool_use_id": "a1", "content": "结果一"}
+            ]},
+            {"role": "system", "content": [{"type": "text", "text": supplemental_context}]},
+            {"role": "assistant", "content": [
+                {"type": "tool_use", "id": "b1", "name": "Bash", "input": {}},
+                {"type": "tool_use", "id": "b2", "name": "Bash", "input": {}},
+                {"type": "tool_use", "id": "b3", "name": "Bash", "input": {}}
+            ]},
+            {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": "b1", "content": "结果一"},
+                {"type": "tool_result", "tool_use_id": "b3", "content": "结果三"},
+                {"type": "tool_result", "tool_use_id": "b2", "content": "结果二"}
+            ]},
+            {"role": "system", "content": task_notification},
+            {"role": "assistant", "content": [
+                {"type": "tool_use", "id": "c1", "name": "Bash", "input": {}}
+            ]},
+            {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": "c1", "content": "检查完成"}
+            ]}
+        ]);
+        let messages = messages.as_array().unwrap();
+        let mut request = json!({
+            "system": "固定系统指令",
+            "messages": &messages[..2],
+            "tools": [{"name": "Bash", "input_schema": {"type": "object"}}]
+        });
+        let mut previous = convert_request(&request).unwrap();
+        assert_eq!(
+            previous["systemInstruction"]["parts"],
+            json!([{"text": "固定系统指令"}, {"text": "项目环境"}])
+        );
+        for (end, tool_ids, expected_context) in [
+            (5, &["a2", "a1"][..], Some(supplemental_context.as_str())),
+            (8, &["b1", "b3", "b2"][..], Some(task_notification)),
+            (10, &["c1"][..], None),
+        ] {
+            request["messages"] = json!(&messages[..end]);
+            let converted = convert_request(&request).unwrap();
+            assert_eq!(
+                converted["systemInstruction"],
+                previous["systemInstruction"]
+            );
+            assert_eq!(converted["tools"], previous["tools"]);
+            let prefix = previous["contents"].as_array().unwrap();
+            let contents = converted["contents"].as_array().unwrap();
+            assert_eq!(contents.len(), prefix.len() + 2);
+            assert_eq!(&contents[..prefix.len()], prefix);
+            let parts = contents.last().unwrap()["parts"].as_array().unwrap();
+            assert_eq!(
+                parts.len(),
+                tool_ids.len() + usize::from(expected_context.is_some())
+            );
+            for (part, id) in parts.iter().zip(tool_ids) {
+                assert_eq!(part["functionResponse"]["id"], *id);
+                assert_eq!(part["functionResponse"]["name"], "Bash");
+            }
+            if let Some(context) = expected_context {
+                assert_eq!(parts.last().unwrap(), &json!({"text": context}));
+            }
+            previous = converted;
+        }
     }
 
     #[test]
@@ -897,15 +961,6 @@ mod tests {
             ]}),
             json!({"role": "system", "content": [{"type": "text", "text": notice, "cache_control": {"type": "ephemeral"}}]}),
         ]);
-
-        let mut unrelated = continuation.clone();
-        unrelated["messages"][2]["content"][0]["name"] = json!("Bash");
-        let unrelated = convert_request(&unrelated).unwrap();
-        assert_eq!(unrelated["systemInstruction"]["parts"][2]["text"], notice);
-        assert_eq!(
-            unrelated["contents"][2]["parts"].as_array().unwrap().len(),
-            2
-        );
 
         let converted = convert_request(&continuation).unwrap();
         let contents = converted["contents"].as_array().unwrap();
@@ -937,6 +992,13 @@ mod tests {
             &next["contents"].as_array().unwrap()[..contents.len()],
             contents
         );
+        continuation["messages"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"role": "system", "content": notice}));
+        let unrelated = convert_request(&continuation).unwrap();
+        assert_eq!(unrelated["systemInstruction"]["parts"][2]["text"], notice);
+        assert_eq!(unrelated["contents"], next["contents"]);
     }
 
     #[test]

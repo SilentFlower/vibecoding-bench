@@ -1458,7 +1458,7 @@ def verify_messages_thinking_and_images(request, wait_idle, database):
 
 
 def verify_messages_read_truncation(request, wait_idle):
-    """核对截断提示及旧前缀在真实 AGY 出站中的位置。@param request 公共 HTTP 入口。@param wait_idle 发送器回收检查。@return 实际请求数。"""
+    """核对工具补充及旧前缀在真实 AGY 出站中的位置。@param request 公共 HTTP 入口。@param wait_idle 发送器回收检查。@return 实际请求数。"""
     path = '/v1/messages'
     initial_count = len(Upstream.calls)
     main = {'model': MODEL, 'max_tokens': 128, 'system': '固定的合成系统提示',
@@ -1471,16 +1471,19 @@ def verify_messages_read_truncation(request, wait_idle):
     require(len(calls) == 1 and calls[0]['name'] == 'Read', '首轮未返回 Read 工具调用')
     notice = (f'[Truncated: {MESSAGES_READ_PATH}. Showing lines 1–200 of 420 total (24000 tokens). '
         'Read with offset=201 limit=200 for the next portion.]')
+    notification = '<task-notification><status>completed</status></task-notification>'
     returned = '合成文件片段'
     history = main['messages'] + [{'role': 'assistant', 'content': calls}, {'role': 'user', 'content': [
         {'type': 'tool_result', 'tool_use_id': calls[0]['id'], 'content': returned}]}]
     continuation = {**main, 'messages': history + [{'role': 'system', 'content': [
-        {'type': 'text', 'text': notice, 'cache_control': {'type': 'ephemeral'}}]}]}
+        {'type': 'text', 'text': notice, 'cache_control': {'type': 'ephemeral'}},
+        {'type': 'text', 'text': notification}]}]}
     status, raw = request(path, continuation)
     require(status == 200, f'带截断提示的续轮失败：{status} {raw[:350]!r}')
     reply = json.loads(raw)['content']
     wait_idle()
     later = {**main, 'messages': history + [{'role': 'system', 'content': notice},
+        {'role': 'system', 'content': notification},
         {'role': 'assistant', 'content': reply}, {'role': 'user', 'content': '继续读取。'}]}
     status, raw = request(path, later)
     require(status == 200, f'带历史截断提示的下一轮失败：{status} {raw[:350]!r}')
@@ -1494,9 +1497,12 @@ def verify_messages_read_truncation(request, wait_idle):
         require(current['contents'][:len(prefix)] == prefix, 'Read 续轮改变了已发送的历史前缀')
         parts = [part for message in current['contents'] for part in message['parts']]
         results = [(index, part['functionResponse']) for index, part in enumerate(parts) if 'functionResponse' in part]
-        notices = [index for index, part in enumerate(parts) if notice in part.get('text', '')]
-        require(len(results) == 1 and len(notices) == 1 and results[0][0] < notices[0], '截断提示未唯一追加在工具回填之后')
-        result = results[0][1]
+        require(len(results) == 1, '工具回填的出站次数错误')
+        result_index, result = results[0]
+        before = '\n'.join(part.get('text', '') for part in parts[:result_index])
+        after = '\n'.join(part.get('text', '') for part in parts[result_index+1:])
+        require(all(text not in before and after.count(text) == 1 for text in (notice, notification))
+            and after.index(notice) < after.index(notification), '补充文本未按原顺序追加在工具回填之后')
         require(result['id'] == calls[0]['id'] and json.loads(result['response']['output'])['result'] == returned,
             'Read 续轮改变了工具 ID 或回填正文')
     return len(sent)

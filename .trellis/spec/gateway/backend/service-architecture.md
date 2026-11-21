@@ -1964,8 +1964,8 @@ transport.submit(prepared, body, ttfb_timeout).await
 
 ### 3. Contracts
 
-- 顶层 `system` 和历史 `system` 文本按顺序构成 Gemini 的 `systemInstruction`。同一轮已有用户内容时，历史 `system` 中以 `UserPromptSubmit hook additional context: ` 开头的 Claude Code 钩子文本作为 `text` Part 附在该轮最后一条用户内容末尾。字符串和文本块数组采用同一投影。等本轮用户内容收齐再附加，让分批工具结果排在钩子文本之前，并复用已有的系统提示和消息前缀。
-- 同一用户轮存在通过 `tool_use_id` 配对的 `Read` 结果时，单行 `[Truncated: …]` 系统文本若包含数字行范围 `lines 起始–结束 of 总数 total` 和分页指令 `Read with offset=数字 limit=数字`，同样作为原文 `text` Part 排在当轮所有工具结果之后。行范围接受 `–` 和 `-`。其余系统文本按原规则汇入 `systemInstruction`。
+- 顶层 `system` 和归属全局的历史系统文本按顺序构成 Gemini 的 `systemInstruction`。同一用户轮中，遇到已通过 `tool_use_id` 找到原调用的工具结果后，后续的 `messages[].role = "system"` 文本归入该轮，适用于 Read 截断提示、后台任务通知和其他补充文本。已有用户内容时，以 `UserPromptSubmit hook additional context: ` 开头的钩子文本同样归入该轮。
+- 下一条 `assistant` 消息或历史末尾结束当前用户轮。将该轮已收集的补充按原顺序作为 `text` Part 追加到最后一条用户内容，分批工具结果排在补充文本之前。字符串和文本块数组采用同一投影。重发历史时按同一规则复用旧轮位置。其余历史系统文本归入 `systemInstruction`。
 - 图片沿原生媒体校验。普通函数调用和工具回填按 `tool_use_id` 对应，续轮补回已匹配原调用的真实模型签名。
 - 正整数手动预算优先，沿 Gemini 的预算区间选择低、中、高档。否则 `effort` 的 `low`、`medium`、`high`、`xhigh` 对应同名档，`none` 和 `minimal` 对应低档，`max` 对应 `xhigh`。基础模型优先尝试目标档位，再用原来可接单的同系目录候选。显式型号按精确名称匹配。工具续轮复用原账号和实际档位。思考 token 数由所选原生型号决定。
 - AGY 返回的栅格图片 `inlineData` 按源 MIME 与 Base64 数据生成 Markdown 图片文本。Messages JSON 使用 `text` 内容块，SSE 使用 `text_delta`，都保留原 Part 顺序。原生 Gemini JSON 和 SSE 保留 `inlineData` 结构，原生 `thinkingConfig` 沿账号环境共同合同。
@@ -1985,6 +1985,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 
 ### 5. Scenarios and Examples
 
+- 两轮工具回填后分别追加运行状态和 `<task-notification>`。提前合入全局系统指令会改写缓存前缀。每段补充应随对应工具轮发送，后续回放中旧轮的位置固定。
 - 手动预算 1024 优先匹配同一基础型号的 `-low`。目录缺少目标档位时，按原候选选择实际可用型号，实际命中以请求诊断为准。直接指定 `-low` 时按该精确型号选号。
 - 原生发送器的生成请求接受默认或 `TEXT` 模式。要求 `responseModalities: ["IMAGE"]` 会收到字段级 400。Messages 只投影模型实际回传的图片。真实出图需在有授权的环境按固定 AGY 和目录型号验证。
 - 正常查询 `IANA Example Domains`。声明 `allowed_domains: ["iana.org"]` 时保留 `www.iana.org` 直链。声明 `blocked_domains: ["iana.org"]` 时过滤该直链。
@@ -1993,7 +1994,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 ### 6. Tests Required
 
 - `messages_prompt_hook_*` 核对两种钩子文本形状的 `systemInstruction` 和历史前缀，以及普通系统提示和分批工具结果的顺序。
-- `messages_read_truncation_notice_keeps_its_position_across_tool_turns` 和 `verify_agy_native_loopback.py --messages-search` 核对截断提示从文本块数组转为历史字符串后的顺序、工具回填 ID 与正文、`systemInstruction` 与实际出站前缀。只有其他工具回填时，截断格式文本沿普通系统指令处理。
+- `messages_tool_result_system_supplements_keep_the_cached_prefix` 核对四轮累积历史中的两批任意补充、工具回填 ID、`systemInstruction` 和已发送的消息前缀。`messages_read_truncation_notice_keeps_its_position_across_tool_turns` 核对 Read 截断提示及普通用户轮的系统归属。`verify_agy_native_loopback.py --messages-search` 核对截断提示和后台任务通知在实际出站中唯一出现、排在原工具结果之后且维持原顺序。
 - `verify_agy_native_loopback.py --image <离线测试镜像> --messages-search` 核对来源直链与跳转、允许域与禁止域、无域规则、重复查询、账号和工具回填 ID、取消清理。
 - 同一回环核对思考选号、目录缺档、显式档位和改 effort 后的同账号工具续轮。用同一图片源核对 Messages JSON 和 SSE 的 Markdown 数据及顺序，以及原生 Gemini 两种响应的原始 `inlineData` 和终态。
 - 加 `--claude-code <可执行文件>` 核对真实客户端 `searchCount=1`、来源链接和后续生成。真实 Google 联网由有授权的测试账号单独验收。
