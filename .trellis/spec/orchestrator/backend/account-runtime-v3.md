@@ -2072,6 +2072,8 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - 监督器将请求墙钟截止转换为单调截止，接收剩余时间范围 `(0,125]` 秒并限制原请求预算最多120秒。`Supervisor.acquire(value, until)`在选择及创建worker前复核截止，旧代关闭后重新检查；`Worker.start(until)`在Popen前再次复核。退役计入原请求耗时，过期返回 `request_deadline_exceeded`，停止新代创建及原生启动。
 - 仅源错误code=401/status=UNAUTHENTICATED且没有候选及usage时参与有界恢复；须尚未交付、无工具结果历史、原作业实际收口、同账号ready新代且AT改变，最多一次。容量/控制失败、SSE首帧后、取消或过期均不重放。
 - 控制响应头已返回 4xx/5xx 时保留状态码，错误正文解析失败时同样适用。普通 HTTP 和 SSE 首帧前用该状态结束请求，已开始的 SSE 通过尾帧 `error.code` 交付同一状态。尝试记录使用真实控制状态和 `native_control` 阶段，根记录保留实际客户端 HTTP 状态。已确证的上游配额 429 优先，已保留的成功结果继续按成功收尾。
+- 原生控制关闭失败时，结果保留要求同一模型调用的完整 EOF、可交付候选、可核对用量及交付链完整。`STOP` 要求可见文本和完整常规计数。`MAX_TOKENS` 可保留文本、思考文本或内联媒体。省略 `candidatesTokenCount` 时，以合法的 `promptTokenCount`、`totalTokenCount` 和正数 `thoughtsTokenCount` 核对截断结果，原用量字段按源帧交付。源错误、待续工具、未确认归属、交付失败及缺少 EOF 继续进入原错误路径。
+- 保留截断结果时完成事件使用 `finish_reason=max_tokens`，并记录已知 `observed_control_http_status` 和 `control_recovery=kept`。控制失败的工作进程仍按原路径排空和退役。原生控制成功且轨迹确认 `CASCADE_RUN_STATUS_IDLE` 时，结果可按既有工作进程轮换条件复用热进程。主调用的 `STOP` 或 `MAX_TOKENS` 配合 EOF 为独立旁路调用提供隔离依据。
 - 账号内共享完整265700040字节封存映像，核对SHA和四封存，decode计数、分发大小、控制/内核/观察器/原生RSS/PSS/USS与cgroup独立展示。max_workers等于账号concurrency，范围1..64，跨模型和凭据代次共用物理上限。有限sender RAM为512+256×workers MiB，network 256MiB、CLI至少512MiB，总量受原预算约束；零沿明确无限策略。
 - AGY 启动快照与同身份热进程分别回收。快照占用原缓存池名额，优先复用正在运行的热进程。控制器在线时，`restore.state` 的 `waiting` 表示尚无快照，`preparing` 表示后台准备中，`ready` 以当前代次的可恢复快照为准。准备失败以 `unavailable` 和 `template_failed` 表达，普通启动继续可用。
 - 文件型模板观察器使用同一个 `/proc/PID/exe` 文件描述符核对实际文件身份和完整 SHA256。通过短暂的私有不可读映射取得内核报告的背板设备号和 inode，再按该组合核对目标进程映射。封存 memfd 按原设备号和 inode 核验。启动和恢复均要求唯一零偏移基址、非可写共享映射和四个固定指令指纹。模板启动固定 `GODEBUG=multipathtcp=0`，使当前 CRIU 4.2 能保存 AGY 的监听套接字。
@@ -2095,6 +2097,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 | 已有令牌可见目录，公开模型无对应映射 | 404 `NOT_FOUND`，提示读取 `GET /v1beta/models`，零发送 |
 | pending/reconcile、旧凭据代次或无确证错误状态的原生失败 | 受控503，保留原请求归属及实际入口计数 |
 | 原生终态失败，控制 HTTP 状态为 4xx/5xx | 保留原码。SSE 已发首帧时 HTTP 状态保持 200，尾帧 `error.code` 为原码 |
+| 可信源 `MAX_TOKENS` 和模型 EOF 已交付，控制面返回 500 | 返回原截断内容与用量，Messages 终态为 `max_tokens`。控制 500 仍保留在诊断中，工作进程按失败路径退役 |
 | 源只有文本或usage、缺少源终态 | 原生流不完整。已有控制错误码时保留原码，其他情况沿503路径 |
 | v1/v2合法有限或明确无限预算 | 按冻结值准入；未知/不匹配拒绝 |
 | 公共断连、原截止到期 | 精确取消原作业，活动保持到实际收口后释放 |
@@ -2133,6 +2136,7 @@ GET .../node-migrations: failure.stage 可为 preflight；运行中的恢复不�
 - `test_agy_runtime`、`test_agy_supervisor`、`test_agy_environment`覆盖AT-only、参数、目录、帧/签名、终态、代次/工具、v1/v2有限/无限/未知预算、环境归属与维护。
 - `test_agy_runtime` 覆盖两种工具声明、嵌套缺项、两种元组、字符串常量与 `enum` 冲突及重复归一化。固定原版回环断言实际出站的内层 `items`、元组长度上限、单值 `enum`，并核对工具调用保留数字及布尔值、结果完成回填。
 - `test_agy_runtime` 验证已观测控制状态、非法 JSON 响应与成功结果保留。`verify_agy_gemini.py` 验证普通 HTTP、SSE 首帧前后与尝试记录的状态，覆盖 200 和旧内核字段缺失的503兜底。固定原版回环验证非法工具正则导致的控制500及零模型提交。
+- `test_model_result_survives_only_post_stream_control_failure` 覆盖文本、纯思考、无候选计数、内联媒体及非法用量的 `MAX_TOKENS`，核对源帧、单次提交、诊断及退役。`test_isolated_calls_do_not_change_completed_tool_stream` 核对主轮 EOF 后的独立调用隔离。
 - `test_agy_supervisor`覆盖已过期准入、旧代关闭耗尽截止以及真实Worker.start过期；分别断言worker创建为0、新代启动为0及Popen调用为0，均返回 `request_deadline_exceeded`。
 - AGY 文件型模板应在普通业务权限的隔离 OverlayFS 上实际保存并恢复，核对首笔合成请求、原生 PID 和唯一提交。另验普通 memfd、错误文件身份、恢复失败及凭据换代。`test_agy_runtime`、`test_agy_supervisor` 和 `test_native_criu_settings` 核对阶段、原请求回退及旧代或非白名单原因的投影。
 - `native/criu/test_agy.py` 核对正式监督代次布局、跨代目录和链接拒绝、文件句柄失败的脱敏摘要。在 Linux 6.1 的隔离 OCI 容器中使用账号工作目录与 CRIU 目录的绑定挂载，验证基线保存失败、修复后从同一 PID 恢复，以及保存失败、恢复失败、凭据换代各自只投递一次合成请求。授权现场验收时，用正式发送器的代次布局验证快照保存成功，实际模型请求须记录 `criu_restore` 并正常返回。

@@ -9,7 +9,12 @@ from .contract import InputError
 RULE_VERSION = 'new-api-homoglyph-v1'
 POLICY_SOURCE = 'cortex_custom_system'
 USER_REMINDER_SOURCE = 'cortex_user_reminder'
-REMINDER_SYSTEM_INSTRUCTION = "Use the provided context to answer the user's request."
+REMINDER_SYSTEM_INSTRUCTION = (
+    "Use the provided context to answer the user's request. "
+    "When working on multi-step tasks or calling tools, briefly share your progress and explain what you are doing and why. "
+    "For strict-format requests such as JSON-only output, or auxiliary tasks such as compaction, summaries, titles, and classification, "
+    "return only the requested output."
+)
 
 
 def default_policy() -> dict:

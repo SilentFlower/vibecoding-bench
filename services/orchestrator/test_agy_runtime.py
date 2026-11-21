@@ -52,8 +52,10 @@ class AgyRuntimeTests(unittest.TestCase):
 
     def test_isolated_calls_do_not_change_completed_tool_stream(self):
         """主轮 EOF 后隔离交错的独立调用，同会话的第二次启动仍计入原作业。@return 无。"""
-        for conversation, isolation in [('other','foreign_model_observed'), ('','unassigned_model_observed')]:
-            with self.subTest(conversation=conversation):
+        cases = [('STOP', 'other', 'foreign_model_observed'), ('STOP', '', 'unassigned_model_observed'),
+            ('MAX_TOKENS', 'other', 'foreign_model_observed')]
+        for finish_reason, conversation, isolation in cases:
+            with self.subTest(finish_reason=finish_reason, conversation=conversation):
                 bridge=Bridge.__new__(Bridge)
                 worker=Worker.__new__(Worker)
                 recorded=[]
@@ -72,7 +74,7 @@ class AgyRuntimeTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError,'native_root_identity.unfinished_stream'):
                     bridge._emit(extra)
                 call={'name':'fixture','args':{'x':1}}
-                frame=json.dumps({'candidates':[{'content':{'parts':[{'functionCall':call}]},'finishReason':'STOP'}]}).encode()
+                frame=json.dumps({'candidates':[{'content':{'parts':[{'functionCall':call}]},'finishReason':finish_reason}]}).encode()
                 bridge._emit({**owned,'event':'gemini_response','data_base64':base64.b64encode(frame).decode()})
                 with self.assertRaisesRegex(RuntimeError,'source_call_identity'):
                     bridge._emit({**extra,'event':'model_end','native_error_present':None})
@@ -99,12 +101,29 @@ class AgyRuntimeTests(unittest.TestCase):
     def test_model_result_survives_only_post_stream_control_failure(self):
         """通过真实执行入口区分已结束的结果、断流、工具和取消。@return 无。"""
         usage={'promptTokenCount':12,'candidatesTokenCount':2,'totalTokenCount':14}
+        text = [{'text': '合成模型结果'}]
+        thinking = [{'text': '合成思考', 'thought': True}]
+        media = [{'inlineData': {'mimeType': 'image/png', 'data': 'aW1hZ2U='}}]
+        thinking_usage = {'promptTokenCount': 12, 'totalTokenCount': 42, 'thoughtsTokenCount': 30}
+        max_tokens_cases = {
+            'max_tokens_rpc_200': (text, usage, 'kept'),
+            'max_tokens_text': (text, usage, 'kept'),
+            'max_tokens_thinking': (thinking, {**thinking_usage, 'candidatesTokenCount': 0}, 'kept'),
+            'max_tokens_without_candidates': (thinking, thinking_usage, 'kept'),
+            'max_tokens_media': (media, usage, 'kept'),
+            'max_tokens_missing_output': ([], usage, 'missing_text'),
+            'max_tokens_invalid_candidates': (thinking, {**thinking_usage, 'candidatesTokenCount': None}, 'missing_usage'),
+            'max_tokens_invalid_thoughts': (thinking, {**thinking_usage, 'thoughtsTokenCount': True}, 'missing_usage'),
+        }
         cases=[('rpc_503','completed'),('rpc_400','error'),('not_idle','completed'),('late_observer_error','completed'),
             ('missing_stop','error'),('missing_usage','error'),('pending_tool','error'),('unregistered_tool','error'),
             ('early_observer_error','error'),('second_model_call','error'),('cancelled','cancelled'),
             ('late_eof_clean','error'),('late_eof_truncated','error')]
+        cases.extend((mode, 'completed' if reason == 'kept' else 'error')
+            for mode, (_, _, reason) in max_tokens_cases.items())
         for mode,expected in cases:
             with self.subTest(mode=mode):
+                max_tokens_case = max_tokens_cases.get(mode)
                 kernel=Kernel.__new__(Kernel)
                 kernel.state=self.root/mode;kernel.state.mkdir()
                 kernel.cfg={'capture_enabled':False,'rotate_after':None}
@@ -122,7 +141,7 @@ class AgyRuntimeTests(unittest.TestCase):
                         return {'status':200,'response':{'cascadeId':'owned'}}
                     self.assertEqual(method,'GetCascadeTrajectory')
                     state='CASCADE_RUN_STATUS_RUNNING' if mode=='not_idle' else 'CASCADE_RUN_STATUS_IDLE'
-                    return {'status':200,'response':{'status':state}}
+                    return {'status':200,'response':{'status':state,'trajectory':{'trajectoryId':'fixture','steps':[]}}}
                 worker.call=control
                 bridge=Bridge.__new__(Bridge);bridge.worker=worker;bridge.run_folder=kernel.state
                 bridge.events=io.StringIO();bridge.errors=[];bridge.source_events=0;bridge.reader_error=None
@@ -130,6 +149,8 @@ class AgyRuntimeTests(unittest.TestCase):
                 bridge.generation='synthetic-generation';bridge.capture_tls=False;worker.bridge=bridge
                 value={'request_id':'synthetic','request_format':'gemini','native_steps':[],
                     'prompt':'fixture','system':'','model':self.fixed_model[1],'max_generations':1,'tools':[]}
+                if max_tokens_case:
+                    value['native_completion'] = {'maxTokens': 30}
                 scope=Scope(value,1,worker);kernel.worker=worker;kernel.active=scope
 
                 def submit(worker, method, body, scope):
@@ -146,6 +167,10 @@ class AgyRuntimeTests(unittest.TestCase):
                     frame={'candidates':[candidate]}
                     if mode.startswith('late_eof_'):frame={}
                     if mode!='missing_usage':frame['usageMetadata']=usage
+                    if max_tokens_case:
+                        self.assertEqual(body['cascadeConfig']['plannerConfig']['completionConfigOverride']['maxTokens'], 30)
+                        candidate.update(finishReason='MAX_TOKENS', content={'parts': max_tokens_case[0]})
+                        frame['usageMetadata'] = max_tokens_case[1]
                     encoded=base64.b64encode(json.dumps(frame).encode()).decode()
                     bridge._emit({**event,'event':'gemini_response','data_base64':encoded})
                     if mode=='early_observer_error':bridge._emit({'event':'observer_error','ns':2})
@@ -156,6 +181,8 @@ class AgyRuntimeTests(unittest.TestCase):
                     done=threading.Event();done.set()
                     status={'not_idle':200,'late_observer_error':200,'unregistered_tool':200,'rpc_400':400,
                         'late_eof_clean':200,'late_eof_truncated':500}.get(mode,503)
+                    if max_tokens_case:
+                        status = 200 if mode == 'max_tokens_rpc_200' else 500
                     if mode.startswith('late_eof_'):
                         pending=SimpleNamespace(error=None,value=None,response_status=None)
                         def wait(_timeout):
@@ -174,6 +201,12 @@ class AgyRuntimeTests(unittest.TestCase):
                 terminal=[(kind,fields) for kind,fields in events if kind in ('completed','error','cancelled')]
                 self.assertEqual([kind for kind,_ in terminal],[expected])
                 self.assertEqual(submissions,['owned'])
+                if mode == 'max_tokens_rpc_200':
+                    self.assertEqual(terminal[0][1]['finish_reason'], 'max_tokens')
+                    self.assertEqual(retirements, [])
+                    self.assertEqual(events[-1][0], 'idle')
+                    self.assertEqual(events[-1][1]['next_generation'], bridge.generation)
+                    continue
                 self.assertEqual(retirements,['request_error'])
                 self.assertEqual(events[-1][0],'idle')
                 self.assertIsNone(events[-1][1]['next_generation'])
@@ -183,6 +216,22 @@ class AgyRuntimeTests(unittest.TestCase):
                     'unregistered_tool':'ineligible_error',
                     'early_observer_error':'observer_before_eof','second_model_call':'model_call_count','cancelled':'ineligible_error',
                     'late_eof_clean':'ineligible_error','late_eof_truncated':'missing_stop'}
+                if max_tokens_case:
+                    reasons[mode] = max_tokens_case[2]
+                    fields = terminal[0][1]
+                    self.assertEqual(fields['observed_control_http_status'], 500)
+                    self.assertTrue(fields['native_receive_ended'])
+                    self.assertTrue(fields['native_source_terminal'])
+                    if expected == 'completed':
+                        self.assertEqual(fields['finish_reason'], 'max_tokens')
+                        delivered = [json.loads(base64.b64decode(event['data']['data_base64']))
+                            for kind, event in events if kind == 'gemini_response']
+                        self.assertEqual(len(delivered), 1)
+                        self.assertEqual(delivered[0]['usageMetadata'], max_tokens_case[1])
+                        self.assertEqual(delivered[0]['candidates'][0]['finishReason'], 'MAX_TOKENS')
+                        self.assertEqual(delivered[0]['candidates'][0]['content']['parts'], max_tokens_case[0])
+                    else:
+                        self.assertEqual(fields['control_http_status'], 500)
                 self.assertEqual(len(diagnostic),1)
                 self.assertEqual(diagnostic[0].rsplit('.',1)[-1],reasons[mode])
                 self.assertEqual(terminal[0][1]['control_recovery'],reasons[mode])
@@ -207,8 +256,8 @@ class AgyRuntimeTests(unittest.TestCase):
                         self.assertEqual(fields['control_http_status'],500)
                         self.assertEqual(fields['control_error_detail'],'unexpected_eof')
                 if expected=='completed':
-                    expected_code={'rpc_503':'native_request_failed','not_idle':'native_not_idle',
-                        'late_observer_error':'native_protocol_error'}[mode]
+                    expected_code={'not_idle':'native_not_idle',
+                        'late_observer_error':'native_protocol_error'}.get(mode, 'native_request_failed')
                     self.assertEqual(terminal[0][1]['control_error_code'],expected_code)
                     self.assertFalse(terminal[0][1]['native_tool_pending'])
                     self.assertNotIn('control_http_status',terminal[0][1])

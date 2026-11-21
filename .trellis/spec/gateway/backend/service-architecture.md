@@ -2013,7 +2013,8 @@ transport.submit(prepared, body, ttfb_timeout).await
 ### 3. Contracts
 
 - 账号管理页独立保存两个布尔值，新旧账号的位置开关默认关闭。网关按实际选中的 AGY 账号冻结设置。普通 Messages 生成有独立系统文本时选择第一条不含函数结果的用户内容，公开请求正文不提供策略索引。
-- 原生入口以换行合并系统文本，先执行现有 `transform_system`，再按可选索引追加一个 `<system-reminder>` 文本块。此时独立系统段使用 `Use the provided context to answer the user's request.`。字符映射只处理原系统文本。标签、固定中性指令和已有消息逐字保留。Gemini 原生直连沿独立系统段。
+- 原生入口以换行合并系统文本，先执行现有 `transform_system`，再按可选索引追加一个 `<system-reminder>` 文本块。此时独立系统段使用 `REMINDER_SYSTEM_INSTRUCTION`。字符映射只处理原系统文本。标签、固定英文指令和已有消息逐字保留。Gemini 原生直连沿独立系统段。
+- `REMINDER_SYSTEM_INSTRUCTION` 为 `Use the provided context to answer the user's request. When working on multi-step tasks or calling tools, briefly share your progress and explain what you are doing and why. For strict-format requests such as JSON-only output, or auxiliary tasks such as compaction, summaries, titles, and classification, return only the requested output.`
 - 领取和历史续轮依据投影前正文及原有工具签名、调用 ID 和结果定位。新生成采用当前账号值。同一 HTTP 的认证恢复复用首次策略。开启位置或同形体时，网关先核对实际落点和转换回执再交付源帧。
 
 ### 4. Validation & Error Matrix

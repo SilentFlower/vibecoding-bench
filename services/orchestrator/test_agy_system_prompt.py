@@ -85,6 +85,13 @@ class AgySystemPromptTests(unittest.TestCase):
             'model': 'gemini-synthetic', 'native_model': 'MODEL_PLACEHOLDER_M36', 'body': body}
         original_steps = decode_request(raw)['native_steps']
         expected = ('ABC system\n中文 {x: 3}', 'ΑΒС ѕуѕtеm\n中文 {х: 3}')
+        expected_instruction = (
+            "Use the provided context to answer the user's request. "
+            "When working on multi-step tasks or calling tools, briefly share your progress and explain what you are doing and why. "
+            "For strict-format requests such as JSON-only output, or auxiliary tasks such as compaction, summaries, titles, and classification, "
+            "return only the requested output."
+        )
+        self.assertEqual(REMINDER_SYSTEM_INSTRUCTION, expected_instruction)
         for glyphs in (False, True):
             for reminder in (False, True):
                 with self.subTest(glyphs=glyphs, reminder=reminder):
@@ -95,7 +102,7 @@ class AgySystemPromptTests(unittest.TestCase):
                     self.assertEqual(body, original)
                     self.assertEqual(decoded['gemini_body'], original)
                     self.assertEqual(decoded['native_steps'][1:], original_steps[1:])
-                    self.assertEqual(decoded['system'], REMINDER_SYSTEM_INSTRUCTION if reminder else expected[glyphs])
+                    self.assertEqual(decoded['system'], expected_instruction if reminder else expected[glyphs])
                     user = decoded['native_steps'][0]['userInput']['userResponse']
                     original_user = original_steps[0]['userInput']['userResponse']
                     self.assertEqual(user, original_user + (

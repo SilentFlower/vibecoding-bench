@@ -1852,7 +1852,12 @@ def verify_system_reminder(request, wait_idle, database, request_ids):
     homoglyph = 'agy_system_prompt_homoglyph_enabled'
     account_path = '/admin/accounts/1'
     messages_path = '/v1/messages'
-    neutral = "Use the provided context to answer the user's request."
+    neutral = (
+        "Use the provided context to answer the user's request. "
+        "When working on multi-step tasks or calling tools, briefly share your progress and explain what you are doing and why. "
+        "For strict-format requests such as JSON-only output, or auxiliary tasks such as compaction, summaries, titles, and classification, "
+        "return only the requested output."
+    )
     sample = ['ABC system', '中文 {x: 3}']
     converted = ['ΑΒС ѕуѕtеm', '中文 {х: 3}']
     user_prompt = 'TLS_SYNTHETIC_TOOL read a sample record'

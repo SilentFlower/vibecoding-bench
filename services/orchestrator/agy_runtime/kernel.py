@@ -22,7 +22,7 @@ from .storage import ROOT, SOURCE_SHA, Output, binary, config, private_dir
 from .stream_controller import DrainBridge, NativeJob, DeliverySpool
 from .layer_reader import LayerReader
 from .tool_broker import Broker
-from .gemini_frames import Frames
+from .gemini_frames import Frames, RESULT_FINISH_REASONS
 from .capture import save_egress, save_submission
 from .wire_capture import NativeTlsTrace
 from .credentials import read_access_document
@@ -226,7 +226,7 @@ class Worker:
         if job and call_id==job.call_id:raise RuntimeError('native_root_identity.call_reused')
         if conversation==scope.root:return True
         if (scope.value.get('request_format')!='gemini' or not job or job.calls!=1 or job.ends!=1
-                or not job.ended.is_set() or scope.frames.finish_reason!='STOP'):
+                or not job.ended.is_set() or scope.frames.finish_reason not in RESULT_FINISH_REASONS):
             raise RuntimeError('native_root_identity.unfinished_stream')
         if not conversation and not scope.frames.calls:
             raise RuntimeError('native_root_identity.missing_cascade')
@@ -595,6 +595,8 @@ class Kernel:
                 except RuntimeError:retire=True
             last_planner=next((s['plannerResponse'] for s in reversed(trajectory['steps']) if 'plannerResponse' in s),{})
             finish_reason='tool_calls' if scope.value.get('request_format')=='gemini' and scope.frames.calls else 'generation_limit' if last_planner.get('toolCalls') else 'stop'
+            if finish_reason == 'stop' and scope.frames.finish_reason == 'MAX_TOKENS':
+                finish_reason = 'max_tokens'
             scope.final_status='completed'
             self.emit('tool_turn_finalized' if scope.tool_wait_published else 'completed',**scope.identity(),finish_reason=finish_reason,status='completed',history_id=ident,history_error=history_error,native_cascade_id=scope.root,native_trajectory_id=trajectory['trajectoryId'],native_empty=scope.job.chunks==0,native_model_calls=scope.job.calls,native_tool_pending=False)
         except Exception as exc:
@@ -625,9 +627,10 @@ class Kernel:
             except OSError:
                 pass
             if blocker is None:
-                # 已按顺序交付原始 STOP 和用量。控制失败由真实退役收口，原模型结果不重放。
+                # 业务终态有完整源帧证据。控制调用仍缺空闲确认，由原退役路径收口。
                 scope.final_status='completed'
-                self.emit('completed',**scope.identity(),finish_reason='stop',status='completed',
+                finish_reason = 'max_tokens' if scope.frames.finish_reason == 'MAX_TOKENS' else 'stop'
+                self.emit('completed',**scope.identity(),finish_reason=finish_reason,status='completed',
                     native_cascade_id=scope.root,native_model_calls=1,native_empty=False,native_tool_pending=False,
                     control_error_code=code,control_recovery=recovery,**observed)
             else:

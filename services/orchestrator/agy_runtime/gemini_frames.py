@@ -5,6 +5,13 @@ import json
 from uuid import uuid4
 
 
+RESULT_FINISH_REASONS = ('STOP', 'MAX_TOKENS')
+
+
+def _token_count(value):
+    return type(value) is int and 0 <= value < 2**64
+
+
 class Frames:
     """保存本请求的输出归属和函数调用摘要。"""
 
@@ -13,14 +20,17 @@ class Frames:
         self.calls=[];self.sequence=0;self.terminal=False;self.finish_reason=None
         self.call_ids=set()
         self.source_error=False;self.usage_complete=False;self.visible_text=False
+        self.max_tokens_usage_complete = False
+        self.thought_or_media = False
 
     def recovery_blocker(self):
         """报告源帧阻止保留结果的首个条件。@return 受控代码，完整普通结果返回空。"""
         if self.source_error:return 'source_error'
         if self.calls:return 'tool_pending'
-        if self.finish_reason!='STOP':return 'missing_stop'
-        if not self.visible_text:return 'missing_text'
-        if not self.usage_complete:return 'missing_usage'
+        if self.finish_reason not in RESULT_FINISH_REASONS:return 'missing_stop'
+        truncated = self.finish_reason == 'MAX_TOKENS'
+        if not (self.visible_text or truncated and self.thought_or_media):return 'missing_text'
+        if not (self.max_tokens_usage_complete if truncated else self.usage_complete):return 'missing_usage'
         return None
 
     def project(self, event):
@@ -41,8 +51,13 @@ class Frames:
         self.source_error |= 'error' in body
         usage=body.get('usageMetadata')
         if isinstance(usage,dict):
-            fields=('promptTokenCount','candidatesTokenCount','totalTokenCount')
-            self.usage_complete=all(type(usage.get(key)) is int and 0<=usage[key]<2**64 for key in fields)
+            base_usage = all(_token_count(usage.get(key)) for key in ('promptTokenCount', 'totalTokenCount'))
+            self.usage_complete = base_usage and _token_count(usage.get('candidatesTokenCount'))
+            thoughts = usage.get('thoughtsTokenCount')
+            # 达到上限时，原生可能只报告已发生的思考用量。保留字段实际缺省，兼容性只用于恢复判断。
+            thinking_usage = base_usage and 'candidatesTokenCount' not in usage and _token_count(thoughts) and thoughts > 0
+            self.max_tokens_usage_complete = (self.usage_complete or thinking_usage) and (
+                'thoughtsTokenCount' not in usage or _token_count(thoughts))
         candidates=body.get('candidates',[])
         # 官方控制RPC和通道EOF都可能在截断后正常返回，业务成功还须有源终态。
         feedback=body.get('promptFeedback',{})
@@ -56,7 +71,18 @@ class Frames:
         if isinstance(reason,str) and reason not in ['','FINISH_REASON_UNSPECIFIED']:
             self.finish_reason=reason;self.terminal=True
         if not isinstance(parts,list):raise RuntimeError('invalid_native_gemini_parts')
-        self.visible_text |= any(isinstance(part.get('text'),str) and bool(part['text']) and part.get('thought') is not True for part in parts)
+        for part in parts:
+            text = part.get('text')
+            if isinstance(text, str) and text:
+                if part.get('thought') is True:
+                    self.thought_or_media = True
+                else:
+                    self.visible_text = True
+            inline = part.get('inlineData', part.get('inline_data'))
+            if isinstance(inline, dict):
+                mime = inline.get('mimeType', inline.get('mime_type'))
+                data = inline.get('data')
+                self.thought_or_media |= isinstance(mime, str) and bool(mime) and isinstance(data, str) and bool(data)
         calls=[p['functionCall'] for p in parts if 'functionCall' in p]
         assigned_id=False
         for call in calls:
