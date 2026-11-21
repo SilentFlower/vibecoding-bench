@@ -9,6 +9,32 @@ import uuid
 from .contract import InputError, fields, text
 
 
+def _identity(call):
+    return (call['id'], call['name'], json.loads(call['argumentsJson']))
+
+
+def _gemini_batch(steps, index):
+    for planner in range(index - 1, -1, -1):
+        calls = (steps[planner].get('plannerResponse') or {}).get('toolCalls')
+        if calls:
+            break
+    else:
+        raise RuntimeError('tool_native_planner_missing')
+    positions = []
+    observed = []
+    for position in range(planner + 1, len(steps)):
+        step = steps[position]
+        if 'plannerResponse' in step:
+            break
+        call = (step.get('metadata') or {}).get('toolCall')
+        if call:
+            positions.append(position)
+            observed.append(_identity(call))
+    if index not in positions or observed != [_identity(call) for call in calls]:
+        raise RuntimeError('tool_native_step_identity')
+    return tuple(positions), calls
+
+
 class Broker:
     """持有单次请求的工具定义、真实原生调用与待交还结果。"""
 
@@ -42,31 +68,41 @@ class Broker:
         scope=self.scope;metadata=params.get('_meta',{})
         if self.closed or scope.cancel.is_set():raise RuntimeError('tool_request_cancelled')
         if metadata.get('antigravity.google/conversation_id')!=scope.root:raise RuntimeError('tool_native_root_identity')
-        token=metadata.get('progressToken');trajectory_id,index=text(token).rsplit(':',1)
+        token=metadata.get('progressToken');trajectory_id,index=text(token).rsplit(':',1);index=int(index)
         current=scope.worker.call('GetCascadeTrajectory',{'cascadeId':scope.root},scope)
         if current['status']!=200:raise RuntimeError('tool_native_trajectory_unavailable')
         trajectory=current['response']['trajectory']
         if trajectory['trajectoryId']!=trajectory_id:raise RuntimeError('tool_native_trajectory_identity')
-        step=trajectory['steps'][int(index)];call=step['metadata']['toolCall']
+        steps=trajectory['steps']
+        if not 0<=index<len(steps):raise RuntimeError('tool_native_step_identity')
+        call=steps[index]['metadata']['toolCall']
         args=params.get('arguments',{})
         if call['name']!=params.get('name') or json.loads(call['argumentsJson'])!=args:raise RuntimeError('tool_native_call_identity')
         if params['name'] not in {d['name'] for d in self.definitions}:raise RuntimeError('tool_not_declared')
-        self.trajectory_id=trajectory_id
-        if scope.value.get('request_format')=='gemini':
-            scope.native_tool_calls=copy.deepcopy(next((s['plannerResponse']['toolCalls'] for s in reversed(trajectory['steps'][:int(index)]) if s.get('plannerResponse',{}).get('toolCalls')),None))
-            if scope.native_tool_calls is None:raise RuntimeError('tool_native_planner_missing')
-        ident=call['id'];execution=str(uuid.uuid4());pending={'native_call':copy.deepcopy(call),'execution_id':execution,'result':None,'token':token,'step_index':int(index)}
+        gemini=scope.value.get('request_format')=='gemini'
+        if gemini:positions,planned=_gemini_batch(steps,index)
+        ident=call['id'];execution=str(uuid.uuid4());pending={'native_call':copy.deepcopy(call),'execution_id':execution,'result':None,'token':token,'step_index':index}
+        # 同名和同 ID 的真实原生步骤仍分别收取一个结果。公开事件继续保留原生调用 ID。
+        slot=index if gemini else ident
         with self.condition:
-            if ident in self.pending:raise RuntimeError('duplicate_native_tool_call')
-            self.pending[ident]=pending
-            if scope.value.get('request_format')=='gemini':
-                if self.gemini_results is not None:pending['result']=self.gemini_result(ident)
+            if self.trajectory_id not in (None,trajectory_id):raise RuntimeError('tool_native_trajectory_identity')
+            self.trajectory_id=trajectory_id
+            if slot in self.pending:raise RuntimeError('duplicate_native_tool_call')
+            if gemini:
+                if scope.native_tool_calls is None:
+                    scope.native_tool_calls=copy.deepcopy(planned)
+                    scope.native_tool_steps=positions
+                elif scope.native_tool_steps!=positions or scope.native_tool_calls!=planned:
+                    raise RuntimeError('tool_native_step_identity')
+                if self.gemini_results is not None:pending['result']=self.gemini_result(slot)
+            self.pending[slot]=pending
+            if gemini:
                 self.owner.emit('tool_waiting',**scope.identity(),tool_call_id=ident,tool_execution_id=execution,
                     native_cascade_id=scope.root,native_trajectory_id=trajectory_id)
                 scope.tool_wait_ready.set()
             else:
                 self.owner.emit('tool_call',**scope.identity(),tool_call_id=ident,tool_execution_id=execution,name=params['name'],arguments=args,
-                    thinking_signature=call.get('thinkingSignature'),native_trajectory_id=trajectory_id,native_step_index=int(index),native_progress_token=token)
+                    thinking_signature=call.get('thinkingSignature'),native_trajectory_id=trajectory_id,native_step_index=index,native_progress_token=token)
             while pending['result'] is None and not self.closed and not scope.cancel.is_set():self.condition.wait(.1)
             if pending['result'] is None:
                 self.owner.emit('tool_aborted',**scope.identity(),tool_call_id=ident,tool_execution_id=execution)
@@ -84,7 +120,7 @@ class Broker:
         with self.condition:
             if self.closed or self.scope.cancel.is_set() or self.gemini_results is not None:raise InputError('gemini_tool_turn_closed')
             # 发布工具轮时已逐项核对原生和公开调用的顺序、名称及参数。
-            identities=self.scope.tool_native_ids
+            identities=self.scope.native_tool_steps
             if len(identities)!=len(values) or not self.pending.keys()<=set(identities):
                 raise InputError('gemini_pending_results_mismatch')
             self.gemini_results=copy.deepcopy(dict(zip(identities,values)))

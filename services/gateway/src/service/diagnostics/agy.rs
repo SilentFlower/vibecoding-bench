@@ -215,6 +215,17 @@ impl AgyAttemptTrace {
         if native["control_error_detail"] == "unexpected_eof" {
             context.control_error_detail = Some("unexpected_eof".into());
         }
+        if let Some(detail) = native["tool_protocol_detail"].as_str().filter(|detail| {
+            matches!(
+                *detail,
+                "planner_identity"
+                    | "mcp_callback_rejected"
+                    | "invalid_native_tool_step"
+                    | "mcp_callback_missing"
+            )
+        }) {
+            context.control_error_detail = Some(detail.into());
+        }
         if let Some(ended) = native["native_receive_ended"].as_bool() {
             context.native_receive_ended = Some(ended);
         }
@@ -244,6 +255,8 @@ impl AgyAttemptTrace {
                     | "native_tool_yield_timeout"
                     | "native_tool_yield_failed"
                     | "ambiguous_parallel_function_calls"
+                    | "native_tool_frame_identity"
+                    | "invalid_native_tool_id"
                     | "unsupported_gemini_candidate_count"
                     | "invalid_native_gemini_parts"
                     | "native_safety_endpoint_rejected"

@@ -933,6 +933,7 @@ impl RequestTraceGuard {
             AppError::AgyControl(_) => "native_control",
             AppError::AgyToolTurnFailed
             | AppError::AgyToolReplayUnavailable
+            | AppError::AgyToolContinuationTerminal { .. }
             | AppError::AgyToolResponseExpired => "tool_continuation",
             AppError::BadGateway(_) => "transport",
             // 503 可来自凭据、环境或原生准备，具体阶段由失败边界记录。

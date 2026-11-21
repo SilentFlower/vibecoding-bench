@@ -126,7 +126,7 @@ pub fn build_router(
 ) -> Router {
     let proxy_svc = Arc::new(ProxyService::new(settings_store.database_pool()));
     let state = AppState {
-        gemini_svc: Arc::new(GeminiService::default()),
+        gemini_svc: Arc::new(GeminiService::new(settings_store.database_pool())),
         proxy_svc,
         gateway_svc,
         account_svc,
@@ -968,7 +968,10 @@ async fn runtime_lease_update(
         .await;
     if input.operation == "prepare" {
         if agy_migration {
-            state.account_svc.prepare_agy_migration(id, &input.owner).await?;
+            state
+                .account_svc
+                .prepare_agy_migration(id, &input.owner)
+                .await?;
         } else {
             queue.runtime_gate.prepare(&input.owner)?;
         }

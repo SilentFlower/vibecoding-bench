@@ -9,6 +9,7 @@ import os
 import secrets
 import subprocess
 import threading
+import time
 from urllib.parse import urlsplit
 import zlib
 
@@ -161,13 +162,14 @@ class _Request(BaseHTTPRequestHandler):
 class SafetyEgress:
     """持有一次原生作业的回环入口和活动上游连接。"""
 
-    def __init__(self, rules, token, proxy, ca_file=None, capture=None):
-        """冻结阈值及租约。@param rules 客户端安全规则。@param token 当前代次访问令牌。@param proxy 账号代理。@param ca_file 受信证书路径。@param capture 已冻结的采集回调。@return 无。"""
+    def __init__(self, rules, token, proxy, ca_file=None, capture=None, *, execution_deadline=None):
+        """冻结阈值及租约。@param rules 客户端安全规则。@param token 当前代次访问令牌。@param proxy 账号代理。@param ca_file 受信证书路径。@param capture 采集回调。@param execution_deadline 原单调截止。@return 无。"""
         parsed = urlsplit(proxy)
         if parsed.scheme not in ('http', 'socks5', 'socks5h') or not parsed.hostname or not parsed.port:
             raise ValueError('native_safety_proxy_missing')
         self.rules = rules
         self.capture = capture
+        self.deadline = time.monotonic() + 120 if execution_deadline is None else execution_deadline
         self.authorization = ('Bearer ' + token).encode('ascii')
         self.proxy = proxy
         self.ca_file = ca_file
@@ -196,8 +198,11 @@ class SafetyEgress:
             suppressed = [name + ':' for name in CURL_DEFAULT_HEADERS if name.lower() not in supplied]
             lines = [f'proxy = {json.dumps(self.proxy, ensure_ascii=False)}',
                      *(f'header = {json.dumps(header, ensure_ascii=False)}' for header in (*headers, *suppressed))]
+            remaining = self.deadline - time.monotonic()
+            if remaining <= 0:
+                raise OSError('request_deadline_exceeded')
             command = ['curl', '-q', '--config', '-', '--silent', '--http1.1', '--raw', '--include',
-                       '--no-buffer', '--suppress-connect-headers', '--noproxy', '', '--max-time', '120',
+                       '--no-buffer', '--suppress-connect-headers', '--noproxy', '', '--max-time', f'{max(.001, remaining):.3f}',
                        '--proxy-header', 'Proxy-Connection:', '--proxy-header', 'User-Agent: Go-http-client/1.1',
                        '--data-binary', f'@/proc/self/fd/{fd}', '--url', CLOUD_CODE + path]
             if self.ca_file:

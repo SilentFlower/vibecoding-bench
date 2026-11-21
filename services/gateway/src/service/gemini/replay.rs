@@ -1,7 +1,7 @@
 //! 已受理工具续轮的提交回执和短期响应缓存。
 
 use std::mem::size_of;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use futures_util::{Stream, stream};
 use serde::ser::{Serialize, SerializeMap, Serializer};
@@ -37,9 +37,17 @@ impl ReplayKey {
             body_digest: digest.finalize().into(),
         })
     }
+
+    /// 编码持久回执的正文摘要。@return 固定十六进制。
+    pub(super) fn digest(&self) -> String {
+        self.body_digest
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect()
+    }
 }
 
-struct SortedJson<'a>(&'a Value);
+pub(super) struct SortedJson<'a>(pub(super) &'a Value);
 
 impl Serialize for SortedJson<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -65,6 +73,12 @@ struct StoredFrame {
     _reservation: OwnedSemaphorePermit,
 }
 
+/// 有界保留实际原生历史，供有物理收口证明的失败恢复。
+pub(super) struct RuntimeContents {
+    pub(super) value: Value,
+    _reservation: OwnedSemaphorePermit,
+}
+
 #[derive(Default)]
 struct ReplayState {
     frames: Vec<Arc<StoredFrame>>,
@@ -87,8 +101,10 @@ pub(super) struct ToolReplay {
     pub(super) previous_turn: String,
     pub(super) derived_session_id: Option<String>,
     pub(super) session_scope: Option<String>,
-    pub(super) deadline: Instant,
-    pub(super) receipt_deadline: Instant,
+    pub(super) body_key: String,
+    runtime: Mutex<Option<Arc<RuntimeContents>>>,
+    planned_deadline: Instant,
+    sender_deadline: OnceLock<Instant>,
     pub(super) cutover: Option<InferenceCutover>,
     budget: Arc<Semaphore>,
     _receipt_reservation: Option<OwnedSemaphorePermit>,
@@ -117,8 +133,10 @@ impl ToolReplay {
             previous_turn,
             derived_session_id,
             session_scope: None,
-            deadline,
-            receipt_deadline: deadline + AGY_TOOL_WAIT_LIMIT,
+            body_key: String::new(),
+            runtime: Mutex::default(),
+            planned_deadline: deadline,
+            sender_deadline: OnceLock::new(),
             cutover,
             budget,
             _receipt_reservation: None,
@@ -127,16 +145,62 @@ impl ToolReplay {
         }
     }
 
+    /// 保留需要复用的已规范化历史。@param value 原生历史。@param permit 字节预算。@return 无。
+    pub(super) fn keep_runtime_contents(&mut self, value: Value, permit: OwnedSemaphorePermit) {
+        self.runtime = Mutex::new(Some(Arc::new(RuntimeContents {
+            value,
+            _reservation: permit,
+        })));
+    }
+
+    /// 返回失败恢复需要的原生历史。@return 可用时持有预算的快照。
+    pub(super) fn runtime_contents(&self) -> Option<Arc<RuntimeContents>> {
+        self.runtime
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone()
+    }
+
+    /// 成功或明确终止恢复后释放历史字节，回执摘要继续保留。@return 无。
+    pub(super) fn discard_runtime_contents(&self) {
+        self.runtime
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .take();
+    }
+
+    /// 冻结实际协商的 sender 截止。@param deadline 同一生成的单调截止。@return 无。
+    pub(super) fn set_sender_deadline(&self, deadline: Instant) {
+        let _ = self
+            .sender_deadline
+            .set(deadline.min(self.planned_deadline));
+        self.changes.send_replace(());
+    }
+
+    /// 读取已知的真实生成截止。@return 原准备或实际 sender 截止。
+    pub(super) fn deadline(&self) -> Instant {
+        self.sender_deadline
+            .get()
+            .copied()
+            .unwrap_or(self.planned_deadline)
+    }
+
+    /// 返回轻量内存回执清理时刻。@return 原生成及工具等待窗口。
+    pub(super) fn receipt_deadline(&self) -> Instant {
+        self.deadline() + AGY_TOOL_WAIT_LIMIT
+    }
+
     /// 在领取原批次之前为提交回执保留共享内存预算。
     /// @param key 规范化的重读键。@param budget 轻量回执独立预算。@return 可接纳回填时成功。
     pub(super) fn reserve_receipt(
         &mut self,
-        key: &ReplayKey,
+        key: &str,
         budget: &Arc<Semaphore>,
     ) -> Result<(), AppError> {
         // 原尝试与 HTTP 根同为 UUID，键还需由到期任务保存一份。
         let bytes = size_of::<Self>()
-            + 2 * (size_of::<ReplayKey>() + key.model.len() + self.request_id.len())
+            + 2 * (key.len() + self.request_id.len())
+            + self.body_key.len()
             + self.previous_turn.len()
             + self.derived_session_id.as_ref().map_or(0, String::len)
             + self.session_scope.as_ref().map_or(0, String::len);
@@ -184,7 +248,7 @@ impl ToolReplay {
     /// 在执行期限之外，仅保留已进入发送边界的回执。
     /// @param now 当前单调时刻。@return 重试仍可定位原归属时为真。
     pub(super) fn retained(&self, now: Instant) -> bool {
-        now < self.deadline || (now < self.receipt_deadline && self.attempt().is_some())
+        now < self.deadline() || (now < self.receipt_deadline() && self.attempt().is_some())
     }
 
     /// 保留一份紧凑帧。容量不足只关闭重读，首笔仍沿原通道交付。
@@ -194,7 +258,7 @@ impl ToolReplay {
             .frames
             .lock()
             .unwrap_or_else(|error| error.into_inner());
-        if state.terminal.is_some() || state.unavailable || Instant::now() >= self.deadline {
+        if state.terminal.is_some() || state.unavailable || Instant::now() >= self.deadline() {
             return;
         }
         let stored = serde_json::to_vec(frame).ok().and_then(|encoded| {
@@ -222,6 +286,9 @@ impl ToolReplay {
 
     /// 唤醒读者并保留首个终态。@param result 原生成的终态。@return 无。
     pub(super) fn finish(&self, result: Result<(), AppError>) {
+        if result.is_ok() {
+            self.discard_runtime_contents();
+        }
         let mut state = self
             .frames
             .lock()
@@ -244,7 +311,7 @@ impl ToolReplay {
     }
 
     fn unavailable_error(&self, state: &ReplayState) -> Option<AppError> {
-        let expired = Instant::now() >= self.deadline;
+        let expired = Instant::now() >= self.deadline();
         if !expired && !state.unavailable {
             return None;
         }
@@ -265,13 +332,26 @@ impl ToolReplay {
     }
 
     /// 检查首笔断开后是否仍有重试方在读取。@return 存在重试读者时为真。
+    #[cfg(test)]
     pub(super) fn has_readers(&self) -> bool {
         self.changes.receiver_count() != 0
     }
 
-    /// 等待当前重试读者都离开。@return 无。
-    pub(super) async fn readers_closed(&self) {
-        self.changes.closed().await;
+    /// 生成截止已过时给物理收口留一段有界时间。
+    /// @param until 收口等待截止。@return 无。
+    pub(super) async fn wait_terminal(&self, until: Instant) {
+        let mut changes = self.changes.subscribe();
+        loop {
+            let finished = self
+                .frames
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .terminal
+                .is_some();
+            if finished || !matches!(timeout_at(until, changes.changed()).await, Ok(Ok(()))) {
+                return;
+            }
+        }
     }
 
     /// 从首帧读取，慢读者仅保留自身游标。
@@ -300,7 +380,7 @@ impl ToolReplay {
                     return terminal.err().map(|error| (Err(error), None));
                 }
                 if !matches!(
-                    timeout_at(replay.deadline, changes.changed()).await,
+                    timeout_at(replay.deadline(), changes.changed()).await,
                     Ok(Ok(()))
                 ) {
                     return Some((
@@ -428,7 +508,7 @@ mod tests {
             failed.response_error(),
             Some(AppError::AgyControl(StatusCode::INTERNAL_SERVER_ERROR))
         ));
-        assert!(!failed.retained(failed.receipt_deadline));
+        assert!(!failed.retained(failed.receipt_deadline()));
 
         let succeeded = response(budget, now - Duration::from_secs(1));
         succeeded.mark_sending("original-success");

@@ -11,7 +11,7 @@ pub const AGY_SOURCE_SHA256: &str =
     "39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43";
 
 /// 公共生成请求共用的原生执行预算。
-pub(super) const AGY_REQUEST_SECONDS: i64 = 120;
+pub(super) const AGY_REQUEST_SECONDS: i64 = 240;
 
 /// 原版在 AT 剩余 310 秒时可离线启动，另预留一次完整原生请求时长。
 pub(super) const AGY_ACCESS_VALIDITY_SECONDS: i64 = 310 + AGY_REQUEST_SECONDS;

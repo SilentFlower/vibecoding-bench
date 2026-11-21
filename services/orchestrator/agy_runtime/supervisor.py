@@ -32,14 +32,17 @@ from .system_prompt import decode_policy, default_policy
 
 TOOL_WAIT_SECONDS = 3600
 EXTRA_WORKER_IDLE_SECONDS = 120
+REQUEST_SECONDS = 120
+GENERATION_SECONDS = 240
+DEADLINE_SKEW_SECONDS = 5
 
 
-def deadline(value: int) -> float:
-    """把私有墙钟截止冻结为本次单调截止。@param value UTC毫秒。@return 单调截止。"""
+def deadline(value: int, budget: int = REQUEST_SECONDS) -> float:
+    """冻结当前单调截止。@param value UTC毫秒。@param budget 操作执行预算。@return 单调截止。"""
     remaining = value / 1000 - time.time() if type(value) is int else -1
-    if not 0 < remaining <= 125:
+    if not 0 < remaining <= budget + DEADLINE_SKEW_SECONDS:
         raise InputError('invalid_request_deadline')
-    return time.monotonic() + min(120, remaining)
+    return time.monotonic() + min(budget, remaining)
 
 
 def validate_submission(value: dict, config: dict) -> dict:
@@ -93,7 +96,7 @@ def validate_submission(value: dict, config: dict) -> dict:
         raise InputError('invalid_media_policy')
     if type(value.get('disable_safety_filtering',False)) is not bool:
         raise InputError('invalid_safety_policy')
-    deadline(value['deadline_unix_ms'])
+    deadline(value['deadline_unix_ms'], GENERATION_SECONDS if value['type']=='submit' else REQUEST_SECONDS)
     result=copy.deepcopy(value)
     result.setdefault('capture_enabled',False)
     if warm:
@@ -596,7 +599,7 @@ class Supervisor:
     def submit(self, raw):
         """登记唯一HTTP请求并在线程中执行。@param raw 受信提交。@return 无。"""
         value = validate_submission(raw, self.config)
-        until = deadline(value['deadline_unix_ms'])
+        until = deadline(value['deadline_unix_ms'], GENERATION_SECONDS if value['type']=='submit' else REQUEST_SECONDS)
         with self.condition:
             if self.closed or value['request_id'] in self.jobs:
                 raise InputError('request_already_registered')
@@ -819,7 +822,7 @@ class Supervisor:
                     pass
             payload={'schema_version': 1, 'type': 'gemini_request', 'request_id': value['request_id'],
                 'model': value['model'], 'native_model': value['native_model'],
-                'body': value['body'], 'system_prompt_policy':value['system_prompt_policy']}
+                'body': value['body'], 'system_prompt_policy':value['system_prompt_policy'], 'execution_deadline':until}
             if value.get('gif_frames'):payload['gif_frames']=True
             if value.get('disable_safety_filtering'):payload['disable_safety_filtering']=True
             if value.get('capture_enabled') and value.get('full_egress'):payload['full_egress']=True

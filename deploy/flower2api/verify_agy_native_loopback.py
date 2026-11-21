@@ -40,6 +40,7 @@ SEARCH_URL = 'https://www.iana.org/help/example-domains'
 SEARCH_REDIRECT = 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/fixture'
 SEARCH_REDIRECT_TITLE = 'IANA Redirect Fixture'
 MESSAGES_READ_PATH = '/fixture/large.txt'
+CUT_OFF_REWRITE = 'Your response above was cut off mid-stream and only your next message is delivered. Write the complete response again from the start — no apology, no mention of the cut-off.'
 
 
 def require(condition, message):
@@ -146,9 +147,13 @@ class Upstream(BaseHTTPRequestHandler):
                 self.usage_then_eof(truncated='TLS_SYNTHETIC_EOF_SHORT' in encoded,
                     with_text='TLS_SYNTHETIC_EOF_TEXT' in encoded)
                 return
+            recover_once = 'AGY_RECEIPT_FAIL_ONCE' in encoded and 'functionResponse' in encoded
             if 'AGY_RECEIPT_FAIL' in encoded and 'functionResponse' in encoded:
-                self.usage_then_eof(truncated=True,with_text=False)
-                return
+                seen = sum('AGY_RECEIPT_FAIL_ONCE' in json.dumps(record['body'])
+                    and 'functionResponse' in json.dumps(record['body']) for record in self.calls)
+                if not recover_once or seen==1:
+                    self.usage_then_eof(truncated=True,with_text=False)
+                    return
             rejected=next((result for marker,result in (
                 ('TLS_SYNTHETIC_UPSTREAM_UNAVAILABLE',(503,'UNAVAILABLE')),
                 ('TLS_SYNTHETIC_UPSTREAM_QUOTA',(429,'RESOURCE_EXHAUSTED')),
@@ -166,9 +171,9 @@ class Upstream(BaseHTTPRequestHandler):
             results='functionResponse' in encoded
             tool='TLS_SYNTHETIC_TOOL' in encoded and not results
             receipt_result_count=None
-            if ('AGY_RECEIPT_OWNERSHIP' in encoded or 'AGY_RECEIPT_FAIL' in encoded) and not receipt_side:
+            if any(marker in encoded for marker in ('AGY_RECEIPT_OWNERSHIP','AGY_RECEIPT_FAIL','AGY_RECEIPT_DROP')) and not receipt_side:
                 receipt_result_count=sum('functionResponse' in part for turn in body['request']['contents'] for part in turn['parts'])
-                tool=receipt_result_count<2
+                tool=receipt_result_count<2 and not recover_once and not ('AGY_RECEIPT_DROP' in encoded and results)
             deadline_chain='TLS_SYNTHETIC_LONG_TOOL_CHAIN' in encoded
             if deadline_chain:
                 returned=sum('functionResponse' in part for content in body['request']['contents']
@@ -241,6 +246,20 @@ class Upstream(BaseHTTPRequestHandler):
             elif tool and 'TLS_SYNTHETIC_TOOL_PARALLEL' in encoded:
                 frames[0]['candidates'][0]['content']['parts'].append(
                     {'functionCall':{'name':'synthetic_tool','args':{'x':2}}})
+            if 'AGY_RELIABILITY_LONG' in encoded:
+                frames=[{'candidates':[{'index':0,'content':{'role':'model','parts':[{'text':'深思考已开始','thought':True}]}}]},
+                    {'candidates':[{'index':0,'content':{'role':'model','parts':[{'text':'长生成结束'}]}}]}]
+            if not results and 'AGY_RELIABILITY_SEARCH' in encoded:
+                frames=[{'candidates':[{'index':0,'content':{'role':'model','parts':[
+                    {'functionCall':{'name':'web_search','id':'fixture-search','args':{'query':'合成查询'}}}]}}]}]
+            if not results and 'AGY_RELIABILITY_DUPLICATE' in encoded:
+                second=1 if 'AGY_RELIABILITY_DUPLICATE_IDENTICAL' in encoded else 2
+                frames=[{'candidates':[{'index':0,'content':{'role':'model','parts':[
+                    {'functionCall':{'name':'synthetic_tool','id':'fixture-repeat','args':{'x':x}}}]}}]}
+                    for x in (1,second)]
+            if not results and 'AGY_RELIABILITY_NUMERIC_ID' in encoded:
+                frames=[{'candidates':[{'index':0,'content':{'role':'model','parts':[
+                    {'functionCall':{'name':'synthetic_tool','id':17,'args':{'x':1}}}]}}]}]
             if repeated:frames*=64
             if capacity:
                 error={'error':{'code':429,'status':'RESOURCE_EXHAUSTED','message':'private synthetic detail'}}
@@ -259,11 +278,13 @@ class Upstream(BaseHTTPRequestHandler):
                     with urlopen(value,timeout=5) as response:state=json.load(response)
                     native=next((process['native']['pid'] for process in state['agy']['processes'] if process.get('native')),None)
                     require(native is not None,'重复帧实验缺少真实原生PID')
-                for frame in frames:
+                for index,frame in enumerate(frames):
                     if native:os.kill(native,signal.SIGURG)
                     envelope=frame if 'error' in frame else {'response':frame}
                     self.wfile.write(('data: '+json.dumps(envelope,ensure_ascii=False)+'\n\n').encode())
                     self.wfile.flush()
+                    if 'AGY_RELIABILITY_LONG' in encoded and index==0:time.sleep(121)
+                    if 'AGY_RECEIPT_DROP' in encoded and results and index==0:time.sleep(.8)
                     time.sleep(.1 if cancel else .02)
             except OSError:
                 if cancel:
@@ -339,6 +360,7 @@ class Proxy(BaseHTTPRequestHandler):
 class Binding(BaseHTTPRequestHandler):
     """复用真实网关传输准备边界，返回唯一合成环境。"""
     continuation_mode = 'claim'
+    long_generation = False
     hold_preparation = None
 
     def log_message(self,*args):
@@ -356,6 +378,8 @@ class Binding(BaseHTTPRequestHandler):
             host='flower2api-'+hashlib.sha256(b'synthetic').hexdigest()[:12]+'-'+ENVIRONMENT
             value={'account_id':1,'environment_id':ENVIRONMENT,'generation':1,'endpoint':f'http://{host}:8091',
                 'secret':SECRET,'release_id':'synthetic-release'}
+            if self.long_generation:
+                value['agy_generation_seconds']=240
             if self.continuation_mode != 'claim':
                 value.update(agy_tool_continuation_protocol=1, agy_tool_continuation_mode=self.continuation_mode)
         else:
@@ -1982,8 +2006,8 @@ def verify_system_reminder(request, wait_idle, database, request_ids):
     return {'system_reminder': observed, 'gemini_direct': True, 'real_model_submissions': 0}
 
 
-def verify_tool_receipts(request, wait_idle, database, request_ids):
-    """核对原版并发帧，以及跨公开响应期限的提交回执。@param request 公开请求。@param wait_idle 原生收口。@param database 合成 SQLite。@param request_ids 请求根。@return 验证摘要。"""
+def verify_tool_receipts(request, wait_idle, database, request_ids, restart_gateway):
+    """核对并发帧及续轮回执。@param request 公开请求。@param wait_idle 原生收口。@param database 合成 SQLite。@param request_ids 请求根。@param restart_gateway 重启合成网关。@return 验证摘要。"""
     path='/v1/messages'
 
     def append_results(body, message):
@@ -2050,21 +2074,22 @@ def verify_tool_receipts(request, wait_idle, database, request_ids):
     retry=copy.deepcopy(failed)
     retry['thinking'].pop('display')
     with ThreadPoolExecutor(max_workers=4) as pool:
-        statuses=list(pool.map(lambda _:request(path,retry)[0],range(16)))
-    require(statuses==[500]*16 and len(Upstream.calls)==count,'重读改变原失败或重复提交了模型')
+        results=list(pool.map(lambda _:request(path,retry),range(16)))
+    require(all(status==400 and b'AGY_TOOL_CONTINUATION_TERMINAL' in raw for status,raw in results)
+        and len(Upstream.calls)==count+1,'失败恢复没有共享唯一次历史尝试 '+str([status for status,_ in results]))
+    wait_idle()
 
     time.sleep(max(0,125-(time.monotonic()-started)))
-    for body,root,expected in [(success,success_root,410),(retry,failure_root,500)]:
-        status,raw=request(path,body)
-        replay_root=request_ids[-1]
-        require(status==expected,'响应帧回收后的原回执状态错误 '+raw[:200].decode(errors='replace'))
-        recorded=detail(replay_root,replay=True)
-        original=detail(root)
-        context=recorded['request']['context']
-        require(recorded['request']['attempt_count']==0 and not recorded['attempts']
-            and original['request']['attempt_count']==len(original['attempts'])==1
-            and context['replay_of_request_id']==root and context['replay_of_attempt_id']==original['attempts'][0]['attempt_id']
-            and context['replay_submission_state']=='model_observed','响应回收后的诊断未关联原尝试')
+    status,raw=request(path,success)
+    require(status==410,'成功响应帧未按生成预算回收 '+raw[:200].decode(errors='replace'))
+    recorded=detail(request_ids[-1],replay=True)
+    original=detail(success_root)
+    context=recorded['request']['context']
+    require(recorded['request']['attempt_count']==0 and not recorded['attempts']
+        and context['replay_of_request_id']==success_root and context['replay_of_attempt_id']==original['attempts'][0]['attempt_id']
+        and context['replay_submission_state']=='model_observed','成功过期诊断未关联原尝试')
+    status,raw=request(path,retry)
+    require(status==400 and b'AGY_TOOL_CONTINUATION_TERMINAL' in raw,'失败回执到期后恢复上限丢失')
     different=copy.deepcopy(retry)
     different['messages'][-1]['content'][0]['content']='不同合成回填'
     other_session={**retry,'metadata':{'user_id':json.dumps({'session_id':'fixture-other-receipt'})}}
@@ -2073,19 +2098,105 @@ def verify_tool_receipts(request, wait_idle, database, request_ids):
     with database:
         database.execute("UPDATE api_tokens SET blocked_accounts='1' WHERE token='synthetic-key'")
     try:
-        require(request(path,retry)[0]==400,'撤销账号访问后仍返回原回执')
+        require(request(path,retry)[0]==400,'撤销账号访问后仍接受原回执')
     finally:
         with database:
             database.execute("UPDATE api_tokens SET blocked_accounts='' WHERE token='synthetic-key'")
-    require(len(Upstream.calls)==count==7,'模型提交计数与两种场景不符')
-    return {'auxiliary_calls':2,'main_tool_delivered':True,'immediate_failure_replays':len(statuses),
-        'expired_success_status':410,'expired_failure_status':500,'late_replays_linked':True,
-        'synthetic_model_calls':count,'real_model_submissions':0}
+    require(len(Upstream.calls)==count+1,'失败终态后的重放产生额外模型调用')
+
+    dropped=issue('AGY_RECEIPT_DROP')
+    before=len(Upstream.calls)
+    status,raw=request(path,{**dropped,'stream':True},first_chunk=True)
+    require(status==200 and b'content_block_delta' in raw and b'message_stop' not in raw,'未在实际生成时断开客户端')
+    status,raw=request(path,dropped)
+    require(status==200 and '本地TLS回复'.encode() in raw and len(Upstream.calls)==before+1,
+        '断开后同正文没有接回原生成')
+    wait_idle()
+
+    recoverable=issue('AGY_RECEIPT_FAIL_ONCE')
+    require(request(path,recoverable)[0]==500,'重启前样本没有触发真实控制面失败')
+    wait_idle()
+    restart_gateway()
+    amended=copy.deepcopy(recoverable)
+    amended['messages'][-1]['content'].append({'type':'text','text':CUT_OFF_REWRITE})
+    before=len(Upstream.calls)
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        recovered=list(pool.map(lambda body:request(path,body),[amended,recoverable]*3))
+    require(all(status==200 and '本地TLS回复'.encode() in raw for status,raw in recovered)
+        and len(Upstream.calls)==before+1,'重启后未共用一次历史恢复 '+str([status for status,_ in recovered]))
+    require(CUT_OFF_REWRITE in json.dumps(Upstream.calls[-1]['body'],ensure_ascii=False)
+        or request(path,amended)[0]==200,'断流提示无法接回已生成的结果')
+    wait_idle()
+    return {'auxiliary_calls':2,'main_tool_delivered':True,'same_body_failure_retries':len(results),
+        'recovery_attempts_after_original_failure':1,'expired_success_status':410,'exhausted_status':400,
+        'restart_recovered':True,'reconnected_in_flight':True,'late_replays_linked':True,'synthetic_model_calls':len(Upstream.calls),
+        'real_model_submissions':0}
+
+
+def verify_reliability(request, wait_idle, base):
+    """验证原生重复工具、外部搜索、无内存历史和超旧截止的长流。@param request 公开入口。@param wait_idle 真正原生收口。@param base 路由。@return 真实回环结果。"""
+    def run_tool(marker, function, schema, expected, value_key):
+        body={'contents':[{'role':'user','parts':[{'text':marker}]}],
+            'tools':[{'functionDeclarations':[{'name':function,'parameters':schema}]}]}
+        status,raw=request(base+'generateContent',body)
+        require(status==200, f'{marker} 返回 {status} {raw[:300]!r}')
+        parts=[part for part in json.loads(raw)['candidates'][0]['content']['parts'] if 'functionCall' in part]
+        ids={part['functionCall']['id'] for part in parts}
+        require(len(parts)==len(ids)==expected,'公开批次缺失、重复或未核对')
+        results=[{'functionResponse':{'id':part['functionCall']['id'],'name':function,
+            'response':{'value':part['functionCall']['args'][value_key]}}} for part in reversed(parts)]
+        body['contents'].extend([{'role':'model','parts':parts},
+            {'role':'user','parts':results+[{'text':'根据工具结果继续'}]}])
+        status,raw=request(base+'generateContent',body)
+        require(status==200 and '本地TLS回复'.encode() in raw, f'回填后续轮失败 {status} {raw[:250]!r}')
+        wait_idle()
+        if expected==2:verify_parallel_tool_mapping(2)
+    schema={'type':'OBJECT','properties':{'x':{'type':'INTEGER'}}}
+    run_tool('AGY_RELIABILITY_DUPLICATE','synthetic_tool',schema,2,'x')
+    run_tool('AGY_RELIABILITY_DUPLICATE_IDENTICAL','synthetic_tool',schema,2,'x')
+    run_tool('AGY_RELIABILITY_SEARCH','web_search',{},1,'query')
+
+    invalid={'contents':[{'role':'user','parts':[{'text':'AGY_RELIABILITY_NUMERIC_ID'}]}],
+        'tools':[{'functionDeclarations':[{'name':'synthetic_tool','parameters':schema}]}]}
+    status,raw=request(base+'generateContent',invalid)
+    require(status>=400 and b'functionCall' not in raw,'非法工具 ID 获得待回填批次')
+    wait_idle()
+    before=len(Upstream.calls)
+    history={'contents':[{ 'role':'user','parts':[{'text':'历史启动'}]},
+        {'role':'model','parts':[{'functionCall':{'name':'synthetic_tool','id':'independent-history','args':{'x':4}}}]},
+        {'role':'user','parts':[{'functionResponse':{'name':'synthetic_tool','id':'independent-history','response':{'value':4}}}]},
+        {'role':'user','parts':[{'text':CUT_OFF_REWRITE}]}],
+        'tools':invalid['tools']}
+    status,raw=request(base+'generateContent',history)
+    require(status==200 and '本地TLS回复'.encode() in raw,'合法独立历史无法续轮 '+str(status))
+    require(request(base+'generateContent',history)==(status,raw) and len(Upstream.calls)==before+1,
+        '无内存历史重读重复提交')
+    malformed=copy.deepcopy(history)
+    malformed['contents'][2]['parts'][0]['functionResponse']['id']='unknown'
+    require(request(base+'generateContent',malformed)[0]==400 and len(Upstream.calls)==before+1,'错误历史进入原生生成')
+    wait_idle()
+    Binding.long_generation=True
+    Upstream.model_catalog_host='daily-cloudcode-pa.googleapis.com'
+    rules=[{'category':category,'threshold':'BLOCK_MEDIUM_AND_ABOVE'} for category in (
+        'HARM_CATEGORY_HARASSMENT','HARM_CATEGORY_HATE_SPEECH',
+        'HARM_CATEGORY_SEXUALLY_EXPLICIT','HARM_CATEGORY_DANGEROUS_CONTENT')]
+    start=time.monotonic()
+    status,raw=request(base+'streamGenerateContent?alt=sse',
+        {'contents':[{'role':'user','parts':[{'text':'AGY_RELIABILITY_LONG'}]}],'safetySettings':rules})
+    elapsed=time.monotonic()-start
+    frames=sse_frames(raw)
+    final=frames[-1] if frames else {}
+    require(status==200 and 120<elapsed<240 and final['candidates'][0]['finishReason']=='STOP'
+        and final['usageMetadata']['totalTokenCount']==7 and '长生成结束'.encode() in raw
+        and Upstream.calls[-1]['body']['request']['safetySettings']==rules,'长流没有越过 120 秒完整结束')
+    wait_idle()
+    return {'duplicate_id_batches':2,'external_search_query':True,'invalid_id_rejected':True,
+        'history_without_turn':True,'elapsed_seconds':round(elapsed,3),'real_model_submissions':0}
 
 
 def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,kernel_selection=False,tool_deadlines=False,parallel_tools=False,
            *, shared_models=False, live_capacity=False, messages_search=False, continuation_modes=False,
-           tool_receipts=False, system_reminder=False):
+           tool_receipts=False, system_reminder=False, reliability=False):
     """执行真实公共业务。@param homoglyph 检验系统策略。@param capture_off 验证关闭采集。@param png 核对图片与工具历史。@param installed_adapter 使用镜像内适配器。@param kernel_selection 验证内核切换。@param tool_deadlines 验证跨首轮期限的工具链。@param parallel_tools 验证同名工具。@return 脱敏验证摘要。"""
     require(os.geteuid()==1001,'原生业务探针必须使用UID1001')
     os.umask(0o077)
@@ -2119,8 +2230,8 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
             command=['/opt/verify-lib/ld-linux-x86-64.so.2','--library-path','/opt/verify-lib',executable]
         children.append(subprocess.Popen(command,stdout=output,stderr=subprocess.STDOUT))
     request_ids=[]
-    def request(path,body=None,admin=False,first_tool_frame=False,token='synthetic-key',*,session_id=None):
-        """通过真实公共 HTTP 执行一次请求。@param path 路径。@param body Gemini 正文。@param admin 是否管理调用。@param first_tool_frame 是否在首条工具事件后退出。@param token 合成入口令牌。@param session_id 独立的合成会话。@return 状态与正文。"""
+    def request(path,body=None,admin=False,first_tool_frame=False,token='synthetic-key',*,session_id=None,first_chunk=False):
+        """使用真实 HTTP 请求。@param path 路径。@param body 正文。@param admin 管理调用。@param first_tool_frame 首工具后退出。@param token 合成令牌。@param session_id 会话。@param first_chunk 首内容后退出。@return 状态与正文。"""
         headers={'x-api-key':'synthetic-admin' if admin else token,'content-type':'application/json'}
         if not admin:headers['X-Synthetic-Ingress']='never-upstream'
         if session_id is not None:headers['X-Session-Id']=session_id
@@ -2129,12 +2240,14 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
         value=Request('http://127.0.0.1:5674'+path,data=json.dumps(body).encode() if body is not None else None,headers=headers,
             method='PUT' if body is not None and (path=='/admin/settings' or path.startswith('/admin/accounts/')) else None)
         try:
-            with urlopen(value,timeout=125) as response:
+            with urlopen(value,timeout=255 if reliability else 125) as response:
                 if response.headers.get('x-cc2api-request-id'):request_ids.append(response.headers['x-cc2api-request-id'])
-                if first_tool_frame:
+                if first_tool_frame or first_chunk:
                     received=[]
                     for line in response:
                         received.append(line)
+                        if first_chunk and line.startswith(b'data: ') and json.loads(line[6:]).get('type')=='content_block_delta':
+                            break
                         if line.startswith(b'data: ') and any('functionCall' in part
                             for candidate in json.loads(line[6:]).get('candidates',[])
                             for part in candidate.get('content',{}).get('parts',[])):
@@ -2144,6 +2257,20 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
         except HTTPError as error:
             if error.headers.get('x-cc2api-request-id'):request_ids.append(error.headers['x-cc2api-request-id'])
             return error.code,error.read()
+    def restart_gateway():
+        """重启合成网关进程，保留同一个测试数据库。@return 无。"""
+        children[-1].terminate()
+        children[-1].wait(12)
+        children[-1]=subprocess.Popen(command,stdout=outputs[-1],stderr=subprocess.STDOUT)
+        until=time.monotonic()+25
+        while time.monotonic()<until:
+            require(children[-1].poll() is None,'重启后的隔离网关进程退出')
+            try:
+                if request('/api/hello')[0]==200:return
+            except OSError:
+                pass
+            time.sleep(.05)
+        raise ValueError('重启后隔离网关未就绪')
     def wait_idle():
         """等待原生退役及许可实际释放。@return 无。"""
         until=time.monotonic()+85
@@ -2158,9 +2285,17 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
         while time.monotonic()<until:
             require(all(child.poll() is None for child in children),'真实服务启动失败')
             try:
-                request('/api/hello');break
+                status,_=request('/api/hello')
+                sender_status=Request('http://127.0.0.1:8091/internal/status',
+                    headers={'authorization':'Bearer '+SECRET})
+                with urlopen(sender_status,timeout=2) as response:
+                    sender=json.load(response)
+                if status==200 and sender['environment_id']==ENVIRONMENT and sender['generation']==1:
+                    break
             except OSError:
                 time.sleep(.1)
+        else:
+            raise ValueError('隔离网关与发送器未同时就绪')
         database=sqlite3.connect('/state/gateway.sqlite')
         with database:
             database.execute("INSERT INTO accounts(id,name,email,platform,token,device_id,auth_type,access_token,refresh_token,oauth_expires_at,concurrency,auto_telemetry,auto_poll_usage,usage_data) VALUES(1,'synthetic','synthetic@example.test','antigravity','','','oauth','synthetic-at-1','synthetic-rt','2099-01-01T00:00:00Z',1,0,0,?)",
@@ -2178,7 +2313,11 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
             database.close()
             return result
         if tool_receipts:
-            result=verify_tool_receipts(request,wait_idle,database,request_ids)
+            result=verify_tool_receipts(request,wait_idle,database,request_ids,restart_gateway)
+            database.close()
+            return result
+        if reliability:
+            result=verify_reliability(request,wait_idle,base)
             database.close()
             return result
         if continuation_modes:
@@ -2398,6 +2537,7 @@ def main():
     parser.add_argument('--messages-search', action='store_true')
     parser.add_argument('--continuation-modes', action='store_true')
     parser.add_argument('--tool-receipts', action='store_true')
+    parser.add_argument('--reliability', action='store_true')
     parser.add_argument('--system-reminder', action='store_true')
     parser.add_argument('--claude-code', type=Path)
     args=parser.parse_args()
@@ -2406,7 +2546,7 @@ def main():
         result = inside(args.homoglyph,args.capture_off,args.png,installed_adapter,args.kernel_selection,args.tool_deadlines,args.parallel_tools,
             shared_models=args.shared_models,live_capacity=args.live_capacity,messages_search=args.messages_search,
             continuation_modes=args.continuation_modes,tool_receipts=args.tool_receipts,
-            system_reminder=args.system_reminder)
+            system_reminder=args.system_reminder,reliability=args.reliability)
         print(json.dumps(result, ensure_ascii=False))
         return
     require(bool(args.image),'需要明确的固定原版测试镜像')
@@ -2475,7 +2615,7 @@ def main():
                 ('--tool-deadlines',args.tool_deadlines),('--shared-models',args.shared_models),
                 ('--live-capacity',args.live_capacity),('--messages-search',args.messages_search),
                 ('--continuation-modes',args.continuation_modes),('--tool-receipts',args.tool_receipts),
-                ('--system-reminder', args.system_reminder)):
+                ('--system-reminder', args.system_reminder),('--reliability',args.reliability)):
             if enabled:probe.append(flag)
         container=client.containers.run(args.image,probe,entrypoint=['python3'],detach=True,
             user='1001:1001',network_mode='none',read_only=True,cap_drop=['ALL'],security_opt=['no-new-privileges:true'],
@@ -2489,6 +2629,7 @@ def main():
         logs=container.logs().decode(errors='replace')
         evidence=root/('.trellis/.runtime/agy-continuation-modes-private' if args.continuation_modes else '.trellis/.runtime/agy-messages-search-private' if args.messages_search else '.trellis/.runtime/agy-live-capacity-private' if args.live_capacity else '.trellis/.runtime/agy-shared-models-private' if args.shared_models else '.trellis/.runtime/agy-parallel-tools-private' if args.parallel_tools else '.trellis/.runtime/agy-tool-deadlines-private' if args.tool_deadlines else '.trellis/.runtime/agy-kernel-selection-private' if args.kernel_selection else '.trellis/.runtime/agy-png-loopback-private' if args.png else '.trellis/.runtime/agy-homoglyph-capture-off-private' if args.capture_off else '.trellis/.runtime/agy-homoglyph-loopback-private' if args.homoglyph else '.trellis/.runtime/agy-runtime-loopback-private')
         if args.tool_receipts:evidence=root/'.trellis/.runtime/agy-tool-receipts-private'
+        if args.reliability:evidence=root/'.trellis/.runtime/agy-tool-reliability-private'
         if args.system_reminder:evidence=root/'.trellis/.runtime/agy-system-reminder-private'
         if evidence.exists():shutil.rmtree(evidence)
         shutil.copytree(folder,evidence,ignore=lambda directory,names:[name for name in names

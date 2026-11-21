@@ -91,6 +91,15 @@
       "predecessor": 9,
       "rollback_mode": "compatible",
       "version": 10
+    },
+    {
+      "checksum": "fa7aa12d360fa94a697d5451d9719ba7891191a8d201f8413cec6d745ced9e85",
+      "engine": "sqlite",
+      "id": "gateway.agy-tool-receipts.11",
+      "kind": "schema",
+      "predecessor": 10,
+      "rollback_mode": "compatible",
+      "version": 11
     }
   ]
 }

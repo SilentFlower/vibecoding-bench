@@ -39,8 +39,9 @@ use crate::error::AppError;
 use crate::model::account::Account;
 use crate::model::request_diagnostics::{ExecutionLocation, RequestLogMode};
 use crate::service::agy_contract::{
-    AgyAccessSnapshot, AgyModelId, AgyOperation, AgySenderConfig, AgySubmission,
-    AgySystemPromptPolicy, AgyToolCompletion, AgyToolContinuationMode, AgyWarmPreparation,
+    AGY_REQUEST_SECONDS, AgyAccessSnapshot, AgyModelId, AgyOperation, AgySenderConfig,
+    AgySubmission, AgySystemPromptPolicy, AgyToolCompletion, AgyToolContinuationMode,
+    AgyWarmPreparation,
 };
 use crate::service::agy_runtime::AgyPool;
 use crate::service::gemini::agy_input_rejection;
@@ -60,6 +61,13 @@ const AGY_TOOL_FINALIZATION_FAILED: &str = "x-flower2api-agy-finalization-failed
 
 const META_HEADER: &str = "x-v3-request";
 const ERROR_HEADER: &str = "x-v3-transport-error";
+/// 核对可信 sender 在原生提交前的显式拒绝。@param response 绑定的私有响应。@return 未进入发送边界。
+pub(super) fn agy_rejected_before_send(response: &reqwest::Response) -> bool {
+    response
+        .headers()
+        .get(ERROR_HEADER)
+        .is_some_and(|value| value == "before-send")
+}
 const NODE_RELAY_PREFIX: &str = "/cluster-transports/v2/";
 /// 私有请求最多持有的单调执行预算。
 pub(crate) const REQUEST_BUDGET_MS: u64 = 120_000;
@@ -87,6 +95,8 @@ struct RuntimeBinding {
     agy_tool_continuation_mode: AgyToolContinuationMode,
     #[serde(default)]
     agy_tool_continuation_protocol: u32,
+    #[serde(default)]
+    agy_generation_seconds: u64,
 }
 
 /// 请求元信息与原始 body 分开传输，避免重新序列化改变协议字节。
@@ -272,9 +282,19 @@ pub struct PreparedTransport {
     account_id: i64,
     route: PreparedRoute,
     tool_continuation_mode: AgyToolContinuationMode,
+    long_agy_generation: bool,
 }
 
 impl PreparedTransport {
+    /// 读取发送器和已选内核共同支持的生成预算。@return 原生生成时长。
+    pub(super) fn agy_generation_budget(&self) -> Duration {
+        Duration::from_millis(if self.long_agy_generation {
+            AGY_REQUEST_SECONDS as u64 * 1000
+        } else {
+            REQUEST_BUDGET_MS
+        })
+    }
+
     /// 核对编排器授予的 AGY 后台绑定。@param account_id 权威账号。
     /// @param binding 已运行或首次获准启动的环境。@param client 内部管理客户端。
     /// @param secret 私有转接认证。@return 只用于当前已确认环境的发送通道。
@@ -295,6 +315,7 @@ impl PreparedTransport {
             account_id,
             route: PreparedRoute::V3 { client, binding },
             tool_continuation_mode: AgyToolContinuationMode::Claim,
+            long_agy_generation: false,
         })
     }
 
@@ -429,6 +450,7 @@ impl PreparedTransport {
             return Err(AppError::ServiceUnavailable("原AGY环境不可用".into()));
         };
         let id = Uuid::new_v4().to_string();
+        let deadline = deadline.min(Instant::now() + Duration::from_millis(REQUEST_BUDGET_MS));
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
             return Err(AppError::BadRequest("原工具轮已到期".into()));
@@ -521,6 +543,12 @@ impl PreparedTransport {
                 "AGY需要受管账号运行环境".into(),
             ));
         };
+        let budget = if operation == AgyOperation::Generate {
+            self.agy_generation_budget()
+        } else {
+            Duration::from_millis(REQUEST_BUDGET_MS)
+        };
+        let deadline = deadline.min(Instant::now() + budget);
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
             return Err(AppError::ServiceUnavailable("AGY请求已到截止时间".into()));
@@ -595,6 +623,7 @@ pub async fn prepare(
             account_id: account.id,
             route: PreparedRoute::Direct(account.proxy_url.clone()),
             tool_continuation_mode: AgyToolContinuationMode::Claim,
+            long_agy_generation: false,
         });
     }
     let secret = std::env::var("V3_INTERNAL_TOKEN").map_err(|_| {
@@ -676,6 +705,7 @@ pub(crate) async fn prepare_existing(
         account_id: account.id,
         route: PreparedRoute::V3 { client, binding },
         tool_continuation_mode: AgyToolContinuationMode::Claim,
+        long_agy_generation: false,
     }))
 }
 
@@ -729,6 +759,7 @@ async fn prepare_from_runtime(
         binding,
         agy_tool_continuation_mode,
         agy_tool_continuation_protocol,
+        agy_generation_seconds,
     } = response
         .json()
         .await
@@ -746,6 +777,7 @@ async fn prepare_from_runtime(
         account_id: account.id,
         route: PreparedRoute::V3 { client, binding },
         tool_continuation_mode: agy_tool_continuation_mode,
+        long_agy_generation: agy_generation_seconds == AGY_REQUEST_SECONDS as u64,
     })
 }
 
@@ -1451,6 +1483,15 @@ fn validate_request_at(
     config: &SenderConfig,
     wall_now_ms: u64,
 ) -> Result<Duration, AppError> {
+    validate_request_budget(prepared, config, wall_now_ms, REQUEST_BUDGET_MS)
+}
+
+fn validate_request_budget(
+    prepared: &PreparedRequest,
+    config: &SenderConfig,
+    wall_now_ms: u64,
+    budget_ms: u64,
+) -> Result<Duration, AppError> {
     let url = reqwest::Url::parse(&prepared.target_url)
         .map_err(|_| AppError::BadRequest("invalid upstream URL".into()))?;
     let allowed = reqwest::Url::parse(&config.allowed_origin)
@@ -1481,6 +1522,7 @@ fn validate_request_at(
         &prepared.request_id,
         prepared.deadline_unix_ms,
         wall_now_ms,
+        budget_ms,
     )
 }
 
@@ -1492,10 +1534,11 @@ fn request_budget(
     request_id: &str,
     deadline_ms: u64,
     wall_now_ms: u64,
+    budget_ms: u64,
 ) -> Result<Duration, AppError> {
     if Uuid::parse_str(request_id).is_err()
         || deadline_ms <= wall_now_ms
-        || deadline_ms > wall_now_ms.saturating_add(REQUEST_BUDGET_MS + CLOCK_SKEW_MS)
+        || deadline_ms > wall_now_ms.saturating_add(budget_ms + CLOCK_SKEW_MS)
         || account_id != binding.account_id
         || environment_id != binding.environment_id
         || generation != binding.generation
@@ -1506,7 +1549,7 @@ fn request_budget(
     }
     // 跨进程的墙钟可能回拨；偏差只用于接纳，实际等待仍钳制为原预算。
     Ok(Duration::from_millis(
-        (deadline_ms - wall_now_ms).min(REQUEST_BUDGET_MS),
+        (deadline_ms - wall_now_ms).min(budget_ms),
     ))
 }
 
@@ -1871,7 +1914,14 @@ async fn agy_operation(
                 "该账号环境未配置AGY内核".into(),
             ));
         }
-        let deadline = validate_request(&submission.request, &config)?;
+        let budget_ms = if operation == AgyOperation::Generate {
+            AGY_REQUEST_SECONDS as u64 * 1000
+        } else {
+            REQUEST_BUDGET_MS
+        };
+        let now = Instant::now();
+        let deadline =
+            now + validate_request_budget(&submission.request, &config, now_ms(), budget_ms)?;
         submission.validate(now_ms())?;
         let target = reqwest::Url::parse(&submission.request.target_url)
             .map_err(|_| AppError::BadRequest("AGY目标无效".into()))?;
@@ -1954,6 +2004,7 @@ async fn agy_warm(
         &input.request_id,
         input.deadline_unix_ms,
         wall_now_ms,
+        REQUEST_BUDGET_MS,
     )?;
     input.credential_snapshot.validate(wall_now_ms)?;
     if input.credential_snapshot.account_id != input.account_id {
@@ -2432,6 +2483,7 @@ mod tests {
         let server = tokio::spawn(axum::serve(listener, router).into_future());
         let transport = PreparedTransport {
             tool_continuation_mode: AgyToolContinuationMode::Claim,
+            long_agy_generation: false,
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -2494,6 +2546,7 @@ mod tests {
         );
         let transport = PreparedTransport {
             tool_continuation_mode: AgyToolContinuationMode::Claim,
+            long_agy_generation: false,
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -2527,6 +2580,7 @@ mod tests {
         });
         let transport = PreparedTransport {
             tool_continuation_mode: AgyToolContinuationMode::Claim,
+            long_agy_generation: false,
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -2728,6 +2782,7 @@ mod tests {
         };
         let mut transport = PreparedTransport {
             tool_continuation_mode: AgyToolContinuationMode::Claim,
+            long_agy_generation: false,
             account_id: 7,
             route: PreparedRoute::V3 {
                 client: Client::new(),
@@ -2758,6 +2813,7 @@ mod tests {
         assert!(
             PreparedTransport {
                 tool_continuation_mode: AgyToolContinuationMode::Claim,
+                long_agy_generation: false,
                 account_id: 7,
                 route: PreparedRoute::Direct(String::new())
             }
@@ -3122,6 +3178,27 @@ mod tests {
         assert_eq!(
             validate_request_at(&prepared, &config, issued + 119_000).unwrap(),
             Duration::from_secs(1)
+        );
+        let agy_budget_ms = AGY_REQUEST_SECONDS as u64 * 1000;
+        prepared.deadline_unix_ms = issued + agy_budget_ms;
+        assert!(validate_request_at(&prepared, &config, issued).is_err());
+        assert_eq!(
+            validate_request_budget(&prepared, &config, issued - CLOCK_SKEW_MS, agy_budget_ms)
+                .unwrap(),
+            Duration::from_secs(240)
+        );
+        assert!(
+            validate_request_budget(
+                &prepared,
+                &config,
+                issued - CLOCK_SKEW_MS - 1,
+                agy_budget_ms
+            )
+            .is_err()
+        );
+        assert!(
+            validate_request_budget(&prepared, &config, issued + agy_budget_ms, agy_budget_ms)
+                .is_err()
         );
         prepared.deadline_unix_ms = now_ms() + 30_000;
         prepared.generation = 1;

@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 from agy_runtime.contract import InputError
 from agy_runtime.process_memory import cgroup_memory
-from agy_runtime.supervisor import Supervisor, Worker as NativeWorker, deadline, validate_submission
+from agy_runtime.supervisor import GENERATION_SECONDS, Supervisor, Worker as NativeWorker, deadline, validate_submission
 
 
 class OutputFixture:
@@ -564,6 +564,18 @@ class AgySupervisorTests(unittest.TestCase):
         with self.assertRaisesRegex(InputError, 'request_deadline_exceeded'):
             self.supervisor.acquire(self.submission(), time.monotonic() - 1)
         self.assertEqual(WorkerFixture.order, [])
+
+    def test_generate_keeps_240_seconds_and_prepare_keeps_120(self):
+        """生成与旧准备共用时钟偏差边界和独立操作预算。@return 无。"""
+        issued = 1800000000
+        with patch('agy_runtime.supervisor.time.time', return_value=issued), patch(
+                'agy_runtime.supervisor.time.monotonic', return_value=50):
+            wire = (issued + GENERATION_SECONDS + 5) * 1000
+            self.assertEqual(deadline(wire, GENERATION_SECONDS), 290)
+            with self.assertRaises(InputError):
+                deadline(wire)
+            with self.assertRaises(InputError):
+                deadline(wire+1, GENERATION_SECONDS)
 
     def test_retirement_consuming_deadline_never_starts_next_generation(self):
         """旧代退役耗尽截止后保持零新代启动。@return 无。"""

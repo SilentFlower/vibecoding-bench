@@ -1,6 +1,7 @@
 """解析 Gemini 工具与调用方持有的历史，构造独立 Cortex 输入。"""
 import copy
 import json
+import math
 import re
 from collections import Counter
 from .contract import InputError, decode_gemini_bytes, text, tools
@@ -44,6 +45,13 @@ def definitions(body, changes):
             if schema=={}:
                 schema={'type':'object','properties':{}}
                 changes.append({'path':location+'/parameters','action':'empty_function_parameters_as_object'})
+            if (value.get('name')=='web_search' and isinstance(schema,dict)
+                    and set(schema)<={'type','properties','additionalProperties','description'}
+                    and str(schema.get('type','object')).lower()=='object'
+                    and schema.get('properties',{})=={} and schema.get('additionalProperties',True) is True):
+                # AGY 在 MCP 调用前拒绝未声明的 query。仅补全可接纳任意属性的旧版声明。
+                schema={**schema,'type':'object','properties':{'query':{'type':'string'}}}
+                changes.append({'path':location+'/parameters/properties/query','action':'legacy_web_search_query'})
             result.append({'name':value.get('name'),'description':value.get('description',''),'input_schema':normalize(schema,location+'/parameters',changes)})
     return tools(result)
 
@@ -232,10 +240,13 @@ def native_history(contents, tool_names=(), gif=None, *, native_model):
 
 def decode_request(raw, *, fixed_model: tuple[str, str | int] | None = None):
     """校验 Gemini 业务输入。@param raw 私有信封。@param fixed_model 独立内核的固定映射。@return 本轮原生执行参数。"""
-    checked_fields(raw,{'schema_version','type','request_id','model','native_model','body','system_prompt_policy','gif_frames','disable_safety_filtering','full_egress'},'')
+    checked_fields(raw,{'schema_version','type','request_id','model','native_model','body','system_prompt_policy','gif_frames','disable_safety_filtering','full_egress','execution_deadline'},'')
     if type(raw.get('schema_version')) is not int or raw['schema_version']!=1 or raw.get('type')!='gemini_request':raise InputError('invalid_schema')
     ident=text(raw.get('request_id'))
     if not ident or len(ident)>128:raise InputError('invalid_request_id')
+    execution_deadline=raw.get('execution_deadline')
+    if execution_deadline is not None and (type(execution_deadline) not in (float,int) or not math.isfinite(execution_deadline)
+            or execution_deadline<=0):raise InputError('invalid_request_deadline')
     if fixed_model is None:
         native_model = raw.get('native_model')
         if not valid_model_mapping(raw.get('model'), native_model):
@@ -309,23 +320,29 @@ def decode_request(raw, *, fixed_model: tuple[str, str | int] | None = None):
         notices.append({'field':'parallel_tool_calls','policy':'native_disable_requested;ordered_same_name_results','reason':'new-api removes function IDs'})
     return {'request_id':ident,'prompt':'','messages':[],'history_id':None,'system':submitted,'system_prompt_policy':report,'model':native_model,'tools':declared,'max_generations':1,
         'request_format':'gemini','gemini_body':copy.deepcopy(body),'native_completion':completion,'native_steps':steps,'schema_changes':changes,'compatibility_notes':notices,
-        'safety_egress_rules':safety_egress_rules,'full_egress':full_egress}
+        'safety_egress_rules':safety_egress_rules,'full_egress':full_egress,'execution_deadline':execution_deadline}
 def continuation_results(previous, calls, incoming):
     """把续轮结果绑定到本 worker 唯一待回填工具轮。@param previous 原始入站正文。@param calls 实际模型调用。@param incoming 新正文。@return 按原调用顺序排列的真实结果。"""
     original=previous['contents'];contents=incoming['contents'];count=len(original)
-    if len(contents)!=count+2 or contents[:count]!=original:raise InputError('gemini_pending_history_mismatch')
-    model,user=contents[count:]
-    if model.get('role')!='model' or user.get('role','user')!='user':raise InputError('gemini_pending_turn_mismatch')
+    if len(contents)<count+2 or contents[:count]!=original:raise InputError('gemini_pending_history_mismatch')
+    model,*users=contents[count:]
+    if model.get('role')!='model' or any(user.get('role','user')!='user' for user in users):
+        raise InputError('gemini_pending_turn_mismatch')
     expected=[{'name':c['name'],'args':c.get('args',{})} for c in calls]
     observed=[{'name':p['functionCall']['name'],'args':p['functionCall'].get('args',{})} for p in model['parts'] if 'functionCall' in p]
     if expected!=observed:raise InputError('gemini_pending_call_mismatch')
     for part, call in zip([p['functionCall'] for p in model['parts'] if 'functionCall' in p], calls):
         if 'id' in part and part['id'] != call.get('id'):raise InputError('gemini_pending_call_mismatch')
     # 拒绝坏图后才能领取原工具轮，避免输入修正时发现结果已被消费。
-    for index, part in enumerate(user['parts']):
-        if isinstance(part, dict):
-            media_part(part, f'/body/contents/{count + 1}/parts/{index}', 'user')
-    values=[p['functionResponse'] for p in user['parts'] if 'functionResponse' in p]
+    values=[];seen_text=False
+    for user_index,user in enumerate(users,count+1):
+        for index, part in enumerate(user['parts']):
+            if not isinstance(part,dict):raise InputError('gemini_pending_turn_mismatch')
+            media_part(part, f'/body/contents/{user_index}/parts/{index}', 'user')
+            if 'functionResponse' in part:
+                if seen_text:raise InputError('gemini_pending_results_mismatch')
+                values.append(part['functionResponse'])
+            seen_text |= 'text' in part
     ordered = _ordered_tool_results(calls, values)
     if ordered is None:
         raise InputError('gemini_pending_results_mismatch')

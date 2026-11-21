@@ -34,7 +34,7 @@ CONTROL_CLOSE_ERRORS={'native_request_failed','native_transport_error','native_c
     'native_process_exited','native_protocol_error'}
 NATIVE_ERRORS=CONTROL_CLOSE_ERRORS|{'cancelled','cancel_timeout','native_stream_incomplete','native_delivery_error',
     'native_start_rejected','tool_protocol_error','native_tool_yield_timeout','native_tool_yield_failed',
-    'ambiguous_parallel_function_calls','unsupported_gemini_candidate_count','invalid_native_gemini_parts',
+    'native_tool_frame_identity','invalid_native_tool_id','unsupported_gemini_candidate_count','invalid_native_gemini_parts',
     'native_safety_endpoint_rejected','native_safety_egress_unobserved'}
 CONTROL_EXCEPTION_TYPES={'AssertionError','AttributeError','IndexError','JSONDecodeError','KeyError',
     'OSError','RuntimeError','TimeoutError','TypeError','ValueError'}
@@ -86,11 +86,12 @@ class Scope:
         """创建请求归属。@param value 已验证请求。@param seq 内核序号。@param worker 工作进程。@return 无返回值。"""
         steps = value['native_steps'] if 'native_steps' in value else history_steps(value['messages'], native_model=value['model'])
         self.history_count=len(steps);self.value=value;self.seq=seq;self.worker=worker;self.route=f'r-{seq}';self.root=None;self.job=None
-        self.frames=Frames();self.native_tool_calls=None;self.compatibility_error=None;self.tool_wait_ready=threading.Event();self.tool_wait_published=False;self.resume_claimed=False;self.final_status=None;self.yield_tools=threading.Event();self.yield_cancelled=threading.Event();self.yield_started=None;self.yield_rpc=None
+        previous_ids=(call['id'] for content in value.get('gemini_body',{}).get('contents',[])
+            for part in content['parts'] if (call:=part.get('functionCall')) and 'id' in call)
+        self.frames=Frames(previous_ids);self.native_tool_calls=None;self.native_tool_steps=();self.tool_protocol_detail=None;self.compatibility_error=None;self.tool_wait_ready=threading.Event();self.tool_wait_published=False;self.resume_claimed=False;self.final_status=None;self.yield_tools=threading.Event();self.yield_cancelled=threading.Event();self.yield_started=None;self.yield_rpc=None
         self.broker=None;self.cancel=threading.Event();self.cancel_started=None;self.cancel_sent=False;self.finished=threading.Event()
         self.safety_egress=None;self.tls_trace=None
         self.isolated_call_ids=set()
-        self.tool_native_ids=()
 
     def identity(self):
         """返回公开协议身份。@return 身份字段。"""
@@ -439,13 +440,14 @@ class Kernel:
         """完成公开响应并保留原生工具轮直到真实结果到达。@param scope 当前轮次。@return 无。"""
         source=[(c['name'],c.get('args',{})) for c in scope.frames.calls]
         native=[(c['name'],json.loads(c['argumentsJson'])) for c in scope.native_tool_calls]
-        ids=tuple(c['id'] for c in scope.native_tool_calls)
-        known_ids=set(ids)
-        if (source!=native or len(known_ids)!=len(ids)
-                or any(call['id'] in known_ids and call['id']!=identifier
-                       for call,identifier in zip(scope.frames.calls,ids))):
+        ids=tuple(c.get('id') for c in scope.native_tool_calls)
+        if (source!=native or len(scope.native_tool_steps)!=len(source)
+                or len(scope.frames.source_call_ids)!=len(ids)
+                or any(not isinstance(identifier,str) or not identifier
+                       or source_id is not None and source_id!=identifier
+                       for source_id,identifier in zip(scope.frames.source_call_ids,ids))):
+            scope.tool_protocol_detail='planner_identity'
             raise RuntimeError('tool_protocol_error')
-        scope.tool_native_ids=ids
         scope.tool_wait_published=True
         self.emit('completed',**scope.identity(),finish_reason='tool_calls',history_id=None,history_error=None,native_cascade_id=scope.root,native_trajectory_id=scope.broker.trajectory_id,native_model_calls=scope.job.calls,native_empty=False,native_tool_pending=True)
 
@@ -520,7 +522,8 @@ class Kernel:
             if rules:=scope.value.get('safety_egress_rules'):
                 token=read_access_document(worker.bridge.native_home)['token']['access_token']
                 capture=partial(self.capture_egress,scope,token) if self.cfg.get('capture_root') else None
-                scope.safety_egress=SafetyEgress(rules,token,worker.bridge.proxy_url,worker.bridge.ca_file,capture)
+                scope.safety_egress=SafetyEgress(rules,token,worker.bridge.proxy_url,worker.bridge.ca_file,capture,
+                    execution_deadline=scope.value.get('execution_deadline'))
                 switched=worker.call('SetCloudCodeURL',{'url':scope.safety_egress.url},scope)
                 if switched['status']!=200:
                     control_status=switched['status']
@@ -545,7 +548,9 @@ class Kernel:
             future=RPC(worker,'SendUserCascadeMessage',body,scope)
             while not future.done.wait(.05):
                 # Receive 先关闭时控制 RPC 可能仍在传回真实错误。监督器的原截止仍约束本次等待。
-                if scope.broker and scope.broker.failure:raise RuntimeError('tool_protocol_error')
+                if scope.broker and scope.broker.failure:
+                    scope.tool_protocol_detail='mcp_callback_rejected'
+                    raise RuntimeError('tool_protocol_error')
                 if worker.bridge.reader_error or worker.bridge.errors:raise RuntimeError('native_protocol_error')
                 if (scope.tool_wait_ready.is_set() and not scope.tool_wait_published and not scope.cancel.is_set()
                         and scope.job.calls==scope.job.ends==1 and scope.job.ended.is_set() and not scope.job.native_error
@@ -563,12 +568,12 @@ class Kernel:
                 if worker.bridge.proc.poll() is not None:raise RuntimeError('native_process_exited')
             if scope.cancel.is_set():raise RuntimeError('cancelled')
             if future.error:raise RuntimeError('native_control_timeout' if future.error=='TimeoutError' else 'native_transport_error')
+            if scope.compatibility_error:raise RuntimeError(scope.compatibility_error)
             yielded=scope.yield_tools.is_set()
             if yielded:
                 if scope.yield_rpc is None or not scope.yield_rpc.done.wait(11) or scope.yield_rpc.error or scope.yield_rpc.value['status']!=200:raise RuntimeError('native_tool_yield_failed')
                 scope.yield_cancelled.set();retire=True
             elif future.value['status']!=200:raise RuntimeError('native_request_failed')
-            if scope.compatibility_error:raise RuntimeError(scope.compatibility_error)
             if not scope.job.ended.wait(3):raise RuntimeError('native_stream_incomplete')
             phase='trajectory'
             current=worker.call('GetCascadeTrajectory',{'cascadeId':scope.root},scope)
@@ -578,7 +583,13 @@ class Kernel:
             if worker.bridge.reader_error or worker.bridge.errors:raise RuntimeError('native_protocol_error')
             if scope.job.calls<1 or scope.job.calls!=scope.job.ends or scope.job.calls>scope.value['max_generations'] or scope.job.native_error:raise RuntimeError('native_stream_incomplete')
             if scope.value.get('request_format')=='gemini' and not scope.frames.terminal:raise RuntimeError('native_stream_incomplete')
-            if scope.frames.calls and not scope.tool_wait_published:raise RuntimeError('tool_protocol_error')
+            if scope.frames.calls and not scope.tool_wait_published:
+                scope.tool_protocol_detail=('mcp_callback_rejected' if scope.broker and scope.broker.failure
+                    else 'invalid_native_tool_step' if any(step.get('status')=='CORTEX_STEP_STATUS_INVALID'
+                         and (step.get('metadata') or {}).get('toolCall')
+                         for step in current['response']['trajectory']['steps'][scope.history_count:])
+                    else 'mcp_callback_missing')
+                raise RuntimeError('tool_protocol_error')
             if spool.overflow or spool.failure:raise RuntimeError('native_delivery_error')
             phase='finalize'
             trajectory=current['response']['trajectory'];(folder/'trajectory.json').write_text(json.dumps(trajectory,ensure_ascii=False))
@@ -609,6 +620,8 @@ class Kernel:
             status=control_status if type(control_status) is int and 100<=control_status<=599 else 'unknown'
             observed={'native_receive_ended':bool(scope.job and scope.job.ended.is_set()),
                 'native_source_terminal':scope.frames.terminal}
+            if code=='tool_protocol_error' and scope.tool_protocol_detail:
+                observed['tool_protocol_detail']=scope.tool_protocol_detail
             if type(status) is int:
                 observed['observed_control_http_status']=status
             if phase=='submission' and future and type(status) is int and status>=400:

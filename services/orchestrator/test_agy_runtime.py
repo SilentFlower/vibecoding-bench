@@ -199,7 +199,7 @@ class AgyRuntimeTests(unittest.TestCase):
 
                 with patch('agy_runtime.kernel.RPC',side_effect=submit):kernel.execute(scope)
                 terminal=[(kind,fields) for kind,fields in events if kind in ('completed','error','cancelled')]
-                self.assertEqual([kind for kind,_ in terminal],[expected])
+                self.assertEqual([kind for kind,_ in terminal],[expected],terminal)
                 self.assertEqual(submissions,['owned'])
                 if mode == 'max_tokens_rpc_200':
                     self.assertEqual(terminal[0][1]['finish_reason'], 'max_tokens')
@@ -530,18 +530,19 @@ class AgyRuntimeTests(unittest.TestCase):
             thread.join(2)
 
     def test_kernel_completion_reaches_real_tool_broker_once(self):
-        """两个同名工具反序混合回填时各完成一次。@return 无。"""
+        """原生 ID 重复时按原步骤各完成一次反序混合回填。@return 无。"""
         body={'contents':[{'role':'user','parts':[{'text':'合成问题'}]}]}
         call={'id':'synthetic-call','name':'synthetic_tool','args':{'x':1}}
         frames=Frames()
         parts=[{'functionCall':call,'thoughtSignature':'synthetic-signature'},
-            {'functionCall':{'name':'synthetic_tool','args':{'x':2}}}]
+            {'functionCall':{'id':'synthetic-call','name':'synthetic_tool','args':{'x':2}}}]
         source={'candidates':[{'content':{'parts':parts},'finishReason':'STOP'}]}
         projected=frames.project({'data_base64':base64.b64encode(json.dumps(source).encode()).decode()})
         public_parts=[json.loads(base64.b64decode(frame['data_base64']))['candidates'][0]['content']['parts'][0]
             for frame in projected]
         self.assertEqual(public_parts[0],parts[0])
         self.assertTrue(public_parts[1]['functionCall']['id'].startswith('call_'))
+        self.assertEqual(frames.source_call_ids,['synthetic-call','synthetic-call'])
         incoming=copy.deepcopy(body)
         incoming['contents']+=[{'role':'model','parts':public_parts},
             {'role':'user','parts':[
@@ -553,12 +554,12 @@ class AgyRuntimeTests(unittest.TestCase):
         service.lock=threading.RLock();service.cfg={'capture_enabled':False};service.worker_id='synthetic-worker'
         emitted=[];service.output=SimpleNamespace(emit=emitted.append)
         scope=SimpleNamespace(tool_wait_published=True,resume_claimed=False,cancel=threading.Event(),
-            tool_native_ids=('synthetic-native-call-1','synthetic-native-call-2'),
+            native_tool_steps=(3,4),
             value={'gemini_body':body,'request_id':identity['request_id'],'tools':[]},frames=frames,identity=lambda:identity)
         scope.broker=Broker(service,scope,self.root)
         self.addCleanup(scope.broker.close)
-        scope.broker.pending['synthetic-native-call-2']={'result':None}
-        scope.broker.pending['synthetic-native-call-1']={'result':None}
+        scope.broker.pending[4]={'result':None}
+        scope.broker.pending[3]={'result':None}
         service.active=scope
         value={'schema_version':1,'type':'finish_tool_turn',**identity,'body':incoming}
         wrong=copy.deepcopy(value);wrong['body']['contents'][-1]['parts'][0]['functionResponse']['id']='other'
@@ -570,10 +571,43 @@ class AgyRuntimeTests(unittest.TestCase):
         mixed = copy.deepcopy(value)
         mixed['body']['contents'][-1]['parts'][0]['functionResponse'].pop('id')
         service.finish_tool_turn(mixed)
-        self.assertEqual(scope.broker.pending['synthetic-native-call-1']['result']['structuredContent'],{'result':9})
-        self.assertEqual(scope.broker.pending['synthetic-native-call-2']['result']['structuredContent'],{'result':10})
+        self.assertEqual(scope.broker.pending[3]['result']['structuredContent'],{'result':9})
+        self.assertEqual(scope.broker.pending[4]['result']['structuredContent'],{'result':10})
         self.assertEqual(emitted[-1]['type'],'tool_continuation_accepted')
         with self.assertRaises(InputError):service.finish_tool_turn(mixed)
+
+    def test_tool_frames_distinguish_source_repetition_from_equal_parts(self):
+        """同一观察身份重投时只消费一次，下一源帧仍有独立原生步骤。@return 无。"""
+        def event(epoch, identifier):
+            value={'response':{'candidates':[{'content':{'parts':[
+                {'functionCall':{'name':'Read','id':identifier,'args':{}}}]}}]}}
+            block=b'data: '+json.dumps(value).encode()+b'\n\n'
+            return {'call_id':'r-1.1','source':'codeassist_scanner_block','raw_epoch':epoch,
+                'data_base64':base64.b64encode(block).decode()}
+        frames=Frames()
+        self.assertEqual(len(frames.project(event(1,'same'))),1)
+        self.assertEqual(frames.project(event(1,'same')),[])
+        self.assertEqual(len(frames.project(event(2,'same'))),1)
+        self.assertEqual(frames.source_call_ids,['same','same'])
+        self.assertEqual(len(frames.call_ids),2)
+        with self.assertRaisesRegex(RuntimeError,'native_tool_frame_identity'):
+            frames.project(event(2,'changed'))
+        with self.assertRaisesRegex(RuntimeError,'invalid_native_tool_id'):
+            frames.project(event(3,17))
+
+    def test_legacy_web_search_query_respects_explicit_schema(self):
+        """兼容线上空查询声明并保留闭合或自定义属性。@return 无。"""
+        for schema, expected in [
+                ({},{'query':{'type':'string'}}),
+                ({'type':'OBJECT','properties':{}},{'query':{'type':'string'}}),
+                ({'type':'object','properties':{},'additionalProperties':False},{}),
+                ({'type':'object','properties':{'term':{'type':'string'}}},{'term':{'type':'string'}})]:
+            definition={'name':'web_search','parameters':schema}
+            body={'tools':[{'functionDeclarations':[definition]}]}
+            before=copy.deepcopy(body)
+            normalized=gemini_contract.definitions(body,[])[0]['input_schema']
+            self.assertEqual(normalized.get('properties',{}),expected)
+            self.assertEqual(body,before)
 
     def test_access_only_document_is_private_and_cannot_overwrite_a_generation(self):
         """业务发布只保存AT，原代次和权威RT保持隔离。@return 无。"""
@@ -851,6 +885,13 @@ class AgyRuntimeTests(unittest.TestCase):
                 'response': {'value': '合成结果'}}}]}]
         self.assertEqual(gemini_contract.continuation_results(previous, [call], incoming),
             [{'value': '合成结果'}])
+        continuation = copy.deepcopy(incoming)
+        continuation['contents'].append({'role':'user','parts':[{'text':'收到结果后继续'}]})
+        self.assertEqual(gemini_contract.continuation_results(previous, [call], continuation),
+            [{'value':'合成结果'}])
+        steps = gemini_contract.native_history(continuation['contents'], native_model=self.fixed_model[1])
+        self.assertEqual(steps[-2]['type'], 'CORTEX_STEP_TYPE_GENERIC')
+        self.assertEqual(steps[-1]['userInput']['userResponse'], '收到结果后继续')
         incoming['contents'][-1]['parts'][0]['functionResponse']['name'] = 'old-result-name'
         self.assertEqual(gemini_contract.continuation_results(previous, [call], incoming),
             [{'value': '合成结果'}])

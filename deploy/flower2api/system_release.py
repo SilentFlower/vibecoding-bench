@@ -30,6 +30,7 @@ BENCH_SCHEMA_SOURCES = {
     'bench.agy-nodes.6': 'orchestrator/agy_node_schema.py',
 }
 GATEWAY_SCHEMA_SOURCES = {
+    'gateway.agy-tool-receipts.11': 'cc2api/src/store/agy_tool_receipts_schema.rs',
     'gateway.agy-system-reminder.10': 'cc2api/src/store/agy_system_reminder_schema.rs',
     'gateway.agy-safety.9': 'cc2api/src/store/agy_safety_schema.rs',
     'gateway.agy-media.8': 'cc2api/src/store/agy_media_schema.rs',

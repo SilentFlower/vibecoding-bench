@@ -344,7 +344,9 @@ def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance
         if binding['account_id']!=gateway_id or binding['environment_id']!=row['environment_id'] or binding['generation']!=row['generation'] or binding['release_id']!=role_release(runtime,row):
             raise ValueError('AGY传输绑定代次不一致')
         if supports_tool_continuation(runtime, row, current_kernel, labels):
-            return {**binding, 'agy_tool_continuation_protocol': 1}
+            binding = {**binding, 'agy_tool_continuation_protocol': 1}
+        if current_kernel is None and labels.get('vibebench.agy-generation-seconds') == '240':
+            binding = {**binding, 'agy_generation_seconds': 240}
         return binding
 
 

@@ -1,6 +1,7 @@
 """将原生 Gemini 源帧投影为现有 new-api 可消费的单 Part 流。"""
 import base64
 import copy
+import hashlib
 import json
 from uuid import uuid4
 
@@ -15,10 +16,12 @@ def _token_count(value):
 class Frames:
     """保存本请求的输出归属和函数调用摘要。"""
 
-    def __init__(self):
-        """创建独立帧状态。@return 无。"""
+    def __init__(self, previous_ids=()):
+        """创建独立帧状态。@param previous_ids 原历史的公开调用 ID。@return 无。"""
         self.calls=[];self.sequence=0;self.terminal=False;self.finish_reason=None
-        self.call_ids=set()
+        self.call_ids=set(previous_ids)
+        self.source_call_ids=[]
+        self.last_source_frame=None
         self.source_error=False;self.usage_complete=False;self.visible_text=False
         self.max_tokens_usage_complete = False
         self.thought_or_media = False
@@ -37,6 +40,16 @@ class Frames:
         """拆分候选 Part，保留终态和用量。@param event 原生源事件。@return 兼容事件数组。"""
         raw=base64.b64decode(event['data_base64'],validate=True)
         if event.get('source')=='codeassist_scanner_block':
+            epoch=event.get('raw_epoch')
+            if type(epoch) is int:
+                identity=(event['call_id'],epoch)
+                checksum=hashlib.sha256(raw).digest()
+                if self.last_source_frame:
+                    previous,digest=self.last_source_frame
+                    if identity==previous and checksum==digest:return []
+                    if identity[0]!=previous[0] or epoch<=previous[1]:
+                        raise RuntimeError('native_tool_frame_identity')
+                self.last_source_frame=(identity,checksum)
             # OAuth的Scanner逻辑块包含SSE前缀及response信封，原始块仍由桥接归档保存。
             data=b'\n'.join(line[5:].lstrip(b' ') for line in raw.splitlines() if line.startswith(b'data:'))
             if not data:return []
@@ -87,12 +100,14 @@ class Frames:
         assigned_id=False
         for call in calls:
             identifier=call.get('id')
-            if identifier is None or identifier=='':
+            if identifier is not None and not isinstance(identifier,str):
+                raise RuntimeError('invalid_native_tool_id')
+            self.source_call_ids.append(identifier or None)
+            # 原版可在多个独立步骤沿用同一 ID。仅在公开边界分配唯一身份。
+            if not identifier or identifier in self.call_ids:
                 identifier='call_'+uuid4().hex
                 call['id']=identifier
                 assigned_id=True
-            if not isinstance(identifier,str) or identifier in self.call_ids:
-                raise RuntimeError('ambiguous_parallel_function_calls')
             self.call_ids.add(identifier)
         self.calls.extend(copy.deepcopy(calls))
         if len(parts)<2:

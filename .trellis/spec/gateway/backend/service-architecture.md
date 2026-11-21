@@ -2058,15 +2058,18 @@ transport.submit(prepared, body, ttfb_timeout).await
 - 已鉴权的 AGY Messages 请求匹配 Claude Code 固定后台摘要模板、可选 `Previous:` 行和完整工具配对时，本地生成 3–5 词状态。匹配在合入当轮系统补充文本之前进行。原工具归属与发送许可由真实回填持有。普通追加文字继续走生成路径。
 - 首块有效内容、完整工具批次或确认成功的明确终态才提交公开首帧。用量和元数据先累计。原生接收先结束且源终态缺失时，在原预算内等待同一次控制结果。诊断分别记录 `native_receive_ended`、`native_source_terminal`、`observed_control_http_status` 与可选 `control_error_detail`。`tool_continuation_mode`、`tool_continuation_path` 和 `tool_continuation_reason` 分别记录配置、实际路径及原因。
 - 固定 AGY 1.5.9 的观察器按调用 goroutine 的 `g.goid` 关联 Receive，按 Scanner 的 `g.parentGoid` 和同一活动作业关联原始帧。已验证映像中的槽为 `0x98` 和 `0x118`。主调用 STOP 并收到 EOF 后，与主根独立的原生调用沿各自 `call_id` 隔离。空会话的侧调用沿主工具等待阶段和独立调用身份核验。同根再次启动或无法定位归属的主帧仍进入原生失败路径。
-- 已进入发送边界的回执保留规范化正文摘要、令牌及会话范围、原账号、原尝试、发送状态和实际终态。有界回执预算独立于响应帧。帧最迟在原 120 秒期限回收，回执从原期限再保存一个原生工具等待窗口（3600 秒）。已观察到匹配尝试的 `model_start` 才标记 `model_observed`。回执重读重新核对调用方权限，原失败保留原公开错误。重读和超时本身不发起新一轮。
+- SQLite 的 gateway.agy-tool-receipts.11 和 PostgreSQL 初始化持久登记工具批次。记录正文、调用、签名和会话摘要，以及账号、尝试归属、阶段和恢复额度。正文和成功响应帧只走有界内存。重读权限仍按令牌、账号及会话核对。严格身份优先，省略 ID 时仅用唯一的前缀与参数别名。
+- 已受理续轮保留实际 sender 生成截止，客户端断开后仍可读取原生成。成功帧在该截止回收，轻量回执有独立的工具等待窗口。只有实际 model_start 才标记 model_observed。失败后的请求不从头重放部分正文及用量。
+- 同一账号、环境代次及实际尝试的可信 job_finalized 确认关闭后，暂时性失败、超时或取消可以原样历史恢复一次。原工具结果只导入历史。明确未发送的可信 sender 回执也允许恢复。原样重试及追加固定 Claude Code 断流提示的请求共用额度。实际派发时保留新请求中的提示。恢复会产生实际模型用量。
+- 缺少可信关闭、恢复用尽或原失败不适合继续时返回 HTTP 400，分类 AGY_TOOL_CONTINUATION_TERMINAL，带原 HTTP 根。成功但响应字节已过期的状态仍为 410。
 
 ### 4. Validation & Error Matrix
 
 | 条件 | 结果 |
 | --- | --- |
 | 设置代次或版本过期，或内核缺少所选模式的能力 | 管理 POST 返回 409 |
-| 工具回填归属冲突或待领取批次过期 | 400，零新增模型提交 |
-| 同一回填的响应字节已回收且提交回执仍有效 | 原失败按原状态交付。原成功的响应返回 410。重读关联原尝试 |
+| 工具回填归属冲突 | 400，零新增模型提交 |
+| 同一回填的响应字节已回收且提交回执仍有效 | 原成功的响应返回 410。失败按物理收口及恢复额度决定是否进行一次合法历史恢复 |
 | 历史续轮等待真实退出证明时到期 | 返回失败，零新增模型提交 |
 | 首块前缺少源终态，控制结果为 200 | 503，诊断保留实际控制 200 |
 | 首块前确认控制 HTTP 500 或源配额 429 | 保留实际错误状态 |
@@ -2074,14 +2077,14 @@ transport.submit(prepared, body, ttfb_timeout).await
 
 ### 5. Scenarios and Examples
 
-- 正常领取优先收到匹配结果后直接收口。原轮先确认退出且未领取结果时，同一回填从历史生成一次。客户端在 120 秒内可重读完整响应，在后续回执窗口可查询同一失败或收到响应已过期状态。
+- 正常领取优先收到匹配结果后直接收口。原轮先确认退出且未领取结果时，同一回填从历史生成一次。客户端在实际生成预算内可重读该成功响应。回执持久保留原状态及恢复额度。
 - 连接断开只表示传输状态未知。收到匹配的 `history_closed` 后才具备历史接续的退出依据。网关重启会丢失进程内的待续轮归属。
 
 ### 6. Tests Required
 
 - `verify_agy_native_loopback.py --continuation-modes` 核对原版 1.5.9 四条接续路径、配置冻结、错误会话与签名拒绝、正文重读、缓存前缀及首帧前后错误。`--messages-search` 核对历史偏好下的 WebSearch 回调与 Read 截断前缀。
 - `usage_prefix_retains_http_error_until_the_first_deliverable_frame` 核对首帧之前的错误、开流后 SSE 终态和缓存用量保留。`history_closure_requires_the_original_worker_and_request` 核对回执归属和缺失证明。
-- `verify_agy_native_loopback.py --tool-receipts` 以两笔重叠的原版调用验证 Scanner 帧归属，并重放一笔侧调用的空会话。核对完整主工具批次、真实 EOF 失败的 16 次重读及超过 120 秒的原尝试回执。`--tool-deadlines` 核对长工具等待和已回收响应的 410。
+- `verify_agy_native_loopback.py --tool-receipts` 以两笔重叠的原版调用验证 Scanner 帧归属，并重放一笔侧调用的空会话。核对完整主工具批次、真实 EOF 失败的 16 次重试、一次历史恢复、恢复用尽的 400 及重启后共用恢复资格。`--tool-deadlines` 核对长工具等待和已回收响应的 410。
 
 ## Scenario: AGY 本地进度标签回执
 
