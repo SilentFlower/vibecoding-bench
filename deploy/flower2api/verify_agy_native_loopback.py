@@ -17,6 +17,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import uuid
 import wave
 import zlib
 from concurrent.futures import ThreadPoolExecutor
@@ -284,7 +285,8 @@ class Upstream(BaseHTTPRequestHandler):
                     self.wfile.write(('data: '+json.dumps(envelope,ensure_ascii=False)+'\n\n').encode())
                     self.wfile.flush()
                     if 'AGY_RELIABILITY_LONG' in encoded and index==0:time.sleep(121)
-                    if 'AGY_RECEIPT_DROP' in encoded and results and index==0:time.sleep(.8)
+                    if 'AGY_RECEIPT_DROP' in encoded and results and index==0:
+                        time.sleep(5 if 'RECEIPT_GATE_CUTOVER' in encoded else .8)
                     time.sleep(.1 if cancel else .02)
             except OSError:
                 if cancel:
@@ -1849,6 +1851,29 @@ Bad (branch name): "Analyzed adam/background-summary branch diff"'''
         observed[f'{mode}/{expected_path}']={'close_ms':closed_ms,'resume_ms':resumed_ms,
             'first_output_ms':sample['first_output_ms']}
 
+    gemini_path=f'/v1beta/models/{MODEL}:generateContent'
+    gemini={'contents':[{'role':'user','parts':[{'text':'TLS_SYNTHETIC_TOOL GEMINI_CLAIM_SIGNATURE'}]}],
+        'tools':[{'functionDeclarations':[{'name':'synthetic_tool','parameters':{
+            'type':'object','properties':{'x':{'type':'integer'}}}}]}]}
+    Binding.continuation_mode='claim'
+    status,raw=request(gemini_path,gemini)
+    require(status==200,'Gemini Claim 签名夹具未交付工具轮')
+    content=json.loads(raw)['candidates'][0]['content']
+    part=next(item for item in content['parts'] if 'functionCall' in item)
+    require(part['thoughtSignature']=='c3ludGhldGljLXNpZw==','Gemini Claim 缺少实际源签名')
+    part['thoughtSignature']='skip_thought_signature_validator'
+    call=part['functionCall']
+    gemini['contents'].extend([content,{'role':'user','parts':[{'functionResponse':{
+        'id':call['id'],'name':call['name'],'response':{'value':'合成结果'}}}]}])
+    before=len(Upstream.calls)
+    status,raw=request(gemini_path,gemini)
+    require(status==200 and request(gemini_path,gemini)==(status,raw) and len(Upstream.calls)==before+1,
+        'Gemini Claim 添加占位签名后未续轮或重复发送 '+raw[:200].decode(errors='replace'))
+    require(any(item.get('thoughtSignature')=='c3ludGhldGljLXNpZw=='
+        for turn in Upstream.calls[-1]['body']['request']['contents'] for item in turn['parts']),
+        'Gemini Claim 回填未还原实际源签名')
+    wait_idle()
+
     for marker, expected, source_status in [('',503,200),('TLS_SYNTHETIC_EOF_SHORT',500,500),
             ('TLS_SYNTHETIC_EOF_SHORT TLS_SYNTHETIC_EOF_TEXT',200,500)]:
         body={'model':MODEL,'max_tokens':128,'stream':True,
@@ -1867,7 +1892,8 @@ Bad (branch name): "Analyzed adam/background-summary branch diff"'''
             '原生收流证据缺少实际控制状态')
         if source_status==500:
             require(fields.get('control_error_detail')=='unexpected_eof','截断未保留原生响应读取错误')
-    return {'continuation_modes':observed,'agent_summary':True,'empty_streams':True,'real_model_submissions':0}
+    return {'continuation_modes':observed,'agent_summary':True,'empty_streams':True,
+        'gemini_claim_signature_rewritten':True,'real_model_submissions':0}
 
 
 def verify_system_reminder(request, wait_idle, database, request_ids):
@@ -2006,6 +2032,21 @@ def verify_system_reminder(request, wait_idle, database, request_ids):
     return {'system_reminder': observed, 'gemini_direct': True, 'real_model_submissions': 0}
 
 
+def receipt_fixture_gate(operation=None):
+    """向断网夹具发布本地维护门禁。@param operation 维护 UUID。@return 本次代次。"""
+    directory=Path('/state/receipt-gate')
+    directory.mkdir(exist_ok=True)
+    epoch=str(uuid.uuid4())
+    record={'schema_version':1,'deployment':'synthetic','operation_id':operation,'epoch':epoch,
+        'phase':'blocked' if operation else 'idle','target_release':None,
+        'revision':str(uuid.uuid4()),'created_at':'2026-01-01T00:00:00Z'}
+    temporary=directory/'admission.tmp'
+    with os.fdopen(os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600),'w') as stream:
+        json.dump(record,stream)
+    temporary.replace(directory/'admission.json')
+    return epoch
+
+
 def verify_tool_receipts(request, wait_idle, database, request_ids, restart_gateway):
     """核对并发帧及续轮回执。@param request 公开请求。@param wait_idle 原生收口。@param database 合成 SQLite。@param request_ids 请求根。@param restart_gateway 重启合成网关。@return 验证摘要。"""
     path='/v1/messages'
@@ -2030,7 +2071,7 @@ def verify_tool_receipts(request, wait_idle, database, request_ids, restart_gate
 
     def detail(root, *, replay=False):
         """等待实际诊断写入。@param root 请求根。@param replay 是否重读。@return 诊断详情。"""
-        until=time.monotonic()+8
+        until=time.monotonic()+20
         while time.monotonic()<until:
             status,raw=request('/admin/request-diagnostics/'+root,admin=True)
             if status==200:
@@ -2127,10 +2168,55 @@ def verify_tool_receipts(request, wait_idle, database, request_ids, restart_gate
     require(CUT_OFF_REWRITE in json.dumps(Upstream.calls[-1]['body'],ensure_ascii=False)
         or request(path,amended)[0]==200,'断流提示无法接回已生成的结果')
     wait_idle()
+
+    persisted=issue('TLS_SYNTHETIC_TOOL RECEIPT_SUCCESS_STORAGE_ERROR')
+    with database:
+        database.execute("""CREATE TRIGGER fixture_fail_success BEFORE UPDATE OF phase ON agy_tool_receipts
+            WHEN NEW.phase='success' BEGIN SELECT RAISE(ABORT,'synthetic receipt write failure'); END""")
+    try:
+        before=len(Upstream.calls)
+        status,raw=request(path,{**persisted,'stream':True})
+        require(status==200 and b'event: message_stop' in raw and b'event: error' not in raw,
+            '成功回执存储失败污染了已交付流')
+        require(request(path,persisted)[0]==200 and len(Upstream.calls)==before+1,
+            '成功回执存储失败触发重复模型发送')
+    finally:
+        with database:
+            database.execute('DROP TRIGGER fixture_fail_success')
+    wait_idle()
+
+    interrupted=issue('AGY_RECEIPT_DROP RECEIPT_GATE_CUTOVER')
+    before=len(Upstream.calls)
+    retry_rows=database.execute("SELECT COUNT(*) FROM agy_tool_receipts WHERE phase='retry'").fetchone()[0]
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        in_flight=executor.submit(request,path,{**interrupted,'stream':True})
+        until=time.monotonic()+30
+        while len(Upstream.calls)==before:
+            require(time.monotonic()<until,'维护夹具未进入模型发送')
+            time.sleep(.02)
+        operation=str(uuid.uuid4())
+        epoch=receipt_fixture_gate(operation)
+        try:
+            cutover=Request('http://127.0.0.1:5674/admin/runtime/system-update/cutover',
+                data=json.dumps({'operation_id':operation,'epoch':epoch}).encode(),
+                headers={'x-v3-service-token':SECRET,'x-api-key':'synthetic-admin','content-type':'application/json'})
+            with urlopen(cutover,timeout=10) as response:
+                require(json.load(response)['accepted'],'本地网关未接纳维护中断')
+            require(b'event: message_stop' not in in_flight.result()[1],'维护夹具在原流成功后才触发')
+            until=time.monotonic()+30
+            while database.execute("SELECT COUNT(*) FROM agy_tool_receipts WHERE phase='retry'").fetchone()[0]<=retry_rows:
+                require(time.monotonic()<until,'维护物理收口未保留恢复权')
+                time.sleep(.05)
+        finally:
+            receipt_fixture_gate()
+    status,raw=request(path,interrupted)
+    require(status==200 and '本地TLS回复'.encode() in raw and len(Upstream.calls)==before+2,
+        '维护已收口的同批回填未从完整历史恢复一次')
+    wait_idle()
     return {'auxiliary_calls':2,'main_tool_delivered':True,'same_body_failure_retries':len(results),
         'recovery_attempts_after_original_failure':1,'expired_success_status':410,'exhausted_status':400,
         'restart_recovered':True,'reconnected_in_flight':True,'late_replays_linked':True,'synthetic_model_calls':len(Upstream.calls),
-        'real_model_submissions':0}
+        'success_despite_storage_error':True,'cutover_recovered':True,'real_model_submissions':0}
 
 
 def verify_reliability(request, wait_idle, base):
@@ -2222,6 +2308,10 @@ def inside(homoglyph=False,capture_off=False,png=False,installed_adapter=False,k
             'max_workers':3 if live_capacity else 1,'memory_mib':1536 if png or live_capacity or Path('/opt/claude-code').is_file() else 768}}
     if capture_off:config.pop('native_capture_dir')
     Path('/state/sender.json').write_text(json.dumps(config))
+    if tool_receipts:
+        receipt_fixture_gate()
+        os.environ['V3_UPDATE_GATE_DIR']='/state/receipt-gate'
+        os.environ['V3_ACCOUNT_RELEASE']=os.environ['V3_RELEASE']
     outputs=[];children=[]
     for executable,name in [('/opt/sender','sender'),('/opt/gateway','gateway')]:
         output=open('/state/'+name+'.log','wb');outputs.append(output)

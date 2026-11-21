@@ -11,6 +11,7 @@ use super::replay::SortedJson;
 use super::{AGY_REQUEST_SECONDS, AGY_TOOL_WAIT_LIMIT};
 
 /// 原始批次及允许查找的别名。
+#[derive(Clone)]
 pub(super) struct BatchKey {
     pub(super) exact: String,
     token: i64,
@@ -50,6 +51,7 @@ impl BatchKey {
     }
 }
 
+/// 计算已经规范化的记录摘要。@param value 可序列化值。@return SHA-256 的十六进制值。
 pub(super) fn digest(value: impl Serialize) -> String {
     let mut hash = Sha256::new();
     serde_json::to_writer(&mut hash, &value).expect("已验证的 JSON 可序列化");
@@ -72,6 +74,33 @@ pub(super) struct Receipt {
     pub(super) signatures: Vec<Option<String>>,
 }
 
+impl Receipt {
+    /// 构造已交付工具轮或待发送的首次历史标记。
+    /// @param key 批次。@param account 账号。@param scope 会话。@param source 原轮。@param signatures 签名摘要。@return 回执初值。
+    pub(super) fn new(
+        key: &BatchKey,
+        account: i64,
+        scope: String,
+        source: Option<&str>,
+        signatures: Vec<Option<String>>,
+    ) -> Self {
+        Self {
+            key: key.exact.clone(),
+            token: key.token,
+            account,
+            scope,
+            shape: key.shape.clone(),
+            source: source.unwrap_or_default().into(),
+            attempt: String::new(),
+            body: String::new(),
+            phase: if source.is_some() { "waiting" } else { "ready" }.into(),
+            recovered: false,
+            signatures,
+        }
+    }
+}
+
+/// 保管持久发送边界。所有写入按原批次和当前尝试比较更新。
 #[derive(Clone)]
 pub(super) struct ReceiptStore(pub(super) AnyPool);
 
@@ -84,29 +113,21 @@ fn expires() -> i64 {
     (now_ms() + (AGY_TOOL_WAIT_LIMIT.as_secs() + AGY_REQUEST_SECONDS as u64) * 1000) as i64
 }
 
+/// 投影可持久化的会话作用域。@param session 已核对会话。@return 会话摘要，缺失时为空字符串。
 pub(super) fn session_scope(session: Option<&str>) -> String {
     session.map_or_else(String::new, digest)
 }
 
 impl ReceiptStore {
-    /// 登记实际发布的工具批次或合法的历史起点。
-    /// @param key 批次身份。@param account 已授权账号。@param scope 会话摘要。
-    /// @param source 原生工具轮的 HTTP 根。@param signatures 源签名摘要。@return 当前请求成功登记时为真。
-    pub(super) async fn insert(
-        &self,
-        key: &BatchKey,
-        account: i64,
-        scope: &str,
-        source: Option<&str>,
-        signatures: &[Option<String>],
-    ) -> Result<bool, AppError> {
+    /// 登记实际发布的批次或已取得发送权的首笔历史。@param key 批次。@param receipt 可信初值。@return 此次成功新增。
+    pub(super) async fn insert(&self, key: &BatchKey, receipt: &Receipt) -> Result<bool, AppError> {
         sqlx::query("DELETE FROM agy_tool_receipts WHERE expires_ms <= $1")
             .bind(now_ms() as i64)
             .execute(&self.0)
             .await
             .map_err(storage_error)?;
         let new = sqlx::query(
-            "INSERT INTO agy_tool_receipts VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'','',$9,0,$10,$11,$12)
+            "INSERT INTO agy_tool_receipts VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,$12,$13,$14)
              ON CONFLICT(batch_key) DO NOTHING",
         )
         .bind(&key.exact)
@@ -114,13 +135,15 @@ impl ReceiptStore {
         .bind(&key.prefix)
         .bind(&key.shape)
         .bind(key.token)
-        .bind(account)
-        .bind(scope)
-        .bind(source.unwrap_or_default())
-        .bind(if source.is_some() { "waiting" } else { "ready" })
-        .bind(i64::from(source.is_none()))
+        .bind(receipt.account)
+        .bind(&receipt.scope)
+        .bind(&receipt.source)
+        .bind(&receipt.attempt)
+        .bind(&receipt.body)
+        .bind(&receipt.phase)
+        .bind(i64::from(receipt.source.is_empty()))
         .bind(expires())
-        .bind(serde_json::to_string(signatures).expect("固定的签名摘要可序列化"))
+        .bind(serde_json::to_string(&receipt.signatures).expect("固定的签名摘要可序列化"))
         .execute(&self.0)
         .await
         .map_err(storage_error)?;
@@ -164,16 +187,24 @@ impl ReceiptStore {
         }))
     }
 
-    /// 比较并取得原批次的准备权。@param previous 原快照。@param attempt 本次请求。@param body 正文摘要。@return 取得准备权。
-    pub(super) async fn prepare(
+    /// 原子取得实际发送权。@param previous 原快照。@param fresh 首次历史的批次。@param attempt 本次请求。@param body 正文摘要。@param scope 会话。@return 取得发送权。
+    pub(super) async fn start_sending(
         &self,
         previous: &Receipt,
+        fresh: Option<&BatchKey>,
         attempt: &str,
         body: &str,
         scope: &str,
     ) -> Result<bool, AppError> {
+        if let Some(key) = fresh {
+            let mut next = previous.clone();
+            next.phase = "sending".into();
+            next.attempt = attempt.into();
+            next.body = body.into();
+            return self.insert(key, &next).await;
+        }
         let row = sqlx::query(
-            "UPDATE agy_tool_receipts SET phase='preparing',attempt_id=$1,body_key=$2,
+            "UPDATE agy_tool_receipts SET phase='sending',attempt_id=$1,body_key=$2,
                 recovered=$3,expires_ms=$4,session_scope=CASE WHEN session_scope='' THEN $9 ELSE session_scope END
              WHERE batch_key=$5 AND (phase=$6 OR ($6='waiting' AND phase='ready'))
                  AND attempt_id=$7 AND expires_ms>$8
@@ -185,34 +216,26 @@ impl ReceiptStore {
         Ok(row.rows_affected() == 1)
     }
 
-    /// 准备失败时只恢复当前准备权持有者的旧状态。@param previous 原快照。@param attempt 本次请求。@return 回执更新。
-    pub(super) async fn abandon(&self, previous: &Receipt, attempt: &str) -> Result<(), AppError> {
-        self.restore(previous, attempt, "preparing").await
-    }
-
-    /// 撤销已确认未进入模型调用的输入拒绝。@param previous 原快照。@param attempt 本次请求。@return 更新结果。
-    pub(super) async fn rejected_input(
+    /// 还原已明确未发送的尝试。@param previous 原快照。@param attempt 本次请求。@param fresh 是否首次历史。@return 更新结果。
+    pub(super) async fn restore_unsent(
         &self,
         previous: &Receipt,
         attempt: &str,
+        fresh: bool,
     ) -> Result<(), AppError> {
-        self.restore(previous, attempt, "sending").await
-    }
-
-    async fn restore(
-        &self,
-        previous: &Receipt,
-        attempt: &str,
-        phase: &str,
-    ) -> Result<(), AppError> {
+        if fresh {
+            sqlx::query("DELETE FROM agy_tool_receipts WHERE batch_key=$1 AND attempt_id=$2 AND phase='sending'")
+                .bind(&previous.key).bind(attempt).execute(&self.0).await.map_err(storage_error)?;
+            return Ok(());
+        }
         sqlx::query(
             "UPDATE agy_tool_receipts SET phase=CASE WHEN $1='waiting' AND source_closed=1 THEN 'ready' ELSE $1 END,
-                attempt_id=$2,body_key=$3,recovered=$4
-             WHERE batch_key=$5 AND attempt_id=$6 AND phase=$7",
+                attempt_id=$2,body_key=$3,recovered=$4,session_scope=$5
+             WHERE batch_key=$6 AND attempt_id=$7 AND phase='sending'",
         )
         .bind(&previous.phase).bind(&previous.attempt).bind(&previous.body)
-        .bind(i64::from(previous.recovered)).bind(&previous.key).bind(attempt)
-        .bind(phase)
+        .bind(i64::from(previous.recovered)).bind(&previous.scope)
+        .bind(&previous.key).bind(attempt)
         .execute(&self.0).await.map_err(storage_error)?;
         Ok(())
     }
@@ -257,7 +280,7 @@ mod tests {
     use serde_json::json;
     use sqlx::any::{AnyPoolOptions, install_default_drivers};
 
-    use super::{BatchKey, ReceiptStore};
+    use super::{BatchKey, Receipt, ReceiptStore};
 
     async fn exercise(dsn: &str, driver: &str) {
         install_default_drivers();
@@ -272,17 +295,13 @@ mod tests {
         let calls = [json!({"id":source,"name":"Read","args":{"n":1}})];
         let prefix = [json!({"role":"user","parts":[{"text":"Fixture"}]})];
         let key = BatchKey::new(7, "fixture", &prefix, &calls);
-        assert!(
-            store
-                .insert(&key, 18, "session", Some(&source), &[None])
-                .await
-                .unwrap()
-        );
+        let published = Receipt::new(&key, 18, "session".into(), Some(&source), vec![None]);
+        assert!(store.insert(&key, &published).await.unwrap());
         let waiting = store.find(&key).await.unwrap().unwrap();
         assert_eq!(waiting.phase, "waiting");
         assert!(
             !store
-                .prepare(&waiting, "wrong-session", "same-body", "other")
+                .start_sending(&waiting, None, "wrong-session", "same-body", "other")
                 .await
                 .unwrap()
         );
@@ -295,8 +314,8 @@ mod tests {
         let ready = store.find(&key).await.unwrap().unwrap();
         assert_eq!(ready.phase, "ready");
         let (left, right) = tokio::join!(
-            store.prepare(&ready, "first", "same-body", "session"),
-            store.prepare(&ready, "parallel", "same-body", "session"),
+            store.start_sending(&ready, None, "first", "same-body", "session"),
+            store.start_sending(&ready, None, "parallel", "same-body", "session"),
         );
         let winner = if left.unwrap() {
             assert!(!right.unwrap());
@@ -305,13 +324,10 @@ mod tests {
             assert!(right.unwrap());
             "parallel"
         };
-        assert!(
-            store
-                .transition(&key.exact, winner, "preparing", "sending")
-                .await
-                .unwrap()
-        );
-        store.abandon(&ready, winner).await.unwrap();
+        store
+            .restore_unsent(&ready, "different-attempt", false)
+            .await
+            .unwrap();
         assert_eq!(store.find(&key).await.unwrap().unwrap().phase, "sending");
         assert!(
             store
@@ -326,19 +342,27 @@ mod tests {
         assert_eq!(retry.body, "same-body");
         assert!(
             restarted
-                .prepare(&retry, "recovery", "same-body", "session")
+                .start_sending(&retry, None, "recovery-unsent", "same-body", "session")
                 .await
                 .unwrap()
         );
         assert!(
             !restarted
-                .prepare(&retry, "duplicate", "same-body", "session")
+                .start_sending(&retry, None, "duplicate", "same-body", "session")
                 .await
                 .unwrap()
         );
+        restarted
+            .restore_unsent(&retry, "recovery-unsent", false)
+            .await
+            .unwrap();
+        let restored = restarted.find(&key).await.unwrap().unwrap();
+        assert_eq!(restored.phase, "retry");
+        assert_eq!(restored.attempt, winner);
+        assert!(!restored.recovered);
         assert!(
             restarted
-                .transition(&key.exact, "recovery", "preparing", "sending")
+                .start_sending(&restored, None, "recovery", "same-body", "session")
                 .await
                 .unwrap()
         );
@@ -362,6 +386,41 @@ mod tests {
             restarted.find(&other_token).await.unwrap().unwrap().token,
             7
         );
+        let fresh_calls = [json!({"id":uuid::Uuid::new_v4().to_string(),"name":"Read","args":{}})];
+        let fresh_key = BatchKey::new(7, "fixture", &prefix, &fresh_calls);
+        let first = Receipt::new(&fresh_key, 18, "session".into(), None, vec![None]);
+        let second = Receipt::new(&fresh_key, 19, "session".into(), None, vec![None]);
+        assert!(
+            restarted
+                .start_sending(&first, Some(&fresh_key), "fresh", "same-body", "session")
+                .await
+                .unwrap()
+        );
+        assert!(
+            !restarted
+                .start_sending(
+                    &second,
+                    Some(&fresh_key),
+                    "parallel",
+                    "same-body",
+                    "session"
+                )
+                .await
+                .unwrap()
+        );
+        restarted
+            .restore_unsent(&second, "parallel", true)
+            .await
+            .unwrap();
+        assert_eq!(
+            restarted.find(&fresh_key).await.unwrap().unwrap().account,
+            18
+        );
+        restarted
+            .restore_unsent(&first, "fresh", true)
+            .await
+            .unwrap();
+        assert!(restarted.find(&fresh_key).await.unwrap().is_none());
         pool.close().await;
     }
 

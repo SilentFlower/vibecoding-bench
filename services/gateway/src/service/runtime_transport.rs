@@ -551,7 +551,7 @@ impl PreparedTransport {
         let deadline = deadline.min(Instant::now() + budget);
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
-            return Err(AppError::ServiceUnavailable("AGY请求已到截止时间".into()));
+            return Err(AppError::AdmissionLimited { retry_after: 1 });
         }
         let submission = AgySubmission {
             request: PreparedRequest {

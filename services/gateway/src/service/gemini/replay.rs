@@ -75,7 +75,7 @@ struct StoredFrame {
 
 /// 有界保留实际原生历史，供有物理收口证明的失败恢复。
 pub(super) struct RuntimeContents {
-    pub(super) value: Value,
+    pub(super) value: Arc<Value>,
     _reservation: OwnedSemaphorePermit,
 }
 
@@ -98,7 +98,6 @@ pub(super) struct ReplayAttempt {
 pub(super) struct ToolReplay {
     pub(super) account_id: i64,
     pub(super) request_id: String,
-    pub(super) previous_turn: String,
     pub(super) derived_session_id: Option<String>,
     pub(super) session_scope: Option<String>,
     pub(super) body_key: String,
@@ -114,14 +113,13 @@ pub(super) struct ToolReplay {
 
 impl ToolReplay {
     /// 在工具轮领取时冻结响应归属和预算。
-    /// @param account_id 原账号。@param request_id 接续轮 HTTP 根。@param previous_turn 原工具轮。
+    /// @param account_id 原账号。@param request_id 接续轮 HTTP 根。
     /// @param derived_session_id 工具原归属的派生会话。@param deadline 接续轮截止。
     /// @param cutover 维护清理信号。@param budget 共享帧缓存预算。
     /// @return 等待发送的响应记录。
     pub(super) fn new(
         account_id: i64,
         request_id: String,
-        previous_turn: String,
         derived_session_id: Option<String>,
         deadline: Instant,
         cutover: Option<InferenceCutover>,
@@ -130,7 +128,6 @@ impl ToolReplay {
         Self {
             account_id,
             request_id,
-            previous_turn,
             derived_session_id,
             session_scope: None,
             body_key: String::new(),
@@ -146,11 +143,14 @@ impl ToolReplay {
     }
 
     /// 保留需要复用的已规范化历史。@param value 原生历史。@param permit 字节预算。@return 无。
-    pub(super) fn keep_runtime_contents(&mut self, value: Value, permit: OwnedSemaphorePermit) {
-        self.runtime = Mutex::new(Some(Arc::new(RuntimeContents {
+    pub(super) fn keep_runtime_contents(&self, value: Arc<Value>, permit: OwnedSemaphorePermit) {
+        *self
+            .runtime
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = Some(Arc::new(RuntimeContents {
             value,
             _reservation: permit,
-        })));
+        }));
     }
 
     /// 返回失败恢复需要的原生历史。@return 可用时持有预算的快照。
@@ -201,7 +201,6 @@ impl ToolReplay {
         let bytes = size_of::<Self>()
             + 2 * (key.len() + self.request_id.len())
             + self.body_key.len()
-            + self.previous_turn.len()
             + self.derived_session_id.as_ref().map_or(0, String::len)
             + self.session_scope.as_ref().map_or(0, String::len);
         let bytes = u32::try_from(bytes).map_err(|_| AppError::AgyToolReplayUnavailable)?;
@@ -331,12 +330,6 @@ impl ToolReplay {
         self.unavailable_error(&state)
     }
 
-    /// 检查首笔断开后是否仍有重试方在读取。@return 存在重试读者时为真。
-    #[cfg(test)]
-    pub(super) fn has_readers(&self) -> bool {
-        self.changes.receiver_count() != 0
-    }
-
     /// 生成截止已过时给物理收口留一段有界时间。
     /// @param until 收口等待截止。@return 无。
     pub(super) async fn wait_terminal(&self, until: Instant) {
@@ -411,7 +404,6 @@ mod tests {
         Arc::new(ToolReplay::new(
             1,
             "request".into(),
-            "previous".into(),
             None,
             deadline,
             None,
@@ -455,7 +447,6 @@ mod tests {
             ));
             assert!(reader.next().await.is_none());
         }
-        assert!(!response.has_readers());
     }
 
     #[tokio::test]
