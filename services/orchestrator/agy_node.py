@@ -501,7 +501,7 @@ class AgyNode:
                         'phase': 'fenced', 'operation_id': identity.operation_id})
                 atomic_json(root / 'runtime/node-migration-target.json', {**marker, 'phase': 'revoked'})
             elif root.exists() or root.is_symlink():
-                self.executor._previous_copy(root, {**receipt, 'platform': 'antigravity'})
+                self.executor._previous_copy(root, receipt)
             elif self.executor._scoped_containers(identity.environment_id):
                 raise ValueError('AGY 目标存在缺少目录的实际角色')
             atomic_json(path, receipt)

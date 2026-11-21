@@ -688,24 +688,26 @@ class NodeExecution:
             fence = _read_json(root / 'runtime/node-fence.json')
         except FileNotFoundError:
             raise ValueError('目标环境包含其他操作资料，请先核对原隔离回执') from None
-        same_revoked = False
-        if (intent.get('platform') == 'antigravity' and isinstance(fence, dict)
-                and fence.get('assignment_revision') == intent['revision']
-                and isinstance(fence.get('operation_id'), str) and re.fullmatch('[a-f0-9]{32}', fence['operation_id'])):
-            tombstone = self.data / 'node-migrations' / fence['operation_id'] / 'revoked.json'
-            expected = {key: intent[key] for key in ('node_key', 'account_id', 'environment_id', 'revision')}
-            same_revoked = _read_json(tombstone) == {'protocol': 1, **expected,
-                'operation_id': fence['operation_id'], 'phase': 'revoked'}
         if (not isinstance(fence, dict) or fence.get('protocol') != 1 or fence.get('phase') != 'fenced'
                 or fence.get('node_key') != self.node_key or fence.get('environment_id') != intent['environment_id']
                 or fence.get('account_id') != intent['account_id'] or fence.get('operation_id') == intent['operation_id']
                 or not isinstance(fence.get('operation_id'), str) or not re.fullmatch('[a-f0-9]{32}', fence['operation_id'])
                 or type(fence.get('assignment_revision')) is not int
-                or not (1 <= fence['assignment_revision'] < intent['revision'] or same_revoked)
+                or not 1 <= fence['assignment_revision'] <= intent['revision']
                 or type(fence.get('generation')) is not int or fence['generation'] < 0
                 or not isinstance(fence.get('stopped_containers'), list)
                 or any(not isinstance(value, str) for value in fence['stopped_containers'])):
             raise ValueError('目标已有副本缺少原已停止隔离证明')
+        if fence['assignment_revision'] == intent['revision']:
+            # 中央提交前撤销保留原分配版本。同版本目标须证明旧操作已经撤销。
+            tombstone = self.data / 'node-migrations' / fence['operation_id'] / 'revoked.json'
+            expected = {key: intent[key] for key in ('node_key', 'account_id', 'environment_id', 'revision')}
+            try:
+                revoked = _read_json(tombstone)
+            except FileNotFoundError:
+                revoked = None
+            if revoked != {'protocol': 1, **expected, 'operation_id': fence['operation_id'], 'phase': 'revoked'}:
+                raise ValueError('目标同版本副本缺少匹配的原撤销收据')
         if self.node_key != 'local':
             ownership = _read_json(root / 'runtime/node-assignment.json')
             if ownership != {'protocol': 1, 'node_key': self.node_key, 'account_id': intent['account_id'],

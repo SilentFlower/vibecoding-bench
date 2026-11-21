@@ -263,15 +263,15 @@ class NodeExecutionTests(unittest.TestCase):
             self.executor.inspect(request.model_copy(update={'assignment_revision': 2}))
         self.assertTrue((root / 'runtime/execution.json').exists())
 
-    def migration_input(self) -> ImportPreparation:
-        """从真实源资料建立核验后的私有目标树。:return: 带冻结CLI身份和代次的发布输入。"""
-        source_data = self.root / 'source'
+    def migration_input(self, *, operation_id: str = 'c' * 32) -> ImportPreparation:
+        """从真实源资料建立核验后的私有目标树。:param operation_id: 本次合成迁移。:return: 带冻结CLI身份和代次的发布输入。"""
+        source_data = self.root / 'source' / operation_id
         source_root = source_data / 'environments' / ('e' * 32)
         identity = {'userID': 'b' * 64, 'oauthAccount': {'accountUuid': 'synthetic-account'}}
         atomic_json(source_root / 'home/.claude.json', identity)
         (source_root / 'projects').mkdir()
         (source_root / 'projects/sentinel.txt').write_text('已核对的工程资料')
-        archive_identity = ArchiveIdentity(operation_id='c' * 32, deployment_id='synthetic',
+        archive_identity = ArchiveIdentity(operation_id=operation_id, deployment_id='synthetic',
             source_node_key='local' if self.node_key != 'local' else 'b' * 32,
             account_id=1, environment_id='e' * 32, assignment_revision=1)
         files = MigrationFiles(source_data, archive_identity.source_node_key, 'synthetic')
@@ -281,8 +281,8 @@ class NodeExecutionTests(unittest.TestCase):
         stage = ImportStage(node_key=self.node_key, transfer_id='f' * 32, target_revision=2, archive=archive)
         target = MigrationFiles(self.root, self.node_key, 'synthetic')
         target.stage(stage)
-        private = self.root / 'node-migrations' / ('c' * 32) / 'imports' / ('f' * 32)
-        shutil.copyfile(source_data / 'node-migrations' / ('c' * 32) / 'exports' / ('d' * 32 + '.tar'), private / 'environment.tar')
+        private = self.root / 'node-migrations' / operation_id / 'imports' / ('f' * 32)
+        shutil.copyfile(source_data / 'node-migrations' / operation_id / 'exports' / ('d' * 32 + '.tar'), private / 'environment.tar')
         target.restore(stage)
         preparation = self.request.model_copy(update={'assignment_revision': 2,
             'environment': {**self.request.environment, 'generation': 4, 'state': 'ready'},
@@ -345,6 +345,60 @@ class NodeExecutionTests(unittest.TestCase):
                 operation()
         private = self.root / 'node-migrations' / ('c' * 32) / 'imports' / ('f' * 32)
         self.assertEqual('已核对的工程资料', (private / 'environment/projects/sentinel.txt').read_text())
+
+    def test_cancelled_cc_target_can_be_prepared_again_at_the_same_revision(self) -> None:
+        """用真实准备和撤销入口验证同版本的新操作必须持有匹配停止证据。:return: None。"""
+        request = self.migration_input()
+        first = self.executor.prepare_import(request)
+        root = self.root / 'environments' / ('e' * 32)
+        atomic_json(root / 'home/local.json', {'value': '已取消目标的资料'})
+        labels = {'vibebench.product': 'v3', 'vibebench.deployment': 'synthetic',
+            'vibebench.environment': 'e' * 32, 'vibebench.cluster-node': self.node_key}
+        container = Mock(id='network', status='exited', labels={**labels, 'vibebench.role': 'account-network'},
+            attrs={'State': {'Running': False, 'Pid': 0}})
+        roles = [container]
+        self.executor.client.containers.list.return_value = roles
+        container.remove.side_effect = roles.clear
+        revocation = ImportRevocation(node_key=self.node_key, target_revision=2, identity=request.stage.archive.identity)
+        with patch.multiple(_Runtime, create=True, client=self.executor.client,
+                reviews=Mock(serial_state=Mock(return_value=None)), environment_jobs=Mock(return_value=[]),
+                _execution_records=Mock(return_value=[]), _running_sender_active=Mock(return_value=False),
+                _stop_environment=Mock(), _labels=Mock(return_value=dict(container.labels)), _update=Mock()):
+            receipt = self.executor.revoke_import(revocation)
+        self.assertEqual('revoked', receipt['phase'])
+        fence = json.loads((root / 'runtime/node-fence.json').read_text())
+        self.assertEqual((2, ['network']), (fence['assignment_revision'], fence['stopped_containers']))
+        with self.assertRaisesRegex(ValueError, '已撤销'):
+            self.executor.prepare_import(request)
+
+        # 中央仍处于源 revision 1。取消另一笔尚未发布的迁移时，必须能验证旧目标。
+        unpublished = revocation.model_copy(update={'identity': revocation.identity.model_copy(
+            update={'operation_id': '1' * 32})})
+        self.assertEqual('revoked', self.executor.revoke_import(unpublished)['phase'])
+        self.assertEqual(fence, json.loads((root / 'runtime/node-fence.json').read_text()))
+
+        retry = self.migration_input(operation_id='2' * 32)
+        tombstone = self.root / 'node-migrations' / request.stage.archive.identity.operation_id / 'revoked.json'
+        tombstone.unlink()
+        with self.assertRaisesRegex(ValueError, '原撤销收据'):
+            self.executor.prepare_import(retry)
+        atomic_json(tombstone, {**receipt, 'account_id': 99})
+        with self.assertRaisesRegex(ValueError, '原撤销收据'):
+            self.executor.prepare_import(retry)
+        atomic_json(tombstone, receipt)
+        container.attrs['State'] = {'Running': True, 'Pid': 42}
+        with self.assertRaisesRegex(ValueError, '未核对角色'):
+            self.executor.prepare_import(retry)
+        container.remove.assert_not_called()
+        container.attrs['State'] = {'Running': False, 'Pid': 0}
+
+        result = self.executor.prepare_import(retry)
+        self.assertEqual('prepared', result['phase'])
+        self.assertEqual(first['environment']['generation'] + 1, result['environment']['generation'])
+        self.assertEqual(2, json.loads((root / 'runtime/node-assignment.json').read_text())['revision'])
+        previous = tombstone.parent.parent / ('2' * 32) / 'imports' / ('f' * 32) / 'previous-environment'
+        self.assertEqual({'value': '已取消目标的资料'}, json.loads((previous / 'home/local.json').read_text()))
+        container.remove.assert_called_once_with()
 
     def test_returning_target_preserves_old_fenced_home_and_uses_new_source_generation(self) -> None:
         """迁回已停机旧副本时保留原HOME，独立投影从新源代次准备。:return: None。"""
