@@ -1,6 +1,6 @@
 //! 固定账号容器中的 HTTPS 发送进程，沿用网关 crate 的 HTTP/TLS 实现。
 
-use claude_code_gateway::service::runtime_transport::sender_router;
+use claude_code_gateway::service::runtime_transport::serve_sender;
 use tracing_subscriber::EnvFilter;
 
 /// 初始化账号发送器日志并提供受限的内部服务。
@@ -22,7 +22,5 @@ async fn main() {
         reason = "sender_started",
         "账号发送器已启动"
     );
-    axum::serve(listener, sender_router(path))
-        .await
-        .expect("账号发送器退出");
+    serve_sender(listener, path).await.expect("账号发送器退出");
 }

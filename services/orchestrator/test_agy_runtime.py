@@ -388,6 +388,7 @@ class AgyRuntimeTests(unittest.TestCase):
 
                 spare.start=start
                 spare.close=lambda: setattr(spare,'closed',True)
+                spare.running=lambda: spare.process is not None and not spare.closed
                 with patch('agy_runtime.supervisor.Worker',return_value=spare) as factory:
                     if mode=='ready':
                         warming=threading.Thread(target=supervisor.prewarm_replacement,args=(original,value,until),daemon=True)
@@ -462,7 +463,7 @@ class AgyRuntimeTests(unittest.TestCase):
             """构造活进程或占用中的原工具进程。@param key 复用键。@param age 空闲时长。@param busy 是否独占。@return 测试进程。"""
             return SimpleNamespace(key=(1, key), last_used=now-age, busy=busy, parked=False,
                 credential_expires_at=4070908800000, process=SimpleNamespace(poll=lambda: None),
-                close=released.set)
+                close=released.set, running=lambda: True)
 
         old, current, tool, other = worker('same', 121), worker('same', 1), worker('same', 300, True), worker('other', 3)
         supervisor.workers = [old, current, tool, other]

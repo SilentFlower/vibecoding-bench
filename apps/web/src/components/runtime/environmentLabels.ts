@@ -25,6 +25,21 @@ export const preparationReasons:Record<string,string> = {identity_changed: '运�
     account_memory_insufficient: '账号总内存不足以容纳网络、原生发送器和 CLI，请调整后重试',
     maintenance: '账号正在维护', system_maintenance: '平台更新中，结束后自动准备', sleeping: '环境休眠', disabled: '账号已停用'};
 
+/** 反重力后台准备原因的中文说明。 */
+export const agyPreparationReasons: Record<string, string> = {
+  waiting_capacity: '等待节点容量',
+  account_disabled: '账号已停用',
+  credentials_not_ready: '等待凭据就绪',
+  node_paused: '所属节点已暂停接单',
+  node_transition: '所属节点正在切换',
+  environment_unavailable: '环境状态待核对',
+  environment_prepare_failed: '运行组件启动失败',
+  agy_status_failed: '读取进程状态失败',
+  agy_credentials_unavailable: '运行凭据暂不可用',
+  agy_warm_failed: '热进程启动失败',
+  sender_upgrade_required: '发送器需升级',
+};
+
 /** 既有运行时状态的中文含义。 */
 export const tlsStates:Record<string,string> = {not_installed: '需系统更新安装采集器', disabled: '已关闭', stopped: '停止待启动', preparing: '准备中', ready: '已就绪', unavailable: '暂不可用'};
 

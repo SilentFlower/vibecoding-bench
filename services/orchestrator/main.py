@@ -68,7 +68,7 @@ from sse_starlette.sse import EventSourceResponse
 from starlette.websockets import WebSocketState
 
 from quota_protocol import merge_quota_observation, passive_recovery_decision, quota_decision, quota_observation, quota_timestamp, warmup_quota_decision, warmup_sample_used
-from account_runtime import AccountRuntime, RuntimeBusy, V3_DEFAULT_TIMEZONE, atomic_json, derive_v3_fingerprint
+from account_runtime import AccountRuntime, RuntimeBusy, RuntimeCapacityUnavailable, V3_DEFAULT_TIMEZONE, atomic_json, derive_v3_fingerprint
 from account_work_control import AccountWorkCoordinator
 from oauth_refresh_probe import OAUTH_REFRESH_SCRIPT, execute_oauth_refresh_probe
 from account_update_identity import role_release
@@ -14267,6 +14267,50 @@ def v3_agy_ingress(account_id: int, attempt_id: str, body: AgyIngressIn):
     return {'state':'saved'}
 
 
+@app.post('/internal/v3/agy-environments/{account_id}')
+def v3_agy_environment(account_id: int, prepare: bool = False) -> dict:
+    """登记环境并按需申请后台绑定。@param account_id 网关账号。@param prepare 是否申请预热绑定。@return 当前归属与准备状态。"""
+    if not account_runtime:
+        raise HTTPException(404, 'AGY 运行环境未启用')
+    from agy_environment import BackgroundPreparationDeferred, background_wake, lookup, register_ready, transport
+    try:
+        with UPDATE_GATE.admission('agy-environment-preparation'):
+            try:
+                row = register_ready(account_runtime, account_id)
+            except ValueError:
+                raise HTTPException(409, 'AGY 账号尚未完成凭据登记') from None
+            result = {'environment_id': row['environment_id'], 'generation': row['generation']}
+            if not prepare:
+                return {**result, 'state': 'registered'}
+            try:
+                if agy_placement:
+                    binding = agy_placement.transport(account_id, wake=False, background=True)
+                else:
+                    with account_runtime.environment_lock(row['environment_id']):
+                        current = lookup(account_runtime, account_id)
+                        if current is None or current['environment_id'] != row['environment_id']:
+                            raise ValueError('AGY 环境归属已变化')
+                        config = account_runtime.gateway._request('GET', f'/admin/runtime/accounts/{account_id}/config')
+                        wake = background_wake(current, config)
+                        binding = transport(account_runtime, account_id, wake=wake, allow_eviction=False)
+            except RuntimeCapacityUnavailable:
+                return {**result, 'state': 'unprepared', 'reason': 'waiting_capacity'}
+            except BackgroundPreparationDeferred as error:
+                return {**result, 'state': 'unprepared', 'reason': str(error)}
+            except (ValueError, RuntimeError, OSError, DockerException):
+                # 创建角色可能已经推进代次，失败必须和当前卡片归属一致。
+                current = lookup(account_runtime, account_id)
+                if current and current['environment_id'] == result['environment_id']:
+                    result['generation'] = current['generation']
+                return {**result, 'state': 'failed', 'reason': 'environment_prepare_failed'}
+            if binding is None:
+                return {**result, 'state': 'unprepared', 'reason': 'environment_unavailable'}
+            return {'environment_id': binding['environment_id'], 'generation': binding['generation'],
+                'state': 'bound', 'binding': binding}
+    except (RuntimeError, OSError, sqlite3.Error):
+        raise HTTPException(503, 'AGY 环境登记暂不可用') from None
+
+
 @app.get("/internal/v3/transport/{account_id}")
 def v3_transport(account_id: int, wake: bool = True):
     """解析唯一绑定账号并返回受限发送实例，浏览器无法直接调用。"""
@@ -14320,7 +14364,19 @@ def _v3_environment_summary(row: dict, ownerships: dict, native_preparations: di
     from agy_environment import lookup_environment, summary as agy_summary
     agy = lookup_environment(account_runtime, row['environment_id'])
     if agy:
-        return agy_placement.summary(agy) if agy_placement else agy_summary(account_runtime, agy)
+        result = agy_placement.summary(agy) if agy_placement else agy_summary(account_runtime, agy)
+        observation = native_preparations.get(agy['gateway_account_id'], {})
+        runtime = result.setdefault('agy_runtime', {})
+        if (observation.get('environment_id') == result['environment_id']
+                and observation.get('generation') == result['generation']
+                and not result['busy'] and not runtime.get('active')):
+            if observation.get('state') == 'disabled':
+                runtime.update(state='disabled', preparation_reason='account_disabled')
+            elif (runtime.get('state') in ('unprepared', 'ready', 'unknown')
+                    and runtime.get('idle_workers', 0) == 0
+                    and observation.get('state') in ('unprepared', 'failed')):
+                runtime.update(state=observation['state'], preparation_reason=observation.get('reason'))
+        return result
     account = None
     row['credential_ownership'] = ownerships.get(row['account_id'])
     if cluster_service and row['account_id'] is None:

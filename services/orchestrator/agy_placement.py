@@ -10,9 +10,10 @@ from urllib.error import HTTPError
 from docker.errors import DockerException
 
 from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS
+from account_runtime import RuntimeCapacityUnavailable
 from account_update_identity import configured_release
 from agy_capacity import CapacityError, _receipt as capacity_receipt, change_capacity
-from agy_environment import lookup, register, summary, transport
+from agy_environment import BackgroundPreparationDeferred, INITIAL_PREPARATION, background_wake, lookup, register, summary, transport
 from agy_node import AgyNode
 from agy_node_contract import AgyLocation, AgyPreparation
 from cluster_deployment import node_container_name
@@ -65,8 +66,8 @@ class AgyPlacement:
                 raise ValueError('AGY 网关环境已变化')
             yield updated, self.store.agy_assignment(account_id)
 
-    def transport(self, account_id: int, *, wake: bool) -> dict | None:
-        """解析当前执行节点并核对真实发送绑定。@param account_id 网关账号。@param wake 是否唤醒。@return 受限绑定。"""
+    def transport(self, account_id: int, *, wake: bool, background: bool = False) -> dict | None:
+        """解析当前执行节点并核对真实绑定。@param account_id 网关账号。@param wake 业务是否唤醒。@param background 是否为后台准备。@return 受限绑定。"""
         if lookup(self.runtime, account_id) is None:
             if not wake:
                 return None
@@ -75,17 +76,28 @@ class AgyPlacement:
                 raise ValueError('AGY 网关凭据或账号尚未就绪')
             register(self.runtime, account_id)
         with self.current(account_id) as (row, assignment):
+            if background:
+                if assignment['phase'] != 'ready':
+                    raise BackgroundPreparationDeferred('node_transition')
+                if not assignment['enabled']:
+                    raise BackgroundPreparationDeferred('node_paused')
+                configuration = self.configuration(account_id)
+                wake = background_wake(row, configuration)
             if not self._accepts(assignment):
                 raise ValueError('AGY 所属节点正在维护或已暂停接单')
             if assignment['kind'] == 'local':
-                return transport(self.runtime, account_id, wake=wake)
+                return transport(self.runtime, account_id, wake=wake, allow_eviction=not background)
             node = self.store.get(assignment['node_id'])
             prepared = json.loads(node['preparation_json'] or '{}')
             if prepared.get('state') != 'prepared' or prepared.get('release') != self.runtime.release_id:
                 raise ValueError('AGY 所属节点需要准备同批运行组件')
             scope = self.scope(row, assignment)
             peer = self.command(assignment['node_id'], 'agy-prepare', AgyPreparation(
-                **scope, environment=row, configuration=self.configuration(account_id), wake=wake).model_dump())
+                **scope, environment=row, configuration=configuration if background else self.configuration(account_id),
+                wake=wake).model_dump())
+            if background and wake and peer.get('preparation_reason') == 'waiting_capacity':
+                self.prepared(peer, scope, wake=False)
+                raise RuntimeCapacityUnavailable('AGY 所属节点没有空余环境容量')
             actual, binding = self.prepared(peer, scope, wake=wake)
             self._mirror(row, assignment, actual)
             if binding is None:
@@ -208,6 +220,7 @@ class AgyPlacement:
         observed = {'fingerprint': json.loads(row['fingerprint_json']), 'state': 'node_unreachable',
             'role_status': {role: 'unknown' for role in ROLE_COLUMNS}, 'busy': True, 'request_backend': 'agy159',
             'node_observed': False, 'node_message': 'AGY 所属节点状态待核对', 'platform_release': self.runtime.release_id}
+        observed['fingerprint'].pop(INITIAL_PREPARATION, None)
         try:
             value = self.exact(row, assignment, 'agy-inspect')['environment']
             observed.update(value, node_observed=True, node_message='已读取 AGY 所属节点的实际环境')

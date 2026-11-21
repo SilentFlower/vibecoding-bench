@@ -10,7 +10,8 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from urllib.error import HTTPError
 
-from agy_environment import SOURCE_SHA256, lookup
+from account_runtime import RuntimeCapacityUnavailable
+from agy_environment import BackgroundPreparationDeferred, INITIAL_PREPARATION, SOURCE_SHA256, lookup
 from agy_node import AgyNode
 from agy_placement import AgyPlacement
 from cluster_archive import AgyArchiveIdentity, restore_environment_archive
@@ -129,6 +130,33 @@ class AgyMigrationTests(unittest.TestCase):
         snapshot['active'] = 1
         with self.assertRaisesRegex(ValueError, '配置许可已变化'), placement._maintenance(7, proof):
             self.fail('有原请求时不应静默')
+
+    def test_background_prepare_uses_assigned_node_and_preserves_capacity_wait(self):
+        """远程后台首启复用精确节点证明，容量满和节点暂停各自等待。@return 无。"""
+        placement = AgyPlacement.__new__(AgyPlacement)
+        placement.store = self.store
+        lock = threading.RLock()
+        placement.runtime = SimpleNamespace(database=self.database, environment_lock=lambda _: lock, release_id='synthetic')
+        placement.configuration = Mock(return_value={'status': 'active', 'api_accepting': True, 'work_enabled': True,
+            'credential_state': {'phase': 'ready'}})
+        with self.database() as connection:
+            connection.execute("UPDATE agy_node_assignments SET node_id=2 WHERE account_id=7")
+            connection.execute("UPDATE cluster_nodes SET preparation_json=? WHERE id=2", (json.dumps(
+                {'state': 'prepared', 'release': 'synthetic'}),))
+            connection.execute("UPDATE account_environments SET generation=0,state='stopped',fingerprint_json=? "
+                "WHERE name='agy:7'", (json.dumps({INITIAL_PREPARATION: True}),))
+        placement.command = Mock(return_value={'protocol': 1, 'node_key': 'b' * 32, 'assignment_revision': 1,
+            'environment': lookup(self.store, 7), 'binding': None, 'preparation_reason': 'waiting_capacity'})
+        with self.assertRaises(RuntimeCapacityUnavailable):
+            placement.transport(7, wake=False, background=True)
+        node_id, operation, payload = placement.command.call_args.args
+        self.assertEqual((node_id, operation, payload['generation'], payload['wake']), (2, 'agy-prepare', 0, True))
+        self.assertTrue(json.loads(lookup(self.store, 7)['fingerprint_json'])[INITIAL_PREPARATION])
+        with self.database() as connection:
+            connection.execute("UPDATE cluster_nodes SET enabled=0 WHERE id=2")
+        with self.assertRaisesRegex(BackgroundPreparationDeferred, 'node_paused'):
+            placement.transport(7, wake=False, background=True)
+        placement.command.assert_called_once()
 
     def test_remote_archive_requires_gateway_deletion_and_same_stopped_generation(self):
         """只有网关确认删除且最新投影已静默时，原分配才从节点工作中归档。@return 无。"""

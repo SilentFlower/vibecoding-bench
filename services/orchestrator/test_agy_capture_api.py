@@ -9,7 +9,8 @@ from fastapi.testclient import TestClient
 
 import main
 import test_agy_environment
-from agy_environment import register
+from account_runtime import RuntimeCapacityUnavailable
+from agy_environment import lookup, register
 from agy_runtime.capture import save_submission
 
 
@@ -73,6 +74,50 @@ class AgyCaptureApiTests(unittest.TestCase):
         self.assertEqual(value['ingress'],ingress)
         self.assertEqual([stage['stage'] for stage in value['stages']],['ingress'])
         self.runtime.client.containers.run.assert_not_called()
+
+    def test_default_environment_registration_and_capacity_wait_are_visible(self):
+        """核对私有登记、当前环境投影及零回收容量等待。@return 无。"""
+        account_id = 18
+        config = {'account_id': account_id, 'platform': 'antigravity', 'auth_type': 'oauth',
+            'status': 'active', 'work_enabled': True, 'api_accepting': True, 'credential_state': {'phase': 'ready'}}
+        observations = []
+
+        def gateway_get(method, path, **_):
+            if path == '/admin/native-preparations':
+                return observations
+            self.assertEqual((method, path), ('GET', f'/admin/runtime/accounts/{account_id}/config'))
+            return config
+
+        self.runtime.gateway._request.side_effect = gateway_get
+        self.runtime.gateway.list_accounts.return_value = [
+            {'id': account_id, 'name': '合成 Ultra', 'platform': 'antigravity'}]
+        path = f'/internal/v3/agy-environments/{account_id}'
+        with patch.multiple(main, agy_placement=None, get_db=self.fixture.database,
+                credential_ownership=None, cc2api_client=self.runtime.gateway):
+            self.assertEqual(self.client.post(path).status_code, 401)
+            self.assertIsNone(lookup(self.runtime, account_id))
+            registered = self.client.post(path, headers=self.headers)
+            self.assertEqual(registered.status_code, 200, registered.text)
+            self.assertEqual(registered.json()['state'], 'registered')
+            self.assertEqual(self.client.post(path, headers=self.headers).json(), registered.json())
+            with patch('agy_environment.transport', side_effect=RuntimeCapacityUnavailable('合成名额已用完')) as prepare:
+                waiting = self.client.post(path + '?prepare=true', headers=self.headers)
+                prepare.assert_called_once_with(self.runtime, account_id, wake=True, allow_eviction=False)
+            self.assertEqual(waiting.status_code, 200, waiting.text)
+            self.assertEqual(waiting.json()['reason'], 'waiting_capacity')
+            observations.append({'account_id': account_id, **waiting.json()})
+            listed = self.client.get('/api/environments', headers=self.headers)
+            self.assertEqual(listed.status_code, 200, listed.text)
+            card, = [row for row in listed.json() if row.get('gateway_account_id') == account_id]
+            self.assertEqual(card['gateway_account_name'], '合成 Ultra')
+            self.assertEqual(card['environment_id'], registered.json()['environment_id'])
+            self.assertEqual(card['agy_runtime']['state'], 'unprepared')
+            self.assertEqual(card['agy_runtime']['preparation_reason'], 'waiting_capacity')
+            observations[0].update(generation=1, state='failed', reason='agy_warm_failed')
+            cards = self.client.get('/api/environments', headers=self.headers).json()
+            card, = [row for row in cards if row.get('gateway_account_id') == account_id]
+            self.assertEqual(card['agy_runtime']['state'], 'unprepared')
+            self.assertNotIn('preparation_reason', card['agy_runtime'])
 
 
 if __name__=='__main__':unittest.main()

@@ -179,6 +179,10 @@ class RuntimeBusy(ValueError):
     """低优先级作业遇到正式工作时顺延，不能记为认证或任务失败。"""
 
 
+class RuntimeCapacityUnavailable(RuntimeBusy):
+    """当前节点的后台启动名额已用满。"""
+
+
 def active_account_environments(client, deployment: str, node_key: str | None) -> set[str]:
     """统计所属节点实际占用的账号角色。@param client 节点 Docker。@param deployment 部署。@param node_key 远程节点。@return 活动环境身份。"""
     running = client.containers.list(filters={"label": ["vibebench.product=v3", f"vibebench.deployment={deployment}"]})
@@ -2977,7 +2981,7 @@ class AccountRuntime:
         if requested["environment_id"] in active_environments or len(active_environments) < self.limit:
             return
         if not allow_eviction:
-            raise RuntimeBusy("后台预启动跳过：当前没有空余账号环境容量")
+            raise RuntimeCapacityUnavailable("后台预启动跳过：当前没有空余账号环境容量")
         connection = self.database()
         try:
             rows = [dict(row) for row in connection.execute("SELECT * FROM account_environments")]

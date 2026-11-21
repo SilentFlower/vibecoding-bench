@@ -645,7 +645,7 @@ pub struct GatewayService {
     disabled_thinking_rewrite: RwLock<DisabledThinkingRewrite>,
     assistant_prefill_intercept_config: RwLock<AssistantPrefillInterceptConfig>,
     rate_limit_request_log_config: RwLock<RateLimitRequestLogConfig>,
-    request_diagnostics_config: RwLock<RequestDiagnosticsConfig>,
+    request_diagnostics_config: Arc<RwLock<RequestDiagnosticsConfig>>,
     non_stream_probe_cache_config: RwLock<NonStreamProbeCacheConfig>,
     non_stream_probe_cache: RwLock<HashMap<String, CachedProbeResponse>>,
     stream_stability_config: RwLock<StreamStabilityConfig>,
@@ -699,10 +699,14 @@ impl GatewayService {
         cache: Arc<dyn CacheStore>,
         usage_store: Arc<UsageStore>,
     ) -> Self {
+        let request_diagnostics_config = Arc::new(RwLock::default());
         Self {
             native_signature_repairs: NativeSignatureRepairs::default(),
             session_policy_block_svc: Arc::new(SessionPolicyBlockService::new(&settings_store)),
-            native_prewarmer: NativePrewarmer::new(account_svc.clone()),
+            native_prewarmer: NativePrewarmer::new(
+                account_svc.clone(),
+                request_diagnostics_config.clone(),
+            ),
             account_svc,
             rewriter,
             telemetry_svc,
@@ -744,7 +748,7 @@ impl GatewayService {
                 default_assistant_prefill_intercept_config(),
             ),
             rate_limit_request_log_config: RwLock::new(default_rate_limit_request_log_config()),
-            request_diagnostics_config: RwLock::default(),
+            request_diagnostics_config,
             non_stream_probe_cache_config: RwLock::new(default_non_stream_probe_cache_config()),
             non_stream_probe_cache: RwLock::new(HashMap::new()),
             stream_stability_config: RwLock::new(default_stream_stability_config()),

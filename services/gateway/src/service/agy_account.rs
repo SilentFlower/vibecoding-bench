@@ -7,22 +7,19 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use super::{
-    AccountService, CredentialActivity, DEFAULT_REQUEST_SLOT_UNITS, OAUTH_LOCK_TTL, OAUTH_WAIT_ATTEMPTS,
-    OAUTH_WAIT_RETRY, build_oauth_credential_snapshot, validate_account_usage_limits,
+    AccountService, CredentialActivity, DEFAULT_REQUEST_SLOT_UNITS, OAUTH_LOCK_TTL,
+    OAUTH_WAIT_ATTEMPTS, OAUTH_WAIT_RETRY, build_oauth_credential_snapshot,
+    validate_account_usage_limits,
 };
 use crate::error::AppError;
 use crate::model::account::{Account, AccountAuthType, AccountStatus};
 use crate::model::api_token::ApiToken;
 use crate::model::proxy::ProxyConnection;
 use crate::model::request_diagnostics::DiagnosticParameters;
-use crate::service::agy_contract::{AGY_REQUEST_SECONDS, AgyAccessSnapshot, AgyModelId};
+use crate::service::agy_contract::{AGY_ACCESS_VALIDITY_SECONDS, AgyAccessSnapshot, AgyModelId};
 use crate::service::runtime_bridge::{agy_capacity, agy_request};
 use crate::service::v3_scheduling::{SchedulingCandidate, SchedulingRequest};
 use tokio::time::sleep;
-
-// AGY 1.5.9 离线启动实测在剩余 299 秒时要求登录，310 秒时可就绪。
-// 预留原请求预算，避免无刷新令牌的业务进程在准备或执行时触及该窗口。
-const AGY_ACCESS_VALIDITY_SECONDS: i64 = 310 + AGY_REQUEST_SECONDS;
 
 /// 在网关提交期间持有本账号操作，丢失调用方或进程重启后可按已保存值收口。
 struct AgyCapacityEdit<'a> {

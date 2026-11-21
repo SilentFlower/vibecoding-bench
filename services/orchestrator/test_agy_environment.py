@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from account_runtime import AccountRuntime, derive_v3_fingerprint
-from agy_environment import SOURCE_SHA256, capture, lookup, lookup_environment, maintenance, quiesce, register, sender_config, summary, transport
+from agy_environment import BackgroundPreparationDeferred, SOURCE_SHA256, background_wake, capture, lookup, lookup_environment, maintenance, quiesce, register, register_ready, sender_config, stop_environment, summary, transport
 from agy_kernel import activate, catalog, module_root, selection, stage, work_root
 from agy_tool_continuation import configured_binding, read_policy, save_policy
 from cluster_service import ClusterService
@@ -85,6 +85,8 @@ class AgyEnvironmentTests(unittest.TestCase):
     def test_stopped_environment_shows_configured_local_node(self):
         """停止的环境也显示本机归属，实际进程状态沿原取值。@return 无。"""
         row = register(self.runtime, 17)
+        with patch.object(self.runtime, '_stop_environment'):
+            stop_environment(self.runtime, row, remove=False)
         connection = self.database()
         try:
             connection.execute("UPDATE cluster_nodes SET name=? WHERE node_key='local'", ('合成中央节点',))
@@ -97,6 +99,41 @@ class AgyEnvironmentTests(unittest.TestCase):
         self.assertEqual(result['node'], {'node_id': node_id, 'node_key': 'local',
             'node_name': '合成中央节点', 'kind': 'local', 'enabled': True})
         self.assertEqual(result['agy_runtime']['state'], 'sleeping')
+
+    def test_ready_gateway_accounts_share_default_binding_and_stop_retires_initial_preparation(self):
+        """并发默认登记及业务登记复用唯一环境，显式停止收口首启资格。@return 无。"""
+        config = {'account_id': 17, 'platform': 'antigravity', 'auth_type': 'oauth', 'status': 'active',
+            'api_accepting': True, 'work_enabled': True, 'credential_state': {'phase': 'ready'}}
+        self.runtime.gateway._request.return_value = {**config, 'credential_state': {'phase': 'reauth'}}
+        with self.assertRaisesRegex(ValueError, '凭据尚未就绪'):
+            register_ready(self.runtime, 17)
+        self.assertIsNone(lookup(self.runtime, 17))
+        self.runtime.gateway._request.return_value = config
+        start = threading.Barrier(2)
+        rows = []
+
+        def create(register_account):
+            start.wait(2)
+            rows.append(register_account(self.runtime, 17))
+
+        threads = [threading.Thread(target=create, args=(entry,)) for entry in (register_ready, register)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(2)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]['environment_id'], rows[1]['environment_id'])
+        row = rows[0]
+        self.assertTrue(background_wake(row, config))
+        self.assertEqual(summary(self.runtime, row)['agy_runtime']['state'], 'unprepared')
+        with self.assertRaisesRegex(BackgroundPreparationDeferred, 'account_disabled'):
+            background_wake(row, {**config, 'work_enabled': False})
+        with patch.object(self.runtime, '_stop_environment'):
+            stop_environment(self.runtime, row, remove=True, retire_initial=False)
+            self.assertTrue(background_wake(row, config))
+            stop_environment(self.runtime, row, remove=False)
+        with self.assertRaisesRegex(BackgroundPreparationDeferred, 'environment_stopped'):
+            background_wake(register_ready(self.runtime, 17), config)
 
     def test_finite_resources_stay_inside_original_total(self):
         """AGY物理进程上限沿账号并发，有限RAM不足在创建前拒绝。@return 无。"""

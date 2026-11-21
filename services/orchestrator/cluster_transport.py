@@ -22,7 +22,7 @@ _METHODS = {'internal/send': 'POST', 'internal/native/status': 'GET', 'internal/
     'internal/native/prepare-switch': 'POST', 'internal/native/prepare/cancel': 'POST',
     'internal/native/messages': 'POST', 'internal/status': 'GET'}
 _AGY_METHODS = {'internal/agy/prepare': 'POST', 'internal/agy/generate': 'POST',
-    'internal/agy/tools': 'POST', 'internal/agy/cancel': 'POST', 'internal/status': 'GET'}
+    'internal/agy/tools': 'POST', 'internal/agy/cancel': 'POST', 'internal/agy/warm': 'POST', 'internal/status': 'GET'}
 _HOP_HEADERS = {b'connection', b'keep-alive', b'proxy-authenticate', b'proxy-authorization',
     b'te', b'trailer', b'transfer-encoding', b'upgrade', b'host', b'x-v3-relay-token'}
 

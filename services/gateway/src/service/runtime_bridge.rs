@@ -10,6 +10,7 @@ use axum::{Json, Router};
 use futures_util::{SinkExt, StreamExt};
 use reqwest::redirect::Policy;
 use reqwest::{Client, Error as ReqwestError};
+use serde::Deserialize;
 use serde_json::{Value, json};
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -23,12 +24,81 @@ use crate::error::AppError;
 use crate::handler::router::AppState;
 use crate::model::proxy::ProxySyncTarget;
 use crate::service::runtime_lease::RuntimeLease;
+use crate::service::runtime_transport::{PreparedTransport, TransportBinding};
 use crate::store::proxy_store::ProxyRecord;
 
 mod task_proxy;
 
 const SESSION_TIMEOUT: Duration = Duration::from_secs(5);
 const STATUS_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// 编排器确认的环境登记和后台绑定结果。
+#[derive(Deserialize)]
+pub(super) struct AgyEnvironmentPreparation {
+    pub environment_id: String,
+    pub generation: u64,
+    pub state: String,
+    pub reason: Option<String>,
+    #[serde(skip)]
+    pub transport: Option<PreparedTransport>,
+}
+
+/// 读取当前权威账号的默认环境。@param account_id 网关账号。@param prepare 是否申请后台运行绑定。
+/// @param budget 剩余控制预算。@return 环境登记回执、当前绑定或者受控等待状态。
+pub(super) async fn agy_environment(
+    account_id: i64,
+    prepare: bool,
+    budget: Duration,
+) -> Result<AgyEnvironmentPreparation, AppError> {
+    #[derive(Deserialize)]
+    struct Reply {
+        #[serde(flatten)]
+        preparation: AgyEnvironmentPreparation,
+        binding: Option<TransportBinding>,
+    }
+
+    let (base, token, client) = config()?;
+    let failed = || AppError::ServiceUnavailable("agy_environment_unavailable".into());
+    let response = client
+        .post(format!("{base}/internal/v3/agy-environments/{account_id}"))
+        .query(&[("prepare", prepare)])
+        .bearer_auth(&token)
+        .timeout(if prepare {
+            budget
+        } else {
+            budget.min(SESSION_TIMEOUT)
+        })
+        .send()
+        .await
+        .map_err(|_| failed())?;
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Err(AppError::ServiceUnavailable(
+            "orchestrator_upgrade_required".into(),
+        ));
+    }
+    let Reply {
+        mut preparation,
+        binding,
+    } = response
+        .error_for_status()
+        .map_err(|_| failed())?
+        .json()
+        .await
+        .map_err(|_| failed())?;
+    if preparation.state == "bound" {
+        let binding = binding.ok_or_else(failed)?;
+        if !prepare
+            || binding.environment_id != preparation.environment_id
+            || binding.generation != preparation.generation
+        {
+            return Err(failed());
+        }
+        preparation.transport = Some(PreparedTransport::for_agy_preparation(
+            account_id, binding, client, &token,
+        )?);
+    }
+    Ok(preparation)
+}
 
 /// 核对维护前已经登记的 CLI 作业，拒绝旧 owner 的迟到重放。
 /// @param account_id 原账号。

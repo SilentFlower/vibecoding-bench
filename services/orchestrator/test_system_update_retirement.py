@@ -23,8 +23,9 @@ class RetirementTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             database = Path(folder) / 'bench.sqlite'
             with sqlite3.connect(database) as connection:
-                connection.executescript('CREATE TABLE account_environments(environment_id TEXT,account_id INTEGER,generation INTEGER,state TEXT);'
-                    "INSERT INTO account_environments VALUES('synthetic',1,7,'ready');"
+                connection.executescript('CREATE TABLE account_environments(environment_id TEXT,account_id INTEGER,'
+                    'fingerprint_json TEXT NOT NULL,generation INTEGER,state TEXT);'
+                    "INSERT INTO account_environments VALUES('synthetic',1,'{}',7,'ready');"
                     'CREATE TABLE accounts(id INTEGER);INSERT INTO accounts VALUES(1);')
 
             def connect():
@@ -99,7 +100,7 @@ class RetirementTests(unittest.TestCase):
                 # 反重力升级在停止旧发送器后清除监督器记录，重建才能正常唤醒。
                 with connect() as connection:
                     connection.executescript('CREATE TABLE platform_api_environments(gateway_account_id INTEGER,environment_id TEXT,platform TEXT);'
-                        "INSERT INTO account_environments VALUES('agy',NULL,8,'ready');"
+                        "INSERT INTO account_environments VALUES('agy',NULL,'{}',8,'ready');"
                         "INSERT INTO platform_api_environments VALUES(14,'agy','antigravity');")
                 target = Path(folder) / 'agy'
                 stale = target / 'runtime/native/agy/kernels/old/worker/supervisor.json'

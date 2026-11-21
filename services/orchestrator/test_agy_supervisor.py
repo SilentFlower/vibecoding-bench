@@ -75,8 +75,15 @@ class WorkerFixture:
         self.ready = {'source_sha256': owner.image_sha, 'native_pid': 123, 'observer_pid': 124}
         self.last_used = time.monotonic()
 
-    def start(self, until):
-        """记录真实建代顺序。@param until 截止。@return 无。"""
+    def _read_native_start(self):
+        return 'synthetic-start'
+
+    def running(self):
+        """返回合成原生进程存活状态。@return 是否运行中。"""
+        return self.process is not None and self.process.poll() is None
+
+    def start(self, until, cancelled=None):
+        """记录真实建代顺序。@param until 截止。@param cancelled 后台取消通知。@return 无。"""
         self.order.append(('start', self.generation))
         self.process = SimpleNamespace(pid=125, poll=lambda: 0 if self.closed else None)
         self.started_at = self.ready_at = time.monotonic()
@@ -151,6 +158,41 @@ class AgySupervisorTests(unittest.TestCase):
             'model': 'gemini-synthetic', 'native_model': 'MODEL_PLACEHOLDER_M36',
             'body': {'contents': [{'role': 'user', 'parts': [{'text': '合成问题'}]}]},
             'deadline_unix_ms': int((time.time() + 30) * 1000)}
+
+    def test_background_warm_reuses_one_worker_and_preserves_open_tool_turn(self):
+        """预热只建立一个实进程，新凭据重建时仍保持零模型提交。@return 无。"""
+        def warm(generation=1):
+            value = self.submission(generation=generation)
+            for field in ('api_token_id', 'model', 'native_model', 'body'):
+                value.pop(field)
+            value['type'] = 'warm'
+            self.supervisor.submit(value)
+            prepared = self.output.wait(value['request_id'], 'prepared')
+            self.assertEqual(self.output.wait(value['request_id'], 'job_finalized')['status'], 'prepared')
+            return prepared
+
+        with patch('agy_runtime.supervisor.Worker', WorkerFixture), patch.object(
+                self.supervisor, 'restore_available', return_value=True):
+            first = warm()
+            self.assertEqual(first['preparation_state'], 'ready')
+            self.assertEqual(warm()['native_pid'], first['native_pid'])
+            self.assertEqual(WorkerFixture.order, [('start', 1)])
+            self.assertEqual(self.supervisor.status()['idle_workers'], 1)
+            self.assertEqual(self.supervisor.status()['allocated_workers'], 1)
+            self.assertFalse(self.supervisor.workers[0].parked)
+
+            live = self.submission()
+            self.supervisor.submit(live)
+            self.output.wait(live['request_id'], 'completed')
+            self.assertEqual(warm()['preparation_state'], 'busy')
+            self.assertEqual(WorkerFixture.order, [('start', 1), ('model', 1)])
+            self.assertEqual(self.supervisor.status()['tool_waiting'], 1)
+
+            self.assertTrue(self.supervisor.cancel(live['request_id'], live['api_token_id']))
+            self.output.wait(live['request_id'], 'job_finalized')
+            self.assertEqual(warm(2)['preparation_state'], 'ready')
+            self.assertEqual(self.supervisor.status()['idle_identity'][0]['credential_generation'], 2)
+            self.assertEqual([item for item in WorkerFixture.order if item[0] == 'model'], [('model', 1)])
 
     def test_v1_finite_and_unlimited_budgets_pass_supervisor_admission(self):
         """真实v1文件读取结果进入监督器准入，有限和明确无限均保持可用。@return 无。"""

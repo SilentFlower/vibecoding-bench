@@ -23,6 +23,11 @@ from runtime_names import account_container_prefix
 from system_update_gate import update_open
 
 SOURCE_SHA256 = '39816d49d5ab92229952987225c23ea3fed7580699dcb4a444e0388e0ac1ce43'
+INITIAL_PREPARATION = 'agy_initial_preparation_pending'
+
+
+class BackgroundPreparationDeferred(ValueError):
+    """等待当前账号、环境或节点重新具备后台准备资格。"""
 
 
 def sender_config(configuration: dict, fingerprint: dict, labels: dict) -> dict:
@@ -93,6 +98,7 @@ def summary(runtime, row: dict) -> dict:
     """复用环境卡片并只读实际发送器观测。@param runtime 现有运行时。@param row AGY归属环境。@return 脱敏环境投影。"""
     result=dict(row)
     result['fingerprint']=json.loads(result.pop('fingerprint_json'))
+    initial_preparation = result['fingerprint'].pop(INITIAL_PREPARATION, False) is True
     connection = runtime.database()
     try:
         # 网关账号 ID 与任务账号 ID 各自独立。AGY 的执行归属取固定本机节点。
@@ -107,7 +113,8 @@ def summary(runtime, row: dict) -> dict:
         can_reprofile=False,reprofile_message='AGY环境按网关账号管理',identity_status='AGY账号独立OAuth HOME',
         native_preparation=None,native_kernel=None,native_kernels=None,cli_versions=[],criu=None,
         platform_release=runtime.release_id,content_capture=capture(runtime,row),busy=False)
-    result['agy_runtime']={'version':'1.5.9','source_sha256':SOURCE_SHA256,'state':'sleeping' if row['state']=='stopped' else 'unknown'}
+    state = 'unprepared' if initial_preparation else 'sleeping' if row['state'] == 'stopped' else 'unknown'
+    result['agy_runtime']={'version':'1.5.9','source_sha256':SOURCE_SHA256,'state':state}
     criu_observation = None
     if result['role_status'].get('sender')=='running':
         try:
@@ -125,6 +132,7 @@ def summary(runtime, row: dict) -> dict:
                     'module_root':observed.get('module_root'),'restore':observed.pop('restore',None),
                     'checked_at_ms':time.time_ns()//1_000_000}
                 loaded = observed.pop('module_root', None)
+                observed.pop('idle_identity', None)
                 result['agy_runtime'].update(observed)
                 if loaded is not None:
                     result['agy_runtime']['loaded_kernel'] = kernel_id(loaded)
@@ -153,6 +161,7 @@ def register(runtime, gateway_id: int) -> dict:
             return row
         fingerprint = runtime.fingerprint(None)
         fingerprint.update(mem=default_account_memory(), swap=os.environ.get('V3_ACCOUNT_SWAP', '0'))
+        fingerprint[INITIAL_PREPARATION] = True
         account_limits(fingerprint['mem'], fingerprint['swap'])
         connection = runtime.database()
         try:
@@ -166,6 +175,38 @@ def register(runtime, gateway_id: int) -> dict:
         finally:
             connection.close()
         return lookup(runtime, gateway_id)
+
+
+def register_ready(runtime, gateway_id: int) -> dict:
+    """默认登记已保存且凭据就绪的 AGY 账号。@param runtime 现有编排器。@param gateway_id 网关账号。@return 唯一环境。"""
+    config = runtime.gateway._request('GET', f'/admin/runtime/accounts/{gateway_id}/config')
+    if (config.get('account_id') != gateway_id or config.get('platform') != 'antigravity' or config.get('auth_type') != 'oauth'
+            or config.get('credential_state', {}).get('phase') != 'ready'):
+        raise ValueError('AGY 账号凭据尚未就绪')
+    return register(runtime, gateway_id)
+
+
+def background_wake(row: dict, config: dict) -> bool:
+    """按原环境及网关门禁判定后台绑定用途。@param row 已锁定环境。@param config 当前账号配置。@return 首启为真，运行中为假。"""
+    if (config.get('status') != 'active' or config.get('api_accepting') is not True
+            or config.get('work_enabled') is not True):
+        raise BackgroundPreparationDeferred('account_disabled')
+    if config.get('credential_state', {}).get('phase') != 'ready':
+        raise BackgroundPreparationDeferred('credentials_not_ready')
+    if row['state'] == 'ready':
+        return False
+    if (row['state'] == 'stopped' and row['generation'] == 0
+            and json.loads(row['fingerprint_json']).get(INITIAL_PREPARATION) is True):
+        return True
+    raise BackgroundPreparationDeferred('environment_stopped' if row['state'] == 'stopped' else 'environment_unavailable')
+
+
+def _complete_initial_preparation(runtime, row: dict, state: str) -> None:
+    fingerprint = json.loads(row['fingerprint_json'])
+    if fingerprint.pop(INITIAL_PREPARATION, None) is not None:
+        runtime._update(row, state=state, fingerprint_json=json.dumps(fingerprint))
+    else:
+        runtime._update(row, state=state)
 
 
 def account_input(configuration: dict, row: dict) -> dict:
@@ -298,7 +339,7 @@ def transport(runtime, gateway_id: int, *, wake: bool = True, system_maintenance
                         runtime._update(row,state='reconcile')
                         raise ValueError('AGY发送器尚未就绪') from None
                     time.sleep(.1)
-            runtime._update(row,state='ready')
+            _complete_initial_preparation(runtime, row, 'ready')
         binding=runtime.read_sender_configuration(row)['binding']
         if binding['account_id']!=gateway_id or binding['environment_id']!=row['environment_id'] or binding['generation']!=row['generation'] or binding['release_id']!=role_release(runtime,row):
             raise ValueError('AGY传输绑定代次不一致')
@@ -325,12 +366,15 @@ def clear_work_copies(runtime, row: dict) -> None:
                 atomic_json(folder/'retired.json',{'retired_at':time.time()})
 
 
-def stop_environment(runtime, row: dict, *, remove: bool) -> None:
-    """在实际停止反重力角色后清理该环境的派生状态。@param runtime 现有运行时。@param row 已排空的环境。@param remove 是否移除已停止角色。@return 无。"""
+def stop_environment(runtime, row: dict, *, remove: bool, retire_initial: bool = True) -> None:
+    """在实际停止反重力角色后清理派生状态。@param runtime 现有运行时。@param row 已排空的环境。@param remove 是否移除原角色。@param retire_initial 是否结束首启资格。@return 无。"""
     runtime._stop_environment(row,remove=remove)
     # Docker 停机可能直接终止监督进程。旧启动记录属于已停止的进程，会误拦后续唤醒。
     clear_work_copies(runtime,row)
-    runtime._update(row,state='stopped')
+    if retire_initial:
+        _complete_initial_preparation(runtime, row, 'stopped')
+    else:
+        runtime._update(row, state='stopped')
 
 
 def quiesce(runtime, row: dict, proof: dict) -> None:
@@ -342,7 +386,8 @@ def quiesce(runtime, row: dict, proof: dict) -> None:
             raise ValueError('AGY配置事务许可已变化')
         if runtime._running_sender_active(row):
             raise ValueError('AGY原生请求或工具轮仍在执行')
-        stop_environment(runtime,row,remove=True)
+        # 配置事务完成后，新登记的环境仍能使用更新后的配置首次启动。
+        stop_environment(runtime, row, remove=True, retire_initial=False)
 
 
 def maintenance(runtime, row: dict, operation: str) -> None:

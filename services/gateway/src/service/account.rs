@@ -22,6 +22,7 @@ use crate::model::account::{
 use crate::model::credential_ownership::CredentialOwnershipInput;
 use crate::service::account_work::{AccountWorkAdmission, AccountWorkControls};
 use crate::service::rewriter::ClientType;
+use crate::service::runtime_bridge::agy_environment;
 use crate::service::runtime_lease::RuntimeGate;
 use crate::service::v3_scheduling::{
     PhaseCounts, SchedulingAccountSummary, SchedulingCandidate, SchedulingConfig,
@@ -826,7 +827,18 @@ impl AccountService {
     pub async fn create_account(&self, a: &mut Account) -> Result<(), AppError> {
         if a.is_antigravity() {
             self.verify_agy_account(a).await?;
-            return self.store.create(a).await;
+            self.store.create(a).await?;
+            if std::env::var("V3_RUNTIME_URL").is_ok_and(|value| !value.is_empty()) {
+                // 账号已经提交，编排器暂时不可用时由后续巡检补登记。
+                if agy_environment(a.id, false, Duration::from_secs(5))
+                    .await
+                    .is_err()
+                {
+                    warn!(account_id = a.id, "AGY运行环境待后台补登记");
+                }
+                self.notify_native_change(a.id, false);
+            }
+            return Ok(());
         }
         if !a.is_claude_code() {
             return Err(AppError::BadRequest("未知账号平台".into()));

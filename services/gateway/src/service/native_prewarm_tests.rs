@@ -118,7 +118,7 @@ async fn maintenance_waits_without_failure_and_reopens_promptly() {
         "canonical_env":{},"canonical_prompt_env":{},"canonical_process":{},"billing_mode":"strip",
         "request_backend":"native293","created_at":"2026-11-13T00:00:00Z","updated_at":"2026-11-13T00:00:00Z"})).unwrap();
     store.create(&mut account).await.unwrap();
-    let prewarmer = NativePrewarmer::new(accounts.clone());
+    let prewarmer = NativePrewarmer::new(accounts.clone(), Default::default());
     prewarmer.start_with_retries([0, 1, 2]);
     let status = wait_state(&prewarmer, account.id, "maintenance", None).await;
     assert_eq!(status["reason"], "system_maintenance");
@@ -206,7 +206,7 @@ async fn maintenance_waits_without_failure_and_reopens_promptly() {
 
     drop(prewarmer);
     yield_now().await;
-    let prewarmer = NativePrewarmer::new(accounts.clone());
+    let prewarmer = NativePrewarmer::new(accounts.clone(), Default::default());
     prewarmer.start_with_retries([0, 1, 2]);
     wait_state(&prewarmer, account.id, "failed", None).await;
     assert_eq!(calls.load(Ordering::SeqCst), 2);
@@ -218,7 +218,7 @@ async fn maintenance_waits_without_failure_and_reopens_promptly() {
     drop(prewarmer);
     yield_now().await;
     failing.store(true, Ordering::SeqCst);
-    let prewarmer = NativePrewarmer::new(accounts.clone());
+    let prewarmer = NativePrewarmer::new(accounts.clone(), Default::default());
     prewarmer.start_with_retries([0, 1, 2]);
     let failed = wait_state(&prewarmer, account.id, "failed", None).await;
     assert_eq!(calls.load(Ordering::SeqCst), 4);
@@ -381,7 +381,7 @@ async fn maintenance_waits_without_failure_and_reopens_promptly() {
         set_var("V3_ACCOUNT_RELEASE", "system-ci-1-1");
     }
     let server = spawn(async move { serve(listener, router).await.unwrap() });
-    let prewarmer = NativePrewarmer::new(accounts.clone());
+    let prewarmer = NativePrewarmer::new(accounts.clone(), Default::default());
     prewarmer.start_with_retries([3600, 7200, 10800]);
     timeout(Duration::from_secs(10), submitted_signal.notified())
         .await

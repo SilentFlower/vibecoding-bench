@@ -9,7 +9,7 @@ import { SearchInput } from './ui/controls';
 import { ConfirmationDialog } from './ui/feedback';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { runtimeRequest, type RuntimeEnvironment, type CpuResources } from './runtime/runtimeApi';
-import { preparationReasons, criuStates } from './runtime/environmentLabels';
+import { agyPreparationReasons, preparationReasons, criuStates } from './runtime/environmentLabels';
 import EnvironmentResources from './runtime/EnvironmentResources.vue';
 import ExecutionNodeBadge from './runtime/ExecutionNodeBadge.vue';
 import PlatformBadge from './PlatformBadge.vue';
@@ -50,12 +50,33 @@ function tone(row:RuntimeEnvironment):string{return row.state==='ready'?'healthy
 /** 当前已生效的开关状态。@param value 状态。@return 文案。 */
 function featureLabel(value:RuntimeEnvironment['criu']):string{return value?.applied===true?(value.enabled?'已开启':'已关闭'):value?.applied===false?'待应用':'待核对';}
 /** 区分首轮快照、真实失败及过期结果。@param row 环境。@return 当前准备状态。 */
-function preparationLabel(row:RuntimeEnvironment):string{if(row.platform==='antigravity'){if(row.agy_runtime?.warming_workers)return'正在预热';if(row.agy_runtime?.tool_waiting)return'等待工具结果';if(row.agy_runtime?.state==='ready'&&agyIdleWorkers(row)===0)return'等待准备';return ({ready:'热进程就绪',busy:'执行中',unprepared:'等待准备',sleeping:'环境休眠',reconcile:'待对账',unknown:'状态待核对'} as Record<string,string>)[row.agy_runtime?.state??'unknown']||'状态待核对';}const value=row.native_preparation;if(!value)return'准备状态待核对';if(value.state==='unknown'){if(['snapshot_pending','snapshot_missing'].includes(value.reason??''))return value.checking?'正在检查':'等待快照';if(value.reason==='check_expired')return'检查已过期';return'状态待核对';}return prepNames[value.state]||'未知状态';}
+function preparationLabel(row:RuntimeEnvironment):string{
+ if(row.platform==='antigravity'){
+  const runtime=row.agy_runtime;
+  if(runtime?.tool_waiting)return '等待工具结果';
+  if(runtime?.warming_workers)return '正在预热';
+  const labels:Record<string,string>={busy:'执行中',unprepared:'等待准备',preparing:'正在预热',
+   failed:'准备失败',disabled:'账号已停用',sleeping:'环境休眠',reconcile:'待对账'};
+  const idle=agyIdleWorkers(row);
+  const label=runtime?.state==='ready'?(idle===undefined?'状态待核对':idle>0?'热进程就绪':'等待准备'):
+   labels[runtime?.state??'']??'状态待核对';
+  const reason=agyPreparationReasons[runtime?.preparation_reason??''];
+  return reason&&label!==reason?`${label} · ${reason}`:label;
+ }
+ const value=row.native_preparation;
+ if(!value)return '准备状态待核对';
+ if(value.state==='unknown'){
+  if(['snapshot_pending','snapshot_missing'].includes(value.reason??''))return value.checking?'正在检查':'等待快照';
+  if(value.reason==='check_expired')return '检查已过期';
+  return '状态待核对';
+ }
+ return prepNames[value.state]||'未知状态';
+}
 /** 优先展示发送器核验的空闲进程数。@param row 环境。@return 空闲数或未知。 */
 function agyIdleWorkers(row:RuntimeEnvironment):number|undefined{
  const runtime=row.agy_runtime;
  if(runtime?.idle_workers!=null)return runtime.idle_workers;
- if(runtime?.workers!=null&&runtime.active!=null)return Math.max(0,runtime.workers-runtime.active);
+ if(runtime?.workers===0)return 0;
  return undefined;
 }
 /** 显示实际加载的候选摘要或平台运行内核。@param row 环境。@return 内核摘要。 */

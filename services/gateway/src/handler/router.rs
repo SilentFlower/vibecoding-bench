@@ -788,8 +788,10 @@ async fn runtime_account_config(
 ) -> Result<Json<serde_json::Value>, AppError> {
     let account = state.account_svc.get_account(id).await?;
     if account.is_antigravity() {
+        let work = state.account_svc.work_controls.snapshot(id).await?;
         let mut configuration = json!({"account_id":account.id,"platform":account.platform,"proxy_url":account.proxy_url,
             "auth_type":account.auth_type,"status":account.status,"email":account.email,"concurrency":account.concurrency,
+            "work_enabled":work.work_enabled,"api_accepting":work.api_accepting,
             "request_backend":"agy159","credential_state":state.account_svc.agy_state(id).await?});
         if let Some(operation) = query.capacity_operation {
             configuration["capacity_edit_active"] =
@@ -1109,13 +1111,16 @@ async fn update_account_work(
     headers: HeaderMap,
     Json(input): Json<AccountWorkUpdate>,
 ) -> Result<Json<AccountWorkSnapshot>, AppError> {
-    state.account_svc.get_account(id).await?;
+    let account = state.account_svc.get_account(id).await?;
     if input.work_enabled.is_some()
         && std::env::var("V3_RUNTIME_URL").is_ok_and(|value| !value.is_empty())
     {
         require_v3_credential_service(&headers)?;
     }
     let snapshot = state.account_svc.work_controls.update(id, input).await?;
+    if account.is_antigravity() {
+        state.account_svc.notify_native_change(id, true);
+    }
     Ok(Json(snapshot))
 }
 
@@ -2992,7 +2997,7 @@ async fn native_preparation_snapshots(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<serde_json::Value>>, AppError> {
     let snapshots = state.gateway_svc.native_preparation_snapshots();
-    let accounts = state.account_svc.list_accounts().await?;
+    let accounts = state.account_svc.list_platform_accounts().await?;
     Ok(Json(
         accounts
             .into_iter()
@@ -3002,7 +3007,11 @@ async fn native_preparation_snapshots(
                     .find(|item| item["account_id"] == account.id)
                     .cloned()
                     .unwrap_or_else(|| json!({"account_id":account.id,"state":"unprepared"}));
-                value["request_backend"] = json!(account.request_backend);
+                value["request_backend"] = if account.is_antigravity() {
+                    json!("agy159")
+                } else {
+                    json!(account.request_backend)
+                };
                 value
             })
             .collect(),

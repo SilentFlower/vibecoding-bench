@@ -142,6 +142,13 @@ async def main() -> None:
     try:
         completed, _ = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
         business_exited = pending[0] in completed
+        if agy is not None and not business_exited and sender.returncode is None:
+            # Docker 原停止时间为 5 秒，先传递正常退出并留出强制收口时间。
+            try:
+                signal.pidfd_send_signal(sender_fd, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            await asyncio.wait(pending[:1], timeout=4)
     finally:
         if serving:
             serving.cancel()

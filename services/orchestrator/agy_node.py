@@ -8,7 +8,7 @@ from pathlib import Path
 from pydantic import Field, StrictStr
 
 from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, role_container
-from account_runtime import _read_json, active_account_environments
+from account_runtime import RuntimeCapacityUnavailable, _read_json, active_account_environments
 from account_update_identity import configured_release
 from agy_capacity import CapacityError, _receipt as capacity_receipt, change_capacity
 from agy_environment import account_input, capture, lookup, sender_config, stop_environment, summary, transport
@@ -182,7 +182,10 @@ class AgyNode:
     def _prepare(self, request):
         with self.executor._locked(environment_id=request.environment_id), self.executor._locked(), self._runtime(request) as runtime:
             self._row(runtime, request, ready=True, recover_preparation=True)
-            binding = transport(runtime, request.account_id, wake=request.wake, allow_eviction=False)
+            try:
+                binding = transport(runtime, request.account_id, wake=request.wake, allow_eviction=False)
+            except RuntimeCapacityUnavailable:
+                return {**self._prepared(runtime, request, None), 'preparation_reason': 'waiting_capacity'}
             return self._prepared(runtime, request, binding)
 
     def _prepared(self, runtime, request, binding):
@@ -247,7 +250,7 @@ class AgyNode:
                 if runtime._running_sender_active(row) and (action != 'reconcile'
                         or summary(runtime, row).get('reconcile_allowed') is not True):
                     raise ValueError('AGY 原发送器仍有活动')
-                stop_environment(runtime, row, remove=action != 'stop')
+                stop_environment(runtime, row, remove=action != 'stop', retire_initial=action != 'quiesce')
                 result = {'ok': True}
             return {'protocol': 1, **request.model_dump(include=set(AgyLocation.model_fields)),
                 'value': result, 'environment': row}

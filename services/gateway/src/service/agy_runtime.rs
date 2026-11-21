@@ -25,7 +25,9 @@ use tokio_stream::wrappers::ReceiverStream;
 use uuid::Uuid;
 
 use crate::error::AppError;
-use crate::service::agy_contract::{AgyOperation, AgySubmission, AgyToolCompletion};
+use crate::service::agy_contract::{
+    AgyOperation, AgySubmission, AgyToolCompletion, AgyWarmPreparation,
+};
 use crate::service::runtime_transport::{SenderConfig, now_ms, read_config};
 
 /// 单账号监督进程池；热配置更换前要求原活动已收口。
@@ -248,6 +250,18 @@ impl Drop for CancelOnDrop {
 }
 
 impl AgyPool {
+    /// 发送器停止接单后关闭空闲监督器。@return 实际进程退出，活动业务保留原对账保护。
+    pub(super) async fn shutdown_idle(&self) {
+        let state = self.controller.lock().await;
+        let Some(controller) = state.as_ref() else {
+            return;
+        };
+        let idle = controller.active.lock().await.is_empty();
+        if idle {
+            controller.stop().await;
+        }
+    }
+
     /// 请求监督器取消原私有请求。@param request_id 原尝试身份。@param api_token_id 原调用方。@return 取消指令是否已登记。
     pub(crate) async fn cancel(&self, request_id: &str, api_token_id: i64) -> Result<(), AppError> {
         let controller = self.controller.lock().await.clone();
@@ -482,36 +496,8 @@ impl AgyPool {
         operation: AgyOperation,
     ) -> Result<Response, AppError> {
         submission.validate(now_ms())?;
-        let controller = timeout_at(deadline, self.controller(config, config_path))
-            .await
-            .map_err(|_| unavailable())??;
-        let (sender, receiver) = mpsc::channel(16);
-        let complete = Arc::new(AtomicBool::new(false));
-        let request_id = submission.request.request_id.clone();
-        {
-            let mut requests = controller.requests.lock().await;
-            if requests.contains_key(&request_id)
-                || controller.active.lock().await.contains(&request_id)
-            {
-                return Err(AppError::BadRequest("AGY请求已经登记".into()));
-            }
-            requests.insert(
-                request_id.clone(),
-                Subscriber {
-                    sender,
-                    api_token_id: submission.api_token_id,
-                },
-            );
-            controller.active.lock().await.insert(request_id.clone());
-        }
-        let guard = CancelOnDrop {
-            controller: controller.clone(),
-            request_id: request_id.clone(),
-            api_token_id: submission.api_token_id,
-            complete,
-        };
         let mut value = json!({"schema_version":1,"type":operation.supervisor_command(),
-            "request_id":request_id,"account_id":submission.request.account_id,
+            "request_id":submission.request.request_id,"account_id":submission.request.account_id,
             "environment_id":submission.request.environment_id,"environment_generation":submission.request.generation,
             "api_token_id":submission.api_token_id,"credential_snapshot":submission.credential_snapshot,
             "model":submission.model,"native_model":submission.native_model,"body":submission.body,
@@ -529,6 +515,70 @@ impl AgyPool {
         if submission.disable_safety_filtering {
             value["disable_safety_filtering"] = Value::Bool(true);
         }
+        self.run_job(
+            config,
+            config_path,
+            submission.request.request_id,
+            submission.api_token_id,
+            value,
+            deadline,
+        )
+        .await
+    }
+
+    /// 在同池准备实际空闲进程。@param config 当前配置。@param config_path 私有配置入口。
+    /// @param input 预热归属及 AT 快照。@param deadline 原单调截止。@return 私有终态事件流。
+    pub(super) async fn warm(
+        &self,
+        config: &SenderConfig,
+        config_path: &str,
+        input: AgyWarmPreparation,
+        deadline: Instant,
+    ) -> Result<Response, AppError> {
+        let value = json!({"schema_version":1,"type":"warm","request_id":input.request_id,
+            "account_id":input.account_id,"environment_id":input.environment_id,
+            "environment_generation":input.generation,"credential_snapshot":input.credential_snapshot,
+            "deadline_unix_ms":input.deadline_unix_ms,"capture_enabled":input.capture_enabled});
+        // 零只用于服务作业的撤销归属。业务私有入口要求正调用方 ID。
+        self.run_job(config, config_path, input.request_id, 0, value, deadline)
+            .await
+    }
+
+    async fn run_job(
+        &self,
+        config: &SenderConfig,
+        config_path: &str,
+        request_id: String,
+        api_token_id: i64,
+        value: Value,
+        deadline: Instant,
+    ) -> Result<Response, AppError> {
+        let controller = timeout_at(deadline, self.controller(config, config_path))
+            .await
+            .map_err(|_| unavailable())??;
+        let (sender, receiver) = mpsc::channel(16);
+        {
+            let mut requests = controller.requests.lock().await;
+            if requests.contains_key(&request_id)
+                || controller.active.lock().await.contains(&request_id)
+            {
+                return Err(AppError::BadRequest("AGY请求已经登记".into()));
+            }
+            requests.insert(
+                request_id.clone(),
+                Subscriber {
+                    sender,
+                    api_token_id,
+                },
+            );
+            controller.active.lock().await.insert(request_id.clone());
+        }
+        let guard = CancelOnDrop {
+            controller: controller.clone(),
+            request_id: request_id.clone(),
+            api_token_id,
+            complete: Arc::new(AtomicBool::new(false)),
+        };
         if let Err(error) = controller.send(&value).await {
             controller.requests.lock().await.remove(&request_id);
             return Err(error);
@@ -600,7 +650,7 @@ impl AgyPool {
                 requires_reconciliation(Path::new(&agy.work_root)).unwrap_or(true)
             });
             return json!({"state":if stale {"reconcile"} else {"unprepared"},
-                "capacity_protocol":1,"workers":0,"allocated_workers":0,"active":0,
+                "capacity_protocol":1,"workers":0,"allocated_workers":0,"active":0,"idle_workers":0,
                 "max_workers":config.agy.as_ref().map(|agy| agy.max_workers)});
         };
         if controller.closed.load(Ordering::Acquire) {

@@ -13,6 +13,9 @@ pub const AGY_SOURCE_SHA256: &str =
 /// 公共生成请求共用的原生执行预算。
 pub(super) const AGY_REQUEST_SECONDS: i64 = 120;
 
+/// 原版在 AT 剩余 310 秒时可离线启动，另预留一次完整原生请求时长。
+pub(super) const AGY_ACCESS_VALIDITY_SECONDS: i64 = 310 + AGY_REQUEST_SECONDS;
+
 /// 账号发送器中区分生成、预热和原版搜索的操作。
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum AgyOperation {
@@ -223,6 +226,19 @@ impl AgyAccessSnapshot {
         }
         Ok(())
     }
+}
+
+/// 服务间零模型准备信封，绑定当前环境及 AT 快照。
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct AgyWarmPreparation {
+    pub account_id: i64,
+    pub environment_id: String,
+    pub generation: u64,
+    pub request_id: String,
+    pub deadline_unix_ms: u64,
+    pub credential_snapshot: AgyAccessSnapshot,
+    pub capture_enabled: bool,
 }
 
 /// 网关在同次准入内冻结的Gemini请求，秘密仅传入账号发送器。
