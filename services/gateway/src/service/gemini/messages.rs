@@ -26,6 +26,7 @@ const IMAGE_BASE64: GeneralPurpose = GeneralPurpose::new(
     &alphabet::STANDARD,
     GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
 );
+const USER_PROMPT_SUBMIT_CONTEXT_PREFIX: &str = "UserPromptSubmit hook additional context: ";
 
 fn invalid(message: &str) -> AppError {
     AppError::BadRequest(message.into())
@@ -64,6 +65,16 @@ fn system_parts(value: &Value) -> Result<Vec<Value>, AppError> {
         .collect()
 }
 
+fn append_turn_context(contents: &mut [Value], turn_context: &mut Vec<Value>) {
+    if let Some(parts) = contents
+        .last_mut()
+        .filter(|content| content["role"] == "user")
+        .and_then(|content| content["parts"].as_array_mut())
+    {
+        parts.append(turn_context);
+    }
+}
+
 /// 投影已识别的 Messages 请求。@param request 原始请求。@return Gemini 正文。
 pub(super) fn convert_request(request: &Value) -> Result<Value, AppError> {
     let messages = request["messages"]
@@ -72,6 +83,7 @@ pub(super) fn convert_request(request: &Value) -> Result<Value, AppError> {
         .ok_or_else(|| invalid("Messages 历史为空或无效"))?;
     let mut contents = Vec::with_capacity(messages.len());
     let mut call_names = HashMap::new();
+    let mut turn_context = Vec::new();
     let mut system = request
         .get("system")
         .filter(|value| !value.is_null())
@@ -81,10 +93,26 @@ pub(super) fn convert_request(request: &Value) -> Result<Value, AppError> {
     for message in messages {
         let role = match message["role"].as_str() {
             Some("user") => "user",
-            Some("assistant") => "model",
+            Some("assistant") => {
+                append_turn_context(&mut contents, &mut turn_context);
+                "model"
+            }
             Some("system") => {
-                // Claude Code 可能将环境提示附在用户之后，Gemini 通过同一系统指令接收它。
-                system.extend(system_parts(&message["content"])?);
+                let has_user_turn = contents
+                    .last()
+                    .is_some_and(|content| content["role"] == "user");
+                for part in system_parts(&message["content"])? {
+                    if has_user_turn
+                        && part["text"]
+                            .as_str()
+                            .is_some_and(|text| text.starts_with(USER_PROMPT_SUBMIT_CONTEXT_PREFIX))
+                    {
+                        // 本轮钩子上下文排在工具结果之后，既保留回填边界，也保持全局缓存前缀稳定。
+                        turn_context.push(part);
+                    } else {
+                        system.push(part);
+                    }
+                }
                 continue;
             }
             _ => return Err(invalid("Messages 消息角色无效")),
@@ -159,6 +187,7 @@ pub(super) fn convert_request(request: &Value) -> Result<Value, AppError> {
         }
         contents.push(json!({"role": role, "parts": parts}));
     }
+    append_turn_context(&mut contents, &mut turn_context);
 
     if contents.is_empty() {
         return Err(invalid("Messages 缺少对话消息"));
@@ -557,8 +586,85 @@ pub(super) fn stream_response(
 
 #[cfg(test)]
 mod tests {
-    use super::{response_text, thinking_tier};
+    use super::{convert_request, response_text, thinking_tier};
     use serde_json::json;
+
+    #[test]
+    fn messages_prompt_hook_keeps_system_and_tool_continuation_prefix_stable() {
+        let main = json!({
+            "system": "固定规则",
+            "messages": [
+                {"role": "user", "content": "查询项目资料"},
+                {"role": "system", "content": "项目环境"}
+            ]
+        });
+        let previous = convert_request(&main).unwrap();
+        assert_eq!(
+            previous["systemInstruction"]["parts"],
+            json!([{"text": "固定规则"}, {"text": "项目环境"}])
+        );
+        let context = "UserPromptSubmit hook additional context: 当前没有活跃任务。";
+        for hook_content in [json!(context), json!([{"type": "text", "text": context}])] {
+            let mut continuation = main.clone();
+            continuation["messages"].as_array_mut().unwrap().extend([
+                json!({"role": "assistant", "content": [
+                    {"type": "tool_use", "id": "search", "name": "WebSearch", "input": {}},
+                    {"type": "tool_use", "id": "read", "name": "Read", "input": {}}
+                ]}),
+                json!({"role": "user", "content": [
+                    {"type": "tool_result", "tool_use_id": "read", "content": "读取结果"},
+                    {"type": "tool_result", "tool_use_id": "search", "content": "搜索结果"}
+                ]}),
+                json!({"role": "system", "content": hook_content}),
+            ]);
+            let converted = convert_request(&continuation).unwrap();
+            let contents = converted["contents"].as_array().unwrap();
+            let prefix = previous["contents"].as_array().unwrap();
+            assert_eq!(
+                converted["systemInstruction"],
+                previous["systemInstruction"]
+            );
+            assert_eq!(contents.len(), prefix.len() + 2);
+            assert_eq!(&contents[..prefix.len()], prefix);
+            assert_eq!(
+                contents.last().unwrap(),
+                &json!({"role": "user", "parts": [
+                    {"functionResponse": {"id": "read", "name": "Read", "response": {"result": "读取结果"}}},
+                    {"functionResponse": {"id": "search", "name": "WebSearch", "response": {"result": "搜索结果"}}},
+                    {"text": context}
+                ]})
+            );
+        }
+    }
+
+    #[test]
+    fn messages_prompt_hook_follows_split_tool_results_in_history() {
+        let context = "UserPromptSubmit hook additional context: 追加任务状态。";
+        let request = json!({"messages": [
+            {"role": "user", "content": "读取两份资料"},
+            {"role": "assistant", "content": [
+                {"type": "tool_use", "id": "first", "name": "Read", "input": {}},
+                {"type": "tool_use", "id": "second", "name": "Read", "input": {}}
+            ]},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "first"}]},
+            {"role": "system", "content": context},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "second"}]},
+            {"role": "assistant", "content": "已读取。"},
+            {"role": "user", "content": "继续。"}
+        ]});
+        let converted = convert_request(&request).unwrap();
+        assert!(converted.get("systemInstruction").is_none());
+        assert_eq!(
+            converted["contents"][2]["parts"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            converted["contents"][3]["parts"][0]["functionResponse"]["id"],
+            "second"
+        );
+        assert_eq!(converted["contents"][3]["parts"][1]["text"], context);
+        assert_eq!(converted["contents"][4]["role"], "model");
+    }
 
     #[test]
     fn messages_thinking_tier_prefers_valid_manual_budget() {

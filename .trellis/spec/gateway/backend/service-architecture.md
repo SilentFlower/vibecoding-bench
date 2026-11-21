@@ -1964,7 +1964,8 @@ transport.submit(prepared, body, ttfb_timeout).await
 
 ### 3. Contracts
 
-- 顶层 `system` 和消息列表中的 `system` 文本按顺序并为 Gemini 系统提示。图片沿原生媒体校验。普通函数调用和工具回填按 `tool_use_id` 对应，续轮补回已匹配原调用的真实模型签名。
+- 顶层 `system` 和历史 `system` 文本按顺序构成 Gemini 的 `systemInstruction`。同一轮已有用户内容时，历史 `system` 中以 `UserPromptSubmit hook additional context: ` 开头的 Claude Code 钩子文本作为 `text` Part 附在该轮最后一条用户内容末尾。字符串和文本块数组采用同一投影。等本轮用户内容收齐再附加，让分批工具结果排在钩子文本之前，并复用已有的系统提示和消息前缀。
+- 图片沿原生媒体校验。普通函数调用和工具回填按 `tool_use_id` 对应，续轮补回已匹配原调用的真实模型签名。
 - 正整数手动预算优先，沿 Gemini 的预算区间选择低、中、高档。否则 `effort` 的 `low`、`medium`、`high`、`xhigh` 对应同名档，`none` 和 `minimal` 对应低档，`max` 对应 `xhigh`。基础模型优先尝试目标档位，再用原来可接单的同系目录候选。显式型号按精确名称匹配。工具续轮复用原账号和实际档位。思考 token 数由所选原生型号决定。
 - AGY 返回的栅格图片 `inlineData` 按源 MIME 与 Base64 数据生成 Markdown 图片文本。Messages JSON 使用 `text` 内容块，SSE 使用 `text_delta`，都保留原 Part 顺序。原生 Gemini JSON 和 SSE 保留 `inlineData` 结构，原生 `thinkingConfig` 沿账号环境共同合同。
 - 会话依次使用正文中合法的显式值、`X-Claude-Code-Session-Id`、`X-Session-Id`。网关在反重力域内结合 API 令牌派生选号键，管理诊断显示原始 Session ID。待回填轮的搜索复用同令牌、显式会话、模型和查询所对应的原账号许可。该轮的相同查询复用原搜索回执，每次回包按请求的域名规则过滤。
@@ -1990,6 +1991,7 @@ transport.submit(prepared, body, ttfb_timeout).await
 
 ### 6. Tests Required
 
+- `messages_prompt_hook_*` 核对两种钩子文本形状的 `systemInstruction` 和历史前缀，以及普通系统提示和分批工具结果的顺序。
 - `verify_agy_native_loopback.py --image <离线测试镜像> --messages-search` 核对来源直链与跳转、允许域与禁止域、无域规则、重复查询、账号和工具回填 ID、取消清理。
 - 同一回环核对思考选号、目录缺档、显式档位和改 effort 后的同账号工具续轮。用同一图片源核对 Messages JSON 和 SSE 的 Markdown 数据及顺序，以及原生 Gemini 两种响应的原始 `inlineData` 和终态。
 - 加 `--claude-code <可执行文件>` 核对真实客户端 `searchCount=1`、来源链接和后续生成。真实 Google 联网由有授权的测试账号单独验收。
