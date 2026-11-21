@@ -24,6 +24,35 @@
 
 SQLite 固定维护入口为 `claude-code-gateway database-migrations plan|apply|verify --operation-id <UUID> --target-version <N>`。迁移台账、签名证据、两库恢复及错误合同统一见[平台自动迁移规范](../../platform/deploy/platform-online-update.md#scenario-自动数据库迁移与原操作恢复)。
 
+## Scenario: Gateway SQLite 池连接外键
+
+### 1. Scope / Trigger
+
+适用于 Gateway 数据库连接池初始化和依赖 SQLite 级联删除的存储入口。
+
+### 2. Signatures
+
+- `init_db(driver: &str, dsn: &str) -> Result<AnyPool, sqlx::Error>` 为 async。Gateway 启动及 SQLite 迁移验证复用此入口。
+
+### 3. Contracts
+
+- SQLite 分支在每条物理连接建好后、交给业务前执行 `PRAGMA foreign_keys=ON`，覆盖首次、扩容和替换连接。已有库和新建库共用回调。
+- WAL 按 SQLite 文件设置。PostgreSQL 走原 DSN 连接路径。
+
+### 4. Validation & Error Matrix
+
+- SQLite 建连及回调成功时交付连接。回调执行失败按 SQLx 建连错误处理，出错连接不交给业务。
+- 删除账号或代理时，由对应 SQLite 外键清理关联子行。
+
+### 5. Scenarios and Examples
+
+- 多条连接在并发删除时各自执行外键约束。被替换连接的后继连接也执行约束。
+- 在池上执行一次外键 PRAGMA 只处理该次查询借到的连接。连接级设置放在 `after_connect`。
+
+### 6. Tests Required
+
+- `sqlite_pool_enforces_foreign_keys_during_concurrent_deletes` 检查池中每条连接及替换连接的外键状态，在真实迁移后的库中并发删除账号与代理。断言其子行清空，其它实体的子行保留。
+
 ## Settings Key 契约
 
 新增 setting 必须同步：
