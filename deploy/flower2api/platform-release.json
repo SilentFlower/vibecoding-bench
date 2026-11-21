@@ -1,5 +1,5 @@
 {
   "schema_version": 1,
-  "version": "v1.29.1",
-  "changes": "反重力与 Claude Messages\n\n- 修复 Claude Code 续轮时，UserPromptSubmit 补充上下文被并入全局系统指令导致缓存前缀变化的问题。补充上下文随当轮用户消息发出，排在分批返回的工具结果之后。\n\n安装\n\n- 数据库版本为 Bench 6、Gateway 9。通过后台「系统更新」检查和安装。安装前收口进行中的 AGY 节点迁移，并按更新器提示迁回仍在远程运行的 AGY 账号。"
+  "version": "v1.29.2",
+  "changes": "反重力与 Claude Messages\n\n- Claude Code 工具续轮的 Read 文件读取截断提示随对应工具结果发出，保留原有系统指令和历史消息前缀。\n\n安装\n\n- 数据库版本为 Bench 6、Gateway 9。通过后台「系统更新」检查和安装。安装前收口进行中的 AGY 节点迁移，并按更新器提示迁回仍在远程运行的 AGY 账号。"
 }
